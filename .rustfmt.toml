@@ -1,0 +1,12 @@
+edition = "2021"
+version = "Two"
+max_width = 110
+# won't add \r\n on windows machines, better on diffs
+newline_style = "Unix"
+use_small_heuristics = "Max"
+tab_spaces = 2
+imports_granularity = "Crate"
+use_field_init_shorthand = true
+use_try_shorthand = true
+spaces_around_ranges = true
+overflow_delimited_expr = true
