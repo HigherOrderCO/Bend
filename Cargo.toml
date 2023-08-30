@@ -3,12 +3,10 @@ name = "hvm-lang"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 anyhow = "1.0.72"
 ariadne = "0.3.0"
 chumsky = "1.0.0-alpha.4"
-clap = {version = "4.4.1", features = ["derive"]}
+clap = { version = "4.4.1", features = ["derive"] }
 logos = "0.13.0"
 shrinkwraprs = "0.3.0"

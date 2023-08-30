@@ -13,14 +13,13 @@ use chumsky::{
   IterParser, Parser,
 };
 use logos::Logos;
-use std::collections::HashMap;
 
 pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Token>>> {
   let token_iter = Token::lexer(code).spanned().map(|(token, span)| match token {
-    Ok(t) => (t, SimpleSpan::from(span).into()),
-    Err(e) => (Token::Error(e), SimpleSpan::from(span).into()),
+    Ok(t) => (t, SimpleSpan::from(span)),
+    Err(e) => (Token::Error(e), SimpleSpan::from(span)),
   });
-  let token_stream = Stream::from_iter(token_iter).spanned(SimpleSpan::from(code.len() .. code.len()).into());
+  let token_stream = Stream::from_iter(token_iter).spanned(SimpleSpan::from(code.len() .. code.len()));
   book_parser().parse(token_stream).into_result()
 }
 
@@ -68,7 +67,7 @@ where
     Token::NotEquals => NumOper::Neq,
   };
 
-  let var = name.map(|name| Term::Var { name });
+  let var = name.map(|name| Term::Var { nam: name });
 
   let term = recursive(|term| {
     let nested = term
@@ -79,12 +78,12 @@ where
 
     let app = item
       .clone()
-      .foldl(item.clone().repeated(), |fun, arg| Term::App { func: Box::new(fun), arg: Box::new(arg) });
+      .foldl(item.clone().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
 
     let lam = just(Token::Lambda)
       .ignore_then(name)
       .then(term.clone())
-      .map(|(name, body)| Term::Lam { name, body: Box::new(body) });
+      .map(|(name, body)| Term::Lam { nam: name, bod: Box::new(body) });
 
     let dup = just(Token::Dup)
       .ignore_then(name)
@@ -93,7 +92,7 @@ where
       .then(term.clone())
       .then_ignore(just(Token::Semicolon))
       .then(term.clone())
-      .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), next: Box::new(next) });
+      .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) });
 
     let let_ = just(Token::Let)
       .ignore_then(name)
@@ -102,7 +101,7 @@ where
       .then_ignore(just(Token::Semicolon))
       .then(term.clone())
       .map(|((name, body), next)| Term::App {
-        func: Box::new(Term::Lam { name, body: next.into() }),
+        fun: Box::new(Term::Lam { nam: name, bod: next.into() }),
         arg: Box::new(body),
       });
 
@@ -138,14 +137,17 @@ where
     for (rule, rule_span) in rules {
       if let Some((crnt_def, def_span)) = crnt_def.as_mut() {
         if rule.name == crnt_def.name {
-          crnt_def.rules.push(rule);
-          def_span.end = rule_span.end;
+          emitter
+            .emit(Rich::custom(*def_span, format!("Definition with multiple rules '{}'", *crnt_def.name)));
+          // TODO: Enable definitions with multiple rules when implementing pattern matching
+          // crnt_def.rules.push(rule);
+          // def_span.end = rule_span.end;
         } else {
           let def = std::mem::replace(crnt_def, Definition { name: rule.name, rules: vec![] });
           add_to_def_book(&mut book, def, *def_span, emitter);
         }
       } else {
-        crnt_def = Some((Definition { name: rule.name, rules: vec![] }, rule_span));
+        crnt_def = Some((Definition { name: rule.name.clone(), rules: vec![rule] }, rule_span));
       }
     }
     if let Some((def, span)) = crnt_def {
@@ -154,14 +156,18 @@ where
     book
   }
 
-  fn add_to_def_book(book: &mut DefinitionBook, def: Definition, span: SimpleSpan, emitter: &mut Emitter<Rich<Token>>) {
-    if book.definitions.contains_key(&def.name) {
-      emitter.emit(Rich::custom(span, format!("Repeated definition '{}'", def.name.as_ref())));
+  fn add_to_def_book(
+    book: &mut DefinitionBook,
+    def: Definition,
+    span: SimpleSpan,
+    emitter: &mut Emitter<Rich<Token>>,
+  ) {
+    if book.defs.contains_key(&def.name) {
+      emitter.emit(Rich::custom(span, format!("Repeated definition '{}'", *def.name)));
     } else {
-      book.definitions.insert(def.name.clone(), def);
+      book.defs.insert(def.name.clone(), def);
     }
   }
-
 
   let parsed_rules =
     rule_parser().map_with_span(|rule, span| (rule, span)).repeated().collect::<Vec<(Rule, SimpleSpan)>>();

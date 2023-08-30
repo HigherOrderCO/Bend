@@ -21,7 +21,7 @@ pub enum Token {
   #[token("=")]
   Equals,
 
-  #[regex("[0-9]+", |lex| lex.slice().parse().map(|x| Number(x)).ok())]
+  #[regex("[0-9]+", |lex| lex.slice().parse().map(Number).ok())]
   Number(Number),
 
   #[token("+")]
@@ -80,7 +80,7 @@ pub enum Token {
 
   #[token(")")]
   RParen,
-  
+
   #[token("\n")]
   NewLine,
 

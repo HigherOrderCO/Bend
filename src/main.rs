@@ -16,7 +16,7 @@ fn main() -> anyhow::Result<()> {
   let args = Args::parse();
   let book = loader::load_file_to_book(&args.path)?;
   println!("{book:?}");
-  // let compiled = to_core::book_to_hvm_core(book)?;
-  // println!("{compiled}");
+  let compiled = to_core::book_to_hvm_core(&book)?;
+  println!("{compiled}");
   Ok(())
 }
