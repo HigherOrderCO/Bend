@@ -14,15 +14,6 @@ use chumsky::{
 };
 use logos::Logos;
 
-pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Token>>> {
-  let token_iter = Token::lexer(code).spanned().map(|(token, span)| match token {
-    Ok(t) => (t, SimpleSpan::from(span)),
-    Err(e) => (Token::Error(e), SimpleSpan::from(span)),
-  });
-  let token_stream = Stream::from_iter(token_iter).spanned(SimpleSpan::from(code.len() .. code.len()));
-  book_parser().parse(token_stream).into_result()
-}
-
 // TODO: Pattern matching on rules
 // TODO: Other types of numbers
 /// <Name>   ::= <name_token> // [_a-zA-Z][_a-zA-Z0-9]*
@@ -39,8 +30,28 @@ pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Toke
 /// <Rule>   ::= "(" <Name> ")" "=" <newline_token>* <Term> <newline_token>*
 /// <Def>    ::= (<Rule> <NewLine>)+
 /// <Book>   ::= <Def>+
+pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Token>>> {
+  let token_iter = Token::lexer(code).spanned().map(|(token, span)| match token {
+    Ok(t) => (t, SimpleSpan::from(span)),
+    Err(e) => (Token::Error(e), SimpleSpan::from(span)),
+  });
+  let token_stream = Stream::from_iter(token_iter).spanned(SimpleSpan::from(code.len() .. code.len()));
+  book_parser().parse(token_stream).into_result()
+}
 
-fn rule_parser<'a, I>() -> impl Parser<'a, I, Rule, extra::Err<Rich<'a, Token>>>
+pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
+  // TODO: Make a function that calls a parser. I couldn't figure out how to type it correctly.
+  let token_iter = Token::lexer(code).spanned().map(|(token, span)| match token {
+    Ok(t) => (t, SimpleSpan::from(span)),
+    Err(e) => (Token::Error(e), SimpleSpan::from(span)),
+  });
+  let token_stream = Stream::from_iter(token_iter).spanned(SimpleSpan::from(code.len() .. code.len()));
+  term_parser().parse(token_stream).into_result()
+}
+
+// Parsers
+
+fn term_parser<'a, I>() -> impl Parser<'a, I, Term, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -69,7 +80,7 @@ where
 
   let var = name.map(|name| Term::Var { nam: name });
 
-  let term = recursive(|term| {
+  recursive(|term| {
     let nested = term
       .clone()
       .delimited_by(just(Token::LParen).then(new_line.clone()), just(Token::RParen).then(new_line.clone()));
@@ -112,13 +123,21 @@ where
     });
 
     choice((lam, app, dup, let_, num_op, item))
-  });
+  })
+}
+
+fn rule_parser<'a, I>() -> impl Parser<'a, I, Rule, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  let name = select!(Token::Name(name) => Name(name.to_string()));
+  let new_line = just(Token::NewLine).repeated();
 
   just(Token::LParen)
     .ignore_then(name)
     .then_ignore(just(Token::RParen))
     .then_ignore(just(Token::Equals))
-    .then(term.delimited_by(new_line.clone(), new_line.clone()))
+    .then(term_parser().delimited_by(new_line.clone(), new_line.clone()))
     .map(|(name, body)| Rule { name, pats: vec![], body })
 }
 

@@ -21,9 +21,9 @@ pub struct Rule {
 
 #[derive(Debug, Clone)]
 pub enum Pattern {
-  Ctr(Name, Vec<Pattern>),
-  Num(Number),
-  Var(Name),
+  _Ctr(Name, Vec<Pattern>),
+  _Num(Number),
+  _Var(Name),
 }
 
 #[derive(Debug, Clone)]

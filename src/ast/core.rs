@@ -1,6 +1,7 @@
+use super::DefId;
+use itertools::Itertools;
 use std::{collections::HashMap, fmt};
 
-use super::DefId;
 pub struct Book {
   pub defs: HashMap<DefId, LNet>,
 }
@@ -9,8 +10,8 @@ pub struct Book {
 
 #[derive(Debug)]
 pub struct LNet {
-  root: LTree,
-  acts: LActs,
+  pub root: LTree,
+  pub acts: LActs,
 }
 
 #[derive(Debug)]
@@ -83,10 +84,10 @@ pub fn u32_to_name(num: u32) -> String {
 
 impl fmt::Display for LNet {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    writeln!(f, "  $ {}", self.root)?;
+    write!(f, "$ {}", self.root)?;
     for (a, b) in &self.acts {
-      writeln!(f, "  & {}", a)?;
-      writeln!(f, "  ~ {}", b)?;
+      write!(f, "\n& {}", a)?;
+      write!(f, "\n~ {}", b)?;
     }
     Ok(())
   }
@@ -108,24 +109,23 @@ impl fmt::Display for Book {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     for (id, net) in &self.defs {
       writeln!(f, "{} =", u32_to_name(**id))?;
-      writeln!(f, "{}\n", net)?;
+      writeln!(f, "{}\n", net.to_string().split('\n').map(|x| format!("  {x}")).join("\n"))?;
     }
     Ok(())
   }
 }
 
 pub type Tag = u8;
-pub type Val = u32;
-
-pub const NIL: Tag = 0x0; // empty node
-pub const REF: Tag = 0x1; // reference to a definition (closed net)
-pub const NUM: Tag = 0x2; // unboxed number
-pub const ERA: Tag = 0x3; // unboxed eraser
-pub const VRR: Tag = 0x4; // variable pointing to root
-pub const VR1: Tag = 0x5; // variable pointing to aux1 port of node
-pub const VR2: Tag = 0x6; // variable pointing to aux2 port of node
-pub const RDT: Tag = 0x7; // redirection to root
-pub const RD1: Tag = 0x8; // redirection to aux1 port of node
-pub const RD2: Tag = 0x9; // redirection to aux2 port of node
+// Not used in hvm-core AST
+// pub const NIL: Tag = 0x0; // empty node
+// pub const REF: Tag = 0x1; // reference to a definition (closed net)
+// pub const NUM: Tag = 0x2; // unboxed number
+// pub const ERA: Tag = 0x3; // unboxed eraser
+// pub const VRR: Tag = 0x4; // variable pointing to root
+// pub const VR1: Tag = 0x5; // variable pointing to aux1 port of node
+// pub const VR2: Tag = 0x6; // variable pointing to aux2 port of node
+// pub const RDT: Tag = 0x7; // redirection to root
+// pub const RD1: Tag = 0x8; // redirection to aux1 port of node
+// pub const RD2: Tag = 0x9; // redirection to aux2 port of node
 pub const CON: Tag = 0xA; // points to main port of con node
 pub const DUP: Tag = 0xB; // points to main port of dup node; higher labels also dups

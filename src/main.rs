@@ -1,10 +1,10 @@
 use clap::Parser;
 use std::path::PathBuf;
 
-mod ast;
-mod loader;
-mod parser;
-mod to_core;
+pub mod ast;
+pub mod loader;
+pub mod parser;
+pub mod to_core;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

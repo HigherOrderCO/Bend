@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use crate::ast::{DefId, Name, Term};
+use crate::ast::{
+  self,
+  core::{LNet, LTree},
+  DefId, Name, Term,
+};
 
 #[derive(Clone, Debug)]
 /// Net representation used only as an intermediate for converting to hvm-core format
@@ -208,4 +212,129 @@ fn encode_term(
       Ok(port(node, 2))
     }
   }
+}
+
+pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
+  let tree_roots = get_tree_roots(inet);
+  let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
+  let root = compat_tree_to_hvm_tree(inet, tree_roots[1], &mut port_to_var_id);
+  let mut acts = vec![];
+  for active_pair in tree_roots[2 ..].chunks_exact(2) {
+    let act1 = compat_tree_to_hvm_tree(inet, active_pair[0], &mut port_to_var_id);
+    let act2 = compat_tree_to_hvm_tree(inet, active_pair[1], &mut port_to_var_id);
+    acts.push((act1, act2));
+  }
+  Ok(LNet { root, acts })
+}
+
+type TreeId = NodeId;
+type VarId = u32;
+
+/// Returns a list of all the tree node roots in the compat inet.
+fn get_tree_roots(inet: &INet) -> Vec<NodeId> {
+  let mut node_to_tree_id: Vec<Option<TreeId>> = vec![None; inet.nodes.len() / 4];
+  let mut tree_roots: Vec<NodeId> = vec![addr(ROOT), addr(enter(inet, ROOT))];
+  let mut side_links: Vec<Port> = vec![]; // Links between trees
+
+  // Start by mapping the root tree
+  go_down_tree(inet, tree_roots[1], 0, &mut node_to_tree_id, &mut side_links);
+  // Check each side-link for a possible new tree pair;
+  while let Some(dest_port) = side_links.pop() {
+    let dest_node = addr(dest_port);
+    // Only go up unmarked trees
+    if node_to_tree_id[dest_node as usize].is_none() {
+      let (new_tree1, new_tree2) = go_up_tree(inet, dest_node);
+      go_down_tree(inet, new_tree1, tree_roots.len() as TreeId, &mut node_to_tree_id, &mut side_links);
+      tree_roots.push(new_tree1);
+      go_down_tree(inet, new_tree2, tree_roots.len() as TreeId, &mut node_to_tree_id, &mut side_links);
+      tree_roots.push(new_tree2);
+    }
+  }
+
+  tree_roots
+}
+
+/// Go down a node tree, marking all nodes with the tree_id and storing any side_links found.
+fn go_down_tree(
+  inet: &INet,
+  root: NodeId,
+  tree_id: TreeId,
+  node_to_tree_id: &mut [Option<NodeId>],
+  side_links: &mut Vec<Port>,
+) {
+  let mut nodes_to_check = vec![root];
+  while let Some(node) = nodes_to_check.pop() {
+    node_to_tree_id[node as usize] = Some(tree_id);
+    for down_slot in [1, 2] {
+      let down_port = enter(inet, port(node, down_slot));
+      if slot(down_port) == 0 {
+        // If this down-link is to a main port, this is a node of the same tree
+        nodes_to_check.push(addr(down_port));
+      } else {
+        // Otherwise it's a side-link
+        side_links.push(down_port);
+      }
+    }
+  }
+}
+
+/// Goes up a node tree, starting from some given node.
+/// Returns the root of this tree and the root of its active pair.
+fn go_up_tree(inet: &INet, start_node: NodeId) -> (NodeId, NodeId) {
+  let mut crnt_node = start_node;
+  loop {
+    let up_port = enter(inet, port(crnt_node, 0));
+    let up_node = addr(up_port);
+    if slot(up_port) == 0 {
+      return (crnt_node, up_node);
+    } else {
+      crnt_node = up_node;
+    }
+  }
+}
+
+fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashMap<Port, VarId>) -> LTree {
+  let kind = kind(inet, root);
+  let tag = kind & TAG_MASK;
+  let label = kind & LABEL_MASK; // TODO: Check if label too high, do something about it.
+  match tag {
+    ERA => LTree::Era,
+    CON => LTree::Nod {
+      tag: ast::core::CON,
+      lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
+      rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
+    },
+    DUP => LTree::Nod {
+      tag: ast::core::DUP + label as u8,
+      lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
+      rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
+    },
+    REF => LTree::Ref { nam: label },
+    NUM => LTree::Num { val: enter(inet, port(root, 1)) },
+    NUMOP => todo!(), // TODO: HVM2 doesn't have numeric operator atm.
+    _ => unreachable!(),
+  }
+}
+
+fn var_or_subtree(inet: &INet, src_port: Port, port_to_var_id: &mut HashMap<Port, VarId>) -> LTree {
+  let dst_port = enter(inet, src_port);
+  if slot(dst_port) == 0 {
+    // Subtree
+    compat_tree_to_hvm_tree(inet, addr(dst_port), port_to_var_id)
+  } else {
+    // Var
+    if let Some(&var_id) = port_to_var_id.get(&src_port) {
+      // Previously found var
+      LTree::Var { nam: var_id_to_name(var_id) }
+    } else {
+      // New var
+      let var_id = port_to_var_id.len() as u32;
+      port_to_var_id.insert(dst_port, var_id);
+      LTree::Var { nam: var_id_to_name(var_id) }
+    }
+  }
+}
+
+fn var_id_to_name(var_id: VarId) -> String {
+  format!("x{var_id}")
 }
