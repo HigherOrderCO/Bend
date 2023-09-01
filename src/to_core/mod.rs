@@ -8,7 +8,6 @@ pub fn book_to_hvm_core(book: &DefinitionBook) -> anyhow::Result<ast::core::Book
   let def_to_id = HashMap::from_iter(book.defs.keys().map(|name| (name.clone(), DefId(name_to_u32(name)))));
   let mut core_book = ast::core::Book { defs: HashMap::new() };
   for (name, def) in book.defs.iter() {
-    println!("Starting to term to core conversion");
     let net = definition_to_hvm_core(def, &def_to_id)?;
     core_book.defs.insert(def_to_id[name], net);
   }

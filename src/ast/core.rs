@@ -107,7 +107,7 @@ impl fmt::Display for LTree {
 
 impl fmt::Display for Book {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    for (id, net) in &self.defs {
+    for (id, net) in self.defs.iter().sorted_unstable_by_key(|(id, _)| *id) {
       writeln!(f, "{} =", u32_to_name(**id))?;
       writeln!(f, "{}\n", net.to_string().split('\n').map(|x| format!("  {x}")).join("\n"))?;
     }
