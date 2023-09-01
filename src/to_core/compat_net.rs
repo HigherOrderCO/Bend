@@ -65,11 +65,6 @@ pub fn enter(inet: &INet, port: Port) -> Port {
   inet.nodes[port as usize]
 }
 
-/// Enters a slot on the node pointed by this port.
-pub fn get(inet: &INet, p: Port, s: SlotId) -> Port {
-  enter(inet, port(addr(p), s))
-}
-
 /// Kind of the node.
 pub fn kind(inet: &INet, node: NodeId) -> NodeKind {
   inet.nodes[port(node, 3) as usize]
@@ -215,56 +210,68 @@ fn encode_term(
 }
 
 pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
-  let tree_roots = get_tree_roots(inet);
+  let (root_root, acts_roots) = get_tree_roots(inet);
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
-  let root = compat_tree_to_hvm_tree(inet, tree_roots[1], &mut port_to_var_id);
+  let root = if let Some(root_root) = root_root {
+    // If there is a root tree connected to the root node
+    compat_tree_to_hvm_tree(inet, root_root, &mut port_to_var_id)
+  } else {
+    // If the root node points to some aux port (application)
+    port_to_var_id.insert(enter(inet, ROOT), 0);
+    LTree::Var { nam: var_id_to_name(0) }
+  };
   let mut acts = vec![];
-  for active_pair in tree_roots[2 ..].chunks_exact(2) {
-    let act1 = compat_tree_to_hvm_tree(inet, active_pair[0], &mut port_to_var_id);
-    let act2 = compat_tree_to_hvm_tree(inet, active_pair[1], &mut port_to_var_id);
-    acts.push((act1, act2));
+  for [root0, root1] in acts_roots {
+    let act0 = compat_tree_to_hvm_tree(inet, root0, &mut port_to_var_id);
+    let act1 = compat_tree_to_hvm_tree(inet, root1, &mut port_to_var_id);
+    acts.push((act0, act1));
   }
   Ok(LNet { root, acts })
 }
 
-type TreeId = NodeId;
 type VarId = u32;
 
 /// Returns a list of all the tree node roots in the compat inet.
-fn get_tree_roots(inet: &INet) -> Vec<NodeId> {
-  let mut node_to_tree_id: Vec<Option<TreeId>> = vec![None; inet.nodes.len() / 4];
-  let mut tree_roots: Vec<NodeId> = vec![addr(ROOT), addr(enter(inet, ROOT))];
+fn get_tree_roots(inet: &INet) -> (Option<NodeId>, Vec<[NodeId; 2]>) {
+  let mut acts_roots: Vec<[NodeId; 2]> = vec![];
+  let mut explored_nodes = vec![false; inet.nodes.len() / 4];
   let mut side_links: Vec<Port> = vec![]; // Links between trees
 
-  // Start by mapping the root tree
-  go_down_tree(inet, tree_roots[1], 0, &mut node_to_tree_id, &mut side_links);
+  // Start by checking the root tree (if any)
+  explored_nodes[addr(ROOT) as usize] = true;
+  let root_link = enter(inet, ROOT);
+  let root_root = if slot(root_link) == 0 {
+    // If the root node is connected to a main port, we have a root tree
+    let root_node = addr(root_link);
+    go_down_tree(inet, root_node, &mut explored_nodes, &mut side_links);
+    Some(root_node)
+  } else {
+    // Otherwise, root node connected to an aux port, no root tree.
+    side_links.push(root_link);
+    None
+  };
+
   // Check each side-link for a possible new tree pair;
   while let Some(dest_port) = side_links.pop() {
     let dest_node = addr(dest_port);
     // Only go up unmarked trees
-    if node_to_tree_id[dest_node as usize].is_none() {
-      let (new_tree1, new_tree2) = go_up_tree(inet, dest_node);
-      go_down_tree(inet, new_tree1, tree_roots.len() as TreeId, &mut node_to_tree_id, &mut side_links);
-      tree_roots.push(new_tree1);
-      go_down_tree(inet, new_tree2, tree_roots.len() as TreeId, &mut node_to_tree_id, &mut side_links);
-      tree_roots.push(new_tree2);
+    if !explored_nodes[dest_node as usize] {
+      let new_roots = go_up_tree(inet, dest_node);
+      go_down_tree(inet, new_roots[0], &mut explored_nodes, &mut side_links);
+      go_down_tree(inet, new_roots[1], &mut explored_nodes, &mut side_links);
+      acts_roots.push(new_roots);
     }
   }
 
-  tree_roots
+  (root_root, acts_roots)
 }
 
 /// Go down a node tree, marking all nodes with the tree_id and storing any side_links found.
-fn go_down_tree(
-  inet: &INet,
-  root: NodeId,
-  tree_id: TreeId,
-  node_to_tree_id: &mut [Option<NodeId>],
-  side_links: &mut Vec<Port>,
-) {
+fn go_down_tree(inet: &INet, root: NodeId, explored_nodes: &mut [bool], side_links: &mut Vec<Port>) {
+  debug_assert!(!explored_nodes[root as usize], "Explored same tree twice");
   let mut nodes_to_check = vec![root];
   while let Some(node) = nodes_to_check.pop() {
-    node_to_tree_id[node as usize] = Some(tree_id);
+    explored_nodes[node as usize] = true;
     for down_slot in [1, 2] {
       let down_port = enter(inet, port(node, down_slot));
       if slot(down_port) == 0 {
@@ -280,13 +287,13 @@ fn go_down_tree(
 
 /// Goes up a node tree, starting from some given node.
 /// Returns the root of this tree and the root of its active pair.
-fn go_up_tree(inet: &INet, start_node: NodeId) -> (NodeId, NodeId) {
+fn go_up_tree(inet: &INet, start_node: NodeId) -> [NodeId; 2] {
   let mut crnt_node = start_node;
   loop {
     let up_port = enter(inet, port(crnt_node, 0));
     let up_node = addr(up_port);
     if slot(up_port) == 0 {
-      return (crnt_node, up_node);
+      return [crnt_node, up_node];
     } else {
       crnt_node = up_node;
     }

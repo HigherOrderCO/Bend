@@ -27,8 +27,8 @@ use logos::Logos;
 /// <Let>    ::= "let" <Name> "=" <Term> ";" <Term>
 /// <NumOp>  ::= <numop_token> <Item> <Item>
 /// <Term>   ::= <Lam> | <App> | <Dup> | <Let> | <NumOp> | <Item>
-/// <Rule>   ::= "(" <Name> ")" "=" <newline_token>* <Term> <newline_token>*
-/// <Def>    ::= (<Rule> <NewLine>)+
+/// <Rule>   ::= "(" <Name> ")" "=" <newline_token>* <Term>
+/// <Def>    ::= <Rule> (<NewLine>+ <Rule>)*
 /// <Book>   ::= <Def>+
 pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Token>>> {
   let token_iter = Token::lexer(code).spanned().map(|(token, span)| match token {
@@ -83,7 +83,7 @@ where
   recursive(|term| {
     let nested = term
       .clone()
-      .delimited_by(just(Token::LParen).then(new_line.clone()), just(Token::RParen).then(new_line.clone()));
+      .delimited_by(just(Token::LParen).then(new_line.clone()), just(Token::RParen).then(new_line));
 
     let item = choice((var, number, nested));
 
@@ -131,13 +131,13 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   let name = select!(Token::Name(name) => Name(name.to_string()));
-  let new_line = just(Token::NewLine).repeated();
 
   just(Token::LParen)
     .ignore_then(name)
     .then_ignore(just(Token::RParen))
     .then_ignore(just(Token::Equals))
-    .then(term_parser().delimited_by(new_line.clone(), new_line.clone()))
+    .then_ignore(just(Token::NewLine).repeated())
+    .then(term_parser())
     .map(|(name, body)| Rule { name, pats: vec![], body })
 }
 
@@ -151,45 +151,32 @@ where
     emitter: &mut Emitter<Rich<Token>>,
   ) -> DefinitionBook {
     let mut book = DefinitionBook::new();
-    let mut crnt_def: Option<(Definition, SimpleSpan)> = None;
+
     // Check for repeated defs (could be rules out of order or actually repeated names)
-    for (rule, rule_span) in rules {
-      if let Some((crnt_def, def_span)) = crnt_def.as_mut() {
-        if rule.name == crnt_def.name {
-          emitter
-            .emit(Rich::custom(*def_span, format!("Definition with multiple rules '{}'", *crnt_def.name)));
-          // TODO: Enable definitions with multiple rules when implementing pattern matching
-          // crnt_def.rules.push(rule);
-          // def_span.end = rule_span.end;
-        } else {
-          let def = std::mem::replace(crnt_def, Definition { name: rule.name, rules: vec![] });
-          add_to_def_book(&mut book, def, *def_span, emitter);
-        }
+    for def_rules in rules.group_by(|(rule1, _), (rule2, _)| rule1.name == rule2.name) {
+      if def_rules.len() > 1 {
+        // TODO: Enable definitions with multiple rules when implementing pattern matching
+        let def_span = SimpleSpan::new(def_rules.first().unwrap().1.start, def_rules.last().unwrap().1.end);
+        emitter
+          .emit(Rich::custom(def_span, format!("Definition with multiple rules '{}'", *def_rules[0].0.name)));
       } else {
-        crnt_def = Some((Definition { name: rule.name.clone(), rules: vec![rule] }, rule_span));
+        let (rule, span) = &def_rules[0];
+        let def = Definition { name: rule.name.clone(), rules: vec![rule.clone()] };
+        if book.defs.contains_key(&def.name) {
+          emitter.emit(Rich::custom(*span, format!("Repeated definition '{}'", *def.name)));
+        } else {
+          book.defs.insert(def.name.clone(), def);
+        }
       }
-    }
-    if let Some((def, span)) = crnt_def {
-      add_to_def_book(&mut book, def, span, emitter);
     }
     book
   }
 
-  fn add_to_def_book(
-    book: &mut DefinitionBook,
-    def: Definition,
-    span: SimpleSpan,
-    emitter: &mut Emitter<Rich<Token>>,
-  ) {
-    if book.defs.contains_key(&def.name) {
-      emitter.emit(Rich::custom(span, format!("Repeated definition '{}'", *def.name)));
-    } else {
-      book.defs.insert(def.name.clone(), def);
-    }
-  }
+  let parsed_rules = rule_parser()
+    .map_with_span(|rule, span| (rule, span))
+    .then_ignore(just(Token::NewLine).repeated().at_least(1))
+    .repeated()
+    .collect::<Vec<(Rule, SimpleSpan)>>();
 
-  let parsed_rules =
-    rule_parser().map_with_span(|rule, span| (rule, span)).repeated().collect::<Vec<(Rule, SimpleSpan)>>();
-
-  parsed_rules.validate(move |rules, span, emitter| rules_to_book(rules, span, emitter))
+  parsed_rules.validate(rules_to_book)
 }

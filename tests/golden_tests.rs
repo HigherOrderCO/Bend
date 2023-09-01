@@ -1,9 +1,16 @@
-use hvm_lang::{loader::print_err_reports, parser::parse_term, to_core::term_to_hvm_core};
+use hvm_lang::{
+  loader::print_err_reports,
+  parser::{parse_definition_book, parse_term},
+  to_core::{book_to_hvm_core, term_to_hvm_core},
+};
 use pretty_assertions::assert_eq;
 use std::{collections::HashMap, fs, io::Write, path::Path};
 use walkdir::WalkDir;
 
-fn run_single_golden_test(path: &Path, run: &dyn Fn(&Path, &str) -> anyhow::Result<String>) -> anyhow::Result<()> {
+fn run_single_golden_test(
+  path: &Path,
+  run: &dyn Fn(&Path, &str) -> anyhow::Result<String>,
+) -> anyhow::Result<()> {
   let code = fs::read_to_string(path)?;
   let result = run(path, &code)?;
   let golden_path = path.with_extension("golden");
@@ -37,6 +44,19 @@ fn single_terms() {
       anyhow::anyhow!("Parsing error")
     })?;
     let net = term_to_hvm_core(&term, &HashMap::new())?;
+    Ok(net.to_string())
+  })
+}
+
+#[test]
+fn single_files() {
+  let root = format!("{}/tests/golden_tests/single_files", env!("CARGO_MANIFEST_DIR"));
+  run_golden_test_dir(Path::new(&root), &|path, code| {
+    let book = parse_definition_book(code).map_err(|errs| {
+      print_err_reports(&path.to_string_lossy(), code, errs);
+      anyhow::anyhow!("Parsing error")
+    })?;
+    let net = book_to_hvm_core(&book)?;
     Ok(net.to_string())
   })
 }
