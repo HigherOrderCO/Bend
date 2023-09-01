@@ -28,8 +28,8 @@ use logos::Logos;
 /// <NumOp>  ::= <numop_token> <Item> <Item>
 /// <Term>   ::= <Lam> | <App> | <Dup> | <Let> | <NumOp> | <Item>
 /// <Rule>   ::= "(" <Name> ")" "=" <newline_token>* <Term>
-/// <Def>    ::= <Rule> (<NewLine>+ <Rule>)*
-/// <Book>   ::= <Def>+
+/// <Def>    ::= <NewLine>* <Rule> (<NewLine>+ <Rule>)*
+/// <Book>   ::= <Def>+ // Sequential rules grouped by name
 pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Token>>> {
   let token_iter = Token::lexer(code).spanned().map(|(token, span)| match token {
     Ok(t) => (t, SimpleSpan::from(span)),
@@ -83,7 +83,8 @@ where
   recursive(|term| {
     let nested = term
       .clone()
-      .delimited_by(just(Token::LParen).then(new_line.clone()), just(Token::RParen).then(new_line));
+      .delimited_by(new_line.clone(), new_line)
+      .delimited_by(just(Token::LParen), just(Token::RParen));
 
     let item = choice((var, number, nested));
 
@@ -172,10 +173,13 @@ where
     book
   }
 
+  let new_line = just(Token::NewLine).repeated();
+
   let parsed_rules = rule_parser()
     .map_with_span(|rule, span| (rule, span))
-    .then_ignore(just(Token::NewLine).repeated().at_least(1))
-    .repeated()
+    .separated_by(new_line.clone().at_least(1))
+    .allow_leading()
+    .allow_trailing()
     .collect::<Vec<(Rule, SimpleSpan)>>();
 
   parsed_rules.validate(rules_to_book)
