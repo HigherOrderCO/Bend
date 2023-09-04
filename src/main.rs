@@ -30,9 +30,9 @@ fn main() -> anyhow::Result<()> {
   let mut def = Book::new();
 
   let _def_book = compiled.defs.iter().for_each(|(name, term)| {
-    ({
+    {
       define(&mut def, (u64_to_name(**name as u64)).as_str(), term.to_string().as_str());
-    })
+    }
   });
 
   let net = &mut Net::new(1 << 26);
