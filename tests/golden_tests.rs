@@ -43,7 +43,7 @@ fn single_terms() {
       print_err_reports(&path.to_string_lossy(), code, errs);
       anyhow::anyhow!("Parsing error")
     })?;
-    let net = term_to_hvm_core(&term, &HashMap::new())?;
+    let net = term_to_hvm_core(term, &HashMap::new())?;
     Ok(net.to_string())
   })
 }

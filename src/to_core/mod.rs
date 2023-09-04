@@ -1,3 +1,4 @@
+mod affine;
 mod compat_net;
 
 use self::compat_net::{compat_net_to_core, term_to_compat_net};
@@ -19,10 +20,11 @@ pub fn definition_to_hvm_core(
   def_to_id: &HashMap<Name, DefId>,
 ) -> anyhow::Result<ast::core::LNet> {
   // TODO: Multiple rules, pattern matching, etc.
-  term_to_hvm_core(&definition.rules[0].body, def_to_id)
+  term_to_hvm_core(definition.rules[0].body.clone(), def_to_id)
 }
 
-pub fn term_to_hvm_core(term: &Term, def_to_id: &HashMap<Name, DefId>) -> anyhow::Result<ast::core::LNet> {
-  let compat_net = term_to_compat_net(term, def_to_id)?;
+pub fn term_to_hvm_core(term: Term, def_to_id: &HashMap<Name, DefId>) -> anyhow::Result<ast::core::LNet> {
+  let term = term.try_into_affine(&def_to_id.keys().cloned().collect())?;
+  let compat_net = term_to_compat_net(&term, def_to_id)?;
   compat_net_to_core(&compat_net)
 }

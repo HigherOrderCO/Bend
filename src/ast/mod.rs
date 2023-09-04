@@ -3,9 +3,10 @@ pub mod hvm_lang;
 
 pub use hvm_lang::{Definition, DefinitionBook, NumOper, Rule, Term};
 
+use derive_more::{Display, From, Into};
 use shrinkwraprs::Shrinkwrap;
 
-#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
 pub struct Name(pub String);
 
 // TODO: Accept other number types
