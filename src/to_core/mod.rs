@@ -6,7 +6,7 @@ use crate::ast::{
   core::{Book, LNet},
   DefId, Definition, DefinitionBook, Name, Term,
 };
-use hvm2::lang::name_to_u64;
+use hvm2::lang::{lnet_to_net, name_to_u64};
 use std::collections::HashMap;
 
 pub fn book_to_hvm_core(book: &DefinitionBook) -> anyhow::Result<Book> {
@@ -31,4 +31,18 @@ pub fn term_to_hvm_core(term: Term, def_to_id: &HashMap<Name, DefId>) -> anyhow:
   let term = term.try_into_affine(&def_to_id.keys().cloned().collect())?;
   let compat_net = term_to_compat_net(&term, def_to_id)?;
   compat_net_to_core(&compat_net)
+}
+
+pub fn book_to_hvm_internal(book: Book) -> (hvm2::core::Net, hvm2::core::Book) {
+  let mut hvm_book = hvm2::core::Book::new();
+
+  book.defs.iter().for_each(|(&name, term)| {
+    hvm_book.def(*name, lnet_to_net(term));
+  });
+
+  // TODO: Fix this mess
+  let mut root = hvm2::core::Net::new(1 << 26);
+  root.init(name_to_u64("Main"));
+
+  (root, hvm_book)
 }

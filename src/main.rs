@@ -1,7 +1,8 @@
 #![feature(slice_group_by)]
 
 use clap::Parser;
-use std::path::PathBuf;
+use hvm2::lang::show_net;
+use std::{path::PathBuf, time::Instant};
 
 pub mod ast;
 pub mod loader;
@@ -36,14 +37,30 @@ fn main() -> anyhow::Result<()> {
     println!("{book:?}");
   }
 
-  let compiled = to_core::book_to_hvm_core(&book)?;
+  let core_book = to_core::book_to_hvm_core(&book)?;
 
   if args.compile {
-    println!("{compiled}");
+    println!("{core_book}");
   }
 
   if args.run {
-    todo!()
+    let (mut root, runtime_book) = to_core::book_to_hvm_internal(core_book);
+
+    let start_time = Instant::now();
+    // Computes its normal form
+    root.normalize(&runtime_book);
+
+    let elapsed = start_time.elapsed().as_secs_f64();
+    // Shows results and stats
+
+    println!("[net]\n{}", show_net(&root));
+    println!("size: {}", root.node.len());
+    println!("used: {}", root.used);
+    let cost = root.rwts;
+
+    let rps = cost as f64 / elapsed / 1_000_000.0;
+
+    println!("Time: {elapsed:.3}s | Rwts: {cost} | RPS: {rps:.3}m");
   }
 
   Ok(())
