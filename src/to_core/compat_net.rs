@@ -1,35 +1,34 @@
-use std::collections::HashMap;
-
 use crate::ast::{
   self,
-  core::{LNet, LTree},
+  core::{LNet, LTree, Tag},
   DefId, Name, Term,
 };
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 /// Net representation used only as an intermediate for converting to hvm-core format
 pub struct INet {
-  pub nodes: Vec<u32>,
+  pub nodes: Vec<NodeVal>,
 }
 
-pub type NodeKind = u32;
-
-/// A port is just a u32 combining address (30 bits) and slot (2 bits).
-pub type Port = u32;
-pub type NodeId = u32;
-pub type SlotId = u32;
+type NodeVal = u64;
+type NodeKind = NodeVal;
+type Port = NodeVal;
+type NodeId = NodeVal;
+type SlotId = NodeVal;
 
 /// The ROOT port is on the deadlocked root node at address 0.
-pub const ROOT: Port = 1;
-pub const TAG: NodeKind = 28;
-pub const ERA: NodeKind = 0 << TAG;
-pub const CON: NodeKind = 1 << TAG;
-pub const DUP: NodeKind = 2 << TAG;
-pub const REF: NodeKind = 3 << TAG;
-pub const NUM: NodeKind = 4 << TAG;
-pub const NUMOP: NodeKind = 5 << TAG;
-pub const LABEL_MASK: NodeKind = (1 << TAG) - 1;
-pub const TAG_MASK: NodeKind = !LABEL_MASK;
+const ROOT: Port = 1;
+const TAG_WIDTH: u32 = Tag::BITS;
+const TAG: u32 = 64 - TAG_WIDTH;
+const ERA: NodeKind = 0 << TAG;
+const CON: NodeKind = 1 << TAG;
+const DUP: NodeKind = 2 << TAG;
+const REF: NodeKind = 3 << TAG;
+const NUM: NodeKind = 4 << TAG;
+const NUMOP: NodeKind = 5 << TAG;
+const LABEL_MASK: NodeKind = (1 << TAG) - 1;
+const TAG_MASK: NodeKind = !LABEL_MASK;
 
 /// Create a new net, with a deadlocked root node.
 pub fn new_inet() -> INet {
@@ -113,7 +112,7 @@ fn encode_term(
   up: Port,
   scope: &mut HashMap<Name, Vec<usize>>,
   vars: &mut Vec<(Port, Option<Port>)>,
-  dups: &mut u32,
+  dups: &mut NodeId,
   def_to_id: &HashMap<Name, DefId>,
 ) -> anyhow::Result<Port> {
   match term {
@@ -151,7 +150,7 @@ fn encode_term(
     // - 1: points to the occurrence of the first variable.
     // - 2: points to the occurrence of the second variable.
     Term::Dup { fst, snd, val, nxt } => {
-      let dup = new_node(inet, DUP + *dups);
+      let dup = new_node(inet, DUP | *dups);
       *dups += 1;
       let val = encode_term(inet, val, port(dup, 0), scope, vars, dups, def_to_id)?;
       link(inet, val, port(dup, 0));
@@ -199,7 +198,7 @@ fn encode_term(
       Ok(port(node, 0))
     }
     Term::NumOp { op, fst, snd } => {
-      let node = new_node(inet, NUMOP | u8::from(*op) as u32);
+      let node = new_node(inet, NUMOP | u8::from(*op) as NodeKind);
       let fst = encode_term(inet, fst, port(node, 0), scope, vars, dups, def_to_id)?;
       link(inet, port(node, 0), fst);
       let snd = encode_term(inet, snd, port(node, 1), scope, vars, dups, def_to_id)?;
@@ -229,7 +228,7 @@ pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
   Ok(LNet { root, acts })
 }
 
-type VarId = u32;
+type VarId = NodeId;
 
 /// Returns a list of all the tree node roots in the compat inet.
 fn get_tree_roots(inet: &INet) -> (Option<NodeId>, Vec<[NodeId; 2]>) {
@@ -312,12 +311,12 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
     DUP => LTree::Nod {
-      tag: ast::core::DUP + label as u8,
+      tag: ast::core::DUP + label as Tag,
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
     REF => LTree::Ref { nam: label },
-    NUM => LTree::Num { val: enter(inet, port(root, 1)) },
+    NUM => LTree::NUM { val: enter(inet, port(root, 1)) },
     NUMOP => todo!(), // TODO: HVM2 doesn't have numeric operator atm.
     _ => unreachable!("{tag:x}"),
   }
@@ -335,7 +334,7 @@ fn var_or_subtree(inet: &INet, src_port: Port, port_to_var_id: &mut HashMap<Port
       LTree::Var { nam: var_id_to_name(var_id) }
     } else {
       // New var
-      let var_id = port_to_var_id.len() as u32;
+      let var_id = port_to_var_id.len() as VarId;
       port_to_var_id.insert(dst_port, var_id);
       LTree::Var { nam: var_id_to_name(var_id) }
     }

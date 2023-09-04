@@ -222,11 +222,20 @@ dependencies = [
  "chumsky",
  "clap",
  "derive_more",
+ "hvm2",
  "itertools 0.11.0",
  "logos",
  "pretty_assertions",
  "shrinkwraprs",
  "walkdir",
+]
+
+[[package]]
+name = "hvm2"
+version = "0.1.0"
+source = "git+https://github.com/developedby/HVM2.git#466837f4df2256f4fc14efac9599de1748bd826d"
+dependencies = [
+ "nohash",
 ]
 
 [[package]]
@@ -284,6 +293,12 @@ checksum = "dbfc0d229f1f42d790440136d941afd806bc9e949e2bcb8faa813b0f00d1267e"
 dependencies = [
  "logos-codegen",
 ]
+
+[[package]]
+name = "nohash"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0f889fb66f7acdf83442c35775764b51fed3c606ab9cee51500dbde2cf528ca"
 
 [[package]]
 name = "once_cell"

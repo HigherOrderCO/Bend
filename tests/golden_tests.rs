@@ -1,4 +1,5 @@
 use hvm_lang::{
+  ast::core::show_lnet,
   loader::print_err_reports,
   parser::{parse_definition_book, parse_term},
   to_core::{book_to_hvm_core, term_to_hvm_core},
@@ -44,7 +45,7 @@ fn single_terms() {
       anyhow::anyhow!("Parsing error")
     })?;
     let net = term_to_hvm_core(term, &HashMap::new())?;
-    Ok(net.to_string())
+    Ok(show_lnet(&net))
   })
 }
 
