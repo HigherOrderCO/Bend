@@ -182,7 +182,7 @@ fn encode_term(
       }
       // If the name is not in scope, check if it's a definition's name
       if let Some(definition_id) = def_to_id.get(nam) {
-        let node = new_node(inet, REF + **definition_id);
+        let node = new_node(inet, REF | **definition_id);
         link(inet, port(node, 1), port(node, 2));
         link(inet, up, port(node, 0));
         Ok(port(node, 0))
@@ -199,7 +199,7 @@ fn encode_term(
       Ok(port(node, 0))
     }
     Term::NumOp { op, fst, snd } => {
-      let node = new_node(inet, NUMOP + u8::from(*op) as u32);
+      let node = new_node(inet, NUMOP | u8::from(*op) as u32);
       let fst = encode_term(inet, fst, port(node, 0), scope, vars, dups, def_to_id)?;
       link(inet, port(node, 0), fst);
       let snd = encode_term(inet, snd, port(node, 1), scope, vars, dups, def_to_id)?;
@@ -319,7 +319,7 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
     REF => LTree::Ref { nam: label },
     NUM => LTree::Num { val: enter(inet, port(root, 1)) },
     NUMOP => todo!(), // TODO: HVM2 doesn't have numeric operator atm.
-    _ => unreachable!(),
+    _ => unreachable!("{tag:x}"),
   }
 }
 

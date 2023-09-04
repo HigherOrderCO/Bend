@@ -1,10 +1,12 @@
+use std::{iter::Map, ops::Range};
+
 use crate::{
   ast::{Definition, DefinitionBook, Name, NumOper, Rule, Term},
   parser::lexer::Token,
 };
 use chumsky::{
   extra,
-  input::{Emitter, Stream, ValueInput},
+  input::{Emitter, SpannedInput, Stream, ValueInput},
   prelude::{Input, Rich},
   primitive::{choice, just},
   recursive::recursive,
@@ -12,7 +14,9 @@ use chumsky::{
   span::SimpleSpan,
   IterParser, Parser,
 };
-use logos::Logos;
+use logos::{Logos, SpannedIter};
+
+use super::lexer::LexingError;
 
 // TODO: Pattern matching on rules
 // TODO: Other types of numbers
@@ -23,40 +27,63 @@ use logos::Logos;
 /// <Item>   ::= <Var> | <Number> | <Nested>
 /// <App>    ::= <Item> <Item>+
 /// <Lam>    ::= ("λ"|"\") <Name> <Term>
-/// <Dup>    ::= "dup" <Name> <Name> "=" <Term> ";" <Term>
-/// <Let>    ::= "let" <Name> "=" <Term> ";" <Term>
+/// <Dup>    ::= "dup" <Name> <Name> "=" <Term> ";" <NewLine>* <Term>
+/// <Let>    ::= "let" <Name> "=" <Term> ";" <NewLine>* <Term>
 /// <NumOp>  ::= <numop_token> <Item> <Item>
 /// <Term>   ::= <Lam> | <App> | <Dup> | <Let> | <NumOp> | <Item>
 /// <Rule>   ::= "(" <Name> ")" "=" <newline_token>* <Term>
 /// <Def>    ::= <NewLine>* <Rule> (<NewLine>+ <Rule>)*
 /// <Book>   ::= <Def>+ // Sequential rules grouped by name
 pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Token>>> {
-  let token_iter = Token::lexer(code).spanned().map(|(token, span)| match token {
-    Ok(t) => (t, SimpleSpan::from(span)),
-    Err(e) => (Token::Error(e), SimpleSpan::from(span)),
-  });
-  let token_stream = Stream::from_iter(token_iter).spanned(SimpleSpan::from(code.len() .. code.len()));
-  book_parser().parse(token_stream).into_result()
+  book_parser().parse(token_stream(code)).into_result()
 }
 
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
   // TODO: Make a function that calls a parser. I couldn't figure out how to type it correctly.
+  term_parser().parse(token_stream(code)).into_result()
+}
+
+fn token_stream(
+  code: &str,
+) -> SpannedInput<
+  Token,
+  SimpleSpan,
+  Stream<
+    Map<SpannedIter<Token>, impl FnMut((Result<Token, LexingError>, Range<usize>)) -> (Token, SimpleSpan)>,
+  >,
+> {
+  // TODO: Maybe change to just using chumsky.
+  // The integration is not so smooth and we need to figure out
+  // errors, spans and other things that are not so obvious.
   let token_iter = Token::lexer(code).spanned().map(|(token, span)| match token {
     Ok(t) => (t, SimpleSpan::from(span)),
     Err(e) => (Token::Error(e), SimpleSpan::from(span)),
   });
-  let token_stream = Stream::from_iter(token_iter).spanned(SimpleSpan::from(code.len() .. code.len()));
-  term_parser().parse(token_stream).into_result()
+  Stream::from_iter(token_iter).spanned(SimpleSpan::from(code.len() .. code.len()))
 }
 
 // Parsers
+const MAX_NAME_LEN: usize = 4;
+
+fn name_parser<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  select!(Token::Name(name) => Name(name)).validate(|name, span, emitter| {
+    if name.len() > MAX_NAME_LEN {
+      // TODO: Implement some kind of name mapping for definitions so that we can fit any def size.
+      // e.g. sequential mapping, mangling, hashing, etc
+      emitter.emit(Rich::custom(span, format!("'{}' exceed maximum name length of {}", *name, MAX_NAME_LEN)))
+    }
+    name
+  })
+}
 
 fn term_parser<'a, I>() -> impl Parser<'a, I, Term, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   let new_line = just(Token::NewLine).repeated();
-  let name = select!(Token::Name(name) => Name(name.to_string()));
   let number = select!(Token::Number(num) => Term::Num{val: num});
 
   let num_oper = select! {
@@ -78,12 +105,12 @@ where
     Token::NotEquals => NumOper::Neq,
   };
 
-  let var = name.map(|name| Term::Var { nam: name });
+  let var = name_parser().map(|name| Term::Var { nam: name }).boxed();
 
   recursive(|term| {
     let nested = term
       .clone()
-      .delimited_by(new_line.clone(), new_line)
+      .delimited_by(new_line.clone(), new_line.clone())
       .delimited_by(just(Token::LParen), just(Token::RParen));
 
     let item = choice((var, number, nested));
@@ -93,29 +120,34 @@ where
       .foldl(item.clone().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
 
     let lam = just(Token::Lambda)
-      .ignore_then(name)
+      .ignore_then(name_parser())
       .then(term.clone())
-      .map(|(name, body)| Term::Lam { nam: name, bod: Box::new(body) });
+      .map(|(name, body)| Term::Lam { nam: name, bod: Box::new(body) })
+      .boxed();
 
     let dup = just(Token::Dup)
-      .ignore_then(name)
-      .then(name)
+      .ignore_then(name_parser())
+      .then(name_parser())
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(just(Token::Semicolon))
+      .then_ignore(new_line.clone())
       .then(term.clone())
-      .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) });
+      .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) })
+      .boxed();
 
     let let_ = just(Token::Let)
-      .ignore_then(name)
+      .ignore_then(name_parser())
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(just(Token::Semicolon))
+      .then_ignore(new_line.clone())
       .then(term.clone())
       .map(|((name, body), next)| Term::App {
         fun: Box::new(Term::Lam { nam: name, bod: next.into() }),
         arg: Box::new(body),
-      });
+      })
+      .boxed();
 
     let num_op = num_oper.then(item.clone()).then(item.clone()).map(|((op, fst), snd)| Term::NumOp {
       op,
@@ -131,10 +163,8 @@ fn rule_parser<'a, I>() -> impl Parser<'a, I, Rule, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let name = select!(Token::Name(name) => Name(name.to_string()));
-
   just(Token::LParen)
-    .ignore_then(name)
+    .ignore_then(name_parser())
     .then_ignore(just(Token::RParen))
     .then_ignore(just(Token::Equals))
     .then_ignore(just(Token::NewLine).repeated())
