@@ -33,16 +33,18 @@ pub fn term_to_hvm_core(term: Term, def_to_id: &HashMap<Name, DefId>) -> anyhow:
   compat_net_to_core(&compat_net)
 }
 
-pub fn book_to_hvm_internal(book: Book) -> (hvm2::core::Net, hvm2::core::Book) {
-  let mut hvm_book = hvm2::core::Book::new();
+pub fn book_to_hvm_internal(book: &Book) -> anyhow::Result<(hvm2::core::Net, hvm2::core::Book)> {
+  // TODO: Don't try to preallocate a huge buffer
+  if !book.defs.contains_key(&name_to_u64("Main")) {
+    return Err(anyhow::anyhow!("File has no 'Main' definition"));
+  }
+  let mut root = hvm2::core::Net::new(1 << 26);
+  root.init(name_to_u64("Main"));
 
+  let mut hvm_book = hvm2::core::Book::new();
   book.defs.iter().for_each(|(&name, term)| {
     hvm_book.def(*name, lnet_to_net(term));
   });
 
-  // TODO: Fix this mess
-  let mut root = hvm2::core::Net::new(1 << 26);
-  root.init(name_to_u64("Main"));
-
-  (root, hvm_book)
+  Ok((root, hvm_book))
 }

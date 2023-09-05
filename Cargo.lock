@@ -233,7 +233,7 @@ dependencies = [
 [[package]]
 name = "hvm2"
 version = "0.1.0"
-source = "git+https://github.com/developedby/HVM2.git#466837f4df2256f4fc14efac9599de1748bd826d"
+source = "git+https://github.com/developedby/HVM2.git#27359706039029b26509d73b1c3b0c30b84ff083"
 dependencies = [
  "nohash",
 ]

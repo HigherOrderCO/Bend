@@ -11,6 +11,7 @@ clap = { version = "4.4.1", features = ["derive"] }
 derive_more = "0.99.17"
 # TODO: Point to actual hvm2 repo after it's released, or a cargo crate after it's published
 hvm2 = { git = "https://github.com/developedby/HVM2.git" }
+# hvm2 = { path = "../HVM2-WIP/rust" }
 itertools = "0.11.0"
 logos = "0.13.0"
 shrinkwraprs = "0.3.0"

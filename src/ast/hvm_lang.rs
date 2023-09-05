@@ -1,3 +1,5 @@
+use hvm2::lang::OP;
+
 use super::{Name, Number};
 use std::collections::HashMap;
 
@@ -36,7 +38,7 @@ pub enum Term {
   NumOp { op: NumOper, fst: Box<Term>, snd: Box<Term> },
 }
 
-// TODO: Use the hvm2 values when we have it
+// TODO: Switch to the hvm2 type when it's done
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum NumOper {
   Add,
@@ -76,6 +78,44 @@ impl From<NumOper> for u8 {
       NumOper::Gte => 0xd,
       NumOper::Eql => 0xe,
       NumOper::Neq => 0xf,
+    }
+  }
+}
+
+impl TryFrom<u8> for NumOper {
+  type Error = ();
+
+  fn try_from(value: u8) -> Result<Self, Self::Error> {
+    match value {
+      0 => Ok(NumOper::Add),
+      1 => Ok(NumOper::Sub),
+      2 => Ok(NumOper::Mul),
+      3 => Ok(NumOper::Div),
+      4 ..= 15 => todo!(),
+      _ => Err(()),
+    }
+  }
+}
+
+impl From<NumOper> for OP {
+  fn from(value: NumOper) -> Self {
+    match value {
+      NumOper::Add => OP::ADD,
+      NumOper::Sub => OP::SUB,
+      NumOper::Mul => OP::MUL,
+      NumOper::Div => OP::DIV,
+      NumOper::Mod => todo!(),
+      NumOper::And => todo!(),
+      NumOper::Or => todo!(),
+      NumOper::Xor => todo!(),
+      NumOper::Shl => todo!(),
+      NumOper::Shr => todo!(),
+      NumOper::Ltn => todo!(),
+      NumOper::Lte => todo!(),
+      NumOper::Gtn => todo!(),
+      NumOper::Gte => todo!(),
+      NumOper::Eql => todo!(),
+      NumOper::Neq => todo!(),
     }
   }
 }

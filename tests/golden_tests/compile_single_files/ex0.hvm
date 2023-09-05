@@ -4,4 +4,4 @@
 (S) = λk λs λz s k
 (C_1) = λs λz (s z)
 (C_2) = λs dup s0 s1 = s; λz (s0 (s1 z))
-(Main) = ((C_2) (S) (Z))
+(Main) = C_2 S Z

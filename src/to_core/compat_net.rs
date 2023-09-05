@@ -1,10 +1,9 @@
 use crate::ast::{
   self,
-  core::{LNet, LTree, Tag},
-  DefId, Name, Term,
+  core::{LNet, LTree, Tag, OP},
+  DefId, Name, NumOper, Term,
 };
 use std::collections::HashMap;
-
 #[derive(Clone, Debug)]
 /// Net representation used only as an intermediate for converting to hvm-core format
 pub struct INet {
@@ -317,8 +316,12 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
     },
     REF => LTree::Ref { nam: label },
     NUM => LTree::NUM { val: enter(inet, port(root, 1)) },
-    NUMOP => todo!(), // TODO: HVM2 doesn't have numeric operator atm.
-    _ => unreachable!("{tag:x}"),
+    NUMOP => LTree::Opx {
+      opx: OP::from(NumOper::try_from(label as u8).unwrap()),
+      lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
+      rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
+    },
+    _ => unreachable!("Invalid tag in compat tree {tag:x}"),
   }
 }
 

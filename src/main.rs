@@ -44,7 +44,7 @@ fn main() -> anyhow::Result<()> {
   }
 
   if args.run {
-    let (mut root, runtime_book) = to_core::book_to_hvm_internal(core_book);
+    let (mut root, runtime_book) = to_core::book_to_hvm_internal(&core_book)?;
 
     let start_time = Instant::now();
     // Computes its normal form
