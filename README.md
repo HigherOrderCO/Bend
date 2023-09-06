@@ -3,4 +3,4 @@ Please note that hvm doesn't have a parser for files with multiple definitions a
 
 `cargo test` to run all tests.
 
-Check `tests/golden_tests/single_files/` for some examples.
+Check `example.hvm` for an example of all of hvm-langs features
