@@ -190,10 +190,11 @@ fn encode_term(
       }
     }
     Term::Num { val } => {
-      let node = new_node(inet, NUM);
+      debug_assert!(**val <= LABEL_MASK);
+      let node = new_node(inet, NUM | **val);
       // TODO: This is a workaround with the vector of nodes representation that didn't have number support
-      inet.nodes[port(node, 1) as usize] = **val;
-      inet.nodes[port(node, 2) as usize] = **val;
+      inet.nodes[port(node, 1) as usize] = port(node, 2);
+      inet.nodes[port(node, 2) as usize] = port(node, 1);
       Ok(port(node, 0))
     }
     Term::NumOp { op, fst, snd } => {
@@ -271,10 +272,6 @@ fn go_down_tree(inet: &INet, root: NodeId, explored_nodes: &mut [bool], side_lin
   while let Some(node) = nodes_to_check.pop() {
     debug_assert!(explored_nodes[node as usize] == false);
     explored_nodes[node as usize] = true;
-    // TODO: In this hacky intermediate representation nums are stored in the ports.
-    if kind(inet, node) == NUM {
-      continue;
-    }
     for down_slot in [1, 2] {
       let down_port = enter(inet, port(node, down_slot));
       if slot(down_port) == 0 {
@@ -320,7 +317,7 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
     REF => LTree::Ref { nam: label },
-    NUM => LTree::NUM { val: enter(inet, port(root, 1)) },
+    NUM => LTree::NUM { val: label },
     NUMOP => LTree::Opx {
       opx: OP::from(NumOper::try_from(label as u8).unwrap()),
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
