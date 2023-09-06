@@ -1,7 +1,7 @@
-use hvm2::lang::OP;
-
 use super::{Name, Number};
-use std::collections::HashMap;
+use hvm2::lang::OP;
+use itertools::Itertools;
+use std::{collections::HashMap, fmt};
 
 #[derive(Debug, Clone, Default)]
 pub struct DefinitionBook {
@@ -123,5 +123,81 @@ impl From<NumOper> for OP {
 impl DefinitionBook {
   pub fn new() -> Self {
     Default::default()
+  }
+}
+
+impl From<Pattern> for Term {
+  fn from(value: Pattern) -> Self {
+    match value {
+      Pattern::_Ctr(nam, args) => args
+        .into_iter()
+        .fold(Term::Var { nam }, |acc, arg| Term::App { fun: Box::new(acc), arg: Box::new(arg.into()) }),
+      Pattern::_Num(num) => Term::Num { val: num },
+      Pattern::_Var(nam) => Term::Var { nam },
+    }
+  }
+}
+
+impl fmt::Display for NumOper {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      NumOper::Add => write!(f, "+"),
+      NumOper::Sub => write!(f, "-"),
+      NumOper::Mul => write!(f, "*"),
+      NumOper::Div => write!(f, "/"),
+      NumOper::Mod => write!(f, "%"),
+      NumOper::And => write!(f, "&"),
+      NumOper::Or => write!(f, "|"),
+      NumOper::Xor => write!(f, "^"),
+      NumOper::Shl => write!(f, "<<"),
+      NumOper::Shr => write!(f, ">>"),
+      NumOper::Ltn => write!(f, "<"),
+      NumOper::Lte => write!(f, "<="),
+      NumOper::Gtn => write!(f, ">"),
+      NumOper::Gte => write!(f, ">="),
+      NumOper::Eql => write!(f, "=="),
+      NumOper::Neq => write!(f, "!="),
+    }
+  }
+}
+
+impl fmt::Display for Term {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Term::Lam { nam, bod } => write!(f, "λ{nam} {bod}"),
+      Term::Var { nam } => write!(f, "{nam}"),
+      Term::App { fun, arg } => write!(f, "({fun} {arg})"),
+      Term::Dup { fst, snd, val, nxt } => write!(f, "dup {fst} {snd} = {val}; {nxt}"),
+      Term::Num { val } => write!(f, "{val}"),
+      Term::NumOp { op, fst, snd } => write!(f, "({op} {fst} {snd})"),
+    }
+  }
+}
+
+impl fmt::Display for Pattern {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", Term::from(self.clone()))
+  }
+}
+
+impl fmt::Display for Rule {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    let Rule { name, pats, body } = self;
+    writeln!(f, "({}{}) = {}", name, pats.into_iter().map(|x| format!(" {x}")).join(""), body)
+  }
+}
+
+impl fmt::Display for Definition {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    for rule in &self.rules {
+      write!(f, "{rule}")?
+    }
+    Ok(())
+  }
+}
+
+impl fmt::Display for DefinitionBook {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.defs.values().map(|x| x.to_string()).join("\n"))
   }
 }
