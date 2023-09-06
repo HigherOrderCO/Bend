@@ -269,7 +269,12 @@ fn go_down_tree(inet: &INet, root: NodeId, explored_nodes: &mut [bool], side_lin
   debug_assert!(!explored_nodes[root as usize], "Explored same tree twice");
   let mut nodes_to_check = vec![root];
   while let Some(node) = nodes_to_check.pop() {
+    debug_assert!(explored_nodes[node as usize] == false);
     explored_nodes[node as usize] = true;
+    // TODO: In this hacky intermediate representation nums are stored in the ports.
+    if kind(inet, node) == NUM {
+      continue;
+    }
     for down_slot in [1, 2] {
       let down_port = enter(inet, port(node, down_slot));
       if slot(down_port) == 0 {

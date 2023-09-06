@@ -74,13 +74,9 @@ fn run_single_files() {
       print_err_reports(&path.to_string_lossy(), code, errs);
       anyhow::anyhow!("Parsing error")
     })?;
-    eprintln!("1");
     let core_book = book_to_hvm_core(&book)?;
-    eprintln!("2");
     let (mut root, runtime_book) = book_to_hvm_internal(&core_book)?;
-    eprintln!("3");
     root.normalize(&runtime_book);
-    eprintln!("4");
     Ok(show_lnet(&readback_lnet(&root)))
   })
 }
