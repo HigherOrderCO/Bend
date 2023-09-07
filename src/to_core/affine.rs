@@ -137,5 +137,7 @@ fn term_to_affine(value: Term, scope: &mut Scope, def_names: &HashSet<Name>) -> 
       fst: Box::new(term_to_affine(*fst, scope, def_names)?),
       snd: Box::new(term_to_affine(*snd, scope, def_names)?),
     }),
+    Term::Sup { .. } => unreachable!(),
+    Term::Era => unreachable!(),
   }
 }

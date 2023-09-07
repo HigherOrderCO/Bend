@@ -1,72 +1,72 @@
 E =
-  $ (0 * (0 * (0 x0 x0)))
+  $ (0 * (0 * (0 a a)))
   
 I =
-  $ (0 x0 (0 * (0 (0 x0 x1) (0 * x1))))
+  $ (0 a (0 * (0 (0 a b) (0 * b))))
   
 O =
-  $ (0 x0 (0 (0 x0 x1) (0 * (0 * x1))))
+  $ (0 a (0 (0 a b) (0 * (0 * b))))
   
 c2 =
-  $ (0 (16 (0 x0 x1) (0 x2 x0)) (0 x2 x1))
+  $ (0 (16 (0 a b) (0 c a)) (0 c b))
   
 Ex2 =
-  $ x0
-  & (0 x1 x0)
+  $ a
+  & (0 b a)
   ~ @run
-  & (0 @I (0 @E x1))
+  & (0 @I (0 @E b))
   ~ @c2
   
 dec =
-  $ (0 (0 @decO (0 @decI (0 @E x0))) x0)
+  $ (0 (0 @decO (0 @decI (0 @E a))) a)
   
 low =
-  $ (0 (0 @lowO (0 @lowI (0 @E x0))) x0)
+  $ (0 (0 @lowO (0 @lowI (0 @E a))) a)
   
 run =
-  $ (0 (0 @runO (0 @runI (0 @E x0))) x0)
+  $ (0 (0 @runO (0 @runI (0 @E a))) a)
   
 decI =
-  $ (0 x0 x1)
-  & (0 x0 x1)
+  $ (0 a b)
+  & (0 a b)
   ~ @low
   
 decO =
-  $ (0 x0 x1)
-  & (0 x2 x1)
+  $ (0 a b)
+  & (0 c b)
   ~ @I
-  & (0 x0 x2)
+  & (0 a c)
   ~ @dec
   
 lowI =
-  $ (0 x0 x1)
-  & (0 x2 x1)
+  $ (0 a b)
+  & (0 c b)
   ~ @O
-  & (0 x0 x2)
+  & (0 a c)
   ~ @I
   
 lowO =
-  $ (0 x0 x1)
-  & (0 x2 x1)
+  $ (0 a b)
+  & (0 c b)
   ~ @O
-  & (0 x0 x2)
+  & (0 a c)
   ~ @O
   
 runI =
-  $ (0 x0 x1)
-  & (0 x2 x1)
+  $ (0 a b)
+  & (0 c b)
   ~ @run
-  & (0 x3 x2)
+  & (0 d c)
   ~ @dec
-  & (0 x0 x3)
+  & (0 a d)
   ~ @I
   
 runO =
-  $ (0 x0 x1)
-  & (0 x2 x1)
+  $ (0 a b)
+  & (0 c b)
   ~ @run
-  & (0 x3 x2)
+  & (0 d c)
   ~ @dec
-  & (0 x0 x3)
+  & (0 a d)
   ~ @O
   

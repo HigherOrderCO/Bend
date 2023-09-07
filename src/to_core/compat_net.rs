@@ -1,78 +1,13 @@
 use crate::ast::{
   self,
+  compat::{
+    addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, NodeKind, Port, CON, DUP, ERA,
+    LABEL_MASK, NUM, NUMOP, REF, ROOT, TAG_MASK,
+  },
   core::{LNet, LTree, Tag, OP},
   DefId, Name, NumOper, Term,
 };
 use std::collections::HashMap;
-#[derive(Clone, Debug)]
-/// Net representation used only as an intermediate for converting to hvm-core format
-pub struct INet {
-  pub nodes: Vec<NodeVal>,
-}
-
-type NodeVal = u64;
-type NodeKind = NodeVal;
-type Port = NodeVal;
-type NodeId = NodeVal;
-type SlotId = NodeVal;
-
-/// The ROOT port is on the deadlocked root node at address 0.
-const ROOT: Port = 1;
-const TAG_WIDTH: u32 = Tag::BITS;
-const TAG: u32 = 64 - TAG_WIDTH;
-const ERA: NodeKind = 0 << TAG;
-const CON: NodeKind = 1 << TAG;
-const DUP: NodeKind = 2 << TAG;
-const REF: NodeKind = 3 << TAG;
-const NUM: NodeKind = 4 << TAG;
-const NUMOP: NodeKind = 5 << TAG;
-const LABEL_MASK: NodeKind = (1 << TAG) - 1;
-const TAG_MASK: NodeKind = !LABEL_MASK;
-
-/// Create a new net, with a deadlocked root node.
-pub fn new_inet() -> INet {
-  INet {
-    nodes: vec![2, 1, 0, ERA], // p2 points to p0, p1 points to net
-  }
-}
-
-/// Allocates a new node, reclaiming a freed space if possible.
-pub fn new_node(inet: &mut INet, kind: NodeKind) -> NodeId {
-  let node = addr(inet.nodes.len() as Port);
-  inet.nodes.extend([port(node, 0), port(node, 1), port(node, 2), kind]);
-  node
-}
-
-/// Builds a port (an address / slot pair).
-pub fn port(node: NodeId, slot: SlotId) -> Port {
-  (node << 2) | slot
-}
-
-/// Returns the address of a port (TODO: rename).
-pub fn addr(port: Port) -> NodeId {
-  port >> 2
-}
-
-/// Returns the slot of a port.
-pub fn slot(port: Port) -> SlotId {
-  port & 3
-}
-
-/// Enters a port, returning the port on the other side.
-pub fn enter(inet: &INet, port: Port) -> Port {
-  inet.nodes[port as usize]
-}
-
-/// Kind of the node.
-pub fn kind(inet: &INet, node: NodeId) -> NodeKind {
-  inet.nodes[port(node, 3) as usize]
-}
-
-/// Links two ports.
-pub fn link(inet: &mut INet, ptr_a: Port, ptr_b: Port) {
-  inet.nodes[ptr_a as usize] = ptr_b;
-  inet.nodes[ptr_b as usize] = ptr_a;
-}
 
 /// Converts an IC term into an IC net.
 pub fn term_to_compat_net(term: &Term, def_to_id: &HashMap<Name, DefId>) -> anyhow::Result<INet> {
@@ -205,6 +140,8 @@ fn encode_term(
       link(inet, port(node, 1), snd);
       Ok(port(node, 2))
     }
+    Term::Sup { .. } => unreachable!(),
+    Term::Era => unreachable!(),
   }
 }
 
@@ -270,7 +207,7 @@ fn go_down_tree(inet: &INet, root: NodeId, explored_nodes: &mut [bool], side_lin
   debug_assert!(!explored_nodes[root as usize], "Explored same tree twice");
   let mut nodes_to_check = vec![root];
   while let Some(node) = nodes_to_check.pop() {
-    debug_assert!(explored_nodes[node as usize] == false);
+    debug_assert!(!explored_nodes[node as usize]);
     explored_nodes[node as usize] = true;
     for down_slot in [1, 2] {
       let down_port = enter(inet, port(node, down_slot));
@@ -346,6 +283,16 @@ fn var_or_subtree(inet: &INet, src_port: Port, port_to_var_id: &mut HashMap<Port
   }
 }
 
-fn var_id_to_name(var_id: VarId) -> String {
-  format!("x{var_id}")
+fn var_id_to_name(mut var_id: VarId) -> String {
+  let mut name = String::new();
+  loop {
+    let c = (var_id % 26) as u8 + b'a';
+    name.push(c as char);
+    var_id /= 26;
+    if var_id == 0 {
+      break;
+    }
+  }
+  name
+  // format!("x{var_id}")
 }

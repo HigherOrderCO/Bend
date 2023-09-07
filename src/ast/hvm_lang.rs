@@ -36,6 +36,8 @@ pub enum Term {
   Dup { fst: Name, snd: Name, val: Box<Term>, nxt: Box<Term> },
   Num { val: Number },
   NumOp { op: NumOper, fst: Box<Term>, snd: Box<Term> },
+  Sup { fst: Box<Term>, snd: Box<Term> },
+  Era,
 }
 
 // TODO: Switch to the hvm2 type when it's done
@@ -120,6 +122,17 @@ impl From<NumOper> for OP {
   }
 }
 
+impl From<&OP> for NumOper {
+  fn from(value: &OP) -> Self {
+    match value {
+      OP::ADD => NumOper::Add,
+      OP::MUL => NumOper::Mul,
+      OP::DIV => NumOper::Div,
+      OP::SUB => NumOper::Sub,
+    }
+  }
+}
+
 impl DefinitionBook {
   pub fn new() -> Self {
     Default::default()
@@ -170,6 +183,8 @@ impl fmt::Display for Term {
       Term::Dup { fst, snd, val, nxt } => write!(f, "dup {fst} {snd} = {val}; {nxt}"),
       Term::Num { val } => write!(f, "{val}"),
       Term::NumOp { op, fst, snd } => write!(f, "({op} {fst} {snd})"),
+      Term::Sup { fst, snd } => write!(f, "{{{fst} {snd}}}"),
+      Term::Era => write!(f, "*"),
     }
   }
 }
@@ -183,7 +198,7 @@ impl fmt::Display for Pattern {
 impl fmt::Display for Rule {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     let Rule { name, pats, body } = self;
-    writeln!(f, "({}{}) = {}", name, pats.into_iter().map(|x| format!(" {x}")).join(""), body)
+    writeln!(f, "({}{}) = {}", name, pats.iter().map(|x| format!(" {x}")).join(""), body)
   }
 }
 

@@ -1,9 +1,9 @@
-use hvm2::lang::readback_lnet;
 use hvm_lang::{
   ast::core::show_lnet,
   loader::print_err_reports,
   parser::{parse_definition_book, parse_term},
-  to_core::{book_to_hvm_core, book_to_hvm_internal, term_to_hvm_core},
+  run_book,
+  to_core::{book_to_hvm_core, term_to_hvm_core},
 };
 use pretty_assertions::assert_eq;
 use std::{collections::HashMap, fs, io::Write, path::Path};
@@ -74,9 +74,7 @@ fn run_single_files() {
       print_err_reports(&path.to_string_lossy(), code, errs);
       anyhow::anyhow!("Parsing error")
     })?;
-    let core_book = book_to_hvm_core(&book)?;
-    let (mut root, runtime_book) = book_to_hvm_internal(&core_book)?;
-    root.normalize(&runtime_book);
-    Ok(show_lnet(&readback_lnet(&root)))
+    let (res, _) = run_book(&book)?;
+    Ok(res.to_string())
   })
 }

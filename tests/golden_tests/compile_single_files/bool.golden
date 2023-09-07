@@ -1,14 +1,14 @@
 Not =
-  $ (0 (0 @fals (0 @true x0)) x0)
+  $ (0 (0 @fals (0 @true a)) a)
   
 Main =
-  $ x0
-  & (0 @true x0)
+  $ a
+  & (0 @true a)
   ~ @Not
   
 fals =
-  $ (0 * (0 x0 x0))
+  $ (0 * (0 a a))
   
 true =
-  $ (0 x0 (0 * x0))
+  $ (0 a (0 * a))
   
