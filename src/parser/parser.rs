@@ -63,14 +63,14 @@ fn token_stream(
 }
 
 // Parsers
-const MAX_NAME_LEN: usize = 4;
+const MAX_NAME_LEN: u32 = (u64::BITS - u16::BITS) / 64_u32.ilog2();
 
 fn name_parser<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   select!(Token::Name(name) => Name(name)).validate(|name, span, emitter| {
-    if name.len() > MAX_NAME_LEN {
+    if name.len() > MAX_NAME_LEN as usize {
       // TODO: Implement some kind of name mapping for definitions so that we can fit any def size.
       // e.g. sequential mapping, mangling, hashing, etc
       emitter.emit(Rich::custom(span, format!("'{}' exceed maximum name length of {}", *name, MAX_NAME_LEN)))

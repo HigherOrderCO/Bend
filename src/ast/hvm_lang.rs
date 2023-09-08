@@ -1,5 +1,4 @@
 use super::{Name, Number};
-use hvm2::lang::OP;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt};
 
@@ -40,7 +39,6 @@ pub enum Term {
   Era,
 }
 
-// TODO: Switch to the hvm2 type when it's done
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum NumOper {
   Add,
@@ -95,40 +93,6 @@ impl TryFrom<u8> for NumOper {
       3 => Ok(NumOper::Div),
       4 ..= 15 => todo!(),
       _ => Err(()),
-    }
-  }
-}
-
-impl From<NumOper> for OP {
-  fn from(value: NumOper) -> Self {
-    match value {
-      NumOper::Add => OP::ADD,
-      NumOper::Sub => OP::SUB,
-      NumOper::Mul => OP::MUL,
-      NumOper::Div => OP::DIV,
-      NumOper::Mod => todo!(),
-      NumOper::And => todo!(),
-      NumOper::Or => todo!(),
-      NumOper::Xor => todo!(),
-      NumOper::Shl => todo!(),
-      NumOper::Shr => todo!(),
-      NumOper::Ltn => todo!(),
-      NumOper::Lte => todo!(),
-      NumOper::Gtn => todo!(),
-      NumOper::Gte => todo!(),
-      NumOper::Eql => todo!(),
-      NumOper::Neq => todo!(),
-    }
-  }
-}
-
-impl From<&OP> for NumOper {
-  fn from(value: &OP) -> Self {
-    match value {
-      OP::ADD => NumOper::Add,
-      OP::MUL => NumOper::Mul,
-      OP::DIV => NumOper::Div,
-      OP::SUB => NumOper::Sub,
     }
   }
 }

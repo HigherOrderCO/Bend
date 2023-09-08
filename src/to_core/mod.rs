@@ -2,11 +2,8 @@ mod affine;
 mod compat_net;
 
 use self::compat_net::{compat_net_to_core, term_to_compat_net};
-use crate::ast::{
-  core::{Book, LNet},
-  DefId, Definition, DefinitionBook, Name, Term,
-};
-use hvm2::lang::{lnet_to_net, name_to_u64};
+use crate::ast::{core::Book, DefId, Definition, DefinitionBook, Name, Term};
+use hvm_core::{lnet_to_net, name_to_u64, LNet};
 use std::collections::HashMap;
 
 pub fn book_to_hvm_core(book: &DefinitionBook) -> anyhow::Result<Book> {
@@ -33,15 +30,15 @@ pub fn term_to_hvm_core(term: Term, def_to_id: &HashMap<Name, DefId>) -> anyhow:
   compat_net_to_core(&compat_net)
 }
 
-pub fn book_to_hvm_internal(book: &Book) -> anyhow::Result<(hvm2::core::Net, hvm2::core::Book)> {
+pub fn book_to_hvm_internal(book: &Book) -> anyhow::Result<(hvm_core::Net, hvm_core::Book)> {
   // TODO: Don't try to preallocate a huge buffer
   if !book.defs.contains_key(&name_to_u64("Main")) {
     return Err(anyhow::anyhow!("File has no 'Main' definition"));
   }
-  let mut root = hvm2::core::Net::new(1 << 26);
-  root.init(name_to_u64("Main"));
+  let mut root = hvm_core::Net::new(1 << 26);
+  root.boot(name_to_u64("Main"));
 
-  let mut hvm_book = hvm2::core::Book::new();
+  let mut hvm_book = hvm_core::Book::new();
   book.defs.iter().for_each(|(&name, term)| {
     hvm_book.def(*name, lnet_to_net(term));
   });

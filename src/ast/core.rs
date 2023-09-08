@@ -1,12 +1,7 @@
 use super::DefId;
-use hvm2::lang::u64_to_name;
+use hvm_core::{show_lnet, u64_to_name, LNet};
 use itertools::Itertools;
 use std::{collections::HashMap, fmt};
-
-pub use hvm2::{
-  core::{Tag, CON, DUP, ERA, REF},
-  lang::{show_lnet, show_ltree, show_net, LNet, LTree, OP},
-};
 
 pub struct Book {
   pub defs: HashMap<DefId, LNet>,

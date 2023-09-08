@@ -214,6 +214,13 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
+name = "hvm-core"
+version = "0.1.0"
+dependencies = [
+ "nohash",
+]
+
+[[package]]
 name = "hvm-lang"
 version = "0.1.0"
 dependencies = [
@@ -222,20 +229,12 @@ dependencies = [
  "chumsky",
  "clap",
  "derive_more",
- "hvm2",
+ "hvm-core",
  "itertools 0.11.0",
  "logos",
  "pretty_assertions",
  "shrinkwraprs",
  "walkdir",
-]
-
-[[package]]
-name = "hvm2"
-version = "0.1.0"
-source = "git+https://github.com/developedby/HVM2.git#27359706039029b26509d73b1c3b0c30b84ff083"
-dependencies = [
- "nohash",
 ]
 
 [[package]]

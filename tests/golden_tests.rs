@@ -1,5 +1,5 @@
+use hvm_core::show_lnet;
 use hvm_lang::{
-  ast::core::show_lnet,
   loader::print_err_reports,
   parser::{parse_definition_book, parse_term},
   run_book,

@@ -1,6 +1,6 @@
-use crate::ast::core::Tag;
-
 // TODO: Refactor to not use this intermediate form
+
+use hvm_core::Tag;
 
 #[derive(Clone, Debug)]
 /// Net representation used only as an intermediate for converting to hvm-core format

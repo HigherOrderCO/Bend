@@ -1,11 +1,11 @@
+use hvm_core::{LNet, LTree, Tag};
+
 use crate::ast::{
-  self,
   compat::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, NodeKind, Port, CON, DUP, ERA,
     LABEL_MASK, NUM, NUMOP, REF, ROOT, TAG_MASK,
   },
-  core::{LNet, LTree, Tag, OP},
-  DefId, Name, NumOper, Term,
+  DefId, Name, Term,
 };
 use std::collections::HashMap;
 
@@ -244,22 +244,18 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
   match tag {
     ERA => LTree::Era,
     CON => LTree::Nod {
-      tag: ast::core::CON,
+      tag: hvm_core::CON,
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
     DUP => LTree::Nod {
-      tag: ast::core::DUP + label as Tag,
+      tag: hvm_core::DUP + label as Tag,
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
     REF => LTree::Ref { nam: label },
     NUM => LTree::NUM { val: label },
-    NUMOP => LTree::Opx {
-      opx: OP::from(NumOper::try_from(label as u8).unwrap()),
-      lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
-    },
+    NUMOP => todo!(),
     _ => unreachable!("Invalid tag in compat tree {tag:x}"),
   }
 }

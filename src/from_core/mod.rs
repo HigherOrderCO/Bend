@@ -1,13 +1,12 @@
-use std::collections::{HashMap, HashSet};
-
 use crate::ast::{
   compat::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
     SlotId, CON, DUP, ERA, LABEL_MASK, NUM, NUMOP, REF, ROOT, TAG_MASK,
   },
-  Name, NumOper, Number, Term,
+  Name, Number, Term,
 };
-use hvm2::lang::{u64_to_name, LNet, LTree};
+use hvm_core::{u64_to_name, LNet, LTree};
+use std::collections::{HashMap, HashSet};
 
 pub fn readback_net(net: &LNet) -> anyhow::Result<Term> {
   let core_net = core_net_to_compat(net)?;
@@ -68,7 +67,7 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         inodes.push(INode { kind: ERA, ports: [subtree_root, var.clone(), var] });
       }
       LTree::Nod { tag, lft, rgt } => {
-        let kind = if *tag == hvm2::core::CON { CON } else { DUP | (*tag - hvm2::core::DUP) as NodeKind };
+        let kind = if *tag == hvm_core::CON { CON } else { DUP | (*tag - hvm_core::DUP) as NodeKind };
         let var_lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let var_rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var_lft, var_rgt] })
@@ -83,12 +82,6 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         let kind = NUM | (*val as NodeKind);
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
-      }
-      LTree::Opx { opx, lft, rgt } => {
-        let kind = NUMOP | u8::from(NumOper::from(opx)) as NodeKind;
-        let var_lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
-        let var_rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, var_lft, var_rgt] })
       }
     }
   }

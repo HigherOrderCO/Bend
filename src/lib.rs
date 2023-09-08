@@ -8,7 +8,7 @@ pub mod to_core;
 
 use ast::{core::Book, DefinitionBook, Term};
 use from_core::readback_net;
-use hvm2::lang::{readback_lnet, LNet};
+use hvm_core::{readback_lnet, LNet};
 use std::time::Instant;
 
 pub use loader::load_file_to_book;
@@ -29,7 +29,7 @@ pub fn run_compiled(book: &Book) -> anyhow::Result<(LNet, RunStats)> {
   let start_time = Instant::now();
 
   // Computes its normal form
-  root.normalize(&runtime_book);
+  root.normal(&runtime_book);
 
   let elapsed = start_time.elapsed().as_secs_f64();
 
