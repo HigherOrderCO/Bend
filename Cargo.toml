@@ -9,8 +9,8 @@ ariadne = "0.3.0"
 chumsky = "1.0.0-alpha.4"
 clap = { version = "4.4.1", features = ["derive"] }
 derive_more = "0.99.17"
-hvm_core = { git = "https://github.com/HigherOrderCO/hvm-core.git" }
-# hvm-core = { path = "../hvm-core/rust" }
+# hvm_core = { git = "https://github.com/HigherOrderCO/hvm-core.git" }
+hvm-core = { path = "../hvm-core/rust" }
 itertools = "0.11.0"
 logos = "0.13.0"
 shrinkwraprs = "0.3.0"

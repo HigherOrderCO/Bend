@@ -1,10 +1,11 @@
 use hvm_core::show_lnet;
 use hvm_lang::{
-  loader::print_err_reports,
+  loader::display_err_for_text,
   parser::{parse_definition_book, parse_term},
   run_book,
   to_core::{book_to_hvm_core, term_to_hvm_core},
 };
+use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::{collections::HashMap, fs, io::Write, path::Path};
 use walkdir::WalkDir;
@@ -43,10 +44,10 @@ fn run_golden_test_dir(root: &Path, run: &dyn Fn(&Path, &str) -> anyhow::Result<
 #[test]
 fn compile_single_terms() {
   let root = format!("{}/tests/golden_tests/compile_single_terms", env!("CARGO_MANIFEST_DIR"));
-  run_golden_test_dir(Path::new(&root), &|path, code| {
+  run_golden_test_dir(Path::new(&root), &|_, code| {
     let term = parse_term(code).map_err(|errs| {
-      print_err_reports(&path.to_string_lossy(), code, errs);
-      anyhow::anyhow!("Parsing error")
+      let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
+      anyhow::anyhow!(msg)
     })?;
     let net = term_to_hvm_core(term, &HashMap::new())?;
     Ok(show_lnet(&net))
@@ -56,10 +57,10 @@ fn compile_single_terms() {
 #[test]
 fn compile_single_files() {
   let root = format!("{}/tests/golden_tests/compile_single_files", env!("CARGO_MANIFEST_DIR"));
-  run_golden_test_dir(Path::new(&root), &|path, code| {
+  run_golden_test_dir(Path::new(&root), &|_, code| {
     let book = parse_definition_book(code).map_err(|errs| {
-      print_err_reports(&path.to_string_lossy(), code, errs);
-      anyhow::anyhow!("Parsing error")
+      let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
+      anyhow::anyhow!(msg)
     })?;
     let core_book = book_to_hvm_core(&book)?;
     Ok(core_book.to_string())
@@ -69,10 +70,10 @@ fn compile_single_files() {
 #[test]
 fn run_single_files() {
   let root = format!("{}/tests/golden_tests/run_single_files", env!("CARGO_MANIFEST_DIR"));
-  run_golden_test_dir(Path::new(&root), &|path, code| {
+  run_golden_test_dir(Path::new(&root), &|_, code| {
     let book = parse_definition_book(code).map_err(|errs| {
-      print_err_reports(&path.to_string_lossy(), code, errs);
-      anyhow::anyhow!("Parsing error")
+      let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
+      anyhow::anyhow!(msg)
     })?;
     let (res, _) = run_book(&book)?;
     Ok(res.to_string())
