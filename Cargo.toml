@@ -3,11 +3,22 @@ name = "hvm-lang"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "hvm_lang"
+
+[[bin]]
+name = "hvm-lang"
+required-features = ["cli"]
+
+[features]
+default = ["cli"]
+cli = ["clap"]
+
 [dependencies]
 anyhow = "1.0.72"
 ariadne = "0.3.0"
 chumsky = "1.0.0-alpha.4"
-clap = { version = "4.4.1", features = ["derive"] }
+clap = { version = "4.4.1", features = ["derive"], optional = true }
 derive_more = "0.99.17"
 hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core.git" }
 # hvm-core = { path = "../hvm-core/rust" }
