@@ -4,12 +4,15 @@ pub mod ast;
 pub mod from_core;
 pub mod loader;
 pub mod parser;
+pub mod semantic;
 pub mod to_core;
 
 use ast::{core::Book, DefinitionBook, Term};
 use from_core::readback_net;
 use hvm_core::{readback_lnet, LNet};
+use semantic::check_main;
 use std::time::Instant;
+use to_core::{book_to_hvm_core, book_to_hvm_internal};
 
 pub use loader::load_file_to_book;
 
@@ -20,11 +23,11 @@ pub fn check_book(book: &DefinitionBook) -> anyhow::Result<()> {
 }
 
 pub fn compile_book(book: &DefinitionBook) -> anyhow::Result<Book> {
-  to_core::book_to_hvm_core(book)
+  book_to_hvm_core(book)
 }
 
 pub fn run_compiled(book: &Book) -> anyhow::Result<(LNet, RunStats)> {
-  let (mut root, runtime_book) = to_core::book_to_hvm_internal(book)?;
+  let (mut root, runtime_book) = book_to_hvm_internal(book)?;
 
   let start_time = Instant::now();
 
@@ -39,6 +42,7 @@ pub fn run_compiled(book: &Book) -> anyhow::Result<(LNet, RunStats)> {
 }
 
 pub fn run_book(book: &DefinitionBook) -> anyhow::Result<(Term, RunStats)> {
+  check_main(book)?;
   let compiled = compile_book(book)?;
   let (res, stats) = run_compiled(&compiled)?;
   let res = readback_net(&res)?;

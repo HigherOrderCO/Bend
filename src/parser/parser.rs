@@ -1,7 +1,6 @@
-use std::{iter::Map, ops::Range};
-
+use super::lexer::LexingError;
 use crate::{
-  ast::{Definition, DefinitionBook, Name, NumOper, Rule, Term},
+  ast::{DefId, Definition, DefinitionBook, Name, NumOper, Rule, Term},
   parser::lexer::Token,
 };
 use chumsky::{
@@ -15,8 +14,7 @@ use chumsky::{
   IterParser, Parser,
 };
 use logos::{Logos, SpannedIter};
-
-use super::lexer::LexingError;
+use std::{collections::hash_map, iter::Map, ops::Range};
 
 // TODO: Pattern matching on rules
 // TODO: Other types of numbers
@@ -63,19 +61,20 @@ fn token_stream(
 }
 
 // Parsers
-const MAX_NAME_LEN: u32 = (u64::BITS - u16::BITS) / 64_u32.ilog2();
+const MAX_NAME_LEN: usize = ((u64::BITS - u16::BITS) / 64_u32.ilog2()) as usize;
 
 fn name_parser<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  select!(Token::Name(name) => Name(name)).validate(|name, span, emitter| {
-    if name.len() > MAX_NAME_LEN as usize {
+  select!(Token::Name(name) => Name(name)).try_map(|name, span| {
+    if name.len() > MAX_NAME_LEN {
       // TODO: Implement some kind of name mapping for definitions so that we can fit any def size.
       // e.g. sequential mapping, mangling, hashing, etc
-      emitter.emit(Rich::custom(span, format!("'{}' exceed maximum name length of {}", *name, MAX_NAME_LEN)))
+      Err(Rich::custom(span, format!("'{}' exceed maximum name length of {}", *name, MAX_NAME_LEN)))
+    } else {
+      Ok(name)
     }
-    name
   })
 }
 
@@ -169,7 +168,7 @@ where
     .then_ignore(just(Token::Equals))
     .then_ignore(just(Token::NewLine).repeated())
     .then(term_parser())
-    .map(|(name, body)| Rule { name, pats: vec![], body })
+    .map(|(name, body)| Rule { def_id: DefId::from(&name), pats: vec![], body })
 }
 
 fn book_parser<'a, I>() -> impl Parser<'a, I, DefinitionBook, extra::Err<Rich<'a, Token>>>
@@ -184,19 +183,20 @@ where
     let mut book = DefinitionBook::new();
 
     // Check for repeated defs (could be rules out of order or actually repeated names)
-    for def_rules in rules.group_by(|(rule1, _), (rule2, _)| rule1.name == rule2.name) {
+    for def_rules in rules.group_by(|(rule1, _), (rule2, _)| rule1.def_id == rule2.def_id) {
+      let name = Name::from(def_rules[0].0.def_id);
       if def_rules.len() > 1 {
         // TODO: Enable definitions with multiple rules when implementing pattern matching
         let def_span = SimpleSpan::new(def_rules.first().unwrap().1.start, def_rules.last().unwrap().1.end);
-        emitter
-          .emit(Rich::custom(def_span, format!("Definition with multiple rules '{}'", *def_rules[0].0.name)));
+        emitter.emit(Rich::custom(def_span, format!("Definition with multiple rules '{name}'",)));
       } else {
         let (rule, span) = &def_rules[0];
-        let def = Definition { name: rule.name.clone(), rules: vec![rule.clone()] };
-        if book.defs.contains_key(&def.name) {
-          emitter.emit(Rich::custom(*span, format!("Repeated definition '{}'", *def.name)));
+        let def = Definition { name, rules: vec![rule.clone()] };
+        let def_id = DefId::from(&def.name);
+        if let hash_map::Entry::Vacant(e) = book.defs.entry(def_id) {
+          e.insert(def);
         } else {
-          book.defs.insert(def.name.clone(), def);
+          emitter.emit(Rich::custom(*span, format!("Repeated definition '{}'", *def.name)));
         }
       }
     }

@@ -1,10 +1,10 @@
-use super::{Name, Number};
+use super::{DefId, Name, Number};
 use itertools::Itertools;
 use std::{collections::HashMap, fmt};
 
 #[derive(Debug, Clone, Default)]
 pub struct DefinitionBook {
-  pub defs: HashMap<Name, Definition>,
+  pub defs: HashMap<DefId, Definition>,
 }
 
 #[derive(Debug, Clone)]
@@ -15,7 +15,7 @@ pub struct Definition {
 
 #[derive(Debug, Clone)]
 pub struct Rule {
-  pub name: Name,
+  pub def_id: DefId,
   pub pats: Vec<Pattern>,
   pub body: Term,
 }
@@ -31,6 +31,7 @@ pub enum Pattern {
 pub enum Term {
   Lam { nam: Name, bod: Box<Term> },
   Var { nam: Name },
+  Ref { def_id: DefId },
   App { fun: Box<Term>, arg: Box<Term> },
   Dup { fst: Name, snd: Name, val: Box<Term>, nxt: Box<Term> },
   Num { val: Number },
@@ -143,6 +144,7 @@ impl fmt::Display for Term {
     match self {
       Term::Lam { nam, bod } => write!(f, "λ{nam} {bod}"),
       Term::Var { nam } => write!(f, "{nam}"),
+      Term::Ref { def_id } => write!(f, "{}", Name::from(*def_id)),
       Term::App { fun, arg } => write!(f, "({fun} {arg})"),
       Term::Dup { fst, snd, val, nxt } => write!(f, "dup {fst} {snd} = {val}; {nxt}"),
       Term::Num { val } => write!(f, "{val}"),
@@ -161,8 +163,8 @@ impl fmt::Display for Pattern {
 
 impl fmt::Display for Rule {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let Rule { name, pats, body } = self;
-    writeln!(f, "({}{}) = {}", name, pats.iter().map(|x| format!(" {x}")).join(""), body)
+    let Rule { def_id, pats, body } = self;
+    writeln!(f, "({}{}) = {}", Name::from(*def_id), pats.iter().map(|x| format!(" {x}")).join(""), body)
   }
 }
 

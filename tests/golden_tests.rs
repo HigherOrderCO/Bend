@@ -7,7 +7,7 @@ use hvm_lang::{
 };
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
-use std::{collections::HashMap, fs, io::Write, path::Path};
+use std::{collections::HashSet, fs, io::Write, path::Path};
 use walkdir::WalkDir;
 
 fn run_single_golden_test(
@@ -49,7 +49,7 @@ fn compile_single_terms() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let net = term_to_hvm_core(term, &HashMap::new())?;
+    let net = term_to_hvm_core(term, &HashSet::new())?;
     Ok(show_lnet(&net))
   })
 }

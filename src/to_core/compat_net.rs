@@ -1,5 +1,3 @@
-use hvm_core::{LNet, LTree, Tag};
-
 use crate::ast::{
   compat::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, NodeKind, Port, CON, DUP, ERA,
@@ -7,10 +5,11 @@ use crate::ast::{
   },
   DefId, Name, Term,
 };
-use std::collections::HashMap;
+use hvm_core::{LNet, LTree, Tag};
+use std::collections::{HashMap, HashSet};
 
 /// Converts an IC term into an IC net.
-pub fn term_to_compat_net(term: &Term, def_to_id: &HashMap<Name, DefId>) -> anyhow::Result<INet> {
+pub fn term_to_compat_net(term: &Term, def_names: &HashSet<Name>) -> anyhow::Result<INet> {
   let mut inet = new_inet();
   // Initializes state variables
   // For each variable we hold where they are declared and where it's stored
@@ -18,7 +17,7 @@ pub fn term_to_compat_net(term: &Term, def_to_id: &HashMap<Name, DefId>) -> anyh
   let mut scope = HashMap::new();
 
   // Encodes the main term.
-  let main = encode_term(&mut inet, term, ROOT, &mut scope, &mut vars, &mut 0, def_to_id)?;
+  let main = encode_term(&mut inet, term, ROOT, &mut scope, &mut vars, &mut 0, def_names)?;
 
   // Link unused variables
   // TODO: Could be refactored.
@@ -47,7 +46,7 @@ fn encode_term(
   scope: &mut HashMap<Name, Vec<usize>>,
   vars: &mut Vec<(Port, Option<Port>)>,
   dups: &mut NodeId,
-  def_to_id: &HashMap<Name, DefId>,
+  def_names: &HashSet<Name>,
 ) -> anyhow::Result<Port> {
   match term {
     // A lambda becomes to a con node. Ports:
@@ -61,7 +60,7 @@ fn encode_term(
       // TODO: This scoping operation is repeated every time, can refactor.
       scope.entry(name.clone()).or_default().push(vars.len());
       vars.push((decl_port, None));
-      let bod = encode_term(inet, body, port(fun, 2), scope, vars, dups, def_to_id)?;
+      let bod = encode_term(inet, body, port(fun, 2), scope, vars, dups, def_names)?;
       scope.get_mut(name).unwrap().pop().unwrap();
 
       link(inet, port(fun, 2), bod);
@@ -73,9 +72,9 @@ fn encode_term(
     // - 2: points to where the application occurs.
     Term::App { fun, arg } => {
       let app = new_node(inet, CON);
-      let fun = encode_term(inet, fun, port(app, 0), scope, vars, dups, def_to_id)?;
+      let fun = encode_term(inet, fun, port(app, 0), scope, vars, dups, def_names)?;
       link(inet, port(app, 0), fun);
-      let arg = encode_term(inet, arg, port(app, 1), scope, vars, dups, def_to_id)?;
+      let arg = encode_term(inet, arg, port(app, 1), scope, vars, dups, def_names)?;
       link(inet, port(app, 1), arg);
       Ok(port(app, 2))
     }
@@ -86,14 +85,14 @@ fn encode_term(
     Term::Dup { fst, snd, val, nxt } => {
       let dup = new_node(inet, DUP | *dups);
       *dups += 1;
-      let val = encode_term(inet, val, port(dup, 0), scope, vars, dups, def_to_id)?;
+      let val = encode_term(inet, val, port(dup, 0), scope, vars, dups, def_names)?;
       link(inet, val, port(dup, 0));
 
       scope.entry(fst.clone()).or_default().push(vars.len());
       vars.push((port(dup, 1), None));
       scope.entry(snd.clone()).or_default().push(vars.len());
       vars.push((port(dup, 2), None));
-      let nxt = encode_term(inet, nxt, up, scope, vars, dups, def_to_id)?;
+      let nxt = encode_term(inet, nxt, up, scope, vars, dups, def_names)?;
       scope.get_mut(snd).unwrap().pop().unwrap();
       scope.get_mut(fst).unwrap().pop().unwrap();
       Ok(nxt)
@@ -114,8 +113,8 @@ fn encode_term(
         }
       }
       // If the name is not in scope, check if it's a definition's name
-      if let Some(definition_id) = def_to_id.get(nam) {
-        let node = new_node(inet, REF | **definition_id);
+      if def_names.contains(nam) {
+        let node = new_node(inet, REF | *DefId::from(nam));
         link(inet, port(node, 1), port(node, 2));
         link(inet, up, port(node, 0));
         Ok(port(node, 0))
@@ -123,6 +122,12 @@ fn encode_term(
         // This has to be checked earlier
         Err(anyhow::anyhow!("Unbound variable: '{}'", nam.as_ref()))
       }
+    }
+    Term::Ref { def_id } => {
+      let node = new_node(inet, REF | **def_id);
+      link(inet, port(node, 1), port(node, 2));
+      link(inet, up, port(node, 0));
+      Ok(port(node, 0))
     }
     Term::Num { val } => {
       debug_assert!(**val <= LABEL_MASK);
@@ -134,9 +139,9 @@ fn encode_term(
     }
     Term::NumOp { op, fst, snd } => {
       let node = new_node(inet, NUMOP | u8::from(*op) as NodeKind);
-      let fst = encode_term(inet, fst, port(node, 0), scope, vars, dups, def_to_id)?;
+      let fst = encode_term(inet, fst, port(node, 0), scope, vars, dups, def_names)?;
       link(inet, port(node, 0), fst);
-      let snd = encode_term(inet, snd, port(node, 1), scope, vars, dups, def_to_id)?;
+      let snd = encode_term(inet, snd, port(node, 1), scope, vars, dups, def_names)?;
       link(inet, port(node, 1), snd);
       Ok(port(node, 2))
     }
