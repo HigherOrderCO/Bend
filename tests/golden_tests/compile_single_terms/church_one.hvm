@@ -1,1 +1,1 @@
-(λk λs λz dup s0 s1 = s; (s0 ((k s1) z))) (λq λw w)
+(λk λs λz dup s0 s1 = s; (s0 ((k s1) z)) λq λw w)

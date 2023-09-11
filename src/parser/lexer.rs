@@ -9,7 +9,7 @@ pub enum Token {
   #[regex("[_a-zA-Z][_a-zA-Z0-9]*", |lex| lex.slice().parse().ok())]
   Name(String),
 
-  #[regex(r"\\|λ")]
+  #[regex("@|λ")]
   Lambda,
 
   #[token("let")]
