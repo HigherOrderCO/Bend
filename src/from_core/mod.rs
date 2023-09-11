@@ -120,8 +120,17 @@ fn readback_compat(net: &INet) -> Term {
       return Name("*".to_string());
     }
     if !var_name.contains_key(&var_port) {
-      let nam = Name(u64_to_name(var_name.len() as u64 + 1));
-      var_name.insert(var_port, nam.clone());
+      let mut n = var_name.len();
+      let mut name = String::new();
+      loop {
+        let c = (n % 26) as u8 + b'a';
+        name.push(c as char);
+        n /= 26;
+        if n == 0 {
+          break;
+        }
+      }
+      var_name.insert(var_port, Name(name));
     }
     var_name.get(&var_port).unwrap().clone()
   }
