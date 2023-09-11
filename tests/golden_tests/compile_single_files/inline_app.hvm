@@ -1,0 +1,4 @@
+Rule1 = λx x
+Rule2 = λx x
+Rule3 = Rule1 Rule2
+Main = Rule3 Rule3
