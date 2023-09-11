@@ -1,4 +1,4 @@
-mod compat_net;
+pub mod compat_net;
 
 use self::compat_net::{compat_net_to_core, term_to_compat_net};
 use crate::ast::{core::Book, DefId, Definition, DefinitionBook, Name, Term};
