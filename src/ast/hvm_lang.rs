@@ -29,11 +29,11 @@ pub enum Pattern {
 
 #[derive(Debug, Clone)]
 pub enum Term {
-  Lam { nam: Name, bod: Box<Term> },
+  Lam { nam: Option<Name>, bod: Box<Term> },
   Var { nam: Name },
   Ref { def_id: DefId },
   App { fun: Box<Term>, arg: Box<Term> },
-  Dup { fst: Name, snd: Name, val: Box<Term>, nxt: Box<Term> },
+  Dup { fst: Option<Name>, snd: Option<Name>, val: Box<Term>, nxt: Box<Term> },
   Num { val: Number },
   NumOp { op: NumOper, fst: Box<Term>, snd: Box<Term> },
   Sup { fst: Box<Term>, snd: Box<Term> },
@@ -142,11 +142,18 @@ impl fmt::Display for NumOper {
 impl fmt::Display for Term {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Term::Lam { nam, bod } => write!(f, "λ{nam} {bod}"),
+      Term::Lam { nam, bod } => write!(f, "λ{} {}", nam.clone().unwrap_or(Name("*".to_string())), bod),
       Term::Var { nam } => write!(f, "{nam}"),
       Term::Ref { def_id } => write!(f, "{}", Name::from(*def_id)),
       Term::App { fun, arg } => write!(f, "({fun} {arg})"),
-      Term::Dup { fst, snd, val, nxt } => write!(f, "dup {fst} {snd} = {val}; {nxt}"),
+      Term::Dup { fst, snd, val, nxt } => write!(
+        f,
+        "dup {} {} = {}; {}",
+        fst.clone().unwrap_or(Name("*".to_string())),
+        snd.clone().unwrap_or(Name("*".to_string())),
+        val,
+        nxt
+      ),
       Term::Num { val } => write!(f, "{val}"),
       Term::NumOp { op, fst, snd } => write!(f, "({op} {fst} {snd})"),
       Term::Sup { fst, snd } => write!(f, "{{{fst} {snd}}}"),

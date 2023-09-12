@@ -162,6 +162,7 @@ fn readback_compat(net: &INet) -> Term {
         // If we're visiting a port 0, then it is a lambda.
         0 => {
           let nam = name_of(net, port(addr(next), 1), var_name);
+          let nam = if *nam == "*" { None } else { Some(nam) };
           let prt = enter(net, port(addr(next), 2));
           let bod = reader(net, prt, var_name, dups_vec, dups_set, seen);
           Term::Lam { nam, bod: Box::new(bod) }
@@ -228,6 +229,8 @@ fn readback_compat(net: &INet) -> Term {
       reader(net, enter(net, port(dup, 0)), &mut binder_name, &mut dups_vec, &mut dups_set, &mut seen);
     let fst = name_of(net, port(dup, 1), &mut binder_name);
     let snd = name_of(net, port(dup, 2), &mut binder_name);
+    let fst = if *fst == "*" { None } else { Some(fst) };
+    let snd = if *snd == "*" { None } else { Some(snd) };
     let val = Box::new(val);
     let nxt = Box::new(main);
     main = Term::Dup { fst, snd, val, nxt };

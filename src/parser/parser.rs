@@ -95,7 +95,7 @@ where
   select! {
     Token::Add => NumOper::Add,
     Token::Sub => NumOper::Sub,
-    Token::Mul => NumOper::Mul,
+    Token::Asterisk => NumOper::Mul,
     Token::Div => NumOper::Div,
     Token::Mod => NumOper::Mod,
     Token::And => NumOper::And,
@@ -119,12 +119,13 @@ where
   let new_line = || just(Token::NewLine).repeated();
   let number = select!(Token::Number(num) => Term::Num{val: num});
   let var = name().map(|name| Term::Var { nam: name }).boxed();
+  let era_or_name = choice((select!(Token::Asterisk => None), name().map(Some))).boxed();
 
   recursive(|term| {
     // λx body
     let lam = just(Token::Lambda)
       .ignore_then(new_line())
-      .ignore_then(name())
+      .ignore_then(era_or_name.clone())
       .then_ignore(new_line())
       .then(term.clone())
       .map(|(name, body)| Term::Lam { nam: name, bod: Box::new(body) })
@@ -133,9 +134,9 @@ where
     // dup x1 x2 = body; next
     let dup = just(Token::Dup)
       .ignore_then(new_line())
-      .ignore_then(name())
+      .ignore_then(era_or_name.clone())
       .then_ignore(new_line())
-      .then(name())
+      .then(era_or_name.clone())
       .then_ignore(new_line())
       .then_ignore(just(Token::Equals))
       .then_ignore(new_line())
@@ -149,7 +150,7 @@ where
     // let x = body; next
     let let_ = just(Token::Let)
       .ignore_then(new_line())
-      .ignore_then(name())
+      .ignore_then(era_or_name.clone())
       .then_ignore(new_line())
       .then_ignore(just(Token::Equals))
       .then_ignore(new_line())

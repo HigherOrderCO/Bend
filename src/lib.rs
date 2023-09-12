@@ -16,14 +16,15 @@ use to_core::{book_to_hvm_core, book_to_hvm_internal};
 
 pub use loader::load_file_to_book;
 
-pub fn check_book(book: &DefinitionBook) -> anyhow::Result<()> {
+pub fn check_book(book: DefinitionBook) -> anyhow::Result<()> {
   // TODO: Do the checks without having to do full compilation
   compile_book(book)?;
   Ok(())
 }
 
-pub fn compile_book(book: &DefinitionBook) -> anyhow::Result<Book> {
-  book_to_hvm_core(book)
+pub fn compile_book(book: DefinitionBook) -> anyhow::Result<Book> {
+  let book = book.try_into_affine()?;
+  book_to_hvm_core(&book)
 }
 
 pub fn run_compiled(book: &Book) -> anyhow::Result<(LNet, RunStats)> {
@@ -41,8 +42,8 @@ pub fn run_compiled(book: &Book) -> anyhow::Result<(LNet, RunStats)> {
   Ok((net, stats))
 }
 
-pub fn run_book(book: &DefinitionBook) -> anyhow::Result<(Term, RunStats)> {
-  check_main(book)?;
+pub fn run_book(book: DefinitionBook) -> anyhow::Result<(Term, RunStats)> {
+  check_main(&book)?;
   let compiled = compile_book(book)?;
   let (res, stats) = run_compiled(&compiled)?;
   let res = readback_net(&res)?;

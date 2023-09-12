@@ -34,14 +34,14 @@ fn main() -> anyhow::Result<()> {
 
   match args.mode {
     Mode::Check => {
-      check_book(&book)?;
+      check_book(book)?;
     }
     Mode::Compile => {
-      let compiled = compile_book(&book)?;
+      let compiled = compile_book(book)?;
       println!("{compiled}");
     }
     Mode::Run => {
-      let (res, stats) = run_book(&book)?;
+      let (res, stats) = run_book(book)?;
       let rps = stats.rewrites as f64 / stats.run_time / 1_000_000.0;
       println!("\n{}\n", res);
       println!("size: {}", stats.size);

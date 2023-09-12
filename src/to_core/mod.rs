@@ -1,28 +1,26 @@
 pub mod compat_net;
 
 use self::compat_net::{compat_net_to_core, term_to_compat_net};
-use crate::ast::{core::Book, DefId, Definition, DefinitionBook, Name, Term};
+use crate::ast::{core::Book, DefId, Definition, DefinitionBook, Term};
 use hvm_core::{lnet_to_net, LNet};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 pub fn book_to_hvm_core(book: &DefinitionBook) -> anyhow::Result<Book> {
   let mut core_book = Book { defs: HashMap::new() };
-  let def_names = book.defs.values().map(|x| &x.name).cloned().collect();
   for (def_id, def) in book.defs.iter() {
-    let net = definition_to_hvm_core(def, &def_names)?;
+    let net = definition_to_hvm_core(def)?;
     core_book.defs.insert(*def_id, net);
   }
   Ok(core_book)
 }
 
-pub fn definition_to_hvm_core(definition: &Definition, def_names: &HashSet<Name>) -> anyhow::Result<LNet> {
+pub fn definition_to_hvm_core(definition: &Definition) -> anyhow::Result<LNet> {
   // TODO: Multiple rules, pattern matching, etc.
-  term_to_hvm_core(definition.rules[0].body.clone(), def_names)
+  term_to_hvm_core(&definition.rules[0].body)
 }
 
-pub fn term_to_hvm_core(term: Term, def_names: &HashSet<Name>) -> anyhow::Result<LNet> {
-  let term = term.try_into_affine(def_names)?;
-  let compat_net = term_to_compat_net(&term, def_names)?;
+pub fn term_to_hvm_core(term: &Term) -> anyhow::Result<LNet> {
+  let compat_net = term_to_compat_net(term)?;
   compat_net_to_core(&compat_net)
 }
 

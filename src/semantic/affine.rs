@@ -21,7 +21,7 @@ impl DefinitionBook {
       let body = body.try_into_affine(&def_names)?;
       new_book.defs.insert(def_id, Definition { name, rules: vec![Rule { def_id, pats, body }] });
     }
-    todo!()
+    Ok(new_book)
   }
 }
 
@@ -32,13 +32,9 @@ type Scope = BTreeMap<Name, Vec<Vec<usize>>>;
 fn term_to_affine(value: Term, scope: &mut Scope, def_names: &HashSet<Name>) -> anyhow::Result<Term> {
   match value {
     Term::Lam { nam, bod } => {
-      scope.entry(nam.clone()).or_default().push(vec![]);
+      push_scope(&nam, scope);
       let bod = term_to_affine(*bod, scope, def_names)?.into();
-      let var_uses = scope.get_mut(&*nam).unwrap().pop().unwrap();
-      let (nam, bod) = add_dups_of_var(&nam, bod, &var_uses, scope, def_names);
-      if scope.get(&*nam).unwrap().is_empty() {
-        scope.remove(&*nam);
-      }
+      let (nam, bod) = pop_scope(&nam, bod, scope, def_names);
       Ok(Term::Lam { nam, bod })
     }
     Term::Var { nam } => {
@@ -89,18 +85,17 @@ fn term_to_affine(value: Term, scope: &mut Scope, def_names: &HashSet<Name>) -> 
     // }),
     Term::Dup { fst, snd, val, nxt } => {
       if fst == snd {
-        // TODO: This should probably be a warning instead of an error
-        return Err(anyhow::anyhow!("Found dup with same name for both variables: '{fst}'"));
+        if let Some(fst) = fst {
+          // TODO: This should probably be a warning instead of an error
+          return Err(anyhow::anyhow!("Found dup with same name for both variables: '{fst}'"));
+        }
       }
       let val = term_to_affine(*val, scope, def_names)?.into();
-
-      scope.entry(fst.clone()).or_default().push(vec![]);
-      scope.entry(snd.clone()).or_default().push(vec![]);
+      push_scope(&fst, scope);
+      push_scope(&snd, scope);
       let nxt = term_to_affine(*nxt, scope, def_names)?.into();
-      let snd_uses = scope.get_mut(&snd).unwrap().pop().unwrap();
-      let fst_uses = scope.get_mut(&fst).unwrap().pop().unwrap();
-      let (snd, nxt) = add_dups_of_var(&snd, nxt, &snd_uses, scope, def_names);
-      let (fst, nxt) = add_dups_of_var(&fst, nxt, &fst_uses, scope, def_names);
+      let (snd, nxt) = pop_scope(&snd, nxt, scope, def_names);
+      let (fst, nxt) = pop_scope(&fst, nxt, scope, def_names);
       Ok(Term::Dup { fst, snd, val, nxt })
     }
     num @ Term::Num { .. } => Ok(num),
@@ -111,6 +106,33 @@ fn term_to_affine(value: Term, scope: &mut Scope, def_names: &HashSet<Name>) -> 
     }),
     Term::Sup { .. } => unreachable!(),
     Term::Era => unreachable!(),
+  }
+}
+
+fn push_scope(nam: &Option<Name>, scope: &mut Scope) {
+  if let Some(nam) = &nam {
+    scope.entry(nam.clone()).or_default().push(vec![]);
+  }
+}
+
+// Removes a variable from the scope, adding dups/era when necessary
+fn pop_scope(
+  nam: &Option<Name>,
+  bod: Box<Term>,
+  scope: &mut Scope,
+  def_names: &HashSet<Name>,
+) -> (Option<Name>, Box<Term>) {
+  if let Some(nam) = &nam {
+    let var_uses = scope.get_mut(nam).unwrap().pop().unwrap();
+    let (new_nam, bod) = add_dups_of_var(nam, bod, &var_uses, scope, def_names);
+    if let Some(new_nam) = &new_nam {
+      if scope.get(new_nam).unwrap().is_empty() {
+        scope.remove(new_nam);
+      }
+    }
+    (new_nam, bod)
+  } else {
+    (None, bod)
   }
 }
 
@@ -147,23 +169,30 @@ fn add_dups_of_var(
   var_uses: &[usize],
   scope: &Scope,
   def_names: &HashSet<Name>,
-) -> (Name, Box<Term>) {
-  if var_uses.len() == 1 {
-    (make_dup_name(var_name, var_uses[0]), var_body)
-  } else {
-    let mut var_uses = var_uses.to_vec();
-    let mut refs_to_add = VecDeque::from_iter(var_uses.iter().map(|i| make_dup_name(var_name, *i)));
-    while let (Some(fst), Some(snd)) = (refs_to_add.pop_front(), refs_to_add.pop_front()) {
-      let dup_name = if refs_to_add.is_empty() {
-        Name(var_name.to_string()) // Topmost DUP refers to original lambda var
-      } else {
-        let (name, new_idx) = make_new_dup_name(var_name, &var_uses, scope, def_names);
-        refs_to_add.push_back(name.clone());
-        var_uses.push(new_idx);
-        name.clone()
-      };
-      var_body = Box::new(Term::Dup { fst, snd, val: Term::Var { nam: dup_name }.into(), nxt: var_body });
+) -> (Option<Name>, Box<Term>) {
+  match var_uses.len() {
+    0 => (None, var_body),
+    1 => (Some(make_dup_name(var_name, var_uses[0])), var_body),
+    _ => {
+      let mut var_uses = var_uses.to_vec();
+      let mut refs_to_add = VecDeque::from_iter(var_uses.iter().map(|i| make_dup_name(var_name, *i)));
+      while let (Some(fst), Some(snd)) = (refs_to_add.pop_front(), refs_to_add.pop_front()) {
+        let dup_name = if refs_to_add.is_empty() {
+          Name(var_name.to_string()) // Topmost DUP refers to original lambda var
+        } else {
+          let (name, new_idx) = make_new_dup_name(var_name, &var_uses, scope, def_names);
+          refs_to_add.push_back(name.clone());
+          var_uses.push(new_idx);
+          name.clone()
+        };
+        var_body = Box::new(Term::Dup {
+          fst: Some(fst),
+          snd: Some(snd),
+          val: Term::Var { nam: dup_name }.into(),
+          nxt: var_body,
+        });
+      }
+      (Some(var_name.clone()), var_body)
     }
-    (var_name.clone(), var_body)
   }
 }

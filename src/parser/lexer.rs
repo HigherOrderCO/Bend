@@ -31,7 +31,7 @@ pub enum Token {
   Sub,
 
   #[token("*")]
-  Mul,
+  Asterisk,
 
   #[token("/")]
   Div,
@@ -154,7 +154,7 @@ impl fmt::Display for Token {
       Self::Number(num) => write!(f, "{}", num.as_ref()),
       Self::Add => write!(f, "+"),
       Self::Sub => write!(f, "-"),
-      Self::Mul => write!(f, "*"),
+      Self::Asterisk => write!(f, "*"),
       Self::Div => write!(f, "/"),
       Self::Mod => write!(f, "%"),
       Self::And => write!(f, "&"),

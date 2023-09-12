@@ -1,9 +1,10 @@
 use hvm_core::show_lnet;
 use hvm_lang::{
+  compile_book,
   loader::display_err_for_text,
   parser::{parse_definition_book, parse_term},
   run_book,
-  to_core::{book_to_hvm_core, term_to_hvm_core},
+  to_core::term_to_hvm_core,
 };
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
@@ -49,7 +50,8 @@ fn compile_single_terms() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let net = term_to_hvm_core(term, &HashSet::new())?;
+    let term = term.try_into_affine(&HashSet::new())?;
+    let net = term_to_hvm_core(&term)?;
     Ok(show_lnet(&net))
   })
 }
@@ -62,7 +64,7 @@ fn compile_single_files() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let core_book = book_to_hvm_core(&book)?;
+    let core_book = compile_book(book)?;
     Ok(core_book.to_string())
   })
 }
@@ -75,7 +77,7 @@ fn run_single_files() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let (res, _) = run_book(&book)?;
+    let (res, _) = run_book(book)?;
     Ok(res.to_string())
   })
 }
