@@ -12,6 +12,9 @@ pub enum Token {
   #[regex("@|λ")]
   Lambda,
 
+  #[token("$")]
+  Dollar,
+
   #[token("let")]
   Let,
 
@@ -147,7 +150,8 @@ impl fmt::Display for Token {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
       Self::Name(s) => write!(f, "{}", s),
-      Self::Lambda => write!(f, r"λ"),
+      Self::Lambda => write!(f, "λ"),
+      Self::Dollar => write!(f, "$"),
       Self::Let => write!(f, "let"),
       Self::Dup => write!(f, "dup"),
       Self::Equals => write!(f, "="),

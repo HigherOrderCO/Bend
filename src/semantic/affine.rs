@@ -1,12 +1,23 @@
 use crate::ast::{DefId, Definition, DefinitionBook, Name, Rule, Term};
-use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 
 impl Term {
   /// Makes sure that all variables are affine (used 0 or 1 times), adding the needed dups.
   /// Checks for variables not defined anywhere.
   /// Converts def references into a Ref type
   pub fn try_into_affine(self, def_names: &HashSet<Name>) -> anyhow::Result<Self> {
-    term_to_affine(self, &mut BTreeMap::new(), def_names)
+    let mut globals = HashMap::new();
+    let term = term_to_affine(self, &mut BTreeMap::new(), &mut globals, def_names)?;
+    for (name, (defined, used)) in globals {
+      if !defined {
+        return Err(anyhow::anyhow!("Unbound global variable '${name}'"));
+      }
+      if !used {
+        // TODO: Instead, we should transform into a scoped erased lambda
+        return Err(anyhow::anyhow!("Unused global variable '${name}'"));
+      }
+    }
+    Ok(term)
   }
 }
 
@@ -29,11 +40,17 @@ type Scope = BTreeMap<Name, Vec<Vec<usize>>>;
 
 /// `scope` maps variable names to a stack of set of ids per var sharing this name>.
 /// `num_uses` counts how many times each variable name was used. This is used to create unique names.
-fn term_to_affine(value: Term, scope: &mut Scope, def_names: &HashSet<Name>) -> anyhow::Result<Term> {
+/// `globals` stores if a global variable has been defined and used somewhere in the term.
+fn term_to_affine(
+  value: Term,
+  scope: &mut Scope,
+  globals: &mut HashMap<Name, (bool, bool)>,
+  def_names: &HashSet<Name>,
+) -> anyhow::Result<Term> {
   match value {
     Term::Lam { nam, bod } => {
       push_scope(&nam, scope);
-      let bod = term_to_affine(*bod, scope, def_names)?.into();
+      let bod = term_to_affine(*bod, scope, globals, def_names)?.into();
       let (nam, bod) = pop_scope(&nam, bod, scope, def_names);
       Ok(Term::Lam { nam, bod })
     }
@@ -63,6 +80,31 @@ fn term_to_affine(value: Term, scope: &mut Scope, def_names: &HashSet<Name>) -> 
         }
       }
     }
+    // TODO: Add var use checking for global lambdas and vars
+    Term::GlobalLam { nam, bod } => {
+      if let Some(global_use) = globals.get_mut(&nam) {
+        if global_use.0 {
+          return Err(anyhow::anyhow!("Global variable '{nam}' declared more than once"));
+        } else {
+          global_use.0 = true;
+        }
+      }
+      let bod = term_to_affine(*bod, scope, globals, def_names)?.into();
+      Ok(Term::GlobalLam { nam, bod })
+    }
+    Term::GlobalVar { nam } => {
+      if let Some(global_use) = globals.get_mut(&nam) {
+        if global_use.1 {
+          // TODO: Add dups on the first outer scope that contain all uses.
+          return Err(anyhow::anyhow!(
+            "Global variable '{nam}' used more than once. Explicitly assign it to a scoped variable with a let or dup instead."
+          ));
+        } else {
+          global_use.1 = true;
+        }
+      }
+      Ok(Term::GlobalVar { nam })
+    }
     Term::Ref { def_id } => {
       // We expect to not encounter this case, but if something changes in the future,
       // we're already deling with the possibility.
@@ -74,8 +116,8 @@ fn term_to_affine(value: Term, scope: &mut Scope, def_names: &HashSet<Name>) -> 
       }
     }
     Term::App { fun, arg } => Ok(Term::App {
-      fun: Box::new(term_to_affine(*fun, scope, def_names)?),
-      arg: Box::new(term_to_affine(*arg, scope, def_names)?),
+      fun: Box::new(term_to_affine(*fun, scope, globals, def_names)?),
+      arg: Box::new(term_to_affine(*arg, scope, globals, def_names)?),
     }),
     // TODO: Should we add support for manually specifying sup terms?
     // Term::Sup { label, fst, snd } => Ok(Term::Sup {
@@ -90,10 +132,10 @@ fn term_to_affine(value: Term, scope: &mut Scope, def_names: &HashSet<Name>) -> 
           return Err(anyhow::anyhow!("Found dup with same name for both variables: '{fst}'"));
         }
       }
-      let val = term_to_affine(*val, scope, def_names)?.into();
+      let val = term_to_affine(*val, scope, globals, def_names)?.into();
       push_scope(&fst, scope);
       push_scope(&snd, scope);
-      let nxt = term_to_affine(*nxt, scope, def_names)?.into();
+      let nxt = term_to_affine(*nxt, scope, globals, def_names)?.into();
       let (snd, nxt) = pop_scope(&snd, nxt, scope, def_names);
       let (fst, nxt) = pop_scope(&fst, nxt, scope, def_names);
       Ok(Term::Dup { fst, snd, val, nxt })
@@ -101,8 +143,8 @@ fn term_to_affine(value: Term, scope: &mut Scope, def_names: &HashSet<Name>) -> 
     num @ Term::Num { .. } => Ok(num),
     Term::NumOp { op, fst, snd } => Ok(Term::NumOp {
       op,
-      fst: Box::new(term_to_affine(*fst, scope, def_names)?),
-      snd: Box::new(term_to_affine(*snd, scope, def_names)?),
+      fst: Box::new(term_to_affine(*fst, scope, globals, def_names)?),
+      snd: Box::new(term_to_affine(*snd, scope, globals, def_names)?),
     }),
     Term::Sup { .. } => unreachable!(),
     Term::Era => unreachable!(),

@@ -6,16 +6,21 @@ use crate::ast::{
   Name, Term,
 };
 use hvm_core::{LNet, LTree, Tag};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Converts an IC term into an IC net.
 pub fn term_to_compat_net(term: &Term) -> anyhow::Result<INet> {
   let mut inet = new_inet();
 
   // Encodes the main term.
-  let main = encode_term(&mut inet, term, ROOT, &mut HashMap::new(), &mut vec![], &mut 0)?;
-  if ROOT != main {
-    link(&mut inet, ROOT, main);
+  let mut global_vars = HashMap::new();
+  let main = encode_term(&mut inet, term, ROOT, &mut HashMap::new(), &mut vec![], &mut global_vars, &mut 0)?;
+
+  for (decl_port, use_port) in global_vars.into_values() {
+    link(&mut inet, decl_port, use_port);
+  }
+  if Some(ROOT) != main {
+    link_local(&mut inet, ROOT, main);
   }
 
   Ok(inet)
@@ -24,6 +29,7 @@ pub fn term_to_compat_net(term: &Term) -> anyhow::Result<INet> {
 /// Adds a subterm connected to `up` to the `inet`.
 /// `scope` has the current variable scope.
 /// `vars` has the information of which ports the variables are declared and used in.
+/// `global_vars` has the same information for global lambdas. Must be linked outside this function.
 /// Expects variables to be affine, refs to be stored as Refs and all names to be bound.
 fn encode_term(
   inet: &mut INet,
@@ -31,22 +37,28 @@ fn encode_term(
   up: Port,
   scope: &mut HashMap<Name, Vec<usize>>,
   vars: &mut Vec<(Port, Option<Port>)>,
+  global_vars: &mut HashMap<Name, (Port, Port)>,
   dups: &mut NodeId,
-) -> anyhow::Result<Port> {
+) -> anyhow::Result<Option<Port>> {
   match term {
     // A lambda becomes to a con node. Ports:
     // - 0: points to where the lambda occurs.
     // - 1: points to the lambda variable.
     // - 2: points to the lambda body.
-    Term::Lam { nam: name, bod: body } => {
+    Term::Lam { nam, bod } => {
       let fun = new_node(inet, CON);
-
-      push_scope(name, port(fun, 1), scope, vars);
-      let bod = encode_term(inet, body, port(fun, 2), scope, vars, dups)?;
-      pop_scope(name, port(fun, 1), inet, scope);
-
-      link(inet, port(fun, 2), bod);
-      Ok(port(fun, 0))
+      push_scope(nam, port(fun, 1), scope, vars);
+      let bod = encode_term(inet, bod, port(fun, 2), scope, vars, global_vars, dups)?;
+      pop_scope(nam, port(fun, 1), inet, scope);
+      link_local(inet, port(fun, 2), bod);
+      Ok(Some(port(fun, 0)))
+    }
+    Term::GlobalLam { nam, bod } => {
+      let fun = new_node(inet, CON);
+      global_vars.entry(nam.clone()).or_default().0 = port(fun, 1);
+      let bod = encode_term(inet, bod, port(fun, 2), scope, vars, global_vars, dups)?;
+      link_local(inet, port(fun, 2), bod);
+      Ok(Some(port(fun, 0)))
     }
     // An application becomes to a con node too. Ports:
     // - 0: points to the function being applied.
@@ -54,11 +66,11 @@ fn encode_term(
     // - 2: points to where the application occurs.
     Term::App { fun, arg } => {
       let app = new_node(inet, CON);
-      let fun = encode_term(inet, fun, port(app, 0), scope, vars, dups)?;
-      link(inet, port(app, 0), fun);
-      let arg = encode_term(inet, arg, port(app, 1), scope, vars, dups)?;
-      link(inet, port(app, 1), arg);
-      Ok(port(app, 2))
+      let fun = encode_term(inet, fun, port(app, 0), scope, vars, global_vars, dups)?;
+      link_local(inet, port(app, 0), fun);
+      let arg = encode_term(inet, arg, port(app, 1), scope, vars, global_vars, dups)?;
+      link_local(inet, port(app, 1), arg);
+      Ok(Some(port(app, 2)))
     }
     // A dup becomes a dup node too. Ports:
     // - 0: points to the value projected.
@@ -67,12 +79,12 @@ fn encode_term(
     Term::Dup { fst, snd, val, nxt } => {
       let dup = new_node(inet, DUP | *dups);
       *dups += 1;
-      let val = encode_term(inet, val, port(dup, 0), scope, vars, dups)?;
-      link(inet, val, port(dup, 0));
+      let val = encode_term(inet, val, port(dup, 0), scope, vars, global_vars, dups)?;
+      link_local(inet, port(dup, 0), val);
 
       push_scope(fst, port(dup, 1), scope, vars);
       push_scope(snd, port(dup, 2), scope, vars);
-      let nxt = encode_term(inet, nxt, up, scope, vars, dups)?;
+      let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, dups)?;
       pop_scope(snd, port(dup, 2), inet, scope);
       pop_scope(fst, port(dup, 1), inet, scope);
 
@@ -88,13 +100,17 @@ fn encode_term(
       debug_assert!(use_port.is_none(), "Variable {nam} used more than once");
       link(inet, up, *declare_port);
       *use_port = Some(up);
-      Ok(*declare_port)
+      Ok(Some(*declare_port))
+    }
+    Term::GlobalVar { nam } => {
+      global_vars.entry(nam.clone()).or_default().1 = up;
+      Ok(None)
     }
     Term::Ref { def_id } => {
       let node = new_node(inet, REF | **def_id);
       link(inet, port(node, 1), port(node, 2));
       link(inet, up, port(node, 0));
-      Ok(port(node, 0))
+      Ok(Some(port(node, 0)))
     }
     Term::Num { val } => {
       debug_assert!(**val <= LABEL_MASK);
@@ -102,15 +118,15 @@ fn encode_term(
       // TODO: This is a workaround with the vector of nodes representation that didn't have number support
       inet.nodes[port(node, 1) as usize] = port(node, 2);
       inet.nodes[port(node, 2) as usize] = port(node, 1);
-      Ok(port(node, 0))
+      Ok(Some(port(node, 0)))
     }
     Term::NumOp { op, fst, snd } => {
       let node = new_node(inet, NUMOP | u8::from(*op) as NodeKind);
-      let fst = encode_term(inet, fst, port(node, 0), scope, vars, dups)?;
-      link(inet, port(node, 0), fst);
-      let snd = encode_term(inet, snd, port(node, 1), scope, vars, dups)?;
-      link(inet, port(node, 1), snd);
-      Ok(port(node, 2))
+      let fst = encode_term(inet, fst, port(node, 0), scope, vars, global_vars, dups)?;
+      link_local(inet, port(node, 0), fst);
+      let snd = encode_term(inet, snd, port(node, 1), scope, vars, global_vars, dups)?;
+      link_local(inet, port(node, 1), snd);
+      Ok(Some(port(node, 2)))
     }
     Term::Sup { .. } => unreachable!(),
     Term::Era => unreachable!(),
@@ -139,8 +155,14 @@ fn pop_scope(name: &Option<Name>, decl_port: Port, inet: &mut INet, scope: &mut 
   }
 }
 
+fn link_local(inet: &mut INet, ptr_a: Port, ptr_b: Option<Port>) {
+  if let Some(ptr_b) = ptr_b {
+    link(inet, ptr_a, ptr_b);
+  }
+}
+
 pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
-  let (root_root, acts_roots) = get_tree_roots(inet);
+  let (root_root, acts_roots) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(root_root) = root_root {
     // If there is a root tree connected to the root node
@@ -162,7 +184,7 @@ pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
 type VarId = NodeId;
 
 /// Returns a list of all the tree node roots in the compat inet.
-fn get_tree_roots(inet: &INet) -> (Option<NodeId>, Vec<[NodeId; 2]>) {
+fn get_tree_roots(inet: &INet) -> anyhow::Result<(Option<NodeId>, Vec<[NodeId; 2]>)> {
   let mut acts_roots: Vec<[NodeId; 2]> = vec![];
   let mut explored_nodes = vec![false; inet.nodes.len() / 4];
   let mut side_links: Vec<Port> = vec![]; // Links between trees
@@ -173,7 +195,7 @@ fn get_tree_roots(inet: &INet) -> (Option<NodeId>, Vec<[NodeId; 2]>) {
   let root_root = if slot(root_link) == 0 {
     // If the root node is connected to a main port, we have a root tree
     let root_node = addr(root_link);
-    go_down_tree(inet, root_node, &mut explored_nodes, &mut side_links);
+    go_down_tree(inet, root_node, &mut explored_nodes, &mut side_links)?;
     Some(root_node)
   } else {
     // Otherwise, root node connected to an aux port, no root tree.
@@ -186,22 +208,29 @@ fn get_tree_roots(inet: &INet) -> (Option<NodeId>, Vec<[NodeId; 2]>) {
     let dest_node = addr(dest_port);
     // Only go up unmarked trees
     if !explored_nodes[dest_node as usize] {
-      let new_roots = go_up_tree(inet, dest_node);
-      go_down_tree(inet, new_roots[0], &mut explored_nodes, &mut side_links);
-      go_down_tree(inet, new_roots[1], &mut explored_nodes, &mut side_links);
+      let new_roots = go_up_tree(inet, dest_node)?;
+      go_down_tree(inet, new_roots[0], &mut explored_nodes, &mut side_links)?;
+      go_down_tree(inet, new_roots[1], &mut explored_nodes, &mut side_links)?;
       acts_roots.push(new_roots);
     }
   }
 
-  (root_root, acts_roots)
+  Ok((root_root, acts_roots))
 }
 
 /// Go down a node tree, marking all nodes with the tree_id and storing any side_links found.
-fn go_down_tree(inet: &INet, root: NodeId, explored_nodes: &mut [bool], side_links: &mut Vec<Port>) {
+fn go_down_tree(
+  inet: &INet,
+  root: NodeId,
+  explored_nodes: &mut [bool],
+  side_links: &mut Vec<Port>,
+) -> anyhow::Result<()> {
   debug_assert!(!explored_nodes[root as usize], "Explored same tree twice");
   let mut nodes_to_check = vec![root];
   while let Some(node) = nodes_to_check.pop() {
-    debug_assert!(!explored_nodes[node as usize]);
+    if explored_nodes[node as usize] {
+      return Err(anyhow::anyhow!("Cyclic terms are not supported"));
+    }
     explored_nodes[node as usize] = true;
     for down_slot in [1, 2] {
       let down_port = enter(inet, port(node, down_slot));
@@ -214,17 +243,22 @@ fn go_down_tree(inet: &INet, root: NodeId, explored_nodes: &mut [bool], side_lin
       }
     }
   }
+  Ok(())
 }
 
 /// Goes up a node tree, starting from some given node.
 /// Returns the root of this tree and the root of its active pair.
-fn go_up_tree(inet: &INet, start_node: NodeId) -> [NodeId; 2] {
+fn go_up_tree(inet: &INet, start_node: NodeId) -> anyhow::Result<[NodeId; 2]> {
+  let mut explored_nodes = HashSet::new();
   let mut crnt_node = start_node;
   loop {
+    if !explored_nodes.insert(crnt_node) {
+      return Err(anyhow::anyhow!("Cyclic terms are not supported"));
+    }
     let up_port = enter(inet, port(crnt_node, 0));
     let up_node = addr(up_port);
     if slot(up_port) == 0 {
-      return [crnt_node, up_node];
+      return Ok([crnt_node, up_node]);
     } else {
       crnt_node = up_node;
     }

@@ -111,7 +111,8 @@ fn inodes_to_inet(inodes: &INodes) -> INet {
   inet
 }
 
-// Converts an Interaction-INet node to an Interaction Calculus term.
+// TODO: Add support for global lambdas.
+/// Converts an Interaction-INet node to an Interaction Calculus term.
 fn readback_compat(net: &INet) -> Term {
   // Given a port, returns its name, or assigns one if it wasn't named yet.
   fn name_of(net: &INet, var_port: Port, var_name: &mut HashMap<Port, Name>) -> Name {

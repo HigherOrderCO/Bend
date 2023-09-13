@@ -23,13 +23,15 @@ use std::{collections::hash_map, iter::Map, ops::Range};
 /// <Rule>   ::= ("(" <Name> ")" | <Name>) \n* "=" \n* (<InlineNumOp> | <InlineApp>)
 /// <InlineNumOp> ::= <numop_token> <Term> <Term>
 /// <InlineApp>   ::= <Term>+
-/// <Term>   ::= <Var> | <Number> | <Lam> | <Dup> | <Let> | <NumOp> | <App>
+/// <Term>   ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Let> | <NumOp> | <App>
 /// <Lam>    ::= ("λ"|"@") \n* <Name> \n* <Term>
+/// <GlobalLam> ::= ("λ"|"@") "$" <Name> \n* <Term>
 /// <Dup>    ::= "dup" \n* <Name> \n* <Name> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
 /// <Let>    ::= "let" \n* <Name> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
 /// <NumOp>  ::= "(" \n* <numop_token> \n* <Term> \n* <Term> \n* ")"
 /// <App>    ::= "(" \n* <Term> (\n* <Term>)* \n* ")"
 /// <Var>    ::= <Name>
+/// <GlobalVar> ::= "$" <Name>
 /// <Name>   ::= <name_token> // [_a-zA-Z][_a-zA-Z0-9]{0..7}
 /// <Number> ::= <number_token> // [0-9]+
 pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Token>>> {
@@ -119,6 +121,7 @@ where
   let new_line = || just(Token::NewLine).repeated();
   let number = select!(Token::Number(num) => Term::Num{val: num});
   let var = name().map(|name| Term::Var { nam: name }).boxed();
+  let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::GlobalVar { nam: name }).boxed();
   let era_or_name = choice((select!(Token::Asterisk => None), name().map(Some))).boxed();
 
   recursive(|term| {
@@ -129,6 +132,17 @@ where
       .then_ignore(new_line())
       .then(term.clone())
       .map(|(name, body)| Term::Lam { nam: name, bod: Box::new(body) })
+      .boxed();
+
+    // λ$x body
+    let global_lam = just(Token::Lambda)
+      .ignore_then(new_line())
+      .ignore_then(just(Token::Dollar))
+      .ignore_then(new_line())
+      .ignore_then(name())
+      .then_ignore(new_line())
+      .then(term.clone())
+      .map(|(name, body)| Term::GlobalLam { nam: name, bod: Box::new(body) })
       .boxed();
 
     // dup x1 x2 = body; next
@@ -186,7 +200,7 @@ where
       .map(|((op, fst), snd)| Term::NumOp { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((var, number, lam, dup, let_, num_op, app))
+    choice((global_var, var, number, global_lam, lam, dup, let_, num_op, app))
   })
 }
 

@@ -31,6 +31,8 @@ pub enum Pattern {
 pub enum Term {
   Lam { nam: Option<Name>, bod: Box<Term> },
   Var { nam: Name },
+  GlobalLam { nam: Name, bod: Box<Term> },
+  GlobalVar { nam: Name },
   Ref { def_id: DefId },
   App { fun: Box<Term>, arg: Box<Term> },
   Dup { fst: Option<Name>, snd: Option<Name>, val: Box<Term>, nxt: Box<Term> },
@@ -144,6 +146,8 @@ impl fmt::Display for Term {
     match self {
       Term::Lam { nam, bod } => write!(f, "λ{} {}", nam.clone().unwrap_or(Name("*".to_string())), bod),
       Term::Var { nam } => write!(f, "{nam}"),
+      Term::GlobalLam { nam, bod } => write!(f, "λ${nam} {bod}"),
+      Term::GlobalVar { nam } => write!(f, "${nam}"),
       Term::Ref { def_id } => write!(f, "{}", Name::from(*def_id)),
       Term::App { fun, arg } => write!(f, "({fun} {arg})"),
       Term::Dup { fst, snd, val, nxt } => write!(

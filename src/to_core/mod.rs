@@ -36,3 +36,29 @@ pub fn book_to_hvm_internal(book: &Book) -> anyhow::Result<(hvm_core::Net, hvm_c
 
   Ok((root, hvm_book))
 }
+
+/*
+pub fn term_to_hvm_core2(term: &Term, def_names: &HashSet<Name>) -> anyhow::Result<LNet> {
+
+}
+
+fn go(term: &Term, def_names: &HashSet<Name>, prev: Option<Name>, gen_var_count: &mut usize) -> (Option<LTree>, Option<(LTree, LTree)>) {
+  match term {
+    Term::Lam { nam, bod } => todo!(),
+    Term::Var { nam } => todo!(),
+    Term::Ref { def_id } => LTree::Ref { nam: **def_id },
+    Term::App { fun, arg } => {
+      if let Some(prev) = prev {
+        let fun =
+        let app = LTree::Nod { tag: CON, lft: (), rgt: LTree::Var { nam: prev } };
+      } else {
+        unreachable!();
+      }
+    }
+    Term::Dup { fst, snd, val, nxt } => todo!(),
+    Term::Num { val } => LTree::NUM { val },
+    Term::NumOp { op, fst, snd } => unreachable!(),
+    Term::Sup { fst, snd } => unreachable!(),
+    Term::Era => unreachable!(),
+}
+}*/
