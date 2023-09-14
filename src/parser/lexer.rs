@@ -6,7 +6,7 @@ use crate::ast::Number;
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(error=LexingError)]
 pub enum Token {
-  #[regex("[_a-zA-Z][_a-zA-Z0-9]*", |lex| lex.slice().parse().ok())]
+  #[regex("[_.a-zA-Z][_.a-zA-Z0-9]*", |lex| lex.slice().parse().ok())]
   Name(String),
 
   #[regex("@|λ")]

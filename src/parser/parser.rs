@@ -125,6 +125,7 @@ where
   let var = name().map(|name| Term::Var { nam: name }).boxed();
   let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::GlobalVar { nam: name }).boxed();
   let era_or_name = choice((select!(Token::Asterisk => None), name().map(Some))).boxed();
+  let term_sep = choice((just(Token::NewLine), just(Token::Semicolon)));
 
   recursive(|term| {
     // λx body
@@ -157,7 +158,7 @@ where
       .then_ignore(just(Token::Equals))
       .then_ignore(new_line())
       .then(term.clone())
-      .then_ignore(just(Token::Semicolon))
+      .then_ignore(term_sep.clone())
       .then_ignore(new_line())
       .then(term.clone())
       .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) })
@@ -171,8 +172,7 @@ where
       .then_ignore(just(Token::Equals))
       .then_ignore(new_line())
       .then(term.clone())
-      .then_ignore(new_line())
-      .then_ignore(just(Token::Semicolon))
+      .then_ignore(term_sep)
       .then_ignore(new_line())
       .then(term.clone())
       .map(|((name, body), next)| Term::App {
