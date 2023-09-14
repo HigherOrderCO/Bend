@@ -1,23 +1,22 @@
 // TODO: Refactor to not use this intermediate form
 
-use hvm_core::Tag;
+use hvm_core::Val;
 
 #[derive(Clone, Debug)]
 /// Net representation used only as an intermediate for converting to hvm-core format
 pub struct INet {
-  pub nodes: Vec<NodeVal>,
+  pub nodes: Vec<Val>,
 }
 
-pub type NodeVal = u64;
-pub type NodeKind = NodeVal;
-pub type Port = NodeVal;
-pub type NodeId = NodeVal;
-pub type SlotId = NodeVal;
+pub type NodeKind = Val;
+pub type Port = Val;
+pub type NodeId = Val;
+pub type SlotId = Val;
 
 /// The ROOT port is on the deadlocked root node at address 0.
 pub const ROOT: Port = 1;
-pub const TAG_WIDTH: u32 = Tag::BITS;
-pub const TAG: u32 = 64 - TAG_WIDTH;
+pub const TAG_WIDTH: u32 = 4; // TODO: Make this generic over the HVM type.
+pub const TAG: u32 = Val::BITS - TAG_WIDTH;
 pub const ERA: NodeKind = 0 << TAG;
 pub const CON: NodeKind = 1 << TAG;
 pub const DUP: NodeKind = 2 << TAG;

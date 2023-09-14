@@ -3,9 +3,9 @@ use crate::ast::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
     SlotId, CON, DUP, ERA, LABEL_MASK, NUM, NUMOP, REF, ROOT, TAG_MASK,
   },
-  Name, Number, Term,
+  id_to_name, var_id_to_name, Name, Number, Term,
 };
-use hvm_core::{u64_to_name, LNet, LTree};
+use hvm_core::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
 
 pub fn readback_net(net: &LNet) -> anyhow::Result<Term> {
@@ -120,20 +120,9 @@ fn readback_compat(net: &INet) -> Term {
     if kind(net, addr(enter(net, var_port))) == ERA {
       return Name("*".to_string());
     }
-    if !var_name.contains_key(&var_port) {
-      let mut n = var_name.len();
-      let mut name = String::new();
-      loop {
-        let c = (n % 26) as u8 + b'a';
-        name.push(c as char);
-        n /= 26;
-        if n == 0 {
-          break;
-        }
-      }
-      var_name.insert(var_port, Name(name));
-    }
-    var_name.get(&var_port).unwrap().clone()
+    let new_name = var_id_to_name(var_name.len() as Val);
+    let name = var_name.entry(var_port).or_insert(new_name);
+    name.clone()
   }
 
   // Reads a term recursively by starting at root node.
@@ -182,7 +171,7 @@ fn readback_compat(net: &INet) -> Term {
           Term::App { fun: Box::new(fun), arg: Box::new(arg) }
         }
       },
-      REF => Term::Var { nam: Name(u64_to_name(label)) },
+      REF => Term::Var { nam: id_to_name(label) },
       // If we're visiting a fan node...
       DUP => match slot(next) {
         // If we're visiting a port 0, then it is a pair.

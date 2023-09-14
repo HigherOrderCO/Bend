@@ -13,8 +13,9 @@ use chumsky::{
   span::SimpleSpan,
   IterParser, Parser,
 };
+use hvm_core::{Ptr, Val};
 use logos::{Logos, SpannedIter};
-use std::{collections::hash_map, iter::Map, ops::Range};
+use std::{collections::hash_map, iter::Map, ops::Range, sync::LazyLock};
 
 // TODO: Pattern matching on rules
 // TODO: Other types of numbers
@@ -73,17 +74,18 @@ fn token_stream(
 }
 
 // Parsers
-const MAX_NAME_LEN: usize = ((u64::BITS - u16::BITS) / 64_u32.ilog2()) as usize;
+static MAX_NAME_LEN: LazyLock<usize> =
+  LazyLock::new(|| ((Ptr::new(0, Val::MAX).data + 1).ilog2() / 64_u32.ilog2()) as usize);
 
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   select!(Token::Name(name) => Name(name)).try_map(|name, span| {
-    if name.len() > MAX_NAME_LEN {
+    if name.len() > *MAX_NAME_LEN {
       // TODO: Implement some kind of name mapping for definitions so that we can fit any def size.
       // e.g. sequential mapping, mangling, hashing, etc
-      Err(Rich::custom(span, format!("'{}' exceed maximum name length of {}", *name, MAX_NAME_LEN)))
+      Err(Rich::custom(span, format!("'{}' exceed maximum name length of {}", *name, *MAX_NAME_LEN)))
     } else {
       Ok(name)
     }

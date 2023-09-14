@@ -3,7 +3,7 @@ use crate::ast::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, NodeKind, Port, CON, DUP, ERA,
     LABEL_MASK, NUM, NUMOP, REF, ROOT, TAG_MASK,
   },
-  Name, Term,
+  var_id_to_name, Name, Term,
 };
 use hvm_core::{LNet, LTree, Tag};
 use std::collections::{HashMap, HashSet};
@@ -121,7 +121,7 @@ fn encode_term(
       Ok(Some(port(node, 0)))
     }
     Term::NumOp { op, fst, snd } => {
-      let node = new_node(inet, NUMOP | u8::from(*op) as NodeKind);
+      let node = new_node(inet, NUMOP | Tag::from(*op) as NodeKind);
       let fst = encode_term(inet, fst, port(node, 0), scope, vars, global_vars, dups)?;
       link_local(inet, port(node, 0), fst);
       let snd = encode_term(inet, snd, port(node, 1), scope, vars, global_vars, dups)?;
@@ -170,7 +170,7 @@ pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
   } else {
     // If the root node points to some aux port (application)
     port_to_var_id.insert(enter(inet, ROOT), 0);
-    LTree::Var { nam: var_id_to_name(0) }
+    LTree::Var { nam: var_id_to_name(0).0 }
   };
   let mut acts = vec![];
   for [root0, root1] in acts_roots {
@@ -297,26 +297,12 @@ fn var_or_subtree(inet: &INet, src_port: Port, port_to_var_id: &mut HashMap<Port
     // Var
     if let Some(&var_id) = port_to_var_id.get(&src_port) {
       // Previously found var
-      LTree::Var { nam: var_id_to_name(var_id) }
+      LTree::Var { nam: var_id_to_name(var_id).0 }
     } else {
       // New var
       let var_id = port_to_var_id.len() as VarId;
       port_to_var_id.insert(dst_port, var_id);
-      LTree::Var { nam: var_id_to_name(var_id) }
+      LTree::Var { nam: var_id_to_name(var_id).0 }
     }
   }
-}
-
-fn var_id_to_name(mut var_id: VarId) -> String {
-  let mut name = String::new();
-  loop {
-    let c = (var_id % 26) as u8 + b'a';
-    name.push(c as char);
-    var_id /= 26;
-    if var_id == 0 {
-      break;
-    }
-  }
-  name
-  // format!("x{var_id}")
 }

@@ -1,16 +1,16 @@
 Main =
   $ a
-  & (0 @Rule3 a)
-  ~ @Rule3
+  & (0 @Rul3 a)
+  ~ @Rul3
   
-Rule1 =
+Rul1 =
   $ (0 a a)
   
-Rule2 =
+Rul2 =
   $ (0 a a)
   
-Rule3 =
+Rul3 =
   $ a
-  & (0 @Rule2 a)
-  ~ @Rule1
+  & (0 @Rul2 a)
+  ~ @Rul1
   

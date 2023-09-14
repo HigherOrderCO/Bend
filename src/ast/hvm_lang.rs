@@ -1,4 +1,5 @@
 use super::{DefId, Name, Number};
+use hvm_core::Tag;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt};
 
@@ -62,7 +63,8 @@ pub enum NumOper {
   Neq,
 }
 
-impl From<NumOper> for u8 {
+/// Not a valid full tag, rather it's just the label and not the op.
+impl From<NumOper> for Tag {
   fn from(value: NumOper) -> Self {
     match value {
       NumOper::Add => 0x0,
@@ -85,10 +87,10 @@ impl From<NumOper> for u8 {
   }
 }
 
-impl TryFrom<u8> for NumOper {
+impl TryFrom<Tag> for NumOper {
   type Error = ();
 
-  fn try_from(value: u8) -> Result<Self, Self::Error> {
+  fn try_from(value: Tag) -> Result<Self, Self::Error> {
     match value {
       0 => Ok(NumOper::Add),
       1 => Ok(NumOper::Sub),
