@@ -8,41 +8,46 @@ use crate::ast::{
 use hvm_core::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
 
-pub fn readback_net(net: &LNet) -> anyhow::Result<Term> {
-  let core_net = core_net_to_compat(net)?;
-  let term = readback_compat(&core_net);
-  Ok(term)
+pub fn readback_net(net: &LNet) -> anyhow::Result<(Term, bool)> {
+  let compat_net = core_net_to_compat(net)?;
+  let readback = readback_compat(&compat_net);
+  Ok(readback)
 }
 
-fn core_net_to_compat(net: &LNet) -> anyhow::Result<INet> {
+fn core_net_to_compat(lnet: &LNet) -> anyhow::Result<INet> {
+  let inodes = lnet_to_inodes(lnet);
+  let compat_net = inodes_to_inet(&inodes);
+  Ok(compat_net)
+}
+
+fn lnet_to_inodes(lnet: &LNet) -> INodes {
   let mut inodes = vec![];
   let mut n_vars = 0;
-  let net_root = if let LTree::Var { nam } = &net.root { nam } else { "" };
+  let net_root = if let LTree::Var { nam } = &lnet.root { nam } else { "" };
 
-  if !matches!(&net.root, LTree::Var { .. }) {
-    let mut root = tree_to_inodes(&net.root, "_".to_string(), net_root, &mut n_vars);
+  // If we have a tree attached to the net root, convert that first
+  if !matches!(&lnet.root, LTree::Var { .. }) {
+    let mut root = tree_to_inodes(&lnet.root, "_".to_string(), net_root, &mut n_vars);
     inodes.append(&mut root);
   }
-
-  for (i, (tree1, tree2)) in net.acts.iter().enumerate() {
+  // Convert all the trees forming active pairs.
+  for (i, (tree1, tree2)) in lnet.acts.iter().enumerate() {
     let tree_root = format!("a{i}");
     let mut tree1 = tree_to_inodes(tree1, tree_root.clone(), net_root, &mut n_vars);
     inodes.append(&mut tree1);
     let mut tree2 = tree_to_inodes(tree2, tree_root, net_root, &mut n_vars);
     inodes.append(&mut tree2);
   }
-
-  let compat_net = inodes_to_inet(&inodes);
-  Ok(compat_net)
-}
-
-fn new_var(n_vars: &mut NodeId) -> String {
-  let new_var = format!("x{n_vars}");
-  *n_vars += 1;
-  new_var
+  inodes
 }
 
 fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut NodeId) -> INodes {
+  fn new_var(n_vars: &mut NodeId) -> String {
+    let new_var = format!("x{n_vars}");
+    *n_vars += 1;
+    new_var
+  }
+
   fn process_node_subtree<'a>(
     subtree: &'a LTree,
     net_root: &str,
@@ -113,7 +118,7 @@ fn inodes_to_inet(inodes: &INodes) -> INet {
 
 // TODO: Add support for global lambdas.
 /// Converts an Interaction-INet node to an Interaction Calculus term.
-fn readback_compat(net: &INet) -> Term {
+fn readback_compat(net: &INet) -> (Term, bool) {
   // Given a port, returns its name, or assigns one if it wasn't named yet.
   fn name_of(net: &INet, var_port: Port, var_name: &mut HashMap<Port, Name>) -> Name {
     // If port is linked to an erase node, return an unused variable
@@ -125,75 +130,86 @@ fn readback_compat(net: &INet) -> Term {
     name.clone()
   }
 
-  // Reads a term recursively by starting at root node.
+  /// Reads a term recursively by starting at root node.
+  /// Returns the term and whether it's a valid readback.
   fn reader(
     net: &INet,
     next: Port,
-    var_name: &mut HashMap<Port, Name>,
+    decl_port_to_name: &mut HashMap<Port, Name>,
     dups_vec: &mut Vec<NodeId>,
     dups_set: &mut HashSet<NodeId>,
     seen: &mut HashSet<Port>,
-  ) -> Term {
+  ) -> (Term, bool) {
     if seen.contains(&next) {
-      return Term::Var { nam: Name("...".to_string()) };
+      return (Term::Var { nam: Name("...".to_string()) }, false);
     }
 
     seen.insert(next);
 
-    let kind_ = kind(net, addr(next));
+    let node = addr(next);
+    let kind_ = kind(net, node);
     let tag = kind_ & TAG_MASK;
     let label = kind_ & LABEL_MASK;
 
     match tag {
       // If we're visiting a set...
-      ERA => Term::Era,
+      ERA => {
+        // Only the main port actually exists in an ERA, the auxes are just an artifact of this representation.
+        let valid = slot(next) == 0;
+        (Term::Era, valid)
+      }
       // If we're visiting a con node...
       CON => match slot(next) {
         // If we're visiting a port 0, then it is a lambda.
         0 => {
-          let nam = name_of(net, port(addr(next), 1), var_name);
+          seen.insert(port(node, 2));
+          let nam = name_of(net, port(node, 1), decl_port_to_name);
           let nam = if *nam == "*" { None } else { Some(nam) };
-          let prt = enter(net, port(addr(next), 2));
-          let bod = reader(net, prt, var_name, dups_vec, dups_set, seen);
-          Term::Lam { nam, bod: Box::new(bod) }
+          let prt = enter(net, port(node, 2));
+          let (bod, valid) = reader(net, prt, decl_port_to_name, dups_vec, dups_set, seen);
+          (Term::Lam { nam, bod: Box::new(bod) }, valid)
         }
         // If we're visiting a port 1, then it is a variable.
-        1 => {
-          Term::Var { nam: name_of(net, next, var_name) }
-          //Var{nam: format!("{}@{}", String::from_utf8_lossy(&name_of(net, next, var_name)), addr(next)).into()}
-        }
+        1 => (Term::Var { nam: name_of(net, next, decl_port_to_name) }, true),
         // If we're visiting a port 2, then it is an application.
         _ => {
-          let prt = enter(net, port(addr(next), 0));
-          let fun = reader(net, prt, var_name, dups_vec, dups_set, seen);
-          let prt = enter(net, port(addr(next), 1));
-          let arg = reader(net, prt, var_name, dups_vec, dups_set, seen);
-          Term::App { fun: Box::new(fun), arg: Box::new(arg) }
+          seen.insert(port(node, 0));
+          seen.insert(port(node, 1));
+          let prt = enter(net, port(node, 0));
+          let (fun, fun_valid) = reader(net, prt, decl_port_to_name, dups_vec, dups_set, seen);
+          let prt = enter(net, port(node, 1));
+          let (arg, arg_valid) = reader(net, prt, decl_port_to_name, dups_vec, dups_set, seen);
+          let valid = fun_valid && arg_valid;
+          (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
         }
       },
-      REF => Term::Var { nam: id_to_name(label) },
+      REF => (Term::Var { nam: id_to_name(label) }, true),
       // If we're visiting a fan node...
       DUP => match slot(next) {
         // If we're visiting a port 0, then it is a pair.
         0 => {
-          let prt = enter(net, port(addr(next), 1));
-          let fst = reader(net, prt, var_name, dups_vec, dups_set, seen);
-          let prt = enter(net, port(addr(next), 2));
-          let snd = reader(net, prt, var_name, dups_vec, dups_set, seen);
-          Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }
+          seen.insert(port(node, 1));
+          seen.insert(port(node, 2));
+          let prt = enter(net, port(node, 1));
+          let (fst, fst_valid) = reader(net, prt, decl_port_to_name, dups_vec, dups_set, seen);
+          let prt = enter(net, port(node, 2));
+          let (snd, snd_valid) = reader(net, prt, decl_port_to_name, dups_vec, dups_set, seen);
+          let valid = fst_valid && snd_valid;
+          (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
         // If we're visiting a port 1 or 2, then it is a variable.
         // Also, that means we found a dup, so we store it to read later.
         _ => {
-          if !dups_set.contains(&addr(next)) {
-            dups_set.insert(addr(next));
-            dups_vec.push(addr(next));
+          if !dups_set.contains(&node) {
+            dups_set.insert(node);
+            dups_vec.push(node);
+          } else {
+            // Second time we find, it has to be the other dup variable.
           }
-          //Var{nam: format!("{}@{}", String::from_utf8_lossy(&name_of(net, next, var_name)), addr(next)).into()}
-          Term::Var { nam: name_of(net, next, var_name) }
+          (Term::Var { nam: name_of(net, next, decl_port_to_name) }, true)
         }
       },
-      NUM => Term::Num { val: Number(label) },
+      NUM => (Term::Num { val: Number(label) }, true),
       NUMOP => todo!(),
       _ => unreachable!(),
     }
@@ -201,7 +217,7 @@ fn readback_compat(net: &INet) -> Term {
 
   // A hashmap linking ports to binder names. Those ports have names:
   // Port 1 of a con node (λ), ports 1 and 2 of a fan node (let).
-  let mut binder_name = HashMap::new();
+  let mut decl_port_to_name = HashMap::new();
 
   // Dup aren't scoped. We find them when we read one of the variables
   // introduced by them. Thus, we must store the dups we find to read later.
@@ -211,19 +227,34 @@ fn readback_compat(net: &INet) -> Term {
   let mut seen = HashSet::new();
 
   // Reads the main term from the net
-  let mut main = reader(net, enter(net, ROOT), &mut binder_name, &mut dups_vec, &mut dups_set, &mut seen);
+  let (mut main, mut valid) =
+    reader(net, enter(net, ROOT), &mut decl_port_to_name, &mut dups_vec, &mut dups_set, &mut seen);
 
   // Reads let founds by starting the reader function from their 0 ports.
   while let Some(dup) = dups_vec.pop() {
-    let val =
-      reader(net, enter(net, port(dup, 0)), &mut binder_name, &mut dups_vec, &mut dups_set, &mut seen);
-    let fst = name_of(net, port(dup, 1), &mut binder_name);
-    let snd = name_of(net, port(dup, 2), &mut binder_name);
+    seen.insert(port(dup, 0));
+    let (val, val_valid) =
+      reader(net, enter(net, port(dup, 0)), &mut decl_port_to_name, &mut dups_vec, &mut dups_set, &mut seen);
+    let fst = name_of(net, port(dup, 1), &mut decl_port_to_name);
+    let snd = name_of(net, port(dup, 2), &mut decl_port_to_name);
     let fst = if *fst == "*" { None } else { Some(fst) };
     let snd = if *snd == "*" { None } else { Some(snd) };
     let val = Box::new(val);
     let nxt = Box::new(main);
     main = Term::Dup { fst, snd, val, nxt };
+    valid = valid && val_valid;
   }
-  main
+
+  // Check if the readback didn't leave any unread nodes (for example reading var from a lam but never reading the lam itself)
+  for &decl_port in decl_port_to_name.keys() {
+    for check_slot in 0 .. 3 {
+      let check_port = port(addr(decl_port), check_slot);
+      let other_node = addr(enter(net, check_port));
+      if !seen.contains(&check_port) && kind(net, other_node) != ERA {
+        valid = false;
+      }
+    }
+  }
+
+  (main, valid)
 }

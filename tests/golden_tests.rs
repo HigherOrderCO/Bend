@@ -1,6 +1,7 @@
-use hvm_core::show_lnet;
+use hvm_core::{parse_lnet, show_lnet};
 use hvm_lang::{
   compile_book,
+  from_core::readback_net,
   loader::display_err_for_text,
   parser::{parse_definition_book, parse_term},
   run_book,
@@ -77,7 +78,18 @@ fn run_single_files() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let (res, _) = run_book(book)?;
-    Ok(res.to_string())
+    let (res, valid, _, _) = run_book(book)?;
+    let res = if valid { res.to_string() } else { format!("Invalid readback\n{}", res.to_string()) };
+    Ok(res)
+  })
+}
+
+#[test]
+fn readback_lnet() {
+  let root = format!("{}/tests/golden_tests/readback_lnet", env!("CARGO_MANIFEST_DIR"));
+  run_golden_test_dir(Path::new(&root), &|_, code| {
+    let lnet = parse_lnet(&mut code.chars().peekable());
+    let (term, valid) = readback_net(&lnet)?;
+    if valid { Ok(term.to_string()) } else { Ok(format!("Invalid readback:\n{term}")) }
   })
 }

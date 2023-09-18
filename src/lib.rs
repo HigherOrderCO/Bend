@@ -43,12 +43,12 @@ pub fn run_compiled(book: &Book) -> anyhow::Result<(LNet, RunStats)> {
   Ok((net, stats))
 }
 
-pub fn run_book(book: DefinitionBook) -> anyhow::Result<(Term, RunStats)> {
+pub fn run_book(book: DefinitionBook) -> anyhow::Result<(Term, bool, LNet, RunStats)> {
   check_main(&book)?;
   let compiled = compile_book(book)?;
-  let (res, stats) = run_compiled(&compiled)?;
-  let res = readback_net(&res)?;
-  Ok((res, stats))
+  let (res_lnet, stats) = run_compiled(&compiled)?;
+  let (res_term, valid_readback) = readback_net(&res_lnet)?;
+  Ok((res_term, valid_readback, res_lnet, stats))
 }
 
 pub struct RunStats {

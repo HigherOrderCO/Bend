@@ -1,0 +1,1 @@
+dup c f = a; dup d g = (b e); λa (λb (c d) λe (f g))

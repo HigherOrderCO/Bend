@@ -1,6 +1,7 @@
 #![feature(slice_group_by)]
 
 use clap::{Parser, ValueEnum};
+use hvm_core::show_lnet;
 use hvm_lang::{check_book, compile_book, load_file_to_book, run_book};
 use std::path::PathBuf;
 
@@ -41,9 +42,18 @@ fn main() -> anyhow::Result<()> {
       println!("{compiled}");
     }
     Mode::Run => {
-      let (res, stats) = run_book(book)?;
+      let (res_term, valid_readback, res_lnet, stats) = run_book(book)?;
       let rps = stats.rewrites as f64 / stats.run_time / 1_000_000.0;
-      println!("\n{}\n", res);
+      if args.verbose {
+        println!("\n{}", show_lnet(&res_lnet));
+      }
+
+      if valid_readback {
+        println!("\n{}\n", res_term);
+      } else {
+        println!("\nInvalid readback from inet.");
+        println!(" Got:\n{}\n", res_term);
+      }
       println!("size: {}", stats.size);
       println!("used: {}", stats.used);
       println!("Time: {:.3}s | Rwts: {} | RPS: {:.3}m", stats.run_time, stats.rewrites, rps);
