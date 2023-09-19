@@ -120,14 +120,19 @@ fn inodes_to_inet(inodes: &INodes) -> INet {
 /// Converts an Interaction-INet node to an Interaction Calculus term.
 fn readback_compat(net: &INet) -> (Term, bool) {
   // Given a port, returns its name, or assigns one if it wasn't named yet.
-  fn name_of(net: &INet, var_port: Port, var_name: &mut HashMap<Port, Name>) -> Name {
+  fn var_name(var_port: Port, var_port_to_name: &mut HashMap<Port, Name>) -> Name {
+    let new_name = var_id_to_name(var_port_to_name.len() as Val);
+    let name = var_port_to_name.entry(var_port).or_insert(new_name);
+    name.clone()
+  }
+
+  fn decl_name(net: &INet, var_port: Port, var_port_to_name: &mut HashMap<Port, Name>) -> Option<Name> {
     // If port is linked to an erase node, return an unused variable
     if kind(net, addr(enter(net, var_port))) == ERA {
-      return Name("*".to_string());
+      return None;
+    } else {
+      Some(var_name(var_port, var_port_to_name))
     }
-    let new_name = var_id_to_name(var_name.len() as Val);
-    let name = var_name.entry(var_port).or_insert(new_name);
-    name.clone()
   }
 
   /// Reads a term recursively by starting at root node.
@@ -135,7 +140,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
   fn reader(
     net: &INet,
     next: Port,
-    decl_port_to_name: &mut HashMap<Port, Name>,
+    var_port_to_name: &mut HashMap<Port, Name>,
     dups_vec: &mut Vec<NodeId>,
     dups_set: &mut HashSet<NodeId>,
     seen: &mut HashSet<Port>,
@@ -163,22 +168,21 @@ fn readback_compat(net: &INet) -> (Term, bool) {
         // If we're visiting a port 0, then it is a lambda.
         0 => {
           seen.insert(port(node, 2));
-          let nam = name_of(net, port(node, 1), decl_port_to_name);
-          let nam = if *nam == "*" { None } else { Some(nam) };
+          let nam = decl_name(net, port(node, 1), var_port_to_name);
           let prt = enter(net, port(node, 2));
-          let (bod, valid) = reader(net, prt, decl_port_to_name, dups_vec, dups_set, seen);
+          let (bod, valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           (Term::Lam { nam, bod: Box::new(bod) }, valid)
         }
         // If we're visiting a port 1, then it is a variable.
-        1 => (Term::Var { nam: name_of(net, next, decl_port_to_name) }, true),
+        1 => (Term::Var { nam: var_name(next, var_port_to_name) }, true),
         // If we're visiting a port 2, then it is an application.
         _ => {
           seen.insert(port(node, 0));
           seen.insert(port(node, 1));
           let prt = enter(net, port(node, 0));
-          let (fun, fun_valid) = reader(net, prt, decl_port_to_name, dups_vec, dups_set, seen);
+          let (fun, fun_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           let prt = enter(net, port(node, 1));
-          let (arg, arg_valid) = reader(net, prt, decl_port_to_name, dups_vec, dups_set, seen);
+          let (arg, arg_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           let valid = fun_valid && arg_valid;
           (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
         }
@@ -191,9 +195,9 @@ fn readback_compat(net: &INet) -> (Term, bool) {
           seen.insert(port(node, 1));
           seen.insert(port(node, 2));
           let prt = enter(net, port(node, 1));
-          let (fst, fst_valid) = reader(net, prt, decl_port_to_name, dups_vec, dups_set, seen);
+          let (fst, fst_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           let prt = enter(net, port(node, 2));
-          let (snd, snd_valid) = reader(net, prt, decl_port_to_name, dups_vec, dups_set, seen);
+          let (snd, snd_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           let valid = fst_valid && snd_valid;
           (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
@@ -206,7 +210,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
           } else {
             // Second time we find, it has to be the other dup variable.
           }
-          (Term::Var { nam: name_of(net, next, decl_port_to_name) }, true)
+          (Term::Var { nam: var_name(next, var_port_to_name) }, true)
         }
       },
       NUM => (Term::Num { val: Number(label) }, true),
@@ -217,7 +221,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
 
   // A hashmap linking ports to binder names. Those ports have names:
   // Port 1 of a con node (λ), ports 1 and 2 of a fan node (let).
-  let mut decl_port_to_name = HashMap::new();
+  let mut var_port_to_name = HashMap::new();
 
   // Dup aren't scoped. We find them when we read one of the variables
   // introduced by them. Thus, we must store the dups we find to read later.
@@ -228,17 +232,15 @@ fn readback_compat(net: &INet) -> (Term, bool) {
 
   // Reads the main term from the net
   let (mut main, mut valid) =
-    reader(net, enter(net, ROOT), &mut decl_port_to_name, &mut dups_vec, &mut dups_set, &mut seen);
+    reader(net, enter(net, ROOT), &mut var_port_to_name, &mut dups_vec, &mut dups_set, &mut seen);
 
-  // Reads let founds by starting the reader function from their 0 ports.
+  // Read all the dup bodies.
   while let Some(dup) = dups_vec.pop() {
     seen.insert(port(dup, 0));
     let (val, val_valid) =
-      reader(net, enter(net, port(dup, 0)), &mut decl_port_to_name, &mut dups_vec, &mut dups_set, &mut seen);
-    let fst = name_of(net, port(dup, 1), &mut decl_port_to_name);
-    let snd = name_of(net, port(dup, 2), &mut decl_port_to_name);
-    let fst = if *fst == "*" { None } else { Some(fst) };
-    let snd = if *snd == "*" { None } else { Some(snd) };
+      reader(net, enter(net, port(dup, 0)), &mut var_port_to_name, &mut dups_vec, &mut dups_set, &mut seen);
+    let fst = decl_name(net, port(dup, 1), &mut var_port_to_name);
+    let snd = decl_name(net, port(dup, 2), &mut var_port_to_name);
     let val = Box::new(val);
     let nxt = Box::new(main);
     main = Term::Dup { fst, snd, val, nxt };
@@ -246,7 +248,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
   }
 
   // Check if the readback didn't leave any unread nodes (for example reading var from a lam but never reading the lam itself)
-  for &decl_port in decl_port_to_name.keys() {
+  for &decl_port in var_port_to_name.keys() {
     for check_slot in 0 .. 3 {
       let check_port = port(addr(decl_port), check_slot);
       let other_node = addr(enter(net, check_port));
