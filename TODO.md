@@ -29,6 +29,8 @@ Error reporting:
   Add nice looking errors for errors outside the parser.
   Improve error messages.
 
+Support any size of name
+Convert from lambda terms directly into LNet without using the intermediate vector of nodes form
 Numbers and numerical operations (need hvm support)
 Documentation
 Benchmarking the compiler
