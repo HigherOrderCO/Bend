@@ -75,7 +75,7 @@ fn token_stream(
 
 // Parsers
 static MAX_NAME_LEN: LazyLock<usize> =
-  LazyLock::new(|| ((Ptr::new(0, Val::MAX).data + 1).ilog2() / 64_u32.ilog2()) as usize);
+  LazyLock::new(|| ((Ptr::new(0, Val::MAX).data() + 1).ilog2() / 64_u32.ilog2()) as usize);
 
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where

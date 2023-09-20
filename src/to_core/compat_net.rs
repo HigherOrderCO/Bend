@@ -162,7 +162,7 @@ fn link_local(inet: &mut INet, ptr_a: Port, ptr_b: Option<Port>) {
 }
 
 pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
-  let (root_root, acts_roots) = get_tree_roots(inet)?;
+  let (root_root, redx_roots) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(root_root) = root_root {
     // If there is a root tree connected to the root node
@@ -172,20 +172,20 @@ pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
     port_to_var_id.insert(enter(inet, ROOT), 0);
     LTree::Var { nam: var_id_to_name(0).0 }
   };
-  let mut acts = vec![];
-  for [root0, root1] in acts_roots {
-    let act0 = compat_tree_to_hvm_tree(inet, root0, &mut port_to_var_id);
-    let act1 = compat_tree_to_hvm_tree(inet, root1, &mut port_to_var_id);
-    acts.push((act0, act1));
+  let mut rdex = vec![];
+  for [root0, root1] in redx_roots {
+    let rdex0 = compat_tree_to_hvm_tree(inet, root0, &mut port_to_var_id);
+    let rdex1 = compat_tree_to_hvm_tree(inet, root1, &mut port_to_var_id);
+    rdex.push((rdex0, rdex1));
   }
-  Ok(LNet { root, acts })
+  Ok(LNet { root, rdex })
 }
 
 type VarId = NodeId;
 
 /// Returns a list of all the tree node roots in the compat inet.
 fn get_tree_roots(inet: &INet) -> anyhow::Result<(Option<NodeId>, Vec<[NodeId; 2]>)> {
-  let mut acts_roots: Vec<[NodeId; 2]> = vec![];
+  let mut redx_roots: Vec<[NodeId; 2]> = vec![];
   let mut explored_nodes = vec![false; inet.nodes.len() / 4];
   let mut side_links: Vec<Port> = vec![]; // Links between trees
 
@@ -211,11 +211,11 @@ fn get_tree_roots(inet: &INet) -> anyhow::Result<(Option<NodeId>, Vec<[NodeId; 2
       let new_roots = go_up_tree(inet, dest_node)?;
       go_down_tree(inet, new_roots[0], &mut explored_nodes, &mut side_links)?;
       go_down_tree(inet, new_roots[1], &mut explored_nodes, &mut side_links)?;
-      acts_roots.push(new_roots);
+      redx_roots.push(new_roots);
     }
   }
 
-  Ok((root_root, acts_roots))
+  Ok((root_root, redx_roots))
 }
 
 /// Go down a node tree, marking all nodes with the tree_id and storing any side_links found.

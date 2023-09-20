@@ -31,7 +31,7 @@ fn lnet_to_inodes(lnet: &LNet) -> INodes {
     inodes.append(&mut root);
   }
   // Convert all the trees forming active pairs.
-  for (i, (tree1, tree2)) in lnet.acts.iter().enumerate() {
+  for (i, (tree1, tree2)) in lnet.rdex.iter().enumerate() {
     let tree_root = format!("a{i}");
     let mut tree1 = tree_to_inodes(tree1, tree_root.clone(), net_root, &mut n_vars);
     inodes.append(&mut tree1);
