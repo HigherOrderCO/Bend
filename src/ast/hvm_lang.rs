@@ -23,9 +23,16 @@ pub struct Rule {
 
 #[derive(Debug, Clone)]
 pub enum Pattern {
-  _Ctr(Name, Vec<Pattern>),
-  _Num(Number),
-  _Var(Name),
+  Ctr(Name, Vec<Pattern>),
+  Num(Number),
+  Var(Option<Name>),
+}
+
+#[derive(Debug, Clone)]
+pub enum Type {
+  Any,
+  Number,
+  Adt(HashMap<Name, Vec<Type>>),
 }
 
 #[derive(Debug, Clone)]
@@ -111,11 +118,20 @@ impl DefinitionBook {
 impl From<Pattern> for Term {
   fn from(value: Pattern) -> Self {
     match value {
-      Pattern::_Ctr(nam, args) => args
-        .into_iter()
-        .fold(Term::Var { nam }, |acc, arg| Term::App { fun: Box::new(acc), arg: Box::new(arg.into()) }),
-      Pattern::_Num(num) => Term::Num { val: num },
-      Pattern::_Var(nam) => Term::Var { nam },
+      Pattern::Ctr(nam, args) => {
+        args.into_iter().fold(Term::Ref { def_id: DefId::from(&nam) }, |acc, arg| Term::App {
+          fun: Box::new(acc),
+          arg: Box::new(arg.into()),
+        })
+      }
+      Pattern::Num(num) => Term::Num { val: num },
+      Pattern::Var(nam) => {
+        if let Some(nam) = nam {
+          Term::Var { nam }
+        } else {
+          Term::Era
+        }
+      }
     }
   }
 }
@@ -155,8 +171,8 @@ impl fmt::Display for Term {
       Term::Dup { fst, snd, val, nxt } => write!(
         f,
         "dup {} {} = {}; {}",
-        fst.clone().unwrap_or(Name("*".to_string())),
-        snd.clone().unwrap_or(Name("*".to_string())),
+        fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
+        snd.as_ref().map(|x| x.as_str()).unwrap_or("*"),
         val,
         nxt
       ),

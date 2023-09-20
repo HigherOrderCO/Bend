@@ -1,5 +1,4 @@
 #![feature(lazy_cell)]
-#![feature(slice_group_by)]
 
 pub mod ast;
 pub mod from_core;

@@ -1,6 +1,6 @@
 use super::lexer::LexingError;
 use crate::{
-  ast::{DefId, Definition, DefinitionBook, Name, NumOper, Rule, Term},
+  ast::{hvm_lang::Pattern, DefId, Definition, DefinitionBook, Name, NumOper, Rule, Term},
   parser::lexer::Token,
 };
 use chumsky::{
@@ -14,6 +14,7 @@ use chumsky::{
   IterParser, Parser,
 };
 use hvm_core::{Ptr, Val};
+use itertools::Itertools;
 use logos::{Logos, SpannedIter};
 use std::{collections::hash_map, iter::Map, ops::Range, sync::LazyLock};
 
@@ -21,11 +22,12 @@ use std::{collections::hash_map, iter::Map, ops::Range, sync::LazyLock};
 // TODO: Other types of numbers
 /// <Book>   ::= <Def>* // Sequential rules grouped by name
 /// <Def>    ::= \n* <Rule> (\n+ <Rule>)* \n*
-/// <Rule>   ::= ("(" <Name> ")" | <Name>) \n* "=" \n* (<InlineNumOp> | <InlineApp>)
+/// <Rule>   ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) \n* "=" \n* (<InlineNumOp> | <InlineApp>)
+/// <Pattern> ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number>
 /// <InlineNumOp> ::= <numop_token> <Term> <Term>
 /// <InlineApp>   ::= <Term>+
 /// <Term>   ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Let> | <NumOp> | <App>
-/// <Lam>    ::= ("λ"|"@") \n* <Name> \n* <Term>
+/// <Lam>    ::= ("λ"|"@") \n* <NameEra> \n* <Term>
 /// <GlobalLam> ::= ("λ"|"@") "$" <Name> \n* <Term>
 /// <Dup>    ::= "dup" \n* <Name> \n* <Name> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
 /// <Let>    ::= "let" \n* <Name> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
@@ -33,10 +35,11 @@ use std::{collections::hash_map, iter::Map, ops::Range, sync::LazyLock};
 /// <App>    ::= "(" \n* <Term> (\n* <Term>)* \n* ")"
 /// <Var>    ::= <Name>
 /// <GlobalVar> ::= "$" <Name>
+/// <NameEra> ::= <Name> | "*"
 /// <Name>   ::= <name_token> // [_a-zA-Z][_a-zA-Z0-9]{0..7}
 /// <Number> ::= <number_token> // [0-9]+
 pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Token>>> {
-  book_parser().parse(token_stream(code)).into_result()
+  book().parse(token_stream(code)).into_result()
 }
 
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
@@ -92,6 +95,13 @@ where
   })
 }
 
+fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  choice((select!(Token::Asterisk => None), name().map(Some)))
+}
+
 fn num_oper<'a, I>() -> impl Parser<'a, I, NumOper, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -124,14 +134,13 @@ where
   let number = select!(Token::Number(num) => Term::Num{val: num});
   let var = name().map(|name| Term::Var { nam: name }).boxed();
   let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::GlobalVar { nam: name }).boxed();
-  let era_or_name = choice((select!(Token::Asterisk => None), name().map(Some))).boxed();
   let term_sep = choice((just(Token::NewLine), just(Token::Semicolon)));
 
   recursive(|term| {
     // λx body
     let lam = just(Token::Lambda)
       .ignore_then(new_line())
-      .ignore_then(era_or_name.clone())
+      .ignore_then(name_or_era())
       .then_ignore(new_line())
       .then(term.clone())
       .map(|(name, body)| Term::Lam { nam: name, bod: Box::new(body) })
@@ -151,9 +160,9 @@ where
     // dup x1 x2 = body; next
     let dup = just(Token::Dup)
       .ignore_then(new_line())
-      .ignore_then(era_or_name.clone())
+      .ignore_then(name_or_era())
       .then_ignore(new_line())
-      .then(era_or_name.clone())
+      .then(name_or_era())
       .then_ignore(new_line())
       .then_ignore(just(Token::Equals))
       .then_ignore(new_line())
@@ -167,7 +176,7 @@ where
     // let x = body; next
     let let_ = just(Token::Let)
       .ignore_then(new_line())
-      .ignore_then(era_or_name.clone())
+      .ignore_then(name_or_era())
       .then_ignore(new_line())
       .then_ignore(just(Token::Equals))
       .then_ignore(new_line())
@@ -206,6 +215,22 @@ where
   })
 }
 
+fn pattern<'a, I>() -> impl Parser<'a, I, Pattern, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  recursive(|pattern| {
+    let ctr = name()
+      .then(pattern.repeated().collect())
+      .delimited_by(just(Token::LParen), just(Token::RParen))
+      .map(|(name, pats)| Pattern::Ctr(name, pats))
+      .boxed();
+    let num = select!(Token::Number(num) => Pattern::Num(num)).boxed();
+    let var = name_or_era().map(|name| Pattern::Var(name)).boxed();
+    choice((ctr, num, var))
+  })
+}
+
 fn rule<'a, I>() -> impl Parser<'a, I, Rule, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -219,14 +244,15 @@ where
   });
 
   choice((name(), name().delimited_by(just(Token::LParen), just(Token::RParen))))
+    .then(pattern().repeated().collect())
     .then_ignore(just(Token::NewLine).repeated())
     .then_ignore(just(Token::Equals))
     .then_ignore(just(Token::NewLine).repeated())
     .then(choice((inline_num_oper, inline_app)))
-    .map(|(name, body)| Rule { def_id: DefId::from(&name), pats: vec![], body })
+    .map(|((name, pats), body)| Rule { def_id: DefId::from(&name), pats, body })
 }
 
-fn book_parser<'a, I>() -> impl Parser<'a, I, DefinitionBook, extra::Err<Rich<'a, Token>>>
+fn book<'a, I>() -> impl Parser<'a, I, DefinitionBook, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -238,21 +264,15 @@ where
     let mut book = DefinitionBook::new();
 
     // Check for repeated defs (could be rules out of order or actually repeated names)
-    for def_rules in rules.group_by(|(rule1, _), (rule2, _)| rule1.def_id == rule2.def_id) {
-      let name = Name::from(def_rules[0].0.def_id);
-      if def_rules.len() > 1 {
-        // TODO: Enable definitions with multiple rules when implementing pattern matching
-        let def_span = SimpleSpan::new(def_rules.first().unwrap().1.start, def_rules.last().unwrap().1.end);
-        emitter.emit(Rich::custom(def_span, format!("Definition with multiple rules '{name}'",)));
+    for (def_id, def_rules) in rules.into_iter().group_by(|(rule1, _)| rule1.def_id).into_iter() {
+      let (def_rules, spans): (Vec<Rule>, Vec<SimpleSpan>) = def_rules.unzip();
+      let name = Name::from(def_id);
+      let def = Definition { name, rules: def_rules };
+      if let hash_map::Entry::Vacant(e) = book.defs.entry(def_id) {
+        e.insert(def);
       } else {
-        let (rule, span) = &def_rules[0];
-        let def = Definition { name, rules: vec![rule.clone()] };
-        let def_id = DefId::from(&def.name);
-        if let hash_map::Entry::Vacant(e) = book.defs.entry(def_id) {
-          e.insert(def);
-        } else {
-          emitter.emit(Rich::custom(*span, format!("Repeated definition '{}'", *def.name)));
-        }
+        let span = SimpleSpan::new(spans.first().unwrap().start, spans.last().unwrap().end);
+        emitter.emit(Rich::custom(span, format!("Repeated definition '{}'", *def.name)));
       }
     }
     book
