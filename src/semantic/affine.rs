@@ -56,19 +56,17 @@ fn term_to_affine(
     }
     Term::Var { nam } => {
       // Count this var use and give it a new unique name
-      if let Some(mut var_use_stack) = scope.remove(&*nam) {
-        let var_uses = var_use_stack.last_mut().unwrap();
-
+      if let Some(var_use_stack) = scope.get(&nam) {
+        let var_uses = var_use_stack.last().unwrap().clone();
         // Create a new name, except for the first occurence
         let (new_name, name_idx) = if var_uses.is_empty() {
           (nam.clone(), 0)
         } else {
-          make_new_dup_name(&nam, var_uses, scope, def_names)
+          make_new_dup_name(&nam, &var_uses, scope, def_names)
         };
-        var_uses.push(name_idx);
+        // Add new name to scope
+        scope.get_mut(&nam).unwrap().last_mut().unwrap().push(name_idx);
 
-        // Removing and adding back to avoid ownership issues
-        scope.insert(nam, var_use_stack);
         let term = Term::Var { nam: new_name };
         Ok(term)
       } else {
@@ -165,12 +163,13 @@ fn pop_scope(
   def_names: &HashSet<Name>,
 ) -> (Option<Name>, Box<Term>) {
   if let Some(nam) = &nam {
+    // Remove variable from scope, getting all the occurences
     let var_uses = scope.get_mut(nam).unwrap().pop().unwrap();
+    // Add the necessary dups to make all uses affine.
     let (new_nam, bod) = add_dups_of_var(nam, bod, &var_uses, scope, def_names);
-    if let Some(new_nam) = &new_nam {
-      if scope.get(new_nam).unwrap().is_empty() {
-        scope.remove(new_nam);
-      }
+    // Remove this name from the scope if there are no variables using it.
+    if scope.get(nam).unwrap().is_empty() {
+      scope.remove(nam);
     }
     (new_nam, bod)
   } else {
