@@ -31,7 +31,7 @@ pub fn book_to_hvm_internal(book: &Book) -> anyhow::Result<(hvm_core::Net, hvm_c
 
   let mut hvm_book = hvm_core::Book::new();
   book.defs.iter().for_each(|(&name, term)| {
-    hvm_book.def(*name, lnet_to_net(term));
+    hvm_book.def(*name, lnet_to_net(term, None));
   });
 
   Ok((root, hvm_book))
