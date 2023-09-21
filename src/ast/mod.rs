@@ -5,7 +5,7 @@ pub mod hvm_lang;
 pub use hvm_lang::{Definition, DefinitionBook, NumOper, Rule, Term};
 
 use derive_more::{Display, From, Into};
-use hvm_core::{name_to_u32, u32_to_name, Val};
+use hvm_core::{name_to_val, val_to_name, Val};
 use shrinkwraprs::Shrinkwrap;
 
 #[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
@@ -29,22 +29,22 @@ impl From<&Name> for DefId {
 
 impl From<&str> for DefId {
   fn from(value: &str) -> Self {
-    name_to_u32(value).into()
+    name_to_val(value).into()
   }
 }
 
 impl From<DefId> for Name {
   fn from(value: DefId) -> Self {
-    Name(u32_to_name(*value))
+    Name(val_to_name(*value))
   }
 }
 
 pub fn name_to_id(name: &Name) -> Val {
-  name_to_u32(name)
+  name_to_val(name)
 }
 
 pub fn id_to_name(num: Val) -> Name {
-  Name(u32_to_name(num))
+  Name(val_to_name(num))
 }
 
 pub fn var_id_to_name(mut var_id: Val) -> Name {
