@@ -83,11 +83,12 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      LTree::NUM { val } => {
+      LTree::Num { val } => {
         let kind = NUM | (*val as NodeKind);
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
+      LTree::OpX { .. } => todo!(),
     }
   }
   inodes

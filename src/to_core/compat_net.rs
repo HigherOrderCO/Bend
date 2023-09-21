@@ -282,7 +282,7 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
     REF => LTree::Ref { nam: label },
-    NUM => LTree::NUM { val: label },
+    NUM => LTree::Num { val: label },
     NUMOP => todo!(),
     _ => unreachable!("Invalid tag in compat tree {tag:x}"),
   }

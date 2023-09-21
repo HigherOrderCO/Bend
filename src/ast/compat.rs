@@ -15,7 +15,7 @@ pub type SlotId = Val;
 
 /// The ROOT port is on the deadlocked root node at address 0.
 pub const ROOT: Port = 1;
-pub const TAG_WIDTH: u32 = 4; // TODO: Make this generic over the HVM type.
+pub const TAG_WIDTH: u32 = 16; // TODO: Make this generic over the HVM type.
 pub const TAG: u32 = Val::BITS - TAG_WIDTH;
 pub const ERA: NodeKind = 0 << TAG;
 pub const CON: NodeKind = 1 << TAG;
