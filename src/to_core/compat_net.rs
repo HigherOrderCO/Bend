@@ -3,7 +3,7 @@ use crate::ast::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, NodeKind, Port, CON, DUP, ERA,
     LABEL_MASK, NUM, NUMOP, REF, ROOT, TAG_MASK,
   },
-  var_id_to_name, Name, Term,
+  var_id_to_name, Name, NumOper, Term,
 };
 use hvm_core::{LNet, LTree, Tag};
 use std::collections::{HashMap, HashSet};
@@ -121,7 +121,7 @@ fn encode_term(
       Ok(Some(port(node, 0)))
     }
     Term::NumOp { op, fst, snd } => {
-      let node = new_node(inet, NUMOP | Tag::from(*op) as NodeKind);
+      let node = new_node(inet, NUMOP | NodeKind::from(*op));
       let fst = encode_term(inet, fst, port(node, 0), scope, vars, global_vars, dups)?;
       link_local(inet, port(node, 0), fst);
       let snd = encode_term(inet, snd, port(node, 1), scope, vars, global_vars, dups)?;
@@ -283,7 +283,11 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
     },
     REF => LTree::Ref { nam: label },
     NUM => LTree::Num { val: label },
-    NUMOP => todo!(),
+    NUMOP => LTree::OpX {
+      opx: hvm_core::OP::from(NumOper::from(label)),
+      lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
+      rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
+    },
     _ => unreachable!("Invalid tag in compat tree {tag:x}"),
   }
 }

@@ -226,7 +226,7 @@ where
       .map(|(name, pats)| Pattern::Ctr(name, pats))
       .boxed();
     let num = select!(Token::Number(num) => Pattern::Num(num)).boxed();
-    let var = name_or_era().map(|name| Pattern::Var(name)).boxed();
+    let var = name_or_era().map(Pattern::Var).boxed();
     choice((ctr, num, var))
   })
 }

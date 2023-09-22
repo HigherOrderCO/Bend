@@ -130,7 +130,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
   fn decl_name(net: &INet, var_port: Port, var_port_to_name: &mut HashMap<Port, Name>) -> Option<Name> {
     // If port is linked to an erase node, return an unused variable
     if kind(net, addr(enter(net, var_port))) == ERA {
-      return None;
+      None
     } else {
       Some(var_name(var_port, var_port_to_name))
     }

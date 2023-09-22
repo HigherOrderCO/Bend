@@ -1,5 +1,4 @@
 use super::{DefId, Name, Number};
-use hvm_core::Tag;
 use itertools::Itertools;
 use std::{collections::HashMap, fmt};
 
@@ -70,41 +69,20 @@ pub enum NumOper {
   Neq,
 }
 
-/// Not a valid full tag, rather it's just the label and not the op.
-impl From<NumOper> for Tag {
+impl From<NumOper> for hvm_core::OP {
   fn from(value: NumOper) -> Self {
     match value {
-      NumOper::Add => 0x0,
-      NumOper::Sub => 0x1,
-      NumOper::Mul => 0x2,
-      NumOper::Div => 0x3,
-      NumOper::Mod => 0x4,
-      NumOper::And => 0x5,
-      NumOper::Or => 0x6,
-      NumOper::Xor => 0x7,
-      NumOper::Shl => 0x8,
-      NumOper::Shr => 0x9,
-      NumOper::Ltn => 0xa,
-      NumOper::Lte => 0xb,
-      NumOper::Gtn => 0xc,
-      NumOper::Gte => 0xd,
-      NumOper::Eql => 0xe,
-      NumOper::Neq => 0xf,
+      NumOper::Add => hvm_core::OP::ADD,
+      _ => todo!(),
     }
   }
 }
 
-impl TryFrom<Tag> for NumOper {
-  type Error = ();
-
-  fn try_from(value: Tag) -> Result<Self, Self::Error> {
+impl From<hvm_core::OP> for NumOper {
+  fn from(value: hvm_core::OP) -> Self {
     match value {
-      0 => Ok(NumOper::Add),
-      1 => Ok(NumOper::Sub),
-      2 => Ok(NumOper::Mul),
-      3 => Ok(NumOper::Div),
-      4 ..= 15 => todo!(),
-      _ => Err(()),
+      hvm_core::OP::ADD => NumOper::Add,
+      _ => todo!(),
     }
   }
 }
