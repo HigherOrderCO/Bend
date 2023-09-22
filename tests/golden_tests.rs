@@ -94,7 +94,7 @@ fn readback_lnet() {
   run_golden_test_dir(Path::new(&root), &|_, code| {
     let lnet = parse_lnet(&mut code.chars().peekable());
     let def_names = Default::default();
-    let (term, valid) = readback_net(&lnet, &def_names)?;
+    let (term, valid) = readback_net(&lnet)?;
     if valid {
       Ok(term.to_string(&def_names))
     } else {

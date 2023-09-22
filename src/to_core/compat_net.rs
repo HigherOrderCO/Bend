@@ -1,7 +1,7 @@
 use crate::ast::{
   compat::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, NodeKind, Port, CON, DUP, ERA,
-    LABEL_MASK, NUMOP, REF, ROOT, TAG_MASK, NUM_U32, NUM_I32,
+    LABEL_MASK, NUMOP, NUM_I32, NUM_U32, REF, ROOT, TAG_MASK,
   },
   var_id_to_name, DefId, Name, NumOper, Term,
 };
@@ -53,7 +53,7 @@ fn encode_term(
       link_local(inet, port(fun, 2), bod);
       Ok(Some(port(fun, 0)))
     }
-    Term::GlobalLam { nam, bod } => {
+    Term::Chn { nam, bod } => {
       let fun = new_node(inet, CON);
       global_vars.entry(nam.clone()).or_default().0 = port(fun, 1);
       let bod = encode_term(inet, bod, port(fun, 2), scope, vars, global_vars, dups)?;
@@ -102,7 +102,7 @@ fn encode_term(
       *use_port = Some(up);
       Ok(Some(*declare_port))
     }
-    Term::GlobalVar { nam } => {
+    Term::Lnk { nam } => {
       global_vars.entry(nam.clone()).or_default().1 = up;
       Ok(None)
     }
@@ -128,7 +128,7 @@ fn encode_term(
       inet.nodes[port(node, 2) as usize] = port(node, 1);
       Ok(Some(port(node, 0)))
     }
-    Term::NumOp { op, fst, snd } => {
+    Term::Opr { op, fst, snd } => {
       let node = new_node(inet, NUMOP | NodeKind::from(*op));
       let fst = encode_term(inet, fst, port(node, 0), scope, vars, global_vars, dups)?;
       link_local(inet, port(node, 0), fst);

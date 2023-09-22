@@ -1,7 +1,7 @@
 pub mod compat_net;
 
 use self::compat_net::{compat_net_to_core, term_to_compat_net};
-use crate::ast::{core::Book, Definition, DefinitionBook, Name, Term, DefId};
+use crate::ast::{core::Book, DefId, Definition, DefinitionBook, Name, Term};
 use hvm_core::{lnet_to_net, LNet};
 use std::collections::HashMap;
 

@@ -9,7 +9,7 @@ pub mod to_core;
 
 use ast::{core::Book, hvm_lang::DefNames, DefinitionBook, Term};
 use from_core::readback_net;
-use hvm_core::{readback_lnet, LNet, show_lnet};
+use hvm_core::{readback_lnet, show_lnet, LNet};
 use semantic::check_main;
 use std::time::Instant;
 use to_core::{book_to_hvm_core, book_to_hvm_internal};
@@ -49,7 +49,7 @@ pub fn run_book(book: DefinitionBook) -> anyhow::Result<(Term, DefNames, RunInfo
   let (compiled, def_names) = compile_book(book)?;
   let (res_lnet, stats) = run_compiled(&compiled)?;
   eprintln!("lnet\n{}", show_lnet(&res_lnet));
-  let (res_term, valid_readback) = readback_net(&res_lnet, &def_names)?;
+  let (res_term, valid_readback) = readback_net(&res_lnet)?;
   let info = RunInfo { stats, valid_readback, lnet: res_lnet };
   Ok((res_term, def_names, info))
 }

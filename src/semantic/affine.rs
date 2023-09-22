@@ -73,7 +73,7 @@ fn term_to_affine(
       }
     }
     // TODO: Add var use checking for global lambdas and vars
-    Term::GlobalLam { nam, bod } => {
+    Term::Chn { nam, bod } => {
       if let Some(global_use) = globals.get_mut(nam) {
         if global_use.0 {
           return Err(anyhow::anyhow!("Global variable '{nam}' declared more than once"));
@@ -82,9 +82,9 @@ fn term_to_affine(
         }
       }
       let bod = term_to_affine(bod, scope, globals, def_names)?.into();
-      Term::GlobalLam { nam: nam.clone(), bod }
+      Term::Chn { nam: nam.clone(), bod }
     }
-    Term::GlobalVar { nam } => {
+    Term::Lnk { nam } => {
       if let Some(global_use) = globals.get_mut(nam) {
         if global_use.1 {
           // TODO: Add dups on the first outer scope that contain all uses.
@@ -95,7 +95,7 @@ fn term_to_affine(
           global_use.1 = true;
         }
       }
-      Term::GlobalVar { nam: nam.clone() }
+      Term::Lnk { nam: nam.clone() }
     }
     Term::Ref { def_id } => {
       // We expect to not encounter this case, but if something changes in the future,
@@ -125,7 +125,7 @@ fn term_to_affine(
       let (fst, nxt) = pop_scope(fst, nxt, scope, def_names);
       Term::Dup { fst, snd, val, nxt }
     }
-    Term::NumOp { op, fst, snd } => Term::NumOp {
+    Term::Opr { op, fst, snd } => Term::Opr {
       op: *op,
       fst: Box::new(term_to_affine(fst, scope, globals, def_names)?),
       snd: Box::new(term_to_affine(snd, scope, globals, def_names)?),

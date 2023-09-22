@@ -34,18 +34,51 @@ pub enum Pattern {
 
 #[derive(Debug, Clone)]
 pub enum Term {
-  Lam { nam: Option<Name>, bod: Box<Term> },
-  Var { nam: Name },
-  GlobalLam { nam: Name, bod: Box<Term> },
-  GlobalVar { nam: Name },
+  Lam {
+    nam: Option<Name>,
+    bod: Box<Term>,
+  },
+  Var {
+    nam: Name,
+  },
+  /// Like a scopeless lambda, where the variable can occur outside the body
+  Chn {
+    nam: Name,
+    bod: Box<Term>,
+  },
+  /// The use of a Channel variable
+  Lnk {
+    nam: Name,
+  },
   /* Let { nam: Name, val: Box<Term>, nxt: Box<Term> }, */
-  Ref { def_id: DefId },
-  App { fun: Box<Term>, arg: Box<Term> },
-  Dup { fst: Option<Name>, snd: Option<Name>, val: Box<Term>, nxt: Box<Term> },
-  U32 { val: u32 },
-  I32 { val: i32 },
-  NumOp { op: NumOper, fst: Box<Term>, snd: Box<Term> },
-  Sup { fst: Box<Term>, snd: Box<Term> },
+  Ref {
+    def_id: DefId,
+  },
+  App {
+    fun: Box<Term>,
+    arg: Box<Term>,
+  },
+  Dup {
+    fst: Option<Name>,
+    snd: Option<Name>,
+    val: Box<Term>,
+    nxt: Box<Term>,
+  },
+  U32 {
+    val: u32,
+  },
+  I32 {
+    val: i32,
+  },
+  Opr {
+    op: NumOper,
+    fst: Box<Term>,
+    snd: Box<Term>,
+  },
+  Sup {
+    fst: Box<Term>,
+    snd: Box<Term>,
+  },
   Era,
 }
 
@@ -132,8 +165,8 @@ impl Term {
         format!("λ{} {}", nam.clone().unwrap_or(Name("*".to_string())), bod.to_string(def_names))
       }
       Term::Var { nam } => format!("{nam}"),
-      Term::GlobalLam { nam, bod } => format!("λ${} {}", nam, bod.to_string(def_names)),
-      Term::GlobalVar { nam } => format!("${nam}"),
+      Term::Chn { nam, bod } => format!("λ${} {}", nam, bod.to_string(def_names)),
+      Term::Lnk { nam } => format!("${nam}"),
       /* Term::Let { nam, val, nxt } => {
         format!("let {} = {}; {}", nam, val.to_string(def_names), nxt.to_string(def_names))
       } */
@@ -148,7 +181,7 @@ impl Term {
       ),
       Term::U32 { val } => format!("{val}"),
       Term::I32 { val } => format!("{val:+}"),
-      Term::NumOp { op, fst, snd } => {
+      Term::Opr { op, fst, snd } => {
         format!("({} {} {})", op, fst.to_string(def_names), snd.to_string(def_names))
       }
       Term::Sup { fst, snd } => format!("{{{} {}}}", fst.to_string(def_names), snd.to_string(def_names)),

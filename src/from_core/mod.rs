@@ -1,18 +1,17 @@
 use crate::ast::{
   compat::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
-    SlotId, CON, DUP, ERA, LABEL_MASK, NUMOP, REF, ROOT, TAG_MASK, NUM_U32, NUM_I32,
+    SlotId, CON, DUP, ERA, LABEL_MASK, NUMOP, NUM_I32, NUM_U32, REF, ROOT, TAG_MASK,
   },
-  hvm_lang::DefNames,
   var_id_to_name, DefId, Name, NumOper, Term,
 };
 use hvm_core::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
 
-pub fn readback_net(net: &LNet, def_names: &DefNames) -> anyhow::Result<(Term, bool)> {
+pub fn readback_net(net: &LNet) -> anyhow::Result<(Term, bool)> {
   /* check_lnet_valid(net)?; */
   let compat_net = core_net_to_compat(net)?;
-  let readback = readback_compat(&compat_net, def_names);
+  let readback = readback_compat(&compat_net);
   Ok(readback)
 }
 
@@ -135,7 +134,7 @@ fn inodes_to_inet(inodes: &INodes) -> INet {
 
 // TODO: Add support for global lambdas.
 /// Converts an Interaction-INet node to an Interaction Calculus term.
-fn readback_compat(net: &INet, def_names: &DefNames) -> (Term, bool) {
+fn readback_compat(net: &INet) -> (Term, bool) {
   // Given a port, returns its name, or assigns one if it wasn't named yet.
   fn var_name(var_port: Port, var_port_to_name: &mut HashMap<Port, Name>) -> Name {
     let new_name = var_id_to_name(var_port_to_name.len() as Val);
@@ -161,7 +160,6 @@ fn readback_compat(net: &INet, def_names: &DefNames) -> (Term, bool) {
     dups_vec: &mut Vec<NodeId>,
     dups_set: &mut HashSet<NodeId>,
     seen: &mut HashSet<Port>,
-    def_names: &DefNames,
   ) -> (Term, bool) {
     if seen.contains(&next) {
       return (Term::Var { nam: Name("...".to_string()) }, false);
@@ -188,7 +186,7 @@ fn readback_compat(net: &INet, def_names: &DefNames) -> (Term, bool) {
           seen.insert(port(node, 2));
           let nam = decl_name(net, port(node, 1), var_port_to_name);
           let prt = enter(net, port(node, 2));
-          let (bod, valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen, def_names);
+          let (bod, valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           (Term::Lam { nam, bod: Box::new(bod) }, valid)
         }
         // If we're visiting a port 1, then it is a variable.
@@ -198,9 +196,9 @@ fn readback_compat(net: &INet, def_names: &DefNames) -> (Term, bool) {
           seen.insert(port(node, 0));
           seen.insert(port(node, 1));
           let prt = enter(net, port(node, 0));
-          let (fun, fun_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen, def_names);
+          let (fun, fun_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           let prt = enter(net, port(node, 1));
-          let (arg, arg_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen, def_names);
+          let (arg, arg_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           let valid = fun_valid && arg_valid;
           (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
         }
@@ -214,9 +212,9 @@ fn readback_compat(net: &INet, def_names: &DefNames) -> (Term, bool) {
           seen.insert(port(node, 1));
           seen.insert(port(node, 2));
           let prt = enter(net, port(node, 1));
-          let (fst, fst_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen, def_names);
+          let (fst, fst_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           let prt = enter(net, port(node, 2));
-          let (snd, snd_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen, def_names);
+          let (snd, snd_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           let valid = fst_valid && snd_valid;
           (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
@@ -241,11 +239,11 @@ fn readback_compat(net: &INet, def_names: &DefNames) -> (Term, bool) {
           seen.insert(port(node, 1));
           let op = NumOper::from(label);
           let fst = enter(net, port(node, 0));
-          let (fst, fst_valid) = reader(net, fst, var_port_to_name, dups_vec, dups_set, seen, def_names);
+          let (fst, fst_valid) = reader(net, fst, var_port_to_name, dups_vec, dups_set, seen);
           let snd = enter(net, port(node, 1));
-          let (snd, snd_valid) = reader(net, snd, var_port_to_name, dups_vec, dups_set, seen, def_names);
+          let (snd, snd_valid) = reader(net, snd, var_port_to_name, dups_vec, dups_set, seen);
           let valid = fst_valid && snd_valid;
-          (Term::NumOp { op, fst: Box::new(fst), snd: Box::new(snd) }, valid)
+          (Term::Opr { op, fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
         _ => unreachable!(),
       },
@@ -266,14 +264,13 @@ fn readback_compat(net: &INet, def_names: &DefNames) -> (Term, bool) {
 
   // Reads the main term from the net
   let (mut main, mut valid) =
-    reader(net, enter(net, ROOT), &mut var_port_to_name, &mut dups_vec, &mut dups_set, &mut seen, def_names);
+    reader(net, enter(net, ROOT), &mut var_port_to_name, &mut dups_vec, &mut dups_set, &mut seen);
 
   // Read all the dup bodies.
   while let Some(dup) = dups_vec.pop() {
     seen.insert(port(dup, 0));
     let val = enter(net, port(dup, 0));
-    let (val, val_valid) =
-      reader(net, val, &mut var_port_to_name, &mut dups_vec, &mut dups_set, &mut seen, def_names);
+    let (val, val_valid) = reader(net, val, &mut var_port_to_name, &mut dups_vec, &mut dups_set, &mut seen);
     let fst = decl_name(net, port(dup, 1), &mut var_port_to_name);
     let snd = decl_name(net, port(dup, 2), &mut var_port_to_name);
     main = Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(main) };

@@ -44,7 +44,7 @@ pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Toke
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
   let inline_app =
     term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
-  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::NumOp {
+  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opr {
     op,
     fst: Box::new(fst),
     snd: Box::new(snd),
@@ -123,7 +123,7 @@ where
   let unsigned = select!(Token::Unsigned(num) => Term::U32{val: num});
   let signed = select!(Token::Signed(num) => Term::I32{val: num});
   let var = name().map(|name| Term::Var { nam: name }).boxed();
-  let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::GlobalVar { nam: name }).boxed();
+  let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::Lnk { nam: name }).boxed();
   let term_sep = choice((just(Token::NewLine), just(Token::Semicolon)));
 
   recursive(|term| {
@@ -144,7 +144,7 @@ where
       .ignore_then(name())
       .then_ignore(new_line())
       .then(term.clone())
-      .map(|(name, body)| Term::GlobalLam { nam: name, bod: Box::new(body) })
+      .map(|(name, body)| Term::Chn { nam: name, bod: Box::new(body) })
       .boxed();
 
     // dup x1 x2 = body; next
@@ -199,7 +199,7 @@ where
       .then(term.clone())
       .delimited_by(new_line(), new_line())
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|((op, fst), snd)| Term::NumOp { op, fst: Box::new(fst), snd: Box::new(snd) })
+      .map(|((op, fst), snd)| Term::Opr { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
     choice((global_var, var, unsigned, signed, global_lam, lam, dup, let_, num_op, app))
@@ -229,7 +229,7 @@ where
 {
   let inline_app =
     term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
-  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::NumOp {
+  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opr {
     op,
     fst: Box::new(fst),
     snd: Box::new(snd),
