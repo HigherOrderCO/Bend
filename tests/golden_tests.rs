@@ -9,7 +9,7 @@ use hvm_lang::{
 };
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
-use std::{collections::HashSet, fs, io::Write, path::Path};
+use std::{fs, io::Write, path::Path};
 use walkdir::WalkDir;
 
 fn run_single_golden_test(
@@ -51,7 +51,7 @@ fn compile_single_terms() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let term = term.try_into_affine(&HashSet::new())?;
+    let term = term.try_into_affine(&Default::default())?;
     let net = term_to_hvm_core(&term)?;
     Ok(show_lnet(&net))
   })
@@ -65,8 +65,8 @@ fn compile_single_files() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let core_book = compile_book(book)?;
-    Ok(core_book.to_string())
+    let (core_book, def_names) = compile_book(book)?;
+    Ok(core_book.to_string(&def_names))
   })
 }
 
@@ -78,8 +78,12 @@ fn run_single_files() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let (res, valid, _, _) = run_book(book)?;
-    let res = if valid { res.to_string() } else { format!("Invalid readback\n{}", res.to_string()) };
+    let (res, def_names, info) = run_book(book)?;
+    let res = if info.valid_readback {
+      res.to_string(&def_names)
+    } else {
+      format!("Invalid readback\n{}", res.to_string(&def_names))
+    };
     Ok(res)
   })
 }
@@ -89,7 +93,12 @@ fn readback_lnet() {
   let root = format!("{}/tests/golden_tests/readback_lnet", env!("CARGO_MANIFEST_DIR"));
   run_golden_test_dir(Path::new(&root), &|_, code| {
     let lnet = parse_lnet(&mut code.chars().peekable());
-    let (term, valid) = readback_net(&lnet)?;
-    if valid { Ok(term.to_string()) } else { Ok(format!("Invalid readback:\n{term}")) }
+    let def_names = Default::default();
+    let (term, valid) = readback_net(&lnet, &def_names)?;
+    if valid {
+      Ok(term.to_string(&def_names))
+    } else {
+      Ok(format!("Invalid readback:\n{}", term.to_string(&def_names)))
+    }
   })
 }

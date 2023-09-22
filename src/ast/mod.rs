@@ -5,7 +5,7 @@ pub mod hvm_lang;
 pub use hvm_lang::{Definition, DefinitionBook, NumOper, Rule, Term};
 
 use derive_more::{Display, From, Into};
-use hvm_core::{name_to_val, val_to_name, Val};
+use hvm_core::Val;
 use shrinkwraprs::Shrinkwrap;
 
 #[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
@@ -21,32 +21,6 @@ pub struct VarId(pub Val);
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Display)]
 pub struct Number(pub Val);
 
-impl From<&Name> for DefId {
-  fn from(value: &Name) -> Self {
-    DefId::from(value.as_str())
-  }
-}
-
-impl From<&str> for DefId {
-  fn from(value: &str) -> Self {
-    name_to_val(value).into()
-  }
-}
-
-impl From<DefId> for Name {
-  fn from(value: DefId) -> Self {
-    Name(val_to_name(*value))
-  }
-}
-
-pub fn name_to_id(name: &Name) -> Val {
-  name_to_val(name)
-}
-
-pub fn id_to_name(num: Val) -> Name {
-  Name(val_to_name(num))
-}
-
 pub fn var_id_to_name(mut var_id: Val) -> Name {
   let mut name = String::new();
   loop {
@@ -58,4 +32,15 @@ pub fn var_id_to_name(mut var_id: Val) -> Name {
     }
   }
   Name(name)
+}
+
+// TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
+impl DefId {
+  pub fn to_internal(self) -> Val {
+    *self + 1
+  }
+
+  pub fn from_internal(val: Val) -> Self {
+    Self(val - 1)
+  }
 }

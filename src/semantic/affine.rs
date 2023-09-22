@@ -1,11 +1,22 @@
-use crate::ast::{DefId, Definition, DefinitionBook, Name, Rule, Term};
-use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use crate::ast::{hvm_lang::DefNames, DefinitionBook, Name, Term};
+use std::collections::{BTreeMap, HashMap, VecDeque};
+
+impl DefinitionBook {
+  pub fn try_into_affine(&mut self) -> anyhow::Result<()> {
+    for def in self.defs.iter_mut() {
+      for rule in def.rules.iter_mut() {
+        rule.body = rule.body.try_into_affine(&self.def_names)?;
+      }
+    }
+    Ok(())
+  }
+}
 
 impl Term {
   /// Makes sure that all variables are affine (used 0 or 1 times), adding the needed dups.
   /// Checks for variables not defined anywhere.
   /// Converts def references into a Ref type
-  pub fn try_into_affine(self, def_names: &HashSet<Name>) -> anyhow::Result<Self> {
+  pub fn try_into_affine(&self, def_names: &DefNames) -> anyhow::Result<Self> {
     let mut globals = HashMap::new();
     let term = term_to_affine(self, &mut BTreeMap::new(), &mut globals, def_names)?;
     for (name, (defined, used)) in globals {
@@ -21,77 +32,60 @@ impl Term {
   }
 }
 
-impl DefinitionBook {
-  pub fn try_into_affine(self) -> anyhow::Result<Self> {
-    // TODO: don't clone everything
-    let def_names = self.defs.values().map(|Definition { name, .. }| name).cloned().collect();
-    let mut new_book = DefinitionBook::new();
-    for (def_id, Definition { name, mut rules }) in self.defs.into_iter() {
-      // TODO: Pattern matching
-      let Some(Rule { pats, body, .. }) = rules.pop() else { unreachable!() };
-      let body = body.try_into_affine(&def_names)?;
-      new_book.defs.insert(def_id, Definition { name, rules: vec![Rule { def_id, pats, body }] });
-    }
-    Ok(new_book)
-  }
-}
-
 type Scope = BTreeMap<Name, Vec<Vec<usize>>>;
 
 /// `scope` maps variable names to a stack of set of ids per var sharing this name>.
 /// `num_uses` counts how many times each variable name was used. This is used to create unique names.
 /// `globals` stores if a global variable has been defined and used somewhere in the term.
 fn term_to_affine(
-  value: Term,
+  value: &Term,
   scope: &mut Scope,
   globals: &mut HashMap<Name, (bool, bool)>,
-  def_names: &HashSet<Name>,
+  def_names: &DefNames,
 ) -> anyhow::Result<Term> {
-  match value {
+  let term = match value {
     Term::Lam { nam, bod } => {
-      push_scope(&nam, scope);
-      let bod = term_to_affine(*bod, scope, globals, def_names)?.into();
-      let (nam, bod) = pop_scope(&nam, bod, scope, def_names);
-      Ok(Term::Lam { nam, bod })
+      push_scope(nam, scope);
+      let bod = term_to_affine(bod, scope, globals, def_names)?.into();
+      let (nam, bod) = pop_scope(nam, bod, scope, def_names);
+      Term::Lam { nam, bod }
     }
     Term::Var { nam } => {
       // Count this var use and give it a new unique name
-      if let Some(var_use_stack) = scope.get(&nam) {
+      if let Some(var_use_stack) = scope.get(nam) {
         let var_uses = var_use_stack.last().unwrap().clone();
         // Create a new name, except for the first occurence
         let (new_name, name_idx) = if var_uses.is_empty() {
           (nam.clone(), 0)
         } else {
-          make_new_dup_name(&nam, &var_uses, scope, def_names)
+          make_new_dup_name(nam, &var_uses, scope, def_names)
         };
         // Add new name to scope
-        scope.get_mut(&nam).unwrap().last_mut().unwrap().push(name_idx);
-
-        let term = Term::Var { nam: new_name };
-        Ok(term)
+        scope.get_mut(nam).unwrap().last_mut().unwrap().push(name_idx);
+        Term::Var { nam: new_name }
       } else {
         // Unbound var, could be a def, could be actually unbound
-        if def_names.contains(&nam) {
-          Ok(Term::Ref { def_id: DefId::from(&nam) })
+        if let Some(def_id) = def_names.get_by_right(nam) {
+          Term::Ref { def_id: *def_id }
         } else {
-          Err(anyhow::anyhow!("Unbound variable '{nam}'"))
+          return Err(anyhow::anyhow!("Unbound variable '{nam}'"));
         }
       }
     }
     // TODO: Add var use checking for global lambdas and vars
     Term::GlobalLam { nam, bod } => {
-      if let Some(global_use) = globals.get_mut(&nam) {
+      if let Some(global_use) = globals.get_mut(nam) {
         if global_use.0 {
           return Err(anyhow::anyhow!("Global variable '{nam}' declared more than once"));
         } else {
           global_use.0 = true;
         }
       }
-      let bod = term_to_affine(*bod, scope, globals, def_names)?.into();
-      Ok(Term::GlobalLam { nam, bod })
+      let bod = term_to_affine(bod, scope, globals, def_names)?.into();
+      Term::GlobalLam { nam: nam.clone(), bod }
     }
     Term::GlobalVar { nam } => {
-      if let Some(global_use) = globals.get_mut(&nam) {
+      if let Some(global_use) = globals.get_mut(nam) {
         if global_use.1 {
           // TODO: Add dups on the first outer scope that contain all uses.
           return Err(anyhow::anyhow!(
@@ -101,22 +95,21 @@ fn term_to_affine(
           global_use.1 = true;
         }
       }
-      Ok(Term::GlobalVar { nam })
+      Term::GlobalVar { nam: nam.clone() }
     }
     Term::Ref { def_id } => {
       // We expect to not encounter this case, but if something changes in the future,
       // we're already deling with the possibility.
-      let name = Name::from(def_id);
-      if def_names.contains(&name) {
-        Ok(Term::Ref { def_id })
+      if def_names.contains_left(def_id) {
+        Term::Ref { def_id: *def_id }
       } else {
-        Err(anyhow::anyhow!("Reference to undefined definition '{name}'"))
+        return Err(anyhow::anyhow!("Reference to undefined definition (Unknown name for now)"));
       }
     }
-    Term::App { fun, arg } => Ok(Term::App {
-      fun: Box::new(term_to_affine(*fun, scope, globals, def_names)?),
-      arg: Box::new(term_to_affine(*arg, scope, globals, def_names)?),
-    }),
+    Term::App { fun, arg } => Term::App {
+      fun: Box::new(term_to_affine(fun, scope, globals, def_names)?),
+      arg: Box::new(term_to_affine(arg, scope, globals, def_names)?),
+    },
     // TODO: Should we add support for manually specifying sup terms?
     // Term::Sup { label, fst, snd } => Ok(Term::Sup {
     //   label,
@@ -130,23 +123,25 @@ fn term_to_affine(
           return Err(anyhow::anyhow!("Found dup with same name for both variables: '{fst}'"));
         }
       }
-      let val = term_to_affine(*val, scope, globals, def_names)?.into();
-      push_scope(&fst, scope);
-      push_scope(&snd, scope);
-      let nxt = term_to_affine(*nxt, scope, globals, def_names)?.into();
-      let (snd, nxt) = pop_scope(&snd, nxt, scope, def_names);
-      let (fst, nxt) = pop_scope(&fst, nxt, scope, def_names);
-      Ok(Term::Dup { fst, snd, val, nxt })
+      let val = term_to_affine(val, scope, globals, def_names)?.into();
+      push_scope(fst, scope);
+      push_scope(snd, scope);
+      let nxt = term_to_affine(nxt, scope, globals, def_names)?.into();
+      let (snd, nxt) = pop_scope(snd, nxt, scope, def_names);
+      let (fst, nxt) = pop_scope(fst, nxt, scope, def_names);
+      Term::Dup { fst, snd, val, nxt }
     }
-    num @ Term::Num { .. } => Ok(num),
-    Term::NumOp { op, fst, snd } => Ok(Term::NumOp {
-      op,
-      fst: Box::new(term_to_affine(*fst, scope, globals, def_names)?),
-      snd: Box::new(term_to_affine(*snd, scope, globals, def_names)?),
-    }),
+    Term::NumOp { op, fst, snd } => Term::NumOp {
+      op: *op,
+      fst: Box::new(term_to_affine(fst, scope, globals, def_names)?),
+      snd: Box::new(term_to_affine(snd, scope, globals, def_names)?),
+    },
+    num @ Term::Num { .. } => num.clone(),
     Term::Sup { .. } => unreachable!(),
     Term::Era => unreachable!(),
-  }
+    a => todo!("{}", a.to_string(def_names)),
+  };
+  Ok(term)
 }
 
 fn push_scope(nam: &Option<Name>, scope: &mut Scope) {
@@ -160,7 +155,7 @@ fn pop_scope(
   nam: &Option<Name>,
   bod: Box<Term>,
   scope: &mut Scope,
-  def_names: &HashSet<Name>,
+  def_names: &DefNames,
 ) -> (Option<Name>, Box<Term>) {
   if let Some(nam) = &nam {
     // Remove variable from scope, getting all the occurences
@@ -183,12 +178,7 @@ fn make_dup_name(nam: &str, idx: usize) -> Name {
   Name(name)
 }
 
-fn make_new_dup_name(
-  nam: &str,
-  var_uses: &[usize],
-  scope: &Scope,
-  def_names: &HashSet<Name>,
-) -> (Name, usize) {
+fn make_new_dup_name(nam: &str, var_uses: &[usize], scope: &Scope, def_names: &DefNames) -> (Name, usize) {
   let mut new_idx = var_uses.last().map_or(0, |x| x + 1);
   // NOTE: Checking if `$var_$i` is in `scope` requires checking entries where fst == $var_$i
   //   but also entries where fst == $var and indices.contain(i).
@@ -196,7 +186,7 @@ fn make_new_dup_name(
   //   so this must be done after we have all definitions of all imported files.
   loop {
     let name = make_dup_name(nam, new_idx);
-    if scope.contains_key(&name) || def_names.contains(&name) {
+    if scope.contains_key(&name) || def_names.contains_right(&name) {
       new_idx += 1;
     } else {
       return (name, new_idx);
@@ -209,7 +199,7 @@ fn add_dups_of_var(
   mut var_body: Box<Term>,
   var_uses: &[usize],
   scope: &Scope,
-  def_names: &HashSet<Name>,
+  def_names: &DefNames,
 ) -> (Option<Name>, Box<Term>) {
   match var_uses.len() {
     0 => (None, var_body),

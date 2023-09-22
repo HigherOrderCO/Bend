@@ -1,14 +1,14 @@
-Not =
-  $ (0 (0 @fals (0 @true a)) a)
+1 (true) =
+  $ (0 a (0 * a))
   
-Main =
-  $ a
-  & (0 @true a)
-  ~ @Not
-  
-fals =
+2 (fals) =
   $ (0 * (0 a a))
   
-true =
-  $ (0 a (0 * a))
+3 (Not) =
+  $ (0 (0 @2 (0 @1 a)) a)
+  
+4 (Main) =
+  $ a
+  & (0 @1 a)
+  ~ @3
   

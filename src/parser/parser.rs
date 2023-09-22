@@ -13,10 +13,9 @@ use chumsky::{
   span::SimpleSpan,
   IterParser, Parser,
 };
-use hvm_core::{Ptr, Val};
 use itertools::Itertools;
 use logos::{Logos, SpannedIter};
-use std::{collections::hash_map, iter::Map, ops::Range, sync::LazyLock};
+use std::{iter::Map, ops::Range};
 
 // TODO: Pattern matching on rules
 // TODO: Other types of numbers
@@ -77,22 +76,12 @@ fn token_stream(
 }
 
 // Parsers
-static MAX_NAME_LEN: LazyLock<usize> =
-  LazyLock::new(|| ((Ptr::new(0, Val::MAX).data() + 1).ilog2() / 64_u32.ilog2()) as usize);
 
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  select!(Token::Name(name) => Name(name)).try_map(|name, span| {
-    if name.len() > *MAX_NAME_LEN {
-      // TODO: Implement some kind of name mapping for definitions so that we can fit any def size.
-      // e.g. sequential mapping, mangling, hashing, etc
-      Err(Rich::custom(span, format!("'{}' exceed maximum name length of {}", *name, *MAX_NAME_LEN)))
-    } else {
-      Ok(name)
-    }
-  })
+  select!(Token::Name(name) => Name(name))
 }
 
 fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
@@ -176,7 +165,7 @@ where
     // let x = body; next
     let let_ = just(Token::Let)
       .ignore_then(new_line())
-      .ignore_then(name_or_era())
+      .ignore_then(name())
       .then_ignore(new_line())
       .then_ignore(just(Token::Equals))
       .then_ignore(new_line())
@@ -184,8 +173,9 @@ where
       .then_ignore(term_sep)
       .then_ignore(new_line())
       .then(term.clone())
+      //.map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) })
       .map(|((name, body), next)| Term::App {
-        fun: Box::new(Term::Lam { nam: name, bod: next.into() }),
+        fun: Box::new(Term::Lam { nam: Some(name), bod: next.into() }),
         arg: Box::new(body),
       })
       .boxed();
@@ -231,7 +221,7 @@ where
   })
 }
 
-fn rule<'a, I>() -> impl Parser<'a, I, Rule, extra::Err<Rich<'a, Token>>>
+fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -249,7 +239,7 @@ where
     .then_ignore(just(Token::Equals))
     .then_ignore(just(Token::NewLine).repeated())
     .then(choice((inline_num_oper, inline_app)))
-    .map(|((name, pats), body)| Rule { def_id: DefId::from(&name), pats, body })
+    .map(|((name, pats), body)| (name, Rule { def_id: DefId(0), pats, body }))
 }
 
 fn book<'a, I>() -> impl Parser<'a, I, DefinitionBook, extra::Err<Rich<'a, Token>>>
@@ -257,22 +247,26 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   fn rules_to_book(
-    rules: Vec<(Rule, SimpleSpan)>,
+    rules: Vec<((Name, Rule), SimpleSpan)>,
     _span: SimpleSpan,
     emitter: &mut Emitter<Rich<Token>>,
   ) -> DefinitionBook {
     let mut book = DefinitionBook::new();
 
     // Check for repeated defs (could be rules out of order or actually repeated names)
-    for (def_id, def_rules) in rules.into_iter().group_by(|(rule1, _)| rule1.def_id).into_iter() {
-      let (def_rules, spans): (Vec<Rule>, Vec<SimpleSpan>) = def_rules.unzip();
-      let name = Name::from(def_id);
-      let def = Definition { name, rules: def_rules };
-      if let hash_map::Entry::Vacant(e) = book.defs.entry(def_id) {
-        e.insert(def);
+    // TODO: Solve the lifetime here to avoid cloning names
+    for (_, rules_data) in rules.into_iter().group_by(|((name, _), _)| name.clone()).into_iter() {
+      let (rules, spans): (Vec<(Name, Rule)>, Vec<SimpleSpan>) = rules_data.unzip();
+      let (mut names, mut rules): (Vec<Name>, Vec<Rule>) = rules.into_iter().unzip();
+      let name = names.pop().unwrap();
+      if !book.def_names.contains_right(&name) {
+        let def_id = DefId(book.defs.len() as u64);
+        rules.iter_mut().for_each(|rule| rule.def_id = def_id);
+        book.defs.push(Definition { def_id, rules });
+        book.def_names.insert(def_id, name);
       } else {
         let span = SimpleSpan::new(spans.first().unwrap().start, spans.last().unwrap().end);
-        emitter.emit(Rich::custom(span, format!("Repeated definition '{}'", *def.name)));
+        emitter.emit(Rich::custom(span, format!("Repeated definition '{}'", name)));
       }
     }
     book
@@ -285,7 +279,7 @@ where
     .separated_by(new_line.at_least(1))
     .allow_leading()
     .allow_trailing()
-    .collect::<Vec<(Rule, SimpleSpan)>>();
+    .collect::<Vec<((Name, Rule), SimpleSpan)>>();
 
   parsed_rules.validate(rules_to_book)
 }

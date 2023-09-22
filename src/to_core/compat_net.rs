@@ -3,9 +3,9 @@ use crate::ast::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, NodeKind, Port, CON, DUP, ERA,
     LABEL_MASK, NUM, NUMOP, REF, ROOT, TAG_MASK,
   },
-  var_id_to_name, Name, NumOper, Term,
+  var_id_to_name, Name, NumOper, Term, DefId,
 };
-use hvm_core::{LNet, LTree, Tag};
+use hvm_core::{LNet, LTree, Tag, name_to_val};
 use std::collections::{HashMap, HashSet};
 
 /// Converts an IC term into an IC net.
@@ -130,6 +130,7 @@ fn encode_term(
     }
     Term::Sup { .. } => unreachable!(),
     Term::Era => unreachable!(),
+    _ => todo!(),
   }
 }
 
@@ -281,7 +282,7 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
-    REF => LTree::Ref { nam: label },
+    REF => LTree::Ref { nam: DefId(label).to_internal() },
     NUM => LTree::Num { val: label },
     NUMOP => LTree::OpX {
       opx: hvm_core::OP::from(NumOper::from(label)),

@@ -2,7 +2,7 @@
 
 use clap::{Parser, ValueEnum};
 use hvm_core::show_lnet;
-use hvm_lang::{check_book, compile_book, load_file_to_book, run_book};
+use hvm_lang::{check_book, compile_book, load_file_to_book, run_book, RunInfo};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -38,21 +38,22 @@ fn main() -> anyhow::Result<()> {
       check_book(book)?;
     }
     Mode::Compile => {
-      let compiled = compile_book(book)?;
-      println!("{compiled}");
+      let (compiled, def_names) = compile_book(book)?;
+      println!("{}", compiled.to_string(&def_names));
     }
     Mode::Run => {
-      let (res_term, valid_readback, res_lnet, stats) = run_book(book)?;
+      let (res_term, def_names, info) = run_book(book)?;
+      let RunInfo { stats, valid_readback, lnet } = info;
       let rps = stats.rewrites as f64 / stats.run_time / 1_000_000.0;
       if args.verbose {
-        println!("\n{}", show_lnet(&res_lnet));
+        println!("\n{}", show_lnet(&lnet));
       }
 
       if valid_readback {
-        println!("\n{}\n", res_term);
+        println!("\n{}\n", res_term.to_string(&def_names));
       } else {
         println!("\nInvalid readback from inet.");
-        println!(" Got:\n{}\n", res_term);
+        println!(" Got:\n{}\n", res_term.to_string(&def_names));
       }
       println!("size: {}", stats.size);
       println!("used: {}", stats.used);

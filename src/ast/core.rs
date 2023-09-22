@@ -1,18 +1,27 @@
-use super::{id_to_name, DefId};
-use hvm_core::{show_lnet, LNet};
+use super::{hvm_lang::DefNames, DefId};
+use hvm_core::{show_lnet, val_to_name, LNet};
 use itertools::Itertools;
-use std::{collections::HashMap, fmt};
+use std::collections::HashMap;
 
 pub struct Book {
   pub defs: HashMap<DefId, LNet>,
+  pub main: DefId,
 }
 
-impl fmt::Display for Book {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    for (id, net) in self.defs.iter().sorted_unstable_by_key(|(id, _)| *id) {
-      writeln!(f, "{} =", id_to_name(**id))?;
-      writeln!(f, "{}", show_lnet(net).split('\n').map(|x| format!("  {x}")).join("\n"))?;
-    }
-    Ok(())
+impl Book {
+  pub fn to_string(&self, def_names: &DefNames) -> String {
+    self
+      .defs
+      .iter()
+      .sorted_unstable_by_key(|(id, _)| *id)
+      .map(|(id, net)| {
+        format!(
+          "{} ({}) =\n{}",
+          val_to_name(id.to_internal()),
+          def_names.get_by_left(id).unwrap(),
+          show_lnet(net).split('\n').map(|x| format!("  {x}")).join("\n")
+        )
+      })
+      .join("\n")
   }
 }

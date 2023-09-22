@@ -17,6 +17,7 @@ cli = ["clap"]
 [dependencies]
 anyhow = "1.0.72"
 ariadne = "0.3.0"
+bimap = "0.6.3"
 chumsky = "1.0.0-alpha.4"
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 derive_more = "0.99.17"
