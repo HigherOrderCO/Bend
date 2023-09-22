@@ -30,6 +30,12 @@ pub fn var_id_to_name(mut var_id: Val) -> Name {
   Name(name)
 }
 
+impl Name {
+  pub fn from_str(value: &str) -> Self {
+    Name(value.to_string())
+  }
+}
+
 // TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
 impl DefId {
   pub fn to_internal(self) -> Val {

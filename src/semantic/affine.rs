@@ -203,7 +203,8 @@ fn add_dups_of_var(
       let mut refs_to_add = VecDeque::from_iter(var_uses.iter().map(|i| make_dup_name(var_name, *i)));
       while let (Some(fst), Some(snd)) = (refs_to_add.pop_front(), refs_to_add.pop_front()) {
         let dup_name = if refs_to_add.is_empty() {
-          Name(var_name.to_string()) // Topmost DUP refers to original lambda var
+          // Topmost DUP refers to original lambda var
+          var_name.clone()
         } else {
           let (name, new_idx) = make_new_dup_name(var_name, &var_uses, scope, def_names);
           refs_to_add.push_back(name.clone());

@@ -175,7 +175,7 @@ impl Term {
   pub fn to_string(&self, def_names: &DefNames) -> String {
     match self {
       Term::Lam { nam, bod } => {
-        format!("λ{} {}", nam.clone().unwrap_or(Name("*".to_string())), bod.to_string(def_names))
+        format!("λ{} {}", nam.clone().unwrap_or(Name::from_str("*")), bod.to_string(def_names))
       }
       Term::Var { nam } => format!("{nam}"),
       Term::Chn { nam, bod } => format!("λ${} {}", nam, bod.to_string(def_names)),

@@ -162,7 +162,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
     seen: &mut HashSet<Port>,
   ) -> (Term, bool) {
     if seen.contains(&next) {
-      return (Term::Var { nam: Name("...".to_string()) }, false);
+      return (Term::Var { nam: Name::from_str("...") }, false);
     }
 
     seen.insert(next);
