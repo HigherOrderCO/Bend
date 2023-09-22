@@ -23,8 +23,9 @@ pub const ERA: NodeKind = 0 << TAG;
 pub const CON: NodeKind = 1 << TAG;
 pub const DUP: NodeKind = 2 << TAG;
 pub const REF: NodeKind = 3 << TAG;
-pub const NUM: NodeKind = 4 << TAG;
-pub const NUMOP: NodeKind = 5 << TAG;
+pub const NUM_U32: NodeKind = 4 << TAG;
+pub const NUM_I32: NodeKind = 5 << TAG;
+pub const NUMOP: NodeKind = 6 << TAG;
 pub const LABEL_MASK: NodeKind = (1 << TAG) - 1;
 pub const TAG_MASK: NodeKind = !LABEL_MASK;
 

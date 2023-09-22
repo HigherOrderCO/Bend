@@ -1,4 +1,4 @@
-use super::{DefId, Name, Number};
+use super::{DefId, Name};
 use bimap::BiHashMap;
 use itertools::Itertools;
 use std::fmt;
@@ -27,7 +27,8 @@ pub struct Rule {
 #[derive(Debug, Clone)]
 pub enum Pattern {
   Ctr(Name, Vec<Pattern>),
-  Num(Number),
+  U32(u32),
+  I32(i32),
   Var(Option<Name>),
 }
 
@@ -37,11 +38,12 @@ pub enum Term {
   Var { nam: Name },
   GlobalLam { nam: Name, bod: Box<Term> },
   GlobalVar { nam: Name },
-  //Let { nam: Name, val: Box<Term>, nxt: Box<Term> },
+  /* Let { nam: Name, val: Box<Term>, nxt: Box<Term> }, */
   Ref { def_id: DefId },
   App { fun: Box<Term>, arg: Box<Term> },
   Dup { fst: Option<Name>, snd: Option<Name>, val: Box<Term>, nxt: Box<Term> },
-  Num { val: Number },
+  U32 { val: u32 },
+  I32 { val: i32 },
   NumOp { op: NumOper, fst: Box<Term>, snd: Box<Term> },
   Sup { fst: Box<Term>, snd: Box<Term> },
   Era,
@@ -144,7 +146,8 @@ impl Term {
         val.to_string(def_names),
         nxt.to_string(def_names)
       ),
-      Term::Num { val } => format!("{val}"),
+      Term::U32 { val } => format!("{val}"),
+      Term::I32 { val } => format!("{val:+}"),
       Term::NumOp { op, fst, snd } => {
         format!("({} {} {})", op, fst.to_string(def_names), snd.to_string(def_names))
       }
@@ -158,7 +161,8 @@ impl fmt::Display for Pattern {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Pattern::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
-      Pattern::Num(num) => write!(f, "{num}"),
+      Pattern::U32(num) => write!(f, "{num}"),
+      Pattern::I32(num) => write!(f, "{num:+}"),
       Pattern::Var(nam) => write!(f, "{}", nam.as_ref().map(|x| x.as_str()).unwrap_or("*")),
     }
   }

@@ -1,12 +1,12 @@
 use crate::ast::{
   compat::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
-    SlotId, CON, DUP, ERA, LABEL_MASK, NUM, NUMOP, REF, ROOT, TAG_MASK,
+    SlotId, CON, DUP, ERA, LABEL_MASK, NUMOP, REF, ROOT, TAG_MASK, NUM_U32, NUM_I32,
   },
   hvm_lang::DefNames,
-  var_id_to_name, Name, NumOper, Number, Term, DefId,
+  var_id_to_name, DefId, Name, NumOper, Term,
 };
-use hvm_core::{LNet, LTree, Val, val_to_name};
+use hvm_core::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
 
 pub fn readback_net(net: &LNet, def_names: &DefNames) -> anyhow::Result<(Term, bool)> {
@@ -89,8 +89,13 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      LTree::Num { val } => {
-        let kind = NUM | (*val as NodeKind);
+      LTree::U32 { val } => {
+        let kind = NUM_U32 | (*val as NodeKind);
+        let var = new_var(n_vars);
+        inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
+      }
+      LTree::I32 { val } => {
+        let kind = NUM_I32 | (*val as u32 as NodeKind);
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
@@ -201,9 +206,7 @@ fn readback_compat(net: &INet, def_names: &DefNames) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      REF => {
-        (Term::Ref { def_id: DefId(label)}, true)
-      }
+      REF => (Term::Ref { def_id: DefId(label) }, true),
       // If we're visiting a fan node...
       DUP => match slot(next) {
         // If we're visiting a port 0, then it is a pair.
@@ -230,7 +233,8 @@ fn readback_compat(net: &INet, def_names: &DefNames) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      NUM => (Term::Num { val: Number(label) }, true),
+      NUM_U32 => (Term::U32 { val: label as u32 }, true),
+      NUM_I32 => (Term::I32 { val: label as u32 as i32 }, true),
       NUMOP => match slot(next) {
         2 => {
           seen.insert(port(node, 0));

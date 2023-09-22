@@ -110,12 +110,6 @@ fn term_to_affine(
       fun: Box::new(term_to_affine(fun, scope, globals, def_names)?),
       arg: Box::new(term_to_affine(arg, scope, globals, def_names)?),
     },
-    // TODO: Should we add support for manually specifying sup terms?
-    // Term::Sup { label, fst, snd } => Ok(Term::Sup {
-    //   label,
-    //   fst: term_to_affine(*fst, scope, def_names)?.into(),
-    //   snd: term_to_affine(*snd, scope, def_names)?.into(),
-    // }),
     Term::Dup { fst, snd, val, nxt } => {
       if fst == snd {
         if let Some(fst) = fst {
@@ -136,10 +130,10 @@ fn term_to_affine(
       fst: Box::new(term_to_affine(fst, scope, globals, def_names)?),
       snd: Box::new(term_to_affine(snd, scope, globals, def_names)?),
     },
-    num @ Term::Num { .. } => num.clone(),
+    num @ Term::U32 { .. } | num @ Term::I32 { .. } => num.clone(),
+    // TODO: Should we add support for manually specifying sup terms?
     Term::Sup { .. } => unreachable!(),
     Term::Era => unreachable!(),
-    a => todo!("{}", a.to_string(def_names)),
   };
   Ok(term)
 }

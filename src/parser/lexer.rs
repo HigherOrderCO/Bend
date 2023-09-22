@@ -1,8 +1,6 @@
 use logos::{FilterResult, Lexer, Logos};
 use std::fmt;
 
-use crate::ast::Number;
-
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(error=LexingError)]
 pub enum Token {
@@ -24,8 +22,11 @@ pub enum Token {
   #[token("=")]
   Equals,
 
-  #[regex("[0-9]+", |lex| lex.slice().parse().map(Number).ok())]
-  Number(Number),
+  #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
+  Unsigned(u32),
+
+  #[regex("[+-][0-9]+", |lex| lex.slice().parse().ok())]
+  Signed(i32),
 
   #[token("+")]
   Add,
@@ -155,7 +156,8 @@ impl fmt::Display for Token {
       Self::Let => write!(f, "let"),
       Self::Dup => write!(f, "dup"),
       Self::Equals => write!(f, "="),
-      Self::Number(num) => write!(f, "{}", num.as_ref()),
+      Self::Unsigned(num) => write!(f, "{num}"),
+      Self::Signed(num) => write!(f, "{num:+}"),
       Self::Add => write!(f, "+"),
       Self::Sub => write!(f, "-"),
       Self::Asterisk => write!(f, "*"),

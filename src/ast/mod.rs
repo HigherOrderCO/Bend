@@ -17,10 +17,6 @@ pub struct DefId(pub Val);
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into)]
 pub struct VarId(pub Val);
 
-// TODO: Accept other number types
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Display)]
-pub struct Number(pub Val);
-
 pub fn var_id_to_name(mut var_id: Val) -> Name {
   let mut name = String::new();
   loop {

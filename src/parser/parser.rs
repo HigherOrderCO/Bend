@@ -120,7 +120,8 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   let new_line = || just(Token::NewLine).repeated();
-  let number = select!(Token::Number(num) => Term::Num{val: num});
+  let unsigned = select!(Token::Unsigned(num) => Term::U32{val: num});
+  let signed = select!(Token::Signed(num) => Term::I32{val: num});
   let var = name().map(|name| Term::Var { nam: name }).boxed();
   let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::GlobalVar { nam: name }).boxed();
   let term_sep = choice((just(Token::NewLine), just(Token::Semicolon)));
@@ -173,7 +174,7 @@ where
       .then_ignore(term_sep)
       .then_ignore(new_line())
       .then(term.clone())
-      //.map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) })
+      /* .map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) }) */
       .map(|((name, body), next)| Term::App {
         fun: Box::new(Term::Lam { nam: Some(name), bod: next.into() }),
         arg: Box::new(body),
@@ -201,7 +202,7 @@ where
       .map(|((op, fst), snd)| Term::NumOp { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, number, global_lam, lam, dup, let_, num_op, app))
+    choice((global_var, var, unsigned, signed, global_lam, lam, dup, let_, num_op, app))
   })
 }
 
@@ -215,9 +216,10 @@ where
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .map(|(name, pats)| Pattern::Ctr(name, pats))
       .boxed();
-    let num = select!(Token::Number(num) => Pattern::Num(num)).boxed();
+    let unsigned = select!(Token::Unsigned(num) => Pattern::U32(num)).boxed();
+    let signed = select!(Token::Signed(num) => Pattern::I32(num)).boxed();
     let var = name_or_era().map(Pattern::Var).boxed();
-    choice((ctr, num, var))
+    choice((ctr, unsigned, signed, var))
   })
 }
 

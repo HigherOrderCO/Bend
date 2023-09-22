@@ -1,11 +1,11 @@
 use crate::ast::{
   compat::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, NodeKind, Port, CON, DUP, ERA,
-    LABEL_MASK, NUM, NUMOP, REF, ROOT, TAG_MASK,
+    LABEL_MASK, NUMOP, REF, ROOT, TAG_MASK, NUM_U32, NUM_I32,
   },
-  var_id_to_name, Name, NumOper, Term, DefId,
+  var_id_to_name, DefId, Name, NumOper, Term,
 };
-use hvm_core::{LNet, LTree, Tag, name_to_val};
+use hvm_core::{LNet, LTree, Tag};
 use std::collections::{HashMap, HashSet};
 
 /// Converts an IC term into an IC net.
@@ -112,9 +112,17 @@ fn encode_term(
       link(inet, up, port(node, 0));
       Ok(Some(port(node, 0)))
     }
-    Term::Num { val } => {
-      debug_assert!(**val <= LABEL_MASK);
-      let node = new_node(inet, NUM | **val);
+    Term::U32 { val } => {
+      debug_assert!(*val as NodeKind <= LABEL_MASK);
+      let node = new_node(inet, NUM_U32 | *val as NodeKind);
+      // TODO: This is a workaround with the vector of nodes representation that didn't have number support
+      inet.nodes[port(node, 1) as usize] = port(node, 2);
+      inet.nodes[port(node, 2) as usize] = port(node, 1);
+      Ok(Some(port(node, 0)))
+    }
+    Term::I32 { val } => {
+      debug_assert!(*val as u32 as NodeKind <= LABEL_MASK);
+      let node = new_node(inet, NUM_I32 | *val as u32 as NodeKind);
       // TODO: This is a workaround with the vector of nodes representation that didn't have number support
       inet.nodes[port(node, 1) as usize] = port(node, 2);
       inet.nodes[port(node, 2) as usize] = port(node, 1);
@@ -283,7 +291,8 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
     REF => LTree::Ref { nam: DefId(label).to_internal() },
-    NUM => LTree::Num { val: label },
+    NUM_U32 => LTree::U32 { val: label as u32 },
+    NUM_I32 => LTree::I32 { val: label as u32 as i32 },
     NUMOP => LTree::OpX {
       opx: hvm_core::OP::from(NumOper::from(label)),
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
