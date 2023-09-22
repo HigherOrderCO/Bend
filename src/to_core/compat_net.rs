@@ -60,6 +60,7 @@ fn encode_term(
       link_local(inet, port(fun, 2), bod);
       Ok(Some(port(fun, 0)))
     }
+    Term::Let { nam, val, nxt } => todo!(),
     // An application becomes to a con node too. Ports:
     // - 0: points to the function being applied.
     // - 1: points to the function's argument.

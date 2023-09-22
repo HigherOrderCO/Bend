@@ -51,7 +51,7 @@ pub enum Term {
   Lnk {
     nam: Name,
   },
-  /* Let { nam: Name, val: Box<Term>, nxt: Box<Term> }, */
+  Let { nam: Name, val: Box<Term>, nxt: Box<Term> },
   Ref {
     def_id: DefId,
   },
@@ -99,9 +99,9 @@ impl Term {
       Term::Var { nam } => format!("{nam}"),
       Term::Chn { nam, bod } => format!("λ${} {}", nam, bod.to_string(def_names)),
       Term::Lnk { nam } => format!("${nam}"),
-      /* Term::Let { nam, val, nxt } => {
+      Term::Let { nam, val, nxt } => {
         format!("let {} = {}; {}", nam, val.to_string(def_names), nxt.to_string(def_names))
-      } */
+      }
       Term::Ref { def_id } => format!("{}", def_names.get_by_left(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
       Term::Dup { fst, snd, val, nxt } => format!(

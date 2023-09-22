@@ -97,6 +97,7 @@ fn term_to_affine(
       }
       Term::Lnk { nam: nam.clone() }
     }
+    Term::Let { nam, val, nxt } => todo!(),
     Term::Ref { def_id } => {
       // We expect to not encounter this case, but if something changes in the future,
       // we're already deling with the possibility.
