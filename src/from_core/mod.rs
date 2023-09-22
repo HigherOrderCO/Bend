@@ -3,7 +3,7 @@ use crate::ast::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
     SlotId, CON, DUP, ERA, LABEL_MASK, NUM, NUMOP, REF, ROOT, TAG_MASK,
   },
-  id_to_name, var_id_to_name, Name, Number, Term,
+  id_to_name, var_id_to_name, Name, NumOper, Number, Term,
 };
 use hvm_core::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
@@ -73,9 +73,9 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
       }
       LTree::Nod { tag, lft, rgt } => {
         let kind = if *tag == hvm_core::CON { CON } else { DUP | (*tag - hvm_core::DUP) as NodeKind };
-        let var_lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
-        let var_rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, var_lft, var_rgt] })
+        let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
+        let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
+        inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
       }
       LTree::Var { .. } => unreachable!(),
       LTree::Ref { nam } => {
@@ -88,7 +88,12 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      LTree::OpX { .. } => todo!(),
+      LTree::OpX { opx, lft, rgt } => {
+        let kind = NUMOP | NodeKind::from(NumOper::from(opx));
+        let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
+        let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
+        inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
+      }
     }
   }
   inodes
@@ -177,7 +182,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
         // If we're visiting a port 1, then it is a variable.
         1 => (Term::Var { nam: var_name(next, var_port_to_name) }, true),
         // If we're visiting a port 2, then it is an application.
-        _ => {
+        2 => {
           seen.insert(port(node, 0));
           seen.insert(port(node, 1));
           let prt = enter(net, port(node, 0));
@@ -187,6 +192,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
           let valid = fun_valid && arg_valid;
           (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
         }
+        _ => unreachable!(),
       },
       REF => (Term::Var { nam: id_to_name(label) }, true),
       // If we're visiting a fan node...
@@ -204,7 +210,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
         }
         // If we're visiting a port 1 or 2, then it is a variable.
         // Also, that means we found a dup, so we store it to read later.
-        _ => {
+        1 | 2 => {
           if !dups_set.contains(&node) {
             dups_set.insert(node);
             dups_vec.push(node);
@@ -213,9 +219,23 @@ fn readback_compat(net: &INet) -> (Term, bool) {
           }
           (Term::Var { nam: var_name(next, var_port_to_name) }, true)
         }
+        _ => unreachable!(),
       },
       NUM => (Term::Num { val: Number(label) }, true),
-      NUMOP => todo!(),
+      NUMOP => match slot(next) {
+        2 => {
+          seen.insert(port(node, 0));
+          seen.insert(port(node, 1));
+          let op = NumOper::from(label);
+          let fst = enter(net, port(node, 0));
+          let (fst, fst_valid) = reader(net, fst, var_port_to_name, dups_vec, dups_set, seen);
+          let snd = enter(net, port(node, 1));
+          let (snd, snd_valid) = reader(net, snd, var_port_to_name, dups_vec, dups_set, seen);
+          let valid = fst_valid && snd_valid;
+          (Term::NumOp { op, fst: Box::new(fst), snd: Box::new(snd) }, valid)
+        }
+        _ => unreachable!(),
+      },
       _ => unreachable!(),
     }
   }

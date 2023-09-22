@@ -87,6 +87,15 @@ impl From<hvm_core::OP> for NumOper {
   }
 }
 
+impl From<&hvm_core::OP> for NumOper {
+  fn from(value: &hvm_core::OP) -> Self {
+    match value {
+      hvm_core::OP::ADD => NumOper::Add,
+      _ => todo!(),
+    }
+  }
+}
+
 impl DefinitionBook {
   pub fn new() -> Self {
     Default::default()
