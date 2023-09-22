@@ -2,7 +2,7 @@ pub mod compat;
 pub mod core;
 pub mod hvm_lang;
 
-pub use hvm_lang::{Definition, DefinitionBook, NumOper, Rule, Term};
+pub use hvm_lang::{Definition, DefinitionBook, Opr, Rule, Term};
 
 use derive_more::{Display, From, Into};
 use hvm_core::Val;

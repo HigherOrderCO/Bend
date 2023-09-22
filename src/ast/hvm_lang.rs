@@ -46,7 +46,7 @@ pub enum Term {
     nam: Name,
     bod: Box<Term>,
   },
-  /// The use of a Channel variable
+  /// The use of a Channel variable.
   Lnk {
     nam: Name,
   },
@@ -70,8 +70,9 @@ pub enum Term {
   I32 {
     val: i32,
   },
-  Opr {
-    op: NumOper,
+  /// A numeric operation between built-in numbers.
+  Opx {
+    op: Opr,
     fst: Box<Term>,
     snd: Box<Term>,
   },
@@ -82,8 +83,9 @@ pub enum Term {
   Era,
 }
 
+/// A numeric operator, for built-in machine numbers
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum NumOper {
+pub enum Opr {
   Add,
   Sub,
   Mul,
@@ -102,29 +104,40 @@ pub enum NumOper {
   Neq,
 }
 
-impl From<NumOper> for hvm_core::OP {
-  fn from(value: NumOper) -> Self {
+impl From<Opr> for hvm_core::OP {
+  fn from(value: Opr) -> Self {
     match value {
-      NumOper::Add => hvm_core::OP::ADD,
+      Opr::Add => hvm_core::OP::ADD,
       _ => todo!(),
     }
   }
 }
 
-impl From<hvm_core::OP> for NumOper {
+impl From<hvm_core::OP> for Opr {
   fn from(value: hvm_core::OP) -> Self {
     match value {
-      hvm_core::OP::ADD => NumOper::Add,
+      hvm_core::OP::ADD => Opr::Add,
       _ => todo!(),
     }
   }
 }
 
-impl From<&hvm_core::OP> for NumOper {
+impl From<&hvm_core::OP> for Opr {
   fn from(value: &hvm_core::OP) -> Self {
     match value {
-      hvm_core::OP::ADD => NumOper::Add,
-      _ => todo!(),
+      hvm_core::OP::ADD => Opr::Add,
+      hvm_core::OP::SUB => Opr::Sub,
+      hvm_core::OP::MUL => Opr::Mul,
+      hvm_core::OP::DIV => Opr::Div,
+      hvm_core::OP::MOD => Opr::Mod,
+      hvm_core::OP::EQ => Opr::Eql,
+      hvm_core::OP::NEQ => Opr::Neq,
+      hvm_core::OP::LT => Opr::Ltn,
+      hvm_core::OP::GT => Opr::Gtn,
+      hvm_core::OP::LTE => Opr::Lte,
+      hvm_core::OP::GTE => Opr::Gte,
+      hvm_core::OP::AND => Opr::And,
+      hvm_core::OP::OR => Opr::Or,
     }
   }
 }
@@ -135,25 +148,25 @@ impl DefinitionBook {
   }
 }
 
-impl fmt::Display for NumOper {
+impl fmt::Display for Opr {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      NumOper::Add => write!(f, "+"),
-      NumOper::Sub => write!(f, "-"),
-      NumOper::Mul => write!(f, "*"),
-      NumOper::Div => write!(f, "/"),
-      NumOper::Mod => write!(f, "%"),
-      NumOper::And => write!(f, "&"),
-      NumOper::Or => write!(f, "|"),
-      NumOper::Xor => write!(f, "^"),
-      NumOper::Shl => write!(f, "<<"),
-      NumOper::Shr => write!(f, ">>"),
-      NumOper::Ltn => write!(f, "<"),
-      NumOper::Lte => write!(f, "<="),
-      NumOper::Gtn => write!(f, ">"),
-      NumOper::Gte => write!(f, ">="),
-      NumOper::Eql => write!(f, "=="),
-      NumOper::Neq => write!(f, "!="),
+      Opr::Add => write!(f, "+"),
+      Opr::Sub => write!(f, "-"),
+      Opr::Mul => write!(f, "*"),
+      Opr::Div => write!(f, "/"),
+      Opr::Mod => write!(f, "%"),
+      Opr::And => write!(f, "&"),
+      Opr::Or => write!(f, "|"),
+      Opr::Xor => write!(f, "^"),
+      Opr::Shl => write!(f, "<<"),
+      Opr::Shr => write!(f, ">>"),
+      Opr::Ltn => write!(f, "<"),
+      Opr::Lte => write!(f, "<="),
+      Opr::Gtn => write!(f, ">"),
+      Opr::Gte => write!(f, ">="),
+      Opr::Eql => write!(f, "=="),
+      Opr::Neq => write!(f, "!="),
     }
   }
 }
@@ -181,7 +194,7 @@ impl Term {
       ),
       Term::U32 { val } => format!("{val}"),
       Term::I32 { val } => format!("{val:+}"),
-      Term::Opr { op, fst, snd } => {
+      Term::Opx { op, fst, snd } => {
         format!("({} {} {})", op, fst.to_string(def_names), snd.to_string(def_names))
       }
       Term::Sup { fst, snd } => format!("{{{} {}}}", fst.to_string(def_names), snd.to_string(def_names)),

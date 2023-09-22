@@ -125,7 +125,7 @@ fn term_to_affine(
       let (fst, nxt) = pop_scope(fst, nxt, scope, def_names);
       Term::Dup { fst, snd, val, nxt }
     }
-    Term::Opr { op, fst, snd } => Term::Opr {
+    Term::Opx { op, fst, snd } => Term::Opx {
       op: *op,
       fst: Box::new(term_to_affine(fst, scope, globals, def_names)?),
       snd: Box::new(term_to_affine(snd, scope, globals, def_names)?),

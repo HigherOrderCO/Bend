@@ -1,6 +1,6 @@
 use super::lexer::LexingError;
 use crate::{
-  ast::{hvm_lang::Pattern, DefId, Definition, DefinitionBook, Name, NumOper, Rule, Term},
+  ast::{hvm_lang::Pattern, DefId, Definition, DefinitionBook, Name, Opr, Rule, Term},
   parser::lexer::Token,
 };
 use chumsky::{
@@ -44,7 +44,7 @@ pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Toke
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
   let inline_app =
     term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
-  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opr {
+  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opx {
     op,
     fst: Box::new(fst),
     snd: Box::new(snd),
@@ -91,27 +91,27 @@ where
   choice((select!(Token::Asterisk => None), name().map(Some)))
 }
 
-fn num_oper<'a, I>() -> impl Parser<'a, I, NumOper, extra::Err<Rich<'a, Token>>>
+fn num_oper<'a, I>() -> impl Parser<'a, I, Opr, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   select! {
-    Token::Add => NumOper::Add,
-    Token::Sub => NumOper::Sub,
-    Token::Asterisk => NumOper::Mul,
-    Token::Div => NumOper::Div,
-    Token::Mod => NumOper::Mod,
-    Token::And => NumOper::And,
-    Token::Or => NumOper::Or,
-    Token::Xor => NumOper::Xor,
-    Token::Shl => NumOper::Shl,
-    Token::Shr => NumOper::Shr,
-    Token::Lte => NumOper::Lte,
-    Token::Ltn => NumOper::Ltn,
-    Token::Gte => NumOper::Gte,
-    Token::Gtn => NumOper::Gtn,
-    Token::EqualsEquals => NumOper::Eql,
-    Token::NotEquals => NumOper::Neq,
+    Token::Add => Opr::Add,
+    Token::Sub => Opr::Sub,
+    Token::Asterisk => Opr::Mul,
+    Token::Div => Opr::Div,
+    Token::Mod => Opr::Mod,
+    Token::And => Opr::And,
+    Token::Or => Opr::Or,
+    Token::Xor => Opr::Xor,
+    Token::Shl => Opr::Shl,
+    Token::Shr => Opr::Shr,
+    Token::Lte => Opr::Lte,
+    Token::Ltn => Opr::Ltn,
+    Token::Gte => Opr::Gte,
+    Token::Gtn => Opr::Gtn,
+    Token::EqualsEquals => Opr::Eql,
+    Token::NotEquals => Opr::Neq,
   }
 }
 
@@ -199,7 +199,7 @@ where
       .then(term.clone())
       .delimited_by(new_line(), new_line())
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|((op, fst), snd)| Term::Opr { op, fst: Box::new(fst), snd: Box::new(snd) })
+      .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
     choice((global_var, var, unsigned, signed, global_lam, lam, dup, let_, num_op, app))
@@ -229,7 +229,7 @@ where
 {
   let inline_app =
     term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
-  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opr {
+  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opx {
     op,
     fst: Box::new(fst),
     snd: Box::new(snd),

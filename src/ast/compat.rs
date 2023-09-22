@@ -1,8 +1,7 @@
 // TODO: Refactor to not use this intermediate form
 
+use super::Opr;
 use hvm_core::Val;
-
-use super::NumOper;
 
 #[derive(Clone, Debug)]
 /// Net representation used only as an intermediate for converting to hvm-core format
@@ -74,19 +73,19 @@ pub fn link(inet: &mut INet, ptr_a: Port, ptr_b: Port) {
   inet.nodes[ptr_b as usize] = ptr_a;
 }
 
-impl From<NodeKind> for NumOper {
+impl From<NodeKind> for Opr {
   fn from(value: NodeKind) -> Self {
     match value {
-      0 => NumOper::Add,
+      0 => Opr::Add,
       _ => todo!(),
     }
   }
 }
 
-impl From<NumOper> for NodeKind {
-  fn from(value: NumOper) -> Self {
+impl From<Opr> for NodeKind {
+  fn from(value: Opr) -> Self {
     match value {
-      NumOper::Add => 0,
+      Opr::Add => 0,
       _ => todo!(),
     }
   }

@@ -3,7 +3,7 @@ use crate::ast::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
     SlotId, CON, DUP, ERA, LABEL_MASK, NUMOP, NUM_I32, NUM_U32, REF, ROOT, TAG_MASK,
   },
-  var_id_to_name, DefId, Name, NumOper, Term,
+  var_id_to_name, DefId, Name, Opr, Term,
 };
 use hvm_core::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
@@ -99,7 +99,7 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
       LTree::OpX { opx, lft, rgt } => {
-        let kind = NUMOP | NodeKind::from(NumOper::from(opx));
+        let kind = NUMOP | NodeKind::from(Opr::from(opx));
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
@@ -237,13 +237,13 @@ fn readback_compat(net: &INet) -> (Term, bool) {
         2 => {
           seen.insert(port(node, 0));
           seen.insert(port(node, 1));
-          let op = NumOper::from(label);
+          let op = Opr::from(label);
           let fst = enter(net, port(node, 0));
           let (fst, fst_valid) = reader(net, fst, var_port_to_name, dups_vec, dups_set, seen);
           let snd = enter(net, port(node, 1));
           let (snd, snd_valid) = reader(net, snd, var_port_to_name, dups_vec, dups_set, seen);
           let valid = fst_valid && snd_valid;
-          (Term::Opr { op, fst: Box::new(fst), snd: Box::new(snd) }, valid)
+          (Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
         _ => unreachable!(),
       },
