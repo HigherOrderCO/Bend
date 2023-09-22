@@ -1,5 +1,6 @@
 use super::{DefId, Name};
 use bimap::BiHashMap;
+use hvm_core::{opx_to_string, OP};
 use itertools::Itertools;
 use std::fmt;
 
@@ -72,7 +73,7 @@ pub enum Term {
   },
   /// A numeric operation between built-in numbers.
   Opx {
-    op: Opr,
+    op: OP,
     fst: Box<Term>,
     snd: Box<Term>,
   },
@@ -83,91 +84,9 @@ pub enum Term {
   Era,
 }
 
-/// A numeric operator, for built-in machine numbers
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum Opr {
-  Add,
-  Sub,
-  Mul,
-  Div,
-  Mod,
-  And,
-  Or,
-  Xor,
-  Shl,
-  Shr,
-  Ltn,
-  Lte,
-  Gtn,
-  Gte,
-  Eql,
-  Neq,
-}
-
-impl From<Opr> for hvm_core::OP {
-  fn from(value: Opr) -> Self {
-    match value {
-      Opr::Add => hvm_core::OP::ADD,
-      _ => todo!(),
-    }
-  }
-}
-
-impl From<hvm_core::OP> for Opr {
-  fn from(value: hvm_core::OP) -> Self {
-    match value {
-      hvm_core::OP::ADD => Opr::Add,
-      _ => todo!(),
-    }
-  }
-}
-
-impl From<&hvm_core::OP> for Opr {
-  fn from(value: &hvm_core::OP) -> Self {
-    match value {
-      hvm_core::OP::ADD => Opr::Add,
-      hvm_core::OP::SUB => Opr::Sub,
-      hvm_core::OP::MUL => Opr::Mul,
-      hvm_core::OP::DIV => Opr::Div,
-      hvm_core::OP::MOD => Opr::Mod,
-      hvm_core::OP::EQ => Opr::Eql,
-      hvm_core::OP::NEQ => Opr::Neq,
-      hvm_core::OP::LT => Opr::Ltn,
-      hvm_core::OP::GT => Opr::Gtn,
-      hvm_core::OP::LTE => Opr::Lte,
-      hvm_core::OP::GTE => Opr::Gte,
-      hvm_core::OP::AND => Opr::And,
-      hvm_core::OP::OR => Opr::Or,
-    }
-  }
-}
-
 impl DefinitionBook {
   pub fn new() -> Self {
     Default::default()
-  }
-}
-
-impl fmt::Display for Opr {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Opr::Add => write!(f, "+"),
-      Opr::Sub => write!(f, "-"),
-      Opr::Mul => write!(f, "*"),
-      Opr::Div => write!(f, "/"),
-      Opr::Mod => write!(f, "%"),
-      Opr::And => write!(f, "&"),
-      Opr::Or => write!(f, "|"),
-      Opr::Xor => write!(f, "^"),
-      Opr::Shl => write!(f, "<<"),
-      Opr::Shr => write!(f, ">>"),
-      Opr::Ltn => write!(f, "<"),
-      Opr::Lte => write!(f, "<="),
-      Opr::Gtn => write!(f, ">"),
-      Opr::Gte => write!(f, ">="),
-      Opr::Eql => write!(f, "=="),
-      Opr::Neq => write!(f, "!="),
-    }
   }
 }
 
@@ -195,7 +114,7 @@ impl Term {
       Term::U32 { val } => format!("{val}"),
       Term::I32 { val } => format!("{val:+}"),
       Term::Opx { op, fst, snd } => {
-        format!("({} {} {})", op, fst.to_string(def_names), snd.to_string(def_names))
+        format!("({} {} {})", opx_to_string(op), fst.to_string(def_names), snd.to_string(def_names))
       }
       Term::Sup { fst, snd } => format!("{{{} {}}}", fst.to_string(def_names), snd.to_string(def_names)),
       Term::Era => "*".to_string(),

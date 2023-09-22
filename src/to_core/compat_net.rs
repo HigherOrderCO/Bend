@@ -1,9 +1,9 @@
 use crate::ast::{
   compat::{
-    addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, NodeKind, Port, CON, DUP, ERA,
-    LABEL_MASK, NUMOP, NUM_I32, NUM_U32, REF, ROOT, TAG_MASK,
+    addr, enter, kind, label_to_op, link, new_inet, new_node, op_to_label, port, slot, INet, NodeId,
+    NodeKind, Port, CON, DUP, ERA, LABEL_MASK, NUMOP, NUM_I32, NUM_U32, REF, ROOT, TAG_MASK,
   },
-  var_id_to_name, DefId, Name, Opr, Term,
+  var_id_to_name, DefId, Name, Term,
 };
 use hvm_core::{LNet, LTree, Tag};
 use std::collections::{HashMap, HashSet};
@@ -129,7 +129,7 @@ fn encode_term(
       Ok(Some(port(node, 0)))
     }
     Term::Opx { op, fst, snd } => {
-      let node = new_node(inet, NUMOP | NodeKind::from(*op));
+      let node = new_node(inet, NUMOP | op_to_label(*op));
       let fst = encode_term(inet, fst, port(node, 0), scope, vars, global_vars, dups)?;
       link_local(inet, port(node, 0), fst);
       let snd = encode_term(inet, snd, port(node, 1), scope, vars, global_vars, dups)?;
@@ -293,7 +293,7 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
     NUM_U32 => LTree::U32 { val: label as u32 },
     NUM_I32 => LTree::I32 { val: label as u32 as i32 },
     NUMOP => LTree::OpX {
-      opx: hvm_core::OP::from(Opr::from(label)),
+      opx: label_to_op(label),
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },

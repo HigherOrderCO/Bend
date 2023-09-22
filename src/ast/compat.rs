@@ -1,7 +1,6 @@
 // TODO: Refactor to not use this intermediate form
 
-use super::Opr;
-use hvm_core::Val;
+use hvm_core::{Val, OP};
 
 #[derive(Clone, Debug)]
 /// Net representation used only as an intermediate for converting to hvm-core format
@@ -73,24 +72,42 @@ pub fn link(inet: &mut INet, ptr_a: Port, ptr_b: Port) {
   inet.nodes[ptr_b as usize] = ptr_a;
 }
 
-impl From<NodeKind> for Opr {
-  fn from(value: NodeKind) -> Self {
-    match value {
-      0 => Opr::Add,
-      _ => todo!(),
-    }
+pub fn op_to_label(value: OP) -> NodeKind {
+  match value {
+    OP::ADD => 0x0,
+    OP::SUB => 0x1,
+    OP::MUL => 0x2,
+    OP::DIV => 0x3,
+    OP::MOD => 0x4,
+    OP::EQ => 0x5,
+    OP::NEQ => 0x6,
+    OP::LT => 0x7,
+    OP::GT => 0x8,
+    OP::LTE => 0x9,
+    OP::GTE => 0xa,
+    OP::AND => 0xb,
+    OP::OR => 0xc,
   }
 }
 
-impl From<Opr> for NodeKind {
-  fn from(value: Opr) -> Self {
-    match value {
-      Opr::Add => 0,
-      _ => todo!(),
-    }
+pub fn label_to_op(value: NodeKind) -> OP {
+  match value {
+    0x0 => OP::ADD,
+    0x1 => OP::SUB,
+    0x2 => OP::MUL,
+    0x3 => OP::DIV,
+    0x4 => OP::MOD,
+    0x5 => OP::EQ,
+    0x6 => OP::NEQ,
+    0x7 => OP::LT,
+    0x8 => OP::GT,
+    0x9 => OP::LTE,
+    0xa => OP::GTE,
+    0xb => OP::AND,
+    0xc => OP::OR,
+    _ => unreachable!(),
   }
 }
-
 #[derive(Debug)]
 pub struct INode {
   pub kind: NodeKind,

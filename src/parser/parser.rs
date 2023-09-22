@@ -1,6 +1,6 @@
 use super::lexer::LexingError;
 use crate::{
-  ast::{hvm_lang::Pattern, DefId, Definition, DefinitionBook, Name, Opr, Rule, Term},
+  ast::{hvm_lang::Pattern, DefId, Definition, DefinitionBook, Name, Rule, Term},
   parser::lexer::Token,
 };
 use chumsky::{
@@ -13,6 +13,7 @@ use chumsky::{
   span::SimpleSpan,
   IterParser, Parser,
 };
+use hvm_core::OP;
 use itertools::Itertools;
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range};
@@ -91,27 +92,27 @@ where
   choice((select!(Token::Asterisk => None), name().map(Some)))
 }
 
-fn num_oper<'a, I>() -> impl Parser<'a, I, Opr, extra::Err<Rich<'a, Token>>>
+fn num_oper<'a, I>() -> impl Parser<'a, I, OP, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   select! {
-    Token::Add => Opr::Add,
-    Token::Sub => Opr::Sub,
-    Token::Asterisk => Opr::Mul,
-    Token::Div => Opr::Div,
-    Token::Mod => Opr::Mod,
-    Token::And => Opr::And,
-    Token::Or => Opr::Or,
-    Token::Xor => Opr::Xor,
-    Token::Shl => Opr::Shl,
-    Token::Shr => Opr::Shr,
-    Token::Lte => Opr::Lte,
-    Token::Ltn => Opr::Ltn,
-    Token::Gte => Opr::Gte,
-    Token::Gtn => Opr::Gtn,
-    Token::EqualsEquals => Opr::Eql,
-    Token::NotEquals => Opr::Neq,
+    Token::Add => OP::ADD,
+    Token::Sub => OP::SUB,
+    Token::Asterisk => OP::MUL,
+    Token::Div => OP::DIV,
+    Token::Mod => OP::MOD,
+    Token::And => OP::AND,
+    Token::Or => OP::OR,
+    // Token::Xor => Opr::Xor,
+    // Token::Shl => Opr::Shl,
+    // Token::Shr => Opr::Shr,
+    Token::Lte => OP::LTE,
+    Token::Ltn => OP::LT,
+    Token::Gte => OP::GTE,
+    Token::Gtn => OP::GT,
+    Token::EqualsEquals => OP::EQ,
+    Token::NotEquals => OP::NEQ,
   }
 }
 

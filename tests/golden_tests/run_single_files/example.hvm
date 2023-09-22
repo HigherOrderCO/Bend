@@ -13,13 +13,15 @@
 // Of course you can always do them manually
 (def4) = λz dup z1 z2 = z; (z1 (λx (x x x x x) z2))
 
-// TODO
 // You can use machine numbers and some native numeric operations
 // Numeric operations can only reduce numbers, doing (+ (λx x) 1) will not do anything
-// (nums) = λx1 λx2 (* (+ x1 1) (/ (- x2 2) 1))
+(nums) = λx1 λx2 (* (+ x1 1) (/ (- x2 2) 1))
+
+// For signed integers, make sure to put the sign (+ or -) in front.
+(nums_signed) = λx1 λx2 (* (+ x1 -1) (/ (- x2 +2) -1))
 
 // All files must have a main definition to be run.
 // You can execute a program in HVM with "cargo run -- --run <path to file>"
 // Other options are "--check" (the default mode) to just see if the file is well formed
 // and "--compile" to output hvm-core code.
-(Main) = (Def2 1)
+(Main) = (nums_signed 3 4)

@@ -43,10 +43,10 @@ pub enum Token {
   #[token("%")]
   Mod,
 
-  #[token("&")]
+  #[token("&&")]
   And,
 
-  #[token("|")]
+  #[token("||")]
   Or,
 
   #[token("^")]
