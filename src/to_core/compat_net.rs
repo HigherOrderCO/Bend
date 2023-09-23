@@ -60,7 +60,6 @@ fn encode_term(
       link_local(inet, port(fun, 2), bod);
       Ok(Some(port(fun, 0)))
     }
-    Term::Let { nam, val, nxt } => todo!(),
     // An application becomes to a con node too. Ports:
     // - 0: points to the function being applied.
     // - 1: points to the function's argument.
@@ -94,7 +93,10 @@ fn encode_term(
     Term::Var { nam } => {
       // We assume this variable to be valid, bound and correctly scoped.
       // This pass must be done before.
-      debug_assert!(scope.contains_key(nam), "Unbound variable {nam}");
+      debug_assert!(
+        scope.contains_key(nam),
+        "Unbound variable {nam}. Expected this check to be already done"
+      );
       let var_stack = scope.get(nam).unwrap();
       let crnt_var = *var_stack.last().unwrap();
       let (declare_port, use_port) = vars.get_mut(crnt_var).unwrap();
@@ -137,8 +139,9 @@ fn encode_term(
       link_local(inet, port(node, 1), snd);
       Ok(Some(port(node, 2)))
     }
-    Term::Sup { .. } => unreachable!(),
-    Term::Era => unreachable!(),
+    Term::Let { .. } => unreachable!(), // Removed in earlier poss
+    Term::Sup { .. } => unreachable!(), // Not supported in syntax
+    Term::Era => unreachable!(),        // Not supported in syntax
   }
 }
 

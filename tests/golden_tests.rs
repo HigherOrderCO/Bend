@@ -51,7 +51,7 @@ fn compile_single_terms() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let term = term.try_into_affine(&Default::default())?;
+    let term = term.sanitize_vars(&Default::default())?;
     let net = term_to_hvm_core(&term)?;
     Ok(show_lnet(&net))
   })

@@ -1,7 +1,5 @@
 /// Semantic checking
 use crate::ast::{DefinitionBook, Name};
-
-pub mod affine;
 // pub mod pattern;
 pub mod vars;
 

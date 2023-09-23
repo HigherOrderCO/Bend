@@ -1,1 +1,1 @@
-dup b c = a; λa (b c)
+dup c b = a; λa (b c)

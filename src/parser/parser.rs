@@ -175,11 +175,7 @@ where
       .then_ignore(term_sep)
       .then_ignore(new_line())
       .then(term.clone())
-      /* .map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) }) */
-      .map(|((name, body), next)| Term::App {
-        fun: Box::new(Term::Lam { nam: Some(name), bod: next.into() }),
-        arg: Box::new(body),
-      })
+      .map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
     // (f arg1 arg2 ...)

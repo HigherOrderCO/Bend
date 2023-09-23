@@ -51,7 +51,11 @@ pub enum Term {
   Lnk {
     nam: Name,
   },
-  Let { nam: Name, val: Box<Term>, nxt: Box<Term> },
+  Let {
+    nam: Name,
+    val: Box<Term>,
+    nxt: Box<Term>,
+  },
   Ref {
     def_id: DefId,
   },
