@@ -44,7 +44,7 @@ fn main() -> anyhow::Result<()> {
     Mode::Run => {
       let (res_term, def_names, info) = run_book(book)?;
       let RunInfo { stats, valid_readback, lnet } = info;
-      let rps = stats.rewrites as f64 / stats.run_time / 1_000_000.0;
+      let rps = stats.rewrites.total_rewrites() as f64 / stats.run_time / 1_000_000.0;
       if args.verbose {
         println!("\n{}", show_lnet(&lnet));
       }
@@ -57,7 +57,15 @@ fn main() -> anyhow::Result<()> {
       }
       println!("size: {}", stats.size);
       println!("used: {}", stats.used);
-      println!("Time: {:.3}s | Rwts: {} | RPS: {:.3}m", stats.run_time, stats.rewrites, rps);
+      println!(
+        "Time: {:.3}s | Anni: {:.3} | Comm: {:.3} | Eras: {:.3} | Dref: {:.3} | RPS: {:.3}m",
+        stats.run_time,
+        stats.rewrites.anni,
+        stats.rewrites.comm,
+        stats.rewrites.eras,
+        stats.rewrites.dref,
+        rps
+      );
     }
   }
 

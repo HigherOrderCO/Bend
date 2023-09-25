@@ -13,10 +13,13 @@ use chumsky::{
   span::SimpleSpan,
   IterParser, Parser,
 };
-use hvm_core::OP;
+use hvm_core::Val;
 use itertools::Itertools;
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range};
+
+#[cfg(feature = "nums")]
+use hvm_core::OP;
 
 // TODO: Pattern matching on rules
 // TODO: Other types of numbers
@@ -45,13 +48,18 @@ pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Toke
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
   let inline_app =
     term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
+  #[cfg(feature = "nums")]
   let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opx {
     op,
     fst: Box::new(fst),
     snd: Box::new(snd),
   });
+  #[cfg(feature = "nums")]
   let standalone_term = choice((inline_app, inline_num_oper))
     .delimited_by(just(Token::NewLine).repeated(), just(Token::NewLine).repeated());
+  #[cfg(not(feature = "nums"))]
+  let standalone_term =
+    inline_app.delimited_by(just(Token::NewLine).repeated(), just(Token::NewLine).repeated());
 
   // TODO: Make a function that calls a parser. I couldn't figure out how to type it correctly.
   standalone_term.parse(token_stream(code)).into_result()
@@ -92,6 +100,7 @@ where
   choice((select!(Token::Asterisk => None), name().map(Some)))
 }
 
+#[cfg(feature = "nums")]
 fn num_oper<'a, I>() -> impl Parser<'a, I, OP, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -121,11 +130,14 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   let new_line = || just(Token::NewLine).repeated();
-  let unsigned = select!(Token::Unsigned(num) => Term::U32{val: num});
-  let signed = select!(Token::Signed(num) => Term::I32{val: num});
   let var = name().map(|name| Term::Var { nam: name }).boxed();
   let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::Lnk { nam: name }).boxed();
   let term_sep = choice((just(Token::NewLine), just(Token::Semicolon)));
+
+  #[cfg(feature = "nums")]
+  let unsigned = select!(Token::Unsigned(num) => Term::U32{val: num});
+  #[cfg(feature = "nums")]
+  let signed = select!(Token::Signed(num) => Term::I32{val: num});
 
   recursive(|term| {
     // λx body
@@ -189,6 +201,7 @@ where
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
+    #[cfg(feature = "nums")]
     let num_op = num_oper()
       .then_ignore(new_line())
       .then(term.clone())
@@ -199,7 +212,15 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, unsigned, signed, global_lam, lam, dup, let_, num_op, app))
+    #[cfg(feature = "nums")]
+    {
+      choice((global_var, var, unsigned, signed, global_lam, lam, dup, let_, num_op, app))
+    }
+
+    #[cfg(not(feature = "nums"))]
+    {
+      choice((global_var, var, global_lam, lam, dup, let_, app))
+    }
   })
 }
 
@@ -226,18 +247,26 @@ where
 {
   let inline_app =
     term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
+  #[cfg(feature = "nums")]
   let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opx {
     op,
     fst: Box::new(fst),
     snd: Box::new(snd),
   });
 
-  choice((name(), name().delimited_by(just(Token::LParen), just(Token::RParen))))
-    .then(pattern().repeated().collect())
+  let lhs = choice((name(), name().delimited_by(just(Token::LParen), just(Token::RParen))))
+    .then(pattern().repeated().collect());
+
+  #[cfg(feature = "nums")]
+  let rhs = choice((inline_num_oper, inline_app));
+  #[cfg(not(feature = "nums"))]
+  let rhs = inline_app;
+
+  lhs
     .then_ignore(just(Token::NewLine).repeated())
     .then_ignore(just(Token::Equals))
     .then_ignore(just(Token::NewLine).repeated())
-    .then(choice((inline_num_oper, inline_app)))
+    .then(rhs)
     .map(|((name, pats), body)| (name, Rule { def_id: DefId(0), pats, body }))
 }
 
@@ -259,7 +288,7 @@ where
       let (mut names, mut rules): (Vec<Name>, Vec<Rule>) = rules.into_iter().unzip();
       let name = names.pop().unwrap();
       if !book.def_names.contains_right(&name) {
-        let def_id = DefId(book.defs.len() as u64);
+        let def_id = DefId(book.defs.len() as Val);
         rules.iter_mut().for_each(|rule| rule.def_id = def_id);
         book.defs.push(Definition { def_id, rules });
         book.def_names.insert(def_id, name);

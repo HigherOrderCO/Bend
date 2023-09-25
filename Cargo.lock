@@ -221,7 +221,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 [[package]]
 name = "hvm-core"
 version = "0.1.0"
-source = "git+https://github.com/HigherOrderCO/hvm-core.git#1cfc6388a04a68a1fcf3c9df893c0afe73c3b75d"
+source = "git+https://github.com/HigherOrderCO/hvm-core.git#b62dc7c2adf37292963a73bdba01a38222df7394"
 dependencies = [
  "nohash",
 ]
@@ -375,9 +375,9 @@ dependencies = [
 
 [[package]]
 name = "semver"
-version = "1.0.18"
+version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0293b4b29daaf487284529cc2f5675b8e57c61f70167ba415a463651fd6a918"
+checksum = "ad977052201c6de01a8ef2aa3378c4bd23217a056337d1d6da40468d267a4fb0"
 
 [[package]]
 name = "shrinkwraprs"

@@ -33,10 +33,31 @@ fn run_single_golden_test(
 }
 
 fn run_golden_test_dir(root: &Path, run: &dyn Fn(&Path, &str) -> anyhow::Result<String>) {
-  for entry in WalkDir::new(root).follow_links(true) {
+  let walker = WalkDir::new(root).sort_by_file_name().max_depth(2).into_iter().filter_entry(|e| {
+    let path = e.path();
+    if path == root {
+      true
+    } else if path.is_file() && path.extension().map(|x| x == "hvm").unwrap_or(false) {
+      true
+    } else if path.is_dir() {
+      // We only go inside directories if their name is the name of an enabled feature.
+      // To do this, we get the feature name from the directory and check if enabled.
+      // This allows us to enable and disable tests based on the default features.
+      // TODO: We want to be able to check all tests in one go, enabling and disabling features as necessary.
+      if let Some(dir_name) = path.file_name() {
+        let feature_name = format!("CARGO_FEATURE_{}", dir_name.to_str().unwrap_or(""));
+        std::env::var(feature_name).is_ok()
+      } else {
+        false
+      }
+    } else {
+      false
+    }
+  });
+  for entry in walker {
     let entry = entry.unwrap();
     let path = entry.path();
-    if path.is_file() && path.extension().map(|x| x == "hvm").unwrap_or(false) {
+    if path.is_file() {
       eprintln!("running {}", path.display());
       run_single_golden_test(path, run).unwrap();
     }

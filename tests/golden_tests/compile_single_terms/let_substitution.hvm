@@ -1,1 +1,1 @@
-let x = 1; x
+let x = λa (a a); x

@@ -1,12 +1,15 @@
 use crate::ast::{
   compat::{
-    addr, enter, kind, label_to_op, link, new_inet, new_node, op_to_label, port, slot, INet, NodeId,
-    NodeKind, Port, CON, DUP, ERA, LABEL_MASK, NUMOP, NUM_I32, NUM_U32, REF, ROOT, TAG_MASK,
+    addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, Port, CON, DUP, ERA, LABEL_MASK,
+    REF, ROOT, TAG_MASK,
   },
   var_id_to_name, DefId, Name, Term,
 };
 use hvm_core::{LNet, LTree, Tag};
 use std::collections::{HashMap, HashSet};
+
+#[cfg(feature = "nums")]
+use crate::ast::compat::{label_to_op, op_to_label, NodeKind, NUMOP, NUM_I32, NUM_U32};
 
 /// Converts an IC term into an IC net.
 pub fn term_to_compat_net(term: &Term) -> anyhow::Result<INet> {
@@ -115,6 +118,10 @@ fn encode_term(
       link(inet, up, port(node, 0));
       Ok(Some(port(node, 0)))
     }
+    Term::Let { .. } => unreachable!(), // Removed in earlier poss
+    Term::Sup { .. } => unreachable!(), // Not supported in syntax
+    Term::Era => unreachable!(),        // Not supported in syntax
+    #[cfg(feature = "nums")]
     Term::U32 { val } => {
       debug_assert!(*val as NodeKind <= LABEL_MASK);
       let node = new_node(inet, NUM_U32 | *val as NodeKind);
@@ -123,6 +130,7 @@ fn encode_term(
       inet.nodes[port(node, 2) as usize] = port(node, 1);
       Ok(Some(port(node, 0)))
     }
+    #[cfg(feature = "nums")]
     Term::I32 { val } => {
       debug_assert!(*val as u32 as NodeKind <= LABEL_MASK);
       let node = new_node(inet, NUM_I32 | *val as u32 as NodeKind);
@@ -131,6 +139,7 @@ fn encode_term(
       inet.nodes[port(node, 2) as usize] = port(node, 1);
       Ok(Some(port(node, 0)))
     }
+    #[cfg(feature = "nums")]
     Term::Opx { op, fst, snd } => {
       let node = new_node(inet, NUMOP | op_to_label(*op));
       let fst = encode_term(inet, fst, port(node, 0), scope, vars, global_vars, dups)?;
@@ -139,9 +148,6 @@ fn encode_term(
       link_local(inet, port(node, 1), snd);
       Ok(Some(port(node, 2)))
     }
-    Term::Let { .. } => unreachable!(), // Removed in earlier poss
-    Term::Sup { .. } => unreachable!(), // Not supported in syntax
-    Term::Era => unreachable!(),        // Not supported in syntax
   }
 }
 
@@ -294,8 +300,11 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
     REF => LTree::Ref { nam: DefId(label).to_internal() },
+    #[cfg(feature = "nums")]
     NUM_U32 => LTree::U32 { val: label as u32 },
+    #[cfg(feature = "nums")]
     NUM_I32 => LTree::I32 { val: label as u32 as i32 },
+    #[cfg(feature = "nums")]
     NUMOP => LTree::OpX {
       opx: label_to_op(label),
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),

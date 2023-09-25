@@ -12,7 +12,8 @@ required-features = ["cli"]
 
 [features]
 default = ["cli"]
-cli = ["clap"]
+cli = ["dep:clap"]
+nums = []
 
 [dependencies]
 anyhow = "1.0.72"

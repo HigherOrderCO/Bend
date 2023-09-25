@@ -1,8 +1,10 @@
 use super::{DefId, Name};
 use bimap::BiHashMap;
-use hvm_core::{opx_to_string, OP};
 use itertools::Itertools;
 use std::fmt;
+
+#[cfg(feature = "nums")]
+use hvm_core::{opx_to_string, OP};
 
 pub type DefNames = BiHashMap<DefId, Name>;
 
@@ -69,23 +71,26 @@ pub enum Term {
     val: Box<Term>,
     nxt: Box<Term>,
   },
+  Sup {
+    fst: Box<Term>,
+    snd: Box<Term>,
+  },
+  Era,
+  #[cfg(feature = "nums")]
   U32 {
     val: u32,
   },
+  #[cfg(feature = "nums")]
   I32 {
     val: i32,
   },
+  #[cfg(feature = "nums")]
   /// A numeric operation between built-in numbers.
   Opx {
     op: OP,
     fst: Box<Term>,
     snd: Box<Term>,
   },
-  Sup {
-    fst: Box<Term>,
-    snd: Box<Term>,
-  },
-  Era,
 }
 
 impl DefinitionBook {
@@ -115,13 +120,16 @@ impl Term {
         val.to_string(def_names),
         nxt.to_string(def_names)
       ),
+      Term::Sup { fst, snd } => format!("{{{} {}}}", fst.to_string(def_names), snd.to_string(def_names)),
+      Term::Era => "*".to_string(),
+      #[cfg(feature = "nums")]
       Term::U32 { val } => format!("{val}"),
+      #[cfg(feature = "nums")]
       Term::I32 { val } => format!("{val:+}"),
+      #[cfg(feature = "nums")]
       Term::Opx { op, fst, snd } => {
         format!("({} {} {})", opx_to_string(op), fst.to_string(def_names), snd.to_string(def_names))
       }
-      Term::Sup { fst, snd } => format!("{{{} {}}}", fst.to_string(def_names), snd.to_string(def_names)),
-      Term::Era => "*".to_string(),
     }
   }
 }

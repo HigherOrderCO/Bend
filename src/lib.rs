@@ -40,7 +40,12 @@ pub fn run_compiled(book: &Book) -> anyhow::Result<(LNet, RunStats)> {
 
   let elapsed = start_time.elapsed().as_secs_f64();
 
-  let stats = RunStats { rewrites: root.rwts, size: root.node.len(), used: root.used, run_time: elapsed };
+  let stats = RunStats {
+    rewrites: Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref },
+    size: root.node.len(),
+    used: root.used,
+    run_time: elapsed,
+  };
   let net = readback_lnet(&root);
   Ok((net, stats))
 }
@@ -62,8 +67,21 @@ pub struct RunInfo {
 }
 
 pub struct RunStats {
-  pub rewrites: usize,
+  pub rewrites: Rewrites,
   pub size: usize,
   pub used: usize,
   pub run_time: f64,
+}
+
+pub struct Rewrites {
+  pub anni: usize,
+  pub comm: usize,
+  pub eras: usize,
+  pub dref: usize,
+}
+
+impl Rewrites {
+  pub fn total_rewrites(&self) -> usize {
+    self.anni + self.comm + self.eras + self.dref
+  }
 }

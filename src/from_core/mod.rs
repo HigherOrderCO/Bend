@@ -1,12 +1,15 @@
 use crate::ast::{
   compat::{
-    addr, enter, kind, label_to_op, link, new_inet, new_node, op_to_label, port, slot, INet, INode, INodes,
-    NodeId, NodeKind, Port, SlotId, CON, DUP, ERA, LABEL_MASK, NUMOP, NUM_I32, NUM_U32, REF, ROOT, TAG_MASK,
+    addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
+    SlotId, CON, DUP, ERA, LABEL_MASK, REF, ROOT, TAG_MASK,
   },
   var_id_to_name, DefId, Name, Term,
 };
 use hvm_core::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
+
+#[cfg(feature = "nums")]
+use crate::ast::compat::{label_to_op, op_to_label, NUMOP, NUM_I32, NUM_U32};
 
 pub fn readback_net(net: &LNet) -> anyhow::Result<(Term, bool)> {
   /* check_lnet_valid(net)?; */
@@ -88,16 +91,19 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
+      #[cfg(feature = "nums")]
       LTree::U32 { val } => {
         let kind = NUM_U32 | (*val as NodeKind);
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
+      #[cfg(feature = "nums")]
       LTree::I32 { val } => {
         let kind = NUM_I32 | (*val as u32 as NodeKind);
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
+      #[cfg(feature = "nums")]
       LTree::OpX { opx, lft, rgt } => {
         let kind = NUMOP | op_to_label(*opx);
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
@@ -231,8 +237,11 @@ fn readback_compat(net: &INet) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
+      #[cfg(feature = "nums")]
       NUM_U32 => (Term::U32 { val: label as u32 }, true),
+      #[cfg(feature = "nums")]
       NUM_I32 => (Term::I32 { val: label as u32 as i32 }, true),
+      #[cfg(feature = "nums")]
       NUMOP => match slot(next) {
         2 => {
           seen.insert(port(node, 0));

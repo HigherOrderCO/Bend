@@ -108,15 +108,18 @@ fn check_uses(term: &Term, def_names: &DefNames) -> anyhow::Result<()> {
           pop_scope(fst, scope);
         }
       }
-      Term::Opx { fst, snd, .. } => {
-        go(fst, scope, globals, def_names)?;
-        go(snd, scope, globals, def_names)?;
-      }
       Term::Sup { fst, snd } => {
         go(fst, scope, globals, def_names)?;
         go(snd, scope, globals, def_names)?;
       }
-      Term::Ref { .. } | Term::U32 { .. } | Term::I32 { .. } | Term::Era => (),
+      Term::Ref { .. } | Term::Era => (),
+      #[cfg(feature = "nums")]
+      Term::Opx { fst, snd, .. } => {
+        go(fst, scope, globals, def_names)?;
+        go(snd, scope, globals, def_names)?;
+      }
+      #[cfg(feature = "nums")]
+      Term::U32 { .. } | Term::I32 { .. } => (),
     }
     Ok(())
   }
@@ -235,15 +238,16 @@ fn unique_var_names(term: &Term, def_names: &DefNames) -> anyhow::Result<(Term, 
         let fst = fst.as_ref().map(|fst| pop_name(fst, name_map));
         Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(nxt) }
       }
-      Term::Opx { op, fst, snd } => {
-        let fst = go(fst, name_map, name_count, var_uses, def_names)?;
-        let snd = go(snd, name_map, name_count, var_uses, def_names)?;
-        Term::Opx { op: *op, fst: Box::new(fst), snd: Box::new(snd) }
-      }
       Term::Sup { fst, snd } => {
         let fst = go(fst, name_map, name_count, var_uses, def_names)?;
         let snd = go(snd, name_map, name_count, var_uses, def_names)?;
         Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }
+      }
+      #[cfg(feature = "nums")]
+      Term::Opx { op, fst, snd } => {
+        let fst = go(fst, name_map, name_count, var_uses, def_names)?;
+        let snd = go(snd, name_map, name_count, var_uses, def_names)?;
+        Term::Opx { op: *op, fst: Box::new(fst), snd: Box::new(snd) }
       }
       t => t.clone(),
     };
@@ -354,12 +358,13 @@ fn term_to_affine(
       fun: Box::new(term_to_affine(*fun, var_uses, let_bodies)?),
       arg: Box::new(term_to_affine(*arg, var_uses, let_bodies)?),
     },
-    Term::Opx { op, fst, snd } => Term::Opx {
-      op,
+    Term::Sup { fst, snd } => Term::Sup {
       fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
       snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
     },
-    Term::Sup { fst, snd } => Term::Sup {
+    #[cfg(feature = "nums")]
+    Term::Opx { op, fst, snd } => Term::Opx {
+      op,
       fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
       snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
     },

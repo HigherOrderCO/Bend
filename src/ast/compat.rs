@@ -1,6 +1,6 @@
 // TODO: Refactor to not use this intermediate form
 
-use hvm_core::{Val, OP};
+use hvm_core::Val;
 
 #[derive(Clone, Debug)]
 /// Net representation used only as an intermediate for converting to hvm-core format
@@ -72,6 +72,18 @@ pub fn link(inet: &mut INet, ptr_a: Port, ptr_b: Port) {
   inet.nodes[ptr_b as usize] = ptr_a;
 }
 
+#[derive(Debug)]
+pub struct INode {
+  pub kind: NodeKind,
+  pub ports: [String; 3],
+}
+
+pub type INodes = Vec<INode>;
+
+#[cfg(feature = "nums")]
+use hvm_core::OP;
+
+#[cfg(feature = "nums")]
 pub fn op_to_label(value: OP) -> NodeKind {
   match value {
     OP::ADD => 0x0,
@@ -90,6 +102,7 @@ pub fn op_to_label(value: OP) -> NodeKind {
   }
 }
 
+#[cfg(feature = "nums")]
 pub fn label_to_op(value: NodeKind) -> OP {
   match value {
     0x0 => OP::ADD,
@@ -108,10 +121,3 @@ pub fn label_to_op(value: NodeKind) -> OP {
     _ => unreachable!(),
   }
 }
-#[derive(Debug)]
-pub struct INode {
-  pub kind: NodeKind,
-  pub ports: [String; 3],
-}
-
-pub type INodes = Vec<INode>;
