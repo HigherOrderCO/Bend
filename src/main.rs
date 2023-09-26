@@ -14,6 +14,9 @@ struct Args {
   #[arg(short, long)]
   pub verbose: bool,
 
+  #[arg(long, help = "How much memory to allocate for the runtime", default_value = "128M", value_parser = mem_parser)]
+  pub mem: usize,
+
   #[arg(help = "Path to the input file")]
   pub path: PathBuf,
 }
@@ -25,7 +28,15 @@ enum Mode {
   Run,
 }
 
+fn mem_parser(arg: &str) -> anyhow::Result<usize> {
+  let bytes = byte_unit::Byte::from_str(arg)?;
+  Ok(bytes.get_bytes() as usize)
+}
+
 fn main() -> anyhow::Result<()> {
+  #[cfg(not(feature = "cli"))]
+  compile_error!("The 'cli' feature is needed for the hvm-lang cli");
+
   let args = Args::parse();
 
   let book = load_file_to_book(&args.path)?;
@@ -42,7 +53,7 @@ fn main() -> anyhow::Result<()> {
       println!("{}", compiled.to_string(&def_names));
     }
     Mode::Run => {
-      let (res_term, def_names, info) = run_book(book)?;
+      let (res_term, def_names, info) = run_book(book, args.mem)?;
       let RunInfo { stats, valid_readback, lnet } = info;
       let rps = stats.rewrites.total_rewrites() as f64 / stats.run_time / 1_000_000.0;
       if args.verbose {
@@ -55,7 +66,8 @@ fn main() -> anyhow::Result<()> {
         println!("\nInvalid readback from inet.");
         println!(" Got:\n{}\n", res_term.to_string(&def_names));
       }
-      println!("size: {}", stats.size);
+      // TODO: Some way to figure out total memory use?
+      // println!("size: {}", stats.size);
       println!("used: {}", stats.used);
       println!(
         "Time: {:.3}s | Anni: {:.3} | Comm: {:.3} | Eras: {:.3} | Dref: {:.3} | RPS: {:.3}m",

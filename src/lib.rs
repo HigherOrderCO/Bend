@@ -30,8 +30,8 @@ pub fn compile_book(mut book: DefinitionBook) -> anyhow::Result<(Book, DefNames)
   Ok((core_book, book.def_names))
 }
 
-pub fn run_compiled(book: &Book) -> anyhow::Result<(LNet, RunStats)> {
-  let (mut root, runtime_book) = book_to_hvm_internal(book)?;
+pub fn run_compiled(book: &Book, mem_size: usize) -> anyhow::Result<(LNet, RunStats)> {
+  let (mut root, runtime_book) = book_to_hvm_internal(book, mem_size)?;
 
   let start_time = Instant::now();
 
@@ -50,11 +50,10 @@ pub fn run_compiled(book: &Book) -> anyhow::Result<(LNet, RunStats)> {
   Ok((net, stats))
 }
 
-pub fn run_book(book: DefinitionBook) -> anyhow::Result<(Term, DefNames, RunInfo)> {
+pub fn run_book(book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
   check_main(&book)?;
   let (compiled, def_names) = compile_book(book)?;
-  let (res_lnet, stats) = run_compiled(&compiled)?;
-  eprintln!("lnet\n{}", show_lnet(&res_lnet));
+  let (res_lnet, stats) = run_compiled(&compiled, mem_size)?;
   let (res_term, valid_readback) = readback_net(&res_lnet)?;
   let info = RunInfo { stats, valid_readback, lnet: res_lnet };
   Ok((res_term, def_names, info))

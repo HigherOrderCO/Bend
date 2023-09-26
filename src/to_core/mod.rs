@@ -26,9 +26,9 @@ pub fn term_to_hvm_core(term: &Term) -> anyhow::Result<LNet> {
   compat_net_to_core(&compat_net)
 }
 
-pub fn book_to_hvm_internal(book: &Book) -> anyhow::Result<(hvm_core::Net, hvm_core::Book)> {
+pub fn book_to_hvm_internal(book: &Book, mem_size: usize) -> anyhow::Result<(hvm_core::Net, hvm_core::Book)> {
   // TODO: Don't try to preallocate a huge buffer
-  let mut root = hvm_core::Net::new(1 << 26);
+  let mut root = hvm_core::Net::new(mem_size);
   root.boot(book.main.to_internal()); // TODO: Don't use this workaround
 
   let mut hvm_book = hvm_core::Book::new();

@@ -99,7 +99,8 @@ fn run_single_files() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let (res, def_names, info) = run_book(book)?;
+    // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
+    let (res, def_names, info) = run_book(book, 1 << 20)?;
     let res = if info.valid_readback {
       res.to_string(&def_names)
     } else {
