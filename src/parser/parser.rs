@@ -234,10 +234,21 @@ where
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .map(|(name, pats)| Pattern::Ctr(name, pats))
       .boxed();
-    let unsigned = select!(Token::Unsigned(num) => Pattern::U32(num)).boxed();
-    let signed = select!(Token::Signed(num) => Pattern::I32(num)).boxed();
     let var = name_or_era().map(Pattern::Var).boxed();
-    choice((ctr, unsigned, signed, var))
+
+    #[cfg(feature = "nums")]
+    let unsigned = select!(Token::Unsigned(num) => Pattern::U32(num)).boxed();
+    #[cfg(feature = "nums")]
+    let signed = select!(Token::Signed(num) => Pattern::I32(num)).boxed();
+
+    #[cfg(feature = "nums")]
+    {
+      choice((ctr, unsigned, signed, var))
+    }
+    #[cfg(not(feature = "nums"))]
+    {
+      choice((ctr, var))
+    }
   })
 }
 
@@ -287,7 +298,7 @@ where
       let (rules, spans): (Vec<(Name, Rule)>, Vec<SimpleSpan>) = rules_data.unzip();
       let (mut names, mut rules): (Vec<Name>, Vec<Rule>) = rules.into_iter().unzip();
       let name = names.pop().unwrap();
-      if !book.def_names.contains_right(&name) {
+      if !book.def_names.contains_name(&name) {
         let def_id = DefId(book.defs.len() as Val);
         rules.iter_mut().for_each(|rule| rule.def_id = def_id);
         book.defs.push(Definition { def_id, rules });

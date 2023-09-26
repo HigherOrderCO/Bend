@@ -12,7 +12,7 @@ pub fn book_to_hvm_core(book: &DefinitionBook) -> anyhow::Result<Book> {
     defs.insert(def.def_id, net);
   }
   // TODO: Ugly, if we know whether main will be there we should use that information correctly
-  let main = *book.def_names.get_by_right(&Name::from("Main".to_string())).unwrap_or(&DefId(0));
+  let main = book.def_names.def_id(&Name::from("Main".to_string())).unwrap_or(DefId(0));
   Ok(Book { defs, main })
 }
 

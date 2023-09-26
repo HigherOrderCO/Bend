@@ -71,7 +71,7 @@ fn check_uses(term: &Term, def_names: &DefNames) -> anyhow::Result<()> {
         go(bod, scope, globals, def_names)?;
       }
       Term::Var { nam } => {
-        if !scope.contains_key(nam) && !def_names.contains_right(nam) {
+        if !scope.contains_key(nam) && !def_names.contains_name(nam) {
           return Err(anyhow::anyhow!("Unbound variable '{nam}'"));
         }
       }
@@ -205,7 +205,7 @@ fn unique_var_names(term: &Term, def_names: &DefNames) -> anyhow::Result<(Term, 
           Term::Var { nam }
         } else {
           // If it's not in scope, we know it must be a Ref by our preconditions
-          Term::Ref { def_id: *def_names.get_by_right(nam).unwrap() }
+          Term::Ref { def_id: def_names.def_id(nam).unwrap() }
         }
       }
       Term::Chn { nam, bod } => {

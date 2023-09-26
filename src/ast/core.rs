@@ -18,7 +18,7 @@ impl Book {
         format!(
           "{} ({}) =\n{}",
           val_to_name(id.to_internal()),
-          def_names.get_by_left(id).unwrap(),
+          def_names.name(id).unwrap(),
           show_lnet(net).split('\n').map(|x| format!("  {x}")).join("\n")
         )
       })
