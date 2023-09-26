@@ -9,7 +9,7 @@ pub mod to_core;
 
 use ast::{core::Book, hvm_lang::DefNames, DefinitionBook, Term};
 use from_core::readback_net;
-use hvm_core::{readback_lnet, show_lnet, LNet};
+use hvm_core::{readback_lnet, LNet};
 use semantic::check_main;
 use std::time::Instant;
 use to_core::{book_to_hvm_core, book_to_hvm_internal};
@@ -40,12 +40,10 @@ pub fn run_compiled(book: &Book, mem_size: usize) -> anyhow::Result<(LNet, RunSt
 
   let elapsed = start_time.elapsed().as_secs_f64();
 
-  let stats = RunStats {
-    rewrites: Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref },
-    size: root.node.len(),
-    used: root.used,
-    run_time: elapsed,
-  };
+  let rewrites = Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref };
+  let def = root.clone().to_def();
+  let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
+  // TODO: Make readback for hvm-core Def type
   let net = readback_lnet(&root);
   Ok((net, stats))
 }
@@ -67,7 +65,6 @@ pub struct RunInfo {
 
 pub struct RunStats {
   pub rewrites: Rewrites,
-  pub size: usize,
   pub used: usize,
   pub run_time: f64,
 }

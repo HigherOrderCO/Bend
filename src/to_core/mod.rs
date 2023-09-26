@@ -33,7 +33,7 @@ pub fn book_to_hvm_internal(book: &Book, mem_size: usize) -> anyhow::Result<(hvm
 
   let mut hvm_book = hvm_core::Book::new();
   book.defs.iter().for_each(|(&def_id, term)| {
-    hvm_book.def(def_id.to_internal(), lnet_to_net(term, None));
+    hvm_book.def(def_id.to_internal(), lnet_to_net(term, None).to_def());
   });
 
   Ok((root, hvm_book))
