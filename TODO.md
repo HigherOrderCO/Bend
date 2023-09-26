@@ -6,14 +6,13 @@ Readback:
   Find a solution (in terms of syntax) for what to do when dups cannot be scoped (eg. dup a b = c; dup c d = a; ... This is cyclic but there are probably valid examples).
 
 Pattern matching:
-  Add patterns to the parser.
-  Check arity of rules.
   Infer type of definitions.
   Check that types are used consistently and constructor names are unique.
   Convert pattern matching rules and constructors inside terms into lambda calculus.
 
 Optimizations:
-  Inlining and Closed subterm extraction.
+  Find a good heuristic for when to extract combinators in subterms (and maybe inline small ones).
+  Merge identical definitions
   Unused definition pruning.
   Constant folding and prereduction of rules.
   Consider different encoding for pattern matching.
@@ -29,7 +28,6 @@ Error reporting:
   Add nice looking errors for errors outside the parser.
   Improve error messages.
 
-Support any size of name
 Convert from lambda terms directly into LNet without using the intermediate vector of nodes form
 Numbers and numerical operations (need hvm support)
 Documentation

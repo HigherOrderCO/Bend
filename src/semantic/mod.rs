@@ -1,6 +1,7 @@
 /// Semantic checking
 use crate::ast::{DefinitionBook, Name};
 // pub mod pattern;
+pub mod combinators;
 pub mod vars;
 
 pub fn check_main(book: &DefinitionBook) -> anyhow::Result<()> {
