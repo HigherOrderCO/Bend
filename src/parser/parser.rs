@@ -13,7 +13,6 @@ use chumsky::{
   span::SimpleSpan,
   IterParser, Parser,
 };
-use hvm_core::Val;
 use itertools::Itertools;
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range};
@@ -299,10 +298,9 @@ where
       let (mut names, mut rules): (Vec<Name>, Vec<Rule>) = rules.into_iter().unzip();
       let name = names.pop().unwrap();
       if !book.def_names.contains_name(&name) {
-        let def_id = DefId(book.defs.len() as Val);
+        let def_id = book.def_names.insert(name);
         rules.iter_mut().for_each(|rule| rule.def_id = def_id);
         book.defs.push(Definition { def_id, rules });
-        book.def_names.insert(def_id, name);
       } else {
         let span = SimpleSpan::new(spans.first().unwrap().start, spans.last().unwrap().end);
         emitter.emit(Rich::custom(span, format!("Repeated definition '{}'", name)));

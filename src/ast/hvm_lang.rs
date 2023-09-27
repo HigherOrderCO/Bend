@@ -128,7 +128,7 @@ impl DefNames {
 
   pub fn insert(&mut self, name: Name) -> DefId {
     let def_id = self.id_count;
-    *self.id_count += 1;
+    self.id_count.0 += 1;
     match self.map.insert(def_id, name) {
       Overwritten::Neither => def_id,
       _ => todo!("Overwritting name-id pairs not supported"),
