@@ -7,7 +7,10 @@ use std::fmt;
 use hvm_core::{opx_to_string, OP};
 
 #[derive(Debug, Clone, Default)]
-pub struct DefNames(BiHashMap<DefId, Name>);
+pub struct DefNames {
+  map: BiHashMap<DefId, Name>,
+  id_count: DefId,
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct DefinitionBook {
@@ -108,24 +111,26 @@ impl DefNames {
   }
 
   pub fn name(&self, def_id: &DefId) -> Option<&Name> {
-    self.0.get_by_left(def_id)
+    self.map.get_by_left(def_id)
   }
 
   pub fn def_id(&self, name: &Name) -> Option<DefId> {
-    self.0.get_by_right(name).copied()
+    self.map.get_by_right(name).copied()
   }
 
   pub fn contains_name(&self, name: &Name) -> bool {
-    self.0.contains_right(name)
+    self.map.contains_right(name)
   }
 
   pub fn contains_def_id(&self, def_id: &DefId) -> bool {
-    self.0.contains_left(def_id)
+    self.map.contains_left(def_id)
   }
 
-  pub fn insert(&mut self, def_id: DefId, name: Name) {
-    match self.0.insert(def_id, name) {
-      Overwritten::Neither => (),
+  pub fn insert(&mut self, name: Name) -> DefId {
+    let def_id = self.id_count;
+    *self.id_count += 1;
+    match self.map.insert(def_id, name) {
+      Overwritten::Neither => def_id,
       _ => todo!("Overwritting name-id pairs not supported"),
     }
   }

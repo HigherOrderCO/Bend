@@ -6,44 +6,31 @@ use std::collections::HashSet;
 impl DefinitionBook {
   pub fn detach_combinators(&mut self) {
     let mut combinators = Vec::new();
-    let new_ids_base = self.defs.len() as u32;
 
     for def in self.defs.iter_mut() {
       for rule in def.rules.iter_mut() {
-        rule.body.detach_combinators(rule.def_id, new_ids_base, &self.def_names, &mut combinators);
+        rule.body.detach_combinators(rule.def_id, &mut self.def_names, &mut combinators);
       }
     }
 
-    for (name, def_id, body) in combinators {
-      self.def_names.insert(def_id, name);
-      let rules = vec![Rule { def_id, pats: Vec::new(), body }];
-
-      self.defs.push(Definition { def_id, rules })
-    }
+    self.defs.append(&mut combinators)
   }
 }
 
-type Combinators = Vec<(Name, DefId, Term)>;
+type Combinators = Vec<Definition>;
 
 struct TermInfo<'d> {
   //Number of times a Term has been detached from the current Term
   counter: u32,
-  //Base value for creating new DefIds
-  new_ids_base: u32,
   rule_id: DefId,
-  def_names: &'d DefNames,
+  def_names: &'d mut DefNames,
   needed_names: HashSet<Name>,
   combinators: &'d mut Combinators,
 }
 
 impl<'d> TermInfo<'d> {
-  fn new(
-    new_ids_base: u32,
-    rule_id: DefId,
-    def_names: &'d DefNames,
-    combinators: &'d mut Combinators,
-  ) -> Self {
-    Self { counter: 0, new_ids_base, rule_id, def_names, needed_names: HashSet::new(), combinators }
+  fn new(rule_id: DefId, def_names: &'d mut DefNames, combinators: &'d mut Combinators) -> Self {
+    Self { counter: 0, rule_id, def_names, needed_names: HashSet::new(), combinators }
   }
   fn request_name(&mut self, name: &Name) {
     self.needed_names.insert(name.to_owned());
@@ -66,16 +53,18 @@ impl<'d> TermInfo<'d> {
   }
 
   fn detach_term(&mut self, term: &mut Term) {
-    let Name(name) = self.def_names.name(&self.rule_id).unwrap();
-    let combinator = Name(format!("{name}{}", self.counter));
+    let name = self.def_names.name(&self.rule_id).unwrap();
+    let comb_name = Name(format!("{name}${}", self.counter));
     self.counter += 1;
 
-    let def_id = DefId(self.new_ids_base + (self.combinators.len() as u32));
+    let comb_id = self.def_names.insert(comb_name);
 
-    let combinator_var = Term::Ref { def_id };
-    let extracted_term = std::mem::replace(term, combinator_var);
+    let comb_var = Term::Ref { def_id: comb_id };
+    let extracted_term = std::mem::replace(term, comb_var);
 
-    self.combinators.push((combinator, def_id, extracted_term));
+    let rules = vec![Rule { def_id: comb_id, pats: Vec::new(), body: extracted_term }];
+    let def = Definition { def_id: comb_id, rules };
+    self.combinators.push(def);
   }
 }
 
@@ -83,8 +72,7 @@ impl Term {
   pub fn detach_combinators(
     &mut self,
     rule_id: DefId,
-    new_ids_base: u32,
-    def_names: &DefNames,
+    def_names: &mut DefNames,
     combinators: &mut Combinators,
   ) {
     fn go(term: &mut Term, depth: usize, term_info: &mut TermInfo) -> bool {
@@ -155,6 +143,6 @@ impl Term {
       }
     }
 
-    go(self, 0, &mut TermInfo::new(new_ids_base, rule_id, def_names, combinators));
+    go(self, 0, &mut TermInfo::new(rule_id, def_names, combinators));
   }
 }
