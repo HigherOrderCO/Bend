@@ -1,0 +1,231 @@
+use crate::ast::{
+  hvm_lang::{DefNames, Pattern},
+  DefId, Definition, DefinitionBook, Name, Rule, Term,
+};
+use std::collections::HashSet;
+
+impl DefinitionBook {
+  /// Splits definitions with nested pattern matching into multiple ones so that the maximum pattern matching depth is 1.
+  pub fn flatten_rules(&mut self) {
+    for i in 0 .. self.defs.len() {
+      let (old_def, mut new_defs) = flatten_def(&self.defs[i], &mut self.def_names);
+      self.defs[i] = old_def;
+      self.defs.append(&mut new_defs);
+    }
+  }
+}
+
+fn must_split(rule: &Rule) -> bool {
+  for pat in &rule.pats {
+    if let Pattern::Ctr(_, args) = &pat {
+      for arg in args {
+        if matches!(arg, Pattern::Ctr(..)) {
+          return true;
+        }
+        #[cfg(feature = "nums")]
+        if matches!(arg, Pattern::U32(..) | Pattern::I32(..)) {
+          return true;
+        }
+      }
+    }
+  }
+  false
+}
+
+fn matches_together(a: &Rule, b: &Rule) -> (bool, bool) {
+  let mut matches_with_a = true;
+  let mut same_shape = true;
+
+  for (a_pat, b_pat) in a.pats.iter().zip(&b.pats) {
+    match (&a_pat, &b_pat) {
+      (Pattern::Var(..), _) => (),
+      (_, Pattern::Var(..)) => {
+        same_shape = false;
+      }
+      (Pattern::Ctr(an, ..), Pattern::Ctr(bn, ..)) if an == bn => (),
+      (Pattern::Ctr(an, ..), Pattern::Ctr(bn, ..)) if an != bn => {
+        matches_with_a = false;
+        same_shape = false;
+      }
+      #[cfg(feature = "nums")]
+      (Pattern::U32(a), Pattern::U32(b)) | (Pattern::I32(a), Pattern::I32(b)) if a == b => (),
+      #[cfg(feature = "nums")]
+      (Pattern::U32(a), Pattern::U32(b)) | (Pattern::I32(a), Pattern::I32(b)) if a != b => {
+        matches_with_a = false;
+        same_shape = false;
+      }
+      #[cfg(feature = "nums")]
+      (
+        (Pattern::Ctr(..) | Pattern::U32(..) | Pattern::I32(..)),
+        (Pattern::Ctr(..) | Pattern::U32(..) | Pattern::I32(..)),
+      ) if std::mem::discriminant(a_pat) != std::mem::discriminant(b_pat) => {
+        matches_with_a = false;
+        same_shape = false;
+      }
+      _ => {}
+    }
+  }
+  (matches_with_a, same_shape)
+}
+
+fn split_rule(
+  rule: &Rule,
+  other_rules: &[Rule],
+  rule_idx: usize,
+  name_count: &mut u64,
+  skip: &mut HashSet<usize>,
+  def_names: &mut DefNames,
+) -> (Rule, Definition, Vec<Definition>) {
+  let mut var_count = 0;
+
+  let num = *name_count;
+  *name_count += 1;
+  let old_def_name = def_names.name(&rule.def_id).unwrap();
+  let new_def_name = Name(format!("{}${}$", old_def_name, num));
+  let new_def_id = def_names.insert(new_def_name);
+
+  let old_rule = make_rule_calling_split(rule, &mut var_count, new_def_id);
+  let new_def = make_split_def(rule, other_rules, rule_idx, new_def_id, &mut var_count, skip);
+  let (new_def, split_defs) = flatten_def(&new_def, def_names);
+  (old_rule, new_def, split_defs)
+}
+
+/// Make a rule that calls the new split definition to be used in place of the rules with nested patterns.
+fn make_rule_calling_split(old_rule: &Rule, var_count: &mut usize, new_def_id: DefId) -> Rule {
+  let mut old_rule_pats: Vec<Pattern> = Vec::new();
+  let mut old_rule_body_args: Vec<Term> = Vec::new();
+
+  for pat in &old_rule.pats {
+    match &pat {
+      Pattern::Var(name) => {
+        old_rule_pats.push(pat.clone());
+        // TODO: Test this
+        old_rule_body_args.push(Term::Var { nam: name.as_ref().cloned().unwrap_or(Name::new("_")) });
+      }
+      Pattern::Ctr(name, args) => {
+        let mut new_pat_args = Vec::new();
+
+        for field in args {
+          let arg = match &field {
+            Pattern::Ctr(..) => {
+              let nam = Name(format!(".x{}", var_count));
+              *var_count += 1;
+              Pattern::Var(Some(nam))
+            }
+            Pattern::Var(..) => field.clone(),
+            #[cfg(feature = "nums")]
+            Pattern::U32(..) | Pattern::I32(..) => {
+              let nam = Name(format!(".x{}", var_count));
+              var_count += 1;
+              Pattern::Var(Some(nam))
+            }
+          };
+          old_rule_body_args.push(Term::from(&arg));
+          new_pat_args.push(arg);
+        }
+
+        old_rule_pats.push(Pattern::Ctr(name.clone(), new_pat_args));
+      }
+      #[cfg(feature = "nums")]
+      Pattern::U32(..) | Pattern::I32(..) => {
+        old_rule_pats.push(pat.clone());
+      }
+    }
+  }
+  let old_rule_body = Term::call(Term::Ref { def_id: new_def_id }, old_rule_body_args);
+
+  Rule { def_id: old_rule.def_id, pats: old_rule_pats, body: old_rule_body }
+}
+
+/// Make the definition coming from splitting a rule with nested patterns.
+fn make_split_def(
+  rule: &Rule,
+  other_rules: &[Rule],
+  rule_idx: usize,
+  new_def_id: DefId,
+  var_count: &mut usize,
+  skip: &mut HashSet<usize>,
+) -> Definition {
+  let mut new_def_rules: Vec<Rule> = Vec::new();
+
+  for (j, other) in other_rules.iter().enumerate().skip(rule_idx) {
+    let (compatible, same_shape) = matches_together(rule, other);
+    if compatible {
+      if same_shape {
+        skip.insert(j);
+      }
+      let mut new_rule_pats = Vec::new();
+      let mut new_rule_body = other.body.clone();
+      for (rule_pat, other_pat) in rule.pats.iter().zip(&other.pats) {
+        match (&rule_pat, &other_pat) {
+          (Pattern::Ctr(..), Pattern::Ctr(_, pat_args)) => {
+            new_rule_pats.extend(pat_args.clone());
+          }
+          (Pattern::Ctr(name, args), Pattern::Var(opat_name)) => {
+            let mut new_ctr_args = vec![];
+
+            for _ in 0 .. args.len() {
+              let new_arg = Pattern::Var(Some(Name(format!(".x{}", var_count))));
+
+              *var_count += 1;
+
+              new_ctr_args.push(Term::from(&new_arg));
+              new_rule_pats.push(new_arg);
+            }
+
+            let new_ctr = Term::call(Term::Var { nam: name.clone() }, new_ctr_args);
+
+            if let Some(opat_name) = opat_name {
+              new_rule_body.subst(opat_name, &new_ctr);
+            }
+          }
+          (Pattern::Var(..), _) => {
+            new_rule_pats.push(other_pat.clone());
+          }
+          #[cfg(feature = "nums")]
+          (Pattern::U32(..), Pattern::U32(..)) | (Pattern::I32(..), Pattern::I32(..)) => (),
+          #[cfg(feature = "nums")]
+          (Pattern::U32(..) | Pattern::I32(..), Pattern::Var(name)) => {
+            new_rule_body.subst(name, rule_pat);
+          }
+          #[cfg(feature = "nums")]
+          _ => {
+            panic!("Internal error. Please report."); // not possible since it matches
+          }
+        }
+      }
+      let new_rule = Rule { def_id: new_def_id, pats: new_rule_pats, body: new_rule_body };
+      new_def_rules.push(new_rule);
+    }
+  }
+  debug_assert!(!new_def_rules.is_empty());
+
+  Definition { def_id: new_def_id, rules: new_def_rules }
+}
+
+fn flatten_def(def: &Definition, def_names: &mut DefNames) -> (Definition, Vec<Definition>) {
+  let mut name_count = 0;
+
+  let mut skip: HashSet<usize> = HashSet::default();
+  let mut new_defs: Vec<Definition> = Vec::new();
+  let mut old_def_rules: Vec<Rule> = Vec::new();
+
+  for i in 0 .. def.rules.len() {
+    if !skip.contains(&i) {
+      let rule = &def.rules[i];
+      if must_split(rule) {
+        let (old_rule, new_def, split_defs) =
+          split_rule(rule, &def.rules, i, &mut name_count, &mut skip, def_names);
+        old_def_rules.push(old_rule);
+        new_defs.push(new_def);
+        new_defs.extend(split_defs);
+      } else {
+        old_def_rules.push(def.rules[i].clone());
+      }
+    }
+  }
+
+  let old_def = Definition { def_id: def.def_id, rules: old_def_rules };
+
+  (old_def, new_defs)
+}

@@ -47,7 +47,7 @@ impl DefinitionBook {
     for def in &self.defs {
       let mut crnt_types = vec![Type::Any; def.rules[0].pats.len()];
       for rule in &def.rules {
-        for (pat_idx, pat) in rule.pats.iter().enumerate() {
+        /* for (pat_idx, pat) in rule.pats.iter().enumerate() {
           if let Some(pat_type) = Type::from(pat).merge(&crnt_types[pat_idx]) {
             crnt_types[pat_idx] = pat_type;
           } else {
@@ -56,7 +56,7 @@ impl DefinitionBook {
               self.def_names.name(&def.def_id).unwrap()
             ));
           }
-        }
+        } */
       }
     }
     todo!()

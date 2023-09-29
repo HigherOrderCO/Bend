@@ -140,7 +140,7 @@ impl Term {
   pub fn to_string(&self, def_names: &DefNames) -> String {
     match self {
       Term::Lam { nam, bod } => {
-        format!("λ{} {}", nam.clone().unwrap_or(Name::from_str("*")), bod.to_string(def_names))
+        format!("λ{} {}", nam.clone().unwrap_or(Name::new("*")), bod.to_string(def_names))
       }
       Term::Var { nam } => format!("{nam}"),
       Term::Chn { nam, bod } => format!("λ${} {}", nam, bod.to_string(def_names)),
@@ -169,17 +169,45 @@ impl Term {
       }
     }
   }
-}
 
-impl fmt::Display for Pattern {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+  /// Make a call term by folding args around a called function term with applications.
+  pub fn call(called: Term, args: impl IntoIterator<Item = Term>) -> Self {
+    args.into_iter().fold(called, |acc, arg| Term::App { fun: Box::new(acc), arg: Box::new(arg) })
+  }
+
+  /// Substitute the occurences of a variable in a term with the given term.
+  pub fn subst(&mut self, from: &Name, to: &Term) {
     match self {
-      Pattern::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
-      Pattern::Var(nam) => write!(f, "{}", nam.as_ref().map(|x| x.as_str()).unwrap_or("*")),
-      #[cfg(feature = "nums")]
-      Pattern::U32(num) => write!(f, "{num}"),
-      #[cfg(feature = "nums")]
-      Pattern::I32(num) => write!(f, "{num:+}"),
+      Term::Lam { nam: None, bod } => bod.subst(from, to),
+      Term::Lam { nam: Some(nam), bod } if nam == from => (),
+      Term::Lam { nam: Some(nam), bod } => bod.subst(from, to),
+      Term::Var { nam } if nam == from => *self = to.clone(),
+      Term::Var { nam } => (),
+      // Only substitute scoped variables.
+      Term::Chn { nam, bod } => bod.subst(from, to),
+      Term::Lnk { nam } => (),
+      Term::Let { nam, val, nxt } => {
+        val.subst(from, to);
+        if nam != from {
+          nxt.subst(from, to);
+        }
+      }
+      Term::Ref { def_id } => (),
+      Term::App { fun, arg } => {
+        fun.subst(from, to);
+        arg.subst(from, to);
+      }
+      Term::Dup { fst, snd, val, nxt } => {
+        val.subst(from, to);
+        if fst.as_ref().map_or(true, |fst| fst == from) && fst.as_ref().map_or(true, |snd| snd == from) {
+          nxt.subst(from, to);
+        }
+      }
+      Term::Sup { fst, snd } => {
+        fst.subst(from, to);
+        snd.subst(from, to);
+      }
+      Term::Era => (),
     }
   }
 }
@@ -198,12 +226,38 @@ impl Rule {
 
 impl Definition {
   pub fn to_string(&self, def_names: &DefNames) -> String {
-    self.rules.iter().map(|x| x.to_string(def_names)).join("")
+    self.rules.iter().map(|x| x.to_string(def_names)).join("\n")
   }
 }
 
-impl DefinitionBook {
-  pub fn to_string(&self, def_names: &DefNames) -> String {
-    self.defs.iter().map(|x| x.to_string(def_names)).join("\n")
+impl From<&Pattern> for Term {
+  fn from(value: &Pattern) -> Self {
+    match value {
+      Pattern::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
+      Pattern::Var(nam) => Term::Var { nam: Name::new(nam.as_ref().map(|x| x.as_str()).unwrap_or("_")) },
+      #[cfg(feature = "nums")]
+      Pattern::U32(num) => Term::U32 { num },
+      #[cfg(feature = "nums")]
+      Pattern::I32(num) => Term::I32 { num },
+    }
+  }
+}
+
+impl fmt::Display for DefinitionBook {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+      write!(f, "{}", self.defs.iter().map(|x| x.to_string(&self.def_names)).join("\n\n"))
+    }
+}
+
+impl fmt::Display for Pattern {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Pattern::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
+      Pattern::Var(nam) => write!(f, "{}", nam.as_ref().map(|x| x.as_str()).unwrap_or("*")),
+      #[cfg(feature = "nums")]
+      Pattern::U32(num) => write!(f, "{num}"),
+      #[cfg(feature = "nums")]
+      Pattern::I32(num) => write!(f, "{num:+}"),
+    }
   }
 }

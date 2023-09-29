@@ -124,3 +124,16 @@ fn readback_lnet() {
     }
   })
 }
+
+#[test]
+fn flatten_rules() {
+  let root = format!("{}/tests/golden_tests/flatten_rules", env!("CARGO_MANIFEST_DIR"));
+  run_golden_test_dir(Path::new(&root), &|_, code| {
+    let mut book = parse_definition_book(code).map_err(|errs| {
+      let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
+      anyhow::anyhow!(msg)
+    })?;
+    book.flatten_rules();
+    Ok(book.to_string())
+  })
+}

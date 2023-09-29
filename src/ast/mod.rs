@@ -31,7 +31,7 @@ pub fn var_id_to_name(mut var_id: Val) -> Name {
 }
 
 impl Name {
-  pub fn from_str(value: &str) -> Self {
+  pub fn new(value: &str) -> Self {
     Name(value.to_string())
   }
 }
