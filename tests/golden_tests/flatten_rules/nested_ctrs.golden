@@ -5,8 +5,5 @@
 (Rule$0$ a (CtrB1 b)) = (a b)
 (Rule$0$ a (CtrB2 .x0 b)) = (((Rule$0$$0$ a) .x0) b)
 (Rule$0$ a b) = (a b)
-(Rule$0$ .x1 .x2) = ((CtrA .x1) .x2)
 
 (Rule$0$$0$ a (CtrC) b) = (a b)
-(Rule$0$$0$ a .x1 .x2) = (a ((CtrB2 .x1) .x2))
-(Rule$0$$0$ .x1 .x3 .x4) = ((CtrA .x1) ((CtrB2 .x3) .x4))

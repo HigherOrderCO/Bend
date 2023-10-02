@@ -178,28 +178,27 @@ impl Term {
   /// Substitute the occurences of a variable in a term with the given term.
   pub fn subst(&mut self, from: &Name, to: &Term) {
     match self {
-      Term::Lam { nam: None, bod } => bod.subst(from, to),
-      Term::Lam { nam: Some(nam), bod } if nam == from => (),
-      Term::Lam { nam: Some(nam), bod } => bod.subst(from, to),
+      Term::Lam { nam: Some(nam), .. } if nam == from => (),
+      Term::Lam { bod, .. } => bod.subst(from, to),
       Term::Var { nam } if nam == from => *self = to.clone(),
-      Term::Var { nam } => (),
+      Term::Var { .. } => (),
       // Only substitute scoped variables.
-      Term::Chn { nam, bod } => bod.subst(from, to),
-      Term::Lnk { nam } => (),
+      Term::Chn { bod, .. } => bod.subst(from, to),
+      Term::Lnk { .. } => (),
       Term::Let { nam, val, nxt } => {
         val.subst(from, to);
         if nam != from {
           nxt.subst(from, to);
         }
       }
-      Term::Ref { def_id } => (),
+      Term::Ref { .. } => (),
       Term::App { fun, arg } => {
         fun.subst(from, to);
         arg.subst(from, to);
       }
       Term::Dup { fst, snd, val, nxt } => {
         val.subst(from, to);
-        if fst.as_ref().map_or(true, |fst| fst == from) && fst.as_ref().map_or(true, |snd| snd == from) {
+        if fst.as_ref().map_or(true, |fst| fst == from) && snd.as_ref().map_or(true, |snd| snd == from) {
           nxt.subst(from, to);
         }
       }
@@ -244,9 +243,9 @@ impl From<&Pattern> for Term {
 }
 
 impl fmt::Display for DefinitionBook {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-      write!(f, "{}", self.defs.iter().map(|x| x.to_string(&self.def_names)).join("\n\n"))
-    }
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.defs.iter().map(|x| x.to_string(&self.def_names)).join("\n\n"))
+  }
 }
 
 impl fmt::Display for Pattern {

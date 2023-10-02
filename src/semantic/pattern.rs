@@ -1,10 +1,9 @@
+use crate::ast::{DefId, DefinitionBook, Name};
 use hvm_core::Val;
-use itertools::Itertools;
 use std::collections::HashMap;
 
 /// Semantic passes for pattern matching on defiinition rules.
 /// Extract ADTs from patterns in a book, then convert them into lambda calculus.
-use crate::ast::{hvm_lang::Pattern, DefId, DefinitionBook, Name};
 
 impl DefinitionBook {
   /// Checks whether all rules of a definition have the same number of arguments
