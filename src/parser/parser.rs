@@ -264,8 +264,8 @@ where
     snd: Box::new(snd),
   });
 
-  let lhs = choice((name(), name().delimited_by(just(Token::LParen), just(Token::RParen))))
-    .then(pattern().repeated().collect());
+  let lhs = name().then(pattern().repeated().collect()).boxed();
+  let lhs = choice((lhs.clone(), lhs.delimited_by(just(Token::LParen), just(Token::RParen))));
 
   #[cfg(feature = "nums")]
   let rhs = choice((inline_num_oper, inline_app));
