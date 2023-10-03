@@ -1,12 +1,15 @@
 use super::{DefId, Name};
 use bimap::{BiHashMap, Overwritten};
 use itertools::Itertools;
-use std::fmt;
+use std::{
+  cell::RefCell,
+  fmt::{self, Debug},
+};
 
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
-  map: BiHashMap<DefId, Name>,
-  id_count: DefId,
+  map: RefCell<BiHashMap<DefId, Name>>,
+  id_count: RefCell<DefId>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -122,26 +125,31 @@ impl DefNames {
     Default::default()
   }
 
-  pub fn name(&self, def_id: &DefId) -> Option<&Name> {
-    self.map.get_by_left(def_id)
+  pub fn name(&self, def_id: &DefId) -> Option<Name> {
+    self.map.borrow().get_by_left(def_id).cloned()
   }
 
   pub fn def_id(&self, name: &Name) -> Option<DefId> {
-    self.map.get_by_right(name).copied()
+    self.map.borrow().get_by_right(name).copied()
   }
 
   pub fn contains_name(&self, name: &Name) -> bool {
-    self.map.contains_right(name)
+    self.map.borrow().contains_right(name)
   }
 
   pub fn contains_def_id(&self, def_id: &DefId) -> bool {
-    self.map.contains_left(def_id)
+    self.map.borrow().contains_left(def_id)
   }
 
-  pub fn insert(&mut self, name: Name) -> DefId {
-    let def_id = self.id_count;
-    self.id_count.0 += 1;
-    match self.map.insert(def_id, name) {
+  pub fn insert(&self, name: Name) -> DefId {
+    let def_id = {
+      let mut id_count = self.id_count.borrow_mut();
+      let def_id = *id_count;
+      id_count.0 += 1;
+      def_id
+    };
+
+    match self.map.borrow_mut().insert(def_id, name) {
       Overwritten::Neither => def_id,
       _ => todo!("Overwritting name-id pairs not supported"),
     }
