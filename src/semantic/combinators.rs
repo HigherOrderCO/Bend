@@ -169,8 +169,13 @@ impl Term {
       // (b)
       Self::Var { .. } => C::I.into(),
 
+      // Especial case
+      Self::App { fun: box Self::Lam { nam: Some(n), bod }, arg } => {
+        A::App(Box::new(bod.abstract_by(&n)), Box::new((*arg).into())).abstract_by(name)
+      }
+
       // (c)
-      Self::App { fun, arg } if arg.is_var(name) => (*fun).into(),
+      Self::App { fun, arg } if arg.is_var(name) && !fun.occours_check(name) => (*fun).into(),
 
       Self::App { fun: box Self::App { fun, arg }, arg: arg2 } if !fun.occours_check(name) => {
         match (arg.occours_check(name), arg2.occours_check(name)) {
