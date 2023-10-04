@@ -47,55 +47,90 @@ impl Term {
 
 #[derive(Debug)]
 pub enum Combinator {
-  K(Term),
-  KC(Box<Combinator>),
+  K,
   I,
-  T(Term),
-  TC(Box<Combinator>),
-  B_(Term, Term, Box<Combinator>),
-  C_(Term, Box<Combinator>, Term),
-  S_(Term, Box<Combinator>, Box<Combinator>),
-  B(Term, Box<Combinator>),
-  C(Box<Combinator>, Term),
-  S(Box<Combinator>, Box<Combinator>),
+  B,
+  C,
+  S,
+  B_,
+  C_,
+  S_,
 }
 
-impl Combinator {
+#[derive(Debug)]
+pub enum AbsTerm {
+  Term(Term),
+  Comb(Combinator),
+  App(Box<AbsTerm>, Box<AbsTerm>),
+}
+
+impl Into<AbsTerm> for Term {
+  fn into(self) -> AbsTerm {
+    AbsTerm::Term(self)
+  }
+}
+
+impl Into<AbsTerm> for Combinator {
+  fn into(self) -> AbsTerm {
+    AbsTerm::Comb(self)
+  }
+}
+
+impl AbsTerm {
+  pub fn call(called: Combinator, args: impl IntoIterator<Item = AbsTerm>) -> Self {
+    args.into_iter().fold(called.into(), |acc, arg| AbsTerm::App(Box::new(acc), Box::new(arg)))
+  }
+
   pub fn to_string(&self, names: &DefNames) -> String {
     match self {
-      Self::K(term) => term.to_string(names),
-      Self::KC(comb) => comb.to_string(names),
-      Self::I => "I".to_owned(),
-      Self::T(term) => term.to_string(names),
-      Self::TC(comb) => comb.to_string(names),
-      Self::B_(e, t, c) => {
-        format!("(B_ {} {} {})", e.to_string(names), t.to_string(names), c.to_string(names))
+      Self::Term(term) => term.to_string(names),
+      Self::Comb(comb) => format!("{:?}", comb),
+      Self::App(k, args) => {
+        format!("({} {})", k.to_string(names), args.to_string(names))
       }
-      Self::C_(e, c, t) => {
-        format!("(C_ {} {} {})", e.to_string(names), c.to_string(names), t.to_string(names))
-      }
-      Self::S_(e, c1, c2) => {
-        format!("(S_ {} {} {})", e.to_string(names), c1.to_string(names), c2.to_string(names))
-      }
-      Self::B(t, c) => format!("(B {} {})", t.to_string(names), c.to_string(names)),
-      Self::C(c, t) => format!("(C {} {})", c.to_string(names), t.to_string(names)),
-      Self::S(c1, c2) => format!("(S {} {})", c1.to_string(names), c2.to_string(names)),
     }
   }
 
   pub fn to_term(self, names: &DefNames) -> Term {
     match self {
-      Self::K(t) => Term::app(comb_ref("_K", names), t),
-      Self::KC(c) => Term::app(comb_ref("_K", names), c.to_term(names)),
-      Self::I => comb_ref("_I", names),
-      Self::T(t) => t,
-      Self::TC(c) => c.to_term(names),
-      Self::B_(d, t, c) => Term::call(comb_ref("_B_", names), [d, t, c.to_term(names)]),
-      Self::C_(d, c, t) => Term::call(comb_ref("_C_", names), [d, c.to_term(names), t]),
-      Self::S_(d, c1, c2) => Term::call(comb_ref("_S_", names), [d, c1.to_term(names), c2.to_term(names)]),
-      Self::B(t, c) => Term::call(comb_ref("_B", names), [t, c.to_term(names)]),
-      Self::C(c, t) => Term::call(comb_ref("_C", names), [c.to_term(names), t]),
-      Self::S(c1, c2) => Term::call(comb_ref("_S", names), [c1.to_term(names), c2.to_term(names)]),
+      Self::Term(term) => term,
+      Self::Comb(c) => comb_ref(&format!("_{:?}", c), names),
+      Self::App(k, args) => Term::app(k.to_term(names), args.to_term(names)),
+    }
+  }
+
+  pub fn abstract_by(self, name: &str) -> Self {
+    match self {
+      Self::Term(term) => term.abstract_by(name),
+      Self::Comb(comb) => Self::Comb(comb),
+
+      _ if !self.occours_check(name) => AbsTerm::call(Combinator::K, vec![self]),
+
+      Self::App(box Self::App(fun, arg), arg2) if !fun.occours_check(name) => {
+        match (arg.occours_check(name), arg2.occours_check(name)) {
+          (false, true) => AbsTerm::call(Combinator::B_, vec![*fun, *arg, arg2.abstract_by(name)]),
+          (true, false) => AbsTerm::call(Combinator::C_, vec![*fun, arg.abstract_by(name), *arg2]),
+          (true, true) => {
+            AbsTerm::call(Combinator::S_, vec![*fun, arg.abstract_by(name), arg2.abstract_by(name)])
+          }
+          (false, false) => unreachable!(),
+        }
+      }
+
+      Self::App(fun, arg) => match (fun.occours_check(name), arg.occours_check(name)) {
+        (false, true) => AbsTerm::call(Combinator::B, vec![*fun, arg.abstract_by(name)]),
+        (true, false) => AbsTerm::call(Combinator::C, vec![fun.abstract_by(name), *arg]),
+        (true, true) => AbsTerm::call(Combinator::S, vec![fun.abstract_by(name), arg.abstract_by(name)]),
+        (false, false) => unreachable!(),
+      },
+    }
+  }
+
+  pub fn occours_check(&self, name: &str) -> bool {
+    match self {
+      Self::Term(term) => term.occours_check(name),
+      Self::Comb(_) => false,
+      Self::App(fun, arg) => fun.occours_check(name) || arg.occours_check(name),
     }
   }
 }
@@ -110,56 +145,52 @@ impl Term {
     let extracted = std::mem::replace(self, Term::Era);
     let Self::Lam { nam: Some(ref name), bod } = extracted else { panic!() };
 
-    *self = bod.abstract_by(&name, names).to_term(names);
+    *self = bod.abstract_by(&name).to_term(names);
   }
 
   /// abcdef algorithm - pp. 42–67 of the second volume of Combinatory Logic
-  pub fn abstract_by(mut self, name: &str, names: &DefNames) -> Combinator {
+  pub fn abstract_by(self, name: &str) -> AbsTerm {
+    use AbsTerm as A;
     use Combinator as C;
 
     match self {
       // Especial case
-      Self::Lam { nam: Some(_), .. } => {
-        self.abstract_lambda(names);
-        C::TC(Box::new(self.abstract_by(name, names)))
-      }
+      Self::Lam { nam: Some(n), bod } => bod.abstract_by(&n).abstract_by(name),
 
       // Especial case
-      Self::Lam { nam: None, bod } => C::KC(Box::new(bod.abstract_by(name, names))),
+      Self::Lam { nam: None, bod } => A::call(C::K, vec![bod.abstract_by(name)]),
 
       // (a)
-      _ if !self.occours_check(name) => C::K(self),
+      _ if !self.occours_check(name) => A::call(C::K, vec![self.into()]),
 
       // (b)
-      Self::Var { .. } => C::I,
+      Self::Var { .. } => C::I.into(),
 
       // (c)
-      Self::App { fun, arg } if arg.is_var(name) => C::T(*fun),
+      Self::App { fun, arg } if arg.is_var(name) => (*fun).into(),
 
       Self::App { fun: box Self::App { fun, arg }, arg: arg2 } if !fun.occours_check(name) => {
         match (arg.occours_check(name), arg2.occours_check(name)) {
-          (true, true) => {
-            C::S_(*fun, Box::new(arg.abstract_by(name, names)), Box::new(arg2.abstract_by(name, names)))
-          }
-          (true, false) => C::C_(*fun, Box::new(arg.abstract_by(name, names)), *arg2),
-          (false, true) => C::B_(*fun, *arg, Box::new(arg2.abstract_by(name, names))),
+          (false, true) => A::call(C::B_, vec![(*fun).into(), (*arg).into(), arg2.abstract_by(name)]),
+          (true, false) => A::call(C::C_, vec![(*fun).into(), arg.abstract_by(name), (*arg2).into()]),
+          (true, true) => A::call(C::S_, vec![(*fun).into(), arg.abstract_by(name), arg2.abstract_by(name)]),
           (false, false) => unreachable!(),
         }
       }
 
       // (d)
       Self::App { fun, arg } if !fun.occours_check(name) && arg.occours_check(name) => {
-        C::B(*fun, Box::new(arg.abstract_by(name, names)))
+        A::call(C::B, vec![(*fun).into(), arg.abstract_by(name)])
       }
 
       // (e)
       Self::App { fun, arg } if fun.occours_check(name) && !arg.occours_check(name) => {
-        C::C(Box::new(fun.abstract_by(name, names)), *arg)
+        A::call(C::C, vec![fun.abstract_by(name), (*arg).into()])
       }
 
       // (f)
       Self::App { fun, arg } if fun.occours_check(name) && arg.occours_check(name) => {
-        C::S(Box::new(fun.abstract_by(name, names)), Box::new(arg.abstract_by(name, names)))
+        A::call(C::S, vec![fun.abstract_by(name), arg.abstract_by(name)])
       }
 
       Self::App { .. } => unreachable!(),
@@ -176,23 +207,23 @@ impl Term {
 
   pub fn occours_check(&self, name: &str) -> bool {
     match self {
-      Term::Var { nam: Name(n) } => n == name,
-      Term::Lam { nam, bod } => !nam.as_ref().is_some_and(|Name(n)| n == name) && bod.occours_check(name),
-      Term::Chn { nam: _, bod } => bod.occours_check(name),
-      Term::App { fun, arg } => fun.occours_check(name) || arg.occours_check(name),
-      Term::Sup { fst, snd } => fst.occours_check(name) || snd.occours_check(name),
-      Term::Let { nam: Name(n), val, nxt } => {
+      Self::Var { nam: Name(n) } => n == name,
+      Self::Lam { nam, bod } => !nam.as_ref().is_some_and(|Name(n)| n == name) && bod.occours_check(name),
+      Self::Chn { nam: _, bod } => bod.occours_check(name),
+      Self::App { fun, arg } => fun.occours_check(name) || arg.occours_check(name),
+      Self::Sup { fst, snd } => fst.occours_check(name) || snd.occours_check(name),
+      Self::Let { nam: Name(n), val, nxt } => {
         val.occours_check(name) || (n != name && nxt.occours_check(name))
       }
-      Term::Dup { fst, snd, val, nxt } => {
+      Self::Dup { fst, snd, val, nxt } => {
         val.occours_check(name)
           || (!fst.as_ref().is_some_and(|Name(n)| n == name)
             && !snd.as_ref().is_some_and(|Name(n)| n == name)
             && nxt.occours_check(name))
       }
-      Term::Lnk { .. } => false,
-      Term::Ref { .. } => false,
-      Term::Era => false,
+      Self::Lnk { .. } => false,
+      Self::Ref { .. } => false,
+      Self::Era => false,
     }
   }
 
