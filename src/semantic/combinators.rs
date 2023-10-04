@@ -8,13 +8,14 @@ impl DefinitionBook {
 
     for def in self.defs.iter_mut() {
       for rule in def.rules.iter_mut() {
-        // println!("Term:\n{}\n", rule.body.to_string(&self.def_names));
+        println!("Term:\n{}\n", rule.body.to_string(&self.def_names));
         rule.body.abstract_lambdas(&self.def_names);
-        // println!("Result:\n{}\n", rule.body.to_string(&self.def_names));
+        println!("Result:\n{}\n", rule.body.to_string(&self.def_names));
       }
     }
 
     self.defs.append(&mut comb);
+    todo!();
   }
 }
 
@@ -103,6 +104,8 @@ impl AbsTerm {
     match self {
       Self::Term(term) => term.abstract_by(name),
       Self::Comb(comb) => Self::Comb(comb),
+
+      Self::App(fun, box Self::Term(Term::Var { nam: Name(n) })) if n == name => *fun,
 
       _ if !self.occours_check(name) => AbsTerm::call(Combinator::K, vec![self]),
 
