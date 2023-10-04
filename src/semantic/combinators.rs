@@ -104,7 +104,9 @@ impl AbsTerm {
       Self::Term(term) => term.abstract_by(name),
       Self::Comb(comb) => Self::Comb(comb),
 
-      Self::App(fun, box Self::Term(Term::Var { nam: Name(n) })) if n == name => *fun,
+      Self::App(fun, box Self::Term(Term::Var { nam: Name(n) })) if n == name && !fun.occours_check(name) => {
+        *fun
+      }
 
       _ if !self.occours_check(name) => AbsTerm::call(Combinator::K, vec![self]),
 
@@ -148,6 +150,16 @@ impl AbsTerm {
         C::S_ => *self = Self::Comb(C::S), // (C_ S_ I I) => S
         _ => {}
       },
+
+      Self::App(
+        box Self::App(box Self::Comb(C::C_), box Self::App(box Self::Comb(C::C), box Self::Comb(C::I))),
+        box Self::Comb(C::I),
+      ) => *self = Self::Comb(C::I), // (C_ (C_ I) I) => I
+
+      Self::App(f, a) => {
+        f.reduce();
+        a.reduce();
+      }
       _ => {}
     }
   }
@@ -218,14 +230,28 @@ impl Term {
         A::call(C::S, vec![fun.abstract_by(name), arg.abstract_by(name)])
       }
 
+      Self::Dup { fst: Some(nam), snd: Some(s), val, mut nxt } => {
+        nxt.subst(&s, &Term::Var { nam: nam.clone() });
+        A::App(Box::new(nxt.abstract_if_occours(&nam)), Box::new((*val).into())).abstract_by(name)
+      }
+
+      Self::Dup { fst: Some(nam), snd: None, val, nxt }
+      | Self::Dup { fst: None, snd: Some(nam), val, nxt } => {
+        A::App(Box::new(nxt.abstract_if_occours(&nam)), Box::new((*val).into())).abstract_by(name)
+      }
+
+      Self::Dup { fst: None, snd: None, val: _, nxt } => nxt.abstract_by(name),
+
+      Self::Let { nam, val, nxt } => {
+        A::App(Box::new(nxt.abstract_if_occours(&nam)), Box::new((*val).into())).abstract_by(name)
+      }
+
       Self::App { .. } => unreachable!(),
       Self::Ref { .. } => unreachable!(),
       Self::Lnk { .. } => unreachable!(),
       Self::Era => unreachable!(),
 
       Self::Chn { .. } => todo!(),
-      Self::Let { .. } => todo!(),
-      Self::Dup { .. } => todo!(),
       Self::Sup { .. } => todo!(),
     }
   }
@@ -249,6 +275,13 @@ impl Term {
       Self::Lnk { .. } => false,
       Self::Ref { .. } => false,
       Self::Era => false,
+    }
+  }
+
+  fn abstract_if_occours(self, name: &str) -> AbsTerm {
+    match self.occours_check(&name) {
+      true => self.abstract_by(&name),
+      false => self.into(),
     }
   }
 
