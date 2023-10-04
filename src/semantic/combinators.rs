@@ -15,7 +15,6 @@ impl DefinitionBook {
     }
 
     self.defs.append(&mut comb);
-    todo!();
   }
 }
 
@@ -136,6 +135,22 @@ impl AbsTerm {
       Self::App(fun, arg) => fun.occours_check(name) || arg.occours_check(name),
     }
   }
+
+  pub fn reduce(&mut self) {
+    use Combinator as C;
+
+    match self {
+      Self::App(
+        box Self::App(box Self::App(box Self::Comb(C::C_), box Self::Comb(c)), box Self::Comb(C::I)),
+        box Self::Comb(C::I),
+      ) => match c {
+        C::C_ => *self = Self::Comb(C::C), // (C_ C_ I I) => C
+        C::S_ => *self = Self::Comb(C::S), // (C_ S_ I I) => S
+        _ => {}
+      },
+      _ => {}
+    }
+  }
 }
 
 fn comb_ref(name: &str, names: &DefNames) -> Term {
@@ -148,7 +163,9 @@ impl Term {
     let extracted = std::mem::replace(self, Term::Era);
     let Self::Lam { nam: Some(ref name), bod } = extracted else { panic!() };
 
-    *self = bod.abstract_by(&name).to_term(names);
+    let mut abstracted = bod.abstract_by(&name);
+    abstracted.reduce();
+    *self = abstracted.to_term(names);
   }
 
   /// abcdef algorithm - pp. 42–67 of the second volume of Combinatory Logic
