@@ -18,7 +18,7 @@ impl DefinitionBook {
 
 impl Term {
   pub fn abstract_lambdas(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
-    pub fn go(term: &mut Term, depth: usize, names: &mut DefNames, defs: &mut Vec<Definition>) {
+    fn go(term: &mut Term, depth: usize, names: &mut DefNames, defs: &mut Vec<Definition>) {
       match term {
         Term::Lam { nam: Some(_), bod } => {
           if !(depth == 0 && bod.is_simple()) {
@@ -50,7 +50,7 @@ impl Term {
     go(self, 0, names, defs)
   }
 
-  pub fn is_simple(&self) -> bool {
+  fn is_simple(&self) -> bool {
     match self {
       Self::Var { .. } => true,
       Self::Lam { nam: _, bod } => bod.is_simple(),
@@ -67,7 +67,7 @@ impl Term {
 }
 
 #[derive(Debug)]
-pub enum Combinator {
+enum Combinator {
   K,
   I,
   B,
@@ -81,8 +81,8 @@ pub enum Combinator {
 impl From<Combinator> for Term {
   fn from(value: Combinator) -> Self {
     match value {
-      Combinator::K => Self::lam(Some("x"), Self::lam(Some("y"), Self::var("x"))),
-      Combinator::I => Self::lam(Some("x"), Self::var("x")),
+      Combinator::K => Self::lam("x", Self::lam("y", Self::var("x"))),
+      Combinator::I => Self::lam("x", Self::var("x")),
       Combinator::B => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).xyz_lambda(),
       Combinator::C => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).xyz_lambda(),
       Combinator::S => {
@@ -113,14 +113,14 @@ impl Combinator {
 }
 
 impl DefNames {
-  pub fn register(&mut self, name: Name, body: Term) -> (DefId, Definition) {
+  fn register(&mut self, name: Name, body: Term) -> (DefId, Definition) {
     let def_id = self.insert(name);
     (def_id, Definition { def_id, rules: vec![Rule { def_id, pats: Vec::new(), body }] })
   }
 }
 
 #[derive(Debug)]
-pub enum AbsTerm {
+enum AbsTerm {
   Term(Term),
   Comb(Combinator),
   App(Box<AbsTerm>, Box<AbsTerm>),
@@ -139,29 +139,19 @@ impl From<Combinator> for AbsTerm {
 }
 
 impl AbsTerm {
-  pub fn call(called: Combinator, args: impl IntoIterator<Item = AbsTerm>) -> Self {
+  fn call(called: Combinator, args: impl IntoIterator<Item = AbsTerm>) -> Self {
     args.into_iter().fold(called.into(), |acc, arg| AbsTerm::App(Box::new(acc), Box::new(arg)))
   }
 
-  pub fn to_string(&self, names: &DefNames) -> String {
-    match self {
-      Self::Term(term) => term.to_string(names),
-      Self::Comb(comb) => format!("{:?}", comb),
-      Self::App(k, args) => {
-        format!("({} {})", k.to_string(names), args.to_string(names))
-      }
-    }
-  }
-
-  pub fn to_term(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
+  fn into_term(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
     match self {
       Self::Term(term) => term,
       Self::Comb(c) => c.comb_ref(names, defs),
-      Self::App(k, args) => Term::app(k.to_term(names, defs), args.to_term(names, defs)),
+      Self::App(k, args) => Term::app(k.into_term(names, defs), args.into_term(names, defs)),
     }
   }
 
-  pub fn abstract_by(self, name: &str) -> Self {
+  fn abstract_by(self, name: &str) -> Self {
     match self {
       Self::Term(term) => term.abstract_by(name),
       Self::Comb(comb) => Self::call(Combinator::K, [Self::Comb(comb)]),
@@ -192,7 +182,7 @@ impl AbsTerm {
     }
   }
 
-  pub fn occours_check(&self, name: &str) -> bool {
+  fn occours_check(&self, name: &str) -> bool {
     match self {
       Self::Term(term) => term.occours_check(name),
       Self::Comb(_) => false,
@@ -200,7 +190,7 @@ impl AbsTerm {
     }
   }
 
-  pub fn reduce(&mut self) {
+  fn reduce(&mut self) {
     use Combinator as C;
 
     match self {
@@ -222,13 +212,14 @@ impl AbsTerm {
         f.reduce();
         a.reduce();
       }
+
       _ => {}
     }
   }
 }
 
 impl Term {
-  pub fn abstract_lambda(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
+  fn abstract_lambda(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
     let extracted = std::mem::replace(self, Term::Era);
     let Self::Lam { nam: Some(name), bod } = extracted else { panic!() };
 
@@ -237,12 +228,12 @@ impl Term {
     } else {
       let mut abstracted = bod.abstract_by(&name);
       abstracted.reduce();
-      abstracted.to_term(names, defs)
+      abstracted.into_term(names, defs)
     };
   }
 
   /// abcdef algorithm - pp. 42–67 of the second volume of Combinatory Logic
-  pub fn abstract_by(self, name: &str) -> AbsTerm {
+  fn abstract_by(self, name: &str) -> AbsTerm {
     use AbsTerm as A;
     use Combinator as C;
 
@@ -337,7 +328,7 @@ impl Term {
     }
   }
 
-  pub fn occours_check(&self, name: &str) -> bool {
+  fn occours_check(&self, name: &str) -> bool {
     match self {
       Self::Var { nam: Name(n) } => n == name,
       Self::Lam { nam, bod } => !nam.as_ref().is_some_and(|Name(n)| n == name) && bod.occours_check(name),
@@ -409,8 +400,8 @@ impl Term {
     matches!(self, Term::Var { nam: Name(n) } if n == name)
   }
 
-  fn lam(name: Option<&str>, body: Self) -> Self {
-    Self::Lam { nam: name.map(Name::new), bod: Box::new(body) }
+  fn lam(name: &str, body: Self) -> Self {
+    Self::Lam { nam: Some(Name::new(name)), bod: Box::new(body) }
   }
 
   fn app(fun: Self, arg: Self) -> Self {
@@ -422,12 +413,12 @@ impl Term {
   }
 
   fn xyz_lambda(self) -> Self {
-    Self::lam(Some("x"), Self::lam(Some("y"), Self::lam(Some("z"), self)))
+    Self::lam("x", Self::lam("y", Self::lam("z", self)))
   }
 
   fn dxyz_lambda(self) -> Self {
     let Self::App { fun, arg } = self else { panic!() };
-    Self::lam(Some("d"), {
+    Self::lam("d", {
       Self::App { fun: Box::new(Self::App { fun: Box::new(Self::var("d")), arg: fun }), arg }.xyz_lambda()
     })
   }
