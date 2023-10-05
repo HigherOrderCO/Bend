@@ -1,6 +1,8 @@
-use crate::ast::{hvm_lang::DefNames, DefId, Definition, DefinitionBook, Name, Rule, Term};
+use crate::ast::{hvm_lang::DefNames, Definition, DefinitionBook, Name, Rule, Term};
 
 impl DefinitionBook {
+  /// Applies bracket abstraction to remove lambdas form rule bodies,
+  /// replacing it with applications with [`combinators`][Combinator]
   pub fn detach_combinators(&mut self) {
     let mut comb = Vec::new();
 
@@ -15,6 +17,7 @@ impl DefinitionBook {
 }
 
 impl Term {
+  /// Navigate the term body in search for lambdas to abstract.
   pub fn abstract_lambdas(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
     fn go(term: &mut Term, depth: usize, names: &mut DefNames, defs: &mut Vec<Definition>) {
       match term {
@@ -48,6 +51,7 @@ impl Term {
     go(self, 0, names, defs)
   }
 
+  /// Heuristics for when a term is simple enough to not need to be abstracted.
   fn is_simple(&self) -> bool {
     match self {
       Self::Var { .. } => true,
@@ -62,164 +66,13 @@ impl Term {
       Self::Era => true,
     }
   }
-}
 
-#[derive(Debug)]
-enum Combinator {
-  K,
-  I,
-  B,
-  C,
-  S,
-  B_,
-  C_,
-  S_,
-}
-
-impl From<Combinator> for Term {
-  fn from(value: Combinator) -> Self {
-    match value {
-      Combinator::K => Self::lam("x", Self::lam("y", Self::var("x"))),
-      Combinator::I => Self::lam("x", Self::var("x")),
-      Combinator::B => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).xyz_lambda(),
-      Combinator::B_ => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).dxyz_lambda(),
-      Combinator::C => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).xyz_lambda(),
-      Combinator::C_ => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).dxyz_lambda(),
-      Combinator::S => {
-        Self::app(Self::app(Self::var("x"), Self::var("z")), Self::app(Self::var("y"), Self::var("z")))
-          .xyz_lambda()
-      }
-      Combinator::S_ => {
-        Self::app(Self::app(Self::var("x"), Self::var("z")), Self::app(Self::var("y"), Self::var("z")))
-          .dxyz_lambda()
-      }
-    }
-  }
-}
-
-impl Combinator {
-  fn comb_ref(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
-    let name = Name::new(&format!("${:?}", self));
-    let def_id = names.def_id(&name).unwrap_or_else(|| {
-      let (def_id, def) = names.register(name, self.into());
-      defs.push(def);
-      def_id
-    });
-
-    Term::Ref { def_id }
-  }
-}
-
-impl DefNames {
-  fn register(&mut self, name: Name, body: Term) -> (DefId, Definition) {
-    let def_id = self.insert(name);
-    (def_id, Definition { def_id, rules: vec![Rule { def_id, pats: Vec::new(), body }] })
-  }
-}
-
-#[derive(Debug)]
-enum AbsTerm {
-  Term(Term),
-  Comb(Combinator),
-  App(Box<AbsTerm>, Box<AbsTerm>),
-}
-
-impl From<Term> for AbsTerm {
-  fn from(value: Term) -> Self {
-    Self::Term(value)
-  }
-}
-
-impl From<Combinator> for AbsTerm {
-  fn from(value: Combinator) -> Self {
-    Self::Comb(value)
-  }
-}
-
-impl AbsTerm {
-  fn call(called: Combinator, args: impl IntoIterator<Item = AbsTerm>) -> Self {
-    args.into_iter().fold(called.into(), |acc, arg| AbsTerm::App(Box::new(acc), Box::new(arg)))
-  }
-
-  fn into_term(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
-    match self {
-      Self::Term(term) => term,
-      Self::Comb(c) => c.comb_ref(names, defs),
-      Self::App(k, args) => Term::app(k.into_term(names, defs), args.into_term(names, defs)),
-    }
-  }
-
-  fn abstract_by(self, name: &str) -> Self {
-    match self {
-      Self::Term(term) => term.abstract_by(name),
-      Self::Comb(comb) => Self::call(Combinator::K, [Self::Comb(comb)]),
-
-      Self::App(fun, box Self::Term(Term::Var { nam: Name(n) })) if n == name && !fun.occours_check(name) => {
-        *fun
-      }
-
-      _ if !self.occours_check(name) => AbsTerm::call(Combinator::K, vec![self]),
-
-      Self::App(box Self::App(fun, arg), arg2) if !fun.occours_check(name) => {
-        match (arg.occours_check(name), arg2.occours_check(name)) {
-          (false, true) => AbsTerm::call(Combinator::B_, vec![*fun, *arg, arg2.abstract_by(name)]),
-          (true, false) => AbsTerm::call(Combinator::C_, vec![*fun, arg.abstract_by(name), *arg2]),
-          (true, true) => {
-            AbsTerm::call(Combinator::S_, vec![*fun, arg.abstract_by(name), arg2.abstract_by(name)])
-          }
-          (false, false) => unreachable!(),
-        }
-      }
-
-      Self::App(fun, arg) => match (fun.occours_check(name), arg.occours_check(name)) {
-        (false, true) => AbsTerm::call(Combinator::B, vec![*fun, arg.abstract_by(name)]),
-        (true, false) => AbsTerm::call(Combinator::C, vec![fun.abstract_by(name), *arg]),
-        (true, true) => AbsTerm::call(Combinator::S, vec![fun.abstract_by(name), arg.abstract_by(name)]),
-        (false, false) => unreachable!(),
-      },
-    }
-  }
-
-  fn occours_check(&self, name: &str) -> bool {
-    match self {
-      Self::Term(term) => term.occours_check(name),
-      Self::Comb(_) => false,
-      Self::App(fun, arg) => fun.occours_check(name) || arg.occours_check(name),
-    }
-  }
-
-  fn reduce(&mut self) {
-    use Combinator as C;
-
-    match self {
-      Self::App(
-        box Self::App(box Self::App(box Self::Comb(C::C_), box Self::Comb(c)), box Self::Comb(C::I)),
-        box Self::Comb(C::I),
-      ) => match c {
-        C::C_ => *self = Self::Comb(C::C), // (C_ C_ I I) => C
-        C::S_ => *self = Self::Comb(C::S), // (C_ S_ I I) => S
-        _ => {}
-      },
-
-      Self::App(
-        box Self::App(box Self::Comb(C::C_), box Self::App(box Self::Comb(C::C), box Self::Comb(C::I))),
-        box Self::Comb(C::I),
-      ) => *self = Self::Comb(C::I), // (C_ (C_ I) I) => I
-
-      Self::App(f, a) => {
-        f.reduce();
-        a.reduce();
-      }
-
-      _ => {}
-    }
-  }
-}
-
-impl Term {
+  /// Replaces a reference to a [`Term::Lam`] with its abstracted body.
+  /// If [`Term::channel_check`] finds the lambda variable inside a channel body,
+  /// it returns the lambda without change
   fn abstract_lambda(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
     let extracted = std::mem::replace(self, Term::Era);
-    let Self::Lam { nam: Some(name), bod } = extracted else { panic!() };
+    let Self::Lam { nam: Some(name), bod } = extracted else { panic!("Not a lambda term") };
 
     *self = if bod.channel_check(&name, false) {
       Self::Lam { nam: Some(name), bod }
@@ -230,143 +83,20 @@ impl Term {
     };
   }
 
-  /// abcdef algorithm - pp. 42–67 of the second volume of Combinatory Logic
-  fn abstract_by(self, name: &str) -> AbsTerm {
-    use AbsTerm as A;
-    use Combinator as C;
-
-    match self {
-      // If the lambda body contains a channel with the lambda variable inside,
-      // we can not abstract it, so we just wrap it inside the AbsTerm
-      Self::Lam { nam: Some(ref n), ref bod } if bod.channel_check(&n, false) => A::Term(self),
-
-      // [name] Lam { n, bod } => [name] ([n] bod)
-      Self::Lam { nam: Some(n), bod } => bod.abstract_by(&n).abstract_by(name),
-
-      // [name] Lam { _, bod } => K ([name] bod)
-      Self::Lam { nam: None, bod } => A::call(C::K, vec![bod.abstract_by(name)]),
-
-      // [name] App { Lam { n, bod }, arg }
-      Self::App { fun: box Self::Lam { nam: Some(n), bod }, arg } => {
-        if bod.channel_check(&n, false) {
-          // (Lam { n, bod } ([name] arg))
-          A::App(Box::new(A::Term(Self::Lam { nam: Some(n), bod })), Box::new(arg.abstract_by(name)))
-        } else {
-          // ([name] ([n] bod) arg)
-          A::App(Box::new(bod.abstract_by(&n)), Box::new((*arg).into())).abstract_by(name)
-        }
-      }
-
-      // [name] App { fun, Lam { n, bod } }
-      Self::App { fun, arg: box Self::Lam { nam: Some(n), bod } } => {
-        if bod.channel_check(&n, false) {
-          // (([name] arg) Lam { n, bod })
-          A::App(Box::new(fun.abstract_by(name)), Box::new(A::Term(Self::Lam { nam: Some(n), bod })))
-        } else {
-          // ([name] arg ([n] bod))
-          A::App(Box::new((*fun).into()), Box::new(bod.abstract_by(&n))).abstract_by(name)
-        }
-      }
-
-      // (a)
-      // [name] E => K E
-      e if !e.occours_check(name) => A::call(C::K, vec![e.into()]),
-
-      // (b)
-      // [name] Var { name } => I
-      // We know it is the abstracted var because it did not match case (a)
-      Self::Var { .. } => C::I.into(),
-
-      // (c)
-      // [name] App { E, Var { name } } => E
-      Self::App { fun, arg } if arg.is_var(name) && !fun.occours_check(name) => (*fun).into(),
-
-      Self::App { fun: box Self::App { fun, arg }, arg: arg2 } if !fun.occours_check(name) => {
-        match (arg.occours_check(name), arg2.occours_check(name)) {
-          // (d')
-          // [name] App { App { E, F }, X } => B' E F ([name] X)
-          (false, true) => A::call(C::B_, vec![(*fun).into(), (*arg).into(), arg2.abstract_by(name)]),
-          // (c')
-          // [name] App { App { E, X }, F } => C' E ([name] X) F
-          (true, false) => A::call(C::C_, vec![(*fun).into(), arg.abstract_by(name), (*arg2).into()]),
-          // (f')
-          // [name] App { App { E, X }, Y } => S' E ([name] X) ([name] Y)
-          (true, true) => A::call(C::S_, vec![(*fun).into(), arg.abstract_by(name), arg2.abstract_by(name)]),
-          // Taken care by case (a)
-          (false, false) => unreachable!(),
-        }
-      }
-
-      // (d)
-      // [name] App { E, X } => B E ([name] X)
-      Self::App { fun, arg } if !fun.occours_check(name) && arg.occours_check(name) => {
-        A::call(C::B, vec![(*fun).into(), arg.abstract_by(name)])
-      }
-
-      // (e)
-      // [name] App { X, E } => C ([name] X) E
-      Self::App { fun, arg } if fun.occours_check(name) && !arg.occours_check(name) => {
-        A::call(C::C, vec![fun.abstract_by(name), (*arg).into()])
-      }
-
-      // (f)
-      // [name] App { X, Y } => S ([name] X) ([name] Y)
-      Self::App { fun, arg } if fun.occours_check(name) && arg.occours_check(name) => {
-        A::call(C::S, vec![fun.abstract_by(name), arg.abstract_by(name)])
-      }
-
-      // [name] Dup { fst, snd, val, nxt } => ([name] ([fst|snd] nxt) val)
-      Self::Dup { fst: Some(nam), snd: Some(s), val, mut nxt } => {
-        nxt.subst(&s, &Term::Var { nam: nam.clone() });
-        A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
-      }
-
-      // [name] Dup { fst, _, val, nxt } => ([name] ([fst] nxt) val)
-      // [name] Dup { _, snd, val, nxt } => ([name] ([snd] nxt) val)
-      Self::Dup { fst: Some(nam), snd: None, val, nxt }
-      | Self::Dup { fst: None, snd: Some(nam), val, nxt } => {
-        A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
-      }
-
-      // [name] Dup { _, _, val, nxt } => [name] nxt
-      Self::Dup { fst: None, snd: None, val: _, nxt } => nxt.abstract_by(name),
-
-      // [name] Let { nam, val, nxt } => ([name] ([nam] nxt) val)
-      Self::Let { nam, val, nxt } => {
-        A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
-      }
-
-      // Term::channel_check invalidates abstration of lambdas that have their variables inside of a channel
-      Self::Chn { .. } => unimplemented!(),
-
-      Self::Sup { .. } => todo!(),
-
-      // All cases of application are taken care by previous branches
-      Self::App { .. } => unreachable!(),
-
-      // The abstraction variable can not occour inside these, so case (a) catches all the next branches
-      Self::Ref { .. } => unreachable!(),
-      Self::Lnk { .. } => unreachable!(),
-      Self::Era => unreachable!(),
-    }
-  }
-
-  /// Checks if the given name occours as a variable inside the term
-  fn occours_check(&self, name: &str) -> bool {
+  /// Checks if the given name occurs as a variable inside the term
+  fn occurs_check(&self, name: &str) -> bool {
     match self {
       Self::Var { nam: Name(n) } => n == name,
-      Self::Lam { nam, bod } => !nam.as_ref().is_some_and(|Name(n)| n == name) && bod.occours_check(name),
-      Self::Chn { nam: _, bod } => bod.occours_check(name),
-      Self::App { fun, arg } => fun.occours_check(name) || arg.occours_check(name),
-      Self::Sup { fst, snd } => fst.occours_check(name) || snd.occours_check(name),
-      Self::Let { nam: Name(n), val, nxt } => {
-        val.occours_check(name) || (n != name && nxt.occours_check(name))
-      }
+      Self::Lam { nam, bod } => !nam.as_ref().is_some_and(|Name(n)| n == name) && bod.occurs_check(name),
+      Self::Chn { nam: _, bod } => bod.occurs_check(name),
+      Self::App { fun, arg } => fun.occurs_check(name) || arg.occurs_check(name),
+      Self::Sup { fst, snd } => fst.occurs_check(name) || snd.occurs_check(name),
+      Self::Let { nam: Name(n), val, nxt } => val.occurs_check(name) || (n != name && nxt.occurs_check(name)),
       Self::Dup { fst, snd, val, nxt } => {
-        val.occours_check(name)
+        val.occurs_check(name)
           || (!fst.as_ref().is_some_and(|Name(n)| n == name)
             && !snd.as_ref().is_some_and(|Name(n)| n == name)
-            && nxt.occours_check(name))
+            && nxt.occurs_check(name))
       }
       Self::Lnk { .. } => false,
       Self::Ref { .. } => false,
@@ -374,7 +104,7 @@ impl Term {
     }
   }
 
-  /// Checks if the given name occours as a variable inside the body of a channel in the term
+  /// Checks if the given name occurs as a variable inside the body of a channel in the term
   fn channel_check(&self, name: &str, inside_chn: bool) -> bool {
     match self {
       Self::Var { nam: Name(n) } => inside_chn && n == name,
@@ -389,7 +119,7 @@ impl Term {
       }
 
       Self::Dup { fst, snd, val, nxt } => {
-        if val.occours_check(name) {
+        if val.occurs_check(name) {
           if let Some(f) = fst {
             if nxt.channel_check(f, inside_chn) {
               return true;
@@ -435,9 +165,9 @@ impl Term {
     Self::lam("x", Self::lam("y", Self::lam("z", self)))
   }
 
-  /// Creates a lambda of the term on the form: 
+  /// Creates a lambda of the term on the form:
   /// `λdλxλyλz ((d f) a)` when the term is a `App { f, a }`,
-  /// or otherwise `λdλxλyλz d self` 
+  /// or otherwise `λdλxλyλz d self`
   fn dxyz_lambda(self) -> Self {
     let term = match self {
       Self::App { fun, arg } => {
@@ -447,5 +177,307 @@ impl Term {
     };
 
     Self::lam("d", term.xyz_lambda())
+  }
+}
+
+#[derive(Debug)]
+enum Combinator {
+  /// λxλy x
+  K,
+  /// λx x
+  I,
+  /// λxλyλz (x (y z))
+  B,
+  /// λxλyλz (x z y)
+  C,
+  /// λxλyλz ((x z)(y z))
+  S,
+  /// λdλxλyλz ((d x) (y z))
+  B_,
+  /// λdλxλyλz ((d (x z)) y)
+  C_,
+  /// λdλxλyλz ((d (x z)) (y z))
+  S_,
+}
+
+impl Combinator {
+  /// Gets the [`Term::Ref`] of the combinator if it already has one,
+  /// or registers it to a new DefId, adding its definition to the the vec of definitions,
+  /// and returning the new ref
+  fn comb_ref(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
+    let name = Name::new(&format!("${:?}", self));
+    let def_id = names.def_id(&name).unwrap_or_else(|| {
+      let def_id = names.insert(name);
+      let body = self.into();
+      defs.push(Definition { def_id, rules: vec![Rule { def_id, pats: Vec::new(), body }] });
+
+      def_id
+    });
+
+    Term::Ref { def_id }
+  }
+}
+
+impl From<Combinator> for Term {
+  fn from(value: Combinator) -> Self {
+    match value {
+      Combinator::K => Self::lam("x", Self::lam("y", Self::var("x"))),
+      Combinator::I => Self::lam("x", Self::var("x")),
+      Combinator::B => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).xyz_lambda(),
+      Combinator::B_ => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).dxyz_lambda(),
+      Combinator::C => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).xyz_lambda(),
+      Combinator::C_ => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).dxyz_lambda(),
+      Combinator::S => {
+        Self::app(Self::app(Self::var("x"), Self::var("z")), Self::app(Self::var("y"), Self::var("z")))
+          .xyz_lambda()
+      }
+      Combinator::S_ => {
+        Self::app(Self::app(Self::var("x"), Self::var("z")), Self::app(Self::var("y"), Self::var("z")))
+          .dxyz_lambda()
+      }
+    }
+  }
+}
+
+/// Abstracted version of [Term].
+/// Can contain terms that could not be abstracted,
+/// combinators and applications with itself.
+#[derive(Debug)]
+enum AbsTerm {
+  Term(Term),
+  Comb(Combinator),
+  App(Box<AbsTerm>, Box<AbsTerm>),
+}
+
+impl From<Term> for AbsTerm {
+  fn from(value: Term) -> Self {
+    Self::Term(value)
+  }
+}
+
+impl From<Combinator> for AbsTerm {
+  fn from(value: Combinator) -> Self {
+    Self::Comb(value)
+  }
+}
+
+impl AbsTerm {
+  /// Checks if the given name occurs as a variable inside the AbsTerm
+  fn occurs_check(&self, name: &str) -> bool {
+    match self {
+      Self::Term(term) => term.occurs_check(name),
+      Self::Comb(_) => false,
+      Self::App(fun, arg) => fun.occurs_check(name) || arg.occurs_check(name),
+    }
+  }
+
+  /// Checks the applications inside the AbsTerm for known possible reductions,
+  /// and apply those that it finds;
+  fn reduce(&mut self) {
+    use Combinator as C;
+
+    match self {
+      Self::App(
+        box Self::App(box Self::App(box Self::Comb(C::C_), box Self::Comb(c)), box Self::Comb(C::I)),
+        box Self::Comb(C::I),
+      ) => match c {
+        C::C_ => *self = Self::Comb(C::C), // (C_ C_ I I) => C
+        C::S_ => *self = Self::Comb(C::S), // (C_ S_ I I) => S
+        _ => {}
+      },
+
+      Self::App(
+        box Self::App(box Self::Comb(C::C_), box Self::App(box Self::Comb(C::C), box Self::Comb(C::I))),
+        box Self::Comb(C::I),
+      ) => *self = Self::Comb(C::I), // (C_ (C_ I) I) => I
+
+      Self::App(f, a) => {
+        f.reduce();
+        a.reduce();
+      }
+
+      _ => {}
+    }
+  }
+
+  /// Make a call AbsTerm by folding args around a called function Combinator with applications.
+  fn call(called: Combinator, args: impl IntoIterator<Item = AbsTerm>) -> Self {
+    args.into_iter().fold(called.into(), |acc, arg| AbsTerm::App(Box::new(acc), Box::new(arg)))
+  }
+
+  fn into_term(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
+    match self {
+      Self::Term(term) => term,
+      Self::Comb(c) => c.comb_ref(names, defs),
+      Self::App(k, args) => Term::app(k.into_term(names, defs), args.into_term(names, defs)),
+    }
+  }
+
+  /// Abstracted version of [`Term::abstract_by`].
+  /// Check the full function for more details.
+  fn abstract_by(self, name: &str) -> Self {
+    match self {
+      Self::Term(term) => term.abstract_by(name),
+
+      // [name] Combinator => K Combinator
+      Self::Comb(comb) => Self::call(Combinator::K, [Self::Comb(comb)]),
+
+      // (a)
+      e if !e.occurs_check(name) => AbsTerm::call(Combinator::K, vec![e]),
+
+      // (c)
+      Self::App(fun, box Self::Term(Term::Var { nam: Name(_) })) if !fun.occurs_check(name) => *fun,
+
+      // (d', c', f')
+      Self::App(box Self::App(fun, arg), arg2) if !fun.occurs_check(name) => {
+        match (arg.occurs_check(name), arg2.occurs_check(name)) {
+          (false, true) => AbsTerm::call(Combinator::B_, vec![*fun, *arg, arg2.abstract_by(name)]),
+          (true, false) => AbsTerm::call(Combinator::C_, vec![*fun, arg.abstract_by(name), *arg2]),
+          (true, true) => {
+            AbsTerm::call(Combinator::S_, vec![*fun, arg.abstract_by(name), arg2.abstract_by(name)])
+          }
+          (false, false) => unreachable!(),
+        }
+      }
+
+      // (d, c, f)
+      Self::App(fun, arg) => match (fun.occurs_check(name), arg.occurs_check(name)) {
+        (false, true) => AbsTerm::call(Combinator::B, vec![*fun, arg.abstract_by(name)]),
+        (true, false) => AbsTerm::call(Combinator::C, vec![fun.abstract_by(name), *arg]),
+        (true, true) => AbsTerm::call(Combinator::S, vec![fun.abstract_by(name), arg.abstract_by(name)]),
+        (false, false) => unreachable!(),
+      },
+    }
+  }
+}
+
+impl Term {
+  /// Implementation of the abcdef algorithm - pp. 42–67 of the second volume of Combinatory Logic
+  fn abstract_by(self, name: &str) -> AbsTerm {
+    use AbsTerm as A;
+    use Combinator as C;
+
+    match self {
+      // The reference did not include abstraction of lambdas inside lambdas.
+      // In the next branches we take care of abstracting them away,
+      // before continuing the abstraction by the current lambda if necessary
+
+      // If the lambda body contains a channel with the lambda variable inside,
+      // we can not abstract it, so we just wrap it inside the AbsTerm
+      Self::Lam { nam: Some(ref n), ref bod } if bod.channel_check(n, false) => A::Term(self),
+
+      // [name] Lam { n, bod } => [name] ([n] bod)
+      Self::Lam { nam: Some(n), bod } => bod.abstract_by(&n).abstract_by(name),
+
+      // [name] Lam { _, bod } => K ([name] bod)
+      Self::Lam { nam: None, bod } => A::call(C::K, vec![bod.abstract_by(name)]),
+
+      // [name] App { Lam { n, bod }, arg }
+      Self::App { fun: box Self::Lam { nam: Some(n), bod }, arg } => {
+        if bod.channel_check(&n, false) {
+          // (Lam { n, bod } ([name] arg))
+          A::App(Box::new(A::Term(Self::Lam { nam: Some(n), bod })), Box::new(arg.abstract_by(name)))
+        } else {
+          // ([name] ([n] bod) arg)
+          A::App(Box::new(bod.abstract_by(&n)), Box::new((*arg).into())).abstract_by(name)
+        }
+      }
+
+      // [name] App { fun, Lam { n, bod } }
+      Self::App { fun, arg: box Self::Lam { nam: Some(n), bod } } => {
+        if bod.channel_check(&n, false) {
+          // (([name] arg) Lam { n, bod })
+          A::App(Box::new(fun.abstract_by(name)), Box::new(A::Term(Self::Lam { nam: Some(n), bod })))
+        } else {
+          // ([name] arg ([n] bod))
+          A::App(Box::new((*fun).into()), Box::new(bod.abstract_by(&n))).abstract_by(name)
+        }
+      }
+
+      // abcdef branches starts here
+
+      // (a)
+      // [name] E => K E
+      e if !e.occurs_check(name) => A::call(C::K, vec![e.into()]),
+
+      // (b)
+      // [name] Var { name } => I
+      // We know it is the abstracted var because it did not match case (a)
+      Self::Var { .. } => C::I.into(),
+
+      // (c)
+      // [name] App { E, Var { name } } => E
+      Self::App { fun, arg } if arg.is_var(name) && !fun.occurs_check(name) => (*fun).into(),
+
+      Self::App { fun: box Self::App { fun, arg }, arg: arg2 } if !fun.occurs_check(name) => {
+        match (arg.occurs_check(name), arg2.occurs_check(name)) {
+          // (d')
+          // [name] App { App { E, F }, X } => B' E F ([name] X)
+          (false, true) => A::call(C::B_, vec![(*fun).into(), (*arg).into(), arg2.abstract_by(name)]),
+          // (c')
+          // [name] App { App { E, X }, F } => C' E ([name] X) F
+          (true, false) => A::call(C::C_, vec![(*fun).into(), arg.abstract_by(name), (*arg2).into()]),
+          // (f')
+          // [name] App { App { E, X }, Y } => S' E ([name] X) ([name] Y)
+          (true, true) => A::call(C::S_, vec![(*fun).into(), arg.abstract_by(name), arg2.abstract_by(name)]),
+          // Taken care by case (a)
+          (false, false) => unreachable!(),
+        }
+      }
+
+      // (d)
+      // [name] App { E, X } => B E ([name] X)
+      Self::App { fun, arg } if !fun.occurs_check(name) && arg.occurs_check(name) => {
+        A::call(C::B, vec![(*fun).into(), arg.abstract_by(name)])
+      }
+
+      // (e)
+      // [name] App { X, E } => C ([name] X) E
+      Self::App { fun, arg } if fun.occurs_check(name) && !arg.occurs_check(name) => {
+        A::call(C::C, vec![fun.abstract_by(name), (*arg).into()])
+      }
+
+      // (f)
+      // [name] App { X, Y } => S ([name] X) ([name] Y)
+      Self::App { fun, arg } if fun.occurs_check(name) && arg.occurs_check(name) => {
+        A::call(C::S, vec![fun.abstract_by(name), arg.abstract_by(name)])
+      }
+
+      // Additions to the algorithm to support terms not included in the reference:
+
+      // [name] Dup { fst, snd, val, nxt } => ([name] ([fst|snd] nxt) val)
+      Self::Dup { fst: Some(nam), snd: Some(s), val, mut nxt } => {
+        nxt.subst(&s, &Term::Var { nam: nam.clone() });
+        A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
+      }
+
+      // [name] Dup { fst, _, val, nxt } => ([name] ([fst] nxt) val)
+      // [name] Dup { _, snd, val, nxt } => ([name] ([snd] nxt) val)
+      Self::Dup { fst: Some(nam), snd: None, val, nxt }
+      | Self::Dup { fst: None, snd: Some(nam), val, nxt } => {
+        A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
+      }
+
+      // [name] Dup { _, _, val, nxt } => [name] nxt
+      Self::Dup { fst: None, snd: None, val: _, nxt } => nxt.abstract_by(name),
+
+      // [name] Let { nam, val, nxt } => ([name] ([nam] nxt) val)
+      Self::Let { nam, val, nxt } => {
+        A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
+      }
+
+      // Term::channel_check invalidates abstraction of lambdas that have their variables inside of a channel
+      Self::Chn { .. } => unimplemented!(),
+
+      Self::Sup { .. } => todo!(),
+
+      // All cases of application are taken care by previous branches
+      Self::App { .. } => unreachable!(),
+
+      // The abstraction variable can not occur inside these, so case (a) catches all the next branches
+      Self::Ref { .. } => unreachable!(),
+      Self::Lnk { .. } => unreachable!(),
+      Self::Era => unreachable!(),
+    }
   }
 }
