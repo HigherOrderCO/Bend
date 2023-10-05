@@ -101,7 +101,7 @@ impl From<Combinator> for Term {
 
 impl Combinator {
   fn comb_ref(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
-    let name = Name::new(&format!("_{:?}", self));
+    let name = Name::new(&format!("${:?}", self));
     let def_id = names.def_id(&name).unwrap_or_else(|| {
       let (def_id, def) = names.register(name, self.into());
       defs.push(def);
@@ -430,33 +430,5 @@ impl Term {
     Self::lam(Some("d"), {
       Self::App { fun: Box::new(Self::App { fun: Box::new(Self::var("d")), arg: fun }), arg }.xyz_lambda()
     })
-  }
-}
-
-#[cfg(test)]
-mod tests {
-  use crate::ast::{DefinitionBook, Term};
-
-  #[test]
-  fn test() {
-    let mut book = DefinitionBook::new();
-
-    let mut test_case = Term::lam(
-      Some("f"),
-      Term::lam(
-        Some("g"),
-        Term::lam(
-          Some("x"),
-          Term::app(
-            Term::app(Term::var("some_var"), Term::app(Term::var("f"), Term::var("x"))),
-            Term::app(Term::var("g"), Term::var("x")),
-          ),
-        ),
-      ),
-    );
-
-    println!("Term:\n{}\n", test_case.to_string(&book.def_names));
-    test_case.abstract_lambdas(&mut book.def_names, &mut Vec::new());
-    println!("Result:\n{}\n", test_case.to_string(&book.def_names));
   }
 }
