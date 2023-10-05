@@ -173,11 +173,15 @@ fn comb_ref(name: &str, names: &DefNames) -> Term {
 impl Term {
   pub fn abstract_lambda(&mut self, names: &DefNames) {
     let extracted = std::mem::replace(self, Term::Era);
-    let Self::Lam { nam: Some(ref name), bod } = extracted else { panic!() };
+    let Self::Lam { nam: Some(name), bod } = extracted else { panic!() };
 
-    let mut abstracted = bod.abstract_by(&name);
-    abstracted.reduce();
-    *self = abstracted.to_term(names);
+    *self = if bod.channel_check(&name, false) {
+      Self::Lam { nam: Some(name), bod }
+    } else {
+      let mut abstracted = bod.abstract_by(&name);
+      abstracted.reduce();
+      abstracted.to_term(names)
+    };
   }
 
   /// abcdef algorithm - pp. 42–67 of the second volume of Combinatory Logic
@@ -187,7 +191,13 @@ impl Term {
 
     match self {
       // Especial case
-      Self::Lam { nam: Some(n), bod } => bod.abstract_by(&n).abstract_by(name),
+      Self::Lam { nam: Some(n), bod } => {
+        if bod.channel_check(&n, false) {
+          A::Term(Self::Lam { nam: Some(n), bod })
+        } else {
+          bod.abstract_by(&n).abstract_by(name)
+        }
+      }
 
       // Especial case
       Self::Lam { nam: None, bod } => A::call(C::K, vec![bod.abstract_by(name)]),
@@ -200,7 +210,20 @@ impl Term {
 
       // Especial case
       Self::App { fun: box Self::Lam { nam: Some(n), bod }, arg } => {
-        A::App(Box::new(bod.abstract_by(&n)), Box::new((*arg).into())).abstract_by(name)
+        if bod.channel_check(&n, false) {
+          A::App(Box::new(A::Term(Self::Lam { nam: Some(n), bod })), Box::new(arg.abstract_by(name)))
+        } else {
+          A::App(Box::new(bod.abstract_by(&n)), Box::new((*arg).into())).abstract_by(name)
+        }
+      }
+
+      // Especial case
+      Self::App { fun, arg: box Self::Lam { nam: Some(n), bod } } => {
+        if bod.channel_check(&n, false) {
+          A::App(Box::new(fun.abstract_by(name)), Box::new(A::Term(Self::Lam { nam: Some(n), bod })))
+        } else {
+          A::App(Box::new((*fun).into()), Box::new(bod.abstract_by(&n))).abstract_by(name)
+        }
       }
 
       // (c)
@@ -246,13 +269,14 @@ impl Term {
         A::App(Box::new(nxt.abstract_if_occours(&nam)), Box::new((*val).into())).abstract_by(name)
       }
 
+      Self::Chn { .. } => unimplemented!(),
+
+      Self::Sup { .. } => todo!(),
+
       Self::App { .. } => unreachable!(),
       Self::Ref { .. } => unreachable!(),
       Self::Lnk { .. } => unreachable!(),
       Self::Era => unreachable!(),
-
-      Self::Chn { .. } => todo!(),
-      Self::Sup { .. } => todo!(),
     }
   }
 
@@ -272,6 +296,45 @@ impl Term {
             && !snd.as_ref().is_some_and(|Name(n)| n == name)
             && nxt.occours_check(name))
       }
+      Self::Lnk { .. } => false,
+      Self::Ref { .. } => false,
+      Self::Era => false,
+    }
+  }
+
+  fn channel_check(&self, name: &str, inside_chn: bool) -> bool {
+    match self {
+      Self::Var { nam: Name(n) } => inside_chn && n == name,
+      Self::Lam { nam, bod } => {
+        !nam.as_ref().is_some_and(|Name(n)| n == name) && bod.channel_check(name, inside_chn)
+      }
+      Self::Chn { nam: _, bod } => bod.channel_check(name, true),
+      Self::App { fun, arg } => fun.channel_check(name, inside_chn) || arg.channel_check(name, inside_chn),
+      Self::Sup { fst, snd } => fst.channel_check(name, inside_chn) || snd.channel_check(name, inside_chn),
+      Self::Let { nam: Name(n), val, nxt } => {
+        val.channel_check(name, inside_chn) || (n != name && nxt.channel_check(name, inside_chn))
+      }
+
+      Self::Dup { fst, snd, val, nxt } => {
+        if val.occours_check(name) {
+          if let Some(f) = fst {
+            if nxt.channel_check(f, inside_chn) {
+              return true;
+            };
+          }
+          if let Some(s) = snd {
+            if nxt.channel_check(s, inside_chn) {
+              return true;
+            };
+          }
+        }
+
+        val.channel_check(name, inside_chn)
+          || (!fst.as_ref().is_some_and(|Name(n)| n == name)
+            && !snd.as_ref().is_some_and(|Name(n)| n == name)
+            && nxt.channel_check(name, inside_chn))
+      }
+
       Self::Lnk { .. } => false,
       Self::Ref { .. } => false,
       Self::Era => false,
