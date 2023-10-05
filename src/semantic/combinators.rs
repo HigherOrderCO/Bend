@@ -1,14 +1,14 @@
-use crate::ast::{hvm_lang::DefNames, Definition, DefinitionBook, Name, Rule, Term};
+use crate::ast::{hvm_lang::DefNames, DefId, Definition, DefinitionBook, Name, Rule, Term};
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
 impl DefinitionBook {
   pub fn detach_combinators(&mut self) {
-    let mut comb = self.register_combinators();
+    let mut comb = Vec::new();
 
     for def in self.defs.iter_mut() {
       for rule in def.rules.iter_mut() {
-        rule.body.abstract_lambdas(&self.def_names);
+        rule.body.abstract_lambdas(&mut self.def_names, &mut comb);
       }
     }
 
@@ -17,27 +17,27 @@ impl DefinitionBook {
 }
 
 impl Term {
-  pub fn abstract_lambdas(&mut self, names: &DefNames) {
-    pub fn go(term: &mut Term, depth: usize, names: &DefNames) {
+  pub fn abstract_lambdas(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
+    pub fn go(term: &mut Term, depth: usize, names: &mut DefNames, defs: &mut Vec<Definition>) {
       match term {
         Term::Lam { nam: Some(_), bod } => {
           if !(depth == 0 && bod.is_simple()) {
-            term.abstract_lambda(names)
+            term.abstract_lambda(names, defs)
           }
         }
-        Term::Lam { nam: _, bod } => go(bod, depth + 1, names),
-        Term::Chn { nam: _, bod } => go(bod, depth + 1, names),
+        Term::Lam { nam: _, bod } => go(bod, depth + 1, names, defs),
+        Term::Chn { nam: _, bod } => go(bod, depth + 1, names, defs),
         Term::Let { nam: _, val, nxt } => {
-          go(val, depth + 1, names);
-          go(nxt, depth + 1, names);
+          go(val, depth + 1, names, defs);
+          go(nxt, depth + 1, names, defs);
         }
         Term::App { fun, arg } => {
-          go(fun, depth + 1, names);
-          go(arg, depth + 1, names);
+          go(fun, depth + 1, names, defs);
+          go(arg, depth + 1, names, defs);
         }
         Term::Dup { fst: _, snd: _, val, nxt } => {
-          go(val, depth + 1, names);
-          go(nxt, depth + 1, names);
+          go(val, depth + 1, names, defs);
+          go(nxt, depth + 1, names, defs);
         }
         Term::Sup { .. } => todo!(),
         Term::Var { .. } => {}
@@ -47,7 +47,7 @@ impl Term {
       }
     }
 
-    go(self, 0, names)
+    go(self, 0, names, defs)
   }
 
   pub fn is_simple(&self) -> bool {
@@ -76,6 +76,47 @@ pub enum Combinator {
   B_,
   C_,
   S_,
+}
+
+impl From<Combinator> for Term {
+  fn from(value: Combinator) -> Self {
+    match value {
+      Combinator::K => Self::lam(Some("x"), Self::lam(Some("y"), Self::var("x"))),
+      Combinator::I => Self::lam(Some("x"), Self::var("x")),
+      Combinator::B => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).xyz_lambda(),
+      Combinator::C => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).xyz_lambda(),
+      Combinator::S => {
+        Self::app(Self::app(Self::var("x"), Self::var("z")), Self::app(Self::var("y"), Self::var("z")))
+          .xyz_lambda()
+      }
+      Combinator::B_ => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).dxyz_lambda(),
+      Combinator::C_ => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).dxyz_lambda(),
+      Combinator::S_ => {
+        Self::app(Self::app(Self::var("x"), Self::var("z")), Self::app(Self::var("y"), Self::var("z")))
+          .dxyz_lambda()
+      }
+    }
+  }
+}
+
+impl Combinator {
+  fn comb_ref(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
+    let name = Name::new(&format!("_{:?}", self));
+    let def_id = names.def_id(&name).unwrap_or_else(|| {
+      let (def_id, def) = names.register(name, self.into());
+      defs.push(def);
+      def_id
+    });
+
+    Term::Ref { def_id }
+  }
+}
+
+impl DefNames {
+  pub fn register(&mut self, name: Name, body: Term) -> (DefId, Definition) {
+    let def_id = self.insert(name);
+    (def_id, Definition { def_id, rules: vec![Rule { def_id, pats: Vec::new(), body }] })
+  }
 }
 
 #[derive(Debug)]
@@ -112,11 +153,11 @@ impl AbsTerm {
     }
   }
 
-  pub fn to_term(self, names: &DefNames) -> Term {
+  pub fn to_term(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
     match self {
       Self::Term(term) => term,
-      Self::Comb(c) => comb_ref(&format!("_{:?}", c), names),
-      Self::App(k, args) => Term::app(k.to_term(names), args.to_term(names)),
+      Self::Comb(c) => c.comb_ref(names, defs),
+      Self::App(k, args) => Term::app(k.to_term(names, defs), args.to_term(names, defs)),
     }
   }
 
@@ -186,13 +227,8 @@ impl AbsTerm {
   }
 }
 
-fn comb_ref(name: &str, names: &DefNames) -> Term {
-  let def_id = names.def_id(&Name::new(name)).unwrap();
-  Term::Ref { def_id }
-}
-
 impl Term {
-  pub fn abstract_lambda(&mut self, names: &DefNames) {
+  pub fn abstract_lambda(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
     let extracted = std::mem::replace(self, Term::Era);
     let Self::Lam { nam: Some(name), bod } = extracted else { panic!() };
 
@@ -201,7 +237,7 @@ impl Term {
     } else {
       let mut abstracted = bod.abstract_by(&name);
       abstracted.reduce();
-      abstracted.to_term(names)
+      abstracted.to_term(names, defs)
     };
   }
 
@@ -384,48 +420,16 @@ impl Term {
   fn var(name: &str) -> Self {
     Self::Var { nam: Name::new(name) }
   }
-}
 
-impl DefinitionBook {
-  pub fn register_combinators(&mut self) -> Vec<Definition> {
-    let mut combinators = Vec::new();
-
-    combinators.push(self.register("_K", Term::lam(Some("x"), Term::lam(Some("y"), Term::var("x")))));
-    combinators.push(self.register("_I", Term::lam(Some("x"), Term::var("x"))));
-
-    let xyz_lambda = |body| Term::lam(Some("x"), Term::lam(Some("y"), Term::lam(Some("z"), body)));
-    let dxyz_lambda = |body| {
-      Term::lam(
-        Some("d"),
-        xyz_lambda({
-          let Term::App { fun, arg } = body else { panic!() };
-          Term::App { fun: Box::new(Term::App { fun: Box::new(Term::var("d")), arg: fun }), arg }
-        }),
-      )
-    };
-
-    let b_body = Term::app(Term::var("x"), Term::app(Term::var("y"), Term::var("z")));
-
-    combinators.push(self.register("_B", xyz_lambda(b_body.clone())));
-    combinators.push(self.register("_B_", dxyz_lambda(b_body)));
-
-    let c_body = Term::app(Term::app(Term::var("x"), Term::var("z")), Term::var("y"));
-
-    combinators.push(self.register("_C", xyz_lambda(c_body.clone())));
-    combinators.push(self.register("_C_", dxyz_lambda(c_body)));
-
-    let s_body =
-      Term::app(Term::app(Term::var("x"), Term::var("z")), Term::app(Term::var("y"), Term::var("z")));
-
-    combinators.push(self.register("_S", xyz_lambda(s_body.clone())));
-    combinators.push(self.register("_S_", dxyz_lambda(s_body)));
-
-    combinators
+  fn xyz_lambda(self) -> Self {
+    Self::lam(Some("x"), Self::lam(Some("y"), Self::lam(Some("z"), self)))
   }
 
-  pub fn register(&mut self, name: &str, body: Term) -> Definition {
-    let def_id = self.def_names.insert(Name::new(name));
-    Definition { def_id, rules: vec![Rule { def_id, pats: Vec::new(), body }] }
+  fn dxyz_lambda(self) -> Self {
+    let Self::App { fun, arg } = self else { panic!() };
+    Self::lam(Some("d"), {
+      Self::App { fun: Box::new(Self::App { fun: Box::new(Self::var("d")), arg: fun }), arg }.xyz_lambda()
+    })
   }
 }
 
@@ -436,7 +440,6 @@ mod tests {
   #[test]
   fn test() {
     let mut book = DefinitionBook::new();
-    book.register_combinators();
 
     let mut test_case = Term::lam(
       Some("f"),
@@ -453,7 +456,7 @@ mod tests {
     );
 
     println!("Term:\n{}\n", test_case.to_string(&book.def_names));
-    test_case.abstract_lambdas(&book.def_names);
+    test_case.abstract_lambdas(&mut book.def_names, &mut Vec::new());
     println!("Result:\n{}\n", test_case.to_string(&book.def_names));
   }
 }
