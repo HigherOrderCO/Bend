@@ -8,9 +8,7 @@ impl DefinitionBook {
 
     for def in self.defs.iter_mut() {
       for rule in def.rules.iter_mut() {
-        println!("Term:\n{}\n", rule.body.to_string(&self.def_names));
         rule.body.abstract_lambdas(&self.def_names);
-        println!("Result:\n{}\n", rule.body.to_string(&self.def_names));
       }
     }
 
@@ -87,15 +85,15 @@ pub enum AbsTerm {
   App(Box<AbsTerm>, Box<AbsTerm>),
 }
 
-impl Into<AbsTerm> for Term {
-  fn into(self) -> AbsTerm {
-    AbsTerm::Term(self)
+impl From<Term> for AbsTerm {
+  fn from(value: Term) -> Self {
+    Self::Term(value)
   }
 }
 
-impl Into<AbsTerm> for Combinator {
-  fn into(self) -> AbsTerm {
-    AbsTerm::Comb(self)
+impl From<Combinator> for AbsTerm {
+  fn from(value: Combinator) -> Self {
+    Self::Comb(value)
   }
 }
 
@@ -365,8 +363,8 @@ impl Term {
   }
 
   fn abstract_if_occours(self, name: &str) -> AbsTerm {
-    match self.occours_check(&name) {
-      true => self.abstract_by(&name),
+    match self.occours_check(name) {
+      true => self.abstract_by(name),
       false => self.into(),
     }
   }
