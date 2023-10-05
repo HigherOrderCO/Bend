@@ -1,7 +1,5 @@
 use crate::ast::{hvm_lang::DefNames, DefId, Definition, DefinitionBook, Name, Rule, Term};
 
-/// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
-/// Precondition: Vars must have been sanitized
 impl DefinitionBook {
   pub fn detach_combinators(&mut self) {
     let mut comb = Vec::new();
@@ -84,13 +82,13 @@ impl From<Combinator> for Term {
       Combinator::K => Self::lam("x", Self::lam("y", Self::var("x"))),
       Combinator::I => Self::lam("x", Self::var("x")),
       Combinator::B => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).xyz_lambda(),
+      Combinator::B_ => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).dxyz_lambda(),
       Combinator::C => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).xyz_lambda(),
+      Combinator::C_ => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).dxyz_lambda(),
       Combinator::S => {
         Self::app(Self::app(Self::var("x"), Self::var("z")), Self::app(Self::var("y"), Self::var("z")))
           .xyz_lambda()
       }
-      Combinator::B_ => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).dxyz_lambda(),
-      Combinator::C_ => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).dxyz_lambda(),
       Combinator::S_ => {
         Self::app(Self::app(Self::var("x"), Self::var("z")), Self::app(Self::var("y"), Self::var("z")))
           .dxyz_lambda()
@@ -238,96 +236,122 @@ impl Term {
     use Combinator as C;
 
     match self {
-      // Especial case
-      Self::Lam { nam: Some(n), bod } => {
-        if bod.channel_check(&n, false) {
-          A::Term(Self::Lam { nam: Some(n), bod })
-        } else {
-          bod.abstract_by(&n).abstract_by(name)
-        }
-      }
+      // If the lambda body contains a channel with the lambda variable inside,
+      // we can not abstract it, so we just wrap it inside the AbsTerm
+      Self::Lam { nam: Some(ref n), ref bod } if bod.channel_check(&n, false) => A::Term(self),
 
-      // Especial case
+      // [name] Lam { n, bod } => [name] ([n] bod)
+      Self::Lam { nam: Some(n), bod } => bod.abstract_by(&n).abstract_by(name),
+
+      // [name] Lam { _, bod } => K ([name] bod)
       Self::Lam { nam: None, bod } => A::call(C::K, vec![bod.abstract_by(name)]),
 
-      // (a)
-      _ if !self.occours_check(name) => A::call(C::K, vec![self.into()]),
-
-      // (b)
-      Self::Var { .. } => C::I.into(),
-
-      // Especial case
+      // [name] App { Lam { n, bod }, arg }
       Self::App { fun: box Self::Lam { nam: Some(n), bod }, arg } => {
         if bod.channel_check(&n, false) {
+          // (Lam { n, bod } ([name] arg))
           A::App(Box::new(A::Term(Self::Lam { nam: Some(n), bod })), Box::new(arg.abstract_by(name)))
         } else {
+          // ([name] ([n] bod) arg)
           A::App(Box::new(bod.abstract_by(&n)), Box::new((*arg).into())).abstract_by(name)
         }
       }
 
-      // Especial case
+      // [name] App { fun, Lam { n, bod } }
       Self::App { fun, arg: box Self::Lam { nam: Some(n), bod } } => {
         if bod.channel_check(&n, false) {
+          // (([name] arg) Lam { n, bod })
           A::App(Box::new(fun.abstract_by(name)), Box::new(A::Term(Self::Lam { nam: Some(n), bod })))
         } else {
+          // ([name] arg ([n] bod))
           A::App(Box::new((*fun).into()), Box::new(bod.abstract_by(&n))).abstract_by(name)
         }
       }
 
+      // (a)
+      // [name] E => K E
+      e if !e.occours_check(name) => A::call(C::K, vec![e.into()]),
+
+      // (b)
+      // [name] Var { name } => I
+      // We know it is the abstracted var because it did not match case (a)
+      Self::Var { .. } => C::I.into(),
+
       // (c)
+      // [name] App { E, Var { name } } => E
       Self::App { fun, arg } if arg.is_var(name) && !fun.occours_check(name) => (*fun).into(),
 
       Self::App { fun: box Self::App { fun, arg }, arg: arg2 } if !fun.occours_check(name) => {
         match (arg.occours_check(name), arg2.occours_check(name)) {
+          // (d')
+          // [name] App { App { E, F }, X } => B' E F ([name] X)
           (false, true) => A::call(C::B_, vec![(*fun).into(), (*arg).into(), arg2.abstract_by(name)]),
+          // (c')
+          // [name] App { App { E, X }, F } => C' E ([name] X) F
           (true, false) => A::call(C::C_, vec![(*fun).into(), arg.abstract_by(name), (*arg2).into()]),
+          // (f')
+          // [name] App { App { E, X }, Y } => S' E ([name] X) ([name] Y)
           (true, true) => A::call(C::S_, vec![(*fun).into(), arg.abstract_by(name), arg2.abstract_by(name)]),
+          // Taken care by case (a)
           (false, false) => unreachable!(),
         }
       }
 
       // (d)
+      // [name] App { E, X } => B E ([name] X)
       Self::App { fun, arg } if !fun.occours_check(name) && arg.occours_check(name) => {
         A::call(C::B, vec![(*fun).into(), arg.abstract_by(name)])
       }
 
       // (e)
+      // [name] App { X, E } => C ([name] X) E
       Self::App { fun, arg } if fun.occours_check(name) && !arg.occours_check(name) => {
         A::call(C::C, vec![fun.abstract_by(name), (*arg).into()])
       }
 
       // (f)
+      // [name] App { X, Y } => S ([name] X) ([name] Y)
       Self::App { fun, arg } if fun.occours_check(name) && arg.occours_check(name) => {
         A::call(C::S, vec![fun.abstract_by(name), arg.abstract_by(name)])
       }
 
+      // [name] Dup { fst, snd, val, nxt } => ([name] ([fst|snd] nxt) val)
       Self::Dup { fst: Some(nam), snd: Some(s), val, mut nxt } => {
         nxt.subst(&s, &Term::Var { nam: nam.clone() });
-        A::App(Box::new(nxt.abstract_if_occours(&nam)), Box::new((*val).into())).abstract_by(name)
+        A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
       }
 
+      // [name] Dup { fst, _, val, nxt } => ([name] ([fst] nxt) val)
+      // [name] Dup { _, snd, val, nxt } => ([name] ([snd] nxt) val)
       Self::Dup { fst: Some(nam), snd: None, val, nxt }
       | Self::Dup { fst: None, snd: Some(nam), val, nxt } => {
-        A::App(Box::new(nxt.abstract_if_occours(&nam)), Box::new((*val).into())).abstract_by(name)
+        A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
       }
 
+      // [name] Dup { _, _, val, nxt } => [name] nxt
       Self::Dup { fst: None, snd: None, val: _, nxt } => nxt.abstract_by(name),
 
+      // [name] Let { nam, val, nxt } => ([name] ([nam] nxt) val)
       Self::Let { nam, val, nxt } => {
-        A::App(Box::new(nxt.abstract_if_occours(&nam)), Box::new((*val).into())).abstract_by(name)
+        A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
       }
 
+      // Term::channel_check invalidates abstration of lambdas that have their variables inside of a channel
       Self::Chn { .. } => unimplemented!(),
 
       Self::Sup { .. } => todo!(),
 
+      // All cases of application are taken care by previous branches
       Self::App { .. } => unreachable!(),
+
+      // The abstraction variable can not occour inside these, so case (a) catches all the next branches
       Self::Ref { .. } => unreachable!(),
       Self::Lnk { .. } => unreachable!(),
       Self::Era => unreachable!(),
     }
   }
 
+  /// Checks if the given name occours as a variable inside the term
   fn occours_check(&self, name: &str) -> bool {
     match self {
       Self::Var { nam: Name(n) } => n == name,
@@ -350,6 +374,7 @@ impl Term {
     }
   }
 
+  /// Checks if the given name occours as a variable inside the body of a channel in the term
   fn channel_check(&self, name: &str, inside_chn: bool) -> bool {
     match self {
       Self::Var { nam: Name(n) } => inside_chn && n == name,
@@ -389,13 +414,6 @@ impl Term {
     }
   }
 
-  fn abstract_if_occours(self, name: &str) -> AbsTerm {
-    match self.occours_check(name) {
-      true => self.abstract_by(name),
-      false => self.into(),
-    }
-  }
-
   fn is_var(&self, name: &str) -> bool {
     matches!(self, Term::Var { nam: Name(n) } if n == name)
   }
@@ -412,14 +430,22 @@ impl Term {
     Self::Var { nam: Name::new(name) }
   }
 
+  /// Creates a lambda of the term on the form: `λxλyλz self`
   fn xyz_lambda(self) -> Self {
     Self::lam("x", Self::lam("y", Self::lam("z", self)))
   }
 
+  /// Creates a lambda of the term on the form: 
+  /// `λdλxλyλz ((d f) a)` when the term is a `App { f, a }`,
+  /// or otherwise `λdλxλyλz d self` 
   fn dxyz_lambda(self) -> Self {
-    let Self::App { fun, arg } = self else { panic!() };
-    Self::lam("d", {
-      Self::App { fun: Box::new(Self::App { fun: Box::new(Self::var("d")), arg: fun }), arg }.xyz_lambda()
-    })
+    let term = match self {
+      Self::App { fun, arg } => {
+        Self::App { fun: Box::new(Self::App { fun: Box::new(Self::var("d")), arg: fun }), arg }
+      }
+      other => Self::App { fun: Box::new(Self::var("d")), arg: Box::new(other) },
+    };
+
+    Self::lam("d", term.xyz_lambda())
   }
 }
