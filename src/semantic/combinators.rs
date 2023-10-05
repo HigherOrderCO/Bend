@@ -20,27 +20,50 @@ impl DefinitionBook {
 
 impl Term {
   pub fn abstract_lambdas(&mut self, names: &DefNames) {
+    pub fn go(term: &mut Term, depth: usize, names: &DefNames) {
+      match term {
+        Term::Lam { nam: Some(_), bod } => {
+          if !(depth == 0 && bod.is_simple()) {
+            term.abstract_lambda(names)
+          }
+        }
+        Term::Lam { nam: _, bod } => go(bod, depth + 1, names),
+        Term::Chn { nam: _, bod } => go(bod, depth + 1, names),
+        Term::Let { nam: _, val, nxt } => {
+          go(val, depth + 1, names);
+          go(nxt, depth + 1, names);
+        }
+        Term::App { fun, arg } => {
+          go(fun, depth + 1, names);
+          go(arg, depth + 1, names);
+        }
+        Term::Dup { fst: _, snd: _, val, nxt } => {
+          go(val, depth + 1, names);
+          go(nxt, depth + 1, names);
+        }
+        Term::Sup { .. } => todo!(),
+        Term::Var { .. } => {}
+        Term::Lnk { .. } => {}
+        Term::Ref { .. } => {}
+        Term::Era => {}
+      }
+    }
+
+    go(self, 0, names)
+  }
+
+  pub fn is_simple(&self) -> bool {
     match self {
-      Term::Lam { nam: Some(_), bod: _ } => self.abstract_lambda(names),
-      Term::Lam { nam: _, bod } => bod.abstract_lambdas(names),
-      Term::Chn { nam: _, bod } => bod.abstract_lambdas(names),
-      Term::Let { nam: _, val, nxt } => {
-        val.abstract_lambdas(names);
-        nxt.abstract_lambdas(names);
-      }
-      Term::App { fun, arg } => {
-        fun.abstract_lambdas(names);
-        arg.abstract_lambdas(names);
-      }
-      Term::Dup { fst: _, snd: _, val, nxt } => {
-        val.abstract_lambdas(names);
-        nxt.abstract_lambdas(names);
-      }
-      Term::Sup { .. } => todo!(),
-      Term::Var { .. } => {}
-      Term::Lnk { .. } => {}
-      Term::Ref { .. } => {}
-      Term::Era => {}
+      Self::Var { .. } => true,
+      Self::Lam { nam: _, bod } => bod.is_simple(),
+      Self::Chn { nam: _, bod } => bod.is_simple(),
+      Self::Lnk { .. } => true,
+      Self::Let { .. } => false,
+      Self::Ref { .. } => true,
+      Self::App { fun, arg } => fun.is_simple() && arg.is_simple(),
+      Self::Dup { .. } => false,
+      Self::Sup { .. } => false,
+      Self::Era => true,
     }
   }
 }
