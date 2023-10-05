@@ -102,7 +102,7 @@ impl AbsTerm {
   pub fn abstract_by(self, name: &str) -> Self {
     match self {
       Self::Term(term) => term.abstract_by(name),
-      Self::Comb(comb) => Self::Comb(comb),
+      Self::Comb(comb) => Self::call(Combinator::K, [Self::Comb(comb)]),
 
       Self::App(fun, box Self::Term(Term::Var { nam: Name(n) })) if n == name && !fun.occours_check(name) => {
         *fun
