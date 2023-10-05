@@ -2,7 +2,6 @@
 use crate::ast::{DefinitionBook, Name};
 
 pub mod combinators;
-pub mod flatten;
 pub mod pattern;
 pub mod vars;
 

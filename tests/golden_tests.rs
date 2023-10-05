@@ -1,5 +1,6 @@
-use hvm_core::{parse_lnet, show_lnet};
+use hvm_core::{parse_lnet, show_lnet, Val};
 use hvm_lang::{
+  ast::DefId,
   compile_book,
   from_core::readback_net,
   loader::display_err_for_text,
@@ -9,7 +10,12 @@ use hvm_lang::{
 };
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
-use std::{fs, io::Write, path::Path};
+use std::{
+  fs,
+  io::Write,
+  path::{Path, PathBuf},
+};
+use stdext::function_name;
 use walkdir::WalkDir;
 
 fn run_single_golden_test(
@@ -32,8 +38,13 @@ fn run_single_golden_test(
   }
 }
 
-fn run_golden_test_dir(root: &Path, run: &dyn Fn(&Path, &str) -> anyhow::Result<String>) {
-  let walker = WalkDir::new(root).sort_by_file_name().max_depth(2).into_iter().filter_entry(|e| {
+fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&Path, &str) -> anyhow::Result<String>) {
+  let root = PathBuf::from(format!(
+    "{}/tests/golden_tests/{}",
+    env!("CARGO_MANIFEST_DIR"),
+    test_name.rsplit_once(":").unwrap().1
+  ));
+  let walker = WalkDir::new(&root).sort_by_file_name().max_depth(2).into_iter().filter_entry(|e| {
     let path = e.path();
     if path == root {
       true
@@ -66,8 +77,7 @@ fn run_golden_test_dir(root: &Path, run: &dyn Fn(&Path, &str) -> anyhow::Result<
 
 #[test]
 fn compile_single_terms() {
-  let root = format!("{}/tests/golden_tests/compile_single_terms", env!("CARGO_MANIFEST_DIR"));
-  run_golden_test_dir(Path::new(&root), &|_, code| {
+  run_golden_test_dir(function_name!(), &|_, code| {
     let term = parse_term(code).map_err(|errs| {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
@@ -80,8 +90,7 @@ fn compile_single_terms() {
 
 #[test]
 fn compile_single_files() {
-  let root = format!("{}/tests/golden_tests/compile_single_files", env!("CARGO_MANIFEST_DIR"));
-  run_golden_test_dir(Path::new(&root), &|_, code| {
+  run_golden_test_dir(function_name!(), &|_, code| {
     let book = parse_definition_book(code).map_err(|errs| {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
@@ -93,8 +102,7 @@ fn compile_single_files() {
 
 #[test]
 fn run_single_files() {
-  let root = format!("{}/tests/golden_tests/run_single_files", env!("CARGO_MANIFEST_DIR"));
-  run_golden_test_dir(Path::new(&root), &|_, code| {
+  run_golden_test_dir(function_name!(), &|_, code| {
     let book = parse_definition_book(code).map_err(|errs| {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
@@ -112,8 +120,7 @@ fn run_single_files() {
 
 #[test]
 fn readback_lnet() {
-  let root = format!("{}/tests/golden_tests/readback_lnet", env!("CARGO_MANIFEST_DIR"));
-  run_golden_test_dir(Path::new(&root), &|_, code| {
+  run_golden_test_dir(function_name!(), &|_, code| {
     let lnet = parse_lnet(&mut code.chars().peekable());
     let def_names = Default::default();
     let (term, valid) = readback_net(&lnet)?;
@@ -127,13 +134,40 @@ fn readback_lnet() {
 
 #[test]
 fn flatten_rules() {
-  let root = format!("{}/tests/golden_tests/flatten_rules", env!("CARGO_MANIFEST_DIR"));
-  run_golden_test_dir(Path::new(&root), &|_, code| {
+  run_golden_test_dir(function_name!(), &|_, code| {
     let mut book = parse_definition_book(code).map_err(|errs| {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
     book.flatten_rules();
     Ok(book.to_string())
+  })
+}
+
+#[test]
+fn type_inference() {
+  run_golden_test_dir(function_name!(), &|_, code| {
+    let mut book = parse_definition_book(code).map_err(|errs| {
+      let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
+      anyhow::anyhow!(msg)
+    })?;
+    book.check_rule_arities()?;
+    book.flatten_rules();
+    let (adts, def_types) = book.get_types_from_patterns()?;
+    let mut out = String::new();
+    out.push_str("Adts: [\n");
+    for (adt_id, adt) in adts.iter().sorted_by_key(|x| x.0) {
+      out.push_str(&format!("  {adt_id} => {adt}\n"));
+    }
+    out.push_str("]\nTypes: [\n");
+    for (def_id, def_types) in def_types.iter().enumerate() {
+      out.push_str(&format!(
+        "  {} => [{}]\n",
+        book.def_names.name(&DefId::from(def_id as Val)).unwrap(),
+        def_types.iter().map(|x| format!("{x:?}")).join(", "),
+      ));
+    }
+    out.push_str("]");
+    Ok(out)
   })
 }

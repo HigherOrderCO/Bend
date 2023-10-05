@@ -1,0 +1,5 @@
+Not (True) = False
+Not (False) = True
+
+And (True) b = b
+And (False) b = False

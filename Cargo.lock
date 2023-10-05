@@ -252,6 +252,7 @@ dependencies = [
  "logos",
  "pretty_assertions",
  "shrinkwraprs",
+ "stdext",
  "walkdir",
 ]
 
@@ -435,6 +436,12 @@ dependencies = [
  "psm",
  "winapi",
 ]
+
+[[package]]
+name = "stdext"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6f3b6b32ae82412fb897ef134867d53a294f57ba5b758f06d71e865352c3e207"
 
 [[package]]
 name = "strsim"

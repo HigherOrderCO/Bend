@@ -31,4 +31,5 @@ shrinkwraprs = "0.3.0"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
+stdext = "0.3.1"
 walkdir = "2.3.3"

@@ -1,0 +1,7 @@
+Adts: [
+  0 => [(True), (False)]
+]
+Types: [
+  Not => [Adt(0)]
+  And => [Adt(18446744073709551615), Any]
+]
