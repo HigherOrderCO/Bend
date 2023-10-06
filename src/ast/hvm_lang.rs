@@ -1,7 +1,7 @@
 use super::{DefId, Name};
 use bimap::{BiHashMap, Overwritten};
 use itertools::Itertools;
-use std::fmt::{self, Debug};
+use std::fmt;
 
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
@@ -122,8 +122,8 @@ impl DefNames {
     Default::default()
   }
 
-  pub fn name(&self, def_id: &DefId) -> Option<Name> {
-    self.map.get_by_left(def_id).cloned()
+  pub fn name(&self, def_id: &DefId) -> Option<&Name> {
+    self.map.get_by_left(def_id)
   }
 
   pub fn def_id(&self, name: &Name) -> Option<DefId> {
