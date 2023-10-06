@@ -3,6 +3,8 @@ use crate::ast::{hvm_lang::DefNames, Definition, DefinitionBook, Name, Rule, Ter
 impl DefinitionBook {
   /// Applies bracket abstraction to remove lambdas form rule bodies,
   /// replacing it with applications with [`combinators`][Combinator]
+  /// 
+  /// This pass generates non-sanitized rules, [`DefinitionBook::sanitize_vars`] should be called after
   pub fn detach_combinators(&mut self) {
     let mut comb = Vec::new();
 
