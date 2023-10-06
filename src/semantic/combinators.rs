@@ -17,7 +17,6 @@ impl DefinitionBook {
 }
 
 impl Term {
-  /// Navigate the term body in search for lambdas to abstract.
   pub fn abstract_lambdas(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
     fn go(term: &mut Term, depth: usize, names: &mut DefNames, defs: &mut Vec<Definition>) {
       match term {
@@ -68,13 +67,13 @@ impl Term {
   }
 
   /// Replaces a reference to a [`Term::Lam`] with its abstracted body.
-  /// If [`Term::channel_check`] finds the lambda variable inside a channel body,
+  /// If [`Term::channel_check`] finds a channel subterm with the lambda variable in its body,
   /// it returns the lambda without change
   fn abstract_lambda(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
     let extracted = std::mem::replace(self, Term::Era);
     let Self::Lam { nam: Some(name), bod } = extracted else { panic!("Not a lambda term") };
 
-    *self = if bod.channel_check(&name, false) {
+    *self = if bod.channel_check(&name) {
       Self::Lam { nam: Some(name), bod }
     } else {
       let mut abstracted = bod.abstract_by(&name);
@@ -83,7 +82,6 @@ impl Term {
     };
   }
 
-  /// Checks if the given name occurs as a variable inside the term
   fn occurs_check(&self, name: &str) -> bool {
     match self {
       Self::Var { nam: Name(n) } => n == name,
@@ -104,44 +102,49 @@ impl Term {
     }
   }
 
-  /// Checks if the given name occurs as a variable inside the body of a channel in the term
-  fn channel_check(&self, name: &str, inside_chn: bool) -> bool {
-    match self {
-      Self::Var { nam: Name(n) } => inside_chn && n == name,
-      Self::Lam { nam, bod } => {
-        !nam.as_ref().is_some_and(|Name(n)| n == name) && bod.channel_check(name, inside_chn)
-      }
-      Self::Chn { nam: _, bod } => bod.channel_check(name, true),
-      Self::App { fun, arg } => fun.channel_check(name, inside_chn) || arg.channel_check(name, inside_chn),
-      Self::Sup { fst, snd } => fst.channel_check(name, inside_chn) || snd.channel_check(name, inside_chn),
-      Self::Let { nam: Name(n), val, nxt } => {
-        val.channel_check(name, inside_chn) || (n != name && nxt.channel_check(name, inside_chn))
-      }
-
-      Self::Dup { fst, snd, val, nxt } => {
-        if val.occurs_check(name) {
-          if let Some(f) = fst {
-            if nxt.channel_check(f, inside_chn) {
-              return true;
-            };
-          }
-          if let Some(s) = snd {
-            if nxt.channel_check(s, inside_chn) {
-              return true;
-            };
-          }
+  /// Checks if the term has a [`Term::Chn`] subterm
+  /// with the given name occurring as a variable inside its body
+  fn channel_check(&self, name: &str) -> bool {
+    fn check(term: &Term, name: &str, inside_chn: bool) -> bool {
+      match term {
+        Term::Var { nam: Name(n) } => inside_chn && n == name,
+        Term::Lam { nam, bod } => {
+          !nam.as_ref().is_some_and(|Name(n)| n == name) && check(bod, name, inside_chn)
+        }
+        Term::Chn { nam: _, bod } => check(bod, name, true),
+        Term::App { fun, arg } => check(fun, name, inside_chn) || check(arg, name, inside_chn),
+        Term::Sup { fst, snd } => check(fst, name, inside_chn) || check(snd, name, inside_chn),
+        Term::Let { nam: Name(n), val, nxt } => {
+          check(val, name, inside_chn) || (n != name && check(nxt, name, inside_chn))
         }
 
-        val.channel_check(name, inside_chn)
-          || (!fst.as_ref().is_some_and(|Name(n)| n == name)
-            && !snd.as_ref().is_some_and(|Name(n)| n == name)
-            && nxt.channel_check(name, inside_chn))
-      }
+        Term::Dup { fst, snd, val, nxt } => {
+          if val.occurs_check(name) {
+            if let Some(f) = fst {
+              if check(nxt, f, inside_chn) {
+                return true;
+              };
+            }
+            if let Some(s) = snd {
+              if check(nxt, s, inside_chn) {
+                return true;
+              };
+            }
+          }
 
-      Self::Lnk { .. } => false,
-      Self::Ref { .. } => false,
-      Self::Era => false,
+          check(val, name, inside_chn)
+            || (!fst.as_ref().is_some_and(|Name(n)| n == name)
+              && !snd.as_ref().is_some_and(|Name(n)| n == name)
+              && check(nxt, name, inside_chn))
+        }
+
+        Term::Lnk { .. } => false,
+        Term::Ref { .. } => false,
+        Term::Era => false,
+      }
     }
+
+    check(self, name, false)
   }
 
   fn is_var(&self, name: &str) -> bool {
@@ -262,7 +265,6 @@ impl From<Combinator> for AbsTerm {
 }
 
 impl AbsTerm {
-  /// Checks if the given name occurs as a variable inside the AbsTerm
   fn occurs_check(&self, name: &str) -> bool {
     match self {
       Self::Term(term) => term.occurs_check(name),
@@ -313,8 +315,8 @@ impl AbsTerm {
     }
   }
 
-  /// Abstracted version of [`Term::abstract_by`].
-  /// Check the full function for more details.
+  /// Abstracted version of the abcdef implementation in [`Term::abstract_by`].
+  /// Check the full function for more details about the arms labels.
   fn abstract_by(self, name: &str) -> Self {
     match self {
       Self::Term(term) => term.abstract_by(name),
@@ -328,7 +330,7 @@ impl AbsTerm {
       // (c)
       Self::App(fun, box Self::Term(Term::Var { nam: Name(_) })) if !fun.occurs_check(name) => *fun,
 
-      // (d', c', f')
+      // (d', e', f')
       Self::App(box Self::App(fun, arg), arg2) if !fun.occurs_check(name) => {
         match (arg.occurs_check(name), arg2.occurs_check(name)) {
           (false, true) => AbsTerm::call(Combinator::B_, vec![*fun, *arg, arg2.abstract_by(name)]),
@@ -340,7 +342,7 @@ impl AbsTerm {
         }
       }
 
-      // (d, c, f)
+      // (d, e, f)
       Self::App(fun, arg) => match (fun.occurs_check(name), arg.occurs_check(name)) {
         (false, true) => AbsTerm::call(Combinator::B, vec![*fun, arg.abstract_by(name)]),
         (true, false) => AbsTerm::call(Combinator::C, vec![fun.abstract_by(name), *arg]),
@@ -364,7 +366,7 @@ impl Term {
 
       // If the lambda body contains a channel with the lambda variable inside,
       // we can not abstract it, so we just wrap it inside the AbsTerm
-      Self::Lam { nam: Some(ref n), ref bod } if bod.channel_check(n, false) => A::Term(self),
+      Self::Lam { nam: Some(ref n), ref bod } if bod.channel_check(n) => A::Term(self),
 
       // [name] Lam { n, bod } => [name] ([n] bod)
       Self::Lam { nam: Some(n), bod } => bod.abstract_by(&n).abstract_by(name),
@@ -374,7 +376,7 @@ impl Term {
 
       // [name] App { Lam { n, bod }, arg }
       Self::App { fun: box Self::Lam { nam: Some(n), bod }, arg } => {
-        if bod.channel_check(&n, false) {
+        if bod.channel_check(&n) {
           // (Lam { n, bod } ([name] arg))
           A::App(Box::new(A::Term(Self::Lam { nam: Some(n), bod })), Box::new(arg.abstract_by(name)))
         } else {
@@ -385,7 +387,7 @@ impl Term {
 
       // [name] App { fun, Lam { n, bod } }
       Self::App { fun, arg: box Self::Lam { nam: Some(n), bod } } => {
-        if bod.channel_check(&n, false) {
+        if bod.channel_check(&n) {
           // (([name] arg) Lam { n, bod })
           A::App(Box::new(fun.abstract_by(name)), Box::new(A::Term(Self::Lam { nam: Some(n), bod })))
         } else {
@@ -394,7 +396,10 @@ impl Term {
         }
       }
 
-      // abcdef branches starts here
+      // abcdef branches starts here.
+      // The abstraction function is represented by enclosing the abstraction variable with brackets.
+      // The abstracted variable cannot occur in terms E or F, but it has to occur in terms X and Y.
+      // Other symbols (S K I B C S' B' and C') represents the use of Combinators
 
       // (a)
       // [name] E => K E
@@ -414,7 +419,7 @@ impl Term {
           // (d')
           // [name] App { App { E, F }, X } => B' E F ([name] X)
           (false, true) => A::call(C::B_, vec![(*fun).into(), (*arg).into(), arg2.abstract_by(name)]),
-          // (c')
+          // (e')
           // [name] App { App { E, X }, F } => C' E ([name] X) F
           (true, false) => A::call(C::C_, vec![(*fun).into(), arg.abstract_by(name), (*arg2).into()]),
           // (f')
