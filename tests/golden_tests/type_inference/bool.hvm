@@ -1,5 +1,31 @@
 Not (True) = False
 Not (False) = True
 
-And (True) b = b
+Not2 (False) = True
+Not2 x = False
+
 And (False) b = False
+And (True) b = b
+
+Or (False) b = b
+Or (True) b = True
+
+//Or2 (True) b = True
+//Or2 a (True) = True
+
+Xor (True) (False) = True
+Xor (False) (True) = True
+Xor a b = False
+
+Xor2 (True) b = Not b
+Xor2 (False) b = b
+
+Xnor a b = Not (Xor a b)
+
+If (True)  t e = t
+If (False) t e = e
+
+If2 cond = cond
+
+//Andc (True) (False) = True
+//Andc a b = False

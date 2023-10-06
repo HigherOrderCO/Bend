@@ -2,6 +2,8 @@
 use crate::ast::{DefinitionBook, Name};
 
 pub mod combinators;
+/// Semantic passes for pattern matching on defiinition rules.
+/// Extract ADTs from patterns in a book, then convert them into lambda calculus.
 pub mod pattern;
 pub mod vars;
 

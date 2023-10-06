@@ -1,7 +1,8 @@
+use super::{Adt, AdtId, Type};
 use crate::ast::{hvm_lang::Pattern, DefId, Definition, DefinitionBook, Name};
 use anyhow::anyhow;
 use itertools::Itertools;
-use std::{collections::HashMap, fmt};
+use std::collections::HashMap;
 
 impl DefinitionBook {
   /// Infers ADTs from the patterns of the rules in a book.
@@ -10,18 +11,26 @@ impl DefinitionBook {
   /// These could be same name in different types, different arities or mixing numbers and ADTs.
   /// Precondition: Rules have been flattened, rule arity is correct.
   pub fn get_types_from_patterns(&self) -> anyhow::Result<(HashMap<AdtId, Adt>, Vec<Vec<Type>>)> {
+    // TODO: This algorithm does a lot of unnecessary copying, checking and moving around of data.
+    // There's a lot of space for optimizing.
+
+    // The infered ADTs, possibly shared between multiple defs
     let mut adts: HashMap<AdtId, Adt> = HashMap::new();
+    // The types of each pattern in each def.
+    let mut types: Vec<Vec<Type>> = vec![];
+    // Control
     let mut pats_using_adt: HashMap<AdtId, Vec<(DefId, usize)>> = HashMap::new();
     let mut ctr_name_to_adt: HashMap<Name, AdtId> = HashMap::new();
-    let mut types: Vec<Vec<Type>> = vec![]; // The type of each 
     let mut adt_counter = 0;
+
     for def in &self.defs {
       let pat_types = get_types_from_def_patterns(def)?;
       // Check if the types in this def share some ctr names with previous types.
-      // Try to merge them if they do
+      // Try to merge them if they do.
       for (i, typ) in pat_types.iter().enumerate() {
         if let Type::Adt(_) = typ {
           let mut crnt_adt = def.get_adt_from_pat(i)?;
+          eprintln!("crnt_adt: {crnt_adt}");
           // Gather the existing types that share constructor names.
           // We will try to merge them all together.
           let mut to_merge = vec![];
@@ -44,6 +53,7 @@ impl DefinitionBook {
             // All the other adts are removed in favor of the merged one that has all the constructors.
             // The control variables are updated to now point everything to the merged adt.
             let dest_id = to_merge[0];
+            pats_using_adt.get_mut(&dest_id).unwrap().push((def.def_id, i));
             for to_merge in to_merge {
               merge_adts(
                 &mut crnt_adt,
@@ -69,35 +79,6 @@ impl DefinitionBook {
       }
     }
     Ok((adts, types))
-  }
-}
-
-#[derive(Debug, Clone)]
-pub enum Type {
-  Any,
-  Adt(AdtId),
-  #[cfg(feature = "nums")]
-  U32,
-  #[cfg(feature = "nums")]
-  I32,
-}
-
-type AdtId = usize;
-
-#[derive(Debug, Clone, PartialEq, Default)]
-pub struct Adt {
-  // Constructor names and their arities
-  ctrs: HashMap<Name, usize>,
-  others: bool,
-}
-
-impl Adt {
-  pub fn from_ctr(nam: Name, arity: usize) -> Self {
-    Adt { ctrs: HashMap::from_iter([(nam, arity)]), others: false }
-  }
-
-  pub fn new() -> Self {
-    Default::default()
   }
 }
 
@@ -127,7 +108,9 @@ impl Definition {
           if let Some(expected_arity) = adt.ctrs.get(nam) {
             if *expected_arity == self.arity() {
             } else {
-              return Err(anyhow::anyhow!("Inconsistent arity used for constructor {nam}"));
+              return Err(anyhow::anyhow!(
+                "Inconsistent arity used for constructor {nam} across different rules for the same definition argument"
+              ));
             }
           } else {
             adt.ctrs.insert(nam.clone(), args.len());
@@ -150,45 +133,40 @@ fn merge_adts(
   pats_using_adt: &mut HashMap<AdtId, Vec<(DefId, usize)>>,
   ctr_name_to_adt: &mut HashMap<Name, AdtId>,
 ) -> anyhow::Result<()> {
+  let adts2 = adts.clone();
   let other_adt = adts.get_mut(&other_id).unwrap();
-  if this_adt != other_adt {
-    let accept_different = this_adt.others || other_adt.others;
-    if accept_different {
-      this_adt.others = accept_different;
-      for (ctr_name, ctr_arity) in &other_adt.ctrs {
-        *ctr_name_to_adt.get_mut(ctr_name).unwrap() = this_id;
-        if let Some(old_arity) = this_adt.ctrs.get(ctr_name) {
-          if old_arity != ctr_arity {
-            return Err(anyhow!("Inconsistent arity used for constructor {ctr_name}"));
-          }
-        } else {
-          this_adt.ctrs.insert(ctr_name.clone(), *ctr_arity);
-        }
+
+  // If all constructors of the other ADT are known, check that this ADT doesn't have any extra constructors.
+  // Also check arity of shared constructors.
+  for (ctr_name, this_arity) in &this_adt.ctrs {
+    if let Some(other_arity) = other_adt.ctrs.get(ctr_name) {
+      if this_arity != other_arity {
+        return Err(anyhow!(
+          "Inconsistent arity used for constructor {ctr_name} across different definition arguments"
+        ));
       }
-    } else {
-      return Err(anyhow!("Found same constructor being used in incompatible types"));
+    } else if !other_adt.others {
+      eprintln!("Adts: {{{}}}", adts2.iter().map(|(a, b)| format!("{a} => {b}")).join(", "));
+      return Err(anyhow!("Found same constructor {ctr_name} being used in incompatible types {this_adt} and {other_adt}"));
     }
   }
+  // If not all constructors of this ADT are known, move any new constructors from the other ADT to this one.
+  if this_adt.others {
+    for (ctr_name, other_arity) in &other_adt.ctrs {
+      if !other_adt.ctrs.contains_key(ctr_name) {
+        this_adt.ctrs.insert(ctr_name.clone(), *other_arity);
+      }
+    }
+  }
+  this_adt.others = this_adt.others && other_adt.others;
   if this_id != other_id {
+    for ctr_name in other_adt.ctrs.keys() {
+      *ctr_name_to_adt.get_mut(ctr_name).unwrap() = this_id;
+    }
     let mut moved_pats = pats_using_adt.remove(&other_id).unwrap();
     pats_using_adt.get_mut(&this_id).unwrap().append(&mut moved_pats);
     adts.remove(&other_id);
   }
 
   Ok(())
-}
-
-impl fmt::Display for Adt {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(
-      f,
-      "[{}{}]",
-      self
-        .ctrs
-        .iter()
-        .map(|(nam, arity)| format!("({}{})", nam, (0 .. *arity).map(|_| format!(" _")).join("")))
-        .join(", "),
-      if self.others { ", ..." } else { "" }
-    )
-  }
 }

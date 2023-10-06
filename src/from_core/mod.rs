@@ -18,10 +18,6 @@ pub fn readback_net(net: &LNet) -> anyhow::Result<(Term, bool)> {
   Ok(readback)
 }
 
-fn check_lnet_valid(net: &LNet) -> anyhow::Result<()> {
-  todo!()
-}
-
 fn core_net_to_compat(lnet: &LNet) -> anyhow::Result<INet> {
   let inodes = lnet_to_inodes(lnet);
   let compat_net = inodes_to_inet(&inodes);
