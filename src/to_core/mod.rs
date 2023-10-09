@@ -2,7 +2,7 @@ pub mod compat_net;
 
 use self::compat_net::{compat_net_to_core, term_to_compat_net};
 use crate::ast::{core::Book, DefId, Definition, DefinitionBook, Name, Term};
-use hvm_core::{lnet_to_net, LNet};
+use hvmc::{lnet_to_net, LNet};
 use std::collections::HashMap;
 
 pub fn book_to_hvm_core(book: &DefinitionBook) -> anyhow::Result<Book> {
@@ -26,12 +26,12 @@ pub fn term_to_hvm_core(term: &Term) -> anyhow::Result<LNet> {
   compat_net_to_core(&compat_net)
 }
 
-pub fn book_to_hvm_internal(book: &Book, mem_size: usize) -> anyhow::Result<(hvm_core::Net, hvm_core::Book)> {
+pub fn book_to_hvm_internal(book: &Book, mem_size: usize) -> anyhow::Result<(hvmc::Net, hvmc::Book)> {
   // TODO: Don't try to preallocate a huge buffer
-  let mut root = hvm_core::Net::new(mem_size);
+  let mut root = hvmc::Net::new(mem_size);
   root.boot(book.main.to_internal()); // TODO: Don't use this workaround
 
-  let mut hvm_book = hvm_core::Book::new();
+  let mut hvm_book = hvmc::Book::new();
   book.defs.iter().for_each(|(&def_id, term)| {
     hvm_book.def(def_id.to_internal(), lnet_to_net(term, None).to_def());
   });

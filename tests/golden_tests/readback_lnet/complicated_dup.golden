@@ -1,1 +1,2 @@
-dup c f = a; dup d g = (b e); λa (λb (c d) λe (f g))
+Invalid readback:
+dup a c = ...; dup h b = ...; dup f d = g; dup g e = {{f {... ...}} ...}; {{{a b} {c d}} e}

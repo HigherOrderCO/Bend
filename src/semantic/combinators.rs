@@ -135,9 +135,7 @@ impl Term {
         Term::Era => true,
 
         #[cfg(feature = "nums")]
-        Term::U32 { .. } => true,
-        #[cfg(feature = "nums")]
-        Term::I32 { .. } => true,
+        Term::Num { .. } => true,
         #[cfg(feature = "nums")]
         Term::Opx { .. } => true,
       }

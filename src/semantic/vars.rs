@@ -1,5 +1,5 @@
 use crate::ast::{hvm_lang::DefNames, var_id_to_name, DefinitionBook, Name, Term};
-use hvm_core::Val;
+use hvmc::Val;
 use std::collections::HashMap;
 
 /// For all var declarations:
@@ -118,7 +118,7 @@ fn check_uses(term: &Term, def_names: &DefNames) -> anyhow::Result<()> {
         go(snd, scope, globals, def_names)?;
       }
       #[cfg(feature = "nums")]
-      Term::U32 { .. } | Term::I32 { .. } => (),
+      Term::Num { .. } => (),
     }
     Ok(())
   }

@@ -147,7 +147,9 @@ fn merge_adts(
       }
     } else if !other_adt.others {
       eprintln!("Adts: {{{}}}", adts2.iter().map(|(a, b)| format!("{a} => {b}")).join(", "));
-      return Err(anyhow!("Found same constructor {ctr_name} being used in incompatible types {this_adt} and {other_adt}"));
+      return Err(anyhow!(
+        "Found same constructor {ctr_name} being used in incompatible types {this_adt} and {other_adt}"
+      ));
     }
   }
   // If not all constructors of this ADT are known, move any new constructors from the other ADT to this one.

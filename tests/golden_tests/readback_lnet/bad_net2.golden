@@ -1,2 +1,2 @@
 Invalid readback:
-λa ({... a} ...)
+dup d a = ...; dup c b = {c ...}; {a b}

@@ -3,13 +3,14 @@ use crate::ast::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
     SlotId, CON, DUP, ERA, LABEL_MASK, REF, ROOT, TAG_MASK,
   },
+  hvm_lang::Op,
   var_id_to_name, DefId, Name, Term,
 };
-use hvm_core::{LNet, LTree, Val};
+use hvmc::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
 
 #[cfg(feature = "nums")]
-use crate::ast::compat::{label_to_op, op_to_label, NUMOP, NUM_I32, NUM_U32};
+use crate::ast::compat::{label_to_op, NUM, OP2};
 
 pub fn readback_net(net: &LNet) -> anyhow::Result<(Term, bool)> {
   /* check_lnet_valid(net)?; */
@@ -75,8 +76,8 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         let var = new_var(n_vars);
         inodes.push(INode { kind: ERA, ports: [subtree_root, var.clone(), var] });
       }
-      LTree::Nod { tag, lft, rgt } => {
-        let kind = if *tag == hvm_core::CON { CON } else { DUP | (*tag - hvm_core::DUP) as NodeKind };
+      LTree::Ctr { lab, lft, rgt } => {
+        let kind = if *lab == hvmc::CT0 { CON } else { DUP | *lab as NodeKind };
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
@@ -88,24 +89,19 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
       #[cfg(feature = "nums")]
-      LTree::U32 { val } => {
-        let kind = NUM_U32 | (*val as NodeKind);
+      LTree::Num { val } => {
+        let kind = NUM | (*val as NodeKind);
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
       #[cfg(feature = "nums")]
-      LTree::I32 { val } => {
-        let kind = NUM_I32 | (*val as u32 as NodeKind);
-        let var = new_var(n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
-      }
-      #[cfg(feature = "nums")]
-      LTree::OpX { opx, lft, rgt } => {
-        let kind = NUMOP | op_to_label(*opx);
+      LTree::Op2 { lft, rgt } => {
+        let kind = OP2;
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
       }
+      LTree::Ite { .. } => todo!(),
     }
   }
   inodes
@@ -166,7 +162,6 @@ fn readback_compat(net: &INet) -> (Term, bool) {
     if seen.contains(&next) {
       return (Term::Var { nam: Name::new("...") }, false);
     }
-
     seen.insert(next);
 
     let node = addr(next);
@@ -234,26 +229,42 @@ fn readback_compat(net: &INet) -> (Term, bool) {
         _ => unreachable!(),
       },
       #[cfg(feature = "nums")]
-      NUM_U32 => (Term::U32 { val: label as u32 }, true),
+      NUM => (Term::Num { val: label as u32 }, true),
       #[cfg(feature = "nums")]
-      NUM_I32 => (Term::I32 { val: label as u32 as i32 }, true),
-      #[cfg(feature = "nums")]
-      NUMOP => match slot(next) {
+      OP2 => match slot(next) {
         2 => {
           seen.insert(port(node, 0));
           seen.insert(port(node, 1));
-          let op = label_to_op(label);
-          let fst = enter(net, port(node, 0));
-          let (fst, fst_valid) = reader(net, fst, var_port_to_name, dups_vec, dups_set, seen);
-          let snd = enter(net, port(node, 1));
-          let (snd, snd_valid) = reader(net, snd, var_port_to_name, dups_vec, dups_set, seen);
-          let valid = fst_valid && snd_valid;
-          (Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) }, valid)
+          let op_port = enter(net, port(node, 0));
+          let (op_term, op_valid) = reader(net, op_port, var_port_to_name, dups_vec, dups_set, seen);
+          let arg_port = enter(net, port(node, 1));
+          let (arg_term, fst_valid) = reader(net, arg_port, var_port_to_name, dups_vec, dups_set, seen);
+          let valid = op_valid && fst_valid;
+          match op_term {
+            Term::Num { val } => {
+              let (val, op) = split_num_with_op(val);
+              if let Some(op) = op {
+                (Term::Opx { op, fst: Box::new(Term::Num { val }), snd: Box::new(arg_term) }, valid)
+              } else {
+                // TODO: is this possible?
+                todo!()
+              }
+            }
+            Term::Opx { op, fst: _, snd } => (Term::Opx { op, fst: snd, snd: Box::new(arg_term) }, valid),
+            // TODO: Actually unreachable?
+            _ => unreachable!(),
+          }
         }
         _ => unreachable!(),
       },
       _ => unreachable!(),
     }
+  }
+
+  fn split_num_with_op(num: Val) -> (Val, Option<Op>) {
+    let op = label_to_op(num >> 24);
+    let num = num & ((1 << 24) - 1);
+    (num, op)
   }
 
   // A hashmap linking ports to binder names. Those ports have names:

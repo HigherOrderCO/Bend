@@ -1,5 +1,5 @@
 use super::{hvm_lang::DefNames, DefId};
-use hvm_core::{show_lnet, val_to_name, LNet};
+use hvmc::{show_lnet, val_to_name, LNet};
 use itertools::Itertools;
 use std::collections::HashMap;
 
@@ -16,7 +16,7 @@ impl Book {
       .sorted_unstable_by_key(|(id, _)| *id)
       .map(|(id, net)| {
         format!(
-          "{} ({}) =\n{}",
+          "@{} ({}) =\n{}",
           val_to_name(id.to_internal()),
           def_names.name(id).unwrap(),
           show_lnet(net).split('\n').map(|x| format!("  {x}")).join("\n")

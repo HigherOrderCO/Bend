@@ -1,2 +1,2 @@
 Invalid readback:
-dup c d = a; λa λb c
+dup b a = ...; {{a b} {... ...}}

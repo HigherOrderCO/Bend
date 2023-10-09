@@ -23,10 +23,7 @@ pub enum Token {
   Equals,
 
   #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
-  Unsigned(u32),
-
-  #[regex("[+-][0-9]+", |lex| lex.slice().parse().ok())]
-  Signed(i32),
+  Num(u32),
 
   #[token("+")]
   Add,
@@ -43,10 +40,13 @@ pub enum Token {
   #[token("%")]
   Mod,
 
-  #[token("&&")]
+  #[token("~")]
+  Tilde,
+
+  #[token("&")]
   And,
 
-  #[token("||")]
+  #[token("|")]
   Or,
 
   #[token("^")]
@@ -61,15 +61,13 @@ pub enum Token {
   #[token("<")]
   Ltn,
 
-  #[token("<=")]
-  Lte,
-
+  // #[token("<=")]
+  // Lte,
   #[token(">")]
   Gtn,
 
-  #[token(">=")]
-  Gte,
-
+  // #[token(">=")]
+  // Gte,
   #[token("==")]
   EqualsEquals,
 
@@ -156,22 +154,22 @@ impl fmt::Display for Token {
       Self::Let => write!(f, "let"),
       Self::Dup => write!(f, "dup"),
       Self::Equals => write!(f, "="),
-      Self::Unsigned(num) => write!(f, "{num}"),
-      Self::Signed(num) => write!(f, "{num:+}"),
+      Self::Num(num) => write!(f, "{num}"),
       Self::Add => write!(f, "+"),
       Self::Sub => write!(f, "-"),
       Self::Asterisk => write!(f, "*"),
       Self::Div => write!(f, "/"),
       Self::Mod => write!(f, "%"),
+      Self::Tilde => write!(f, "~"),
       Self::And => write!(f, "&"),
       Self::Or => write!(f, "|"),
       Self::Xor => write!(f, "^"),
       Self::Shl => write!(f, "<<"),
       Self::Shr => write!(f, ">>"),
       Self::Ltn => write!(f, "<"),
-      Self::Lte => write!(f, "<="),
+      // Self::Lte => write!(f, "<="),
       Self::Gtn => write!(f, ">"),
-      Self::Gte => write!(f, ">="),
+      // Self::Gte => write!(f, ">="),
       Self::NotEquals => write!(f, "!="),
       Self::EqualsEquals => write!(f, "=="),
       Self::Semicolon => write!(f, ";"),

@@ -11,7 +11,7 @@ name = "hvm-lang"
 required-features = ["cli"]
 
 [features]
-default = ["cli"]
+default = ["cli", "nums"]
 cli = ["dep:clap", "dep:byte-unit"]
 nums = []
 
@@ -20,11 +20,11 @@ anyhow = "1.0.72"
 ariadne = "0.3.0"
 bimap = "0.6.3"
 byte-unit = { version = "4.0.19", optional = true }
-chumsky = "1.0.0-alpha.4"
+chumsky = "= 1.0.0-alpha.4"
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 derive_more = "0.99.17"
 hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core.git" }
-#hvm-core = { path = "../hvm-core/rust" }
+#hvmc = { path = "../hvm-core/" }
 itertools = "0.11.0"
 logos = "0.13.0"
 shrinkwraprs = "0.3.0"

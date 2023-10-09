@@ -1,4 +1,3 @@
-use hvm_core::{parse_lnet, show_lnet, Val};
 use hvm_lang::{
   ast::DefId,
   compile_book,
@@ -8,6 +7,7 @@ use hvm_lang::{
   run_book,
   to_core::term_to_hvm_core,
 };
+use hvmc::{parse_lnet, show_lnet, Val};
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::{
@@ -121,7 +121,7 @@ fn run_single_files() {
 #[test]
 fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|_, code| {
-    let lnet = parse_lnet(&mut code.chars().peekable());
+    let lnet = parse_lnet(&mut code.chars().peekable()).map_err(|e| anyhow::anyhow!(e))?;
     let def_names = Default::default();
     let (term, valid) = readback_net(&lnet)?;
     if valid {

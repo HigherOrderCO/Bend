@@ -3,9 +3,6 @@ use bimap::{BiHashMap, Overwritten};
 use itertools::Itertools;
 use std::fmt;
 
-#[cfg(feature = "nums")]
-use hvm_core::{opx_to_string, OP};
-
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
   map: BiHashMap<DefId, Name>,
@@ -36,9 +33,7 @@ pub enum Pattern {
   Ctr(Name, Vec<Pattern>),
   Var(Option<Name>),
   #[cfg(feature = "nums")]
-  U32(u32),
-  #[cfg(feature = "nums")]
-  I32(i32),
+  Num(u32),
 }
 
 #[derive(Debug, Clone)]
@@ -83,20 +78,35 @@ pub enum Term {
   },
   Era,
   #[cfg(feature = "nums")]
-  U32 {
+  Num {
     val: u32,
-  },
-  #[cfg(feature = "nums")]
-  I32 {
-    val: i32,
   },
   #[cfg(feature = "nums")]
   /// A numeric operation between built-in numbers.
   Opx {
-    op: OP,
+    op: Op,
     fst: Box<Term>,
     snd: Box<Term>,
   },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Op {
+  ADD,
+  SUB,
+  MUL,
+  DIV,
+  MOD,
+  EQ,
+  NE,
+  LT,
+  GT,
+  AND,
+  OR,
+  XOR,
+  NOT,
+  LSH,
+  RSH,
 }
 
 impl DefinitionBook {
@@ -160,12 +170,10 @@ impl Term {
       Term::Sup { fst, snd } => format!("{{{} {}}}", fst.to_string(def_names), snd.to_string(def_names)),
       Term::Era => "*".to_string(),
       #[cfg(feature = "nums")]
-      Term::U32 { val } => format!("{val}"),
-      #[cfg(feature = "nums")]
-      Term::I32 { val } => format!("{val:+}"),
+      Term::Num { val } => format!("{val}"),
       #[cfg(feature = "nums")]
       Term::Opx { op, fst, snd } => {
-        format!("({} {} {})", opx_to_string(op), fst.to_string(def_names), snd.to_string(def_names))
+        format!("({} {} {})", op, fst.to_string(def_names), snd.to_string(def_names))
       }
     }
   }
@@ -207,6 +215,13 @@ impl Term {
         snd.subst(from, to);
       }
       Term::Era => (),
+      #[cfg(feature = "nums")]
+      Term::Num { .. } => (),
+      #[cfg(feature = "nums")]
+      Term::Opx { fst, snd, .. } => {
+        fst.subst(from, to);
+        snd.subst(from, to);
+      }
     }
   }
 }
@@ -243,9 +258,7 @@ impl From<&Pattern> for Term {
       Pattern::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
       Pattern::Var(nam) => Term::Var { nam: Name::new(nam.as_ref().map(|x| x.as_str()).unwrap_or("_")) },
       #[cfg(feature = "nums")]
-      Pattern::U32(num) => Term::U32 { num },
-      #[cfg(feature = "nums")]
-      Pattern::I32(num) => Term::I32 { num },
+      Pattern::Num(num) => Term::Num { val: *num },
     }
   }
 }
@@ -262,9 +275,29 @@ impl fmt::Display for Pattern {
       Pattern::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
       Pattern::Var(nam) => write!(f, "{}", nam.as_ref().map(|x| x.as_str()).unwrap_or("*")),
       #[cfg(feature = "nums")]
-      Pattern::U32(num) => write!(f, "{num}"),
-      #[cfg(feature = "nums")]
-      Pattern::I32(num) => write!(f, "{num:+}"),
+      Pattern::Num(num) => write!(f, "{num}"),
+    }
+  }
+}
+
+impl fmt::Display for Op {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Op::ADD => write!(f, "+"),
+      Op::SUB => write!(f, "-"),
+      Op::MUL => write!(f, "*"),
+      Op::DIV => write!(f, "/"),
+      Op::MOD => write!(f, "%"),
+      Op::EQ => write!(f, "=="),
+      Op::NE => write!(f, "!="),
+      Op::LT => write!(f, "<"),
+      Op::GT => write!(f, ">"),
+      Op::AND => write!(f, "&"),
+      Op::OR => write!(f, "|"),
+      Op::XOR => write!(f, "^"),
+      Op::NOT => write!(f, "~"),
+      Op::LSH => write!(f, "<<"),
+      Op::RSH => write!(f, ">>"),
     }
   }
 }

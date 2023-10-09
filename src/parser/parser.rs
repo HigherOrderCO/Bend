@@ -18,7 +18,7 @@ use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range};
 
 #[cfg(feature = "nums")]
-use hvm_core::OP;
+use crate::ast::hvm_lang::Op;
 
 // TODO: Pattern matching on rules
 // TODO: Other types of numbers
@@ -100,27 +100,26 @@ where
 }
 
 #[cfg(feature = "nums")]
-fn num_oper<'a, I>() -> impl Parser<'a, I, OP, extra::Err<Rich<'a, Token>>>
+fn num_oper<'a, I>() -> impl Parser<'a, I, Op, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   select! {
-    Token::Add => OP::ADD,
-    Token::Sub => OP::SUB,
-    Token::Asterisk => OP::MUL,
-    Token::Div => OP::DIV,
-    Token::Mod => OP::MOD,
-    Token::And => OP::AND,
-    Token::Or => OP::OR,
-    // Token::Xor => Opr::Xor,
-    // Token::Shl => Opr::Shl,
-    // Token::Shr => Opr::Shr,
-    Token::Lte => OP::LTE,
-    Token::Ltn => OP::LT,
-    Token::Gte => OP::GTE,
-    Token::Gtn => OP::GT,
-    Token::EqualsEquals => OP::EQ,
-    Token::NotEquals => OP::NEQ,
+    Token::Add => Op::ADD,
+    Token::Sub => Op::SUB,
+    Token::Asterisk => Op::MUL,
+    Token::Div => Op::DIV,
+    Token::Mod => Op::MOD,
+    Token::EqualsEquals => Op::EQ,
+    Token::NotEquals => Op::NE,
+    Token::Ltn => Op::LT,
+    Token::Gtn => Op::GT,
+    Token::And => Op::AND,
+    Token::Or => Op::OR,
+    Token::Xor => Op::XOR,
+    Token::Tilde => Op::NOT,
+    Token::Shl => Op::LSH,
+    Token::Shr => Op::RSH,
   }
 }
 
@@ -134,9 +133,7 @@ where
   let term_sep = choice((just(Token::NewLine), just(Token::Semicolon)));
 
   #[cfg(feature = "nums")]
-  let unsigned = select!(Token::Unsigned(num) => Term::U32{val: num});
-  #[cfg(feature = "nums")]
-  let signed = select!(Token::Signed(num) => Term::I32{val: num});
+  let unsigned = select!(Token::Num(num) => Term::Num{val: num});
 
   recursive(|term| {
     // λx body
@@ -213,7 +210,7 @@ where
 
     #[cfg(feature = "nums")]
     {
-      choice((global_var, var, unsigned, signed, global_lam, lam, dup, let_, num_op, app))
+      choice((global_var, var, unsigned, global_lam, lam, dup, let_, num_op, app))
     }
 
     #[cfg(not(feature = "nums"))]
@@ -236,13 +233,11 @@ where
     let var = name_or_era().map(Pattern::Var).boxed();
 
     #[cfg(feature = "nums")]
-    let unsigned = select!(Token::Unsigned(num) => Pattern::U32(num)).boxed();
-    #[cfg(feature = "nums")]
-    let signed = select!(Token::Signed(num) => Pattern::I32(num)).boxed();
+    let num = select!(Token::Num(num) => Pattern::Num(num)).boxed();
 
     #[cfg(feature = "nums")]
     {
-      choice((ctr, unsigned, signed, var))
+      choice((ctr, num, var))
     }
     #[cfg(not(feature = "nums"))]
     {

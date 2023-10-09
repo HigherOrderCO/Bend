@@ -5,7 +5,7 @@ pub mod hvm_lang;
 pub use hvm_lang::{Definition, DefinitionBook, Rule, Term};
 
 use derive_more::{Display, From, Into};
-use hvm_core::Val;
+use hvmc::Val;
 use shrinkwraprs::Shrinkwrap;
 
 #[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]

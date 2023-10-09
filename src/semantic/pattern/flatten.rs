@@ -2,7 +2,7 @@ use crate::ast::{
   hvm_lang::{DefNames, Pattern},
   DefId, Definition, DefinitionBook, Name, Rule, Term,
 };
-use hvm_core::Val;
+use hvmc::Val;
 use std::collections::HashSet;
 
 impl DefinitionBook {
@@ -62,7 +62,7 @@ fn must_split(rule: &Rule) -> bool {
           return true;
         }
         #[cfg(feature = "nums")]
-        if matches!(arg, Pattern::U32(..) | Pattern::I32(..)) {
+        if matches!(arg, Pattern::Num(..)) {
           return true;
         }
       }
@@ -87,9 +87,9 @@ fn matches_together(a: &Rule, b: &Rule) -> bool {
         break;
       }
       #[cfg(feature = "nums")]
-      (Pattern::U32(a), Pattern::U32(b)) | (Pattern::I32(a), Pattern::I32(b)) if a == b => (),
+      (Pattern::Num(a), Pattern::Num(b)) if a == b => (),
       #[cfg(feature = "nums")]
-      (Pattern::U32(a), Pattern::U32(b)) | (Pattern::I32(a), Pattern::I32(b)) => {
+      (Pattern::Num(..), Pattern::Num(..)) => {
         a_implies_b = false;
         break;
       }
@@ -177,10 +177,12 @@ fn make_split_def(
             new_rule_pats.push(other_pat.clone());
           }
           #[cfg(feature = "nums")]
-          (Pattern::U32(..), Pattern::U32(..)) | (Pattern::I32(..), Pattern::I32(..)) => (),
+          (Pattern::Num(..), Pattern::Num(..)) => (),
           #[cfg(feature = "nums")]
-          (Pattern::U32(..) | Pattern::I32(..), Pattern::Var(name)) => {
-            new_rule_body.subst(name, rule_pat);
+          (Pattern::Num(num), Pattern::Var(name)) => {
+            if let Some(name) = name {
+              new_rule_body.subst(name, &Term::Num { val: *num });
+            }
           }
           #[cfg(feature = "nums")]
           // Not possible since we know it matches
@@ -223,7 +225,7 @@ fn make_rule_calling_split(old_rule: &Rule, new_def_id: DefId) -> Rule {
             }
             Pattern::Var(..) => field.clone(),
             #[cfg(feature = "nums")]
-            Pattern::U32(..) | Pattern::I32(..) => {
+            Pattern::Num(..) => {
               let nam = Name(format!(".x{}", var_count));
               var_count += 1;
               Pattern::Var(Some(nam))
@@ -236,7 +238,7 @@ fn make_rule_calling_split(old_rule: &Rule, new_def_id: DefId) -> Rule {
         old_rule_pats.push(Pattern::Ctr(name.clone(), new_pat_args));
       }
       #[cfg(feature = "nums")]
-      Pattern::U32(..) | Pattern::I32(..) => {
+      Pattern::Num(..) => {
         old_rule_pats.push(pat.clone());
       }
     }

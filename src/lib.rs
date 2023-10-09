@@ -9,7 +9,7 @@ pub mod to_core;
 
 use ast::{core::Book, hvm_lang::DefNames, DefinitionBook, Term};
 use from_core::readback_net;
-use hvm_core::{readback_lnet, LNet};
+use hvmc::{readback_lnet, LNet};
 use semantic::check_main;
 use std::time::Instant;
 use to_core::{book_to_hvm_core, book_to_hvm_internal};

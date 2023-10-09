@@ -1,6 +1,8 @@
 // TODO: Refactor to not use this intermediate form
 
-use hvm_core::Val;
+#[cfg(feature = "nums")]
+use super::hvm_lang::Op;
+use hvmc::Val;
 
 #[derive(Clone, Debug)]
 /// Net representation used only as an intermediate for converting to hvm-core format
@@ -15,15 +17,14 @@ pub type SlotId = Val;
 
 /// The ROOT port is on the deadlocked root node at address 0.
 pub const ROOT: Port = 1;
-pub const TAG_WIDTH: u32 = 16; // TODO: Make this generic over the HVM type.
+pub const TAG_WIDTH: u32 = 4; // TODO: Make this generic over the HVM type.
 pub const TAG: u32 = Val::BITS - TAG_WIDTH;
 pub const ERA: NodeKind = 0 << TAG;
 pub const CON: NodeKind = 1 << TAG;
 pub const DUP: NodeKind = 2 << TAG;
 pub const REF: NodeKind = 3 << TAG;
-pub const NUM_U32: NodeKind = 4 << TAG;
-pub const NUM_I32: NodeKind = 5 << TAG;
-pub const NUMOP: NodeKind = 6 << TAG;
+pub const NUM: NodeKind = 4 << TAG;
+pub const OP2: NodeKind = 6 << TAG;
 pub const LABEL_MASK: NodeKind = (1 << TAG) - 1;
 pub const TAG_MASK: NodeKind = !LABEL_MASK;
 
@@ -81,43 +82,44 @@ pub struct INode {
 pub type INodes = Vec<INode>;
 
 #[cfg(feature = "nums")]
-use hvm_core::OP;
-
-#[cfg(feature = "nums")]
-pub fn op_to_label(value: OP) -> NodeKind {
+pub fn op_to_label(value: Op) -> NodeKind {
   match value {
-    OP::ADD => 0x0,
-    OP::SUB => 0x1,
-    OP::MUL => 0x2,
-    OP::DIV => 0x3,
-    OP::MOD => 0x4,
-    OP::EQ => 0x5,
-    OP::NEQ => 0x6,
-    OP::LT => 0x7,
-    OP::GT => 0x8,
-    OP::LTE => 0x9,
-    OP::GTE => 0xa,
-    OP::AND => 0xb,
-    OP::OR => 0xc,
+    Op::ADD => 0x1,
+    Op::SUB => 0x2,
+    Op::MUL => 0x3,
+    Op::DIV => 0x4,
+    Op::MOD => 0x5,
+    Op::EQ => 0x6,
+    Op::NE => 0x7,
+    Op::LT => 0x8,
+    Op::GT => 0x9,
+    Op::AND => 0xa,
+    Op::OR => 0xb,
+    Op::XOR => 0xc,
+    Op::NOT => 0xd,
+    Op::LSH => 0xe,
+    Op::RSH => 0xf,
   }
 }
 
 #[cfg(feature = "nums")]
-pub fn label_to_op(value: NodeKind) -> OP {
+pub fn label_to_op(value: NodeKind) -> Option<Op> {
   match value {
-    0x0 => OP::ADD,
-    0x1 => OP::SUB,
-    0x2 => OP::MUL,
-    0x3 => OP::DIV,
-    0x4 => OP::MOD,
-    0x5 => OP::EQ,
-    0x6 => OP::NEQ,
-    0x7 => OP::LT,
-    0x8 => OP::GT,
-    0x9 => OP::LTE,
-    0xa => OP::GTE,
-    0xb => OP::AND,
-    0xc => OP::OR,
-    _ => unreachable!(),
+    0x1 => Some(Op::ADD),
+    0x2 => Some(Op::SUB),
+    0x3 => Some(Op::MUL),
+    0x4 => Some(Op::DIV),
+    0x5 => Some(Op::MOD),
+    0x6 => Some(Op::EQ),
+    0x7 => Some(Op::NE),
+    0x8 => Some(Op::LT),
+    0x9 => Some(Op::GT),
+    0xa => Some(Op::AND),
+    0xb => Some(Op::OR),
+    0xc => Some(Op::XOR),
+    0xd => Some(Op::NOT),
+    0xe => Some(Op::LSH),
+    0xf => Some(Op::RSH),
+    _ => None,
   }
 }

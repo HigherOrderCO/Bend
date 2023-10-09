@@ -1,8 +1,8 @@
 #![feature(slice_group_by)]
 
 use clap::{Parser, ValueEnum};
-use hvm_core::show_lnet;
 use hvm_lang::{check_book, compile_book, load_file_to_book, run_book, RunInfo};
+use hvmc::show_lnet;
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
