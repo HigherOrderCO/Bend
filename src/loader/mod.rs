@@ -11,7 +11,7 @@ pub fn load_file_to_book(path: &Path) -> anyhow::Result<DefinitionBook> {
   match parse_definition_book(&code) {
     Ok(book) => Ok(book),
     Err(errs) => {
-      let msg = errs.into_iter().map(|e| display_miette_err_for_console(e, path, &code)).join("\n");
+      let msg = errs.into_iter().map(|e| display_miette_err(e, path, &code)).join("\n");
       Err(anyhow::anyhow!(msg))
     }
   }
@@ -40,8 +40,8 @@ pub fn err_to_report<'a, T: Display>(err: Rich<T>, path: &'a str) -> Report<'a, 
     .finish()
 }
 
-/// Displays a [SyntaxError] from the given `err`.
-pub fn display_miette_err_for_console<T: Display>(err: Rich<T>, path: &Path, code: &str) -> String {
+/// Displays a formatted [SyntaxError] from the given `err` based on the current report handler.
+pub fn display_miette_err<T: Display>(err: Rich<T>, path: &Path, code: &str) -> String {
   let source = code.to_string();
   let name = path.to_str().unwrap();
 

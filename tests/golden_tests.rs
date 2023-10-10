@@ -2,7 +2,7 @@ use hvm_lang::{
   ast::DefId,
   compile_book,
   from_core::readback_net,
-  loader::display_err_for_text,
+  loader::{display_err_for_text, display_miette_err},
   parser::{parse_definition_book, parse_term},
   run_book,
   to_core::term_to_hvm_core,
@@ -169,5 +169,22 @@ fn type_inference() {
     }
     out.push_str("]");
     Ok(out)
+  })
+}
+
+#[test]
+fn error_outputs() {
+  let _ = miette::set_hook(Box::new(|_| Box::new(miette::JSONReportHandler::new())));
+
+  run_golden_test_dir(function_name!(), &|path, code| {
+    let path = Path::new(path.file_name().unwrap());
+
+    parse_definition_book(code).map_err(|errs| {
+      let msg = errs.into_iter().map(|e| display_miette_err(e, path, code)).join("\n");
+      println!("{}", msg);
+      anyhow::anyhow!(msg)
+    })?;
+
+    Ok(String::new())
   })
 }
