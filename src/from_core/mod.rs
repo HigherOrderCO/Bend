@@ -77,7 +77,7 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         inodes.push(INode { kind: ERA, ports: [subtree_root, var.clone(), var] });
       }
       LTree::Ctr { lab, lft, rgt } => {
-        let kind = if *lab == hvmc::CT0 { CON } else { DUP | *lab as NodeKind };
+        let kind = if *lab == 0 { CON } else { DUP | (*lab - 1) as NodeKind };
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
