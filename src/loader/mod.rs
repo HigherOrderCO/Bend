@@ -2,7 +2,7 @@ use crate::{ast::DefinitionBook, parser::parse_definition_book};
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use chumsky::prelude::Rich;
 use itertools::Itertools;
-use miette::{miette, Diagnostic, NamedSource, SourceSpan};
+use miette::{diagnostic, miette, Diagnostic, NamedSource, SourceSpan};
 use std::{fmt::Display, ops::Range, path::Path};
 
 /// Reads a file and parses to a definition book.
@@ -50,9 +50,7 @@ pub fn display_miette_err_for_console<T: Display>(err: Rich<T>, path: &Path, cod
 
   let report = miette!(error);
 
-  println!("{report:?}");
-
-  report.to_string()
+  format!("{report:?}")
 }
 
 #[derive(thiserror::Error, Debug, Diagnostic)]
