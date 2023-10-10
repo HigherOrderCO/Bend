@@ -1,7 +1,7 @@
 use crate::ast::{
   compat::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
-    SlotId, CON, DUP, ERA, LABEL_MASK, REF, ROOT, TAG_MASK,
+    SlotId, CON, DUP, ERA, ITE, LABEL_MASK, REF, ROOT, TAG_MASK,
   },
   hvm_lang::Op,
   var_id_to_name, DefId, Name, Term,
@@ -9,7 +9,6 @@ use crate::ast::{
 use hvmc::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
 
-#[cfg(feature = "nums")]
 use crate::ast::compat::{label_to_op, NUM, OP2};
 
 pub fn readback_net(net: &LNet) -> anyhow::Result<(Term, bool)> {
@@ -88,13 +87,11 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      #[cfg(feature = "nums")]
       LTree::Num { val } => {
         let kind = NUM | (*val as NodeKind);
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      #[cfg(feature = "nums")]
       LTree::Op2 { lft, rgt } => {
         let kind = OP2;
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
@@ -201,6 +198,38 @@ fn readback_compat(net: &INet) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
+      ITE => match slot(next) {
+        2 => {
+          seen.insert(port(node, 0));
+          seen.insert(port(node, 1));
+          let cond_port = enter(net, port(node, 0));
+          let (cond_term, cond_valid) = reader(net, cond_port, var_port_to_name, dups_vec, dups_set, seen);
+          let branches_port = enter(net, port(node, 0));
+          let branches_node = addr(branches_port);
+          let branches_kind = kind(net, branches_node);
+          if branches_kind & TAG_MASK == CON {
+            seen.insert(port(branches_node, 0));
+            seen.insert(port(branches_node, 1));
+            seen.insert(port(branches_node, 2));
+            let then_port = enter(net, port(node, 0));
+            let (then_term, then_valid) = reader(net, then_port, var_port_to_name, dups_vec, dups_set, seen);
+            let else_port = enter(net, port(node, 0));
+            let (else_term, else_valid) = reader(net, else_port, var_port_to_name, dups_vec, dups_set, seen);
+            let valid = cond_valid && then_valid && else_valid;
+            (
+              Term::If { cond: Box::new(cond_term), then: Box::new(then_term), els_: Box::new(else_term) },
+              valid,
+            )
+          } else {
+            // TODO: Is there any case where we expect a different node type here on readback
+            (
+              Term::If { cond: Box::new(cond_term), then: Box::new(Term::Era), els_: Box::new(Term::Era) },
+              false,
+            )
+          }
+        }
+        _ => unreachable!(),
+      },
       REF => (Term::Ref { def_id: DefId(label) }, true),
       // If we're visiting a fan node...
       DUP => match slot(next) {
@@ -228,9 +257,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      #[cfg(feature = "nums")]
       NUM => (Term::Num { val: label as u32 }, true),
-      #[cfg(feature = "nums")]
       OP2 => match slot(next) {
         2 => {
           seen.insert(port(node, 0));
@@ -244,10 +271,18 @@ fn readback_compat(net: &INet) -> (Term, bool) {
             Term::Num { val } => {
               let (val, op) = split_num_with_op(val);
               if let Some(op) = op {
+                // This is Num + Op in the same value
                 (Term::Opx { op, fst: Box::new(Term::Num { val }), snd: Box::new(arg_term) }, valid)
               } else {
-                // TODO: is this possible?
-                todo!()
+                // This is just Op as value
+                (
+                  Term::Opx {
+                    op: label_to_op(val).unwrap(),
+                    fst: Box::new(arg_term),
+                    snd: Box::new(Term::Era),
+                  },
+                  valid,
+                )
               }
             }
             Term::Opx { op, fst: _, snd } => (Term::Opx { op, fst: snd, snd: Box::new(arg_term) }, valid),

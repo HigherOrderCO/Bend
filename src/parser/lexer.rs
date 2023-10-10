@@ -19,6 +19,9 @@ pub enum Token {
   #[token("dup")]
   Dup,
 
+  #[token("if")]
+  If,
+
   #[token("=")]
   Equals,
 
@@ -153,6 +156,7 @@ impl fmt::Display for Token {
       Self::Dollar => write!(f, "$"),
       Self::Let => write!(f, "let"),
       Self::Dup => write!(f, "dup"),
+      Self::If => write!(f, "if"),
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),
       Self::Add => write!(f, "+"),

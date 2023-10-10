@@ -58,11 +58,7 @@ fn must_split(rule: &Rule) -> bool {
   for pat in &rule.pats {
     if let Pattern::Ctr(_, args) = &pat {
       for arg in args {
-        if matches!(arg, Pattern::Ctr(..)) {
-          return true;
-        }
-        #[cfg(feature = "nums")]
-        if matches!(arg, Pattern::Num(..)) {
+        if matches!(arg, Pattern::Ctr(..) | Pattern::Num(..)) {
           return true;
         }
       }
@@ -86,9 +82,7 @@ fn matches_together(a: &Rule, b: &Rule) -> bool {
         a_implies_b = false;
         break;
       }
-      #[cfg(feature = "nums")]
       (Pattern::Num(a), Pattern::Num(b)) if a == b => (),
-      #[cfg(feature = "nums")]
       (Pattern::Num(..), Pattern::Num(..)) => {
         a_implies_b = false;
         break;
@@ -120,7 +114,6 @@ fn split_rule(
   let new_def_id = make_split_def_name(rules[rule_idx].def_id, name_count, def_names);
   let new_def = make_split_def(rules, rule_idx, new_def_id, &mut var_count, skip);
   let old_rule = make_rule_calling_split(&rules[rule_idx], new_def_id);
-  eprintln!("x {}", new_def.to_string(def_names));
   // Recursively flatten the newly created definition
   let (new_def, split_defs) = flatten_def(&new_def, def_names);
   (old_rule, new_def, split_defs)
@@ -176,15 +169,12 @@ fn make_split_def(
           (Pattern::Var(..), other_pat) => {
             new_rule_pats.push(other_pat.clone());
           }
-          #[cfg(feature = "nums")]
           (Pattern::Num(..), Pattern::Num(..)) => (),
-          #[cfg(feature = "nums")]
           (Pattern::Num(num), Pattern::Var(name)) => {
             if let Some(name) = name {
               new_rule_body.subst(name, &Term::Num { val: *num });
             }
           }
-          #[cfg(feature = "nums")]
           // Not possible since we know it matches
           _ => {
             panic!("Internal error. Please report.");
@@ -224,7 +214,6 @@ fn make_rule_calling_split(old_rule: &Rule, new_def_id: DefId) -> Rule {
               Pattern::Var(Some(nam))
             }
             Pattern::Var(..) => field.clone(),
-            #[cfg(feature = "nums")]
             Pattern::Num(..) => {
               let nam = Name(format!(".x{}", var_count));
               var_count += 1;
@@ -237,7 +226,6 @@ fn make_rule_calling_split(old_rule: &Rule, new_def_id: DefId) -> Rule {
 
         old_rule_pats.push(Pattern::Ctr(name.clone(), new_pat_args));
       }
-      #[cfg(feature = "nums")]
       Pattern::Num(..) => {
         old_rule_pats.push(pat.clone());
       }

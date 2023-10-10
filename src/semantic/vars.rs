@@ -91,6 +91,11 @@ fn check_uses(term: &Term, def_names: &DefNames) -> anyhow::Result<()> {
         go(fun, scope, globals, def_names)?;
         go(arg, scope, globals, def_names)?;
       }
+      Term::If { cond, then, els_ } => {
+        go(cond, scope, globals, def_names)?;
+        go(then, scope, globals, def_names)?;
+        go(els_, scope, globals, def_names)?;
+      }
       Term::Dup { fst, snd, val, nxt } => {
         go(val, scope, globals, def_names)?;
         if let Some(fst) = fst {
@@ -112,12 +117,10 @@ fn check_uses(term: &Term, def_names: &DefNames) -> anyhow::Result<()> {
         go(snd, scope, globals, def_names)?;
       }
       Term::Ref { .. } | Term::Era => (),
-      #[cfg(feature = "nums")]
       Term::Opx { fst, snd, .. } => {
         go(fst, scope, globals, def_names)?;
         go(snd, scope, globals, def_names)?;
       }
-      #[cfg(feature = "nums")]
       Term::Num { .. } => (),
     }
     Ok(())
@@ -242,13 +245,18 @@ fn unique_var_names(term: &Term, def_names: &DefNames) -> anyhow::Result<(Term, 
         let snd = go(snd, name_map, name_count, var_uses, def_names)?;
         Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }
       }
-      #[cfg(feature = "nums")]
       Term::Opx { op, fst, snd } => {
         let fst = go(fst, name_map, name_count, var_uses, def_names)?;
         let snd = go(snd, name_map, name_count, var_uses, def_names)?;
         Term::Opx { op: *op, fst: Box::new(fst), snd: Box::new(snd) }
       }
-      t => t.clone(),
+      Term::If { cond, then, els_ } => {
+        let cond = go(cond, name_map, name_count, var_uses, def_names)?;
+        let then = go(then, name_map, name_count, var_uses, def_names)?;
+        let els_ = go(els_, name_map, name_count, var_uses, def_names)?;
+        Term::If { cond: Box::new(cond), then: Box::new(then), els_: Box::new(els_) }
+      }
+      t @ (Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. }) => t.clone(),
     };
     Ok(term)
   }
@@ -361,13 +369,14 @@ fn term_to_affine(
       fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
       snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
     },
-    #[cfg(feature = "nums")]
     Term::Opx { op, fst, snd } => Term::Opx {
       op,
       fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
       snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
     },
-    t => t,
+    t @ (Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. }) => t,
+
+    Term::If { cond, then, els_ } => todo!(),
   };
   Ok(term)
 }

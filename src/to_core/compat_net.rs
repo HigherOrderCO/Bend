@@ -1,14 +1,13 @@
 use crate::ast::{
   compat::{
-    addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, Port, CON, DUP, ERA, LABEL_MASK,
-    REF, ROOT, TAG_MASK,
+    addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, Port, CON, DUP, ERA, ITE,
+    LABEL_MASK, REF, ROOT, TAG_MASK,
   },
   var_id_to_name, DefId, Name, Term,
 };
 use hvmc::{LNet, LTree, Tag};
 use std::collections::{HashMap, HashSet};
 
-#[cfg(feature = "nums")]
 use crate::ast::compat::{op_to_label, NodeKind, NUM, OP2};
 
 /// Converts an IC term into an IC net.
@@ -48,6 +47,7 @@ fn encode_term(
     // - 0: points to where the lambda occurs.
     // - 1: points to the lambda variable.
     // - 2: points to the lambda body.
+    // core: (var_use bod)
     Term::Lam { nam, bod } => {
       let fun = new_node(inet, CON);
       push_scope(nam, port(fun, 1), scope, vars);
@@ -56,6 +56,7 @@ fn encode_term(
       link_local(inet, port(fun, 2), bod);
       Ok(Some(port(fun, 0)))
     }
+    // core: (var_use bod)
     Term::Chn { nam, bod } => {
       let fun = new_node(inet, CON);
       global_vars.entry(nam.clone()).or_default().0 = port(fun, 1);
@@ -67,6 +68,7 @@ fn encode_term(
     // - 0: points to the function being applied.
     // - 1: points to the function's argument.
     // - 2: points to where the application occurs.
+    // core: & fun ~ (arg ret) (fun not necessarily main port)
     Term::App { fun, arg } => {
       let app = new_node(inet, CON);
       let fun = encode_term(inet, fun, port(app, 0), scope, vars, global_vars, dups)?;
@@ -75,10 +77,29 @@ fn encode_term(
       link_local(inet, port(app, 1), arg);
       Ok(Some(port(app, 2)))
     }
+    // core: & cond ~ ? (then els_) ret
+    Term::If { cond, then, els_ } => {
+      let if_ = new_node(inet, ITE);
+
+      let cond = encode_term(inet, cond, port(if_, 0), scope, vars, global_vars, dups)?;
+      link_local(inet, port(if_, 0), cond);
+
+      let branches = new_node(inet, CON);
+      link(inet, port(if_, 1), port(branches, 0));
+
+      let then = encode_term(inet, then, port(branches, 1), scope, vars, global_vars, dups)?;
+      link_local(inet, port(branches, 1), then);
+
+      let els_ = encode_term(inet, els_, port(branches, 2), scope, vars, global_vars, dups)?;
+      link_local(inet, port(branches, 2), els_);
+
+      Ok(Some(port(if_, 2)))
+    }
     // A dup becomes a dup node too. Ports:
     // - 0: points to the value projected.
     // - 1: points to the occurrence of the first variable.
     // - 2: points to the occurrence of the second variable.
+    // core: & val ~ {lab fst snd} (val not necessarily main port)
     Term::Dup { fst, snd, val, nxt } => {
       let dup = new_node(inet, DUP | *dups);
       *dups += 1;
@@ -112,6 +133,7 @@ fn encode_term(
       global_vars.entry(nam.clone()).or_default().1 = up;
       Ok(None)
     }
+    // core: @def_id
     Term::Ref { def_id } => {
       let node = new_node(inet, REF | **def_id);
       link(inet, port(node, 1), port(node, 2));
@@ -121,7 +143,7 @@ fn encode_term(
     Term::Let { .. } => unreachable!(), // Removed in earlier poss
     Term::Sup { .. } => unreachable!(), // Not supported in syntax
     Term::Era => unreachable!(),        // Not supported in syntax
-    #[cfg(feature = "nums")]
+    // core: #val
     Term::Num { val } => {
       debug_assert!(*val as NodeKind <= LABEL_MASK);
       let node = new_node(inet, NUM | *val as NodeKind);
@@ -129,18 +151,20 @@ fn encode_term(
       link(inet, port(node, 1), port(node, 2));
       Ok(Some(port(node, 0)))
     }
-    #[cfg(feature = "nums")]
+    // core: & #op ~ <fst <snd ret>>
     Term::Opx { op, fst, snd } => {
       let op_node = new_node(inet, NUM | op_to_label(*op));
       link(inet, port(op_node, 1), port(op_node, 2));
 
       let fst_node = new_node(inet, OP2);
-      link(inet, port(op_node, 1), port(fst_node, 0));
+      link(inet, port(op_node, 0), port(fst_node, 0));
+
       let fst = encode_term(inet, fst, port(fst_node, 1), scope, vars, global_vars, dups)?;
       link_local(inet, port(fst_node, 1), fst);
 
       let snd_node = new_node(inet, OP2);
-      link(inet, port(fst_node, 1), port(snd_node, 0));
+      link(inet, port(fst_node, 2), port(snd_node, 0));
+
       let snd = encode_term(inet, snd, port(snd_node, 1), scope, vars, global_vars, dups)?;
       link_local(inet, port(snd_node, 1), snd);
 
@@ -298,12 +322,14 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
     REF => LTree::Ref { nam: DefId(label).to_internal() },
-    #[cfg(feature = "nums")]
     NUM => LTree::Num { val: label as u32 },
-    #[cfg(feature = "nums")]
     OP2 => LTree::Op2 {
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
+    },
+    ITE => LTree::Ite {
+      sel: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
+      ret: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
     _ => unreachable!("Invalid tag in compat tree {tag:x}"),
   }

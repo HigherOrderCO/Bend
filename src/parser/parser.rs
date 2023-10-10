@@ -17,7 +17,6 @@ use itertools::Itertools;
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range};
 
-#[cfg(feature = "nums")]
 use crate::ast::hvm_lang::Op;
 
 // TODO: Pattern matching on rules
@@ -47,18 +46,13 @@ pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Toke
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
   let inline_app =
     term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
-  #[cfg(feature = "nums")]
   let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opx {
     op,
     fst: Box::new(fst),
     snd: Box::new(snd),
   });
-  #[cfg(feature = "nums")]
   let standalone_term = choice((inline_app, inline_num_oper))
     .delimited_by(just(Token::NewLine).repeated(), just(Token::NewLine).repeated());
-  #[cfg(not(feature = "nums"))]
-  let standalone_term =
-    inline_app.delimited_by(just(Token::NewLine).repeated(), just(Token::NewLine).repeated());
 
   // TODO: Make a function that calls a parser. I couldn't figure out how to type it correctly.
   standalone_term.parse(token_stream(code)).into_result()
@@ -99,7 +93,6 @@ where
   choice((select!(Token::Asterisk => None), name().map(Some)))
 }
 
-#[cfg(feature = "nums")]
 fn num_oper<'a, I>() -> impl Parser<'a, I, Op, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -132,7 +125,6 @@ where
   let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::Lnk { nam: name }).boxed();
   let term_sep = choice((just(Token::NewLine), just(Token::Semicolon)));
 
-  #[cfg(feature = "nums")]
   let unsigned = select!(Token::Num(num) => Term::Num{val: num});
 
   recursive(|term| {
@@ -186,6 +178,19 @@ where
       .map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
+    let if_ = just(Token::If)
+      .ignore_then(new_line())
+      .ignore_then(term.clone())
+      .then_ignore(select!(Token::Name(nam) if nam == "then" => ()))
+      .then(term.clone())
+      .then_ignore(select!(Token::Name(nam) if nam == "else" => ()))
+      .then(term.clone())
+      .map(|((cond, then), els_)| Term::If {
+        cond: Box::new(cond),
+        then: Box::new(then),
+        els_: Box::new(els_),
+      });
+
     // (f arg1 arg2 ...)
     let app = term
       .clone()
@@ -197,7 +202,6 @@ where
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
-    #[cfg(feature = "nums")]
     let num_op = num_oper()
       .then_ignore(new_line())
       .then(term.clone())
@@ -208,15 +212,7 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    #[cfg(feature = "nums")]
-    {
-      choice((global_var, var, unsigned, global_lam, lam, dup, let_, num_op, app))
-    }
-
-    #[cfg(not(feature = "nums"))]
-    {
-      choice((global_var, var, global_lam, lam, dup, let_, app))
-    }
+    choice((global_var, var, unsigned, global_lam, lam, dup, let_, if_, num_op, app))
   })
 }
 
@@ -231,18 +227,8 @@ where
       .map(|(name, pats)| Pattern::Ctr(name, pats))
       .boxed();
     let var = name_or_era().map(Pattern::Var).boxed();
-
-    #[cfg(feature = "nums")]
     let num = select!(Token::Num(num) => Pattern::Num(num)).boxed();
-
-    #[cfg(feature = "nums")]
-    {
-      choice((ctr, num, var))
-    }
-    #[cfg(not(feature = "nums"))]
-    {
-      choice((ctr, var))
-    }
+    choice((ctr, num, var))
   })
 }
 
@@ -252,7 +238,6 @@ where
 {
   let inline_app =
     term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
-  #[cfg(feature = "nums")]
   let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opx {
     op,
     fst: Box::new(fst),
@@ -262,10 +247,7 @@ where
   let lhs = name().then(pattern().repeated().collect()).boxed();
   let lhs = choice((lhs.clone(), lhs.delimited_by(just(Token::LParen), just(Token::RParen))));
 
-  #[cfg(feature = "nums")]
   let rhs = choice((inline_num_oper, inline_app));
-  #[cfg(not(feature = "nums"))]
-  let rhs = inline_app;
 
   lhs
     .then_ignore(just(Token::NewLine).repeated())

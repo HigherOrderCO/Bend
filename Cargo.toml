@@ -11,9 +11,8 @@ name = "hvm-lang"
 required-features = ["cli"]
 
 [features]
-default = ["cli", "nums"]
+default = ["cli"]
 cli = ["dep:clap", "dep:byte-unit"]
-nums = []
 
 [dependencies]
 anyhow = "1.0.72"

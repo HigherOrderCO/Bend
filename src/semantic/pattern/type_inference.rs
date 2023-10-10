@@ -4,13 +4,16 @@ use anyhow::anyhow;
 use itertools::Itertools;
 use std::collections::HashMap;
 
+type Adts = HashMap<AdtId, Adt>;
+type Types = Vec<Vec<Type>>;
+
 impl DefinitionBook {
   /// Infers ADTs from the patterns of the rules in a book.
   /// Returns the infered type of the patterns of each definition.
   /// Returns an error if rules use the types in a inconsistent way.
   /// These could be same name in different types, different arities or mixing numbers and ADTs.
   /// Precondition: Rules have been flattened, rule arity is correct.
-  pub fn get_types_from_patterns(&self) -> anyhow::Result<(HashMap<AdtId, Adt>, Vec<Vec<Type>>)> {
+  pub fn get_types_from_patterns(&self) -> anyhow::Result<(Adts, Types)> {
     // TODO: This algorithm does a lot of unnecessary copying, checking and moving around of data.
     // There's a lot of space for optimizing.
 
@@ -117,7 +120,7 @@ impl Definition {
           }
         }
         Pattern::Var(_) => adt.others = true,
-        #[cfg(feature = "nums")]
+
         _ => panic!("Expected only Ctr and Var patterns to be called here"),
       }
     }

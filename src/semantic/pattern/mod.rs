@@ -31,9 +31,7 @@ impl DefinitionBook {
 pub enum Type {
   Any,
   Adt(AdtId),
-  #[cfg(feature = "nums")]
   U32,
-  #[cfg(feature = "nums")]
   I32,
 }
 

@@ -32,7 +32,6 @@ pub struct Rule {
 pub enum Pattern {
   Ctr(Name, Vec<Pattern>),
   Var(Option<Name>),
-  #[cfg(feature = "nums")]
   Num(u32),
 }
 
@@ -66,6 +65,11 @@ pub enum Term {
     fun: Box<Term>,
     arg: Box<Term>,
   },
+  If {
+    cond: Box<Term>,
+    then: Box<Term>,
+    els_: Box<Term>,
+  },
   Dup {
     fst: Option<Name>,
     snd: Option<Name>,
@@ -77,11 +81,9 @@ pub enum Term {
     snd: Box<Term>,
   },
   Era,
-  #[cfg(feature = "nums")]
   Num {
     val: u32,
   },
-  #[cfg(feature = "nums")]
   /// A numeric operation between built-in numbers.
   Opx {
     op: Op,
@@ -160,6 +162,14 @@ impl Term {
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
+      Term::If { cond, then, els_ } => {
+        format!(
+          "if {} then {} else {}",
+          cond.to_string(def_names),
+          then.to_string(def_names),
+          els_.to_string(def_names)
+        )
+      }
       Term::Dup { fst, snd, val, nxt } => format!(
         "dup {} {} = {}; {}",
         fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
@@ -169,9 +179,7 @@ impl Term {
       ),
       Term::Sup { fst, snd } => format!("{{{} {}}}", fst.to_string(def_names), snd.to_string(def_names)),
       Term::Era => "*".to_string(),
-      #[cfg(feature = "nums")]
       Term::Num { val } => format!("{val}"),
-      #[cfg(feature = "nums")]
       Term::Opx { op, fst, snd } => {
         format!("({} {} {})", op, fst.to_string(def_names), snd.to_string(def_names))
       }
@@ -199,6 +207,11 @@ impl Term {
           nxt.subst(from, to);
         }
       }
+      Term::If { cond, then, els_ } => {
+        cond.subst(from, to);
+        then.subst(from, to);
+        els_.subst(from, to);
+      }
       Term::Ref { .. } => (),
       Term::App { fun, arg } => {
         fun.subst(from, to);
@@ -215,9 +228,7 @@ impl Term {
         snd.subst(from, to);
       }
       Term::Era => (),
-      #[cfg(feature = "nums")]
       Term::Num { .. } => (),
-      #[cfg(feature = "nums")]
       Term::Opx { fst, snd, .. } => {
         fst.subst(from, to);
         snd.subst(from, to);
@@ -257,7 +268,6 @@ impl From<&Pattern> for Term {
     match value {
       Pattern::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
       Pattern::Var(nam) => Term::Var { nam: Name::new(nam.as_ref().map(|x| x.as_str()).unwrap_or("_")) },
-      #[cfg(feature = "nums")]
       Pattern::Num(num) => Term::Num { val: *num },
     }
   }
@@ -274,7 +284,6 @@ impl fmt::Display for Pattern {
     match self {
       Pattern::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
       Pattern::Var(nam) => write!(f, "{}", nam.as_ref().map(|x| x.as_str()).unwrap_or("*")),
-      #[cfg(feature = "nums")]
       Pattern::Num(num) => write!(f, "{num}"),
     }
   }
