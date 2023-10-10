@@ -1,0 +1,3 @@
+(three) = λfλx (f (f (f x)))
+
+(Main) = (three three

@@ -1,0 +1,1 @@
+{"message": "found 'λ' expected '='","severity": "error","causes": [],"filename": "expected_equals.hvm","labels": [{"label": "found 'λ' expected '='","span": {"offset": 7,"length": 2}}],"related": []}

@@ -27,7 +27,9 @@ hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core.git" }
 #hvmc = { path = "../hvm-core/" }
 itertools = "0.11.0"
 logos = "0.13.0"
+miette = { version = "5.10.0", features = ["fancy"] }
 shrinkwraprs = "0.3.0"
+thiserror = "1.0.49"
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
