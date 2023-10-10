@@ -24,12 +24,10 @@ Parser:
 
 Error reporting:
   Use error types and not just fail with opaque anyhow::Error.
-  Fix span of errors.
   Add nice looking errors for errors outside the parser.
   Improve error messages.
 
 Convert from lambda terms directly into LNet without using the intermediate vector of nodes form
-Numbers and numerical operations (need hvm support)
 Documentation
 Benchmarking the compiler
 
