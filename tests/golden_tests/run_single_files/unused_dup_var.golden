@@ -1,2 +1,2 @@
 Invalid readback
-dup b d = a; λa (b λc c)
+dup d b = a; λa (b λc c)

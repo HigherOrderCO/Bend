@@ -26,8 +26,8 @@ pub fn check_book(book: DefinitionBook) -> anyhow::Result<()> {
 pub fn compile_book(mut book: DefinitionBook) -> anyhow::Result<(Book, DefNames)> {
   book.check_rule_arities()?;
   // book.flatten_rules();
-  book.detach_combinators();
   book.sanitize_vars()?;
+  book.detach_supercombinators();
   // book.try_into_affine()?;
   let core_book = book_to_hvm_core(&book)?;
   Ok((core_book, book.def_names))
