@@ -1,1 +1,1 @@
-Found same constructor being used in incompatible types [(False), (True)] and [(False)]
+Found same constructor True being used in incompatible types [(False), (True)] and [(False)]

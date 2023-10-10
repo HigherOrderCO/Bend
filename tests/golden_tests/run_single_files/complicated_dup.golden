@@ -1,2 +1,1 @@
-Invalid readback
-dup a b = ...; {{{a ...} {b {... ...}}} ...}
+dup b d = a; dup c e = (d e); λa (b c)
