@@ -12,13 +12,16 @@ pub struct DefNames {
 #[derive(Debug, Clone, Default)]
 pub struct DefinitionBook {
   pub def_names: DefNames,
-  pub defs: Vec<Definition>,
+  pub defs: Vec<SpannedDefinition>,
 }
+
+/// A [Definition] with byte range.
+type SpannedDefinition = Spanned<Definition>;
 
 #[derive(Debug, Clone)]
 pub struct Definition {
   pub def_id: DefId,
-  pub rules: Vec<Rule>,
+  pub rules: Vec<SpannedRule>,
 }
 
 /// A [Rule] with byte range.

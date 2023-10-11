@@ -1,7 +1,7 @@
 use super::lexer::LexingError;
 use crate::{
   ast::{
-    hvm_lang::{Pattern, SpannedPattern, SpannedTerm},
+    hvm_lang::{Pattern, SpannedPattern, SpannedRule, SpannedTerm},
     spanned::Spanned,
     DefId, Definition, DefinitionBook, Name, Rule, Term,
   },
@@ -268,7 +268,7 @@ where
   })
 }
 
-fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
+fn rule<'a, I>() -> impl Parser<'a, I, (Name, SpannedRule), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -293,7 +293,9 @@ where
     .then_ignore(just(Token::Equals))
     .then_ignore(just(Token::NewLine).repeated())
     .then(rhs)
-    .map(|((name, pats), body)| (name, Rule { def_id: DefId(0), pats, body }))
+    .map_with_span(|((name, pats), body), span: SimpleSpan| {
+      (name, Spanned::new(Rule { def_id: DefId(0), pats, body }, span.into_range()))
+    })
 }
 
 fn book<'a, I>() -> impl Parser<'a, I, DefinitionBook, extra::Err<Rich<'a, Token>>>
@@ -301,7 +303,7 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   fn rules_to_book(
-    rules: Vec<((Name, Rule), SimpleSpan)>,
+    rules: Vec<((Name, SpannedRule), SimpleSpan)>,
     _span: SimpleSpan,
     emitter: &mut Emitter<Rich<Token>>,
   ) -> DefinitionBook {
@@ -310,15 +312,16 @@ where
     // Check for repeated defs (could be rules out of order or actually repeated names)
     // TODO: Solve the lifetime here to avoid cloning names
     for (_, rules_data) in rules.into_iter().group_by(|((name, _), _)| name.clone()).into_iter() {
-      let (rules, spans): (Vec<(Name, Rule)>, Vec<SimpleSpan>) = rules_data.unzip();
-      let (mut names, mut rules): (Vec<Name>, Vec<Rule>) = rules.into_iter().unzip();
+      let (rules, spans): (Vec<(Name, SpannedRule)>, Vec<SimpleSpan>) = rules_data.unzip();
+      let (mut names, mut rules): (Vec<Name>, Vec<SpannedRule>) = rules.into_iter().unzip();
+      let range = spans.first().unwrap().start .. spans.last().unwrap().end;
       let name = names.pop().unwrap();
       if !book.def_names.contains_name(&name) {
         let def_id = book.def_names.insert(name);
         rules.iter_mut().for_each(|rule| rule.def_id = def_id);
-        book.defs.push(Definition { def_id, rules });
+        book.defs.push(Spanned::new(Definition { def_id, rules }, range));
       } else {
-        let span = SimpleSpan::new(spans.first().unwrap().start, spans.last().unwrap().end);
+        let span = SimpleSpan::new(range.start, range.end);
         emitter.emit(Rich::custom(span, format!("Repeated definition '{}'", name)));
       }
     }
@@ -332,7 +335,7 @@ where
     .separated_by(new_line.at_least(1))
     .allow_leading()
     .allow_trailing()
-    .collect::<Vec<((Name, Rule), SimpleSpan)>>();
+    .collect::<Vec<((Name, SpannedRule), SimpleSpan)>>();
 
   parsed_rules.validate(rules_to_book)
 }
