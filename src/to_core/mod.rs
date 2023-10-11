@@ -27,10 +27,10 @@ pub fn term_to_hvm_core(term: &Term) -> anyhow::Result<LNet> {
 }
 
 pub fn book_to_hvm_internal(book: &Book, mem_size: usize) -> anyhow::Result<(hvmc::Net, hvmc::Book)> {
+
   // TODO: Don't try to preallocate a huge buffer
   let mut root = hvmc::Net::new(mem_size);
   root.boot(book.main.to_internal()); // TODO: Don't use this workaround
-
   let mut hvm_book = hvmc::Book::new();
   book.defs.iter().for_each(|(&def_id, term)| {
     hvm_book.def(def_id.to_internal(), lnet_to_net(term, None).to_def());

@@ -14,7 +14,7 @@ struct Args {
   #[arg(short, long)]
   pub verbose: bool,
 
-  #[arg(long, help = "How much memory to allocate for the runtime", default_value = "128M", value_parser = mem_parser)]
+  #[arg(long, help = "How much memory to allocate for the runtime", default_value = "1G", value_parser = mem_parser)]
   pub mem: usize,
 
   #[arg(help = "Path to the input file")]
@@ -53,7 +53,7 @@ fn main() -> anyhow::Result<()> {
       println!("{}", compiled.to_string(&def_names));
     }
     Mode::Run => {
-      let (res_term, def_names, info) = run_book(book, args.mem)?;
+      let (res_term, def_names, info) = run_book(book, args.mem / std::mem::size_of::<u64>())?;
       let RunInfo { stats, valid_readback, lnet } = info;
       let rps = stats.rewrites.total_rewrites() as f64 / stats.run_time / 1_000_000.0;
       if args.verbose {

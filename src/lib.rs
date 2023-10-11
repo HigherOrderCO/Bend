@@ -34,19 +34,15 @@ pub fn compile_book(mut book: DefinitionBook) -> anyhow::Result<(Book, DefNames)
 
 pub fn run_compiled(book: &Book, mem_size: usize) -> anyhow::Result<(LNet, RunStats)> {
   let (mut root, runtime_book) = book_to_hvm_internal(book, mem_size)?;
-
   let start_time = Instant::now();
-
   // Computes its normal form
   root.normal(&runtime_book);
-
   let elapsed = start_time.elapsed().as_secs_f64();
-
   let rewrites = Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref };
-  let def = root.clone().to_def();
+  let net = readback_lnet(&root);
+  let def = root.to_def();
   let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
   // TODO: Make readback for hvm-core Def type
-  let net = readback_lnet(&root);
   Ok((net, stats))
 }
 
