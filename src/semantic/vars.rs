@@ -361,6 +361,11 @@ fn term_to_affine(
       let (nxt, snd) = if let Some(snd) = snd { duplicate_lam(snd, nxt, uses_snd) } else { (nxt, snd) };
       Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(nxt) }
     }
+    Term::If { cond, then, els_ } => Term::If {
+      cond: Box::new(term_to_affine(*cond, var_uses, let_bodies)?),
+      then: Box::new(term_to_affine(*then, var_uses, let_bodies)?),
+      els_: Box::new(term_to_affine(*els_, var_uses, let_bodies)?),
+    },
     Term::App { fun, arg } => Term::App {
       fun: Box::new(term_to_affine(*fun, var_uses, let_bodies)?),
       arg: Box::new(term_to_affine(*arg, var_uses, let_bodies)?),
@@ -375,8 +380,6 @@ fn term_to_affine(
       snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
     },
     t @ (Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. }) => t,
-
-    Term::If { cond, then, els_ } => todo!(),
   };
   Ok(term)
 }
