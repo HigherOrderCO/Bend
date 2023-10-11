@@ -1,8 +1,13 @@
-use crate::ast::{hvm_lang::DefNames, Definition, DefinitionBook, Name, Rule, Term};
+use crate::ast::{
+  hvm_lang::{DefNames, Op},
+  Definition, DefinitionBook, Name, Rule, Term,
+};
 
 impl DefinitionBook {
   /// Applies bracket abstraction to remove lambdas form rule bodies,
   /// replacing it with applications with [`combinators`][Combinator]
+  ///
+  /// This pass should be used after [`DefinitionBook::sanitize_vars`]
   pub fn detach_combinators(&mut self) {
     let mut comb = Vec::new();
 
@@ -92,6 +97,10 @@ impl Term {
   }
 
   fn occurs_check(&self, name: &str) -> bool {
+    if name.is_empty() {
+      return false;
+    };
+
     match self {
       Self::Var { nam: Name(n) } => n == name,
       Self::Lam { nam, bod } => !nam.as_ref().is_some_and(|Name(n)| n == name) && bod.occurs_check(name),
@@ -238,7 +247,7 @@ impl Combinator {
 impl From<Combinator> for Term {
   fn from(value: Combinator) -> Self {
     match value {
-      Combinator::K => Self::lam("x", Self::lam("y", Self::var("x"))),
+      Combinator::K => Self::lam("x", Self::Lam { nam: None, bod: Box::new(Self::var("x")) }),
       Combinator::I => Self::lam("x", Self::var("x")),
 
       Combinator::B => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).xyz_lambda(),
@@ -281,6 +290,7 @@ impl From<Combinator> for Term {
 enum AbsTerm {
   Term(Term),
   Comb(Combinator),
+  Opx(Op),
   App(Box<AbsTerm>, Box<AbsTerm>),
 }
 
@@ -296,12 +306,19 @@ impl From<Combinator> for AbsTerm {
   }
 }
 
+impl From<Op> for AbsTerm {
+  fn from(value: Op) -> Self {
+    Self::Opx(value)
+  }
+}
+
 impl AbsTerm {
   fn occurs_check(&self, name: &str) -> bool {
     match self {
       Self::Term(term) => term.occurs_check(name),
       Self::Comb(_) => false,
       Self::App(fun, arg) => fun.occurs_check(name) || arg.occurs_check(name),
+      Self::Opx(_) => false,
     }
   }
 
@@ -335,7 +352,7 @@ impl AbsTerm {
   }
 
   /// Make a call AbsTerm by folding args around a called function Combinator with applications.
-  fn call(called: Combinator, args: impl IntoIterator<Item = AbsTerm>) -> Self {
+  fn call<C: Into<AbsTerm>>(called: C, args: impl IntoIterator<Item = AbsTerm>) -> Self {
     args.into_iter().fold(called.into(), |acc, arg| AbsTerm::App(Box::new(acc), Box::new(arg)))
   }
 
@@ -343,7 +360,23 @@ impl AbsTerm {
     match self {
       Self::Term(term) => term,
       Self::Comb(c) => c.comb_ref(names, defs),
+
+      Self::App(box Self::App(box Self::Opx(op), a), b) => {
+        Term::Opx { op, fst: Box::new(a.into_term(names, defs)), snd: Box::new(b.into_term(names, defs)) }
+      }
+
+      Self::App(box Self::Opx(op), a) => Term::lam("$b", Term::Opx {
+        op,
+        fst: Box::new(a.into_term(names, defs)),
+        snd: Box::new(Term::var("$b")),
+      }),
+
       Self::App(k, args) => Term::app(k.into_term(names, defs), args.into_term(names, defs)),
+
+      Self::Opx(op) => Term::lam(
+        "$a",
+        Term::lam("$b", Term::Opx { op, fst: Box::new(Term::var("$a")), snd: Box::new(Term::var("$b")) }),
+      ),
     }
   }
 
@@ -381,6 +414,8 @@ impl AbsTerm {
         (true, true) => Self::call(Combinator::S, vec![fun.abstract_by(name), arg.abstract_by(name)]),
         (false, false) => unreachable!(),
       },
+
+      Self::Opx(_) => unreachable!(),
     }
   }
 }
@@ -403,8 +438,10 @@ impl Term {
       // [name] Lam { n, bod } => [name] ([n] bod)
       Self::Lam { nam: Some(n), bod } => bod.abstract_by(&n).abstract_by(name),
 
-      // [name] Lam { _, bod } => K ([name] bod)
-      Self::Lam { nam: None, bod } => A::call(C::K, vec![bod.abstract_by(name)]),
+      // [name] Lam { _, bod } => [name] (K bod)
+      Self::Lam { nam: None, bod } => {
+        A::App(Box::new(C::K.into()), Box::new((*bod).into())).abstract_by(name)
+      }
 
       // [name] App { Lam { n, bod }, arg }
       Self::App { fun: box Self::Lam { nam: Some(n), bod }, arg } => {
@@ -503,9 +540,12 @@ impl Term {
         A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
       }
 
+      // [name] Opx { op, fst, snd } => [name] (op fst snd)
+      Self::Opx { op, fst, snd } => A::call(op, [(*fst).into(), (*snd).into()]).abstract_by(name),
+
       Self::Sup { .. } => todo!(),
-      Self::If { .. } => todo!(),
-      Self::Opx { .. } => todo!(),
+
+      Self::If { .. } => unimplemented!("Not suported here, should run sanitize_vars pass first"),
 
       // Term::channel_check invalidates abstraction of lambdas that have their variables inside of a channel
       Self::Chn { .. } => unreachable!(),
