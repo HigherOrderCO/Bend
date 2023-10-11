@@ -181,7 +181,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
           let nam = decl_name(net, port(node, 1), var_port_to_name);
           let prt = enter(net, port(node, 2));
           let (bod, valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
-          (Term::Lam { nam, bod: Box::new(bod) }, valid)
+          (Term::Lam { nam, bod: Box::new(bod.into()) }, valid)
         }
         // If we're visiting a port 1, then it is a variable.
         1 => (Term::Var { nam: var_name(next, var_port_to_name) }, true),
@@ -194,7 +194,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
           let prt = enter(net, port(node, 1));
           let (arg, arg_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           let valid = fun_valid && arg_valid;
-          (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
+          (Term::App { fun: Box::new(fun.into()), arg: Box::new(arg.into()) }, valid)
         }
         _ => unreachable!(),
       },
@@ -217,13 +217,21 @@ fn readback_compat(net: &INet) -> (Term, bool) {
             let (else_term, else_valid) = reader(net, else_port, var_port_to_name, dups_vec, dups_set, seen);
             let valid = cond_valid && then_valid && else_valid;
             (
-              Term::If { cond: Box::new(cond_term), then: Box::new(then_term), els_: Box::new(else_term) },
+              Term::If {
+                cond: Box::new(cond_term.into()),
+                then: Box::new(then_term.into()),
+                els_: Box::new(else_term.into()),
+              },
               valid,
             )
           } else {
             // TODO: Is there any case where we expect a different node type here on readback
             (
-              Term::If { cond: Box::new(cond_term), then: Box::new(Term::Era), els_: Box::new(Term::Era) },
+              Term::If {
+                cond: Box::new(cond_term.into()),
+                then: Box::new(Term::Era.into()),
+                els_: Box::new(Term::Era.into()),
+              },
               false,
             )
           }
@@ -242,7 +250,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
           let prt = enter(net, port(node, 2));
           let (snd, snd_valid) = reader(net, prt, var_port_to_name, dups_vec, dups_set, seen);
           let valid = fst_valid && snd_valid;
-          (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
+          (Term::Sup { fst: Box::new(fst.into()), snd: Box::new(snd.into()) }, valid)
         }
         // If we're visiting a port 1 or 2, then it is a variable.
         // Also, that means we found a dup, so we store it to read later.
@@ -272,20 +280,27 @@ fn readback_compat(net: &INet) -> (Term, bool) {
               let (val, op) = split_num_with_op(val);
               if let Some(op) = op {
                 // This is Num + Op in the same value
-                (Term::Opx { op, fst: Box::new(Term::Num { val }), snd: Box::new(arg_term) }, valid)
+                (
+                  Term::Opx {
+                    op: op.into(),
+                    fst: Box::new(Term::Num { val }.into()),
+                    snd: Box::new(arg_term.into()),
+                  },
+                  valid,
+                )
               } else {
                 // This is just Op as value
                 (
                   Term::Opx {
-                    op: label_to_op(val).unwrap(),
-                    fst: Box::new(arg_term),
-                    snd: Box::new(Term::Era),
+                    op: label_to_op(val).unwrap().into(),
+                    fst: Box::new(arg_term.into()),
+                    snd: Box::new(Term::Era.into()),
                   },
                   valid,
                 )
               }
             }
-            Term::Opx { op, fst, snd: _ } => (Term::Opx { op, fst, snd: Box::new(arg_term) }, valid),
+            Term::Opx { op, fst, snd: _ } => (Term::Opx { op, fst, snd: Box::new(arg_term.into()) }, valid),
             // TODO: Actually unreachable?
             _ => unreachable!(),
           }
@@ -324,7 +339,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
     let (val, val_valid) = reader(net, val, &mut var_port_to_name, &mut dups_vec, &mut dups_set, &mut seen);
     let fst = decl_name(net, port(dup, 1), &mut var_port_to_name);
     let snd = decl_name(net, port(dup, 2), &mut var_port_to_name);
-    main = Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(main) };
+    main = Term::Dup { fst, snd, val: Box::new(val.into()), nxt: Box::new(main.into()) };
     valid = valid && val_valid;
   }
 

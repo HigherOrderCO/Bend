@@ -224,6 +224,10 @@ where
       })
       .delimited_by(new_line(), new_line())
       .delimited_by(just(Token::LParen), just(Token::RParen))
+      .map_with_span(|mut e: SpannedTerm, span: SimpleSpan| {
+        e.span = span.into_range();
+        e
+      })
       .boxed();
 
     let num_op = num_oper()

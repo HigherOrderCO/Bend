@@ -199,7 +199,13 @@ impl Term {
   }
 
   /// Make a call term by folding args around a called function term with applications.
-  pub fn call(called: SpannedTerm, args: impl IntoIterator<Item = SpannedTerm>) -> Spanned<Self> {
+  pub fn call(called: Term, args: impl IntoIterator<Item = Term>) -> Self {
+    args
+      .into_iter()
+      .fold(called, |acc, arg| Term::App { fun: Box::new(acc.into()), arg: Box::new(arg.into()) })
+  }
+
+  pub fn call_spanned(called: SpannedTerm, args: impl IntoIterator<Item = SpannedTerm>) -> Spanned<Self> {
     args.into_iter().fold(called, |acc, arg| {
       let span = called.mix(&arg);
       let t = Term::App { fun: Box::new(acc), arg: Box::new(arg) };
@@ -259,7 +265,7 @@ impl Rule {
     format!(
       "({}{}) = {}",
       def_names.name(def_id).unwrap(),
-      pats.iter().map(|x| format!(" {x}")).join(""),
+      pats.iter().map(|x| format!(" {x}", x = &**x)).join(""),
       body.to_string(def_names)
     )
   }
@@ -282,7 +288,9 @@ impl Definition {
 impl From<&Pattern> for Term {
   fn from(value: &Pattern) -> Self {
     match value {
-      Pattern::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
+      Pattern::Ctr(nam, args) => {
+        Term::call(Term::Var { nam: nam.clone() }, args.iter().map(|arg| Term::from(&**arg)))
+      }
       Pattern::Var(nam) => Term::Var { nam: Name::new(nam.as_ref().map(|x| x.as_str()).unwrap_or("_")) },
       Pattern::Num(num) => Term::Num { val: *num },
     }
@@ -298,7 +306,9 @@ impl fmt::Display for DefinitionBook {
 impl fmt::Display for Pattern {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Pattern::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
+      Pattern::Ctr(name, pats) => {
+        write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}", p = &**p)).join(""))
+      }
       Pattern::Var(nam) => write!(f, "{}", nam.as_ref().map(|x| x.as_str()).unwrap_or("*")),
       Pattern::Num(num) => write!(f, "{num}"),
     }

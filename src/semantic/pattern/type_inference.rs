@@ -92,7 +92,7 @@ fn get_types_from_def_patterns(def: &Definition) -> anyhow::Result<Vec<Type>> {
     let pats = def.rules.iter().map(|x| &x.pats[pat_idx]);
     let mut pat_type = Type::Any;
     for pat in pats {
-      if let Pattern::Ctr(..) = pat {
+      if let Pattern::Ctr(..) = &**pat {
         pat_type = Type::Adt(usize::MAX);
       }
     }
@@ -106,7 +106,7 @@ impl Definition {
   fn get_adt_from_pat(&self, pat_idx: usize) -> anyhow::Result<Adt> {
     let mut adt = Adt::new();
     for rule in &self.rules {
-      match &rule.pats[pat_idx] {
+      match &rule.pats[pat_idx].as_ref() {
         Pattern::Ctr(nam, args) => {
           if let Some(expected_arity) = adt.ctrs.get(nam) {
             if *expected_arity == self.arity() {

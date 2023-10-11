@@ -43,3 +43,9 @@ impl<T: std::fmt::Debug> Debug for Spanned<T> {
     self.inner.fmt(f)
   }
 }
+
+impl<T> From<T> for Spanned<T> {
+  fn from(value: T) -> Self {
+    Spanned::ghost(value)
+  }
+}
