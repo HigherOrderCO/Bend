@@ -219,7 +219,7 @@ impl Term {
       }
       Term::Dup { fst, snd, val, nxt } => {
         val.subst(from, to);
-        if fst.as_ref().map_or(true, |fst| fst == from) && snd.as_ref().map_or(true, |snd| snd == from) {
+        if fst.as_ref().map_or(true, |fst| fst != from) && snd.as_ref().map_or(true, |snd| snd != from) {
           nxt.subst(from, to);
         }
       }
