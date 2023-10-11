@@ -3,8 +3,6 @@ use crate::ast::{hvm_lang::DefNames, Definition, DefinitionBook, Name, Rule, Ter
 impl DefinitionBook {
   /// Applies bracket abstraction to remove lambdas form rule bodies,
   /// replacing it with applications with [`combinators`][Combinator]
-  ///
-  /// This pass generates non-sanitized rules, [`DefinitionBook::sanitize_vars`] should be called after
   pub fn detach_combinators(&mut self) {
     let mut comb = Vec::new();
 
@@ -228,18 +226,36 @@ impl From<Combinator> for Term {
     match value {
       Combinator::K => Self::lam("x", Self::lam("y", Self::var("x"))),
       Combinator::I => Self::lam("x", Self::var("x")),
+
       Combinator::B => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).xyz_lambda(),
       Combinator::B_ => Self::app(Self::var("x"), Self::app(Self::var("y"), Self::var("z"))).dxyz_lambda(),
       Combinator::C => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).xyz_lambda(),
       Combinator::C_ => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).dxyz_lambda(),
-      Combinator::S => {
-        Self::app(Self::app(Self::var("x"), Self::var("z")), Self::app(Self::var("y"), Self::var("z")))
-          .xyz_lambda()
+
+      Combinator::S => Self::Dup {
+        fst: Some(Name::new("z1")),
+        snd: Some(Name::new("z2")),
+        val: Box::new(Self::var("z")),
+        nxt: Box::new(Self::app(
+          Self::app(Self::var("x"), Self::var("z1")),
+          Self::app(Self::var("y"), Self::var("z2")),
+        )),
       }
-      Combinator::S_ => {
-        Self::app(Self::app(Self::var("x"), Self::var("z")), Self::app(Self::var("y"), Self::var("z")))
-          .dxyz_lambda()
-      }
+      .xyz_lambda(),
+
+      Combinator::S_ => Self::lam(
+        "d",
+        Self::Dup {
+          fst: Some(Name::new("z1")),
+          snd: Some(Name::new("z2")),
+          val: Box::new(Self::var("z")),
+          nxt: Box::new(Self::app(
+            Self::app(Self::var("d"), Self::app(Self::var("x"), Self::var("z1"))),
+            Self::app(Self::var("y"), Self::var("z2")),
+          )),
+        }
+        .xyz_lambda(),
+      ),
     }
   }
 }
@@ -324,10 +340,10 @@ impl AbsTerm {
       Self::Term(term) => term.abstract_by(name),
 
       // [name] Combinator => K Combinator
-      Self::Comb(comb) => Self::call(Combinator::K, [Self::Comb(comb)]),
+      Self::Comb(_) => Self::call(Combinator::K, [self]),
 
       // (a)
-      e if !e.occurs_check(name) => AbsTerm::call(Combinator::K, vec![e]),
+      e if !e.occurs_check(name) => Self::call(Combinator::K, vec![e]),
 
       // (c)
       Self::App(fun, box Self::Term(Term::Var { nam: Name(_) })) if !fun.occurs_check(name) => *fun,
@@ -335,10 +351,10 @@ impl AbsTerm {
       // (d', e', f')
       Self::App(box Self::App(fun, arg), arg2) if !fun.occurs_check(name) => {
         match (arg.occurs_check(name), arg2.occurs_check(name)) {
-          (false, true) => AbsTerm::call(Combinator::B_, vec![*fun, *arg, arg2.abstract_by(name)]),
-          (true, false) => AbsTerm::call(Combinator::C_, vec![*fun, arg.abstract_by(name), *arg2]),
+          (false, true) => Self::call(Combinator::B_, vec![*fun, *arg, arg2.abstract_by(name)]),
+          (true, false) => Self::call(Combinator::C_, vec![*fun, arg.abstract_by(name), *arg2]),
           (true, true) => {
-            AbsTerm::call(Combinator::S_, vec![*fun, arg.abstract_by(name), arg2.abstract_by(name)])
+            Self::call(Combinator::S_, vec![*fun, arg.abstract_by(name), arg2.abstract_by(name)])
           }
           (false, false) => unreachable!(),
         }
@@ -346,9 +362,9 @@ impl AbsTerm {
 
       // (d, e, f)
       Self::App(fun, arg) => match (fun.occurs_check(name), arg.occurs_check(name)) {
-        (false, true) => AbsTerm::call(Combinator::B, vec![*fun, arg.abstract_by(name)]),
-        (true, false) => AbsTerm::call(Combinator::C, vec![fun.abstract_by(name), *arg]),
-        (true, true) => AbsTerm::call(Combinator::S, vec![fun.abstract_by(name), arg.abstract_by(name)]),
+        (false, true) => Self::call(Combinator::B, vec![*fun, arg.abstract_by(name)]),
+        (true, false) => Self::call(Combinator::C, vec![fun.abstract_by(name), *arg]),
+        (true, true) => Self::call(Combinator::S, vec![fun.abstract_by(name), arg.abstract_by(name)]),
         (false, false) => unreachable!(),
       },
     }
