@@ -18,7 +18,7 @@ impl DefinitionBook {
   pub fn sanitize_vars(&mut self) -> anyhow::Result<()> {
     for def in self.defs.iter_mut() {
       for rule in def.rules.iter_mut() {
-        rule.body = rule.body.sanitize_vars(&self.def_names)?;
+        rule.body = rule.body.sanitize_vars(&self.def_names)?.into();
       }
     }
     Ok(())
@@ -196,11 +196,11 @@ fn unique_var_names(term: &Term, def_names: &DefNames) -> anyhow::Result<(Term, 
         push_name(nam.clone(), name_map, name_count, var_uses);
         let bod = go(bod, name_map, name_count, var_uses, def_names)?;
         let nam = pop_name(nam, name_map);
-        Term::Lam { nam: Some(nam), bod: Box::new(bod) }
+        Term::Lam { nam: Some(nam), bod: Box::new(bod.into()) }
       }
       Term::Lam { nam: None, bod } => {
         let bod = go(bod, name_map, name_count, var_uses, def_names)?;
-        Term::Lam { nam: None, bod: Box::new(bod) }
+        Term::Lam { nam: None, bod: Box::new(bod.into()) }
       }
       Term::Var { nam } => {
         if let Some(nam) = use_var(nam, name_map, var_uses) {
@@ -213,19 +213,19 @@ fn unique_var_names(term: &Term, def_names: &DefNames) -> anyhow::Result<(Term, 
       Term::Chn { nam, bod } => {
         // Global lam names are already unique, so no need to do anything
         let bod = go(bod, name_map, name_count, var_uses, def_names)?;
-        Term::Chn { nam: nam.clone(), bod: Box::new(bod) }
+        Term::Chn { nam: nam.clone(), bod: Box::new(bod.into()) }
       }
       Term::Let { nam, val, nxt } => {
         let val = go(val, name_map, name_count, var_uses, def_names)?;
         push_name(nam.clone(), name_map, name_count, var_uses);
         let nxt = go(nxt, name_map, name_count, var_uses, def_names)?;
         let nam = pop_name(nam, name_map);
-        Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) }
+        Term::Let { nam, val: Box::new(val.into()), nxt: Box::new(nxt.into()) }
       }
       Term::App { fun, arg } => {
         let fun = go(fun, name_map, name_count, var_uses, def_names)?;
         let arg = go(arg, name_map, name_count, var_uses, def_names)?;
-        Term::App { fun: Box::new(fun), arg: Box::new(arg) }
+        Term::App { fun: Box::new(fun.into()), arg: Box::new(arg.into()) }
       }
       Term::Dup { fst, snd, val, nxt } => {
         let val = go(val, name_map, name_count, var_uses, def_names)?;
@@ -238,23 +238,23 @@ fn unique_var_names(term: &Term, def_names: &DefNames) -> anyhow::Result<(Term, 
         let nxt = go(nxt, name_map, name_count, var_uses, def_names)?;
         let snd = snd.as_ref().map(|snd| pop_name(snd, name_map));
         let fst = fst.as_ref().map(|fst| pop_name(fst, name_map));
-        Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(nxt) }
+        Term::Dup { fst, snd, val: Box::new(val.into()), nxt: Box::new(nxt.into()) }
       }
       Term::Sup { fst, snd } => {
         let fst = go(fst, name_map, name_count, var_uses, def_names)?;
         let snd = go(snd, name_map, name_count, var_uses, def_names)?;
-        Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }
+        Term::Sup { fst: Box::new(fst.into()), snd: Box::new(snd.into()) }
       }
       Term::Opx { op, fst, snd } => {
         let fst = go(fst, name_map, name_count, var_uses, def_names)?;
         let snd = go(snd, name_map, name_count, var_uses, def_names)?;
-        Term::Opx { op: *op, fst: Box::new(fst), snd: Box::new(snd) }
+        Term::Opx { op: *op, fst: Box::new(fst.into()), snd: Box::new(snd.into()) }
       }
       Term::If { cond, then, els_ } => {
         let cond = go(cond, name_map, name_count, var_uses, def_names)?;
         let then = go(then, name_map, name_count, var_uses, def_names)?;
         let els_ = go(els_, name_map, name_count, var_uses, def_names)?;
-        Term::If { cond: Box::new(cond), then: Box::new(then), els_: Box::new(els_) }
+        Term::If { cond: Box::new(cond.into()), then: Box::new(then.into()), els_: Box::new(els_.into()) }
       }
       t @ (Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. }) => t.clone(),
     };
@@ -283,14 +283,14 @@ fn term_to_affine(
         snd: if i == uses - 1 { Some(dup_name(nam, uses)) } else { Some(internal_dup_name(nam, uses)) },
         val: if i == 1 {
           if let Some(dup_body) = &dup_body {
-            Box::new(dup_body.clone()) // TODO: don't clone here
+            Box::new(dup_body.clone().into()) // TODO: don't clone here
           } else {
-            Box::new(Term::Var { nam: nam.clone() })
+            Box::new(Term::Var { nam: nam.clone() }.into())
           }
         } else {
-          Box::new(Term::Var { nam: internal_dup_name(nam, uses) })
+          Box::new(Term::Var { nam: internal_dup_name(nam, uses) }.into())
         },
-        nxt: Box::new(nxt),
+        nxt: Box::new(nxt.into()),
       };
     }
     nxt
@@ -319,13 +319,13 @@ fn term_to_affine(
 
   let term = match term {
     Term::Lam { nam: None, bod } => {
-      Term::Lam { nam: None, bod: Box::new(term_to_affine(*bod, var_uses, let_bodies)?) }
+      Term::Lam { nam: None, bod: Box::new(term_to_affine(bod.inner, var_uses, let_bodies)?.into()) }
     }
     Term::Lam { nam: Some(nam), bod } => {
       if let Some(uses) = var_uses.get(&nam).copied() {
-        let bod = term_to_affine(*bod, var_uses, let_bodies)?;
+        let bod = term_to_affine(**bod, var_uses, let_bodies)?;
         let (bod, nam) = duplicate_lam(nam, bod, uses);
-        Term::Lam { nam, bod: Box::new(bod) }
+        Term::Lam { nam, bod: Box::new(bod.into()) }
       } else {
         Term::Lam { nam: None, bod }
       }
@@ -335,19 +335,21 @@ fn term_to_affine(
       *var_uses.get_mut(&nam).unwrap() -= 1;
       if let Some(subst) = let_bodies.remove(&nam) { subst } else { Term::Var { nam: dup_name(&nam, uses) } }
     }
-    Term::Chn { nam, bod } => Term::Chn { nam, bod: Box::new(term_to_affine(*bod, var_uses, let_bodies)?) },
+    Term::Chn { nam, bod } => {
+      Term::Chn { nam, bod: Box::new(term_to_affine(**bod, var_uses, let_bodies)?.into()) }
+    }
     Term::Let { nam, val, nxt } => {
       let uses = var_uses[&nam];
       match uses {
-        0 => term_to_affine(*nxt, var_uses, let_bodies)?,
+        0 => term_to_affine(**nxt, var_uses, let_bodies)?,
         1 => {
-          let val = term_to_affine(*val, var_uses, let_bodies)?;
+          let val = term_to_affine(**val, var_uses, let_bodies)?;
           let_bodies.insert(nam, val);
-          term_to_affine(*nxt, var_uses, let_bodies)?
+          term_to_affine(**nxt, var_uses, let_bodies)?
         }
         uses => {
-          let val = term_to_affine(*val, var_uses, let_bodies)?;
-          let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
+          let val = term_to_affine(**val, var_uses, let_bodies)?;
+          let nxt = term_to_affine(**nxt, var_uses, let_bodies)?;
           duplicate_let(&nam, nxt, uses, val)
         }
       }
@@ -355,11 +357,11 @@ fn term_to_affine(
     Term::Dup { fst, snd, val, nxt } => {
       let uses_fst = fst.as_ref().map(|fst| *var_uses.get(fst).unwrap()).unwrap_or(0);
       let uses_snd = snd.as_ref().map(|snd| *var_uses.get(snd).unwrap()).unwrap_or(0);
-      let val = term_to_affine(*val, var_uses, let_bodies)?;
-      let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
+      let val = term_to_affine(**val, var_uses, let_bodies)?;
+      let nxt = term_to_affine(**nxt, var_uses, let_bodies)?;
       let (nxt, fst) = if let Some(fst) = fst { duplicate_lam(fst, nxt, uses_fst) } else { (nxt, fst) };
       let (nxt, snd) = if let Some(snd) = snd { duplicate_lam(snd, nxt, uses_snd) } else { (nxt, snd) };
-      Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(nxt) }
+      Term::Dup { fst, snd, val: Box::new(val.into()), nxt: Box::new(nxt.into()) }
     }
     Term::If { cond, then, els_ } => Term::If {
       cond: Box::new(term_to_affine(*cond, var_uses, let_bodies)?),
@@ -367,17 +369,17 @@ fn term_to_affine(
       els_: Box::new(term_to_affine(*els_, var_uses, let_bodies)?),
     },
     Term::App { fun, arg } => Term::App {
-      fun: Box::new(term_to_affine(*fun, var_uses, let_bodies)?),
-      arg: Box::new(term_to_affine(*arg, var_uses, let_bodies)?),
+      fun: Box::new(term_to_affine(**fun, var_uses, let_bodies)?.into()),
+      arg: Box::new(term_to_affine(**arg, var_uses, let_bodies)?.into()),
     },
     Term::Sup { fst, snd } => Term::Sup {
-      fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
-      snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
+      fst: Box::new(term_to_affine(**fst, var_uses, let_bodies)?.into()),
+      snd: Box::new(term_to_affine(**snd, var_uses, let_bodies)?.into()),
     },
     Term::Opx { op, fst, snd } => Term::Opx {
       op,
-      fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
-      snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
+      fst: Box::new(term_to_affine(**fst, var_uses, let_bodies)?.into()),
+      snd: Box::new(term_to_affine(**snd, var_uses, let_bodies)?.into()),
     },
     t @ (Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. }) => t,
   };
