@@ -285,7 +285,7 @@ fn readback_compat(net: &INet) -> (Term, bool) {
                 )
               }
             }
-            Term::Opx { op, fst: _, snd } => (Term::Opx { op, fst: snd, snd: Box::new(arg_term) }, valid),
+            Term::Opx { op, fst, snd: _ } => (Term::Opx { op, fst, snd: Box::new(arg_term) }, valid),
             // TODO: Actually unreachable?
             _ => unreachable!(),
           }
