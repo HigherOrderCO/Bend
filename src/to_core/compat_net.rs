@@ -153,7 +153,7 @@ fn encode_term(
     }
     // core: & #op ~ <fst <snd ret>>
     Term::Opx { op, fst, snd } => {
-      let op_node = new_node(inet, NUM | op_to_label(*op));
+      let op_node = new_node(inet, NUM | op_to_label(**op));
       link(inet, port(op_node, 1), port(op_node, 2));
 
       let fst_node = new_node(inet, OP2);

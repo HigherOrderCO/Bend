@@ -27,7 +27,7 @@ pub type SpannedRule = Spanned<Rule>;
 #[derive(Debug, Clone)]
 pub struct Rule {
   pub def_id: DefId,
-  pub pats: Vec<Pattern>,
+  pub pats: Vec<SpannedPattern>,
   pub body: SpannedTerm,
 }
 
@@ -36,7 +36,7 @@ pub type SpannedPattern = Spanned<Pattern>;
 
 #[derive(Debug, Clone)]
 pub enum Pattern {
-  Ctr(Name, Vec<Pattern>),
+  Ctr(Name, Vec<SpannedPattern>),
   Var(Option<Name>),
   Num(u32),
 }

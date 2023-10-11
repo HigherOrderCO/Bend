@@ -1,7 +1,7 @@
 use super::lexer::LexingError;
 use crate::{
   ast::{
-    hvm_lang::{Pattern, SpannedTerm},
+    hvm_lang::{Pattern, SpannedPattern, SpannedTerm},
     spanned::Spanned,
     DefId, Definition, DefinitionBook, Name, Rule, Term,
   },
@@ -243,7 +243,7 @@ where
   })
 }
 
-fn pattern<'a, I>() -> impl Parser<'a, I, Pattern, extra::Err<Rich<'a, Token>>>
+fn pattern<'a, I>() -> impl Parser<'a, I, SpannedPattern, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -251,10 +251,19 @@ where
     let ctr = name()
       .then(pattern.repeated().collect())
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|(name, pats)| Pattern::Ctr(name, pats))
+      .map_with_span(|(name, pats), span: SimpleSpan| {
+        Spanned::new(Pattern::Ctr(name, pats), span.into_range())
+      })
       .boxed();
-    let var = name_or_era().map(Pattern::Var).boxed();
-    let num = select!(Token::Num(num) => Pattern::Num(num)).boxed();
+
+    let var = name_or_era()
+      .map_with_span(|nam, span: SimpleSpan| Spanned::new(Pattern::Var(nam), span.into_range()))
+      .boxed();
+
+    let num = select!(Token::Num(num) => Pattern::Num(num))
+      .map_with_span(|pat, span: SimpleSpan| Spanned::new(pat, span.into_range()))
+      .boxed();
+
     choice((ctr, num, var))
   })
 }
