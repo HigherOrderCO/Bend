@@ -1,6 +1,7 @@
 pub mod compat;
 pub mod core;
 pub mod hvm_lang;
+pub mod spanned;
 
 pub use hvm_lang::{Definition, DefinitionBook, Rule, Term};
 
