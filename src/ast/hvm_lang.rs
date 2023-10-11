@@ -16,7 +16,7 @@ pub struct DefinitionBook {
 }
 
 /// A [Definition] with byte range.
-type SpannedDefinition = Spanned<Definition>;
+pub type SpannedDefinition = Spanned<Definition>;
 
 #[derive(Debug, Clone)]
 pub struct Definition {
@@ -205,13 +205,13 @@ impl Term {
       .fold(called, |acc, arg| Term::App { fun: Box::new(acc.into()), arg: Box::new(arg.into()) })
   }
 
-  pub fn call_spanned(called: SpannedTerm, args: impl IntoIterator<Item = SpannedTerm>) -> Spanned<Self> {
-    args.into_iter().fold(called, |acc, arg| {
-      let span = called.mix(&arg);
-      let t = Term::App { fun: Box::new(acc), arg: Box::new(arg) };
-      Spanned::new(t, span)
-    })
-  }
+  // pub fn call_spanned(called: SpannedTerm, args: impl IntoIterator<Item = SpannedTerm>) -> Spanned<Self> {
+  //   args.into_iter().fold(called, |acc, arg| {
+  //     let span = called.mix(&arg);
+  //     let t = Term::App { fun: Box::new(acc), arg: Box::new(arg) };
+  //     Spanned::new(t, span)
+  //   })
+  // }
 
   /// Substitute the occurences of a variable in a term with the given term.
   pub fn subst(&mut self, from: &Name, to: &Term) {

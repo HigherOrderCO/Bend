@@ -49,3 +49,9 @@ impl<T> From<T> for Spanned<T> {
     Spanned::ghost(value)
   }
 }
+
+impl<T> std::ops::DerefMut for Spanned<T> {
+  fn deref_mut(&mut self) -> &mut Self::Target {
+    &mut self.inner
+  }
+}

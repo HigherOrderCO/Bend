@@ -248,7 +248,7 @@ fn unique_var_names(term: &Term, def_names: &DefNames) -> anyhow::Result<(Term, 
       Term::Opx { op, fst, snd } => {
         let fst = go(fst, name_map, name_count, var_uses, def_names)?;
         let snd = go(snd, name_map, name_count, var_uses, def_names)?;
-        Term::Opx { op: *op, fst: Box::new(fst.into()), snd: Box::new(snd.into()) }
+        Term::Opx { op: op.clone(), fst: Box::new(fst.into()), snd: Box::new(snd.into()) }
       }
       Term::If { cond, then, els_ } => {
         let cond = go(cond, name_map, name_count, var_uses, def_names)?;
@@ -323,7 +323,7 @@ fn term_to_affine(
     }
     Term::Lam { nam: Some(nam), bod } => {
       if let Some(uses) = var_uses.get(&nam).copied() {
-        let bod = term_to_affine(**bod, var_uses, let_bodies)?;
+        let bod = term_to_affine(bod.inner, var_uses, let_bodies)?;
         let (bod, nam) = duplicate_lam(nam, bod, uses);
         Term::Lam { nam, bod: Box::new(bod.into()) }
       } else {
@@ -336,20 +336,20 @@ fn term_to_affine(
       if let Some(subst) = let_bodies.remove(&nam) { subst } else { Term::Var { nam: dup_name(&nam, uses) } }
     }
     Term::Chn { nam, bod } => {
-      Term::Chn { nam, bod: Box::new(term_to_affine(**bod, var_uses, let_bodies)?.into()) }
+      Term::Chn { nam, bod: Box::new(term_to_affine(bod.inner, var_uses, let_bodies)?.into()) }
     }
     Term::Let { nam, val, nxt } => {
       let uses = var_uses[&nam];
       match uses {
-        0 => term_to_affine(**nxt, var_uses, let_bodies)?,
+        0 => term_to_affine(nxt.inner, var_uses, let_bodies)?,
         1 => {
-          let val = term_to_affine(**val, var_uses, let_bodies)?;
+          let val = term_to_affine(val.inner, var_uses, let_bodies)?;
           let_bodies.insert(nam, val);
-          term_to_affine(**nxt, var_uses, let_bodies)?
+          term_to_affine(nxt.inner, var_uses, let_bodies)?
         }
         uses => {
-          let val = term_to_affine(**val, var_uses, let_bodies)?;
-          let nxt = term_to_affine(**nxt, var_uses, let_bodies)?;
+          let val = term_to_affine(val.inner, var_uses, let_bodies)?;
+          let nxt = term_to_affine(nxt.inner, var_uses, let_bodies)?;
           duplicate_let(&nam, nxt, uses, val)
         }
       }
@@ -357,8 +357,8 @@ fn term_to_affine(
     Term::Dup { fst, snd, val, nxt } => {
       let uses_fst = fst.as_ref().map(|fst| *var_uses.get(fst).unwrap()).unwrap_or(0);
       let uses_snd = snd.as_ref().map(|snd| *var_uses.get(snd).unwrap()).unwrap_or(0);
-      let val = term_to_affine(**val, var_uses, let_bodies)?;
-      let nxt = term_to_affine(**nxt, var_uses, let_bodies)?;
+      let val = term_to_affine(val.inner, var_uses, let_bodies)?;
+      let nxt = term_to_affine(nxt.inner, var_uses, let_bodies)?;
       let (nxt, fst) = if let Some(fst) = fst { duplicate_lam(fst, nxt, uses_fst) } else { (nxt, fst) };
       let (nxt, snd) = if let Some(snd) = snd { duplicate_lam(snd, nxt, uses_snd) } else { (nxt, snd) };
       Term::Dup { fst, snd, val: Box::new(val.into()), nxt: Box::new(nxt.into()) }
@@ -369,17 +369,17 @@ fn term_to_affine(
       els_: Box::new(term_to_affine(*els_, var_uses, let_bodies)?),
     },
     Term::App { fun, arg } => Term::App {
-      fun: Box::new(term_to_affine(**fun, var_uses, let_bodies)?.into()),
-      arg: Box::new(term_to_affine(**arg, var_uses, let_bodies)?.into()),
+      fun: Box::new(term_to_affine(fun.inner, var_uses, let_bodies)?.into()),
+      arg: Box::new(term_to_affine(arg.inner, var_uses, let_bodies)?.into()),
     },
     Term::Sup { fst, snd } => Term::Sup {
-      fst: Box::new(term_to_affine(**fst, var_uses, let_bodies)?.into()),
-      snd: Box::new(term_to_affine(**snd, var_uses, let_bodies)?.into()),
+      fst: Box::new(term_to_affine(fst.inner, var_uses, let_bodies)?.into()),
+      snd: Box::new(term_to_affine(snd.inner, var_uses, let_bodies)?.into()),
     },
     Term::Opx { op, fst, snd } => Term::Opx {
       op,
-      fst: Box::new(term_to_affine(**fst, var_uses, let_bodies)?.into()),
-      snd: Box::new(term_to_affine(**snd, var_uses, let_bodies)?.into()),
+      fst: Box::new(term_to_affine(fst.inner, var_uses, let_bodies)?.into()),
+      snd: Box::new(term_to_affine(snd.inner, var_uses, let_bodies)?.into()),
     },
     t @ (Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. }) => t,
   };

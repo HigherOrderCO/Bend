@@ -49,8 +49,9 @@ pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Toke
 
 pub fn parse_term(code: &str) -> Result<SpannedTerm, Vec<Rich<Token>>> {
   let inline_app = term().foldl(term().repeated(), |fun, arg| {
+    let span = fun.mix(&arg);
     let t = Term::App { fun: Box::new(fun), arg: Box::new(arg) };
-    Spanned::new(t, fun.mix(&arg))
+    Spanned::new(t, span)
   });
   let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| {
     let span = op.mix(&snd);

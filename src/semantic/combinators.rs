@@ -1,4 +1,4 @@
-use crate::ast::{hvm_lang::DefNames, DefId, Definition, DefinitionBook, Name, Rule, Term};
+use crate::ast::{hvm_lang::DefNames, spanned::Spanned, DefId, Definition, DefinitionBook, Name, Rule, Term};
 use std::collections::HashSet;
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
@@ -9,10 +9,12 @@ impl DefinitionBook {
 
     for def in self.defs.iter_mut() {
       for rule in def.rules.iter_mut() {
-        rule.body.detach_combinators(rule.def_id, &mut self.def_names, &mut combinators);
+        let rule_id = rule.def_id;
+        rule.body.detach_combinators(rule_id, &mut self.def_names, &mut combinators);
       }
     }
 
+    let mut combinators = combinators.into_iter().map(Spanned::ghost).collect();
     self.defs.append(&mut combinators)
   }
 }
@@ -62,7 +64,7 @@ impl<'d> TermInfo<'d> {
     let comb_var = Term::Ref { def_id: comb_id };
     let extracted_term = std::mem::replace(term, comb_var);
 
-    let rules = vec![Rule { def_id: comb_id, pats: Vec::new(), body: extracted_term }];
+    let rules = vec![Rule { def_id: comb_id, pats: Vec::new(), body: extracted_term.into() }.into()];
     let def = Definition { def_id: comb_id, rules };
     self.combinators.push(def);
   }
