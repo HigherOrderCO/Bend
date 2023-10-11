@@ -1,4 +1,4 @@
-use super::{DefId, Name};
+use super::{spanned::Spanned, DefId, Name};
 use bimap::{BiHashMap, Overwritten};
 use itertools::Itertools;
 use std::fmt;
@@ -21,12 +21,18 @@ pub struct Definition {
   pub rules: Vec<Rule>,
 }
 
+/// A [Rule] with byte range.
+pub type SpannedRule = Spanned<Rule>;
+
 #[derive(Debug, Clone)]
 pub struct Rule {
   pub def_id: DefId,
   pub pats: Vec<Pattern>,
-  pub body: Term,
+  pub body: SpannedTerm,
 }
+
+/// A [Pattern] with byte range.
+pub type SpannedPattern = Spanned<Pattern>;
 
 #[derive(Debug, Clone)]
 pub enum Pattern {
@@ -35,11 +41,14 @@ pub enum Pattern {
   Num(u32),
 }
 
+/// A [Term] with byte range.
+pub type SpannedTerm = Spanned<Term>;
+
 #[derive(Debug, Clone)]
 pub enum Term {
   Lam {
     nam: Option<Name>,
-    bod: Box<Term>,
+    bod: Box<SpannedTerm>,
   },
   Var {
     nam: Name,
@@ -47,7 +56,7 @@ pub enum Term {
   /// Like a scopeless lambda, where the variable can occur outside the body
   Chn {
     nam: Name,
-    bod: Box<Term>,
+    bod: Box<SpannedTerm>,
   },
   /// The use of a Channel variable.
   Lnk {
@@ -55,30 +64,30 @@ pub enum Term {
   },
   Let {
     nam: Name,
-    val: Box<Term>,
-    nxt: Box<Term>,
+    val: Box<SpannedTerm>,
+    nxt: Box<SpannedTerm>,
   },
   Ref {
     def_id: DefId,
   },
   App {
-    fun: Box<Term>,
-    arg: Box<Term>,
+    fun: Box<SpannedTerm>,
+    arg: Box<SpannedTerm>,
   },
   If {
-    cond: Box<Term>,
-    then: Box<Term>,
-    els_: Box<Term>,
+    cond: Box<SpannedTerm>,
+    then: Box<SpannedTerm>,
+    els_: Box<SpannedTerm>,
   },
   Dup {
     fst: Option<Name>,
     snd: Option<Name>,
-    val: Box<Term>,
-    nxt: Box<Term>,
+    val: Box<SpannedTerm>,
+    nxt: Box<SpannedTerm>,
   },
   Sup {
-    fst: Box<Term>,
-    snd: Box<Term>,
+    fst: Box<SpannedTerm>,
+    snd: Box<SpannedTerm>,
   },
   Era,
   Num {
@@ -86,9 +95,9 @@ pub enum Term {
   },
   /// A numeric operation between built-in numbers.
   Opx {
-    op: Op,
-    fst: Box<Term>,
-    snd: Box<Term>,
+    op: Spanned<Op>,
+    fst: Box<SpannedTerm>,
+    snd: Box<SpannedTerm>,
   },
 }
 
@@ -181,14 +190,18 @@ impl Term {
       Term::Era => "*".to_string(),
       Term::Num { val } => format!("{val}"),
       Term::Opx { op, fst, snd } => {
-        format!("({} {} {})", op, fst.to_string(def_names), snd.to_string(def_names))
+        format!("({} {} {})", **op, fst.to_string(def_names), snd.to_string(def_names))
       }
     }
   }
 
   /// Make a call term by folding args around a called function term with applications.
-  pub fn call(called: Term, args: impl IntoIterator<Item = Term>) -> Self {
-    args.into_iter().fold(called, |acc, arg| Term::App { fun: Box::new(acc), arg: Box::new(arg) })
+  pub fn call(called: SpannedTerm, args: impl IntoIterator<Item = SpannedTerm>) -> Spanned<Self> {
+    args.into_iter().fold(called, |acc, arg| {
+      let span = called.mix(&arg);
+      let t = Term::App { fun: Box::new(acc), arg: Box::new(arg) };
+      Spanned::new(t, span)
+    })
   }
 
   /// Substitute the occurences of a variable in a term with the given term.

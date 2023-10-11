@@ -1,6 +1,10 @@
 use super::lexer::LexingError;
 use crate::{
-  ast::{hvm_lang::Pattern, DefId, Definition, DefinitionBook, Name, Rule, Term},
+  ast::{
+    hvm_lang::{Pattern, SpannedTerm},
+    spanned::Spanned,
+    DefId, Definition, DefinitionBook, Name, Rule, Term,
+  },
   parser::lexer::Token,
 };
 use chumsky::{
@@ -43,13 +47,15 @@ pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Toke
   book().parse(token_stream(code)).into_result()
 }
 
-pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
-  let inline_app =
-    term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
-  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opx {
-    op,
-    fst: Box::new(fst),
-    snd: Box::new(snd),
+pub fn parse_term(code: &str) -> Result<SpannedTerm, Vec<Rich<Token>>> {
+  let inline_app = term().foldl(term().repeated(), |fun, arg| {
+    let t = Term::App { fun: Box::new(fun), arg: Box::new(arg) };
+    Spanned::new(t, fun.mix(&arg))
+  });
+  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| {
+    let span = op.mix(&snd);
+    let t = Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) };
+    Spanned::new(t, span)
   });
   let standalone_term = choice((inline_app, inline_num_oper))
     .delimited_by(just(Token::NewLine).repeated(), just(Token::NewLine).repeated());
@@ -93,7 +99,7 @@ where
   choice((select!(Token::Asterisk => None), name().map(Some)))
 }
 
-fn num_oper<'a, I>() -> impl Parser<'a, I, Op, extra::Err<Rich<'a, Token>>>
+fn num_oper<'a, I>() -> impl Parser<'a, I, Spanned<Op>, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -114,18 +120,25 @@ where
     Token::Shl => Op::LSH,
     Token::Shr => Op::RSH,
   }
+  .map_with_span(|op, span: SimpleSpan| Spanned::new(op, span.into_range()))
 }
 
-fn term<'a, I>() -> impl Parser<'a, I, Term, extra::Err<Rich<'a, Token>>>
+fn term<'a, I>() -> impl Parser<'a, I, SpannedTerm, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   let new_line = || just(Token::NewLine).repeated();
-  let var = name().map(|name| Term::Var { nam: name }).boxed();
-  let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::Lnk { nam: name }).boxed();
+  let var = name()
+    .map_with_span(|name, span: SimpleSpan| Spanned::new(Term::Var { nam: name }, span.into_range()))
+    .boxed();
+  let global_var = just(Token::Dollar)
+    .ignore_then(name())
+    .map_with_span(|name, span: SimpleSpan| Spanned::new(Term::Lnk { nam: name }, span.into_range()))
+    .boxed();
   let term_sep = choice((just(Token::NewLine), just(Token::Semicolon)));
 
-  let unsigned = select!(Token::Num(num) => Term::Num{val: num});
+  let unsigned = select!(Token::Num(num) => Term::Num{val: num})
+    .map_with_span(|term, span: SimpleSpan| Spanned::new(term, span.into_range()));
 
   recursive(|term| {
     // λx body
@@ -134,7 +147,10 @@ where
       .ignore_then(name_or_era())
       .then_ignore(new_line())
       .then(term.clone())
-      .map(|(name, body)| Term::Lam { nam: name, bod: Box::new(body) })
+      .map_with_span(|(name, body), span: SimpleSpan| {
+        let t = Term::Lam { nam: name, bod: Box::new(body) };
+        Spanned::new(t, span.into_range())
+      })
       .boxed();
 
     // λ$x body
@@ -145,7 +161,10 @@ where
       .ignore_then(name())
       .then_ignore(new_line())
       .then(term.clone())
-      .map(|(name, body)| Term::Chn { nam: name, bod: Box::new(body) })
+      .map_with_span(|(name, body), span: SimpleSpan| {
+        let t = Term::Chn { nam: name, bod: Box::new(body) };
+        Spanned::new(t, span.into_range())
+      })
       .boxed();
 
     // dup x1 x2 = body; next
@@ -161,7 +180,10 @@ where
       .then_ignore(term_sep.clone())
       .then_ignore(new_line())
       .then(term.clone())
-      .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) })
+      .map_with_span(|(((fst, snd), val), next), span: SimpleSpan| {
+        let t = Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) };
+        Spanned::new(t, span.into_range())
+      })
       .boxed();
 
     // let x = body; next
@@ -175,7 +197,10 @@ where
       .then_ignore(term_sep)
       .then_ignore(new_line())
       .then(term.clone())
-      .map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) })
+      .map_with_span(|((nam, val), nxt), span: SimpleSpan| {
+        let t = Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) };
+        Spanned::new(t, span.into_range())
+      })
       .boxed();
 
     let if_ = just(Token::If)
@@ -185,18 +210,17 @@ where
       .then(term.clone())
       .then_ignore(select!(Token::Name(nam) if nam == "else" => ()))
       .then(term.clone())
-      .map(|((cond, then), els_)| Term::If {
-        cond: Box::new(cond),
-        then: Box::new(then),
-        els_: Box::new(els_),
+      .map_with_span(|((cond, then), els_), span: SimpleSpan| {
+        let t = Term::If { cond: Box::new(cond), then: Box::new(then), els_: Box::new(els_) };
+        Spanned::new(t, span.into_range())
       });
 
     // (f arg1 arg2 ...)
     let app = term
       .clone()
-      .foldl(new_line().ignore_then(term.clone()).repeated(), |fun, arg| Term::App {
-        fun: Box::new(fun),
-        arg: Box::new(arg),
+      .foldl(new_line().ignore_then(term.clone()).repeated(), |fun, arg| {
+        let span = fun.mix(&arg);
+        Spanned::new(Term::App { fun: Box::new(fun), arg: Box::new(arg) }, span)
       })
       .delimited_by(new_line(), new_line())
       .delimited_by(just(Token::LParen), just(Token::RParen))
@@ -209,7 +233,10 @@ where
       .then(term.clone())
       .delimited_by(new_line(), new_line())
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
+      .map_with_span(|((op, fst), snd), span: SimpleSpan| {
+        let t = Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) };
+        Spanned::new(t, span.into_range())
+      })
       .boxed();
 
     choice((global_var, var, unsigned, global_lam, lam, dup, let_, if_, num_op, app))
@@ -236,12 +263,15 @@ fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let inline_app =
-    term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
-  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opx {
-    op,
-    fst: Box::new(fst),
-    snd: Box::new(snd),
+  let inline_app = term().foldl(term().repeated(), |fun, arg| {
+    let span = fun.mix(&arg);
+    let t = Term::App { fun: Box::new(fun), arg: Box::new(arg) };
+    Spanned::new(t, span)
+  });
+  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| {
+    let span = op.mix(&snd);
+    let t = Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) };
+    Spanned::new(t, span)
   });
 
   let lhs = name().then(pattern().repeated().collect()).boxed();
