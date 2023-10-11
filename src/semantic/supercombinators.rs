@@ -117,6 +117,13 @@ impl Term {
 
           fun_is_super && arg_is_super
         }
+        Term::If { cond, then, els_ } => {
+          let cond_is_super = go(cond, depth + 1, term_info);
+          let then_is_super = go(then, depth + 1, term_info);
+          let else_is_super = go(els_, depth + 1, term_info);
+
+          cond_is_super && then_is_super && else_is_super
+        }
         Term::Dup { fst, snd, val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_supper = go(nxt, depth + 1, term_info);
@@ -132,14 +139,15 @@ impl Term {
         }
 
         Term::Sup { .. } => todo!(),
-        Term::Era => true,
 
-        #[cfg(feature = "nums")]
-        Term::U32 { .. } => true,
-        #[cfg(feature = "nums")]
-        Term::I32 { .. } => true,
-        #[cfg(feature = "nums")]
-        Term::Opx { .. } => true,
+        Term::Era => true,
+        Term::Num { .. } => true,
+        Term::Opx { fst, snd, .. } => {
+          let fst_is_super = go(fst, depth + 1, term_info);
+          let snd_is_super = go(snd, depth + 1, term_info);
+
+          fst_is_super && snd_is_super
+        }
       }
     }
 

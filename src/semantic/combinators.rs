@@ -35,15 +35,21 @@ impl Term {
           go(fun, depth + 1, names, defs);
           go(arg, depth + 1, names, defs);
         }
+        Term::If { cond, then, els_ } => {
+          go(cond, depth + 1, names, defs);
+          go(then, depth + 1, names, defs);
+          go(els_, depth + 1, names, defs);
+        }
         Term::Dup { fst: _, snd: _, val, nxt } => {
           go(val, depth + 1, names, defs);
           go(nxt, depth + 1, names, defs);
         }
+        Term::Opx { fst, snd, .. } => {
+          go(fst, depth + 1, names, defs);
+          go(snd, depth + 1, names, defs);
+        }
         Term::Sup { .. } => todo!(),
-        Term::Var { .. } => {}
-        Term::Lnk { .. } => {}
-        Term::Ref { .. } => {}
-        Term::Era => {}
+        Term::Var { .. } | Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } => {}
       }
     }
 
@@ -53,16 +59,19 @@ impl Term {
   /// Heuristics for when a term is simple enough to not need to be abstracted.
   fn is_simple(&self) -> bool {
     match self {
-      Self::Var { .. } => true,
       Self::Lam { nam: _, bod } => bod.is_simple(),
       Self::Chn { nam: _, bod } => bod.is_simple(),
-      Self::Lnk { .. } => true,
-      Self::Let { .. } => false,
-      Self::Ref { .. } => true,
       Self::App { fun, arg } => fun.is_simple() && arg.is_simple(),
+      Self::If { cond, then, els_ } => cond.is_simple() && then.is_simple() && els_.is_simple(),
+      Self::Var { .. } => true,
+      Self::Lnk { .. } => true,
+      Self::Ref { .. } => true,
+      Self::Opx { .. } => true,
+      Self::Num { .. } => true,
+      Self::Era => true,
+      Self::Let { .. } => false,
       Self::Dup { .. } => false,
       Self::Sup { .. } => false,
-      Self::Era => true,
     }
   }
 
@@ -96,9 +105,11 @@ impl Term {
             && !snd.as_ref().is_some_and(|Name(n)| n == name)
             && nxt.occurs_check(name))
       }
-      Self::Lnk { .. } => false,
-      Self::Ref { .. } => false,
-      Self::Era => false,
+      Self::If { cond, then, els_ } => {
+        cond.occurs_check(name) || then.occurs_check(name) || els_.occurs_check(name)
+      }
+      Self::Opx { fst, snd, .. } => fst.occurs_check(name) || snd.occurs_check(name),
+      Self::Lnk { .. } | Self::Ref { .. } | Self::Num { .. } | Self::Era => false,
     }
   }
 
@@ -117,7 +128,6 @@ impl Term {
         Term::Let { nam: Name(n), val, nxt } => {
           check(val, name, inside_chn) || (n != name && check(nxt, name, inside_chn))
         }
-
         Term::Dup { fst, snd, val, nxt } => {
           if val.occurs_check(name) {
             if let Some(f) = fst {
@@ -137,9 +147,13 @@ impl Term {
               && !snd.as_ref().is_some_and(|Name(n)| n == name)
               && check(nxt, name, inside_chn))
         }
-
+        Term::If { cond, then, els_ } => {
+          cond.channel_check(name) || then.channel_check(name) || els_.channel_check(name)
+        }
+        Term::Opx { fst, snd, .. } => fst.channel_check(name) || snd.channel_check(name),
         Term::Lnk { .. } => false,
         Term::Ref { .. } => false,
+        Term::Num { .. } => false,
         Term::Era => false,
       }
     }
@@ -489,18 +503,18 @@ impl Term {
         A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
       }
 
-      // Term::channel_check invalidates abstraction of lambdas that have their variables inside of a channel
-      Self::Chn { .. } => unimplemented!(),
-
       Self::Sup { .. } => todo!(),
+      Self::If { .. } => todo!(),
+      Self::Opx { .. } => todo!(),
+
+      // Term::channel_check invalidates abstraction of lambdas that have their variables inside of a channel
+      Self::Chn { .. } => unreachable!(),
 
       // All cases of application are taken care by previous branches
       Self::App { .. } => unreachable!(),
 
       // The abstraction variable can not occur inside these, so case (a) catches all the next branches
-      Self::Ref { .. } => unreachable!(),
-      Self::Lnk { .. } => unreachable!(),
-      Self::Era => unreachable!(),
+      Self::Ref { .. } | Self::Lnk { .. } | Self::Num { .. } | Self::Era => unreachable!(),
     }
   }
 }
