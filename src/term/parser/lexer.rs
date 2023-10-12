@@ -88,7 +88,7 @@ pub enum Token {
 
   #[token("{")]
   LBracket,
-  
+
   #[token("}")]
   RBracket,
 
