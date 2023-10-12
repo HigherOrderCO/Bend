@@ -3,15 +3,13 @@
 
 pub mod from_core;
 pub mod net;
-pub mod semantic;
 pub mod term;
 pub mod to_core;
 
 use from_core::readback_net;
 use hvmc::{readback_lnet, LBook, LNet};
-use semantic::check_main;
 use std::time::Instant;
-use term::{DefId, DefNames, DefinitionBook, Term};
+use term::{DefId, DefNames, DefinitionBook, Term, Name};
 use to_core::{book_to_hvm_core, book_to_hvm_internal};
 
 pub use crate::term::load_book::load_file_to_book;
@@ -23,9 +21,10 @@ pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
 }
 
 pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<LBook> {
-  book.check_rule_arities()?;
-  book.flatten_rules();
-  book.sanitize_vars()?;
+  book.resolve_refs();
+  book.check_unbound_vars()?;
+  book.make_var_names_unique();
+  book.linearize_vars()?;
   book.detach_supercombinators();
   // book.try_into_affine()?;
   let core_book = book_to_hvm_core(book)?;
@@ -46,7 +45,11 @@ pub fn run_compiled(book: &LBook, main: DefId, mem_size: usize) -> (LNet, RunSta
 }
 
 pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
-  let main = check_main(&book)?;
+  let main = if let Some(main) = book.def_names.def_id(&Name::new("Main")) {
+    Ok(main)
+  } else {
+    Err(anyhow::anyhow!("File has no 'Main' definition"))
+  }?;
   let compiled = compile_book(&mut book)?;
   let (res_lnet, stats) = run_compiled(&compiled, main, mem_size);
   let (res_term, valid_readback) = readback_net(&res_lnet, &book)?;

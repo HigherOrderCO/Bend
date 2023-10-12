@@ -5,11 +5,11 @@ use hvm_lang::{
   term::{
     load_book::{display_err_for_text, display_miette_err},
     parser::{parse_definition_book, parse_term},
-    DefId, DefinitionBook,
+    DefinitionBook,
   },
   to_core::term_to_hvm_core,
 };
-use hvmc::{parse_lnet, show_lbook, show_lnet, Val};
+use hvmc::{parse_lnet, show_lbook, show_lnet};
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::{
@@ -133,17 +133,6 @@ fn readback_lnet() {
     } else {
       Ok(format!("Invalid readback:\n{}", term.to_string(&book.def_names)))
     }
-  })
-}
-
-#[test]
-fn flatten_rules() {
-  run_golden_test_dir(function_name!(), &|_, code| {
-    let book = parse_definition_book(code).map_err(|errs| {
-      let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
-      anyhow::anyhow!(msg)
-    })?;
-    Ok(book.to_string())
   })
 }
 
