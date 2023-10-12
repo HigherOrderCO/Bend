@@ -39,7 +39,7 @@ fn main() -> anyhow::Result<()> {
 
   let args = Args::parse();
 
-  let book = load_file_to_book(&args.path)?;
+  let mut book = load_file_to_book(&args.path)?;
   if args.verbose {
     println!("{book:?}");
   }
@@ -49,8 +49,8 @@ fn main() -> anyhow::Result<()> {
       check_book(book)?;
     }
     Mode::Compile => {
-      let (compiled, def_names) = compile_book(book)?;
-      println!("{}", compiled.to_string(&def_names));
+      let compiled = compile_book(&mut book)?;
+      println!("{}", compiled.to_string(&book.def_names));
     }
     Mode::Run => {
       let (res_term, def_names, info) = run_book(book, args.mem / std::mem::size_of::<u64>())?;
