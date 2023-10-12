@@ -1,7 +1,4 @@
-use crate::{
-  ast::{Definition, DefinitionBook, Name, Rule, Term},
-  term::{DefNames, Op},
-};
+use crate::term::{DefNames, Definition, DefinitionBook, Name, Op, Rule, Term};
 
 impl DefinitionBook {
   /// Applies bracket abstraction to remove lambdas form rule bodies,

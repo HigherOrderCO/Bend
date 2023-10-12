@@ -1,4 +1,4 @@
-use crate::ast::{DefinitionBook, Name};
+use crate::term::{DefinitionBook, Name};
 use itertools::Itertools;
 use std::{collections::HashMap, fmt};
 

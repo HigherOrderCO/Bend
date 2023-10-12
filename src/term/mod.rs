@@ -2,9 +2,11 @@ pub mod load_book;
 pub mod parser;
 pub mod transform;
 
-use crate::ast::{DefId, Name};
 use bimap::{BiHashMap, Overwritten};
+use derive_more::{Display, From, Into};
+use hvmc::Val;
 use itertools::Itertools;
+use shrinkwraprs::Shrinkwrap;
 use std::fmt;
 
 #[derive(Debug, Clone, Default)]
@@ -118,6 +120,44 @@ pub enum Op {
 impl DefinitionBook {
   pub fn new() -> Self {
     Default::default()
+  }
+}
+#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
+pub struct Name(pub String);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Default)]
+pub struct DefId(pub Val);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into)]
+pub struct VarId(pub Val);
+
+pub fn var_id_to_name(mut var_id: Val) -> Name {
+  let mut name = String::new();
+  loop {
+    let c = (var_id % 26) as u8 + b'a';
+    name.push(c as char);
+    var_id /= 26;
+    if var_id == 0 {
+      break;
+    }
+  }
+  Name(name)
+}
+
+impl Name {
+  pub fn new(value: &str) -> Self {
+    Name(value.to_string())
+  }
+}
+
+impl DefId {
+  // TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
+  pub fn to_internal(self) -> Val {
+    *self + 1
+  }
+
+  pub fn from_internal(val: Val) -> Self {
+    Self(val - 1)
   }
 }
 

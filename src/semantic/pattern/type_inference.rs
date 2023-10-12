@@ -1,8 +1,5 @@
 use super::{Adt, AdtId, Type};
-use crate::{
-  ast::{DefId, Definition, DefinitionBook, Name},
-  term::Pattern,
-};
+use crate::term::{DefId, Definition, DefinitionBook, Name, Pattern};
 use anyhow::anyhow;
 use itertools::Itertools;
 use std::collections::HashMap;

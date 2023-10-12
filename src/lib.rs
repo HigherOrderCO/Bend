@@ -1,19 +1,17 @@
 #![feature(lazy_cell)]
 #![feature(box_patterns)]
 
-pub mod ast;
 pub mod from_core;
 pub mod net;
 pub mod semantic;
 pub mod term;
 pub mod to_core;
 
-use ast::{DefId, DefinitionBook, Term};
 use from_core::readback_net;
 use hvmc::{readback_lnet, LBook, LNet};
 use semantic::check_main;
 use std::time::Instant;
-use term::DefNames;
+use term::{DefId, DefNames, DefinitionBook, Term};
 use to_core::{book_to_hvm_core, book_to_hvm_internal};
 
 pub use crate::term::load_book::load_file_to_book;

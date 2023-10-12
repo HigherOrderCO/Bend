@@ -1,5 +1,5 @@
 /// Semantic checking
-use crate::ast::{DefId, DefinitionBook, Name};
+use crate::term::{DefId, DefinitionBook, Name};
 
 /// Semantic passes for pattern matching on defiinition rules.
 /// Extract ADTs from patterns in a book, then convert them into lambda calculus.

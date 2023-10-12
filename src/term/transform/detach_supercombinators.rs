@@ -1,7 +1,4 @@
-use crate::{
-  ast::{DefId, Definition, DefinitionBook, Name, Rule, Term},
-  term::DefNames,
-};
+use crate::term::{DefId, DefNames, Definition, DefinitionBook, Name, Rule, Term};
 use std::collections::HashSet;
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term

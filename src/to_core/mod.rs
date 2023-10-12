@@ -1,7 +1,7 @@
 pub mod compat_net;
 
 use self::compat_net::{compat_net_to_core, term_to_compat_net};
-use crate::ast::{DefId, Definition, DefinitionBook, Term};
+use crate::term::{DefId, Definition, DefinitionBook, Term};
 use hvmc::{lbook_to_book, val_to_name, LBook, LNet};
 
 pub fn book_to_hvm_core(book: &DefinitionBook) -> anyhow::Result<LBook> {

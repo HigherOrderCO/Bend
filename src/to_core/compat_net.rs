@@ -1,9 +1,9 @@
 use crate::{
-  ast::{var_id_to_name, DefId, Name, Term},
   net::inter_net::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, Port, CON, DUP, ERA, ITE,
     LABEL_MASK, REF, ROOT, TAG_MASK,
   },
+  term::{var_id_to_name, DefId, Name, Term},
 };
 use hvmc::{LNet, LTree, Tag};
 use std::collections::{HashMap, HashSet};

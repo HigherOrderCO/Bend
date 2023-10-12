@@ -1,8 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::{
-  ast::{DefId, Definition, DefinitionBook, Name, Rule, Term},
-  term::{Op, Pattern},
-};
+use crate::term::{DefId, Definition, DefinitionBook, Name, Op, Pattern, Rule, Term};
 use chumsky::{
   extra,
   input::{Emitter, SpannedInput, Stream, ValueInput},

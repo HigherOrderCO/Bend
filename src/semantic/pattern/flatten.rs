@@ -1,7 +1,4 @@
-use crate::{
-  ast::{DefId, Definition, DefinitionBook, Name, Rule, Term},
-  term::{DefNames, Pattern},
-};
+use crate::term::{DefId, DefNames, Definition, DefinitionBook, Name, Pattern, Rule, Term};
 use hvmc::Val;
 use std::collections::HashSet;
 
