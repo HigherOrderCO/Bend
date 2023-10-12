@@ -1,6 +1,6 @@
-use crate::ast::{
-  hvm_lang::{DefNames, Op},
-  Definition, DefinitionBook, Name, Rule, Term,
+use crate::{
+  ast::{Definition, DefinitionBook, Name, Rule, Term},
+  term::{DefNames, Op},
 };
 
 impl DefinitionBook {

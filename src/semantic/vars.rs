@@ -1,4 +1,7 @@
-use crate::ast::{hvm_lang::DefNames, var_id_to_name, DefinitionBook, Name, Term};
+use crate::{
+  ast::{var_id_to_name, DefinitionBook, Name, Term},
+  term::DefNames,
+};
 use hvmc::Val;
 use std::collections::HashMap;
 

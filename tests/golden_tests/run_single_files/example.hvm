@@ -17,11 +17,9 @@
 // Numeric operations can only reduce numbers, doing (+ (λx x) 1) will not do anything
 (nums) = λx1 λx2 (* (+ x1 1) (/ (- x2 2) 1))
 
-// For signed integers, make sure to put the sign (+ or -) in front.
-(nums_signed) = λx1 λx2 (* (+ x1 -1) (/ (- x2 +2) -1))
 
 // All files must have a main definition to be run.
 // You can execute a program in HVM with "cargo run -- --run <path to file>"
 // Other options are "--check" (the default mode) to just see if the file is well formed
 // and "--compile" to output hvm-core code.
-(Main) = (nums_signed 3 4)
+(Main) = (nums 3 4)

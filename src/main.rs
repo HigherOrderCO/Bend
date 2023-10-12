@@ -2,7 +2,7 @@
 
 use clap::{Parser, ValueEnum};
 use hvm_lang::{check_book, compile_book, load_file_to_book, run_book, RunInfo};
-use hvmc::show_lnet;
+use hvmc::{show_lbook, show_lnet};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -50,7 +50,7 @@ fn main() -> anyhow::Result<()> {
     }
     Mode::Compile => {
       let compiled = compile_book(&mut book)?;
-      println!("{}", compiled.to_string(&book.def_names));
+      println!("{}", show_lbook(&compiled));
     }
     Mode::Run => {
       let (res_term, def_names, info) = run_book(book, args.mem / std::mem::size_of::<u64>())?;

@@ -1,5 +1,8 @@
 use super::{Adt, AdtId, Type};
-use crate::ast::{hvm_lang::Pattern, DefId, Definition, DefinitionBook, Name};
+use crate::{
+  ast::{DefId, Definition, DefinitionBook, Name},
+  term::Pattern,
+};
 use anyhow::anyhow;
 use itertools::Itertools;
 use std::collections::HashMap;

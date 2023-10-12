@@ -2,12 +2,14 @@ use hvm_lang::{
   ast::{DefId, DefinitionBook},
   compile_book,
   from_core::readback_net,
-  loader::{display_err_for_text, display_miette_err},
-  parser::{parse_definition_book, parse_term},
   run_book,
+  term::{
+    load_book::{display_err_for_text, display_miette_err},
+    parser::{parse_definition_book, parse_term},
+  },
   to_core::term_to_hvm_core,
 };
-use hvmc::{parse_lnet, show_lnet, Val};
+use hvmc::{parse_lnet, show_lbook, show_lnet, Val};
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::{
@@ -95,8 +97,8 @@ fn compile_single_files() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let core_book = compile_book(&mut book)?;
-    Ok(core_book.to_string(&book.def_names))
+    let compiled = compile_book(&mut book)?;
+    Ok(show_lbook(&compiled))
   })
 }
 

@@ -1,4 +1,8 @@
-use super::{DefId, Name};
+pub mod load_book;
+pub mod parser;
+pub mod transform;
+
+use crate::ast::{DefId, Name};
 use bimap::{BiHashMap, Overwritten};
 use itertools::Itertools;
 use std::fmt;
