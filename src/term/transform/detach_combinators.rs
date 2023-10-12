@@ -1,4 +1,4 @@
-use crate::term::{DefNames, DefinitionBook, Name, Op, Definition, Term};
+use crate::term::{DefNames, Definition, DefinitionBook, Name, Op, Term};
 
 impl DefinitionBook {
   /// Applies bracket abstraction to remove lambdas form rule bodies,
@@ -17,8 +17,8 @@ impl DefinitionBook {
 }
 
 impl Term {
-  pub fn abstract_lambdas(&mut self, names: &mut DefNames, defs: &mut Vec<Rule>) {
-    fn go(term: &mut Term, depth: usize, names: &mut DefNames, defs: &mut Vec<Rule>) {
+  pub fn abstract_lambdas(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
+    fn go(term: &mut Term, depth: usize, names: &mut DefNames, defs: &mut Vec<Definition>) {
       match term {
         Term::Lam { nam: Some(_), bod } => {
           if !(depth == 0 && bod.is_simple()) {
@@ -78,7 +78,7 @@ impl Term {
   /// Replaces a reference to a [`Term::Lam`] with its abstracted body.
   /// If [`Term::channel_check`] finds a channel subterm with the lambda variable in its body,
   /// it returns the lambda without change
-  fn abstract_lambda(&mut self, names: &mut DefNames, defs: &mut Vec<Rule>) {
+  fn abstract_lambda(&mut self, names: &mut DefNames, defs: &mut Vec<Definition>) {
     let extracted = std::mem::replace(self, Term::Era);
     let Self::Lam { nam: Some(name), bod } = extracted else { panic!("Not a lambda term") };
 
@@ -225,12 +225,12 @@ impl Combinator {
   /// Gets the [`Term::Ref`] of the combinator if it already has one,
   /// or registers it to a new DefId, adding its definition to the the vec of definitions,
   /// and returning the new ref
-  fn comb_ref(self, names: &mut DefNames, defs: &mut Vec<Rule>) -> Term {
+  fn comb_ref(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
     let name = Name::new(&format!("${:?}", self));
     let def_id = names.def_id(&name).unwrap_or_else(|| {
       let def_id = names.insert(name);
       let body = self.into();
-      defs.push(Rule { def_id, body });
+      defs.push(Definition { def_id, body });
 
       def_id
     });
@@ -351,7 +351,7 @@ impl AbsTerm {
     args.into_iter().fold(called.into(), |acc, arg| AbsTerm::App(Box::new(acc), Box::new(arg)))
   }
 
-  fn into_term(self, names: &mut DefNames, defs: &mut Vec<Rule>) -> Term {
+  fn into_term(self, names: &mut DefNames, defs: &mut Vec<Definition>) -> Term {
     match self {
       Self::Term(term) => term,
       Self::Comb(c) => c.comb_ref(names, defs),

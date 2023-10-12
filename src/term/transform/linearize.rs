@@ -1,4 +1,4 @@
-use crate::term::{Definition, DefinitionBook, Name, Term};
+use crate::term::{DefinitionBook, Name, Term};
 use hvmc::Val;
 use std::collections::HashMap;
 
@@ -17,16 +17,7 @@ use std::collections::HashMap;
 impl DefinitionBook {
   pub fn linearize_vars(&mut self) -> anyhow::Result<()> {
     for def in &mut self.defs {
-      def.linearize_vars()?;
-    }
-    Ok(())
-  }
-}
-
-impl Definition {
-  pub fn linearize_vars(&mut self) -> anyhow::Result<()> {
-    for rule in &mut self.rules {
-      rule.body.linearize_vars()?;
+      def.body.linearize_vars()?;
     }
     Ok(())
   }

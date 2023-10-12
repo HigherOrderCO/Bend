@@ -1,4 +1,4 @@
-use crate::term::{DefNames, Definition, DefinitionBook, Name, Term};
+use crate::term::{DefNames, DefinitionBook, Name, Term};
 use std::collections::HashMap;
 
 impl DefinitionBook {
@@ -7,15 +7,7 @@ impl DefinitionBook {
   /// Postcondition: Refs are encoded as refs, with the correct def id.
   pub fn resolve_refs(&mut self) {
     for def in &mut self.defs {
-      def.resolve_refs(&self.def_names);
-    }
-  }
-}
-
-impl Definition {
-  pub fn resolve_refs(&mut self, def_names: &DefNames) {
-    for rule in &mut self.rules {
-      rule.body.resolve_refs(def_names);
+      def.body.resolve_refs(&self.def_names);
     }
   }
 }

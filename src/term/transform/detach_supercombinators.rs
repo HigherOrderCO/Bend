@@ -1,4 +1,4 @@
-use crate::term::{DefId, DefNames, DefinitionBook, Name, Rule, Term};
+use crate::term::{DefId, DefNames, Definition, DefinitionBook, Name, Term};
 use std::collections::HashSet;
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
@@ -15,7 +15,7 @@ impl DefinitionBook {
   }
 }
 
-type Combinators = Vec<Rule>;
+type Combinators = Vec<Definition>;
 
 struct TermInfo<'d> {
   //Number of times a Term has been detached from the current Term
@@ -60,7 +60,7 @@ impl<'d> TermInfo<'d> {
     let comb_var = Term::Ref { def_id: comb_id };
     let extracted_term = std::mem::replace(term, comb_var);
 
-    let rule = Rule { def_id: comb_id, body: extracted_term };
+    let rule = Definition { def_id: comb_id, body: extracted_term };
     self.combinators.push(rule);
   }
 }

@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{DefId, DefinitionBook, Name, Op, Pattern, Rule, Term};
+use crate::term::{DefId, Definition, DefinitionBook, Name, Op, Term};
 use chumsky::{
   extra,
   input::{Emitter, SpannedInput, Stream, ValueInput},
@@ -10,7 +10,6 @@ use chumsky::{
   span::SimpleSpan,
   IterParser, Parser,
 };
-use itertools::Itertools;
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range};
 
@@ -224,23 +223,7 @@ where
   })
 }
 
-fn pattern<'a, I>() -> impl Parser<'a, I, Pattern, extra::Err<Rich<'a, Token>>>
-where
-  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
-{
-  recursive(|pattern| {
-    let ctr = name()
-      .then(pattern.repeated().collect())
-      .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|(name, pats)| Pattern::Ctr(name, pats))
-      .boxed();
-    let var = name_or_era().map(Pattern::Var).boxed();
-    let num = select!(Token::Num(num) => Pattern::Num(num)).boxed();
-    choice((ctr, num, var))
-  })
-}
-
-fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
+fn definition<'a, I>() -> impl Parser<'a, I, (Name, Definition), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -252,7 +235,7 @@ where
     snd: Box::new(snd),
   });
 
-  let lhs = name().then(pattern().repeated().collect()).boxed();
+  let lhs = name().boxed();
   let lhs = choice((lhs.clone(), lhs.delimited_by(just(Token::LParen), just(Token::RParen))));
 
   let rhs = choice((inline_num_oper, inline_app));
@@ -262,15 +245,15 @@ where
     .then_ignore(just(Token::Equals))
     .then_ignore(just(Token::NewLine).repeated())
     .then(rhs)
-    .map(|((name, pats), body)| (name, Rule { def_id: DefId(0), pats, body }))
+    .map(|(name, body)| (name, Definition { def_id: DefId(0), body }))
 }
 
 fn book<'a, I>() -> impl Parser<'a, I, DefinitionBook, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  fn rules_to_book(
-    rules: Vec<((Name, Rule), SimpleSpan)>,
+  fn definitions_to_book(
+    defs: Vec<((Name, Definition), SimpleSpan)>,
     _span: SimpleSpan,
     emitter: &mut Emitter<Rich<Token>>,
   ) -> DefinitionBook {
@@ -278,16 +261,13 @@ where
 
     // Check for repeated defs (could be rules out of order or actually repeated names)
     // TODO: Solve the lifetime here to avoid cloning names
-    for (_, rules_data) in rules.into_iter().group_by(|((name, _), _)| name.clone()).into_iter() {
-      let (rules, spans): (Vec<(Name, Rule)>, Vec<SimpleSpan>) = rules_data.unzip();
-      let (mut names, mut rules): (Vec<Name>, Vec<Rule>) = rules.into_iter().unzip();
-      let name = names.pop().unwrap();
+    for ((name, Definition { body, .. }), def_span) in defs {
       if !book.def_names.contains_name(&name) {
         let def_id = book.def_names.insert(name);
-        rules.iter_mut().for_each(|rule| rule.def_id = def_id);
-        book.defs.push(Definition { def_id, rules });
+        book.defs.push(Definition { def_id, body });
       } else {
-        let span = SimpleSpan::new(spans.first().unwrap().start, spans.last().unwrap().end);
+        let (start, end) = (def_span.start, def_span.end);
+        let span = SimpleSpan::new(start, end);
         emitter.emit(Rich::custom(span, format!("Repeated definition '{}'", name)));
       }
     }
@@ -296,12 +276,12 @@ where
 
   let new_line = just(Token::NewLine).repeated();
 
-  let parsed_rules = rule()
-    .map_with_span(|rule, span| (rule, span))
+  let parsed_definitions = definition()
+    .map_with_span(|def, span| (def, span))
     .separated_by(new_line.at_least(1))
     .allow_leading()
     .allow_trailing()
-    .collect::<Vec<((Name, Rule), SimpleSpan)>>();
+    .collect::<Vec<((Name, Definition), SimpleSpan)>>();
 
-  parsed_rules.validate(rules_to_book)
+  parsed_definitions.validate(definitions_to_book)
 }

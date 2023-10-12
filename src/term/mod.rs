@@ -1,7 +1,6 @@
 use bimap::{BiHashMap, Overwritten};
 use derive_more::{Display, From, Into};
 use hvmc::Val;
-use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
 use std::fmt;
 
@@ -59,20 +58,13 @@ pub struct DefNames {
 #[derive(Debug, Clone, Default)]
 pub struct DefinitionBook {
   pub def_names: DefNames,
-  pub defs: Vec<Rule>,
+  pub defs: Vec<Definition>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Rule {
+pub struct Definition {
   pub def_id: DefId,
   pub body: Term,
-}
-
-#[derive(Debug, Clone)]
-pub enum Pattern {
-  Ctr(Name, Vec<Pattern>),
-  Var(Option<Name>),
-  Num(u32),
 }
 
 #[derive(Debug, Clone)]
@@ -277,36 +269,10 @@ impl Term {
   }
 }
 
-impl Rule {
+impl Definition {
   pub fn to_string(&self, def_names: &DefNames) -> String {
-    let Rule { def_id, body } = self;
+    let Definition { def_id, body } = self;
     format!("({}) = {}", def_names.name(def_id).unwrap(), body.to_string(def_names))
-  }
-}
-
-impl From<&Pattern> for Term {
-  fn from(value: &Pattern) -> Self {
-    match value {
-      Pattern::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
-      Pattern::Var(nam) => Term::Var { nam: Name::new(nam.as_ref().map(|x| x.as_str()).unwrap_or("_")) },
-      Pattern::Num(num) => Term::Num { val: *num },
-    }
-  }
-}
-
-impl fmt::Display for DefinitionBook {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", self.defs.iter().map(|x| x.to_string(&self.def_names)).join("\n\n"))
-  }
-}
-
-impl fmt::Display for Pattern {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Pattern::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
-      Pattern::Var(nam) => write!(f, "{}", nam.as_ref().map(|x| x.as_str()).unwrap_or("*")),
-      Pattern::Num(num) => write!(f, "{num}"),
-    }
   }
 }
 

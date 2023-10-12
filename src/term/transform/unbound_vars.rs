@@ -1,20 +1,11 @@
-use crate::term::{Definition, DefinitionBook, Name, Term};
+use crate::term::{DefinitionBook, Name, Term};
 use hvmc::Val;
 use std::collections::HashMap;
 
 impl DefinitionBook {
   pub fn check_unbound_vars(&self) -> anyhow::Result<()> {
     for def in &self.defs {
-      def.check_unbound_vars()?;
-    }
-    Ok(())
-  }
-}
-
-impl Definition {
-  pub fn check_unbound_vars(&self) -> anyhow::Result<()> {
-    for rule in &self.rules {
-      rule.body.check_unbound_vars()?;
+      def.body.check_unbound_vars()?;
     }
     Ok(())
   }
