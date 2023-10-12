@@ -364,9 +364,9 @@ fn term_to_affine(
       Term::Dup { fst, snd, val: Box::new(val.into()), nxt: Box::new(nxt.into()) }
     }
     Term::If { cond, then, els_ } => Term::If {
-      cond: Box::new(term_to_affine(*cond, var_uses, let_bodies)?),
-      then: Box::new(term_to_affine(*then, var_uses, let_bodies)?),
-      els_: Box::new(term_to_affine(*els_, var_uses, let_bodies)?),
+      cond: Box::new(term_to_affine(cond.inner, var_uses, let_bodies)?.into()),
+      then: Box::new(term_to_affine(then.inner, var_uses, let_bodies)?.into()),
+      els_: Box::new(term_to_affine(els_.inner, var_uses, let_bodies)?.into()),
     },
     Term::App { fun, arg } => Term::App {
       fun: Box::new(term_to_affine(fun.inner, var_uses, let_bodies)?.into()),
