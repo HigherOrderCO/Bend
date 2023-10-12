@@ -1,5 +1,5 @@
 use hvm_lang::{
-  ast::DefId,
+  ast::{DefId, DefinitionBook},
   compile_book,
   from_core::readback_net,
   loader::{display_err_for_text, display_miette_err},
@@ -91,12 +91,12 @@ fn compile_single_terms() {
 #[test]
 fn compile_single_files() {
   run_golden_test_dir(function_name!(), &|_, code| {
-    let book = parse_definition_book(code).map_err(|errs| {
+    let mut book = parse_definition_book(code).map_err(|errs| {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let (core_book, def_names) = compile_book(book)?;
-    Ok(core_book.to_string(&def_names))
+    let core_book = compile_book(&mut book)?;
+    Ok(core_book.to_string(&book.def_names))
   })
 }
 
@@ -122,12 +122,12 @@ fn run_single_files() {
 fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|_, code| {
     let lnet = parse_lnet(&mut code.chars().peekable()).map_err(|e| anyhow::anyhow!(e))?;
-    let def_names = Default::default();
-    let (term, valid) = readback_net(&lnet)?;
+    let book = DefinitionBook::default();
+    let (term, valid) = readback_net(&lnet, &book)?;
     if valid {
-      Ok(term.to_string(&def_names))
+      Ok(term.to_string(&book.def_names))
     } else {
-      Ok(format!("Invalid readback:\n{}", term.to_string(&def_names)))
+      Ok(format!("Invalid readback:\n{}", term.to_string(&book.def_names)))
     }
   })
 }

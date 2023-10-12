@@ -17,20 +17,20 @@ use to_core::{book_to_hvm_core, book_to_hvm_internal};
 
 pub use loader::load_file_to_book;
 
-pub fn check_book(book: DefinitionBook) -> anyhow::Result<()> {
+pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
   // TODO: Do the checks without having to do full compilation
-  compile_book(book)?;
+  compile_book(&mut book)?;
   Ok(())
 }
 
-pub fn compile_book(mut book: DefinitionBook) -> anyhow::Result<(Book, DefNames)> {
+pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<Book> {
   book.check_rule_arities()?;
   book.flatten_rules();
   book.sanitize_vars()?;
   book.detach_supercombinators();
   // book.try_into_affine()?;
   let core_book = book_to_hvm_core(&book)?;
-  Ok((core_book, book.def_names))
+  Ok(core_book)
 }
 
 pub fn run_compiled(book: &Book, mem_size: usize) -> anyhow::Result<(LNet, RunStats)> {
@@ -47,13 +47,13 @@ pub fn run_compiled(book: &Book, mem_size: usize) -> anyhow::Result<(LNet, RunSt
   Ok((net, stats))
 }
 
-pub fn run_book(book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
+pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
   check_main(&book)?;
-  let (compiled, def_names) = compile_book(book)?;
+  let compiled = compile_book(&mut book)?;
   let (res_lnet, stats) = run_compiled(&compiled, mem_size)?;
-  let (res_term, valid_readback) = readback_net(&res_lnet)?;
+  let (res_term, valid_readback) = readback_net(&res_lnet, &book)?;
   let info = RunInfo { stats, valid_readback, lnet: res_lnet };
-  Ok((res_term, def_names, info))
+  Ok((res_term, book.def_names, info))
 }
 
 pub struct RunInfo {
