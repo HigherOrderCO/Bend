@@ -1,7 +1,7 @@
-use super::lexer::LexingError;
+use super::lexer::{LexingError, Token};
 use crate::{
-  ast::{hvm_lang::Pattern, DefId, Definition, DefinitionBook, Name, Rule, Term},
-  parser::lexer::Token,
+  ast::{DefId, Definition, DefinitionBook, Name, Rule, Term},
+  term::{Op, Pattern},
 };
 use chumsky::{
   extra,
@@ -17,7 +17,7 @@ use itertools::Itertools;
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range};
 
-use crate::ast::hvm_lang::Op;
+// use crate::ast::hvm_lang::Op;
 
 // TODO: Pattern matching on rules
 // TODO: Other types of numbers

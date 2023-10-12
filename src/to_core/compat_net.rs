@@ -1,14 +1,14 @@
-use crate::ast::{
-  compat::{
+use crate::{
+  ast::{var_id_to_name, DefId, Name, Term},
+  net::inter_net::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, NodeId, Port, CON, DUP, ERA, ITE,
     LABEL_MASK, REF, ROOT, TAG_MASK,
   },
-  var_id_to_name, DefId, Name, Term,
 };
 use hvmc::{LNet, LTree, Tag};
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::compat::{op_to_label, NodeKind, NUM, OP2};
+use crate::net::inter_net::{op_to_label, NodeKind, NUM, OP2};
 
 /// Converts an IC term into an IC net.
 pub fn term_to_compat_net(term: &Term) -> anyhow::Result<INet> {

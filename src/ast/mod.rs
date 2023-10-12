@@ -1,8 +1,6 @@
-pub mod compat;
 pub mod core;
-pub mod hvm_lang;
 
-pub use hvm_lang::{Definition, DefinitionBook, Rule, Term};
+pub use crate::term::{Definition, DefinitionBook, Rule, Term};
 
 use derive_more::{Display, From, Into};
 use hvmc::Val;

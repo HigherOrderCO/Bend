@@ -1,15 +1,15 @@
-use crate::ast::{
-  compat::{
+use crate::{
+  ast::{var_id_to_name, DefId, Name, Term},
+  net::inter_net::{
     addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
     SlotId, CON, DUP, ERA, ITE, LABEL_MASK, REF, ROOT, TAG_MASK,
   },
-  hvm_lang::Op,
-  var_id_to_name, DefId, DefinitionBook, Name, Term,
+  term::{DefinitionBook, Op},
 };
 use hvmc::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::compat::{label_to_op, NUM, OP2};
+use crate::net::inter_net::{label_to_op, NUM, OP2};
 
 pub fn readback_net(net: &LNet, book: &DefinitionBook) -> anyhow::Result<(Term, bool)> {
   /* check_lnet_valid(net)?; */

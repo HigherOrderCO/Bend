@@ -1,6 +1,6 @@
 // TODO: Refactor to not use this intermediate form
 
-use super::hvm_lang::Op;
+use crate::term::Op;
 use hvmc::Val;
 
 #[derive(Clone, Debug)]

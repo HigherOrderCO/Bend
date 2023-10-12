@@ -1,4 +1,5 @@
-use super::{hvm_lang::DefNames, DefId};
+use super::DefId;
+use crate::term::DefNames;
 use hvmc::{show_lnet, val_to_name, LNet};
 use itertools::Itertools;
 use std::collections::HashMap;

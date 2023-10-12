@@ -1,6 +1,6 @@
-use crate::ast::{
-  hvm_lang::{DefNames, Pattern},
-  DefId, Definition, DefinitionBook, Name, Rule, Term,
+use crate::{
+  ast::{DefId, Definition, DefinitionBook, Name, Rule, Term},
+  term::{DefNames, Pattern},
 };
 use hvmc::Val;
 use std::collections::HashSet;

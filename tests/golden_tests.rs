@@ -2,9 +2,11 @@ use hvm_lang::{
   ast::{DefId, DefinitionBook},
   compile_book,
   from_core::readback_net,
-  loader::{display_err_for_text, display_miette_err},
-  parser::{parse_definition_book, parse_term},
   run_book,
+  term::{
+    load_book::{display_err_for_text, display_miette_err},
+    parser::{parse_definition_book, parse_term},
+  },
   to_core::term_to_hvm_core,
 };
 use hvmc::{parse_lnet, show_lnet, Val};

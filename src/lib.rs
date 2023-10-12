@@ -3,19 +3,20 @@
 
 pub mod ast;
 pub mod from_core;
-pub mod loader;
-pub mod parser;
+pub mod net;
 pub mod semantic;
+pub mod term;
 pub mod to_core;
 
-use ast::{core::Book, hvm_lang::DefNames, DefinitionBook, Term};
+use ast::{core::Book, DefinitionBook, Term};
 use from_core::readback_net;
 use hvmc::{readback_lnet, LNet};
 use semantic::check_main;
 use std::time::Instant;
+use term::DefNames;
 use to_core::{book_to_hvm_core, book_to_hvm_internal};
 
-pub use loader::load_file_to_book;
+pub use crate::term::load_book::load_file_to_book;
 
 pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
   // TODO: Do the checks without having to do full compilation
