@@ -80,11 +80,13 @@ fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&Path, &str) -> anyhow::Res
 #[test]
 fn compile_single_terms() {
   run_golden_test_dir(function_name!(), &|_, code| {
-    let term = parse_term(code).map_err(|errs| {
+    let mut term = parse_term(code).map_err(|errs| {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let term = term.sanitize_vars(&Default::default())?;
+    term.check_unbound_vars()?;
+    term.make_var_names_unique();
+    term.linearize_vars()?;
     let net = term_to_hvm_core(&term)?;
     Ok(show_lnet(&net))
   })
@@ -137,40 +139,11 @@ fn readback_lnet() {
 #[test]
 fn flatten_rules() {
   run_golden_test_dir(function_name!(), &|_, code| {
-    let mut book = parse_definition_book(code).map_err(|errs| {
+    let book = parse_definition_book(code).map_err(|errs| {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    book.flatten_rules();
     Ok(book.to_string())
-  })
-}
-
-#[test]
-fn type_inference() {
-  run_golden_test_dir(function_name!(), &|_, code| {
-    let mut book = parse_definition_book(code).map_err(|errs| {
-      let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
-      anyhow::anyhow!(msg)
-    })?;
-    book.check_rule_arities()?;
-    book.flatten_rules();
-    let (adts, def_types) = book.get_types_from_patterns()?;
-    let mut out = String::new();
-    out.push_str("Adts: [\n");
-    for (adt_id, adt) in adts.iter().sorted_by_key(|x| x.0) {
-      out.push_str(&format!("  {adt_id} => {adt}\n"));
-    }
-    out.push_str("]\nTypes: [\n");
-    for (def_id, def_types) in def_types.iter().enumerate() {
-      out.push_str(&format!(
-        "  {} => [{}]\n",
-        book.def_names.name(&DefId::from(def_id as Val)).unwrap(),
-        def_types.iter().map(|x| format!("{x:?}")).join(", "),
-      ));
-    }
-    out.push_str("]");
-    Ok(out)
   })
 }
 

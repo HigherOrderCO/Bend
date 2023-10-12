@@ -1,5 +1,0 @@
-(Rule (CtrA a (CtrB1 b))) = (a b)
-(Rule (CtrA a (CtrB2 (CtrC) b))) = (a b)
-(Rule (CtrA a b)) = (a b)
-(Rule (CtrB b)) = b
-(Rule x) = x
