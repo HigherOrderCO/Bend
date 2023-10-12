@@ -1,13 +1,12 @@
 use hvm_lang::{
   compile_book,
-  from_core::readback_net,
+  extras::{readback_net, term_to_hvm_core},
   run_book,
   term::{
     load_book::{display_err_for_text, display_miette_err},
     parser::{parse_definition_book, parse_term},
     DefinitionBook,
   },
-  to_core::term_to_hvm_core,
 };
 use hvmc::{parse_lnet, show_lbook, show_lnet};
 use itertools::Itertools;

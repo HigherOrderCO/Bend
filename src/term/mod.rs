@@ -1,13 +1,54 @@
-pub mod load_book;
-pub mod parser;
-pub mod transform;
-
 use bimap::{BiHashMap, Overwritten};
 use derive_more::{Display, From, Into};
 use hvmc::Val;
 use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
 use std::fmt;
+
+pub mod load_book;
+pub mod net_to_term;
+pub mod parser;
+pub mod term_to_net;
+pub mod transform;
+
+#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
+pub struct Name(pub String);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Default)]
+pub struct DefId(pub Val);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into)]
+pub struct VarId(pub Val);
+
+pub fn var_id_to_name(mut var_id: Val) -> Name {
+  let mut name = String::new();
+  loop {
+    let c = (var_id % 26) as u8 + b'a';
+    name.push(c as char);
+    var_id /= 26;
+    if var_id == 0 {
+      break;
+    }
+  }
+  Name(name)
+}
+
+impl Name {
+  pub fn new(value: &str) -> Self {
+    Name(value.to_string())
+  }
+}
+
+// TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
+impl DefId {
+  pub fn to_internal(self) -> Val {
+    *self + 1
+  }
+
+  pub fn from_internal(val: Val) -> Self {
+    Self(val - 1)
+  }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
@@ -18,19 +59,12 @@ pub struct DefNames {
 #[derive(Debug, Clone, Default)]
 pub struct DefinitionBook {
   pub def_names: DefNames,
-  pub defs: Vec<Definition>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Definition {
-  pub def_id: DefId,
-  pub rules: Vec<Rule>,
+  pub defs: Vec<Rule>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Rule {
   pub def_id: DefId,
-  pub pats: Vec<Pattern>,
   pub body: Term,
 }
 
@@ -120,44 +154,6 @@ pub enum Op {
 impl DefinitionBook {
   pub fn new() -> Self {
     Default::default()
-  }
-}
-#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
-pub struct Name(pub String);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Default)]
-pub struct DefId(pub Val);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into)]
-pub struct VarId(pub Val);
-
-pub fn var_id_to_name(mut var_id: Val) -> Name {
-  let mut name = String::new();
-  loop {
-    let c = (var_id % 26) as u8 + b'a';
-    name.push(c as char);
-    var_id /= 26;
-    if var_id == 0 {
-      break;
-    }
-  }
-  Name(name)
-}
-
-impl Name {
-  pub fn new(value: &str) -> Self {
-    Name(value.to_string())
-  }
-}
-
-impl DefId {
-  // TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
-  pub fn to_internal(self) -> Val {
-    *self + 1
-  }
-
-  pub fn from_internal(val: Val) -> Self {
-    Self(val - 1)
   }
 }
 
@@ -283,27 +279,8 @@ impl Term {
 
 impl Rule {
   pub fn to_string(&self, def_names: &DefNames) -> String {
-    let Rule { def_id, pats, body } = self;
-    format!(
-      "({}{}) = {}",
-      def_names.name(def_id).unwrap(),
-      pats.iter().map(|x| format!(" {x}")).join(""),
-      body.to_string(def_names)
-    )
-  }
-
-  pub fn arity(&self) -> usize {
-    self.pats.len()
-  }
-}
-
-impl Definition {
-  pub fn to_string(&self, def_names: &DefNames) -> String {
-    self.rules.iter().map(|x| x.to_string(def_names)).join("\n")
-  }
-
-  pub fn arity(&self) -> usize {
-    self.rules[0].arity()
+    let Rule { def_id, body } = self;
+    format!("({}) = {}", def_names.name(def_id).unwrap(), body.to_string(def_names))
   }
 }
 

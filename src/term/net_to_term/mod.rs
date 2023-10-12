@@ -1,134 +1,13 @@
-use crate::{
-  net::inter_net::{
-    addr, enter, kind, link, new_inet, new_node, port, slot, INet, INode, INodes, NodeId, NodeKind, Port,
-    SlotId, CON, DUP, ERA, ITE, LABEL_MASK, REF, ROOT, TAG_MASK,
-  },
-  term::{var_id_to_name, DefId, DefinitionBook, Name, Op, Term},
+use super::{var_id_to_name, DefId, DefinitionBook, Name, Op, Term, Val};
+use crate::net::inter_net::{
+  addr, enter, kind, label_to_op, port, slot, INet, NodeId, Port, CON, DUP, ERA, ITE, LABEL_MASK, NUM, OP2,
+  REF, ROOT, TAG_MASK,
 };
-use hvmc::{LNet, LTree, Val};
 use std::collections::{HashMap, HashSet};
-
-use crate::net::inter_net::{label_to_op, NUM, OP2};
-
-pub fn readback_net(net: &LNet, book: &DefinitionBook) -> anyhow::Result<(Term, bool)> {
-  /* check_lnet_valid(net)?; */
-  let compat_net = core_net_to_compat(net)?;
-  let readback = readback_compat(&compat_net, book);
-  Ok(readback)
-}
-
-fn core_net_to_compat(lnet: &LNet) -> anyhow::Result<INet> {
-  let inodes = lnet_to_inodes(lnet);
-  let compat_net = inodes_to_inet(&inodes);
-  Ok(compat_net)
-}
-
-fn lnet_to_inodes(lnet: &LNet) -> INodes {
-  let mut inodes = vec![];
-  let mut n_vars = 0;
-  let net_root = if let LTree::Var { nam } = &lnet.root { nam } else { "" };
-
-  // If we have a tree attached to the net root, convert that first
-  if !matches!(&lnet.root, LTree::Var { .. }) {
-    let mut root = tree_to_inodes(&lnet.root, "_".to_string(), net_root, &mut n_vars);
-    inodes.append(&mut root);
-  }
-  // Convert all the trees forming active pairs.
-  for (i, (tree1, tree2)) in lnet.rdex.iter().enumerate() {
-    let tree_root = format!("a{i}");
-    let mut tree1 = tree_to_inodes(tree1, tree_root.clone(), net_root, &mut n_vars);
-    inodes.append(&mut tree1);
-    let mut tree2 = tree_to_inodes(tree2, tree_root, net_root, &mut n_vars);
-    inodes.append(&mut tree2);
-  }
-  inodes
-}
-
-fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut NodeId) -> INodes {
-  fn new_var(n_vars: &mut NodeId) -> String {
-    let new_var = format!("x{n_vars}");
-    *n_vars += 1;
-    new_var
-  }
-
-  fn process_node_subtree<'a>(
-    subtree: &'a LTree,
-    net_root: &str,
-    subtrees: &mut Vec<(String, &'a LTree)>,
-    n_vars: &mut NodeId,
-  ) -> String {
-    if let LTree::Var { nam } = subtree {
-      if nam == net_root { "_".to_string() } else { nam.clone() }
-    } else {
-      let var = new_var(n_vars);
-      subtrees.push((var.clone(), subtree));
-      var
-    }
-  }
-
-  let mut inodes = vec![];
-  let mut subtrees = vec![(tree_root, tree)];
-  while let Some((subtree_root, subtree)) = subtrees.pop() {
-    match subtree {
-      LTree::Era => {
-        let var = new_var(n_vars);
-        inodes.push(INode { kind: ERA, ports: [subtree_root, var.clone(), var] });
-      }
-      LTree::Ctr { lab, lft, rgt } => {
-        let kind = if *lab == 0 { CON } else { DUP | (*lab - 1) as NodeKind };
-        let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
-        let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
-      }
-      LTree::Var { .. } => unreachable!(),
-      LTree::Ref { nam } => {
-        let kind = REF | (*DefId::from_internal(*nam) as NodeKind);
-        let var = new_var(n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
-      }
-      LTree::Num { val } => {
-        let kind = NUM | (*val as NodeKind);
-        let var = new_var(n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
-      }
-      LTree::Op2 { lft, rgt } => {
-        let kind = OP2;
-        let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
-        let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
-      }
-      LTree::Ite { .. } => todo!(),
-    }
-  }
-  inodes
-}
-
-// Converts INodes to an INet by linking ports based on names.
-fn inodes_to_inet(inodes: &INodes) -> INet {
-  let mut inet = new_inet();
-  let mut name_map = std::collections::HashMap::new();
-
-  for inode in inodes.iter() {
-    let node = new_node(&mut inet, inode.kind);
-    for (j, name) in inode.ports.iter().enumerate() {
-      let p = port(node, j as SlotId);
-      if name == "_" {
-        link(&mut inet, p, ROOT);
-      } else if let Some(&q) = name_map.get(name) {
-        link(&mut inet, p, q);
-        name_map.remove(name);
-      } else {
-        name_map.insert(name.clone(), p);
-      }
-    }
-  }
-
-  inet
-}
 
 // TODO: Add support for global lambdas.
 /// Converts an Interaction-INet node to an Interaction Calculus term.
-fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
+pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
   // Given a port, returns its name, or assigns one if it wasn't named yet.
   fn var_name(var_port: Port, var_port_to_id: &mut HashMap<Port, Val>, id_counter: &mut Val) -> Name {
     let id = var_port_to_id.entry(var_port).or_insert_with(|| {
@@ -246,10 +125,9 @@ fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
       REF => {
         let def_id = DefId(label);
         if book.is_generated_rule(def_id) {
-          let def = &book.defs[def_id.0 as usize];
-          assert!(def.rules.len() == 1);
+          let rule = &book.defs[def_id.0 as usize];
 
-          let mut term = def.rules[0].body.clone();
+          let mut term = rule.body.clone();
           term.fix_names(id_counter, book);
 
           (term, true)
@@ -404,10 +282,9 @@ impl Term {
       Term::Lnk { .. } => {}
       Term::Ref { def_id } => {
         if book.is_generated_rule(*def_id) {
-          let def = &book.defs[def_id.0 as usize];
-          assert!(def.rules.len() == 1);
+          let rule = &book.defs[def_id.0 as usize];
 
-          let mut term = def.rules[0].body.clone();
+          let mut term = rule.body.clone();
           term.fix_names(id_counter, book);
 
           *self = term

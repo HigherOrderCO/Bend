@@ -1,18 +1,16 @@
 #![feature(lazy_cell)]
 #![feature(box_patterns)]
 
-pub mod from_core;
-pub mod net;
-pub mod term;
-pub mod to_core;
-
-use from_core::readback_net;
+use extras::*;
 use hvmc::{readback_lnet, LBook, LNet};
 use std::time::Instant;
-use term::{DefId, DefNames, DefinitionBook, Term, Name};
-use to_core::{book_to_hvm_core, book_to_hvm_internal};
+use term::{DefId, DefNames, DefinitionBook, Name, Term};
 
-pub use crate::term::load_book::load_file_to_book;
+pub mod extras;
+pub mod net;
+pub mod term;
+
+pub use term::load_book::load_file_to_book;
 
 pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
   // TODO: Do the checks without having to do full compilation
@@ -26,7 +24,6 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<LBook> {
   book.make_var_names_unique();
   book.linearize_vars()?;
   book.detach_supercombinators();
-  // book.try_into_affine()?;
   let core_book = book_to_hvm_core(book)?;
   Ok(core_book)
 }
