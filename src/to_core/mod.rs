@@ -1,19 +1,16 @@
 pub mod compat_net;
 
 use self::compat_net::{compat_net_to_core, term_to_compat_net};
-use crate::ast::{core::Book, DefId, Definition, DefinitionBook, Name, Term};
-use hvmc::{lnet_to_net, LNet};
-use std::collections::HashMap;
+use crate::ast::{DefId, Definition, DefinitionBook, Term};
+use hvmc::{lbook_to_book, val_to_name, LBook, LNet};
 
-pub fn book_to_hvm_core(book: &DefinitionBook) -> anyhow::Result<Book> {
-  let mut defs = HashMap::new();
+pub fn book_to_hvm_core(book: &DefinitionBook) -> anyhow::Result<LBook> {
+  let mut lbook = LBook::new();
   for def in book.defs.iter() {
     let net = definition_to_hvm_core(def)?;
-    defs.insert(def.def_id, net);
+    lbook.insert(val_to_name(def.def_id.to_internal()), net);
   }
-  // TODO: Ugly, if we know whether main will be there we should use that information correctly
-  let main = book.def_names.def_id(&Name::from("Main".to_string())).unwrap_or(DefId(0));
-  Ok(Book { defs, main })
+  Ok(lbook)
 }
 
 pub fn definition_to_hvm_core(definition: &Definition) -> anyhow::Result<LNet> {
@@ -26,16 +23,11 @@ pub fn term_to_hvm_core(term: &Term) -> anyhow::Result<LNet> {
   compat_net_to_core(&compat_net)
 }
 
-pub fn book_to_hvm_internal(book: &Book, mem_size: usize) -> anyhow::Result<(hvmc::Net, hvmc::Book)> {
-  // TODO: Don't try to preallocate a huge buffer
-  let mut root = hvmc::Net::new(mem_size);
-  root.boot(book.main.to_internal()); // TODO: Don't use this workaround
-  let mut hvm_book = hvmc::Book::new();
-  book.defs.iter().for_each(|(&def_id, term)| {
-    hvm_book.def(def_id.to_internal(), lnet_to_net(term, None).to_def());
-  });
-
-  Ok((root, hvm_book))
+pub fn book_to_hvm_internal(book: &LBook, main: DefId, mem_size: usize) -> (hvmc::Net, hvmc::Book) {
+  let book = lbook_to_book(book);
+  let mut net = hvmc::Net::new(mem_size);
+  net.boot(main.to_internal());
+  (net, book)
 }
 
 /*

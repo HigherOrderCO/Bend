@@ -1,5 +1,3 @@
-pub mod core;
-
 pub use crate::term::{Definition, DefinitionBook, Rule, Term};
 
 use derive_more::{Display, From, Into};

@@ -8,9 +8,9 @@ pub mod semantic;
 pub mod term;
 pub mod to_core;
 
-use ast::{core::Book, DefinitionBook, Term};
+use ast::{DefId, DefinitionBook, Term};
 use from_core::readback_net;
-use hvmc::{readback_lnet, LNet};
+use hvmc::{readback_lnet, LBook, LNet};
 use semantic::check_main;
 use std::time::Instant;
 use term::DefNames;
@@ -24,18 +24,18 @@ pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
   Ok(())
 }
 
-pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<Book> {
+pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<LBook> {
   book.check_rule_arities()?;
   book.flatten_rules();
   book.sanitize_vars()?;
   book.detach_supercombinators();
   // book.try_into_affine()?;
-  let core_book = book_to_hvm_core(&book)?;
+  let core_book = book_to_hvm_core(book)?;
   Ok(core_book)
 }
 
-pub fn run_compiled(book: &Book, mem_size: usize) -> anyhow::Result<(LNet, RunStats)> {
-  let (mut root, runtime_book) = book_to_hvm_internal(book, mem_size)?;
+pub fn run_compiled(book: &LBook, main: DefId, mem_size: usize) -> (LNet, RunStats) {
+  let (mut root, runtime_book) = book_to_hvm_internal(book, main, mem_size);
   let start_time = Instant::now();
   // Computes its normal form
   root.normal(&runtime_book);
@@ -44,14 +44,13 @@ pub fn run_compiled(book: &Book, mem_size: usize) -> anyhow::Result<(LNet, RunSt
   let net = readback_lnet(&root);
   let def = root.to_def();
   let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
-  // TODO: Make readback for hvm-core Def type
-  Ok((net, stats))
+  (net, stats)
 }
 
 pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
-  check_main(&book)?;
+  let main = check_main(&book)?;
   let compiled = compile_book(&mut book)?;
-  let (res_lnet, stats) = run_compiled(&compiled, mem_size)?;
+  let (res_lnet, stats) = run_compiled(&compiled, main, mem_size);
   let (res_term, valid_readback) = readback_net(&res_lnet, &book)?;
   let info = RunInfo { stats, valid_readback, lnet: res_lnet };
   Ok((res_term, book.def_names, info))
