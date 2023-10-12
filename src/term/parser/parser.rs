@@ -178,10 +178,21 @@ where
     let if_ = just(Token::If)
       .ignore_then(new_line())
       .ignore_then(term.clone())
-      .then_ignore(select!(Token::Name(nam) if nam == "then" => ()))
-      .then(term.clone())
+      .then(
+        term
+          .clone()
+          .delimited_by(new_line(), new_line())
+          .delimited_by(just(Token::LBracket), just(Token::RBracket))
+          .delimited_by(new_line(), new_line()),
+      )
       .then_ignore(select!(Token::Name(nam) if nam == "else" => ()))
-      .then(term.clone())
+      .then(
+        term
+          .clone()
+          .delimited_by(new_line(), new_line())
+          .delimited_by(just(Token::LBracket), just(Token::RBracket))
+          .delimited_by(new_line(), new_line()),
+      )
       .map(|((cond, then), els_)| Term::If {
         cond: Box::new(cond),
         then: Box::new(then),

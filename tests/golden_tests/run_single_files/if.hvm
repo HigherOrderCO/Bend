@@ -1,1 +1,5 @@
-Main = if (+ 0 1) then λt λf t else λt λf f
+Main = if (+ 0 1) {
+  λt λf t
+ } else {
+   λt λf f
+ }

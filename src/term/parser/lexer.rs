@@ -86,6 +86,12 @@ pub enum Token {
   #[token(")")]
   RParen,
 
+  #[token("{")]
+  LBracket,
+  
+  #[token("}")]
+  RBracket,
+
   #[token("\n")]
   NewLine,
 
@@ -179,6 +185,8 @@ impl fmt::Display for Token {
       Self::Semicolon => write!(f, ";"),
       Self::LParen => write!(f, "("),
       Self::RParen => write!(f, ")"),
+      Self::LBracket => write!(f, "{{"),
+      Self::RBracket => write!(f, "}}"),
       Self::NewLine => write!(f, "<NewLine>"),
       Self::SingleLineComment => write!(f, "<SingleLineComment>"),
       Self::MultiLineComment => write!(f, "<MultiLineComment>"),
