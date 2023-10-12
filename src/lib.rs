@@ -1,4 +1,5 @@
 #![feature(lazy_cell)]
+#![feature(box_patterns)]
 
 pub mod ast;
 pub mod from_core;
@@ -26,7 +27,7 @@ pub fn compile_book(mut book: DefinitionBook) -> anyhow::Result<(Book, DefNames)
   book.check_rule_arities()?;
   book.flatten_rules();
   book.sanitize_vars()?;
-  book.detach_combinators();
+  book.detach_supercombinators();
   // book.try_into_affine()?;
   let core_book = book_to_hvm_core(&book)?;
   Ok((core_book, book.def_names))

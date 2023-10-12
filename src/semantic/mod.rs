@@ -5,6 +5,7 @@ pub mod combinators;
 /// Semantic passes for pattern matching on defiinition rules.
 /// Extract ADTs from patterns in a book, then convert them into lambda calculus.
 pub mod pattern;
+pub mod supercombinators;
 pub mod vars;
 
 pub fn check_main(book: &DefinitionBook) -> anyhow::Result<()> {
