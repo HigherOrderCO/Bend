@@ -132,8 +132,12 @@ fn inodes_to_inet(inodes: &INodes) -> INet {
 fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
   // Given a port, returns its name, or assigns one if it wasn't named yet.
   fn var_name(var_port: Port, var_port_to_id: &mut HashMap<Port, Val>, id_counter: &mut Val) -> Name {
-    let id = var_port_to_id.entry(var_port).or_insert(*id_counter);
-    *id_counter += 1;
+    let id = var_port_to_id.entry(var_port).or_insert_with(|| {
+      let id = *id_counter;
+      *id_counter += 1;
+      id
+    });
+
     var_id_to_name(*id)
   }
 
