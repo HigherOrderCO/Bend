@@ -1,9 +1,20 @@
-use super::{Name, Term};
+use super::{DefId, DefinitionBook, Name, Term};
 use crate::net::inter_net::{
   link, new_inet, new_node, op_to_label, port, INet, NodeId, NodeKind, Port, CON, DUP, ERA, ITE, LABEL_MASK,
   NUM, OP2, REF, ROOT,
 };
 use std::collections::HashMap;
+
+pub fn book_to_compact_nets(book: &DefinitionBook) -> anyhow::Result<Vec<(DefId, INet)>> {
+  let mut nets = Vec::new();
+
+  for rule in book.defs.iter() {
+    let net = term_to_compat_net(&rule.body)?;
+    nets.push((rule.def_id, net))
+  }
+
+  Ok(nets)
+}
 
 /// Converts an IC term into an IC net.
 pub fn term_to_compat_net(term: &Term) -> anyhow::Result<INet> {

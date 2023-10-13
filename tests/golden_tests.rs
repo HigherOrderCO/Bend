@@ -1,11 +1,11 @@
 use hvm_lang::{
   compile_book,
-  extras::{readback_net, term_to_hvm_core},
+  net::{compat_net_to_core, core_net_to_compat},
   run_book,
   term::{
     load_book::{display_err_for_text, display_miette_err},
     parser::{parse_definition_book, parse_term},
-    DefinitionBook,
+    readback_compat, term_to_compat_net, DefinitionBook,
   },
 };
 use hvmc::{parse_lnet, show_lbook, show_lnet};
@@ -86,7 +86,8 @@ fn compile_single_terms() {
     term.check_unbound_vars()?;
     term.make_var_names_unique();
     term.linearize_vars()?;
-    let net = term_to_hvm_core(&term)?;
+    let compat_net = term_to_compat_net(&term)?;
+    let net = compat_net_to_core(&compat_net)?;
     Ok(show_lnet(&net))
   })
 }
@@ -126,7 +127,8 @@ fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|_, code| {
     let lnet = parse_lnet(&mut code.chars().peekable()).map_err(|e| anyhow::anyhow!(e))?;
     let book = DefinitionBook::default();
-    let (term, valid) = readback_net(&lnet, &book)?;
+    let compat_net = core_net_to_compat(&lnet)?;
+    let (term, valid) = readback_compat(&compat_net, &book);
     if valid {
       Ok(term.to_string(&book.def_names))
     } else {

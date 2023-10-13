@@ -10,6 +10,9 @@ pub mod parser;
 pub mod term_to_net;
 pub mod transform;
 
+pub use net_to_term::readback_compat;
+pub use term_to_net::{book_to_compact_nets, term_to_compat_net};
+
 #[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
 pub struct Name(pub String);
 

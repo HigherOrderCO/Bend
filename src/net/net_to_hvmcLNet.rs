@@ -1,7 +1,15 @@
 use super::inter_net::*;
 use crate::term::*;
-use hvmc::{LNet, LTree, Tag};
+use hvmc::{val_to_name, LBook, LNet, LTree, Tag};
 use std::collections::{HashMap, HashSet};
+
+pub fn nets_to_hvm_core(nets: Vec<(DefId, INet)>) -> anyhow::Result<LBook> {
+  let mut lbook = LBook::new();
+  for (id, inet) in nets {
+    lbook.insert(val_to_name(id.to_internal()), compat_net_to_core(&inet)?);
+  }
+  Ok(lbook)
+}
 
 pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
   let (root_root, redx_roots) = get_tree_roots(inet)?;
