@@ -4,6 +4,7 @@ use hvmc::run::Val;
 use shrinkwraprs::Shrinkwrap;
 use std::fmt;
 
+pub mod check;
 pub mod load_book;
 pub mod net_to_term;
 pub mod parser;
@@ -88,7 +89,7 @@ pub enum Term {
   },
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Op {
   ADD,
   SUB,

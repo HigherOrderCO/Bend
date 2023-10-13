@@ -4,7 +4,7 @@
 use hvmc::ast::{book_to_runtime, net_from_runtime, Book, Net};
 use net::{core_net_to_compat, nets_to_hvm_core};
 use std::time::Instant;
-use term::{book_to_compact_nets, readback_compat, DefId, DefNames, DefinitionBook, Name, Term};
+use term::{book_to_compact_nets, readback_compat, DefId, DefNames, DefinitionBook, Term};
 
 pub mod net;
 pub mod term;
@@ -22,6 +22,7 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<Book> {
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars()?;
+  book.check_self_referential_defs()?;
   book.detach_supercombinators();
   let nets = book_to_compact_nets(book)?;
   let core_book = nets_to_hvm_core(nets)?;
@@ -47,11 +48,7 @@ pub fn run_compiled(book: &Book, main: DefId, mem_size: usize) -> (Net, RunStats
 }
 
 pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
-  let main = if let Some(main) = book.def_names.def_id(&Name::new("Main")) {
-    Ok(main)
-  } else {
-    Err(anyhow::anyhow!("File has no 'Main' definition"))
-  }?;
+  let main = book.check_has_main()?;
   let compiled = compile_book(&mut book)?;
   let (res_lnet, stats) = run_compiled(&compiled, main, mem_size);
   let compat_net = core_net_to_compat(&res_lnet)?;
