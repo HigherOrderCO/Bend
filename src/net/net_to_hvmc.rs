@@ -1,17 +1,18 @@
 use super::inter_net::*;
 use crate::term::*;
-use hvmc::{val_to_name, LBook, LNet, LTree, Tag};
+use hvmc::ast::{val_to_name, Book, Net, Tree};
+use hvmc::run::Tag;
 use std::collections::{HashMap, HashSet};
 
-pub fn nets_to_hvm_core(nets: Vec<(DefId, INet)>) -> anyhow::Result<LBook> {
-  let mut lbook = LBook::new();
+pub fn nets_to_hvm_core(nets: Vec<(DefId, INet)>) -> anyhow::Result<Book> {
+  let mut book = Book::new();
   for (id, inet) in nets {
-    lbook.insert(val_to_name(id.to_internal()), compat_net_to_core(&inet)?);
+    book.insert(val_to_name(id.to_internal()), compat_net_to_core(&inet)?);
   }
-  Ok(lbook)
+  Ok(book)
 }
 
-pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
+pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<Net> {
   let (root_root, redx_roots) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(root_root) = root_root {
@@ -20,7 +21,7 @@ pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
   } else {
     // If the root node points to some aux port (application)
     port_to_var_id.insert(enter(inet, ROOT), 0);
-    LTree::Var { nam: var_id_to_name(0).0 }
+    Tree::Var { nam: var_id_to_name(0).0 }
   };
   let mut rdex = vec![];
   for [root0, root1] in redx_roots {
@@ -28,32 +29,32 @@ pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<LNet> {
     let rdex1 = compat_tree_to_hvm_tree(inet, root1, &mut port_to_var_id);
     rdex.push((rdex0, rdex1));
   }
-  Ok(LNet { root, rdex })
+  Ok(Net { root, rdex })
 }
 
-fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashMap<Port, VarId>) -> LTree {
+fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashMap<Port, VarId>) -> Tree {
   let kind = kind(inet, root);
   let tag = kind & TAG_MASK;
   let label = kind & LABEL_MASK; // TODO: Check if label too high, do something about it.
   match tag {
-    ERA => LTree::Era,
-    CON => LTree::Ctr {
+    ERA => Tree::Era,
+    CON => Tree::Ctr {
       lab: 0,
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
-    DUP => LTree::Ctr {
+    DUP => Tree::Ctr {
       lab: (label + 1) as Tag,
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
-    REF => LTree::Ref { nam: DefId(label).to_internal() },
-    NUM => LTree::Num { val: label as u32 },
-    OP2 => LTree::Op2 {
+    REF => Tree::Ref { nam: DefId(label).to_internal() },
+    NUM => Tree::Num { val: label as u32 },
+    OP2 => Tree::Op2 {
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
-    MAT => LTree::Mat {
+    MAT => Tree::Mat {
       sel: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       ret: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
@@ -61,7 +62,7 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
   }
 }
 
-fn var_or_subtree(inet: &INet, src_port: Port, port_to_var_id: &mut HashMap<Port, VarId>) -> LTree {
+fn var_or_subtree(inet: &INet, src_port: Port, port_to_var_id: &mut HashMap<Port, VarId>) -> Tree {
   let dst_port = enter(inet, src_port);
   if slot(dst_port) == 0 {
     // Subtree
@@ -70,12 +71,12 @@ fn var_or_subtree(inet: &INet, src_port: Port, port_to_var_id: &mut HashMap<Port
     // Var
     if let Some(&var_id) = port_to_var_id.get(&src_port) {
       // Previously found var
-      LTree::Var { nam: var_id_to_name(var_id).0 }
+      Tree::Var { nam: var_id_to_name(var_id).0 }
     } else {
       // New var
       let var_id = port_to_var_id.len() as VarId;
       port_to_var_id.insert(dst_port, var_id);
-      LTree::Var { nam: var_id_to_name(var_id).0 }
+      Tree::Var { nam: var_id_to_name(var_id).0 }
     }
   }
 }
