@@ -61,14 +61,13 @@ fn main() -> anyhow::Result<()> {
       }
 
       if valid_readback {
-        println!("\n{}\n", res_term.to_string(&def_names));
+        println!("{}\n", res_term.to_string(&def_names));
       } else {
-        println!("\nInvalid readback from inet.");
-        println!(" Got:\n{}\n", res_term.to_string(&def_names));
+        println!("Invalid readback from inet.");
+        println!("Got:\n{}\n", res_term.to_string(&def_names));
       }
       // TODO: Some way to figure out total memory use?
       // println!("size: {}", stats.size);
-      println!("used: {}", stats.used);
       println!(
         "Time: {:.3}s | Anni: {:.3} | Comm: {:.3} | Eras: {:.3} | Dref: {:.3} | RPS: {:.3}m",
         stats.run_time,
