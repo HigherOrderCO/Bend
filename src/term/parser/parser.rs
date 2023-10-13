@@ -157,8 +157,7 @@ where
       .map(|(((cond, zero), pred), succ)| Term::Match {
         cond: Box::new(cond),
         zero: Box::new(zero),
-        succ: Box::new(succ),
-        pred,
+        succ: Box::new(Term::Lam { nam: pred, bod: Box::new(succ) }),
       })
       .boxed();
 

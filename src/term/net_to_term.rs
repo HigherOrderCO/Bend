@@ -107,52 +107,21 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
           if sel_kind & TAG_MASK != CON {
             // TODO: Is there any case where we expect a different node type here on readback?
             return (
-              Term::Match {
-                cond: Box::new(cond_term),
-                zero: Box::new(Term::Era),
-                pred: None,
-                succ: Box::new(Term::Era),
-              },
+              Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
               false,
             );
           }
 
-          // Read the Zero rule
           let zero_port = enter(net, port(sel_node, 1));
           let (zero_term, zero_valid) =
             reader(net, zero_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-
-          // Read the Succ rule, with the pred lambda
-          let succ_node = addr(enter(net, port(sel_node, 2)));
-          seen.insert(port(succ_node, 0));
-          seen.insert(port(succ_node, 2));
-
-          let succ_kind = kind(net, succ_node);
-          if succ_kind & TAG_MASK != CON {
-            return (
-              Term::Match {
-                cond: Box::new(cond_term),
-                zero: Box::new(zero_term),
-                pred: None,
-                succ: Box::new(Term::Era),
-              },
-              false,
-            );
-          }
-
-          let pred = decl_name(net, port(succ_node, 1), var_port_to_id, id_counter);
-          let succ = enter(net, port(succ_node, 2));
+          let succ_port = enter(net, port(sel_node, 2));
           let (succ_term, succ_valid) =
-            reader(net, succ, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+            reader(net, succ_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
 
           let valid = cond_valid && zero_valid && succ_valid;
           (
-            Term::Match {
-              cond: Box::new(cond_term),
-              zero: Box::new(zero_term),
-              pred,
-              succ: Box::new(succ_term),
-            },
+            Term::Match { cond: Box::new(cond_term), zero: Box::new(zero_term), succ: Box::new(succ_term) },
             valid,
           )
         }
@@ -331,10 +300,9 @@ impl Term {
         fun.fix_names(id_counter, book);
         arg.fix_names(id_counter, book);
       }
-      Term::Match { cond, zero, pred, succ } => {
+      Term::Match { cond, zero, succ } => {
         cond.fix_names(id_counter, book);
         zero.fix_names(id_counter, book);
-        fix_name(pred, id_counter, succ);
         succ.fix_names(id_counter, book);
       }
       Term::Dup { fst, snd, val, nxt } => {

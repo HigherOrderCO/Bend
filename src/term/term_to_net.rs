@@ -83,8 +83,8 @@ fn encode_term(
       link_local(inet, port(app, 1), arg);
       Ok(Some(port(app, 2)))
     }
-    // core: & cond ~ ? (zero (pred succ)) ret
-    Term::Match { cond, zero, succ, pred } => {
+    // core: & cond ~ ? (zero succ) ret
+    Term::Match { cond, zero, succ } => {
       let if_ = new_node(inet, MAT);
 
       let cond = encode_term(inet, cond, port(if_, 0), scope, vars, global_vars, dups)?;
@@ -96,13 +96,8 @@ fn encode_term(
       let zero = encode_term(inet, zero, port(sel, 1), scope, vars, global_vars, dups)?;
       link_local(inet, port(sel, 1), zero);
 
-      // For the succ branch, we add a lambda binding pred as a variable
-      let succ_node = new_node(inet, CON);
-      link(inet, port(succ_node, 0), port(sel, 2));
-      push_scope(pred, port(succ_node, 1), scope, vars);
-      let succ = encode_term(inet, succ, port(succ_node, 2), scope, vars, global_vars, dups)?;
-      pop_scope(pred, port(succ_node, 1), inet, scope);
-      link_local(inet, port(succ_node, 2), succ);
+      let succ = encode_term(inet, succ, port(sel, 2), scope, vars, global_vars, dups)?;
+      link_local(inet, port(sel, 2), succ);
 
       Ok(Some(port(if_, 2)))
     }

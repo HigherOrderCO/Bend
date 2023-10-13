@@ -84,15 +84,11 @@ fn unique_var_names(term: &Term, name_map: &mut UniqueNameScope, name_count: &mu
       let snd = unique_var_names(snd, name_map, name_count);
       Term::Opx { op: *op, fst: Box::new(fst), snd: Box::new(snd) }
     }
-    Term::Match { cond, zero, pred, succ } => {
+    Term::Match { cond, zero, succ } => {
       let cond = unique_var_names(cond, name_map, name_count);
       let zero = unique_var_names(zero, name_map, name_count);
-      if let Some(pred) = pred {
-        push_name(pred.clone(), name_map, name_count);
-      }
       let succ = unique_var_names(succ, name_map, name_count);
-      let pred = pred.as_ref().map(|pred| pop_name(pred, name_map));
-      Term::Match { cond: Box::new(cond), zero: Box::new(zero), pred, succ: Box::new(succ) }
+      Term::Match { cond: Box::new(cond), zero: Box::new(zero), succ: Box::new(succ) }
     }
     t @ (Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. }) => t.clone(),
   }

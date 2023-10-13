@@ -114,14 +114,10 @@ impl Term {
 
           fun_is_super && arg_is_super
         }
-        Term::Match { cond, zero, pred, succ } => {
+        Term::Match { cond, zero, succ } => {
           let cond_is_super = go(cond, depth + 1, term_info);
           let zero_is_super = go(zero, depth + 1, term_info);
           let succ_is_super = go(succ, depth + 1, term_info);
-
-          if let Some(pred) = pred {
-            term_info.provide(pred);
-          }
 
           cond_is_super && zero_is_super && succ_is_super
         }

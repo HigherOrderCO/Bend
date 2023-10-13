@@ -13,45 +13,6 @@ pub mod transform;
 pub use net_to_term::readback_compat;
 pub use term_to_net::{book_to_compact_nets, term_to_compat_net};
 
-#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
-pub struct Name(pub String);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Default)]
-pub struct DefId(pub Val);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into)]
-pub struct VarId(pub Val);
-
-pub fn var_id_to_name(mut var_id: Val) -> Name {
-  let mut name = String::new();
-  loop {
-    let c = (var_id % 26) as u8 + b'a';
-    name.push(c as char);
-    var_id /= 26;
-    if var_id == 0 {
-      break;
-    }
-  }
-  Name(name)
-}
-
-impl Name {
-  pub fn new(value: &str) -> Self {
-    Name(value.to_string())
-  }
-}
-
-// TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
-impl DefId {
-  pub fn to_internal(self) -> Val {
-    *self + 1
-  }
-
-  pub fn from_internal(val: Val) -> Self {
-    Self(val - 1)
-  }
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
   map: BiHashMap<DefId, Name>,
@@ -103,7 +64,6 @@ pub enum Term {
   Match {
     cond: Box<Term>,
     zero: Box<Term>,
-    pred: Option<Name>,
     succ: Box<Term>,
   },
   Dup {
@@ -145,6 +105,45 @@ pub enum Op {
   NOT,
   LSH,
   RSH,
+}
+
+#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
+pub struct Name(pub String);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Default)]
+pub struct DefId(pub Val);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into)]
+pub struct VarId(pub Val);
+
+pub fn var_id_to_name(mut var_id: Val) -> Name {
+  let mut name = String::new();
+  loop {
+    let c = (var_id % 26) as u8 + b'a';
+    name.push(c as char);
+    var_id /= 26;
+    if var_id == 0 {
+      break;
+    }
+  }
+  Name(name)
+}
+
+impl Name {
+  pub fn new(value: &str) -> Self {
+    Name(value.to_string())
+  }
+}
+
+// TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
+impl DefId {
+  pub fn to_internal(self) -> Val {
+    *self + 1
+  }
+
+  pub fn from_internal(val: Val) -> Self {
+    Self(val - 1)
+  }
 }
 
 impl DefinitionBook {
@@ -198,14 +197,19 @@ impl Term {
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
-      Term::Match { cond, zero, pred, succ } => {
-        format!(
-          "match {} {{ 0: {}; 1+{}: {} }}",
-          cond.to_string(def_names),
-          zero.to_string(def_names),
-          pred.clone().unwrap_or(Name::new("*")),
-          succ.to_string(def_names),
-        )
+      Term::Match { cond, zero, succ } => {
+        if let Term::Lam { nam: pred, bod: succ } = succ.as_ref() {
+          format!(
+            "match {} {{ 0: {}; 1+{}: {} }}",
+            cond.to_string(def_names),
+            zero.to_string(def_names),
+            pred.clone().unwrap_or(Name::new("*")),
+            succ.to_string(def_names),
+          )
+        } else {
+          eprintln!("{self:?}");
+          panic!("Invalid match expression on stringification");
+        }
       }
       Term::Dup { fst, snd, val, nxt } => format!(
         "dup {} {} = {}; {}",

@@ -81,13 +81,11 @@ fn term_to_affine(
       let (nxt, snd) = if let Some(snd) = snd { duplicate_lam(snd, nxt, uses_snd) } else { (nxt, snd) };
       Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(nxt) }
     }
-    Term::Match { cond, zero, pred, succ } => {
+    Term::Match { cond, zero, succ } => {
       let cond = term_to_affine(*cond, var_uses, let_bodies)?;
       let zero = term_to_affine(*zero, var_uses, let_bodies)?;
-      let uses = pred.as_ref().map(|pred| *var_uses.get(pred).unwrap()).unwrap_or(0);
       let succ = term_to_affine(*succ, var_uses, let_bodies)?;
-      let (succ, pred) = if let Some(pred) = pred { duplicate_lam(pred, succ, uses) } else { (succ, pred) };
-      Term::Match { cond: Box::new(cond), zero: Box::new(zero), pred, succ: Box::new(succ) }
+      Term::Match { cond: Box::new(cond), zero: Box::new(zero), succ: Box::new(succ) }
     }
     Term::App { fun, arg } => Term::App {
       fun: Box::new(term_to_affine(*fun, var_uses, let_bodies)?),
@@ -190,14 +188,9 @@ fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
       get_var_use(fun, uses);
       get_var_use(arg, uses);
     }
-    Term::Match { cond, zero, pred, succ } => {
+    Term::Match { cond, zero, succ } => {
       get_var_use(cond, uses);
       get_var_use(zero, uses);
-      if let Some(pred) = pred {
-        if !uses.contains_key(pred) {
-          uses.insert(pred.clone(), 0);
-        }
-      }
       get_var_use(succ, uses);
     }
     Term::Sup { fst, snd } => {

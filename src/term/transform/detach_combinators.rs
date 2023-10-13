@@ -109,10 +109,8 @@ impl Term {
             && !snd.as_ref().is_some_and(|Name(n)| n == name)
             && nxt.occurs_check(name))
       }
-      Self::Match { cond, zero, succ, pred } => {
-        cond.occurs_check(name)
-          || zero.occurs_check(name)
-          || (!pred.as_ref().is_some_and(|Name(n)| n == name) && succ.occurs_check(name))
+      Self::Match { cond, zero, succ } => {
+        cond.occurs_check(name) || zero.occurs_check(name) || succ.occurs_check(name)
       }
       Self::Opx { fst, snd, .. } => fst.occurs_check(name) || snd.occurs_check(name),
       Self::Lnk { .. } | Self::Ref { .. } | Self::Num { .. } | Self::Era => false,

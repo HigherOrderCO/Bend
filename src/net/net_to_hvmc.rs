@@ -1,7 +1,9 @@
 use super::inter_net::*;
 use crate::term::*;
-use hvmc::ast::{val_to_name, Book, Net, Tree};
-use hvmc::run::Tag;
+use hvmc::{
+  ast::{val_to_name, Book, Net, Tree},
+  run::Tag,
+};
 use std::collections::{HashMap, HashSet};
 
 pub fn nets_to_hvm_core(nets: Vec<(DefId, INet)>) -> anyhow::Result<Book> {
