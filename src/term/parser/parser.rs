@@ -14,16 +14,12 @@ use itertools::Itertools;
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range};
 
-// use crate::ast::hvm_lang::Op;
-
 // TODO: Pattern matching on rules
 // TODO: Other types of numbers
 /// <Book>   ::= <Def>* // Sequential rules grouped by name
 /// <Def>    ::= \n* <Rule> (\n+ <Rule>)* \n*
 /// <Rule>   ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) \n* "=" \n* (<InlineNumOp> | <InlineApp>)
 /// <Pattern> ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number>
-/// <InlineNumOp> ::= <numop_token> <Term> <Term>
-/// <InlineApp>   ::= <Term>+
 /// <Term>   ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Let> | <NumOp> | <App>
 /// <Lam>    ::= ("λ"|"@") \n* <NameEra> \n* <Term>
 /// <GlobalLam> ::= ("λ"|"@") "$" <Name> \n* <Term>
@@ -41,18 +37,8 @@ pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Toke
 }
 
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
-  let inline_app =
-    term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
-  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opx {
-    op,
-    fst: Box::new(fst),
-    snd: Box::new(snd),
-  });
-  let standalone_term = choice((inline_app, inline_num_oper))
-    .delimited_by(just(Token::NewLine).repeated(), just(Token::NewLine).repeated());
-
   // TODO: Make a function that calls a parser. I couldn't figure out how to type it correctly.
-  standalone_term.parse(token_stream(code)).into_result()
+  term().parse(token_stream(code)).into_result()
 }
 
 fn token_stream(
@@ -117,82 +103,54 @@ fn term<'a, I>() -> impl Parser<'a, I, Term, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let new_line = || just(Token::NewLine).repeated();
   let var = name().map(|name| Term::Var { nam: name }).boxed();
   let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::Lnk { nam: name }).boxed();
-  let term_sep = choice((just(Token::NewLine), just(Token::Semicolon)));
-
-  let unsigned = select!(Token::Num(num) => Term::Num{val: num});
+  let number = select!(Token::Num(num) => Term::Num{val: num});
+  let term_sep = just(Token::Semicolon).or_not();
 
   recursive(|term| {
     // λx body
     let lam = just(Token::Lambda)
-      .ignore_then(new_line())
       .ignore_then(name_or_era())
-      .then_ignore(new_line())
       .then(term.clone())
       .map(|(name, body)| Term::Lam { nam: name, bod: Box::new(body) })
       .boxed();
 
     // λ$x body
     let global_lam = just(Token::Lambda)
-      .ignore_then(new_line())
       .ignore_then(just(Token::Dollar))
-      .ignore_then(new_line())
       .ignore_then(name())
-      .then_ignore(new_line())
       .then(term.clone())
       .map(|(name, body)| Term::Chn { nam: name, bod: Box::new(body) })
       .boxed();
 
     // dup x1 x2 = body; next
     let dup = just(Token::Dup)
-      .ignore_then(new_line())
       .ignore_then(name_or_era())
-      .then_ignore(new_line())
       .then(name_or_era())
-      .then_ignore(new_line())
       .then_ignore(just(Token::Equals))
-      .then_ignore(new_line())
       .then(term.clone())
       .then_ignore(term_sep.clone())
-      .then_ignore(new_line())
       .then(term.clone())
       .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) })
       .boxed();
 
     // let x = body; next
     let let_ = just(Token::Let)
-      .ignore_then(new_line())
       .ignore_then(name())
-      .then_ignore(new_line())
       .then_ignore(just(Token::Equals))
-      .then_ignore(new_line())
       .then(term.clone())
       .then_ignore(term_sep)
-      .then_ignore(new_line())
       .then(term.clone())
       .map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
+    // if cond { then } else { els_ }
     let if_ = just(Token::If)
-      .ignore_then(new_line())
       .ignore_then(term.clone())
-      .then(
-        term
-          .clone()
-          .delimited_by(new_line(), new_line())
-          .delimited_by(just(Token::LBracket), just(Token::RBracket))
-          .delimited_by(new_line(), new_line()),
-      )
+      .then(term.clone().delimited_by(just(Token::LBracket), just(Token::RBracket)))
       .then_ignore(select!(Token::Name(nam) if nam == "else" => ()))
-      .then(
-        term
-          .clone()
-          .delimited_by(new_line(), new_line())
-          .delimited_by(just(Token::LBracket), just(Token::RBracket))
-          .delimited_by(new_line(), new_line()),
-      )
+      .then(term.clone().delimited_by(just(Token::LBracket), just(Token::RBracket)))
       .map(|((cond, then), els_)| Term::If {
         cond: Box::new(cond),
         then: Box::new(then),
@@ -202,25 +160,18 @@ where
     // (f arg1 arg2 ...)
     let app = term
       .clone()
-      .foldl(new_line().ignore_then(term.clone()).repeated(), |fun, arg| Term::App {
-        fun: Box::new(fun),
-        arg: Box::new(arg),
-      })
-      .delimited_by(new_line(), new_line())
+      .foldl(term.clone().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) })
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
     let num_op = num_oper()
-      .then_ignore(new_line())
       .then(term.clone())
-      .then_ignore(new_line())
       .then(term.clone())
-      .delimited_by(new_line(), new_line())
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, unsigned, global_lam, lam, dup, let_, if_, num_op, app))
+    choice((global_var, var, number, global_lam, lam, dup, let_, if_, num_op, app))
   })
 }
 
@@ -244,24 +195,12 @@ fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let inline_app =
-    term().foldl(term().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) });
-  let inline_num_oper = num_oper().then(term()).then(term()).map(|((op, fst), snd)| Term::Opx {
-    op,
-    fst: Box::new(fst),
-    snd: Box::new(snd),
-  });
-
   let lhs = name().then(pattern().repeated().collect()).boxed();
   let lhs = choice((lhs.clone(), lhs.delimited_by(just(Token::LParen), just(Token::RParen))));
 
-  let rhs = choice((inline_num_oper, inline_app));
-
   lhs
-    .then_ignore(just(Token::NewLine).repeated())
     .then_ignore(just(Token::Equals))
-    .then_ignore(just(Token::NewLine).repeated())
-    .then(rhs)
+    .then(term())
     .map(|((name, pats), body)| (name, Rule { def_id: DefId(0), pats, body }))
 }
 
@@ -294,13 +233,9 @@ where
     book
   }
 
-  let new_line = just(Token::NewLine).repeated();
-
   let parsed_rules = rule()
     .map_with_span(|rule, span| (rule, span))
-    .separated_by(new_line.at_least(1))
-    .allow_leading()
-    .allow_trailing()
+    .repeated()
     .collect::<Vec<((Name, Rule), SimpleSpan)>>();
 
   parsed_rules.validate(rules_to_book)

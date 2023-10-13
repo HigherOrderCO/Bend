@@ -92,16 +92,13 @@ pub enum Token {
   #[token("}")]
   RBracket,
 
-  #[token("\n")]
-  NewLine,
-
   #[regex("//.*", logos::skip)]
   SingleLineComment,
 
   #[token("/*", comment)]
   MultiLineComment,
 
-  #[regex(r"[ \t\f\r]+", logos::skip)]
+  #[regex(r"[ \t\f\r\n]+", logos::skip)]
   Whitespace,
 
   Error(LexingError),
@@ -187,7 +184,6 @@ impl fmt::Display for Token {
       Self::RParen => write!(f, ")"),
       Self::LBracket => write!(f, "{{"),
       Self::RBracket => write!(f, "}}"),
-      Self::NewLine => write!(f, "<NewLine>"),
       Self::SingleLineComment => write!(f, "<SingleLineComment>"),
       Self::MultiLineComment => write!(f, "<MultiLineComment>"),
       Self::Whitespace => write!(f, "<Whitespace>"),
