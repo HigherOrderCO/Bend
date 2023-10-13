@@ -12,15 +12,13 @@ impl DefinitionBook {
   }
 
   /// Check that a definition is not just a reference to itself
-  pub fn check_self_referential_defs(&self) -> anyhow::Result<()> {
+  pub fn check_ref_to_ref(&self) -> anyhow::Result<()> {
     for def in &self.defs {
-      if let Term::Ref { def_id } = def.body {
-        if def_id == def.def_id {
-          return Err(anyhow::anyhow!(
-            "Definition {} is self-referential",
-            self.def_names.name(&def.def_id).unwrap()
-          ));
-        }
+      if let Term::Ref { .. } = def.body {
+        return Err(anyhow::anyhow!(
+          "Definition {} is just a reference to another definition",
+          self.def_names.name(&def.def_id).unwrap()
+        ));
       }
     }
     Ok(())
