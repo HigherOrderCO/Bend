@@ -8,9 +8,9 @@ use std::collections::HashMap;
 pub fn book_to_compact_nets(book: &DefinitionBook) -> anyhow::Result<Vec<(DefId, INet)>> {
   let mut nets = Vec::new();
 
-  for rule in book.defs.iter() {
-    let net = term_to_compat_net(&rule.body)?;
-    nets.push((rule.def_id, net))
+  for (_, def) in book.defs.iter() {
+    let net = term_to_compat_net(&def.body)?;
+    nets.push((def.def_id, net))
   }
 
   Ok(nets)

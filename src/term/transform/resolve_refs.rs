@@ -6,7 +6,7 @@ impl DefinitionBook {
   /// Precondition: Refs are encoded as vars.
   /// Postcondition: Refs are encoded as refs, with the correct def id.
   pub fn resolve_refs(&mut self) {
-    for def in &mut self.defs {
+    for (_, def) in &mut self.defs {
       def.body.resolve_refs(&self.def_names);
     }
   }

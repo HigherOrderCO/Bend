@@ -130,7 +130,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
       REF => {
         let def_id = DefId(label);
         if book.is_generated_rule(def_id) {
-          let rule = &book.defs[def_id.0 as usize];
+          let rule = book.defs.get(&def_id).unwrap();
 
           let mut term = rule.body.clone();
           term.fix_names(id_counter, book);
@@ -290,7 +290,7 @@ impl Term {
       Term::Lnk { .. } => {}
       Term::Ref { def_id } => {
         if book.is_generated_rule(*def_id) {
-          let rule = &book.defs[def_id.0 as usize];
+          let rule = book.defs.get(def_id).unwrap();
           let mut term = rule.body.clone();
           term.fix_names(id_counter, book);
           *self = term

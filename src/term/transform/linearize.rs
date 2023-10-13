@@ -16,7 +16,7 @@ use std::collections::HashMap;
 /// Precondition: All variables are bound and have unique names within each definition.
 impl DefinitionBook {
   pub fn linearize_vars(&mut self) -> anyhow::Result<()> {
-    for def in &mut self.defs {
+    for (_, def) in &mut self.defs {
       def.body.linearize_vars()?;
     }
     Ok(())
