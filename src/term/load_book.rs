@@ -1,5 +1,4 @@
-use super::parser::parse_definition_book;
-use crate::term::DefinitionBook;
+use super::{parser::parse_definition_book, DefinitionBook};
 use ariadne::{Color, Label, Report, ReportKind, Source};
 use chumsky::prelude::Rich;
 use itertools::Itertools;

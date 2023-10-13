@@ -1,18 +1,15 @@
 #![feature(lazy_cell)]
 #![feature(box_patterns)]
 
-pub mod from_core;
+use hvmc::{lbook_to_book, readback_lnet, LBook, LNet};
+use net::{core_net_to_compat, nets_to_hvm_core};
+use std::time::Instant;
+use term::{book_to_compact_nets, readback_compat, DefId, DefNames, DefinitionBook, Name, Term};
+
 pub mod net;
 pub mod term;
-pub mod to_core;
 
-use from_core::readback_net;
-use hvmc::{readback_lnet, LBook, LNet};
-use std::time::Instant;
-use term::{DefId, DefNames, DefinitionBook, Term, Name};
-use to_core::{book_to_hvm_core, book_to_hvm_internal};
-
-pub use crate::term::load_book::load_file_to_book;
+pub use term::load_book::load_file_to_book;
 
 pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
   // TODO: Do the checks without having to do full compilation
@@ -26,16 +23,21 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<LBook> {
   book.make_var_names_unique();
   book.linearize_vars()?;
   book.detach_supercombinators();
-  // book.try_into_affine()?;
-  let core_book = book_to_hvm_core(book)?;
+  let nets = book_to_compact_nets(book)?;
+  let core_book = nets_to_hvm_core(nets)?;
   Ok(core_book)
 }
 
 pub fn run_compiled(book: &LBook, main: DefId, mem_size: usize) -> (LNet, RunStats) {
-  let (mut root, runtime_book) = book_to_hvm_internal(book, main, mem_size);
+  let runtime_book = lbook_to_book(book);
+  let mut root = hvmc::Net::new(mem_size);
+  root.boot(main.to_internal());
+
   let start_time = Instant::now();
+
   // Computes its normal form
   root.normal(&runtime_book);
+
   let elapsed = start_time.elapsed().as_secs_f64();
   let rewrites = Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref };
   let net = readback_lnet(&root);
@@ -52,7 +54,8 @@ pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Te
   }?;
   let compiled = compile_book(&mut book)?;
   let (res_lnet, stats) = run_compiled(&compiled, main, mem_size);
-  let (res_term, valid_readback) = readback_net(&res_lnet, &book)?;
+  let compat_net = core_net_to_compat(&res_lnet)?;
+  let (res_term, valid_readback) = readback_compat(&compat_net, &book);
   let info = RunInfo { stats, valid_readback, lnet: res_lnet };
   Ok((res_term, book.def_names, info))
 }

@@ -1,13 +1,56 @@
-pub mod load_book;
-pub mod parser;
-pub mod transform;
-
 use bimap::{BiHashMap, Overwritten};
 use derive_more::{Display, From, Into};
 use hvmc::Val;
-use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
 use std::fmt;
+
+pub mod load_book;
+pub mod net_to_term;
+pub mod parser;
+pub mod term_to_net;
+pub mod transform;
+
+pub use net_to_term::readback_compat;
+pub use term_to_net::{book_to_compact_nets, term_to_compat_net};
+
+#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
+pub struct Name(pub String);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Default)]
+pub struct DefId(pub Val);
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into)]
+pub struct VarId(pub Val);
+
+pub fn var_id_to_name(mut var_id: Val) -> Name {
+  let mut name = String::new();
+  loop {
+    let c = (var_id % 26) as u8 + b'a';
+    name.push(c as char);
+    var_id /= 26;
+    if var_id == 0 {
+      break;
+    }
+  }
+  Name(name)
+}
+
+impl Name {
+  pub fn new(value: &str) -> Self {
+    Name(value.to_string())
+  }
+}
+
+// TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
+impl DefId {
+  pub fn to_internal(self) -> Val {
+    *self + 1
+  }
+
+  pub fn from_internal(val: Val) -> Self {
+    Self(val - 1)
+  }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
@@ -24,21 +67,7 @@ pub struct DefinitionBook {
 #[derive(Debug, Clone)]
 pub struct Definition {
   pub def_id: DefId,
-  pub rules: Vec<Rule>,
-}
-
-#[derive(Debug, Clone)]
-pub struct Rule {
-  pub def_id: DefId,
-  pub pats: Vec<Pattern>,
   pub body: Term,
-}
-
-#[derive(Debug, Clone)]
-pub enum Pattern {
-  Ctr(Name, Vec<Pattern>),
-  Var(Option<Name>),
-  Num(u32),
 }
 
 #[derive(Debug, Clone)]
@@ -120,44 +149,6 @@ pub enum Op {
 impl DefinitionBook {
   pub fn new() -> Self {
     Default::default()
-  }
-}
-#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
-pub struct Name(pub String);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Default)]
-pub struct DefId(pub Val);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into)]
-pub struct VarId(pub Val);
-
-pub fn var_id_to_name(mut var_id: Val) -> Name {
-  let mut name = String::new();
-  loop {
-    let c = (var_id % 26) as u8 + b'a';
-    name.push(c as char);
-    var_id /= 26;
-    if var_id == 0 {
-      break;
-    }
-  }
-  Name(name)
-}
-
-impl Name {
-  pub fn new(value: &str) -> Self {
-    Name(value.to_string())
-  }
-}
-
-impl DefId {
-  // TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
-  pub fn to_internal(self) -> Val {
-    *self + 1
-  }
-
-  pub fn from_internal(val: Val) -> Self {
-    Self(val - 1)
   }
 }
 
@@ -281,55 +272,10 @@ impl Term {
   }
 }
 
-impl Rule {
-  pub fn to_string(&self, def_names: &DefNames) -> String {
-    let Rule { def_id, pats, body } = self;
-    format!(
-      "({}{}) = {}",
-      def_names.name(def_id).unwrap(),
-      pats.iter().map(|x| format!(" {x}")).join(""),
-      body.to_string(def_names)
-    )
-  }
-
-  pub fn arity(&self) -> usize {
-    self.pats.len()
-  }
-}
-
 impl Definition {
   pub fn to_string(&self, def_names: &DefNames) -> String {
-    self.rules.iter().map(|x| x.to_string(def_names)).join("\n")
-  }
-
-  pub fn arity(&self) -> usize {
-    self.rules[0].arity()
-  }
-}
-
-impl From<&Pattern> for Term {
-  fn from(value: &Pattern) -> Self {
-    match value {
-      Pattern::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
-      Pattern::Var(nam) => Term::Var { nam: Name::new(nam.as_ref().map(|x| x.as_str()).unwrap_or("_")) },
-      Pattern::Num(num) => Term::Num { val: *num },
-    }
-  }
-}
-
-impl fmt::Display for DefinitionBook {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", self.defs.iter().map(|x| x.to_string(&self.def_names)).join("\n\n"))
-  }
-}
-
-impl fmt::Display for Pattern {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Pattern::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
-      Pattern::Var(nam) => write!(f, "{}", nam.as_ref().map(|x| x.as_str()).unwrap_or("*")),
-      Pattern::Num(num) => write!(f, "{num}"),
-    }
+    let Definition { def_id, body } = self;
+    format!("({}) = {}", def_names.name(def_id).unwrap(), body.to_string(def_names))
   }
 }
 

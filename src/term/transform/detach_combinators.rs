@@ -1,4 +1,4 @@
-use crate::term::{DefNames, Definition, DefinitionBook, Name, Op, Rule, Term};
+use crate::term::{DefNames, Definition, DefinitionBook, Name, Op, Term};
 
 impl DefinitionBook {
   /// Applies bracket abstraction to remove lambdas form rule bodies,
@@ -8,10 +8,8 @@ impl DefinitionBook {
   pub fn detach_combinators(&mut self) {
     let mut comb = Vec::new();
 
-    for def in self.defs.iter_mut() {
-      for rule in def.rules.iter_mut() {
-        rule.body.abstract_lambdas(&mut self.def_names, &mut comb);
-      }
+    for rule in self.defs.iter_mut() {
+      rule.body.abstract_lambdas(&mut self.def_names, &mut comb);
     }
 
     self.defs.append(&mut comb);
@@ -232,7 +230,7 @@ impl Combinator {
     let def_id = names.def_id(&name).unwrap_or_else(|| {
       let def_id = names.insert(name);
       let body = self.into();
-      defs.push(Definition { def_id, rules: vec![Rule { def_id, pats: Vec::new(), body }] });
+      defs.push(Definition { def_id, body });
 
       def_id
     });
