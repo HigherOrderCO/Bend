@@ -53,7 +53,7 @@ fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashM
       lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },
-    ITE => LTree::Ite {
+    MAT => LTree::Mat {
       sel: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
       ret: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
     },

@@ -24,7 +24,7 @@ pub const DUP: NodeKind = 2 << TAG;
 pub const REF: NodeKind = 3 << TAG;
 pub const NUM: NodeKind = 4 << TAG;
 pub const OP2: NodeKind = 6 << TAG;
-pub const ITE: NodeKind = 7 << TAG;
+pub const MAT: NodeKind = 7 << TAG;
 pub const LABEL_MASK: NodeKind = (1 << TAG) - 1;
 pub const TAG_MASK: NodeKind = !LABEL_MASK;
 

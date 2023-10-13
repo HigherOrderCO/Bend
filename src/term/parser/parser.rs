@@ -135,22 +135,32 @@ where
       .ignore_then(name())
       .then_ignore(just(Token::Equals))
       .then(term.clone())
-      .then_ignore(term_sep)
+      .then_ignore(term_sep.clone())
       .then(term.clone())
       .map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
-    // if cond { then } else { els_ }
-    let if_ = just(Token::If)
+    // match val { 0: zero; 1 + pred: succ }
+    let match_ = just(Token::Match)
       .ignore_then(term.clone())
-      .then(term.clone().delimited_by(just(Token::LBracket), just(Token::RBracket)))
-      .then_ignore(select!(Token::Name(nam) if nam == "else" => ()))
-      .then(term.clone().delimited_by(just(Token::LBracket), just(Token::RBracket)))
-      .map(|((cond, then), els_)| Term::If {
+      .then_ignore(just(Token::LBracket))
+      .then_ignore(select!(Token::Num(0) => ()))
+      .then_ignore(just(Token::Colon))
+      .then(term.clone())
+      .then_ignore(term_sep.clone())
+      .then_ignore(select!(Token::Num(1) => ()))
+      .then_ignore(just(Token::Add))
+      .then(name_or_era())
+      .then_ignore(just(Token::Colon))
+      .then(term.clone())
+      .then_ignore(just(Token::RBracket))
+      .map(|(((cond, zero), pred), succ)| Term::Match {
         cond: Box::new(cond),
-        then: Box::new(then),
-        els_: Box::new(els_),
-      });
+        zero: Box::new(zero),
+        succ: Box::new(succ),
+        pred,
+      })
+      .boxed();
 
     // (f arg1 arg2 ...)
     let app = term
@@ -166,7 +176,7 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, number, global_lam, lam, dup, let_, if_, num_op, app))
+    choice((global_var, var, number, global_lam, lam, dup, let_, match_, num_op, app))
   })
 }
 

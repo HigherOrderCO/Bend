@@ -53,10 +53,12 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(fun, def_names, scope);
       resolve_refs(arg, def_names, scope);
     }
-    Term::If { cond, then, els_ } => {
+    Term::Match { cond, zero, pred, succ } => {
       resolve_refs(cond, def_names, scope);
-      resolve_refs(then, def_names, scope);
-      resolve_refs(els_, def_names, scope);
+      resolve_refs(zero, def_names, scope);
+      push_scope(pred.clone(), scope);
+      resolve_refs(succ, def_names, scope);
+      pop_scope(pred.clone(), scope);
     }
     Term::Sup { fst, snd } => {
       resolve_refs(fst, def_names, scope);

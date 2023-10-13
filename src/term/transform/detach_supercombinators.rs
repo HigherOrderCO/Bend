@@ -114,12 +114,16 @@ impl Term {
 
           fun_is_super && arg_is_super
         }
-        Term::If { cond, then, els_ } => {
+        Term::Match { cond, zero, pred, succ } => {
           let cond_is_super = go(cond, depth + 1, term_info);
-          let then_is_super = go(then, depth + 1, term_info);
-          let else_is_super = go(els_, depth + 1, term_info);
+          let zero_is_super = go(zero, depth + 1, term_info);
+          let succ_is_super = go(succ, depth + 1, term_info);
 
-          cond_is_super && then_is_super && else_is_super
+          if let Some(pred) = pred {
+            term_info.provide(pred);
+          }
+
+          cond_is_super && zero_is_super && succ_is_super
         }
         Term::Dup { fst, snd, val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);

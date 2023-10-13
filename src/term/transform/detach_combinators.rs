@@ -35,10 +35,10 @@ impl Term {
           go(fun, depth + 1, names, defs);
           go(arg, depth + 1, names, defs);
         }
-        Term::If { cond, then, els_ } => {
+        Term::Match { cond, zero, succ, .. } => {
           go(cond, depth + 1, names, defs);
-          go(then, depth + 1, names, defs);
-          go(els_, depth + 1, names, defs);
+          go(zero, depth + 1, names, defs);
+          go(succ, depth + 1, names, defs);
         }
         Term::Dup { fst: _, snd: _, val, nxt } => {
           go(val, depth + 1, names, defs);
@@ -62,7 +62,7 @@ impl Term {
       Self::Lam { nam: _, bod } => bod.is_simple(),
       Self::Chn { nam: _, bod } => bod.is_simple(),
       Self::App { fun, arg } => fun.is_simple() && arg.is_simple(),
-      Self::If { cond, then, els_ } => cond.is_simple() && then.is_simple() && els_.is_simple(),
+      Self::Match { cond, zero, succ, .. } => cond.is_simple() && zero.is_simple() && succ.is_simple(),
       Self::Var { .. } => true,
       Self::Lnk { .. } => true,
       Self::Ref { .. } => true,
@@ -109,8 +109,10 @@ impl Term {
             && !snd.as_ref().is_some_and(|Name(n)| n == name)
             && nxt.occurs_check(name))
       }
-      Self::If { cond, then, els_ } => {
-        cond.occurs_check(name) || then.occurs_check(name) || els_.occurs_check(name)
+      Self::Match { cond, zero, succ, pred } => {
+        cond.occurs_check(name)
+          || zero.occurs_check(name)
+          || (!pred.as_ref().is_some_and(|Name(n)| n == name) && succ.occurs_check(name))
       }
       Self::Opx { fst, snd, .. } => fst.occurs_check(name) || snd.occurs_check(name),
       Self::Lnk { .. } | Self::Ref { .. } | Self::Num { .. } | Self::Era => false,
@@ -151,8 +153,8 @@ impl Term {
               && !snd.as_ref().is_some_and(|Name(n)| n == name)
               && check(nxt, name, inside_chn))
         }
-        Term::If { cond, then, els_ } => {
-          cond.channel_check(name) || then.channel_check(name) || els_.channel_check(name)
+        Term::Match { cond, zero, succ, .. } => {
+          cond.channel_check(name) || zero.channel_check(name) || succ.channel_check(name)
         }
         Term::Opx { fst, snd, .. } => fst.channel_check(name) || snd.channel_check(name),
         Term::Lnk { .. } => false,
@@ -540,7 +542,7 @@ impl Term {
 
       Self::Sup { .. } => todo!(),
 
-      Self::If { .. } => unimplemented!("Not suported here, should run sanitize_vars pass first"),
+      Self::Match { .. } => unimplemented!("Not suported here, should run sanitize_vars pass first"),
 
       // Term::channel_check invalidates abstraction of lambdas that have their variables inside of a channel
       Self::Chn { .. } => unreachable!(),

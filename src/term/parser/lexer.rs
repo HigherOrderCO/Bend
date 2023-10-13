@@ -19,8 +19,8 @@ pub enum Token {
   #[token("dup")]
   Dup,
 
-  #[token("if")]
-  If,
+  #[token("match")]
+  Match,
 
   #[token("=")]
   Equals,
@@ -64,13 +64,9 @@ pub enum Token {
   #[token("<")]
   Ltn,
 
-  // #[token("<=")]
-  // Lte,
   #[token(">")]
   Gtn,
 
-  // #[token(">=")]
-  // Gte,
   #[token("==")]
   EqualsEquals,
 
@@ -79,6 +75,9 @@ pub enum Token {
 
   #[token(";")]
   Semicolon,
+
+  #[token(":")]
+  Colon,
 
   #[token("(")]
   LParen,
@@ -159,7 +158,7 @@ impl fmt::Display for Token {
       Self::Dollar => write!(f, "$"),
       Self::Let => write!(f, "let"),
       Self::Dup => write!(f, "dup"),
-      Self::If => write!(f, "if"),
+      Self::Match => write!(f, "match"),
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),
       Self::Add => write!(f, "+"),
@@ -179,6 +178,7 @@ impl fmt::Display for Token {
       // Self::Gte => write!(f, ">="),
       Self::NotEquals => write!(f, "!="),
       Self::EqualsEquals => write!(f, "=="),
+      Self::Colon => write!(f, ":"),
       Self::Semicolon => write!(f, ";"),
       Self::LParen => write!(f, "("),
       Self::RParen => write!(f, ")"),

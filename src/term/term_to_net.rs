@@ -1,6 +1,6 @@
 use super::{DefId, DefinitionBook, Name, Term};
 use crate::net::inter_net::{
-  link, new_inet, new_node, op_to_label, port, INet, NodeId, NodeKind, Port, CON, DUP, ERA, ITE, LABEL_MASK,
+  link, new_inet, new_node, op_to_label, port, INet, NodeId, NodeKind, Port, CON, DUP, ERA, LABEL_MASK, MAT,
   NUM, OP2, REF, ROOT,
 };
 use std::collections::HashMap;
@@ -83,21 +83,26 @@ fn encode_term(
       link_local(inet, port(app, 1), arg);
       Ok(Some(port(app, 2)))
     }
-    // core: & cond ~ ? (then els_) ret
-    Term::If { cond, then, els_ } => {
-      let if_ = new_node(inet, ITE);
+    // core: & cond ~ ? (zero (pred succ)) ret
+    Term::Match { cond, zero, succ, pred } => {
+      let if_ = new_node(inet, MAT);
 
       let cond = encode_term(inet, cond, port(if_, 0), scope, vars, global_vars, dups)?;
       link_local(inet, port(if_, 0), cond);
 
-      let branches = new_node(inet, CON);
-      link(inet, port(if_, 1), port(branches, 0));
+      let sel = new_node(inet, CON);
+      link(inet, port(sel, 0), port(if_, 1));
 
-      let then = encode_term(inet, then, port(branches, 1), scope, vars, global_vars, dups)?;
-      link_local(inet, port(branches, 1), then);
+      let zero = encode_term(inet, zero, port(sel, 1), scope, vars, global_vars, dups)?;
+      link_local(inet, port(sel, 1), zero);
 
-      let els_ = encode_term(inet, els_, port(branches, 2), scope, vars, global_vars, dups)?;
-      link_local(inet, port(branches, 2), els_);
+      // For the succ branch, we add a lambda binding pred as a variable
+      let succ_node = new_node(inet, CON);
+      link(inet, port(succ_node, 0), port(sel, 2));
+      push_scope(pred, port(succ_node, 1), scope, vars);
+      let succ = encode_term(inet, succ, port(succ_node, 2), scope, vars, global_vars, dups)?;
+      pop_scope(pred, port(succ_node, 1), inet, scope);
+      link_local(inet, port(succ_node, 2), succ);
 
       Ok(Some(port(if_, 2)))
     }

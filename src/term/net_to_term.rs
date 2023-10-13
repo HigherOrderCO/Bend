@@ -1,6 +1,6 @@
 use super::{var_id_to_name, DefId, DefinitionBook, Name, Op, Term, Val};
 use crate::net::inter_net::{
-  addr, enter, kind, label_to_op, port, slot, INet, NodeId, Port, CON, DUP, ERA, ITE, LABEL_MASK, NUM, OP2,
+  addr, enter, kind, label_to_op, port, slot, INet, NodeId, Port, CON, DUP, ERA, LABEL_MASK, MAT, NUM, OP2,
   REF, ROOT, TAG_MASK,
 };
 use std::collections::{HashMap, HashSet};
@@ -87,37 +87,74 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      ITE => match slot(next) {
+      MAT => match slot(next) {
         2 => {
+          // Read the matched expression
           seen.insert(port(node, 0));
           seen.insert(port(node, 1));
           let cond_port = enter(net, port(node, 0));
           let (cond_term, cond_valid) =
             reader(net, cond_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-          let branches_node = addr(enter(net, port(node, 1)));
-          let branches_kind = kind(net, branches_node);
-          if branches_kind & TAG_MASK == CON {
-            seen.insert(port(branches_node, 0));
-            seen.insert(port(branches_node, 1));
-            seen.insert(port(branches_node, 2));
-            let then_port = enter(net, port(branches_node, 1));
-            let (then_term, then_valid) =
-              reader(net, then_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-            let else_port = enter(net, port(branches_node, 2));
-            let (else_term, else_valid) =
-              reader(net, else_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-            let valid = cond_valid && then_valid && else_valid;
-            (
-              Term::If { cond: Box::new(cond_term), then: Box::new(then_term), els_: Box::new(else_term) },
-              valid,
-            )
-          } else {
+
+          // Read the pattern matching node
+          let sel_node = addr(enter(net, port(node, 1)));
+          seen.insert(port(sel_node, 0));
+          seen.insert(port(sel_node, 1));
+          seen.insert(port(sel_node, 2));
+
+          // We expect the pattern matching node to be a CON
+          let sel_kind = kind(net, sel_node);
+          if sel_kind & TAG_MASK != CON {
             // TODO: Is there any case where we expect a different node type here on readback?
-            (
-              Term::If { cond: Box::new(cond_term), then: Box::new(Term::Era), els_: Box::new(Term::Era) },
+            return (
+              Term::Match {
+                cond: Box::new(cond_term),
+                zero: Box::new(Term::Era),
+                pred: None,
+                succ: Box::new(Term::Era),
+              },
               false,
-            )
+            );
           }
+
+          // Read the Zero rule
+          let zero_port = enter(net, port(sel_node, 1));
+          let (zero_term, zero_valid) =
+            reader(net, zero_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+
+          // Read the Succ rule, with the pred lambda
+          let succ_node = addr(enter(net, port(sel_node, 2)));
+          seen.insert(port(succ_node, 0));
+          seen.insert(port(succ_node, 2));
+
+          let succ_kind = kind(net, succ_node);
+          if succ_kind & TAG_MASK != CON {
+            return (
+              Term::Match {
+                cond: Box::new(cond_term),
+                zero: Box::new(zero_term),
+                pred: None,
+                succ: Box::new(Term::Era),
+              },
+              false,
+            );
+          }
+
+          let pred = decl_name(net, port(succ_node, 1), var_port_to_id, id_counter);
+          let succ = enter(net, port(succ_node, 2));
+          let (succ_term, succ_valid) =
+            reader(net, succ, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+
+          let valid = cond_valid && zero_valid && succ_valid;
+          (
+            Term::Match {
+              cond: Box::new(cond_term),
+              zero: Box::new(zero_term),
+              pred,
+              succ: Box::new(succ_term),
+            },
+            valid,
+          )
         }
         _ => unreachable!(),
       },
@@ -265,27 +302,28 @@ impl DefinitionBook {
 
 impl Term {
   fn fix_names(&mut self, id_counter: &mut Val, book: &DefinitionBook) {
-    match self {
-      Term::Lam { nam: Some(n), bod } => {
+    fn fix_name(nam: &mut Option<Name>, id_counter: &mut Val, bod: &mut Term) {
+      if let Some(nam) = nam {
         let name = var_id_to_name(*id_counter);
         *id_counter += 1;
+        bod.subst(nam, &Term::Var { nam: name.clone() });
+        *nam = name;
+      }
+    }
 
-        bod.subst(n, &Term::Var { nam: name.clone() });
-        *n = name;
-
+    match self {
+      Term::Lam { nam, bod } => {
+        fix_name(nam, id_counter, bod);
         bod.fix_names(id_counter, book);
       }
-      Term::Lam { nam: None, bod } => bod.fix_names(id_counter, book),
       Term::Var { .. } => {}
       Term::Chn { nam: _, bod } => bod.fix_names(id_counter, book),
       Term::Lnk { .. } => {}
       Term::Ref { def_id } => {
         if book.is_generated_rule(*def_id) {
           let rule = &book.defs[def_id.0 as usize];
-
           let mut term = rule.body.clone();
           term.fix_names(id_counter, book);
-
           *self = term
         }
       }
@@ -293,30 +331,16 @@ impl Term {
         fun.fix_names(id_counter, book);
         arg.fix_names(id_counter, book);
       }
-      Term::If { cond, then, els_ } => {
+      Term::Match { cond, zero, pred, succ } => {
         cond.fix_names(id_counter, book);
-        then.fix_names(id_counter, book);
-        els_.fix_names(id_counter, book);
+        zero.fix_names(id_counter, book);
+        fix_name(pred, id_counter, succ);
+        succ.fix_names(id_counter, book);
       }
       Term::Dup { fst, snd, val, nxt } => {
         val.fix_names(id_counter, book);
-
-        if let Some(nam) = fst {
-          let name = var_id_to_name(*id_counter);
-          *id_counter += 1;
-
-          nxt.subst(nam, &Term::Var { nam: name.clone() });
-          fst.replace(name);
-        }
-
-        if let Some(nam) = snd {
-          let name = var_id_to_name(*id_counter);
-          *id_counter += 1;
-
-          nxt.subst(nam, &Term::Var { nam: name.clone() });
-          snd.replace(name);
-        }
-
+        fix_name(fst, id_counter, nxt);
+        fix_name(snd, id_counter, nxt);
         nxt.fix_names(id_counter, book);
       }
       Term::Sup { fst, snd } => {

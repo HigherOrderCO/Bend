@@ -100,10 +100,11 @@ pub enum Term {
     fun: Box<Term>,
     arg: Box<Term>,
   },
-  If {
+  Match {
     cond: Box<Term>,
-    then: Box<Term>,
-    els_: Box<Term>,
+    zero: Box<Term>,
+    pred: Option<Name>,
+    succ: Box<Term>,
   },
   Dup {
     fst: Option<Name>,
@@ -197,12 +198,13 @@ impl Term {
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
-      Term::If { cond, then, els_ } => {
+      Term::Match { cond, zero, pred, succ } => {
         format!(
-          "if {} then {} else {}",
+          "match {} {{ 0: {}; 1+{}: {} }}",
           cond.to_string(def_names),
-          then.to_string(def_names),
-          els_.to_string(def_names)
+          zero.to_string(def_names),
+          pred.clone().unwrap_or(Name::new("*")),
+          succ.to_string(def_names),
         )
       }
       Term::Dup { fst, snd, val, nxt } => format!(
@@ -242,10 +244,10 @@ impl Term {
           nxt.subst(from, to);
         }
       }
-      Term::If { cond, then, els_ } => {
+      Term::Match { cond, zero, succ, .. } => {
         cond.subst(from, to);
-        then.subst(from, to);
-        els_.subst(from, to);
+        zero.subst(from, to);
+        succ.subst(from, to);
       }
       Term::Ref { .. } => (),
       Term::App { fun, arg } => {

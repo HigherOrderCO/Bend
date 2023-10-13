@@ -67,10 +67,16 @@ pub fn check_uses<'a>(
       check_uses(fun, scope, globals)?;
       check_uses(arg, scope, globals)?;
     }
-    Term::If { cond, then, els_ } => {
+    Term::Match { cond, zero, pred, succ } => {
       check_uses(cond, scope, globals)?;
-      check_uses(then, scope, globals)?;
-      check_uses(els_, scope, globals)?;
+      check_uses(zero, scope, globals)?;
+      if let Some(pred) = pred {
+        push_scope(pred, scope);
+      }
+      check_uses(succ, scope, globals)?;
+      if let Some(pred) = pred {
+        pop_scope(pred, scope);
+      }
     }
     Term::Dup { fst, snd, val, nxt } => {
       check_uses(val, scope, globals)?;

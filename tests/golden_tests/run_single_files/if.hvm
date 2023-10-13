@@ -1,5 +1,0 @@
-Main = if (+ 0 1) {
-  λt λf t
- } else {
-   λt λf f
- }
