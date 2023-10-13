@@ -1,5 +1,5 @@
 use crate::term::{DefinitionBook, Name, Term};
-use hvmc::Val;
+use hvmc::run::Val;
 use std::collections::HashMap;
 
 impl DefinitionBook {

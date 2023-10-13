@@ -8,7 +8,7 @@ use hvm_lang::{
     readback_compat, term_to_compat_net, DefinitionBook,
   },
 };
-use hvmc::{parse_lnet, show_lbook, show_lnet};
+use hvmc::ast::{parse_net, show_book, show_net};
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::{
@@ -77,7 +77,7 @@ fn compile_single_terms() {
     term.linearize_vars()?;
     let compat_net = term_to_compat_net(&term)?;
     let net = compat_net_to_core(&compat_net)?;
-    Ok(show_lnet(&net))
+    Ok(show_net(&net))
   })
 }
 
@@ -89,7 +89,7 @@ fn compile_single_files() {
       anyhow::anyhow!(msg)
     })?;
     let compiled = compile_book(&mut book)?;
-    Ok(show_lbook(&compiled))
+    Ok(show_book(&compiled))
   })
 }
 
@@ -114,7 +114,7 @@ fn run_single_files() {
 #[test]
 fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|_, code| {
-    let lnet = parse_lnet(&mut code.chars().peekable()).map_err(|e| anyhow::anyhow!(e))?;
+    let lnet = parse_net(&mut code.chars().peekable()).map_err(|e| anyhow::anyhow!(e))?;
     let book = DefinitionBook::default();
     let compat_net = core_net_to_compat(&lnet)?;
     let (term, valid) = readback_compat(&compat_net, &book);

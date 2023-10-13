@@ -3,26 +3,26 @@ use super::inter_net::{
   REF, ROOT,
 };
 use crate::{net::inter_net::MAT, term::DefId};
-use hvmc::{LNet, LTree};
+use hvmc::ast::{Net, Tree};
 
-pub fn core_net_to_compat(lnet: &LNet) -> anyhow::Result<INet> {
-  let inodes = lnet_to_inodes(lnet);
+pub fn core_net_to_compat(net: &Net) -> anyhow::Result<INet> {
+  let inodes = hvmc_to_inodes(net);
   let compat_net = inodes_to_inet(&inodes);
   Ok(compat_net)
 }
 
-fn lnet_to_inodes(lnet: &LNet) -> INodes {
+fn hvmc_to_inodes(net: &Net) -> INodes {
   let mut inodes = vec![];
   let mut n_vars = 0;
-  let net_root = if let LTree::Var { nam } = &lnet.root { nam } else { "" };
+  let net_root = if let Tree::Var { nam } = &net.root { nam } else { "" };
 
   // If we have a tree attached to the net root, convert that first
-  if !matches!(&lnet.root, LTree::Var { .. }) {
-    let mut root = tree_to_inodes(&lnet.root, "_".to_string(), net_root, &mut n_vars);
+  if !matches!(&net.root, Tree::Var { .. }) {
+    let mut root = tree_to_inodes(&net.root, "_".to_string(), net_root, &mut n_vars);
     inodes.append(&mut root);
   }
   // Convert all the trees forming active pairs.
-  for (i, (tree1, tree2)) in lnet.rdex.iter().enumerate() {
+  for (i, (tree1, tree2)) in net.rdex.iter().enumerate() {
     let tree_root = format!("a{i}");
     let mut tree1 = tree_to_inodes(tree1, tree_root.clone(), net_root, &mut n_vars);
     inodes.append(&mut tree1);
@@ -32,7 +32,7 @@ fn lnet_to_inodes(lnet: &LNet) -> INodes {
   inodes
 }
 
-fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut NodeId) -> INodes {
+fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut NodeId) -> INodes {
   fn new_var(n_vars: &mut NodeId) -> String {
     let new_var = format!("x{n_vars}");
     *n_vars += 1;
@@ -40,12 +40,12 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
   }
 
   fn process_node_subtree<'a>(
-    subtree: &'a LTree,
+    subtree: &'a Tree,
     net_root: &str,
-    subtrees: &mut Vec<(String, &'a LTree)>,
+    subtrees: &mut Vec<(String, &'a Tree)>,
     n_vars: &mut NodeId,
   ) -> String {
-    if let LTree::Var { nam } = subtree {
+    if let Tree::Var { nam } = subtree {
       if nam == net_root { "_".to_string() } else { nam.clone() }
     } else {
       let var = new_var(n_vars);
@@ -58,34 +58,34 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
   let mut subtrees = vec![(tree_root, tree)];
   while let Some((subtree_root, subtree)) = subtrees.pop() {
     match subtree {
-      LTree::Era => {
+      Tree::Era => {
         let var = new_var(n_vars);
         inodes.push(INode { kind: ERA, ports: [subtree_root, var.clone(), var] });
       }
-      LTree::Ctr { lab, lft, rgt } => {
+      Tree::Ctr { lab, lft, rgt } => {
         let kind = if *lab == 0 { CON } else { DUP | (*lab - 1) as NodeKind };
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
       }
-      LTree::Var { .. } => unreachable!(),
-      LTree::Ref { nam } => {
+      Tree::Var { .. } => unreachable!(),
+      Tree::Ref { nam } => {
         let kind = REF | (*DefId::from_internal(*nam) as NodeKind);
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      LTree::Num { val } => {
+      Tree::Num { val } => {
         let kind = NUM | (*val as NodeKind);
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      LTree::Op2 { lft, rgt } => {
+      Tree::Op2 { lft, rgt } => {
         let kind = OP2;
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
       }
-      LTree::Mat { sel, ret } => {
+      Tree::Mat { sel, ret } => {
         let kind = MAT;
         let sel = process_node_subtree(sel, net_root, &mut subtrees, n_vars);
         let ret = process_node_subtree(ret, net_root, &mut subtrees, n_vars);

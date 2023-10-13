@@ -1,5 +1,5 @@
 use crate::term::{DefinitionBook, Name, Term};
-use hvmc::Val;
+use hvmc::run::Val;
 use std::collections::HashMap;
 
 /// Erases variables that weren't used, dups the ones that were used more than once.

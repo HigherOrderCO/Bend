@@ -1,7 +1,7 @@
 // TODO: Use a proper node type
 
 use crate::term::Op;
-use hvmc::Val;
+use hvmc::run::Val;
 
 #[derive(Clone, Debug)]
 /// Net representation used only as an intermediate for converting to hvm-core format

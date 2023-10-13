@@ -1,6 +1,6 @@
 use bimap::{BiHashMap, Overwritten};
 use derive_more::{Display, From, Into};
-use hvmc::Val;
+use hvmc::run::Val;
 use shrinkwraprs::Shrinkwrap;
 use std::fmt;
 

@@ -2,7 +2,7 @@
 
 use clap::{Parser, ValueEnum};
 use hvm_lang::{check_book, compile_book, load_file_to_book, run_book, RunInfo};
-use hvmc::{show_lbook, show_lnet};
+use hvmc::ast::{show_book, show_net};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -50,14 +50,14 @@ fn main() -> anyhow::Result<()> {
     }
     Mode::Compile => {
       let compiled = compile_book(&mut book)?;
-      println!("{}", show_lbook(&compiled));
+      println!("{}", show_book(&compiled));
     }
     Mode::Run => {
       let (res_term, def_names, info) = run_book(book, args.mem / std::mem::size_of::<u64>())?;
-      let RunInfo { stats, valid_readback, lnet } = info;
+      let RunInfo { stats, valid_readback, net: lnet } = info;
       let rps = stats.rewrites.total_rewrites() as f64 / stats.run_time / 1_000_000.0;
       if args.verbose {
-        println!("\n{}", show_lnet(&lnet));
+        println!("\n{}", show_net(&lnet));
       }
 
       if valid_readback {

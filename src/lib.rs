@@ -1,7 +1,7 @@
 #![feature(lazy_cell)]
 #![feature(box_patterns)]
 
-use hvmc::{lbook_to_book, readback_lnet, LBook, LNet};
+use hvmc::ast::{book_to_runtime, net_from_runtime, Book, Net};
 use net::{core_net_to_compat, nets_to_hvm_core};
 use std::time::Instant;
 use term::{book_to_compact_nets, readback_compat, DefId, DefNames, DefinitionBook, Name, Term};
@@ -17,7 +17,7 @@ pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
   Ok(())
 }
 
-pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<LBook> {
+pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<Book> {
   book.resolve_refs();
   book.check_unbound_vars()?;
   book.make_var_names_unique();
@@ -28,9 +28,9 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<LBook> {
   Ok(core_book)
 }
 
-pub fn run_compiled(book: &LBook, main: DefId, mem_size: usize) -> (LNet, RunStats) {
-  let runtime_book = lbook_to_book(book);
-  let mut root = hvmc::Net::new(mem_size);
+pub fn run_compiled(book: &Book, main: DefId, mem_size: usize) -> (Net, RunStats) {
+  let runtime_book = book_to_runtime(book);
+  let mut root = hvmc::run::Net::new(mem_size);
   root.boot(main.to_internal());
 
   let start_time = Instant::now();
@@ -40,7 +40,7 @@ pub fn run_compiled(book: &LBook, main: DefId, mem_size: usize) -> (LNet, RunSta
 
   let elapsed = start_time.elapsed().as_secs_f64();
   let rewrites = Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref };
-  let net = readback_lnet(&root);
+  let net = net_from_runtime(&root);
   let def = root.to_def();
   let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
   (net, stats)
@@ -56,14 +56,14 @@ pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Te
   let (res_lnet, stats) = run_compiled(&compiled, main, mem_size);
   let compat_net = core_net_to_compat(&res_lnet)?;
   let (res_term, valid_readback) = readback_compat(&compat_net, &book);
-  let info = RunInfo { stats, valid_readback, lnet: res_lnet };
+  let info = RunInfo { stats, valid_readback, net: res_lnet };
   Ok((res_term, book.def_names, info))
 }
 
 pub struct RunInfo {
   pub stats: RunStats,
   pub valid_readback: bool,
-  pub lnet: LNet,
+  pub net: Net,
 }
 
 pub struct RunStats {
