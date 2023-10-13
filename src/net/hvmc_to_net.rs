@@ -2,7 +2,7 @@ use super::inter_net::{
   link, new_inet, new_node, port, INet, INode, INodes, NodeId, NodeKind, SlotId, CON, DUP, ERA, NUM, OP2,
   REF, ROOT,
 };
-use crate::term::DefId;
+use crate::{net::inter_net::ITE, term::DefId};
 use hvmc::{LNet, LTree};
 
 pub fn core_net_to_compat(lnet: &LNet) -> anyhow::Result<INet> {
@@ -85,7 +85,12 @@ fn tree_to_inodes(tree: &LTree, tree_root: String, net_root: &str, n_vars: &mut 
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
       }
-      LTree::Ite { .. } => todo!(),
+      LTree::Ite { sel, ret } => {
+        let kind = ITE;
+        let sel = process_node_subtree(sel, net_root, &mut subtrees, n_vars);
+        let ret = process_node_subtree(ret, net_root, &mut subtrees, n_vars);
+        inodes.push(INode { kind, ports: [subtree_root, sel, ret] })
+      }
     }
   }
   inodes

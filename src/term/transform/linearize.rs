@@ -127,7 +127,6 @@ fn make_dup_tree(nam: &Name, mut nxt: Term, uses: Val, dup_body: Option<Term>) -
 }
 
 fn duplicate_lam(nam: Name, nxt: Term, uses: Val) -> (Term, Option<Name>) {
-  // TODO: Is there a difference between a list of dups and a complete binary tree of dups?
   match uses {
     0 => (nxt, None),
     1 => (nxt, Some(dup_name(&nam, 1))),

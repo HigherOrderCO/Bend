@@ -94,17 +94,16 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
           let cond_port = enter(net, port(node, 0));
           let (cond_term, cond_valid) =
             reader(net, cond_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-          let branches_port = enter(net, port(node, 0));
-          let branches_node = addr(branches_port);
+          let branches_node = addr(enter(net, port(node, 1)));
           let branches_kind = kind(net, branches_node);
           if branches_kind & TAG_MASK == CON {
             seen.insert(port(branches_node, 0));
             seen.insert(port(branches_node, 1));
             seen.insert(port(branches_node, 2));
-            let then_port = enter(net, port(node, 0));
+            let then_port = enter(net, port(branches_node, 1));
             let (then_term, then_valid) =
               reader(net, then_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-            let else_port = enter(net, port(node, 0));
+            let else_port = enter(net, port(branches_node, 2));
             let (else_term, else_valid) =
               reader(net, else_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
             let valid = cond_valid && then_valid && else_valid;
@@ -113,7 +112,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
               valid,
             )
           } else {
-            // TODO: Is there any case where we expect a different node type here on readback
+            // TODO: Is there any case where we expect a different node type here on readback?
             (
               Term::If { cond: Box::new(cond_term), then: Box::new(Term::Era), els_: Box::new(Term::Era) },
               false,

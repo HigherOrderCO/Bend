@@ -1,4 +1,4 @@
-// TODO: Refactor to not use this intermediate form
+// TODO: Use a proper node type
 
 use crate::term::Op;
 use hvmc::Val;
@@ -47,7 +47,7 @@ pub fn port(node: NodeId, slot: SlotId) -> Port {
   (node << 2) | slot
 }
 
-/// Returns the address of a port (TODO: rename).
+/// Returns the address of a port.
 pub fn addr(port: Port) -> NodeId {
   port >> 2
 }

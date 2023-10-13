@@ -51,17 +51,6 @@ fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&Path, &str) -> anyhow::Res
       true
     } else if path.is_file() && path.extension().map(|x| x == "hvm").unwrap_or(false) {
       true
-    } else if path.is_dir() {
-      // We only go inside directories if their name is the name of an enabled feature.
-      // To do this, we get the feature name from the directory and check if enabled.
-      // This allows us to enable and disable tests based on the default features.
-      // TODO: We want to be able to check all tests in one go, enabling and disabling features as necessary.
-      if let Some(dir_name) = path.file_name() {
-        let feature_name = format!("CARGO_FEATURE_{}", dir_name.to_str().unwrap_or(""));
-        std::env::var(feature_name).is_ok()
-      } else {
-        false
-      }
     } else {
       false
     }

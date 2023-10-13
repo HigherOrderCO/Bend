@@ -194,7 +194,6 @@ where
     let mut book = DefinitionBook::new();
 
     // Check for repeated defs (could be rules out of order or actually repeated names)
-    // TODO: Solve the lifetime here to avoid cloning names
     for ((name, Definition { body, .. }), def_span) in defs {
       if !book.def_names.contains_name(&name) {
         let def_id = book.def_names.insert(name);
