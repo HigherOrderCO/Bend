@@ -25,9 +25,10 @@ impl Term {
   fn find_used_definitions(&self, used: &mut Definitions, defs: &BTreeMap<DefId, Definition>) {
     match &self {
       Term::Ref { def_id } => {
-        used.insert(*def_id);
-        let Definition { body, .. } = defs.get(def_id).unwrap();
-        body.find_used_definitions(used, defs);
+        if used.insert(*def_id) {
+          let Definition { body, .. } = defs.get(def_id).unwrap();
+          body.find_used_definitions(used, defs);
+        }
       }
       Term::Let { val, nxt, .. } => {
         val.find_used_definitions(used, defs);
