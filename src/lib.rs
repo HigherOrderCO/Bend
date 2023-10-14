@@ -40,7 +40,7 @@ pub fn run_compiled(book: &Book, main: DefId, mem_size: usize) -> (Net, RunStats
   root.normal(&runtime_book);
 
   let elapsed = start_time.elapsed().as_secs_f64();
-  let rewrites = Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref };
+  let rewrites = Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
   let net = net_from_runtime(&root);
   let def = root.to_def();
   let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
@@ -74,10 +74,11 @@ pub struct Rewrites {
   pub comm: usize,
   pub eras: usize,
   pub dref: usize,
+  pub oper: usize,
 }
 
 impl Rewrites {
   pub fn total_rewrites(&self) -> usize {
-    self.anni + self.comm + self.eras + self.dref
+    self.anni + self.comm + self.eras + self.dref + self.oper
   }
 }
