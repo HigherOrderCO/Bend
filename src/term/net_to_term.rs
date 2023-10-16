@@ -23,7 +23,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
     id_counter: &mut Val,
   ) -> Option<Name> {
     // If port is linked to an erase node, return an unused variable
-    if net.node(var_port.node()).kind == NodeKind::Era {
+    if net.node(net.enter_port(var_port).node()).kind == NodeKind::Era {
       None
     } else {
       Some(var_name(var_port, var_port_to_id, id_counter))
