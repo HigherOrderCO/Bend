@@ -1,5 +1,5 @@
-use super::inter_net::*;
-use crate::term::*;
+use super::{INet, Node, NodeId, NodeKind::*, Port, ROOT};
+use crate::term::{var_id_to_name, DefId};
 use hvmc::{
   ast::{val_to_name, Book, Net, Tree},
   run::Tag,
@@ -15,60 +15,57 @@ pub fn nets_to_hvm_core(nets: Vec<(DefId, INet)>) -> anyhow::Result<Book> {
 }
 
 pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<Net> {
-  let (root_root, redx_roots) = get_tree_roots(inet)?;
+  let (net_root, redxs) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
-  let root = if let Some(root_root) = root_root {
+  let root = if let Some(net_root) = net_root {
     // If there is a root tree connected to the root node
-    compat_tree_to_hvm_tree(inet, root_root, &mut port_to_var_id)
+    net_tree_to_hvmc_tree(inet, net_root, &mut port_to_var_id)
   } else {
     // If the root node points to some aux port (application)
-    port_to_var_id.insert(enter(inet, ROOT), 0);
+    port_to_var_id.insert(inet.enter_port(ROOT), 0);
     Tree::Var { nam: var_id_to_name(0).0 }
   };
   let mut rdex = vec![];
-  for [root0, root1] in redx_roots {
-    let rdex0 = compat_tree_to_hvm_tree(inet, root0, &mut port_to_var_id);
-    let rdex1 = compat_tree_to_hvm_tree(inet, root1, &mut port_to_var_id);
+  for [root0, root1] in redxs {
+    let rdex0 = net_tree_to_hvmc_tree(inet, root0, &mut port_to_var_id);
+    let rdex1 = net_tree_to_hvmc_tree(inet, root1, &mut port_to_var_id);
     rdex.push((rdex0, rdex1));
   }
   Ok(Net { root, rdex })
 }
 
-fn compat_tree_to_hvm_tree(inet: &INet, root: NodeId, port_to_var_id: &mut HashMap<Port, VarId>) -> Tree {
-  let kind = kind(inet, root);
-  let tag = kind & TAG_MASK;
-  let label = kind & LABEL_MASK; // TODO: Check if label too high, do something about it.
-  match tag {
-    ERA => Tree::Era,
-    CON => Tree::Ctr {
+fn net_tree_to_hvmc_tree(inet: &INet, tree_root: NodeId, port_to_var_id: &mut HashMap<Port, VarId>) -> Tree {
+  let tree_root = inet.node(tree_root);
+  match tree_root.kind {
+    Era => Tree::Era,
+    Con => Tree::Ctr {
       lab: 0,
-      lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
+      lft: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
+      rgt: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
     },
-    DUP => Tree::Ctr {
-      lab: (label + 1) as Tag,
-      lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
+    Dup { lab } => Tree::Ctr {
+      lab: (lab + 1) as Tag,
+      lft: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
+      rgt: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
     },
-    REF => Tree::Ref { nam: DefId(label).to_internal() },
-    NUM => Tree::Num { val: label as u32 },
-    OP2 => Tree::Op2 {
-      lft: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
+    Ref { def_id } => Tree::Ref { nam: def_id.to_internal() },
+    Num { val } => Tree::Num { val },
+    Op2 => Tree::Op2 {
+      lft: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
+      rgt: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
     },
     MAT => Tree::Mat {
-      sel: Box::new(var_or_subtree(inet, port(root, 1), port_to_var_id)),
-      ret: Box::new(var_or_subtree(inet, port(root, 2), port_to_var_id)),
+      sel: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
+      ret: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
     },
-    _ => unreachable!("Invalid tag in compat tree {tag:x}"),
   }
 }
 
 fn var_or_subtree(inet: &INet, src_port: Port, port_to_var_id: &mut HashMap<Port, VarId>) -> Tree {
-  let dst_port = enter(inet, src_port);
-  if slot(dst_port) == 0 {
+  let dst_port = inet.enter_port(src_port);
+  if dst_port.slot() == 0 {
     // Subtree
-    compat_tree_to_hvm_tree(inet, addr(dst_port), port_to_var_id)
+    net_tree_to_hvmc_tree(inet, dst_port.node(), port_to_var_id)
   } else {
     // Var
     if let Some(&var_id) = port_to_var_id.get(&src_port) {
@@ -92,11 +89,11 @@ fn get_tree_roots(inet: &INet) -> anyhow::Result<(Option<NodeId>, Vec<[NodeId; 2
   let mut side_links: Vec<Port> = vec![]; // Links between trees
 
   // Start by checking the root tree (if any)
-  explored_nodes[addr(ROOT) as usize] = true;
-  let root_link = enter(inet, ROOT);
-  let root_root = if slot(root_link) == 0 {
+  explored_nodes[ROOT.node() as usize] = true;
+  let root_link = inet.enter_port(ROOT);
+  let root_root = if root_link.slot() == 0 {
     // If the root node is connected to a main port, we have a root tree
-    let root_node = addr(root_link);
+    let root_node = root_link.node();
     go_down_tree(inet, root_node, &mut explored_nodes, &mut side_links)?;
     Some(root_node)
   } else {
@@ -107,7 +104,7 @@ fn get_tree_roots(inet: &INet) -> anyhow::Result<(Option<NodeId>, Vec<[NodeId; 2
 
   // Check each side-link for a possible new tree pair;
   while let Some(dest_port) = side_links.pop() {
-    let dest_node = addr(dest_port);
+    let dest_node = dest_port.node();
     // Only go up unmarked trees
     if !explored_nodes[dest_node as usize] {
       let new_roots = go_up_tree(inet, dest_node)?;
@@ -129,16 +126,16 @@ fn go_down_tree(
 ) -> anyhow::Result<()> {
   debug_assert!(!explored_nodes[root as usize], "Explored same tree twice");
   let mut nodes_to_check = vec![root];
-  while let Some(node) = nodes_to_check.pop() {
-    if explored_nodes[node as usize] {
+  while let Some(node_id) = nodes_to_check.pop() {
+    if explored_nodes[node_id as usize] {
       return Err(anyhow::anyhow!("Cyclic terms are not supported"));
     }
-    explored_nodes[node as usize] = true;
+    explored_nodes[node_id as usize] = true;
     for down_slot in [1, 2] {
-      let down_port = enter(inet, port(node, down_slot));
-      if slot(down_port) == 0 {
+      let down_port = inet.enter_port(Port(node_id, down_slot));
+      if down_port.slot() == 0 {
         // If this down-link is to a main port, this is a node of the same tree
-        nodes_to_check.push(addr(down_port));
+        nodes_to_check.push(down_port.node());
       } else {
         // Otherwise it's a side-link
         side_links.push(down_port);
@@ -157,12 +154,11 @@ fn go_up_tree(inet: &INet, start_node: NodeId) -> anyhow::Result<[NodeId; 2]> {
     if !explored_nodes.insert(crnt_node) {
       return Err(anyhow::anyhow!("Cyclic terms are not supported"));
     }
-    let up_port = enter(inet, port(crnt_node, 0));
-    let up_node = addr(up_port);
-    if slot(up_port) == 0 {
-      return Ok([crnt_node, up_node]);
+    let up = inet.enter_port(Port(crnt_node, 0));
+    if up.slot() == 0 {
+      return Ok([crnt_node, up.node()]);
     } else {
-      crnt_node = up_node;
+      crnt_node = up.node();
     }
   }
 }

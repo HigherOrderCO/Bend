@@ -1,8 +1,5 @@
 use super::{DefId, DefinitionBook, Name, Term};
-use crate::net::inter_net::{
-  link, new_inet, new_node, op_to_label, port, INet, NodeId, NodeKind, Port, CON, DUP, ERA, LABEL_MASK, MAT,
-  NUM, OP2, REF, ROOT,
-};
+use crate::net::{INet, NodeId, NodeKind, NodeKind::*, Port, LABEL_MASK, ROOT};
 use std::collections::HashMap;
 
 pub fn book_to_compact_nets(book: &DefinitionBook) -> anyhow::Result<Vec<(DefId, INet)>> {
@@ -18,14 +15,14 @@ pub fn book_to_compact_nets(book: &DefinitionBook) -> anyhow::Result<Vec<(DefId,
 
 /// Converts an IC term into an IC net.
 pub fn term_to_compat_net(term: &Term) -> anyhow::Result<INet> {
-  let mut inet = new_inet();
+  let mut inet = INet::new();
 
   // Encodes the main term.
   let mut global_vars = HashMap::new();
   let main = encode_term(&mut inet, term, ROOT, &mut HashMap::new(), &mut vec![], &mut global_vars, &mut 0)?;
 
   for (decl_port, use_port) in global_vars.into_values() {
-    link(&mut inet, decl_port, use_port);
+    inet.link(decl_port, use_port);
   }
   if Some(ROOT) != main {
     link_local(&mut inet, ROOT, main);
@@ -55,20 +52,20 @@ fn encode_term(
     // - 2: points to the lambda body.
     // core: (var_use bod)
     Term::Lam { nam, bod } => {
-      let fun = new_node(inet, CON);
-      push_scope(nam, port(fun, 1), scope, vars);
-      let bod = encode_term(inet, bod, port(fun, 2), scope, vars, global_vars, dups)?;
-      pop_scope(nam, port(fun, 1), inet, scope);
-      link_local(inet, port(fun, 2), bod);
-      Ok(Some(port(fun, 0)))
+      let fun = inet.new_node(Con);
+      push_scope(nam, Port(fun, 1), scope, vars);
+      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, dups)?;
+      pop_scope(nam, Port(fun, 1), inet, scope);
+      link_local(inet, Port(fun, 2), bod);
+      Ok(Some(Port(fun, 0)))
     }
     // core: (var_use bod)
     Term::Chn { nam, bod } => {
-      let fun = new_node(inet, CON);
-      global_vars.entry(nam.clone()).or_default().0 = port(fun, 1);
-      let bod = encode_term(inet, bod, port(fun, 2), scope, vars, global_vars, dups)?;
-      link_local(inet, port(fun, 2), bod);
-      Ok(Some(port(fun, 0)))
+      let fun = inet.new_node(Con);
+      global_vars.entry(nam.clone()).or_default().0 = Port(fun, 1);
+      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(fun, 2), bod);
+      Ok(Some(Port(fun, 0)))
     }
     // An application becomes to a con node too. Ports:
     // - 0: points to the function being applied.
@@ -159,7 +156,7 @@ fn encode_term(
     }
     // core: & #op ~ <fst <snd ret>>
     Term::Opx { op, fst, snd } => {
-      let op_node = new_node(inet, NUM | op_to_label(*op));
+      let op_node = new_node(inet, NUM | to_hvmc_label(*op));
       link(inet, port(op_node, 1), port(op_node, 2));
 
       let fst_node = new_node(inet, OP2);
