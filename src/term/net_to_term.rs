@@ -1,5 +1,5 @@
 use super::{var_id_to_name, DefId, DefinitionBook, Name, Op, Term, Val};
-use crate::net::{INet, NodeId, NodeKind::*, Port, LABEL_MASK, ROOT, TAG_MASK};
+use crate::net::{INet, NodeId, NodeKind, Port, ROOT};
 use std::collections::{HashMap, HashSet};
 
 // TODO: Add support for global lambdas.
@@ -23,7 +23,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
     id_counter: &mut Val,
   ) -> Option<Name> {
     // If port is linked to an erase node, return an unused variable
-    if net.node(var_port.node()).kind == Era {
+    if net.node(var_port.node()).kind == NodeKind::Era {
       None
     } else {
       Some(var_name(var_port, var_port_to_id, id_counter))
@@ -48,17 +48,16 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
     seen.insert(next);
 
     let node = next.node();
-    let kind_ = net.node(node).kind;
 
-    match kind_ {
+    match net.node(node).kind {
       // If we're visiting a set...
-      Era => {
+      NodeKind::Era => {
         // Only the main port actually exists in an ERA, the auxes are just an artifact of this representation.
         let valid = next.slot() == 0;
         (Term::Era, valid)
       }
       // If we're visiting a con node...
-      Con => match next.slot() {
+      NodeKind::Con => match next.slot() {
         // If we're visiting a port 0, then it is a lambda.
         0 => {
           seen.insert(Port(node, 2));
@@ -82,7 +81,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      Mat => match next.slot() {
+      NodeKind::Mat => match next.slot() {
         2 => {
           // Read the matched expression
           seen.insert(Port(node, 0));
@@ -99,7 +98,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
 
           // We expect the pattern matching node to be a CON
           let sel_kind = net.node(sel_node).kind;
-          if sel_kind == Con {
+          if sel_kind == NodeKind::Con {
             // TODO: Is there any case where we expect a different node type here on readback?
             return (
               Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
@@ -122,7 +121,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      Ref { def_id } => {
+      NodeKind::Ref { def_id } => {
         if book.is_generated_rule(def_id) {
           let rule = &book.defs[def_id.0 as usize];
 
@@ -135,7 +134,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
       }
       // If we're visiting a fan node...
-      Dup { lab } => match next.slot() {
+      NodeKind::Dup { lab: _ } => match next.slot() {
         // If we're visiting a port 0, then it is a pair.
         0 => {
           seen.insert(Port(node, 1));
@@ -160,8 +159,8 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      Num { val } => (Term::Num { val }, true),
-      OP2 => match next.slot() {
+      NodeKind::Num { val } => (Term::Num { val }, true),
+      NodeKind::Op2 => match next.slot() {
         2 => {
           seen.insert(Port(node, 0));
           seen.insert(Port(node, 1));
@@ -197,7 +196,6 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      _ => unreachable!(),
     }
   }
 
@@ -248,7 +246,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
     for check_slot in 0 .. 3 {
       let check_port = Port(decl_port.node(), check_slot);
       let other_node = net.enter_port(check_port).node();
-      if !seen.contains(&check_port) && net.node(other_node).kind != Era {
+      if !seen.contains(&check_port) && net.node(other_node).kind != NodeKind::Era {
         valid = false;
       }
     }

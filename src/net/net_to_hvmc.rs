@@ -1,4 +1,4 @@
-use super::{INet, Node, NodeId, NodeKind::*, Port, ROOT};
+use super::{INet, NodeId, NodeKind, Port, ROOT};
 use crate::term::{var_id_to_name, DefId};
 use hvmc::{
   ast::{val_to_name, Book, Net, Tree},
@@ -37,24 +37,24 @@ pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<Net> {
 fn net_tree_to_hvmc_tree(inet: &INet, tree_root: NodeId, port_to_var_id: &mut HashMap<Port, VarId>) -> Tree {
   let tree_root = inet.node(tree_root);
   match tree_root.kind {
-    Era => Tree::Era,
-    Con => Tree::Ctr {
+    NodeKind::Era => Tree::Era,
+    NodeKind::Con => Tree::Ctr {
       lab: 0,
       lft: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
     },
-    Dup { lab } => Tree::Ctr {
+    NodeKind::Dup { lab } => Tree::Ctr {
       lab: (lab + 1) as Tag,
       lft: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
     },
-    Ref { def_id } => Tree::Ref { nam: def_id.to_internal() },
-    Num { val } => Tree::Num { val },
-    Op2 => Tree::Op2 {
+    NodeKind::Ref { def_id } => Tree::Ref { nam: def_id.to_internal() },
+    NodeKind::Num { val } => Tree::Num { val },
+    NodeKind::Op2 => Tree::Op2 {
       lft: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
       rgt: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
     },
-    MAT => Tree::Mat {
+    NodeKind::Mat => Tree::Mat {
       sel: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
       ret: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
     },

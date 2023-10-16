@@ -1,4 +1,4 @@
-use super::{INet, INodes, NodeId, NodeKind, NodeKind::*, Port, SlotId, ROOT};
+use super::{INet, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use crate::{net::INode, term::DefId};
 use hvmc::ast::{Net, Tree};
 

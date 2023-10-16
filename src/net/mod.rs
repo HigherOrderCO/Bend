@@ -22,7 +22,7 @@ pub struct Node {
   pub kind: NodeKind,
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Port(pub NodeId, pub SlotId);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -121,8 +121,8 @@ impl Port {
 }
 
 impl Op {
-  pub fn to_hvmc_label(value: Op) -> Val {
-    match value {
+  pub fn to_hvmc_label(self) -> Val {
+    match self {
       Op::ADD => 0x1,
       Op::SUB => 0x2,
       Op::MUL => 0x3,
