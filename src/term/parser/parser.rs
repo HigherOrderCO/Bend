@@ -206,7 +206,7 @@ where
     for ((name, Definition { body, .. }), def_span) in defs {
       if !book.def_names.contains_name(&name) {
         let def_id = book.def_names.insert(name);
-        book.defs.push(Definition { def_id, body });
+        book.defs.insert(def_id, Definition { def_id, body });
       } else {
         let (start, end) = (def_span.start, def_span.end);
         let span = SimpleSpan::new(start, end);

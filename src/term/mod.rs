@@ -2,7 +2,7 @@ use bimap::{BiHashMap, Overwritten};
 use derive_more::{Display, From, Into};
 use hvmc::run::Val;
 use shrinkwraprs::Shrinkwrap;
-use std::fmt;
+use std::{collections::BTreeMap, fmt};
 
 pub mod check;
 pub mod load_book;
@@ -23,7 +23,7 @@ pub struct DefNames {
 #[derive(Debug, Clone, Default)]
 pub struct DefinitionBook {
   pub def_names: DefNames,
-  pub defs: Vec<Definition>,
+  pub defs: BTreeMap<DefId, Definition>,
 }
 
 #[derive(Debug, Clone)]

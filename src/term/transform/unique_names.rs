@@ -8,7 +8,7 @@ impl DefinitionBook {
   /// Makes all variables in each definition have a new unique name.
   /// Precondition: Definition references have been resolved, no unbound variables.
   pub fn make_var_names_unique(&mut self) {
-    for def in &mut self.defs {
+    for def in self.defs.values_mut() {
       def.body.make_var_names_unique()
     }
   }

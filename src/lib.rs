@@ -24,6 +24,7 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<Book> {
   book.linearize_vars()?;
   book.check_ref_to_ref()?;
   book.detach_supercombinators();
+  book.prune();
   let nets = book_to_compact_nets(book)?;
   let core_book = nets_to_hvm_core(nets)?;
   Ok(core_book)
