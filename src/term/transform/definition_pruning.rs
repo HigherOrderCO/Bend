@@ -21,42 +21,46 @@ impl DefinitionBook {
 }
 
 impl Term {
-  /// Recursively finds all used definitions on every term that can have a def_id.
+  /// Finds all used definitions on every term that can have a def_id.
   fn find_used_definitions(&self, used: &mut Definitions, defs: &BTreeMap<DefId, Definition>) {
-    match &self {
-      Term::Ref { def_id } => {
-        if used.insert(*def_id) {
-          let Definition { body, .. } = defs.get(def_id).unwrap();
-          body.find_used_definitions(used, defs);
+    let mut to_visit = vec![self];
+
+    while let Some(term) = to_visit.pop() {
+      match term {
+        Term::Ref { def_id } => {
+          if used.insert(*def_id) {
+            let Definition { body, .. } = defs.get(def_id).unwrap();
+            to_visit.push(body);
+          }
         }
+        Term::Let { val, nxt, .. } => {
+          val.find_used_definitions(used, defs);
+          nxt.find_used_definitions(used, defs);
+        }
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.find_used_definitions(used, defs),
+        Term::App { fun, arg } => {
+          fun.find_used_definitions(used, defs);
+          arg.find_used_definitions(used, defs);
+        }
+        Term::Match { cond, zero, succ, .. } => {
+          cond.find_used_definitions(used, defs);
+          zero.find_used_definitions(used, defs);
+          succ.find_used_definitions(used, defs);
+        }
+        Term::Dup { val, nxt, .. } => {
+          val.find_used_definitions(used, defs);
+          nxt.find_used_definitions(used, defs);
+        }
+        Term::Sup { fst, snd } => {
+          fst.find_used_definitions(used, defs);
+          snd.find_used_definitions(used, defs);
+        }
+        Term::Opx { fst, snd, .. } => {
+          fst.find_used_definitions(used, defs);
+          snd.find_used_definitions(used, defs);
+        }
+        _ => {}
       }
-      Term::Let { val, nxt, .. } => {
-        val.find_used_definitions(used, defs);
-        nxt.find_used_definitions(used, defs);
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.find_used_definitions(used, defs),
-      Term::App { fun, arg } => {
-        fun.find_used_definitions(used, defs);
-        arg.find_used_definitions(used, defs);
-      }
-      Term::Match { cond, zero, succ, .. } => {
-        cond.find_used_definitions(used, defs);
-        zero.find_used_definitions(used, defs);
-        succ.find_used_definitions(used, defs);
-      }
-      Term::Dup { val, nxt, .. } => {
-        val.find_used_definitions(used, defs);
-        nxt.find_used_definitions(used, defs);
-      }
-      Term::Sup { fst, snd } => {
-        fst.find_used_definitions(used, defs);
-        snd.find_used_definitions(used, defs);
-      }
-      Term::Opx { fst, snd, .. } => {
-        fst.find_used_definitions(used, defs);
-        snd.find_used_definitions(used, defs);
-      }
-      _ => {}
     }
   }
 }
