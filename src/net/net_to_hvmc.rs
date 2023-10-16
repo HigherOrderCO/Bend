@@ -35,28 +35,27 @@ pub fn compat_net_to_core(inet: &INet) -> anyhow::Result<Net> {
 }
 
 fn net_tree_to_hvmc_tree(inet: &INet, tree_root: NodeId, port_to_var_id: &mut HashMap<Port, VarId>) -> Tree {
-  let tree_root = inet.node(tree_root);
-  match tree_root.kind {
+  match inet.node(tree_root).kind {
     NodeKind::Era => Tree::Era,
     NodeKind::Con => Tree::Ctr {
       lab: 0,
-      lft: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
+      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),
+      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
     },
     NodeKind::Dup { lab } => Tree::Ctr {
       lab: (lab + 1) as Tag,
-      lft: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
+      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),
+      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
     },
     NodeKind::Ref { def_id } => Tree::Ref { nam: def_id.to_internal() },
     NodeKind::Num { val } => Tree::Num { val },
     NodeKind::Op2 => Tree::Op2 {
-      lft: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
+      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),
+      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
     },
     NodeKind::Mat => Tree::Mat {
-      sel: Box::new(var_or_subtree(inet, tree_root.port(1), port_to_var_id)),
-      ret: Box::new(var_or_subtree(inet, tree_root.port(2), port_to_var_id)),
+      sel: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),
+      ret: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
     },
   }
 }
@@ -85,7 +84,7 @@ type VarId = NodeId;
 /// Returns a list of all the tree node roots in the compat inet.
 fn get_tree_roots(inet: &INet) -> anyhow::Result<(Option<NodeId>, Vec<[NodeId; 2]>)> {
   let mut redx_roots: Vec<[NodeId; 2]> = vec![];
-  let mut explored_nodes = vec![false; inet.nodes.len() / 4];
+  let mut explored_nodes = vec![false; inet.nodes.len()];
   let mut side_links: Vec<Port> = vec![]; // Links between trees
 
   // Start by checking the root tree (if any)
