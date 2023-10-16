@@ -51,7 +51,7 @@ pub enum Term {
     nam: Name,
   },
   Let {
-    nam: Name,
+    pat: Pat,
     val: Box<Term>,
     nxt: Box<Term>,
   },
@@ -87,6 +87,16 @@ pub enum Term {
     fst: Box<Term>,
     snd: Box<Term>,
   },
+  Pair {
+    fst: Box<Term>,
+    snd: Box<Term>,
+  },
+}
+
+#[derive(Debug, Clone)]
+pub enum Pat {
+  Name(Name),
+  Pair(Box<Pat>, Box<Pat>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -196,8 +206,8 @@ impl Term {
       Term::Var { nam } => format!("{nam}"),
       Term::Chn { nam, bod } => format!("λ${} {}", nam, bod.to_string(def_names)),
       Term::Lnk { nam } => format!("${nam}"),
-      Term::Let { nam, val, nxt } => {
-        format!("let {} = {}; {}", nam, val.to_string(def_names), nxt.to_string(def_names))
+      Term::Let { pat, val, nxt } => {
+        format!("let {} = {}; {}", pat.to_string(), val.to_string(def_names), nxt.to_string(def_names))
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
@@ -230,6 +240,7 @@ impl Term {
       Term::Opx { op, fst, snd } => {
         format!("({} {} {})", op, fst.to_string(def_names), snd.to_string(def_names))
       }
+      Term::Pair { fst, snd } => format!("({}, {})", fst.to_string(def_names), snd.to_string(def_names)),
     }
   }
 
@@ -248,10 +259,12 @@ impl Term {
       // Only substitute scoped variables.
       Term::Chn { bod, .. } => bod.subst(from, to),
       Term::Lnk { .. } => (),
-      Term::Let { nam, val, nxt } => {
+      Term::Let { pat, val, nxt } => {
         val.subst(from, to);
-        if nam != from {
-          nxt.subst(from, to);
+        if let Pat::Name(nam) = pat {
+          if nam != from {
+            nxt.subst(from, to);
+          }
         }
       }
       Term::Match { cond, zero, succ, .. } => {
@@ -280,6 +293,16 @@ impl Term {
         fst.subst(from, to);
         snd.subst(from, to);
       }
+      Term::Pair { .. } => todo!(),
+    }
+  }
+}
+
+impl Pat {
+  pub fn to_string(&self) -> String {
+    match self {
+      Pat::Name(nam) => nam.to_string(),
+      Pat::Pair(fst, snd) => format!("({}, {})", fst.to_string(), snd.to_string()),
     }
   }
 }

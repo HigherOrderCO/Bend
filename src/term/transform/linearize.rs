@@ -1,4 +1,4 @@
-use crate::term::{DefinitionBook, Name, Term};
+use crate::term::{DefinitionBook, Name, Pat, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -56,7 +56,7 @@ fn term_to_affine(
       if let Some(subst) = let_bodies.remove(&nam) { subst } else { Term::Var { nam: dup_name(&nam, uses) } }
     }
     Term::Chn { nam, bod } => Term::Chn { nam, bod: Box::new(term_to_affine(*bod, var_uses, let_bodies)?) },
-    Term::Let { nam, val, nxt } => {
+    Term::Let { pat: Pat::Name(nam), val, nxt } => {
       let uses = var_uses[&nam];
       match uses {
         0 => term_to_affine(*nxt, var_uses, let_bodies)?,
@@ -72,6 +72,7 @@ fn term_to_affine(
         }
       }
     }
+    Term::Let { .. } => todo!(),
     Term::Dup { fst, snd, val, nxt } => {
       let uses_fst = fst.as_ref().map(|fst| *var_uses.get(fst).unwrap()).unwrap_or(0);
       let uses_snd = snd.as_ref().map(|snd| *var_uses.get(snd).unwrap()).unwrap_or(0);
@@ -101,6 +102,7 @@ fn term_to_affine(
       snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
     },
     t @ (Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. }) => t,
+    Term::Pair { .. } => todo!(),
   };
   Ok(term)
 }
@@ -176,13 +178,14 @@ fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
     }
     Term::Chn { bod, .. } => get_var_use(bod, uses),
     Term::Lnk { .. } => (),
-    Term::Let { nam, val, nxt } => {
+    Term::Let { pat: Pat::Name(nam), val, nxt } => {
       if !uses.contains_key(nam) {
         uses.insert(nam.clone(), 0);
       }
       get_var_use(val, uses);
       get_var_use(nxt, uses);
     }
+    Term::Let { .. } => todo!(),
     Term::Ref { .. } => (),
     Term::App { fun, arg } => {
       get_var_use(fun, uses);
@@ -203,5 +206,6 @@ fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
       get_var_use(fst, uses);
       get_var_use(snd, uses);
     }
+    Term::Pair { .. } => todo!(),
   }
 }

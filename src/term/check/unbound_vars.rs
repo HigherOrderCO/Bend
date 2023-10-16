@@ -1,4 +1,4 @@
-use crate::term::{DefinitionBook, Name, Term};
+use crate::term::{DefinitionBook, Name, Pat, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -57,12 +57,13 @@ pub fn check_uses<'a>(
     Term::Lnk { nam } => {
       globals.entry(nam).or_default().1 = true;
     }
-    Term::Let { nam, val, nxt } => {
+    Term::Let { pat: Pat::Name(nam), val, nxt } => {
       check_uses(val, scope, globals)?;
       push_scope(nam, scope);
       check_uses(nxt, scope, globals)?;
       pop_scope(nam, scope);
     }
+    Term::Let { .. } => todo!(),
     Term::App { fun, arg } => {
       check_uses(fun, scope, globals)?;
       check_uses(arg, scope, globals)?;
@@ -98,6 +99,7 @@ pub fn check_uses<'a>(
       check_uses(snd, scope, globals)?;
     }
     Term::Num { .. } => (),
+    Term::Pair { .. } => todo!(),
   }
   Ok(())
 }

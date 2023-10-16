@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{DefId, Definition, DefinitionBook, Name, Op, Term};
+use crate::term::{DefId, Definition, DefinitionBook, Name, Op, Pat, Term};
 use chumsky::{
   extra,
   input::{Emitter, SpannedInput, Stream, ValueInput},
@@ -130,14 +130,24 @@ where
       .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) })
       .boxed();
 
-    // let x = body; next
+    // (x, y)
+    let pair = term
+      .clone()
+      .then_ignore(just(Token::Comma))
+      .then(term.clone())
+      .delimited_by(just(Token::LParen), just(Token::RParen))
+      .map(|(fst, snd)| Term::Pair { fst: Box::new(fst), snd: Box::new(snd) })
+      .boxed();
+
+    // let a = ...
+    // let (a, b) = ...
     let let_ = just(Token::Let)
-      .ignore_then(name())
+      .ignore_then(pat())
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(term_sep.clone())
       .then(term.clone())
-      .map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) })
+      .map(|((pat, val), nxt)| Term::Let { pat, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
     // match val { 0: zero; 1 + pred: succ }
@@ -175,7 +185,26 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, number, global_lam, lam, dup, let_, match_, num_op, app))
+    choice((global_var, var, number, pair, global_lam, lam, dup, let_, match_, num_op, app))
+  })
+}
+
+fn pat<'a, I>() -> impl Parser<'a, I, Pat, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  recursive(|pat| {
+    let pat_nam = name().map(|nam| Pat::Name(nam)).boxed();
+
+    let pat_pair = pat
+      .clone()
+      .then_ignore(just(Token::Comma))
+      .then(pat)
+      .delimited_by(just(Token::LParen), just(Token::RParen))
+      .map(|(fst, snd)| Pat::Pair(Box::new(fst), Box::new(snd)))
+      .boxed();
+
+    choice((pat_nam, pat_pair))
   })
 }
 
