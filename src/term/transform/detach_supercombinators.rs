@@ -7,7 +7,7 @@ impl DefinitionBook {
   pub fn detach_supercombinators(&mut self) {
     let mut combinators = Combinators::new();
 
-    for (_, def) in self.defs.iter_mut() {
+    for def in self.defs.values_mut() {
       def.body.detach_combinators(def.def_id, &mut self.def_names, &mut combinators);
     }
 

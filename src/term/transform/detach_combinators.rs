@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use crate::term::{DefNames, Definition, DefinitionBook, Name, Op, Term, DefId};
+use crate::term::{DefId, DefNames, Definition, DefinitionBook, Name, Op, Term};
 
 impl DefinitionBook {
   /// Applies bracket abstraction to remove lambdas form rule bodies,
@@ -9,11 +9,11 @@ impl DefinitionBook {
   /// This pass should be used after [`DefinitionBook::sanitize_vars`]
   pub fn detach_combinators(&mut self) {
     let mut comb = Combinators::new();
-    
-    for (_, def) in self.defs.iter_mut() {
+
+    for def in self.defs.values_mut() {
       def.body.abstract_lambdas(&mut self.def_names, &mut comb);
     }
-    
+
     self.defs.append(&mut comb);
   }
 }

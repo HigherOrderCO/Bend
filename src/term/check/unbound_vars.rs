@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 impl DefinitionBook {
   pub fn check_unbound_vars(&self) -> anyhow::Result<()> {
-    for (_, def) in &self.defs {
+    for def in self.defs.values() {
       def.body.check_unbound_vars()?;
     }
     Ok(())
