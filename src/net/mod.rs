@@ -4,7 +4,7 @@ pub mod net_to_hvmc;
 pub use hvmc_to_net::core_net_to_compat;
 pub use net_to_hvmc::{compat_net_to_core, nets_to_hvm_core};
 
-use crate::term::{DefId, Op};
+use crate::term::DefId;
 use hvmc::run::Val;
 use NodeKind::*;
 
@@ -117,49 +117,6 @@ impl Port {
   /// Returns the slot of a port.
   pub fn slot(self) -> SlotId {
     self.1
-  }
-}
-
-impl Op {
-  pub fn to_hvmc_label(self) -> Val {
-    match self {
-      Op::ADD => 0x1,
-      Op::SUB => 0x2,
-      Op::MUL => 0x3,
-      Op::DIV => 0x4,
-      Op::MOD => 0x5,
-      Op::EQ => 0x6,
-      Op::NE => 0x7,
-      Op::LT => 0x8,
-      Op::GT => 0x9,
-      Op::AND => 0xa,
-      Op::OR => 0xb,
-      Op::XOR => 0xc,
-      Op::NOT => 0xd,
-      Op::LSH => 0xe,
-      Op::RSH => 0xf,
-    }
-  }
-
-  pub fn from_hvmc_label(value: Val) -> Option<Op> {
-    match value {
-      0x1 => Some(Op::ADD),
-      0x2 => Some(Op::SUB),
-      0x3 => Some(Op::MUL),
-      0x4 => Some(Op::DIV),
-      0x5 => Some(Op::MOD),
-      0x6 => Some(Op::EQ),
-      0x7 => Some(Op::NE),
-      0x8 => Some(Op::LT),
-      0x9 => Some(Op::GT),
-      0xa => Some(Op::AND),
-      0xb => Some(Op::OR),
-      0xc => Some(Op::XOR),
-      0xd => Some(Op::NOT),
-      0xe => Some(Op::LSH),
-      0xf => Some(Op::RSH),
-      _ => None,
-    }
   }
 }
 

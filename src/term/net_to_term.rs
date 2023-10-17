@@ -255,6 +255,29 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
   (main, valid)
 }
 
+impl Op {
+  pub fn from_hvmc_label(value: Val) -> Option<Op> {
+    match value {
+      0x1 => Some(Op::ADD),
+      0x2 => Some(Op::SUB),
+      0x3 => Some(Op::MUL),
+      0x4 => Some(Op::DIV),
+      0x5 => Some(Op::MOD),
+      0x6 => Some(Op::EQ),
+      0x7 => Some(Op::NE),
+      0x8 => Some(Op::LT),
+      0x9 => Some(Op::GT),
+      0xa => Some(Op::AND),
+      0xb => Some(Op::OR),
+      0xc => Some(Op::XOR),
+      0xd => Some(Op::NOT),
+      0xe => Some(Op::LSH),
+      0xf => Some(Op::RSH),
+      _ => None,
+    }
+  }
+}
+
 impl DefinitionBook {
   pub fn is_generated_rule(&self, def_id: DefId) -> bool {
     self.def_names.name(&def_id).map_or(false, |Name(name)| name.contains('$'))

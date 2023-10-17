@@ -1,5 +1,6 @@
-use super::{DefId, DefinitionBook, Name, Term};
+use super::{DefId, DefinitionBook, Name, Op, Term};
 use crate::net::{INet, NodeId, NodeKind::*, Port, LABEL_MASK, ROOT};
+use hvmc::run::Val;
 use std::collections::HashMap;
 
 pub fn book_to_compact_nets(book: &DefinitionBook) -> anyhow::Result<Vec<(DefId, INet)>> {
@@ -201,5 +202,27 @@ fn pop_scope(name: &Option<Name>, decl_port: Port, inet: &mut INet, scope: &mut 
 fn link_local(inet: &mut INet, ptr_a: Port, ptr_b: Option<Port>) {
   if let Some(ptr_b) = ptr_b {
     inet.link(ptr_a, ptr_b);
+  }
+}
+
+impl Op {
+  pub fn to_hvmc_label(self) -> Val {
+    match self {
+      Op::ADD => 0x1,
+      Op::SUB => 0x2,
+      Op::MUL => 0x3,
+      Op::DIV => 0x4,
+      Op::MOD => 0x5,
+      Op::EQ => 0x6,
+      Op::NE => 0x7,
+      Op::LT => 0x8,
+      Op::GT => 0x9,
+      Op::AND => 0xa,
+      Op::OR => 0xb,
+      Op::XOR => 0xc,
+      Op::NOT => 0xd,
+      Op::LSH => 0xe,
+      Op::RSH => 0xf,
+    }
   }
 }
