@@ -195,9 +195,9 @@ where
 {
   let pat_nam = name().map(|nam| Pat::Nam(nam)).boxed();
 
-  let pat_pair = name()
+  let pat_pair = name_or_era()
     .then_ignore(just(Token::Comma))
-    .then(name())
+    .then(name_or_era())
     .delimited_by(just(Token::LParen), just(Token::RParen))
     .map(|(fst, snd)| Pat::Tup(fst, snd))
     .boxed();

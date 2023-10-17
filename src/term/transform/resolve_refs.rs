@@ -34,13 +34,13 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
     Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
       resolve_refs(val, def_names, scope);
 
-      push_scope(Some(l_nam.clone()), scope);
-      push_scope(Some(r_nam.clone()), scope);
+      push_scope(l_nam.clone(), scope);
+      push_scope(r_nam.clone(), scope);
 
       resolve_refs(nxt, def_names, scope);
 
-      pop_scope(Some(l_nam.clone()), scope);
-      pop_scope(Some(r_nam.clone()), scope);
+      pop_scope(l_nam.clone(), scope);
+      pop_scope(r_nam.clone(), scope);
     }
     Term::Dup { fst, snd, val, nxt } => {
       resolve_refs(val, def_names, scope);

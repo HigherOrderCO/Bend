@@ -111,8 +111,12 @@ impl Term {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_supper = go(nxt, depth + 1, term_info);
 
-          term_info.provide(r_nam);
-          term_info.provide(l_nam);
+          if let Some(l_nam) = l_nam {
+            term_info.provide(l_nam);
+          }
+          if let Some(r_nam) = r_nam {
+            term_info.provide(r_nam);
+          }
 
           val_is_super && nxt_is_supper
         }

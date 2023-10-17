@@ -66,13 +66,21 @@ pub fn check_uses<'a>(
     Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
       check_uses(val, scope, globals)?;
 
-      push_scope(l_nam, scope);
-      push_scope(r_nam, scope);
+      if let Some(l_nam) = l_nam {
+        push_scope(l_nam, scope);
+      }
+      if let Some(r_nam) = r_nam {
+        push_scope(r_nam, scope);
+      }
 
       check_uses(nxt, scope, globals)?;
 
-      pop_scope(l_nam, scope);
-      pop_scope(r_nam, scope);
+      if let Some(l_nam) = l_nam {
+        pop_scope(l_nam, scope);
+      }
+      if let Some(r_nam) = r_nam {
+        pop_scope(r_nam, scope);
+      }
     }
     Term::App { fun, arg } => {
       check_uses(fun, scope, globals)?;

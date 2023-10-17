@@ -73,12 +73,14 @@ fn term_to_affine(
       }
     }
     Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
-      let uses_fst = *var_uses.get(&l_nam).unwrap_or(&0);
-      let uses_snd = *var_uses.get(&r_nam).unwrap_or(&0);
+      let uses_fst = l_nam.as_ref().map(|l_nam| *var_uses.get(l_nam).unwrap()).unwrap_or(0);
+      let uses_snd = r_nam.as_ref().map(|r_nam| *var_uses.get(r_nam).unwrap()).unwrap_or(0);
       let val = term_to_affine(*val, var_uses, let_bodies)?;
       let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
-      let (nxt, fst) = duplicate_lam(l_nam, nxt, uses_fst);
-      let (nxt, snd) = duplicate_lam(r_nam, nxt, uses_snd);
+      let (nxt, fst) =
+        if let Some(l_nam) = l_nam { duplicate_lam(l_nam, nxt, uses_fst) } else { (nxt, l_nam) };
+      let (nxt, snd) =
+        if let Some(r_nam) = r_nam { duplicate_lam(r_nam, nxt, uses_snd) } else { (nxt, r_nam) };
       Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(nxt) }
     }
     Term::Dup { fst, snd, val, nxt } => {
@@ -197,11 +199,15 @@ fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
       get_var_use(nxt, uses);
     }
     Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
-      if !uses.contains_key(l_nam) {
-        uses.insert(l_nam.clone(), 0);
+      if let Some(l_nam) = l_nam {
+        if !uses.contains_key(l_nam) {
+          uses.insert(l_nam.clone(), 0);
+        }
       }
-      if !uses.contains_key(r_nam) {
-        uses.insert(r_nam.clone(), 0);
+      if let Some(r_nam) = r_nam {
+        if !uses.contains_key(r_nam) {
+          uses.insert(r_nam.clone(), 0);
+        }
       }
       get_var_use(val, uses);
       get_var_use(nxt, uses);

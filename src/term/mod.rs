@@ -96,7 +96,7 @@ pub enum Term {
 #[derive(Debug, Clone)]
 pub enum Pat {
   Nam(Name),
-  Tup(Name, Name),
+  Tup(Option<Name>, Option<Name>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -293,7 +293,10 @@ impl Term {
         fst.subst(from, to);
         snd.subst(from, to);
       }
-      Term::Tup { .. } => todo!(),
+      Term::Tup { fst, snd } => {
+        fst.subst(from, to);
+        snd.subst(from, to);
+      }
     }
   }
 }
@@ -302,7 +305,13 @@ impl Pat {
   pub fn to_string(&self) -> String {
     match self {
       Pat::Nam(nam) => nam.to_string(),
-      Pat::Tup(fst, snd) => format!("({}, {})", fst.to_string(), snd.to_string()),
+      Pat::Tup(fst, snd) => {
+        format!(
+          "({}, {})",
+          fst.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),
+          snd.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),
+        )
+      }
     }
   }
 }
