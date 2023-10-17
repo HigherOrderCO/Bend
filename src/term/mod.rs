@@ -87,7 +87,7 @@ pub enum Term {
     fst: Box<Term>,
     snd: Box<Term>,
   },
-  Pair {
+  Tup {
     fst: Box<Term>,
     snd: Box<Term>,
   },
@@ -95,8 +95,8 @@ pub enum Term {
 
 #[derive(Debug, Clone)]
 pub enum Pat {
-  Name(Name),
-  Pair(Box<Pat>, Box<Pat>),
+  Nam(Name),
+  Tup(Box<Pat>, Box<Pat>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -240,7 +240,7 @@ impl Term {
       Term::Opx { op, fst, snd } => {
         format!("({} {} {})", op, fst.to_string(def_names), snd.to_string(def_names))
       }
-      Term::Pair { fst, snd } => format!("({}, {})", fst.to_string(def_names), snd.to_string(def_names)),
+      Term::Tup { fst, snd } => format!("({}, {})", fst.to_string(def_names), snd.to_string(def_names)),
     }
   }
 
@@ -261,7 +261,7 @@ impl Term {
       Term::Lnk { .. } => (),
       Term::Let { pat, val, nxt } => {
         val.subst(from, to);
-        if let Pat::Name(nam) = pat {
+        if let Pat::Nam(nam) = pat {
           if nam != from {
             nxt.subst(from, to);
           }
@@ -293,7 +293,7 @@ impl Term {
         fst.subst(from, to);
         snd.subst(from, to);
       }
-      Term::Pair { .. } => todo!(),
+      Term::Tup { .. } => todo!(),
     }
   }
 }
@@ -301,8 +301,8 @@ impl Term {
 impl Pat {
   pub fn to_string(&self) -> String {
     match self {
-      Pat::Name(nam) => nam.to_string(),
-      Pat::Pair(fst, snd) => format!("({}, {})", fst.to_string(), snd.to_string()),
+      Pat::Nam(nam) => nam.to_string(),
+      Pat::Tup(fst, snd) => format!("({}, {})", fst.to_string(), snd.to_string()),
     }
   }
 }

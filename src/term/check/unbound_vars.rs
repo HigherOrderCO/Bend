@@ -57,13 +57,37 @@ pub fn check_uses<'a>(
     Term::Lnk { nam } => {
       globals.entry(nam).or_default().1 = true;
     }
-    Term::Let { pat: Pat::Name(nam), val, nxt } => {
+    Term::Let { pat: Pat::Nam(nam), val, nxt } => {
       check_uses(val, scope, globals)?;
       push_scope(nam, scope);
       check_uses(nxt, scope, globals)?;
       pop_scope(nam, scope);
     }
-    Term::Let { .. } => todo!(),
+    Term::Let { pat: Pat::Tup(l_pat, r_pat), val, nxt } => {
+      check_uses(val, scope, globals)?;
+
+      let mut to_check = vec![l_pat, r_pat];
+      let mut to_pop = Vec::new();
+
+      while let Some(pat) = to_check.pop() {
+        match &**pat {
+          Pat::Nam(nam) => {
+            push_scope(nam, scope);
+            to_pop.push(nam);
+          }
+          Pat::Tup(l, r) => {
+            to_check.push(l);
+            to_check.push(r);
+          }
+        }
+      }
+
+      check_uses(nxt, scope, globals)?;
+
+      while let Some(pop) = to_pop.pop() {
+        pop_scope(pop, scope);
+      }
+    }
     Term::App { fun, arg } => {
       check_uses(fun, scope, globals)?;
       check_uses(arg, scope, globals)?;
@@ -99,7 +123,10 @@ pub fn check_uses<'a>(
       check_uses(snd, scope, globals)?;
     }
     Term::Num { .. } => (),
-    Term::Pair { .. } => todo!(),
+    Term::Tup { fst, snd } => {
+      check_uses(fst, scope, globals)?;
+      check_uses(snd, scope, globals)?;
+    }
   }
   Ok(())
 }

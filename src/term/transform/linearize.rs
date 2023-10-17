@@ -56,7 +56,7 @@ fn term_to_affine(
       if let Some(subst) = let_bodies.remove(&nam) { subst } else { Term::Var { nam: dup_name(&nam, uses) } }
     }
     Term::Chn { nam, bod } => Term::Chn { nam, bod: Box::new(term_to_affine(*bod, var_uses, let_bodies)?) },
-    Term::Let { pat: Pat::Name(nam), val, nxt } => {
+    Term::Let { pat: Pat::Nam(nam), val, nxt } => {
       let uses = var_uses[&nam];
       match uses {
         0 => term_to_affine(*nxt, var_uses, let_bodies)?,
@@ -102,7 +102,7 @@ fn term_to_affine(
       snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
     },
     t @ (Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. }) => t,
-    Term::Pair { .. } => todo!(),
+    Term::Tup { .. } => todo!(),
   };
   Ok(term)
 }
@@ -178,7 +178,7 @@ fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
     }
     Term::Chn { bod, .. } => get_var_use(bod, uses),
     Term::Lnk { .. } => (),
-    Term::Let { pat: Pat::Name(nam), val, nxt } => {
+    Term::Let { pat: Pat::Nam(nam), val, nxt } => {
       if !uses.contains_key(nam) {
         uses.insert(nam.clone(), 0);
       }
@@ -206,6 +206,6 @@ fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
       get_var_use(fst, uses);
       get_var_use(snd, uses);
     }
-    Term::Pair { .. } => todo!(),
+    Term::Tup { .. } => todo!(),
   }
 }

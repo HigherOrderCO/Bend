@@ -54,7 +54,7 @@ impl Term {
         }
         Term::Sup { .. } => todo!(),
         Term::Var { .. } | Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } => {}
-        Term::Pair { .. } => todo!(),
+        Term::Tup { .. } => todo!(),
       }
     }
 
@@ -77,7 +77,7 @@ impl Term {
       Self::Let { .. } => false,
       Self::Dup { .. } => false,
       Self::Sup { .. } => false,
-      Self::Pair { .. } => todo!(),
+      Self::Tup { .. } => todo!(),
     }
   }
 
@@ -108,10 +108,10 @@ impl Term {
       Self::Chn { nam: _, bod } => bod.occurs_check(name),
       Self::App { fun, arg } => fun.occurs_check(name) || arg.occurs_check(name),
       Self::Sup { fst, snd } => fst.occurs_check(name) || snd.occurs_check(name),
-      Self::Let { pat: Pat::Name(Name(n)), val, nxt } => {
+      Self::Let { pat: Pat::Nam(Name(n)), val, nxt } => {
         val.occurs_check(name) || (n != name && nxt.occurs_check(name))
       }
-      Self::Let { pat: Pat::Pair(..), .. } => todo!(),
+      Self::Let { pat: Pat::Tup(..), .. } => todo!(),
       Self::Dup { fst, snd, val, nxt } => {
         val.occurs_check(name)
           || (!fst.as_ref().is_some_and(|Name(n)| n == name)
@@ -123,7 +123,7 @@ impl Term {
       }
       Self::Opx { fst, snd, .. } => fst.occurs_check(name) || snd.occurs_check(name),
       Self::Lnk { .. } | Self::Ref { .. } | Self::Num { .. } | Self::Era => false,
-      Self::Pair { .. } => todo!(),
+      Self::Tup { .. } => todo!(),
     }
   }
 
@@ -139,7 +139,7 @@ impl Term {
         Term::Chn { nam: _, bod } => check(bod, name, true),
         Term::App { fun, arg } => check(fun, name, inside_chn) || check(arg, name, inside_chn),
         Term::Sup { fst, snd } => check(fst, name, inside_chn) || check(snd, name, inside_chn),
-        Term::Let { pat: Pat::Name(Name(n)), val, nxt } => {
+        Term::Let { pat: Pat::Nam(Name(n)), val, nxt } => {
           check(val, name, inside_chn) || (n != name && check(nxt, name, inside_chn))
         }
         Term::Let { .. } => todo!(),
@@ -170,7 +170,7 @@ impl Term {
         Term::Ref { .. } => false,
         Term::Num { .. } => false,
         Term::Era => false,
-        Term::Pair { .. } => todo!(),
+        Term::Tup { .. } => todo!(),
       }
     }
 
@@ -543,7 +543,7 @@ impl Term {
       Self::Dup { fst: None, snd: None, val: _, nxt } => nxt.abstract_by(name),
 
       // [name] Let { nam, val, nxt } => ([name] ([nam] nxt) val)
-      Self::Let { pat: Pat::Name(nam), val, nxt } => {
+      Self::Let { pat: Pat::Nam(nam), val, nxt } => {
         A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
       }
 
@@ -564,7 +564,7 @@ impl Term {
 
       // The abstraction variable can not occur inside these, so case (a) catches all the next branches
       Self::Ref { .. } | Self::Lnk { .. } | Self::Num { .. } | Self::Era => unreachable!(),
-      Self::Pair { .. } => todo!(),
+      Self::Tup { .. } => todo!(),
     }
   }
 }

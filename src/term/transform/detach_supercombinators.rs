@@ -100,7 +100,7 @@ impl Term {
           false
         }
         Term::Lnk { .. } => false,
-        Term::Let { pat: Pat::Name(nam), val, nxt } => {
+        Term::Let { pat: Pat::Nam(nam), val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_super = go(nxt, depth + 1, term_info);
           term_info.provide(nam);
@@ -146,7 +146,7 @@ impl Term {
 
           fst_is_super && snd_is_super
         }
-        Term::Pair { .. } => todo!(),
+        Term::Tup { .. } => todo!(),
       }
     }
 

@@ -136,7 +136,7 @@ where
       .then_ignore(just(Token::Comma))
       .then(term.clone())
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|(fst, snd)| Term::Pair { fst: Box::new(fst), snd: Box::new(snd) })
+      .map(|(fst, snd)| Term::Tup { fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
     // let a = ...
@@ -194,14 +194,14 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   recursive(|pat| {
-    let pat_nam = name().map(|nam| Pat::Name(nam)).boxed();
+    let pat_nam = name().map(|nam| Pat::Nam(nam)).boxed();
 
     let pat_pair = pat
       .clone()
       .then_ignore(just(Token::Comma))
       .then(pat)
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|(fst, snd)| Pat::Pair(Box::new(fst), Box::new(snd)))
+      .map(|(fst, snd)| Pat::Tup(Box::new(fst), Box::new(snd)))
       .boxed();
 
     choice((pat_nam, pat_pair))

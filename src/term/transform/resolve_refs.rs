@@ -25,13 +25,37 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(bod, def_names, scope);
       pop_scope(nam.clone(), scope);
     }
-    Term::Let { pat: Pat::Name(nam), val, nxt } => {
+    Term::Let { pat: Pat::Nam(nam), val, nxt } => {
       resolve_refs(val, def_names, scope);
       push_scope(Some(nam.clone()), scope);
       resolve_refs(nxt, def_names, scope);
       pop_scope(Some(nam.clone()), scope);
     }
-    Term::Let { .. } => todo!(),
+    Term::Let { pat: Pat::Tup(l_pat, r_pat), val, nxt } => {
+      resolve_refs(val, def_names, scope);
+
+      let mut to_resolve = vec![l_pat, r_pat];
+      let mut to_pop = Vec::new();
+
+      while let Some(pat) = to_resolve.pop() {
+        match &mut **pat {
+          Pat::Nam(nam) => {
+            push_scope(Some(nam.clone()), scope);
+            to_pop.push(nam.clone());
+          }
+          Pat::Tup(l, r) => {
+            to_resolve.push(l);
+            to_resolve.push(r);
+          }
+        }
+      }
+
+      resolve_refs(nxt, def_names, scope);
+
+      while let Some(nam) = to_pop.pop() {
+        pop_scope(Some(nam), scope);
+      }
+    }
     Term::Dup { fst, snd, val, nxt } => {
       resolve_refs(val, def_names, scope);
       push_scope(fst.clone(), scope);
@@ -67,7 +91,7 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(fst, def_names, scope);
       resolve_refs(snd, def_names, scope);
     }
-    Term::Pair { fst, snd } => {
+    Term::Tup { fst, snd } => {
       resolve_refs(fst, def_names, scope);
       resolve_refs(snd, def_names, scope);
     }

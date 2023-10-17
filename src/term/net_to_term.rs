@@ -503,7 +503,7 @@ impl Term {
         snd.fix_names(id_counter, book);
       }
       Term::Let { .. } => unreachable!(),
-      Term::Pair { .. } => todo!(),
+      Term::Tup { .. } => todo!(),
     }
   }
 }

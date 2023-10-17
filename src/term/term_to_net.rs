@@ -219,7 +219,7 @@ fn encode_term(
 
       Ok(Some(Port(snd_node, 2)))
     }
-    Term::Pair { .. } => todo!(),
+    Term::Tup { .. } => todo!(),
   }
 }
 
