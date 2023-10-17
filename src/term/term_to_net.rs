@@ -1,8 +1,6 @@
-use super::{DefId, DefinitionBook, Name, Term};
-use crate::net::inter_net::{
-  link, new_inet, new_node, op_to_label, port, INet, NodeId, NodeKind, Port, CON, DUP, ERA, LABEL_MASK, MAT,
-  NUM, OP2, REF, ROOT,
-};
+use super::{DefId, DefinitionBook, Name, Op, Term};
+use crate::net::{INet, NodeId, NodeKind::*, Port, LABEL_MASK, ROOT};
+use hvmc::run::Val;
 use std::collections::HashMap;
 
 pub fn book_to_compact_nets(book: &DefinitionBook) -> anyhow::Result<Vec<(DefId, INet)>> {
@@ -18,14 +16,14 @@ pub fn book_to_compact_nets(book: &DefinitionBook) -> anyhow::Result<Vec<(DefId,
 
 /// Converts an IC term into an IC net.
 pub fn term_to_compat_net(term: &Term) -> anyhow::Result<INet> {
-  let mut inet = new_inet();
+  let mut inet = INet::new();
 
   // Encodes the main term.
   let mut global_vars = HashMap::new();
   let main = encode_term(&mut inet, term, ROOT, &mut HashMap::new(), &mut vec![], &mut global_vars, &mut 0)?;
 
   for (decl_port, use_port) in global_vars.into_values() {
-    link(&mut inet, decl_port, use_port);
+    inet.link(decl_port, use_port);
   }
   if Some(ROOT) != main {
     link_local(&mut inet, ROOT, main);
@@ -55,20 +53,20 @@ fn encode_term(
     // - 2: points to the lambda body.
     // core: (var_use bod)
     Term::Lam { nam, bod } => {
-      let fun = new_node(inet, CON);
-      push_scope(nam, port(fun, 1), scope, vars);
-      let bod = encode_term(inet, bod, port(fun, 2), scope, vars, global_vars, dups)?;
-      pop_scope(nam, port(fun, 1), inet, scope);
-      link_local(inet, port(fun, 2), bod);
-      Ok(Some(port(fun, 0)))
+      let fun = inet.new_node(Con);
+      push_scope(nam, Port(fun, 1), scope, vars);
+      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, dups)?;
+      pop_scope(nam, Port(fun, 1), inet, scope);
+      link_local(inet, Port(fun, 2), bod);
+      Ok(Some(Port(fun, 0)))
     }
     // core: (var_use bod)
     Term::Chn { nam, bod } => {
-      let fun = new_node(inet, CON);
-      global_vars.entry(nam.clone()).or_default().0 = port(fun, 1);
-      let bod = encode_term(inet, bod, port(fun, 2), scope, vars, global_vars, dups)?;
-      link_local(inet, port(fun, 2), bod);
-      Ok(Some(port(fun, 0)))
+      let fun = inet.new_node(Con);
+      global_vars.entry(nam.clone()).or_default().0 = Port(fun, 1);
+      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(fun, 2), bod);
+      Ok(Some(Port(fun, 0)))
     }
     // An application becomes to a con node too. Ports:
     // - 0: points to the function being applied.
@@ -76,30 +74,30 @@ fn encode_term(
     // - 2: points to where the application occurs.
     // core: & fun ~ (arg ret) (fun not necessarily main port)
     Term::App { fun, arg } => {
-      let app = new_node(inet, CON);
-      let fun = encode_term(inet, fun, port(app, 0), scope, vars, global_vars, dups)?;
-      link_local(inet, port(app, 0), fun);
-      let arg = encode_term(inet, arg, port(app, 1), scope, vars, global_vars, dups)?;
-      link_local(inet, port(app, 1), arg);
-      Ok(Some(port(app, 2)))
+      let app = inet.new_node(Con);
+      let fun = encode_term(inet, fun, Port(app, 0), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(app, 0), fun);
+      let arg = encode_term(inet, arg, Port(app, 1), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(app, 1), arg);
+      Ok(Some(Port(app, 2)))
     }
     // core: & cond ~ ? (zero succ) ret
     Term::Match { cond, zero, succ } => {
-      let if_ = new_node(inet, MAT);
+      let if_ = inet.new_node(Mat);
 
-      let cond = encode_term(inet, cond, port(if_, 0), scope, vars, global_vars, dups)?;
-      link_local(inet, port(if_, 0), cond);
+      let cond = encode_term(inet, cond, Port(if_, 0), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(if_, 0), cond);
 
-      let sel = new_node(inet, CON);
-      link(inet, port(sel, 0), port(if_, 1));
+      let sel = inet.new_node(Con);
+      inet.link(Port(sel, 0), Port(if_, 1));
 
-      let zero = encode_term(inet, zero, port(sel, 1), scope, vars, global_vars, dups)?;
-      link_local(inet, port(sel, 1), zero);
+      let zero = encode_term(inet, zero, Port(sel, 1), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(sel, 1), zero);
 
-      let succ = encode_term(inet, succ, port(sel, 2), scope, vars, global_vars, dups)?;
-      link_local(inet, port(sel, 2), succ);
+      let succ = encode_term(inet, succ, Port(sel, 2), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(sel, 2), succ);
 
-      Ok(Some(port(if_, 2)))
+      Ok(Some(Port(if_, 2)))
     }
     // A dup becomes a dup node too. Ports:
     // - 0: points to the value projected.
@@ -107,16 +105,16 @@ fn encode_term(
     // - 2: points to the occurrence of the second variable.
     // core: & val ~ {lab fst snd} (val not necessarily main port)
     Term::Dup { fst, snd, val, nxt } => {
-      let dup = new_node(inet, DUP | *dups);
+      let dup = inet.new_node(Dup { lab: u8::try_from(*dups).unwrap() });
       *dups += 1;
-      let val = encode_term(inet, val, port(dup, 0), scope, vars, global_vars, dups)?;
-      link_local(inet, port(dup, 0), val);
+      let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(dup, 0), val);
 
-      push_scope(fst, port(dup, 1), scope, vars);
-      push_scope(snd, port(dup, 2), scope, vars);
+      push_scope(fst, Port(dup, 1), scope, vars);
+      push_scope(snd, Port(dup, 2), scope, vars);
       let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, dups)?;
-      pop_scope(snd, port(dup, 2), inet, scope);
-      pop_scope(fst, port(dup, 1), inet, scope);
+      pop_scope(snd, Port(dup, 2), inet, scope);
+      pop_scope(fst, Port(dup, 1), inet, scope);
 
       Ok(nxt)
     }
@@ -131,7 +129,7 @@ fn encode_term(
       let crnt_var = *var_stack.last().unwrap();
       let (declare_port, use_port) = vars.get_mut(crnt_var).unwrap();
       debug_assert!(use_port.is_none(), "Variable {nam} used more than once");
-      link(inet, up, *declare_port);
+      inet.link(up, *declare_port);
       *use_port = Some(up);
       Ok(Some(*declare_port))
     }
@@ -141,40 +139,40 @@ fn encode_term(
     }
     // core: @def_id
     Term::Ref { def_id } => {
-      let node = new_node(inet, REF | **def_id);
-      link(inet, port(node, 1), port(node, 2));
-      link(inet, up, port(node, 0));
-      Ok(Some(port(node, 0)))
+      let node = inet.new_node(Ref { def_id: *def_id });
+      inet.link(Port(node, 1), Port(node, 2));
+      inet.link(up, Port(node, 0));
+      Ok(Some(Port(node, 0)))
     }
     Term::Let { .. } => unreachable!(), // Removed in earlier poss
     Term::Sup { .. } => unreachable!(), // Not supported in syntax
     Term::Era => unreachable!(),        // Not supported in syntax
     // core: #val
     Term::Num { val } => {
-      debug_assert!(*val as NodeKind <= LABEL_MASK);
-      let node = new_node(inet, NUM | *val as NodeKind);
+      debug_assert!(*val <= LABEL_MASK);
+      let node = inet.new_node(Num { val: *val });
       // This representation only has nodes of arity 2, so we connect the two aux ports that are not used.
-      link(inet, port(node, 1), port(node, 2));
-      Ok(Some(port(node, 0)))
+      inet.link(Port(node, 1), Port(node, 2));
+      Ok(Some(Port(node, 0)))
     }
     // core: & #op ~ <fst <snd ret>>
     Term::Opx { op, fst, snd } => {
-      let op_node = new_node(inet, NUM | op_to_label(*op));
-      link(inet, port(op_node, 1), port(op_node, 2));
+      let op_node = inet.new_node(Num { val: op.to_hvmc_label() });
+      inet.link(Port(op_node, 1), Port(op_node, 2));
 
-      let fst_node = new_node(inet, OP2);
-      link(inet, port(op_node, 0), port(fst_node, 0));
+      let fst_node = inet.new_node(Op2);
+      inet.link(Port(op_node, 0), Port(fst_node, 0));
 
-      let fst = encode_term(inet, fst, port(fst_node, 1), scope, vars, global_vars, dups)?;
-      link_local(inet, port(fst_node, 1), fst);
+      let fst = encode_term(inet, fst, Port(fst_node, 1), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(fst_node, 1), fst);
 
-      let snd_node = new_node(inet, OP2);
-      link(inet, port(fst_node, 2), port(snd_node, 0));
+      let snd_node = inet.new_node(Op2);
+      inet.link(Port(fst_node, 2), Port(snd_node, 0));
 
-      let snd = encode_term(inet, snd, port(snd_node, 1), scope, vars, global_vars, dups)?;
-      link_local(inet, port(snd_node, 1), snd);
+      let snd = encode_term(inet, snd, Port(snd_node, 1), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(snd_node, 1), snd);
 
-      Ok(Some(port(snd_node, 2)))
+      Ok(Some(Port(snd_node, 2)))
     }
   }
 }
@@ -195,14 +193,36 @@ fn pop_scope(name: &Option<Name>, decl_port: Port, inet: &mut INet, scope: &mut 
   if let Some(name) = name {
     scope.get_mut(name).unwrap().pop().unwrap();
   } else {
-    let era = new_node(inet, ERA);
-    link(inet, decl_port, port(era, 0));
-    link(inet, port(era, 1), port(era, 2));
+    let era = inet.new_node(Era);
+    inet.link(decl_port, Port(era, 0));
+    inet.link(Port(era, 1), Port(era, 2));
   }
 }
 
 fn link_local(inet: &mut INet, ptr_a: Port, ptr_b: Option<Port>) {
   if let Some(ptr_b) = ptr_b {
-    link(inet, ptr_a, ptr_b);
+    inet.link(ptr_a, ptr_b);
+  }
+}
+
+impl Op {
+  pub fn to_hvmc_label(self) -> Val {
+    match self {
+      Op::ADD => 0x1,
+      Op::SUB => 0x2,
+      Op::MUL => 0x3,
+      Op::DIV => 0x4,
+      Op::MOD => 0x5,
+      Op::EQ => 0x6,
+      Op::NE => 0x7,
+      Op::LT => 0x8,
+      Op::GT => 0x9,
+      Op::AND => 0xa,
+      Op::OR => 0xb,
+      Op::XOR => 0xc,
+      Op::NOT => 0xd,
+      Op::LSH => 0xe,
+      Op::RSH => 0xf,
+    }
   }
 }

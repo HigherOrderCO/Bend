@@ -1,8 +1,5 @@
-use super::inter_net::{
-  link, new_inet, new_node, port, INet, INode, INodes, NodeId, NodeKind, SlotId, CON, DUP, ERA, NUM, OP2,
-  REF, ROOT,
-};
-use crate::{net::inter_net::MAT, term::DefId};
+use super::{INet, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
+use crate::{net::INode, term::DefId};
 use hvmc::ast::{Net, Tree};
 
 pub fn core_net_to_compat(net: &Net) -> anyhow::Result<INet> {
@@ -60,33 +57,34 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
     match subtree {
       Tree::Era => {
         let var = new_var(n_vars);
-        inodes.push(INode { kind: ERA, ports: [subtree_root, var.clone(), var] });
+        inodes.push(INode { kind: Era, ports: [subtree_root, var.clone(), var] });
       }
       Tree::Ctr { lab, lft, rgt } => {
-        let kind = if *lab == 0 { CON } else { DUP | (*lab - 1) as NodeKind };
+        // Dup labels in INet representation start at 0, while for hvmc::Net they start at 1
+        let kind = if *lab == 0 { Con } else { Dup { lab: *lab - 1 } };
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
       }
       Tree::Var { .. } => unreachable!(),
       Tree::Ref { nam } => {
-        let kind = REF | (*DefId::from_internal(*nam) as NodeKind);
+        let kind = Ref { def_id: DefId::from_internal(*nam) };
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
       Tree::Num { val } => {
-        let kind = NUM | (*val as NodeKind);
+        let kind = Num { val: *val };
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
       Tree::Op2 { lft, rgt } => {
-        let kind = OP2;
+        let kind = Op2;
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
       }
       Tree::Mat { sel, ret } => {
-        let kind = MAT;
+        let kind = Mat;
         let sel = process_node_subtree(sel, net_root, &mut subtrees, n_vars);
         let ret = process_node_subtree(ret, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, sel, ret] })
@@ -98,17 +96,17 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
 
 // Converts INodes to an INet by linking ports based on names.
 fn inodes_to_inet(inodes: &INodes) -> INet {
-  let mut inet = new_inet();
+  let mut inet = INet::new();
   let mut name_map = std::collections::HashMap::new();
 
   for inode in inodes.iter() {
-    let node = new_node(&mut inet, inode.kind);
+    let node = inet.new_node(inode.kind);
     for (j, name) in inode.ports.iter().enumerate() {
-      let p = port(node, j as SlotId);
+      let p = Port(node, j as SlotId);
       if name == "_" {
-        link(&mut inet, p, ROOT);
+        inet.link(p, ROOT);
       } else if let Some(&q) = name_map.get(name) {
-        link(&mut inet, p, q);
+        inet.link(p, q);
         name_map.remove(name);
       } else {
         name_map.insert(name.clone(), p);
