@@ -107,7 +107,15 @@ impl Term {
 
           val_is_super && nxt_is_super
         }
-        Term::Let { .. } => todo!(),
+        Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
+          let val_is_super = go(val, depth + 1, term_info);
+          let nxt_is_supper = go(nxt, depth + 1, term_info);
+
+          term_info.provide(r_nam);
+          term_info.provide(l_nam);
+
+          val_is_super && nxt_is_supper
+        }
         Term::Ref { .. } => true,
         Term::App { fun, arg } => {
           let fun_is_super = go(fun, depth + 1, term_info);
@@ -146,7 +154,12 @@ impl Term {
 
           fst_is_super && snd_is_super
         }
-        Term::Tup { .. } => todo!(),
+        Term::Tup { fst, snd } => {
+          let fst_is_super = go(fst, depth + 1, term_info);
+          let snd_is_super = go(snd, depth + 1, term_info);
+
+          fst_is_super && snd_is_super
+        }
       }
     }
 

@@ -31,30 +31,16 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(nxt, def_names, scope);
       pop_scope(Some(nam.clone()), scope);
     }
-    Term::Let { pat: Pat::Tup(l_pat, r_pat), val, nxt } => {
+    Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
       resolve_refs(val, def_names, scope);
 
-      let mut to_resolve = vec![l_pat, r_pat];
-      let mut to_pop = Vec::new();
-
-      while let Some(pat) = to_resolve.pop() {
-        match &mut **pat {
-          Pat::Nam(nam) => {
-            push_scope(Some(nam.clone()), scope);
-            to_pop.push(nam.clone());
-          }
-          Pat::Tup(l, r) => {
-            to_resolve.push(l);
-            to_resolve.push(r);
-          }
-        }
-      }
+      push_scope(Some(l_nam.clone()), scope);
+      push_scope(Some(r_nam.clone()), scope);
 
       resolve_refs(nxt, def_names, scope);
 
-      while let Some(nam) = to_pop.pop() {
-        pop_scope(Some(nam), scope);
-      }
+      pop_scope(Some(l_nam.clone()), scope);
+      pop_scope(Some(r_nam.clone()), scope);
     }
     Term::Dup { fst, snd, val, nxt } => {
       resolve_refs(val, def_names, scope);

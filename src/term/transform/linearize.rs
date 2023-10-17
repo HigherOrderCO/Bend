@@ -72,7 +72,15 @@ fn term_to_affine(
         }
       }
     }
-    Term::Let { pat: Pat::Tup(l_pat, r_pat), val, nxt } => todo!(),
+    Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
+      let uses_fst = *var_uses.get(&l_nam).unwrap_or(&0);
+      let uses_snd = *var_uses.get(&r_nam).unwrap_or(&0);
+      let val = term_to_affine(*val, var_uses, let_bodies)?;
+      let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
+      let (nxt, fst) = duplicate_lam(l_nam, nxt, uses_fst);
+      let (nxt, snd) = duplicate_lam(r_nam, nxt, uses_snd);
+      Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(nxt) }
+    }
     Term::Dup { fst, snd, val, nxt } => {
       let uses_fst = fst.as_ref().map(|fst| *var_uses.get(fst).unwrap()).unwrap_or(0);
       let uses_snd = snd.as_ref().map(|snd| *var_uses.get(snd).unwrap()).unwrap_or(0);
@@ -188,21 +196,12 @@ fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
       get_var_use(val, uses);
       get_var_use(nxt, uses);
     }
-    Term::Let { pat: Pat::Tup(l_pat, r_pat), val, nxt } => {
-      let mut to_check = vec![l_pat, r_pat];
-
-      while let Some(pat) = to_check.pop() {
-        match &**pat {
-          Pat::Nam(nam) => {
-            if !uses.contains_key(nam) {
-              uses.insert(nam.clone(), 0);
-            }
-          }
-          Pat::Tup(l, r) => {
-            to_check.push(l);
-            to_check.push(r);
-          }
-        }
+    Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
+      if !uses.contains_key(l_nam) {
+        uses.insert(l_nam.clone(), 0);
+      }
+      if !uses.contains_key(r_nam) {
+        uses.insert(r_nam.clone(), 0);
       }
       get_var_use(val, uses);
       get_var_use(nxt, uses);
@@ -227,6 +226,9 @@ fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
       get_var_use(fst, uses);
       get_var_use(snd, uses);
     }
-    Term::Tup { .. } => todo!(),
+    Term::Tup { fst, snd } => {
+      get_var_use(fst, uses);
+      get_var_use(snd, uses);
+    }
   }
 }

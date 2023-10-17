@@ -63,30 +63,16 @@ pub fn check_uses<'a>(
       check_uses(nxt, scope, globals)?;
       pop_scope(nam, scope);
     }
-    Term::Let { pat: Pat::Tup(l_pat, r_pat), val, nxt } => {
+    Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
       check_uses(val, scope, globals)?;
 
-      let mut to_check = vec![l_pat, r_pat];
-      let mut to_pop = Vec::new();
-
-      while let Some(pat) = to_check.pop() {
-        match &**pat {
-          Pat::Nam(nam) => {
-            push_scope(nam, scope);
-            to_pop.push(nam);
-          }
-          Pat::Tup(l, r) => {
-            to_check.push(l);
-            to_check.push(r);
-          }
-        }
-      }
+      push_scope(l_nam, scope);
+      push_scope(r_nam, scope);
 
       check_uses(nxt, scope, globals)?;
 
-      while let Some(pop) = to_pop.pop() {
-        pop_scope(pop, scope);
-      }
+      pop_scope(l_nam, scope);
+      pop_scope(r_nam, scope);
     }
     Term::App { fun, arg } => {
       check_uses(fun, scope, globals)?;

@@ -56,40 +56,15 @@ fn unique_var_names(term: &Term, name_map: &mut UniqueNameScope, name_count: &mu
       let nam = pop_name(nam, name_map);
       Term::Let { pat: Pat::Nam(nam), val: Box::new(val), nxt: Box::new(nxt) }
     }
-    Term::Let { pat: pat @ Pat::Tup(l_pat, r_pat), val, nxt } => {
+    Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
       let val = unique_var_names(val, name_map, name_count);
 
-      let mut to_visit = vec![l_pat, r_pat];
-
-      while let Some(push) = to_visit.pop() {
-        match &**push {
-          Pat::Nam(nam) => {
-            push_name(nam.clone(), name_map, name_count);
-          }
-          Pat::Tup(l, r) => {
-            to_visit.push(l);
-            to_visit.push(r);
-          }
-        }
-      }
+      push_name(l_nam.clone(), name_map, name_count);
+      push_name(r_nam.clone(), name_map, name_count);
 
       let nxt = unique_var_names(nxt, name_map, name_count);
 
-      fn go(pat: &mut Pat, name_map: &mut UniqueNameScope) {
-        match pat {
-          Pat::Nam(nam) => {
-            *nam = pop_name(nam, name_map);
-          }
-          Pat::Tup(l, r) => {
-            go(r, name_map);
-            go(l, name_map);
-          }
-        }
-      }
-
-      let mut new_pat = pat.clone();
-
-      go(&mut new_pat, name_map);
+      let new_pat = Pat::Tup(pop_name(l_nam, name_map), pop_name(r_nam, name_map));
 
       Term::Let { pat: new_pat, val: Box::new(val), nxt: Box::new(nxt) }
     }

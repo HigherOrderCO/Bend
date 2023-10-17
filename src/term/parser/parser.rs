@@ -193,19 +193,16 @@ fn pat<'a, I>() -> impl Parser<'a, I, Pat, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  recursive(|pat| {
-    let pat_nam = name().map(|nam| Pat::Nam(nam)).boxed();
+  let pat_nam = name().map(|nam| Pat::Nam(nam)).boxed();
 
-    let pat_pair = pat
-      .clone()
-      .then_ignore(just(Token::Comma))
-      .then(pat)
-      .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|(fst, snd)| Pat::Tup(Box::new(fst), Box::new(snd)))
-      .boxed();
+  let pat_pair = name()
+    .then_ignore(just(Token::Comma))
+    .then(name())
+    .delimited_by(just(Token::LParen), just(Token::RParen))
+    .map(|(fst, snd)| Pat::Tup(fst, snd))
+    .boxed();
 
-    choice((pat_nam, pat_pair))
-  })
+  choice((pat_nam, pat_pair))
 }
 
 fn definition<'a, I>() -> impl Parser<'a, I, (Name, Definition), extra::Err<Rich<'a, Token>>>

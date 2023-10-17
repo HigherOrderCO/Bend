@@ -96,7 +96,7 @@ pub enum Term {
 #[derive(Debug, Clone)]
 pub enum Pat {
   Nam(Name),
-  Tup(Box<Pat>, Box<Pat>),
+  Tup(Name, Name),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
