@@ -1,38 +1,175 @@
 use super::{var_id_to_name, DefId, DefinitionBook, Name, Op, Term, Val};
-use crate::net::inter_net::{
-  addr, enter, kind, label_to_op, port, slot, INet, NodeId, Port, CON, DUP, ERA, LABEL_MASK, MAT, NUM, OP2,
-  REF, ROOT, TAG_MASK,
-};
+use crate::net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use std::collections::{HashMap, HashSet};
 
-// TODO: Add support for global lambdas.
-/// Converts an Interaction-INet node to an Interaction Calculus term.
-pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
-  // Given a port, returns its name, or assigns one if it wasn't named yet.
-  fn var_name(var_port: Port, var_port_to_id: &mut HashMap<Port, Val>, id_counter: &mut Val) -> Name {
-    let id = var_port_to_id.entry(var_port).or_insert_with(|| {
-      let id = *id_counter;
-      *id_counter += 1;
-      id
-    });
-
-    var_id_to_name(*id)
-  }
-
-  fn decl_name(
+// TODO: Display scopeless lambdas as such
+/// Converts an Interaction-INet to a Lambda Calculus term, resolvind Dups and Sups where possible.
+pub fn net_to_term_non_linear(net: &INet, book: &DefinitionBook) -> (Term, bool) {
+  /// Reads a term recursively by starting at root node.
+  /// Returns the term and whether it's a valid readback.
+  fn reader(
     net: &INet,
-    var_port: Port,
+    next: Port,
     var_port_to_id: &mut HashMap<Port, Val>,
     id_counter: &mut Val,
-  ) -> Option<Name> {
-    // If port is linked to an erase node, return an unused variable
-    if kind(net, addr(enter(net, var_port))) == ERA {
-      None
-    } else {
-      Some(var_name(var_port, var_port_to_id, id_counter))
+    dup_scope: &mut HashMap<u8, Vec<SlotId>>,
+    book: &DefinitionBook,
+  ) -> (Term, bool) {
+    let node = next.node();
+
+    match net.node(node).kind {
+      // If we're visiting a set...
+      Era => {
+        // Only the main port actually exists in an ERA, the auxes are just an artifact of this representation.
+        let valid = next.slot() == 0;
+        (Term::Era, valid)
+      }
+      // If we're visiting a con node...
+      Con => match next.slot() {
+        // If we're visiting a port 0, then it is a lambda.
+        0 => {
+          let nam = decl_name(net, Port(node, 1), var_port_to_id, id_counter);
+          let prt = net.enter_port(Port(node, 2));
+          let (bod, valid) = reader(net, prt, var_port_to_id, id_counter, dup_scope, book);
+          (Term::Lam { nam, bod: Box::new(bod) }, valid)
+        }
+        // If we're visiting a port 1, then it is a variable.
+        1 => (Term::Var { nam: var_name(next, var_port_to_id, id_counter) }, true),
+        // If we're visiting a port 2, then it is an application.
+        2 => {
+          let prt = net.enter_port(Port(node, 0));
+          let (fun, fun_valid) = reader(net, prt, var_port_to_id, id_counter, dup_scope, book);
+          let prt = net.enter_port(Port(node, 1));
+          let (arg, arg_valid) = reader(net, prt, var_port_to_id, id_counter, dup_scope, book);
+          let valid = fun_valid && arg_valid;
+          (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
+        }
+        _ => unreachable!(),
+      },
+      Mat => match next.slot() {
+        2 => {
+          // Read the matched expression
+          let cond_port = net.enter_port(Port(node, 0));
+          let (cond_term, cond_valid) = reader(net, cond_port, var_port_to_id, id_counter, dup_scope, book);
+
+          // Read the pattern matching node
+          let sel_node = net.enter_port(Port(node, 1)).node();
+
+          // We expect the pattern matching node to be a CON
+          let sel_kind = net.node(sel_node).kind;
+          if sel_kind != Con {
+            // TODO: Is there any case where we expect a different node type here on readback?
+            return (
+              Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
+              false,
+            );
+          }
+
+          let zero_port = net.enter_port(Port(sel_node, 1));
+          let (zero_term, zero_valid) = reader(net, zero_port, var_port_to_id, id_counter, dup_scope, book);
+          let succ_port = net.enter_port(Port(sel_node, 2));
+          let (succ_term, succ_valid) = reader(net, succ_port, var_port_to_id, id_counter, dup_scope, book);
+
+          let valid = cond_valid && zero_valid && succ_valid;
+          (
+            Term::Match { cond: Box::new(cond_term), zero: Box::new(zero_term), succ: Box::new(succ_term) },
+            valid,
+          )
+        }
+        _ => unreachable!(),
+      },
+      Ref { def_id } => {
+        if book.is_generated_rule(def_id) {
+          let rule = book.defs.get(&def_id).unwrap();
+
+          let mut term = rule.body.clone();
+          term.fix_names(id_counter, book);
+
+          (term, true)
+        } else {
+          (Term::Ref { def_id }, true)
+        }
+      }
+      // If we're visiting a fan node...
+      Dup { lab } => match next.slot() {
+        // If we're visiting a port 0, then it is a pair.
+        0 => {
+          let stack = dup_scope.entry(lab).or_default();
+          if let Some(slot) = stack.pop() {
+            // Since we had a paired Dup in the path to this Sup,
+            // we "decay" the superposition according to the original direction we came from the Dup.
+            let chosen = net.enter_port(Port(node, slot));
+            let (val, valid) = reader(net, chosen, var_port_to_id, id_counter, dup_scope, book);
+            dup_scope.get_mut(&lab).unwrap().push(slot);
+            (val, valid)
+          } else {
+            // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
+            let fst = net.enter_port(Port(node, 1));
+            let snd = net.enter_port(Port(node, 2));
+            let (fst, fst_valid) = reader(net, fst, var_port_to_id, id_counter, dup_scope, book);
+            let (snd, snd_valid) = reader(net, snd, var_port_to_id, id_counter, dup_scope, book);
+            let valid = fst_valid && snd_valid;
+            (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
+          }
+        }
+        // If we're visiting a port 1 or 2, then it is a variable.
+        // Also, that means we found a dup, so we store it to read later.
+        1 | 2 => {
+          let body = net.enter_port(Port(node, 0));
+          dup_scope.entry(lab).or_default().push(next.slot());
+          let (body, valid) = reader(net, body, var_port_to_id, id_counter, dup_scope, book);
+          dup_scope.entry(lab).or_default().pop().unwrap();
+          (body, valid)
+        }
+        _ => unreachable!(),
+      },
+      Num { val } => (Term::Num { val }, true),
+      Op2 => match next.slot() {
+        2 => {
+          let op_port = net.enter_port(Port(node, 0));
+          let (op_term, op_valid) = reader(net, op_port, var_port_to_id, id_counter, dup_scope, book);
+          let arg_port = net.enter_port(Port(node, 1));
+          let (arg_term, fst_valid) = reader(net, arg_port, var_port_to_id, id_counter, dup_scope, book);
+          let valid = op_valid && fst_valid;
+          match op_term {
+            Term::Num { val } => {
+              let (val, op) = split_num_with_op(val);
+              if let Some(op) = op {
+                // This is Num + Op in the same value
+                (Term::Opx { op, fst: Box::new(Term::Num { val }), snd: Box::new(arg_term) }, valid)
+              } else {
+                // This is just Op as value
+                (
+                  Term::Opx {
+                    op: Op::from_hvmc_label(val).unwrap(),
+                    fst: Box::new(arg_term),
+                    snd: Box::new(Term::Era),
+                  },
+                  valid,
+                )
+              }
+            }
+            Term::Opx { op, fst, snd: _ } => (Term::Opx { op, fst, snd: Box::new(arg_term) }, valid),
+            // TODO: Actually unreachable?
+            _ => unreachable!(),
+          }
+        }
+        _ => unreachable!(),
+      },
     }
   }
+  // A hashmap linking ports to binder names. Those ports have names:
+  // Port 1 of a con node (λ), ports 1 and 2 of a fan node (let).
+  let mut var_port_to_id = HashMap::new();
+  let id_counter = &mut 0;
+  let mut dup_scope = HashMap::new();
 
+  // Reads the main term from the net
+  reader(net, net.enter_port(ROOT), &mut var_port_to_id, id_counter, &mut dup_scope, book)
+}
+
+/// Converts an Interaction-INet to an Interaction Calculus term.
+pub fn net_to_term_linear(net: &INet, book: &DefinitionBook) -> (Term, bool) {
   /// Reads a term recursively by starting at root node.
   /// Returns the term and whether it's a valid readback.
   fn reader(
@@ -50,25 +187,22 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
     }
     seen.insert(next);
 
-    let node = addr(next);
-    let kind_ = kind(net, node);
-    let tag = kind_ & TAG_MASK;
-    let label = kind_ & LABEL_MASK;
+    let node = next.node();
 
-    match tag {
+    match net.node(node).kind {
       // If we're visiting a set...
-      ERA => {
+      Era => {
         // Only the main port actually exists in an ERA, the auxes are just an artifact of this representation.
-        let valid = slot(next) == 0;
+        let valid = next.slot() == 0;
         (Term::Era, valid)
       }
       // If we're visiting a con node...
-      CON => match slot(next) {
+      Con => match next.slot() {
         // If we're visiting a port 0, then it is a lambda.
         0 => {
-          seen.insert(port(node, 2));
-          let nam = decl_name(net, port(node, 1), var_port_to_id, id_counter);
-          let prt = enter(net, port(node, 2));
+          seen.insert(Port(node, 2));
+          let nam = decl_name(net, Port(node, 1), var_port_to_id, id_counter);
+          let prt = net.enter_port(Port(node, 2));
           let (bod, valid) = reader(net, prt, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
           (Term::Lam { nam, bod: Box::new(bod) }, valid)
         }
@@ -76,35 +210,35 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         1 => (Term::Var { nam: var_name(next, var_port_to_id, id_counter) }, true),
         // If we're visiting a port 2, then it is an application.
         2 => {
-          seen.insert(port(node, 0));
-          seen.insert(port(node, 1));
-          let prt = enter(net, port(node, 0));
+          seen.insert(Port(node, 0));
+          seen.insert(Port(node, 1));
+          let prt = net.enter_port(Port(node, 0));
           let (fun, fun_valid) = reader(net, prt, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-          let prt = enter(net, port(node, 1));
+          let prt = net.enter_port(Port(node, 1));
           let (arg, arg_valid) = reader(net, prt, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
           let valid = fun_valid && arg_valid;
           (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
         }
         _ => unreachable!(),
       },
-      MAT => match slot(next) {
+      Mat => match next.slot() {
         2 => {
           // Read the matched expression
-          seen.insert(port(node, 0));
-          seen.insert(port(node, 1));
-          let cond_port = enter(net, port(node, 0));
+          seen.insert(Port(node, 0));
+          seen.insert(Port(node, 1));
+          let cond_port = net.enter_port(Port(node, 0));
           let (cond_term, cond_valid) =
             reader(net, cond_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
 
           // Read the pattern matching node
-          let sel_node = addr(enter(net, port(node, 1)));
-          seen.insert(port(sel_node, 0));
-          seen.insert(port(sel_node, 1));
-          seen.insert(port(sel_node, 2));
+          let sel_node = net.enter_port(Port(node, 1)).node();
+          seen.insert(Port(sel_node, 0));
+          seen.insert(Port(sel_node, 1));
+          seen.insert(Port(sel_node, 2));
 
           // We expect the pattern matching node to be a CON
-          let sel_kind = kind(net, sel_node);
-          if sel_kind & TAG_MASK != CON {
+          let sel_kind = net.node(sel_node).kind;
+          if sel_kind != Con {
             // TODO: Is there any case where we expect a different node type here on readback?
             return (
               Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
@@ -112,10 +246,10 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
             );
           }
 
-          let zero_port = enter(net, port(sel_node, 1));
+          let zero_port = net.enter_port(Port(sel_node, 1));
           let (zero_term, zero_valid) =
             reader(net, zero_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-          let succ_port = enter(net, port(sel_node, 2));
+          let succ_port = net.enter_port(Port(sel_node, 2));
           let (succ_term, succ_valid) =
             reader(net, succ_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
 
@@ -127,8 +261,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      REF => {
-        let def_id = DefId(label);
+      Ref { def_id } => {
         if book.is_generated_rule(def_id) {
           let rule = book.defs.get(&def_id).unwrap();
 
@@ -141,14 +274,14 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
       }
       // If we're visiting a fan node...
-      DUP => match slot(next) {
+      Dup { lab: _ } => match next.slot() {
         // If we're visiting a port 0, then it is a pair.
         0 => {
-          seen.insert(port(node, 1));
-          seen.insert(port(node, 2));
-          let prt = enter(net, port(node, 1));
+          seen.insert(Port(node, 1));
+          seen.insert(Port(node, 2));
+          let prt = net.enter_port(Port(node, 1));
           let (fst, fst_valid) = reader(net, prt, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-          let prt = enter(net, port(node, 2));
+          let prt = net.enter_port(Port(node, 2));
           let (snd, snd_valid) = reader(net, prt, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
           let valid = fst_valid && snd_valid;
           (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
@@ -166,15 +299,15 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      NUM => (Term::Num { val: label as u32 }, true),
-      OP2 => match slot(next) {
+      Num { val } => (Term::Num { val }, true),
+      Op2 => match next.slot() {
         2 => {
-          seen.insert(port(node, 0));
-          seen.insert(port(node, 1));
-          let op_port = enter(net, port(node, 0));
+          seen.insert(Port(node, 0));
+          seen.insert(Port(node, 1));
+          let op_port = net.enter_port(Port(node, 0));
           let (op_term, op_valid) =
             reader(net, op_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-          let arg_port = enter(net, port(node, 1));
+          let arg_port = net.enter_port(Port(node, 1));
           let (arg_term, fst_valid) =
             reader(net, arg_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
           let valid = op_valid && fst_valid;
@@ -188,7 +321,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
                 // This is just Op as value
                 (
                   Term::Opx {
-                    op: label_to_op(val).unwrap(),
+                    op: Op::from_hvmc_label(val).unwrap(),
                     fst: Box::new(arg_term),
                     snd: Box::new(Term::Era),
                   },
@@ -203,14 +336,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
-      _ => unreachable!(),
     }
-  }
-
-  fn split_num_with_op(num: Val) -> (Val, Option<Op>) {
-    let op = label_to_op(num >> 24);
-    let num = num & ((1 << 24) - 1);
-    (num, op)
   }
 
   // A hashmap linking ports to binder names. Those ports have names:
@@ -228,7 +354,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
   // Reads the main term from the net
   let (mut main, mut valid) = reader(
     net,
-    enter(net, ROOT),
+    net.enter_port(ROOT),
     &mut var_port_to_id,
     id_counter,
     &mut dups_vec,
@@ -239,12 +365,12 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
 
   // Read all the dup bodies.
   while let Some(dup) = dups_vec.pop() {
-    seen.insert(port(dup, 0));
-    let val = enter(net, port(dup, 0));
+    seen.insert(Port(dup, 0));
+    let val = net.enter_port(Port(dup, 0));
     let (val, val_valid) =
       reader(net, val, &mut var_port_to_id, id_counter, &mut dups_vec, &mut dups_set, &mut seen, book);
-    let fst = decl_name(net, port(dup, 1), &mut var_port_to_id, id_counter);
-    let snd = decl_name(net, port(dup, 2), &mut var_port_to_id, id_counter);
+    let fst = decl_name(net, Port(dup, 1), &mut var_port_to_id, id_counter);
+    let snd = decl_name(net, Port(dup, 2), &mut var_port_to_id, id_counter);
     main = Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(main) };
     valid = valid && val_valid;
   }
@@ -252,15 +378,66 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
   // Check if the readback didn't leave any unread nodes (for example reading var from a lam but never reading the lam itself)
   for &decl_port in var_port_to_id.keys() {
     for check_slot in 0 .. 3 {
-      let check_port = port(addr(decl_port), check_slot);
-      let other_node = addr(enter(net, check_port));
-      if !seen.contains(&check_port) && kind(net, other_node) != ERA {
+      let check_port = Port(decl_port.node(), check_slot);
+      let other_node = net.enter_port(check_port).node();
+      if !seen.contains(&check_port) && net.node(other_node).kind != Era {
         valid = false;
       }
     }
   }
 
   (main, valid)
+}
+
+impl Op {
+  pub fn from_hvmc_label(value: Val) -> Option<Op> {
+    match value {
+      0x1 => Some(Op::ADD),
+      0x2 => Some(Op::SUB),
+      0x3 => Some(Op::MUL),
+      0x4 => Some(Op::DIV),
+      0x5 => Some(Op::MOD),
+      0x6 => Some(Op::EQ),
+      0x7 => Some(Op::NE),
+      0x8 => Some(Op::LT),
+      0x9 => Some(Op::GT),
+      0xa => Some(Op::AND),
+      0xb => Some(Op::OR),
+      0xc => Some(Op::XOR),
+      0xd => Some(Op::NOT),
+      0xe => Some(Op::LSH),
+      0xf => Some(Op::RSH),
+      _ => None,
+    }
+  }
+}
+
+// Given a port, returns its name, or assigns one if it wasn't named yet.
+fn var_name(var_port: Port, var_port_to_id: &mut HashMap<Port, Val>, id_counter: &mut Val) -> Name {
+  let id = var_port_to_id.entry(var_port).or_insert_with(|| {
+    let id = *id_counter;
+    *id_counter += 1;
+    id
+  });
+
+  var_id_to_name(*id)
+}
+
+fn decl_name(
+  net: &INet,
+  var_port: Port,
+  var_port_to_id: &mut HashMap<Port, Val>,
+  id_counter: &mut Val,
+) -> Option<Name> {
+  // If port is linked to an erase node, return an unused variable
+  let var_kind = net.node(net.enter_port(var_port).node()).kind;
+  if let Era = var_kind { None } else { Some(var_name(var_port, var_port_to_id, id_counter)) }
+}
+
+fn split_num_with_op(num: Val) -> (Val, Option<Op>) {
+  let op = Op::from_hvmc_label(num >> 24);
+  let num = num & ((1 << 24) - 1);
+  (num, op)
 }
 
 impl DefinitionBook {

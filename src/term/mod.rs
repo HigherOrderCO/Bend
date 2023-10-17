@@ -11,7 +11,7 @@ pub mod parser;
 pub mod term_to_net;
 pub mod transform;
 
-pub use net_to_term::readback_compat;
+pub use net_to_term::net_to_term_linear;
 pub use term_to_net::{book_to_compact_nets, term_to_compat_net};
 
 #[derive(Debug, Clone, Default)]
@@ -199,18 +199,20 @@ impl Term {
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
       Term::Match { cond, zero, succ } => {
-        if let Term::Lam { nam: pred, bod: succ } = succ.as_ref() {
-          format!(
-            "match {} {{ 0: {}; 1+{}: {} }}",
-            cond.to_string(def_names),
-            zero.to_string(def_names),
-            pred.clone().unwrap_or(Name::new("*")),
-            succ.to_string(def_names),
-          )
-        } else {
-          eprintln!("{self:?}");
-          panic!("Invalid match expression on stringification");
-        }
+        // Only the Lambda case represents a valid match construction,
+        // but we still have to display invalid ones
+        let (pred, succ) = match succ.as_ref() {
+          Term::Lam { nam, bod } => (nam, bod),
+          _ => (&None, succ),
+        };
+
+        format!(
+          "match {} {{ 0: {}; 1+{}: {} }}",
+          cond.to_string(def_names),
+          zero.to_string(def_names),
+          pred.clone().unwrap_or(Name::new("*")),
+          succ.to_string(def_names),
+        )
       }
       Term::Dup { fst, snd, val, nxt } => format!(
         "dup {} {} = {}; {}",

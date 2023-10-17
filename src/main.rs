@@ -70,9 +70,16 @@ fn main() -> anyhow::Result<()> {
       }
       // TODO: Some way to figure out total memory use?
       // println!("size: {}", stats.size);
-      
+
       // TODO: check for -s flag
-      println!("RWTS   : {}", stats.rewrites.anni + stats.rewrites.comm + stats.rewrites.eras + stats.rewrites.dref + stats.rewrites.oper);
+      println!(
+        "RWTS   : {}",
+        stats.rewrites.anni
+          + stats.rewrites.comm
+          + stats.rewrites.eras
+          + stats.rewrites.dref
+          + stats.rewrites.oper
+      );
       println!("- ANNI : {}", stats.rewrites.anni);
       println!("- COMM : {}", stats.rewrites.comm);
       println!("- ERAS : {}", stats.rewrites.eras);
@@ -80,7 +87,6 @@ fn main() -> anyhow::Result<()> {
       println!("- OPER : {}", stats.rewrites.oper);
       println!("TIME   : {:.3} s", stats.run_time);
       println!("RPS    : {:.3} m", rps);
-
     }
   }
 
