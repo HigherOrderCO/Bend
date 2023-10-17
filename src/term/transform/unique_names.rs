@@ -60,13 +60,11 @@ fn unique_var_names(term: &Term, name_map: &mut UniqueNameScope, name_count: &mu
       let val = unique_var_names(val, name_map, name_count);
 
       let mut to_visit = vec![l_pat, r_pat];
-      let mut to_pop = Vec::new();
 
       while let Some(push) = to_visit.pop() {
         match &**push {
           Pat::Nam(nam) => {
             push_name(nam.clone(), name_map, name_count);
-            to_pop.push(nam);
           }
           Pat::Tup(l, r) => {
             to_visit.push(l);
