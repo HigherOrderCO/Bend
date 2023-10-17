@@ -98,7 +98,7 @@ pub fn readback_compat(net: &INet, book: &DefinitionBook) -> (Term, bool) {
 
           // We expect the pattern matching node to be a CON
           let sel_kind = net.node(sel_node).kind;
-          if sel_kind == NodeKind::Con {
+          if sel_kind != NodeKind::Con {
             // TODO: Is there any case where we expect a different node type here on readback?
             return (
               Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
