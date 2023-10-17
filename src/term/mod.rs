@@ -199,6 +199,8 @@ impl Term {
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
       Term::Match { cond, zero, succ } => {
+        // Only the Lambda case represents a valid match construction,
+        // but we still have to display invalid ones
         let (pred, succ) = match succ.as_ref() {
           Term::Lam { nam, bod } => (nam, bod),
           _ => (&None, succ),
