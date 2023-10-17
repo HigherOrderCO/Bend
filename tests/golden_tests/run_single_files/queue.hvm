@@ -13,7 +13,7 @@ Nil = λc λn n
 Cons = λh λt λc λn (c h t)
 
 // Output: [1, 2, 3]
-Main =
+main =
   let q = Qnew
   let q = ((Qadd) 1 q)
   let q = ((Qadd) 2 q)

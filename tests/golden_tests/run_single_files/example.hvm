@@ -22,4 +22,4 @@
 // You can execute a program in HVM with "cargo run -- --run <path to file>"
 // Other options are "--check" (the default mode) to just see if the file is well formed
 // and "--compile" to output hvm-core code.
-(Main) = (nums 3 4)
+(main) = (nums 3 4)
