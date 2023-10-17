@@ -1,9 +1,8 @@
 use super::{parser::parse_definition_book, DefinitionBook};
-use ariadne::{Color, Label, Report, ReportKind, Source};
 use chumsky::prelude::Rich;
 use itertools::Itertools;
 use miette::{diagnostic, miette, Diagnostic, NamedSource, SourceSpan};
-use std::{fmt::Display, ops::Range, path::Path};
+use std::{fmt::Display, path::Path};
 
 /// Reads a file and parses to a definition book.
 pub fn load_file_to_book(path: &Path) -> anyhow::Result<DefinitionBook> {
@@ -17,27 +16,8 @@ pub fn load_file_to_book(path: &Path) -> anyhow::Result<DefinitionBook> {
   }
 }
 
-pub fn display_err_for_console<T: Display>(err: Rich<T>, path: &Path, code: &str) -> String {
-  let path = path.to_string_lossy();
-  let report = err_to_report(err, &path);
-  let mut out: Vec<u8> = vec![];
-  report.write((path.as_ref(), Source::from(code)), &mut out).unwrap();
-  String::from_utf8(out).unwrap()
-}
-
 pub fn display_err_for_text<T: Display>(err: Rich<T>) -> String {
   err.to_string()
-}
-
-pub fn err_to_report<'a, T: Display>(err: Rich<T>, path: &'a str) -> Report<'a, (&'a str, Range<usize>)> {
-  Report::build(ReportKind::Error, path, err.span().start)
-    .with_message(err.to_string())
-    .with_label(
-      Label::new((path, err.span().into_range()))
-        .with_message(err.reason().to_string())
-        .with_color(Color::Red),
-    )
-    .finish()
 }
 
 /// Displays a formatted [SyntaxError] from the given `err` based on the current report handler.
