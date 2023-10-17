@@ -10,6 +10,9 @@ name = "hvm_lang"
 name = "hvm-lang"
 required-features = ["cli"]
 
+[profile.release]
+lto = true
+
 [features]
 default = ["cli"]
 cli = ["dep:clap", "dep:byte-unit"]
