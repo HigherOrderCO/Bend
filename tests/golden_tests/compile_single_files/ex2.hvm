@@ -16,4 +16,4 @@
 (lowO) = λx (O (O x))
 (lowI) = λx (O (I x))
 
-(Ex2) = (run (c2 I E))
+(main) = (run (c2 I E))
