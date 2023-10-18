@@ -83,12 +83,34 @@ fn term_to_affine(
             let let_ = Term::Let { pat: LetPat::Var(l_nam.unwrap()), val: fst, nxt };
             term_to_affine(let_, var_uses, let_bodies)?
           }
+          Term::Var { nam } => {
+            if let Some(subst) = let_bodies.remove(&nam) {
+              let let_ = Term::Let { pat: LetPat::Tup(l_nam, r_nam), val: Box::new(subst), nxt };
+              term_to_affine(let_, var_uses, let_bodies)?
+            } else {
+              let val = term_to_affine(Term::Var { nam }, var_uses, let_bodies)?;
+              let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
+              let (nxt, l_nam) = duplicate_lam(l_nam.unwrap(), nxt, fst_uses);
+              Term::Let { pat: LetPat::Tup(l_nam, r_nam), val: Box::new(val), nxt: Box::new(nxt) }
+            }
+          }
           _ => unimplemented!(),
         },
         (0, _) => match *val {
           Term::Tup { snd, .. } => {
             let let_ = Term::Let { pat: LetPat::Var(r_nam.unwrap()), val: snd, nxt };
             term_to_affine(let_, var_uses, let_bodies)?
+          }
+          Term::Var { nam } => {
+            if let Some(subst) = let_bodies.remove(&nam) {
+              let let_ = Term::Let { pat: LetPat::Tup(l_nam, r_nam), val: Box::new(subst), nxt };
+              term_to_affine(let_, var_uses, let_bodies)?
+            } else {
+              let val = term_to_affine(Term::Var { nam }, var_uses, let_bodies)?;
+              let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
+              let (nxt, r_nam) = duplicate_lam(r_nam.unwrap(), nxt, snd_uses);
+              Term::Let { pat: LetPat::Tup(l_nam, r_nam), val: Box::new(val), nxt: Box::new(nxt) }
+            }
           }
           _ => unimplemented!(),
         },
