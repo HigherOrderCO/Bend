@@ -4,10 +4,10 @@ pub mod unbound_vars;
 
 impl DefinitionBook {
   pub fn check_has_main(&self) -> anyhow::Result<DefId> {
-    if let Some(main) = self.def_names.def_id(&Name::new("Main")) {
+    if let Some(main) = self.def_names.def_id(&Name::new("main")) {
       Ok(main)
     } else {
-      Err(anyhow::anyhow!("File has no 'Main' definition"))
+      Err(anyhow::anyhow!("File has no 'main' definition"))
     }
   }
 

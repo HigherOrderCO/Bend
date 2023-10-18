@@ -1,12 +1,9 @@
-#![feature(lazy_cell)]
 #![feature(box_patterns)]
 
-use hvmc::ast::{book_to_runtime, net_from_runtime, Book, Net};
+use hvmc::ast::{book_to_runtime, name_to_val, net_from_runtime, Book, Net};
 use net::{hvmc_to_net, nets_to_hvm_core};
 use std::time::Instant;
-use term::{
-  book_to_compact_nets, net_to_term::net_to_term_non_linear, DefId, DefNames, DefinitionBook, Term,
-};
+use term::{book_to_compact_nets, net_to_term::net_to_term_non_linear, DefNames, DefinitionBook, Term};
 
 pub mod net;
 pub mod term;
@@ -20,6 +17,7 @@ pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
 }
 
 pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<Book> {
+  let main = book.check_has_main()?;
   book.resolve_refs();
   book.check_unbound_vars()?;
   book.make_var_names_unique();
@@ -28,14 +26,14 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<Book> {
   book.detach_supercombinators();
   book.prune();
   let nets = book_to_compact_nets(book)?;
-  let core_book = nets_to_hvm_core(nets)?;
+  let core_book = nets_to_hvm_core(nets, main)?;
   Ok(core_book)
 }
 
-pub fn run_compiled(book: &Book, main: DefId, mem_size: usize) -> (Net, RunStats) {
+pub fn run_compiled(book: &Book, mem_size: usize) -> (Net, RunStats) {
   let runtime_book = book_to_runtime(book);
   let mut root = hvmc::run::Net::new(mem_size);
-  root.boot(main.to_internal());
+  root.boot(name_to_val("main"));
 
   let start_time = Instant::now();
   root.normal(&runtime_book);
@@ -49,11 +47,9 @@ pub fn run_compiled(book: &Book, main: DefId, mem_size: usize) -> (Net, RunStats
 }
 
 pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
-  let main = book.check_has_main()?;
   let compiled = compile_book(&mut book)?;
-  let (res_lnet, stats) = run_compiled(&compiled, main, mem_size);
+  let (res_lnet, stats) = run_compiled(&compiled, mem_size);
   let net = hvmc_to_net(&res_lnet)?;
-  eprintln!("{:?}", net);
   let (res_term, valid_readback) = net_to_term_non_linear(&net, &book);
   let info = RunInfo { stats, valid_readback, net: res_lnet };
   Ok((res_term, book.def_names, info))

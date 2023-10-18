@@ -2,4 +2,4 @@
 val = λn (match n { 0: valZ; 1+p: (valS p) })
   valZ = 0
   valS = λp (val p)
-Main = (val 1)
+main = (val 1)
