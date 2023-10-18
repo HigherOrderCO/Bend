@@ -6,10 +6,11 @@ use hvmc::{
 };
 use std::collections::{HashMap, HashSet};
 
-pub fn nets_to_hvm_core(nets: Vec<(DefId, INet)>) -> anyhow::Result<Book> {
+pub fn nets_to_hvm_core(nets: Vec<(DefId, INet)>, main: DefId) -> anyhow::Result<Book> {
   let mut book = Book::new();
   for (id, inet) in nets {
-    book.insert(val_to_name(id.to_internal()), compat_net_to_core(&inet)?);
+    let name = if id == main { "main".to_string() } else { val_to_name(id.to_internal()) };
+    book.insert(name, compat_net_to_core(&inet)?);
   }
   Ok(book)
 }

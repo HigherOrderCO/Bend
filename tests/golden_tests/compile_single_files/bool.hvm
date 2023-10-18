@@ -2,4 +2,4 @@
 (fals) = λt λf f
 (Not) = λx (x fals true)
 
-(Main) = (Not true)
+(main) = (Not true)
