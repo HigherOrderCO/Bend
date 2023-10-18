@@ -51,7 +51,7 @@ pub enum Term {
     nam: Name,
   },
   Let {
-    pat: Pat,
+    pat: LetPat,
     val: Box<Term>,
     nxt: Box<Term>,
   },
@@ -94,8 +94,8 @@ pub enum Term {
 }
 
 #[derive(Debug, Clone)]
-pub enum Pat {
-  Nam(Name),
+pub enum LetPat {
+  Var(Name),
   Tup(Option<Name>, Option<Name>),
 }
 
@@ -261,7 +261,7 @@ impl Term {
       Term::Lnk { .. } => (),
       Term::Let { pat, val, nxt } => {
         val.subst(from, to);
-        if let Pat::Nam(nam) = pat {
+        if let LetPat::Var(nam) = pat {
           if nam != from {
             nxt.subst(from, to);
           }
@@ -301,11 +301,11 @@ impl Term {
   }
 }
 
-impl Pat {
+impl LetPat {
   pub fn to_string(&self) -> String {
     match self {
-      Pat::Nam(nam) => nam.to_string(),
-      Pat::Tup(fst, snd) => {
+      LetPat::Var(nam) => nam.to_string(),
+      LetPat::Tup(fst, snd) => {
         format!(
           "({}, {})",
           fst.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),

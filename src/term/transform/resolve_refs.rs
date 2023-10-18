@@ -1,4 +1,4 @@
-use crate::term::{DefNames, DefinitionBook, Name, Pat, Term};
+use crate::term::{DefNames, DefinitionBook, LetPat, Name, Term};
 use std::collections::HashMap;
 
 impl DefinitionBook {
@@ -25,13 +25,13 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(bod, def_names, scope);
       pop_scope(nam.clone(), scope);
     }
-    Term::Let { pat: Pat::Nam(nam), val, nxt } => {
+    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
       resolve_refs(val, def_names, scope);
       push_scope(Some(nam.clone()), scope);
       resolve_refs(nxt, def_names, scope);
       pop_scope(Some(nam.clone()), scope);
     }
-    Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
+    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
       resolve_refs(val, def_names, scope);
 
       push_scope(l_nam.clone(), scope);

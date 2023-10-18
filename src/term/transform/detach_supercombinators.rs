@@ -1,4 +1,4 @@
-use crate::term::{DefId, DefNames, Definition, DefinitionBook, Name, Pat, Term};
+use crate::term::{DefId, DefNames, Definition, DefinitionBook, LetPat, Name, Term};
 use std::collections::{BTreeMap, HashSet};
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
@@ -100,14 +100,14 @@ impl Term {
           false
         }
         Term::Lnk { .. } => false,
-        Term::Let { pat: Pat::Nam(nam), val, nxt } => {
+        Term::Let { pat: LetPat::Var(nam), val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_super = go(nxt, depth + 1, term_info);
           term_info.provide(nam);
 
           val_is_super && nxt_is_super
         }
-        Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
+        Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_supper = go(nxt, depth + 1, term_info);
 

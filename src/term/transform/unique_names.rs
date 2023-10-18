@@ -1,6 +1,6 @@
 // Pass to give all variables in a definition unique names.
 
-use crate::term::{var_id_to_name, DefinitionBook, Name, Pat, Term};
+use crate::term::{var_id_to_name, DefinitionBook, LetPat, Name, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -49,14 +49,14 @@ fn unique_var_names(term: &Term, name_map: &mut UniqueNameScope, name_count: &mu
       let bod = unique_var_names(bod, name_map, name_count);
       Term::Chn { nam: nam.clone(), bod: Box::new(bod) }
     }
-    Term::Let { pat: Pat::Nam(nam), val, nxt } => {
+    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
       let val = unique_var_names(val, name_map, name_count);
       push_name(nam.clone(), name_map, name_count);
       let nxt = unique_var_names(nxt, name_map, name_count);
       let nam = pop_name(nam, name_map);
-      Term::Let { pat: Pat::Nam(nam), val: Box::new(val), nxt: Box::new(nxt) }
+      Term::Let { pat: LetPat::Var(nam), val: Box::new(val), nxt: Box::new(nxt) }
     }
-    Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
+    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
       let val = unique_var_names(val, name_map, name_count);
 
       if let Some(l_nam) = l_nam {
@@ -71,7 +71,7 @@ fn unique_var_names(term: &Term, name_map: &mut UniqueNameScope, name_count: &mu
       let l_nam = l_nam.as_ref().map(|l_nam| pop_name(l_nam, name_map));
       let r_nam = r_nam.as_ref().map(|r_nam| pop_name(r_nam, name_map));
 
-      let new_pat = Pat::Tup(l_nam, r_nam);
+      let new_pat = LetPat::Tup(l_nam, r_nam);
 
       Term::Let { pat: new_pat, val: Box::new(val), nxt: Box::new(nxt) }
     }

@@ -1,5 +1,5 @@
 use super::{DefId, DefNames, DefinitionBook, Name, Op, Term};
-use crate::term::Pat;
+use crate::term::LetPat;
 use crate::net::{INet, NodeId, NodeKind::*, Port, LABEL_MASK, ROOT};
 use hvmc::{
   ast::{name_to_val, val_to_name},
@@ -190,7 +190,7 @@ fn encode_term(
       inet.link(up, Port(node, 0));
       Ok(Some(Port(node, 0)))
     }
-    Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
+    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
       let dup = inet.new_node(Dup { lab: u8::try_from(*dups).unwrap() });
       *dups += 1;
       let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups)?;

@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{DefId, Definition, DefinitionBook, Name, Op, Pat, Term};
+use crate::term::{DefId, Definition, DefinitionBook, LetPat, Name, Op, Term};
 use chumsky::{
   extra,
   input::{Emitter, SpannedInput, Stream, ValueInput},
@@ -189,17 +189,17 @@ where
   })
 }
 
-fn pat<'a, I>() -> impl Parser<'a, I, Pat, extra::Err<Rich<'a, Token>>>
+fn pat<'a, I>() -> impl Parser<'a, I, LetPat, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let pat_nam = name().map(|nam| Pat::Nam(nam)).boxed();
+  let pat_nam = name().map(|nam| LetPat::Var(nam)).boxed();
 
   let pat_pair = name_or_era()
     .then_ignore(just(Token::Comma))
     .then(name_or_era())
     .delimited_by(just(Token::LParen), just(Token::RParen))
-    .map(|(fst, snd)| Pat::Tup(fst, snd))
+    .map(|(fst, snd)| LetPat::Tup(fst, snd))
     .boxed();
 
   choice((pat_nam, pat_pair))
