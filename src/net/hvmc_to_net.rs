@@ -70,7 +70,11 @@ fn tree_to_inodes(
       }
       Tree::Ctr { lab, lft, rgt } => {
         // Dup labels in INet representation start at 0, while for hvmc::Net they start at 1
-        let kind = if *lab == 0 { Con } else { Dup { lab: *lab - 1 } };
+        let kind = match *lab {
+          0 => Con,
+          1 => Tup,
+          _ => Dup { lab: *lab - 2 },
+        };
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })

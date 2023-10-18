@@ -191,8 +191,8 @@ fn encode_term(
       Ok(Some(Port(node, 0)))
     }
     Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
-      let dup = inet.new_node(Dup { lab: u8::try_from(*dups).unwrap() });
-      *dups += 1;
+      let dup = inet.new_node(Tup);
+
       let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups)?;
       link_local(inet, Port(dup, 0), val);
 

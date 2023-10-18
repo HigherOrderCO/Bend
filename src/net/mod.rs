@@ -33,6 +33,7 @@ pub enum NodeKind {
   Era,
   /// Lambdas and applications
   Con,
+  Tup,
   Dup { lab: u8 },
   /// Reference to function definitions
   Ref { def_id: DefId },
