@@ -1,11 +1,12 @@
 use hvm_lang::{
   compile_book,
-  net::{compat_net_to_core, core_net_to_compat},
+  net::{compat_net_to_core, hvmc_to_net},
   run_book,
   term::{
     load_book::{display_err_for_text, display_miette_err},
+    net_to_term::net_to_term_non_linear,
     parser::{parse_definition_book, parse_term},
-    readback_compat, term_to_compat_net, DefinitionBook,
+    term_to_compat_net, DefinitionBook,
   },
 };
 use hvmc::ast::{parse_net, show_book, show_net};
@@ -116,8 +117,8 @@ fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|_, code| {
     let lnet = parse_net(&mut code.chars().peekable()).map_err(|e| anyhow::anyhow!(e))?;
     let book = DefinitionBook::default();
-    let compat_net = core_net_to_compat(&lnet)?;
-    let (term, valid) = readback_compat(&compat_net, &book);
+    let compat_net = hvmc_to_net(&lnet)?;
+    let (term, valid) = net_to_term_non_linear(&compat_net, &book);
     if valid {
       Ok(term.to_string(&book.def_names))
     } else {

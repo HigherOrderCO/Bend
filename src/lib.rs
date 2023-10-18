@@ -1,10 +1,9 @@
-#![feature(lazy_cell)]
 #![feature(box_patterns)]
 
 use hvmc::ast::{book_to_runtime, name_to_val, net_from_runtime, Book, Net};
-use net::{core_net_to_compat, nets_to_hvm_core};
+use net::{hvmc_to_net, nets_to_hvm_core};
 use std::time::Instant;
-use term::{book_to_compact_nets, readback_compat, DefNames, DefinitionBook, Term};
+use term::{book_to_compact_nets, net_to_term::net_to_term_non_linear, DefNames, DefinitionBook, Term};
 
 pub mod net;
 pub mod term;
@@ -39,7 +38,8 @@ pub fn run_compiled(book: &Book, mem_size: usize) -> (Net, RunStats) {
   let start_time = Instant::now();
   root.normal(&runtime_book);
   let elapsed = start_time.elapsed().as_secs_f64();
-  let rewrites = Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
+  let rewrites =
+    Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
   let net = net_from_runtime(&root);
   let def = root.to_def();
   let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
@@ -49,8 +49,8 @@ pub fn run_compiled(book: &Book, mem_size: usize) -> (Net, RunStats) {
 pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
   let compiled = compile_book(&mut book)?;
   let (res_lnet, stats) = run_compiled(&compiled, mem_size);
-  let compat_net = core_net_to_compat(&res_lnet)?;
-  let (res_term, valid_readback) = readback_compat(&compat_net, &book);
+  let net = hvmc_to_net(&res_lnet)?;
+  let (res_term, valid_readback) = net_to_term_non_linear(&net, &book);
   let info = RunInfo { stats, valid_readback, net: res_lnet };
   Ok((res_term, book.def_names, info))
 }

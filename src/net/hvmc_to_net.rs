@@ -2,7 +2,7 @@ use super::{INet, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use crate::{net::INode, term::DefId};
 use hvmc::ast::{Net, Tree};
 
-pub fn core_net_to_compat(net: &Net) -> anyhow::Result<INet> {
+pub fn hvmc_to_net(net: &Net) -> anyhow::Result<INet> {
   let inodes = hvmc_to_inodes(net);
   let compat_net = inodes_to_inet(&inodes);
   Ok(compat_net)

@@ -1,2 +1,1 @@
-Invalid readback:
-dup c d = a; λa λb c
+λa λb a
