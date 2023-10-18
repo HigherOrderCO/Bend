@@ -73,15 +73,33 @@ fn term_to_affine(
       }
     }
     Term::Let { pat: Pat::Tup(l_nam, r_nam), val, nxt } => {
-      let uses_fst = l_nam.as_ref().map(|l_nam| *var_uses.get(l_nam).unwrap()).unwrap_or(0);
-      let uses_snd = r_nam.as_ref().map(|r_nam| *var_uses.get(r_nam).unwrap()).unwrap_or(0);
-      let val = term_to_affine(*val, var_uses, let_bodies)?;
-      let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
-      let (nxt, fst) =
-        if let Some(l_nam) = l_nam { duplicate_lam(l_nam, nxt, uses_fst) } else { (nxt, l_nam) };
-      let (nxt, snd) =
-        if let Some(r_nam) = r_nam { duplicate_lam(r_nam, nxt, uses_snd) } else { (nxt, r_nam) };
-      Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(nxt) }
+      let fst_uses = l_nam.as_ref().map(|l_nam| *var_uses.get(l_nam).unwrap()).unwrap_or(0);
+      let snd_uses = r_nam.as_ref().map(|r_nam| *var_uses.get(r_nam).unwrap()).unwrap_or(0);
+
+      match (fst_uses, snd_uses) {
+        (0, 0) => *nxt,
+        (_, 0) => match *val {
+          Term::Tup { fst, .. } => {
+            let let_ = Term::Let { pat: Pat::Nam(l_nam.unwrap()), val: fst, nxt };
+            term_to_affine(let_, var_uses, let_bodies)?
+          }
+          _ => unimplemented!(),
+        },
+        (0, _) => match *val {
+          Term::Tup { snd, .. } => {
+            let let_ = Term::Let { pat: Pat::Nam(r_nam.unwrap()), val: snd, nxt };
+            term_to_affine(let_, var_uses, let_bodies)?
+          }
+          _ => unimplemented!(),
+        },
+        (_, _) => {
+          let val = term_to_affine(*val, var_uses, let_bodies)?;
+          let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
+          let (nxt, l_nam) = duplicate_lam(l_nam.unwrap(), nxt, fst_uses);
+          let (nxt, r_nam) = duplicate_lam(r_nam.unwrap(), nxt, snd_uses);
+          Term::Let { pat: Pat::Tup(l_nam, r_nam), val: Box::new(val), nxt: Box::new(nxt) }
+        }
+      }
     }
     Term::Dup { fst, snd, val, nxt } => {
       let uses_fst = fst.as_ref().map(|fst| *var_uses.get(fst).unwrap()).unwrap_or(0);
