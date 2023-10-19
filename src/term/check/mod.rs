@@ -4,14 +4,13 @@ pub mod unbound_vars;
 
 impl DefinitionBook {
   pub fn check_has_main(&self) -> anyhow::Result<DefId> {
-    if let Some(main) = self
-      .def_names
-      .def_id(&Name::new(DefNames::ENTRY_POINT))
-      .or_else(|| self.def_names.def_id(&Name::new(DefNames::HVM1_ENTRY_POINT)))
-    {
-      Ok(main)
-    } else {
-      Err(anyhow::anyhow!("File has no 'main' definition"))
+    match (
+      self.def_names.def_id(&Name::new(DefNames::ENTRY_POINT)),
+      self.def_names.def_id(&Name::new(DefNames::HVM1_ENTRY_POINT)),
+    ) {
+      (None, None) => Err(anyhow::anyhow!("File has no 'main' definition")),
+      (Some(_), Some(_)) => Err(anyhow::anyhow!("File has both 'Main' and 'main' definitions")),
+      (None, Some(main)) | (Some(main), None) => Ok(main),
     }
   }
 
