@@ -1,5 +1,5 @@
 use super::{INet, NodeId, NodeKind, Port, ROOT};
-use crate::term::{var_id_to_name, DefId};
+use crate::term::{var_id_to_name, DefId, DefNames};
 use hvmc::{
   ast::{Book, Net, Tree},
   run::{Tag, Val},

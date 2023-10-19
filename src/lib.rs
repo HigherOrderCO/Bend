@@ -37,7 +37,7 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<(Book, HashMap<
 pub fn run_compiled(book: &Book, mem_size: usize) -> (Net, RunStats) {
   let runtime_book = book_to_runtime(book);
   let mut root = hvmc::run::Net::new(mem_size);
-  root.boot(name_to_val("main"));
+  root.boot(name_to_val(DefNames::ENTRY_POINT));
 
   let start_time = Instant::now();
   root.normal(&runtime_book);

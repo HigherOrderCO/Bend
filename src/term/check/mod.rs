@@ -1,10 +1,14 @@
-use super::{DefId, DefinitionBook, Name, Term};
+use super::{DefId, DefNames, DefinitionBook, Name, Term};
 
 pub mod unbound_vars;
 
 impl DefinitionBook {
   pub fn check_has_main(&self) -> anyhow::Result<DefId> {
-    if let Some(main) = self.def_names.def_id(&Name::new("main")) {
+    if let Some(main) = self
+      .def_names
+      .def_id(&Name::new(DefNames::ENTRY_POINT))
+      .or_else(|| self.def_names.def_id(&Name::new(DefNames::HVM1_ENTRY_POINT)))
+    {
       Ok(main)
     } else {
       Err(anyhow::anyhow!("File has no 'main' definition"))
