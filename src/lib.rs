@@ -27,7 +27,7 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<(Book, HashMap<
   book.linearize_vars()?;
   book.check_ref_to_ref()?;
   book.detach_supercombinators();
-  book.prune();
+  book.prune(main);
   let (nets, id_to_hvmc_name) = book_to_nets(book, main)?;
   let core_book = nets_to_hvm_core(nets, &id_to_hvmc_name)?;
   let hvmc_name_to_id = id_to_hvmc_name.into_iter().map(|(k, v)| (v, k)).collect();

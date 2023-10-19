@@ -20,11 +20,6 @@ pub struct DefNames {
   id_count: DefId,
 }
 
-impl DefNames {
-  pub const ENTRY_POINT: &'static str = "main";
-  pub const HVM1_ENTRY_POINT: &'static str = "Main";
-}
-
 #[derive(Debug, Clone, Default)]
 pub struct DefinitionBook {
   pub def_names: DefNames,
@@ -159,6 +154,9 @@ impl DefinitionBook {
 }
 
 impl DefNames {
+  pub const ENTRY_POINT: &'static str = "main";
+  pub const HVM1_ENTRY_POINT: &'static str = "Main";
+
   pub fn new() -> Self {
     Default::default()
   }
