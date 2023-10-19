@@ -207,7 +207,7 @@ impl Term {
       Term::Chn { nam, bod } => format!("λ${} {}", nam, bod.to_string(def_names)),
       Term::Lnk { nam } => format!("${nam}"),
       Term::Let { pat, val, nxt } => {
-        format!("let {} = {}; {}", pat.to_string(), val.to_string(def_names), nxt.to_string(def_names))
+        format!("let {} = {}; {}", pat, val.to_string(def_names), nxt.to_string(def_names))
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
@@ -301,12 +301,13 @@ impl Term {
   }
 }
 
-impl LetPat {
-  pub fn to_string(&self) -> String {
+impl fmt::Display for LetPat {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      LetPat::Var(nam) => nam.to_string(),
+      LetPat::Var(nam) => write!(f, "{}", nam),
       LetPat::Tup(fst, snd) => {
-        format!(
+        write!(
+          f,
           "({}, {})",
           fst.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),
           snd.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),

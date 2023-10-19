@@ -164,7 +164,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &DefinitionBook) -> (Term, bool)
         let (snd, snd_valid) = reader(net, prt, var_port_to_id, id_counter, dup_scope, book);
         let valid = fst_valid && snd_valid;
         (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
-      },
+      }
     }
   }
   // A hashmap linking ports to binder names. Those ports have names:
@@ -289,9 +289,11 @@ pub fn net_to_term_linear(net: &INet, book: &DefinitionBook) -> (Term, bool) {
           seen.insert(Port(node, 1));
           seen.insert(Port(node, 2));
           let fst_port = net.enter_port(Port(node, 1));
-          let (fst, fst_valid) = reader(net, fst_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (fst, fst_valid) =
+            reader(net, fst_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
           let snd_port = net.enter_port(Port(node, 2));
-          let (snd, snd_valid) = reader(net, snd_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (snd, snd_valid) =
+            reader(net, snd_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
           let valid = fst_valid && snd_valid;
           (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
@@ -351,9 +353,11 @@ pub fn net_to_term_linear(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         seen.insert(Port(node, 1));
         seen.insert(Port(node, 2));
         let fst_port = net.enter_port(Port(node, 1));
-        let (fst, fst_valid) = reader(net, fst_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+        let (fst, fst_valid) =
+          reader(net, fst_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
         let snd_port = net.enter_port(Port(node, 2));
-        let (snd, snd_valid) = reader(net, snd_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+        let (snd, snd_valid) =
+          reader(net, snd_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
         let valid = fst_valid && snd_valid;
         (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
       }
