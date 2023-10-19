@@ -1,9 +1,15 @@
 #![feature(box_patterns)]
 
-use hvmc::ast::{book_to_runtime, name_to_val, net_from_runtime, Book, Net};
+use bimap::BiHashMap;
+use hvmc::{
+  ast::{book_to_runtime, name_to_val, net_from_runtime, Book, Net},
+  run::Val,
+};
 use net::{hvmc_to_net, nets_to_hvm_core};
 use std::time::Instant;
-use term::{book_to_compact_nets, net_to_term::net_to_term_non_linear, DefNames, DefinitionBook, Term};
+use term::{
+  book_to_compact_nets, net_to_term::net_to_term_non_linear, DefId, DefNames, DefinitionBook, Term,
+};
 
 pub mod net;
 pub mod term;
@@ -16,7 +22,7 @@ pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
   Ok(())
 }
 
-pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<Book> {
+pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<(Book, BiHashMap<DefId, Val>)> {
   let main = book.check_has_main()?;
   book.resolve_refs();
   book.check_unbound_vars()?;
@@ -25,9 +31,9 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<Book> {
   book.check_ref_to_ref()?;
   book.detach_supercombinators();
   book.prune();
-  let nets = book_to_compact_nets(book)?;
-  let core_book = nets_to_hvm_core(nets, main)?;
-  Ok(core_book)
+  let (nets, id_map) = book_to_compact_nets(book, main)?;
+  let core_book = nets_to_hvm_core(nets, &id_map)?;
+  Ok((core_book, id_map))
 }
 
 pub fn run_compiled(book: &Book, mem_size: usize) -> (Net, RunStats) {
@@ -47,9 +53,9 @@ pub fn run_compiled(book: &Book, mem_size: usize) -> (Net, RunStats) {
 }
 
 pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
-  let compiled = compile_book(&mut book)?;
+  let (compiled, id_map) = compile_book(&mut book)?;
   let (res_lnet, stats) = run_compiled(&compiled, mem_size);
-  let net = hvmc_to_net(&res_lnet)?;
+  let net = hvmc_to_net(&res_lnet, &|val| *id_map.get_by_right(&val).unwrap())?;
   let (res_term, valid_readback) = net_to_term_non_linear(&net, &book);
   let info = RunInfo { stats, valid_readback, net: res_lnet };
   Ok((res_term, book.def_names, info))

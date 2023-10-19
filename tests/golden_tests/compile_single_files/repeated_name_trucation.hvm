@@ -1,0 +1,2 @@
+main_long_name_that_truncates_to_main = @a @b main_long_name_that_truncates_to_main
+main = @a (main_long_name_that_truncates_to_main a)

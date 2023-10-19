@@ -1,17 +1,50 @@
 use super::{DefId, DefinitionBook, Name, Op, Term};
 use crate::net::{INet, NodeId, NodeKind::*, Port, LABEL_MASK, ROOT};
-use hvmc::run::Val;
+use bimap::BiHashMap;
+use hvmc::{
+  ast::{name_to_val, val_to_name},
+  run::Val,
+};
 use std::collections::HashMap;
 
-pub fn book_to_compact_nets(book: &DefinitionBook) -> anyhow::Result<Vec<(DefId, INet)>> {
-  let mut nets = Vec::new();
+pub fn book_to_compact_nets(
+  book: &DefinitionBook,
+  main: DefId,
+) -> anyhow::Result<(HashMap<String, INet>, BiHashMap<DefId, Val>)> {
+  let mut nets = HashMap::new();
+  let mut id_map = BiHashMap::new();
 
-  for (_, def) in book.defs.iter() {
+  for def in book.defs.values() {
     let net = term_to_compat_net(&def.body)?;
-    nets.push((def.def_id, net))
+    let name = if def.def_id == main { "main".to_string() } else { def_id_to_name(book, def.def_id, &nets) };
+
+    id_map.insert(def.def_id, name_to_val(&name));
+    nets.insert(name, net);
   }
 
-  Ok(nets)
+  Ok((nets, id_map))
+}
+
+pub fn def_id_to_name(book: &DefinitionBook, def_id: DefId, nets: &HashMap<String, INet>) -> String {
+  fn truncate(s: &str, max_chars: usize) -> &str {
+    match s.char_indices().nth(max_chars) {
+      None => s,
+      Some((idx, _)) => &s[.. idx],
+    }
+  }
+
+  fn to_internal_name(def_id: DefId, nets: &HashMap<String, INet>) -> String {
+    let name = val_to_name(def_id.to_internal());
+    if nets.contains_key(&name) { to_internal_name(DefId(def_id.0 + 1), nets) } else { name }
+  }
+
+  if book.is_generated_rule(def_id) {
+    to_internal_name(def_id, nets)
+  } else {
+    let Name(name) = book.def_names.name(&def_id).unwrap();
+    let name = truncate(name, 4).to_owned();
+    if nets.contains_key(&name) || name.eq("main") { to_internal_name(def_id, nets) } else { name }
+  }
 }
 
 /// Converts an IC term into an IC net.

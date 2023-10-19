@@ -50,7 +50,7 @@ fn main() -> anyhow::Result<()> {
       check_book(book)?;
     }
     Mode::Compile => {
-      let compiled = compile_book(&mut book)?;
+      let (compiled, _) = compile_book(&mut book)?;
       println!("{}", show_book(&compiled));
     }
     Mode::Run => {

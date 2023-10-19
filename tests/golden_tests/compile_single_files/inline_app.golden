@@ -1,6 +1,6 @@
-@1 = (a a)
-@2 = (a a)
-@3 = a
-& (@2 a) ~ @1
+@Rul1 = (a a)
+@Rul2 = (a a)
+@Rul3 = a
+& (@Rul2 a) ~ @Rul1
 @main = a
-& (@3 a) ~ @3
+& (@Rul3 a) ~ @Rul3

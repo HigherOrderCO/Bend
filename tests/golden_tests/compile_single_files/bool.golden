@@ -1,6 +1,6 @@
-@1 = (a (* a))
-@2 = (* @5)
-@3 = ((@2 (@1 a)) a)
 @5 = (a a)
+@Not = ((@fals (@true a)) a)
+@fals = (* @5)
 @main = a
-& (@1 a) ~ @3
+& (@true a) ~ @Not
+@true = (a (* a))
