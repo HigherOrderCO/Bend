@@ -1,15 +1,12 @@
 #![feature(box_patterns)]
 
-use bimap::BiHashMap;
 use hvmc::{
   ast::{book_to_runtime, name_to_val, net_from_runtime, Book, Net},
   run::Val,
 };
 use net::{hvmc_to_net, nets_to_hvm_core};
-use std::time::Instant;
-use term::{
-  book_to_compact_nets, net_to_term::net_to_term_non_linear, DefId, DefNames, DefinitionBook, Term,
-};
+use std::{collections::HashMap, time::Instant};
+use term::{book_to_nets, net_to_term::net_to_term_non_linear, DefId, DefNames, DefinitionBook, Term};
 
 pub mod net;
 pub mod term;
@@ -22,7 +19,7 @@ pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
   Ok(())
 }
 
-pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<(Book, BiHashMap<DefId, Val>)> {
+pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<(Book, HashMap<Val, DefId>)> {
   let main = book.check_has_main()?;
   book.resolve_refs();
   book.check_unbound_vars()?;
@@ -31,9 +28,10 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<(Book, BiHashMa
   book.check_ref_to_ref()?;
   book.detach_supercombinators();
   book.prune();
-  let (nets, id_map) = book_to_compact_nets(book, main)?;
-  let core_book = nets_to_hvm_core(nets, &id_map)?;
-  Ok((core_book, id_map))
+  let (nets, id_to_hvmc_name) = book_to_nets(book, main)?;
+  let core_book = nets_to_hvm_core(nets, &id_to_hvmc_name)?;
+  let hvmc_name_to_id = id_to_hvmc_name.into_iter().map(|(k, v)| (v, k)).collect();
+  Ok((core_book, hvmc_name_to_id))
 }
 
 pub fn run_compiled(book: &Book, mem_size: usize) -> (Net, RunStats) {
@@ -53,9 +51,9 @@ pub fn run_compiled(book: &Book, mem_size: usize) -> (Net, RunStats) {
 }
 
 pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
-  let (compiled, id_map) = compile_book(&mut book)?;
+  let (compiled, hvmc_name_to_id) = compile_book(&mut book)?;
   let (res_lnet, stats) = run_compiled(&compiled, mem_size);
-  let net = hvmc_to_net(&res_lnet, &|val| *id_map.get_by_right(&val).unwrap())?;
+  let net = hvmc_to_net(&res_lnet, &|val| hvmc_name_to_id[&val])?;
   let (res_term, valid_readback) = net_to_term_non_linear(&net, &book);
   let info = RunInfo { stats, valid_readback, net: res_lnet };
   Ok((res_term, book.def_names, info))

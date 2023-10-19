@@ -1,31 +1,36 @@
 use super::{DefId, DefinitionBook, Name, Op, Term};
 use crate::net::{INet, NodeId, NodeKind::*, Port, LABEL_MASK, ROOT};
-use bimap::BiHashMap;
 use hvmc::{
   ast::{name_to_val, val_to_name},
   run::Val,
 };
 use std::collections::HashMap;
 
-pub fn book_to_compact_nets(
+pub fn book_to_nets(
   book: &DefinitionBook,
   main: DefId,
-) -> anyhow::Result<(HashMap<String, INet>, BiHashMap<DefId, Val>)> {
+) -> anyhow::Result<(HashMap<String, INet>, HashMap<DefId, Val>)> {
   let mut nets = HashMap::new();
-  let mut id_map = BiHashMap::new();
+  let mut id_to_hvmc_name = HashMap::new();
 
   for def in book.defs.values() {
     let net = term_to_compat_net(&def.body)?;
-    let name = if def.def_id == main { "main".to_string() } else { def_id_to_name(book, def.def_id, &nets) };
+    let name =
+      if def.def_id == main { "main".to_string() } else { def_id_to_hvmc_name(book, def.def_id, &nets) };
 
-    id_map.insert(def.def_id, name_to_val(&name));
+    id_to_hvmc_name.insert(def.def_id, name_to_val(&name));
     nets.insert(name, net);
   }
 
-  Ok((nets, id_map))
+  Ok((nets, id_to_hvmc_name))
 }
 
-pub fn def_id_to_name(book: &DefinitionBook, def_id: DefId, nets: &HashMap<String, INet>) -> String {
+/// Converts rules names to unique names compatible with hvm-core:
+///   If the rule is compiler-generated: Convert the DefId value into a new name
+///   If not: Truncates the rule name into 4 chars
+/// Them checks if the given hashmap already contains the resulted name,
+/// if it does, falls back into converting its DefId and succeeding ones until a unique name is found.
+fn def_id_to_hvmc_name(book: &DefinitionBook, def_id: DefId, nets: &HashMap<String, INet>) -> String {
   fn truncate(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
       None => s,
@@ -33,17 +38,21 @@ pub fn def_id_to_name(book: &DefinitionBook, def_id: DefId, nets: &HashMap<Strin
     }
   }
 
-  fn to_internal_name(def_id: DefId, nets: &HashMap<String, INet>) -> String {
+  fn gen_unique_name(def_id: DefId, nets: &HashMap<String, INet>) -> String {
     let name = val_to_name(def_id.to_internal());
-    if nets.contains_key(&name) { to_internal_name(DefId(def_id.0 + 1), nets) } else { name }
+    if nets.contains_key(&name) { gen_unique_name(DefId(def_id.0 + 1), nets) } else { name }
   }
 
   if book.is_generated_rule(def_id) {
-    to_internal_name(def_id, nets)
+    gen_unique_name(def_id, nets)
   } else {
     let Name(name) = book.def_names.name(&def_id).unwrap();
-    let name = truncate(name, 4).to_owned();
-    if nets.contains_key(&name) || name.eq("main") { to_internal_name(def_id, nets) } else { name }
+    let name = truncate(name, 4);
+    if !(nets.contains_key(name) || name.eq("main")) {
+      name.to_owned()
+    } else {
+      gen_unique_name(def_id, nets)
+    }
   }
 }
 
