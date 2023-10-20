@@ -195,14 +195,14 @@ where
 {
   let pat_nam = name().map(|nam| LetPat::Var(nam)).boxed();
 
-  let pat_pair = name_or_era()
+  let pat_tup = name_or_era()
     .then_ignore(just(Token::Comma))
     .then(name_or_era())
     .delimited_by(just(Token::LParen), just(Token::RParen))
     .map(|(fst, snd)| LetPat::Tup(fst, snd))
     .boxed();
 
-  choice((pat_nam, pat_pair))
+  choice((pat_nam, pat_tup))
 }
 
 fn definition<'a, I>() -> impl Parser<'a, I, (Name, Definition), extra::Err<Rich<'a, Token>>>

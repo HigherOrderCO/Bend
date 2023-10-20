@@ -77,7 +77,7 @@ fn term_to_affine(
       let snd_uses = r_nam.as_ref().map(|r_nam| *var_uses.get(r_nam).unwrap()).unwrap_or(0);
 
       match (fst_uses, snd_uses, *val) {
-        (0, 0, _) => *nxt,
+        (0, 0, _) => term_to_affine(*nxt, var_uses, let_bodies)?,
         (_, 0, Term::Tup { fst, .. }) => {
           let let_ = Term::Let { pat: LetPat::Var(l_nam.unwrap()), val: fst, nxt };
           term_to_affine(let_, var_uses, let_bodies)?
