@@ -1,8 +1,8 @@
-@1 = (? (@2 @5) a a)
-@2 = #0
-@3 = (a b)
-& (a b) ~ @1
 @5 = (a b)
-& (a b) ~ @3
+& (a b) ~ @valS
 @main = a
-& (#1 a) ~ @1
+& (#1 a) ~ @val
+@val = (? (@valZ @5) a a)
+@valS = (a b)
+& (a b) ~ @val
+@valZ = #0

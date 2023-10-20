@@ -6,7 +6,7 @@ use hvm_lang::{
     load_book::{display_err_for_text, display_miette_err},
     net_to_term::net_to_term_non_linear,
     parser::{parse_definition_book, parse_term},
-    term_to_compat_net, DefinitionBook,
+    term_to_compat_net, DefId, DefinitionBook,
   },
 };
 use hvmc::ast::{parse_net, show_book, show_net};
@@ -77,7 +77,7 @@ fn compile_single_terms() {
     term.make_var_names_unique();
     term.linearize_vars()?;
     let compat_net = term_to_compat_net(&term)?;
-    let net = compat_net_to_core(&compat_net)?;
+    let net = compat_net_to_core(&compat_net, &|def_id| def_id.to_internal())?;
     Ok(show_net(&net))
   })
 }
@@ -89,7 +89,7 @@ fn compile_single_files() {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
       anyhow::anyhow!(msg)
     })?;
-    let compiled = compile_book(&mut book)?;
+    let (compiled, _) = compile_book(&mut book)?;
     Ok(show_book(&compiled))
   })
 }
@@ -117,7 +117,7 @@ fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|_, code| {
     let lnet = parse_net(&mut code.chars().peekable()).map_err(|e| anyhow::anyhow!(e))?;
     let book = DefinitionBook::default();
-    let compat_net = hvmc_to_net(&lnet)?;
+    let compat_net = hvmc_to_net(&lnet, &|val| DefId::from_internal(val))?;
     let (term, valid) = net_to_term_non_linear(&compat_net, &book);
     if valid {
       Ok(term.to_string(&book.def_names))

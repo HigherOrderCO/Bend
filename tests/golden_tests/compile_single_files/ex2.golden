@@ -1,31 +1,31 @@
-@1 = ([(a b) (c a)] (c b))
-@2 = (a ((a b) (* (* b))))
-@3 = (a (* ((a b) (* b))))
-@4 = (* @G)
-@5 = ((@6 (@7 (@4 a))) a)
-@6 = (a b)
-& (c b) ~ @5
-& (d c) ~ @8
-& (a d) ~ @2
-@7 = (a b)
-& (c b) ~ @5
-& (d c) ~ @8
-& (a d) ~ @3
-@8 = ((@9 (@A (@4 a))) a)
-@9 = (a b)
-& (c b) ~ @3
-& (a c) ~ @8
-@A = (a b)
-& (a b) ~ @B
-@B = ((@C (@D (@4 a))) a)
-@C = (a b)
-& (c b) ~ @2
-& (a c) ~ @2
-@D = (a b)
-& (c b) ~ @2
-& (a c) ~ @3
+@E = (* @G)
 @F = (a a)
 @G = (* @F)
+@I = (a (* ((a b) (* b))))
+@O = (a ((a b) (* (* b))))
+@c2 = ([(a b) (c a)] (c b))
+@dec = ((@decO (@decI (@E a))) a)
+@decI = (a b)
+& (a b) ~ @low
+@decO = (a b)
+& (c b) ~ @I
+& (a c) ~ @dec
+@low = ((@lowO (@lowI (@E a))) a)
+@lowI = (a b)
+& (c b) ~ @O
+& (a c) ~ @I
+@lowO = (a b)
+& (c b) ~ @O
+& (a c) ~ @O
 @main = a
-& (b a) ~ @5
-& (@3 (@4 b)) ~ @1
+& (b a) ~ @run
+& (@I (@E b)) ~ @c2
+@run = ((@runO (@runI (@E a))) a)
+@runI = (a b)
+& (c b) ~ @run
+& (d c) ~ @dec
+& (a d) ~ @I
+@runO = (a b)
+& (c b) ~ @run
+& (d c) ~ @dec
+& (a d) ~ @O
