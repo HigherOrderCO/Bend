@@ -129,18 +129,12 @@ pub fn net_to_term_non_linear(net: &INet, book: &DefinitionBook) -> (Term, bool)
         // If we're visiting a port 1 or 2, then it is a variable.
         // Also, that means we found a dup, so we store it to read later.
         1 | 2 => {
-          // let body = net.enter_port(Port(node, 0));
-          // dup_scope.entry(lab).or_default().push(next.slot());
-          // let (body, valid) = reader(net, body, var_port_to_id, id_counter, dup_scope, book);
-          // dup_scope.entry(lab).or_default().pop().unwrap();
-          // (body, valid)
-          if !dups_set.contains(&node) {
-            dups_set.insert(node);
-            dups_vec.push(node);
-          } else {
-            // Second time we find, it has to be the other dup variable.
-          }
-          (Term::Var { nam: var_name(next, var_port_to_id, id_counter) }, true)
+          let body = net.enter_port(Port(node, 0));
+          dup_scope.entry(lab).or_default().push(next.slot());
+          let (body, valid) =
+            reader(net, body, var_port_to_id, id_counter, dup_scope, book, dups_vec, dups_set);
+          dup_scope.entry(lab).or_default().pop().unwrap();
+          (body, valid)
         }
         _ => unreachable!(),
       },
@@ -180,16 +174,28 @@ pub fn net_to_term_non_linear(net: &INet, book: &DefinitionBook) -> (Term, bool)
         _ => unreachable!(),
       },
       Rot => (Term::Era, false),
-      Tup => {
-        let prt = net.enter_port(Port(node, 1));
-        let (fst, fst_valid) =
-          reader(net, prt, var_port_to_id, id_counter, dup_scope, book, dups_vec, dups_set);
-        let prt = net.enter_port(Port(node, 2));
-        let (snd, snd_valid) =
-          reader(net, prt, var_port_to_id, id_counter, dup_scope, book, dups_vec, dups_set);
-        let valid = fst_valid && snd_valid;
-        (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
-      }
+      Tup => match next.slot() {
+        0 => {
+          let prt = net.enter_port(Port(node, 1));
+          let (fst, fst_valid) =
+            reader(net, prt, var_port_to_id, id_counter, dup_scope, book, dups_vec, dups_set);
+          let prt = net.enter_port(Port(node, 2));
+          let (snd, snd_valid) =
+            reader(net, prt, var_port_to_id, id_counter, dup_scope, book, dups_vec, dups_set);
+          let valid = fst_valid && snd_valid;
+          (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
+        }
+        1 | 2 => {
+          if !dups_set.contains(&node) {
+            dups_set.insert(node);
+            dups_vec.push(node);
+          } else {
+            // Second time we find, it has to be the other dup variable.
+          }
+          (Term::Var { nam: var_name(next, var_port_to_id, id_counter) }, true)
+        }
+        _ => unreachable!(),
+      },
     }
   }
   // A hashmap linking ports to binder names. Those ports have names:
@@ -218,26 +224,17 @@ pub fn net_to_term_non_linear(net: &INet, book: &DefinitionBook) -> (Term, bool)
 
     let val = net.enter_port(Port(dup, 0));
 
+    let (val, val_valid) =
+      reader(net, val, &mut var_port_to_id, id_counter, &mut dup_scope, book, &mut dups_vec, &mut dups_set);
+    let l_nam = decl_name(net, Port(dup, 1), &mut var_port_to_id, id_counter);
+    let r_nam = decl_name(net, Port(dup, 2), &mut var_port_to_id, id_counter);
+
     main = match kind {
-      Tup => {
-        let (val, val_valid) = reader(
-          net,
-          val,
-          &mut var_port_to_id,
-          id_counter,
-          &mut dup_scope,
-          book,
-          &mut dups_vec,
-          &mut dups_set,
-        );
-        valid = valid && val_valid;
-        let l_nam = decl_name(net, Port(dup, 1), &mut var_port_to_id, id_counter);
-        let r_nam = decl_name(net, Port(dup, 2), &mut var_port_to_id, id_counter);
-        Term::Let { pat: LetPat::Tup(l_nam, r_nam), val: Box::new(val), nxt: Box::new(main) }
-      }
-      Dup { .. } => todo!(),
+      Tup => Term::Let { pat: LetPat::Tup(l_nam, r_nam), val: Box::new(val), nxt: Box::new(main) },
+      Dup { .. } => Term::Dup { fst: l_nam, snd: r_nam, val: Box::new(val), nxt: Box::new(main) },
       _ => unreachable!(),
     };
+    valid = valid && val_valid;
   }
 
   (main, valid)
