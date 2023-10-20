@@ -1,4 +1,4 @@
-use super::{DefId, DefinitionBook, Name, Op, Term};
+use super::{DefId, DefNames, DefinitionBook, Name, Op, Term};
 use crate::net::{INet, NodeId, NodeKind::*, Port, LABEL_MASK, ROOT};
 use hvmc::{
   ast::{name_to_val, val_to_name},
@@ -15,8 +15,11 @@ pub fn book_to_nets(
 
   for def in book.defs.values() {
     let net = term_to_compat_net(&def.body)?;
-    let name =
-      if def.def_id == main { "main".to_string() } else { def_id_to_hvmc_name(book, def.def_id, &nets) };
+    let name = if def.def_id == main {
+      DefNames::ENTRY_POINT.to_string()
+    } else {
+      def_id_to_hvmc_name(book, def.def_id, &nets)
+    };
 
     id_to_hvmc_name.insert(def.def_id, name_to_val(&name));
     nets.insert(name, net);
@@ -48,7 +51,7 @@ fn def_id_to_hvmc_name(book: &DefinitionBook, def_id: DefId, nets: &HashMap<Stri
   } else {
     let Name(name) = book.def_names.name(&def_id).unwrap();
     let name = truncate(name, 4);
-    if !(nets.contains_key(name) || name.eq("main")) {
+    if !(nets.contains_key(name) || name.eq(DefNames::ENTRY_POINT)) {
       name.to_owned()
     } else {
       gen_unique_name(def_id, nets)
