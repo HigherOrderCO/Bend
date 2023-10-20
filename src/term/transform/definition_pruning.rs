@@ -1,22 +1,20 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::term::{DefId, Definition, DefinitionBook, Name, Term};
+use crate::term::{DefId, Definition, DefinitionBook, Term};
 
 type Definitions = HashSet<DefId>;
 
 impl DefinitionBook {
   /// Removes all unused definitions starting from Main.
-  pub fn prune(&mut self) {
-    if let Some(ref main) = self.def_names.def_id(&Name::new("Main")) {
-      let mut used = Definitions::new();
+  pub fn prune(&mut self, main: DefId) {
+    let mut used = Definitions::new();
 
-      let Definition { def_id, body } = self.defs.get(main).unwrap();
-      used.insert(*def_id);
-      body.find_used_definitions(&mut used, &self.defs);
+    let Definition { def_id, body } = self.defs.get(&main).unwrap();
+    used.insert(*def_id);
+    body.find_used_definitions(&mut used, &self.defs);
 
-      self.defs.retain(|def_id, _| used.contains(def_id));
-      self.def_names.map.retain(|def_id, _| used.contains(def_id));
-    }
+    self.defs.retain(|def_id, _| used.contains(def_id));
+    self.def_names.map.retain(|def_id, _| used.contains(def_id));
   }
 }
 

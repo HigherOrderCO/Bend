@@ -154,6 +154,9 @@ impl DefinitionBook {
 }
 
 impl DefNames {
+  pub const ENTRY_POINT: &'static str = "main";
+  pub const HVM1_ENTRY_POINT: &'static str = "Main";
+
   pub fn new() -> Self {
     Default::default()
   }
