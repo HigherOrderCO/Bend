@@ -1,0 +1,2 @@
+A = λa λb main
+main = λa (A a)
