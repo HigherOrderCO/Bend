@@ -156,6 +156,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &DefinitionBook) -> (Term, bool)
         }
         _ => unreachable!(),
       },
+      Rot => (Term::Era, false)
     }
   }
   // A hashmap linking ports to binder names. Those ports have names:
@@ -336,6 +337,8 @@ pub fn net_to_term_linear(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         }
         _ => unreachable!(),
       },
+      // If we're revisiting the root node something went wrong with this net
+      Rot => (Term::Era, false)
     }
   }
 
@@ -430,7 +433,8 @@ fn decl_name(
   id_counter: &mut Val,
 ) -> Option<Name> {
   // If port is linked to an erase node, return an unused variable
-  let var_kind = net.node(net.enter_port(var_port).node()).kind;
+  let var_use = net.enter_port(var_port);
+  let var_kind = net.node(var_use.node()).kind;
   if let Era = var_kind { None } else { Some(var_name(var_port, var_port_to_id, id_counter)) }
 }
 

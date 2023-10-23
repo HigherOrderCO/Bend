@@ -65,6 +65,7 @@ fn net_tree_to_hvmc_tree(
       sel: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       ret: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
+    NodeKind::Rot => unreachable!(),
   }
 }
 

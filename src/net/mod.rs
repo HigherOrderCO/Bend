@@ -27,12 +27,20 @@ pub struct Port(pub NodeId, pub SlotId);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NodeKind {
+  /// Root node
+  Rot,
+  /// Erasure nodes
   Era,
+  /// Lambdas and applications
   Con,
   Dup { lab: u8 },
+  /// Reference to function definitions
   Ref { def_id: DefId },
+  /// Numbers
   Num { val: Val },
+  /// Numeric operations
   Op2,
+  /// Pattern matching on numbers
   Mat,
 }
 
@@ -50,7 +58,7 @@ impl INet {
   /// Create a new net, with a deadlocked root node.
   pub fn new() -> Self {
     INet {
-      nodes: vec![Node::new(Port(0, 2), Port(0, 1), Port(0, 0), Era)], // p2 points to p0, p1 points to net
+      nodes: vec![Node::new(Port(0, 2), Port(0, 1), Port(0, 0), Rot)], // p2 points to p0, p1 points to net
     }
   }
 
