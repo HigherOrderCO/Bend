@@ -235,7 +235,7 @@ fn encode_term(
       Ok(Some(Port(snd_node, 2)))
     }
     Term::Tup { fst, snd } => {
-      let tup = inet.new_node(Con);
+      let tup = inet.new_node(Tup);
 
       let fst = encode_term(inet, fst, Port(tup, 1), scope, vars, global_vars, dups)?;
       link_local(inet, Port(tup, 1), fst);
