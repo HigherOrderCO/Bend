@@ -1,8 +1,8 @@
-use super::{DefId, DefNames, DefinitionBook, Name, Term};
+use super::{Book, DefId, DefNames, Name, Term};
 
 pub mod unbound_vars;
 
-impl DefinitionBook {
+impl Book {
   pub fn check_has_main(&self) -> anyhow::Result<DefId> {
     match (
       self.def_names.def_id(&Name::new(DefNames::ENTRY_POINT)),

@@ -1,8 +1,8 @@
-use crate::term::{DefinitionBook, LetPat, Name, Term};
+use crate::term::{Book, LetPat, Name, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
-impl DefinitionBook {
+impl Book {
   pub fn check_unbound_vars(&self) -> anyhow::Result<()> {
     for def in self.defs.values() {
       def.body.check_unbound_vars()?;

@@ -6,7 +6,7 @@ use hvm_lang::{
     load_book::{display_err_for_text, display_miette_err},
     net_to_term::net_to_term_non_linear,
     parser::{parse_definition_book, parse_term},
-    term_to_compat_net, DefId, DefinitionBook,
+    term_to_compat_net, Book, DefId,
   },
 };
 use hvmc::ast::{parse_net, show_book, show_net};
@@ -116,7 +116,7 @@ fn run_single_files() {
 fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|_, code| {
     let lnet = parse_net(&mut code.chars().peekable()).map_err(|e| anyhow::anyhow!(e))?;
-    let book = DefinitionBook::default();
+    let book = Book::default();
     let compat_net = hvmc_to_net(&lnet, &|val| DefId::from_internal(val))?;
     let (term, valid) = net_to_term_non_linear(&compat_net, &book);
     if valid {

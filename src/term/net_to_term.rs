@@ -1,13 +1,12 @@
-use super::{var_id_to_name, DefId, DefinitionBook, Name, Op, Term, Val};
 use crate::{
-  net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
-  term::LetPat,
+  net::*,
+  term::{net_to_term::NodeKind::*, var_id_to_name, Book, DefId, LetPat, Name, Op, Term, Val},
 };
 use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
 /// Converts an Interaction-INet to a Lambda Calculus term, resolvind Dups and Sups where possible.
-pub fn net_to_term_non_linear(net: &INet, book: &DefinitionBook) -> (Term, bool) {
+pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
   /// Reads a term recursively by starting at root node.
   /// Returns the term and whether it's a valid readback.
   fn reader(
@@ -18,7 +17,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &DefinitionBook) -> (Term, bool)
     dup_scope: &mut HashMap<u8, Vec<SlotId>>,
     lets_vec: &mut Vec<NodeId>,
     lets_set: &mut HashSet<NodeId>,
-    book: &DefinitionBook,
+    book: &Book,
   ) -> (Term, bool) {
     let node = next.node();
 
@@ -90,10 +89,12 @@ pub fn net_to_term_non_linear(net: &INet, book: &DefinitionBook) -> (Term, bool)
         _ => unreachable!(),
       },
       Ref { def_id } => {
-        if book.is_generated_rule(def_id) {
-          let rule = book.defs.get(&def_id).unwrap();
-
-          let mut term = rule.body.clone();
+        if book.is_generated_def(def_id) {
+          let def = book.defs.get(&def_id).unwrap();
+          if def.rules.len() > 0 {
+            panic!("What to do in this case?");
+          }
+          let mut term = def.rules[0].body.clone();
           term.fix_names(id_counter, book);
 
           (term, true)
@@ -235,7 +236,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &DefinitionBook) -> (Term, bool)
 }
 
 /// Converts an Interaction-INet to an Interaction Calculus term.
-pub fn net_to_term_linear(net: &INet, book: &DefinitionBook) -> (Term, bool) {
+pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
   /// Reads a term recursively by starting at root node.
   /// Returns the term and whether it's a valid readback.
   fn reader(
@@ -246,7 +247,7 @@ pub fn net_to_term_linear(net: &INet, book: &DefinitionBook) -> (Term, bool) {
     dups_vec: &mut Vec<NodeId>,
     dups_set: &mut HashSet<NodeId>,
     seen: &mut HashSet<Port>,
-    book: &DefinitionBook,
+    book: &Book,
   ) -> (Term, bool) {
     if seen.contains(&next) {
       return (Term::Var { nam: Name::new("...") }, false);
@@ -328,10 +329,12 @@ pub fn net_to_term_linear(net: &INet, book: &DefinitionBook) -> (Term, bool) {
         _ => unreachable!(),
       },
       Ref { def_id } => {
-        if book.is_generated_rule(def_id) {
-          let rule = book.defs.get(&def_id).unwrap();
-
-          let mut term = rule.body.clone();
+        if book.is_generated_def(def_id) {
+          let def = book.defs.get(&def_id).unwrap();
+          if def.rules.len() > 0 {
+            panic!("What to do in this case?");
+          }
+          let mut term = def.rules[0].body.clone();
           term.fix_names(id_counter, book);
 
           (term, true)
@@ -523,14 +526,14 @@ fn split_num_with_op(num: Val) -> (Val, Option<Op>) {
   (num, op)
 }
 
-impl DefinitionBook {
-  pub fn is_generated_rule(&self, def_id: DefId) -> bool {
+impl Book {
+  pub fn is_generated_def(&self, def_id: DefId) -> bool {
     self.def_names.name(&def_id).map_or(false, |Name(name)| name.contains('$'))
   }
 }
 
 impl Term {
-  fn fix_names(&mut self, id_counter: &mut Val, book: &DefinitionBook) {
+  fn fix_names(&mut self, id_counter: &mut Val, book: &Book) {
     fn fix_name(nam: &mut Option<Name>, id_counter: &mut Val, bod: &mut Term) {
       if let Some(nam) = nam {
         let name = var_id_to_name(*id_counter);
@@ -549,9 +552,12 @@ impl Term {
       Term::Chn { nam: _, bod } => bod.fix_names(id_counter, book),
       Term::Lnk { .. } => {}
       Term::Ref { def_id } => {
-        if book.is_generated_rule(*def_id) {
-          let rule = book.defs.get(def_id).unwrap();
-          let mut term = rule.body.clone();
+        if book.is_generated_def(*def_id) {
+          let def = book.defs.get(def_id).unwrap();
+          if def.rules.len() > 0 {
+            panic!("What to do in this case?");
+          }
+          let mut term = def.rules[0].body.clone();
           term.fix_names(id_counter, book);
           *self = term
         }

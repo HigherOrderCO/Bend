@@ -1,8 +1,7 @@
+use crate::term::{Book, DefId, DefNames, Definition, LetPat, Name, Op, Term};
 use std::collections::BTreeMap;
 
-use crate::term::{DefId, DefNames, Definition, DefinitionBook, LetPat, Name, Op, Term};
-
-impl DefinitionBook {
+impl Book {
   /// Applies bracket abstraction to remove lambdas form rule bodies,
   /// replacing it with applications with [`combinators`][Combinator]
   ///

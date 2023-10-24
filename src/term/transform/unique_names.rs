@@ -1,10 +1,10 @@
 // Pass to give all variables in a definition unique names.
 
-use crate::term::{var_id_to_name, DefinitionBook, LetPat, Name, Term};
+use crate::term::*;
 use hvmc::run::Val;
 use std::collections::HashMap;
 
-impl DefinitionBook {
+impl Book {
   /// Makes all variables in each definition have a new unique name.
   /// Precondition: Definition references have been resolved, no unbound variables.
   pub fn make_var_names_unique(&mut self) {

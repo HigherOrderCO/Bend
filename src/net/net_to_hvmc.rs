@@ -1,8 +1,8 @@
-use super::{INet, NodeId, NodeKind, Port, ROOT, BASE_DUP_HVMC_LABEL};
+use super::{INet, NodeId, NodeKind, Port, BASE_DUP_HVMC_LABEL, ROOT};
 use crate::term::{var_id_to_name, DefId};
 use hvmc::{
   ast::{Book, Net, Tree},
-  run::{Tag, Val},
+  run::Val,
 };
 use std::collections::{HashMap, HashSet};
 

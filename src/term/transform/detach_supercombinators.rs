@@ -1,9 +1,10 @@
-use crate::term::{DefId, DefNames, Definition, DefinitionBook, LetPat, Name, Term};
 use std::collections::{BTreeMap, HashSet};
+
+use crate::term::*;
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
-impl DefinitionBook {
+impl Book {
   pub fn detach_supercombinators(&mut self) {
     let mut combinators = Combinators::new();
 

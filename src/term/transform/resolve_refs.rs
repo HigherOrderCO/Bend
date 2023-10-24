@@ -1,7 +1,7 @@
-use crate::term::{DefNames, DefinitionBook, LetPat, Name, Term};
+use crate::term::*;
 use std::collections::HashMap;
 
-impl DefinitionBook {
+impl Book {
   /// Decides if names inside a term belong to a Var or to a Ref.
   /// Precondition: Refs are encoded as vars.
   /// Postcondition: Refs are encoded as refs, with the correct def id.

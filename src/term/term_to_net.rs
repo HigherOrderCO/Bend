@@ -1,5 +1,4 @@
-use super::{DefId, DefNames, DefinitionBook, Name, Op, Term};
-use crate::term::LetPat;
+use super::{Book, DefId, DefNames, LetPat, Name, Op, Term};
 use crate::net::{INet, NodeId, NodeKind::*, Port, LABEL_MASK, ROOT};
 use hvmc::{
   ast::{name_to_val, val_to_name},
@@ -8,7 +7,7 @@ use hvmc::{
 use std::collections::HashMap;
 
 pub fn book_to_nets(
-  book: &DefinitionBook,
+  book: &Book,
   main: DefId,
 ) -> anyhow::Result<(HashMap<String, INet>, HashMap<DefId, Val>)> {
   let mut nets = HashMap::new();
@@ -34,7 +33,7 @@ pub fn book_to_nets(
 ///   If not: Truncates the rule name into 4 chars
 /// Them checks if the given hashmap already contains the resulted name,
 /// if it does, falls back into converting its DefId and succeeding ones until a unique name is found.
-fn def_id_to_hvmc_name(book: &DefinitionBook, def_id: DefId, nets: &HashMap<String, INet>) -> String {
+fn def_id_to_hvmc_name(book: &Book, def_id: DefId, nets: &HashMap<String, INet>) -> String {
   fn truncate(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
       None => s,
@@ -47,7 +46,7 @@ fn def_id_to_hvmc_name(book: &DefinitionBook, def_id: DefId, nets: &HashMap<Stri
     if nets.contains_key(&name) { gen_unique_name(DefId(def_id.0 + 1), nets) } else { name }
   }
 
-  if book.is_generated_rule(def_id) {
+  if book.is_generated_def(def_id) {
     gen_unique_name(def_id, nets)
   } else {
     let Name(name) = book.def_names.name(&def_id).unwrap();

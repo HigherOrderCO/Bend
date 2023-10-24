@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::term::{DefId, Definition, DefinitionBook, Term};
+use crate::term::{Book, DefId, Definition, Term};
 
 type Definitions = HashSet<DefId>;
 
-impl DefinitionBook {
+impl Book {
   /// Removes all unused definitions starting from Main.
   pub fn prune(&mut self, main: DefId) {
     let mut used = Definitions::new();
@@ -65,7 +65,6 @@ impl Term {
         Term::Lnk { .. } => (),
         Term::Era => (),
         Term::Num { .. } => (),
-        
       }
     }
   }
