@@ -1,4 +1,4 @@
-use crate::term::{DefNames, DefinitionBook, Name, Term};
+use crate::term::{DefNames, DefinitionBook, LetPat, Name, Term};
 use std::collections::HashMap;
 
 impl DefinitionBook {
@@ -25,11 +25,22 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(bod, def_names, scope);
       pop_scope(nam.clone(), scope);
     }
-    Term::Let { nam, val, nxt } => {
+    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
       resolve_refs(val, def_names, scope);
       push_scope(Some(nam.clone()), scope);
       resolve_refs(nxt, def_names, scope);
       pop_scope(Some(nam.clone()), scope);
+    }
+    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
+      resolve_refs(val, def_names, scope);
+
+      push_scope(l_nam.clone(), scope);
+      push_scope(r_nam.clone(), scope);
+
+      resolve_refs(nxt, def_names, scope);
+
+      pop_scope(l_nam.clone(), scope);
+      pop_scope(r_nam.clone(), scope);
     }
     Term::Dup { fst, snd, val, nxt } => {
       resolve_refs(val, def_names, scope);
@@ -63,6 +74,10 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(snd, def_names, scope);
     }
     Term::Opx { fst, snd, .. } => {
+      resolve_refs(fst, def_names, scope);
+      resolve_refs(snd, def_names, scope);
+    }
+    Term::Tup { fst, snd } => {
       resolve_refs(fst, def_names, scope);
       resolve_refs(snd, def_names, scope);
     }

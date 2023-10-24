@@ -1,4 +1,5 @@
 use super::{DefId, DefNames, DefinitionBook, Name, Op, Term};
+use crate::term::LetPat;
 use crate::net::{INet, NodeId, NodeKind::*, Port, LABEL_MASK, ROOT};
 use hvmc::{
   ast::{name_to_val, val_to_name},
@@ -189,6 +190,20 @@ fn encode_term(
       inet.link(up, Port(node, 0));
       Ok(Some(Port(node, 0)))
     }
+    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
+      let dup = inet.new_node(Tup);
+
+      let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(dup, 0), val);
+
+      push_scope(l_nam, Port(dup, 1), scope, vars);
+      push_scope(r_nam, Port(dup, 2), scope, vars);
+      let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, dups)?;
+      pop_scope(r_nam, Port(dup, 2), inet, scope);
+      pop_scope(l_nam, Port(dup, 1), inet, scope);
+
+      Ok(nxt)
+    }
     Term::Let { .. } => unreachable!(), // Removed in earlier poss
     Term::Sup { .. } => unreachable!(), // Not supported in syntax
     Term::Era => unreachable!(),        // Not supported in syntax
@@ -218,6 +233,17 @@ fn encode_term(
       link_local(inet, Port(snd_node, 1), snd);
 
       Ok(Some(Port(snd_node, 2)))
+    }
+    Term::Tup { fst, snd } => {
+      let tup = inet.new_node(Tup);
+
+      let fst = encode_term(inet, fst, Port(tup, 1), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(tup, 1), fst);
+
+      let snd = encode_term(inet, snd, Port(tup, 2), scope, vars, global_vars, dups)?;
+      link_local(inet, Port(tup, 2), snd);
+
+      Ok(Some(Port(tup, 0)))
     }
   }
 }

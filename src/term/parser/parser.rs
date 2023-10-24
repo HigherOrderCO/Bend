@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{DefId, Definition, DefinitionBook, Name, Op, Term};
+use crate::term::{DefId, Definition, DefinitionBook, LetPat, Name, Op, Term};
 use chumsky::{
   extra,
   input::{Emitter, SpannedInput, Stream, ValueInput},
@@ -130,14 +130,24 @@ where
       .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) })
       .boxed();
 
-    // let x = body; next
+    // (x, y)
+    let pair = term
+      .clone()
+      .then_ignore(just(Token::Comma))
+      .then(term.clone())
+      .delimited_by(just(Token::LParen), just(Token::RParen))
+      .map(|(fst, snd)| Term::Tup { fst: Box::new(fst), snd: Box::new(snd) })
+      .boxed();
+
+    // let a = ...
+    // let (a, b) = ...
     let let_ = just(Token::Let)
-      .ignore_then(name())
+      .ignore_then(let_pat())
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(term_sep.clone())
       .then(term.clone())
-      .map(|((nam, val), nxt)| Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) })
+      .map(|((pat, val), nxt)| Term::Let { pat, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
     // match val { 0: zero; 1 + pred: succ }
@@ -175,8 +185,24 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, number, global_lam, lam, dup, let_, match_, num_op, app))
+    choice((global_var, var, number, pair, global_lam, lam, dup, let_, match_, num_op, app))
   })
+}
+
+fn let_pat<'a, I>() -> impl Parser<'a, I, LetPat, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  let pat_nam = name().map(|nam| LetPat::Var(nam)).boxed();
+
+  let pat_tup = name_or_era()
+    .then_ignore(just(Token::Comma))
+    .then(name_or_era())
+    .delimited_by(just(Token::LParen), just(Token::RParen))
+    .map(|(fst, snd)| LetPat::Tup(fst, snd))
+    .boxed();
+
+  choice((pat_nam, pat_tup))
 }
 
 fn definition<'a, I>() -> impl Parser<'a, I, (Name, Definition), extra::Err<Rich<'a, Token>>>

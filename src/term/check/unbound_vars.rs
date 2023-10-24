@@ -1,4 +1,4 @@
-use crate::term::{DefinitionBook, Name, Term};
+use crate::term::{DefinitionBook, LetPat, Name, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -57,11 +57,30 @@ pub fn check_uses<'a>(
     Term::Lnk { nam } => {
       globals.entry(nam).or_default().1 = true;
     }
-    Term::Let { nam, val, nxt } => {
+    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
       check_uses(val, scope, globals)?;
       push_scope(nam, scope);
       check_uses(nxt, scope, globals)?;
       pop_scope(nam, scope);
+    }
+    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
+      check_uses(val, scope, globals)?;
+
+      if let Some(l_nam) = l_nam {
+        push_scope(l_nam, scope);
+      }
+      if let Some(r_nam) = r_nam {
+        push_scope(r_nam, scope);
+      }
+
+      check_uses(nxt, scope, globals)?;
+
+      if let Some(l_nam) = l_nam {
+        pop_scope(l_nam, scope);
+      }
+      if let Some(r_nam) = r_nam {
+        pop_scope(r_nam, scope);
+      }
     }
     Term::App { fun, arg } => {
       check_uses(fun, scope, globals)?;
@@ -98,6 +117,10 @@ pub fn check_uses<'a>(
       check_uses(snd, scope, globals)?;
     }
     Term::Num { .. } => (),
+    Term::Tup { fst, snd } => {
+      check_uses(fst, scope, globals)?;
+      check_uses(snd, scope, globals)?;
+    }
   }
   Ok(())
 }

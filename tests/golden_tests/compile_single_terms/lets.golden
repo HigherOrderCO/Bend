@@ -1,5 +1,5 @@
 a
 & (b (c (d a))) ~ (e e)
-& {4 f {5 g {6 h (h (g (f d)))}}} ~ (i i)
-& {2 j {3 k (k (j c))}} ~ (l l)
-& [m (m b)] ~ (n n)
+& {5 f {6 g {7 h (h (g (f d)))}}} ~ (i i)
+& {3 j {4 k (k (j c))}} ~ (l l)
+& {2 m (m b)} ~ (n n)

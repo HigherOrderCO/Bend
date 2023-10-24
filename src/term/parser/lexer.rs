@@ -79,6 +79,9 @@ pub enum Token {
   #[token(":")]
   Colon,
 
+  #[token(",")]
+  Comma,
+
   #[token("(")]
   LParen,
 
@@ -179,6 +182,7 @@ impl fmt::Display for Token {
       Self::NotEquals => write!(f, "!="),
       Self::EqualsEquals => write!(f, "=="),
       Self::Colon => write!(f, ":"),
+      Self::Comma => write!(f, ","),
       Self::Semicolon => write!(f, ";"),
       Self::LParen => write!(f, "("),
       Self::RParen => write!(f, ")"),

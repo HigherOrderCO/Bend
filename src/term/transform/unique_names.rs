@@ -1,6 +1,6 @@
 // Pass to give all variables in a definition unique names.
 
-use crate::term::{var_id_to_name, DefinitionBook, Name, Term};
+use crate::term::{var_id_to_name, DefinitionBook, LetPat, Name, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -49,12 +49,31 @@ fn unique_var_names(term: &Term, name_map: &mut UniqueNameScope, name_count: &mu
       let bod = unique_var_names(bod, name_map, name_count);
       Term::Chn { nam: nam.clone(), bod: Box::new(bod) }
     }
-    Term::Let { nam, val, nxt } => {
+    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
       let val = unique_var_names(val, name_map, name_count);
       push_name(nam.clone(), name_map, name_count);
       let nxt = unique_var_names(nxt, name_map, name_count);
       let nam = pop_name(nam, name_map);
-      Term::Let { nam, val: Box::new(val), nxt: Box::new(nxt) }
+      Term::Let { pat: LetPat::Var(nam), val: Box::new(val), nxt: Box::new(nxt) }
+    }
+    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
+      let val = unique_var_names(val, name_map, name_count);
+
+      if let Some(l_nam) = l_nam {
+        push_name(l_nam.clone(), name_map, name_count);
+      }
+      if let Some(r_nam) = r_nam {
+        push_name(r_nam.clone(), name_map, name_count);
+      }
+
+      let nxt = unique_var_names(nxt, name_map, name_count);
+
+      let l_nam = l_nam.as_ref().map(|l_nam| pop_name(l_nam, name_map));
+      let r_nam = r_nam.as_ref().map(|r_nam| pop_name(r_nam, name_map));
+
+      let new_pat = LetPat::Tup(l_nam, r_nam);
+
+      Term::Let { pat: new_pat, val: Box::new(val), nxt: Box::new(nxt) }
     }
     Term::App { fun, arg } => {
       let fun = unique_var_names(fun, name_map, name_count);
@@ -89,6 +108,11 @@ fn unique_var_names(term: &Term, name_map: &mut UniqueNameScope, name_count: &mu
       let zero = unique_var_names(zero, name_map, name_count);
       let succ = unique_var_names(succ, name_map, name_count);
       Term::Match { cond: Box::new(cond), zero: Box::new(zero), succ: Box::new(succ) }
+    }
+    Term::Tup { fst, snd } => {
+      let fst = unique_var_names(fst, name_map, name_count);
+      let snd = unique_var_names(snd, name_map, name_count);
+      Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }
     }
     t @ (Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. }) => t.clone(),
   }

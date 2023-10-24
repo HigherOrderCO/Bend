@@ -1,4 +1,4 @@
-use crate::term::{DefId, DefNames, Definition, DefinitionBook, Name, Term};
+use crate::term::{DefId, DefNames, Definition, DefinitionBook, LetPat, Name, Term};
 use std::collections::{BTreeMap, HashSet};
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
@@ -100,12 +100,25 @@ impl Term {
           false
         }
         Term::Lnk { .. } => false,
-        Term::Let { nam, val, nxt } => {
+        Term::Let { pat: LetPat::Var(nam), val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_super = go(nxt, depth + 1, term_info);
           term_info.provide(nam);
 
           val_is_super && nxt_is_super
+        }
+        Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
+          let val_is_super = go(val, depth + 1, term_info);
+          let nxt_is_supper = go(nxt, depth + 1, term_info);
+
+          if let Some(l_nam) = l_nam {
+            term_info.provide(l_nam);
+          }
+          if let Some(r_nam) = r_nam {
+            term_info.provide(r_nam);
+          }
+
+          val_is_super && nxt_is_supper
         }
         Term::Ref { .. } => true,
         Term::App { fun, arg } => {
@@ -140,6 +153,12 @@ impl Term {
         Term::Era => true,
         Term::Num { .. } => true,
         Term::Opx { fst, snd, .. } => {
+          let fst_is_super = go(fst, depth + 1, term_info);
+          let snd_is_super = go(snd, depth + 1, term_info);
+
+          fst_is_super && snd_is_super
+        }
+        Term::Tup { fst, snd } => {
           let fst_is_super = go(fst, depth + 1, term_info);
           let snd_is_super = go(snd, depth + 1, term_info);
 

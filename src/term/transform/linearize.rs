@@ -1,4 +1,4 @@
-use crate::term::{DefinitionBook, Name, Term};
+use crate::term::{DefinitionBook, LetPat, Name, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -56,7 +56,7 @@ fn term_to_affine(
       if let Some(subst) = let_bodies.remove(&nam) { subst } else { Term::Var { nam: dup_name(&nam, uses) } }
     }
     Term::Chn { nam, bod } => Term::Chn { nam, bod: Box::new(term_to_affine(*bod, var_uses, let_bodies)?) },
-    Term::Let { nam, val, nxt } => {
+    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
       let uses = var_uses[&nam];
       match uses {
         0 => term_to_affine(*nxt, var_uses, let_bodies)?,
@@ -71,6 +71,16 @@ fn term_to_affine(
           duplicate_let(&nam, nxt, uses, val)
         }
       }
+    }
+    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
+      // TODO: check if val is a Tuple
+      let fst_uses = l_nam.as_ref().map(|l_nam| *var_uses.get(l_nam).unwrap()).unwrap_or(0);
+      let snd_uses = r_nam.as_ref().map(|r_nam| *var_uses.get(r_nam).unwrap()).unwrap_or(0);
+      let val = term_to_affine(*val, var_uses, let_bodies)?;
+      let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
+      let (nxt, fst) = if let Some(fst) = l_nam { duplicate_lam(fst, nxt, fst_uses) } else { (nxt, l_nam) };
+      let (nxt, snd) = if let Some(snd) = r_nam { duplicate_lam(snd, nxt, snd_uses) } else { (nxt, r_nam) };
+      Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(nxt) }
     }
     Term::Dup { fst, snd, val, nxt } => {
       let uses_fst = fst.as_ref().map(|fst| *var_uses.get(fst).unwrap()).unwrap_or(0);
@@ -97,6 +107,10 @@ fn term_to_affine(
     },
     Term::Opx { op, fst, snd } => Term::Opx {
       op,
+      fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
+      snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
+    },
+    Term::Tup { fst, snd } => Term::Tup {
       fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
       snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
     },
@@ -176,9 +190,23 @@ fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
     }
     Term::Chn { bod, .. } => get_var_use(bod, uses),
     Term::Lnk { .. } => (),
-    Term::Let { nam, val, nxt } => {
+    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
       if !uses.contains_key(nam) {
         uses.insert(nam.clone(), 0);
+      }
+      get_var_use(val, uses);
+      get_var_use(nxt, uses);
+    }
+    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
+      if let Some(l_nam) = l_nam {
+        if !uses.contains_key(l_nam) {
+          uses.insert(l_nam.clone(), 0);
+        }
+      }
+      if let Some(r_nam) = r_nam {
+        if !uses.contains_key(r_nam) {
+          uses.insert(r_nam.clone(), 0);
+        }
       }
       get_var_use(val, uses);
       get_var_use(nxt, uses);
@@ -200,6 +228,10 @@ fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
     Term::Era => (),
     Term::Num { .. } => (),
     Term::Opx { fst, snd, .. } => {
+      get_var_use(fst, uses);
+      get_var_use(snd, uses);
+    }
+    Term::Tup { fst, snd } => {
       get_var_use(fst, uses);
       get_var_use(snd, uses);
     }
