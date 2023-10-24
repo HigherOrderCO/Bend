@@ -142,7 +142,7 @@ where
     // let a = ...
     // let (a, b) = ...
     let let_ = just(Token::Let)
-      .ignore_then(pat())
+      .ignore_then(let_pat())
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(term_sep.clone())
@@ -189,7 +189,7 @@ where
   })
 }
 
-fn pat<'a, I>() -> impl Parser<'a, I, LetPat, extra::Err<Rich<'a, Token>>>
+fn let_pat<'a, I>() -> impl Parser<'a, I, LetPat, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {

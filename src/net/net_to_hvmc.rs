@@ -1,4 +1,4 @@
-use super::{INet, NodeId, NodeKind, Port, ROOT};
+use super::{INet, NodeId, NodeKind, Port, ROOT, BASE_DUP_HVMC_LABEL};
 use crate::term::{var_id_to_name, DefId};
 use hvmc::{
   ast::{Book, Net, Tree},
@@ -56,7 +56,7 @@ fn net_tree_to_hvmc_tree(
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Dup { lab } => Tree::Ctr {
-      lab: (lab + 2) as Tag,
+      lab: (lab + BASE_DUP_HVMC_LABEL) as Tag,
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },

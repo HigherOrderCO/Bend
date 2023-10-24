@@ -582,7 +582,10 @@ impl Term {
         snd.fix_names(id_counter, book);
       }
       Term::Let { .. } => unreachable!(),
-      Term::Tup { .. } => todo!(),
+      Term::Tup { fst, snd } => {
+        fst.fix_names(id_counter, book);
+        snd.fix_names(id_counter, book);
+      }
     }
   }
 }

@@ -1,5 +1,8 @@
 use super::{INet, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
-use crate::{net::INode, term::DefId};
+use crate::{
+  net::{INode, BASE_DUP_HVMC_LABEL},
+  term::DefId,
+};
 use hvmc::{
   ast::{Net, Tree},
   run::Val,
@@ -73,7 +76,7 @@ fn tree_to_inodes(
         let kind = match *lab {
           0 => Con,
           1 => Tup,
-          _ => Dup { lab: *lab - 2 },
+          _ => Dup { lab: *lab - BASE_DUP_HVMC_LABEL },
         };
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
