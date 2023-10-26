@@ -17,11 +17,13 @@ impl Book {
   /// Check that a definition is not just a reference to itself
   pub fn check_ref_to_ref(&self) -> anyhow::Result<()> {
     for def in self.defs.values() {
-      if let Term::Ref { .. } = def.body {
-        return Err(anyhow::anyhow!(
-          "Definition {} is just a reference to another definition",
-          self.def_names.name(&def.def_id).unwrap()
-        ));
+      for rule in def.rules.iter() {
+        if let Term::Ref { .. } = rule.body {
+          return Err(anyhow::anyhow!(
+            "Definition {} is just a reference to another definition",
+            self.def_names.name(&def.def_id).unwrap()
+          ));
+        }
       }
     }
     Ok(())

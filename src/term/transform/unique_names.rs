@@ -9,7 +9,9 @@ impl Book {
   /// Precondition: Definition references have been resolved, no unbound variables.
   pub fn make_var_names_unique(&mut self) {
     for def in self.defs.values_mut() {
-      def.body.make_var_names_unique()
+      for rule in def.rules.iter_mut() {
+        rule.body.make_var_names_unique()
+      }
     }
   }
 }

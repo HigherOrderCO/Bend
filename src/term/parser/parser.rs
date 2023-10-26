@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{Adt, Book, Definition, LetPat, Name, Op, Rule, Term};
+use crate::term::{Adt, Book, Definition, LetPat, Name, Op, Rule, RulePat, Term};
 use chumsky::{
   extra,
   input::{SpannedInput, Stream, ValueInput},
@@ -205,31 +205,48 @@ where
   choice((pat_nam, pat_tup))
 }
 
+fn rule_pat<'a, I>() -> impl Parser<'a, I, RulePat, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  recursive(|rule_pat| {
+    let var = name().map(RulePat::Var).boxed();
+
+    let ctr = name()
+      .then(rule_pat.clone().repeated().collect())
+      .map(|(nam, xs)| RulePat::Ctr(nam, xs))
+      .delimited_by(just(Token::LParen), just(Token::RParen))
+      .boxed();
+
+    choice((var, ctr))
+  })
+}
+
 fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let lhs = choice((name(), name().delimited_by(just(Token::LParen), just(Token::RParen))));
+  let lhs = name().then(rule_pat().repeated().collect()).boxed();
+  let lhs = choice((lhs.clone(), lhs.clone().delimited_by(just(Token::LParen), just(Token::RParen))));
 
-  lhs.then_ignore(just(Token::Equals)).then(term()).map(|(name, body)| (name, Rule { pats: todo!(), body }))
+  lhs.then_ignore(just(Token::Equals)).then(term()).map(|((name, pats), body)| (name, Rule { pats, body }))
 }
 
 fn datatype<'a, I>() -> impl Parser<'a, I, (Name, Adt), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let arity_0 = select!(Token::Name(nam) => (Name(nam), 0));
-  let arity_n = select!(Token::Name(nam) => Name(nam))
-    .then(select!(Token::Name(_) => ()).repeated().at_least(2).collect::<Vec<_>>())
+  let arity_0 = name().map(|nam| (nam, 0));
+  let arity_n = name()
+    .then(name().repeated().collect::<Vec<_>>())
     .delimited_by(just(Token::LParen), just(Token::RParen))
     .map(|(nam, args)| (nam, args.len()));
-  let ctr = choice((arity_0, arity_n));
+  let ctr1 = arity_0.or(arity_n).separated_by(just(Token::Or));
 
-  select!(Token::Name(nam) => nam)
-    .try_map(|n, s| if n == "data" { Ok(()) } else { Err(Rich::custom(s, "")) })
-    .ignore_then(select!(Token::Name(nam) => Name(nam)))
+  just(Token::Data)
+    .ignore_then(name())
     .then_ignore(just(Token::Equals))
-    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, usize)>>())
+    .then(ctr1.collect::<Vec<(Name, usize)>>())
     .map(|(name, ctrs)| (name, Adt { ctrs: ctrs.into_iter().collect() }))
 }
 

@@ -55,7 +55,7 @@ pub struct Rule {
 
 #[derive(Debug, Clone)]
 pub enum RulePat {
-  Var,
+  Var(Name),
   Ctr(Name, Vec<RulePat>),
 }
 
@@ -355,9 +355,8 @@ impl fmt::Display for LetPat {
 }
 
 impl Definition {
-  pub fn to_string(&self, def_names: &DefNames) -> String {
-    let Definition { def_id, body } = self;
-    format!("({}) = {}", def_names.name(def_id).unwrap(), body.to_string(def_names))
+  pub fn to_string(&self, _def_names: &DefNames) -> String {
+    todo!()
   }
 }
 

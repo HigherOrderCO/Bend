@@ -17,7 +17,9 @@ use std::collections::HashMap;
 impl Book {
   pub fn linearize_vars(&mut self) -> anyhow::Result<()> {
     for def in self.defs.values_mut() {
-      def.body.linearize_vars()?;
+      for rule in def.rules.iter_mut() {
+        rule.body.linearize_vars()?;
+      }
     }
     Ok(())
   }

@@ -5,7 +5,9 @@ use std::collections::HashMap;
 impl Book {
   pub fn check_unbound_vars(&self) -> anyhow::Result<()> {
     for def in self.defs.values() {
-      def.body.check_unbound_vars()?;
+      for rule in def.rules.iter() {
+        rule.body.check_unbound_vars()?;
+      }
     }
     Ok(())
   }

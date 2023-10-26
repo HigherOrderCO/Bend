@@ -1,7 +1,7 @@
 #![feature(box_patterns)]
 
 use hvmc::{
-  ast::{book_to_runtime, name_to_val, net_from_runtime, show_net, Book as RBook, Net},
+  ast::{book_to_runtime, name_to_val, net_from_runtime, show_net, Net},
   run::Val,
 };
 use net::{hvmc_to_net, nets_to_hvm_core};
@@ -19,7 +19,7 @@ pub fn check_book(mut book: Book) -> anyhow::Result<()> {
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book) -> anyhow::Result<(RBook, HashMap<Val, DefId>)> {
+pub fn compile_book(book: &mut Book) -> anyhow::Result<(hvmc::ast::Book, HashMap<Val, DefId>)> {
   let main = book.check_has_main()?;
   book.resolve_refs();
   book.check_unbound_vars()?;
@@ -34,7 +34,7 @@ pub fn compile_book(book: &mut Book) -> anyhow::Result<(RBook, HashMap<Val, DefI
   Ok((core_book, hvmc_name_to_id))
 }
 
-pub fn run_compiled(book: &RBook, mem_size: usize) -> (Net, RunStats) {
+pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) {
   let runtime_book = book_to_runtime(book);
   let mut root = hvmc::run::Net::new(mem_size);
   root.boot(name_to_val(DefNames::ENTRY_POINT));

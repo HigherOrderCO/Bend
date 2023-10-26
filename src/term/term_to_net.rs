@@ -14,15 +14,17 @@ pub fn book_to_nets(
   let mut id_to_hvmc_name = HashMap::new();
 
   for def in book.defs.values() {
-    let net = term_to_compat_net(&def.body)?;
-    let name = if def.def_id == main {
-      DefNames::ENTRY_POINT.to_string()
-    } else {
-      def_id_to_hvmc_name(book, def.def_id, &nets)
-    };
+    for rule in def.rules.iter() {
+      let net = term_to_compat_net(&rule.body)?;
+      let name = if def.def_id == main {
+        DefNames::ENTRY_POINT.to_string()
+      } else {
+        def_id_to_hvmc_name(book, def.def_id, &nets)
+      };
 
-    id_to_hvmc_name.insert(def.def_id, name_to_val(&name));
-    nets.insert(name, net);
+      id_to_hvmc_name.insert(def.def_id, name_to_val(&name));
+      nets.insert(name, net);
+    }
   }
 
   Ok((nets, id_to_hvmc_name))
