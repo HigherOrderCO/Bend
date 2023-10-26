@@ -1,6 +1,7 @@
 use super::{Book, DefId, DefNames, Name, Term};
 
 pub mod unbound_vars;
+pub mod shared_names;
 
 impl Book {
   pub fn check_has_main(&self) -> anyhow::Result<DefId> {

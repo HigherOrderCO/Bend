@@ -21,6 +21,7 @@ pub fn check_book(mut book: Book) -> anyhow::Result<()> {
 
 pub fn compile_book(book: &mut Book) -> anyhow::Result<(hvmc::ast::Book, HashMap<Val, DefId>)> {
   let main = book.check_has_main()?;
+  book.check_shared_names()?;
   book.resolve_refs();
   book.check_unbound_vars()?;
   book.make_var_names_unique();

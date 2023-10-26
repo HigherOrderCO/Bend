@@ -241,12 +241,12 @@ where
     .then(name().repeated().collect::<Vec<_>>())
     .delimited_by(just(Token::LParen), just(Token::RParen))
     .map(|(nam, args)| (nam, args.len()));
-  let ctr1 = arity_0.or(arity_n).separated_by(just(Token::Or));
+  let ctr = arity_0.or(arity_n).separated_by(just(Token::Or));
 
   just(Token::Data)
     .ignore_then(name())
     .then_ignore(just(Token::Equals))
-    .then(ctr1.collect::<Vec<(Name, usize)>>())
+    .then(ctr.collect::<Vec<(Name, usize)>>())
     .map(|(name, ctrs)| (name, Adt { ctrs: ctrs.into_iter().collect() }))
 }
 
@@ -271,7 +271,17 @@ where
         }
         TopLevel::Adt((nam, adt)) => {
           if !book.adts.contains_key(&nam) {
-            book.adts.insert(nam, adt);
+            book.adts.insert(nam.clone(), adt.clone());
+            for (ctr, _) in adt.ctrs {
+              if !book.ctrs.contains_key(&ctr) {
+                book.ctrs.insert(ctr, nam.clone());
+              } else {
+                return Err(Rich::custom(
+                  SimpleSpan::from(0 .. 4),
+                  format!("Repeated constructor '{}'", nam),
+                ));
+              }
+            }
           } else {
             return Err(Rich::custom(span, format!("Repeated datatype '{}'", nam)));
           }
