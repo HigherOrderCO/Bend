@@ -1,5 +1,6 @@
-use crate::term::*;
 use std::collections::HashMap;
+
+use crate::term::{Book, DefNames, LetPat, Name, Term};
 
 impl Book {
   /// Decides if names inside a term belong to a Var or to a Ref.

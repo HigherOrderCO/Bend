@@ -128,6 +128,18 @@ fn readback_lnet() {
 }
 
 #[test]
+fn flatten_rules() {
+  run_golden_test_dir(function_name!(), &|_, code| {
+    let mut book = parse_definition_book(code).map_err(|errs| {
+      let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
+      anyhow::anyhow!(msg)
+    })?;
+    book.flatten_rules();
+    Ok(book.to_string())
+  })
+}
+
+#[test]
 fn error_outputs() {
   let _ = miette::set_hook(Box::new(|_| Box::new(miette::JSONReportHandler::new())));
 

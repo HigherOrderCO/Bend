@@ -63,7 +63,7 @@ impl<'d> TermInfo<'d> {
     let comb_var = Term::Ref { def_id: comb_id };
     let extracted_term = std::mem::replace(term, comb_var);
 
-    let rules = vec![Rule { body: extracted_term, pats: Vec::new() }];
+    let rules = vec![Rule { def_id: comb_id, body: extracted_term, pats: Vec::new() }];
     let rule = Definition { def_id: comb_id, rules };
     self.combinators.insert(comb_id, rule);
   }

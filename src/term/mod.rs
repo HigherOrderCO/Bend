@@ -1,6 +1,7 @@
 use bimap::{BiHashMap, Overwritten};
 use derive_more::{Display, From, Into};
 use hvmc::run::Val;
+use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
 use std::{
   collections::{BTreeMap, HashMap},
@@ -49,6 +50,7 @@ pub struct Definition {
 /// A pattern matching rule of a definition.
 #[derive(Debug, Clone)]
 pub struct Rule {
+  pub def_id: DefId,
   pub pats: Vec<RulePat>,
   pub body: Term,
 }
@@ -354,9 +356,45 @@ impl fmt::Display for LetPat {
   }
 }
 
+impl Rule {
+  pub fn to_string(&self, def_names: &DefNames) -> String {
+    let Rule { def_id, pats, body } = self;
+    format!(
+      "({}{}) = {}",
+      def_names.name(def_id).unwrap(),
+      pats.iter().map(|x| format!(" {x}")).join(""),
+      body.to_string(def_names)
+    )
+  }
+}
+
 impl Definition {
-  pub fn to_string(&self, _def_names: &DefNames) -> String {
-    todo!()
+  pub fn to_string(&self, def_names: &DefNames) -> String {
+    self.rules.iter().map(|x| x.to_string(def_names)).join("\n")
+  }
+}
+
+impl fmt::Display for Book {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.defs.iter().map(|(_, x)| x.to_string(&self.def_names)).join("\n\n"))
+  }
+}
+
+impl From<&RulePat> for Term {
+  fn from(value: &RulePat) -> Self {
+    match value {
+      RulePat::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
+      RulePat::Var(nam) => Term::Var { nam: nam.clone() },
+    }
+  }
+}
+
+impl fmt::Display for RulePat {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      RulePat::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
+      RulePat::Var(nam) => write!(f, "{}", nam),
+    }
   }
 }
 
