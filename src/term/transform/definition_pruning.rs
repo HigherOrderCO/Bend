@@ -57,7 +57,15 @@ impl Term {
           fst.find_used_definitions(used, defs);
           snd.find_used_definitions(used, defs);
         }
-        _ => {}
+        Term::Tup { fst, snd } => {
+          fst.find_used_definitions(used, defs);
+          snd.find_used_definitions(used, defs);
+        }
+        Term::Var { .. } => (),
+        Term::Lnk { .. } => (),
+        Term::Era => (),
+        Term::Num { .. } => (),
+        
       }
     }
   }
