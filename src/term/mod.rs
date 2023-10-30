@@ -259,12 +259,16 @@ impl Term {
       // Only substitute scoped variables.
       Term::Chn { bod, .. } => bod.subst(from, to),
       Term::Lnk { .. } => (),
-      Term::Let { pat, val, nxt } => {
+      Term::Let { pat: LetPat::Var(nam), val, nxt } => {
         val.subst(from, to);
-        if let LetPat::Var(nam) = pat {
-          if nam != from {
-            nxt.subst(from, to);
-          }
+        if nam != from {
+          nxt.subst(from, to);
+        }
+      }
+      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+        val.subst(from, to);
+        if fst.as_ref().map_or(true, |fst| fst != from) && snd.as_ref().map_or(true, |snd| snd != from) {
+          nxt.subst(from, to);
         }
       }
       Term::Match { cond, zero, succ, .. } => {
