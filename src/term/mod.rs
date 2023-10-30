@@ -366,11 +366,19 @@ impl Rule {
       body.to_string(def_names)
     )
   }
+
+  pub fn arity(&self) -> usize {
+    self.pats.len()
+  }
 }
 
 impl Definition {
   pub fn to_string(&self, def_names: &DefNames) -> String {
     self.rules.iter().map(|x| x.to_string(def_names)).join("\n")
+  }
+
+  pub fn arity(&self) -> usize {
+    self.rules[0].arity()
   }
 }
 
