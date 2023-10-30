@@ -56,7 +56,7 @@ fn net_tree_to_hvmc_tree(
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Dup { lab } => Tree::Ctr {
-      lab: (lab + BASE_DUP_HVMC_LABEL) as Tag,
+      lab: lab + BASE_DUP_HVMC_LABEL,
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
