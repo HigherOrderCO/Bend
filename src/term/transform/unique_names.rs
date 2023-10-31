@@ -1,6 +1,6 @@
 // Pass to give all variables in a definition unique names.
 
-use crate::term::*;
+use crate::term::{var_id_to_name, Book, LetPat, Name, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 

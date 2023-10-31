@@ -1,7 +1,5 @@
-use crate::{
-  net::*,
-  term::{net_to_term::NodeKind::*, var_id_to_name, Book, DefId, LetPat, Name, Op, Term, Val},
-};
+use super::{var_id_to_name, Book, DefId, LetPat, Name, Op, Term, Val};
+use crate::net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
