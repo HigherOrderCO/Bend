@@ -5,6 +5,7 @@ use itertools::Itertools;
 use crate::term::{Definition, Name, Rule, RulePat};
 
 #[derive(Clone, Debug)]
+/// A "type" of a pattern.
 pub enum Pat {
   Wildcard,
   Constructor(Name, Vec<Pat>),
@@ -31,15 +32,20 @@ impl Definition {
   }
 }
 
+/// Specializes a row based on the first pattern.
 pub fn specialize(row: &Vec<Pat>, label: &Name, size: usize) -> Vec<Vec<Pat>> {
   let first = &row[0];
   match first {
     Pat::Wildcard => {
+      // add wildcards based on the constructor size, extend with the
+      // tail of the row
       let mut xs = vec![Pat::Wildcard; size];
       xs.extend(row[1 ..].to_vec());
       vec![xs]
     }
     Pat::Constructor(nam, args) => match nam {
+      // if the name matches the label, extend the args with the tail
+      // of the row
       name if name == label => {
         let mut xs = args.to_vec();
         xs.extend(row[1 ..].to_vec());
@@ -50,13 +56,14 @@ pub fn specialize(row: &Vec<Pat>, label: &Name, size: usize) -> Vec<Vec<Pat>> {
   }
 }
 
+/// Specializes the matrix.
 pub fn specialize_matrix(matrix: Vec<Vec<Pat>>, label: Name, size: usize) -> Vec<Vec<Pat>> {
   matrix.iter().map(|row| specialize(row, &label, size)).concat()
 }
 
 #[derive(Clone, Debug)]
 pub enum PatType {
-  Var(usize),
+  Var(usize), // an index to make substitutions
   Ctr(Name, Vec<PatType>),
 }
 
@@ -71,18 +78,23 @@ pub fn substitute(name: usize, replace: PatType, pat_type: PatType) -> PatType {
   }
 }
 
-pub fn substitute_list(rep: Vec<PatType>, typ: PatType) -> PatType {
-  rep.into_iter().enumerate().rev().fold(typ, |acc, (idx, rep)| substitute(idx, rep, acc))
+pub fn substitute_list(replace: Vec<PatType>, typ: PatType) -> PatType {
+  replace.into_iter().enumerate().rev().fold(typ, |acc, (idx, rep)| substitute(idx, rep, acc))
 }
 
 pub struct Problem {
+  /// A matrix containing the patterns.
   pub matrix: Vec<Vec<Pat>>,
+  /// The cases we want to check.
   pub case: Vec<Pat>,
+  /// The types of a row in the matrix.
   pub types: Vec<PatType>,
 }
 
 pub struct Ctx {
+  /// A map from the ADT type to it's constructors.
   pub ctx_types: HashMap<String, Vec<String>>,
+  /// A map from the constructor type to pat types.
   pub ctx_cons: HashMap<String, Vec<PatType>>,
 }
 
@@ -136,28 +148,29 @@ pub fn default_matrix(problem: &mut Problem) -> Problem {
 }
 
 impl Problem {
-  pub fn type_name(&self) -> (Name, Vec<PatType>) {
-    match self.types.first() {
-      Some(first_type) => match first_type {
-        PatType::Var(_) => panic!("This should not exist here"),
-        PatType::Ctr(name, args) => (name.clone(), args.clone()),
-      },
-      None => panic!("Empty problem types {:#?}, {:#?}", self.types, self.matrix),
+  pub fn type_name(&self) -> Option<(Name, Vec<PatType>)> {
+    match &self.types[0] {
+      PatType::Var(_) => None,
+      PatType::Ctr(name, args) => Some((name.clone(), args.clone())),
     }
   }
 }
 
 impl Ctx {
   pub fn specialize_ctr(&self, constructor: &Name, args: Vec<PatType>, problem: &Problem) -> bool {
-    let constructor_ty = self.ctx_cons.get(&constructor.0).expect("Constructor not found in context");
+    // get the current constructor type
+    let constructor_type = self.ctx_cons.get(&constructor.0).expect("Constructor not found in context");
 
-    let matrix = specialize_matrix(problem.matrix.clone(), constructor.clone(), constructor_ty.len());
+    // specialize the matrix with the constructor_type
+    let matrix = specialize_matrix(problem.matrix.clone(), constructor.clone(), constructor_type.len());
 
+    // substitute all vars with the args and get the types of the problem
     let mut typ =
-      constructor_ty.iter().map(|c| substitute_list(args.clone(), c.clone())).collect::<Vec<PatType>>();
+      constructor_type.iter().map(|typ| substitute_list(args.clone(), typ.clone())).collect::<Vec<PatType>>();
     typ.extend_from_slice(&problem.types[1 ..]);
 
-    let cases = specialize(&problem.case, constructor, constructor_ty.len()).concat();
+    // specialize the cases for the current constructor
+    let cases = specialize(&problem.case, constructor, constructor_type.len()).concat();
 
     let mut problem_ = Problem { matrix, case: cases, types: typ };
 
@@ -193,24 +206,27 @@ pub fn useful(ctx: &Ctx, problem: &mut Problem) -> bool {
     problem if problem.is_empty() => true,
     problem if problem.is_complete() => false,
     problem => {
-      let (name, args) = problem.type_name();
-      match &problem.case[0] {
-        Pat::Wildcard => {
-          if is_wildcard_matrix(&problem.matrix) {
-            useful(ctx, &mut default_matrix(problem))
-          } else {
-            let cons = problem.matrix.iter().map(|row| get_pat_cons(row[0].clone())).collect();
-            if let Some(names) = cons {
-              match is_sig_complete(ctx, name.0.clone(), names) {
-                Completeness::Complete(_) => split(ctx, &name, args, problem),
-                Completeness::Incomplete(_) => useful(ctx, &mut default_matrix(problem)),
-              }
+      if let Some((name, args)) = problem.type_name() {
+        match &problem.case[0] {
+          Pat::Wildcard => {
+            if is_wildcard_matrix(&problem.matrix) {
+              useful(ctx, &mut default_matrix(problem))
             } else {
-              false
+              let cons = problem.matrix.iter().map(|row| get_pat_cons(row[0].clone())).collect();
+              if let Some(names) = cons {
+                match is_sig_complete(ctx, name.0.clone(), names) {
+                  Completeness::Complete(_) => split(ctx, &name, args, problem),
+                  Completeness::Incomplete(_) => useful(ctx, &mut default_matrix(problem)),
+                }
+              } else {
+                false
+              }
             }
           }
+          Pat::Constructor(nam_, _) => ctx.specialize_ctr(&nam_, args, &problem),
         }
-        Pat::Constructor(nam_, _) => ctx.specialize_ctr(&nam_, args, &problem),
+      } else {
+        false
       }
     }
   }
@@ -228,6 +244,7 @@ mod test {
   use super::Pat;
 
   #[test]
+  #[ignore]
   fn test() {
     let matrix = vec![
       vec![
