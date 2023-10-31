@@ -3,6 +3,7 @@ use super::{Book, DefId, DefNames, Name, Term};
 pub mod shared_names;
 pub mod unbound_vars;
 pub mod type_check;
+pub mod exhaustiveness;
 
 impl Book {
   pub fn check_has_main(&self) -> anyhow::Result<DefId> {
