@@ -226,7 +226,9 @@ fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let lhs = name().then(rule_pat().repeated().collect()).boxed();
+  let def_name =
+    name().try_map(|Name(nam), span| if nam != "data" { Ok(Name(nam)) } else { Err(Rich::custom(span, "")) });
+  let lhs = def_name.then(rule_pat().repeated().collect()).boxed();
   let lhs = choice((lhs.clone(), lhs.clone().delimited_by(just(Token::LParen), just(Token::RParen))));
 
   lhs
@@ -244,12 +246,15 @@ where
     .then(name().repeated().collect::<Vec<_>>())
     .delimited_by(just(Token::LParen), just(Token::RParen))
     .map(|(nam, args)| (nam, args.len()));
-  let ctr = arity_0.or(arity_n).separated_by(just(Token::Or));
+  let ctr = arity_0.or(arity_n);
 
-  just(Token::Data)
+  let data =
+    name().try_map(|Name(nam), span| if nam == "data" { Ok(()) } else { Err(Rich::custom(span, "")) });
+
+  data
     .ignore_then(name())
     .then_ignore(just(Token::Equals))
-    .then(ctr.collect::<Vec<(Name, usize)>>())
+    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, usize)>>())
     .map(|(name, ctrs)| (name, Adt { ctrs: ctrs.into_iter().collect() }))
 }
 
@@ -257,7 +262,7 @@ fn book<'a, I>() -> impl Parser<'a, I, Book, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let top_level = choice((rule().map(|x| TopLevel::Rule(x)), datatype().map(|x| TopLevel::Adt(x))));
+  let top_level = choice((datatype().map(|x| TopLevel::Adt(x)), rule().map(|x| TopLevel::Rule(x))));
 
   top_level.repeated().collect::<Vec<_>>().try_map(|program, span| {
     let mut book = Book::new();

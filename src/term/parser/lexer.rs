@@ -22,9 +22,6 @@ pub enum Token {
   #[token("match")]
   Match,
 
-  #[token("data")]
-  Data,
-
   #[token("=")]
   Equals,
 
@@ -165,7 +162,6 @@ impl fmt::Display for Token {
       Self::Let => write!(f, "let"),
       Self::Dup => write!(f, "dup"),
       Self::Match => write!(f, "match"),
-      Self::Data => write!(f, "data"),
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),
       Self::Add => write!(f, "+"),
