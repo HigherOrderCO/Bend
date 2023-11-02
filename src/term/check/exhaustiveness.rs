@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use itertools::Itertools;
 
-use crate::term::{Definition, Name, Rule, RulePat};
+use crate::term::{Book, Definition, Name, Rule, RulePat};
+
+use super::type_check::Type;
 
 type Row = Vec<RulePat>;
 type Matrix = Vec<Row>;
@@ -189,7 +191,7 @@ fn is_wildcard_matrix(matrix: &Matrix) -> bool {
   matrix.iter().all(is_wildcard_row)
 }
 
-pub fn useful(ctx: &Ctx, problem: &mut Problem) -> bool {
+fn useful(ctx: &Ctx, problem: &mut Problem) -> bool {
   match problem {
     // if the matrix has 0 columns and 0 rows the case is useful
     // to the matrix
@@ -210,7 +212,11 @@ pub fn useful(ctx: &Ctx, problem: &mut Problem) -> bool {
               // get the default matrix and check again
               useful(ctx, &mut default_matrix(problem))
             } else {
-              let cons = problem.matrix.iter().map(|row| get_pat_ctr_name(row[0].clone())).collect();
+              let mut cons: Option<Vec<String>> =
+                problem.matrix.iter().map(|row| get_pat_ctr_name(row[0].clone())).collect();
+              if cons.is_none() {
+                cons = Some(vec![]);
+              }
               if let Some(names) = cons {
                 match is_sig_complete(ctx, name.0.clone(), names) {
                   // if the signature is complete then split based on the type
@@ -234,18 +240,160 @@ pub fn useful(ctx: &Ctx, problem: &mut Problem) -> bool {
   }
 }
 
+impl Book {
+  pub fn check_exhaustiveness(&self) -> anyhow::Result<()> {
+    let typed_defs = self.typed_defs()?;
+
+    for def in self.defs.values() {
+      if let Some(def_types) = typed_defs.get(&def.def_id) {
+        // get the type of each argument
+        let types = def_types
+          .into_iter()
+          .map(|t| match t {
+            Type::Any => todo!(),
+            Type::Adt(name) => RulePat::Ctr(name.clone(), vec![]),
+          })
+          .collect::<Vec<RulePat>>();
+
+        let matrix = def.get_matrix();
+        let rule_arity = def.rules[0].arity();
+        // this is the default case to check if a definition is exhaustive
+        let case = vec![wildcard(); rule_arity];
+
+        // ctx_cons, ex: [Ctr("T"), Ctr("F")]
+        let mut ctx_cons = HashMap::<String, Vec<RulePat>>::new();
+        for t in &types {
+          match t {
+            RulePat::Var(..) => todo!(),
+            RulePat::Ctr(nam, ..) => {
+              let adt = self.adts.get(nam).unwrap();
+              for ctr in adt.ctrs.keys() {
+                ctx_cons.insert(ctr.0.clone(), vec![]);
+              }
+            }
+          }
+        }
+
+        // ctx_types, ex: [("Bool", ["T", "F"])]
+        let mut ctx_types = HashMap::<String, Vec<String>>::new();
+        for t in ctx_cons.keys() {
+          if let Some(adt_nam) = self.ctrs.get(t) {
+            if let Some(k) = ctx_types.get_mut(&adt_nam.0) {
+              k.push(t.clone());
+            } else {
+              ctx_types.insert(adt_nam.0.clone(), vec![t.clone()]);
+            }
+          }
+        }
+
+        let mut problem = Problem { matrix, case, types };
+
+        let ctx = Ctx { ctx_types, ctx_cons };
+
+        // if is useful that means that the rule is not exhaustive
+        if useful(&ctx, &mut problem) {
+          let def_name = self.def_names.map.get_by_left(&def.def_id).unwrap();
+
+          return Err(anyhow::anyhow!("The definition '{def_name}' is not exhaustive."));
+        }
+      }
+    }
+
+    Ok(())
+  }
+}
+
 #[cfg(test)]
 mod test {
   use std::collections::HashMap;
 
   use crate::term::{
     check::exhaustiveness::{useful, wildcard, Ctx, Problem},
+    parser::parse_definition_book,
     Name,
     RulePat::{self, *},
   };
 
   fn ctr(name: &str) -> RulePat {
     Ctr(Name(String::from(name)), vec![])
+  }
+
+  #[test]
+  fn definition_foo_is_not_exhaustive() {
+    let code = r"
+    data Bool = T | F
+
+    foo (T) = 0
+    ";
+    let book = parse_definition_book(code);
+    match book {
+      Ok(mut book) => {
+        book.flatten_rules();
+        let err = book.check_exhaustiveness().unwrap_err();
+        assert_eq!(format!("{}", err), "The definition 'foo' is not exhaustive.")
+      }
+      Err(_) => assert!(false),
+    }
+  }
+
+  #[test]
+  fn definition_and_is_not_exhaustive() {
+    let code = r"
+    data Bool = T | F
+
+    and (T) (T) = (T)
+    and _   (F) = (F)
+    ";
+    let book = parse_definition_book(code);
+    match book {
+      Ok(mut book) => {
+        book.flatten_rules();
+        let err = book.check_exhaustiveness().unwrap_err();
+        assert_eq!(format!("{}", err), "The definition 'and' is not exhaustive.")
+      }
+      Err(_) => assert!(false),
+    }
+  }
+
+  #[test]
+  fn definition_and_is_exhaustive() {
+    let code = r"
+    data Bool = T | F
+
+    and (T) (T) = (T)
+    and _   _   = (F)
+    ";
+    let book = parse_definition_book(code);
+    match book {
+      Ok(mut book) => {
+        book.flatten_rules();
+        let ok = book.check_exhaustiveness().unwrap();
+        assert_eq!((), ok)
+      }
+      Err(_) => assert!(false),
+    }
+  }
+
+  #[test]
+  fn definitions_are_exhaustive() {
+    let code = r"
+    data Bool = T | F
+
+    not (T) = (F)
+    not _   = (T)
+
+    and (T) (T) = (T)
+    and _   _   = (F)
+    ";
+    let book = parse_definition_book(code);
+    match book {
+      Ok(mut book) => {
+        book.flatten_rules();
+        let ok = book.check_exhaustiveness().unwrap();
+        assert_eq!((), ok)
+      }
+      Err(_) => assert!(false),
+    }
   }
 
   #[test]
