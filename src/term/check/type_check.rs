@@ -9,12 +9,13 @@ pub enum Type {
   Adt(Name),
 }
 
-type TypedDefinitions = HashMap<DefId, Vec<Type>>;
+pub type DefinitionTypes = HashMap<DefId, Vec<Type>>;
 
 impl Book {
-  /// Returns a HashMap from the definition id to the inferred pattern types.
-  pub fn typed_defs(&self) -> anyhow::Result<TypedDefinitions> {
-    let mut typed_defs = HashMap::new();
+  /// Returns a HashMap from the definition id to the inferred pattern types
+  /// and checks the rules arities based on the first rule arity.
+  pub fn type_check(&self) -> anyhow::Result<DefinitionTypes> {
+    let mut def_types = HashMap::new();
 
     for def in self.defs.values() {
       let current_arity = def.arity();
@@ -43,10 +44,10 @@ impl Book {
           }
         }
       }
-      typed_defs.insert(def.def_id, arg_types);
+      def_types.insert(def.def_id, arg_types);
     }
 
-    Ok(typed_defs)
+    Ok(def_types)
   }
 }
 

@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use itertools::Itertools;
 
-use crate::term::{Book, Definition, Name, Rule, RulePat};
+use crate::term::{Adt, Book, Definition, Name, Rule, RulePat};
 
-use super::type_check::Type;
+use super::type_check::{DefinitionTypes, Type};
 
 type Row = Vec<RulePat>;
 type Matrix = Vec<Row>;
@@ -25,7 +25,8 @@ fn wildcard() -> RulePat {
   RulePat::Var(Name(String::from("_")))
 }
 
-/// Specializes a row based on the first pattern.
+/// Specializes a row based on the first pattern to discover if it is
+/// exhaustive for the given label.
 fn specialize(row: &Row, label: &Name, size: usize) -> Matrix {
   let first = &row[0];
   match first {
@@ -44,28 +45,8 @@ fn specialize(row: &Row, label: &Name, size: usize) -> Matrix {
   }
 }
 
-fn specialize_matrix(matrix: Matrix, label: Name, size: usize) -> Matrix {
-  matrix.iter().map(|row| specialize(row, &label, size)).concat()
-}
-
-// applies a substitution based on the var name
-fn substitute(name: Name, to: RulePat, from: RulePat) -> RulePat {
-  match from {
-    RulePat::Ctr(nam, args) => {
-      let args = args.iter().map(|arg| substitute(name.clone(), to.clone(), arg.clone())).collect();
-      RulePat::Ctr(nam, args)
-    }
-    RulePat::Var(nam) if nam == name => to,
-    RulePat::Var(..) => from,
-  }
-}
-
-fn idx_to_name(idx: usize) -> Name {
-  Name(idx.to_string())
-}
-
-fn substitute_list(list: Vec<RulePat>, typ: RulePat) -> RulePat {
-  list.into_iter().enumerate().rev().fold(typ, |acc, (idx, rep)| substitute(idx_to_name(idx), rep, acc))
+fn specialize_matrix(matrix: Matrix, label: &Name, size: usize) -> Matrix {
+  matrix.iter().map(|row| specialize(row, label, size)).concat()
 }
 
 pub struct Problem {
@@ -79,9 +60,10 @@ pub struct Problem {
 
 pub struct Ctx {
   /// A map from the ADT type to its constructors.
-  pub ctx_types: HashMap<String, Vec<String>>,
-  /// A map from the constructor type to pat types.
-  pub ctx_cons: HashMap<String, Vec<RulePat>>,
+  // pub ctx_types: HashMap<String, Vec<String>>,
+  pub ctx_types: HashMap<Name, Adt>,
+  /// A map from the constructor to its arity.
+  pub ctx_cons: BTreeMap<Name, usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -100,10 +82,11 @@ fn get_pat_ctr_name(pat: RulePat) -> Option<String> {
 // with the completeness of the signature we discover if we
 // need to specialize or not the matrix.
 // if the column contains all names in a set of constructors
-// then the signature is complete
+// then the signature is complete.
 fn is_sig_complete(ctx: &Ctx, type_name: String, names: Vec<String>) -> Completeness {
   if let Some(ctors) = ctx.ctx_types.get(&type_name) {
-    let missing: Vec<String> = ctors.iter().filter(|n| !names.contains(n)).cloned().collect();
+    let ctrs = ctors.ctrs.keys().clone();
+    let missing = ctrs.map(|n| n.0.clone()).filter(|n| !names.contains(&n)).collect::<Vec<_>>();
 
     if missing.is_empty() { Completeness::Complete(names) } else { Completeness::Incomplete(missing) }
   } else {
@@ -139,31 +122,28 @@ fn default_matrix(problem: &mut Problem) -> Problem {
 }
 
 impl Problem {
-  pub fn type_name(&self) -> Option<(Name, Vec<RulePat>)> {
+  pub fn type_name(&self) -> Option<Name> {
     match &self.types[0] {
       RulePat::Var(..) => None,
-      RulePat::Ctr(name, args) => Some((name.clone(), args.clone())),
+      RulePat::Ctr(name, ..) => Some(name.clone()),
     }
   }
 }
 
 impl Ctx {
-  pub fn specialize_ctr(&self, constructor: &Name, args: Vec<RulePat>, problem: &Problem) -> bool {
+  pub fn specialize_ctr(&self, constructor: &Name, problem: &Problem) -> bool {
     // get the current constructor type
-    let constructor_type = self.ctx_cons.get(&constructor.0).expect("Constructor not found in context");
+    let cons_arity = self.ctx_cons.get(constructor).expect("Constructor not found in context");
 
     // specialize the matrix with the constructor_type
-    let matrix = specialize_matrix(problem.matrix.clone(), constructor.clone(), constructor_type.len());
+    let matrix = specialize_matrix(problem.matrix.clone(), constructor, *cons_arity);
 
-    // substitute all vars with the args and get the types of the problem
-    let mut typ =
-      constructor_type.iter().map(|typ| substitute_list(args.clone(), typ.clone())).collect::<Vec<RulePat>>();
-    typ.extend_from_slice(&problem.types[1 ..]);
+    let types = problem.types[1 ..].to_vec();
 
     // specialize the cases for the current constructor
-    let cases = specialize(&problem.case, constructor, constructor_type.len()).concat();
+    let cases = specialize(&problem.case, constructor, *cons_arity).concat();
 
-    let mut problem_ = Problem { matrix, case: cases, types: typ };
+    let mut problem_ = Problem { matrix, case: cases, types };
 
     useful(self, &mut problem_)
   }
@@ -171,12 +151,9 @@ impl Ctx {
 
 // if a signature is complete, we split and specialize the matrix
 // into new problems for each constructor of a type
-fn split(ctx: &Ctx, typ: &Name, args: Vec<RulePat>, problem: &Problem) -> bool {
-  if let Some(typ) = ctx.ctx_types.get(&typ.0) {
-    typ.iter().any(|label| ctx.specialize_ctr(&Name(label.clone()), args.clone(), problem))
-  } else {
-    false
-  }
+fn split(ctx: &Ctx, typ: &Name, problem: &Problem) -> bool {
+  let adt = ctx.ctx_types.get(typ).expect("Type not found in context");
+  adt.ctrs.iter().any(|(label, _)| ctx.specialize_ctr(label, problem))
 }
 
 fn is_wildcard(pat: &RulePat) -> bool {
@@ -203,94 +180,78 @@ fn useful(ctx: &Ctx, problem: &mut Problem) -> bool {
 
     problem => {
       // take the types of the patterns
-      if let Some((name, args)) = problem.type_name() {
-        match &problem.case[0] {
-          // if it is a wildcard/var
-          RulePat::Var(..) => {
-            if is_wildcard_matrix(&problem.matrix) {
-              // if all patterns of the first column are wildcards then
-              // get the default matrix and check again
-              useful(ctx, &mut default_matrix(problem))
-            } else {
-              let mut cons: Option<Vec<String>> =
-                problem.matrix.iter().map(|row| get_pat_ctr_name(row[0].clone())).collect();
-              if cons.is_none() {
-                cons = Some(vec![]);
-              }
-              if let Some(names) = cons {
+      match problem.type_name() {
+        None => false,
+        Some(name) => {
+          match &problem.case[0] {
+            // if it is a wildcard/var
+            RulePat::Var(..) => {
+              if is_wildcard_matrix(&problem.matrix) {
+                // if all patterns of the first column are wildcards then
+                // get the default matrix and check again
+                useful(ctx, &mut default_matrix(problem))
+              } else {
+                let names = problem
+                  .matrix
+                  .iter()
+                  .map(|row| get_pat_ctr_name(row[0].clone()))
+                  .collect::<Option<Vec<String>>>()
+                  .unwrap_or_default();
+
                 match is_sig_complete(ctx, name.0.clone(), names) {
                   // if the signature is complete then split based on the type
-                  Completeness::Complete(_) => split(ctx, &name, args, problem),
+                  Completeness::Complete(_) => split(ctx, &name, problem),
                   // if the signature of the first pattern is incomplete then get the default matrix
                   // and check again
                   Completeness::Incomplete(_) => useful(ctx, &mut default_matrix(problem)),
                 }
-              } else {
-                false
               }
             }
+            // if it is a constructor we specialize this constructor case
+            RulePat::Ctr(nam_, ..) => ctx.specialize_ctr(&nam_, &problem),
           }
-          // if it is a constructor we specialize this constructor case
-          RulePat::Ctr(nam_, ..) => ctx.specialize_ctr(&nam_, args, &problem),
         }
-      } else {
-        false
       }
     }
   }
 }
 
 impl Book {
-  pub fn check_exhaustiveness(&self) -> anyhow::Result<()> {
-    let typed_defs = self.typed_defs()?;
-
+  pub fn check_exhaustiveness(&self, def_types: &DefinitionTypes) -> anyhow::Result<()> {
     for def in self.defs.values() {
-      if let Some(def_types) = typed_defs.get(&def.def_id) {
+      if let Some(def_types) = def_types.get(&def.def_id) {
         // get the type of each argument
         let types = def_types
           .into_iter()
           .map(|t| match t {
-            Type::Any => todo!(),
+            Type::Any => wildcard(),
             Type::Adt(name) => RulePat::Ctr(name.clone(), vec![]),
           })
           .collect::<Vec<RulePat>>();
 
         let matrix = def.get_matrix();
-        let rule_arity = def.rules[0].arity();
+        let def_arity = def.arity();
         // this is the default case to check if a definition is exhaustive
-        let case = vec![wildcard(); rule_arity];
+        let case = vec![wildcard(); def_arity];
 
-        // ctx_cons, ex: [Ctr("T"), Ctr("F")]
-        let mut ctx_cons = HashMap::<String, Vec<RulePat>>::new();
+        // ctx_cons, ex: [Ctr("Nil", 0), Ctr("Cons", 2)]
+        let mut ctx_cons = BTreeMap::<Name, usize>::new();
         for t in &types {
           match t {
-            RulePat::Var(..) => todo!(),
+            RulePat::Var(..) => {}
             RulePat::Ctr(nam, ..) => {
-              let adt = self.adts.get(nam).unwrap();
-              for ctr in adt.ctrs.keys() {
-                ctx_cons.insert(ctr.0.clone(), vec![]);
-              }
-            }
-          }
-        }
-
-        // ctx_types, ex: [("Bool", ["T", "F"])]
-        let mut ctx_types = HashMap::<String, Vec<String>>::new();
-        for t in ctx_cons.keys() {
-          if let Some(adt_nam) = self.ctrs.get(t) {
-            if let Some(k) = ctx_types.get_mut(&adt_nam.0) {
-              k.push(t.clone());
-            } else {
-              ctx_types.insert(adt_nam.0.clone(), vec![t.clone()]);
+              let adt = self.adts.get(nam).cloned().unwrap();
+              ctx_cons.extend(adt.ctrs);
             }
           }
         }
 
         let mut problem = Problem { matrix, case, types };
 
+        let ctx_types = self.adts.clone();
         let ctx = Ctx { ctx_types, ctx_cons };
 
-        // if is useful that means that the rule is not exhaustive
+        // if the case is useful that means that the rule is not exhaustive
         if useful(&ctx, &mut problem) {
           let def_name = self.def_names.map.get_by_left(&def.def_id).unwrap();
 
@@ -305,17 +266,70 @@ impl Book {
 
 #[cfg(test)]
 mod test {
-  use std::collections::HashMap;
+  use std::collections::{BTreeMap, HashMap};
 
   use crate::term::{
     check::exhaustiveness::{useful, wildcard, Ctx, Problem},
     parser::parse_definition_book,
-    Name,
+    Adt, Name,
     RulePat::{self, *},
   };
 
   fn ctr(name: &str) -> RulePat {
     Ctr(Name(String::from(name)), vec![])
+  }
+
+  fn bool_ctx() -> HashMap<Name, Adt> {
+    HashMap::from([(Name::new("Bool"), Adt {
+      ctrs: BTreeMap::from([(Name::new("T"), 0), (Name::new("F"), 0)]),
+    })])
+  }
+
+  #[test]
+  fn definition_bar_is_exhaustive() {
+    let code = r"
+    data List
+      = (Cons x xs)
+      | Nil
+    data Bool = T | F
+
+    bar (Cons (T) xs) = 2
+    bar (Cons (F) xs) = 1
+    bar (Nil)         = 0
+    ";
+    let book = parse_definition_book(code);
+    match book {
+      Ok(mut book) => {
+        book.flatten_rules();
+        let def_types = book.type_check().unwrap();
+        let ok = book.check_exhaustiveness(&def_types).unwrap();
+        assert_eq!(ok, ok)
+      }
+      Err(_) => assert!(false),
+    }
+  }
+
+  #[test]
+  fn definition_bar_flattened_is_not_exhaustive() {
+    let code = r"
+    data List
+      = (Cons x xs)
+      | Nil
+    data Bool = T | F
+
+    bar (Cons (T) xs) = (Cons (F) (Nil))
+    bar (Nil)         = (Nil)
+    ";
+    let book = parse_definition_book(code);
+    match book {
+      Ok(mut book) => {
+        book.flatten_rules();
+        let def_types = book.type_check().unwrap();
+        let err = book.check_exhaustiveness(&def_types).unwrap_err();
+        assert_eq!(format!("{}", err), "The definition 'bar$0$' is not exhaustive.")
+      }
+      Err(_) => assert!(false),
+    }
   }
 
   #[test]
@@ -329,7 +343,8 @@ mod test {
     match book {
       Ok(mut book) => {
         book.flatten_rules();
-        let err = book.check_exhaustiveness().unwrap_err();
+        let def_types = book.type_check().unwrap();
+        let err = book.check_exhaustiveness(&def_types).unwrap_err();
         assert_eq!(format!("{}", err), "The definition 'foo' is not exhaustive.")
       }
       Err(_) => assert!(false),
@@ -348,7 +363,8 @@ mod test {
     match book {
       Ok(mut book) => {
         book.flatten_rules();
-        let err = book.check_exhaustiveness().unwrap_err();
+        let def_types = book.type_check().unwrap();
+        let err = book.check_exhaustiveness(&def_types).unwrap_err();
         assert_eq!(format!("{}", err), "The definition 'and' is not exhaustive.")
       }
       Err(_) => assert!(false),
@@ -367,7 +383,8 @@ mod test {
     match book {
       Ok(mut book) => {
         book.flatten_rules();
-        let ok = book.check_exhaustiveness().unwrap();
+        let def_types = book.type_check().unwrap();
+        let ok = book.check_exhaustiveness(&def_types).unwrap();
         assert_eq!((), ok)
       }
       Err(_) => assert!(false),
@@ -389,7 +406,8 @@ mod test {
     match book {
       Ok(mut book) => {
         book.flatten_rules();
-        let ok = book.check_exhaustiveness().unwrap();
+        let def_types = book.type_check().unwrap();
+        let ok = book.check_exhaustiveness(&def_types).unwrap();
         assert_eq!((), ok)
       }
       Err(_) => assert!(false),
@@ -412,8 +430,8 @@ mod test {
     let mut problem = Problem { matrix, case, types };
 
     let ctx = Ctx {
-      ctx_types: HashMap::from([("Bool".to_string(), vec!["T".to_string(), "F".to_string()])]),
-      ctx_cons: HashMap::from([("T".to_string(), vec![]), ("F".to_string(), vec![])]),
+      ctx_types: bool_ctx(),
+      ctx_cons: BTreeMap::from([(Name::new("T"), 0), (Name::new("F"), 0)]),
     };
 
     let is_useful = useful(&ctx, &mut problem);
@@ -433,8 +451,8 @@ mod test {
     let mut problem = Problem { matrix, case, types };
 
     let ctx = Ctx {
-      ctx_types: HashMap::from([("Bool".to_string(), vec!["T".to_string(), "F".to_string()])]),
-      ctx_cons: HashMap::from([("T".to_string(), vec![]), ("F".to_string(), vec![])]),
+      ctx_types: bool_ctx(),
+      ctx_cons: BTreeMap::from([(Name::new("T"), 0), (Name::new("F"), 0)]),
     };
 
     let is_useful = useful(&ctx, &mut problem);
@@ -453,8 +471,8 @@ mod test {
     let mut problem = Problem { matrix, case, types };
 
     let ctx = Ctx {
-      ctx_types: HashMap::from([("Bool".to_string(), vec!["T".to_string(), "F".to_string()])]),
-      ctx_cons: HashMap::from([("T".to_string(), vec![]), ("F".to_string(), vec![])]),
+      ctx_types: bool_ctx(),
+      ctx_cons: BTreeMap::from([(Name::new("T"), 0), (Name::new("F"), 0)]),
     };
 
     let is_useful = useful(&ctx, &mut problem);
