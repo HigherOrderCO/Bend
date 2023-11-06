@@ -100,7 +100,6 @@ fn matches_together(a: &Rule, b: &Rule) -> bool {
 /// The new extracted definition might still have nested patterns,
 /// so we flatten those until all patterns have only 1 layer of pattern matching.
 /// Those recursive flattening steps return a vector of new subdefinitions which are also returned here.
-/// If we encounter
 fn split_rule(
   rules: &[Rule],
   rule_idx: usize,
