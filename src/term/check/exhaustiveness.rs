@@ -22,7 +22,7 @@ impl Definition {
 }
 
 fn wildcard() -> RulePat {
-  RulePat::Var(Name(String::from("_")))
+  RulePat::Var(Name::new("_"))
 }
 
 /// Specializes a row based on the first pattern to discover if it is
@@ -45,7 +45,7 @@ fn specialize(row: &Row, label: &Name, size: usize) -> Matrix {
   }
 }
 
-fn specialize_matrix(matrix: Matrix, label: &Name, size: usize) -> Matrix {
+fn specialize_matrix(matrix: &Matrix, label: &Name, size: usize) -> Matrix {
   matrix.iter().map(|row| specialize(row, label, size)).concat()
 }
 
@@ -60,7 +60,6 @@ pub struct Problem {
 
 pub struct Ctx {
   /// A map from the ADT type to its constructors.
-  // pub ctx_types: HashMap<String, Vec<String>>,
   pub ctx_types: HashMap<Name, Adt>,
   /// A map from the constructor to its arity.
   pub ctx_cons: BTreeMap<Name, usize>,
@@ -83,8 +82,8 @@ fn get_pat_ctr_name(pat: RulePat) -> Option<String> {
 // need to specialize or not the matrix.
 // if the column contains all names in a set of constructors
 // then the signature is complete.
-fn is_sig_complete(ctx: &Ctx, type_name: String, names: Vec<String>) -> Completeness {
-  if let Some(ctors) = ctx.ctx_types.get(&type_name) {
+fn is_sig_complete(ctx: &Ctx, type_name: &Name, names: Vec<String>) -> Completeness {
+  if let Some(ctors) = ctx.ctx_types.get(type_name) {
     let ctrs = ctors.ctrs.keys().clone();
     let missing = ctrs.map(|n| n.0.clone()).filter(|n| !names.contains(&n)).collect::<Vec<_>>();
 
@@ -136,7 +135,7 @@ impl Ctx {
     let cons_arity = self.ctx_cons.get(constructor).expect("Constructor not found in context");
 
     // specialize the matrix with the constructor_type
-    let matrix = specialize_matrix(problem.matrix.clone(), constructor, *cons_arity);
+    let matrix = specialize_matrix(&problem.matrix, constructor, *cons_arity);
 
     let types = problem.types[1 ..].to_vec();
 
@@ -198,7 +197,7 @@ fn useful(ctx: &Ctx, problem: &mut Problem) -> bool {
                   .collect::<Option<Vec<String>>>()
                   .unwrap_or_default();
 
-                match is_sig_complete(ctx, name.0.clone(), names) {
+                match is_sig_complete(ctx, &name, names) {
                   // if the signature is complete then split based on the type
                   Completeness::Complete(_) => split(ctx, &name, problem),
                   // if the signature of the first pattern is incomplete then get the default matrix
