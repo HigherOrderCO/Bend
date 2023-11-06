@@ -57,6 +57,13 @@ fn token_stream(
 
 // Parsers
 
+fn soft_keyword<'a, I>(keyword: &'a str) -> impl Parser<'a, I, (), extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  name().try_map(move |Name(nam), span| if nam == keyword { Ok(()) } else { Err(Rich::custom(span, "")) })
+}
+
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -248,8 +255,7 @@ where
     .map(|(nam, args)| (nam, args.len()));
   let ctr = arity_0.or(arity_n);
 
-  let data =
-    name().try_map(|Name(nam), span| if nam == "data" { Ok(()) } else { Err(Rich::custom(span, "")) });
+  let data = soft_keyword("data");
 
   data
     .ignore_then(name())
