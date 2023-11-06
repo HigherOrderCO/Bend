@@ -89,7 +89,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
       Ref { def_id } => {
         if book.is_generated_def(def_id) {
           let def = book.defs.get(&def_id).unwrap();
-          if def.rules.len() > 0 {
+          if def.rules.len() > 1 {
             panic!("What to do in this case?");
           }
           let mut term = def.rules[0].body.clone();
@@ -552,7 +552,7 @@ impl Term {
       Term::Ref { def_id } => {
         if book.is_generated_def(*def_id) {
           let def = book.defs.get(def_id).unwrap();
-          if def.rules.len() > 0 {
+          if def.rules.len() > 1 {
             panic!("What to do in this case?");
           }
           let mut term = def.rules[0].body.clone();
