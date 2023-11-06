@@ -329,8 +329,8 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
       Ref { def_id } => {
         if book.is_generated_def(def_id) {
           let def = book.defs.get(&def_id).unwrap();
-          if def.rules.len() > 0 {
-            panic!("What to do in this case?");
+          if def.rules.len() > 1 {
+            unreachable!();
           }
           let mut term = def.rules[0].body.clone();
           term.fix_names(id_counter, book);
@@ -553,7 +553,7 @@ impl Term {
         if book.is_generated_def(*def_id) {
           let def = book.defs.get(def_id).unwrap();
           if def.rules.len() > 1 {
-            panic!("What to do in this case?");
+            unreachable!();
           }
           let mut term = def.rules[0].body.clone();
           term.fix_names(id_counter, book);

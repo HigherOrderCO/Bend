@@ -300,9 +300,9 @@ mod test {
     match book {
       Ok(mut book) => {
         book.flatten_rules();
-        let def_types = book.type_check().unwrap();
+        let def_types = book.infer_def_types().unwrap();
         let ok = book.check_exhaustiveness(&def_types).unwrap();
-        assert_eq!(ok, ok)
+        assert_eq!((), ok)
       }
       Err(_) => assert!(false),
     }
@@ -323,7 +323,7 @@ mod test {
     match book {
       Ok(mut book) => {
         book.flatten_rules();
-        let def_types = book.type_check().unwrap();
+        let def_types = book.infer_def_types().unwrap();
         let err = book.check_exhaustiveness(&def_types).unwrap_err();
         assert_eq!(format!("{}", err), "The definition 'bar$0$' is not exhaustive.")
       }
@@ -342,7 +342,7 @@ mod test {
     match book {
       Ok(mut book) => {
         book.flatten_rules();
-        let def_types = book.type_check().unwrap();
+        let def_types = book.infer_def_types().unwrap();
         let err = book.check_exhaustiveness(&def_types).unwrap_err();
         assert_eq!(format!("{}", err), "The definition 'foo' is not exhaustive.")
       }
@@ -362,7 +362,7 @@ mod test {
     match book {
       Ok(mut book) => {
         book.flatten_rules();
-        let def_types = book.type_check().unwrap();
+        let def_types = book.infer_def_types().unwrap();
         let err = book.check_exhaustiveness(&def_types).unwrap_err();
         assert_eq!(format!("{}", err), "The definition 'and' is not exhaustive.")
       }
@@ -382,7 +382,7 @@ mod test {
     match book {
       Ok(mut book) => {
         book.flatten_rules();
-        let def_types = book.type_check().unwrap();
+        let def_types = book.infer_def_types().unwrap();
         let ok = book.check_exhaustiveness(&def_types).unwrap();
         assert_eq!((), ok)
       }
@@ -405,7 +405,7 @@ mod test {
     match book {
       Ok(mut book) => {
         book.flatten_rules();
-        let def_types = book.type_check().unwrap();
+        let def_types = book.infer_def_types().unwrap();
         let ok = book.check_exhaustiveness(&def_types).unwrap();
         assert_eq!((), ok)
       }
