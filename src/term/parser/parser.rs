@@ -233,9 +233,7 @@ fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let def_name =
-    name().try_map(|Name(nam), span| if nam != "data" { Ok(Name(nam)) } else { Err(Rich::custom(span, "")) });
-  let lhs = def_name.then(rule_pat().repeated().collect()).boxed();
+  let lhs = name().then(rule_pat().repeated().collect()).boxed();
   let lhs = choice((lhs.clone(), lhs.clone().delimited_by(just(Token::LParen), just(Token::RParen))));
 
   lhs
