@@ -1,17 +1,19 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::term::{DefId, Definition, DefinitionBook, Term};
+use crate::term::{Book, DefId, Definition, Term};
 
 type Definitions = HashSet<DefId>;
 
-impl DefinitionBook {
+impl Book {
   /// Removes all unused definitions starting from Main.
   pub fn prune(&mut self, main: DefId) {
     let mut used = Definitions::new();
 
-    let Definition { def_id, body } = self.defs.get(&main).unwrap();
+    let Definition { def_id, rules } = self.defs.get(&main).unwrap();
     used.insert(*def_id);
-    body.find_used_definitions(&mut used, &self.defs);
+    for rule in rules {
+      rule.body.find_used_definitions(&mut used, &self.defs);
+    }
 
     self.defs.retain(|def_id, _| used.contains(def_id));
     self.def_names.map.retain(|def_id, _| used.contains(def_id));
@@ -27,8 +29,10 @@ impl Term {
       match term {
         Term::Ref { def_id } => {
           if used.insert(*def_id) {
-            let Definition { body, .. } = defs.get(def_id).unwrap();
-            to_visit.push(body);
+            let Definition { rules, .. } = defs.get(def_id).unwrap();
+            for rule in rules {
+              to_visit.push(&rule.body);
+            }
           }
         }
         Term::Let { val, nxt, .. } => {
@@ -65,7 +69,6 @@ impl Term {
         Term::Lnk { .. } => (),
         Term::Era => (),
         Term::Num { .. } => (),
-        
       }
     }
   }

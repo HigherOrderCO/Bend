@@ -34,11 +34,17 @@ pub enum NodeKind {
   /// Lambdas and applications
   Con,
   Tup,
-  Dup { lab: u8 },
+  Dup {
+    lab: u8,
+  },
   /// Reference to function definitions
-  Ref { def_id: DefId },
+  Ref {
+    def_id: DefId,
+  },
   /// Numbers
-  Num { val: Val },
+  Num {
+    val: Val,
+  },
   /// Numeric operations
   Op2,
   /// Pattern matching on numbers

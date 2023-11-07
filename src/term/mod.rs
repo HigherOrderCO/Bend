@@ -1,8 +1,12 @@
 use bimap::{BiHashMap, Overwritten};
 use derive_more::{Display, From, Into};
 use hvmc::run::Val;
+use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
-use std::{collections::BTreeMap, fmt};
+use std::{
+  collections::{BTreeMap, HashMap},
+  fmt,
+};
 
 pub mod check;
 pub mod load_book;
@@ -14,22 +18,47 @@ pub mod transform;
 pub use net_to_term::net_to_term_linear;
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
+/// The representation of a program.
+#[derive(Debug, Clone, Default)]
+pub struct Book {
+  /// Mapping of definition names to ids.
+  pub def_names: DefNames,
+
+  /// The function definitions.
+  pub defs: BTreeMap<DefId, Definition>,
+
+  /// The algebraic datatypes defined by the program
+  pub adts: HashMap<Name, Adt>,
+
+  /// To which type does each constructor belong to.
+  pub ctrs: HashMap<Name, Name>,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
   map: BiHashMap<DefId, Name>,
   id_count: DefId,
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct DefinitionBook {
-  pub def_names: DefNames,
-  pub defs: BTreeMap<DefId, Definition>,
-}
-
+/// A pattern matching function definition.
 #[derive(Debug, Clone)]
 pub struct Definition {
   pub def_id: DefId,
+  pub rules: Vec<Rule>,
+}
+
+/// A pattern matching rule of a definition.
+#[derive(Debug, Clone)]
+pub struct Rule {
+  pub def_id: DefId,
+  pub pats: Vec<RulePat>,
   pub body: Term,
+}
+
+#[derive(Debug, Clone)]
+pub enum RulePat {
+  Var(Name),
+  Ctr(Name, Vec<RulePat>),
 }
 
 #[derive(Debug, Clone)]
@@ -118,6 +147,12 @@ pub enum Op {
   RSH,
 }
 
+/// A user defined  datatype
+#[derive(Debug, Clone, Default)]
+pub struct Adt {
+  pub ctrs: BTreeMap<Name, usize>,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
 pub struct Name(pub String);
 
@@ -157,7 +192,7 @@ impl DefId {
   }
 }
 
-impl DefinitionBook {
+impl Book {
   pub fn new() -> Self {
     Default::default()
   }
@@ -321,10 +356,53 @@ impl fmt::Display for LetPat {
   }
 }
 
+impl Rule {
+  pub fn to_string(&self, def_names: &DefNames) -> String {
+    let Rule { def_id, pats, body } = self;
+    format!(
+      "({}{}) = {}",
+      def_names.name(def_id).unwrap(),
+      pats.iter().map(|x| format!(" {x}")).join(""),
+      body.to_string(def_names)
+    )
+  }
+
+  pub fn arity(&self) -> usize {
+    self.pats.len()
+  }
+}
+
 impl Definition {
   pub fn to_string(&self, def_names: &DefNames) -> String {
-    let Definition { def_id, body } = self;
-    format!("({}) = {}", def_names.name(def_id).unwrap(), body.to_string(def_names))
+    self.rules.iter().map(|x| x.to_string(def_names)).join("\n")
+  }
+
+  pub fn arity(&self) -> usize {
+    self.rules[0].arity()
+  }
+}
+
+impl fmt::Display for Book {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "{}", self.defs.iter().map(|(_, x)| x.to_string(&self.def_names)).join("\n\n"))
+  }
+}
+
+impl From<&RulePat> for Term {
+  fn from(value: &RulePat) -> Self {
+    match value {
+      RulePat::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
+      RulePat::Var(nam) => Term::Var { nam: nam.clone() },
+    }
+  }
+}
+
+impl fmt::Display for RulePat {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      RulePat::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
+      RulePat::Var(nam) => write!(f, "{}", nam),
+    }
   }
 }
 

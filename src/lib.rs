@@ -1,26 +1,27 @@
 #![feature(box_patterns)]
 
 use hvmc::{
-  ast::{book_to_runtime, name_to_val, net_from_runtime, Book, Net},
+  ast::{book_to_runtime, name_to_val, net_from_runtime, show_net, Net},
   run::Val,
 };
 use net::{hvmc_to_net, nets_to_hvm_core};
 use std::{collections::HashMap, time::Instant};
-use term::{book_to_nets, net_to_term::net_to_term_non_linear, DefId, DefNames, DefinitionBook, Term};
+use term::{book_to_nets, net_to_term::net_to_term_non_linear, Book, DefId, DefNames, Term};
 
 pub mod net;
 pub mod term;
 
 pub use term::load_book::load_file_to_book;
 
-pub fn check_book(mut book: DefinitionBook) -> anyhow::Result<()> {
+pub fn check_book(mut book: Book) -> anyhow::Result<()> {
   // TODO: Do the checks without having to do full compilation
   compile_book(&mut book)?;
   Ok(())
 }
 
-pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<(Book, HashMap<Val, DefId>)> {
+pub fn compile_book(book: &mut Book) -> anyhow::Result<(hvmc::ast::Book, HashMap<Val, DefId>)> {
   let main = book.check_has_main()?;
+  book.check_shared_names()?;
   book.resolve_refs();
   book.check_unbound_vars()?;
   book.make_var_names_unique();
@@ -34,7 +35,7 @@ pub fn compile_book(book: &mut DefinitionBook) -> anyhow::Result<(Book, HashMap<
   Ok((core_book, hvmc_name_to_id))
 }
 
-pub fn run_compiled(book: &Book, mem_size: usize) -> (Net, RunStats) {
+pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) {
   let runtime_book = book_to_runtime(book);
   let mut root = hvmc::run::Net::new(mem_size);
   root.boot(name_to_val(DefNames::ENTRY_POINT));
@@ -45,12 +46,13 @@ pub fn run_compiled(book: &Book, mem_size: usize) -> (Net, RunStats) {
   let rewrites =
     Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
   let net = net_from_runtime(&root);
+  eprintln!("{}", show_net(&net));
   let def = root.to_def();
   let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
   (net, stats)
 }
 
-pub fn run_book(mut book: DefinitionBook, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
+pub fn run_book(mut book: Book, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
   let (compiled, hvmc_name_to_id) = compile_book(&mut book)?;
   let (res_lnet, stats) = run_compiled(&compiled, mem_size);
   let net = hvmc_to_net(&res_lnet, &|val| hvmc_name_to_id[&val])?;

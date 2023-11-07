@@ -1,8 +1,8 @@
-use super::{INet, NodeId, NodeKind, Port, ROOT, BASE_DUP_HVMC_LABEL};
+use super::{INet, NodeId, NodeKind, Port, BASE_DUP_HVMC_LABEL, ROOT};
 use crate::term::{var_id_to_name, DefId};
 use hvmc::{
   ast::{Book, Net, Tree},
-  run::{Tag, Val},
+  run::Val,
 };
 use std::collections::{HashMap, HashSet};
 
@@ -12,12 +12,12 @@ pub fn nets_to_hvm_core(
 ) -> anyhow::Result<Book> {
   let mut book = Book::new();
   for (name, inet) in nets {
-    book.insert(name, compat_net_to_core(&inet, id_to_hvmc_name)?);
+    book.insert(name, compat_net_to_core(&inet, &|id| id_to_hvmc_name[&id])?);
   }
   Ok(book)
 }
 
-pub fn compat_net_to_core(inet: &INet, id_to_hvmc_name: &HashMap<DefId, Val>) -> anyhow::Result<Net> {
+pub fn compat_net_to_core(inet: &INet, id_to_hvmc_name: &impl Fn(DefId) -> Val) -> anyhow::Result<Net> {
   let (net_root, redxs) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(net_root) = net_root {
@@ -41,7 +41,7 @@ fn net_tree_to_hvmc_tree(
   inet: &INet,
   tree_root: NodeId,
   port_to_var_id: &mut HashMap<Port, VarId>,
-  id_to_hvmc_name: &HashMap<DefId, Val>,
+  id_to_hvmc_name: &impl Fn(DefId) -> Val,
 ) -> Tree {
   match inet.node(tree_root).kind {
     NodeKind::Era => Tree::Era,
@@ -60,7 +60,7 @@ fn net_tree_to_hvmc_tree(
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
-    NodeKind::Ref { def_id } => Tree::Ref { nam: id_to_hvmc_name[&def_id] },
+    NodeKind::Ref { def_id } => Tree::Ref { nam: id_to_hvmc_name(def_id) },
     NodeKind::Num { val } => Tree::Num { val },
     NodeKind::Op2 => Tree::Op2 {
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
@@ -78,7 +78,7 @@ fn var_or_subtree(
   inet: &INet,
   src_port: Port,
   port_to_var_id: &mut HashMap<Port, VarId>,
-  id_to_hvmc_name: &HashMap<DefId, Val>,
+  id_to_hvmc_name: &impl Fn(DefId) -> Val,
 ) -> Tree {
   let dst_port = inet.enter_port(src_port);
   if dst_port.slot() == 0 {

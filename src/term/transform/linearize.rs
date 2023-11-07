@@ -1,4 +1,4 @@
-use crate::term::{DefinitionBook, LetPat, Name, Term};
+use crate::term::{Book, LetPat, Name, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -14,10 +14,12 @@ use std::collections::HashMap;
 ///   If they're used 1 time: substitute the body in the var use
 ///   If they're use more times: add dups for all the uses, put the let body at the root dup.
 /// Precondition: All variables are bound and have unique names within each definition.
-impl DefinitionBook {
+impl Book {
   pub fn linearize_vars(&mut self) -> anyhow::Result<()> {
     for def in self.defs.values_mut() {
-      def.body.linearize_vars()?;
+      for rule in def.rules.iter_mut() {
+        rule.body.linearize_vars()?;
+      }
     }
     Ok(())
   }

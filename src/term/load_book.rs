@@ -1,11 +1,11 @@
-use super::{parser::parse_definition_book, DefinitionBook};
+use super::{parser::parse_definition_book, Book};
 use chumsky::prelude::Rich;
 use itertools::Itertools;
 use miette::{diagnostic, miette, Diagnostic, NamedSource, SourceSpan};
 use std::{fmt::Display, path::Path};
 
 /// Reads a file and parses to a definition book.
-pub fn load_file_to_book(path: &Path) -> anyhow::Result<DefinitionBook> {
+pub fn load_file_to_book(path: &Path) -> anyhow::Result<Book> {
   let code = std::fs::read_to_string(path)?;
   match parse_definition_book(&code) {
     Ok(book) => Ok(book),

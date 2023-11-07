@@ -1,14 +1,17 @@
-use crate::term::{DefId, DefNames, Definition, DefinitionBook, LetPat, Name, Term};
 use std::collections::{BTreeMap, HashSet};
+
+use crate::term::{Book, DefId, DefNames, Definition, LetPat, Name, Rule, Term};
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
-impl DefinitionBook {
+impl Book {
   pub fn detach_supercombinators(&mut self) {
     let mut combinators = Combinators::new();
 
     for def in self.defs.values_mut() {
-      def.body.detach_combinators(def.def_id, &mut self.def_names, &mut combinators);
+      for rule in def.rules.iter_mut() {
+        rule.body.detach_combinators(def.def_id, &mut self.def_names, &mut combinators);
+      }
     }
 
     self.defs.append(&mut combinators)
@@ -60,7 +63,8 @@ impl<'d> TermInfo<'d> {
     let comb_var = Term::Ref { def_id: comb_id };
     let extracted_term = std::mem::replace(term, comb_var);
 
-    let rule = Definition { def_id: comb_id, body: extracted_term };
+    let rules = vec![Rule { def_id: comb_id, body: extracted_term, pats: Vec::new() }];
+    let rule = Definition { def_id: comb_id, rules };
     self.combinators.insert(comb_id, rule);
   }
 }

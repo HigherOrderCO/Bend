@@ -1,8 +1,8 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{DefId, Definition, DefinitionBook, LetPat, Name, Op, Term};
+use crate::term::{Adt, Book, DefId, Definition, LetPat, Name, Op, Rule, RulePat, Term};
 use chumsky::{
   extra,
-  input::{Emitter, SpannedInput, Stream, ValueInput},
+  input::{SpannedInput, Stream, ValueInput},
   prelude::{Input, Rich},
   primitive::{choice, just},
   recursive::recursive,
@@ -29,7 +29,7 @@ use std::{iter::Map, ops::Range};
 /// <NameEra> ::= <Name> | "*"
 /// <Name>   ::= <name_token> // [_a-zA-Z][_a-zA-Z0-9]{0..7}
 /// <Number> ::= <number_token> // [0-9]+
-pub fn parse_definition_book(code: &str) -> Result<DefinitionBook, Vec<Rich<Token>>> {
+pub fn parse_definition_book(code: &str) -> Result<Book, Vec<Rich<Token>>> {
   book().parse(token_stream(code)).into_result()
 }
 
@@ -56,6 +56,13 @@ fn token_stream(
 }
 
 // Parsers
+
+fn soft_keyword<'a, I>(keyword: &'a str) -> impl Parser<'a, I, (), extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  name().try_map(move |Name(nam), span| if nam == keyword { Ok(()) } else { Err(Rich::custom(span, "")) })
+}
 
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
@@ -205,47 +212,98 @@ where
   choice((pat_nam, pat_tup))
 }
 
-fn definition<'a, I>() -> impl Parser<'a, I, (Name, Definition), extra::Err<Rich<'a, Token>>>
+fn rule_pat<'a, I>() -> impl Parser<'a, I, RulePat, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let lhs = choice((name(), name().delimited_by(just(Token::LParen), just(Token::RParen))));
+  recursive(|rule_pat| {
+    let var = name().map(RulePat::Var).boxed();
+
+    let ctr = name()
+      .then(rule_pat.clone().repeated().collect())
+      .map(|(nam, xs)| RulePat::Ctr(nam, xs))
+      .delimited_by(just(Token::LParen), just(Token::RParen))
+      .boxed();
+
+    choice((var, ctr))
+  })
+}
+
+fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  let lhs = name().then(rule_pat().repeated().collect()).boxed();
+  let lhs = choice((lhs.clone(), lhs.clone().delimited_by(just(Token::LParen), just(Token::RParen))));
 
   lhs
     .then_ignore(just(Token::Equals))
     .then(term())
-    .map(|(name, body)| (name, Definition { def_id: DefId(0), body }))
+    .map(|((name, pats), body)| (name, Rule { def_id: DefId(0), pats, body }))
 }
 
-fn book<'a, I>() -> impl Parser<'a, I, DefinitionBook, extra::Err<Rich<'a, Token>>>
+fn datatype<'a, I>() -> impl Parser<'a, I, (Name, Adt), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  fn definitions_to_book(
-    defs: Vec<((Name, Definition), SimpleSpan)>,
-    _span: SimpleSpan,
-    emitter: &mut Emitter<Rich<Token>>,
-  ) -> DefinitionBook {
-    let mut book = DefinitionBook::new();
+  let arity_0 = name().map(|nam| (nam, 0));
+  let arity_n = name()
+    .then(name().repeated().collect::<Vec<_>>())
+    .delimited_by(just(Token::LParen), just(Token::RParen))
+    .map(|(nam, args)| (nam, args.len()));
+  let ctr = arity_0.or(arity_n);
 
-    // Check for repeated defs (could be rules out of order or actually repeated names)
-    for ((name, Definition { body, .. }), def_span) in defs {
-      if !book.def_names.contains_name(&name) {
-        let def_id = book.def_names.insert(name);
-        book.defs.insert(def_id, Definition { def_id, body });
-      } else {
-        let (start, end) = (def_span.start, def_span.end);
-        let span = SimpleSpan::new(start, end);
-        emitter.emit(Rich::custom(span, format!("Repeated definition '{}'", name)));
+  let data = soft_keyword("data");
+
+  data
+    .ignore_then(name())
+    .then_ignore(just(Token::Equals))
+    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, usize)>>())
+    .map(|(name, ctrs)| (name, Adt { ctrs: ctrs.into_iter().collect() }))
+}
+
+fn book<'a, I>() -> impl Parser<'a, I, Book, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  let top_level = choice((datatype().map(|x| TopLevel::Adt(x)), rule().map(|x| TopLevel::Rule(x))));
+
+  top_level.repeated().collect::<Vec<_>>().try_map(|program, span| {
+    let mut book = Book::new();
+
+    for top_level in program {
+      match top_level {
+        TopLevel::Rule((nam, mut rule)) => {
+          if let Some(def_id) = book.def_names.def_id(&nam) {
+            rule.def_id = def_id;
+            book.defs.get_mut(&def_id).unwrap().rules.push(rule);
+          } else {
+            let def_id = book.def_names.insert(nam);
+            rule.def_id = def_id;
+            book.defs.insert(def_id, Definition { def_id, rules: vec![rule] });
+          }
+        }
+        TopLevel::Adt((nam, adt)) => {
+          if !book.adts.contains_key(&nam) {
+            book.adts.insert(nam.clone(), adt.clone());
+            for (ctr, _) in adt.ctrs {
+              if !book.ctrs.contains_key(&ctr) {
+                book.ctrs.insert(ctr, nam.clone());
+              } else {
+                return Err(Rich::custom(span, format!("Repeated constructor '{}'", nam)));
+              }
+            }
+          } else {
+            return Err(Rich::custom(span, format!("Repeated datatype '{}'", nam)));
+          }
+        }
       }
     }
-    book
-  }
+    Ok(book)
+  })
+}
 
-  let parsed_definitions = definition()
-    .map_with_span(|rule, span| (rule, span))
-    .repeated()
-    .collect::<Vec<((Name, Definition), SimpleSpan)>>();
-
-  parsed_definitions.validate(definitions_to_book)
+enum TopLevel {
+  Rule((Name, Rule)),
+  Adt((Name, Adt)),
 }

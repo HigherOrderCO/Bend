@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
-use crate::term::{DefId, DefNames, Definition, DefinitionBook, LetPat, Name, Op, Term};
+use crate::term::{Book, DefId, DefNames, Definition, LetPat, Name, Op, Rule, Term};
 
-impl DefinitionBook {
+impl Book {
   /// Applies bracket abstraction to remove lambdas form rule bodies,
   /// replacing it with applications with [`combinators`][Combinator]
   ///
@@ -11,7 +11,9 @@ impl DefinitionBook {
     let mut comb = Combinators::new();
 
     for def in self.defs.values_mut() {
-      def.body.abstract_lambdas(&mut self.def_names, &mut comb);
+      for rule in def.rules.iter_mut() {
+        rule.body.abstract_lambdas(&mut self.def_names, &mut comb);
+      }
     }
 
     self.defs.append(&mut comb);
@@ -242,7 +244,8 @@ impl Combinator {
     let def_id = names.def_id(&name).unwrap_or_else(|| {
       let def_id = names.insert(name);
       let body = self.into();
-      defs.insert(def_id, Definition { def_id, body });
+      let rules = vec![Rule { def_id, pats: Vec::new(), body }];
+      defs.insert(def_id, Definition { def_id, rules });
 
       def_id
     });

@@ -1,8 +1,5 @@
-use super::{INet, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
-use crate::{
-  net::{INode, BASE_DUP_HVMC_LABEL},
-  term::DefId,
-};
+use super::{INet, INode, INodes, NodeId, NodeKind::*, Port, SlotId, BASE_DUP_HVMC_LABEL, ROOT};
+use crate::term::DefId;
 use hvmc::{
   ast::{Net, Tree},
   run::Val,

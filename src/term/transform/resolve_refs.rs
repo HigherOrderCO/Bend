@@ -1,13 +1,16 @@
-use crate::term::{DefNames, DefinitionBook, LetPat, Name, Term};
 use std::collections::HashMap;
 
-impl DefinitionBook {
+use crate::term::{Book, DefNames, LetPat, Name, Term};
+
+impl Book {
   /// Decides if names inside a term belong to a Var or to a Ref.
   /// Precondition: Refs are encoded as vars.
   /// Postcondition: Refs are encoded as refs, with the correct def id.
   pub fn resolve_refs(&mut self) {
     for def in self.defs.values_mut() {
-      def.body.resolve_refs(&self.def_names);
+      for rule in def.rules.iter_mut() {
+        rule.body.resolve_refs(&self.def_names);
+      }
     }
   }
 }
