@@ -1,7 +1,7 @@
 #![feature(box_patterns)]
 
 use hvmc::{
-  ast::{book_to_runtime, name_to_val, net_from_runtime, show_net, Net},
+  ast::{book_to_runtime, name_to_val, net_from_runtime, /*show_net,*/ Net},
   run::Val,
 };
 use net::{hvmc_to_net, nets_to_hvm_core};
@@ -43,10 +43,9 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) 
   let start_time = Instant::now();
   root.normal(&runtime_book);
   let elapsed = start_time.elapsed().as_secs_f64();
-  let rewrites =
-    Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
+  let rewrites = Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
   let net = net_from_runtime(&root);
-  eprintln!("{}", show_net(&net));
+  //eprintln!("{}", show_net(&net));
   let def = root.to_def();
   let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
   (net, stats)
