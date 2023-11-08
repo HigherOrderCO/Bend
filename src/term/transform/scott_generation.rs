@@ -7,14 +7,8 @@ impl Book {
 
       for (ctr_name, arity) in &curr_ctrs {
         let mut ctr_args = Vec::new();
-        let mut ctrs = Vec::new();
-
-        for ctr in curr_ctrs.keys() {
-          ctrs.push(ctr.clone());
-          if ctr == ctr_name {
-            make_args(arity, &mut ctr_args);
-          }
-        }
+        let ctrs = curr_ctrs.keys().cloned().collect();
+        make_args(arity, &mut ctr_args);
 
         let lam = make_lam(ctr_args, ctrs, ctr_name);
 
@@ -37,16 +31,14 @@ fn make_args(args_count: &usize, ctr_args: &mut Vec<Name>) {
 }
 
 fn make_lam(ctr_args: Vec<Name>, ctrs: Vec<Name>, ctr_name: &Name) -> Term {
-  fn fold_lam(acc: Term, arg: Name) -> Term {
-    Term::Lam { nam: Some(arg), bod: Box::new(acc) }
-  }
-
   let ctr = Term::Var { nam: ctr_name.clone() };
 
   let app = ctr_args
     .iter()
     .cloned()
     .fold(ctr, |acc, nam| Term::App { fun: Box::new(acc), arg: Box::new(Term::Var { nam }) });
+
+  let fold_lam = |acc, arg| Term::Lam { nam: Some(arg), bod: Box::new(acc) };
 
   let lam = ctrs.iter().rev().cloned().fold(app, fold_lam);
 
