@@ -67,7 +67,7 @@ fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&Path, &str) -> anyhow::Res
 }
 
 #[test]
-fn compile_single_terms() {
+fn compile_term() {
   run_golden_test_dir(function_name!(), &|_, code| {
     let mut term = parse_term(code).map_err(|errs| {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
@@ -83,7 +83,7 @@ fn compile_single_terms() {
 }
 
 #[test]
-fn compile_single_files() {
+fn compile_file() {
   run_golden_test_dir(function_name!(), &|_, code| {
     let mut book = parse_definition_book(code).map_err(|errs| {
       let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
