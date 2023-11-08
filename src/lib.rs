@@ -26,8 +26,8 @@ pub fn compile_book(book: &mut Book) -> anyhow::Result<(hvmc::ast::Book, HashMap
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars()?;
-  book.check_ref_to_ref()?;
   book.detach_supercombinators();
+  book.simplify_ref_to_ref()?;
   book.prune(main);
   let (nets, id_to_hvmc_name) = book_to_nets(book, main)?;
   let core_book = nets_to_hvm_core(nets, &id_to_hvmc_name)?;
@@ -43,9 +43,9 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) 
   let start_time = Instant::now();
   root.normal(&runtime_book);
   let elapsed = start_time.elapsed().as_secs_f64();
-  let rewrites = Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
+  let rewrites =
+    Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
   let net = net_from_runtime(&root);
-  //eprintln!("{}", show_net(&net));
   let def = root.to_def();
   let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
   (net, stats)
