@@ -1,11 +1,13 @@
 use bimap::{BiHashMap, Overwritten};
 use derive_more::{Display, From, Into};
 use hvmc::run::Val;
+use indexmap::IndexMap;
 use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
 use std::{
   collections::{BTreeMap, HashMap},
   fmt,
+  hash::Hash,
 };
 
 pub mod check;
@@ -150,7 +152,8 @@ pub enum Op {
 /// A user defined  datatype
 #[derive(Debug, Clone, Default)]
 pub struct Adt {
-  pub ctrs: BTreeMap<Name, usize>,
+  // pub ctrs: BTreeMap<Name, usize>,
+  pub ctrs: IndexMap<Name, usize>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]

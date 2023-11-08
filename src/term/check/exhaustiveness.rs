@@ -267,6 +267,8 @@ impl Book {
 mod test {
   use std::collections::{BTreeMap, HashMap};
 
+  use indexmap::IndexMap;
+
   use crate::term::{
     check::exhaustiveness::{useful, wildcard, Ctx, Problem},
     parser::parse_definition_book,
@@ -280,7 +282,7 @@ mod test {
 
   fn bool_ctx() -> HashMap<Name, Adt> {
     HashMap::from([(Name::new("Bool"), Adt {
-      ctrs: BTreeMap::from([(Name::new("T"), 0), (Name::new("F"), 0)]),
+      ctrs: IndexMap::from([(Name::new("T"), 0), (Name::new("F"), 0)]),
     })])
   }
 
