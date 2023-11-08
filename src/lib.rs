@@ -46,7 +46,6 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) 
   let rewrites =
     Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
   let net = net_from_runtime(&root);
-  //eprintln!("{}", show_net(&net));
   let def = root.to_def();
   let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
   (net, stats)

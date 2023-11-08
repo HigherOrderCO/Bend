@@ -43,8 +43,6 @@ impl Book {
       *body = subst_body;
     }
 
-    // Remove the now unused defs
-
     Ok(())
   }
 }
