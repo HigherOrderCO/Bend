@@ -200,7 +200,7 @@ fn let_pat<'a, I>() -> impl Parser<'a, I, LetPat, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let pat_nam = name().map(|nam| LetPat::Var(nam)).boxed();
+  let pat_nam = name().map(LetPat::Var).boxed();
 
   let pat_tup = name_or_era()
     .then_ignore(just(Token::Comma))
@@ -266,7 +266,7 @@ fn book<'a, I>() -> impl Parser<'a, I, Book, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let top_level = choice((datatype().map(|x| TopLevel::Adt(x)), rule().map(|x| TopLevel::Rule(x))));
+  let top_level = choice((datatype().map(TopLevel::Adt), rule().map(TopLevel::Rule)));
 
   top_level.repeated().collect::<Vec<_>>().try_map(|program, span| {
     let mut book = Book::new();

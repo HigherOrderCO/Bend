@@ -385,7 +385,7 @@ impl Definition {
 
 impl fmt::Display for Book {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", self.defs.iter().map(|(_, x)| x.to_string(&self.def_names)).join("\n\n"))
+    write!(f, "{}", self.defs.values().map(|x| x.to_string(&self.def_names)).join("\n\n"))
   }
 }
 

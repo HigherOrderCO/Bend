@@ -59,7 +59,7 @@ impl Book {
   }
 }
 
-fn unify(t: Type, idx: usize, ctx: &mut Vec<Type>) -> Result<(), anyhow::Error> {
+fn unify(t: Type, idx: usize, ctx: &mut [Type]) -> Result<(), anyhow::Error> {
   if ctx[idx] == Type::Any {
     ctx[idx] = t;
   } else if ctx[idx] != t.clone() {

@@ -1,4 +1,4 @@
-use super::{Book, DefId, DefNames, Name, Term};
+use super::{Book, DefId, DefNames, Name};
 
 pub mod exhaustiveness;
 pub mod shared_names;
