@@ -6,9 +6,8 @@ impl Book {
       let curr_ctrs = adt.ctrs.clone();
 
       for (ctr_name, arity) in &curr_ctrs {
-        let mut ctr_args = Vec::new();
         let ctrs = curr_ctrs.keys().cloned().collect();
-        make_args(arity, &mut ctr_args);
+        let ctr_args = make_args(arity);
 
         let lam = make_lam(ctr_args, ctrs, ctr_name);
 
@@ -23,11 +22,13 @@ impl Book {
   }
 }
 
-fn make_args(args_count: &usize, ctr_args: &mut Vec<Name>) {
+fn make_args(args_count: &usize) -> Vec<Name> {
+  let mut ctr_args = Vec::new();
   for n in 0 .. *args_count {
     let nam = Name(format!("a{n}"));
     ctr_args.push(nam);
   }
+  ctr_args
 }
 
 fn make_lam(ctr_args: Vec<Name>, ctrs: Vec<Name>, ctr_name: &Name) -> Term {
