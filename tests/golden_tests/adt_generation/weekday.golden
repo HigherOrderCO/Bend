@@ -1,15 +1,15 @@
 (main) = (λx x Saturday)
 
-(Sunday) = λSunday λMonday λTuesday λWednesday λThursday λFriday λSaturday Sunday
+(Monday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Monday
 
-(Monday) = λSunday λMonday λTuesday λWednesday λThursday λFriday λSaturday Monday
+(Tuesday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Tuesday
 
-(Tuesday) = λSunday λMonday λTuesday λWednesday λThursday λFriday λSaturday Tuesday
+(Wednesday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Wednesday
 
-(Wednesday) = λSunday λMonday λTuesday λWednesday λThursday λFriday λSaturday Wednesday
+(Thursday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Thursday
 
-(Thursday) = λSunday λMonday λTuesday λWednesday λThursday λFriday λSaturday Thursday
+(Friday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Friday
 
-(Friday) = λSunday λMonday λTuesday λWednesday λThursday λFriday λSaturday Friday
+(Saturday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Saturday
 
-(Saturday) = λSunday λMonday λTuesday λWednesday λThursday λFriday λSaturday Saturday
+(Sunday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Sunday
