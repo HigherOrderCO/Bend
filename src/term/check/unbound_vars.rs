@@ -5,7 +5,8 @@ use std::collections::HashMap;
 impl Book {
   pub fn check_unbound_vars(&self) -> anyhow::Result<()> {
     for def in self.defs.values() {
-      debug_assert!(def.rules.len() == 1, "Definition rules should be removed in earlier pass");
+      // TODO: Enable when pattern matching is done
+      //debug_assert!(def.rules.len() == 1, "Definition rules should be removed in earlier pass");
       def.rules[0].body.check_unbound_vars()?;
     }
     Ok(())

@@ -178,8 +178,8 @@ impl Name {
   }
 }
 
-// TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
 impl DefId {
+  // TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
   pub fn to_internal(self) -> Val {
     *self + 1
   }
