@@ -17,6 +17,7 @@ impl Book {
         let def = Definition { def_id, rules };
 
         self.defs.insert(def_id, def);
+        self.ctrs.remove(ctr_name);
       }
     }
   }
@@ -44,27 +45,4 @@ fn make_lam(ctr_args: Vec<Name>, ctrs: Vec<Name>, ctr_name: &Name) -> Term {
   let lam = ctrs.iter().rev().cloned().fold(app, fold_lam);
 
   ctr_args.iter().rev().cloned().fold(lam, fold_lam)
-}
-
-#[cfg(test)]
-mod test {
-  use crate::term::parser::parse_definition_book;
-
-  #[test]
-  // what should we test here?
-  fn adt_generation() {
-    let code = r"
-    data List = (Cons x xs) | Nil
-    data Bool = True | False
-    data Tree = (Node val lft rgt) | Leaf
-    ";
-    let book = parse_definition_book(code);
-    match book {
-      Ok(mut book) => {
-        book.generate_scott_adts();
-        println!("{}", book);
-      }
-      Err(_) => todo!(),
-    }
-  }
 }

@@ -29,7 +29,7 @@ pub struct Book {
   pub defs: BTreeMap<DefId, Definition>,
 
   /// The algebraic datatypes defined by the program
-  pub adts: HashMap<Name, Adt>,
+  pub adts: BTreeMap<Name, Adt>,
 
   /// To which type does each constructor belong to.
   pub ctrs: HashMap<Name, Name>,
