@@ -30,8 +30,15 @@ enum Mode {
 }
 
 fn mem_parser(arg: &str) -> anyhow::Result<usize> {
-  let bytes = byte_unit::Byte::from_str(arg)?;
-  Ok(bytes.get_bytes() as usize)
+  let (base, mult) = match arg.to_lowercase().chars().last() {
+    None => return Err(anyhow::anyhow!("Mem size argument is empty")),
+    Some('k') => (&arg[0 .. arg.len() - 1], 1 << 10),
+    Some('m') => (&arg[0 .. arg.len() - 1], 1 << 20),
+    Some('g') => (&arg[0 .. arg.len() - 1], 1 << 30),
+    Some(_) => (arg, 1),
+  };
+  let base = base.parse::<usize>()?;
+  Ok(base * mult)
 }
 
 fn main() -> anyhow::Result<()> {

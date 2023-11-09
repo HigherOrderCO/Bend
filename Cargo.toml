@@ -15,12 +15,11 @@ lto = true
 
 [features]
 default = ["cli"]
-cli = ["dep:clap", "dep:byte-unit"]
+cli = ["dep:clap"]
 
 [dependencies]
 anyhow = "1.0.72"
 bimap = "0.6.3"
-byte-unit = { version = "4.0.19", optional = true }
 chumsky = "= 1.0.0-alpha.4"
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 derive_more = "0.99.17"
