@@ -1,5 +1,4 @@
 use bimap::{BiHashMap, Overwritten};
-use derive_more::{Display, From, Into};
 use hvmc::run::Val;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -154,14 +153,11 @@ pub struct Adt {
   pub ctrs: IndexMap<Name, usize>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
+#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord)]
 pub struct Name(pub String);
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, Default)]
 pub struct DefId(pub Val);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into)]
-pub struct VarId(pub Val);
 
 pub fn var_id_to_name(mut var_id: Val) -> Name {
   let mut name = String::new();
@@ -426,5 +422,11 @@ impl fmt::Display for Op {
       Op::LSH => write!(f, "<<"),
       Op::RSH => write!(f, ">>"),
     }
+  }
+}
+
+impl fmt::Display for Name {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    self.0.fmt(f)
   }
 }
