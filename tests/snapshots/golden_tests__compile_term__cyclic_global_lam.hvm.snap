@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+Found term that compiles into an inet with a vicious cycle

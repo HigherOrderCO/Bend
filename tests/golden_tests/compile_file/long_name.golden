@@ -1,3 +1,0 @@
-@WowT = (a a)
-@main = (a b)
-& (a b) ~ @WowT

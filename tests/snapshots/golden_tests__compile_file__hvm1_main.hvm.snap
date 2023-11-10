@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+@main = (a a)
+

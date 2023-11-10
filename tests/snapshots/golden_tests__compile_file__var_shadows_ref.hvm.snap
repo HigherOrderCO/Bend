@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+@3 = (a a)
+@a = (a a)
+@main = a
+& (@3 a) ~ @a
+

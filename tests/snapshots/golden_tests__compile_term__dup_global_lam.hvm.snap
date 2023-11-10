@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+a
+& (b a) ~ ({2 (c b) c} (d d))
