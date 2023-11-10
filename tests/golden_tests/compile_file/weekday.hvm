@@ -1,0 +1,10 @@
+data Weekday
+  = Monday
+  | Tuesday
+  | Wednesday
+  | Thursday
+  | Friday
+  | Saturday
+  | Sunday
+
+main = (@x x Saturday)

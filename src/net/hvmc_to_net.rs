@@ -5,10 +5,9 @@ use hvmc::{
   run::Val,
 };
 
-pub fn hvmc_to_net(net: &Net, hvmc_name_to_id: &impl Fn(Val) -> DefId) -> anyhow::Result<INet> {
+pub fn hvmc_to_net(net: &Net, hvmc_name_to_id: &impl Fn(Val) -> DefId) -> INet {
   let inodes = hvmc_to_inodes(net, hvmc_name_to_id);
-  let compat_net = inodes_to_inet(&inodes);
-  Ok(compat_net)
+  inodes_to_inet(&inodes)
 }
 
 fn hvmc_to_inodes(net: &Net, hvmc_name_to_id: &impl Fn(Val) -> DefId) -> INodes {
@@ -110,6 +109,7 @@ fn tree_to_inodes(
 // Converts INodes to an INet by linking ports based on names.
 fn inodes_to_inet(inodes: &INodes) -> INet {
   let mut inet = INet::new();
+  // Maps named inode ports to numeric inet ports.
   let mut name_map = std::collections::HashMap::new();
 
   for inode in inodes.iter() {

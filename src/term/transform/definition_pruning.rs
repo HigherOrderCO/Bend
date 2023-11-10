@@ -15,8 +15,11 @@ impl Book {
       rule.body.find_used_definitions(&mut used, &self.defs);
     }
 
-    self.defs.retain(|def_id, _| used.contains(def_id));
-    self.def_names.map.retain(|def_id, _| used.contains(def_id));
+    let ids = HashSet::from_iter(self.def_names.def_ids().copied());
+    let unused = ids.difference(&used);
+    for &unused_id in unused {
+      self.remove_def(unused_id);
+    }
   }
 }
 
@@ -35,40 +38,25 @@ impl Term {
             }
           }
         }
-        Term::Let { val, nxt, .. } => {
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.find_used_definitions(used, defs),
+        Term::Let { val, nxt, .. } | Term::Dup { val, nxt, .. } => {
           val.find_used_definitions(used, defs);
           nxt.find_used_definitions(used, defs);
         }
-        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.find_used_definitions(used, defs),
         Term::App { fun, arg } => {
           fun.find_used_definitions(used, defs);
           arg.find_used_definitions(used, defs);
+        }
+        Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+          fst.find_used_definitions(used, defs);
+          snd.find_used_definitions(used, defs);
         }
         Term::Match { cond, zero, succ, .. } => {
           cond.find_used_definitions(used, defs);
           zero.find_used_definitions(used, defs);
           succ.find_used_definitions(used, defs);
         }
-        Term::Dup { val, nxt, .. } => {
-          val.find_used_definitions(used, defs);
-          nxt.find_used_definitions(used, defs);
-        }
-        Term::Sup { fst, snd } => {
-          fst.find_used_definitions(used, defs);
-          snd.find_used_definitions(used, defs);
-        }
-        Term::Opx { fst, snd, .. } => {
-          fst.find_used_definitions(used, defs);
-          snd.find_used_definitions(used, defs);
-        }
-        Term::Tup { fst, snd } => {
-          fst.find_used_definitions(used, defs);
-          snd.find_used_definitions(used, defs);
-        }
-        Term::Var { .. } => (),
-        Term::Lnk { .. } => (),
-        Term::Era => (),
-        Term::Num { .. } => (),
+        Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => (),
       }
     }
   }

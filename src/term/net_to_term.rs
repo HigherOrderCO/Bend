@@ -89,9 +89,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
       Ref { def_id } => {
         if book.is_generated_def(def_id) {
           let def = book.defs.get(&def_id).unwrap();
-          if def.rules.len() > 1 {
-            unreachable!();
-          }
+          def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
           term.fix_names(id_counter, book);
 
@@ -329,9 +327,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
       Ref { def_id } => {
         if book.is_generated_def(def_id) {
           let def = book.defs.get(&def_id).unwrap();
-          if def.rules.len() > 1 {
-            unreachable!();
-          }
+          def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
           term.fix_names(id_counter, book);
 
@@ -546,28 +542,14 @@ impl Term {
         fix_name(nam, id_counter, bod);
         bod.fix_names(id_counter, book);
       }
-      Term::Var { .. } => {}
-      Term::Chn { nam: _, bod } => bod.fix_names(id_counter, book),
-      Term::Lnk { .. } => {}
       Term::Ref { def_id } => {
         if book.is_generated_def(*def_id) {
           let def = book.defs.get(def_id).unwrap();
-          if def.rules.len() > 1 {
-            unreachable!();
-          }
+          def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
           term.fix_names(id_counter, book);
           *self = term
         }
-      }
-      Term::App { fun, arg } => {
-        fun.fix_names(id_counter, book);
-        arg.fix_names(id_counter, book);
-      }
-      Term::Match { cond, zero, succ } => {
-        cond.fix_names(id_counter, book);
-        zero.fix_names(id_counter, book);
-        succ.fix_names(id_counter, book);
       }
       Term::Dup { fst, snd, val, nxt } => {
         val.fix_names(id_counter, book);
@@ -575,21 +557,22 @@ impl Term {
         fix_name(snd, id_counter, nxt);
         nxt.fix_names(id_counter, book);
       }
-      Term::Sup { fst, snd } => {
+      Term::Chn { nam: _, bod } => bod.fix_names(id_counter, book),
+      Term::App { fun, arg } => {
+        fun.fix_names(id_counter, book);
+        arg.fix_names(id_counter, book);
+      }
+      Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { op: _, fst, snd } => {
         fst.fix_names(id_counter, book);
         snd.fix_names(id_counter, book);
       }
-      Term::Era => {}
-      Term::Num { .. } => {}
-      Term::Opx { op: _, fst, snd } => {
-        fst.fix_names(id_counter, book);
-        snd.fix_names(id_counter, book);
+      Term::Match { cond, zero, succ } => {
+        cond.fix_names(id_counter, book);
+        zero.fix_names(id_counter, book);
+        succ.fix_names(id_counter, book);
       }
       Term::Let { .. } => unreachable!(),
-      Term::Tup { fst, snd } => {
-        fst.fix_names(id_counter, book);
-        snd.fix_names(id_counter, book);
-      }
+      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => {}
     }
   }
 }

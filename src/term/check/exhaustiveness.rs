@@ -85,7 +85,7 @@ fn get_pat_ctr_name(pat: RulePat) -> Option<String> {
 fn is_sig_complete(ctx: &Ctx, type_name: &Name, names: Vec<String>) -> Completeness {
   if let Some(ctors) = ctx.ctx_types.get(type_name) {
     let ctrs = ctors.ctrs.keys().clone();
-    let missing = ctrs.map(|n| n.0.clone()).filter(|n| !names.contains(&n)).collect::<Vec<_>>();
+    let missing = ctrs.map(|n| n.0.clone()).filter(|n| !names.contains(n)).collect::<Vec<_>>();
 
     if missing.is_empty() { Completeness::Complete(names) } else { Completeness::Incomplete(missing) }
   } else {
@@ -207,7 +207,7 @@ fn useful(ctx: &Ctx, problem: &mut Problem) -> bool {
               }
             }
             // if it is a constructor we specialize this constructor case
-            RulePat::Ctr(nam_, ..) => ctx.specialize_ctr(&nam_, &problem),
+            RulePat::Ctr(nam_, ..) => ctx.specialize_ctr(nam_, problem),
           }
         }
       }
@@ -216,12 +216,12 @@ fn useful(ctx: &Ctx, problem: &mut Problem) -> bool {
 }
 
 impl Book {
-  pub fn check_exhaustiveness(&self, def_types: &DefinitionTypes) -> anyhow::Result<()> {
+  pub fn check_exhaustiveness(&self, def_types: &DefinitionTypes) -> Result<(), String> {
     for def in self.defs.values() {
       if let Some(def_types) = def_types.get(&def.def_id) {
         // get the type of each argument
         let types = def_types
-          .into_iter()
+          .iter()
           .map(|t| match t {
             Type::Any => wildcard(),
             Type::Adt(name) => RulePat::Ctr(name.clone(), vec![]),
@@ -252,9 +252,8 @@ impl Book {
 
         // if the case is useful that means that the rule is not exhaustive
         if useful(&ctx, &mut problem) {
-          let def_name = self.def_names.map.get_by_left(&def.def_id).unwrap();
-
-          return Err(anyhow::anyhow!("The definition '{def_name}' is not exhaustive."));
+          let def_name = self.def_names.name(&def.def_id).unwrap();
+          return Err(format!("The definition '{def_name}' is not exhaustive."));
         }
       }
     }

@@ -1,23 +1,21 @@
-use crate::term::{Book, Definition, Name, Rule, Term};
+use crate::term::{Book, Name, Rule, Term};
 
 impl Book {
   pub fn generate_scott_adts(&mut self) {
+    let mut defs = vec![];
     for adt in self.adts.values() {
-      let curr_ctrs = adt.ctrs.clone();
-
-      for (ctr_name, arity) in &curr_ctrs {
-        let ctrs = curr_ctrs.keys().cloned().collect();
+      for (ctr_name, arity) in &adt.ctrs {
         let ctr_args = make_args(arity);
+        let ctrs: Vec<_> = adt.ctrs.keys().cloned().collect();
 
         let lam = make_lam(ctr_args, ctrs, ctr_name);
 
-        let def_id = self.def_names.insert(ctr_name.clone());
-
-        let rules = vec![Rule { def_id, pats: vec![], body: lam }];
-        let def = Definition { def_id, rules };
-
-        self.defs.insert(def_id, def);
+        let rules = vec![Rule { pats: vec![], body: lam }];
+        defs.push((ctr_name.clone(), rules));
       }
+    }
+    for (name, rules) in defs {
+      self.insert_def(name, rules);
     }
   }
 }
@@ -37,7 +35,7 @@ fn make_lam(ctr_args: Vec<Name>, ctrs: Vec<Name>, ctr_name: &Name) -> Term {
 
   let fold_lam = |acc, arg| Term::Lam { nam: Some(arg), bod: Box::new(acc) };
 
-  let lam = ctrs.iter().rev().cloned().fold(app, fold_lam);
+  let lam = ctrs.into_iter().rev().fold(app, fold_lam);
 
-  ctr_args.iter().rev().cloned().fold(lam, fold_lam)
+  ctr_args.into_iter().rev().fold(lam, fold_lam)
 }

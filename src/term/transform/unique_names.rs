@@ -18,8 +18,7 @@ impl Book {
 
 impl Term {
   pub fn make_var_names_unique(&mut self) {
-    let new_term = unique_var_names(self, &mut Default::default(), &mut 0);
-    *self = new_term;
+    unique_var_names(self, &mut Default::default(), &mut 0);
   }
 }
 
@@ -27,118 +26,71 @@ type VarId = Val;
 type UniqueNameScope = HashMap<Name, Vec<VarId>>;
 
 // Recursive implementation of unique names pass.
-fn unique_var_names(term: &Term, name_map: &mut UniqueNameScope, name_count: &mut VarId) -> Term {
+fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count: &mut VarId) {
   match term {
-    Term::Lam { nam: Some(nam), bod } => {
+    Term::Lam { nam, bod } => {
       // Put the name in scope and assign it a unique id.
       // Convert the lambda body and then remove it from scope.
       // Return a lambda with the newly created name
-      push_name(nam.clone(), name_map, name_count);
-      let bod = unique_var_names(bod, name_map, name_count);
-      let nam = pop_name(nam, name_map);
-      Term::Lam { nam: Some(nam), bod: Box::new(bod) }
+      push_name(nam.as_ref(), name_map, name_count);
+      unique_var_names(bod, name_map, name_count);
+      *nam = pop_name(nam.as_ref(), name_map);
     }
-    Term::Lam { nam: None, bod } => {
-      let bod = unique_var_names(bod, name_map, name_count);
-      Term::Lam { nam: None, bod: Box::new(bod) }
-    }
-    Term::Var { nam } => {
-      let nam = use_var(nam, name_map).unwrap();
-      Term::Var { nam }
-    }
-    Term::Chn { nam, bod } => {
-      // Global lam names are already unique, so no need to do anything
-      let bod = unique_var_names(bod, name_map, name_count);
-      Term::Chn { nam: nam.clone(), bod: Box::new(bod) }
-    }
+    Term::Var { nam } => *nam = use_var(nam, name_map),
     Term::Let { pat: LetPat::Var(nam), val, nxt } => {
-      let val = unique_var_names(val, name_map, name_count);
-      push_name(nam.clone(), name_map, name_count);
-      let nxt = unique_var_names(nxt, name_map, name_count);
-      let nam = pop_name(nam, name_map);
-      Term::Let { pat: LetPat::Var(nam), val: Box::new(val), nxt: Box::new(nxt) }
+      unique_var_names(val, name_map, name_count);
+      push_name(Some(nam), name_map, name_count);
+      unique_var_names(nxt, name_map, name_count);
+      *nam = pop_name(Some(nam), name_map).unwrap();
     }
-    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
-      let val = unique_var_names(val, name_map, name_count);
-
-      if let Some(l_nam) = l_nam {
-        push_name(l_nam.clone(), name_map, name_count);
-      }
-      if let Some(r_nam) = r_nam {
-        push_name(r_nam.clone(), name_map, name_count);
-      }
-
-      let nxt = unique_var_names(nxt, name_map, name_count);
-
-      let l_nam = l_nam.as_ref().map(|l_nam| pop_name(l_nam, name_map));
-      let r_nam = r_nam.as_ref().map(|r_nam| pop_name(r_nam, name_map));
-
-      let new_pat = LetPat::Tup(l_nam, r_nam);
-
-      Term::Let { pat: new_pat, val: Box::new(val), nxt: Box::new(nxt) }
+    Term::Dup { fst, snd, val, nxt } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+      unique_var_names(val, name_map, name_count);
+      push_name(fst.as_ref(), name_map, name_count);
+      push_name(snd.as_ref(), name_map, name_count);
+      unique_var_names(nxt, name_map, name_count);
+      *snd = pop_name(snd.as_ref(), name_map);
+      *fst = pop_name(fst.as_ref(), name_map);
     }
+    // Global lam names are already unique, so no need to do anything
+    Term::Chn { bod, .. } => unique_var_names(bod, name_map, name_count),
     Term::App { fun, arg } => {
-      let fun = unique_var_names(fun, name_map, name_count);
-      let arg = unique_var_names(arg, name_map, name_count);
-      Term::App { fun: Box::new(fun), arg: Box::new(arg) }
+      unique_var_names(fun, name_map, name_count);
+      unique_var_names(arg, name_map, name_count);
     }
-    Term::Dup { fst, snd, val, nxt } => {
-      let val = unique_var_names(val, name_map, name_count);
-      if let Some(fst) = fst {
-        push_name(fst.clone(), name_map, name_count);
-      }
-      if let Some(snd) = snd {
-        push_name(snd.clone(), name_map, name_count);
-      }
-      let nxt = unique_var_names(nxt, name_map, name_count);
-      let snd = snd.as_ref().map(|snd| pop_name(snd, name_map));
-      let fst = fst.as_ref().map(|fst| pop_name(fst, name_map));
-      Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(nxt) }
-    }
-    Term::Sup { fst, snd } => {
-      let fst = unique_var_names(fst, name_map, name_count);
-      let snd = unique_var_names(snd, name_map, name_count);
-      Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }
-    }
-    Term::Opx { op, fst, snd } => {
-      let fst = unique_var_names(fst, name_map, name_count);
-      let snd = unique_var_names(snd, name_map, name_count);
-      Term::Opx { op: *op, fst: Box::new(fst), snd: Box::new(snd) }
+    Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+      unique_var_names(fst, name_map, name_count);
+      unique_var_names(snd, name_map, name_count);
     }
     Term::Match { cond, zero, succ } => {
-      let cond = unique_var_names(cond, name_map, name_count);
-      let zero = unique_var_names(zero, name_map, name_count);
-      let succ = unique_var_names(succ, name_map, name_count);
-      Term::Match { cond: Box::new(cond), zero: Box::new(zero), succ: Box::new(succ) }
+      unique_var_names(cond, name_map, name_count);
+      unique_var_names(zero, name_map, name_count);
+      unique_var_names(succ, name_map, name_count);
     }
-    Term::Tup { fst, snd } => {
-      let fst = unique_var_names(fst, name_map, name_count);
-      let snd = unique_var_names(snd, name_map, name_count);
-      Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }
-    }
-    t @ (Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. }) => t.clone(),
+    Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } => (),
   }
 }
 
-fn push_name(name: Name, name_map: &mut UniqueNameScope, name_count: &mut VarId) {
-  name_map.entry(name).or_default().push(*name_count);
-  *name_count += 1;
-}
-
-fn pop_name(name: &Name, name_map: &mut UniqueNameScope) -> Name {
-  let new_name = name_map.get_mut(name).unwrap().pop().unwrap();
-  if name_map[name].is_empty() {
-    name_map.remove(name);
+fn push_name(name: Option<&Name>, name_map: &mut UniqueNameScope, name_count: &mut VarId) {
+  if let Some(name) = name {
+    name_map.entry(name.clone()).or_default().push(*name_count);
+    *name_count += 1;
   }
-  var_id_to_name(new_name)
 }
 
-fn use_var(nam: &Name, name_map: &UniqueNameScope) -> Option<Name> {
-  if let Some(vars) = name_map.get(nam) {
-    let var_id = *vars.last().unwrap();
-    let new_name = var_id_to_name(var_id);
-    Some(new_name)
+fn pop_name(name: Option<&Name>, name_map: &mut UniqueNameScope) -> Option<Name> {
+  if let Some(name) = name {
+    let new_name = name_map.get_mut(name).unwrap().pop().unwrap();
+    if name_map[name].is_empty() {
+      name_map.remove(name);
+    }
+    Some(var_id_to_name(new_name))
   } else {
     None
   }
+}
+
+fn use_var(nam: &Name, name_map: &UniqueNameScope) -> Name {
+  let vars = name_map.get(nam).unwrap();
+  let var_id = *vars.last().unwrap();
+  var_id_to_name(var_id)
 }

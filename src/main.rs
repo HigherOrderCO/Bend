@@ -24,17 +24,27 @@ struct Args {
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Mode {
+  /// Checks that the program is sintactically and semantically correct.
   Check,
+  /// Compiles the program to hvmc and prints to stdout.
   Compile,
+  /// Compiles the program and runs it with the hvm.
   Run,
 }
 
-fn mem_parser(arg: &str) -> anyhow::Result<usize> {
-  let bytes = byte_unit::Byte::from_str(arg)?;
-  Ok(bytes.get_bytes() as usize)
+fn mem_parser(arg: &str) -> Result<usize, String> {
+  let (base, mult) = match arg.to_lowercase().chars().last() {
+    None => return Err("Mem size argument is empty".to_string()),
+    Some('k') => (&arg[0 .. arg.len() - 1], 1 << 10),
+    Some('m') => (&arg[0 .. arg.len() - 1], 1 << 20),
+    Some('g') => (&arg[0 .. arg.len() - 1], 1 << 30),
+    Some(_) => (arg, 1),
+  };
+  let base = base.parse::<usize>().map_err(|e| e.to_string())?;
+  Ok(base * mult)
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<(), String> {
   #[cfg(not(feature = "cli"))]
   compile_error!("The 'cli' feature is needed for the hvm-lang cli");
 
@@ -68,9 +78,6 @@ fn main() -> anyhow::Result<()> {
         println!("Invalid readback from inet.");
         println!("Got:\n{}\n", res_term.to_string(&def_names));
       }
-      // TODO: Some way to figure out total memory use?
-      // println!("size: {}", stats.size);
-
       // TODO: check for -s flag
       println!(
         "RWTS   : {}",

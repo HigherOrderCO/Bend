@@ -6,18 +6,19 @@ use hvmc::{
 };
 use std::collections::{HashMap, HashSet};
 
-pub fn nets_to_hvm_core(
+pub fn nets_to_hvmc(
   nets: HashMap<String, INet>,
   id_to_hvmc_name: &HashMap<DefId, Val>,
-) -> anyhow::Result<Book> {
+) -> Result<Book, String> {
   let mut book = Book::new();
   for (name, inet) in nets {
-    book.insert(name, compat_net_to_core(&inet, &|id| id_to_hvmc_name[&id])?);
+    let net = net_to_hvmc(&inet, &|id| id_to_hvmc_name[&id])?;
+    book.insert(name, net);
   }
   Ok(book)
 }
 
-pub fn compat_net_to_core(inet: &INet, id_to_hvmc_name: &impl Fn(DefId) -> Val) -> anyhow::Result<Net> {
+pub fn net_to_hvmc(inet: &INet, id_to_hvmc_name: &impl Fn(DefId) -> Val) -> Result<Net, String> {
   let (net_root, redxs) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(net_root) = net_root {
@@ -101,7 +102,7 @@ fn var_or_subtree(
 type VarId = NodeId;
 
 /// Returns a list of all the tree node roots in the compat inet.
-fn get_tree_roots(inet: &INet) -> anyhow::Result<(Option<NodeId>, Vec<[NodeId; 2]>)> {
+fn get_tree_roots(inet: &INet) -> Result<(Option<NodeId>, Vec<[NodeId; 2]>), String> {
   let mut redx_roots: Vec<[NodeId; 2]> = vec![];
   let mut explored_nodes = vec![false; inet.nodes.len()];
   let mut side_links: Vec<Port> = vec![]; // Links between trees
@@ -141,12 +142,12 @@ fn go_down_tree(
   root: NodeId,
   explored_nodes: &mut [bool],
   side_links: &mut Vec<Port>,
-) -> anyhow::Result<()> {
+) -> Result<(), String> {
   debug_assert!(!explored_nodes[root as usize], "Explored same tree twice");
   let mut nodes_to_check = vec![root];
   while let Some(node_id) = nodes_to_check.pop() {
     if explored_nodes[node_id as usize] {
-      return Err(anyhow::anyhow!("Cyclic terms are not supported"));
+      return Err("Found term that compiles into an inet with a vicious cycle".to_string());
     }
     explored_nodes[node_id as usize] = true;
     for down_slot in [1, 2] {
@@ -165,12 +166,12 @@ fn go_down_tree(
 
 /// Goes up a node tree, starting from some given node.
 /// Returns the root of this tree and the root of its active pair.
-fn go_up_tree(inet: &INet, start_node: NodeId) -> anyhow::Result<[NodeId; 2]> {
+fn go_up_tree(inet: &INet, start_node: NodeId) -> Result<[NodeId; 2], String> {
   let mut explored_nodes = HashSet::new();
   let mut crnt_node = start_node;
   loop {
     if !explored_nodes.insert(crnt_node) {
-      return Err(anyhow::anyhow!("Cyclic terms are not supported"));
+      return Err("Found term that compiles into an inet with a vicious cycle".to_string());
     }
     let up = inet.enter_port(Port(crnt_node, 0));
     if up.slot() == 0 {

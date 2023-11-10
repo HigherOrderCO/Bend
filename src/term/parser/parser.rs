@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{Adt, Book, DefId, Definition, LetPat, Name, Op, Rule, RulePat, Term};
+use crate::term::{Adt, Book, LetPat, Name, Op, Rule, RulePat, Term};
 use chumsky::{
   extra,
   input::{SpannedInput, Stream, ValueInput},
@@ -200,7 +200,7 @@ fn let_pat<'a, I>() -> impl Parser<'a, I, LetPat, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let pat_nam = name().map(|nam| LetPat::Var(nam)).boxed();
+  let pat_nam = name().map(LetPat::Var).boxed();
 
   let pat_tup = name_or_era()
     .then_ignore(just(Token::Comma))
@@ -236,10 +236,7 @@ where
   let lhs = name().then(rule_pat().repeated().collect()).boxed();
   let lhs = choice((lhs.clone(), lhs.clone().delimited_by(just(Token::LParen), just(Token::RParen))));
 
-  lhs
-    .then_ignore(just(Token::Equals))
-    .then(term())
-    .map(|((name, pats), body)| (name, Rule { def_id: DefId(0), pats, body }))
+  lhs.then_ignore(just(Token::Equals)).then(term()).map(|((name, pats), body)| (name, Rule { pats, body }))
 }
 
 fn datatype<'a, I>() -> impl Parser<'a, I, (Name, Adt), extra::Err<Rich<'a, Token>>>
@@ -266,21 +263,18 @@ fn book<'a, I>() -> impl Parser<'a, I, Book, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let top_level = choice((datatype().map(|x| TopLevel::Adt(x)), rule().map(|x| TopLevel::Rule(x))));
+  let top_level = choice((datatype().map(TopLevel::Adt), rule().map(TopLevel::Rule)));
 
   top_level.repeated().collect::<Vec<_>>().try_map(|program, span| {
     let mut book = Book::new();
 
     for top_level in program {
       match top_level {
-        TopLevel::Rule((nam, mut rule)) => {
+        TopLevel::Rule((nam, rule)) => {
           if let Some(def_id) = book.def_names.def_id(&nam) {
-            rule.def_id = def_id;
             book.defs.get_mut(&def_id).unwrap().rules.push(rule);
           } else {
-            let def_id = book.def_names.insert(nam);
-            rule.def_id = def_id;
-            book.defs.insert(def_id, Definition { def_id, rules: vec![rule] });
+            book.insert_def(nam, vec![rule]);
           }
         }
         TopLevel::Adt((nam, adt)) => {

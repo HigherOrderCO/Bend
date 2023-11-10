@@ -4,7 +4,7 @@ use hvmc::{
   ast::{book_to_runtime, name_to_val, net_from_runtime, /*show_net,*/ Net},
   run::Val,
 };
-use net::{hvmc_to_net, nets_to_hvm_core};
+use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{collections::HashMap, time::Instant};
 use term::{book_to_nets, net_to_term::net_to_term_non_linear, Book, DefId, DefNames, Term};
 
@@ -13,24 +13,25 @@ pub mod term;
 
 pub use term::load_book::load_file_to_book;
 
-pub fn check_book(mut book: Book) -> anyhow::Result<()> {
+pub fn check_book(mut book: Book) -> Result<(), String> {
   // TODO: Do the checks without having to do full compilation
   compile_book(&mut book)?;
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book) -> anyhow::Result<(hvmc::ast::Book, HashMap<Val, DefId>)> {
+pub fn compile_book(book: &mut Book) -> Result<(hvmc::ast::Book, HashMap<Val, DefId>), String> {
   let main = book.check_has_main()?;
   book.check_shared_names()?;
+  book.generate_scott_adts();
   book.resolve_refs();
   book.check_unbound_vars()?;
   book.make_var_names_unique();
-  book.linearize_vars()?;
+  book.linearize_vars();
   book.detach_supercombinators();
   book.simplify_ref_to_ref()?;
   book.prune(main);
-  let (nets, id_to_hvmc_name) = book_to_nets(book, main)?;
-  let core_book = nets_to_hvm_core(nets, &id_to_hvmc_name)?;
+  let (nets, id_to_hvmc_name) = book_to_nets(book, main);
+  let core_book = nets_to_hvmc(nets, &id_to_hvmc_name)?;
   let hvmc_name_to_id = id_to_hvmc_name.into_iter().map(|(k, v)| (v, k)).collect();
   Ok((core_book, hvmc_name_to_id))
 }
@@ -43,6 +44,7 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) 
   let start_time = Instant::now();
   root.normal(&runtime_book);
   let elapsed = start_time.elapsed().as_secs_f64();
+
   let rewrites =
     Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
   let net = net_from_runtime(&root);
@@ -51,10 +53,10 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) 
   (net, stats)
 }
 
-pub fn run_book(mut book: Book, mem_size: usize) -> anyhow::Result<(Term, DefNames, RunInfo)> {
+pub fn run_book(mut book: Book, mem_size: usize) -> Result<(Term, DefNames, RunInfo), String> {
   let (compiled, hvmc_name_to_id) = compile_book(&mut book)?;
   let (res_lnet, stats) = run_compiled(&compiled, mem_size);
-  let net = hvmc_to_net(&res_lnet, &|val| hvmc_name_to_id[&val])?;
+  let net = hvmc_to_net(&res_lnet, &|val| hvmc_name_to_id[&val]);
   let (res_term, valid_readback) = net_to_term_non_linear(&net, &book);
   let info = RunInfo { stats, valid_readback, net: res_lnet };
   Ok((res_term, book.def_names, info))

@@ -1,9 +1,6 @@
 pub mod hvmc_to_net;
 pub mod net_to_hvmc;
 
-pub use hvmc_to_net::hvmc_to_net;
-pub use net_to_hvmc::{compat_net_to_core, nets_to_hvm_core};
-
 use crate::term::DefId;
 use hvmc::run::Val;
 use NodeKind::*;
@@ -56,7 +53,7 @@ pub type SlotId = Val;
 
 /// The ROOT port is on the deadlocked root node at address 0.
 pub const ROOT: Port = Port(0, 1);
-pub const TAG_WIDTH: u32 = 4; // TODO: Make this generic over the HVM type.
+pub const TAG_WIDTH: u32 = 4;
 pub const TAG: u32 = Val::BITS - TAG_WIDTH;
 pub const LABEL_MASK: Val = (1 << TAG) - 1;
 pub const TAG_MASK: Val = !LABEL_MASK;

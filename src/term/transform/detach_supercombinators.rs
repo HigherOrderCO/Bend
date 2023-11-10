@@ -14,6 +14,8 @@ impl Book {
       }
     }
 
+    // Definitions are not inserted to the book as they are defined to appease the borrow checker.
+    // Since we are mut borrowing the rules we can't borrow the book to insert at the same time.
     self.defs.append(&mut combinators)
   }
 }
@@ -63,7 +65,7 @@ impl<'d> TermInfo<'d> {
     let comb_var = Term::Ref { def_id: comb_id };
     let extracted_term = std::mem::replace(term, comb_var);
 
-    let rules = vec![Rule { def_id: comb_id, body: extracted_term, pats: Vec::new() }];
+    let rules = vec![Rule { body: extracted_term, pats: Vec::new() }];
     let rule = Definition { def_id: comb_id, rules };
     self.combinators.insert(comb_id, rule);
   }

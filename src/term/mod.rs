@@ -1,5 +1,3 @@
-use bimap::{BiHashMap, Overwritten};
-use derive_more::{Display, From, Into};
 use hvmc::run::Val;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -37,7 +35,8 @@ pub struct Book {
 
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
-  map: BiHashMap<DefId, Name>,
+  id_to_name: HashMap<DefId, Name>,
+  name_to_id: HashMap<Name, DefId>,
   id_count: DefId,
 }
 
@@ -51,7 +50,6 @@ pub struct Definition {
 /// A pattern matching rule of a definition.
 #[derive(Debug, Clone)]
 pub struct Rule {
-  pub def_id: DefId,
   pub pats: Vec<RulePat>,
   pub body: Term,
 }
@@ -85,17 +83,13 @@ pub enum Term {
     val: Box<Term>,
     nxt: Box<Term>,
   },
-  Ref {
-    def_id: DefId,
-  },
   App {
     fun: Box<Term>,
     arg: Box<Term>,
   },
-  Match {
-    cond: Box<Term>,
-    zero: Box<Term>,
-    succ: Box<Term>,
+  Tup {
+    fst: Box<Term>,
+    snd: Box<Term>,
   },
   Dup {
     fst: Option<Name>,
@@ -107,7 +101,6 @@ pub enum Term {
     fst: Box<Term>,
     snd: Box<Term>,
   },
-  Era,
   Num {
     val: u32,
   },
@@ -117,10 +110,15 @@ pub enum Term {
     fst: Box<Term>,
     snd: Box<Term>,
   },
-  Tup {
-    fst: Box<Term>,
-    snd: Box<Term>,
+  Match {
+    cond: Box<Term>,
+    zero: Box<Term>,
+    succ: Box<Term>,
   },
+  Ref {
+    def_id: DefId,
+  },
+  Era,
 }
 
 #[derive(Debug, Clone)]
@@ -154,14 +152,11 @@ pub struct Adt {
   pub ctrs: IndexMap<Name, usize>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
+#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord)]
 pub struct Name(pub String);
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Default)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, Default)]
 pub struct DefId(pub Val);
-
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, From, Into)]
-pub struct VarId(pub Val);
 
 pub fn var_id_to_name(mut var_id: Val) -> Name {
   let mut name = String::new();
@@ -182,8 +177,8 @@ impl Name {
   }
 }
 
-// TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
 impl DefId {
+  // TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
   pub fn to_internal(self) -> Val {
     *self + 1
   }
@@ -197,6 +192,19 @@ impl Book {
   pub fn new() -> Self {
     Default::default()
   }
+
+  pub fn insert_def(&mut self, name: Name, rules: Vec<Rule>) -> DefId {
+    let def_id = self.def_names.insert(name);
+    let def = Definition { def_id, rules };
+    self.defs.insert(def_id, def);
+    def_id
+  }
+
+  pub fn remove_def(&mut self, def_id: DefId) -> Option<(Name, Definition)> {
+    let def = self.defs.remove(&def_id);
+    let name = self.def_names.remove(def_id);
+    name.zip(def)
+  }
 }
 
 impl DefNames {
@@ -208,28 +216,43 @@ impl DefNames {
   }
 
   pub fn name(&self, def_id: &DefId) -> Option<&Name> {
-    self.map.get_by_left(def_id)
+    self.id_to_name.get(def_id)
   }
 
   pub fn def_id(&self, name: &Name) -> Option<DefId> {
-    self.map.get_by_right(name).copied()
+    self.name_to_id.get(name).copied()
   }
 
   pub fn contains_name(&self, name: &Name) -> bool {
-    self.map.contains_right(name)
+    self.name_to_id.contains_key(name)
   }
 
   pub fn contains_def_id(&self, def_id: &DefId) -> bool {
-    self.map.contains_left(def_id)
+    self.id_to_name.contains_key(def_id)
   }
 
   pub fn insert(&mut self, name: Name) -> DefId {
     let def_id = self.id_count;
     self.id_count.0 += 1;
-    match self.map.insert(def_id, name) {
-      Overwritten::Neither => def_id,
-      _ => todo!("Overwritting name-id pairs not supported"),
+    self.id_to_name.insert(def_id, name.clone());
+    self.name_to_id.insert(name, def_id);
+    def_id
+  }
+
+  pub fn remove(&mut self, def_id: DefId) -> Option<Name> {
+    let nam = self.id_to_name.remove(&def_id);
+    if let Some(nam) = &nam {
+      self.name_to_id.remove(nam);
     }
+    nam
+  }
+
+  pub fn names(&self) -> impl Iterator<Item = &Name> {
+    self.name_to_id.keys()
+  }
+
+  pub fn def_ids(&self) -> impl Iterator<Item = &DefId> {
+    self.id_to_name.keys()
   }
 }
 
@@ -358,13 +381,12 @@ impl fmt::Display for LetPat {
 }
 
 impl Rule {
-  pub fn to_string(&self, def_names: &DefNames) -> String {
-    let Rule { def_id, pats, body } = self;
+  pub fn to_string(&self, def_id: &DefId, def_names: &DefNames) -> String {
     format!(
       "({}{}) = {}",
       def_names.name(def_id).unwrap(),
-      pats.iter().map(|x| format!(" {x}")).join(""),
-      body.to_string(def_names)
+      self.pats.iter().map(|x| format!(" {x}")).join(""),
+      self.body.to_string(def_names)
     )
   }
 
@@ -375,17 +397,21 @@ impl Rule {
 
 impl Definition {
   pub fn to_string(&self, def_names: &DefNames) -> String {
-    self.rules.iter().map(|x| x.to_string(def_names)).join("\n")
+    self.rules.iter().map(|x| x.to_string(&self.def_id, def_names)).join("\n")
   }
 
   pub fn arity(&self) -> usize {
     self.rules[0].arity()
   }
+
+  pub fn assert_no_pattern_matching_rules(&self) {
+    assert!(self.rules.len() == 1, "Definition rules should have been removed in earlier pass");
+  }
 }
 
 impl fmt::Display for Book {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", self.defs.iter().map(|(_, x)| x.to_string(&self.def_names)).join("\n\n"))
+    write!(f, "{}", self.defs.values().map(|x| x.to_string(&self.def_names)).join("\n\n"))
   }
 }
 
@@ -426,5 +452,11 @@ impl fmt::Display for Op {
       Op::LSH => write!(f, "<<"),
       Op::RSH => write!(f, ">>"),
     }
+  }
+}
+
+impl fmt::Display for Name {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    self.0.fmt(f)
   }
 }
