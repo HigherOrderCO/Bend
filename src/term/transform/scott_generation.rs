@@ -17,19 +17,14 @@ impl Book {
         let def = Definition { def_id, rules };
 
         self.defs.insert(def_id, def);
-        self.ctrs.remove(ctr_name);
       }
     }
   }
 }
 
 fn make_args(args_count: &usize) -> Vec<Name> {
-  let mut ctr_args = Vec::new();
-  for n in 0 .. *args_count {
-    let nam = Name(format!("a{n}"));
-    ctr_args.push(nam);
-  }
-  ctr_args
+  let to_nam = |n| Name(format!("a{n}"));
+  (0 .. *args_count).map(to_nam).collect()
 }
 
 fn make_lam(ctr_args: Vec<Name>, ctrs: Vec<Name>, ctr_name: &Name) -> Term {
