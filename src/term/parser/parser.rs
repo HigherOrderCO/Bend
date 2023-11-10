@@ -268,6 +268,7 @@ where
   top_level.repeated().collect::<Vec<_>>().try_map(|program, span| {
     let mut book = Book::new();
 
+    // Collect rules and adts into a book
     for top_level in program {
       match top_level {
         TopLevel::Rule((nam, rule)) => {
@@ -293,6 +294,7 @@ where
         }
       }
     }
+
     Ok(book)
   })
 }

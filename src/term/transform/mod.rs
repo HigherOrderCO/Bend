@@ -7,3 +7,4 @@ pub mod linearize;
 pub mod resolve_refs;
 pub mod simplify_ref_to_ref;
 pub mod unique_names;
+pub mod resolve_ctrs_in_pats;
