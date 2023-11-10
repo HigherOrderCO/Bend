@@ -34,18 +34,7 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(nxt, def_names, scope);
       pop_scope(Some(nam.clone()), scope);
     }
-    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
-      resolve_refs(val, def_names, scope);
-
-      push_scope(l_nam.clone(), scope);
-      push_scope(r_nam.clone(), scope);
-
-      resolve_refs(nxt, def_names, scope);
-
-      pop_scope(l_nam.clone(), scope);
-      pop_scope(r_nam.clone(), scope);
-    }
-    Term::Dup { fst, snd, val, nxt } => {
+    Term::Dup { fst, snd, val, nxt } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
       resolve_refs(val, def_names, scope);
       push_scope(fst.clone(), scope);
       push_scope(snd.clone(), scope);
@@ -67,28 +56,16 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(fun, def_names, scope);
       resolve_refs(arg, def_names, scope);
     }
+    Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+      resolve_refs(fst, def_names, scope);
+      resolve_refs(snd, def_names, scope);
+    }
     Term::Match { cond, zero, succ } => {
       resolve_refs(cond, def_names, scope);
       resolve_refs(zero, def_names, scope);
       resolve_refs(succ, def_names, scope);
     }
-    Term::Sup { fst, snd } => {
-      resolve_refs(fst, def_names, scope);
-      resolve_refs(snd, def_names, scope);
-    }
-    Term::Opx { fst, snd, .. } => {
-      resolve_refs(fst, def_names, scope);
-      resolve_refs(snd, def_names, scope);
-    }
-    Term::Tup { fst, snd } => {
-      resolve_refs(fst, def_names, scope);
-      resolve_refs(snd, def_names, scope);
-    }
-    Term::Lnk { .. } => (),
-    // We don't expect to find any refs here, but if we do, just ignore it.
-    Term::Ref { .. } => (),
-    Term::Era => (),
-    Term::Num { .. } => (),
+    Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
   }
 }
 

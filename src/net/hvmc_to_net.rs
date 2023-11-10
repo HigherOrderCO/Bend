@@ -110,6 +110,7 @@ fn tree_to_inodes(
 // Converts INodes to an INet by linking ports based on names.
 fn inodes_to_inet(inodes: &INodes) -> INet {
   let mut inet = INet::new();
+  // Maps named inode ports to numeric inet ports.
   let mut name_map = std::collections::HashMap::new();
 
   for inode in inodes.iter() {

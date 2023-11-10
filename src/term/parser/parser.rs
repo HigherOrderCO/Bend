@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{Adt, Book, Definition, LetPat, Name, Op, Rule, RulePat, Term};
+use crate::term::{Adt, Book, LetPat, Name, Op, Rule, RulePat, Term};
 use chumsky::{
   extra,
   input::{SpannedInput, Stream, ValueInput},
@@ -274,8 +274,7 @@ where
           if let Some(def_id) = book.def_names.def_id(&nam) {
             book.defs.get_mut(&def_id).unwrap().rules.push(rule);
           } else {
-            let def_id = book.def_names.insert(nam);
-            book.defs.insert(def_id, Definition { def_id, rules: vec![rule] });
+            book.insert_def(nam, vec![rule]);
           }
         }
         TopLevel::Adt((nam, adt)) => {

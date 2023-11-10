@@ -3,10 +3,11 @@ use hvmc::run::Val;
 use std::collections::HashMap;
 
 impl Book {
+  /// Checks that there are no unbound variables in all definitions.
   pub fn check_unbound_vars(&self) -> anyhow::Result<()> {
     for def in self.defs.values() {
       // TODO: Enable when pattern matching is done
-      //debug_assert!(def.rules.len() == 1, "Definition rules should be removed in earlier pass");
+      // def.assert_no_pattern_matching_rules();
       def.rules[0].body.check_unbound_vars()?;
     }
     Ok(())
@@ -39,13 +40,10 @@ pub fn check_uses<'a>(
 ) -> anyhow::Result<()> {
   // TODO: Don't stop at the first error
   match term {
-    Term::Lam { nam: Some(nam), bod } => {
-      push_scope(nam, scope);
+    Term::Lam { nam, bod } => {
+      push_scope(nam.as_ref(), scope);
       check_uses(bod, scope, globals)?;
-      pop_scope(nam, scope);
-    }
-    Term::Lam { nam: None, bod } => {
-      check_uses(bod, scope, globals)?;
+      pop_scope(nam.as_ref(), scope);
     }
     Term::Var { nam } => {
       if !scope.contains_key(nam) {
@@ -61,84 +59,52 @@ pub fn check_uses<'a>(
     }
     Term::Let { pat: LetPat::Var(nam), val, nxt } => {
       check_uses(val, scope, globals)?;
-      push_scope(nam, scope);
+      push_scope(Some(nam), scope);
       check_uses(nxt, scope, globals)?;
-      pop_scope(nam, scope);
+      pop_scope(Some(nam), scope);
     }
-    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
+    Term::Dup { fst, snd, val, nxt } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
       check_uses(val, scope, globals)?;
-
-      if let Some(l_nam) = l_nam {
-        push_scope(l_nam, scope);
-      }
-      if let Some(r_nam) = r_nam {
-        push_scope(r_nam, scope);
-      }
-
+      push_scope(fst.as_ref(), scope);
+      push_scope(snd.as_ref(), scope);
       check_uses(nxt, scope, globals)?;
-
-      if let Some(l_nam) = l_nam {
-        pop_scope(l_nam, scope);
-      }
-      if let Some(r_nam) = r_nam {
-        pop_scope(r_nam, scope);
-      }
+      pop_scope(fst.as_ref(), scope);
+      pop_scope(snd.as_ref(), scope);
     }
     Term::App { fun, arg } => {
       check_uses(fun, scope, globals)?;
       check_uses(arg, scope, globals)?;
+    }
+    Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { fst, snd, .. } => {
+      check_uses(fst, scope, globals)?;
+      check_uses(snd, scope, globals)?;
     }
     Term::Match { cond, zero, succ } => {
       check_uses(cond, scope, globals)?;
       check_uses(zero, scope, globals)?;
       check_uses(succ, scope, globals)?;
     }
-    Term::Dup { fst, snd, val, nxt } => {
-      check_uses(val, scope, globals)?;
-      if let Some(fst) = fst {
-        push_scope(fst, scope)
-      }
-      if let Some(snd) = snd {
-        push_scope(snd, scope);
-      }
-      check_uses(nxt, scope, globals)?;
-      if let Some(snd) = snd {
-        pop_scope(snd, scope);
-      }
-      if let Some(fst) = fst {
-        pop_scope(fst, scope);
-      }
-    }
-    Term::Sup { fst, snd } => {
-      check_uses(fst, scope, globals)?;
-      check_uses(snd, scope, globals)?;
-    }
-    Term::Ref { .. } | Term::Era => (),
-    Term::Opx { fst, snd, .. } => {
-      check_uses(fst, scope, globals)?;
-      check_uses(snd, scope, globals)?;
-    }
-    Term::Num { .. } => (),
-    Term::Tup { fst, snd } => {
-      check_uses(fst, scope, globals)?;
-      check_uses(snd, scope, globals)?;
-    }
+    Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
   }
   Ok(())
 }
 
-fn push_scope<'a>(nam: &'a Name, scope: &mut HashMap<&'a Name, Val>) {
-  if let Some(n_declarations) = scope.get_mut(nam) {
-    *n_declarations += 1;
-  } else {
-    scope.insert(nam, 1);
+fn push_scope<'a> (nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, Val>) {
+  if let Some(nam) = nam {
+    if let Some(n_declarations) = scope.get_mut(nam) {
+      *n_declarations += 1;
+    } else {
+      scope.insert(nam, 1);
+    }
   }
 }
 
-fn pop_scope(nam: &Name, scope: &mut HashMap<&Name, Val>) {
-  let n_declarations = scope.get_mut(nam).unwrap();
-  *n_declarations -= 1;
-  if *n_declarations == 0 {
-    scope.remove(nam);
+fn pop_scope(nam: Option<&Name>, scope: &mut HashMap<&Name, Val>) {
+  if let Some(nam) = nam {
+    let n_declarations = scope.get_mut(nam).unwrap();
+    *n_declarations -= 1;
+    if *n_declarations == 0 {
+      scope.remove(nam);
+    }
   }
 }

@@ -16,11 +16,9 @@ impl Book {
   /// and checks the rules arities based on the first rule arity.
   pub fn infer_def_types(&self) -> anyhow::Result<DefinitionTypes> {
     let mut def_types = HashMap::new();
-
     for def in self.defs.values() {
       self.infer_def_type(def, &mut def_types)?;
     }
-
     Ok(def_types)
   }
 

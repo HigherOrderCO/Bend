@@ -83,17 +83,13 @@ pub enum Term {
     val: Box<Term>,
     nxt: Box<Term>,
   },
-  Ref {
-    def_id: DefId,
-  },
   App {
     fun: Box<Term>,
     arg: Box<Term>,
   },
-  Match {
-    cond: Box<Term>,
-    zero: Box<Term>,
-    succ: Box<Term>,
+  Tup {
+    fst: Box<Term>,
+    snd: Box<Term>,
   },
   Dup {
     fst: Option<Name>,
@@ -105,7 +101,6 @@ pub enum Term {
     fst: Box<Term>,
     snd: Box<Term>,
   },
-  Era,
   Num {
     val: u32,
   },
@@ -115,10 +110,15 @@ pub enum Term {
     fst: Box<Term>,
     snd: Box<Term>,
   },
-  Tup {
-    fst: Box<Term>,
-    snd: Box<Term>,
+  Match {
+    cond: Box<Term>,
+    zero: Box<Term>,
+    succ: Box<Term>,
   },
+  Ref {
+    def_id: DefId,
+  },
+  Era,
 }
 
 #[derive(Debug, Clone)]
@@ -193,14 +193,17 @@ impl Book {
     Default::default()
   }
 
-  pub fn insert_def(&mut self, name: Name, def: Definition) {
+  pub fn insert_def(&mut self, name: Name, rules: Vec<Rule>) -> DefId {
     let def_id = self.def_names.insert(name);
+    let def = Definition { def_id, rules };
     self.defs.insert(def_id, def);
+    def_id
   }
 
-  pub fn remove_def(&mut self, def_id: DefId) {
-    self.defs.remove(&def_id);
-    self.def_names.remove(def_id);
+  pub fn remove_def(&mut self, def_id: DefId) -> Option<(Name, Definition)> {
+    let def = self.defs.remove(&def_id);
+    let name = self.def_names.remove(def_id);
+    name.zip(def)
   }
 }
 
@@ -399,6 +402,10 @@ impl Definition {
 
   pub fn arity(&self) -> usize {
     self.rules[0].arity()
+  }
+
+  pub fn assert_no_pattern_matching_rules(&self) {
+    assert!(self.rules.len() == 1, "Definition rules should have been removed in earlier pass");
   }
 }
 

@@ -11,11 +11,7 @@ impl Book {
     let mut ref_map: HashMap<DefId, DefId> = HashMap::new();
     // Find to which defs we're mapping the ones that are just references.
     for def_id in self.def_names.def_ids() {
-      debug_assert_eq!(
-        self.defs.get(def_id).unwrap().rules.len(),
-        1,
-        "Expected defs to have only one rule at this point."
-      );
+      self.defs[def_id].assert_no_pattern_matching_rules();
       let mut ref_id = def_id;
       let mut is_ref_to_ref = false;
       while let Term::Ref { def_id: next_ref_id } = &self.defs.get(ref_id).unwrap().rules[0].body {
@@ -63,14 +59,14 @@ fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) {
       subst_ref_to_ref(fun, ref_map);
       subst_ref_to_ref(arg, ref_map);
     }
+    Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+      subst_ref_to_ref(fst, ref_map);
+      subst_ref_to_ref(snd, ref_map);
+    }
     Term::Match { cond, zero, succ } => {
       subst_ref_to_ref(cond, ref_map);
       subst_ref_to_ref(zero, ref_map);
       subst_ref_to_ref(succ, ref_map);
-    }
-    Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
-      subst_ref_to_ref(fst, ref_map);
-      subst_ref_to_ref(snd, ref_map);
     }
     Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => (),
   }

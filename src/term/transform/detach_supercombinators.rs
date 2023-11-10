@@ -14,6 +14,8 @@ impl Book {
       }
     }
 
+    // Definitions are not inserted to the book as they are defined to appease the borrow checker.
+    // Since we are mut borrowing the rules we can't borrow the book to insert at the same time.
     self.defs.append(&mut combinators)
   }
 }

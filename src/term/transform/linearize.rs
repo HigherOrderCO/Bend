@@ -28,130 +28,171 @@ impl Book {
 impl Term {
   pub fn linearize_vars(&mut self) -> anyhow::Result<()> {
     let mut var_uses = HashMap::new();
-    get_var_use(self, &mut var_uses);
-    *self = term_to_affine(self.clone(), &mut var_uses, &mut HashMap::new())?;
+    count_var_uses_in_term(self, &mut var_uses);
+    term_to_affine(self, &mut var_uses, &mut HashMap::new())?;
     Ok(())
   }
 }
 
-fn term_to_affine(
-  term: Term,
-  var_uses: &mut HashMap<Name, Val>,
-  let_bodies: &mut HashMap<Name, Term>,
-) -> anyhow::Result<Term> {
-  let term = match term {
-    Term::Lam { nam: None, bod } => {
-      Term::Lam { nam: None, bod: Box::new(term_to_affine(*bod, var_uses, let_bodies)?) }
-    }
-    Term::Lam { nam: Some(nam), bod } => {
-      if let Some(uses) = var_uses.get(&nam).copied() {
-        let bod = term_to_affine(*bod, var_uses, let_bodies)?;
-        let (bod, nam) = duplicate_lam(nam, bod, uses);
-        Term::Lam { nam, bod: Box::new(bod) }
-      } else {
-        Term::Lam { nam: None, bod }
-      }
-    }
+fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
+  match term {
     Term::Var { nam } => {
-      let uses = var_uses[&nam];
-      *var_uses.get_mut(&nam).unwrap() -= 1;
-      if let Some(subst) = let_bodies.remove(&nam) { subst } else { Term::Var { nam: dup_name(&nam, uses) } }
+      *uses.entry(nam.clone()).or_default() += 1;
     }
-    Term::Chn { nam, bod } => Term::Chn { nam, bod: Box::new(term_to_affine(*bod, var_uses, let_bodies)?) },
-    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
-      let uses = var_uses[&nam];
-      match uses {
-        0 => term_to_affine(*nxt, var_uses, let_bodies)?,
-        1 => {
-          let val = term_to_affine(*val, var_uses, let_bodies)?;
-          let_bodies.insert(nam, val);
-          term_to_affine(*nxt, var_uses, let_bodies)?
-        }
-        uses => {
-          let val = term_to_affine(*val, var_uses, let_bodies)?;
-          let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
-          duplicate_let(&nam, nxt, uses, val)
-        }
-      }
-    }
-    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
-      // TODO: check if val is a Tuple
-      let fst_uses = l_nam.as_ref().map(|l_nam| *var_uses.get(l_nam).unwrap()).unwrap_or(0);
-      let snd_uses = r_nam.as_ref().map(|r_nam| *var_uses.get(r_nam).unwrap()).unwrap_or(0);
-      let val = term_to_affine(*val, var_uses, let_bodies)?;
-      let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
-      let (nxt, fst) = if let Some(fst) = l_nam { duplicate_lam(fst, nxt, fst_uses) } else { (nxt, l_nam) };
-      let (nxt, snd) = if let Some(snd) = r_nam { duplicate_lam(snd, nxt, snd_uses) } else { (nxt, r_nam) };
-      Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(nxt) }
+    Term::Lam { nam, bod } => {
+      add_var(nam.as_ref(), uses);
+      count_var_uses_in_term(bod, uses)
     }
     Term::Dup { fst, snd, val, nxt } => {
-      let uses_fst = fst.as_ref().map(|fst| *var_uses.get(fst).unwrap()).unwrap_or(0);
-      let uses_snd = snd.as_ref().map(|snd| *var_uses.get(snd).unwrap()).unwrap_or(0);
-      let val = term_to_affine(*val, var_uses, let_bodies)?;
-      let nxt = term_to_affine(*nxt, var_uses, let_bodies)?;
-      let (nxt, fst) = if let Some(fst) = fst { duplicate_lam(fst, nxt, uses_fst) } else { (nxt, fst) };
-      let (nxt, snd) = if let Some(snd) = snd { duplicate_lam(snd, nxt, uses_snd) } else { (nxt, snd) };
-      Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(nxt) }
+      add_var(fst.as_ref(), uses);
+      add_var(snd.as_ref(), uses);
+      count_var_uses_in_term(val, uses);
+      count_var_uses_in_term(nxt, uses);
+    }
+    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+      add_var(Some(nam), uses);
+      count_var_uses_in_term(val, uses);
+      count_var_uses_in_term(nxt, uses);
+    }
+    Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+      add_var(fst.as_ref(), uses);
+      add_var(snd.as_ref(), uses);
+      count_var_uses_in_term(val, uses);
+      count_var_uses_in_term(nxt, uses);
+    }
+    Term::Chn { bod, .. } => count_var_uses_in_term(bod, uses),
+    Term::App { fun, arg } => {
+      count_var_uses_in_term(fun, uses);
+      count_var_uses_in_term(arg, uses);
+    }
+    Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+      count_var_uses_in_term(fst, uses);
+      count_var_uses_in_term(snd, uses);
     }
     Term::Match { cond, zero, succ } => {
-      let cond = term_to_affine(*cond, var_uses, let_bodies)?;
-      let zero = term_to_affine(*zero, var_uses, let_bodies)?;
-      let succ = term_to_affine(*succ, var_uses, let_bodies)?;
-      Term::Match { cond: Box::new(cond), zero: Box::new(zero), succ: Box::new(succ) }
+      count_var_uses_in_term(cond, uses);
+      count_var_uses_in_term(zero, uses);
+      count_var_uses_in_term(succ, uses);
     }
-    Term::App { fun, arg } => Term::App {
-      fun: Box::new(term_to_affine(*fun, var_uses, let_bodies)?),
-      arg: Box::new(term_to_affine(*arg, var_uses, let_bodies)?),
-    },
-    Term::Sup { fst, snd } => Term::Sup {
-      fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
-      snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
-    },
-    Term::Opx { op, fst, snd } => Term::Opx {
-      op,
-      fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
-      snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
-    },
-    Term::Tup { fst, snd } => Term::Tup {
-      fst: Box::new(term_to_affine(*fst, var_uses, let_bodies)?),
-      snd: Box::new(term_to_affine(*snd, var_uses, let_bodies)?),
-    },
-    t @ (Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. }) => t,
-  };
-  Ok(term)
+    Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
+  }
 }
 
-fn make_dup_tree(nam: &Name, mut nxt: Term, uses: Val, dup_body: Option<Term>) -> Term {
+fn term_to_affine(
+  term: &mut Term,
+  var_uses: &mut HashMap<Name, Val>,
+  let_bodies: &mut HashMap<Name, Term>,
+) -> anyhow::Result<()> {
+  match term {
+    // Var-declaring terms
+    Term::Lam { nam, bod } => {
+      if let Some(nam_some) = nam {
+        if let Some(uses) = var_uses.get(nam_some).copied() {
+          term_to_affine(bod, var_uses, let_bodies)?;
+          duplicate_lam(nam, bod, uses);
+        } else {
+          term_to_affine(bod, var_uses, let_bodies)?;
+        }
+      } else {
+        term_to_affine(bod, var_uses, let_bodies)?;
+      }
+    }
+
+    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+      let uses = var_uses[nam];
+      match uses {
+        0 => {
+          term_to_affine(nxt, var_uses, let_bodies)?;
+        }
+        1 => {
+          term_to_affine(val, var_uses, let_bodies)?;
+          let_bodies.insert(nam.clone(), std::mem::replace(val.as_mut(), Term::Era));
+          term_to_affine(nxt, var_uses, let_bodies)?;
+        }
+        uses => {
+          term_to_affine(val, var_uses, let_bodies)?;
+          term_to_affine(nxt, var_uses, let_bodies)?;
+          duplicate_let(&nam, nxt, uses, val);
+        }
+      }
+      *term = std::mem::replace(nxt.as_mut(), Term::Era);
+    }
+
+    Term::Dup { fst, snd, val, nxt } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+      let uses_fst = get_var_uses(fst.as_ref(), var_uses);
+      let uses_snd = get_var_uses(snd.as_ref(), var_uses);
+      term_to_affine(val, var_uses, let_bodies)?;
+      term_to_affine(nxt, var_uses, let_bodies)?;
+      duplicate_lam(fst, nxt, uses_fst);
+      duplicate_lam(snd, nxt, uses_snd);
+    }
+
+    // Var-using terms
+    Term::Var { nam } => {
+      let uses = var_uses[nam];
+      *var_uses.get_mut(nam).unwrap() -= 1;
+      if let Some(subst) = let_bodies.remove(nam) {
+        *term = subst.clone();
+      } else {
+        *nam = dup_name(&nam, uses);
+      }
+    }
+
+    // Others
+    Term::Chn { bod, .. } => term_to_affine(bod, var_uses, let_bodies)?,
+    Term::App { fun, arg } => {
+      term_to_affine(fun, var_uses, let_bodies)?;
+      term_to_affine(arg, var_uses, let_bodies)?;
+    }
+    Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+      term_to_affine(fst, var_uses, let_bodies)?;
+      term_to_affine(snd, var_uses, let_bodies)?;
+    }
+    Term::Match { cond, zero, succ } => {
+      term_to_affine(cond, var_uses, let_bodies)?;
+      term_to_affine(zero, var_uses, let_bodies)?;
+      term_to_affine(succ, var_uses, let_bodies)?;
+    }
+    Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } => (),
+  };
+  Ok(())
+}
+
+fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, Val>) -> Val {
+  if let Some(nam) = nam { *var_uses.get(nam).unwrap() } else { 0 }
+}
+
+fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, dup_body: Option<&mut Term>) {
   // TODO: Is there a difference between a list of dups and a complete binary tree of dups?
   // Creates this: "dup x1 x1_dup = body; dup x2 x2_dup = x1_dup; dup x3 x4 = x2_dup; nxt"
   for i in (1 .. uses).rev() {
-    nxt = Term::Dup {
+    let old_nxt = std::mem::replace(nxt, Term::Era);
+    *nxt = Term::Dup {
       fst: Some(dup_name(nam, i)),
       snd: if i == uses - 1 { Some(dup_name(nam, uses)) } else { Some(internal_dup_name(nam, uses)) },
       val: if i == 1 {
         if let Some(dup_body) = &dup_body {
-          Box::new(dup_body.clone()) // TODO: don't clone here
+          Box::new((*dup_body).clone()) // TODO: don't clone here
         } else {
           Box::new(Term::Var { nam: nam.clone() })
         }
       } else {
         Box::new(Term::Var { nam: internal_dup_name(nam, uses) })
       },
-      nxt: Box::new(nxt),
+      nxt: Box::new(old_nxt),
     };
   }
-  nxt
 }
 
-fn duplicate_lam(nam: Name, nxt: Term, uses: Val) -> (Term, Option<Name>) {
+fn duplicate_lam(nam: &mut Option<Name>, nxt: &mut Term, uses: Val) {
   match uses {
-    0 => (nxt, None),
-    1 => (nxt, Some(dup_name(&nam, 1))),
-    uses => (make_dup_tree(&nam, nxt, uses, None), Some(nam)),
+    0 => *nam = None,
+    1 => *nam = Some(dup_name(nam.as_ref().unwrap(), 1)),
+    uses => make_dup_tree(nam.as_ref().unwrap(), nxt, uses, None),
   }
 }
 
-fn duplicate_let(nam: &Name, nxt: Term, uses: Val, let_body: Term) -> Term {
+fn duplicate_let(nam: &Name, nxt: &mut Term, uses: Val, let_body: &mut Term) {
   make_dup_tree(nam, nxt, uses, Some(let_body))
 }
 
@@ -163,79 +204,8 @@ fn internal_dup_name(nam: &Name, uses: Val) -> Name {
   Name(format!("{}_dup", dup_name(nam, uses)))
 }
 
-fn get_var_use(term: &Term, uses: &mut HashMap<Name, Val>) {
-  match term {
-    Term::Var { nam } => {
-      *uses.entry(nam.clone()).or_default() += 1;
-    }
-    Term::Lam { nam, bod } => {
-      if let Some(nam) = nam {
-        if !uses.contains_key(nam) {
-          uses.insert(nam.clone(), 0);
-        }
-      }
-      get_var_use(bod, uses)
-    }
-    Term::Dup { fst, snd, val, nxt } => {
-      if let Some(fst) = fst {
-        if !uses.contains_key(fst) {
-          uses.insert(fst.clone(), 0);
-        }
-      }
-      if let Some(snd) = snd {
-        if !uses.contains_key(snd) {
-          uses.insert(snd.clone(), 0);
-        }
-      }
-      get_var_use(val, uses);
-      get_var_use(nxt, uses);
-    }
-    Term::Chn { bod, .. } => get_var_use(bod, uses),
-    Term::Lnk { .. } => (),
-    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
-      if !uses.contains_key(nam) {
-        uses.insert(nam.clone(), 0);
-      }
-      get_var_use(val, uses);
-      get_var_use(nxt, uses);
-    }
-    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
-      if let Some(l_nam) = l_nam {
-        if !uses.contains_key(l_nam) {
-          uses.insert(l_nam.clone(), 0);
-        }
-      }
-      if let Some(r_nam) = r_nam {
-        if !uses.contains_key(r_nam) {
-          uses.insert(r_nam.clone(), 0);
-        }
-      }
-      get_var_use(val, uses);
-      get_var_use(nxt, uses);
-    }
-    Term::Ref { .. } => (),
-    Term::App { fun, arg } => {
-      get_var_use(fun, uses);
-      get_var_use(arg, uses);
-    }
-    Term::Match { cond, zero, succ } => {
-      get_var_use(cond, uses);
-      get_var_use(zero, uses);
-      get_var_use(succ, uses);
-    }
-    Term::Sup { fst, snd } => {
-      get_var_use(fst, uses);
-      get_var_use(snd, uses);
-    }
-    Term::Era => (),
-    Term::Num { .. } => (),
-    Term::Opx { fst, snd, .. } => {
-      get_var_use(fst, uses);
-      get_var_use(snd, uses);
-    }
-    Term::Tup { fst, snd } => {
-      get_var_use(fst, uses);
-      get_var_use(snd, uses);
-    }
+fn add_var(nam: Option<&Name>, uses: &mut HashMap<Name, Val>) {
+  if let Some(nam) = nam {
+    uses.entry(nam.clone()).or_insert(0);
   }
 }

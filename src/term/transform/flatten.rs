@@ -186,7 +186,6 @@ fn make_rule_calling_split(old_rule: &Rule, new_def_id: DefId) -> Rule {
     match &pat {
       RulePat::Var(name) => {
         old_rule_pats.push(pat.clone());
-        // TODO: Test this
         old_rule_body_args.push(Term::Var { nam: name.clone() });
       }
       RulePat::Ctr(name, args) => {

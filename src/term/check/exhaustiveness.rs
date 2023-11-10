@@ -252,7 +252,7 @@ impl Book {
 
         // if the case is useful that means that the rule is not exhaustive
         if useful(&ctx, &mut problem) {
-          let def_name = self.def_names.map.get_by_left(&def.def_id).unwrap();
+          let def_name = self.def_names.name(&def.def_id).unwrap();
 
           return Err(anyhow::anyhow!("The definition '{def_name}' is not exhaustive."));
         }

@@ -16,6 +16,8 @@ impl Book {
       }
     }
 
+    // Definitions are not inserted to the book as they are defined to appease the borrow checker.
+    // Since we are mut borrowing the rules we can't borrow the book to insert at the same time.
     self.defs.append(&mut comb);
   }
 }
@@ -242,6 +244,7 @@ impl Combinator {
   fn comb_ref(self, names: &mut DefNames, defs: &mut Combinators) -> Term {
     let name = Name::new(&format!("${:?}", self));
     let def_id = names.def_id(&name).unwrap_or_else(|| {
+
       let def_id = names.insert(name);
       let body = self.into();
       let rules = vec![Rule { pats: Vec::new(), body }];

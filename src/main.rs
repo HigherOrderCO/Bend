@@ -24,8 +24,11 @@ struct Args {
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Mode {
+  /// Checks that the program is sintactically and semantically correct.
   Check,
+  /// Compiles the program to hvmc and prints to stdout.
   Compile,
+  /// Compiles the program and runs it with the hvm.
   Run,
 }
 
@@ -75,9 +78,6 @@ fn main() -> anyhow::Result<()> {
         println!("Invalid readback from inet.");
         println!("Got:\n{}\n", res_term.to_string(&def_names));
       }
-      // TODO: Some way to figure out total memory use?
-      // println!("size: {}", stats.size);
-
       // TODO: check for -s flag
       println!(
         "RWTS   : {}",
