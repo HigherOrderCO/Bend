@@ -144,10 +144,7 @@ fn flatten_rules() {
 #[test]
 fn adt_generation() {
   run_golden_test_dir(function_name!(), &|_, code| {
-    let mut book = parse_definition_book(code).map_err(|errs| {
-      let msg = errs.into_iter().map(|e| display_err_for_text(e)).join("\n");
-      anyhow::anyhow!(msg)
-    })?;
+    let mut book = do_parse_book(code)?;
     book.generate_scott_adts();
     Ok(book.to_string())
   })

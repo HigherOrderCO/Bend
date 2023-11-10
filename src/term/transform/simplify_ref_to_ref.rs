@@ -11,7 +11,7 @@ impl Book {
     let mut ref_map: HashMap<DefId, DefId> = HashMap::new();
     // Find to which defs we're mapping the ones that are just references.
     for def_id in self.def_names.def_ids() {
-      self.defs[def_id].assert_no_pattern_matching_rules();
+      //self.defs[def_id].assert_no_pattern_matching_rules();
       let mut ref_id = def_id;
       let mut is_ref_to_ref = false;
       while let Term::Ref { def_id: next_ref_id } = &self.defs.get(ref_id).unwrap().rules[0].body {

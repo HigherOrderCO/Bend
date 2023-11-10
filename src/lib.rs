@@ -22,6 +22,7 @@ pub fn check_book(mut book: Book) -> Result<(), String> {
 pub fn compile_book(book: &mut Book) -> Result<(hvmc::ast::Book, HashMap<Val, DefId>), String> {
   let main = book.check_has_main()?;
   book.check_shared_names()?;
+  book.generate_scott_adts();
   book.resolve_refs();
   book.check_unbound_vars()?;
   book.make_var_names_unique();
