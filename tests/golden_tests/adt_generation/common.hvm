@@ -1,0 +1,25 @@
+data Box
+  = (Filled value)
+  | Empty
+
+data Option
+  = (Some x)
+  | None
+
+data Result
+  = (Ok a)
+  | (Err b)
+
+data List
+  = (Cons x xs)
+  | Nil
+
+data Bool = True | False
+
+data Light = Red | Yellow | Green
+
+data Direction
+  = North
+  | South
+  | East
+  | West

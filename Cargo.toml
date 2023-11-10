@@ -25,6 +25,7 @@ chumsky = "= 1.0.0-alpha.4"
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 derive_more = "0.99.17"
 hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core.git" }
+indexmap = "2.1.0"
 itertools = "0.11.0"
 logos = "0.13.0"
 miette = { version = "5.10.0", features = ["fancy"] }

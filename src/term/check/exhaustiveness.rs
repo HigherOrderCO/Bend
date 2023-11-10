@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 use itertools::Itertools;
 
@@ -60,7 +60,7 @@ pub struct Problem {
 
 pub struct Ctx {
   /// A map from the ADT type to its constructors.
-  pub ctx_types: HashMap<Name, Adt>,
+  pub ctx_types: BTreeMap<Name, Adt>,
   /// A map from the constructor to its arity.
   pub ctx_cons: BTreeMap<Name, usize>,
 }
@@ -265,7 +265,9 @@ impl Book {
 
 #[cfg(test)]
 mod test {
-  use std::collections::{BTreeMap, HashMap};
+  use std::collections::BTreeMap;
+
+  use indexmap::IndexMap;
 
   use crate::term::{
     check::exhaustiveness::{useful, wildcard, Ctx, Problem},
@@ -278,9 +280,9 @@ mod test {
     Ctr(Name(String::from(name)), vec![])
   }
 
-  fn bool_ctx() -> HashMap<Name, Adt> {
-    HashMap::from([(Name::new("Bool"), Adt {
-      ctrs: BTreeMap::from([(Name::new("T"), 0), (Name::new("F"), 0)]),
+  fn bool_ctx() -> BTreeMap<Name, Adt> {
+    BTreeMap::from([(Name::new("Bool"), Adt {
+      ctrs: IndexMap::from([(Name::new("T"), 0), (Name::new("F"), 0)]),
     })])
   }
 

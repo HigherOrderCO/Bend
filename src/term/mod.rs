@@ -1,6 +1,7 @@
 use bimap::{BiHashMap, Overwritten};
 use derive_more::{Display, From, Into};
 use hvmc::run::Val;
+use indexmap::IndexMap;
 use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
 use std::{
@@ -28,7 +29,7 @@ pub struct Book {
   pub defs: BTreeMap<DefId, Definition>,
 
   /// The algebraic datatypes defined by the program
-  pub adts: HashMap<Name, Adt>,
+  pub adts: BTreeMap<Name, Adt>,
 
   /// To which type does each constructor belong to.
   pub ctrs: HashMap<Name, Name>,
@@ -150,7 +151,7 @@ pub enum Op {
 /// A user defined  datatype
 #[derive(Debug, Clone, Default)]
 pub struct Adt {
-  pub ctrs: BTreeMap<Name, usize>,
+  pub ctrs: IndexMap<Name, usize>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, From, Into, Display)]
