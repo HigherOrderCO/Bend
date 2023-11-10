@@ -33,25 +33,23 @@ fn do_parse_net(code: &str) -> Result<hvmc::ast::Net, String> {
   parse_net(&mut code.chars().peekable())
 }
 
+const TESTS_PATH: &'static str = "/tests/golden_tests/";
+
 fn run_single_golden_test(
   path: &Path,
   run: &dyn Fn(&Path, &str) -> Result<String, String>,
 ) -> Result<(), String> {
   let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
-  let file_name = path.to_str().and_then(|path| path.rsplit_once("tests/golden_tests/")).unwrap().1;
+  let file_name = path.to_str().and_then(|path| path.rsplit_once(TESTS_PATH)).unwrap().1;
 
-  let result = match run(path, &code) {
-    Ok(res) => res,
-    Err(err) => err.to_string(),
-  };
-
+  let result: String = run(path, &code).unwrap_or_else(|err| err);
   assert_snapshot!(file_name, result);
   Ok(())
 }
 
 fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&Path, &str) -> Result<String, String>) {
   let root = PathBuf::from(format!(
-    "{}/tests/golden_tests/{}",
+    "{}{TESTS_PATH}{}",
     env!("CARGO_MANIFEST_DIR"),
     test_name.rsplit_once(':').unwrap().1
   ));
