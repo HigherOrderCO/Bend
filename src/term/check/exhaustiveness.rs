@@ -1,6 +1,6 @@
 use super::type_check::{DefinitionTypes, Type};
 use crate::term::{Adt, Book, Name, Rule, RulePat};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 impl Book {
   /// For each pattern-matching definition, check that any given value will match at least one of the rules.
@@ -34,8 +34,8 @@ fn check_pattern(
       Type::Adt(adt_nam) => {
         let adt = &adts[adt_nam];
         // Find which rules match each constructor
-        let mut next_rules_to_check: HashMap<Name, Vec<usize>> =
-          HashMap::from_iter(adt.ctrs.keys().cloned().map(|ctr| (ctr, vec![])));
+        let mut next_rules_to_check: BTreeMap<Name, Vec<usize>> =
+          BTreeMap::from_iter(adt.ctrs.keys().cloned().map(|ctr| (ctr, vec![])));
         for rule_idx in rules_to_check {
           let pat = &rules[rule_idx].pats[pat_idx];
           match pat {
@@ -46,7 +46,6 @@ fn check_pattern(
         }
         // Match each constructor of the current pattern and recursively check the next pattern.
         for (ctr, rules_to_check) in next_rules_to_check {
-          eprintln!("Ctr:{}, rules:{:?}", ctr, rules_to_check);
           if rules_to_check.is_empty() {
             return Err(format!(
               "Non-exhaustive pattern at definition '{}'. Argument {} of type '{}' does not cover the '{}' constructor",
