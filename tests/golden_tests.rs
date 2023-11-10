@@ -1,6 +1,6 @@
 use hvm_lang::{
   compile_book,
-  net::{compat_net_to_core, hvmc_to_net},
+  net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
   term::{
     net_to_term::net_to_term_non_linear,
@@ -19,32 +19,26 @@ use std::{
 use stdext::function_name;
 use walkdir::WalkDir;
 
-fn do_parse_book(code: &str) -> anyhow::Result<Book> {
+fn do_parse_book(code: &str) -> Result<Book, String> {
   match parse_definition_book(code) {
     Ok(book) => Ok(book),
-    Err(errs) => {
-      let msg = errs.into_iter().map(|e| e.to_string()).join("\n");
-      Err(anyhow::anyhow!(msg))
-    }
+    Err(errs) => Err(errs.into_iter().map(|e| e.to_string()).join("\n")),
   }
 }
 
-fn do_parse_term(code: &str) -> anyhow::Result<Term> {
-  parse_term(code).map_err(|errs| {
-    let msg = errs.into_iter().map(|e| e.to_string()).join("\n");
-    anyhow::anyhow!(msg)
-  })
+fn do_parse_term(code: &str) -> Result<Term, String> {
+  parse_term(code).map_err(|errs| errs.into_iter().map(|e| e.to_string()).join("\n"))
 }
 
-fn do_parse_net(code: &str) -> anyhow::Result<hvmc::ast::Net> {
-  parse_net(&mut code.chars().peekable()).map_err(|e| anyhow::anyhow!(e))
+fn do_parse_net(code: &str) -> Result<hvmc::ast::Net, String> {
+  parse_net(&mut code.chars().peekable())
 }
 
 fn run_single_golden_test(
   path: &Path,
-  run: &dyn Fn(&Path, &str) -> anyhow::Result<String>,
-) -> anyhow::Result<()> {
-  let code = fs::read_to_string(path)?;
+  run: &dyn Fn(&Path, &str) -> Result<String, String>,
+) -> Result<(), String> {
+  let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
   let result = match run(path, &code) {
     Ok(res) => res,
     Err(err) => err.to_string(),
@@ -54,13 +48,13 @@ fn run_single_golden_test(
     assert_eq!(result, to_check, "Testing file '{}'", path.display());
     Ok(())
   } else {
-    let mut file = fs::File::create(golden_path)?;
-    file.write_all(result.as_bytes())?;
+    let mut file = fs::File::create(golden_path).map_err(|e| e.to_string())?;
+    file.write_all(result.as_bytes()).map_err(|e| e.to_string())?;
     Ok(())
   }
 }
 
-fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&Path, &str) -> anyhow::Result<String>) {
+fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&Path, &str) -> Result<String, String>) {
   let root = PathBuf::from(format!(
     "{}/tests/golden_tests/{}",
     env!("CARGO_MANIFEST_DIR"),
@@ -92,9 +86,9 @@ fn compile_term() {
     let mut term = do_parse_term(code)?;
     term.check_unbound_vars()?;
     term.make_var_names_unique();
-    term.linearize_vars()?;
-    let compat_net = term_to_compat_net(&term)?;
-    let net = compat_net_to_core(&compat_net, &|def_id| def_id.to_internal())?;
+    term.linearize_vars();
+    let compat_net = term_to_compat_net(&term);
+    let net = net_to_hvmc(&compat_net, &|def_id| def_id.to_internal())?;
     Ok(show_net(&net))
   })
 }
@@ -128,7 +122,7 @@ fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|_, code| {
     let net = do_parse_net(code)?;
     let book = Book::default();
-    let compat_net = hvmc_to_net(&net, &|val| DefId::from_internal(val))?;
+    let compat_net = hvmc_to_net(&net, &|val| DefId::from_internal(val));
     let (term, valid) = net_to_term_non_linear(&compat_net, &book);
     if valid {
       Ok(term.to_string(&book.def_names))

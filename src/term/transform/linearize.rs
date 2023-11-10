@@ -15,22 +15,20 @@ use std::collections::HashMap;
 ///   If they're use more times: add dups for all the uses, put the let body at the root dup.
 /// Precondition: All variables are bound and have unique names within each definition.
 impl Book {
-  pub fn linearize_vars(&mut self) -> anyhow::Result<()> {
+  pub fn linearize_vars(&mut self) {
     for def in self.defs.values_mut() {
       for rule in def.rules.iter_mut() {
-        rule.body.linearize_vars()?;
+        rule.body.linearize_vars();
       }
     }
-    Ok(())
   }
 }
 
 impl Term {
-  pub fn linearize_vars(&mut self) -> anyhow::Result<()> {
+  pub fn linearize_vars(&mut self) {
     let mut var_uses = HashMap::new();
     count_var_uses_in_term(self, &mut var_uses);
-    term_to_affine(self, &mut var_uses, &mut HashMap::new())?;
-    Ok(())
+    term_to_affine(self, &mut var_uses, &mut HashMap::new());
   }
 }
 
@@ -78,23 +76,19 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
   }
 }
 
-fn term_to_affine(
-  term: &mut Term,
-  var_uses: &mut HashMap<Name, Val>,
-  let_bodies: &mut HashMap<Name, Term>,
-) -> anyhow::Result<()> {
+fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies: &mut HashMap<Name, Term>) {
   match term {
     // Var-declaring terms
     Term::Lam { nam, bod } => {
       if let Some(nam_some) = nam {
         if let Some(uses) = var_uses.get(nam_some).copied() {
-          term_to_affine(bod, var_uses, let_bodies)?;
+          term_to_affine(bod, var_uses, let_bodies);
           duplicate_lam(nam, bod, uses);
         } else {
-          term_to_affine(bod, var_uses, let_bodies)?;
+          term_to_affine(bod, var_uses, let_bodies);
         }
       } else {
-        term_to_affine(bod, var_uses, let_bodies)?;
+        term_to_affine(bod, var_uses, let_bodies);
       }
     }
 
@@ -102,17 +96,17 @@ fn term_to_affine(
       let uses = var_uses[nam];
       match uses {
         0 => {
-          term_to_affine(nxt, var_uses, let_bodies)?;
+          term_to_affine(nxt, var_uses, let_bodies);
         }
         1 => {
-          term_to_affine(val, var_uses, let_bodies)?;
+          term_to_affine(val, var_uses, let_bodies);
           let_bodies.insert(nam.clone(), std::mem::replace(val.as_mut(), Term::Era));
-          term_to_affine(nxt, var_uses, let_bodies)?;
+          term_to_affine(nxt, var_uses, let_bodies);
         }
         uses => {
-          term_to_affine(val, var_uses, let_bodies)?;
-          term_to_affine(nxt, var_uses, let_bodies)?;
-          duplicate_let(&nam, nxt, uses, val);
+          term_to_affine(val, var_uses, let_bodies);
+          term_to_affine(nxt, var_uses, let_bodies);
+          duplicate_let(nam, nxt, uses, val);
         }
       }
       *term = std::mem::replace(nxt.as_mut(), Term::Era);
@@ -121,8 +115,8 @@ fn term_to_affine(
     Term::Dup { fst, snd, val, nxt } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
       let uses_fst = get_var_uses(fst.as_ref(), var_uses);
       let uses_snd = get_var_uses(snd.as_ref(), var_uses);
-      term_to_affine(val, var_uses, let_bodies)?;
-      term_to_affine(nxt, var_uses, let_bodies)?;
+      term_to_affine(val, var_uses, let_bodies);
+      term_to_affine(nxt, var_uses, let_bodies);
       duplicate_lam(fst, nxt, uses_fst);
       duplicate_lam(snd, nxt, uses_snd);
     }
@@ -134,28 +128,27 @@ fn term_to_affine(
       if let Some(subst) = let_bodies.remove(nam) {
         *term = subst.clone();
       } else {
-        *nam = dup_name(&nam, uses);
+        *nam = dup_name(nam, uses);
       }
     }
 
     // Others
-    Term::Chn { bod, .. } => term_to_affine(bod, var_uses, let_bodies)?,
+    Term::Chn { bod, .. } => term_to_affine(bod, var_uses, let_bodies),
     Term::App { fun, arg } => {
-      term_to_affine(fun, var_uses, let_bodies)?;
-      term_to_affine(arg, var_uses, let_bodies)?;
+      term_to_affine(fun, var_uses, let_bodies);
+      term_to_affine(arg, var_uses, let_bodies);
     }
     Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
-      term_to_affine(fst, var_uses, let_bodies)?;
-      term_to_affine(snd, var_uses, let_bodies)?;
+      term_to_affine(fst, var_uses, let_bodies);
+      term_to_affine(snd, var_uses, let_bodies);
     }
     Term::Match { cond, zero, succ } => {
-      term_to_affine(cond, var_uses, let_bodies)?;
-      term_to_affine(zero, var_uses, let_bodies)?;
-      term_to_affine(succ, var_uses, let_bodies)?;
+      term_to_affine(cond, var_uses, let_bodies);
+      term_to_affine(zero, var_uses, let_bodies);
+      term_to_affine(succ, var_uses, let_bodies);
     }
     Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } => (),
   };
-  Ok(())
 }
 
 fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, Val>) -> Val {
@@ -163,7 +156,7 @@ fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, Val>) -> Val {
 }
 
 fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, dup_body: Option<&mut Term>) {
-  // TODO: Is there a difference between a list of dups and a complete binary tree of dups?
+  // TODO: Is there a difference between a list of dups and a complete binary tree of dups
   // Creates this: "dup x1 x1_dup = body; dup x2 x2_dup = x1_dup; dup x3 x4 = x2_dup; nxt"
   for i in (1 .. uses).rev() {
     let old_nxt = std::mem::replace(nxt, Term::Era);

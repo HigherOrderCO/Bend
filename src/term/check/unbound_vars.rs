@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 impl Book {
   /// Checks that there are no unbound variables in all definitions.
-  pub fn check_unbound_vars(&self) -> anyhow::Result<()> {
+  pub fn check_unbound_vars(&self) -> Result<(), String> {
     for def in self.defs.values() {
       // TODO: Enable when pattern matching is done
       // def.assert_no_pattern_matching_rules();
@@ -17,14 +17,14 @@ impl Book {
 impl Term {
   /// Checks that all variables are bound.
   /// Precondition: References have been resolved.
-  pub fn check_unbound_vars(&self) -> anyhow::Result<()> {
+  pub fn check_unbound_vars(&self) -> Result<(), String> {
     let mut globals = HashMap::new();
     check_uses(self, &mut HashMap::new(), &mut globals)?;
 
     // Check global vars
     for (nam, (declared, used)) in globals.into_iter() {
       if used && !declared {
-        return Err(anyhow::anyhow!("Unbound unscoped variable '${nam}'"));
+        return Err(format!("Unbound unscoped variable '${nam}'"));
       }
     }
     Ok(())
@@ -37,7 +37,7 @@ pub fn check_uses<'a>(
   term: &'a Term,
   scope: &mut HashMap<&'a Name, Val>,
   globals: &mut HashMap<&'a Name, (bool, bool)>,
-) -> anyhow::Result<()> {
+) -> Result<(), String> {
   // TODO: Don't stop at the first error
   match term {
     Term::Lam { nam, bod } => {
@@ -47,7 +47,7 @@ pub fn check_uses<'a>(
     }
     Term::Var { nam } => {
       if !scope.contains_key(nam) {
-        return Err(anyhow::anyhow!("Unbound variable '{nam}'"));
+        return Err(format!("Unbound variable '{nam}'"));
       }
     }
     Term::Chn { nam, bod } => {
@@ -89,7 +89,7 @@ pub fn check_uses<'a>(
   Ok(())
 }
 
-fn push_scope<'a> (nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, Val>) {
+fn push_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, Val>) {
   if let Some(nam) = nam {
     if let Some(n_declarations) = scope.get_mut(nam) {
       *n_declarations += 1;

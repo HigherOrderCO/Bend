@@ -216,7 +216,7 @@ fn useful(ctx: &Ctx, problem: &mut Problem) -> bool {
 }
 
 impl Book {
-  pub fn check_exhaustiveness(&self, def_types: &DefinitionTypes) -> anyhow::Result<()> {
+  pub fn check_exhaustiveness(&self, def_types: &DefinitionTypes) -> Result<(), String> {
     for def in self.defs.values() {
       if let Some(def_types) = def_types.get(&def.def_id) {
         // get the type of each argument
@@ -253,8 +253,7 @@ impl Book {
         // if the case is useful that means that the rule is not exhaustive
         if useful(&ctx, &mut problem) {
           let def_name = self.def_names.name(&def.def_id).unwrap();
-
-          return Err(anyhow::anyhow!("The definition '{def_name}' is not exhaustive."));
+          return Err(format!("The definition '{def_name}' is not exhaustive."));
         }
       }
     }

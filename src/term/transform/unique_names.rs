@@ -68,7 +68,6 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
     }
     Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } => (),
   }
-  .into()
 }
 
 fn push_name(name: Option<&Name>, name_map: &mut UniqueNameScope, name_count: &mut VarId) {

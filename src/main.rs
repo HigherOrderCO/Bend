@@ -32,19 +32,19 @@ enum Mode {
   Run,
 }
 
-fn mem_parser(arg: &str) -> anyhow::Result<usize> {
+fn mem_parser(arg: &str) -> Result<usize, String> {
   let (base, mult) = match arg.to_lowercase().chars().last() {
-    None => return Err(anyhow::anyhow!("Mem size argument is empty")),
+    None => return Err("Mem size argument is empty".to_string()),
     Some('k') => (&arg[0 .. arg.len() - 1], 1 << 10),
     Some('m') => (&arg[0 .. arg.len() - 1], 1 << 20),
     Some('g') => (&arg[0 .. arg.len() - 1], 1 << 30),
     Some(_) => (arg, 1),
   };
-  let base = base.parse::<usize>()?;
+  let base = base.parse::<usize>().map_err(|e| e.to_string())?;
   Ok(base * mult)
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<(), String> {
   #[cfg(not(feature = "cli"))]
   compile_error!("The 'cli' feature is needed for the hvm-lang cli");
 

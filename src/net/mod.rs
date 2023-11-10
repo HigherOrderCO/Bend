@@ -1,9 +1,6 @@
 pub mod hvmc_to_net;
 pub mod net_to_hvmc;
 
-pub use hvmc_to_net::hvmc_to_net;
-pub use net_to_hvmc::{compat_net_to_core, nets_to_hvm_core};
-
 use crate::term::DefId;
 use hvmc::run::Val;
 use NodeKind::*;

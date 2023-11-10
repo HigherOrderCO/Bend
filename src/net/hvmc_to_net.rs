@@ -5,10 +5,9 @@ use hvmc::{
   run::Val,
 };
 
-pub fn hvmc_to_net(net: &Net, hvmc_name_to_id: &impl Fn(Val) -> DefId) -> anyhow::Result<INet> {
+pub fn hvmc_to_net(net: &Net, hvmc_name_to_id: &impl Fn(Val) -> DefId) -> INet {
   let inodes = hvmc_to_inodes(net, hvmc_name_to_id);
-  let compat_net = inodes_to_inet(&inodes);
-  Ok(compat_net)
+  inodes_to_inet(&inodes)
 }
 
 fn hvmc_to_inodes(net: &Net, hvmc_name_to_id: &impl Fn(Val) -> DefId) -> INodes {

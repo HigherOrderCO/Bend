@@ -244,7 +244,6 @@ impl Combinator {
   fn comb_ref(self, names: &mut DefNames, defs: &mut Combinators) -> Term {
     let name = Name::new(&format!("${:?}", self));
     let def_id = names.def_id(&name).unwrap_or_else(|| {
-
       let def_id = names.insert(name);
       let body = self.into();
       let rules = vec![Rule { pats: Vec::new(), body }];

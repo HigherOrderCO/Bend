@@ -63,12 +63,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.75"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4668cab20f66d8d020e1fbc0ebe47217433c1b6c8f2040faf858554e394ace6"
-
-[[package]]
 name = "beef"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -205,7 +199,6 @@ source = "git+https://github.com/HigherOrderCO/hvm-core.git#d802283e7544785af5a2
 name = "hvm-lang"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "chumsky",
  "clap",
  "hvm-core",
