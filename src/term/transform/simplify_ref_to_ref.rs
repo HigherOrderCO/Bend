@@ -10,7 +10,7 @@ impl Book {
   pub fn simplify_ref_to_ref(&mut self) -> anyhow::Result<()> {
     let mut ref_map: HashMap<DefId, DefId> = HashMap::new();
     // Find to which defs we're mapping the ones that are just references.
-    for def_id in self.defs.keys() {
+    for def_id in self.def_names.def_ids() {
       debug_assert_eq!(
         self.defs.get(def_id).unwrap().rules.len(),
         1,

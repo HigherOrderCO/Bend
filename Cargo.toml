@@ -19,7 +19,6 @@ cli = ["dep:clap"]
 
 [dependencies]
 anyhow = "1.0.72"
-bimap = "0.6.3"
 chumsky = "= 1.0.0-alpha.4"
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core.git" }

@@ -19,7 +19,7 @@ impl Book {
       }
     }
 
-    for def_name in self.def_names.map.right_values() {
+    for def_name in self.def_names.names() {
       if !checked.insert(def_name) {
         return Err(anyhow::anyhow!("Duplicated name '{def_name}'"));
       }

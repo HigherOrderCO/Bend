@@ -15,8 +15,13 @@ impl Book {
       rule.body.find_used_definitions(&mut used, &self.defs);
     }
 
-    self.defs.retain(|def_id, _| used.contains(def_id));
-    self.def_names.map.retain(|def_id, _| used.contains(def_id));
+    let ids = HashSet::from_iter(self.def_names.def_ids().copied());
+    let unused = ids.difference(&used);
+    for unused_id in unused {
+      self.defs.remove(unused_id);
+      let unused_name = self.def_names.id_to_name.remove(unused_id).unwrap();
+      self.def_names.name_to_id.remove(&unused_name);
+    }
   }
 }
 

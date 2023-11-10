@@ -1,4 +1,3 @@
-use bimap::{BiHashMap, Overwritten};
 use hvmc::run::Val;
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -36,7 +35,8 @@ pub struct Book {
 
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
-  map: BiHashMap<DefId, Name>,
+  id_to_name: HashMap<DefId, Name>,
+  name_to_id: HashMap<Name, DefId>,
   id_count: DefId,
 }
 
@@ -204,28 +204,43 @@ impl DefNames {
   }
 
   pub fn name(&self, def_id: &DefId) -> Option<&Name> {
-    self.map.get_by_left(def_id)
+    self.id_to_name.get(def_id)
   }
 
   pub fn def_id(&self, name: &Name) -> Option<DefId> {
-    self.map.get_by_right(name).copied()
+    self.name_to_id.get(name).copied()
   }
 
   pub fn contains_name(&self, name: &Name) -> bool {
-    self.map.contains_right(name)
+    self.name_to_id.contains_key(name)
   }
 
   pub fn contains_def_id(&self, def_id: &DefId) -> bool {
-    self.map.contains_left(def_id)
+    self.id_to_name.contains_key(def_id)
   }
 
   pub fn insert(&mut self, name: Name) -> DefId {
     let def_id = self.id_count;
     self.id_count.0 += 1;
-    match self.map.insert(def_id, name) {
-      Overwritten::Neither => def_id,
-      _ => todo!("Overwritting name-id pairs not supported"),
+    self.id_to_name.insert(def_id, name.clone());
+    self.name_to_id.insert(name, def_id);
+    def_id
+  }
+
+  pub fn remove(&mut self, def_id: DefId) -> Option<Name> {
+    let nam = self.id_to_name.remove(&def_id);
+    if let Some(nam) = &nam {
+      self.name_to_id.remove(nam);
     }
+    nam
+  }
+
+  pub fn names(&self) -> impl Iterator<Item = &Name> {
+    self.name_to_id.keys()
+  }
+
+  pub fn def_ids(&self) -> impl Iterator<Item = &DefId> {
+    self.id_to_name.keys()
   }
 }
 
