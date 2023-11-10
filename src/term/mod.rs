@@ -50,7 +50,6 @@ pub struct Definition {
 /// A pattern matching rule of a definition.
 #[derive(Debug, Clone)]
 pub struct Rule {
-  pub def_id: DefId,
   pub pats: Vec<RulePat>,
   pub body: Term,
 }
@@ -192,6 +191,16 @@ impl DefId {
 impl Book {
   pub fn new() -> Self {
     Default::default()
+  }
+
+  pub fn insert_def(&mut self, name: Name, def: Definition) {
+    let def_id = self.def_names.insert(name);
+    self.defs.insert(def_id, def);
+  }
+
+  pub fn remove_def(&mut self, def_id: DefId) {
+    self.defs.remove(&def_id);
+    self.def_names.remove(def_id);
   }
 }
 
@@ -369,13 +378,12 @@ impl fmt::Display for LetPat {
 }
 
 impl Rule {
-  pub fn to_string(&self, def_names: &DefNames) -> String {
-    let Rule { def_id, pats, body } = self;
+  pub fn to_string(&self, def_id: &DefId, def_names: &DefNames) -> String {
     format!(
       "({}{}) = {}",
       def_names.name(def_id).unwrap(),
-      pats.iter().map(|x| format!(" {x}")).join(""),
-      body.to_string(def_names)
+      self.pats.iter().map(|x| format!(" {x}")).join(""),
+      self.body.to_string(def_names)
     )
   }
 
@@ -386,7 +394,7 @@ impl Rule {
 
 impl Definition {
   pub fn to_string(&self, def_names: &DefNames) -> String {
-    self.rules.iter().map(|x| x.to_string(def_names)).join("\n")
+    self.rules.iter().map(|x| x.to_string(&self.def_id, def_names)).join("\n")
   }
 
   pub fn arity(&self) -> usize {

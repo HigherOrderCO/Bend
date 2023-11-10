@@ -244,7 +244,7 @@ impl Combinator {
     let def_id = names.def_id(&name).unwrap_or_else(|| {
       let def_id = names.insert(name);
       let body = self.into();
-      let rules = vec![Rule { def_id, pats: Vec::new(), body }];
+      let rules = vec![Rule { pats: Vec::new(), body }];
       defs.insert(def_id, Definition { def_id, rules });
 
       def_id

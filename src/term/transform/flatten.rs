@@ -40,7 +40,7 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> (Definition, Vec<D
       let rule = &def.rules[i];
       if must_split(rule) {
         let (old_rule, new_def, split_defs) =
-          split_rule(&def.rules, i, &mut name_count, &mut skip, def_names);
+          split_rule(def.def_id, &def.rules, i, &mut name_count, &mut skip, def_names);
         old_def_rules.push(old_rule);
         new_defs.push(new_def);
         new_defs.extend(split_defs);
@@ -101,6 +101,7 @@ fn matches_together(a: &Rule, b: &Rule) -> bool {
 /// so we flatten those until all patterns have only 1 layer of pattern matching.
 /// Those recursive flattening steps return a vector of new subdefinitions which are also returned here.
 fn split_rule(
+  def_id: DefId,
   rules: &[Rule],
   rule_idx: usize,
   name_count: &mut Val,
@@ -108,7 +109,7 @@ fn split_rule(
   def_names: &mut DefNames,
 ) -> (Rule, Definition, Vec<Definition>) {
   let mut var_count: Val = 0;
-  let new_def_id = make_split_def_name(rules[rule_idx].def_id, name_count, def_names);
+  let new_def_id = make_split_def_name(def_id, name_count, def_names);
   let new_def = make_split_def(rules, rule_idx, new_def_id, &mut var_count, skip);
   let old_rule = make_rule_calling_split(&rules[rule_idx], new_def_id);
   // Recursively flatten the newly created definition
@@ -166,7 +167,7 @@ fn make_split_def(
           }
         }
       }
-      let new_rule = Rule { def_id: new_def_id, pats: new_rule_pats, body: new_rule_body };
+      let new_rule = Rule { pats: new_rule_pats, body: new_rule_body };
       new_def_rules.push(new_rule);
     }
   }
@@ -210,5 +211,5 @@ fn make_rule_calling_split(old_rule: &Rule, new_def_id: DefId) -> Rule {
   }
   let old_rule_body = Term::call(Term::Ref { def_id: new_def_id }, old_rule_body_args);
 
-  Rule { def_id: old_rule.def_id, pats: old_rule_pats, body: old_rule_body }
+  Rule { pats: old_rule_pats, body: old_rule_body }
 }
