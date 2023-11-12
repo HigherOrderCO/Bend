@@ -4,10 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "hvm_lang"
+name = "hvml"
 
 [[bin]]
-name = "hvm-lang"
+name = "hvml"
 required-features = ["cli"]
 
 [profile.release]
