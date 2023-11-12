@@ -1,5 +1,5 @@
 use clap::{Parser, ValueEnum};
-use hvm_lang::{check_book, compile_book, load_file_to_book, run_book, RunInfo};
+use hvml::{check_book, compile_book, load_file_to_book, run_book, RunInfo};
 use hvmc::{
   ast::{show_book, show_net},
   run::Ptr,

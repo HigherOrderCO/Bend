@@ -5,9 +5,11 @@ edition = "2021"
 
 [lib]
 name = "hvml"
+path = "src/lib.rs"
 
 [[bin]]
 name = "hvml"
+path = "src/main.rs"
 required-features = ["cli"]
 
 [profile.release]
