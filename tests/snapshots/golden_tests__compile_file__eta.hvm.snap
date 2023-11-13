@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+@Id = (a a)
+@main = @Id
+

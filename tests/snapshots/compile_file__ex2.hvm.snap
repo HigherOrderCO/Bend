@@ -8,9 +8,7 @@ input_file: tests/golden_tests/compile_file/ex2.hvm
 @I = (a (* ((a b) (* b))))
 @O = (a ((a b) (* (* b))))
 @c2 = ({2 (a b) (c a)} (c b))
-@dec = ((@decO (@decI (@E a))) a)
-@decI = (a b)
-& (a b) ~ @low
+@dec = ((@decO (@low (@E a))) a)
 @decO = (a b)
 & (c b) ~ @I
 & (a c) ~ @dec
