@@ -30,8 +30,8 @@ pub fn compile_book(book: &mut Book) -> Result<(hvmc::ast::Book, HashMap<Val, De
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();
-  book.detach_supercombinators();
   book.eta_reduction();
+  book.detach_supercombinators();
   book.simplify_ref_to_ref()?;
   book.prune(main);
   let (nets, id_to_hvmc_name) = book_to_nets(book, main);
