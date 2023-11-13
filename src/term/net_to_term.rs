@@ -10,11 +10,9 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
   fn reader(
     net: &INet,
     next: Port,
-    var_port_to_id: &mut HashMap<Port, Val>,
-    id_counter: &mut Val,
+    namegem: &mut NameGem,
     dup_scope: &mut HashMap<u8, Vec<SlotId>>,
-    lets_vec: &mut Vec<NodeId>,
-    lets_set: &mut HashSet<NodeId>,
+    tup_scope: &mut Scope,
     book: &Book,
   ) -> (Term, bool) {
     let node = next.node();
@@ -30,22 +28,19 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
       Con => match next.slot() {
         // If we're visiting a port 0, then it is a lambda.
         0 => {
-          let nam = decl_name(net, Port(node, 1), var_port_to_id, id_counter);
+          let nam = namegem.decl_name(net, Port(node, 1));
           let prt = net.enter_port(Port(node, 2));
-          let (bod, valid) =
-            reader(net, prt, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+          let (bod, valid) = reader(net, prt, namegem, dup_scope, tup_scope, book);
           (Term::Lam { nam, bod: Box::new(bod) }, valid)
         }
         // If we're visiting a port 1, then it is a variable.
-        1 => (Term::Var { nam: var_name(next, var_port_to_id, id_counter) }, true),
+        1 => (Term::Var { nam: namegem.var_name(next) }, true),
         // If we're visiting a port 2, then it is an application.
         2 => {
           let prt = net.enter_port(Port(node, 0));
-          let (fun, fun_valid) =
-            reader(net, prt, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+          let (fun, fun_valid) = reader(net, prt, namegem, dup_scope, tup_scope, book);
           let prt = net.enter_port(Port(node, 1));
-          let (arg, arg_valid) =
-            reader(net, prt, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+          let (arg, arg_valid) = reader(net, prt, namegem, dup_scope, tup_scope, book);
           let valid = fun_valid && arg_valid;
           (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
         }
@@ -55,8 +50,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
         2 => {
           // Read the matched expression
           let cond_port = net.enter_port(Port(node, 0));
-          let (cond_term, cond_valid) =
-            reader(net, cond_port, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+          let (cond_term, cond_valid) = reader(net, cond_port, namegem, dup_scope, tup_scope, book);
 
           // Read the pattern matching node
           let sel_node = net.enter_port(Port(node, 1)).node();
@@ -72,11 +66,9 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
-          let (zero_term, zero_valid) =
-            reader(net, zero_port, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+          let (zero_term, zero_valid) = reader(net, zero_port, namegem, dup_scope, tup_scope, book);
           let succ_port = net.enter_port(Port(sel_node, 2));
-          let (succ_term, succ_valid) =
-            reader(net, succ_port, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+          let (succ_term, succ_valid) = reader(net, succ_port, namegem, dup_scope, tup_scope, book);
 
           let valid = cond_valid && zero_valid && succ_valid;
           (
@@ -91,7 +83,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
           let def = book.defs.get(&def_id).unwrap();
           def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
-          term.fix_names(id_counter, book);
+          term.fix_names(&mut namegem.id_counter, book);
 
           (term, true)
         } else {
@@ -107,18 +99,15 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
             // Since we had a paired Dup in the path to this Sup,
             // we "decay" the superposition according to the original direction we came from the Dup.
             let chosen = net.enter_port(Port(node, slot));
-            let (val, valid) =
-              reader(net, chosen, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+            let (val, valid) = reader(net, chosen, namegem, dup_scope, tup_scope, book);
             dup_scope.get_mut(&lab).unwrap().push(slot);
             (val, valid)
           } else {
             // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
             let fst = net.enter_port(Port(node, 1));
             let snd = net.enter_port(Port(node, 2));
-            let (fst, fst_valid) =
-              reader(net, fst, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
-            let (snd, snd_valid) =
-              reader(net, snd, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+            let (fst, fst_valid) = reader(net, fst, namegem, dup_scope, tup_scope, book);
+            let (snd, snd_valid) = reader(net, snd, namegem, dup_scope, tup_scope, book);
             let valid = fst_valid && snd_valid;
             (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
           }
@@ -128,8 +117,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
         1 | 2 => {
           let body = net.enter_port(Port(node, 0));
           dup_scope.entry(lab).or_default().push(next.slot());
-          let (body, valid) =
-            reader(net, body, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+          let (body, valid) = reader(net, body, namegem, dup_scope, tup_scope, book);
           dup_scope.entry(lab).or_default().pop().unwrap();
           (body, valid)
         }
@@ -139,11 +127,9 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
       Op2 => match next.slot() {
         2 => {
           let op_port = net.enter_port(Port(node, 0));
-          let (op_term, op_valid) =
-            reader(net, op_port, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+          let (op_term, op_valid) = reader(net, op_port, namegem, dup_scope, tup_scope, book);
           let arg_port = net.enter_port(Port(node, 1));
-          let (arg_term, fst_valid) =
-            reader(net, arg_port, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+          let (arg_term, fst_valid) = reader(net, arg_port, namegem, dup_scope, tup_scope, book);
           let valid = op_valid && fst_valid;
           match op_term {
             Term::Num { val } => {
@@ -174,25 +160,18 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
       Tup => match next.slot() {
         // If we're visiting a port 0, then it is a Tup.
         0 => {
-          let fst = net.enter_port(Port(node, 1));
-          let snd = net.enter_port(Port(node, 2));
-          let (fst, fst_valid) =
-            reader(net, fst, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
-          let (snd, snd_valid) =
-            reader(net, snd, var_port_to_id, id_counter, dup_scope, lets_vec, lets_set, book);
+          let fst_port = net.enter_port(Port(node, 1));
+          let (fst, fst_valid) = reader(net, fst_port, namegem, dup_scope, tup_scope, book);
+          let snd_port = net.enter_port(Port(node, 2));
+          let (snd, snd_valid) = reader(net, snd_port, namegem, dup_scope, tup_scope, book);
           let valid = fst_valid && snd_valid;
           (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
         // If we're visiting a port 1 or 2, then it is a variable.
         // Also, that means we found a let, so we store it to read later.
         1 | 2 => {
-          if !lets_set.contains(&node) {
-            lets_set.insert(node);
-            lets_vec.push(node);
-          } else {
-            // Second time we find, it has to be the other let variable.
-          }
-          (Term::Var { nam: var_name(next, var_port_to_id, id_counter) }, true)
+          tup_scope.insert(node);
+          (Term::Var { nam: namegem.var_name(next) }, true)
         }
         _ => unreachable!(),
       },
@@ -200,30 +179,21 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
   }
   // A hashmap linking ports to binder names. Those ports have names:
   // Port 1 of a con node (λ), ports 1 and 2 of a fan node (let).
-  let mut var_port_to_id = HashMap::new();
-  let id_counter = &mut 0;
+  let mut namegem = NameGem::default();
+
   let mut dup_scope = HashMap::new();
-  let mut lets_vec = Vec::new();
-  let mut lets_set = HashSet::new();
+  let mut tup_scope = Scope::default();
 
   // Reads the main term from the net
-  let (mut main, mut valid) = reader(
-    net,
-    net.enter_port(ROOT),
-    &mut var_port_to_id,
-    id_counter,
-    &mut dup_scope,
-    &mut lets_vec,
-    &mut lets_set,
-    book,
-  );
+  let (mut main, mut valid) =
+    reader(net, net.enter_port(ROOT), &mut namegem, &mut dup_scope, &mut tup_scope, book);
 
-  while let Some(tup) = lets_vec.pop() {
+  // Read all the let bodies.
+  while let Some(tup) = tup_scope.vec.pop() {
     let val = net.enter_port(Port(tup, 0));
-    let (val, val_valid) =
-      reader(net, val, &mut var_port_to_id, id_counter, &mut dup_scope, &mut lets_vec, &mut lets_set, book);
-    let fst = decl_name(net, Port(tup, 1), &mut var_port_to_id, id_counter);
-    let snd = decl_name(net, Port(tup, 2), &mut var_port_to_id, id_counter);
+    let (val, val_valid) = reader(net, val, &mut namegem, &mut dup_scope, &mut tup_scope, book);
+    let fst = namegem.decl_name(net, Port(tup, 1));
+    let snd = namegem.decl_name(net, Port(tup, 2));
     main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) };
     valid = valid && val_valid;
   }
@@ -238,10 +208,9 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
   fn reader(
     net: &INet,
     next: Port,
-    var_port_to_id: &mut HashMap<Port, Val>,
-    id_counter: &mut Val,
-    dups_vec: &mut Vec<NodeId>,
-    dups_set: &mut HashSet<NodeId>,
+    namegem: &mut NameGem,
+    dup_scope: &mut Scope,
+    tup_scope: &mut Scope,
     seen: &mut HashSet<Port>,
     book: &Book,
   ) -> (Term, bool) {
@@ -264,21 +233,21 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
         // If we're visiting a port 0, then it is a lambda.
         0 => {
           seen.insert(Port(node, 2));
-          let nam = decl_name(net, Port(node, 1), var_port_to_id, id_counter);
+          let nam = namegem.decl_name(net, Port(node, 1));
           let prt = net.enter_port(Port(node, 2));
-          let (bod, valid) = reader(net, prt, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (bod, valid) = reader(net, prt, namegem, dup_scope, tup_scope, seen, book);
           (Term::Lam { nam, bod: Box::new(bod) }, valid)
         }
         // If we're visiting a port 1, then it is a variable.
-        1 => (Term::Var { nam: var_name(next, var_port_to_id, id_counter) }, true),
+        1 => (Term::Var { nam: namegem.var_name(next) }, true),
         // If we're visiting a port 2, then it is an application.
         2 => {
           seen.insert(Port(node, 0));
           seen.insert(Port(node, 1));
           let prt = net.enter_port(Port(node, 0));
-          let (fun, fun_valid) = reader(net, prt, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (fun, fun_valid) = reader(net, prt, namegem, dup_scope, tup_scope, seen, book);
           let prt = net.enter_port(Port(node, 1));
-          let (arg, arg_valid) = reader(net, prt, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (arg, arg_valid) = reader(net, prt, namegem, dup_scope, tup_scope, seen, book);
           let valid = fun_valid && arg_valid;
           (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
         }
@@ -290,8 +259,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           seen.insert(Port(node, 0));
           seen.insert(Port(node, 1));
           let cond_port = net.enter_port(Port(node, 0));
-          let (cond_term, cond_valid) =
-            reader(net, cond_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (cond_term, cond_valid) = reader(net, cond_port, namegem, dup_scope, tup_scope, seen, book);
 
           // Read the pattern matching node
           let sel_node = net.enter_port(Port(node, 1)).node();
@@ -310,11 +278,9 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
-          let (zero_term, zero_valid) =
-            reader(net, zero_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (zero_term, zero_valid) = reader(net, zero_port, namegem, dup_scope, tup_scope, seen, book);
           let succ_port = net.enter_port(Port(sel_node, 2));
-          let (succ_term, succ_valid) =
-            reader(net, succ_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (succ_term, succ_valid) = reader(net, succ_port, namegem, dup_scope, tup_scope, seen, book);
 
           let valid = cond_valid && zero_valid && succ_valid;
           (
@@ -329,7 +295,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           let def = book.defs.get(&def_id).unwrap();
           def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
-          term.fix_names(id_counter, book);
+          term.fix_names(&mut namegem.id_counter, book);
 
           (term, true)
         } else {
@@ -343,24 +309,17 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           seen.insert(Port(node, 1));
           seen.insert(Port(node, 2));
           let fst_port = net.enter_port(Port(node, 1));
-          let (fst, fst_valid) =
-            reader(net, fst_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (fst, fst_valid) = reader(net, fst_port, namegem, dup_scope, tup_scope, seen, book);
           let snd_port = net.enter_port(Port(node, 2));
-          let (snd, snd_valid) =
-            reader(net, snd_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (snd, snd_valid) = reader(net, snd_port, namegem, dup_scope, tup_scope, seen, book);
           let valid = fst_valid && snd_valid;
           (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
         // If we're visiting a port 1 or 2, then it is a variable.
         // Also, that means we found a dup, so we store it to read later.
         1 | 2 => {
-          if !dups_set.contains(&node) {
-            dups_set.insert(node);
-            dups_vec.push(node);
-          } else {
-            // Second time we find, it has to be the other dup variable.
-          }
-          (Term::Var { nam: var_name(next, var_port_to_id, id_counter) }, true)
+          dup_scope.insert(node);
+          (Term::Var { nam: namegem.var_name(next) }, true)
         }
         _ => unreachable!(),
       },
@@ -370,11 +329,9 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           seen.insert(Port(node, 0));
           seen.insert(Port(node, 1));
           let op_port = net.enter_port(Port(node, 0));
-          let (op_term, op_valid) =
-            reader(net, op_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (op_term, op_valid) = reader(net, op_port, namegem, dup_scope, tup_scope, seen, book);
           let arg_port = net.enter_port(Port(node, 1));
-          let (arg_term, fst_valid) =
-            reader(net, arg_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
+          let (arg_term, fst_valid) = reader(net, arg_port, namegem, dup_scope, tup_scope, seen, book);
           let valid = op_valid && fst_valid;
           match op_term {
             Term::Num { val } => {
@@ -403,59 +360,68 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
       },
       // If we're revisiting the root node something went wrong with this net
       Rot => (Term::Era, false),
-      Tup => {
-        seen.insert(Port(node, 1));
-        seen.insert(Port(node, 2));
-        let fst_port = net.enter_port(Port(node, 1));
-        let (fst, fst_valid) =
-          reader(net, fst_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-        let snd_port = net.enter_port(Port(node, 2));
-        let (snd, snd_valid) =
-          reader(net, snd_port, var_port_to_id, id_counter, dups_vec, dups_set, seen, book);
-        let valid = fst_valid && snd_valid;
-        (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
-      }
+      Tup => match next.slot() {
+        // If we're visiting a port 0, then it is a Tup.
+        0 => {
+          seen.insert(Port(node, 1));
+          seen.insert(Port(node, 2));
+          let fst_port = net.enter_port(Port(node, 1));
+          let (fst, fst_valid) = reader(net, fst_port, namegem, dup_scope, tup_scope, seen, book);
+          let snd_port = net.enter_port(Port(node, 2));
+          let (snd, snd_valid) = reader(net, snd_port, namegem, dup_scope, tup_scope, seen, book);
+          let valid = fst_valid && snd_valid;
+          (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
+        }
+        // If we're visiting a port 1 or 2, then it is a variable.
+        // Also, that means we found a let, so we store it to read later.
+        1 | 2 => {
+          tup_scope.insert(node);
+          (Term::Var { nam: namegem.var_name(next) }, true)
+        }
+        _ => unreachable!(),
+      },
     }
   }
 
   // A hashmap linking ports to binder names. Those ports have names:
   // Port 1 of a con node (λ), ports 1 and 2 of a fan node (let).
-  let mut var_port_to_id = HashMap::new();
-  let id_counter = &mut 0;
+  let mut namegem = NameGem::default();
 
   // Dup aren't scoped. We find them when we read one of the variables
   // introduced by them. Thus, we must store the dups we find to read later.
   // We have a vec for .pop(). and a set to avoid storing duplicates.
-  let mut dups_vec = Vec::new();
-  let mut dups_set = HashSet::new();
+  let mut dup_scope = Scope::default();
+  let mut tup_scope = Scope::default();
   let mut seen = HashSet::new();
 
   // Reads the main term from the net
-  let (mut main, mut valid) = reader(
-    net,
-    net.enter_port(ROOT),
-    &mut var_port_to_id,
-    id_counter,
-    &mut dups_vec,
-    &mut dups_set,
-    &mut seen,
-    book,
-  );
+  let (mut main, mut valid) =
+    reader(net, net.enter_port(ROOT), &mut namegem, &mut dup_scope, &mut tup_scope, &mut seen, book);
 
   // Read all the dup bodies.
-  while let Some(dup) = dups_vec.pop() {
+  while let Some(dup) = dup_scope.vec.pop() {
     seen.insert(Port(dup, 0));
     let val = net.enter_port(Port(dup, 0));
-    let (val, val_valid) =
-      reader(net, val, &mut var_port_to_id, id_counter, &mut dups_vec, &mut dups_set, &mut seen, book);
-    let fst = decl_name(net, Port(dup, 1), &mut var_port_to_id, id_counter);
-    let snd = decl_name(net, Port(dup, 2), &mut var_port_to_id, id_counter);
+    let (val, val_valid) = reader(net, val, &mut namegem, &mut dup_scope, &mut tup_scope, &mut seen, book);
+    let fst = namegem.decl_name(net, Port(dup, 1));
+    let snd = namegem.decl_name(net, Port(dup, 2));
     main = Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(main) };
     valid = valid && val_valid;
   }
 
+  // Read all the let bodies.
+  while let Some(tup) = tup_scope.vec.pop() {
+    seen.insert(Port(tup, 0));
+    let val = net.enter_port(Port(tup, 0));
+    let (val, val_valid) = reader(net, val, &mut namegem, &mut dup_scope, &mut tup_scope, &mut seen, book);
+    let fst = namegem.decl_name(net, Port(tup, 1));
+    let snd = namegem.decl_name(net, Port(tup, 2));
+    main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) };
+    valid = valid && val_valid;
+  }
+
   // Check if the readback didn't leave any unread nodes (for example reading var from a lam but never reading the lam itself)
-  for &decl_port in var_port_to_id.keys() {
+  for &decl_port in namegem.var_port_to_id.keys() {
     for check_slot in 0 .. 3 {
       let check_port = Port(decl_port.node(), check_slot);
       let other_node = net.enter_port(check_port).node();
@@ -466,6 +432,47 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
   }
 
   (main, valid)
+}
+
+#[derive(Default)]
+struct Scope {
+  vec: Vec<NodeId>,
+  set: HashSet<NodeId>,
+}
+
+impl Scope {
+  fn insert(&mut self, node: NodeId) {
+    if !self.set.contains(&node) {
+      self.set.insert(node);
+      self.vec.push(node);
+    }
+  }
+}
+
+#[derive(Default)]
+struct NameGem {
+  var_port_to_id: HashMap<Port, Val>,
+  id_counter: Val,
+}
+
+impl NameGem {
+  // Given a port, returns its name, or assigns one if it wasn't named yet.
+  fn var_name(&mut self, var_port: Port) -> Name {
+    let id = self.var_port_to_id.entry(var_port).or_insert_with(|| {
+      let id = self.id_counter;
+      self.id_counter += 1;
+      id
+    });
+
+    var_id_to_name(*id)
+  }
+
+  fn decl_name(&mut self, net: &INet, var_port: Port) -> Option<Name> {
+    // If port is linked to an erase node, return an unused variable
+    let var_use = net.enter_port(var_port);
+    let var_kind = net.node(var_use.node()).kind;
+    if let Era = var_kind { None } else { Some(self.var_name(var_port)) }
+  }
 }
 
 impl Op {
@@ -489,29 +496,6 @@ impl Op {
       _ => None,
     }
   }
-}
-
-// Given a port, returns its name, or assigns one if it wasn't named yet.
-fn var_name(var_port: Port, var_port_to_id: &mut HashMap<Port, Val>, id_counter: &mut Val) -> Name {
-  let id = var_port_to_id.entry(var_port).or_insert_with(|| {
-    let id = *id_counter;
-    *id_counter += 1;
-    id
-  });
-
-  var_id_to_name(*id)
-}
-
-fn decl_name(
-  net: &INet,
-  var_port: Port,
-  var_port_to_id: &mut HashMap<Port, Val>,
-  id_counter: &mut Val,
-) -> Option<Name> {
-  // If port is linked to an erase node, return an unused variable
-  let var_use = net.enter_port(var_port);
-  let var_kind = net.node(var_use.node()).kind;
-  if let Era = var_kind { None } else { Some(var_name(var_port, var_port_to_id, id_counter)) }
 }
 
 fn split_num_with_op(num: Val) -> (Val, Option<Op>) {
