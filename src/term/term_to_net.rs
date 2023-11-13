@@ -1,18 +1,27 @@
 use super::{Book, DefId, DefNames, LetPat, Name, Op, Term};
-use crate::net::{INet, NodeId, NodeKind::*, Port, LABEL_MASK, ROOT};
+use crate::{
+  net::{INet, NodeKind::*, Port, LABEL_MASK, MAX_DUP_HVMC_LABEL, ROOT},
+  Warning,
+};
 use hvmc::{
   ast::{name_to_val, val_to_name},
   run::Val,
 };
 use std::collections::HashMap;
 
-pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>) {
+pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, Vec<Warning>) {
+  let mut warnings = Vec::new();
   let mut nets = HashMap::new();
   let mut id_to_hvmc_name = HashMap::new();
 
   for def in book.defs.values() {
     for rule in def.rules.iter() {
-      let net = term_to_compat_net(&rule.body);
+      let (net, dup_count) = term_to_compat_net(&rule.body);
+
+      if dup_count > MAX_DUP_HVMC_LABEL {
+        warnings.push(Warning::TooManyDups { name: book.def_names.name(&def.def_id).unwrap().to_string() })
+      }
+
       let name = if def.def_id == main {
         DefNames::ENTRY_POINT.to_string()
       } else {
@@ -24,7 +33,7 @@ pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap
     }
   }
 
-  (nets, id_to_hvmc_name)
+  (nets, id_to_hvmc_name, warnings)
 }
 
 /// Converts rules names to unique names compatible with hvm-core:
@@ -59,12 +68,14 @@ fn def_id_to_hvmc_name(book: &Book, def_id: DefId, nets: &HashMap<String, INet>)
 }
 
 /// Converts an IC term into an IC net.
-pub fn term_to_compat_net(term: &Term) -> INet {
+pub fn term_to_compat_net(term: &Term) -> (INet, u8) {
   let mut inet = INet::new();
 
   // Encodes the main term.
   let mut global_vars = HashMap::new();
-  let main = encode_term(&mut inet, term, ROOT, &mut HashMap::new(), &mut vec![], &mut global_vars, &mut 0);
+  let mut dups = 0;
+  let main =
+    encode_term(&mut inet, term, ROOT, &mut HashMap::new(), &mut vec![], &mut global_vars, &mut dups);
 
   for (decl_port, use_port) in global_vars.into_values() {
     inet.link(decl_port, use_port);
@@ -73,7 +84,7 @@ pub fn term_to_compat_net(term: &Term) -> INet {
     link_local(&mut inet, ROOT, main);
   }
 
-  inet
+  (inet, dups)
 }
 
 /// Adds a subterm connected to `up` to the `inet`.
@@ -88,7 +99,7 @@ fn encode_term(
   scope: &mut HashMap<Name, Vec<usize>>,
   vars: &mut Vec<(Port, Option<Port>)>,
   global_vars: &mut HashMap<Name, (Port, Port)>,
-  dups: &mut NodeId,
+  dups: &mut u8,
 ) -> Option<Port> {
   match term {
     // A lambda becomes to a con node. Ports:
@@ -149,7 +160,7 @@ fn encode_term(
     // - 2: points to the occurrence of the second variable.
     // core: & val ~ {lab fst snd} (val not necessarily main port)
     Term::Dup { fst, snd, val, nxt } => {
-      let dup = inet.new_node(Dup { lab: u8::try_from(*dups).unwrap() });
+      let dup = inet.new_node(Dup { lab: *dups });
       *dups += 1;
       let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups);
       link_local(inet, Port(dup, 0), val);

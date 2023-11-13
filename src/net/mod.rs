@@ -59,6 +59,7 @@ pub const LABEL_MASK: Val = (1 << TAG) - 1;
 pub const TAG_MASK: Val = !LABEL_MASK;
 
 pub const BASE_DUP_HVMC_LABEL: u8 = 2;
+pub const MAX_DUP_HVMC_LABEL: u8 = 4;
 
 impl INet {
   /// Create a new net, with a deadlocked root node.
