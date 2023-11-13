@@ -1,0 +1,13 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+(Rule (CtrA a .x0)) = ((Rule$0$ a) .x0)
+(Rule (CtrB b)) = b
+(Rule x) = x
+
+(Rule$0$ a (CtrB1 b)) = (a b)
+(Rule$0$ a (CtrB2 .x0 b)) = (((Rule$0$$0$ a) .x0) b)
+(Rule$0$ a b) = (a b)
+
+(Rule$0$$0$ a (CtrC) b) = (a b)

@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+@9 = (a a)
+@C_2 = ({2 (a b) (c a)} (c b))
+@S = (a ((a b) (* b)))
+@Z = (* @9)
+@main = a
+& (@S (@Z a)) ~ @C_2
+

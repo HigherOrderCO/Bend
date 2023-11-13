@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+Definition main is a reference to itself

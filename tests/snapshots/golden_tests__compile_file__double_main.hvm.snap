@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+File has both 'Main' and 'main' definitions

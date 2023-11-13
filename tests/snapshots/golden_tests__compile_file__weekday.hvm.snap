@@ -1,0 +1,14 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+@9 = (a a)
+@K = (a (* a))
+@L = (* @K)
+@M = (* @L)
+@N = (* @M)
+@O = (* @N)
+@Satu = (* @O)
+@main = a
+& (@Satu a) ~ @9
+

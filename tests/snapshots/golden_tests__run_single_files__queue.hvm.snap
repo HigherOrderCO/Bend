@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+λa λ* ((a 1) λb λ* ((b 2) λc λ* ((c 3) λ* λd d)))

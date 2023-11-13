@@ -1,8 +1,0 @@
-@5 = (a b)
-& (a b) ~ @valS
-@main = a
-& (#1 a) ~ @val
-@val = (? (@valZ @5) a a)
-@valS = (a b)
-& (a b) ~ @val
-@valZ = #0

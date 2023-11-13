@@ -9,11 +9,10 @@ use hvml::{
     term_to_compat_net, Book, DefId, Term,
   },
 };
+use insta::assert_snapshot;
 use itertools::Itertools;
-use pretty_assertions::assert_eq;
 use std::{
   fs,
-  io::Write,
   path::{Path, PathBuf},
 };
 use stdext::function_name;
@@ -34,47 +33,36 @@ fn do_parse_net(code: &str) -> Result<hvmc::ast::Net, String> {
   parse_net(&mut code.chars().peekable())
 }
 
+const TESTS_PATH: &'static str = "/tests/golden_tests/";
+
 fn run_single_golden_test(
   path: &Path,
   run: &dyn Fn(&Path, &str) -> Result<String, String>,
 ) -> Result<(), String> {
   let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
-  let result = match run(path, &code) {
-    Ok(res) => res,
-    Err(err) => err.to_string(),
-  };
-  let golden_path = path.with_extension("golden");
-  if let Ok(to_check) = fs::read_to_string(&golden_path) {
-    assert_eq!(result, to_check, "Testing file '{}'", path.display());
-    Ok(())
-  } else {
-    let mut file = fs::File::create(golden_path).map_err(|e| e.to_string())?;
-    file.write_all(result.as_bytes()).map_err(|e| e.to_string())?;
-    Ok(())
-  }
+  let file_name = path.to_str().and_then(|path| path.rsplit_once(TESTS_PATH)).unwrap().1;
+
+  let result: String = run(path, &code).unwrap_or_else(|err| err);
+  assert_snapshot!(file_name, result);
+  Ok(())
 }
 
 fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&Path, &str) -> Result<String, String>) {
   let root = PathBuf::from(format!(
-    "{}/tests/golden_tests/{}",
+    "{}{TESTS_PATH}{}",
     env!("CARGO_MANIFEST_DIR"),
-    test_name.rsplit_once(":").unwrap().1
+    test_name.rsplit_once(':').unwrap().1
   ));
+
   let walker = WalkDir::new(&root).sort_by_file_name().max_depth(2).into_iter().filter_entry(|e| {
     let path = e.path();
-    if path == root {
-      true
-    } else if path.is_file() && path.extension().map(|x| x == "hvm").unwrap_or(false) {
-      true
-    } else {
-      false
-    }
+    path == root || (path.is_file() && path.extension().is_some_and(|x| x == "hvm"))
   });
+
   for entry in walker {
     let entry = entry.unwrap();
     let path = entry.path();
     if path.is_file() {
-      eprintln!("running {}", path.display());
       run_single_golden_test(path, run).unwrap();
     }
   }
@@ -122,7 +110,7 @@ fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|_, code| {
     let net = do_parse_net(code)?;
     let book = Book::default();
-    let compat_net = hvmc_to_net(&net, &|val| DefId::from_internal(val));
+    let compat_net = hvmc_to_net(&net, &DefId::from_internal);
     let (term, valid) = net_to_term_non_linear(&compat_net, &book);
     if valid {
       Ok(term.to_string(&book.def_names))

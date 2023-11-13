@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+expression: result
+---
+({3 (a b) (c d)} e)
+& ((f {2 a c}) b) ~ ((f d) e)
