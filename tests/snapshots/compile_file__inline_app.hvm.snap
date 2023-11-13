@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/inline_app.hvm
 ---
-@Rul1 = (a a)
-@Rul2 = (a a)
-@Rul3 = a
-& (@Rul2 a) ~ @Rul1
-@main = a
-& (@Rul3 a) ~ @Rul3
+@Rul1 = (b b)
+@Rul2 = (b b)
+@Rul3 = b
+& @Rul1 ~ (@Rul2 b)
+@main = b
+& @Rul3 ~ (@Rul3 b)
 

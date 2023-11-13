@@ -3,32 +3,32 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/ex2.hvm
 ---
 @E = (* @G)
-@F = (a a)
+@F = (b b)
 @G = (* @F)
-@I = (a (* ((a b) (* b))))
-@O = (a ((a b) (* (* b))))
-@c2 = ({2 (a b) (c a)} (c b))
-@dec = ((@decO (@low (@E a))) a)
-@decO = (a b)
-& (c b) ~ @I
-& (a c) ~ @dec
-@low = ((@lowO (@lowI (@E a))) a)
-@lowI = (a b)
-& (c b) ~ @O
-& (a c) ~ @I
-@lowO = (a b)
-& (c b) ~ @O
-& (a c) ~ @O
-@main = a
-& (b a) ~ @run
-& (@I (@E b)) ~ @c2
-@run = ((@runO (@runI (@E a))) a)
-@runI = (a b)
-& (c b) ~ @run
-& (d c) ~ @dec
-& (a d) ~ @I
-@runO = (a b)
-& (c b) ~ @run
-& (d c) ~ @dec
-& (a d) ~ @O
+@I = (b (* ((b c) (* c))))
+@O = (b ((b c) (* (* c))))
+@c2 = ({2 (b c) (d b)} (d c))
+@dec = ((@decO (@low (@E b))) b)
+@decO = (b c)
+& @dec ~ (b d)
+& @I ~ (d c)
+@low = ((@lowO (@lowI (@E b))) b)
+@lowI = (b c)
+& @I ~ (b d)
+& @O ~ (d c)
+@lowO = (b c)
+& @O ~ (b d)
+& @O ~ (d c)
+@main = b
+& @c2 ~ (@I (@E c))
+& @run ~ (c b)
+@run = ((@runO (@runI (@E b))) b)
+@runI = (b c)
+& @I ~ (b d)
+& @dec ~ (d e)
+& @run ~ (e c)
+@runO = (b c)
+& @O ~ (b d)
+& @dec ~ (d e)
+& @run ~ (e c)
 

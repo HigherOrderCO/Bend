@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/long_name.hvm
 ---
-@WowT = (a a)
+@WowT = (b b)
 @main = @WowT
 

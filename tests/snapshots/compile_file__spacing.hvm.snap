@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/spacing.hvm
 ---
-@2 = (a a)
-@main = ({2 a b} c)
-& (b (a c)) ~ @2
+@2 = (b b)
+@main = ({2 b c} d)
+& @2 ~ (c (b d))
 

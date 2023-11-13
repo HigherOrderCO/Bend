@@ -4,10 +4,12 @@ use hvmc::{
   ast::{book_to_runtime, name_to_val, net_from_runtime, /*show_net,*/ Net},
   run::Val,
 };
+use hvmc_net::pre_reduce::pre_reduce_book;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{collections::HashMap, time::Instant};
 use term::{book_to_nets, net_to_term::net_to_term_non_linear, Book, DefId, DefNames, Term};
 
+mod hvmc_net;
 pub mod net;
 pub mod term;
 
@@ -35,7 +37,8 @@ pub fn compile_book(book: &mut Book) -> Result<(hvmc::ast::Book, HashMap<Val, De
   book.simplify_ref_to_ref()?;
   book.prune(main);
   let (nets, id_to_hvmc_name) = book_to_nets(book, main);
-  let core_book = nets_to_hvmc(nets, &id_to_hvmc_name)?;
+  let mut core_book = nets_to_hvmc(nets, &id_to_hvmc_name)?;
+  pre_reduce_book(&mut core_book)?;
   let hvmc_name_to_id = id_to_hvmc_name.into_iter().map(|(k, v)| (v, k)).collect();
   Ok((core_book, hvmc_name_to_id))
 }
