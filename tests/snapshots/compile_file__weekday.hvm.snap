@@ -2,13 +2,13 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/weekday.hvm
 ---
-@9 = (a a)
-@K = (a (* a))
+@9 = (b b)
+@K = (b (* b))
 @L = (* @K)
 @M = (* @L)
 @N = (* @M)
 @O = (* @N)
 @Satu = (* @O)
-@main = a
-& (@Satu a) ~ @9
+@main = b
+& @9 ~ (@Satu b)
 

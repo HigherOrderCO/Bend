@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/ex0.hvm
 ---
-@9 = (a a)
-@C_2 = ({2 (a b) (c a)} (c b))
-@S = (a ((a b) (* b)))
+@9 = (b b)
+@C_2 = ({2 (b c) (d b)} (d c))
+@S = (b ((b c) (* c)))
 @Z = (* @9)
-@main = a
-& (@S (@Z a)) ~ @C_2
+@main = b
+& @C_2 ~ (@S (@Z b))
 
