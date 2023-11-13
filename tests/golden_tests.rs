@@ -1,4 +1,5 @@
-use hvm_lang::{
+use hvmc::ast::{parse_net, show_book, show_net};
+use hvml::{
   compile_book,
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
@@ -8,7 +9,6 @@ use hvm_lang::{
     term_to_compat_net, Book, DefId, Term,
   },
 };
-use hvmc::ast::{parse_net, show_book, show_net};
 use itertools::Itertools;
 use pretty_assertions::assert_eq;
 use std::{
