@@ -8,9 +8,8 @@ impl Book {
     for (def_id, def) in &self.defs {
       let def_name = self.def_names.name(def_id).unwrap();
       let types = &def_types[def_id];
-      let mut type_stack: Vec<&Name> = vec![];
       let rules_to_check = Vec::from_iter(0 .. def.rules.len());
-      check_pattern(0, &self.adts, &def.rules, types, &mut type_stack, rules_to_check, def_name)?;
+      check_pattern(0, &self.adts, &def.rules, types, rules_to_check, def_name)?;
     }
     Ok(())
   }
@@ -21,16 +20,13 @@ fn check_pattern(
   adts: &BTreeMap<Name, Adt>,
   rules: &[Rule],
   types: &[Type],
-  type_stack: &mut Vec<&Name>,
   rules_to_check: Vec<usize>,
   def_name: &Name,
 ) -> Result<(), String> {
   if let Some(pat_type) = types.get(0) {
     match pat_type {
       // We can skip non pattern matching arguments
-      Type::Any => {
-        check_pattern(pat_idx + 1, adts, rules, &types[1 ..], type_stack, rules_to_check, def_name)?
-      }
+      Type::Any => check_pattern(pat_idx + 1, adts, rules, &types[1 ..], rules_to_check, def_name)?,
       Type::Adt(adt_nam) => {
         let adt = &adts[adt_nam];
         // Find which rules match each constructor
@@ -52,7 +48,7 @@ fn check_pattern(
               def_name, pat_idx, adt_nam, ctr
             ));
           } else {
-            check_pattern(pat_idx + 1, adts, rules, &types[1 ..], type_stack, rules_to_check, def_name)?;
+            check_pattern(pat_idx + 1, adts, rules, &types[1 ..], rules_to_check, def_name)?;
           }
         }
       }

@@ -34,21 +34,14 @@ impl Book {
         return Err("Arity error.".to_string());
       }
       for (idx, pat) in rule.pats.iter().enumerate() {
-        match pat {
-          RulePat::Var(nam) => match self.ctrs.get(nam) {
-            Some(nam) => {
-              let t = Type::Adt(nam.clone());
-              unify(t, idx, &mut arg_types)?;
-            }
-            None => {}
-          },
-          RulePat::Ctr(nam, _) => match self.ctrs.get(nam) {
+        if let RulePat::Ctr(nam, _) = pat {
+          match self.ctrs.get(nam) {
             Some(nam) => {
               let t = Type::Adt(nam.clone());
               unify(t, idx, &mut arg_types)?;
             }
             None => return Err("Unknown constructor '{nam}'.".to_string()),
-          },
+          }
         }
       }
     }
