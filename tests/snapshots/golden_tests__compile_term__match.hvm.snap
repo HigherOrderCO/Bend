@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-a
-& <#0 <#1 ? ((b (* b)) (* (* (c c)))) a>> ~ #1

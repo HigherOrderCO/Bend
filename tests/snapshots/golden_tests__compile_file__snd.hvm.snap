@@ -1,8 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-@main = a
-& ([#0 #42] a) ~ @snd
-@snd = ([* a] a)
-

@@ -1,7 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-a
-& <b <c a>> ~ #1
-& [b c] ~ [#1 #2]

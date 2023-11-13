@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_term/church_one.hvm
+---
+a
+& ((* (b b)) a) ~ ((c (d e)) ({2 (e f) c} (d f)))

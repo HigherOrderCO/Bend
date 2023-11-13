@@ -1,8 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-@WowT = (a a)
-@main = (a b)
-& (a b) ~ @WowT
-

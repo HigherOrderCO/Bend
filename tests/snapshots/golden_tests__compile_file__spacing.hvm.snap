@@ -1,8 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-@2 = (a a)
-@main = ({2 a b} c)
-& (b (a c)) ~ @2
-

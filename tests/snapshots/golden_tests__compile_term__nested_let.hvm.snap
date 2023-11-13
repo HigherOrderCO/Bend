@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-a
-& [[* *] [a *]] ~ [[#2 #4] [#3 #6]]

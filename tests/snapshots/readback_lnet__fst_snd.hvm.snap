@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/readback_lnet/fst_snd.hvm
+---
+let (*, b) = a; let (d, *) = c; (λa b (λc d ((1, 3), 2)))

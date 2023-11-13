@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-Unbound variable 'two'
