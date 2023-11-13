@@ -33,7 +33,7 @@ fn do_parse_net(code: &str) -> Result<hvmc::ast::Net, String> {
   parse_net(&mut code.chars().peekable())
 }
 
-const TESTS_PATH: &'static str = "/tests/golden_tests/";
+const TESTS_PATH: &str = "/tests/golden_tests/";
 
 fn run_single_golden_test(
   path: &Path,
@@ -43,7 +43,16 @@ fn run_single_golden_test(
   let file_name = path.to_str().and_then(|path| path.rsplit_once(TESTS_PATH)).unwrap().1;
 
   let result: String = run(path, &code).unwrap_or_else(|err| err);
-  assert_snapshot!(file_name, result);
+
+  let mut settings = insta::Settings::clone_current();
+  settings.set_prepend_module_to_snapshot(false);
+  settings.set_omit_expression(true);
+  settings.set_input_file(path);
+
+  settings.bind(|| {
+    assert_snapshot!(file_name, result);
+  });
+
   Ok(())
 }
 

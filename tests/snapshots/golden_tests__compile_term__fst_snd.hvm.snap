@@ -1,7 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-a
-& (b a) ~ ([* c] c)
-& ([[#1 #3] #2] b) ~ ([d *] d)

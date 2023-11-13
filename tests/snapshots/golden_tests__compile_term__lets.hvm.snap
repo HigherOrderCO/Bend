@@ -1,9 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-a
-& (b (c (d a))) ~ (e e)
-& {5 f {6 g {7 h (h (g (f d)))}}} ~ (i i)
-& {3 j {4 k (k (j c))}} ~ (l l)
-& {2 m (m b)} ~ (n n)

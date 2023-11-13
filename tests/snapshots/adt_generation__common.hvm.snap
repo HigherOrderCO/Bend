@@ -1,0 +1,37 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/adt_generation/common.hvm
+---
+(True) = λTrue λFalse True
+
+(False) = λTrue λFalse False
+
+(Filled) = λa0 λFilled λEmpty (Filled a0)
+
+(Empty) = λFilled λEmpty Empty
+
+(North) = λNorth λSouth λEast λWest North
+
+(South) = λNorth λSouth λEast λWest South
+
+(East) = λNorth λSouth λEast λWest East
+
+(West) = λNorth λSouth λEast λWest West
+
+(Red) = λRed λYellow λGreen Red
+
+(Yellow) = λRed λYellow λGreen Yellow
+
+(Green) = λRed λYellow λGreen Green
+
+(Cons) = λa0 λa1 λCons λNil ((Cons a0) a1)
+
+(Nil) = λCons λNil Nil
+
+(Some) = λa0 λSome λNone (Some a0)
+
+(None) = λSome λNone None
+
+(Ok) = λa0 λOk λErr (Ok a0)
+
+(Err) = λa0 λOk λErr (Err a0)

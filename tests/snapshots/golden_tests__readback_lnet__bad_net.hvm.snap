@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-Invalid readback:
-*

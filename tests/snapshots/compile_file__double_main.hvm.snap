@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/double_main.hvm
+---
+File has both 'Main' and 'main' definitions

@@ -1,8 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-@A2 = #1
-@B5 = #2
-@main = [[@A2 @B5] @B5]
-

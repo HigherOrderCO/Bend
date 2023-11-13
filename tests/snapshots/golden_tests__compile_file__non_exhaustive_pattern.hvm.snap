@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-Non-exhaustive pattern at definition 'Foo'. Argument 2 of type 'Type' does not cover the 'A' constructor

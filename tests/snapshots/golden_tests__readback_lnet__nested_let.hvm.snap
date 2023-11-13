@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-let (c, b) = ((2, 4), (3, 6)); let (a, *) = b; a

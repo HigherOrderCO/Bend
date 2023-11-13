@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-λa (λb (a (b c)) λc (a (b c)))

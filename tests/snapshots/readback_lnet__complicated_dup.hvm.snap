@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/readback_lnet/complicated_dup.hvm
+---
+λa (λb (a (b c)) λc (a (b c)))

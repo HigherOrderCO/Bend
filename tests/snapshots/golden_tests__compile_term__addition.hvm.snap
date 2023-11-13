@@ -1,8 +1,0 @@
----
-source: tests/golden_tests.rs
-expression: result
----
-a
-& (#8 a) ~ (b c)
-& <d <b c>> ~ #1
-& <#1 <#1 d>> ~ #1
