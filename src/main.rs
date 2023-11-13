@@ -1,9 +1,9 @@
 use clap::{Parser, ValueEnum};
-use hvml::{check_book, compile_book, load_file_to_book, run_book, RunInfo};
 use hvmc::{
   ast::{show_book, show_net},
   run::Ptr,
 };
+use hvml::{check_book, compile_book, load_file_to_book, run_book, RunInfo};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
