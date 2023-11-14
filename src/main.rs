@@ -15,7 +15,10 @@ struct Args {
   #[arg(short, long)]
   pub verbose: bool,
 
-  #[arg(long, help = "How much memory to allocate for the runtime", default_value = "1G", value_parser = mem_parser)]
+  #[arg(short, long, help = "Shows runtime stats and rewrite counts")]
+  pub stats: bool,
+
+  #[arg(short, long, help = "How much memory to allocate for the runtime", default_value = "1G", value_parser = mem_parser)]
   pub mem: usize,
 
   #[arg(help = "Path to the input file")]
@@ -78,22 +81,17 @@ fn main() -> Result<(), String> {
         println!("Invalid readback from inet.");
         println!("Got:\n{}\n", res_term.to_string(&def_names));
       }
-      // TODO: check for -s flag
-      println!(
-        "RWTS   : {}",
-        stats.rewrites.anni
-          + stats.rewrites.comm
-          + stats.rewrites.eras
-          + stats.rewrites.dref
-          + stats.rewrites.oper
-      );
-      println!("- ANNI : {}", stats.rewrites.anni);
-      println!("- COMM : {}", stats.rewrites.comm);
-      println!("- ERAS : {}", stats.rewrites.eras);
-      println!("- DREF : {}", stats.rewrites.dref);
-      println!("- OPER : {}", stats.rewrites.oper);
-      println!("TIME   : {:.3} s", stats.run_time);
-      println!("RPS    : {:.3} m", rps);
+
+      if args.stats {
+        println!("RWTS   : {}", stats.rewrites.total_rewrites());
+        println!("- ANNI : {}", stats.rewrites.anni);
+        println!("- COMM : {}", stats.rewrites.comm);
+        println!("- ERAS : {}", stats.rewrites.eras);
+        println!("- DREF : {}", stats.rewrites.dref);
+        println!("- OPER : {}", stats.rewrites.oper);
+        println!("TIME   : {:.3} s", stats.run_time);
+        println!("RPS    : {:.3} m", rps);
+      }
     }
   }
 
