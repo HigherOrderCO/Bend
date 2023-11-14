@@ -1,12 +1,11 @@
 // Reduce the compiled networks, solving any annihilations and commutations.
 // This is a useful optimization on its own, but also required by an hvm-core optimization.
 
-use std::collections::BTreeMap;
-
 use hvmc::{
   ast::{net_from_runtime, net_to_runtime},
   run::{NUM, OP2, REF},
 };
+use std::collections::BTreeMap;
 
 pub fn pre_reduce_book(book: &mut BTreeMap<String, hvmc::ast::Net>) -> Result<(), String> {
   for (nam, net) in book.iter_mut() {
@@ -15,7 +14,7 @@ pub fn pre_reduce_book(book: &mut BTreeMap<String, hvmc::ast::Net>) -> Result<()
   Ok(())
 }
 
-fn pre_reduce_net(nam: &str, net: &mut hvmc::ast::Net) -> Result<(), String> {
+pub fn pre_reduce_net(nam: &str, net: &mut hvmc::ast::Net) -> Result<(), String> {
   let mut rt = hvmc::run::Net::new(1 << 18);
   net_to_runtime(&mut rt, net);
   pre_reduce_run_net(nam, &mut rt)?;
@@ -23,7 +22,7 @@ fn pre_reduce_net(nam: &str, net: &mut hvmc::ast::Net) -> Result<(), String> {
   Ok(())
 }
 
-fn pre_reduce_run_net(nam: &str, net: &mut hvmc::run::Net) -> Result<(), String> {
+pub fn pre_reduce_run_net(nam: &str, net: &mut hvmc::run::Net) -> Result<(), String> {
   // Note: not calling Book::new() since that takes super long (~600ms).
   // We know it's okay in this specific case since we are sure no derefs will occur.
   let book = hvmc::run::Book { defs: vec![] };
