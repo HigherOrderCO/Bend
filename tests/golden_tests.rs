@@ -1,4 +1,4 @@
-use hvmc::ast::{parse_net, show_book, show_net};
+use hvmc::ast::{parse_net, show_net};
 use hvml::{
   compile_book,
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
@@ -8,6 +8,7 @@ use hvml::{
     parser::{parse_definition_book, parse_term},
     term_to_compat_net, Book, DefId, Term,
   },
+  Warning,
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -84,9 +85,16 @@ fn compile_term() {
     term.check_unbound_vars()?;
     term.make_var_names_unique();
     term.linearize_vars();
-    let compat_net = term_to_compat_net(&term);
+    let (compat_net, dups) = term_to_compat_net(&term);
     let net = net_to_hvmc(&compat_net, &|def_id| def_id.to_internal())?;
-    Ok(show_net(&net))
+
+    let result = if dups > hvml::net::MAX_DUP_HVMC_LABEL {
+      format!("// {}\n{}", Warning::TooManyDups { name: String::new() }, show_net(&net))
+    } else {
+      show_net(&net)
+    };
+
+    Ok(result)
   })
 }
 
@@ -94,8 +102,8 @@ fn compile_term() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|_, code| {
     let mut book = do_parse_book(code)?;
-    let (compiled, _) = compile_book(&mut book)?;
-    Ok(show_book(&compiled))
+    let compiled = compile_book(&mut book)?;
+    Ok(format!("{:?}", compiled))
   })
 }
 

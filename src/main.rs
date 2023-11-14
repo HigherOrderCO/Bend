@@ -63,8 +63,13 @@ fn main() -> Result<(), String> {
       check_book(book)?;
     }
     Mode::Compile => {
-      let (compiled, _) = compile_book(&mut book)?;
-      println!("{}", show_book(&compiled));
+      let compiled = compile_book(&mut book)?;
+
+      for warn in &compiled.warnings {
+        eprintln!("WARNING: {warn}");
+      }
+
+      println!("{}", show_book(&compiled.core_book));
     }
     Mode::Run => {
       let mem_size = args.mem / std::mem::size_of::<(Ptr, Ptr)>();

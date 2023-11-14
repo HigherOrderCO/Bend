@@ -1,7 +1,7 @@
 #![feature(box_patterns)]
 
 use hvmc::{
-  ast::{book_to_runtime, name_to_val, net_from_runtime, /*show_net,*/ Net},
+  ast::{book_to_runtime, name_to_val, net_from_runtime, show_book, Net},
   run::Val,
 };
 use hvmc_net::pre_reduce::pre_reduce_book;
@@ -21,7 +21,34 @@ pub fn check_book(mut book: Book) -> Result<(), String> {
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book) -> Result<(hvmc::ast::Book, HashMap<Val, DefId>), String> {
+pub enum Warning {
+  TooManyDups { name: String },
+}
+
+impl std::fmt::Display for Warning {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let Self::TooManyDups { name } = self;
+    write!(f, "This rule generated more dups then what is supported by hvm-core: {}", name)
+  }
+}
+
+pub struct CompileResult {
+  pub core_book: hvmc::ast::Book,
+  pub hvmc_name_to_id: HashMap<Val, DefId>,
+  pub warnings: Vec<Warning>,
+}
+
+impl std::fmt::Debug for CompileResult {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    for warn in &self.warnings {
+      writeln!(f, "// WARNING: {}", warn)?;
+    }
+
+    write!(f, "{}", show_book(&self.core_book))
+  }
+}
+
+pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
   let main = book.check_has_main()?;
   book.check_shared_names()?;
   book.resolve_ctrs_in_pats();
@@ -36,11 +63,11 @@ pub fn compile_book(book: &mut Book) -> Result<(hvmc::ast::Book, HashMap<Val, De
   book.detach_supercombinators();
   book.simplify_ref_to_ref()?;
   book.prune(main);
-  let (nets, id_to_hvmc_name) = book_to_nets(book, main);
+  let (nets, id_to_hvmc_name, warnings) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &id_to_hvmc_name)?;
   pre_reduce_book(&mut core_book)?;
   let hvmc_name_to_id = id_to_hvmc_name.into_iter().map(|(k, v)| (v, k)).collect();
-  Ok((core_book, hvmc_name_to_id))
+  Ok(CompileResult { core_book, hvmc_name_to_id, warnings })
 }
 
 pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) {
@@ -61,8 +88,17 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) 
 }
 
 pub fn run_book(mut book: Book, mem_size: usize) -> Result<(Term, DefNames, RunInfo), String> {
-  let (compiled, hvmc_name_to_id) = compile_book(&mut book)?;
-  let (res_lnet, stats) = run_compiled(&compiled, mem_size);
+  let CompileResult { core_book, hvmc_name_to_id, warnings } = compile_book(&mut book)?;
+
+  if !warnings.is_empty() {
+    for warn in warnings {
+      eprintln!("{}", warn);
+    }
+
+    return Err("Could not run the code because of the previous warnings".into());
+  }
+
+  let (res_lnet, stats) = run_compiled(&core_book, mem_size);
   let net = hvmc_to_net(&res_lnet, &|val| hvmc_name_to_id[&val]);
   let (res_term, valid_readback) = net_to_term_non_linear(&net, &book);
   let info = RunInfo { stats, valid_readback, net: res_lnet };
