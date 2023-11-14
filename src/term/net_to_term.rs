@@ -131,27 +131,32 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
           let arg_port = net.enter_port(Port(node, 1));
           let (arg_term, fst_valid) = reader(net, arg_port, namegen, dup_scope, tup_scope, book);
           let valid = op_valid && fst_valid;
-          match op_term {
-            Term::Num { val } => {
-              let (val, op) = split_num_with_op(val);
-              if let Some(op) = op {
-                // This is Num + Op in the same value
-                (Term::Opx { op, fst: Box::new(Term::Num { val }), snd: Box::new(arg_term) }, valid)
-              } else {
-                // This is just Op as value
-                (
-                  Term::Opx {
-                    op: Op::from_hvmc_label(val).unwrap(),
-                    fst: Box::new(arg_term),
-                    snd: Box::new(Term::Era),
-                  },
-                  valid,
-                )
-              }
+
+          let go = |val: Val, arg: Term| {
+            let (val, op) = split_num_with_op(val);
+            if let Some(op) = op {
+              // This is Num + Op in the same value
+              (Term::Opx { op, fst: Box::new(Term::Num { val }), snd: Box::new(arg) }, valid)
+            } else {
+              // This is just Op as value
+              (
+                Term::Opx {
+                  op: Op::from_hvmc_label(val).unwrap(),
+                  fst: Box::new(arg),
+                  snd: Box::new(Term::Era),
+                },
+                valid,
+              )
             }
+          };
+
+          match op_term {
+            Term::Num { val } => go(val, arg_term),
             Term::Opx { op, fst, snd: _ } => (Term::Opx { op, fst, snd: Box::new(arg_term) }, valid),
-            // TODO: Actually unreachable?
-            _ => unreachable!(),
+            _ => match arg_term {
+              Term::Num { val } => go(val, op_term),
+              _ => unreachable!(),
+            },
           }
         }
         _ => unreachable!(),
