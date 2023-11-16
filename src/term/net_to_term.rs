@@ -149,9 +149,13 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
                 }
               }
               Term::Opx { op, fst, snd } => match &*snd {
+                // this ERA means that we came from the first OP2 node.
                 Term::Era => Term::Opx { op, fst, snd: Box::new(arg_term) },
+                // anything else is just a partially applied chain of OP2 nodes.
                 _ => go(arg_term, Term::Opx { op, fst, snd }),
               },
+              // otherwise this is an OP1 and we flip the port 1 and 0 to undo the
+              // OP2 ~ NUM interaction.
               other => go(arg_term, other),
             }
           }
