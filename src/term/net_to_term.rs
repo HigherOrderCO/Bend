@@ -132,32 +132,30 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
           let (arg_term, fst_valid) = reader(net, arg_port, namegen, dup_scope, tup_scope, book);
           let valid = op_valid && fst_valid;
 
-          let go = |val: Val, arg: Term| {
-            let (val, op) = split_num_with_op(val);
-            if let Some(op) = op {
-              // This is Num + Op in the same value
-              (Term::Opx { op, fst: Box::new(Term::Num { val }), snd: Box::new(arg) }, valid)
-            } else {
-              // This is just Op as value
-              (
-                Term::Opx {
-                  op: Op::from_hvmc_label(val).unwrap(),
-                  fst: Box::new(arg),
-                  snd: Box::new(Term::Era),
-                },
-                valid,
-              )
+          fn go(op_term: Term, arg_term: Term) -> Term {
+            match op_term {
+              Term::Num { val } => {
+                let (val, op) = split_num_with_op(val);
+                if let Some(op) = op {
+                  // This is Num + Op in the same value
+                  Term::Opx { op, fst: Box::new(Term::Num { val }), snd: Box::new(arg_term) }
+                } else {
+                  // This is just Op as value
+                  Term::Opx {
+                    op: Op::from_hvmc_label(val).unwrap(),
+                    fst: Box::new(arg_term),
+                    snd: Box::new(Term::Era),
+                  }
+                }
+              }
+              Term::Opx { op, fst, snd } => match &*snd {
+                Term::Era => Term::Opx { op, fst, snd: Box::new(arg_term) },
+                _ => go(arg_term, Term::Opx { op, fst, snd }),
+              },
+              other => go(arg_term, other),
             }
-          };
-
-          match op_term {
-            Term::Num { val } => go(val, arg_term),
-            Term::Opx { op, fst, snd: _ } => (Term::Opx { op, fst, snd: Box::new(arg_term) }, valid),
-            _ => match arg_term {
-              Term::Num { val } => go(val, op_term),
-              _ => unreachable!(),
-            },
           }
+          (go(op_term, arg_term), valid)
         }
         _ => unreachable!(),
       },
