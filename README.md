@@ -6,7 +6,7 @@ HVM-Lang is an Intermediate Representation for HVM-Core that provides a higher l
 
 With the nightly version of rust installed, clone the repository:
 ```bash
-git clone git@github.com:HigherOrderCO/hvm-lang.git
+git clone https://github.com/HigherOrderCO/hvm-lang.git
 
 cd hvm-lang
 ```
