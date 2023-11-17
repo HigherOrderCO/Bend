@@ -15,25 +15,25 @@ use std::{iter::Map, ops::Range};
 
 /// <Book>    ::= <TopLevel>*
 /// <TopLevel> ::= (<Def> | <Data>)
-/// <Def>     ::= \n* <Rule> (\n+ <Rule>)* \n*
-/// <Data>    ::= "data" \n* <Name> \n* "=" \n* (<Name> | "(" \n* <Name> (\n* <Name>)* \n* ")")+
-/// <Rule>    ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) \n* "=" \n* (<InlineNumOp> | <InlineApp>)
+/// <Def>     ::= <Rule> (<Rule>)*
+/// <Data>    ::= "data" <Name> "=" (<Name> | "(" <Name> (<Name>)* ")")+
+/// <Rule>    ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) "=" (<InlineNumOp> | <InlineApp>)
 /// <Pattern> ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number>
 /// <Term>    ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Tup> | <Let> | <NumOp> | <App>
-/// <Lam>     ::= ("λ"|"@") \n* <NameEra> \n* <Term>
-/// <GlobalLam> ::= ("λ"|"@") "$" <Name> \n* <Term>
-/// <Dup>    ::= "dup" \n* <Tag>? \n* <NameEra> \n* <NameEra> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
-/// <Tup>    ::= "(" \n* <Term> \n* "," \n* <Term> \n* ")"
-/// <Let>    ::= "let" \n* <LetPat> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
-/// <LetPat> ::= <Name> | "(" \n* <NameEra> \n* "," \n* <NameEra> \n* ")"
-/// <NumOp>  ::= "(" \n* <numop_token> \n* <Term> \n* <Term> \n* ")"
-/// <App>    ::= "(" \n* <Term> (\n* <Term>)* \n* ")"
+/// <Lam>     ::= ("λ"|"@") <NameEra> <Term>
+/// <GlobalLam> ::= ("λ"|"@") "$" <Name> <Term>
+/// <Dup>    ::= "dup" <Tag>? <NameEra> <NameEra> "=" <Term> ";" <Term>
+/// <Tup>    ::= "(" <Term> "," <Term> ")"
+/// <Let>    ::= "let" <LetPat> "=" <Term> ";" <Term>
+/// <LetPat> ::= <Name> | "(" <NameEra> "," <NameEra> ")"
+/// <NumOp>  ::= "(" <numop_token> <Term> <Term> ")"
+/// <App>    ::= "(" <Term> (<Term>)* ")"
 /// <Var>    ::= <Name>
 /// <GlobalVar> ::= "$" <Name>
 /// <NameEra> ::= <Name> | "*"
 /// <Name>   ::= <name_token> // [_a-zA-Z][_a-zA-Z0-9]{0..7}
 /// <Number> ::= <number_token> // [0-9]+
-/// <Tag>    ::= "#" \n* <Name>
+/// <Tag>    ::= "#" <Name>
 pub fn parse_definition_book(code: &str) -> Result<Book, Vec<Rich<Token>>> {
   book().parse(token_stream(code)).into_result()
 }

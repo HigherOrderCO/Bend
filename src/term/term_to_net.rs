@@ -273,13 +273,15 @@ fn encode_term(
   }
 }
 
+// If the tag exists in the storage return the value.
+// If not, insert the tag with the current storage length.
 fn tagged_dup(tag_storage: &mut HashMap<Name, u8>, tag: Name, inet: &mut INet) -> u32 {
-  let storage_len = tag_storage.len();
+  let storage_len = tag_storage.len() as u8;
   match tag_storage.entry(tag) {
     Entry::Occupied(e) => inet.new_node(Dup { lab: *e.get() }),
     Entry::Vacant(e) => {
-      e.insert(storage_len as u8);
-      inet.new_node(Dup { lab: storage_len as u8 })
+      e.insert(storage_len);
+      inet.new_node(Dup { lab: storage_len })
     }
   }
 }
