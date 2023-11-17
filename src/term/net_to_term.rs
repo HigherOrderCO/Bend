@@ -206,8 +206,13 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
     val.get_needed_vars(&mut vars);
 
     let let_ctx = LetBody::Ctx(fst, snd, val);
-    if let (LetBody::Failed(fst, snd, val), _) = let_ctx.search_and_insert(&mut main, &mut vars) {
-      main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) }
+
+    match let_ctx.search_and_insert(&mut main, &mut vars).0 {
+      LetBody::Failed(fst, snd, val) => {
+        main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) }
+      }
+      LetBody::Ctx(..) => unreachable!(), // This should not happen, as it means the vars `fst` and `snd` were not used in the body
+      LetBody::Used => {}
     }
 
     valid = valid && val_valid;
@@ -223,6 +228,8 @@ enum LetBody {
 }
 
 impl LetBody {
+  /// Searchers the term and inserts the let body in the position bettewn where the vars it depends are defined, 
+  /// and where the its vars are used
   fn search_and_insert(self, term: &mut Term, vars: &mut HashSet<Name>) -> (Self, bool) {
     match term.search_let_scope(self, vars) {
       (Self::Ctx(fst, snd, val), true) => (term.insert_let(fst, snd, val, vars), true),
@@ -230,6 +237,9 @@ impl LetBody {
     }
   }
 
+  /// Searches all the terms and substitutes it if only one term used the ctx vars.
+  /// Otherwise, returns the context with true if more then one term used the vars,
+  /// or false if none.
   fn multi_search_and_insert(self, terms: &mut [&mut Term], vars: &mut HashSet<Name>) -> (Self, bool) {
     let mut var_uses = Vec::with_capacity(terms.len());
     let mut ctx = self;
