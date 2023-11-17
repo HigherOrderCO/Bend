@@ -1,6 +1,6 @@
 # HVM-Lang
 
-HVM-Lang is an Intermediate Representation for HVM-Core that provides a higher level syntax to write programs based on the Interaction-Calculus.
+HVM-Lang serves as an Intermediate Representation for HVM-Core, offering a higher level syntax for writing programs based on the Interaction-Calculus.
 
 ## Installation
 
@@ -11,7 +11,7 @@ git clone https://github.com/HigherOrderCO/hvm-lang.git
 cd hvm-lang
 ```
 
-Install with cargo:
+Install using cargo:
 ```bash
 cargo install --path .
 ```
@@ -26,80 +26,75 @@ main = (+ 3 2)
 
 HVM-Lang searches for the `main | Main` definitions as entrypoint of the program.
 
-To run a program using hvm-lang you can use the argument `run`, like below:
+To run a program, use the `run` argument:
 ```bash
 hvm-lang run <file>
 ```
 
-It will show the number 5 and also some stats like time and rewrites.
+It will show the number 5.
+Adding the `--stats` option displays some runtime stats like time and rewrites.
 
-You can pass the option `--mem <size>` to limit the memory amount of the runtime. The default is 1GB.
+To limit the runtime memory, use the `--mem <size> option.` The default is 1GB:
 ```bash
 hvm-lang --mem 65536 run <file>
 ```
+You can specify the memory size in bytes (default), kilobytes (k), megabytes (m), or gigabytes (g), e.g., `--mem 200m.`
 
-To compile a program you can use the `compile` argument:
+To compile a program use the `compile` argument:
 ```bash
 hvm-lang compile <file>
 ```
-It will output to stdout the compiled file.
+This will output the compiled file to stdout.
 
 ## Language Syntax
 
 HVM-Lang syntax consists in Terms and Definitions.
-A Term is something that holds value, it can be a Number, an Application, a Function, etc. A Definition points to a Term.
+A Term represents a value, such as a Number, an Application, Function, etc. A Definition points to a Term.
 
-Here we have a definition 'two' to the number 2.
+Here we are defining 'two' as the number 2:
 ```rs
 two = 2
 ```
 
-Here we have a lambda, the lambda's body is the variable x.
+A lambda where the body is the variable `x`:
 ```rs
 id = λx x
 ```
 
-Operations can handle just 2 terms at once.
+Operations can handle just 2 terms at time:
 ```rs
 some_val = (+ (+ 7 4) (* 2 3))
 ```
-The current operations are: `+, -, *, /, %, ==, !=, <, >, &, |, ^, ~, <<, >>`.
+The current operations include `+, -, *, /, %, ==, !=, <, >, &, |, ^, ~, <<, >>`.
 
-A let term, we use it to bind some value to the next term, in this case `(* result 2)`.
+A let term binds some value to the next term, in this case `(* result 2)`:
 ```rs
 let result = (+ 1 2); (* result 2)
 ```
 
-It is possible to define tuples.
+It is possible to define tuples:
 ```rs
 tup = (2, 2)
 ```
 
-And pattern-match the tuple with the let.
+And pattern-match tuples with let:
 ```rs
 let (x, y) = tup; (+ x y)
 ```
 
-It is possible to duplicate terms using `dup`.
+Term duplication is possible using `dup`:
 ```rs
 // the number 2 in church encoding using dup.
 ch2 = λf λx dup f1 f2 = f; (f1 (f2 x))
+
+/// a tagged '#i' dup
+id_id = dup #i id1 id2 = λx x; (id1 id2)
 
 // the number 3 in church encoding using dup.
 ch3 = λf λx dup f0 f1 = f; dup f2 f3 = f0; (f1 (f2 (f3 x)))
 ```
 
-HVM-Lang has a match syntax for machine numbers.
-We match the case 0 and the case where the number is greater
-than 0, p binds the value of the matching number - 1.
-```rs
-to_church = λn match n {
-  0: λf λx x;
-  1+p: λf λx (f (to_church p f x))
-}
-```
-
-Also, it is possible to use global lambdas, where the variable occurs outside it's body:
+It is possible to use channels, the variable occur outside it's body:
 ```rs
 ($a (λ$a 1 λb b))
 ```
@@ -107,6 +102,16 @@ This term will reduce to:
 ```
 (λb b 1)
 1
+```
+
+A match syntax for machine numbers.
+We match the case 0 and the case where the number is greater
+than 0, p binds the value of the matching number - 1:
+```rs
+to_church = λn match n {
+  0: λf λx x;
+  1+p: λf λx (f (to_church p f x))
+}
 ```
 
 ## Terms to Nodes
