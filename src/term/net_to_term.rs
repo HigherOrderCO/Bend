@@ -206,7 +206,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
     val.get_needed_vars(&mut vars);
 
     let let_ctx = LetBody::Ctx(fst, snd, val);
-    if let (LetBody::Failed(fst, snd, val), _) = let_ctx.search_and_and_insert(&mut main, &mut vars) {
+    if let (LetBody::Failed(fst, snd, val), _) = let_ctx.search_and_insert(&mut main, &mut vars) {
       main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) }
     }
 
@@ -223,14 +223,14 @@ enum LetBody {
 }
 
 impl LetBody {
-  fn search_and_and_insert(self, term: &mut Term, vars: &mut HashSet<Name>) -> (Self, bool) {
+  fn search_and_insert(self, term: &mut Term, vars: &mut HashSet<Name>) -> (Self, bool) {
     match term.search_let_scope(self, vars) {
       (Self::Ctx(fst, snd, val), true) => (term.insert_let(fst, snd, val, vars), true),
       (ctx, uses) => (ctx, uses),
     }
   }
 
-  fn multi_search_and_and_insert(self, terms: &mut [&mut Term], vars: &mut HashSet<Name>) -> (Self, bool) {
+  fn multi_search_and_insert(self, terms: &mut [&mut Term], vars: &mut HashSet<Name>) -> (Self, bool) {
     let mut var_uses = Vec::with_capacity(terms.len());
     let mut ctx = self;
     let mut var_use;
@@ -273,10 +273,10 @@ impl Term {
     match self {
       Term::Lam { nam: Some(nam), bod } => {
         vars.remove(nam);
-        ctx.search_and_and_insert(bod, vars)
+        ctx.search_and_insert(bod, vars)
       }
 
-      Term::Lam { bod, .. } => ctx.search_and_and_insert(bod, vars),
+      Term::Lam { bod, .. } => ctx.search_and_insert(bod, vars),
 
       Term::Let { pat: LetPat::Var(nam), val, nxt } => {
         let (ctx, val_use) = val.search_let_scope(ctx, vars);
@@ -314,14 +314,14 @@ impl Term {
         }
       }
 
-      Term::Chn { bod, .. } => ctx.search_and_and_insert(bod, vars),
+      Term::Chn { bod, .. } => ctx.search_and_insert(bod, vars),
 
       Term::App { fun: fst, arg: snd }
       | Term::Tup { fst, snd }
       | Term::Sup { fst, snd }
-      | Term::Opx { fst, snd, .. } => ctx.multi_search_and_and_insert(&mut [fst, snd], vars),
+      | Term::Opx { fst, snd, .. } => ctx.multi_search_and_insert(&mut [fst, snd], vars),
 
-      Term::Match { cond, zero, succ } => ctx.multi_search_and_and_insert(&mut [cond, zero, succ], vars),
+      Term::Match { cond, zero, succ } => ctx.multi_search_and_insert(&mut [cond, zero, succ], vars),
 
       Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => (ctx, false),
     }
