@@ -201,11 +201,190 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
     let (val, val_valid) = reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, book);
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
-    main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) };
+
+    let mut vars = HashSet::new();
+    val.get_needed_vars(&mut vars);
+
+    let let_ctx = LetBody::Ctx(fst, snd, val);
+    if let (LetBody::Failed(fst, snd, val), _) = let_ctx.search_and_and_insert(&mut main, &mut vars) {
+      main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) }
+    }
+
     valid = valid && val_valid;
   }
 
   (main, valid)
+}
+
+enum LetBody {
+  Used,
+  Ctx(Option<Name>, Option<Name>, Term),
+  Failed(Option<Name>, Option<Name>, Term),
+}
+
+impl LetBody {
+  fn search_and_and_insert(self, term: &mut Term, vars: &mut HashSet<Name>) -> (Self, bool) {
+    match term.search_let_scope(self, vars) {
+      (Self::Ctx(fst, snd, val), true) => (term.insert_let(fst, snd, val, vars), true),
+      (ctx, uses) => (ctx, uses),
+    }
+  }
+
+  fn multi_search_and_and_insert(self, terms: &mut [&mut Term], vars: &mut HashSet<Name>) -> (Self, bool) {
+    let mut var_uses = Vec::with_capacity(terms.len());
+    let mut ctx = self;
+    let mut var_use;
+
+    for term in terms.iter_mut() {
+      (ctx, var_use) = term.search_let_scope(ctx, vars);
+      var_uses.push(var_use);
+    }
+
+    let used_in_terms: Vec<_> =
+      var_uses.into_iter().enumerate().filter_map(|(index, is_used)| is_used.then_some(index)).collect();
+
+    match (used_in_terms.len(), ctx) {
+      (1, Self::Ctx(fst, snd, val)) => (terms[used_in_terms[0]].insert_let(fst, snd, val, vars), true),
+      (0, ctx) => (ctx, false),
+      (_, ctx) => (ctx, true),
+    }
+  }
+}
+
+impl Term {
+  fn insert_let(
+    &mut self,
+    fst: Option<Name>,
+    snd: Option<Name>,
+    val: Term,
+    vars: &mut HashSet<Name>,
+  ) -> LetBody {
+    if vars.is_empty() {
+      let nxt = Box::new(std::mem::replace(self, Term::Era));
+
+      *self = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt };
+      LetBody::Used
+    } else {
+      LetBody::Failed(fst, snd, val)
+    }
+  }
+
+  fn search_let_scope(&mut self, ctx: LetBody, vars: &mut HashSet<Name>) -> (LetBody, bool) {
+    match self {
+      Term::Lam { nam: Some(nam), bod } => {
+        vars.remove(nam);
+        ctx.search_and_and_insert(bod, vars)
+      }
+
+      Term::Lam { bod, .. } => ctx.search_and_and_insert(bod, vars),
+
+      Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+        let (ctx, val_use) = val.search_let_scope(ctx, vars);
+
+        vars.remove(nam);
+        let (ctx, nxt_use) = nxt.search_let_scope(ctx, vars);
+
+        match (val_use ^ nxt_use, ctx) {
+          (true, ctx @ LetBody::Ctx(..)) => (ctx, true),
+          (_, ctx) => (ctx, val_use && nxt_use),
+        }
+      }
+
+      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt } => {
+        let (ctx, val_use) = val.search_let_scope(ctx, vars);
+
+        fst.as_ref().map(|fst| vars.remove(fst));
+        snd.as_ref().map(|snd| vars.remove(snd));
+        let (ctx, nxt_use) = nxt.search_let_scope(ctx, vars);
+
+        match (val_use ^ nxt_use, ctx) {
+          (true, ctx @ LetBody::Ctx(..)) => (ctx, true),
+          (_, ctx) => (ctx, val_use && nxt_use),
+        }
+      }
+
+      Term::Var { nam } => {
+        if let LetBody::Ctx(fst, snd, val) = ctx {
+          let is_fst = fst.as_ref().map_or(false, |fst| fst == nam);
+          let is_snd = snd.as_ref().map_or(false, |snd| snd == nam);
+
+          (LetBody::Ctx(fst, snd, val), is_fst || is_snd)
+        } else {
+          (ctx, false)
+        }
+      }
+
+      Term::Chn { bod, .. } => ctx.search_and_and_insert(bod, vars),
+
+      Term::App { fun: fst, arg: snd }
+      | Term::Tup { fst, snd }
+      | Term::Sup { fst, snd }
+      | Term::Opx { fst, snd, .. } => ctx.multi_search_and_and_insert(&mut [fst, snd], vars),
+
+      Term::Match { cond, zero, succ } => ctx.multi_search_and_and_insert(&mut [cond, zero, succ], vars),
+
+      Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => (ctx, false),
+    }
+  }
+
+  fn get_needed_vars(&self, vars: &mut HashSet<Name>) {
+    match self {
+      Term::Lam { nam: Some(nam), bod } => {
+        let mut new_scope = HashSet::new();
+        bod.get_needed_vars(&mut new_scope);
+        new_scope.remove(nam);
+
+        vars.extend(new_scope);
+      }
+      Term::Lam { nam: None, bod } => bod.get_needed_vars(vars),
+      Term::Var { nam } => _ = vars.insert(nam.clone()),
+      Term::Chn { bod, .. } => bod.get_needed_vars(vars),
+      Term::Lnk { .. } => {}
+      Term::Let { pat, val, nxt } => {
+        val.get_needed_vars(vars);
+
+        let mut new_scope = HashSet::new();
+        nxt.get_needed_vars(&mut new_scope);
+
+        match pat {
+          LetPat::Var(nam) => _ = new_scope.remove(nam),
+          LetPat::Tup(l, r) => {
+            l.as_ref().map(|l| new_scope.remove(l));
+            r.as_ref().map(|r| new_scope.remove(r));
+          }
+        }
+
+        vars.extend(new_scope);
+      }
+      Term::App { fun, arg } => {
+        fun.get_needed_vars(vars);
+        arg.get_needed_vars(vars);
+      }
+      Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { op: _, fst, snd } => {
+        fst.get_needed_vars(vars);
+        snd.get_needed_vars(vars);
+      }
+      Term::Dup { fst, snd, val, nxt } => {
+        val.get_needed_vars(vars);
+
+        let mut new_scope = HashSet::new();
+        nxt.get_needed_vars(&mut new_scope);
+
+        fst.as_ref().map(|fst| new_scope.remove(fst));
+        snd.as_ref().map(|snd| new_scope.remove(snd));
+
+        vars.extend(new_scope);
+      }
+      Term::Match { cond, zero, succ } => {
+        cond.get_needed_vars(vars);
+        zero.get_needed_vars(vars);
+        succ.get_needed_vars(vars);
+      }
+      Term::Num { .. } => {}
+      Term::Ref { .. } => {}
+      Term::Era => {}
+    }
+  }
 }
 
 /// Converts an Interaction-INet to an Interaction Calculus term.
