@@ -172,7 +172,7 @@ fn encode_term(
     Term::Dup { fst, snd, val, nxt, tag } => {
       let dup: u32;
       if let Some(tag) = tag {
-        dup = tagged_dup(tag_storage, tag, inet);
+        dup = tagged_dup(tag_storage, tag.clone(), inet);
       } else {
         dup = inet.new_node(Dup { lab: *dups });
         *dups += 1;
@@ -273,13 +273,12 @@ fn encode_term(
   }
 }
 
-fn tagged_dup(tag_storage: &mut HashMap<Name, u8>, tag: &Name, inet: &mut INet) -> u32 {
+fn tagged_dup(tag_storage: &mut HashMap<Name, u8>, tag: Name, inet: &mut INet) -> u32 {
   let storage_len = tag_storage.len();
-  match tag_storage.entry(tag.clone()) {
+  match tag_storage.entry(tag) {
     Entry::Occupied(e) => inet.new_node(Dup { lab: *e.get() }),
     Entry::Vacant(e) => {
       e.insert(storage_len as u8);
-      println!("{tag_storage:?}");
       inet.new_node(Dup { lab: storage_len as u8 })
     }
   }

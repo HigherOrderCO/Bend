@@ -13,15 +13,19 @@ use chumsky::{
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range};
 
-/// <Book>   ::= <Def>* // Sequential rules grouped by name
-/// <Def>    ::= \n* <Rule> (\n+ <Rule>)* \n*
-/// <Rule>   ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) \n* "=" \n* (<InlineNumOp> | <InlineApp>)
+/// <Book>    ::= <TopLevel>*
+/// <TopLevel> ::= (<Def> | <Data>)
+/// <Def>     ::= \n* <Rule> (\n+ <Rule>)* \n*
+/// <Data>    ::= "data" \n* <Name> \n* "=" \n* (<Name> | "(" \n* <Name> (\n* <Name>)* \n* ")")+
+/// <Rule>    ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) \n* "=" \n* (<InlineNumOp> | <InlineApp>)
 /// <Pattern> ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number>
-/// <Term>   ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Let> | <NumOp> | <App>
-/// <Lam>    ::= ("λ"|"@") \n* <NameEra> \n* <Term>
+/// <Term>    ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Tup> | <Let> | <NumOp> | <App>
+/// <Lam>     ::= ("λ"|"@") \n* <NameEra> \n* <Term>
 /// <GlobalLam> ::= ("λ"|"@") "$" <Name> \n* <Term>
-/// <Dup>    ::= "dup" \n* <Name> \n* <Name> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
-/// <Let>    ::= "let" \n* <Name> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
+/// <Dup>    ::= "dup" \n* <Tag>? \n* <NameEra> \n* <NameEra> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
+/// <Tup>    ::= "(" \n* <Term> \n* "," \n* <Term> \n* ")"
+/// <Let>    ::= "let" \n* <LetPat> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
+/// <LetPat> ::= <Name> | "(" \n* <NameEra> \n* "," \n* <NameEra> \n* ")"
 /// <NumOp>  ::= "(" \n* <numop_token> \n* <Term> \n* <Term> \n* ")"
 /// <App>    ::= "(" \n* <Term> (\n* <Term>)* \n* ")"
 /// <Var>    ::= <Name>
@@ -29,6 +33,7 @@ use std::{iter::Map, ops::Range};
 /// <NameEra> ::= <Name> | "*"
 /// <Name>   ::= <name_token> // [_a-zA-Z][_a-zA-Z0-9]{0..7}
 /// <Number> ::= <number_token> // [0-9]+
+/// <Tag>    ::= "#" \n* <Name>
 pub fn parse_definition_book(code: &str) -> Result<Book, Vec<Rich<Token>>> {
   book().parse(token_stream(code)).into_result()
 }
@@ -152,7 +157,7 @@ where
       .boxed();
 
     // (x, y)
-    let pair = term
+    let tup = term
       .clone()
       .then_ignore(just(Token::Comma))
       .then(term.clone())
@@ -206,7 +211,7 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, number, pair, global_lam, lam, dup, let_, match_, num_op, app))
+    choice((global_var, var, number, tup, global_lam, lam, dup, let_, match_, num_op, app))
   })
 }
 
