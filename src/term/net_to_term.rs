@@ -284,10 +284,7 @@ impl Term {
         vars.remove(nam);
         let (ctx, nxt_use) = nxt.search_let_scope(ctx, vars);
 
-        match (val_use ^ nxt_use, ctx) {
-          (true, ctx @ LetBody::Ctx(..)) => (ctx, true),
-          (_, ctx) => (ctx, val_use && nxt_use),
-        }
+        (ctx, val_use || nxt_use)
       }
 
       Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt } => {
@@ -297,10 +294,7 @@ impl Term {
         snd.as_ref().map(|snd| vars.remove(snd));
         let (ctx, nxt_use) = nxt.search_let_scope(ctx, vars);
 
-        match (val_use ^ nxt_use, ctx) {
-          (true, ctx @ LetBody::Ctx(..)) => (ctx, true),
-          (_, ctx) => (ctx, val_use && nxt_use),
-        }
+        (ctx, val_use || nxt_use)
       }
 
       Term::Var { nam } => {
@@ -316,10 +310,11 @@ impl Term {
 
       Term::Chn { bod, .. } => ctx.search_and_insert(bod, vars),
 
-      Term::App { fun: fst, arg: snd }
-      | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd }
-      | Term::Opx { fst, snd, .. } => ctx.multi_search_and_insert(&mut [fst, snd], vars),
+      Term::App { fun, arg } => ctx.multi_search_and_insert(&mut [fun, arg], vars),
+
+      Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { fst, snd, .. } => {
+        ctx.multi_search_and_insert(&mut [fst, snd], vars)
+      }
 
       Term::Match { cond, zero, succ } => ctx.multi_search_and_insert(&mut [cond, zero, succ], vars),
 
@@ -327,6 +322,7 @@ impl Term {
     }
   }
 
+  /// Collects all the free variables that a term has
   fn get_needed_vars(&self, vars: &mut HashSet<Name>) {
     match self {
       Term::Lam { nam: Some(nam), bod } => {
@@ -340,19 +336,24 @@ impl Term {
       Term::Var { nam } => _ = vars.insert(nam.clone()),
       Term::Chn { bod, .. } => bod.get_needed_vars(vars),
       Term::Lnk { .. } => {}
-      Term::Let { pat, val, nxt } => {
+      Term::Let { pat: LetPat::Var(nam), val, nxt } => {
         val.get_needed_vars(vars);
 
         let mut new_scope = HashSet::new();
         nxt.get_needed_vars(&mut new_scope);
 
-        match pat {
-          LetPat::Var(nam) => _ = new_scope.remove(nam),
-          LetPat::Tup(l, r) => {
-            l.as_ref().map(|l| new_scope.remove(l));
-            r.as_ref().map(|r| new_scope.remove(r));
-          }
-        }
+        new_scope.remove(nam);
+
+        vars.extend(new_scope);
+      }
+      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt } => {
+        val.get_needed_vars(vars);
+
+        let mut new_scope = HashSet::new();
+        nxt.get_needed_vars(&mut new_scope);
+
+        fst.as_ref().map(|fst| new_scope.remove(fst));
+        snd.as_ref().map(|snd| new_scope.remove(snd));
 
         vars.extend(new_scope);
       }
@@ -363,17 +364,6 @@ impl Term {
       Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { op: _, fst, snd } => {
         fst.get_needed_vars(vars);
         snd.get_needed_vars(vars);
-      }
-      Term::Dup { fst, snd, val, nxt } => {
-        val.get_needed_vars(vars);
-
-        let mut new_scope = HashSet::new();
-        nxt.get_needed_vars(&mut new_scope);
-
-        fst.as_ref().map(|fst| new_scope.remove(fst));
-        snd.as_ref().map(|snd| new_scope.remove(snd));
-
-        vars.extend(new_scope);
       }
       Term::Match { cond, zero, succ } => {
         cond.get_needed_vars(vars);
