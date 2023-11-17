@@ -140,7 +140,7 @@ impl Term {
 
           cond_is_super && zero_is_super && succ_is_super
         }
-        Term::Dup { fst, snd, val, nxt } => {
+        Term::Dup { fst, snd, val, nxt, .. } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_supper = go(nxt, depth + 1, term_info);
 

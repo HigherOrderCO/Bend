@@ -48,7 +48,7 @@ impl Term {
           go(zero, depth + 1, names, defs);
           go(succ, depth + 1, names, defs);
         }
-        Term::Dup { fst: _, snd: _, val, nxt } => {
+        Term::Dup { tag: _, fst: _, snd: _, val, nxt } => {
           go(val, depth + 1, names, defs);
           go(nxt, depth + 1, names, defs);
         }
@@ -116,7 +116,7 @@ impl Term {
         val.occurs_check(name) || (n != name && nxt.occurs_check(name))
       }
       Self::Let { pat: LetPat::Tup(..), .. } => todo!(),
-      Self::Dup { fst, snd, val, nxt } => {
+      Self::Dup { tag: _, fst, snd, val, nxt } => {
         val.occurs_check(name)
           || (!fst.as_ref().is_some_and(|Name(n)| n == name)
             && !snd.as_ref().is_some_and(|Name(n)| n == name)
@@ -147,7 +147,7 @@ impl Term {
           check(val, name, inside_chn) || (n != name && check(nxt, name, inside_chn))
         }
         Term::Let { .. } => todo!(),
-        Term::Dup { fst, snd, val, nxt } => {
+        Term::Dup { tag: _, fst, snd, val, nxt } => {
           if val.occurs_check(name) {
             if let Some(f) = fst {
               if check(nxt, f, inside_chn) {
@@ -268,6 +268,7 @@ impl From<Combinator> for Term {
       Combinator::C_ => Self::app(Self::app(Self::var("x"), Self::var("z")), Self::var("y")).dxyz_lambda(),
 
       Combinator::S => Self::Dup {
+        tag: None,
         fst: Some(Name::new("z1")),
         snd: Some(Name::new("z2")),
         val: Box::new(Self::var("z")),
@@ -281,6 +282,7 @@ impl From<Combinator> for Term {
       Combinator::S_ => Self::lam(
         "d",
         Self::Dup {
+          tag: None,
           fst: Some(Name::new("z1")),
           snd: Some(Name::new("z2")),
           val: Box::new(Self::var("z")),
@@ -532,20 +534,20 @@ impl Term {
       // Additions to the algorithm to support terms not included in the reference:
 
       // [name] Dup { fst, snd, val, nxt } => ([name] ([fst|snd] nxt) val)
-      Self::Dup { fst: Some(nam), snd: Some(s), val, mut nxt } => {
+      Self::Dup { tag: _, fst: Some(nam), snd: Some(s), val, mut nxt } => {
         nxt.subst(&s, &Term::Var { nam: nam.clone() });
         A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
       }
 
       // [name] Dup { fst, _, val, nxt } => ([name] ([fst] nxt) val)
       // [name] Dup { _, snd, val, nxt } => ([name] ([snd] nxt) val)
-      Self::Dup { fst: Some(nam), snd: None, val, nxt }
-      | Self::Dup { fst: None, snd: Some(nam), val, nxt } => {
+      Self::Dup { tag: _, fst: Some(nam), snd: None, val, nxt }
+      | Self::Dup { tag: _, fst: None, snd: Some(nam), val, nxt } => {
         A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
       }
 
       // [name] Dup { _, _, val, nxt } => [name] nxt
-      Self::Dup { fst: None, snd: None, val: _, nxt } => nxt.abstract_by(name),
+      Self::Dup { tag: _, fst: None, snd: None, val: _, nxt } => nxt.abstract_by(name),
 
       // [name] Let { nam, val, nxt } => ([name] ([nam] nxt) val)
       Self::Let { pat: LetPat::Var(nam), val, nxt } => {

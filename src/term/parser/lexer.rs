@@ -28,6 +28,9 @@ pub enum Token {
   #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
   Num(u32),
 
+  #[token("#")]
+  Hash,
+
   #[token("+")]
   Add,
 
@@ -164,6 +167,7 @@ impl fmt::Display for Token {
       Self::Match => write!(f, "match"),
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),
+      Self::Hash => write!(f, "#"),
       Self::Add => write!(f, "+"),
       Self::Sub => write!(f, "-"),
       Self::Asterisk => write!(f, "*"),

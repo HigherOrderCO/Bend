@@ -7,7 +7,7 @@ use hvmc::{
   ast::{name_to_val, val_to_name},
   run::Val,
 };
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, Vec<Warning>) {
   let mut warnings = Vec::new();
@@ -74,8 +74,17 @@ pub fn term_to_compat_net(term: &Term) -> (INet, u8) {
   // Encodes the main term.
   let mut global_vars = HashMap::new();
   let mut dups = 0;
-  let main =
-    encode_term(&mut inet, term, ROOT, &mut HashMap::new(), &mut vec![], &mut global_vars, &mut dups);
+  let mut tag_storage = HashMap::new();
+  let main = encode_term(
+    &mut inet,
+    term,
+    ROOT,
+    &mut HashMap::new(),
+    &mut vec![],
+    &mut global_vars,
+    &mut dups,
+    &mut tag_storage,
+  );
 
   for (decl_port, use_port) in global_vars.into_values() {
     inet.link(decl_port, use_port);
@@ -100,6 +109,7 @@ fn encode_term(
   vars: &mut Vec<(Port, Option<Port>)>,
   global_vars: &mut HashMap<Name, (Port, Port)>,
   dups: &mut u8,
+  tag_storage: &mut HashMap<Name, u8>,
 ) -> Option<Port> {
   match term {
     // A lambda becomes to a con node. Ports:
@@ -110,7 +120,7 @@ fn encode_term(
     Term::Lam { nam, bod } => {
       let fun = inet.new_node(Con);
       push_scope(nam, Port(fun, 1), scope, vars);
-      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, dups);
+      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, dups, tag_storage);
       pop_scope(nam, Port(fun, 1), inet, scope);
       link_local(inet, Port(fun, 2), bod);
       Some(Port(fun, 0))
@@ -119,7 +129,7 @@ fn encode_term(
     Term::Chn { nam, bod } => {
       let fun = inet.new_node(Con);
       global_vars.entry(nam.clone()).or_default().0 = Port(fun, 1);
-      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, dups);
+      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(fun, 2), bod);
       Some(Port(fun, 0))
     }
@@ -130,9 +140,9 @@ fn encode_term(
     // core: & fun ~ (arg ret) (fun not necessarily main port)
     Term::App { fun, arg } => {
       let app = inet.new_node(Con);
-      let fun = encode_term(inet, fun, Port(app, 0), scope, vars, global_vars, dups);
+      let fun = encode_term(inet, fun, Port(app, 0), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(app, 0), fun);
-      let arg = encode_term(inet, arg, Port(app, 1), scope, vars, global_vars, dups);
+      let arg = encode_term(inet, arg, Port(app, 1), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(app, 1), arg);
       Some(Port(app, 2))
     }
@@ -140,16 +150,16 @@ fn encode_term(
     Term::Match { cond, zero, succ } => {
       let if_ = inet.new_node(Mat);
 
-      let cond = encode_term(inet, cond, Port(if_, 0), scope, vars, global_vars, dups);
+      let cond = encode_term(inet, cond, Port(if_, 0), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(if_, 0), cond);
 
       let sel = inet.new_node(Con);
       inet.link(Port(sel, 0), Port(if_, 1));
 
-      let zero = encode_term(inet, zero, Port(sel, 1), scope, vars, global_vars, dups);
+      let zero = encode_term(inet, zero, Port(sel, 1), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(sel, 1), zero);
 
-      let succ = encode_term(inet, succ, Port(sel, 2), scope, vars, global_vars, dups);
+      let succ = encode_term(inet, succ, Port(sel, 2), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(sel, 2), succ);
 
       Some(Port(if_, 2))
@@ -159,15 +169,21 @@ fn encode_term(
     // - 1: points to the occurrence of the first variable.
     // - 2: points to the occurrence of the second variable.
     // core: & val ~ {lab fst snd} (val not necessarily main port)
-    Term::Dup { fst, snd, val, nxt } => {
-      let dup = inet.new_node(Dup { lab: *dups });
-      *dups += 1;
-      let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups);
+    Term::Dup { fst, snd, val, nxt, tag } => {
+      let dup: u32;
+      if let Some(tag) = tag {
+        dup = tagged_dup(tag_storage, tag, inet);
+      } else {
+        dup = inet.new_node(Dup { lab: *dups });
+        *dups += 1;
+      };
+
+      let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(dup, 0), val);
 
       push_scope(fst, Port(dup, 1), scope, vars);
       push_scope(snd, Port(dup, 2), scope, vars);
-      let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, dups);
+      let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, dups, tag_storage);
       pop_scope(snd, Port(dup, 2), inet, scope);
       pop_scope(fst, Port(dup, 1), inet, scope);
 
@@ -202,12 +218,12 @@ fn encode_term(
     Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
       let dup = inet.new_node(Tup);
 
-      let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups);
+      let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(dup, 0), val);
 
       push_scope(l_nam, Port(dup, 1), scope, vars);
       push_scope(r_nam, Port(dup, 2), scope, vars);
-      let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, dups);
+      let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, dups, tag_storage);
       pop_scope(r_nam, Port(dup, 2), inet, scope);
       pop_scope(l_nam, Port(dup, 1), inet, scope);
 
@@ -232,13 +248,13 @@ fn encode_term(
       let fst_node = inet.new_node(Op2);
       inet.link(Port(op_node, 0), Port(fst_node, 0));
 
-      let fst = encode_term(inet, fst, Port(fst_node, 1), scope, vars, global_vars, dups);
+      let fst = encode_term(inet, fst, Port(fst_node, 1), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(fst_node, 1), fst);
 
       let snd_node = inet.new_node(Op2);
       inet.link(Port(fst_node, 2), Port(snd_node, 0));
 
-      let snd = encode_term(inet, snd, Port(snd_node, 1), scope, vars, global_vars, dups);
+      let snd = encode_term(inet, snd, Port(snd_node, 1), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(snd_node, 1), snd);
 
       Some(Port(snd_node, 2))
@@ -246,13 +262,25 @@ fn encode_term(
     Term::Tup { fst, snd } => {
       let tup = inet.new_node(Tup);
 
-      let fst = encode_term(inet, fst, Port(tup, 1), scope, vars, global_vars, dups);
+      let fst = encode_term(inet, fst, Port(tup, 1), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(tup, 1), fst);
 
-      let snd = encode_term(inet, snd, Port(tup, 2), scope, vars, global_vars, dups);
+      let snd = encode_term(inet, snd, Port(tup, 2), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(tup, 2), snd);
 
       Some(Port(tup, 0))
+    }
+  }
+}
+
+fn tagged_dup(tag_storage: &mut HashMap<Name, u8>, tag: &Name, inet: &mut INet) -> u32 {
+  let storage_len = tag_storage.len();
+  match tag_storage.entry(tag.clone()) {
+    Entry::Occupied(e) => inet.new_node(Dup { lab: *e.get() }),
+    Entry::Vacant(e) => {
+      e.insert(storage_len as u8);
+      println!("{tag_storage:?}");
+      inet.new_node(Dup { lab: storage_len as u8 })
     }
   }
 }

@@ -71,6 +71,13 @@ where
   select!(Token::Name(name) => Name(name))
 }
 
+fn tag<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  just(Token::Hash).ignore_then(name()).or_not()
+}
+
 fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -128,13 +135,20 @@ where
 
     // dup x1 x2 = body; next
     let dup = just(Token::Dup)
-      .ignore_then(name_or_era())
+      .ignore_then(tag())
+      .then(name_or_era())
       .then(name_or_era())
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(term_sep.clone())
       .then(term.clone())
-      .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) })
+      .map(|((((tag, fst), snd), val), next)| Term::Dup {
+        tag,
+        fst,
+        snd,
+        val: Box::new(val),
+        nxt: Box::new(next),
+      })
       .boxed();
 
     // (x, y)
