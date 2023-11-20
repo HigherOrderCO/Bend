@@ -296,7 +296,7 @@ impl Term {
 
       Term::Let { pat: LetPat::Var(_), .. } => unreachable!(),
 
-      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt } => {
+      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
         let (ctx, val_use) = val.resolve_let_scope(ctx, free_vars);
 
         fst.as_ref().map(|fst| free_vars.remove(fst));
@@ -355,7 +355,7 @@ impl Term {
 
         free_vars.extend(new_scope);
       }
-      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt } => {
+      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
         val.free_vars(free_vars);
 
         let mut new_scope = HashSet::new();
