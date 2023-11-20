@@ -7,7 +7,7 @@ use hvmc::{
   ast::{name_to_val, val_to_name},
   run::Val,
 };
-use std::collections::HashMap;
+use std::collections::{hash_map::Entry, HashMap};
 
 pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, Vec<Warning>) {
   let mut warnings = Vec::new();
@@ -73,9 +73,17 @@ pub fn term_to_compat_net(term: &Term) -> (INet, u8) {
 
   // Encodes the main term.
   let mut global_vars = HashMap::new();
-  let mut dups = 0;
-  let main =
-    encode_term(&mut inet, term, ROOT, &mut HashMap::new(), &mut vec![], &mut global_vars, &mut dups);
+  let mut label_generator = LabelGenerator::default();
+
+  let main = encode_term(
+    &mut inet,
+    term,
+    ROOT,
+    &mut HashMap::new(),
+    &mut vec![],
+    &mut global_vars,
+    &mut label_generator,
+  );
 
   for (decl_port, use_port) in global_vars.into_values() {
     inet.link(decl_port, use_port);
@@ -84,7 +92,7 @@ pub fn term_to_compat_net(term: &Term) -> (INet, u8) {
     link_local(&mut inet, ROOT, main);
   }
 
-  (inet, dups)
+  (inet, label_generator.untagged_dups)
 }
 
 /// Adds a subterm connected to `up` to the `inet`.
@@ -99,7 +107,7 @@ fn encode_term(
   scope: &mut HashMap<Name, Vec<usize>>,
   vars: &mut Vec<(Port, Option<Port>)>,
   global_vars: &mut HashMap<Name, (Port, Port)>,
-  dups: &mut u8,
+  label_generator: &mut LabelGenerator,
 ) -> Option<Port> {
   match term {
     // A lambda becomes to a con node. Ports:
@@ -110,7 +118,7 @@ fn encode_term(
     Term::Lam { nam, bod } => {
       let fun = inet.new_node(Con);
       push_scope(nam, Port(fun, 1), scope, vars);
-      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, dups);
+      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, label_generator);
       pop_scope(nam, Port(fun, 1), inet, scope);
       link_local(inet, Port(fun, 2), bod);
       Some(Port(fun, 0))
@@ -119,7 +127,7 @@ fn encode_term(
     Term::Chn { nam, bod } => {
       let fun = inet.new_node(Con);
       global_vars.entry(nam.clone()).or_default().0 = Port(fun, 1);
-      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, dups);
+      let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, label_generator);
       link_local(inet, Port(fun, 2), bod);
       Some(Port(fun, 0))
     }
@@ -130,9 +138,9 @@ fn encode_term(
     // core: & fun ~ (arg ret) (fun not necessarily main port)
     Term::App { fun, arg } => {
       let app = inet.new_node(Con);
-      let fun = encode_term(inet, fun, Port(app, 0), scope, vars, global_vars, dups);
+      let fun = encode_term(inet, fun, Port(app, 0), scope, vars, global_vars, label_generator);
       link_local(inet, Port(app, 0), fun);
-      let arg = encode_term(inet, arg, Port(app, 1), scope, vars, global_vars, dups);
+      let arg = encode_term(inet, arg, Port(app, 1), scope, vars, global_vars, label_generator);
       link_local(inet, Port(app, 1), arg);
       Some(Port(app, 2))
     }
@@ -140,16 +148,16 @@ fn encode_term(
     Term::Match { cond, zero, succ } => {
       let if_ = inet.new_node(Mat);
 
-      let cond = encode_term(inet, cond, Port(if_, 0), scope, vars, global_vars, dups);
+      let cond = encode_term(inet, cond, Port(if_, 0), scope, vars, global_vars, label_generator);
       link_local(inet, Port(if_, 0), cond);
 
       let sel = inet.new_node(Con);
       inet.link(Port(sel, 0), Port(if_, 1));
 
-      let zero = encode_term(inet, zero, Port(sel, 1), scope, vars, global_vars, dups);
+      let zero = encode_term(inet, zero, Port(sel, 1), scope, vars, global_vars, label_generator);
       link_local(inet, Port(sel, 1), zero);
 
-      let succ = encode_term(inet, succ, Port(sel, 2), scope, vars, global_vars, dups);
+      let succ = encode_term(inet, succ, Port(sel, 2), scope, vars, global_vars, label_generator);
       link_local(inet, Port(sel, 2), succ);
 
       Some(Port(if_, 2))
@@ -159,15 +167,16 @@ fn encode_term(
     // - 1: points to the occurrence of the first variable.
     // - 2: points to the occurrence of the second variable.
     // core: & val ~ {lab fst snd} (val not necessarily main port)
-    Term::Dup { fst, snd, val, nxt } => {
-      let dup = inet.new_node(Dup { lab: *dups });
-      *dups += 1;
-      let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups);
+    Term::Dup { fst, snd, val, nxt, tag } => {
+      let lab = label_generator.generate(tag);
+      let dup = inet.new_node(Dup { lab });
+
+      let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, label_generator);
       link_local(inet, Port(dup, 0), val);
 
       push_scope(fst, Port(dup, 1), scope, vars);
       push_scope(snd, Port(dup, 2), scope, vars);
-      let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, dups);
+      let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, label_generator);
       pop_scope(snd, Port(dup, 2), inet, scope);
       pop_scope(fst, Port(dup, 1), inet, scope);
 
@@ -202,12 +211,12 @@ fn encode_term(
     Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
       let dup = inet.new_node(Tup);
 
-      let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups);
+      let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, label_generator);
       link_local(inet, Port(dup, 0), val);
 
       push_scope(l_nam, Port(dup, 1), scope, vars);
       push_scope(r_nam, Port(dup, 2), scope, vars);
-      let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, dups);
+      let nxt = encode_term(inet, nxt, up, scope, vars, global_vars, label_generator);
       pop_scope(r_nam, Port(dup, 2), inet, scope);
       pop_scope(l_nam, Port(dup, 1), inet, scope);
 
@@ -232,13 +241,13 @@ fn encode_term(
       let fst_node = inet.new_node(Op2);
       inet.link(Port(op_node, 0), Port(fst_node, 0));
 
-      let fst = encode_term(inet, fst, Port(fst_node, 1), scope, vars, global_vars, dups);
+      let fst = encode_term(inet, fst, Port(fst_node, 1), scope, vars, global_vars, label_generator);
       link_local(inet, Port(fst_node, 1), fst);
 
       let snd_node = inet.new_node(Op2);
       inet.link(Port(fst_node, 2), Port(snd_node, 0));
 
-      let snd = encode_term(inet, snd, Port(snd_node, 1), scope, vars, global_vars, dups);
+      let snd = encode_term(inet, snd, Port(snd_node, 1), scope, vars, global_vars, label_generator);
       link_local(inet, Port(snd_node, 1), snd);
 
       Some(Port(snd_node, 2))
@@ -246,10 +255,10 @@ fn encode_term(
     Term::Tup { fst, snd } => {
       let tup = inet.new_node(Tup);
 
-      let fst = encode_term(inet, fst, Port(tup, 1), scope, vars, global_vars, dups);
+      let fst = encode_term(inet, fst, Port(tup, 1), scope, vars, global_vars, label_generator);
       link_local(inet, Port(tup, 1), fst);
 
-      let snd = encode_term(inet, snd, Port(tup, 2), scope, vars, global_vars, dups);
+      let snd = encode_term(inet, snd, Port(tup, 2), scope, vars, global_vars, label_generator);
       link_local(inet, Port(tup, 2), snd);
 
       Some(Port(tup, 0))
@@ -303,6 +312,30 @@ impl Op {
       Op::NOT => 0xd,
       Op::LSH => 0xe,
       Op::RSH => 0xf,
+    }
+  }
+}
+
+#[derive(Default)]
+struct LabelGenerator {
+  untagged_dups: u8,
+  tagged_dups: HashMap<Name, u8>,
+}
+
+impl LabelGenerator {
+  // If some tag and new generate a new label, otherwise return the generated label.
+  // If none use the implicit label counter.
+  fn generate(&mut self, tag: &Option<Name>) -> u8 {
+    if let Some(tag) = tag {
+      let next_lab = self.tagged_dups.len() as u8;
+      match self.tagged_dups.entry(tag.clone()) {
+        Entry::Occupied(e) => e.get().clone(),
+        Entry::Vacant(e) => e.insert(next_lab).clone(),
+      }
+    } else {
+      let lab = self.untagged_dups;
+      self.untagged_dups += 1;
+      lab
     }
   }
 }

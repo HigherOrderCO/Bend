@@ -92,6 +92,7 @@ pub enum Term {
     snd: Box<Term>,
   },
   Dup {
+    tag: Option<Name>,
     fst: Option<Name>,
     snd: Option<Name>,
     val: Box<Term>,
@@ -286,7 +287,7 @@ impl Term {
           succ.to_string(def_names),
         )
       }
-      Term::Dup { fst, snd, val, nxt } => format!(
+      Term::Dup { tag: _, fst, snd, val, nxt } => format!(
         "dup {} {} = {}; {}",
         fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
         snd.as_ref().map(|x| x.as_str()).unwrap_or("*"),
@@ -340,7 +341,7 @@ impl Term {
         fun.subst(from, to);
         arg.subst(from, to);
       }
-      Term::Dup { fst, snd, val, nxt } => {
+      Term::Dup { tag: _, fst, snd, val, nxt } => {
         val.subst(from, to);
         if fst.as_ref().map_or(true, |fst| fst != from) && snd.as_ref().map_or(true, |snd| snd != from) {
           nxt.subst(from, to);

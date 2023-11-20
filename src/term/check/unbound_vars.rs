@@ -63,7 +63,7 @@ pub fn check_uses<'a>(
       check_uses(nxt, scope, globals)?;
       pop_scope(Some(nam), scope);
     }
-    Term::Dup { fst, snd, val, nxt } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
       check_uses(val, scope, globals)?;
       push_scope(fst.as_ref(), scope);
       push_scope(snd.as_ref(), scope);

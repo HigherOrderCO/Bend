@@ -13,22 +13,27 @@ use chumsky::{
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range};
 
-/// <Book>   ::= <Def>* // Sequential rules grouped by name
-/// <Def>    ::= \n* <Rule> (\n+ <Rule>)* \n*
-/// <Rule>   ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) \n* "=" \n* (<InlineNumOp> | <InlineApp>)
+/// <Book>    ::= <TopLevel>*
+/// <TopLevel> ::= (<Def> | <Data>)
+/// <Def>     ::= <Rule> (<Rule>)*
+/// <Data>    ::= "data" <Name> "=" (<Name> | "(" <Name> (<Name>)* ")")+
+/// <Rule>    ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) "=" (<InlineNumOp> | <InlineApp>)
 /// <Pattern> ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number>
-/// <Term>   ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Let> | <NumOp> | <App>
-/// <Lam>    ::= ("λ"|"@") \n* <NameEra> \n* <Term>
-/// <GlobalLam> ::= ("λ"|"@") "$" <Name> \n* <Term>
-/// <Dup>    ::= "dup" \n* <Name> \n* <Name> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
-/// <Let>    ::= "let" \n* <Name> \n* "=" \n* <Term> (\n+ | \n* ";") \n* <Term>
-/// <NumOp>  ::= "(" \n* <numop_token> \n* <Term> \n* <Term> \n* ")"
-/// <App>    ::= "(" \n* <Term> (\n* <Term>)* \n* ")"
+/// <Term>    ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Tup> | <Let> | <NumOp> | <App>
+/// <Lam>     ::= ("λ"|"@") <NameEra> <Term>
+/// <GlobalLam> ::= ("λ"|"@") "$" <Name> <Term>
+/// <Dup>    ::= "dup" <Tag>? <NameEra> <NameEra> "=" <Term> ";" <Term>
+/// <Tup>    ::= "(" <Term> "," <Term> ")"
+/// <Let>    ::= "let" <LetPat> "=" <Term> ";" <Term>
+/// <LetPat> ::= <Name> | "(" <NameEra> "," <NameEra> ")"
+/// <NumOp>  ::= "(" <numop_token> <Term> <Term> ")"
+/// <App>    ::= "(" <Term> (<Term>)* ")"
 /// <Var>    ::= <Name>
 /// <GlobalVar> ::= "$" <Name>
 /// <NameEra> ::= <Name> | "*"
 /// <Name>   ::= <name_token> // [_a-zA-Z][_a-zA-Z0-9]{0..7}
 /// <Number> ::= <number_token> // [0-9]+
+/// <Tag>    ::= "#" <Name>
 pub fn parse_definition_book(code: &str) -> Result<Book, Vec<Rich<Token>>> {
   book().parse(token_stream(code)).into_result()
 }
@@ -69,6 +74,13 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   select!(Token::Name(name) => Name(name))
+}
+
+fn tag<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  just(Token::Hash).ignore_then(name()).or_not()
 }
 
 fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
@@ -128,17 +140,24 @@ where
 
     // dup x1 x2 = body; next
     let dup = just(Token::Dup)
-      .ignore_then(name_or_era())
+      .ignore_then(tag())
+      .then(name_or_era())
       .then(name_or_era())
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(term_sep.clone())
       .then(term.clone())
-      .map(|(((fst, snd), val), next)| Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(next) })
+      .map(|((((tag, fst), snd), val), next)| Term::Dup {
+        tag,
+        fst,
+        snd,
+        val: Box::new(val),
+        nxt: Box::new(next),
+      })
       .boxed();
 
     // (x, y)
-    let pair = term
+    let tup = term
       .clone()
       .then_ignore(just(Token::Comma))
       .then(term.clone())
@@ -192,7 +211,7 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, number, pair, global_lam, lam, dup, let_, match_, num_op, app))
+    choice((global_var, var, number, tup, global_lam, lam, dup, let_, match_, num_op, app))
   })
 }
 

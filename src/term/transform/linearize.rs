@@ -41,7 +41,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       add_var(nam.as_ref(), uses);
       count_var_uses_in_term(bod, uses)
     }
-    Term::Dup { fst, snd, val, nxt } => {
+    Term::Dup { fst, snd, val, nxt, .. } => {
       add_var(fst.as_ref(), uses);
       add_var(snd.as_ref(), uses);
       count_var_uses_in_term(val, uses);
@@ -112,7 +112,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       *term = std::mem::replace(nxt.as_mut(), Term::Era);
     }
 
-    Term::Dup { fst, snd, val, nxt } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
       let uses_fst = get_var_uses(fst.as_ref(), var_uses);
       let uses_snd = get_var_uses(snd.as_ref(), var_uses);
       term_to_affine(val, var_uses, let_bodies);
@@ -161,6 +161,7 @@ fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, dup_body: Option<&mut Te
   for i in (1 .. uses).rev() {
     let old_nxt = std::mem::replace(nxt, Term::Era);
     *nxt = Term::Dup {
+      tag: None,
       fst: Some(dup_name(nam, i)),
       snd: if i == uses - 1 { Some(dup_name(nam, uses)) } else { Some(internal_dup_name(nam, uses)) },
       val: if i == 1 {

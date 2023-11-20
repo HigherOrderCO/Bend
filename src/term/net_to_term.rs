@@ -412,7 +412,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
     let (val, val_valid) = reader(net, val, &mut namegem, &mut dup_scope, &mut tup_scope, &mut seen, book);
     let fst = namegem.decl_name(net, Port(dup, 1));
     let snd = namegem.decl_name(net, Port(dup, 2));
-    main = Term::Dup { fst, snd, val: Box::new(val), nxt: Box::new(main) };
+    main = Term::Dup { tag: None, fst, snd, val: Box::new(val), nxt: Box::new(main) };
     valid = valid && val_valid;
   }
 
@@ -542,7 +542,7 @@ impl Term {
           *self = term
         }
       }
-      Term::Dup { fst, snd, val, nxt } => {
+      Term::Dup { fst, snd, val, nxt, .. } => {
         val.fix_names(id_counter, book);
         fix_name(fst, id_counter, nxt);
         fix_name(snd, id_counter, nxt);
