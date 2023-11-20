@@ -2,6 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/addition_var_fst.hvm
 ---
-@main = (a b)
-& #1 ~ <a <#1 b>>
+@main = (<+ #1 a> a)
 

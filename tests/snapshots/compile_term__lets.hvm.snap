@@ -5,6 +5,6 @@ input_file: tests/golden_tests/compile_term/lets.hvm
 // This rule generated more dups then what is supported by hvm-core: 
 a
 & (b (c (d a))) ~ (e e)
-& {5 f {6 g {7 h (h (g (f d)))}}} ~ (i i)
-& {3 j {4 k (k (j c))}} ~ (l l)
-& {2 m (m b)} ~ (n n)
+& {3 f {4 g {5 h (h (g (f d)))}}} ~ (i i)
+& {1 j {2 k (k (j c))}} ~ (l l)
+& {0 m (m b)} ~ (n n)
