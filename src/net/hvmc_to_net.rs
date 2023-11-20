@@ -1,4 +1,4 @@
-use super::{INet, INode, INodes, NodeId, NodeKind::*, Port, SlotId, BASE_DUP_HVMC_LABEL, ROOT};
+use super::{INet, INode, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use crate::term::DefId;
 use hvmc::{
   ast::{Net, Tree},
@@ -67,30 +67,34 @@ fn tree_to_inodes(
         let var = new_var(n_vars);
         inodes.push(INode { kind: Era, ports: [subtree_root, var.clone(), var] });
       }
-      Tree::Ctr { lab, lft, rgt } => {
-        // Dup labels in INet representation start at 0, while for hvmc::Net they start at 1
-        let kind = match *lab {
-          0 => Con,
-          1 => Tup,
-          _ => Dup { lab: *lab - BASE_DUP_HVMC_LABEL },
-        };
+      Tree::Con { lft, rgt } => {
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
+        inodes.push(INode { kind: Con, ports: [subtree_root, lft, rgt] })
+      }
+      Tree::Tup { lft, rgt } => {
+        let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
+        let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
+        inodes.push(INode { kind: Tup, ports: [subtree_root, lft, rgt] })
+      }
+      Tree::Dup { lab, lft, rgt } => {
+        let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
+        let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
+        inodes.push(INode { kind: Dup { lab: *lab }, ports: [subtree_root, lft, rgt] })
       }
       Tree::Var { .. } => unreachable!(),
       Tree::Ref { nam } => {
-        let kind = Ref { def_id: hvmc_name_to_id(*nam) };
+        let kind = Ref { def_id: hvmc_name_to_id((*nam).into()) };
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      Tree::Num { val } => {
-        let kind = Num { val: *val };
+      Tree::Num { loc } => {
+        let kind = Num { val: *loc };
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      Tree::Op2 { lft, rgt } => {
-        let kind = Op2;
+      Tree::Op2 { opr, lft, rgt } => {
+        let kind = Op2 { opr: *opr };
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
