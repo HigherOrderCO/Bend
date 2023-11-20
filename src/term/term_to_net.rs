@@ -170,13 +170,8 @@ fn encode_term(
     // - 2: points to the occurrence of the second variable.
     // core: & val ~ {lab fst snd} (val not necessarily main port)
     Term::Dup { fst, snd, val, nxt, tag } => {
-      let dup: u32;
-      if let Some(tag) = tag {
-        dup = tagged_dup(tag_storage, tag.clone(), inet);
-      } else {
-        dup = inet.new_node(Dup { lab: *dups });
-        *dups += 1;
-      };
+      let lab = generate_dup_label(tag_storage, tag, dups);
+      let dup = inet.new_node(Dup { lab });
 
       let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, dups, tag_storage);
       link_local(inet, Port(dup, 0), val);
@@ -273,16 +268,21 @@ fn encode_term(
   }
 }
 
-// If the tag exists in the storage return the value.
-// If not, insert the tag with the current storage length.
-fn tagged_dup(tag_storage: &mut HashMap<Name, u8>, tag: Name, inet: &mut INet) -> u32 {
-  let storage_len = tag_storage.len() as u8;
-  match tag_storage.entry(tag) {
-    Entry::Occupied(e) => inet.new_node(Dup { lab: *e.get() }),
-    Entry::Vacant(e) => {
-      e.insert(storage_len);
-      inet.new_node(Dup { lab: storage_len })
+// If tagged and new generate a new label, otherwise return the generated label.
+// If not tagged use the implicit label counter.
+fn generate_dup_label(tag_storage: &mut HashMap<Name, u8>, tag: &Option<Name>, dups: &mut u8) -> u8 {
+  if let Some(tag) = tag {
+    let next_lab = tag_storage.len() as u8;
+    match tag_storage.entry(tag.clone()) {
+      Entry::Occupied(e) => e.get().clone(),
+      Entry::Vacant(e) => {
+        e.insert(next_lab).clone()
+      }
     }
+  } else {
+    let lab = *dups;
+    *dups += 1;
+    lab
   }
 }
 
