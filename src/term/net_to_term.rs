@@ -186,26 +186,204 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
   }
   // A hashmap linking ports to binder names. Those ports have names:
   // Port 1 of a con node (λ), ports 1 and 2 of a fan node (let).
-  let mut namegem = NameGen::default();
+  let mut namegen = NameGen::default();
 
   let mut dup_scope = HashMap::new();
   let mut tup_scope = Scope::default();
 
   // Reads the main term from the net
   let (mut main, mut valid) =
-    reader(net, net.enter_port(ROOT), &mut namegem, &mut dup_scope, &mut tup_scope, book);
+    reader(net, net.enter_port(ROOT), &mut namegen, &mut dup_scope, &mut tup_scope, book);
 
   // Read all the let bodies.
   while let Some(tup) = tup_scope.vec.pop() {
     let val = net.enter_port(Port(tup, 0));
-    let (val, val_valid) = reader(net, val, &mut namegem, &mut dup_scope, &mut tup_scope, book);
-    let fst = namegem.decl_name(net, Port(tup, 1));
-    let snd = namegem.decl_name(net, Port(tup, 2));
-    main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) };
+    let (val, val_valid) = reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, book);
+    let fst = namegen.decl_name(net, Port(tup, 1));
+    let snd = namegen.decl_name(net, Port(tup, 2));
+
+    let mut free_vars = HashSet::new();
+    val.free_vars(&mut free_vars);
+
+    let let_ctx = LetInsertion::Todo(fst, snd, val);
+
+    match let_ctx.search_and_insert(&mut main, &mut free_vars).0 {
+      LetInsertion::Err(fst, snd, val) => {
+        main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) }
+      }
+      LetInsertion::Ok => {}
+      _ => unreachable!(),
+    }
+
     valid = valid && val_valid;
   }
 
   (main, valid)
+}
+
+enum LetInsertion {
+  Ok,
+  Err(Option<Name>, Option<Name>, Term),
+  Todo(Option<Name>, Option<Name>, Term),
+}
+
+impl LetInsertion {
+  /// Searchers the term and inserts the let body in the position bettewn where the vars it depends are defined,
+  /// and where the its vars are used
+  fn search_and_insert(self, term: &mut Term, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
+    match term.resolve_let_scope(self, free_vars) {
+      (Self::Todo(fst, snd, val), true) => (term.insert_let(fst, snd, val, free_vars), true),
+      (ctx, uses) => (ctx, uses),
+    }
+  }
+
+  /// Searches all the terms and substitutes it if only one term used the ctx vars.
+  /// Otherwise, returns the context with true if more then one term used the vars,
+  /// or false if none.
+  fn multi_search_and_insert(
+    self,
+    terms: &mut [&mut Term],
+    free_vars: &mut HashSet<Name>,
+  ) -> (LetInsertion, bool) {
+    let mut var_uses = Vec::with_capacity(terms.len());
+    let mut ctx = self;
+    let mut var_use;
+
+    for term in terms.iter_mut() {
+      (ctx, var_use) = term.resolve_let_scope(ctx, free_vars);
+      var_uses.push(var_use);
+    }
+
+    let used_in_terms: Vec<_> =
+      var_uses.into_iter().enumerate().filter_map(|(index, is_used)| is_used.then_some(index)).collect();
+
+    match (used_in_terms.len(), ctx) {
+      (1, Self::Todo(fst, snd, val)) => (terms[used_in_terms[0]].insert_let(fst, snd, val, free_vars), true),
+      (0, ctx) => (ctx, false),
+      (_, ctx) => (ctx, true),
+    }
+  }
+}
+
+impl Term {
+  fn insert_let(
+    &mut self,
+    fst: Option<Name>,
+    snd: Option<Name>,
+    val: Term,
+    free_vars: &mut HashSet<Name>,
+  ) -> LetInsertion {
+    // If all the vars it depends on were found, we update the term with the Let
+    if free_vars.is_empty() {
+      let nxt = Box::new(std::mem::replace(self, Term::Era));
+
+      *self = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt };
+      LetInsertion::Ok
+    } else {
+      // Otherwise, return a failed attempt, that will pass through to the first call to `search and insert`
+      LetInsertion::Err(fst, snd, val)
+    }
+  }
+
+  fn resolve_let_scope(&mut self, ctx: LetInsertion, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
+    match self {
+      Term::Lam { nam: Some(nam), bod } => {
+        free_vars.remove(nam);
+        ctx.search_and_insert(bod, free_vars)
+      }
+
+      Term::Lam { nam: None, bod } => ctx.search_and_insert(bod, free_vars),
+
+      Term::Let { pat: LetPat::Var(_), .. } => unreachable!(),
+
+      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
+        let (ctx, val_use) = val.resolve_let_scope(ctx, free_vars);
+
+        fst.as_ref().map(|fst| free_vars.remove(fst));
+        snd.as_ref().map(|snd| free_vars.remove(snd));
+        let (ctx, nxt_use) = nxt.resolve_let_scope(ctx, free_vars);
+
+        (ctx, val_use || nxt_use)
+      }
+
+      Term::Var { nam } => {
+        if let LetInsertion::Todo(fst, snd, val) = ctx {
+          let is_fst = fst.as_ref().map_or(false, |fst| fst == nam);
+          let is_snd = snd.as_ref().map_or(false, |snd| snd == nam);
+
+          (LetInsertion::Todo(fst, snd, val), is_fst || is_snd)
+        } else {
+          (ctx, false)
+        }
+      }
+
+      Term::Chn { bod, .. } => ctx.search_and_insert(bod, free_vars),
+
+      Term::App { fun, arg } => ctx.multi_search_and_insert(&mut [fun, arg], free_vars),
+
+      Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { fst, snd, .. } => {
+        ctx.multi_search_and_insert(&mut [fst, snd], free_vars)
+      }
+
+      Term::Match { cond, zero, succ } => ctx.multi_search_and_insert(&mut [cond, zero, succ], free_vars),
+
+      Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => (ctx, false),
+    }
+  }
+
+  /// Collects all the free variables that a term has
+  fn free_vars(&self, free_vars: &mut HashSet<Name>) {
+    match self {
+      Term::Lam { nam: Some(nam), bod } => {
+        let mut new_scope = HashSet::new();
+        bod.free_vars(&mut new_scope);
+        new_scope.remove(nam);
+
+        free_vars.extend(new_scope);
+      }
+      Term::Lam { nam: None, bod } => bod.free_vars(free_vars),
+      Term::Var { nam } => _ = free_vars.insert(nam.clone()),
+      Term::Chn { bod, .. } => bod.free_vars(free_vars),
+      Term::Lnk { .. } => {}
+      Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+        val.free_vars(free_vars);
+
+        let mut new_scope = HashSet::new();
+        nxt.free_vars(&mut new_scope);
+
+        new_scope.remove(nam);
+
+        free_vars.extend(new_scope);
+      }
+      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
+        val.free_vars(free_vars);
+
+        let mut new_scope = HashSet::new();
+        nxt.free_vars(&mut new_scope);
+
+        fst.as_ref().map(|fst| new_scope.remove(fst));
+        snd.as_ref().map(|snd| new_scope.remove(snd));
+
+        free_vars.extend(new_scope);
+      }
+      Term::App { fun, arg } => {
+        fun.free_vars(free_vars);
+        arg.free_vars(free_vars);
+      }
+      Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { op: _, fst, snd } => {
+        fst.free_vars(free_vars);
+        snd.free_vars(free_vars);
+      }
+      Term::Match { cond, zero, succ } => {
+        cond.free_vars(free_vars);
+        zero.free_vars(free_vars);
+        succ.free_vars(free_vars);
+      }
+      Term::Num { .. } => {}
+      Term::Ref { .. } => {}
+      Term::Era => {}
+    }
+  }
 }
 
 /// Converts an Interaction-INet to an Interaction Calculus term.
@@ -215,7 +393,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
   fn reader(
     net: &INet,
     next: Port,
-    namegem: &mut NameGen,
+    namegen: &mut NameGen,
     dup_scope: &mut Scope,
     tup_scope: &mut Scope,
     seen: &mut HashSet<Port>,
@@ -240,21 +418,21 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
         // If we're visiting a port 0, then it is a lambda.
         0 => {
           seen.insert(Port(node, 2));
-          let nam = namegem.decl_name(net, Port(node, 1));
+          let nam = namegen.decl_name(net, Port(node, 1));
           let prt = net.enter_port(Port(node, 2));
-          let (bod, valid) = reader(net, prt, namegem, dup_scope, tup_scope, seen, book);
+          let (bod, valid) = reader(net, prt, namegen, dup_scope, tup_scope, seen, book);
           (Term::Lam { nam, bod: Box::new(bod) }, valid)
         }
         // If we're visiting a port 1, then it is a variable.
-        1 => (Term::Var { nam: namegem.var_name(next) }, true),
+        1 => (Term::Var { nam: namegen.var_name(next) }, true),
         // If we're visiting a port 2, then it is an application.
         2 => {
           seen.insert(Port(node, 0));
           seen.insert(Port(node, 1));
           let prt = net.enter_port(Port(node, 0));
-          let (fun, fun_valid) = reader(net, prt, namegem, dup_scope, tup_scope, seen, book);
+          let (fun, fun_valid) = reader(net, prt, namegen, dup_scope, tup_scope, seen, book);
           let prt = net.enter_port(Port(node, 1));
-          let (arg, arg_valid) = reader(net, prt, namegem, dup_scope, tup_scope, seen, book);
+          let (arg, arg_valid) = reader(net, prt, namegen, dup_scope, tup_scope, seen, book);
           let valid = fun_valid && arg_valid;
           (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
         }
@@ -266,7 +444,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           seen.insert(Port(node, 0));
           seen.insert(Port(node, 1));
           let cond_port = net.enter_port(Port(node, 0));
-          let (cond_term, cond_valid) = reader(net, cond_port, namegem, dup_scope, tup_scope, seen, book);
+          let (cond_term, cond_valid) = reader(net, cond_port, namegen, dup_scope, tup_scope, seen, book);
 
           // Read the pattern matching node
           let sel_node = net.enter_port(Port(node, 1)).node();
@@ -285,9 +463,9 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
-          let (zero_term, zero_valid) = reader(net, zero_port, namegem, dup_scope, tup_scope, seen, book);
+          let (zero_term, zero_valid) = reader(net, zero_port, namegen, dup_scope, tup_scope, seen, book);
           let succ_port = net.enter_port(Port(sel_node, 2));
-          let (succ_term, succ_valid) = reader(net, succ_port, namegem, dup_scope, tup_scope, seen, book);
+          let (succ_term, succ_valid) = reader(net, succ_port, namegen, dup_scope, tup_scope, seen, book);
 
           let valid = cond_valid && zero_valid && succ_valid;
           (
@@ -302,7 +480,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           let def = book.defs.get(&def_id).unwrap();
           def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
-          term.fix_names(&mut namegem.id_counter, book);
+          term.fix_names(&mut namegen.id_counter, book);
 
           (term, true)
         } else {
@@ -316,9 +494,9 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           seen.insert(Port(node, 1));
           seen.insert(Port(node, 2));
           let fst_port = net.enter_port(Port(node, 1));
-          let (fst, fst_valid) = reader(net, fst_port, namegem, dup_scope, tup_scope, seen, book);
+          let (fst, fst_valid) = reader(net, fst_port, namegen, dup_scope, tup_scope, seen, book);
           let snd_port = net.enter_port(Port(node, 2));
-          let (snd, snd_valid) = reader(net, snd_port, namegem, dup_scope, tup_scope, seen, book);
+          let (snd, snd_valid) = reader(net, snd_port, namegen, dup_scope, tup_scope, seen, book);
           let valid = fst_valid && snd_valid;
           (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
@@ -326,7 +504,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
         // Also, that means we found a dup, so we store it to read later.
         1 | 2 => {
           dup_scope.insert(node);
-          (Term::Var { nam: namegem.var_name(next) }, true)
+          (Term::Var { nam: namegen.var_name(next) }, true)
         }
         _ => unreachable!(),
       },
@@ -336,9 +514,9 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           seen.insert(Port(node, 0));
           seen.insert(Port(node, 1));
           let op_port = net.enter_port(Port(node, 0));
-          let (op_term, op_valid) = reader(net, op_port, namegem, dup_scope, tup_scope, seen, book);
+          let (op_term, op_valid) = reader(net, op_port, namegen, dup_scope, tup_scope, seen, book);
           let arg_port = net.enter_port(Port(node, 1));
-          let (arg_term, fst_valid) = reader(net, arg_port, namegem, dup_scope, tup_scope, seen, book);
+          let (arg_term, fst_valid) = reader(net, arg_port, namegen, dup_scope, tup_scope, seen, book);
           let valid = op_valid && fst_valid;
           match op_term {
             Term::Num { val } => {
@@ -373,9 +551,9 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           seen.insert(Port(node, 1));
           seen.insert(Port(node, 2));
           let fst_port = net.enter_port(Port(node, 1));
-          let (fst, fst_valid) = reader(net, fst_port, namegem, dup_scope, tup_scope, seen, book);
+          let (fst, fst_valid) = reader(net, fst_port, namegen, dup_scope, tup_scope, seen, book);
           let snd_port = net.enter_port(Port(node, 2));
-          let (snd, snd_valid) = reader(net, snd_port, namegem, dup_scope, tup_scope, seen, book);
+          let (snd, snd_valid) = reader(net, snd_port, namegen, dup_scope, tup_scope, seen, book);
           let valid = fst_valid && snd_valid;
           (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
@@ -383,7 +561,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
         // Also, that means we found a let, so we store it to read later.
         1 | 2 => {
           tup_scope.insert(node);
-          (Term::Var { nam: namegem.var_name(next) }, true)
+          (Term::Var { nam: namegen.var_name(next) }, true)
         }
         _ => unreachable!(),
       },
@@ -392,7 +570,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
 
   // A hashmap linking ports to binder names. Those ports have names:
   // Port 1 of a con node (λ), ports 1 and 2 of a fan node (let).
-  let mut namegem = NameGen::default();
+  let mut namegen = NameGen::default();
 
   // Dup aren't scoped. We find them when we read one of the variables
   // introduced by them. Thus, we must store the dups we find to read later.
@@ -403,15 +581,15 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
 
   // Reads the main term from the net
   let (mut main, mut valid) =
-    reader(net, net.enter_port(ROOT), &mut namegem, &mut dup_scope, &mut tup_scope, &mut seen, book);
+    reader(net, net.enter_port(ROOT), &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, book);
 
   // Read all the dup bodies.
   while let Some(dup) = dup_scope.vec.pop() {
     seen.insert(Port(dup, 0));
     let val = net.enter_port(Port(dup, 0));
-    let (val, val_valid) = reader(net, val, &mut namegem, &mut dup_scope, &mut tup_scope, &mut seen, book);
-    let fst = namegem.decl_name(net, Port(dup, 1));
-    let snd = namegem.decl_name(net, Port(dup, 2));
+    let (val, val_valid) = reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, book);
+    let fst = namegen.decl_name(net, Port(dup, 1));
+    let snd = namegen.decl_name(net, Port(dup, 2));
     main = Term::Dup { tag: None, fst, snd, val: Box::new(val), nxt: Box::new(main) };
     valid = valid && val_valid;
   }
@@ -420,15 +598,15 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
   while let Some(tup) = tup_scope.vec.pop() {
     seen.insert(Port(tup, 0));
     let val = net.enter_port(Port(tup, 0));
-    let (val, val_valid) = reader(net, val, &mut namegem, &mut dup_scope, &mut tup_scope, &mut seen, book);
-    let fst = namegem.decl_name(net, Port(tup, 1));
-    let snd = namegem.decl_name(net, Port(tup, 2));
+    let (val, val_valid) = reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, book);
+    let fst = namegen.decl_name(net, Port(tup, 1));
+    let snd = namegen.decl_name(net, Port(tup, 2));
     main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) };
     valid = valid && val_valid;
   }
 
   // Check if the readback didn't leave any unread nodes (for example reading var from a lam but never reading the lam itself)
-  for &decl_port in namegem.var_port_to_id.keys() {
+  for &decl_port in namegen.var_port_to_id.keys() {
     for check_slot in 0 .. 3 {
       let check_port = Port(decl_port.node(), check_slot);
       let other_node = net.enter_port(check_port).node();
