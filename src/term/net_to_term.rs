@@ -231,7 +231,7 @@ impl LetInsertion {
   /// Searchers the term and inserts the let body in the position bettewn where the vars it depends are defined,
   /// and where the its vars are used
   fn search_and_insert(self, term: &mut Term, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
-    match term.search_let_scope(self, free_vars) {
+    match term.resolve_let_scope(self, free_vars) {
       (Self::Todo(fst, snd, val), true) => (term.insert_let(fst, snd, val, free_vars), true),
       (ctx, uses) => (ctx, uses),
     }
@@ -250,7 +250,7 @@ impl LetInsertion {
     let mut var_use;
 
     for term in terms.iter_mut() {
-      (ctx, var_use) = term.search_let_scope(ctx, free_vars);
+      (ctx, var_use) = term.resolve_let_scope(ctx, free_vars);
       var_uses.push(var_use);
     }
 
@@ -285,7 +285,7 @@ impl Term {
     }
   }
 
-  fn search_let_scope(&mut self, ctx: LetInsertion, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
+  fn resolve_let_scope(&mut self, ctx: LetInsertion, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
     match self {
       Term::Lam { nam: Some(nam), bod } => {
         free_vars.remove(nam);
@@ -297,11 +297,11 @@ impl Term {
       Term::Let { pat: LetPat::Var(_), .. } => unreachable!(),
 
       Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt } => {
-        let (ctx, val_use) = val.search_let_scope(ctx, free_vars);
+        let (ctx, val_use) = val.resolve_let_scope(ctx, free_vars);
 
         fst.as_ref().map(|fst| free_vars.remove(fst));
         snd.as_ref().map(|snd| free_vars.remove(snd));
-        let (ctx, nxt_use) = nxt.search_let_scope(ctx, free_vars);
+        let (ctx, nxt_use) = nxt.resolve_let_scope(ctx, free_vars);
 
         (ctx, val_use || nxt_use)
       }
