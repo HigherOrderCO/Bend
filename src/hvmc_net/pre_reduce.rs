@@ -3,7 +3,7 @@
 
 use hvmc::{
   ast::{net_from_runtime, net_to_runtime},
-  run::{NUM, OP2, REF},
+  run::{Heap, NUM, OP2, REF},
 };
 use std::collections::BTreeMap;
 
@@ -15,7 +15,8 @@ pub fn pre_reduce_book(book: &mut BTreeMap<String, hvmc::ast::Net>) -> Result<()
 }
 
 pub fn pre_reduce_net(nam: &str, net: &mut hvmc::ast::Net) -> Result<(), String> {
-  let mut rt = hvmc::run::Net::new(1 << 18);
+  let heap = Heap::init(1 << 18);
+  let mut rt = hvmc::run::Net::new(&heap);
   net_to_runtime(&mut rt, net);
   pre_reduce_run_net(nam, &mut rt)?;
   *net = net_from_runtime(&rt);

@@ -1,8 +1,8 @@
 #![feature(box_patterns)]
 
 use hvmc::{
-  ast::{book_to_runtime, name_to_val, net_from_runtime, show_book, Net},
-  run::Val,
+  ast::{book_to_runtime, name_to_val, net_from_runtime, runtime_net_to_runtime_def, show_book, Net},
+  run::{self, Heap, Rewrites, Val},
 };
 use hvmc_net::pre_reduce::pre_reduce_book;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
@@ -72,18 +72,17 @@ pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
 
 pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) {
   let runtime_book = book_to_runtime(book);
-  let mut root = hvmc::run::Net::new(mem_size);
-  root.boot(name_to_val(DefNames::ENTRY_POINT));
+  let heap = Heap::init(mem_size);
+  let mut root = hvmc::run::Net::new(&heap);
+  root.boot(name_to_val(DefNames::ENTRY_POINT) as run::Loc);
 
   let start_time = Instant::now();
   root.normal(&runtime_book);
   let elapsed = start_time.elapsed().as_secs_f64();
 
-  let rewrites =
-    Rewrites { anni: root.anni, comm: root.comm, eras: root.eras, dref: root.dref, oper: root.oper };
   let net = net_from_runtime(&root);
-  let def = root.to_def();
-  let stats = RunStats { rewrites, used: def.node.len(), run_time: elapsed };
+  let def = runtime_net_to_runtime_def(&root);
+  let stats = RunStats { rewrites: root.rwts, used: def.node.len(), run_time: elapsed };
   (net, stats)
 }
 
@@ -117,16 +116,6 @@ pub struct RunStats {
   pub run_time: f64,
 }
 
-pub struct Rewrites {
-  pub anni: usize,
-  pub comm: usize,
-  pub eras: usize,
-  pub dref: usize,
-  pub oper: usize,
-}
-
-impl Rewrites {
-  pub fn total_rewrites(&self) -> usize {
-    self.anni + self.comm + self.eras + self.dref + self.oper
-  }
+pub fn total_rewrites(rwrts: &Rewrites) -> usize {
+  rwrts.anni + rwrts.comm + rwrts.eras + rwrts.dref + rwrts.oper
 }

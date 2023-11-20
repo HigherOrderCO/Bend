@@ -3,7 +3,7 @@ use hvmc::{
   ast::{show_book, show_net},
   run::Ptr,
 };
-use hvml::{check_book, compile_book, load_file_to_book, run_book, RunInfo};
+use hvml::{check_book, compile_book, load_file_to_book, run_book, total_rewrites, RunInfo};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -75,7 +75,8 @@ fn main() -> Result<(), String> {
       let mem_size = args.mem / std::mem::size_of::<(Ptr, Ptr)>();
       let (res_term, def_names, info) = run_book(book, mem_size)?;
       let RunInfo { stats, valid_readback, net: lnet } = info;
-      let rps = stats.rewrites.total_rewrites() as f64 / stats.run_time / 1_000_000.0;
+      let total_rewrites = total_rewrites(&stats.rewrites);
+      let rps = total_rewrites as f64 / stats.run_time / 1_000_000.0;
       if args.verbose {
         println!("\n{}", show_net(&lnet));
       }
@@ -88,7 +89,7 @@ fn main() -> Result<(), String> {
       }
 
       if args.stats {
-        println!("RWTS   : {}", stats.rewrites.total_rewrites());
+        println!("RWTS   : {}", total_rewrites);
         println!("- ANNI : {}", stats.rewrites.anni);
         println!("- COMM : {}", stats.rewrites.comm);
         println!("- ERAS : {}", stats.rewrites.eras);
