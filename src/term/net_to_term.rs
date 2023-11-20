@@ -126,45 +126,17 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
       },
       Num { val } => (Term::Num { val }, true),
       Op2 { opr } => match next.slot() {
-        0 => {
-          let op_port = net.enter_port(Port(node, 1));
-          let (fst, op_valid) = reader(net, op_port, namegen, dup_scope, tup_scope, book);
-          let arg_port = net.enter_port(Port(node, 2));
-          let (snd, fst_valid) = reader(net, arg_port, namegen, dup_scope, tup_scope, book);
-          let valid = op_valid && fst_valid;
+        2 => {
+          let op_port = net.enter_port(Port(node, 0));
+          let (fst, fst_valid) = reader(net, op_port, namegen, dup_scope, tup_scope, book);
+          let arg_port = net.enter_port(Port(node, 1));
+          let (snd, snd_valid) = reader(net, arg_port, namegen, dup_scope, tup_scope, book);
+          let valid = fst_valid && snd_valid;
 
-          (Term::Opx { op: Op::from_hvmc_label(opr).unwrap(), fst: Box::new(fst), snd: Box::new(snd) }, valid)
-          // fn go(op_term: Term, arg_term: Term, opr: u32) -> Term {
-          //   match op_term {
-          //     Term::Num { val } => {
-          //       println!("here");
-          //       // let (val, op) = split_num_with_op(opr);
-          //       let op = Op::from_hvmc_label(opr);
-          //       if let Some(op) = op {
-          //         // This is Num + Op in the same value
-          //         println!("here");
-          //         Term::Opx { op, fst: Box::new(arg_term), snd: Box::new(op_term) }
-          //       } else {
-          //         // This is just Op as value
-          //         Term::Opx {
-          //           op: Op::from_hvmc_label(val).unwrap(),
-          //           fst: Box::new(arg_term),
-          //           snd: Box::new(Term::Era),
-          //         }
-          //       }
-          //     }
-          //     Term::Opx { op, fst, snd } => match &*snd {
-          //       // this ERA means that we came from the first OP2 node.
-          //       Term::Era => Term::Opx { op, fst, snd: Box::new(arg_term) },
-          //       // anything else is just a partially applied chain of OP2 nodes.
-          //       _ => go(arg_term, Term::Opx { op, fst, snd }, opr),
-          //     },
-          //     // otherwise this is an OP1 and we flip the port 1 and 0 to undo the
-          //     // OP2 ~ NUM interaction.
-          //     other => go(arg_term, other, opr),
-          //   }
-          // }
-          // (go(op_term, arg_term, opr), valid)
+          let term =
+            Term::Opx { op: Op::from_hvmc_label(opr).unwrap(), fst: Box::new(fst), snd: Box::new(snd) };
+
+          (term, valid)
         }
         _ => unreachable!(),
       },
@@ -514,41 +486,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
         _ => unreachable!(),
       },
       Num { val } => (Term::Num { val }, true),
-      Op2 { opr } => match next.slot() {
-        // FIXME: Update to use the `opr` field
-        2 => {
-          seen.insert(Port(node, 0));
-          seen.insert(Port(node, 1));
-          let op_port = net.enter_port(Port(node, 0));
-          let (op_term, op_valid) = reader(net, op_port, namegen, dup_scope, tup_scope, seen, book);
-          let arg_port = net.enter_port(Port(node, 1));
-          let (arg_term, fst_valid) = reader(net, arg_port, namegen, dup_scope, tup_scope, seen, book);
-          let valid = op_valid && fst_valid;
-          match op_term {
-            Term::Num { val } => {
-              let (val, op) = split_num_with_op(val);
-              if let Some(op) = op {
-                // This is Num + Op in the same value
-                (Term::Opx { op, fst: Box::new(Term::Num { val }), snd: Box::new(arg_term) }, valid)
-              } else {
-                // This is just Op as value
-                (
-                  Term::Opx {
-                    op: Op::from_hvmc_label(val).unwrap(),
-                    fst: Box::new(arg_term),
-                    snd: Box::new(Term::Era),
-                  },
-                  valid,
-                )
-              }
-            }
-            Term::Opx { op, fst, snd: _ } => (Term::Opx { op, fst, snd: Box::new(arg_term) }, valid),
-            // TODO: Actually unreachable?
-            _ => unreachable!(),
-          }
-        }
-        _ => unreachable!(),
-      },
+      Op2 { .. } => todo!(),
       // If we're revisiting the root node something went wrong with this net
       Rot => (Term::Era, false),
       Tup => match next.slot() {
@@ -687,12 +625,6 @@ impl Op {
       _ => None,
     }
   }
-}
-
-fn split_num_with_op(num: Loc) -> (Loc, Option<Op>) {
-  let op = Op::from_hvmc_label(num >> 24);
-  let num = num & ((1 << 24) - 1);
-  (num, op)
 }
 
 impl Book {

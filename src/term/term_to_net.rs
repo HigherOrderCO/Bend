@@ -236,28 +236,11 @@ fn encode_term(
     // core: & fst ~ <op snd ret>
     Term::Opx { op, fst, snd } => {
       let opx = inet.new_node(Op2 { opr: op.to_hvmc_label() });
-      let fst_port = encode_term(inet, fst, Port(opx, 1), scope, vars, global_vars, label_generator);
-      link_local(inet, Port(opx, 1), fst_port);
-      let snd_port = encode_term(inet, snd, Port(opx, 2), scope, vars, global_vars, label_generator);
-      link_local(inet, Port(opx, 2), snd_port);
-      Some(Port(opx, 0))
-      // todo
-      // let op_node = inet.new_node(Num { val: op.to_hvmc_label() });
-      // inet.link(Port(op_node, 1), Port(op_node, 2));
-
-      // let fst_node = inet.new_node(Op2 { opr: todo!() });
-      // inet.link(Port(op_node, 0), Port(fst_node, 0));
-
-      // let fst = encode_term(inet, fst, Port(fst_node, 1), scope, vars, global_vars, label_generator);
-      // link_local(inet, Port(fst_node, 1), fst);
-
-      // let snd_node = inet.new_node(Op2 { opr: todo!() });
-      // inet.link(Port(fst_node, 2), Port(snd_node, 0));
-
-      // let snd = encode_term(inet, snd, Port(snd_node, 1), scope, vars, global_vars, label_generator);
-      // link_local(inet, Port(snd_node, 1), snd);
-
-      // Some(Port(snd_node, 2))
+      let fst_port = encode_term(inet, fst, Port(opx, 0), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(opx, 0), fst_port);
+      let snd_port = encode_term(inet, snd, Port(opx, 1), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(opx, 1), snd_port);
+      Some(Port(opx, 2))
     }
     Term::Tup { fst, snd } => {
       let tup = inet.new_node(Tup);
