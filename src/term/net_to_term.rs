@@ -202,17 +202,17 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
 
-    let mut vars = HashSet::new();
-    val.get_needed_vars(&mut vars);
+    let mut free_vars = HashSet::new();
+    val.free_vars(&mut free_vars);
 
-    let let_ctx = LetBody::Ctx(fst, snd, val);
+    let let_ctx = LetInsertion::Todo(fst, snd, val);
 
-    match let_ctx.search_and_insert(&mut main, &mut vars) {
-      Err(LetBody::Ctx(fst, snd, val)) => {
+    match let_ctx.search_and_insert(&mut main, &mut free_vars).0 {
+      LetInsertion::Err(fst, snd, val) => {
         main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) }
       }
-      Err(_) => unreachable!(),
-      Ok(_) => {}
+      LetInsertion::Ok => {}
+      _ => unreachable!(),
     }
 
     valid = valid && val_valid;
@@ -221,33 +221,36 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
   (main, valid)
 }
 
-enum LetBody {
-  Used,
-  Ctx(Option<Name>, Option<Name>, Term),
+enum LetInsertion {
+  Ok,
+  Err(Option<Name>, Option<Name>, Term),
+  Todo(Option<Name>, Option<Name>, Term),
 }
 
-type LetResult = Result<(LetBody, bool), LetBody>;
-
-impl LetBody {
+impl LetInsertion {
   /// Searchers the term and inserts the let body in the position bettewn where the vars it depends are defined,
   /// and where the its vars are used
-  fn search_and_insert(self, term: &mut Term, vars: &mut HashSet<Name>) -> LetResult {
-    match term.search_let_scope(self, vars)? {
-      (Self::Ctx(fst, snd, val), true) => Ok((term.insert_let(fst, snd, val, vars)?, true)),
-      (ctx, uses) => Ok((ctx, uses)),
+  fn search_and_insert(self, term: &mut Term, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
+    match term.search_let_scope(self, free_vars) {
+      (Self::Todo(fst, snd, val), true) => (term.insert_let(fst, snd, val, free_vars), true),
+      (ctx, uses) => (ctx, uses),
     }
   }
 
   /// Searches all the terms and substitutes it if only one term used the ctx vars.
   /// Otherwise, returns the context with true if more then one term used the vars,
   /// or false if none.
-  fn multi_search_and_insert(self, terms: &mut [&mut Term], vars: &mut HashSet<Name>) -> LetResult {
+  fn multi_search_and_insert(
+    self,
+    terms: &mut [&mut Term],
+    free_vars: &mut HashSet<Name>,
+  ) -> (LetInsertion, bool) {
     let mut var_uses = Vec::with_capacity(terms.len());
     let mut ctx = self;
     let mut var_use;
 
     for term in terms.iter_mut() {
-      (ctx, var_use) = term.search_let_scope(ctx, vars)?;
+      (ctx, var_use) = term.search_let_scope(ctx, free_vars);
       var_uses.push(var_use);
     }
 
@@ -255,9 +258,9 @@ impl LetBody {
       var_uses.into_iter().enumerate().filter_map(|(index, is_used)| is_used.then_some(index)).collect();
 
     match (used_in_terms.len(), ctx) {
-      (1, Self::Ctx(fst, snd, val)) => Ok((terms[used_in_terms[0]].insert_let(fst, snd, val, vars)?, true)),
-      (0, ctx) => Ok((ctx, false)),
-      (_, ctx) => Ok((ctx, true)),
+      (1, Self::Todo(fst, snd, val)) => (terms[used_in_terms[0]].insert_let(fst, snd, val, free_vars), true),
+      (0, ctx) => (ctx, false),
+      (_, ctx) => (ctx, true),
     }
   }
 }
@@ -268,120 +271,113 @@ impl Term {
     fst: Option<Name>,
     snd: Option<Name>,
     val: Term,
-    vars: &mut HashSet<Name>,
-  ) -> Result<LetBody, LetBody> {
+    free_vars: &mut HashSet<Name>,
+  ) -> LetInsertion {
     // If all the vars it depends on were found, we update the term with the Let
-    if vars.is_empty() {
+    if free_vars.is_empty() {
       let nxt = Box::new(std::mem::replace(self, Term::Era));
 
       *self = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt };
-      Ok(LetBody::Used)
+      LetInsertion::Ok
     } else {
       // Otherwise, return a failed attempt, that will pass through to the first call to `search and insert`
-      Err(LetBody::Ctx(fst, snd, val))
+      LetInsertion::Err(fst, snd, val)
     }
   }
 
-  fn search_let_scope(&mut self, ctx: LetBody, vars: &mut HashSet<Name>) -> LetResult {
+  fn search_let_scope(&mut self, ctx: LetInsertion, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
     match self {
       Term::Lam { nam: Some(nam), bod } => {
-        vars.remove(nam);
-        ctx.search_and_insert(bod, vars)
+        free_vars.remove(nam);
+        ctx.search_and_insert(bod, free_vars)
       }
 
-      Term::Lam { bod, .. } => ctx.search_and_insert(bod, vars),
+      Term::Lam { nam: None, bod } => ctx.search_and_insert(bod, free_vars),
 
-      Term::Let { pat: LetPat::Var(nam), val, nxt } => {
-        let (ctx, val_use) = val.search_let_scope(ctx, vars)?;
-
-        vars.remove(nam);
-        let (ctx, nxt_use) = nxt.search_let_scope(ctx, vars)?;
-
-        Ok((ctx, val_use || nxt_use))
-      }
+      Term::Let { pat: LetPat::Var(_), .. } => unreachable!(),
 
       Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt } => {
-        let (ctx, val_use) = val.search_let_scope(ctx, vars)?;
+        let (ctx, val_use) = val.search_let_scope(ctx, free_vars);
 
-        fst.as_ref().map(|fst| vars.remove(fst));
-        snd.as_ref().map(|snd| vars.remove(snd));
-        let (ctx, nxt_use) = nxt.search_let_scope(ctx, vars)?;
+        fst.as_ref().map(|fst| free_vars.remove(fst));
+        snd.as_ref().map(|snd| free_vars.remove(snd));
+        let (ctx, nxt_use) = nxt.search_let_scope(ctx, free_vars);
 
-        Ok((ctx, val_use || nxt_use))
+        (ctx, val_use || nxt_use)
       }
 
       Term::Var { nam } => {
-        if let LetBody::Ctx(fst, snd, val) = ctx {
+        if let LetInsertion::Todo(fst, snd, val) = ctx {
           let is_fst = fst.as_ref().map_or(false, |fst| fst == nam);
           let is_snd = snd.as_ref().map_or(false, |snd| snd == nam);
 
-          Ok((LetBody::Ctx(fst, snd, val), is_fst || is_snd))
+          (LetInsertion::Todo(fst, snd, val), is_fst || is_snd)
         } else {
-          Ok((ctx, false))
+          (ctx, false)
         }
       }
 
-      Term::Chn { bod, .. } => ctx.search_and_insert(bod, vars),
+      Term::Chn { bod, .. } => ctx.search_and_insert(bod, free_vars),
 
-      Term::App { fun, arg } => ctx.multi_search_and_insert(&mut [fun, arg], vars),
+      Term::App { fun, arg } => ctx.multi_search_and_insert(&mut [fun, arg], free_vars),
 
       Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { fst, snd, .. } => {
-        ctx.multi_search_and_insert(&mut [fst, snd], vars)
+        ctx.multi_search_and_insert(&mut [fst, snd], free_vars)
       }
 
-      Term::Match { cond, zero, succ } => ctx.multi_search_and_insert(&mut [cond, zero, succ], vars),
+      Term::Match { cond, zero, succ } => ctx.multi_search_and_insert(&mut [cond, zero, succ], free_vars),
 
-      Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => Ok((ctx, false)),
+      Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => (ctx, false),
     }
   }
 
   /// Collects all the free variables that a term has
-  fn get_needed_vars(&self, vars: &mut HashSet<Name>) {
+  fn free_vars(&self, free_vars: &mut HashSet<Name>) {
     match self {
       Term::Lam { nam: Some(nam), bod } => {
         let mut new_scope = HashSet::new();
-        bod.get_needed_vars(&mut new_scope);
+        bod.free_vars(&mut new_scope);
         new_scope.remove(nam);
 
-        vars.extend(new_scope);
+        free_vars.extend(new_scope);
       }
-      Term::Lam { nam: None, bod } => bod.get_needed_vars(vars),
-      Term::Var { nam } => _ = vars.insert(nam.clone()),
-      Term::Chn { bod, .. } => bod.get_needed_vars(vars),
+      Term::Lam { nam: None, bod } => bod.free_vars(free_vars),
+      Term::Var { nam } => _ = free_vars.insert(nam.clone()),
+      Term::Chn { bod, .. } => bod.free_vars(free_vars),
       Term::Lnk { .. } => {}
       Term::Let { pat: LetPat::Var(nam), val, nxt } => {
-        val.get_needed_vars(vars);
+        val.free_vars(free_vars);
 
         let mut new_scope = HashSet::new();
-        nxt.get_needed_vars(&mut new_scope);
+        nxt.free_vars(&mut new_scope);
 
         new_scope.remove(nam);
 
-        vars.extend(new_scope);
+        free_vars.extend(new_scope);
       }
       Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt } => {
-        val.get_needed_vars(vars);
+        val.free_vars(free_vars);
 
         let mut new_scope = HashSet::new();
-        nxt.get_needed_vars(&mut new_scope);
+        nxt.free_vars(&mut new_scope);
 
         fst.as_ref().map(|fst| new_scope.remove(fst));
         snd.as_ref().map(|snd| new_scope.remove(snd));
 
-        vars.extend(new_scope);
+        free_vars.extend(new_scope);
       }
       Term::App { fun, arg } => {
-        fun.get_needed_vars(vars);
-        arg.get_needed_vars(vars);
+        fun.free_vars(free_vars);
+        arg.free_vars(free_vars);
       }
       Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { op: _, fst, snd } => {
-        fst.get_needed_vars(vars);
-        snd.get_needed_vars(vars);
+        fst.free_vars(free_vars);
+        snd.free_vars(free_vars);
       }
       Term::Match { cond, zero, succ } => {
-        cond.get_needed_vars(vars);
-        zero.get_needed_vars(vars);
-        succ.get_needed_vars(vars);
+        cond.free_vars(free_vars);
+        zero.free_vars(free_vars);
+        succ.free_vars(free_vars);
       }
       Term::Num { .. } => {}
       Term::Ref { .. } => {}
