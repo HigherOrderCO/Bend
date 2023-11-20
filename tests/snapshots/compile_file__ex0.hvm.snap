@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/ex0.hvm
 ---
 @9 = (a a)
-@C_2 = ({2 (a b) (c a)} (c b))
+@C_2 = ({0 (a b) (c a)} (c b))
 @S = (a ((a b) (* b)))
 @Z = (* @9)
 @main = a

@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/erased_dup.hvm
 ---
-({2 * a} a)
+({0 * a} a)
