@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/extracted_match_pred.hvm
 ---
-@main = b
-& @val ~ (#1 b)
-@val = (? (@valZ @val) b b)
+@main = a
+& @val ~ (#1 a)
+@val = (? (@valZ @val) a a)
 @valZ = #0
 
