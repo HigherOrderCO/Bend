@@ -126,42 +126,45 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
       },
       Num { val } => (Term::Num { val }, true),
       Op2 { opr } => match next.slot() {
-        // FIXME: Update to use the `opr` field
-        2 => {
-          let op_port = net.enter_port(Port(node, 0));
-          let (op_term, op_valid) = reader(net, op_port, namegen, dup_scope, tup_scope, book);
-          let arg_port = net.enter_port(Port(node, 1));
-          let (arg_term, fst_valid) = reader(net, arg_port, namegen, dup_scope, tup_scope, book);
+        0 => {
+          let op_port = net.enter_port(Port(node, 1));
+          let (fst, op_valid) = reader(net, op_port, namegen, dup_scope, tup_scope, book);
+          let arg_port = net.enter_port(Port(node, 2));
+          let (snd, fst_valid) = reader(net, arg_port, namegen, dup_scope, tup_scope, book);
           let valid = op_valid && fst_valid;
 
-          fn go(op_term: Term, arg_term: Term) -> Term {
-            match op_term {
-              Term::Num { val } => {
-                let (val, op) = split_num_with_op(val);
-                if let Some(op) = op {
-                  // This is Num + Op in the same value
-                  Term::Opx { op, fst: Box::new(Term::Num { val }), snd: Box::new(arg_term) }
-                } else {
-                  // This is just Op as value
-                  Term::Opx {
-                    op: Op::from_hvmc_label(val).unwrap(),
-                    fst: Box::new(arg_term),
-                    snd: Box::new(Term::Era),
-                  }
-                }
-              }
-              Term::Opx { op, fst, snd } => match &*snd {
-                // this ERA means that we came from the first OP2 node.
-                Term::Era => Term::Opx { op, fst, snd: Box::new(arg_term) },
-                // anything else is just a partially applied chain of OP2 nodes.
-                _ => go(arg_term, Term::Opx { op, fst, snd }),
-              },
-              // otherwise this is an OP1 and we flip the port 1 and 0 to undo the
-              // OP2 ~ NUM interaction.
-              other => go(arg_term, other),
-            }
-          }
-          (go(op_term, arg_term), valid)
+          (Term::Opx { op: Op::from_hvmc_label(opr).unwrap(), fst: Box::new(fst), snd: Box::new(snd) }, valid)
+          // fn go(op_term: Term, arg_term: Term, opr: u32) -> Term {
+          //   match op_term {
+          //     Term::Num { val } => {
+          //       println!("here");
+          //       // let (val, op) = split_num_with_op(opr);
+          //       let op = Op::from_hvmc_label(opr);
+          //       if let Some(op) = op {
+          //         // This is Num + Op in the same value
+          //         println!("here");
+          //         Term::Opx { op, fst: Box::new(arg_term), snd: Box::new(op_term) }
+          //       } else {
+          //         // This is just Op as value
+          //         Term::Opx {
+          //           op: Op::from_hvmc_label(val).unwrap(),
+          //           fst: Box::new(arg_term),
+          //           snd: Box::new(Term::Era),
+          //         }
+          //       }
+          //     }
+          //     Term::Opx { op, fst, snd } => match &*snd {
+          //       // this ERA means that we came from the first OP2 node.
+          //       Term::Era => Term::Opx { op, fst, snd: Box::new(arg_term) },
+          //       // anything else is just a partially applied chain of OP2 nodes.
+          //       _ => go(arg_term, Term::Opx { op, fst, snd }, opr),
+          //     },
+          //     // otherwise this is an OP1 and we flip the port 1 and 0 to undo the
+          //     // OP2 ~ NUM interaction.
+          //     other => go(arg_term, other, opr),
+          //   }
+          // }
+          // (go(op_term, arg_term, opr), valid)
         }
         _ => unreachable!(),
       },
