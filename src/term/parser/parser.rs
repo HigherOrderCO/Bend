@@ -183,7 +183,7 @@ where
     let match_ = just(Token::Match)
       .ignore_then(term.clone())
       .then_ignore(just(Token::LBracket))
-      .then(arm.separated_by(just(Token::Semicolon)).collect())
+      .then(arm.separated_by(term_sep.clone()).collect())
       .then_ignore(just(Token::RBracket))
       .map(|(abacaxi, maca)| Term::Match { scrutinee: Box::new(abacaxi), arms: maca })
       .boxed();
