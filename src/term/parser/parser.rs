@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{Adt, Book, LetPat, Name, Op, Rule, RulePat, Term};
+use crate::term::{Adt, Book, LetPat, MatchNum, Name, Op, Rule, RulePat, Term};
 use chumsky::{
   extra,
   input::{SpannedInput, Stream, ValueInput},
@@ -176,25 +176,16 @@ where
       .map(|((pat, val), nxt)| Term::Let { pat, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
-    // match val { 0: zero; 1 + pred: succ }
+    // pat: term
+    let arm = rule_pat().then_ignore(just(Token::Colon)).then(term.clone()).boxed();
+
+    // match scrutinee { pat: term;... }
     let match_ = just(Token::Match)
       .ignore_then(term.clone())
       .then_ignore(just(Token::LBracket))
-      .then_ignore(select!(Token::Num(0) => ()))
-      .then_ignore(just(Token::Colon))
-      .then(term.clone())
-      .then_ignore(term_sep.clone())
-      .then_ignore(select!(Token::Num(1) => ()))
-      .then_ignore(just(Token::Add))
-      .then(name_or_era())
-      .then_ignore(just(Token::Colon))
-      .then(term.clone())
+      .then(arm.separated_by(just(Token::Semicolon)).collect())
       .then_ignore(just(Token::RBracket))
-      .map(|(((cond, zero), pred), succ)| Term::Match {
-        cond: Box::new(cond),
-        zero: Box::new(zero),
-        succ: Box::new(Term::Lam { nam: pred, bod: Box::new(succ) }),
-      })
+      .map(|(abacaxi, maca)| Term::Match { scrutinee: Box::new(abacaxi), arms: maca })
       .boxed();
 
     // (f arg1 arg2 ...)
@@ -214,6 +205,17 @@ where
     choice((global_var, var, number, tup, global_lam, lam, dup, let_, match_, num_op, app))
   })
 }
+
+// fn arms<'a, I>() -> impl Parser<'a, I, Vec<(RulePat, Term)>, extra::Err<Rich<'a, Token>>>
+// where
+//   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+// {
+//   rule_pat()
+//     .then_ignore(just(Token::Colon))
+//     .then(term())
+//     .separated_by(just(Token::Semicolon))
+//   // todo()
+// }
 
 fn let_pat<'a, I>() -> impl Parser<'a, I, LetPat, extra::Err<Rich<'a, Token>>>
 where
@@ -244,7 +246,15 @@ where
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
-    choice((var, ctr))
+    let zero = select!(Token::Num(0) => RulePat::Num(MatchNum::Zero));
+
+    let succ = just(Token::Num(1))
+      .ignore_then(just(Token::Add))
+      .ignore_then(name_or_era())
+      .map(|x| RulePat::Num(MatchNum::Succ(x)))
+      .boxed();
+
+    choice((zero, succ, var, ctr))
   })
 }
 

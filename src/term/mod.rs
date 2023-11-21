@@ -55,9 +55,16 @@ pub struct Rule {
 }
 
 #[derive(Debug, Clone)]
+pub enum MatchNum {
+  Zero,
+  Succ(Option<Name>),
+}
+
+#[derive(Debug, Clone)]
 pub enum RulePat {
   Var(Name),
   Ctr(Name, Vec<RulePat>),
+  Num(MatchNum),
 }
 
 #[derive(Debug, Clone)]
@@ -112,9 +119,8 @@ pub enum Term {
     snd: Box<Term>,
   },
   Match {
-    cond: Box<Term>,
-    zero: Box<Term>,
-    succ: Box<Term>,
+    scrutinee: Box<Term>,
+    arms: Vec<(RulePat, Term)>,
   },
   Ref {
     def_id: DefId,
@@ -271,22 +277,7 @@ impl Term {
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
-      Term::Match { cond, zero, succ } => {
-        // Only the Lambda case represents a valid match construction,
-        // but we still have to display invalid ones
-        let (pred, succ) = match succ.as_ref() {
-          Term::Lam { nam, bod } => (nam, bod),
-          _ => (&None, succ),
-        };
-
-        format!(
-          "match {} {{ 0: {}; 1+{}: {} }}",
-          cond.to_string(def_names),
-          zero.to_string(def_names),
-          pred.clone().unwrap_or(Name::new("*")),
-          succ.to_string(def_names),
-        )
-      }
+      Term::Match { .. } => todo!(),
       Term::Dup { tag: _, fst, snd, val, nxt } => format!(
         "dup {} {} = {}; {}",
         fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
@@ -331,11 +322,11 @@ impl Term {
           nxt.subst(from, to);
         }
       }
-      Term::Match { cond, zero, succ, .. } => {
-        cond.subst(from, to);
-        zero.subst(from, to);
-        succ.subst(from, to);
-      }
+      Term::Match { arms, .. } => {
+        for (_, term) in arms {
+          term.subst(from, to);
+        }
+      },
       Term::Ref { .. } => (),
       Term::App { fun, arg } => {
         fun.subst(from, to);
@@ -421,6 +412,7 @@ impl From<&RulePat> for Term {
     match value {
       RulePat::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
       RulePat::Var(nam) => Term::Var { nam: nam.clone() },
+      RulePat::Num(..) => todo!(),
     }
   }
 }
@@ -430,6 +422,7 @@ impl fmt::Display for RulePat {
     match self {
       RulePat::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
       RulePat::Var(nam) => write!(f, "{}", nam),
+      RulePat::Num(..) => todo!(),
     }
   }
 }
