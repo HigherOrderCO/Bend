@@ -6,7 +6,7 @@ input_file: tests/golden_tests/compile_file/tagged_dup.hvm
 @3 = (a a)
 @4 = (a a)
 @main = a
-& @3 ~ {0 b c}
-& @4 ~ {0 d e}
-& @2 ~ {0 (f (b (c (d (e a))))) f}
+& @3 ~ {2 b c}
+& @4 ~ {2 d e}
+& @2 ~ {2 (f (b (c (d (e a))))) f}
 

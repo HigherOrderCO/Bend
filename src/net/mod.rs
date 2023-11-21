@@ -60,6 +60,7 @@ pub const TAG: u32 = Val::BITS - TAG_WIDTH;
 pub const LABEL_MASK: Val = (1 << TAG) - 1;
 pub const TAG_MASK: Val = !LABEL_MASK;
 
+pub const BASE_DUP_HVMC_LABEL: u32 = 2;
 pub const MAX_DUP_HVMC_LABEL: u32 = 4; // FIXME
 
 impl INet {

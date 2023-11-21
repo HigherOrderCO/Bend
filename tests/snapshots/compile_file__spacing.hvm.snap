@@ -3,6 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/spacing.hvm
 ---
 @2 = (a a)
-@main = ({0 a b} c)
+@main = ({2 a b} c)
 & @2 ~ (b (a c))
 
