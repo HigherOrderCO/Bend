@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/tagged_dup.hvm
+---
+@2 = (a a)
+@3 = (a a)
+@4 = (a a)
+@main = a
+& @3 ~ {0 b c}
+& @4 ~ {0 d e}
+& @2 ~ {0 (f (b (c (d (e a))))) f}
+
