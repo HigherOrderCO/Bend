@@ -77,7 +77,7 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize) -> (Net, RunStats) 
   root.boot(name_to_val(DefNames::ENTRY_POINT) as run::Loc);
 
   let start_time = Instant::now();
-  root.normal(&runtime_book);
+  root.parallel_normal(&runtime_book);
   let elapsed = start_time.elapsed().as_secs_f64();
 
   let net = net_from_runtime(&root);
