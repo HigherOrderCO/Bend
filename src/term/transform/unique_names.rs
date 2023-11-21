@@ -1,6 +1,6 @@
 // Pass to give all variables in a definition unique names.
 
-use crate::term::{var_id_to_name, Book, LetPat, Name, Term};
+use crate::term::{var_id_to_name, Book, LetPat, MatchNum, Name, RulePat, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -63,8 +63,28 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
     }
     Term::Match { scrutinee, arms } => {
       unique_var_names(scrutinee, name_map, name_count);
-      for (_, term) in arms {
+      for (rule, term) in arms {
+        match rule {
+          RulePat::Var(nam) => push_name(Some(nam), name_map, name_count),
+          RulePat::Ctr(_, _) => todo!(),
+          RulePat::Num(MatchNum::Zero) => {}
+          RulePat::Num(MatchNum::Succ(nam)) => push_name(nam.as_ref(), name_map, name_count),
+        }
+
         unique_var_names(term, name_map, name_count);
+
+        match rule {
+          RulePat::Var(nam) => {
+            push_name(Some(nam), name_map, name_count);
+            *nam = pop_name(Some(nam), name_map).unwrap();
+          }
+          RulePat::Ctr(_, _) => todo!(),
+          RulePat::Num(MatchNum::Zero) => {}
+          RulePat::Num(MatchNum::Succ(nam)) => {
+            push_name(nam.as_ref(), name_map, name_count);
+            *nam = pop_name(nam.as_ref(), name_map);
+          }
+        }
       }
     }
     Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } => (),

@@ -1,4 +1,4 @@
-use crate::term::{Book, LetPat, Name, Term};
+use crate::term::{Book, LetPat, MatchNum, Name, RulePat, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -81,8 +81,22 @@ pub fn check_uses<'a>(
     }
     Term::Match { scrutinee, arms } => {
       check_uses(scrutinee, scope, globals)?;
-      for (_, term) in arms {
+      for (rule, term) in arms {
+        match rule {
+          RulePat::Var(nam) => push_scope(Some(nam), scope),
+          RulePat::Ctr(_, _) => todo!(),
+          RulePat::Num(MatchNum::Zero) => {}
+          RulePat::Num(MatchNum::Succ(nam)) => push_scope(nam.as_ref(), scope),
+        }
+
         check_uses(term, scope, globals)?;
+
+        match rule {
+          RulePat::Var(nam) => pop_scope(Some(nam), scope),
+          RulePat::Ctr(_, _) => todo!(),
+          RulePat::Num(MatchNum::Zero) => {}
+          RulePat::Num(MatchNum::Succ(nam)) => pop_scope(nam.as_ref(), scope),
+        }
       }
     }
     Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
