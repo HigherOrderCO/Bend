@@ -277,7 +277,12 @@ impl Term {
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
-      Term::Match { .. } => todo!(),
+      Term::Match { scrutinee, arms } => {
+        let arms =
+          arms.into_iter().map(|(pat, term)| format!("{}: {}", pat, term.to_string(def_names))).join("; ");
+
+        format!("match {} {{ {} }}", scrutinee.to_string(def_names), arms,)
+      }
       Term::Dup { tag: _, fst, snd, val, nxt } => format!(
         "dup {} {} = {}; {}",
         fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
@@ -354,6 +359,12 @@ impl Term {
       }
     }
   }
+
+  pub fn num_match(scrutinee: Term, zero_term: Term, succ_label: Option<Name>, succ_term: Term) -> Self {
+    let zero = (RulePat::Num(MatchNum::Zero), zero_term);
+    let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);
+    Self::Match { scrutinee: Box::new(scrutinee), arms: vec![zero, succ] }
+  }
 }
 
 impl fmt::Display for LetPat {
@@ -422,7 +433,8 @@ impl fmt::Display for RulePat {
     match self {
       RulePat::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
       RulePat::Var(nam) => write!(f, "{}", nam),
-      RulePat::Num(..) => todo!(),
+      RulePat::Num(MatchNum::Zero) => write!(f, "0"),
+      RulePat::Num(MatchNum::Succ(p)) => write!(f, "1+{}", p.as_ref().map_or("*", |Name(n)| n)),
     }
   }
 }
