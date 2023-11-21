@@ -2,7 +2,7 @@ pub mod hvmc_to_net;
 pub mod net_to_hvmc;
 
 use crate::term::DefId;
-use hvmc::run::Val;
+use hvmc::run::{Lab, Loc, Val};
 use NodeKind::*;
 
 #[derive(Clone, Debug)]
@@ -32,7 +32,7 @@ pub enum NodeKind {
   Con,
   Tup,
   Dup {
-    lab: u8,
+    lab: Lab,
   },
   /// Reference to function definitions
   Ref {
@@ -40,10 +40,12 @@ pub enum NodeKind {
   },
   /// Numbers
   Num {
-    val: Val,
+    val: Loc,
   },
   /// Numeric operations
-  Op2,
+  Op2 {
+    opr: Lab,
+  },
   /// Pattern matching on numbers
   Mat,
 }
@@ -58,8 +60,8 @@ pub const TAG: u32 = Val::BITS - TAG_WIDTH;
 pub const LABEL_MASK: Val = (1 << TAG) - 1;
 pub const TAG_MASK: Val = !LABEL_MASK;
 
-pub const BASE_DUP_HVMC_LABEL: u8 = 2;
-pub const MAX_DUP_HVMC_LABEL: u8 = 4;
+pub const BASE_DUP_HVMC_LABEL: u32 = 2;
+pub const MAX_DUP_HVMC_LABEL: u32 = 0xFFFFFFF;
 
 impl INet {
   /// Create a new net, with a deadlocked root node.

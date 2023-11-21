@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/spacing2.hvm
 ---
-@2 = (b b)
-@3 = (b b)
-@main = b
-& @2 ~ (@3 b)
+@2 = (a a)
+@3 = (a a)
+@main = a
+& @2 ~ (@3 a)
 

@@ -1,11 +1,11 @@
 use super::{Book, DefId, DefNames, LetPat, Name, Op, Term};
 use crate::{
-  net::{INet, NodeKind::*, Port, LABEL_MASK, MAX_DUP_HVMC_LABEL, ROOT},
+  net::{INet, NodeKind::*, Port, MAX_DUP_HVMC_LABEL, ROOT},
   Warning,
 };
 use hvmc::{
   ast::{name_to_val, val_to_name},
-  run::Val,
+  run::{Loc, Val},
 };
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -68,7 +68,7 @@ fn def_id_to_hvmc_name(book: &Book, def_id: DefId, nets: &HashMap<String, INet>)
 }
 
 /// Converts an IC term into an IC net.
-pub fn term_to_compat_net(term: &Term) -> (INet, u8) {
+pub fn term_to_compat_net(term: &Term) -> (INet, u32) {
   let mut inet = INet::new();
 
   // Encodes the main term.
@@ -227,30 +227,20 @@ fn encode_term(
     Term::Era => unreachable!(),        // Not supported in syntax
     // core: #val
     Term::Num { val } => {
-      debug_assert!(*val <= LABEL_MASK);
+      // debug_assert!(*val <= LABEL_MASK); // Uneeded?
       let node = inet.new_node(Num { val: *val });
       // This representation only has nodes of arity 2, so we connect the two aux ports that are not used.
       inet.link(Port(node, 1), Port(node, 2));
       Some(Port(node, 0))
     }
-    // core: & #op ~ <fst <snd ret>>
+    // core: & fst ~ <op snd ret>
     Term::Opx { op, fst, snd } => {
-      let op_node = inet.new_node(Num { val: op.to_hvmc_label() });
-      inet.link(Port(op_node, 1), Port(op_node, 2));
-
-      let fst_node = inet.new_node(Op2);
-      inet.link(Port(op_node, 0), Port(fst_node, 0));
-
-      let fst = encode_term(inet, fst, Port(fst_node, 1), scope, vars, global_vars, label_generator);
-      link_local(inet, Port(fst_node, 1), fst);
-
-      let snd_node = inet.new_node(Op2);
-      inet.link(Port(fst_node, 2), Port(snd_node, 0));
-
-      let snd = encode_term(inet, snd, Port(snd_node, 1), scope, vars, global_vars, label_generator);
-      link_local(inet, Port(snd_node, 1), snd);
-
-      Some(Port(snd_node, 2))
+      let opx = inet.new_node(Op2 { opr: op.to_hvmc_label() });
+      let fst_port = encode_term(inet, fst, Port(opx, 0), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(opx, 0), fst_port);
+      let snd_port = encode_term(inet, snd, Port(opx, 1), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(opx, 1), snd_port);
+      Some(Port(opx, 2))
     }
     Term::Tup { fst, snd } => {
       let tup = inet.new_node(Tup);
@@ -295,39 +285,39 @@ fn link_local(inet: &mut INet, ptr_a: Port, ptr_b: Option<Port>) {
 }
 
 impl Op {
-  pub fn to_hvmc_label(self) -> Val {
+  pub fn to_hvmc_label(self) -> Loc {
     match self {
-      Op::ADD => 0x1,
-      Op::SUB => 0x2,
-      Op::MUL => 0x3,
-      Op::DIV => 0x4,
-      Op::MOD => 0x5,
-      Op::EQ => 0x6,
-      Op::NE => 0x7,
-      Op::LT => 0x8,
-      Op::GT => 0x9,
-      Op::AND => 0xa,
-      Op::OR => 0xb,
-      Op::XOR => 0xc,
-      Op::NOT => 0xd,
-      Op::LSH => 0xe,
-      Op::RSH => 0xf,
+      Op::ADD => 0x0,
+      Op::SUB => 0x1,
+      Op::MUL => 0x2,
+      Op::DIV => 0x3,
+      Op::MOD => 0x4,
+      Op::EQ => 0x5,
+      Op::NE => 0x6,
+      Op::LT => 0x7,
+      Op::GT => 0x8,
+      Op::AND => 0x9,
+      Op::OR => 0xa,
+      Op::XOR => 0xb,
+      Op::NOT => 0xc,
+      Op::LSH => 0xd,
+      Op::RSH => 0xe,
     }
   }
 }
 
 #[derive(Default)]
 struct LabelGenerator {
-  untagged_dups: u8,
-  tagged_dups: HashMap<Name, u8>,
+  untagged_dups: u32,
+  tagged_dups: HashMap<Name, u32>,
 }
 
 impl LabelGenerator {
   // If some tag and new generate a new label, otherwise return the generated label.
   // If none use the implicit label counter.
-  fn generate(&mut self, tag: &Option<Name>) -> u8 {
+  fn generate(&mut self, tag: &Option<Name>) -> u32 {
     if let Some(tag) = tag {
-      let next_lab = self.tagged_dups.len() as u8;
+      let next_lab = self.tagged_dups.len() as u32;
       match self.tagged_dups.entry(tag.clone()) {
         Entry::Occupied(e) => e.get().clone(),
         Entry::Vacant(e) => e.insert(next_lab).clone(),
