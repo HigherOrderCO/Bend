@@ -69,7 +69,7 @@ fn main() -> Result<(), String> {
         eprintln!("WARNING: {warn}");
       }
 
-      println!("{}", show_book(&compiled.core_book));
+      print!("{}", show_book(&compiled.core_book));
     }
     Mode::Run => {
       let mem_size = args.mem / std::mem::size_of::<(Ptr, Ptr)>();
@@ -82,14 +82,14 @@ fn main() -> Result<(), String> {
       }
 
       if valid_readback {
-        println!("{}\n", res_term.to_string(&def_names));
+        println!("{}", res_term.to_string(&def_names));
       } else {
         println!("Invalid readback from inet.");
-        println!("Got:\n{}\n", res_term.to_string(&def_names));
+        println!("Got:\n{}", res_term.to_string(&def_names));
       }
 
       if args.stats {
-        println!("RWTS   : {}", total_rewrites);
+        println!("\nRWTS   : {}", total_rewrites);
         println!("- ANNI : {}", stats.rewrites.anni);
         println!("- COMM : {}", stats.rewrites.comm);
         println!("- ERAS : {}", stats.rewrites.eras);
