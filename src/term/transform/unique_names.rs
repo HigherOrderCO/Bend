@@ -61,10 +61,11 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
       unique_var_names(fst, name_map, name_count);
       unique_var_names(snd, name_map, name_count);
     }
-    Term::Match { cond, zero, succ } => {
-      unique_var_names(cond, name_map, name_count);
-      unique_var_names(zero, name_map, name_count);
-      unique_var_names(succ, name_map, name_count);
+    Term::Match { scrutinee, arms } => {
+      unique_var_names(scrutinee, name_map, name_count);
+      for (_, term) in arms {
+        unique_var_names(term, name_map, name_count);
+      }
     }
     Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } => (),
   }

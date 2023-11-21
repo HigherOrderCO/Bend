@@ -40,10 +40,11 @@ impl Term {
         fst.eta_reduction();
         snd.eta_reduction();
       }
-      Term::Match { cond, zero, succ } => {
-        cond.eta_reduction();
-        zero.eta_reduction();
-        succ.eta_reduction();
+      Term::Match { scrutinee, arms } => {
+        scrutinee.eta_reduction();
+        for (_, term) in arms {
+          term.eta_reduction();
+        }
       }
       Term::Lnk { .. } | Term::Var { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => {}
     }

@@ -326,7 +326,7 @@ impl Term {
         for (_, term) in arms {
           term.subst(from, to);
         }
-      },
+      }
       Term::Ref { .. } => (),
       Term::App { fun, arg } => {
         fun.subst(from, to);

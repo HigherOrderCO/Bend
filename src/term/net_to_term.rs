@@ -61,7 +61,8 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
           if sel_kind != Con {
             // TODO: Is there any case where we expect a different node type here on readback?
             return (
-              Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
+              todo!(),
+              // Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
               false,
             );
           }
@@ -73,7 +74,8 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
 
           let valid = cond_valid && zero_valid && succ_valid;
           (
-            Term::Match { cond: Box::new(cond_term), zero: Box::new(zero_term), succ: Box::new(succ_term) },
+            todo!(),
+            // Term::Match { cond: Box::new(cond_term), zero: Box::new(zero_term), succ: Box::new(succ_term) },
             valid,
           )
         }
@@ -302,7 +304,7 @@ impl Term {
         ctx.multi_search_and_insert(&mut [fst, snd], free_vars)
       }
 
-      Term::Match { cond, zero, succ } => ctx.multi_search_and_insert(&mut [cond, zero, succ], free_vars),
+      Term::Match { .. } => todo!(), /*ctx.multi_search_and_insert(&mut [cond, zero, succ], free_vars),*/
 
       Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => (ctx, false),
     }
@@ -351,10 +353,11 @@ impl Term {
         fst.free_vars(free_vars);
         snd.free_vars(free_vars);
       }
-      Term::Match { cond, zero, succ } => {
-        cond.free_vars(free_vars);
-        zero.free_vars(free_vars);
-        succ.free_vars(free_vars);
+      Term::Match { .. } => {
+        todo!();
+        // cond.free_vars(free_vars);
+        // zero.free_vars(free_vars);
+        // succ.free_vars(free_vars);
       }
       Term::Num { .. } => {}
       Term::Ref { .. } => {}
@@ -434,7 +437,8 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           if sel_kind != Con {
             // TODO: Is there any case where we expect a different node type here on readback?
             return (
-              Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
+              todo!(),
+              // Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
               false,
             );
           }
@@ -446,7 +450,8 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
 
           let valid = cond_valid && zero_valid && succ_valid;
           (
-            Term::Match { cond: Box::new(cond_term), zero: Box::new(zero_term), succ: Box::new(succ_term) },
+            todo!(),
+            // Term::Match { cond: Box::new(cond_term), zero: Box::new(zero_term), succ: Box::new(succ_term) },
             valid,
           )
         }
@@ -673,10 +678,11 @@ impl Term {
         fst.fix_names(id_counter, book);
         snd.fix_names(id_counter, book);
       }
-      Term::Match { cond, zero, succ } => {
-        cond.fix_names(id_counter, book);
-        zero.fix_names(id_counter, book);
-        succ.fix_names(id_counter, book);
+      Term::Match { .. } => {
+        todo!();
+        // cond.fix_names(id_counter, book);
+        // zero.fix_names(id_counter, book);
+        // succ.fix_names(id_counter, book);
       }
       Term::Let { .. } => unreachable!(),
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => {}

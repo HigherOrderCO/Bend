@@ -60,10 +60,11 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(fst, def_names, scope);
       resolve_refs(snd, def_names, scope);
     }
-    Term::Match { cond, zero, succ } => {
-      resolve_refs(cond, def_names, scope);
-      resolve_refs(zero, def_names, scope);
-      resolve_refs(succ, def_names, scope);
+    Term::Match { scrutinee, arms } => {
+      resolve_refs(scrutinee, def_names, scope);
+      for (_, term) in arms {
+        resolve_refs(term, def_names, scope);
+      }
     }
     Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
   }

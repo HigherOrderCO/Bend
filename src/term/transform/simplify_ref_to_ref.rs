@@ -63,10 +63,11 @@ fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) {
       subst_ref_to_ref(fst, ref_map);
       subst_ref_to_ref(snd, ref_map);
     }
-    Term::Match { cond, zero, succ } => {
-      subst_ref_to_ref(cond, ref_map);
-      subst_ref_to_ref(zero, ref_map);
-      subst_ref_to_ref(succ, ref_map);
+    Term::Match { scrutinee, arms } => {
+      subst_ref_to_ref(scrutinee, ref_map);
+      for (_, term) in arms {
+        subst_ref_to_ref(term, ref_map);
+      }
     }
     Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => (),
   }

@@ -133,12 +133,14 @@ impl Term {
 
           fun_is_super && arg_is_super
         }
-        Term::Match { cond, zero, succ } => {
-          let cond_is_super = go(cond, depth + 1, term_info);
-          let zero_is_super = go(zero, depth + 1, term_info);
-          let succ_is_super = go(succ, depth + 1, term_info);
+        Term::Match { scrutinee, arms } => {
+          let mut supers = vec![go(scrutinee, depth + 1, term_info)];
 
-          cond_is_super && zero_is_super && succ_is_super
+          for (_, term) in arms {
+            supers.push(go(term, depth + 1, term_info));
+          }
+
+          supers.iter().all(|e| *e)
         }
         Term::Dup { fst, snd, val, nxt, .. } => {
           let val_is_super = go(val, depth + 1, term_info);

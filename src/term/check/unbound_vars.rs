@@ -79,10 +79,11 @@ pub fn check_uses<'a>(
       check_uses(fst, scope, globals)?;
       check_uses(snd, scope, globals)?;
     }
-    Term::Match { cond, zero, succ } => {
-      check_uses(cond, scope, globals)?;
-      check_uses(zero, scope, globals)?;
-      check_uses(succ, scope, globals)?;
+    Term::Match { scrutinee, arms } => {
+      check_uses(scrutinee, scope, globals)?;
+      for (_, term) in arms {
+        check_uses(term, scope, globals)?;
+      }
     }
     Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
   }

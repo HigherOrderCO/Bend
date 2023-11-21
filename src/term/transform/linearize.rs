@@ -67,10 +67,11 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       count_var_uses_in_term(fst, uses);
       count_var_uses_in_term(snd, uses);
     }
-    Term::Match { cond, zero, succ } => {
-      count_var_uses_in_term(cond, uses);
-      count_var_uses_in_term(zero, uses);
-      count_var_uses_in_term(succ, uses);
+    Term::Match { scrutinee, arms } => {
+      count_var_uses_in_term(scrutinee, uses);
+      for (_, term) in arms {
+        count_var_uses_in_term(term, uses);
+      }
     }
     Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
   }
@@ -142,10 +143,11 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       term_to_affine(fst, var_uses, let_bodies);
       term_to_affine(snd, var_uses, let_bodies);
     }
-    Term::Match { cond, zero, succ } => {
-      term_to_affine(cond, var_uses, let_bodies);
-      term_to_affine(zero, var_uses, let_bodies);
-      term_to_affine(succ, var_uses, let_bodies);
+    Term::Match { scrutinee, arms } => {
+      term_to_affine(scrutinee, var_uses, let_bodies);
+      for (_, term) in arms {
+        term_to_affine(term, var_uses, let_bodies);
+      }
     }
     Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } => (),
   };

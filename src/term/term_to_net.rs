@@ -145,22 +145,23 @@ fn encode_term(
       Some(Port(app, 2))
     }
     // core: & cond ~  (zero succ) ret
-    Term::Match { cond, zero, succ } => {
-      let if_ = inet.new_node(Mat);
+    Term::Match { .. } => {
+      todo!();
+      // let if_ = inet.new_node(Mat);
 
-      let cond = encode_term(inet, cond, Port(if_, 0), scope, vars, global_vars, label_generator);
-      link_local(inet, Port(if_, 0), cond);
+      // let cond = encode_term(inet, cond, Port(if_, 0), scope, vars, global_vars, label_generator);
+      // link_local(inet, Port(if_, 0), cond);
 
-      let sel = inet.new_node(Con);
-      inet.link(Port(sel, 0), Port(if_, 1));
+      // let sel = inet.new_node(Con);
+      // inet.link(Port(sel, 0), Port(if_, 1));
 
-      let zero = encode_term(inet, zero, Port(sel, 1), scope, vars, global_vars, label_generator);
-      link_local(inet, Port(sel, 1), zero);
+      // let zero = encode_term(inet, zero, Port(sel, 1), scope, vars, global_vars, label_generator);
+      // link_local(inet, Port(sel, 1), zero);
 
-      let succ = encode_term(inet, succ, Port(sel, 2), scope, vars, global_vars, label_generator);
-      link_local(inet, Port(sel, 2), succ);
+      // let succ = encode_term(inet, succ, Port(sel, 2), scope, vars, global_vars, label_generator);
+      // link_local(inet, Port(sel, 2), succ);
 
-      Some(Port(if_, 2))
+      // Some(Port(if_, 2))
     }
     // A dup becomes a dup node too. Ports:
     // - 0: points to the value projected.
