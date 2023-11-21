@@ -1,6 +1,6 @@
 # HVM-Lang
 
-HVM-Lang serves as an Intermediate Representation for HVM-Core, offering a higher level syntax for writing programs based on the Interaction-Calculus.
+HVM-Lang serves as an Intermediate Representation for HVM-Core, offering a higher level syntax for writing programs based on the [Interaction-Calculus](https://github.com/VictorTaelin/Interaction-Calculus#interaction-calculus).
 
 ## Installation
 
@@ -28,7 +28,7 @@ HVM-Lang searches for the `main | Main` definitions as entrypoint of the program
 
 To run a program, use the `run` argument:
 ```bash
-hvm-lang run <file>
+hvml run <file>
 ```
 
 It will show the number 5.
@@ -36,13 +36,13 @@ Adding the `--stats` option displays some runtime stats like time and rewrites.
 
 To limit the runtime memory, use the `--mem <size> option.` The default is 1GB:
 ```bash
-hvm-lang --mem 65536 run <file>
+hvml --mem 65536 run <file>
 ```
 You can specify the memory size in bytes (default), kilobytes (k), megabytes (m), or gigabytes (g), e.g., `--mem 200m.`
 
 To compile a program use the `compile` argument:
 ```bash
-hvm-lang compile <file>
+hvml compile <file>
 ```
 This will output the compiled file to stdout.
 
