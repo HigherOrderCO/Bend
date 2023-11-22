@@ -47,7 +47,7 @@ pub fn infer_arg_type<'a>(
         if let Some(adt_nam) = ctrs.get(ctr_nam) {
           Type::Adt(adt_nam.clone())
         } else {
-          return Err("Unknown constructor '{nam}'.".to_string());
+          return Err(format!("Unknown constructor '{ctr_nam}'"));
         }
       }
       RulePat::Num(_) => todo!(),

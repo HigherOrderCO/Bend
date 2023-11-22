@@ -2,6 +2,7 @@ use crate::term::{
   check::type_check::{infer_arg_type, Type},
   Adt, Book, Name, RulePat, Term,
 };
+use itertools::Itertools;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 impl Book {
@@ -21,15 +22,15 @@ impl Term {
     adts: &'a BTreeMap<Name, Adt>,
     ctrs: &HashMap<Name, Name>,
   ) -> Result<&'a Adt, String> {
-    let ty = infer_arg_type(pats.iter(), ctrs).unwrap_or_else(|err| panic!("{err}"));
+    let ty = infer_arg_type(pats.iter(), ctrs)?;
 
     let Type::Adt(nam) = ty else { unreachable!() };
 
     let Adt { ctrs } = &adts[&nam];
 
-    let mut result = true;
     let mut names = HashSet::new();
     let mut repeated = HashSet::new();
+    let mut missing: HashSet<_> = ctrs.keys().collect();
 
     for rule in pats {
       let RulePat::Ctr(nam, _) = rule else { unreachable!() };
@@ -38,19 +39,21 @@ impl Term {
         repeated.insert(nam.clone());
       }
 
-      result &= ctrs.contains_key(nam);
+      missing.remove(nam);
+    }
+
+    fn ctrs_plural_or_sing(n: usize) -> &'static str {
+      if n > 1 { "constructors" } else { "a constructor" }
     }
 
     if !repeated.is_empty() {
-      return Err("Repeated these constructos: ".to_string()); // TODO: Better error
+      let plural_or_singular = ctrs_plural_or_sing(repeated.len());
+      return Err(format!("Repeated {plural_or_singular} in a match block: {}", repeated.iter().join(", ")));
     }
 
-    if pats.len() != ctrs.len() {
-      return Err("Missing constructos: ".to_owned()); // TODO: Better error
-    }
-
-    if !result {
-      return Err("Some rule in the match does not exist on the type".to_string()); // TODO: Better error
+    if !missing.is_empty() {
+      let plural_or_singular = ctrs_plural_or_sing(missing.len());
+      return Err(format!("Missing {plural_or_singular} in a match block: {}", missing.iter().join(", ")));
     }
 
     Ok(&adts[&nam])
