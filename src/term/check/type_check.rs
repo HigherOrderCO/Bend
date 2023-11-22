@@ -35,7 +35,7 @@ impl Definition {
   }
 }
 
-fn infer_arg_type<'a>(
+pub fn infer_arg_type<'a>(
   pats: impl Iterator<Item = &'a RulePat>,
   ctrs: &HashMap<Name, Name>,
 ) -> Result<Type, String> {
