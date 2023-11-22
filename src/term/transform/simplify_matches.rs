@@ -47,13 +47,15 @@ impl Term {
     }
 
     if !repeated.is_empty() {
-      let plural_or_singular = ctrs_plural_or_sing(repeated.len());
-      return Err(format!("Repeated {plural_or_singular} in a match block: {}", repeated.iter().join(", ")));
+      let constructor = ctrs_plural_or_sing(repeated.len());
+      let repeated = repeated.into_iter().join(", ");
+      return Err(format!("Repeated {constructor} in a match block: {repeated}"));
     }
 
     if !missing.is_empty() {
-      let plural_or_singular = ctrs_plural_or_sing(missing.len());
-      return Err(format!("Missing {plural_or_singular} in a match block: {}", missing.iter().join(", ")));
+      let constructor = ctrs_plural_or_sing(missing.len());
+      let missing = missing.into_iter().join(", ");
+      return Err(format!("Missing {constructor} in a match block: {missing}"));
     }
 
     Ok(&adts[&nam])
