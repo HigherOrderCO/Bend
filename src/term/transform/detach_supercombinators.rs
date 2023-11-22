@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::term::{Book, DefId, DefNames, Definition, LetPat, Name, Rule, Term};
+use crate::term::{Book, DefId, DefNames, Definition, LetPat, Name, Rule, Term, MatchNum, RulePat};
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
@@ -136,11 +136,21 @@ impl Term {
         Term::Match { scrutinee, arms } => {
           let mut supers = vec![go(scrutinee, depth + 1, term_info)];
 
-          for (_, term) in arms {
+          for (pat, term) in arms {
+            match pat {
+              RulePat::Var(_) => todo!(),
+              RulePat::Ctr(_, _) => todo!(),
+              RulePat::Num(MatchNum::Zero) => {},
+              RulePat::Num(MatchNum::Succ(p)) => {
+                if let Some(nam) = p {
+                  term_info.provide(nam);
+                }
+              },
+            }
             supers.push(go(term, depth + 1, term_info));
           }
 
-          supers.iter().all(|e| *e)
+          supers.iter().all(|e| *e == true)
         }
         Term::Dup { fst, snd, val, nxt, .. } => {
           let val_is_super = go(val, depth + 1, term_info);

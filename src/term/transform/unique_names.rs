@@ -63,9 +63,9 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
     }
     Term::Match { scrutinee, arms } => {
       unique_var_names(scrutinee, name_map, name_count);
-      for (rule, term) in arms {
+      for (rule, term) in &mut arms.clone() {
         match rule {
-          RulePat::Var(nam) => push_name(Some(nam), name_map, name_count),
+          RulePat::Var(nam) => push_name(Some(&nam), name_map, name_count),
           RulePat::Ctr(_, _) => todo!(),
           RulePat::Num(MatchNum::Zero) => {}
           RulePat::Num(MatchNum::Succ(nam)) => push_name(nam.as_ref(), name_map, name_count),
@@ -75,13 +75,11 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
 
         match rule {
           RulePat::Var(nam) => {
-            push_name(Some(nam), name_map, name_count);
             *nam = pop_name(Some(nam), name_map).unwrap();
           }
           RulePat::Ctr(_, _) => todo!(),
           RulePat::Num(MatchNum::Zero) => {}
           RulePat::Num(MatchNum::Succ(nam)) => {
-            push_name(nam.as_ref(), name_map, name_count);
             *nam = pop_name(nam.as_ref(), name_map);
           }
         }

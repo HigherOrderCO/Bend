@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 54
+input_file: tests/golden_tests/run_single_files/eta.hvm
+---
+λa a
