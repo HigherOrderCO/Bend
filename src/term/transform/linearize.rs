@@ -1,4 +1,4 @@
-use crate::term::{Book, LetPat, Name, Term, RulePat, MatchNum};
+use crate::term::{Book, LetPat, MatchNum, Name, RulePat, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 

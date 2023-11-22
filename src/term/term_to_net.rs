@@ -1,4 +1,4 @@
-use super::{Book, DefId, DefNames, LetPat, Name, Op, Term, native_match};
+use super::{native_match, Book, DefId, DefNames, LetPat, Name, Op, Term};
 use crate::{
   net::{INet, NodeKind::*, Port, MAX_DUP_HVMC_LABEL, ROOT},
   Warning,
@@ -156,7 +156,7 @@ fn encode_term(
         inet.link(Port(sel, 0), Port(if_, 1));
         let zero = encode_term(inet, &zero, Port(sel, 1), scope, vars, global_vars, label_generator);
         link_local(inet, Port(sel, 1), zero);
-  
+
         let succ = encode_term(inet, &succ, Port(sel, 2), scope, vars, global_vars, label_generator);
         link_local(inet, Port(sel, 2), succ);
       } else {

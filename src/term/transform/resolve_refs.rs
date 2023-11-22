@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::term::{Book, DefNames, LetPat, Name, Term, RulePat, MatchNum};
+use crate::term::{Book, DefNames, LetPat, MatchNum, Name, RulePat, Term};
 
 impl Book {
   /// Decides if names inside a term belong to a Var or to a Ref.
@@ -66,19 +66,19 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
         match pat {
           RulePat::Var(_) => todo!(),
           RulePat::Ctr(_, _) => todo!(),
-          RulePat::Num(MatchNum::Zero) => {},
+          RulePat::Num(MatchNum::Zero) => {}
           RulePat::Num(MatchNum::Succ(p)) => {
             push_scope(p.clone(), scope);
-          },
+          }
         }
         resolve_refs(term, def_names, scope);
         match pat {
           RulePat::Var(_) => todo!(),
           RulePat::Ctr(_, _) => todo!(),
-          RulePat::Num(MatchNum::Zero) => {},
+          RulePat::Num(MatchNum::Zero) => {}
           RulePat::Num(MatchNum::Succ(p)) => {
             pop_scope(p.clone(), scope);
-          },
+          }
         }
       }
     }

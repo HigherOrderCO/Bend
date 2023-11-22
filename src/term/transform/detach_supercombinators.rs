@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::term::{Book, DefId, DefNames, Definition, LetPat, Name, Rule, Term, MatchNum, RulePat};
+use crate::term::{Book, DefId, DefNames, Definition, LetPat, MatchNum, Name, Rule, RulePat, Term};
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
@@ -140,12 +140,12 @@ impl Term {
             match pat {
               RulePat::Var(_) => todo!(),
               RulePat::Ctr(_, _) => todo!(),
-              RulePat::Num(MatchNum::Zero) => {},
+              RulePat::Num(MatchNum::Zero) => {}
               RulePat::Num(MatchNum::Succ(p)) => {
                 if let Some(nam) = p {
                   term_info.provide(nam);
                 }
-              },
+              }
             }
             supers.push(go(term, depth + 1, term_info));
           }
