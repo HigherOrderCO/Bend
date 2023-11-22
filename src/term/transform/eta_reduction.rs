@@ -44,22 +44,18 @@ impl Term {
         scrutinee.eta_reduction();
         for (rule, term) in arms {
           term.eta_reduction();
-          match rule {
-            RulePat::Var(_) => todo!(),
-            RulePat::Ctr(_, _) => todo!(),
-            RulePat::Num(MatchNum::Zero) => {}
-            RulePat::Num(MatchNum::Succ(nam)) => {
-              let mut lam = Term::Lam { nam: nam.take(), bod: Box::new(std::mem::replace(term, Term::Era)) };
-              lam.eta_reduction();
-              match lam {
-                Term::Lam { nam: nam2, bod } => {
-                  *nam = nam2;
-                  *term = *bod;
-                }
-                body => {
-                  *rule = RulePat::Num(MatchNum::Zero);
-                  *term = body;
-                }
+
+          if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+            let mut lam = Term::Lam { nam: nam.take(), bod: Box::new(std::mem::replace(term, Term::Era)) };
+            lam.eta_reduction();
+            match lam {
+              Term::Lam { nam: nam2, bod } => {
+                *nam = nam2;
+                *term = *bod;
+              }
+              body => {
+                *rule = RulePat::Num(MatchNum::Zero);
+                *term = body;
               }
             }
           }

@@ -134,23 +134,19 @@ impl Term {
           fun_is_super && arg_is_super
         }
         Term::Match { scrutinee, arms } => {
-          let mut supers = vec![go(scrutinee, depth + 1, term_info)];
+          let mut is_super = go(scrutinee, depth + 1, term_info);
 
           for (pat, term) in arms {
-            match pat {
-              RulePat::Var(_) => todo!(),
-              RulePat::Ctr(_, _) => todo!(),
-              RulePat::Num(MatchNum::Zero) => {}
-              RulePat::Num(MatchNum::Succ(p)) => {
-                if let Some(nam) = p {
-                  term_info.provide(nam);
-                }
-              }
+            let RulePat::Num(num) = pat else { unreachable!() };
+
+            if let MatchNum::Succ(Some(nam)) = num {
+              term_info.provide(nam);
             }
-            supers.push(go(term, depth + 1, term_info));
+
+            is_super &= go(term, depth + 1, term_info);
           }
 
-          supers.iter().all(|e| *e == true)
+          is_super
         }
         Term::Dup { fst, snd, val, nxt, .. } => {
           let val_is_super = go(val, depth + 1, term_info);

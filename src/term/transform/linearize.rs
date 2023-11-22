@@ -70,17 +70,12 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
     Term::Match { scrutinee, arms } => {
       count_var_uses_in_term(scrutinee, uses);
       for (rule, term) in arms {
-        match rule {
-          RulePat::Var(_) => todo!(),
-          RulePat::Ctr(_, _) => todo!(),
-          RulePat::Num(MatchNum::Zero) => {}
-          RulePat::Num(MatchNum::Succ(nam)) => add_var(nam.as_ref(), uses),
+        if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+          add_var(nam.as_ref(), uses)
         }
+
         count_var_uses_in_term(term, uses);
       }
-      // for (_, term) in arms {
-      //   count_var_uses_in_term(term, uses);
-      // }
     }
     Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
   }
@@ -155,23 +150,21 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
     Term::Match { scrutinee, arms } => {
       term_to_affine(scrutinee, var_uses, let_bodies);
       for (rule, term) in arms {
-        match rule {
-          RulePat::Var(_) => todo!(),
-          RulePat::Ctr(_, _) => todo!(),
-          RulePat::Num(MatchNum::Zero) => term_to_affine(term, var_uses, let_bodies),
-          RulePat::Num(MatchNum::Succ(nam)) => {
-            if let Some(nam_some) = nam {
-              if let Some(uses) = var_uses.get(nam_some).copied() {
-                term_to_affine(term, var_uses, let_bodies);
-                duplicate_lam(nam, term, uses);
-              } else {
-                term_to_affine(term, var_uses, let_bodies);
-              }
-            } else {
+        let RulePat::Num(num) = rule else {
+          unreachable!();
+        };
+
+        if let MatchNum::Succ(nam) = num {
+          if let Some(nam_some) = nam {
+            if let Some(uses) = var_uses.get(nam_some).copied() {
               term_to_affine(term, var_uses, let_bodies);
+              duplicate_lam(nam, term, uses);
+              continue;
             }
           }
-        };
+        }
+
+        term_to_affine(term, var_uses, let_bodies)
       }
     }
     Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } => (),

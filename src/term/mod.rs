@@ -279,7 +279,7 @@ impl Term {
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
       Term::Match { scrutinee, arms } => {
         let arms =
-          arms.into_iter().map(|(pat, term)| format!("{}: {}", pat, term.to_string(def_names))).join("; ");
+          arms.iter().map(|(pat, term)| format!("{}: {}", pat, term.to_string(def_names))).join("; ");
 
         format!("match {} {{ {} }}", scrutinee.to_string(def_names), arms,)
       }

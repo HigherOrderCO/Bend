@@ -46,7 +46,7 @@ impl Term {
     }
 
     if pats.len() != ctrs.len() {
-      return Err("Missing constructos: ".to_owned()); //TODO: Better error
+      return Err("Missing constructos: ".to_owned()); // TODO: Better error
     }
 
     if !result {
@@ -112,29 +112,28 @@ impl Term {
     Ok(())
   }
 
-  #[allow(unused_mut)]
   fn make_match_app(nam: Name, arms: Vec<(RulePat, Term)>, Adt { ctrs }: &Adt) -> Self {
-    let mut res = Term::Var { nam: nam.clone() };
     let mut apps = vec![];
 
     for (ctr_name, args) in ctrs {
       for (rule, term) in &arms {
-        match rule {
-          RulePat::Var(ctr) => {
-            if ctr == ctr_name {
-              let lam = args.iter().rev().cloned().fold(term.clone(), |t, n| Term::Lam { nam: Some(binded(&nam, n)), bod: Box::new(t) });
-              apps.push(lam);
-            }
-          },
-          _ => unreachable!(),
+        let RulePat::Var(ctr) = rule else { unreachable!() };
+        if ctr == ctr_name {
+          let lam = args
+            .iter()
+            .rev()
+            .fold(term.clone(), |t, n| Term::Lam { nam: Some(binded(&nam, n)), bod: Box::new(t) });
+          apps.push(lam);
         }
       }
     }
 
-    apps.into_iter().fold(res, |scrutinee, t| Term::App { fun: Box::new(scrutinee), arg: Box::new(t) })
+    apps
+      .into_iter()
+      .fold(Term::Var { nam }, |scrutinee, t| Term::App { fun: Box::new(scrutinee), arg: Box::new(t) })
   }
 }
 
-fn binded(bind: &Name, acc: Name) -> Name {
+fn binded(bind: &Name, acc: &Name) -> Name {
   Name::new(&format!("{bind}.{acc}"))
 }

@@ -63,18 +63,14 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
     Term::Match { scrutinee, arms } => {
       resolve_refs(scrutinee, def_names, scope);
       for (pat, term) in arms {
-        match pat {
-          RulePat::Var(nam) => push_scope(Some(nam.clone()), scope),
-          RulePat::Ctr(_, _) => todo!(),
-          RulePat::Num(MatchNum::Zero) => {}
-          RulePat::Num(MatchNum::Succ(p)) => push_scope(p.clone(), scope),
+        if let RulePat::Num(MatchNum::Succ(p)) = pat {
+          push_scope(p.clone(), scope)
         }
+
         resolve_refs(term, def_names, scope);
-        match pat {
-          RulePat::Var(nam) => pop_scope(Some(nam.clone()), scope),
-          RulePat::Ctr(_, _) => todo!(),
-          RulePat::Num(MatchNum::Zero) => {}
-          RulePat::Num(MatchNum::Succ(p)) => pop_scope(p.clone(), scope),
+
+        if let RulePat::Num(MatchNum::Succ(p)) = pat {
+          pop_scope(p.clone(), scope)
         }
       }
     }
