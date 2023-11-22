@@ -327,9 +327,21 @@ impl Term {
           nxt.subst(from, to);
         }
       }
-      Term::Match { arms, .. } => {
-        for (_, term) in arms {
-          term.subst(from, to);
+      Term::Match { scrutinee, arms } => {
+        scrutinee.subst(from, to);
+
+        for (rule, term) in arms {
+          let can_subst;
+
+          if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
+            can_subst = nam != from
+          } else {
+            can_subst = true
+          };
+
+          if can_subst {
+            term.subst(from, to);
+          }
         }
       }
       Term::Ref { .. } => (),
