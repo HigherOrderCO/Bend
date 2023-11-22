@@ -369,7 +369,7 @@ impl Term {
 
 pub fn native_match(arms: Vec<(RulePat, Term)>) -> Option<(Term, Term)> {
   use MatchNum::*;
-  
+
   if !arms.len() == 2 {
     return None;
   }
@@ -379,8 +379,9 @@ pub fn native_match(arms: Vec<(RulePat, Term)>) -> Option<(Term, Term)> {
       let zero = zero.clone();
       let succ = Term::Lam { nam: nam.clone(), bod: Box::new(succ.clone()) };
       Some((zero, succ))
-    },
-    _ => None
+    }
+    ((RulePat::Num(Zero), zero), (RulePat::Num(Zero), succ)) => Some((zero.clone(), succ.clone())),
+    _ => None,
   }
 }
 

@@ -1,7 +1,0 @@
----
-source: tests/golden_tests.rs
-assertion_line: 54
-input_file: tests/golden_tests/compile_term/match.hvm
----
-a
-& <+ #1 ?<((b (c b)) (* (* (d d)))) a>> ~ #0
