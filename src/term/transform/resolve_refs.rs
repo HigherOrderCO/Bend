@@ -64,21 +64,17 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(scrutinee, def_names, scope);
       for (pat, term) in arms {
         match pat {
-          RulePat::Var(_) => todo!(),
+          RulePat::Var(nam) => push_scope(Some(nam.clone()), scope),
           RulePat::Ctr(_, _) => todo!(),
           RulePat::Num(MatchNum::Zero) => {}
-          RulePat::Num(MatchNum::Succ(p)) => {
-            push_scope(p.clone(), scope);
-          }
+          RulePat::Num(MatchNum::Succ(p)) => push_scope(p.clone(), scope),
         }
         resolve_refs(term, def_names, scope);
         match pat {
-          RulePat::Var(_) => todo!(),
+          RulePat::Var(nam) => pop_scope(Some(nam.clone()), scope),
           RulePat::Ctr(_, _) => todo!(),
           RulePat::Num(MatchNum::Zero) => {}
-          RulePat::Num(MatchNum::Succ(p)) => {
-            pop_scope(p.clone(), scope);
-          }
+          RulePat::Num(MatchNum::Succ(p)) => pop_scope(p.clone(), scope),
         }
       }
     }
