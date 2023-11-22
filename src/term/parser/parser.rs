@@ -272,11 +272,11 @@ fn datatype<'a, I>() -> impl Parser<'a, I, (Name, Adt), extra::Err<Rich<'a, Toke
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let arity_0 = name().map(|nam| (nam, 0));
+  let arity_0 = name().map(|nam| (nam, vec![]));
   let arity_n = name()
     .then(name().repeated().collect::<Vec<_>>())
     .delimited_by(just(Token::LParen), just(Token::RParen))
-    .map(|(nam, args)| (nam, args.len()));
+    .map(|(nam, args)| (nam, args));
   let ctr = arity_0.or(arity_n);
 
   let data = soft_keyword("data");
@@ -284,7 +284,7 @@ where
   data
     .ignore_then(name())
     .then_ignore(just(Token::Equals))
-    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, usize)>>())
+    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, Vec<Name>)>>())
     .map(|(name, ctrs)| (name, Adt { ctrs: ctrs.into_iter().collect() }))
 }
 

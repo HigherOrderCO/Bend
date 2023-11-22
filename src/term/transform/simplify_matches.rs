@@ -113,13 +113,28 @@ impl Term {
   }
 
   #[allow(unused_mut)]
-  fn make_match_app(nam: Name, arms: Vec<(RulePat, Term)>, _adts: &Adt) -> Self {
-    let mut res = Term::Var { nam };
+  fn make_match_app(nam: Name, arms: Vec<(RulePat, Term)>, Adt { ctrs }: &Adt) -> Self {
+    let mut res = Term::Var { nam: nam.clone() };
+    let mut apps = vec![];
 
-    for (rule, arm) in arms {
-      todo!("[{:?} => {:?}]", rule, arm)
+    for (ctr_name, args) in ctrs {
+      for (rule, term) in &arms {
+        match rule {
+          RulePat::Var(ctr) => {
+            if ctr == ctr_name {
+              let lam = args.iter().rev().cloned().fold(term.clone(), |t, n| Term::Lam { nam: Some(binded(&nam, n)), bod: Box::new(t) });
+              apps.push(lam);
+            }
+          },
+          _ => unreachable!(),
+        }
+      }
     }
 
-    res
+    apps.into_iter().fold(res, |scrutinee, t| Term::App { fun: Box::new(scrutinee), arg: Box::new(t) })
   }
+}
+
+fn binded(bind: &Name, acc: Name) -> Name {
+  Name::new(&format!("{bind}.{acc}"))
 }

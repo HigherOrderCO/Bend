@@ -156,7 +156,7 @@ pub enum Op {
 /// A user defined  datatype
 #[derive(Debug, Clone, Default)]
 pub struct Adt {
-  pub ctrs: IndexMap<Name, usize>,
+  pub ctrs: IndexMap<Name, Vec<Name>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord)]
