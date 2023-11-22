@@ -43,12 +43,7 @@ impl Term {
           go(fun, depth + 1, names, defs);
           go(arg, depth + 1, names, defs);
         }
-        Term::Match { .. } => {
-          todo!();
-          // go(cond, depth + 1, names, defs);
-          // go(zero, depth + 1, names, defs);
-          // go(succ, depth + 1, names, defs);
-        }
+        Term::Match { .. } => todo!(),
         Term::Dup { tag: _, fst: _, snd: _, val, nxt } => {
           go(val, depth + 1, names, defs);
           go(nxt, depth + 1, names, defs);

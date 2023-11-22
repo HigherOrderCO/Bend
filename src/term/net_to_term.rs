@@ -1,4 +1,4 @@
-use super::{var_id_to_name, Book, DefId, LetPat, Name, Op, Term, Val};
+use super::{var_id_to_name, Book, DefId, LetPat, MatchNum, Name, Op, RulePat, Term, Val};
 use crate::net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use hvmc::run::Loc;
 use std::collections::{HashMap, HashSet};
@@ -283,6 +283,22 @@ impl Term {
         (ctx, val_use || nxt_use)
       }
 
+      Term::Match { scrutinee, arms } => {
+        let (mut ctx, mut val_use) = scrutinee.resolve_let_scope(ctx, free_vars);
+
+        for (rule, term) in arms {
+          if let RulePat::Num(MatchNum::Succ(Some(p))) = rule {
+            free_vars.remove(p);
+          }
+
+          let (arm_ctx, arm_use) = term.resolve_let_scope(ctx, free_vars);
+          val_use &= arm_use;
+          ctx = arm_ctx;
+        }
+
+        (ctx, val_use)
+      }
+
       Term::Var { nam } => {
         if let LetInsertion::Todo(fst, snd, val) = ctx {
           let is_fst = fst.as_ref().map_or(false, |fst| fst == nam);
@@ -301,8 +317,6 @@ impl Term {
       Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { fst, snd, .. } => {
         ctx.multi_search_and_insert(&mut [fst, snd], free_vars)
       }
-
-      Term::Match { .. } => todo!(), /*ctx.multi_search_and_insert(&mut [cond, zero, succ], free_vars),*/
 
       Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => (ctx, false),
     }
@@ -351,11 +365,19 @@ impl Term {
         fst.free_vars(free_vars);
         snd.free_vars(free_vars);
       }
-      Term::Match { .. } => {
-        todo!();
-        // cond.free_vars(free_vars);
-        // zero.free_vars(free_vars);
-        // succ.free_vars(free_vars);
+      Term::Match { scrutinee, arms } => {
+        scrutinee.free_vars(free_vars);
+
+        for (rule, term) in arms {
+          let mut new_scope = HashSet::new();
+          term.free_vars(&mut new_scope);
+
+          if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
+            new_scope.remove(nam);
+          }
+
+          free_vars.extend(new_scope);
+        }
       }
       Term::Num { .. } => {}
       Term::Ref { .. } => {}
@@ -674,11 +696,16 @@ impl Term {
         fst.fix_names(id_counter, book);
         snd.fix_names(id_counter, book);
       }
-      Term::Match { .. } => {
-        todo!();
-        // cond.fix_names(id_counter, book);
-        // zero.fix_names(id_counter, book);
-        // succ.fix_names(id_counter, book);
+      Term::Match { scrutinee, arms } => {
+        scrutinee.fix_names(id_counter, book);
+
+        for (rule, term) in arms {
+          if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+            fix_name(nam, id_counter, term);
+          }
+
+          term.fix_names(id_counter, book)
+        }
       }
       Term::Let { .. } => unreachable!(),
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => {}
