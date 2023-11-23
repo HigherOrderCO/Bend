@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/lets.hvm
 ---
 a
-& (b (c (d a))) ~ (e e)
-& {5 f {6 g {7 h (h (g (f d)))}}} ~ (i i)
-& {3 j {4 k (k (j c))}} ~ (l l)
-& {2 m (m b)} ~ (n n)
+& (b b) ~ (c (d (e a)))
+& (f f) ~ {5 g {6 h {7 i (i (h (g e)))}}}
+& (j j) ~ {3 k {4 l (l (k d))}}
+& (m m) ~ {2 n (n c)}

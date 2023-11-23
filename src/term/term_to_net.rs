@@ -319,8 +319,8 @@ impl LabelGenerator {
     if let Some(tag) = tag {
       let next_lab = self.tagged_dups.len() as u32;
       match self.tagged_dups.entry(tag.clone()) {
-        Entry::Occupied(e) => e.get().clone(),
-        Entry::Vacant(e) => e.insert(next_lab).clone(),
+        Entry::Occupied(e) => *e.get(),
+        Entry::Vacant(e) => *e.insert(next_lab),
       }
     } else {
       let lab = self.untagged_dups;
