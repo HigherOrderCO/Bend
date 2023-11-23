@@ -160,7 +160,7 @@ fn encode_term(
         let succ = encode_term(inet, &succ, Port(sel, 2), scope, vars, global_vars, label_generator);
         link_local(inet, Port(sel, 2), succ);
       } else {
-        unreachable!();
+        unreachable!()
       }
 
       Some(Port(if_, 2))

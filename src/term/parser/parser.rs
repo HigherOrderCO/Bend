@@ -123,6 +123,7 @@ where
   let term_sep = just(Token::Semicolon).or_not();
 
   recursive(|term| {
+    let pred = select!(Token::Pred(s) => Term::Var { nam: Name(s) }).boxed();
     // *
     let era = just(Token::Asterisk).to(Term::Era).boxed();
 
@@ -191,6 +192,27 @@ where
       .map(|(scrutinee, arms)| Term::Match { scrutinee: Box::new(scrutinee), arms })
       .boxed();
 
+    let native_match = just(Token::Match)
+      .ignore_then(name())
+      .then_ignore(just(Token::LBracket))
+      .then_ignore(select!(Token::Num(0) => ()))
+      .then_ignore(just(Token::Colon))
+      .then(term.clone())
+      .then_ignore(term_sep.clone())
+      .then_ignore(just(Token::Add))
+      .then_ignore(just(Token::Colon))
+      .then(term.clone())
+      .then_ignore(term_sep.clone())
+      .then_ignore(just(Token::RBracket))
+      .map(|((cond, zero), succ)| Term::Match {
+        scrutinee: Box::new(Term::Var { nam: cond.clone() }),
+        arms: vec![
+          (RulePat::Num(MatchNum::Zero), zero),
+          (RulePat::Num(MatchNum::Succ(Some(Name(format!("{cond}-1"))))), succ),
+        ],
+      })
+      .boxed();
+
     // (f arg1 arg2 ...)
     let app = term
       .clone()
@@ -205,7 +227,22 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, number, tup, global_lam, lam, dup, let_, match_, num_op, app, era))
+    choice((
+      global_var,
+      var,
+      number,
+      tup,
+      global_lam,
+      lam,
+      dup,
+      let_,
+      native_match,
+      match_,
+      num_op,
+      app,
+      era,
+      pred,
+    ))
   })
 }
 
@@ -238,13 +275,20 @@ where
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
-    let zero = select!(Token::Num(0) => RulePat::Num(MatchNum::Zero));
+    let zero = select!(Token::Num(0) => RulePat::Num(MatchNum::Zero)).validate(|this, span, emit| {
+      emit.emit(Rich::custom(span, "Old zero syntax not supported."));
+      this
+    });
 
     let succ = just(Token::Num(1))
       .ignore_then(just(Token::Add))
       .ignore_then(name_or_era())
       .map(|x| RulePat::Num(MatchNum::Succ(x)))
-      .boxed();
+      .boxed()
+      .validate(|this, span, emit| {
+        emit.emit(Rich::custom(span, "Old pred syntax not supported."));
+        this
+      });
 
     choice((zero, succ, var, ctr))
   })

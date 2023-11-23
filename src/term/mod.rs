@@ -388,6 +388,7 @@ pub fn native_match(arms: Vec<(RulePat, Term)>) -> Option<(Term, Term)> {
       let succ = Term::Lam { nam: nam.clone(), bod: Box::new(succ.clone()) };
       Some((zero, succ))
     }
+    [(RulePat::Num(Zero), zero), (RulePat::Num(Zero), succ)] => Some((zero.clone(), succ.clone())),
     _ => None,
   }
 }
