@@ -3,5 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/addition.hvm
 ---
 a
-& (#8 a) ~ (b c)
-& <+ #1 <+ b c>> ~ #1
+& (b c) ~ (#8 a)
+& #1 ~ <+ #1 <+ b c>>

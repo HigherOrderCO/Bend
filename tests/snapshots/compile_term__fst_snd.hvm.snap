@@ -3,5 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/fst_snd.hvm
 ---
 a
-& (b a) ~ ([* c] c)
-& ([[#1 #3] #2] b) ~ ([d *] d)
+& ([* b] b) ~ (c a)
+& ([d *] d) ~ ([[#1 #3] #2] c)

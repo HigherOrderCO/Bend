@@ -6,6 +6,7 @@ use hvmc::{
 };
 use std::collections::{HashMap, HashSet};
 
+/// Converts the inet-encoded definitions into an hvmc AST Book.
 pub fn nets_to_hvmc(
   nets: HashMap<String, INet>,
   id_to_hvmc_name: &HashMap<DefId, Val>,
@@ -18,6 +19,7 @@ pub fn nets_to_hvmc(
   Ok(book)
 }
 
+/// Convert an inet-encoded definition into an hvmc AST inet.
 pub fn net_to_hvmc(inet: &INet, id_to_hvmc_name: &impl Fn(DefId) -> Val) -> Result<Net, String> {
   let (net_root, redxs) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
@@ -100,71 +102,91 @@ fn var_or_subtree(
 
 type VarId = NodeId;
 
-/// Returns a list of all the tree node roots in the compat inet.
+/// Finds the roots of all the trees in the inet.
+/// Returns them as the root of the root tree and the active pairs of the net.
+/// Active pairs are found by a right-to-left, depth-first search.
 fn get_tree_roots(inet: &INet) -> Result<(Option<NodeId>, Vec<[NodeId; 2]>), String> {
   let mut redx_roots: Vec<[NodeId; 2]> = vec![];
+  let mut movements: Vec<Movement> = vec![];
+  let mut root_set = HashSet::from([ROOT.node()]);
   let mut explored_nodes = vec![false; inet.nodes.len()];
-  let mut side_links: Vec<Port> = vec![]; // Links between trees
 
   // Start by checking the root tree (if any)
   explored_nodes[ROOT.node() as usize] = true;
   let root_link = inet.enter_port(ROOT);
-  let root_root = if root_link.slot() == 0 {
+  let root_node = root_link.node();
+  let root_tree_root = if root_link.slot() == 0 {
     // If the root node is connected to a main port, we have a root tree
-    let root_node = root_link.node();
-    go_down_tree(inet, root_node, &mut explored_nodes, &mut side_links)?;
+    movements.push(Movement::Down(root_node));
+    root_set.insert(root_node);
     Some(root_node)
   } else {
     // Otherwise, root node connected to an aux port, no root tree.
-    side_links.push(root_link);
+    movements.push(Movement::Side(root_node));
     None
   };
 
-  // Check each side-link for a possible new tree pair;
-  while let Some(dest_port) = side_links.pop() {
-    let dest_node = dest_port.node();
-    // Only go up unmarked trees
-    if !explored_nodes[dest_node as usize] {
-      let new_roots = go_up_tree(inet, dest_node)?;
-      go_down_tree(inet, new_roots[0], &mut explored_nodes, &mut side_links)?;
-      go_down_tree(inet, new_roots[1], &mut explored_nodes, &mut side_links)?;
-      redx_roots.push(new_roots);
+  // Traverse the net
+  while let Some(movement) = movements.pop() {
+    match movement {
+      Movement::Down(node_id) => explore_down_link(inet, node_id, &mut explored_nodes, &mut movements)?,
+      Movement::Side(node_id) => explore_side_link(inet, node_id, &mut movements, &mut redx_roots, &mut root_set)?,
     }
   }
 
-  Ok((root_root, redx_roots))
+  Ok((root_tree_root, redx_roots))
 }
 
-/// Go down a node tree, marking all nodes with the tree_id and storing any side_links found.
-fn go_down_tree(
+enum Movement {
+  Down(NodeId),
+  Side(NodeId),
+}
+
+fn explore_down_link(
   inet: &INet,
-  root: NodeId,
+  node_id: NodeId,
   explored_nodes: &mut [bool],
-  side_links: &mut Vec<Port>,
+  movements: &mut Vec<Movement>,
 ) -> Result<(), String> {
-  debug_assert!(!explored_nodes[root as usize], "Explored same tree twice");
-  let mut nodes_to_check = vec![root];
-  while let Some(node_id) = nodes_to_check.pop() {
-    if explored_nodes[node_id as usize] {
-      return Err("Found term that compiles into an inet with a vicious cycle".to_string());
-    }
+  // Don't go down already explored nodes.
+  if !explored_nodes[node_id as usize] {
     explored_nodes[node_id as usize] = true;
     for down_slot in [1, 2] {
       let down_port = inet.enter_port(Port(node_id, down_slot));
-      if down_port.slot() == 0 {
+      let movement = if down_port.slot() == 0 || down_port == ROOT {
         // If this down-link is to a main port, this is a node of the same tree
-        nodes_to_check.push(down_port.node());
+        Movement::Down(down_port.node())
       } else {
         // Otherwise it's a side-link
-        side_links.push(down_port);
-      }
+        Movement::Side(down_port.node())
+      };
+      movements.push(movement);
     }
   }
   Ok(())
 }
 
+fn explore_side_link(
+  inet: &INet,
+  node_id: NodeId,
+  movements: &mut Vec<Movement>,
+  redx_roots: &mut Vec<[NodeId; 2]>,
+  root_set: &mut HashSet<NodeId>,
+) -> Result<(), String> {
+  let new_roots = go_up_tree(inet, node_id)?;
+  // If this is a new tree, explore it downwards
+  if !root_set.contains(&new_roots[0]) && !root_set.contains(&new_roots[1]) {
+    movements.push(Movement::Down(new_roots[0]));
+    movements.push(Movement::Down(new_roots[1]));
+    redx_roots.push(new_roots);
+    root_set.insert(new_roots[0]);
+    root_set.insert(new_roots[1]);
+  }
+  Ok(())
+}
+
 /// Goes up a node tree, starting from some given node.
-/// Returns the root of this tree and the root of its active pair.
+/// Returns the active pair at the root of this tree.
 fn go_up_tree(inet: &INet, start_node: NodeId) -> Result<[NodeId; 2], String> {
   let mut explored_nodes = HashSet::new();
   let mut crnt_node = start_node;
@@ -173,8 +195,8 @@ fn go_up_tree(inet: &INet, start_node: NodeId) -> Result<[NodeId; 2], String> {
       return Err("Found term that compiles into an inet with a vicious cycle".to_string());
     }
     let up = inet.enter_port(Port(crnt_node, 0));
-    if up.slot() == 0 {
-      return Ok([crnt_node, up.node()]);
+    if up.slot() == 0 || up == ROOT {
+      return Ok([up.node(), crnt_node]);
     } else {
       crnt_node = up.node();
     }
