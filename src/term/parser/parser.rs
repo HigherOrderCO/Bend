@@ -123,6 +123,9 @@ where
   let term_sep = just(Token::Semicolon).or_not();
 
   recursive(|term| {
+    // *
+    let era = just(Token::Asterisk).to(Term::Era).boxed();
+
     // λx body
     let lam = just(Token::Lambda)
       .ignore_then(name_or_era())
@@ -202,20 +205,9 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, number, tup, global_lam, lam, dup, let_, match_, num_op, app))
+    choice((global_var, var, number, tup, global_lam, lam, dup, let_, match_, num_op, app, era))
   })
 }
-
-// fn arms<'a, I>() -> impl Parser<'a, I, Vec<(RulePat, Term)>, extra::Err<Rich<'a, Token>>>
-// where
-//   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
-// {
-//   rule_pat()
-//     .then_ignore(just(Token::Colon))
-//     .then(term())
-//     .separated_by(just(Token::Semicolon))
-//   // todo()
-// }
 
 fn let_pat<'a, I>() -> impl Parser<'a, I, LetPat, extra::Err<Rich<'a, Token>>>
 where

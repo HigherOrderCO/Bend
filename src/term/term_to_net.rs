@@ -228,7 +228,11 @@ fn encode_term(
     }
     Term::Let { .. } => unreachable!(), // Removed in earlier poss
     Term::Sup { .. } => unreachable!(), // Not supported in syntax
-    Term::Era => unreachable!(),        // Not supported in syntax
+    Term::Era => {
+      let era = inet.new_node(Era);
+      inet.link(Port(era, 1), Port(era, 2));
+      Some(Port(era, 0))
+    },
     // core: #val
     Term::Num { val } => {
       // debug_assert!(*val <= LABEL_MASK); // Uneeded?
