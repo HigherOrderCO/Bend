@@ -6,37 +6,45 @@ use crate::term::{
 impl Book {
   pub fn encode_pattern_matching_functions(&mut self, def_types: &DefinitionTypes) {
     for def_id in self.defs.keys().copied().collect::<Vec<_>>() {
-      let def_name = self.def_names.name(&def_id).unwrap();
+      let def_name = self.def_names.name(&def_id).unwrap().clone();
+      eprintln!("{def_name}");
       let def = self.defs.get_mut(&def_id).unwrap();
+      let def_type = &def_types[&def_id];
+      let crnt_rules = (0 .. def.rules.len()).collect();
 
-      // TODO: For functions with only one rule that doesnt pattern match, we can skip this for better readability of compiled result
+      // For functions with only one rule that doesnt pattern match, we can skip this pass.
+      if def_type.iter().all(|t| matches!(t, Type::Any)) {
+        continue;
+      }
+
       // First create a definition for each rule body
-      for (rule_idx, rule) in def.rules.iter_mut().enumerate() {
-        let rule_name = make_rule_name(def_name, rule_idx);
+      let mut rule_bodies = vec![];
+      for rule in def.rules.iter_mut() {
         let body = std::mem::replace(&mut rule.body, Term::Era);
-        let body = make_rule_body(body, rule_idx, def_name, &rule.pats);
+        let body = make_rule_body(body, &rule.pats);
+        rule_bodies.push(body);
+      }
+      for (rule_idx, body) in rule_bodies.into_iter().enumerate() {
+        let rule_name = make_rule_name(&def_name, rule_idx);
         self.insert_def(rule_name, vec![Rule { pats: vec![], body }]);
       }
 
       // Generate scott-encoded pattern matching
-      let def_type = &def_types[&def_id];
-      let crnt_rules = (0 .. def.rules.len()).collect();
-      make_pattern_matching_case(self, def_type, def_id, def_name, crnt_rules, vec![]);
+      make_pattern_matching_case(self, def_type, def_id, &def_name, crnt_rules, vec![]);
     }
   }
 }
 
 fn make_rule_name(def_name: &Name, rule_idx: usize) -> Name {
-  Name(format!("{def_name}${rule_idx}"))
+  Name(format!("{def_name}$R{rule_idx}"))
 }
 
-/// Given
-fn make_rule_body(mut body: Term, rule_idx: usize, def_name: &Name, pats: &[RulePat]) -> Term {
+fn make_rule_body(mut body: Term, pats: &[RulePat]) -> Term {
   // Add the lambdas for the pattern variables
   for pat in pats.iter().rev() {
     match pat {
       RulePat::Var(nam) => body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) },
-      RulePat::Ctr(nam, vars) => {
+      RulePat::Ctr(_, vars) => {
         for var in vars.iter().rev() {
           let RulePat::Var(nam) = var else { unreachable!() };
           body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) }
@@ -109,8 +117,8 @@ fn make_leaf_pattern_matching_case(
     nam
   };
   let make_var = |counter: &mut usize| {
-    let nam = Name(format!("x{counter}"));
     *counter -= 1;
+    let nam = Name(format!("x{counter}"));
     nam
   };
   let make_app = |term: Term, nam: Name| Term::App { fun: Box::new(term), arg: Box::new(Term::Var { nam }) };
@@ -145,9 +153,10 @@ fn make_leaf_pattern_matching_case(
     }
   });
 
-  book.insert_def(new_def_name, vec![Rule { pats: vec![], body: term }]);
+  add_case_to_book(book, new_def_name, term);
 }
 
+/// Builds a function for one of the pattern matches of the original one, as well as the next subfunctions recursively.
 fn make_branch_pattern_matching_case(
   book: &mut Book,
   def_type: &[Type],
@@ -175,8 +184,8 @@ fn make_branch_pattern_matching_case(
     nam
   };
   let make_var = |counter: &mut usize| {
-    let nam = Name(format!("x{counter}"));
     *counter -= 1;
+    let nam = Name(format!("x{counter}"));
     nam
   };
 
@@ -218,9 +227,13 @@ fn make_branch_pattern_matching_case(
   });
   // Lambda for the matched variable
   let term = Term::Lam { nam: Some(Name::new("x")), bod: Box::new(term) };
-  book.insert_def(Name::new(crnt_name), vec![Rule{ pats: vec![], body: term }]);
+  add_case_to_book(book, crnt_name.clone(), term);
 }
 
-fn get_next_fn_names<'a>(crnt_name: &str, ctrs: impl Iterator<Item = &'a Name>) -> Vec<Name> {
-  ctrs.map(|ctr| Name(format!("{}${}", crnt_name, ctr))).collect()
+fn add_case_to_book(book: &mut Book, nam: Name, body: Term) {
+  if let Some(def_id) = book.def_names.def_id(&nam) {
+    book.defs.get_mut(&def_id).unwrap().rules = vec![Rule{ pats: vec![], body }];
+  } else {
+    book.insert_def(nam, vec![Rule{ pats: vec![], body }]);
+  }
 }

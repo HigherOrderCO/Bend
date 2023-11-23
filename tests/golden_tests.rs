@@ -147,10 +147,16 @@ fn flatten_rules() {
 }
 
 #[test]
-fn adt_generation() {
+fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
+    book.check_shared_names()?;
+    book.resolve_ctrs_in_pats();
     book.generate_scott_adts();
+    let def_types = book.infer_def_types()?;
+    book.check_exhaustive_patterns(&def_types)?;
+    book.encode_pattern_matching_functions(&def_types);
     Ok(book.to_string())
   })
 }
+

@@ -1,6 +1,6 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/adt_generation/expr.hvm
+input_file: tests/golden_tests/encode_pattern_match/expr.hvm
 ---
 (Var) = λname λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Var name)
 
