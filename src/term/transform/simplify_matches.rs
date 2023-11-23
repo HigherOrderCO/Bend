@@ -1,7 +1,8 @@
 use crate::term::{
   check::type_check::{infer_arg_type, Type},
-  Adt, Book, Name, RulePat, Term, Definition, DefId, DefNames, Rule,
+  Adt, Book, DefId, DefNames, Definition, Name, Rule, RulePat, Term,
 };
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -11,7 +12,14 @@ impl Book {
     for (def_id, def) in &mut self.defs {
       let def_name = self.def_names.name(def_id).unwrap().clone();
       for rule in def.rules.iter_mut() {
-        rule.body.simplify_matches(&def_name, &self.adts, &self.ctrs, &mut self.def_names, &mut new_rules, 0)?;
+        rule.body.simplify_matches(
+          &def_name,
+          &self.adts,
+          &self.ctrs,
+          &mut self.def_names,
+          &mut new_rules,
+          &mut 0,
+        )?;
       }
     }
     self.defs.append(&mut new_rules);
@@ -71,7 +79,7 @@ impl Term {
     ctrs: &HashMap<Name, Name>,
     def_names: &mut DefNames,
     new_rules: &mut BTreeMap<DefId, Definition>,
-    match_count: usize,
+    match_count: &mut usize,
   ) -> Result<(), String> {
     match self {
       Term::Match { scrutinee, arms } => {
@@ -79,12 +87,12 @@ impl Term {
           return Err("Empty match block found".to_string());
         }
 
-        if matches!(arms[0], (RulePat::Num(_), _)) {
-          scrutinee.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count + 1)?;
+        for (_, term) in arms.iter_mut() {
+          term.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
+        }
 
-          for (_, term) in arms {
-            term.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count + 1)?;
-          }
+        if matches!(arms[0], (RulePat::Num(_), _)) {
+          scrutinee.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
         } else {
           let Term::Match { scrutinee, arms } = std::mem::replace(self, Term::Era) else { unreachable!() };
 
@@ -102,17 +110,14 @@ impl Term {
 
           let adt = Term::check_matches(&rules, adts, ctrs)?;
 
-          // let arms = arms
-          //   .into_iter()
-          //   .map(|(pat, body)| {
-          //     (pat, Term::make_match_app(nam.clone(), arms, adt, def_name, def_names, new_rules, match_count))
-          //   }).collect();
-
-          *self = Term::make_match_app(nam, arms, adt, def_name, def_names, new_rules, match_count + 1);
+          *match_count += 1;
+          *self = Term::make_match_app(nam, arms, adt, def_name, def_names, new_rules, *match_count);
         }
       }
 
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count + 1)?,
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+        bod.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?
+      }
 
       Term::App { fun: fst, arg: snd }
       | Term::Let { val: fst, nxt: snd, .. }
@@ -120,8 +125,8 @@ impl Term {
       | Term::Tup { fst, snd }
       | Term::Sup { fst, snd }
       | Term::Opx { fst, snd, .. } => {
-        fst.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count + 1)?;
-        snd.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count + 1)?;
+        fst.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
+        snd.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
       }
 
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => {}
@@ -158,16 +163,29 @@ impl Term {
     let mut refs_to_app = Vec::new();
 
     for (body, name) in apps {
+      let mut free_vars = IndexSet::new();
+      body.free_vars(&mut free_vars);
+
+      let body = free_vars
+        .iter()
+        .rev()
+        .cloned()
+        .fold(body, |acc: Term, name| Term::Lam { nam: Some(name), bod: Box::new(acc) });
+
       let rules = vec![Rule { pats: Vec::new(), body }];
       let gen_id = def_names.insert(name.clone());
       let def = Definition { def_id: gen_id, rules };
       new_rules.insert(gen_id, def);
-      refs_to_app.push(gen_id);
+      refs_to_app.push((gen_id, free_vars));
     }
 
-    refs_to_app
-      .into_iter()
-      .fold(Term::Var { nam }, |scrutinee, t| Term::App { fun: Box::new(scrutinee), arg: Box::new(Term::Ref { def_id: t }) })
+    refs_to_app.into_iter().fold(Term::Var { nam }, |scrutinee, (def_id, free)| Term::App {
+      fun: Box::new(scrutinee),
+      arg: Box::new(free.into_iter().fold(Term::Ref { def_id }, |acc, nam| Term::App {
+        fun: Box::new(acc),
+        arg: Box::new(Term::Var { nam }),
+      })),
+    })
   }
 }
 

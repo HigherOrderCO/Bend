@@ -1,6 +1,7 @@
 use super::{var_id_to_name, Book, DefId, LetPat, MatchNum, Name, Op, RulePat, Term, Val};
 use crate::net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use hvmc::run::Loc;
+use indexmap::IndexSet;
 use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
@@ -179,7 +180,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
 
-    let mut free_vars = HashSet::new();
+    let mut free_vars = IndexSet::new();
     val.free_vars(&mut free_vars);
 
     let let_ctx = LetInsertion::Todo(fst, snd, val);
@@ -207,7 +208,7 @@ enum LetInsertion {
 impl LetInsertion {
   /// Searchers the term and inserts the let body in the position bettewn where the vars it depends are defined,
   /// and where the its vars are used
-  fn search_and_insert(self, term: &mut Term, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
+  fn search_and_insert(self, term: &mut Term, free_vars: &mut IndexSet<Name>) -> (LetInsertion, bool) {
     match term.resolve_let_scope(self, free_vars) {
       (Self::Todo(fst, snd, val), true) => (term.insert_let(fst, snd, val, free_vars), true),
       (ctx, uses) => (ctx, uses),
@@ -220,7 +221,7 @@ impl LetInsertion {
   fn multi_search_and_insert(
     self,
     terms: &mut [&mut Term],
-    free_vars: &mut HashSet<Name>,
+    free_vars: &mut IndexSet<Name>,
   ) -> (LetInsertion, bool) {
     let mut var_uses = Vec::with_capacity(terms.len());
     let mut ctx = self;
@@ -248,7 +249,7 @@ impl Term {
     fst: Option<Name>,
     snd: Option<Name>,
     val: Term,
-    free_vars: &mut HashSet<Name>,
+    free_vars: &mut IndexSet<Name>,
   ) -> LetInsertion {
     // If all the vars it depends on were found, we update the term with the Let
     if free_vars.is_empty() {
@@ -262,7 +263,7 @@ impl Term {
     }
   }
 
-  fn resolve_let_scope(&mut self, ctx: LetInsertion, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
+  fn resolve_let_scope(&mut self, ctx: LetInsertion, free_vars: &mut IndexSet<Name>) -> (LetInsertion, bool) {
     match self {
       Term::Lam { nam: Some(nam), bod } => {
         free_vars.remove(nam);
@@ -323,10 +324,10 @@ impl Term {
   }
 
   /// Collects all the free variables that a term has
-  fn free_vars(&self, free_vars: &mut HashSet<Name>) {
+  pub fn free_vars(&self, free_vars: &mut IndexSet<Name>) {
     match self {
       Term::Lam { nam: Some(nam), bod } => {
-        let mut new_scope = HashSet::new();
+        let mut new_scope = IndexSet::new();
         bod.free_vars(&mut new_scope);
         new_scope.remove(nam);
 
@@ -339,7 +340,7 @@ impl Term {
       Term::Let { pat: LetPat::Var(nam), val, nxt } => {
         val.free_vars(free_vars);
 
-        let mut new_scope = HashSet::new();
+        let mut new_scope = IndexSet::new();
         nxt.free_vars(&mut new_scope);
 
         new_scope.remove(nam);
@@ -349,7 +350,7 @@ impl Term {
       Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
         val.free_vars(free_vars);
 
-        let mut new_scope = HashSet::new();
+        let mut new_scope = IndexSet::new();
         nxt.free_vars(&mut new_scope);
 
         fst.as_ref().map(|fst| new_scope.remove(fst));
@@ -369,7 +370,7 @@ impl Term {
         scrutinee.free_vars(free_vars);
 
         for (rule, term) in arms {
-          let mut new_scope = HashSet::new();
+          let mut new_scope = IndexSet::new();
           term.free_vars(&mut new_scope);
 
           if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
