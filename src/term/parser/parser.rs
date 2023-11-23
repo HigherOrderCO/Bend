@@ -180,13 +180,13 @@ where
       .boxed();
 
     // pat: term
-    let arm = rule_pat().then_ignore(just(Token::Colon)).then(term.clone()).boxed();
+    let match_arm = rule_pat().then_ignore(just(Token::Colon)).then(term.clone()).boxed();
 
     // match scrutinee { pat: term;... }
     let match_ = just(Token::Match)
       .ignore_then(term.clone())
       .then_ignore(just(Token::LBracket))
-      .then(arm.separated_by(term_sep.clone()).allow_trailing().collect())
+      .then(match_arm.separated_by(term_sep.clone()).allow_trailing().collect())
       .then_ignore(just(Token::RBracket))
       .map(|(scrutinee, arms)| Term::Match { scrutinee: Box::new(scrutinee), arms })
       .boxed();

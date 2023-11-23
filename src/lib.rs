@@ -57,7 +57,6 @@ pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
   book.generate_scott_adts();
   book.resolve_refs();
   book.simplify_matches()?;
-  println!("{book}");
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();

@@ -188,7 +188,6 @@ fn encode_term(
     Term::Var { nam } => {
       // We assume this variable to be valid, bound and correctly scoped.
       // This pass must be done before.
-      // println!("aaa -> {:?}", scope);
       debug_assert!(
         scope.contains_key(nam),
         "Unbound variable {nam}. Expected this check to be already done"
@@ -232,7 +231,7 @@ fn encode_term(
       let era = inet.new_node(Era);
       inet.link(Port(era, 1), Port(era, 2));
       Some(Port(era, 0))
-    },
+    }
     // core: #val
     Term::Num { val } => {
       // debug_assert!(*val <= LABEL_MASK); // Uneeded?

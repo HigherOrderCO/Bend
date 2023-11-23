@@ -2,7 +2,7 @@ use crate::term::{
   check::type_check::{infer_arg_type, Type},
   Adt, Book, DefId, DefNames, Definition, Name, Rule, RulePat, Term,
 };
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 use itertools::Itertools;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -153,8 +153,8 @@ impl Term {
           let lam = args
             .iter()
             .rev()
-            .fold(term.clone(), |t, n| Term::Lam { nam: Some(binded(&nam, n)), bod: Box::new(t) });
-          let def_name = gen_def_name(def_name, ctr_name, match_count);
+            .fold(term.clone(), |acc, n| Term::Lam { nam: Some(binded(&nam, n)), bod: Box::new(acc) });
+          let def_name = make_def_name(def_name, ctr_name, match_count);
           apps.push((lam, def_name));
         }
       }
@@ -173,10 +173,10 @@ impl Term {
         .fold(body, |acc: Term, name| Term::Lam { nam: Some(name), bod: Box::new(acc) });
 
       let rules = vec![Rule { pats: Vec::new(), body }];
-      let gen_id = def_names.insert(name.clone());
-      let def = Definition { def_id: gen_id, rules };
-      new_rules.insert(gen_id, def);
-      refs_to_app.push((gen_id, free_vars));
+      let def_id = def_names.insert(name.clone());
+      let def = Definition { def_id, rules };
+      new_rules.insert(def_id, def);
+      refs_to_app.push((def_id, free_vars));
     }
 
     refs_to_app.into_iter().fold(Term::Var { nam }, |scrutinee, (def_id, free)| Term::App {
@@ -193,6 +193,6 @@ fn binded(bind: &Name, acc: &Name) -> Name {
   Name::new(&format!("{bind}.{acc}"))
 }
 
-fn gen_def_name(def_name: &Name, ctr: &Name, i: usize) -> Name {
+fn make_def_name(def_name: &Name, ctr: &Name, i: usize) -> Name {
   Name::new(&format!("{def_name}${ctr}${i}"))
 }
