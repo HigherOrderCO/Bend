@@ -36,14 +36,11 @@ fn do_parse_net(code: &str) -> Result<hvmc::ast::Net, String> {
 
 const TESTS_PATH: &str = "/tests/golden_tests/";
 
-fn run_single_golden_test(
-  path: &Path,
-  run: &dyn Fn(&Path, &str) -> Result<String, String>,
-) -> Result<(), String> {
+fn run_single_golden_test(path: &Path, run: &dyn Fn(&str) -> Result<String, String>) -> Result<(), String> {
   let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
   let file_name = path.to_str().and_then(|path| path.rsplit_once(TESTS_PATH)).unwrap().1;
 
-  let result: String = run(path, &code).unwrap_or_else(|err| err);
+  let result: String = run(&code).unwrap_or_else(|err| err);
 
   let mut settings = insta::Settings::clone_current();
   settings.set_prepend_module_to_snapshot(false);
@@ -57,7 +54,7 @@ fn run_single_golden_test(
   Ok(())
 }
 
-fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&Path, &str) -> Result<String, String>) {
+fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str) -> Result<String, String>) {
   let root = PathBuf::from(format!(
     "{}{TESTS_PATH}{}",
     env!("CARGO_MANIFEST_DIR"),
@@ -80,7 +77,7 @@ fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&Path, &str) -> Result<Stri
 
 #[test]
 fn compile_term() {
-  run_golden_test_dir(function_name!(), &|_, code| {
+  run_golden_test_dir(function_name!(), &|code| {
     let mut term = do_parse_term(code)?;
     term.check_unbound_vars()?;
     term.make_var_names_unique();
@@ -100,7 +97,7 @@ fn compile_term() {
 
 #[test]
 fn compile_file() {
-  run_golden_test_dir(function_name!(), &|_, code| {
+  run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
     let compiled = compile_book(&mut book)?;
     Ok(format!("{:?}", compiled))
@@ -109,7 +106,7 @@ fn compile_file() {
 
 #[test]
 fn run_single_files() {
-  run_golden_test_dir(function_name!(), &|_, code| {
+  run_golden_test_dir(function_name!(), &|code| {
     let book = do_parse_book(code)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, def_names, info) = run_book(book, 1 << 20, true)?;
@@ -124,7 +121,7 @@ fn run_single_files() {
 
 #[test]
 fn readback_lnet() {
-  run_golden_test_dir(function_name!(), &|_, code| {
+  run_golden_test_dir(function_name!(), &|code| {
     let net = do_parse_net(code)?;
     let book = Book::default();
     let compat_net = hvmc_to_net(&net, &DefId::from_internal);
@@ -139,7 +136,7 @@ fn readback_lnet() {
 
 #[test]
 fn flatten_rules() {
-  run_golden_test_dir(function_name!(), &|_, code| {
+  run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
     book.flatten_rules();
     Ok(book.to_string())
@@ -148,7 +145,7 @@ fn flatten_rules() {
 
 #[test]
 fn adt_generation() {
-  run_golden_test_dir(function_name!(), &|_, code| {
+  run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
     book.generate_scott_adts();
     Ok(book.to_string())
