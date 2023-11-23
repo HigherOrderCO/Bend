@@ -465,9 +465,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
 
           let valid = cond_valid && zero_valid && succ_valid;
 
-          let Term::Lam { nam, bod } = succ_term else {
-            unreachable!();
-          };
+          let Term::Lam { nam, bod } = succ_term else { unreachable!() };
 
           let term = Term::num_match(cond_term, zero_term, nam, *bod);
           (term, valid)

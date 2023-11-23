@@ -150,9 +150,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
     Term::Match { scrutinee, arms } => {
       term_to_affine(scrutinee, var_uses, let_bodies);
       for (rule, term) in arms {
-        let RulePat::Num(num) = rule else {
-          unreachable!();
-        };
+        let RulePat::Num(num) = rule else { unreachable!() };
 
         if let MatchNum::Succ(nam) = num {
           if let Some(nam_some) = nam {

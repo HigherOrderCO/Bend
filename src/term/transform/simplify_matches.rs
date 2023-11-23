@@ -82,7 +82,7 @@ impl Term {
     match_count: &mut usize,
   ) -> Result<(), String> {
     match self {
-      Term::Match { scrutinee, arms } => {
+      Term::Match { arms, .. } => {
         if arms.is_empty() {
           return Err("Empty match block found".to_string());
         }
@@ -91,14 +91,11 @@ impl Term {
           term.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
         }
 
-        if matches!(arms[0], (RulePat::Num(_), _)) {
-          scrutinee.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
-        } else {
+        if !matches!(arms[0], (RulePat::Num(_), _)) {
           let Term::Match { scrutinee, arms } = std::mem::replace(self, Term::Era) else { unreachable!() };
 
-          let Term::Var { nam } = *scrutinee else {
-            unreachable!(); // the scrutinee of a match on adts should always be a var
-          };
+          // the scrutinee of a match on adts should always be a var
+          let Term::Var { nam } = *scrutinee else { unreachable!() };
 
           let rules: Vec<_> = arms
             .iter()
