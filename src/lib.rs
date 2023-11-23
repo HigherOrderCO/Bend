@@ -56,6 +56,7 @@ pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
   book.check_exhaustive_patterns(&def_types)?;
   book.generate_scott_adts();
   book.simplify_matches()?;
+  println!("{book}");
   book.resolve_refs();
   book.check_unbound_vars()?;
   book.make_var_names_unique();
