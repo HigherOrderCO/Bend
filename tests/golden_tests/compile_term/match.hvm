@@ -1,5 +1,5 @@
-match (+ 0 1) 
-{
-  0 : λt λf t
-  1+ * : λt λf f
+let n = (+ 0 1);
+match n {
+  0: λt λf t
+  +: λt λf f
 }

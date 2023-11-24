@@ -1,6 +1,7 @@
-use super::{var_id_to_name, Book, DefId, LetPat, Name, Op, Term, Val};
+use super::{var_id_to_name, Book, DefId, LetPat, MatchNum, Name, Op, RulePat, Term, Val};
 use crate::net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use hvmc::run::Loc;
+use indexmap::IndexSet;
 use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
@@ -60,10 +61,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
           let sel_kind = net.node(sel_node).kind;
           if sel_kind != Con {
             // TODO: Is there any case where we expect a different node type here on readback?
-            return (
-              Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
-              false,
-            );
+            return (Term::num_match(cond_term, Term::Era, None, Term::Era), false);
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
@@ -72,10 +70,11 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
           let (succ_term, succ_valid) = reader(net, succ_port, namegen, dup_scope, tup_scope, book);
 
           let valid = cond_valid && zero_valid && succ_valid;
-          (
-            Term::Match { cond: Box::new(cond_term), zero: Box::new(zero_term), succ: Box::new(succ_term) },
-            valid,
-          )
+
+          let Term::Lam { nam, bod } = succ_term else { unreachable!() };
+
+          let term = Term::num_match(cond_term, zero_term, nam, *bod);
+          (term, valid)
         }
         _ => unreachable!(),
       },
@@ -179,7 +178,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
 
-    let mut free_vars = HashSet::new();
+    let mut free_vars = IndexSet::new();
     val.free_vars(&mut free_vars);
 
     let let_ctx = LetInsertion::Todo(fst, snd, val);
@@ -207,7 +206,7 @@ enum LetInsertion {
 impl LetInsertion {
   /// Searchers the term and inserts the let body in the position bettewn where the vars it depends are defined,
   /// and where the its vars are used
-  fn search_and_insert(self, term: &mut Term, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
+  fn search_and_insert(self, term: &mut Term, free_vars: &mut IndexSet<Name>) -> (LetInsertion, bool) {
     match term.resolve_let_scope(self, free_vars) {
       (Self::Todo(fst, snd, val), true) => (term.insert_let(fst, snd, val, free_vars), true),
       (ctx, uses) => (ctx, uses),
@@ -220,7 +219,7 @@ impl LetInsertion {
   fn multi_search_and_insert(
     self,
     terms: &mut [&mut Term],
-    free_vars: &mut HashSet<Name>,
+    free_vars: &mut IndexSet<Name>,
   ) -> (LetInsertion, bool) {
     let mut var_uses = Vec::with_capacity(terms.len());
     let mut ctx = self;
@@ -248,7 +247,7 @@ impl Term {
     fst: Option<Name>,
     snd: Option<Name>,
     val: Term,
-    free_vars: &mut HashSet<Name>,
+    free_vars: &mut IndexSet<Name>,
   ) -> LetInsertion {
     // If all the vars it depends on were found, we update the term with the Let
     if free_vars.is_empty() {
@@ -262,7 +261,7 @@ impl Term {
     }
   }
 
-  fn resolve_let_scope(&mut self, ctx: LetInsertion, free_vars: &mut HashSet<Name>) -> (LetInsertion, bool) {
+  fn resolve_let_scope(&mut self, ctx: LetInsertion, free_vars: &mut IndexSet<Name>) -> (LetInsertion, bool) {
     match self {
       Term::Lam { nam: Some(nam), bod } => {
         free_vars.remove(nam);
@@ -281,6 +280,22 @@ impl Term {
         let (ctx, nxt_use) = nxt.resolve_let_scope(ctx, free_vars);
 
         (ctx, val_use || nxt_use)
+      }
+
+      Term::Match { scrutinee, arms } => {
+        let (mut ctx, mut val_use) = scrutinee.resolve_let_scope(ctx, free_vars);
+
+        for (rule, term) in arms {
+          if let RulePat::Num(MatchNum::Succ(Some(p))) = rule {
+            free_vars.remove(p);
+          }
+
+          let (arm_ctx, arm_use) = term.resolve_let_scope(ctx, free_vars);
+          val_use &= arm_use;
+          ctx = arm_ctx;
+        }
+
+        (ctx, val_use)
       }
 
       Term::Var { nam } => {
@@ -302,60 +317,7 @@ impl Term {
         ctx.multi_search_and_insert(&mut [fst, snd], free_vars)
       }
 
-      Term::Match { cond, zero, succ } => ctx.multi_search_and_insert(&mut [cond, zero, succ], free_vars),
-
       Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => (ctx, false),
-    }
-  }
-
-  /// Collects all the free variables that a term has
-  fn free_vars(&self, free_vars: &mut HashSet<Name>) {
-    match self {
-      Term::Lam { nam: Some(nam), bod } => {
-        let mut new_scope = HashSet::new();
-        bod.free_vars(&mut new_scope);
-        new_scope.remove(nam);
-
-        free_vars.extend(new_scope);
-      }
-      Term::Lam { nam: None, bod } => bod.free_vars(free_vars),
-      Term::Var { nam } => _ = free_vars.insert(nam.clone()),
-      Term::Chn { bod, .. } => bod.free_vars(free_vars),
-      Term::Lnk { .. } => {}
-      Term::Let { pat: LetPat::Var(nam), val, nxt } => {
-        val.free_vars(free_vars);
-
-        let mut new_scope = HashSet::new();
-        nxt.free_vars(&mut new_scope);
-
-        new_scope.remove(nam);
-
-        free_vars.extend(new_scope);
-      }
-      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
-        val.free_vars(free_vars);
-
-        let mut new_scope = HashSet::new();
-        nxt.free_vars(&mut new_scope);
-
-        fst.as_ref().map(|fst| new_scope.remove(fst));
-        snd.as_ref().map(|snd| new_scope.remove(snd));
-
-        free_vars.extend(new_scope);
-      }
-      Term::App { fun: fst, arg: snd }
-      | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd }
-      | Term::Opx { op: _, fst, snd } => {
-        fst.free_vars(free_vars);
-        snd.free_vars(free_vars);
-      }
-      Term::Match { cond, zero, succ } => {
-        cond.free_vars(free_vars);
-        zero.free_vars(free_vars);
-        succ.free_vars(free_vars);
-      }
-      Term::Ref { .. } | Term::Num { .. } | Term::Era => {}
     }
   }
 }
@@ -430,10 +392,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           let sel_kind = net.node(sel_node).kind;
           if sel_kind != Con {
             // TODO: Is there any case where we expect a different node type here on readback?
-            return (
-              Term::Match { cond: Box::new(cond_term), zero: Box::new(Term::Era), succ: Box::new(Term::Era) },
-              false,
-            );
+            return (Term::num_match(cond_term, Term::Era, None, Term::Era), false);
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
@@ -442,10 +401,11 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           let (succ_term, succ_valid) = reader(net, succ_port, namegen, dup_scope, tup_scope, seen, book);
 
           let valid = cond_valid && zero_valid && succ_valid;
-          (
-            Term::Match { cond: Box::new(cond_term), zero: Box::new(zero_term), succ: Box::new(succ_term) },
-            valid,
-          )
+
+          let Term::Lam { nam, bod } = succ_term else { unreachable!() };
+
+          let term = Term::num_match(cond_term, zero_term, nam, *bod);
+          (term, valid)
         }
         _ => unreachable!(),
       },
@@ -669,10 +629,16 @@ impl Term {
         fst.fix_names(id_counter, book);
         snd.fix_names(id_counter, book);
       }
-      Term::Match { cond, zero, succ } => {
-        cond.fix_names(id_counter, book);
-        zero.fix_names(id_counter, book);
-        succ.fix_names(id_counter, book);
+      Term::Match { scrutinee, arms } => {
+        scrutinee.fix_names(id_counter, book);
+
+        for (rule, term) in arms {
+          if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+            fix_name(nam, id_counter, term);
+          }
+
+          term.fix_names(id_counter, book)
+        }
       }
       Term::Let { .. } => unreachable!(),
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => {}

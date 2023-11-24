@@ -2,23 +2,23 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/adt_generation/expr.hvm
 ---
-(Var) = λa0 λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Var a0)
+(Var) = λname λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Var name)
 
-(Num) = λa0 λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Num a0)
+(Num) = λval λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Num val)
 
-(App) = λa0 λa1 λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((App a0) a1)
+(App) = λfun λarg λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((App fun) arg)
 
-(Fun) = λa0 λa1 λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((Fun a0) a1)
+(Fun) = λname λbody λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((Fun name) body)
 
-(If) = λa0 λa1 λa2 λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (((If a0) a1) a2)
+(If) = λcond λthen λelse λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (((If cond) then) else)
 
-(Let) = λa0 λa1 λa2 λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (((Let a0) a1) a2)
+(Let) = λbind λval λnext λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (((Let bind) val) next)
 
-(Dup) = λa0 λa1 λa2 λa3 λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((((Dup a0) a1) a2) a3)
+(Dup) = λfst λsnd λval λnext λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((((Dup fst) snd) val) next)
 
-(Tup) = λa0 λa1 λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((Tup a0) a1)
+(Tup) = λfst λsnd λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((Tup fst) snd)
 
-(Op2) = λa0 λa1 λa2 λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (((Op2 a0) a1) a2)
+(Op2) = λop λfst λsnd λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (((Op2 op) fst) snd)
 
 (Add) = λAdd λSub λMul λDiv Add
 

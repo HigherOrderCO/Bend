@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{Adt, Book, LetPat, Name, Op, Rule, RulePat, Term};
+use crate::term::{Adt, Book, LetPat, MatchNum, Name, Op, Rule, RulePat, Term};
 use chumsky::{
   extra,
   input::{SpannedInput, Stream, ValueInput},
@@ -123,6 +123,10 @@ where
   let term_sep = just(Token::Semicolon).or_not();
 
   recursive(|term| {
+    let pred = select!(Token::Pred(s) => Term::Var { nam: Name(s) }).boxed();
+    // *
+    let era = just(Token::Asterisk).to(Term::Era).boxed();
+
     // λx body
     let lam = just(Token::Lambda)
       .ignore_then(name_or_era())
@@ -176,24 +180,36 @@ where
       .map(|((pat, val), nxt)| Term::Let { pat, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
-    // match val { 0: zero; 1 + pred: succ }
+    // pat: term
+    let match_arm = rule_pat().then_ignore(just(Token::Colon)).then(term.clone()).boxed();
+
+    // match scrutinee { pat: term;... }
     let match_ = just(Token::Match)
       .ignore_then(term.clone())
+      .then_ignore(just(Token::LBracket))
+      .then(match_arm.separated_by(term_sep.clone()).allow_trailing().collect())
+      .then_ignore(just(Token::RBracket))
+      .map(|(scrutinee, arms)| Term::Match { scrutinee: Box::new(scrutinee), arms })
+      .boxed();
+
+    let native_match = just(Token::Match)
+      .ignore_then(name())
       .then_ignore(just(Token::LBracket))
       .then_ignore(select!(Token::Num(0) => ()))
       .then_ignore(just(Token::Colon))
       .then(term.clone())
       .then_ignore(term_sep.clone())
-      .then_ignore(select!(Token::Num(1) => ()))
       .then_ignore(just(Token::Add))
-      .then(name_or_era())
       .then_ignore(just(Token::Colon))
       .then(term.clone())
+      .then_ignore(term_sep.clone())
       .then_ignore(just(Token::RBracket))
-      .map(|(((cond, zero), pred), succ)| Term::Match {
-        cond: Box::new(cond),
-        zero: Box::new(zero),
-        succ: Box::new(Term::Lam { nam: pred, bod: Box::new(succ) }),
+      .map(|((cond, zero), succ)| Term::Match {
+        scrutinee: Box::new(Term::Var { nam: cond.clone() }),
+        arms: vec![
+          (RulePat::Num(MatchNum::Zero), zero),
+          (RulePat::Num(MatchNum::Succ(Some(Name(format!("{cond}-1"))))), succ),
+        ],
       })
       .boxed();
 
@@ -211,7 +227,22 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    choice((global_var, var, number, tup, global_lam, lam, dup, let_, match_, num_op, app))
+    choice((
+      global_var,
+      var,
+      number,
+      tup,
+      global_lam,
+      lam,
+      dup,
+      let_,
+      native_match,
+      match_,
+      num_op,
+      app,
+      era,
+      pred,
+    ))
   })
 }
 
@@ -244,7 +275,22 @@ where
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
-    choice((var, ctr))
+    let zero = select!(Token::Num(0) => RulePat::Num(MatchNum::Zero)).validate(|this, span, emit| {
+      emit.emit(Rich::custom(span, "Old zero syntax not supported."));
+      this
+    });
+
+    let succ = just(Token::Num(1))
+      .ignore_then(just(Token::Add))
+      .ignore_then(name_or_era())
+      .map(|x| RulePat::Num(MatchNum::Succ(x)))
+      .boxed()
+      .validate(|this, span, emit| {
+        emit.emit(Rich::custom(span, "Old pred syntax not supported."));
+        this
+      });
+
+    choice((zero, succ, var, ctr))
   })
 }
 
@@ -262,11 +308,11 @@ fn datatype<'a, I>() -> impl Parser<'a, I, (Name, Adt), extra::Err<Rich<'a, Toke
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let arity_0 = name().map(|nam| (nam, 0));
+  let arity_0 = name().map(|nam| (nam, vec![]));
   let arity_n = name()
     .then(name().repeated().collect::<Vec<_>>())
     .delimited_by(just(Token::LParen), just(Token::RParen))
-    .map(|(nam, args)| (nam, args.len()));
+    .map(|(nam, args)| (nam, args));
   let ctr = arity_0.or(arity_n);
 
   let data = soft_keyword("data");
@@ -274,7 +320,7 @@ where
   data
     .ignore_then(name())
     .then_ignore(just(Token::Equals))
-    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, usize)>>())
+    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, Vec<Name>)>>())
     .map(|(name, ctrs)| (name, Adt { ctrs: ctrs.into_iter().collect() }))
 }
 
