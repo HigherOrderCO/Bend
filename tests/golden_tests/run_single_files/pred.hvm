@@ -1,6 +1,6 @@
 Pred = λt match t {
   0: 0
-  1+p: p
+  +: t-1
 }
 
 main = (Pred 3)

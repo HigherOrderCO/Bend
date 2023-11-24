@@ -40,10 +40,26 @@ impl Term {
         fst.eta_reduction();
         snd.eta_reduction();
       }
-      Term::Match { cond, zero, succ } => {
-        cond.eta_reduction();
-        zero.eta_reduction();
-        succ.eta_reduction();
+      Term::Match { scrutinee, arms } => {
+        scrutinee.eta_reduction();
+        for (rule, term) in arms {
+          term.eta_reduction();
+
+          if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+            let mut lam = Term::Lam { nam: nam.take(), bod: Box::new(std::mem::replace(term, Term::Era)) };
+            lam.eta_reduction();
+            match lam {
+              Term::Lam { nam: nam2, bod } => {
+                *nam = nam2;
+                *term = *bod;
+              }
+              body => {
+                *rule = RulePat::Num(MatchNum::Zero);
+                *term = body;
+              }
+            }
+          }
+        }
       }
       Term::Lnk { .. } | Term::Var { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => {}
     }
