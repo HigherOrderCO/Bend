@@ -54,6 +54,7 @@ pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
   book.check_shared_names()?;
   book.resolve_ctrs_in_pats();
   book.generate_scott_adts();
+  book.flatten_rules();
   let def_types = book.infer_def_types()?;
   book.check_exhaustive_patterns(&def_types)?;
   book.encode_pattern_matching_functions(&def_types);

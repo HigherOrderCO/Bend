@@ -56,7 +56,7 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> (Definition, Vec<D
 /// Returns true if a rule needs to be split to be made flat.
 /// If a rule has nested patterns (matchable pattern inside another matchable pattern) then it must be split.
 /// Ex: (Rule (CtrA (CtrB))) has a constructor inside a constructor
-/// It must be separated into a new rule (Rule$0 (CtrB)) while changing the old pattern to (Rule (CtrA .x0)).
+/// It must be separated into a new rule (Rule$F0 (CtrB)) while changing the old pattern to (Rule (CtrA .x0)).
 fn must_split(rule: &Rule) -> bool {
   for pat in &rule.pats {
     if let RulePat::Ctr(_, args) = &pat {
@@ -123,7 +123,7 @@ fn make_split_def_name(old_def_id: DefId, name_count: &mut Val, def_names: &mut 
   let num = *name_count;
   *name_count += 1;
   let old_def_name = def_names.name(&old_def_id).unwrap();
-  let new_def_name = Name(format!("{}${}$", old_def_name, num));
+  let new_def_name = Name(format!("{}$F{}", old_def_name, num));
   def_names.insert(new_def_name)
 }
 

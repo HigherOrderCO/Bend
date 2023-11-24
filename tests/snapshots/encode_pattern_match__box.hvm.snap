@@ -1,6 +1,5 @@
 ---
 source: tests/golden_tests.rs
-assertion_line: 54
 input_file: tests/golden_tests/encode_pattern_match/box.hvm
 ---
 (unbox) = λx (x unbox$Pnew)

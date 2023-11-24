@@ -3,13 +3,13 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/flatten_rules/bits_dec.hvm
 ---
 (Data.Bits.dec Data.Bits.e) = Data.Bits.e
-(Data.Bits.dec (Data.Bits.o .x0)) = (Data.Bits.dec$0$ .x0)
-(Data.Bits.dec (Data.Bits.i .x0)) = (Data.Bits.dec$1$ .x0)
+(Data.Bits.dec (Data.Bits.o .x0)) = (Data.Bits.dec$F0 .x0)
+(Data.Bits.dec (Data.Bits.i .x0)) = (Data.Bits.dec$F1 .x0)
 
-(Data.Bits.dec$0$ (Data.Bits.e)) = Data.Bits.e
-(Data.Bits.dec$0$ (Data.Bits.o b.pred)) = (Data.Bits.i (Data.Bits.dec b.pred))
-(Data.Bits.dec$0$ (Data.Bits.i b.pred)) = (Data.Bits.i (Data.Bits.dec b.pred))
+(Data.Bits.dec$F0 (Data.Bits.e)) = Data.Bits.e
+(Data.Bits.dec$F0 (Data.Bits.o b.pred)) = (Data.Bits.i (Data.Bits.dec b.pred))
+(Data.Bits.dec$F0 (Data.Bits.i b.pred)) = (Data.Bits.i (Data.Bits.dec b.pred))
 
-(Data.Bits.dec$1$ (Data.Bits.e)) = (Data.Bits.o Data.Bits.e)
-(Data.Bits.dec$1$ (Data.Bits.o b.pred)) = (Data.Bits.o b.pred)
-(Data.Bits.dec$1$ (Data.Bits.i b.pred)) = (Data.Bits.o b.pred)
+(Data.Bits.dec$F1 (Data.Bits.e)) = (Data.Bits.o Data.Bits.e)
+(Data.Bits.dec$F1 (Data.Bits.o b.pred)) = (Data.Bits.o b.pred)
+(Data.Bits.dec$F1 (Data.Bits.i b.pred)) = (Data.Bits.o b.pred)

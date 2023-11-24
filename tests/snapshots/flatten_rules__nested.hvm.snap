@@ -1,6 +1,6 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/flatten_rules/nested_ctrs.hvm
+input_file: tests/golden_tests/flatten_rules/nested.hvm
 ---
 (Rule (CtrA a .x0)) = ((Rule$F0 a) .x0)
 (Rule (CtrB b)) = b

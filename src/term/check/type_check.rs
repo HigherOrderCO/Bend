@@ -13,6 +13,7 @@ pub type DefinitionTypes = HashMap<DefId, Vec<Type>>;
 impl Book {
   /// Returns a HashMap from the definition id to the inferred pattern types
   /// and checks the rules arities based on the first rule arity.
+  /// Expects patterns to be flattened.
   pub fn infer_def_types(&self) -> Result<DefinitionTypes, String> {
     let mut def_types = HashMap::new();
     for (def_id, def) in &self.defs {
