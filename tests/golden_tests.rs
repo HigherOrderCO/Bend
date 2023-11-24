@@ -6,7 +6,7 @@ use hvml::{
   term::{
     net_to_term::net_to_term_non_linear,
     parser::{parse_definition_book, parse_term},
-    term_to_compat_net, Book, DefId, Term,
+    term_to_compat_net, Book, DefId, Term, term_to_net::LabelGenerator,
   },
   Warning,
 };
@@ -82,7 +82,8 @@ fn compile_term() {
     term.check_unbound_vars()?;
     term.make_var_names_unique();
     term.linearize_vars();
-    let (compat_net, dups) = term_to_compat_net(&term);
+    let mut label_generator = LabelGenerator::default();
+    let (compat_net, dups) = term_to_compat_net(&term, &mut label_generator);
     let net = net_to_hvmc(&compat_net, &|def_id| def_id.to_internal())?;
 
     let result = if dups > hvml::net::MAX_DUP_HVMC_LABEL {
