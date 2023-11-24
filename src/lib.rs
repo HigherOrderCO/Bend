@@ -70,7 +70,12 @@ pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
   Ok(CompileResult { core_book, hvmc_name_to_id, warnings })
 }
 
-pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize, paralel: bool) -> (Net, RunStats) {
+pub fn run_compiled(
+  book: &hvmc::ast::Book,
+  mem_size: usize,
+  parallel: bool,
+  hook: Option<impl FnMut(Net)>,
+) -> (Net, RunStats) {
   let runtime_book = book_to_runtime(book);
   let heap = Heap::init(mem_size);
   let mut root = hvmc::run::Net::new(&heap);
@@ -78,10 +83,19 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize, paralel: bool) -> (
 
   let start_time = Instant::now();
 
-  if paralel {
-    root.parallel_normal(&runtime_book);
+  if let Some(mut hook) = hook {
+    root.expand(&runtime_book);
+    while root.rdex.len() > 0 {
+      hook(net_from_runtime(&root));
+      root.reduce(&runtime_book, 1);
+      root.expand(&runtime_book);
+    }
   } else {
-    root.normal(&runtime_book)
+    if parallel {
+      root.parallel_normal(&runtime_book);
+    } else {
+      root.normal(&runtime_book)
+    }
   }
 
   let elapsed = start_time.elapsed().as_secs_f64();
@@ -92,7 +106,12 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize, paralel: bool) -> (
   (net, stats)
 }
 
-pub fn run_book(mut book: Book, mem_size: usize, paralel: bool) -> Result<(Term, DefNames, RunInfo), String> {
+pub fn run_book(
+  mut book: Book,
+  mem_size: usize,
+  parallel: bool,
+  debug: bool,
+) -> Result<(Term, DefNames, RunInfo), String> {
   let CompileResult { core_book, hvmc_name_to_id, warnings } = compile_book(&mut book)?;
 
   if !warnings.is_empty() {
@@ -103,7 +122,24 @@ pub fn run_book(mut book: Book, mem_size: usize, paralel: bool) -> Result<(Term,
     return Err("Could not run the code because of the previous warnings".into());
   }
 
-  let (res_lnet, stats) = run_compiled(&core_book, mem_size, paralel);
+  let (res_lnet, stats) = run_compiled(
+    &core_book,
+    mem_size,
+    parallel,
+    if debug {
+      Some(|net| {
+        let net = hvmc_to_net(&net, &|val| hvmc_name_to_id[&val]);
+        let (res_term, valid_readback) = net_to_term_non_linear(&net, &book);
+        println!(
+          "{}{}\n---------------------------------------",
+          if valid_readback { "" } else { "[invalid] " },
+          res_term.to_string(&book.def_names)
+        );
+      })
+    } else {
+      None
+    },
+  );
   let net = hvmc_to_net(&res_lnet, &|val| hvmc_name_to_id[&val]);
   let (res_term, valid_readback) = net_to_term_non_linear(&net, &book);
   let info = RunInfo { stats, valid_readback, net: res_lnet };

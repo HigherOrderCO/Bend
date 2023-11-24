@@ -110,7 +110,7 @@ fn run_single_files() {
   run_golden_test_dir(function_name!(), &|code| {
     let book = do_parse_book(code)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, def_names, info) = run_book(book, 1 << 20, true)?;
+    let (res, def_names, info) = run_book(book, 1 << 20, true, false)?;
     let res = if info.valid_readback {
       res.to_string(&def_names)
     } else {

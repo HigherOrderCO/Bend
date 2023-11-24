@@ -24,6 +24,9 @@ struct Args {
   #[arg(short = '1', help = "Single-core mode (no parallelism)")]
   pub single_core: bool,
 
+  #[arg(short = 'd', help = "Debug mode (print each reduction step)")]
+  pub debug: bool,
+
   #[arg(help = "Path to the input file")]
   pub path: PathBuf,
 }
@@ -76,7 +79,7 @@ fn main() -> Result<(), String> {
     }
     Mode::Run => {
       let mem_size = args.mem / std::mem::size_of::<(Ptr, Ptr)>();
-      let (res_term, def_names, info) = run_book(book, mem_size, !args.single_core)?;
+      let (res_term, def_names, info) = run_book(book, mem_size, !args.single_core, args.debug)?;
       let RunInfo { stats, valid_readback, net: lnet } = info;
       let total_rewrites = total_rewrites(&stats.rewrites);
       let rps = total_rewrites as f64 / stats.run_time / 1_000_000.0;
