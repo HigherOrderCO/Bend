@@ -63,7 +63,7 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
     }
     Term::Match { scrutinee, arms } => {
       unique_var_names(scrutinee, name_map, name_count);
-      for (rule, term) in &mut arms.clone() {
+      for (rule, term) in arms {
         if let RulePat::Num(MatchNum::Succ(nam)) = rule {
           push_name(nam.as_ref(), name_map, name_count)
         }

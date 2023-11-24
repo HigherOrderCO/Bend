@@ -460,7 +460,7 @@ impl fmt::Display for RulePat {
       RulePat::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
       RulePat::Var(nam) => write!(f, "{}", nam),
       RulePat::Num(MatchNum::Zero) => write!(f, "0"),
-      RulePat::Num(MatchNum::Succ(p)) => write!(f, "1+{}", p.as_ref().map_or("*", |Name(n)| n)),
+      RulePat::Num(MatchNum::Succ(_)) => write!(f, "+"),
     }
   }
 }
