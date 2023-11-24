@@ -1,5 +1,5 @@
 use hvmc::run::Val;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
 use std::{
@@ -369,6 +369,69 @@ impl Term {
         fst.subst(from, to);
         snd.subst(from, to);
       }
+    }
+  }
+
+  /// Collects all the free variables that a term has
+  pub fn free_vars(&self, free_vars: &mut IndexSet<Name>) {
+    match self {
+      Term::Lam { nam: Some(nam), bod } => {
+        let mut new_scope = IndexSet::new();
+        bod.free_vars(&mut new_scope);
+        new_scope.remove(nam);
+
+        free_vars.extend(new_scope);
+      }
+      Term::Lam { nam: None, bod } => bod.free_vars(free_vars),
+      Term::Var { nam } => _ = free_vars.insert(nam.clone()),
+      Term::Chn { bod, .. } => bod.free_vars(free_vars),
+      Term::Lnk { .. } => {}
+      Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+        val.free_vars(free_vars);
+
+        let mut new_scope = IndexSet::new();
+        nxt.free_vars(&mut new_scope);
+
+        new_scope.remove(nam);
+
+        free_vars.extend(new_scope);
+      }
+      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
+        val.free_vars(free_vars);
+
+        let mut new_scope = IndexSet::new();
+        nxt.free_vars(&mut new_scope);
+
+        fst.as_ref().map(|fst| new_scope.remove(fst));
+        snd.as_ref().map(|snd| new_scope.remove(snd));
+
+        free_vars.extend(new_scope);
+      }
+      Term::App { fun, arg } => {
+        fun.free_vars(free_vars);
+        arg.free_vars(free_vars);
+      }
+      Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { op: _, fst, snd } => {
+        fst.free_vars(free_vars);
+        snd.free_vars(free_vars);
+      }
+      Term::Match { scrutinee, arms } => {
+        scrutinee.free_vars(free_vars);
+
+        for (rule, term) in arms {
+          let mut new_scope = IndexSet::new();
+          term.free_vars(&mut new_scope);
+
+          if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
+            new_scope.remove(nam);
+          }
+
+          free_vars.extend(new_scope);
+        }
+      }
+      Term::Num { .. } => {}
+      Term::Ref { .. } => {}
+      Term::Era => {}
     }
   }
 
