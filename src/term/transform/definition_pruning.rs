@@ -51,11 +51,10 @@ impl Term {
           fst.find_used_definitions(used, defs);
           snd.find_used_definitions(used, defs);
         }
-        Term::Match { scrutinee, arms } => {
-          scrutinee.find_used_definitions(used, defs);
-          for (_, term) in arms {
-            term.find_used_definitions(used, defs);
-          }
+        Term::Match { cond, zero, succ, .. } => {
+          cond.find_used_definitions(used, defs);
+          zero.find_used_definitions(used, defs);
+          succ.find_used_definitions(used, defs);
         }
         Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => (),
       }

@@ -4,10 +4,11 @@ impl Book {
   pub fn generate_scott_adts(&mut self) {
     let mut defs = vec![];
     for adt in self.adts.values() {
-      for (ctr_name, args) in &adt.ctrs {
+      for (ctr_name, arity) in &adt.ctrs {
+        let ctr_args = make_args(arity);
         let ctrs: Vec<_> = adt.ctrs.keys().cloned().collect();
 
-        let lam = make_lam(args.clone(), ctrs, ctr_name);
+        let lam = make_lam(ctr_args, ctrs, ctr_name);
 
         let rules = vec![Rule { pats: vec![], body: lam }];
         defs.push((ctr_name.clone(), rules));
@@ -17,6 +18,11 @@ impl Book {
       self.insert_def(name, rules);
     }
   }
+}
+
+fn make_args(args_count: &usize) -> Vec<Name> {
+  let to_nam = |n| Name(format!("a{n}"));
+  (0 .. *args_count).map(to_nam).collect()
 }
 
 fn make_lam(ctr_args: Vec<Name>, ctrs: Vec<Name>, ctr_name: &Name) -> Term {
