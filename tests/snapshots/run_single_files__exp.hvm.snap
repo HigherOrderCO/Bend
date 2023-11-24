@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_single_files/exp.hvm
+---
+λa λb (a (a (a (a b))))

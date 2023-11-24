@@ -13,10 +13,11 @@ pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap
   let mut warnings = Vec::new();
   let mut nets = HashMap::new();
   let mut id_to_hvmc_name = HashMap::new();
+  let mut label_generator = LabelGenerator::default();
 
   for def in book.defs.values() {
     for rule in def.rules.iter() {
-      let (net, dup_count) = term_to_compat_net(&rule.body);
+      let (net, dup_count) = term_to_compat_net(&rule.body, &mut label_generator);
 
       if dup_count > MAX_DUP_HVMC_LABEL {
         warnings.push(Warning::TooManyDups { name: book.def_names.name(&def.def_id).unwrap().to_string() })
@@ -68,12 +69,11 @@ fn def_id_to_hvmc_name(book: &Book, def_id: DefId, nets: &HashMap<String, INet>)
 }
 
 /// Converts an IC term into an IC net.
-pub fn term_to_compat_net(term: &Term) -> (INet, u32) {
+pub fn term_to_compat_net(term: &Term, label_generator: &mut LabelGenerator) -> (INet, u32) {
   let mut inet = INet::new();
 
   // Encodes the main term.
   let mut global_vars = HashMap::new();
-  let mut label_generator = LabelGenerator::default();
 
   let main = encode_term(
     &mut inet,
@@ -82,7 +82,7 @@ pub fn term_to_compat_net(term: &Term) -> (INet, u32) {
     &mut HashMap::new(),
     &mut vec![],
     &mut global_vars,
-    &mut label_generator,
+    label_generator,
   );
 
   for (decl_port, use_port) in global_vars.into_values() {
@@ -314,7 +314,7 @@ impl Op {
 }
 
 #[derive(Default)]
-struct LabelGenerator {
+pub struct LabelGenerator {
   untagged_dups: u32,
   tagged_dups: HashMap<Name, u32>,
 }
