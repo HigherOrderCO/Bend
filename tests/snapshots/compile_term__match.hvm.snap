@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/match.hvm
 ---
 a
-& #0 ~ <+ #1 ?<((b (c b)) (* (* (d d)))) a>>
+& #0 ~ <+ #1 ?<((b (* b)) (* (* (c c)))) a>>
