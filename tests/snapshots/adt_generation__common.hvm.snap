@@ -6,7 +6,7 @@ input_file: tests/golden_tests/adt_generation/common.hvm
 
 (False) = λTrue λFalse False
 
-(Filled) = λa0 λFilled λEmpty (Filled a0)
+(Filled) = λvalue λFilled λEmpty (Filled value)
 
 (Empty) = λFilled λEmpty Empty
 
@@ -24,14 +24,14 @@ input_file: tests/golden_tests/adt_generation/common.hvm
 
 (Green) = λRed λYellow λGreen Green
 
-(Cons) = λa0 λa1 λCons λNil ((Cons a0) a1)
+(Cons) = λx λxs λCons λNil ((Cons x) xs)
 
 (Nil) = λCons λNil Nil
 
-(Some) = λa0 λSome λNone (Some a0)
+(Some) = λx λSome λNone (Some x)
 
 (None) = λSome λNone None
 
-(Ok) = λa0 λOk λErr (Ok a0)
+(Ok) = λa λOk λErr (Ok a)
 
-(Err) = λa0 λOk λErr (Err a0)
+(Err) = λb λOk λErr (Err b)
