@@ -1,4 +1,4 @@
-use crate::term::{Book, LetPat, MatchNum, Name, RulePat, Term};
+use crate::term::{Book, LetPat, Name, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -67,15 +67,10 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       count_var_uses_in_term(fst, uses);
       count_var_uses_in_term(snd, uses);
     }
-    Term::Match { scrutinee, arms } => {
-      count_var_uses_in_term(scrutinee, uses);
-      for (rule, term) in arms {
-        if let RulePat::Num(MatchNum::Succ(nam)) = rule {
-          add_var(nam.as_ref(), uses)
-        }
-
-        count_var_uses_in_term(term, uses);
-      }
+    Term::Match { cond, zero, succ } => {
+      count_var_uses_in_term(cond, uses);
+      count_var_uses_in_term(zero, uses);
+      count_var_uses_in_term(succ, uses);
     }
     Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
   }
@@ -147,23 +142,10 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       term_to_affine(fst, var_uses, let_bodies);
       term_to_affine(snd, var_uses, let_bodies);
     }
-    Term::Match { scrutinee, arms } => {
-      term_to_affine(scrutinee, var_uses, let_bodies);
-      for (rule, term) in arms {
-        let RulePat::Num(num) = rule else { unreachable!() };
-
-        if let MatchNum::Succ(nam) = num {
-          if let Some(nam_some) = nam {
-            if let Some(uses) = var_uses.get(nam_some).copied() {
-              term_to_affine(term, var_uses, let_bodies);
-              duplicate_lam(nam, term, uses);
-              continue;
-            }
-          }
-        }
-
-        term_to_affine(term, var_uses, let_bodies)
-      }
+    Term::Match { cond, zero, succ } => {
+      term_to_affine(cond, var_uses, let_bodies);
+      term_to_affine(zero, var_uses, let_bodies);
+      term_to_affine(succ, var_uses, let_bodies);
     }
     Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } => (),
   };

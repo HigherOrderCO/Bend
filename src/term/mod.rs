@@ -1,5 +1,5 @@
 use hvmc::run::Val;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
 use std::{
@@ -55,16 +55,9 @@ pub struct Rule {
 }
 
 #[derive(Debug, Clone)]
-pub enum MatchNum {
-  Zero,
-  Succ(Option<Name>),
-}
-
-#[derive(Debug, Clone)]
 pub enum RulePat {
   Var(Name),
   Ctr(Name, Vec<RulePat>),
-  Num(MatchNum),
 }
 
 #[derive(Debug, Clone)]
@@ -119,8 +112,9 @@ pub enum Term {
     snd: Box<Term>,
   },
   Match {
-    scrutinee: Box<Term>,
-    arms: Vec<(RulePat, Term)>,
+    cond: Box<Term>,
+    zero: Box<Term>,
+    succ: Box<Term>,
   },
   Ref {
     def_id: DefId,
@@ -156,7 +150,7 @@ pub enum Op {
 /// A user defined  datatype
 #[derive(Debug, Clone, Default)]
 pub struct Adt {
-  pub ctrs: IndexMap<Name, Vec<Name>>,
+  pub ctrs: IndexMap<Name, usize>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord)]
@@ -277,11 +271,21 @@ impl Term {
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
-      Term::Match { scrutinee, arms } => {
-        let arms =
-          arms.iter().map(|(pat, term)| format!("{}: {}", pat, term.to_string(def_names))).join("; ");
+      Term::Match { cond, zero, succ } => {
+        // Only the Lambda case represents a valid match construction,
+        // but we still have to display invalid ones
+        let (pred, succ) = match succ.as_ref() {
+          Term::Lam { nam, bod } => (nam, bod),
+          _ => (&None, succ),
+        };
 
-        format!("match {} {{ {} }}", scrutinee.to_string(def_names), arms,)
+        format!(
+          "match {} {{ 0: {}; 1+{}: {} }}",
+          cond.to_string(def_names),
+          zero.to_string(def_names),
+          pred.clone().unwrap_or(Name::new("*")),
+          succ.to_string(def_names),
+        )
       }
       Term::Dup { tag: _, fst, snd, val, nxt } => format!(
         "dup {} {} = {}; {}",
@@ -327,22 +331,10 @@ impl Term {
           nxt.subst(from, to);
         }
       }
-      Term::Match { scrutinee, arms } => {
-        scrutinee.subst(from, to);
-
-        for (rule, term) in arms {
-          let can_subst;
-
-          if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
-            can_subst = nam != from
-          } else {
-            can_subst = true
-          };
-
-          if can_subst {
-            term.subst(from, to);
-          }
-        }
+      Term::Match { cond, zero, succ, .. } => {
+        cond.subst(from, to);
+        zero.subst(from, to);
+        succ.subst(from, to);
       }
       Term::Ref { .. } => (),
       Term::App { fun, arg } => {
@@ -370,109 +362,6 @@ impl Term {
         snd.subst(from, to);
       }
     }
-  }
-
-  /// Collects all the free variables that a term has
-  pub fn free_vars(&self, free_vars: &mut IndexSet<Name>) {
-    match self {
-      Term::Lam { nam: Some(nam), bod } => {
-        let mut new_scope = IndexSet::new();
-        bod.free_vars(&mut new_scope);
-        new_scope.remove(nam);
-
-        free_vars.extend(new_scope);
-      }
-      Term::Lam { nam: None, bod } => bod.free_vars(free_vars),
-      Term::Var { nam } => _ = free_vars.insert(nam.clone()),
-      Term::Chn { bod, .. } => bod.free_vars(free_vars),
-      Term::Lnk { .. } => {}
-      Term::Let { pat: LetPat::Var(nam), val, nxt } => {
-        val.free_vars(free_vars);
-
-        let mut new_scope = IndexSet::new();
-        nxt.free_vars(&mut new_scope);
-
-        new_scope.remove(nam);
-
-        free_vars.extend(new_scope);
-      }
-      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
-        val.free_vars(free_vars);
-
-        let mut new_scope = IndexSet::new();
-        nxt.free_vars(&mut new_scope);
-
-        fst.as_ref().map(|fst| new_scope.remove(fst));
-        snd.as_ref().map(|snd| new_scope.remove(snd));
-
-        free_vars.extend(new_scope);
-      }
-      Term::App { fun, arg } => {
-        fun.free_vars(free_vars);
-        arg.free_vars(free_vars);
-      }
-      Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { op: _, fst, snd } => {
-        fst.free_vars(free_vars);
-        snd.free_vars(free_vars);
-      }
-      Term::Match { scrutinee, arms } => {
-        scrutinee.free_vars(free_vars);
-
-        for (rule, term) in arms {
-          let mut new_scope = IndexSet::new();
-          term.free_vars(&mut new_scope);
-
-          if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
-            new_scope.remove(nam);
-          }
-
-          free_vars.extend(new_scope);
-        }
-      }
-      Term::Num { .. } => {}
-      Term::Ref { .. } => {}
-      Term::Era => {}
-    }
-  }
-
-  pub fn num_match(scrutinee: Term, zero_term: Term, succ_label: Option<Name>, mut succ_term: Term) -> Term {
-    let zero = (RulePat::Num(MatchNum::Zero), zero_term);
-
-    if let Term::Var { .. } = &scrutinee {
-      let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);
-      Term::Match { scrutinee: Box::new(scrutinee), arms: vec![zero, succ] }
-    } else {
-      let match_bind = succ_label.clone().unwrap_or_else(|| Name::new("*"));
-
-      if succ_label.is_some() {
-        succ_term.subst(&match_bind, &Term::Var { nam: Name(format!("{}-1", match_bind)) });
-      }
-
-      let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);
-
-      Term::Let {
-        pat: LetPat::Var(match_bind.clone()),
-        val: Box::new(scrutinee),
-        nxt: Box::new(Term::Match {
-          scrutinee: Box::new(Term::Var { nam: match_bind }),
-          arms: vec![zero, succ],
-        }),
-      }
-    }
-  }
-}
-
-pub fn native_match(arms: Vec<(RulePat, Term)>) -> Option<(Term, Term)> {
-  use MatchNum::*;
-
-  match &arms[..] {
-    [(RulePat::Num(Zero), zero), (RulePat::Num(Succ(nam)), succ)] => {
-      let zero = zero.clone();
-      let succ = Term::Lam { nam: nam.clone(), bod: Box::new(succ.clone()) };
-      Some((zero, succ))
-    }
-    [(RulePat::Num(Zero), zero), (RulePat::Num(Zero), succ)] => Some((zero.clone(), succ.clone())),
-    _ => None,
   }
 }
 
@@ -532,7 +421,6 @@ impl From<&RulePat> for Term {
     match value {
       RulePat::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
       RulePat::Var(nam) => Term::Var { nam: nam.clone() },
-      RulePat::Num(..) => todo!(),
     }
   }
 }
@@ -542,8 +430,6 @@ impl fmt::Display for RulePat {
     match self {
       RulePat::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
       RulePat::Var(nam) => write!(f, "{}", nam),
-      RulePat::Num(MatchNum::Zero) => write!(f, "0"),
-      RulePat::Num(MatchNum::Succ(_)) => write!(f, "+"),
     }
   }
 }

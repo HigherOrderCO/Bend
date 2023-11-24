@@ -38,7 +38,6 @@ fn check_pattern(
             // Rules with a var pattern are relevant to all constructors.
             RulePat::Var(_) => next_rules_to_check.values_mut().for_each(|x| x.push(rule_idx)),
             RulePat::Ctr(ctr_nam, _) => next_rules_to_check.get_mut(ctr_nam).unwrap().push(rule_idx),
-            RulePat::Num(..) => todo!(),
           }
         }
         // Match each constructor of the current pattern and recursively check the next pattern.
