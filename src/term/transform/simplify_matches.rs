@@ -91,9 +91,14 @@ impl Term {
           term.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
         }
 
-        if !matches!(arms[0], (RulePat::Num(_), _)) {
-          let Term::Match { scrutinee, arms } = std::mem::replace(self, Term::Era) else { unreachable!() };
+        let Term::Match { scrutinee, arms } = std::mem::replace(self, Term::Era) else { unreachable!() };
 
+        if matches!(arms[0], (RulePat::Num(_), _)) {
+          *self = Term::Match {
+            scrutinee,
+            arms: Self::match_native_arms(arms, match_count, def_name, def_names, new_rules),
+          };
+        } else {
           // the scrutinee of a match on adts should always be a var
           let Term::Var { nam } = *scrutinee else { unreachable!() };
 
@@ -108,7 +113,7 @@ impl Term {
           let adt = Term::check_matches(&rules, adts, ctrs)?;
 
           *match_count += 1;
-          *self = Term::make_match_app(nam, arms, adt, def_name, def_names, new_rules, *match_count);
+          *self = Term::match_adt_app(nam, arms, adt, def_name, def_names, new_rules, *match_count);
         }
       }
 
@@ -132,7 +137,52 @@ impl Term {
     Ok(())
   }
 
-  fn make_match_app(
+  fn match_native_arms(
+    arms: Vec<(RulePat, Term)>,
+    match_count: &mut usize,
+    def_name: &Name,
+    def_names: &mut DefNames,
+    new_rules: &mut BTreeMap<DefId, Definition>,
+  ) -> Vec<(RulePat, Term)> {
+    let mut new_arms = Vec::new();
+
+    for (rule, body) in arms {
+      let mut free_vars = IndexSet::new();
+      body.free_vars(&mut free_vars);
+
+      if free_vars.is_empty() {
+        new_arms.push((rule, body));
+        continue;
+      }
+
+      *match_count += 1;
+
+      let body = free_vars
+        .iter()
+        .rev()
+        .cloned()
+        .fold(body, |acc: Term, name| Term::Lam { nam: Some(name), bod: Box::new(acc) });
+
+      let rules = vec![Rule { pats: Vec::new(), body }];
+
+      let name = make_def_name(def_name, &Name("pred".to_string()), *match_count);
+
+      let def_id = def_names.insert(name.clone());
+      let def = Definition { def_id, rules };
+      new_rules.insert(def_id, def);
+
+      let body = free_vars.into_iter().fold(Term::Ref { def_id }, |acc, nam| Term::App {
+        fun: Box::new(acc),
+        arg: Box::new(Term::Var { nam }),
+      });
+
+      new_arms.push((rule, body));
+    }
+
+    new_arms
+  }
+
+  fn match_adt_app(
     nam: Name,
     arms: Vec<(RulePat, Term)>,
     Adt { ctrs }: &Adt,
