@@ -78,27 +78,40 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
   }
 }
 
+/// We use a special named variable to only count the number of actual var uses on the resulting term
+fn used_var_counter(var_name: &Name) -> Name {
+  Name(format!("${var_name}$used"))
+}
+
+/// Var-declaring terms
+fn term_with_bind_to_afine(
+  term: &mut Term,
+  nam: &mut Option<Name>,
+  var_uses: &mut HashMap<Name, Val>,
+  let_bodies: &mut HashMap<Name, Term>,
+) {
+  if let Some(nam_some) = nam {
+    if let Some(mut uses) = var_uses.get(nam_some).copied() {
+      term_to_affine(term, var_uses, let_bodies);
+
+      // When a term is removed, the number of uses of a variable can change inside the term_to_affine call.
+      // We check the updated count instead of using the one we caulculated initially
+      if uses != 0 {
+        let name = used_var_counter(nam_some);
+        uses = var_uses.get(&name).copied().unwrap_or(0)
+      };
+
+      duplicate_lam(nam, term, uses);
+      return;
+    }
+  }
+
+  term_to_affine(term, var_uses, let_bodies);
+}
+
 fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies: &mut HashMap<Name, Term>) {
   match term {
-    // Var-declaring terms
-    Term::Lam { nam, bod } => {
-      if let Some(nam_some) = nam {
-        if let Some(mut uses) = var_uses.get(nam_some).copied() {
-          term_to_affine(bod, var_uses, let_bodies);
-
-          if uses != 0 {
-            let name = Name(format!("{nam_some}$used"));
-            uses = var_uses.get(&name).copied().unwrap_or(0)
-          };
-
-          duplicate_lam(nam, bod, uses);
-        } else {
-          term_to_affine(bod, var_uses, let_bodies);
-        }
-      } else {
-        term_to_affine(bod, var_uses, let_bodies);
-      }
-    }
+    Term::Lam { nam, bod } => term_with_bind_to_afine(bod, nam, var_uses, let_bodies),
 
     Term::Let { pat: LetPat::Var(nam), val, nxt } => {
       let uses = var_uses[nam];
@@ -108,6 +121,9 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
 
           let mut free_vars = IndexSet::new();
           val.free_vars(&mut free_vars);
+
+          // We are going to remove the val term,
+          // so we need to remove the free variables it uses from the vars count
           for var in free_vars {
             let Entry::Occupied(mut entry) = var_uses.entry(var) else { unreachable!() };
 
@@ -148,9 +164,12 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       if let Some(subst) = let_bodies.remove(nam) {
         *term = subst.clone();
       } else {
-        let used_counter = format!("{nam}$used");
+        let used_counter = used_var_counter(nam);
+
         *nam = dup_name(nam, uses);
-        *var_uses.entry(Name(used_counter)).or_default() += 1;
+
+        // Updates de actual var uses on the resulting term
+        *var_uses.entry(used_counter).or_default() += 1;
       }
     }
 
@@ -166,25 +185,11 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
     Term::Match { scrutinee, arms } => {
       term_to_affine(scrutinee, var_uses, let_bodies);
       for (rule, term) in arms {
-        let RulePat::Num(num) = rule else { unreachable!() };
-
-        if let MatchNum::Succ(nam) = num {
-          if let Some(nam_some) = nam {
-            if let Some(mut uses) = var_uses.get(nam_some).copied() {
-              term_to_affine(term, var_uses, let_bodies);
-
-              if uses != 0 {
-                let name = Name(format!("{nam_some}$used"));
-                uses = var_uses.get(&name).copied().unwrap_or(0)
-              };
-
-              duplicate_lam(nam, term, uses);
-              continue;
-            }
-          }
+        match rule {
+          RulePat::Num(MatchNum::Succ(nam)) => term_with_bind_to_afine(term, nam, var_uses, let_bodies),
+          RulePat::Num(_) => term_to_affine(term, var_uses, let_bodies),
+          _ => unreachable!(),
         }
-
-        term_to_affine(term, var_uses, let_bodies)
       }
     }
     Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } => (),
