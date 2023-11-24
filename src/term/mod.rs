@@ -372,10 +372,30 @@ impl Term {
     }
   }
 
-  pub fn num_match(scrutinee: Term, zero_term: Term, succ_label: Option<Name>, succ_term: Term) -> Self {
+  pub fn num_match(scrutinee: Term, zero_term: Term, succ_label: Option<Name>, mut succ_term: Term) -> Term {
     let zero = (RulePat::Num(MatchNum::Zero), zero_term);
-    let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);
-    Self::Match { scrutinee: Box::new(scrutinee), arms: vec![zero, succ] }
+
+    if let Term::Var { .. } = &scrutinee {
+      let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);
+      Term::Match { scrutinee: Box::new(scrutinee), arms: vec![zero, succ] }
+    } else {
+      let match_bind = succ_label.clone().unwrap_or_else(|| Name::new("*"));
+
+      if succ_label.is_some() {
+        succ_term.subst(&match_bind, &Term::Var { nam: Name(format!("{}-1", match_bind)) });
+      }
+
+      let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);
+
+      Term::Let {
+        pat: LetPat::Var(match_bind.clone()),
+        val: Box::new(scrutinee),
+        nxt: Box::new(Term::Match {
+          scrutinee: Box::new(Term::Var { nam: match_bind }),
+          arms: vec![zero, succ],
+        }),
+      }
+    }
   }
 }
 
