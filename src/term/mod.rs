@@ -365,6 +365,12 @@ impl Term {
   }
 }
 
+impl Default for Term {
+  fn default() -> Self {
+    Term::Era
+  }
+}
+
 impl fmt::Display for LetPat {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
