@@ -66,9 +66,7 @@ pub const MAX_DUP_HVMC_LABEL: u32 = 0xFFFFFFF;
 impl INet {
   /// Create a new net, with a deadlocked root node.
   pub fn new() -> Self {
-    INet {
-      nodes: vec![Node::new(Port(0, 2), Port(0, 1), Port(0, 0), Rot)], // p2 points to p0, p1 points to net
-    }
+    Self::default()
   }
 
   /// Allocates a new node with its ports disconnected.
@@ -98,6 +96,14 @@ impl INet {
   /// Sets a port to point to another port
   pub fn set(&mut self, src: Port, dst: Port) {
     *self.nodes[src.node() as usize].port_mut(src.slot()) = dst;
+  }
+}
+
+impl Default for INet {
+  fn default() -> Self {
+    INet {
+      nodes: vec![Node::new(Port(0, 2), Port(0, 1), Port(0, 0), Rot)], // p2 points to p0, p1 points to net
+    }
   }
 }
 
