@@ -23,7 +23,7 @@ impl Book {
 type Combinators = BTreeMap<DefId, Definition>;
 
 struct TermInfo<'d> {
-  //Number of times a Term has been detached from the current Term
+  // Number of times a Term has been detached from the current Term
   counter: u32,
   rule_id: DefId,
   def_names: &'d mut DefNames,
@@ -39,8 +39,10 @@ impl<'d> TermInfo<'d> {
     self.needed_names.insert(name.to_owned());
   }
 
-  fn provide(&mut self, name: &Name) {
-    self.needed_names.remove(name);
+  fn provide(&mut self, name: Option<&Name>) {
+    if let Some(name) = name {
+      self.needed_names.remove(name);
+    }
   }
 
   fn check(&self) -> bool {
@@ -85,11 +87,9 @@ impl Term {
 
           let is_super = go(bod, depth + 1, term_info);
 
-          if let Some(name) = nam {
-            term_info.provide(name);
-          }
+          term_info.provide(nam.as_ref());
 
-          if is_super && depth != 0 && term_info.check() {
+          if is_super && !term.is_id() && depth != 0 && term_info.check() {
             term_info.detach_term(term);
           }
 
@@ -109,7 +109,7 @@ impl Term {
         Term::Let { pat: LetPat::Var(nam), val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_super = go(nxt, depth + 1, term_info);
-          term_info.provide(nam);
+          term_info.provide(Some(nam));
 
           val_is_super && nxt_is_super
         }
@@ -117,12 +117,8 @@ impl Term {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_supper = go(nxt, depth + 1, term_info);
 
-          if let Some(l_nam) = l_nam {
-            term_info.provide(l_nam);
-          }
-          if let Some(r_nam) = r_nam {
-            term_info.provide(r_nam);
-          }
+          term_info.provide(l_nam.as_ref());
+          term_info.provide(r_nam.as_ref());
 
           val_is_super && nxt_is_supper
         }
@@ -144,12 +140,8 @@ impl Term {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_supper = go(nxt, depth + 1, term_info);
 
-          if let Some(snd) = snd {
-            term_info.provide(snd);
-          }
-          if let Some(fst) = fst {
-            term_info.provide(fst);
-          }
+          term_info.provide(fst.as_ref());
+          term_info.provide(snd.as_ref());
 
           val_is_super && nxt_is_supper
         }
@@ -174,5 +166,13 @@ impl Term {
     }
 
     go(self, 0, &mut TermInfo::new(rule_id, def_names, combinators));
+  }
+
+  // We don't want to detach id function, since that's not a net gain in performance or space
+  fn is_id(&self) -> bool {
+    match self {
+      Term::Lam { nam: Some(lam_nam), bod: box Term::Var { nam: var_nam } } if lam_nam == var_nam => true,
+      _ => false,
+    }
   }
 }
