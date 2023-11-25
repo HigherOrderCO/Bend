@@ -60,7 +60,7 @@ pub enum RulePat {
   Ctr(Name, Vec<RulePat>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Term {
   Lam {
     nam: Option<Name>,
@@ -119,6 +119,7 @@ pub enum Term {
   Ref {
     def_id: DefId,
   },
+  #[default]
   Era,
 }
 
@@ -331,36 +332,25 @@ impl Term {
           nxt.subst(from, to);
         }
       }
-      Term::Match { cond, zero, succ, .. } => {
-        cond.subst(from, to);
-        zero.subst(from, to);
-        succ.subst(from, to);
-      }
-      Term::Ref { .. } => (),
-      Term::App { fun, arg } => {
-        fun.subst(from, to);
-        arg.subst(from, to);
-      }
       Term::Dup { tag: _, fst, snd, val, nxt } => {
         val.subst(from, to);
         if fst.as_ref().map_or(true, |fst| fst != from) && snd.as_ref().map_or(true, |snd| snd != from) {
           nxt.subst(from, to);
         }
       }
-      Term::Sup { fst, snd } => {
+      Term::Match { cond, zero, succ, .. } => {
+        cond.subst(from, to);
+        zero.subst(from, to);
+        succ.subst(from, to);
+      }
+      Term::App { fun: fst, arg: snd }
+      | Term::Sup { fst, snd }
+      | Term::Tup { fst, snd }
+      | Term::Opx { fst, snd, .. } => {
         fst.subst(from, to);
         snd.subst(from, to);
       }
-      Term::Era => (),
-      Term::Num { .. } => (),
-      Term::Opx { fst, snd, .. } => {
-        fst.subst(from, to);
-        snd.subst(from, to);
-      }
-      Term::Tup { fst, snd } => {
-        fst.subst(from, to);
-        snd.subst(from, to);
-      }
+      Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
     }
   }
 }

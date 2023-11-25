@@ -89,7 +89,7 @@ impl Term {
   /// If [`Term::channel_check`] finds a channel subterm with the lambda variable in its body,
   /// it returns the lambda without change
   fn abstract_lambda(&mut self, names: &mut DefNames, defs: &mut Combinators) {
-    let extracted = std::mem::replace(self, Term::Era);
+    let extracted = std::mem::take(self);
     let Self::Lam { nam: Some(name), bod } = extracted else { panic!("Not a lambda term") };
 
     *self = if bod.channel_check(&name) {

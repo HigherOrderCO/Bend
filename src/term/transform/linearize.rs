@@ -34,14 +34,16 @@ impl Term {
 
 fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
   match term {
+    // Var users
     Term::Var { nam } => {
       *uses.entry(nam.clone()).or_default() += 1;
     }
+    // Var producers
     Term::Lam { nam, bod } => {
       add_var(nam.as_ref(), uses);
       count_var_uses_in_term(bod, uses)
     }
-    Term::Dup { fst, snd, val, nxt, .. } => {
+    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
       add_var(fst.as_ref(), uses);
       add_var(snd.as_ref(), uses);
       count_var_uses_in_term(val, uses);
@@ -52,18 +54,12 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       count_var_uses_in_term(val, uses);
       count_var_uses_in_term(nxt, uses);
     }
-    Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
-      add_var(fst.as_ref(), uses);
-      add_var(snd.as_ref(), uses);
-      count_var_uses_in_term(val, uses);
-      count_var_uses_in_term(nxt, uses);
-    }
+    // Others
     Term::Chn { bod, .. } => count_var_uses_in_term(bod, uses),
-    Term::App { fun, arg } => {
-      count_var_uses_in_term(fun, uses);
-      count_var_uses_in_term(arg, uses);
-    }
-    Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+    Term::App { fun: fst, arg: snd }
+    | Term::Sup { fst, snd }
+    | Term::Tup { fst, snd }
+    | Term::Opx { fst, snd, .. } => {
       count_var_uses_in_term(fst, uses);
       count_var_uses_in_term(snd, uses);
     }
@@ -100,7 +96,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
         }
         1 => {
           term_to_affine(val, var_uses, let_bodies);
-          let_bodies.insert(nam.clone(), std::mem::replace(val.as_mut(), Term::Era));
+          let_bodies.insert(nam.clone(), std::mem::take(val.as_mut()));
           term_to_affine(nxt, var_uses, let_bodies);
         }
         uses => {
@@ -109,7 +105,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
           duplicate_let(nam, nxt, uses, val);
         }
       }
-      *term = std::mem::replace(nxt.as_mut(), Term::Era);
+      *term = std::mem::take(nxt.as_mut());
     }
 
     Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
@@ -134,11 +130,10 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
 
     // Others
     Term::Chn { bod, .. } => term_to_affine(bod, var_uses, let_bodies),
-    Term::App { fun, arg } => {
-      term_to_affine(fun, var_uses, let_bodies);
-      term_to_affine(arg, var_uses, let_bodies);
-    }
-    Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+    Term::App { fun: fst, arg: snd }
+    | Term::Sup { fst, snd }
+    | Term::Tup { fst, snd }
+    | Term::Opx { fst, snd, .. } => {
       term_to_affine(fst, var_uses, let_bodies);
       term_to_affine(snd, var_uses, let_bodies);
     }

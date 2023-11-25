@@ -13,20 +13,15 @@ impl Book {
 impl Term {
   pub fn eta_reduction(&mut self) {
     match self {
-      Term::Lam { nam: Some(lam_var), bod } => match &mut **bod {
-        Term::App { fun, arg } => match &**arg {
-          Term::Var { nam } if nam == lam_var => {
-            let Term::App { fun, .. } = *std::mem::replace(bod, Box::new(Term::Era)) else { unreachable!() };
-            *self = *fun;
-            self.eta_reduction();
+      Term::Lam { nam: Some(lam_var), bod } => {
+        bod.eta_reduction();
+        match bod.as_mut() {
+          Term::App { fun, arg: box Term::Var { nam: var_nam } } if lam_var == var_nam => {
+            *self = std::mem::take(fun.as_mut());
           }
-          _ => {
-            fun.eta_reduction();
-            arg.eta_reduction();
-          }
-        },
-        _ => bod.eta_reduction(),
-      },
+          _ => (),
+        }
+      }
       Term::Lam { nam: _, bod } | Term::Chn { nam: _, bod } => bod.eta_reduction(),
       Term::Let { pat: _, val, nxt } | Term::Dup { tag: _, fst: _, snd: _, val, nxt } => {
         val.eta_reduction();

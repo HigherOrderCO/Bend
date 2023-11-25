@@ -33,7 +33,7 @@ impl Book {
     for def_id in self.defs.keys().copied().collect::<Vec<_>>() {
       let body = &mut self.defs.get_mut(&def_id).unwrap().rules[0].body;
       // Moving in and out so the borrow checker doesn't complain
-      let mut subst_body = std::mem::replace(body, Term::Era);
+      let mut subst_body = std::mem::take(body);
       subst_ref_to_ref(&mut subst_body, &ref_map);
       let body = &mut self.defs.get_mut(&def_id).unwrap().rules[0].body;
       *body = subst_body;
@@ -51,15 +51,12 @@ fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) {
       }
     }
     Term::Lam { bod, .. } | Term::Chn { bod, .. } => subst_ref_to_ref(bod, ref_map),
-    Term::Let { val, nxt, .. } | Term::Dup { val, nxt, .. } => {
-      subst_ref_to_ref(val, ref_map);
-      subst_ref_to_ref(nxt, ref_map);
-    }
-    Term::App { fun, arg } => {
-      subst_ref_to_ref(fun, ref_map);
-      subst_ref_to_ref(arg, ref_map);
-    }
-    Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+    Term::App { fun: fst, arg: snd }
+    | Term::Let { val: fst, nxt: snd, .. }
+    | Term::Dup { val: fst, nxt: snd, .. }
+    | Term::Sup { fst, snd }
+    | Term::Tup { fst, snd }
+    | Term::Opx { fst, snd, .. } => {
       subst_ref_to_ref(fst, ref_map);
       subst_ref_to_ref(snd, ref_map);
     }

@@ -11,7 +11,7 @@ use chumsky::{
   IterParser, Parser,
 };
 use logos::{Logos, SpannedIter};
-use std::{iter::Map, ops::Range};
+use std::{collections::hash_map::Entry, iter::Map, ops::Range};
 
 /// <Book>    ::= <TopLevel>*
 /// <TopLevel> ::= (<Def> | <Data>)
@@ -301,8 +301,8 @@ where
           if !book.adts.contains_key(&nam) {
             book.adts.insert(nam.clone(), adt.clone());
             for (ctr, _) in adt.ctrs {
-              if !book.ctrs.contains_key(&ctr) {
-                book.ctrs.insert(ctr, nam.clone());
+              if let Entry::Vacant(e) = book.ctrs.entry(ctr) {
+                e.insert(nam.clone());
               } else {
                 return Err(Rich::custom(span, format!("Repeated constructor '{}'", nam)));
               }

@@ -2,9 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/bool.hvm
 ---
-@5 = (a a)
 @Not = ((@fals (@true a)) a)
-@fals = (* @5)
+@fals = (* (a a))
 @main = a
 & @Not ~ (@true a)
 @true = (a (* a))
