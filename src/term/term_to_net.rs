@@ -110,10 +110,12 @@ fn encode_term(
     // core: (var_use bod)
     Term::Lam { nam, bod } => {
       let fun = inet.new_node(Con);
+
       push_scope(nam, Port(fun, 1), scope, vars);
       let bod = encode_term(inet, bod, Port(fun, 2), scope, vars, global_vars, label_generator);
       pop_scope(nam, Port(fun, 1), inet, scope);
       link_local(inet, Port(fun, 2), bod);
+
       Some(Port(fun, 0))
     }
     // core: (var_use bod)
@@ -131,10 +133,13 @@ fn encode_term(
     // core: & fun ~ (arg ret) (fun not necessarily main port)
     Term::App { fun, arg } => {
       let app = inet.new_node(Con);
+
       let fun = encode_term(inet, fun, Port(app, 0), scope, vars, global_vars, label_generator);
       link_local(inet, Port(app, 0), fun);
+
       let arg = encode_term(inet, arg, Port(app, 1), scope, vars, global_vars, label_generator);
       link_local(inet, Port(app, 1), arg);
+
       Some(Port(app, 2))
     }
     // core: & cond ~  (zero succ) ret
@@ -229,10 +234,13 @@ fn encode_term(
     // core: & fst ~ <op snd ret>
     Term::Opx { op, fst, snd } => {
       let opx = inet.new_node(Op2 { opr: op.to_hvmc_label() });
+
       let fst_port = encode_term(inet, fst, Port(opx, 0), scope, vars, global_vars, label_generator);
       link_local(inet, Port(opx, 0), fst_port);
+
       let snd_port = encode_term(inet, snd, Port(opx, 1), scope, vars, global_vars, label_generator);
       link_local(inet, Port(opx, 1), snd_port);
+
       Some(Port(opx, 2))
     }
     Term::Tup { fst, snd } => {

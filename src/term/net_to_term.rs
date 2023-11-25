@@ -343,11 +343,10 @@ impl Term {
 
         free_vars.extend(new_scope);
       }
-      Term::App { fun, arg } => {
-        fun.free_vars(free_vars);
-        arg.free_vars(free_vars);
-      }
-      Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { op: _, fst, snd } => {
+      Term::App { fun: fst, arg: snd }
+      | Term::Tup { fst, snd }
+      | Term::Sup { fst, snd }
+      | Term::Opx { op: _, fst, snd } => {
         fst.free_vars(free_vars);
         snd.free_vars(free_vars);
       }
@@ -356,9 +355,7 @@ impl Term {
         zero.free_vars(free_vars);
         succ.free_vars(free_vars);
       }
-      Term::Num { .. } => {}
-      Term::Ref { .. } => {}
-      Term::Era => {}
+      Term::Ref { .. } | Term::Num { .. } | Term::Era => {}
     }
   }
 }
@@ -665,11 +662,10 @@ impl Term {
         nxt.fix_names(id_counter, book);
       }
       Term::Chn { nam: _, bod } => bod.fix_names(id_counter, book),
-      Term::App { fun, arg } => {
-        fun.fix_names(id_counter, book);
-        arg.fix_names(id_counter, book);
-      }
-      Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { op: _, fst, snd } => {
+      Term::App { fun: fst, arg: snd }
+      | Term::Sup { fst, snd }
+      | Term::Tup { fst, snd }
+      | Term::Opx { op: _, fst, snd } => {
         fst.fix_names(id_counter, book);
         snd.fix_names(id_counter, book);
       }

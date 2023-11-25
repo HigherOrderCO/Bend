@@ -51,15 +51,12 @@ fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) {
       }
     }
     Term::Lam { bod, .. } | Term::Chn { bod, .. } => subst_ref_to_ref(bod, ref_map),
-    Term::Let { val, nxt, .. } | Term::Dup { val, nxt, .. } => {
-      subst_ref_to_ref(val, ref_map);
-      subst_ref_to_ref(nxt, ref_map);
-    }
-    Term::App { fun, arg } => {
-      subst_ref_to_ref(fun, ref_map);
-      subst_ref_to_ref(arg, ref_map);
-    }
-    Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+    Term::App { fun: fst, arg: snd }
+    | Term::Let { val: fst, nxt: snd, .. }
+    | Term::Dup { val: fst, nxt: snd, .. }
+    | Term::Sup { fst, snd }
+    | Term::Tup { fst, snd }
+    | Term::Opx { fst, snd, .. } => {
       subst_ref_to_ref(fst, ref_map);
       subst_ref_to_ref(snd, ref_map);
     }

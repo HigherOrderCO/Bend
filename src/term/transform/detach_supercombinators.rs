@@ -113,30 +113,7 @@ impl Term {
 
           val_is_super && nxt_is_super
         }
-        Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
-          let val_is_super = go(val, depth + 1, term_info);
-          let nxt_is_supper = go(nxt, depth + 1, term_info);
-
-          term_info.provide(l_nam.as_ref());
-          term_info.provide(r_nam.as_ref());
-
-          val_is_super && nxt_is_supper
-        }
-        Term::Ref { .. } => true,
-        Term::App { fun, arg } => {
-          let fun_is_super = go(fun, depth + 1, term_info);
-          let arg_is_super = go(arg, depth + 1, term_info);
-
-          fun_is_super && arg_is_super
-        }
-        Term::Match { cond, zero, succ } => {
-          let cond_is_super = go(cond, depth + 1, term_info);
-          let zero_is_super = go(zero, depth + 1, term_info);
-          let succ_is_super = go(succ, depth + 1, term_info);
-
-          cond_is_super && zero_is_super && succ_is_super
-        }
-        Term::Dup { fst, snd, val, nxt, .. } => {
+        Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_supper = go(nxt, depth + 1, term_info);
 
@@ -145,23 +122,23 @@ impl Term {
 
           val_is_super && nxt_is_supper
         }
+        Term::Match { cond, zero, succ } => {
+          let cond_is_super = go(cond, depth + 1, term_info);
+          let zero_is_super = go(zero, depth + 1, term_info);
+          let succ_is_super = go(succ, depth + 1, term_info);
 
-        Term::Sup { .. } => todo!(),
-
-        Term::Era => true,
-        Term::Num { .. } => true,
-        Term::Opx { fst, snd, .. } => {
+          cond_is_super && zero_is_super && succ_is_super
+        }
+        Term::App { fun: fst, arg: snd }
+        | Term::Sup { fst, snd }
+        | Term::Tup { fst, snd }
+        | Term::Opx { fst, snd, .. } => {
           let fst_is_super = go(fst, depth + 1, term_info);
           let snd_is_super = go(snd, depth + 1, term_info);
 
           fst_is_super && snd_is_super
         }
-        Term::Tup { fst, snd } => {
-          let fst_is_super = go(fst, depth + 1, term_info);
-          let snd_is_super = go(snd, depth + 1, term_info);
-
-          fst_is_super && snd_is_super
-        }
+        Term::Ref { .. } | Term::Num { .. } | Term::Era => true,
       }
     }
 
