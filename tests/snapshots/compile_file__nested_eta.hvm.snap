@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/nested_eta.hvm
+---
+@X = (a a)
+@main = @X
+

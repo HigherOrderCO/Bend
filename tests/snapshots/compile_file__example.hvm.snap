@@ -2,13 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/example.hvm
 ---
-@7 = (a a)
-@8 = (a a)
-@9 = (a a)
-@Def1 = a
-& @7 ~ (@8 a)
-@Def2 = a
-& @9 ~ (@Def1 a)
+@Def1 = (a a)
+@Def2 = @Def1
 @main = a
 & @Def2 ~ (#1 a)
 

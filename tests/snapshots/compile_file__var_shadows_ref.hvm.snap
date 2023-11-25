@@ -2,8 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/var_shadows_ref.hvm
 ---
-@3 = (a a)
 @a = (a a)
 @main = a
-& @a ~ (@3 a)
+& @a ~ ((b b) a)
 
