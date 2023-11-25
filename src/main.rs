@@ -1,8 +1,5 @@
 use clap::{Parser, ValueEnum};
-use hvmc::{
-  ast::{show_book, show_net},
-  run::Ptr,
-};
+use hvmc::ast::{show_book, show_net};
 use hvml::{check_book, compile_book, load_file_to_book, run_book, total_rewrites, RunInfo};
 use std::path::PathBuf;
 

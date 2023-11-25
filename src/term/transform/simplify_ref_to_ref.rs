@@ -33,7 +33,7 @@ impl Book {
     for def_id in self.defs.keys().copied().collect::<Vec<_>>() {
       let body = &mut self.defs.get_mut(&def_id).unwrap().rules[0].body;
       // Moving in and out so the borrow checker doesn't complain
-      let mut subst_body = std::mem::replace(body, Term::Era);
+      let mut subst_body = std::mem::take(body);
       subst_ref_to_ref(&mut subst_body, &ref_map);
       let body = &mut self.defs.get_mut(&def_id).unwrap().rules[0].body;
       *body = subst_body;

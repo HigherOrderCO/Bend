@@ -92,7 +92,11 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize, parallel: bool) -> 
   (net, stats)
 }
 
-pub fn run_book(mut book: Book, mem_size: usize, parallel: bool) -> Result<(Term, DefNames, RunInfo), String> {
+pub fn run_book(
+  mut book: Book,
+  mem_size: usize,
+  parallel: bool,
+) -> Result<(Term, DefNames, RunInfo), String> {
   let CompileResult { core_book, hvmc_name_to_id, warnings } = compile_book(&mut book)?;
 
   if !warnings.is_empty() {

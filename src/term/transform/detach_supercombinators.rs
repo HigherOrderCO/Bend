@@ -171,7 +171,7 @@ impl Term {
   // We don't want to detach id function, since that's not a net gain in performance or space
   fn is_id(&self) -> bool {
     match self {
-      Term::Lam { nam: Some(lam_nam), bod: box Term::Var { nam: var_nam } } if lam_nam == var_nam => true,
+      Term::Lam { nam: Some(lam_nam), bod: box Term::Var { nam: var_nam } } => lam_nam == var_nam,
       _ => false,
     }
   }

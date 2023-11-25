@@ -100,7 +100,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
         }
         1 => {
           term_to_affine(val, var_uses, let_bodies);
-          let_bodies.insert(nam.clone(), std::mem::replace(val.as_mut(), Term::Era));
+          let_bodies.insert(nam.clone(), std::mem::take(val.as_mut()));
           term_to_affine(nxt, var_uses, let_bodies);
         }
         uses => {
@@ -109,7 +109,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
           duplicate_let(nam, nxt, uses, val);
         }
       }
-      *term = std::mem::replace(nxt.as_mut(), Term::Era);
+      *term = std::mem::take(nxt.as_mut());
     }
 
     Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {

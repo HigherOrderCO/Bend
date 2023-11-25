@@ -60,7 +60,7 @@ pub enum RulePat {
   Ctr(Name, Vec<RulePat>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub enum Term {
   Lam {
     nam: Option<Name>,
@@ -119,6 +119,7 @@ pub enum Term {
   Ref {
     def_id: DefId,
   },
+  #[default]
   Era,
 }
 
@@ -362,12 +363,6 @@ impl Term {
         snd.subst(from, to);
       }
     }
-  }
-}
-
-impl Default for Term {
-  fn default() -> Self {
-    Term::Era
   }
 }
 

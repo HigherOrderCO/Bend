@@ -75,15 +75,8 @@ pub fn term_to_compat_net(term: &Term, label_generator: &mut LabelGenerator) -> 
   // Encodes the main term.
   let mut global_vars = HashMap::new();
 
-  let main = encode_term(
-    &mut inet,
-    term,
-    ROOT,
-    &mut HashMap::new(),
-    &mut vec![],
-    &mut global_vars,
-    label_generator,
-  );
+  let main =
+    encode_term(&mut inet, term, ROOT, &mut HashMap::new(), &mut vec![], &mut global_vars, label_generator);
 
   for (decl_port, use_port) in global_vars.into_values() {
     inet.link(decl_port, use_port);

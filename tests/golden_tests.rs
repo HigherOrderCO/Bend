@@ -6,7 +6,9 @@ use hvml::{
   term::{
     net_to_term::net_to_term_non_linear,
     parser::{parse_definition_book, parse_term},
-    term_to_compat_net, Book, DefId, Term, term_to_net::LabelGenerator,
+    term_to_compat_net,
+    term_to_net::LabelGenerator,
+    Book, DefId, Term,
   },
   Warning,
 };
