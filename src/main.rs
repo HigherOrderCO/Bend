@@ -75,11 +75,11 @@ fn main() -> Result<(), String> {
       print!("{}", show_book(&compiled.core_book));
     }
     Mode::Run => {
-      let mem_size = args.mem / std::mem::size_of::<(Ptr, Ptr)>();
+      let mem_size = args.mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
       let (res_term, def_names, info) = run_book(book, mem_size, !args.single_core)?;
       let RunInfo { stats, valid_readback, net: lnet } = info;
-      let total_rewrites = total_rewrites(&stats.rewrites);
-      let rps = total_rewrites as f64 / stats.run_time / 1_000_000.0;
+      let total_rewrites = total_rewrites(&stats.rewrites) as f64;
+      let rps = total_rewrites / stats.run_time / 1_000_000.0;
       if args.verbose {
         println!("\n{}", show_net(&lnet));
       }
