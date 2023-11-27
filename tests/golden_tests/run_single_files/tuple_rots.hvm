@@ -1,0 +1,10 @@
+data Tup8 = (MkTup8 a b c d e f g h)
+
+rot = λx (x λa λb λc λd λe λf λg λh (MkTup8 b c d e f g h a))
+
+app = λn match n {
+  0: λf λx x
+  +: λf λx (app n-1 f (f x))
+}
+
+main = (app 100 rot (MkTup8 1 2 3 4 5 6 7 8))
