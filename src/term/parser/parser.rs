@@ -123,7 +123,9 @@ where
   let term_sep = just(Token::Semicolon).or_not();
 
   recursive(|term| {
+    // <Name>-1
     let pred = select!(Token::Pred(s) => Term::Var { nam: Name(s) }).boxed();
+
     // *
     let era = just(Token::Asterisk).to(Term::Era).boxed();
 
@@ -140,6 +142,14 @@ where
       .ignore_then(name())
       .then(term.clone())
       .map(|(name, body)| Term::Chn { nam: name, bod: Box::new(body) })
+      .boxed();
+
+    // {fst snd}
+    let sup = just(Token::LBracket)
+      .ignore_then(term.clone())
+      .then(term.clone())
+      .then_ignore(just(Token::RBracket))
+      .map(|(fst, snd)| Term::Sup { fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
     // dup x1 x2 = body; next
@@ -231,6 +241,7 @@ where
       global_var,
       var,
       number,
+      sup,
       tup,
       global_lam,
       lam,

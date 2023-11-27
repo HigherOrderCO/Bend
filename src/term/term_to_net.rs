@@ -222,7 +222,17 @@ fn encode_term(
       nxt
     }
     Term::Let { .. } => unreachable!(), // Removed in earlier poss
-    Term::Sup { .. } => unreachable!(), // Not supported in syntax
+    Term::Sup { fst, snd } => {
+      let dup = inet.new_node(Dup { lab: 0 });
+
+      let fst = encode_term(inet, fst, Port(dup, 1), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(dup, 1), fst);
+
+      let snd = encode_term(inet, snd, Port(dup, 2), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(dup, 2), snd);
+
+      Some(Port(dup, 0))
+    }
     Term::Era => {
       let era = inet.new_node(Era);
       inet.link(Port(era, 1), Port(era, 2));
