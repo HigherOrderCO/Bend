@@ -179,7 +179,7 @@ fn match_native_arms(
 /// Split each arm of an adt match on its own rule,
 /// returning a scott encoded term of the aplication of the scrutinee to each rule
 fn match_adt_app(
-  nam: Name,
+  scrutinee: Name,
   Adt { ctrs }: &Adt,
   arms: &[(RulePat, Term)],
   def_name: &Name,
@@ -193,10 +193,21 @@ fn match_adt_app(
     for (rule, term) in arms {
       let RulePat::Var(ctr) = rule else { unreachable!() };
       if ctr == ctr_name {
+        let mut term = term.clone();
+
+        term.subst(
+          &scrutinee,
+          &Term::call(
+            Term::Ref { def_id: def_names.def_id(ctr_name).unwrap() },
+            args.iter().map(|arg| Term::Var { nam: binded(&scrutinee, arg) }),
+          ),
+        );
+
         let lam = args
           .iter()
           .rev()
-          .fold(term.clone(), |acc, n| Term::Lam { nam: Some(binded(&nam, n)), bod: Box::new(acc) });
+          .fold(term, |acc, n| Term::Lam { nam: Some(binded(&scrutinee, n)), bod: Box::new(acc) });
+
         let def_name = make_def_name(def_name, ctr_name, match_count);
         apps.push((lam, def_name));
       }
@@ -213,7 +224,7 @@ fn match_adt_app(
     refs_to_app.push(def_id);
   }
 
-  refs_to_app.into_iter().fold(Term::Var { nam }, |scrutinee, def_id| Term::App {
+  refs_to_app.into_iter().fold(Term::Var { nam: scrutinee }, |scrutinee, def_id| Term::App {
     fun: Box::new(scrutinee),
     arg: Box::new(Term::Ref { def_id }),
   })
