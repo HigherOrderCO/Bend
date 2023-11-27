@@ -31,7 +31,7 @@ impl Term {
         fun.eta_reduction();
         arg.eta_reduction();
       }
-      Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { op: _, fst, snd } => {
+      Term::Tup { fst, snd } | Term::Sup { fst, snd, .. } | Term::Opx { op: _, fst, snd } => {
         fst.eta_reduction();
         snd.eta_reduction();
       }

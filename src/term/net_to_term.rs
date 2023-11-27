@@ -109,7 +109,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
             let (fst, fst_valid) = reader(net, fst, namegen, dup_scope, tup_scope, book);
             let (snd, snd_valid) = reader(net, snd, namegen, dup_scope, tup_scope, book);
             let valid = fst_valid && snd_valid;
-            (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
+            (Term::Sup { tag: None, fst: Box::new(fst), snd: Box::new(snd) }, valid)
           }
         }
         // If we're visiting a port 1 or 2, then it is a variable.
@@ -313,7 +313,7 @@ impl Term {
 
       Term::App { fun, arg } => ctx.multi_search_and_insert(&mut [fun, arg], free_vars),
 
-      Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { fst, snd, .. } => {
+      Term::Tup { fst, snd } | Term::Sup { fst, snd, .. } | Term::Opx { fst, snd, .. } => {
         ctx.multi_search_and_insert(&mut [fst, snd], free_vars)
       }
 
@@ -432,7 +432,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           let snd_port = net.enter_port(Port(node, 2));
           let (snd, snd_valid) = reader(net, snd_port, namegen, dup_scope, tup_scope, seen, book);
           let valid = fst_valid && snd_valid;
-          (Term::Sup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
+          (Term::Sup { tag: None, fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
         // If we're visiting a port 1 or 2, then it is a variable.
         // Also, that means we found a dup, so we store it to read later.
@@ -623,7 +623,7 @@ impl Term {
       }
       Term::Chn { nam: _, bod } => bod.fix_names(id_counter, book),
       Term::App { fun: fst, arg: snd }
-      | Term::Sup { fst, snd }
+      | Term::Sup { fst, snd, .. }
       | Term::Tup { fst, snd }
       | Term::Opx { op: _, fst, snd } => {
         fst.fix_names(id_counter, book);

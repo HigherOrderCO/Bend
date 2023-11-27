@@ -138,7 +138,7 @@ impl Term {
           is_super
         }
         Term::App { fun: fst, arg: snd }
-        | Term::Sup { fst, snd }
+        | Term::Sup { fst, snd, .. }
         | Term::Tup { fst, snd }
         | Term::Opx { fst, snd, .. } => {
           let fst_is_super = go(fst, depth + 1, term_info);

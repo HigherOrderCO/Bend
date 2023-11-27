@@ -107,7 +107,7 @@ impl Term {
       Self::Lam { nam, bod } => !nam.as_ref().is_some_and(|Name(n)| n == name) && bod.occurs_check(name),
       Self::Chn { nam: _, bod } => bod.occurs_check(name),
       Self::App { fun, arg } => fun.occurs_check(name) || arg.occurs_check(name),
-      Self::Sup { fst, snd } => fst.occurs_check(name) || snd.occurs_check(name),
+      Self::Sup { fst, snd, .. } => fst.occurs_check(name) || snd.occurs_check(name),
       Self::Let { pat: LetPat::Var(Name(n)), val, nxt } => {
         val.occurs_check(name) || (n != name && nxt.occurs_check(name))
       }
@@ -136,7 +136,7 @@ impl Term {
         }
         Term::Chn { nam: _, bod } => check(bod, name, true),
         Term::App { fun, arg } => check(fun, name, inside_chn) || check(arg, name, inside_chn),
-        Term::Sup { fst, snd } => check(fst, name, inside_chn) || check(snd, name, inside_chn),
+        Term::Sup { fst, snd, .. } => check(fst, name, inside_chn) || check(snd, name, inside_chn),
         Term::Let { pat: LetPat::Var(Name(n)), val, nxt } => {
           check(val, name, inside_chn) || (n != name && check(nxt, name, inside_chn))
         }

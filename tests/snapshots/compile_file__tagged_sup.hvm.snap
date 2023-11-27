@@ -1,0 +1,10 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/tagged_sup.hvm
+---
+@a = {2 (a a) (b b)}
+@b = {2 (a a) (b b)}
+@c = {3 (a a) (b b)}
+@main = a
+& @a ~ (@b (@c a))
+

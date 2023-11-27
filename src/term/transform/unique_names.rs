@@ -54,7 +54,7 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
     // Global lam names are already unique, so no need to do anything
     Term::Chn { bod, .. } => unique_var_names(bod, name_map, name_count),
     Term::App { fun: fst, arg: snd }
-    | Term::Sup { fst, snd }
+    | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {
       unique_var_names(fst, name_map, name_count);

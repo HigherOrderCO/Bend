@@ -53,7 +53,7 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
     }
     Term::Chn { bod, .. } => resolve_refs(bod, def_names, scope),
     Term::App { fun: fst, arg: snd }
-    | Term::Sup { fst, snd }
+    | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {
       resolve_refs(fst, def_names, scope);

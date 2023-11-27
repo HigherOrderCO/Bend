@@ -75,7 +75,7 @@ pub fn check_uses<'a>(
       check_uses(fun, scope, globals)?;
       check_uses(arg, scope, globals)?;
     }
-    Term::Tup { fst, snd } | Term::Sup { fst, snd } | Term::Opx { fst, snd, .. } => {
+    Term::Tup { fst, snd } | Term::Sup { fst, snd, .. } | Term::Opx { fst, snd, .. } => {
       check_uses(fst, scope, globals)?;
       check_uses(snd, scope, globals)?;
     }

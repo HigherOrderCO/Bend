@@ -146,10 +146,11 @@ where
 
     // {fst snd}
     let sup = just(Token::LBracket)
-      .ignore_then(term.clone())
+      .ignore_then(tag())
+      .then(term.clone())
       .then(term.clone())
       .then_ignore(just(Token::RBracket))
-      .map(|(fst, snd)| Term::Sup { fst: Box::new(fst), snd: Box::new(snd) })
+      .map(|((tag, fst), snd)| Term::Sup { tag, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
     // dup x1 x2 = body; next

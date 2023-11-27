@@ -47,7 +47,7 @@ impl Term {
           fun.find_used_definitions(used, defs);
           arg.find_used_definitions(used, defs);
         }
-        Term::Sup { fst, snd } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+        Term::Sup { fst, snd, .. } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
           fst.find_used_definitions(used, defs);
           snd.find_used_definitions(used, defs);
         }

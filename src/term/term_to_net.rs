@@ -167,7 +167,7 @@ fn encode_term(
     // - 2: points to the occurrence of the second variable.
     // core: & val ~ {lab fst snd} (val not necessarily main port)
     Term::Dup { fst, snd, val, nxt, tag } => {
-      let lab = label_generator.generate(tag);
+      let lab = label_generator.generate(tag, LabelFor::Dup);
       let dup = inet.new_node(Dup { lab });
 
       let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, label_generator);
@@ -222,16 +222,17 @@ fn encode_term(
       nxt
     }
     Term::Let { .. } => unreachable!(), // Removed in earlier poss
-    Term::Sup { fst, snd } => {
-      let dup = inet.new_node(Dup { lab: 0 });
+    Term::Sup { tag, fst, snd } => {
+      let lab = label_generator.generate(tag, LabelFor::Sup);
+      let sup = inet.new_node(Dup { lab });
 
-      let fst = encode_term(inet, fst, Port(dup, 1), scope, vars, global_vars, label_generator);
-      link_local(inet, Port(dup, 1), fst);
+      let fst = encode_term(inet, fst, Port(sup, 1), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(sup, 1), fst);
 
-      let snd = encode_term(inet, snd, Port(dup, 2), scope, vars, global_vars, label_generator);
-      link_local(inet, Port(dup, 2), snd);
+      let snd = encode_term(inet, snd, Port(sup, 2), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(sup, 2), snd);
 
-      Some(Port(dup, 0))
+      Some(Port(sup, 0))
     }
     Term::Era => {
       let era = inet.new_node(Era);
@@ -326,22 +327,45 @@ impl Op {
 pub struct LabelGenerator {
   untagged_dups: u32,
   tagged_dups: HashMap<Name, u32>,
+  untagged_sups: u32,
+  tagged_sups: HashMap<Name, u32>,
+}
+
+enum LabelFor {
+  Dup,
+  Sup,
 }
 
 impl LabelGenerator {
   // If some tag and new generate a new label, otherwise return the generated label.
   // If none use the implicit label counter.
-  fn generate(&mut self, tag: &Option<Name>) -> u32 {
+  fn generate(&mut self, tag: &Option<Name>, label_for: LabelFor) -> u32 {
     if let Some(tag) = tag {
-      let next_lab = self.tagged_dups.len() as u32;
-      match self.tagged_dups.entry(tag.clone()) {
+      let tagged = self.get_tagged(label_for);
+      let next_lab = tagged.len() as u32;
+      match tagged.entry(tag.clone()) {
         Entry::Occupied(e) => *e.get(),
         Entry::Vacant(e) => *e.insert(next_lab),
       }
     } else {
-      let lab = self.untagged_dups;
-      self.untagged_dups += 1;
+      let untagged = self.get_untagged(label_for);
+      let lab = *untagged;
+      *untagged += 1;
       lab
+    }
+  }
+
+  fn get_tagged(&mut self, label_for: LabelFor) -> &mut HashMap<Name, u32> {
+    match label_for {
+      LabelFor::Dup => &mut self.tagged_dups,
+      LabelFor::Sup => &mut self.tagged_sups,
+    }
+  }
+
+  fn get_untagged(&mut self, label_for: LabelFor) -> &mut u32 {
+    match label_for {
+      LabelFor::Dup => &mut self.untagged_dups,
+      LabelFor::Sup => &mut self.untagged_sups,
     }
   }
 }
