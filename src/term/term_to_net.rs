@@ -9,7 +9,7 @@ use hvmc::{
 };
 use std::collections::{hash_map::Entry, HashMap};
 
-pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, Vec<Warning>) {
+pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, Vec<Warning>, HashMap<u32, Name>) {
   let mut warnings = Vec::new();
   let mut nets = HashMap::new();
   let mut id_to_hvmc_name = HashMap::new();
@@ -34,7 +34,7 @@ pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap
     }
   }
 
-  (nets, id_to_hvmc_name, warnings)
+  (nets, id_to_hvmc_name, warnings, label_generator.labels_to_tag)
 }
 
 /// Converts rules names to unique names compatible with hvm-core:
@@ -85,7 +85,7 @@ pub fn term_to_compat_net(term: &Term, label_generator: &mut LabelGenerator) -> 
     link_local(&mut inet, ROOT, main);
   }
 
-  (inet, label_generator.untagged_dups)
+  (inet, label_generator.next)
 }
 
 /// Adds a subterm connected to `up` to the `inet`.
@@ -167,7 +167,7 @@ fn encode_term(
     // - 2: points to the occurrence of the second variable.
     // core: & val ~ {lab fst snd} (val not necessarily main port)
     Term::Dup { fst, snd, val, nxt, tag } => {
-      let lab = label_generator.generate(tag, LabelFor::Dup);
+      let lab = label_generator.generate(tag);
       let dup = inet.new_node(Dup { lab });
 
       let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, label_generator);
@@ -223,7 +223,7 @@ fn encode_term(
     }
     Term::Let { .. } => unreachable!(), // Removed in earlier poss
     Term::Sup { tag, fst, snd } => {
-      let lab = label_generator.generate(tag, LabelFor::Sup);
+      let lab = label_generator.generate(&Some(tag.clone()));
       let sup = inet.new_node(Dup { lab });
 
       let fst = encode_term(inet, fst, Port(sup, 1), scope, vars, global_vars, label_generator);
@@ -325,47 +325,29 @@ impl Op {
 
 #[derive(Default)]
 pub struct LabelGenerator {
-  untagged_dups: u32,
+  next: u32,
   tagged_dups: HashMap<Name, u32>,
-  untagged_sups: u32,
-  tagged_sups: HashMap<Name, u32>,
-}
-
-enum LabelFor {
-  Dup,
-  Sup,
+  labels_to_tag: HashMap<u32, Name>,
 }
 
 impl LabelGenerator {
   // If some tag and new generate a new label, otherwise return the generated label.
   // If none use the implicit label counter.
-  fn generate(&mut self, tag: &Option<Name>, label_for: LabelFor) -> u32 {
+  fn generate(&mut self, tag: &Option<Name>) -> u32 {
     if let Some(tag) = tag {
-      let tagged = self.get_tagged(label_for);
-      let next_lab = tagged.len() as u32;
-      match tagged.entry(tag.clone()) {
+      match self.tagged_dups.entry(tag.clone()) {
         Entry::Occupied(e) => *e.get(),
-        Entry::Vacant(e) => *e.insert(next_lab),
+        Entry::Vacant(e) => {
+          let lab = self.next;
+          self.next += 1;
+          self.labels_to_tag.insert(lab, tag.clone());
+          *e.insert(lab)
+        },
       }
     } else {
-      let untagged = self.get_untagged(label_for);
-      let lab = *untagged;
-      *untagged += 1;
+      let lab = self.next;
+      self.next += 1;
       lab
-    }
-  }
-
-  fn get_tagged(&mut self, label_for: LabelFor) -> &mut HashMap<Name, u32> {
-    match label_for {
-      LabelFor::Dup => &mut self.tagged_dups,
-      LabelFor::Sup => &mut self.tagged_sups,
-    }
-  }
-
-  fn get_untagged(&mut self, label_for: LabelFor) -> &mut u32 {
-    match label_for {
-      LabelFor::Dup => &mut self.untagged_dups,
-      LabelFor::Sup => &mut self.untagged_sups,
     }
   }
 }

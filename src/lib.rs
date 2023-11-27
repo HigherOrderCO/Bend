@@ -7,7 +7,7 @@ use hvmc::{
 use hvmc_net::pre_reduce::pre_reduce_book;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{collections::HashMap, time::Instant};
-use term::{book_to_nets, net_to_term::net_to_term_non_linear, Book, DefId, DefNames, Term};
+use term::{book_to_nets, net_to_term::net_to_term_non_linear, Book, DefId, DefNames, Term, Name};
 
 pub mod hvmc_net;
 pub mod net;
@@ -36,6 +36,7 @@ pub struct CompileResult {
   pub core_book: hvmc::ast::Book,
   pub hvmc_name_to_id: HashMap<Val, DefId>,
   pub warnings: Vec<Warning>,
+  pub labels_to_tag: HashMap<u32, Name>,
 }
 
 impl std::fmt::Debug for CompileResult {
@@ -64,11 +65,11 @@ pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
   book.detach_supercombinators();
   book.simplify_ref_to_ref()?;
   book.prune(main);
-  let (nets, id_to_hvmc_name, warnings) = book_to_nets(book, main);
+  let (nets, id_to_hvmc_name, warnings, labels_to_tag) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &id_to_hvmc_name)?;
   pre_reduce_book(&mut core_book)?;
   let hvmc_name_to_id = id_to_hvmc_name.into_iter().map(|(k, v)| (v, k)).collect();
-  Ok(CompileResult { core_book, hvmc_name_to_id, warnings })
+  Ok(CompileResult { core_book, hvmc_name_to_id, warnings, labels_to_tag })
 }
 
 pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize, parallel: bool) -> (Net, RunStats) {
@@ -98,7 +99,7 @@ pub fn run_book(
   mem_size: usize,
   parallel: bool,
 ) -> Result<(Term, DefNames, RunInfo), String> {
-  let CompileResult { core_book, hvmc_name_to_id, warnings } = compile_book(&mut book)?;
+  let CompileResult { core_book, hvmc_name_to_id, warnings, labels_to_tag } = compile_book(&mut book)?;
 
   if !warnings.is_empty() {
     for warn in warnings {
@@ -110,7 +111,7 @@ pub fn run_book(
 
   let (res_lnet, stats) = run_compiled(&core_book, mem_size, parallel);
   let net = hvmc_to_net(&res_lnet, &|val| hvmc_name_to_id[&val]);
-  let (res_term, valid_readback) = net_to_term_non_linear(&net, &book);
+  let (res_term, valid_readback) = net_to_term_non_linear(&net, &book, &labels_to_tag);
   let info = RunInfo { stats, valid_readback, net: res_lnet };
   Ok((res_term, book.def_names, info))
 }

@@ -76,11 +76,18 @@ where
   select!(Token::Name(name) => Name(name))
 }
 
-fn tag<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
+fn optional_tag<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   just(Token::Hash).ignore_then(name()).or_not()
+}
+
+fn tag<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  just(Token::Hash).ignore_then(name())
 }
 
 fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
@@ -144,7 +151,7 @@ where
       .map(|(name, body)| Term::Chn { nam: name, bod: Box::new(body) })
       .boxed();
 
-    // {fst snd}
+    // {#tag fst snd}
     let sup = just(Token::LBracket)
       .ignore_then(tag())
       .then(term.clone())
@@ -153,9 +160,9 @@ where
       .map(|((tag, fst), snd)| Term::Sup { tag, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    // dup x1 x2 = body; next
+    // dup #tag? x1 x2 = body; next
     let dup = just(Token::Dup)
-      .ignore_then(tag())
+      .ignore_then(optional_tag())
       .then(name_or_era())
       .then(name_or_era())
       .then_ignore(just(Token::Equals))

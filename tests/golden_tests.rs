@@ -128,7 +128,7 @@ fn readback_lnet() {
     let net = do_parse_net(code)?;
     let book = Book::default();
     let compat_net = hvmc_to_net(&net, &DefId::from_internal);
-    let (term, valid) = net_to_term_non_linear(&compat_net, &book);
+    let (term, valid) = net_to_term_non_linear(&compat_net, &book, &Default::default());
     if valid {
       Ok(term.to_string(&book.def_names))
     } else {

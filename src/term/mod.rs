@@ -106,7 +106,7 @@ pub enum Term {
     nxt: Box<Term>,
   },
   Sup {
-    tag: Option<Name>,
+    tag: Name,
     fst: Box<Term>,
     snd: Box<Term>,
   },
@@ -292,7 +292,7 @@ impl Term {
         val.to_string(def_names),
         nxt.to_string(def_names)
       ),
-      Term::Sup { fst, snd, .. } => format!("{{{} {}}}", fst.to_string(def_names), snd.to_string(def_names)),
+      Term::Sup { tag, fst, snd } => format!("{{#{} {} {}}}", tag, fst.to_string(def_names), snd.to_string(def_names)),
       Term::Era => "*".to_string(),
       Term::Num { val } => format!("{val}"),
       Term::Opx { op, fst, snd } => {
