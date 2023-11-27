@@ -1,6 +1,6 @@
 use crate::term::{Book, LetPat, MatchNum, Name, RulePat, Term};
 use hvmc::run::Val;
-use indexmap::IndexSet;
+use indexmap::IndexMap;
 use std::collections::{hash_map::Entry, HashMap};
 
 /// Erases variables that weren't used, dups the ones that were used more than once.
@@ -117,22 +117,22 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       let uses = var_uses[nam];
       match uses {
         0 => {
-          term_to_affine(nxt, var_uses, let_bodies);
-
-          let mut free_vars = IndexSet::new();
+          let mut free_vars = IndexMap::new();
           val.free_vars(&mut free_vars);
 
           // We are going to remove the val term,
           // so we need to remove the free variables it uses from the vars count
-          for var in free_vars {
+          for (var, used) in free_vars {
             let Entry::Occupied(mut entry) = var_uses.entry(var) else { unreachable!() };
 
             if *entry.get() == 1 {
               entry.remove();
             } else {
-              *entry.get_mut() -= 1;
+              *entry.get_mut() -= used;
             }
           }
+
+          term_to_affine(nxt, var_uses, let_bodies);
         }
         1 => {
           term_to_affine(val, var_uses, let_bodies);

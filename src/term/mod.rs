@@ -1,5 +1,5 @@
 use hvmc::run::Val;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
 use std::{
@@ -364,23 +364,23 @@ impl Term {
   }
 
   /// Collects all the free variables that a term has
-  pub fn free_vars(&self, free_vars: &mut IndexSet<Name>) {
+  pub fn free_vars(&self, free_vars: &mut IndexMap<Name, u64>) {
     match self {
       Term::Lam { nam: Some(nam), bod } => {
-        let mut new_scope = IndexSet::new();
+        let mut new_scope = IndexMap::new();
         bod.free_vars(&mut new_scope);
         new_scope.remove(nam);
 
         free_vars.extend(new_scope);
       }
       Term::Lam { nam: None, bod } => bod.free_vars(free_vars),
-      Term::Var { nam } => _ = free_vars.insert(nam.clone()),
+      Term::Var { nam } => *free_vars.entry(nam.clone()).or_default() += 1,
       Term::Chn { bod, .. } => bod.free_vars(free_vars),
       Term::Lnk { .. } => {}
       Term::Let { pat: LetPat::Var(nam), val, nxt } => {
         val.free_vars(free_vars);
 
-        let mut new_scope = IndexSet::new();
+        let mut new_scope = IndexMap::new();
         nxt.free_vars(&mut new_scope);
 
         new_scope.remove(nam);
@@ -390,7 +390,7 @@ impl Term {
       Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
         val.free_vars(free_vars);
 
-        let mut new_scope = IndexSet::new();
+        let mut new_scope = IndexMap::new();
         nxt.free_vars(&mut new_scope);
 
         fst.as_ref().map(|fst| new_scope.remove(fst));
@@ -409,7 +409,7 @@ impl Term {
         scrutinee.free_vars(free_vars);
 
         for (rule, term) in arms {
-          let mut new_scope = IndexSet::new();
+          let mut new_scope = IndexMap::new();
           term.free_vars(&mut new_scope);
 
           if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
