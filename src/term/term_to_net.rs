@@ -149,17 +149,15 @@ fn encode_term(
       let cond = encode_term(inet, scrutinee, Port(if_, 0), scope, vars, global_vars, label_generator);
       link_local(inet, Port(if_, 0), cond);
 
-      if let Some((zero, succ)) = native_match(arms.clone()) {
-        let sel = inet.new_node(Con);
-        inet.link(Port(sel, 0), Port(if_, 1));
-        let zero = encode_term(inet, &zero, Port(sel, 1), scope, vars, global_vars, label_generator);
-        link_local(inet, Port(sel, 1), zero);
+      let (zero, succ) = native_match(arms.clone());
 
-        let succ = encode_term(inet, &succ, Port(sel, 2), scope, vars, global_vars, label_generator);
-        link_local(inet, Port(sel, 2), succ);
-      } else {
-        unreachable!()
-      }
+      let sel = inet.new_node(Con);
+      inet.link(Port(sel, 0), Port(if_, 1));
+      let zero = encode_term(inet, &zero, Port(sel, 1), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(sel, 1), zero);
+
+      let succ = encode_term(inet, &succ, Port(sel, 2), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(sel, 2), succ);
 
       Some(Port(if_, 2))
     }

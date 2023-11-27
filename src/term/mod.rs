@@ -449,17 +449,18 @@ impl Term {
   }
 }
 
-pub fn native_match(arms: Vec<(RulePat, Term)>) -> Option<(Term, Term)> {
+/// Returns the lambda representation of native number match arms
+pub fn native_match(arms: Vec<(RulePat, Term)>) -> (Term, Term) {
   use MatchNum::*;
 
   match &arms[..] {
     [(RulePat::Num(Zero), zero), (RulePat::Num(Succ(nam)), succ)] => {
       let zero = zero.clone();
       let succ = Term::Lam { nam: nam.clone(), bod: Box::new(succ.clone()) };
-      Some((zero, succ))
+      (zero, succ)
     }
-    [(RulePat::Num(Zero), zero), (RulePat::Num(Zero), succ)] => Some((zero.clone(), succ.clone())),
-    _ => None,
+    [(RulePat::Num(Zero), zero), (RulePat::Num(Zero), succ)] => (zero.clone(), succ.clone()),
+    _ => unreachable!(),
   }
 }
 
