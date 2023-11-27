@@ -16,7 +16,10 @@ impl Book {
 impl Term {
   pub fn linearize_matches(&mut self) {
     match self {
-      Term::Lam { nam, bod } => linearize_matches(bod, nam.as_ref()),
+      Term::Lam { nam, bod } => {
+        bod.linearize_matches();
+        linearize_matches(bod, nam.as_ref())
+      }
       Term::Chn { bod, .. } => bod.linearize_matches(),
 
       Term::Match { scrutinee, arms } => {
@@ -43,14 +46,7 @@ impl Term {
 
 fn linearize_matches(term: &mut Term, name: Option<&Name>) {
   match term {
-    Term::Lam { nam, bod } => {
-      // first we linearize the inner lambda
-      linearize_matches(bod, nam.as_ref());
-      // them we can linearize the outer lambda
-      linearize_matches(bod, name)
-    }
-
-    Term::Chn { bod, .. } => linearize_matches(bod, name),
+    Term::Lam { bod, .. } | Term::Chn { bod, .. } => linearize_matches(bod, name),
 
     Term::Let { pat: LetPat::Var(nam), val, nxt } => {
       linearize_matches(val, name);

@@ -1,7 +1,7 @@
 use super::{var_id_to_name, Book, DefId, LetPat, MatchNum, Name, Op, RulePat, Term, Val};
 use crate::net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use hvmc::run::Loc;
-use indexmap::{IndexSet, IndexMap};
+use indexmap::{IndexMap, IndexSet};
 use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
