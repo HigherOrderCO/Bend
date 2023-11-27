@@ -61,7 +61,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
           let sel_kind = net.node(sel_node).kind;
           if sel_kind != Con {
             // TODO: Is there any case where we expect a different node type here on readback?
-            return (Term::num_match(cond_term, Term::Era, None, Term::Era), false);
+            return (Term::new_native_match(cond_term, Term::Era, None, Term::Era), false);
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
@@ -73,7 +73,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book) -> (Term, bool) {
 
           let Term::Lam { nam, bod } = succ_term else { unreachable!() };
 
-          let term = Term::num_match(cond_term, zero_term, nam, *bod);
+          let term = Term::new_native_match(cond_term, zero_term, nam, *bod);
           (term, valid)
         }
         _ => unreachable!(),
@@ -392,7 +392,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
           let sel_kind = net.node(sel_node).kind;
           if sel_kind != Con {
             // TODO: Is there any case where we expect a different node type here on readback?
-            return (Term::num_match(cond_term, Term::Era, None, Term::Era), false);
+            return (Term::new_native_match(cond_term, Term::Era, None, Term::Era), false);
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
@@ -404,7 +404,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book) -> (Term, bool) {
 
           let Term::Lam { nam, bod } = succ_term else { unreachable!() };
 
-          let term = Term::num_match(cond_term, zero_term, nam, *bod);
+          let term = Term::new_native_match(cond_term, zero_term, nam, *bod);
           (term, valid)
         }
         _ => unreachable!(),

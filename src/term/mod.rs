@@ -422,10 +422,17 @@ impl Term {
     }
   }
 
-  pub fn num_match(scrutinee: Term, zero_term: Term, succ_label: Option<Name>, mut succ_term: Term) -> Term {
+  /// Creates a new [`Term::Match`] from the given terms.
+  /// If `scrutinee` is not a `Term::Var`, creates a let binding containing the match in its body
+  pub fn new_native_match(
+    scrutinee: Self,
+    zero_term: Self,
+    succ_label: Option<Name>,
+    mut succ_term: Self,
+  ) -> Self {
     let zero = (RulePat::Num(MatchNum::Zero), zero_term);
 
-    if let Term::Var { .. } = &scrutinee {
+    if matches!(scrutinee, Term::Var { .. }) {
       let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);
       Term::Match { scrutinee: Box::new(scrutinee), arms: vec![zero, succ] }
     } else {
