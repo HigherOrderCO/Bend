@@ -165,6 +165,10 @@ fn make_split_def(
           (RulePat::Var(..), other_pat) => {
             new_rule_pats.push(other_pat.clone());
           }
+          (RulePat::Ctr(_, _), RulePat::Num(_)) => todo!(),
+          (RulePat::Num(_), RulePat::Var(_)) => todo!(),
+          (RulePat::Num(_), RulePat::Ctr(_, _)) => todo!(),
+          (RulePat::Num(_), RulePat::Num(_)) => todo!(),
         }
       }
       let new_rule = Rule { pats: new_rule_pats, body: new_rule_body };
@@ -199,6 +203,7 @@ fn make_rule_calling_split(old_rule: &Rule, new_def_id: DefId) -> Rule {
               RulePat::Var(nam)
             }
             RulePat::Var(..) => field.clone(),
+            RulePat::Num(..) => todo!(),
           };
           old_rule_body_args.push(Term::from(&arg));
           new_pat_args.push(arg);
@@ -206,6 +211,7 @@ fn make_rule_calling_split(old_rule: &Rule, new_def_id: DefId) -> Rule {
 
         old_rule_pats.push(RulePat::Ctr(name.clone(), new_pat_args));
       }
+      RulePat::Num(..) => todo!(),
     }
   }
   let old_rule_body = Term::call(Term::Ref { def_id: new_def_id }, old_rule_body_args);

@@ -1,4 +1,4 @@
-use super::{Book, DefId, DefNames, LetPat, Name, Op, Term};
+use super::{native_match, Book, DefId, DefNames, LetPat, Name, Op, Term};
 use crate::{
   net::{INet, NodeKind::*, Port, MAX_DUP_HVMC_LABEL, ROOT},
   Warning,
@@ -143,19 +143,20 @@ fn encode_term(
       Some(Port(app, 2))
     }
     // core: & cond ~  (zero succ) ret
-    Term::Match { cond, zero, succ } => {
+    Term::Match { scrutinee, arms } => {
       let if_ = inet.new_node(Mat);
 
-      let cond = encode_term(inet, cond, Port(if_, 0), scope, vars, global_vars, label_generator);
+      let cond = encode_term(inet, scrutinee, Port(if_, 0), scope, vars, global_vars, label_generator);
       link_local(inet, Port(if_, 0), cond);
+
+      let (zero, succ) = native_match(arms.clone());
 
       let sel = inet.new_node(Con);
       inet.link(Port(sel, 0), Port(if_, 1));
-
-      let zero = encode_term(inet, zero, Port(sel, 1), scope, vars, global_vars, label_generator);
+      let zero = encode_term(inet, &zero, Port(sel, 1), scope, vars, global_vars, label_generator);
       link_local(inet, Port(sel, 1), zero);
 
-      let succ = encode_term(inet, succ, Port(sel, 2), scope, vars, global_vars, label_generator);
+      let succ = encode_term(inet, &succ, Port(sel, 2), scope, vars, global_vars, label_generator);
       link_local(inet, Port(sel, 2), succ);
 
       Some(Port(if_, 2))
@@ -222,7 +223,11 @@ fn encode_term(
     }
     Term::Let { .. } => unreachable!(), // Removed in earlier poss
     Term::Sup { .. } => unreachable!(), // Not supported in syntax
-    Term::Era => unreachable!(),        // Not supported in syntax
+    Term::Era => {
+      let era = inet.new_node(Era);
+      inet.link(Port(era, 1), Port(era, 2));
+      Some(Port(era, 0))
+    }
     // core: #val
     Term::Num { val } => {
       // debug_assert!(*val <= LABEL_MASK); // Uneeded?

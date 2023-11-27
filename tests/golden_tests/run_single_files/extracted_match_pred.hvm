@@ -1,5 +1,5 @@
 // We expect the lambda 'p' from the match to be extracted which allows this recursive func
-val = λn (match n { 0: valZ; 1+p: (valS p) })
+val = λn (match n { 0: valZ; +: (valS n-1) })
   valZ = 0
   valS = λp (val p)
 main = (val 1)
