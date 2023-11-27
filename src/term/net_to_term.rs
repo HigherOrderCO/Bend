@@ -1,7 +1,7 @@
 use super::{var_id_to_name, Book, DefId, LetPat, MatchNum, Name, Op, RulePat, Term, Val};
 use crate::net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use hvmc::run::Loc;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
@@ -180,9 +180,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
 
-    let mut free_vars = IndexMap::new();
-    val.free_vars(&mut free_vars);
-    let mut free_vars = free_vars.into_iter().map(|(vars, _)| vars).collect();
+    let mut free_vars = val.free_vars().into_keys().collect();
 
     let let_ctx = LetInsertion::Todo(fst, snd, val);
 
