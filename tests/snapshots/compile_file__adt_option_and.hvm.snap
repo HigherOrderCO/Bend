@@ -1,0 +1,17 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/adt_option_and.hvm
+---
+@5 = (a (b c))
+& @Some ~ ([b a] c)
+@6 = (* @None)
+@7 = (a ((@5 (@6 (a b))) b))
+@8 = (* @None)
+@None = (* (a a))
+@Opti = ((@7 (@8 a)) a)
+@Some = (a ((a b) (* b)))
+@main = a
+& @Opti ~ (b (c a))
+& @Some ~ (#3 c)
+& @Some ~ (#1 b)
+

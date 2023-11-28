@@ -2,6 +2,7 @@ use crate::term::{
   check::type_check::{infer_arg_type, Type},
   Adt, Book, DefId, DefNames, Definition, MatchNum, Name, Rule, RulePat, Term,
 };
+use indexmap::IndexSet;
 use itertools::Itertools;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -197,47 +198,64 @@ fn match_adt_app(
   new_rules: &mut BTreeMap<DefId, Definition>,
   match_count: usize,
 ) -> Term {
-  let mut apps = vec![];
+  let mut refs_to_app = Vec::new();
+  let mut ordered_arms = Vec::new();
+  let mut free_vars = IndexSet::new();
 
   for (ctr_name, args) in ctrs {
     for (rule, term) in arms {
       let RulePat::Var(ctr) = rule else { unreachable!() };
+
       if ctr == ctr_name {
         let mut term = term.clone();
 
         term.subst(
           &scrutinee,
           &Term::call(
-            Term::Ref { def_id: def_names.def_id(ctr_name).unwrap() },
+            Term::Ref { def_id: def_names.def_id(ctr).unwrap() },
             args.iter().map(|arg| Term::Var { nam: binded(&scrutinee, arg) }),
           ),
         );
 
-        let lam = args
-          .iter()
-          .rev()
-          .fold(term, |acc, n| Term::Lam { nam: Some(binded(&scrutinee, n)), bod: Box::new(acc) });
+        let adt_binds: HashSet<_> = args.iter().map(|n| binded(&scrutinee, n)).collect();
+        let free_vars_staging = term.free_vars().into_keys().filter(|k| !adt_binds.contains(k));
 
-        let def_name = make_def_name(def_name, ctr_name, match_count);
-        apps.push((lam, def_name));
+        free_vars.extend(free_vars_staging);
+        ordered_arms.push((ctr, term));
       }
     }
   }
 
-  let mut refs_to_app = Vec::new();
+  for (ctr, term) in ordered_arms {
+    let body = free_vars
+      .iter()
+      .cloned()
+      .rev()
+      .fold(term, |acc: Term, name| Term::Lam { nam: Some(name), bod: Box::new(acc) });
 
-  for (body, name) in apps {
+    let args = &ctrs[ctr];
+
+    let body = args
+      .iter()
+      .rev()
+      .fold(body, |acc, n| Term::Lam { nam: Some(binded(&scrutinee, n)), bod: Box::new(acc) });
+
     let rules = vec![Rule { pats: Vec::new(), body }];
-    let def_id = def_names.insert(name);
+
+    let def_name = make_def_name(def_name, ctr, match_count);
+    let def_id = def_names.insert(def_name);
     let def = Definition { def_id, rules };
     new_rules.insert(def_id, def);
     refs_to_app.push(def_id);
   }
 
-  refs_to_app.into_iter().fold(Term::Var { nam: scrutinee }, |scrutinee, def_id| Term::App {
-    fun: Box::new(scrutinee),
-    arg: Box::new(Term::Ref { def_id }),
-  })
+  free_vars.into_iter().fold(
+    refs_to_app.into_iter().fold(Term::Var { nam: scrutinee }, |scrutinee, def_id| Term::App {
+      fun: Box::new(scrutinee),
+      arg: Box::new(Term::Ref { def_id }),
+    }),
+    |acc, nam| Term::App { fun: Box::new(acc), arg: Box::new(Term::Var { nam }) },
+  )
 }
 
 fn binded(bind: &Name, acc: &Name) -> Name {

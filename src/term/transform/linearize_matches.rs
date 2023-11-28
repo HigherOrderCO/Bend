@@ -18,7 +18,9 @@ impl Term {
     match self {
       Term::Lam { nam, bod } => {
         bod.linearize_matches();
-        bod.linearize_matches_by(nam.as_ref())
+        if let Some(name) = nam {
+          bod.linearize_matches_by(name);
+        }
       }
 
       Term::Chn { bod, .. } => bod.linearize_matches(),
@@ -44,22 +46,20 @@ impl Term {
     }
   }
 
-  fn linearize_matches_by(&mut self, name: Option<&Name>) {
+  pub fn linearize_matches_by(&mut self, name: &Name) {
     match self {
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.linearize_matches_by(name),
 
       Term::Let { pat: LetPat::Var(nam), val, nxt } => {
         val.linearize_matches_by(name);
-        if !name.is_some_and(|n| n == nam) {
+        if name != nam {
           nxt.linearize_matches_by(name);
         }
       }
 
       Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
         val.linearize_matches_by(name);
-        if !name
-          .is_some_and(|nam| fst.as_ref().is_some_and(|n| n == nam) || snd.as_ref().is_some_and(|n| n == nam))
-        {
+        if !(fst.as_ref().is_some_and(|n| n == name) || snd.as_ref().is_some_and(|n| n == name)) {
           nxt.linearize_matches_by(name);
         }
       }
@@ -73,9 +73,9 @@ impl Term {
       }
 
       Term::Match { scrutinee, .. } => {
-        let Term::Var { nam } = &**scrutinee else { unreachable!() };
+        let Term::Var { nam } = scrutinee.as_ref() else { unreachable!() };
 
-        if name.is_some_and(|n| n == nam) {
+        if nam == name || !self.free_vars().contains_key(name) {
           return;
         }
 
@@ -84,14 +84,14 @@ impl Term {
         let arms = arms
           .into_iter()
           .map(|(rule, arm)| {
-            let arm = Term::Lam { nam: name.cloned(), bod: Box::new(arm) };
+            let arm = Term::Lam { nam: Some(name.clone()), bod: Box::new(arm) };
             (rule, arm)
           })
           .collect();
 
         *self = Term::App {
           fun: Box::new(Term::Match { scrutinee, arms }),
-          arg: Box::new(name.cloned().map(|nam| Term::Var { nam }).unwrap_or_default()),
+          arg: Box::new(Term::Var { nam: name.clone() }),
         };
       }
 
