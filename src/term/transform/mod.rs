@@ -5,7 +5,6 @@ pub mod encode_adts;
 pub mod eta_reduction;
 pub mod flatten;
 pub mod linearize;
-pub mod linearize_matches;
 pub mod resolve_ctrs_in_pats;
 pub mod resolve_refs;
 pub mod simplify_matches;

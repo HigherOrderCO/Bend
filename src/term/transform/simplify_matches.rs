@@ -144,6 +144,12 @@ fn match_native(
 ) -> Term {
   let mut new_arms = Vec::new();
 
+  let mut free_vars = IndexSet::new();
+
+  for (_, body) in &arms {
+    free_vars.extend(body.free_vars().into_keys().filter(|Name(nam)| nam != &format!("{scrutinee}-1")));
+  }
+
   for (rule, mut body) in arms {
     let (name, bind) = match &rule {
       RulePat::Num(MatchNum::Zero) => ("zero", None),
@@ -151,14 +157,8 @@ fn match_native(
       _ => unreachable!(), // Succ(None) should not happen here
     };
 
-    let mut free_vars: IndexSet<_> =
-      body.free_vars().into_keys().filter(|k| k.0 != format!("{scrutinee}-1")).collect();
-
     if let Some(nam) = &bind {
       body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) };
-    } else {
-      free_vars.shift_remove(&scrutinee);
-      body.subst(&scrutinee, &Term::Num { val: 0 });
     }
 
     body =
@@ -170,10 +170,7 @@ fn match_native(
     let def = Definition { def_id, rules };
     new_rules.insert(def_id, def);
 
-    let mut body = free_vars.into_iter().fold(Term::Ref { def_id }, |acc, nam| Term::App {
-      fun: Box::new(acc),
-      arg: Box::new(Term::Var { nam }),
-    });
+    let mut body = Term::Ref { def_id };
 
     if let Some(nam) = bind {
       body = Term::App { fun: Box::new(body), arg: Box::new(Term::Var { nam }) }
@@ -182,7 +179,11 @@ fn match_native(
     new_arms.push((rule, body));
   }
 
-  Term::Match { scrutinee: Box::new(Term::Var { nam: scrutinee }), arms: new_arms }
+  free_vars
+    .into_iter()
+    .fold(Term::Match { scrutinee: Box::new(Term::Var { nam: scrutinee }), arms: new_arms }, |acc, nam| {
+      Term::App { fun: Box::new(acc), arg: Box::new(Term::Var { nam }) }
+    })
 }
 
 /// Split each arm of an adt match on its own rule,
