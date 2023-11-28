@@ -9,7 +9,7 @@ use hvmc::{
 };
 use std::collections::{hash_map::Entry, HashMap};
 
-pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, Vec<Warning>) {
+pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, HashMap<u32, Name>, Vec<Warning>) {
   let mut warnings = Vec::new();
   let mut nets = HashMap::new();
   let mut id_to_hvmc_name = HashMap::new();
@@ -34,7 +34,7 @@ pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap
     }
   }
 
-  (nets, id_to_hvmc_name, warnings)
+  (nets, id_to_hvmc_name, label_generator.labels_to_tag, warnings)
 }
 
 /// Converts rules names to unique names compatible with hvm-core:
@@ -85,7 +85,7 @@ pub fn term_to_compat_net(term: &Term, label_generator: &mut LabelGenerator) -> 
     link_local(&mut inet, ROOT, main);
   }
 
-  (inet, label_generator.untagged_dups)
+  (inet, label_generator.next)
 }
 
 /// Adds a subterm connected to `up` to the `inet`.
@@ -222,7 +222,18 @@ fn encode_term(
       nxt
     }
     Term::Let { .. } => unreachable!(), // Removed in earlier poss
-    Term::Sup { .. } => unreachable!(), // Not supported in syntax
+    Term::Sup { tag, fst, snd } => {
+      let lab = label_generator.generate(&Some(tag.clone()));
+      let sup = inet.new_node(Dup { lab });
+
+      let fst = encode_term(inet, fst, Port(sup, 1), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(sup, 1), fst);
+
+      let snd = encode_term(inet, snd, Port(sup, 2), scope, vars, global_vars, label_generator);
+      link_local(inet, Port(sup, 2), snd);
+
+      Some(Port(sup, 0))
+    }
     Term::Era => {
       let era = inet.new_node(Era);
       inet.link(Port(era, 1), Port(era, 2));
@@ -314,8 +325,9 @@ impl Op {
 
 #[derive(Default)]
 pub struct LabelGenerator {
-  untagged_dups: u32,
+  next: u32,
   tagged_dups: HashMap<Name, u32>,
+  labels_to_tag: HashMap<u32, Name>,
 }
 
 impl LabelGenerator {
@@ -323,14 +335,18 @@ impl LabelGenerator {
   // If none use the implicit label counter.
   fn generate(&mut self, tag: &Option<Name>) -> u32 {
     if let Some(tag) = tag {
-      let next_lab = self.tagged_dups.len() as u32;
       match self.tagged_dups.entry(tag.clone()) {
         Entry::Occupied(e) => *e.get(),
-        Entry::Vacant(e) => *e.insert(next_lab),
+        Entry::Vacant(e) => {
+          let lab = self.next;
+          self.next += 1;
+          self.labels_to_tag.insert(lab, tag.clone());
+          *e.insert(lab)
+        },
       }
     } else {
-      let lab = self.untagged_dups;
-      self.untagged_dups += 1;
+      let lab = self.next;
+      self.next += 1;
       lab
     }
   }

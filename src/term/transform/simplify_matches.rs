@@ -125,7 +125,7 @@ impl Term {
       | Term::Let { val: fst, nxt: snd, .. }
       | Term::Dup { val: fst, nxt: snd, .. }
       | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd }
+      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
         snd.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;

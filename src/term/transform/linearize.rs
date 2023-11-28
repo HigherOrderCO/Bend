@@ -58,7 +58,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
     // Others
     Term::Chn { bod, .. } => count_var_uses_in_term(bod, uses),
     Term::App { fun: fst, arg: snd }
-    | Term::Sup { fst, snd }
+    | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {
       count_var_uses_in_term(fst, uses);
@@ -176,7 +176,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
     // Others
     Term::Chn { bod, .. } => term_to_affine(bod, var_uses, let_bodies),
     Term::App { fun: fst, arg: snd }
-    | Term::Sup { fst, snd }
+    | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {
       term_to_affine(fst, var_uses, let_bodies);
