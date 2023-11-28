@@ -9,7 +9,7 @@ use hvmc::{
 };
 use std::collections::{hash_map::Entry, HashMap};
 
-pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, Vec<Warning>, HashMap<u32, Name>) {
+pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, HashMap<u32, Name>, Vec<Warning>) {
   let mut warnings = Vec::new();
   let mut nets = HashMap::new();
   let mut id_to_hvmc_name = HashMap::new();
@@ -34,7 +34,7 @@ pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap
     }
   }
 
-  (nets, id_to_hvmc_name, warnings, label_generator.labels_to_tag)
+  (nets, id_to_hvmc_name, label_generator.labels_to_tag, warnings)
 }
 
 /// Converts rules names to unique names compatible with hvm-core:

@@ -35,8 +35,8 @@ impl std::fmt::Display for Warning {
 pub struct CompileResult {
   pub core_book: hvmc::ast::Book,
   pub hvmc_name_to_id: HashMap<Val, DefId>,
-  pub warnings: Vec<Warning>,
   pub labels_to_tag: HashMap<u32, Name>,
+  pub warnings: Vec<Warning>,
 }
 
 impl std::fmt::Debug for CompileResult {
@@ -65,11 +65,11 @@ pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
   book.detach_supercombinators();
   book.simplify_ref_to_ref()?;
   book.prune(main);
-  let (nets, id_to_hvmc_name, warnings, labels_to_tag) = book_to_nets(book, main);
+  let (nets, id_to_hvmc_name, labels_to_tag, warnings) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &id_to_hvmc_name)?;
   pre_reduce_book(&mut core_book)?;
   let hvmc_name_to_id = id_to_hvmc_name.into_iter().map(|(k, v)| (v, k)).collect();
-  Ok(CompileResult { core_book, hvmc_name_to_id, warnings, labels_to_tag })
+  Ok(CompileResult { core_book, hvmc_name_to_id, labels_to_tag, warnings })
 }
 
 pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize, parallel: bool) -> (Net, RunStats) {
@@ -99,7 +99,7 @@ pub fn run_book(
   mem_size: usize,
   parallel: bool,
 ) -> Result<(Term, DefNames, RunInfo), String> {
-  let CompileResult { core_book, hvmc_name_to_id, warnings, labels_to_tag } = compile_book(&mut book)?;
+  let CompileResult { core_book, hvmc_name_to_id, labels_to_tag, warnings } = compile_book(&mut book)?;
 
   if !warnings.is_empty() {
     for warn in warnings {
