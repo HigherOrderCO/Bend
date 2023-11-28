@@ -93,16 +93,11 @@ impl Term {
         *match_count += 1;
 
         let Term::Match { scrutinee, arms } = std::mem::take(self) else { unreachable!() };
+        let Term::Var { nam } = *scrutinee else { unreachable!() };
 
         if matches!(arms[0], (RulePat::Num(_), _)) {
-          *self = Term::Match {
-            scrutinee,
-            arms: match_native_arms(arms, def_name, def_names, new_rules, *match_count),
-          };
+          *self = match_native(nam, arms, def_name, def_names, new_rules, *match_count);
         } else {
-          // the scrutinee of a match on adts should always be a var
-          let Term::Var { nam } = *scrutinee else { unreachable!() };
-
           let rules: Vec<_> = arms
             .iter()
             .map(|(rule, _)| match rule {
@@ -137,25 +132,37 @@ impl Term {
   }
 }
 
-/// Split each arm of a native number match on its own rule
-fn match_native_arms(
+/// Split each arm of a native number match on its own rule and reconstructs the match term
+fn match_native(
+  scrutinee: Name,
   arms: Vec<(RulePat, Term)>,
   def_name: &Name,
   def_names: &mut DefNames,
   new_rules: &mut BTreeMap<DefId, Definition>,
   match_count: usize,
-) -> Vec<(RulePat, Term)> {
+) -> Term {
   let mut new_arms = Vec::new();
 
   for (rule, mut body) in arms {
     let (name, bind) = match &rule {
       RulePat::Num(MatchNum::Zero) => ("zero", None),
-      RulePat::Num(MatchNum::Succ(nam)) => ("succ", nam.clone()),
-      _ => unreachable!(),
+      RulePat::Num(MatchNum::Succ(Some(nam))) => ("succ", Some(nam.clone())),
+      _ => unreachable!(), // Succ(None) should not happen here
     };
 
+    let mut pass_scrutinee = false;
+
     if let Some(nam) = &bind {
-      body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) }
+      let free = body.free_vars();
+      pass_scrutinee = free.contains_key(&scrutinee);
+
+      body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) };
+
+      if pass_scrutinee {
+        body = Term::Lam { nam: Some(scrutinee.clone()), bod: Box::new(body) };
+      }
+    } else {
+      body.subst(&scrutinee, &Term::Num { val: 0 });
     }
 
     let name = make_def_name(def_name, &Name(name.to_string()), match_count);
@@ -167,13 +174,16 @@ fn match_native_arms(
     let mut body = Term::Ref { def_id };
 
     if let Some(nam) = bind {
+      if pass_scrutinee {
+        body = Term::App { fun: Box::new(body), arg: Box::new(Term::Var { nam: scrutinee.clone() }) }
+      }
       body = Term::App { fun: Box::new(body), arg: Box::new(Term::Var { nam }) }
     }
 
     new_arms.push((rule, body));
   }
 
-  new_arms
+  Term::Match { scrutinee: Box::new(Term::Var { nam: scrutinee }), arms: new_arms }
 }
 
 /// Split each arm of an adt match on its own rule,
