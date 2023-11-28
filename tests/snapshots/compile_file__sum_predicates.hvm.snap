@@ -1,0 +1,16 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/sum_predicates.hvm
+---
+@3 = #0
+@4 = (a a)
+@5 = (a a)
+@6 = (<+ a b> (a b))
+@7 = (?<(@3 @4) a> a)
+@8 = ({2 a b} (?<(c d) e> e))
+& @6 ~ (a d)
+& @5 ~ (b c)
+@main = a
+& @sum_ ~ (#8 (#5 a))
+@sum_ = (?<(@7 @8) a> a)
+

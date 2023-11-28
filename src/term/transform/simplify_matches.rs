@@ -151,20 +151,18 @@ fn match_native(
       _ => unreachable!(), // Succ(None) should not happen here
     };
 
-    let mut pass_scrutinee = false;
+    let mut free_vars: IndexSet<_> =
+      body.free_vars().into_keys().filter(|k| k.0 != format!("{scrutinee}-1")).collect();
 
     if let Some(nam) = &bind {
-      let free = body.free_vars();
-      pass_scrutinee = free.contains_key(&scrutinee);
-
       body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) };
-
-      if pass_scrutinee {
-        body = Term::Lam { nam: Some(scrutinee.clone()), bod: Box::new(body) };
-      }
     } else {
+      free_vars.shift_remove(&scrutinee);
       body.subst(&scrutinee, &Term::Num { val: 0 });
     }
+
+    body =
+      free_vars.iter().cloned().rev().fold(body, |acc, f| Term::Lam { nam: Some(f), bod: Box::new(acc) });
 
     let name = make_def_name(def_name, &Name(name.to_string()), match_count);
     let def_id = def_names.insert(name);
@@ -172,12 +170,12 @@ fn match_native(
     let def = Definition { def_id, rules };
     new_rules.insert(def_id, def);
 
-    let mut body = Term::Ref { def_id };
+    let mut body = free_vars.into_iter().fold(Term::Ref { def_id }, |acc, nam| Term::App {
+      fun: Box::new(acc),
+      arg: Box::new(Term::Var { nam }),
+    });
 
     if let Some(nam) = bind {
-      if pass_scrutinee {
-        body = Term::App { fun: Box::new(body), arg: Box::new(Term::Var { nam: scrutinee.clone() }) }
-      }
       body = Term::App { fun: Box::new(body), arg: Box::new(Term::Var { nam }) }
     }
 
@@ -259,9 +257,9 @@ fn match_adt_app(
 }
 
 fn binded(bind: &Name, acc: &Name) -> Name {
-  Name::new(&format!("{bind}.{acc}"))
+  Name(format!("{bind}.{acc}"))
 }
 
 fn make_def_name(def_name: &Name, ctr: &Name, i: usize) -> Name {
-  Name::new(&format!("{def_name}${ctr}${i}"))
+  Name(format!("{def_name}${ctr}${i}"))
 }
