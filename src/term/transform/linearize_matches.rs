@@ -36,7 +36,7 @@ impl Term {
       | Term::Dup { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd }
       | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd }
+      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.linearize_matches();
         snd.linearize_matches();
@@ -66,7 +66,7 @@ impl Term {
 
       Term::App { fun: fst, arg: snd }
       | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd }
+      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.linearize_matches_by(name);
         snd.linearize_matches_by(name);
