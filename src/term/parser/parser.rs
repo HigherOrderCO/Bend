@@ -76,13 +76,6 @@ where
   select!(Token::Name(name) => Name(name))
 }
 
-fn optional_tag<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
-where
-  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
-{
-  just(Token::Hash).ignore_then(name()).or_not()
-}
-
 fn tag<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -162,7 +155,7 @@ where
 
     // dup #tag? x1 x2 = body; next
     let dup = just(Token::Dup)
-      .ignore_then(optional_tag())
+      .ignore_then(tag().or_not())
       .then(name_or_era())
       .then(name_or_era())
       .then_ignore(just(Token::Equals))
