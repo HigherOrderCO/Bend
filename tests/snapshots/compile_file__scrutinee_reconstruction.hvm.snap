@@ -6,9 +6,9 @@ input_file: tests/golden_tests/compile_file/scrutinee_reconstruction.hvm
 & @Some ~ (a b)
 @6 = (a a)
 @None = (* (a a))
-@Opti = ((@5 (@6 a)) a)
+@Option.or = ((@5 (@6 a)) a)
 @Some = (a ((a b) (* b)))
 @main = a
-& @Opti ~ (b (@None a))
+& @Option.or ~ (b (@None a))
 & @Some ~ (#5 b)
 

@@ -26,7 +26,7 @@ pub fn pre_reduce_net(nam: &str, net: &mut hvmc::ast::Net) -> Result<(), String>
 pub fn pre_reduce_run_net(nam: &str, net: &mut hvmc::run::Net) -> Result<(), String> {
   // Note: not calling Book::new() since that takes super long (~600ms).
   // We know it's okay in this specific case since we are sure no derefs will occur.
-  let book = hvmc::run::Book { defs: vec![] };
+  let book = hvmc::run::Book::new();
   let mut collected_redexes = vec![];
   const MAX_ITERS: usize = 100_000_000;
   let mut num_iters = 0;

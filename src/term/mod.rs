@@ -111,7 +111,7 @@ pub enum Term {
     snd: Box<Term>,
   },
   Num {
-    val: u32,
+    val: u64,
   },
   /// A numeric operation between built-in numbers.
   Opx {
@@ -147,12 +147,14 @@ pub enum Op {
   NE,
   LT,
   GT,
+  LTE,
+  GTE,
   AND,
   OR,
   XOR,
-  NOT,
   LSH,
   RSH,
+  NOT,
 }
 
 /// A user defined  datatype
@@ -571,12 +573,14 @@ impl fmt::Display for Op {
       Op::NE => write!(f, "!="),
       Op::LT => write!(f, "<"),
       Op::GT => write!(f, ">"),
+      Op::LTE => write!(f, "<="),
+      Op::GTE => write!(f, ">="),
       Op::AND => write!(f, "&"),
       Op::OR => write!(f, "|"),
       Op::XOR => write!(f, "^"),
-      Op::NOT => write!(f, "~"),
       Op::LSH => write!(f, "<<"),
       Op::RSH => write!(f, ">>"),
+      Op::NOT => write!(f, "~"),
     }
   }
 }

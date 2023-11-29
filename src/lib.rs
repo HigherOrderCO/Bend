@@ -2,7 +2,7 @@
 
 use hvmc::{
   ast::{book_to_runtime, name_to_val, net_from_runtime, runtime_net_to_runtime_def, show_book, Net},
-  run::{self, Heap, Rewrites, Val},
+  run::{Heap, Rewrites, Val},
 };
 use hvmc_net::pre_reduce::pre_reduce_book;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
@@ -76,7 +76,7 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize, parallel: bool) -> 
   let runtime_book = book_to_runtime(book);
   let heap = Heap::init(mem_size);
   let mut root = hvmc::run::Net::new(&heap);
-  root.boot(name_to_val(DefNames::ENTRY_POINT) as run::Loc);
+  root.boot(name_to_val(DefNames::ENTRY_POINT));
 
   let start_time = Instant::now();
 
