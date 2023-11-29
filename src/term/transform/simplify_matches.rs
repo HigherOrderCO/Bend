@@ -1,6 +1,6 @@
 use crate::term::{
   check::type_check::{infer_arg_type, Type},
-  Adt, Book, DefId, DefNames, Definition, MatchNum, Name, Rule, RulePat, Term,
+  Adt, Book, DefId, DefNames, Definition, MatchNum, Name, Pattern, Rule, Term,
 };
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -29,7 +29,7 @@ impl Book {
 
 impl Term {
   pub fn check_matches<'a>(
-    pats: &[RulePat],
+    pats: &[Pattern],
     adts: &'a BTreeMap<Name, Adt>,
     ctrs: &HashMap<Name, Name>,
   ) -> Result<&'a Adt, String> {
@@ -44,7 +44,7 @@ impl Term {
     let mut missing: HashSet<_> = ctrs.keys().collect();
 
     for rule in pats {
-      let RulePat::Ctr(nam, _) = rule else { unreachable!() };
+      let Pattern::Ctr(nam, _) = rule else { unreachable!() };
 
       if !names.insert(nam.clone()) {
         repeated.insert(nam.clone());
@@ -96,13 +96,13 @@ impl Term {
         let Term::Match { scrutinee, arms } = std::mem::take(self) else { unreachable!() };
         let Term::Var { nam } = *scrutinee else { unreachable!() };
 
-        if matches!(arms[0], (RulePat::Num(_), _)) {
+        if matches!(arms[0], (Pattern::Num(_), _)) {
           *self = match_native(nam, arms, def_name, def_names, new_rules, *match_count);
         } else {
           let rules: Vec<_> = arms
             .iter()
             .map(|(rule, _)| match rule {
-              RulePat::Var(nam) => RulePat::Ctr(nam.clone(), Vec::new()),
+              Pattern::Var(nam) => Pattern::Ctr(nam.clone(), Vec::new()),
               _ => unreachable!(),
             })
             .collect();
@@ -136,7 +136,7 @@ impl Term {
 /// Split each arm of a native number match on its own rule and reconstructs the match term
 fn match_native(
   scrutinee: Name,
-  arms: Vec<(RulePat, Term)>,
+  arms: Vec<(Pattern, Term)>,
   def_name: &Name,
   def_names: &mut DefNames,
   new_rules: &mut BTreeMap<DefId, Definition>,
@@ -152,8 +152,8 @@ fn match_native(
 
   for (rule, mut body) in arms {
     let (name, bind) = match &rule {
-      RulePat::Num(MatchNum::Zero) => ("zero", None),
-      RulePat::Num(MatchNum::Succ(Some(nam))) => ("succ", Some(nam.clone())),
+      Pattern::Num(MatchNum::Zero) => ("zero", None),
+      Pattern::Num(MatchNum::Succ(Some(nam))) => ("succ", Some(nam.clone())),
       _ => unreachable!(), // Succ(None) should not happen here
     };
 
@@ -191,7 +191,7 @@ fn match_native(
 fn match_adt_app(
   scrutinee: Name,
   Adt { ctrs }: &Adt,
-  arms: &[(RulePat, Term)],
+  arms: &[(Pattern, Term)],
   def_name: &Name,
   def_names: &mut DefNames,
   new_rules: &mut BTreeMap<DefId, Definition>,
@@ -203,7 +203,7 @@ fn match_adt_app(
 
   for (ctr_name, args) in ctrs {
     for (rule, term) in arms {
-      let RulePat::Var(ctr) = rule else { unreachable!() };
+      let Pattern::Var(ctr) = rule else { unreachable!() };
 
       if ctr == ctr_name {
         let mut term = term.clone();

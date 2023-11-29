@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::term::{Book, DefNames, LetPat, MatchNum, Name, RulePat, Term};
+use crate::term::{Book, DefNames, MatchNum, Name, Pattern, Term};
 
 impl Book {
   /// Decides if names inside a term belong to a Var or to a Ref.
@@ -28,13 +28,13 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(bod, def_names, scope);
       pop_scope(nam.clone(), scope);
     }
-    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+    Term::Let { pat: Pattern::Var(nam), val, nxt } => {
       resolve_refs(val, def_names, scope);
       push_scope(Some(nam.clone()), scope);
       resolve_refs(nxt, def_names, scope);
       pop_scope(Some(nam.clone()), scope);
     }
-    Term::Dup { tag: _, fst, snd, val, nxt } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+    Term::Dup { tag: _, fst, snd, val, nxt } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
       resolve_refs(val, def_names, scope);
       push_scope(fst.clone(), scope);
       push_scope(snd.clone(), scope);
@@ -42,6 +42,7 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       pop_scope(fst.clone(), scope);
       pop_scope(snd.clone(), scope);
     }
+    Term::Let { .. } => todo!(),
 
     // If variable not defined, we check if it's a ref and swap if it is.
     Term::Var { nam } => {
@@ -62,13 +63,13 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
     Term::Match { scrutinee, arms } => {
       resolve_refs(scrutinee, def_names, scope);
       for (pat, term) in arms {
-        if let RulePat::Num(MatchNum::Succ(p)) = pat {
+        if let Pattern::Num(MatchNum::Succ(p)) = pat {
           push_scope(p.clone(), scope)
         }
 
         resolve_refs(term, def_names, scope);
 
-        if let RulePat::Num(MatchNum::Succ(p)) = pat {
+        if let Pattern::Num(MatchNum::Succ(p)) = pat {
           pop_scope(p.clone(), scope)
         }
       }

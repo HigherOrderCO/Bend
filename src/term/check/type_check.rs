@@ -1,4 +1,4 @@
-use crate::term::{Book, DefId, Definition, Name, RulePat};
+use crate::term::{Book, DefId, Definition, Name, Pattern};
 use core::fmt;
 use std::collections::HashMap;
 
@@ -36,21 +36,22 @@ impl Definition {
 }
 
 pub fn infer_arg_type<'a>(
-  pats: impl Iterator<Item = &'a RulePat>,
+  pats: impl Iterator<Item = &'a Pattern>,
   ctrs: &HashMap<Name, Name>,
 ) -> Result<Type, String> {
   let mut arg_type = Type::Any;
   for pat in pats {
     let pat_type = match pat {
-      RulePat::Var(_) => Type::Any,
-      RulePat::Ctr(ctr_nam, _) => {
+      Pattern::Var(_) => Type::Any,
+      Pattern::Ctr(ctr_nam, _) => {
         if let Some(adt_nam) = ctrs.get(ctr_nam) {
           Type::Adt(adt_nam.clone())
         } else {
           return Err(format!("Unknown constructor '{ctr_nam}'"));
         }
       }
-      RulePat::Num(_) => todo!(),
+      Pattern::Num(..) => todo!(),
+      Pattern::Tup(..) => todo!(),
     };
     unify(pat_type, &mut arg_type)?;
   }

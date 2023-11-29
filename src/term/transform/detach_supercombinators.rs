@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::term::{Book, DefId, DefNames, Definition, LetPat, MatchNum, Name, Rule, RulePat, Term};
+use crate::term::{Book, DefId, DefNames, Definition, MatchNum, Name, Pattern, Rule, Term};
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
@@ -106,14 +106,14 @@ impl Term {
           false
         }
         Term::Lnk { .. } => false,
-        Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+        Term::Let { pat: Pattern::Var(nam), val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_super = go(nxt, depth + 1, term_info);
           term_info.provide(Some(nam));
 
           val_is_super && nxt_is_super
         }
-        Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+        Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_supper = go(nxt, depth + 1, term_info);
 
@@ -122,11 +122,12 @@ impl Term {
 
           val_is_super && nxt_is_supper
         }
+        Term::Let { .. } => todo!(),
         Term::Match { scrutinee, arms } => {
           let mut is_super = go(scrutinee, depth + 1, term_info);
 
           for (pat, term) in arms {
-            let RulePat::Num(num) = pat else { unreachable!() };
+            let Pattern::Num(num) = pat else { unreachable!() };
 
             if let MatchNum::Succ(nam) = num {
               term_info.provide(nam.as_ref());

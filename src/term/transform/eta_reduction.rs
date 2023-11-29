@@ -40,7 +40,7 @@ impl Term {
         for (rule, term) in arms {
           term.eta_reduction();
 
-          if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+          if let Pattern::Num(MatchNum::Succ(nam)) = rule {
             let mut lam = Term::Lam { nam: nam.take(), bod: Box::new(std::mem::replace(term, Term::Era)) };
             lam.eta_reduction();
             match lam {
@@ -49,7 +49,7 @@ impl Term {
                 *term = *bod;
               }
               body => {
-                *rule = RulePat::Num(MatchNum::Zero);
+                *rule = Pattern::Num(MatchNum::Zero);
                 *term = body;
               }
             }

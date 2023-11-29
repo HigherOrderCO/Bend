@@ -1,4 +1,4 @@
-use crate::term::{Book, RulePat};
+use crate::term::{Book, Pattern};
 
 impl Book {
   /// Resolve Constructor names inside rule patterns.
@@ -9,9 +9,9 @@ impl Book {
     for def in self.defs.values_mut() {
       for rule in &mut def.rules {
         for pat in &mut rule.pats {
-          if let RulePat::Var(nam) = &pat {
+          if let Pattern::Var(nam) = &pat {
             if self.ctrs.contains_key(nam) {
-              *pat = RulePat::Ctr(nam.clone(), vec![])
+              *pat = Pattern::Ctr(nam.clone(), vec![])
             }
           }
         }

@@ -1,5 +1,8 @@
-use super::{var_id_to_name, Book, DefId, LetPat, MatchNum, Name, Op, RulePat, Term, Val};
-use crate::net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
+use super::{var_id_to_name, Book, DefId, MatchNum, Name, Op, Term, Val};
+use crate::{
+  net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
+  term::Pattern,
+};
 use hvmc::run::Loc;
 use indexmap::IndexSet;
 use std::collections::{HashMap, HashSet};
@@ -53,7 +56,8 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
         2 => {
           // Read the matched expression
           let cond_port = net.enter_port(Port(node, 0));
-          let (cond_term, cond_valid) = reader(net, cond_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (cond_term, cond_valid) =
+            reader(net, cond_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
 
           // Read the pattern matching node
           let sel_node = net.enter_port(Port(node, 1)).node();
@@ -66,9 +70,11 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
-          let (zero_term, zero_valid) = reader(net, zero_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (zero_term, zero_valid) =
+            reader(net, zero_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
           let succ_port = net.enter_port(Port(sel_node, 2));
-          let (succ_term, succ_valid) = reader(net, succ_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (succ_term, succ_valid) =
+            reader(net, succ_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
 
           let valid = cond_valid && zero_valid && succ_valid;
 
@@ -176,7 +182,8 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
   // Read all the let bodies.
   while let Some(tup) = tup_scope.vec.pop() {
     let val = net.enter_port(Port(tup, 0));
-    let (val, val_valid) = reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, labels_to_tag, book);
+    let (val, val_valid) =
+      reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, labels_to_tag, book);
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
 
@@ -186,7 +193,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
 
     match let_ctx.search_and_insert(&mut main, &mut free_vars).0 {
       LetInsertion::Err(fst, snd, val) => {
-        main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) }
+        main = Term::Let { pat: Pattern::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) }
       }
       LetInsertion::Ok => {}
       _ => unreachable!(),
@@ -254,7 +261,7 @@ impl Term {
     if free_vars.is_empty() {
       let nxt = Box::new(std::mem::replace(self, Term::Era));
 
-      *self = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt };
+      *self = Term::Let { pat: Pattern::Tup(fst, snd), val: Box::new(val), nxt };
       LetInsertion::Ok
     } else {
       // Otherwise, return a failed attempt, that will pass through to the first call to `search and insert`
@@ -271,9 +278,9 @@ impl Term {
 
       Term::Lam { nam: None, bod } => ctx.search_and_insert(bod, free_vars),
 
-      Term::Let { pat: LetPat::Var(_), .. } => unreachable!(),
+      Term::Let { pat: Pattern::Var(_), .. } => unreachable!(),
 
-      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
+      Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
         let (ctx, val_use) = val.resolve_let_scope(ctx, free_vars);
 
         fst.as_ref().map(|fst| free_vars.remove(fst));
@@ -283,11 +290,13 @@ impl Term {
         (ctx, val_use || nxt_use)
       }
 
+      Term::Let { .. } => todo!(),
+
       Term::Match { scrutinee, arms } => {
         let (mut ctx, mut val_use) = scrutinee.resolve_let_scope(ctx, free_vars);
 
         for (rule, term) in arms {
-          if let RulePat::Num(MatchNum::Succ(Some(p))) = rule {
+          if let Pattern::Num(MatchNum::Succ(Some(p))) = rule {
             free_vars.remove(p);
           }
 
@@ -382,7 +391,8 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
           seen.insert(Port(node, 0));
           seen.insert(Port(node, 1));
           let cond_port = net.enter_port(Port(node, 0));
-          let (cond_term, cond_valid) = reader(net, cond_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (cond_term, cond_valid) =
+            reader(net, cond_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
 
           // Read the pattern matching node
           let sel_node = net.enter_port(Port(node, 1)).node();
@@ -398,9 +408,11 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
-          let (zero_term, zero_valid) = reader(net, zero_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (zero_term, zero_valid) =
+            reader(net, zero_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
           let succ_port = net.enter_port(Port(sel_node, 2));
-          let (succ_term, succ_valid) = reader(net, succ_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (succ_term, succ_valid) =
+            reader(net, succ_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
 
           let valid = cond_valid && zero_valid && succ_valid;
 
@@ -430,9 +442,11 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
           seen.insert(Port(node, 1));
           seen.insert(Port(node, 2));
           let fst_port = net.enter_port(Port(node, 1));
-          let (fst, fst_valid) = reader(net, fst_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (fst, fst_valid) =
+            reader(net, fst_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
           let snd_port = net.enter_port(Port(node, 2));
-          let (snd, snd_valid) = reader(net, snd_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (snd, snd_valid) =
+            reader(net, snd_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
           let valid = fst_valid && snd_valid;
           let tag = labels_to_tag.get(&lab).cloned().unwrap_or_else(|| Name::new("auto"));
           (Term::Sup { tag, fst: Box::new(fst), snd: Box::new(snd) }, valid)
@@ -455,9 +469,11 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
           seen.insert(Port(node, 1));
           seen.insert(Port(node, 2));
           let fst_port = net.enter_port(Port(node, 1));
-          let (fst, fst_valid) = reader(net, fst_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (fst, fst_valid) =
+            reader(net, fst_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
           let snd_port = net.enter_port(Port(node, 2));
-          let (snd, snd_valid) = reader(net, snd_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (snd, snd_valid) =
+            reader(net, snd_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
           let valid = fst_valid && snd_valid;
           (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
@@ -484,14 +500,23 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
   let mut seen = HashSet::new();
 
   // Reads the main term from the net
-  let (mut main, mut valid) =
-    reader(net, net.enter_port(ROOT), &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels_to_tag, book);
+  let (mut main, mut valid) = reader(
+    net,
+    net.enter_port(ROOT),
+    &mut namegen,
+    &mut dup_scope,
+    &mut tup_scope,
+    &mut seen,
+    labels_to_tag,
+    book,
+  );
 
   // Read all the dup bodies.
   while let Some(dup) = dup_scope.vec.pop() {
     seen.insert(Port(dup, 0));
     let val = net.enter_port(Port(dup, 0));
-    let (val, val_valid) = reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels_to_tag, book);
+    let (val, val_valid) =
+      reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels_to_tag, book);
     let fst = namegen.decl_name(net, Port(dup, 1));
     let snd = namegen.decl_name(net, Port(dup, 2));
     main = Term::Dup { tag: None, fst, snd, val: Box::new(val), nxt: Box::new(main) };
@@ -502,10 +527,11 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
   while let Some(tup) = tup_scope.vec.pop() {
     seen.insert(Port(tup, 0));
     let val = net.enter_port(Port(tup, 0));
-    let (val, val_valid) = reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels_to_tag, book);
+    let (val, val_valid) =
+      reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels_to_tag, book);
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
-    main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) };
+    main = Term::Let { pat: Pattern::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) };
     valid = valid && val_valid;
   }
 
@@ -636,7 +662,7 @@ impl Term {
         scrutinee.fix_names(id_counter, book);
 
         for (rule, term) in arms {
-          if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+          if let Pattern::Num(MatchNum::Succ(nam)) = rule {
             fix_name(nam, id_counter, term);
           }
 

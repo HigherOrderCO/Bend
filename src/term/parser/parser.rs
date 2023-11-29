@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{Adt, Book, LetPat, MatchNum, Name, Op, Rule, RulePat, Term};
+use crate::term::{Adt, Book, MatchNum, Name, Op, Pattern, Rule, Term};
 use chumsky::{
   extra,
   input::{SpannedInput, Stream, ValueInput},
@@ -183,7 +183,13 @@ where
     // let a = ...
     // let (a, b) = ...
     let let_ = just(Token::Let)
-      .ignore_then(let_pat())
+      .ignore_then(pattern())
+      .validate(|pat, span, emit| {
+        if !matches!(&pat, Pattern::Var(..) | Pattern::Tup(..)) {
+          emit.emit(Rich::custom(span, "Numbers and Constructors not supported in let."));
+        }
+        pat
+      })
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(term_sep.clone())
@@ -192,7 +198,16 @@ where
       .boxed();
 
     // pat: term
-    let match_arm = rule_pat().then_ignore(just(Token::Colon)).then(term.clone()).boxed();
+    let match_arm = pattern()
+      .validate(|this, span, emit| {
+        if !matches!(&this, Pattern::Var(..)) {
+          emit.emit(Rich::custom(span, "Numbers, Constructors and Tuples not supported in match arm."));
+        }
+        this
+      })
+      .then_ignore(just(Token::Colon))
+      .then(term.clone())
+      .boxed();
 
     // match scrutinee { pat: term;... }
     let match_ = just(Token::Match)
@@ -218,8 +233,8 @@ where
       .map(|((cond, zero), succ)| Term::Match {
         scrutinee: Box::new(Term::Var { nam: cond.clone() }),
         arms: vec![
-          (RulePat::Num(MatchNum::Zero), zero),
-          (RulePat::Num(MatchNum::Succ(Some(Name(format!("{cond}-1"))))), succ),
+          (Pattern::Num(MatchNum::Zero), zero),
+          (Pattern::Num(MatchNum::Succ(Some(Name(format!("{cond}-1"))))), succ),
         ],
       })
       .boxed();
@@ -258,36 +273,27 @@ where
   })
 }
 
-fn let_pat<'a, I>() -> impl Parser<'a, I, LetPat, extra::Err<Rich<'a, Token>>>
+fn pattern<'a, I>() -> impl Parser<'a, I, Pattern, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let pat_nam = name().map(LetPat::Var).boxed();
-
-  let pat_tup = name_or_era()
-    .then_ignore(just(Token::Comma))
-    .then(name_or_era())
-    .delimited_by(just(Token::LParen), just(Token::RParen))
-    .map(|(fst, snd)| LetPat::Tup(fst, snd))
-    .boxed();
-
-  choice((pat_nam, pat_tup))
-}
-
-fn rule_pat<'a, I>() -> impl Parser<'a, I, RulePat, extra::Err<Rich<'a, Token>>>
-where
-  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
-{
-  recursive(|rule_pat| {
-    let var = name().map(RulePat::Var).boxed();
+  recursive(|pattern| {
+    let var = name().map(Pattern::Var).boxed();
 
     let ctr = name()
-      .then(rule_pat.clone().repeated().collect())
-      .map(|(nam, xs)| RulePat::Ctr(nam, xs))
+      .then(pattern.clone().repeated().collect())
+      .map(|(nam, xs)| Pattern::Ctr(nam, xs))
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
-    let zero = select!(Token::Num(0) => RulePat::Num(MatchNum::Zero)).validate(|this, span, emit| {
+    let tup = name_or_era()
+      .then_ignore(just(Token::Comma))
+      .then(name_or_era())
+      .delimited_by(just(Token::LParen), just(Token::RParen))
+      .map(|(fst, snd)| Pattern::Tup(fst, snd))
+      .boxed();
+
+    let zero = select!(Token::Num(0) => Pattern::Num(MatchNum::Zero)).validate(|this, span, emit| {
       emit.emit(Rich::custom(span, "Old zero syntax not supported."));
       this
     });
@@ -295,14 +301,14 @@ where
     let succ = just(Token::Num(1))
       .ignore_then(just(Token::Add))
       .ignore_then(name_or_era())
-      .map(|x| RulePat::Num(MatchNum::Succ(x)))
+      .map(|x| Pattern::Num(MatchNum::Succ(x)))
       .boxed()
       .validate(|this, span, emit| {
         emit.emit(Rich::custom(span, "Old pred syntax not supported."));
         this
       });
 
-    choice((zero, succ, var, ctr))
+    choice((zero, succ, var, ctr, tup))
   })
 }
 
@@ -310,7 +316,7 @@ fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let lhs = name().then(rule_pat().repeated().collect()).boxed();
+  let lhs = name().then(pattern().repeated().collect()).boxed();
   let lhs = choice((lhs.clone(), lhs.clone().delimited_by(just(Token::LParen), just(Token::RParen))));
 
   lhs.then_ignore(just(Token::Equals)).then(term()).map(|((name, pats), body)| (name, Rule { pats, body }))
