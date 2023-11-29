@@ -119,6 +119,27 @@ pub fn run_book(
   Ok((res_term, book.def_names, info))
 }
 
+pub fn desugar_book(book: &mut Book) -> Result<(), String> {
+  let main = book.check_has_main()?;
+  book.check_shared_names()?;
+  book.resolve_ctrs_in_pats();
+  book.generate_scott_adts();
+  book.check_unbound_pats()?;
+  book.flatten_rules();
+  let def_types = book.infer_def_types()?;
+  book.check_exhaustive_patterns(&def_types)?;
+  book.encode_pattern_matching_functions(&def_types);
+  book.resolve_refs();
+  book.check_unbound_vars()?;
+  book.make_var_names_unique();
+  book.linearize_vars();
+  book.eta_reduction();
+  book.detach_supercombinators();
+  book.simplify_ref_to_ref()?;
+  book.prune(main);
+  Ok(())
+}
+
 pub struct RunInfo {
   pub stats: RunStats,
   pub valid_readback: bool,

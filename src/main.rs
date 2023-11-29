@@ -1,6 +1,6 @@
 use clap::{Parser, ValueEnum};
 use hvmc::ast::{show_book, show_net};
-use hvml::{check_book, compile_book, load_file_to_book, run_book, total_rewrites, RunInfo};
+use hvml::{check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, RunInfo};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -33,6 +33,8 @@ enum Mode {
   Compile,
   /// Compiles the program and runs it with the hvm.
   Run,
+  /// Runs the lambda-term level optimization passes.
+  Desugar,
 }
 
 fn mem_parser(arg: &str) -> Result<usize, String> {
@@ -70,6 +72,10 @@ fn main() -> Result<(), String> {
       }
 
       print!("{}", show_book(&compiled.core_book));
+    }
+    Mode::Desugar => {
+      desugar_book(&mut book)?;
+      println!("{book}");
     }
     Mode::Run => {
       let mem_size = args.mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
