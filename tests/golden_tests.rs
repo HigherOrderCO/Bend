@@ -141,6 +141,10 @@ fn readback_lnet() {
 fn flatten_rules() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
+    book.check_shared_names()?;
+    book.resolve_ctrs_in_pats();
+    book.generate_scott_adts();
+    book.check_unbound_pats()?;
     book.flatten_rules();
     Ok(book.to_string())
   })

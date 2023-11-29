@@ -1,0 +1,5 @@
+data List = (Cons head tail) | Nil
+
+Unpack cmp Nil = Nil
+Unpack cmp (Cons h Nil) = h
+Unpack cmp xs = (cmp xs)
