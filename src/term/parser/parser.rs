@@ -104,6 +104,8 @@ where
     Token::NotEquals => Op::NE,
     Token::Ltn => Op::LT,
     Token::Gtn => Op::GT,
+    Token::Lte => Op::LTE,
+    Token::Gte => Op::GTE,
     Token::And => Op::AND,
     Token::Or => Op::OR,
     Token::Xor => Op::XOR,
