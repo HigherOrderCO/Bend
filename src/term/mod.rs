@@ -1,5 +1,5 @@
 use hvmc::run::Val;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
 use std::{
@@ -364,63 +364,70 @@ impl Term {
   }
 
   /// Collects all the free variables that a term has
-  pub fn free_vars(&self, free_vars: &mut IndexSet<Name>) {
-    match self {
-      Term::Lam { nam: Some(nam), bod } => {
-        let mut new_scope = IndexSet::new();
-        bod.free_vars(&mut new_scope);
-        new_scope.remove(nam);
-
-        free_vars.extend(new_scope);
-      }
-      Term::Lam { nam: None, bod } => bod.free_vars(free_vars),
-      Term::Var { nam } => _ = free_vars.insert(nam.clone()),
-      Term::Chn { bod, .. } => bod.free_vars(free_vars),
-      Term::Lnk { .. } => {}
-      Term::Let { pat: LetPat::Var(nam), val, nxt } => {
-        val.free_vars(free_vars);
-
-        let mut new_scope = IndexSet::new();
-        nxt.free_vars(&mut new_scope);
-
-        new_scope.remove(nam);
-
-        free_vars.extend(new_scope);
-      }
-      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
-        val.free_vars(free_vars);
-
-        let mut new_scope = IndexSet::new();
-        nxt.free_vars(&mut new_scope);
-
-        fst.as_ref().map(|fst| new_scope.remove(fst));
-        snd.as_ref().map(|snd| new_scope.remove(snd));
-
-        free_vars.extend(new_scope);
-      }
-      Term::App { fun: fst, arg: snd }
-      | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { op: _, fst, snd } => {
-        fst.free_vars(free_vars);
-        snd.free_vars(free_vars);
-      }
-      Term::Match { scrutinee, arms } => {
-        scrutinee.free_vars(free_vars);
-
-        for (rule, term) in arms {
-          let mut new_scope = IndexSet::new();
-          term.free_vars(&mut new_scope);
-
-          if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
-            new_scope.remove(nam);
-          }
+  /// and the number of times each var is used
+  pub fn free_vars(&self) -> IndexMap<Name, u64> {
+    fn go(term: &Term, free_vars: &mut IndexMap<Name, u64>) {
+      match term {
+        Term::Lam { nam: Some(nam), bod } => {
+          let mut new_scope = IndexMap::new();
+          go(bod, &mut new_scope);
+          new_scope.remove(nam);
 
           free_vars.extend(new_scope);
         }
+        Term::Lam { nam: None, bod } => go(bod, free_vars),
+        Term::Var { nam } => *free_vars.entry(nam.clone()).or_default() += 1,
+        Term::Chn { bod, .. } => go(bod, free_vars),
+        Term::Lnk { .. } => {}
+        Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+          go(val, free_vars);
+
+          let mut new_scope = IndexMap::new();
+          go(nxt, &mut new_scope);
+
+          new_scope.remove(nam);
+
+          free_vars.extend(new_scope);
+        }
+        Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
+          go(val, free_vars);
+
+          let mut new_scope = IndexMap::new();
+          go(nxt, &mut new_scope);
+
+          fst.as_ref().map(|fst| new_scope.remove(fst));
+          snd.as_ref().map(|snd| new_scope.remove(snd));
+
+          free_vars.extend(new_scope);
+        }
+        Term::App { fun: fst, arg: snd }
+        | Term::Tup { fst, snd }
+        | Term::Sup { fst, snd, .. }
+        | Term::Opx { op: _, fst, snd } => {
+          go(fst, free_vars);
+          go(snd, free_vars);
+        }
+        Term::Match { scrutinee, arms } => {
+          go(scrutinee, free_vars);
+
+          for (rule, term) in arms {
+            let mut new_scope = IndexMap::new();
+            go(term, &mut new_scope);
+
+            if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
+              new_scope.remove(nam);
+            }
+
+            free_vars.extend(new_scope);
+          }
+        }
+        Term::Ref { .. } | Term::Num { .. } | Term::Era => {}
       }
-      Term::Ref { .. } | Term::Num { .. } | Term::Era => {}
     }
+
+    let mut free_vars = IndexMap::new();
+    go(self, &mut free_vars);
+    free_vars
   }
 
   /// Creates a new [`Term::Match`] from the given terms.
@@ -428,19 +435,27 @@ impl Term {
   pub fn new_native_match(
     scrutinee: Self,
     zero_term: Self,
-    succ_label: Option<Name>,
+    mut succ_label: Option<Name>,
     mut succ_term: Self,
   ) -> Self {
     let zero = (RulePat::Num(MatchNum::Zero), zero_term);
 
-    if matches!(scrutinee, Term::Var { .. }) {
+    if let Term::Var { nam } = &scrutinee {
+      if let Some(label) = &succ_label {
+        let new_label = Name(format!("{}-1", nam));
+        succ_term.subst(label, &Term::Var { nam: new_label.clone() });
+        succ_label = Some(new_label);
+      }
+
       let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);
       Term::Match { scrutinee: Box::new(scrutinee), arms: vec![zero, succ] }
     } else {
       let match_bind = succ_label.clone().unwrap_or_else(|| Name::new("*"));
 
-      if succ_label.is_some() {
-        succ_term.subst(&match_bind, &Term::Var { nam: Name(format!("{}-1", match_bind)) });
+      if let Some(label) = &succ_label {
+        let new_label = Name(format!("{}-1", label));
+        succ_term.subst(label, &Term::Var { nam: new_label.clone() });
+        succ_label = Some(new_label);
       }
 
       let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);

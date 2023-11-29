@@ -1,6 +1,6 @@
 use crate::term::{
   check::type_check::{infer_arg_type, Type},
-  Adt, Book, DefId, DefNames, Definition, Name, Rule, RulePat, Term,
+  Adt, Book, DefId, DefNames, Definition, MatchNum, Name, Rule, RulePat, Term,
 };
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -91,17 +91,14 @@ impl Term {
           term.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
         }
 
+        *match_count += 1;
+
         let Term::Match { scrutinee, arms } = std::mem::take(self) else { unreachable!() };
+        let Term::Var { nam } = *scrutinee else { unreachable!() };
 
         if matches!(arms[0], (RulePat::Num(_), _)) {
-          *self = Term::Match {
-            scrutinee,
-            arms: match_native_arms(arms, def_name, def_names, new_rules, match_count),
-          };
+          *self = match_native(nam, arms, def_name, def_names, new_rules, *match_count);
         } else {
-          // the scrutinee of a match on adts should always be a var
-          let Term::Var { nam } = *scrutinee else { unreachable!() };
-
           let rules: Vec<_> = arms
             .iter()
             .map(|(rule, _)| match rule {
@@ -111,14 +108,12 @@ impl Term {
             .collect();
 
           let adt = Term::check_matches(&rules, adts, ctrs)?;
-
-          *match_count += 1;
-          *self = match_adt_app(nam, adt, arms, def_name, def_names, new_rules, *match_count);
+          *self = match_adt_app(nam, adt, &arms, def_name, def_names, new_rules, *match_count);
         }
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?
+        bod.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
       }
 
       Term::App { fun: fst, arg: snd }
@@ -138,111 +133,134 @@ impl Term {
   }
 }
 
-/// Split each arm of a native number match on its own rule
-fn match_native_arms(
-  arms: Vec<(RulePat, Term)>,
-  def_name: &Name,
-  def_names: &mut DefNames,
-  new_rules: &mut BTreeMap<DefId, Definition>,
-  match_count: &mut usize,
-) -> Vec<(RulePat, Term)> {
-  let mut new_arms = Vec::new();
-
-  for (rule, body) in arms {
-    let mut free_vars = IndexSet::new();
-    body.free_vars(&mut free_vars);
-
-    if free_vars.is_empty() {
-      new_arms.push((rule, body));
-      continue;
-    }
-
-    *match_count += 1;
-
-    let body = free_vars
-      .iter()
-      .rev()
-      .cloned()
-      .fold(body, |acc: Term, name| Term::Lam { nam: Some(name), bod: Box::new(acc) });
-
-    let rules = vec![Rule { pats: Vec::new(), body }];
-
-    let name = make_def_name(def_name, &Name("pred".to_string()), *match_count);
-
-    let def_id = def_names.insert(name.clone());
-    let def = Definition { def_id, rules };
-    new_rules.insert(def_id, def);
-
-    let body = free_vars.into_iter().fold(Term::Ref { def_id }, |acc, nam| Term::App {
-      fun: Box::new(acc),
-      arg: Box::new(Term::Var { nam }),
-    });
-
-    new_arms.push((rule, body));
-  }
-
-  new_arms
-}
-
-/// Split each arm of an adt match on its own rule,
-/// returning a scott encoded term of the aplication of the scrutinee to each rule
-fn match_adt_app(
-  nam: Name,
-  Adt { ctrs }: &Adt,
+/// Split each arm of a native number match on its own rule and reconstructs the match term
+fn match_native(
+  scrutinee: Name,
   arms: Vec<(RulePat, Term)>,
   def_name: &Name,
   def_names: &mut DefNames,
   new_rules: &mut BTreeMap<DefId, Definition>,
   match_count: usize,
 ) -> Term {
-  let mut apps = vec![];
+  let mut new_arms = Vec::new();
+
+  let mut free_vars = IndexSet::new();
+
+  for (_, body) in &arms {
+    free_vars.extend(body.free_vars().into_keys().filter(|Name(nam)| nam != &format!("{scrutinee}-1")));
+  }
+
+  for (rule, mut body) in arms {
+    let (name, bind) = match &rule {
+      RulePat::Num(MatchNum::Zero) => ("zero", None),
+      RulePat::Num(MatchNum::Succ(Some(nam))) => ("succ", Some(nam.clone())),
+      _ => unreachable!(), // Succ(None) should not happen here
+    };
+
+    if let Some(nam) = &bind {
+      body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) };
+    }
+
+    body =
+      free_vars.iter().cloned().rev().fold(body, |acc, f| Term::Lam { nam: Some(f), bod: Box::new(acc) });
+
+    let name = make_def_name(def_name, &Name(name.to_string()), match_count);
+    let def_id = def_names.insert(name);
+    let rules = vec![Rule { pats: Vec::new(), body }];
+    let def = Definition { def_id, rules };
+    new_rules.insert(def_id, def);
+
+    let mut body = Term::Ref { def_id };
+
+    if let Some(nam) = bind {
+      body = Term::App { fun: Box::new(body), arg: Box::new(Term::Var { nam }) }
+    }
+
+    new_arms.push((rule, body));
+  }
+
+  free_vars
+    .into_iter()
+    .fold(Term::Match { scrutinee: Box::new(Term::Var { nam: scrutinee }), arms: new_arms }, |acc, nam| {
+      Term::App { fun: Box::new(acc), arg: Box::new(Term::Var { nam }) }
+    })
+}
+
+/// Split each arm of an adt match on its own rule,
+/// returning a scott encoded term of the aplication of the scrutinee to each rule
+fn match_adt_app(
+  scrutinee: Name,
+  Adt { ctrs }: &Adt,
+  arms: &[(RulePat, Term)],
+  def_name: &Name,
+  def_names: &mut DefNames,
+  new_rules: &mut BTreeMap<DefId, Definition>,
+  match_count: usize,
+) -> Term {
+  let mut refs_to_app = Vec::new();
+  let mut ordered_arms = Vec::new();
+  let mut free_vars = IndexSet::new();
 
   for (ctr_name, args) in ctrs {
-    for (rule, term) in arms.iter() {
+    for (rule, term) in arms {
       let RulePat::Var(ctr) = rule else { unreachable!() };
+
       if ctr == ctr_name {
-        let lam = args
-          .iter()
-          .rev()
-          .fold(term.clone(), |acc, n| Term::Lam { nam: Some(binded(&nam, n)), bod: Box::new(acc) });
-        let def_name = make_def_name(def_name, ctr_name, match_count);
-        apps.push((lam, def_name));
+        let mut term = term.clone();
+
+        term.subst(
+          &scrutinee,
+          &Term::call(
+            Term::Ref { def_id: def_names.def_id(ctr).unwrap() },
+            args.iter().map(|arg| Term::Var { nam: binded(&scrutinee, arg) }),
+          ),
+        );
+
+        let adt_binds: HashSet<_> = args.iter().map(|n| binded(&scrutinee, n)).collect();
+        let free_vars_staging = term.free_vars().into_keys().filter(|k| !adt_binds.contains(k));
+
+        free_vars.extend(free_vars_staging);
+        ordered_arms.push((ctr, term));
       }
     }
   }
 
-  let mut refs_to_app = Vec::new();
-
-  for (body, name) in apps {
-    let mut free_vars = IndexSet::new();
-    body.free_vars(&mut free_vars);
-
+  for (ctr, term) in ordered_arms {
     let body = free_vars
       .iter()
-      .rev()
       .cloned()
-      .fold(body, |acc: Term, name| Term::Lam { nam: Some(name), bod: Box::new(acc) });
+      .rev()
+      .fold(term, |acc: Term, name| Term::Lam { nam: Some(name), bod: Box::new(acc) });
+
+    let args = &ctrs[ctr];
+
+    let body = args
+      .iter()
+      .rev()
+      .fold(body, |acc, n| Term::Lam { nam: Some(binded(&scrutinee, n)), bod: Box::new(acc) });
 
     let rules = vec![Rule { pats: Vec::new(), body }];
-    let def_id = def_names.insert(name.clone());
+
+    let def_name = make_def_name(def_name, ctr, match_count);
+    let def_id = def_names.insert(def_name);
     let def = Definition { def_id, rules };
     new_rules.insert(def_id, def);
-    refs_to_app.push((def_id, free_vars));
+    refs_to_app.push(def_id);
   }
 
-  refs_to_app.into_iter().fold(Term::Var { nam }, |scrutinee, (def_id, free)| Term::App {
-    fun: Box::new(scrutinee),
-    arg: Box::new(free.into_iter().fold(Term::Ref { def_id }, |acc, nam| Term::App {
-      fun: Box::new(acc),
-      arg: Box::new(Term::Var { nam }),
-    })),
-  })
+  free_vars.into_iter().fold(
+    refs_to_app.into_iter().fold(Term::Var { nam: scrutinee }, |scrutinee, def_id| Term::App {
+      fun: Box::new(scrutinee),
+      arg: Box::new(Term::Ref { def_id }),
+    }),
+    |acc, nam| Term::App { fun: Box::new(acc), arg: Box::new(Term::Var { nam }) },
+  )
 }
 
 fn binded(bind: &Name, acc: &Name) -> Name {
-  Name::new(&format!("{bind}.{acc}"))
+  Name(format!("{bind}.{acc}"))
 }
 
 fn make_def_name(def_name: &Name, ctr: &Name, i: usize) -> Name {
-  Name::new(&format!("{def_name}${ctr}${i}"))
+  Name(format!("{def_name}${ctr}${i}"))
 }

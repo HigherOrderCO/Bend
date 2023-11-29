@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/match_mult_linearization.hvm
+---
+@2 = (<+ a <+ b c>> (a (b c)))
+@3 = (a (b (c (<+ a <+ b <+ c d>>> d))))
+@main = (?<(@2 @3) a> a)
+

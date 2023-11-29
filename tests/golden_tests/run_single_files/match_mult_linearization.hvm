@@ -1,0 +1,4 @@
+main = @a @b @c @d match a {
+  0: (+ (+ b c) d);
+  +: (+ (+ (+ a-1 b) c) d);
+}

@@ -1,0 +1,4 @@
+main = @a @b let c = (+ a a); match a {
+  0: b;
+  +: (+ a-1 b);
+}

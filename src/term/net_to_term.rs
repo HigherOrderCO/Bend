@@ -180,8 +180,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
 
-    let mut free_vars = IndexSet::new();
-    val.free_vars(&mut free_vars);
+    let mut free_vars = val.free_vars().into_keys().collect();
 
     let let_ctx = LetInsertion::Todo(fst, snd, val);
 
