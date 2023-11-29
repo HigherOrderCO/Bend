@@ -5,6 +5,7 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
   Any,
+  Tup,
   Adt(Name),
 }
 
@@ -50,8 +51,8 @@ pub fn infer_arg_type<'a>(
           return Err(format!("Unknown constructor '{ctr_nam}'"));
         }
       }
+      Pattern::Tup(..) => Type::Tup,
       Pattern::Num(..) => todo!(),
-      Pattern::Tup(..) => todo!(),
     };
     unify(pat_type, &mut arg_type)?;
   }
@@ -73,6 +74,7 @@ impl fmt::Display for Type {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Type::Any => write!(f, "any"),
+      Type::Tup => write!(f, "tup"),
       Type::Adt(nam) => write!(f, "{nam}"),
     }
   }

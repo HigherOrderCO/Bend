@@ -54,6 +54,7 @@ fn check_pattern(
           }
         }
       }
+      Type::Tup => todo!(),
     }
   }
   Ok(())
