@@ -1,0 +1,4 @@
+data bool = true | false
+
+Foo x false = x
+Foo x true = (Foo x x)

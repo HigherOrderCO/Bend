@@ -7,7 +7,7 @@ If False then else = else
 Pure x = (Cons x Nil)
 
 Map Nil f = Nil
-Map (Cons h t) f = (Cons (f h) (Map tail f))
+Map (Cons h t) f = (Cons (f h) (Map t f))
 
 MergeSort cmp xs = (Unpack cmp (Map xs Pure))
 

@@ -25,7 +25,7 @@ fn make_non_pattern_matching_def(book: &mut Book, def_id: DefId) {
   let def = book.defs.get_mut(&def_id).unwrap();
   let rule = def.rules.get_mut(0).unwrap();
   for pat in rule.pats.iter().rev() {
-    let RulePat::Var(var) = pat else {unreachable!()};
+    let RulePat::Var(var) = pat else { unreachable!() };
     let bod = std::mem::replace(&mut rule.body, Term::Era);
     rule.body = Term::Lam { nam: Some(var.clone()), bod: Box::new(bod) };
   }
@@ -82,10 +82,9 @@ fn make_pattern_matching_case(
   def_id: DefId,
   crnt_name: &Name,
   crnt_rules: Vec<usize>,
-  mut match_path: Vec<RulePat>,
+  match_path: Vec<RulePat>,
 ) {
   let def = &book.defs[&def_id];
-  let def_name = book.def_names.name(&def_id).unwrap();
   // This is safe since we check exhaustiveness earlier.
   let fst_rule_idx = crnt_rules[0];
   let fst_rule = &def.rules[fst_rule_idx];
@@ -96,25 +95,19 @@ fn make_pattern_matching_case(
   let all_args_done = crnt_arg_idx >= fst_rule.arity();
   let is_fst_rule_irrefutable =
     all_args_done || fst_rule.pats[crnt_arg_idx ..].iter().all(|p| matches!(p, RulePat::Var(_)));
+
   if is_fst_rule_irrefutable {
-    let rule_def_name = make_rule_name(def_name, fst_rule_idx);
-    let rule_def_id = book.def_names.def_id(&rule_def_name).unwrap();
-    make_leaf_pattern_matching_case(
-      book,
-      Name::new(crnt_name),
-      rule_def_id,
-      &fst_rule.pats.clone(),
-      match_path,
-    );
+    // First rule will always be selected, generate leaf case.
+    make_leaf_pattern_matching_case(book, def_id, crnt_name, fst_rule_idx, match_path);
   } else {
     let is_matching_case =
       crnt_rules.iter().any(|rule_idx| matches!(def.rules[*rule_idx].pats[crnt_arg_idx], RulePat::Ctr(..)));
     if is_matching_case {
+      // Current arg is pattern matching, encode the pattern matching call
       make_branch_pattern_matching_case(book, def_type, def_id, crnt_name, crnt_rules, match_path);
     } else {
-      // In non matching cases, we just add this argument to the variables and go to the next pattern.
-      match_path.push(RulePat::Var(Name::new("")));
-      make_pattern_matching_case(book, def_type, def_id, crnt_name, crnt_rules, match_path);
+      // Current arg is not pattern matching, call next subfunction passing this arg.
+      make_non_pattern_matching_case(book, def_type, def_id, crnt_name, crnt_rules, match_path);
     }
   }
 }
@@ -122,11 +115,16 @@ fn make_pattern_matching_case(
 /// Builds the function calling one of the original rule bodies.
 fn make_leaf_pattern_matching_case(
   book: &mut Book,
-  new_def_name: Name,
-  rule_def_id: DefId,
-  rule_pats: &[RulePat],
+  def_id: DefId,
+  crnt_name: &Name,
+  rule_idx: usize,
   match_path: Vec<RulePat>,
 ) {
+  let def_name = book.def_names.name(&def_id).unwrap();
+  let rule_def_name = make_rule_name(def_name, rule_idx);
+  let rule_def_id = book.def_names.def_id(&rule_def_name).unwrap();
+  let rule = &book.defs[&def_id].rules[rule_idx];
+
   // The term we're building
   let mut term = Term::Ref { def_id: rule_def_id };
   // Counts how many variables are used and then counts down to declare them.
@@ -139,14 +137,13 @@ fn make_leaf_pattern_matching_case(
   };
   let make_var = |counter: &mut usize| {
     *counter -= 1;
-    let nam = Name(format!("x{counter}"));
-    nam
+    Name(format!("x{counter}"))
   };
   let make_app = |term: Term, nam: Name| Term::App { fun: Box::new(term), arg: Box::new(Term::Var { nam }) };
   let make_lam = |nam: Name, term: Term| Term::Lam { nam: Some(nam), bod: Box::new(term) };
 
   // Add the applications to call the rule body
-  term = match_path.iter().zip(rule_pats).fold(term, |term, (matched, pat)| {
+  term = match_path.iter().zip(&rule.pats).fold(term, |term, (matched, pat)| {
     match (matched, pat) {
       (RulePat::Var(_), RulePat::Var(_)) => make_app(term, use_var(&mut matched_var_counter)),
       (RulePat::Ctr(_, vars), RulePat::Ctr(_, _)) => {
@@ -156,10 +153,9 @@ fn make_leaf_pattern_matching_case(
       // So, to call the rule body we have to recreate the constructor.
       // (On scott encoding, if one of the cases is matched we must also match on all the other constructors for this arg)
       (RulePat::Ctr(ctr_nam, vars), RulePat::Var(_)) => {
-        let ctr_ref_id = book.def_names.def_id(&ctr_nam).unwrap();
+        let ctr_ref_id = book.def_names.def_id(ctr_nam).unwrap();
         let ctr_args = vars.iter().map(|_| use_var(&mut matched_var_counter));
-        let ctr_term =
-          ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, |ctr_term, ctr_var| make_app(ctr_term, ctr_var));
+        let ctr_term = ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, make_app);
         Term::App { fun: Box::new(term), arg: Box::new(ctr_term) }
       }
       (RulePat::Var(_), RulePat::Ctr(_, _)) => unreachable!(),
@@ -174,7 +170,7 @@ fn make_leaf_pattern_matching_case(
     }
   });
 
-  add_case_to_book(book, new_def_name, term);
+  add_case_to_book(book, crnt_name.clone(), term);
 }
 
 /// Builds a function for one of the pattern matches of the original one, as well as the next subfunctions recursively.
@@ -206,8 +202,7 @@ fn make_branch_pattern_matching_case(
   };
   let make_var = |counter: &mut usize| {
     *counter -= 1;
-    let nam = Name(format!("x{counter}"));
-    nam
+    Name(format!("x{counter}"))
   };
 
   let crnt_arg_idx = match_path.len();
@@ -233,7 +228,9 @@ fn make_branch_pattern_matching_case(
     let def_id = book.def_names.def_id(&name).unwrap();
     make_app(term, Term::Ref { def_id })
   });
+
   let mut var_count = 0;
+
   // Applied arguments
   let term = match_path.iter().fold(term, |term, pat| match pat {
     RulePat::Var(_) => make_app(term, Term::Var { nam: use_var(&mut var_count) }),
@@ -241,13 +238,50 @@ fn make_branch_pattern_matching_case(
       vars.iter().fold(term, |term, _| make_app(term, Term::Var { nam: use_var(&mut var_count) }))
     }
   });
+
   // Lambdas for arguments
   let term = match_path.iter().rev().fold(term, |term, pat| match pat {
     RulePat::Var(_) => make_lam(make_var(&mut var_count), term),
     RulePat::Ctr(_, vars) => vars.iter().fold(term, |term, _| make_lam(make_var(&mut var_count), term)),
   });
+
   // Lambda for the matched variable
   let term = Term::Lam { nam: Some(Name::new("x")), bod: Box::new(term) };
+
+  add_case_to_book(book, crnt_name.clone(), term);
+}
+
+fn make_non_pattern_matching_case(
+  book: &mut Book,
+  def_type: &[Type],
+  def_id: DefId,
+  crnt_name: &Name,
+  crnt_rules: Vec<usize>,
+  mut match_path: Vec<RulePat>,
+) {
+  let arg_name = Name::new("x");
+  let nxt_name = Name::new("nxt");
+  let nxt_def_name = Name(format!("{crnt_name}$P"));
+
+  // Make next function
+  match_path.push(RulePat::Var(arg_name.clone()));
+  make_pattern_matching_case(book, def_type, def_id, &nxt_def_name, crnt_rules, match_path);
+
+  // Make call to next function
+  let nxt_def_id = book.def_names.def_id(&nxt_def_name).unwrap();
+  let term = Term::Lam {
+    nam: Some(arg_name.clone()),
+    bod: Box::new(Term::Lam {
+      nam: Some(nxt_name.clone()),
+      bod: Box::new(Term::App {
+        fun: Box::new(Term::App {
+          fun: Box::new(Term::Ref { def_id: nxt_def_id }),
+          arg: Box::new(Term::Var { nam: nxt_name }),
+        }),
+        arg: Box::new(Term::Var { nam: arg_name }),
+      }),
+    }),
+  };
   add_case_to_book(book, crnt_name.clone(), term);
 }
 
