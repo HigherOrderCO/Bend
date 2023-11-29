@@ -5,7 +5,7 @@ use hvmc::{
   ast::{net_from_runtime, net_to_runtime},
   run::{Heap, NUM, OP2, REF},
 };
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 
 pub fn pre_reduce_book(book: &mut BTreeMap<String, hvmc::ast::Net>) -> Result<(), String> {
   for (nam, net) in book.iter_mut() {
@@ -26,7 +26,7 @@ pub fn pre_reduce_net(nam: &str, net: &mut hvmc::ast::Net) -> Result<(), String>
 pub fn pre_reduce_run_net(nam: &str, net: &mut hvmc::run::Net) -> Result<(), String> {
   // Note: not calling Book::new() since that takes super long (~600ms).
   // We know it's okay in this specific case since we are sure no derefs will occur.
-  let book = hvmc::run::Book { defs: HashMap::with_hasher(std::hash::BuildHasherDefault::default()) };
+  let book = hvmc::run::Book::new();
   let mut collected_redexes = vec![];
   const MAX_ITERS: usize = 100_000_000;
   let mut num_iters = 0;

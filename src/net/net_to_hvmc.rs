@@ -61,7 +61,7 @@ fn net_tree_to_hvmc_tree(
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
-    NodeKind::Ref { def_id } => Tree::Ref { nam: id_to_hvmc_name(def_id) as Val },
+    NodeKind::Ref { def_id } => Tree::Ref { nam: id_to_hvmc_name(def_id) },
     NodeKind::Num { val } => Tree::Num { val },
     NodeKind::Op2 { opr } => Tree::Op2 {
       opr,
