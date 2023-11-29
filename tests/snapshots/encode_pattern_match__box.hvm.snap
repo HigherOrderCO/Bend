@@ -4,7 +4,7 @@ input_file: tests/golden_tests/encode_pattern_match/box.hvm
 ---
 (unbox) = λx (x unbox$Pnew)
 
-(new) = λa0 λnew (new a0)
+(new) = λval λnew (new val)
 
 (unbox$R0) = λval val
 

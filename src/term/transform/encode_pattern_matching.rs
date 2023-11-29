@@ -71,6 +71,7 @@ fn make_rule_body(mut body: Term, pats: &[RulePat]) -> Term {
           body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) }
         }
       }
+      RulePat::Num(..) => todo!(),
     }
   }
   body
@@ -159,6 +160,8 @@ fn make_leaf_pattern_matching_case(
         Term::App { fun: Box::new(term), arg: Box::new(ctr_term) }
       }
       (RulePat::Var(_), RulePat::Ctr(_, _)) => unreachable!(),
+      (_, RulePat::Num(..)) => todo!(),
+      (RulePat::Num(..), _) => todo!(),
     }
   });
 
@@ -168,6 +171,7 @@ fn make_leaf_pattern_matching_case(
     RulePat::Ctr(_, vars) => {
       vars.iter().fold(term, |term, _| make_lam(make_var(&mut matched_var_counter), term))
     }
+    RulePat::Num(..) => todo!(),
   });
 
   add_case_to_book(book, crnt_name.clone(), term);
@@ -189,6 +193,7 @@ fn make_branch_pattern_matching_case(
       .filter(|&rule_idx| match &def_rules[rule_idx].pats[arg_idx] {
         RulePat::Var(_) => true,
         RulePat::Ctr(nam, _) => nam == ctr,
+        RulePat::Num(..) => todo!(),
       })
       .collect()
   }
@@ -211,11 +216,11 @@ fn make_branch_pattern_matching_case(
 
   // First we create the subfunctions
   // TODO: We could group together functions with same arity that map to the same (default) case.
-  for (next_ctr, &next_ctr_ari) in next_ctrs.iter() {
+  for (next_ctr, next_ctr_args) in next_ctrs.iter() {
     let def = &book.defs[&def_id];
     let crnt_name = make_next_fn_name(crnt_name, next_ctr);
     let crnt_rules = filter_rules(&def.rules, &crnt_rules, match_path.len(), next_ctr);
-    let new_vars = RulePat::Ctr(next_ctr.clone(), vec![RulePat::Var(Name::new("")); next_ctr_ari]);
+    let new_vars = RulePat::Ctr(next_ctr.clone(), vec![RulePat::Var(Name::new("")); next_ctr_args.len()]);
     let mut match_path = match_path.clone();
     match_path.push(new_vars);
     make_pattern_matching_case(book, def_type, def_id, &crnt_name, crnt_rules, match_path);
@@ -237,12 +242,14 @@ fn make_branch_pattern_matching_case(
     RulePat::Ctr(_, vars) => {
       vars.iter().fold(term, |term, _| make_app(term, Term::Var { nam: use_var(&mut var_count) }))
     }
+    RulePat::Num(_) => todo!(),
   });
 
   // Lambdas for arguments
   let term = match_path.iter().rev().fold(term, |term, pat| match pat {
     RulePat::Var(_) => make_lam(make_var(&mut var_count), term),
     RulePat::Ctr(_, vars) => vars.iter().fold(term, |term, _| make_lam(make_var(&mut var_count), term)),
+    RulePat::Num(_) => todo!(),
   });
 
   // Lambda for the matched variable

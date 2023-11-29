@@ -29,6 +29,7 @@ impl RulePat {
           arg.resolve_ctrs(is_ctr);
         }
       }
+      RulePat::Num(_) => (),
     }
   }
 }

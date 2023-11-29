@@ -35,6 +35,7 @@ pub fn unbound_pats(pat: &RulePat, def_names: &DefNames) -> HashSet<Name> {
         check.extend(args.iter());
       }
       RulePat::Var(_) => (),
+      RulePat::Num(_) => (),
     }
   }
   unbounds

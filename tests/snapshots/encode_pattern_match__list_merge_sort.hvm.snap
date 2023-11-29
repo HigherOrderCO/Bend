@@ -20,7 +20,7 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 
 (False) = λTrue λFalse False
 
-(Cons) = λa0 λa1 λCons λNil ((Cons a0) a1)
+(Cons) = λhead λtail λCons λNil ((Cons head) tail)
 
 (Nil) = λCons λNil Nil
 

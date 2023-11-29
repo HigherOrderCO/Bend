@@ -7,7 +7,7 @@ use hvmc::{
 use hvmc_net::pre_reduce::pre_reduce_book;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{collections::HashMap, time::Instant};
-use term::{book_to_nets, net_to_term::net_to_term_non_linear, Book, DefId, DefNames, Term, Name};
+use term::{book_to_nets, net_to_term::net_to_term_non_linear, Book, DefId, DefNames, Name, Term};
 
 pub mod hvmc_net;
 pub mod net;

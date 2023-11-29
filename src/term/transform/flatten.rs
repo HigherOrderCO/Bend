@@ -145,7 +145,7 @@ fn make_old_rule(pats: &[RulePat], new_split_def_id: DefId) -> Rule {
         new_pats.push(RulePat::Var(nam.clone()));
         new_body_args.push(Term::Var { nam: nam.clone() });
       }
-      RulePat::Num(num) => {
+      RulePat::Num(_) => {
         // How to do this if num can be either a number or some sort of lambda? add a match? separate both cases?
         todo!();
       }
@@ -185,7 +185,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         let new_ctr = Term::call(Term::Ref { def_id: rule_arg_def_id }, new_ctr_args);
         new_body.subst(other_arg_name, &new_ctr);
       }
-      (RulePat::Num(num), RulePat::Num(..)) => new_pats.push(other_arg.clone()),
+      (RulePat::Num(..), RulePat::Num(..)) => new_pats.push(other_arg.clone()),
       (RulePat::Num(..), RulePat::Var(..)) => {
         // How to do this with this kind of number pattern? Subst with a match?
         todo!();

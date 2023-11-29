@@ -22,20 +22,20 @@ input_file: tests/golden_tests/flatten_rules/already_flat.hvm
 (Rule6 a) = a
 (Rule6 b) = b
 
-(CtrA1) = λa0 λCtrA1 λCtrA2 λCtrA3 (CtrA1 a0)
+(CtrA1) = λa λCtrA1 λCtrA2 λCtrA3 (CtrA1 a)
 
-(CtrA2) = λa0 λa1 λCtrA1 λCtrA2 λCtrA3 ((CtrA2 a0) a1)
+(CtrA2) = λa1 λa2 λCtrA1 λCtrA2 λCtrA3 ((CtrA2 a1) a2)
 
-(CtrA3) = λa0 λCtrA1 λCtrA2 λCtrA3 (CtrA3 a0)
+(CtrA3) = λa λCtrA1 λCtrA2 λCtrA3 (CtrA3 a)
 
 (CtrB0) = λCtrB0 λCtrB1 λCtrB2 λCtrB3 CtrB0
 
-(CtrB1) = λa0 λCtrB0 λCtrB1 λCtrB2 λCtrB3 (CtrB1 a0)
+(CtrB1) = λb λCtrB0 λCtrB1 λCtrB2 λCtrB3 (CtrB1 b)
 
-(CtrB2) = λa0 λCtrB0 λCtrB1 λCtrB2 λCtrB3 (CtrB2 a0)
+(CtrB2) = λb λCtrB0 λCtrB1 λCtrB2 λCtrB3 (CtrB2 b)
 
-(CtrB3) = λa0 λCtrB0 λCtrB1 λCtrB2 λCtrB3 (CtrB3 a0)
+(CtrB3) = λb λCtrB0 λCtrB1 λCtrB2 λCtrB3 (CtrB3 b)
 
 (CtrA) = λCtrA λCtrB CtrA
 
-(CtrB) = λa0 λCtrA λCtrB (CtrB a0)
+(CtrB) = λx λCtrA λCtrB (CtrB x)
