@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/match_dup_and_reconstruction.hvm
+---
+@4 = ({2 a b} [c a])
+& @Boxe ~ (b c)
+@Boxe = (a ((a b) b))
+@Got = ((@4 a) a)
+@main = a
+& @Got ~ (b a)
+& @Boxe ~ (#10 b)
+
