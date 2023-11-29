@@ -29,7 +29,7 @@ pub enum Token {
   Equals,
 
   #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
-  Num(u32),
+  Num(u64),
 
   #[token("#")]
   Hash,

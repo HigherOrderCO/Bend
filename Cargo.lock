@@ -204,8 +204,11 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "hvm-core"
-version = "0.2.7"
-source = "git+https://github.com/HigherOrderCO/hvm-core#1887f72bd361bc052aea0f9061f1bc1c2f49e5d3"
+version = "0.2.10"
+source = "git+https://github.com/HigherOrderCO/hvm-core#7a0b802a2a91ce4c68eb191c2f1bb151147ff412"
+dependencies = [
+ "nohash-hasher",
+]
 
 [[package]]
 name = "hvm-lang"
@@ -313,6 +316,12 @@ checksum = "dbfc0d229f1f42d790440136d941afd806bc9e949e2bcb8faa813b0f00d1267e"
 dependencies = [
  "logos-codegen",
 ]
+
+[[package]]
+name = "nohash-hasher"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
 name = "once_cell"
