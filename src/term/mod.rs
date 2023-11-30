@@ -50,7 +50,7 @@ pub struct Definition {
 /// A pattern matching rule of a definition.
 #[derive(Debug, Clone)]
 pub struct Rule {
-  pub pats: Vec<RulePat>,
+  pub pats: Vec<Pattern>,
   pub body: Term,
 }
 
@@ -58,13 +58,6 @@ pub struct Rule {
 pub enum MatchNum {
   Zero,
   Succ(Option<Name>),
-}
-
-#[derive(Debug, Clone)]
-pub enum RulePat {
-  Var(Name),
-  Ctr(Name, Vec<RulePat>),
-  Num(MatchNum),
 }
 
 #[derive(Debug, Clone, Default)]
@@ -86,7 +79,7 @@ pub enum Term {
     nam: Name,
   },
   Let {
-    pat: LetPat,
+    pat: Pattern,
     val: Box<Term>,
     nxt: Box<Term>,
   },
@@ -111,7 +104,7 @@ pub enum Term {
     snd: Box<Term>,
   },
   Num {
-    val: u32,
+    val: u64,
   },
   /// A numeric operation between built-in numbers.
   Opx {
@@ -121,7 +114,7 @@ pub enum Term {
   },
   Match {
     scrutinee: Box<Term>,
-    arms: Vec<(RulePat, Term)>,
+    arms: Vec<(Pattern, Term)>,
   },
   Ref {
     def_id: DefId,
@@ -131,8 +124,10 @@ pub enum Term {
 }
 
 #[derive(Debug, Clone)]
-pub enum LetPat {
+pub enum Pattern {
   Var(Name),
+  Ctr(Name, Vec<Pattern>),
+  Num(MatchNum),
   Tup(Option<Name>, Option<Name>),
 }
 
@@ -147,12 +142,14 @@ pub enum Op {
   NE,
   LT,
   GT,
+  LTE,
+  GTE,
   AND,
   OR,
   XOR,
-  NOT,
   LSH,
   RSH,
+  NOT,
 }
 
 /// A user defined  datatype
@@ -319,18 +316,19 @@ impl Term {
       // Only substitute scoped variables.
       Term::Chn { bod, .. } => bod.subst(from, to),
       Term::Lnk { .. } => (),
-      Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+      Term::Let { pat: Pattern::Var(nam), val, nxt } => {
         val.subst(from, to);
         if nam != from {
           nxt.subst(from, to);
         }
       }
-      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+      Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
         val.subst(from, to);
         if fst.as_ref().map_or(true, |fst| fst != from) && snd.as_ref().map_or(true, |snd| snd != from) {
           nxt.subst(from, to);
         }
       }
+      Term::Let { .. } => todo!(),
       Term::Dup { tag: _, fst, snd, val, nxt } => {
         val.subst(from, to);
         if fst.as_ref().map_or(true, |fst| fst != from) && snd.as_ref().map_or(true, |snd| snd != from) {
@@ -343,7 +341,7 @@ impl Term {
         for (rule, term) in arms {
           let can_subst;
 
-          if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
+          if let Pattern::Num(MatchNum::Succ(Some(nam))) = rule {
             can_subst = nam != from
           } else {
             can_subst = true
@@ -381,7 +379,7 @@ impl Term {
         Term::Var { nam } => *free_vars.entry(nam.clone()).or_default() += 1,
         Term::Chn { bod, .. } => go(bod, free_vars),
         Term::Lnk { .. } => {}
-        Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+        Term::Let { pat: Pattern::Var(nam), val, nxt } => {
           go(val, free_vars);
 
           let mut new_scope = IndexMap::new();
@@ -391,7 +389,7 @@ impl Term {
 
           free_vars.extend(new_scope);
         }
-        Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
+        Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
           go(val, free_vars);
 
           let mut new_scope = IndexMap::new();
@@ -402,6 +400,7 @@ impl Term {
 
           free_vars.extend(new_scope);
         }
+        Term::Let { .. } => todo!(),
         Term::App { fun: fst, arg: snd }
         | Term::Tup { fst, snd }
         | Term::Sup { fst, snd, .. }
@@ -416,7 +415,7 @@ impl Term {
             let mut new_scope = IndexMap::new();
             go(term, &mut new_scope);
 
-            if let RulePat::Num(MatchNum::Succ(Some(nam))) = rule {
+            if let Pattern::Num(MatchNum::Succ(Some(nam))) = rule {
               new_scope.remove(nam);
             }
 
@@ -440,7 +439,7 @@ impl Term {
     mut succ_label: Option<Name>,
     mut succ_term: Self,
   ) -> Self {
-    let zero = (RulePat::Num(MatchNum::Zero), zero_term);
+    let zero = (Pattern::Num(MatchNum::Zero), zero_term);
 
     if let Term::Var { nam } = &scrutinee {
       if let Some(label) = &succ_label {
@@ -449,7 +448,7 @@ impl Term {
         succ_label = Some(new_label);
       }
 
-      let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);
+      let succ = (Pattern::Num(MatchNum::Succ(succ_label)), succ_term);
       Term::Match { scrutinee: Box::new(scrutinee), arms: vec![zero, succ] }
     } else {
       let match_bind = succ_label.clone().unwrap_or_else(|| Name::new("*"));
@@ -460,10 +459,10 @@ impl Term {
         succ_label = Some(new_label);
       }
 
-      let succ = (RulePat::Num(MatchNum::Succ(succ_label)), succ_term);
+      let succ = (Pattern::Num(MatchNum::Succ(succ_label)), succ_term);
 
       Term::Let {
-        pat: LetPat::Var(match_bind.clone()),
+        pat: Pattern::Var(match_bind.clone()),
         val: Box::new(scrutinee),
         nxt: Box::new(Term::Match {
           scrutinee: Box::new(Term::Var { nam: match_bind }),
@@ -475,32 +474,32 @@ impl Term {
 }
 
 /// Returns the lambda representation of native number match arms
-pub fn native_match(arms: Vec<(RulePat, Term)>) -> (Term, Term) {
+pub fn native_match(arms: Vec<(Pattern, Term)>) -> (Term, Term) {
   use MatchNum::*;
 
   match &arms[..] {
-    [(RulePat::Num(Zero), zero), (RulePat::Num(Succ(nam)), succ)] => {
+    [(Pattern::Num(Zero), zero), (Pattern::Num(Succ(nam)), succ)] => {
       let zero = zero.clone();
       let succ = Term::Lam { nam: nam.clone(), bod: Box::new(succ.clone()) };
       (zero, succ)
     }
-    [(RulePat::Num(Zero), zero), (RulePat::Num(Zero), succ)] => (zero.clone(), succ.clone()),
+    [(Pattern::Num(Zero), zero), (Pattern::Num(Zero), succ)] => (zero.clone(), succ.clone()),
     _ => unreachable!(),
   }
 }
 
-impl fmt::Display for LetPat {
+impl fmt::Display for Pattern {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      LetPat::Var(nam) => write!(f, "{}", nam),
-      LetPat::Tup(fst, snd) => {
-        write!(
-          f,
-          "({}, {})",
-          fst.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),
-          snd.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),
-        )
-      }
+      Pattern::Var(nam) => write!(f, "{nam}"),
+      Pattern::Ctr(nam, pats) => write!(f, "({}{})", nam, pats.iter().map(|p| format!(" {p}")).join("")),
+      Pattern::Num(num) => write!(f, "{num}"),
+      Pattern::Tup(fst, snd) => write!(
+        f,
+        "({}, {})",
+        fst.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),
+        snd.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),
+      ),
     }
   }
 }
@@ -540,23 +539,22 @@ impl fmt::Display for Book {
   }
 }
 
-impl From<&RulePat> for Term {
-  fn from(value: &RulePat) -> Self {
+impl From<&Pattern> for Term {
+  fn from(value: &Pattern) -> Self {
     match value {
-      RulePat::Ctr(nam, args) => Term::call(Term::Var { nam: nam.clone() }, args.iter().map(Term::from)),
-      RulePat::Var(nam) => Term::Var { nam: nam.clone() },
-      RulePat::Num(..) => todo!(),
+      Pattern::Var(nam) => Term::Var { nam: nam.clone() },
+      Pattern::Ctr(nam, pats) => Term::call(Term::Var { nam: nam.clone() }, pats.iter().map(Term::from)),
+      Pattern::Num(..) => todo!(),
+      Pattern::Tup(..) => todo!(),
     }
   }
 }
 
-impl fmt::Display for RulePat {
+impl fmt::Display for MatchNum {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      RulePat::Ctr(name, pats) => write!(f, "({}{})", name, pats.iter().map(|p| format!(" {p}")).join("")),
-      RulePat::Var(nam) => write!(f, "{}", nam),
-      RulePat::Num(MatchNum::Zero) => write!(f, "0"),
-      RulePat::Num(MatchNum::Succ(_)) => write!(f, "+"),
+      MatchNum::Zero => write!(f, "0"),
+      MatchNum::Succ(_) => write!(f, "+"),
     }
   }
 }
@@ -573,12 +571,14 @@ impl fmt::Display for Op {
       Op::NE => write!(f, "!="),
       Op::LT => write!(f, "<"),
       Op::GT => write!(f, ">"),
+      Op::LTE => write!(f, "<="),
+      Op::GTE => write!(f, ">="),
       Op::AND => write!(f, "&"),
       Op::OR => write!(f, "|"),
       Op::XOR => write!(f, "^"),
-      Op::NOT => write!(f, "~"),
       Op::LSH => write!(f, "<<"),
       Op::RSH => write!(f, ">>"),
+      Op::NOT => write!(f, "~"),
     }
   }
 }

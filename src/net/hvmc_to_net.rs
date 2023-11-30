@@ -88,8 +88,8 @@ fn tree_to_inodes(
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      Tree::Num { loc } => {
-        let kind = Num { val: *loc };
+      Tree::Num { val } => {
+        let kind = Num { val: *val };
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }

@@ -8,10 +8,10 @@ input_file: tests/golden_tests/compile_file/adt_option_and.hvm
 @7 = (a ((@5 (@6 (a b))) b))
 @8 = (* @None)
 @None = (* (a a))
-@Opti = ((@7 (@8 a)) a)
+@Option.and = ((@7 (@8 a)) a)
 @Some = (a ((a b) (* b)))
 @main = a
-& @Opti ~ (b (c a))
+& @Option.and ~ (b (c a))
 & @Some ~ (#3 c)
 & @Some ~ (#1 b)
 

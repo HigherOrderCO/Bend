@@ -29,7 +29,7 @@ pub enum Token {
   Equals,
 
   #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
-  Num(u32),
+  Num(u64),
 
   #[token("#")]
   Hash,
@@ -72,6 +72,12 @@ pub enum Token {
 
   #[token(">")]
   Gtn,
+
+  #[token("<=")]
+  Lte,
+
+  #[token(">=")]
+  Gte,
 
   #[token("==")]
   EqualsEquals,
@@ -183,9 +189,9 @@ impl fmt::Display for Token {
       Self::Shl => write!(f, "<<"),
       Self::Shr => write!(f, ">>"),
       Self::Ltn => write!(f, "<"),
-      // Self::Lte => write!(f, "<="),
       Self::Gtn => write!(f, ">"),
-      // Self::Gte => write!(f, ">="),
+      Self::Lte => write!(f, "<="),
+      Self::Gte => write!(f, ">="),
       Self::NotEquals => write!(f, "!="),
       Self::EqualsEquals => write!(f, "=="),
       Self::Colon => write!(f, ":"),

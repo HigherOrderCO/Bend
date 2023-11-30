@@ -1,4 +1,4 @@
-use super::{native_match, Book, DefId, DefNames, LetPat, Name, Op, Term};
+use super::{native_match, Book, DefId, DefNames, Name, Op, Pattern, Term};
 use crate::{
   net::{INet, NodeKind::*, Port, MAX_DUP_HVMC_LABEL, ROOT},
   Warning,
@@ -62,7 +62,7 @@ fn def_id_to_hvmc_name(book: &Book, def_id: DefId, nets: &HashMap<String, INet>)
     gen_unique_name(def_id, nets)
   } else {
     let Name(name) = book.def_names.name(&def_id).unwrap();
-    let name = truncate(name, 4);
+    let name = truncate(name, 10);
     if !(nets.contains_key(name) || name.eq(DefNames::ENTRY_POINT)) {
       name.to_owned()
     } else {
@@ -210,7 +210,7 @@ fn encode_term(
       inet.link(up, Port(node, 0));
       Some(Port(node, 0))
     }
-    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
+    Term::Let { pat: Pattern::Tup(l_nam, r_nam), val, nxt } => {
       let dup = inet.new_node(Tup);
 
       let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, label_generator);
@@ -316,12 +316,14 @@ impl Op {
       Op::NE => 0x6,
       Op::LT => 0x7,
       Op::GT => 0x8,
-      Op::AND => 0x9,
-      Op::OR => 0xa,
-      Op::XOR => 0xb,
-      Op::NOT => 0xc,
-      Op::LSH => 0xd,
-      Op::RSH => 0xe,
+      Op::LTE => 0x9,
+      Op::GTE => 0xa,
+      Op::AND => 0xb,
+      Op::OR => 0xc,
+      Op::XOR => 0xd,
+      Op::LSH => 0xe,
+      Op::RSH => 0xf,
+      Op::NOT => 0x10,
     }
   }
 }

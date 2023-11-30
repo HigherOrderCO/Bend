@@ -1,6 +1,6 @@
 // Pass to give all variables in a definition unique names.
 
-use crate::term::{var_id_to_name, Book, LetPat, MatchNum, Name, RulePat, Term};
+use crate::term::{var_id_to_name, Book, MatchNum, Name, Pattern, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -37,13 +37,13 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
       *nam = pop_name(nam.as_ref(), name_map);
     }
     Term::Var { nam } => *nam = use_var(nam, name_map),
-    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+    Term::Let { pat: Pattern::Var(nam), val, nxt } => {
       unique_var_names(val, name_map, name_count);
       push_name(Some(nam), name_map, name_count);
       unique_var_names(nxt, name_map, name_count);
       *nam = pop_name(Some(nam), name_map).unwrap();
     }
-    Term::Dup { tag: _, fst, snd, val, nxt } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+    Term::Dup { tag: _, fst, snd, val, nxt } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
       unique_var_names(val, name_map, name_count);
       push_name(fst.as_ref(), name_map, name_count);
       push_name(snd.as_ref(), name_map, name_count);
@@ -51,6 +51,7 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
       *snd = pop_name(snd.as_ref(), name_map);
       *fst = pop_name(fst.as_ref(), name_map);
     }
+    Term::Let { .. } => todo!(),
     // Global lam names are already unique, so no need to do anything
     Term::Chn { bod, .. } => unique_var_names(bod, name_map, name_count),
     Term::App { fun: fst, arg: snd }
@@ -63,13 +64,13 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
     Term::Match { scrutinee, arms } => {
       unique_var_names(scrutinee, name_map, name_count);
       for (rule, term) in arms {
-        if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+        if let Pattern::Num(MatchNum::Succ(nam)) = rule {
           push_name(nam.as_ref(), name_map, name_count)
         }
 
         unique_var_names(term, name_map, name_count);
 
-        if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+        if let Pattern::Num(MatchNum::Succ(nam)) = rule {
           *nam = pop_name(nam.as_ref(), name_map)
         }
       }

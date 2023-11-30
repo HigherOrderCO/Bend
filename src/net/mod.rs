@@ -2,7 +2,7 @@ pub mod hvmc_to_net;
 pub mod net_to_hvmc;
 
 use crate::term::DefId;
-use hvmc::run::{Lab, Loc, Val};
+use hvmc::run::{Lab, Val};
 use NodeKind::*;
 
 #[derive(Clone, Debug)]
@@ -40,7 +40,7 @@ pub enum NodeKind {
   },
   /// Numbers
   Num {
-    val: Loc,
+    val: Val,
   },
   /// Numeric operations
   Op2 {

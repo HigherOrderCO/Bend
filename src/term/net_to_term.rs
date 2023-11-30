@@ -1,5 +1,8 @@
-use super::{var_id_to_name, Book, DefId, LetPat, MatchNum, Name, Op, RulePat, Term, Val};
-use crate::net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
+use super::{var_id_to_name, Book, DefId, MatchNum, Name, Op, Term, Val};
+use crate::{
+  net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
+  term::Pattern,
+};
 use hvmc::run::Loc;
 use indexmap::IndexSet;
 use std::collections::{HashMap, HashSet};
@@ -190,7 +193,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
 
     match let_ctx.search_and_insert(&mut main, &mut free_vars).0 {
       LetInsertion::Err(fst, snd, val) => {
-        main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) }
+        main = Term::Let { pat: Pattern::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) }
       }
       LetInsertion::Ok => {}
       _ => unreachable!(),
@@ -258,7 +261,7 @@ impl Term {
     if free_vars.is_empty() {
       let nxt = Box::new(std::mem::replace(self, Term::Era));
 
-      *self = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt };
+      *self = Term::Let { pat: Pattern::Tup(fst, snd), val: Box::new(val), nxt };
       LetInsertion::Ok
     } else {
       // Otherwise, return a failed attempt, that will pass through to the first call to `search and insert`
@@ -275,9 +278,9 @@ impl Term {
 
       Term::Lam { nam: None, bod } => ctx.search_and_insert(bod, free_vars),
 
-      Term::Let { pat: LetPat::Var(_), .. } => unreachable!(),
+      Term::Let { pat: Pattern::Var(_), .. } => unreachable!(),
 
-      Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
+      Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
         let (ctx, val_use) = val.resolve_let_scope(ctx, free_vars);
 
         fst.as_ref().map(|fst| free_vars.remove(fst));
@@ -287,11 +290,13 @@ impl Term {
         (ctx, val_use || nxt_use)
       }
 
+      Term::Let { .. } => todo!(),
+
       Term::Match { scrutinee, arms } => {
         let (mut ctx, mut val_use) = scrutinee.resolve_let_scope(ctx, free_vars);
 
         for (rule, term) in arms {
-          if let RulePat::Num(MatchNum::Succ(Some(p))) = rule {
+          if let Pattern::Num(MatchNum::Succ(Some(p))) = rule {
             free_vars.remove(p);
           }
 
@@ -526,7 +531,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
       reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels_to_tag, book);
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
-    main = Term::Let { pat: LetPat::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) };
+    main = Term::Let { pat: Pattern::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) };
     valid = valid && val_valid;
   }
 
@@ -597,12 +602,14 @@ impl Op {
       0x6 => Some(Op::NE),
       0x7 => Some(Op::LT),
       0x8 => Some(Op::GT),
-      0x9 => Some(Op::AND),
-      0xa => Some(Op::OR),
-      0xb => Some(Op::XOR),
-      0xc => Some(Op::NOT),
-      0xd => Some(Op::LSH),
-      0xe => Some(Op::RSH),
+      0x9 => Some(Op::LTE),
+      0xa => Some(Op::GTE),
+      0xb => Some(Op::AND),
+      0xc => Some(Op::OR),
+      0xd => Some(Op::XOR),
+      0xe => Some(Op::LSH),
+      0xf => Some(Op::RSH),
+      0x10 => Some(Op::NOT),
       _ => None,
     }
   }
@@ -657,7 +664,7 @@ impl Term {
         scrutinee.fix_names(id_counter, book);
 
         for (rule, term) in arms {
-          if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+          if let Pattern::Num(MatchNum::Succ(nam)) = rule {
             fix_name(nam, id_counter, term);
           }
 

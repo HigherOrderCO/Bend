@@ -1,4 +1,4 @@
-use crate::term::{Book, Name, RulePat};
+use crate::term::{Book, Name, Pattern};
 
 impl Book {
   /// Resolve Constructor names inside rule patterns.
@@ -16,20 +16,21 @@ impl Book {
   }
 }
 
-impl RulePat {
+impl Pattern {
   pub fn resolve_ctrs(&mut self, is_ctr: &impl Fn(&Name) -> bool) {
     match self {
-      RulePat::Var(nam) => {
+      Pattern::Var(nam) => {
         if is_ctr(nam) {
-          *self = RulePat::Ctr(nam.clone(), vec![])
+          *self = Pattern::Ctr(nam.clone(), vec![])
         }
       }
-      RulePat::Ctr(_, args) => {
+      Pattern::Ctr(_, args) => {
         for arg in args {
           arg.resolve_ctrs(is_ctr);
         }
       }
-      RulePat::Num(_) => (),
+      Pattern::Num(_) => (),
+      Pattern::Tup(_, _) => (),
     }
   }
 }

@@ -9,6 +9,6 @@ input_file: tests/golden_tests/compile_file/sum_predicates.hvm
 @7 = (?<(@3 @4) a> a)
 @8 = (?<(@5 @6) a> a)
 @main = a
-& @sum_ ~ (#8 (#5 a))
-@sum_ = (?<(@7 @8) a> a)
+& @sum_pred ~ (#8 (#5 a))
+@sum_pred = (?<(@7 @8) a> a)
 

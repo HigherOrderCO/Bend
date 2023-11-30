@@ -7,6 +7,6 @@ input_file: tests/golden_tests/compile_file/weekday.hvm
 @L = (* @K)
 @M = (* @L)
 @N = (* @M)
-@Satu = (* @N)
-@main = @Satu
+@Saturday = (* @N)
+@main = @Saturday
 
