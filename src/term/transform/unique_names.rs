@@ -99,7 +99,6 @@ fn pop_name(name: Option<&Name>, name_map: &mut UniqueNameScope) -> Option<Name>
 }
 
 fn use_var(nam: &Name, name_map: &UniqueNameScope) -> Name {
-  println!("nam: {nam:?}");
   let vars = name_map.get(nam).unwrap();
   let var_id = *vars.last().unwrap();
   var_id_to_name(var_id)
