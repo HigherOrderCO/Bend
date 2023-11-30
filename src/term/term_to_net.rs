@@ -9,7 +9,10 @@ use hvmc::{
 };
 use std::collections::{hash_map::Entry, HashMap};
 
-pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, HashMap<u32, Name>, Vec<Warning>) {
+pub fn book_to_nets(
+  book: &Book,
+  main: DefId,
+) -> (HashMap<String, INet>, HashMap<DefId, Val>, HashMap<u32, Name>, Vec<Warning>) {
   let mut warnings = Vec::new();
   let mut nets = HashMap::new();
   let mut id_to_hvmc_name = HashMap::new();
@@ -344,7 +347,7 @@ impl LabelGenerator {
           self.next += 1;
           self.labels_to_tag.insert(lab, tag.clone());
           *e.insert(lab)
-        },
+        }
       }
     } else {
       let lab = self.next;

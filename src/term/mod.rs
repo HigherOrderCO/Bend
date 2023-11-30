@@ -294,7 +294,9 @@ impl Term {
         val.to_string(def_names),
         nxt.to_string(def_names)
       ),
-      Term::Sup { tag, fst, snd } => format!("{{#{} {} {}}}", tag, fst.to_string(def_names), snd.to_string(def_names)),
+      Term::Sup { tag, fst, snd } => {
+        format!("{{#{} {} {}}}", tag, fst.to_string(def_names), snd.to_string(def_names))
+      }
       Term::Era => "*".to_string(),
       Term::Num { val } => format!("{val}"),
       Term::Opx { op, fst, snd } => {

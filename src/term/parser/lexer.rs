@@ -1,5 +1,5 @@
 use logos::{FilterResult, Lexer, Logos};
-use std::fmt;
+use std::{fmt, num::ParseIntError};
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(error=LexingError)]
@@ -29,6 +29,8 @@ pub enum Token {
   Equals,
 
   #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
+  #[regex("0[xX][0-9a-fA-F_]{1,15}", |lex| from_radix(16, lex).ok())]
+  #[regex("0[bB][0-1_]{1,60}", |lex| from_radix(2, lex).ok())]
   Num(u64),
 
   #[token("#")]
@@ -116,6 +118,12 @@ pub enum Token {
   Whitespace,
 
   Error(LexingError),
+}
+
+fn from_radix(radix: u32, lexer: &mut Lexer<Token>) -> Result<u64, ParseIntError> {
+  let slice = &lexer.slice()[2 ..];
+  let slice = &slice.replace("_", "");
+  u64::from_str_radix(slice, radix)
 }
 
 #[derive(Default, Debug, PartialEq, Clone)]
