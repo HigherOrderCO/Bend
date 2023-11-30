@@ -1,0 +1,13 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/box.hvm
+---
+(unbox) = λx (x unbox$Pnew)
+
+(new) = λval λnew (new val)
+
+(unbox$R0) = λval val
+
+(unbox$R1) = λx x
+
+(unbox$Pnew) = λx0 (unbox$R0 x0)

@@ -1,0 +1,19 @@
+data bool = true | false
+
+not false = true
+not true = false
+
+and false false = false
+and false true = false
+and true false = false
+and true true = true
+
+and2 true b = b
+and2 false b = false
+
+and3 true true = true
+and3 a b = false
+
+and4 false b = false
+and4 a false = false
+and4 a b = true

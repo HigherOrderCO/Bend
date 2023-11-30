@@ -84,7 +84,7 @@ fn tree_to_inodes(
       }
       Tree::Var { .. } => unreachable!(),
       Tree::Ref { nam } => {
-        let kind = Ref { def_id: hvmc_name_to_id((*nam).into()) };
+        let kind = Ref { def_id: hvmc_name_to_id(*nam) };
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }

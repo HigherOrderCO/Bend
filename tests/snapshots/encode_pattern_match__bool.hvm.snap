@@ -1,0 +1,79 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/bool.hvm
+---
+(not) = λx ((x not$Ptrue) not$Pfalse)
+
+(and) = λx ((x and$Ptrue) and$Pfalse)
+
+(and2) = λx ((x and2$Ptrue) and2$Pfalse)
+
+(and3) = λx ((x and3$Ptrue) and3$Pfalse)
+
+(and4) = λx ((x and4$Ptrue) and4$Pfalse)
+
+(true) = λtrue λfalse true
+
+(false) = λtrue λfalse false
+
+(not$R0) = true
+
+(not$R1) = false
+
+(not$Ptrue) = not$R1
+
+(not$Pfalse) = not$R0
+
+(and$R0) = false
+
+(and$R1) = false
+
+(and$R2) = false
+
+(and$R3) = true
+
+(and$Ptrue$Ptrue) = and$R3
+
+(and$Ptrue$Pfalse) = and$R2
+
+(and$Ptrue) = λx ((x and$Ptrue$Ptrue) and$Ptrue$Pfalse)
+
+(and$Pfalse$Ptrue) = and$R1
+
+(and$Pfalse$Pfalse) = and$R0
+
+(and$Pfalse) = λx ((x and$Pfalse$Ptrue) and$Pfalse$Pfalse)
+
+(and2$R0) = λb b
+
+(and2$R1) = λb false
+
+(and2$Ptrue) = and2$R0
+
+(and2$Pfalse) = and2$R1
+
+(and3$R0) = true
+
+(and3$R1) = λa λb false
+
+(and3$Ptrue$Ptrue) = and3$R0
+
+(and3$Ptrue$Pfalse) = ((and3$R1 true) false)
+
+(and3$Ptrue) = λx ((x and3$Ptrue$Ptrue) and3$Ptrue$Pfalse)
+
+(and3$Pfalse) = (and3$R1 false)
+
+(and4$R0) = λb false
+
+(and4$R1) = λa false
+
+(and4$R2) = λa λb true
+
+(and4$Ptrue$Ptrue) = ((and4$R2 true) true)
+
+(and4$Ptrue$Pfalse) = (and4$R1 true)
+
+(and4$Ptrue) = λx ((x and4$Ptrue$Ptrue) and4$Ptrue$Pfalse)
+
+(and4$Pfalse) = and4$R0

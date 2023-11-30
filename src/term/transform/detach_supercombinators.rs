@@ -59,7 +59,7 @@ impl<'d> TermInfo<'d> {
 
   fn detach_term(&mut self, term: &mut Term) {
     let name = self.def_names.name(&self.rule_id).unwrap();
-    let comb_name = Name(format!("{name}${}", self.counter));
+    let comb_name = Name(format!("{name}$S{}", self.counter));
     self.counter += 1;
 
     let comb_id = self.def_names.insert(comb_name);

@@ -1,0 +1,26 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/flatten_rules/nested.hvm
+---
+(Rule (CtrA a x$0)) = ((Rule$F0 a) x$0)
+(Rule (CtrB b)) = b
+(Rule x) = x
+
+(CtrB1) = λb λCtrB1 λCtrB2 (CtrB1 b)
+
+(CtrB2) = λa λb λCtrB1 λCtrB2 ((CtrB2 a) b)
+
+(CtrC) = λCtrC CtrC
+
+(CtrA) = λa λb λCtrA λCtrB ((CtrA a) b)
+
+(CtrB) = λa λCtrA λCtrB (CtrB a)
+
+(Rule$F0 a (CtrB1 b)) = (a b)
+(Rule$F0 a (CtrB2 x$0 b)) = (((Rule$F0$F0 a) x$0) b)
+(Rule$F0 a b) = (a b)
+(Rule$F0 x$0 x$1) = ((CtrA x$0) x$1)
+
+(Rule$F0$F0 a (CtrC) b) = (a b)
+(Rule$F0$F0 a x$0 x$1) = (a ((CtrB2 x$0) x$1))
+(Rule$F0$F0 x$0 x$0 x$1) = ((CtrA x$0) ((CtrB2 x$0) x$1))

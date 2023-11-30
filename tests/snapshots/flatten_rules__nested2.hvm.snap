@@ -1,0 +1,13 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/flatten_rules/nested2.hvm
+---
+(Foo a (Cons b x$0)) = (((Foo$F0 a) b) x$0)
+(Foo a b) = (a b)
+
+(Cons) = λh λt λCons λNil ((Cons h) t)
+
+(Nil) = λCons λNil Nil
+
+(Foo$F0 a b (Cons c d)) = (((a b) c) d)
+(Foo$F0 a x$0 x$1) = (a ((Cons x$0) x$1))

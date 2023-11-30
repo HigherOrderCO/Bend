@@ -1,0 +1,4 @@
+data List = (Cons h t) | Nil
+
+Foo a (Cons b (Cons c d)) = (a b c d)
+Foo a b = (a b)

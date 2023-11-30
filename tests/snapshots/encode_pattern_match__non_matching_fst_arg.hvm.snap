@@ -1,0 +1,19 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/non_matching_fst_arg.hvm
+---
+(Foo) = λx λnxt ((Foo$P nxt) x)
+
+(true) = λtrue λfalse true
+
+(false) = λtrue λfalse false
+
+(Foo$R0) = λx x
+
+(Foo$R1) = λx ((Foo x) x)
+
+(Foo$P$Ptrue) = λx0 (Foo$R1 x0)
+
+(Foo$P$Pfalse) = λx0 (Foo$R0 x0)
+
+(Foo$P) = λx λx0 (((x Foo$P$Ptrue) Foo$P$Pfalse) x0)
