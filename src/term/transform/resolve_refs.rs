@@ -30,9 +30,9 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
     }
     Term::Let { pat: Pattern::Var(nam), val, nxt } => {
       resolve_refs(val, def_names, scope);
-      push_scope(Some(nam.clone()), scope);
+      push_scope(nam.clone(), scope);
       resolve_refs(nxt, def_names, scope);
-      pop_scope(Some(nam.clone()), scope);
+      pop_scope(nam.clone(), scope);
     }
     Term::Dup { tag: _, fst, snd, val, nxt } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
       resolve_refs(val, def_names, scope);

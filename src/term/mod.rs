@@ -125,7 +125,7 @@ pub enum Term {
 
 #[derive(Debug, Clone)]
 pub enum Pattern {
-  Var(Name),
+  Var(Option<Name>),
   Ctr(Name, Vec<Pattern>),
   Num(MatchNum),
   Tup(Option<Name>, Option<Name>),
@@ -318,8 +318,10 @@ impl Term {
       Term::Lnk { .. } => (),
       Term::Let { pat: Pattern::Var(nam), val, nxt } => {
         val.subst(from, to);
-        if nam != from {
-          nxt.subst(from, to);
+        if let Some(nam) = nam {
+          if nam != from {
+            nxt.subst(from, to);
+          }
         }
       }
       Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
@@ -385,7 +387,9 @@ impl Term {
           let mut new_scope = IndexMap::new();
           go(nxt, &mut new_scope);
 
-          new_scope.remove(nam);
+          if let Some(nam) = nam {
+            new_scope.remove(nam);
+          }
 
           free_vars.extend(new_scope);
         }
@@ -462,7 +466,7 @@ impl Term {
       let succ = (Pattern::Num(MatchNum::Succ(succ_label)), succ_term);
 
       Term::Let {
-        pat: Pattern::Var(match_bind.clone()),
+        pat: Pattern::Var(Some(match_bind.clone())),
         val: Box::new(scrutinee),
         nxt: Box::new(Term::Match {
           scrutinee: Box::new(Term::Var { nam: match_bind }),
@@ -491,7 +495,8 @@ pub fn native_match(arms: Vec<(Pattern, Term)>) -> (Term, Term) {
 impl fmt::Display for Pattern {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      Pattern::Var(nam) => write!(f, "{nam}"),
+      Pattern::Var(None) => write!(f, "*"),
+      Pattern::Var(Some(nam)) => write!(f, "{nam}"),
       Pattern::Ctr(nam, pats) => write!(f, "({}{})", nam, pats.iter().map(|p| format!(" {p}")).join("")),
       Pattern::Num(num) => write!(f, "{num}"),
       Pattern::Tup(fst, snd) => write!(
@@ -542,7 +547,8 @@ impl fmt::Display for Book {
 impl From<&Pattern> for Term {
   fn from(value: &Pattern) -> Self {
     match value {
-      Pattern::Var(nam) => Term::Var { nam: nam.clone() },
+      Pattern::Var(None) => Term::Era,
+      Pattern::Var(Some(nam)) => Term::Var { nam: nam.clone() },
       Pattern::Ctr(nam, pats) => Term::call(Term::Var { nam: nam.clone() }, pats.iter().map(Term::from)),
       Pattern::Num(..) => todo!(),
       Pattern::Tup(..) => todo!(),

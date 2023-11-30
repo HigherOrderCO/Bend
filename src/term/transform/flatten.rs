@@ -143,26 +143,29 @@ fn make_old_rule(pats: &[Pattern], new_split_def_id: DefId) -> Rule {
         let mut new_arg_args = Vec::new();
         for field in arg_args {
           let var_name = match field {
-            Pattern::Ctr(..) | Pattern::Tup(..) | Pattern::Num(..) => make_var_name(&mut var_count),
-            Pattern::Var(nam) => nam.clone(),
+            Pattern::Ctr(..) | Pattern::Tup(..) | Pattern::Num(..) | Pattern::Var(None) => {
+              make_var_name(&mut var_count)
+            }
+            Pattern::Var(Some(nam)) => nam.clone(),
           };
-          new_arg_args.push(Pattern::Var(var_name.clone()));
+          new_arg_args.push(Pattern::Var(Some(var_name.clone())));
           new_body_args.push(Term::Var { nam: var_name });
         }
         new_pats.push(Pattern::Ctr(arg_name.clone(), new_arg_args));
       }
       Pattern::Tup(a, b) => {
         if let Some(nam) = a {
-          new_pats.push(Pattern::Var(nam.clone()));
+          new_pats.push(Pattern::Var(Some(nam.clone())));
           new_body_args.push(Term::Var { nam: nam.clone() });
         }
         if let Some(nam) = b {
-          new_pats.push(Pattern::Var(nam.clone()));
+          new_pats.push(Pattern::Var(Some(nam.clone())));
           new_body_args.push(Term::Var { nam: nam.clone() });
         }
       }
-      Pattern::Var(nam) => {
-        new_pats.push(Pattern::Var(nam.clone()));
+      Pattern::Var(None) => todo!(),
+      Pattern::Var(Some(nam)) => {
+        new_pats.push(Pattern::Var(Some(nam.clone())));
         new_body_args.push(Term::Var { nam: nam.clone() });
       }
       Pattern::Num(_) => {
@@ -194,17 +197,18 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_pats.push(other_field.clone());
         }
       }
-      (Pattern::Ctr(rule_arg_name, rule_arg_args), Pattern::Var(other_arg_name)) => {
+      (Pattern::Ctr(rule_arg_name, rule_arg_args), Pattern::Var(Some(other_arg_name))) => {
         let mut new_ctr_args = vec![];
         for _ in 0 .. rule_arg_args.len() {
           let new_nam = make_var_name(&mut var_count);
           new_ctr_args.push(Term::Var { nam: new_nam.clone() });
-          new_pats.push(Pattern::Var(new_nam));
+          new_pats.push(Pattern::Var(Some(new_nam)));
         }
         let rule_arg_def_id = def_names.def_id(rule_arg_name).unwrap();
         let new_ctr = Term::call(Term::Ref { def_id: rule_arg_def_id }, new_ctr_args);
         new_body.subst(other_arg_name, &new_ctr);
       }
+      (Pattern::Ctr(..), Pattern::Var(None)) => todo!(),
       (Pattern::Num(..), Pattern::Num(..)) => new_pats.push(other_arg.clone()),
       (Pattern::Num(..), Pattern::Var(..)) => {
         // How to do this with this kind of number pattern? Subst with a match?
@@ -212,18 +216,18 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
       }
       (Pattern::Tup(a_fst, a_snd), Pattern::Tup(b_fst, b_snd)) => {
         if let Some(fst) = a_fst.clone().or(b_fst.clone()) {
-          new_pats.push(Pattern::Var(fst));
+          new_pats.push(Pattern::Var(Some(fst)));
         }
         if let Some(snd) = a_snd.clone().or(b_snd.clone()) {
-          new_pats.push(Pattern::Var(snd));
+          new_pats.push(Pattern::Var(Some(snd)));
         }
       }
       (Pattern::Tup(fst, snd), Pattern::Var(_)) => {
         if let Some(fst) = fst.clone() {
-          new_pats.push(Pattern::Var(fst));
+          new_pats.push(Pattern::Var(Some(fst)));
         }
         if let Some(snd) = snd.clone() {
-          new_pats.push(Pattern::Var(snd));
+          new_pats.push(Pattern::Var(Some(snd)));
         }
       }
       (Pattern::Var(..), _) => {

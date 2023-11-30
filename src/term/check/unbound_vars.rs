@@ -59,9 +59,13 @@ pub fn check_uses<'a>(
     }
     Term::Let { pat: Pattern::Var(nam), val, nxt } => {
       check_uses(val, scope, globals)?;
-      push_scope(Some(nam), scope);
+      if let Some(nam) = nam {
+        push_scope(Some(nam), scope);
+      };
       check_uses(nxt, scope, globals)?;
-      pop_scope(Some(nam), scope);
+      if let Some(nam) = nam {
+        pop_scope(Some(nam), scope);
+      };
     }
     Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
       check_uses(val, scope, globals)?;

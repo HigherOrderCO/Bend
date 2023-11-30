@@ -109,7 +109,9 @@ impl Term {
         Term::Let { pat: Pattern::Var(nam), val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_super = go(nxt, depth + 1, term_info);
-          term_info.provide(Some(nam));
+          if let Some(nam) = nam {
+            term_info.provide(Some(nam));
+          }
 
           val_is_super && nxt_is_super
         }
