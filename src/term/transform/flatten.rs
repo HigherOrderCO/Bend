@@ -1,5 +1,4 @@
 use crate::term::{Book, DefId, DefNames, Definition, Name, Pattern, Rule, Term};
-use chumsky::primitive::todo;
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
@@ -61,17 +60,20 @@ fn matches_together(a: &[Pattern], b: &[Pattern]) -> (bool, bool) {
       (Pattern::Ctr(..) | Pattern::Num(_) | Pattern::Tup(..), Pattern::Var(..)) => {
         same_shape = false;
       }
+      (Pattern::Num(a_num), Pattern::Num(b_num)) => {
+        if std::mem::discriminant(a_num) != std::mem::discriminant(b_num) {
+          matches_together = false;
+          same_shape = false;
+        }
+      }
+      (Pattern::Tup(..), Pattern::Tup(..)) => {
+        todo!()
+      }
       (
         Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
         Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
       ) => {
         if std::mem::discriminant(a) != std::mem::discriminant(b) {
-          matches_together = false;
-          same_shape = false;
-        }
-      }
-      (Pattern::Num(a_num), Pattern::Num(b_num)) => {
-        if std::mem::discriminant(a_num) != std::mem::discriminant(b_num) {
           matches_together = false;
           same_shape = false;
         }
