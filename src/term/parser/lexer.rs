@@ -29,8 +29,8 @@ pub enum Token {
   Equals,
 
   #[regex("[0-9_]+", |lex| from_radix(10, lex).ok(), priority = 2)]
-  #[regex("0[xX][0-9a-fA-F_]{1,15}", |lex| from_radix(16, lex).ok())]
-  #[regex("0[bB][0-1_]{1,60}", |lex| from_radix(2, lex).ok())]
+  #[regex("0[xX][0-9a-fA-F_]+", |lex| from_radix(16, lex).ok())]
+  #[regex("0[bB][0-1_]+", |lex| from_radix(2, lex).ok())]
   Num(u64),
 
   #[token("#")]
