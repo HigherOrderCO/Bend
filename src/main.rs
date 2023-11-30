@@ -27,7 +27,7 @@ struct Args {
 
 #[derive(ValueEnum, Clone, Debug)]
 enum Mode {
-  /// Checks that the program is sintactically and semantically correct.
+  /// Checks that the program is syntactically and semantically correct.
   Check,
   /// Compiles the program to hvmc and prints to stdout.
   Compile,
