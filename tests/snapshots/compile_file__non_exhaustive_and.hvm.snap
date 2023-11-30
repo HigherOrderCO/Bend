@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/non_exhaustive_and.hvm
+---
+Non-exhaustive pattern at definition 'Bool.and'. Hint: (F) (T) not covered.

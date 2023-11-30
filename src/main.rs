@@ -49,63 +49,67 @@ fn mem_parser(arg: &str) -> Result<usize, String> {
   Ok(base * mult)
 }
 
-fn main() -> Result<(), String> {
-  #[cfg(not(feature = "cli"))]
-  compile_error!("The 'cli' feature is needed for the hvm-lang cli");
+fn main() {
+  fn run() -> Result<(), String> {
+    #[cfg(not(feature = "cli"))]
+    compile_error!("The 'cli' feature is needed for the hvm-lang cli");
 
-  let args = Args::parse();
+    let args = Args::parse();
 
-  let mut book = load_file_to_book(&args.path)?;
-  if args.verbose {
-    println!("{book:?}");
+    let mut book = load_file_to_book(&args.path)?;
+    if args.verbose {
+      println!("{book:?}");
+    }
+
+    match args.mode {
+      Mode::Check => {
+        check_book(book)?;
+      }
+      Mode::Compile => {
+        let compiled = compile_book(&mut book)?;
+
+        for warn in &compiled.warnings {
+          eprintln!("WARNING: {warn}");
+        }
+
+        print!("{}", show_book(&compiled.core_book));
+      }
+      Mode::Desugar => {
+        desugar_book(&mut book)?;
+        println!("{book}");
+      }
+      Mode::Run => {
+        let mem_size = args.mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
+        let (res_term, def_names, info) = run_book(book, mem_size, !args.single_core)?;
+        let RunInfo { stats, valid_readback, net: lnet } = info;
+        let total_rewrites = total_rewrites(&stats.rewrites) as f64;
+        let rps = total_rewrites / stats.run_time / 1_000_000.0;
+        if args.verbose {
+          println!("\n{}", show_net(&lnet));
+        }
+
+        if valid_readback {
+          println!("{}", res_term.to_string(&def_names));
+        } else {
+          println!("Invalid readback from inet.");
+          println!("Got:\n{}", res_term.to_string(&def_names));
+        }
+
+        if args.stats {
+          println!("\nRWTS   : {}", total_rewrites);
+          println!("- ANNI : {}", stats.rewrites.anni);
+          println!("- COMM : {}", stats.rewrites.comm);
+          println!("- ERAS : {}", stats.rewrites.eras);
+          println!("- DREF : {}", stats.rewrites.dref);
+          println!("- OPER : {}", stats.rewrites.oper);
+          println!("TIME   : {:.3} s", stats.run_time);
+          println!("RPS    : {:.3} m", rps);
+        }
+      }
+    }
+    Ok(())
   }
-
-  match args.mode {
-    Mode::Check => {
-      check_book(book)?;
-    }
-    Mode::Compile => {
-      let compiled = compile_book(&mut book)?;
-
-      for warn in &compiled.warnings {
-        eprintln!("WARNING: {warn}");
-      }
-
-      print!("{}", show_book(&compiled.core_book));
-    }
-    Mode::Desugar => {
-      desugar_book(&mut book)?;
-      println!("{book}");
-    }
-    Mode::Run => {
-      let mem_size = args.mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
-      let (res_term, def_names, info) = run_book(book, mem_size, !args.single_core)?;
-      let RunInfo { stats, valid_readback, net: lnet } = info;
-      let total_rewrites = total_rewrites(&stats.rewrites) as f64;
-      let rps = total_rewrites / stats.run_time / 1_000_000.0;
-      if args.verbose {
-        println!("\n{}", show_net(&lnet));
-      }
-
-      if valid_readback {
-        println!("{}", res_term.to_string(&def_names));
-      } else {
-        println!("Invalid readback from inet.");
-        println!("Got:\n{}", res_term.to_string(&def_names));
-      }
-
-      if args.stats {
-        println!("\nRWTS   : {}", total_rewrites);
-        println!("- ANNI : {}", stats.rewrites.anni);
-        println!("- COMM : {}", stats.rewrites.comm);
-        println!("- ERAS : {}", stats.rewrites.eras);
-        println!("- DREF : {}", stats.rewrites.dref);
-        println!("- OPER : {}", stats.rewrites.oper);
-        println!("TIME   : {:.3} s", stats.run_time);
-        println!("RPS    : {:.3} m", rps);
-      }
-    }
+  if let Err(e) = run() {
+    eprintln!("{e}");
   }
-
-  Ok(())
 }
