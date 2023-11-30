@@ -150,6 +150,7 @@ pub fn desugar_book(book: &mut Book) -> Result<(), String> {
   book.check_exhaustive_patterns(&def_types)?;
   book.encode_pattern_matching_functions(&def_types);
   book.resolve_refs();
+  book.simplify_matches()?;
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();

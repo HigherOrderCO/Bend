@@ -1,0 +1,22 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/list_reverse.hvm
+---
+@6 = (a (b c))
+& @concat ~ (d (e c))
+& @cons ~ (a (@nil e))
+& @reverse ~ (b d)
+@A = (a (b (c d)))
+& @cons ~ (a (e d))
+& @concat ~ (b (c e))
+@B = (a a)
+@concat = ((@A (@B a)) a)
+@cons = (a (b ((a (b c)) (* c))))
+@main = a
+& @reverse ~ (b a)
+& @cons ~ (#3 (c b))
+& @cons ~ (#2 (d c))
+& @cons ~ (#1 (@nil d))
+@nil = (* (a a))
+@reverse = ((@6 (@nil a)) a)
+

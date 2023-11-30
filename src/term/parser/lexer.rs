@@ -122,7 +122,7 @@ pub enum Token {
 
 fn from_radix(radix: u32, lexer: &mut Lexer<Token>) -> Result<u64, ParseIntError> {
   let slice = if radix == 10 { lexer.slice() } else { &lexer.slice()[2 ..] };
-  let slice = &slice.replace("_", "");
+  let slice = &slice.replace('_', "");
   u64::from_str_radix(slice, radix)
 }
 
