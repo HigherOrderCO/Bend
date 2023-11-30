@@ -3,4 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/nums.hvm
 ---
 a
-& #4294967295 ~ <+ #5 a>
+& #4294967295 ~ <+ b a>
+& #5 ~ <+ #1000 b>

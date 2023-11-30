@@ -28,7 +28,7 @@ pub enum Token {
   #[token("=")]
   Equals,
 
-  #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
+  #[regex("[0-9_]+", |lex| from_radix(10, lex).ok(), priority = 2)]
   #[regex("0[xX][0-9a-fA-F_]{1,15}", |lex| from_radix(16, lex).ok())]
   #[regex("0[bB][0-1_]{1,60}", |lex| from_radix(2, lex).ok())]
   Num(u64),
@@ -121,7 +121,7 @@ pub enum Token {
 }
 
 fn from_radix(radix: u32, lexer: &mut Lexer<Token>) -> Result<u64, ParseIntError> {
-  let slice = &lexer.slice()[2 ..];
+  let slice = if radix == 10 { lexer.slice() } else { &lexer.slice()[2 ..] };
   let slice = &slice.replace("_", "");
   u64::from_str_radix(slice, radix)
 }
