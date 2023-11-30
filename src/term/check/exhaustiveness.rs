@@ -1,5 +1,5 @@
 use super::type_check::{DefinitionTypes, Type};
-use crate::term::{Adt, Book, Name, Rule, RulePat};
+use crate::term::{Adt, Book, Name, Pattern, Rule};
 use std::collections::BTreeMap;
 
 impl Book {
@@ -36,9 +36,10 @@ fn check_pattern(
           let pat = &rules[rule_idx].pats[pat_idx];
           match pat {
             // Rules with a var pattern are relevant to all constructors.
-            RulePat::Var(_) => next_rules_to_check.values_mut().for_each(|x| x.push(rule_idx)),
-            RulePat::Ctr(ctr_nam, _) => next_rules_to_check.get_mut(ctr_nam).unwrap().push(rule_idx),
-            RulePat::Num(..) => todo!(),
+            Pattern::Var(_) => next_rules_to_check.values_mut().for_each(|x| x.push(rule_idx)),
+            Pattern::Ctr(ctr_nam, _) => next_rules_to_check.get_mut(ctr_nam).unwrap().push(rule_idx),
+            Pattern::Num(..) => todo!(),
+            Pattern::Tup(..) => todo!(),
           }
         }
         // Match each constructor of the current pattern and recursively check the next pattern.
@@ -53,6 +54,7 @@ fn check_pattern(
           }
         }
       }
+      Type::Tup => todo!(),
     }
   }
   Ok(())

@@ -1,4 +1,4 @@
-use crate::term::{Book, LetPat, MatchNum, Name, RulePat, Term};
+use crate::term::{Book, MatchNum, Name, Pattern, Term};
 use hvmc::run::Val;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -43,17 +43,18 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       add_var(nam.as_ref(), uses);
       count_var_uses_in_term(bod, uses)
     }
-    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
       add_var(fst.as_ref(), uses);
       add_var(snd.as_ref(), uses);
       count_var_uses_in_term(val, uses);
       count_var_uses_in_term(nxt, uses);
     }
-    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+    Term::Let { pat: Pattern::Var(nam), val, nxt } => {
       add_var(Some(nam), uses);
       count_var_uses_in_term(val, uses);
       count_var_uses_in_term(nxt, uses);
     }
+    Term::Let { .. } => todo!(),
     // Others
     Term::Chn { bod, .. } => count_var_uses_in_term(bod, uses),
     Term::App { fun: fst, arg: snd }
@@ -66,7 +67,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
     Term::Match { scrutinee, arms } => {
       count_var_uses_in_term(scrutinee, uses);
       for (rule, term) in arms {
-        if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+        if let Pattern::Num(MatchNum::Succ(nam)) = rule {
           add_var(nam.as_ref(), uses)
         }
 
@@ -112,7 +113,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
   match term {
     Term::Lam { nam, bod } => term_with_bind_to_afine(bod, nam, var_uses, let_bodies),
 
-    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+    Term::Let { pat: Pattern::Var(nam), val, nxt } => {
       let uses = var_uses[nam];
       match uses {
         0 => {
@@ -144,7 +145,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       *term = std::mem::take(nxt.as_mut());
     }
 
-    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
       let uses_fst = get_var_uses(fst.as_ref(), var_uses);
       let uses_snd = get_var_uses(snd.as_ref(), var_uses);
       term_to_affine(val, var_uses, let_bodies);
@@ -152,6 +153,8 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       duplicate_lam(fst, nxt, uses_fst);
       duplicate_lam(snd, nxt, uses_snd);
     }
+
+    Term::Let { .. } => todo!(),
 
     // Var-using terms
     Term::Var { nam } => {
@@ -182,8 +185,8 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       term_to_affine(scrutinee, var_uses, let_bodies);
       for (rule, term) in arms {
         match rule {
-          RulePat::Num(MatchNum::Succ(nam)) => term_with_bind_to_afine(term, nam, var_uses, let_bodies),
-          RulePat::Num(_) => term_to_affine(term, var_uses, let_bodies),
+          Pattern::Num(MatchNum::Succ(nam)) => term_with_bind_to_afine(term, nam, var_uses, let_bodies),
+          Pattern::Num(_) => term_to_affine(term, var_uses, let_bodies),
           _ => unreachable!(),
         }
       }

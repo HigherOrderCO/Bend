@@ -1,4 +1,4 @@
-use super::{native_match, Book, DefId, DefNames, LetPat, Name, Op, Term};
+use super::{native_match, Book, DefId, DefNames, Name, Op, Pattern, Term};
 use crate::{
   net::{INet, NodeKind::*, Port, MAX_DUP_HVMC_LABEL, ROOT},
   Warning,
@@ -9,7 +9,10 @@ use hvmc::{
 };
 use std::collections::{hash_map::Entry, HashMap};
 
-pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HashMap<DefId, Val>, HashMap<u32, Name>, Vec<Warning>) {
+pub fn book_to_nets(
+  book: &Book,
+  main: DefId,
+) -> (HashMap<String, INet>, HashMap<DefId, Val>, HashMap<u32, Name>, Vec<Warning>) {
   let mut warnings = Vec::new();
   let mut nets = HashMap::new();
   let mut id_to_hvmc_name = HashMap::new();
@@ -207,7 +210,7 @@ fn encode_term(
       inet.link(up, Port(node, 0));
       Some(Port(node, 0))
     }
-    Term::Let { pat: LetPat::Tup(l_nam, r_nam), val, nxt } => {
+    Term::Let { pat: Pattern::Tup(l_nam, r_nam), val, nxt } => {
       let dup = inet.new_node(Tup);
 
       let val = encode_term(inet, val, Port(dup, 0), scope, vars, global_vars, label_generator);
@@ -344,7 +347,7 @@ impl LabelGenerator {
           self.next += 1;
           self.labels_to_tag.insert(lab, tag.clone());
           *e.insert(lab)
-        },
+        }
       }
     } else {
       let lab = self.next;

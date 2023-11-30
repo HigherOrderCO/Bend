@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use hvmc::run::Val;
 
-use crate::term::{Book, DefId, DefNames, Definition, Name, Rule, RulePat, Term};
+use crate::term::{Book, DefId, DefNames, Definition, Name, Pattern, Rule, Term};
 
 impl Book {
   /// Splits definitions with nested pattern matching into multiple ones so that the maximum pattern matching depth is 1.
@@ -59,9 +59,9 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> (Definition, Vec<D
 /// It must be separated into a new rule (Rule$0 (CtrB)) while changing the old pattern to (Rule (CtrA .x0)).
 fn must_split(rule: &Rule) -> bool {
   for pat in &rule.pats {
-    if let RulePat::Ctr(_, args) = &pat {
+    if let Pattern::Ctr(_, args) = &pat {
       for arg in args {
-        if matches!(arg, RulePat::Ctr(..)) {
+        if matches!(arg, Pattern::Ctr(..)) {
           return true;
         }
       }
@@ -76,12 +76,12 @@ fn matches_together(a: &Rule, b: &Rule) -> bool {
 
   for (a_pat, b_pat) in a.pats.iter().zip(&b.pats) {
     match (&a_pat, &b_pat) {
-      (RulePat::Var(..), _) => (),
+      (Pattern::Var(..), _) => (),
       // The hvm also has this clause, but it's used to generate extra incorrect rules.
       // On the hvm this doesn't matter, but here it would mess with the ADTs.
       //(_, Pattern::Var(..)) => b_implies_a = false,
-      (RulePat::Ctr(an, ..), RulePat::Ctr(bn, ..)) if an == bn => (),
-      (RulePat::Ctr(..), RulePat::Ctr(..)) => {
+      (Pattern::Ctr(an, ..), Pattern::Ctr(bn, ..)) if an == bn => (),
+      (Pattern::Ctr(..), Pattern::Ctr(..)) => {
         a_implies_b = false;
         break;
       }
@@ -148,13 +148,13 @@ fn make_split_def(
       let mut new_rule_body = other.body.clone();
       for (rule_pat, other_pat) in rule.pats.iter().zip(&other.pats) {
         match (rule_pat, other_pat) {
-          (RulePat::Ctr(..), RulePat::Ctr(_, pat_args)) => {
+          (Pattern::Ctr(..), Pattern::Ctr(_, pat_args)) => {
             new_rule_pats.extend(pat_args.clone());
           }
-          (RulePat::Ctr(ctr_name, ctr_args), RulePat::Var(opat_name)) => {
+          (Pattern::Ctr(ctr_name, ctr_args), Pattern::Var(opat_name)) => {
             let mut new_ctr_args = vec![];
             for _ in 0 .. ctr_args.len() {
-              let new_arg = RulePat::Var(Name(format!(".x{}", var_count)));
+              let new_arg = Pattern::Var(Name(format!(".x{}", var_count)));
               *var_count += 1;
               new_ctr_args.push(Term::from(&new_arg));
               new_rule_pats.push(new_arg);
@@ -162,13 +162,19 @@ fn make_split_def(
             let new_ctr = Term::call(Term::Var { nam: ctr_name.clone() }, new_ctr_args);
             new_rule_body.subst(opat_name, &new_ctr);
           }
-          (RulePat::Var(..), other_pat) => {
+          (Pattern::Var(..), other_pat) => {
             new_rule_pats.push(other_pat.clone());
           }
-          (RulePat::Ctr(_, _), RulePat::Num(_)) => todo!(),
-          (RulePat::Num(_), RulePat::Var(_)) => todo!(),
-          (RulePat::Num(_), RulePat::Ctr(_, _)) => todo!(),
-          (RulePat::Num(_), RulePat::Num(_)) => todo!(),
+          (Pattern::Ctr(_, _), Pattern::Num(_)) => todo!(),
+          (Pattern::Num(_), Pattern::Var(_)) => todo!(),
+          (Pattern::Num(_), Pattern::Ctr(_, _)) => todo!(),
+          (Pattern::Num(_), Pattern::Num(_)) => todo!(),
+          (Pattern::Ctr(_, _), Pattern::Tup(_, _)) => todo!(),
+          (Pattern::Num(_), Pattern::Tup(_, _)) => todo!(),
+          (Pattern::Tup(_, _), Pattern::Var(_)) => todo!(),
+          (Pattern::Tup(_, _), Pattern::Ctr(_, _)) => todo!(),
+          (Pattern::Tup(_, _), Pattern::Num(_)) => todo!(),
+          (Pattern::Tup(_, _), Pattern::Tup(_, _)) => todo!(),
         }
       }
       let new_rule = Rule { pats: new_rule_pats, body: new_rule_body };
@@ -183,35 +189,37 @@ fn make_split_def(
 /// Make a rule that calls the new split definition to be used in place of the rules with nested patterns.
 fn make_rule_calling_split(old_rule: &Rule, new_def_id: DefId) -> Rule {
   let mut var_count = 0;
-  let mut old_rule_pats: Vec<RulePat> = Vec::new();
+  let mut old_rule_pats: Vec<Pattern> = Vec::new();
   let mut old_rule_body_args: Vec<Term> = Vec::new();
 
   for pat in &old_rule.pats {
     match &pat {
-      RulePat::Var(name) => {
+      Pattern::Var(name) => {
         old_rule_pats.push(pat.clone());
         old_rule_body_args.push(Term::Var { nam: name.clone() });
       }
-      RulePat::Ctr(name, args) => {
+      Pattern::Ctr(name, args) => {
         let mut new_pat_args = Vec::new();
 
         for field in args {
           let arg = match &field {
-            RulePat::Ctr(..) => {
+            Pattern::Ctr(..) => {
               let nam = Name(format!(".x{}", var_count));
               var_count += 1;
-              RulePat::Var(nam)
+              Pattern::Var(nam)
             }
-            RulePat::Var(..) => field.clone(),
-            RulePat::Num(..) => todo!(),
+            Pattern::Var(..) => field.clone(),
+            Pattern::Num(..) => todo!(),
+            Pattern::Tup(..) => todo!(),
           };
           old_rule_body_args.push(Term::from(&arg));
           new_pat_args.push(arg);
         }
 
-        old_rule_pats.push(RulePat::Ctr(name.clone(), new_pat_args));
+        old_rule_pats.push(Pattern::Ctr(name.clone(), new_pat_args));
       }
-      RulePat::Num(..) => todo!(),
+      Pattern::Num(..) => todo!(),
+      Pattern::Tup(..) => todo!(),
     }
   }
   let old_rule_body = Term::call(Term::Ref { def_id: new_def_id }, old_rule_body_args);

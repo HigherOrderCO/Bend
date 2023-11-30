@@ -1,4 +1,4 @@
-use crate::term::{Book, LetPat, MatchNum, Name, RulePat, Term};
+use crate::term::{Book, MatchNum, Name, Pattern, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -57,13 +57,13 @@ pub fn check_uses<'a>(
     Term::Lnk { nam } => {
       globals.entry(nam).or_default().1 = true;
     }
-    Term::Let { pat: LetPat::Var(nam), val, nxt } => {
+    Term::Let { pat: Pattern::Var(nam), val, nxt } => {
       check_uses(val, scope, globals)?;
       push_scope(Some(nam), scope);
       check_uses(nxt, scope, globals)?;
       pop_scope(Some(nam), scope);
     }
-    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: LetPat::Tup(fst, snd), val, nxt } => {
+    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
       check_uses(val, scope, globals)?;
       push_scope(fst.as_ref(), scope);
       push_scope(snd.as_ref(), scope);
@@ -71,6 +71,7 @@ pub fn check_uses<'a>(
       pop_scope(fst.as_ref(), scope);
       pop_scope(snd.as_ref(), scope);
     }
+    Term::Let { pat, .. } => todo!("pat: {pat:?}"),
     Term::App { fun, arg } => {
       check_uses(fun, scope, globals)?;
       check_uses(arg, scope, globals)?;
@@ -82,13 +83,13 @@ pub fn check_uses<'a>(
     Term::Match { scrutinee, arms } => {
       check_uses(scrutinee, scope, globals)?;
       for (rule, term) in arms {
-        if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+        if let Pattern::Num(MatchNum::Succ(nam)) = rule {
           push_scope(nam.as_ref(), scope);
         }
 
         check_uses(term, scope, globals)?;
 
-        if let RulePat::Num(MatchNum::Succ(nam)) = rule {
+        if let Pattern::Num(MatchNum::Succ(nam)) = rule {
           pop_scope(nam.as_ref(), scope);
         }
       }
