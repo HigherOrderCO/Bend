@@ -157,12 +157,12 @@ fn match_native(
       _ => unreachable!(), // Succ(None) should not happen here
     };
 
+    body =
+      free_vars.iter().cloned().rev().fold(body, |acc, f| Term::Lam { nam: Some(f), bod: Box::new(acc) });
+
     if let Some(nam) = &bind {
       body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) };
     }
-
-    body =
-      free_vars.iter().cloned().rev().fold(body, |acc, f| Term::Lam { nam: Some(f), bod: Box::new(acc) });
 
     let name = make_def_name(def_name, &Name(name.to_string()), match_count);
     let def_id = def_names.insert(name);

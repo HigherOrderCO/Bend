@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_single_files/match_mult_linearization.hvm
 ---
-λa match a { 0: λb λc λd (+ (+ b c) d); +: λf λg λh (+ (+ (+ h a-1) f) g) }
+λa match a { 0: λb λc λd (+ (+ b c) d); +: λf λg λh (+ (+ (+ a-1 f) g) h) }
