@@ -2,11 +2,13 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/scrutinee_reconstruction.hvm
 ---
-@5 = (a (* b))
-& @Some ~ (a b)
-@6 = (a a)
+@5 = ((@6 (@7 a)) a)
+@6 = (* @A)
+@7 = (* (a a))
+@A = (a (* a))
 @None = (* (a a))
-@Option.or = ((@5 (@6 a)) a)
+@Option.or = ({2 a b} c)
+& @5 ~ (b (a c))
 @Some = (a ((a b) (* b)))
 @main = a
 & @Option.or ~ (b (@None a))

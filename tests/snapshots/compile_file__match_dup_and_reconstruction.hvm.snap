@@ -2,10 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/match_dup_and_reconstruction.hvm
 ---
-@4 = ({2 a b} [c a])
-& @Boxed ~ (b c)
+@4 = ((@5 a) a)
+@5 = (a (b [b a]))
 @Boxed = (a ((a b) b))
-@Got = ((@4 a) a)
+@Got = ({2 a b} c)
+& @4 ~ (b (a c))
 @main = a
 & @Got ~ (b a)
 & @Boxed ~ (#10 b)
