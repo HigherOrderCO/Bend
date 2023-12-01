@@ -128,36 +128,28 @@ fn make_leaf_pattern_matching_case(
   let rule = &book.defs[&def_id].rules[rule_idx];
 
   // The term we're building
-  let mut term = Term::Ref { def_id: rule_def_id };
-  // Counts how many variables are used and then counts down to declare them.
-  let mut matched_var_counter = 0;
+  let term = Term::Ref { def_id: rule_def_id };
 
-  let use_var = |counter: &mut usize| {
-    let nam = Name(format!("x{counter}"));
-    *counter += 1;
-    nam
-  };
-  let make_var = |counter: &mut usize| {
-    *counter -= 1;
-    Name(format!("x{counter}"))
-  };
-  let make_app = |term: Term, nam: Name| Term::App { fun: Box::new(term), arg: Box::new(Term::Var { nam }) };
-  let make_lam = |nam: Name, term: Term| Term::Lam { nam: Some(nam), bod: Box::new(term) };
+  let (num_new_args, num_old_args) = get_pat_arg_count(&match_path);
+  let old_args = (0 .. num_old_args).map(|x| Name(format!("x{x}")));
+  let new_args = (0 .. num_new_args).map(|x| Name(format!("y{x}")));
+
+  let mut arg_use = old_args.clone().chain(new_args.clone());
 
   // Add the applications to call the rule body
-  term = match_path.iter().zip(&rule.pats).fold(term, |term, (matched, pat)| {
+  let term = match_path.iter().zip(&rule.pats).fold(term, |term, (matched, pat)| {
     match (matched, pat) {
-      (Pattern::Var(_), Pattern::Var(_)) => make_app(term, use_var(&mut matched_var_counter)),
+      (Pattern::Var(_), Pattern::Var(_)) => Term::arg_call(term, arg_use.next().unwrap()),
       (Pattern::Ctr(_, vars), Pattern::Ctr(_, _)) => {
-        vars.iter().fold(term, |term, _| make_app(term, use_var(&mut matched_var_counter)))
+        vars.iter().fold(term, |term, _| Term::arg_call(term, arg_use.next().unwrap()))
       }
       // This particular rule was not matching on this arg but due to the other rules we had to match on a constructor.
       // So, to call the rule body we have to recreate the constructor.
       // (On scott encoding, if one of the cases is matched we must also match on all the other constructors for this arg)
       (Pattern::Ctr(ctr_nam, vars), Pattern::Var(_)) => {
         let ctr_ref_id = book.def_names.def_id(ctr_nam).unwrap();
-        let ctr_args = vars.iter().map(|_| use_var(&mut matched_var_counter));
-        let ctr_term = ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, make_app);
+        let ctr_args = vars.iter().map(|_| arg_use.next().unwrap());
+        let ctr_term = ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, Term::arg_call);
         Term::App { fun: Box::new(term), arg: Box::new(ctr_term) }
       }
       (Pattern::Var(_), Pattern::Ctr(_, _)) => unreachable!(),
@@ -169,19 +161,16 @@ fn make_leaf_pattern_matching_case(
   });
 
   // Add the lambdas to get the matched variables
-  term = match_path.iter().rev().fold(term, |term, matched| match matched {
-    Pattern::Var(_) => make_lam(make_var(&mut matched_var_counter), term),
-    Pattern::Ctr(_, vars) => {
-      vars.iter().fold(term, |term, _| make_lam(make_var(&mut matched_var_counter), term))
-    }
-    Pattern::Num(..) => todo!(),
-    Pattern::Tup(..) => todo!(),
-  });
+  let arg_decl = new_args.chain(old_args);
+  let term = arg_decl.rev().fold(term, |term, arg| Term::named_lam(arg, term));
 
   add_case_to_book(book, crnt_name.clone(), term);
 }
 
 /// Builds a function for one of the pattern matches of the original one, as well as the next subfunctions recursively.
+/// `(Rule ... (CtrA a0 ... an) ...) = ...`
+/// to
+/// `(Case) = λy1 .. λyn λx1 ... λxm λx (x Case$CtrA ... Case$CtrN x1 ... xm y1 ... yn)`
 fn make_branch_pattern_matching_case(
   book: &mut Book,
   def_type: &[Type],
@@ -204,16 +193,6 @@ fn make_branch_pattern_matching_case(
   }
   let make_next_fn_name = |crnt_name, ctr_name| Name(format!("{crnt_name}$P{ctr_name}"));
   let make_app = |term, arg| Term::App { fun: Box::new(term), arg: Box::new(arg) };
-  let make_lam = |nam, term| Term::Lam { nam: Some(nam), bod: Box::new(term) };
-  let use_var = |counter: &mut usize| {
-    let nam = Name(format!("x{counter}"));
-    *counter += 1;
-    nam
-  };
-  let make_var = |counter: &mut usize| {
-    *counter -= 1;
-    Name(format!("x{counter}"))
-  };
 
   let crnt_arg_idx = match_path.len();
   let Type::Adt(next_type) = &def_type[crnt_arg_idx] else { unreachable!() };
@@ -232,7 +211,7 @@ fn make_branch_pattern_matching_case(
     make_pattern_matching_case(book, def_type, def_id, &crnt_name, crnt_rules, match_path);
   }
 
-  // Pattern matched value
+  // Pattern matching on current argument
   let term = Term::Var { nam: Name::new("x") };
   let term = next_ctrs.keys().fold(term, |term, ctr| {
     let name = make_next_fn_name(crnt_name, ctr);
@@ -240,64 +219,57 @@ fn make_branch_pattern_matching_case(
     make_app(term, Term::Ref { def_id })
   });
 
-  let mut var_count = 0;
+  let term = add_arg_calls(term, &match_path);
 
-  // Applied arguments
-  let term = match_path.iter().fold(term, |term, pat| match pat {
-    Pattern::Var(_) => make_app(term, Term::Var { nam: use_var(&mut var_count) }),
-    Pattern::Ctr(_, vars) => {
-      vars.iter().fold(term, |term, _| make_app(term, Term::Var { nam: use_var(&mut var_count) }))
-    }
-    Pattern::Num(_) => todo!(),
-    Pattern::Tup(..) => todo!(),
-  });
+  // Lambda for pattern matched value
+  let term = Term::named_lam(Name::new("x"), term);
 
-  // Lambdas for arguments
-  let term = match_path.iter().rev().fold(term, |term, pat| match pat {
-    Pattern::Var(_) => make_lam(make_var(&mut var_count), term),
-    Pattern::Ctr(_, vars) => vars.iter().fold(term, |term, _| make_lam(make_var(&mut var_count), term)),
-    Pattern::Num(_) => todo!(),
-    Pattern::Tup(..) => todo!(),
-  });
-
-  // Lambda for the matched variable
-  let term = Term::Lam { nam: Some(Name::new("x")), bod: Box::new(term) };
+  let term = add_arg_lams(term, &match_path);
 
   add_case_to_book(book, crnt_name.clone(), term);
 }
 
+/// `(Rule ... y ...) = ...`
+/// to
+/// `(Case) = λy1 .. λyn λx1 ... λxm λx (NextCase x x1 ... xm y1 .. yn)`
 fn make_non_pattern_matching_case(
   book: &mut Book,
   def_type: &[Type],
   def_id: DefId,
   crnt_name: &Name,
   crnt_rules: Vec<usize>,
-  mut match_path: Vec<Pattern>,
+  match_path: Vec<Pattern>,
 ) {
   let arg_name = Name::new("x");
-  let nxt_name = Name::new("nxt");
   let nxt_def_name = Name(format!("{crnt_name}$P"));
 
   // Make next function
-  match_path.push(Pattern::Var(Some(arg_name.clone())));
-  make_pattern_matching_case(book, def_type, def_id, &nxt_def_name, crnt_rules, match_path);
+  let mut next_match_path = match_path.clone();
+  next_match_path.push(Pattern::Var(Some(arg_name.clone())));
+  make_pattern_matching_case(book, def_type, def_id, &nxt_def_name, crnt_rules, next_match_path);
 
   // Make call to next function
   let nxt_def_id = book.def_names.def_id(&nxt_def_name).unwrap();
-  let term = Term::Lam {
-    nam: Some(arg_name.clone()),
-    bod: Box::new(Term::Lam {
-      nam: Some(nxt_name.clone()),
-      bod: Box::new(Term::App {
-        fun: Box::new(Term::App {
-          fun: Box::new(Term::Ref { def_id: nxt_def_id }),
-          arg: Box::new(Term::Var { nam: nxt_name }),
-        }),
-        arg: Box::new(Term::Var { nam: arg_name }),
-      }),
-    }),
-  };
+  let term = Term::Ref { def_id: nxt_def_id };
+  let term = Term::arg_call(term, arg_name.clone());
+  let term = add_arg_calls(term, &match_path);
+
+  // Lambda for pattern matched value
+  let term = Term::named_lam(arg_name, term);
+
+  let term = add_arg_lams(term, &match_path);
+
   add_case_to_book(book, crnt_name.clone(), term);
+}
+
+impl Term {
+  fn named_lam(nam: Name, bod: Term) -> Term {
+    Term::Lam { nam: Some(nam), bod: Box::new(bod) }
+  }
+
+  fn arg_call(term: Term, arg: Name) -> Term {
+    Term::App { fun: Box::new(term), arg: Box::new(Term::Var { nam: arg }) }
+  }
 }
 
 fn add_case_to_book(book: &mut Book, nam: Name, body: Term) {
@@ -306,4 +278,39 @@ fn add_case_to_book(book: &mut Book, nam: Name, body: Term) {
   } else {
     book.insert_def(nam, vec![Rule { pats: vec![], body }]);
   }
+}
+
+// How many old arguments and how many new arguments in the match path
+fn get_pat_arg_count(match_path: &[Pattern]) -> (usize, usize) {
+  let pat_arg_count = |pat: &Pattern| match pat {
+    Pattern::Var(_) => 1,
+    Pattern::Ctr(_, vars) => vars.len(),
+    Pattern::Num(_) => todo!(),
+    Pattern::Tup(..) => todo!(),
+  };
+  if let Some((new_pat, old_pats)) = match_path.split_last() {
+    let new_args = pat_arg_count(new_pat);
+    let old_args = old_pats.iter().map(pat_arg_count).sum();
+    (new_args, old_args)
+  } else {
+    (0, 0)
+  }
+}
+
+/// Adds the argument calls to the term, with old args followed by new args.
+fn add_arg_calls(term: Term, match_path: &[Pattern]) -> Term {
+  let (num_new_args, num_old_args) = get_pat_arg_count(match_path);
+  let old_args = (0 .. num_old_args).map(|x| Name(format!("x{x}")));
+  let new_args = (0 .. num_new_args).map(|x| Name(format!("y{x}")));
+  let args = old_args.chain(new_args);
+  args.fold(term, Term::arg_call)
+}
+
+// Adds the argument lambdas to the term, with new args followed by old args.
+fn add_arg_lams(term: Term, match_path: &[Pattern]) -> Term {
+  let (num_new_args, num_old_args) = get_pat_arg_count(match_path);
+  let old_args = (0 .. num_old_args).map(|x| Name(format!("x{x}")));
+  let new_args = (0 .. num_new_args).map(|x| Name(format!("y{x}")));
+  let args = new_args.chain(old_args);
+  args.rev().fold(term, |term, arg| Term::named_lam(arg, term))
 }

@@ -1,0 +1,45 @@
+data Tree = (Leaf a) | (Both a b)
+data Error = Err
+
+// Atomic Swapper
+(Swap n a b) = match n {
+  0: (Both a b)
+  +: (Both b a)
+}
+
+// Swaps distant values in parallel; corresponds to a Red Box
+(Warp s (Leaf a)   (Leaf b))   = (Swap (^ (> a b) s) (Leaf a) (Leaf b))
+(Warp s (Both a b) (Both c d)) = (Join (Warp s a c) (Warp s b d))
+(Warp s a b) = Err
+
+// Rebuilds the warped tree in the original order
+(Join (Both a b) (Both c d)) = (Both (Both a c) (Both b d))
+(Join a b) = Err
+
+// Recursively warps each sub-tree; corresponds to a Blue/Green Box
+(Flow s (Leaf a))   = (Leaf a)
+(Flow s (Both a b)) = (Down s (Warp s a b))
+
+// Propagates Flow downwards
+(Down s (Leaf a))   = (Leaf a)
+(Down s (Both a b)) = (Both (Flow s a) (Flow s b))
+
+// Bitonic Sort
+(Sort s (Leaf a))   = (Leaf a)
+(Sort s (Both a b)) = (Flow s (Both (Sort 0 a) (Sort 1 b)))
+
+// Generates a tree of depth `n`
+(Gen n x) = match n {
+  0: (Leaf x)
+  +: (Both (Gen n-1 (* x 2)) (Gen n-1 (+ (* x 2) 1)))
+}
+
+// Reverses a tree
+(Rev (Leaf x))   = (Leaf x)
+(Rev (Both a b)) = (Both (Rev b) (Rev a))
+
+// Sums a tree
+(Sum (Leaf x))   = x
+(Sum (Both a b)) = (+ (Sum a) (Sum b))
+
+Main = (Sum (Sort 0 (Rev (Gen 4 0))))

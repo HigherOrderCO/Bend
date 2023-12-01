@@ -10,11 +10,11 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 
 (MergeSort) = λcmp λxs ((Unpack cmp) ((Map xs) Pure))
 
-(Unpack) = λx λnxt ((Unpack$P nxt) x)
+(Unpack) = λx (Unpack$P x)
 
-(MergePair) = λx λnxt ((MergePair$P nxt) x)
+(MergePair) = λx (MergePair$P x)
 
-(Merge) = λx λnxt ((Merge$P nxt) x)
+(Merge) = λx (Merge$P x)
 
 (True) = λTrue λFalse True
 
@@ -24,9 +24,9 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 
 (Nil) = λCons λNil Nil
 
-(Unpack$F0) = λx λnxt ((Unpack$F0$P nxt) x)
+(Unpack$F0) = λx (Unpack$F0$P x)
 
-(MergePair$F0) = λx λnxt ((MergePair$F0$P nxt) x)
+(MergePair$F0) = λx (MergePair$F0$P x)
 
 (If$R0) = λthen λelse then
 
@@ -40,7 +40,7 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 
 (Map$R1) = λh λt λf ((Cons (f h)) ((Map t) f))
 
-(Map$PCons) = λx0 λx1 ((Map$R1 x0) x1)
+(Map$PCons) = λy0 λy1 ((Map$R1 y0) y1)
 
 (Map$PNil) = Map$R0
 
@@ -50,21 +50,21 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 
 (Unpack$R2) = λcmp λxs ((Unpack cmp) ((MergePair cmp) xs))
 
-(Unpack$P$PCons) = λx0 λx1 λx2 (((Unpack$R1 x0) x1) x2)
+(Unpack$P$PCons) = λy0 λy1 λx0 (((Unpack$R1 x0) y0) y1)
 
 (Unpack$P$PNil) = λx0 (Unpack$R0 x0)
 
-(Unpack$P) = λx λx0 (((x Unpack$P$PCons) Unpack$P$PNil) x0)
+(Unpack$P) = λy0 λx (((x Unpack$P$PCons) Unpack$P$PNil) y0)
 
 (MergePair$R0) = λcmp λh1 λx$0 (((MergePair$F0 cmp) h1) x$0)
 
 (MergePair$R1) = λcmp λxs xs
 
-(MergePair$P$PCons) = λx0 λx1 λx2 (((MergePair$R0 x0) x1) x2)
+(MergePair$P$PCons) = λy0 λy1 λx0 (((MergePair$R0 x0) y0) y1)
 
 (MergePair$P$PNil) = λx0 ((MergePair$R1 x0) Nil)
 
-(MergePair$P) = λx λx0 (((x MergePair$P$PCons) MergePair$P$PNil) x0)
+(MergePair$P) = λy0 λx (((x MergePair$P$PCons) MergePair$P$PNil) y0)
 
 (Merge$R0) = λcmp λys ys
 
@@ -72,36 +72,36 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 
 (Merge$R2) = λcmp λxh λxt λyh λyt (((If ((cmp xh) yh)) let ys = ((Cons yh) yt); ((Cons xh) (((Merge cmp) xt) ys))) let xs = ((Cons xh) xt); ((Cons yh) (((Merge cmp) xs) yt)))
 
-(Merge$P$PCons$PCons) = λx0 λx1 λx2 λx3 λx4 (((((Merge$R2 x0) x1) x2) x3) x4)
+(Merge$P$PCons$PCons) = λy0 λy1 λx0 λx1 λx2 (((((Merge$R2 x0) x1) x2) y0) y1)
 
 (Merge$P$PCons$PNil) = λx0 λx1 λx2 ((Merge$R1 x0) ((Cons x1) x2))
 
-(Merge$P$PCons) = λx λx0 λx1 λx2 (((((x Merge$P$PCons$PCons) Merge$P$PCons$PNil) x0) x1) x2)
+(Merge$P$PCons) = λy0 λy1 λx0 λx (((((x Merge$P$PCons$PCons) Merge$P$PCons$PNil) x0) y0) y1)
 
 (Merge$P$PNil) = λx0 (Merge$R0 x0)
 
-(Merge$P) = λx λx0 (((x Merge$P$PCons) Merge$P$PNil) x0)
+(Merge$P) = λy0 λx (((x Merge$P$PCons) Merge$P$PNil) y0)
 
 (Unpack$F0$R0) = λcmp λh h
 
 (Unpack$F0$R1) = λcmp λx$0 λx$1 ((Unpack cmp) ((MergePair cmp) ((Cons x$0) x$1)))
 
-(Unpack$F0$P$P$PCons) = λx0 λx1 λx2 λx3 (((Unpack$F0$R1 x0) x1) ((Cons x2) x3))
+(Unpack$F0$P$P$PCons) = λy0 λy1 λx0 λx1 (((Unpack$F0$R1 x0) x1) ((Cons y0) y1))
 
 (Unpack$F0$P$P$PNil) = λx0 λx1 ((Unpack$F0$R0 x0) x1)
 
-(Unpack$F0$P$P) = λx λx0 λx1 ((((x Unpack$F0$P$P$PCons) Unpack$F0$P$P$PNil) x0) x1)
+(Unpack$F0$P$P) = λy0 λx0 λx ((((x Unpack$F0$P$P$PCons) Unpack$F0$P$P$PNil) x0) y0)
 
-(Unpack$F0$P) = λx λnxt ((Unpack$F0$P$P nxt) x)
+(Unpack$F0$P) = λy0 λx ((Unpack$F0$P$P x) y0)
 
 (MergePair$F0$R0) = λcmp λh1 λh2 λt ((Cons (((Merge cmp) h1) h2)) ((MergePair cmp) t))
 
 (MergePair$F0$R1) = λcmp λx$0 λx$1 ((Cons x$0) x$1)
 
-(MergePair$F0$P$P$PCons) = λx0 λx1 λx2 λx3 ((((MergePair$F0$R0 x0) x1) x2) x3)
+(MergePair$F0$P$P$PCons) = λy0 λy1 λx0 λx1 ((((MergePair$F0$R0 x0) x1) y0) y1)
 
 (MergePair$F0$P$P$PNil) = λx0 λx1 (((MergePair$F0$R1 x0) x1) Nil)
 
-(MergePair$F0$P$P) = λx λx0 λx1 ((((x MergePair$F0$P$P$PCons) MergePair$F0$P$P$PNil) x0) x1)
+(MergePair$F0$P$P) = λy0 λx0 λx ((((x MergePair$F0$P$P$PCons) MergePair$F0$P$P$PNil) x0) y0)
 
-(MergePair$F0$P) = λx λnxt ((MergePair$F0$P$P nxt) x)
+(MergePair$F0$P) = λy0 λx ((MergePair$F0$P$P x) y0)
