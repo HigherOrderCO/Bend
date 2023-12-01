@@ -1,6 +1,6 @@
 use crate::term::{
   check::type_check::{infer_arg_type, Type},
-  Adt, Book, DefId, DefNames, Definition, MatchNum, Name, Pattern, Rule, Term,
+  Adt, Book, DefId, DefNames, Definition, MatchNum, Name, Pattern, Rule, Tag, Term,
 };
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -116,7 +116,7 @@ impl Term {
         bod.simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)?;
       }
 
-      Term::App { fun: fst, arg: snd }
+      Term::App { fun: fst, arg: snd, .. }
       | Term::Let { val: fst, nxt: snd, .. }
       | Term::Dup { val: fst, nxt: snd, .. }
       | Term::Tup { fst, snd }
@@ -157,11 +157,14 @@ fn match_native(
       _ => unreachable!(), // Succ(None) should not happen here
     };
 
-    body =
-      free_vars.iter().cloned().rev().fold(body, |acc, f| Term::Lam { nam: Some(f), bod: Box::new(acc) });
+    body = free_vars.iter().cloned().rev().fold(body, |acc, f| Term::Lam {
+      tag: Tag::Static,
+      nam: Some(f),
+      bod: Box::new(acc),
+    });
 
     if let Some(nam) = &bind {
-      body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) };
+      body = Term::Lam { tag: Tag::Static, nam: Some(nam.clone()), bod: Box::new(body) };
     }
 
     let name = make_def_name(def_name, &Name::new(name), match_count);
@@ -173,7 +176,7 @@ fn match_native(
     let mut body = Term::Ref { def_id };
 
     if let Some(nam) = bind {
-      body = Term::App { fun: Box::new(body), arg: Box::new(Term::Var { nam }) }
+      body = Term::App { tag: Tag::Static, fun: Box::new(body), arg: Box::new(Term::Var { nam }) }
     }
 
     new_arms.push((rule, body));
@@ -182,7 +185,7 @@ fn match_native(
   free_vars
     .into_iter()
     .fold(Term::Match { scrutinee: Box::new(Term::Var { nam: scrutinee }), arms: new_arms }, |acc, nam| {
-      Term::App { fun: Box::new(acc), arg: Box::new(Term::Var { nam }) }
+      Term::App { tag: Tag::Static, fun: Box::new(acc), arg: Box::new(Term::Var { nam }) }
     })
 }
 
@@ -226,11 +229,16 @@ fn match_adt_app(
   let def = Definition { def_id, rules };
   new_defs.insert(def_id, def);
 
-  let scrutinee_app =
-    Term::App { fun: Box::new(Term::Ref { def_id }), arg: Box::new(Term::Var { nam: scrutinee }) };
-  free_vars
-    .into_iter()
-    .fold(scrutinee_app, |acc, nam| Term::App { fun: Box::new(acc), arg: Box::new(Term::Var { nam }) })
+  let scrutinee_app = Term::App {
+    tag: Tag::Static,
+    fun: Box::new(Term::Ref { def_id }),
+    arg: Box::new(Term::Var { nam: scrutinee }),
+  };
+  free_vars.into_iter().fold(scrutinee_app, |acc, nam| Term::App {
+    tag: Tag::Static,
+    fun: Box::new(acc),
+    arg: Box::new(Term::Var { nam }),
+  })
 }
 
 fn vec_name_to_pat(scrutinee: &Name, names: &[Name]) -> Vec<Pattern> {

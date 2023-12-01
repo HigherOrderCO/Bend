@@ -2,12 +2,17 @@
 
 use hvmc::{
   ast::{book_to_runtime, name_to_val, net_from_runtime, runtime_net_to_runtime_def, show_book, Net},
-  run::{Heap, Rewrites, Val},
+  run::{Heap, Rewrites},
 };
 use hvmc_net::pre_reduce::pre_reduce_book;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
-use std::{collections::HashMap, time::Instant};
-use term::{book_to_nets, net_to_term::net_to_term_non_linear, Book, DefId, DefNames, Name, Term};
+use std::time::Instant;
+use term::{
+  book_to_nets,
+  net_to_term::net_to_term_non_linear,
+  term_to_net::{HvmcNames, Labels},
+  Book, DefNames, Term,
+};
 
 pub mod hvmc_net;
 pub mod net;
@@ -21,21 +26,18 @@ pub fn check_book(mut book: Book) -> Result<(), String> {
   Ok(())
 }
 
-pub enum Warning {
-  TooManyDups { name: String },
-}
+pub enum Warning {}
 
 impl std::fmt::Display for Warning {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let Self::TooManyDups { name } = self;
-    write!(f, "This rule generated more dups then what is supported by hvm-core: {}", name)
+  fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match *self {}
   }
 }
 
 pub struct CompileResult {
   pub core_book: hvmc::ast::Book,
-  pub hvmc_name_to_id: HashMap<Val, DefId>,
-  pub labels_to_tag: HashMap<u32, Name>,
+  pub hvmc_names: HvmcNames,
+  pub labels: Labels,
   pub warnings: Vec<Warning>,
 }
 
@@ -68,11 +70,10 @@ pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
   book.detach_supercombinators();
   book.simplify_ref_to_ref()?;
   book.prune(main);
-  let (nets, id_to_hvmc_name, labels_to_tag, warnings) = book_to_nets(book, main);
-  let mut core_book = nets_to_hvmc(nets, &id_to_hvmc_name)?;
+  let (nets, hvmc_names, labels) = book_to_nets(book, main);
+  let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
   pre_reduce_book(&mut core_book)?;
-  let hvmc_name_to_id = id_to_hvmc_name.into_iter().map(|(k, v)| (v, k)).collect();
-  Ok(CompileResult { core_book, hvmc_name_to_id, labels_to_tag, warnings })
+  Ok(CompileResult { core_book, hvmc_names, labels, warnings: vec![] })
 }
 
 pub fn run_compiled(
@@ -115,7 +116,7 @@ pub fn run_book(
   parallel: bool,
   debug: bool,
 ) -> Result<(Term, DefNames, RunInfo), String> {
-  let CompileResult { core_book, hvmc_name_to_id, labels_to_tag, warnings } = compile_book(&mut book)?;
+  let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book)?;
 
   if !warnings.is_empty() {
     for warn in warnings {
@@ -125,11 +126,10 @@ pub fn run_book(
     return Err("Could not run the code because of the previous warnings".into());
   }
 
-  let debug_hook =
-    if debug { Some(|net: &_| debug_hook(net, &book, &hvmc_name_to_id, &labels_to_tag)) } else { None };
+  let debug_hook = if debug { Some(|net: &_| debug_hook(net, &book, &hvmc_names, &labels)) } else { None };
   let (res_lnet, stats) = run_compiled(&core_book, mem_size, parallel, debug_hook);
-  let net = hvmc_to_net(&res_lnet, &|val| hvmc_name_to_id[&val]);
-  let (res_term, valid_readback) = net_to_term_non_linear(&net, &book, &labels_to_tag);
+  let net = hvmc_to_net(&res_lnet, &|id| hvmc_names.hvmc_name_to_id[&id]);
+  let (res_term, valid_readback) = net_to_term_non_linear(&net, &book, &labels);
   let info = RunInfo { stats, valid_readback, net: res_lnet };
   Ok((res_term, book.def_names, info))
 }
@@ -156,14 +156,9 @@ pub fn desugar_book(book: &mut Book) -> Result<(), String> {
   Ok(())
 }
 
-fn debug_hook(
-  net: &Net,
-  book: &Book,
-  hvmc_name_to_id: &HashMap<u64, DefId>,
-  labels_to_tag: &HashMap<u32, Name>,
-) {
-  let net = hvmc_to_net(net, &|val| hvmc_name_to_id[&val]);
-  let (res_term, valid_readback) = net_to_term_non_linear(&net, book, labels_to_tag);
+fn debug_hook(net: &Net, book: &Book, hvmc_names: &HvmcNames, labels: &Labels) {
+  let net = hvmc_to_net(net, &|id| hvmc_names.hvmc_name_to_id[&id]);
+  let (res_term, valid_readback) = net_to_term_non_linear(&net, book, labels);
   println!(
     "{}{}\n---------------------------------------",
     if valid_readback { "" } else { "[invalid] " },

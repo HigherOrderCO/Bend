@@ -23,7 +23,7 @@ impl Term {
 
 fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name, usize>) {
   match term {
-    Term::Lam { nam, bod } => {
+    Term::Lam { nam, bod, .. } => {
       push_scope(nam.clone(), scope);
       resolve_refs(bod, def_names, scope);
       pop_scope(nam.clone(), scope);
@@ -53,7 +53,7 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       }
     }
     Term::Chn { bod, .. } => resolve_refs(bod, def_names, scope),
-    Term::App { fun: fst, arg: snd }
+    Term::App { fun: fst, arg: snd, .. }
     | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {

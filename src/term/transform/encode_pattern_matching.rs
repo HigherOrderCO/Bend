@@ -1,6 +1,6 @@
 use crate::term::{
   check::type_check::{DefinitionTypes, Type},
-  Book, DefId, Name, Pattern, Rule, Term,
+  Book, DefId, Name, Pattern, Rule, Tag, Term,
 };
 
 impl Book {
@@ -27,7 +27,7 @@ fn make_non_pattern_matching_def(book: &mut Book, def_id: DefId) {
   for pat in rule.pats.iter().rev() {
     let Pattern::Var(var) = pat else { unreachable!() };
     let bod = std::mem::replace(&mut rule.body, Term::Era);
-    rule.body = Term::Lam { nam: var.clone(), bod: Box::new(bod) };
+    rule.body = Term::Lam { tag: Tag::Static, nam: var.clone(), bod: Box::new(bod) };
   }
   rule.pats = vec![];
 }
@@ -64,24 +64,21 @@ fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
   // Add the lambdas for the pattern variables
   for pat in pats.iter().rev() {
     match pat {
-      Pattern::Var(nam) => body = Term::Lam { nam: nam.clone(), bod: Box::new(body) },
+      Pattern::Var(nam) => body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) },
       Pattern::Ctr(_, vars) => {
         for var in vars.iter().rev() {
           let Pattern::Var(nam) = var else { unreachable!() };
-          body = Term::Lam { nam: nam.clone(), bod: Box::new(body) }
+          body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) }
         }
       }
       Pattern::Num(..) => todo!(),
       pat @ Pattern::Tup(_fst, _snd) => {
         let tup = Name::new("%0");
         body = Term::Lam {
+          tag: Tag::Static,
           nam: Some(tup.clone()),
-          bod: Term::Let {
-            pat: pat.clone(),
-            val: Box::new(Term::Var { nam: tup }),
-            nxt: Box::new(body),
-          }
-          .into(),
+          bod: Term::Let { pat: pat.clone(), val: Box::new(Term::Var { nam: tup }), nxt: Box::new(body) }
+            .into(),
         };
       }
     }
@@ -161,7 +158,7 @@ fn make_leaf_pattern_matching_case(
         let ctr_ref_id = book.def_names.def_id(ctr_nam).unwrap();
         let ctr_args = vars.iter().map(|_| arg_use.next().unwrap());
         let ctr_term = ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, Term::arg_call);
-        Term::App { fun: Box::new(term), arg: Box::new(ctr_term) }
+        Term::App { tag: Tag::Static, fun: Box::new(term), arg: Box::new(ctr_term) }
       }
       (_, Pattern::Tup(..)) => arg_use.clone().fold(term, Term::arg_call),
       (Pattern::Tup(fst, snd), Pattern::Var(..)) => {
@@ -208,7 +205,7 @@ fn make_branch_pattern_matching_case(
       .collect()
   }
   let make_next_fn_name = |crnt_name, ctr_name| Name(format!("{crnt_name}$P{ctr_name}"));
-  let make_app = |term, arg| Term::App { fun: Box::new(term), arg: Box::new(arg) };
+  let make_app = |term, arg| Term::App { tag: Tag::Static, fun: Box::new(term), arg: Box::new(arg) };
 
   let crnt_arg_idx = match_path.len();
   let Type::Adt(next_type) = &def_type[crnt_arg_idx] else { unreachable!() };
@@ -280,11 +277,11 @@ fn make_non_pattern_matching_case(
 
 impl Term {
   fn named_lam(nam: Name, bod: Term) -> Term {
-    Term::Lam { nam: Some(nam), bod: Box::new(bod) }
+    Term::Lam { tag: Tag::Static, nam: Some(nam), bod: Box::new(bod) }
   }
 
   fn arg_call(term: Term, arg: Name) -> Term {
-    Term::App { fun: Box::new(term), arg: Box::new(Term::Var { nam: arg }) }
+    Term::App { tag: Tag::Static, fun: Box::new(term), arg: Box::new(Term::Var { nam: arg }) }
   }
 }
 

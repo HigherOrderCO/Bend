@@ -1,4 +1,4 @@
-use crate::term::{Book, MatchNum, Name, Pattern, Term};
+use crate::term::{Book, MatchNum, Name, Pattern, Tag, Term};
 use hvmc::run::Val;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -39,7 +39,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       *uses.entry(nam.clone()).or_default() += 1;
     }
     // Var producers
-    Term::Lam { nam, bod } => {
+    Term::Lam { nam, bod, .. } => {
       add_var(nam.as_ref(), uses);
       count_var_uses_in_term(bod, uses)
     }
@@ -57,7 +57,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
     Term::Let { .. } => todo!(),
     // Others
     Term::Chn { bod, .. } => count_var_uses_in_term(bod, uses),
-    Term::App { fun: fst, arg: snd }
+    Term::App { fun: fst, arg: snd, .. }
     | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {
@@ -84,7 +84,7 @@ fn used_var_counter(var_name: &Name) -> Name {
 }
 
 /// Var-declaring terms
-fn term_with_bind_to_afine(
+fn term_with_bind_to_affine(
   term: &mut Term,
   nam: &mut Option<Name>,
   var_uses: &mut HashMap<Name, Val>,
@@ -111,7 +111,7 @@ fn term_with_bind_to_afine(
 
 fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies: &mut HashMap<Name, Term>) {
   match term {
-    Term::Lam { nam, bod } => term_with_bind_to_afine(bod, nam, var_uses, let_bodies),
+    Term::Lam { nam, bod, .. } => term_with_bind_to_affine(bod, nam, var_uses, let_bodies),
 
     Term::Let { pat: Pattern::Var(Some(nam)), val, nxt } => {
       let uses = var_uses[nam];
@@ -178,7 +178,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
 
     // Others
     Term::Chn { bod, .. } => term_to_affine(bod, var_uses, let_bodies),
-    Term::App { fun: fst, arg: snd }
+    Term::App { fun: fst, arg: snd, .. }
     | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {
@@ -189,7 +189,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       term_to_affine(scrutinee, var_uses, let_bodies);
       for (rule, term) in arms {
         match rule {
-          Pattern::Num(MatchNum::Succ(nam)) => term_with_bind_to_afine(term, nam, var_uses, let_bodies),
+          Pattern::Num(MatchNum::Succ(nam)) => term_with_bind_to_affine(term, nam, var_uses, let_bodies),
           Pattern::Num(_) => term_to_affine(term, var_uses, let_bodies),
           _ => unreachable!(),
         }
@@ -209,7 +209,7 @@ fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, dup_body: Option<&mut Te
   for i in (1 .. uses).rev() {
     let old_nxt = std::mem::replace(nxt, Term::Era);
     *nxt = Term::Dup {
-      tag: None,
+      tag: Tag::Auto,
       fst: Some(dup_name(nam, i)),
       snd: if i == uses - 1 { Some(dup_name(nam, uses)) } else { Some(internal_dup_name(nam, uses)) },
       val: if i == 1 {

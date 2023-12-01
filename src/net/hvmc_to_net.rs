@@ -1,5 +1,5 @@
 use super::{INet, INode, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
-use crate::{net::BASE_DUP_HVMC_LABEL, term::DefId};
+use crate::term::DefId;
 use hvmc::{
   ast::{Net, Tree},
   run::Val,
@@ -70,7 +70,7 @@ fn tree_to_inodes(
       Tree::Con { lft, rgt } => {
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind: Con, ports: [subtree_root, lft, rgt] })
+        inodes.push(INode { kind: Con { lab: None }, ports: [subtree_root, lft, rgt] })
       }
       Tree::Tup { lft, rgt } => {
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
@@ -80,7 +80,10 @@ fn tree_to_inodes(
       Tree::Dup { lab, lft, rgt } => {
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind: Dup { lab: *lab - BASE_DUP_HVMC_LABEL }, ports: [subtree_root, lft, rgt] })
+        inodes.push(INode {
+          kind: if lab & 1 == 0 { Con { lab: Some(lab >> 1) } } else { Dup { lab: lab >> 1 } },
+          ports: [subtree_root, lft, rgt],
+        })
       }
       Tree::Var { .. } => unreachable!(),
       Tree::Ref { nam } => {
