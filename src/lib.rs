@@ -56,11 +56,11 @@ pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
   book.generate_scott_adts();
   book.check_unbound_pats()?;
   book.flatten_rules();
+  book.resolve_refs();
+  book.simplify_matches()?;
   let def_types = book.infer_def_types()?;
   book.check_exhaustive_patterns(&def_types)?;
   book.encode_pattern_matching_functions(&def_types);
-  book.resolve_refs();
-  book.simplify_matches()?;
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();
