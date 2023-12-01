@@ -1,6 +1,5 @@
 ---
 source: tests/golden_tests.rs
-assertion_line: 53
 input_file: tests/golden_tests/run_single_files/bitonic_sort.hvm
 ---
-6
+120

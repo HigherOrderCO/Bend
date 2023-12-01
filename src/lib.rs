@@ -90,17 +90,15 @@ pub fn run_compiled(
 
   if let Some(mut hook) = hook {
     root.expand(&runtime_book);
-    while root.rdex.len() > 0 {
+    while !root.rdex.is_empty() {
       hook(&net_from_runtime(&root));
       root.reduce(&runtime_book, 1);
       root.expand(&runtime_book);
     }
+  } else if parallel {
+    root.parallel_normal(&runtime_book);
   } else {
-    if parallel {
-      root.parallel_normal(&runtime_book);
-    } else {
-      root.normal(&runtime_book)
-    }
+    root.normal(&runtime_book)
   }
 
   let elapsed = start_time.elapsed().as_secs_f64();
@@ -127,11 +125,8 @@ pub fn run_book(
     return Err("Could not run the code because of the previous warnings".into());
   }
 
-  let debug_hook = if debug {
-    Some(|net: &_| debug_hook(net, &book, &hvmc_name_to_id, &labels_to_tag))
-  } else {
-    None
-  };
+  let debug_hook =
+    if debug { Some(|net: &_| debug_hook(net, &book, &hvmc_name_to_id, &labels_to_tag)) } else { None };
   let (res_lnet, stats) = run_compiled(&core_book, mem_size, parallel, debug_hook);
   let net = hvmc_to_net(&res_lnet, &|val| hvmc_name_to_id[&val]);
   let (res_term, valid_readback) = net_to_term_non_linear(&net, &book, &labels_to_tag);
@@ -167,8 +162,8 @@ fn debug_hook(
   hvmc_name_to_id: &HashMap<u64, DefId>,
   labels_to_tag: &HashMap<u32, Name>,
 ) {
-  let net = hvmc_to_net(&net, &|val| hvmc_name_to_id[&val]);
-  let (res_term, valid_readback) = net_to_term_non_linear(&net, &book, &labels_to_tag);
+  let net = hvmc_to_net(net, &|val| hvmc_name_to_id[&val]);
+  let (res_term, valid_readback) = net_to_term_non_linear(&net, book, labels_to_tag);
   println!(
     "{}{}\n---------------------------------------",
     if valid_readback { "" } else { "[invalid] " },

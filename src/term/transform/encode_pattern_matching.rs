@@ -132,24 +132,24 @@ fn make_leaf_pattern_matching_case(
 
   // For the leaf case there are no actual new args, we're just reusing the same function.
   let (num_new_args, num_old_args) = get_pat_arg_count(&match_path);
-  let num_args = num_new_args + num_old_args;
-  let args = (0 .. num_args).map(|x| Name(format!("x{x}")));
+  let old_args = (0 .. num_old_args).map(|x| Name(format!("x{x}")));
+  let new_args = (0 .. num_new_args).map(|x| Name(format!("y{x}")));
 
-  let mut arg_it = args.clone();
+  let mut arg_use = old_args.clone().chain(new_args.clone());
 
   // Add the applications to call the rule body
   let term = match_path.iter().zip(&rule.pats).fold(term, |term, (matched, pat)| {
     match (matched, pat) {
-      (Pattern::Var(_), Pattern::Var(_)) => Term::arg_call(term, arg_it.next().unwrap()),
+      (Pattern::Var(_), Pattern::Var(_)) => Term::arg_call(term, arg_use.next().unwrap()),
       (Pattern::Ctr(_, vars), Pattern::Ctr(_, _)) => {
-        vars.iter().fold(term, |term, _| Term::arg_call(term, arg_it.next().unwrap()))
+        vars.iter().fold(term, |term, _| Term::arg_call(term, arg_use.next().unwrap()))
       }
       // This particular rule was not matching on this arg but due to the other rules we had to match on a constructor.
       // So, to call the rule body we have to recreate the constructor.
       // (On scott encoding, if one of the cases is matched we must also match on all the other constructors for this arg)
       (Pattern::Ctr(ctr_nam, vars), Pattern::Var(_)) => {
         let ctr_ref_id = book.def_names.def_id(ctr_nam).unwrap();
-        let ctr_args = vars.iter().map(|_| arg_it.next().unwrap());
+        let ctr_args = vars.iter().map(|_| arg_use.next().unwrap());
         let ctr_term = ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, Term::arg_call);
         Term::App { fun: Box::new(term), arg: Box::new(ctr_term) }
       }
@@ -162,7 +162,8 @@ fn make_leaf_pattern_matching_case(
   });
 
   // Add the lambdas to get the matched variables
-  let term = args.rev().fold(term, |term, arg| Term::named_lam(arg, term));
+  let arg_decl = new_args.chain(old_args);
+  let term = arg_decl.rev().fold(term, |term, arg| Term::named_lam(arg, term));
 
   add_case_to_book(book, crnt_name.clone(), term);
 }
@@ -303,7 +304,6 @@ fn add_arg_calls(term: Term, match_path: &[Pattern]) -> Term {
   let old_args = (0 .. num_old_args).map(|x| Name(format!("x{x}")));
   let new_args = (0 .. num_new_args).map(|x| Name(format!("y{x}")));
   let args = old_args.chain(new_args);
-
   args.fold(term, Term::arg_call)
 }
 

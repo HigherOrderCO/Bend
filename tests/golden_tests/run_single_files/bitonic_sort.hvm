@@ -42,4 +42,4 @@ data Error = Err
 (Sum (Leaf x))   = x
 (Sum (Both a b)) = (+ (Sum a) (Sum b))
 
-Main = (Sort 0 (Both (Leaf 1) (Leaf 0)))
+Main = (Sum (Sort 0 (Rev (Gen 4 0))))
