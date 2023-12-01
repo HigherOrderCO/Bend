@@ -8,7 +8,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 impl Book {
   pub fn simplify_matches(&mut self) -> Result<(), String> {
-    let mut new_rules = BTreeMap::<DefId, Definition>::new();
+    let mut new_defs = BTreeMap::<DefId, Definition>::new();
     for (def_id, def) in &mut self.defs {
       let def_name = self.def_names.name(def_id).unwrap().clone();
       for rule in def.rules.iter_mut() {
@@ -17,12 +17,12 @@ impl Book {
           &self.adts,
           &self.ctrs,
           &mut self.def_names,
-          &mut new_rules,
+          &mut new_defs,
           &mut 0,
         )?;
       }
     }
-    self.defs.append(&mut new_rules);
+    self.defs.append(&mut new_defs);
     Ok(())
   }
 }
@@ -78,7 +78,7 @@ impl Term {
     adts: &BTreeMap<Name, Adt>,
     ctrs: &HashMap<Name, Name>,
     def_names: &mut DefNames,
-    new_rules: &mut BTreeMap<DefId, Definition>,
+    new_defs: &mut BTreeMap<DefId, Definition>,
     match_count: &mut usize,
   ) -> Result<(), String> {
     match self {
@@ -88,7 +88,7 @@ impl Term {
         }
 
         for (_, term) in arms.iter_mut() {
-          term.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
+          term.simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)?;
         }
 
         *match_count += 1;
@@ -97,7 +97,7 @@ impl Term {
         let Term::Var { nam } = *scrutinee else { unreachable!() };
 
         if matches!(arms[0], (Pattern::Num(_), _)) {
-          *self = match_native(nam, arms, def_name, def_names, new_rules, *match_count);
+          *self = match_native(nam, arms, def_name, def_names, new_defs, *match_count);
         } else {
           let rules: Vec<_> = arms
             .iter()
@@ -108,12 +108,12 @@ impl Term {
             .collect();
 
           let adt = Term::check_matches(&rules, adts, ctrs)?;
-          *self = match_adt_app(nam, adt, &arms, def_name, def_names, new_rules, *match_count);
+          *self = match_adt_app(nam, adt, &arms, def_name, def_names, new_defs, *match_count);
         }
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
+        bod.simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)?;
       }
 
       Term::App { fun: fst, arg: snd }
@@ -122,8 +122,8 @@ impl Term {
       | Term::Tup { fst, snd }
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
-        fst.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
-        snd.simplify_matches(def_name, adts, ctrs, def_names, new_rules, match_count)?;
+        fst.simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)?;
+        snd.simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)?;
       }
 
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => {}
@@ -133,13 +133,13 @@ impl Term {
   }
 }
 
-/// Split each arm of a native number match on its own rule and reconstructs the match term
+/// Split each arm of a native number match on its own def and reconstructs the match term
 fn match_native(
   scrutinee: Name,
   arms: Vec<(Pattern, Term)>,
   def_name: &Name,
   def_names: &mut DefNames,
-  new_rules: &mut BTreeMap<DefId, Definition>,
+  new_defs: &mut BTreeMap<DefId, Definition>,
   match_count: usize,
 ) -> Term {
   let mut new_arms = Vec::new();
@@ -168,7 +168,7 @@ fn match_native(
     let def_id = def_names.insert(name);
     let rules = vec![Rule { pats: Vec::new(), body }];
     let def = Definition { def_id, rules };
-    new_rules.insert(def_id, def);
+    new_defs.insert(def_id, def);
 
     let mut body = Term::Ref { def_id };
 
@@ -194,7 +194,7 @@ fn match_adt_app(
   arms: &[(Pattern, Term)],
   def_name: &Name,
   def_names: &mut DefNames,
-  new_rules: &mut BTreeMap<DefId, Definition>,
+  new_defs: &mut BTreeMap<DefId, Definition>,
   match_count: usize,
 ) -> Term {
   let mut rules = Vec::new();
@@ -224,7 +224,7 @@ fn match_adt_app(
   let new_name = make_def_name(def_name, &Name::new("match"), match_count);
   let def_id = def_names.insert(new_name);
   let def = Definition { def_id, rules };
-  new_rules.insert(def_id, def);
+  new_defs.insert(def_id, def);
 
   let scrutinee_app =
     Term::App { fun: Box::new(Term::Ref { def_id }), arg: Box::new(Term::Var { nam: scrutinee }) };
