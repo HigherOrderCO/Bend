@@ -1,0 +1,6 @@
+data Bool = T | F
+
+Bool.and T T = T
+Bool.and F F = F
+
+Main = *

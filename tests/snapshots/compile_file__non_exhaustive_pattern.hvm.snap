@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/non_exhaustive_pattern.hvm
 ---
-Non-exhaustive pattern at definition 'Foo'. Argument 2 of type 'Type' does not cover the 'A' constructor
+Non-exhaustive pattern at definition 'Foo'. Hint: (A) (A) (A) (A) not covered.

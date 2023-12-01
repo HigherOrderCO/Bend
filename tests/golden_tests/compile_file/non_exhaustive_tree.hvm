@@ -1,0 +1,5 @@
+data Tree = (Leaf a) | (Both a b)
+(Warp s (Leaf a)   (Leaf b))   = 0
+(Warp s (Both a b) (Both c d)) = 1
+
+main = *
