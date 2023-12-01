@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/match_tup.hvm
+---
+@3 = ([<+ a b> a] b)
+@main = a
+& @3 ~ ([#7 #3] a)
+

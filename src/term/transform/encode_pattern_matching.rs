@@ -8,7 +8,7 @@ impl Book {
     for def_id in self.defs.keys().copied().collect::<Vec<_>>() {
       let def_type = &def_types[&def_id];
 
-      let is_matching_def = def_type.iter().any(|t| matches!(t, Type::Adt(_)));
+      let is_matching_def = def_type.iter().any(|t| matches!(t, Type::Adt(_) | Type::Tup));
       if is_matching_def {
         make_pattern_matching_def(self, def_id, def_type);
       } else {
@@ -23,7 +23,7 @@ impl Book {
 /// For functions that don't pattern match, just move the arg variables into the body.
 fn make_non_pattern_matching_def(book: &mut Book, def_id: DefId) {
   let def = book.defs.get_mut(&def_id).unwrap();
-  let rule = def.rules.get_mut(0).unwrap();
+  let rule = def.rules.first_mut().unwrap();
   for pat in rule.pats.iter().rev() {
     let Pattern::Var(var) = pat else { unreachable!() };
     let bod = std::mem::replace(&mut rule.body, Term::Era);
@@ -72,7 +72,18 @@ fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
         }
       }
       Pattern::Num(..) => todo!(),
-      Pattern::Tup(..) => todo!(),
+      pat @ Pattern::Tup(_fst, _snd) => {
+        let tup = Name::new("%0");
+        body = Term::Lam {
+          nam: Some(tup.clone()),
+          bod: Term::Let {
+            pat: pat.clone(),
+            val: Box::new(Term::Var { nam: tup }),
+            nxt: Box::new(body),
+          }
+          .into(),
+        };
+      }
     }
   }
   body
@@ -155,7 +166,10 @@ fn make_leaf_pattern_matching_case(
       (Pattern::Var(_), Pattern::Ctr(_, _)) => unreachable!(),
       (_, Pattern::Num(..)) => todo!(),
       (Pattern::Num(..), _) => todo!(),
-      (_, Pattern::Tup(..)) => todo!(),
+      (_, Pattern::Tup(_fst, _snd)) => arg_use.clone().fold(term, |acc, arg| Term::App {
+        fun: Box::new(acc),
+        arg: Box::new(Term::Var { nam: arg.clone() }),
+      }),
       (Pattern::Tup(..), _) => todo!(),
     }
   });
