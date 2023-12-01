@@ -30,7 +30,7 @@ fn check_pattern(
       // We can skip non pattern matching arguments
       Type::Any => {
         let mut match_path = match_path.clone();
-        match_path.push(Pattern::Var(Name::new("_")));
+        match_path.push(Pattern::Var(Some(Name::new("_"))));
         check_pattern(&mut match_path, adts, rules, &types[1 ..], rules_to_check, def_name)?
       }
       Type::Adt(adt_nam) => {
