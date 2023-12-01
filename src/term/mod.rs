@@ -274,10 +274,18 @@ impl DefNames {
 }
 
 impl Tag {
-  pub fn to_string(&self) -> String {
+  pub fn to_string_padded(&self) -> String {
     match self {
       Tag::Named(name) => format!("#{name} "),
       Tag::Numeric(num) => format!("#{num} "),
+      Tag::Auto => "".to_owned(),
+      Tag::Static => "".to_owned(),
+    }
+  }
+  pub fn to_string(&self) -> String {
+    match self {
+      Tag::Named(name) => format!("#{name}"),
+      Tag::Numeric(num) => format!("#{num}"),
       Tag::Auto => "".to_owned(),
       Tag::Static => "".to_owned(),
     }
@@ -288,17 +296,24 @@ impl Term {
   pub fn to_string(&self, def_names: &DefNames) -> String {
     match self {
       Term::Lam { tag, nam, bod } => {
-        format!("λ{}{} {}", tag.to_string(), nam.clone().unwrap_or(Name::new("*")), bod.to_string(def_names))
+        format!(
+          "λ{}{} {}",
+          tag.to_string_padded(),
+          nam.clone().unwrap_or(Name::new("*")),
+          bod.to_string(def_names)
+        )
       }
       Term::Var { nam } => format!("{nam}"),
-      Term::Chn { tag, nam, bod } => format!("λ{}${} {}", tag.to_string(), nam, bod.to_string(def_names)),
+      Term::Chn { tag, nam, bod } => {
+        format!("λ{}${} {}", tag.to_string_padded(), nam, bod.to_string(def_names))
+      }
       Term::Lnk { nam } => format!("${nam}"),
       Term::Let { pat, val, nxt } => {
         format!("let {} = {}; {}", pat, val.to_string(def_names), nxt.to_string(def_names))
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { tag, fun, arg } => {
-        format!("({}{} {})", tag.to_string(), fun.to_string(def_names), arg.to_string(def_names))
+        format!("({}{} {})", tag.to_string_padded(), fun.to_string(def_names), arg.to_string(def_names))
       }
       Term::Match { scrutinee, arms } => {
         let arms =
@@ -306,15 +321,16 @@ impl Term {
 
         format!("match {} {{ {} }}", scrutinee.to_string(def_names), arms,)
       }
-      Term::Dup { tag: _, fst, snd, val, nxt } => format!(
-        "dup {} {} = {}; {}",
+      Term::Dup { tag, fst, snd, val, nxt } => format!(
+        "dup{} {} {} = {}; {}",
+        tag.to_string(),
         fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
         snd.as_ref().map(|x| x.as_str()).unwrap_or("*"),
         val.to_string(def_names),
         nxt.to_string(def_names)
       ),
       Term::Sup { tag, fst, snd } => {
-        format!("{{{}{} {}}}", tag.to_string(), fst.to_string(def_names), snd.to_string(def_names))
+        format!("{{{}{} {}}}", tag.to_string_padded(), fst.to_string(def_names), snd.to_string(def_names))
       }
       Term::Era => "*".to_string(),
       Term::Num { val } => format!("{val}"),
