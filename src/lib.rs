@@ -75,7 +75,12 @@ pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
   Ok(CompileResult { core_book, hvmc_name_to_id, labels_to_tag, warnings })
 }
 
-pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize, parallel: bool) -> (Net, RunStats) {
+pub fn run_compiled(
+  book: &hvmc::ast::Book,
+  mem_size: usize,
+  parallel: bool,
+  hook: Option<impl FnMut(&Net)>,
+) -> (Net, RunStats) {
   let runtime_book = book_to_runtime(book);
   let heap = Heap::init(mem_size);
   let mut root = hvmc::run::Net::new(&heap);
@@ -83,10 +88,19 @@ pub fn run_compiled(book: &hvmc::ast::Book, mem_size: usize, parallel: bool) -> 
 
   let start_time = Instant::now();
 
-  if parallel {
-    root.parallel_normal(&runtime_book);
+  if let Some(mut hook) = hook {
+    root.expand(&runtime_book);
+    while root.rdex.len() > 0 {
+      hook(&net_from_runtime(&root));
+      root.reduce(&runtime_book, 1);
+      root.expand(&runtime_book);
+    }
   } else {
-    root.normal(&runtime_book)
+    if parallel {
+      root.parallel_normal(&runtime_book);
+    } else {
+      root.normal(&runtime_book)
+    }
   }
 
   let elapsed = start_time.elapsed().as_secs_f64();
@@ -101,6 +115,7 @@ pub fn run_book(
   mut book: Book,
   mem_size: usize,
   parallel: bool,
+  debug: bool,
 ) -> Result<(Term, DefNames, RunInfo), String> {
   let CompileResult { core_book, hvmc_name_to_id, labels_to_tag, warnings } = compile_book(&mut book)?;
 
@@ -112,7 +127,12 @@ pub fn run_book(
     return Err("Could not run the code because of the previous warnings".into());
   }
 
-  let (res_lnet, stats) = run_compiled(&core_book, mem_size, parallel);
+  let debug_hook = if debug {
+    Some(|net: &_| debug_hook(net, &book, &hvmc_name_to_id, &labels_to_tag))
+  } else {
+    None
+  };
+  let (res_lnet, stats) = run_compiled(&core_book, mem_size, parallel, debug_hook);
   let net = hvmc_to_net(&res_lnet, &|val| hvmc_name_to_id[&val]);
   let (res_term, valid_readback) = net_to_term_non_linear(&net, &book, &labels_to_tag);
   let info = RunInfo { stats, valid_readback, net: res_lnet };
@@ -138,6 +158,21 @@ pub fn desugar_book(book: &mut Book) -> Result<(), String> {
   book.simplify_ref_to_ref()?;
   book.prune(main);
   Ok(())
+}
+
+fn debug_hook(
+  net: &Net,
+  book: &Book,
+  hvmc_name_to_id: &HashMap<u64, DefId>,
+  labels_to_tag: &HashMap<u32, Name>,
+) {
+  let net = hvmc_to_net(&net, &|val| hvmc_name_to_id[&val]);
+  let (res_term, valid_readback) = net_to_term_non_linear(&net, &book, &labels_to_tag);
+  println!(
+    "{}{}\n---------------------------------------",
+    if valid_readback { "" } else { "[invalid] " },
+    res_term.to_string(&book.def_names)
+  );
 }
 
 pub struct RunInfo {
