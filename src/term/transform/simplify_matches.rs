@@ -186,8 +186,8 @@ fn match_native(
     })
 }
 
-/// Split each arm of an adt match on its own rule,
-/// returning a scott encoded term of the aplication of the scrutinee to each rule
+/// Transforms a match into a new definition with every arm of `arms` as a rule.
+/// The result is the new def applied to the scrutinee followed by the free vars of the arms.
 fn match_adt_app(
   scrutinee: Name,
   Adt { ctrs }: &Adt,
