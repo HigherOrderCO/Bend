@@ -50,7 +50,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       count_var_uses_in_term(nxt, uses);
     }
     Term::Let { pat: Pattern::Var(nam), val, nxt } => {
-      add_var(Some(nam), uses);
+      add_var(nam.as_ref(), uses);
       count_var_uses_in_term(val, uses);
       count_var_uses_in_term(nxt, uses);
     }
@@ -113,7 +113,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
   match term {
     Term::Lam { nam, bod } => term_with_bind_to_afine(bod, nam, var_uses, let_bodies),
 
-    Term::Let { pat: Pattern::Var(nam), val, nxt } => {
+    Term::Let { pat: Pattern::Var(Some(nam)), val, nxt } => {
       let uses = var_uses[nam];
       match uses {
         0 => {
@@ -143,6 +143,10 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
         }
       }
       *term = std::mem::take(nxt.as_mut());
+    }
+
+    Term::Let { pat: Pattern::Var(None), nxt, .. } => {
+      *term = *nxt.clone();
     }
 
     Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {

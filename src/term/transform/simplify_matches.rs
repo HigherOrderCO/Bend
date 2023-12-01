@@ -102,7 +102,7 @@ impl Term {
           let rules: Vec<_> = arms
             .iter()
             .map(|(rule, _)| match rule {
-              Pattern::Var(nam) => Pattern::Ctr(nam.clone(), Vec::new()),
+              Pattern::Var(Some(nam)) => Pattern::Ctr(nam.clone(), Vec::new()),
               _ => unreachable!(),
             })
             .collect();
@@ -203,7 +203,7 @@ fn match_adt_app(
 
   for (ctr_name, args) in ctrs {
     for (rule, term) in arms {
-      let Pattern::Var(ctr) = rule else { unreachable!() };
+      let Pattern::Var(Some(ctr)) = rule else { unreachable!() };
 
       if ctr == ctr_name {
         let mut term = term.clone();

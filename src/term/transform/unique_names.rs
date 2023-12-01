@@ -39,9 +39,9 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
     Term::Var { nam } => *nam = use_var(nam, name_map),
     Term::Let { pat: Pattern::Var(nam), val, nxt } => {
       unique_var_names(val, name_map, name_count);
-      push_name(Some(nam), name_map, name_count);
+      push_name(nam.as_ref(), name_map, name_count);
       unique_var_names(nxt, name_map, name_count);
-      *nam = pop_name(Some(nam), name_map).unwrap();
+      *nam = pop_name(nam.as_ref(), name_map);
     }
     Term::Dup { tag: _, fst, snd, val, nxt } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
       unique_var_names(val, name_map, name_count);

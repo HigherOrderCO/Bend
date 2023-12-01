@@ -27,7 +27,7 @@ fn make_non_pattern_matching_def(book: &mut Book, def_id: DefId) {
   for pat in rule.pats.iter().rev() {
     let Pattern::Var(var) = pat else { unreachable!() };
     let bod = std::mem::replace(&mut rule.body, Term::Era);
-    rule.body = Term::Lam { nam: Some(var.clone()), bod: Box::new(bod) };
+    rule.body = Term::Lam { nam: var.clone(), bod: Box::new(bod) };
   }
   rule.pats = vec![];
 }
@@ -64,11 +64,11 @@ fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
   // Add the lambdas for the pattern variables
   for pat in pats.iter().rev() {
     match pat {
-      Pattern::Var(nam) => body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) },
+      Pattern::Var(nam) => body = Term::Lam { nam: nam.clone(), bod: Box::new(body) },
       Pattern::Ctr(_, vars) => {
         for var in vars.iter().rev() {
           let Pattern::Var(nam) = var else { unreachable!() };
-          body = Term::Lam { nam: Some(nam.clone()), bod: Box::new(body) }
+          body = Term::Lam { nam: nam.clone(), bod: Box::new(body) }
         }
       }
       Pattern::Num(..) => todo!(),
@@ -225,7 +225,8 @@ fn make_branch_pattern_matching_case(
     let def = &book.defs[&def_id];
     let crnt_name = make_next_fn_name(crnt_name, next_ctr);
     let crnt_rules = filter_rules(&def.rules, &crnt_rules, match_path.len(), next_ctr);
-    let new_vars = Pattern::Ctr(next_ctr.clone(), vec![Pattern::Var(Name::new("")); next_ctr_args.len()]);
+    let new_vars =
+      Pattern::Ctr(next_ctr.clone(), vec![Pattern::Var(Some(Name::new(""))); next_ctr_args.len()]);
     let mut match_path = match_path.clone();
     match_path.push(new_vars);
     make_pattern_matching_case(book, def_type, def_id, &crnt_name, crnt_rules, match_path);
@@ -278,7 +279,7 @@ fn make_non_pattern_matching_case(
   let nxt_def_name = Name(format!("{crnt_name}$P"));
 
   // Make next function
-  match_path.push(Pattern::Var(arg_name.clone()));
+  match_path.push(Pattern::Var(Some(arg_name.clone())));
   make_pattern_matching_case(book, def_type, def_id, &nxt_def_name, crnt_rules, match_path);
 
   // Make call to next function

@@ -19,7 +19,7 @@ impl Book {
 impl Pattern {
   pub fn resolve_ctrs(&mut self, is_ctr: &impl Fn(&Name) -> bool) {
     match self {
-      Pattern::Var(nam) => {
+      Pattern::Var(Some(nam)) => {
         if is_ctr(nam) {
           *self = Pattern::Ctr(nam.clone(), vec![])
         }
@@ -29,6 +29,7 @@ impl Pattern {
           arg.resolve_ctrs(is_ctr);
         }
       }
+      Pattern::Var(None) => (),
       Pattern::Num(_) => (),
       Pattern::Tup(_, _) => (),
     }

@@ -280,7 +280,7 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   recursive(|pattern| {
-    let var = name().map(Pattern::Var).boxed();
+    let var = name_or_era().map(Pattern::Var).boxed();
 
     let ctr = name()
       .then(pattern.clone().repeated().collect())

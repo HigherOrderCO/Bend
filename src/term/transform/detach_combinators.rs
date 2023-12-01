@@ -108,7 +108,7 @@ impl Term {
       Self::Chn { nam: _, bod } => bod.occurs_check(name),
       Self::App { fun, arg } => fun.occurs_check(name) || arg.occurs_check(name),
       Self::Sup { fst, snd, .. } => fst.occurs_check(name) || snd.occurs_check(name),
-      Self::Let { pat: Pattern::Var(Name(n)), val, nxt } => {
+      Self::Let { pat: Pattern::Var(Some(Name(n))), val, nxt } => {
         val.occurs_check(name) || (n != name && nxt.occurs_check(name))
       }
       Self::Let { pat: Pattern::Tup(..), .. } => todo!(),
@@ -138,7 +138,7 @@ impl Term {
         Term::Chn { nam: _, bod } => check(bod, name, true),
         Term::App { fun, arg } => check(fun, name, inside_chn) || check(arg, name, inside_chn),
         Term::Sup { fst, snd, .. } => check(fst, name, inside_chn) || check(snd, name, inside_chn),
-        Term::Let { pat: Pattern::Var(Name(n)), val, nxt } => {
+        Term::Let { pat: Pattern::Var(Some(Name(n))), val, nxt } => {
           check(val, name, inside_chn) || (n != name && check(nxt, name, inside_chn))
         }
         Term::Let { .. } => todo!(),
@@ -543,7 +543,7 @@ impl Term {
       Self::Dup { tag: _, fst: None, snd: None, val: _, nxt } => nxt.abstract_by(name),
 
       // [name] Let { nam, val, nxt } => ([name] ([nam] nxt) val)
-      Self::Let { pat: Pattern::Var(nam), val, nxt } => {
+      Self::Let { pat: Pattern::Var(Some(nam)), val, nxt } => {
         A::App(Box::new(nxt.abstract_by(&nam)), Box::new((*val).into())).abstract_by(name)
       }
 
