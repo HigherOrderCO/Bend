@@ -130,7 +130,6 @@ fn make_leaf_pattern_matching_case(
   // The term we're building
   let term = Term::Ref { def_id: rule_def_id };
 
-  // For the leaf case there are no actual new args, we're just reusing the same function.
   let (num_new_args, num_old_args) = get_pat_arg_count(&match_path);
   let old_args = (0 .. num_old_args).map(|x| Name(format!("x{x}")));
   let new_args = (0 .. num_new_args).map(|x| Name(format!("y{x}")));
