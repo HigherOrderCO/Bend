@@ -8,10 +8,9 @@ use hvmc_net::pre_reduce::pre_reduce_book;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::time::Instant;
 use term::{
-  book_to_nets,
-  net_to_term::net_to_term_non_linear,
+  book_to_nets, net_to_term,
   term_to_net::{HvmcNames, Labels},
-  Book, DefNames, Term,
+  Book, DefNames, ReadbackError, Term,
 };
 
 pub mod hvmc_net;
@@ -115,6 +114,7 @@ pub fn run_book(
   mem_size: usize,
   parallel: bool,
   debug: bool,
+  linear: bool,
 ) -> Result<(Term, DefNames, RunInfo), String> {
   let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book)?;
 
@@ -126,11 +126,12 @@ pub fn run_book(
     return Err("Could not run the code because of the previous warnings".into());
   }
 
-  let debug_hook = if debug { Some(|net: &_| debug_hook(net, &book, &hvmc_names, &labels)) } else { None };
+  let debug_hook =
+    if debug { Some(|net: &_| debug_hook(net, &book, &hvmc_names, &labels, linear)) } else { None };
   let (res_lnet, stats) = run_compiled(&core_book, mem_size, parallel, debug_hook);
   let net = hvmc_to_net(&res_lnet, &|id| hvmc_names.hvmc_name_to_id[&id]);
-  let (res_term, valid_readback) = net_to_term_non_linear(&net, &book, &labels);
-  let info = RunInfo { stats, valid_readback, net: res_lnet };
+  let (res_term, readback_errors) = net_to_term(&net, &book, &labels, linear);
+  let info = RunInfo { stats, readback_errors, net: res_lnet };
   Ok((res_term, book.def_names, info))
 }
 
@@ -156,19 +157,19 @@ pub fn desugar_book(book: &mut Book) -> Result<(), String> {
   Ok(())
 }
 
-fn debug_hook(net: &Net, book: &Book, hvmc_names: &HvmcNames, labels: &Labels) {
+fn debug_hook(net: &Net, book: &Book, hvmc_names: &HvmcNames, labels: &Labels, linear: bool) {
   let net = hvmc_to_net(net, &|id| hvmc_names.hvmc_name_to_id[&id]);
-  let (res_term, valid_readback) = net_to_term_non_linear(&net, book, labels);
+  let (res_term, errors) = net_to_term(&net, book, labels, linear);
   println!(
     "{}{}\n---------------------------------------",
-    if valid_readback { "" } else { "[invalid] " },
+    if errors.is_empty() { "".to_string() } else { format!("Invalid readback: {:?}\n", errors) },
     res_term.to_string(&book.def_names)
   );
 }
 
 pub struct RunInfo {
   pub stats: RunStats,
-  pub valid_readback: bool,
+  pub readback_errors: Vec<ReadbackError>,
   pub net: Net,
 }
 

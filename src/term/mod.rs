@@ -14,7 +14,7 @@ pub mod parser;
 pub mod term_to_net;
 pub mod transform;
 
-pub use net_to_term::net_to_term_linear;
+pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
 /// The representation of a program.

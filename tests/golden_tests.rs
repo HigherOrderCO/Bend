@@ -4,7 +4,7 @@ use hvml::{
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
   term::{
-    net_to_term::net_to_term_non_linear,
+    net_to_term::net_to_term,
     parser::{parse_definition_book, parse_term},
     term_to_compat_net, Book, DefId, Term,
   },
@@ -104,11 +104,11 @@ fn run_single_files() {
   run_golden_test_dir(function_name!(), &|code| {
     let book = do_parse_book(code)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, def_names, info) = run_book(book, 1 << 20, true, false)?;
-    let res = if info.valid_readback {
+    let (res, def_names, info) = run_book(book, 1 << 20, true, false, false)?;
+    let res = if info.readback_errors.is_empty() {
       res.to_string(&def_names)
     } else {
-      format!("Invalid readback\n{}", res.to_string(&def_names))
+      format!("Invalid readback: {:?}\n{}", info.readback_errors, res.to_string(&def_names))
     };
     Ok(res)
   })
@@ -120,11 +120,11 @@ fn readback_lnet() {
     let net = do_parse_net(code)?;
     let book = Book::default();
     let compat_net = hvmc_to_net(&net, &DefId::from_internal);
-    let (term, valid) = net_to_term_non_linear(&compat_net, &book, &Default::default());
-    if valid {
+    let (term, errors) = net_to_term(&compat_net, &book, &Default::default(), false);
+    if errors.is_empty() {
       Ok(term.to_string(&book.def_names))
     } else {
-      Ok(format!("Invalid readback:\n{}", term.to_string(&book.def_names)))
+      Ok(format!("Invalid readback: {:?}\n{}", errors, term.to_string(&book.def_names)))
     }
   })
 }
