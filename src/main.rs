@@ -102,7 +102,7 @@ fn main() {
           } else {
             format!("Invalid readback: {:?}\n", readback_errors)
           },
-          res_term.to_string(&def_names)
+          res_term.display(&def_names)
         );
 
         if args.stats {

@@ -163,7 +163,7 @@ fn debug_hook(net: &Net, book: &Book, hvmc_names: &HvmcNames, labels: &Labels, l
   println!(
     "{}{}\n---------------------------------------",
     if errors.is_empty() { "".to_string() } else { format!("Invalid readback: {:?}\n", errors) },
-    res_term.to_string(&book.def_names)
+    res_term.display(&book.def_names)
   );
 }
 
