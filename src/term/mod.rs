@@ -293,6 +293,14 @@ impl Tag {
 }
 
 impl Term {
+  fn to_string_app(&self, tag: &Tag, def_names: &DefNames) -> String {
+    match self {
+      Term::App { tag: tag2, fun, arg } if tag2 == tag => {
+        format!("{} {}", fun.to_string_app(tag, def_names), arg.to_string(def_names))
+      }
+      _ => self.to_string(def_names),
+    }
+  }
   pub fn to_string(&self, def_names: &DefNames) -> String {
     match self {
       Term::Lam { tag, nam, bod } => {
@@ -313,7 +321,12 @@ impl Term {
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
       Term::App { tag, fun, arg } => {
-        format!("({}{} {})", tag.to_string_padded(), fun.to_string(def_names), arg.to_string(def_names))
+        format!(
+          "({}{} {})",
+          tag.to_string_padded(),
+          fun.to_string_app(tag, def_names),
+          arg.to_string(def_names)
+        )
       }
       Term::Match { scrutinee, arms } => {
         let arms =
