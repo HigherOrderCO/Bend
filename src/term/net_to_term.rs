@@ -4,7 +4,6 @@ use crate::{
   term::Pattern,
 };
 use hvmc::run::Loc;
-use indexmap::IndexSet;
 use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
@@ -27,23 +26,18 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
     let val = reader.read_term(reader.net.enter_port(Port(node, 0)));
     let fst = reader.namegen.decl_name(net, Port(node, 1));
     let snd = reader.namegen.decl_name(net, Port(node, 2));
-    let mut free_vars = val.free_vars().into_keys().collect();
 
     let tag = match reader.net.node(node).kind {
       Tup => None,
       Dup { lab } => Some(reader.labels.dup.to_tag(Some(lab))),
       _ => unreachable!(),
     };
-    let let_ctx = LetInsertion::Todo(tag, fst, snd, val);
 
-    match let_ctx.search_and_insert(&mut term, &mut free_vars).0 {
-      LetInsertion::Err(kind, fst, snd, val) => {
-        let result = term.insert_let(kind, fst, snd, val, &mut IndexSet::new());
-        debug_assert!(matches!(result, LetInsertion::Ok));
-      }
-      LetInsertion::Ok => {}
-      _ => unreachable!(),
-    }
+    let split = &mut Split { tag, fst, snd, val };
+
+    let uses = term.insert_split(split, usize::MAX).unwrap();
+    let result = term.insert_split(split, uses);
+    debug_assert_eq!(result, None);
   }
 
   (term, reader.errors)
@@ -212,135 +206,57 @@ impl<'a> Reader<'a> {
   }
 }
 
-enum LetInsertion {
-  Ok,
-  Err(Option<Tag>, Option<Name>, Option<Name>, Term),
-  Todo(Option<Tag>, Option<Name>, Option<Name>, Term),
-}
-
-impl LetInsertion {
-  /// Searchers the term and inserts the let body in the position bettewn where the vars it depends are defined,
-  /// and where the its vars are used
-  fn search_and_insert(self, term: &mut Term, free_vars: &mut IndexSet<Name>) -> (LetInsertion, bool) {
-    match term.resolve_let_scope(self, free_vars) {
-      (Self::Todo(tag, fst, snd, val), true) => (term.insert_let(tag, fst, snd, val, free_vars), true),
-      (ctx, uses) => (ctx, uses),
-    }
-  }
-
-  /// Searches all the terms and substitutes it if only one term used the ctx vars.
-  /// Otherwise, returns the context with true if more then one term used the vars,
-  /// or false if none.
-  fn multi_search_and_insert(
-    self,
-    terms: &mut [&mut Term],
-    free_vars: &mut IndexSet<Name>,
-  ) -> (LetInsertion, bool) {
-    let mut var_uses = Vec::with_capacity(terms.len());
-    let mut ctx = self;
-    let mut var_use;
-
-    for term in terms.iter_mut() {
-      (ctx, var_use) = term.resolve_let_scope(ctx, free_vars);
-      var_uses.push(var_use);
-    }
-
-    let used_in_terms: Vec<_> =
-      var_uses.into_iter().enumerate().filter_map(|(index, is_used)| is_used.then_some(index)).collect();
-
-    match (used_in_terms.len(), ctx) {
-      (1, Self::Todo(tag, fst, snd, val)) => {
-        (terms[used_in_terms[0]].insert_let(tag, fst, snd, val, free_vars), true)
-      }
-      (0, ctx) => (ctx, false),
-      (_, ctx) => (ctx, true),
-    }
-  }
+/// Represents `let (fst, snd) = val` if `tag` is `None`, and `dup#tag fst snd = val` otherwise.
+#[derive(Default)]
+struct Split {
+  tag: Option<Tag>,
+  fst: Option<Name>,
+  snd: Option<Name>,
+  val: Term,
 }
 
 impl Term {
-  fn insert_let(
-    &mut self,
-    tag: Option<Tag>,
-    fst: Option<Name>,
-    snd: Option<Name>,
-    val: Term,
-    free_vars: &mut IndexSet<Name>,
-  ) -> LetInsertion {
-    // If all the vars it depends on were found, we update the term with the Let
-    if free_vars.is_empty() {
-      let nxt = Box::new(std::mem::replace(self, Term::Era));
-
+  /// Calculates the number of times `fst` and `snd` appear in this term. If
+  /// that is `>= threshold`, it inserts the split at this term, and returns
+  /// `None`. Otherwise, returns `Some(uses)`.
+  ///
+  /// This is only really useful when called in two passes – first, with
+  /// `threshold = usize::MAX`, to count the number of uses, and then with
+  /// `threshold = uses`.
+  ///
+  /// This has the effect of inserting the split at the lowest common ancestor
+  /// of all of the uses of `fst` and `snd`.
+  fn insert_split<'a>(&'a mut self, split: &mut Split, threshold: usize) -> Option<usize> {
+    let n = match self {
+      Term::Var { nam } => (split.fst.as_ref() == Some(nam) || split.snd.as_ref() == Some(nam)) as usize,
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.insert_split(split, threshold)?,
+      Term::Let { val: fst, nxt: snd, .. }
+      | Term::App { fun: fst, arg: snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. } => {
+        fst.insert_split(split, threshold)? + snd.insert_split(split, threshold)?
+      }
+      Term::Match { scrutinee, arms } => {
+        let mut n = scrutinee.insert_split(split, threshold)?;
+        for arm in arms {
+          n += arm.1.insert_split(split, threshold)?;
+        }
+        n
+      }
+      Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => 0,
+    };
+    if n >= threshold {
+      let Split { tag, fst, snd, val } = std::mem::take(split);
+      let nxt = Box::new(std::mem::take(self));
       *self = match tag {
         None => Term::Let { pat: Pattern::Tup(fst, snd), val: Box::new(val), nxt },
         Some(tag) => Term::Dup { tag, fst, snd, val: Box::new(val), nxt },
       };
-
-      LetInsertion::Ok
+      None
     } else {
-      // Otherwise, return a failed attempt, that will pass through to the first call to `search and insert`
-      LetInsertion::Err(tag, fst, snd, val)
-    }
-  }
-
-  fn resolve_let_scope(&mut self, ctx: LetInsertion, free_vars: &mut IndexSet<Name>) -> (LetInsertion, bool) {
-    match self {
-      Term::Lam { nam: Some(nam), bod, .. } => {
-        free_vars.remove(nam);
-        ctx.search_and_insert(bod, free_vars)
-      }
-
-      Term::Lam { nam: None, bod, .. } => ctx.search_and_insert(bod, free_vars),
-
-      Term::Let { pat: Pattern::Var(_), .. } => unreachable!(),
-
-      Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
-        let (ctx, val_use) = val.resolve_let_scope(ctx, free_vars);
-
-        fst.as_ref().map(|fst| free_vars.remove(fst));
-        snd.as_ref().map(|snd| free_vars.remove(snd));
-        let (ctx, nxt_use) = nxt.resolve_let_scope(ctx, free_vars);
-
-        (ctx, val_use || nxt_use)
-      }
-
-      Term::Let { .. } => todo!(),
-
-      Term::Match { scrutinee, arms } => {
-        let (mut ctx, mut val_use) = scrutinee.resolve_let_scope(ctx, free_vars);
-
-        for (rule, term) in arms {
-          if let Pattern::Num(MatchNum::Succ(Some(p))) = rule {
-            free_vars.remove(p);
-          }
-
-          let (arm_ctx, arm_use) = term.resolve_let_scope(ctx, free_vars);
-          val_use &= arm_use;
-          ctx = arm_ctx;
-        }
-
-        (ctx, val_use)
-      }
-
-      Term::Var { nam } => {
-        if let LetInsertion::Todo(tag, fst, snd, val) = ctx {
-          let is_fst = fst.as_ref().is_some_and(|fst| fst == nam);
-          let is_snd = snd.as_ref().is_some_and(|snd| snd == nam);
-
-          (LetInsertion::Todo(tag, fst, snd, val), is_fst || is_snd)
-        } else {
-          (ctx, false)
-        }
-      }
-
-      Term::Chn { bod, .. } => ctx.search_and_insert(bod, free_vars),
-
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { fst, snd, .. } => ctx.multi_search_and_insert(&mut [fst, snd], free_vars),
-
-      Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => (ctx, false),
+      Some(n)
     }
   }
 }
