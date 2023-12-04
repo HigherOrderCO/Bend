@@ -302,11 +302,7 @@ fn get_pat_arg_count(match_path: &[Pattern]) -> (usize, usize) {
     Pattern::Var(_) => 1,
     Pattern::Ctr(_, vars) => vars.len(),
     Pattern::Num(_) => todo!(),
-    Pattern::Tup(fst, snd) => match (fst, snd) {
-      (None, None) => 0,
-      (Some(..), Some(..)) => 2,
-      (None, Some(..)) | (Some(..), None) => 1,
-    }
+    Pattern::Tup(..) => 2,
   };
   if let Some((new_pat, old_pats)) = match_path.split_last() {
     let new_args = pat_arg_count(new_pat);

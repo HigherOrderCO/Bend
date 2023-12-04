@@ -63,12 +63,10 @@ pub fn infer_arg_type<'a>(
 
 fn unify(new: Type, old: &mut Type) -> Result<(), String> {
   match (new, &old) {
-    (Type::Adt(new), Type::Any) => *old = Type::Adt(new),
     (Type::Adt(new), Type::Adt(old)) if &new != old => {
       return Err(format!("Type mismatch. Found '{}' expected {}.", new, old));
     }
-    (Type::Tup, Type::Any) => *old = Type::Tup,
-    (Type::Num, Type::Any) => *old = Type::Num,
+    (new, Type::Any) => *old = new,
     _ => (),
   };
   Ok(())
