@@ -43,7 +43,8 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       add_var(nam.as_ref(), uses);
       count_var_uses_in_term(bod, uses)
     }
-    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
+    Term::Dup { fst, snd, val, nxt, .. }
+    | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
       add_var(fst.as_ref(), uses);
       add_var(snd.as_ref(), uses);
       count_var_uses_in_term(val, uses);
@@ -149,7 +150,8 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       *term = *nxt.clone();
     }
 
-    Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
+    Term::Dup { fst, snd, val, nxt, .. }
+    | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
       let uses_fst = get_var_uses(fst.as_ref(), var_uses);
       let uses_snd = get_var_uses(snd.as_ref(), var_uses);
       term_to_affine(val, var_uses, let_bodies);

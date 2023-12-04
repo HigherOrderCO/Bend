@@ -113,7 +113,8 @@ impl Term {
 
           val_is_super && nxt_is_super
         }
-        Term::Dup { fst, snd, val, nxt, .. } | Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
+        Term::Dup { fst, snd, val, nxt, .. }
+        | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
           let val_is_super = go(val, depth + 1, term_info);
           let nxt_is_supper = go(nxt, depth + 1, term_info);
 

@@ -213,7 +213,7 @@ impl<'a> EncodeTermState<'a> {
         self.inet.link(up, Port(node, 0));
         Some(Port(node, 0))
       }
-      Term::Let { pat: Pattern::Tup(l_nam, r_nam), val, nxt } => {
+      Term::Let { pat: Pattern::Tup(box Pattern::Var(l_nam), box Pattern::Var(r_nam)), val, nxt } => {
         let dup = self.inet.new_node(Tup);
 
         let val = self.encode_term(val, Port(dup, 0));

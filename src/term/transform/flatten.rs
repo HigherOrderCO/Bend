@@ -153,7 +153,7 @@ fn make_old_rule(pats: &[Pattern], new_split_def_id: DefId) -> Rule {
         }
         new_pats.push(Pattern::Ctr(arg_name.clone(), new_arg_args));
       }
-      Pattern::Tup(a, b) => {
+      Pattern::Tup(box Pattern::Var(a), box Pattern::Var(b)) => {
         if let Some(nam) = a {
           new_pats.push(Pattern::Var(Some(nam.clone())));
           new_body_args.push(Term::Var { nam: nam.clone() });
@@ -163,6 +163,7 @@ fn make_old_rule(pats: &[Pattern], new_split_def_id: DefId) -> Rule {
           new_body_args.push(Term::Var { nam: nam.clone() });
         }
       }
+      Pattern::Tup(..) => todo!(),
       Pattern::Var(None) => todo!(),
       Pattern::Var(Some(nam)) => {
         new_pats.push(Pattern::Var(Some(nam.clone())));
@@ -214,7 +215,10 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         // How to do this with this kind of number pattern? Subst with a match?
         todo!();
       }
-      (Pattern::Tup(a_fst, a_snd), Pattern::Tup(b_fst, b_snd)) => {
+      (
+        Pattern::Tup(box Pattern::Var(a_fst), box Pattern::Var(a_snd)),
+        Pattern::Tup(box Pattern::Var(b_fst), box Pattern::Var(b_snd)),
+      ) => {
         if let Some(fst) = a_fst.clone().or(b_fst.clone()) {
           new_pats.push(Pattern::Var(Some(fst)));
         }
@@ -222,7 +226,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_pats.push(Pattern::Var(Some(snd)));
         }
       }
-      (Pattern::Tup(fst, snd), Pattern::Var(_)) => {
+      (Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), Pattern::Var(_)) => {
         if let Some(fst) = fst.clone() {
           new_pats.push(Pattern::Var(Some(fst)));
         }
@@ -230,13 +234,12 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_pats.push(Pattern::Var(Some(snd)));
         }
       }
+      (_, Pattern::Tup(..)) => todo!(),
+      (Pattern::Tup(..), _) => todo!(),
       (Pattern::Var(..), _) => {
         new_pats.push(other_arg.clone());
       }
-      (
-        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
-        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
-      ) => {
+      (Pattern::Ctr(..) | Pattern::Num(..), Pattern::Ctr(..) | Pattern::Num(..)) => {
         if std::mem::discriminant(rule_arg) != std::mem::discriminant(other_arg) {
           unreachable!()
         }
