@@ -205,11 +205,12 @@ fn make_branch_pattern_matching_case(
       .collect()
   }
   let make_next_fn_name = |crnt_name, ctr_name| Name(format!("{crnt_name}$P{ctr_name}"));
-  let make_app = |term, arg| Term::App { tag: Tag::Static, fun: Box::new(term), arg: Box::new(arg) };
 
   let crnt_arg_idx = match_path.len();
   let Type::Adt(next_type) = &def_type[crnt_arg_idx] else { unreachable!() };
   let next_ctrs = book.adts[next_type].ctrs.clone();
+  let make_app =
+    |term, arg| Term::App { tag: Tag::Named(next_type.clone()), fun: Box::new(term), arg: Box::new(arg) };
 
   // First we create the subfunctions
   // TODO: We could group together functions with same arity that map to the same (default) case.
