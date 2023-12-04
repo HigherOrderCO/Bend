@@ -140,6 +140,24 @@ pub enum Pattern {
 }
 
 impl Pattern {
+  pub fn occurs(&self, name: &Name) -> bool {
+    match self {
+      Pattern::Var(None) => false,
+      Pattern::Var(Some(nam)) => nam == name,
+      Pattern::Ctr(.., args) => {
+        let mut ret = false;
+        for arg in args {
+          ret |= arg.occurs(name);
+        }
+        ret
+      }
+      Pattern::Num(..) => false,
+      Pattern::Tup(fst, snd) => {
+        fst.as_ref().map_or(false, |fst| fst == name) || snd.as_ref().map_or(false, |snd| snd == name)
+      }
+    }
+  }
+
   pub fn names(&self) -> Vec<&Option<Name>> {
     fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Option<Name>>) {
       match pat {
@@ -322,21 +340,12 @@ impl Term {
       // Only substitute scoped variables.
       Term::Chn { bod, .. } => bod.subst(from, to),
       Term::Lnk { .. } => (),
-      Term::Let { pat: Pattern::Var(nam), val, nxt } => {
+      Term::Let { pat, val, nxt } => {
         val.subst(from, to);
-        if let Some(nam) = nam {
-          if nam != from {
-            nxt.subst(from, to);
-          }
-        }
-      }
-      Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } => {
-        val.subst(from, to);
-        if fst.as_ref().map_or(true, |fst| fst != from) && snd.as_ref().map_or(true, |snd| snd != from) {
+        if !pat.occurs(from) {
           nxt.subst(from, to);
         }
       }
-      Term::Let { .. } => todo!(),
       Term::Dup { tag: _, fst, snd, val, nxt } => {
         val.subst(from, to);
         if fst.as_ref().map_or(true, |fst| fst != from) && snd.as_ref().map_or(true, |snd| snd != from) {
@@ -387,19 +396,17 @@ impl Term {
         Term::Var { nam } => *free_vars.entry(nam.clone()).or_default() += 1,
         Term::Chn { bod, .. } => go(bod, free_vars),
         Term::Lnk { .. } => {}
-        Term::Let { pat: Pattern::Var(nam), val, nxt } => {
+        Term::Let { pat, val, nxt } => {
           go(val, free_vars);
 
           let mut new_scope = IndexMap::new();
           go(nxt, &mut new_scope);
 
-          if let Some(nam) = nam {
-            new_scope.remove(nam);
-          }
+          pat.for_each_bind(&mut |bind| _ = bind.map(|n| new_scope.remove(n)));
 
           free_vars.extend(new_scope);
         }
-        Term::Let { pat: Pattern::Tup(fst, snd), val, nxt } | Term::Dup { fst, snd, val, nxt, .. } => {
+        Term::Dup { fst, snd, val, nxt, .. } => {
           go(val, free_vars);
 
           let mut new_scope = IndexMap::new();
@@ -410,7 +417,6 @@ impl Term {
 
           free_vars.extend(new_scope);
         }
-        Term::Let { .. } => todo!(),
         Term::App { fun: fst, arg: snd, .. }
         | Term::Tup { fst, snd }
         | Term::Sup { fst, snd, .. }

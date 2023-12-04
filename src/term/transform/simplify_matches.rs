@@ -6,19 +6,34 @@ use indexmap::IndexSet;
 use itertools::Itertools;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
+struct MatchesBook<'book> {
+  adts: &'book BTreeMap<Name, Adt>,
+  ctrs: &'book HashMap<Name, Name>,
+  def_names: &'book mut DefNames,
+  new_defs: BTreeMap<DefId, Definition>,
+}
+
+impl<'book> MatchesBook<'book> {
+  fn new(
+    adts: &'book BTreeMap<Name, Adt>,
+    ctrs: &'book HashMap<Name, Name>,
+    def_names: &'book mut DefNames,
+  ) -> Self {
+    Self { adts, ctrs, def_names, new_defs: BTreeMap::<DefId, Definition>::new() }
+  }
+}
+
 impl Book {
   pub fn simplify_matches(&mut self) -> Result<(), String> {
-    let mut new_defs = BTreeMap::<DefId, Definition>::new();
+    let book = &mut MatchesBook::new(&self.adts, &self.ctrs, &mut self.def_names);
+
     for (def_id, def) in &mut self.defs {
-      let def_name = self.def_names.name(def_id).unwrap().clone();
+      let def_name = book.def_names.name(def_id).cloned().unwrap();
       for rule in def.rules.iter_mut() {
-        rule
-          .body
-          .simplify_matches(&def_name, &self.adts, &self.ctrs, &mut self.def_names, &mut new_defs, &mut 0)
-          .map_err(|err| err.to_string())?;
+        rule.body.simplify_matches(&def_name, book, &mut 0).map_err(|err| err.to_string())?;
       }
     }
-    self.defs.append(&mut new_defs);
+    self.defs.append(&mut book.new_defs);
     Ok(())
   }
 }
@@ -70,11 +85,11 @@ impl std::fmt::Display for MatchError {
 }
 
 impl Term {
-  pub fn check_matches<'a>(
+  pub fn check_matches<'book>(
     pats: &[Pattern],
-    adts: &'a BTreeMap<Name, Adt>,
-    ctrs: &'a HashMap<Name, Name>,
-  ) -> Result<&'a Adt, MatchError> {
+    adts: &'book BTreeMap<Name, Adt>,
+    ctrs: &'book HashMap<Name, Name>,
+  ) -> Result<&'book Adt, MatchError> {
     let ty = infer_arg_type(pats.iter(), ctrs).map_err(MatchError::Infer)?;
 
     let Type::Adt(nam) = ty else { unreachable!() };
@@ -118,13 +133,10 @@ impl Term {
     Ok(&adts[&nam])
   }
 
-  pub fn simplify_matches(
+  fn simplify_matches(
     &mut self,
     def_name: &Name,
-    adts: &BTreeMap<Name, Adt>,
-    ctrs: &HashMap<Name, Name>,
-    def_names: &mut DefNames,
-    new_defs: &mut BTreeMap<DefId, Definition>,
+    book: &mut MatchesBook,
     match_count: &mut usize,
   ) -> Result<(), MatchError> {
     match self {
@@ -134,7 +146,7 @@ impl Term {
         }
 
         for (_, term) in arms.iter_mut() {
-          term.simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)?;
+          term.simplify_matches(&def_name, book, match_count)?;
         }
 
         *match_count += 1;
@@ -143,34 +155,43 @@ impl Term {
         let Term::Var { nam } = *scrutinee else { unreachable!() };
 
         if matches!(arms[0], (Pattern::Num(_), _)) {
-          *self = match_native(nam, arms, def_name, def_names, new_defs, *match_count);
+          *self = match_native(nam, arms, def_name, book, *match_count);
         } else {
           let rules: Vec<_> = arms
             .iter()
+            .cloned()
             .map(|(rule, _)| match rule {
-              Pattern::Var(Some(nam)) => Pattern::Ctr(nam.clone(), Vec::new()),
-              Pattern::Ctr(..) => rule.clone(),
+              Pattern::Var(Some(nam)) => Pattern::Ctr(nam, Vec::new()),
+              Pattern::Ctr(..) => rule,
               _ => unreachable!(),
             })
             .collect();
 
-          let adt = Term::check_matches(&rules, adts, ctrs)?;
-          *self = match_adt_app(nam, adt, &arms, def_name, def_names, new_defs, *match_count);
+          let adt = Term::check_matches(&rules, book.adts, book.ctrs)?;
+          *self = match_adt_app(nam, adt, &arms, def_name, book, match_count)?;
         }
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)?;
+        bod.simplify_matches(def_name, book, match_count)?;
       }
 
       Term::Let { pat: Pattern::Ctr(_, _), .. } => {
         let Term::Let { pat, val, nxt } = std::mem::take(self) else { unreachable!() };
-        let Term::Var { .. } = *val else { todo!() };
+        let arms = vec![(pat, *nxt)];
 
-        *self = Term::Match { scrutinee: val, arms: vec![(pat, *nxt)] };
+        *self = match &*val {
+          Term::Var { .. } => Term::Match { scrutinee: val, arms },
+          _ => {
+            let nam = Name::new("$temp$scrutinee");
+            let pat = Pattern::Var(Some(nam.clone()));
+            let scrutinee = Box::new(Term::Var { nam });
+            Term::Let { pat, val, nxt: Box::new(Term::Match { scrutinee, arms }) }
+          }
+        };
 
         self
-          .simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)
+          .simplify_matches(def_name, book, match_count)
           .map_err(|err| MatchError::LetPat(Box::new(err)))?;
       }
 
@@ -180,8 +201,8 @@ impl Term {
       | Term::Tup { fst, snd }
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
-        fst.simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)?;
-        snd.simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)?;
+        fst.simplify_matches(def_name, book, match_count)?;
+        snd.simplify_matches(def_name, book, match_count)?;
       }
 
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => {}
@@ -196,8 +217,7 @@ fn match_native(
   scrutinee: Name,
   arms: Vec<(Pattern, Term)>,
   def_name: &Name,
-  def_names: &mut DefNames,
-  new_defs: &mut BTreeMap<DefId, Definition>,
+  book: &mut MatchesBook,
   match_count: usize,
 ) -> Term {
   let mut new_arms = Vec::new();
@@ -226,10 +246,10 @@ fn match_native(
     }
 
     let name = make_def_name(def_name, &Name::new(name), match_count);
-    let def_id = def_names.insert(name);
+    let def_id = book.def_names.insert(name);
     let rules = vec![Rule { pats: Vec::new(), body }];
     let def = Definition { def_id, rules };
-    new_defs.insert(def_id, def);
+    book.new_defs.insert(def_id, def);
 
     let mut body = Term::Ref { def_id };
 
@@ -254,63 +274,73 @@ fn match_adt_app(
   Adt { ctrs }: &Adt,
   arms: &[(Pattern, Term)],
   def_name: &Name,
-  def_names: &mut DefNames,
-  new_defs: &mut BTreeMap<DefId, Definition>,
-  match_count: usize,
-) -> Term {
-  let mut rules = Vec::new();
+  book: &mut MatchesBook,
+  match_count: &mut usize,
+) -> Result<Term, MatchError> {
+  let mut rules = BTreeMap::new();
   let mut free_vars = IndexSet::new();
+  let current_count = *match_count;
 
-  for (ctr_name, args) in ctrs {
-    for (rule, term) in arms {
-      let mut body = term.clone();
+  for (rule, term) in arms {
+    let mut body = term.clone();
 
-      let ctr = match rule {
-        Pattern::Var(Some(ctr)) => ctr,
-        Pattern::Ctr(ctr, pats) => {
-          for (n, pat) in pats.iter().enumerate() {
-            let Pattern::Var(Some(var)) = pat else { todo!() };
-            body.subst(var, &Term::Var { nam: binded(&scrutinee, &args[n]) })
-          }
+    let ctr = match rule {
+      Pattern::Var(Some(ctr)) => ctr,
+      Pattern::Var(None) => unreachable!(),
+      Pattern::Ctr(ctr, pats) => {
+        for (n, pat) in pats.iter().enumerate() {
+          let scrutinee_field = Term::Var { nam: binded(&scrutinee, &ctrs[ctr][n]) };
 
-          ctr
+          match pat {
+            Pattern::Var(Some(var)) => body.subst(var, &scrutinee_field),
+            Pattern::Var(None) => {}
+            _ => {
+              body = Term::Let { pat: pat.clone(), val: Box::new(scrutinee_field), nxt: Box::new(body) };
+              body.simplify_matches(def_name, book, match_count)?;
+            }
+          };
         }
-        _ => unreachable!(),
-      };
-
-      if ctr == ctr_name {
-        let pat = Pattern::Ctr(ctr_name.clone(), vec_name_to_pat(&scrutinee, args));
-        let adt_binds: HashSet<_> = args.iter().map(|n| binded(&scrutinee, n)).collect();
-        let term_free_vars = body.free_vars().into_keys().filter(|k| !adt_binds.contains(k));
-        free_vars.extend(term_free_vars);
-
-        let rule = Rule { pats: vec![pat], body };
-        rules.push(rule);
+        ctr
       }
-    }
+      Pattern::Num(_) => todo!(),
+      Pattern::Tup(_, _) => todo!(),
+    };
+
+    let args = &ctrs[ctr];
+
+    let pat = Pattern::Ctr(ctr.clone(), vec_name_to_pat(&scrutinee, &args));
+    let adt_binds: HashSet<_> = args.iter().map(|n| binded(&scrutinee, n)).collect();
+    let term_free_vars = body.free_vars().into_keys().filter(|k| !adt_binds.contains(k));
+    free_vars.extend(term_free_vars);
+
+    let rule = Rule { pats: vec![pat], body };
+    rules.insert(ctrs.get_index_of(ctr).unwrap(), rule);
   }
 
-  for rule in &mut rules {
+  for rule in rules.values_mut() {
     for var in &free_vars {
       rule.pats.push(Pattern::Var(Some(var.clone())));
     }
   }
 
-  let new_name = make_def_name(def_name, &Name::new("match"), match_count);
-  let def_id = def_names.insert(new_name);
-  let def = Definition { def_id, rules };
-  new_defs.insert(def_id, def);
+  let new_name = make_def_name(def_name, &Name::new("match"), current_count);
+  let def_id = book.def_names.insert(new_name);
+  let def = Definition { def_id, rules: rules.into_values().collect() };
+  book.new_defs.insert(def_id, def);
 
   let scrutinee_app = Term::App {
     tag: Tag::Static,
     fun: Box::new(Term::Ref { def_id }),
     arg: Box::new(Term::Var { nam: scrutinee }),
   };
-  free_vars.into_iter().fold(scrutinee_app, |acc, nam| Term::App {
+
+  let app = free_vars.into_iter().fold(scrutinee_app, |acc, nam| Term::App {
     tag: Tag::Static,
     fun: Box::new(acc),
     arg: Box::new(Term::Var { nam }),
-  })
+  });
+
+  Ok(app)
 }
 
 fn vec_name_to_pat(scrutinee: &Name, names: &[Name]) -> Vec<Pattern> {
