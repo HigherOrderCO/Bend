@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/fst.hvm
+---
+@3 = ([a *] a)
+@main = a
+& @3 ~ ([#4 #8] a)
+

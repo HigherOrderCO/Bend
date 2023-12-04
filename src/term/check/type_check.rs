@@ -6,6 +6,7 @@ use std::collections::HashMap;
 pub enum Type {
   Any,
   Tup,
+  Num,
   Adt(Name),
 }
 
@@ -53,19 +54,19 @@ pub fn infer_arg_type<'a>(
         }
       }
       Pattern::Tup(..) => Type::Tup,
-      Pattern::Num(..) => todo!(),
+      Pattern::Num(..) => Type::Num,
     };
-    unify(pat_type, &mut arg_type)?;
+    unify(pat_type, &mut arg_type)?
   }
   Ok(arg_type)
 }
 
 fn unify(new: Type, old: &mut Type) -> Result<(), String> {
   match (new, &old) {
-    (Type::Adt(new), Type::Any) => *old = Type::Adt(new),
     (Type::Adt(new), Type::Adt(old)) if &new != old => {
       return Err(format!("Type mismatch. Found '{}' expected {}.", new, old));
     }
+    (new, Type::Any) => *old = new,
     _ => (),
   };
   Ok(())
@@ -76,6 +77,7 @@ impl fmt::Display for Type {
     match self {
       Type::Any => write!(f, "any"),
       Type::Tup => write!(f, "tup"),
+      Type::Num => write!(f, "num"),
       Type::Adt(nam) => write!(f, "{nam}"),
     }
   }

@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/fst_fst.hvm
+---
+@3 = ([a *] ([b *] [a b]))
+@4 = ({2 a b} ({3 c d} e))
+& @3 ~ (d (b (c (a e))))
+@5 = (a (b c))
+& @4 ~ (b (a c))
+@main = a
+& @5 ~ ([#3 #9] ([#4 #12] a))
+

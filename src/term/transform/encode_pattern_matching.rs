@@ -8,7 +8,7 @@ impl Book {
     for def_id in self.defs.keys().copied().collect::<Vec<_>>() {
       let def_type = &def_types[&def_id];
 
-      let is_matching_def = def_type.iter().any(|t| matches!(t, Type::Adt(_)));
+      let is_matching_def = def_type.iter().any(|t| matches!(t, Type::Adt(_) | Type::Tup | Type::Num));
       if is_matching_def {
         make_pattern_matching_def(self, def_id, def_type);
       } else {
@@ -23,7 +23,7 @@ impl Book {
 /// For functions that don't pattern match, just move the arg variables into the body.
 fn make_non_pattern_matching_def(book: &mut Book, def_id: DefId) {
   let def = book.defs.get_mut(&def_id).unwrap();
-  let rule = def.rules.get_mut(0).unwrap();
+  let rule = def.rules.first_mut().unwrap();
   for pat in rule.pats.iter().rev() {
     let Pattern::Var(var) = pat else { unreachable!() };
     let bod = std::mem::replace(&mut rule.body, Term::Era);
@@ -72,7 +72,18 @@ fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
         }
       }
       Pattern::Num(..) => todo!(),
-      Pattern::Tup(..) => todo!(),
+      pat @ Pattern::Tup(_fst, _snd) => {
+        let tup = Name::new("%0");
+        body = Term::Lam {
+          nam: Some(tup.clone()),
+          bod: Term::Let {
+            pat: pat.clone(),
+            val: Box::new(Term::Var { nam: tup }),
+            nxt: Box::new(body),
+          }
+          .into(),
+        };
+      }
     }
   }
   body
@@ -152,10 +163,15 @@ fn make_leaf_pattern_matching_case(
         let ctr_term = ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, Term::arg_call);
         Term::App { fun: Box::new(term), arg: Box::new(ctr_term) }
       }
-      (Pattern::Var(_), Pattern::Ctr(_, _)) => unreachable!(),
+      (_, Pattern::Tup(..)) => arg_use.clone().fold(term, Term::arg_call),
+      (Pattern::Tup(fst, snd), Pattern::Var(..)) => {
+        let fst = if let Some(nam) = fst { Term::Var { nam: nam.clone() } } else { Term::Era };
+        let snd = if let Some(nam) = snd { Term::Var { nam: nam.clone() } } else { Term::Era };
+        Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }
+      }
+      (Pattern::Var(_), _) => unreachable!(),
       (_, Pattern::Num(..)) => todo!(),
       (Pattern::Num(..), _) => todo!(),
-      (_, Pattern::Tup(..)) => todo!(),
       (Pattern::Tup(..), _) => todo!(),
     }
   });
@@ -286,7 +302,7 @@ fn get_pat_arg_count(match_path: &[Pattern]) -> (usize, usize) {
     Pattern::Var(_) => 1,
     Pattern::Ctr(_, vars) => vars.len(),
     Pattern::Num(_) => todo!(),
-    Pattern::Tup(..) => todo!(),
+    Pattern::Tup(..) => 2,
   };
   if let Some((new_pat, old_pats)) = match_path.split_last() {
     let new_args = pat_arg_count(new_pat);
