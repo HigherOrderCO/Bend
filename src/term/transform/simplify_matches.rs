@@ -12,14 +12,10 @@ impl Book {
     for (def_id, def) in &mut self.defs {
       let def_name = self.def_names.name(def_id).unwrap().clone();
       for rule in def.rules.iter_mut() {
-        rule.body.simplify_matches(
-          &def_name,
-          &self.adts,
-          &self.ctrs,
-          &mut self.def_names,
-          &mut new_defs,
-          &mut 0,
-        )?;
+        rule
+          .body
+          .simplify_matches(&def_name, &self.adts, &self.ctrs, &mut self.def_names, &mut new_defs, &mut 0)
+          .map_err(|err| err.to_string())?;
       }
     }
     self.defs.append(&mut new_defs);
@@ -27,46 +23,96 @@ impl Book {
   }
 }
 
+#[derive(Debug)]
+pub enum MatchError {
+  Empty,
+  Infer(String),
+  RepeatedBind(Name),
+  RepeatedCtrs(Vec<Name>),
+  Missing(HashSet<Name>),
+  LetPat(Box<MatchError>),
+}
+
+impl std::error::Error for MatchError {}
+
+impl std::fmt::Display for MatchError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn ctrs_plural_or_sing(n: usize) -> &'static str {
+      if n > 1 { "constructors" } else { "a constructor" }
+    }
+
+    match self {
+      MatchError::Empty => write!(f, "Empty match block found"),
+      MatchError::Infer(err) => write!(f, "{err}"),
+      MatchError::RepeatedBind(bind) => write!(f, "Repeated var name in a match block: {}", bind),
+      MatchError::RepeatedCtrs(names) => {
+        let constructor = ctrs_plural_or_sing(names.len());
+        let repeated = names.into_iter().join(", ");
+        write!(f, "Repeated {constructor} in a match block: {repeated}")
+      }
+      MatchError::Missing(names) => {
+        let constructor = ctrs_plural_or_sing(names.len());
+        let missing = names.into_iter().join(", ");
+        write!(f, "Missing {constructor} in a match block: {missing}")
+      }
+      MatchError::LetPat(err) => {
+        let let_err = err.to_string().replace("match block", "let bind");
+        write!(f, "{let_err}")?;
+
+        if matches!(err.as_ref(), MatchError::Missing(_)) {
+          write!(f, "\nConsider using a match block instead")?;
+        }
+
+        Ok(())
+      }
+    }
+  }
+}
+
 impl Term {
   pub fn check_matches<'a>(
     pats: &[Pattern],
     adts: &'a BTreeMap<Name, Adt>,
-    ctrs: &HashMap<Name, Name>,
-  ) -> Result<&'a Adt, String> {
-    let ty = infer_arg_type(pats.iter(), ctrs)?;
+    ctrs: &'a HashMap<Name, Name>,
+  ) -> Result<&'a Adt, MatchError> {
+    let ty = infer_arg_type(pats.iter(), ctrs).map_err(MatchError::Infer)?;
 
     let Type::Adt(nam) = ty else { unreachable!() };
 
     let Adt { ctrs } = &adts[&nam];
 
     let mut names = HashSet::new();
-    let mut repeated = HashSet::new();
-    let mut missing: HashSet<_> = ctrs.keys().collect();
+    let mut repeated = Vec::new();
+    let mut missing: HashSet<_> = ctrs.keys().cloned().collect();
+    let mut binds = HashSet::new();
 
     for rule in pats {
-      let Pattern::Ctr(nam, _) = rule else { unreachable!() };
+      let Pattern::Ctr(nam, args) = rule else { unreachable!() };
 
-      if !names.insert(nam.clone()) {
-        repeated.insert(nam.clone());
+      for arg in args {
+        for bind in arg.names() {
+          match bind {
+            Some(bind) if !binds.insert(bind) => {
+              return Err(MatchError::RepeatedBind(bind.clone()));
+            }
+            _ => (),
+          }
+        }
+      }
+
+      if !names.insert(nam) {
+        repeated.push(nam.clone());
       }
 
       missing.remove(nam);
     }
 
-    fn ctrs_plural_or_sing(n: usize) -> &'static str {
-      if n > 1 { "constructors" } else { "a constructor" }
-    }
-
     if !repeated.is_empty() {
-      let constructor = ctrs_plural_or_sing(repeated.len());
-      let repeated = repeated.into_iter().join(", ");
-      return Err(format!("Repeated {constructor} in a match block: {repeated}"));
+      return Err(MatchError::RepeatedCtrs(repeated));
     }
 
     if !missing.is_empty() {
-      let constructor = ctrs_plural_or_sing(missing.len());
-      let missing = missing.into_iter().join(", ");
-      return Err(format!("Missing {constructor} in a match block: {missing}"));
+      return Err(MatchError::Missing(missing));
     }
 
     Ok(&adts[&nam])
@@ -80,11 +126,11 @@ impl Term {
     def_names: &mut DefNames,
     new_defs: &mut BTreeMap<DefId, Definition>,
     match_count: &mut usize,
-  ) -> Result<(), String> {
+  ) -> Result<(), MatchError> {
     match self {
       Term::Match { arms, .. } => {
         if arms.is_empty() {
-          return Err("Empty match block found".to_string());
+          return Err(MatchError::Empty);
         }
 
         for (_, term) in arms.iter_mut() {
@@ -103,6 +149,7 @@ impl Term {
             .iter()
             .map(|(rule, _)| match rule {
               Pattern::Var(Some(nam)) => Pattern::Ctr(nam.clone(), Vec::new()),
+              Pattern::Ctr(..) => rule.clone(),
               _ => unreachable!(),
             })
             .collect();
@@ -114,6 +161,17 @@ impl Term {
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
         bod.simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)?;
+      }
+
+      Term::Let { pat: Pattern::Ctr(_, _), .. } => {
+        let Term::Let { pat, val, nxt } = std::mem::take(self) else { unreachable!() };
+        let Term::Var { .. } = *val else { todo!() };
+
+        *self = Term::Match { scrutinee: val, arms: vec![(pat, *nxt)] };
+
+        self
+          .simplify_matches(def_name, adts, ctrs, def_names, new_defs, match_count)
+          .map_err(|err| MatchError::LetPat(Box::new(err)))?;
       }
 
       Term::App { fun: fst, arg: snd, .. }
@@ -205,14 +263,28 @@ fn match_adt_app(
 
   for (ctr_name, args) in ctrs {
     for (rule, term) in arms {
-      let Pattern::Var(Some(ctr)) = rule else { unreachable!() };
+      let mut body = term.clone();
+
+      let ctr = match rule {
+        Pattern::Var(Some(ctr)) => ctr,
+        Pattern::Ctr(ctr, pats) => {
+          for (n, pat) in pats.iter().enumerate() {
+            let Pattern::Var(Some(var)) = pat else { todo!() };
+            body.subst(var, &Term::Var { nam: binded(&scrutinee, &args[n]) })
+          }
+
+          ctr
+        }
+        _ => unreachable!(),
+      };
+
       if ctr == ctr_name {
         let pat = Pattern::Ctr(ctr_name.clone(), vec_name_to_pat(&scrutinee, args));
         let adt_binds: HashSet<_> = args.iter().map(|n| binded(&scrutinee, n)).collect();
-        let term_free_vars = term.free_vars().into_keys().filter(|k| !adt_binds.contains(k));
+        let term_free_vars = body.free_vars().into_keys().filter(|k| !adt_binds.contains(k));
         free_vars.extend(term_free_vars);
 
-        let rule = Rule { pats: vec![pat], body: term.clone() };
+        let rule = Rule { pats: vec![pat], body };
         rules.push(rule);
       }
     }

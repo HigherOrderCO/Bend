@@ -54,7 +54,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       count_var_uses_in_term(val, uses);
       count_var_uses_in_term(nxt, uses);
     }
-    Term::Let { .. } => todo!(),
+    Term::Let { .. } => unreachable!(),
     // Others
     Term::Chn { bod, .. } => count_var_uses_in_term(bod, uses),
     Term::App { fun: fst, arg: snd, .. }
@@ -158,7 +158,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       duplicate_lam(snd, nxt, uses_snd);
     }
 
-    Term::Let { .. } => todo!(),
+    Term::Let { .. } => unreachable!(),
 
     // Var-using terms
     Term::Var { nam } => {

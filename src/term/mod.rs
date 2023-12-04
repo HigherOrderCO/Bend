@@ -139,6 +139,38 @@ pub enum Pattern {
   Tup(Option<Name>, Option<Name>),
 }
 
+impl Pattern {
+  pub fn names(&self) -> Vec<&Option<Name>> {
+    fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Option<Name>>) {
+      match pat {
+        Pattern::Var(nam) => _ = set.push(nam),
+        Pattern::Ctr(_, pats) => pats.iter().for_each(|pat| go(pat, set)),
+        Pattern::Tup(fst, snd) => {
+          set.push(fst);
+          set.push(snd);
+        }
+        Pattern::Num(_) => {}
+      }
+    }
+
+    let mut set = Vec::new();
+    go(self, &mut set);
+    set
+  }
+
+  pub fn for_each_bind<'a>(&'a self, f: &mut impl FnMut(Option<&'a Name>)) {
+    match self {
+      Pattern::Var(nam) => f(nam.as_ref()),
+      Pattern::Ctr(_, pats) => pats.iter().for_each(|pat| pat.for_each_bind(f)),
+      Pattern::Tup(fst, snd) => {
+        f(fst.as_ref());
+        f(snd.as_ref());
+      }
+      Pattern::Num(_) => {}
+    }
+  }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Op {
   ADD,

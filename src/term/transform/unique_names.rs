@@ -51,7 +51,7 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
       *snd = pop_name(snd.as_ref(), name_map);
       *fst = pop_name(fst.as_ref(), name_map);
     }
-    Term::Let { .. } => todo!(),
+    Term::Let { .. } => unreachable!(),
     // Global lam names are already unique, so no need to do anything
     Term::Chn { bod, .. } => unique_var_names(bod, name_map, name_count),
     Term::App { fun: fst, arg: snd, .. }

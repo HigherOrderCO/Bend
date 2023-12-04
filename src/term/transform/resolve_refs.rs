@@ -42,7 +42,20 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       pop_scope(fst.clone(), scope);
       pop_scope(snd.clone(), scope);
     }
-    Term::Let { .. } => todo!(),
+    Term::Let { pat: Pattern::Ctr(_, pats), val, nxt } => {
+      resolve_refs(val, def_names, scope);
+
+      for pat in pats.iter() {
+        pat.for_each_bind(&mut |nam| push_scope(nam.cloned(), scope));
+      }
+
+      resolve_refs(nxt, def_names, scope);
+
+      for pat in pats {
+        pat.for_each_bind(&mut |nam| pop_scope(nam.cloned(), scope));
+      }
+    }
+    Term::Let { .. } => unreachable!(),
 
     // If variable not defined, we check if it's a ref and swap if it is.
     Term::Var { nam } => {

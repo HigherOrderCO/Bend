@@ -188,8 +188,8 @@ where
     let let_ = just(Token::Let)
       .ignore_then(pattern())
       .validate(|pat, span, emit| {
-        if !matches!(&pat, Pattern::Var(..) | Pattern::Tup(..)) {
-          emit.emit(Rich::custom(span, "Numbers and Constructors not supported in let."));
+        if matches!(&pat, Pattern::Num(..)) {
+          emit.emit(Rich::custom(span, "Numbers not supported in let."));
         }
         pat
       })

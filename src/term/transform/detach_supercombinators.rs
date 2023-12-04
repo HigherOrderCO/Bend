@@ -122,7 +122,7 @@ impl Term {
 
           val_is_super && nxt_is_supper
         }
-        Term::Let { .. } => todo!(),
+        Term::Let { .. } => unreachable!(),
         Term::Match { scrutinee, arms } => {
           let mut is_super = go(scrutinee, depth + 1, term_info);
 
