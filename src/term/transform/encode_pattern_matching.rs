@@ -8,7 +8,7 @@ impl Book {
     for def_id in self.defs.keys().copied().collect::<Vec<_>>() {
       let def_type = &def_types[&def_id];
 
-      let is_matching_def = def_type.iter().any(|t| matches!(t, Type::Adt(_) | Type::Tup));
+      let is_matching_def = def_type.iter().any(|t| matches!(t, Type::Adt(_) | Type::Tup | Type::Num));
       if is_matching_def {
         make_pattern_matching_def(self, def_id, def_type);
       } else {
@@ -163,13 +163,15 @@ fn make_leaf_pattern_matching_case(
         let ctr_term = ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, Term::arg_call);
         Term::App { fun: Box::new(term), arg: Box::new(ctr_term) }
       }
-      (Pattern::Var(_), Pattern::Ctr(_, _)) => unreachable!(),
+      (_, Pattern::Tup(..)) => arg_use.clone().fold(term, Term::arg_call),
+      (Pattern::Tup(fst, snd), Pattern::Var(..)) => {
+        let fst = if let Some(nam) = fst { Term::Var { nam: nam.clone() } } else { Term::Era };
+        let snd = if let Some(nam) = snd { Term::Var { nam: nam.clone() } } else { Term::Era };
+        Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }
+      }
+      (Pattern::Var(_), _) => unreachable!(),
       (_, Pattern::Num(..)) => todo!(),
       (Pattern::Num(..), _) => todo!(),
-      (_, Pattern::Tup(_fst, _snd)) => arg_use.clone().fold(term, |acc, arg| Term::App {
-        fun: Box::new(acc),
-        arg: Box::new(Term::Var { nam: arg.clone() }),
-      }),
       (Pattern::Tup(..), _) => todo!(),
     }
   });
@@ -300,7 +302,11 @@ fn get_pat_arg_count(match_path: &[Pattern]) -> (usize, usize) {
     Pattern::Var(_) => 1,
     Pattern::Ctr(_, vars) => vars.len(),
     Pattern::Num(_) => todo!(),
-    Pattern::Tup(..) => todo!(),
+    Pattern::Tup(fst, snd) => match (fst, snd) {
+      (None, None) => 0,
+      (Some(..), Some(..)) => 2,
+      (None, Some(..)) | (Some(..), None) => 1,
+    }
   };
   if let Some((new_pat, old_pats)) = match_path.split_last() {
     let new_args = pat_arg_count(new_pat);
