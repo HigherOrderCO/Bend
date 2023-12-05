@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/church_one.hvm
 ---
 a
-& ((b (c d)) ({2 (d e) b} (c e))) ~ ((* (f f)) a)
+& ((b (c d)) ({3 (d e) b} (c e))) ~ ((* (f f)) a)
