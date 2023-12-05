@@ -46,13 +46,17 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(val, def_names, scope);
 
       for pat in pats.iter() {
-        pat.for_each_bind(&mut |nam| push_scope(nam.cloned(), scope));
+        for nam in pat.names() {
+          push_scope(Some(nam.clone()), scope)
+        }
       }
 
       resolve_refs(nxt, def_names, scope);
 
       for pat in pats {
-        pat.for_each_bind(&mut |nam| pop_scope(nam.cloned(), scope));
+        for nam in pat.names() {
+          pop_scope(Some(nam.clone()), scope)
+        }
       }
     }
     Term::Let { .. } => unreachable!(),

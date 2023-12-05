@@ -158,7 +158,7 @@ impl Pattern {
     }
   }
 
-  pub fn names(&self) -> Vec<&Option<Name>> {
+  pub fn names(&self) -> impl Iterator<Item = &Name> {
     fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Option<Name>>) {
       match pat {
         Pattern::Var(nam) => _ = set.push(nam),
@@ -173,19 +173,7 @@ impl Pattern {
 
     let mut set = Vec::new();
     go(self, &mut set);
-    set
-  }
-
-  pub fn for_each_bind<'a>(&'a self, f: &mut impl FnMut(Option<&'a Name>)) {
-    match self {
-      Pattern::Var(nam) => f(nam.as_ref()),
-      Pattern::Ctr(_, pats) => pats.iter().for_each(|pat| pat.for_each_bind(f)),
-      Pattern::Tup(fst, snd) => {
-        f(fst.as_ref());
-        f(snd.as_ref());
-      }
-      Pattern::Num(_) => {}
-    }
+    set.into_iter().flat_map(|a| a.as_ref())
   }
 }
 
@@ -402,7 +390,9 @@ impl Term {
           let mut new_scope = IndexMap::new();
           go(nxt, &mut new_scope);
 
-          pat.for_each_bind(&mut |bind| _ = bind.map(|n| new_scope.remove(n)));
+          for bind in pat.names() {
+            new_scope.remove(bind);
+          }
 
           free_vars.extend(new_scope);
         }

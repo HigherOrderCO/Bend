@@ -104,10 +104,8 @@ impl Term {
 
       for arg in args {
         for bind in arg.names() {
-          if let Some(bind) = bind {
-            if !binds.insert(bind) {
-              return Err(MatchError::Repeated(bind.clone()));
-            }
+          if !binds.insert(bind) {
+            return Err(MatchError::Repeated(bind.clone()));
           }
         }
       }
