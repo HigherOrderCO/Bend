@@ -1,0 +1,6 @@
+data Maybe = (Some val) | None
+
+main = 
+  let maybe = (Some 1)
+  let (Some value) = maybe
+  value

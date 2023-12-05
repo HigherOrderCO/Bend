@@ -71,7 +71,7 @@ pub fn check_uses<'a>(
       pop_scope(fst.as_ref(), scope);
       pop_scope(snd.as_ref(), scope);
     }
-    Term::Let { pat, .. } => todo!("pat: {pat:?}"),
+    Term::Let { .. } => unreachable!(),
     Term::App { fun, arg, .. } => {
       check_uses(fun, scope, globals)?;
       check_uses(arg, scope, globals)?;

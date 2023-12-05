@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/match_adt_non_exhaustive.hvm
+---
+Non-exhaustive pattern at definition 'main$match$1$F0'. Hint: (Some) not covered.

@@ -188,8 +188,8 @@ where
     let let_ = just(Token::Let)
       .ignore_then(pattern())
       .validate(|pat, span, emit| {
-        if !matches!(&pat, Pattern::Var(..) | Pattern::Tup(..)) {
-          emit.emit(Rich::custom(span, "Numbers and Constructors not supported in let."));
+        if matches!(&pat, Pattern::Num(..)) {
+          emit.emit(Rich::custom(span, "Numbers not supported in let."));
         }
         pat
       })
@@ -203,8 +203,8 @@ where
     // pat: term
     let match_arm = pattern()
       .validate(|this, span, emit| {
-        if !matches!(&this, Pattern::Var(..)) {
-          emit.emit(Rich::custom(span, "Numbers, Constructors and Tuples not supported in match arm."));
+        if matches!(&this, Pattern::Tup(..) | Pattern::Num(_)) {
+          emit.emit(Rich::custom(span, "Number and Tuples not supported in match arm."));
         }
         this
       })
