@@ -6,19 +6,19 @@ input_file: tests/golden_tests/encode_pattern_match/expr.hvm
 
 (Num) = λval λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Num val)
 
-(App) = λfun λarg λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((App fun) arg)
+(App) = λfun λarg λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (App fun arg)
 
-(Fun) = λname λbody λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((Fun name) body)
+(Fun) = λname λbody λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Fun name body)
 
-(If) = λcond λthen λelse λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (((If cond) then) else)
+(If) = λcond λthen λelse λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (If cond then else)
 
-(Let) = λbind λval λnext λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (((Let bind) val) next)
+(Let) = λbind λval λnext λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Let bind val next)
 
-(Dup) = λfst λsnd λval λnext λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((((Dup fst) snd) val) next)
+(Dup) = λfst λsnd λval λnext λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Dup fst snd val next)
 
-(Tup) = λfst λsnd λVar λNum λApp λFun λIf λLet λDup λTup λOp2 ((Tup fst) snd)
+(Tup) = λfst λsnd λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Tup fst snd)
 
-(Op2) = λop λfst λsnd λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (((Op2 op) fst) snd)
+(Op2) = λop λfst λsnd λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Op2 op fst snd)
 
 (Add) = λAdd λSub λMul λDiv Add
 

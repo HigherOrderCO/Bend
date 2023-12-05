@@ -1,20 +1,17 @@
 use hvmc::run::Val;
 use indexmap::IndexMap;
-use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
-use std::{
-  collections::{BTreeMap, HashMap},
-  fmt,
-};
+use std::collections::{BTreeMap, HashMap};
 
 pub mod check;
+pub mod display;
 pub mod load_book;
 pub mod net_to_term;
 pub mod parser;
 pub mod term_to_net;
 pub mod transform;
 
-pub use net_to_term::net_to_term_linear;
+pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
 /// The representation of a program.
@@ -273,74 +270,7 @@ impl DefNames {
   }
 }
 
-impl Tag {
-  pub fn to_string_padded(&self) -> String {
-    match self {
-      Tag::Named(name) => format!("#{name} "),
-      Tag::Numeric(num) => format!("#{num} "),
-      Tag::Auto => "".to_owned(),
-      Tag::Static => "".to_owned(),
-    }
-  }
-  pub fn to_string(&self) -> String {
-    match self {
-      Tag::Named(name) => format!("#{name}"),
-      Tag::Numeric(num) => format!("#{num}"),
-      Tag::Auto => "".to_owned(),
-      Tag::Static => "".to_owned(),
-    }
-  }
-}
-
 impl Term {
-  pub fn to_string(&self, def_names: &DefNames) -> String {
-    match self {
-      Term::Lam { tag, nam, bod } => {
-        format!(
-          "λ{}{} {}",
-          tag.to_string_padded(),
-          nam.clone().unwrap_or(Name::new("*")),
-          bod.to_string(def_names)
-        )
-      }
-      Term::Var { nam } => format!("{nam}"),
-      Term::Chn { tag, nam, bod } => {
-        format!("λ{}${} {}", tag.to_string_padded(), nam, bod.to_string(def_names))
-      }
-      Term::Lnk { nam } => format!("${nam}"),
-      Term::Let { pat, val, nxt } => {
-        format!("let {} = {}; {}", pat, val.to_string(def_names), nxt.to_string(def_names))
-      }
-      Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
-      Term::App { tag, fun, arg } => {
-        format!("({}{} {})", tag.to_string_padded(), fun.to_string(def_names), arg.to_string(def_names))
-      }
-      Term::Match { scrutinee, arms } => {
-        let arms =
-          arms.iter().map(|(pat, term)| format!("{}: {}", pat, term.to_string(def_names))).join("; ");
-
-        format!("match {} {{ {} }}", scrutinee.to_string(def_names), arms,)
-      }
-      Term::Dup { tag, fst, snd, val, nxt } => format!(
-        "dup{} {} {} = {}; {}",
-        tag.to_string(),
-        fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
-        snd.as_ref().map(|x| x.as_str()).unwrap_or("*"),
-        val.to_string(def_names),
-        nxt.to_string(def_names)
-      ),
-      Term::Sup { tag, fst, snd } => {
-        format!("{{{}{} {}}}", tag.to_string_padded(), fst.to_string(def_names), snd.to_string(def_names))
-      }
-      Term::Era => "*".to_string(),
-      Term::Num { val } => format!("{val}"),
-      Term::Opx { op, fst, snd } => {
-        format!("({} {} {})", op, fst.to_string(def_names), snd.to_string(def_names))
-      }
-      Term::Tup { fst, snd } => format!("({}, {})", fst.to_string(def_names), snd.to_string(def_names)),
-    }
-  }
-
   /// Make a call term by folding args around a called function term with applications.
   pub fn call(called: Term, args: impl IntoIterator<Item = Term>) -> Self {
     args.into_iter().fold(called, |acc, arg| Term::App {
@@ -536,55 +466,19 @@ pub fn native_match(arms: Vec<(Pattern, Term)>) -> (Term, Term) {
   }
 }
 
-impl fmt::Display for Pattern {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Pattern::Var(None) => write!(f, "*"),
-      Pattern::Var(Some(nam)) => write!(f, "{nam}"),
-      Pattern::Ctr(nam, pats) => write!(f, "({}{})", nam, pats.iter().map(|p| format!(" {p}")).join("")),
-      Pattern::Num(num) => write!(f, "{num}"),
-      Pattern::Tup(fst, snd) => write!(
-        f,
-        "({}, {})",
-        fst.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),
-        snd.as_ref().map(|s| s.to_string()).unwrap_or("*".to_string()),
-      ),
-    }
-  }
-}
-
 impl Rule {
-  pub fn to_string(&self, def_id: &DefId, def_names: &DefNames) -> String {
-    format!(
-      "({}{}) = {}",
-      def_names.name(def_id).unwrap(),
-      self.pats.iter().map(|x| format!(" {x}")).join(""),
-      self.body.to_string(def_names)
-    )
-  }
-
   pub fn arity(&self) -> usize {
     self.pats.len()
   }
 }
 
 impl Definition {
-  pub fn to_string(&self, def_names: &DefNames) -> String {
-    self.rules.iter().map(|x| x.to_string(&self.def_id, def_names)).join("\n")
-  }
-
   pub fn arity(&self) -> usize {
     self.rules[0].arity()
   }
 
   pub fn assert_no_pattern_matching_rules(&self) {
     assert!(self.rules.len() == 1, "Definition rules should have been removed in earlier pass");
-  }
-}
-
-impl fmt::Display for Book {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", self.defs.values().map(|x| x.to_string(&self.def_names)).join("\n\n"))
   }
 }
 
@@ -597,44 +491,5 @@ impl From<&Pattern> for Term {
       Pattern::Num(..) => todo!(),
       Pattern::Tup(..) => todo!(),
     }
-  }
-}
-
-impl fmt::Display for MatchNum {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      MatchNum::Zero => write!(f, "0"),
-      MatchNum::Succ(_) => write!(f, "+"),
-    }
-  }
-}
-
-impl fmt::Display for Op {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Op::ADD => write!(f, "+"),
-      Op::SUB => write!(f, "-"),
-      Op::MUL => write!(f, "*"),
-      Op::DIV => write!(f, "/"),
-      Op::MOD => write!(f, "%"),
-      Op::EQ => write!(f, "=="),
-      Op::NE => write!(f, "!="),
-      Op::LT => write!(f, "<"),
-      Op::GT => write!(f, ">"),
-      Op::LTE => write!(f, "<="),
-      Op::GTE => write!(f, ">="),
-      Op::AND => write!(f, "&"),
-      Op::OR => write!(f, "|"),
-      Op::XOR => write!(f, "^"),
-      Op::LSH => write!(f, "<<"),
-      Op::RSH => write!(f, ">>"),
-      Op::NOT => write!(f, "~"),
-    }
-  }
-}
-
-impl fmt::Display for Name {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    self.0.fmt(f)
   }
 }

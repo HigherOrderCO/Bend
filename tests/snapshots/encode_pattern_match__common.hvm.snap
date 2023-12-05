@@ -24,7 +24,7 @@ input_file: tests/golden_tests/encode_pattern_match/common.hvm
 
 (Green) = λRed λYellow λGreen Green
 
-(Cons) = λx λxs λCons λNil ((Cons x) xs)
+(Cons) = λx λxs λCons λNil (Cons x xs)
 
 (Nil) = λCons λNil Nil
 

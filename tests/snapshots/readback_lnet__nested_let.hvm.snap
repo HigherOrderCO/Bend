@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/readback_lnet/nested_let.hvm
 ---
-let (c, b) = ((2, 4), (3, 6)); let (a, *) = b; a
+let (a, *) = let (c, b) = ((2, 4), (3, 6)); b; a
