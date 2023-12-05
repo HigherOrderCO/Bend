@@ -1,0 +1,10 @@
+data Maybe = (Some val) | None
+
+main =
+  let maybe = (Some (Some 1))
+
+  match maybe {
+    (None): 0
+    (Some (None)): 0
+    (Some (Some v)): v
+  }

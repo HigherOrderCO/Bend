@@ -1,0 +1,7 @@
+data Maybe = (Some val) | None
+
+main = @maybe
+  match maybe {
+    (None): 0
+    (Some (None)): 0
+  }
