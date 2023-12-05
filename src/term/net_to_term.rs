@@ -40,6 +40,8 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
     debug_assert_eq!(result, None);
   }
 
+  reader.resugar_adts(&mut term);
+
   (term, reader.errors)
 }
 
@@ -49,6 +51,8 @@ pub enum ReadbackError {
   ReachedRoot,
   Cyclic,
   InvalidBind,
+  InvalidAdt,
+  InvalidAdtMatch,
 }
 
 struct Reader<'a> {
@@ -182,10 +186,7 @@ impl<'a> Reader<'a> {
         }
         _ => unreachable!(),
       },
-      Rot => {
-        self.errors.push(ReadbackError::ReachedRoot);
-        Term::Era
-      }
+      Rot => self.error(ReadbackError::ReachedRoot),
       Tup => match next.slot() {
         // If we're visiting a port 0, then it is a Tup.
         0 => {
@@ -300,6 +301,12 @@ impl NameGen {
     let var_kind = net.node(var_use.node()).kind;
     if let Era = var_kind { None } else { Some(self.var_name(var_port)) }
   }
+
+  fn unique(&mut self) -> Name {
+    let id = self.id_counter;
+    self.id_counter += 1;
+    var_id_to_name(id)
+  }
 }
 
 impl Op {
@@ -386,5 +393,135 @@ impl Term {
       Term::Let { .. } => unreachable!(),
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => {}
     }
+  }
+}
+
+impl<'a> Reader<'a> {
+  fn deref(&mut self, term: &mut Term) {
+    while let Term::Ref { def_id } = term {
+      let def = &self.book.defs[def_id];
+      def.assert_no_pattern_matching_rules();
+      *term = def.rules[0].body.clone();
+      term.fix_names(&mut self.namegen.id_counter, self.book);
+    }
+  }
+  fn resugar_adts(&mut self, term: &mut Term) {
+    match term {
+      Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
+        let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
+          return self.resugar_adts(bod);
+        };
+        let mut cur = &mut *term;
+        let mut current_arm = None;
+        for ctr in &adt.ctrs {
+          self.deref(cur);
+          match cur {
+            Term::Lam { tag: Tag::Named(tag), nam, bod } if &*tag == adt_name => {
+              if let Some(nam) = nam {
+                if current_arm.is_some() {
+                  return self.error(ReadbackError::InvalidAdt);
+                }
+                current_arm = Some((nam.clone(), ctr))
+              }
+              cur = bod;
+            }
+            _ => return self.error(ReadbackError::InvalidAdt),
+          }
+        }
+        let Some(current_arm) = current_arm else {
+          return self.error(ReadbackError::InvalidAdt);
+        };
+        let app = cur;
+        let mut cur = &mut *app;
+        for _ in current_arm.1.1 {
+          self.deref(cur);
+          match cur {
+            Term::App { tag: Tag::Static, fun, .. } => cur = fun,
+            _ => return self.error(ReadbackError::InvalidAdt),
+          }
+        }
+        match cur {
+          Term::Var { nam } if nam == &current_arm.0 => {}
+          _ => return self.error(ReadbackError::InvalidAdt),
+        }
+        let def_id = self.book.def_names.def_id(current_arm.1.0).unwrap();
+        *cur = Term::Ref { def_id };
+        let app = std::mem::take(app);
+        *term = app;
+        self.resugar_adts(term);
+      }
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => self.resugar_adts(bod),
+      Term::App { tag: Tag::Named(adt_name), fun, arg } => {
+        let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
+          self.resugar_adts(fun);
+          self.resugar_adts(arg);
+          return;
+        };
+        let mut cur = &mut *term;
+        let mut arms = Vec::new();
+        for ctr in adt.ctrs.iter().rev() {
+          self.deref(cur);
+          match cur {
+            Term::App { tag: Tag::Named(tag), fun, arg } if &*tag == adt_name => {
+              let mut args = Vec::new();
+              let mut arm_term = &mut **arg;
+              for _ in ctr.1 {
+                self.deref(arm_term);
+                if !matches!(arm_term, Term::Lam { tag: Tag::Static, .. } if &*tag == adt_name) {
+                  let nam = self.namegen.unique();
+                  let body = std::mem::take(arm_term);
+                  *arm_term = Term::Lam {
+                    tag: Tag::Static,
+                    nam: Some(nam.clone()),
+                    bod: Box::new(Term::App {
+                      tag: Tag::Static,
+                      fun: Box::new(body),
+                      arg: Box::new(Term::Var { nam }),
+                    }),
+                  };
+                }
+                match arm_term {
+                  Term::Lam { nam, bod, .. } => {
+                    args.push(match nam {
+                      Some(x) => Pattern::Var(Some(x.clone())),
+                      None => Pattern::Var(None),
+                    });
+                    arm_term = &mut **bod;
+                  }
+                  _ => unreachable!(),
+                }
+              }
+              arms.push((Pattern::Ctr(ctr.0.clone(), args), arm_term));
+              cur = &mut **fun;
+            }
+            _ => return self.error(ReadbackError::InvalidAdtMatch),
+          }
+        }
+        let scrutinee = std::mem::take(cur);
+        let arms = arms.into_iter().rev().map(|arm| (arm.0, std::mem::take(arm.1))).collect();
+        *term = Term::Match { scrutinee: Box::new(scrutinee), arms };
+        self.resugar_adts(term);
+      }
+      Term::App { fun: fst, arg: snd, .. }
+      | Term::Let { val: fst, nxt: snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. } => {
+        self.resugar_adts(fst);
+        self.resugar_adts(snd);
+      }
+      Term::Match { scrutinee, arms } => {
+        self.resugar_adts(scrutinee);
+        for arm in arms {
+          self.resugar_adts(&mut arm.1);
+        }
+      }
+      Term::Lnk { .. } | Term::Num { .. } | Term::Var { .. } | Term::Ref { .. } | Term::Era => {}
+    }
+  }
+  fn error<T: Default>(&mut self, error: ReadbackError) -> T {
+    self.errors.push(error);
+    T::default()
   }
 }

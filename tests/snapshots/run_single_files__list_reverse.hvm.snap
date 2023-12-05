@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_single_files/list_reverse.hvm
 ---
-λa λ* (a 1 λb λ* (b 2 λc λ* (c 3 λ* λd d)))
+(cons 1 (cons 2 (cons 3 nil)))

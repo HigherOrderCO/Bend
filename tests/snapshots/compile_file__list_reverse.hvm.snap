@@ -10,13 +10,13 @@ input_file: tests/golden_tests/compile_file/list_reverse.hvm
 & @cons ~ (a (e d))
 & @concat ~ (b (c e))
 @B = (a a)
-@concat = ((@A (@B a)) a)
-@cons = (a (b ((a (b c)) (* c))))
+@concat = ({2 @A {2 @B a}} a)
+@cons = (a (b {2 (a (b c)) {2 * c}}))
 @main = a
 & @reverse ~ (b a)
 & @cons ~ (#3 (c b))
 & @cons ~ (#2 (d c))
 & @cons ~ (#1 (@nil d))
-@nil = (* (a a))
-@reverse = ((@6 (@nil a)) a)
+@nil = {2 * {2 a a}}
+@reverse = ({2 @6 {2 @nil a}} a)
 

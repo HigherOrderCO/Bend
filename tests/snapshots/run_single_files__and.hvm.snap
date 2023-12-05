@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_single_files/and.hvm
 ---
-λ* λa a
+false

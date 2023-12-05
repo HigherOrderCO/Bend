@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/box.hvm
 ---
-(unbox) = λx (x unbox$Pnew)
+(unbox) = λx (#box x unbox$Pnew)
 
-(new) = λval λnew (new val)
+(new) = λval λ#box new (new val)
 
 (unbox$R0) = λval val
 
