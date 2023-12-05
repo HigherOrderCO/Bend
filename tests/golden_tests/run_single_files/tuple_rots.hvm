@@ -1,4 +1,4 @@
-data Tup8 = (MkTup8 a b c d e f g h)
+MkTup8 = @a @b @c @d @e @f @g @h @MkTup8 (MkTup8 a b c d e f g h)
 
 rot = λx (x λa λb λc λd λe λf λg λh (MkTup8 b c d e f g h a))
 
