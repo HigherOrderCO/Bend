@@ -28,7 +28,7 @@ type UniqueNameScope = HashMap<Name, Vec<VarId>>;
 // Recursive implementation of unique names pass.
 fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count: &mut VarId) {
   match term {
-    Term::Lam { nam, bod } => {
+    Term::Lam { nam, bod, .. } => {
       // Put the name in scope and assign it a unique id.
       // Convert the lambda body and then remove it from scope.
       // Return a lambda with the newly created name
@@ -54,7 +54,7 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
     Term::Let { .. } => todo!(),
     // Global lam names are already unique, so no need to do anything
     Term::Chn { bod, .. } => unique_var_names(bod, name_map, name_count),
-    Term::App { fun: fst, arg: snd }
+    Term::App { fun: fst, arg: snd, .. }
     | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {

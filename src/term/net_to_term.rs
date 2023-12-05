@@ -1,4 +1,4 @@
-use super::{var_id_to_name, Book, DefId, MatchNum, Name, Op, Term, Val};
+use super::{term_to_net::Labels, var_id_to_name, Book, DefId, MatchNum, Name, Op, Term, Val};
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
   term::Pattern,
@@ -9,7 +9,7 @@ use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
 /// Converts an Interaction-INet to a Lambda Calculus term, resolvind Dups and Sups where possible.
-pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, Name>) -> (Term, bool) {
+pub fn net_to_term_non_linear(net: &INet, book: &Book, labels: &Labels) -> (Term, bool) {
   /// Reads a term recursively by starting at root node.
   /// Returns the term and whether it's a valid readback.
   fn reader(
@@ -18,7 +18,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
     namegen: &mut NameGen,
     dup_scope: &mut HashMap<u32, Vec<SlotId>>,
     tup_scope: &mut Scope,
-    labels_to_tag: &HashMap<u32, Name>,
+    labels: &Labels,
     book: &Book,
   ) -> (Term, bool) {
     let node = next.node();
@@ -31,24 +31,24 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
         (Term::Era, valid)
       }
       // If we're visiting a con node...
-      Con => match next.slot() {
+      Con { lab } => match next.slot() {
         // If we're visiting a port 0, then it is a lambda.
         0 => {
           let nam = namegen.decl_name(net, Port(node, 1));
           let prt = net.enter_port(Port(node, 2));
-          let (bod, valid) = reader(net, prt, namegen, dup_scope, tup_scope, labels_to_tag, book);
-          (Term::Lam { nam, bod: Box::new(bod) }, valid)
+          let (bod, valid) = reader(net, prt, namegen, dup_scope, tup_scope, labels, book);
+          (Term::Lam { tag: labels.con.to_tag(lab), nam, bod: Box::new(bod) }, valid)
         }
         // If we're visiting a port 1, then it is a variable.
         1 => (Term::Var { nam: namegen.var_name(next) }, true),
         // If we're visiting a port 2, then it is an application.
         2 => {
           let prt = net.enter_port(Port(node, 0));
-          let (fun, fun_valid) = reader(net, prt, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (fun, fun_valid) = reader(net, prt, namegen, dup_scope, tup_scope, labels, book);
           let prt = net.enter_port(Port(node, 1));
-          let (arg, arg_valid) = reader(net, prt, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (arg, arg_valid) = reader(net, prt, namegen, dup_scope, tup_scope, labels, book);
           let valid = fun_valid && arg_valid;
-          (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
+          (Term::App { tag: labels.con.to_tag(lab), fun: Box::new(fun), arg: Box::new(arg) }, valid)
         }
         _ => unreachable!(),
       },
@@ -56,29 +56,26 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
         2 => {
           // Read the matched expression
           let cond_port = net.enter_port(Port(node, 0));
-          let (cond_term, cond_valid) =
-            reader(net, cond_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (cond_term, cond_valid) = reader(net, cond_port, namegen, dup_scope, tup_scope, labels, book);
 
           // Read the pattern matching node
           let sel_node = net.enter_port(Port(node, 1)).node();
 
           // We expect the pattern matching node to be a CON
           let sel_kind = net.node(sel_node).kind;
-          if sel_kind != Con {
+          if sel_kind != (Con { lab: None }) {
             // TODO: Is there any case where we expect a different node type here on readback?
             return (Term::new_native_match(cond_term, Term::Era, None, Term::Era), false);
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
-          let (zero_term, zero_valid) =
-            reader(net, zero_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (zero_term, zero_valid) = reader(net, zero_port, namegen, dup_scope, tup_scope, labels, book);
           let succ_port = net.enter_port(Port(sel_node, 2));
-          let (succ_term, succ_valid) =
-            reader(net, succ_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (succ_term, succ_valid) = reader(net, succ_port, namegen, dup_scope, tup_scope, labels, book);
 
           let valid = cond_valid && zero_valid && succ_valid;
 
-          let Term::Lam { nam, bod } = succ_term else { unreachable!() };
+          let Term::Lam { nam, bod, .. } = succ_term else { unreachable!() };
 
           let term = Term::new_native_match(cond_term, zero_term, nam, *bod);
           (term, valid)
@@ -106,18 +103,17 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
             // Since we had a paired Dup in the path to this Sup,
             // we "decay" the superposition according to the original direction we came from the Dup.
             let chosen = net.enter_port(Port(node, slot));
-            let (val, valid) = reader(net, chosen, namegen, dup_scope, tup_scope, labels_to_tag, book);
+            let (val, valid) = reader(net, chosen, namegen, dup_scope, tup_scope, labels, book);
             dup_scope.get_mut(&lab).unwrap().push(slot);
             (val, valid)
           } else {
             // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
             let fst = net.enter_port(Port(node, 1));
             let snd = net.enter_port(Port(node, 2));
-            let (fst, fst_valid) = reader(net, fst, namegen, dup_scope, tup_scope, labels_to_tag, book);
-            let (snd, snd_valid) = reader(net, snd, namegen, dup_scope, tup_scope, labels_to_tag, book);
+            let (fst, fst_valid) = reader(net, fst, namegen, dup_scope, tup_scope, labels, book);
+            let (snd, snd_valid) = reader(net, snd, namegen, dup_scope, tup_scope, labels, book);
             let valid = fst_valid && snd_valid;
-            let tag = labels_to_tag.get(&lab).cloned().unwrap_or_else(|| Name::new("auto"));
-            (Term::Sup { tag, fst: Box::new(fst), snd: Box::new(snd) }, valid)
+            (Term::Sup { tag: labels.dup.to_tag(Some(lab)), fst: Box::new(fst), snd: Box::new(snd) }, valid)
           }
         }
         // If we're visiting a port 1 or 2, then it is a variable.
@@ -125,7 +121,7 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
         1 | 2 => {
           let body = net.enter_port(Port(node, 0));
           dup_scope.entry(lab).or_default().push(next.slot());
-          let (body, valid) = reader(net, body, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (body, valid) = reader(net, body, namegen, dup_scope, tup_scope, labels, book);
           dup_scope.entry(lab).or_default().pop().unwrap();
           (body, valid)
         }
@@ -135,9 +131,9 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
       Op2 { opr } => match next.slot() {
         2 => {
           let op_port = net.enter_port(Port(node, 0));
-          let (fst, fst_valid) = reader(net, op_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (fst, fst_valid) = reader(net, op_port, namegen, dup_scope, tup_scope, labels, book);
           let arg_port = net.enter_port(Port(node, 1));
-          let (snd, snd_valid) = reader(net, arg_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (snd, snd_valid) = reader(net, arg_port, namegen, dup_scope, tup_scope, labels, book);
           let valid = fst_valid && snd_valid;
 
           let term =
@@ -152,9 +148,9 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
         // If we're visiting a port 0, then it is a Tup.
         0 => {
           let fst_port = net.enter_port(Port(node, 1));
-          let (fst, fst_valid) = reader(net, fst_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (fst, fst_valid) = reader(net, fst_port, namegen, dup_scope, tup_scope, labels, book);
           let snd_port = net.enter_port(Port(node, 2));
-          let (snd, snd_valid) = reader(net, snd_port, namegen, dup_scope, tup_scope, labels_to_tag, book);
+          let (snd, snd_valid) = reader(net, snd_port, namegen, dup_scope, tup_scope, labels, book);
           let valid = fst_valid && snd_valid;
           (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
@@ -177,13 +173,12 @@ pub fn net_to_term_non_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u
 
   // Reads the main term from the net
   let (mut main, mut valid) =
-    reader(net, net.enter_port(ROOT), &mut namegen, &mut dup_scope, &mut tup_scope, labels_to_tag, book);
+    reader(net, net.enter_port(ROOT), &mut namegen, &mut dup_scope, &mut tup_scope, labels, book);
 
   // Read all the let bodies.
   while let Some(tup) = tup_scope.vec.pop() {
     let val = net.enter_port(Port(tup, 0));
-    let (val, val_valid) =
-      reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, labels_to_tag, book);
+    let (val, val_valid) = reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, labels, book);
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
 
@@ -271,12 +266,12 @@ impl Term {
 
   fn resolve_let_scope(&mut self, ctx: LetInsertion, free_vars: &mut IndexSet<Name>) -> (LetInsertion, bool) {
     match self {
-      Term::Lam { nam: Some(nam), bod } => {
+      Term::Lam { nam: Some(nam), bod, .. } => {
         free_vars.remove(nam);
         ctx.search_and_insert(bod, free_vars)
       }
 
-      Term::Lam { nam: None, bod } => ctx.search_and_insert(bod, free_vars),
+      Term::Lam { nam: None, bod, .. } => ctx.search_and_insert(bod, free_vars),
 
       Term::Let { pat: Pattern::Var(_), .. } => unreachable!(),
 
@@ -321,11 +316,10 @@ impl Term {
 
       Term::Chn { bod, .. } => ctx.search_and_insert(bod, free_vars),
 
-      Term::App { fun, arg } => ctx.multi_search_and_insert(&mut [fun, arg], free_vars),
-
-      Term::Tup { fst, snd } | Term::Sup { fst, snd, .. } | Term::Opx { fst, snd, .. } => {
-        ctx.multi_search_and_insert(&mut [fst, snd], free_vars)
-      }
+      Term::App { fun: fst, arg: snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. } => ctx.multi_search_and_insert(&mut [fst, snd], free_vars),
 
       Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => (ctx, false),
     }
@@ -333,7 +327,7 @@ impl Term {
 }
 
 /// Converts an Interaction-INet to an Interaction Calculus term.
-pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, Name>) -> (Term, bool) {
+pub fn net_to_term_linear(net: &INet, book: &Book, labels: &Labels) -> (Term, bool) {
   /// Reads a term recursively by starting at root node.
   /// Returns the term and whether it's a valid readback.
   fn reader(
@@ -343,7 +337,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
     dup_scope: &mut Scope,
     tup_scope: &mut Scope,
     seen: &mut HashSet<Port>,
-    labels_to_tag: &HashMap<u32, Name>,
+    labels: &Labels,
     book: &Book,
   ) -> (Term, bool) {
     if seen.contains(&next) {
@@ -361,14 +355,14 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
         (Term::Era, valid)
       }
       // If we're visiting a con node...
-      Con => match next.slot() {
+      Con { lab } => match next.slot() {
         // If we're visiting a port 0, then it is a lambda.
         0 => {
           seen.insert(Port(node, 2));
           let nam = namegen.decl_name(net, Port(node, 1));
           let prt = net.enter_port(Port(node, 2));
-          let (bod, valid) = reader(net, prt, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
-          (Term::Lam { nam, bod: Box::new(bod) }, valid)
+          let (bod, valid) = reader(net, prt, namegen, dup_scope, tup_scope, seen, labels, book);
+          (Term::Lam { tag: labels.con.to_tag(lab), nam, bod: Box::new(bod) }, valid)
         }
         // If we're visiting a port 1, then it is a variable.
         1 => (Term::Var { nam: namegen.var_name(next) }, true),
@@ -377,11 +371,11 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
           seen.insert(Port(node, 0));
           seen.insert(Port(node, 1));
           let prt = net.enter_port(Port(node, 0));
-          let (fun, fun_valid) = reader(net, prt, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (fun, fun_valid) = reader(net, prt, namegen, dup_scope, tup_scope, seen, labels, book);
           let prt = net.enter_port(Port(node, 1));
-          let (arg, arg_valid) = reader(net, prt, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (arg, arg_valid) = reader(net, prt, namegen, dup_scope, tup_scope, seen, labels, book);
           let valid = fun_valid && arg_valid;
-          (Term::App { fun: Box::new(fun), arg: Box::new(arg) }, valid)
+          (Term::App { tag: labels.con.to_tag(lab), fun: Box::new(fun), arg: Box::new(arg) }, valid)
         }
         _ => unreachable!(),
       },
@@ -392,7 +386,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
           seen.insert(Port(node, 1));
           let cond_port = net.enter_port(Port(node, 0));
           let (cond_term, cond_valid) =
-            reader(net, cond_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+            reader(net, cond_port, namegen, dup_scope, tup_scope, seen, labels, book);
 
           // Read the pattern matching node
           let sel_node = net.enter_port(Port(node, 1)).node();
@@ -402,21 +396,21 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
 
           // We expect the pattern matching node to be a CON
           let sel_kind = net.node(sel_node).kind;
-          if sel_kind != Con {
+          if sel_kind != (Con { lab: None }) {
             // TODO: Is there any case where we expect a different node type here on readback?
             return (Term::new_native_match(cond_term, Term::Era, None, Term::Era), false);
           }
 
           let zero_port = net.enter_port(Port(sel_node, 1));
           let (zero_term, zero_valid) =
-            reader(net, zero_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+            reader(net, zero_port, namegen, dup_scope, tup_scope, seen, labels, book);
           let succ_port = net.enter_port(Port(sel_node, 2));
           let (succ_term, succ_valid) =
-            reader(net, succ_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+            reader(net, succ_port, namegen, dup_scope, tup_scope, seen, labels, book);
 
           let valid = cond_valid && zero_valid && succ_valid;
 
-          let Term::Lam { nam, bod } = succ_term else { unreachable!() };
+          let Term::Lam { nam, bod, .. } = succ_term else { unreachable!() };
 
           let term = Term::new_native_match(cond_term, zero_term, nam, *bod);
           (term, valid)
@@ -442,14 +436,11 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
           seen.insert(Port(node, 1));
           seen.insert(Port(node, 2));
           let fst_port = net.enter_port(Port(node, 1));
-          let (fst, fst_valid) =
-            reader(net, fst_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (fst, fst_valid) = reader(net, fst_port, namegen, dup_scope, tup_scope, seen, labels, book);
           let snd_port = net.enter_port(Port(node, 2));
-          let (snd, snd_valid) =
-            reader(net, snd_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (snd, snd_valid) = reader(net, snd_port, namegen, dup_scope, tup_scope, seen, labels, book);
           let valid = fst_valid && snd_valid;
-          let tag = labels_to_tag.get(&lab).cloned().unwrap_or_else(|| Name::new("auto"));
-          (Term::Sup { tag, fst: Box::new(fst), snd: Box::new(snd) }, valid)
+          (Term::Sup { tag: labels.dup.to_tag(Some(lab)), fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
         // If we're visiting a port 1 or 2, then it is a variable.
         // Also, that means we found a dup, so we store it to read later.
@@ -469,11 +460,9 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
           seen.insert(Port(node, 1));
           seen.insert(Port(node, 2));
           let fst_port = net.enter_port(Port(node, 1));
-          let (fst, fst_valid) =
-            reader(net, fst_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (fst, fst_valid) = reader(net, fst_port, namegen, dup_scope, tup_scope, seen, labels, book);
           let snd_port = net.enter_port(Port(node, 2));
-          let (snd, snd_valid) =
-            reader(net, snd_port, namegen, dup_scope, tup_scope, seen, labels_to_tag, book);
+          let (snd, snd_valid) = reader(net, snd_port, namegen, dup_scope, tup_scope, seen, labels, book);
           let valid = fst_valid && snd_valid;
           (Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, valid)
         }
@@ -500,26 +489,19 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
   let mut seen = HashSet::new();
 
   // Reads the main term from the net
-  let (mut main, mut valid) = reader(
-    net,
-    net.enter_port(ROOT),
-    &mut namegen,
-    &mut dup_scope,
-    &mut tup_scope,
-    &mut seen,
-    labels_to_tag,
-    book,
-  );
+  let (mut main, mut valid) =
+    reader(net, net.enter_port(ROOT), &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels, book);
 
   // Read all the dup bodies.
   while let Some(dup) = dup_scope.vec.pop() {
     seen.insert(Port(dup, 0));
     let val = net.enter_port(Port(dup, 0));
     let (val, val_valid) =
-      reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels_to_tag, book);
+      reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels, book);
+    let Dup { lab } = net.node(dup).kind else { unreachable!() };
     let fst = namegen.decl_name(net, Port(dup, 1));
     let snd = namegen.decl_name(net, Port(dup, 2));
-    main = Term::Dup { tag: None, fst, snd, val: Box::new(val), nxt: Box::new(main) };
+    main = Term::Dup { tag: labels.dup.to_tag(Some(lab)), fst, snd, val: Box::new(val), nxt: Box::new(main) };
     valid = valid && val_valid;
   }
 
@@ -528,7 +510,7 @@ pub fn net_to_term_linear(net: &INet, book: &Book, labels_to_tag: &HashMap<u32, 
     seen.insert(Port(tup, 0));
     let val = net.enter_port(Port(tup, 0));
     let (val, val_valid) =
-      reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels_to_tag, book);
+      reader(net, val, &mut namegen, &mut dup_scope, &mut tup_scope, &mut seen, labels, book);
     let fst = namegen.decl_name(net, Port(tup, 1));
     let snd = namegen.decl_name(net, Port(tup, 2));
     main = Term::Let { pat: Pattern::Tup(fst, snd), val: Box::new(val), nxt: Box::new(main) };
@@ -633,7 +615,7 @@ impl Term {
     }
 
     match self {
-      Term::Lam { nam, bod } => {
+      Term::Lam { nam, bod, .. } => {
         fix_name(nam, id_counter, bod);
         bod.fix_names(id_counter, book);
       }
@@ -652,8 +634,8 @@ impl Term {
         fix_name(snd, id_counter, nxt);
         nxt.fix_names(id_counter, book);
       }
-      Term::Chn { nam: _, bod } => bod.fix_names(id_counter, book),
-      Term::App { fun: fst, arg: snd }
+      Term::Chn { bod, .. } => bod.fix_names(id_counter, book),
+      Term::App { fun: fst, arg: snd, .. }
       | Term::Sup { fst, snd, .. }
       | Term::Tup { fst, snd }
       | Term::Opx { op: _, fst, snd } => {

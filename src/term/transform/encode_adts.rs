@@ -1,4 +1,4 @@
-use crate::term::{Book, Name, Rule, Term};
+use crate::term::{Book, Name, Rule, Tag, Term};
 
 impl Book {
   pub fn generate_scott_adts(&mut self) {
@@ -22,12 +22,13 @@ impl Book {
 fn make_lam(ctr_args: Vec<Name>, ctrs: Vec<Name>, ctr_name: &Name) -> Term {
   let ctr = Term::Var { nam: ctr_name.clone() };
 
-  let app = ctr_args
-    .iter()
-    .cloned()
-    .fold(ctr, |acc, nam| Term::App { fun: Box::new(acc), arg: Box::new(Term::Var { nam }) });
+  let app = ctr_args.iter().cloned().fold(ctr, |acc, nam| Term::App {
+    tag: Tag::Static,
+    fun: Box::new(acc),
+    arg: Box::new(Term::Var { nam }),
+  });
 
-  let fold_lam = |acc, arg| Term::Lam { nam: Some(arg), bod: Box::new(acc) };
+  let fold_lam = |acc, arg| Term::Lam { tag: Tag::Static, nam: Some(arg), bod: Box::new(acc) };
 
   let lam = ctrs.into_iter().rev().fold(app, fold_lam);
 

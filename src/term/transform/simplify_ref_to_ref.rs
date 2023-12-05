@@ -51,7 +51,7 @@ fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) {
       }
     }
     Term::Lam { bod, .. } | Term::Chn { bod, .. } => subst_ref_to_ref(bod, ref_map),
-    Term::App { fun: fst, arg: snd }
+    Term::App { fun: fst, arg: snd, .. }
     | Term::Let { val: fst, nxt: snd, .. }
     | Term::Dup { val: fst, nxt: snd, .. }
     | Term::Sup { fst, snd, .. }

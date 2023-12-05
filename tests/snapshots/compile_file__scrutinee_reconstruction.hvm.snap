@@ -7,7 +7,7 @@ input_file: tests/golden_tests/compile_file/scrutinee_reconstruction.hvm
 @7 = (* (a a))
 @A = (a (* a))
 @None = (* (a a))
-@Option.or = ({2 a b} c)
+@Option.or = ({3 a b} c)
 & @5 ~ (b (a c))
 @Some = (a ((a b) (* b)))
 @main = a

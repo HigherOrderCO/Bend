@@ -1,5 +1,5 @@
 use super::lexer::{LexingError, Token};
-use crate::term::{Adt, Book, MatchNum, Name, Op, Pattern, Rule, Term};
+use crate::term::{Adt, Book, MatchNum, Name, Op, Pattern, Rule, Tag, Term};
 use chumsky::{
   extra,
   input::{SpannedInput, Stream, ValueInput},
@@ -76,11 +76,11 @@ where
   select!(Token::Name(name) => Name(name))
 }
 
-fn tag<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
+fn tag<'a, I>(default: Tag) -> impl Parser<'a, I, Tag, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  just(Token::Hash).ignore_then(name())
+  just(Token::Hash).ignore_then(name()).or_not().map(move |x| x.map(Tag::Named).unwrap_or(default.clone()))
 }
 
 fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
@@ -133,22 +133,23 @@ where
 
     // λx body
     let lam = just(Token::Lambda)
-      .ignore_then(name_or_era())
+      .ignore_then(tag(Tag::Static))
+      .then(name_or_era())
       .then(term.clone())
-      .map(|(name, body)| Term::Lam { nam: name, bod: Box::new(body) })
+      .map(|((tag, name), body)| Term::Lam { tag, nam: name, bod: Box::new(body) })
       .boxed();
 
     // λ$x body
     let global_lam = just(Token::Lambda)
-      .ignore_then(just(Token::Dollar))
-      .ignore_then(name())
+      .ignore_then(tag(Tag::Static))
+      .then(just(Token::Dollar).ignore_then(name()))
       .then(term.clone())
-      .map(|(name, body)| Term::Chn { nam: name, bod: Box::new(body) })
+      .map(|((tag, name), body)| Term::Chn { tag, nam: name, bod: Box::new(body) })
       .boxed();
 
     // {#tag fst snd}
     let sup = just(Token::LBracket)
-      .ignore_then(tag())
+      .ignore_then(tag(Tag::Auto))
       .then(term.clone())
       .then(term.clone())
       .then_ignore(just(Token::RBracket))
@@ -157,7 +158,7 @@ where
 
     // dup #tag? x1 x2 = body; next
     let dup = just(Token::Dup)
-      .ignore_then(tag().or_not())
+      .ignore_then(tag(Tag::Auto))
       .then(name_or_era())
       .then(name_or_era())
       .then_ignore(just(Token::Equals))
@@ -242,9 +243,12 @@ where
       .boxed();
 
     // (f arg1 arg2 ...)
-    let app = term
-      .clone()
-      .foldl(term.clone().repeated(), |fun, arg| Term::App { fun: Box::new(fun), arg: Box::new(arg) })
+    let app = tag(Tag::Static)
+      .then(term.clone())
+      .foldl(term.clone().repeated(), |(tag, fun), arg| {
+        (tag.clone(), Term::App { tag, fun: Box::new(fun), arg: Box::new(arg) })
+      })
+      .map(|(_, app)| app)
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 

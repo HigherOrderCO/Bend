@@ -60,9 +60,18 @@ pub enum MatchNum {
   Succ(Option<Name>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Tag {
+  Named(Name),
+  Numeric(u32),
+  Auto,
+  Static,
+}
+
 #[derive(Debug, Clone, Default)]
 pub enum Term {
   Lam {
+    tag: Tag,
     nam: Option<Name>,
     bod: Box<Term>,
   },
@@ -71,6 +80,7 @@ pub enum Term {
   },
   /// Like a scopeless lambda, where the variable can occur outside the body
   Chn {
+    tag: Tag,
     nam: Name,
     bod: Box<Term>,
   },
@@ -84,6 +94,7 @@ pub enum Term {
     nxt: Box<Term>,
   },
   App {
+    tag: Tag,
     fun: Box<Term>,
     arg: Box<Term>,
   },
@@ -92,14 +103,14 @@ pub enum Term {
     snd: Box<Term>,
   },
   Dup {
-    tag: Option<Name>,
+    tag: Tag,
     fst: Option<Name>,
     snd: Option<Name>,
     val: Box<Term>,
     nxt: Box<Term>,
   },
   Sup {
-    tag: Name,
+    tag: Tag,
     fst: Box<Term>,
     snd: Box<Term>,
   },
@@ -262,35 +273,64 @@ impl DefNames {
   }
 }
 
+impl Tag {
+  pub fn to_string_padded(&self) -> String {
+    match self {
+      Tag::Named(name) => format!("#{name} "),
+      Tag::Numeric(num) => format!("#{num} "),
+      Tag::Auto => "".to_owned(),
+      Tag::Static => "".to_owned(),
+    }
+  }
+  pub fn to_string(&self) -> String {
+    match self {
+      Tag::Named(name) => format!("#{name}"),
+      Tag::Numeric(num) => format!("#{num}"),
+      Tag::Auto => "".to_owned(),
+      Tag::Static => "".to_owned(),
+    }
+  }
+}
+
 impl Term {
   pub fn to_string(&self, def_names: &DefNames) -> String {
     match self {
-      Term::Lam { nam, bod } => {
-        format!("λ{} {}", nam.clone().unwrap_or(Name::new("*")), bod.to_string(def_names))
+      Term::Lam { tag, nam, bod } => {
+        format!(
+          "λ{}{} {}",
+          tag.to_string_padded(),
+          nam.clone().unwrap_or(Name::new("*")),
+          bod.to_string(def_names)
+        )
       }
       Term::Var { nam } => format!("{nam}"),
-      Term::Chn { nam, bod } => format!("λ${} {}", nam, bod.to_string(def_names)),
+      Term::Chn { tag, nam, bod } => {
+        format!("λ{}${} {}", tag.to_string_padded(), nam, bod.to_string(def_names))
+      }
       Term::Lnk { nam } => format!("${nam}"),
       Term::Let { pat, val, nxt } => {
         format!("let {} = {}; {}", pat, val.to_string(def_names), nxt.to_string(def_names))
       }
       Term::Ref { def_id } => format!("{}", def_names.name(def_id).unwrap()),
-      Term::App { fun, arg } => format!("({} {})", fun.to_string(def_names), arg.to_string(def_names)),
+      Term::App { tag, fun, arg } => {
+        format!("({}{} {})", tag.to_string_padded(), fun.to_string(def_names), arg.to_string(def_names))
+      }
       Term::Match { scrutinee, arms } => {
         let arms =
           arms.iter().map(|(pat, term)| format!("{}: {}", pat, term.to_string(def_names))).join("; ");
 
         format!("match {} {{ {} }}", scrutinee.to_string(def_names), arms,)
       }
-      Term::Dup { tag: _, fst, snd, val, nxt } => format!(
-        "dup {} {} = {}; {}",
+      Term::Dup { tag, fst, snd, val, nxt } => format!(
+        "dup{} {} {} = {}; {}",
+        tag.to_string(),
         fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
         snd.as_ref().map(|x| x.as_str()).unwrap_or("*"),
         val.to_string(def_names),
         nxt.to_string(def_names)
       ),
       Term::Sup { tag, fst, snd } => {
-        format!("{{#{} {} {}}}", tag, fst.to_string(def_names), snd.to_string(def_names))
+        format!("{{{}{} {}}}", tag.to_string_padded(), fst.to_string(def_names), snd.to_string(def_names))
       }
       Term::Era => "*".to_string(),
       Term::Num { val } => format!("{val}"),
@@ -303,7 +343,11 @@ impl Term {
 
   /// Make a call term by folding args around a called function term with applications.
   pub fn call(called: Term, args: impl IntoIterator<Item = Term>) -> Self {
-    args.into_iter().fold(called, |acc, arg| Term::App { fun: Box::new(acc), arg: Box::new(arg) })
+    args.into_iter().fold(called, |acc, arg| Term::App {
+      tag: Tag::Static,
+      fun: Box::new(acc),
+      arg: Box::new(arg),
+    })
   }
 
   /// Substitute the occurences of a variable in a term with the given term.
@@ -354,7 +398,7 @@ impl Term {
           }
         }
       }
-      Term::App { fun: fst, arg: snd }
+      Term::App { fun: fst, arg: snd, .. }
       | Term::Sup { fst, snd, .. }
       | Term::Tup { fst, snd }
       | Term::Opx { fst, snd, .. } => {
@@ -370,14 +414,14 @@ impl Term {
   pub fn free_vars(&self) -> IndexMap<Name, u64> {
     fn go(term: &Term, free_vars: &mut IndexMap<Name, u64>) {
       match term {
-        Term::Lam { nam: Some(nam), bod } => {
+        Term::Lam { nam: Some(nam), bod, .. } => {
           let mut new_scope = IndexMap::new();
           go(bod, &mut new_scope);
           new_scope.remove(nam);
 
           free_vars.extend(new_scope);
         }
-        Term::Lam { nam: None, bod } => go(bod, free_vars),
+        Term::Lam { nam: None, bod, .. } => go(bod, free_vars),
         Term::Var { nam } => *free_vars.entry(nam.clone()).or_default() += 1,
         Term::Chn { bod, .. } => go(bod, free_vars),
         Term::Lnk { .. } => {}
@@ -405,7 +449,7 @@ impl Term {
           free_vars.extend(new_scope);
         }
         Term::Let { .. } => todo!(),
-        Term::App { fun: fst, arg: snd }
+        Term::App { fun: fst, arg: snd, .. }
         | Term::Tup { fst, snd }
         | Term::Sup { fst, snd, .. }
         | Term::Opx { op: _, fst, snd } => {
@@ -484,7 +528,7 @@ pub fn native_match(arms: Vec<(Pattern, Term)>) -> (Term, Term) {
   match &arms[..] {
     [(Pattern::Num(Zero), zero), (Pattern::Num(Succ(nam)), succ)] => {
       let zero = zero.clone();
-      let succ = Term::Lam { nam: nam.clone(), bod: Box::new(succ.clone()) };
+      let succ = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(succ.clone()) };
       (zero, succ)
     }
     [(Pattern::Num(Zero), zero), (Pattern::Num(Zero), succ)] => (zero.clone(), succ.clone()),

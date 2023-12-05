@@ -6,11 +6,8 @@ use hvml::{
   term::{
     net_to_term::net_to_term_non_linear,
     parser::{parse_definition_book, parse_term},
-    term_to_compat_net,
-    term_to_net::LabelGenerator,
-    Book, DefId, Term,
+    term_to_compat_net, Book, DefId, Term,
   },
-  Warning,
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -84,15 +81,10 @@ fn compile_term() {
     term.check_unbound_vars()?;
     term.make_var_names_unique();
     term.linearize_vars();
-    let mut label_generator = LabelGenerator::default();
-    let (compat_net, dups) = term_to_compat_net(&term, &mut label_generator);
+    let compat_net = term_to_compat_net(&term, &mut Default::default());
     let net = net_to_hvmc(&compat_net, &|def_id| def_id.to_internal())?;
 
-    let result = if dups > hvml::net::MAX_DUP_HVMC_LABEL {
-      format!("// {}\n{}", Warning::TooManyDups { name: String::new() }, show_net(&net))
-    } else {
-      show_net(&net)
-    };
+    let result = show_net(&net);
 
     Ok(result)
   })

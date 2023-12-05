@@ -43,7 +43,7 @@ impl Term {
           val.find_used_definitions(used, defs);
           nxt.find_used_definitions(used, defs);
         }
-        Term::App { fun, arg } => {
+        Term::App { fun, arg, .. } => {
           fun.find_used_definitions(used, defs);
           arg.find_used_definitions(used, defs);
         }

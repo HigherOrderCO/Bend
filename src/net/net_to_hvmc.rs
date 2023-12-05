@@ -1,5 +1,5 @@
-use super::{INet, NodeId, NodeKind, Port, BASE_DUP_HVMC_LABEL, ROOT};
-use crate::term::{var_id_to_name, DefId};
+use super::{INet, NodeId, NodeKind, Port, ROOT};
+use crate::term::{term_to_net::HvmcNames, var_id_to_name, DefId};
 use hvmc::{
   ast::{Book, Net, Tree},
   run::Val,
@@ -7,13 +7,10 @@ use hvmc::{
 use std::collections::{HashMap, HashSet};
 
 /// Converts the inet-encoded definitions into an hvmc AST Book.
-pub fn nets_to_hvmc(
-  nets: HashMap<String, INet>,
-  id_to_hvmc_name: &HashMap<DefId, Val>,
-) -> Result<Book, String> {
+pub fn nets_to_hvmc(nets: HashMap<String, INet>, hvmc_names: &HvmcNames) -> Result<Book, String> {
   let mut book = Book::new();
   for (name, inet) in nets {
-    let net = net_to_hvmc(&inet, &|id| id_to_hvmc_name[&id])?;
+    let net = net_to_hvmc(&inet, &|id| hvmc_names.id_to_hvmc_name[&id])?;
     book.insert(name, net);
   }
   Ok(book)
@@ -48,7 +45,7 @@ fn net_tree_to_hvmc_tree(
 ) -> Tree {
   match inet.node(tree_root).kind {
     NodeKind::Era => Tree::Era,
-    NodeKind::Con => Tree::Con {
+    NodeKind::Con { lab: None } => Tree::Con {
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
@@ -56,8 +53,13 @@ fn net_tree_to_hvmc_tree(
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
+    NodeKind::Con { lab: Some(lab) } => Tree::Dup {
+      lab: (lab + 1) << 1 | 0,
+      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
+      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
+    },
     NodeKind::Dup { lab } => Tree::Dup {
-      lab: lab + BASE_DUP_HVMC_LABEL,
+      lab: (lab + 1) << 1 | 1,
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
