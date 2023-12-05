@@ -33,7 +33,12 @@ impl Book {
         rule.body.simplify_matches(&def_name, book, &mut 0).map_err(|err| err.to_string())?;
       }
     }
-    self.defs.append(&mut book.new_defs);
+
+    if !book.new_defs.is_empty() {
+      self.defs.append(&mut book.new_defs);
+      self.flatten_rules();
+    }
+
     Ok(())
   }
 }
@@ -42,8 +47,7 @@ impl Book {
 pub enum MatchError {
   Empty,
   Infer(String),
-  RepeatedBind(Name),
-  RepeatedCtrs(Vec<Name>),
+  Repeated(Name),
   Missing(HashSet<Name>),
   LetPat(Box<MatchError>),
 }
@@ -59,12 +63,7 @@ impl std::fmt::Display for MatchError {
     match self {
       MatchError::Empty => write!(f, "Empty match block found"),
       MatchError::Infer(err) => write!(f, "{err}"),
-      MatchError::RepeatedBind(bind) => write!(f, "Repeated var name in a match block: {}", bind),
-      MatchError::RepeatedCtrs(names) => {
-        let constructor = ctrs_plural_or_sing(names.len());
-        let repeated = names.into_iter().join(", ");
-        write!(f, "Repeated {constructor} in a match block: {repeated}")
-      }
+      MatchError::Repeated(bind) => write!(f, "Repeated var name in a match block: {}", bind),
       MatchError::Missing(names) => {
         let constructor = ctrs_plural_or_sing(names.len());
         let missing = names.into_iter().join(", ");
@@ -96,34 +95,24 @@ impl Term {
 
     let Adt { ctrs } = &adts[&nam];
 
-    let mut names = HashSet::new();
-    let mut repeated = Vec::new();
     let mut missing: HashSet<_> = ctrs.keys().cloned().collect();
-    let mut binds = HashSet::new();
 
     for rule in pats {
       let Pattern::Ctr(nam, args) = rule else { unreachable!() };
 
+      let mut binds = HashSet::new();
+
       for arg in args {
         for bind in arg.names() {
-          match bind {
-            Some(bind) if !binds.insert(bind) => {
-              return Err(MatchError::RepeatedBind(bind.clone()));
+          if let Some(bind) = bind {
+            if !binds.insert(bind) {
+              return Err(MatchError::Repeated(bind.clone()));
             }
-            _ => (),
           }
         }
       }
 
-      if !names.insert(nam) {
-        repeated.push(nam.clone());
-      }
-
       missing.remove(nam);
-    }
-
-    if !repeated.is_empty() {
-      return Err(MatchError::RepeatedCtrs(repeated));
     }
 
     if !missing.is_empty() {
@@ -176,6 +165,7 @@ impl Term {
         bod.simplify_matches(def_name, book, match_count)?;
       }
 
+      // Desugar lets with constructors into `Term::Match`
       Term::Let { pat: Pattern::Ctr(_, _), .. } => {
         let Term::Let { pat, val, nxt } = std::mem::take(self) else { unreachable!() };
         let arms = vec![(pat, *nxt)];
@@ -277,47 +267,38 @@ fn match_adt_app(
   book: &mut MatchesBook,
   match_count: &mut usize,
 ) -> Result<Term, MatchError> {
-  let mut rules = BTreeMap::new();
+  let mut rules = Vec::new();
   let mut free_vars = IndexSet::new();
   let current_count = *match_count;
 
   for (rule, term) in arms {
-    let mut body = term.clone();
+    let body = term.clone();
+    let adt_binds: HashSet<_>;
 
-    let ctr = match rule {
-      Pattern::Var(Some(ctr)) => ctr,
-      Pattern::Var(None) => unreachable!(),
-      Pattern::Ctr(ctr, pats) => {
-        for (n, pat) in pats.iter().enumerate() {
-          let scrutinee_field = Term::Var { nam: binded(&scrutinee, &ctrs[ctr][n]) };
+    let pats = match rule {
+      Pattern::Var(var) => {
+        let Some(ctr) = var else { unreachable!() };
+        let pats = Pattern::Ctr(ctr.clone(), vec_name_to_pat(&scrutinee, &ctrs[ctr]));
 
-          match pat {
-            Pattern::Var(Some(var)) => body.subst(var, &scrutinee_field),
-            Pattern::Var(None) => {}
-            _ => {
-              body = Term::Let { pat: pat.clone(), val: Box::new(scrutinee_field), nxt: Box::new(body) };
-              body.simplify_matches(def_name, book, match_count)?;
-            }
-          };
-        }
-        ctr
+        adt_binds = ctrs[ctr].iter().map(|n| binded(&scrutinee, n)).collect();
+        vec![pats]
+      }
+      Pattern::Ctr(_, _) => {
+        adt_binds = rule.names().into_iter().flat_map(|nam| nam.as_ref().cloned()).collect();
+        vec![rule.clone()]
       }
       Pattern::Num(_) => todo!(),
       Pattern::Tup(_, _) => todo!(),
     };
 
-    let args = &ctrs[ctr];
-
-    let pat = Pattern::Ctr(ctr.clone(), vec_name_to_pat(&scrutinee, &args));
-    let adt_binds: HashSet<_> = args.iter().map(|n| binded(&scrutinee, n)).collect();
     let term_free_vars = body.free_vars().into_keys().filter(|k| !adt_binds.contains(k));
     free_vars.extend(term_free_vars);
 
-    let rule = Rule { pats: vec![pat], body };
-    rules.insert(ctrs.get_index_of(ctr).unwrap(), rule);
+    let rule = Rule { pats, body };
+    rules.push(rule);
   }
 
-  for rule in rules.values_mut() {
+  for rule in &mut rules {
     for var in &free_vars {
       rule.pats.push(Pattern::Var(Some(var.clone())));
     }
@@ -325,7 +306,7 @@ fn match_adt_app(
 
   let new_name = make_def_name(def_name, &Name::new("match"), current_count);
   let def_id = book.def_names.insert(new_name);
-  let def = Definition { def_id, rules: rules.into_values().collect() };
+  let def = Definition { def_id, rules };
   book.new_defs.insert(def_id, def);
 
   let scrutinee_app = Term::App {
