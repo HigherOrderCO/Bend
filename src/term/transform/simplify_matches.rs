@@ -271,20 +271,16 @@ fn match_adt_app(
 
   for (rule, term) in arms {
     let body = term.clone();
-    let adt_binds: HashSet<_>;
 
-    let pats = match rule {
+    let (pats, adt_binds) = match rule {
       Pattern::Var(var) => {
         let Some(ctr) = var else { unreachable!() };
         let pats = Pattern::Ctr(ctr.clone(), vec_name_to_pat(&scrutinee, &ctrs[ctr]));
+        let adt_binds: Vec<_> = ctrs[ctr].iter().map(|n| binded(&scrutinee, n)).collect();
 
-        adt_binds = ctrs[ctr].iter().map(|n| binded(&scrutinee, n)).collect();
-        vec![pats]
+        (vec![pats], adt_binds)
       }
-      Pattern::Ctr(_, _) => {
-        adt_binds = rule.names().into_iter().flat_map(|nam| nam.as_ref().cloned()).collect();
-        vec![rule.clone()]
-      }
+      Pattern::Ctr(_, _) => (vec![rule.clone()], rule.names().cloned().collect()),
       Pattern::Num(_) => todo!(),
       Pattern::Tup(_, _) => todo!(),
     };
