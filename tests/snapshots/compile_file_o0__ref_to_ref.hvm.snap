@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o0/ref_to_ref.hvm
+---
+@A2 = #1
+@B5 = #2
+@main = [[@A2 @B5] @B5]
+

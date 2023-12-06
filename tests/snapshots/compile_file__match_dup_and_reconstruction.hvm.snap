@@ -5,8 +5,7 @@ input_file: tests/golden_tests/compile_file/match_dup_and_reconstruction.hvm
 @4 = ({2 @5 a} a)
 @5 = (a (b [b a]))
 @Boxed = (a {2 (a b) b})
-@Got = ({3 a b} c)
-& @4 ~ (b (a c))
+@Got = ({3 a {2 @5 (a b)}} b)
 @main = a
 & @Got ~ (b a)
 & @Boxed ~ (#10 b)

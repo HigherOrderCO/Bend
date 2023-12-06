@@ -8,6 +8,7 @@ use hvml::{
     parser::{parse_definition_book, parse_term},
     term_to_compat_net, Book, DefId, Term,
   },
+  OptimizationLevel,
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -94,7 +95,16 @@ fn compile_term() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
-    let compiled = compile_book(&mut book)?;
+    let compiled = compile_book(&mut book, OptimizationLevel::Heavy)?;
+    Ok(format!("{:?}", compiled))
+  })
+}
+
+#[test]
+fn compile_file_o0() {
+  run_golden_test_dir(function_name!(), &|code| {
+    let mut book = do_parse_book(code)?;
+    let compiled = compile_book(&mut book, OptimizationLevel::Light)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -104,7 +114,7 @@ fn run_single_files() {
   run_golden_test_dir(function_name!(), &|code| {
     let book = do_parse_book(code)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, def_names, info) = run_book(book, 1 << 20, true, false, false)?;
+    let (res, def_names, info) = run_book(book, 1 << 20, true, false, false, OptimizationLevel::Heavy)?;
     let res = if info.readback_errors.is_empty() {
       res.display(&def_names).to_string()
     } else {

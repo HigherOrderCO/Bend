@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o0/addition_const.hvm
+---
+@main = a
+& #1 ~ <+ #2 a>
+

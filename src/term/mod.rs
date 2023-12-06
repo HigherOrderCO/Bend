@@ -161,7 +161,7 @@ impl Pattern {
   pub fn names(&self) -> impl Iterator<Item = &Name> {
     fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Option<Name>>) {
       match pat {
-        Pattern::Var(nam) => _ = set.push(nam),
+        Pattern::Var(nam) => set.push(nam),
         Pattern::Ctr(_, pats) => pats.iter().for_each(|pat| go(pat, set)),
         Pattern::Tup(fst, snd) => {
           set.push(fst);

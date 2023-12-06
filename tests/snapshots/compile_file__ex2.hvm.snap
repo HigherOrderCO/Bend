@@ -27,7 +27,6 @@ input_file: tests/golden_tests/compile_file/ex2.hvm
 & @dec ~ (d c)
 & @I ~ (a d)
 @runO = (a b)
-& @run ~ (c b)
-& @dec ~ (d c)
-& @O ~ (a d)
+& @dec ~ (a c)
+& (c b) ~ @runI
 

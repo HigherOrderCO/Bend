@@ -4,8 +4,7 @@ input_file: tests/golden_tests/compile_file/inline_app.hvm
 ---
 @Rul1 = (a a)
 @Rul2 = (a a)
-@Rul3 = a
-& @Rul1 ~ (@Rul2 a)
+@Rul3 = (a a)
 @main = a
 & @Rul3 ~ (@Rul3 a)
 

@@ -227,7 +227,7 @@ impl Term {
   ///
   /// This has the effect of inserting the split at the lowest common ancestor
   /// of all of the uses of `fst` and `snd`.
-  fn insert_split<'a>(&'a mut self, split: &mut Split, threshold: usize) -> Option<usize> {
+  fn insert_split(&mut self, split: &mut Split, threshold: usize) -> Option<usize> {
     let n = match self {
       Term::Var { nam } => (split.fst.as_ref() == Some(nam) || split.snd.as_ref() == Some(nam)) as usize,
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.insert_split(split, threshold)?,

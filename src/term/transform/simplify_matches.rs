@@ -66,7 +66,7 @@ impl std::fmt::Display for MatchError {
       MatchError::Repeated(bind) => write!(f, "Repeated var name in a match block: {}", bind),
       MatchError::Missing(names) => {
         let constructor = ctrs_plural_or_sing(names.len());
-        let missing = names.into_iter().join(", ");
+        let missing = names.iter().join(", ");
         write!(f, "Missing {constructor} in a match block: {missing}")
       }
       MatchError::LetPat(err) => {
@@ -133,7 +133,7 @@ impl Term {
         }
 
         for (_, term) in arms.iter_mut() {
-          term.simplify_matches(&def_name, book, match_count)?;
+          term.simplify_matches(def_name, book, match_count)?;
         }
 
         *match_count += 1;
