@@ -64,8 +64,11 @@ fn check_pattern(
           }
         }
       }
-      Type::Tup => (),
-      Type::Num => todo!(),
+      Type::Tup | Type::Num => {
+        let mut match_path = match_path.clone();
+        match_path.push(Pattern::Var(Some(Name::new("_"))));
+        check_pattern(&mut match_path, adts, rules, &types[1 ..], rules_to_check, def_name)?
+      }
     }
   }
   Ok(())

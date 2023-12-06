@@ -299,20 +299,13 @@ where
       .map(|(fst, snd)| Pattern::Tup(fst, snd))
       .boxed();
 
-    let zero = select!(Token::Num(0) => Pattern::Num(MatchNum::Zero)).validate(|this, span, emit| {
-      emit.emit(Rich::custom(span, "Old zero syntax not supported."));
-      this
-    });
+    let zero = select!(Token::Num(0) => Pattern::Num(MatchNum::Zero));
 
     let succ = just(Token::Num(1))
       .ignore_then(just(Token::Add))
       .ignore_then(name_or_era())
       .map(|x| Pattern::Num(MatchNum::Succ(x)))
-      .boxed()
-      .validate(|this, span, emit| {
-        emit.emit(Rich::custom(span, "Old pred syntax not supported."));
-        this
-      });
+      .boxed();
 
     choice((zero, succ, var, ctr, tup))
   })
