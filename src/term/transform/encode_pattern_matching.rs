@@ -71,11 +71,11 @@ fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
           body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) }
         }
       }
-      Pattern::Num(MatchNum::Zero) => {},
+      Pattern::Num(MatchNum::Zero) => (),
       Pattern::Num(MatchNum::Succ(s)) => {
         body = Term::Lam { tag: Tag::Static, nam: s.clone(), bod: Box::new(body) }
       }
-      pat @ Pattern::Tup(_fst, _snd) => {
+      pat @ Pattern::Tup(..) => {
         let tup = Name::new("%0");
         body = Term::Lam {
           tag: Tag::Static,
@@ -174,12 +174,12 @@ fn make_leaf_pattern_matching_case(
         let snd = if let Some(nam) = snd { Term::Var { nam: nam.clone() } } else { Term::Era };
         Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }
       }
-      (Pattern::Var(..), Pattern::Num(..)) => term,
       (Pattern::Ctr(Name(n), args), Pattern::Num(..)) => match n.as_str() {
         "0" => term,
         "+" => args.iter().fold(term, |term, _| Term::arg_call(term, arg_use.next().unwrap())),
         _ => unreachable!(),
       },
+      (Pattern::Var(..), Pattern::Num(..)) => term,
       (Pattern::Var(_), _) => unreachable!(),
       (Pattern::Num(..), _) => todo!(),
       (Pattern::Tup(..), _) => todo!(),
@@ -201,14 +201,17 @@ fn make_num_pattern_matching_case(
   crnt_rules: Vec<usize>,
   match_path: Vec<Pattern>,
 ) {
-  fn filter_rules(def_rules: &[Rule], crnt_rules: &[usize], arg_idx: usize) -> Vec<usize> {
+  use MatchNum::*;
+
+  fn filter_rules(def_rules: &[Rule], crnt_rules: &[usize], arg_idx: usize, Name(ctr): &Name) -> Vec<usize> {
     crnt_rules
       .iter()
       .copied()
       .filter(|&rule_idx| match &def_rules[rule_idx].pats[arg_idx] {
         Pattern::Var(_) => false,
         Pattern::Ctr(_nam, _) => false,
-        Pattern::Num(..) => true,
+        Pattern::Num(Succ(_)) => ctr == "+",
+        Pattern::Num(Zero) => ctr == "0",
         Pattern::Tup(..) => false,
       })
       .collect()
@@ -219,7 +222,7 @@ fn make_num_pattern_matching_case(
   for (next_ctr, next_ctr_args) in vec![(Name::new("0"), vec![]), (Name::new("+"), vec![Name::new("p")])] {
     let def = &book.defs[&def_id];
     let crnt_name = make_next_fn_name(crnt_name, &next_ctr);
-    let crnt_rules = filter_rules(&def.rules, &crnt_rules, match_path.len());
+    let crnt_rules = filter_rules(&def.rules, &crnt_rules, match_path.len(), &next_ctr);
     let new_vars =
       Pattern::Ctr(next_ctr.clone(), vec![Pattern::Var(Some(Name::new(""))); next_ctr_args.len()]);
     let mut match_path = match_path.clone();
@@ -235,7 +238,7 @@ fn make_num_pattern_matching_case(
     scrutinee: Box::new(term),
     arms: vec![
       (Pattern::Num(MatchNum::Zero), Term::Ref { def_id: zero_id }),
-      (Pattern::Num(MatchNum::Succ(None)), Term::Ref { def_id: succ_id }),
+      (Pattern::Num(MatchNum::Zero), Term::Ref { def_id: succ_id }),
     ],
   };
   let term = Term::named_lam(Name::new("x"), term);
