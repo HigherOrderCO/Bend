@@ -235,7 +235,6 @@ fn make_num_pattern_matching_case(
       let mut body = Term::Ref { def_id: book.def_names.def_id(&crnt_name).unwrap() };
 
       if let Succ(nam) = &next_ctr {
-        println!("here");
         body = Term::App {
           tag: Tag::Static,
           fun: Box::new(body),

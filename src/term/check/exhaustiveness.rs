@@ -1,7 +1,7 @@
 use itertools::Itertools;
 
 use super::type_check::{DefinitionTypes, Type};
-use crate::term::{Adt, Book, Name, Pattern, Rule};
+use crate::term::{Adt, Book, MatchNum, Name, Pattern, Rule};
 use std::collections::BTreeMap;
 
 impl Book {
@@ -64,10 +64,37 @@ fn check_pattern(
           }
         }
       }
-      Type::Tup | Type::Num => {
+      Type::Tup => {
         let mut match_path = match_path.clone();
-        match_path.push(Pattern::Var(Some(Name::new("_"))));
+        match_path.push(Pattern::Tup(Some(Name::new("_")), Some(Name::new("_"))));
         check_pattern(&mut match_path, adts, rules, &types[1 ..], rules_to_check, def_name)?
+      }
+      Type::Num => {
+        let mut zeros = 0;
+        let mut succs = 0;
+        for rule in &rules_to_check {
+          let pat = &rules[*rule].pats[match_path.len()];
+          if let Pattern::Num(n) = pat {
+            match n {
+              MatchNum::Zero => zeros += 1,
+              MatchNum::Succ(_) => succs += 1,
+            }
+          } else {
+            unreachable!()
+          }
+        }
+        let num = if zeros > succs { MatchNum::Succ(None) } else { MatchNum::Zero };
+        let num = Pattern::Num(num);
+        if zeros != succs {
+          return Err(format!(
+            "Non-exhaustive pattern at definition '{}'. Number pattern '{}' not covered.",
+            def_name, num
+          ));
+        } else {
+          let mut match_path = match_path.clone();
+          match_path.push(Pattern::Num(MatchNum::Zero));
+          check_pattern(&mut match_path, adts, rules, &types[1 ..], rules_to_check, def_name)?
+        }
       }
     }
   }
