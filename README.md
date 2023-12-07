@@ -106,12 +106,62 @@ This term will reduce to:
 
 A match syntax for machine numbers.
 We match the case 0 and the case where the number is greater
-than 0, n-1 binds the value of the matching number - 1:
+than 0, `n-1` binds the value of the matching number - 1:
 ```rs
-to_church = λn match n {
-  0: λf λx x;
-  +: λf λx (f (to_church n-1 f x))
-}
+Number.to_church = λn λf λx 
+  match n {
+    0: x
+    +: (f (Number.to_church n-1 f x))
+  }
+```
+
+It is possible to define Data types using `data`:
+```rs
+data Option = (Some val) | None
+```
+
+If the data type has a single possible value, it can be destructured using `let`:
+```rs
+data Boxed = (Box val)
+
+let (Box value) = boxed; value
+```
+
+Otherwise, there are two pattern syntaxes for matching on data types:
+
+```rs
+// Implict bindings
+Option.map = λoption λf
+  match option {
+    Some: (Some (f option.val))
+    None: None
+  }
+
+// and
+
+// Explict bindings
+Option.map = λoption λf
+  match option {
+    (Some value): (Some (f value))
+    (None): None
+  }
+```
+
+Rules can also have patterns.
+It functions like match expressions with explicit bindings:
+
+```rs
+(Option.map (Some value) f) = (Some (f value))
+(Option.map None f) = None
+```
+
+But with the extra ability to match on multiple values at once:
+
+```rs
+data Boolean = True | False
+
+(Option.is_both_some (Some lft_val) (Some rgt_val)) = True
+(Option.is_both_some lft rgt) = False
 ```
 
 ## Terms to Nodes
