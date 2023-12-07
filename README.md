@@ -65,7 +65,7 @@ Operations can handle just 2 terms at time:
 ```rs
 some_val = (+ (+ 7 4) (* 2 3))
 ```
-The current operations include `+, -, *, /, %, ==, !=, <, >, &, |, ^, ~, <<, >>`.
+The current operations include `+, -, *, /, %, ==, !=, <, >, <=, >=, &, |, ^, ~, <<, >>`.
 
 A let term binds some value to the next term, in this case `(* result 2)`:
 ```rs
@@ -77,7 +77,7 @@ It is possible to define tuples:
 tup = (2, 2)
 ```
 
-And pattern-match tuples with let:
+And destructuring tuples with `let`:
 ```rs
 let (x, y) = tup; (+ x y)
 ```
@@ -106,11 +106,11 @@ This term will reduce to:
 
 A match syntax for machine numbers.
 We match the case 0 and the case where the number is greater
-than 0, p binds the value of the matching number - 1:
+than 0, n-1 binds the value of the matching number - 1:
 ```rs
 to_church = λn match n {
   0: λf λx x;
-  1+p: λf λx (f (to_church p f x))
+  +: λf λx (f (to_church n-1 f x))
 }
 ```
 
