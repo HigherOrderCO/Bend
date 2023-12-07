@@ -241,7 +241,9 @@ fn make_num_pattern_matching_case(
       (Pattern::Num(MatchNum::Zero), Term::Ref { def_id: succ_id }),
     ],
   };
+  let term = add_arg_calls(term, &match_path);
   let term = Term::named_lam(Name::new("x"), term);
+  let term = add_arg_lams(term, &match_path);
   
   add_case_to_book(book, crnt_name.clone(), term);
 }
