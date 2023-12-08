@@ -205,7 +205,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 [[package]]
 name = "hvm-core"
 version = "0.2.11"
-source = "git+https://github.com/HigherOrderCO/hvm-core#4980a7f960ac225fe3d080d1395529fc2cf2c05e"
+source = "git+https://github.com/HigherOrderCO/hvm-core#af4410d6033550f76574f6685c17000a62465d52"
 dependencies = [
  "nohash-hasher",
 ]
@@ -325,9 +325,9 @@ checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
 name = "once_cell"
-version = "1.18.0"
+version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
+checksum = "3fdb12b2476b595f9358c5161aa467c2438859caa136dec86c26fdd2efe17b92"
 
 [[package]]
 name = "proc-macro2"
