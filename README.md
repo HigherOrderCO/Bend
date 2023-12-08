@@ -46,6 +46,10 @@ hvml compile <file>
 ```
 This will output the compiled file to stdout.
 
+## Machine Integer
+
+At the moment, HVM-Lang supports only unsigned 60-bit integers.
+
 ## Language Syntax
 
 HVM-Lang syntax consists in Terms and Definitions.
@@ -130,7 +134,7 @@ let (Box value) = boxed; value
 Otherwise, there are two pattern syntaxes for matching on data types:
 
 ```rs
-// Implict bindings
+// Implicit bindings
 Option.map = λoption λf
   match option {
     Some: (Some (f option.val))
@@ -139,7 +143,7 @@ Option.map = λoption λf
 
 // and
 
-// Explict bindings
+// Explicit bindings
 Option.map = λoption λf
   match option {
     (Some value): (Some (f value))
@@ -216,15 +220,10 @@ ToMachine = λn (n ToMachine0 0)
 Definitions are lazy in the runtime. Lifting lambda terms to new definitions will prevent infinite expansion.
 
 Consider this code:
-```hs
+```rs
 Ch_2 = λf λx (f (f x))
 ```
 As you can see the variable `f` is used more than once, so HVM-Lang optimizes this and generates a duplication tree.
-```
+```rs
 Ch_2 = λf λx dup f0 f0_ = f; dup f1 f1_ = f0_ = (f0 (f1 x))
 ```
-
-### Planned features
-
-- Data types
-- Pattern matching
