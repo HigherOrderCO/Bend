@@ -46,10 +46,6 @@ hvml compile <file>
 ```
 This will output the compiled file to stdout.
 
-## Machine Integer
-
-At the moment, HVM-Lang supports only unsigned 60-bit integers.
-
 ## Language Syntax
 
 HVM-Lang syntax consists in Terms and Definitions.
@@ -59,6 +55,8 @@ Here we are defining 'two' as the number 2:
 ```rs
 two = 2
 ```
+
+Currently, the only supported type of machine numbers are unsigned 60-bit integers.  
 
 A lambda where the body is the variable `x`:
 ```rs
@@ -110,7 +108,7 @@ This term will reduce to:
 
 A match syntax for machine numbers.
 We match the case 0 and the case where the number is greater
-than 0, `n-1` binds the value of the matching number - 1:
+than 0, if `n` is the matched variable, `n-1` binds the value of the number - 1:
 ```rs
 Number.to_church = λn λf λx 
   match n {
@@ -119,31 +117,33 @@ Number.to_church = λn λf λx
   }
 ```
 
-It is possible to define Data types using `data`:
+It is possible to define Data types using `data`.  
+If a constructor has any arguments, parenthesis are necessary around it:
 ```rs
 data Option = (Some val) | None
 ```
 
-If the data type has a single possible value, it can be destructured using `let`:
+If the data type has a single constructor, it can be destructured using `let`:
 ```rs
 data Boxed = (Box val)
 
 let (Box value) = boxed; value
 ```
 
-Otherwise, there are two pattern syntaxes for matching on data types:
+Otherwise, there are two pattern syntaxes for matching on data types.  
+One which binds implicitly the matched variable name plus `.` and the fields names on each constructor:
 
 ```rs
-// Implicit bindings
 Option.map = λoption λf
   match option {
     Some: (Some (f option.val))
     None: None
   }
+```
 
-// and
+And another one which deconstructs the matched variable with explicit bindings:
 
-// Explicit bindings
+```rs
 Option.map = λoption λf
   match option {
     (Some value): (Some (f value))
@@ -168,7 +168,7 @@ data Boolean = True | False
 (Option.is_both_some lft rgt) = False
 ```
 
-## Terms to Nodes
+## Compilation of Terms to HVM-core
 
 How terms are compiled into interaction net nodes?
 

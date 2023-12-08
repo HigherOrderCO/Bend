@@ -49,10 +49,11 @@ data Bool = True | False
 data Boxed = (Box val)
 
 // Types with only one constructor can be destructured using `let` or a single matching definition
+(Box.map (Box val) f) = (Box (f val))
+
 (Box.unbox) = λbox
   let (Box val) = box
   val
-(Box.map (Box val) f) = (Box (f val))
 
 // Use tuples to store two values together without needing to create a new data type
 (Tuple.new fst snd) =
@@ -60,10 +61,11 @@ data Boxed = (Box val)
   pair
 
 // Then you can destructure it inside the definition or using `let`
-(Tuple.fst) = λpair
+(Tuple.fst (fst, snd)) = fst
+
+(Tuple.snd) = λpair
   let (fst, snd) = pair
-  fst
-(Tuple.snd (fst, snd)) = snd
+  snd
 
 // All files must have a main definition to be run.
 // You can execute a program in HVM with "cargo run -- --run <path to file>"
