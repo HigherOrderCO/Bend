@@ -75,12 +75,8 @@ fn reduce_single_run_net(nam: &str, net: &mut hvmc::run::Net, num_iters: &mut us
   while !rdexes.is_empty() {
     for (a, b) in rdexes {
       match (a.tag(), b.tag()) {
-        // TODO: We don't need to necessarily stop at derefs/function calls.
         // But things would start to grow pretty quickly and we need some criteria for which net to choose and when to stop.
         (REF, OP2 ..) | (OP2 .., REF) => collected_redexes.push((a, b)),
-        // TODO: Because OP1 is mangled with OP2 during readback, I decided to not process it here.
-        // Instead, we could undo OP1s before doing readback and that would allow a little bit more optimization.
-        (NUM, OP2) | (OP2, NUM) => collected_redexes.push((a, b)),
         _ => net.interact(&book, a, b),
       }
 
@@ -115,6 +111,10 @@ fn net_len(net: &hvmc::ast::Net) -> usize {
         | hvmc::ast::Tree::Mat { sel: lft, ret: rgt } => {
           len += 1;
           trees.push(lft);
+          trees.push(rgt);
+        }
+        hvmc::ast::Tree::Op1 { rgt, .. } => {
+          len += 1;
           trees.push(rgt);
         }
         hvmc::ast::Tree::Era | hvmc::ast::Tree::Ref { .. } | hvmc::ast::Tree::Num { .. } => {
