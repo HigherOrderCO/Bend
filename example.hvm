@@ -17,6 +17,42 @@
 // Numeric operations can only reduce numbers, doing (+ (λx x) 1) will not do anything
 (nums) = λx1 λx2 (* (+ x1 1) (/ (- x2 2) 1))
 
+// Write new data types like this
+data Bool = True | False
+
+// You can have pattern matching on definitions
+// Use `*` to ignore a pattern
+(Bool.or True  *) = True
+(Bool.or * True)  = True
+(Bool.or * *)     = False
+
+// Or using a match expression
+(Bool.not) = λbool
+  match bool {
+    True:  False
+    False: True
+  }
+
+// Data types can store values
+data Boxed = (Box val)
+
+// Types with only one constructor can be destructured using `let` or a single matching definition
+(Box.unbox) = λbox
+  let (Box val) = box
+  val
+(Box.unbox2 (Box val)) = val
+
+// Use tuples to store two values toguether without needing to create a new data type
+(Tuple.new fst snd) =
+  let pair = (fst, snd)
+  pair
+
+// Then you can destructure it using let or in the definition
+(Tuple.fst) = λpair
+  let (fst, snd) = pair
+  fst
+(Tuple.snd (fst, snd)) = snd
+
 // All files must have a main definition to be run.
 // You can execute a program in HVM with "cargo run -- --run <path to file>"
 // Other options are "--check" (the default mode) to just see if the file is well formed
