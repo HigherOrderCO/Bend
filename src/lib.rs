@@ -21,7 +21,7 @@ pub use term::load_book::load_file_to_book;
 
 pub fn check_book(mut book: Book) -> Result<(), String> {
   // TODO: Do the checks without having to do full compilation
-  compile_book(&mut book)?;
+  compile_book(&mut book, OptimizationLevel::Light)?;
   Ok(())
 }
 
@@ -30,6 +30,20 @@ pub enum Warning {}
 impl std::fmt::Display for Warning {
   fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match *self {}
+  }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub enum OptimizationLevel {
+  /// The minimum amount of transformations to produce valid hvmc outputs.
+  Light,
+  /// More aggressive optimizations.
+  Heavy,
+}
+
+impl From<usize> for OptimizationLevel {
+  fn from(value: usize) -> Self {
+    if value == 0 { OptimizationLevel::Light } else { OptimizationLevel::Heavy }
   }
 }
 
@@ -50,11 +64,11 @@ impl std::fmt::Debug for CompileResult {
   }
 }
 
-pub fn compile_book(book: &mut Book) -> Result<CompileResult, String> {
-  let main = desugar_book(book)?;
+pub fn compile_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<CompileResult, String> {
+  let main = desugar_book(book, opt_level)?;
   let (nets, hvmc_names, labels) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
-  pre_reduce_book(&mut core_book)?;
+  pre_reduce_book(&mut core_book, opt_level >= OptimizationLevel::Heavy)?;
   Ok(CompileResult { core_book, hvmc_names, labels, warnings: vec![] })
 }
 
@@ -98,8 +112,9 @@ pub fn run_book(
   parallel: bool,
   debug: bool,
   linear: bool,
+  opt_level: OptimizationLevel,
 ) -> Result<(Term, DefNames, RunInfo), String> {
-  let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book)?;
+  let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opt_level)?;
 
   if !warnings.is_empty() {
     for warn in warnings {
@@ -118,7 +133,7 @@ pub fn run_book(
   Ok((res_term, book.def_names, info))
 }
 
-pub fn desugar_book(book: &mut Book) -> Result<DefId, String> {
+pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<DefId, String> {
   let main = book.check_has_main()?;
   book.check_shared_names()?;
   book.resolve_ctrs_in_pats();
@@ -133,7 +148,9 @@ pub fn desugar_book(book: &mut Book) -> Result<DefId, String> {
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();
-  book.eta_reduction();
+  if opt_level >= OptimizationLevel::Heavy {
+    book.eta_reduction();
+  }
   book.detach_supercombinators();
   book.simplify_ref_to_ref()?;
   book.prune(main);

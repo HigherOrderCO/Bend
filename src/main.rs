@@ -1,6 +1,9 @@
 use clap::{Parser, ValueEnum};
 use hvmc::ast::{show_book, show_net};
-use hvml::{check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, RunInfo};
+use hvml::{
+  check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, OptimizationLevel,
+  RunInfo,
+};
 use std::path::PathBuf;
 
 #[derive(Parser, Debug)]
@@ -26,6 +29,8 @@ struct Args {
 
   #[arg(short = 'l', help = "Linear readback (show explicit dups)")]
   pub linear: bool,
+  #[arg(short = 'O', default_value = "1", help = "Optimization level (0 or 1)", value_parser = opt_level_parser)]
+  pub opt_level: OptimizationLevel,
 
   #[arg(help = "Path to the input file")]
   pub path: PathBuf,
@@ -55,6 +60,11 @@ fn mem_parser(arg: &str) -> Result<usize, String> {
   Ok(base * mult)
 }
 
+fn opt_level_parser(arg: &str) -> Result<OptimizationLevel, String> {
+  let num = arg.parse::<usize>().map_err(|e| e.to_string())?;
+  Ok(OptimizationLevel::from(num))
+}
+
 fn main() {
   fn run() -> Result<(), String> {
     #[cfg(not(feature = "cli"))]
@@ -72,7 +82,7 @@ fn main() {
         check_book(book)?;
       }
       Mode::Compile => {
-        let compiled = compile_book(&mut book)?;
+        let compiled = compile_book(&mut book, args.opt_level)?;
 
         for warn in &compiled.warnings {
           eprintln!("WARNING: {warn}");
@@ -81,13 +91,13 @@ fn main() {
         print!("{}", show_book(&compiled.core_book));
       }
       Mode::Desugar => {
-        desugar_book(&mut book)?;
+        desugar_book(&mut book, args.opt_level)?;
         println!("{book}");
       }
       Mode::Run => {
         let mem_size = args.mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
         let (res_term, def_names, info) =
-          run_book(book, mem_size, !args.single_core, args.debug, args.linear)?;
+          run_book(book, mem_size, !args.single_core, args.debug, args.linear, args.opt_level)?;
         let RunInfo { stats, readback_errors, net: lnet } = info;
         let total_rewrites = total_rewrites(&stats.rewrites) as f64;
         let rps = total_rewrites / stats.run_time / 1_000_000.0;
