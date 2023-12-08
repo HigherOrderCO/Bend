@@ -56,6 +56,14 @@ Here we are defining 'two' as the number 2:
 two = 2
 ```
 
+Numbers can also be written as binary or hexadecimal by using the prefix `0b` and `0x` respectively.  
+You can use `_` as a digit separator, it can be used on large numbers to make them more readable:
+```rs
+decimal =     1194684
+binary =      0b100_100_011_101_010_111_100
+hexadecimal = 0x123_abc
+```
+
 Currently, the only supported type of machine numbers are unsigned 60-bit integers.  
 
 A lambda where the body is the variable `x`:
