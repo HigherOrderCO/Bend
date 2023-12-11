@@ -56,6 +56,16 @@ Here we are defining 'two' as the number 2:
 two = 2
 ```
 
+Numbers can also be written as binary or hexadecimal by using the prefix `0b` and `0x` respectively.  
+You can use `_` as a digit separator, it can be used on large numbers to make them more readable:
+```rs
+decimal =     1194684
+binary =      0b100_100_011_101_010_111_100
+hexadecimal = 0x123_abc
+```
+
+Currently, the only supported type of machine numbers are unsigned 60-bit integers.  
+
 A lambda where the body is the variable `x`:
 ```rs
 id = λx x
@@ -65,7 +75,7 @@ Operations can handle just 2 terms at time:
 ```rs
 some_val = (+ (+ 7 4) (* 2 3))
 ```
-The current operations include `+, -, *, /, %, ==, !=, <, >, &, |, ^, ~, <<, >>`.
+The current operations include `+, -, *, /, %, ==, !=, <, >, <=, >=, &, |, ^, ~, <<, >>`.
 
 A let term binds some value to the next term, in this case `(* result 2)`:
 ```rs
@@ -77,7 +87,7 @@ It is possible to define tuples:
 tup = (2, 2)
 ```
 
-And pattern-match tuples with let:
+And destructuring tuples with `let`:
 ```rs
 let (x, y) = tup; (+ x y)
 ```
@@ -106,15 +116,67 @@ This term will reduce to:
 
 A match syntax for machine numbers.
 We match the case 0 and the case where the number is greater
-than 0, p binds the value of the matching number - 1:
+than 0, if `n` is the matched variable, `n-1` binds the value of the number - 1:
 ```rs
-to_church = λn match n {
-  0: λf λx x;
-  1+p: λf λx (f (to_church p f x))
-}
+Number.to_church = λn λf λx 
+  match n {
+    0: x
+    +: (f (Number.to_church n-1 f x))
+  }
 ```
 
-## Terms to Nodes
+It is possible to define Data types using `data`.  
+If a constructor has any arguments, parenthesis are necessary around it:
+```rs
+data Option = (Some val) | None
+```
+
+If the data type has a single constructor, it can be destructured using `let`:
+```rs
+data Boxed = (Box val)
+
+let (Box value) = boxed; value
+```
+
+Otherwise, there are two pattern syntaxes for matching on data types.  
+One which binds implicitly the matched variable name plus `.` and the fields names on each constructor:
+
+```rs
+Option.map = λoption λf
+  match option {
+    Some: (Some (f option.val))
+    None: None
+  }
+```
+
+And another one which deconstructs the matched variable with explicit bindings:
+
+```rs
+Option.map = λoption λf
+  match option {
+    (Some value): (Some (f value))
+    (None): None
+  }
+```
+
+Rules can also have patterns.
+It functions like match expressions with explicit bindings:
+
+```rs
+(Option.map (Some value) f) = (Some (f value))
+(Option.map None f) = None
+```
+
+But with the extra ability to match on multiple values at once:
+
+```rs
+data Boolean = True | False
+
+(Option.is_both_some (Some lft_val) (Some rgt_val)) = True
+(Option.is_both_some lft rgt) = False
+```
+
+## Compilation of Terms to HVM-core
 
 How terms are compiled into interaction net nodes?
 
@@ -166,15 +228,10 @@ ToMachine = λn (n ToMachine0 0)
 Definitions are lazy in the runtime. Lifting lambda terms to new definitions will prevent infinite expansion.
 
 Consider this code:
-```hs
+```rs
 Ch_2 = λf λx (f (f x))
 ```
 As you can see the variable `f` is used more than once, so HVM-Lang optimizes this and generates a duplication tree.
-```
+```rs
 Ch_2 = λf λx dup f0 f0_ = f; dup f1 f1_ = f0_ = (f0 (f1 x))
 ```
-
-### Planned features
-
-- Data types
-- Pattern matching
