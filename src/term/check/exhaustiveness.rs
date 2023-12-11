@@ -70,30 +70,35 @@ fn check_pattern(
         check_pattern(&mut match_path, adts, rules, &types[1 ..], rules_to_check, def_name)?
       }
       Type::Num => {
-        let mut zeros = 0;
-        let mut succs = 0;
-        for rule in &rules_to_check {
-          let pat = &rules[*rule].pats[match_path.len()];
-          if let Pattern::Num(n) = pat {
-            match n {
-              MatchNum::Zero => zeros += 1,
-              MatchNum::Succ(_) => succs += 1,
+        let mut next_rules_to_check: BTreeMap<Name, Vec<usize>> =
+          BTreeMap::from([(Name::new("0"), vec![]), (Name::new("+"), vec![])]);
+        for rule_idx in rules_to_check {
+          let pat = &rules[rule_idx].pats[match_path.len()];
+          match pat {
+            Pattern::Num(MatchNum::Zero) => {
+              next_rules_to_check.get_mut(&Name(format!("0"))).unwrap().push(rule_idx);
             }
-          } else {
-            unreachable!()
+            Pattern::Num(MatchNum::Succ(..)) => {
+              next_rules_to_check.get_mut(&Name(format!("+"))).unwrap().push(rule_idx);
+            }
+            other => {
+              return Err(format!("Expected a number but found '{other}' at definition '{def_name}'."));
+            }
           }
         }
-        let num = if zeros > succs { MatchNum::Succ(None) } else { MatchNum::Zero };
-        let num = Pattern::Num(num);
-        if zeros != succs {
-          return Err(format!(
-            "Non-exhaustive pattern at definition '{}'. Number pattern '{}' not covered.",
-            def_name, num
-          ));
-        } else {
-          let mut match_path = match_path.clone();
-          match_path.push(Pattern::Num(MatchNum::Zero));
-          check_pattern(&mut match_path, adts, rules, &types[1 ..], rules_to_check, def_name)?
+        for (num, rules_to_check) in next_rules_to_check {
+          if rules_to_check.is_empty() {
+            return Err(format!(
+              "Non-exhaustive pattern at definition '{}'. Number pattern '{}' not covered at position {}.",
+              def_name,
+              num,
+              match_path.len()
+            ));
+          } else {
+            let mut match_path = match_path.clone();
+            match_path.push(Pattern::Var(Some(num)));
+            check_pattern(&mut match_path, adts, rules, &types[1 ..], rules_to_check, def_name)?;
+          }
         }
       }
     }
