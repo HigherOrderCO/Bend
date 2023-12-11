@@ -92,19 +92,60 @@ And destructuring tuples with `let`:
 let (x, y) = tup; (+ x y)
 ```
 
-Term duplication is possible using `dup`:
+Term duplication is done automatically when a variable is used more than once. But it's possible to manually duplicate a term using `dup`:
 ```rs
 // the number 2 in church encoding using dup.
 ch2 = λf λx dup f1 f2 = f; (f1 (f2 x))
-
-/// a tagged '#i' dup
-id_id = dup #i id1 id2 = λx x; (id1 id2)
 
 // the number 3 in church encoding using dup.
 ch3 = λf λx dup f0 f1 = f; dup f2 f3 = f0; (f1 (f2 (f3 x)))
 ```
 
-It is possible to use channels, the variable occur outside it's body:
+A `sup` is a superposition of two values, it is defined using curly brackets with two terms inside
+```rs
+sup = {3 7}
+```
+
+Sups can be used anywhere a value is expected, if anything interacts with the superposition, the result is the superposition of that interaction on both the possible values:
+
+```rs
+mul = λa λb (* a b)
+result     = (mul 2 5)         // returns 10
+result_sup = (mul 2 {5 7})     // returns {10 14}
+multi_sup  = (mul {2 3} {5 7}) // returns {{10 14} {15 21}}
+```
+
+To access both values of a superposition, `dups` with labels are needed.  
+A `dup` generally just duplicates the term it points to:
+
+```rs
+// each dup variable now has a copy of the {1 2} superposition
+dup x1 x2 = {1 2}
+```
+
+Both `dups` and `sups` support labels, that is, a field starting with `#` to identify their counterpart:
+```rs
+// here, x1 now contains the value of 1, and x2 the value of 2
+dup #i x1 x2 = {#i 1 2}
+```
+
+Due to how dups are compiled, dup tags between two interacting terms should not contain the same label. For example, an application of the church numeral 2 with itself:
+
+```rs
+c2 = λf λx dup f1 f2 = f; (f1 (f2 x))
+main = (c2 c2)
+```
+
+To avoid label collision, HVM-Lang automatically generates new dup labels for each dup in the code. But with cases like the example above, when the interacting dups comes from the same place, the result is an invalid reduction.  
+
+To fix the problem, its necessary to re-create the term so that a new label is assigned, or manually assign one:
+```rs
+c2  = λf λx dup        f1 f2 = f; (f1 (f2 x))
+c2_ = λf λx dup #label f1 f2 = f; (f1 (f2 x))
+main = (c2 c2_)
+```
+
+It is possible to use channels, the channel variable can occur outside it's body:
 ```rs
 ($a (λ$a 1 λb b))
 ```
@@ -175,6 +216,40 @@ data Boolean = True | False
 (Option.is_both_some (Some lft_val) (Some rgt_val)) = True
 (Option.is_both_some lft rgt) = False
 ```
+
+## Advanced
+
+Similarly to dups and sups, lambdas and applications can have labels too.  
+For example, data types can be encoded as tagged lambdas:
+```rs
+// data Bool = T | F
+T = @#Bool t @#Bool f t
+F = @#Bool t @#Bool f f
+
+// data List = (Cons x xs) | Nil
+Cons = @x @xs @#List c @#List n (#List c x xs)
+Nil  =        @#List c @#List n n
+```
+
+When encoding the pattern matching, the application can then use the same label:
+
+```rs
+// not = @bool match bool { T: (F) F: (T) } 
+not = @bool (#Bool bool F T)
+```
+
+This allows, in some limited* scenarios, automatic vectorization:
+```rs
+// vectorizes to: (Cons F (Cons T (Cons F Nil)))
+main = (not (Cons T (Cons F (Cons T Nil))))
+```
+
+The tagged lambda and applications are compiled to `dup` `inet` nodes with different tag values for each label. This allows for different commutation rules, check [HVM-Core](https://github.com/HigherOrderCO/hvm-core/tree/main#language) to learn more about it.
+
+### *limitations:
+- When using a built-in ADT (created using the `data` keyword), it must not contain fields 
+- The function must not be recursive
+- There must not be labels in common between the function and what you want to vectorize over
 
 ## Compilation of Terms to HVM-core
 
