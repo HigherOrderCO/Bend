@@ -66,10 +66,14 @@ fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
     match pat {
       Pattern::Var(nam) => body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) },
       Pattern::Ctr(_, vars) => {
-        for var in vars.iter().rev() {
-          let Pattern::Var(nam) = var else { unreachable!() };
-          body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) }
-        }
+        body = make_rule_body(body, vars);
+        // for var in vars.iter().rev() {
+        //   let Pattern::Var(nam) = var else {
+
+        //     unreachable!()
+        //   };
+        //   body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) }
+        // }
       }
       Pattern::Num(MatchNum::Zero) => (),
       Pattern::Num(MatchNum::Succ(s)) => {

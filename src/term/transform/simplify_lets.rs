@@ -1,60 +1,47 @@
-use crate::term::{Book, Name, Pattern, Term};
+use std::collections::BTreeMap;
 
-fn extract_tup(is_fst: bool, count: &mut usize, pat: &mut Pattern, paths: &mut Vec<(Name, Pattern)>) {
-  if let Pattern::Tup(fst, snd) = pat {
-    extract_tup(false, count, fst, paths);
-    extract_tup(false, count, snd, paths);
-    if !is_fst {
-      let old_pat = pat.clone();
-      let name = Name(format!("%x{count}"));
-      *count += 1;
-      *pat = Pattern::Var(Some(name.clone()));
-      paths.push((name, old_pat));
-    }
-  }
-}
-
-fn extract(pat: &mut Pattern) -> Vec<(Name, Pattern)> {
-  let mut ret = Vec::new();
-  extract_tup(true, &mut 0, pat, &mut ret);
-  ret
-}
+use crate::term::{Book, Name, Term, Definition, Tag, Rule, DefId, DefNames, Pattern};
 
 impl Term {
-  pub fn simplify_let(&mut self) {
+  pub fn simplify_let(&mut self, def_names: &mut DefNames, counter: &mut usize, new_defs: &mut BTreeMap<DefId, Definition>) {
     match self {
-      Term::Let { .. } => {
-        let Term::Let { mut pat, mut val, mut nxt } = std::mem::take(self) else { unreachable!() };
-        let mut extracted = extract(&mut pat);
-        extracted.reverse();
-        while let Some((nam, extracted)) = extracted.pop() {
-          let val = Box::new(Term::Var { nam });
-          nxt = Box::new(Term::Let { pat: extracted, val, nxt })
-        }
-        val.simplify_let();
-        nxt.simplify_let();
-        *self = Term::Let { pat, val, nxt }
+      Term::Let { pat: Pattern::Tup(..), .. } => {
+        let Term::Let { pat, mut val, mut nxt } = std::mem::take(self) else { unreachable!() };
+        val.simplify_let(def_names, counter, new_defs);
+        nxt.simplify_let(def_names, counter, new_defs);
+        let new_name = make_let_name(counter);
+        let def_id = def_names.insert(new_name.clone());
+        *counter += 1;
+        *self = Term::App {
+          tag: Tag::Static,
+          fun: Box::new(Term::Var { nam: new_name }),
+          arg: val.clone(),
+        };
+        let rule = Rule { pats: vec![pat.clone()], body: *nxt };
+        new_defs.insert(def_id, Definition { def_id, rules: vec![rule] });
+      },
+      Term::Let { val, nxt, .. } => {
+        val.simplify_let(def_names, counter, new_defs);
+        nxt.simplify_let(def_names, counter, new_defs);
+      },
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+        bod.simplify_let(def_names, counter, new_defs);
+      },
+      Term::App { fun, arg, .. } => {
+        fun.simplify_let(def_names, counter, new_defs);
+        arg.simplify_let(def_names, counter, new_defs);
       },
       Term::Dup { val, nxt, .. } => {
-        val.simplify_let();
-        nxt.simplify_let();
+        val.simplify_let(def_names, counter, new_defs);
+        nxt.simplify_let(def_names, counter, new_defs);
       },
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.simplify_let(),
-      Term::App { fun, arg } => {
-        fun.simplify_let();
-        arg.simplify_let();
+      Term::Tup { fst, snd } | Term::Sup { fst, snd, .. } | Term::Opx { fst, snd, .. } => {
+        fst.simplify_let(def_names, counter, new_defs);
+        snd.simplify_let(def_names, counter, new_defs);
       },
-      Term::Tup { fst, snd } => {
-        fst.simplify_let();
-        snd.simplify_let();
-      },
-      Term::Sup { fst, snd, .. } | Term::Opx { fst, snd, .. } => {
-        fst.simplify_let();
-        snd.simplify_let()
-      },
-      Term::Match { arms, .. } => {
-        for arm in arms {
-          arm.1.simplify_let();
+      Term::Match { scrutinee: _, arms } => {
+        for (_, bod) in arms {
+          bod.simplify_let(def_names, counter, new_defs);
         }
       },
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => (),
@@ -62,12 +49,19 @@ impl Term {
   }
 }
 
+fn make_let_name(counter: &usize) -> Name {
+  Name(format!("let%{counter}"))
+}
+
 impl Book {
   pub fn simplify_lets(&mut self) {
+    let mut new_defs = BTreeMap::new();
+    let let_counter = &mut 0;
     for def in self.defs.values_mut() {
       for rule in def.rules.iter_mut() {
-        rule.body.simplify_let();
+        rule.body.simplify_let(&mut self.def_names, let_counter, &mut new_defs);
       }
     }
+    self.defs.extend(new_defs);
   }
 }

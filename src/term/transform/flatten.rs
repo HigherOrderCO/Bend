@@ -36,7 +36,10 @@ impl Pattern {
       Pattern::Ctr(_, args) => args.iter().any(|arg| arg.is_matchable()),
       Pattern::Var(_) => false,
       Pattern::Num(_) => false,
-      Pattern::Tup(_, _) => false,
+      Pattern::Tup(fst, snd) => match (&**fst, &**snd) {
+        (Pattern::Tup(..), _) | (_, Pattern::Tup(..)) => true,
+        _ => false,
+      },
     }
   }
 
@@ -66,9 +69,9 @@ fn matches_together(a: &[Pattern], b: &[Pattern]) -> (bool, bool) {
           same_shape = false;
         }
       }
-      (Pattern::Tup(..), Pattern::Tup(..)) => {
-        todo!()
-      }
+      // (Pattern::Tup(..), Pattern::Tup(..)) => {
+        // todo!()
+      // }
       (
         Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
         Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
@@ -153,17 +156,25 @@ fn make_old_rule(pats: &[Pattern], new_split_def_id: DefId) -> Rule {
         }
         new_pats.push(Pattern::Ctr(arg_name.clone(), new_arg_args));
       }
-      Pattern::Tup(box Pattern::Var(a), box Pattern::Var(b)) => {
-        if let Some(nam) = a {
-          new_pats.push(Pattern::Var(Some(nam.clone())));
-          new_body_args.push(Term::Var { nam: nam.clone() });
-        }
-        if let Some(nam) = b {
-          new_pats.push(Pattern::Var(Some(nam.clone())));
-          new_body_args.push(Term::Var { nam: nam.clone() });
-        }
-      }
-      Pattern::Tup(..) => todo!(),
+      // Pattern::Tup(box Pattern::Var(a), box Pattern::Var(b)) => {
+      //   if let Some(nam) = a {
+      //     new_pats.push(Pattern::Var(Some(nam.clone())));
+      //     new_body_args.push(Term::Var { nam: nam.clone() });
+      //   }
+      //   if let Some(nam) = b {
+      //     new_pats.push(Pattern::Var(Some(nam.clone())));
+      //     new_body_args.push(Term::Var { nam: nam.clone() });
+      //   }
+      // }
+      Pattern::Tup(_fst, _snd) => {
+        let a = make_var_name(&mut var_count);
+        let b = make_var_name(&mut var_count);
+        new_body_args.push(Term::Var { nam: a.clone() });
+        new_body_args.push(Term::Var { nam: b.clone() });
+        let a = Pattern::Var(Some(a));
+        let b = Pattern::Var(Some(b));
+        new_pats.push(Pattern::Tup(a.into(), b.into()));
+      },
       Pattern::Var(None) => todo!(),
       Pattern::Var(Some(nam)) => {
         new_pats.push(Pattern::Var(Some(nam.clone())));
@@ -234,6 +245,10 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_pats.push(Pattern::Var(Some(snd)));
         }
       }
+      (Pattern::Tup(fst, snd), Pattern::Tup(..)) => {
+        new_pats.push(*fst.clone());
+        new_pats.push(*snd.clone());
+      },
       (_, Pattern::Tup(..)) => todo!(),
       (Pattern::Tup(..), _) => todo!(),
       (Pattern::Var(..), _) => {
