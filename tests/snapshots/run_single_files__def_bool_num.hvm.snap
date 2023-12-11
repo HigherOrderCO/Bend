@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_single_files/def_bool_num.hvm
+---
+Non-exhaustive pattern at definition 'go'. Number pattern '0' not covered at position 1.

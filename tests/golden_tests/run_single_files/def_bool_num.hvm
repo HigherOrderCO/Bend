@@ -1,0 +1,6 @@
+data bool = true | false
+
+go true  0   = 1
+go false 1+* = 0
+
+main = (go true 1)
