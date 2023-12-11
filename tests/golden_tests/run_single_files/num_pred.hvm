@@ -1,0 +1,4 @@
+Pred 0      = 0
+Pred 1+pred = pred
+
+Main = (Pred 43)
