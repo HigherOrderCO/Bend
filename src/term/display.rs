@@ -1,7 +1,5 @@
 use std::fmt::{self, Display};
 
-use itertools::Itertools;
-
 use crate::term::Name;
 
 use super::{Book, DefId, DefNames, Definition, MatchNum, Op, Pattern, Rule, Tag, Term};
@@ -101,7 +99,7 @@ impl fmt::Display for Pattern {
     match self {
       Pattern::Var(None) => write!(f, "*"),
       Pattern::Var(Some(nam)) => write!(f, "{nam}"),
-      Pattern::Ctr(nam, pats) => write!(f, "({}{})", nam, pats.iter().map(|p| format!(" {p}")).join("")),
+      Pattern::Ctr(nam, pats) => write!(f, "({}{})", nam, DisplayJoin(|| pats.iter().map(|p| display!(" {p}")), "")),
       Pattern::Num(num) => write!(f, "{num}"),
       Pattern::Tup(fst, snd) => write!(f, "({}, {})", fst, snd,),
     }

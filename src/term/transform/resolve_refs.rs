@@ -34,8 +34,20 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       resolve_refs(nxt, def_names, scope);
       pop_scope(nam.clone(), scope);
     }
-    Term::Dup { tag: _, fst, snd, val, nxt }
-    | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
+    Term::Let { pat, val, nxt } => {
+      resolve_refs(val, def_names, scope);
+
+      for nam in pat.names() {
+        push_scope(Some(nam.clone()), scope)
+      }
+
+      resolve_refs(nxt, def_names, scope);
+
+      for nam in pat.names() {
+        pop_scope(Some(nam.clone()), scope)
+      }
+    }
+    Term::Dup { tag: _, fst, snd, val, nxt } => {
       resolve_refs(val, def_names, scope);
       push_scope(fst.clone(), scope);
       push_scope(snd.clone(), scope);
@@ -43,24 +55,6 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
       pop_scope(fst.clone(), scope);
       pop_scope(snd.clone(), scope);
     }
-    Term::Let { pat: Pattern::Ctr(_, pats), val, nxt } => {
-      resolve_refs(val, def_names, scope);
-
-      for pat in pats.iter() {
-        for nam in pat.names() {
-          push_scope(Some(nam.clone()), scope)
-        }
-      }
-
-      resolve_refs(nxt, def_names, scope);
-
-      for pat in pats {
-        for nam in pat.names() {
-          pop_scope(Some(nam.clone()), scope)
-        }
-      }
-    }
-    Term::Let { .. } => unreachable!(),
 
     // If variable not defined, we check if it's a ref and swap if it is.
     Term::Var { nam } => {

@@ -139,7 +139,6 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Def
   book.resolve_ctrs_in_pats();
   book.generate_scott_adts();
   book.check_unbound_pats()?;
-  book.simplify_lets();
   book.flatten_rules();
   book.resolve_refs();
   book.simplify_matches()?;

@@ -203,8 +203,8 @@ where
     // pat: term
     let match_arm = pattern()
       .validate(|this, span, emit| {
-        if matches!(&this, Pattern::Tup(..) | Pattern::Num(_)) {
-          emit.emit(Rich::custom(span, "Number and Tuples not supported in match arm."));
+        if matches!(&this, Pattern::Num(_)) {
+          emit.emit(Rich::custom(span, "Number not supported in match arm."));
         }
         this
       })
