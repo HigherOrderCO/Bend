@@ -60,7 +60,7 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
         }
       }
     }
-    p@Term::Let { .. } => unreachable!("{p:?}"),
+    Term::Let { .. } => unreachable!(),
 
     // If variable not defined, we check if it's a ref and swap if it is.
     Term::Var { nam } => {
