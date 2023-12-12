@@ -158,16 +158,6 @@ c2_ = λf λx dup #label f1 f2 = f; (f1 (f2 x))
 main = (c2 c2_)
 ```
 
-It is possible to use channels, the channel variable can occur outside it's body:
-```rs
-($a (λ$a 1 λb b))
-```
-This term will reduce to:
-```
-(λb b 1)
-1
-```
-
 A match syntax for machine numbers.
 We match the case 0 and the case where the number is greater
 than 0, if `n` is the matched variable, `n-1` binds the value of the number - 1:
@@ -231,6 +221,20 @@ data Boolean = True | False
 ```
 
 ## Advanced
+
+### Scopeless Lambdas
+
+It is possible have lambdas whose variables can occour outside of their scopes. To use it, add `$` on the lambda declaration and on the variable using it:
+```rs
+($a (λ$a 1 λb b))
+```
+This term will reduce with the following steps:
+```rs
+(λb b 1)
+1
+```
+
+### Tagged Lambdas
 
 Similarly to dups and sups, lambdas and applications can have labels too.  
 For example, data types can be encoded as tagged lambdas:
