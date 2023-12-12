@@ -203,8 +203,8 @@ where
     // pat: term
     let match_arm = pattern()
       .validate(|this, span, emit| {
-        if matches!(&this, Pattern::Tup(..) | Pattern::Num(_)) {
-          emit.emit(Rich::custom(span, "Number and Tuples not supported in match arm."));
+        if matches!(&this, Pattern::Num(_)) {
+          emit.emit(Rich::custom(span, "Number not supported in match arm."));
         }
         this
       })
@@ -292,11 +292,12 @@ where
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
-    let tup = name_or_era()
+    let tup = pattern
+      .clone()
       .then_ignore(just(Token::Comma))
-      .then(name_or_era())
+      .then(pattern.clone())
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|(fst, snd)| Pattern::Tup(fst, snd))
+      .map(|(fst, snd)| Pattern::Tup(Box::new(fst), Box::new(snd)))
       .boxed();
 
     let zero = select!(Token::Num(0) => Pattern::Num(MatchNum::Zero));

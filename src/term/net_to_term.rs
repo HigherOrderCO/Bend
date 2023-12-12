@@ -252,7 +252,11 @@ impl Term {
       let Split { tag, fst, snd, val } = std::mem::take(split);
       let nxt = Box::new(std::mem::take(self));
       *self = match tag {
-        None => Term::Let { pat: Pattern::Tup(fst, snd), val: Box::new(val), nxt },
+        None => Term::Let {
+          pat: Pattern::Tup(Box::new(Pattern::Var(fst)), Box::new(Pattern::Var(snd))),
+          val: Box::new(val),
+          nxt,
+        },
         Some(tag) => Term::Dup { tag, fst, snd, val: Box::new(val), nxt },
       };
       None

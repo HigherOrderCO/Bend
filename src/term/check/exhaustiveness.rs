@@ -66,7 +66,8 @@ fn check_pattern(
       }
       Type::Tup => {
         let mut match_path = match_path.clone();
-        match_path.push(Pattern::Tup(Some(Name::new("_")), Some(Name::new("_"))));
+        let wildcard = Some(Name::new("_"));
+        match_path.push(Pattern::Tup(Pattern::Var(wildcard.clone()).into(), Pattern::Var(wildcard).into()));
         check_pattern(&mut match_path, adts, rules, &types[1 ..], rules_to_check, def_name)?
       }
       Type::Num => {

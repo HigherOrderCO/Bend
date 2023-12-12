@@ -4,7 +4,7 @@
 use crate::term::DefNames;
 use hvmc::{
   ast::{name_to_val, net_from_runtime, net_to_runtime, runtime_net_to_runtime_def},
-  run::{APtr, Heap, NUM, OP2, REF, ROOT},
+  run::{APtr, Heap, OP2, REF, ROOT},
 };
 use std::collections::BTreeMap;
 

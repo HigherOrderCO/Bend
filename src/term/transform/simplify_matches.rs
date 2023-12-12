@@ -143,6 +143,8 @@ impl Term {
 
         if matches!(arms[0], (Pattern::Num(_), _)) {
           *self = match_native(nam, arms, def_name, book, *match_count);
+        } else if matches!(arms[0], (Pattern::Tup(..), _)) {
+          *self = match_tup(nam, arms[0].clone(), def_name, book, *match_count);
         } else {
           let rules: Vec<_> = arms
             .iter()
@@ -163,8 +165,8 @@ impl Term {
         bod.simplify_matches(def_name, book, match_count)?;
       }
 
-      // Desugar lets with constructors into `Term::Match`
-      Term::Let { pat: Pattern::Ctr(_, _), .. } => {
+      // Desugar lets with constructors or tuples into `Term::Match`
+      Term::Let { pat: Pattern::Ctr(_, _) | Pattern::Tup(..), .. } => {
         let Term::Let { pat, val, nxt } = std::mem::take(self) else { unreachable!() };
         let arms = vec![(pat, *nxt)];
 
@@ -316,6 +318,29 @@ fn match_adt_app(
   });
 
   Ok(app)
+}
+
+fn match_tup(
+  scrutinee: Name,
+  (tup_pat, body): (Pattern, Term),
+  def_name: &Name,
+  book: &mut MatchesBook,
+  match_count: usize,
+) -> Term {
+  let rule = Rule { pats: vec![tup_pat], body };
+
+  let new_name = make_def_name(def_name, &Name::new("let"), match_count);
+  let def_id = book.def_names.insert(new_name);
+  let def = Definition { def_id, rules: vec![rule] };
+  book.new_defs.insert(def_id, def);
+
+  let scrutinee_app = Term::App {
+    tag: Tag::Static,
+    fun: Box::new(Term::Ref { def_id }),
+    arg: Box::new(Term::Var { nam: scrutinee }),
+  };
+
+  scrutinee_app
 }
 
 fn vec_name_to_pat(scrutinee: &Name, names: &[Name]) -> Vec<Pattern> {

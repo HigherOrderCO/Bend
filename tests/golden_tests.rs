@@ -161,6 +161,7 @@ fn encode_pattern_match() {
     book.generate_scott_adts();
     book.check_unbound_pats()?;
     book.flatten_rules();
+    book.simplify_matches()?;
     let def_types = book.infer_def_types()?;
     book.check_exhaustive_patterns(&def_types)?;
     book.encode_pattern_matching_functions(&def_types);

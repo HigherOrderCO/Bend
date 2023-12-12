@@ -136,7 +136,7 @@ pub enum Pattern {
   Var(Option<Name>),
   Ctr(Name, Vec<Pattern>),
   Num(MatchNum),
-  Tup(Option<Name>, Option<Name>),
+  Tup(Box<Pattern>, Box<Pattern>),
 }
 
 impl Pattern {
@@ -152,9 +152,7 @@ impl Pattern {
         ret
       }
       Pattern::Num(..) => false,
-      Pattern::Tup(fst, snd) => {
-        fst.as_ref().map_or(false, |fst| fst == name) || snd.as_ref().map_or(false, |snd| snd == name)
-      }
+      Pattern::Tup(fst, snd) => fst.occurs(name) || snd.occurs(name),
     }
   }
 
@@ -164,8 +162,8 @@ impl Pattern {
         Pattern::Var(nam) => set.push(nam),
         Pattern::Ctr(_, pats) => pats.iter().for_each(|pat| go(pat, set)),
         Pattern::Tup(fst, snd) => {
-          set.push(fst);
-          set.push(snd);
+          go(fst, set);
+          go(snd, set);
         }
         Pattern::Num(_) => {}
       }
@@ -330,7 +328,7 @@ impl Term {
       Term::Lnk { .. } => (),
       Term::Let { pat, val, nxt } => {
         val.subst(from, to);
-        if !pat.occurs(from) {
+        if !pat.occurs(&from) {
           nxt.subst(from, to);
         }
       }

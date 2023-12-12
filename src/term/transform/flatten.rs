@@ -36,7 +36,10 @@ impl Pattern {
       Pattern::Ctr(_, args) => args.iter().any(|arg| arg.is_matchable()),
       Pattern::Var(_) => false,
       Pattern::Num(_) => false,
-      Pattern::Tup(_, _) => false,
+      Pattern::Tup(fst, snd) => match (&**fst, &**snd) {
+        (Pattern::Tup(..), _) | (_, Pattern::Tup(..)) => true,
+        _ => false,
+      },
     }
   }
 
@@ -65,9 +68,6 @@ fn matches_together(a: &[Pattern], b: &[Pattern]) -> (bool, bool) {
           matches_together = false;
           same_shape = false;
         }
-      }
-      (Pattern::Tup(..), Pattern::Tup(..)) => {
-        todo!()
       }
       (
         Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
@@ -153,15 +153,14 @@ fn make_old_rule(pats: &[Pattern], new_split_def_id: DefId) -> Rule {
         }
         new_pats.push(Pattern::Ctr(arg_name.clone(), new_arg_args));
       }
-      Pattern::Tup(a, b) => {
-        if let Some(nam) = a {
-          new_pats.push(Pattern::Var(Some(nam.clone())));
-          new_body_args.push(Term::Var { nam: nam.clone() });
-        }
-        if let Some(nam) = b {
-          new_pats.push(Pattern::Var(Some(nam.clone())));
-          new_body_args.push(Term::Var { nam: nam.clone() });
-        }
+      Pattern::Tup(_, _) => {
+        let fst = make_var_name(&mut var_count);
+        let snd = make_var_name(&mut var_count);
+        new_body_args.push(Term::Var { nam: fst.clone() });
+        new_body_args.push(Term::Var { nam: snd.clone() });
+        let fst = Pattern::Var(Some(fst));
+        let snd = Pattern::Var(Some(snd));
+        new_pats.push(Pattern::Tup(Box::new(fst), Box::new(snd)));
       }
       Pattern::Var(None) => todo!(),
       Pattern::Var(Some(nam)) => {
@@ -214,7 +213,10 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         // How to do this with this kind of number pattern? Subst with a match?
         todo!();
       }
-      (Pattern::Tup(a_fst, a_snd), Pattern::Tup(b_fst, b_snd)) => {
+      (
+        Pattern::Tup(box Pattern::Var(a_fst), box Pattern::Var(a_snd)),
+        Pattern::Tup(box Pattern::Var(b_fst), box Pattern::Var(b_snd)),
+      ) => {
         if let Some(fst) = a_fst.clone().or(b_fst.clone()) {
           new_pats.push(Pattern::Var(Some(fst)));
         }
@@ -222,7 +224,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_pats.push(Pattern::Var(Some(snd)));
         }
       }
-      (Pattern::Tup(fst, snd), Pattern::Var(_)) => {
+      (Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), Pattern::Var(_)) => {
         if let Some(fst) = fst.clone() {
           new_pats.push(Pattern::Var(Some(fst)));
         }
@@ -230,13 +232,16 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_pats.push(Pattern::Var(Some(snd)));
         }
       }
+      (Pattern::Tup(fst, snd), Pattern::Tup(..)) => {
+        new_pats.push(*fst.clone());
+        new_pats.push(*snd.clone());
+      }
+      (_, Pattern::Tup(..)) => todo!(),
+      (Pattern::Tup(..), _) => todo!(),
       (Pattern::Var(..), _) => {
         new_pats.push(other_arg.clone());
       }
-      (
-        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
-        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
-      ) => {
+      (Pattern::Ctr(..) | Pattern::Num(..), Pattern::Ctr(..) | Pattern::Num(..)) => {
         if std::mem::discriminant(rule_arg) != std::mem::discriminant(other_arg) {
           unreachable!()
         }
