@@ -71,6 +71,19 @@ A lambda where the body is the variable `x`:
 id = λx x
 ```
 
+Lambdas can also be defined using `@`.  
+To not bind the value of the lambda to any name, use `*`:
+```hs
+True  = @t @* t
+False = λ* λf f
+```
+
+`*` can also be used to define an eraser term.  
+It compiles to an `inet` node with only one port that deletes anything that’s plugged into it.
+```rs
+era = *
+```
+
 Operations can handle just 2 terms at time:
 ```rs
 some_val = (+ (+ 7 4) (* 2 3))
