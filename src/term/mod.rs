@@ -54,7 +54,7 @@ pub struct Rule {
 #[derive(Debug, Clone)]
 pub enum MatchNum {
   Zero,
-  Succ(Option<Name>),
+  Succ(Option<Option<Name>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -156,7 +156,7 @@ impl Pattern {
     }
   }
 
-  pub fn names(&self) -> impl Iterator<Item = &Name> {
+  pub fn names(&self) -> impl DoubleEndedIterator<Item = &Name> {
     fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Option<Name>>) {
       match pat {
         Pattern::Var(nam) => set.push(nam),
@@ -165,13 +165,58 @@ impl Pattern {
           go(fst, set);
           go(snd, set);
         }
+        Pattern::Num(MatchNum::Succ(Some(nam))) => {
+          set.push(nam);
+        }
         Pattern::Num(_) => {}
       }
     }
-
     let mut set = Vec::new();
     go(self, &mut set);
     set.into_iter().flat_map(|a| a.as_ref())
+  }
+
+  pub fn names_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Name> {
+    fn go<'a>(pat: &'a mut Pattern, set: &mut Vec<&'a mut Option<Name>>) {
+      match pat {
+        Pattern::Var(nam) => set.push(nam),
+        Pattern::Ctr(_, pats) => pats.iter_mut().for_each(|pat| go(pat, set)),
+        Pattern::Tup(fst, snd) => {
+          go(fst, set);
+          go(snd, set);
+        }
+        Pattern::Num(MatchNum::Succ(Some(nam))) => {
+          set.push(nam);
+        }
+        Pattern::Num(_) => {}
+      }
+    }
+    let mut set = Vec::new();
+    go(self, &mut set);
+    set.into_iter().flat_map(|a| a.as_mut())
+  }
+
+  pub fn is_detached_num_match(&self) -> bool {
+    if let Pattern::Num(num) = self {
+      match num {
+        MatchNum::Zero => true,
+        MatchNum::Succ(None) => true,
+        MatchNum::Succ(Some(_)) => false,
+      }
+    } else {
+      false
+    }
+  }
+
+  pub fn is_flat(&self) -> bool {
+    match self {
+      Pattern::Var(_) => true,
+      Pattern::Ctr(_, args) => args.iter().all(|arg| matches!(arg, Pattern::Var(_))),
+      Pattern::Num(_) => true,
+      Pattern::Tup(fst, snd) => {
+        matches!(fst.as_ref(), Pattern::Var(_)) && matches!(snd.as_ref(), Pattern::Var(_))
+      }
+    }
   }
 }
 
@@ -202,7 +247,7 @@ pub struct Adt {
   pub ctrs: IndexMap<Name, Vec<Name>>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, Default)]
 pub struct Name(pub String);
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, Default)]
@@ -328,7 +373,7 @@ impl Term {
       Term::Lnk { .. } => (),
       Term::Let { pat, val, nxt } => {
         val.subst(from, to);
-        if !pat.occurs(&from) {
+        if !pat.occurs(from) {
           nxt.subst(from, to);
         }
       }
@@ -344,7 +389,7 @@ impl Term {
         for (rule, term) in arms {
           let can_subst;
 
-          if let Pattern::Num(MatchNum::Succ(Some(nam))) = rule {
+          if let Pattern::Num(MatchNum::Succ(Some(Some(nam)))) = rule {
             can_subst = nam != from
           } else {
             can_subst = true
@@ -419,7 +464,7 @@ impl Term {
             let mut new_scope = IndexMap::new();
             go(term, &mut new_scope);
 
-            if let Pattern::Num(MatchNum::Succ(Some(nam))) = rule {
+            if let Pattern::Num(MatchNum::Succ(Some(Some(nam)))) = rule {
               new_scope.remove(nam);
             }
 
@@ -452,7 +497,7 @@ impl Term {
         succ_label = Some(new_label);
       }
 
-      let succ = (Pattern::Num(MatchNum::Succ(succ_label)), succ_term);
+      let succ = (Pattern::Num(MatchNum::Succ(Some(succ_label))), succ_term);
       Term::Match { scrutinee: Box::new(scrutinee), arms: vec![zero, succ] }
     } else {
       let match_bind = succ_label.clone().unwrap_or_else(|| Name::new("*"));
@@ -463,7 +508,7 @@ impl Term {
         succ_label = Some(new_label);
       }
 
-      let succ = (Pattern::Num(MatchNum::Succ(succ_label)), succ_term);
+      let succ = (Pattern::Num(MatchNum::Succ(Some(succ_label))), succ_term);
 
       Term::Let {
         pat: Pattern::Var(Some(match_bind.clone())),
@@ -474,21 +519,6 @@ impl Term {
         }),
       }
     }
-  }
-}
-
-/// Returns the lambda representation of native number match arms
-pub fn native_match(arms: Vec<(Pattern, Term)>) -> (Term, Term) {
-  use MatchNum::*;
-
-  match &arms[..] {
-    [(Pattern::Num(Zero), zero), (Pattern::Num(Succ(nam)), succ)] => {
-      let zero = zero.clone();
-      let succ = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(succ.clone()) };
-      (zero, succ)
-    }
-    [(Pattern::Num(Zero), zero), (Pattern::Num(Zero), succ)] => (zero.clone(), succ.clone()),
-    _ => unreachable!(),
   }
 }
 

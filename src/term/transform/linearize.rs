@@ -68,7 +68,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
     Term::Match { scrutinee, arms } => {
       count_var_uses_in_term(scrutinee, uses);
       for (rule, term) in arms {
-        if let Pattern::Num(MatchNum::Succ(nam)) = rule {
+        if let Pattern::Num(MatchNum::Succ(Some(nam))) = rule {
           add_var(nam.as_ref(), uses)
         }
 
@@ -191,7 +191,9 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       term_to_affine(scrutinee, var_uses, let_bodies);
       for (rule, term) in arms {
         match rule {
-          Pattern::Num(MatchNum::Succ(nam)) => term_with_bind_to_affine(term, nam, var_uses, let_bodies),
+          Pattern::Num(MatchNum::Succ(Some(nam))) => {
+            term_with_bind_to_affine(term, nam, var_uses, let_bodies)
+          }
           Pattern::Num(_) => term_to_affine(term, var_uses, let_bodies),
           _ => unreachable!(),
         }

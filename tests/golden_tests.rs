@@ -1,6 +1,6 @@
 use hvmc::ast::{parse_net, show_net};
 use hvml::{
-  compile_book,
+  compile_book, encode_pattern_matching,
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
   term::{
@@ -146,7 +146,10 @@ fn flatten_rules() {
     book.check_shared_names()?;
     book.resolve_ctrs_in_pats();
     book.generate_scott_adts();
+    book.desugar_let_destructors();
+    book.desugar_implicit_match_binds();
     book.check_unbound_pats()?;
+    book.extract_matches()?;
     book.flatten_rules();
     Ok(book.to_string())
   })
@@ -157,14 +160,9 @@ fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
     book.check_shared_names()?;
-    book.resolve_ctrs_in_pats();
     book.generate_scott_adts();
-    book.check_unbound_pats()?;
-    book.flatten_rules();
-    book.simplify_matches()?;
-    let def_types = book.infer_def_types()?;
-    book.check_exhaustive_patterns(&def_types)?;
-    book.encode_pattern_matching_functions(&def_types);
+    book.resolve_refs();
+    encode_pattern_matching(&mut book)?;
     Ok(book.to_string())
   })
 }

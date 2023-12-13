@@ -136,15 +136,9 @@ pub fn run_book(
 pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<DefId, String> {
   let main = book.check_has_main()?;
   book.check_shared_names()?;
-  book.resolve_ctrs_in_pats();
   book.generate_scott_adts();
-  book.check_unbound_pats()?;
-  book.flatten_rules();
   book.resolve_refs();
-  book.simplify_matches()?;
-  let def_types = book.infer_def_types()?;
-  book.check_exhaustive_patterns(&def_types)?;
-  book.encode_pattern_matching_functions(&def_types);
+  encode_pattern_matching(book)?;
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();
@@ -155,6 +149,19 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Def
   book.simplify_ref_to_ref()?;
   book.prune(main);
   Ok(main)
+}
+
+pub fn encode_pattern_matching(book: &mut Book) -> Result<(), String> {
+  book.resolve_ctrs_in_pats();
+  book.check_unbound_pats()?;
+  book.desugar_let_destructors();
+  book.desugar_implicit_match_binds();
+  book.extract_matches()?;
+  book.flatten_rules();
+  let def_types = book.infer_def_types()?;
+  book.check_exhaustive_patterns(&def_types)?;
+  book.encode_pattern_matching_functions(&def_types);
+  Ok(())
 }
 
 fn debug_hook(net: &Net, book: &Book, hvmc_names: &HvmcNames, labels: &Labels, linear: bool) {

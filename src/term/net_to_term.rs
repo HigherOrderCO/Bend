@@ -387,7 +387,7 @@ impl Term {
         scrutinee.fix_names(id_counter, book);
 
         for (rule, term) in arms {
-          if let Pattern::Num(MatchNum::Succ(nam)) = rule {
+          if let Pattern::Num(MatchNum::Succ(Some(nam))) = rule {
             fix_name(nam, id_counter, term);
           }
 

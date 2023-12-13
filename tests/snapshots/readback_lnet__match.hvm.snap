@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/readback_lnet/match.hvm
 ---
-let b = 1; match b { 0: λa a; +: b-1 }
+let b = 1; match b { 0: λa a; +b-1: b-1 }

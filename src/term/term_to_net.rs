@@ -1,5 +1,8 @@
-use super::{native_match, Book, DefId, DefNames, Name, Op, Pattern, Tag, Term};
-use crate::net::{INet, NodeKind::*, Port, ROOT};
+use super::{Book, DefId, DefNames, Name, Op, Pattern, Tag, Term};
+use crate::{
+  net::{INet, NodeKind::*, Port, ROOT},
+  term::MatchNum,
+};
 use hvmc::{
   ast::{name_to_val, val_to_name},
   run::{Loc, Val},
@@ -156,14 +159,17 @@ impl<'a> EncodeTermState<'a> {
         let cond = self.encode_term(scrutinee, Port(if_, 0));
         self.link_local(Port(if_, 0), cond);
 
-        let (zero, succ) = native_match(arms.clone());
+        debug_assert!(matches!(arms[0].0, Pattern::Num(MatchNum::Zero)));
+        debug_assert!(matches!(arms[1].0, Pattern::Num(MatchNum::Succ(None))));
+        let zero = &arms[0].1;
+        let succ = &arms[1].1;
 
         let sel = self.inet.new_node(Con { lab: None });
         self.inet.link(Port(sel, 0), Port(if_, 1));
-        let zero = self.encode_term(&zero, Port(sel, 1));
+        let zero = self.encode_term(zero, Port(sel, 1));
         self.link_local(Port(sel, 1), zero);
 
-        let succ = self.encode_term(&succ, Port(sel, 2));
+        let succ = self.encode_term(succ, Port(sel, 2));
         self.link_local(Port(sel, 2), succ);
 
         Some(Port(if_, 2))

@@ -1,6 +1,6 @@
 // Pass to give all variables in a definition unique names.
 
-use crate::term::{var_id_to_name, Book, MatchNum, Name, Pattern, Term};
+use crate::term::{var_id_to_name, Book, Name, Pattern, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -23,38 +23,52 @@ impl Term {
 }
 
 type VarId = Val;
-type UniqueNameScope = HashMap<Name, Vec<VarId>>;
+
+#[derive(Default)]
+struct UniqueNameScope(HashMap<Name, Vec<VarId>>);
 
 // Recursive implementation of unique names pass.
 fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count: &mut VarId) {
   match term {
+    // Terms that create names
     Term::Lam { nam, bod, .. } => {
       // Put the name in scope and assign it a unique id.
       // Convert the lambda body and then remove it from scope.
       // Return a lambda with the newly created name
-      push_name(nam.as_ref(), name_map, name_count);
+      name_map.push(nam.as_ref(), name_count);
       unique_var_names(bod, name_map, name_count);
-      *nam = pop_name(nam.as_ref(), name_map);
+      *nam = name_map.pop(nam.as_ref());
     }
-    Term::Var { nam } => *nam = use_var(nam, name_map),
     Term::Let { pat: Pattern::Var(nam), val, nxt } => {
       unique_var_names(val, name_map, name_count);
-      push_name(nam.as_ref(), name_map, name_count);
+
+      name_map.push(nam.as_ref(), name_count);
       unique_var_names(nxt, name_map, name_count);
-      *nam = pop_name(nam.as_ref(), name_map);
+      *nam = name_map.pop(nam.as_ref());
     }
     Term::Dup { tag: _, fst, snd, val, nxt }
     | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
       unique_var_names(val, name_map, name_count);
-      push_name(fst.as_ref(), name_map, name_count);
-      push_name(snd.as_ref(), name_map, name_count);
+
+      name_map.push(fst.as_ref(), name_count);
+      name_map.push(snd.as_ref(), name_count);
       unique_var_names(nxt, name_map, name_count);
-      *snd = pop_name(snd.as_ref(), name_map);
-      *fst = pop_name(fst.as_ref(), name_map);
+      *snd = name_map.pop(snd.as_ref());
+      *fst = name_map.pop(fst.as_ref());
     }
-    Term::Let { .. } => unreachable!(),
-    // Global lam names are already unique, so no need to do anything
-    Term::Chn { bod, .. } => unique_var_names(bod, name_map, name_count),
+    Term::Match { scrutinee, arms } => {
+      unique_var_names(scrutinee, name_map, name_count);
+      for (pat, term) in arms {
+        pat.names().for_each(|nam| name_map.push(Some(nam), name_count));
+        unique_var_names(term, name_map, name_count);
+        pat.names_mut().rev().for_each(|nam| *nam = name_map.pop(Some(nam)).unwrap());
+      }
+    }
+
+    // Terms that use names
+    Term::Var { nam } => *nam = name_map.use_var(nam),
+
+    // Others
     Term::App { fun: fst, arg: snd, .. }
     | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
@@ -62,45 +76,39 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
       unique_var_names(fst, name_map, name_count);
       unique_var_names(snd, name_map, name_count);
     }
-    Term::Match { scrutinee, arms } => {
-      unique_var_names(scrutinee, name_map, name_count);
-      for (rule, term) in arms {
-        if let Pattern::Num(MatchNum::Succ(nam)) = rule {
-          push_name(nam.as_ref(), name_map, name_count)
-        }
-
-        unique_var_names(term, name_map, name_count);
-
-        if let Pattern::Num(MatchNum::Succ(nam)) = rule {
-          *nam = pop_name(nam.as_ref(), name_map)
-        }
-      }
-    }
+    // Global lam names are already unique, so no need to do anything
+    Term::Chn { bod, .. } => unique_var_names(bod, name_map, name_count),
     Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } => (),
-  }
-}
 
-fn push_name(name: Option<&Name>, name_map: &mut UniqueNameScope, name_count: &mut VarId) {
-  if let Some(name) = name {
-    name_map.entry(name.clone()).or_default().push(*name_count);
-    *name_count += 1;
-  }
-}
-
-fn pop_name(name: Option<&Name>, name_map: &mut UniqueNameScope) -> Option<Name> {
-  if let Some(name) = name {
-    let new_name = name_map.get_mut(name).unwrap().pop().unwrap();
-    if name_map[name].is_empty() {
-      name_map.remove(name);
+    Term::Let { .. } => {
+      unreachable!("Let terms other than tuple destruction should have been desugared already.")
     }
-    Some(var_id_to_name(new_name))
-  } else {
-    None
   }
 }
 
-fn use_var(nam: &Name, name_map: &UniqueNameScope) -> Name {
-  let vars = name_map.get(nam).unwrap();
-  let var_id = *vars.last().unwrap();
-  var_id_to_name(var_id)
+impl UniqueNameScope {
+  fn push(&mut self, nam: Option<&Name>, name_count: &mut VarId) {
+    if let Some(name) = nam {
+      self.0.entry(name.clone()).or_default().push(*name_count);
+      *name_count += 1;
+    }
+  }
+
+  fn pop(&mut self, nam: Option<&Name>) -> Option<Name> {
+    if let Some(name) = nam {
+      let new_name = self.0.get_mut(name).unwrap().pop().unwrap();
+      if self.0[name].is_empty() {
+        self.0.remove(name);
+      }
+      Some(var_id_to_name(new_name))
+    } else {
+      None
+    }
+  }
+
+  fn use_var(&self, nam: &Name) -> Name {
+    let vars = &self.0[nam];
+    let var_id = *vars.last().unwrap();
+    var_id_to_name(var_id)
+  }
 }

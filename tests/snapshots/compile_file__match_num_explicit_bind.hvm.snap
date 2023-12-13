@@ -1,0 +1,10 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/match_num_explicit_bind.hvm
+---
+@3 = (?<(@4 @5) a> a)
+@4 = #0
+@5 = (a a)
+@main = a
+& @3 ~ (#4 a)
+

@@ -77,10 +77,10 @@ fn check_pattern(
           let pat = &rules[rule_idx].pats[match_path.len()];
           match pat {
             Pattern::Num(MatchNum::Zero) => {
-              next_rules_to_check.get_mut(&Name(format!("0"))).unwrap().push(rule_idx);
+              next_rules_to_check.get_mut(&Name::new("0")).unwrap().push(rule_idx);
             }
-            Pattern::Num(MatchNum::Succ(..)) => {
-              next_rules_to_check.get_mut(&Name(format!("+"))).unwrap().push(rule_idx);
+            Pattern::Num(MatchNum::Succ { .. }) => {
+              next_rules_to_check.get_mut(&Name::new("+")).unwrap().push(rule_idx);
             }
             other => {
               return Err(format!("Expected a number but found '{other}' at definition '{def_name}'."));
