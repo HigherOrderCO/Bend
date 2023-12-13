@@ -167,6 +167,7 @@ fn make_leaf_pattern_matching_case(
         let ctr_term = ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, Term::arg_call);
         Term::App { tag: Tag::Static, fun: Box::new(term), arg: Box::new(ctr_term) }
       }
+      // As the destructuring of the tuple happens later, we just pass the tuple itself.
       (_, Pattern::Tup(..)) => Term::arg_call(term, arg_use.next().unwrap()),
       (Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), Pattern::Var(..)) => {
         let fst = if let Some(nam) = fst { Term::Var { nam: nam.clone() } } else { Term::Era };
