@@ -75,14 +75,14 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
     Term::Match { scrutinee, arms } => {
       resolve_refs(scrutinee, def_names, scope);
       for (pat, term) in arms {
-        if let Pattern::Num(MatchNum::Succ(p)) = pat {
-          push_scope(p.clone(), scope)
+        if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat {
+          push_scope(nam.clone(), scope)
         }
 
         resolve_refs(term, def_names, scope);
 
-        if let Pattern::Num(MatchNum::Succ(p)) = pat {
-          pop_scope(p.clone(), scope)
+        if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat {
+          pop_scope(nam.clone(), scope)
         }
       }
     }

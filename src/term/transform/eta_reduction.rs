@@ -38,27 +38,9 @@ impl Term {
       }
       Term::Match { scrutinee, arms } => {
         scrutinee.eta_reduction();
-        for (rule, term) in arms {
+        for (pat, term) in arms {
+          debug_assert!(pat.is_detached_num_match());
           term.eta_reduction();
-
-          if let Pattern::Num(MatchNum::Succ(nam)) = rule {
-            let mut lam = Term::Lam {
-              tag: Tag::Static,
-              nam: nam.take(),
-              bod: Box::new(std::mem::replace(term, Term::Era)),
-            };
-            lam.eta_reduction();
-            match lam {
-              Term::Lam { nam: nam2, bod, .. } => {
-                *nam = nam2;
-                *term = *bod;
-              }
-              body => {
-                *rule = Pattern::Num(MatchNum::Zero);
-                *term = body;
-              }
-            }
-          }
         }
       }
       Term::Lnk { .. } | Term::Var { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => {}

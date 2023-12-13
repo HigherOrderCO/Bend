@@ -29,25 +29,6 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
     .collect()
 }
 
-impl Pattern {
-  /// Whether this pattern has other nested matchable patterns inside.
-  fn is_nested(&self) -> bool {
-    match self {
-      Pattern::Ctr(_, args) => args.iter().any(|arg| arg.is_matchable()),
-      Pattern::Var(_) => false,
-      Pattern::Num(_) => false,
-      Pattern::Tup(fst, snd) => match (&**fst, &**snd) {
-        (Pattern::Tup(..), _) | (_, Pattern::Tup(..)) => true,
-        _ => false,
-      },
-    }
-  }
-
-  fn is_matchable(&self) -> bool {
-    matches!(self, Pattern::Ctr(..))
-  }
-}
-
 /// Checks true if every time that `a` matches, `b` will match too.
 fn matches_together(a: &[Pattern], b: &[Pattern]) -> (bool, bool) {
   let mut matches_together = true;
@@ -91,7 +72,7 @@ fn split_group(rules: &[(Name, Rule)], def_names: &mut DefNames) -> HashMap<Name
   for i in 0 .. rules.len() {
     if !skip.contains(&i) {
       let (name, rule) = &rules[i];
-      let must_split = rule.pats.iter().any(|pat| pat.is_nested());
+      let must_split = rule.pats.iter().any(|pat| !pat.is_flat());
       if must_split {
         let new_split_name = Name(format!("{}$F{}", name, split_rule_count));
         split_rule_count += 1;
@@ -196,7 +177,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_pats.push(other_field.clone());
         }
       }
-      (Pattern::Ctr(rule_arg_name, rule_arg_args), Pattern::Var(Some(other_arg_name))) => {
+      (Pattern::Ctr(rule_arg_name, rule_arg_args), Pattern::Var(Some(other_arg))) => {
         let mut new_ctr_args = vec![];
         for _ in 0 .. rule_arg_args.len() {
           let new_nam = make_var_name(&mut var_count);
@@ -205,47 +186,38 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         }
         let rule_arg_def_id = def_names.def_id(rule_arg_name).unwrap();
         let new_ctr = Term::call(Term::Ref { def_id: rule_arg_def_id }, new_ctr_args);
-        new_body.subst(other_arg_name, &new_ctr);
+        new_body.subst(other_arg, &new_ctr);
       }
-      (Pattern::Ctr(..), Pattern::Var(None)) => todo!(),
       (Pattern::Num(..), Pattern::Num(..)) => new_pats.push(other_arg.clone()),
       (Pattern::Num(..), Pattern::Var(..)) => {
         // How to do this with this kind of number pattern? Subst with a match?
         todo!();
       }
-      (
-        Pattern::Tup(box Pattern::Var(a_fst), box Pattern::Var(a_snd)),
-        Pattern::Tup(box Pattern::Var(b_fst), box Pattern::Var(b_snd)),
-      ) => {
-        if let Some(fst) = a_fst.clone().or(b_fst.clone()) {
-          new_pats.push(Pattern::Var(Some(fst)));
-        }
-        if let Some(snd) = a_snd.clone().or(b_snd.clone()) {
-          new_pats.push(Pattern::Var(Some(snd)));
-        }
-      }
-      (Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), Pattern::Var(_)) => {
-        if let Some(fst) = fst.clone() {
-          new_pats.push(Pattern::Var(Some(fst)));
-        }
-        if let Some(snd) = snd.clone() {
-          new_pats.push(Pattern::Var(Some(snd)));
-        }
-      }
-      (Pattern::Tup(fst, snd), Pattern::Tup(..)) => {
+      (Pattern::Tup(_, _), Pattern::Tup(fst, snd)) => {
         new_pats.push(*fst.clone());
         new_pats.push(*snd.clone());
       }
-      (_, Pattern::Tup(..)) => todo!(),
-      (Pattern::Tup(..), _) => todo!(),
+      (Pattern::Tup(..), Pattern::Var(Some(other_arg))) => {
+        let fst_nam = make_var_name(&mut var_count);
+        let snd_nam = make_var_name(&mut var_count);
+        let fst_arg = Term::Var { nam: fst_nam.clone() };
+        let snd_arg = Term::Var { nam: snd_nam.clone() };
+        new_pats.push(Pattern::Var(Some(fst_nam)));
+        new_pats.push(Pattern::Var(Some(snd_nam)));
+        let new_ctr = Term::Tup { fst: Box::new(fst_arg), snd: Box::new(snd_arg) };
+        new_body.subst(other_arg, &new_ctr);
+      }
       (Pattern::Var(..), _) => {
         new_pats.push(other_arg.clone());
       }
-      (Pattern::Ctr(..) | Pattern::Num(..), Pattern::Ctr(..) | Pattern::Num(..)) => {
-        if std::mem::discriminant(rule_arg) != std::mem::discriminant(other_arg) {
-          unreachable!()
-        }
+      // Unreachable cases, we only call this function if we know the two patterns match together
+      (
+        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
+        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
+      ) => {
+        unreachable!()
       }
+      (_, Pattern::Var(None)) => unreachable!(),
     }
   }
   Rule { pats: new_pats, body: new_body }

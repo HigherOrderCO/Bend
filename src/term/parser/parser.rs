@@ -235,10 +235,7 @@ where
       .then_ignore(just(Token::RBracket))
       .map(|((cond, zero), succ)| Term::Match {
         scrutinee: Box::new(Term::Var { nam: cond.clone() }),
-        arms: vec![
-          (Pattern::Num(MatchNum::Zero), zero),
-          (Pattern::Num(MatchNum::Succ(Some(Name(format!("{cond}-1"))))), succ),
-        ],
+        arms: vec![(Pattern::Num(MatchNum::Zero), zero), (Pattern::Num(MatchNum::Succ(None)), succ)],
       })
       .boxed();
 
@@ -305,7 +302,7 @@ where
     let succ = just(Token::Num(1))
       .ignore_then(just(Token::Add))
       .ignore_then(name_or_era())
-      .map(|x| Pattern::Num(MatchNum::Succ(x)))
+      .map(|nam| Pattern::Num(MatchNum::Succ(Some(nam))))
       .boxed();
 
     choice((zero, succ, var, ctr, tup))

@@ -99,7 +99,9 @@ impl fmt::Display for Pattern {
     match self {
       Pattern::Var(None) => write!(f, "*"),
       Pattern::Var(Some(nam)) => write!(f, "{nam}"),
-      Pattern::Ctr(nam, pats) => write!(f, "({}{})", nam, DisplayJoin(|| pats.iter().map(|p| display!(" {p}")), "")),
+      Pattern::Ctr(nam, pats) => {
+        write!(f, "({}{})", nam, DisplayJoin(|| pats.iter().map(|p| display!(" {p}")), ""))
+      }
       Pattern::Num(num) => write!(f, "{num}"),
       Pattern::Tup(fst, snd) => write!(f, "({}, {})", fst, snd,),
     }
@@ -133,7 +135,9 @@ impl fmt::Display for MatchNum {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       MatchNum::Zero => write!(f, "0"),
-      MatchNum::Succ(_) => write!(f, "+"),
+      MatchNum::Succ(None) => write!(f, "+"),
+      MatchNum::Succ(Some(None)) => write!(f, "+*"),
+      MatchNum::Succ(Some(Some(nam))) => write!(f, "+{nam}"),
     }
   }
 }
@@ -176,7 +180,7 @@ impl<F: Fn(&mut fmt::Formatter) -> fmt::Result> Display for DisplayFn<F> {
   }
 }
 
-struct DisplayJoin<F, S>(F, S);
+pub struct DisplayJoin<F, S>(pub F, pub S);
 
 impl<F, I, S> Display for DisplayJoin<F, S>
 where

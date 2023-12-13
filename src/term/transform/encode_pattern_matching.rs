@@ -72,8 +72,9 @@ fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
         }
       }
       Pattern::Num(MatchNum::Zero) => (),
-      Pattern::Num(MatchNum::Succ(s)) => {
-        body = Term::Lam { tag: Tag::Static, nam: s.clone(), bod: Box::new(body) }
+      Pattern::Num(MatchNum::Succ(None)) => (),
+      Pattern::Num(MatchNum::Succ(Some(nam))) => {
+        body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) }
       }
       pat @ Pattern::Tup(..) => {
         let tup = Name::new("%0");
@@ -176,7 +177,7 @@ fn make_leaf_pattern_matching_case(
       (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => {
         arg_use.clone().fold(term, Term::arg_call)
       }
-      (Pattern::Num(MatchNum::Succ(..)), Pattern::Num(MatchNum::Succ(..))) => {
+      (Pattern::Num(MatchNum::Succ { .. }), Pattern::Num(MatchNum::Succ { .. })) => {
         arg_use.clone().fold(term, Term::arg_call)
       }
       (Pattern::Var(..), Pattern::Num(..)) => term,
@@ -208,44 +209,38 @@ fn make_num_pattern_matching_case(
     crnt_rules
       .iter()
       .copied()
-      .filter(|&rule_idx| match (&def_rules[rule_idx].pats[arg_idx], num) {
-        (Pattern::Num(Zero), Zero) => true,
-        (Pattern::Num(Succ(..)), Succ(..)) => true,
-        _ => false,
+      .filter(|&rule_idx| {
+        matches!(
+          (&def_rules[rule_idx].pats[arg_idx], num),
+          (Pattern::Num(Zero), Zero) | (Pattern::Num(Succ { .. }), Succ { .. })
+        )
       })
       .collect()
   }
 
   let make_next_fn_name = |ctr_name: &MatchNum| Name(format!("{crnt_name}$P{ctr_name}"));
 
-  let arms = [Zero, Succ(Some(Name::new("pred$")))];
-
-  let arms = arms
+  let arms = [Zero, Succ(None)]
     .into_iter()
     .map(|next_ctr| {
       let def = &book.defs[&def_id];
       let crnt_name = make_next_fn_name(&next_ctr);
       let crnt_rules = filter_rules(&def.rules, &crnt_rules, match_path.len(), &next_ctr);
-      let new_vars = Pattern::Num(next_ctr.clone());
+      let new_vars = match next_ctr {
+        Zero => Pattern::Num(Zero),
+        Succ(_) => Pattern::Num(Succ(Some(Some(Name::new("pred$"))))),
+      };
       let mut match_path = match_path.clone();
       match_path.push(new_vars);
 
       make_pattern_matching_case(book, def_type, def_id, &crnt_name, crnt_rules, match_path);
 
-      let mut body = Term::Ref { def_id: book.def_names.def_id(&crnt_name).unwrap() };
-
-      if let Succ(nam) = &next_ctr {
-        body = Term::App {
-          tag: Tag::Static,
-          fun: Box::new(body),
-          arg: Box::new(Term::Var { nam: nam.clone().unwrap() }),
-        };
-      };
-
+      let body = Term::Ref { def_id: book.def_names.def_id(&crnt_name).unwrap() };
       (Pattern::Num(next_ctr), body)
     })
     .collect();
 
+  // Detach the pred variable by passing it as a variable of the matched path but not including it in this match expression
   let term = Term::Match { scrutinee: Box::new(Term::Var { nam: Name::new("x") }), arms };
   let term = add_arg_calls(term, &match_path);
   let term = Term::named_lam(Name::new("x"), term);
@@ -374,7 +369,7 @@ fn get_pat_arg_count(match_path: &[Pattern]) -> (usize, usize) {
     Pattern::Var(_) => 1,
     Pattern::Ctr(_, vars) => vars.len(),
     Pattern::Num(MatchNum::Zero) => 0,
-    Pattern::Num(MatchNum::Succ(..)) => 1,
+    Pattern::Num(MatchNum::Succ { .. }) => 1,
     Pattern::Tup(..) => 2,
   };
   if let Some((new_pat, old_pats)) = match_path.split_last() {

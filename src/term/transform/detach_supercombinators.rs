@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::term::{Book, DefId, DefNames, Definition, MatchNum, Name, Pattern, Rule, Term};
+use crate::term::{Book, DefId, DefNames, Definition, Name, Pattern, Rule, Term};
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
@@ -128,11 +128,7 @@ impl Term {
           let mut is_super = go(scrutinee, depth + 1, term_info);
 
           for (pat, term) in arms {
-            let Pattern::Num(num) = pat else { unreachable!() };
-
-            if let MatchNum::Succ(nam) = num {
-              term_info.provide(nam.as_ref());
-            }
+            debug_assert!(pat.is_detached_num_match());
 
             is_super &= go(term, depth + 1, term_info);
           }

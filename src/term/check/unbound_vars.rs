@@ -83,14 +83,14 @@ pub fn check_uses<'a>(
     }
     Term::Match { scrutinee, arms } => {
       check_uses(scrutinee, scope, globals)?;
-      for (rule, term) in arms {
-        if let Pattern::Num(MatchNum::Succ(nam)) = rule {
+      for (pat, term) in arms {
+        if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat {
           push_scope(nam.as_ref(), scope);
         }
 
         check_uses(term, scope, globals)?;
 
-        if let Pattern::Num(MatchNum::Succ(nam)) = rule {
+        if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat {
           pop_scope(nam.as_ref(), scope);
         }
       }
