@@ -144,7 +144,7 @@ fn make_leaf_pattern_matching_case(
   let rule = &book.defs[&def_id].rules[rule_idx];
 
   // The term we're building
-  let term = Term::Ref { def_id: rule_def_id };
+  let mut term = Term::Ref { def_id: rule_def_id };
 
   // Whether the args of the rule we're calling are used or discarded
   let lambdas_usage = &mut book.defs[&rule_def_id].rules[0].body.arg_vars_are_used().into_iter();
@@ -167,7 +167,7 @@ fn make_leaf_pattern_matching_case(
   }
 
   // Add the applications to call the rule body
-  let term = match_path.iter().zip(&rule.pats).fold(term, |term, (matched, pat)| {
+  term = match_path.iter().zip(&rule.pats).fold(term, |term, (matched, pat)| {
     match (matched, pat) {
       (Pattern::Var(_), Pattern::Var(_)) => Term::optional_arg_call(term, next(lambdas_usage, arg_use)),
       (Pattern::Ctr(_, vars), Pattern::Ctr(_, _)) => {
@@ -208,10 +208,52 @@ fn make_leaf_pattern_matching_case(
   });
 
   // Add the lambdas to get the matched variables
-  let arg_decl = new_args.chain(old_args);
-  let term = arg_decl.rev().fold(term, |term, arg| Term::named_lam(arg, term));
+  term = old_args.rev().fold(term, |term, arg| Term::named_lam(arg, term));
+
+  if num_new_args > 0 {
+    term = add_tagged_new_args(term, match_path.last().unwrap(), &mut new_args.rev(), book);
+  }
 
   add_case_to_book(book, crnt_name.clone(), term);
+}
+
+fn add_tagged_new_args(
+  term: Term,
+  pat: &Pattern,
+  new_args: &mut impl Iterator<Item = Name>,
+  book: &Book,
+) -> Term {
+  fn go(
+    mut term: Term,
+    pat: &Pattern,
+    new_args: &mut impl Iterator<Item = Name>,
+    book: &Book,
+    tag: Option<String>,
+  ) -> Term {
+    match pat {
+      Pattern::Var(field) => {
+        if let Some((var, tag)) = field.clone().zip(tag) {
+          let name = Name(format!("{}.{}", tag, var));
+          term = Term::tagged_lam(new_args.next().unwrap(), term, Tag::Named(name))
+        } else {
+          term = Term::named_lam(new_args.next().unwrap(), term);
+        }
+      }
+      Pattern::Ctr(ctr, new) => {
+        let adt_name = &book.ctrs[ctr];
+
+        for pattern in new.iter().rev() {
+          term = go(term, pattern, new_args, book, Some(format!("{}.{}", adt_name, ctr)));
+        }
+      }
+      Pattern::Num(_) => term = Term::named_lam(new_args.next().unwrap(), term),
+      Pattern::Tup(..) => todo!(),
+    }
+
+    term
+  }
+
+  go(term, pat, new_args, book, None)
 }
 
 fn make_num_pattern_matching_case(
@@ -306,8 +348,10 @@ fn make_adt_pattern_matching_case(
     let def = &book.defs[&def_id];
     let crnt_name = make_next_fn_name(crnt_name, next_ctr);
     let crnt_rules = filter_rules(&def.rules, &crnt_rules, match_path.len(), next_ctr);
-    let new_vars =
-      Pattern::Ctr(next_ctr.clone(), vec![Pattern::Var(Some(Name::new(""))); next_ctr_args.len()]);
+    let new_vars = Pattern::Ctr(
+      next_ctr.clone(),
+      next_ctr_args.iter().cloned().map(|name| Pattern::Var(Some(name))).collect(),
+    );
     let mut match_path = match_path.clone();
     match_path.push(new_vars);
     make_pattern_matching_case(book, def_type, def_id, &crnt_name, crnt_rules, match_path);
@@ -326,7 +370,7 @@ fn make_adt_pattern_matching_case(
   // Lambda for pattern matched value
   let term = Term::named_lam(Name::new("x"), term);
 
-  let term = add_arg_lams(term, &match_path);
+  let term = add_arg_tagged_lams(term, &match_path, &book);
 
   add_case_to_book(book, crnt_name.clone(), term);
 }
@@ -367,6 +411,10 @@ fn make_non_pattern_matching_case(
 impl Term {
   fn named_lam(nam: Name, bod: Term) -> Term {
     Term::Lam { tag: Tag::Static, nam: Some(nam), bod: Box::new(bod) }
+  }
+
+  fn tagged_lam(nam: Name, bod: Term, tag: Tag) -> Term {
+    Term::Lam { tag, nam: Some(nam), bod: Box::new(bod) }
   }
 
   fn arg_call(term: Term, arg: Name) -> Term {
@@ -454,4 +502,19 @@ fn add_arg_lams(term: Term, match_path: &[Pattern]) -> Term {
   let new_args = (0 .. num_new_args).map(|x| Name(format!("y{x}")));
   let args = new_args.chain(old_args);
   args.rev().fold(term, |term, arg| Term::named_lam(arg, term))
+}
+
+// Adds the argument lambdas to the term, with new args followed by old args.
+fn add_arg_tagged_lams(term: Term, match_path: &[Pattern], book: &Book) -> Term {
+  let (num_new_args, num_old_args) = get_pat_arg_count(&match_path);
+  let old_args = (0 .. num_old_args).map(|x| Name(format!("x{x}")));
+  let new_args = (0 .. num_new_args).map(|x| Name(format!("y{x}")));
+
+  let mut term = old_args.rev().fold(term, |term, arg| Term::named_lam(arg, term));
+
+  if num_new_args > 0 {
+    term = add_tagged_new_args(term, match_path.last().unwrap(), &mut new_args.rev(), book);
+  }
+
+  term
 }

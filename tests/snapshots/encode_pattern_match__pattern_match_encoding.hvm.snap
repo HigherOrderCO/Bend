@@ -6,26 +6,26 @@ input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.hvm
 
 (main) = (Foo A 2)
 
-(A) = λa λ#MyType A λ#MyType B λ#MyType C λ#MyType D λ#MyType E (A a)
+(A) = λa λ#MyType A λ#MyType B λ#MyType C λ#MyType D λ#MyType E (#MyType.A.a A a)
 
-(B) = λb λ#MyType A λ#MyType B λ#MyType C λ#MyType D λ#MyType E (B b)
+(B) = λb λ#MyType A λ#MyType B λ#MyType C λ#MyType D λ#MyType E (#MyType.B.b B b)
 
-(C) = λc λ#MyType A λ#MyType B λ#MyType C λ#MyType D λ#MyType E (C c)
+(C) = λc λ#MyType A λ#MyType B λ#MyType C λ#MyType D λ#MyType E (#MyType.C.c C c)
 
-(D) = λd1 λd2 λ#MyType A λ#MyType B λ#MyType C λ#MyType D λ#MyType E (D d1 d2)
+(D) = λd1 λd2 λ#MyType A λ#MyType B λ#MyType C λ#MyType D λ#MyType E (#MyType.D.d2 (#MyType.D.d1 D d1) d2)
 
-(E) = λe1 λe2 λ#MyType A λ#MyType B λ#MyType C λ#MyType D λ#MyType E (E e1 e2)
+(E) = λe1 λe2 λ#MyType A λ#MyType B λ#MyType C λ#MyType D λ#MyType E (#MyType.E.e2 (#MyType.E.e1 E e1) e2)
 
 (Foo$R0) = λa 100
 
 (Foo$R1) = λ* 200
 
-(Foo$PA) = λy0 (Foo$R0 *)
+(Foo$PA) = λ#MyType.A.a y0 (Foo$R0 *)
 
-(Foo$PB) = λy0 (Foo$R1 *)
+(Foo$PB) = λ#MyType.B.b y0 (Foo$R1 *)
 
-(Foo$PC) = λy0 (Foo$R1 *)
+(Foo$PC) = λ#MyType.C.c y0 (Foo$R1 *)
 
-(Foo$PD) = λy0 λy1 (Foo$R1 *)
+(Foo$PD) = λ#MyType.D.d1 y0 λ#MyType.D.d2 y1 (Foo$R1 *)
 
-(Foo$PE) = λy0 λy1 (Foo$R1 *)
+(Foo$PE) = λ#MyType.E.e1 y0 λ#MyType.E.e2 y1 (Foo$R1 *)
