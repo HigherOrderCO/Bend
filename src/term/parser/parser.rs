@@ -202,12 +202,7 @@ where
 
     // pat: term
     let match_arm = pattern()
-      .validate(|this, span, emit| {
-        if matches!(&this, Pattern::Num(_)) {
-          emit.emit(Rich::custom(span, "Number not supported in match arm."));
-        }
-        this
-      })
+      .or(just(Token::Add).map(|_| Pattern::Num(MatchNum::Succ(None))))
       .then_ignore(just(Token::Colon))
       .then(term.clone())
       .boxed();
@@ -299,11 +294,8 @@ where
 
     let zero = select!(Token::Num(0) => Pattern::Num(MatchNum::Zero));
 
-    let succ = just(Token::Num(1))
-      .ignore_then(just(Token::Add))
-      .ignore_then(name_or_era())
-      .map(|nam| Pattern::Num(MatchNum::Succ(Some(nam))))
-      .boxed();
+    let succ =
+      just(Token::Add).ignore_then(name_or_era()).map(|nam| Pattern::Num(MatchNum::Succ(Some(nam)))).boxed();
 
     choice((zero, succ, var, ctr, tup))
   })
