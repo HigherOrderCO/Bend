@@ -9,6 +9,7 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 
 impl Book {
   /// Extracts any match terms into pattern matching functions.
+  /// Creates rules with potentially nested patterns, so the flattening pass needs to be called after.
   pub fn extract_matches(&mut self) -> Result<(), String> {
     let book = &mut MatchesBook::new(&mut self.def_names);
 
@@ -19,11 +20,7 @@ impl Book {
       }
     }
 
-    if !book.new_defs.is_empty() {
-      self.defs.append(&mut book.new_defs);
-      self.flatten_rules();
-    }
-
+    self.defs.append(&mut book.new_defs);
     Ok(())
   }
 }
@@ -85,10 +82,8 @@ impl Term {
     adts: &'book BTreeMap<Name, Adt>,
     ctrs: &'book HashMap<Name, Name>,
   ) -> Result<&'book Adt, MatchError> {
-    let ty = infer_arg_type(pats.iter(), ctrs).map_err(MatchError::Infer)?;
-
-    let Type::Adt(nam) = ty else { unreachable!() };
-
+    let pat_type = infer_arg_type(pats.iter(), ctrs).map_err(MatchError::Infer)?;
+    let Type::Adt(nam) = pat_type else { unreachable!() };
     let Adt { ctrs } = &adts[&nam];
 
     let mut missing: HashSet<_> = ctrs.keys().cloned().collect();
@@ -97,7 +92,6 @@ impl Term {
       let Pattern::Ctr(nam, args) = rule else { unreachable!() };
 
       let mut binds = HashSet::new();
-
       for arg in args {
         for bind in arg.names() {
           if !binds.insert(bind) {
@@ -105,7 +99,6 @@ impl Term {
           }
         }
       }
-
       missing.remove(nam);
     }
 
@@ -134,10 +127,9 @@ impl Term {
 
         *match_count += 1;
 
-        let arms = std::mem::take(arms);
         let nam = std::mem::take(nam);
-
-        *self = match_to_def(nam, &arms, def_name, book, match_count)?;
+        let arms = std::mem::take(arms);
+        *self = match_to_def(nam, &arms, def_name, book, *match_count);
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
@@ -171,10 +163,8 @@ fn match_to_def(
   arms: &[(Pattern, Term)],
   def_name: &Name,
   book: &mut MatchesBook,
-  match_count: &mut usize,
-) -> Result<Term, MatchError> {
-  let current_count = *match_count;
-
+  match_count: usize,
+) -> Term {
   let free_vars: IndexSet<Name> = arms
     .iter()
     .flat_map(|(pat, term)| term.free_vars().into_keys().filter(|k| !pat.names().contains(k)))
@@ -190,7 +180,7 @@ fn match_to_def(
     }
   }
 
-  let new_name = make_def_name(def_name, &Name::new("match"), current_count);
+  let new_name = make_def_name(def_name, &Name::new("match"), match_count);
   let def_id = book.def_names.insert(new_name);
   let def = Definition { def_id, rules };
   book.new_defs.insert(def_id, def);
@@ -201,13 +191,11 @@ fn match_to_def(
     arg: Box::new(Term::Var { nam: scrutinee }),
   };
 
-  let app = free_vars.into_iter().fold(scrutinee_app, |acc, nam| Term::App {
+  free_vars.into_iter().fold(scrutinee_app, |acc, nam| Term::App {
     tag: Tag::Static,
     fun: Box::new(acc),
     arg: Box::new(Term::Var { nam }),
-  });
-
-  Ok(app)
+  })
 }
 
 fn make_def_name(def_name: &Name, ctr: &Name, i: usize) -> Name {
