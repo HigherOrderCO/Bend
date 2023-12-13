@@ -327,7 +327,14 @@ fn match_tup(
   book: &mut MatchesBook,
   match_count: usize,
 ) -> Term {
-  let rule = Rule { pats: vec![tup_pat], body };
+  let binds: Vec<_> = tup_pat.names().cloned().collect();
+  let free_vars: Vec<_> = body.free_vars().into_keys().filter(|k| !binds.contains(k)).collect();
+
+  let mut rule = Rule { pats: vec![tup_pat], body };
+
+  for var in free_vars.iter() {
+    rule.pats.push(Pattern::Var(Some(var.clone())));
+  }
 
   let new_name = make_def_name(def_name, &Name::new("let"), match_count);
   let def_id = book.def_names.insert(new_name);
@@ -340,7 +347,13 @@ fn match_tup(
     arg: Box::new(Term::Var { nam: scrutinee }),
   };
 
-  scrutinee_app
+  let app = free_vars.into_iter().fold(scrutinee_app, |acc, nam| Term::App {
+    tag: Tag::Static,
+    fun: Box::new(acc),
+    arg: Box::new(Term::Var { nam }),
+  });
+
+  app
 }
 
 fn vec_name_to_pat(scrutinee: &Name, names: &[Name]) -> Vec<Pattern> {
