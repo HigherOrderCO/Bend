@@ -167,7 +167,7 @@ fn make_leaf_pattern_matching_case(
         let ctr_term = ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, Term::arg_call);
         Term::App { tag: Tag::Static, fun: Box::new(term), arg: Box::new(ctr_term) }
       }
-      (_, Pattern::Tup(..)) => arg_use.clone().fold(term, Term::arg_call),
+      (_, Pattern::Tup(..)) => Term::arg_call(term, arg_use.next().unwrap()),
       (Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), Pattern::Var(..)) => {
         let fst = if let Some(nam) = fst { Term::Var { nam: nam.clone() } } else { Term::Era };
         let snd = if let Some(nam) = snd { Term::Var { nam: nam.clone() } } else { Term::Era };
