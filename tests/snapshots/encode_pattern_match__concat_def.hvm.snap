@@ -1,0 +1,13 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/concat_def.hvm
+---
+(String.concat) = λx (String.concat$P x)
+
+(main) = (String.concat (2, λ#Str x (42, (43, x))) (2, λ#Str x (44, (45, x))))
+
+(String.concat$R0) = λ%0 let (a_len, a_buf) = %0; λ%0 let (b_len, b_buf) = %0; ((+ a_len b_len), λ#Str x (#Str a_buf (#Str b_buf x)))
+
+(String.concat$P$P) = λy0 λx0 (String.concat$R0 x0 y0)
+
+(String.concat$P) = λy0 λx (String.concat$P$P x y0)
