@@ -226,11 +226,12 @@ data Boolean = True | False
 
 It is possible have lambdas whose variables can occour outside of their scopes. To use it, add `$` on the lambda declaration and on the variable using it:
 ```rs
-($a (λ$a 1 λb b))
+($a ((λ$a 1) (λb b)))
 ```
 This term will reduce with the following steps:
 ```rs
-(λb b 1)
+($a ((λ$a 1) (λb b)))
+((λb b) 1)
 1
 ```
 
