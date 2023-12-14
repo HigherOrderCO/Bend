@@ -192,7 +192,10 @@ impl<'a> Reader<'a> {
         0 => {
           let fst = self.read_term(self.net.enter_port(Port(node, 1)));
           let snd = self.read_term(self.net.enter_port(Port(node, 2)));
-          Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }
+          match snd {
+            Term::Lam { tag, bod, .. } if tag == Tag::str() => decode_str(fst, *bod),
+            snd => Term::Tup { fst: Box::new(fst), snd: Box::new(snd) },
+          }
         }
         // If we're visiting a port 1 or 2, then it is a variable.
         1 | 2 => {
@@ -205,6 +208,25 @@ impl<'a> Reader<'a> {
 
     term
   }
+}
+
+fn decode_str(fst: Term, bod: Term) -> Term {
+  let Term::Num { val: len } = fst else { unreachable!() };
+  let mut s = String::with_capacity(len as usize);
+  let mut next = vec![bod];
+  while let Some(t) = next.pop() {
+    match t {
+      Term::Var { .. } => break, // reached the end of the str
+      Term::Tup { fst, snd } => {
+        let Term::Num { val } = *fst else { unreachable!() };
+        let char = char::from_u32(val as u32);
+        s.push(char.unwrap());
+        next.push(*snd);
+      }
+      _ => unreachable!(),
+    }
+  }
+  Term::Str { val: s }
 }
 
 /// Represents `let (fst, snd) = val` if `tag` is `None`, and `dup#tag fst snd = val` otherwise.

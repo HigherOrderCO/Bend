@@ -286,6 +286,12 @@ impl DefId {
   }
 }
 
+impl Tag {
+  pub fn str() -> Self {
+    Self::Named(Name::new("Str"))
+  }
+}
+
 impl Book {
   pub fn new() -> Self {
     Default::default()
