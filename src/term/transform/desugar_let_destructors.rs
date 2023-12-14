@@ -32,7 +32,12 @@ impl Term {
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
         bod.desugar_let_destructors();
       }
-      Term::Num { .. } | Term::Var { .. } | Term::Lnk { .. } | Term::Ref { .. } | Term::Era => (),
+      Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Ref { .. }
+      | Term::Era => (),
       Term::Let { pat, val, nxt } => {
         val.desugar_let_destructors();
         nxt.desugar_let_destructors();

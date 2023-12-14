@@ -144,7 +144,7 @@ impl Term {
 
           fst_is_super && snd_is_super
         }
-        Term::Ref { .. } | Term::Num { .. } | Term::Era => true,
+        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => true,
       }
     }
 

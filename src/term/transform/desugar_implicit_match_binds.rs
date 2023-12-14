@@ -52,7 +52,12 @@ impl Term {
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
         bod.desugar_implicit_match_binds(ctrs, adts);
       }
-      Term::Era | Term::Ref { .. } | Term::Num { .. } | Term::Lnk { .. } | Term::Var { .. } => (),
+      Term::Era
+      | Term::Ref { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Lnk { .. }
+      | Term::Var { .. } => (),
       Term::Let { pat: _, .. } => {
         unreachable!("Expected destructor let expressions to have been desugared already")
       }

@@ -246,7 +246,7 @@ impl Term {
         }
         n
       }
-      Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => 0,
+      Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Ref { .. } | Term::Era => 0,
     };
     if n >= threshold {
       let Split { tag, fst, snd, val } = std::mem::take(split);
@@ -395,7 +395,7 @@ impl Term {
         }
       }
       Term::Let { .. } => unreachable!(),
-      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => {}
+      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => {}
     }
   }
 }
@@ -521,7 +521,12 @@ impl<'a> Reader<'a> {
           self.resugar_adts(&mut arm.1);
         }
       }
-      Term::Lnk { .. } | Term::Num { .. } | Term::Var { .. } | Term::Ref { .. } | Term::Era => {}
+      Term::Lnk { .. }
+      | Term::Num { .. }
+      | Term::Var { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era => {}
     }
   }
   fn error<T: Default>(&mut self, error: ReadbackError) -> T {

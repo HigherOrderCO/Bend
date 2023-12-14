@@ -78,7 +78,7 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
     }
     // Global lam names are already unique, so no need to do anything
     Term::Chn { bod, .. } => unique_var_names(bod, name_map, name_count),
-    Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } => (),
+    Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } | Term::Str { .. } => (),
 
     Term::Let { .. } => {
       unreachable!("Let terms other than tuple destruction should have been desugared already.")

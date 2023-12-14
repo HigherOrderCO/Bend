@@ -258,6 +258,7 @@ impl<'a> EncodeTermState<'a> {
         self.inet.link(Port(node, 1), Port(node, 2));
         Some(Port(node, 0))
       }
+      Term::Str { .. } => todo!(),
       // core: & fst ~ <op snd ret>
       Term::Opx { op, fst, snd } => {
         let opx = self.inet.new_node(Op2 { opr: op.to_hvmc_label() });

@@ -65,7 +65,12 @@ impl Term {
         snd.resolve_ctrs_in_pats(is_ctr);
       }
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.resolve_ctrs_in_pats(is_ctr),
-      Term::Var { .. } | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
+      Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Ref { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Era => (),
     }
   }
 }

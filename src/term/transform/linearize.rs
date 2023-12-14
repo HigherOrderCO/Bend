@@ -75,7 +75,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
         count_var_uses_in_term(term, uses);
       }
     }
-    Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
+    Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => (),
   }
 }
 
@@ -199,7 +199,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
         }
       }
     }
-    Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } => (),
+    Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } => (),
   };
 }
 

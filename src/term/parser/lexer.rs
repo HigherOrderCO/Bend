@@ -33,6 +33,14 @@ pub enum Token {
   #[regex("0[bB][0-1_]+", |lex| from_radix(2, lex).ok())]
   Num(u64),
 
+  #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#, |lex| {
+    let mut s = lex.slice().to_string();
+    s.pop();
+    s.remove(0);
+    s
+  })]
+  Str(String),
+
   #[token("#")]
   Hash,
 
@@ -184,6 +192,7 @@ impl fmt::Display for Token {
       Self::Match => write!(f, "match"),
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),
+      Self::Str(s) => write!(f, "\"{s}\""),
       Self::Hash => write!(f, "#"),
       Self::Add => write!(f, "+"),
       Self::Sub => write!(f, "-"),
