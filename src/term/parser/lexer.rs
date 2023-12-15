@@ -36,7 +36,7 @@ pub enum Token {
   #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#, |lex| normalized_string(lex).ok())]
   Str(String),
 
-  #[regex(r#"'[\W|\w]'"#, num_of_char)]
+  #[regex(r#"'(.|\\t|\\u[0-9a-fA-F]{4}|\\n|\\')'"#, normalized_char)]
   Char(u64),
 
   #[token("#")]
@@ -209,10 +209,25 @@ fn comment(lexer: &mut Lexer<'_, Token>) -> FilterResult<(), LexingError> {
   FilterResult::Skip
 }
 
-fn num_of_char(lexer: &mut Lexer<Token>) -> Option<u64> {
+fn normalized_char(lexer: &mut Lexer<Token>) -> Option<u64> {
   let slice = lexer.slice();
   let slice = &slice[1 .. slice.len() - 1];
-  let c = slice.chars().next()?;
+  let chars = &mut slice.chars();
+  let c = match chars.next()? {
+    '\\' => match chars.next() {
+      Some('n') => '\n',
+      Some('t') => '\t',
+      Some('\'') => '\'',
+      Some('u') => {
+        let hex = chars.take(4).collect::<String>();
+        let hex_val = u32::from_str_radix(&hex, 16).unwrap();
+        char::from_u32(hex_val).unwrap_or(char::REPLACEMENT_CHARACTER)
+      }
+      Some(..) => return None,
+      None => '\\',
+    },
+    other => other,
+  };
   Some(u64::from(c))
 }
 
