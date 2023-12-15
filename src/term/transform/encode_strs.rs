@@ -34,19 +34,12 @@ impl Term {
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
         bod.encode_str();
       }
-      Term::Let { val, nxt, .. } | Term::Dup { val, nxt, .. } => {
-        val.encode_str();
-        nxt.encode_str();
-      }
-      Term::App { fun, arg, .. } => {
-        fun.encode_str();
-        arg.encode_str();
-      }
-      Term::Tup { fst, snd } | Term::Sup { fst, snd, .. } => {
-        fst.encode_str();
-        snd.encode_str();
-      }
-      Term::Opx { fst, snd, .. } => {
+      Term::App { fun: fst, arg: snd, .. }
+      | Term::Let { val: fst, nxt: snd, .. }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. } => {
         fst.encode_str();
         snd.encode_str();
       }

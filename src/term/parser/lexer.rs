@@ -33,12 +33,7 @@ pub enum Token {
   #[regex("0[bB][0-1_]+", |lex| from_radix(2, lex).ok())]
   Num(u64),
 
-  #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#, |lex| {
-    let mut s = lex.slice().to_string();
-    s.pop();
-    s.remove(0);
-    s
-  })]
+  #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#, |lex| normalized_string(lex).ok())]
   Str(String),
 
   #[token("#")]
@@ -132,6 +127,36 @@ fn from_radix(radix: u32, lexer: &mut Lexer<Token>) -> Result<u64, ParseIntError
   let slice = if radix == 10 { lexer.slice() } else { &lexer.slice()[2 ..] };
   let slice = &slice.replace('_', "");
   u64::from_str_radix(slice, radix)
+}
+
+fn normalized_string(lexer: &mut Lexer<Token>) -> Result<String, ParseIntError> {
+  let slice = lexer.slice();
+  let slice = &slice[1 .. slice.len() - 1];
+
+  let mut s = String::new();
+  let chars = &mut slice.chars();
+
+  while let Some(char) = chars.next() {
+    match char {
+      '\\' => match chars.next() {
+        Some('n') => s.push('\n'),
+        Some('t') => s.push('\t'),
+        Some('u') => {
+          let hex = chars.take(4).collect::<String>();
+          let hex_val = u32::from_str_radix(&hex, 16)?;
+          let char = char::from_u32(hex_val).unwrap_or(char::REPLACEMENT_CHARACTER);
+          s.push(char);
+        }
+        Some(other) => {
+          s.push('\\');
+          s.push(other);
+        }
+        None => s.push('\\'),
+      },
+      other => s.push(other),
+    }
+  }
+  Ok(s)
 }
 
 #[derive(Default, Debug, PartialEq, Clone)]

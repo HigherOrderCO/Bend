@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_single_files/str_concat.hvm
 ---
-"hello world"
+hello world

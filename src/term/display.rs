@@ -67,7 +67,7 @@ impl Term {
       }
       Term::Era => write!(f, "*"),
       Term::Num { val } => write!(f, "{val}"),
-      Term::Str { val } => write!(f, "\"{val}\""),
+      Term::Str { val } => write!(f, "{val}"),
       Term::Opx { op, fst, snd } => {
         write!(f, "({} {} {})", op, fst.display(def_names), snd.display(def_names))
       }
