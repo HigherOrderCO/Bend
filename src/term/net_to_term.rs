@@ -53,6 +53,9 @@ pub enum ReadbackError {
   InvalidBind,
   InvalidAdt,
   InvalidAdtMatch,
+  InvalidStrLen,
+  InvalidStrTerm,
+  InvalidChar,
 }
 
 struct Reader<'a> {
@@ -193,7 +196,7 @@ impl<'a> Reader<'a> {
           let fst = self.read_term(self.net.enter_port(Port(node, 1)));
           let snd = self.read_term(self.net.enter_port(Port(node, 2)));
           match snd {
-            Term::Lam { tag, bod, .. } if tag == Tag::str() => decode_str(fst, *bod),
+            Term::Lam { tag, bod, .. } if tag == Tag::str() => self.decode_str(fst, *bod),
             snd => Term::Tup { fst: Box::new(fst), snd: Box::new(snd) },
           }
         }
@@ -210,23 +213,32 @@ impl<'a> Reader<'a> {
   }
 }
 
-fn decode_str(fst: Term, bod: Term) -> Term {
-  let Term::Num { val: len } = fst else { unreachable!() };
-  let mut s = String::with_capacity(len as usize);
-  let mut next = vec![bod];
-  while let Some(t) = next.pop() {
-    match t {
-      Term::Var { .. } => break, // reached the end of the str
-      Term::Tup { fst, snd } => {
-        let Term::Num { val } = *fst else { unreachable!() };
-        let char = char::from_u32(val as u32);
-        s.push(char.unwrap());
-        next.push(*snd);
+impl<'a> Reader<'a> {
+  fn decode_str(&mut self, fst: Term, bod: Term) -> Term {
+    let Term::Num { val: len } = fst else {
+      return self.error(ReadbackError::InvalidStrLen);
+    };
+    let mut s = String::with_capacity(len as usize);
+    let mut next = vec![bod];
+    while let Some(t) = next.pop() {
+      match t {
+        Term::Var { .. } => break, // reached the end of the str
+        Term::Tup { fst, snd } => {
+          let Term::Num { val } = *fst else {
+            return self.error(ReadbackError::InvalidChar);
+          };
+          if let Some(c) = char::from_u32(val as u32) {
+            s.push(c);
+            next.push(*snd);
+          } else {
+            self.errors.push(ReadbackError::InvalidChar);
+          }
+        }
+        _ => self.errors.push(ReadbackError::InvalidStrTerm),
       }
-      _ => unreachable!(),
     }
+    Term::Str { val: s }
   }
-  Term::Str { val: s }
 }
 
 /// Represents `let (fst, snd) = val` if `tag` is `None`, and `dup#tag fst snd = val` otherwise.
