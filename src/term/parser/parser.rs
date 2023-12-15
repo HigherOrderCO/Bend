@@ -252,12 +252,14 @@ where
       .boxed();
 
     let str = select!(Token::Str(s) => Term::Str { val: s }).boxed();
+    let chr = select!(Token::Char(c) => Term::Num { val: c }).boxed();
 
     choice((
       global_var,
       var,
       number,
       str,
+      chr,
       sup,
       tup,
       global_lam,

@@ -36,6 +36,9 @@ pub enum Token {
   #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#, |lex| normalized_string(lex).ok())]
   Str(String),
 
+  #[regex(r#"'[\W|\w]'"#, num_of_char)]
+  Char(u64),
+
   #[token("#")]
   Hash,
 
@@ -206,6 +209,13 @@ fn comment(lexer: &mut Lexer<'_, Token>) -> FilterResult<(), LexingError> {
   FilterResult::Skip
 }
 
+fn num_of_char(lexer: &mut Lexer<Token>) -> Option<u64> {
+  let slice = lexer.slice();
+  let slice = &slice[1 .. slice.len() - 1];
+  let c = slice.chars().next()?;
+  Some(u64::from(c))
+}
+
 impl fmt::Display for Token {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
@@ -218,6 +228,7 @@ impl fmt::Display for Token {
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),
       Self::Str(s) => write!(f, "\"{s}\""),
+      Self::Char(c) => write!(f, "'{c}'"),
       Self::Hash => write!(f, "#"),
       Self::Add => write!(f, "+"),
       Self::Sub => write!(f, "-"),
