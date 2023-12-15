@@ -66,6 +66,6 @@ fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) {
         subst_ref_to_ref(term, ref_map);
       }
     }
-    Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => (),
+    Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => (),
   }
 }

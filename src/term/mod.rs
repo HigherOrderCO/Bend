@@ -114,6 +114,9 @@ pub enum Term {
   Num {
     val: u64,
   },
+  Str {
+    val: String,
+  },
   /// A numeric operation between built-in numbers.
   Opx {
     op: Op,
@@ -283,6 +286,12 @@ impl DefId {
   }
 }
 
+impl Tag {
+  pub fn str() -> Self {
+    Self::Named(Name::new("Str"))
+  }
+}
+
 impl Book {
   pub fn new() -> Self {
     Default::default()
@@ -407,7 +416,7 @@ impl Term {
         fst.subst(from, to);
         snd.subst(from, to);
       }
-      Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
+      Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => (),
     }
   }
 
@@ -471,7 +480,7 @@ impl Term {
             free_vars.extend(new_scope);
           }
         }
-        Term::Ref { .. } | Term::Num { .. } | Term::Era => {}
+        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => {}
       }
     }
 

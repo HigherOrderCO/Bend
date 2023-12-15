@@ -5,6 +5,7 @@ pub mod detach_combinators;
 pub mod detach_supercombinators;
 pub mod encode_adts;
 pub mod encode_pattern_matching;
+pub mod encode_strs;
 pub mod eta_reduction;
 pub mod extract_matches;
 pub mod flatten;

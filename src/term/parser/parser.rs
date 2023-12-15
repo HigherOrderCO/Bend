@@ -251,10 +251,15 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
+    let str = select!(Token::Str(s) => Term::Str { val: s }).boxed();
+    let chr = select!(Token::Char(c) => Term::Num { val: c }).boxed();
+
     choice((
       global_var,
       var,
       number,
+      str,
+      chr,
       sup,
       tup,
       global_lam,

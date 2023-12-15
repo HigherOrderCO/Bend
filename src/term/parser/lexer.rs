@@ -33,6 +33,12 @@ pub enum Token {
   #[regex("0[bB][0-1_]+", |lex| from_radix(2, lex).ok())]
   Num(u64),
 
+  #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#, |lex| normalized_string(lex).ok())]
+  Str(String),
+
+  #[regex(r#"'(.|\\t|\\u[0-9a-fA-F]{4}|\\n|\\')'"#, normalized_char)]
+  Char(u64),
+
   #[token("#")]
   Hash,
 
@@ -126,6 +132,36 @@ fn from_radix(radix: u32, lexer: &mut Lexer<Token>) -> Result<u64, ParseIntError
   u64::from_str_radix(slice, radix)
 }
 
+fn normalized_string(lexer: &mut Lexer<Token>) -> Result<String, ParseIntError> {
+  let slice = lexer.slice();
+  let slice = &slice[1 .. slice.len() - 1];
+
+  let mut s = String::new();
+  let chars = &mut slice.chars();
+
+  while let Some(char) = chars.next() {
+    match char {
+      '\\' => match chars.next() {
+        Some('n') => s.push('\n'),
+        Some('t') => s.push('\t'),
+        Some('u') => {
+          let hex = chars.take(4).collect::<String>();
+          let hex_val = u32::from_str_radix(&hex, 16)?;
+          let char = char::from_u32(hex_val).unwrap_or(char::REPLACEMENT_CHARACTER);
+          s.push(char);
+        }
+        Some(other) => {
+          s.push('\\');
+          s.push(other);
+        }
+        None => s.push('\\'),
+      },
+      other => s.push(other),
+    }
+  }
+  Ok(s)
+}
+
 #[derive(Default, Debug, PartialEq, Clone)]
 pub enum LexingError {
   UnclosedComment,
@@ -173,6 +209,28 @@ fn comment(lexer: &mut Lexer<'_, Token>) -> FilterResult<(), LexingError> {
   FilterResult::Skip
 }
 
+fn normalized_char(lexer: &mut Lexer<Token>) -> Option<u64> {
+  let slice = lexer.slice();
+  let slice = &slice[1 .. slice.len() - 1];
+  let chars = &mut slice.chars();
+  let c = match chars.next()? {
+    '\\' => match chars.next() {
+      Some('n') => '\n',
+      Some('t') => '\t',
+      Some('\'') => '\'',
+      Some('u') => {
+        let hex = chars.take(4).collect::<String>();
+        let hex_val = u32::from_str_radix(&hex, 16).unwrap();
+        char::from_u32(hex_val).unwrap_or(char::REPLACEMENT_CHARACTER)
+      }
+      Some(..) => return None,
+      None => '\\',
+    },
+    other => other,
+  };
+  Some(u64::from(c))
+}
+
 impl fmt::Display for Token {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
@@ -184,6 +242,8 @@ impl fmt::Display for Token {
       Self::Match => write!(f, "match"),
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),
+      Self::Str(s) => write!(f, "\"{s}\""),
+      Self::Char(c) => write!(f, "'{c}'"),
       Self::Hash => write!(f, "#"),
       Self::Add => write!(f, "+"),
       Self::Sub => write!(f, "-"),

@@ -53,6 +53,9 @@ pub enum ReadbackError {
   InvalidBind,
   InvalidAdt,
   InvalidAdtMatch,
+  InvalidStrLen,
+  InvalidStrTerm,
+  InvalidChar,
 }
 
 struct Reader<'a> {
@@ -192,7 +195,10 @@ impl<'a> Reader<'a> {
         0 => {
           let fst = self.read_term(self.net.enter_port(Port(node, 1)));
           let snd = self.read_term(self.net.enter_port(Port(node, 2)));
-          Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }
+          match snd {
+            Term::Lam { tag, bod, .. } if tag == Tag::str() => self.decode_str(fst, *bod),
+            snd => Term::Tup { fst: Box::new(fst), snd: Box::new(snd) },
+          }
         }
         // If we're visiting a port 1 or 2, then it is a variable.
         1 | 2 => {
@@ -204,6 +210,34 @@ impl<'a> Reader<'a> {
     };
 
     term
+  }
+}
+
+impl<'a> Reader<'a> {
+  fn decode_str(&mut self, fst: Term, bod: Term) -> Term {
+    let Term::Num { val: len } = fst else {
+      return self.error(ReadbackError::InvalidStrLen);
+    };
+    let mut s = String::with_capacity(len as usize);
+    let mut next = vec![bod];
+    while let Some(t) = next.pop() {
+      match t {
+        Term::Var { .. } => break, // reached the end of the str
+        Term::Tup { fst, snd } => {
+          let Term::Num { val } = *fst else {
+            return self.error(ReadbackError::InvalidChar);
+          };
+          if let Some(c) = char::from_u32(val as u32) {
+            s.push(c);
+            next.push(*snd);
+          } else {
+            self.errors.push(ReadbackError::InvalidChar);
+          }
+        }
+        _ => self.errors.push(ReadbackError::InvalidStrTerm),
+      }
+    }
+    Term::Str { val: s }
   }
 }
 
@@ -246,7 +280,7 @@ impl Term {
         }
         n
       }
-      Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => 0,
+      Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Ref { .. } | Term::Era => 0,
     };
     if n >= threshold {
       let Split { tag, fst, snd, val } = std::mem::take(split);
@@ -395,7 +429,7 @@ impl Term {
         }
       }
       Term::Let { .. } => unreachable!(),
-      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => {}
+      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => {}
     }
   }
 }
@@ -521,7 +555,12 @@ impl<'a> Reader<'a> {
           self.resugar_adts(&mut arm.1);
         }
       }
-      Term::Lnk { .. } | Term::Num { .. } | Term::Var { .. } | Term::Ref { .. } | Term::Era => {}
+      Term::Lnk { .. }
+      | Term::Num { .. }
+      | Term::Var { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era => {}
     }
   }
   fn error<T: Default>(&mut self, error: ReadbackError) -> T {

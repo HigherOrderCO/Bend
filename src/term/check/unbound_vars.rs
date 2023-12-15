@@ -95,7 +95,7 @@ pub fn check_uses<'a>(
         }
       }
     }
-    Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
+    Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => (),
   }
   Ok(())
 }

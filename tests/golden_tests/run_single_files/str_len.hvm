@@ -1,0 +1,3 @@
+String.len (s_len, *) = s_len
+
+main = (String.len "λx 🐼")

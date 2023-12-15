@@ -86,7 +86,7 @@ fn resolve_refs(term: &mut Term, def_names: &DefNames, scope: &mut HashMap<Name,
         }
       }
     }
-    Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era => (),
+    Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => (),
   }
 }
 

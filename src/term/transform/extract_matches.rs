@@ -144,7 +144,12 @@ impl Term {
         fst.extract_matches(def_name, book, match_count)?;
         snd.extract_matches(def_name, book, match_count)?;
       }
-      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => {}
+      Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era => {}
 
       Term::Match { .. } => unreachable!("Scrutinee of match expression should have been extracted already"),
       Term::Let { pat, .. } => {

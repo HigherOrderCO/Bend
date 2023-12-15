@@ -43,7 +43,12 @@ impl Term {
           term.eta_reduction();
         }
       }
-      Term::Lnk { .. } | Term::Var { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => {}
+      Term::Lnk { .. }
+      | Term::Var { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era => {}
     }
   }
 }

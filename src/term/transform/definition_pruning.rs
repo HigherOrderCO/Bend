@@ -57,7 +57,7 @@ impl Term {
             term.find_used_definitions(used, defs);
           }
         }
-        Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era => (),
+        Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => (),
       }
     }
   }
