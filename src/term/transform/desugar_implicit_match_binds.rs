@@ -14,8 +14,29 @@ impl Book {
 impl Term {
   pub fn desugar_implicit_match_binds(&mut self, ctrs: &HashMap<Name, Name>, adts: &BTreeMap<Name, Adt>) {
     match self {
-      Term::Match { scrutinee, arms } => {
-        let Term::Var { nam: scrutinee } = scrutinee.as_ref() else { unreachable!() };
+      Term::Match { scrutinee, .. } => {
+        let scrutinee = match scrutinee.as_ref() {
+          Term::Var { nam } => nam.clone(),
+          _ => {
+            let nam = Name::new("%temp%scrutinee");
+
+            let Term::Match { scrutinee, arms } = std::mem::take(self) else { unreachable!() };
+
+            *self = Term::Let {
+              pat: Pattern::Var(Some(nam.clone())),
+              val: scrutinee,
+              nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam: nam.clone() }), arms }),
+            };
+
+            nam
+          }
+        };
+
+        let arms = match self {
+          Term::Match { arms, .. } | Term::Let { nxt: box Term::Match { arms, .. }, .. } => arms,
+          _ => unreachable!(),
+        };
+
         for (pat, body) in arms {
           match pat {
             Pattern::Var(_) => (),

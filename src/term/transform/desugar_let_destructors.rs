@@ -38,13 +38,13 @@ impl Term {
       | Term::Lnk { .. }
       | Term::Ref { .. }
       | Term::Era => (),
-      Term::Let { pat, val, nxt } => {
+
+      Term::Let { .. } => {
+        let Term::Let { pat, mut val, mut nxt } = std::mem::take(self) else { unreachable!() };
+
         val.desugar_let_destructors();
         nxt.desugar_let_destructors();
 
-        let pat = std::mem::replace(pat, Pattern::Var(None));
-        let val = std::mem::take(val);
-        let nxt = std::mem::take(nxt);
         let arms = vec![(pat, *nxt)];
 
         *self = match val.as_ref() {

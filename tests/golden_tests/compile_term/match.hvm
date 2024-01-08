@@ -1,5 +1,4 @@
-let n = (+ 0 1);
-match n {
+match (+ 0 1) {
   0: λt λf t
   +: λ* λt λf f // The term to hvmc function assumes the pred variable is already detached from the match
 }
