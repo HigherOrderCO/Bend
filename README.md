@@ -1,6 +1,6 @@
 # HVM-Lang
 
-HVM-Lang serves as an Intermediate Representation for HVM-Core, offering a higher level syntax for writing programs based on the [Interaction-Calculus](https://github.com/VictorTaelin/Interaction-Calculus#interaction-calculus).
+HVM-Lang is a lambda-calculus based language and serves as an Intermediate Representation for HVM-Core, offering a higher level syntax for writing programs based on the [Interaction-Calculus](https://github.com/VictorTaelin/Interaction-Calculus#interaction-calculus).
 
 ## Installation
 
@@ -77,6 +77,16 @@ To not bind the value of the lambda to any name, use `*`:
 True  = @t @* t
 False = λ* λf f
 ```
+
+Applications are enclosed by `(` `)`.
+```rs
+(λx x λx x λx x)
+```
+This term is the same as:
+```rs
+(((λx x) (λx x)) (λx x))
+```
+Parentheses around lambdas are optional.
 
 `*` can also be used to define an eraser term.  
 It compiles to an `inet` node with only one port that deletes anything that’s plugged into it.
