@@ -128,7 +128,7 @@ fn main() {
           println!("RPS    : {:.3} m", rps);
         }
       }
-      Mode::Repl => run_repl(&mut book)?,
+      Mode::Repl => run_repl(&mut book, !args.single_core, args.linear, args.opt_level, args.stats, args.debug)?,
     }
     Ok(())
   }
