@@ -9,19 +9,19 @@ impl Book {
 
     for adt_name in self.adts.keys() {
       if !checked.insert(adt_name) {
-        return Err("Duplicated name '{adt_name}'".to_string());
+        return Err(format!("Duplicated name '{adt_name}'"));
       }
     }
 
     for ctr_name in self.ctrs.keys() {
       if !checked.insert(ctr_name) {
-        return Err("Duplicated name '{ctr_name}'".to_string());
+        return Err(format!("Duplicated name '{ctr_name}'"));
       }
     }
 
     for def_name in self.def_names.names() {
       if !checked.insert(def_name) {
-        return Err("Duplicated name '{def_name}'".to_string());
+        return Err(format!("Duplicated name '{def_name}'"));
       }
     }
 
