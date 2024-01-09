@@ -66,6 +66,20 @@ hexadecimal = 0x123_abc
 
 Currently, the only supported type of machine numbers are unsigned 60-bit integers.  
 
+Strings are delimited by `"` `"` and support Unicode characters.
+```rs
+main = "Hello, 🌎"
+```
+A string is desugared to a tuple containing the list of chars and its length. The chars have a tagged lambda with label 'String' for fast concatenation.
+```rs
+(λ#String x ('H', ('e', ('l', ('l', ('o', x))))), 5)
+```
+
+Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
+```
+main = '\u4242'
+```
+
 A lambda where the body is the variable `x`:
 ```rs
 id = λx x
