@@ -146,8 +146,8 @@ fn make_leaf_pattern_matching_case(
   // The term we're building
   let term = Term::Ref { def_id: rule_def_id };
 
-  // The lambdas  of the rule we're calling
-  let lambdas_usage = &mut book.defs[&rule_def_id].rules[0].body.lambdas_usage().into_iter();
+  // Whether the args of the rule we're calling are used or discarded
+  let lambdas_usage = &mut book.defs[&rule_def_id].rules[0].body.arg_vars_are_used().into_iter();
 
   let (num_new_args, num_old_args) = get_pat_arg_count(&match_path);
   let old_args = (0 .. num_old_args).map(|x| Name(format!("x{x}")));
@@ -155,18 +155,15 @@ fn make_leaf_pattern_matching_case(
 
   let arg_use = &mut old_args.clone().chain(new_args.clone());
 
-  fn next(
-    usage: &mut impl Iterator<Item = Option<()>>,
-    args: &mut impl Iterator<Item = Name>,
-  ) -> Option<Name> {
-    usage.next().zip(args.next()).map(|(usage, arg)| usage.map(|_| arg)).flatten()
+  fn next(usage: &mut impl Iterator<Item = bool>, args: &mut impl Iterator<Item = Name>) -> Option<Name> {
+    usage.next().zip(args.next()).and_then(|(usage, arg)| usage.then(|| arg))
   }
 
   fn into_iter(
-    usage: impl Iterator<Item = Option<()>>,
+    usage: impl Iterator<Item = bool>,
     args: impl Iterator<Item = Name>,
   ) -> impl Iterator<Item = Option<Name>> {
-    usage.zip(args).map(|(usage, arg)| usage.map(|_| arg))
+    usage.zip(args).map(|(usage, arg)| usage.then(|| arg))
   }
 
   // Add the applications to call the rule body
@@ -181,9 +178,9 @@ fn make_leaf_pattern_matching_case(
       // (On scott encoding, if one of the cases is matched we must also match on all the other constructors for this arg)
       (Pattern::Ctr(ctr_nam, vars), Pattern::Var(_)) => {
         let ctr_args = vars.iter().map(|_| arg_use.next().unwrap());
-        
+
         // If the rule lambda is discarding the Ctr, we don't need to re-build it
-        let ctr_term = if lambdas_usage.next().flatten().is_none() {
+        let ctr_term = if !lambdas_usage.next().unwrap() {
           Term::Era
         } else {
           let ctr_ref_id = book.def_names.def_id(ctr_nam).unwrap();
@@ -381,16 +378,21 @@ impl Term {
     Term::App { tag: Tag::Static, fun: Box::new(term), arg }
   }
 
-  // Returns a sequence representing whether the lambda arg is binded or ignored
-  fn lambdas_usage(&self) -> Vec<Option<()>> {
-    fn go(term: &Term, vec: &mut Vec<Option<()>>) {
+  /// Returns a sequence representing whether the lambda arg is binded or discarded
+  ///
+  /// # Example
+  ///
+  /// `λa λ* (a λx x) -> vec![true, false]`
+  /// 
+  fn arg_vars_are_used(&self) -> Vec<bool> {
+    fn go(term: &Term, vec: &mut Vec<bool>) {
       match term {
         Term::Lam { nam: None, bod, .. } => {
-          vec.push(None);
+          vec.push(false);
           go(bod, vec);
         }
         Term::Lam { nam: Some(_), bod, .. } => {
-          vec.push(Some(()));
+          vec.push(true);
           go(bod, vec);
         }
         Term::Let { nxt, .. } | Term::Dup { nxt, .. } => {
