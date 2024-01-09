@@ -1,2 +1,3 @@
-main_long_name_that_truncates_to_main = @a @b main_long_name_that_truncates_to_main
-main = @a (main_long_name_that_truncates_to_main a)
+long_name_that_truncates = @a @b long_name_that_truncates
+long_name_that_truncates_too = @a a
+main = (long_name_that_truncates long_name_that_truncates_too)

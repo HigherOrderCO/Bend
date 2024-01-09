@@ -7,11 +7,11 @@ impl Book {
   // When we find a function that is simply directly calling another function,
   // substitutes all occurences of that function to the one being called, avoiding the unnecessary redirect.
   // In case there is a long chaing of ref-to-ref-to-ref, we substitute values by the last function in the chain.
-  pub fn simplify_ref_to_ref(&mut self) -> Result<(), String> {
+  pub fn simplify_ref_to_ref(&mut self, main: DefId) -> Result<(), String> {
     let mut ref_map: HashMap<DefId, DefId> = HashMap::new();
     // Find to which defs we're mapping the ones that are just references.
     for def_id in self.def_names.def_ids() {
-      //self.defs[def_id].assert_no_pattern_matching_rules();
+      self.defs[def_id].assert_no_pattern_matching_rules();
       let mut ref_id = def_id;
       let mut is_ref_to_ref = false;
       while let Term::Ref { def_id: next_ref_id } = &self.defs.get(ref_id).unwrap().rules[0].body {
@@ -37,6 +37,14 @@ impl Book {
       subst_ref_to_ref(&mut subst_body, &ref_map);
       let body = &mut self.defs.get_mut(&def_id).unwrap().rules[0].body;
       *body = subst_body;
+    }
+
+    match &self.defs.get(&main).unwrap().rules[0].body {
+      Term::Ref { def_id } => {
+        self.defs.get_mut(&main).unwrap().rules[0].body =
+          self.defs.get(def_id).unwrap().rules[0].body.clone();
+      }
+      _ => {}
     }
 
     Ok(())
