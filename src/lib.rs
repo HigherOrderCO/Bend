@@ -79,15 +79,15 @@ pub fn compile_book(
 }
 
 pub fn run_compiled(
-  book: &hvmc::ast::Book,
+  runtime_book: hvmc::run::Book,
   mem_size: usize,
   parallel: bool,
   hook: Option<impl FnMut(&Net)>,
+  entrypoint: hvmc::run::Val,
 ) -> (Net, RunStats) {
-  let runtime_book = book_to_runtime(book);
   let heap = Heap::init(mem_size);
   let mut root = hvmc::run::Net::new(&heap);
-  root.boot(name_to_val(DefNames::ENTRY_POINT));
+  root.boot(entrypoint);
 
   let start_time = Instant::now();
 
@@ -132,7 +132,13 @@ pub fn run_book(
 
   let debug_hook =
     if debug { Some(|net: &_| debug_hook(net, &book, &hvmc_names, &labels, linear)) } else { None };
-  let (res_lnet, stats) = run_compiled(&core_book, mem_size, parallel, debug_hook);
+  let (res_lnet, stats) = run_compiled(
+    book_to_runtime(&core_book),
+    mem_size,
+    parallel,
+    debug_hook,
+    name_to_val(DefNames::ENTRY_POINT),
+  );
   let net = hvmc_to_net(&res_lnet, &|id| hvmc_names.hvmc_name_to_id[&id]);
   let (res_term, readback_errors) = net_to_term(&net, &book, &labels, linear);
   let info = RunInfo { stats, readback_errors, net: res_lnet };
@@ -182,46 +188,28 @@ pub fn run_repl(
 
           let mut runtime_book = book_to_runtime(&core_book);
 
-          let heap = hvmc::run::Heap::init(1 << 16);
+          let heap = Heap::init(1 << 16);
           let mut runtime_net = hvmc::run::Net::new(&heap);
           hvmc::ast::net_to_runtime(&mut runtime_net, &hvmc_net);
           let def = runtime_net_to_runtime_def(&runtime_net);
           runtime_book.def(def_id, def.clone());
 
-          let heap = hvmc::run::Heap::init(1 << 16);
-          let mut root = hvmc::run::Net::new(&heap);
-          root.boot(def_id);
-
-          let start_time = Instant::now();
           let hook =
             if debug { Some(|net: &_| debug_hook(net, &book, &hvmc_names, &labels, linear)) } else { None };
-          if let Some(hook) = hook {
-            root.expand(&runtime_book);
-            while !root.rdex.is_empty() {
-              hook(&net_from_runtime(&root));
-              root.reduce(&runtime_book, 1);
-              root.expand(&runtime_book);
-            }
-          } else if parallel {
-            root.parallel_normal(&runtime_book);
-          } else {
-            root.normal(&runtime_book)
-          }
-          let elapsed = start_time.elapsed().as_secs_f64();
+          let (result, RunStats { rewrites, run_time, .. }) =
+            run_compiled(runtime_book, 1 << 16, parallel, hook, def_id);
 
-          let result = net_from_runtime(&root);
           let net = hvmc_to_net(&result, &|id| hvmc_names.hvmc_name_to_id[&id]);
           let (term, errors) = net_to_term(&net, book, &labels, linear);
 
-          let total_rewrites = total_rewrites(&root.rwts) as f64;
-          let run_stats = RunStats { rewrites: root.rwts, used: def.node.len(), run_time: elapsed };
-          let rps = total_rewrites / run_stats.run_time / 1_000_000.0;
+          let total_rewrites = total_rewrites(&rewrites) as f64;
+          let rps = total_rewrites / run_time / 1_000_000.0;
 
           if errors.is_empty() {
             print!("{}\n", term.display(&book.def_names),);
             if stats {
               println!("RWS   : {}", total_rewrites);
-              println!("TIME  : {:.3} s", run_stats.run_time);
+              println!("TIME  : {:.3} s", run_time);
               println!("RPS   : {:.3} m", rps);
             }
           } else {
