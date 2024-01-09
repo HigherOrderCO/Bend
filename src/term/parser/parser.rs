@@ -380,3 +380,28 @@ enum TopLevel {
   Rule((Name, Rule)),
   Adt((Name, Adt)),
 }
+
+#[derive(Clone)]
+pub enum Repl {
+  Def((Name, Term)),
+  Term(Term),
+  Exit,
+}
+
+pub fn repl<'a, I>() -> impl Parser<'a, I, Repl, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  let exit = soft_keyword("exit").to(Repl::Exit);
+  let def = name().then_ignore(just(Token::Equals)).then(term());
+  choice((exit, def.map(Repl::Def), term().map(Repl::Term)))
+}
+
+pub fn parse_repl(input: &String) -> Result<Repl, Vec<Rich<'_, Token>>> {
+  let token_iter = Token::lexer(&input).spanned().map(|(token, span)| match token {
+    Ok(t) => (t, SimpleSpan::from(span)),
+    Err(e) => (Token::Error(e), SimpleSpan::from(span)),
+  });
+  let stream = Stream::from_iter(token_iter).spanned(SimpleSpan::from(input.len() .. input.len()));
+  repl().parse(stream).into_result()
+}

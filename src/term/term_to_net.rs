@@ -385,3 +385,10 @@ impl LabelGenerator {
     self.name_to_label.clear();
   }
 }
+
+impl HvmcNames {
+  pub fn insert(&mut self, def_id: DefId, name: Val) {
+    self.id_to_hvmc_name.insert(def_id, name);
+    self.hvmc_name_to_id.insert(name, def_id);
+  }
+}

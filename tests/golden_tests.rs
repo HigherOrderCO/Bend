@@ -95,7 +95,7 @@ fn compile_term() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
-    let compiled = compile_book(&mut book, OptimizationLevel::Heavy)?;
+    let compiled = compile_book(&mut book, OptimizationLevel::Heavy, true)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -104,7 +104,7 @@ fn compile_file() {
 fn compile_file_o0() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
-    let compiled = compile_book(&mut book, OptimizationLevel::Light)?;
+    let compiled = compile_book(&mut book, OptimizationLevel::Light, true)?;
     Ok(format!("{:?}", compiled))
   })
 }

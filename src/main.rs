@@ -1,8 +1,8 @@
 use clap::{Parser, ValueEnum};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
-  check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, OptimizationLevel,
-  RunInfo,
+  check_book, compile_book, desugar_book, load_file_to_book, run_book, run_repl, total_rewrites,
+  OptimizationLevel, RunInfo,
 };
 use std::path::PathBuf;
 
@@ -46,6 +46,8 @@ enum Mode {
   Run,
   /// Runs the lambda-term level optimization passes.
   Desugar,
+  /// Runs the repl mode.
+  Repl,
 }
 
 fn mem_parser(arg: &str) -> Result<usize, String> {
@@ -82,7 +84,7 @@ fn main() {
         check_book(book)?;
       }
       Mode::Compile => {
-        let compiled = compile_book(&mut book, args.opt_level)?;
+        let compiled = compile_book(&mut book, args.opt_level, true)?;
 
         for warn in &compiled.warnings {
           eprintln!("WARNING: {warn}");
@@ -91,7 +93,7 @@ fn main() {
         print!("{}", show_book(&compiled.core_book));
       }
       Mode::Desugar => {
-        desugar_book(&mut book, args.opt_level)?;
+        desugar_book(&mut book, args.opt_level, true)?;
         println!("{book}");
       }
       Mode::Run => {
@@ -126,6 +128,7 @@ fn main() {
           println!("RPS    : {:.3} m", rps);
         }
       }
+      Mode::Repl => run_repl(&mut book)?,
     }
     Ok(())
   }

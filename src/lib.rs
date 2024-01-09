@@ -19,9 +19,11 @@ pub mod term;
 
 pub use term::load_book::load_file_to_book;
 
+use crate::term::parser::parser::{parse_repl, Repl};
+
 pub fn check_book(mut book: Book) -> Result<(), String> {
   // TODO: Do the checks without having to do full compilation
-  compile_book(&mut book, OptimizationLevel::Light)?;
+  compile_book(&mut book, OptimizationLevel::Light, true)?;
   Ok(())
 }
 
@@ -64,8 +66,12 @@ impl std::fmt::Debug for CompileResult {
   }
 }
 
-pub fn compile_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<CompileResult, String> {
-  let main = desugar_book(book, opt_level)?;
+pub fn compile_book(
+  book: &mut Book,
+  opt_level: OptimizationLevel,
+  prune: bool,
+) -> Result<CompileResult, String> {
+  let main = desugar_book(book, opt_level, prune)?;
   let (nets, hvmc_names, labels) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
   pre_reduce_book(&mut core_book, opt_level >= OptimizationLevel::Heavy)?;
@@ -114,7 +120,7 @@ pub fn run_book(
   linear: bool,
   opt_level: OptimizationLevel,
 ) -> Result<(Term, DefNames, RunInfo), String> {
-  let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opt_level)?;
+  let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opt_level, true)?;
 
   if !warnings.is_empty() {
     for warn in warnings {
@@ -133,7 +139,75 @@ pub fn run_book(
   Ok((res_term, book.def_names, info))
 }
 
-pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<DefId, String> {
+pub fn run_repl(book: &mut Book) -> Result<(), String> {
+  use std::io::Write;
+
+  let CompileResult { mut core_book, mut hvmc_names, mut labels, warnings: _ } =
+    compile_book(book, OptimizationLevel::Light, false)?;
+
+  loop {
+    std::io::stdout().write(b"*> ").unwrap();
+    std::io::stdout().flush().unwrap();
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).unwrap();
+
+    match parse_repl(&input) {
+      Ok(repl) => match repl {
+        Repl::Exit => break,
+        Repl::Def((name, mut term)) => {
+          // TODO: term.desugar method
+          term.resolve_refs(&book.def_names);
+
+          let def_id = book.def_names.insert(name.clone());
+          let name_as_val = name_to_val(&name.0);
+          hvmc_names.insert(def_id, name_as_val);
+
+          let compat_net = term::term_to_net::term_to_compat_net(&term, &mut labels);
+          let hvmc_net = net::net_to_hvmc::net_to_hvmc(&compat_net, &|id| hvmc_names.id_to_hvmc_name[&id])?;
+
+          core_book.insert(name.0, hvmc_net);
+        }
+        Repl::Term(mut term) => {
+          // TODO: term.desugar method
+          term.resolve_refs(&book.def_names);
+
+          let def_id = hvmc::u60::new(u64::MAX);
+          let compat_net = term::term_to_net::term_to_compat_net(&term, &mut labels);
+          let hvmc_net = net::net_to_hvmc::net_to_hvmc(&compat_net, &|id| hvmc_names.id_to_hvmc_name[&id])?;
+
+          let mut runtime_book = hvmc::ast::book_to_runtime(&core_book);
+
+          let heap = hvmc::run::Heap::init(1 << 12);
+          let mut runtime_net = hvmc::run::Net::new(&heap);
+          hvmc::ast::net_to_runtime(&mut runtime_net, &hvmc_net);
+          runtime_book.def(def_id, hvmc::ast::runtime_net_to_runtime_def(&runtime_net));
+
+          let heap = hvmc::run::Heap::init(1 << 12);
+          let mut root = hvmc::run::Net::new(&heap);
+          root.boot(def_id);
+          root.parallel_normal(&runtime_book);
+
+          let result = hvmc::ast::net_from_runtime(&root);
+          let net = net::hvmc_to_net::hvmc_to_net(&result, &|id| hvmc_names.hvmc_name_to_id[&id]);
+          let (term, errors) = term::net_to_term(&net, book, &labels, false);
+
+          if errors.is_empty() {
+            println!("{}", term.display(&book.def_names));
+          } else {
+            format!("Invalid readback: {:?}\n", errors);
+          }
+        }
+      },
+      Err(e) => {
+        let msg = itertools::Itertools::join(&mut e.into_iter().map(|e| e.to_string()), "\n");
+        println!("{msg}")
+      }
+    }
+  }
+  Ok(())
+}
+
+pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel, prune: bool) -> Result<DefId, String> {
   let main = book.check_has_main()?;
   book.check_shared_names()?;
   book.encode_strs();
@@ -148,7 +222,9 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Def
   }
   book.detach_supercombinators();
   book.simplify_ref_to_ref()?;
-  book.prune(main);
+  if prune {
+    book.prune(main);
+  }
   Ok(main)
 }
 
