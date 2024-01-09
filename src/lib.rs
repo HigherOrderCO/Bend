@@ -156,7 +156,7 @@ pub fn run_repl(book: &mut Book) -> Result<(), String> {
         Repl::Exit => break,
         Repl::Def((name, mut term)) => {
           // TODO: term.desugar method
-          term.resolve_refs(&book.def_names);
+          term.desugar(&book, Flags::new().set(Term::UNIQUE).set(Term::ETA));
 
           let def_id = book.def_names.insert(name.clone());
           let name_as_val = name_to_val(&name.0);
@@ -169,7 +169,7 @@ pub fn run_repl(book: &mut Book) -> Result<(), String> {
         }
         Repl::Term(mut term) => {
           // TODO: term.desugar method
-          term.resolve_refs(&book.def_names);
+          term.desugar(&book, Flags::new());
 
           let def_id = hvmc::u60::new(u64::MAX);
           let compat_net = term::term_to_net::term_to_compat_net(&term, &mut labels);
@@ -177,12 +177,12 @@ pub fn run_repl(book: &mut Book) -> Result<(), String> {
 
           let mut runtime_book = hvmc::ast::book_to_runtime(&core_book);
 
-          let heap = hvmc::run::Heap::init(1 << 12);
+          let heap = hvmc::run::Heap::init(1 << 16);
           let mut runtime_net = hvmc::run::Net::new(&heap);
           hvmc::ast::net_to_runtime(&mut runtime_net, &hvmc_net);
           runtime_book.def(def_id, hvmc::ast::runtime_net_to_runtime_def(&runtime_net));
 
-          let heap = hvmc::run::Heap::init(1 << 12);
+          let heap = hvmc::run::Heap::init(1 << 16);
           let mut root = hvmc::run::Net::new(&heap);
           root.boot(def_id);
           root.parallel_normal(&runtime_book);
@@ -265,4 +265,37 @@ pub struct RunStats {
 
 pub fn total_rewrites(rwrts: &Rewrites) -> usize {
   rwrts.anni + rwrts.comm + rwrts.eras + rwrts.dref + rwrts.oper
+}
+
+struct Flags(u8);
+
+impl Flags {
+  fn new() -> Self {
+    Self(0)
+  }
+
+  fn set(self, flag: u8) -> Self {
+    Self(self.0 | flag)
+  }
+
+  fn has(&self, flag: u8) -> bool {
+    self.0 & flag == flag
+  }
+}
+
+impl Term {
+  const UNIQUE: u8 = 1;
+  const ETA: u8 = 1 << 1;
+
+  fn desugar(&mut self, book: &Book, flags: Flags) {
+    if flags.has(Term::UNIQUE) {
+      self.make_var_names_unique();
+    }
+    self.encode_str();
+    self.linearize_vars();
+    self.resolve_refs(&book.def_names);
+    if flags.has(Term::ETA) {
+      self.eta_reduction();
+    }
+  }
 }

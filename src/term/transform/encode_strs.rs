@@ -13,7 +13,7 @@ impl Book {
 }
 
 impl Term {
-  fn encode_str(&mut self) {
+  pub fn encode_str(&mut self) {
     match self {
       Term::Str { val } => {
         let mut len = 0;
