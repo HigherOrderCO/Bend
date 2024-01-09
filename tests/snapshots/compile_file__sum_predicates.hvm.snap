@@ -3,14 +3,12 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/sum_predicates.hvm
 ---
 @3 = (?<(@6 @7) a> a)
-@4 = (?<(@A @B) a> a)
 @5 = (?<(@3 @F) a> a)
 @6 = #0
 @7 = (a a)
 @A = (a a)
 @B = (a (<+ a b> b))
-@F = (a (b c))
-& @4 ~ (b (a c))
+@F = (a (?<(@A @B) (a b)> b))
 @main = a
 & @5 ~ (#8 (#5 a))
 
