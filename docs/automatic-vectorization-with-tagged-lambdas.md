@@ -1,6 +1,6 @@
 # Automatic vectorization with tagged lambdas
 
-We have seen in [Dups and Sups](docs/dups-and-sups.md) that duplications and superpositions can have labels. In HVM, lambdas and applications can have labels too.  
+We have seen in [Dups and Sups](dups-and-sups.md) that duplications and superpositions can have labels. In HVM, lambdas and applications can have labels too.  
 
 Tagged applications will only annihilate lambdas with the same tag.
 ```rs
@@ -48,6 +48,6 @@ This works because the `Bool`-tagged application in `not` passes through the `Li
 The tagged lambda and applications are compiled to `inet` nodes with different tag values for each data type. This allows them to commute, read [HVM-Core](https://github.com/HigherOrderCO/hvm-core/tree/main#language) to learn more about it.
 
 ### Limitations
-- When using a [built-in data type](docs/defining-data-types.md) (created using the `data` keyword), it must not contain fields 
+- When using a [built-in data type](defining-data-types.md) (created using the `data` keyword), it must not contain fields 
 - The function must not be recursive
 - There must not be labels in common between the function and what you want to vectorize over

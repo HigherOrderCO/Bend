@@ -24,7 +24,7 @@ When reading back, if we visit a Constructor via port 0 then we know it's a lamb
 
 - The `Number` node uses the label to store it's number.
 - An `Op2` node uses the label to store it's operation.
-- And a `Constructor` node can have a label too! This is used for `dup` and [lambda tags](docs/automatic-vectorization-with-tagged-lambdas.md.
+- And a `Constructor` node can have a label too! This is used for `dup` and [lambda tags](automatic-vectorization-with-tagged-lambdas.md.
 
 A duplication `dup a b = x` compiles into a Constructor node too, but with a different label.
 A superposition `{a b}` compiles to a Constructor node too. The difference here comes from context too.

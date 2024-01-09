@@ -52,7 +52,7 @@ Output:
 
 What? This is even more confusing. The first two values are `1`, as expected. But what about the last term?
 
-The last term in the tuple is a **superposition** of two values. A [superposition](docs/dups-and-sups.md) is the "other side" of a duplication. It is created here because we implicitly duplicated `f` when we used it twice, and duplicating lambdas creates superpositions.
+The last term in the tuple is a **superposition** of two values. A [superposition](dups-and-sups.md) is the "other side" of a duplication. It is created here because we implicitly duplicated `f` when we used it twice, and duplicating lambdas creates superpositions.
 
 ## Usage
 
