@@ -378,7 +378,7 @@ impl Term {
     Term::App { tag: Tag::Static, fun: Box::new(term), arg }
   }
 
-  /// Returns a sequence representing whether the lambda arg is binded or discarded
+  /// Returns a sequence representing whether consecutive lambda args are binded or discarded
   ///
   /// # Example
   ///
