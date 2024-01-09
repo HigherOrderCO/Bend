@@ -51,21 +51,6 @@ This will output the compiled file to stdout.
 
 HVM-Lang files consists of a series of definitions, which bind a name to a term. Terms can be lambdas, applications, or other terms.
 
-
-Strings are delimited by `"` `"` and support Unicode characters.
-```rs
-main = "Hello, 🌎"
-```
-A string is desugared to a tuple containing the list of chars and its length. The chars have a tagged lambda with label 'String' for fast concatenation.
-```rs
-(λ#String x ('H', ('e', ('l', ('l', ('o', x))))), 5)
-```
-
-Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
-```
-main = '\u4242'
-```
-
 Here's a lambda where the body is the variable `x`:
 ```rs
 id = λx x
@@ -111,6 +96,20 @@ tup = (2, 2)
 And destructuring tuples with `let`:
 ```rs
 let (x, y) = tup; (+ x y)
+```
+
+Strings are delimited by `"` `"` and support Unicode characters.
+```rs
+main = "Hello, 🌎"
+```
+A string is desugared to a tuple containing the list of chars and its length. The chars have a tagged lambda with label 'String' for fast concatenation.
+```rs
+(λ#String x ('H', ('e', ('l', ('l', ('o', x))))), 5)
+```
+
+Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
+```
+main = '\u4242'
 ```
 
 ### More features
