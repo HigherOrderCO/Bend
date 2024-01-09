@@ -56,8 +56,22 @@ The last term in the tuple is a **superposition** of two values. A [superpositio
 
 ## Usage
 
-Now that we know how scopeless lambdas work, we can make programs using them. An example of a function that is usually thought as "primitive", but can be implemented using scopeless lambdas is **call/cc**. 
+Now that we know how scopeless lambdas work, we can make programs using them. An example of a function that is usually thought as "primitive", but can be implemented using scopeless lambdas is [call/cc](http://www.madore.org/~david/computers/callcc.html)
 
-Callcc is a function that takes a function that takes a parameter `k`. When `k` is called with an argument, `callcc` returns it.
+Call/cc is a function that takes a function that takes a parameter `k`. When `k` is called with an argument, `callcc` returns it.
 
-TODO: Code
+```rs
+// Function that discards its second argument
+Seq a b = a
+
+// Create a program capable of using `callcc`
+CC.lang = λprogram
+  let callcc  = λcallback (λ$garbage($hole) (callback λ$hole(0)));
+  let result  = (program callcc);
+  (Seq result $garbage)
+
+Main = (CC.lang λcallcc 
+  // This code calls `callcc`, then calls `k` to fill the hole with `42`. This means that the call to callcc returns `42`, and the program returns `52`. (+ (k 42) 1729) is garbage and is erased.
+  (+ 10 (callcc λk(+ (k 42) 1729)))
+)
+```

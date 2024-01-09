@@ -1,6 +1,6 @@
 # Making recursive definitions lazy
 
-The HVM-Core is an eager runtime, for both CPU and parallel GPU implementations.
+The HVM-Core is an eager runtime, for both CPU and parallel GPU implementations. Recursive terms will unroll indefinitely.
 
 Because of that, is recommended to use [supercombinator](https://en.wikipedia.org/wiki/Supercombinator) formulation to make terms be unrolled lazily, preventing infinite expansion in recursive function bodies.
 
@@ -17,4 +17,4 @@ ToMachine = λn (n ToMachine0 0)
 ```
 Definitions are lazy in the runtime. Lifting lambda terms to new definitions will prevent infinite expansion.
 
-This optimization and many others is done automatically by hvm-lang.
+This optimization is done automatically by hvm-lang.

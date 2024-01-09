@@ -1,6 +1,6 @@
 # Defining data types
 
-It is possible to define complex data types using the `data` keyword.
+It is possible to easily define complex data types using the `data` keyword.
 
 ```rs
 // A Boolean is either True or False
@@ -21,7 +21,7 @@ data Boxed = (Box val)
 let (Box value) = boxed; value
 ```
 
-For more complex types, there are two pattern syntaxes for matching on data types.  
+For more complex types, there are two pattern syntaxes for matching data types.  
 
 One of them binds implicitly the matched variable name plus `.` and the field names on each constructor:
 
@@ -33,7 +33,7 @@ Option.map = λoption λf
   }
 ```
 
-And another one which deconstructs the matched variable with explicit bindings:
+And another one, which deconstructs the matched variable with explicit bindings:
 
 ```rs
 Option.map = λoption λf
@@ -60,4 +60,4 @@ data Boolean = True | False
 (Option.is_both_some lft rgt) = False
 ```
 
-In conclusion, the `data` keyword is very useful as it allows you easily create data types and deconstruct them.
+In conclusion, the `data` keyword is very useful as it allows you to easily create data types and deconstruct them.

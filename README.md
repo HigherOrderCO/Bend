@@ -113,18 +113,20 @@ And destructuring tuples with `let`:
 let (x, y) = tup; (+ x y)
 ```
 
-### Advanced features
+### More features
 
-Advanced features are described in other files:
+Other features are described in the following documentation files:
 
-- Duplications and superpositions: [Dups and sups](docs/dups-and-sups.md)
-- Data types: [Defining data types](docs/defining-data-types.md)
-- Native numbers and operations: [Native numbers](docs/native-numbers.md)
-- Scopeless lambdas: [Using scopeless lambdas](docs/using-scopeless-lambdas.md)
-- Tagged lambdas and applications: [Automatic vectorization with tagged lambdas](docs/automatic-vectorization-with-tagged-lambdas.md)
-- Lazy definitions: [Making recursive definitions lazy](docs/lazy-definitions.md)
+Basic resources: &#128215;; Intermediate resources: &#128217;; Hard resources: &#128213;.
+
+- &#128215; Lazy definitions: [Making recursive definitions lazy](docs/lazy-definitions.md)
+- &#128215; Data types: [Defining data types](docs/defining-data-types.md)
+- &#128215; Native numbers and operations: [Native numbers](docs/native-numbers.md)
+- &#128217; Duplications and superpositions: [Dups and sups](docs/dups-and-sups.md)
+- &#128217; Scopeless lambdas: [Using scopeless lambdas](docs/using-scopeless-lambdas.md)
+- &#128217; Tagged lambdas and applications: [Automatic vectorization with tagged lambdas](docs/automatic-vectorization-with-tagged-lambdas.md)
 
 ## Further reading
 
-- [Compilation and readback](docs/compilation-and-readback.md)
-- [Old HVM wiki learning material](https://github.com/HigherOrderCO/HVM/wiki/HVM-Wiki). It is outdated, but it can still teach you some of the basics.
+- &#128217; [Compilation and readback](docs/compilation-and-readback.md)
+- &#128217; [Old HVM wiki learning material](https://github.com/HigherOrderCO/HVM/wiki/HVM-Wiki). It is outdated, but it can still teach you some of the basics.
