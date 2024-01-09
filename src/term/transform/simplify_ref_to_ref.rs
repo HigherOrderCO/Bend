@@ -39,12 +39,10 @@ impl Book {
       *body = subst_body;
     }
 
-    match &self.defs.get(&main).unwrap().rules[0].body {
-      Term::Ref { def_id } => {
-        self.defs.get_mut(&main).unwrap().rules[0].body =
-          self.defs.get(def_id).unwrap().rules[0].body.clone();
-      }
-      _ => {}
+    if let Term::Ref { def_id } = &self.defs.get(&main).unwrap().rules[0].body {
+      let rule_body = self.defs.get(def_id).unwrap().rules[0].body.clone();
+      let main_body = &mut self.defs.get_mut(&main).unwrap().rules[0].body;
+      *main_body = rule_body;
     }
 
     Ok(())
