@@ -70,7 +70,7 @@ Strings are delimited by `"` `"` and support Unicode characters.
 ```rs
 main = "Hello, 🌎"
 ```
-A string is desugared to a tuple containing a list of chars with a tagged 'String' lambda for concatenation and it's length.
+A string is desugared to a tuple containing the list of chars and its length. The chars have a tagged lambda with label 'String' for fast concatenation.
 ```rs
 (λ#String x ('H', ('e', ('l', ('l', ('o', x))))), 5)
 ```
