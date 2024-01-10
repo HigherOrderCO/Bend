@@ -156,9 +156,9 @@ where
       .map(|((tag, fst), snd)| Term::Sup { tag, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    // dup #tag? x1 x2 = body; next
-    let dup = just(Token::Dup)
-      .ignore_then(tag(Tag::Auto))
+    // #tag? dup x1 x2 = body; next
+    let dup = tag(Tag::Auto)
+      .then_ignore(just(Token::Dup))
       .then(name_or_era())
       .then(name_or_era())
       .then_ignore(just(Token::Equals))

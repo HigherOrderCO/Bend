@@ -55,7 +55,7 @@ impl Term {
       }
       Term::Dup { tag, fst, snd, val, nxt } => write!(
         f,
-        "dup{} {} {} = {}; {}",
+        "{}dup {} {} = {}; {}",
         tag.display(),
         fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
         snd.as_ref().map(|x| x.as_str()).unwrap_or("*"),
