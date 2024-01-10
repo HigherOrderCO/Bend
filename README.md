@@ -48,7 +48,6 @@ This will output the compiled file to stdout.
 
 ## Syntax
 
-
 HVM-Lang files consists of a series of definitions, which bind a name to a term. Terms can be lambdas, applications, or other terms.
 
 Here's a lambda where the body is the variable `x`:
@@ -102,9 +101,14 @@ Strings are delimited by `"` `"` and support Unicode characters.
 ```rs
 main = "Hello, 🌎"
 ```
-A string is desugared to a tuple containing the list of chars and its length. The chars have a tagged lambda with label 'String' for fast concatenation.
+A string is desugared to a tuple containing its length and its content as a list of characters. The characters are encoded using a tagged lambda with label 'str' for fast concatenation.
 ```rs
-(λ#String x ('H', ('e', ('l', ('l', ('o', x))))), 5)
+(5, λ#str x ('H', ('e', ('l', ('l', ('o', x))))))
+```
+
+Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
+```
+main = '\u4242'
 ```
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.

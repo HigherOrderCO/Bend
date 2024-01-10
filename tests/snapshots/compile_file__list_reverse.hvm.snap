@@ -2,15 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/list_reverse.hvm
 ---
-@6 = (a (b c))
-& @concat ~ (d (e c))
-& @cons ~ (a (@nil e))
-& @reverse ~ (b d)
-@A = (a (b (c d)))
-& @cons ~ (a (e d))
-& @concat ~ (b (c e))
+@6 = (a ({2 @6 {2 @nil {2 @A {2 @B ({2 (a (@nil b)) {2 * b}} c)}}}} c))
+@A = (a ({2 @A {2 @B (b c)}} (b {2 (a (c d)) {2 * d}})))
 @B = (a a)
-@concat = ({2 @A {2 @B a}} a)
 @cons = (a (b {2 (a (b c)) {2 * c}}))
 @main = a
 & @reverse ~ (b a)
