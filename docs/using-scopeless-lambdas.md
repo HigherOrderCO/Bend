@@ -12,11 +12,20 @@ Of course, using scopeless lambdas as a replacement for regular lambdas is kind 
 
 ```rs
 main = (((λ$x 1) 2), $x)
-// ---- x gets replaced by 2 and application gets replaced by 1
+// $x gets replaced by 2 and the application ((λ$x 1) 2) gets replaced by 1
 // Outputs (1, 2)
 ```
 
-Take some time to think about the program above. It is valid, despite `$x` being used outside the body.
+Take some time to think about the program above. It is valid, despite `$x` being used outside the lambda's body.
+
+However, scopeless lambdas don't bind across definitions
+```rs
+def = $x
+
+main = (((λ$x 1) 2), def)
+```
+
+The bound variables are local to each term.
 
 ## Duplicating scopeless lambdas
 
@@ -26,10 +35,8 @@ We have seen that the variable bound to a scopeless lambda gets set when the lam
 main = // TODO bug in hvm-lang
 	let _ = λ$x 1 // Discard and erase the scopeless lambda
 	(2, $x)
-```
-Output:
-```rs
-(2, *)
+
+// Outputs (2, *)
 ```
 
 The program outputs `2` as the first item of the tuple, as expected. But the second item is `*`! What is `*`?
@@ -44,10 +51,8 @@ Try to answer this with your knowledge of HVM. Will it throw a runtime error? Wi
 main =
 	let f = λ$x 1 // Assign the lambda to a variable
 	((f 2), ((f 3), $x)) // Return a tuple of (f 2) and another tuple.
-```
-Output:
-```
-(1, (1, {#0 3 2}))
+
+// Outputs (1, (1, {#0 3 2}))
 ```
 
 What? This is even more confusing. The first two values are `1`, as expected. But what about the last term?

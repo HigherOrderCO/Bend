@@ -1,3 +1,5 @@
+// This program is an example that shows how scopeless lambdas can be used.
+
 Seq a b = a
 
 // Create a program capable of using `callcc`

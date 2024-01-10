@@ -23,6 +23,15 @@ some_val = (+ (+ 7 4) (* 2 3))
 ```
 The current operations include `+, -, *, /, %, ==, !=, <, >, <=, >=, &, |, ^, ~, <<, >>`.
 
+The `~` symbol stands for NOT. It takes two arguments and calculates the 60-bit binary NOT of the first one, but ignores its second one. However, because of implementation details, the second argument must be a number too.
+
+```rs
+main = (~ 42 10)
+// Outputs the same thing as (~ 42 50)
+// And as (~ 42 1729)
+// But not the same thing as (~ 42 *) (!)
+```
+
 HVM-lang also includes a `match` syntax for native numbers. The `0` case is chosen when `n` is 0, and the `+` case is chosen when `n` is greater than 0. The previous number, by default, bound to `n-1`.
 ```rs
 Number.to_church = λn λf λx 
@@ -45,7 +54,7 @@ fibonacci = λn // n is the argument
   match n {
     // If the number is 0, then return 0
     0: 0
-    // If the number is greater than 0, bind the predecessor to `a`
+    // If the number is greater than 0, bind it predecessor to `a`
     +a:
     match a {
       // If the predecessor is 0, then return 1
