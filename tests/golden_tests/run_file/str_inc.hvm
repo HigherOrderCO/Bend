@@ -1,0 +1,6 @@
+(StrInc (len, buf)) = (len, @#str x (StrGo len (#str buf x)))
+
+(StrGo 0 str) = str
+(StrGo +x (head, tail)) = ((+ 1 head), (StrGo x tail))
+
+main = (StrInc "hello world")
