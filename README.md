@@ -288,7 +288,6 @@ main = (not (Cons T (Cons F (Cons T Nil))))
 The tagged lambda and applications are compiled to `dup` `inet` nodes with different tag values for each label. This allows for different commutation rules, check [HVM-Core](https://github.com/HigherOrderCO/hvm-core/tree/main#language) to learn more about it.
 
 ### *limitations:
-- When using a built-in ADT (created using the `data` keyword), it must not contain fields 
 - The function must not be recursive
 - There must not be labels in common between the function and what you want to vectorize over
 
