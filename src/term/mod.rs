@@ -288,7 +288,7 @@ impl DefId {
 
 impl Tag {
   pub fn str() -> Self {
-    Self::Named(Name::new("Str"))
+    Self::Named(Name::new("str"))
   }
 }
 
