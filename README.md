@@ -72,7 +72,7 @@ main = "Hello, 🌎"
 ```
 A string is desugared to a tuple containing its length and the list of chars. The chars have a tagged lambda with label 'str' for fast concatenation.
 ```rs
-(5, λ#str x ('H', ('e', ('l', ('l', ('o', x))))))
+(5, #str λx ('H', ('e', ('l', ('l', ('o', x))))))
 ```
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
@@ -163,7 +163,7 @@ dup x1 x2 = {1 2}
 Both `dups` and `sups` support labels, that is, a field starting with `#` to identify their counterpart:
 ```rs
 // here, x1 now contains the value of 1, and x2 the value of 2
-dup #i x1 x2 = {#i 1 2}
+#i dup x1 x2 = #i {1 2}
 ```
 
 Due to how dups are compiled, dup tags between two interacting terms should not contain the same label. For example, an application of the church numeral 2 with itself:
@@ -177,8 +177,8 @@ To avoid label collision, HVM-Lang automatically generates new dup labels for ea
 
 To fix the problem, its necessary to re-create the term so that a new label is assigned, or manually assign one:
 ```rs
-c2  = λf λx dup        f1 f2 = f; (f1 (f2 x))
-c2_ = λf λx dup #label f1 f2 = f; (f1 (f2 x))
+c2  = λf λx        dup f1 f2 = f; (f1 (f2 x))
+c2_ = λf λx #label dup f1 f2 = f; (f1 (f2 x))
 main = (c2 c2_)
 ```
 
@@ -264,19 +264,19 @@ Similarly to dups and sups, lambdas and applications can have labels too.
 For example, data types can be encoded as tagged lambdas:
 ```rs
 // data Bool = T | F
-T = λ#Bool t λ#Bool f t
-F = λ#Bool t λ#Bool f f
+T = #Bool @t #Bool @f t
+F = #Bool @t #Bool @f f
 
 // data List = (Cons x xs) | Nil
-Cons = λx λxs λ#List c λ#List n (#List.Cons.xs (#List.Cons.x c x) xs)
-Nil  =        λ#List c λ#List n n
+Cons = @x @xs #List @c #List @n #List (c x xs)
+Nil  =        #List @c #List @n n
 ```
 
 When encoding the pattern matching, the application can then use the same label:
 
 ```rs
-// not = λbool match bool { T: (F) F: (T) } 
-not = λbool (#Bool bool F T)
+// not = @bool match bool { T: (F) F: (T) } 
+not = @bool #Bool (bool F T)
 ```
 
 This allows, in some limited* scenarios, automatic vectorization:
