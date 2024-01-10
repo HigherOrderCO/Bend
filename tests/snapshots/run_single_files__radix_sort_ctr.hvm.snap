@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_single_files/radix_sort_ctr.hvm
----
-120
