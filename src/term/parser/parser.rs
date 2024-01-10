@@ -156,11 +156,13 @@ where
       .map(|((tag, fst), snd)| Term::Sup { tag, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    // #tag? dup x1 x2 = body; next
-    let dup = tag(Tag::Auto)
-      .then_ignore(just(Token::Dup))
+    // let #tag? {x1 x2} = body; next
+    let dup = just(Token::Let)
+      .ignore_then(tag(Tag::Auto))
+      .then_ignore(just(Token::LBracket))
       .then(name_or_era())
       .then(name_or_era())
+      .then_ignore(just(Token::RBracket))
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(term_sep.clone())
