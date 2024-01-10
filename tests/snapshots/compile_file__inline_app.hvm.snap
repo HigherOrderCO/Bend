@@ -2,8 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/inline_app.hvm
 ---
-@Rul1 = (a a)
-@Rul2 = (a a)
 @Rul3 = (a a)
 @main = a
 & @Rul3 ~ (@Rul3 a)
