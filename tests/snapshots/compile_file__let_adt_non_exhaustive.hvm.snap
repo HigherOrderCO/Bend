@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/let_adt_non_exhaustive.hvm
 ---
-Non-exhaustive pattern at definition 'main$match$1'. Hint: (None) not covered.
+Non-exhaustive pattern at definition 'main$match$1'. Hint: (main$match$1 None) not covered.
