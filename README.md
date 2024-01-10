@@ -264,19 +264,19 @@ Similarly to dups and sups, lambdas and applications can have labels too.
 For example, data types can be encoded as tagged lambdas:
 ```rs
 // data Bool = T | F
-T = @#Bool t @#Bool f t
-F = @#Bool t @#Bool f f
+T = λ#Bool t λ#Bool f t
+F = λ#Bool t λ#Bool f f
 
 // data List = (Cons x xs) | Nil
-Cons = @x @xs @#List c @#List n (#List c x xs)
-Nil  =        @#List c @#List n n
+Cons = λx λxs λ#List c λ#List n (#List.Cons.xs (#List.Cons.x c x) xs)
+Nil  =        λ#List c λ#List n n
 ```
 
 When encoding the pattern matching, the application can then use the same label:
 
 ```rs
-// not = @bool match bool { T: (F) F: (T) } 
-not = @bool (#Bool bool F T)
+// not = λbool match bool { T: (F) F: (T) } 
+not = λbool (#Bool bool F T)
 ```
 
 This allows, in some limited* scenarios, automatic vectorization:
@@ -288,7 +288,6 @@ main = (not (Cons T (Cons F (Cons T Nil))))
 The tagged lambda and applications are compiled to `dup` `inet` nodes with different tag values for each label. This allows for different commutation rules, check [HVM-Core](https://github.com/HigherOrderCO/hvm-core/tree/main#language) to learn more about it.
 
 ### *limitations:
-- When using a built-in ADT (created using the `data` keyword), it must not contain fields 
 - The function must not be recursive
 - There must not be labels in common between the function and what you want to vectorize over
 
