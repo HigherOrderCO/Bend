@@ -4,16 +4,16 @@ input_file: tests/golden_tests/encode_pattern_match/weekday.hvm
 ---
 (main) = (λx x Saturday)
 
-(Monday) = λ#Weekday Monday λ#Weekday Tuesday λ#Weekday Wednesday λ#Weekday Thursday λ#Weekday Friday λ#Weekday Saturday λ#Weekday Sunday Monday
+(Monday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Monday
 
-(Tuesday) = λ#Weekday Monday λ#Weekday Tuesday λ#Weekday Wednesday λ#Weekday Thursday λ#Weekday Friday λ#Weekday Saturday λ#Weekday Sunday Tuesday
+(Tuesday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Tuesday
 
-(Wednesday) = λ#Weekday Monday λ#Weekday Tuesday λ#Weekday Wednesday λ#Weekday Thursday λ#Weekday Friday λ#Weekday Saturday λ#Weekday Sunday Wednesday
+(Wednesday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Wednesday
 
-(Thursday) = λ#Weekday Monday λ#Weekday Tuesday λ#Weekday Wednesday λ#Weekday Thursday λ#Weekday Friday λ#Weekday Saturday λ#Weekday Sunday Thursday
+(Thursday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Thursday
 
-(Friday) = λ#Weekday Monday λ#Weekday Tuesday λ#Weekday Wednesday λ#Weekday Thursday λ#Weekday Friday λ#Weekday Saturday λ#Weekday Sunday Friday
+(Friday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Friday
 
-(Saturday) = λ#Weekday Monday λ#Weekday Tuesday λ#Weekday Wednesday λ#Weekday Thursday λ#Weekday Friday λ#Weekday Saturday λ#Weekday Sunday Saturday
+(Saturday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Saturday
 
-(Sunday) = λ#Weekday Monday λ#Weekday Tuesday λ#Weekday Wednesday λ#Weekday Thursday λ#Weekday Friday λ#Weekday Saturday λ#Weekday Sunday Sunday
+(Sunday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Sunday
