@@ -264,12 +264,12 @@ Similarly to dups and sups, lambdas and applications can have labels too.
 For example, data types can be encoded as tagged lambdas:
 ```rs
 // data Bool = T | F
-T = #Bool @t #Bool @f t
-F = #Bool @t #Bool @f f
+T = #Bool λt #Bool λf t
+F = #Bool λt #Bool λf f
 
 // data List = (Cons x xs) | Nil
-Cons = @x @xs #List @c #List @n #List (c x xs)
-Nil  =        #List @c #List @n n
+Cons = λx λxs #List λc #List λn #List.Cons.xs (#List.Cons.x (c x) xs)
+Nil  =        #List λc #List λn n
 ```
 
 When encoding the pattern matching, the application can then use the same label:
