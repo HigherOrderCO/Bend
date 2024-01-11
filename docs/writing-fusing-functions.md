@@ -28,13 +28,13 @@ If the boolean is `true`, then the function will return `false`. If it is `false
 ## Self-application
 
 What happens if we self-compose the `not` function? It is a well known fact that`(not (not x)) == x`, so we should expect something that behaves like the identity function.
-```
+```rs
 main = λx (not (not x))
 // Output:
 // λa (a λ* λb b λc λ* c λ* λd d λe λ* e)
 ```
 The self-application of `not` outputs a large term. Testing will show that the term does indeed behave like an identity function. However, since the self-application of `not` is larger than `not` itself, if we self-compose this function many times, our program will get really slow and eat up a lot of memory, despite all functions being equivalent to the identity function:
-```
+```rs
 main = λx (not (not x)) // Long
 main = λx (not (not (not (not x)))) // Longer
 main = λx (not (not (not (not (not (not (not (not x)))))))) // Longer
@@ -46,19 +46,19 @@ Luckily, there's a trick we can do to make the self-application of `not` much sh
 
 ### Fusing functions
 Let's first take our initial `not` implementation.
-```
+```rs
 not = λboolean (boolean false true)
 ```
 We begin by replacing `false` and `true` by their values.
-```
+```rs
 not = λboolean (boolean λtλf(f) λtλf(t))
 ```
 After doing this, it's easy to notice that there's something that both terms have in common. Both of them are lambdas that take in two arguments. We can **lift** the lambda arguments up and make them **shared** between both cases.
-```
+```rs
 not = λbooleanλtλf (boolean f t)
 ```
 Let's see how the self-application of `not` gets reduced now. Each line will be a step in the reduction.
-```
+```rs
 main = λx (not (not x))
 main = λx (not (λbooleanλtλf (boolean f t) x))
 main = λx (not (λtλf (boolean x f t)))
@@ -74,7 +74,7 @@ Fusing isn't only for Church-encoded `not`. Fusing can be done anywhere where ef
 To show the power of fusing, here is a program that self-composes `fusing_not` 2^512 times and prints the result. `2^512` is larger than amount of atoms in the observable universe, and yet HVM is still able to work with it due to its optimal sharing capabilities. 
 
 This program uses [native numbers, which are described here](native-numbers.md).
-```
+```rs
 true = λt λf t
 false = λt λf f
 not = λboolean (boolean false true)
@@ -89,7 +89,7 @@ main =
 	(two_pow_512 fusing_not)  // try replacing this by not. Will it still work?
 ```
 Here is the program's output:
-```
+```bash
 $ hvml run -s fuse_magic.hvm 
 λa λb λc (a b c)
 
