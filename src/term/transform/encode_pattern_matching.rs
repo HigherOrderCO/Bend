@@ -191,8 +191,8 @@ fn make_leaf_pattern_matching_case(
       (Pattern::Var(..), Pattern::Num(..)) => term,
       (Pattern::Ctr(..), _) => unreachable!(),
       (Pattern::Var(_), _) => unreachable!(),
-      (Pattern::Num(..), _) => todo!(),
-      (Pattern::Tup(..), _) => todo!(),
+      (Pattern::Num(..), _) => unreachable!(),
+      (Pattern::Tup(..), _) => unreachable!(),
     }
   });
 
