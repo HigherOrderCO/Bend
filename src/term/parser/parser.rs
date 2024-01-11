@@ -131,36 +131,38 @@ where
     // *
     let era = just(Token::Asterisk).to(Term::Era).boxed();
 
-    // λx body
-    let lam = just(Token::Lambda)
-      .ignore_then(tag(Tag::Static))
+    // #tag? λx body
+    let lam = tag(Tag::Static)
+      .then_ignore(just(Token::Lambda))
       .then(name_or_era())
       .then(term.clone())
       .map(|((tag, name), body)| Term::Lam { tag, nam: name, bod: Box::new(body) })
       .boxed();
 
-    // λ$x body
-    let global_lam = just(Token::Lambda)
-      .ignore_then(tag(Tag::Static))
+    // #tag? λ$x body
+    let global_lam = tag(Tag::Static)
+      .then_ignore(just(Token::Lambda))
       .then(just(Token::Dollar).ignore_then(name()))
       .then(term.clone())
       .map(|((tag, name), body)| Term::Chn { tag, nam: name, bod: Box::new(body) })
       .boxed();
 
-    // {#tag fst snd}
-    let sup = just(Token::LBracket)
-      .ignore_then(tag(Tag::Auto))
+    // #tag {fst snd}
+    let sup = tag(Tag::Auto)
+      .then_ignore(just(Token::LBracket))
       .then(term.clone())
       .then(term.clone())
       .then_ignore(just(Token::RBracket))
       .map(|((tag, fst), snd)| Term::Sup { tag, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    // dup #tag? x1 x2 = body; next
-    let dup = just(Token::Dup)
+    // let #tag? {x1 x2} = body; next
+    let dup = just(Token::Let)
       .ignore_then(tag(Tag::Auto))
+      .then_ignore(just(Token::LBracket))
       .then(name_or_era())
       .then(name_or_era())
+      .then_ignore(just(Token::RBracket))
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(term_sep.clone())
@@ -234,14 +236,15 @@ where
       })
       .boxed();
 
-    // (f arg1 arg2 ...)
+    // #tag? (f arg1 arg2 ...)
     let app = tag(Tag::Static)
+      .then_ignore(just(Token::LParen))
       .then(term.clone())
       .foldl(term.clone().repeated(), |(tag, fun), arg| {
         (tag.clone(), Term::App { tag, fun: Box::new(fun), arg: Box::new(arg) })
       })
+      .then_ignore(just(Token::RParen))
       .map(|(_, app)| app)
-      .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
     let num_op = num_oper()

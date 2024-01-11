@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/def_bool_num.hvm
+---
+Non-exhaustive pattern at definition 'go'. Hint: (go false 0) not covered.

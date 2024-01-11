@@ -1,4 +1,4 @@
-(c2) = λs dup s0 s1 = s; λz (s0 (s1 z))
+(c2) = λs let {s0 s1} = s; λz (s0 (s1 z))
 
 (O) = λt λo λi λe (o t)
 (I) = λt λo λi λe (i t)

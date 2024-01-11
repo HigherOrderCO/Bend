@@ -1,12 +1,12 @@
 # Dups and sups
 
-Term duplication is done automatically when a variable is used more than once. But it's possible to manually duplicate a term using `dup`:
+Term duplication is done automatically when a variable is used more than once. But it's possible to manually duplicate a term using `let`. This type of statement is called `dup` or `duplication`.
 ```rs
-// the number 2 in church encoding using dup.
-ch2 = λf λx dup f1 f2 = f; (f1 (f2 x))
+// the number 2 in church encoding using let.
+ch2 = λf λx let {f1 f2} = f; (f1 (f2 x))
 
-// the number 3 in church encoding using dup.
-ch3 = λf λx dup f0 f1 = f; dup f2 f3 = f0; (f1 (f2 (f3 x)))
+// the number 3 in church encoding using let.
+ch3 = λf λx let {f0 f1} = f; let {f2 f3} = f0; (f1 (f2 (f3 x)))
 ```
 
 A `sup` is a superposition of two values, it is defined using curly brackets with two terms inside. A superposition is the opposite of a duplication.
@@ -23,24 +23,24 @@ result_sup = (mul 2 {5 7})     // returns {10 14}
 multi_sup  = (mul {2 3} {5 7}) // returns {{10 14} {15 21}}
 ```
 
-To access both values of a superposition, `dups` with labels are needed.  
+To access both values of a superposition, superpositions with labels are needed.  
 A `dup` generally just duplicates the term it points to:
 
 ```rs
 // each dup variable now has a copy of the {1 2} superposition
-dup x1 x2 = {1 2}
+let {x1 x2} = {1 2}
 ```
 
-Both `dups` and `sups` support labels, that is, a field starting with `#` to identify their counterpart:
+Both `dups` and `sups` support labels, that is, a field starting with `#` to identify their counterpart. Unlabeled dups and sups are automatically assigned unique labels:
 ```rs
 // here, x1 now contains the value of 1, and x2 the value of 2
-dup #i x1 x2 = {#i 1 2}
+let #i{x1 x2} = #i{1 2}
 ```
 
 Due to how dups are compiled, dup tags between two interacting terms should not contain the same label. For example, an application of the church numeral 2 with itself won't reduce as expected:
 
 ```rs
-c2 = λf λx dup f1 f2 = f; (f1 (f2 x))
+c2 = λf λx let {f1 f2} = f; (f1 (f2 x))
 main = (c2 c2)
 ```
 
@@ -50,7 +50,7 @@ This is not *incorrect* behavior or *undefined* behaviour. It is incorrect only 
 
 To fix the problem, its necessary to re-create the term so that a new label is assigned, or manually assign one:
 ```rs
-c2  = λf λx dup        f1 f2 = f; (f1 (f2 x))
-c2_ = λf λx dup #label f1 f2 = f; (f1 (f2 x))
+c2  = λf λx let        {f1 f2} = f; (f1 (f2 x))
+c2_ = λf λx let #label {f1 f2} = f; (f1 (f2 x))
 main = (c2 c2_)
 ```

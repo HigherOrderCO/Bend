@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/non_exhaustive_different_types.hvm
+---
+Non-exhaustive pattern at definition 'foo'. Hint: (foo f1 f2 t3 f4) not covered.

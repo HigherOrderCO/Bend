@@ -110,12 +110,6 @@ Characters are delimited by `'` `'` and support Unicode escape sequences. They h
 ```
 main = '\u4242'
 ```
-
-Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
-```
-main = '\u4242'
-```
-
 ### More features
 
 Key:

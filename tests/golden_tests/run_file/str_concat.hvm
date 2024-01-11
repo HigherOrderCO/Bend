@@ -1,0 +1,4 @@
+String.concat (a_len, a_buf) (b_len, b_buf) =
+  ((+ a_len b_len), #str @x #str (a_buf #str (b_buf x)))
+
+main = (String.concat "hello " "world")

@@ -19,9 +19,6 @@ pub enum Token {
   #[token("let")]
   Let,
 
-  #[token("dup")]
-  Dup,
-
   #[token("match")]
   Match,
 
@@ -36,7 +33,8 @@ pub enum Token {
   #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#, |lex| normalized_string(lex).ok())]
   Str(String),
 
-  #[regex(r#"'(.|\\t|\\u[0-9a-fA-F]{4}|\\n|\\')'"#, normalized_char)]
+  #[regex(r#"'\\U[0-9a-fA-F]{1,8}'"#, normalized_char, priority = 2)]
+  #[regex(r#"'(.|\\t|\\u[0-9a-fA-F]{1,4}|\\n|\\')'"#, normalized_char)]
   Char(u64),
 
   #[token("#")]
@@ -144,8 +142,8 @@ fn normalized_string(lexer: &mut Lexer<Token>) -> Result<String, ParseIntError> 
       '\\' => match chars.next() {
         Some('n') => s.push('\n'),
         Some('t') => s.push('\t'),
-        Some('u') => {
-          let hex = chars.take(4).collect::<String>();
+        Some('u') | Some('U') => {
+          let hex = chars.take(8).collect::<String>();
           let hex_val = u32::from_str_radix(&hex, 16)?;
           let char = char::from_u32(hex_val).unwrap_or(char::REPLACEMENT_CHARACTER);
           s.push(char);
@@ -218,8 +216,8 @@ fn normalized_char(lexer: &mut Lexer<Token>) -> Option<u64> {
       Some('n') => '\n',
       Some('t') => '\t',
       Some('\'') => '\'',
-      Some('u') => {
-        let hex = chars.take(4).collect::<String>();
+      Some('u') | Some('U') => {
+        let hex = chars.take(8).collect::<String>();
         let hex_val = u32::from_str_radix(&hex, 16).unwrap();
         char::from_u32(hex_val).unwrap_or(char::REPLACEMENT_CHARACTER)
       }
@@ -238,7 +236,6 @@ impl fmt::Display for Token {
       Self::Lambda => write!(f, "λ"),
       Self::Dollar => write!(f, "$"),
       Self::Let => write!(f, "let"),
-      Self::Dup => write!(f, "dup"),
       Self::Match => write!(f, "match"),
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),

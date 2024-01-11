@@ -110,7 +110,7 @@ fn compile_file_o0() {
 }
 
 #[test]
-fn run_single_files() {
+fn run_file() {
   run_golden_test_dir(function_name!(), &|code| {
     let book = do_parse_book(code)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster

@@ -24,7 +24,7 @@ impl Term {
       Term::Lam { tag, nam, bod } => {
         write!(
           f,
-          "λ{}{} {}",
+          "{}λ{} {}",
           tag.display_padded(),
           nam.clone().unwrap_or(Name::new("*")),
           bod.display(def_names)
@@ -32,7 +32,7 @@ impl Term {
       }
       Term::Var { nam } => write!(f, "{nam}"),
       Term::Chn { tag, nam, bod } => {
-        write!(f, "λ{}${} {}", tag.display_padded(), nam, bod.display(def_names))
+        write!(f, "{}λ${} {}", tag.display_padded(), nam, bod.display(def_names))
       }
       Term::Lnk { nam } => write!(f, "${nam}"),
       Term::Let { pat, val, nxt } => {
@@ -40,7 +40,7 @@ impl Term {
       }
       Term::Ref { def_id } => write!(f, "{}", def_names.name(def_id).unwrap()),
       Term::App { tag, fun, arg } => {
-        write!(f, "({}{} {})", tag.display_padded(), fun.display_app(tag, def_names), arg.display(def_names))
+        write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag, def_names), arg.display(def_names))
       }
       Term::Match { scrutinee, arms } => {
         write!(
@@ -55,7 +55,7 @@ impl Term {
       }
       Term::Dup { tag, fst, snd, val, nxt } => write!(
         f,
-        "dup{} {} {} = {}; {}",
+        "let{} {{{} {}}} = {}; {}",
         tag.display(),
         fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
         snd.as_ref().map(|x| x.as_str()).unwrap_or("*"),
@@ -63,7 +63,7 @@ impl Term {
         nxt.display(def_names)
       ),
       Term::Sup { tag, fst, snd } => {
-        write!(f, "{{{}{} {}}}", tag.display_padded(), fst.display(def_names), snd.display(def_names))
+        write!(f, "{}{{{} {}}}", tag.display_padded(), fst.display(def_names), snd.display(def_names))
       }
       Term::Era => write!(f, "*"),
       Term::Num { val } => write!(f, "{val}"),
