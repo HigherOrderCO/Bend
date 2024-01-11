@@ -195,10 +195,7 @@ impl<'a> Reader<'a> {
         0 => {
           let fst = self.read_term(self.net.enter_port(Port(node, 1)));
           let snd = self.read_term(self.net.enter_port(Port(node, 2)));
-          match snd {
-            Term::Lam { tag, bod, .. } if tag == Tag::str() => self.decode_str(fst, *bod),
-            snd => Term::Tup { fst: Box::new(fst), snd: Box::new(snd) },
-          }
+          Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }
         }
         // If we're visiting a port 1 or 2, then it is a variable.
         1 | 2 => {
@@ -214,29 +211,32 @@ impl<'a> Reader<'a> {
 }
 
 impl<'a> Reader<'a> {
-  fn decode_str(&mut self, fst: Term, bod: Term) -> Term {
-    let Term::Num { val: len } = fst else {
-      return self.error(ReadbackError::InvalidStrLen);
-    };
-    let mut s = String::with_capacity(len as usize);
-    let mut next = vec![bod];
-    while let Some(t) = next.pop() {
+  fn decode_str(&mut self, fst: &mut Term) -> Term {
+    let mut s = String::new();
+    fn go(t: &mut Term, s: &mut String) {
       match t {
-        Term::Var { .. } => break, // reached the end of the str
-        Term::Tup { fst, snd } => {
-          let Term::Num { val } = *fst else {
-            return self.error(ReadbackError::InvalidChar);
-          };
-          if let Some(c) = char::from_u32(val as u32) {
-            s.push(c);
-            next.push(*snd);
-          } else {
-            self.errors.push(ReadbackError::InvalidChar);
-          }
+        Term::Num { val } => s.push(unsafe { char::from_u32_unchecked(*val as u32) }),
+        Term::Lam { bod, .. } => go(bod, s),
+        Term::App { tag, arg, .. } if *tag == Tag::string_scons_head() => go(arg, s),
+        Term::App { fun, arg, .. } => {
+          go(fun, s);
+          go(arg, s);
         }
-        _ => self.errors.push(ReadbackError::InvalidStrTerm),
+        Term::Var { .. } => {}
+        Term::Chn { .. }
+        | Term::Lnk { .. }
+        | Term::Let { .. }
+        | Term::Tup { .. }
+        | Term::Dup { .. }
+        | Term::Sup { .. }
+        | Term::Str { .. }
+        | Term::Opx { .. }
+        | Term::Match { .. }
+        | Term::Ref { .. }
+        | Term::Era => unreachable!("{t:?}"),
       }
     }
+    go(fst, &mut s);
     Term::Str { val: s }
   }
 }
@@ -446,6 +446,10 @@ impl<'a> Reader<'a> {
   fn resugar_adts(&mut self, term: &mut Term) {
     match term {
       Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
+        if *adt_name == Name::new("String") {
+          *term = self.decode_str(bod);
+          return;
+        }
         let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
           return self.resugar_adts(bod);
         };
