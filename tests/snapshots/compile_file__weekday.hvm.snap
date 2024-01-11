@@ -2,11 +2,26 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/weekday.hvm
 ---
-@L = {2 a {2 * a}}
-@M = {2 * @L}
-@N = {2 * @M}
-@O = {2 * @N}
-@P = {2 * @O}
-@Saturday = {2 * @P}
+@B = {8 a {8 * {8 * {8 * {8 * {8 * a}}}}}}
+@C = {8 a {8 * {8 * {8 * {8 * a}}}}}
+@D = {8 * @C}
+@E = {8 a {8 * {8 * {8 * a}}}}
+@F = {8 * @E}
+@G = {8 * @F}
+@H = {8 a {8 * {8 * a}}}
+@I = {8 * @H}
+@J = {8 * @I}
+@K = {8 * @J}
+@L = {8 a {8 * a}}
+@M = {8 * @L}
+@N = {8 * @M}
+@O = {8 * @N}
+@P = {8 * @O}
+@Q = {8 * {8 a a}}
+@R = {8 * @Q}
+@S = {8 * @R}
+@Saturday = {8 * @P}
+@T = {8 * @S}
+@U = {8 * @T}
 @main = @Saturday
 

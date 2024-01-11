@@ -8,6 +8,14 @@ impl Book {
   /// Removes all unused definitions starting from Main.
   pub fn prune(&mut self, main: DefId) {
     let mut used = Definitions::new();
+    // insert as used all user defined constructors
+    for ctr in self.ctrs.keys() {
+      let Definition { def_id, rules } = self.defs.get(&self.def_names.name_to_id[ctr]).unwrap();
+      used.insert(*def_id);
+      for rule in rules {
+        rule.body.find_used_definitions(&mut used, &self.defs);
+      }
+    }
 
     let Definition { def_id, rules } = self.defs.get(&main).unwrap();
     used.insert(*def_id);
