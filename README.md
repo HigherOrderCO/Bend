@@ -118,9 +118,12 @@ main = '\u4242'
 
 ### More features
 
-Other features are described in the following documentation files:
+Key:
+- &#128215;: Basic resources
+- &#128217;: Intermediate resources
+- &#128213;: Advanced resources
 
-Basic resources: &#128215;; Intermediate resources: &#128217;; Hard resources: &#128213;.
+Other features are described in the following documentation files:
 
 - &#128215; Lazy definitions: [Making recursive definitions lazy](docs/lazy-definitions.md)
 - &#128215; Data types: [Defining data types](docs/defining-data-types.md)
@@ -128,6 +131,7 @@ Basic resources: &#128215;; Intermediate resources: &#128217;; Hard resources: &
 - &#128217; Duplications and superpositions: [Dups and sups](docs/dups-and-sups.md)
 - &#128217; Scopeless lambdas: [Using scopeless lambdas](docs/using-scopeless-lambdas.md)
 - &#128217; Tagged lambdas and applications: [Automatic vectorization with tagged lambdas](docs/automatic-vectorization-with-tagged-lambdas.md)
+- &#128213;: Fusing functions: [Writing fusing functions](docs/writing-fusing-functions.md)
 
 ## Further reading
 
