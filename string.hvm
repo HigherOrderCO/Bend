@@ -1,3 +1,0 @@
-(StrCons x (str_tup, str_len)) = (λ#String k (x, (str_tup k)), (+ 1 str_len))
-
-Main = (StrCons 'a' "foo")
