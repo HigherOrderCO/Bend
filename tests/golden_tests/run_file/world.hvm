@@ -1,1 +1,1 @@
-main = (1, @#str s ('\U1F30E', s))
+main = (SCons '\U1F30E' SNil)

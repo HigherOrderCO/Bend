@@ -160,6 +160,7 @@ fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
     book.check_shared_names()?;
+    book.encode_strs();
     book.generate_scott_adts();
     book.resolve_refs();
     encode_pattern_matching(&mut book)?;
