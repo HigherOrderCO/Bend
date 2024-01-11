@@ -1,6 +1,6 @@
 (StrInc (len, buf)) = (len, #str λx (StrGo len #str (buf x)))
 
-(StrGo 0 str) = str
+(StrGo 0  (head, tail)) = (head, tail)
 (StrGo +x (head, tail)) = ((+ 1 head), (StrGo x tail))
 
 // Old str encoding

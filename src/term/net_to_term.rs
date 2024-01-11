@@ -4,6 +4,7 @@ use crate::{
   term::Pattern,
 };
 use hvmc::run::Loc;
+use indexmap::IndexSet;
 use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
@@ -22,7 +23,7 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
 
   let mut term = reader.read_term(net.enter_port(ROOT));
 
-  while let Some(node) = reader.scope.vec.pop() {
+  while let Some(node) = reader.scope.pop() {
     let val = reader.read_term(reader.net.enter_port(Port(node, 0)));
     let fst = reader.namegen.decl_name(net, Port(node, 1));
     let snd = reader.namegen.decl_name(net, Port(node, 2));
@@ -157,8 +158,20 @@ impl<'a> Reader<'a> {
           }
           .unwrap_or_else(|| {
             // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
-            let fst = self.read_term(self.net.enter_port(Port(node, 1)));
-            let snd = self.read_term(self.net.enter_port(Port(node, 2)));
+            let fst_port = self.net.enter_port(Port(node, 1));
+            let fst = self.read_term(fst_port);
+  
+            let snd_port = self.net.enter_port(Port(node, 2));
+            let snd = self.read_term(snd_port);
+  
+            if fst_port.node() == snd_port.node() {
+              let node = fst_port.node();
+              if let Dup { .. } = self.net.node(node).kind {
+                self.scope.remove(&node);
+                return self.read_term(self.net.enter_port(Port(node, 0)))
+              }
+            }
+
             Term::Sup { tag: self.labels.dup.to_tag(Some(lab)), fst: Box::new(fst), snd: Box::new(snd) }
           })
         }
@@ -191,8 +204,20 @@ impl<'a> Reader<'a> {
       Tup => match next.slot() {
         // If we're visiting a port 0, then it is a Tup.
         0 => {
-          let fst = self.read_term(self.net.enter_port(Port(node, 1)));
-          let snd = self.read_term(self.net.enter_port(Port(node, 2)));
+          let fst_port = self.net.enter_port(Port(node, 1));
+          let fst = self.read_term(fst_port);
+
+          let snd_port = self.net.enter_port(Port(node, 2));
+          let snd = self.read_term(snd_port);
+
+          if fst_port.node() == snd_port.node() {
+            let node = fst_port.node();
+            if let Tup = self.net.node(node).kind {
+              self.scope.remove(&node);
+              return self.read_term(self.net.enter_port(Port(node, 0)))
+            }
+          }
+
           Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }
         }
         // If we're visiting a port 1 or 2, then it is a variable.
@@ -298,20 +323,7 @@ impl Term {
   }
 }
 
-#[derive(Default)]
-struct Scope {
-  vec: Vec<NodeId>,
-  set: HashSet<NodeId>,
-}
-
-impl Scope {
-  fn insert(&mut self, node: NodeId) {
-    if !self.set.contains(&node) {
-      self.set.insert(node);
-      self.vec.push(node);
-    }
-  }
-}
+type Scope = IndexSet<NodeId>;
 
 #[derive(Default)]
 struct NameGen {
