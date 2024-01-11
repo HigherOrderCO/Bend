@@ -6,9 +6,9 @@ input_file: tests/golden_tests/flatten_rules/nested_0ary.hvm
 (Unpack cmp (Cons h x$0)) = (Unpack$F0 cmp h x$0)
 (Unpack cmp xs) = (cmp xs)
 
-(Cons) = λhead λtail λ#List Cons λ#List Nil (#List.Cons.tail (#List.Cons.head Cons head) tail)
+(Cons) = λhead λtail #List λCons #List λNil #List.Cons.tail (#List.Cons.head (Cons head) tail)
 
-(Nil) = λ#List Cons λ#List Nil Nil
+(Nil) = #List λCons #List λNil Nil
 
 (Unpack$F0 cmp h (Nil)) = h
 (Unpack$F0 cmp x$0 x$1) = (cmp (Cons x$0 x$1))

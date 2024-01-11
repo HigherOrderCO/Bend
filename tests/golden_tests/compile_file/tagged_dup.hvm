@@ -1,5 +1,5 @@
 main =
-  dup #i a b = @x x;
-  dup #i c d = @x x;
-  dup #i e f = @x x;
+  let #i {a b} = @x x;
+  let #i {c d} = @x x;
+  let #i {e f} = @x x;
   (a b c d e f)

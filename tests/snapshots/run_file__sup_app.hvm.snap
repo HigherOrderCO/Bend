@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/sup_app.hvm
 ---
-{#id 3 3}
+#id {3 3}

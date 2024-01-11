@@ -72,7 +72,7 @@ main = "Hello, 🌎"
 ```
 A string is desugared to a tuple containing its length and the list of chars. The chars have a tagged lambda with label 'str' for fast concatenation.
 ```rs
-(5, λ#str x ('H', ('e', ('l', ('l', ('o', x))))))
+(5, #str λx ('H', ('e', ('l', ('l', ('o', x))))))
 ```
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
@@ -129,13 +129,13 @@ And destructuring tuples with `let`:
 let (x, y) = tup; (+ x y)
 ```
 
-Term duplication is done automatically when a variable is used more than once. But it's possible to manually duplicate a term using `dup`:
+Term duplication is done automatically when a variable is used more than once. But it's possible to manually duplicate a term using `let {x0 x1}`:
 ```rs
 // the number 2 in church encoding using dup.
-ch2 = λf λx dup f1 f2 = f; (f1 (f2 x))
+ch2 = λf λx let {f1 f2} = f; (f1 (f2 x))
 
 // the number 3 in church encoding using dup.
-ch3 = λf λx dup f0 f1 = f; dup f2 f3 = f0; (f1 (f2 (f3 x)))
+ch3 = λf λx let {f0 f1} = f; let {f2 f3} = f0; (f1 (f2 (f3 x)))
 ```
 
 A `sup` is a superposition of two values, it is defined using curly brackets with two terms inside
@@ -153,23 +153,23 @@ multi_sup  = (mul {2 3} {5 7}) // returns {{10 14} {15 21}}
 ```
 
 To access both values of a superposition, `dups` with labels are needed.  
-A `dup` generally just duplicates the term it points to:
+A `let {x1 x2}` generally just duplicates the term it points to:
 
 ```rs
 // each dup variable now has a copy of the {1 2} superposition
-dup x1 x2 = {1 2}
+let {x1 x2} = {1 2}
 ```
 
-Both `dups` and `sups` support labels, that is, a field starting with `#` to identify their counterpart:
+Both `let {x1 x2}` and `sups` support labels, that is, a field starting with `#` to identify their counterpart:
 ```rs
 // here, x1 now contains the value of 1, and x2 the value of 2
-dup #i x1 x2 = {#i 1 2}
+let #i {x1 x2} = #i {1 2}
 ```
 
 Due to how dups are compiled, dup tags between two interacting terms should not contain the same label. For example, an application of the church numeral 2 with itself:
 
 ```rs
-c2 = λf λx dup f1 f2 = f; (f1 (f2 x))
+c2 = λf λx let {f1 f2} = f; (f1 (f2 x))
 main = (c2 c2)
 ```
 
@@ -177,8 +177,8 @@ To avoid label collision, HVM-Lang automatically generates new dup labels for ea
 
 To fix the problem, its necessary to re-create the term so that a new label is assigned, or manually assign one:
 ```rs
-c2  = λf λx dup        f1 f2 = f; (f1 (f2 x))
-c2_ = λf λx dup #label f1 f2 = f; (f1 (f2 x))
+c2  = λf λx let {f1 f2} = f; (f1 (f2 x))
+c2_ = λf λx let #label {f1 f2} = f; (f1 (f2 x))
 main = (c2 c2_)
 ```
 
@@ -264,19 +264,19 @@ Similarly to dups and sups, lambdas and applications can have labels too.
 For example, data types can be encoded as tagged lambdas:
 ```rs
 // data Bool = T | F
-T = λ#Bool t λ#Bool f t
-F = λ#Bool t λ#Bool f f
+T = #Bool λt #Bool λf t
+F = #Bool λt #Bool λf f
 
 // data List = (Cons x xs) | Nil
-Cons = λx λxs λ#List c λ#List n (#List.Cons.xs (#List.Cons.x c x) xs)
-Nil  =        λ#List c λ#List n n
+Cons = λx λxs #List λc #List λn #List.Cons.xs (#List.Cons.x (c x) xs)
+Nil  =        #List λc #List λn n
 ```
 
 When encoding the pattern matching, the application can then use the same label:
 
 ```rs
-// not = λbool match bool { T: (F) F: (T) } 
-not = λbool (#Bool bool F T)
+// not = @bool match bool { T: (F) F: (T) } 
+not = @bool #Bool (bool F T)
 ```
 
 This allows, in some limited* scenarios, automatic vectorization:
@@ -348,5 +348,5 @@ Ch_2 = λf λx (f (f x))
 ```
 As you can see the variable `f` is used more than once, so HVM-Lang optimizes this and generates a duplication tree.
 ```rs
-Ch_2 = λf λx dup f0 f0_ = f; dup f1 f1_ = f0_ = (f0 (f1 x))
+Ch_2 = λf λx let {f0 f0_} = f; let {f1 f1_} = f0_; (f0 (f1 x))
 ```

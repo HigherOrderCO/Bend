@@ -1,1 +1,1 @@
-λa dup a1 a2 = a; a2
+λa let {a1 a2} = a; a2
