@@ -464,8 +464,8 @@ fn get_pat_arg_count(match_path: &[Pattern]) -> (usize, usize) {
     Pattern::Ctr(_, vars) => vars.len(),
     Pattern::Num(MatchNum::Zero) => 0,
     Pattern::Num(MatchNum::Succ { .. }) => 1,
-    // For tuples this isn't actually called, because we only destructure them at the end 
-    Pattern::Tup(..) => 2, 
+    // For tuples this isn't actually called, because we only destructure them at the end
+    Pattern::Tup(..) => 2,
   };
   if let Some((new_pat, old_pats)) = match_path.split_last() {
     let new_args = pat_arg_count(new_pat);

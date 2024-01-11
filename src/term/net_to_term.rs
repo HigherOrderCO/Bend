@@ -158,21 +158,14 @@ impl<'a> Reader<'a> {
           }
           .unwrap_or_else(|| {
             // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
-            let fst_port = self.net.enter_port(Port(node, 1));
-            let fst = self.read_term(fst_port);
-  
-            let snd_port = self.net.enter_port(Port(node, 2));
-            let snd = self.read_term(snd_port);
-  
-            if fst_port.node() == snd_port.node() {
-              let node = fst_port.node();
-              if let Dup { .. } = self.net.node(node).kind {
-                self.scope.remove(&node);
-                return self.read_term(self.net.enter_port(Port(node, 0)))
-              }
-            }
-
-            Term::Sup { tag: self.labels.dup.to_tag(Some(lab)), fst: Box::new(fst), snd: Box::new(snd) }
+            self.decay_or_get_ports(node).map_or_else(
+              |(fst, snd)| Term::Sup {
+                tag: self.labels.dup.to_tag(Some(lab)),
+                fst: Box::new(fst),
+                snd: Box::new(snd),
+              },
+              |term| term,
+            )
           })
         }
         // If we're visiting a port 1 or 2, then it is a variable.
@@ -203,23 +196,9 @@ impl<'a> Reader<'a> {
       Rot => self.error(ReadbackError::ReachedRoot),
       Tup => match next.slot() {
         // If we're visiting a port 0, then it is a Tup.
-        0 => {
-          let fst_port = self.net.enter_port(Port(node, 1));
-          let fst = self.read_term(fst_port);
-
-          let snd_port = self.net.enter_port(Port(node, 2));
-          let snd = self.read_term(snd_port);
-
-          if fst_port.node() == snd_port.node() {
-            let node = fst_port.node();
-            if let Tup = self.net.node(node).kind {
-              self.scope.remove(&node);
-              return self.read_term(self.net.enter_port(Port(node, 0)))
-            }
-          }
-
-          Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }
-        }
+        0 => self
+          .decay_or_get_ports(node)
+          .map_or_else(|(fst, snd)| Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, |term| term),
         // If we're visiting a port 1 or 2, then it is a variable.
         1 | 2 => {
           self.scope.insert(node);
@@ -230,6 +209,42 @@ impl<'a> Reader<'a> {
     };
 
     term
+  }
+
+  /// Enters both ports 1 and 2 of a node  
+  /// If both ports are connected to the same node, and that node Kind is the same as the given node Kind,  
+  /// Reads the port 0 of the connected node, and returns that term,  
+  /// Otherwise, returns the terms on ports 1 and 2 of the given node.
+  ///
+  /// # Example
+  ///
+  ///
+  /// ```text
+  /// // λa let (a, b) = a; (a, b)
+  /// ([a b] [a b])
+  ///
+  /// The node `(a, b)` is just a reconstruction of the destructuring of `a`,  
+  /// So we can skip both steps and just return the "value" unchanged:
+  ///
+  /// // λa a
+  /// (a a)
+  /// ```
+  ///
+  fn decay_or_get_ports(&mut self, node: NodeId) -> Result<Term, (Term, Term)> {
+    let fst_port = self.net.enter_port(Port(node, 1));
+    let snd_port = self.net.enter_port(Port(node, 2));
+
+    if fst_port.node() == snd_port.node() && fst_port.slot() == 1 && snd_port.slot() == 2 {
+      let first_node = fst_port.node();
+      if self.net.node(node).kind == self.net.node(first_node).kind {
+        self.scope.remove(&first_node);
+        return Ok(self.read_term(self.net.enter_port(Port(first_node, 0))));
+      }
+    }
+
+    let fst = self.read_term(fst_port);
+    let snd = self.read_term(snd_port);
+    Err((fst, snd))
   }
 }
 
