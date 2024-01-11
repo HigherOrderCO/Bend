@@ -65,7 +65,7 @@ main = λx (not (λtλf (boolean x f t)))
 main = λx (λboolean1λt1λf1 (boolean1 f1 t1) (λtλf (boolean x f t)))
 main = λxλt1λf1 (λtλf (x f t) f1 t1)
 main = λxλt1λf1 (λf (x f f1) t1))
-main = λxλt1λf1 (x f t1)
+main = λxλt1λf1 (x t1 f1)
 ```
 Wow! Simply by replacing lambda arguments with the values applied to them, we were able to make `(not (not x))` not grow in size. This is what fusing means, and it's a really powerful tool to make programs faster.
 
