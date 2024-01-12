@@ -211,13 +211,22 @@ impl<'a> Reader<'a> {
     term
   }
 
-  /// Enters both ports 1 and 2 of a node  
-  /// If both ports are connected to the same node, and that node Kind is the same as the given node Kind,  
-  /// Reads the port 0 of the connected node, and returns that term,  
-  /// Otherwise, returns the terms on ports 1 and 2 of the given node.
+  /// Enters both ports 1 and 2 of a node,  
+  /// Returning a Term if is possible to simplify the net, or the Terms on the two ports of the node.  
+  /// The two possible outcomes are always equivalent.
+  ///   
+  /// If:  
+  ///  - The node Kind is CON/TUP/DUP  
+  ///  - Both ports 1 and 2 are connected to the same node on slots 1 and 2 respectively  
+  ///  - That node Kind is the same as the given node Kind  
+  ///
+  /// Then:  
+  ///   Reads the port 0 of the connected node, and returns that term.
+  ///
+  /// Otherwise:  
+  ///   Returns the terms on ports 1 and 2 of the given node.
   ///
   /// # Example
-  ///
   ///
   /// ```text
   /// // λa let (a, b) = a; (a, b)
@@ -234,11 +243,21 @@ impl<'a> Reader<'a> {
     let fst_port = self.net.enter_port(Port(node, 1));
     let snd_port = self.net.enter_port(Port(node, 2));
 
-    if fst_port.node() == snd_port.node() && fst_port.slot() == 1 && snd_port.slot() == 2 {
-      let first_node = fst_port.node();
-      if self.net.node(node).kind == self.net.node(first_node).kind {
-        self.scope.remove(&first_node);
-        return Ok(self.read_term(self.net.enter_port(Port(first_node, 0))));
+    let node_kind = self.net.node(node).kind;
+
+    // This is not valid for all kinds of nodes, only CON/TUP/DUP, due to their interaction rules.
+    if matches!(node_kind, Con { .. } | Tup | Dup { .. }) {
+      match (fst_port, snd_port) {
+        (Port(fst_node, 1), Port(snd_node, 2)) if fst_node == snd_node => {
+          if self.net.node(fst_node).kind == node_kind {
+            self.scope.remove(&fst_node);
+
+            let port_zero = self.net.enter_port(Port(fst_node, 0));
+            let term = self.read_term(port_zero);
+            return Ok(term);
+          }
+        }
+        _ => {}
       }
     }
 
