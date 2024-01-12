@@ -23,13 +23,14 @@ impl Book {
 /// For functions that don't pattern match, just move the arg variables into the body.
 fn make_non_pattern_matching_def(book: &mut Book, def_id: DefId) {
   let def = book.defs.get_mut(&def_id).unwrap();
-  let rule = def.rules.first_mut().unwrap();
+  let mut rule = std::mem::take(def.rules.first_mut().unwrap());
   for pat in rule.pats.iter().rev() {
     let Pattern::Var(var) = pat else { unreachable!() };
-    let bod = std::mem::replace(&mut rule.body, Term::Era);
+    let bod = std::mem::take(&mut rule.body);
     rule.body = Term::Lam { tag: Tag::Static, nam: var.clone(), bod: Box::new(bod) };
   }
   rule.pats = vec![];
+  def.rules = vec![rule];
 }
 
 /// For function that do pattern match,
