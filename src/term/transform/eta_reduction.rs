@@ -1,6 +1,8 @@
 use crate::term::*;
 
 impl Book {
+  /// Applies eta-reduction to all definitions, converting occurences of `@x (f x)` into just `f`.
+  /// Assumes that variables are linear (used exactly once).
   pub fn eta_reduction(&mut self) {
     for def in self.defs.values_mut() {
       for rule in def.rules.iter_mut() {
@@ -11,6 +13,8 @@ impl Book {
 }
 
 impl Term {
+  /// Eta-reduces a term and any subterms.
+  /// Expects variables to be linear.
   pub fn eta_reduction(&mut self) {
     match self {
       Term::Lam { tag: lam_tag, nam: Some(lam_var), bod } => {
