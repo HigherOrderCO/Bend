@@ -2,12 +2,18 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/concat_def.hvm
 ---
-(String.concat) = λx (String.concat$P x)
+(concat) = λx #String (x concat$PSCons concat$PSNil)
 
-(main) = (String.concat (2, #str λx (42, (43, x))) (2, #str λx (44, (45, x))))
+(main) = (concat (SCons 97 (SCons 98 SNil)) (SCons 99 (SCons 100 SNil)))
 
-(String.concat$R0) = λ%0 let (a_len, a_buf) = %0; λ%0 let (b_len, b_buf) = %0; ((+ a_len b_len), #str λx #str (a_buf #str (b_buf x)))
+(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
 
-(String.concat$P$P) = λy0 λx0 (String.concat$R0 x0 y0)
+(SNil) = #String λSCons #String λSNil SNil
 
-(String.concat$P) = λy0 λx (String.concat$P$P x y0)
+(concat$R0) = λstr str
+
+(concat$R1) = λc λrest1 λstr2 (SCons c (concat rest1 str2))
+
+(concat$PSCons) = #String.SCons.head λy0 #String.SCons.tail λy1 (concat$R1 y0 y1)
+
+(concat$PSNil) = concat$R0

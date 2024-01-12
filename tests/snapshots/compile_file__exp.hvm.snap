@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/exp.hvm
 ---
-@2 = ({3 (a b) (b c)} (a c))
-@3 = ({5 (a b) (b c)} (a c))
+@4 = ({3 (a b) (b c)} (a c))
+@5 = ({5 (a b) (b c)} (a c))
 @main = a
-& @2 ~ (@3 a)
+& @4 ~ (@5 a)
 
