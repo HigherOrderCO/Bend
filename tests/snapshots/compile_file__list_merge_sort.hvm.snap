@@ -2,7 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/list_merge_sort.hvm
 ---
-@Cons = (a (b {4 {8 a {6 b c}} {4 * c}}))
 @H = (a (* a))
 @I = (* (a a))
 @L = (* @Nil)
