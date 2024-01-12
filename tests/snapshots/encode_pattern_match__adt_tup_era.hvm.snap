@@ -1,0 +1,23 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/adt_tup_era.hvm
+---
+(Foo) = λx #Tuple (x Foo$PPair)
+
+(Main) = (Foo (Pair 1 5))
+
+(Pair) = λa λb #Tuple λPair #Tuple.Pair.b (#Tuple.Pair.a (Pair a) b)
+
+(Foo$F0) = λx #Tuple (x Foo$F0$PPair)
+
+(Foo$R0) = λx$0 λc (Foo$F0 x$0 c)
+
+(Foo$R1) = λ* 2
+
+(Foo$PPair) = #Tuple.Pair.a λy0 #Tuple.Pair.b λy1 (Foo$R0 y0 y1)
+
+(Foo$F0$R0) = λa λb λc a
+
+(Foo$F0$R1) = λ* λ* 2
+
+(Foo$F0$PPair) = #Tuple.Pair.a λy0 #Tuple.Pair.b λy1 (Foo$F0$R0 y0 *)

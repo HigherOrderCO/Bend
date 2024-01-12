@@ -1,0 +1,27 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/bool_tup.hvm
+---
+(foo) = λx (foo$P x)
+
+(main) = (foo (F, T))
+
+(T) = #Bool λT #Bool λF T
+
+(F) = #Bool λT #Bool λF F
+
+(foo$F0) = λx #Bool (x foo$F0$PT foo$F0$PF)
+
+(foo$R0) = λ%0 let (x$0, x$1) = %0; (foo$F0 x$0 x$1)
+
+(foo$R1) = λ* F
+
+(foo$P) = λy0 (foo$R0 y0)
+
+(foo$F0$R0) = λx x
+
+(foo$F0$R1) = λ* λ* F
+
+(foo$F0$PT) = foo$F0$R0
+
+(foo$F0$PF) = (foo$F0$R1 *)
