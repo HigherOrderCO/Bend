@@ -159,13 +159,6 @@ fn make_leaf_pattern_matching_case(
     usage.next().zip(args.next()).and_then(|(usage, arg)| usage.then(|| arg))
   }
 
-  fn into_iter(
-    usage: impl Iterator<Item = bool>,
-    args: impl Iterator<Item = Name>,
-  ) -> impl Iterator<Item = Option<Name>> {
-    usage.zip(args).map(|(usage, arg)| usage.then(|| arg))
-  }
-
   // Add the applications to call the rule body
   term = match_path.iter().zip(&rule.pats).fold(term, |term, (matched, pat)| {
     match (matched, pat) {
@@ -191,19 +184,15 @@ fn make_leaf_pattern_matching_case(
       }
       // As the destructuring of the tuple happens later, we just pass the tuple itself.
       (Pattern::Var(_), Pattern::Tup(..)) => Term::optional_arg_call(term, next(lambdas_usage, arg_use)),
-      (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => {
-        let optional_args = into_iter(lambdas_usage.clone(), arg_use.clone());
-        optional_args.fold(term, Term::optional_arg_call)
-      }
+      (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => term,
       (Pattern::Num(MatchNum::Succ { .. }), Pattern::Num(MatchNum::Succ { .. })) => {
-        let optional_args = into_iter(lambdas_usage.clone(), arg_use.clone());
-        optional_args.fold(term, Term::optional_arg_call)
+        Term::optional_arg_call(term, next(lambdas_usage, arg_use))
       }
       (Pattern::Var(..), Pattern::Num(..)) => term,
       (Pattern::Ctr(..), _) => unreachable!(),
       (Pattern::Var(_), _) => unreachable!(),
-      (Pattern::Num(..), _) => todo!(),
-      (Pattern::Tup(..), _) => todo!(),
+      (Pattern::Num(..), _) => unreachable!(),
+      (Pattern::Tup(..), _) => unreachable!(),
     }
   });
 
@@ -475,6 +464,7 @@ fn get_pat_arg_count(match_path: &[Pattern]) -> (usize, usize) {
     Pattern::Ctr(_, vars) => vars.len(),
     Pattern::Num(MatchNum::Zero) => 0,
     Pattern::Num(MatchNum::Succ { .. }) => 1,
+    // For tuples this isn't actually called, because we only destructure them at the end
     Pattern::Tup(..) => 2,
   };
   if let Some((new_pat, old_pats)) = match_path.split_last() {
