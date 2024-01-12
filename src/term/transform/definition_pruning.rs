@@ -8,7 +8,9 @@ impl Book {
   /// Removes all unused definitions starting from Main.
   pub fn prune(&mut self, main: DefId) {
     let mut used = Definitions::new();
-    // insert as used all user defined constructors
+    // Since the readback needs the constructors to work we need
+    // to mark as used all constructors in case of the user
+    // manually encode a constructor with tagged lambdas
     for ctr in self.ctrs.keys() {
       let Definition { def_id, rules } = self.defs.get(&self.def_names.name_to_id[ctr]).unwrap();
       used.insert(*def_id);
