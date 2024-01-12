@@ -6,6 +6,10 @@ input_file: tests/golden_tests/encode_pattern_match/adt_tup_era.hvm
 
 (Main) = (Foo (Pair 1 5))
 
+(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
+
+(SNil) = #String λSCons #String λSNil SNil
+
 (Pair) = λa λb #Tuple λPair #Tuple.Pair.b (#Tuple.Pair.a (Pair a) b)
 
 (Foo$F0) = λx #Tuple (x Foo$F0$PPair)
