@@ -206,8 +206,12 @@ impl DefId {
 }
 
 impl Tag {
-  pub fn str() -> Self {
-    Self::Named(Name::new("str"))
+  pub fn string() -> Self {
+    Self::Named(Name::new("String"))
+  }
+
+  pub fn string_scons_head() -> Self {
+    Self::Named(Name::new("String.SCons.head"))
   }
 }
 

@@ -16,6 +16,10 @@ input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.hvm
 
 (E) = λe1 λe2 #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.E.e2 (#MyType.E.e1 (E e1) e2)
 
+(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
+
+(SNil) = #String λSCons #String λSNil SNil
+
 (Foo$R0) = λa 100
 
 (Foo$R1) = λ* 200

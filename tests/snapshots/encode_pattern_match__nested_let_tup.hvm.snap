@@ -4,6 +4,10 @@ input_file: tests/golden_tests/encode_pattern_match/nested_let_tup.hvm
 ---
 (main) = let %temp%scrutinee = let %temp%scrutinee = (10, ((1, ((2, 3), 4)), 3)); (main$match$1 %temp%scrutinee); (main$match$3 %temp%scrutinee)
 
+(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
+
+(SNil) = #String λSCons #String λSNil SNil
+
 (main$match$1) = λx (main$match$1$P x)
 
 (main$match$2) = λx (main$match$2$P x)

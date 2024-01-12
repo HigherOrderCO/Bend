@@ -35,3 +35,7 @@ input_file: tests/golden_tests/encode_pattern_match/common.hvm
 (Ok) = λa #Result λOk #Result λErr #Result.Ok.a (Ok a)
 
 (Err) = λb #Result λOk #Result λErr #Result.Err.b (Err b)
+
+(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
+
+(SNil) = #String λSCons #String λSNil SNil

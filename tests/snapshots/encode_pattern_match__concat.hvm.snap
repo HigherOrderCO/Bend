@@ -2,18 +2,20 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/concat.hvm
 ---
-(String.concat) = λa λb (String.concat$match$2 a b)
+(String.concat) = λa λb (String.concat$match$1 a b)
 
-(main) = (String.concat (2, λx (42, (43, x))) (2, λx (44, (45, x))))
+(main) = (String.concat (SCons 97 (SCons 98 SNil)) (SCons 99 (SCons 100 SNil)))
 
-(String.concat$match$1) = λx (String.concat$match$1$P x)
+(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
 
-(String.concat$match$2) = λx (String.concat$match$2$P x)
+(SNil) = #String λSCons #String λSNil SNil
 
-(String.concat$match$1$R0) = λ%0 let (b_len, b_buf) = %0; λa_len λa_buf ((+ a_len b_len), λx (a_buf (b_buf x)))
+(String.concat$match$1) = λx #String (x String.concat$match$1$PSCons String.concat$match$1$PSNil)
 
-(String.concat$match$1$P) = λy0 (String.concat$match$1$R0 y0)
+(String.concat$match$1$R0) = λb b
 
-(String.concat$match$2$R0) = λ%0 let (a_len, a_buf) = %0; λb (String.concat$match$1 b a_len a_buf)
+(String.concat$match$1$R1) = λhd λtl λb (SCons hd (String.concat tl b))
 
-(String.concat$match$2$P) = λy0 (String.concat$match$2$R0 y0)
+(String.concat$match$1$PSCons) = #String.SCons.head λy0 #String.SCons.tail λy1 (String.concat$match$1$R1 y0 y1)
+
+(String.concat$match$1$PSNil) = String.concat$match$1$R0

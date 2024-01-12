@@ -1,6 +1,7 @@
 String.concat = @a @b
-  let (a_len, a_buf) = a;
-  let (b_len, b_buf) = b;
-  ((+ a_len b_len), @x (a_buf (b_buf x)))
+  match a {
+    SNil: b;
+    (SCons hd tl): (SCons hd (String.concat tl b))
+  }
 
-main = (String.concat (2, @x (42, (43, x))) (2, @x (44, (45, x))))
+main = (String.concat "ab" "cd")

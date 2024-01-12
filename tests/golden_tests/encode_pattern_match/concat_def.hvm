@@ -1,4 +1,4 @@
-String.concat (a_len, a_buf) (b_len, b_buf) =
-  ((+ a_len b_len), #str @x #str (a_buf #str (b_buf x)))
+concat (SNil) str = str
+concat (SCons c rest1) str2 = (SCons c (concat rest1 str2))
 
-main = (String.concat (2, #str @x (42, (43, x))) (2, #str @x (44, (45, x))))
+main = (concat "ab" "cd")
