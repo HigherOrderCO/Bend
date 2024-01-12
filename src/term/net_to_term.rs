@@ -53,9 +53,7 @@ pub enum ReadbackError {
   InvalidBind,
   InvalidAdt,
   InvalidAdtMatch,
-  InvalidStrLen,
   InvalidStrTerm,
-  InvalidChar,
 }
 
 struct Reader<'a> {
@@ -211,16 +209,16 @@ impl<'a> Reader<'a> {
 }
 
 impl<'a> Reader<'a> {
-  fn decode_str(&mut self, fst: &mut Term) -> Term {
+  fn decode_str(&mut self, term: &mut Term) -> Term {
     let mut s = String::new();
-    fn go(t: &mut Term, s: &mut String) {
+    fn go(t: &mut Term, s: &mut String, rd: &mut Reader<'_>) {
       match t {
         Term::Num { val } => s.push(unsafe { char::from_u32_unchecked(*val as u32) }),
-        Term::Lam { bod, .. } => go(bod, s),
-        Term::App { tag, arg, .. } if *tag == Tag::string_scons_head() => go(arg, s),
+        Term::Lam { bod, .. } => go(bod, s, rd),
+        Term::App { tag, arg, .. } if *tag == Tag::string_scons_head() => go(arg, s, rd),
         Term::App { fun, arg, .. } => {
-          go(fun, s);
-          go(arg, s);
+          go(fun, s, rd);
+          go(arg, s, rd);
         }
         Term::Var { .. } => {}
         Term::Chn { .. }
@@ -233,10 +231,10 @@ impl<'a> Reader<'a> {
         | Term::Opx { .. }
         | Term::Match { .. }
         | Term::Ref { .. }
-        | Term::Era => unreachable!("{t:?}"),
+        | Term::Era => rd.error(ReadbackError::InvalidStrTerm),
       }
     }
-    go(fst, &mut s);
+    go(term, &mut s, self);
     Term::Str { val: s }
   }
 }
@@ -445,11 +443,8 @@ impl<'a> Reader<'a> {
   }
   fn resugar_adts(&mut self, term: &mut Term) {
     match term {
+      Term::Lam { tag, bod, .. } if *tag == Tag::string() => *term = self.decode_str(bod),
       Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
-        if *adt_name == Name::new("String") {
-          *term = self.decode_str(bod);
-          return;
-        }
         let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
           return self.resugar_adts(bod);
         };
