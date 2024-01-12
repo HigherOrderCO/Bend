@@ -30,7 +30,9 @@ pub fn compile_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Com
   let (nets, hvmc_names, labels) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
   pre_reduce_book(&mut core_book, opt_level >= OptimizationLevel::Heavy)?;
-  prune_defs(&mut core_book);
+  if opt_level >= OptimizationLevel::Heavy {
+    prune_defs(&mut core_book);
+  }
   Ok(CompileResult { core_book, hvmc_names, labels, warnings: vec![] })
 }
 
@@ -48,8 +50,12 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Def
     book.eta_reduction();
   }
   book.detach_supercombinators();
-  book.simplify_ref_to_ref()?;
-  book.prune(main);
+  if opt_level >= OptimizationLevel::Heavy {
+    book.simplify_ref_to_ref()?;
+  }
+  if opt_level >= OptimizationLevel::Heavy {
+    book.prune(main);
+  }
   Ok(main)
 }
 
