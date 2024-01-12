@@ -188,7 +188,6 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         let new_ctr = Term::call(Term::Ref { def_id: rule_arg_def_id }, new_ctr_args);
         new_body.subst(other_arg, &new_ctr);
       }
-      (Pattern::Num(..), Pattern::Num(..)) => new_pats.push(other_arg.clone()),
       (Pattern::Num(..), _) => unreachable!(),
       (Pattern::Tup(_, _), Pattern::Tup(fst, snd)) => {
         new_pats.push(*fst.clone());
@@ -212,7 +211,11 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
       ) => {
         unreachable!()
       }
-      (Pattern::Ctr(..), Pattern::Var(None)) => new_pats.push(Pattern::Var(None)),
+      (Pattern::Ctr(_, ctr_fields), Pattern::Var(None)) => {
+        for _ in ctr_fields {
+          new_pats.push(Pattern::Var(None));
+        }
+      },
       (Pattern::Tup(..), Pattern::Var(None)) => {
         new_pats.push(Pattern::Var(None));
         new_pats.push(Pattern::Var(None));
