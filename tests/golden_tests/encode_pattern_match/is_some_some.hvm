@@ -1,0 +1,6 @@
+data Option = (Some x) | (None)
+
+some_some (Some (Some x)) = 1
+some_some *               = 0
+
+main = (some_some (Some 1))

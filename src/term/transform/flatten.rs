@@ -177,6 +177,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_pats.push(other_field.clone());
         }
       }
+      (Pattern::Ctr(..), Pattern::Var(None)) => new_pats.push(Pattern::Var(None)),
       (Pattern::Ctr(rule_arg_name, rule_arg_args), Pattern::Var(Some(other_arg))) => {
         let mut new_ctr_args = vec![];
         for _ in 0 .. rule_arg_args.len() {
