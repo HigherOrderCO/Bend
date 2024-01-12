@@ -177,7 +177,6 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_pats.push(other_field.clone());
         }
       }
-      (Pattern::Ctr(..), Pattern::Var(None)) => new_pats.push(Pattern::Var(None)),
       (Pattern::Ctr(rule_arg_name, rule_arg_args), Pattern::Var(Some(other_arg))) => {
         let mut new_ctr_args = vec![];
         for _ in 0 .. rule_arg_args.len() {
@@ -190,10 +189,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         new_body.subst(other_arg, &new_ctr);
       }
       (Pattern::Num(..), Pattern::Num(..)) => new_pats.push(other_arg.clone()),
-      (Pattern::Num(..), Pattern::Var(..)) => {
-        // How to do this with this kind of number pattern? Subst with a match?
-        todo!();
-      }
+      (Pattern::Num(..), _) => unreachable!(),
       (Pattern::Tup(_, _), Pattern::Tup(fst, snd)) => {
         new_pats.push(*fst.clone());
         new_pats.push(*snd.clone());
@@ -208,17 +204,19 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         let new_ctr = Term::Tup { fst: Box::new(fst_arg), snd: Box::new(snd_arg) };
         new_body.subst(other_arg, &new_ctr);
       }
-      (Pattern::Var(..), _) => {
-        new_pats.push(other_arg.clone());
-      }
+      (Pattern::Var(..), _) => new_pats.push(other_arg.clone()),
       // Unreachable cases, we only call this function if we know the two patterns match together
       (
-        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
+        Pattern::Ctr(..) | Pattern::Tup(..),
         Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
       ) => {
         unreachable!()
       }
-      (_, Pattern::Var(None)) => unreachable!(),
+      (Pattern::Ctr(..), Pattern::Var(None)) => new_pats.push(Pattern::Var(None)),
+      (Pattern::Tup(..), Pattern::Var(None)) => {
+        new_pats.push(Pattern::Var(None));
+        new_pats.push(Pattern::Var(None));
+      },
     }
   }
   Rule { pats: new_pats, body: new_body }

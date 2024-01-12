@@ -1,0 +1,6 @@
+data Bool = T | F
+
+foo (T, x) = x
+foo * = F
+
+main = (foo (F, T))
