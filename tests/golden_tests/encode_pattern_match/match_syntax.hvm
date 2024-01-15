@@ -1,0 +1,7 @@
+data List = (Cons x xs) | (Nil)
+
+head x =
+  match x {
+  | Nil: Nil
+  Cons: x.x;
+  }

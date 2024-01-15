@@ -202,12 +202,15 @@ where
       .map(|((pat, val), nxt)| Term::Let { pat, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
-    // pat: term
-    let match_arm = pattern()
+    // '|'? pat: term
+    let match_arm = 
+    just(Token::Or).or_not().ignore_then(
+      pattern()
       .or(just(Token::Add).map(|_| Pattern::Num(MatchNum::Succ(None))))
       .then_ignore(just(Token::Colon))
       .then(term.clone())
-      .boxed();
+      .boxed()
+    );
 
     // match scrutinee { pat: term;... }
     let match_ = just(Token::Match)
