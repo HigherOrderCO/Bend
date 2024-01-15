@@ -10,7 +10,11 @@ const HEAD: &str = "head";
 const TAIL: &str = "tail";
 
 impl Book {
-  pub fn encode_strs(&mut self) {
+  pub fn encode_strs(&mut self) -> Result<(), String> {
+    if self.adts.contains_key(&Name::new(STRING)) {
+      return Err(format!("String is a built-in data type and should not be overridden."));
+    }
+
     self.ctrs.insert(Name::new(SNIL), Name::new(STRING));
     self.ctrs.insert(Name::new(SCONS), Name::new(STRING));
 
@@ -33,6 +37,8 @@ impl Book {
       self.ctrs.remove(&Name::new(SCONS));
       self.adts.remove(&Name::new(STRING));
     }
+
+    Ok(())
   }
 }
 
@@ -64,7 +70,7 @@ impl Term {
         let fst_uses = fst.encode_str();
         let snd_uses = snd.encode_str();
         fst_uses || snd_uses
-      },
+      }
       Term::Match { arms, .. } => {
         let mut used = false;
         for arm in arms {
