@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/extracted_match_pred.hvm
 ---
-@7 = (?<(@valZ @7) a> a)
+@5 = (?<(@valZ @5) a> a)
 @main = a
-& @7 ~ (#1 a)
+& @5 ~ (#1 a)
 @valZ = #0
 

@@ -24,10 +24,6 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 
 (Nil) = #List λCons #List λNil Nil
 
-(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
-
-(SNil) = #String λSCons #String λSNil SNil
-
 (Unpack$F0) = λx (Unpack$F0$P x)
 
 (MergePair$F0) = λx (MergePair$F0$P x)

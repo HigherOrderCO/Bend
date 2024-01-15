@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/ex2.hvm
 ---
-@E = (* @H)
-@H = (* (a a))
+@E = (* @F)
+@F = (* (a a))
 @I = (a (* ((a b) (* b))))
 @c2 = ({3 (a b) (c a)} (c b))
 @decO = ((@decO (@low (@E a))) (* ((a b) (* b))))

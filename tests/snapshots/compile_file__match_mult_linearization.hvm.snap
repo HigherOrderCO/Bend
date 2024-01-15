@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/match_mult_linearization.hvm
 ---
-@4 = (?<(@5 @6) a> a)
-@5 = (<+ a <+ b c>> (a (b c)))
-@6 = (<+ a <+ b <+ c d>>> (a (b (c d))))
-@main = @4
+@2 = (?<(@3 @4) a> a)
+@3 = (<+ a <+ b c>> (a (b c)))
+@4 = (<+ a <+ b <+ c d>>> (a (b (c d))))
+@main = @2
 

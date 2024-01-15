@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/match_tup.hvm
 ---
-@5 = ([<+ a b> a] b)
+@3 = ([<+ a b> a] b)
 @main = a
-& @5 ~ ([#7 #3] a)
+& @3 ~ ([#7 #3] a)
 

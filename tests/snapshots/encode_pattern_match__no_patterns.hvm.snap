@@ -7,7 +7,3 @@ input_file: tests/golden_tests/encode_pattern_match/no_patterns.hvm
 (Id2) = λx x
 
 (Pair) = λa λb (a, b)
-
-(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
-
-(SNil) = #String λSCons #String λSNil SNil

@@ -2,7 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o0/addition_const.hvm
 ---
-@SCons = (a (b {2 {6 a {4 b c}} {2 * c}}))
-@SNil = {2 * {2 a a}}
 @main = #3
 

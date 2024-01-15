@@ -4,10 +4,6 @@ input_file: tests/golden_tests/encode_pattern_match/box.hvm
 ---
 (unbox) = λx #box (x unbox$Pnew)
 
-(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
-
-(SNil) = #String λSCons #String λSNil SNil
-
 (new) = λval #box λnew #box.new.val (new val)
 
 (unbox$R0) = λval val

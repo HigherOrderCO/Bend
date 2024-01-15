@@ -10,8 +10,4 @@ input_file: tests/golden_tests/encode_pattern_match/var_only.hvm
 
 (True) = #Bool λFalse #Bool λTrue True
 
-(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
-
-(SNil) = #String λSCons #String λSNil SNil
-
 (main$match$1) = λfalse Foo

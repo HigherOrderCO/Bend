@@ -10,10 +10,6 @@ input_file: tests/golden_tests/encode_pattern_match/bool_tup.hvm
 
 (F) = #Bool λT #Bool λF F
 
-(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
-
-(SNil) = #String λSCons #String λSNil SNil
-
 (foo$F0) = λx #Bool (x foo$F0$PT foo$F0$PF)
 
 (foo$R0) = λ%0 let (x$0, x$1) = %0; (foo$F0 x$0 x$1)
