@@ -103,7 +103,7 @@ main = "Hello, 🌎"
 ```
 A string is desugared to a String data type containing two constructors, `SCons` and `SNil`.
 ```rs
-(SCons 'H' (SCons 'e', (SCons 'l' (SCons 'l', (SCosn 'o' SNil)))))
+(SCons 'H' (SCons 'e', (SCons 'l' (SCons 'l', (SCons 'o' SNil)))))
 ```
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
