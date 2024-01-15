@@ -45,7 +45,7 @@ pub struct Definition {
 }
 
 /// A pattern matching rule of a definition.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Rule {
   pub pats: Vec<Pattern>,
   pub body: Term,

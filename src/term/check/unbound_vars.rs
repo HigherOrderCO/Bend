@@ -6,8 +6,7 @@ impl Book {
   /// Checks that there are no unbound variables in all definitions.
   pub fn check_unbound_vars(&self) -> Result<(), String> {
     for def in self.defs.values() {
-      // TODO: Enable when pattern matching is done
-      // def.assert_no_pattern_matching_rules();
+      def.assert_no_pattern_matching_rules();
       def.rules[0].body.check_unbound_vars()?;
     }
     Ok(())

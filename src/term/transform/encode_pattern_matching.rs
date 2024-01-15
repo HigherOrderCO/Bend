@@ -23,13 +23,14 @@ impl Book {
 /// For functions that don't pattern match, just move the arg variables into the body.
 fn make_non_pattern_matching_def(book: &mut Book, def_id: DefId) {
   let def = book.defs.get_mut(&def_id).unwrap();
-  let rule = def.rules.first_mut().unwrap();
+  let mut rule = std::mem::take(def.rules.first_mut().unwrap());
   for pat in rule.pats.iter().rev() {
     let Pattern::Var(var) = pat else { unreachable!() };
-    let bod = std::mem::replace(&mut rule.body, Term::Era);
+    let bod = std::mem::take(&mut rule.body);
     rule.body = Term::Lam { tag: Tag::Static, nam: var.clone(), bod: Box::new(bod) };
   }
   rule.pats = vec![];
+  def.rules = vec![rule];
 }
 
 /// For function that do pattern match,
@@ -156,7 +157,7 @@ fn make_leaf_pattern_matching_case(
   let arg_use = &mut old_args.clone().chain(new_args.clone());
 
   fn next(usage: &mut impl Iterator<Item = bool>, args: &mut impl Iterator<Item = Name>) -> Option<Name> {
-    usage.next().zip(args.next()).and_then(|(usage, arg)| usage.then(|| arg))
+    usage.next().zip(args.next()).and_then(|(usage, arg)| usage.then_some(arg))
   }
 
   // Add the applications to call the rule body
@@ -359,7 +360,7 @@ fn make_adt_pattern_matching_case(
   // Lambda for pattern matched value
   let term = Term::named_lam(Name::new("x"), term);
 
-  let term = add_arg_tagged_lams(term, &match_path, &book);
+  let term = add_arg_tagged_lams(term, &match_path, book);
 
   add_case_to_book(book, crnt_name.clone(), term);
 }
@@ -496,7 +497,7 @@ fn add_arg_lams(term: Term, match_path: &[Pattern]) -> Term {
 
 // Adds the argument lambdas to the term, with new args followed by old args.
 fn add_arg_tagged_lams(term: Term, match_path: &[Pattern], book: &Book) -> Term {
-  let (num_new_args, num_old_args) = get_pat_arg_count(&match_path);
+  let (num_new_args, num_old_args) = get_pat_arg_count(match_path);
   let old_args = (0 .. num_old_args).map(|x| Name(format!("x{x}")));
   let new_args = (0 .. num_new_args).map(|x| Name(format!("y{x}")));
 

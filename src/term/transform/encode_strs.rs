@@ -3,11 +3,11 @@ use indexmap::IndexMap;
 
 use crate::term::{Adt, Book, Name, Tag, Term};
 
-const STRING: &'static str = "String";
-const SNIL: &'static str = "SNil";
-const SCONS: &'static str = "SCons";
-const HEAD: &'static str = "head";
-const TAIL: &'static str = "tail";
+const STRING: &str = "String";
+const SNIL: &str = "SNil";
+const SCONS: &str = "SCons";
+const HEAD: &str = "head";
+const TAIL: &str = "tail";
 
 impl Book {
   pub fn encode_strs(&mut self) {
