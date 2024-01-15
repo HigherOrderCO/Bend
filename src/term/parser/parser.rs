@@ -202,7 +202,7 @@ where
       .map(|((pat, val), nxt)| Term::Let { pat, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
-    // '\'? pat: term
+    // '|'? pat: term
     let match_arm = 
     just(Token::Or).or_not().ignore_then(
       pattern()
