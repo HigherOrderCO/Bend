@@ -30,11 +30,13 @@ pub enum Token {
   #[regex("0[bB][0-1_]+", |lex| from_radix(2, lex).ok())]
   Num(u64),
 
-  #[regex(r#""([^"\\]|\\t|\\u|\\n|\\")*""#, |lex| normalized_string(lex).ok())]
+  #[regex(r#""([^"\\]|\\[tun"])*""#, |lex| normalized_string(lex).ok())]
   Str(String),
 
   #[regex(r#"'\\U[0-9a-fA-F]{1,8}'"#, normalized_char, priority = 2)]
-  #[regex(r#"'(.|\\t|\\u[0-9a-fA-F]{1,4}|\\n|\\')'"#, normalized_char)]
+  // Since '.' is just covering any ascii char, we need to make the
+  // regex match any possible character of the unicode general category
+  #[regex(r#"'(\p{L}|\p{M}|\p{N}|\p{P}|\p{S}|\p{Z}|\p{C}|\p{Emoji}|\\u[0-9a-fA-F]{1,4}|\\[tn'])'"#, normalized_char)]
   Char(u64),
 
   #[token("#")]
