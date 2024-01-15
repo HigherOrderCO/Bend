@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/list_reverse.hvm
 ---
-@A = {6 a {4 {2 @A {2 @nil {2 @E {2 @D ({2 {6 a {4 @nil b}} {2 * b}} c)}}}} c}}
+@A = {12 a {10 {2 @A {2 @nil {2 @E {2 @D ({2 {12 a {10 @nil b}} {2 * b}} c)}}}} c}}
 @D = (a a)
-@E = {6 a {4 {2 @E {2 @D (b c)}} (b {2 {6 a {4 c d}} {2 * d}})}}
-@cons = (a (b {2 {6 a {4 b c}} {2 * c}}))
+@E = {12 a {10 {2 @E {2 @D (b c)}} (b {2 {12 a {10 c d}} {2 * d}})}}
+@cons = (a (b {2 {12 a {10 b c}} {2 * c}}))
 @main = a
 & @reverse ~ (b a)
 & @cons ~ (#3 (c b))
