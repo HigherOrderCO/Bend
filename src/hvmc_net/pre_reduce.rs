@@ -46,7 +46,12 @@ pub fn pre_reduce_book(book: &mut BTreeMap<String, hvmc::ast::Net>, cross_refs: 
     if iters > MAX_ITERS {
       return Err(format!("Unable to pre-reduce definition {nam} in under {MAX_ITERS} iterations"));
     }
-    rt_book.defs.insert(fid, runtime_net_sparse_to_runtime_def(&rt));
+
+    let new_def = runtime_net_sparse_to_runtime_def(&rt);
+
+    let def = rt_book.defs.get_mut(&fid).unwrap();
+    def.rdex = new_def.rdex;
+    def.node = new_def.node;
   }
   *book = book_from_runtime(&rt_book);
   Ok(())
