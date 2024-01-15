@@ -36,7 +36,10 @@ pub enum Token {
   #[regex(r#"'\\U[0-9a-fA-F]{1,8}'"#, normalized_char, priority = 2)]
   // Since '.' is just covering any ascii char, we need to make the
   // regex match any possible character of the unicode general category
-  #[regex(r#"'(\p{L}|\p{M}|\p{N}|\p{P}|\p{S}|\p{Z}|\p{C}|\p{Emoji}|\\u[0-9a-fA-F]{1,4}|\\[tn'])'"#, normalized_char)]
+  #[regex(
+    r#"'(\p{L}|\p{M}|\p{N}|\p{P}|\p{S}|\p{Z}|\p{C}|\p{Emoji}|\\u[0-9a-fA-F]{1,4}|\\[tn'])'"#,
+    normalized_char
+  )]
   Char(u64),
 
   #[token("#")]

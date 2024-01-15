@@ -12,7 +12,7 @@ const TAIL: &str = "tail";
 impl Book {
   pub fn encode_strs(&mut self) -> Result<(), String> {
     if self.adts.contains_key(&Name::new(STRING)) {
-      return Err(format!("String is a built-in data type and should not be overridden."));
+      return Err("String is a built-in data type and should not be overridden.".to_string());
     }
 
     self.ctrs.insert(Name::new(SNIL), Name::new(STRING));
@@ -32,7 +32,7 @@ impl Book {
       }
     }
 
-    if found_str == false {
+    if !found_str {
       self.ctrs.remove(&Name::new(SNIL));
       self.ctrs.remove(&Name::new(SCONS));
       self.adts.remove(&Name::new(STRING));
