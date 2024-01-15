@@ -34,7 +34,7 @@ pub enum Token {
   Str(String),
 
   #[regex(r#"'\\U[0-9a-fA-F]{1,8}'"#, normalized_char, priority = 2)]
-  #[regex(r#"'(.|\\t|\\u[0-9a-fA-F]{1,4}|\\n|\\')'"#, normalized_char)]
+  #[regex(r#"'(\p{L}|\p{M}|\p{N}|\p{P}|\p{S}|\p{Z}|\p{C}|\p{Emoji}|\\t|\\u[0-9a-fA-F]{1,4}|\\n|\\')'"#, normalized_char)]
   Char(u64),
 
   #[token("#")]
