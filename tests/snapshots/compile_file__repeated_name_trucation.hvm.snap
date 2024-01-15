@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/repeated_name_trucation.hvm
 ---
-@5 = (* @main_long_)
+@3 = (* @main_long_)
 @main = @main_long_
-@main_long_ = (* @5)
+@main_long_ = (* @3)
 

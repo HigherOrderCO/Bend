@@ -21,16 +21,23 @@ impl Book {
       ]),
     });
 
+    let mut found_str = false;
     for def in self.defs.values_mut() {
       for rule in &mut def.rules {
-        rule.body.encode_str();
+        found_str |= rule.body.encode_str();
       }
+    }
+
+    if found_str == false {
+      self.ctrs.remove(&Name::new(SNIL));
+      self.ctrs.remove(&Name::new(SCONS));
+      self.adts.remove(&Name::new(STRING));
     }
   }
 }
 
 impl Term {
-  fn encode_str(&mut self) {
+  fn encode_str(&mut self) -> bool {
     match self {
       Term::Str { val } => {
         let chars = val.chars();
@@ -45,6 +52,7 @@ impl Term {
           };
           Term::App { tag: Tag::Static, fun: Box::new(scons_app), arg: Box::new(acc) }
         });
+        true
       }
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.encode_str(),
       Term::App { fun: fst, arg: snd, .. }
@@ -53,15 +61,19 @@ impl Term {
       | Term::Tup { fst, snd }
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
-        fst.encode_str();
-        snd.encode_str();
-      }
+        let fst_uses = fst.encode_str();
+        let snd_uses = snd.encode_str();
+        fst_uses || snd_uses
+      },
       Term::Match { arms, .. } => {
+        let mut used = false;
         for arm in arms {
-          arm.1.encode_str();
+          used |= arm.1.encode_str();
         }
+        used
       }
-      Term::Lnk { .. } | Term::Num { .. } | Term::Var { .. } | Term::Ref { .. } | Term::Era => {}
+      Term::Var { nam: Name(nam) } => nam == SCONS || nam == SNIL,
+      Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => false,
     }
   }
 }

@@ -2,26 +2,26 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/list_merge_sort.hvm
 ---
-@H = (a (* a))
-@I = (* (a a))
-@L = (* @Nil)
-@MergeSort = (a ({4 @N {4 @L (@Pure {4 @S {4 @T (a b)}})}} b))
-@N = {8 a {6 {4 @N {4 @L (b c)}} ({3 b (a d)} {4 {8 d {6 c e}} {4 * e}})}}
+@F = (a (* a))
+@G = (* (a a))
+@J = (* @Nil)
+@L = {8 a {6 {4 @L {4 @J (b c)}} ({3 b (a d)} {4 {8 d {6 c e}} {4 * e}})}}
+@MergeSort = (a ({4 @L {4 @J (@Pure {4 @Q {4 @R (a b)}})}} b))
 @Nil = {4 * {4 a a}}
 @Pure = (a {4 {8 a {6 @Nil b}} {4 * b}})
-@S = {8 a {6 {4 @k {4 @l (b (a c))}} (b c)}}
-@T = (* @Nil)
-@X = {8 a {6 {4 @q {4 @r (b (a c))}} (b c)}}
-@Y = (* @Nil)
-@d = {8 {15 a {17 b c}} {6 {19 {4 @d {4 @e (d (e (f g)))}} h} ({5 d {7 i (j (c {2 @H {2 @I ({4 {8 k {6 l m}} {4 * m}} ({4 {8 a {6 g n}} {4 * n}} o))}}))}} ({9 e {11 k j}} ({13 f {4 @f {4 @g (i ({4 {8 b {6 h p}} {4 * p}} l))}}} o)))}}
-@e = (* @u)
-@f = {8 a {6 b (c ({4 @d {4 @e (c (a (b d)))}} d))}}
-@g = (* (a a))
-@k = {8 a {6 {4 @X {4 @Y (b {4 @k {4 @l (c (d e))}})}} ({21 {23 b f} c} ({4 @f {4 @g (f (a d))}} e))}}
-@l = (* (a a))
+@Q = {8 a {6 {4 @i {4 @j (b (a c))}} (b c)}}
+@R = (* @Nil)
+@V = {8 a {6 {4 @o {4 @p (b (a c))}} (b c)}}
+@W = (* @Nil)
+@b = {8 {15 a {17 b c}} {6 {19 {4 @b {4 @c (d (e (f g)))}} h} ({5 d {7 i (j (c {2 @F {2 @G ({4 {8 k {6 l m}} {4 * m}} ({4 {8 a {6 g n}} {4 * n}} o))}}))}} ({9 e {11 k j}} ({13 f {4 @d {4 @e (i ({4 {8 b {6 h p}} {4 * p}} l))}}} o)))}}
+@c = (* @s)
+@d = {8 a {6 b (c ({4 @b {4 @c (c (a (b d)))}} d))}}
+@e = (* (a a))
+@i = {8 a {6 {4 @V {4 @W (b {4 @i {4 @j (c (d e))}})}} ({21 {23 b f} c} ({4 @d {4 @e (f (a d))}} e))}}
+@j = (* (a a))
 @main = @MergeSort
-@q = {8 a {6 {4 @X {4 @Y (b c)}} ({23 b d} ({4 @f {4 @g (d (a e))}} {4 {8 e {6 c f}} {4 * f}}))}}
-@r = (* @v)
-@u = (a (b {4 {8 a {6 b c}} {4 * c}}))
-@v = (a {4 {8 a {6 @Nil b}} {4 * b}})
+@o = {8 a {6 {4 @V {4 @W (b c)}} ({23 b d} ({4 @d {4 @e (d (a e))}} {4 {8 e {6 c f}} {4 * f}}))}}
+@p = (* @t)
+@s = (a (b {4 {8 a {6 b c}} {4 * c}}))
+@t = (a {4 {8 a {6 @Nil b}} {4 * b}})
 

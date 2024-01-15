@@ -10,7 +10,5 @@ input_file: tests/golden_tests/compile_file_o0/ref_to_ref.hvm
 @B4 = @B5
 @B5 = #2
 @C1 = @B4
-@SCons = (a (b {2 {6 a {4 b c}} {2 * c}}))
-@SNil = {2 * {2 a a}}
 @main = [[@A1 @B1] @C1]
 

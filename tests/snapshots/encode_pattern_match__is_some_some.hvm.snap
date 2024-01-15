@@ -10,10 +10,6 @@ input_file: tests/golden_tests/encode_pattern_match/is_some_some.hvm
 
 (None) = #Option λSome #Option λNone None
 
-(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
-
-(SNil) = #String λSCons #String λSNil SNil
-
 (some_some$F0) = λx #Option (x some_some$F0$PSome some_some$F0$PNone)
 
 (some_some$R0) = λx$0 (some_some$F0 x$0)

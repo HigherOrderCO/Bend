@@ -4,10 +4,6 @@ input_file: tests/golden_tests/encode_pattern_match/weekday.hvm
 ---
 (main) = (λx x Saturday)
 
-(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
-
-(SNil) = #String λSCons #String λSNil SNil
-
 (Monday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Monday
 
 (Tuesday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Tuesday
