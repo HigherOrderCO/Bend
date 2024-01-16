@@ -1,9 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/encode_pattern_match/lists.hvm
----
-(main) = (LCons 1 (LCons λx x (LCons (LCons 3 LNil) LNil)))
-
-(LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)
-
-(LNil) = #List λLCons #List λLNil LNil
