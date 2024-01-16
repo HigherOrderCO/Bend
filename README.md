@@ -101,9 +101,13 @@ Strings are delimited by `"` `"` and support Unicode characters.
 ```rs
 main = "Hello, 🌎"
 ```
-A string is desugared to a tuple containing its length and its content as a list of characters. The characters are encoded using a tagged lambda with label 'str' for fast concatenation.
+A string is desugared to a String data type containing two constructors, `SCons` and `SNil`.
 ```rs
-(5, λ#str x ('H', ('e', ('l', ('l', ('o', x))))))
+// These two are equivalent
+StrEx1 = "Hello"
+
+data String = (SCons head tail) | SNil
+StrEx2 = (SCons 'H' (SCons 'e', (SCons 'l' (SCons 'l', (SCons 'o' SNil)))))
 ```
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
