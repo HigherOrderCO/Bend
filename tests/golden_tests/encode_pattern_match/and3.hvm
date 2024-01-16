@@ -1,0 +1,6 @@
+data Bool = T | F
+
+And (T, T, T) = T
+And * = F
+
+main = (And (F, T, F))

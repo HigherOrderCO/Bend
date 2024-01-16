@@ -176,15 +176,6 @@ where
       })
       .boxed();
 
-    // (x, y)
-    let tup = term
-      .clone()
-      .then_ignore(just(Token::Comma))
-      .then(term.clone())
-      .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|(fst, snd)| Term::Tup { fst: Box::new(fst), snd: Box::new(snd) })
-      .boxed();
-
     // let a = ...
     // let (a, b) = ...
     let let_ = just(Token::Let)
@@ -256,6 +247,16 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
+    // (x, ..n)
+    let tup = term
+      .clone()
+      .separated_by(just(Token::Comma))
+      .at_least(2)
+      .collect::<Vec<Term>>()
+      .map(|xs| make_tup_tree(&xs, |a, b| Term::Tup { fst: Box::new(a), snd: Box::new(b) }))
+      .delimited_by(just(Token::LParen), just(Token::RParen))
+      .boxed();
+
     let str = select!(Token::Str(s) => Term::Str { val: s }).boxed();
     let chr = select!(Token::Char(c) => Term::Num { val: c }).boxed();
 
@@ -281,6 +282,18 @@ where
   })
 }
 
+fn make_tup_tree<A: Clone>(xs: &[A], make: fn(A, A) -> A) -> A {
+  match xs {
+    [] => unreachable!(),
+    [x] => x.clone(),
+    xs => {
+      let half = xs.len() / 2;
+      let (x, y) = xs.split_at(half);
+      make(make_tup_tree(x, make), make_tup_tree(y, make))
+    }
+  }
+}
+
 fn pattern<'a, I>() -> impl Parser<'a, I, Pattern, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -296,10 +309,11 @@ where
 
     let tup = pattern
       .clone()
-      .then_ignore(just(Token::Comma))
-      .then(pattern.clone())
+      .separated_by(just(Token::Comma))
+      .at_least(2)
+      .collect::<Vec<Pattern>>()
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|(fst, snd)| Pattern::Tup(Box::new(fst), Box::new(snd)))
+      .map(|xs| make_tup_tree(&xs, |a, b| Pattern::Tup(Box::new(a), Box::new(b))))
       .boxed();
 
     let zero = select!(Token::Num(0) => Pattern::Num(MatchNum::Zero));
