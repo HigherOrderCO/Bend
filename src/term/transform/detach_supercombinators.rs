@@ -9,9 +9,8 @@ impl Book {
     let mut combinators = Combinators::new();
 
     for def in self.defs.values_mut() {
-      for rule in def.rules.iter_mut() {
-        rule.body.detach_combinators(def.def_id, &mut self.def_names, &mut combinators);
-      }
+      def.assert_no_pattern_matching_rules();
+      def.rules[0].body.detach_combinators(def.def_id, &mut self.def_names, &mut combinators);
     }
 
     // Definitions are not inserted to the book as they are defined to appease the borrow checker.
@@ -68,7 +67,7 @@ impl<'d> TermInfo<'d> {
     let extracted_term = std::mem::replace(term, comb_var);
 
     let rules = vec![Rule { body: extracted_term, pats: Vec::new() }];
-    let rule = Definition { def_id: comb_id, rules };
+    let rule = Definition { def_id: comb_id, rules, generated: false };
     self.combinators.insert(comb_id, rule);
   }
 }

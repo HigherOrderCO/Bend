@@ -50,17 +50,16 @@ fn make_pattern_matching_def(book: &mut Book, def_id: DefId, def_type: &[Type]) 
   }
   for (rule_idx, body) in rule_bodies.into_iter().enumerate() {
     let rule_name = make_rule_name(&def_name, rule_idx);
-    book.insert_def(rule_name, vec![Rule { pats: vec![], body }]);
+    let is_generated = false;
+    book.insert_def(rule_name, is_generated, vec![Rule { pats: vec![], body }]);
   }
 
   // Generate scott-encoded pattern matching
   make_pattern_matching_case(book, def_type, def_id, &def_name, crnt_rules, vec![]);
 }
 
-pub const RULE_PREFIX: &str = "$R";
-
 fn make_rule_name(def_name: &Name, rule_idx: usize) -> Name {
-  Name(format!("{def_name}{RULE_PREFIX}{rule_idx}"))
+  Name(format!("{def_name}$R{rule_idx}"))
 }
 
 fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
@@ -456,7 +455,7 @@ fn add_case_to_book(book: &mut Book, nam: Name, body: Term) {
   if let Some(def_id) = book.def_names.def_id(&nam) {
     book.defs.get_mut(&def_id).unwrap().rules = vec![Rule { pats: vec![], body }];
   } else {
-    book.insert_def(nam, vec![Rule { pats: vec![], body }]);
+    book.insert_def(nam, true, vec![Rule { pats: vec![], body }]);
   }
 }
 
