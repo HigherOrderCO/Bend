@@ -1,3 +1,0 @@
-X = λa a
-
-main = λb0 λb1 (X b0 b1)

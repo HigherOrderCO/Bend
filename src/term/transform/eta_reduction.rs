@@ -1,12 +1,21 @@
+use super::encode_pattern_matching::RULE_PREFIX;
 use crate::term::*;
 
 impl Book {
-  /// Applies eta-reduction to all definitions, converting occurences of `@x (f x)` into just `f`.
+  /// Applies eta-reduction to all generated definitions, converting occurrences of `@x (f x)` into just `f`.
   /// Assumes that variables are linear (used exactly once).
   pub fn eta_reduction(&mut self) {
     for def in self.defs.values_mut() {
-      for rule in def.rules.iter_mut() {
-        rule.body.eta_reduction();
+      def.assert_no_pattern_matching_rules();
+
+      if self
+        .def_names
+        .name(&def.def_id)
+        // Definitions containing `RULE_PREFIX` are match arms branches written by the user, and shouldn't be reduced
+        .map_or(false, |Name(name)| name.contains('$') && !name.contains(RULE_PREFIX))
+      {
+        let rule = &mut def.rules[0].body;
+        rule.eta_reduction();
       }
     }
   }

@@ -12,7 +12,7 @@ impl Book {
       if is_matching_def {
         make_pattern_matching_def(self, def_id, def_type);
       } else {
-        // For functions with only one rule that doesnt pattern match,
+        // For functions with only one rule that doesn't pattern match,
         // we just move the variables from arg to body.
         make_non_pattern_matching_def(self, def_id);
       }
@@ -57,8 +57,10 @@ fn make_pattern_matching_def(book: &mut Book, def_id: DefId, def_type: &[Type]) 
   make_pattern_matching_case(book, def_type, def_id, &def_name, crnt_rules, vec![]);
 }
 
+pub const RULE_PREFIX: &str = "$R";
+
 fn make_rule_name(def_name: &Name, rule_idx: usize) -> Name {
-  Name(format!("{def_name}$R{rule_idx}"))
+  Name(format!("{def_name}{RULE_PREFIX}{rule_idx}"))
 }
 
 fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
