@@ -82,6 +82,7 @@ impl Term {
       Term::Let { pat: _, .. } => {
         unreachable!("Expected destructor let expressions to have been desugared already")
       }
+      Term::List { .. } => unreachable!("Should have been desugared already"),
     }
   }
 }

@@ -161,6 +161,7 @@ fn encode_pattern_match() {
     let mut book = do_parse_book(code)?;
     book.check_shared_names()?;
     book.encode_strs()?;
+    book.encode_lists()?;
     book.generate_scott_adts();
     book.resolve_refs();
     encode_pattern_matching(&mut book)?;

@@ -287,6 +287,7 @@ impl<'a> Reader<'a> {
         | Term::Dup { .. }
         | Term::Sup { .. }
         | Term::Str { .. }
+        | Term::List { .. }
         | Term::Opx { .. }
         | Term::Match { .. }
         | Term::Ref { .. }
@@ -337,6 +338,7 @@ impl Term {
         }
         n
       }
+      Term::List { .. } => unreachable!(),
       Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Ref { .. } | Term::Era => 0,
     };
     if n >= threshold {
@@ -472,7 +474,7 @@ impl Term {
           term.fix_names(id_counter, book)
         }
       }
-      Term::Let { .. } => unreachable!(),
+      Term::Let { .. } | Term::List { .. } => unreachable!(),
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => {}
     }
   }
@@ -604,6 +606,7 @@ impl<'a> Reader<'a> {
           self.resugar_adts(&mut arm.1);
         }
       }
+      Term::List { .. } => unreachable!(),
       Term::Lnk { .. }
       | Term::Num { .. }
       | Term::Var { .. }

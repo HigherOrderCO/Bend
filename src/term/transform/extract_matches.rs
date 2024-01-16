@@ -155,6 +155,7 @@ impl Term {
       Term::Let { pat, .. } => {
         unreachable!("Destructor let expression should have been desugared already. {pat}")
       }
+      Term::List { .. } => unreachable!("Should have been desugared already"),
     }
 
     Ok(())

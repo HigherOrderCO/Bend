@@ -3,6 +3,7 @@ pub mod desugar_implicit_match_binds;
 pub mod desugar_let_destructors;
 pub mod detach_supercombinators;
 pub mod encode_adts;
+pub mod encode_lists;
 pub mod encode_pattern_matching;
 pub mod encode_strs;
 pub mod eta_reduction;

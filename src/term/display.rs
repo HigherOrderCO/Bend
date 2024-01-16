@@ -72,6 +72,7 @@ impl Term {
         write!(f, "({} {} {})", op, fst.display(def_names), snd.display(def_names))
       }
       Term::Tup { fst, snd } => write!(f, "({}, {})", fst.display(def_names), snd.display(def_names)),
+      Term::List { els: _ } => todo!(),
     })
   }
 }

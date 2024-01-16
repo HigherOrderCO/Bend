@@ -15,15 +15,7 @@ impl Book {
       return Err("String is a built-in data type and should not be overridden.".to_string());
     }
 
-    self.ctrs.insert(Name::new(SNIL), Name::new(STRING));
-    self.ctrs.insert(Name::new(SCONS), Name::new(STRING));
-
-    self.adts.insert(Name::new(STRING), Adt {
-      ctrs: IndexMap::from([
-        (Name::new(SCONS), vec![Name::new(HEAD), Name::new(TAIL)]),
-        (Name::new(SNIL), vec![]),
-      ]),
-    });
+    self.declare_str_adt();
 
     let mut found_str = false;
     for def in self.defs.values_mut() {
@@ -39,6 +31,18 @@ impl Book {
     }
 
     Ok(())
+  }
+
+  fn declare_str_adt(&mut self) {
+    self.ctrs.insert(Name::new(SNIL), Name::new(STRING));
+    self.ctrs.insert(Name::new(SCONS), Name::new(STRING));
+
+    self.adts.insert(Name::new(STRING), Adt {
+      ctrs: IndexMap::from([
+        (Name::new(SCONS), vec![Name::new(HEAD), Name::new(TAIL)]),
+        (Name::new(SNIL), vec![]),
+      ]),
+    });
   }
 }
 
@@ -71,10 +75,18 @@ impl Term {
         let snd_uses = snd.encode_str();
         fst_uses || snd_uses
       }
-      Term::Match { arms, .. } => {
+      Term::Match { arms, scrutinee } => {
         let mut used = false;
+        let scrutinee_used = scrutinee.encode_str();
         for arm in arms {
           used |= arm.1.encode_str();
+        }
+        scrutinee_used || used
+      }
+      Term::List { els } => {
+        let mut used = false;
+        for el in els {
+          used |= el.encode_str();
         }
         used
       }

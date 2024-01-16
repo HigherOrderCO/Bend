@@ -57,6 +57,7 @@ impl Term {
           }
         };
       }
+      Term::List { .. } => unreachable!("Should have been desugared already"),
     }
   }
 }

@@ -117,6 +117,9 @@ pub enum Term {
   Str {
     val: String,
   },
+  List {
+    els: Vec<Term>,
+  },
   /// A numeric operation between built-in numbers.
   Opx {
     op: Op,
@@ -332,6 +335,7 @@ impl Term {
           }
         }
       }
+      Term::List { els } => els.iter_mut().for_each(|el| el.subst(from, to)),
       Term::App { fun: fst, arg: snd, .. }
       | Term::Sup { fst, snd, .. }
       | Term::Tup { fst, snd }
@@ -401,6 +405,13 @@ impl Term {
             }
 
             free_vars.extend(new_scope);
+          }
+        }
+        Term::List { els } => {
+          for el in els {
+            let mut fvs = IndexMap::new();
+            go(el, &mut fvs);
+            free_vars.extend(fvs);
           }
         }
         Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => {}

@@ -24,9 +24,9 @@ input_file: tests/golden_tests/encode_pattern_match/common.hvm
 
 (Green) = #Light λRed #Light λYellow #Light λGreen Green
 
-(Cons) = λx λxs #List λCons #List λNil #List.Cons.xs (#List.Cons.x (Cons x) xs)
+(Cons) = λx λxs #List_ λCons #List_ λNil #List_.Cons.xs (#List_.Cons.x (Cons x) xs)
 
-(Nil) = #List λCons #List λNil Nil
+(Nil) = #List_ λCons #List_ λNil Nil
 
 (Some) = λx #Option λSome #Option λNone #Option.Some.x (Some x)
 

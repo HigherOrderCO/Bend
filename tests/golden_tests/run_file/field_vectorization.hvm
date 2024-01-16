@@ -1,6 +1,6 @@
 data Box = (New a)
 data Bool = T | F
-data List = (Cons x xs) | Nil
+data List_ = (Cons x xs) | Nil
 data Pair = (Tup a b)
 
 (Tup.and (Tup (New T) (New T))) = T

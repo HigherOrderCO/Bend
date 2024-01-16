@@ -51,6 +51,7 @@ impl Term {
       | Term::Var { .. }
       | Term::Num { .. }
       | Term::Str { .. }
+      | Term::List { .. }
       | Term::Ref { .. }
       | Term::Era => {}
     }
