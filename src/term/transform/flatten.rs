@@ -206,21 +206,18 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
       }
       (Pattern::Var(..), _) => new_pats.push(other_arg.clone()),
       // Unreachable cases, we only call this function if we know the two patterns match together
-      (
-        Pattern::Ctr(..) | Pattern::Tup(..),
-        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
-      ) => {
+      (Pattern::Ctr(..) | Pattern::Tup(..), Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..)) => {
         unreachable!()
       }
       (Pattern::Ctr(_, ctr_fields), Pattern::Var(None)) => {
         for _ in ctr_fields {
           new_pats.push(Pattern::Var(None));
         }
-      },
+      }
       (Pattern::Tup(..), Pattern::Var(None)) => {
         new_pats.push(Pattern::Var(None));
         new_pats.push(Pattern::Var(None));
-      },
+      }
     }
   }
   Rule { pats: new_pats, body: new_body }

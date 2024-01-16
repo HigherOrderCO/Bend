@@ -203,13 +203,12 @@ where
       .boxed();
 
     // '|'? pat: term
-    let match_arm = 
-    just(Token::Or).or_not().ignore_then(
+    let match_arm = just(Token::Or).or_not().ignore_then(
       pattern()
-      .or(just(Token::Add).map(|_| Pattern::Num(MatchNum::Succ(None))))
-      .then_ignore(just(Token::Colon))
-      .then(term.clone())
-      .boxed()
+        .or(just(Token::Add).map(|_| Pattern::Num(MatchNum::Succ(None))))
+        .then_ignore(just(Token::Colon))
+        .then(term.clone())
+        .boxed(),
     );
 
     // match scrutinee { pat: term;... }
