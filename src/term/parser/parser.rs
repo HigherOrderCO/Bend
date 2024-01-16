@@ -261,7 +261,7 @@ where
       .separated_by(just(Token::Comma))
       .at_least(2)
       .collect::<Vec<Term>>()
-      .map(|xs| term_to_tup_tree(&xs))
+      .map(|xs| make_tup_tree(&xs, |a, b| Term::Tup { fst: Box::new(a), snd: Box::new(b) }))
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
@@ -291,26 +291,14 @@ where
   })
 }
 
-fn pat_to_tup_tree(xs: &[Pattern]) -> Pattern {
+fn make_tup_tree<A: Clone>(xs: &[A], make: fn(A, A) -> A) -> A {
   match xs {
     [] => unreachable!(),
     [x] => x.clone(),
     xs => {
       let half = xs.len() / 2;
       let (x, y) = xs.split_at(half);
-      Pattern::Tup(Box::new(pat_to_tup_tree(x)), Box::new(pat_to_tup_tree(y)))
-    }
-  }
-}
-
-fn term_to_tup_tree(xs: &[Term]) -> Term {
-  match xs {
-    [] => unreachable!(),
-    [x] => x.clone(),
-    xs => {
-      let half = xs.len() / 2;
-      let (x, y) = xs.split_at(half);
-      Term::Tup { fst: Box::new(term_to_tup_tree(x)), snd: Box::new(term_to_tup_tree(y)) }
+      make(make_tup_tree(x, make), make_tup_tree(y, make))
     }
   }
 }
@@ -334,7 +322,7 @@ where
       .at_least(2)
       .collect::<Vec<Pattern>>()
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|xs| pat_to_tup_tree(&xs))
+      .map(|xs| make_tup_tree(&xs, |a, b| Pattern::Tup(Box::new(a), Box::new(b))))
       .boxed();
 
     let tup = pattern
