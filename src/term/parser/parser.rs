@@ -256,6 +256,15 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
+    let ntup = term
+      .clone()
+      .separated_by(just(Token::Comma))
+      .at_least(2)
+      .collect::<Vec<Term>>()
+      .map(|xs| term_to_tup_tree(&xs))
+      .delimited_by(just(Token::LParen), just(Token::RParen))
+      .boxed();
+
     let str = select!(Token::Str(s) => Term::Str { val: s }).boxed();
     let chr = select!(Token::Char(c) => Term::Num { val: c }).boxed();
 
@@ -266,6 +275,7 @@ where
       str,
       chr,
       sup,
+      ntup,
       tup,
       global_lam,
       lam,
@@ -281,6 +291,30 @@ where
   })
 }
 
+fn pat_to_tup_tree(xs: &[Pattern]) -> Pattern {
+  match xs {
+    [] => unreachable!(),
+    [x] => x.clone(),
+    xs => {
+      let half = xs.len() / 2;
+      let (x, y) = xs.split_at(half);
+      Pattern::Tup(Box::new(pat_to_tup_tree(x)), Box::new(pat_to_tup_tree(y)))
+    }
+  }
+}
+
+fn term_to_tup_tree(xs: &[Term]) -> Term {
+  match xs {
+    [] => unreachable!(),
+    [x] => x.clone(),
+    xs => {
+      let half = xs.len() / 2;
+      let (x, y) = xs.split_at(half);
+      Term::Tup { fst: Box::new(term_to_tup_tree(x)), snd: Box::new(term_to_tup_tree(y)) }
+    }
+  }
+}
+
 fn pattern<'a, I>() -> impl Parser<'a, I, Pattern, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -292,6 +326,15 @@ where
       .then(pattern.clone().repeated().collect())
       .map(|(nam, xs)| Pattern::Ctr(nam, xs))
       .delimited_by(just(Token::LParen), just(Token::RParen))
+      .boxed();
+
+    let ntup = pattern
+      .clone()
+      .separated_by(just(Token::Comma))
+      .at_least(2)
+      .collect::<Vec<Pattern>>()
+      .delimited_by(just(Token::LParen), just(Token::RParen))
+      .map(|xs| pat_to_tup_tree(&xs))
       .boxed();
 
     let tup = pattern
@@ -307,7 +350,7 @@ where
     let succ =
       just(Token::Add).ignore_then(name_or_era()).map(|nam| Pattern::Num(MatchNum::Succ(Some(nam)))).boxed();
 
-    choice((zero, succ, var, ctr, tup))
+    choice((zero, succ, var, ctr, ntup, tup))
   })
 }
 
