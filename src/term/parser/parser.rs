@@ -176,15 +176,6 @@ where
       })
       .boxed();
 
-    // (x, y)
-    let tup = term
-      .clone()
-      .then_ignore(just(Token::Comma))
-      .then(term.clone())
-      .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|(fst, snd)| Term::Tup { fst: Box::new(fst), snd: Box::new(snd) })
-      .boxed();
-
     // let a = ...
     // let (a, b) = ...
     let let_ = just(Token::Let)
@@ -256,7 +247,8 @@ where
       .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
-    let ntup = term
+    // (x, ..n)
+    let tup = term
       .clone()
       .separated_by(just(Token::Comma))
       .at_least(2)
@@ -275,7 +267,6 @@ where
       str,
       chr,
       sup,
-      ntup,
       tup,
       global_lam,
       lam,
@@ -316,7 +307,7 @@ where
       .delimited_by(just(Token::LParen), just(Token::RParen))
       .boxed();
 
-    let ntup = pattern
+    let tup = pattern
       .clone()
       .separated_by(just(Token::Comma))
       .at_least(2)
@@ -325,20 +316,12 @@ where
       .map(|xs| make_tup_tree(&xs, |a, b| Pattern::Tup(Box::new(a), Box::new(b))))
       .boxed();
 
-    let tup = pattern
-      .clone()
-      .then_ignore(just(Token::Comma))
-      .then(pattern.clone())
-      .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|(fst, snd)| Pattern::Tup(Box::new(fst), Box::new(snd)))
-      .boxed();
-
     let zero = select!(Token::Num(0) => Pattern::Num(MatchNum::Zero));
 
     let succ =
       just(Token::Add).ignore_then(name_or_era()).map(|nam| Pattern::Num(MatchNum::Succ(Some(nam)))).boxed();
 
-    choice((zero, succ, var, ctr, ntup, tup))
+    choice((zero, succ, var, ctr, tup))
   })
 }
 
