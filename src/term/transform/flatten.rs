@@ -20,11 +20,17 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
   // For each group, split its internal rules
   let rules = def.rules.iter().map(|r| (def_name.clone(), r.clone())).collect_vec();
   let new_rules = split_group(&rules, def_names);
+  let len = new_rules.len();
+
   new_rules
     .into_iter()
     .map(|(name, rules)| {
       let def_id = def_names.def_id(&name).unwrap();
-      Definition { def_id, generated: def.generated, rules }
+
+      // If the rule was splitted into multiple, the rule taking place of the original is a generated one
+      let generated = if name == def_name && len > 1 { true } else { def.generated };
+
+      Definition { def_id, generated, rules }
     })
     .collect()
 }
