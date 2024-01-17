@@ -262,7 +262,7 @@ where
 
     let list = term
       .clone()
-      .separated_by(just(Token::Comma))
+      .separated_by(just(Token::Comma).or_not())
       .collect()
       .delimited_by(just(Token::LBrace), just(Token::RBrace))
       .map(|els| Term::List { els })

@@ -115,9 +115,9 @@ Characters are delimited by `'` `'` and support Unicode escape sequences. They h
 main = '\u4242'
 ```
 
-Lists are delimited by `[` `]` with elements separated by `,`.
+Lists are delimited by `[` `]` and elements can be optionally separated by `,`.
 ```rs
-ids = [3, 6, 9, 12, 16]
+ids = [3, 6, 9 12 16]
 ```
 A list is desugared to a List data type containing two constructors, `LCons` and `LNil`.
 ```rs
