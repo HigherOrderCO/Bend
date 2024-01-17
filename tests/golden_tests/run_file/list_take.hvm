@@ -1,0 +1,9 @@
+Take_ n list =
+  match (== n 0) {
+  | 0: (Take n list)
+  | +: []
+  }
+Take n (LNil) = []
+Take n (LCons x xs) = (LCons x (Take_ (- n 1) xs))
+
+main = (Take 2 [3, 2, 1, 5, 5, 5])

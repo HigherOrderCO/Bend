@@ -40,6 +40,7 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Def
   let main = book.check_has_main()?;
   book.check_shared_names()?;
   book.encode_strs()?;
+  book.encode_lists()?;
   book.generate_scott_adts();
   book.resolve_refs();
   encode_pattern_matching(book)?;

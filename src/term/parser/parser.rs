@@ -260,10 +260,19 @@ where
     let str = select!(Token::Str(s) => Term::Str { val: s }).boxed();
     let chr = select!(Token::Char(c) => Term::Num { val: c }).boxed();
 
+    let list = term
+      .clone()
+      .separated_by(just(Token::Comma).or_not())
+      .collect()
+      .delimited_by(just(Token::LBrace), just(Token::RBrace))
+      .map(|els| Term::List { els })
+      .boxed();
+
     choice((
       global_var,
       var,
       number,
+      list,
       str,
       chr,
       sup,

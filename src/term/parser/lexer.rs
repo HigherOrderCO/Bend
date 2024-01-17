@@ -117,6 +117,12 @@ pub enum Token {
   #[token("}")]
   RBracket,
 
+  #[token("[")]
+  LBrace,
+
+  #[token("]")]
+  RBrace,
+
   #[regex("//.*", logos::skip)]
   SingleLineComment,
 
@@ -271,6 +277,8 @@ impl fmt::Display for Token {
       Self::RParen => write!(f, ")"),
       Self::LBracket => write!(f, "{{"),
       Self::RBracket => write!(f, "}}"),
+      Self::LBrace => write!(f, "["),
+      Self::RBrace => write!(f, "]"),
       Self::SingleLineComment => write!(f, "<SingleLineComment>"),
       Self::MultiLineComment => write!(f, "<MultiLineComment>"),
       Self::Whitespace => write!(f, "<Whitespace>"),

@@ -10,7 +10,7 @@ data Result
   = (Ok a)
   | (Err b)
 
-data List
+data List_
   = (Cons x xs)
   | Nil
 

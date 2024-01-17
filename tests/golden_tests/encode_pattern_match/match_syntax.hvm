@@ -1,4 +1,4 @@
-data List = (Cons x xs) | (Nil)
+data List_ = (Cons x xs) | (Nil)
 
 head x =
   match x {

@@ -72,6 +72,7 @@ impl Term {
         snd.check_unbound_pats(is_ctr, def_name)?;
       }
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.check_unbound_pats(is_ctr, def_name)?,
+      Term::List { .. } => unreachable!(),
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Ref { .. }

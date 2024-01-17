@@ -96,6 +96,7 @@ pub fn check_uses<'a>(
         }
       }
     }
+    Term::List { .. } => unreachable!(),
     Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => (),
   }
   Ok(())

@@ -70,6 +70,7 @@ impl Term {
       | Term::Ref { .. }
       | Term::Num { .. }
       | Term::Str { .. }
+      | Term::List { .. }
       | Term::Era => (),
     }
   }

@@ -83,6 +83,7 @@ fn unique_var_names(term: &mut Term, name_map: &mut UniqueNameScope, name_count:
     Term::Let { .. } => {
       unreachable!("Let terms other than tuple destruction should have been desugared already.")
     }
+    Term::List { .. } => unreachable!("Should have been desugared already."),
   }
 }
 
