@@ -60,6 +60,7 @@ fn matches_together(a: &[Pattern], b: &[Pattern]) -> (bool, bool) {
         }
       }
       (Pattern::Var(..), _) => (),
+      (Pattern::List(..), _) | (_, Pattern::List(..)) => unreachable!(),
     }
   }
   (matches_together, same_shape)
@@ -128,6 +129,7 @@ fn make_old_rule(pats: &[Pattern], new_split_def_id: DefId) -> Rule {
               make_var_name(&mut var_count)
             }
             Pattern::Var(Some(nam)) => nam.clone(),
+            Pattern::List(..) => unreachable!(),
           };
           new_arg_args.push(Pattern::Var(Some(var_name.clone())));
           new_body_args.push(Term::Var { nam: var_name });
@@ -152,6 +154,7 @@ fn make_old_rule(pats: &[Pattern], new_split_def_id: DefId) -> Rule {
         // How to do this if num can be either a number or some sort of lambda? add a match? separate both cases?
         todo!();
       }
+      Pattern::List(..) => unreachable!(),
     }
   }
   let new_body = Term::call(Term::Ref { def_id: new_split_def_id }, new_body_args);
@@ -218,6 +221,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         new_pats.push(Pattern::Var(None));
         new_pats.push(Pattern::Var(None));
       }
+      (Pattern::List(..), _) | (_, Pattern::List(..)) => unreachable!(),
     }
   }
   Rule { pats: new_pats, body: new_body }
