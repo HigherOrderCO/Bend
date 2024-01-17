@@ -143,6 +143,7 @@ pub enum Pattern {
   Ctr(Name, Vec<Pattern>),
   Num(MatchNum),
   Tup(Box<Pattern>, Box<Pattern>),
+  List(Vec<Pattern>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -470,7 +471,7 @@ impl Pattern {
     match self {
       Pattern::Var(None) => false,
       Pattern::Var(Some(nam)) => nam == name,
-      Pattern::Ctr(.., args) => {
+      Pattern::Ctr(.., args) | Pattern::List(args) => {
         let mut ret = false;
         for arg in args {
           ret |= arg.occurs(name);
@@ -486,7 +487,7 @@ impl Pattern {
     fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Option<Name>>) {
       match pat {
         Pattern::Var(nam) => set.push(nam),
-        Pattern::Ctr(_, pats) => pats.iter().for_each(|pat| go(pat, set)),
+        Pattern::Ctr(_, pats) | Pattern::List(pats) => pats.iter().for_each(|pat| go(pat, set)),
         Pattern::Tup(fst, snd) => {
           go(fst, set);
           go(snd, set);
@@ -506,7 +507,7 @@ impl Pattern {
     fn go<'a>(pat: &'a mut Pattern, set: &mut Vec<&'a mut Option<Name>>) {
       match pat {
         Pattern::Var(nam) => set.push(nam),
-        Pattern::Ctr(_, pats) => pats.iter_mut().for_each(|pat| go(pat, set)),
+        Pattern::Ctr(_, pats) | Pattern::List(pats) => pats.iter_mut().for_each(|pat| go(pat, set)),
         Pattern::Tup(fst, snd) => {
           go(fst, set);
           go(snd, set);
@@ -537,7 +538,7 @@ impl Pattern {
   pub fn is_flat(&self) -> bool {
     match self {
       Pattern::Var(_) => true,
-      Pattern::Ctr(_, args) => args.iter().all(|arg| matches!(arg, Pattern::Var(_))),
+      Pattern::Ctr(_, args) | Pattern::List(args) => args.iter().all(|arg| matches!(arg, Pattern::Var(_))),
       Pattern::Num(_) => true,
       Pattern::Tup(fst, snd) => {
         matches!(fst.as_ref(), Pattern::Var(_)) && matches!(snd.as_ref(), Pattern::Var(_))
@@ -570,6 +571,7 @@ impl From<&Pattern> for Term {
       Pattern::Ctr(nam, pats) => Term::call(Term::Var { nam: nam.clone() }, pats.iter().map(Term::from)),
       Pattern::Num(..) => todo!(),
       Pattern::Tup(..) => todo!(),
+      Pattern::List(..) => todo!(),
     }
   }
 }

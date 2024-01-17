@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 
-use crate::term::{Adt, Book, Name, Tag, Term};
+use crate::term::{Adt, Book, Name, Pattern, Tag, Term};
 
 const LIST: &str = "List";
 const LCONS: &str = "LCons";
@@ -19,6 +19,7 @@ impl Book {
     let mut found_list = false;
     for def in self.defs.values_mut() {
       for rule in def.rules.iter_mut() {
+        rule.pats.iter_mut().for_each(|pat| found_list |= pat.encode_lists());
         found_list |= rule.body.encode_lists();
       }
     }
@@ -63,12 +64,17 @@ impl Term {
 
         true
       }
+      Term::Let { pat, val, nxt } => {
+        let pat_uses = pat.encode_lists();
+        let val_uses = val.encode_lists();
+        let nxt_uses = nxt.encode_lists();
+        pat_uses || val_uses || nxt_uses
+      }
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.encode_lists(),
       Term::App { fun: fst, arg: snd, .. }
       | Term::Tup { fst, snd }
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. }
-      | Term::Let { val: fst, nxt: snd, .. }
       | Term::Dup { val: fst, nxt: snd, .. } => {
         let fst_uses = fst.encode_lists();
         let snd_uses = snd.encode_lists();
@@ -88,6 +94,36 @@ impl Term {
       | Term::Str { .. }
       | Term::Var { .. }
       | Term::Era => false,
+    }
+  }
+}
+
+impl Pattern {
+  pub fn encode_lists(&mut self) -> bool {
+    match self {
+      Pattern::List(pats) => {
+        let lnil = Pattern::Var(Some(Name::new(LNIL)));
+
+        *self = pats.into_iter().rfold(lnil, |acc, nxt| {
+          nxt.encode_lists();
+          Pattern::Ctr(Name::new(LCONS), vec![nxt.clone(), acc])
+        });
+
+        true
+      }
+      Pattern::Ctr(_, pats) => {
+        let mut uses = false;
+        for pat in pats {
+          uses |= pat.encode_lists();
+        }
+        uses
+      }
+      Pattern::Tup(fst, snd) => {
+        let fst_uses = fst.encode_lists();
+        let snd_uses = snd.encode_lists();
+        fst_uses || snd_uses
+      }
+      Pattern::Var(..) | Pattern::Num(..) => false,
     }
   }
 }

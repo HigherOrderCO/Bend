@@ -57,6 +57,7 @@ impl Term {
               *p = Some(Some(Name(format!("{scrutinee}-1"))));
             }
             Pattern::Tup(_, _) => (),
+            Pattern::List(..) => unreachable!(),
           }
           body.desugar_implicit_match_binds(ctrs, adts);
         }

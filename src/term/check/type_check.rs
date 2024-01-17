@@ -55,6 +55,7 @@ pub fn infer_arg_type<'a>(
       }
       Pattern::Tup(..) => Type::Tup,
       Pattern::Num(..) => Type::Num,
+      Pattern::List(..) => unreachable!(),
     };
     unify(pat_type, &mut arg_type)?
   }

@@ -26,7 +26,7 @@ impl Pattern {
           *self = Pattern::Ctr(nam.clone(), vec![])
         }
       }
-      Pattern::Ctr(_, args) => {
+      Pattern::Ctr(_, args) | Pattern::List(args) => {
         for arg in args {
           arg.resolve_ctrs(is_ctr);
         }

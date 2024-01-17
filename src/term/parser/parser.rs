@@ -331,12 +331,20 @@ where
       .map(|xs| make_tup_tree(&xs, |a, b| Pattern::Tup(Box::new(a), Box::new(b))))
       .boxed();
 
+    let list = pattern
+      .clone()
+      .separated_by(just(Token::Comma).or_not())
+      .collect()
+      .delimited_by(just(Token::LBrace), just(Token::RBrace))
+      .map(Pattern::List)
+      .boxed();
+
     let zero = select!(Token::Num(0) => Pattern::Num(MatchNum::Zero));
 
     let succ =
       just(Token::Add).ignore_then(name_or_era()).map(|nam| Pattern::Num(MatchNum::Succ(Some(nam)))).boxed();
 
-    choice((zero, succ, var, ctr, tup))
+    choice((zero, succ, var, ctr, list, tup))
   })
 }
 

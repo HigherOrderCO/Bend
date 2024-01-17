@@ -86,6 +86,7 @@ fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
             .into(),
         };
       }
+      Pattern::List(..) => unreachable!(),
     }
   }
   body
@@ -194,6 +195,7 @@ fn make_leaf_pattern_matching_case(
       (Pattern::Var(_), _) => unreachable!(),
       (Pattern::Num(..), _) => unreachable!(),
       (Pattern::Tup(..), _) => unreachable!(),
+      (Pattern::List(..), _) => unreachable!(),
     }
   });
 
@@ -238,6 +240,7 @@ fn add_tagged_new_args(
       }
       Pattern::Num(_) => term = Term::named_lam(new_args.next().unwrap(), term),
       Pattern::Tup(..) => todo!(),
+      Pattern::List(..) => unreachable!(),
     }
 
     term
@@ -321,6 +324,7 @@ fn make_adt_pattern_matching_case(
         Pattern::Ctr(nam, _) => nam == ctr,
         Pattern::Num(..) => todo!(),
         Pattern::Tup(..) => todo!(),
+        Pattern::List(..) => unreachable!(),
       })
       .collect()
   }
@@ -462,7 +466,7 @@ fn add_case_to_book(book: &mut Book, nam: Name, body: Term) {
 fn get_pat_arg_count(match_path: &[Pattern]) -> (usize, usize) {
   let pat_arg_count = |pat: &Pattern| match pat {
     Pattern::Var(_) => 1,
-    Pattern::Ctr(_, vars) => vars.len(),
+    Pattern::Ctr(_, vars) | Pattern::List(vars) => vars.len(),
     Pattern::Num(MatchNum::Zero) => 0,
     Pattern::Num(MatchNum::Succ { .. }) => 1,
     // For tuples this isn't actually called, because we only destructure them at the end
