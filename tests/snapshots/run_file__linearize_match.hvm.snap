@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/linearize_match.hvm
 ---
-λa match a { 0: λb b; +a-1: λd (+ a-1 d) }
+λa λb (match a { 0: λc c; +a-1: λe (+ a-1 e) } b)

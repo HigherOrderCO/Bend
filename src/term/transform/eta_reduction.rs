@@ -1,12 +1,14 @@
 use crate::term::*;
 
 impl Book {
-  /// Applies eta-reduction to all definitions, converting occurences of `@x (f x)` into just `f`.
+  /// Applies eta-reduction to all generated definitions, converting occurrences of `@x (f x)` into just `f`.
   /// Assumes that variables are linear (used exactly once).
   pub fn eta_reduction(&mut self) {
     for def in self.defs.values_mut() {
-      for rule in def.rules.iter_mut() {
-        rule.body.eta_reduction();
+      def.assert_no_pattern_matching_rules();
+      if def.generated {
+        let rule = &mut def.rules[0].body;
+        rule.eta_reduction();
       }
     }
   }

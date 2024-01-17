@@ -12,7 +12,7 @@ impl Book {
       if is_matching_def {
         make_pattern_matching_def(self, def_id, def_type);
       } else {
-        // For functions with only one rule that doesnt pattern match,
+        // For functions with only one rule that doesn't pattern match,
         // we just move the variables from arg to body.
         make_non_pattern_matching_def(self, def_id);
       }
@@ -50,7 +50,8 @@ fn make_pattern_matching_def(book: &mut Book, def_id: DefId, def_type: &[Type]) 
   }
   for (rule_idx, body) in rule_bodies.into_iter().enumerate() {
     let rule_name = make_rule_name(&def_name, rule_idx);
-    book.insert_def(rule_name, vec![Rule { pats: vec![], body }]);
+    let is_generated = false;
+    book.insert_def(rule_name, is_generated, vec![Rule { pats: vec![], body }]);
   }
 
   // Generate scott-encoded pattern matching
@@ -458,7 +459,7 @@ fn add_case_to_book(book: &mut Book, nam: Name, body: Term) {
   if let Some(def_id) = book.def_names.def_id(&nam) {
     book.defs.get_mut(&def_id).unwrap().rules = vec![Rule { pats: vec![], body }];
   } else {
-    book.insert_def(nam, vec![Rule { pats: vec![], body }]);
+    book.insert_def(nam, true, vec![Rule { pats: vec![], body }]);
   }
 }
 

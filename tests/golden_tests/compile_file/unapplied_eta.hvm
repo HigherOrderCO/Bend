@@ -1,2 +1,2 @@
-Id = λb b
+Id = λa a
 main = λa (Id a)

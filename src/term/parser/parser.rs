@@ -428,7 +428,7 @@ where
           if let Some(def_id) = book.def_names.def_id(&nam) {
             book.defs.get_mut(&def_id).unwrap().rules.push(rule);
           } else {
-            book.insert_def(nam, vec![rule]);
+            book.insert_def(nam, false, vec![rule]);
           }
         }
         TopLevel::Adt((nam, adt)) => {

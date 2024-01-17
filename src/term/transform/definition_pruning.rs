@@ -12,18 +12,15 @@ impl Book {
     // to mark as used all constructors in case of the user
     // manually encode a constructor with tagged lambdas
     for ctr in self.ctrs.keys() {
-      let Definition { def_id, rules } = self.defs.get(&self.def_names.name_to_id[ctr]).unwrap();
-      used.insert(*def_id);
-      for rule in rules {
-        rule.body.find_used_definitions(&mut used, &self.defs);
-      }
+      let def = self.defs.get(&self.def_names.name_to_id[ctr]).unwrap();
+      used.insert(def.def_id);
+      def.assert_no_pattern_matching_rules();
+      def.rules[0].body.find_used_definitions(&mut used, &self.defs);
     }
 
-    let Definition { def_id, rules } = self.defs.get(&main).unwrap();
-    used.insert(*def_id);
-    for rule in rules {
-      rule.body.find_used_definitions(&mut used, &self.defs);
-    }
+    let def = self.defs.get(&main).unwrap();
+    used.insert(def.def_id);
+    def.rules[0].body.find_used_definitions(&mut used, &self.defs);
 
     let ids = HashSet::from_iter(self.def_names.def_ids().copied());
     let unused = ids.difference(&used);

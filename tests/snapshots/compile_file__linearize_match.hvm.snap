@@ -2,7 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/linearize_match.hvm
 ---
+@2 = (?<(@3 @4) a> a)
 @3 = (a a)
 @4 = (<+ a b> (a b))
-@main = (?<(@3 @4) a> a)
+@main = (a (b c))
+& @2 ~ (a (b c))
 

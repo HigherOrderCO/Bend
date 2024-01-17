@@ -14,7 +14,7 @@ impl Book {
       }
     }
     for (name, rules) in defs {
-      self.insert_def(name, rules);
+      self.insert_def(name, true, rules);
     }
   }
 }

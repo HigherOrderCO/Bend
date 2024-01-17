@@ -41,6 +41,7 @@ pub struct DefNames {
 #[derive(Debug, Clone)]
 pub struct Definition {
   pub def_id: DefId,
+  pub generated: bool,
   pub rules: Vec<Rule>,
 }
 
@@ -224,9 +225,9 @@ impl Book {
     Default::default()
   }
 
-  pub fn insert_def(&mut self, name: Name, rules: Vec<Rule>) -> DefId {
+  pub fn insert_def(&mut self, name: Name, is_generated: bool, rules: Vec<Rule>) -> DefId {
     let def_id = self.def_names.insert(name);
-    let def = Definition { def_id, rules };
+    let def = Definition { def_id, generated: is_generated, rules };
     self.defs.insert(def_id, def);
     def_id
   }

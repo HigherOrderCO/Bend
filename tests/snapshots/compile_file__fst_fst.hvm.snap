@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/fst_fst.hvm
 ---
-@5 = ([a *] ([b *] [a b]))
+@FstFst = ([a *] ([b *] [a b]))
 @main = a
-& @5 ~ ([#3 #9] ([#4 #12] a))
+& @FstFst ~ ([#3 #9] ([#4 #12] a))
 
