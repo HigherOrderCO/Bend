@@ -1,14 +1,6 @@
-use crate::term::{Book, DefId, Definition, Name, Pattern};
+use crate::term::{Book, DefId, Definition, Name, Pattern, Type};
 use core::fmt;
 use std::collections::HashMap;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Type {
-  Any,
-  Tup,
-  Num,
-  Adt(Name),
-}
 
 pub type DefinitionTypes = HashMap<DefId, Vec<Type>>;
 
@@ -19,7 +11,9 @@ impl Book {
   pub fn infer_def_types(&self) -> Result<DefinitionTypes, String> {
     let mut def_types = HashMap::new();
     for (def_id, def) in &self.defs {
-      let def_type = def.infer_type(&self.ctrs)?;
+      let def_type = def
+        .infer_type(&self.ctrs)
+        .map_err(|e| format!("In definition '{}': {}", self.def_names.name(def_id).unwrap(), e))?;
       def_types.insert(*def_id, def_type);
     }
     Ok(def_types)
@@ -44,20 +38,7 @@ pub fn infer_arg_type<'a>(
 ) -> Result<Type, String> {
   let mut arg_type = Type::Any;
   for pat in pats {
-    let pat_type = match pat {
-      Pattern::Var(_) => Type::Any,
-      Pattern::Ctr(ctr_nam, _) => {
-        if let Some(adt_nam) = ctrs.get(ctr_nam) {
-          Type::Adt(adt_nam.clone())
-        } else {
-          return Err(format!("Unknown constructor '{ctr_nam}'"));
-        }
-      }
-      Pattern::Tup(..) => Type::Tup,
-      Pattern::Num(..) => Type::Num,
-      Pattern::List(..) => unreachable!(),
-    };
-    unify(pat_type, &mut arg_type)?
+    unify(pat.to_type(ctrs)?, &mut arg_type)?;
   }
   Ok(arg_type)
 }

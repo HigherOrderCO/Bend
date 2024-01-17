@@ -24,7 +24,7 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
     .into_iter()
     .map(|(name, rules)| {
       let def_id = def_names.def_id(&name).unwrap();
-      Definition { def_id , generated: def.generated, rules }
+      Definition { def_id, generated: def.generated, rules }
     })
     .collect()
 }

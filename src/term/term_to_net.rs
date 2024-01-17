@@ -258,7 +258,7 @@ impl<'a> EncodeTermState<'a> {
         self.inet.link(Port(node, 1), Port(node, 2));
         Some(Port(node, 0))
       }
-      Term::Str { .. } => unreachable!(), // Removed in desugar str
+      Term::Str { .. } => unreachable!(),  // Removed in desugar str
       Term::List { .. } => unreachable!(), // Removed in desugar list
       // core: & fst ~ <op snd ret>
       Term::Opx { op, fst, snd } => {

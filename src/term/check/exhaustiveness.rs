@@ -1,5 +1,5 @@
-use super::type_check::{DefinitionTypes, Type};
-use crate::term::{Adt, Book, MatchNum, Name, Pattern, Rule};
+use super::type_check::DefinitionTypes;
+use crate::term::{Adt, Book, MatchNum, Name, Pattern, Rule, Type};
 use std::collections::BTreeMap;
 
 impl Book {
@@ -10,7 +10,8 @@ impl Book {
       let def_name = self.def_names.name(def_id).unwrap();
       let types = &def_types[def_id];
       let rules_to_check = Vec::from_iter(0 .. def.rules.len());
-      check_pattern(&mut vec![], &self.adts, &def.rules, types, rules_to_check, def_name)?;
+      check_pattern(&mut vec![], &self.adts, &def.rules, types, rules_to_check, def_name)
+        .map_err(|e| format!("In definition '{}': {}", self.def_names.name(&def.def_id).unwrap(), e))?;
     }
     Ok(())
   }
@@ -72,10 +73,7 @@ fn check_pattern(
     for (ctr, matching_rules) in rules_matching_ctrs {
       if matching_rules.is_empty() {
         let missing = get_missing_pattern(match_path, ctr, &types[1 ..], adts);
-        return Err(format!(
-          "Non-exhaustive pattern at definition '{}'. Hint: ({} {}) not covered.",
-          def_name, def_name, missing
-        ));
+        return Err(format!("Non-exhaustive pattern. Hint: ({} {}) not covered.", def_name, missing));
       } else {
         let mut match_path = match_path.to_vec();
         match_path.push(ctr);

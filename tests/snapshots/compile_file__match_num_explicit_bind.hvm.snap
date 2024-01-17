@@ -2,9 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/match_num_explicit_bind.hvm
 ---
-@4 = #0
-@5 = (a a)
 @main = a
 & @pred ~ (#4 a)
-@pred = (?<(@4 @5) a> a)
+@pred = (?<(#0 (a a)) b> b)
 

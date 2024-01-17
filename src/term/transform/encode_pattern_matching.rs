@@ -1,6 +1,5 @@
 use crate::term::{
-  check::type_check::{DefinitionTypes, Type},
-  Book, DefId, MatchNum, Name, Pattern, Rule, Tag, Term,
+  check::type_check::DefinitionTypes, Book, DefId, MatchNum, Name, Pattern, Rule, Tag, Term, Type,
 };
 
 impl Book {
@@ -33,7 +32,7 @@ fn make_non_pattern_matching_def(book: &mut Book, def_id: DefId) {
   def.rules = vec![rule];
 }
 
-/// For function that do pattern match,
+/// For functions that do pattern match,
 ///  we break them into a tree of small matching functions
 ///  with the original rule bodies at the end.
 fn make_pattern_matching_def(book: &mut Book, def_id: DefId, def_type: &[Type]) {
@@ -93,6 +92,7 @@ fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
   body
 }
 
+/// Builds the encoding for the patterns in a pattern matching function.
 fn make_pattern_matching_case(
   book: &mut Book,
   def_type: &[Type],

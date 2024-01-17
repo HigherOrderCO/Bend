@@ -357,8 +357,8 @@ where
     .then_ignore(just(Token::Equals))
 }
 
-/// This rule always emits an error when it parses successfully 
-/// It is used to report a parsing error that would be unclear otherwise 
+/// This rule always emits an error when it parses successfully
+/// It is used to report a parsing error that would be unclear otherwise
 fn rule_body_missing_paren<'a, I>()
 -> impl Parser<'a, I, ((Name, Vec<Pattern>), Term), extra::Err<Rich<'a, Token>>>
 where
