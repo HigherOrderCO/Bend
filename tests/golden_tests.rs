@@ -175,3 +175,25 @@ fn encode_pattern_match() {
     Ok(book.to_string())
   })
 }
+
+#[test]
+fn eta_reduce() {
+  run_golden_test_dir(function_name!(), &|code| {
+    let mut book = do_parse_book(code)?;
+    let main = book.check_has_main()?;
+    book.check_shared_names()?;
+    book.encode_strs()?;
+    book.encode_lists()?;
+    book.generate_scott_adts();
+    book.resolve_refs();
+    encode_pattern_matching(&mut book)?;
+    book.check_unbound_vars()?;
+    book.make_var_names_unique();
+    book.linearize_vars();
+    book.eta_reduction(true);
+    book.simplify_ref_to_ref()?;
+    book.simplify_main_ref(main);
+    book.prune(main);
+    Ok(book.to_string())
+  })
+}

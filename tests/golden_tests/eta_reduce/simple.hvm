@@ -1,0 +1,1 @@
+main = λa λb λc (main b c) 

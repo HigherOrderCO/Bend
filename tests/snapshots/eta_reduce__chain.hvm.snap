@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/eta_reduce/chain.hvm
+---
+(main) = λa_1 λb_1 λc_1 (+ a_1 (+ b_1 c_1))

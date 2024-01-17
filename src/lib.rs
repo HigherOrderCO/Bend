@@ -48,7 +48,7 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Def
   book.make_var_names_unique();
   book.linearize_vars();
   if opt_level >= OptimizationLevel::Heavy {
-    book.eta_reduction();
+    book.eta_reduction(false);
   }
   book.detach_supercombinators(main);
   if opt_level >= OptimizationLevel::Heavy {
