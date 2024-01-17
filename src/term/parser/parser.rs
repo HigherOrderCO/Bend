@@ -345,7 +345,7 @@ fn rule_body_missing_paren<'a, I>()
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let terms = (tag(Tag::Static))
+  let terms = tag(Tag::Static)
     .then(term())
     .foldl(term().and_is(soft_keyword("data").not()).repeated().at_least(1), |(tag, fun), arg| {
       (tag.clone(), Term::App { tag, fun: Box::new(fun), arg: Box::new(arg) })
