@@ -4,7 +4,7 @@ use chumsky::{
   extra,
   input::{SpannedInput, Stream, ValueInput},
   prelude::{Input, Rich},
-  primitive::{choice, just},
+  primitive::{choice, end, just},
   recursive::recursive,
   select,
   span::SimpleSpan,
@@ -66,7 +66,13 @@ fn soft_keyword<'a, I>(keyword: &'a str) -> impl Parser<'a, I, (), extra::Err<Ri
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  name().try_map(move |Name(nam), span| if nam == keyword { Ok(()) } else { Err(Rich::custom(span, "")) })
+  name().try_map(move |Name(nam), span| {
+    if nam == keyword {
+      Ok(())
+    } else {
+      Err(Rich::custom(span, format!("Expected `{keyword}`, found `{nam}`")))
+    }
+  })
 }
 
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
@@ -325,14 +331,46 @@ where
   })
 }
 
-fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
+fn rule_pattern<'a, I>() -> impl Parser<'a, I, (Name, Vec<Pattern>), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   let lhs = name().then(pattern().repeated().collect()).boxed();
-  let lhs = choice((lhs.clone(), lhs.clone().delimited_by(just(Token::LParen), just(Token::RParen))));
+  choice((lhs.clone(), lhs.clone().delimited_by(just(Token::LParen), just(Token::RParen))))
+    .then_ignore(just(Token::Equals))
+}
 
-  lhs.then_ignore(just(Token::Equals)).then(term()).map(|((name, pats), body)| (name, Rule { pats, body }))
+fn rule_body_missing_paren<'a, I>()
+-> impl Parser<'a, I, ((Name, Vec<Pattern>), Term), extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  let terms = (tag(Tag::Static))
+    .then(term())
+    .foldl(term().and_is(soft_keyword("data").not()).repeated().at_least(1), |(tag, fun), arg| {
+      (tag.clone(), Term::App { tag, fun: Box::new(fun), arg: Box::new(arg) })
+    });
+
+  let end_of_rule = end().or(soft_keyword("data")).rewind();
+
+  rule_pattern()
+    .then(terms)
+    .map(|(rule, (_, app))| (rule, app))
+    .then_ignore(end_of_rule)
+    .validate(|((name, pats), term), span, emit| {
+      emit.emit(Rich::custom(span, format!("Missing Parenthesis around rule `{}` body", name)));
+      ((name, pats), term)
+    })
+    .boxed()
+}
+
+fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  rule_body_missing_paren()
+    .or(rule_pattern().then(term()))
+    .map(|((name, pats), body)| (name, Rule { pats, body }))
 }
 
 fn datatype<'a, I>() -> impl Parser<'a, I, (Name, Adt), extra::Err<Rich<'a, Token>>>
@@ -361,7 +399,7 @@ where
 {
   let top_level = choice((datatype().map(TopLevel::Adt), rule().map(TopLevel::Rule)));
 
-  top_level.repeated().collect::<Vec<_>>().try_map(|program, span| {
+  top_level.repeated().collect::<Vec<_>>().validate(|program, span, emit| {
     let mut book = Book::new();
 
     // Collect rules and adts into a book
@@ -381,17 +419,17 @@ where
               if let Entry::Vacant(e) = book.ctrs.entry(ctr) {
                 e.insert(nam.clone());
               } else {
-                return Err(Rich::custom(span, format!("Repeated constructor '{}'", nam)));
+                emit.emit(Rich::custom(span, format!("Repeated constructor '{}'", nam)));
               }
             }
           } else {
-            return Err(Rich::custom(span, format!("Repeated datatype '{}'", nam)));
+            emit.emit(Rich::custom(span, format!("Repeated datatype '{}'", nam)));
           }
         }
       }
     }
 
-    Ok(book)
+    book
   })
 }
 

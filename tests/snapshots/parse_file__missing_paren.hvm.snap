@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/parse_file/missing_paren.hvm
+---
+Missing Parenthesis around rule `main` body

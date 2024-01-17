@@ -1,0 +1,3 @@
+main = * * * *
+
+data Foo = Bar

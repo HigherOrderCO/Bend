@@ -156,6 +156,14 @@ fn flatten_rules() {
 }
 
 #[test]
+fn parse_file() {
+  run_golden_test_dir(function_name!(), &|code| {
+    let book = do_parse_book(code)?;
+    Ok(book.to_string())
+  })
+}
+
+#[test]
 fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
