@@ -34,8 +34,8 @@ pub fn compile_book(book: &mut Book, opts: Opts) -> Result<CompileResult, String
   let (main, warnings) = desugar_book(book, opts)?;
   let (nets, hvmc_names, labels) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
-  if opts.pre_reduce {
-    pre_reduce_book(&mut core_book, opts.pre_reduce, opts.lazy)?;
+  if opts.pre_reduce && !opts.lazy {
+    pre_reduce_book(&mut core_book, opts.pre_reduce)?;
   }
   if opts.prune {
     prune_defs(&mut core_book);
