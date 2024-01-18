@@ -14,14 +14,14 @@ const MAX_ITERS: usize = 100_000;
 /// Reduces the definitions in the book individually, except for main.
 /// If cross_refs, will deref and try to find the smallest net.
 /// Otherwise, just apply node~node interactions.
-pub fn pre_reduce_book(book: &mut Book, cross_refs: bool, lazy: bool) -> Result<(), String> {
+pub fn pre_reduce_book(book: &mut Book, cross_refs: bool) -> Result<(), String> {
   let rt_book = &mut hvmc::ast::book_to_runtime(book);
   for (nam, net) in book.iter() {
     // Skip unnecessary work
     if net.rdex.is_empty() {
       continue;
     }
-    let mut rt = &mut Net::new(1 << 18, lazy);
+    let mut rt = &mut Net::new(1 << 18, false);
     let fid = name_to_val(nam);
     boot(rt, fid);
     expand(rt, rt_book);
@@ -47,7 +47,7 @@ pub fn pre_reduce_book(book: &mut Book, cross_refs: bool, lazy: bool) -> Result<
       return Err(format!("Unable to pre-reduce definition {nam} in under {MAX_ITERS} iterations"));
     }
 
-    let new_def = runtime_net_sparse_to_runtime_def(&rt, lazy);
+    let new_def = runtime_net_sparse_to_runtime_def(&rt);
 
     let def = rt_book.defs.get_mut(&fid).unwrap();
     def.rdex = new_def.rdex;
@@ -88,32 +88,32 @@ fn reduce_without_deref(net: &mut Net, limit: usize) -> usize {
 }
 
 /// Converts a runtime net after execution, with null elements in the heap, into to an hvmc Def.
-fn runtime_net_sparse_to_runtime_def(rt_net: &Net, lazy: bool) -> hvmc::run::Def {
+fn runtime_net_sparse_to_runtime_def(rt_net: &Net) -> hvmc::run::Def {
   // Convert back and forth to compress the net.
   // Hacky, but works and not that slow.
   let net = net_from_runtime(rt_net);
-  let mut rt_net = Net::new(1 << 18, lazy);
+  let mut rt_net = Net::new(1 << 18, false);
   net_to_runtime(&mut rt_net, &net);
   runtime_net_to_runtime_def(&rt_net)
 }
 
 fn boot(rt: &mut Net, fid: u64) {
   match rt {
-    Net::Lazy(net) => net.net.boot(fid),
     Net::Eager(net) => net.net.boot(fid),
+    _ => unimplemented!(),
   }
 }
 
 fn heap_root(rt: &Net) -> Ptr {
   match rt {
-    Net::Lazy(net) => net.net.heap.get_root(),
     Net::Eager(net) => net.net.heap.get_root(),
+    _ => unimplemented!(),
   }
 }
 
 fn interact(rt: &mut Net, book: &hvmc::run::Book, a: Ptr, b: Ptr) {
   match rt {
-    Net::Lazy(net) => net.net.interact(book, a, b),
     Net::Eager(net) => net.net.interact(book, a, b),
+    _ => unimplemented!(),
   }
 }

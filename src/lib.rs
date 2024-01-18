@@ -35,7 +35,9 @@ pub fn compile_book(
   let main = desugar_book(book, opt_level)?;
   let (nets, hvmc_names, labels) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
-  pre_reduce_book(&mut core_book, opt_level >= OptimizationLevel::Heavy, lazy)?;
+  if !lazy {
+    pre_reduce_book(&mut core_book, opt_level >= OptimizationLevel::Heavy)?;
+  }
   if opt_level >= OptimizationLevel::Heavy {
     prune_defs(&mut core_book);
   }
