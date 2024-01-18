@@ -159,7 +159,7 @@ impl Term {
 /// Converts free vars inside the match arms into lambdas with applications to give them the external value.
 /// Makes the rules extractable and linear (no need for dups when variable used in both rules)
 // TODO: Deal with unscoped lambdas/vars.
-fn linearize_match_free_vars<'a>(match_term: &'a mut Term) -> &'a mut Term {
+fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
   let Term::Match { scrutinee: _, arms } = match_term else { unreachable!() };
   // Collect the vars
   let free_vars: IndexSet<Name> = arms
