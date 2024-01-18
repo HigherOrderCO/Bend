@@ -2,9 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/match_mult_linearization.hvm
 ---
-@2 = (?<(@3 @4) a> a)
-@3 = (<+ a <+ b c>> (a (b c)))
-@4 = (<+ a <+ b <+ c d>>> (a (b (c d))))
-@main = (a (b (c (d e))))
-& @2 ~ (a (b (c (d e))))
+@main = (?<((<+ a <+ b c>> (a (b c))) (<+ d <+ e <+ f g>>> (d (e (f g))))) (h (i (j k)))> (h (i (j k))))
 

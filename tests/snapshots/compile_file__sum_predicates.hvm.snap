@@ -2,13 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/sum_predicates.hvm
 ---
-@6 = #0
-@7 = (a a)
-@A = (a a)
-@B = (a (<+ a b> b))
-@E = (?<(@6 @7) a> a)
-@F = (a (?<(@A @B) (a b)> b))
+@3 = (?<(#0 (a a)) b> b)
+@4 = (a (<+ a b> b))
+@5 = (a (?<((b b) @4) (a c)> c))
 @main = a
 & @sum_pred ~ (#8 (#5 a))
-@sum_pred = (?<(@E @F) (a b)> (a b))
+@sum_pred = (?<(@3 @5) (a b)> (a b))
 

@@ -99,7 +99,6 @@ fn compile_file() {
     Ok(format!("{:?}", compiled))
   })
 }
-
 #[test]
 fn compile_file_o0() {
   run_golden_test_dir(function_name!(), &|code| {

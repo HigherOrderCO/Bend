@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/unbound_var.hvm
 ---
-Unbound variable 'a' in definition ''
+Unbound variable 'a'

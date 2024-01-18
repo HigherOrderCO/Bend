@@ -108,15 +108,20 @@ impl Term {
           }
           // Matching on nums is a primitive operation, we can leave it as is.
           // Not extracting into a separate definition allows us to create very specific inets with the MATCH node.
-          Type::Num => normalize_num_match(self)?,
+          Type::Num => {
+            let match_term = linearize_match_free_vars(self);
+            normalize_num_match(match_term)?
+          }
           // TODO: It would be nice to also not extract tuple matches,
           // but if they have nested patterns it gets more complicated.
           // For now, we use `let (a, b) = x` to get the specific desired inet.
           _ => {
             *match_count += 1;
+            let match_term = linearize_match_free_vars(self);
+            let Term::Match { scrutinee: box Term::Var { nam }, arms } = match_term else { unreachable!() };
             let nam = std::mem::take(nam);
             let arms = std::mem::take(arms);
-            *self = match_to_def(nam, &arms, def_name, book, *match_count);
+            *match_term = match_to_def(nam, &arms, def_name, book, *match_count);
           }
         }
       }
@@ -151,6 +156,49 @@ impl Term {
   }
 }
 
+/// Converts free vars inside the match arms into lambdas with applications to give them the external value.
+/// Makes the rules extractable and linear (no need for dups when variable used in both rules)
+// TODO: Deal with unscoped lambdas/vars.
+fn linearize_match_free_vars<'a>(match_term: &'a mut Term) -> &'a mut Term {
+  let Term::Match { scrutinee: _, arms } = match_term else { unreachable!() };
+  // Collect the vars
+  let free_vars: IndexSet<Name> = arms
+    .iter()
+    .flat_map(|(pat, term)| term.free_vars().into_keys().filter(|k| !pat.names().contains(k)))
+    .collect();
+
+  // Add lambdas to the arms
+  for (_, body) in arms {
+    let old_body = std::mem::take(body);
+    let new_body = free_vars.iter().rev().fold(old_body, |body, var| Term::Lam {
+      tag: Tag::Static,
+      nam: Some(var.clone()),
+      bod: Box::new(body),
+    });
+    *body = new_body;
+  }
+
+  // Add apps to the match
+  let old_match = std::mem::take(match_term);
+  *match_term = free_vars.into_iter().fold(old_match, |acc, nam| Term::App {
+    tag: Tag::Static,
+    fun: Box::new(acc),
+    arg: Box::new(Term::Var { nam }),
+  });
+
+  // Get a reference to the match again
+  // It returns a reference and not an owned value because we want
+  //  to keep the new surrounding Apps but still modify the match further.
+  let mut match_term = match_term;
+  loop {
+    match match_term {
+      Term::App { tag: _, fun, arg: _ } => match_term = fun.as_mut(),
+      Term::Match { .. } => return match_term,
+      _ => unreachable!(),
+    }
+  }
+}
+
 /// Transforms a match into a new definition with every arm of `arms` as a rule.
 /// The result is the new def applied to the scrutinee followed by the free vars of the arms.
 fn match_to_def(
@@ -160,37 +208,18 @@ fn match_to_def(
   book: &mut MatchesBook,
   match_count: usize,
 ) -> Term {
-  let free_vars: IndexSet<Name> = arms
-    .iter()
-    .flat_map(|(pat, term)| term.free_vars().into_keys().filter(|k| !pat.names().contains(k)))
-    .collect();
-
-  let mut rules: Vec<Rule> =
+  let rules: Vec<Rule> =
     arms.iter().map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone() }).collect();
-
-  // Extend the rules with the free variables
-  for rule in &mut rules {
-    for var in &free_vars {
-      rule.pats.push(Pattern::Var(Some(var.clone())));
-    }
-  }
-
   let new_name = make_def_name(def_name, &Name::new("match"), match_count);
   let def_id = book.def_names.insert(new_name);
   let def = Definition { def_id, generated: true, rules };
   book.new_defs.insert(def_id, def);
 
-  let scrutinee_app = Term::App {
+  Term::App {
     tag: Tag::Static,
     fun: Box::new(Term::Ref { def_id }),
     arg: Box::new(Term::Var { nam: scrutinee }),
-  };
-
-  free_vars.into_iter().fold(scrutinee_app, |acc, nam| Term::App {
-    tag: Tag::Static,
-    fun: Box::new(acc),
-    arg: Box::new(Term::Var { nam }),
-  })
+  }
 }
 
 fn make_def_name(def_name: &Name, ctr: &Name, i: usize) -> Name {
