@@ -2,7 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/addition.hvm
 ---
-@2 = (<2+ a> a)
-@main = a
-& @2 ~ (#8 a)
+@main = #10
 

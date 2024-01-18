@@ -5,11 +5,14 @@ use crate::term::{Book, DefId, DefNames, Definition, Name, Pattern, Rule, Term};
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
 impl Book {
-  pub fn detach_supercombinators(&mut self) {
+  pub fn detach_supercombinators(&mut self, main: DefId) {
     let mut combinators = Combinators::new();
 
     for def in self.defs.values_mut() {
       def.assert_no_pattern_matching_rules();
+      if def.def_id == main {
+        continue;
+      }
       def.rules[0].body.detach_combinators(def.def_id, &mut self.def_names, &mut combinators);
     }
 
