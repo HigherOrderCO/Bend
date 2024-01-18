@@ -66,7 +66,7 @@ impl Term {
         nxt.display(def_names)
       ),
       Term::Sup { tag, fst, snd } => {
-        write!(f, "{}{{{} {}}}", tag.display_padded(), fst.display(def_names), snd.display(def_names))
+        write!(f, "{}{{{} {}}}", tag.display(), fst.display(def_names), snd.display(def_names))
       }
       Term::Era => write!(f, "*"),
       Term::Num { val } => write!(f, "{val}"),
