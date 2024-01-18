@@ -8,6 +8,5 @@ input_file: tests/golden_tests/compile_file/weekday.hvm
 @M = {2 * @L}
 @N = {2 * @M}
 @Saturday = {2 * @N}
-@main = a
-& (b b) ~ (@Saturday a)
+@main = @Saturday
 

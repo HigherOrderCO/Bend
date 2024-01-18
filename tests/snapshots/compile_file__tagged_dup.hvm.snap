@@ -2,8 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/tagged_dup.hvm
 ---
-@main = a
-& (b b) ~ {3 (c (d (e (f (g a))))) c}
-& (h h) ~ {3 f g}
-& (i i) ~ {3 d e}
+@main = (a a)
 

@@ -2,6 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/exp.hvm
 ---
-@main = a
-& ({3 (b c) (c d)} (b d)) ~ (({5 (e f) (f g)} (e g)) a)
+@main = ({5 ({5 a b} c) (c {5 b d})} (a d))
 
