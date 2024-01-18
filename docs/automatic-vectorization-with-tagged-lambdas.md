@@ -4,8 +4,11 @@ We have seen in [Dups and Sups](dups-and-sups.md) that duplications and superpos
 
 Tagged applications will only annihilate lambdas with the same tag.
 ```rs
-#A(#A λx(body) arg) // #A is the tag.
-// The tag goes before the term.
+
+// V appllication's tag
+  #A(#A λx(body) arg)
+//    ^ lambda's tag
+// The tag must go before the term.
 // This reduces to
 x = arg; body
 ```
@@ -18,7 +21,7 @@ T = #Bool λt #Bool λf t
 F = #Bool λt #Bool λf f
 
 // data List = (Cons x xs) | Nil
-Cons = λx λxs #List λc #List λn #List.Cons.xs (#List.Cons.x (c x) xs)
+Cons = λx λxs #List λc #List λn #List.Cons.xs(#List.Cons.x(c x) xs)
 Nil  =        #List λc #List λn n
 ```
 
@@ -26,7 +29,7 @@ When encoding the pattern matching, the application can then use the same label:
 
 ```rs
 // not = λbool match bool { T: (F) F: (T) } 
-not = λbool (#Bool bool F T)
+not = λbool #Bool(bool F T)
 ```
 
 In fact, `match` is syntax sugar for a tagged application like the one above. This means that it is not possible to match without using tagged applications.
@@ -34,7 +37,7 @@ In fact, `match` is syntax sugar for a tagged application like the one above. Th
 When an application and a lambda with different tags interact, the application "commutes" through the lambda instead of beta-reducing it. Here is how it works, roughly:
 
 ```rs
-(#A λx #B (b x) a)
+(#A λx #B(b x) a)
 // Reduces to
 #B λc #A((b #A λ$d c) #B(a $d))
 ```
