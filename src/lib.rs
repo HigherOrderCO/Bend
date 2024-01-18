@@ -324,15 +324,15 @@ pub struct RunStats {
 
 fn expand(net: &mut hvmc::run::Net, book: &hvmc::run::Book) {
   match net {
-    hvmc::run::Net::Lazy(net) => net.net.expand(book),
     hvmc::run::Net::Eager(net) => net.net.expand(book),
+    _ => {}
   }
 }
 
 fn reduce(net: &mut hvmc::run::Net, book: &hvmc::run::Book, limit: usize) -> usize {
   match net {
-    hvmc::run::Net::Lazy(_net) => todo!(), //net.net.reduce(book, 1),
     hvmc::run::Net::Eager(net) => net.net.reduce(book, limit),
+    _ => panic!("Unsuported configuration, disable debug mode `-D` or enable less optimzations `-O=0`"),
   }
 }
 
