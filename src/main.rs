@@ -24,11 +24,15 @@ struct Args {
   #[arg(short = '1', help = "Single-core mode (no parallelism)")]
   pub single_core: bool,
 
+  #[arg(short = 'L', help = "Lazy mode")]
+  pub lazy_mode: bool,
+
   #[arg(short = 'd', help = "Debug mode (print each reduction step)")]
   pub debug: bool,
 
   #[arg(short = 'l', help = "Linear readback (show explicit dups)")]
   pub linear: bool,
+
   #[arg(short = 'O', default_value = "1", help = "Optimization level (0 or 1)", value_parser = opt_level_parser)]
   pub opt_level: OptimizationLevel,
 
@@ -82,7 +86,7 @@ fn main() {
         check_book(book)?;
       }
       Mode::Compile => {
-        let compiled = compile_book(&mut book, args.opt_level)?;
+        let compiled = compile_book(&mut book, args.opt_level, args.lazy_mode)?;
 
         for warn in &compiled.warnings {
           eprintln!("WARNING: {warn}");
@@ -96,8 +100,15 @@ fn main() {
       }
       Mode::Run => {
         let mem_size = args.mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
-        let (res_term, def_names, info) =
-          run_book(book, mem_size, !args.single_core, args.debug, args.linear, args.opt_level)?;
+        let (res_term, def_names, info) = run_book(
+          book,
+          mem_size,
+          !args.single_core,
+          args.debug,
+          args.linear,
+          args.lazy_mode,
+          args.opt_level,
+        )?;
         let RunInfo { stats, readback_errors, net: lnet } = info;
         let total_rewrites = total_rewrites(&stats.rewrites) as f64;
         let rps = total_rewrites / stats.run_time / 1_000_000.0;

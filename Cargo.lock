@@ -205,7 +205,7 @@ checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 [[package]]
 name = "hvm-core"
 version = "0.2.14"
-source = "git+https://github.com/HigherOrderCO/hvm-core#7d8053dd8cc820dda988b393c7ec1af8a19c71de"
+source = "git+https://github.com/HigherOrderCO/hvm-core?branch=lazy_mode#8c44696f1a8075e0cb8af85e2d7a0d567ca29d06"
 dependencies = [
  "nohash-hasher",
 ]
