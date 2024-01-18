@@ -154,7 +154,7 @@ where
       .boxed();
 
     // #tag {fst snd}
-    let sup = tag(Tag::Auto)
+    let sup = tag(Tag::Numeric(0))
       .then_ignore(just(Token::LBracket))
       .then(term.clone())
       .then(term.clone())
@@ -164,7 +164,7 @@ where
 
     // let #tag? {x1 x2} = body; next
     let dup = just(Token::Let)
-      .ignore_then(tag(Tag::Auto))
+      .ignore_then(tag(Tag::Numeric(0)))
       .then_ignore(just(Token::LBracket))
       .then(name_or_era())
       .then(name_or_era())

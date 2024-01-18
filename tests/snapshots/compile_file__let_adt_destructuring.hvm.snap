@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/let_adt_destructuring.hvm
 ---
-@6 = {4 a a}
-@Box = (a {2 {4 a b} b})
-@Unbox = ({2 @6 a} a)
+@6 = {6 a a}
+@Box = (a {4 {6 a b} b})
+@Unbox = ({4 @6 a} a)
 @main = a
 & @Unbox ~ (b a)
 & @Box ~ (#1 b)

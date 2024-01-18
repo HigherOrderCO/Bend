@@ -2,11 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/weekday.hvm
 ---
-@J = {2 a {2 * a}}
-@K = {2 * @J}
-@L = {2 * @K}
-@M = {2 * @L}
-@N = {2 * @M}
-@Saturday = {2 * @N}
+@J = {4 a {4 * a}}
+@K = {4 * @J}
+@L = {4 * @K}
+@M = {4 * @L}
+@N = {4 * @M}
+@Saturday = {4 * @N}
 @main = @Saturday
 

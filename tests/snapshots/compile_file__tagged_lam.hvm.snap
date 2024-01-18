@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/tagged_lam.hvm
 ---
-@2 = {2 <+ #1 a> a}
-@3 = {2 {3 a <* a b>} b}
+@2 = {4 <+ #1 a> a}
+@3 = {4 {5 a <* a b>} b}
 @main = [a b]
-& @2 ~ {2 #2 a}
-& @3 ~ {2 #2 b}
+& @2 ~ {4 #2 a}
+& @3 ~ {4 #2 b}
 

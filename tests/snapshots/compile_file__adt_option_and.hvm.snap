@@ -3,12 +3,12 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/adt_option_and.hvm
 ---
 @8 = (* @None)
-@9 = {4 a (b {2 {4 [b a] c} {2 * c}})}
+@9 = {6 a (b {4 {6 [b a] c} {4 * c}})}
 @C = (* @None)
-@D = {4 a ({2 @9 {2 @8 (a b)}} b)}
-@None = {2 * {2 a a}}
-@Option.and = ({2 @D {2 @C (a b)}} (a b))
-@Some = (a {2 {4 a b} {2 * b}})
+@D = {6 a ({4 @9 {4 @8 (a b)}} b)}
+@None = {4 * {4 a a}}
+@Option.and = ({4 @D {4 @C (a b)}} (a b))
+@Some = (a {4 {6 a b} {4 * b}})
 @main = a
 & @Option.and ~ (b (c a))
 & @Some ~ (#3 c)

@@ -5,26 +5,26 @@ input_file: tests/golden_tests/compile_file/list_merge_sort.hvm
 @F = (a (* a))
 @G = (* (a a))
 @J = (* @Nil)
-@L = {8 a {6 {4 @L {4 @J (b c)}} ({3 b (a d)} {4 {8 d {6 c e}} {4 * e}})}}
-@Map = ({4 @L {4 @J a}} a)
-@Nil = {4 * {4 a a}}
-@Pure = (a {4 {8 a {6 @Nil b}} {4 * b}})
-@Q = {8 a {6 {4 @i {4 @j (b (a c))}} (b c)}}
+@L = {10 a {8 {6 @L {6 @J (b c)}} ({5 b (a d)} {6 {10 d {8 c e}} {6 * e}})}}
+@Map = ({6 @L {6 @J a}} a)
+@Nil = {6 * {6 a a}}
+@Pure = (a {6 {10 a {8 @Nil b}} {6 * b}})
+@Q = {10 a {8 {6 @i {6 @j (b (a c))}} (b c)}}
 @R = (* @Nil)
-@Unpack = (a ({4 @Q {4 @R (a b)}} b))
-@V = {8 a {6 {4 @o {4 @p (b (a c))}} (b c)}}
+@Unpack = (a ({6 @Q {6 @R (a b)}} b))
+@V = {10 a {8 {6 @o {6 @p (b (a c))}} (b c)}}
 @W = (* @Nil)
-@b = {8 {15 a {17 b c}} {6 {19 {4 @b {4 @c (d (e (f g)))}} h} ({5 d {7 i (j (c {2 @F {2 @G ({4 {8 k {6 l m}} {4 * m}} ({4 {8 a {6 g n}} {4 * n}} o))}}))}} ({9 e {11 k j}} ({13 f {4 @d {4 @e (i ({4 {8 b {6 h p}} {4 * p}} l))}}} o)))}}
+@b = {10 {17 a {19 b c}} {8 {21 {6 @b {6 @c (d (e (f g)))}} h} ({7 d {9 i (j (c {4 @F {4 @G ({6 {10 k {8 l m}} {6 * m}} ({6 {10 a {8 g n}} {6 * n}} o))}}))}} ({11 e {13 k j}} ({15 f {6 @d {6 @e (i ({6 {10 b {8 h p}} {6 * p}} l))}}} o)))}}
 @c = (* @s)
-@d = {8 a {6 b (c ({4 @b {4 @c (c (a (b d)))}} d))}}
+@d = {10 a {8 b (c ({6 @b {6 @c (c (a (b d)))}} d))}}
 @e = (* (a a))
-@i = {8 a {6 {4 @V {4 @W (b {4 @i {4 @j (c (d e))}})}} ({21 {23 b f} c} ({4 @d {4 @e (f (a d))}} e))}}
+@i = {10 a {8 {6 @V {6 @W (b {6 @i {6 @j (c (d e))}})}} ({23 {25 b f} c} ({6 @d {6 @e (f (a d))}} e))}}
 @j = (* (a a))
 @main = (a (b c))
 & @Unpack ~ (a (d c))
 & @Map ~ (b (@Pure d))
-@o = {8 a {6 {4 @V {4 @W (b c)}} ({23 b d} ({4 @d {4 @e (d (a e))}} {4 {8 e {6 c f}} {4 * f}}))}}
+@o = {10 a {8 {6 @V {6 @W (b c)}} ({25 b d} ({6 @d {6 @e (d (a e))}} {6 {10 e {8 c f}} {6 * f}}))}}
 @p = (* @u)
-@s = (a (b {4 {8 a {6 b c}} {4 * c}}))
-@u = (a {4 {8 a {6 @Nil b}} {4 * b}})
+@s = (a (b {6 {10 a {8 b c}} {6 * c}}))
+@u = (a {6 {10 a {8 @Nil b}} {6 * b}})
 

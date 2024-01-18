@@ -340,11 +340,17 @@ pub struct Labels {
   pub dup: LabelGenerator,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct LabelGenerator {
   pub next: u32,
   pub name_to_label: HashMap<Name, u32>,
   pub label_to_name: HashMap<u32, Name>,
+}
+
+impl Default for LabelGenerator {
+  fn default() -> Self {
+    Self { next: 1, name_to_label: Default::default(), label_to_name: Default::default() }
+  }
 }
 
 impl LabelGenerator {

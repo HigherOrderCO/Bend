@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/tagged_sup.hvm
 ---
-@a = {3 (a a) (b b)}
-@b = {3 (a a) (b b)}
-@c = {5 (a a) (b b)}
+@a = {5 (a a) (b b)}
+@b = {5 (a a) (b b)}
+@c = {7 (a a) (b b)}
 @main = a
 & @a ~ (@b (@c a))
 
