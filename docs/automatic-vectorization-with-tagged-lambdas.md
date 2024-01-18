@@ -37,7 +37,7 @@ In fact, `match` is syntax sugar for a tagged application like the one above. Th
 When an application and a lambda with different tags interact, the application "commutes" through the lambda instead of beta-reducing it. Here is how it works, roughly:
 
 ```rs
-(#A λx #B(b x) a)
+#A (#B λx (b x) a)
 // Reduces to
 #B λc #A((b #A λ$d c) #B(a $d))
 ```
