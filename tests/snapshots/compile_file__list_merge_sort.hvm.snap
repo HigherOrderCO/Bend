@@ -24,7 +24,7 @@ input_file: tests/golden_tests/compile_file/list_merge_sort.hvm
 & @S ~ (a (d c))
 & @Map ~ (b (@Pure d))
 @o = {8 a {6 {4 @V {4 @W (b c)}} ({23 b d} ({4 @d {4 @e (d (a e))}} {4 {8 e {6 c f}} {4 * f}}))}}
-@p = (* @u)
+@p = (* @t)
 @s = (a (b {4 {8 a {6 b c}} {4 * c}}))
-@u = (a {4 {8 a {6 @Nil b}} {4 * b}})
+@t = (a {4 {8 a {6 @Nil b}} {4 * b}})
 

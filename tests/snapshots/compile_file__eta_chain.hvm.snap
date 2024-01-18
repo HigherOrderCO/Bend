@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/eta_chain.hvm
+---
+@main = (<+ a b> (<+ c a> (c b)))
+

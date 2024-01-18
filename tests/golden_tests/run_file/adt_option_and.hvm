@@ -8,4 +8,4 @@ Option.and = @a @b match a {
   None: None
 }
 
-main = Option.and
+main = (Option.and (Some 1))
