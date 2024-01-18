@@ -256,7 +256,7 @@ fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, mut dup_body: Option<&mu
 
   for i in (1 .. uses).rev() {
     *nxt = Term::Dup {
-      tag: Tag::Auto,
+      tag: Tag::Numeric(0),
       fst: make_name(i),
       snd: if i == uses - 1 { make_name(uses) } else { Some(internal_dup_name(nam, i)) },
       val: if i == 1 {
