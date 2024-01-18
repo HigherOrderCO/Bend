@@ -148,7 +148,7 @@ fn flatten_rules() {
     book.desugar_let_destructors();
     book.desugar_implicit_match_binds();
     book.check_unbound_pats()?;
-    book.extract_adt_matches()?;
+    book.extract_adt_matches(&mut vec![])?;
     book.flatten_rules();
     Ok(book.to_string())
   })
@@ -171,7 +171,7 @@ fn encode_pattern_match() {
     book.encode_lists()?;
     book.generate_scott_adts();
     book.resolve_refs()?;
-    encode_pattern_matching(&mut book)?;
+    encode_pattern_matching(&mut book, &mut vec![])?;
     Ok(book.to_string())
   })
 }
