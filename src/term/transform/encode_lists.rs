@@ -88,12 +88,8 @@ impl Term {
         }
         scrutinee_used || used
       }
-      Term::Lnk { .. }
-      | Term::Ref { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Var { .. }
-      | Term::Era => false,
+      Term::Var { nam: Name(nam) } => nam == LCONS || nam == LNIL,
+      Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => false,
     }
   }
 }
