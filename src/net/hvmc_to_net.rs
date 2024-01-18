@@ -81,7 +81,13 @@ fn tree_to_inodes(
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode {
-          kind: if lab & 1 == 0 { Con { lab: Some((lab >> 1) - 1) } } else { Dup { lab: (lab >> 1) - 1 } },
+          kind: if *lab == 0 {
+            Dup { lab: 0 }
+          } else if lab & 1 != 0 {
+            Dup { lab: lab >> 1 }
+          } else {
+            Con { lab: Some(lab >> 1) }
+          },
           ports: [subtree_root, lft, rgt],
         });
       }

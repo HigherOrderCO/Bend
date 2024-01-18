@@ -5,7 +5,7 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
 @E = (* @J)
 @I = (a (* ((a b) (* b))))
 @J = (* (a a))
-@c2 = ({3 (a b) (c a)} (c b))
+@c2 = ({0 (a b) (c a)} (c b))
 @decO = ((@decO (@low (@E a))) (* ((a b) (* b))))
 @low = ((@lowO (@lowI (@E a))) a)
 @lowI = (a (((* ((a b) (* b))) c) (* (* c))))

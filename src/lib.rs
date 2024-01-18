@@ -332,7 +332,7 @@ fn expand(net: &mut hvmc::run::Net, book: &hvmc::run::Book) {
 fn reduce(net: &mut hvmc::run::Net, book: &hvmc::run::Book, limit: usize) -> usize {
   match net {
     hvmc::run::Net::Eager(net) => net.net.reduce(book, limit),
-    _ => panic!("Unsuported configuration, disable debug mode `-D` or enable less optimzations `-O=0`"),
+    _ => panic!("Unsupported configuration, disable debug mode `-D` or enable less optimizations `-O=0`"),
   }
 }
 

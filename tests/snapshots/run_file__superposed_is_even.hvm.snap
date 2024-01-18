@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/superposed_is_even.hvm
 ---
-#0 {#1 {T F} #2 {T F}}
+#0 {#0 {T F} #0 {T F}}
