@@ -17,7 +17,7 @@ pub fn pre_reduce_book(book: &mut BTreeMap<String, hvmc::ast::Net>, cross_refs: 
   let mut rt_book = hvmc::ast::book_to_runtime(book);
   for (nam, net) in book.iter() {
     // Skip unnecessary work
-    if net.rdex.is_empty() {
+    if net.rdex.is_empty() || nam == DefNames::ENTRY_POINT {
       continue;
     }
     let heap = Heap::init(1 << 18);
@@ -26,8 +26,7 @@ pub fn pre_reduce_book(book: &mut BTreeMap<String, hvmc::ast::Net>, cross_refs: 
     rt.boot(fid);
     rt.expand(&rt_book);
 
-    let fully_reduce = cross_refs && nam != DefNames::ENTRY_POINT;
-    let iters = if fully_reduce {
+    let iters = if cross_refs {
       let mut iters = 0;
       // TODO: If I just call `rt.normal` some terms expand infinitely, so I put this workaround.
       // But I don't think this is the right way (even if it works).

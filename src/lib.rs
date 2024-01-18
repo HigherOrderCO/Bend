@@ -50,7 +50,7 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Def
   if opt_level >= OptimizationLevel::Heavy {
     book.eta_reduction();
   }
-  book.detach_supercombinators();
+  book.detach_supercombinators(main);
   if opt_level >= OptimizationLevel::Heavy {
     book.simplify_ref_to_ref()?;
   }
