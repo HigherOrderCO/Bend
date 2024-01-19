@@ -2,5 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/linearize_match.hvm
 ---
-@main = (?<((a a) (<+ b c> (b c))) (d e)> (d e))
+@main = (?<((a a) (<+ b c> (b c))) d> d)
 

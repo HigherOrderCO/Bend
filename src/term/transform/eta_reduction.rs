@@ -3,10 +3,10 @@ use crate::term::*;
 impl Book {
   /// Applies eta-reduction to all generated definitions, converting occurrences of `@x (f x)` into just `f`.
   /// Assumes that variables are linear (used exactly once).
-  pub fn eta_reduction(&mut self) {
+  pub fn eta_reduction(&mut self, reduce_all: bool) {
     for def in self.defs.values_mut() {
       def.assert_no_pattern_matching_rules();
-      if def.generated {
+      if reduce_all || def.generated {
         let rule = &mut def.rules[0].body;
         rule.eta_reduction();
       }
