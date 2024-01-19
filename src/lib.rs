@@ -40,7 +40,7 @@ pub fn compile_book(book: &mut Book, opts: Opts) -> Result<CompileResult, String
 
 pub fn desugar_book(
   book: &mut Book,
-  Opts { eta, ref_to_ref, prune, supercombinators, .. }: Opts,
+  Opts { eta, ref_to_ref, prune, supercombinators, simplify_main, .. }: Opts,
 ) -> Result<(DefId, Vec<Warning>), String> {
   let mut warnings = Vec::new();
   let main = book.check_has_main()?;
@@ -61,7 +61,9 @@ pub fn desugar_book(
   if ref_to_ref {
     book.simplify_ref_to_ref()?;
   }
-  book.simplify_main_ref(main);
+  if simplify_main {
+    book.simplify_main_ref(main);
+  }
   if prune {
     book.prune(main);
   }
@@ -174,12 +176,22 @@ pub struct Opts {
 
   /// Enables [term::transform::detach_supercombinators].
   pub supercombinators: bool,
+
+  /// Enables [term::transform::simplify_main_ref].
+  pub simplify_main: bool,
 }
 
 impl Opts {
   /// All optimizations enabled.
   pub fn heavy() -> Self {
-    Self { eta: true, ref_to_ref: true, prune: true, pre_reduce: true, supercombinators: true }
+    Self {
+      eta: true,
+      ref_to_ref: true,
+      prune: true,
+      pre_reduce: true,
+      supercombinators: true,
+      simplify_main: true,
+    }
   }
 
   /// All optimizations disabled, except detach supercombinators.
@@ -203,6 +215,8 @@ impl Opts {
         "no-ref-to-ref" => self.ref_to_ref = false,
         "supercombinators" => self.supercombinators = true,
         "no-supercombinators" => self.supercombinators = false,
+        "simplify-main" => self.simplify_main = true,
+        "no-simplify-main" => self.simplify_main = false,
         other => return Err(format!("Unknown option '{other}'.")),
       }
     }

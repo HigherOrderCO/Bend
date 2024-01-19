@@ -38,7 +38,8 @@ struct Args {
     action = clap::ArgAction::Append,
     long_help = r#"Enables or disables the given optimizations
     all, eta, no-eta, prune, no-prune, ref-to-ref, no-ref-to-ref,
-    supercombinators (enabled by default), no-supercombinators
+    supercombinators (enabled by default), no-supercombinators,
+    simplify-main, no-simplify-main
     "#,
   )]
   pub opts: Vec<String>,
