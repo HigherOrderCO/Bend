@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/self_ref.hvm
 ---
-Main definition can't be referenced inside the program
+Definition Foo is a reference to itself
