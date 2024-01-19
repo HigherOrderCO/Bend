@@ -29,6 +29,38 @@ impl Term {
     count_var_uses_in_term(self, &mut var_uses);
     term_to_affine(self, &mut var_uses, &mut HashMap::new());
   }
+
+  fn has_unscoped(&self) -> bool {
+    match self {
+      Term::Lnk { .. } | Term::Chn { .. } => true,
+      Term::Lam { bod, .. } => bod.has_unscoped(),
+      Term::Let { val: fst, nxt: snd, .. }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::App { fun: fst, arg: snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. } => fst.has_unscoped() || snd.has_unscoped(),
+      Term::Match { scrutinee, arms } => {
+        if scrutinee.has_unscoped() {
+          return true;
+        }
+
+        for (_, arm) in arms {
+          if arm.has_unscoped() {
+            return true;
+          }
+        }
+
+        false
+      }
+      Term::Num { .. }
+      | Term::Str { .. }
+      | Term::List { .. }
+      | Term::Ref { .. }
+      | Term::Var { .. }
+      | Term::Era => false,
+    }
+  }
 }
 
 fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
@@ -118,19 +150,28 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       let uses = var_uses[nam];
       match uses {
         0 => {
-          // We are going to remove the val term,
-          // so we need to remove the free variables it uses from the vars count
-          for (var, used) in val.free_vars() {
-            let Entry::Occupied(mut entry) = var_uses.entry(var) else { unreachable!() };
+          if val.has_unscoped() {
+            term_to_affine(val, var_uses, let_bodies);
+            term_to_affine(nxt, var_uses, let_bodies);
 
-            if *entry.get() == 1 {
-              entry.remove();
-            } else {
-              *entry.get_mut() -= used;
+            let Term::Let { val, nxt, .. } = std::mem::take(term) else { unreachable!() };
+            *term = Term::Let { pat: Pattern::Var(None), val, nxt };
+
+            return;
+          } else {
+            // We are going to remove the val term,
+            // so we need to remove the free variables it uses from the vars count
+            for (var, used) in val.free_vars() {
+              let Entry::Occupied(mut entry) = var_uses.entry(var) else { unreachable!() };
+
+              if *entry.get() == 1 {
+                entry.remove();
+              } else {
+                *entry.get_mut() -= used;
+              }
             }
+            term_to_affine(nxt, var_uses, let_bodies);
           }
-
-          term_to_affine(nxt, var_uses, let_bodies);
         }
         1 => {
           term_to_affine(val, var_uses, let_bodies);
@@ -146,8 +187,14 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       *term = std::mem::take(nxt.as_mut());
     }
 
-    Term::Let { pat: Pattern::Var(None), nxt, .. } => {
-      *term = *nxt.clone();
+    Term::Let { pat: Pattern::Var(None), val, nxt, .. } => {
+      if val.has_unscoped() {
+        term_to_affine(val, var_uses, let_bodies);
+        term_to_affine(nxt, var_uses, let_bodies);
+      } else {
+        let Term::Let { nxt, .. } = std::mem::take(term) else { unreachable!() };
+        *term = *nxt;
+      }
     }
 
     Term::Dup { fst, snd, val, nxt, .. }

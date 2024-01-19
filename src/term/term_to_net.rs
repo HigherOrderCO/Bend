@@ -233,7 +233,15 @@ impl<'a> EncodeTermState<'a> {
 
         nxt
       }
-      Term::Let { .. } => unreachable!(), // Removed in earlier poss
+      Term::Let { pat: Pattern::Var(None), val, nxt } => {
+        let nod = self.inet.new_node(Era);
+        let val = self.encode_term(val, Port(nod, 0));
+
+        self.link_local(Port(nod, 0), val);
+
+        self.encode_term(nxt, up)
+      }
+      Term::Let { .. } => unreachable!(), // Removed in earlier pass
       Term::Sup { tag, fst, snd } => {
         let sup = self.inet.new_node(Dup { lab: self.labels.dup.generate(tag).unwrap() });
 
