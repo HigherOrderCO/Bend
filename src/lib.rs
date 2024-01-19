@@ -5,12 +5,13 @@ use hvmc::{
   run::{Heap, Rewrites},
 };
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
+use itertools::Itertools;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::time::Instant;
 use term::{
   book_to_nets, net_to_term,
   term_to_net::{HvmcNames, Labels},
-  Book, DefId, DefNames, ReadbackError, Term,
+  Book, DefId, DefNames, Name, ReadbackError, Term,
 };
 
 pub mod hvmc_net;
@@ -26,24 +27,25 @@ pub fn check_book(mut book: Book) -> Result<(), String> {
 }
 
 pub fn compile_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<CompileResult, String> {
-  let main = desugar_book(book, opt_level)?;
+  let (main, warnings) = desugar_book(book, opt_level)?;
   let (nets, hvmc_names, labels) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
   pre_reduce_book(&mut core_book, opt_level >= OptimizationLevel::Heavy)?;
   if opt_level >= OptimizationLevel::Heavy {
     prune_defs(&mut core_book);
   }
-  Ok(CompileResult { core_book, hvmc_names, labels, warnings: vec![] })
+  Ok(CompileResult { core_book, hvmc_names, labels, warnings })
 }
 
-pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<DefId, String> {
+pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<(DefId, Vec<Warning>), String> {
+  let mut warnings = Vec::new();
   let main = book.check_has_main()?;
   book.check_shared_names()?;
   book.encode_strs()?;
   book.encode_lists()?;
   book.generate_scott_adts();
   book.resolve_refs()?;
-  encode_pattern_matching(book)?;
+  encode_pattern_matching(book, &mut warnings)?;
   book.normalize_native_matches()?;
   book.check_unbound_vars()?;
   book.make_var_names_unique();
@@ -57,15 +59,15 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Def
   if opt_level >= OptimizationLevel::Heavy {
     book.prune(main);
   }
-  Ok(main)
+  Ok((main, warnings))
 }
 
-pub fn encode_pattern_matching(book: &mut Book) -> Result<(), String> {
+pub fn encode_pattern_matching(book: &mut Book, warnings: &mut Vec<Warning>) -> Result<(), String> {
   book.resolve_ctrs_in_pats();
   book.check_unbound_pats()?;
   book.desugar_let_destructors();
   book.desugar_implicit_match_binds();
-  book.extract_adt_matches()?;
+  book.extract_adt_matches(warnings)?;
   book.flatten_rules();
   let def_types = book.infer_def_types()?;
   book.check_exhaustive_patterns(&def_types)?;
@@ -79,15 +81,18 @@ pub fn run_book(
   parallel: bool,
   debug: bool,
   linear: bool,
+  skip_warnings: bool,
   opt_level: OptimizationLevel,
 ) -> Result<(Term, DefNames, RunInfo), String> {
   let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opt_level)?;
 
   if !warnings.is_empty() {
-    for warn in warnings {
-      eprintln!("{}", warn);
+    let warnings = warnings.iter().join("\n");
+    if !skip_warnings {
+      return Err(format!("{warnings}\nCould not run the code because of the previous warnings"));
+    } else {
+      eprintln!("{warnings}");
     }
-    return Err("Could not run the code because of the previous warnings".into());
   }
 
   fn debug_hook(net: &Net, book: &Book, hvmc_names: &HvmcNames, labels: &Labels, linear: bool) {
@@ -177,11 +182,17 @@ impl std::fmt::Debug for CompileResult {
   }
 }
 
-pub enum Warning {}
+pub enum Warning {
+  MatchOnlyVars { def_name: Name },
+}
 
 impl std::fmt::Display for Warning {
-  fn fmt(&self, _: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match *self {}
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Warning::MatchOnlyVars { def_name } => {
+        write!(f, "Match expression at definition '{def_name}' only uses var patterns.")
+      }
+    }
   }
 }
 

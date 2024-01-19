@@ -1,5 +1,9 @@
-use crate::term::{
-  display::DisplayJoin, Book, DefId, DefNames, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term, Type,
+use crate::{
+  term::{
+    display::DisplayJoin, Book, DefId, DefNames, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term,
+    Type,
+  },
+  Warning,
 };
 use indexmap::IndexSet;
 use itertools::Itertools;
@@ -8,12 +12,15 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 impl Book {
   /// Extracts adt match terms into pattern matching functions.
   /// Creates rules with potentially nested patterns, so the flattening pass needs to be called after.
-  pub fn extract_adt_matches(&mut self) -> Result<(), String> {
+  pub fn extract_adt_matches(&mut self, warnings: &mut Vec<Warning>) -> Result<(), String> {
     let book = &mut MatchesBook::new(&mut self.def_names);
     for (def_id, def) in &mut self.defs {
       let def_name = book.def_names.name(def_id).cloned().unwrap();
       for rule in def.rules.iter_mut() {
-        rule.body.extract_adt_matches(&def_name, &self.ctrs, book, &mut 0).map_err(|err| err.to_string())?;
+        rule
+          .body
+          .extract_adt_matches(&def_name, &self.ctrs, book, &mut 0, warnings)
+          .map_err(|err| err.to_string())?;
       }
     }
     self.defs.append(&mut book.new_defs);
@@ -92,11 +99,16 @@ impl Term {
     ctrs: &HashMap<Name, Name>,
     book: &mut MatchesBook,
     match_count: &mut usize,
+    warnings: &mut Vec<Warning>,
   ) -> Result<(), MatchError> {
     match self {
       Term::Match { scrutinee: box Term::Var { .. }, arms } => {
+        let all_vars = arms.iter().all(|(pat, ..)| matches!(pat, Pattern::Var(..)));
+        if all_vars && arms.len() > 1 {
+          warnings.push(crate::Warning::MatchOnlyVars { def_name: def_name.clone() });
+        }
         for (_, term) in arms.iter_mut() {
-          term.extract_adt_matches(def_name, ctrs, book, match_count)?;
+          term.extract_adt_matches(def_name, ctrs, book, match_count, warnings)?;
         }
         let matched_type = infer_match_type(arms.iter().map(|(x, _)| x), ctrs)?;
         match matched_type {
@@ -116,7 +128,7 @@ impl Term {
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.extract_adt_matches(def_name, ctrs, book, match_count)?;
+        bod.extract_adt_matches(def_name, ctrs, book, match_count, warnings)?;
       }
       Term::App { fun: fst, arg: snd, .. }
       | Term::Let { pat: Pattern::Var(_), val: fst, nxt: snd }
@@ -124,8 +136,8 @@ impl Term {
       | Term::Tup { fst, snd }
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
-        fst.extract_adt_matches(def_name, ctrs, book, match_count)?;
-        snd.extract_adt_matches(def_name, ctrs, book, match_count)?;
+        fst.extract_adt_matches(def_name, ctrs, book, match_count, warnings)?;
+        snd.extract_adt_matches(def_name, ctrs, book, match_count, warnings)?;
       }
       Term::Var { .. }
       | Term::Lnk { .. }

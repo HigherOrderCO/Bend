@@ -113,7 +113,7 @@ fn run_file() {
   run_golden_test_dir(function_name!(), &|code| {
     let book = do_parse_book(code)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, def_names, info) = run_book(book, 1 << 20, true, false, false, OptimizationLevel::Heavy)?;
+    let (res, def_names, info) = run_book(book, 1 << 20, true, false, false, false, OptimizationLevel::Heavy)?;
     let res = if info.readback_errors.is_empty() {
       res.display(&def_names).to_string()
     } else {
@@ -148,7 +148,7 @@ fn flatten_rules() {
     book.desugar_let_destructors();
     book.desugar_implicit_match_binds();
     book.check_unbound_pats()?;
-    book.extract_adt_matches()?;
+    book.extract_adt_matches(&mut vec![])?;
     book.flatten_rules();
     Ok(book.to_string())
   })
@@ -171,7 +171,7 @@ fn encode_pattern_match() {
     book.encode_lists()?;
     book.generate_scott_adts();
     book.resolve_refs()?;
-    encode_pattern_matching(&mut book)?;
+    encode_pattern_matching(&mut book, &mut vec![])?;
     Ok(book.to_string())
   })
 }
