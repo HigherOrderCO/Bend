@@ -118,19 +118,28 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       let uses = var_uses[nam];
       match uses {
         0 => {
-          // We are going to remove the val term,
-          // so we need to remove the free variables it uses from the vars count
-          for (var, used) in val.free_vars() {
-            let Entry::Occupied(mut entry) = var_uses.entry(var) else { unreachable!() };
+          if check_unscoped(val) {
+            term_to_affine(val, var_uses, let_bodies);
+            term_to_affine(nxt, var_uses, let_bodies);
 
-            if *entry.get() == 1 {
-              entry.remove();
-            } else {
-              *entry.get_mut() -= used;
+            let Term::Let { val, nxt, .. } = std::mem::take(term) else { unreachable!() };
+            *term = Term::Let { pat: Pattern::Var(None), val, nxt };
+
+            return;
+          } else {
+            // We are going to remove the val term,
+            // so we need to remove the free variables it uses from the vars count
+            for (var, used) in val.free_vars() {
+              let Entry::Occupied(mut entry) = var_uses.entry(var) else { unreachable!() };
+
+              if *entry.get() == 1 {
+                entry.remove();
+              } else {
+                *entry.get_mut() -= used;
+              }
             }
+            term_to_affine(nxt, var_uses, let_bodies);
           }
-
-          term_to_affine(nxt, var_uses, let_bodies);
         }
         1 => {
           term_to_affine(val, var_uses, let_bodies);
@@ -146,8 +155,14 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       *term = std::mem::take(nxt.as_mut());
     }
 
-    Term::Let { pat: Pattern::Var(None), nxt, .. } => {
-      *term = *nxt.clone();
+    Term::Let { pat: Pattern::Var(None), val, nxt, .. } => {
+      if check_unscoped(val) {
+        term_to_affine(val, var_uses, let_bodies);
+        term_to_affine(nxt, var_uses, let_bodies);
+      } else {
+        let Term::Let { nxt, .. } = std::mem::take(term) else { unreachable!() };
+        *term = *nxt;
+      }
     }
 
     Term::Dup { fst, snd, val, nxt, .. }
@@ -202,6 +217,38 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
     Term::List { .. } => unreachable!("Should have been desugared already"),
     Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } => (),
   };
+}
+
+fn check_unscoped(term: &Term) -> bool {
+  match term {
+    Term::Lnk { .. } | Term::Chn { .. } => true,
+    Term::Lam { bod, .. } => check_unscoped(&bod),
+    Term::Let { val: fst, nxt: snd, .. }
+    | Term::Dup { val: fst, nxt: snd, .. }
+    | Term::App { fun: fst, arg: snd, .. }
+    | Term::Tup { fst, snd }
+    | Term::Sup { fst, snd, .. }
+    | Term::Opx { fst, snd, .. } => check_unscoped(&fst) || check_unscoped(&snd),
+    Term::Match { scrutinee, arms } => {
+      if check_unscoped(&scrutinee) {
+        return true;
+      }
+
+      for (_, arm) in arms {
+        if check_unscoped(arm) {
+          return true;
+        }
+      }
+
+      false
+    }
+    Term::Num { .. }
+    | Term::Str { .. }
+    | Term::List { .. }
+    | Term::Ref { .. }
+    | Term::Var { .. }
+    | Term::Era => false,
+  }
 }
 
 fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, Val>) -> Val {
