@@ -29,6 +29,38 @@ impl Term {
     count_var_uses_in_term(self, &mut var_uses);
     term_to_affine(self, &mut var_uses, &mut HashMap::new());
   }
+
+  fn has_unscoped(&self) -> bool {
+    match self {
+      Term::Lnk { .. } | Term::Chn { .. } => true,
+      Term::Lam { bod, .. } => bod.has_unscoped(),
+      Term::Let { val: fst, nxt: snd, .. }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::App { fun: fst, arg: snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. } => fst.has_unscoped() || snd.has_unscoped(),
+      Term::Match { scrutinee, arms } => {
+        if scrutinee.has_unscoped() {
+          return true;
+        }
+
+        for (_, arm) in arms {
+          if arm.has_unscoped() {
+            return true;
+          }
+        }
+
+        false
+      }
+      Term::Num { .. }
+      | Term::Str { .. }
+      | Term::List { .. }
+      | Term::Ref { .. }
+      | Term::Var { .. }
+      | Term::Era => false,
+    }
+  }
 }
 
 fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
@@ -118,7 +150,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       let uses = var_uses[nam];
       match uses {
         0 => {
-          if check_unscoped(val) {
+          if val.has_unscoped() {
             term_to_affine(val, var_uses, let_bodies);
             term_to_affine(nxt, var_uses, let_bodies);
 
@@ -156,7 +188,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
     }
 
     Term::Let { pat: Pattern::Var(None), val, nxt, .. } => {
-      if check_unscoped(val) {
+      if val.has_unscoped() {
         term_to_affine(val, var_uses, let_bodies);
         term_to_affine(nxt, var_uses, let_bodies);
       } else {
@@ -217,38 +249,6 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
     Term::List { .. } => unreachable!("Should have been desugared already"),
     Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } => (),
   };
-}
-
-fn check_unscoped(term: &Term) -> bool {
-  match term {
-    Term::Lnk { .. } | Term::Chn { .. } => true,
-    Term::Lam { bod, .. } => check_unscoped(&bod),
-    Term::Let { val: fst, nxt: snd, .. }
-    | Term::Dup { val: fst, nxt: snd, .. }
-    | Term::App { fun: fst, arg: snd, .. }
-    | Term::Tup { fst, snd }
-    | Term::Sup { fst, snd, .. }
-    | Term::Opx { fst, snd, .. } => check_unscoped(&fst) || check_unscoped(&snd),
-    Term::Match { scrutinee, arms } => {
-      if check_unscoped(&scrutinee) {
-        return true;
-      }
-
-      for (_, arm) in arms {
-        if check_unscoped(arm) {
-          return true;
-        }
-      }
-
-      false
-    }
-    Term::Num { .. }
-    | Term::Str { .. }
-    | Term::List { .. }
-    | Term::Ref { .. }
-    | Term::Var { .. }
-    | Term::Era => false,
-  }
 }
 
 fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, Val>) -> Val {
