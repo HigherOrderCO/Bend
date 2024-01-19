@@ -1,0 +1,32 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 51
+input_file: tests/golden_tests/compile_file_o_all/expr.hvm
+---
+@App = (a (b {2 * {2 * {2 {10 a {8 b c}} {2 * {2 * {2 * {2 * {2 * {2 * c}}}}}}}}}))
+@Dup = (a (b (c (d {2 * {2 * {2 * {2 * {2 * {2 * {2 {34 a {32 b {30 c {28 d e}}}} {2 * {2 * e}}}}}}}}}))))
+@F = {46 a {46 * {46 * a}}}
+@G = {46 a {46 * a}}
+@H = {46 * @G}
+@Let = (a (b (c {2 * {2 * {2 * {2 * {2 * {2 {26 a {24 b {22 c d}}} {2 * {2 * {2 * d}}}}}}}}})))
+@Mul = {46 * @H}
+@Num = (a {2 * {2 {6 a b} {2 * {2 * {2 * {2 * {2 * {2 * {2 * b}}}}}}}}})
+@Op2 = (a (b (c {2 * {2 * {2 * {2 * {2 * {2 * {2 * {2 * {2 {44 a {42 b {40 c d}}} d}}}}}}}}})))
+@Sub = {46 * @F}
+@Var = (a {2 {4 a b} {2 * {2 * {2 * {2 * {2 * {2 * {2 * {2 * b}}}}}}}}})
+@main = a
+& @Let ~ (b (c (d a)))
+& @Dup ~ (e (f (g (h d))))
+& @App ~ (i (j h))
+& @Var ~ (#2 j)
+& @Var ~ (#1 i)
+& @Var ~ (#0 g)
+& @Var ~ (#2 f)
+& @Var ~ (#1 e)
+& @Op2 ~ (@Mul (k c))
+& @Op2 ~ (@Sub (l (m (n k))))
+& @Num ~ (#3 n)
+& @Num ~ (#1 m)
+& @Num ~ (#2 l)
+& @Var ~ (#0 b)
+

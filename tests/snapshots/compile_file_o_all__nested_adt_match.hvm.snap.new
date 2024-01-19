@@ -1,0 +1,16 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 51
+input_file: tests/golden_tests/compile_file_o_all/nested_adt_match.hvm
+---
+@4 = ({2 @8 {2 @6 a}} a)
+@6 = #0
+@8 = {4 {2 @C {2 @A a}} a}
+@A = #0
+@C = {4 a a}
+@Some = (a {2 {4 a b} {2 * b}})
+@main = a
+& @4 ~ (b a)
+& @Some ~ (c b)
+& @Some ~ (#1 c)
+

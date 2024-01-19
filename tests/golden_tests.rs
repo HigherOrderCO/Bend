@@ -92,7 +92,7 @@ fn compile_term() {
 }
 
 #[test]
-fn compile_file() {
+fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
     let compiled = compile_book(&mut book, Opts::heavy())?;
@@ -100,7 +100,7 @@ fn compile_file() {
   })
 }
 #[test]
-fn compile_file_o0() {
+fn compile_file() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
     let compiled = compile_book(&mut book, Opts::light())?;

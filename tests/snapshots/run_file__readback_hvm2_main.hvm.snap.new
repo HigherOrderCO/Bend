@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 51
+input_file: tests/golden_tests/run_file/readback_hvm2_main.hvm
+---
+λ* λ* λ* main

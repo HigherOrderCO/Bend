@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 51
+input_file: tests/golden_tests/compile_file_o_all/unapplied_eta.hvm
+---
+@main = (a a)
+

@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 51
+input_file: tests/golden_tests/compile_file_o_all/repeated_name_trucation.hvm
+---
+@2 = (a a)
+@4 = (* @long_name_)
+@long_name_ = (* @4)
+@main = a
+& @long_name_ ~ (@2 a)
+

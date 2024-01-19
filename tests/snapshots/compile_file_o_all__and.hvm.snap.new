@@ -1,0 +1,13 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 51
+input_file: tests/golden_tests/compile_file_o_all/and.hvm
+---
+@6 = (a a)
+@8 = (* @false)
+@9 = (a ({2 @6 {2 @8 (a b)}} b))
+@false = {2 * {2 a a}}
+@main = a
+& @9 ~ (@true (@false a))
+@true = {2 a {2 * a}}
+

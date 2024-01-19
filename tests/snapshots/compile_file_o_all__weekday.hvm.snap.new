@@ -1,0 +1,13 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 51
+input_file: tests/golden_tests/compile_file_o_all/weekday.hvm
+---
+@J = {2 a {2 * a}}
+@K = {2 * @J}
+@L = {2 * @K}
+@M = {2 * @L}
+@N = {2 * @M}
+@Saturday = {2 * @N}
+@main = @Saturday
+

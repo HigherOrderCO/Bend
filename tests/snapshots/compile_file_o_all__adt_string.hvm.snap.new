@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 51
+input_file: tests/golden_tests/compile_file_o_all/adt_string.hvm
+---
+String is a built-in data type and should not be overridden.

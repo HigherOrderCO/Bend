@@ -1,0 +1,21 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 51
+input_file: tests/golden_tests/compile_file/match_num_all_patterns.hvm
+---
+@B = (?<(#0 (a a)) b> b)
+@D = (<+ #1 <- #1 a>> a)
+@E = (<+ #1 <- #1 a>> a)
+@F = (<+ #2 a> a)
+@main = #0
+@succ_var = (?<(#0 (a a)) b> b)
+@succ_var_z = (?<(#1 @F) a> a)
+@succ_zero = (?<(#0 (a a)) b> b)
+@succ_zero_ = (?<(#0 (a a)) b> b)
+@var_succ = (a a)
+@var_zero = (a a)
+@zero_succ = (?<(#0 (a a)) b> b)
+@zero_succ_ = (?<(#0 (a a)) b> b)
+@zero_var = (?<(#0 @D) a> a)
+@zero_var_s = (?<(#0 @E) a> a)
+
