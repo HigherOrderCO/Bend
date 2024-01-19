@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/adt_option_and.hvm
+---
+λa λb (match a { (Some h): (#Option.Some.val λc λd (match d { (Some i): (#Option.Some.val λe λf (Some (f, e)) i); (None): λ* None } c) h); (None): λ* None } b)

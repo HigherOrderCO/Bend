@@ -9,7 +9,7 @@ impl Book {
       let def_name = self.def_names.name(&def.def_id).unwrap();
       for rule in &def.rules {
         for pat in &rule.pats {
-          pat.check_unbounds(&is_ctr, def_name)?;
+          pat.check_unbounds(&is_ctr).map_err(|e| format!("In definition '{}': {}", def_name, e))?;
         }
       }
     }
@@ -18,10 +18,10 @@ impl Book {
 }
 
 impl Pattern {
-  pub fn check_unbounds(&self, is_ctr: &impl Fn(&Name) -> bool, def_name: &Name) -> Result<(), String> {
+  pub fn check_unbounds(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), String> {
     let unbounds = self.unbound_pats(is_ctr);
     if let Some(unbound) = unbounds.iter().next() {
-      Err(format!("Unbound constructor '{unbound}' in definition '{def_name}'"))
+      Err(format!("Unbound constructor '{unbound}'"))
     } else {
       Ok(())
     }
@@ -50,18 +50,18 @@ impl Pattern {
 }
 
 impl Term {
-  pub fn check_unbound_pats(&self, is_ctr: &impl Fn(&Name) -> bool, def_name: &Name) -> Result<(), String> {
+  pub fn check_unbound_pats(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), String> {
     match self {
       Term::Let { pat, val, nxt } => {
-        pat.check_unbounds(is_ctr, def_name)?;
-        val.check_unbound_pats(is_ctr, def_name)?;
-        nxt.check_unbound_pats(is_ctr, def_name)?;
+        pat.check_unbounds(is_ctr)?;
+        val.check_unbound_pats(is_ctr)?;
+        nxt.check_unbound_pats(is_ctr)?;
       }
       Term::Match { scrutinee, arms } => {
-        scrutinee.check_unbound_pats(is_ctr, def_name)?;
+        scrutinee.check_unbound_pats(is_ctr)?;
         for (pat, body) in arms {
-          pat.check_unbounds(is_ctr, def_name)?;
-          body.check_unbound_pats(is_ctr, def_name)?;
+          pat.check_unbounds(is_ctr)?;
+          body.check_unbound_pats(is_ctr)?;
         }
       }
       Term::App { fun: fst, arg: snd, .. }
@@ -69,10 +69,10 @@ impl Term {
       | Term::Dup { val: fst, nxt: snd, .. }
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
-        fst.check_unbound_pats(is_ctr, def_name)?;
-        snd.check_unbound_pats(is_ctr, def_name)?;
+        fst.check_unbound_pats(is_ctr)?;
+        snd.check_unbound_pats(is_ctr)?;
       }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.check_unbound_pats(is_ctr, def_name)?,
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.check_unbound_pats(is_ctr)?,
       Term::List { .. } => unreachable!(),
       Term::Var { .. }
       | Term::Lnk { .. }

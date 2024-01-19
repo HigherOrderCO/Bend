@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/non_exhaustive_pattern.hvm
 ---
-Non-exhaustive pattern at definition 'Foo'. Hint: (Foo A A A A) not covered.
+In definition 'Foo': Non-exhaustive pattern. Hint: (Foo A A A A) not covered.

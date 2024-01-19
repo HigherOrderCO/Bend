@@ -4,10 +4,8 @@ input_file: tests/golden_tests/encode_pattern_match/var_only.hvm
 ---
 (Foo) = λa λb λf (f a)
 
-(main) = λx (main$match$1 x)
+(main) = λx Foo
 
 (False) = #Bool λFalse #Bool λTrue False
 
 (True) = #Bool λFalse #Bool λTrue True
-
-(main$match$1) = λfalse Foo

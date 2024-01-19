@@ -2,11 +2,11 @@ use indexmap::IndexMap;
 
 use crate::term::{Adt, Book, Name, Pattern, Tag, Term};
 
-const LIST: &str = "List";
-const LCONS: &str = "LCons";
-const LNIL: &str = "LNil";
-const HEAD: &str = "head";
-const TAIL: &str = "tail";
+pub const LIST: &str = "List";
+pub const LCONS: &str = "LCons";
+pub const LNIL: &str = "LNil";
+pub const HEAD: &str = "head";
+pub const TAIL: &str = "tail";
 
 impl Book {
   pub fn encode_lists(&mut self) -> Result<(), String> {
@@ -52,7 +52,7 @@ impl Term {
       Term::List { els } => {
         let lnil = Term::Var { nam: Name::new(LNIL) };
 
-        *self = els.into_iter().rfold(lnil, |acc, nxt| {
+        *self = els.iter_mut().rfold(lnil, |acc, nxt| {
           nxt.encode_lists();
           let lcons_app = Term::App {
             tag: Tag::Static,
@@ -100,7 +100,7 @@ impl Pattern {
       Pattern::List(pats) => {
         let lnil = Pattern::Var(Some(Name::new(LNIL)));
 
-        *self = pats.into_iter().rfold(lnil, |acc, nxt| {
+        *self = pats.iter_mut().rfold(lnil, |acc, nxt| {
           nxt.encode_lists();
           Pattern::Ctr(Name::new(LCONS), vec![nxt.clone(), acc])
         });

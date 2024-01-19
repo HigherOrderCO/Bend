@@ -14,6 +14,8 @@ pub mod transform;
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
+use self::transform::encode_lists;
+
 /// The representation of a program.
 #[derive(Debug, Clone, Default)]
 pub struct Book {
@@ -168,7 +170,16 @@ pub enum Op {
   NOT,
 }
 
-/// A user defined  datatype
+/// Pattern types.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Type {
+  Any,
+  Tup,
+  Num,
+  Adt(Name),
+}
+
+/// A user defined datatype
 #[derive(Debug, Clone, Default)]
 pub struct Adt {
   pub ctrs: IndexMap<Name, Vec<Name>>,
@@ -545,6 +556,23 @@ impl Pattern {
         matches!(fst.as_ref(), Pattern::Var(_)) && matches!(snd.as_ref(), Pattern::Var(_))
       }
     }
+  }
+
+  pub fn to_type(&self, ctrs: &HashMap<Name, Name>) -> Result<Type, String> {
+    let typ = match self {
+      Pattern::Var(_) => Type::Any,
+      Pattern::Ctr(ctr_nam, _) => {
+        if let Some(adt_nam) = ctrs.get(ctr_nam) {
+          Type::Adt(adt_nam.clone())
+        } else {
+          return Err(format!("Unknown constructor '{ctr_nam}'"));
+        }
+      }
+      Pattern::Tup(..) => Type::Tup,
+      Pattern::Num(..) => Type::Num,
+      Pattern::List(..) => Type::Adt(Name::new(encode_lists::LIST)),
+    };
+    Ok(typ)
   }
 }
 

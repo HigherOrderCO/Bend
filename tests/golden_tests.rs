@@ -79,7 +79,7 @@ fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str) -> Result<String, Str
 fn compile_term() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut term = do_parse_term(code)?;
-    term.check_unbound_vars(&hvml::term::Name::new(""))?;
+    term.check_unbound_vars()?;
     term.make_var_names_unique();
     term.linearize_vars();
     let compat_net = term_to_compat_net(&term, &mut Default::default());
@@ -99,7 +99,6 @@ fn compile_file() {
     Ok(format!("{:?}", compiled))
   })
 }
-
 #[test]
 fn compile_file_o0() {
   run_golden_test_dir(function_name!(), &|code| {
