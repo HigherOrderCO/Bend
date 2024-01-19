@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/self_ref.hvm
 ---
-Definition main is a reference to itself
+Main definition can't be referenced inside the program
