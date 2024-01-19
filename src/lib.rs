@@ -5,6 +5,7 @@ use hvmc::{
   run::{Heap, Rewrites},
 };
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
+use itertools::Itertools;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::time::Instant;
 use term::{
@@ -80,15 +81,18 @@ pub fn run_book(
   parallel: bool,
   debug: bool,
   linear: bool,
+  skip_warnings: bool,
   opt_level: OptimizationLevel,
 ) -> Result<(Term, DefNames, RunInfo), String> {
   let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opt_level)?;
 
   if !warnings.is_empty() {
-    for warn in warnings {
-      eprintln!("{}", warn);
+    let warnings = warnings.iter().join("\n");
+    if !skip_warnings {
+      return Err(format!("{warnings}\nCould not run the code because of the previous warnings"));
+    } else {
+      eprintln!("{warnings}");
     }
-    return Err("Could not run the code because of the previous warnings".into());
   }
 
   fn debug_hook(net: &Net, book: &Book, hvmc_names: &HvmcNames, labels: &Labels, linear: bool) {
