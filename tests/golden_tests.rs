@@ -148,7 +148,7 @@ fn flatten_rules() {
     book.desugar_let_destructors();
     book.desugar_implicit_match_binds();
     book.check_unbound_pats()?;
-    book.extract_matches()?;
+    book.extract_adt_matches()?;
     book.flatten_rules();
     Ok(book.to_string())
   })

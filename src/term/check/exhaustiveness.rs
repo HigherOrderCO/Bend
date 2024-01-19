@@ -67,6 +67,7 @@ fn check_pattern(
         }
         next_rules_to_check
       }
+      Type::None => unreachable!(),
     };
 
     // Check that each constructor matches at least one rule and then check the next pattern recursively.
@@ -105,5 +106,6 @@ fn first_ctr_of_type(typ: &Type, adts: &BTreeMap<Name, Adt>) -> String {
     Type::Tup => "(_,_)".to_string(),
     Type::Num => "0".to_string(),
     Type::Adt(adt_name) => adts[adt_name].ctrs.keys().next().unwrap().to_string(),
+    Type::None => unreachable!(),
   }
 }

@@ -2,7 +2,7 @@ use std::fmt::{self, Display};
 
 use crate::term::Name;
 
-use super::{Book, DefId, DefNames, Definition, MatchNum, Op, Pattern, Rule, Tag, Term};
+use super::{Book, DefId, DefNames, Definition, MatchNum, Op, Pattern, Rule, Tag, Term, Type};
 
 macro_rules! display {
   ($($x:tt)*) => {
@@ -177,6 +177,17 @@ impl fmt::Display for Name {
   }
 }
 
+impl fmt::Display for Type {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Type::Any => write!(f, "any"),
+      Type::Tup => write!(f, "tup"),
+      Type::Num => write!(f, "num"),
+      Type::Adt(nam) => write!(f, "{nam}"),
+      Type::None => unreachable!(),
+    }
+  }
+}
 struct DisplayFn<F: Fn(&mut fmt::Formatter) -> fmt::Result>(F);
 
 impl<F: Fn(&mut fmt::Formatter) -> fmt::Result> Display for DisplayFn<F> {
