@@ -50,6 +50,7 @@ pub enum MatchError {
   Repeated(Name),
   Missing(HashSet<Name>),
   LetPat(Box<MatchError>),
+  Linearize(Name),
 }
 
 impl std::error::Error for MatchError {}
@@ -79,6 +80,7 @@ impl std::fmt::Display for MatchError {
 
         Ok(())
       }
+      MatchError::Linearize(var) => write!(f, "Unable to linearize variable {var} in a match block."),
     }
   }
 }
@@ -106,7 +108,8 @@ impl Term {
           // For now, to prevent extraction we can use `let (a, b) = ...;`
           Type::Adt(_) | Type::Tup => {
             *match_count += 1;
-            let match_term = linearize_match_free_vars(self);
+            let match_term = linearize_match_unscoped_vars(self)?;
+            let match_term = linearize_match_free_vars(match_term);
             let Term::Match { scrutinee: box Term::Var { nam }, arms } = match_term else { unreachable!() };
             let nam = std::mem::take(nam);
             let arms = std::mem::take(arms);
@@ -383,6 +386,55 @@ fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
     match match_term {
       Term::App { tag: _, fun, arg: _ } => match_term = fun.as_mut(),
       Term::Match { .. } => return match_term,
+      _ => unreachable!(),
+    }
+  }
+}
+
+fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, MatchError> {
+  let Term::Match { scrutinee: _, arms } = match_term else { unreachable!() };
+  // Collect the vars
+  let mut free_vars = IndexSet::new();
+  for (_, arm) in arms.iter_mut() {
+    let (decls, uses) = arm.unscoped_vars();
+    // Not allowed to declare unscoped var and not use it since we need to extract the match arm.
+    if let Some(var) = decls.difference(&uses).next() {
+      return Err(MatchError::Linearize(Name(format!("λ${var}"))));
+    }
+    // Change unscoped var to normal scoped var if it references something outside this match arm.
+    for var in uses.difference(&decls) {
+      arm.subst_unscoped(var, &Term::Var { nam: Name(format!("%match%unscoped%{var}")) });
+    }
+    free_vars.extend(uses);
+  }
+
+  // Add lambdas to the arms
+  for (_, body) in arms {
+    let old_body = std::mem::take(body);
+    let new_body = free_vars.iter().rev().fold(old_body, |body, var| Term::Lam {
+      tag: Tag::Static,
+      nam: Some(Name(format!("%match%unscoped%{var}"))),
+      bod: Box::new(body),
+    });
+    *body = new_body;
+  }
+
+  // Add apps to the match
+  let old_match = std::mem::take(match_term);
+  *match_term = free_vars.into_iter().fold(old_match, |acc, nam| Term::App {
+    tag: Tag::Static,
+    fun: Box::new(acc),
+    arg: Box::new(Term::Lnk { nam }),
+  });
+
+  // Get a reference to the match again
+  // It returns a reference and not an owned value because we want
+  //  to keep the new surrounding Apps but still modify the match further.
+  let mut match_term = match_term;
+  loop {
+    match match_term {
+      Term::App { tag: _, fun, arg: _ } => match_term = fun.as_mut(),
+      Term::Match { .. } => return Ok(match_term),
       _ => unreachable!(),
     }
   }
