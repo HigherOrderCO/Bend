@@ -1,8 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/match_num_explicit_bind.hvm
----
-@main = a
-& @pred ~ (#4 a)
-@pred = (?<(#0 (a a)) b> b)
-

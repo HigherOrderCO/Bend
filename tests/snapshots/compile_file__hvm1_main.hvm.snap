@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/hvm1_main.hvm
----
-@main = (a a)
-
