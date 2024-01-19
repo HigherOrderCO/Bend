@@ -1,5 +1,4 @@
 use crate::term::{Book, DefId, Definition, Name, Pattern, Type};
-use core::fmt;
 use std::collections::HashMap;
 
 pub type DefinitionTypes = HashMap<DefId, Vec<Type>>;
@@ -52,17 +51,6 @@ fn unify(new: Type, old: &mut Type) -> Result<(), String> {
     _ => (),
   };
   Ok(())
-}
-
-impl fmt::Display for Type {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Type::Any => write!(f, "any"),
-      Type::Tup => write!(f, "tup"),
-      Type::Num => write!(f, "num"),
-      Type::Adt(nam) => write!(f, "{nam}"),
-    }
-  }
 }
 
 impl Book {

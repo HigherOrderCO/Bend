@@ -173,6 +173,7 @@ pub enum Op {
 /// Pattern types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
+  None,
   Any,
   Tup,
   Num,
@@ -589,6 +590,7 @@ impl Definition {
 
   pub fn assert_no_pattern_matching_rules(&self) {
     assert!(self.rules.len() == 1, "Definition rules should have been removed in earlier pass");
+    assert!(self.rules[0].pats.is_empty(), "Definition args should have been removed in an earlier pass");
   }
 }
 

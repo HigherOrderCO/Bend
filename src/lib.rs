@@ -44,6 +44,7 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Def
   book.generate_scott_adts();
   book.resolve_refs();
   encode_pattern_matching(book)?;
+  book.normalize_native_matches()?;
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();
@@ -64,7 +65,7 @@ pub fn encode_pattern_matching(book: &mut Book) -> Result<(), String> {
   book.check_unbound_pats()?;
   book.desugar_let_destructors();
   book.desugar_implicit_match_binds();
-  book.extract_matches()?;
+  book.extract_adt_matches()?;
   book.flatten_rules();
   let def_types = book.infer_def_types()?;
   book.check_exhaustive_patterns(&def_types)?;
