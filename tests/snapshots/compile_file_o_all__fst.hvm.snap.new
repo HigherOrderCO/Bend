@@ -1,9 +1,0 @@
----
-source: tests/golden_tests.rs
-assertion_line: 51
-input_file: tests/golden_tests/compile_file_o_all/fst.hvm
----
-@3 = ([a *] a)
-@main = a
-& @3 ~ ([#4 #8] a)
-

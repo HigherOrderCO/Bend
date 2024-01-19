@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-assertion_line: 51
-input_file: tests/golden_tests/compile_file_o_all/let_adt_non_exhaustive.hvm
----
-In definition 'main$match$1': Non-exhaustive pattern. Hint: (main$match$1 None) not covered.

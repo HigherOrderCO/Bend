@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/self_ref.hvm
+---
+Definition main is a reference to itself
