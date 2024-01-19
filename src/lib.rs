@@ -42,7 +42,7 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<Def
   book.encode_strs()?;
   book.encode_lists()?;
   book.generate_scott_adts();
-  book.resolve_refs();
+  book.resolve_refs()?;
   encode_pattern_matching(book)?;
   book.normalize_native_matches()?;
   book.check_unbound_vars()?;

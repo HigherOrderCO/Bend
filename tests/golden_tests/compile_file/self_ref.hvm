@@ -1,1 +1,2 @@
-main = main
+Foo = Foo
+main = Foo

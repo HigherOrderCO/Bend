@@ -15,10 +15,10 @@ impl Book {
       let mut ref_id = def_id;
       let mut is_ref_to_ref = false;
       while let Term::Ref { def_id: next_ref_id } = &self.defs.get(ref_id).unwrap().rules[0].body {
-        if next_ref_id == def_id {
+        if next_ref_id == ref_id {
           return Err(format!(
             "Definition {} is a reference to itself",
-            self.def_names.name(def_id).unwrap()
+            self.def_names.name(ref_id).unwrap()
           ));
         }
         ref_id = next_ref_id;
