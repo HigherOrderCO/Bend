@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/sum_predicates.hvm
+---
+@3 = (?<(#0 (a a)) b> b)
+@4 = (a (<+ a b> b))
+@5 = (a (?<((b b) @4) (a c)> c))
+@main = a
+& @sum_pred ~ (#8 (#5 a))
+@sum_pred = (?<(@3 @5) a> a)
+

@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/addition_var_fst.hvm
+---
+@main = (<+ #1 a> a)
+

@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/bad_parens_making_erased_let.hvm
+---
+In definition 'main': Unbound variable 'two'

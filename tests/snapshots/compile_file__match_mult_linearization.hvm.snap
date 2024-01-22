@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/match_mult_linearization.hvm
----
-@main = (?<((<+ a <+ b c>> (a (b c))) (<+ d <+ e <+ f g>>> (d (e (f g))))) h> h)
-

@@ -1,8 +1,7 @@
 use clap::{Parser, ValueEnum};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
-  check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, OptimizationLevel,
-  RunInfo,
+  check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, Opts, RunInfo,
 };
 use std::path::PathBuf;
 
@@ -32,8 +31,18 @@ struct Args {
 
   #[arg(short = 'l', help = "Linear readback (show explicit dups)")]
   pub linear: bool,
-  #[arg(short = 'O', default_value = "1", help = "Optimization level (0 or 1)", value_parser = opt_level_parser)]
-  pub opt_level: OptimizationLevel,
+
+  #[arg(
+    short = 'O',
+    value_delimiter = ' ',
+    action = clap::ArgAction::Append,
+    long_help = r#"Enables or disables the given optimizations
+    all, eta, no-eta, prune, no-prune, ref-to-ref, no-ref-to-ref,
+    supercombinators (enabled by default), no-supercombinators,
+    simplify-main, no-simplify-main
+    "#,
+  )]
+  pub opts: Vec<String>,
 
   #[arg(help = "Path to the input file")]
   pub path: PathBuf,
@@ -63,17 +72,14 @@ fn mem_parser(arg: &str) -> Result<usize, String> {
   Ok(base * mult)
 }
 
-fn opt_level_parser(arg: &str) -> Result<OptimizationLevel, String> {
-  let num = arg.parse::<usize>().map_err(|e| e.to_string())?;
-  Ok(OptimizationLevel::from(num))
-}
-
 fn main() {
   fn run() -> Result<(), String> {
     #[cfg(not(feature = "cli"))]
     compile_error!("The 'cli' feature is needed for the hvm-lang cli");
 
     let args = Args::parse();
+    let mut opts = Opts::light();
+    Opts::from_vec(&mut opts, args.opts)?;
 
     let mut book = load_file_to_book(&args.path)?;
     if args.verbose {
@@ -85,7 +91,7 @@ fn main() {
         check_book(book)?;
       }
       Mode::Compile => {
-        let compiled = compile_book(&mut book, args.opt_level)?;
+        let compiled = compile_book(&mut book, opts)?;
 
         for warn in &compiled.warnings {
           eprintln!("WARNING: {warn}");
@@ -94,13 +100,13 @@ fn main() {
         print!("{}", show_book(&compiled.core_book));
       }
       Mode::Desugar => {
-        desugar_book(&mut book, args.opt_level)?;
+        desugar_book(&mut book, opts)?;
         println!("{book}");
       }
       Mode::Run => {
         let mem_size = args.mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
         let (res_term, def_names, info) =
-          run_book(book, mem_size, !args.single_core, args.debug, args.linear, args.skip_warnings, args.opt_level)?;
+          run_book(book, mem_size, !args.single_core, args.debug, args.linear, args.skip_warnings,opts)?;
         let RunInfo { stats, readback_errors, net: lnet } = info;
         let total_rewrites = total_rewrites(&stats.rewrites) as f64;
         let rps = total_rewrites / stats.run_time / 1_000_000.0;

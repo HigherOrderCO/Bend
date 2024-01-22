@@ -22,22 +22,26 @@ pub use term::load_book::load_file_to_book;
 
 pub fn check_book(mut book: Book) -> Result<(), String> {
   // TODO: Do the checks without having to do full compilation
-  compile_book(&mut book, OptimizationLevel::Light)?;
+  compile_book(&mut book, Opts::light())?;
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<CompileResult, String> {
-  let (main, warnings) = desugar_book(book, opt_level)?;
+pub fn compile_book(book: &mut Book, opts: Opts) -> Result<CompileResult, String> {
+  let (main, warnings) = desugar_book(book, opts)?;
   let (nets, hvmc_names, labels) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
-  pre_reduce_book(&mut core_book, opt_level >= OptimizationLevel::Heavy)?;
-  if opt_level >= OptimizationLevel::Heavy {
+  pre_reduce_book(&mut core_book, opts.pre_reduce)?;
+  if opts.prune {
     prune_defs(&mut core_book);
   }
   Ok(CompileResult { core_book, hvmc_names, labels, warnings })
 }
 
-pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<(DefId, Vec<Warning>), String> {
+
+pub fn desugar_book(
+  book: &mut Book,
+  Opts { eta, ref_to_ref, prune, supercombinators, simplify_main, .. }: Opts,
+) -> Result<(DefId, Vec<Warning>), String> {
   let mut warnings = Vec::new();
   let main = book.check_has_main()?;
   book.check_shared_names()?;
@@ -50,13 +54,17 @@ pub fn desugar_book(book: &mut Book, opt_level: OptimizationLevel) -> Result<(De
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();
-  book.eta_reduction(opt_level >= OptimizationLevel::Heavy);
-  book.detach_supercombinators(main);
-  if opt_level >= OptimizationLevel::Heavy {
+  book.eta_reduction(eta);
+  if supercombinators {
+    book.detach_supercombinators(main);
+  }
+  if ref_to_ref {
     book.simplify_ref_to_ref()?;
   }
-  book.simplify_main_ref(main);
-  if opt_level >= OptimizationLevel::Heavy {
+  if simplify_main {
+    book.simplify_main_ref(main);
+  }
+  if prune {
     book.prune(main);
   }
   Ok((main, warnings))
@@ -82,9 +90,9 @@ pub fn run_book(
   debug: bool,
   linear: bool,
   skip_warnings: bool,
-  opt_level: OptimizationLevel,
+  opts: Opts,
 ) -> Result<(Term, DefNames, RunInfo), String> {
-  let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opt_level)?;
+  let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opts)?;
 
   if !warnings.is_empty() {
     let warnings = warnings.iter().join("\n");
@@ -152,17 +160,67 @@ pub fn total_rewrites(rwrts: &Rewrites) -> usize {
   rwrts.anni + rwrts.comm + rwrts.eras + rwrts.dref + rwrts.oper
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
-pub enum OptimizationLevel {
-  /// The minimum amount of transformations to produce valid hvmc outputs.
-  Light,
-  /// More aggressive optimizations.
-  Heavy,
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Opts {
+  /// Enables [term::transform::eta_reduction].
+  pub eta: bool,
+
+  /// Enables [term::transform::simplify_ref_to_ref].
+  pub ref_to_ref: bool,
+
+  /// Enables [term::transform::definition_pruning] and [hvmc_net::prune].
+  pub prune: bool,
+
+  /// Enables [hvmc_net::pre_reduce].
+  pub pre_reduce: bool,
+
+  /// Enables [term::transform::detach_supercombinators].
+  pub supercombinators: bool,
+
+  /// Enables [term::transform::simplify_main_ref].
+  pub simplify_main: bool,
 }
 
-impl From<usize> for OptimizationLevel {
-  fn from(value: usize) -> Self {
-    if value == 0 { OptimizationLevel::Light } else { OptimizationLevel::Heavy }
+impl Opts {
+  /// All optimizations enabled.
+  pub fn heavy() -> Self {
+    Self {
+      eta: true,
+      ref_to_ref: true,
+      prune: true,
+      pre_reduce: true,
+      supercombinators: true,
+      simplify_main: true,
+    }
+  }
+
+  /// All optimizations disabled, except detach supercombinators.
+  pub fn light() -> Self {
+    let mut this = Self::default();
+    this.supercombinators = true;
+    this
+  }
+}
+
+impl Opts {
+  pub fn from_vec(&mut self, values: Vec<String>) -> Result<(), String> {
+    for value in values {
+      match value.as_ref() {
+        "all" => *self = Opts::heavy(),
+        "eta" => self.eta = true,
+        "no-eta" => self.eta = false,
+        "prune" => self.prune = true,
+        "no-prune" => self.prune = false,
+        "ref-to-ref" => self.ref_to_ref = true,
+        "no-ref-to-ref" => self.ref_to_ref = false,
+        "supercombinators" => self.supercombinators = true,
+        "no-supercombinators" => self.supercombinators = false,
+        "simplify-main" => self.simplify_main = true,
+        "no-simplify-main" => self.simplify_main = false,
+        other => return Err(format!("Unknown option '{other}'.")),
+      }
+    }
+    Ok(())
   }
 }
 

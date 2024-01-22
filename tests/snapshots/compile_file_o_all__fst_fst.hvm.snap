@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/fst_fst.hvm
+---
+@5 = ([a *] ([b *] [a b]))
+@main = a
+& @5 ~ ([#3 #9] ([#4 #12] a))
+
