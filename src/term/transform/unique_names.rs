@@ -107,8 +107,13 @@ impl UniqueNameScope {
   }
 
   fn use_var(&self, nam: &Name) -> Name {
-    let vars = &self.0[nam];
-    let var_id = *vars.last().unwrap();
-    var_id_to_name(var_id)
+    if let Some(vars) = self.0.get(nam) {
+      let var_id = *vars.last().unwrap();
+      var_id_to_name(var_id)
+    } else {
+      // Skip unbound variables.
+      // With this, we can use this function before checking for unbound vars.
+      nam.clone()
+    }
   }
 }
