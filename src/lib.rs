@@ -37,7 +37,6 @@ pub fn compile_book(book: &mut Book, opts: Opts) -> Result<CompileResult, String
   Ok(CompileResult { core_book, hvmc_names, labels, warnings })
 }
 
-
 pub fn desugar_book(
   book: &mut Book,
   Opts { eta, ref_to_ref, prune, supercombinators, simplify_main, .. }: Opts,
@@ -207,12 +206,15 @@ impl Opts {
     for value in values {
       match value.as_ref() {
         "all" => *self = Opts::heavy(),
+        "no-all" => *self = Opts::default(),
         "eta" => self.eta = true,
         "no-eta" => self.eta = false,
         "prune" => self.prune = true,
         "no-prune" => self.prune = false,
         "ref-to-ref" => self.ref_to_ref = true,
         "no-ref-to-ref" => self.ref_to_ref = false,
+        "pre-reduce" => self.pre_reduce = true,
+        "no-pre-reduce" => self.pre_reduce = false,
         "supercombinators" => self.supercombinators = true,
         "no-supercombinators" => self.supercombinators = false,
         "simplify-main" => self.simplify_main = true,

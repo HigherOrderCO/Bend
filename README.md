@@ -46,6 +46,8 @@ hvml compile <file>
 ```
 This will output the compiled file to stdout.
 
+There are optional toggleable passes through the CLI. [Click here](docs/toggleable-passes.md) to learn about them.
+
 ## Syntax
 
 HVM-Lang files consists of a series of definitions, which bind a name to a term. Terms can be lambdas, applications, or other terms.
