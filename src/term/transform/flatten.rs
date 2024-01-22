@@ -88,7 +88,6 @@ fn split_group(rules: &[(Name, Rule)], def_names: &mut DefNames) -> HashMap<Name
         let old_rule = make_old_rule(&rule.pats, new_split_def_id);
 
         let mut new_group = vec![(name.clone(), old_rule)];
-        //let mut new_group = vec![];
 
         for (j, (_, other)) in rules.iter().enumerate().skip(i) {
           let (compatible, same_shape) = matches_together(&rule.pats, &other.pats);
@@ -151,7 +150,9 @@ fn make_old_rule(pats: &[Pattern], new_split_def_id: DefId) -> Rule {
         let snd = Pattern::Var(Some(snd));
         new_pats.push(Pattern::Tup(Box::new(fst), Box::new(snd)));
       }
-      Pattern::Var(None) => todo!(),
+      Pattern::Var(None) => {
+        new_pats.push(Pattern::Var(None));
+      }
       Pattern::Var(Some(nam)) => {
         new_pats.push(Pattern::Var(Some(nam.clone())));
         new_body_args.push(Term::Var { nam: nam.clone() });
@@ -213,7 +214,8 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         let new_ctr = Term::Tup { fst: Box::new(fst_arg), snd: Box::new(snd_arg) };
         new_body.subst(other_arg, &new_ctr);
       }
-      (Pattern::Var(..), _) => new_pats.push(other_arg.clone()),
+      (Pattern::Var(Some(_)), _) => new_pats.push(other_arg.clone()),
+      (Pattern::Var(None), _) => (),
       // Unreachable cases, we only call this function if we know the two patterns match together
       (Pattern::Ctr(..) | Pattern::Tup(..), Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..)) => {
         unreachable!()
