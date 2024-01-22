@@ -1,6 +1,6 @@
 # Making recursive definitions lazy
 
-The HVM-Core is an eager runtime, for both CPU and parallel GPU implementations. Terms that use ecursive terms will unroll indefinitely.
+The HVM-Core is an eager runtime, for both CPU and parallel GPU implementations. Terms that use recursive terms will unroll indefinitely.
 
 This means that for example, the following code will hang, despite being technically correct and working on Haskell:
 
