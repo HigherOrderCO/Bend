@@ -1,0 +1,4 @@
+// `Foo` inside the term `{Foo Foo}` is not in a active position, tests that it is not unnecessarily extracted
+Foo = @a match a { 0: {Foo Foo}; +p: @* p }
+
+main = (Foo 0)
