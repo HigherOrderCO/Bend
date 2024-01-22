@@ -1,0 +1,6 @@
+data Maybe = None | (Some val)
+
+main = (match (Some 1) {
+  None: @$x *
+  (Some x): x
+} $x)

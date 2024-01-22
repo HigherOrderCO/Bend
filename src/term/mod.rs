@@ -1,5 +1,5 @@
 use hvmc::run::Val;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use shrinkwraprs::Shrinkwrap;
 use std::collections::{BTreeMap, HashMap};
 
@@ -361,6 +361,36 @@ impl Term {
     }
   }
 
+  /// Substitute the occurence of an unscoped variable with the given term.
+  pub fn subst_unscoped(&mut self, from: &Name, to: &Term) {
+    match self {
+      Term::Lnk { nam } if nam == from => {
+        *self = to.clone();
+      }
+      Term::Match { scrutinee, arms } => {
+        scrutinee.subst_unscoped(from, to);
+        arms.iter_mut().for_each(|(_, arm)| arm.subst_unscoped(from, to));
+      }
+      Term::List { els } => els.iter_mut().for_each(|el| el.subst_unscoped(from, to)),
+      Term::Chn { bod, .. } | Term::Lam { bod, .. } => bod.subst_unscoped(from, to),
+      Term::App { fun: fst, arg: snd, .. }
+      | Term::Let { val: fst, nxt: snd, .. }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Sup { fst, snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Opx { fst, snd, .. } => {
+        fst.subst(from, to);
+        snd.subst(from, to);
+      }
+      Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Ref { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Era => (),
+    }
+  }
+
   /// Collects all the free variables that a term has
   /// and the number of times each var is used
   pub fn free_vars(&self) -> IndexMap<Name, u64> {
@@ -435,6 +465,48 @@ impl Term {
     let mut free_vars = IndexMap::new();
     go(self, &mut free_vars);
     free_vars
+  }
+
+  pub fn unscoped_vars(&self) -> (IndexSet<Name>, IndexSet<Name>) {
+    fn go(term: &Term, decls: &mut IndexSet<Name>, uses: &mut IndexSet<Name>) {
+      match term {
+        Term::Chn { tag: _, nam, bod } => {
+          decls.insert(nam.clone());
+          go(bod, decls, uses);
+        }
+        Term::Lnk { nam } => {
+          uses.insert(nam.clone());
+        }
+        Term::Match { scrutinee, arms } => {
+          go(scrutinee, decls, uses);
+          for (_, arm) in arms {
+            go(arm, decls, uses);
+          }
+        }
+        Term::List { els } => {
+          for el in els {
+            go(el, decls, uses);
+          }
+        }
+        Term::Let { val: fst, nxt: snd, .. }
+        | Term::App { fun: fst, arg: snd, .. }
+        | Term::Tup { fst, snd }
+        | Term::Dup { val: fst, nxt: snd, .. }
+        | Term::Sup { fst, snd, .. }
+        | Term::Opx { fst, snd, .. } => {
+          go(fst, decls, uses);
+          go(snd, uses, decls);
+        }
+        Term::Lam { bod, .. } => {
+          go(bod, decls, uses);
+        }
+        Term::Var { .. } | Term::Num { .. } | Term::Str { .. } | Term::Ref { .. } | Term::Era => (),
+      }
+    }
+    let mut decls = Default::default();
+    let mut uses = Default::default();
+    go(self, &mut decls, &mut uses);
+    (decls, uses)
   }
 
   /// Creates a new [`Term::Match`] from the given terms.
