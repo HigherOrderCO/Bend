@@ -37,7 +37,6 @@ pub fn compile_book(book: &mut Book, opts: Opts) -> Result<CompileResult, String
   Ok(CompileResult { core_book, hvmc_names, labels, warnings })
 }
 
-
 pub fn desugar_book(
   book: &mut Book,
   Opts { eta, ref_to_ref, prune, supercombinators, simplify_main, .. }: Opts,
@@ -196,9 +195,7 @@ impl Opts {
 
   /// All optimizations disabled, except detach supercombinators.
   pub fn light() -> Self {
-    let mut this = Self::default();
-    this.supercombinators = true;
-    this
+    Self { supercombinators: true, ..Self::default() }
   }
 }
 

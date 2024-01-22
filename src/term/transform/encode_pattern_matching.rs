@@ -425,7 +425,7 @@ impl Term {
   ///
   /// # Example
   ///
-  /// `λa λ* (a λx x) -> vec![true, false]`
+  /// `λa λb λ* (a λx x) -> vec![true, false, false]`
   ///
   fn arg_vars_are_used(&self) -> Vec<bool> {
     fn go(term: &Term, vec: &mut Vec<bool>) {
