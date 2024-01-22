@@ -1,9 +1,8 @@
+use crate::term::{Book, DefId, DefNames, Definition, Name, Pattern, Rule, Term};
 use std::{
   collections::{BTreeMap, HashSet},
   ops::BitAnd,
 };
-
-use crate::term::{Book, DefId, DefNames, Definition, Name, Pattern, Rule, Term};
 
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
@@ -78,19 +77,26 @@ impl<'d> TermInfo<'d> {
   }
 }
 
-#[derive(Clone, Copy, Debug)]
 enum Detach {
   /// Can be detached freely
   Combinator,
   /// Can not be detached
-  Unscoped,
+  Unscoped { lams: HashSet<Name>, vars: HashSet<Name> },
   /// Should be detached to make the program not hang
   Recursive,
 }
 
 impl Detach {
-  fn can_detach(self) -> bool {
-    !matches!(self, Detach::Unscoped)
+  fn can_detach(&self) -> bool {
+    !matches!(self, Detach::Unscoped { .. })
+  }
+
+  fn unscoped_lam(nam: Name) -> Self {
+    Detach::Unscoped { lams: [nam].into(), vars: Default::default() }
+  }
+
+  fn unscoped_var(nam: Name) -> Self {
+    Detach::Unscoped { lams: Default::default(), vars: [nam].into() }
   }
 }
 
@@ -101,17 +107,32 @@ impl BitAnd for Detach {
     match (self, rhs) {
       (Detach::Combinator, Detach::Combinator) => Detach::Combinator,
 
-      (Detach::Combinator, Detach::Unscoped) => Detach::Unscoped,
-      (Detach::Unscoped, Detach::Combinator) => Detach::Unscoped,
-      (Detach::Unscoped, Detach::Unscoped) => Detach::Unscoped,
+      (Detach::Combinator, unscoped @ Detach::Unscoped { .. }) => unscoped,
+      (unscoped @ Detach::Unscoped { .. }, Detach::Combinator) => unscoped,
+
+      // Merge two unscoped terms into one, removing entries of each matching `Lam` and `Var`.
+      // If all unscoped pairs are found and removed this way, the term can be treated as a Combinator.
+      (Detach::Unscoped { mut lams, mut vars }, Detach::Unscoped { lams: rhs_lams, vars: rhs_vars }) => {
+        lams.extend(rhs_lams);
+        vars.extend(rhs_vars);
+
+        let res_lams: HashSet<_> = lams.difference(&vars).cloned().collect();
+        let res_vars: HashSet<_> = vars.difference(&lams).cloned().collect();
+
+        if res_lams.is_empty() && res_vars.is_empty() {
+          Detach::Combinator
+        } else {
+          Detach::Unscoped { lams: res_lams, vars: res_vars }
+        }
+      }
 
       (Detach::Combinator, Detach::Recursive) => Detach::Recursive,
       (Detach::Recursive, Detach::Combinator) => Detach::Recursive,
       (Detach::Recursive, Detach::Recursive) => Detach::Recursive,
 
       // TODO: Is this the best way to best deal with a term that is both unscoped and recursive?
-      (Detach::Unscoped, Detach::Recursive) => Detach::Unscoped,
-      (Detach::Recursive, Detach::Unscoped) => Detach::Unscoped,
+      (unscoped @ Detach::Unscoped { .. }, Detach::Recursive) => unscoped,
+      (Detach::Recursive, unscoped @ Detach::Unscoped { .. }) => unscoped,
     }
   }
 }
@@ -123,23 +144,37 @@ impl Term {
     def_names: &mut DefNames,
     combinators: &mut Combinators,
   ) {
+    fn go_lam(term: &mut Term, depth: usize, term_info: &mut TermInfo) -> Detach {
+      let parent_scope = term_info.replace_scope(HashSet::new());
+
+      let (nam, bod, unscoped): (Option<&Name>, &mut Term, bool) = match term {
+        Term::Lam { nam, bod, .. } => (nam.as_ref(), bod, false),
+        Term::Chn { nam, bod, .. } => (Some(nam), bod, true),
+        _ => unreachable!(),
+      };
+
+      let mut detach = go(bod, depth + 1, term_info);
+
+      if unscoped {
+        detach = detach & Detach::unscoped_lam(nam.cloned().unwrap())
+      }
+
+      term_info.provide(nam);
+
+      if detach.can_detach() && !term.is_id() && depth != 0 && term_info.has_no_free_vars() {
+        term_info.detach_term(term);
+      }
+
+      term_info.merge_scope(parent_scope);
+
+      detach
+    }
+
     fn go(term: &mut Term, depth: usize, term_info: &mut TermInfo) -> Detach {
       match term {
-        Term::Lam { nam, bod, .. } => {
-          let parent_scope = term_info.replace_scope(HashSet::new());
+        Term::Lam { .. } => go_lam(term, depth, term_info),
+        Term::Chn { .. } => go_lam(term, depth, term_info),
 
-          let detach = go(bod, depth + 1, term_info);
-
-          term_info.provide(nam.as_ref());
-
-          if detach.can_detach() && !term.is_id() && depth != 0 && term_info.has_no_free_vars() {
-            term_info.detach_term(term);
-          }
-
-          term_info.merge_scope(parent_scope);
-
-          detach
-        }
         Term::App { fun, arg, .. } => {
           let parent_scope = term_info.replace_scope(HashSet::new());
 
@@ -161,7 +196,9 @@ impl Term {
               Detach::Combinator
             }
 
-            Detach::Recursive => {
+            // If the only term that is possible to detach is just a Term::Ref,
+            // there is no benefit to it, so that case is skipped
+            Detach::Recursive if !matches!(fun, box Term::Ref { .. }) => {
               term_info.detach_term(fun);
               arg_detach
             }
@@ -179,11 +216,9 @@ impl Term {
           term_info.request_name(nam);
           Detach::Combinator
         }
-        Term::Chn { nam: _, bod, .. } => {
-          go(bod, depth + 1, term_info);
-          Detach::Unscoped
-        }
-        Term::Lnk { .. } => Detach::Unscoped,
+
+        Term::Lnk { nam } => Detach::unscoped_var(nam.clone()),
+
         Term::Let { pat: Pattern::Var(nam), val, nxt } => {
           let val_detach = go(val, depth + 1, term_info);
           let nxt_detach = go(nxt, depth + 1, term_info);

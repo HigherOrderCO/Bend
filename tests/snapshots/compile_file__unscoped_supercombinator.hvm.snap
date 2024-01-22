@@ -1,0 +1,10 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/unscoped_supercombinator.hvm
+---
+@3 = (a ((a b) b))
+@4 = (a ((a b) b))
+@Foo = ((@3 (@4 a)) a)
+@main = a
+& @Foo ~ (* a)
+
