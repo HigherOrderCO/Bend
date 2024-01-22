@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashSet};
+use std::{
+  collections::{BTreeMap, HashSet},
+  ops::BitAnd,
+};
 
 use crate::term::{Book, DefId, DefNames, Definition, Name, Pattern, Rule, Term};
 
@@ -47,7 +50,7 @@ impl<'d> TermInfo<'d> {
     }
   }
 
-  fn check(&self) -> bool {
+  fn has_no_free_vars(&self) -> bool {
     self.needed_names.is_empty()
   }
 
@@ -75,6 +78,44 @@ impl<'d> TermInfo<'d> {
   }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum Detach {
+  /// Can be detached freely
+  Combinator,
+  /// Can not be detached
+  Unscoped,
+  /// Should be detached to make the program not hang
+  Recursive,
+}
+
+impl Detach {
+  fn can_detach(self) -> bool {
+    !matches!(self, Detach::Unscoped)
+  }
+}
+
+impl BitAnd for Detach {
+  type Output = Detach;
+
+  fn bitand(self, rhs: Self) -> Self::Output {
+    match (self, rhs) {
+      (Detach::Combinator, Detach::Combinator) => Detach::Combinator,
+
+      (Detach::Combinator, Detach::Unscoped) => Detach::Unscoped,
+      (Detach::Unscoped, Detach::Combinator) => Detach::Unscoped,
+      (Detach::Unscoped, Detach::Unscoped) => Detach::Unscoped,
+
+      (Detach::Combinator, Detach::Recursive) => Detach::Recursive,
+      (Detach::Recursive, Detach::Combinator) => Detach::Recursive,
+      (Detach::Recursive, Detach::Recursive) => Detach::Recursive,
+
+      // TODO: Is this the best way to best deal with a term that is both unscoped and recursive?
+      (Detach::Unscoped, Detach::Recursive) => Detach::Unscoped,
+      (Detach::Recursive, Detach::Unscoped) => Detach::Unscoped,
+    }
+  }
+}
+
 impl Term {
   pub fn detach_combinators(
     &mut self,
@@ -82,71 +123,115 @@ impl Term {
     def_names: &mut DefNames,
     combinators: &mut Combinators,
   ) {
-    fn go(term: &mut Term, depth: usize, term_info: &mut TermInfo) -> bool {
+    fn go(term: &mut Term, depth: usize, term_info: &mut TermInfo) -> Detach {
       match term {
         Term::Lam { nam, bod, .. } => {
           let parent_scope = term_info.replace_scope(HashSet::new());
 
-          let is_super = go(bod, depth + 1, term_info);
+          let detach = go(bod, depth + 1, term_info);
 
           term_info.provide(nam.as_ref());
 
-          if is_super && !term.is_id() && depth != 0 && term_info.check() {
+          if detach.can_detach() && !term.is_id() && depth != 0 && term_info.has_no_free_vars() {
             term_info.detach_term(term);
           }
 
           term_info.merge_scope(parent_scope);
 
-          is_super
+          detach
         }
+        Term::App { fun, arg, .. } => {
+          let parent_scope = term_info.replace_scope(HashSet::new());
+
+          let fun_detach = go(fun, depth + 1, term_info);
+          let fun_scope = term_info.replace_scope(HashSet::new());
+
+          let arg_detach = go(arg, depth + 1, term_info);
+          let arg_scope = term_info.replace_scope(parent_scope);
+
+          let detach = match fun_detach {
+            // If the fun scope is not empty, we know the recursive ref is not in a active position,
+            // Because if it was an application, it would be already extracted
+            //
+            // e.g.: {recursive_ref some_var}
+            Detach::Recursive if !fun_scope.is_empty() => arg_detach,
+
+            Detach::Recursive if arg_scope.is_empty() && arg_detach.can_detach() => {
+              term_info.detach_term(term);
+              Detach::Combinator
+            }
+
+            Detach::Recursive => {
+              term_info.detach_term(fun);
+              arg_detach
+            }
+
+            _ => fun_detach & arg_detach,
+          };
+
+          term_info.merge_scope(fun_scope);
+          term_info.merge_scope(arg_scope);
+
+          detach
+        }
+
         Term::Var { nam } => {
           term_info.request_name(nam);
-          true
+          Detach::Combinator
         }
         Term::Chn { nam: _, bod, .. } => {
           go(bod, depth + 1, term_info);
-          false
+          Detach::Unscoped
         }
-        Term::Lnk { .. } => false,
+        Term::Lnk { .. } => Detach::Unscoped,
         Term::Let { pat: Pattern::Var(nam), val, nxt } => {
-          let val_is_super = go(val, depth + 1, term_info);
-          let nxt_is_super = go(nxt, depth + 1, term_info);
+          let val_detach = go(val, depth + 1, term_info);
+          let nxt_detach = go(nxt, depth + 1, term_info);
           term_info.provide(nam.as_ref());
 
-          val_is_super && nxt_is_super
+          val_detach & nxt_detach
         }
         Term::Dup { fst, snd, val, nxt, .. }
         | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
-          let val_is_super = go(val, depth + 1, term_info);
-          let nxt_is_supper = go(nxt, depth + 1, term_info);
+          let val_detach = go(val, depth + 1, term_info);
+          let nxt_detach = go(nxt, depth + 1, term_info);
 
           term_info.provide(fst.as_ref());
           term_info.provide(snd.as_ref());
 
-          val_is_super && nxt_is_supper
+          val_detach & nxt_detach
         }
-        Term::Let { .. } => unreachable!(),
         Term::Match { scrutinee, arms } => {
-          let mut is_super = go(scrutinee, depth + 1, term_info);
+          let mut detach = go(scrutinee, depth + 1, term_info);
+          let parent_scope = term_info.replace_scope(HashSet::new());
 
           for (pat, term) in arms {
             debug_assert!(pat.is_detached_num_match());
 
-            is_super &= go(term, depth + 1, term_info);
+            let arm_detach = match go(term, depth + 1, term_info) {
+              // If the recursive ref reached here, it is not in a active position
+              Detach::Recursive => Detach::Combinator,
+              detach => detach,
+            };
+
+            // It is expected that match arms were already linearized
+            debug_assert!(term_info.has_no_free_vars());
+
+            detach = detach & arm_detach;
           }
 
-          is_super
+          term_info.replace_scope(parent_scope);
+          detach
         }
-        Term::App { fun: fst, arg: snd, .. }
-        | Term::Sup { fst, snd, .. }
-        | Term::Tup { fst, snd }
-        | Term::Opx { fst, snd, .. } => {
+        Term::Sup { fst, snd, .. } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
           let fst_is_super = go(fst, depth + 1, term_info);
           let snd_is_super = go(snd, depth + 1, term_info);
 
-          fst_is_super && snd_is_super
+          fst_is_super & snd_is_super
         }
-        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::List { .. } | Term::Era => true,
+        Term::Ref { def_id } if *def_id == term_info.rule_id => Detach::Recursive,
+        Term::Let { .. } | Term::List { .. } => unreachable!(),
+        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => Detach::Combinator,
       }
     }
 
