@@ -45,6 +45,12 @@ Number.to_church = λn λf λx
     0: x
     +p: (f (Number.to_church p f x))
   }
+// Alternative syntax with name binding
+Number.to_church = λn λf λx 
+  match num = n {
+    0: x
+    +: (f (Number.to_church num-1 f x)
+  }
 ```
 
 Using everything we learned, we can write a program that calculates the n-th Fibonacci number using native numbers

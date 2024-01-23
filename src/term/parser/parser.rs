@@ -19,13 +19,15 @@ use std::{collections::hash_map::Entry, iter::Map, ops::Range};
 /// <Data>    ::= "data" <Name> "=" (<Name> | "(" <Name> (<Name>)* ")")+
 /// <Rule>    ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) "=" (<InlineNumOp> | <InlineApp>)
 /// <Pattern> ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number>
-/// <Term>    ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Tup> | <Let> | <NumOp> | <App>
+/// <Term>    ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Tup> | <Let> | <Match> | <NumOp> | <App>
 /// <Lam>     ::= ("λ"|"@") <NameEra> <Term>
 /// <GlobalLam> ::= ("λ"|"@") "$" <Name> <Term>
 /// <Dup>    ::= "dup" <Tag>? <NameEra> <NameEra> "=" <Term> ";" <Term>
 /// <Tup>    ::= "(" <Term> "," <Term> ")"
 /// <Let>    ::= "let" <LetPat> "=" <Term> ";" <Term>
 /// <LetPat> ::= <Name> | "(" <NameEra> "," <NameEra> ")"
+/// <Match>  ::= "match" (<Term> | <Name> "=" <Term>) "{" <match_arm>+ "}"
+/// <match_arm> ::= "|"? <Pattern> ":" <Term> ";"?
 /// <NumOp>  ::= "(" <numop_token> <Term> <Term> ")"
 /// <App>    ::= "(" <Term> (<Term>)* ")"
 /// <Var>    ::= <Name>
@@ -208,7 +210,7 @@ where
         .boxed(),
     );
 
-    // match scrutinee { pat: term;... }
+    // match (scrutinee | <name> = value) { pat: term;... }
     let match_ = just(Token::Match)
       .ignore_then(name().then_ignore(just(Token::Equals)).or_not())
       .then(term.clone())

@@ -1,7 +1,7 @@
-cheese x =
-  match num = x {
+cheese =
+  match num = (+ 2 3) {
   | 0: 653323
-  | +x: (+ x num)
+  | +: (+ num num-1)
   }
 
-main = (cheese 2)
+main = cheese
