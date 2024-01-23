@@ -272,15 +272,21 @@ impl<'a> Reader<'a> {
     let mut s = String::new();
     fn go(t: &mut Term, s: &mut String, rd: &mut Reader<'_>) {
       match t {
-        Term::Num { val } => s.push(unsafe { char::from_u32_unchecked(*val as u32) }),
         Term::Lam { bod, .. } => go(bod, s, rd),
-        Term::App { tag, arg, .. } if *tag == Tag::string_scons_head() => go(arg, s, rd),
+        Term::App { tag, arg, .. } if *tag == Tag::string_scons_head() => {
+          if let Term::Num { val } = &**arg {
+            s.push(unsafe { char::from_u32_unchecked(*val as u32) });
+          } else {
+            rd.error(ReadbackError::InvalidStrTerm)
+          }
+        }
         Term::App { fun, arg, .. } => {
           go(fun, s, rd);
           go(arg, s, rd);
         }
         Term::Var { .. } => {}
         Term::Chn { .. }
+        | Term::Num { .. } // expected to appear only inside SCons.head
         | Term::Lnk { .. }
         | Term::Let { .. }
         | Term::Tup { .. }
