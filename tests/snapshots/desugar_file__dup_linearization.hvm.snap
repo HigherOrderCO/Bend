@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/dup_linearization.hvm
 ---
-(main) = let {a_1 a_1_dup} = *; let {a_2 a_2_dup} = a_1_dup; let {a_3 a_3_dup} = a_2_dup; let {a_4 a_5} = a_3_dup; ((a_5, a_1), (a_2, (a_3, a_4)))
+(main) = let #0{a_1 a_1_dup} = *; let #0{a_2 a_2_dup} = a_1_dup; let #0{a_3 a_3_dup} = a_2_dup; let #0{a_4 a_5} = a_3_dup; ((a_5, a_1), (a_2, (a_3, a_4)))

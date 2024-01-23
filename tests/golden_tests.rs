@@ -116,7 +116,7 @@ fn run_file() {
     let book = do_parse_book(code, path)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, def_names, info) =
-      run_book(book, 1 << 20, true, false, false, WarningOpts::deny_all(), Opts::heavy())?;
+      run_book(book, 1 << 20, true, false, false, false, WarningOpts::deny_all(), Opts::heavy())?;
     Ok(format!("{}{}", info.readback_errors.display(&def_names), res.display(&def_names)))
   })
 }
@@ -194,7 +194,7 @@ fn hangs() {
     let lck = Arc::new(RwLock::new(false));
     let got = lck.clone();
     std::thread::spawn(move || {
-      let _ = run_book(book, 1 << 20, true, false, false, WarningOpts::deny_all(), Opts::heavy());
+      let _ = run_book(book, 1 << 20, true, false, false, false, WarningOpts::deny_all(), Opts::heavy());
       *got.write().unwrap() = true;
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));

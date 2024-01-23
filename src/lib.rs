@@ -34,7 +34,7 @@ pub fn compile_book(book: &mut Book, opts: Opts) -> Result<CompileResult, String
   let (main, warnings) = desugar_book(book, opts)?;
   let (nets, hvmc_names, labels) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
-  if opts.pre_reduce && !opts.lazy {
+  if opts.pre_reduce {
     pre_reduce_book(&mut core_book, opts.pre_reduce)?;
   }
   if opts.prune {
@@ -98,6 +98,7 @@ pub fn run_book(
   parallel: bool,
   debug: bool,
   linear: bool,
+  lazy: bool,
   warning_opts: WarningOpts,
   opts: Opts,
 ) -> Result<(Term, DefNames, RunInfo), String> {
@@ -117,7 +118,7 @@ pub fn run_book(
   let debug_hook =
     if debug { Some(|net: &_| debug_hook(net, &book, &hvmc_names, &labels, linear)) } else { None };
 
-  let (res_lnet, stats) = run_compiled(&core_book, mem_size, parallel, opts.lazy, debug_hook);
+  let (res_lnet, stats) = run_compiled(&core_book, mem_size, parallel, lazy, debug_hook);
   let net = hvmc_to_net(&res_lnet, &|id| hvmc_names.hvmc_name_to_id[&id]);
   let (res_term, readback_errors) = net_to_term(&net, &book, &labels, linear);
   let info = RunInfo { stats, readback_errors, net: res_lnet };
@@ -186,8 +187,6 @@ pub struct Opts {
 
   /// Enables [term::transform::definition_merge]
   pub merge_definitions: bool,
-
-  pub lazy: bool
 }
 
 impl Opts {
@@ -202,7 +201,6 @@ impl Opts {
       simplify_main: true,
       pre_reduce_refs: true,
       merge_definitions: true,
-      lazy: false
     }
   }
 
@@ -325,14 +323,14 @@ pub struct RunStats {
 fn expand(net: &mut hvmc::run::Net, book: &hvmc::run::Book) {
   match net {
     hvmc::run::Net::Eager(net) => net.net.expand(book),
-    _ => {}
+    _ => unreachable!(),
   }
 }
 
 fn reduce(net: &mut hvmc::run::Net, book: &hvmc::run::Book, limit: usize) -> usize {
   match net {
     hvmc::run::Net::Eager(net) => net.net.reduce(book, limit),
-    _ => panic!("Unsupported configuration, disable debug mode `-D` or enable less optimizations `-O=0`"),
+    _ => unreachable!(),
   }
 }
 

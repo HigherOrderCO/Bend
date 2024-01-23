@@ -51,6 +51,9 @@ enum Mode {
     #[arg(short = '1', help = "Single-core mode (no parallelism)")]
     single_core: bool,
 
+    #[arg(short = 'L', help = "Lazy mode")]
+    lazy_mode: bool,
+  
     #[arg(short = 'l', help = "Linear readback (show explicit dups)")]
     linear: bool,
 
@@ -167,15 +170,30 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       desugar_book(&mut book, Opts::light())?;
       println!("{book}");
     }
-    Mode::Run { path, mem, debug, single_core, linear, arg_stats, cli_opts, wopts } => {
+    Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, cli_opts, wopts, lazy_mode } => {
       let warning_opts = wopts.get_warning_opts(WarningOpts::allow_all());
-      let opts = OptArgs::opts_from_cli(&cli_opts);
+      let mut opts = OptArgs::opts_from_cli(&cli_opts);
       opts.check();
+
+      if lazy_mode {
+        if debug {
+          return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".to_string());
+        }
+        single_core = true;
+        opts.supercombinators = false;
+        opts.pre_reduce = false;
+      } else {
+        // TODO: make the behavior of dups and sups the same as before when not using lazy mode
+        eprintln!(
+          "WARNING: Eager evaluation may have wrong results with unlabeled dups/sups, consider using lazy mode `-L`"
+        )
+      }
+
       let book = load_file_to_book(&path)?;
       verbose(&book);
       let mem_size = mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
       let (res_term, def_names, info) =
-        run_book(book, mem_size, !single_core, debug, linear, warning_opts, opts)?;
+        run_book(book, mem_size, !single_core, debug, linear, lazy_mode, warning_opts, opts)?;
       let RunInfo { stats, readback_errors, net: lnet } = info;
       let total_rewrites = total_rewrites(&stats.rewrites) as f64;
       let rps = total_rewrites / stats.run_time / 1_000_000.0;
