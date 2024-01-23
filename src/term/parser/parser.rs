@@ -1,6 +1,9 @@
-use super::lexer::{LexingError, Token};
-use crate::term::{Adt, Book, MatchNum, Name, Op, Pattern, Rule, Tag, Term};
+use crate::term::{
+  parser::lexer::{LexingError, Token},
+  Adt, Book, MatchNum, Name, Op, Pattern, Rule, Tag, Term,
+};
 use chumsky::{
+  error::RichReason,
   extra,
   input::{SpannedInput, Stream, ValueInput},
   prelude::{Input, Rich},
@@ -45,6 +48,19 @@ pub fn parse_definition_book(code: &str) -> Result<Book, Vec<Rich<Token>>> {
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
   // TODO: Make a function that calls a parser. I couldn't figure out how to type it correctly.
   term().parse(token_stream(code)).into_result()
+}
+
+/// Converts a Chumsky parser error into a message.
+pub fn error_to_msg(err: &Rich<'_, Token>, code: &str) -> String {
+  // Line number starts at 1.
+  let end_line = code[.. err.span().end].chars().filter(|c| *c == '\n').count() + 1;
+  let reason = match err.reason() {
+    // When many reasons, the first one is the most relevant.
+    // Otherwise we just get 'multiple errors'.
+    RichReason::Many(errs) => &errs[0],
+    _ => err.reason(),
+  };
+  format!("At line {}: {}", end_line, reason)
 }
 
 fn token_stream(

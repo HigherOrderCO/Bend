@@ -2,5 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/multiple_parsing_errors.hvm
 ---
-Missing Parenthesis around rule `main` body
-Repeated datatype 'Foo'
+At line 3: Missing Parenthesis around rule `main` body
+At line 5: Repeated datatype 'Foo'

@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/missing_paren_then_adt.hvm
 ---
-Missing Parenthesis around rule `main` body
+At line 1: Missing Parenthesis around rule `main` body
