@@ -2,5 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nested_str.hvm
 ---
-Invalid readback: [InvalidStrTerm]
-""
+Invalid readback: [InvalidStrTerm, InvalidStrTerm, InvalidStrTerm, InvalidStrTerm, InvalidStrTerm]
+(((SCons "a" SNil), (SCons 97 (SCons "bc" SNil))), ((SCons "ab" (SCons 99 SNil)), (SCons "ab" (SCons "cd" SNil))))
