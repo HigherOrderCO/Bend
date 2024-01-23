@@ -8,7 +8,7 @@ false = λt λf f
 Matching on values of this representation is simply calling the boolean value with what the function should return if the boolean is true and if the boolean is false.
 ```rs
 if boolean case_true case_false = (boolean case_true case_false)
-main = (if true 42 37) 
+main = (if true 42 37)
 // Outputs 42
 
 // Or alternatively:
@@ -69,9 +69,58 @@ main = λxλt1λf1 (x t1 f1)
 ```
 Wow! Simply by replacing lambda arguments with the values applied to them, we were able to make `(not (not x))` not grow in size. This is what fusing means, and it's a really powerful tool to make programs faster.
 
-Fusing isn't only for Church-encoded `not`. Fusing can be done anywhere where efficient composition is important. Broadly speaking, a good rule of thumb in HVM is "push lambdas to the top and duplications to the bottom".
+Fusing isn't only for Church-encoded `not`. Fusing can be done anywhere where efficient composition is important. What we simply have to do is "lift" lambdas up, and make the arguments "shared" between all cases.
 
-To show the power of fusing, here is a program that self-composes `fusing_not` 2^512 times and prints the result. `2^512` is larger than amount of atoms in the observable universe, and yet HVM is still able to work with it due to its optimal sharing capabilities. 
+## Preventing duplication
+
+Something else that is important when writing fusing functions is linearizing variables to prevent useless duplication.
+
+Consider the [scott-encoded](https://crypto.stanford.edu/~blynn/compiler/scott.html) type `Nat`:
+
+```rs
+zero = λs λz z // 0 as a scott-encoded number
+succ = λpred λs λz (s pred) // Creates a Scott number out of its predecessor
+
+two = (succ (succ zero)) // λs λz (s λs λz (s λs λz z))
+```
+
+We can write an addition function for this type, that adds two numbers
+
+```rs
+add = λa λb
+	let case_succ = λa_pred (succ (add a_pred b)) // If a = p+1, then return (p+b)+1
+	let case_zero = b // If the `a = 0`, return `b`
+	(a case_succ case_zero)
+```
+
+This code seems fine, but it has a problem that makes it suboptimal. There is an implicit [duplication](dups-and-sups.md) here:
+
+```rs
+add = λa λb
+	let {b1 b2} = b;
+	let case_succ = λa_pred (succ (add a_pred b0))
+	let case_zero = b1
+	(a case_succ case_zero)
+```
+
+However, only one of the two duplicated values is ever used. The other one is discarded. This means that this duplication is completely useless! It makes this function suboptimal. In fact, as of commit `ebd469`, it will hang HVM, because it's recursive and HVM2 is eager.
+
+The correct way to define this function is this, which pushes the duplicating lambdas down, and removes the duplication:
+
+```rs
+fusing_add = λa
+	let case_succ = λa_pred λb (succ (fusing_add a_pred b))
+	let case_zero = λb b
+	(a case_succ case_zero)
+```
+
+This function is fusing on `a`, which means that `λx (fusing_add two x)` will have a small normal form (but `λx (fusing_add x two)` won't)
+
+Broadly speaking, a good rule of thumb in HVM is **push linear lambdas to the top and duplicating lambdas to the bottom**.
+
+## Example
+
+To show the power of fusing, here is a program that self-composes `fusing_not` 2^512 times and prints the result. `2^512` is larger than amount of atoms in the observable universe, and yet HVM is still able to work with it due to its optimal sharing capabilities.
 
 This program uses [native numbers, which are described here](native-numbers.md).
 ```rs
@@ -82,15 +131,15 @@ fusing_not = λboolean λt λf (boolean f t)
 // Creates a Church numeral out of a native number
 to_church 0 = λf λx x
 to_church +p = λf λx (f (to_church p f x))
-main = 
+main =
 	let two = λf λx (f (f x))
 	let two_pow_512 = ((to_church 512) two) // Composition of church-encoded numbers is equivalent to exponentiation.
 	// Self-composes `not` 2^512 times and prints the result.
-	(two_pow_512 fusing_not)  // try replacing this by not. Will it still work?
+	(two_pow_512 fusing_not)  // try replacing this by regular not. Will it still work?
 ```
 Here is the program's output:
 ```bash
-$ hvml run -s fuse_magic.hvm 
+$ hvml run -s fuse_magic.hvm
 λa λb λc (a b c)
 
 RWTS   : 15374
