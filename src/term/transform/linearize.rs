@@ -111,11 +111,6 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
   }
 }
 
-/// We use a special named variable to only count the number of actual var uses on the resulting term
-fn used_var_counter(var_name: &Name) -> Name {
-  Name(format!("${var_name}$used"))
-}
-
 /// Var-declaring terms
 fn term_with_bind_to_affine(
   term: &mut Term,
@@ -123,17 +118,10 @@ fn term_with_bind_to_affine(
   var_uses: &mut HashMap<Name, Val>,
   let_bodies: &mut HashMap<Name, Term>,
 ) {
-  if let Some(nam_some) = nam {
-    if let Some(mut uses) = var_uses.get(nam_some).copied() {
+  if let Some(name) = nam {
+    if let Some(_) = var_uses.get(name).copied() {
       term_to_affine(term, var_uses, let_bodies);
-
-      // When a term is removed, the number of uses of a variable can change inside the term_to_affine call.
-      // We check the updated count instead of using the one we caulculated initially
-      if uses != 0 {
-        let name = used_var_counter(nam_some);
-        uses = var_uses.get(&name).copied().unwrap_or(0)
-      };
-
+      let uses = actual_var_use(var_uses, name);
       duplicate_lam(nam, term, uses);
       return;
     }
@@ -181,13 +169,23 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
         uses => {
           term_to_affine(val, var_uses, let_bodies);
           term_to_affine(nxt, var_uses, let_bodies);
-          duplicate_let(nam, nxt, uses, val);
+
+          let mut new_uses = actual_var_use(var_uses, nam);
+
+          // If the number of uses changed (because a term was linearized out):
+          //  We could redo the whole pass on the term.
+          //  Or we can just create extra half-erased-dups `let {nam_n *} = nam_m_dup; nxt` to match the correct labels
+          if uses != new_uses {
+            new_uses += 1
+          };
+
+          duplicate_let(nam, nxt, new_uses, val)
         }
       }
       *term = std::mem::take(nxt.as_mut());
     }
 
-    Term::Let { pat: Pattern::Var(None), val, nxt, .. } => {
+    Term::Let { pat: Pattern::Var(None), val, nxt } => {
       if val.has_unscoped() {
         term_to_affine(val, var_uses, let_bodies);
         term_to_affine(nxt, var_uses, let_bodies);
@@ -211,17 +209,16 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
 
     // Var-using terms
     Term::Var { nam } => {
-      let uses = var_uses[nam];
       *var_uses.get_mut(nam).unwrap() -= 1;
       if let Some(subst) = let_bodies.remove(nam) {
         *term = subst.clone();
       } else {
         let used_counter = used_var_counter(nam);
 
-        *nam = dup_name(nam, uses);
+        let actual_uses = var_uses.entry(used_counter).or_default();
+        *actual_uses += 1;
 
-        // Updates de actual var uses on the resulting term
-        *var_uses.entry(used_counter).or_default() += 1;
+        *nam = dup_name(nam, *actual_uses);
       }
     }
 
@@ -255,25 +252,56 @@ fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, Val>) -> Val {
   if let Some(nam) = nam { *var_uses.get(nam).unwrap() } else { 0 }
 }
 
-fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, dup_body: Option<&mut Term>) {
-  // TODO: Is there a difference between a list of dups and a complete binary tree of dups
-  // Creates this: "dup x1 x1_dup = body; dup x2 x2_dup = x1_dup; dup x3 x4 = x2_dup; nxt"
+// TODO: Is it really necessary to `count_var_uses_in_term` before `term_to_affine`?
+// Can't it be unified in the same function? (given that the actual var uses in a term is already dynamic)
+//
+/// When a term is removed, the number of uses of a variable can change inside the term_to_affine call.
+/// This returns the updated count instead of using the one we calculated initially
+fn actual_var_use(var_uses: &HashMap<Name, Val>, name: &Name) -> Val {
+  var_uses.get(&used_var_counter(name)).copied().unwrap_or(0)
+}
+
+/// We use a special named variable to only count the number of actual var uses on the resulting term
+fn used_var_counter(var_name: &Name) -> Name {
+  Name(format!("${var_name}$used"))
+}
+
+// TODO: Is there a difference between a list of dups and a complete binary tree of dups?
+//
+/// # Example
+///
+/// ```txt
+/// let {x1 x1_dup} = body;
+/// let {x2 x2_dup} = x1_dup;
+/// let {x3 x4}     = x2_dup;
+/// nxt
+/// ```
+fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, mut dup_body: Option<&mut Term>) {
+  let free_vars = &mut nxt.free_vars();
+
+  if let Some(ref body) = dup_body {
+    free_vars.extend(body.free_vars())
+  };
+
+  let make_name = |uses| {
+    let dup_name = dup_name(nam, uses);
+    free_vars.contains_key(&dup_name).then(|| dup_name)
+  };
+
   for i in (1 .. uses).rev() {
-    let old_nxt = std::mem::replace(nxt, Term::Era);
     *nxt = Term::Dup {
       tag: Tag::Auto,
-      fst: Some(dup_name(nam, i)),
-      snd: if i == uses - 1 { Some(dup_name(nam, uses)) } else { Some(internal_dup_name(nam, uses)) },
+      fst: make_name(i),
+      snd: if i == uses - 1 { make_name(uses) } else { Some(internal_dup_name(nam, uses)) },
       val: if i == 1 {
-        if let Some(dup_body) = &dup_body {
-          Box::new((*dup_body).clone()) // TODO: don't clone here
-        } else {
-          Box::new(Term::Var { nam: nam.clone() })
+        match dup_body.as_deref_mut() {
+          Some(body) => Box::new(std::mem::take(body)),
+          None => Box::new(Term::Var { nam: nam.clone() }),
         }
       } else {
         Box::new(Term::Var { nam: internal_dup_name(nam, uses) })
       },
-      nxt: Box::new(old_nxt),
+      nxt: Box::new(std::mem::take(nxt)),
     };
   }
 }
