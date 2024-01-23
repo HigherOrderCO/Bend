@@ -1,4 +1,7 @@
-use super::{parser::parse_definition_book, Book};
+use crate::term::{
+  parser::{parse_definition_book, parser::error_to_msg},
+  Book,
+};
 use itertools::Itertools;
 use std::path::Path;
 
@@ -8,7 +11,7 @@ pub fn load_file_to_book(path: &Path) -> Result<Book, String> {
   match parse_definition_book(&code) {
     Ok(book) => Ok(book),
     Err(errs) => {
-      let msg = errs.into_iter().map(|e| e.to_string()).join("\n");
+      let msg = errs.iter().map(|e| error_to_msg(e, &code)).join("\n");
       Err(msg)
     }
   }

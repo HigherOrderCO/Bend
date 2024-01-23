@@ -1,6 +1,9 @@
-use super::lexer::{LexingError, Token};
-use crate::term::{Adt, Book, MatchNum, Name, Op, Pattern, Rule, Tag, Term};
+use crate::term::{
+  parser::lexer::{LexingError, Token},
+  Adt, Book, MatchNum, Name, Op, Pattern, Rule, Tag, Term,
+};
 use chumsky::{
+  error::RichReason,
   extra,
   input::{SpannedInput, Stream, ValueInput},
   prelude::{Input, Rich},
@@ -13,29 +16,31 @@ use chumsky::{
 use logos::{Logos, SpannedIter};
 use std::{collections::hash_map::Entry, iter::Map, ops::Range};
 
-/// <Book>    ::= <TopLevel>*
-/// <TopLevel> ::= (<Def> | <Data>)
-/// <Def>     ::= <Rule> (<Rule>)*
-/// <Data>    ::= "data" <Name> "=" (<Name> | "(" <Name> (<Name>)* ")")+
-/// <Rule>    ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) "=" (<InlineNumOp> | <InlineApp>)
-/// <Pattern> ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number>
-/// <Term>    ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Tup> | <Let> | <Match> | <NumOp> | <App>
-/// <Lam>     ::= ("λ"|"@") <NameEra> <Term>
-/// <GlobalLam> ::= ("λ"|"@") "$" <Name> <Term>
-/// <Dup>    ::= "dup" <Tag>? <NameEra> <NameEra> "=" <Term> ";" <Term>
-/// <Tup>    ::= "(" <Term> "," <Term> ")"
-/// <Let>    ::= "let" <LetPat> "=" <Term> ";" <Term>
-/// <LetPat> ::= <Name> | "(" <NameEra> "," <NameEra> ")"
-/// <Match>  ::= "match" (<Term> | <Name> "=" <Term>) "{" <match_arm>+ "}"
-/// <match_arm> ::= "|"? <Pattern> ":" <Term> ";"?
-/// <NumOp>  ::= "(" <numop_token> <Term> <Term> ")"
-/// <App>    ::= "(" <Term> (<Term>)* ")"
-/// <Var>    ::= <Name>
-/// <GlobalVar> ::= "$" <Name>
-/// <NameEra> ::= <Name> | "*"
-/// <Name>   ::= <name_token> // [_a-zA-Z][_a-zA-Z0-9]{0..7}
-/// <Number> ::= <number_token> // [0-9]+
-/// <Tag>    ::= "#" <Name>
+// hvml grammar description:
+// <Book>    ::= <TopLevel>*
+// <TopLevel> ::= (<Def> | <Data>)
+// <Def>     ::= <Rule> (<Rule>)*
+// <Data>    ::= "data" <Name> "=" (<Name> | "(" <Name> (<Name>)* ")")+
+// <Rule>    ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) "=" (<InlineNumOp> | <InlineApp>)
+// <Pattern> ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number>
+// <Term>    ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Tup> | <Let> | <Match> | <NumOp> | <App>
+// <Lam>     ::= ("λ"|"@") <NameEra> <Term>
+// <GlobalLam> ::= ("λ"|"@") "$" <Name> <Term>
+// <Dup>    ::= "dup" <Tag>? <NameEra> <NameEra> "=" <Term> ";" <Term>
+// <Tup>    ::= "(" <Term> "," <Term> ")"
+// <Let>    ::= "let" <LetPat> "=" <Term> ";" <Term>
+// <LetPat> ::= <Name> | "(" <NameEra> "," <NameEra> ")"
+// <Match>  ::= "match" (<Term> | <Name> "=" <Term>) "{" <match_arm>+ "}"
+// <match_arm> ::= "|"? <Pattern> ":" <Term> ";"?
+// <NumOp>  ::= "(" <numop_token> <Term> <Term> ")"
+// <App>    ::= "(" <Term> (<Term>)* ")"
+// <Var>    ::= <Name>
+// <GlobalVar> ::= "$" <Name>
+// <NameEra> ::= <Name> | "*"
+// <Name>   ::= <name_token> // [_a-zA-Z][_a-zA-Z0-9]{0..7}
+// <Number> ::= <number_token> // [0-9]+
+// <Tag>    ::= "#" <Name>
+
 pub fn parse_definition_book(code: &str) -> Result<Book, Vec<Rich<Token>>> {
   book().parse(token_stream(code)).into_result()
 }
@@ -43,6 +48,19 @@ pub fn parse_definition_book(code: &str) -> Result<Book, Vec<Rich<Token>>> {
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
   // TODO: Make a function that calls a parser. I couldn't figure out how to type it correctly.
   term().parse(token_stream(code)).into_result()
+}
+
+/// Converts a Chumsky parser error into a message.
+pub fn error_to_msg(err: &Rich<'_, Token>, code: &str) -> String {
+  // Line number starts at 1.
+  let end_line = code[.. err.span().end].chars().filter(|c| *c == '\n').count() + 1;
+  let reason = match err.reason() {
+    // When many reasons, the first one is the most relevant.
+    // Otherwise we just get 'multiple errors'.
+    RichReason::Many(errs) => &errs[0],
+    _ => err.reason(),
+  };
+  format!("At line {}: {}", end_line, reason)
 }
 
 fn token_stream(
@@ -68,13 +86,7 @@ fn soft_keyword<'a, I>(keyword: &'a str) -> impl Parser<'a, I, (), extra::Err<Ri
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  name().try_map(move |Name(nam), span| {
-    if nam == keyword {
-      Ok(())
-    } else {
-      Err(Rich::custom(span, format!("Expected `{keyword}`, found `{nam}`")))
-    }
-  })
+  select!(Token::Name(name) if name == keyword => ())
 }
 
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>

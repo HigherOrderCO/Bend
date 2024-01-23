@@ -5,7 +5,7 @@ use hvml::{
   run_book,
   term::{
     net_to_term::net_to_term,
-    parser::{parse_definition_book, parse_term},
+    parser::{parse_definition_book, parse_term, parser::error_to_msg},
     term_to_compat_net, Book, DefId, Term,
   },
   Opts,
@@ -22,7 +22,7 @@ use walkdir::WalkDir;
 fn do_parse_book(code: &str) -> Result<Book, String> {
   match parse_definition_book(code) {
     Ok(book) => Ok(book),
-    Err(errs) => Err(errs.into_iter().map(|e| e.to_string()).join("\n")),
+    Err(errs) => Err(errs.iter().map(|e| error_to_msg(e, code)).join("\n")),
   }
 }
 
