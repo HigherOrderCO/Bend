@@ -230,6 +230,14 @@ impl Tag {
   pub fn string_scons_head() -> Self {
     Self::Named(Name::new("String.SCons.head"))
   }
+
+  pub fn list() -> Self {
+    Self::Named(Name::new("List"))
+  }
+
+  pub fn list_lcons_head() -> Self {
+    Self::Named(Name::new("List.LCons.head"))
+  }
 }
 
 impl Book {
