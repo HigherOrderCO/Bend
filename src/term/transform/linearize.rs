@@ -119,9 +119,9 @@ fn term_with_bind_to_affine(
   let_bodies: &mut HashMap<Name, Term>,
 ) {
   if let Some(name) = nam {
-    if let Some(_) = var_uses.get(name).copied() {
+    if var_uses.contains_key(name) {
       term_to_affine(term, var_uses, let_bodies);
-      let uses = actual_var_use(var_uses, name);
+      let uses = *actual_var_use(var_uses, name);
       duplicate_lam(nam, term, uses);
       return;
     }
@@ -170,7 +170,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
           term_to_affine(val, var_uses, let_bodies);
           term_to_affine(nxt, var_uses, let_bodies);
 
-          let mut new_uses = actual_var_use(var_uses, nam);
+          let mut new_uses = *actual_var_use(var_uses, nam);
 
           // If the number of uses changed (because a term was linearized out):
           //  We could redo the whole pass on the term.
@@ -213,9 +213,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       if let Some(subst) = let_bodies.remove(nam) {
         *term = subst.clone();
       } else {
-        let used_counter = used_var_counter(nam);
-
-        let actual_uses = var_uses.entry(used_counter).or_default();
+        let actual_uses = actual_var_use(var_uses, nam);
         *actual_uses += 1;
 
         *nam = dup_name(nam, *actual_uses);
@@ -257,12 +255,12 @@ fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, Val>) -> Val {
 //
 /// When a term is removed, the number of uses of a variable can change inside the term_to_affine call.
 /// This returns the updated count instead of using the one we calculated initially
-fn actual_var_use(var_uses: &HashMap<Name, Val>, name: &Name) -> Val {
-  var_uses.get(&used_var_counter(name)).copied().unwrap_or(0)
+fn actual_var_use<'a>(var_uses: &'a mut HashMap<Name, Val>, name: &Name) -> &'a mut u64 {
+  var_uses.entry(actual_var_use_counter(name)).or_default()
 }
 
 /// We use a special named variable to only count the number of actual var uses on the resulting term
-fn used_var_counter(var_name: &Name) -> Name {
+fn actual_var_use_counter(var_name: &Name) -> Name {
   Name(format!("${var_name}$used"))
 }
 
