@@ -268,7 +268,7 @@ impl<'a> Reader<'a> {
 }
 
 impl<'a> Reader<'a> {
-  fn decode_str(&mut self, term: &mut Term) -> Term {
+  fn resugar_string(&mut self, term: &mut Term) -> Term {
     let mut s = String::new();
     fn go(t: &mut Term, s: &mut String, rd: &mut Reader<'_>) {
       match t {
@@ -298,7 +298,7 @@ impl<'a> Reader<'a> {
     Term::Str { val: s }
   }
 
-  fn decode_list(&mut self, term: &mut Term) -> Term {
+  fn resugar_list(&mut self, term: &mut Term) -> Term {
     let mut els = Vec::new();
     fn go(t: &mut Term, els: &mut Vec<Term>, rd: &mut Reader<'_>) {
       match t {
@@ -306,7 +306,7 @@ impl<'a> Reader<'a> {
         Term::App { tag, arg, .. } if *tag == Tag::list_lcons_head() => {
           if let Term::Lam { tag, bod, .. } = &mut **arg {
             if *tag == Tag::list() {
-              els.push(rd.decode_list(bod));
+              els.push(rd.resugar_list(bod));
             } else {
               els.push(*arg.clone());
             }
@@ -519,8 +519,8 @@ impl<'a> Reader<'a> {
   }
   fn resugar_adts(&mut self, term: &mut Term) {
     match term {
-      Term::Lam { tag, bod, .. } if *tag == Tag::string() => *term = self.decode_str(bod),
-      Term::Lam { tag, bod, .. } if *tag == Tag::list() => *term = self.decode_list(bod),
+      Term::Lam { tag, bod, .. } if *tag == Tag::string() => *term = self.resugar_string(bod),
+      Term::Lam { tag, bod, .. } if *tag == Tag::list() => *term = self.resugar_list(bod),
       Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
         let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
           return self.resugar_adts(bod);
