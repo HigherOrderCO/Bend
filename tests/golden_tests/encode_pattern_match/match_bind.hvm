@@ -1,0 +1,7 @@
+cheese =
+  match num = (+ 2 3) {
+  | 0: 653323
+  | +: (+ num num-1)
+  }
+
+main = cheese

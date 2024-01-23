@@ -19,13 +19,15 @@ use std::{collections::hash_map::Entry, iter::Map, ops::Range};
 /// <Data>    ::= "data" <Name> "=" (<Name> | "(" <Name> (<Name>)* ")")+
 /// <Rule>    ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) "=" (<InlineNumOp> | <InlineApp>)
 /// <Pattern> ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number>
-/// <Term>    ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Tup> | <Let> | <NumOp> | <App>
+/// <Term>    ::= <Var> | <GlobalVar> | <Number> | <Lam> | <GlobalLam> | <Dup> | <Tup> | <Let> | <Match> | <NumOp> | <App>
 /// <Lam>     ::= ("λ"|"@") <NameEra> <Term>
 /// <GlobalLam> ::= ("λ"|"@") "$" <Name> <Term>
 /// <Dup>    ::= "dup" <Tag>? <NameEra> <NameEra> "=" <Term> ";" <Term>
 /// <Tup>    ::= "(" <Term> "," <Term> ")"
 /// <Let>    ::= "let" <LetPat> "=" <Term> ";" <Term>
 /// <LetPat> ::= <Name> | "(" <NameEra> "," <NameEra> ")"
+/// <Match>  ::= "match" (<Term> | <Name> "=" <Term>) "{" <match_arm>+ "}"
+/// <match_arm> ::= "|"? <Pattern> ":" <Term> ";"?
 /// <NumOp>  ::= "(" <numop_token> <Term> <Term> ")"
 /// <App>    ::= "(" <Term> (<Term>)* ")"
 /// <Var>    ::= <Name>
@@ -208,13 +210,21 @@ where
         .boxed(),
     );
 
-    // match scrutinee { pat: term;... }
+    // match (scrutinee | <name> = value) { pat: term;... }
     let match_ = just(Token::Match)
-      .ignore_then(term.clone())
+      .ignore_then(name().then_ignore(just(Token::Equals)).or_not())
+      .then(term.clone())
       .then_ignore(just(Token::LBracket))
       .then(match_arm.separated_by(term_sep.clone()).allow_trailing().collect())
       .then_ignore(just(Token::RBracket))
-      .map(|(scrutinee, arms)| Term::Match { scrutinee: Box::new(scrutinee), arms })
+      .map(|((bind, scrutinee), arms)| match bind {
+        Some(nam) => Term::Let {
+          pat: Pattern::Var(Some(nam.clone())),
+          val: Box::new(scrutinee),
+          nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam: nam.clone() }), arms }),
+        },
+        None => Term::Match { scrutinee: Box::new(scrutinee), arms },
+      })
       .boxed();
 
     let native_match = just(Token::Match)

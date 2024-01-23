@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/match_bind.hvm
+---
+(cheese) = let num = (+ 2 3); match num { 0: 653323; +num-1: (+ num num-1) }
+
+(main) = cheese
