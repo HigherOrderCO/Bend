@@ -68,13 +68,7 @@ fn soft_keyword<'a, I>(keyword: &'a str) -> impl Parser<'a, I, (), extra::Err<Ri
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  name().try_map(move |Name(nam), span| {
-    if nam == keyword {
-      Ok(())
-    } else {
-      Err(Rich::custom(span, format!("Expected `{keyword}`, found `{nam}`")))
-    }
-  })
+  select!(Token::Name(name) if name == keyword => ())
 }
 
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
