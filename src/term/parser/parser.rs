@@ -210,11 +210,19 @@ where
 
     // match scrutinee { pat: term;... }
     let match_ = just(Token::Match)
-      .ignore_then(term.clone())
+      .ignore_then(name().then_ignore(just(Token::Equals)).or_not())
+      .then(term.clone())
       .then_ignore(just(Token::LBracket))
       .then(match_arm.separated_by(term_sep.clone()).allow_trailing().collect())
       .then_ignore(just(Token::RBracket))
-      .map(|(scrutinee, arms)| Term::Match { scrutinee: Box::new(scrutinee), arms })
+      .map(|((bind, scrutinee), arms)| match bind {
+        Some(nam) => Term::Let {
+          pat: Pattern::Var(Some(nam.clone())),
+          val: Box::new(scrutinee),
+          nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam: nam.clone() }), arms }),
+        },
+        None => Term::Match { scrutinee: Box::new(scrutinee), arms },
+      })
       .boxed();
 
     let native_match = just(Token::Match)

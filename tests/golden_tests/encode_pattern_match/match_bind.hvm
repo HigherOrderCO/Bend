@@ -1,0 +1,7 @@
+cheese x =
+  match num = x {
+  | 0: 653323
+  | +x: (+ x num)
+  }
+
+main = (cheese 2)
