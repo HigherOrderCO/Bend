@@ -76,12 +76,12 @@ impl Term {
         fst_uses || snd_uses
       }
       Term::Match { arms, scrutinee } => {
-        let mut used = false;
-        let scrutinee_used = scrutinee.encode_str();
-        for arm in arms {
-          used |= arm.1.encode_str();
+        let mut used = scrutinee.encode_str();
+        for (pat, arm) in arms {
+          used |= pat.names().chain(pat.ctrs()).any(|Name(n)| matches!(n.as_str(), SCONS | SNIL));
+          used |= arm.encode_str();
         }
-        scrutinee_used || used
+        used
       }
       Term::List { els } => {
         let mut used = false;

@@ -616,6 +616,27 @@ impl Pattern {
     set.into_iter().flat_map(|a| a.as_mut())
   }
 
+  pub fn ctrs(&self) -> impl DoubleEndedIterator<Item = &Name> {
+    fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Name>) {
+      match pat {
+        Pattern::Ctr(nam, pats) => {
+          set.push(nam);
+          pats.iter().for_each(|pat| go(pat, set));
+        }
+        Pattern::List(pats) => pats.iter().for_each(|pat| go(pat, set)),
+        Pattern::Tup(fst, snd) => {
+          go(fst, set);
+          go(snd, set);
+        }
+        Pattern::Var(_) => {},
+        Pattern::Num(_) => {}
+      }
+    }
+    let mut set = Vec::new();
+    go(self, &mut set);
+    set.into_iter()
+  }
+
   pub fn is_detached_num_match(&self) -> bool {
     if let Pattern::Num(num) = self {
       match num {

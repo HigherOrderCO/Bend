@@ -1,0 +1,10 @@
+main = @a @b 
+  let a =  match a {
+    SCons: 1
+    SNil : 2
+  };
+  let b =  match b {
+    (LCons h t): 1
+    (LNil) : 2
+  };
+  (a, b)
