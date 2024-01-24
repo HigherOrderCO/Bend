@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/override_list_ctr.hvm
 ---
-SNil is a built-in constructor and should not be overriden.
+LNil is a built-in constructor and should not be overriden.
