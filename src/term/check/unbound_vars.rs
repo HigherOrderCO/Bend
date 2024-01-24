@@ -25,8 +25,11 @@ impl Term {
 
     // Check global vars
     for (nam, (declared, used)) in globals.into_iter() {
-      if used && !declared {
-        return Err(format!("Unbound unscoped variable '${nam}'"));
+      match (used, declared) {
+        (1, 1) => {}
+        (0, _) => return Err(format!("Missing unscoped variable use for 'λ${nam}'")),
+        (_, 0) => return Err(format!("Unbound unscoped variable '${nam}'")),
+        (_, _) => return Err(format!("Unscoped variable '${nam}' used more than once")),
       }
     }
     Ok(())
@@ -38,7 +41,7 @@ impl Term {
 pub fn check_uses<'a>(
   term: &'a Term,
   scope: &mut HashMap<&'a Name, Val>,
-  globals: &mut HashMap<&'a Name, (bool, bool)>,
+  globals: &mut HashMap<&'a Name, (usize, usize)>,
 ) -> Result<(), String> {
   // TODO: Don't stop at the first error
   match term {
@@ -53,11 +56,11 @@ pub fn check_uses<'a>(
       }
     }
     Term::Chn { nam, bod, .. } => {
-      globals.entry(nam).or_default().0 = true;
+      globals.entry(nam).or_default().0 += 1;
       check_uses(bod, scope, globals)?;
     }
     Term::Lnk { nam } => {
-      globals.entry(nam).or_default().1 = true;
+      globals.entry(nam).or_default().1 += 1;
     }
     Term::Let { pat: Pattern::Var(nam), val, nxt } => {
       check_uses(val, scope, globals)?;
