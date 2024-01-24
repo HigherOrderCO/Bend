@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 
-use crate::term::{Adt, Book, Name, Pattern, Tag, Term};
+use crate::term::{builtin_adt, Book, Name, Pattern, Tag, Term};
 
 pub const LIST: &str = "List";
 pub const LCONS: &str = "LCons";
@@ -8,41 +8,26 @@ pub const LNIL: &str = "LNil";
 pub const HEAD: &str = "head";
 pub const TAIL: &str = "tail";
 
-impl Book {
-  pub fn encode_lists(&mut self) -> Result<(), String> {
-    if self.adts.contains_key(&Name::new(LIST)) {
-      return Err("List is a built-in data type and should not be overridden.".to_string());
-    }
+pub struct BuiltinList;
 
-    self.declare_list_adt();
+impl builtin_adt::BuiltinAdt for BuiltinList {
+  fn constructors(&self) -> IndexMap<Name, Vec<Name>> {
+    IndexMap::from([(Name::new(LCONS), vec![Name::new(HEAD), Name::new(TAIL)]), (Name::new(LNIL), vec![])])
+  }
 
+  fn name(&self) -> Name {
+    Name::new(LIST)
+  }
+
+  fn encode_terms(&self, book: &mut Book) -> bool {
     let mut found_list = false;
-    for def in self.defs.values_mut() {
+    for def in book.defs.values_mut() {
       for rule in def.rules.iter_mut() {
         rule.pats.iter_mut().for_each(|pat| found_list |= pat.encode_lists());
         found_list |= rule.body.encode_lists();
       }
     }
-
-    if !found_list {
-      self.ctrs.remove(&Name::new(LNIL));
-      self.ctrs.remove(&Name::new(LCONS));
-      self.adts.remove(&Name::new(LIST));
-    }
-
-    Ok(())
-  }
-
-  fn declare_list_adt(&mut self) {
-    self.ctrs.insert(Name::new(LNIL), Name::new(LIST));
-    self.ctrs.insert(Name::new(LCONS), Name::new(LIST));
-
-    self.adts.insert(Name::new(LIST), Adt {
-      ctrs: IndexMap::from([
-        (Name::new(LCONS), vec![Name::new(HEAD), Name::new(TAIL)]),
-        (Name::new(LNIL), vec![]),
-      ]),
-    });
+    found_list
   }
 }
 

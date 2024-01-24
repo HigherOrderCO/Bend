@@ -6,7 +6,9 @@ use hvml::{
   term::{
     net_to_term::net_to_term,
     parser::{parse_definition_book, parse_term, parser::error_to_msg},
-    term_to_compat_net, Book, DefId, Term,
+    term_to_compat_net,
+    transform::{encode_lists::BuiltinList, encode_strs::BuiltinString},
+    Book, DefId, Term,
   },
   Opts,
 };
@@ -167,8 +169,8 @@ fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
     book.check_shared_names()?;
-    book.encode_strs()?;
-    book.encode_lists()?;
+    book.encode_builtin_adt(BuiltinString)?;
+    book.encode_builtin_adt(BuiltinList)?;
     book.generate_scott_adts();
     book.resolve_refs()?;
     encode_pattern_matching(&mut book, &mut vec![])?;

@@ -11,6 +11,7 @@ use std::time::Instant;
 use term::{
   book_to_nets, net_to_term,
   term_to_net::{HvmcNames, Labels},
+  transform::{encode_lists::BuiltinList, encode_strs::BuiltinString},
   Book, DefId, DefNames, Name, Term,
 };
 
@@ -46,8 +47,8 @@ pub fn desugar_book(
   let mut warnings = Vec::new();
   let main = book.check_has_main()?;
   book.check_shared_names()?;
-  book.encode_strs()?;
-  book.encode_lists()?;
+  book.encode_builtin_adt(BuiltinString)?;
+  book.encode_builtin_adt(BuiltinList)?;
   book.generate_scott_adts();
   book.resolve_refs()?;
   encode_pattern_matching(book, &mut warnings)?;
@@ -109,7 +110,11 @@ pub fn run_book(
     let (res_term, errors) = net_to_term(&net, book, labels, linear);
     println!(
       "{}{}\n---------------------------------------",
-      if errors.is_empty() { "".to_string() } else { format!("Invalid readback:\n{}\n", errors.display(&book.def_names)) },
+      if errors.is_empty() {
+        "".to_string()
+      } else {
+        format!("Invalid readback:\n{}\n", errors.display(&book.def_names))
+      },
       res_term.display(&book.def_names)
     );
   }

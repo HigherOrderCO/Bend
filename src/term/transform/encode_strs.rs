@@ -1,7 +1,7 @@
 use hvmc::run::Val;
 use indexmap::IndexMap;
 
-use crate::term::{Adt, Book, Name, Tag, Term};
+use crate::term::{builtin_adt, Book, Name, Tag, Term};
 
 pub const STRING: &str = "String";
 pub const SNIL: &str = "SNil";
@@ -9,40 +9,25 @@ pub const SCONS: &str = "SCons";
 pub const HEAD: &str = "head";
 pub const TAIL: &str = "tail";
 
-impl Book {
-  pub fn encode_strs(&mut self) -> Result<(), String> {
-    if self.adts.contains_key(&Name::new(STRING)) {
-      return Err("String is a built-in data type and should not be overridden.".to_string());
-    }
+pub struct BuiltinString;
 
-    self.declare_str_adt();
-
+impl builtin_adt::BuiltinAdt for BuiltinString {
+  fn encode_terms(&self, book: &mut Book) -> bool {
     let mut found_str = false;
-    for def in self.defs.values_mut() {
+    for def in book.defs.values_mut() {
       for rule in &mut def.rules {
         found_str |= rule.body.encode_str();
       }
     }
-
-    if !found_str {
-      self.ctrs.remove(&Name::new(SNIL));
-      self.ctrs.remove(&Name::new(SCONS));
-      self.adts.remove(&Name::new(STRING));
-    }
-
-    Ok(())
+    found_str
   }
 
-  fn declare_str_adt(&mut self) {
-    self.ctrs.insert(Name::new(SNIL), Name::new(STRING));
-    self.ctrs.insert(Name::new(SCONS), Name::new(STRING));
+  fn constructors(&self) -> IndexMap<Name, Vec<Name>> {
+    IndexMap::from([(Name::new(SCONS), vec![Name::new(HEAD), Name::new(TAIL)]), (Name::new(SNIL), vec![])])
+  }
 
-    self.adts.insert(Name::new(STRING), Adt {
-      ctrs: IndexMap::from([
-        (Name::new(SCONS), vec![Name::new(HEAD), Name::new(TAIL)]),
-        (Name::new(SNIL), vec![]),
-      ]),
-    });
+  fn name(&self) -> Name {
+    Name::new(STRING)
   }
 }
 
