@@ -27,7 +27,7 @@ impl Term {
   pub fn linearize_vars(&mut self) {
     let mut var_uses = HashMap::new();
     count_var_uses_in_term(self, &mut var_uses);
-    term_to_affine(self, &mut var_uses, &mut HashMap::new());
+    term_to_affine(self, &mut var_uses, &mut HashMap::new(), &mut HashMap::new());
   }
 
   fn has_unscoped(&self) -> bool {
@@ -116,31 +116,38 @@ fn term_with_bind_to_affine(
   term: &mut Term,
   nam: &mut Option<Name>,
   var_uses: &mut HashMap<Name, Val>,
+  inst_count: &mut HashMap<Name, Val>,
   let_bodies: &mut HashMap<Name, Term>,
 ) {
   if let Some(name) = nam {
     if var_uses.contains_key(name) {
-      term_to_affine(term, var_uses, let_bodies);
-      let uses = *actual_var_use(var_uses, name);
-      duplicate_lam(nam, term, uses);
+      term_to_affine(term, var_uses, inst_count, let_bodies);
+      let instantiated_count = get_var_uses(Some(name), inst_count);
+      duplicate_lam(nam, term, instantiated_count);
       return;
     }
   }
 
-  term_to_affine(term, var_uses, let_bodies);
+  term_to_affine(term, var_uses, inst_count, let_bodies);
 }
 
-fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies: &mut HashMap<Name, Term>) {
+fn term_to_affine(
+  term: &mut Term,
+  var_uses: &mut HashMap<Name, Val>,
+  // Count to number of times a `Term::Var { nam }` has been reached without being linearized out
+  inst_count: &mut HashMap<Name, Val>,
+  let_bodies: &mut HashMap<Name, Term>,
+) {
   match term {
-    Term::Lam { nam, bod, .. } => term_with_bind_to_affine(bod, nam, var_uses, let_bodies),
+    Term::Lam { nam, bod, .. } => term_with_bind_to_affine(bod, nam, var_uses, inst_count, let_bodies),
 
     Term::Let { pat: Pattern::Var(Some(nam)), val, nxt } => {
       let uses = var_uses[nam];
       match uses {
         0 => {
           if val.has_unscoped() {
-            term_to_affine(val, var_uses, let_bodies);
-            term_to_affine(nxt, var_uses, let_bodies);
+            term_to_affine(val, var_uses, inst_count, let_bodies);
+            term_to_affine(nxt, var_uses, inst_count, let_bodies);
 
             let Term::Let { val, nxt, .. } = std::mem::take(term) else { unreachable!() };
             *term = Term::Let { pat: Pattern::Var(None), val, nxt };
@@ -158,28 +165,28 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
                 *entry.get_mut() -= used;
               }
             }
-            term_to_affine(nxt, var_uses, let_bodies);
+            term_to_affine(nxt, var_uses, inst_count, let_bodies);
           }
         }
         1 => {
-          term_to_affine(val, var_uses, let_bodies);
+          term_to_affine(val, var_uses, inst_count, let_bodies);
           let_bodies.insert(nam.clone(), std::mem::take(val.as_mut()));
-          term_to_affine(nxt, var_uses, let_bodies);
+          term_to_affine(nxt, var_uses, inst_count, let_bodies);
         }
         uses => {
-          term_to_affine(val, var_uses, let_bodies);
-          term_to_affine(nxt, var_uses, let_bodies);
+          term_to_affine(val, var_uses, inst_count, let_bodies);
+          term_to_affine(nxt, var_uses, inst_count, let_bodies);
 
-          let mut new_uses = *actual_var_use(var_uses, nam);
+          let mut instantiated_count = get_var_uses(Some(nam), inst_count);
 
-          // If the number of uses changed (because a term was linearized out):
-          //  We could redo the whole pass on the term.
-          //  Or we can just create extra half-erased-dups `let {nam_n *} = nam_m_dup; nxt` to match the correct labels
-          if uses != new_uses {
-            new_uses += 1
+          if uses != instantiated_count {
+            // TODO: This is done because the number of uses changed (because a term was linearized out)
+            // It creates an extra half-erased-dup `let {nam_n *} = nam_m_dup; nxt` to match the correct labels.
+            // Should be refactored.
+            instantiated_count += 1
           };
 
-          duplicate_let(nam, nxt, new_uses, val)
+          duplicate_let(nam, nxt, instantiated_count, val)
         }
       }
       *term = std::mem::take(nxt.as_mut());
@@ -187,8 +194,8 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
 
     Term::Let { pat: Pattern::Var(None), val, nxt } => {
       if val.has_unscoped() {
-        term_to_affine(val, var_uses, let_bodies);
-        term_to_affine(nxt, var_uses, let_bodies);
+        term_to_affine(val, var_uses, inst_count, let_bodies);
+        term_to_affine(nxt, var_uses, inst_count, let_bodies);
       } else {
         let Term::Let { nxt, .. } = std::mem::take(term) else { unreachable!() };
         *term = *nxt;
@@ -199,8 +206,8 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
     | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
       let uses_fst = get_var_uses(fst.as_ref(), var_uses);
       let uses_snd = get_var_uses(snd.as_ref(), var_uses);
-      term_to_affine(val, var_uses, let_bodies);
-      term_to_affine(nxt, var_uses, let_bodies);
+      term_to_affine(val, var_uses, inst_count, let_bodies);
+      term_to_affine(nxt, var_uses, inst_count, let_bodies);
       duplicate_lam(fst, nxt, uses_fst);
       duplicate_lam(snd, nxt, uses_snd);
     }
@@ -213,30 +220,30 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
       if let Some(subst) = let_bodies.remove(nam) {
         *term = subst.clone();
       } else {
-        let actual_uses = actual_var_use(var_uses, nam);
-        *actual_uses += 1;
+        let instantiated_count = inst_count.entry(nam.to_owned()).or_default();
+        *instantiated_count += 1;
 
-        *nam = dup_name(nam, *actual_uses);
+        *nam = dup_name(nam, *instantiated_count);
       }
     }
 
     // Others
-    Term::Chn { bod, .. } => term_to_affine(bod, var_uses, let_bodies),
+    Term::Chn { bod, .. } => term_to_affine(bod, var_uses, inst_count, let_bodies),
     Term::App { fun: fst, arg: snd, .. }
     | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {
-      term_to_affine(fst, var_uses, let_bodies);
-      term_to_affine(snd, var_uses, let_bodies);
+      term_to_affine(fst, var_uses, inst_count, let_bodies);
+      term_to_affine(snd, var_uses, inst_count, let_bodies);
     }
     Term::Match { scrutinee, arms } => {
-      term_to_affine(scrutinee, var_uses, let_bodies);
+      term_to_affine(scrutinee, var_uses, inst_count, let_bodies);
       for (rule, term) in arms {
         match rule {
           Pattern::Num(MatchNum::Succ(Some(nam))) => {
-            term_with_bind_to_affine(term, nam, var_uses, let_bodies)
+            term_with_bind_to_affine(term, nam, var_uses, inst_count, let_bodies)
           }
-          Pattern::Num(_) => term_to_affine(term, var_uses, let_bodies),
+          Pattern::Num(_) => term_to_affine(term, var_uses, inst_count, let_bodies),
           _ => unreachable!(),
         }
       }
@@ -247,21 +254,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, Val>, let_bodies
 }
 
 fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, Val>) -> Val {
-  if let Some(nam) = nam { *var_uses.get(nam).unwrap() } else { 0 }
-}
-
-// TODO: Is it really necessary to `count_var_uses_in_term` before `term_to_affine`?
-// Can't it be unified in the same function? (given that the actual var uses in a term is already dynamic)
-//
-/// When a term is removed, the number of uses of a variable can change inside the term_to_affine call.
-/// This returns the updated count instead of using the one we calculated initially
-fn actual_var_use<'a>(var_uses: &'a mut HashMap<Name, Val>, name: &Name) -> &'a mut u64 {
-  var_uses.entry(actual_var_use_counter(name)).or_default()
-}
-
-/// We use a special named variable to only count the number of actual var uses on the resulting term
-fn actual_var_use_counter(var_name: &Name) -> Name {
-  Name(format!("${var_name}$used"))
+  nam.and_then(|nam| var_uses.get(nam).copied()).unwrap_or_default()
 }
 
 // TODO: Is there a difference between a list of dups and a complete binary tree of dups?
