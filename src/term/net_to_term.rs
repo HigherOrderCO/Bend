@@ -275,52 +275,31 @@ impl<'a> Reader<'a> {
   fn resugar_string(&mut self, term: &mut Term) -> Term {
     fn go(term: &mut Term, str_term: &mut Term, rd: &mut Reader<'_>) {
       match term {
-        Term::Lam { bod, .. } => go(bod, str_term, rd),
-        Term::App { tag, arg, .. } if *tag == Tag::string_scons_head() => {
-          match arg.as_mut() {
-            Term::Num { val } => {
-              let num = *val;
-              match str_term {
-                Term::Str { ref mut val } => {
-                  val.push(unsafe { char::from_u32_unchecked(num as u32) });
-                },
-                app @ Term::App { .. } => {
-                  insert_string_cons(app, Term::Num { val: num });
-                },
-                _ => unreachable!(),
-              };
-            }
-            Term::Var { nam } => recover_string_cons(str_term, Term::Var { nam: nam.clone() }),
-            Term::Lam { tag, bod, .. } if *tag == Tag::string() => {
-              let string = rd.resugar_string(bod);
-              recover_string_cons(str_term, string.clone());
-              rd.error(ReadbackError::InvalidStrTerm(string))
-            },
-            _ => {
-              let arg = std::mem::take(arg.as_mut());
-              recover_string_cons(str_term, arg.clone());
-              rd.error(ReadbackError::InvalidStrTerm(arg))
-            }
+        Term::Lam { tag, bod, .. } if *tag == Tag::string() => go(bod, str_term, rd),
+        Term::App { tag, arg, .. } if *tag == Tag::string_scons_head() => match arg.as_mut() {
+          Term::Num { val: num } => {
+            match str_term {
+              Term::Str { ref mut val } => {
+                let char: String = unsafe { char::from_u32_unchecked(*num as u32) }.into();
+                *val = char + &val;
+              }
+              term => make_string_cons(term, Term::Num { val: *num }),
+            };
           }
-        }
+          Term::Var { nam } => recover_string_cons(str_term, Term::Var { nam: nam.clone() }),
+          arg => {
+            rd.resugar_adts(arg);
+            let arg = std::mem::take(arg);
+            recover_string_cons(str_term, arg.clone());
+            rd.error(ReadbackError::InvalidStrTerm(arg))
+          }
+        },
         Term::App { fun, arg, .. } => {
-          go(fun, str_term, rd);
           go(arg, str_term, rd);
+          go(fun, str_term, rd);
         }
         Term::Var { .. } => {}
-        Term::Chn { .. }
-        | Term::Num { .. } // expected to appear only inside SCons.head
-        | Term::Lnk { .. }
-        | Term::Let { .. }
-        | Term::Tup { .. }
-        | Term::Dup { .. }
-        | Term::Sup { .. }
-        | Term::Str { .. }
-        | Term::List { .. }
-        | Term::Opx { .. }
-        | Term::Match { .. }
-        | Term::Ref { .. }
-        | Term::Era => rd.error(ReadbackError::InvalidStrTerm(term.clone())),
+        other => rd.error(ReadbackError::InvalidStrTerm(std::mem::take(other))),
       }
     }
     let mut str = Term::Str { val: String::new() };
@@ -329,80 +308,49 @@ impl<'a> Reader<'a> {
   }
 
   fn resugar_list(&mut self, term: &mut Term) -> Term {
-    let mut els = Vec::new();
-    fn go(t: &mut Term, els: &mut Vec<Term>, rd: &mut Reader<'_>) {
-      match t {
-        Term::Lam { tag, bod, .. } if *tag == Tag::list() => go(bod, els, rd),
-        Term::App { tag, arg, .. } if *tag == Tag::list_lcons_head() => {
-          if let Term::Lam { tag, bod, .. } = &mut **arg {
-            if *tag == Tag::list() {
-              els.push(rd.resugar_list(bod));
-            } else {
-              els.push(*arg.clone());
-            }
-          } else {
-            go(arg, els, rd)
+    fn go(term: &mut Term, list: &mut Vec<Term>, rd: &mut Reader<'_>) {
+      match term {
+        Term::Lam { tag, bod, .. } if *tag == Tag::list() => go(bod, list, rd),
+        Term::App { tag, arg, .. } if *tag == Tag::list_lcons_head() => match arg.as_mut() {
+          Term::Lam { .. } => {
+            rd.resugar_adts(arg);
+            list.push(std::mem::take(arg));
           }
-        }
+          Term::Var { .. } => list.push(std::mem::take(arg)),
+          arg => go(arg, list, rd),
+        },
         Term::App { fun, arg, .. } => {
-          go(fun, els, rd);
-          go(arg, els, rd);
+          go(fun, list, rd);
+          go(arg, list, rd);
         }
         Term::Var { .. } => {}
-        other => els.push(other.clone()),
+        other => list.push(std::mem::take(other)),
       }
     }
+    let mut els = Vec::new();
     go(term, &mut els, self);
     Term::List { els }
   }
 }
 
 /// Recover string constructors when it is not possible to correctly readback a string
-fn recover_string_cons(term: &mut Term, cons_term: Term) {
+fn recover_string_cons(term: &mut Term, cons: Term) {
   match term {
-    Term::Str { val } => {
-      let snil = Term::Var { nam: Name::new(SNIL) };
-      let last_term = string_cons(cons_term, snil);
-      *term = string_app(val, last_term)
-    }
-    app @ Term::App { .. } => insert_string_cons(app, cons_term),
-    _ => unreachable!(),
+    Term::Str { val } if val.is_empty() => *term = Term::Var { nam: Name::new(SNIL) },
+    Term::Str { val } => *term = Term::Str { val: val.to_owned() },
+    Term::App { .. } => {},
+    _ => unreachable!()
   }
+
+  make_string_cons(term, cons)
 }
 
-/// Inserts a term as an `(SCons term)` application with the last argument of an app chain
-///
-/// # Example
-///
-/// ```text
-/// // app
-/// (SCons a (SCons b SNil))
-/// // inserting the term `c`
-/// (SCons a (SCons b (SCons c SNil)))
-/// ```
-fn insert_string_cons(app: &mut Term, term: Term) {
-  match app {
-    Term::App { arg, .. } => insert_string_cons(arg, term),
-    app => *app = string_cons(term, std::mem::take(app)),
-  }
-}
 
-/// If the string is empty, returns the arg
-/// Otherwise, converts to a `(SCons str_term arg)` application
-fn string_app(val: &str, arg: Term) -> Term {
-  let str_term = match val.len() {
-    0 => return arg,
-    1 => Term::Num { val: val.chars().next().unwrap().try_into().unwrap() },
-    _ => Term::Str { val: val.to_owned() },
-  };
-
-  string_cons(str_term, arg)
-}
-
-fn string_cons(term: Term, arg: Term) -> Term {
+/// Makes a String Cons application with the given term `(SCons cons term)`
+fn make_string_cons(term: &mut Term, cons: Term) {
   let svar = Term::Var { nam: Name::new(SCONS) };
-  let cons = Term::App { tag: Tag::Auto, fun: Box::new(svar), arg: Box::new(term) };
-  Term::App { tag: Tag::Auto, fun: Box::new(cons), arg: Box::new(arg) }
+  let cons = Term::App { tag: Tag::Auto, fun: Box::new(svar), arg: Box::new(cons) };
+  *term = Term::App { tag: Tag::Auto, fun: Box::new(cons), arg: Box::new(std::mem::take(term)) };
 }
 
 /// Represents `let (fst, snd) = val` if `tag` is `None`, and `dup#tag fst snd = val` otherwise.

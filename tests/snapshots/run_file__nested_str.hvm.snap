@@ -6,7 +6,7 @@ Invalid readback:
 Invalid String Character value '"a"'
 Invalid String Character value '"bc"'
 Invalid String Character value '"ab"'
-Invalid String Character value '"ab"'
 Invalid String Character value '"cd"'
+Invalid String Character value '"ab"'
 
-(((SCons "a" SNil), (SCons 97 (SCons "bc" SNil))), ((SCons "ab" (SCons 99 SNil)), (SCons "ab" (SCons "cd" SNil))))
+(((SCons "a" SNil), (SCons 97 (SCons "bc" SNil))), ((SCons "ab" "c"), (SCons "ab" (SCons "cd" SNil))))
