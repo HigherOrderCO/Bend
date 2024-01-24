@@ -1,0 +1,19 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_in_arm.hvm
+---
+(main) = λx (main$match$1 x)
+
+(T) = #bool λT #bool λF T
+
+(F) = #bool λT #bool λF F
+
+(main$match$1) = λx #bool (x main$match$1$PT main$match$1$PF)
+
+(main$match$1$R0) = λ$x $x
+
+(main$match$1$R1) = λx x
+
+(main$match$1$PT) = main$match$1$R0
+
+(main$match$1$PF) = main$match$1$R1

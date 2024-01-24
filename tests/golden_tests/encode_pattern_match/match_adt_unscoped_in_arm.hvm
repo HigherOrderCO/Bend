@@ -1,0 +1,7 @@
+// Test that we don't mess up with that unscoped lambda/var
+data bool = T | F
+
+main = @x match x {
+  T: @$x $x
+  F: @x x
+}

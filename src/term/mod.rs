@@ -503,7 +503,7 @@ impl Term {
         | Term::Sup { fst, snd, .. }
         | Term::Opx { fst, snd, .. } => {
           go(fst, decls, uses);
-          go(snd, uses, decls);
+          go(snd, decls, uses);
         }
         Term::Lam { bod, .. } => {
           go(bod, decls, uses);
