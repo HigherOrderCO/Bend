@@ -27,10 +27,21 @@ impl Term {
           {
             *self = std::mem::take(fun.as_mut());
           }
-          _ => (),
+          _ => {}
         }
       }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.eta_reduction(),
+      Term::Chn { tag: chn_tag, nam: chn_var, bod } => {
+        bod.eta_reduction();
+        match bod.as_mut() {
+          Term::App { tag: arg_tag, fun, arg: box Term::Lnk { nam: var_nam } }
+            if chn_var == var_nam && chn_tag == arg_tag =>
+          {
+            *self = std::mem::take(fun.as_mut());
+          }
+          _ => {}
+        }
+      }
+      Term::Lam { bod, .. } => bod.eta_reduction(),
       Term::Let { pat: _, val, nxt } | Term::Dup { tag: _, fst: _, snd: _, val, nxt } => {
         val.eta_reduction();
         nxt.eta_reduction();
