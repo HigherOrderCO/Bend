@@ -6,4 +6,4 @@ Invalid readback:
 Invalid String Character value '(*, 4)'
 Invalid String Character value '*'
 
-""
+(SCons (*, 4) (SCons * SNil))

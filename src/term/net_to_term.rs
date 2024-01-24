@@ -296,7 +296,11 @@ impl<'a> Reader<'a> {
               recover_string_cons(str_term, string.clone());
               rd.error(ReadbackError::InvalidStrTerm(string))
             },
-            _ => rd.error(ReadbackError::InvalidStrTerm(*arg.clone())),
+            _ => {
+              let arg = std::mem::take(arg.as_mut());
+              recover_string_cons(str_term, arg.clone());
+              rd.error(ReadbackError::InvalidStrTerm(arg))
+            }
           }
         }
         Term::App { fun, arg, .. } => {
