@@ -109,7 +109,7 @@ pub fn run_book(
     let (res_term, errors) = net_to_term(&net, book, labels, linear);
     println!(
       "{}{}\n---------------------------------------",
-      if errors.is_empty() { "".to_string() } else { format!("Invalid readback:\n{}\n", errors) },
+      if errors.is_empty() { "".to_string() } else { format!("Invalid readback:\n{}\n", errors.display(&book.def_names)) },
       res_term.display(&book.def_names)
     );
   }

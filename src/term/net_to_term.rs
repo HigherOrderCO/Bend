@@ -1,13 +1,12 @@
 use super::{
   term_to_net::Labels,
   transform::encode_strs::{SCONS, SNIL},
-  var_id_to_name, Book, DefId, DefNames, MatchNum, Name, Op, Tag, Term, Val,
+  var_id_to_name, Book, DefId, MatchNum, Name, Op, Tag, Term, Val,
 };
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
   term::Pattern,
 };
-use core::fmt;
 use hvmc::run::Loc;
 use indexmap::IndexSet;
 use std::collections::{HashMap, HashSet};
@@ -48,7 +47,7 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
 
   reader.resugar_adts(&mut term);
 
-  (term, ReadbackErrors::new(reader.errors, book.def_names.clone()))
+  (term, ReadbackErrors::new(reader.errors))
 }
 
 #[derive(Debug)]
@@ -726,11 +725,11 @@ impl<'a> Reader<'a> {
 }
 
 /// A structure that implements display logic for Readback Errors.
-pub struct ReadbackErrors(Vec<ReadbackError>, DefNames);
+pub struct ReadbackErrors(pub Vec<ReadbackError>);
 
 impl ReadbackErrors {
-  pub fn new(errs: Vec<ReadbackError>, def_names: DefNames) -> Self {
-    Self(errs, def_names)
+  pub fn new(errs: Vec<ReadbackError>) -> Self {
+    Self(errs)
   }
 
   pub fn is_empty(&self) -> bool {
@@ -738,45 +737,8 @@ impl ReadbackErrors {
   }
 }
 
-impl fmt::Display for ReadbackErrors {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    let mut err_counts = HashMap::new();
-    for err in &self.0 {
-      if err.can_count() {
-        *err_counts.entry(err).or_insert(0) += 1;
-      } else {
-        err.pretty(f, &self.1)?;
-        writeln!(f)?;
-      }
-    }
-
-    for (err, count) in err_counts {
-      err.pretty(f, &self.1)?;
-      if count > 1 {
-        write!(f, " with {} occurrences", count)?;
-      }
-    }
-
-    Ok(())
-  }
-}
-
 impl ReadbackError {
-  fn pretty(&self, f: &mut fmt::Formatter<'_>, def_names: &DefNames) -> fmt::Result {
-    match self {
-      ReadbackError::InvalidNumericMatch => write!(f, "Invalid Numeric Match"),
-      ReadbackError::ReachedRoot => write!(f, "Reached Root"),
-      ReadbackError::Cyclic => write!(f, "Cyclic Term"),
-      ReadbackError::InvalidBind => write!(f, "Invalid Bind"),
-      ReadbackError::InvalidAdt => write!(f, "Invalid Adt"),
-      ReadbackError::InvalidAdtMatch => write!(f, "Invalid Adt Match"),
-      ReadbackError::InvalidStrTerm(term) => {
-        write!(f, "Invalid String Character value '{}'", term.display(def_names))
-      }
-    }
-  }
-
-  fn can_count(&self) -> bool {
+  pub fn can_count(&self) -> bool {
     match self {
       ReadbackError::InvalidNumericMatch => true,
       ReadbackError::ReachedRoot => true,

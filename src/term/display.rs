@@ -2,7 +2,10 @@ use std::fmt::{self, Display};
 
 use crate::term::Name;
 
-use super::{Book, DefId, DefNames, Definition, MatchNum, Op, Pattern, Rule, Tag, Term, Type};
+use super::{
+  net_to_term::{ReadbackError, ReadbackErrors},
+  Book, DefId, DefNames, Definition, MatchNum, Op, Pattern, Rule, Tag, Term, Type,
+};
 
 macro_rules! display {
   ($($x:tt)*) => {
@@ -213,5 +216,47 @@ where
       x.fmt(f)?;
     }
     Ok(())
+  }
+}
+
+impl ReadbackErrors {
+  pub fn display<'a>(&'a self, def_names: &'a DefNames) -> impl fmt::Display + '_ {
+    use std::collections::HashMap;
+
+    DisplayFn(move |f| {
+      let mut err_counts = HashMap::new();
+      for err in &self.0 {
+        if err.can_count() {
+          *err_counts.entry(err).or_insert(0) += 1;
+        } else {
+          writeln!(f, "{}", err.display(def_names))?;
+        }
+      }
+
+      for (err, count) in err_counts {
+        write!(f, "{}", err.display(def_names))?;
+        if count > 1 {
+          writeln!(f, " with {} occurrences", count)?;
+        }
+      }
+
+      Ok(())
+    })
+  }
+}
+
+impl ReadbackError {
+  pub fn display<'a>(&'a self, def_names: &'a DefNames) -> impl Display + '_ {
+    DisplayFn(move |f| match self {
+      ReadbackError::InvalidNumericMatch => write!(f, "Invalid Numeric Match"),
+      ReadbackError::ReachedRoot => write!(f, "Reached Root"),
+      ReadbackError::Cyclic => write!(f, "Cyclic Term"),
+      ReadbackError::InvalidBind => write!(f, "Invalid Bind"),
+      ReadbackError::InvalidAdt => write!(f, "Invalid Adt"),
+      ReadbackError::InvalidAdtMatch => write!(f, "Invalid Adt Match"),
+      ReadbackError::InvalidStrTerm(term) => {
+        write!(f, "Invalid String Character value '{}'", term.display(def_names))
+      }
+    })
   }
 }
