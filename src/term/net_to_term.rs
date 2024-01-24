@@ -290,11 +290,11 @@ impl<'a> Reader<'a> {
                 _ => unreachable!(),
               };
             }
+            Term::Var { nam } => recover_string_cons(str_term, Term::Var { nam: nam.clone() }),
             Term::Lam { tag, bod, .. } if *tag == Tag::string() => {
-              recover_constructors(str_term, rd.resugar_string(bod));
+              recover_string_cons(str_term, rd.resugar_string(bod));
               rd.error(ReadbackError::InvalidStrTerm)
             },
-            Term::Var { nam } => recover_constructors(str_term, Term::Var { nam: nam.clone() }),
             _ => rd.error(ReadbackError::InvalidStrTerm),
           }
         }
@@ -353,7 +353,7 @@ impl<'a> Reader<'a> {
 }
 
 /// Recover string constructors when it is not possible to correctly readback a string
-fn recover_constructors(term: &mut Term, cons_term: Term) {
+fn recover_string_cons(term: &mut Term, cons_term: Term) {
   match term {
     Term::Str { val } => {
       let snil = Term::Var { nam: Name::new(SNIL) };
@@ -365,13 +365,16 @@ fn recover_constructors(term: &mut Term, cons_term: Term) {
   }
 }
 
-// TODO: `λa (SCons a (SCons 'b' (SCons 'c' SNil)))` could be read back as `λa (SCons a "bc")`
-// but the order in witch decode_str is run complicates this as the `SNil` could be another variable.
-// If decode_str is changed to the reverse order,
-// the hability to just push new chars to the string would be lost,
-// but the readback could be improved.
-//
-/// Inserts a term as an application with the last argument of an app chain
+/// Inserts a term as an `(SCons term)` application with the last argument of an app chain
+///
+/// # Example
+///
+/// ```text
+/// // app
+/// (SCons a (SCons b SNil))
+/// // inserting the term `c`
+/// (SCons a (SCons b (SCons c SNil)))
+/// ```
 fn insert_string_cons(app: &mut Term, term: Term) {
   match app {
     Term::App { arg, .. } => insert_string_cons(arg, term),
@@ -380,7 +383,7 @@ fn insert_string_cons(app: &mut Term, term: Term) {
 }
 
 /// If the string is empty, returns the arg
-/// Otherwise, converts to a `(SCONS str_term arg)` application
+/// Otherwise, converts to a `(SCons str_term arg)` application
 fn string_app(val: &str, arg: Term) -> Term {
   let str_term = match val.len() {
     0 => return arg,
