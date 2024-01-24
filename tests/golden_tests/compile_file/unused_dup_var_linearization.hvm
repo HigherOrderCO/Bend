@@ -1,0 +1,10 @@
+Main =
+  let var = @x x
+  let copy = var
+  let copy2 = var
+  let copy3 = var
+  let copy_copy = copy
+  let copy_copy2 = copy
+  let copy_copy3 = copy2
+  let copy_copy4 = copy2
+  (var copy_copy3)

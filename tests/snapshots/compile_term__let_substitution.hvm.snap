@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/let_substitution.hvm
 ---
-({3 a (a b)} b)
+({3 (a b) a} b)
