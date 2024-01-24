@@ -30,36 +30,11 @@ impl Term {
     term_to_affine(self, &mut var_uses, &mut HashMap::new(), &mut HashMap::new());
   }
 
+  /// Returns false wether the term has no unscoped terms, 
+  /// or all its unscoped binds and usage pairs are within the term.
   fn has_unscoped(&self) -> bool {
-    match self {
-      Term::Lnk { .. } | Term::Chn { .. } => true,
-      Term::Lam { bod, .. } => bod.has_unscoped(),
-      Term::Let { val: fst, nxt: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { fst, snd, .. } => fst.has_unscoped() || snd.has_unscoped(),
-      Term::Match { scrutinee, arms } => {
-        if scrutinee.has_unscoped() {
-          return true;
-        }
-
-        for (_, arm) in arms {
-          if arm.has_unscoped() {
-            return true;
-          }
-        }
-
-        false
-      }
-      Term::Num { .. }
-      | Term::Str { .. }
-      | Term::List { .. }
-      | Term::Ref { .. }
-      | Term::Var { .. }
-      | Term::Era => false,
-    }
+    let (decl, uses) = self.unscoped_vars();
+    decl.symmetric_difference(&uses).count() > 0
   }
 }
 
