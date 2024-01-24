@@ -1,0 +1,1 @@
+Main = (SCons (*, 4) (SCons * SNil))

@@ -119,7 +119,7 @@ fn main() {
           if readback_errors.is_empty() {
             "".to_string()
           } else {
-            format!("Invalid readback: {:?}\n", readback_errors)
+            format!("Invalid readback:\n{}\n", readback_errors)
           },
           res_term.display(&def_names)
         );

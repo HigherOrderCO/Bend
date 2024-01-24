@@ -117,7 +117,7 @@ fn run_file() {
     let res = if info.readback_errors.is_empty() {
       res.display(&def_names).to_string()
     } else {
-      format!("Invalid readback: {:?}\n{}", info.readback_errors, res.display(&def_names))
+      format!("Invalid readback:\n{}\n{}", info.readback_errors, res.display(&def_names))
     };
     Ok(res)
   })
@@ -133,7 +133,7 @@ fn readback_lnet() {
     if errors.is_empty() {
       Ok(term.display(&book.def_names).to_string())
     } else {
-      Ok(format!("Invalid readback: {:?}\n{}", errors, term.display(&book.def_names)))
+      Ok(format!("Invalid readback:\n{}\n{}", errors, term.display(&book.def_names)))
     }
   })
 }
