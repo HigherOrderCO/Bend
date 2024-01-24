@@ -25,11 +25,13 @@ impl Term {
 
     // Check global vars
     for (nam, (declared, used)) in globals.into_iter() {
-      match (used, declared) {
+      match (declared, used) {
         (1, 1) => {}
-        (0, _) => return Err(format!("Missing unscoped variable use for 'λ${nam}'")),
-        (_, 0) => return Err(format!("Unbound unscoped variable '${nam}'")),
-        (_, _) => return Err(format!("Unscoped variable '${nam}' used more than once")),
+        (0, _) => return Err(format!("Unbound unscoped variable '${nam}'")),
+        (_, 0) => return Err(format!("Unscoped variable from lambda 'λ${nam}' is never used")),
+        (1, _) => return Err(format!("Unscoped variable '${nam}' used more than once")),
+        (_, 1) => return Err(format!("Unscoped lambda 'λ${nam}' declared more than once")),
+        (_, _) => return Err(format!("Unscoped lambda 'λ${nam}' and unscoped variable '${nam}' used more than once")),
       }
     }
     Ok(())
