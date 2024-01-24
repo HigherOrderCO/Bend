@@ -251,7 +251,7 @@ fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, mut dup_body: Option<&mu
 
   let make_name = |uses| {
     let dup_name = dup_name(nam, uses);
-    free_vars.contains_key(&dup_name).then(|| dup_name)
+    free_vars.contains_key(&dup_name).then_some(dup_name)
   };
 
   for i in (1 .. uses).rev() {

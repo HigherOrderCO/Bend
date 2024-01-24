@@ -392,7 +392,7 @@ fn insert_string_cons(app: &mut Term, term: Term) {
 fn string_app(val: &str, arg: Term) -> Term {
   let str_term = match val.len() {
     0 => return arg,
-    1 => Term::Num { val: val.chars().nth(0).unwrap().try_into().unwrap() },
+    1 => Term::Num { val: val.chars().next().unwrap().try_into().unwrap() },
     _ => Term::Str { val: val.to_owned() },
   };
 

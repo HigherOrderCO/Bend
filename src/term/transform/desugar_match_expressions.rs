@@ -414,10 +414,11 @@ fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, Mat
       return Err(MatchError::Linearize(Name(format!("λ${var}"))));
     }
     // Change unscoped var to normal scoped var if it references something outside this match arm.
-    for var in uses.difference(&decls) {
+    let arm_free_vars = uses.difference(&decls);
+    for var in arm_free_vars.clone() {
       arm.subst_unscoped(var, &Term::Var { nam: Name(format!("%match%unscoped%{var}")) });
     }
-    free_vars.extend(uses);
+    free_vars.extend(arm_free_vars.cloned());
   }
 
   // Add lambdas to the arms
