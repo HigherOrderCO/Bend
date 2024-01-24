@@ -1,4 +1,8 @@
-use super::{term_to_net::Labels, var_id_to_name, Book, DefId, MatchNum, Name, Op, Tag, Term, Val};
+use super::{
+  term_to_net::Labels,
+  transform::encode_strs::{SCONS, SNIL},
+  var_id_to_name, Book, DefId, MatchNum, Name, Op, Tag, Term, Val,
+};
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
   term::Pattern,
@@ -269,18 +273,38 @@ impl<'a> Reader<'a> {
 
 impl<'a> Reader<'a> {
   fn resugar_string(&mut self, term: &mut Term) -> Term {
-    let mut s = String::new();
-    fn go(t: &mut Term, s: &mut String, rd: &mut Reader<'_>) {
-      match t {
-        Term::Num { val } => s.push(unsafe { char::from_u32_unchecked(*val as u32) }),
-        Term::Lam { bod, .. } => go(bod, s, rd),
-        Term::App { tag, arg, .. } if *tag == Tag::string_scons_head() => go(arg, s, rd),
+    fn go(term: &mut Term, str_term: &mut Term, rd: &mut Reader<'_>) {
+      match term {
+        Term::Lam { bod, .. } => go(bod, str_term, rd),
+        Term::App { tag, arg, .. } if *tag == Tag::string_scons_head() => {
+          match arg.as_mut() {
+            Term::Num { val } => {
+              let num = *val;
+              match str_term {
+                Term::Str { ref mut val } => {
+                  val.push(unsafe { char::from_u32_unchecked(num as u32) });
+                },
+                app @ Term::App { .. } => {
+                  insert_string_cons(app, Term::Num { val: num });
+                },
+                _ => unreachable!(),
+              };
+            }
+            Term::Var { nam } => recover_string_cons(str_term, Term::Var { nam: nam.clone() }),
+            Term::Lam { tag, bod, .. } if *tag == Tag::string() => {
+              recover_string_cons(str_term, rd.resugar_string(bod));
+              rd.error(ReadbackError::InvalidStrTerm)
+            },
+            _ => rd.error(ReadbackError::InvalidStrTerm),
+          }
+        }
         Term::App { fun, arg, .. } => {
-          go(fun, s, rd);
-          go(arg, s, rd);
+          go(fun, str_term, rd);
+          go(arg, str_term, rd);
         }
         Term::Var { .. } => {}
         Term::Chn { .. }
+        | Term::Num { .. } // expected to appear only inside SCons.head
         | Term::Lnk { .. }
         | Term::Let { .. }
         | Term::Tup { .. }
@@ -294,8 +318,9 @@ impl<'a> Reader<'a> {
         | Term::Era => rd.error(ReadbackError::InvalidStrTerm),
       }
     }
-    go(term, &mut s, self);
-    Term::Str { val: s }
+    let mut str = Term::Str { val: String::new() };
+    go(term, &mut str, self);
+    str
   }
 
   fn resugar_list(&mut self, term: &mut Term) -> Term {
@@ -325,6 +350,54 @@ impl<'a> Reader<'a> {
     go(term, &mut els, self);
     Term::List { els }
   }
+}
+
+/// Recover string constructors when it is not possible to correctly readback a string
+fn recover_string_cons(term: &mut Term, cons_term: Term) {
+  match term {
+    Term::Str { val } => {
+      let snil = Term::Var { nam: Name::new(SNIL) };
+      let last_term = string_cons(cons_term, snil);
+      *term = string_app(val, last_term)
+    }
+    app @ Term::App { .. } => insert_string_cons(app, cons_term),
+    _ => unreachable!(),
+  }
+}
+
+/// Inserts a term as an `(SCons term)` application with the last argument of an app chain
+///
+/// # Example
+///
+/// ```text
+/// // app
+/// (SCons a (SCons b SNil))
+/// // inserting the term `c`
+/// (SCons a (SCons b (SCons c SNil)))
+/// ```
+fn insert_string_cons(app: &mut Term, term: Term) {
+  match app {
+    Term::App { arg, .. } => insert_string_cons(arg, term),
+    app => *app = string_cons(term, std::mem::take(app)),
+  }
+}
+
+/// If the string is empty, returns the arg
+/// Otherwise, converts to a `(SCons str_term arg)` application
+fn string_app(val: &str, arg: Term) -> Term {
+  let str_term = match val.len() {
+    0 => return arg,
+    1 => Term::Num { val: val.chars().nth(0).unwrap().try_into().unwrap() },
+    _ => Term::Str { val: val.to_owned() },
+  };
+
+  string_cons(str_term, arg)
+}
+
+fn string_cons(term: Term, arg: Term) -> Term {
+  let svar = Term::Var { nam: Name::new(SCONS) };
+  let cons = Term::App { tag: Tag::Auto, fun: Box::new(svar), arg: Box::new(term) };
+  Term::App { tag: Tag::Auto, fun: Box::new(cons), arg: Box::new(arg) }
 }
 
 /// Represents `let (fst, snd) = val` if `tag` is `None`, and `dup#tag fst snd = val` otherwise.
