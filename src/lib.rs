@@ -11,7 +11,7 @@ use std::time::Instant;
 use term::{
   book_to_nets, net_to_term,
   term_to_net::{HvmcNames, Labels},
-  Book, DefId, DefNames, Name, ReadbackError, Term,
+  Book, DefId, DefNames, Name, Term,
 };
 
 pub mod hvmc_net;
@@ -19,6 +19,8 @@ pub mod net;
 pub mod term;
 
 pub use term::load_book::load_file_to_book;
+
+use crate::term::net_to_term::ReadbackErrors;
 
 pub fn check_book(mut book: Book) -> Result<(), String> {
   // TODO: Do the checks without having to do full compilation
@@ -107,7 +109,7 @@ pub fn run_book(
     let (res_term, errors) = net_to_term(&net, book, labels, linear);
     println!(
       "{}{}\n---------------------------------------",
-      if errors.is_empty() { "".to_string() } else { format!("Invalid readback: {:?}\n", errors) },
+      if errors.is_empty() { "".to_string() } else { format!("Invalid readback:\n{}\n", errors.display(&book.def_names)) },
       res_term.display(&book.def_names)
     );
   }
@@ -256,7 +258,7 @@ impl std::fmt::Display for Warning {
 
 pub struct RunInfo {
   pub stats: RunStats,
-  pub readback_errors: Vec<ReadbackError>,
+  pub readback_errors: ReadbackErrors,
   pub net: Net,
 }
 

@@ -13,7 +13,7 @@ use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
 /// Converts an Interaction-INet to a Lambda Calculus term
-pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (Term, Vec<ReadbackError>) {
+pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (Term, ReadbackErrors) {
   let mut reader = Reader {
     net,
     labels,
@@ -47,7 +47,7 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
 
   reader.resugar_adts(&mut term);
 
-  (term, reader.errors)
+  (term, ReadbackErrors::new(reader.errors))
 }
 
 #[derive(Debug)]
@@ -58,7 +58,7 @@ pub enum ReadbackError {
   InvalidBind,
   InvalidAdt,
   InvalidAdtMatch,
-  InvalidStrTerm,
+  InvalidStrTerm(Term),
 }
 
 struct Reader<'a> {
@@ -292,10 +292,15 @@ impl<'a> Reader<'a> {
             }
             Term::Var { nam } => recover_string_cons(str_term, Term::Var { nam: nam.clone() }),
             Term::Lam { tag, bod, .. } if *tag == Tag::string() => {
-              recover_string_cons(str_term, rd.resugar_string(bod));
-              rd.error(ReadbackError::InvalidStrTerm)
+              let string = rd.resugar_string(bod);
+              recover_string_cons(str_term, string.clone());
+              rd.error(ReadbackError::InvalidStrTerm(string))
             },
-            _ => rd.error(ReadbackError::InvalidStrTerm),
+            _ => {
+              let arg = std::mem::take(arg.as_mut());
+              recover_string_cons(str_term, arg.clone());
+              rd.error(ReadbackError::InvalidStrTerm(arg))
+            }
           }
         }
         Term::App { fun, arg, .. } => {
@@ -315,7 +320,7 @@ impl<'a> Reader<'a> {
         | Term::Opx { .. }
         | Term::Match { .. }
         | Term::Ref { .. }
-        | Term::Era => rd.error(ReadbackError::InvalidStrTerm),
+        | Term::Era => rd.error(ReadbackError::InvalidStrTerm(term.clone())),
       }
     }
     let mut str = Term::Str { val: String::new() };
@@ -720,5 +725,46 @@ impl<'a> Reader<'a> {
   fn error<T: Default>(&mut self, error: ReadbackError) -> T {
     self.errors.push(error);
     T::default()
+  }
+}
+
+/// A structure that implements display logic for Readback Errors.
+pub struct ReadbackErrors(pub Vec<ReadbackError>);
+
+impl ReadbackErrors {
+  pub fn new(errs: Vec<ReadbackError>) -> Self {
+    Self(errs)
+  }
+
+  pub fn is_empty(&self) -> bool {
+    self.0.is_empty()
+  }
+}
+
+impl ReadbackError {
+  pub fn can_count(&self) -> bool {
+    match self {
+      ReadbackError::InvalidNumericMatch => true,
+      ReadbackError::ReachedRoot => true,
+      ReadbackError::Cyclic => true,
+      ReadbackError::InvalidBind => true,
+      ReadbackError::InvalidAdt => true,
+      ReadbackError::InvalidAdtMatch => true,
+      ReadbackError::InvalidStrTerm(..) => false,
+    }
+  }
+}
+
+impl PartialEq for ReadbackError {
+  fn eq(&self, other: &Self) -> bool {
+    core::mem::discriminant(self) == core::mem::discriminant(other)
+  }
+}
+
+impl Eq for ReadbackError {}
+
+impl std::hash::Hash for ReadbackError {
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    core::mem::discriminant(self).hash(state);
   }
 }
