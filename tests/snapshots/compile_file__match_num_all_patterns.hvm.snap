@@ -2,6 +2,20 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/match_num_all_patterns.hvm
 ---
+// WARNING: Unused definition 'zero_succ'.
+// WARNING: Unused definition 'succ_zero'.
+// WARNING: Unused definition 'var_zero'.
+// WARNING: Unused definition 'var_succ'.
+// WARNING: Unused definition 'zero_var'.
+// WARNING: Unused definition 'succ_var'.
+// WARNING: Unused definition 'zero_var_succ'.
+// WARNING: Unused definition 'succ_var_zero'.
+// WARNING: Unused definition 'zero_succ_var'.
+// WARNING: Unused definition 'succ_zero_var'.
+// WARNING: Unused definition 'succ_zero_succ'.
+// WARNING: Unused definition 'zero_var$S0'.
+// WARNING: Unused definition 'zero_var_succ$S0'.
+// WARNING: Unused definition 'succ_var_zero$S0'.
 @B = (?<(#0 (a a)) b> b)
 @D = (<+ #1 <- #1 a>> a)
 @E = (<+ #1 <- #1 a>> a)
