@@ -66,12 +66,12 @@ impl Term {
         fst_uses || snd_uses
       }
       Term::Match { scrutinee, arms } => {
-        let mut used = false;
-        let scrutinee_used = scrutinee.encode_lists();
-        for arm in arms {
-          used |= arm.1.encode_lists();
+        let mut used = scrutinee.encode_lists();
+        for (pat, arm) in arms {
+          used |= pat.names().chain(pat.ctrs()).any(|Name(n)| matches!(n.as_str(), LCONS | LNIL));
+          used |= arm.encode_lists();
         }
-        scrutinee_used || used
+        used
       }
       Term::Var { nam: Name(nam) } => nam == LCONS || nam == LNIL,
       Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => false,
