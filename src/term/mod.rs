@@ -8,6 +8,7 @@ pub mod display;
 pub mod load_book;
 pub mod net_to_term;
 pub mod parser;
+pub mod resugar;
 pub mod term_to_net;
 pub mod transform;
 pub mod builtin_adt;
@@ -257,6 +258,10 @@ impl Book {
     let def = self.defs.remove(&def_id);
     let name = self.def_names.remove(def_id);
     name.zip(def)
+  }
+
+  pub fn is_generated_def(&self, def_id: DefId) -> bool {
+    self.def_names.name(&def_id).map_or(false, |Name(name)| name.contains('$'))
   }
 }
 

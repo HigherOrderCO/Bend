@@ -221,10 +221,13 @@ where
 
 impl ReadbackErrors {
   pub fn display<'a>(&'a self, def_names: &'a DefNames) -> impl fmt::Display + '_ {
-    use std::collections::HashMap;
-
     DisplayFn(move |f| {
-      let mut err_counts = HashMap::new();
+      if self.0.is_empty() {
+        return Ok(());
+      }
+
+      writeln!(f, "Invalid readback:")?;
+      let mut err_counts = std::collections::HashMap::new();
       for err in &self.0 {
         if err.can_count() {
           *err_counts.entry(err).or_insert(0) += 1;
@@ -240,7 +243,7 @@ impl ReadbackErrors {
         }
       }
 
-      Ok(())
+      writeln!(f)
     })
   }
 }

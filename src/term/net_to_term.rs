@@ -1,8 +1,4 @@
-use super::{
-  term_to_net::Labels,
-  transform::encode_strs::{SCONS, SNIL},
-  var_id_to_name, Book, DefId, DefNames, MatchNum, Name, Op, Tag, Term, Val,
-};
+use super::{term_to_net::Labels, var_id_to_name, Book, DefNames, MatchNum, Name, Op, Tag, Term, Val};
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
   term::Pattern,
@@ -47,35 +43,24 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
 
   reader.resugar_adts(&mut term);
 
-  (term, ReadbackErrors::new(reader.errors))
+  (term, reader.errors)
 }
 
-#[derive(Debug)]
-pub enum ReadbackError {
-  InvalidNumericMatch,
-  ReachedRoot,
-  Cyclic,
-  InvalidBind,
-  InvalidAdt,
-  InvalidAdtMatch,
-  InvalidStrTerm(Term),
-}
-
-struct Reader<'a> {
+pub struct Reader<'a> {
+  pub book: &'a Book,
+  pub namegen: NameGen,
   net: &'a INet,
   labels: &'a Labels,
-  book: &'a Book,
   dup_paths: Option<HashMap<u32, Vec<SlotId>>>,
   scope: Scope,
-  namegen: NameGen,
   seen: HashSet<Port>,
-  errors: Vec<ReadbackError>,
+  errors: ReadbackErrors,
 }
 
 impl<'a> Reader<'a> {
   fn read_term(&mut self, next: Port) -> Term {
     if self.dup_paths.is_none() && !self.seen.insert(next) {
-      self.errors.push(ReadbackError::Cyclic);
+      self.error(ReadbackError::Cyclic);
       return Term::Var { nam: Name::new("...") };
     }
 
@@ -117,7 +102,7 @@ impl<'a> Reader<'a> {
           let sel_kind = self.net.node(sel_node).kind;
           if sel_kind != (Con { lab: None }) {
             // TODO: Is there any case where we expect a different node type here on readback?
-            self.errors.push(ReadbackError::InvalidNumericMatch);
+            self.error(ReadbackError::InvalidNumericMatch);
             Term::new_native_match(scrutinee, Term::Era, None, Term::Era)
           } else {
             let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
@@ -272,73 +257,18 @@ impl<'a> Reader<'a> {
     let snd = self.read_term(snd_port);
     Err((fst, snd))
   }
-}
 
-impl<'a> Reader<'a> {
-  fn resugar_string(&mut self, term: Term) -> Term {
-    fn go(term: Term, str_term: Term, rd: &mut Reader<'_>) -> Term {
-      match term {
-        Term::Lam { tag, bod, .. } if tag == Tag::string() => go(*bod, str_term, rd),
-        Term::App { tag, arg, .. } if tag == Tag::string_scons_head() => match *arg {
-          Term::Num { val } => match str_term {
-            Term::Str { val: str } => {
-              let char: String = unsafe { char::from_u32_unchecked(val as u32) }.into();
-              Term::Str { val: char + &str }
-            }
-            term => Term::make_cons(Name::new(SCONS), [Term::Num { val }, term], &rd.book.def_names),
-          },
-          Term::Var { nam } => rd.recover_string_cons(str_term, Term::Var { nam }),
-          mut arg => {
-            rd.resugar_adts(&mut arg);
-            rd.error(ReadbackError::InvalidStrTerm(arg.clone()));
-            rd.recover_string_cons(str_term, arg)
-          }
-        },
-        Term::App { fun, arg, .. } => go(*fun, go(*arg, str_term, rd), rd),
-        Term::Var { .. } => str_term,
-        other => {
-          rd.error(ReadbackError::InvalidStrTerm(other));
-          str_term
-        }
-      }
+  pub fn deref(&mut self, term: &mut Term) {
+    while let Term::Ref { def_id } = term {
+      let def = &self.book.defs[def_id];
+      def.assert_no_pattern_matching_rules();
+      *term = def.rules[0].body.clone();
+      term.fix_names(&mut self.namegen.id_counter, self.book);
     }
-
-    go(term, Term::Str { val: String::new() }, self)
   }
 
-  fn resugar_list(&mut self, term: Term) -> Term {
-    fn go(term: Term, list: &mut Vec<Term>, rd: &mut Reader<'_>) {
-      match term {
-        Term::Lam { tag, bod, .. } if tag == Tag::list() => go(*bod, list, rd),
-        Term::App { tag, mut arg, .. } if tag == Tag::list_lcons_head() => match *arg {
-          Term::Lam { .. } => {
-            rd.resugar_adts(&mut arg);
-            list.push(*arg);
-          }
-          Term::Var { .. } => list.push(*arg),
-          arg => go(arg, list, rd),
-        },
-        Term::App { fun, arg, .. } => {
-          go(*fun, list, rd);
-          go(*arg, list, rd);
-        }
-        Term::Var { .. } => {}
-        other => list.push(other),
-      }
-    }
-    let mut els = Vec::new();
-    go(term, &mut els, self);
-    Term::List { els }
-  }
-
-  /// Recover string constructors when it is not possible to correctly readback a string
-  fn recover_string_cons(&self, mut term: Term, cons: Term) -> Term {
-    match term {
-      Term::Str { val } if val.is_empty() => term = Term::Var { nam: Name::new(SNIL) },
-      _ => {}
-    };
-
-    Term::make_cons(Name::new(SCONS), [cons, term], &self.book.def_names)
+  pub fn error(&mut self, error: ReadbackError) {
+    self.errors.0.push(error);
   }
 }
 
@@ -401,78 +331,6 @@ impl Term {
     }
   }
 
-  pub fn make_cons(cons_name: Name, args: impl IntoIterator<Item = Term>, def_names: &DefNames) -> Term {
-    let def_id = def_names.def_id(&cons_name).unwrap();
-    Term::call(Term::Ref { def_id }, args)
-  }
-}
-
-type Scope = IndexSet<NodeId>;
-
-#[derive(Default)]
-struct NameGen {
-  var_port_to_id: HashMap<Port, Val>,
-  id_counter: Val,
-}
-
-impl NameGen {
-  // Given a port, returns its name, or assigns one if it wasn't named yet.
-  fn var_name(&mut self, var_port: Port) -> Name {
-    let id = self.var_port_to_id.entry(var_port).or_insert_with(|| {
-      let id = self.id_counter;
-      self.id_counter += 1;
-      id
-    });
-
-    var_id_to_name(*id)
-  }
-
-  fn decl_name(&mut self, net: &INet, var_port: Port) -> Option<Name> {
-    // If port is linked to an erase node, return an unused variable
-    let var_use = net.enter_port(var_port);
-    let var_kind = net.node(var_use.node()).kind;
-    if let Era = var_kind { None } else { Some(self.var_name(var_port)) }
-  }
-
-  fn unique(&mut self) -> Name {
-    let id = self.id_counter;
-    self.id_counter += 1;
-    var_id_to_name(id)
-  }
-}
-
-impl Op {
-  pub fn from_hvmc_label(value: Loc) -> Option<Op> {
-    match value {
-      0x0 => Some(Op::ADD),
-      0x1 => Some(Op::SUB),
-      0x2 => Some(Op::MUL),
-      0x3 => Some(Op::DIV),
-      0x4 => Some(Op::MOD),
-      0x5 => Some(Op::EQ),
-      0x6 => Some(Op::NE),
-      0x7 => Some(Op::LT),
-      0x8 => Some(Op::GT),
-      0x9 => Some(Op::LTE),
-      0xa => Some(Op::GTE),
-      0xb => Some(Op::AND),
-      0xc => Some(Op::OR),
-      0xd => Some(Op::XOR),
-      0xe => Some(Op::LSH),
-      0xf => Some(Op::RSH),
-      0x10 => Some(Op::NOT),
-      _ => None,
-    }
-  }
-}
-
-impl Book {
-  pub fn is_generated_def(&self, def_id: DefId) -> bool {
-    self.def_names.name(&def_id).map_or(false, |Name(name)| name.contains('$'))
-  }
-}
-
-impl Term {
   fn fix_names(&mut self, id_counter: &mut Val, book: &Book) {
     fn fix_name(nam: &mut Option<Name>, id_counter: &mut Val, bod: &mut Term) {
       if let Some(nam) = nam {
@@ -526,161 +384,85 @@ impl Term {
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => {}
     }
   }
-}
 
-impl<'a> Reader<'a> {
-  fn deref(&mut self, term: &mut Term) {
-    while let Term::Ref { def_id } = term {
-      let def = &self.book.defs[def_id];
-      def.assert_no_pattern_matching_rules();
-      *term = def.rules[0].body.clone();
-      term.fix_names(&mut self.namegen.id_counter, self.book);
-    }
-  }
-  fn resugar_adts(&mut self, term: &mut Term) {
-    match term {
-      Term::Lam { tag, bod, .. } if *tag == Tag::string() => *term = self.resugar_string(std::mem::take(bod)),
-      Term::Lam { tag, bod, .. } if *tag == Tag::list() => *term = self.resugar_list(std::mem::take(bod)),
-      Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
-        let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
-          return self.resugar_adts(bod);
-        };
-        let mut cur = &mut *term;
-        let mut current_arm = None;
-        for ctr in &adt.ctrs {
-          self.deref(cur);
-          match cur {
-            Term::Lam { tag: Tag::Named(tag), nam, bod } if &*tag == adt_name => {
-              if let Some(nam) = nam {
-                if current_arm.is_some() {
-                  return self.error(ReadbackError::InvalidAdt);
-                }
-                current_arm = Some((nam.clone(), ctr))
-              }
-              cur = bod;
-            }
-            _ => return self.error(ReadbackError::InvalidAdt),
-          }
-        }
-        let Some(current_arm) = current_arm else {
-          return self.error(ReadbackError::InvalidAdt);
-        };
-        let app = cur;
-        let mut cur = &mut *app;
-        for _ in current_arm.1.1 {
-          self.deref(cur);
-          match cur {
-            Term::App { tag: Tag::Static, fun, .. } => cur = fun,
-            Term::App { tag: tag @ Tag::Named(_), fun, .. } => {
-              *tag = Tag::Static;
-              cur = fun
-            }
-            _ => return self.error(ReadbackError::InvalidAdt),
-          }
-        }
-        match cur {
-          Term::Var { nam } if nam == &current_arm.0 => {}
-          _ => return self.error(ReadbackError::InvalidAdt),
-        }
-        let def_id = self.book.def_names.def_id(current_arm.1.0).unwrap();
-        *cur = Term::Ref { def_id };
-        let app = std::mem::take(app);
-        *term = app;
-        self.resugar_adts(term);
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => self.resugar_adts(bod),
-      Term::App { tag: Tag::Named(adt_name), fun, arg } => {
-        let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
-          self.resugar_adts(fun);
-          self.resugar_adts(arg);
-          return;
-        };
-        let mut cur = &mut *term;
-        let mut arms = Vec::new();
-        for ctr in adt.ctrs.iter().rev() {
-          self.deref(cur);
-          match cur {
-            Term::App { tag: Tag::Named(tag), fun, arg } if &*tag == adt_name => {
-              let mut args = Vec::new();
-              let mut arm_term = &mut **arg;
-              for _ in ctr.1 {
-                self.deref(arm_term);
-                if !matches!(arm_term, Term::Lam { tag: Tag::Static, .. } if &*tag == adt_name) {
-                  let nam = self.namegen.unique();
-                  let body = std::mem::take(arm_term);
-                  *arm_term = Term::Lam {
-                    tag: Tag::Static,
-                    nam: Some(nam.clone()),
-                    bod: Box::new(Term::App {
-                      tag: Tag::Static,
-                      fun: Box::new(body),
-                      arg: Box::new(Term::Var { nam }),
-                    }),
-                  };
-                }
-                match arm_term {
-                  Term::Lam { nam, bod, .. } => {
-                    args.push(match nam {
-                      Some(x) => Pattern::Var(Some(x.clone())),
-                      None => Pattern::Var(None),
-                    });
-                    arm_term = &mut **bod;
-                  }
-                  _ => unreachable!(),
-                }
-              }
-              arms.push((Pattern::Ctr(ctr.0.clone(), args), arm_term));
-              cur = &mut **fun;
-            }
-            _ => return self.error(ReadbackError::InvalidAdtMatch),
-          }
-        }
-        let scrutinee = std::mem::take(cur);
-        let arms = arms.into_iter().rev().map(|arm| (arm.0, std::mem::take(arm.1))).collect();
-        *term = Term::Match { scrutinee: Box::new(scrutinee), arms };
-        self.resugar_adts(term);
-      }
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Let { val: fst, nxt: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        self.resugar_adts(fst);
-        self.resugar_adts(snd);
-      }
-      Term::Match { scrutinee, arms } => {
-        self.resugar_adts(scrutinee);
-        for arm in arms {
-          self.resugar_adts(&mut arm.1);
-        }
-      }
-      Term::List { .. } => unreachable!(),
-      Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Var { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era => {}
-    }
-  }
-
-  fn error(&mut self, error: ReadbackError) {
-    self.errors.push(error)
+  pub fn make_cons(cons_name: Name, args: impl IntoIterator<Item = Term>, def_names: &DefNames) -> Term {
+    let def_id = def_names.def_id(&cons_name).unwrap();
+    Term::call(Term::Ref { def_id }, args)
   }
 }
 
+type Scope = IndexSet<NodeId>;
+
+#[derive(Default)]
+pub struct NameGen {
+  var_port_to_id: HashMap<Port, Val>,
+  id_counter: Val,
+}
+
+impl NameGen {
+  // Given a port, returns its name, or assigns one if it wasn't named yet.
+  fn var_name(&mut self, var_port: Port) -> Name {
+    let id = self.var_port_to_id.entry(var_port).or_insert_with(|| {
+      let id = self.id_counter;
+      self.id_counter += 1;
+      id
+    });
+
+    var_id_to_name(*id)
+  }
+
+  fn decl_name(&mut self, net: &INet, var_port: Port) -> Option<Name> {
+    // If port is linked to an erase node, return an unused variable
+    let var_use = net.enter_port(var_port);
+    let var_kind = net.node(var_use.node()).kind;
+    if let Era = var_kind { None } else { Some(self.var_name(var_port)) }
+  }
+
+  pub fn unique(&mut self) -> Name {
+    let id = self.id_counter;
+    self.id_counter += 1;
+    var_id_to_name(id)
+  }
+}
+
+impl Op {
+  pub fn from_hvmc_label(value: Loc) -> Option<Op> {
+    match value {
+      0x0 => Some(Op::ADD),
+      0x1 => Some(Op::SUB),
+      0x2 => Some(Op::MUL),
+      0x3 => Some(Op::DIV),
+      0x4 => Some(Op::MOD),
+      0x5 => Some(Op::EQ),
+      0x6 => Some(Op::NE),
+      0x7 => Some(Op::LT),
+      0x8 => Some(Op::GT),
+      0x9 => Some(Op::LTE),
+      0xa => Some(Op::GTE),
+      0xb => Some(Op::AND),
+      0xc => Some(Op::OR),
+      0xd => Some(Op::XOR),
+      0xe => Some(Op::LSH),
+      0xf => Some(Op::RSH),
+      0x10 => Some(Op::NOT),
+      _ => None,
+    }
+  }
+}
+
+#[derive(Default)]
 /// A structure that implements display logic for Readback Errors.
 pub struct ReadbackErrors(pub Vec<ReadbackError>);
 
-impl ReadbackErrors {
-  pub fn new(errs: Vec<ReadbackError>) -> Self {
-    Self(errs)
-  }
-
-  pub fn is_empty(&self) -> bool {
-    self.0.is_empty()
-  }
+#[derive(Debug)]
+pub enum ReadbackError {
+  InvalidNumericMatch,
+  ReachedRoot,
+  Cyclic,
+  InvalidBind,
+  InvalidAdt,
+  InvalidAdtMatch,
+  InvalidStrTerm(Term),
 }
 
 impl ReadbackError {
