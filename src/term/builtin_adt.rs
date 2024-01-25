@@ -13,7 +13,7 @@ pub trait BuiltinAdt {
   /// Returns true if the built-in adt was used.
   fn encode_terms(&self, book: &mut Book) -> bool;
 
-  /// Checks if the adt name or any constructor name was overriden by the user.
+  /// Checks if the adt name or any constructor name was overridden by the user.
   fn check(&self, book: &Book) -> Result<(), String> {
     let adt_name = self.name();
     if book.adts.contains_key(&adt_name) {
@@ -21,7 +21,7 @@ pub trait BuiltinAdt {
     }
     for (ctr, ..) in self.constructors() {
       if book.ctrs.contains_key(&ctr) {
-        return Err(format!("{ctr} is a built-in constructor and should not be overriden."));
+        return Err(format!("{ctr} is a built-in constructor and should not be overridden."));
       }
     }
     Ok(())
