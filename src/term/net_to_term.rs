@@ -283,14 +283,14 @@ impl<'a> Reader<'a> {
                 let char: String = unsafe { char::from_u32_unchecked(*num as u32) }.into();
                 *val = char + &val;
               }
-              term => make_string_cons(term, Term::Num { val: *num }),
+              term => rd.make_string_cons(term, Term::Num { val: *num }),
             };
           }
-          Term::Var { nam } => recover_string_cons(str_term, Term::Var { nam: nam.clone() }),
+          Term::Var { nam } => rd.recover_string_cons(str_term, Term::Var { nam: nam.clone() }),
           arg => {
             rd.resugar_adts(arg);
             let arg = std::mem::take(arg);
-            recover_string_cons(str_term, arg.clone());
+            rd.recover_string_cons(str_term, arg.clone());
             rd.error(ReadbackError::InvalidStrTerm(arg))
           }
         },
@@ -331,26 +331,24 @@ impl<'a> Reader<'a> {
     go(term, &mut els, self);
     Term::List { els }
   }
-}
 
-/// Recover string constructors when it is not possible to correctly readback a string
-fn recover_string_cons(term: &mut Term, cons: Term) {
-  match term {
-    Term::Str { val } if val.is_empty() => *term = Term::Var { nam: Name::new(SNIL) },
-    Term::Str { val } => *term = Term::Str { val: val.to_owned() },
-    Term::App { .. } => {},
-    _ => unreachable!()
+  /// Recover string constructors when it is not possible to correctly readback a string
+  fn recover_string_cons(&self, term: &mut Term, cons: Term) {
+    match term {
+      Term::Str { val } if val.is_empty() => *term = Term::Var { nam: Name::new(SNIL) },
+      Term::Str { val } => *term = Term::Str { val: val.to_owned() },
+      Term::App { .. } => {}
+      _ => unreachable!(),
+    }
+
+    self.make_string_cons(term, cons)
   }
 
-  make_string_cons(term, cons)
-}
-
-
-/// Makes a String Cons application with the given term `(SCons cons term)`
-fn make_string_cons(term: &mut Term, cons: Term) {
-  let svar = Term::Var { nam: Name::new(SCONS) };
-  let cons = Term::App { tag: Tag::Auto, fun: Box::new(svar), arg: Box::new(cons) };
-  *term = Term::App { tag: Tag::Auto, fun: Box::new(cons), arg: Box::new(std::mem::take(term)) };
+  /// Makes a String Cons application with the given term `(SCons cons term)`
+  fn make_string_cons(&self, term: &mut Term, cons: Term) {
+    let def_id = self.book.def_names.def_id(&Name::new(SCONS)).unwrap();
+    *term = Term::call(Term::Ref { def_id }, [cons, std::mem::take(term)]);
+  }
 }
 
 /// Represents `let (fst, snd) = val` if `tag` is `None`, and `dup#tag fst snd = val` otherwise.
