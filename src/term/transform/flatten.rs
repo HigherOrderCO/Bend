@@ -1,4 +1,4 @@
-use crate::term::{Book, DefId, DefNames, Definition, Name, Origin, Pattern, Rule, Term};
+use crate::term::{Book, DefId, DefNames, Definition, MatchNum, Name, Origin, Pattern, Rule, Term};
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
@@ -18,8 +18,7 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
   let def_name = def_names.name(&def.def_id).unwrap().clone();
 
   // For each group, split its internal rules
-  let rules = def.rules.iter().map(|r| (def_name.clone(), r.clone())).collect_vec();
-  let new_rules = split_group(&rules, def_names);
+  let new_rules = split_def(&def_name, &def.rules, def_names);
 
   new_rules
     .into_iter()
@@ -27,80 +26,92 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
     .collect()
 }
 
-/// Checks true if every time that `a` matches, `b` will match too.
-fn matches_together(a: &[Pattern], b: &[Pattern]) -> (bool, bool) {
-  let mut matches_together = true;
-  let mut same_shape = true;
-  for (a, b) in a.iter().zip(b) {
-    match (a, b) {
-      (Pattern::Ctr(a_nam, a_args), Pattern::Ctr(b_nam, b_args)) => {
-        if a_nam != b_nam || a_args.len() != b_args.len() {
-          matches_together = false;
-          same_shape = false;
-        }
+impl Pattern {
+  /// True if the two non-nested patterns cover some overlapping cases.
+  fn overlaps_with(&self, other: &Pattern) -> bool {
+    match (self, other) {
+      (Pattern::Ctr(a_nam, a_args), Pattern::Ctr(b_nam, b_args))
+        if a_nam == b_nam && a_args.len() == b_args.len() =>
+      {
+        true
       }
-      (Pattern::Ctr(..) | Pattern::Num(_) | Pattern::Tup(..), Pattern::Var(..)) => {
-        same_shape = false;
-      }
-      (Pattern::Num(a_num), Pattern::Num(b_num)) => {
-        if std::mem::discriminant(a_num) != std::mem::discriminant(b_num) {
-          matches_together = false;
-          same_shape = false;
-        }
-      }
-      (
-        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
-        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
-      ) => {
-        if std::mem::discriminant(a) != std::mem::discriminant(b) {
-          matches_together = false;
-          same_shape = false;
-        }
-      }
-      (Pattern::Var(..), _) => (),
+      (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => true,
+      (Pattern::Num(MatchNum::Succ(_)), Pattern::Num(MatchNum::Succ(_))) => true,
+      (Pattern::Tup(..), Pattern::Tup(..)) => true,
+      (Pattern::Var(..), _) => true,
+      (_, Pattern::Var(..)) => true,
       (Pattern::List(..), _) | (_, Pattern::List(..)) => unreachable!(),
+      _ => false,
     }
   }
-  (matches_together, same_shape)
+
+  /// True if when a term matches `other` it always also matches `self`.
+  fn is_superset_of(&self, other: &Pattern) -> bool {
+    match (self, other) {
+      (Pattern::Ctr(a_nam, a_args), Pattern::Ctr(b_nam, b_args))
+        if a_nam == b_nam && a_args.len() == b_args.len() =>
+      {
+        true
+      }
+      (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => true,
+      (Pattern::Num(MatchNum::Succ(_)), Pattern::Num(MatchNum::Succ(_))) => true,
+      (Pattern::Tup(..), Pattern::Tup(..)) => true,
+      (Pattern::Var(..), _) => true,
+      (Pattern::List(..), _) | (_, Pattern::List(..)) => unreachable!(),
+      _ => false,
+    }
+  }
 }
 
-fn split_group(rules: &[(Name, Rule)], def_names: &mut DefNames) -> HashMap<Name, Vec<Rule>> {
+fn split_def(name: &Name, rules: &[Rule], def_names: &mut DefNames) -> Vec<(Name, Vec<Rule>)> {
   let mut skip: HashSet<usize> = HashSet::new();
-  let mut new_rules: HashMap<Name, Vec<Rule>> = HashMap::new();
+  let mut new_defs: HashMap<Name, Vec<Rule>> = HashMap::new();
   let mut split_rule_count = 0;
   for i in 0 .. rules.len() {
-    if !skip.contains(&i) {
-      let (name, rule) = &rules[i];
-      let must_split = rule.pats.iter().any(|pat| !pat.is_flat());
-      if must_split {
-        let new_split_name = Name(format!("{}$F{}", name, split_rule_count));
-        split_rule_count += 1;
-        let new_split_def_id = def_names.insert(new_split_name.clone());
+    if skip.contains(&i) {
+      continue;
+    }
 
-        let old_rule = make_old_rule(rule, new_split_def_id);
+    let rule = &rules[i];
+    let must_split = rule.pats.iter().any(|pat| !pat.is_flat());
+    if must_split {
+      let new_split_name = Name(format!("{}$F{}", name, split_rule_count));
+      split_rule_count += 1;
+      let new_split_def_id = def_names.insert(new_split_name.clone());
 
-        let mut new_group = vec![(name.clone(), old_rule)];
+      // Create the rule that replaces the one being flattened.
+      // Destructs one layer of the nested patterns and calls the following, forwarding the extracted fields.
+      let old_rule = make_old_rule(rule, new_split_def_id);
+      new_defs.entry(name.clone()).or_default().push(old_rule);
 
-        for (j, (_, other)) in rules.iter().enumerate().skip(i) {
-          let (compatible, same_shape) = matches_together(&rule.pats, &other.pats);
-          if compatible {
-            if same_shape {
-              skip.insert(j); // avoids identical, duplicated clauses
-            }
-            let new_rule = make_split_rule(rule, other, def_names);
-            new_group.push((new_split_name.clone(), new_rule));
+      // Create a new definition, with one rule for each rule that overlaps patterns with this one (including itself)
+      // The rule patterns have one less layer of nesting and receive the destructed fields as extra args.
+      let mut new_rules = vec![];
+      for (j, other) in rules.iter().enumerate().skip(i) {
+        let has_overlap = rule.pats.iter().zip(&other.pats).all(|(a, b)| a.overlaps_with(b));
+        if has_overlap {
+          let new_rule = make_split_rule(rule, other, def_names);
+          new_rules.push(new_rule);
+
+          // Skip clauses that are already 100% covered by this one.
+          // TODO: This is not enough to skip rules that are redundant but not a subset of any particular other rule.
+          //   This means that it will sometimes generate redundant, unused rules.
+          let is_superset = rule.pats.iter().zip(&other.pats).all(|(a, b)| a.is_superset_of(b));
+          if is_superset {
+            skip.insert(j);
           }
         }
-
-        for (nam, mut rules) in split_group(&new_group, def_names) {
-          new_rules.entry(nam).or_default().append(&mut rules);
-        }
-      } else {
-        new_rules.entry(rules[i].0.clone()).or_default().push(rules[i].1.clone());
       }
+      // Recursively split the newly created def
+      for (nam, mut rules) in split_def(&new_split_name, &new_rules, def_names) {
+        new_defs.entry(nam).or_default().append(&mut rules);
+      }
+    } else {
+      // If this rule is already flat, just mark it to be inserted back as it is.
+      new_defs.entry(name.clone()).or_default().push(rules[i].clone());
     }
   }
-  new_rules
+  new_defs.into_iter().collect()
 }
 
 /// Makes the rule that replaces the original.
