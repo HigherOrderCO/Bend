@@ -1,4 +1,4 @@
-use crate::term::{Book, DefId, DefNames, Definition, MatchNum, Name, Origin, Pattern, Rule, Term};
+use crate::term::{Book, DefId, DefNames, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Term};
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
@@ -38,8 +38,7 @@ impl Pattern {
       (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => true,
       (Pattern::Num(MatchNum::Succ(_)), Pattern::Num(MatchNum::Succ(_))) => true,
       (Pattern::Tup(..), Pattern::Tup(..)) => true,
-      (Pattern::Var(..), _) => true,
-      (_, Pattern::Var(..)) => true,
+      (Pattern::Var(..), _) | (_, Pattern::Var(..)) => true,
       (Pattern::List(..), _) | (_, Pattern::List(..)) => unreachable!(),
       _ => false,
     }
@@ -75,14 +74,10 @@ fn split_def(name: &Name, rules: &[Rule], def_names: &mut DefNames) -> Vec<(Name
     let rule = &rules[i];
     let must_split = rule.pats.iter().any(|pat| !pat.is_flat());
     if must_split {
+      // Create the entry for the new definition name
       let new_split_name = Name(format!("{}$F{}", name, split_rule_count));
-      split_rule_count += 1;
       let new_split_def_id = def_names.insert(new_split_name.clone());
-
-      // Create the rule that replaces the one being flattened.
-      // Destructs one layer of the nested patterns and calls the following, forwarding the extracted fields.
-      let old_rule = make_old_rule(rule, new_split_def_id);
-      new_defs.entry(name.clone()).or_default().push(old_rule);
+      split_rule_count += 1;
 
       // Create a new definition, with one rule for each rule that overlaps patterns with this one (including itself)
       // The rule patterns have one less layer of nesting and receive the destructed fields as extra args.
@@ -106,6 +101,11 @@ fn split_def(name: &Name, rules: &[Rule], def_names: &mut DefNames) -> Vec<(Name
       for (nam, mut rules) in split_def(&new_split_name, &new_rules, def_names) {
         new_defs.entry(nam).or_default().append(&mut rules);
       }
+
+      // Create the rule that replaces the one being flattened.
+      // Destructs one layer of the nested patterns and calls the following, forwarding the extracted fields.
+      let old_rule = make_old_rule(&rule.pats, new_split_def_id);
+      new_defs.entry(name.clone()).or_default().push(old_rule);
     } else {
       // If this rule is already flat, just mark it to be inserted back as it is.
       new_defs.entry(name.clone()).or_default().push(rules[i].clone());
@@ -185,12 +185,25 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
   let mut var_count = 0;
   for (rule_arg, other_arg) in old_rule.pats.iter().zip(&other_rule.pats) {
     match (rule_arg, other_arg) {
-      // We checked before that these two have the same constructor and match together
+      // Two rules with same constructor
       (Pattern::Ctr(_, _), Pattern::Ctr(_, other_arg_args)) => {
+        // We checked before that these two have the same constructor and match together
         for other_field in other_arg_args {
           new_pats.push(other_field.clone());
         }
       }
+      (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => {
+        // No internal fields, so nothing to forward
+      }
+      (Pattern::Num(MatchNum::Succ(_)), Pattern::Num(MatchNum::Succ(Some(nam)))) => {
+        new_pats.push(Pattern::Var(nam.clone()))
+      }
+      (Pattern::Tup(_, _), Pattern::Tup(fst, snd)) => {
+        new_pats.push(*fst.clone());
+        new_pats.push(*snd.clone());
+      }
+
+      // First rule has constructor, second has used var
       (Pattern::Ctr(rule_arg_name, rule_arg_args), Pattern::Var(Some(other_arg))) => {
         let mut new_ctr_args = vec![];
         for _ in 0 .. rule_arg_args.len() {
@@ -202,11 +215,19 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         let new_ctr = Term::call(def_ref, new_ctr_args);
         new_body.subst(other_arg, &new_ctr);
       }
-      // Since numbers don't have subpatterns this should be unreachable.
-      (Pattern::Num(..), _) => unreachable!(),
-      (Pattern::Tup(_, _), Pattern::Tup(fst, snd)) => {
-        new_pats.push(*fst.clone());
-        new_pats.push(*snd.clone());
+      (Pattern::Num(MatchNum::Zero), Pattern::Var(Some(other_arg))) => {
+        let new_ctr = Term::Num { val: 0 };
+        new_body.subst(other_arg, &new_ctr);
+      }
+      (Pattern::Num(MatchNum::Succ(Some(_))), Pattern::Var(Some(other_arg))) => {
+        // Since the other rule used the entire number, we have to recover it after the decrementing.
+        // TODO: Could we simply do this with the usual match normalization? Check.
+        eprintln!("!!!!!!!!!! Maybe bugged !!!!!!!!!!!");
+        let new_nam = make_var_name(&mut var_count);
+        let new_var = Term::Var { nam: new_nam.clone() };
+        new_pats.push(Pattern::Var(Some(new_nam)));
+        let new_ctr = Term::Opx { op: Op::ADD, fst: Box::new(new_var), snd: Box::new(Term::Num { val: 1 }) };
+        new_body.subst(other_arg, &new_ctr);
       }
       (Pattern::Tup(..), Pattern::Var(Some(other_arg))) => {
         let fst_nam = make_var_name(&mut var_count);
@@ -218,22 +239,42 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
         let new_ctr = Term::Tup { fst: Box::new(fst_arg), snd: Box::new(snd_arg) };
         new_body.subst(other_arg, &new_ctr);
       }
-      (Pattern::Var(Some(_)), _) => new_pats.push(other_arg.clone()),
-      (Pattern::Var(None), _) => (),
-      // Unreachable cases, we only call this function if we know the two patterns match together
-      (Pattern::Ctr(..) | Pattern::Tup(..), Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..)) => {
-        unreachable!()
-      }
+
+      // First rule has constructor, second has erased var.
       (Pattern::Ctr(_, ctr_fields), Pattern::Var(None)) => {
         for _ in ctr_fields {
           new_pats.push(Pattern::Var(None));
         }
       }
+      (Pattern::Num(MatchNum::Zero), Pattern::Var(None)) => {
+        // Nothing to pass forward
+      }
+      (Pattern::Num(MatchNum::Succ(_)), Pattern::Var(None)) => {
+        new_pats.push(Pattern::Var(None));
+      }
       (Pattern::Tup(..), Pattern::Var(None)) => {
         new_pats.push(Pattern::Var(None));
         new_pats.push(Pattern::Var(None));
       }
-      (Pattern::List(..), _) | (_, Pattern::List(..)) => unreachable!(),
+
+      // First rule has var.
+      (Pattern::Var(Some(_)), _) => new_pats.push(other_arg.clone()),
+      (Pattern::Var(None), _) => (),
+
+      // Unreachable cases
+      // We only call this function if we know the two patterns match together
+      (
+        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
+        Pattern::Ctr(..) | Pattern::Num(..) | Pattern::Tup(..),
+      ) => {
+        unreachable!()
+      }
+      (Pattern::Num(MatchNum::Succ(None)), _) => unreachable!(
+        "In pattern matching function position, number patterns can't have their lambda detached"
+      ),
+      (Pattern::List(..), _) | (_, Pattern::List(..)) => {
+        unreachable!("List syntax should have been already desugared")
+      }
     }
   }
   Rule { pats: new_pats, body: new_body, origin: Origin::Generated }
