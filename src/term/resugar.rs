@@ -58,8 +58,7 @@ impl<'a> Reader<'a> {
           _ => return self.error(ReadbackError::InvalidAdt),
         }
 
-        let def_id = self.book.def_names.def_id(ctr).unwrap();
-        *cur = Term::Ref { def_id };
+        *cur = self.book.def_names.get_ref(ctr);
 
         *term = std::mem::take(app);
 
@@ -91,15 +90,8 @@ impl<'a> Reader<'a> {
                 if !matches!(arm_term, Term::Lam { tag: Tag::Static, .. } if tag == adt_name) {
                   let nam = self.namegen.unique();
 
-                  *arm_term = Term::Lam {
-                    tag: Tag::Static,
-                    nam: Some(nam.clone()),
-                    bod: Box::new(Term::App {
-                      tag: Tag::Static,
-                      fun: Box::new(std::mem::take(arm_term)),
-                      arg: Box::new(Term::Var { nam }),
-                    }),
-                  };
+                  *arm_term =
+                    Term::named_lam(nam.clone(), Term::arg_call(std::mem::take(arm_term), Some(nam)));
                 }
 
                 match arm_term {
@@ -165,7 +157,7 @@ impl<'a> Reader<'a> {
               let char: String = unsafe { char::from_u32_unchecked(val as u32) }.into();
               Term::Str { val: char + &str }
             }
-            term => Term::make_cons(Name::new(SCONS), [Term::Num { val }, term], &rd.book.def_names),
+            term => Term::call(rd.book.def_names.get_ref(&Name::new(SCONS)), [Term::Num { val }, term]),
           },
           Term::Var { nam } => rd.recover_string_cons(str_term, Term::Var { nam }),
           mut arg => {
@@ -218,6 +210,15 @@ impl<'a> Reader<'a> {
       _ => {}
     };
 
-    Term::make_cons(Name::new(SCONS), [cons, term], &self.book.def_names)
+    Term::call(self.book.def_names.get_ref(&Name::new(SCONS)), [cons, term])
+  }
+
+  fn deref(&mut self, term: &mut Term) {
+    while let Term::Ref { def_id } = term {
+      let def = &self.book.defs[def_id];
+      def.assert_no_pattern_matching_rules();
+      *term = def.rules[0].body.clone();
+      term.fix_names(&mut self.namegen.id_counter, self.book);
+    }
   }
 }

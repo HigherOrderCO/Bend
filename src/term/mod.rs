@@ -3,6 +3,7 @@ use indexmap::{IndexMap, IndexSet};
 use shrinkwraprs::Shrinkwrap;
 use std::collections::{BTreeMap, HashMap};
 
+pub mod builtin_adt;
 pub mod check;
 pub mod display;
 pub mod load_book;
@@ -11,7 +12,6 @@ pub mod parser;
 pub mod resugar;
 pub mod term_to_net;
 pub mod transform;
-pub mod builtin_adt;
 
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
@@ -247,6 +247,14 @@ impl Book {
     Default::default()
   }
 
+  pub fn get_def(&self, rule_name: &Name) -> Option<&Definition> {
+    self.def_names.def_id(&rule_name).and_then(|def_id| self.defs.get(&def_id))
+  }
+
+  pub fn get_def_mut(&mut self, rule_name: &Name) -> Option<&mut Definition> {
+    self.def_names.def_id(&rule_name).and_then(|def_id| self.defs.get_mut(&def_id))
+  }
+
   pub fn insert_def(&mut self, name: Name, is_generated: bool, rules: Vec<Rule>) -> DefId {
     let def_id = self.def_names.insert(name);
     let def = Definition { def_id, generated: is_generated, rules };
@@ -312,6 +320,11 @@ impl DefNames {
   pub fn def_ids(&self) -> impl Iterator<Item = &DefId> {
     self.id_to_name.keys()
   }
+
+  #[track_caller]
+  pub fn get_ref(&self, rule_name: &Name) -> Term {
+    self.def_id(&rule_name).map(|def_id| Term::Ref { def_id }).unwrap()
+  }
 }
 
 impl Term {
@@ -322,6 +335,27 @@ impl Term {
       fun: Box::new(acc),
       arg: Box::new(arg),
     })
+  }
+
+  pub fn arg_call(fun: Term, arg: Option<Name>) -> Self {
+    let arg = Box::new(arg.map_or(Term::Era, |nam| Term::Var { nam }));
+    Term::App { tag: Tag::Static, fun: Box::new(fun), arg }
+  }
+
+  pub fn tagged_app(tag: Tag, fun: Term, arg: Term) -> Self {
+    Term::App { tag, fun: Box::new(fun), arg: Box::new(arg) }
+  }
+
+  pub fn named_lam(nam: Name, bod: Term) -> Self {
+    Term::Lam { tag: Tag::Static, nam: Some(nam), bod: Box::new(bod) }
+  }
+
+  pub fn erased_lam(bod: Term) -> Self {
+    Term::Lam { tag: Tag::Static, nam: None, bod: Box::new(bod) }
+  }
+
+  pub fn tagged_lam(tag: Tag, nam: Name, bod: Term) -> Self {
+    Term::Lam { tag, nam: Some(nam), bod: Box::new(bod) }
   }
 
   /// Substitute the occurences of a variable in a term with the given term.
@@ -634,7 +668,7 @@ impl Pattern {
           go(fst, set);
           go(snd, set);
         }
-        Pattern::Var(_) => {},
+        Pattern::Var(_) => {}
         Pattern::Num(_) => {}
       }
     }

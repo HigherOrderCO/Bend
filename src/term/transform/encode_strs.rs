@@ -1,7 +1,7 @@
 use hvmc::run::Val;
 use indexmap::IndexMap;
 
-use crate::term::{builtin_adt, Book, Name, Tag, Term};
+use crate::term::{builtin_adt, Book, Name, Term};
 
 pub const STRING: &str = "String";
 pub const SNIL: &str = "SNil";
@@ -35,18 +35,13 @@ impl Term {
   fn encode_str(&mut self) -> bool {
     match self {
       Term::Str { val } => {
-        let chars = val.chars();
-
         let snil = Term::Var { nam: Name::new(SNIL) };
-        *self = chars.rfold(snil, |acc, char| {
-          let char = Term::Num { val: Val::from(char) };
-          let scons_app = Term::App {
-            tag: Tag::Static,
-            fun: Box::new(Term::Var { nam: Name::new(SCONS) }),
-            arg: Box::new(char),
-          };
-          Term::App { tag: Tag::Static, fun: Box::new(scons_app), arg: Box::new(acc) }
+
+        *self = val.chars().rfold(snil, |acc, char| {
+          let scons = Term::Var { nam: Name::new(SCONS) };
+          Term::call(scons, [Term::Num { val: Val::from(char) }, acc])
         });
+
         true
       }
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.encode_str(),

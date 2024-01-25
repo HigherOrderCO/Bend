@@ -194,8 +194,8 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_ctr_args.push(Term::Var { nam: new_nam.clone() });
           new_pats.push(Pattern::Var(Some(new_nam)));
         }
-        let rule_arg_def_id = def_names.def_id(rule_arg_name).unwrap();
-        let new_ctr = Term::call(Term::Ref { def_id: rule_arg_def_id }, new_ctr_args);
+        let def_ref = def_names.get_ref(rule_arg_name);
+        let new_ctr = Term::call(def_ref, new_ctr_args);
         new_body.subst(other_arg, &new_ctr);
       }
       // Since numbers don't have subpatterns this should be unreachable.

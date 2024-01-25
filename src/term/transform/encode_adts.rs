@@ -22,18 +22,12 @@ impl Book {
 fn make_lam(adt_name: &Name, ctr_args: Vec<Name>, ctrs: Vec<Name>, ctr_name: &Name) -> Term {
   let ctr = Term::Var { nam: ctr_name.clone() };
 
-  let app = ctr_args.iter().cloned().fold(ctr, |acc, nam| Term::App {
-    tag: Tag::Named(Name(format!("{}.{}.{}", adt_name, ctr_name, nam))),
-    fun: Box::new(acc),
-    arg: Box::new(Term::Var { nam }),
+  let app = ctr_args.iter().cloned().fold(ctr, |acc, nam| {
+    Term::tagged_app(Tag::Named(Name(format!("{}.{}.{}", adt_name, ctr_name, nam))), acc, Term::Var { nam })
   });
 
-  let fold_lam =
-    |acc, arg| Term::Lam { tag: Tag::Named(adt_name.clone()), nam: Some(arg), bod: Box::new(acc) };
+  let lam =
+    ctrs.into_iter().rev().fold(app, |acc, arg| Term::tagged_lam(Tag::Named(adt_name.clone()), arg, acc));
 
-  let lam = ctrs.into_iter().rev().fold(app, fold_lam);
-
-  let fold_lam = |acc, arg| Term::Lam { tag: Tag::Static, nam: Some(arg), bod: Box::new(acc) };
-
-  ctr_args.into_iter().rev().fold(lam, fold_lam)
+  ctr_args.into_iter().rev().fold(lam, |acc, arg| Term::named_lam(arg, acc))
 }

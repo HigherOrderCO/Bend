@@ -1,4 +1,4 @@
-use super::{term_to_net::Labels, var_id_to_name, Book, DefNames, MatchNum, Name, Op, Tag, Term, Val};
+use super::{term_to_net::Labels, var_id_to_name, Book, MatchNum, Name, Op, Tag, Term, Val};
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
   term::Pattern,
@@ -258,15 +258,6 @@ impl<'a> Reader<'a> {
     Err((fst, snd))
   }
 
-  pub fn deref(&mut self, term: &mut Term) {
-    while let Term::Ref { def_id } = term {
-      let def = &self.book.defs[def_id];
-      def.assert_no_pattern_matching_rules();
-      *term = def.rules[0].body.clone();
-      term.fix_names(&mut self.namegen.id_counter, self.book);
-    }
-  }
-
   pub fn error(&mut self, error: ReadbackError) {
     self.errors.0.push(error);
   }
@@ -331,7 +322,7 @@ impl Term {
     }
   }
 
-  fn fix_names(&mut self, id_counter: &mut Val, book: &Book) {
+  pub fn fix_names(&mut self, id_counter: &mut Val, book: &Book) {
     fn fix_name(nam: &mut Option<Name>, id_counter: &mut Val, bod: &mut Term) {
       if let Some(nam) = nam {
         let name = var_id_to_name(*id_counter);
@@ -384,19 +375,14 @@ impl Term {
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => {}
     }
   }
-
-  pub fn make_cons(cons_name: Name, args: impl IntoIterator<Item = Term>, def_names: &DefNames) -> Term {
-    let def_id = def_names.def_id(&cons_name).unwrap();
-    Term::call(Term::Ref { def_id }, args)
-  }
 }
 
 type Scope = IndexSet<NodeId>;
 
 #[derive(Default)]
 pub struct NameGen {
-  var_port_to_id: HashMap<Port, Val>,
-  id_counter: Val,
+  pub var_port_to_id: HashMap<Port, Val>,
+  pub id_counter: Val,
 }
 
 impl NameGen {
@@ -426,7 +412,7 @@ impl NameGen {
 }
 
 impl Op {
-  pub fn from_hvmc_label(value: Loc) -> Option<Op> {
+  fn from_hvmc_label(value: Loc) -> Option<Op> {
     match value {
       0x0 => Some(Op::ADD),
       0x1 => Some(Op::SUB),

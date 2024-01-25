@@ -78,13 +78,12 @@ fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
         body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) }
       }
       pat @ Pattern::Tup(..) => {
-        let tup = Name::new("%0");
-        body = Term::Lam {
-          tag: Tag::Static,
-          nam: Some(tup.clone()),
-          bod: Term::Let { pat: pat.clone(), val: Box::new(Term::Var { nam: tup }), nxt: Box::new(body) }
-            .into(),
-        };
+        let nam = Name::new("%0");
+        body = Term::named_lam(nam.clone(), Term::Let {
+          pat: pat.clone(),
+          val: Box::new(Term::Var { nam }),
+          nxt: Box::new(body),
+        });
       }
       Pattern::List(..) => unreachable!(),
     }
@@ -165,9 +164,9 @@ fn make_leaf_pattern_matching_case(
   // Add the applications to call the rule body
   term = match_path.iter().zip(&rule.pats).fold(term, |term, (matched, pat)| {
     match (matched, pat) {
-      (Pattern::Var(_), Pattern::Var(_)) => Term::optional_arg_call(term, next(lambdas_usage, arg_use)),
+      (Pattern::Var(_), Pattern::Var(_)) => Term::arg_call(term, next(lambdas_usage, arg_use)),
       (Pattern::Ctr(_, vars), Pattern::Ctr(_, _)) => {
-        vars.iter().fold(term, |term, _| Term::optional_arg_call(term, next(lambdas_usage, arg_use)))
+        vars.iter().fold(term, |term, _| Term::arg_call(term, next(lambdas_usage, arg_use)))
       }
       // This particular rule was not matching on this arg but due to the other rules we had to match on a constructor.
       // So, to call the rule body we have to recreate the constructor.
@@ -179,17 +178,17 @@ fn make_leaf_pattern_matching_case(
         let ctr_term = if !lambdas_usage.next().unwrap() {
           Term::Era
         } else {
-          let ctr_ref_id = book.def_names.def_id(ctr_nam).unwrap();
-          ctr_args.fold(Term::Ref { def_id: ctr_ref_id }, Term::arg_call)
+          let ctr_ref = book.def_names.get_ref(ctr_nam);
+          ctr_args.map(Some).fold(ctr_ref, Term::arg_call)
         };
 
-        Term::App { tag: Tag::Static, fun: Box::new(term), arg: Box::new(ctr_term) }
+        Term::call(term, [ctr_term])
       }
       // As the destructuring of the tuple happens later, we just pass the tuple itself.
-      (Pattern::Var(_), Pattern::Tup(..)) => Term::optional_arg_call(term, next(lambdas_usage, arg_use)),
+      (Pattern::Var(_), Pattern::Tup(..)) => Term::arg_call(term, next(lambdas_usage, arg_use)),
       (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => term,
       (Pattern::Num(MatchNum::Succ { .. }), Pattern::Num(MatchNum::Succ { .. })) => {
-        Term::optional_arg_call(term, next(lambdas_usage, arg_use))
+        Term::arg_call(term, next(lambdas_usage, arg_use))
       }
       (Pattern::Var(..), Pattern::Num(..)) => term,
       (Pattern::Ctr(..), _) => unreachable!(),
@@ -227,7 +226,7 @@ fn add_tagged_new_args(
       Pattern::Var(field) => {
         if let Some((var, tag)) = field.clone().zip(tag) {
           let name = Name(format!("{}.{}", tag, var));
-          term = Term::tagged_lam(new_args.next().unwrap(), term, Tag::Named(name))
+          term = Term::tagged_lam(Tag::Named(name), new_args.next().unwrap(), term)
         } else {
           term = Term::named_lam(new_args.next().unwrap(), term);
         }
@@ -290,7 +289,7 @@ fn make_num_pattern_matching_case(
 
       make_pattern_matching_case(book, def_type, def_id, &crnt_name, crnt_rules, match_path);
 
-      let body = Term::Ref { def_id: book.def_names.def_id(&crnt_name).unwrap() };
+      let body = book.def_names.get_ref(&crnt_name);
       (Pattern::Num(next_ctr), body)
     })
     .collect();
@@ -334,8 +333,7 @@ fn make_adt_pattern_matching_case(
   let crnt_arg_idx = match_path.len();
   let Type::Adt(next_type) = &def_type[crnt_arg_idx] else { unreachable!() };
   let next_ctrs = book.adts[next_type].ctrs.clone();
-  let make_app =
-    |term, arg| Term::App { tag: Tag::Named(next_type.clone()), fun: Box::new(term), arg: Box::new(arg) };
+  let make_app = |term, arg| Term::tagged_app(Tag::Named(next_type.clone()), term, arg);
 
   // First we create the subfunctions
   // TODO: We could group together functions with same arity that map to the same (default) case.
@@ -356,8 +354,7 @@ fn make_adt_pattern_matching_case(
   let term = Term::Var { nam: Name::new("x") };
   let term = next_ctrs.keys().fold(term, |term, ctr| {
     let name = make_next_fn_name(crnt_name, ctr);
-    let def_id = book.def_names.def_id(&name).unwrap();
-    make_app(term, Term::Ref { def_id })
+    make_app(term, book.def_names.get_ref(&name))
   });
 
   let term = add_arg_calls(term, &match_path);
@@ -390,9 +387,8 @@ fn make_non_pattern_matching_case(
   make_pattern_matching_case(book, def_type, def_id, &nxt_def_name, crnt_rules, next_match_path);
 
   // Make call to next function
-  let nxt_def_id = book.def_names.def_id(&nxt_def_name).unwrap();
-  let term = Term::Ref { def_id: nxt_def_id };
-  let term = Term::arg_call(term, arg_name.clone());
+  let term = book.def_names.get_ref(&nxt_def_name);
+  let term = Term::arg_call(term, Some(arg_name.clone()));
   let term = add_arg_calls(term, &match_path);
 
   // Lambda for pattern matched value
@@ -404,23 +400,6 @@ fn make_non_pattern_matching_case(
 }
 
 impl Term {
-  fn named_lam(nam: Name, bod: Term) -> Term {
-    Term::Lam { tag: Tag::Static, nam: Some(nam), bod: Box::new(bod) }
-  }
-
-  fn tagged_lam(nam: Name, bod: Term, tag: Tag) -> Term {
-    Term::Lam { tag, nam: Some(nam), bod: Box::new(bod) }
-  }
-
-  fn arg_call(term: Term, arg: Name) -> Term {
-    Term::App { tag: Tag::Static, fun: Box::new(term), arg: Box::new(Term::Var { nam: arg }) }
-  }
-
-  fn optional_arg_call(term: Term, arg: Option<Name>) -> Term {
-    let arg = Box::new(arg.map_or(Term::Era, |nam| Term::Var { nam }));
-    Term::App { tag: Tag::Static, fun: Box::new(term), arg }
-  }
-
   /// Returns a sequence representing whether consecutive lambda args are binded or discarded
   ///
   /// # Example
@@ -456,8 +435,8 @@ impl Term {
 }
 
 fn add_case_to_book(book: &mut Book, nam: Name, body: Term) {
-  if let Some(def_id) = book.def_names.def_id(&nam) {
-    book.defs.get_mut(&def_id).unwrap().rules = vec![Rule { pats: vec![], body }];
+  if let Some(def) = book.get_def_mut(&nam) {
+    def.rules = vec![Rule { pats: vec![], body }];
   } else {
     book.insert_def(nam, true, vec![Rule { pats: vec![], body }]);
   }
@@ -488,7 +467,7 @@ fn add_arg_calls(term: Term, match_path: &[Pattern]) -> Term {
   let old_args = (0 .. num_old_args).map(|x| Name(format!("x{x}")));
   let new_args = (0 .. num_new_args).map(|x| Name(format!("y{x}")));
   let args = old_args.chain(new_args);
-  args.fold(term, Term::arg_call)
+  args.map(Some).fold(term, Term::arg_call)
 }
 
 // Adds the argument lambdas to the term, with new args followed by old args.

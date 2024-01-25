@@ -176,11 +176,7 @@ fn match_to_def(
   let def = Definition { def_id, generated: true, rules };
   book.new_defs.insert(def_id, def);
 
-  Term::App {
-    tag: Tag::Static,
-    fun: Box::new(Term::Ref { def_id }),
-    arg: Box::new(Term::Var { nam: scrutinee }),
-  }
+  Term::arg_call(Term::Ref { def_id }, Some(scrutinee))
 }
 
 fn make_def_name(def_name: &Name, ctr: &Name, i: usize) -> Name {
@@ -293,26 +289,24 @@ fn normalize_num_match(term: &mut Term) -> Result<(), MatchError> {
       // Need to detach and increment again.
       // match x {0: ...; +: @x-1 let x = (+ x-1 1); ...}
       Pattern::Var(Some(var)) => {
-        let body = Term::Lam {
-          tag: Tag::Static,
-          nam: Some(Name::new("%pred")),
-          bod: Box::new(Term::Let {
-            pat: Pattern::Var(Some(var.clone())),
-            val: Box::new(Term::Opx {
-              op: Op::ADD,
-              fst: Box::new(Term::Var { nam: Name::new("%pred") }),
-              snd: Box::new(Term::Num { val: 1 }),
-            }),
-            nxt: Box::new(std::mem::take(body)),
+        let body = Term::Let {
+          pat: Pattern::Var(Some(var.clone())),
+          val: Box::new(Term::Opx {
+            op: Op::ADD,
+            fst: Box::new(Term::Var { nam: Name::new("%pred") }),
+            snd: Box::new(Term::Num { val: 1 }),
           }),
+          nxt: Box::new(std::mem::take(body)),
         };
+
+        let body = Term::named_lam(Name::new("%pred"), body);
         succ_arm = Some((Pattern::Num(MatchNum::Succ(None)), body));
         break;
       }
       // Var unused, so no need to increment
       // match x {0: ...; +: @* ...}
       Pattern::Var(None) => {
-        let body = Term::Lam { tag: Tag::Static, nam: None, bod: Box::new(std::mem::take(body)) };
+        let body = Term::erased_lam(std::mem::take(body));
         succ_arm = Some((Pattern::Num(MatchNum::Succ(None)), body));
         break;
       }
@@ -374,21 +368,12 @@ fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
   // Add lambdas to the arms
   for (_, body) in arms {
     let old_body = std::mem::take(body);
-    let new_body = free_vars.iter().rev().fold(old_body, |body, var| Term::Lam {
-      tag: Tag::Static,
-      nam: Some(var.clone()),
-      bod: Box::new(body),
-    });
-    *body = new_body;
+    *body = free_vars.iter().rev().fold(old_body, |body, var| Term::named_lam(var.clone(), body));
   }
 
   // Add apps to the match
   let old_match = std::mem::take(match_term);
-  *match_term = free_vars.into_iter().fold(old_match, |acc, nam| Term::App {
-    tag: Tag::Static,
-    fun: Box::new(acc),
-    arg: Box::new(Term::Var { nam }),
-  });
+  *match_term = free_vars.into_iter().fold(old_match, |acc, nam| Term::arg_call(acc, Some(nam)));
 
   // Get a reference to the match again
   // It returns a reference and not an owned value because we want
@@ -424,21 +409,15 @@ fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, Mat
   // Add lambdas to the arms
   for (_, body) in arms {
     let old_body = std::mem::take(body);
-    let new_body = free_vars.iter().rev().fold(old_body, |body, var| Term::Lam {
-      tag: Tag::Static,
-      nam: Some(Name(format!("%match%unscoped%{var}"))),
-      bod: Box::new(body),
-    });
-    *body = new_body;
+    *body = free_vars
+      .iter()
+      .rev()
+      .fold(old_body, |body, var| Term::named_lam(Name(format!("%match%unscoped%{var}")), body));
   }
 
   // Add apps to the match
   let old_match = std::mem::take(match_term);
-  *match_term = free_vars.into_iter().fold(old_match, |acc, nam| Term::App {
-    tag: Tag::Static,
-    fun: Box::new(acc),
-    arg: Box::new(Term::Lnk { nam }),
-  });
+  *match_term = free_vars.into_iter().fold(old_match, |acc, nam| Term::call(acc, [Term::Lnk { nam }]));
 
   // Get a reference to the match again
   // It returns a reference and not an owned value because we want
