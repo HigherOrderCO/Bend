@@ -20,7 +20,7 @@ impl Book {
         rule
           .body
           .extract_adt_matches(&def_name, &self.ctrs, book, &mut 0, warnings)
-          .map_err(|err| err.to_string())?;
+          .map_err(|e| format!("In definition '{}': {}", def_name, e))?;
       }
     }
     self.defs.append(&mut book.new_defs);
@@ -32,7 +32,11 @@ impl Book {
   /// Should be run after pattern matching functions are desugared.
   pub fn normalize_native_matches(&mut self) -> Result<(), String> {
     for def in self.defs.values_mut() {
-      def.rule_mut().body.normalize_native_matches(&self.ctrs).map_err(|e| e.to_string())?;
+      def
+        .rule_mut()
+        .body
+        .normalize_native_matches(&self.ctrs)
+        .map_err(|e| format!("In definition '{}': {}", self.def_names.name(&def.def_id).unwrap(), e))?;
     }
     Ok(())
   }
