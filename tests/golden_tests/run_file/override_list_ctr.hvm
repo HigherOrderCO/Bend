@@ -1,0 +1,4 @@
+data Override
+  = LNil
+
+main = [λz λk z]

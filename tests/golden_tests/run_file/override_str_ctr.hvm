@@ -1,0 +1,4 @@
+data Override
+  = (SCons any)
+
+main = (SCons "any")
