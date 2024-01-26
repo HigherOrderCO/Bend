@@ -33,8 +33,10 @@ impl Book {
       if prune {
         self.remove_def(unused_id);
       } else {
-        let def_name = self.def_names.id_to_name[&unused_id].clone();
-        warnings.push(Warning::UnusedDefinition { def_name })
+        if !self.is_generated_def(unused_id) {
+          let def_name = self.def_names.id_to_name[&unused_id].clone();
+          warnings.push(Warning::UnusedDefinition { def_name })
+        }
       }
     }
   }
