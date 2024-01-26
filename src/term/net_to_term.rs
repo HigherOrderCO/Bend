@@ -220,12 +220,12 @@ impl<'a> Reader<'a> {
   ///
   /// # Example
   ///
-  /// ```text
+  /// ```hvm
   /// // λa let (a, b) = a; (a, b)
   /// ([a b] [a b])
   ///
-  /// The node `(a, b)` is just a reconstruction of the destructuring of `a`,  
-  /// So we can skip both steps and just return the "value" unchanged:
+  /// // The node `(a, b)` is just a reconstruction of the destructuring of `a`,  
+  /// // So we can skip both steps and just return the "value" unchanged:
   ///
   /// // λa a
   /// (a a)
@@ -449,6 +449,7 @@ pub enum ReadbackError {
   InvalidAdt,
   InvalidAdtMatch,
   InvalidStrTerm(Term),
+  UnexpectedTag(Name, Tag),
 }
 
 impl ReadbackError {
@@ -460,7 +461,8 @@ impl ReadbackError {
       ReadbackError::InvalidBind => true,
       ReadbackError::InvalidAdt => true,
       ReadbackError::InvalidAdtMatch => true,
-      ReadbackError::InvalidStrTerm(..) => false,
+      ReadbackError::InvalidStrTerm(_) => false,
+      ReadbackError::UnexpectedTag(..) => false,
     }
   }
 }

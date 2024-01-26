@@ -226,7 +226,7 @@ impl ReadbackErrors {
         return Ok(());
       }
 
-      writeln!(f, "Invalid readback:")?;
+      writeln!(f, "Readback Warning:")?;
       let mut err_counts = std::collections::HashMap::new();
       for err in &self.0 {
         if err.can_count() {
@@ -256,6 +256,14 @@ impl ReadbackError {
       ReadbackError::Cyclic => write!(f, "Cyclic Term"),
       ReadbackError::InvalidBind => write!(f, "Invalid Bind"),
       ReadbackError::InvalidAdt => write!(f, "Invalid Adt"),
+      ReadbackError::UnexpectedTag(exp, fnd) => {
+        write!(f, "Unexpected tag found during Adt readback, expected '#{}', but found ", exp)?;
+
+        match fnd {
+          Tag::Static => write!(f, "no tag"),
+          _ => write!(f, "'{}'", fnd.display()),
+        }
+      }
       ReadbackError::InvalidAdtMatch => write!(f, "Invalid Adt Match"),
       ReadbackError::InvalidStrTerm(term) => {
         write!(f, "Invalid String Character value '{}'", term.display(def_names))

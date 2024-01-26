@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nested_str.hvm
 ---
-Invalid readback:
+Readback Warning:
 Invalid String Character value '"a"'
 Invalid String Character value '"bc"'
 Invalid String Character value '"ab"'

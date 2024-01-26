@@ -23,11 +23,15 @@ fn make_lam(adt_name: &Name, ctr_args: Vec<Name>, ctrs: Vec<Name>, ctr_name: &Na
   let ctr = Term::Var { nam: ctr_name.clone() };
 
   let app = ctr_args.iter().cloned().fold(ctr, |acc, nam| {
-    Term::tagged_app(Tag::Named(Name(format!("{}.{}.{}", adt_name, ctr_name, nam))), acc, Term::Var { nam })
+    Term::tagged_app(Tag::Named(adt_field_tag(adt_name, ctr_name, &nam)), acc, Term::Var { nam })
   });
 
   let lam =
     ctrs.into_iter().rev().fold(app, |acc, arg| Term::tagged_lam(Tag::Named(adt_name.clone()), arg, acc));
 
   ctr_args.into_iter().rev().fold(lam, |acc, arg| Term::named_lam(arg, acc))
+}
+
+pub fn adt_field_tag(adt_name: &Name, ctr_name: &Name, field_name: &Name) -> Name {
+  Name(format!("{}.{}.{}", adt_name, ctr_name, field_name))
 }
