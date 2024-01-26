@@ -15,8 +15,7 @@ use hvml::{
 use insta::assert_snapshot;
 use itertools::Itertools;
 use std::{
-  fs,
-  path::{Path, PathBuf},
+  collections::HashMap, fs, path::{Path, PathBuf}
 };
 use stdext::function_name;
 use walkdir::WalkDir;
@@ -81,7 +80,7 @@ fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str) -> Result<String, Str
 fn compile_term() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut term = do_parse_term(code)?;
-    term.check_unbound_vars()?;
+    term.check_unbound_vars(&mut HashMap::new())?;
     term.make_var_names_unique();
     term.linearize_vars();
     let compat_net = term_to_compat_net(&term, &mut Default::default());

@@ -1,4 +1,4 @@
-use crate::term::{Book, MatchNum, Name, Pattern, Term};
+use crate::term::{Book, Name, Pattern, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -6,11 +6,17 @@ impl Book {
   /// Checks that there are no unbound variables in all definitions.
   pub fn check_unbound_vars(&self) -> Result<(), String> {
     for def in self.defs.values() {
-      def.assert_no_pattern_matching_rules();
-      def.rules[0]
-        .body
-        .check_unbound_vars()
-        .map_err(|e| format!("In definition '{}': {}", self.def_names.name(&def.def_id).unwrap(), e))?;
+      for rule in &def.rules {
+        let mut scope = HashMap::new();
+        for pat in &rule.pats {
+          pat.names().for_each(|nam| push_scope(Some(nam), &mut scope));
+        }
+
+        rule
+          .body
+          .check_unbound_vars(&mut scope)
+          .map_err(|e| format!("In definition '{}': {}", self.def_names.name(&def.def_id).unwrap(), e))?;
+      }
     }
     Ok(())
   }
@@ -19,9 +25,9 @@ impl Book {
 impl Term {
   /// Checks that all variables are bound.
   /// Precondition: References have been resolved.
-  pub fn check_unbound_vars(&self) -> Result<(), String> {
+  pub fn check_unbound_vars<'a>(&'a self, scope: &mut HashMap<&'a Name, Val>) -> Result<(), String> {
     let mut globals = HashMap::new();
-    check_uses(self, &mut HashMap::new(), &mut globals)?;
+    check_uses(self, scope, &mut globals)?;
 
     // Check global vars
     for (nam, (declared, used)) in globals.into_iter() {
@@ -31,7 +37,11 @@ impl Term {
         (_, 0) => return Err(format!("Unscoped variable from lambda 'λ${nam}' is never used")),
         (1, _) => return Err(format!("Unscoped variable '${nam}' used more than once")),
         (_, 1) => return Err(format!("Unscoped lambda 'λ${nam}' declared more than once")),
-        (_, _) => return Err(format!("Unscoped lambda 'λ${nam}' and unscoped variable '${nam}' used more than once")),
+        (_, _) => {
+          return Err(format!(
+            "Unscoped lambda 'λ${nam}' and unscoped variable '${nam}' used more than once"
+          ));
+        }
       }
     }
     Ok(())
@@ -91,15 +101,11 @@ pub fn check_uses<'a>(
     Term::Match { scrutinee, arms } => {
       check_uses(scrutinee, scope, globals)?;
       for (pat, term) in arms {
-        if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat {
-          push_scope(nam.as_ref(), scope);
-        }
+        pat.names().for_each(|nam| push_scope(Some(&nam), scope));
 
         check_uses(term, scope, globals)?;
 
-        if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat {
-          pop_scope(nam.as_ref(), scope);
-        }
+        pat.names().for_each(|nam| pop_scope(Some(nam), scope));
       }
     }
     Term::List { .. } => unreachable!(),

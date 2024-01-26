@@ -52,11 +52,13 @@ pub fn desugar_book(
   book.generate_scott_adts();
   book.resolve_refs()?;
   encode_pattern_matching(book, &mut warnings)?;
+  book.check_unbound_vars()?;
   book.normalize_native_matches()?;
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();
   book.eta_reduction(eta);
+  book.check_unbounds()?;
   if supercombinators {
     book.detach_supercombinators(main);
   }
@@ -77,6 +79,9 @@ pub fn encode_pattern_matching(book: &mut Book, warnings: &mut Vec<Warning>) -> 
   book.check_unbound_pats()?;
   book.desugar_let_destructors();
   book.desugar_implicit_match_binds();
+  // This call to unbound vars needs to be after desugar_implicit_match_binds,
+  // since we need the generated pattern names, like `x-1`, `ctr.field`.
+  book.check_unbound_vars()?;
   book.extract_adt_matches(warnings)?;
   book.flatten_rules();
   let def_types = book.infer_def_types()?;
