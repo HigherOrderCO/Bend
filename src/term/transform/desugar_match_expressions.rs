@@ -169,11 +169,13 @@ fn match_to_def(
   book: &mut MatchesBook,
   match_count: usize,
 ) -> Term {
-  let rules: Vec<Rule> =
-    arms.iter().map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone() }).collect();
+  let rules: Vec<Rule> = arms
+    .iter()
+    .map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone(), generated: true })
+    .collect();
   let new_name = make_def_name(def_name, &Name::new("match"), match_count);
   let def_id = book.def_names.insert(new_name);
-  let def = Definition { def_id, generated: true, rules };
+  let def = Definition { def_id, rules };
   book.new_defs.insert(def_id, def);
 
   Term::arg_call(Term::Ref { def_id }, Some(scrutinee))

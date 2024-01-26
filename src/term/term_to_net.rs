@@ -61,7 +61,7 @@ fn def_id_to_hvmc_name(book: &Book, def_id: DefId, nets: &HashMap<String, INet>)
     if nets.contains_key(&name) { gen_unique_name(DefId(def_id.0 + 1), nets) } else { name }
   }
 
-  if book.is_generated_def(def_id) {
+  if book.is_def_name_generated(def_id) {
     gen_unique_name(def_id, nets)
   } else {
     let Name(name) = book.def_names.name(&def_id).unwrap();

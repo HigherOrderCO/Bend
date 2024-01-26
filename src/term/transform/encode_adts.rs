@@ -9,12 +9,12 @@ impl Book {
 
         let lam = make_lam(adt_name, args.clone(), ctrs, ctr_name);
 
-        let rules = vec![Rule { pats: vec![], body: lam }];
+        let rules = vec![Rule { pats: vec![], body: lam, generated: true }];
         defs.push((ctr_name.clone(), rules));
       }
     }
     for (name, rules) in defs {
-      self.insert_def(name, true, rules);
+      self.insert_def(name, rules);
     }
   }
 }

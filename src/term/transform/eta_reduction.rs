@@ -6,9 +6,10 @@ impl Book {
   pub fn eta_reduction(&mut self, reduce_all: bool) {
     for def in self.defs.values_mut() {
       def.assert_no_pattern_matching_rules();
-      if reduce_all || def.generated {
-        let rule = &mut def.rules[0].body;
-        rule.eta_reduction();
+      let rule = &mut def.rules[0];
+
+      if reduce_all || rule.generated {
+        rule.body.eta_reduction();
       }
     }
   }

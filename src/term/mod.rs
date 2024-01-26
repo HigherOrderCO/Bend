@@ -45,7 +45,6 @@ pub struct DefNames {
 #[derive(Debug, Clone)]
 pub struct Definition {
   pub def_id: DefId,
-  pub generated: bool,
   pub rules: Vec<Rule>,
 }
 
@@ -54,6 +53,8 @@ pub struct Definition {
 pub struct Rule {
   pub pats: Vec<Pattern>,
   pub body: Term,
+  /// Whether this rule body was auto generated or written by the user
+  pub generated: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -251,13 +252,14 @@ impl Book {
     self.def_names.def_id(&rule_name).and_then(|def_id| self.defs.get(&def_id))
   }
 
+  // TODO: This get_def/insert_def functions could have an `entry` api instead
   pub fn get_def_mut(&mut self, rule_name: &Name) -> Option<&mut Definition> {
     self.def_names.def_id(&rule_name).and_then(|def_id| self.defs.get_mut(&def_id))
   }
 
-  pub fn insert_def(&mut self, name: Name, is_generated: bool, rules: Vec<Rule>) -> DefId {
+  pub fn insert_def(&mut self, name: Name, rules: Vec<Rule>) -> DefId {
     let def_id = self.def_names.insert(name);
-    let def = Definition { def_id, generated: is_generated, rules };
+    let def = Definition { def_id, rules };
     self.defs.insert(def_id, def);
     def_id
   }
@@ -268,7 +270,8 @@ impl Book {
     name.zip(def)
   }
 
-  pub fn is_generated_def(&self, def_id: DefId) -> bool {
+  /// Checks if the name of the definition of the given DefId is generated or writen by the user
+  pub fn is_def_name_generated(&self, def_id: DefId) -> bool {
     self.def_names.name(&def_id).map_or(false, |Name(name)| name.contains('$'))
   }
 }

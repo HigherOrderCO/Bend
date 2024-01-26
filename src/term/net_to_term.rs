@@ -116,7 +116,7 @@ impl<'a> Reader<'a> {
         _ => unreachable!(),
       },
       Ref { def_id } => {
-        if self.book.is_generated_def(def_id) {
+        if self.book.is_def_name_generated(def_id) {
           let def = self.book.defs.get(&def_id).unwrap();
           def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
@@ -338,7 +338,7 @@ impl Term {
         bod.fix_names(id_counter, book);
       }
       Term::Ref { def_id } => {
-        if book.is_generated_def(*def_id) {
+        if book.is_def_name_generated(*def_id) {
           let def = book.defs.get(def_id).unwrap();
           def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
