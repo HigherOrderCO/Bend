@@ -178,7 +178,7 @@ impl<'a> Reader<'a> {
           let fst = self.read_term(self.net.enter_port(Port(node, 0)));
           let snd = self.read_term(self.net.enter_port(Port(node, 1)));
 
-          Term::Opx { op: Op::from_hvmc_label(opr).unwrap(), fst: Box::new(fst), snd: Box::new(snd) }
+          Term::Opx { op: Op::from_hvmc_label(opr), fst: Box::new(fst), snd: Box::new(snd) }
         }
         _ => unreachable!(),
       },
@@ -412,26 +412,26 @@ impl NameGen {
 }
 
 impl Op {
-  fn from_hvmc_label(value: Loc) -> Option<Op> {
+  fn from_hvmc_label(value: Loc) -> Op {
     match value {
-      0x0 => Some(Op::ADD),
-      0x1 => Some(Op::SUB),
-      0x2 => Some(Op::MUL),
-      0x3 => Some(Op::DIV),
-      0x4 => Some(Op::MOD),
-      0x5 => Some(Op::EQ),
-      0x6 => Some(Op::NE),
-      0x7 => Some(Op::LT),
-      0x8 => Some(Op::GT),
-      0x9 => Some(Op::LTE),
-      0xa => Some(Op::GTE),
-      0xb => Some(Op::AND),
-      0xc => Some(Op::OR),
-      0xd => Some(Op::XOR),
-      0xe => Some(Op::LSH),
-      0xf => Some(Op::RSH),
-      0x10 => Some(Op::NOT),
-      _ => None,
+      hvmc::run::ADD => Op::ADD,
+      hvmc::run::SUB => Op::SUB,
+      hvmc::run::MUL => Op::MUL,
+      hvmc::run::DIV => Op::DIV,
+      hvmc::run::MOD => Op::MOD,
+      hvmc::run::EQ => Op::EQ,
+      hvmc::run::NE => Op::NE,
+      hvmc::run::LT => Op::LT,
+      hvmc::run::GT => Op::GT,
+      hvmc::run::LTE => Op::LTE,
+      hvmc::run::GTE => Op::GTE,
+      hvmc::run::AND => Op::AND,
+      hvmc::run::OR => Op::OR,
+      hvmc::run::XOR => Op::XOR,
+      hvmc::run::LSH => Op::LSH,
+      hvmc::run::RSH => Op::RSH,
+      hvmc::run::NOT => Op::NOT,
+      _ => panic!("Invalid Op value: `{}`", value),
     }
   }
 }
