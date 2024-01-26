@@ -31,7 +31,11 @@ impl Term {
         (_, 0) => return Err(format!("Unscoped variable from lambda 'λ${nam}' is never used")),
         (1, _) => return Err(format!("Unscoped variable '${nam}' used more than once")),
         (_, 1) => return Err(format!("Unscoped lambda 'λ${nam}' declared more than once")),
-        (_, _) => return Err(format!("Unscoped lambda 'λ${nam}' and unscoped variable '${nam}' used more than once")),
+        (_, _) => {
+          return Err(format!(
+            "Unscoped lambda 'λ${nam}' and unscoped variable '${nam}' used more than once"
+          ));
+        }
       }
     }
     Ok(())
