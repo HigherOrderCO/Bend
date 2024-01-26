@@ -15,11 +15,7 @@ impl<'a> Reader<'a> {
           return self.resugar_adts(bod);
         };
 
-        match self.resugar_adt_cons(std::mem::take(term), adt, adt_name) {
-          Ok(adt) => *term = adt,
-          Err(err) => return self.error(err),
-        }
-
+        self.resugar_adt_cons(term, adt, adt_name);
         self.resugar_adts(term);
       }
 
@@ -32,11 +28,7 @@ impl<'a> Reader<'a> {
           return;
         };
 
-        match self.resugar_adt_match(std::mem::take(term), adt_name, adt) {
-          Ok(mtch) => *term = mtch,
-          Err(err) => return self.error(err),
-        };
-
+        self.resugar_adt_match(term, adt_name, adt);
         self.resugar_adts(term);
       }
 
@@ -67,90 +59,92 @@ impl<'a> Reader<'a> {
     }
   }
 
-  fn resugar_adt_cons(&mut self, mut term: Term, adt: &Adt, adt_name: &Name) -> Result<Term, ReadbackError> {
+  fn resugar_adt_cons(&mut self, term: &mut Term, adt: &Adt, adt_name: &Name) {
+    let mut app = &mut *term;
     let mut current_arm = None;
 
     for ctr in &adt.ctrs {
-      self.deref(&mut term);
-      match term {
-        Term::Lam { tag: Tag::Named(tag), nam, bod } if &tag == adt_name => {
+      self.deref(app);
+      match app {
+        Term::Lam { tag: Tag::Named(tag), nam, bod } if tag == adt_name => {
           if let Some(nam) = nam {
             if current_arm.is_some() {
-              return Err(ReadbackError::InvalidAdt);
+              return self.error(ReadbackError::InvalidAdt);
             }
             current_arm = Some((nam.clone(), ctr))
           }
-          term = *bod;
+          app = &mut *bod;
         }
-        _ => return Err(ReadbackError::InvalidAdt),
+        _ => return self.error(ReadbackError::InvalidAdt),
       }
     }
 
     let Some((arm_name, (ctr, ctr_args))) = current_arm else {
-      return Err(ReadbackError::InvalidAdt);
+      return self.error(ReadbackError::InvalidAdt);
     };
 
-    let mut cur = &mut term;
+    let mut cur = &mut *app;
 
     for _ in ctr_args {
       self.deref(cur);
       match cur {
         Term::App { tag: Tag::Static, fun, .. } => cur = fun,
+        // Removes the tag of the application with the adt field `#adt_name.cons_name.field_name`
         Term::App { tag: tag @ Tag::Named(_), fun, .. } => {
           *tag = Tag::Static;
           cur = fun
         }
-        _ => return Err(ReadbackError::InvalidAdt),
+        _ => return self.error(ReadbackError::InvalidAdt),
       }
     }
 
     match cur {
       Term::Var { nam } if nam == &arm_name => {}
-      _ => return Err(ReadbackError::InvalidAdt),
+      _ => return self.error(ReadbackError::InvalidAdt),
     }
 
     *cur = self.book.def_names.get_ref(ctr);
-
-    Ok(term)
+    *term = std::mem::take(app);
   }
 
-  fn resugar_adt_match(&mut self, mut term: Term, adt_name: &Name, adt: &Adt) -> Result<Term, ReadbackError> {
+  fn resugar_adt_match(&mut self, term: &mut Term, adt_name: &Name, adt: &Adt) {
+    let mut cur = &mut *term;
     let mut arms = Vec::new();
 
     for (ctr, ctr_args) in adt.ctrs.iter().rev() {
-      self.deref(&mut term);
-      match term {
-        Term::App { tag: Tag::Named(tag), fun, arg } if &tag == adt_name => {
+      self.deref(cur);
+      match cur {
+        Term::App { tag: Tag::Named(tag), fun, arg } if tag == adt_name => {
           let mut args = Vec::new();
-          let mut arm = *arg;
+          let mut arm = arg.as_mut();
 
           for _ in ctr_args {
-            self.deref(&mut arm);
+            self.deref(arm);
 
             if !matches!(arm, Term::Lam { tag: Tag::Static, .. }) {
               let nam = self.namegen.unique();
-              arm = Term::named_lam(nam.clone(), Term::arg_call(arm, Some(nam)));
+              *arm = Term::named_lam(nam.clone(), Term::arg_call(std::mem::take(arm), Some(nam)));
             }
 
             match arm {
               Term::Lam { nam, bod, .. } => {
                 args.push(nam.clone().map_or(Pattern::Var(None), |x| Pattern::Var(Some(x))));
-                arm = *bod;
+                arm = bod.as_mut();
               }
               _ => unreachable!(),
             }
           }
 
           arms.push((Pattern::Ctr(ctr.clone(), args), arm));
-          term = *fun;
+          cur = &mut *fun;
         }
-        _ => return Err(ReadbackError::InvalidAdtMatch),
+        _ => return self.error(ReadbackError::InvalidAdtMatch),
       }
     }
 
-    let scrutinee = Box::new(term);
-    let arms = arms.into_iter().rev().map(|(pat, term)| (pat, term)).collect();
-    Ok(Term::Match { scrutinee, arms })
+    let scrutinee = Box::new(std::mem::take(cur));
+    let arms = arms.into_iter().rev().map(|(pat, term)| (pat, std::mem::take(term))).collect();
+    *term = Term::Match { scrutinee, arms };
   }
 
   fn resugar_string(&mut self, term: Term) -> Term {
