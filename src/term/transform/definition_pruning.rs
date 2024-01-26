@@ -1,12 +1,17 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 
-use crate::term::{Book, DefId, Definition, Term};
+use indexmap::IndexSet;
 
-type Definitions = HashSet<DefId>;
+use crate::{
+  term::{Book, DefId, Definition, Term},
+  Warning,
+};
+
+type Definitions = IndexSet<DefId>;
 
 impl Book {
   /// Removes all unused definitions starting from Main.
-  pub fn prune(&mut self, main: DefId) {
+  pub fn prune(&mut self, main: DefId, prune: bool, warnings: &mut Vec<Warning>) {
     let mut used = Definitions::new();
     // Since the readback needs the constructors to work we need
     // to mark as used all constructors in case of the user
@@ -22,10 +27,15 @@ impl Book {
     used.insert(def.def_id);
     def.rules[0].body.find_used_definitions(&mut used, &self.defs);
 
-    let ids = HashSet::from_iter(self.def_names.def_ids().copied());
+    let ids = IndexSet::<DefId>::from_iter(self.def_names.def_ids().copied());
     let unused = ids.difference(&used);
     for &unused_id in unused {
-      self.remove_def(unused_id);
+      if prune {
+        self.remove_def(unused_id);
+      } else if !self.is_generated_def(unused_id) {
+        let def_name = self.def_names.id_to_name[&unused_id].clone();
+        warnings.push(Warning::UnusedDefinition { def_name })
+      }
     }
   }
 }

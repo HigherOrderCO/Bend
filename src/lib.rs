@@ -66,9 +66,7 @@ pub fn desugar_book(
   if simplify_main {
     book.simplify_main_ref(main);
   }
-  if prune {
-    book.prune(main);
-  }
+  book.prune(main, prune, &mut warnings);
   Ok((main, warnings))
 }
 
@@ -249,6 +247,7 @@ impl std::fmt::Debug for CompileResult {
 
 pub enum Warning {
   MatchOnlyVars { def_name: Name },
+  UnusedDefinition { def_name: Name },
 }
 
 impl std::fmt::Display for Warning {
@@ -257,6 +256,7 @@ impl std::fmt::Display for Warning {
       Warning::MatchOnlyVars { def_name } => {
         write!(f, "Match expression at definition '{def_name}' only uses var patterns.")
       }
+      Warning::UnusedDefinition { def_name } => write!(f, "Unused definition '{def_name}'."),
     }
   }
 }

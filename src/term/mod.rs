@@ -3,6 +3,7 @@ use indexmap::{IndexMap, IndexSet};
 use shrinkwraprs::Shrinkwrap;
 use std::collections::{BTreeMap, HashMap};
 
+pub mod builtin_adt;
 pub mod check;
 pub mod display;
 pub mod load_book;
@@ -10,7 +11,6 @@ pub mod net_to_term;
 pub mod parser;
 pub mod term_to_net;
 pub mod transform;
-pub mod builtin_adt;
 
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
@@ -35,8 +35,8 @@ pub struct Book {
 
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
-  id_to_name: HashMap<DefId, Name>,
-  name_to_id: HashMap<Name, DefId>,
+  id_to_name: IndexMap<DefId, Name>,
+  name_to_id: IndexMap<Name, DefId>,
   id_count: DefId,
 }
 
@@ -629,7 +629,7 @@ impl Pattern {
           go(fst, set);
           go(snd, set);
         }
-        Pattern::Var(_) => {},
+        Pattern::Var(_) => {}
         Pattern::Num(_) => {}
       }
     }
