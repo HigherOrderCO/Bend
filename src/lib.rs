@@ -52,13 +52,15 @@ pub fn desugar_book(
   book.generate_scott_adts();
   book.resolve_refs()?;
   encode_pattern_matching(book, &mut warnings)?;
+  // sanity check
   book.check_unbound_vars()?;
   book.normalize_native_matches()?;
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();
   book.eta_reduction(eta);
-  book.check_unbounds()?;
+  // sanity check
+  book.check_unbound_vars()?;
   if supercombinators {
     book.detach_supercombinators(main);
   }

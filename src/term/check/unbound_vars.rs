@@ -24,7 +24,7 @@ impl Book {
 
 impl Term {
   /// Checks that all variables are bound.
-  /// Precondition: References have been resolved.
+  /// Precondition: References have been resolved, implicit binds have been solved.
   pub fn check_unbound_vars<'a>(&'a self, scope: &mut HashMap<&'a Name, Val>) -> Result<(), String> {
     let mut globals = HashMap::new();
     check_uses(self, scope, &mut globals)?;
