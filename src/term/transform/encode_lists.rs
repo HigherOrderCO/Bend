@@ -78,6 +78,7 @@ impl Term {
 impl Pattern {
   pub fn encode_lists(&mut self) -> bool {
     match self {
+      Pattern::Var(Some(Name(nam))) => nam == LNIL,
       Pattern::List(pats) => {
         let lnil = Pattern::Var(Some(Name::new(LNIL)));
 
@@ -88,8 +89,8 @@ impl Pattern {
 
         true
       }
-      Pattern::Ctr(_, pats) => {
-        let mut uses = false;
+      Pattern::Ctr(Name(nam), pats) => {
+        let mut uses = nam == LCONS;
         for pat in pats {
           uses |= pat.encode_lists();
         }

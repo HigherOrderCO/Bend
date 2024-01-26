@@ -1,0 +1,4 @@
+main = *
+
+Foo SNil = 0
+Foo *    = 1
