@@ -78,7 +78,9 @@ impl Term {
 impl Pattern {
   pub fn encode_lists(&mut self) -> bool {
     match self {
-      Pattern::Var(Some(Name(nam))) => nam == LNIL,
+      // TODO: This should be removed once when we separate adding
+      // constructors to desugaring list terms.
+      Pattern::Var(Some(Name(nam))) => nam == LCONS || nam == LNIL,
       Pattern::List(pats) => {
         let lnil = Pattern::Var(Some(Name::new(LNIL)));
 
@@ -90,7 +92,7 @@ impl Pattern {
         true
       }
       Pattern::Ctr(Name(nam), pats) => {
-        let mut uses = nam == LCONS;
+        let mut uses = nam == LCONS || nam == LNIL;
         for pat in pats {
           uses |= pat.encode_lists();
         }

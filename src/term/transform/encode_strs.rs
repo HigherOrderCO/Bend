@@ -80,9 +80,9 @@ impl Term {
 impl Pattern {
   pub fn encode_str(&mut self) -> bool {
     match self {
-      Pattern::Var(Some(Name(nam))) => nam == SNIL,
+      Pattern::Var(Some(Name(nam))) => nam == SCONS || nam == SNIL,
       Pattern::Ctr(Name(nam), pats) => {
-        let mut uses = nam == SCONS;
+        let mut uses = nam == SCONS || nam == SNIL;
         for pat in pats {
           uses |= pat.encode_str();
         }
