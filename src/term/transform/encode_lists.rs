@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 
-use crate::term::{builtin_adt, Book, Name, Pattern, Tag, Term};
+use crate::term::{builtin_adt, Book, Name, Pattern, Term};
 
 pub const LIST: &str = "List";
 pub const LCONS: &str = "LCons";
@@ -39,12 +39,8 @@ impl Term {
 
         *self = els.iter_mut().rfold(lnil, |acc, nxt| {
           nxt.encode_lists();
-          let lcons_app = Term::App {
-            tag: Tag::Static,
-            fun: Box::new(Term::Var { nam: Name::new(LCONS) }),
-            arg: Box::new(nxt.clone()),
-          };
-          Term::App { tag: Tag::Static, fun: Box::new(lcons_app), arg: Box::new(acc) }
+          let lcons = Term::Var { nam: Name::new(LCONS) };
+          Term::call(lcons, [nxt.clone(), acc])
         });
 
         true

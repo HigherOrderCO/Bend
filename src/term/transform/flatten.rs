@@ -20,18 +20,10 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
   // For each group, split its internal rules
   let rules = def.rules.iter().map(|r| (def_name.clone(), r.clone())).collect_vec();
   let new_rules = split_group(&rules, def_names);
-  let len = new_rules.len();
 
   new_rules
     .into_iter()
-    .map(|(name, rules)| {
-      let def_id = def_names.def_id(&name).unwrap();
-
-      // If the rule was splitted into multiple, the rule taking place of the original is a generated one
-      let generated = if name == def_name && len > 1 { true } else { def.generated };
-
-      Definition { def_id, generated, rules }
-    })
+    .map(|(name, rules)| Definition { def_id: def_names.def_id(&name).unwrap(), rules })
     .collect()
 }
 
@@ -85,7 +77,7 @@ fn split_group(rules: &[(Name, Rule)], def_names: &mut DefNames) -> HashMap<Name
         split_rule_count += 1;
         let new_split_def_id = def_names.insert(new_split_name.clone());
 
-        let old_rule = make_old_rule(&rule.pats, new_split_def_id);
+        let old_rule = make_old_rule(&rule, new_split_def_id);
 
         let mut new_group = vec![(name.clone(), old_rule)];
 
@@ -113,13 +105,14 @@ fn split_group(rules: &[(Name, Rule)], def_names: &mut DefNames) -> HashMap<Name
 
 /// Makes the rule that replaces the original.
 /// The new version of the rule is flat and calls the next layer of pattern matching.
-fn make_old_rule(pats: &[Pattern], new_split_def_id: DefId) -> Rule {
+fn make_old_rule(rule: &Rule, new_split_def_id: DefId) -> Rule {
   //(Foo Tic (Bar a b) (Haz c d)) = A
   //(Foo Tic x         y)         = B
   //---------------------------------
   //(Foo Tic (Bar a b) (Haz c d)) = B[x <- (Bar a b), y <- (Haz c d)]
   //
   //(Foo.0 a b c d) = ...
+  let pats = &rule.pats;
   let mut new_pats = Vec::new();
   let mut new_body_args = Vec::new();
   let mut var_count = 0;
@@ -165,7 +158,7 @@ fn make_old_rule(pats: &[Pattern], new_split_def_id: DefId) -> Rule {
     }
   }
   let new_body = Term::call(Term::Ref { def_id: new_split_def_id }, new_body_args);
-  Rule { pats: new_pats, body: new_body }
+  Rule { pats: new_pats, body: new_body, generated: rule.generated }
 }
 
 /// Makes one of the new rules, flattening one layer of the original pattern.
@@ -194,8 +187,8 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_ctr_args.push(Term::Var { nam: new_nam.clone() });
           new_pats.push(Pattern::Var(Some(new_nam)));
         }
-        let rule_arg_def_id = def_names.def_id(rule_arg_name).unwrap();
-        let new_ctr = Term::call(Term::Ref { def_id: rule_arg_def_id }, new_ctr_args);
+        let def_ref = def_names.get_ref(rule_arg_name);
+        let new_ctr = Term::call(def_ref, new_ctr_args);
         new_body.subst(other_arg, &new_ctr);
       }
       // Since numbers don't have subpatterns this should be unreachable.
@@ -232,7 +225,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
       (Pattern::List(..), _) | (_, Pattern::List(..)) => unreachable!(),
     }
   }
-  Rule { pats: new_pats, body: new_body }
+  Rule { pats: new_pats, body: new_body, generated: true }
 }
 
 fn make_var_name(var_count: &mut usize) -> Name {

@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/readback_lnet/bad_net.hvm
 ---
-Invalid readback:
+Readback Warning:
 Reached Root
 *

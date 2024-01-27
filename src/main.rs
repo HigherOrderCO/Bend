@@ -114,15 +114,7 @@ fn main() {
           println!("\n{}", show_net(&lnet));
         }
 
-        println!(
-          "{}{}",
-          if readback_errors.is_empty() {
-            "".to_string()
-          } else {
-            format!("Invalid readback:\n{}\n", readback_errors.display(&def_names))
-          },
-          res_term.display(&def_names)
-        );
+        println!("{}{}", readback_errors.display(&def_names), res_term.display(&def_names));
 
         if args.stats {
           println!("\nRWTS   : {}", total_rewrites);

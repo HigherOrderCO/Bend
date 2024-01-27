@@ -221,10 +221,13 @@ where
 
 impl ReadbackErrors {
   pub fn display<'a>(&'a self, def_names: &'a DefNames) -> impl fmt::Display + '_ {
-    use std::collections::HashMap;
-
     DisplayFn(move |f| {
-      let mut err_counts = HashMap::new();
+      if self.0.is_empty() {
+        return Ok(());
+      }
+
+      writeln!(f, "Readback Warning:")?;
+      let mut err_counts = std::collections::HashMap::new();
       for err in &self.0 {
         if err.can_count() {
           *err_counts.entry(err).or_insert(0) += 1;
@@ -240,7 +243,7 @@ impl ReadbackErrors {
         }
       }
 
-      Ok(())
+      writeln!(f)
     })
   }
 }
@@ -253,6 +256,14 @@ impl ReadbackError {
       ReadbackError::Cyclic => write!(f, "Cyclic Term"),
       ReadbackError::InvalidBind => write!(f, "Invalid Bind"),
       ReadbackError::InvalidAdt => write!(f, "Invalid Adt"),
+      ReadbackError::UnexpectedTag(exp, fnd) => {
+        write!(f, "Unexpected tag found during Adt readback, expected '#{}', but found ", exp)?;
+
+        match fnd {
+          Tag::Static => write!(f, "no tag"),
+          _ => write!(f, "'{}'", fnd.display()),
+        }
+      }
       ReadbackError::InvalidAdtMatch => write!(f, "Invalid Adt Match"),
       ReadbackError::InvalidStrTerm(term) => {
         write!(f, "Invalid String Character value '{}'", term.display(def_names))

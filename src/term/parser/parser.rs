@@ -411,7 +411,7 @@ where
 {
   rule_body_missing_paren()
     .or(rule_pattern().then(term()))
-    .map(|((name, pats), body)| (name, Rule { pats, body }))
+    .map(|((name, pats), body)| (name, Rule { pats, body, generated: false }))
 }
 
 fn datatype<'a, I>() -> impl Parser<'a, I, (Name, Adt), extra::Err<Rich<'a, Token>>>
@@ -447,10 +447,10 @@ where
     for top_level in program {
       match top_level {
         TopLevel::Rule((nam, rule)) => {
-          if let Some(def_id) = book.def_names.def_id(&nam) {
-            book.defs.get_mut(&def_id).unwrap().rules.push(rule);
+          if let Some(def) = book.get_def_mut(&nam) {
+            def.rules.push(rule);
           } else {
-            book.insert_def(nam, false, vec![rule]);
+            book.insert_def(nam, vec![rule]);
           }
         }
         TopLevel::Adt((nam, adt)) => {

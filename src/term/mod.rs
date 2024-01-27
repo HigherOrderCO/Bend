@@ -9,6 +9,7 @@ pub mod display;
 pub mod load_book;
 pub mod net_to_term;
 pub mod parser;
+pub mod resugar;
 pub mod term_to_net;
 pub mod transform;
 
@@ -44,7 +45,6 @@ pub struct DefNames {
 #[derive(Debug, Clone)]
 pub struct Definition {
   pub def_id: DefId,
-  pub generated: bool,
   pub rules: Vec<Rule>,
 }
 
@@ -53,6 +53,8 @@ pub struct Definition {
 pub struct Rule {
   pub pats: Vec<Pattern>,
   pub body: Term,
+  /// Whether this rule body was auto generated or written by the user
+  pub generated: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -246,9 +248,18 @@ impl Book {
     Default::default()
   }
 
-  pub fn insert_def(&mut self, name: Name, is_generated: bool, rules: Vec<Rule>) -> DefId {
+  pub fn get_def(&self, rule_name: &Name) -> Option<&Definition> {
+    self.def_names.def_id(&rule_name).and_then(|def_id| self.defs.get(&def_id))
+  }
+
+  // TODO: This get_def/insert_def functions could have an `entry` api instead
+  pub fn get_def_mut(&mut self, rule_name: &Name) -> Option<&mut Definition> {
+    self.def_names.def_id(&rule_name).and_then(|def_id| self.defs.get_mut(&def_id))
+  }
+
+  pub fn insert_def(&mut self, name: Name, rules: Vec<Rule>) -> DefId {
     let def_id = self.def_names.insert(name);
-    let def = Definition { def_id, generated: is_generated, rules };
+    let def = Definition { def_id, rules };
     self.defs.insert(def_id, def);
     def_id
   }
@@ -257,6 +268,11 @@ impl Book {
     let def = self.defs.remove(&def_id);
     let name = self.def_names.remove(def_id);
     name.zip(def)
+  }
+
+  /// Checks if the name of the definition of the given DefId is generated or writen by the user
+  pub fn is_def_name_generated(&self, def_id: DefId) -> bool {
+    self.def_names.name(&def_id).map_or(false, |Name(name)| name.contains('$'))
   }
 }
 
@@ -307,6 +323,11 @@ impl DefNames {
   pub fn def_ids(&self) -> impl Iterator<Item = &DefId> {
     self.id_to_name.keys()
   }
+
+  #[track_caller]
+  pub fn get_ref(&self, rule_name: &Name) -> Term {
+    self.def_id(&rule_name).map(|def_id| Term::Ref { def_id }).unwrap()
+  }
 }
 
 impl Term {
@@ -317,6 +338,27 @@ impl Term {
       fun: Box::new(acc),
       arg: Box::new(arg),
     })
+  }
+
+  pub fn arg_call(fun: Term, arg: Option<Name>) -> Self {
+    let arg = Box::new(arg.map_or(Term::Era, |nam| Term::Var { nam }));
+    Term::App { tag: Tag::Static, fun: Box::new(fun), arg }
+  }
+
+  pub fn tagged_app(tag: Tag, fun: Term, arg: Term) -> Self {
+    Term::App { tag, fun: Box::new(fun), arg: Box::new(arg) }
+  }
+
+  pub fn named_lam(nam: Name, bod: Term) -> Self {
+    Term::Lam { tag: Tag::Static, nam: Some(nam), bod: Box::new(bod) }
+  }
+
+  pub fn erased_lam(bod: Term) -> Self {
+    Term::Lam { tag: Tag::Static, nam: None, bod: Box::new(bod) }
+  }
+
+  pub fn tagged_lam(tag: Tag, nam: Name, bod: Term) -> Self {
+    Term::Lam { tag, nam: Some(nam), bod: Box::new(bod) }
   }
 
   /// Substitute the occurences of a variable in a term with the given term.

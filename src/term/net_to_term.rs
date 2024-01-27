@@ -1,8 +1,4 @@
-use super::{
-  term_to_net::Labels,
-  transform::encode_strs::{SCONS, SNIL},
-  var_id_to_name, Book, DefId, MatchNum, Name, Op, Tag, Term, Val,
-};
+use super::{term_to_net::Labels, var_id_to_name, Book, MatchNum, Name, Op, Tag, Term, Val};
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
   term::Pattern,
@@ -47,35 +43,24 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
 
   reader.resugar_adts(&mut term);
 
-  (term, ReadbackErrors::new(reader.errors))
+  (term, reader.errors)
 }
 
-#[derive(Debug)]
-pub enum ReadbackError {
-  InvalidNumericMatch,
-  ReachedRoot,
-  Cyclic,
-  InvalidBind,
-  InvalidAdt,
-  InvalidAdtMatch,
-  InvalidStrTerm(Term),
-}
-
-struct Reader<'a> {
+pub struct Reader<'a> {
+  pub book: &'a Book,
+  pub namegen: NameGen,
   net: &'a INet,
   labels: &'a Labels,
-  book: &'a Book,
   dup_paths: Option<HashMap<u32, Vec<SlotId>>>,
   scope: Scope,
-  namegen: NameGen,
   seen: HashSet<Port>,
-  errors: Vec<ReadbackError>,
+  errors: ReadbackErrors,
 }
 
 impl<'a> Reader<'a> {
   fn read_term(&mut self, next: Port) -> Term {
     if self.dup_paths.is_none() && !self.seen.insert(next) {
-      self.errors.push(ReadbackError::Cyclic);
+      self.error(ReadbackError::Cyclic);
       return Term::Var { nam: Name::new("...") };
     }
 
@@ -117,7 +102,7 @@ impl<'a> Reader<'a> {
           let sel_kind = self.net.node(sel_node).kind;
           if sel_kind != (Con { lab: None }) {
             // TODO: Is there any case where we expect a different node type here on readback?
-            self.errors.push(ReadbackError::InvalidNumericMatch);
+            self.error(ReadbackError::InvalidNumericMatch);
             Term::new_native_match(scrutinee, Term::Era, None, Term::Era)
           } else {
             let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
@@ -131,7 +116,7 @@ impl<'a> Reader<'a> {
         _ => unreachable!(),
       },
       Ref { def_id } => {
-        if self.book.is_generated_def(def_id) {
+        if self.book.is_def_name_generated(def_id) {
           let def = self.book.defs.get(&def_id).unwrap();
           def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
@@ -193,11 +178,14 @@ impl<'a> Reader<'a> {
           let fst = self.read_term(self.net.enter_port(Port(node, 0)));
           let snd = self.read_term(self.net.enter_port(Port(node, 1)));
 
-          Term::Opx { op: Op::from_hvmc_label(opr).unwrap(), fst: Box::new(fst), snd: Box::new(snd) }
+          Term::Opx { op: Op::from_hvmc_label(opr), fst: Box::new(fst), snd: Box::new(snd) }
         }
         _ => unreachable!(),
       },
-      Rot => self.error(ReadbackError::ReachedRoot),
+      Rot => {
+        self.error(ReadbackError::ReachedRoot);
+        Term::Era
+      }
       Tup => match next.slot() {
         // If we're visiting a port 0, then it is a Tup.
         0 => self
@@ -232,12 +220,12 @@ impl<'a> Reader<'a> {
   ///
   /// # Example
   ///
-  /// ```text
+  /// ```hvm
   /// // λa let (a, b) = a; (a, b)
   /// ([a b] [a b])
   ///
-  /// The node `(a, b)` is just a reconstruction of the destructuring of `a`,  
-  /// So we can skip both steps and just return the "value" unchanged:
+  /// // The node `(a, b)` is just a reconstruction of the destructuring of `a`,  
+  /// // So we can skip both steps and just return the "value" unchanged:
   ///
   /// // λa a
   /// (a a)
@@ -269,140 +257,10 @@ impl<'a> Reader<'a> {
     let snd = self.read_term(snd_port);
     Err((fst, snd))
   }
-}
 
-impl<'a> Reader<'a> {
-  fn resugar_string(&mut self, term: &mut Term) -> Term {
-    fn go(term: &mut Term, str_term: &mut Term, rd: &mut Reader<'_>) {
-      match term {
-        Term::Lam { bod, .. } => go(bod, str_term, rd),
-        Term::App { tag, arg, .. } if *tag == Tag::string_scons_head() => {
-          match arg.as_mut() {
-            Term::Num { val } => {
-              let num = *val;
-              match str_term {
-                Term::Str { ref mut val } => {
-                  val.push(unsafe { char::from_u32_unchecked(num as u32) });
-                },
-                app @ Term::App { .. } => {
-                  insert_string_cons(app, Term::Num { val: num });
-                },
-                _ => unreachable!(),
-              };
-            }
-            Term::Var { nam } => recover_string_cons(str_term, Term::Var { nam: nam.clone() }),
-            Term::Lam { tag, bod, .. } if *tag == Tag::string() => {
-              let string = rd.resugar_string(bod);
-              recover_string_cons(str_term, string.clone());
-              rd.error(ReadbackError::InvalidStrTerm(string))
-            },
-            _ => {
-              let arg = std::mem::take(arg.as_mut());
-              recover_string_cons(str_term, arg.clone());
-              rd.error(ReadbackError::InvalidStrTerm(arg))
-            }
-          }
-        }
-        Term::App { fun, arg, .. } => {
-          go(fun, str_term, rd);
-          go(arg, str_term, rd);
-        }
-        Term::Var { .. } => {}
-        Term::Chn { .. }
-        | Term::Num { .. } // expected to appear only inside SCons.head
-        | Term::Lnk { .. }
-        | Term::Let { .. }
-        | Term::Tup { .. }
-        | Term::Dup { .. }
-        | Term::Sup { .. }
-        | Term::Str { .. }
-        | Term::List { .. }
-        | Term::Opx { .. }
-        | Term::Match { .. }
-        | Term::Ref { .. }
-        | Term::Era => rd.error(ReadbackError::InvalidStrTerm(term.clone())),
-      }
-    }
-    let mut str = Term::Str { val: String::new() };
-    go(term, &mut str, self);
-    str
+  pub fn error(&mut self, error: ReadbackError) {
+    self.errors.0.push(error);
   }
-
-  fn resugar_list(&mut self, term: &mut Term) -> Term {
-    let mut els = Vec::new();
-    fn go(t: &mut Term, els: &mut Vec<Term>, rd: &mut Reader<'_>) {
-      match t {
-        Term::Lam { tag, bod, .. } if *tag == Tag::list() => go(bod, els, rd),
-        Term::App { tag, arg, .. } if *tag == Tag::list_lcons_head() => {
-          if let Term::Lam { tag, bod, .. } = &mut **arg {
-            if *tag == Tag::list() {
-              els.push(rd.resugar_list(bod));
-            } else {
-              els.push(*arg.clone());
-            }
-          } else {
-            go(arg, els, rd)
-          }
-        }
-        Term::App { fun, arg, .. } => {
-          go(fun, els, rd);
-          go(arg, els, rd);
-        }
-        Term::Var { .. } => {}
-        other => els.push(other.clone()),
-      }
-    }
-    go(term, &mut els, self);
-    Term::List { els }
-  }
-}
-
-/// Recover string constructors when it is not possible to correctly readback a string
-fn recover_string_cons(term: &mut Term, cons_term: Term) {
-  match term {
-    Term::Str { val } => {
-      let snil = Term::Var { nam: Name::new(SNIL) };
-      let last_term = string_cons(cons_term, snil);
-      *term = string_app(val, last_term)
-    }
-    app @ Term::App { .. } => insert_string_cons(app, cons_term),
-    _ => unreachable!(),
-  }
-}
-
-/// Inserts a term as an `(SCons term)` application with the last argument of an app chain
-///
-/// # Example
-///
-/// ```text
-/// // app
-/// (SCons a (SCons b SNil))
-/// // inserting the term `c`
-/// (SCons a (SCons b (SCons c SNil)))
-/// ```
-fn insert_string_cons(app: &mut Term, term: Term) {
-  match app {
-    Term::App { arg, .. } => insert_string_cons(arg, term),
-    app => *app = string_cons(term, std::mem::take(app)),
-  }
-}
-
-/// If the string is empty, returns the arg
-/// Otherwise, converts to a `(SCons str_term arg)` application
-fn string_app(val: &str, arg: Term) -> Term {
-  let str_term = match val.len() {
-    0 => return arg,
-    1 => Term::Num { val: val.chars().next().unwrap().try_into().unwrap() },
-    _ => Term::Str { val: val.to_owned() },
-  };
-
-  string_cons(str_term, arg)
-}
-
-fn string_cons(term: Term, arg: Term) -> Term {
-  let svar = Term::Var { nam: Name::new(SCONS) };
-  let cons = Term::App { tag: Tag::Auto, fun: Box::new(svar), arg: Box::new(term) };
-  Term::App { tag: Tag::Auto, fun: Box::new(cons), arg: Box::new(arg) }
 }
 
 /// Represents `let (fst, snd) = val` if `tag` is `None`, and `dup#tag fst snd = val` otherwise.
@@ -463,75 +321,8 @@ impl Term {
       Some(n)
     }
   }
-}
 
-type Scope = IndexSet<NodeId>;
-
-#[derive(Default)]
-struct NameGen {
-  var_port_to_id: HashMap<Port, Val>,
-  id_counter: Val,
-}
-
-impl NameGen {
-  // Given a port, returns its name, or assigns one if it wasn't named yet.
-  fn var_name(&mut self, var_port: Port) -> Name {
-    let id = self.var_port_to_id.entry(var_port).or_insert_with(|| {
-      let id = self.id_counter;
-      self.id_counter += 1;
-      id
-    });
-
-    var_id_to_name(*id)
-  }
-
-  fn decl_name(&mut self, net: &INet, var_port: Port) -> Option<Name> {
-    // If port is linked to an erase node, return an unused variable
-    let var_use = net.enter_port(var_port);
-    let var_kind = net.node(var_use.node()).kind;
-    if let Era = var_kind { None } else { Some(self.var_name(var_port)) }
-  }
-
-  fn unique(&mut self) -> Name {
-    let id = self.id_counter;
-    self.id_counter += 1;
-    var_id_to_name(id)
-  }
-}
-
-impl Op {
-  pub fn from_hvmc_label(value: Loc) -> Option<Op> {
-    match value {
-      0x0 => Some(Op::ADD),
-      0x1 => Some(Op::SUB),
-      0x2 => Some(Op::MUL),
-      0x3 => Some(Op::DIV),
-      0x4 => Some(Op::MOD),
-      0x5 => Some(Op::EQ),
-      0x6 => Some(Op::NE),
-      0x7 => Some(Op::LT),
-      0x8 => Some(Op::GT),
-      0x9 => Some(Op::LTE),
-      0xa => Some(Op::GTE),
-      0xb => Some(Op::AND),
-      0xc => Some(Op::OR),
-      0xd => Some(Op::XOR),
-      0xe => Some(Op::LSH),
-      0xf => Some(Op::RSH),
-      0x10 => Some(Op::NOT),
-      _ => None,
-    }
-  }
-}
-
-impl Book {
-  pub fn is_generated_def(&self, def_id: DefId) -> bool {
-    self.def_names.name(&def_id).map_or(false, |Name(name)| name.contains('$'))
-  }
-}
-
-impl Term {
-  fn fix_names(&mut self, id_counter: &mut Val, book: &Book) {
+  pub fn fix_names(&mut self, id_counter: &mut Val, book: &Book) {
     fn fix_name(nam: &mut Option<Name>, id_counter: &mut Val, bod: &mut Term) {
       if let Some(nam) = nam {
         let name = var_id_to_name(*id_counter);
@@ -547,7 +338,7 @@ impl Term {
         bod.fix_names(id_counter, book);
       }
       Term::Ref { def_id } => {
-        if book.is_generated_def(*def_id) {
+        if book.is_def_name_generated(*def_id) {
           let def = book.defs.get(def_id).unwrap();
           def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
@@ -586,159 +377,79 @@ impl Term {
   }
 }
 
-impl<'a> Reader<'a> {
-  fn deref(&mut self, term: &mut Term) {
-    while let Term::Ref { def_id } = term {
-      let def = &self.book.defs[def_id];
-      def.assert_no_pattern_matching_rules();
-      *term = def.rules[0].body.clone();
-      term.fix_names(&mut self.namegen.id_counter, self.book);
-    }
+type Scope = IndexSet<NodeId>;
+
+#[derive(Default)]
+pub struct NameGen {
+  pub var_port_to_id: HashMap<Port, Val>,
+  pub id_counter: Val,
+}
+
+impl NameGen {
+  // Given a port, returns its name, or assigns one if it wasn't named yet.
+  fn var_name(&mut self, var_port: Port) -> Name {
+    let id = self.var_port_to_id.entry(var_port).or_insert_with(|| {
+      let id = self.id_counter;
+      self.id_counter += 1;
+      id
+    });
+
+    var_id_to_name(*id)
   }
-  fn resugar_adts(&mut self, term: &mut Term) {
-    match term {
-      Term::Lam { tag, bod, .. } if *tag == Tag::string() => *term = self.resugar_string(bod),
-      Term::Lam { tag, bod, .. } if *tag == Tag::list() => *term = self.resugar_list(bod),
-      Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
-        let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
-          return self.resugar_adts(bod);
-        };
-        let mut cur = &mut *term;
-        let mut current_arm = None;
-        for ctr in &adt.ctrs {
-          self.deref(cur);
-          match cur {
-            Term::Lam { tag: Tag::Named(tag), nam, bod } if &*tag == adt_name => {
-              if let Some(nam) = nam {
-                if current_arm.is_some() {
-                  return self.error(ReadbackError::InvalidAdt);
-                }
-                current_arm = Some((nam.clone(), ctr))
-              }
-              cur = bod;
-            }
-            _ => return self.error(ReadbackError::InvalidAdt),
-          }
-        }
-        let Some(current_arm) = current_arm else {
-          return self.error(ReadbackError::InvalidAdt);
-        };
-        let app = cur;
-        let mut cur = &mut *app;
-        for _ in current_arm.1.1 {
-          self.deref(cur);
-          match cur {
-            Term::App { tag: Tag::Static, fun, .. } => cur = fun,
-            Term::App { tag: tag @ Tag::Named(_), fun, .. } => {
-              *tag = Tag::Static;
-              cur = fun
-            }
-            _ => return self.error(ReadbackError::InvalidAdt),
-          }
-        }
-        match cur {
-          Term::Var { nam } if nam == &current_arm.0 => {}
-          _ => return self.error(ReadbackError::InvalidAdt),
-        }
-        let def_id = self.book.def_names.def_id(current_arm.1.0).unwrap();
-        *cur = Term::Ref { def_id };
-        let app = std::mem::take(app);
-        *term = app;
-        self.resugar_adts(term);
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => self.resugar_adts(bod),
-      Term::App { tag: Tag::Named(adt_name), fun, arg } => {
-        let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
-          self.resugar_adts(fun);
-          self.resugar_adts(arg);
-          return;
-        };
-        let mut cur = &mut *term;
-        let mut arms = Vec::new();
-        for ctr in adt.ctrs.iter().rev() {
-          self.deref(cur);
-          match cur {
-            Term::App { tag: Tag::Named(tag), fun, arg } if &*tag == adt_name => {
-              let mut args = Vec::new();
-              let mut arm_term = &mut **arg;
-              for _ in ctr.1 {
-                self.deref(arm_term);
-                if !matches!(arm_term, Term::Lam { tag: Tag::Static, .. } if &*tag == adt_name) {
-                  let nam = self.namegen.unique();
-                  let body = std::mem::take(arm_term);
-                  *arm_term = Term::Lam {
-                    tag: Tag::Static,
-                    nam: Some(nam.clone()),
-                    bod: Box::new(Term::App {
-                      tag: Tag::Static,
-                      fun: Box::new(body),
-                      arg: Box::new(Term::Var { nam }),
-                    }),
-                  };
-                }
-                match arm_term {
-                  Term::Lam { nam, bod, .. } => {
-                    args.push(match nam {
-                      Some(x) => Pattern::Var(Some(x.clone())),
-                      None => Pattern::Var(None),
-                    });
-                    arm_term = &mut **bod;
-                  }
-                  _ => unreachable!(),
-                }
-              }
-              arms.push((Pattern::Ctr(ctr.0.clone(), args), arm_term));
-              cur = &mut **fun;
-            }
-            _ => return self.error(ReadbackError::InvalidAdtMatch),
-          }
-        }
-        let scrutinee = std::mem::take(cur);
-        let arms = arms.into_iter().rev().map(|arm| (arm.0, std::mem::take(arm.1))).collect();
-        *term = Term::Match { scrutinee: Box::new(scrutinee), arms };
-        self.resugar_adts(term);
-      }
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Let { val: fst, nxt: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        self.resugar_adts(fst);
-        self.resugar_adts(snd);
-      }
-      Term::Match { scrutinee, arms } => {
-        self.resugar_adts(scrutinee);
-        for arm in arms {
-          self.resugar_adts(&mut arm.1);
-        }
-      }
-      Term::List { .. } => unreachable!(),
-      Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Var { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era => {}
-    }
+
+  fn decl_name(&mut self, net: &INet, var_port: Port) -> Option<Name> {
+    // If port is linked to an erase node, return an unused variable
+    let var_use = net.enter_port(var_port);
+    let var_kind = net.node(var_use.node()).kind;
+    if let Era = var_kind { None } else { Some(self.var_name(var_port)) }
   }
-  fn error<T: Default>(&mut self, error: ReadbackError) -> T {
-    self.errors.push(error);
-    T::default()
+
+  pub fn unique(&mut self) -> Name {
+    let id = self.id_counter;
+    self.id_counter += 1;
+    var_id_to_name(id)
   }
 }
 
+impl Op {
+  fn from_hvmc_label(value: Loc) -> Op {
+    match value {
+      hvmc::run::ADD => Op::ADD,
+      hvmc::run::SUB => Op::SUB,
+      hvmc::run::MUL => Op::MUL,
+      hvmc::run::DIV => Op::DIV,
+      hvmc::run::MOD => Op::MOD,
+      hvmc::run::EQ => Op::EQ,
+      hvmc::run::NE => Op::NE,
+      hvmc::run::LT => Op::LT,
+      hvmc::run::GT => Op::GT,
+      hvmc::run::LTE => Op::LTE,
+      hvmc::run::GTE => Op::GTE,
+      hvmc::run::AND => Op::AND,
+      hvmc::run::OR => Op::OR,
+      hvmc::run::XOR => Op::XOR,
+      hvmc::run::LSH => Op::LSH,
+      hvmc::run::RSH => Op::RSH,
+      hvmc::run::NOT => Op::NOT,
+      _ => panic!("Invalid Op value: `{}`", value),
+    }
+  }
+}
+
+#[derive(Default)]
 /// A structure that implements display logic for Readback Errors.
 pub struct ReadbackErrors(pub Vec<ReadbackError>);
 
-impl ReadbackErrors {
-  pub fn new(errs: Vec<ReadbackError>) -> Self {
-    Self(errs)
-  }
-
-  pub fn is_empty(&self) -> bool {
-    self.0.is_empty()
-  }
+#[derive(Debug)]
+pub enum ReadbackError {
+  InvalidNumericMatch,
+  ReachedRoot,
+  Cyclic,
+  InvalidBind,
+  InvalidAdt,
+  InvalidAdtMatch,
+  InvalidStrTerm(Term),
+  UnexpectedTag(Name, Tag),
 }
 
 impl ReadbackError {
@@ -750,7 +461,8 @@ impl ReadbackError {
       ReadbackError::InvalidBind => true,
       ReadbackError::InvalidAdt => true,
       ReadbackError::InvalidAdtMatch => true,
-      ReadbackError::InvalidStrTerm(..) => false,
+      ReadbackError::InvalidStrTerm(_) => false,
+      ReadbackError::UnexpectedTag(..) => false,
     }
   }
 }
