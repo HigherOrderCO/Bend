@@ -32,7 +32,7 @@ impl Book {
     for &unused_id in unused {
       if prune {
         self.remove_def(unused_id);
-      } else if !self.is_generated_def(unused_id) {
+      } else if !self.is_def_name_generated(unused_id) {
         let def_name = self.def_names.id_to_name[&unused_id].clone();
         warnings.push(Warning::UnusedDefinition { def_name })
       }

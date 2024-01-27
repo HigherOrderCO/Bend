@@ -30,7 +30,7 @@ impl Term {
     term_to_affine(self, &mut var_uses, &mut HashMap::new(), &mut HashMap::new());
   }
 
-  /// Returns false wether the term has no unscoped terms, 
+  /// Returns false wether the term has no unscoped terms,
   /// or all its unscoped binds and usage pairs are within the term.
   fn has_unscoped(&self) -> bool {
     let (decl, uses) = self.unscoped_vars();
