@@ -15,7 +15,9 @@ use hvml::{
 use insta::assert_snapshot;
 use itertools::Itertools;
 use std::{
-  collections::HashMap, fs, path::{Path, PathBuf}
+  collections::HashMap,
+  fs,
+  path::{Path, PathBuf},
 };
 use stdext::function_name;
 use walkdir::WalkDir;
