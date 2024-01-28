@@ -64,7 +64,7 @@ impl Term {
       Term::Match { scrutinee, arms } => {
         let mut used = scrutinee.encode_lists();
         for (pat, arm) in arms {
-          used |= pat.names().chain(pat.ctrs()).any(|Name(n)| matches!(n.as_str(), LCONS | LNIL));
+          used |= pat.encode_lists();
           used |= arm.encode_lists();
         }
         used

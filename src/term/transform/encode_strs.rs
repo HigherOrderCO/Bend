@@ -1,7 +1,7 @@
 use hvmc::run::Val;
 use indexmap::IndexMap;
 
-use crate::term::{builtin_adt, Book, Name, Pattern, Term};
+use crate::term::{builtin_adt, Book, Name, Term};
 
 pub const STRING: &str = "String";
 pub const SNIL: &str = "SNil";
@@ -16,7 +16,9 @@ impl builtin_adt::BuiltinAdt for BuiltinString {
     let mut found_str = false;
     for def in book.defs.values_mut() {
       for rule in &mut def.rules {
-        rule.pats.iter_mut().for_each(|pat| found_str |= pat.encode_str());
+        rule.pats.iter_mut().for_each(|pat| {
+          found_str |= pat.names().chain(pat.ctrs()).any(|Name(n)| matches!(n.as_str(), SCONS | SNIL))
+        });
         found_str |= rule.body.encode_str();
       }
     }
@@ -73,22 +75,6 @@ impl Term {
       }
       Term::Var { nam: Name(nam) } => nam == SCONS || nam == SNIL,
       Term::Lnk { .. } | Term::Num { .. } | Term::Ref { .. } | Term::Era => false,
-    }
-  }
-}
-
-impl Pattern {
-  pub fn encode_str(&mut self) -> bool {
-    match self {
-      Pattern::Var(Some(Name(nam))) => nam == SCONS || nam == SNIL,
-      Pattern::Ctr(Name(nam), pats) => {
-        let mut uses = nam == SCONS || nam == SNIL;
-        for pat in pats {
-          uses |= pat.encode_str();
-        }
-        uses
-      }
-      _ => false,
     }
   }
 }

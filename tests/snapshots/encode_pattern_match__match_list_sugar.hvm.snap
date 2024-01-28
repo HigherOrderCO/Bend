@@ -1,0 +1,19 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/match_list_sugar.hvm
+---
+(main) = let %temp%scrutinee = LNil; (main$match$1 %temp%scrutinee)
+
+(LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)
+
+(LNil) = #List λLCons #List λLNil LNil
+
+(main$match$1) = λx #List (x main$match$1$PLCons main$match$1$PLNil)
+
+(main$match$1$R0) = 0
+
+(main$match$1$R1) = λ* 1
+
+(main$match$1$PLCons) = #List.LCons.head λy0 #List.LCons.tail λy1 (main$match$1$R1 *)
+
+(main$match$1$PLNil) = main$match$1$R0
