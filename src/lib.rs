@@ -50,7 +50,6 @@ pub fn desugar_book(
   book.encode_builtin_adt(BuiltinString)?;
   book.encode_builtin_adt(BuiltinList)?;
   book.generate_scott_adts();
-  book.resolve_refs()?;
   encode_pattern_matching(book, &mut warnings)?;
   // sanity check
   book.check_unbound_vars()?;
@@ -77,6 +76,7 @@ pub fn desugar_book(
 pub fn encode_pattern_matching(book: &mut Book, warnings: &mut Vec<Warning>) -> Result<(), String> {
   book.resolve_ctrs_in_pats();
   book.check_unbound_pats()?;
+  book.resolve_refs()?;
   book.desugar_let_destructors();
   book.desugar_implicit_match_binds();
   // This call to unbound vars needs to be after desugar_implicit_match_binds,
