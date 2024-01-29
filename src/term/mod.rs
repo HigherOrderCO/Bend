@@ -34,8 +34,8 @@ pub struct Book {
 
 #[derive(Debug, Clone, Default)]
 pub struct DefNames {
-  id_to_name: IndexMap<DefId, Name>,
-  name_to_id: IndexMap<Name, DefId>,
+  pub id_to_name: IndexMap<DefId, Name>,
+  pub name_to_id: IndexMap<Name, DefId>,
   id_count: DefId,
 }
 
@@ -63,13 +63,13 @@ pub enum Origin {
   Generated,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MatchNum {
   Zero,
   Succ(Option<Option<Name>>),
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Tag {
   Named(Name),
   Numeric(u32),
@@ -77,7 +77,7 @@ pub enum Tag {
   Static,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub enum Term {
   Lam {
     tag: Tag,
@@ -149,7 +149,7 @@ pub enum Term {
   Era,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
   Var(Option<Name>),
   Ctr(Name, Vec<Pattern>),
@@ -158,7 +158,7 @@ pub enum Pattern {
   List(Vec<Pattern>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Op {
   ADD,
   SUB,

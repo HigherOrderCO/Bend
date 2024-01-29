@@ -43,7 +43,7 @@ impl Book {
   }
 }
 
-fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) {
+pub fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) {
   match term {
     Term::Ref { def_id } => {
       if let Some(target_id) = ref_map.get(def_id) {
