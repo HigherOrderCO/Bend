@@ -16,16 +16,27 @@ struct Args {
   pub verbose: bool,
 
   #[arg(
-    short = 'W',
+    short = 'D',
+    long = "deny",
     value_delimiter = ' ',
     action = clap::ArgAction::Append,
-    long_help = r#"Skip compilation warnings
+    long_help = r#"Deny compilation warnings
     all, unused-defs, match-only-vars"#
   )]
-  pub skip_warnings: Vec<String>,
+  pub deny_warnings: Vec<String>,
+
+  #[arg(
+    short = 'A',
+    long = "allow",
+    value_delimiter = ' ',
+    action = clap::ArgAction::Append,
+    long_help = r#"Allow compilation warnings
+    all, unused-defs, match-only-vars"#
+  )]
+  pub allow_warnings: Vec<String>,
 
   #[arg(long, help = "Stops if any warning was produced")]
-  pub errors: bool,
+  pub fatal_warnings: bool,
 
   #[arg(short, long, help = "Shows runtime stats and rewrite counts")]
   pub stats: bool,
@@ -91,7 +102,8 @@ fn main() {
     let mut opts = Opts::light();
     Opts::from_vec(&mut opts, args.opts)?;
     let mut warning_opts = WarningOpts::default();
-    WarningOpts::from_vec(&mut warning_opts, args.skip_warnings)?;
+    WarningOpts::deny(&mut warning_opts, args.deny_warnings)?;
+    WarningOpts::allow(&mut warning_opts, args.allow_warnings)?;
 
     let mut book = load_file_to_book(&args.path)?;
     if args.verbose {
@@ -123,7 +135,7 @@ fn main() {
           !args.single_core,
           args.debug,
           args.linear,
-          args.errors,
+          args.fatal_warnings,
           warning_opts,
           opts,
         )?;
