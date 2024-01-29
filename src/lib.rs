@@ -33,7 +33,9 @@ pub fn compile_book(book: &mut Book, opts: Opts) -> Result<CompileResult, String
   let (main, warnings) = desugar_book(book, opts)?;
   let (nets, hvmc_names, labels) = book_to_nets(book, main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
-  pre_reduce_book(&mut core_book, opts.pre_reduce)?;
+  if opts.pre_reduce {
+    pre_reduce_book(&mut core_book, opts.cross_refs)?;
+  }
   if opts.prune {
     prune_defs(&mut core_book);
   }
@@ -186,6 +188,9 @@ pub struct Opts {
 
   /// Enables [term::transform::simplify_main_ref].
   pub simplify_main: bool,
+
+  /// TODO
+  pub cross_refs: bool,
 }
 
 impl Opts {
@@ -198,6 +203,7 @@ impl Opts {
       pre_reduce: true,
       supercombinators: true,
       simplify_main: true,
+      cross_refs: true,
     }
   }
 
@@ -225,6 +231,8 @@ impl Opts {
         "no-supercombinators" => self.supercombinators = false,
         "simplify-main" => self.simplify_main = true,
         "no-simplify-main" => self.simplify_main = false,
+        "cross-refs" => self.cross_refs = true,
+        "no-cross-refs" => self.cross_refs = false,
         other => return Err(format!("Unknown option '{other}'.")),
       }
     }

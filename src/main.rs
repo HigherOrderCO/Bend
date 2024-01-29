@@ -39,7 +39,7 @@ struct Args {
     long_help = r#"Enables or disables the given optimizations
     all, eta, no-eta, prune, no-prune, ref-to-ref, no-ref-to-ref,
     supercombinators (enabled by default), no-supercombinators,
-    simplify-main, no-simplify-main
+    simplify-main, no-simplify-main, cross-refs, no-cross-refs
     "#,
   )]
   pub opts: Vec<String>,
