@@ -4,12 +4,18 @@ use crate::term::{Book, DefNames, MatchNum, Name, Pattern, Term};
 
 impl Book {
   /// Decides if names inside a term belong to a Var or to a Ref.
-  /// Precondition: Refs are encoded as vars.
+  /// Precondition: Refs are encoded as vars, Constructors are resolved.
   /// Postcondition: Refs are encoded as refs, with the correct def id.
   pub fn resolve_refs(&mut self) -> Result<(), String> {
     for def in self.defs.values_mut() {
       for rule in def.rules.iter_mut() {
-        rule.body.resolve_refs(&self.def_names)?;
+        let mut scope = HashMap::new();
+        rule.pats.iter().for_each(|pat| {
+          pat.names().cloned().for_each(|name| {
+            push_scope(Some(name), &mut scope);
+          })
+        });
+        rule.body.resolve_refs(&self.def_names, &mut scope)?;
       }
     }
     Ok(())
@@ -17,8 +23,12 @@ impl Book {
 }
 
 impl Term {
-  pub fn resolve_refs(&mut self, def_names: &DefNames) -> Result<(), String> {
-    resolve_refs(self, def_names, &mut HashMap::new())
+  pub fn resolve_refs(
+    &mut self,
+    def_names: &DefNames,
+    scope: &mut HashMap<Name, usize>,
+  ) -> Result<(), String> {
+    resolve_refs(self, def_names, scope)
   }
 }
 
