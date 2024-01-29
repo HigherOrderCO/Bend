@@ -98,17 +98,25 @@ pub fn run_book(
   parallel: bool,
   debug: bool,
   linear: bool,
-  skip_warnings: bool,
+  errors: bool,
+  mut warning_opts: WarningOpts,
   opts: Opts,
 ) -> Result<(Term, DefNames, RunInfo), String> {
   let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opts)?;
+  let warnings = warning_opts.filter(warnings);
 
-  if !warnings.is_empty() {
-    let warnings = warnings.iter().join("\n");
-    if !skip_warnings {
-      return Err(format!("{warnings}\nCould not run the code because of the previous warnings"));
-    } else {
-      eprintln!("{warnings}");
+  // if both enabled, ignore the all option
+  if warning_opts.all && errors {
+    warning_opts.all = false;
+  }
+  if !warning_opts.all {
+    if !warnings.is_empty() {
+      let warnings = warnings.iter().join("\n");
+      if errors {
+        return Err(format!("{warnings}\nCould not run the code because of the previous warnings"));
+      } else {
+        eprintln!("{warnings}");
+      }
     }
   }
 
@@ -237,6 +245,52 @@ impl Opts {
       }
     }
     Ok(())
+  }
+}
+
+#[derive(Default)]
+pub struct WarningOpts {
+  pub all: bool,
+  pub match_only_vars: bool,
+  pub unused_defs: bool,
+}
+
+impl WarningOpts {
+  pub fn all() -> Self {
+    Self { all: true, match_only_vars: true, unused_defs: true }
+  }
+
+  // TODO(refactor): this kind of code does not look good
+  pub fn from_vec(&mut self, values: Vec<String>) -> Result<(), String> {
+    for value in values {
+      match value.as_ref() {
+        "all" => self.all = true,
+        "unused-defs" => self.unused_defs = true,
+        "mach-only-vars" => self.match_only_vars = true,
+        other => return Err(format!("Unknown option '{other}'.")),
+      }
+    }
+    Ok(())
+  }
+
+  /// Removes warnings based on the enabled flags.
+  pub fn filter(&self, wrns: Vec<Warning>) -> Vec<Warning> {
+    if self.all {
+      // return the vec in case of the --errors flag be enabled
+      return wrns;
+    };
+    wrns
+      .into_iter()
+      .filter(|w| {
+        if self.match_only_vars {
+          !matches!(w, Warning::MatchOnlyVars { .. })
+        } else if self.unused_defs {
+          !matches!(w, Warning::UnusedDefinition { .. })
+        } else {
+          true
+        }
+      })
+      .collect_vec()
   }
 }
 

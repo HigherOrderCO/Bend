@@ -2,6 +2,7 @@ use clap::{Parser, ValueEnum};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
   check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, Opts, RunInfo,
+  WarningOpts,
 };
 use std::path::PathBuf;
 
@@ -14,8 +15,17 @@ struct Args {
   #[arg(short, long)]
   pub verbose: bool,
 
-  #[arg(short = 'w', help = "Skip compilation warnings")]
-  pub skip_warnings: bool,
+  #[arg(
+    short = 'W',
+    value_delimiter = ' ',
+    action = clap::ArgAction::Append,
+    long_help = r#"Skip compilation warnings
+    all, unused-defs, match-only-vars"#
+  )]
+  pub skip_warnings: Vec<String>,
+
+  #[arg(long, help = "Stops if any warning was produced")]
+  pub errors: bool,
 
   #[arg(short, long, help = "Shows runtime stats and rewrite counts")]
   pub stats: bool,
@@ -80,6 +90,8 @@ fn main() {
     let args = Args::parse();
     let mut opts = Opts::light();
     Opts::from_vec(&mut opts, args.opts)?;
+    let mut warning_opts = WarningOpts::default();
+    WarningOpts::from_vec(&mut warning_opts, args.skip_warnings)?;
 
     let mut book = load_file_to_book(&args.path)?;
     if args.verbose {
@@ -105,8 +117,16 @@ fn main() {
       }
       Mode::Run => {
         let mem_size = args.mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
-        let (res_term, def_names, info) =
-          run_book(book, mem_size, !args.single_core, args.debug, args.linear, args.skip_warnings, opts)?;
+        let (res_term, def_names, info) = run_book(
+          book,
+          mem_size,
+          !args.single_core,
+          args.debug,
+          args.linear,
+          args.errors,
+          warning_opts,
+          opts,
+        )?;
         let RunInfo { stats, readback_errors, net: lnet } = info;
         let total_rewrites = total_rewrites(&stats.rewrites) as f64;
         let rps = total_rewrites / stats.run_time / 1_000_000.0;
