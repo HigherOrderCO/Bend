@@ -8,6 +8,7 @@
 | `-Oref-to-ref` `-Ono-ref-to-ref` | Disabled | [ref-to-ref](#ref-to-ref) |
 | `-Oprune` `-Ono-prune` | Disabled | [definition-pruning](#definition-pruning) |
 | `-Opre-reduce` `-Ono-pre-reduce` | Disabled | [pre-reduce](#pre-reduce) |
+| `-Opre-reduce-refs` `-Ono-pre-reduce-refs` | Disabled | [pre-reduce-refs](#pre-reduce-refs) | 
 | `-Osupercombinators` `-Ono-supercombinators` | Enabled  | [supercombinators](#supercombinators) |
 | `-Osimplify-main` `-Ono-simplify-main` | Disabled | [simplify-main](#simplify-main) |
 
@@ -107,6 +108,39 @@ main = foo
 @main = @foo
 ```
 
+## Pre-reduce-refs
+
+Is triggered only if the [pre-reduce](#pre-reduce) option is enabled.
+
+If enabled, the pre-reduce pass will also reduce reference applications, leading to full normalization of each compiled net.
+
+Example:
+```rs
+foo = (+ 2 2)
+
+bar = (+ foo foo)
+
+main = (bar)
+
+// -Opre-reduce-refs, compilation output
+@bar = #8
+@foo = #4
+@main = @bar
+
+// -Ono-pre-reduce-refs, compilation output
+@bar = a
+& @foo ~ <+ @foo a>
+@foo = #4
+@main = @bar
+
+// -Ono-pre-reduce, compilation output
+@bar = a
+& @foo ~ <+ @foo a>
+@foo = a
+& #2 ~ <+ #2 a>
+@main = @bar
+```
+
 ## Supercombinators
 
 Extracts closed terms to new definitions. See [lazy definitions](lazy-definitions#automatic-optimization).
@@ -133,7 +167,7 @@ fold = λinit λf λxs (xs λh λt (fold (f init h) f t) init)
 If enabled, when directly calling another function, substitute the ref with a copy of its body.
 
 Example:
-```
+```rs
 // program
 id = λx x
 main = id
