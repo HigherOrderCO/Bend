@@ -266,7 +266,7 @@ impl WarningOpts {
       match value.as_ref() {
         "all" => self.all = true,
         "unused-defs" => self.unused_defs = true,
-        "mach-only-vars" => self.match_only_vars = true,
+        "match-only-vars" => self.match_only_vars = true,
         other => return Err(format!("Unknown option '{other}'.")),
       }
     }
