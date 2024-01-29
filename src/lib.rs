@@ -189,7 +189,7 @@ pub struct Opts {
   /// Enables [term::transform::simplify_main_ref].
   pub simplify_main: bool,
 
-  /// TODO
+  /// Enables dereferences in `pre_reduce` pass.
   pub cross_refs: bool,
 }
 

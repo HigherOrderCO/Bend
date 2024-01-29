@@ -152,7 +152,7 @@ main = (a a)
 
 Is triggered only if the [pre-reduce](#pre-reduce) option is enabled.
 
-If enabled, will dereferentiate and try to find the smallest net.
+If enabled, will dereference and try to find the smallest net.
 
 Example:
 ```rs
