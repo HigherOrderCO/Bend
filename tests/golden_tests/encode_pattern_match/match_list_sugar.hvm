@@ -1,0 +1,5 @@
+main =
+  match LNil {
+  | []: 0
+  |  *: 1
+  }

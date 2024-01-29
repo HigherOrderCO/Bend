@@ -64,7 +64,7 @@ impl Term {
       Term::Match { scrutinee, arms } => {
         let mut used = scrutinee.encode_lists();
         for (pat, arm) in arms {
-          used |= pat.names().chain(pat.ctrs()).any(|Name(n)| matches!(n.as_str(), LCONS | LNIL));
+          used |= pat.encode_lists();
           used |= arm.encode_lists();
         }
         used
@@ -78,6 +78,9 @@ impl Term {
 impl Pattern {
   pub fn encode_lists(&mut self) -> bool {
     match self {
+      // TODO: This should be removed once when we separate adding
+      // constructors to desugaring list terms.
+      Pattern::Var(Some(Name(nam))) => nam == LCONS || nam == LNIL,
       Pattern::List(pats) => {
         let lnil = Pattern::Var(Some(Name::new(LNIL)));
 
@@ -88,8 +91,8 @@ impl Pattern {
 
         true
       }
-      Pattern::Ctr(_, pats) => {
-        let mut uses = false;
+      Pattern::Ctr(Name(nam), pats) => {
+        let mut uses = nam == LCONS || nam == LNIL;
         for pat in pats {
           uses |= pat.encode_lists();
         }

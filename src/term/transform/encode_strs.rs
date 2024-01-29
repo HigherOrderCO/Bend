@@ -16,6 +16,9 @@ impl builtin_adt::BuiltinAdt for BuiltinString {
     let mut found_str = false;
     for def in book.defs.values_mut() {
       for rule in &mut def.rules {
+        rule.pats.iter_mut().for_each(|pat| {
+          found_str |= pat.names().chain(pat.ctrs()).any(|Name(n)| matches!(n.as_str(), SCONS | SNIL))
+        });
         found_str |= rule.body.encode_str();
       }
     }
