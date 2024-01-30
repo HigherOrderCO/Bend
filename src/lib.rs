@@ -7,7 +7,7 @@ use hvmc::{
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
 use itertools::Itertools;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
-use std::time::Instant;
+use std::{time::Instant, vec::IntoIter};
 use term::{
   book_to_nets, net_to_term,
   term_to_net::{HvmcNames, Labels},
@@ -265,36 +265,37 @@ pub enum WarningArgs {
 }
 
 impl WarningOpts {
-  pub fn deny_all() -> Self {
-    Self { match_only_vars: WarnState::Deny, unused_defs: WarnState::Deny }
+  pub fn go(
+    &mut self,
+    wopts_id_seq: Vec<&clap::Id>,
+    allows: &mut IntoIter<WarningArgs>,
+    denies: &mut IntoIter<WarningArgs>,
+    warns: &mut IntoIter<WarningArgs>,
+  ) {
+    for id in wopts_id_seq {
+      match id.as_ref() {
+        "allows" => self.set(allows.next().unwrap(), Self::allow_all(), WarnState::Allow),
+        "denies" => self.set(denies.next().unwrap(), Self::deny_all(), WarnState::Deny),
+        "warns" => self.set(warns.next().unwrap(), Self::default(), WarnState::Warn),
+        _ => {}
+      }
+    }
   }
 
   pub fn allow_all() -> Self {
     Self { match_only_vars: WarnState::Allow, unused_defs: WarnState::Allow }
   }
 
-  // TODO(refactor): this kind of code does not look good
-  fn iter_vals(&mut self, values: Vec<WarningArgs>, all: Self, switch: WarnState) -> Result<(), String> {
-    for value in values {
-      match value {
-        WarningArgs::All => *self = all,
-        WarningArgs::UnusedDefs => self.unused_defs = switch,
-        WarningArgs::MatchOnlyVars => self.match_only_vars = switch,
-      }
+  fn set(&mut self, val: WarningArgs, all: Self, switch: WarnState) {
+    match val {
+      WarningArgs::All => *self = all,
+      WarningArgs::UnusedDefs => self.unused_defs = switch,
+      WarningArgs::MatchOnlyVars => self.match_only_vars = switch,
     }
-    Ok(())
   }
 
-  pub fn allow(&mut self, values: Vec<WarningArgs>) -> Result<(), String> {
-    self.iter_vals(values, Self::allow_all(), WarnState::Allow)
-  }
-
-  pub fn warn(&mut self, values: Vec<WarningArgs>) -> Result<(), String> {
-    self.iter_vals(values, Self::default(), WarnState::Warn)
-  }
-
-  pub fn deny(&mut self, values: Vec<WarningArgs>) -> Result<(), String> {
-    self.iter_vals(values, Self::deny_all(), WarnState::Deny)
+  pub fn deny_all() -> Self {
+    Self { match_only_vars: WarnState::Deny, unused_defs: WarnState::Deny }
   }
 
   /// Filters warnings based on the enabled flags.

@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum};
+use clap::{CommandFactory, Parser, ValueEnum};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
   check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, Opts, RunInfo,
@@ -15,36 +15,37 @@ struct Args {
   #[arg(short, long)]
   pub verbose: bool,
 
-  #[arg(
-    short = 'W',
-    long = "warn",
-    value_delimiter = ' ',
-    action = clap::ArgAction::Append,
-    long_help = r#"Show compilation warnings
-    all, unused-defs, match-only-vars"#
-  )]
-  pub warns: Vec<hvml::WarningArgs>,
+  #[command(flatten)]
+  pub wopts: WOpts,
+  // #[arg(
+  //   short = 'W',
+  //   long = "warn",
+  //   value_delimiter = ' ',
+  //   action = clap::ArgAction::Append,
+  //   long_help = r#"Show compilation warnings
+  //   all, unused-defs, match-only-vars"#
+  // )]
+  // pub warns: Vec<hvml::WarningArgs>,
 
-  #[arg(
-    short = 'D',
-    long = "deny",
-    value_delimiter = ' ',
-    action = clap::ArgAction::Append,
-    long_help = r#"Deny compilation warnings
-    all, unused-defs, match-only-vars"#
-  )]
-  pub denies: Vec<hvml::WarningArgs>,
+  // #[arg(
+  //   short = 'D',
+  //   long = "deny",
+  //   value_delimiter = ' ',
+  //   action = clap::ArgAction::Append,
+  //   long_help = r#"Deny compilation warnings
+  //   all, unused-defs, match-only-vars"#
+  // )]
+  // pub denies: Vec<hvml::WarningArgs>,
 
-  #[arg(
-    short = 'A',
-    long = "allow",
-    value_delimiter = ' ',
-    action = clap::ArgAction::Append,
-    long_help = r#"Allow compilation warnings
-    all, unused-defs, match-only-vars"#
-  )]
-  pub allows: Vec<hvml::WarningArgs>,
-
+  // #[arg(
+  //   short = 'A',
+  //   long = "allow",
+  //   value_delimiter = ' ',
+  //   action = clap::ArgAction::Append,
+  //   long_help = r#"Allow compilation warnings
+  //   all, unused-defs, match-only-vars"#
+  // )]
+  // pub allows: Vec<hvml::WarningArgs>,
   #[arg(short, long, help = "Shows runtime stats and rewrite counts")]
   pub stats: bool,
 
@@ -74,6 +75,40 @@ struct Args {
 
   #[arg(help = "Path to the input file")]
   pub path: PathBuf,
+}
+
+#[derive(clap::Args, Debug)]
+#[group(multiple = true)]
+struct WOpts {
+  #[arg(
+    short = 'W',
+    long = "warn",
+    value_delimiter = ' ',
+    action = clap::ArgAction::Append,
+    long_help = r#"Show compilation warnings
+    all, unused-defs, match-only-vars"#
+  )]
+  pub warns: Vec<hvml::WarningArgs>,
+
+  #[arg(
+    short = 'D',
+    long = "deny",
+    value_delimiter = ' ',
+    action = clap::ArgAction::Append,
+    long_help = r#"Deny compilation warnings
+    all, unused-defs, match-only-vars"#
+  )]
+  pub denies: Vec<hvml::WarningArgs>,
+
+  #[arg(
+    short = 'A',
+    long = "allow",
+    value_delimiter = ' ',
+    action = clap::ArgAction::Append,
+    long_help = r#"Allow compilation warnings
+    all, unused-defs, match-only-vars"#
+  )]
+  pub allows: Vec<hvml::WarningArgs>,
 }
 
 #[derive(ValueEnum, Clone, Debug)]
@@ -110,9 +145,12 @@ fn main() {
     Opts::from_vec(&mut opts, args.opts)?;
 
     let mut warning_opts = WarningOpts::default();
-    WarningOpts::allow(&mut warning_opts, args.allows)?;
-    WarningOpts::deny(&mut warning_opts, args.denies)?;
-    WarningOpts::warn(&mut warning_opts, args.warns)?;
+    let argm = Args::command().get_matches();
+    let wopts_id_seq = argm.get_many::<clap::Id>("WOpts").unwrap().collect::<Vec<_>>();
+    let allows = &mut args.wopts.allows.into_iter();
+    let denies = &mut args.wopts.denies.into_iter();
+    let warns = &mut args.wopts.warns.into_iter();
+    WarningOpts::go(&mut warning_opts, wopts_id_seq, allows, denies, warns);
 
     let mut book = load_file_to_book(&args.path)?;
     if args.verbose {
