@@ -111,11 +111,12 @@ impl WOpts {
   fn get_warning_opts(self) -> WarningOpts {
     let mut warning_opts = WarningOpts::default();
     let argm = Args::command().get_matches();
-    let wopts_id_seq = argm.get_many::<clap::Id>("WOpts").unwrap().collect::<Vec<_>>();
-    let allows = &mut self.allows.into_iter();
-    let denies = &mut self.denies.into_iter();
-    let warns = &mut self.warns.into_iter();
-    WarningOpts::from_cli_opts(&mut warning_opts, wopts_id_seq, allows, denies, warns);
+    if let Some(wopts_id_seq) = argm.get_many::<clap::Id>("WOpts") {
+      let allows = &mut self.allows.into_iter();
+      let denies = &mut self.denies.into_iter();
+      let warns = &mut self.warns.into_iter();
+      WarningOpts::from_cli_opts(&mut warning_opts, wopts_id_seq.collect(), allows, denies, warns);
+    }
     warning_opts
   }
 }
