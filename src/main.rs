@@ -17,35 +17,7 @@ struct Args {
 
   #[command(flatten)]
   pub wopts: WOpts,
-  // #[arg(
-  //   short = 'W',
-  //   long = "warn",
-  //   value_delimiter = ' ',
-  //   action = clap::ArgAction::Append,
-  //   long_help = r#"Show compilation warnings
-  //   all, unused-defs, match-only-vars"#
-  // )]
-  // pub warns: Vec<hvml::WarningArgs>,
 
-  // #[arg(
-  //   short = 'D',
-  //   long = "deny",
-  //   value_delimiter = ' ',
-  //   action = clap::ArgAction::Append,
-  //   long_help = r#"Deny compilation warnings
-  //   all, unused-defs, match-only-vars"#
-  // )]
-  // pub denies: Vec<hvml::WarningArgs>,
-
-  // #[arg(
-  //   short = 'A',
-  //   long = "allow",
-  //   value_delimiter = ' ',
-  //   action = clap::ArgAction::Append,
-  //   long_help = r#"Allow compilation warnings
-  //   all, unused-defs, match-only-vars"#
-  // )]
-  // pub allows: Vec<hvml::WarningArgs>,
   #[arg(short, long, help = "Shows runtime stats and rewrite counts")]
   pub stats: bool,
 
@@ -135,6 +107,19 @@ fn mem_parser(arg: &str) -> Result<usize, String> {
   Ok(base * mult)
 }
 
+impl WOpts {
+  fn get_warning_opts(self) -> WarningOpts {
+    let mut warning_opts = WarningOpts::default();
+    let argm = Args::command().get_matches();
+    let wopts_id_seq = argm.get_many::<clap::Id>("WOpts").unwrap().collect::<Vec<_>>();
+    let allows = &mut self.allows.into_iter();
+    let denies = &mut self.denies.into_iter();
+    let warns = &mut self.warns.into_iter();
+    WarningOpts::from_cli_opts(&mut warning_opts, wopts_id_seq, allows, denies, warns);
+    warning_opts
+  }
+}
+
 fn main() {
   fn run() -> Result<(), String> {
     #[cfg(not(feature = "cli"))]
@@ -143,14 +128,7 @@ fn main() {
     let args = Args::parse();
     let mut opts = Opts::light();
     Opts::from_vec(&mut opts, args.opts)?;
-
-    let mut warning_opts = WarningOpts::default();
-    let argm = Args::command().get_matches();
-    let wopts_id_seq = argm.get_many::<clap::Id>("WOpts").unwrap().collect::<Vec<_>>();
-    let allows = &mut args.wopts.allows.into_iter();
-    let denies = &mut args.wopts.denies.into_iter();
-    let warns = &mut args.wopts.warns.into_iter();
-    WarningOpts::go(&mut warning_opts, wopts_id_seq, allows, denies, warns);
+    let warning_opts = args.wopts.get_warning_opts();
 
     let mut book = load_file_to_book(&args.path)?;
     if args.verbose {

@@ -265,7 +265,7 @@ pub enum WarningArgs {
 }
 
 impl WarningOpts {
-  pub fn go(
+  pub fn from_cli_opts(
     &mut self,
     wopts_id_seq: Vec<&clap::Id>,
     allows: &mut IntoIter<WarningArgs>,
