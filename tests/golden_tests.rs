@@ -187,6 +187,6 @@ fn hangs() {
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
 
-    if !*lck.read().unwrap() { Err("Hangs".into()) } else { Ok("Not hangs".into()) }
+    if !*lck.read().unwrap() { Ok("Hangs".into()) } else { Err("Doesn't hang".into()) }
   })
 }
