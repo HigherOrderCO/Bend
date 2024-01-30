@@ -16,6 +16,16 @@ struct Args {
   pub verbose: bool,
 
   #[arg(
+    short = 'W',
+    long = "warn",
+    value_delimiter = ' ',
+    action = clap::ArgAction::Append,
+    long_help = r#"Show compilation warnings
+    all, unused-defs, match-only-vars"#
+  )]
+  pub warns: Vec<hvml::WarningArgs>,
+
+  #[arg(
     short = 'D',
     long = "deny",
     value_delimiter = ' ',
@@ -23,7 +33,7 @@ struct Args {
     long_help = r#"Deny compilation warnings
     all, unused-defs, match-only-vars"#
   )]
-  pub deny_warnings: Vec<String>,
+  pub denies: Vec<hvml::WarningArgs>,
 
   #[arg(
     short = 'A',
@@ -33,7 +43,7 @@ struct Args {
     long_help = r#"Allow compilation warnings
     all, unused-defs, match-only-vars"#
   )]
-  pub allow_warnings: Vec<String>,
+  pub allows: Vec<hvml::WarningArgs>,
 
   #[arg(long, help = "Stops if any warning was produced")]
   pub fatal_warnings: bool,
@@ -101,9 +111,11 @@ fn main() {
     let args = Args::parse();
     let mut opts = Opts::light();
     Opts::from_vec(&mut opts, args.opts)?;
+
     let mut warning_opts = WarningOpts::default();
-    WarningOpts::deny(&mut warning_opts, args.deny_warnings)?;
-    WarningOpts::allow(&mut warning_opts, args.allow_warnings)?;
+    WarningOpts::allow(&mut warning_opts, args.allows)?;
+    WarningOpts::deny(&mut warning_opts, args.denies)?;
+    WarningOpts::warn(&mut warning_opts, args.warns)?;
 
     let mut book = load_file_to_book(&args.path)?;
     if args.verbose {
@@ -111,9 +123,7 @@ fn main() {
     }
 
     match args.mode {
-      Mode::Check => {
-        check_book(book)?;
-      }
+      Mode::Check => check_book(book)?,
       Mode::Compile => {
         let compiled = compile_book(&mut book, opts)?;
 
@@ -129,16 +139,8 @@ fn main() {
       }
       Mode::Run => {
         let mem_size = args.mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
-        let (res_term, def_names, info) = run_book(
-          book,
-          mem_size,
-          !args.single_core,
-          args.debug,
-          args.linear,
-          args.fatal_warnings,
-          warning_opts,
-          opts,
-        )?;
+        let (res_term, def_names, info) =
+          run_book(book, mem_size, !args.single_core, args.debug, args.linear, warning_opts, opts)?;
         let RunInfo { stats, readback_errors, net: lnet } = info;
         let total_rewrites = total_rewrites(&stats.rewrites) as f64;
         let rps = total_rewrites / stats.run_time / 1_000_000.0;

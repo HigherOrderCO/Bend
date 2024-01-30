@@ -1,12 +1,16 @@
 use hvmc::ast::{parse_net, show_net};
 use hvml::{
-  compile_book, encode_pattern_matching, net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc}, run_book, term::{
+  compile_book, encode_pattern_matching,
+  net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
+  run_book,
+  term::{
     net_to_term::net_to_term,
     parser::{parse_definition_book, parse_term, parser::error_to_msg},
     term_to_compat_net,
     transform::{encode_lists::BuiltinList, encode_strs::BuiltinString},
     Book, DefId, Term,
-  }, Opts, WarningOpts
+  },
+  Opts, WarningOpts,
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -112,7 +116,8 @@ fn run_file() {
   run_golden_test_dir(function_name!(), &|code| {
     let book = do_parse_book(code)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, def_names, info) = run_book(book, 1 << 20, true, false, false, true, WarningOpts::default(), Opts::heavy())?;
+    let (res, def_names, info) =
+      run_book(book, 1 << 20, true, false, false, WarningOpts::deny_all(), Opts::heavy())?;
     Ok(format!("{}{}", info.readback_errors.display(&def_names), res.display(&def_names)))
   })
 }
