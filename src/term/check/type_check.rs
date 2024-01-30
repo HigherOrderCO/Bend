@@ -55,8 +55,10 @@ fn unify(new: Type, old: &mut Type) -> Result<(), String> {
 
 impl Book {
   pub fn check_arity(&self) -> Result<(), String> {
-    for def in self.defs.values() {
-      def.check_arity()?;
+    for (def_id, def) in self.defs.iter() {
+      def
+        .check_arity()
+        .map_err(|e| format!("In definition '{}': {}", self.def_names.name(def_id).unwrap(), e))?;
     }
     Ok(())
   }
@@ -67,7 +69,7 @@ impl Definition {
     let expected_arity = self.arity();
     for rule in &self.rules {
       if rule.arity() != expected_arity {
-        return Err("Arity error.".to_string());
+        return Err(format!("Arity error. Found {} arguments, expected {}", rule.arity(), expected_arity));
       }
     }
     Ok(())

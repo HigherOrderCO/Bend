@@ -26,42 +26,6 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
     .collect()
 }
 
-impl Pattern {
-  /// True if the two non-nested patterns cover some overlapping cases.
-  fn overlaps_with(&self, other: &Pattern) -> bool {
-    match (self, other) {
-      (Pattern::Ctr(a_nam, a_args), Pattern::Ctr(b_nam, b_args))
-        if a_nam == b_nam && a_args.len() == b_args.len() =>
-      {
-        true
-      }
-      (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => true,
-      (Pattern::Num(MatchNum::Succ(_)), Pattern::Num(MatchNum::Succ(_))) => true,
-      (Pattern::Tup(..), Pattern::Tup(..)) => true,
-      (Pattern::Var(..), _) | (_, Pattern::Var(..)) => true,
-      (Pattern::List(..), _) | (_, Pattern::List(..)) => unreachable!(),
-      _ => false,
-    }
-  }
-
-  /// True if when a term matches `other` it always also matches `self`.
-  fn is_superset_of(&self, other: &Pattern) -> bool {
-    match (self, other) {
-      (Pattern::Ctr(a_nam, a_args), Pattern::Ctr(b_nam, b_args))
-        if a_nam == b_nam && a_args.len() == b_args.len() =>
-      {
-        true
-      }
-      (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => true,
-      (Pattern::Num(MatchNum::Succ(_)), Pattern::Num(MatchNum::Succ(_))) => true,
-      (Pattern::Tup(..), Pattern::Tup(..)) => true,
-      (Pattern::Var(..), _) => true,
-      (Pattern::List(..), _) | (_, Pattern::List(..)) => unreachable!(),
-      _ => false,
-    }
-  }
-}
-
 fn split_def(name: &Name, rules: &[Rule], def_names: &mut DefNames) -> Vec<(Name, Vec<Rule>)> {
   let mut skip: HashSet<usize> = HashSet::new();
   let mut new_defs: HashMap<Name, Vec<Rule>> = HashMap::new();
@@ -83,16 +47,16 @@ fn split_def(name: &Name, rules: &[Rule], def_names: &mut DefNames) -> Vec<(Name
       // The rule patterns have one less layer of nesting and receive the destructed fields as extra args.
       let mut new_rules = vec![];
       for (j, other) in rules.iter().enumerate().skip(i) {
-        let has_overlap = rule.pats.iter().zip(&other.pats).all(|(a, b)| a.overlaps_with(b));
-        if has_overlap {
+        let share_matches = rule.pats.iter().zip(&other.pats).all(|(a, b)| a.shares_matches_with(b));
+        if share_matches {
           let new_rule = make_split_rule(rule, other, def_names);
           new_rules.push(new_rule);
 
           // Skip clauses that are already 100% covered by this one.
           // TODO: This is not enough to skip rules that are redundant but not a subset of any particular other rule.
           //   This means that it will sometimes generate redundant, unused rules.
-          let is_superset = rule.pats.iter().zip(&other.pats).all(|(a, b)| a.is_superset_of(b));
-          if is_superset {
+          let other_is_subset = other.pats.iter().zip(&rule.pats).all(|(a, b)| a.is_flat_subset_of(b));
+          if other_is_subset {
             skip.insert(j);
           }
         }
@@ -104,7 +68,7 @@ fn split_def(name: &Name, rules: &[Rule], def_names: &mut DefNames) -> Vec<(Name
 
       // Create the rule that replaces the one being flattened.
       // Destructs one layer of the nested patterns and calls the following, forwarding the extracted fields.
-      let old_rule = make_old_rule(&rule.pats, new_split_def_id);
+      let old_rule = make_old_rule(rule, new_split_def_id);
       new_defs.entry(name.clone()).or_default().push(old_rule);
     } else {
       // If this rule is already flat, just mark it to be inserted back as it is.
@@ -132,14 +96,8 @@ fn make_old_rule(rule: &Rule, new_split_def_id: DefId) -> Rule {
     match arg {
       Pattern::Ctr(arg_name, arg_args) => {
         let mut new_arg_args = Vec::new();
-        for field in arg_args {
-          let var_name = match field {
-            Pattern::Ctr(..) | Pattern::Tup(..) | Pattern::Num(..) | Pattern::Var(None) => {
-              make_var_name(&mut var_count)
-            }
-            Pattern::Var(Some(nam)) => nam.clone(),
-            Pattern::List(..) => unreachable!(),
-          };
+        for _ in arg_args {
+          let var_name = make_var_name(&mut var_count);
           new_arg_args.push(Pattern::Var(Some(var_name.clone())));
           new_body_args.push(Term::Var { nam: var_name });
         }
@@ -161,10 +119,16 @@ fn make_old_rule(rule: &Rule, new_split_def_id: DefId) -> Rule {
         new_pats.push(Pattern::Var(Some(nam.clone())));
         new_body_args.push(Term::Var { nam: nam.clone() });
       }
-      Pattern::Num(_) => {
-        // How to do this if num can be either a number or some sort of lambda? add a match? separate both cases?
-        todo!();
+      Pattern::Num(MatchNum::Zero) => {
+        new_pats.push(Pattern::Num(MatchNum::Zero));
       }
+      Pattern::Num(MatchNum::Succ(Some(_))) => {
+        // Always flat, just pass on the variable
+        let var_name = make_var_name(&mut var_count);
+        new_body_args.push(Term::Var { nam: var_name.clone() });
+        new_pats.push(Pattern::Num(MatchNum::Succ(Some(Some(var_name)))));
+      }
+      Pattern::Num(MatchNum::Succ(None)) => unreachable!(),
       Pattern::List(..) => unreachable!(),
     }
   }

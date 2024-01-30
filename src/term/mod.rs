@@ -1,7 +1,11 @@
 use hvmc::run::Val;
 use indexmap::{IndexMap, IndexSet};
+use itertools::Itertools;
 use shrinkwraprs::Shrinkwrap;
-use std::collections::{BTreeMap, HashMap};
+use std::{
+  collections::{BTreeMap, HashMap},
+  vec,
+};
 
 pub mod builtins;
 pub mod check;
@@ -345,8 +349,12 @@ impl DefNames {
 impl Term {
   /// Make a call term by folding args around a called function term with applications.
   pub fn call(called: Term, args: impl IntoIterator<Item = Term>) -> Self {
+    Term::tagged_call(called, args, Tag::Static)
+  }
+
+  pub fn tagged_call(called: Term, args: impl IntoIterator<Item = Term>, tag: Tag) -> Self {
     args.into_iter().fold(called, |acc, arg| Term::App {
-      tag: Tag::Static,
+      tag: tag.clone(),
       fun: Box::new(acc),
       arg: Box::new(arg),
     })
@@ -374,6 +382,20 @@ impl Term {
   }
 
   /// Substitute the occurrences of a variable in a term with the given term.
+  pub fn list(els: impl DoubleEndedIterator<Item = Term>, def_names: &DefNames) -> Self {
+    els.rev().fold(
+      Term::Ref { def_id: def_names.def_id(&Name::new(builtins::LNIL)).unwrap() },
+      |acc, el| {
+        Term::tagged_call(
+          Term::Ref { def_id: def_names.def_id(&Name::new(builtins::LCONS)).unwrap() },
+          [el, acc],
+          Tag::Named(Name::new(builtins::LIST)),
+        )
+      },
+    )
+  }
+
+  /// Substitute the occurences of a variable in a term with the given term.
   pub fn subst(&mut self, from: &Name, to: &Term) {
     match self {
       Term::Lam { nam: Some(nam), .. } if nam == from => (),
@@ -385,7 +407,7 @@ impl Term {
       Term::Lnk { .. } => (),
       Term::Let { pat, val, nxt } => {
         val.subst(from, to);
-        if !pat.occurs(from) {
+        if !pat.names().contains(from) {
           nxt.subst(from, to);
         }
       }
@@ -615,23 +637,7 @@ impl Term {
 }
 
 impl Pattern {
-  pub fn occurs(&self, name: &Name) -> bool {
-    match self {
-      Pattern::Var(None) => false,
-      Pattern::Var(Some(nam)) => nam == name,
-      Pattern::Ctr(.., args) | Pattern::List(args) => {
-        let mut ret = false;
-        for arg in args {
-          ret |= arg.occurs(name);
-        }
-        ret
-      }
-      Pattern::Num(..) => false,
-      Pattern::Tup(fst, snd) => fst.occurs(name) || snd.occurs(name),
-    }
-  }
-
-  pub fn names(&self) -> impl DoubleEndedIterator<Item = &Name> {
+  pub fn vars(&self) -> impl DoubleEndedIterator<Item = &Option<Name>> {
     fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Option<Name>>) {
       match pat {
         Pattern::Var(nam) => set.push(nam),
@@ -648,10 +654,10 @@ impl Pattern {
     }
     let mut set = Vec::new();
     go(self, &mut set);
-    set.into_iter().filter_map(Option::as_ref)
+    set.into_iter()
   }
 
-  pub fn names_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Name> {
+  pub fn vars_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Option<Name>> {
     fn go<'a>(pat: &'a mut Pattern, set: &mut Vec<&'a mut Option<Name>>) {
       match pat {
         Pattern::Var(nam) => set.push(nam),
@@ -668,28 +674,46 @@ impl Pattern {
     }
     let mut set = Vec::new();
     go(self, &mut set);
-    set.into_iter().filter_map(Option::as_mut)
+    set.into_iter()
   }
 
-  pub fn ctrs(&self) -> impl DoubleEndedIterator<Item = &Name> {
-    fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Name>) {
+  pub fn names(&self) -> impl DoubleEndedIterator<Item = &Name> {
+    self.vars().flatten()
+  }
+
+  pub fn names_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Name> {
+    self.vars_mut().flatten()
+  }
+
+  pub fn ctrs(&self) -> Vec<Name> {
+    fn go(pat: &Pattern, set: &mut Vec<Name>) {
       match pat {
         Pattern::Ctr(nam, pats) => {
-          set.push(nam);
+          set.push(nam.clone());
           pats.iter().for_each(|pat| go(pat, set));
         }
-        Pattern::List(pats) => pats.iter().for_each(|pat| go(pat, set)),
+        Pattern::List(pats) => {
+          set.push(Name::new(builtins::LCONS));
+          set.push(Name::new(builtins::LNIL));
+          pats.iter().for_each(|pat| go(pat, set))
+        }
         Pattern::Tup(fst, snd) => {
+          set.push(Name::new("(,)"));
           go(fst, set);
           go(snd, set);
         }
+        Pattern::Num(MatchNum::Zero) => {
+          set.push(Name::new("0"));
+        }
+        Pattern::Num(MatchNum::Succ(_)) => {
+          set.push(Name::new("+"));
+        }
         Pattern::Var(_) => {}
-        Pattern::Num(_) => {}
       }
     }
     let mut set = Vec::new();
     go(self, &mut set);
-    set.into_iter()
+    set
   }
 
   pub fn is_detached_num_match(&self) -> bool {
@@ -704,6 +728,7 @@ impl Pattern {
     }
   }
 
+  /// True if this pattern has no nested subpatterns.
   pub fn is_flat(&self) -> bool {
     match self {
       Pattern::Var(_) => true,
@@ -726,6 +751,53 @@ impl Pattern {
       Pattern::Num(..) => Type::Num,
       Pattern::List(..) => Type::Adt(Name::new(builtins::LIST)),
     }
+  }
+
+  pub fn to_term(&self, def_names: &DefNames) -> Term {
+    match self {
+      Pattern::Var(None) => Term::Era,
+      Pattern::Var(Some(nam)) => Term::Var { nam: nam.clone() },
+      Pattern::Ctr(ctr, args) => Term::call(
+        Term::Ref { def_id: def_names.def_id(ctr).unwrap() },
+        args.iter().map(|arg| arg.to_term(def_names)),
+      ),
+      Pattern::Num(MatchNum::Zero) => Term::Num { val: 0 },
+      Pattern::Num(MatchNum::Succ(None)) => todo!(),
+      Pattern::Num(MatchNum::Succ(Some(Some(nam)))) => Term::Opx {
+        op: Op::ADD,
+        fst: Box::new(Term::Var { nam: nam.clone() }),
+        snd: Box::new(Term::Num { val: 1 }),
+      },
+      Pattern::Num(MatchNum::Succ(Some(None))) => Term::Era,
+      Pattern::Tup(fst, snd) => {
+        Term::Tup { fst: Box::new(fst.to_term(def_names)), snd: Box::new(snd.to_term(def_names)) }
+      }
+      Pattern::List(els) => Term::list(els.iter().map(|el| el.to_term(def_names)), def_names),
+    }
+  }
+
+  /// True if both patterns are equal (match the same expressions) without considering nested patterns.
+  pub fn flat_equals(&self, other: &Pattern) -> bool {
+    match (self, other) {
+      (Pattern::Ctr(a, _), Pattern::Ctr(b, _)) if a == b => true,
+      (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => true,
+      (Pattern::Num(MatchNum::Succ(_)), Pattern::Num(MatchNum::Succ(_))) => true,
+      (Pattern::Tup(_, _), Pattern::Tup(_, _)) => true,
+      (Pattern::List(_), Pattern::List(_)) => true,
+      (Pattern::Var(_), Pattern::Var(_)) => true,
+      _ => false,
+    }
+  }
+
+  /// True if this pattern matches a subset of the other pattern, withough considering nested patterns.
+  /// That is, when something matches the ctr of self if it also matches other.
+  pub fn is_flat_subset_of(&self, other: &Pattern) -> bool {
+    self.flat_equals(other) || matches!(other, Pattern::Var(_))
+  }
+
+  /// True if the two pattern will match some common expressions.
+  pub fn shares_matches_with(&self, other: &Pattern) -> bool {
+    self.flat_equals(other) || matches!(self, Pattern::Var(_)) || matches!(other, Pattern::Var(_))
   }
 }
 
@@ -759,15 +831,29 @@ impl Definition {
   }
 }
 
-impl From<&Pattern> for Term {
-  fn from(value: &Pattern) -> Self {
-    match value {
-      Pattern::Var(None) => Term::Era,
-      Pattern::Var(Some(nam)) => Term::Var { nam: nam.clone() },
-      Pattern::Ctr(nam, pats) => Term::call(Term::Var { nam: nam.clone() }, pats.iter().map(Term::from)),
-      Pattern::Num(..) => todo!(),
-      Pattern::Tup(..) => todo!(),
-      Pattern::List(..) => todo!(),
+impl Type {
+  /// Return the constructors for a given type as patterns.
+  pub fn ctrs(&self, adts: &BTreeMap<Name, Adt>) -> Vec<Pattern> {
+    match self {
+      Type::None => vec![],
+      Type::Any => vec![],
+      Type::Tup => vec![Pattern::Tup(
+        Box::new(Pattern::Var(Some(Name::new("fst")))),
+        Box::new(Pattern::Var(Some(Name::new("snd")))),
+      )],
+      Type::Num => {
+        vec![Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Succ(Some(Some(Name::new("pred")))))]
+      }
+      Type::Adt(adt) => {
+        // TODO: Should return just a ref to ctrs and not clone.
+        adts[adt]
+          .ctrs
+          .iter()
+          .map(|(nam, args)| {
+            Pattern::Ctr(nam.clone(), args.iter().map(|x| Pattern::Var(Some(x.clone()))).collect())
+          })
+          .collect()
+      }
     }
   }
 }
