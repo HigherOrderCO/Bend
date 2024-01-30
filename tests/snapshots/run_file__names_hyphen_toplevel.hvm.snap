@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/names_hyphen_toplevel.hvm
+---
+At line 1: Names with '-' are not supported at top level.
+At line 3: Names with '-' are not supported at top level.
+At line 3: Names with '-' are not supported at top level.

@@ -96,6 +96,19 @@ where
   select!(Token::Name(name) => Name(name))
 }
 
+/// A top level name that not accepts `-`.
+fn tl_name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  select!(Token::Name(name) => Name(name)).validate(|out, span, emitter| {
+    if out.contains('-') {
+      emitter.emit(Rich::custom(span, "Names with '-' are not supported at top level."));
+    }
+    out
+  })
+}
+
 fn tag<'a, I>(default: Tag) -> impl Parser<'a, I, Tag, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -145,9 +158,6 @@ where
   let term_sep = just(Token::Semicolon).or_not();
 
   recursive(|term| {
-    // <Name>-1
-    let pred = select!(Token::Pred(s) => Term::Var { nam: Name(s) }).boxed();
-
     // *
     let era = just(Token::Asterisk).to(Term::Era).boxed();
 
@@ -314,7 +324,6 @@ where
       num_op,
       app,
       era,
-      pred,
     ))
   })
 }
@@ -338,7 +347,7 @@ where
   recursive(|pattern| {
     let var = name_or_era().map(Pattern::Var).boxed();
 
-    let ctr = name()
+    let ctr = tl_name()
       .then(pattern.clone().repeated().collect())
       .map(|(nam, xs)| Pattern::Ctr(nam, xs))
       .delimited_by(just(Token::LParen), just(Token::RParen))
@@ -374,7 +383,7 @@ fn rule_pattern<'a, I>() -> impl Parser<'a, I, (Name, Vec<Pattern>), extra::Err<
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let lhs = name().then(pattern().repeated().collect()).boxed();
+  let lhs = tl_name().then(pattern().repeated().collect()).boxed();
   choice((lhs.clone(), lhs.clone().delimited_by(just(Token::LParen), just(Token::RParen))))
     .then_ignore(just(Token::Equals))
 }
@@ -418,8 +427,8 @@ fn datatype<'a, I>() -> impl Parser<'a, I, (Name, Adt), extra::Err<Rich<'a, Toke
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let arity_0 = name().map(|nam| (nam, vec![]));
-  let arity_n = name()
+  let arity_0 = tl_name().map(|nam| (nam, vec![]));
+  let arity_n = tl_name()
     .then(name().repeated().collect::<Vec<_>>())
     .delimited_by(just(Token::LParen), just(Token::RParen))
     .map(|(nam, args)| (nam, args));
@@ -428,7 +437,7 @@ where
   let data = soft_keyword("data");
 
   data
-    .ignore_then(name())
+    .ignore_then(tl_name())
     .then_ignore(just(Token::Equals))
     .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, Vec<Name>)>>())
     .map(|(name, ctrs)| (name, Adt { ctrs: ctrs.into_iter().collect() }))
