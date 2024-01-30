@@ -18,6 +18,7 @@ use std::{
   collections::HashMap,
   fs,
   path::{Path, PathBuf},
+  sync::{Arc, RwLock},
 };
 use stdext::function_name;
 use walkdir::WalkDir;
@@ -167,5 +168,25 @@ fn encode_pattern_match() {
     book.resolve_refs()?;
     encode_pattern_matching(&mut book, &mut vec![])?;
     Ok(book.to_string())
+  })
+}
+
+#[test]
+#[ignore = "To not delay golden tests execution"]
+fn hangs() {
+  let expected_normalization_time = 1;
+
+  run_golden_test_dir(function_name!(), &|code| {
+    let book = do_parse_book(code)?;
+
+    let lck = Arc::new(RwLock::new(false));
+    let got = lck.clone();
+    std::thread::spawn(move || {
+      let _ = run_book(book, 1 << 20, true, false, false, true, Opts::heavy());
+      *got.write().unwrap() = true;
+    });
+    std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
+
+    if !*lck.read().unwrap() { Ok("Hangs".into()) } else { Err("Doesn't hang".into()) }
   })
 }
