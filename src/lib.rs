@@ -106,7 +106,7 @@ pub fn run_book(
   let warns = warning_opts.filter(&warnings, WarnState::Warn);
   if !warns.is_empty() {
     let warns = warns.iter().join("\n");
-    eprintln!("{}", format!("Warnings:\n{warns}"));
+    eprintln!("Warnings:\n{warns}");
   }
 
   let denies = warning_opts.filter(&warnings, WarnState::Deny);
@@ -298,9 +298,9 @@ impl WarningOpts {
   }
 
   /// Filters warnings based on the enabled flags.
-  pub fn filter<'a>(&'a self, wrns: &'a Vec<Warning>, ws: WarnState) -> Vec<&Warning> {
+  pub fn filter<'a>(&'a self, wrns: &'a [Warning], ws: WarnState) -> Vec<&Warning> {
     wrns
-      .into_iter()
+      .iter()
       .filter(|w| {
         (match w {
           Warning::MatchOnlyVars { .. } => self.match_only_vars,

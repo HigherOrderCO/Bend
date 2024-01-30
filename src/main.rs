@@ -45,9 +45,6 @@ struct Args {
   )]
   pub allows: Vec<hvml::WarningArgs>,
 
-  #[arg(long, help = "Stops if any warning was produced")]
-  pub fatal_warnings: bool,
-
   #[arg(short, long, help = "Shows runtime stats and rewrite counts")]
   pub stats: bool,
 
