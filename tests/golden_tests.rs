@@ -10,7 +10,7 @@ use hvml::{
     transform::{encode_lists::BuiltinList, encode_strs::BuiltinString},
     Book, DefId, Term,
   },
-  Opts,
+  Opts, WarningOpts,
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -117,7 +117,8 @@ fn run_file() {
   run_golden_test_dir(function_name!(), &|code| {
     let book = do_parse_book(code)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, def_names, info) = run_book(book, 1 << 20, true, false, false, false, Opts::heavy())?;
+    let (res, def_names, info) =
+      run_book(book, 1 << 20, true, false, false, WarningOpts::deny_all(), Opts::heavy())?;
     Ok(format!("{}{}", info.readback_errors.display(&def_names), res.display(&def_names)))
   })
 }

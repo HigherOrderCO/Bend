@@ -7,7 +7,7 @@ use hvmc::{
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
 use itertools::Itertools;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
-use std::time::Instant;
+use std::{time::Instant, vec::IntoIter};
 use term::{
   book_to_nets, net_to_term,
   term_to_net::{HvmcNames, Labels},
@@ -98,18 +98,21 @@ pub fn run_book(
   parallel: bool,
   debug: bool,
   linear: bool,
-  skip_warnings: bool,
+  warning_opts: WarningOpts,
   opts: Opts,
 ) -> Result<(Term, DefNames, RunInfo), String> {
   let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opts)?;
 
-  if !warnings.is_empty() {
-    let warnings = warnings.iter().join("\n");
-    if !skip_warnings {
-      return Err(format!("{warnings}\nCould not run the code because of the previous warnings"));
-    } else {
-      eprintln!("{warnings}");
-    }
+  let warns = warning_opts.filter(&warnings, WarnState::Warn);
+  if !warns.is_empty() {
+    let warns = warns.iter().join("\n");
+    eprintln!("Warnings:\n{warns}");
+  }
+
+  let denies = warning_opts.filter(&warnings, WarnState::Deny);
+  if !denies.is_empty() {
+    let denies = denies.iter().join("\n");
+    return Err(format!("{denies}\nCould not run the code because of the previous warnings"));
   }
 
   fn debug_hook(net: &Net, book: &Book, hvmc_names: &HvmcNames, labels: &Labels, linear: bool) {
@@ -237,6 +240,75 @@ impl Opts {
       }
     }
     Ok(())
+  }
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct WarningOpts {
+  pub match_only_vars: WarnState,
+  pub unused_defs: WarnState,
+}
+
+#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum WarnState {
+  #[default]
+  Warn,
+  Allow,
+  Deny,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum WarningArgs {
+  All,
+  UnusedDefs,
+  MatchOnlyVars,
+}
+
+impl WarningOpts {
+  pub fn from_cli_opts(
+    &mut self,
+    wopts_id_seq: Vec<&clap::Id>,
+    allows: &mut IntoIter<WarningArgs>,
+    denies: &mut IntoIter<WarningArgs>,
+    warns: &mut IntoIter<WarningArgs>,
+  ) {
+    for id in wopts_id_seq {
+      match id.as_ref() {
+        "allows" => self.set(allows.next().unwrap(), Self::allow_all(), WarnState::Allow),
+        "denies" => self.set(denies.next().unwrap(), Self::deny_all(), WarnState::Deny),
+        "warns" => self.set(warns.next().unwrap(), Self::default(), WarnState::Warn),
+        _ => {}
+      }
+    }
+  }
+
+  pub fn allow_all() -> Self {
+    Self { match_only_vars: WarnState::Allow, unused_defs: WarnState::Allow }
+  }
+
+  fn set(&mut self, val: WarningArgs, all: Self, switch: WarnState) {
+    match val {
+      WarningArgs::All => *self = all,
+      WarningArgs::UnusedDefs => self.unused_defs = switch,
+      WarningArgs::MatchOnlyVars => self.match_only_vars = switch,
+    }
+  }
+
+  pub fn deny_all() -> Self {
+    Self { match_only_vars: WarnState::Deny, unused_defs: WarnState::Deny }
+  }
+
+  /// Filters warnings based on the enabled flags.
+  pub fn filter<'a>(&'a self, wrns: &'a [Warning], ws: WarnState) -> Vec<&Warning> {
+    wrns
+      .iter()
+      .filter(|w| {
+        (match w {
+          Warning::MatchOnlyVars { .. } => self.match_only_vars,
+          Warning::UnusedDefinition { .. } => self.unused_defs,
+        }) == ws
+      })
+      .collect()
   }
 }
 
