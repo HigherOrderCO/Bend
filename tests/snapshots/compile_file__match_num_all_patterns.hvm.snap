@@ -19,7 +19,8 @@ input_file: tests/golden_tests/compile_file/match_num_all_patterns.hvm
 @F = (<+ #2 a> a)
 @main = #0
 @succ_var = (?<(#0 (a a)) b> b)
-@succ_var_z = (?<(#1 @F) a> a)
+@succ_var_z = (?<(a @F) b> b)
+& #0 ~ <+ #1 a>
 @succ_zero = (?<(#0 (a a)) b> b)
 @succ_zero_ = (?<(#0 (a a)) b> b)
 @var_succ = (a a)
