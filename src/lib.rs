@@ -238,8 +238,8 @@ impl Opts {
         "no-simplify-main" => self.simplify_main = false,
         "pre-reduce-refs" => self.pre_reduce_refs = true,
         "no-pre-reduce-refs" => self.pre_reduce_refs = false,
-        "merge-defnitions" => self.merge_definitions = true,
-        "no-merge-defnitions" => self.merge_definitions = false,
+        "merge-definitions" => self.merge_definitions = true,
+        "no-merge-definitions" => self.merge_definitions = false,
         other => return Err(format!("Unknown option '{other}'.")),
       }
     }
