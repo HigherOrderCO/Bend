@@ -7,16 +7,14 @@ impl Book {
   /// Expects variables to be linear.
   pub fn merge_definitions(&mut self, main: DefId) {
     let ids: Vec<_> = self.defs.keys().copied().collect();
-    let filtered_ids = ids.into_iter().filter(|&id| id != main);
-
-    self.merge(main, filtered_ids);
+    self.merge(main, ids.into_iter());
   }
 
   fn merge(&mut self, main: DefId, defs: impl Iterator<Item = DefId>) {
     let mut term_map: HashMap<Term, DefId> = HashMap::new();
     let mut def_id_map: HashMap<DefId, DefId> = HashMap::new();
 
-    self.collect_terms(defs, &mut term_map, &mut def_id_map);
+    self.collect_terms(defs.filter(|&id| id != main), &mut term_map, &mut def_id_map);
     self.merge_terms(main, term_map, def_id_map);
   }
 
@@ -32,10 +30,10 @@ impl Book {
       def.assert_no_pattern_matching_rules();
       let term = std::mem::take(&mut def.rules[0].body);
 
-      if let Some(new) = term_map.get(&term) {
-        def_id_map.insert(id, *new);
+      if let Some(&new) = term_map.get(&term) {
+        def_id_map.insert(new, new);
+        def_id_map.insert(id, new);
       } else {
-        def_id_map.insert(id, id);
         term_map.insert(term, id);
       }
     }
@@ -73,9 +71,7 @@ impl Book {
 
     for def in self.defs.values_mut() {
       if subst_ref_to_ref(&mut def.rules[0].body, &def_id_map) {
-        if def.def_id != main {
-          updated_defs.push(def.def_id);
-        }
+        updated_defs.push(def.def_id);
       }
     }
 
