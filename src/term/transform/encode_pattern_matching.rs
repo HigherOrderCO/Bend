@@ -1,5 +1,5 @@
 use crate::term::{
-  check::type_check::DefinitionTypes, Book, DefId, MatchNum, Name, Pattern, Rule, Tag, Term, Type,
+  check::type_check::DefinitionTypes, Book, DefId, Definition, MatchNum, Name, Pattern, Rule, Tag, Term, Type,
 };
 
 impl Book {
@@ -22,86 +22,56 @@ impl Book {
 /// For functions that don't pattern match, just move the arg variables into the body.
 fn make_non_pattern_matching_def(book: &mut Book, def_id: DefId) {
   let def = book.defs.get_mut(&def_id).unwrap();
-  let mut rule = std::mem::take(def.rules.first_mut().unwrap());
-  for pat in rule.pats.iter().rev() {
-    let Pattern::Var(var) = pat else { unreachable!() };
-    let bod = std::mem::take(&mut rule.body);
-    rule.body = Term::Lam { tag: Tag::Static, nam: var.clone(), bod: Box::new(bod) };
-  }
-  rule.pats = vec![];
-  def.rules = vec![rule];
+  let rule = def.rules.first_mut().unwrap();
+  let vars = rule.pats.iter().map(|p| p.vars().cloned()).flatten();
+  let body = std::mem::take(&mut rule.body);
+  let body = vars.fold(body, |bod, var| Term::lam(var, bod));
+  def.rules = vec![Rule { pats: vec![], body, origin: rule.origin }];
 }
 
 /// For functions that do pattern match,
 ///  we break them into a tree of small matching functions
 ///  with the original rule bodies at the end.
 fn make_pattern_matching_def(book: &mut Book, def_id: DefId, def_type: &[Type]) {
-  let def_name = book.def_names.name(&def_id).unwrap().clone();
-  let def = book.defs.get_mut(&def_id).unwrap();
-  let origin = def.rules[0].origin;
-  let crnt_rules = (0 .. def.rules.len()).collect();
-
-  // First create a definition for each rule body
-  let mut rule_bodies = vec![];
-  for rule in def.rules.iter_mut() {
+  // First push the pattern bound vars into the rule body
+  let rules = &mut book.defs.get_mut(&def_id).unwrap().rules;
+  for rule in rules {
+    let vars = rule.pats.iter().map(|p| p.vars().cloned()).flatten();
     let body = std::mem::take(&mut rule.body);
-    let body = make_rule_body(body, &rule.pats);
-    rule_bodies.push(body);
-  }
-  for (rule_idx, body) in rule_bodies.into_iter().enumerate() {
-    let rule_name = make_rule_name(&def_name, rule_idx);
-    book.insert_def(rule_name, vec![Rule { pats: vec![], body, origin }]);
+    let body = vars.rev().fold(body, |bod, var| Term::lam(var, bod));
+    rule.body = body;
   }
 
   // Generate scott-encoded pattern matching
-  let new_body = make_pattern_matching_case(book, def_type, def_id, crnt_rules, vec![]);
+  let def = &book.defs[&def_id];
+  let crnt_rules = (0 .. def.rules.len()).collect();
+  let mut new_body = make_pattern_matching_case(book, def, def_type, crnt_rules, vec![]);
+
+  // Simplify the generated term
+  new_body.eta_reduction();
+  beta_reduce(&mut new_body);
+
+  // Substitute the rule bodies into the generated term
+  // TODO: Substituting it here prevents beta-reducing the rule body args.
+  // Ex: `(foo (a, b)) = (a, b)` => `(foo) = λx let (%fst, %snd) = x; (λa λb (a, b) %fst %snd)`
+  // Notice the generated `(λa λb (a, b) %fst %snd)`
+  for (rule_idx, rule) in def.rules.iter().enumerate() {
+    new_body.subst(&rule_body_subst_var(rule_idx), &rule.body);
+  }
+
+  // Put the new body back into the definition.
   let def = book.defs.get_mut(&def_id).unwrap();
   def.rules = vec![Rule { pats: vec![], body: new_body, origin }];
-}
-
-fn make_rule_name(def_name: &Name, rule_idx: usize) -> Name {
-  Name(format!("{def_name}$R{rule_idx}"))
-}
-
-fn make_rule_body(mut body: Term, pats: &[Pattern]) -> Term {
-  // Add the lambdas for the pattern variables
-  for pat in pats.iter().rev() {
-    match pat {
-      Pattern::Var(nam) => body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) },
-      Pattern::Ctr(_, vars) => {
-        for var in vars.iter().rev() {
-          let Pattern::Var(nam) = var else { unreachable!() };
-          body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) }
-        }
-      }
-      Pattern::Num(MatchNum::Zero) => (),
-      Pattern::Num(MatchNum::Succ(None)) => (),
-      Pattern::Num(MatchNum::Succ(Some(nam))) => {
-        body = Term::Lam { tag: Tag::Static, nam: nam.clone(), bod: Box::new(body) }
-      }
-      pat @ Pattern::Tup(..) => {
-        let nam = Name::new("%0");
-        body = Term::named_lam(nam.clone(), Term::Let {
-          pat: pat.clone(),
-          val: Box::new(Term::Var { nam }),
-          nxt: Box::new(body),
-        });
-      }
-      Pattern::List(..) => unreachable!(),
-    }
-  }
-  body
 }
 
 /// Builds the encoding for the patterns in a pattern matching function.
 fn make_pattern_matching_case(
   book: &Book,
+  def: &Definition,
   def_type: &[Type],
-  def_id: DefId,
   crnt_rules: Vec<usize>,
   match_path: Vec<Pattern>,
 ) -> Term {
-  let def = &book.defs[&def_id];
   // This is safe since we check exhaustiveness earlier.
   let fst_rule_idx = crnt_rules[0];
   let fst_rule = &def.rules[fst_rule_idx];
@@ -120,24 +90,26 @@ fn make_pattern_matching_case(
     .iter()
     .flat_map(|pat| pat.vars())
     .enumerate()
-    .map(|(i, _)| Name(format!("%x_{i}")))
+    .map(|(i, _)| Name(format!("%x{i}")))
     .collect();
   let new_args: Vec<Name> = new_match
-    .map(|pat| pat.vars().enumerate().map(|(i, _)| Name(format!("%y_{i}"))).collect())
+    .map(|pat| pat.vars().enumerate().map(|(i, _)| Name(format!("%y{i}"))).collect())
     .unwrap_or(vec![]);
 
   if is_fst_rule_irrefutable {
     // First rule will always be selected, generate leaf case.
-    make_leaf_case(book, def_id, fst_rule_idx, match_path, old_args, new_args)
+    make_leaf_case(book, fst_rule, fst_rule_idx, match_path, old_args, new_args)
   } else {
-    make_match_case(book, def_type, def_id, crnt_rules, match_path, old_args, new_args)
+    make_match_case(book, def, def_type, crnt_rules, match_path, old_args, new_args)
   }
 }
 
+/// Builds the term that pattern matches on the current arg.
+/// Recursively builds the terms matching the next args.
 fn make_match_case(
   book: &Book,
+  def: &Definition,
   def_type: &[Type],
-  def_id: DefId,
   crnt_rules: Vec<usize>,
   match_path: Vec<Pattern>,
   old_args: Vec<Name>,
@@ -154,7 +126,6 @@ fn make_match_case(
     next_type.ctrs(&book.adts)
   };
   for pat in &next_ctrs {
-    let def = &book.defs[&def_id];
     let next_rules = crnt_rules
       .iter()
       .copied()
@@ -162,7 +133,7 @@ fn make_match_case(
       .collect();
     let mut match_path = match_path.clone();
     match_path.push(pat.clone());
-    let next_case = make_pattern_matching_case(book, def_type, def_id, next_rules, match_path);
+    let next_case = make_pattern_matching_case(book, def, def_type, next_rules, match_path);
     next_cases.push(next_case);
   }
 
@@ -195,9 +166,9 @@ fn make_match_case(
     }
   };
   // The calls to the args of previous matches
-  let term = add_arg_calls(term, old_args.clone(), new_args.clone());
+  let term = old_args.iter().chain(new_args.iter()).cloned().fold(term, Term::arg_call);
   // Lambda for pattern matched value
-  let term = Term::named_lam(match_var, term);
+  let term = Term::lam(Some(match_var), term);
   // The bindings of the previous args
   let term = add_arg_lams(term, old_args, new_args, match_path.last(), book);
   term
@@ -206,30 +177,29 @@ fn make_match_case(
 /// Builds the function calling one of the original rule bodies.
 fn make_leaf_case(
   book: &Book,
-  def_id: DefId,
+  rule: &Rule,
   rule_idx: usize,
   match_path: Vec<Pattern>,
   old_args: Vec<Name>,
   new_args: Vec<Name>,
 ) -> Term {
-  let def_name = book.def_names.name(&def_id).unwrap();
-  let rule_def_name = make_rule_name(def_name, rule_idx);
-  let rule_def_id = book.def_names.def_id(&rule_def_name).unwrap();
-  let rule = &book.defs[&def_id].rules[rule_idx];
-
   let args = &mut old_args.iter().chain(new_args.iter()).cloned();
 
   // The term we're building
-  let term = Term::Ref { def_id: rule_def_id };
+  // Instead of directly pasting the rule body here (or a ref to the rule body),
+  // we instead put a variable that we will substitute later with the correct term.
+  // We do this to run simplifying passes on the generated term (eta-reduction and pre-reduction).
+  // TODO: Generate the pattern matching Term already in reduced form to avoid this jank.
+  let term = Term::Var { nam: rule_body_subst_var(rule_idx) };
+
   // Add the applications to call the rule body
   let term = match_path.iter().zip(&rule.pats).fold(term, |term, (matched, pat)| {
     if matched.flat_equals(pat) {
       matched.vars().fold(term, |term, _| Term::arg_call(term, Some(args.next().unwrap())))
     } else {
-      // This particular rule was not matching on this arg but due to the other rules we had to match on a constructor.
-      // So, to call the rule body we have to recreate the constructor.
-      // (On scott encoding, if one of the cases is matched we must also match on all the other constructors for this arg)
-      matched.to_term(&book.def_names)
+      // The pattern in this rule was a Var, but we matched on a constructor.
+      // Rebuild the constructor
+      Term::call(term, [matched.to_term(&book.def_names)])
     }
   });
   // Add the lambdas for the matched args.
@@ -238,12 +208,7 @@ fn make_leaf_case(
   term
 }
 
-/// Adds the argument calls to the term, with old args followed by new args.
-fn add_arg_calls(term: Term, old_args: Vec<Name>, new_args: Vec<Name>) -> Term {
-  old_args.into_iter().chain(new_args).fold(term, |term, arg| Term::arg_call(term, Some(arg)))
-}
-
-// Adds the argument lambdas to the term, with new args followed by old args.
+/// Adds the argument lambdas to the term, with new args followed by old args.
 fn add_arg_lams(
   term: Term,
   old_args: Vec<Name>,
@@ -251,11 +216,13 @@ fn add_arg_lams(
   last_pat: Option<&Pattern>,
   book: &Book,
 ) -> Term {
-  let term = old_args.into_iter().rev().fold(term, |term, arg| Term::named_lam(arg, term));
+  // Add lams for old vars
+  let term = old_args.into_iter().rev().fold(term, |term, arg| Term::lam(Some(arg), term));
 
-  // Add lambdas for the new vars, with tags depending on the matched pattern.
+  // Add lams for new vars
   if let Some(last_pat) = last_pat {
     match last_pat {
+      // Ctr patterns use a named tag for the fields
       Pattern::Ctr(ctr, args) => {
         new_args.into_iter().rev().zip(args.iter().rev()).fold(term, |term, (new_arg, pat)| {
           let adt = &book.ctrs[ctr];
@@ -264,9 +231,66 @@ fn add_arg_lams(
           Term::tagged_lam(tag, new_arg, term)
         })
       }
-      _ => new_args.into_iter().fold(term, |term, new_arg| Term::named_lam(new_arg, term)),
+      _ => new_args.into_iter().rev().fold(term, |term, new_arg| Term::lam(Some(new_arg), term)),
     }
   } else {
     term
+  }
+}
+
+/// Name for a variable to be substituted with the rule body.
+fn rule_body_subst_var(rule_idx: usize) -> Name {
+  Name(format!("%rule_subst_{rule_idx}"))
+}
+
+// Beta reduces a term.
+// Assumes a term in the specific format generated by the pass in this file.
+fn beta_reduce(term: &mut Term) {
+  match term {
+    Term::App { tag: app_tag, fun, arg } => {
+      // #tag (#tag @x bod arg) -> bod/[x -> arg]
+      // #tag (#tag @* bod arg) -> bod
+      if let Term::Lam { tag: lam_tag, nam, bod } = fun.as_mut() {
+        if app_tag == lam_tag {
+          if let Some(nam) = nam {
+            bod.subst(nam, arg.as_ref());
+          }
+          *term = std::mem::take(bod);
+          beta_reduce(term);
+        } else {
+          beta_reduce(fun);
+          beta_reduce(arg);
+        }
+      } else {
+        beta_reduce(fun);
+        beta_reduce(arg);
+      }
+    }
+    Term::Match { scrutinee, arms } => {
+      beta_reduce(scrutinee);
+      for (_, arm) in arms {
+        beta_reduce(arm);
+      }
+    }
+    Term::List { els } => {
+      for el in els {
+        beta_reduce(el);
+      }
+    }
+    Term::Let { val: fst, nxt: snd, .. }
+    | Term::Tup { fst, snd }
+    | Term::Dup { val: fst, nxt: snd, .. }
+    | Term::Sup { fst, snd, .. }
+    | Term::Opx { fst, snd, .. } => {
+      beta_reduce(fst);
+      beta_reduce(snd);
+    }
+    Term::Lam { bod, .. } | Term::Chn { bod, .. } => beta_reduce(bod),
+    Term::Var { .. }
+    | Term::Lnk { .. }
+    | Term::Num { .. }
+    | Term::Str { .. }
+    | Term::Ref { .. }
+    | Term::Era => (),
   }
 }

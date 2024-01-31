@@ -245,7 +245,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
 }
 
 fn make_var_name(var_count: &mut usize) -> Name {
-  let nam = Name(format!("x${var_count}"));
+  let nam = Name(format!("%x{var_count}"));
   *var_count += 1;
   nam
 }

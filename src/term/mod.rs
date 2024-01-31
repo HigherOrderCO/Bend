@@ -347,6 +347,10 @@ impl DefNames {
 }
 
 impl Term {
+  pub fn lam(nam: Option<Name>, bod: Term) -> Self {
+    Term::Lam { tag: Tag::Static, nam, bod: Box::new(bod) }
+  }
+
   /// Make a call term by folding args around a called function term with applications.
   pub fn call(called: Term, args: impl IntoIterator<Item = Term>) -> Self {
     Term::tagged_call(called, args, Tag::Static)
@@ -360,6 +364,7 @@ impl Term {
     })
   }
 
+  /// Apply a variable to a term by the var name.
   pub fn arg_call(fun: Term, arg: Option<Name>) -> Self {
     let arg = Box::new(arg.map_or(Term::Era, |nam| Term::Var { nam }));
     Term::App { tag: Tag::Static, fun: Box::new(fun), arg }
@@ -381,7 +386,6 @@ impl Term {
     Term::Lam { tag, nam: Some(nam), bod: Box::new(bod) }
   }
 
-  /// Substitute the occurrences of a variable in a term with the given term.
   pub fn list(els: impl DoubleEndedIterator<Item = Term>, def_names: &DefNames) -> Self {
     els.rev().fold(
       Term::Ref { def_id: def_names.def_id(&Name::new(builtins::LNIL)).unwrap() },
@@ -395,7 +399,7 @@ impl Term {
     )
   }
 
-  /// Substitute the occurences of a variable in a term with the given term.
+  /// Substitute the occurrences of a variable in a term with the given term.
   pub fn subst(&mut self, from: &Name, to: &Term) {
     match self {
       Term::Lam { nam: Some(nam), .. } if nam == from => (),
@@ -789,7 +793,7 @@ impl Pattern {
     }
   }
 
-  /// True if this pattern matches a subset of the other pattern, withough considering nested patterns.
+  /// True if this pattern matches a subset of the other pattern, without considering nested patterns.
   /// That is, when something matches the ctr of self if it also matches other.
   pub fn is_flat_subset_of(&self, other: &Pattern) -> bool {
     self.flat_equals(other) || matches!(other, Pattern::Var(_))
