@@ -39,7 +39,7 @@ impl Book {
     // Even if we don't prune all the defs, we need check what built-ins are accessible through user code
     if !prune_all {
       for (def_id, def) in &self.defs {
-        // This needs to be done for each rule in case this pass it's run from has not encoded the pattern match
+        // This needs to be done for each rule in case the pass it's ran from has not encoded the pattern match
         // E.g.: the `flatten_rules` golden test
         for rule in &def.rules {
           if rule.origin != Origin::Builtin {
@@ -134,7 +134,7 @@ impl Book {
     let Entry::Vacant(e) = uses.entry(def_id) else { return };
     e.insert(used);
 
-    // This needs to be done for each rule in case this pass it's run from has not encoded the pattern match
+    // This needs to be done for each rule in case the pass it's ran from has not encoded the pattern match
     // E.g.: the `flatten_rules` golden test
     for rule in &self.defs.get(&def_id).unwrap().rules {
       self.find_used_definitions(&rule.body, used, uses);
