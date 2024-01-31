@@ -55,7 +55,7 @@ pub struct Rule {
 }
 
 /// Whether something is built-in, auto generated or written by the user
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
 pub enum Origin {
   #[default]
   User,
@@ -277,14 +277,14 @@ impl Book {
     name.zip(def)
   }
 
-  /// Checks if the name of the definition of the given DefId is generated or writen by the user
+  /// Checks if the name of the definition of the given DefId is generated or written by the user
   pub fn is_def_name_generated(&self, def_id: DefId) -> bool {
     self.def_names.name(&def_id).map_or(false, |Name(name)| name.contains('$'))
   }
 
   /// Checks if the definition of the given DefId is a built-in
   pub fn is_builtin(&self, def_id: DefId) -> bool {
-    matches!(self.defs.get(&def_id).unwrap().rules[0].origin, Origin::Builtin)
+    self.defs.get(&def_id).unwrap().rules[0].origin == Origin::Builtin
   }
 }
 
@@ -373,7 +373,7 @@ impl Term {
     Term::Lam { tag, nam: Some(nam), bod: Box::new(bod) }
   }
 
-  /// Substitute the occurences of a variable in a term with the given term.
+  /// Substitute the occurrences of a variable in a term with the given term.
   pub fn subst(&mut self, from: &Name, to: &Term) {
     match self {
       Term::Lam { nam: Some(nam), .. } if nam == from => (),
@@ -424,7 +424,7 @@ impl Term {
     }
   }
 
-  /// Substitute the occurence of an unscoped variable with the given term.
+  /// Substitute the occurrence of an unscoped variable with the given term.
   pub fn subst_unscoped(&mut self, from: &Name, to: &Term) {
     match self {
       Term::Lnk { nam } if nam == from => {

@@ -8,7 +8,7 @@ impl Book {
       def.assert_no_pattern_matching_rules();
       let rule = &mut def.rules[0];
 
-      if reduce_all || !matches!(rule.origin, Origin::User) {
+      if reduce_all || rule.origin != Origin::User {
         rule.body.eta_reduction();
       }
     }

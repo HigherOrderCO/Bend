@@ -13,10 +13,10 @@ enum Used {
   /// It or its Adt as a tag name are referenced in the user code at all (I.e. non-built-in code)
   Adt,
 
-  /// Rule is acessible from the main entry point, should never be pruned
+  /// Rule is accessible from the main entry point, should never be pruned
   Main,
 
-  /// Rule is not acessible from main nor it's an Adt
+  /// Rule is not accessible from main nor it's an Adt
   /// Should be pruned if `prune_all` or if it's a built-in rule
   /// Otherwise, if the rule has a non-generated name, a warning about the unused def returned
   Unused,
@@ -26,7 +26,7 @@ type Definitions = HashMap<DefId, Used>;
 
 impl Book {
   /// If `prune_all`, removes all unused definitions and adts starting from Main.
-  /// Otherwise, prunes only the builtins not acessible from any non-built-in definition
+  /// Otherwise, prunes only the builtins not accessible from any non-built-in definition
   pub fn prune(&mut self, main: Option<DefId>, prune_all: bool, warnings: &mut Vec<Warning>) {
     let mut used = Definitions::new();
 
@@ -36,13 +36,13 @@ impl Book {
       self.find_used_definitions(&def.rules[0].body, Used::Main, &mut used);
     }
 
-    // Even if we don't prune all the defs, we need check what built-ins are acessible throgh user code
+    // Even if we don't prune all the defs, we need check what built-ins are accessible through user code
     if !prune_all {
       for (def_id, def) in &self.defs {
         // This needs to be done for each rule in case this pass it's run from has not encoded the pattern match
         // E.g.: the `flatten_rules` golden test
         for rule in &def.rules {
-          if !matches!(rule.origin, Origin::Builtin) {
+          if rule.origin != Origin::Builtin {
             match used.entry(*def_id) {
               Entry::Vacant(e) => _ = e.insert(Used::Unused),
               Entry::Occupied(e) if !matches!(e.get(), Used::Unused) => continue,
@@ -57,7 +57,7 @@ impl Book {
 
     let ids = IndexSet::<DefId>::from_iter(self.def_names.def_ids().copied());
 
-    // Filter defs from the 'used' hashmap that are not acessible from main
+    // Filter defs from the 'used' hashmap that are not accessible from main
     let filter = |(id, used)| if let Used::Unused = used { None } else { Some(id) };
     let used: IndexSet<DefId> = used.into_iter().filter_map(filter).collect();
 
@@ -103,7 +103,7 @@ impl Book {
       }
       Term::App { tag, fun, arg } => {
         // mark constructors of the Adt with same name as the tag in case of the user
-        // manually encoded a pattern matching with tagged aplications
+        // manually encoded a pattern matching with tagged applications
         if let Tag::Named(name) = tag {
           self.insert_ctrs_used(name, uses);
         }
