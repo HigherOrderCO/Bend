@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/override_str_ctr.hvm
 ---
-SCons is a built-in constructor and should not be overridden.
+At line 2: SCons is a built-in constructor and should not be overridden.

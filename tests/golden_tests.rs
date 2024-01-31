@@ -64,6 +64,7 @@ fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str) -> Result<String, Str
     let entry = entry.unwrap();
     let path = entry.path();
     if path.is_file() {
+      eprintln!("Testing {}", path.display());
       run_single_golden_test(path, run).unwrap();
     }
   }
@@ -128,14 +129,17 @@ fn readback_lnet() {
 fn flatten_rules() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
+    let main = book.check_has_main().ok();
     book.check_shared_names()?;
+    book.encode_builtins();
     book.resolve_ctrs_in_pats();
     book.generate_scott_adts();
     book.desugar_let_destructors();
     book.desugar_implicit_match_binds();
     book.check_unbound_pats()?;
-    book.extract_adt_matches(&mut vec![])?;
+    book.extract_adt_matches(&mut Vec::new())?;
     book.flatten_rules();
+    book.prune(main, false, &mut Vec::new());
     Ok(book.to_string())
   })
 }
@@ -152,12 +156,13 @@ fn parse_file() {
 fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code| {
     let mut book = do_parse_book(code)?;
+    let main = book.check_has_main().ok();
     book.check_shared_names()?;
-    book.encode_builtin_adt(BuiltinString)?;
-    book.encode_builtin_adt(BuiltinList)?;
+    book.encode_builtins();
     book.generate_scott_adts();
     book.resolve_refs()?;
-    encode_pattern_matching(&mut book, &mut vec![])?;
+    encode_pattern_matching(&mut book, &mut Vec::new())?;
+    book.prune(main, false, &mut Vec::new());
     Ok(book.to_string())
   })
 }

@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/adt_string.hvm
 ---
-String is a built-in data type and should not be overridden.
+At line 1: String is a built-in datatype and should not be overridden.

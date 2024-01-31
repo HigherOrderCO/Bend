@@ -69,7 +69,7 @@ pub fn desugar_book(
   if simplify_main {
     book.simplify_main_ref(main);
   }
-  book.prune(main, prune, &mut warnings);
+  book.prune(Some(main), prune, &mut warnings);
   Ok((main, warnings))
 }
 

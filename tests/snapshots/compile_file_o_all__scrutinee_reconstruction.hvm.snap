@@ -2,11 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/scrutinee_reconstruction.hvm
 ---
-@7 = (* (a a))
-@8 = {4 * @A}
-@A = (a (* a))
+@B = (* (a a))
+@C = {4 * @E}
+@E = (a (* a))
 @None = {2 * {2 a a}}
-@Option.or = ({3 {2 @8 {2 @7 (a b)}} a} b)
+@Option.or = ({3 {2 @C {2 @B (a b)}} a} b)
 @Some = (a {2 {4 a b} {2 * b}})
 @main = a
 & @Option.or ~ (b (@None a))
