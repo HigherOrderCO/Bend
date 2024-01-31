@@ -67,7 +67,7 @@ pub fn desugar_book(book: &mut Book, opts: Opts) -> Result<(DefId, Vec<Warning>)
     book.simplify_main_ref(main);
   }
   if opts.merge_definitions {
-    book.merge_definition(main);
+    book.merge_definitions(main);
   }
   book.prune(Some(main), opts.prune, &mut warnings);
   Ok((main, warnings))

@@ -43,11 +43,15 @@ impl Book {
   }
 }
 
-pub fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) {
+/// Returns whether any substitution happened within the term or not
+pub fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) -> bool {
   match term {
     Term::Ref { def_id } => {
       if let Some(target_id) = ref_map.get(def_id) {
         *def_id = *target_id;
+        true
+      } else {
+        false
       }
     }
     Term::Lam { bod, .. } | Term::Chn { bod, .. } => subst_ref_to_ref(bod, ref_map),
@@ -57,16 +61,19 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) {
     | Term::Sup { fst, snd, .. }
     | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {
-      subst_ref_to_ref(fst, ref_map);
-      subst_ref_to_ref(snd, ref_map);
+      let fst_subst = subst_ref_to_ref(fst, ref_map);
+      let snd_subst = subst_ref_to_ref(snd, ref_map);
+      fst_subst | snd_subst
     }
     Term::Match { scrutinee, arms } => {
-      subst_ref_to_ref(scrutinee, ref_map);
+      let mut subst = subst_ref_to_ref(scrutinee, ref_map);
       for (_, term) in arms {
-        subst_ref_to_ref(term, ref_map);
+        subst |= subst_ref_to_ref(term, ref_map);
       }
+
+      subst
     }
     Term::List { .. } => unreachable!("Should have been desugared already"),
-    Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => (),
+    Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => false,
   }
 }
