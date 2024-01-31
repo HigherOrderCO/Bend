@@ -4,11 +4,8 @@ use std::{fmt, num::ParseIntError};
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(error=LexingError)]
 pub enum Token {
-  #[regex("[_.a-zA-Z][_.a-zA-Z0-9]*", |lex| lex.slice().parse().ok())]
+  #[regex("[_.a-zA-Z][_.a-zA-Z0-9-]*", |lex| lex.slice().parse().ok())]
   Name(String),
-
-  #[regex("[_.a-zA-Z][_.a-zA-Z0-9]*-1", |lex| lex.slice().parse().ok())]
-  Pred(String),
 
   #[regex("@|λ")]
   Lambda,
@@ -243,7 +240,7 @@ fn normalized_char(lexer: &mut Lexer<Token>) -> Option<u64> {
 impl fmt::Display for Token {
   fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
     match self {
-      Self::Name(s) | Self::Pred(s) => write!(f, "{}", s),
+      Self::Name(s) => write!(f, "{}", s),
       Self::Lambda => write!(f, "λ"),
       Self::Dollar => write!(f, "$"),
       Self::Let => write!(f, "let"),
