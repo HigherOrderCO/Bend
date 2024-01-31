@@ -42,7 +42,7 @@ impl Term {
             Pattern::Var(_) => (),
             Pattern::Ctr(nam, pat_args) => {
               let adt = &ctrs[nam];
-              let Adt { ctrs } = &adts[adt];
+              let Adt { ctrs, .. } = &adts[adt];
               let ctr_args = &ctrs[nam.as_ref()];
               if pat_args.is_empty() && !ctr_args.is_empty() {
                 // Implicit ctr args

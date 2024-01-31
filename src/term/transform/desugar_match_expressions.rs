@@ -1,7 +1,7 @@
 use crate::{
   term::{
-    display::DisplayJoin, Book, DefId, DefNames, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term,
-    Type,
+    display::DisplayJoin, Book, DefId, DefNames, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Tag,
+    Term, Type,
   },
   Warning,
 };
@@ -171,7 +171,7 @@ fn match_to_def(
 ) -> Term {
   let rules: Vec<Rule> = arms
     .iter()
-    .map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone(), generated: true })
+    .map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone(), origin: Origin::Generated })
     .collect();
   let new_name = make_def_name(def_name, &Name::new("match"), match_count);
   let def_id = book.def_names.insert(new_name);

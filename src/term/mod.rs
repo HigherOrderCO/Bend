@@ -3,7 +3,7 @@ use indexmap::{IndexMap, IndexSet};
 use shrinkwraprs::Shrinkwrap;
 use std::collections::{BTreeMap, HashMap};
 
-pub mod builtin_adt;
+pub mod builtins;
 pub mod check;
 pub mod display;
 pub mod load_book;
@@ -15,8 +15,6 @@ pub mod transform;
 
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
-
-use self::transform::encode_lists;
 
 /// The representation of a program.
 #[derive(Debug, Clone, Default)]
@@ -53,8 +51,16 @@ pub struct Definition {
 pub struct Rule {
   pub pats: Vec<Pattern>,
   pub body: Term,
-  /// Whether this rule body was auto generated or written by the user
-  pub generated: bool,
+  pub origin: Origin,
+}
+
+/// Whether something is built-in, auto generated or written by the user
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub enum Origin {
+  #[default]
+  User,
+  Builtin,
+  Generated,
 }
 
 #[derive(Debug, Clone)]
@@ -187,6 +193,7 @@ pub enum Type {
 #[derive(Debug, Clone, Default)]
 pub struct Adt {
   pub ctrs: IndexMap<Name, Vec<Name>>,
+  pub origin: Origin,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, Default)]
@@ -270,9 +277,14 @@ impl Book {
     name.zip(def)
   }
 
-  /// Checks if the name of the definition of the given DefId is generated or writen by the user
+  /// Checks if the name of the definition of the given DefId is generated or written by the user
   pub fn is_def_name_generated(&self, def_id: DefId) -> bool {
     self.def_names.name(&def_id).map_or(false, |Name(name)| name.contains('$'))
+  }
+
+  /// Checks if the definition of the given DefId is a built-in
+  pub fn is_builtin(&self, def_id: DefId) -> bool {
+    self.defs.get(&def_id).unwrap().rules[0].origin == Origin::Builtin
   }
 }
 
@@ -361,7 +373,7 @@ impl Term {
     Term::Lam { tag, nam: Some(nam), bod: Box::new(bod) }
   }
 
-  /// Substitute the occurences of a variable in a term with the given term.
+  /// Substitute the occurrences of a variable in a term with the given term.
   pub fn subst(&mut self, from: &Name, to: &Term) {
     match self {
       Term::Lam { nam: Some(nam), .. } if nam == from => (),
@@ -412,7 +424,7 @@ impl Term {
     }
   }
 
-  /// Substitute the occurence of an unscoped variable with the given term.
+  /// Substitute the occurrence of an unscoped variable with the given term.
   pub fn subst_unscoped(&mut self, from: &Name, to: &Term) {
     match self {
       Term::Lnk { nam } if nam == from => {
@@ -715,7 +727,7 @@ impl Pattern {
       }
       Pattern::Tup(..) => Type::Tup,
       Pattern::Num(..) => Type::Num,
-      Pattern::List(..) => Type::Adt(Name::new(encode_lists::LIST)),
+      Pattern::List(..) => Type::Adt(Name::new(builtins::LIST)),
     };
     Ok(typ)
   }
@@ -732,6 +744,7 @@ impl Definition {
     self.rules[0].arity()
   }
 
+  #[track_caller]
   pub fn assert_no_pattern_matching_rules(&self) {
     assert!(self.rules.len() == 1, "Definition rules should have been removed in earlier pass");
     assert!(self.rules[0].pats.is_empty(), "Definition args should have been removed in an earlier pass");

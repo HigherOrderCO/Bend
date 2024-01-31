@@ -1,0 +1,2 @@
+data String = (SCons head tail) | (SNil)
+data List   = (LCons head tail) | (LNil)

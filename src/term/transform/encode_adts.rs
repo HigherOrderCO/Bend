@@ -9,7 +9,7 @@ impl Book {
 
         let lam = make_lam(adt_name, args.clone(), ctrs, ctr_name);
 
-        let rules = vec![Rule { pats: vec![], body: lam, generated: true }];
+        let rules = vec![Rule { pats: vec![], body: lam, origin: adt.origin }];
         defs.push((ctr_name.clone(), rules));
       }
     }

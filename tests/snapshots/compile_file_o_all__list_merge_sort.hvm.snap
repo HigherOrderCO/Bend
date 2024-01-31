@@ -2,29 +2,29 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
 ---
-@F = (a (* a))
-@G = (* (a a))
-@J = (* @Nil)
-@L = {8 a {6 {4 @L {4 @J (b c)}} ({3 (a d) b} {4 {8 d {6 c e}} {4 * e}})}}
-@Map = ({4 @L {4 @J a}} a)
+@J = (a (* a))
+@K = (* (a a))
+@Map = ({4 @P {4 @N a}} a)
+@N = (* @Nil)
 @Nil = {4 * {4 a a}}
+@P = {8 a {6 {4 @P {4 @N (b c)}} ({3 (a d) b} {4 {8 d {6 c e}} {4 * e}})}}
 @Pure = (a {4 {8 a {6 @Nil b}} {4 * b}})
-@Q = {8 a {6 {4 @i {4 @j (b (a c))}} (b c)}}
-@R = (* @Nil)
-@S = (a ({4 @Q {4 @R (a b)}} b))
-@V = {8 a {6 {4 @o {4 @p (b (a c))}} (b c)}}
-@W = (* @Nil)
-@b = {8 {15 a {17 b c}} {6 {19 d {4 @b {4 @c (e (f (g h)))}}} ({5 (i (a {2 @F {2 @G ({4 {8 j {6 k l}} {4 * l}} ({4 {8 c {6 h m}} {4 * m}} n))}})) {7 o e}} ({9 i {11 j f}} ({13 {4 @d {4 @e (o ({4 {8 b {6 d p}} {4 * p}} k))}} g} n)))}}
-@c = (* @s)
-@d = {8 a {6 b (c ({4 @b {4 @c (c (a (b d)))}} d))}}
-@e = (* (a a))
-@i = {8 a {6 {4 @V {4 @W (b {4 @i {4 @j (c (d e))}})}} ({21 c {23 f b}} ({4 @d {4 @e (f (a d))}} e))}}
-@j = (* (a a))
+@U = {8 a {6 {4 @m {4 @n (b (a c))}} (b c)}}
+@V = (* @Nil)
+@W = (a ({4 @U {4 @V (a b)}} b))
+@Z = {8 a {6 {4 @s {4 @t (b (a c))}} (b c)}}
+@a = (* @Nil)
+@f = {8 {15 a {17 b c}} {6 {19 d {4 @f {4 @g (e (f (g h)))}}} ({5 (i (a {2 @J {2 @K ({4 {8 j {6 k l}} {4 * l}} ({4 {8 c {6 h m}} {4 * m}} n))}})) {7 o e}} ({9 i {11 j f}} ({13 {4 @h {4 @i (o ({4 {8 b {6 d p}} {4 * p}} k))}} g} n)))}}
+@g = (* @w)
+@h = {8 a {6 b (c ({4 @f {4 @g (c (a (b d)))}} d))}}
+@i = (* (a a))
+@m = {8 a {6 {4 @Z {4 @a (b {4 @m {4 @n (c (d e))}})}} ({21 c {23 f b}} ({4 @h {4 @i (f (a d))}} e))}}
 @main = (a (b c))
-& @S ~ (a (d c))
+& @W ~ (a (d c))
 & @Map ~ (b (@Pure d))
-@o = {8 a {6 {4 @V {4 @W (b c)}} ({23 d b} ({4 @d {4 @e (d (a e))}} {4 {8 e {6 c f}} {4 * f}}))}}
-@p = (* @t)
-@s = (a (b {4 {8 a {6 b c}} {4 * c}}))
-@t = (a {4 {8 a {6 @Nil b}} {4 * b}})
+@n = (* (a a))
+@s = {8 a {6 {4 @Z {4 @a (b c)}} ({23 d b} ({4 @h {4 @i (d (a e))}} {4 {8 e {6 c f}} {4 * f}}))}}
+@t = (* @x)
+@w = (a (b {4 {8 a {6 b c}} {4 * c}}))
+@x = (a {4 {8 a {6 @Nil b}} {4 * b}})
 

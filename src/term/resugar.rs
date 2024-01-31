@@ -1,9 +1,7 @@
 use super::{
+  builtins::{SCONS, SNIL},
   net_to_term::{ReadbackError, Reader},
-  transform::{
-    encode_adts::adt_field_tag,
-    encode_strs::{SCONS, SNIL},
-  },
+  transform::encode_adts::adt_field_tag,
   Adt, Name, Pattern, Tag, Term,
 };
 use std::borrow::BorrowMut;
