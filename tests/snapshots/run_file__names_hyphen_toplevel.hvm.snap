@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/names_hyphen_toplevel.hvm
 ---
-At tests/golden_tests/run_file/names_hyphen_toplevel.hvm/:1:1: Names with '-' are not supported at top level.
+At tests/golden_tests/run_file/names_hyphen_toplevel.hvm:1:1: Names with '-' are not supported at top level.
 [0m  1 | [4m[31mthis-is-not-allowed[0m = 1[0m
-At tests/golden_tests/run_file/names_hyphen_toplevel.hvm/:3:5: Names with '-' are not supported at top level.
+At tests/golden_tests/run_file/names_hyphen_toplevel.hvm:3:5: Names with '-' are not supported at top level.
 [0m  3 | data [4m[31mFoo-Bar[0m = Baz-Qux[0m
-At tests/golden_tests/run_file/names_hyphen_toplevel.hvm/:3:15: Names with '-' are not supported at top level.
+At tests/golden_tests/run_file/names_hyphen_toplevel.hvm:3:15: Names with '-' are not supported at top level.
 [0m  3 | data Foo-Bar = [4m[31mBaz-Qux[0m

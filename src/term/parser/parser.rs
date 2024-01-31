@@ -64,9 +64,8 @@ pub fn error_to_msg(err: &Rich<'_, Token>, code: &str, path: &Path) -> String {
     RichReason::Many(errs) => &errs[0],
     _ => err.reason(),
   };
-  let mut path = path.to_path_buf();
-  path.push(format!(":{lin}:{col}"));
-  format!("At {}: {}\n{}", path.display(), reason, highlight_error::highlight_error(start, end, code))
+  let path = format!("{}:{lin}:{col}", path.display());
+  format!("At {}: {}\n{}", path, reason, highlight_error::highlight_error(start, end, code))
 }
 
 fn line_and_col_of_byte(until: usize, src: &str) -> (usize, usize) {

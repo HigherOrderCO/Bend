@@ -2,5 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/repeated_adt_name.hvm
 ---
-At tests/golden_tests/parse_file/repeated_adt_name.hvm/:2:0: Repeated datatype 'Foo'
+At tests/golden_tests/parse_file/repeated_adt_name.hvm:2:0: Repeated datatype 'Foo'
 [0m  2 | [4m[31mdata Foo = B[0m

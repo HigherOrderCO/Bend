@@ -2,5 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/just_a_name.hvm
 ---
-At tests/golden_tests/compile_file/just_a_name.hvm/:1:1: found 'asdf' expected '+', '(', '[', or '='
+At tests/golden_tests/compile_file/just_a_name.hvm:1:1: found 'asdf' expected '+', '(', '[', or '='
 [0m 1 | [4m[31masdf[0m
