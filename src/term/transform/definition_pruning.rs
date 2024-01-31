@@ -6,7 +6,7 @@ use crate::{
 };
 use indexmap::IndexSet;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 enum Used {
   /// Rule is a constructor for an Adt
   /// If not `prune_all`, should not be pruned when:
@@ -45,7 +45,7 @@ impl Book {
           if rule.origin != Origin::Builtin {
             match used.entry(*def_id) {
               Entry::Vacant(e) => _ = e.insert(Used::Unused),
-              Entry::Occupied(e) if !matches!(e.get(), Used::Unused) => continue,
+              Entry::Occupied(e) if *e.get() != Used::Unused => continue,
               _ => {}
             }
 
