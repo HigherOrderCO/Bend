@@ -1,4 +1,4 @@
-use crate::term::{Book, DefId, DefNames, Definition, Name, Pattern, Rule, Term};
+use crate::term::{Book, DefId, DefNames, Definition, Name, Origin, Pattern, Rule, Term};
 use std::{
   collections::{BTreeMap, HashSet},
   ops::BitAnd,
@@ -15,7 +15,9 @@ impl Book {
       if def.def_id == main {
         continue;
       }
-      def.rules[0].body.detach_combinators(def.def_id, &mut self.def_names, &mut combinators);
+
+      let rule = &mut def.rules[0];
+      rule.body.detach_combinators(def.def_id, rule.origin, &mut self.def_names, &mut combinators);
     }
 
     // Definitions are not inserted to the book as they are defined to appease the borrow checker.
@@ -30,14 +32,20 @@ struct TermInfo<'d> {
   // Number of times a Term has been detached from the current Term
   counter: u32,
   rule_id: DefId,
+  rule_type: Origin,
   def_names: &'d mut DefNames,
   needed_names: HashSet<Name>,
   combinators: &'d mut Combinators,
 }
 
 impl<'d> TermInfo<'d> {
-  fn new(rule_id: DefId, def_names: &'d mut DefNames, combinators: &'d mut Combinators) -> Self {
-    Self { counter: 0, rule_id, def_names, needed_names: HashSet::new(), combinators }
+  fn new(
+    rule_id: DefId,
+    rule_type: Origin,
+    def_names: &'d mut DefNames,
+    combinators: &'d mut Combinators,
+  ) -> Self {
+    Self { counter: 0, rule_id, rule_type, def_names, needed_names: HashSet::new(), combinators }
   }
   fn request_name(&mut self, name: &Name) {
     self.needed_names.insert(name.to_owned());
@@ -71,7 +79,7 @@ impl<'d> TermInfo<'d> {
     let comb_var = Term::Ref { def_id: comb_id };
     let extracted_term = std::mem::replace(term, comb_var);
 
-    let rules = vec![Rule { body: extracted_term, pats: Vec::new(), generated: false }];
+    let rules = vec![Rule { body: extracted_term, pats: Vec::new(), origin: self.rule_type }];
     let rule = Definition { def_id: comb_id, rules };
     self.combinators.insert(comb_id, rule);
   }
@@ -141,6 +149,7 @@ impl Term {
   pub fn detach_combinators(
     &mut self,
     rule_id: DefId,
+    rule_type: Origin,
     def_names: &mut DefNames,
     combinators: &mut Combinators,
   ) {
@@ -270,7 +279,7 @@ impl Term {
       }
     }
 
-    go(self, 0, &mut TermInfo::new(rule_id, def_names, combinators));
+    go(self, 0, &mut TermInfo::new(rule_id, rule_type, def_names, combinators));
   }
 
   // We don't want to detach id function, since that's not a net gain in performance or space

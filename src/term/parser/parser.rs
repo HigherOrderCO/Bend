@@ -1,11 +1,11 @@
 use crate::term::{
   parser::lexer::{LexingError, Token},
-  Adt, Book, MatchNum, Name, Op, Pattern, Rule, Tag, Term,
+  Adt, Book, MatchNum, Name, Op, Origin, Pattern, Rule, Tag, Term,
 };
 use chumsky::{
   error::RichReason,
   extra,
-  input::{SpannedInput, Stream, ValueInput},
+  input::{Emitter, SpannedInput, Stream, ValueInput},
   prelude::{Input, Rich},
   primitive::{choice, end, just},
   recursive::recursive,
@@ -41,8 +41,12 @@ use std::{collections::hash_map::Entry, iter::Map, ops::Range};
 // <Number> ::= <number_token> // [0-9]+
 // <Tag>    ::= "#" <Name>
 
-pub fn parse_definition_book(code: &str) -> Result<Book, Vec<Rich<Token>>> {
-  book().parse(token_stream(code)).into_result()
+pub fn parse_definition_book(
+  code: &str,
+  default_book: impl Fn() -> Book,
+  rule_type: Origin,
+) -> Result<Book, Vec<Rich<Token>>> {
+  book(default_book, rule_type).parse(token_stream(code)).into_result()
 }
 
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
@@ -405,16 +409,16 @@ where
     .boxed()
 }
 
-fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
+fn rule<'a, I>(rule_type: Origin) -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   rule_body_missing_paren()
     .or(rule_pattern().then(term()))
-    .map(|((name, pats), body)| (name, Rule { pats, body, generated: false }))
+    .map(move |((name, pats), body)| (name, Rule { pats, body, origin: rule_type }))
 }
 
-fn datatype<'a, I>() -> impl Parser<'a, I, (Name, Adt), extra::Err<Rich<'a, Token>>>
+fn datatype<'a, I>(origin: Origin) -> impl Parser<'a, I, (Name, Adt, SimpleSpan), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -431,50 +435,58 @@ where
     .ignore_then(name())
     .then_ignore(just(Token::Equals))
     .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, Vec<Name>)>>())
-    .map(|(name, ctrs)| (name, Adt { ctrs: ctrs.into_iter().collect() }))
+    .map_with_span(move |(name, ctrs), span| (name, Adt { ctrs: ctrs.into_iter().collect(), origin }, span))
 }
 
-fn book<'a, I>() -> impl Parser<'a, I, Book, extra::Err<Rich<'a, Token>>>
+fn book<'a, I>(
+  default_book: impl Fn() -> Book,
+  origin: Origin,
+) -> impl Parser<'a, I, Book, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let top_level = choice((datatype().map(TopLevel::Adt), rule().map(TopLevel::Rule)));
+  let top_level = choice((datatype(origin).map(TopLevel::Adt), rule(origin).map(TopLevel::Rule)));
 
-  top_level.repeated().collect::<Vec<_>>().validate(|program, span, emit| {
-    let mut book = Book::new();
+  top_level.repeated().collect().validate(move |program, _, emit| collect_book(default_book(), program, emit))
+}
 
-    // Collect rules and adts into a book
-    for top_level in program {
-      match top_level {
-        TopLevel::Rule((nam, rule)) => {
-          if let Some(def) = book.get_def_mut(&nam) {
-            def.rules.push(rule);
-          } else {
-            book.insert_def(nam, vec![rule]);
-          }
-        }
-        TopLevel::Adt((nam, adt)) => {
-          if !book.adts.contains_key(&nam) {
-            book.adts.insert(nam.clone(), adt.clone());
-            for (ctr, _) in adt.ctrs {
-              if let Entry::Vacant(e) = book.ctrs.entry(ctr) {
-                e.insert(nam.clone());
-              } else {
-                emit.emit(Rich::custom(span, format!("Repeated constructor '{}'", nam)));
-              }
-            }
-          } else {
-            emit.emit(Rich::custom(span, format!("Repeated datatype '{}'", nam)));
-          }
+/// Collect rules and adts into a book
+fn collect_book(mut book: Book, program: Vec<TopLevel>, emit: &mut Emitter<Rich<'_, Token>>) -> Book {
+  for top_level in program {
+    match top_level {
+      TopLevel::Rule((nam, rule)) => {
+        if let Some(def) = book.get_def_mut(&nam) {
+          def.rules.push(rule);
+        } else {
+          book.insert_def(nam, vec![rule]);
         }
       }
+      TopLevel::Adt((nam, adt, span)) => match book.adts.get(&nam) {
+        None => {
+          book.adts.insert(nam.clone(), adt.clone());
+          for (ctr, _) in adt.ctrs {
+            match book.ctrs.entry(ctr) {
+              Entry::Vacant(e) => _ = e.insert(nam.clone()),
+              Entry::Occupied(e) => emit.emit(Rich::custom(span, match book.adts[e.get()].origin {
+                Origin::Builtin => {
+                  format!("{} is a built-in constructor and should not be overridden.", e.key())
+                }
+                _ => format!("Repeated constructor '{}'", e.key()),
+              })),
+            }
+          }
+        }
+        Some(adt) => emit.emit(Rich::custom(span, match adt.origin {
+          Origin::Builtin => format!("{} is a built-in datatype and should not be overridden.", nam),
+          _ => format!("Repeated datatype '{}'", nam),
+        })),
+      },
     }
-
-    book
-  })
+  }
+  book
 }
 
 enum TopLevel {
   Rule((Name, Rule)),
-  Adt((Name, Adt)),
+  Adt((Name, Adt, SimpleSpan)),
 }

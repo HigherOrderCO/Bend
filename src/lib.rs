@@ -11,7 +11,6 @@ use std::{time::Instant, vec::IntoIter};
 use term::{
   book_to_nets, net_to_term,
   term_to_net::{HvmcNames, Labels},
-  transform::{encode_lists::BuiltinList, encode_strs::BuiltinString},
   Book, DefId, DefNames, Name, Term,
 };
 
@@ -49,9 +48,8 @@ pub fn desugar_book(
   let mut warnings = Vec::new();
   let main = book.check_has_main()?;
   book.check_shared_names()?;
-  book.encode_builtin_adt(BuiltinString)?;
-  book.encode_builtin_adt(BuiltinList)?;
   book.generate_scott_adts();
+  book.encode_builtins();
   encode_pattern_matching(book, &mut warnings)?;
   // sanity check
   book.check_unbound_vars()?;

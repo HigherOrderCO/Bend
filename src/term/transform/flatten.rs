@@ -1,4 +1,4 @@
-use crate::term::{Book, DefId, DefNames, Definition, Name, Pattern, Rule, Term};
+use crate::term::{Book, DefId, DefNames, Definition, Name, Origin, Pattern, Rule, Term};
 use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
@@ -158,7 +158,7 @@ fn make_old_rule(rule: &Rule, new_split_def_id: DefId) -> Rule {
     }
   }
   let new_body = Term::call(Term::Ref { def_id: new_split_def_id }, new_body_args);
-  Rule { pats: new_pats, body: new_body, generated: rule.generated }
+  Rule { pats: new_pats, body: new_body, origin: rule.origin }
 }
 
 /// Makes one of the new rules, flattening one layer of the original pattern.
@@ -225,7 +225,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
       (Pattern::List(..), _) | (_, Pattern::List(..)) => unreachable!(),
     }
   }
-  Rule { pats: new_pats, body: new_body, generated: true }
+  Rule { pats: new_pats, body: new_body, origin: Origin::Generated }
 }
 
 fn make_var_name(var_count: &mut usize) -> Name {

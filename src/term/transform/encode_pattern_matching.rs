@@ -1,5 +1,5 @@
 use crate::term::{
-  check::type_check::DefinitionTypes, Book, DefId, MatchNum, Name, Pattern, Rule, Tag, Term, Type,
+  check::type_check::DefinitionTypes, Book, DefId, MatchNum, Name, Origin, Pattern, Rule, Tag, Term, Type,
 };
 
 impl Book {
@@ -38,7 +38,7 @@ fn make_non_pattern_matching_def(book: &mut Book, def_id: DefId) {
 fn make_pattern_matching_def(book: &mut Book, def_id: DefId, def_type: &[Type]) {
   let def_name = book.def_names.name(&def_id).unwrap().clone();
   let def = book.defs.get_mut(&def_id).unwrap();
-  let generated = def.rules[0].generated;
+  let origin = def.rules[0].origin;
   let crnt_rules = (0 .. def.rules.len()).collect();
 
   // First create a definition for each rule body
@@ -50,7 +50,7 @@ fn make_pattern_matching_def(book: &mut Book, def_id: DefId, def_type: &[Type]) 
   }
   for (rule_idx, body) in rule_bodies.into_iter().enumerate() {
     let rule_name = make_rule_name(&def_name, rule_idx);
-    book.insert_def(rule_name, vec![Rule { pats: vec![], body, generated }]);
+    book.insert_def(rule_name, vec![Rule { pats: vec![], body, origin }]);
   }
 
   // Generate scott-encoded pattern matching
@@ -436,9 +436,9 @@ impl Term {
 
 fn add_case_to_book(book: &mut Book, nam: Name, body: Term) {
   if let Some(def) = book.get_def_mut(&nam) {
-    def.rules = vec![Rule { pats: vec![], body, generated: true }];
+    def.rules = vec![Rule { pats: vec![], body, origin: Origin::Generated }];
   } else {
-    book.insert_def(nam, vec![Rule { pats: vec![], body, generated: true }]);
+    book.insert_def(nam, vec![Rule { pats: vec![], body, origin: Origin::Generated }]);
   }
 }
 

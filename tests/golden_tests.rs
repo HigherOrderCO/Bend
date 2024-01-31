@@ -4,11 +4,8 @@ use hvml::{
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
   term::{
-    net_to_term::net_to_term,
-    parser::{parse_definition_book, parse_term, parser::error_to_msg},
-    term_to_compat_net,
-    transform::{encode_lists::BuiltinList, encode_strs::BuiltinString},
-    Book, DefId, Term,
+    load_book::do_parse_book, net_to_term::net_to_term, parser::parse_term, term_to_compat_net, Book, DefId,
+    Term,
   },
   Opts, WarningOpts,
 };
@@ -22,13 +19,6 @@ use std::{
 };
 use stdext::function_name;
 use walkdir::WalkDir;
-
-fn do_parse_book(code: &str) -> Result<Book, String> {
-  match parse_definition_book(code) {
-    Ok(book) => Ok(book),
-    Err(errs) => Err(errs.iter().map(|e| error_to_msg(e, code)).join("\n")),
-  }
-}
 
 fn do_parse_term(code: &str) -> Result<Term, String> {
   parse_term(code).map_err(|errs| errs.into_iter().map(|e| e.to_string()).join("\n"))
