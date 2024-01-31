@@ -18,7 +18,7 @@ enum Used {
 
   /// Rule is not accessible from main nor it's an Adt
   /// Should be pruned if `prune_all` or if it's a built-in rule
-  /// Otherwise, if the rule has a non-generated name, a warning about the unused def returned
+  /// Otherwise, if the rule has a non-generated name, a warning about the unused def is returned
   Unused,
 }
 
