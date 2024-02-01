@@ -9,7 +9,7 @@ impl Book {
     for (def_id, def) in &self.defs {
       let def_name = self.def_names.name(def_id).unwrap();
       let types = &def_types[def_id];
-      let rules_to_check = Vec::from_iter(0 .. def.rules.len());
+      let rules_to_check = (0 .. def.rules.len()).collect();
       check_pattern(&mut vec![], &self.adts, &def.rules, types, rules_to_check, def_name)
         .map_err(|e| format!("In definition '{}': {}", self.def_names.name(&def.def_id).unwrap(), e))?;
     }
@@ -35,7 +35,7 @@ fn check_pattern(
         let adt = &adts[adt_nam];
         // Find which rules match each constructor
         let mut next_rules_to_check: BTreeMap<Name, Vec<usize>> =
-          BTreeMap::from_iter(adt.ctrs.keys().cloned().map(|ctr| (ctr, vec![])));
+          adt.ctrs.keys().cloned().map(|ctr| (ctr, vec![])).collect();
         for rule_idx in rules_to_check {
           let pat = &rules[rule_idx].pats[match_path.len()];
           match pat {
@@ -73,13 +73,13 @@ fn check_pattern(
     // Check that each constructor matches at least one rule and then check the next pattern recursively.
     for (ctr, matching_rules) in rules_matching_ctrs {
       if matching_rules.is_empty() {
-        let missing = get_missing_pattern(match_path, ctr, &types[1 ..], adts);
+        let missing = get_missing_pattern(match_path, &ctr, &types[1 ..], adts);
         return Err(format!("Non-exhaustive pattern. Hint: ({} {}) not covered.", def_name, missing));
-      } else {
-        let mut match_path = match_path.to_vec();
-        match_path.push(ctr);
-        check_pattern(&mut match_path, adts, rules, &types[1 ..], matching_rules, def_name)?;
       }
+
+      let mut match_path = match_path.clone();
+      match_path.push(ctr);
+      check_pattern(&mut match_path, adts, rules, &types[1 ..], matching_rules, def_name)?;
     }
   }
   Ok(())
@@ -88,11 +88,11 @@ fn check_pattern(
 /// Returns a string with the first pattern not covered by the definition.
 fn get_missing_pattern(
   match_path: &[Name],
-  missing_ctr: Name,
+  missing_ctr: &Name,
   remaining_types: &[Type],
   adts: &BTreeMap<Name, Adt>,
 ) -> String {
-  let mut missing_set: Vec<_> = match_path.iter().map(|x| x.to_string()).collect();
+  let mut missing_set: Vec<_> = match_path.iter().map(ToString::to_string).collect();
   missing_set.push(missing_ctr.to_string());
   for typ in remaining_types {
     missing_set.push(first_ctr_of_type(typ, adts));

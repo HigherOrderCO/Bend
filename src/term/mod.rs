@@ -648,7 +648,7 @@ impl Pattern {
     }
     let mut set = Vec::new();
     go(self, &mut set);
-    set.into_iter().flat_map(|a| a.as_ref())
+    set.into_iter().filter_map(Option::as_ref)
   }
 
   pub fn names_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Name> {
@@ -668,7 +668,7 @@ impl Pattern {
     }
     let mut set = Vec::new();
     go(self, &mut set);
-    set.into_iter().flat_map(|a| a.as_mut())
+    set.into_iter().filter_map(Option::as_mut)
   }
 
   pub fn ctrs(&self) -> impl DoubleEndedIterator<Item = &Name> {

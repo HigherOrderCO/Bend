@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, HashMap};
 impl Book {
   /// Merges definitions that have the same structure into one definition.
   /// Expects variables to be linear.
-  /// 
-  /// Ignores origin of the rules when merging, 
+  ///
+  /// Ignores origin of the rules when merging,
   /// Should not be preceded by passes that cares about the origins.
   pub fn merge_definitions(&mut self, main: DefId) {
     let ids: Vec<_> = self.defs.keys().copied().collect();

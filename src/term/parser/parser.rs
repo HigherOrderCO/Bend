@@ -138,7 +138,7 @@ fn tag<'a, I>(default: Tag) -> impl Parser<'a, I, Tag, extra::Err<Rich<'a, Token
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  just(Token::Hash).ignore_then(name()).or_not().map(move |x| x.map(Tag::Named).unwrap_or(default.clone()))
+  just(Token::Hash).ignore_then(name()).or_not().map(move |x| x.map_or_else(|| default.clone(), Tag::Named))
 }
 
 fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
@@ -267,7 +267,7 @@ where
         Some(nam) => Term::Let {
           pat: Pattern::Var(Some(nam.clone())),
           val: Box::new(scrutinee),
-          nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam: nam.clone() }), arms }),
+          nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam }), arms }),
         },
         None => Term::Match { scrutinee: Box::new(scrutinee), arms },
       })
@@ -285,8 +285,8 @@ where
       .then(term.clone())
       .then_ignore(term_sep.clone())
       .then_ignore(just(Token::RBracket))
-      .map(|((cond, zero), succ)| Term::Match {
-        scrutinee: Box::new(Term::Var { nam: cond.clone() }),
+      .map(|((nam, zero), succ)| Term::Match {
+        scrutinee: Box::new(Term::Var { nam }),
         arms: vec![(Pattern::Num(MatchNum::Zero), zero), (Pattern::Num(MatchNum::Succ(None)), succ)],
       })
       .boxed();

@@ -29,7 +29,7 @@ impl Term {
           f,
           "{}λ{} {}",
           tag.display_padded(),
-          nam.clone().unwrap_or(Name::new("*")),
+          nam.as_ref().map_or("*", |x| x.as_str()),
           bod.display(def_names)
         )
       }
@@ -60,8 +60,8 @@ impl Term {
         f,
         "let{} {{{} {}}} = {}; {}",
         tag.display(),
-        fst.as_ref().map(|x| x.as_str()).unwrap_or("*"),
-        snd.as_ref().map(|x| x.as_str()).unwrap_or("*"),
+        fst.as_ref().map_or("*", |x| x.as_str()),
+        snd.as_ref().map_or("*", |x| x.as_str()),
         val.display(def_names),
         nxt.display(def_names)
       ),
