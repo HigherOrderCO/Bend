@@ -12,7 +12,7 @@ struct Cli {
   #[command(subcommand)]
   pub mode: Mode,
 
-  #[arg(short, long)]
+  #[arg(short, long, global = true)]
   pub verbose: bool,
 }
 
@@ -87,7 +87,7 @@ struct WOpts {
     long = "warn",
     value_delimiter = ' ',
     action = clap::ArgAction::Append,
-    long_help = "Show compilation warnings"
+    long_help = "Show compilation warnings",
   )]
   pub warns: Vec<hvml::WarningArgs>,
 
@@ -96,7 +96,7 @@ struct WOpts {
     long = "deny",
     value_delimiter = ' ',
     action = clap::ArgAction::Append,
-    long_help = "Deny compilation warnings"
+    long_help = "Deny compilation warnings",
   )]
   pub denies: Vec<hvml::WarningArgs>,
 
@@ -105,7 +105,7 @@ struct WOpts {
     long = "allow",
     value_delimiter = ' ',
     action = clap::ArgAction::Append,
-    long_help = "Allow compilation warnings"
+    long_help = "Allow compilation warnings",
   )]
   pub allows: Vec<hvml::WarningArgs>,
 }
@@ -202,14 +202,19 @@ fn run_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book), mut opts: Opts) -> Re
 impl WOpts {
   fn get_warning_opts(self) -> WarningOpts {
     let mut warning_opts = WarningOpts::default();
-    let argm = Cli::command().get_matches();
-    // FIXME: panics because cant find WOpts
-    // if let Some(wopts_id_seq) = argm.get_many::<clap::Id>("WOpts") {
-    //   let allows = &mut self.allows.into_iter();
-    //   let denies = &mut self.denies.into_iter();
-    //   let warns = &mut self.warns.into_iter();
-    //   WarningOpts::from_cli_opts(&mut warning_opts, wopts_id_seq.collect(), allows, denies, warns);
-    // }
+
+    let cmd = Cli::command();
+    let matches = cmd.get_matches();
+
+    let subcmd_name = matches.subcommand_name().expect("To have a subcommand");
+    let argm = matches.subcommand_matches(subcmd_name).expect("To have a subcommand");
+
+    if let Some(wopts_id_seq) = argm.get_many::<clap::Id>("WOpts") {
+      let allows = &mut self.allows.into_iter();
+      let denies = &mut self.denies.into_iter();
+      let warns = &mut self.warns.into_iter();
+      WarningOpts::from_cli_opts(&mut warning_opts, wopts_id_seq.collect(), allows, denies, warns);
+    }
     warning_opts
   }
 }
