@@ -211,7 +211,7 @@ impl Opts {
 impl Opts {
   pub fn check(&self) {
     if !self.supercombinators {
-      println!("Warning: Running in strict mode can lead some functions expand infinitely.");
+      println!("Warning: Running in strict mode without enabling the supercombinators pass can lead to some functions expanding infinitely.");
     }
   }
 }
