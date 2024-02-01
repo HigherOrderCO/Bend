@@ -2,4 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/missing_paren.hvm
 ---
-At line 1: Missing Parenthesis around rule `main` body
+At tests/golden_tests/parse_file/missing_paren.hvm:1:7: Missing Parenthesis around rule body
+[0m  1 | main = [4m[31m* *[0m

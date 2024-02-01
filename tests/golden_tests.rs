@@ -30,11 +30,18 @@ fn do_parse_net(code: &str) -> Result<hvmc::ast::Net, String> {
 
 const TESTS_PATH: &str = "/tests/golden_tests/";
 
-fn run_single_golden_test(path: &Path, run: &dyn Fn(&str) -> Result<String, String>) -> Result<(), String> {
+fn run_single_golden_test(
+  path: &Path,
+  run: &dyn Fn(&str, &Path) -> Result<String, String>,
+) -> Result<(), String> {
   let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
   let file_name = path.to_str().and_then(|path| path.rsplit_once(TESTS_PATH)).unwrap().1;
 
-  let result: String = run(&code).unwrap_or_else(|err| err);
+  // unfortunately we need to do this
+  let file_path = format!("{}{}", &TESTS_PATH[1 ..], file_name);
+  let file_path = Path::new(&file_path);
+
+  let result: String = run(&code, file_path).unwrap_or_else(|err| err);
 
   let mut settings = insta::Settings::clone_current();
   settings.set_prepend_module_to_snapshot(false);
@@ -48,7 +55,7 @@ fn run_single_golden_test(path: &Path, run: &dyn Fn(&str) -> Result<String, Stri
   Ok(())
 }
 
-fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str) -> Result<String, String>) {
+fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str, &Path) -> Result<String, String>) {
   let root = PathBuf::from(format!(
     "{}{TESTS_PATH}{}",
     env!("CARGO_MANIFEST_DIR"),
@@ -72,7 +79,7 @@ fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str) -> Result<String, Str
 
 #[test]
 fn compile_term() {
-  run_golden_test_dir(function_name!(), &|code| {
+  run_golden_test_dir(function_name!(), &|code, _| {
     let mut term = do_parse_term(code)?;
     term.check_unbound_vars(&mut HashMap::new())?;
     term.make_var_names_unique();
@@ -88,16 +95,16 @@ fn compile_term() {
 
 #[test]
 fn compile_file_o_all() {
-  run_golden_test_dir(function_name!(), &|code| {
-    let mut book = do_parse_book(code)?;
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = do_parse_book(code, path)?;
     let compiled = compile_book(&mut book, Opts::heavy())?;
     Ok(format!("{:?}", compiled))
   })
 }
 #[test]
 fn compile_file() {
-  run_golden_test_dir(function_name!(), &|code| {
-    let mut book = do_parse_book(code)?;
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = do_parse_book(code, path)?;
     let compiled = compile_book(&mut book, Opts::light())?;
     Ok(format!("{:?}", compiled))
   })
@@ -105,8 +112,8 @@ fn compile_file() {
 
 #[test]
 fn run_file() {
-  run_golden_test_dir(function_name!(), &|code| {
-    let book = do_parse_book(code)?;
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let book = do_parse_book(code, path)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, def_names, info) =
       run_book(book, 1 << 20, true, false, false, WarningOpts::deny_all(), Opts::heavy())?;
@@ -116,7 +123,7 @@ fn run_file() {
 
 #[test]
 fn readback_lnet() {
-  run_golden_test_dir(function_name!(), &|code| {
+  run_golden_test_dir(function_name!(), &|code, _| {
     let net = do_parse_net(code)?;
     let book = Book::default();
     let compat_net = hvmc_to_net(&net, &DefId::from_internal);
@@ -127,8 +134,8 @@ fn readback_lnet() {
 
 #[test]
 fn flatten_rules() {
-  run_golden_test_dir(function_name!(), &|code| {
-    let mut book = do_parse_book(code)?;
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = do_parse_book(code, path)?;
     let main = book.check_has_main().ok();
     book.check_shared_names()?;
     book.encode_builtins();
@@ -146,16 +153,16 @@ fn flatten_rules() {
 
 #[test]
 fn parse_file() {
-  run_golden_test_dir(function_name!(), &|code| {
-    let book = do_parse_book(code)?;
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let book = do_parse_book(code, path)?;
     Ok(book.to_string())
   })
 }
 
 #[test]
 fn encode_pattern_match() {
-  run_golden_test_dir(function_name!(), &|code| {
-    let mut book = do_parse_book(code)?;
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = do_parse_book(code, path)?;
     let main = book.check_has_main().ok();
     book.check_shared_names()?;
     book.generate_scott_adts();
@@ -172,8 +179,8 @@ fn encode_pattern_match() {
 fn hangs() {
   let expected_normalization_time = 1;
 
-  run_golden_test_dir(function_name!(), &|code| {
-    let book = do_parse_book(code)?;
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let book = do_parse_book(code, path)?;
 
     let lck = Arc::new(RwLock::new(false));
     let got = lck.clone();

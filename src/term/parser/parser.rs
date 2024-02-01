@@ -14,7 +14,7 @@ use chumsky::{
   IterParser, Parser,
 };
 use logos::{Logos, SpannedIter};
-use std::{collections::hash_map::Entry, iter::Map, ops::Range};
+use std::{collections::hash_map::Entry, iter::Map, ops::Range, path::Path};
 
 // hvml grammar description:
 // <Book>    ::= <TopLevel>*
@@ -55,16 +55,37 @@ pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
 }
 
 /// Converts a Chumsky parser error into a message.
-pub fn error_to_msg(err: &Rich<'_, Token>, code: &str) -> String {
-  // Line number starts at 1.
-  let end_line = code[.. err.span().end].chars().filter(|c| *c == '\n').count() + 1;
+pub fn error_to_msg(err: &Rich<'_, Token>, code: &str, path: &Path) -> String {
+  let Range { start, end } = err.span().into_range();
+  let (lin, col) = line_and_col_of_byte(start, code);
   let reason = match err.reason() {
     // When many reasons, the first one is the most relevant.
     // Otherwise we just get 'multiple errors'.
     RichReason::Many(errs) => &errs[0],
     _ => err.reason(),
   };
-  format!("At line {}: {}", end_line, reason)
+  let path = format!("{}:{lin}:{col}", path.display());
+  format!("At {}: {}\n{}", path, reason, highlight_error::highlight_error(start, end, code))
+}
+
+fn line_and_col_of_byte(until: usize, src: &str) -> (usize, usize) {
+  let mut line = 1; // Line number starts at 1.
+  let mut col = 0;
+  let mut gone = 0;
+  for char in src.chars() {
+    let char_len = char.len_utf8();
+    gone += char_len;
+    if char == '\n' {
+      line += 1;
+      col = 0;
+    } else {
+      col += char_len;
+    }
+    if gone >= until {
+      break;
+    }
+  }
+  (line, col)
 }
 
 fn token_stream(
@@ -213,13 +234,12 @@ where
     // let a = ...
     // let (a, b) = ...
     let let_ = just(Token::Let)
-      .ignore_then(pattern())
-      .validate(|pat, span, emit| {
+      .ignore_then(pattern().validate(|pat, span, emit| {
         if matches!(&pat, Pattern::Num(..)) {
           emit.emit(Rich::custom(span, "Numbers not supported in let."));
         }
         pat
-      })
+      }))
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(term_sep.clone())
@@ -408,13 +428,12 @@ where
   let end_of_rule = end().or(soft_keyword("data")).rewind();
 
   rule_pattern()
-    .then(terms)
+    .then(terms.validate(|terms, span, emit| {
+      emit.emit(Rich::custom(span, format!("Missing Parenthesis around rule body")));
+      terms
+    }))
     .map(|(rule, (_, app))| (rule, app))
     .then_ignore(end_of_rule)
-    .validate(|((name, pats), term), span, emit| {
-      emit.emit(Rich::custom(span, format!("Missing Parenthesis around rule `{}` body", name)));
-      ((name, pats), term)
-    })
     .boxed()
 }
 

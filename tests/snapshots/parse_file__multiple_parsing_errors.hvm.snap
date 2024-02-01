@@ -2,5 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/multiple_parsing_errors.hvm
 ---
-At line 3: Missing Parenthesis around rule `main` body
-At line 5: Repeated datatype 'Foo'
+At tests/golden_tests/parse_file/multiple_parsing_errors.hvm:3:7: Missing Parenthesis around rule body
+[0m  3 | main = [4m[31mA B[0m
+At tests/golden_tests/parse_file/multiple_parsing_errors.hvm:5:0: Repeated datatype 'Foo'
+[0m  5 | [4m[31mdata Foo = B[0m

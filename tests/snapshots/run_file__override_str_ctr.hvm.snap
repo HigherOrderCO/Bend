@@ -2,4 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/override_str_ctr.hvm
 ---
-At line 2: SCons is a built-in constructor and should not be overridden.
+At tests/golden_tests/run_file/override_str_ctr.hvm:1:1: SCons is a built-in constructor and should not be overridden.
+[0m  1 | [4m[31mdata Override
+[0m  2 | [4m[31m  = (SCons any)[0m
