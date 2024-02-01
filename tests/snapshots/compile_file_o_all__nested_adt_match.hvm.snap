@@ -4,8 +4,7 @@ input_file: tests/golden_tests/compile_file_o_all/nested_adt_match.hvm
 ---
 @8 = ({2 @C {2 @A a}} a)
 @A = #0
-@C = {4 {2 @G {2 @E a}} a}
-@E = #0
+@C = {4 {2 @G {2 @A a}} a}
 @G = {4 a a}
 @Some = (a {2 {4 a b} {2 * b}})
 @main = a

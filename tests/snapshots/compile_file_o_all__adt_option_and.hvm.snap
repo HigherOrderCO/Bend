@@ -2,10 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/adt_option_and.hvm
 ---
-@A = ({2 @H {2 @G a}} a)
+@A = ({2 @H {2 @C a}} a)
 @C = (* @None)
 @D = {4 a (b {2 {4 [b a] c} {2 * c}})}
-@G = (* @None)
 @H = {4 a ({2 @D {2 @C (a b)}} b)}
 @None = {2 * {2 a a}}
 @Some = (a {2 {4 a b} {2 * b}})

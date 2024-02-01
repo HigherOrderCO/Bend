@@ -1,3 +1,4 @@
+pub mod definition_merge;
 pub mod definition_pruning;
 pub mod desugar_implicit_match_binds;
 pub mod desugar_let_destructors;

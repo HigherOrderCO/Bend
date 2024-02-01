@@ -41,6 +41,7 @@ struct Args {
     all, eta, no-eta, prune, no-prune, ref-to-ref, no-ref-to-ref,
     supercombinators (enabled by default), no-supercombinators,
     simplify-main, no-simplify-main, pre-reduce-refs, no-pre-reduce-refs
+    merge-definitions, no-merge-definitions
     "#,
   )]
   pub opts: Vec<String>,

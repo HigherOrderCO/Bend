@@ -41,10 +41,7 @@ pub fn compile_book(book: &mut Book, opts: Opts) -> Result<CompileResult, String
   Ok(CompileResult { core_book, hvmc_names, labels, warnings })
 }
 
-pub fn desugar_book(
-  book: &mut Book,
-  Opts { eta, ref_to_ref, prune, supercombinators, simplify_main, .. }: Opts,
-) -> Result<(DefId, Vec<Warning>), String> {
+pub fn desugar_book(book: &mut Book, opts: Opts) -> Result<(DefId, Vec<Warning>), String> {
   let mut warnings = Vec::new();
   let main = book.check_has_main()?;
   book.check_shared_names()?;
@@ -57,19 +54,22 @@ pub fn desugar_book(
   book.check_unbound_vars()?;
   book.make_var_names_unique();
   book.linearize_vars();
-  book.eta_reduction(eta);
+  book.eta_reduction(opts.eta);
   // sanity check
   book.check_unbound_vars()?;
-  if supercombinators {
+  if opts.supercombinators {
     book.detach_supercombinators(main);
   }
-  if ref_to_ref {
+  if opts.ref_to_ref {
     book.simplify_ref_to_ref()?;
   }
-  if simplify_main {
+  if opts.simplify_main {
     book.simplify_main_ref(main);
   }
-  book.prune(Some(main), prune, &mut warnings);
+  book.prune(Some(main), opts.prune, &mut warnings);
+  if opts.merge_definitions {
+    book.merge_definitions(main);
+  }
   Ok((main, warnings))
 }
 
@@ -190,8 +190,11 @@ pub struct Opts {
   /// Enables [term::transform::simplify_main_ref].
   pub simplify_main: bool,
 
-  /// Enables dereferences in `pre_reduce` pass.
+  /// Enables dereferences in [hvmc_net::pre_reduce] pass.
   pub pre_reduce_refs: bool,
+
+  /// Enables [term::transform::definition_merge]
+  pub merge_definitions: bool,
 }
 
 impl Opts {
@@ -205,6 +208,7 @@ impl Opts {
       supercombinators: true,
       simplify_main: true,
       pre_reduce_refs: true,
+      merge_definitions: true,
     }
   }
 
@@ -234,6 +238,8 @@ impl Opts {
         "no-simplify-main" => self.simplify_main = false,
         "pre-reduce-refs" => self.pre_reduce_refs = true,
         "no-pre-reduce-refs" => self.pre_reduce_refs = false,
+        "merge-definitions" => self.merge_definitions = true,
+        "no-merge-definitions" => self.merge_definitions = false,
         other => return Err(format!("Unknown option '{other}'.")),
       }
     }

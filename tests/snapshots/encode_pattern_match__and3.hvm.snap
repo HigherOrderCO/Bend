@@ -10,9 +10,9 @@ input_file: tests/golden_tests/encode_pattern_match/and3.hvm
 
 (F) = #Bool λT #Bool λF F
 
-(And$F0) = λx #Bool (x And$F0$PT And$F0$PF)
+(And$F0) = λx #Bool (x And$F0$PT And$F0$PF_$_And$F0$F0$PF)
 
-(And$F0$F0) = λx #Bool (x And$F0$F0$PT And$F0$F0$PF)
+(And$F0$F0) = λx #Bool (x And$F0$F0$PT And$F0$PF_$_And$F0$F0$PF)
 
 (And$R0) = λ%0 let (x$0, x$1) = %0; (And$F0 x$0 x$1)
 
@@ -22,22 +22,18 @@ input_file: tests/golden_tests/encode_pattern_match/and3.hvm
 
 (And$F0$R0) = λ%0 let (x$0, x$1) = %0; (And$F0$F0 x$0 x$1)
 
-(And$F0$R1) = λ* λ* F
+(And$F0$R1_$_And$F0$F0$R1) = λ* λ* F
 
 (And$F0$PT$P) = λy0 (And$F0$R0 y0)
 
 (And$F0$PT) = λx (And$F0$PT$P x)
 
-(And$F0$PF) = (And$F0$R1 *)
+(And$F0$PF_$_And$F0$F0$PF) = (And$F0$R1_$_And$F0$F0$R1 *)
 
 (And$F0$F0$R0) = T
 
-(And$F0$F0$R1) = λ* λ* F
-
 (And$F0$F0$PT$PT) = And$F0$F0$R0
 
-(And$F0$F0$PT$PF) = (And$F0$F0$R1 * *)
+(And$F0$F0$PT$PF) = (And$F0$R1_$_And$F0$F0$R1 * *)
 
 (And$F0$F0$PT) = λx #Bool (x And$F0$F0$PT$PT And$F0$F0$PT$PF)
-
-(And$F0$F0$PF) = (And$F0$F0$R1 *)

@@ -1,0 +1,22 @@
+data Either = (Left value) | (Right value)
+data Bool = True | False
+
+Foo (Left  False) (Left  False) = 1
+Foo (Left  False) (Left  True)  = 1
+Foo (Left  True)  (Left  False) = 1
+Foo (Left  True)  (Left  True)  = 1
+
+Foo (Left  False) (Right False) = 2
+Foo (Left  False) (Right True)  = 2
+Foo (Left  True)  (Right False) = 2
+Foo (Left  True)  (Right True)  = 2
+
+Foo (Right False) (Right False) = 3
+Foo (Right False) (Right True)  = 3
+Foo (Right True)  (Right False) = 3
+Foo (Right True)  (Right True)  = 3
+
+Foo (Right False) (Left False)  = 3
+Foo (Right False) (Left True)   = 3
+Foo (Right True)  (Left False)  = 3
+Foo (Right True)  (Left True)   = 3
