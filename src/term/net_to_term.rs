@@ -343,7 +343,7 @@ impl Term {
           def.assert_no_pattern_matching_rules();
           let mut term = def.rules[0].body.clone();
           term.fix_names(id_counter, book);
-          *self = term
+          *self = term;
         }
       }
       Term::Dup { fst, snd, val, nxt, .. } => {
@@ -368,7 +368,7 @@ impl Term {
             fix_name(nam, id_counter, term);
           }
 
-          term.fix_names(id_counter, book)
+          term.fix_names(id_counter, book);
         }
       }
       Term::Let { .. } | Term::List { .. } => unreachable!(),

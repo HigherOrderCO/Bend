@@ -131,9 +131,9 @@ fn get_tree_roots(inet: &INet) -> Result<(Option<NodeId>, Vec<[NodeId; 2]>), Str
   // Traverse the net
   while let Some(movement) = movements.pop() {
     match movement {
-      Movement::Down(node_id) => explore_down_link(inet, node_id, &mut explored_nodes, &mut movements)?,
+      Movement::Down(node_id) => explore_down_link(inet, node_id, &mut explored_nodes, &mut movements),
       Movement::Side(node_id) => {
-        explore_side_link(inet, node_id, &mut movements, &mut redx_roots, &mut root_set)?
+        explore_side_link(inet, node_id, &mut movements, &mut redx_roots, &mut root_set)?;
       }
     }
   }
@@ -151,7 +151,7 @@ fn explore_down_link(
   node_id: NodeId,
   explored_nodes: &mut [bool],
   movements: &mut Vec<Movement>,
-) -> Result<(), String> {
+) {
   // Don't go down already explored nodes.
   if !explored_nodes[node_id as usize] {
     explored_nodes[node_id as usize] = true;
@@ -167,7 +167,6 @@ fn explore_down_link(
       movements.push(movement);
     }
   }
-  Ok(())
 }
 
 fn explore_side_link(

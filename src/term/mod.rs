@@ -256,12 +256,12 @@ impl Book {
   }
 
   pub fn get_def(&self, rule_name: &Name) -> Option<&Definition> {
-    self.def_names.def_id(&rule_name).and_then(|def_id| self.defs.get(&def_id))
+    self.def_names.def_id(rule_name).and_then(|def_id| self.defs.get(&def_id))
   }
 
   // TODO: This get_def/insert_def functions could have an `entry` api instead
   pub fn get_def_mut(&mut self, rule_name: &Name) -> Option<&mut Definition> {
-    self.def_names.def_id(&rule_name).and_then(|def_id| self.defs.get_mut(&def_id))
+    self.def_names.def_id(rule_name).and_then(|def_id| self.defs.get_mut(&def_id))
   }
 
   pub fn insert_def(&mut self, name: Name, rules: Vec<Rule>) -> DefId {
@@ -338,7 +338,7 @@ impl DefNames {
 
   #[track_caller]
   pub fn get_ref(&self, rule_name: &Name) -> Term {
-    self.def_id(&rule_name).map(|def_id| Term::Ref { def_id }).unwrap()
+    self.def_id(rule_name).map(|def_id| Term::Ref { def_id }).unwrap()
   }
 }
 
@@ -402,9 +402,9 @@ impl Term {
           let can_subst;
 
           if let Pattern::Num(MatchNum::Succ(Some(Some(nam)))) = rule {
-            can_subst = nam != from
+            can_subst = nam != from;
           } else {
-            can_subst = true
+            can_subst = true;
           };
 
           if can_subst {

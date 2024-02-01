@@ -1,3 +1,4 @@
+#![warn(clippy::all)]
 #![feature(box_patterns)]
 
 use hvmc::{
@@ -145,7 +146,7 @@ pub fn run_compiled(
   } else if parallel {
     root.parallel_normal(&runtime_book);
   } else {
-    root.normal(&runtime_book)
+    root.normal(&runtime_book);
   }
 
   let elapsed = start_time.elapsed().as_secs_f64();

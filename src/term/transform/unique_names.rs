@@ -10,7 +10,7 @@ impl Book {
   pub fn make_var_names_unique(&mut self) {
     for def in self.defs.values_mut() {
       def.assert_no_pattern_matching_rules();
-      def.rules[0].body.make_var_names_unique()
+      def.rules[0].body.make_var_names_unique();
     }
   }
 }

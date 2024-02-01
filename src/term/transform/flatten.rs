@@ -77,7 +77,7 @@ fn split_group(rules: &[(Name, Rule)], def_names: &mut DefNames) -> HashMap<Name
         split_rule_count += 1;
         let new_split_def_id = def_names.insert(new_split_name.clone());
 
-        let old_rule = make_old_rule(&rule, new_split_def_id);
+        let old_rule = make_old_rule(rule, new_split_def_id);
 
         let mut new_group = vec![(name.clone(), old_rule)];
 

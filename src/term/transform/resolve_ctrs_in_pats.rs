@@ -23,7 +23,7 @@ impl Pattern {
     match self {
       Pattern::Var(Some(nam)) => {
         if is_ctr(nam) {
-          *self = Pattern::Ctr(nam.clone(), vec![])
+          *self = Pattern::Ctr(nam.clone(), vec![]);
         }
       }
       Pattern::Ctr(_, args) | Pattern::List(args) => {

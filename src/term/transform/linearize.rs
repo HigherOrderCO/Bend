@@ -47,7 +47,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
     // Var producers
     Term::Lam { nam, bod, .. } => {
       add_var(nam.as_ref(), uses);
-      count_var_uses_in_term(bod, uses)
+      count_var_uses_in_term(bod, uses);
     }
     Term::Dup { fst, snd, val, nxt, .. }
     | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
@@ -75,7 +75,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       count_var_uses_in_term(scrutinee, uses);
       for (rule, term) in arms {
         if let Pattern::Num(MatchNum::Succ(Some(nam))) = rule {
-          add_var(nam.as_ref(), uses)
+          add_var(nam.as_ref(), uses);
         }
 
         count_var_uses_in_term(term, uses);
@@ -128,20 +128,21 @@ fn term_to_affine(
             *term = Term::Let { pat: Pattern::Var(None), val, nxt };
 
             return;
-          } else {
-            // We are going to remove the val term,
-            // so we need to remove the free variables it uses from the vars count
-            for (var, used) in val.free_vars() {
-              let Entry::Occupied(mut entry) = var_uses.entry(var) else { unreachable!() };
-
-              if *entry.get() == 1 {
-                entry.remove();
-              } else {
-                *entry.get_mut() -= used;
-              }
-            }
-            term_to_affine(nxt, var_uses, inst_count, let_bodies);
           }
+
+          // We are going to remove the val term,
+          // so we need to remove the free variables it uses from the vars count
+          for (var, used) in val.free_vars() {
+            let Entry::Occupied(mut entry) = var_uses.entry(var) else { unreachable!() };
+
+            if *entry.get() <= used {
+              entry.remove();
+            } else {
+              *entry.get_mut() -= used;
+            }
+          }
+
+          term_to_affine(nxt, var_uses, inst_count, let_bodies);
         }
         1 => {
           term_to_affine(val, var_uses, inst_count, let_bodies);
@@ -158,10 +159,10 @@ fn term_to_affine(
             // TODO: This is done because the number of uses changed (because a term was linearized out)
             // It creates an extra half-erased-dup `let {nam_n *} = nam_m_dup; nxt` to match the correct labels.
             // Should be refactored.
-            instantiated_count += 1
+            instantiated_count += 1;
           };
 
-          duplicate_let(nam, nxt, instantiated_count, val)
+          duplicate_let(nam, nxt, instantiated_count, val);
         }
       }
       *term = std::mem::take(nxt.as_mut());
@@ -193,9 +194,9 @@ fn term_to_affine(
     Term::Var { nam } => {
       *var_uses.get_mut(nam).unwrap() -= 1;
       if let Some(subst) = let_bodies.remove(nam) {
-        *term = subst.clone();
+        *term = subst;
       } else {
-        let instantiated_count = inst_count.entry(nam.to_owned()).or_default();
+        let instantiated_count = inst_count.entry(nam.clone()).or_default();
         *instantiated_count += 1;
 
         *nam = dup_name(nam, *instantiated_count);
@@ -216,7 +217,7 @@ fn term_to_affine(
       for (rule, term) in arms {
         match rule {
           Pattern::Num(MatchNum::Succ(Some(nam))) => {
-            term_with_bind_to_affine(term, nam, var_uses, inst_count, let_bodies)
+            term_with_bind_to_affine(term, nam, var_uses, inst_count, let_bodies);
           }
           Pattern::Num(_) => term_to_affine(term, var_uses, inst_count, let_bodies),
           _ => unreachable!(),
@@ -246,7 +247,7 @@ fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, mut dup_body: Option<&mu
   let free_vars = &mut nxt.free_vars();
 
   if let Some(ref body) = dup_body {
-    free_vars.extend(body.free_vars())
+    free_vars.extend(body.free_vars());
   };
 
   let make_name = |uses| {
@@ -260,10 +261,7 @@ fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, mut dup_body: Option<&mu
       fst: make_name(i),
       snd: if i == uses - 1 { make_name(uses) } else { Some(internal_dup_name(nam, uses)) },
       val: if i == 1 {
-        match dup_body.as_deref_mut() {
-          Some(body) => Box::new(std::mem::take(body)),
-          None => Box::new(Term::Var { nam: nam.clone() }),
-        }
+        Box::new(dup_body.as_deref_mut().map_or_else(|| Term::Var { nam: nam.clone() }, std::mem::take))
       } else {
         Box::new(Term::Var { nam: internal_dup_name(nam, uses) })
       },
@@ -281,7 +279,7 @@ fn duplicate_lam(nam: &mut Option<Name>, nxt: &mut Term, uses: Val) {
 }
 
 fn duplicate_let(nam: &Name, nxt: &mut Term, uses: Val, let_body: &mut Term) {
-  make_dup_tree(nam, nxt, uses, Some(let_body))
+  make_dup_tree(nam, nxt, uses, Some(let_body));
 }
 
 fn dup_name(nam: &Name, uses: Val) -> Name {
