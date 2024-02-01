@@ -54,11 +54,14 @@ fn net_tree_to_hvmc_tree(
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Con { lab: Some(lab) } => Tree::Dup {
-      lab: (lab + 1) << 1,
+      #[allow(clippy::identity_op)]
+      // label shifted left with bit 0 set as 0
+      lab: (lab + 1) << 1 | 0,
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Dup { lab } => Tree::Dup {
+      // label shifted left with bit 0 set as 1
       lab: (lab + 1) << 1 | 1,
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),

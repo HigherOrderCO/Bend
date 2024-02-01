@@ -41,10 +41,10 @@ impl Pattern {
           check.extend(args.iter());
         }
         Pattern::Tup(fst, snd) => {
-          unbounds.extend(fst.unbound_pats(is_ctr));
-          unbounds.extend(snd.unbound_pats(is_ctr));
+          check.push(fst);
+          check.push(snd);
         }
-        Pattern::List(..) => unreachable!(),
+        Pattern::List(args) => args.iter().for_each(|arg| check.push(arg)),
         Pattern::Var(_) | Pattern::Num(_) => {}
       }
     }
