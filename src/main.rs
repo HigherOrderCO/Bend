@@ -21,7 +21,7 @@ enum Mode {
   /// Checks that the program is syntactically and semantically correct.
   Check {
     #[arg(help = "Path to the input file")]
-    file: PathBuf,
+    path: PathBuf,
   },
   /// Compiles the program to hvmc and prints to stdout.
   Compile {
@@ -32,7 +32,7 @@ enum Mode {
       long_help = r#"Enables or disables the given optimizations
       supercombinators is enabled by default."#,
     )]
-    opts: Vec<hvml::OptArgs>,
+    cli_opts: Vec<hvml::OptArgs>,
 
     #[command(flatten)]
     wopts: WOpts,
@@ -148,30 +148,31 @@ fn main() {
 
 fn run_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book), mut opts: Opts) -> Result<(), String> {
   Ok(match cli.mode {
-    Mode::Check { file } => {
-      let book = load_file_to_book(&file)?;
+    Mode::Check { path } => {
+      let book = load_file_to_book(&path)?;
       verbose(&book);
       check_book(book)?;
     }
-    Mode::Compile { path: file, opts: cli_opts, wopts } => {
+    Mode::Compile { path, cli_opts, wopts } => {
       let warning_opts = wopts.get_warning_opts();
       Opts::from_cli_opts(&mut opts, cli_opts)?;
-      let mut book = load_file_to_book(&file)?;
+      let mut book = load_file_to_book(&path)?;
       verbose(&book);
       let compiled = compile_book(&mut book, opts)?;
       hvml::display_warnings(warning_opts, &compiled.warnings)?;
       print!("{}", show_book(&compiled.core_book));
     }
-    Mode::Desugar { path: file } => {
-      let mut book = load_file_to_book(&file)?;
+    Mode::Desugar { path } => {
+      let mut book = load_file_to_book(&path)?;
       verbose(&book);
       desugar_book(&mut book, opts)?;
       println!("{book}");
     }
-    Mode::Run { path: file, mem, debug, single_core, linear, arg_stats, cli_opts, wopts } => {
+    Mode::Run { path, mem, debug, single_core, linear, arg_stats, cli_opts, wopts } => {
       let warning_opts = wopts.get_warning_opts();
       Opts::from_cli_opts(&mut opts, cli_opts)?;
-      let book = load_file_to_book(&file)?;
+      opts.check();
+      let book = load_file_to_book(&path)?;
       verbose(&book);
       let mem_size = mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
       let (res_term, def_names, info) =

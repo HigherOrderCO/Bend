@@ -253,6 +253,12 @@ impl Opts {
     }
     Ok(())
   }
+
+  pub fn check(&self) {
+    if !self.supercombinators {
+      println!("Warning: Running in strict mode can lead some functions expand infinitely.");
+    }
+  }
 }
 
 #[derive(Default, Clone, Copy)]
