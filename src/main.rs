@@ -87,7 +87,7 @@ struct WOpts {
     long = "warn",
     value_delimiter = ' ',
     action = clap::ArgAction::Append,
-    long_help = "Show compilation warnings",
+    help = "Show the specified compilation warning",
   )]
   pub warns: Vec<WarningArgs>,
 
@@ -96,7 +96,7 @@ struct WOpts {
     long = "deny",
     value_delimiter = ' ',
     action = clap::ArgAction::Append,
-    long_help = "Deny compilation warnings",
+    help = "Deny the specified compilation warning",
   )]
   pub denies: Vec<WarningArgs>,
 
@@ -105,7 +105,7 @@ struct WOpts {
     long = "allow",
     value_delimiter = ' ',
     action = clap::ArgAction::Append,
-    long_help = "Allow compilation warnings",
+    help = "Allow the specified compilation warning",
   )]
   pub allows: Vec<WarningArgs>,
 }
