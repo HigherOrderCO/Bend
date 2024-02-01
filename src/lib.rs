@@ -7,7 +7,7 @@ use hvmc::{
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
 use itertools::Itertools;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
-use std::{time::Instant, vec::IntoIter};
+use std::time::Instant;
 use term::{
   book_to_nets, net_to_term,
   term_to_net::{HvmcNames, Labels},
@@ -208,52 +208,7 @@ impl Opts {
   }
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
-pub enum OptArgs {
-  All,
-  NoAll,
-  Eta,
-  NoEta,
-  Prune,
-  NoPrune,
-  RefToRef,
-  NoRefToRef,
-  PreReduce,
-  NoPrereduce,
-  Supercombinators,
-  NoSupercombinators,
-  SimplifyMain,
-  NoSimplifyMain,
-  PreReduceRefs,
-  NoPreReduceRefs,
-}
-
 impl Opts {
-  pub fn from_cli_opts(&mut self, values: Vec<OptArgs>) -> Result<(), String> {
-    use OptArgs::*;
-    for value in values {
-      match value {
-        All => *self = Opts::heavy(),
-        NoAll => *self = Opts::default(),
-        Eta => self.eta = true,
-        NoEta => self.eta = false,
-        Prune => self.prune = true,
-        NoPrune => self.prune = false,
-        RefToRef => self.ref_to_ref = true,
-        NoRefToRef => self.ref_to_ref = false,
-        PreReduce => self.pre_reduce = true,
-        NoPrereduce => self.pre_reduce = false,
-        Supercombinators => self.supercombinators = true,
-        NoSupercombinators => self.supercombinators = false,
-        SimplifyMain => self.simplify_main = true,
-        NoSimplifyMain => self.simplify_main = false,
-        PreReduceRefs => self.pre_reduce_refs = true,
-        NoPreReduceRefs => self.pre_reduce_refs = false,
-      }
-    }
-    Ok(())
-  }
-
   pub fn check(&self) {
     if !self.supercombinators {
       println!("Warning: Running in strict mode can lead some functions expand infinitely.");
@@ -275,41 +230,9 @@ pub enum WarnState {
   Deny,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
-pub enum WarningArgs {
-  All,
-  UnusedDefs,
-  MatchOnlyVars,
-}
-
 impl WarningOpts {
-  pub fn from_cli_opts(
-    &mut self,
-    wopts_id_seq: Vec<&clap::Id>,
-    allows: &mut IntoIter<WarningArgs>,
-    denies: &mut IntoIter<WarningArgs>,
-    warns: &mut IntoIter<WarningArgs>,
-  ) {
-    for id in wopts_id_seq {
-      match id.as_ref() {
-        "allows" => self.set(allows.next().unwrap(), Self::allow_all(), WarnState::Allow),
-        "denies" => self.set(denies.next().unwrap(), Self::deny_all(), WarnState::Deny),
-        "warns" => self.set(warns.next().unwrap(), Self::default(), WarnState::Warn),
-        _ => {}
-      }
-    }
-  }
-
   pub fn allow_all() -> Self {
     Self { match_only_vars: WarnState::Allow, unused_defs: WarnState::Allow }
-  }
-
-  fn set(&mut self, val: WarningArgs, all: Self, switch: WarnState) {
-    match val {
-      WarningArgs::All => *self = all,
-      WarningArgs::UnusedDefs => self.unused_defs = switch,
-      WarningArgs::MatchOnlyVars => self.match_only_vars = switch,
-    }
   }
 
   pub fn deny_all() -> Self {

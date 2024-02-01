@@ -2,9 +2,9 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
   check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, Opts, RunInfo,
-  WarningOpts,
+  WarnState, WarningOpts,
 };
-use std::path::PathBuf;
+use std::{path::PathBuf, vec::IntoIter};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -32,7 +32,7 @@ enum Mode {
       long_help = r#"Enables or disables the given optimizations
       supercombinators is enabled by default."#,
     )]
-    cli_opts: Vec<hvml::OptArgs>,
+    cli_opts: Vec<OptArgs>,
 
     #[command(flatten)]
     wopts: WOpts,
@@ -67,12 +67,12 @@ enum Mode {
       long_help = r#"Enables or disables the given optimizations
       supercombinators is enabled by default."#,
     )]
-    cli_opts: Vec<hvml::OptArgs>,
+    cli_opts: Vec<OptArgs>,
 
     #[command(flatten)]
     wopts: WOpts,
   },
-  /// Runs the lambda-term level optimization passes.
+  /// Runs the lambda-term level desugaring passes.
   Desugar {
     #[arg(help = "Path to the input file")]
     path: PathBuf,
@@ -89,7 +89,7 @@ struct WOpts {
     action = clap::ArgAction::Append,
     long_help = "Show compilation warnings",
   )]
-  pub warns: Vec<hvml::WarningArgs>,
+  pub warns: Vec<WarningArgs>,
 
   #[arg(
     short = 'D',
@@ -98,7 +98,7 @@ struct WOpts {
     action = clap::ArgAction::Append,
     long_help = "Deny compilation warnings",
   )]
-  pub denies: Vec<hvml::WarningArgs>,
+  pub denies: Vec<WarningArgs>,
 
   #[arg(
     short = 'A',
@@ -107,7 +107,7 @@ struct WOpts {
     action = clap::ArgAction::Append,
     long_help = "Allow compilation warnings",
   )]
-  pub allows: Vec<hvml::WarningArgs>,
+  pub allows: Vec<WarningArgs>,
 }
 
 fn mem_parser(arg: &str) -> Result<usize, String> {
@@ -128,7 +128,6 @@ fn main() {
     compile_error!("The 'cli' feature is needed for the hvm-lang cli");
 
     let cli = Cli::parse();
-    let opts = Opts::light();
     let arg_verbose = cli.verbose;
 
     let verbose = |book: &_| {
@@ -137,7 +136,7 @@ fn main() {
       }
     };
 
-    run_mode(cli, &verbose, opts)?;
+    execute_cli_mode(cli, &verbose)?;
 
     Ok(())
   }
@@ -146,7 +145,7 @@ fn main() {
   }
 }
 
-fn run_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book), mut opts: Opts) -> Result<(), String> {
+fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(), String> {
   Ok(match cli.mode {
     Mode::Check { path } => {
       let book = load_file_to_book(&path)?;
@@ -155,7 +154,7 @@ fn run_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book), mut opts: Opts) -> Re
     }
     Mode::Compile { path, cli_opts, wopts } => {
       let warning_opts = wopts.get_warning_opts();
-      Opts::from_cli_opts(&mut opts, cli_opts)?;
+      let opts = OptArgs::opts_from_cli(&cli_opts);
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
       let compiled = compile_book(&mut book, opts)?;
@@ -165,12 +164,12 @@ fn run_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book), mut opts: Opts) -> Re
     Mode::Desugar { path } => {
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
-      desugar_book(&mut book, opts)?;
+      desugar_book(&mut book, Opts::light())?;
       println!("{book}");
     }
     Mode::Run { path, mem, debug, single_core, linear, arg_stats, cli_opts, wopts } => {
       let warning_opts = wopts.get_warning_opts();
-      Opts::from_cli_opts(&mut opts, cli_opts)?;
+      let opts = OptArgs::opts_from_cli(&cli_opts);
       opts.check();
       let book = load_file_to_book(&path)?;
       verbose(&book);
@@ -214,8 +213,90 @@ impl WOpts {
       let allows = &mut self.allows.into_iter();
       let denies = &mut self.denies.into_iter();
       let warns = &mut self.warns.into_iter();
-      WarningOpts::from_cli_opts(&mut warning_opts, wopts_id_seq.collect(), allows, denies, warns);
+      WarningArgs::wopts_from_cli(&mut warning_opts, wopts_id_seq.collect(), allows, denies, warns);
     }
     warning_opts
+  }
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum OptArgs {
+  All,
+  NoAll,
+  Eta,
+  NoEta,
+  Prune,
+  NoPrune,
+  RefToRef,
+  NoRefToRef,
+  PreReduce,
+  NoPrereduce,
+  Supercombinators,
+  NoSupercombinators,
+  SimplifyMain,
+  NoSimplifyMain,
+  PreReduceRefs,
+  NoPreReduceRefs,
+}
+
+impl OptArgs {
+  fn opts_from_cli(args: &Vec<Self>) -> Opts {
+    use OptArgs::*;
+    let mut opts = Opts::light();
+    for arg in args {
+      match arg {
+        All => opts = Opts::heavy(),
+        NoAll => opts = Opts::default(),
+        Eta => opts.eta = true,
+        NoEta => opts.eta = false,
+        Prune => opts.prune = true,
+        NoPrune => opts.prune = false,
+        RefToRef => opts.ref_to_ref = true,
+        NoRefToRef => opts.ref_to_ref = false,
+        PreReduce => opts.pre_reduce = true,
+        NoPrereduce => opts.pre_reduce = false,
+        Supercombinators => opts.supercombinators = true,
+        NoSupercombinators => opts.supercombinators = false,
+        SimplifyMain => opts.simplify_main = true,
+        NoSimplifyMain => opts.simplify_main = false,
+        PreReduceRefs => opts.pre_reduce_refs = true,
+        NoPreReduceRefs => opts.pre_reduce_refs = false,
+      }
+    }
+    opts
+  }
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum WarningArgs {
+  All,
+  UnusedDefs,
+  MatchOnlyVars,
+}
+
+impl WarningArgs {
+  pub fn wopts_from_cli(
+    wopts: &mut WarningOpts,
+    wopts_id_seq: Vec<&clap::Id>,
+    allows: &mut IntoIter<WarningArgs>,
+    denies: &mut IntoIter<WarningArgs>,
+    warns: &mut IntoIter<WarningArgs>,
+  ) {
+    for id in wopts_id_seq {
+      match id.as_ref() {
+        "allows" => Self::set(wopts, allows.next().unwrap(), WarningOpts::allow_all(), WarnState::Allow),
+        "denies" => Self::set(wopts, denies.next().unwrap(), WarningOpts::deny_all(), WarnState::Deny),
+        "warns" => Self::set(wopts, warns.next().unwrap(), WarningOpts::default(), WarnState::Warn),
+        _ => {}
+      }
+    }
+  }
+
+  fn set(wopts: &mut WarningOpts, val: WarningArgs, all: WarningOpts, switch: WarnState) {
+    match val {
+      WarningArgs::All => *wopts = all,
+      WarningArgs::UnusedDefs => wopts.unused_defs = switch,
+      WarningArgs::MatchOnlyVars => wopts.match_only_vars = switch,
+    }
   }
 }
