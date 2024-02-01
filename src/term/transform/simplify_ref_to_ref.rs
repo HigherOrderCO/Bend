@@ -1,14 +1,14 @@
 // Pass for inlining functions that are just a reference to another one.
 
 use crate::term::{Book, DefId, Term};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 impl Book {
   // When we find a function that is simply directly calling another function,
   // substitutes all occurrences of that function to the one being called, avoiding the unnecessary redirect.
   // In case there is a long chain of ref-to-ref-to-ref, we substitute values by the last function in the chain.
   pub fn simplify_ref_to_ref(&mut self) -> Result<(), String> {
-    let mut ref_map: HashMap<DefId, DefId> = HashMap::new();
+    let mut ref_map: BTreeMap<DefId, DefId> = BTreeMap::new();
     // Find to which defs we're mapping the ones that are just references.
     for def_id in self.def_names.def_ids() {
       self.defs[def_id].assert_no_pattern_matching_rules();
@@ -44,7 +44,7 @@ impl Book {
 }
 
 /// Returns whether any substitution happened within the term or not
-pub fn subst_ref_to_ref(term: &mut Term, ref_map: &HashMap<DefId, DefId>) -> bool {
+pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<DefId, DefId>) -> bool {
   match term {
     Term::Ref { def_id } => {
       if let Some(target_id) = ref_map.get(def_id) {

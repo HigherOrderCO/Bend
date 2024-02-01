@@ -2,69 +2,47 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool.hvm
 ---
-(not) = λx #bool (x not$Ptrue not$Pfalse)
+(not) = λx #bool (x not$Ptrue_$_and$Ptrue$Pfalse_$_and$Pfalse$Ptrue_$_and$Pfalse$Pfalse not$Pfalse_$_and$Ptrue$Ptrue_$_and3$Ptrue$Ptrue)
 
 (and) = λx #bool (x and$Ptrue and$Pfalse)
 
-(and2) = λx #bool (x and2$Ptrue and2$Pfalse)
+(and2) = λx #bool (x and2$Ptrue and2$Pfalse_$_and4$Pfalse)
 
 (and3) = λx #bool (x and3$Ptrue and3$Pfalse)
 
-(and4) = λx #bool (x and4$Ptrue and4$Pfalse)
+(and4) = λx #bool (x and4$Ptrue and2$Pfalse_$_and4$Pfalse)
 
 (true) = #bool λtrue #bool λfalse true
 
 (false) = #bool λtrue #bool λfalse false
 
-(not$R0) = true
+(not$R0_$_and$R3_$_and3$R0) = true
 
-(not$R1) = false
+(not$R1_$_and$R0_$_and$R1_$_and$R2) = false
 
-(not$Ptrue) = not$R1
+(not$Ptrue_$_and$Ptrue$Pfalse_$_and$Pfalse$Ptrue_$_and$Pfalse$Pfalse) = not$R1_$_and$R0_$_and$R1_$_and$R2
 
-(not$Pfalse) = not$R0
+(not$Pfalse_$_and$Ptrue$Ptrue_$_and3$Ptrue$Ptrue) = not$R0_$_and$R3_$_and3$R0
 
-(and$R0) = false
+(and$Ptrue) = λx #bool (x not$Pfalse_$_and$Ptrue$Ptrue_$_and3$Ptrue$Ptrue not$Ptrue_$_and$Ptrue$Pfalse_$_and$Pfalse$Ptrue_$_and$Pfalse$Pfalse)
 
-(and$R1) = false
-
-(and$R2) = false
-
-(and$R3) = true
-
-(and$Ptrue$Ptrue) = and$R3
-
-(and$Ptrue$Pfalse) = and$R2
-
-(and$Ptrue) = λx #bool (x and$Ptrue$Ptrue and$Ptrue$Pfalse)
-
-(and$Pfalse$Ptrue) = and$R1
-
-(and$Pfalse$Pfalse) = and$R0
-
-(and$Pfalse) = λx #bool (x and$Pfalse$Ptrue and$Pfalse$Pfalse)
+(and$Pfalse) = λx #bool (x not$Ptrue_$_and$Ptrue$Pfalse_$_and$Pfalse$Ptrue_$_and$Pfalse$Pfalse not$Ptrue_$_and$Ptrue$Pfalse_$_and$Pfalse$Ptrue_$_and$Pfalse$Pfalse)
 
 (and2$R0) = λb b
 
-(and2$R1) = λb false
+(and2$R1_$_and4$R0) = λb false
 
 (and2$Ptrue) = and2$R0
 
-(and2$Pfalse) = and2$R1
-
-(and3$R0) = true
+(and2$Pfalse_$_and4$Pfalse) = and2$R1_$_and4$R0
 
 (and3$R1) = λa λb false
 
-(and3$Ptrue$Ptrue) = and3$R0
-
 (and3$Ptrue$Pfalse) = (and3$R1 * *)
 
-(and3$Ptrue) = λx #bool (x and3$Ptrue$Ptrue and3$Ptrue$Pfalse)
+(and3$Ptrue) = λx #bool (x not$Pfalse_$_and$Ptrue$Ptrue_$_and3$Ptrue$Ptrue and3$Ptrue$Pfalse)
 
 (and3$Pfalse) = (and3$R1 *)
-
-(and4$R0) = λb false
 
 (and4$R1) = λa false
 
@@ -75,5 +53,3 @@ input_file: tests/golden_tests/encode_pattern_match/bool.hvm
 (and4$Ptrue$Pfalse) = (and4$R1 *)
 
 (and4$Ptrue) = λx #bool (x and4$Ptrue$Ptrue and4$Ptrue$Pfalse)
-
-(and4$Pfalse) = and4$R0

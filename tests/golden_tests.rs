@@ -158,10 +158,10 @@ fn encode_pattern_match() {
     let mut book = do_parse_book(code)?;
     let main = book.check_has_main().ok();
     book.check_shared_names()?;
-    book.encode_builtins();
     book.generate_scott_adts();
-    book.resolve_refs()?;
+    book.encode_builtins();
     encode_pattern_matching(&mut book, &mut Vec::new())?;
+    book.merge_definitions(main.unwrap_or(DefId(u64::MAX)));
     book.prune(main, false, &mut Vec::new());
     Ok(book.to_string())
   })

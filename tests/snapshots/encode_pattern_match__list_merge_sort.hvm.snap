@@ -58,23 +58,21 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 
 (MergePair$R0) = λcmp λh1 λx$0 (MergePair$F0 cmp h1 x$0)
 
-(MergePair$R1) = λcmp λxs xs
+(MergePair$R1_$_Merge$R1) = λcmp λxs xs
 
 (MergePair$P$PCons) = #List_.Cons.head λy0 #List_.Cons.tail λy1 λx0 (MergePair$R0 x0 y0 y1)
 
-(MergePair$P$PNil) = λx0 (MergePair$R1 * Nil)
+(MergePair$P$PNil) = λx0 (MergePair$R1_$_Merge$R1 * Nil)
 
 (MergePair$P) = λy0 λx (#List_ (x MergePair$P$PCons MergePair$P$PNil) y0)
 
 (Merge$R0) = λcmp λys ys
 
-(Merge$R1) = λcmp λxs xs
-
 (Merge$R2) = λcmp λxh λxt λyh λyt (If (cmp xh yh) let ys = (Cons yh yt); (Cons xh (Merge cmp xt ys)) let xs = (Cons xh xt); (Cons yh (Merge cmp xs yt)))
 
 (Merge$P$PCons$PCons) = #List_.Cons.head λy0 #List_.Cons.tail λy1 λx0 λx1 λx2 (Merge$R2 x0 x1 x2 y0 y1)
 
-(Merge$P$PCons$PNil) = λx0 λx1 λx2 (Merge$R1 * (Cons x1 x2))
+(Merge$P$PCons$PNil) = λx0 λx1 λx2 (MergePair$R1_$_Merge$R1 * (Cons x1 x2))
 
 (Merge$P$PCons) = #List_.Cons.head λy0 #List_.Cons.tail λy1 λx0 λx (#List_ (x Merge$P$PCons$PCons Merge$P$PCons$PNil) x0 y0 y1)
 
