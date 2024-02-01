@@ -226,7 +226,7 @@ fn add_tagged_new_args(
       Pattern::Var(field) => {
         if let Some((var, tag)) = field.as_ref().zip(tag) {
           let name = Name(format!("{}.{}", tag, var));
-          term = Term::tagged_lam(Tag::Named(name), new_args.next().unwrap(), term)
+          term = Term::tagged_lam(Tag::Named(name), new_args.next().unwrap(), term);
         } else {
           term = Term::named_lam(new_args.next().unwrap(), term);
         }

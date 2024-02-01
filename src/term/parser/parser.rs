@@ -495,19 +495,25 @@ fn collect_book(mut book: Book, program: Vec<TopLevel>, emit: &mut Emitter<Rich<
           for (ctr, _) in adt.ctrs {
             match book.ctrs.entry(ctr) {
               Entry::Vacant(e) => _ = e.insert(nam.clone()),
-              Entry::Occupied(e) => emit.emit(Rich::custom(span, match book.adts[e.get()].origin {
-                Origin::Builtin => {
+              Entry::Occupied(e) => emit.emit(Rich::custom(
+                span,
+                if book.adts[e.get()].origin == Origin::Builtin {
                   format!("{} is a built-in constructor and should not be overridden.", e.key())
-                }
-                _ => format!("Repeated constructor '{}'", e.key()),
-              })),
+                } else {
+                  format!("Repeated constructor '{}'", e.key())
+                },
+              )),
             }
           }
         }
-        Some(adt) => emit.emit(Rich::custom(span, match adt.origin {
-          Origin::Builtin => format!("{} is a built-in datatype and should not be overridden.", nam),
-          _ => format!("Repeated datatype '{}'", nam),
-        })),
+        Some(adt) => emit.emit(Rich::custom(
+          span,
+          if adt.origin == Origin::Builtin {
+            format!("{} is a built-in datatype and should not be overridden.", nam)
+          } else {
+            format!("Repeated datatype '{}'", nam)
+          },
+        )),
       },
     }
   }

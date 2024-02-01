@@ -54,7 +54,7 @@ fn net_tree_to_hvmc_tree(
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Con { lab: Some(lab) } => Tree::Dup {
-      lab: (lab + 1) << 1 | 0,
+      lab: (lab + 1) << 1,
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
@@ -197,11 +197,13 @@ fn go_up_tree(inet: &INet, start_node: NodeId) -> Result<[NodeId; 2], String> {
     if !explored_nodes.insert(crnt_node) {
       return Err("Found term that compiles into an inet with a vicious cycle".to_string());
     }
+
     let up = inet.enter_port(Port(crnt_node, 0));
+
     if up.slot() == 0 || up == ROOT {
       return Ok([up.node(), crnt_node]);
-    } else {
-      crnt_node = up.node();
     }
+
+    crnt_node = up.node();
   }
 }

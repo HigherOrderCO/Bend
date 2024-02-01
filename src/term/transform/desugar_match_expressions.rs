@@ -338,7 +338,7 @@ fn infer_match_type<'a>(
 ) -> Result<Type, MatchError> {
   let mut match_type = Type::None;
   for pat in pats {
-    let new_type = pat.to_type(ctrs).map_err(MatchError::Infer)?;
+    let new_type = pat.to_type(ctrs);
     match (new_type, &mut match_type) {
       (new, Type::None) => match_type = new,
       // TODO: Should we throw a type inference error in this case?

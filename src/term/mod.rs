@@ -715,21 +715,17 @@ impl Pattern {
     }
   }
 
-  pub fn to_type(&self, ctrs: &HashMap<Name, Name>) -> Result<Type, String> {
-    let typ = match self {
+  pub fn to_type(&self, ctrs: &HashMap<Name, Name>) -> Type {
+    match self {
       Pattern::Var(_) => Type::Any,
       Pattern::Ctr(ctr_nam, _) => {
-        if let Some(adt_nam) = ctrs.get(ctr_nam) {
-          Type::Adt(adt_nam.clone())
-        } else {
-          return Err(format!("Unknown constructor '{ctr_nam}'"));
-        }
+        let adt_nam = ctrs.get(ctr_nam).expect("Unknown constructor '{ctr_nam}'");
+        Type::Adt(adt_nam.clone())
       }
       Pattern::Tup(..) => Type::Tup,
       Pattern::Num(..) => Type::Num,
       Pattern::List(..) => Type::Adt(Name::new(builtins::LIST)),
-    };
-    Ok(typ)
+    }
   }
 }
 

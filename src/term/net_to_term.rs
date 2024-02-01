@@ -285,7 +285,7 @@ impl Term {
   /// of all of the uses of `fst` and `snd`.
   fn insert_split(&mut self, split: &mut Split, threshold: usize) -> Option<usize> {
     let n = match self {
-      Term::Var { nam } => (split.fst.as_ref() == Some(nam) || split.snd.as_ref() == Some(nam)) as usize,
+      Term::Var { nam } => usize::from(split.fst.as_ref() == Some(nam) || split.snd.as_ref() == Some(nam)),
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.insert_split(split, threshold)?,
       Term::Let { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
@@ -401,7 +401,7 @@ impl NameGen {
     // If port is linked to an erase node, return an unused variable
     let var_use = net.enter_port(var_port);
     let var_kind = net.node(var_use.node()).kind;
-    if let Era = var_kind { None } else { Some(self.var_name(var_port)) }
+    (var_kind != Era).then(|| self.var_name(var_port))
   }
 
   pub fn unique(&mut self) -> Name {

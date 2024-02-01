@@ -146,7 +146,7 @@ fn main() {
 }
 
 fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(), String> {
-  Ok(match cli.mode {
+  match cli.mode {
     Mode::Check { path } => {
       let book = load_file_to_book(&path)?;
       verbose(&book);
@@ -196,7 +196,8 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
         println!("RPS    : {:.3} m", rps);
       }
     }
-  })
+  };
+  Ok(())
 }
 
 impl WOpts {
