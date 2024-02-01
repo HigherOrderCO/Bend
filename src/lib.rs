@@ -7,7 +7,7 @@ use hvmc::{
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
 use itertools::Itertools;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
-use std::{time::Instant, vec::IntoIter};
+use std::time::Instant;
 use term::{
   book_to_nets, net_to_term,
   term_to_net::{HvmcNames, Labels},
@@ -101,17 +101,7 @@ pub fn run_book(
 ) -> Result<(Term, DefNames, RunInfo), String> {
   let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opts)?;
 
-  let warns = warning_opts.filter(&warnings, WarnState::Warn);
-  if !warns.is_empty() {
-    let warns = warns.iter().join("\n");
-    eprintln!("Warnings:\n{warns}");
-  }
-
-  let denies = warning_opts.filter(&warnings, WarnState::Deny);
-  if !denies.is_empty() {
-    let denies = denies.iter().join("\n");
-    return Err(format!("{denies}\nCould not run the code because of the previous warnings"));
-  }
+  display_warnings(warning_opts, &warnings)?;
 
   fn debug_hook(net: &Net, book: &Book, hvmc_names: &HvmcNames, labels: &Labels, linear: bool) {
     let net = hvmc_to_net(net, &|id| hvmc_names.hvmc_name_to_id[&id]);
@@ -219,31 +209,10 @@ impl Opts {
 }
 
 impl Opts {
-  pub fn from_vec(&mut self, values: Vec<String>) -> Result<(), String> {
-    for value in values {
-      match value.as_ref() {
-        "all" => *self = Opts::heavy(),
-        "no-all" => *self = Opts::default(),
-        "eta" => self.eta = true,
-        "no-eta" => self.eta = false,
-        "prune" => self.prune = true,
-        "no-prune" => self.prune = false,
-        "ref-to-ref" => self.ref_to_ref = true,
-        "no-ref-to-ref" => self.ref_to_ref = false,
-        "pre-reduce" => self.pre_reduce = true,
-        "no-pre-reduce" => self.pre_reduce = false,
-        "supercombinators" => self.supercombinators = true,
-        "no-supercombinators" => self.supercombinators = false,
-        "simplify-main" => self.simplify_main = true,
-        "no-simplify-main" => self.simplify_main = false,
-        "pre-reduce-refs" => self.pre_reduce_refs = true,
-        "no-pre-reduce-refs" => self.pre_reduce_refs = false,
-        "merge-definitions" => self.merge_definitions = true,
-        "no-merge-definitions" => self.merge_definitions = false,
-        other => return Err(format!("Unknown option '{other}'.")),
-      }
+  pub fn check(&self) {
+    if !self.supercombinators {
+      println!("Warning: Running in strict mode without enabling the supercombinators pass can lead to some functions expanding infinitely.");
     }
-    Ok(())
   }
 }
 
@@ -261,41 +230,9 @@ pub enum WarnState {
   Deny,
 }
 
-#[derive(clap::ValueEnum, Clone, Debug)]
-pub enum WarningArgs {
-  All,
-  UnusedDefs,
-  MatchOnlyVars,
-}
-
 impl WarningOpts {
-  pub fn from_cli_opts(
-    &mut self,
-    wopts_id_seq: Vec<&clap::Id>,
-    allows: &mut IntoIter<WarningArgs>,
-    denies: &mut IntoIter<WarningArgs>,
-    warns: &mut IntoIter<WarningArgs>,
-  ) {
-    for id in wopts_id_seq {
-      match id.as_ref() {
-        "allows" => self.set(allows.next().unwrap(), Self::allow_all(), WarnState::Allow),
-        "denies" => self.set(denies.next().unwrap(), Self::deny_all(), WarnState::Deny),
-        "warns" => self.set(warns.next().unwrap(), Self::default(), WarnState::Warn),
-        _ => {}
-      }
-    }
-  }
-
   pub fn allow_all() -> Self {
     Self { match_only_vars: WarnState::Allow, unused_defs: WarnState::Allow }
-  }
-
-  fn set(&mut self, val: WarningArgs, all: Self, switch: WarnState) {
-    match val {
-      WarningArgs::All => *self = all,
-      WarningArgs::UnusedDefs => self.unused_defs = switch,
-      WarningArgs::MatchOnlyVars => self.match_only_vars = switch,
-    }
   }
 
   pub fn deny_all() -> Self {
@@ -314,6 +251,21 @@ impl WarningOpts {
       })
       .collect()
   }
+}
+
+/// Either just prints warnings or returns Err when any denied was produced.
+pub fn display_warnings(warning_opts: WarningOpts, warnings: &Vec<Warning>) -> Result<(), String> {
+  let warns = warning_opts.filter(&warnings, WarnState::Warn);
+  if !warns.is_empty() {
+    let warns = warns.iter().join("\n");
+    eprintln!("Warnings:\n{warns}");
+  }
+  let denies = warning_opts.filter(&warnings, WarnState::Deny);
+  if !denies.is_empty() {
+    let denies = denies.iter().join("\n");
+    return Err(format!("{denies}\nCould not run the code because of the previous warnings"));
+  }
+  Ok(())
 }
 
 pub struct CompileResult {
