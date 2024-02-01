@@ -161,8 +161,8 @@ fn encode_pattern_match() {
     book.generate_scott_adts();
     book.encode_builtins();
     encode_pattern_matching(&mut book, &mut Vec::new())?;
-    book.merge_definitions(main.unwrap_or(DefId(u64::MAX)));
     book.prune(main, false, &mut Vec::new());
+    book.merge_definitions(main.unwrap_or(DefId(u64::MAX)));
     Ok(book.to_string())
   })
 }
