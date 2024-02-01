@@ -32,8 +32,7 @@ impl Book {
   /// Should be run after pattern matching functions are desugared.
   pub fn normalize_native_matches(&mut self) -> Result<(), String> {
     for def in self.defs.values_mut() {
-      def.assert_no_pattern_matching_rules();
-      def.rules[0].body.normalize_native_matches(&self.ctrs).map_err(|e| e.to_string())?;
+      def.rule_mut().body.normalize_native_matches(&self.ctrs).map_err(|e| e.to_string())?;
     }
     Ok(())
   }

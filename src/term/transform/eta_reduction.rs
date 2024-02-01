@@ -5,8 +5,7 @@ impl Book {
   /// Assumes that variables are linear (used exactly once).
   pub fn eta_reduction(&mut self, reduce_all: bool) {
     for def in self.defs.values_mut() {
-      def.assert_no_pattern_matching_rules();
-      let rule = &mut def.rules[0];
+      let rule = def.rule_mut();
 
       if reduce_all || rule.origin != Origin::User {
         rule.body.eta_reduction();

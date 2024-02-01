@@ -118,8 +118,7 @@ impl<'a> Reader<'a> {
       Ref { def_id } => {
         if self.book.is_def_name_generated(def_id) {
           let def = self.book.defs.get(&def_id).unwrap();
-          def.assert_no_pattern_matching_rules();
-          let mut term = def.rules[0].body.clone();
+          let mut term = def.rule().body.clone();
           term.fix_names(&mut self.namegen.id_counter, self.book);
 
           term
@@ -340,8 +339,7 @@ impl Term {
       Term::Ref { def_id } => {
         if book.is_def_name_generated(*def_id) {
           let def = book.defs.get(def_id).unwrap();
-          def.assert_no_pattern_matching_rules();
-          let mut term = def.rules[0].body.clone();
+          let mut term = def.rule().body.clone();
           term.fix_names(id_counter, book);
           *self = term;
         }

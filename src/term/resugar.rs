@@ -274,8 +274,7 @@ impl<'a> Reader<'a> {
   fn deref(&mut self, term: &mut Term) {
     while let Term::Ref { def_id } = term {
       let def = &self.book.defs[def_id];
-      def.assert_no_pattern_matching_rules();
-      *term = def.rules[0].body.clone();
+      *term = def.rule().body.clone();
       term.fix_names(&mut self.namegen.id_counter, self.book);
     }
   }

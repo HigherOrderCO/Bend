@@ -745,6 +745,18 @@ impl Definition {
     assert!(self.rules.len() == 1, "Definition rules should have been removed in earlier pass");
     assert!(self.rules[0].pats.is_empty(), "Definition args should have been removed in an earlier pass");
   }
+
+  #[track_caller]
+  pub fn rule(&self) -> &Rule {
+    self.assert_no_pattern_matching_rules();
+    &self.rules[0]
+  }
+
+  #[track_caller]
+  pub fn rule_mut(&mut self) -> &mut Rule {
+    self.assert_no_pattern_matching_rules();
+    &mut self.rules[0]
+  }
 }
 
 impl From<&Pattern> for Term {

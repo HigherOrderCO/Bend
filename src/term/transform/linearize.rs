@@ -17,8 +17,7 @@ use std::collections::{hash_map::Entry, HashMap};
 impl Book {
   pub fn linearize_vars(&mut self) {
     for def in self.defs.values_mut() {
-      def.assert_no_pattern_matching_rules();
-      def.rules[0].body.linearize_vars();
+      def.rule_mut().body.linearize_vars();
     }
   }
 }

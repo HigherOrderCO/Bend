@@ -30,8 +30,7 @@ impl Book {
     for id in def_entries {
       let def = self.defs.get_mut(&id).unwrap();
 
-      def.assert_no_pattern_matching_rules();
-      let term = std::mem::take(&mut def.rules[0].body);
+      let term = std::mem::take(&mut def.rule_mut().body);
 
       if let Some(&new) = term_map.get(&term) {
         def_id_map.insert(new, new);
@@ -49,7 +48,7 @@ impl Book {
     def_id_map: &BTreeMap<DefId, DefId>,
   ) {
     for (term, id) in term_map {
-      self.defs.get_mut(&id).unwrap().rules[0].body = term;
+      self.defs.get_mut(&id).unwrap().rule_mut().body = term;
     }
 
     self.merge_names(def_id_map);
@@ -78,7 +77,7 @@ impl Book {
     let mut updated_defs = Vec::new();
 
     for def in self.defs.values_mut() {
-      if subst_ref_to_ref(&mut def.rules[0].body, def_id_map) {
+      if subst_ref_to_ref(&mut def.rule_mut().body, def_id_map) {
         updated_defs.push(def.def_id);
       }
     }

@@ -33,7 +33,7 @@ impl Book {
     if let Some(main) = main {
       let def = self.defs.get(&main).unwrap();
       used.insert(main, Used::Main);
-      self.find_used_definitions(&def.rules[0].body, Used::Main, &mut used);
+      self.find_used_definitions(&def.rule().body, Used::Main, &mut used);
     }
 
     // Even if we don't prune all the defs, we need check what built-ins are accessible through user code

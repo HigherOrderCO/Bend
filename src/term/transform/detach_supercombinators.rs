@@ -11,13 +11,13 @@ impl Book {
     let mut combinators = Combinators::new();
 
     for def in self.defs.values_mut() {
-      def.assert_no_pattern_matching_rules();
-      if def.def_id == main {
+      let rule_id = def.def_id;
+      if rule_id == main {
         continue;
       }
 
-      let rule = &mut def.rules[0];
-      rule.body.detach_combinators(def.def_id, rule.origin, &mut self.def_names, &mut combinators);
+      let rule = def.rule_mut();
+      rule.body.detach_combinators(rule_id, rule.origin, &mut self.def_names, &mut combinators);
     }
 
     // Definitions are not inserted to the book as they are defined to appease the borrow checker.
