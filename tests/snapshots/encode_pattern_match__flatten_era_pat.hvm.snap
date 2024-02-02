@@ -2,48 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/flatten_era_pat.hvm
 ---
-(Fn1) = λx (Fn1$P x)
+(Fn1) = λa let (b, c) = a; λ* (Fn1$F0_$_Fn2$F0$F0 b c)
 
-(Fn2) = λx (Fn2$P x)
+(Fn2) = λa let (b, c) = a; (Fn2$F0 b c)
 
-(Fn3) = λx (Fn3$P x)
+(Fn3) = λa let (b, c) = a; λ* (Fn3$F0 b c)
 
 (main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)
 
-(Fn1$F0_$_Fn2$F0$F0) = λx (Fn1$F0$P_$_Fn2$F0$F0$P x)
+(Fn1$F0_$_Fn2$F0$F0) = λa λb let (c, d) = b; c
 
-(Fn2$F0) = λx (Fn2$F0$P x)
+(Fn2$F0) = λa λb let (c, d) = b; (Fn1$F0_$_Fn2$F0$F0 c d)
 
-(Fn3$F0) = λx match x { 0: Fn3$F0$P0; +: Fn3$F0$P+ }
-
-(Fn1$R0) = λ%0 let (x$0, x$1) = %0; λ* (Fn1$F0_$_Fn2$F0$F0 x$0 x$1)
-
-(Fn1$P) = λy0 (Fn1$R0 y0)
-
-(Fn2$R0) = λ%0 let (x$0, x$1) = %0; (Fn2$F0 x$0 x$1)
-
-(Fn2$P) = λy0 (Fn2$R0 y0)
-
-(Fn3$R0) = λ%0 let (x$0, x$1) = %0; λ* (Fn3$F0 x$0 x$1)
-
-(Fn3$P) = λy0 (Fn3$R0 y0)
-
-(Fn1$F0$R0_$_Fn2$F0$F0$R0) = λ* λ%0 let (a, *) = %0; a
-
-(Fn1$F0$P$P_$_Fn2$F0$F0$P$P) = λy0 λx0 (Fn1$F0$R0_$_Fn2$F0$F0$R0 * y0)
-
-(Fn1$F0$P_$_Fn2$F0$F0$P) = λy0 λx (Fn1$F0$P$P_$_Fn2$F0$F0$P$P x y0)
-
-(Fn2$F0$R0) = λ* λ%0 let (x$0, x$1) = %0; (Fn1$F0_$_Fn2$F0$F0 x$0 x$1)
-
-(Fn2$F0$P$P) = λy0 λx0 (Fn2$F0$R0 * y0)
-
-(Fn2$F0$P) = λy0 λx (Fn2$F0$P$P x y0)
-
-(Fn3$F0$R0) = λ* 0
-
-(Fn3$F0$R1) = λa λ* a
-
-(Fn3$F0$P0) = Fn3$F0$R0
-
-(Fn3$F0$P+) = λy0 (Fn3$F0$R1 y0)
+(Fn3$F0) = λa match a { 0: λ* 0; +: λb λ* b }

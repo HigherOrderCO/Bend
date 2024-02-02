@@ -2,11 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/and.hvm
 ---
-@A = (a a)
-@C = (* @false)
-@D = (a ({2 @A {2 @C (a b)}} b))
+@9 = (* @false)
+@and = (a ({2 (b b) {2 @9 (a c)}} c))
 @false = {2 * {2 a a}}
 @main = a
-& @D ~ (@true (@false a))
+& @and ~ (@true (@false a))
 @true = {2 a {2 * a}}
 

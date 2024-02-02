@@ -1,5 +1,5 @@
 // The flattened rule should only have 1 arg, for matching 'B'
-data A_t = A
+data A_t = (A b)
 data B_t = B
 
 (Foo 0 (A B)) = B

@@ -10,12 +10,4 @@ input_file: tests/golden_tests/encode_pattern_match/concat.hvm
 
 (SNil) = #String λSCons #String λSNil SNil
 
-(String.concat$match$1) = λx #String (x String.concat$match$1$PSCons String.concat$match$1$PSNil)
-
-(String.concat$match$1$R0) = λb b
-
-(String.concat$match$1$R1) = λhd λtl λb (SCons hd (String.concat tl b))
-
-(String.concat$match$1$PSCons) = #String.SCons.head λy0 #String.SCons.tail λy1 (String.concat$match$1$R1 y0 y1)
-
-(String.concat$match$1$PSNil) = String.concat$match$1$R0
+(String.concat$match$1) = λa #String (a #String.SCons.head λb #String.SCons.tail λc λd (SCons b (String.concat c d)) λe e)

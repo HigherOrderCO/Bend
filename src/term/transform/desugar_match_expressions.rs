@@ -181,7 +181,7 @@ fn match_to_def(
   let def = Definition { def_id, rules };
   book.new_defs.insert(def_id, def);
 
-  Term::arg_call(Term::Ref { def_id }, Some(scrutinee))
+  Term::arg_call(Term::Ref { def_id }, scrutinee)
 }
 
 fn make_def_name(def_name: &Name, ctr: &Name, i: usize) -> Name {
@@ -378,7 +378,7 @@ fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
 
   // Add apps to the match
   let old_match = std::mem::take(match_term);
-  *match_term = free_vars.into_iter().fold(old_match, |acc, nam| Term::arg_call(acc, Some(nam)));
+  *match_term = free_vars.into_iter().fold(old_match, Term::arg_call);
 
   // Get a reference to the match again
   // It returns a reference and not an owned value because we want

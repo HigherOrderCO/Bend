@@ -4,36 +4,12 @@ input_file: tests/golden_tests/encode_pattern_match/nested_let_tup.hvm
 ---
 (main) = let %temp%scrutinee = let %temp%scrutinee = (10, ((1, ((2, 3), 4)), 3)); (main$match$1 %temp%scrutinee); (main$match$3 %temp%scrutinee)
 
-(main$match$1) = λx (main$match$1$P x)
+(main$match$1) = λa let (b, c) = a; (main$match$1$F0 b c)
 
-(main$match$2) = λx (main$match$2$P x)
+(main$match$2) = λa let (b, c) = a; b
 
-(main$match$3) = λx (main$match$3$P x)
+(main$match$3) = λa let (b, c) = a; (main$match$3$F0 b c)
 
-(main$match$1$F0) = λx (main$match$1$F0$P x)
+(main$match$1$F0) = λa λb let (c, d) = b; c
 
-(main$match$3$F0) = λx (main$match$3$F0$P x)
-
-(main$match$1$R0) = λ%0 let (x$0, x$1) = %0; (main$match$1$F0 x$0 x$1)
-
-(main$match$1$P) = λy0 (main$match$1$R0 y0)
-
-(main$match$2$R0) = λ%0 let (x, y) = %0; x
-
-(main$match$2$P) = λy0 (main$match$2$R0 y0)
-
-(main$match$3$R0) = λ%0 let (x$0, x$1) = %0; (main$match$3$F0 x$0 x$1)
-
-(main$match$3$P) = λy0 (main$match$3$R0 y0)
-
-(main$match$1$F0$R0) = λi λ%0 let (j, k) = %0; j
-
-(main$match$1$F0$P$P) = λy0 λx0 (main$match$1$F0$R0 * y0)
-
-(main$match$1$F0$P) = λy0 λx (main$match$1$F0$P$P x y0)
-
-(main$match$3$F0$R0) = λa λ%0 let (b, c) = %0; (main$match$2 b)
-
-(main$match$3$F0$P$P) = λy0 λx0 (main$match$3$F0$R0 * y0)
-
-(main$match$3$F0$P) = λy0 λx (main$match$3$F0$P$P x y0)
+(main$match$3$F0) = λa λb let (c, d) = b; (main$match$2 c)

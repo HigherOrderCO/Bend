@@ -33,9 +33,10 @@ fn make_non_pattern_matching_def(def: &mut Definition) {
 fn make_pattern_matching_def(book: &mut Book, def_id: DefId, def_type: &[Type]) {
   // First push the pattern bound vars into the rule body
   let rules = &mut book.defs.get_mut(&def_id).unwrap().rules;
-  for rule in rules {
+  for rule in rules.iter_mut() {
     rule.body = add_non_match_arg_lams(std::mem::take(&mut rule.body), &rule.pats);
   }
+  let origin = rules[0].origin;
 
   // Generate scott-encoded pattern matching
   let def = &book.defs[&def_id];
@@ -61,7 +62,7 @@ fn make_pattern_matching_def(book: &mut Book, def_id: DefId, def_type: &[Type]) 
 
   // Put the new body back into the definition.
   let def = book.defs.get_mut(&def_id).unwrap();
-  def.rules = vec![Rule { pats: vec![], body: new_body, origin: rules[0].origin }];
+  def.rules = vec![Rule { pats: vec![], body: new_body, origin }];
 }
 
 /// Builds the encoding for the patterns in a pattern matching function.

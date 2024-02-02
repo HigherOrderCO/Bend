@@ -12,12 +12,4 @@ input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.hvm
 
 (Some) = λval #Maybe λNone #Maybe λSome #Maybe.Some.val (Some val)
 
-(Foo$match$1_$_Bar$match$1) = λx #Maybe (x Foo$match$1$PNone_$_Bar$match$1$PNone Foo$match$1$PSome_$_Bar$match$1$PSome)
-
-(Foo$match$1$R0_$_Bar$match$1$R0) = λ%match%unscoped%x %match%unscoped%x
-
-(Foo$match$1$R1_$_Bar$match$1$R1) = λx λ%match%unscoped%x x
-
-(Foo$match$1$PNone_$_Bar$match$1$PNone) = Foo$match$1$R0_$_Bar$match$1$R0
-
-(Foo$match$1$PSome_$_Bar$match$1$PSome) = #Maybe.Some.val λy0 (Foo$match$1$R1_$_Bar$match$1$R1 y0)
+(Foo$match$1_$_Bar$match$1) = λa #Maybe (a λb b #Maybe.Some.val λc λd c)

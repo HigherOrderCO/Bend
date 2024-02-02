@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.hvm
 ---
-(Foo) = λx #MyType (x Foo$PA Foo$PB Foo$PC Foo$PD Foo$PE)
+(Foo) = λa #MyType (a #MyType.A.a λb 100 #MyType.B.b λc 200 #MyType.C.c λd 200 #MyType.D.d1 λe #MyType.D.d2 λf 200 #MyType.E.e1 λg #MyType.E.e2 λh 200)
 
 (main) = (Foo A 2)
 
@@ -15,17 +15,3 @@ input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.hvm
 (D) = λd1 λd2 #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.D.d2 (#MyType.D.d1 (D d1) d2)
 
 (E) = λe1 λe2 #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.E.e2 (#MyType.E.e1 (E e1) e2)
-
-(Foo$R0) = λa 100
-
-(Foo$R1) = λ* 200
-
-(Foo$PA) = #MyType.A.a λy0 (Foo$R0 *)
-
-(Foo$PB) = #MyType.B.b λy0 (Foo$R1 *)
-
-(Foo$PC) = #MyType.C.c λy0 (Foo$R1 *)
-
-(Foo$PD) = #MyType.D.d1 λy0 #MyType.D.d2 λy1 (Foo$R1 *)
-
-(Foo$PE) = #MyType.E.e1 λy0 #MyType.E.e2 λy1 (Foo$R1 *)

@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/is_some_some.hvm
 ---
-(some_some) = λx #Option (x some_some$PSome some_some$PNone_$_some_some$F0$PNone)
+(some_some) = λa #Option (a #Option.Some.x λb (some_some$F0 b) 0)
 
 (main) = (some_some (Some 1))
 
@@ -10,16 +10,4 @@ input_file: tests/golden_tests/encode_pattern_match/is_some_some.hvm
 
 (None) = #Option λSome #Option λNone None
 
-(some_some$F0) = λx #Option (x some_some$F0$PSome some_some$PNone_$_some_some$F0$PNone)
-
-(some_some$R0) = λx$0 (some_some$F0 x$0)
-
-(some_some$R1_$_some_some$F0$R1) = λ* 0
-
-(some_some$PSome) = #Option.Some.x λy0 (some_some$R0 y0)
-
-(some_some$PNone_$_some_some$F0$PNone) = (some_some$R1_$_some_some$F0$R1 *)
-
-(some_some$F0$R0) = λx 1
-
-(some_some$F0$PSome) = #Option.Some.x λy0 (some_some$F0$R0 *)
+(some_some$F0) = λa #Option (a #Option.Some.x λb 1 0)

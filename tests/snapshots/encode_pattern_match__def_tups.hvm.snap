@@ -2,40 +2,12 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/def_tups.hvm
 ---
-(go) = λx (go$P x)
+(go) = λa let (b, c) = a; (go$F0 b c)
 
 (main) = (go (1, (2, (3, (4, 5)))))
 
-(go$F0) = λx (go$F0$P x)
+(go$F0) = λa λb let (c, d) = b; (go$F0$F0 a c d)
 
-(go$F0$F0) = λx (go$F0$F0$P x)
+(go$F0$F0) = λa λb λc let (d, e) = c; (go$F0$F0$F0 a b d e)
 
-(go$F0$F0$F0) = λx (go$F0$F0$F0$P x)
-
-(go$R0) = λ%0 let (x$0, x$1) = %0; (go$F0 x$0 x$1)
-
-(go$P) = λy0 (go$R0 y0)
-
-(go$F0$R0) = λa λ%0 let (x$0, x$1) = %0; (go$F0$F0 a x$0 x$1)
-
-(go$F0$P$P) = λy0 λx0 (go$F0$R0 x0 y0)
-
-(go$F0$P) = λy0 λx (go$F0$P$P x y0)
-
-(go$F0$F0$R0) = λa λb λ%0 let (x$0, x$1) = %0; (go$F0$F0$F0 a b x$0 x$1)
-
-(go$F0$F0$P$P$P) = λy0 λx0 λx1 (go$F0$F0$R0 x0 x1 y0)
-
-(go$F0$F0$P$P) = λy0 λx0 λx (go$F0$F0$P$P$P x x0 y0)
-
-(go$F0$F0$P) = λy0 λx (go$F0$F0$P$P x y0)
-
-(go$F0$F0$F0$R0) = λa λb λc λ%0 let (d, e) = %0; (+ (+ (+ (+ e d) c) b) a)
-
-(go$F0$F0$F0$P$P$P$P) = λy0 λx0 λx1 λx2 (go$F0$F0$F0$R0 x0 x1 x2 y0)
-
-(go$F0$F0$F0$P$P$P) = λy0 λx0 λx1 λx (go$F0$F0$F0$P$P$P$P x x0 x1 y0)
-
-(go$F0$F0$F0$P$P) = λy0 λx0 λx (go$F0$F0$F0$P$P$P x x0 y0)
-
-(go$F0$F0$F0$P) = λy0 λx (go$F0$F0$F0$P$P x y0)
+(go$F0$F0$F0) = λa λb λc λd let (e, f) = d; (+ (+ (+ (+ f e) c) b) a)
