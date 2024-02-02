@@ -386,16 +386,13 @@ impl Term {
   }
 
   pub fn list(els: impl DoubleEndedIterator<Item = Term>, def_names: &DefNames) -> Self {
-    els.rev().fold(
-      Term::Ref { def_id: def_names.def_id(&Name::new(builtins::LNIL)).unwrap() },
-      |acc, el| {
-        Term::tagged_call(
-          Term::Ref { def_id: def_names.def_id(&Name::new(builtins::LCONS)).unwrap() },
-          [el, acc],
-          Tag::Named(Name::new(builtins::LIST)),
-        )
-      },
-    )
+    els.rev().fold(Term::Ref { def_id: def_names.def_id(&Name::new(builtins::LNIL)).unwrap() }, |acc, el| {
+      Term::tagged_call(
+        Term::Ref { def_id: def_names.def_id(&Name::new(builtins::LCONS)).unwrap() },
+        [el, acc],
+        Tag::Named(Name::new(builtins::LIST)),
+      )
+    })
   }
 
   /// Substitute the occurrences of a variable in a term with the given term.
