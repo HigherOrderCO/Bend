@@ -13,40 +13,34 @@ impl Book {
   }
 }
 
+/// Splits a definition with nested rule patterns into a tree of definitions
+/// with flat patterns, each matching a single layer of patterns.
 fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
-  // Groups rules by function name
-  let def_name = def_names.name(&def.def_id).unwrap().clone();
-
-  // For each group, split its internal rules
-  let new_rules = split_def(&def_name, &def.rules, def_names);
-
-  new_rules
-    .into_iter()
-    .map(|(name, rules)| Definition { def_id: def_names.def_id(&name).unwrap(), rules })
-    .collect()
-}
-
-fn split_def(name: &Name, rules: &[Rule], def_names: &mut DefNames) -> Vec<(Name, Vec<Rule>)> {
   let mut skip: HashSet<usize> = HashSet::new();
-  let mut new_defs: HashMap<Name, Vec<Rule>> = HashMap::new();
+  let mut new_defs: HashMap<DefId, Definition> = HashMap::new();
   let mut split_rule_count = 0;
-  for i in 0 .. rules.len() {
+
+  // We rebuild this definition rule by rule, with non-nested patterns
+  let mut old_def = Definition { def_id: def.def_id, rules: vec![] };
+
+  for i in 0 .. def.rules.len() {
     if skip.contains(&i) {
       continue;
     }
 
-    let rule = &rules[i];
+    let rule = &def.rules[i];
     let must_split = rule.pats.iter().any(|pat| !pat.is_flat());
     if must_split {
       // Create the entry for the new definition name
-      let new_split_name = Name(format!("{}$F{}", name, split_rule_count));
+      let def_name = def_names.name(&def.def_id).unwrap();
+      let new_split_name = Name(format!("{}$F{}", def_name, split_rule_count));
       let new_split_def_id = def_names.insert(new_split_name.clone());
       split_rule_count += 1;
 
       // Create a new definition, with one rule for each rule that overlaps patterns with this one (including itself)
       // The rule patterns have one less layer of nesting and receive the destructed fields as extra args.
       let mut new_rules = vec![];
-      for (j, other) in rules.iter().enumerate().skip(i) {
+      for (j, other) in def.rules.iter().enumerate().skip(i) {
         let share_matches = rule.pats.iter().zip(&other.pats).all(|(a, b)| a.shares_matches_with(b));
         if share_matches {
           let new_rule = make_split_rule(rule, other, def_names);
@@ -61,21 +55,23 @@ fn split_def(name: &Name, rules: &[Rule], def_names: &mut DefNames) -> Vec<(Name
           }
         }
       }
+      let def = Definition { def_id: new_split_def_id, rules: new_rules };
       // Recursively split the newly created def
-      for (nam, mut rules) in split_def(&new_split_name, &new_rules, def_names) {
-        new_defs.entry(nam).or_default().append(&mut rules);
+      for def in flatten_def(&def, def_names) {
+        new_defs.insert(def.def_id, def);
       }
 
       // Create the rule that replaces the one being flattened.
       // Destructs one layer of the nested patterns and calls the following, forwarding the extracted fields.
       let old_rule = make_old_rule(rule, new_split_def_id);
-      new_defs.entry(name.clone()).or_default().push(old_rule);
+      old_def.rules.push(old_rule);
     } else {
       // If this rule is already flat, just mark it to be inserted back as it is.
-      new_defs.entry(name.clone()).or_default().push(rules[i].clone());
+      old_def.rules.push(def.rules[i].clone());
     }
   }
-  new_defs.into_iter().collect()
+  new_defs.insert(old_def.def_id, old_def);
+  new_defs.into_values().collect()
 }
 
 /// Makes the rule that replaces the original.

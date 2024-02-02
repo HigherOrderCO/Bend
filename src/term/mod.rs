@@ -351,28 +351,6 @@ impl Term {
     Term::Lam { tag: Tag::Static, nam, bod: Box::new(bod) }
   }
 
-  /// Make a call term by folding args around a called function term with applications.
-  pub fn call(called: Term, args: impl IntoIterator<Item = Term>) -> Self {
-    Term::tagged_call(called, args, Tag::Static)
-  }
-
-  pub fn tagged_call(called: Term, args: impl IntoIterator<Item = Term>, tag: Tag) -> Self {
-    args.into_iter().fold(called, |acc, arg| Term::App {
-      tag: tag.clone(),
-      fun: Box::new(acc),
-      arg: Box::new(arg),
-    })
-  }
-
-  /// Apply a variable to a term by the var name.
-  pub fn arg_call(fun: Term, arg: Name) -> Self {
-    Term::App { tag: Tag::Static, fun: Box::new(fun), arg: Box::new(Term::Var { nam: arg }) }
-  }
-
-  pub fn tagged_app(tag: Tag, fun: Term, arg: Term) -> Self {
-    Term::App { tag, fun: Box::new(fun), arg: Box::new(arg) }
-  }
-
   pub fn named_lam(nam: Name, bod: Term) -> Self {
     Term::Lam { tag: Tag::Static, nam: Some(nam), bod: Box::new(bod) }
   }
@@ -385,12 +363,34 @@ impl Term {
     Term::Lam { tag, nam: Some(nam), bod: Box::new(bod) }
   }
 
+  pub fn app(fun: Term, arg: Term) -> Self {
+    Term::App { tag: Tag::Static, fun: Box::new(fun), arg: Box::new(arg) }
+  }
+
+  pub fn tagged_app(tag: Tag, fun: Term, arg: Term) -> Self {
+    Term::App { tag, fun: Box::new(fun), arg: Box::new(arg) }
+  }
+
+  /// Make a call term by folding args around a called function term with applications.
+  pub fn call(called: Term, args: impl IntoIterator<Item = Term>) -> Self {
+    args.into_iter().fold(called, |acc, arg| Term::app(acc, arg))
+  }
+
+  pub fn tagged_call(tag: Tag, called: Term, args: impl IntoIterator<Item = Term>) -> Self {
+    args.into_iter().fold(called, |acc, arg| Term::tagged_app(tag.clone(), acc, arg))
+  }
+
+  /// Apply a variable to a term by the var name.
+  pub fn arg_call(fun: Term, arg: Name) -> Self {
+    Term::app(fun, Term::Var { nam: arg })
+  }
+
   pub fn list(els: impl DoubleEndedIterator<Item = Term>, def_names: &DefNames) -> Self {
     els.rev().fold(Term::Ref { def_id: def_names.def_id(&Name::new(builtins::LNIL)).unwrap() }, |acc, el| {
       Term::tagged_call(
-        Term::Ref { def_id: def_names.def_id(&Name::new(builtins::LCONS)).unwrap() },
-        [el, acc],
         Tag::Named(Name::new(builtins::LIST)),
+        def_names.get_ref(&Name::new(builtins::LCONS)),
+        [el, acc],
       )
     })
   }

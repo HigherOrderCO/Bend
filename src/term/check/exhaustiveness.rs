@@ -11,7 +11,7 @@ impl Book {
       let types = &def_types[def_id];
       let rules_to_check = (0 .. def.rules.len()).collect();
       check_pattern(&mut vec![], &self.adts, &def.rules, types, rules_to_check, def_name)
-        .map_err(|e| format!("In definition '{}': {}", self.def_names.name(&def.def_id).unwrap(), e))?;
+        .map_err(|e| format!("In definition '{}': {}", def_name, e))?;
     }
     Ok(())
   }

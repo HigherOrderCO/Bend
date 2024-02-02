@@ -163,13 +163,13 @@ fn make_match_case(
       ],
     },
     Type::Adt(adt_name) => {
-      Term::tagged_call(Term::Var { nam: match_var.clone() }, next_cases, Tag::Named(adt_name.clone()))
+      Term::tagged_call(Tag::Named(adt_name.clone()), Term::Var { nam: match_var.clone() }, next_cases)
     }
   };
   // The calls to the args of previous matches
   let term = old_args.iter().chain(new_args.iter()).cloned().fold(term, Term::arg_call);
   // Lambda for pattern matched value
-  let term = Term::lam(Some(match_var), term);
+  let term = Term::named_lam(match_var, term);
   // The bindings of the previous args
   let term = add_arg_lams(term, old_args, new_args, match_path.last(), book);
   term
@@ -201,7 +201,7 @@ fn make_leaf_case(
       // The pattern in this rule was a Var, but we matched on a constructor.
       // Rebuild the constructor
       let ctr_name = &matched.ctrs()[0];
-      let ctr = Term::Ref { def_id: book.def_names.def_id(ctr_name).unwrap() };
+      let ctr = book.def_names.get_ref(ctr_name);
       let args = matched.vars().map(|_| Term::Var { nam: args.next().unwrap() }).collect::<Vec<_>>();
       Term::call(term, [Term::call(ctr, args)])
     }
@@ -228,7 +228,7 @@ fn add_arg_lams(
   book: &Book,
 ) -> Term {
   // Add lams for old vars
-  let term = old_args.into_iter().rev().fold(term, |term, arg| Term::lam(Some(arg), term));
+  let term = old_args.into_iter().rev().fold(term, |term, arg| Term::named_lam(arg, term));
 
   // Add lams for new vars, with named tags for Ctr fields
   match last_pat {
@@ -242,7 +242,7 @@ fn add_arg_lams(
       })
     }
     // New vars from other pats
-    Some(_) => new_args.into_iter().rev().fold(term, |term, new_arg| Term::lam(Some(new_arg), term)),
+    Some(_) => new_args.into_iter().rev().fold(term, |term, new_arg| Term::named_lam(new_arg, term)),
     // First arg, no new vars.
     None => term,
   }
