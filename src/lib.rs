@@ -1,6 +1,4 @@
 #![feature(box_patterns)]
-#![feature(generic_const_exprs)]
-#![allow(incomplete_features)]
 
 use hvmc::{
   ast::{book_to_runtime, show_book, Net},
