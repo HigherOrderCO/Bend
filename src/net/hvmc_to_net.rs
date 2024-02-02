@@ -82,14 +82,14 @@ fn tree_to_inodes(
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode {
-          kind: if !lazy {
-            if lab & 1 == 0 { Con { lab: Some((lab >> 1) - 1) } } else { Dup { lab: (lab >> 1) - 1 } }
-          } else if *lab == 0 {
-            Dup { lab: 0 }
-          } else if lab & 1 == 0 {
-            Con { lab: Some(lab >> 1) }
-          } else {
-            Dup { lab: lab >> 1 }
+          kind: match (lazy, *lab) {
+            (true, 0) => Dup { lab: 0 },
+
+            (true, lab) if lab & 1 == 0 => Con { lab: Some(lab >> 1) },
+            (false, lab) if lab & 1 == 0 => Con { lab: Some((lab >> 1) - 1) },
+
+            (true, _) => Dup { lab: lab >> 1 },
+            (false, _) => Dup { lab: (lab >> 1) - 1 },
           },
           ports: [subtree_root, lft, rgt],
         });

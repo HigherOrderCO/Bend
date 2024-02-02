@@ -1,7 +1,7 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
-  check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, DesugarOpts, RunInfo,
+  check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, CompileOpts, RunInfo,
   RunOpts, WarnState, WarningOpts,
 };
 use std::{path::PathBuf, vec::IntoIter};
@@ -175,7 +175,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
     Mode::Desugar { path } => {
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
-      desugar_book(&mut book, DesugarOpts::light())?;
+      desugar_book(&mut book, CompileOpts::light())?;
       println!("{book}");
     }
     Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, cli_opts, wopts, lazy_mode } => {
@@ -263,13 +263,13 @@ pub enum OptArgs {
 }
 
 impl OptArgs {
-  fn opts_from_cli(args: &Vec<Self>) -> DesugarOpts {
+  fn opts_from_cli(args: &Vec<Self>) -> CompileOpts {
     use OptArgs::*;
-    let mut opts = DesugarOpts::light();
+    let mut opts = CompileOpts::light();
     for arg in args {
       match arg {
-        All => opts = DesugarOpts::heavy(),
-        NoAll => opts = DesugarOpts::default(),
+        All => opts = CompileOpts::heavy(),
+        NoAll => opts = CompileOpts::default(),
         Eta => opts.eta = true,
         NoEta => opts.eta = false,
         Prune => opts.prune = true,

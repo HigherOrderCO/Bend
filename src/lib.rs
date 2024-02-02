@@ -24,16 +24,16 @@ use crate::term::net_to_term::ReadbackErrors;
 
 pub fn check_book(mut book: Book) -> Result<(), String> {
   // TODO: Do the checks without having to do full compilation
-  compile_book(&mut book, DesugarOpts::light(), false)?;
+  compile_book(&mut book, CompileOpts::light(), false)?;
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book, opts: DesugarOpts, lazy_mode: bool) -> Result<CompileResult, String> {
+pub fn compile_book(book: &mut Book, opts: CompileOpts, lazy_mode: bool) -> Result<CompileResult, String> {
   let (main, warnings) = desugar_book(book, opts)?;
   let (nets, hvmc_names, labels) = book_to_nets(book, main, lazy_mode);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names, lazy_mode)?;
   if opts.pre_reduce {
-    pre_reduce_book(&mut core_book, opts.pre_reduce)?;
+    pre_reduce_book(&mut core_book, opts.pre_reduce_refs)?;
   }
   if opts.prune {
     prune_defs(&mut core_book);
@@ -41,7 +41,7 @@ pub fn compile_book(book: &mut Book, opts: DesugarOpts, lazy_mode: bool) -> Resu
   Ok(CompileResult { core_book, hvmc_names, labels, warnings })
 }
 
-pub fn desugar_book(book: &mut Book, opts: DesugarOpts) -> Result<(DefId, Vec<Warning>), String> {
+pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefId, Vec<Warning>), String> {
   let mut warnings = Vec::new();
   let main = book.check_has_main()?;
   book.check_shared_names()?;
@@ -95,10 +95,10 @@ pub fn run_book(
   mem_size: usize,
   run_opts: RunOpts,
   warning_opts: WarningOpts,
-  desugar_opts: DesugarOpts,
+  compile_opts: CompileOpts,
 ) -> Result<(Term, DefNames, RunInfo), String> {
   let CompileResult { core_book, hvmc_names, labels, warnings } =
-    compile_book(&mut book, desugar_opts, run_opts.lazy_mode)?;
+    compile_book(&mut book, compile_opts, run_opts.lazy_mode)?;
 
   display_warnings(warning_opts, &warnings)?;
 
@@ -180,7 +180,7 @@ impl RunOpts {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct DesugarOpts {
+pub struct CompileOpts {
   /// Enables [term::transform::eta_reduction].
   pub eta: bool,
 
@@ -206,7 +206,7 @@ pub struct DesugarOpts {
   pub merge_definitions: bool,
 }
 
-impl DesugarOpts {
+impl CompileOpts {
   /// All optimizations enabled.
   pub fn heavy() -> Self {
     Self {
@@ -233,7 +233,7 @@ impl DesugarOpts {
   }
 }
 
-impl DesugarOpts {
+impl CompileOpts {
   pub fn check(&self, lazy_mode: bool) {
     if !self.supercombinators && !lazy_mode {
       println!(

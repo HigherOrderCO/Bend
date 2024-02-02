@@ -7,7 +7,7 @@ use hvml::{
     load_book::do_parse_book, net_to_term::net_to_term, parser::parse_term, term_to_compat_net,
     term_to_net::Labels, Book, DefId, Term,
   },
-  DesugarOpts, RunOpts, WarningOpts,
+  CompileOpts, RunOpts, WarningOpts,
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -86,7 +86,7 @@ fn compile_term() {
     term.linearize_vars();
 
     let lazy_mode = false;
-    let compat_net = term_to_compat_net(&term, &mut Labels::default(lazy_mode));
+    let compat_net = term_to_compat_net(&term, &mut Labels::new(lazy_mode));
     let net = net_to_hvmc(&compat_net, &|def_id| def_id.to_internal(), lazy_mode)?;
 
     Ok(show_net(&net))
@@ -97,7 +97,7 @@ fn compile_term() {
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, DesugarOpts::heavy(), false)?;
+    let compiled = compile_book(&mut book, CompileOpts::heavy(), false)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -105,7 +105,7 @@ fn compile_file_o_all() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, DesugarOpts::light(), false)?;
+    let compiled = compile_book(&mut book, CompileOpts::light(), false)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -116,7 +116,7 @@ fn run_file() {
     let book = do_parse_book(code, path)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, def_names, info) =
-      run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), DesugarOpts::heavy())?;
+      run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
     Ok(format!("{}{}", info.readback_errors.display(&def_names), res.display(&def_names)))
   })
 }
@@ -126,7 +126,7 @@ fn run_lazy() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let book = do_parse_book(code, path)?;
 
-    let mut desugar_opts = DesugarOpts::heavy();
+    let mut desugar_opts = CompileOpts::heavy();
     let run_opts = RunOpts::lazy();
     desugar_opts.lazy_mode();
 
@@ -143,7 +143,7 @@ fn readback_lnet() {
     let book = Book::default();
     let lazy_mode = false;
     let compat_net = hvmc_to_net(&net, &DefId::from_internal, lazy_mode);
-    let (term, errors) = net_to_term(&compat_net, &book, &Labels::default(lazy_mode), false);
+    let (term, errors) = net_to_term(&compat_net, &book, &Labels::new(lazy_mode), false);
     Ok(format!("{}{}", errors.display(&book.def_names), term.display(&book.def_names)))
   })
 }
@@ -194,7 +194,7 @@ fn encode_pattern_match() {
 fn desugar_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    desugar_book(&mut book, DesugarOpts::light())?;
+    desugar_book(&mut book, CompileOpts::light())?;
     Ok(book.to_string())
   })
 }
@@ -210,7 +210,7 @@ fn hangs() {
     let lck = Arc::new(RwLock::new(false));
     let got = lck.clone();
     std::thread::spawn(move || {
-      let _ = run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), DesugarOpts::heavy());
+      let _ = run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy());
       *got.write().unwrap() = true;
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));

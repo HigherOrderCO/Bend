@@ -18,7 +18,7 @@ pub struct HvmcNames {
 pub fn book_to_nets(book: &Book, main: DefId, lazy: bool) -> (HashMap<String, INet>, HvmcNames, Labels) {
   let mut nets = HashMap::new();
   let mut hvmc_names = HvmcNames::default();
-  let mut labels = Labels::default(lazy);
+  let mut labels = Labels::new(lazy);
 
   for def in book.defs.values() {
     for rule in def.rules.iter() {
@@ -348,7 +348,7 @@ pub struct Labels {
 }
 
 impl Labels {
-  pub fn default(lazy: bool) -> Self {
+  pub fn new(lazy: bool) -> Self {
     Self { con: LabelGenerator::default(lazy), dup: LabelGenerator::default(lazy) }
   }
 }
