@@ -11,18 +11,18 @@ impl Book {
     let mut combinators = Combinators::new();
 
     for def in self.defs.values_mut() {
-      def.assert_no_pattern_matching_rules();
-      if def.def_id == main {
+      let rule_id = def.def_id;
+      if rule_id == main {
         continue;
       }
 
-      let rule = &mut def.rules[0];
-      rule.body.detach_combinators(def.def_id, rule.origin, &mut self.def_names, &mut combinators);
+      let rule = def.rule_mut();
+      rule.body.detach_combinators(rule_id, rule.origin, &mut self.def_names, &mut combinators);
     }
 
     // Definitions are not inserted to the book as they are defined to appease the borrow checker.
     // Since we are mut borrowing the rules we can't borrow the book to insert at the same time.
-    self.defs.append(&mut combinators)
+    self.defs.append(&mut combinators);
   }
 }
 
@@ -48,7 +48,7 @@ impl<'d> TermInfo<'d> {
     Self { counter: 0, rule_id, rule_type, def_names, needed_names: HashSet::new(), combinators }
   }
   fn request_name(&mut self, name: &Name) {
-    self.needed_names.insert(name.to_owned());
+    self.needed_names.insert(name.clone());
   }
 
   fn provide(&mut self, name: Option<&Name>) {
@@ -165,7 +165,7 @@ impl Term {
       let mut detach = go(bod, depth + 1, term_info);
 
       if unscoped {
-        detach = detach & Detach::unscoped_lam(nam.cloned().unwrap())
+        detach = detach & Detach::unscoped_lam(nam.cloned().unwrap());
       }
 
       term_info.provide(nam);

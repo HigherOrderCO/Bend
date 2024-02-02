@@ -11,10 +11,9 @@ impl Book {
     let mut ref_map: BTreeMap<DefId, DefId> = BTreeMap::new();
     // Find to which defs we're mapping the ones that are just references.
     for def_id in self.def_names.def_ids() {
-      self.defs[def_id].assert_no_pattern_matching_rules();
       let mut ref_id = def_id;
       let mut is_ref_to_ref = false;
-      while let Term::Ref { def_id: next_ref_id } = &self.defs.get(ref_id).unwrap().rules[0].body {
+      while let Term::Ref { def_id: next_ref_id } = &self.defs.get(ref_id).unwrap().rule().body {
         if next_ref_id == ref_id {
           return Err(format!(
             "Definition {} is a reference to itself",
@@ -30,13 +29,8 @@ impl Book {
     }
 
     // Substitute all the occurrences of ref-to-ref.
-    for def_id in self.defs.keys().copied().collect::<Vec<_>>() {
-      let body = &mut self.defs.get_mut(&def_id).unwrap().rules[0].body;
-      // Moving in and out so the borrow checker doesn't complain
-      let mut subst_body = std::mem::take(body);
-      subst_ref_to_ref(&mut subst_body, &ref_map);
-      let body = &mut self.defs.get_mut(&def_id).unwrap().rules[0].body;
-      *body = subst_body;
+    for body in self.defs.values_mut().map(|def| &mut def.rule_mut().body) {
+      subst_ref_to_ref(body, &ref_map);
     }
 
     Ok(())

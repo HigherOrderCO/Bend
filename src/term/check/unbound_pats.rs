@@ -11,6 +11,7 @@ impl Book {
         for pat in &rule.pats {
           pat.check_unbounds(&is_ctr).map_err(|e| format!("In definition '{}': {}", def_name, e))?;
         }
+        rule.body.check_unbound_pats(&is_ctr)?;
       }
     }
     Ok(())
@@ -39,10 +40,12 @@ impl Pattern {
           }
           check.extend(args.iter());
         }
-        Pattern::Var(_) => (),
-        Pattern::Num(_) => (),
-        Pattern::Tup(_, _) => (),
-        Pattern::List(..) => unreachable!(),
+        Pattern::Tup(fst, snd) => {
+          check.push(fst);
+          check.push(snd);
+        }
+        Pattern::List(args) => args.iter().for_each(|arg| check.push(arg)),
+        Pattern::Var(_) | Pattern::Num(_) => {}
       }
     }
     unbounds

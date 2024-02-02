@@ -256,12 +256,12 @@ impl Book {
   }
 
   pub fn get_def(&self, rule_name: &Name) -> Option<&Definition> {
-    self.def_names.def_id(&rule_name).and_then(|def_id| self.defs.get(&def_id))
+    self.def_names.def_id(rule_name).and_then(|def_id| self.defs.get(&def_id))
   }
 
   // TODO: This get_def/insert_def functions could have an `entry` api instead
   pub fn get_def_mut(&mut self, rule_name: &Name) -> Option<&mut Definition> {
-    self.def_names.def_id(&rule_name).and_then(|def_id| self.defs.get_mut(&def_id))
+    self.def_names.def_id(rule_name).and_then(|def_id| self.defs.get_mut(&def_id))
   }
 
   pub fn insert_def(&mut self, name: Name, rules: Vec<Rule>) -> DefId {
@@ -338,7 +338,7 @@ impl DefNames {
 
   #[track_caller]
   pub fn get_ref(&self, rule_name: &Name) -> Term {
-    self.def_id(&rule_name).map(|def_id| Term::Ref { def_id }).unwrap()
+    self.def_id(rule_name).map(|def_id| Term::Ref { def_id }).unwrap()
   }
 }
 
@@ -402,9 +402,9 @@ impl Term {
           let can_subst;
 
           if let Pattern::Num(MatchNum::Succ(Some(Some(nam)))) = rule {
-            can_subst = nam != from
+            can_subst = nam != from;
           } else {
-            can_subst = true
+            can_subst = true;
           };
 
           if can_subst {
@@ -648,7 +648,7 @@ impl Pattern {
     }
     let mut set = Vec::new();
     go(self, &mut set);
-    set.into_iter().flat_map(|a| a.as_ref())
+    set.into_iter().filter_map(Option::as_ref)
   }
 
   pub fn names_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Name> {
@@ -668,7 +668,7 @@ impl Pattern {
     }
     let mut set = Vec::new();
     go(self, &mut set);
-    set.into_iter().flat_map(|a| a.as_mut())
+    set.into_iter().filter_map(Option::as_mut)
   }
 
   pub fn ctrs(&self) -> impl DoubleEndedIterator<Item = &Name> {
@@ -715,21 +715,17 @@ impl Pattern {
     }
   }
 
-  pub fn to_type(&self, ctrs: &HashMap<Name, Name>) -> Result<Type, String> {
-    let typ = match self {
+  pub fn to_type(&self, ctrs: &HashMap<Name, Name>) -> Type {
+    match self {
       Pattern::Var(_) => Type::Any,
       Pattern::Ctr(ctr_nam, _) => {
-        if let Some(adt_nam) = ctrs.get(ctr_nam) {
-          Type::Adt(adt_nam.clone())
-        } else {
-          return Err(format!("Unknown constructor '{ctr_nam}'"));
-        }
+        let adt_nam = ctrs.get(ctr_nam).expect("Unknown constructor '{ctr_nam}'");
+        Type::Adt(adt_nam.clone())
       }
       Pattern::Tup(..) => Type::Tup,
       Pattern::Num(..) => Type::Num,
       Pattern::List(..) => Type::Adt(Name::new(builtins::LIST)),
-    };
-    Ok(typ)
+    }
   }
 }
 
@@ -748,6 +744,18 @@ impl Definition {
   pub fn assert_no_pattern_matching_rules(&self) {
     assert!(self.rules.len() == 1, "Definition rules should have been removed in earlier pass");
     assert!(self.rules[0].pats.is_empty(), "Definition args should have been removed in an earlier pass");
+  }
+
+  #[track_caller]
+  pub fn rule(&self) -> &Rule {
+    self.assert_no_pattern_matching_rules();
+    &self.rules[0]
+  }
+
+  #[track_caller]
+  pub fn rule_mut(&mut self) -> &mut Rule {
+    self.assert_no_pattern_matching_rules();
+    &mut self.rules[0]
   }
 }
 

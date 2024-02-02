@@ -37,7 +37,7 @@ pub fn infer_arg_type<'a>(
 ) -> Result<Type, String> {
   let mut arg_type = Type::Any;
   for pat in pats {
-    unify(pat.to_type(ctrs)?, &mut arg_type)?;
+    unify(pat.to_type(ctrs), &mut arg_type)?;
   }
   Ok(arg_type)
 }

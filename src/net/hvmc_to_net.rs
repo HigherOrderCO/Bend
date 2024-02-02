@@ -70,12 +70,12 @@ fn tree_to_inodes(
       Tree::Con { lft, rgt } => {
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind: Con { lab: None }, ports: [subtree_root, lft, rgt] })
+        inodes.push(INode { kind: Con { lab: None }, ports: [subtree_root, lft, rgt] });
       }
       Tree::Tup { lft, rgt } => {
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind: Tup, ports: [subtree_root, lft, rgt] })
+        inodes.push(INode { kind: Tup, ports: [subtree_root, lft, rgt] });
       }
       Tree::Dup { lab, lft, rgt } => {
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
@@ -83,7 +83,7 @@ fn tree_to_inodes(
         inodes.push(INode {
           kind: if lab & 1 == 0 { Con { lab: Some((lab >> 1) - 1) } } else { Dup { lab: (lab >> 1) - 1 } },
           ports: [subtree_root, lft, rgt],
-        })
+        });
       }
       Tree::Var { .. } => unreachable!(),
       Tree::Ref { nam } => {
@@ -104,19 +104,19 @@ fn tree_to_inodes(
         // Swap ports 0 and 1 and transform into OP2.
         let kind = Op2 { opr: *opr };
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [lft_name, subtree_root, rgt] })
+        inodes.push(INode { kind, ports: [lft_name, subtree_root, rgt] });
       }
       Tree::Op2 { opr, lft, rgt } => {
         let kind = Op2 { opr: *opr };
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, lft, rgt] })
+        inodes.push(INode { kind, ports: [subtree_root, lft, rgt] });
       }
       Tree::Mat { sel, ret } => {
         let kind = Mat;
         let sel = process_node_subtree(sel, net_root, &mut subtrees, n_vars);
         let ret = process_node_subtree(ret, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, sel, ret] })
+        inodes.push(INode { kind, ports: [subtree_root, sel, ret] });
       }
     }
   }
@@ -129,7 +129,7 @@ fn inodes_to_inet(inodes: &INodes) -> INet {
   // Maps named inode ports to numeric inet ports.
   let mut name_map = std::collections::HashMap::new();
 
-  for inode in inodes.iter() {
+  for inode in inodes {
     let node = inet.new_node(inode.kind);
     for (j, name) in inode.ports.iter().enumerate() {
       let p = Port(node, j as SlotId);

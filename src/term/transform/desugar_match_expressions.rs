@@ -32,8 +32,7 @@ impl Book {
   /// Should be run after pattern matching functions are desugared.
   pub fn normalize_native_matches(&mut self) -> Result<(), String> {
     for def in self.defs.values_mut() {
-      def.assert_no_pattern_matching_rules();
-      def.rules[0].body.normalize_native_matches(&self.ctrs).map_err(|e| e.to_string())?;
+      def.rule_mut().body.normalize_native_matches(&self.ctrs).map_err(|e| e.to_string())?;
     }
     Ok(())
   }
@@ -218,7 +217,7 @@ impl Term {
           // Not extracting into a separate definition allows us to create very specific inets with the MATCH node.
           Type::Num => {
             let match_term = linearize_match_free_vars(self);
-            normalize_num_match(match_term)?
+            normalize_num_match(match_term)?;
           }
           Type::Adt(_) => unreachable!("Adt match expressions should have been removed earlier"),
         }
@@ -338,7 +337,7 @@ fn infer_match_type<'a>(
 ) -> Result<Type, MatchError> {
   let mut match_type = Type::None;
   for pat in pats {
-    let new_type = pat.to_type(ctrs).map_err(MatchError::Infer)?;
+    let new_type = pat.to_type(ctrs);
     match (new_type, &mut match_type) {
       (new, Type::None) => match_type = new,
       // TODO: Should we throw a type inference error in this case?

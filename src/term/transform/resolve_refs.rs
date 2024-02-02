@@ -10,11 +10,11 @@ impl Book {
     for def in self.defs.values_mut() {
       for rule in def.rules.iter_mut() {
         let mut scope = HashMap::new();
-        rule.pats.iter().for_each(|pat| {
-          pat.names().cloned().for_each(|name| {
-            push_scope(Some(name), &mut scope);
-          })
-        });
+
+        for name in rule.pats.iter().flat_map(Pattern::names) {
+          push_scope(Some(name), &mut scope);
+        }
+
         rule.body.resolve_refs(&self.def_names, &mut scope)?;
       }
     }
@@ -23,48 +23,48 @@ impl Book {
 }
 
 impl Term {
-  pub fn resolve_refs(
-    &mut self,
+  pub fn resolve_refs<'a>(
+    &'a mut self,
     def_names: &DefNames,
-    scope: &mut HashMap<Name, usize>,
+    scope: &mut HashMap<&'a Name, usize>,
   ) -> Result<(), String> {
     match self {
       Term::Lam { nam, bod, .. } => {
-        push_scope(nam.clone(), scope);
+        push_scope(nam.as_ref(), scope);
         bod.resolve_refs(def_names, scope)?;
-        pop_scope(nam.clone(), scope);
+        pop_scope(nam.as_ref(), scope);
       }
       Term::Let { pat: Pattern::Var(nam), val, nxt } => {
         val.resolve_refs(def_names, scope)?;
-        push_scope(nam.clone(), scope);
+        push_scope(nam.as_ref(), scope);
         nxt.resolve_refs(def_names, scope)?;
-        pop_scope(nam.clone(), scope);
+        pop_scope(nam.as_ref(), scope);
       }
       Term::Let { pat, val, nxt } => {
         val.resolve_refs(def_names, scope)?;
 
         for nam in pat.names() {
-          push_scope(Some(nam.clone()), scope)
+          push_scope(Some(nam), scope);
         }
 
         nxt.resolve_refs(def_names, scope)?;
 
         for nam in pat.names() {
-          pop_scope(Some(nam.clone()), scope)
+          pop_scope(Some(nam), scope);
         }
       }
       Term::Dup { tag: _, fst, snd, val, nxt } => {
         val.resolve_refs(def_names, scope)?;
-        push_scope(fst.clone(), scope);
-        push_scope(snd.clone(), scope);
+        push_scope(fst.as_ref(), scope);
+        push_scope(snd.as_ref(), scope);
         nxt.resolve_refs(def_names, scope)?;
-        pop_scope(fst.clone(), scope);
-        pop_scope(snd.clone(), scope);
+        pop_scope(fst.as_ref(), scope);
+        pop_scope(snd.as_ref(), scope);
       }
 
       // If variable not defined, we check if it's a ref and swap if it is.
       Term::Var { nam } => {
-        if is_var_in_scope(nam.clone(), scope) {
+        if is_var_in_scope(nam, scope) {
           if matches!(nam.0.as_ref(), DefNames::ENTRY_POINT | DefNames::HVM1_ENTRY_POINT) {
             return Err("Main definition can't be referenced inside the program".to_string());
           }
@@ -85,15 +85,12 @@ impl Term {
       Term::Match { scrutinee, arms } => {
         scrutinee.resolve_refs(def_names, scope)?;
         for (pat, term) in arms {
-          if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat {
-            push_scope(nam.clone(), scope)
-          }
+          let nam = if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat { nam.as_ref() } else { None };
+          push_scope(nam, scope);
 
           term.resolve_refs(def_names, scope)?;
 
-          if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat {
-            pop_scope(nam.clone(), scope)
-          }
+          pop_scope(nam, scope);
         }
       }
       Term::List { .. } => unreachable!("Should have been desugared already"),
@@ -103,20 +100,23 @@ impl Term {
   }
 }
 
-fn push_scope(name: Option<Name>, scope: &mut HashMap<Name, usize>) {
+fn push_scope<'a>(name: Option<&'a Name>, scope: &mut HashMap<&'a Name, usize>) {
   if let Some(name) = name {
-    let var_scope = scope.entry(name.clone()).or_default();
+    let var_scope = scope.entry(name).or_default();
     *var_scope += 1;
   }
 }
 
-fn pop_scope(name: Option<Name>, scope: &mut HashMap<Name, usize>) {
+fn pop_scope<'a>(name: Option<&'a Name>, scope: &mut HashMap<&'a Name, usize>) {
   if let Some(name) = name {
-    let var_scope = scope.entry(name.clone()).or_default();
+    let var_scope = scope.entry(name).or_default();
     *var_scope -= 1;
   }
 }
 
-fn is_var_in_scope(name: Name, scope: &mut HashMap<Name, usize>) -> bool {
-  *scope.entry(name.clone()).or_default() == 0
+fn is_var_in_scope<'a>(name: &'a Name, scope: &HashMap<&'a Name, usize>) -> bool {
+  match scope.get(name) {
+    Some(entry) => *entry == 0,
+    None => true,
+  }
 }

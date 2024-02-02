@@ -15,26 +15,24 @@ impl Term {
   pub fn desugar_implicit_match_binds(&mut self, ctrs: &HashMap<Name, Name>, adts: &BTreeMap<Name, Adt>) {
     match self {
       Term::Match { scrutinee, .. } => {
-        let scrutinee = match scrutinee.as_ref() {
-          Term::Var { nam } => nam.clone(),
-          _ => {
-            let nam = Name::new("%temp%scrutinee");
+        let scrutinee = if let Term::Var { nam } = scrutinee.as_ref() {
+          nam.clone()
+        } else {
+          let nam = Name::new("%temp%scrutinee");
 
-            let Term::Match { scrutinee, arms } = std::mem::take(self) else { unreachable!() };
+          let Term::Match { scrutinee, arms } = std::mem::take(self) else { unreachable!() };
 
-            *self = Term::Let {
-              pat: Pattern::Var(Some(nam.clone())),
-              val: scrutinee,
-              nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam: nam.clone() }), arms }),
-            };
+          *self = Term::Let {
+            pat: Pattern::Var(Some(nam.clone())),
+            val: scrutinee,
+            nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam: nam.clone() }), arms }),
+          };
 
-            nam
-          }
+          nam
         };
 
-        let arms = match self {
-          Term::Match { arms, .. } | Term::Let { nxt: box Term::Match { arms, .. }, .. } => arms,
-          _ => unreachable!(),
+        let (Term::Match { arms, .. } | Term::Let { nxt: box Term::Match { arms, .. }, .. }) = self else {
+          unreachable!()
         };
 
         for (pat, body) in arms {

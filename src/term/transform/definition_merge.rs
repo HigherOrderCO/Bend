@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, HashMap};
 impl Book {
   /// Merges definitions that have the same structure into one definition.
   /// Expects variables to be linear.
-  /// 
-  /// Ignores origin of the rules when merging, 
+  ///
+  /// Ignores origin of the rules when merging,
   /// Should not be preceded by passes that cares about the origins.
   pub fn merge_definitions(&mut self, main: DefId) {
     let ids: Vec<_> = self.defs.keys().copied().collect();
@@ -18,10 +18,10 @@ impl Book {
     let mut def_id_map: BTreeMap<DefId, DefId> = BTreeMap::new();
 
     self.collect_terms(defs.filter(|&id| id != main), &mut term_map, &mut def_id_map);
-    self.merge_terms(main, term_map, def_id_map);
+    self.merge_terms(main, term_map, &def_id_map);
   }
 
-  fn collect_terms<'a>(
+  fn collect_terms(
     &mut self,
     def_entries: impl Iterator<Item = DefId>,
     term_map: &mut HashMap<Term, DefId>,
@@ -30,8 +30,7 @@ impl Book {
     for id in def_entries {
       let def = self.defs.get_mut(&id).unwrap();
 
-      def.assert_no_pattern_matching_rules();
-      let term = std::mem::take(&mut def.rules[0].body);
+      let term = std::mem::take(&mut def.rule_mut().body);
 
       if let Some(&new) = term_map.get(&term) {
         def_id_map.insert(new, new);
@@ -42,12 +41,17 @@ impl Book {
     }
   }
 
-  fn merge_terms(&mut self, main: DefId, term_map: HashMap<Term, DefId>, def_id_map: BTreeMap<DefId, DefId>) {
+  fn merge_terms(
+    &mut self,
+    main: DefId,
+    term_map: HashMap<Term, DefId>,
+    def_id_map: &BTreeMap<DefId, DefId>,
+  ) {
     for (term, id) in term_map {
-      self.defs.get_mut(&id).unwrap().rules[0].body = term;
+      self.defs.get_mut(&id).unwrap().rule_mut().body = term;
     }
 
-    self.merge_names(&def_id_map);
+    self.merge_names(def_id_map);
     self.update_refs(def_id_map, main);
   }
 
@@ -69,11 +73,11 @@ impl Book {
     }
   }
 
-  fn update_refs(&mut self, def_id_map: BTreeMap<DefId, DefId>, main: DefId) {
+  fn update_refs(&mut self, def_id_map: &BTreeMap<DefId, DefId>, main: DefId) {
     let mut updated_defs = Vec::new();
 
     for def in self.defs.values_mut() {
-      if subst_ref_to_ref(&mut def.rules[0].body, &def_id_map) {
+      if subst_ref_to_ref(&mut def.rule_mut().body, def_id_map) {
         updated_defs.push(def.def_id);
       }
     }

@@ -145,7 +145,7 @@ pub fn run_compiled(
   } else if parallel {
     root.parallel_normal(&runtime_book);
   } else {
-    root.normal(&runtime_book)
+    root.normal(&runtime_book);
   }
 
   let elapsed = start_time.elapsed().as_secs_f64();
@@ -254,13 +254,13 @@ impl WarningOpts {
 }
 
 /// Either just prints warnings or returns Err when any denied was produced.
-pub fn display_warnings(warning_opts: WarningOpts, warnings: &Vec<Warning>) -> Result<(), String> {
-  let warns = warning_opts.filter(&warnings, WarnState::Warn);
+pub fn display_warnings(warning_opts: WarningOpts, warnings: &[Warning]) -> Result<(), String> {
+  let warns = warning_opts.filter(warnings, WarnState::Warn);
   if !warns.is_empty() {
     let warns = warns.iter().join("\n");
     eprintln!("Warnings:\n{warns}");
   }
-  let denies = warning_opts.filter(&warnings, WarnState::Deny);
+  let denies = warning_opts.filter(warnings, WarnState::Deny);
   if !denies.is_empty() {
     let denies = denies.iter().join("\n");
     return Err(format!("{denies}\nCould not run the code because of the previous warnings"));

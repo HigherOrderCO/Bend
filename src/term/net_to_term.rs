@@ -118,8 +118,7 @@ impl<'a> Reader<'a> {
       Ref { def_id } => {
         if self.book.is_def_name_generated(def_id) {
           let def = self.book.defs.get(&def_id).unwrap();
-          def.assert_no_pattern_matching_rules();
-          let mut term = def.rules[0].body.clone();
+          let mut term = def.rule().body.clone();
           term.fix_names(&mut self.namegen.id_counter, self.book);
 
           term
@@ -285,7 +284,7 @@ impl Term {
   /// of all of the uses of `fst` and `snd`.
   fn insert_split(&mut self, split: &mut Split, threshold: usize) -> Option<usize> {
     let n = match self {
-      Term::Var { nam } => (split.fst.as_ref() == Some(nam) || split.snd.as_ref() == Some(nam)) as usize,
+      Term::Var { nam } => usize::from(split.fst.as_ref() == Some(nam) || split.snd.as_ref() == Some(nam)),
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.insert_split(split, threshold)?,
       Term::Let { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
@@ -340,10 +339,9 @@ impl Term {
       Term::Ref { def_id } => {
         if book.is_def_name_generated(*def_id) {
           let def = book.defs.get(def_id).unwrap();
-          def.assert_no_pattern_matching_rules();
-          let mut term = def.rules[0].body.clone();
+          let mut term = def.rule().body.clone();
           term.fix_names(id_counter, book);
-          *self = term
+          *self = term;
         }
       }
       Term::Dup { fst, snd, val, nxt, .. } => {
@@ -368,7 +366,7 @@ impl Term {
             fix_name(nam, id_counter, term);
           }
 
-          term.fix_names(id_counter, book)
+          term.fix_names(id_counter, book);
         }
       }
       Term::Let { .. } | Term::List { .. } => unreachable!(),
@@ -401,7 +399,7 @@ impl NameGen {
     // If port is linked to an erase node, return an unused variable
     let var_use = net.enter_port(var_port);
     let var_kind = net.node(var_use.node()).kind;
-    if let Era = var_kind { None } else { Some(self.var_name(var_port)) }
+    (var_kind != Era).then(|| self.var_name(var_port))
   }
 
   pub fn unique(&mut self) -> Name {

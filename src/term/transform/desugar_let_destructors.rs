@@ -47,14 +47,13 @@ impl Term {
 
         let arms = vec![(pat, *nxt)];
 
-        *self = match val.as_ref() {
-          Term::Var { .. } => Term::Match { scrutinee: val, arms },
-          _ => {
-            let nam = Name::new("%temp%scrutinee");
-            let pat = Pattern::Var(Some(nam.clone()));
-            let scrutinee = Box::new(Term::Var { nam });
-            Term::Let { pat, val, nxt: Box::new(Term::Match { scrutinee, arms }) }
-          }
+        *self = if let Term::Var { .. } = val.as_ref() {
+          Term::Match { scrutinee: val, arms }
+        } else {
+          let nam = Name::new("%temp%scrutinee");
+          let pat = Pattern::Var(Some(nam.clone()));
+          let scrutinee = Box::new(Term::Var { nam });
+          Term::Let { pat, val, nxt: Box::new(Term::Match { scrutinee, arms }) }
         };
       }
       Term::List { .. } => unreachable!("Should have been desugared already"),

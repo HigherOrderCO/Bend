@@ -54,11 +54,14 @@ fn net_tree_to_hvmc_tree(
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Con { lab: Some(lab) } => Tree::Dup {
+      #[allow(clippy::identity_op)]
+      // label shifted left with bit 0 set as 0
       lab: (lab + 1) << 1 | 0,
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Dup { lab } => Tree::Dup {
+      // label shifted left with bit 0 set as 1
       lab: (lab + 1) << 1 | 1,
       lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
       rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
@@ -131,9 +134,9 @@ fn get_tree_roots(inet: &INet) -> Result<(Option<NodeId>, Vec<[NodeId; 2]>), Str
   // Traverse the net
   while let Some(movement) = movements.pop() {
     match movement {
-      Movement::Down(node_id) => explore_down_link(inet, node_id, &mut explored_nodes, &mut movements)?,
+      Movement::Down(node_id) => explore_down_link(inet, node_id, &mut explored_nodes, &mut movements),
       Movement::Side(node_id) => {
-        explore_side_link(inet, node_id, &mut movements, &mut redx_roots, &mut root_set)?
+        explore_side_link(inet, node_id, &mut movements, &mut redx_roots, &mut root_set)?;
       }
     }
   }
@@ -151,7 +154,7 @@ fn explore_down_link(
   node_id: NodeId,
   explored_nodes: &mut [bool],
   movements: &mut Vec<Movement>,
-) -> Result<(), String> {
+) {
   // Don't go down already explored nodes.
   if !explored_nodes[node_id as usize] {
     explored_nodes[node_id as usize] = true;
@@ -167,7 +170,6 @@ fn explore_down_link(
       movements.push(movement);
     }
   }
-  Ok(())
 }
 
 fn explore_side_link(
@@ -198,11 +200,13 @@ fn go_up_tree(inet: &INet, start_node: NodeId) -> Result<[NodeId; 2], String> {
     if !explored_nodes.insert(crnt_node) {
       return Err("Found term that compiles into an inet with a vicious cycle".to_string());
     }
+
     let up = inet.enter_port(Port(crnt_node, 0));
+
     if up.slot() == 0 || up == ROOT {
       return Ok([up.node(), crnt_node]);
-    } else {
-      crnt_node = up.node();
     }
+
+    crnt_node = up.node();
   }
 }

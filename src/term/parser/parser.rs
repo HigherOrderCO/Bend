@@ -138,7 +138,7 @@ fn tag<'a, I>(default: Tag) -> impl Parser<'a, I, Tag, extra::Err<Rich<'a, Token
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  just(Token::Hash).ignore_then(name()).or_not().map(move |x| x.map(Tag::Named).unwrap_or(default.clone()))
+  just(Token::Hash).ignore_then(name()).or_not().map(move |x| x.map_or_else(|| default.clone(), Tag::Named))
 }
 
 fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
@@ -267,7 +267,7 @@ where
         Some(nam) => Term::Let {
           pat: Pattern::Var(Some(nam.clone())),
           val: Box::new(scrutinee),
-          nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam: nam.clone() }), arms }),
+          nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam }), arms }),
         },
         None => Term::Match { scrutinee: Box::new(scrutinee), arms },
       })
@@ -285,8 +285,8 @@ where
       .then(term.clone())
       .then_ignore(term_sep.clone())
       .then_ignore(just(Token::RBracket))
-      .map(|((cond, zero), succ)| Term::Match {
-        scrutinee: Box::new(Term::Var { nam: cond.clone() }),
+      .map(|((nam, zero), succ)| Term::Match {
+        scrutinee: Box::new(Term::Var { nam }),
         arms: vec![(Pattern::Num(MatchNum::Zero), zero), (Pattern::Num(MatchNum::Succ(None)), succ)],
       })
       .boxed();
@@ -495,19 +495,25 @@ fn collect_book(mut book: Book, program: Vec<TopLevel>, emit: &mut Emitter<Rich<
           for (ctr, _) in adt.ctrs {
             match book.ctrs.entry(ctr) {
               Entry::Vacant(e) => _ = e.insert(nam.clone()),
-              Entry::Occupied(e) => emit.emit(Rich::custom(span, match book.adts[e.get()].origin {
-                Origin::Builtin => {
+              Entry::Occupied(e) => emit.emit(Rich::custom(
+                span,
+                if book.adts[e.get()].origin == Origin::Builtin {
                   format!("{} is a built-in constructor and should not be overridden.", e.key())
-                }
-                _ => format!("Repeated constructor '{}'", e.key()),
-              })),
+                } else {
+                  format!("Repeated constructor '{}'", e.key())
+                },
+              )),
             }
           }
         }
-        Some(adt) => emit.emit(Rich::custom(span, match adt.origin {
-          Origin::Builtin => format!("{} is a built-in datatype and should not be overridden.", nam),
-          _ => format!("Repeated datatype '{}'", nam),
-        })),
+        Some(adt) => emit.emit(Rich::custom(
+          span,
+          if adt.origin == Origin::Builtin {
+            format!("{} is a built-in datatype and should not be overridden.", nam)
+          } else {
+            format!("Repeated datatype '{}'", nam)
+          },
+        )),
       },
     }
   }

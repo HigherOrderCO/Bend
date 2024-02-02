@@ -87,7 +87,7 @@ impl<'a> Reader<'a> {
             if current_arm.is_some() {
               return self.error(ReadbackError::InvalidAdt);
             }
-            current_arm = Some((nam.clone(), ctr))
+            current_arm = Some((nam.clone(), ctr));
           }
           app = &mut *bod;
         }
@@ -109,7 +109,7 @@ impl<'a> Reader<'a> {
         Term::App { tag: Tag::Named(tag_name), .. } if tag_name == &adt_field_tag => {
           let Term::App { tag, fun, .. } = cur.borrow_mut() else { unreachable!() };
           *tag = Tag::Static;
-          cur = fun
+          cur = fun;
         }
         Term::App { tag, .. } => return self.error(ReadbackError::UnexpectedTag(adt_field_tag, tag.clone())),
         _ => return self.error(ReadbackError::InvalidAdt),
@@ -180,13 +180,13 @@ impl<'a> Reader<'a> {
               }
               _ => {
                 if let Term::Lam { tag, .. } = arm {
-                  self.error(ReadbackError::UnexpectedTag(adt_field_tag.clone(), tag.to_owned()));
+                  self.error(ReadbackError::UnexpectedTag(adt_field_tag.clone(), tag.clone()));
                 }
 
                 let nam = self.namegen.unique();
                 args.push(Pattern::Var(Some(nam.clone())));
                 let tag = Tag::Named(adt_field_tag);
-                *arm = Term::tagged_app(tag, std::mem::take(&mut arm), Term::Var { nam });
+                *arm = Term::tagged_app(tag, std::mem::take(arm), Term::Var { nam });
               }
             }
           }
@@ -274,8 +274,7 @@ impl<'a> Reader<'a> {
   fn deref(&mut self, term: &mut Term) {
     while let Term::Ref { def_id } = term {
       let def = &self.book.defs[def_id];
-      def.assert_no_pattern_matching_rules();
-      *term = def.rules[0].body.clone();
+      *term = def.rule().body.clone();
       term.fix_names(&mut self.namegen.id_counter, self.book);
     }
   }

@@ -23,7 +23,7 @@ impl Book {
   pub fn encode_builtins(&mut self) {
     for def in self.defs.values_mut() {
       for rule in def.rules.iter_mut() {
-        rule.pats.iter_mut().for_each(|pat| pat.encode_builtins());
+        rule.pats.iter_mut().for_each(Pattern::encode_builtins);
         rule.body.encode_builtins();
       }
     }
@@ -34,7 +34,7 @@ impl Term {
   fn encode_builtins(&mut self) {
     match self {
       Term::List { els } => *self = Term::encode_list(std::mem::take(els)),
-      Term::Str { val } => *self = Term::encode_str(std::mem::take(val)),
+      Term::Str { val } => *self = Term::encode_str(val),
       Term::Let { pat, val, nxt } => {
         pat.encode_builtins();
         val.encode_builtins();
@@ -69,7 +69,7 @@ impl Term {
     })
   }
 
-  fn encode_str(val: String) -> Term {
+  fn encode_str(val: &str) -> Term {
     let snil = Term::Var { nam: Name::new(SNIL) };
 
     val.chars().rfold(snil, |acc, char| {

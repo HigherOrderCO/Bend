@@ -33,7 +33,7 @@ impl Book {
     if let Some(main) = main {
       let def = self.defs.get(&main).unwrap();
       used.insert(main, Used::Main);
-      self.find_used_definitions(&def.rules[0].body, Used::Main, &mut used);
+      self.find_used_definitions(&def.rule().body, Used::Main, &mut used);
     }
 
     // Even if we don't prune all the defs, we need check what built-ins are accessible through user code
@@ -49,16 +49,16 @@ impl Book {
               _ => {}
             }
 
-            self.find_used_definitions(&rule.body, Used::Unused, &mut used)
+            self.find_used_definitions(&rule.body, Used::Unused, &mut used);
           }
         }
       }
     }
 
-    let ids = IndexSet::<DefId>::from_iter(self.def_names.def_ids().copied());
+    let ids = self.def_names.def_ids().copied().collect::<IndexSet<DefId>>();
 
     // Filter defs from the 'used' hashmap that are not accessible from main
-    let filter = |(id, used)| if let Used::Unused = used { None } else { Some(id) };
+    let filter = |(id, used)| if used == Used::Unused { None } else { Some(id) };
     let used: IndexSet<DefId> = used.into_iter().filter_map(filter).collect();
 
     let unused = ids.difference(&used).copied();
@@ -77,7 +77,7 @@ impl Book {
         self.remove_def(unused_id);
       } else if !self.is_def_name_generated(unused_id) {
         let def_name = self.def_names.id_to_name[&unused_id].clone();
-        warnings.push(Warning::UnusedDefinition { def_name })
+        warnings.push(Warning::UnusedDefinition { def_name });
       }
     }
   }
@@ -85,8 +85,8 @@ impl Book {
   /// Finds all used definitions on every term that can have a def_id.
   fn find_used_definitions(&self, term: &Term, used: Used, uses: &mut Definitions) {
     match term {
-      Term::Ref { def_id } => match self.def_names.name(def_id).map_or(None, |key| self.ctrs.get(key)) {
-        Some(name) => self.insert_ctrs_used(&name, uses),
+      Term::Ref { def_id } => match self.def_names.name(def_id).and_then(|key| self.ctrs.get(key)) {
+        Some(name) => self.insert_ctrs_used(name, uses),
         None => self.insert_used(*def_id, used, uses),
       },
 

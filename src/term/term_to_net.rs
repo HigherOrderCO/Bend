@@ -260,7 +260,6 @@ impl<'a> EncodeTermState<'a> {
       }
       // core: #val
       Term::Num { val } => {
-        // debug_assert!(*val <= LABEL_MASK); // Uneeded?
         let node = self.inet.new_node(Num { val: *val });
         // This representation only has nodes of arity 2, so we connect the two aux ports that are not used.
         self.inet.link(Port(node, 1), Port(node, 2));
