@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/wrong_ctr_var_arity.hvm
 ---
-In definition foo: Arity error. Constructor 'pair' expects 2 fields but was found 0.
+In definition foo: Arity error. Constructor 'pair' expects 2 fields, found 0.

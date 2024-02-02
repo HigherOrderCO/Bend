@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/wrong_ctr_arity.hvm
 ---
-In definition Bar: Arity error. Constructor 'Box' expects 1 fields but was found 2.
+In definition Bar: Arity error. Constructor 'Box' expects 1 fields, found 2.

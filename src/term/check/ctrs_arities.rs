@@ -44,7 +44,7 @@ impl Pattern {
         let args = args.len();
         if *arity != args {
           return Err(format!(
-            "Arity error. Constructor '{}' expects {} fields but was found {}.",
+            "Arity error. Constructor '{}' expects {} fields, found {}.",
             name, arity, args
           ));
         } else {
