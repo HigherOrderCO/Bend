@@ -7,22 +7,22 @@ use hvmc::{
 use std::collections::{HashMap, HashSet};
 
 /// Converts the inet-encoded definitions into an hvmc AST Book.
-pub fn nets_to_hvmc(nets: HashMap<String, INet>, hvmc_names: &HvmcNames, lazy: bool) -> Result<Book, String> {
+pub fn nets_to_hvmc(nets: HashMap<String, INet>, hvmc_names: &HvmcNames) -> Result<Book, String> {
   let mut book = Book::new();
   for (name, inet) in nets {
-    let net = net_to_hvmc(&inet, &|id| hvmc_names.id_to_hvmc_name[&id], lazy)?;
+    let net = net_to_hvmc(&inet, &|id| hvmc_names.id_to_hvmc_name[&id])?;
     book.insert(name, net);
   }
   Ok(book)
 }
 
 /// Convert an inet-encoded definition into an hvmc AST inet.
-pub fn net_to_hvmc(inet: &INet, id_to_hvmc_name: &impl Fn(DefId) -> Val, lazy: bool) -> Result<Net, String> {
+pub fn net_to_hvmc(inet: &INet, id_to_hvmc_name: &impl Fn(DefId) -> Val) -> Result<Net, String> {
   let (net_root, redxs) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(net_root) = net_root {
     // If there is a root tree connected to the root node
-    net_tree_to_hvmc_tree(inet, net_root, &mut port_to_var_id, id_to_hvmc_name, lazy)
+    net_tree_to_hvmc_tree(inet, net_root, &mut port_to_var_id, id_to_hvmc_name)
   } else {
     // If the root node points to some aux port (application)
     port_to_var_id.insert(inet.enter_port(ROOT), 0);
@@ -30,8 +30,8 @@ pub fn net_to_hvmc(inet: &INet, id_to_hvmc_name: &impl Fn(DefId) -> Val, lazy: b
   };
   let mut rdex = vec![];
   for [root0, root1] in redxs {
-    let rdex0 = net_tree_to_hvmc_tree(inet, root0, &mut port_to_var_id, id_to_hvmc_name, lazy);
-    let rdex1 = net_tree_to_hvmc_tree(inet, root1, &mut port_to_var_id, id_to_hvmc_name, lazy);
+    let rdex0 = net_tree_to_hvmc_tree(inet, root0, &mut port_to_var_id, id_to_hvmc_name);
+    let rdex1 = net_tree_to_hvmc_tree(inet, root1, &mut port_to_var_id, id_to_hvmc_name);
     rdex.push((rdex0, rdex1));
   }
   Ok(Net { root, rdex })
@@ -42,45 +42,40 @@ fn net_tree_to_hvmc_tree(
   tree_root: NodeId,
   port_to_var_id: &mut HashMap<Port, VarId>,
   id_to_hvmc_name: &impl Fn(DefId) -> Val,
-  lazy: bool,
 ) -> Tree {
   match inet.node(tree_root).kind {
     NodeKind::Era => Tree::Era,
     NodeKind::Con { lab: None } => Tree::Con {
-      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name, lazy)),
-      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name, lazy)),
+      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
+      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Tup => Tree::Tup {
-      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name, lazy)),
-      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name, lazy)),
+      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
+      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Con { lab: Some(lab) } => Tree::Dup {
       #[allow(clippy::identity_op)]
       // label shifted left with bit 0 set as 0
-      lab: (if lazy { lab } else { lab + 1 }) << 1 | 0,
-      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name, lazy)),
-      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name, lazy)),
+      lab: (lab + 1) << 1 | 0,
+      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
+      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Dup { lab } => Tree::Dup {
       // label shifted left with bit 0 set as 1
-      lab: if lazy {
-        if lab == 0 { 0 } else { lab << 1 | 1 }
-      } else {
-        (lab + 1) << 1 | 1
-      },
-      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name, lazy)),
-      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name, lazy)),
+      lab: (lab + 1) << 1 | 1,
+      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
+      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Ref { def_id } => Tree::Ref { nam: id_to_hvmc_name(def_id) },
     NodeKind::Num { val } => Tree::Num { val },
     NodeKind::Op2 { opr } => Tree::Op2 {
       opr,
-      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name, lazy)),
-      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name, lazy)),
+      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
+      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Mat => Tree::Mat {
-      sel: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name, lazy)),
-      ret: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name, lazy)),
+      sel: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id, id_to_hvmc_name)),
+      ret: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id, id_to_hvmc_name)),
     },
     NodeKind::Rot => unreachable!(),
   }
@@ -91,12 +86,11 @@ fn var_or_subtree(
   src_port: Port,
   port_to_var_id: &mut HashMap<Port, VarId>,
   id_to_hvmc_name: &impl Fn(DefId) -> Val,
-  lazy: bool,
 ) -> Tree {
   let dst_port = inet.enter_port(src_port);
   if dst_port.slot() == 0 {
     // Subtree
-    net_tree_to_hvmc_tree(inet, dst_port.node(), port_to_var_id, id_to_hvmc_name, lazy)
+    net_tree_to_hvmc_tree(inet, dst_port.node(), port_to_var_id, id_to_hvmc_name)
   } else {
     // Var
     if let Some(&var_id) = port_to_var_id.get(&src_port) {

@@ -85,9 +85,8 @@ fn compile_term() {
     term.make_var_names_unique();
     term.linearize_vars();
 
-    let lazy_mode = false;
-    let compat_net = term_to_compat_net(&term, &mut Labels::new(lazy_mode));
-    let net = net_to_hvmc(&compat_net, &|def_id| def_id.to_internal(), lazy_mode)?;
+    let compat_net = term_to_compat_net(&term, &mut Labels::default());
+    let net = net_to_hvmc(&compat_net, &|def_id| def_id.to_internal())?;
 
     Ok(show_net(&net))
   })
@@ -97,7 +96,7 @@ fn compile_term() {
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::heavy(), false)?;
+    let compiled = compile_book(&mut book, CompileOpts::heavy())?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -105,7 +104,7 @@ fn compile_file_o_all() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::light(), false)?;
+    let compiled = compile_book(&mut book, CompileOpts::light())?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -141,9 +140,8 @@ fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|code, _| {
     let net = do_parse_net(code)?;
     let book = Book::default();
-    let lazy_mode = false;
-    let compat_net = hvmc_to_net(&net, &DefId::from_internal, lazy_mode);
-    let (term, errors) = net_to_term(&compat_net, &book, &Labels::new(lazy_mode), false);
+    let compat_net = hvmc_to_net(&net, &DefId::from_internal);
+    let (term, errors) = net_to_term(&compat_net, &book, &Labels::default(), false);
     Ok(format!("{}{}", errors.display(&book.def_names), term.display(&book.def_names)))
   })
 }
