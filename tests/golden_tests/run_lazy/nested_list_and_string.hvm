@@ -1,0 +1,1 @@
+main = @a [a, (*, 2), (SCons [7, "1234", 9] (SCons a (SCons * (SCons '4' (SCons '2' SNil)))))]

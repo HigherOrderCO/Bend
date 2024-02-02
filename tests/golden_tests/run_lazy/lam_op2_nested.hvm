@@ -1,0 +1,7 @@
+/*
+main = λx (+ (* x x) (+ (+ 2 x) 3))
+
+FIXME: panicked at 'not yet implemented' on hvmc::run::NetFields `if next.is_op1() { todo!(); } // FIXME`
+*/
+
+main = *

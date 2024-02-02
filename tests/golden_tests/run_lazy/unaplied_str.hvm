@@ -1,0 +1,1 @@
+main = λa λb (SCons a (SCons 'b' (SCons 'c' (SCons b  SNil))))

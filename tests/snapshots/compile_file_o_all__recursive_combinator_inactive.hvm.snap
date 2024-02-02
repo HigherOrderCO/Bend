@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/recursive_combinator_inactive.hvm
 ---
 @7 = (a (* a))
-@Foo = (?<({0 @Foo @Foo} @7) a> a)
+@Foo = (?<({3 @Foo @Foo} @7) a> a)
 @main = a
 & @Foo ~ (#0 a)
 

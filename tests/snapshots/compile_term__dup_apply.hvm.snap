@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/dup_apply.hvm
 ---
-({0 (a b) a} b)
+({3 (a b) a} b)

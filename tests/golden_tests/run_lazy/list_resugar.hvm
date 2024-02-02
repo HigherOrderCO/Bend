@@ -1,0 +1,1 @@
+Main = (LCons 42 (LCons (LCons @x x LNil) LNil))

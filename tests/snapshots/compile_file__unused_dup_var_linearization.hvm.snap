@@ -3,5 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/unused_dup_var_linearization.hvm
 ---
 @main = a
-& (b b) ~ {0 * {0 {0 c *} {0 (c a) *}}}
+& (b b) ~ {3 * {5 {9 c *} {7 (c a) *}}}
 
