@@ -211,7 +211,9 @@ impl Opts {
 impl Opts {
   pub fn check(&self) {
     if !self.supercombinators {
-      println!("Warning: Running in strict mode without enabling the supercombinators pass can lead to some functions expanding infinitely.");
+      println!(
+        "Warning: Running in strict mode without enabling the supercombinators pass can lead to some functions expanding infinitely."
+      );
     }
   }
 }
@@ -237,6 +239,10 @@ impl WarningOpts {
 
   pub fn deny_all() -> Self {
     Self { match_only_vars: WarnState::Deny, unused_defs: WarnState::Deny }
+  }
+
+  pub fn warn_all() -> Self {
+    Self { match_only_vars: WarnState::Warn, unused_defs: WarnState::Warn }
   }
 
   /// Filters warnings based on the enabled flags.
