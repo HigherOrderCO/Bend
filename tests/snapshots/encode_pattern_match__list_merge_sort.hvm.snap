@@ -2,19 +2,19 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 ---
-(If) = λx #Bool (x If$PTrue If$PFalse)
+(If) = λa #Bool (a λb λc b λd λe e)
 
 (Pure) = λx (Cons x Nil)
 
-(Map) = λx #List_ (x Map$PCons Map$PNil)
+(Map) = λa #List_ (a #List_.Cons.head λb #List_.Cons.tail λc λd (Cons (d b) (Map c d)) λe Nil)
 
 (MergeSort) = λcmp λxs (Unpack cmp (Map xs Pure))
 
-(Unpack) = λx (Unpack$P x)
+(Unpack) = λa λb (#List_ (b #List_.Cons.head λc #List_.Cons.tail λd λe (Unpack$F0 e c d) λf Nil) a)
 
-(MergePair) = λx (MergePair$P x)
+(MergePair) = λa λb (#List_ (b #List_.Cons.head λc #List_.Cons.tail λd λe (MergePair$F0 e c d) λf Nil) a)
 
-(Merge) = λx (Merge$P x)
+(Merge) = λa λb (#List_ (b #List_.Cons.head λc #List_.Cons.tail λd λe λf (#List_ (f #List_.Cons.head λg #List_.Cons.tail λh λi λj λk (If (i j g) let l = (Cons g h); (Cons j (Merge i k l)) let m = (Cons j k); (Cons g (Merge i m h))) λn λo λp (Cons o p)) e c d) λq λr r) a)
 
 (True) = #Bool λTrue #Bool λFalse True
 
@@ -24,82 +24,6 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 
 (Nil) = #List_ λCons #List_ λNil Nil
 
-(Unpack$F0) = λx (Unpack$F0$P x)
+(Unpack$F0) = λa λb λc (#List_ (c #List_.Cons.head λd #List_.Cons.tail λe λf λg (Unpack f (MergePair f (Cons g (Cons d e)))) λh λi i) a b)
 
-(MergePair$F0) = λx (MergePair$F0$P x)
-
-(If$R0) = λthen λelse then
-
-(If$R1) = λthen λelse else
-
-(If$PTrue) = If$R0
-
-(If$PFalse) = If$R1
-
-(Map$R0) = λf Nil
-
-(Map$R1) = λh λt λf (Cons (f h) (Map t f))
-
-(Map$PCons) = #List_.Cons.head λy0 #List_.Cons.tail λy1 (Map$R1 y0 y1)
-
-(Map$PNil) = Map$R0
-
-(Unpack$R0) = λcmp Nil
-
-(Unpack$R1) = λcmp λh λx$0 (Unpack$F0 cmp h x$0)
-
-(Unpack$R2) = λcmp λxs (Unpack cmp (MergePair cmp xs))
-
-(Unpack$P$PCons) = #List_.Cons.head λy0 #List_.Cons.tail λy1 λx0 (Unpack$R1 x0 y0 y1)
-
-(Unpack$P$PNil) = λx0 (Unpack$R0 *)
-
-(Unpack$P) = λy0 λx (#List_ (x Unpack$P$PCons Unpack$P$PNil) y0)
-
-(MergePair$R0) = λcmp λh1 λx$0 (MergePair$F0 cmp h1 x$0)
-
-(MergePair$R1_$_Merge$R1) = λcmp λxs xs
-
-(MergePair$P$PCons) = #List_.Cons.head λy0 #List_.Cons.tail λy1 λx0 (MergePair$R0 x0 y0 y1)
-
-(MergePair$P$PNil) = λx0 (MergePair$R1_$_Merge$R1 * Nil)
-
-(MergePair$P) = λy0 λx (#List_ (x MergePair$P$PCons MergePair$P$PNil) y0)
-
-(Merge$R0) = λcmp λys ys
-
-(Merge$R2) = λcmp λxh λxt λyh λyt (If (cmp xh yh) let ys = (Cons yh yt); (Cons xh (Merge cmp xt ys)) let xs = (Cons xh xt); (Cons yh (Merge cmp xs yt)))
-
-(Merge$P$PCons$PCons) = #List_.Cons.head λy0 #List_.Cons.tail λy1 λx0 λx1 λx2 (Merge$R2 x0 x1 x2 y0 y1)
-
-(Merge$P$PCons$PNil) = λx0 λx1 λx2 (MergePair$R1_$_Merge$R1 * (Cons x1 x2))
-
-(Merge$P$PCons) = #List_.Cons.head λy0 #List_.Cons.tail λy1 λx0 λx (#List_ (x Merge$P$PCons$PCons Merge$P$PCons$PNil) x0 y0 y1)
-
-(Merge$P$PNil) = λx0 (Merge$R0 *)
-
-(Merge$P) = λy0 λx (#List_ (x Merge$P$PCons Merge$P$PNil) y0)
-
-(Unpack$F0$R0) = λcmp λh h
-
-(Unpack$F0$R1) = λcmp λx$0 λx$1 (Unpack cmp (MergePair cmp (Cons x$0 x$1)))
-
-(Unpack$F0$P$P$PCons) = #List_.Cons.head λy0 #List_.Cons.tail λy1 λx0 λx1 (Unpack$F0$R1 x0 x1 (Cons y0 y1))
-
-(Unpack$F0$P$P$PNil) = λx0 λx1 (Unpack$F0$R0 * x1)
-
-(Unpack$F0$P$P) = λy0 λx0 λx (#List_ (x Unpack$F0$P$P$PCons Unpack$F0$P$P$PNil) x0 y0)
-
-(Unpack$F0$P) = λy0 λx (Unpack$F0$P$P x y0)
-
-(MergePair$F0$R0) = λcmp λh1 λh2 λt (Cons (Merge cmp h1 h2) (MergePair cmp t))
-
-(MergePair$F0$R1) = λcmp λx$0 λx$1 (Cons x$0 x$1)
-
-(MergePair$F0$P$P$PCons) = #List_.Cons.head λy0 #List_.Cons.tail λy1 λx0 λx1 (MergePair$F0$R0 x0 x1 y0 y1)
-
-(MergePair$F0$P$P$PNil) = λx0 λx1 (MergePair$F0$R1 * x1 Nil)
-
-(MergePair$F0$P$P) = λy0 λx0 λx (#List_ (x MergePair$F0$P$P$PCons MergePair$F0$P$P$PNil) x0 y0)
-
-(MergePair$F0$P) = λy0 λx (MergePair$F0$P$P x y0)
+(MergePair$F0) = λa λb λc (#List_ (c #List_.Cons.head λd #List_.Cons.tail λe λf λg (Cons (Merge f g d) (MergePair f e)) λh λi (Cons i Nil)) a b)

@@ -175,7 +175,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
     Mode::Desugar { path } => {
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
-      desugar_book(&mut book, CompileOpts::light())?;
+      desugar_book(&mut book, CompileOpts::default())?;
       println!("{book}");
     }
     Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, cli_opts, wopts, lazy_mode } => {

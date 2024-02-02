@@ -8,12 +8,4 @@ input_file: tests/golden_tests/encode_pattern_match/match_syntax.hvm
 
 (Nil) = #List_ λCons #List_ λNil Nil
 
-(head$match$1) = λx #List_ (x head$match$1$PCons head$match$1$PNil)
-
-(head$match$1$R0) = Nil
-
-(head$match$1$R1) = λx.x λx.xs x.x
-
-(head$match$1$PCons) = #List_.Cons.x λy0 #List_.Cons.xs λy1 (head$match$1$R1 y0 *)
-
-(head$match$1$PNil) = head$match$1$R0
+(head$match$1) = λa #List_ (a #List_.Cons.x λb #List_.Cons.xs λc b Nil)

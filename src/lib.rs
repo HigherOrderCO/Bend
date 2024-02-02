@@ -1,4 +1,5 @@
 #![feature(box_patterns)]
+#![feature(let_chains)]
 
 use hvmc::{
   ast::{book_to_runtime, show_book, Net},
@@ -74,6 +75,7 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefId, Vec<Wa
 }
 
 pub fn encode_pattern_matching(book: &mut Book, warnings: &mut Vec<Warning>) -> Result<(), String> {
+  book.check_arity()?;
   book.resolve_ctrs_in_pats();
   book.check_unbound_pats()?;
   book.check_ctrs_arities()?;
@@ -85,6 +87,7 @@ pub fn encode_pattern_matching(book: &mut Book, warnings: &mut Vec<Warning>) -> 
   book.check_unbound_vars()?;
   book.extract_adt_matches(warnings)?;
   book.flatten_rules();
+  eprintln!("{book}\n========================\n");
   let def_types = book.infer_def_types()?;
   book.check_exhaustive_patterns(&def_types)?;
   book.encode_pattern_matching_functions(&def_types);
@@ -143,8 +146,8 @@ pub fn run_compiled(
   (net, stats)
 }
 
-pub fn total_rewrites(rwrts: &Rewrites) -> usize {
-  rwrts.anni + rwrts.comm + rwrts.eras + rwrts.dref + rwrts.oper
+pub fn total_rewrites(rwts: &Rewrites) -> usize {
+  rwts.anni + rwts.comm + rwts.eras + rwts.dref + rwts.oper
 }
 
 #[derive(Clone, Copy, Debug, Default)]

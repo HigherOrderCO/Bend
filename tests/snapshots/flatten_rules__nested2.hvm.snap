@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/flatten_rules/nested2.hvm
 ---
-(Foo a (LCons b x$0)) = (Foo$F0 a b x$0)
+(Foo %x0 (LCons %x1 %x2)) = (Foo$F0 %x0 %x1 %x2)
 (Foo a b) = (a b)
 
 (LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)
@@ -10,4 +10,4 @@ input_file: tests/golden_tests/flatten_rules/nested2.hvm
 (LNil) = #List λLCons #List λLNil LNil
 
 (Foo$F0 a b (LCons c d)) = (a b c d)
-(Foo$F0 a x$0 x$1) = (a (LCons x$0 x$1))
+(Foo$F0 a %x0 %x1) = (a (LCons %x0 %x1))

@@ -1,0 +1,13 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/flatten_rules/redundant_with_era.hvm
+---
+(Fn2 %x0 (%x1, %x2)) = (Fn2$F0 %x0 %x1 %x2)
+(Fn2 0 *) = 0
+(Fn2 +a *) = a
+
+(main) = *
+
+(Fn2$F0 * * (*, a)) = a
+(Fn2$F0 0 * *) = 0
+(Fn2$F0 +a * *) = a

@@ -12,18 +12,6 @@ input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared
 
 (SNil) = #String λSCons #String λSNil SNil
 
-(main$match$1) = λx #String (x main$match$1$PSCons main$match$1$PSNil_$_main$match$2$PLNil)
+(main$match$1) = λa #String (a #String.SCons.head λb #String.SCons.tail λc 1 2)
 
-(main$match$2) = λx #List (x main$match$2$PLCons main$match$1$PSNil_$_main$match$2$PLNil)
-
-(main$match$1$R0) = λa.head λa.tail 1
-
-(main$match$1$R1_$_main$match$2$R1) = 2
-
-(main$match$1$PSCons) = #String.SCons.head λy0 #String.SCons.tail λy1 (main$match$1$R0 * *)
-
-(main$match$1$PSNil_$_main$match$2$PLNil) = main$match$1$R1_$_main$match$2$R1
-
-(main$match$2$R0) = λh λt 1
-
-(main$match$2$PLCons) = #List.LCons.head λy0 #List.LCons.tail λy1 (main$match$2$R0 * *)
+(main$match$2) = λa #List (a #List.LCons.head λb #List.LCons.tail λc 1 2)

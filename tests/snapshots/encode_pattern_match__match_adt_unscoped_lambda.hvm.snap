@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_lambda.hvm
 ---
-Unable to linearize variable λ$x in a match block.
+In definition 'main': Unable to linearize variable λ$x in a match block.

@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/definition_merge.hvm
 ---
-(Foo) = λx #Either (x Foo$PLeft Foo$PRight)
+(Foo) = λa #Either (a #Either.Left.value λb λc (#Either (c #Either.Left.value λd λe (Foo$F0 e d) #Either.Right.value λf λg (Foo$F1 g f)) b) #Either.Right.value λh λi (#Either (i #Either.Left.value λj λk (Foo$F2_$_Foo$F3 k j) #Either.Right.value λl λm (Foo$F2_$_Foo$F3 m l)) h))
 
 (True) = #Bool λTrue #Bool λFalse True
 
@@ -12,44 +12,8 @@ input_file: tests/golden_tests/encode_pattern_match/definition_merge.hvm
 
 (Right) = λvalue #Either λLeft #Either λRight #Either.Right.value (Right value)
 
-(Foo$F0) = λx #Bool (x Foo$F0$PTrue_$_Foo$F0$PFalse Foo$F0$PTrue_$_Foo$F0$PFalse)
+(Foo$F0) = λa #Bool (a λb #Bool (b 1 1) λc #Bool (c 1 1))
 
-(Foo$F1) = λx #Bool (x Foo$F1$PTrue_$_Foo$F1$PFalse Foo$F1$PTrue_$_Foo$F1$PFalse)
+(Foo$F1) = λa #Bool (a λb #Bool (b 2 2) λc #Bool (c 2 2))
 
-(Foo$F2_$_Foo$F3) = λx #Bool (x Foo$F2$PTrue_$_Foo$F2$PFalse_$_Foo$F3$PTrue_$_Foo$F3$PFalse Foo$F2$PTrue_$_Foo$F2$PFalse_$_Foo$F3$PTrue_$_Foo$F3$PFalse)
-
-(Foo$R0) = λx$0 λx$1 (Foo$F0 x$0 x$1)
-
-(Foo$R1) = λx$0 λx$1 (Foo$F1 x$0 x$1)
-
-(Foo$R2_$_Foo$R3) = λx$0 λx$1 (Foo$F2_$_Foo$F3 x$0 x$1)
-
-(Foo$PLeft$PLeft) = #Either.Left.value λy0 λx0 (Foo$R0 x0 y0)
-
-(Foo$PLeft$PRight) = #Either.Right.value λy0 λx0 (Foo$R1 x0 y0)
-
-(Foo$PLeft) = #Either.Left.value λy0 λx (#Either (x Foo$PLeft$PLeft Foo$PLeft$PRight) y0)
-
-(Foo$PRight$PLeft) = #Either.Left.value λy0 λx0 (Foo$R2_$_Foo$R3 x0 y0)
-
-(Foo$PRight$PRight) = #Either.Right.value λy0 λx0 (Foo$R2_$_Foo$R3 x0 y0)
-
-(Foo$PRight) = #Either.Right.value λy0 λx (#Either (x Foo$PRight$PLeft Foo$PRight$PRight) y0)
-
-(Foo$F0$R0_$_Foo$F0$R1_$_Foo$F0$R2_$_Foo$F0$R3) = 1
-
-(Foo$F0$PTrue$PTrue_$_Foo$F0$PTrue$PFalse_$_Foo$F0$PFalse$PTrue_$_Foo$F0$PFalse$PFalse) = Foo$F0$R0_$_Foo$F0$R1_$_Foo$F0$R2_$_Foo$F0$R3
-
-(Foo$F0$PTrue_$_Foo$F0$PFalse) = λx #Bool (x Foo$F0$PTrue$PTrue_$_Foo$F0$PTrue$PFalse_$_Foo$F0$PFalse$PTrue_$_Foo$F0$PFalse$PFalse Foo$F0$PTrue$PTrue_$_Foo$F0$PTrue$PFalse_$_Foo$F0$PFalse$PTrue_$_Foo$F0$PFalse$PFalse)
-
-(Foo$F1$R0_$_Foo$F1$R1_$_Foo$F1$R2_$_Foo$F1$R3) = 2
-
-(Foo$F1$PTrue$PTrue_$_Foo$F1$PTrue$PFalse_$_Foo$F1$PFalse$PTrue_$_Foo$F1$PFalse$PFalse) = Foo$F1$R0_$_Foo$F1$R1_$_Foo$F1$R2_$_Foo$F1$R3
-
-(Foo$F1$PTrue_$_Foo$F1$PFalse) = λx #Bool (x Foo$F1$PTrue$PTrue_$_Foo$F1$PTrue$PFalse_$_Foo$F1$PFalse$PTrue_$_Foo$F1$PFalse$PFalse Foo$F1$PTrue$PTrue_$_Foo$F1$PTrue$PFalse_$_Foo$F1$PFalse$PTrue_$_Foo$F1$PFalse$PFalse)
-
-(Foo$F2$R0_$_Foo$F2$R1_$_Foo$F2$R2_$_Foo$F2$R3_$_Foo$F3$R0_$_Foo$F3$R1_$_Foo$F3$R2_$_Foo$F3$R3) = 3
-
-(Foo$F2$PTrue$PTrue_$_Foo$F2$PTrue$PFalse_$_Foo$F2$PFalse$PTrue_$_Foo$F2$PFalse$PFalse_$_Foo$F3$PTrue$PTrue_$_Foo$F3$PTrue$PFalse_$_Foo$F3$PFalse$PTrue_$_Foo$F3$PFalse$PFalse) = Foo$F2$R0_$_Foo$F2$R1_$_Foo$F2$R2_$_Foo$F2$R3_$_Foo$F3$R0_$_Foo$F3$R1_$_Foo$F3$R2_$_Foo$F3$R3
-
-(Foo$F2$PTrue_$_Foo$F2$PFalse_$_Foo$F3$PTrue_$_Foo$F3$PFalse) = λx #Bool (x Foo$F2$PTrue$PTrue_$_Foo$F2$PTrue$PFalse_$_Foo$F2$PFalse$PTrue_$_Foo$F2$PFalse$PFalse_$_Foo$F3$PTrue$PTrue_$_Foo$F3$PTrue$PFalse_$_Foo$F3$PFalse$PTrue_$_Foo$F3$PFalse$PFalse Foo$F2$PTrue$PTrue_$_Foo$F2$PTrue$PFalse_$_Foo$F2$PFalse$PTrue_$_Foo$F2$PFalse$PFalse_$_Foo$F3$PTrue$PTrue_$_Foo$F3$PTrue$PFalse_$_Foo$F3$PFalse$PTrue_$_Foo$F3$PFalse$PFalse)
+(Foo$F2_$_Foo$F3) = λa #Bool (a λb #Bool (b 3 3) λc #Bool (c 3 3))

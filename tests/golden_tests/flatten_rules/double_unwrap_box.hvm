@@ -1,0 +1,7 @@
+// Should notice that the second rule is redundant, not create flattened rule for it and not forward the second argument.
+data Boxed = (Box x)
+
+(DoubleUnbox (Box (Box x)) *) = x
+(DoubleUnbox * x) = x
+
+Main = (DoubleUnbox (Box (Box 0)) 5)

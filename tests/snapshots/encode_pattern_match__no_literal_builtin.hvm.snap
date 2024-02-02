@@ -4,16 +4,8 @@ input_file: tests/golden_tests/encode_pattern_match/no_literal_builtin.hvm
 ---
 (main) = *
 
-(Foo) = λx #String (x Foo$PSCons Foo$PSNil)
+(Foo) = λa #String (a #String.SCons.head λb #String.SCons.tail λc 1 0)
 
 (SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
 
 (SNil) = #String λSCons #String λSNil SNil
-
-(Foo$R0) = 0
-
-(Foo$R1) = λ* 1
-
-(Foo$PSCons) = #String.SCons.head λy0 #String.SCons.tail λy1 (Foo$R1 *)
-
-(Foo$PSNil) = Foo$R0

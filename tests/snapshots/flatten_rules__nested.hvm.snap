@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/flatten_rules/nested.hvm
 ---
-(Rule (CtrA a x$0)) = (Rule$F0 a x$0)
+(Rule (CtrA %x0 %x1)) = (Rule$F0 %x0 %x1)
 (Rule (CtrB b)) = b
 (Rule x) = x
 
@@ -17,10 +17,10 @@ input_file: tests/golden_tests/flatten_rules/nested.hvm
 (CtrB) = λa #Foo λCtrA #Foo λCtrB #Foo.CtrB.a (CtrB a)
 
 (Rule$F0 a (CtrB1 b)) = (a b)
-(Rule$F0 a (CtrB2 x$0 b)) = (Rule$F0$F0 a x$0 b)
+(Rule$F0 %x0 (CtrB2 %x1 %x2)) = (Rule$F0$F0 %x0 %x1 %x2)
 (Rule$F0 a b) = (a b)
-(Rule$F0 x$0 x$1) = (CtrA x$0 x$1)
+(Rule$F0 %x0 %x1) = (CtrA %x0 %x1)
 
 (Rule$F0$F0 a (CtrC) b) = (a b)
-(Rule$F0$F0 a x$0 x$1) = (a (CtrB2 x$0 x$1))
-(Rule$F0$F0 x$0 x$0 x$1) = (CtrA x$0 (CtrB2 x$0 x$1))
+(Rule$F0$F0 a %x0 %x1) = (a (CtrB2 %x0 %x1))
+(Rule$F0$F0 %x0 %x0 %x1) = (CtrA %x0 (CtrB2 %x0 %x1))

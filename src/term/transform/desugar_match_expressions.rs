@@ -20,7 +20,7 @@ impl Book {
         rule
           .body
           .extract_adt_matches(&def_name, &self.ctrs, book, &mut 0, warnings)
-          .map_err(|err| err.to_string())?;
+          .map_err(|e| format!("In definition '{}': {}", def_name, e))?;
       }
     }
     self.defs.append(&mut book.new_defs);
@@ -32,7 +32,11 @@ impl Book {
   /// Should be run after pattern matching functions are desugared.
   pub fn normalize_native_matches(&mut self) -> Result<(), String> {
     for def in self.defs.values_mut() {
-      def.rule_mut().body.normalize_native_matches(&self.ctrs).map_err(|e| e.to_string())?;
+      def
+        .rule_mut()
+        .body
+        .normalize_native_matches(&self.ctrs)
+        .map_err(|e| format!("In definition '{}': {}", self.def_names.name(&def.def_id).unwrap(), e))?;
     }
     Ok(())
   }
@@ -177,7 +181,7 @@ fn match_to_def(
   let def = Definition { def_id, rules };
   book.new_defs.insert(def_id, def);
 
-  Term::arg_call(Term::Ref { def_id }, Some(scrutinee))
+  Term::arg_call(Term::Ref { def_id }, scrutinee)
 }
 
 fn make_def_name(def_name: &Name, ctr: &Name, i: usize) -> Name {
@@ -374,7 +378,7 @@ fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
 
   // Add apps to the match
   let old_match = std::mem::take(match_term);
-  *match_term = free_vars.into_iter().fold(old_match, |acc, nam| Term::arg_call(acc, Some(nam)));
+  *match_term = free_vars.into_iter().fold(old_match, Term::arg_call);
 
   // Get a reference to the match again
   // It returns a reference and not an owned value because we want
