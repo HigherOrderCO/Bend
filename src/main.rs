@@ -285,17 +285,17 @@ impl WarningArgs {
   ) {
     for id in wopts_id_seq {
       match id.as_ref() {
-        "allows" => Self::set(wopts, allows.next().unwrap(), WarningOpts::allow_all(), WarnState::Allow),
-        "denies" => Self::set(wopts, denies.next().unwrap(), WarningOpts::deny_all(), WarnState::Deny),
-        "warns" => Self::set(wopts, warns.next().unwrap(), WarningOpts::default(), WarnState::Warn),
+        "allows" => Self::set(wopts, allows.next().unwrap(), WarningOpts::allow_all, WarnState::Allow),
+        "denies" => Self::set(wopts, denies.next().unwrap(), WarningOpts::deny_all, WarnState::Deny),
+        "warns" => Self::set(wopts, warns.next().unwrap(), WarningOpts::warn_all, WarnState::Warn),
         _ => {}
       }
     }
   }
 
-  fn set(wopts: &mut WarningOpts, val: WarningArgs, all: WarningOpts, switch: WarnState) {
+  fn set(wopts: &mut WarningOpts, val: WarningArgs, all: impl Fn() -> WarningOpts, switch: WarnState) {
     match val {
-      WarningArgs::All => *wopts = all,
+      WarningArgs::All => *wopts = all(),
       WarningArgs::UnusedDefs => wopts.unused_defs = switch,
       WarningArgs::MatchOnlyVars => wopts.match_only_vars = switch,
     }

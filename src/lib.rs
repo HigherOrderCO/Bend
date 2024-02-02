@@ -211,15 +211,23 @@ impl Opts {
 impl Opts {
   pub fn check(&self) {
     if !self.supercombinators {
-      println!("Warning: Running in strict mode without enabling the supercombinators pass can lead to some functions expanding infinitely.");
+      println!(
+        "Warning: Running in strict mode without enabling the supercombinators pass can lead to some functions expanding infinitely."
+      );
     }
   }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct WarningOpts {
   pub match_only_vars: WarnState,
   pub unused_defs: WarnState,
+}
+
+impl Default for WarningOpts {
+  fn default() -> Self {
+    Self { match_only_vars: WarnState::Warn, unused_defs: WarnState::Allow }
+  }
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -238,6 +246,11 @@ impl WarningOpts {
   pub fn deny_all() -> Self {
     Self { match_only_vars: WarnState::Deny, unused_defs: WarnState::Deny }
   }
+
+  pub fn warn_all() -> Self {
+    Self { match_only_vars: WarnState::Warn, unused_defs: WarnState::Warn }
+  }
+
 
   /// Filters warnings based on the enabled flags.
   pub fn filter<'a>(&'a self, wrns: &'a [Warning], ws: WarnState) -> Vec<&Warning> {
