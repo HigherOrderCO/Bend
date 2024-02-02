@@ -4,7 +4,7 @@ use std::collections::HashSet;
 impl Book {
   /// Check if the constructors in rule patterns or match patterns are defined.
   pub fn check_unbound_pats(&self) -> Result<(), String> {
-    let is_ctr = |nam: &Name| self.def_names.contains_name(nam);
+    let is_ctr = |nam: &Name| self.ctrs.contains_key(nam);
     for def in self.defs.values() {
       let def_name = self.def_names.name(&def.def_id).unwrap();
       for rule in &def.rules {
