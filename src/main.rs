@@ -1,8 +1,8 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
-  check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, Opts, RunInfo,
-  WarnState, WarningOpts,
+  check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, DesugarOpts, RunInfo,
+  RunOpts, WarnState, WarningOpts,
 };
 use std::{path::PathBuf, vec::IntoIter};
 
@@ -34,6 +34,9 @@ enum Mode {
     )]
     cli_opts: Vec<OptArgs>,
 
+    #[arg(short = 'L', help = "Lazy mode")]
+    lazy_mode: bool,
+
     #[command(flatten)]
     wopts: WOpts,
 
@@ -53,7 +56,7 @@ enum Mode {
 
     #[arg(short = 'L', help = "Lazy mode")]
     lazy_mode: bool,
-  
+
     #[arg(short = 'l', help = "Linear readback (show explicit dups)")]
     linear: bool,
 
@@ -155,50 +158,53 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       verbose(&book);
       check_book(book)?;
     }
-    Mode::Compile { path, cli_opts, wopts } => {
+    Mode::Compile { path, cli_opts, wopts, lazy_mode } => {
       let warning_opts = wopts.get_warning_opts(WarningOpts::default());
-      let opts = OptArgs::opts_from_cli(&cli_opts);
+      let mut opts = OptArgs::opts_from_cli(&cli_opts);
+
+      if lazy_mode {
+        opts.lazy_mode()
+      }
+
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
-      let compiled = compile_book(&mut book, opts)?;
+      let compiled = compile_book(&mut book, opts, lazy_mode)?;
       hvml::display_warnings(warning_opts, &compiled.warnings)?;
       print!("{}", show_book(&compiled.core_book));
     }
     Mode::Desugar { path } => {
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
-      desugar_book(&mut book, Opts::light())?;
+      desugar_book(&mut book, DesugarOpts::light())?;
       println!("{book}");
     }
     Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, cli_opts, wopts, lazy_mode } => {
+      if debug && lazy_mode {
+        return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".to_string());
+      }
+
       let warning_opts = wopts.get_warning_opts(WarningOpts::allow_all());
       let mut opts = OptArgs::opts_from_cli(&cli_opts);
-      opts.check();
+      opts.check(lazy_mode);
 
       if lazy_mode {
-        if debug {
-          return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".to_string());
-        }
         single_core = true;
-        opts.supercombinators = false;
-        opts.pre_reduce = false;
-      } else {
-        // TODO: make the behavior of dups and sups the same as before when not using lazy mode
-        eprintln!(
-          "WARNING: Eager evaluation may have wrong results with unlabeled dups/sups, consider using lazy mode `-L`"
-        )
+        opts.lazy_mode()
       }
 
       let book = load_file_to_book(&path)?;
       verbose(&book);
+
       let mem_size = mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
-      let (res_term, def_names, info) =
-        run_book(book, mem_size, !single_core, debug, linear, lazy_mode, warning_opts, opts)?;
-      let RunInfo { stats, readback_errors, net: lnet } = info;
+      let run_opts = RunOpts { single_core, debug, linear, lazy_mode };
+      let (res_term, def_names, RunInfo { stats, readback_errors, net }) =
+        run_book(book, mem_size, run_opts, warning_opts, opts)?;
+
       let total_rewrites = total_rewrites(&stats.rewrites) as f64;
       let rps = total_rewrites / stats.run_time / 1_000_000.0;
+
       if cli.verbose {
-        println!("\n{}", show_net(&lnet));
+        println!("\n{}", show_net(&net));
       }
 
       println!("{}{}", readback_errors.display(&def_names), res_term.display(&def_names));
@@ -257,13 +263,13 @@ pub enum OptArgs {
 }
 
 impl OptArgs {
-  fn opts_from_cli(args: &Vec<Self>) -> Opts {
+  fn opts_from_cli(args: &Vec<Self>) -> DesugarOpts {
     use OptArgs::*;
-    let mut opts = Opts::light();
+    let mut opts = DesugarOpts::light();
     for arg in args {
       match arg {
-        All => opts = Opts::heavy(),
-        NoAll => opts = Opts::default(),
+        All => opts = DesugarOpts::heavy(),
+        NoAll => opts = DesugarOpts::default(),
         Eta => opts.eta = true,
         NoEta => opts.eta = false,
         Prune => opts.prune = true,

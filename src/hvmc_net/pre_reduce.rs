@@ -21,7 +21,7 @@ pub fn pre_reduce_book(book: &mut Book, cross_refs: bool) -> Result<(), String> 
     if net.rdex.is_empty() {
       continue;
     }
-    let mut rt = &mut Net::new(1 << 18, false);
+    let rt = &mut Net::new(1 << 18, false);
     let fid = name_to_val(nam);
     boot(rt, fid);
     expand(rt, rt_book);
@@ -32,7 +32,7 @@ pub fn pre_reduce_book(book: &mut Book, cross_refs: bool) -> Result<(), String> 
       // TODO: If I just call `rt.normal` some terms expand infinitely, so I put this workaround.
       // But I don't think this is the right way (even if it works).
       loop {
-        iters += reduce(rt, &rt_book, MAX_ITERS);
+        iters += reduce(rt, rt_book, MAX_ITERS);
         if heap_root(rt).is_ref() {
           expand(rt, rt_book);
         } else {
@@ -41,13 +41,13 @@ pub fn pre_reduce_book(book: &mut Book, cross_refs: bool) -> Result<(), String> 
       }
       iters
     } else {
-      reduce_without_deref(&mut rt, MAX_ITERS)
+      reduce_without_deref(rt, MAX_ITERS)
     };
     if iters > MAX_ITERS {
       return Err(format!("Unable to pre-reduce definition {nam} in under {MAX_ITERS} iterations"));
     }
 
-    let new_def = runtime_net_sparse_to_runtime_def(&rt);
+    let new_def = runtime_net_sparse_to_runtime_def(rt);
 
     let def = rt_book.defs.get_mut(&fid).unwrap();
     def.rdex = new_def.rdex;
