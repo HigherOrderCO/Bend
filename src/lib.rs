@@ -1,4 +1,5 @@
 #![feature(box_patterns)]
+#![feature(let_chains)]
 
 use hvmc::{
   ast::{book_to_runtime, show_book, Net},

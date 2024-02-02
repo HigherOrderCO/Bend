@@ -365,9 +365,8 @@ impl Term {
   }
 
   /// Apply a variable to a term by the var name.
-  pub fn arg_call(fun: Term, arg: Option<Name>) -> Self {
-    let arg = Box::new(arg.map_or(Term::Era, |nam| Term::Var { nam }));
-    Term::App { tag: Tag::Static, fun: Box::new(fun), arg }
+  pub fn arg_call(fun: Term, arg: Name) -> Self {
+    Term::App { tag: Tag::Static, fun: Box::new(fun), arg: Box::new(Term::Var { nam: arg }) }
   }
 
   pub fn tagged_app(tag: Tag, fun: Term, arg: Term) -> Self {
@@ -400,6 +399,8 @@ impl Term {
   }
 
   /// Substitute the occurrences of a variable in a term with the given term.
+  /// Caution: can cause invalid shadowing of variables if used incorrectly.
+  /// Ex: Using subst to beta-reduce (@a @b a b) converting it into (@b b).
   pub fn subst(&mut self, from: &Name, to: &Term) {
     match self {
       Term::Lam { nam: Some(nam), .. } if nam == from => (),
