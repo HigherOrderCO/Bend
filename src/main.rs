@@ -60,7 +60,7 @@ enum Mode {
     #[arg(short = 'l', help = "Linear readback (show explicit dups)")]
     linear: bool,
 
-    #[arg(short, long = "stats", help = "Shows runtime stats and rewrite counts")]
+    #[arg(short = 's', long = "stats", help = "Shows runtime stats and rewrite counts")]
     arg_stats: bool,
 
     #[arg(help = "Path to the input file")]
@@ -168,7 +168,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
 
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
-      let compiled = compile_book(&mut book, opts, lazy_mode)?;
+      let compiled = compile_book(&mut book, opts)?;
       hvml::display_warnings(warning_opts, &compiled.warnings)?;
       print!("{}", show_book(&compiled.core_book));
     }

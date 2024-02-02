@@ -25,14 +25,14 @@ use crate::term::net_to_term::ReadbackErrors;
 
 pub fn check_book(mut book: Book) -> Result<(), String> {
   // TODO: Do the checks without having to do full compilation
-  compile_book(&mut book, CompileOpts::light(), false)?;
+  compile_book(&mut book, CompileOpts::light())?;
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book, opts: CompileOpts, lazy_mode: bool) -> Result<CompileResult, String> {
+pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult, String> {
   let (main, warnings) = desugar_book(book, opts)?;
-  let (nets, hvmc_names, labels) = book_to_nets(book, main, lazy_mode);
-  let mut core_book = nets_to_hvmc(nets, &hvmc_names, lazy_mode)?;
+  let (nets, hvmc_names, labels) = book_to_nets(book, main);
+  let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
   if opts.pre_reduce {
     pre_reduce_book(&mut core_book, opts.pre_reduce_refs)?;
   }
@@ -100,14 +100,13 @@ pub fn run_book(
   warning_opts: WarningOpts,
   compile_opts: CompileOpts,
 ) -> Result<(Term, DefNames, RunInfo), String> {
-  let CompileResult { core_book, hvmc_names, labels, warnings } =
-    compile_book(&mut book, compile_opts, run_opts.lazy_mode)?;
+  let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, compile_opts)?;
 
   display_warnings(warning_opts, &warnings)?;
 
   let debug_hook = run_opts.debug_hook(&book, &hvmc_names, &labels);
   let (res_lnet, stats) = run_compiled(&core_book, mem_size, run_opts, debug_hook);
-  let net = hvmc_to_net(&res_lnet, &|id| hvmc_names.hvmc_name_to_id[&id], run_opts.lazy_mode);
+  let net = hvmc_to_net(&res_lnet, &|id| hvmc_names.hvmc_name_to_id[&id]);
   let (res_term, readback_errors) = net_to_term(&net, &book, &labels, run_opts.linear);
   let info = RunInfo { stats, readback_errors, net: res_lnet };
   Ok((res_term, book.def_names, info))
@@ -170,7 +169,7 @@ impl RunOpts {
   ) -> Option<impl FnMut(&Net) + 'a> {
     self.debug.then_some({
       |net: &_| {
-        let net = hvmc_to_net(net, &|id| hvmc_names.hvmc_name_to_id[&id], self.lazy_mode);
+        let net = hvmc_to_net(net, &|id| hvmc_names.hvmc_name_to_id[&id]);
         let (res_term, errors) = net_to_term(&net, book, labels, self.linear);
         println!(
           "{}{}\n---------------------------------------",
