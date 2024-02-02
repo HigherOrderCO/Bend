@@ -18,7 +18,6 @@ impl Book {
 fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
   let mut skip: HashSet<usize> = HashSet::new();
   let mut new_defs: HashMap<DefId, Definition> = HashMap::new();
-  let mut split_rule_count = 0;
 
   // We rebuild this definition rule by rule, with non-nested patterns
   let mut old_def = Definition { def_id: def.def_id, rules: vec![] };
@@ -32,10 +31,9 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
     let must_split = rule.pats.iter().any(|pat| !pat.is_flat());
     if must_split {
       // Create the entry for the new definition name
-      let def_name = def_names.name(&def.def_id).unwrap();
-      let new_split_name = Name(format!("{}$F{}", def_name, split_rule_count));
-      let new_split_def_id = def_names.insert(new_split_name.clone());
-      split_rule_count += 1;
+      let old_name = def_names.name(&def.def_id).unwrap();
+      let new_name = Name(format!("{}$F{}", old_name, new_defs.len()));
+      let new_def_id = def_names.insert(new_name.clone());
 
       // Create a new definition, with one rule for each rule that overlaps patterns with this one (including itself)
       // The rule patterns have one less layer of nesting and receive the destructed fields as extra args.
@@ -55,7 +53,7 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
           }
         }
       }
-      let def = Definition { def_id: new_split_def_id, rules: new_rules };
+      let def = Definition { def_id: new_def_id, rules: new_rules };
       // Recursively split the newly created def
       for def in flatten_def(&def, def_names) {
         new_defs.insert(def.def_id, def);
@@ -63,7 +61,7 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
 
       // Create the rule that replaces the one being flattened.
       // Destructs one layer of the nested patterns and calls the following, forwarding the extracted fields.
-      let old_rule = make_old_rule(rule, new_split_def_id);
+      let old_rule = make_old_rule(rule, new_def_id);
       old_def.rules.push(old_rule);
     } else {
       // If this rule is already flat, just mark it to be inserted back as it is.
@@ -76,19 +74,18 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
 
 /// Makes the rule that replaces the original.
 /// The new version of the rule is flat and calls the next layer of pattern matching.
-fn make_old_rule(rule: &Rule, new_split_def_id: DefId) -> Rule {
+fn make_old_rule(rule: &Rule, split_def: DefId) -> Rule {
   //(Foo Tic (Bar a b) (Haz c d)) = A
   //(Foo Tic x         y)         = B
   //---------------------------------
   //(Foo Tic (Bar a b) (Haz c d)) = B[x <- (Bar a b), y <- (Haz c d)]
   //
   //(Foo.0 a b c d) = ...
-  let pats = &rule.pats;
   let mut new_pats = Vec::new();
   let mut new_body_args = Vec::new();
   let mut var_count = 0;
 
-  for arg in pats {
+  for arg in &rule.pats {
     match arg {
       Pattern::Ctr(arg_name, arg_args) => {
         let mut new_arg_args = Vec::new();
@@ -108,13 +105,12 @@ fn make_old_rule(rule: &Rule, new_split_def_id: DefId) -> Rule {
         let snd = Pattern::Var(Some(snd));
         new_pats.push(Pattern::Tup(Box::new(fst), Box::new(snd)));
       }
-      Pattern::Var(None) => {
-        new_pats.push(Pattern::Var(None));
+      Pattern::Var(_) => {
+        let var_name = make_var_name(&mut var_count);
+        new_body_args.push(Term::Var { nam: var_name.clone() });
+        new_pats.push(Pattern::Var(Some(var_name)));
       }
-      Pattern::Var(Some(nam)) => {
-        new_pats.push(Pattern::Var(Some(nam.clone())));
-        new_body_args.push(Term::Var { nam: nam.clone() });
-      }
+
       Pattern::Num(MatchNum::Zero) => {
         new_pats.push(Pattern::Num(MatchNum::Zero));
       }
@@ -128,7 +124,7 @@ fn make_old_rule(rule: &Rule, new_split_def_id: DefId) -> Rule {
       Pattern::List(..) => unreachable!(),
     }
   }
-  let new_body = Term::call(Term::Ref { def_id: new_split_def_id }, new_body_args);
+  let new_body = Term::call(Term::Ref { def_id: split_def }, new_body_args);
   Rule { pats: new_pats, body: new_body, origin: rule.origin }
 }
 
@@ -216,8 +212,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
       }
 
       // First rule has var.
-      (Pattern::Var(Some(_)), _) => new_pats.push(other_arg.clone()),
-      (Pattern::Var(None), _) => (),
+      (Pattern::Var(_), _) => new_pats.push(other_arg.clone()),
 
       // Unreachable cases
       // We only call this function if we know the two patterns match together

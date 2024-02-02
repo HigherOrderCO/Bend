@@ -200,10 +200,10 @@ fn make_leaf_case(
     } else {
       // The pattern in this rule was a Var, but we matched on a constructor.
       // Rebuild the constructor
-      let ctr_name = &matched.ctrs()[0];
-      let ctr = book.def_names.get_ref(ctr_name);
-      let args = matched.vars().map(|_| Term::Var { nam: args.next().unwrap() }).collect::<Vec<_>>();
-      Term::call(term, [Term::call(ctr, args)])
+      let mut ctr = matched.clone();
+      ctr.vars_mut().for_each(|var| *var = Some(args.next().unwrap()));
+      let ctr = ctr.to_term(&book.def_names);
+      Term::app(term, ctr)
     }
   });
   // Add the lambdas for the matched args.
