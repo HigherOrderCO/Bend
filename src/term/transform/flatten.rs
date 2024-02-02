@@ -185,8 +185,6 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
       }
       (Pattern::Num(MatchNum::Succ(Some(_))), Pattern::Var(Some(other_arg))) => {
         // Since the other rule used the entire number, we have to recover it after the decrementing.
-        // TODO: Could we simply do this with the usual match normalization? Check.
-        eprintln!("!!!!!!!!!! Maybe bugged !!!!!!!!!!!");
         let new_nam = make_var_name(&mut var_count);
         let new_var = Term::Var { nam: new_nam.clone() };
         new_pats.push(Pattern::Var(Some(new_nam)));
