@@ -218,16 +218,10 @@ impl Opts {
   }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Default, Clone, Copy)]
 pub struct WarningOpts {
   pub match_only_vars: WarnState,
   pub unused_defs: WarnState,
-}
-
-impl Default for WarningOpts {
-  fn default() -> Self {
-    Self { match_only_vars: WarnState::Warn, unused_defs: WarnState::Allow }
-  }
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -250,7 +244,6 @@ impl WarningOpts {
   pub fn warn_all() -> Self {
     Self { match_only_vars: WarnState::Warn, unused_defs: WarnState::Warn }
   }
-
 
   /// Filters warnings based on the enabled flags.
   pub fn filter<'a>(&'a self, wrns: &'a [Warning], ws: WarnState) -> Vec<&Warning> {

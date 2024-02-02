@@ -153,7 +153,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       check_book(book)?;
     }
     Mode::Compile { path, cli_opts, wopts } => {
-      let warning_opts = wopts.get_warning_opts();
+      let warning_opts = wopts.get_warning_opts(WarningOpts::default());
       let opts = OptArgs::opts_from_cli(&cli_opts);
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
@@ -168,7 +168,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       println!("{book}");
     }
     Mode::Run { path, mem, debug, single_core, linear, arg_stats, cli_opts, wopts } => {
-      let warning_opts = wopts.get_warning_opts();
+      let warning_opts = wopts.get_warning_opts(WarningOpts::allow_all());
       let opts = OptArgs::opts_from_cli(&cli_opts);
       opts.check();
       let book = load_file_to_book(&path)?;
@@ -201,9 +201,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
 }
 
 impl WOpts {
-  fn get_warning_opts(self) -> WarningOpts {
-    let mut warning_opts = WarningOpts::default();
-
+  fn get_warning_opts(self, mut warning_opts: WarningOpts) -> WarningOpts {
     let cmd = Cli::command();
     let matches = cmd.get_matches();
 
