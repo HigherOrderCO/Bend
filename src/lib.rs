@@ -87,7 +87,6 @@ pub fn encode_pattern_matching(book: &mut Book, warnings: &mut Vec<Warning>) -> 
   book.check_unbound_vars()?;
   book.extract_adt_matches(warnings)?;
   book.flatten_rules();
-  eprintln!("{book}\n========================\n");
   let def_types = book.infer_def_types()?;
   book.check_exhaustive_patterns(&def_types)?;
   book.encode_pattern_matching_functions(&def_types);
