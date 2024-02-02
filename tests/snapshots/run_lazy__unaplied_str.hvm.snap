@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_lazy/unaplied_str.hvm
+---
+λa λb (SCons a (SCons 98 (SCons 99 (SCons b SNil))))

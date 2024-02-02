@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_lazy/superposed_is_even.hvm
+---
+#1{#2{T F} #3{T F}}

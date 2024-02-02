@@ -1,0 +1,5 @@
+main =
+  match (+ 0 1) {
+    0: λt λf t
+    +: λt λf f
+  }

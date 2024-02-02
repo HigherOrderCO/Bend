@@ -1,0 +1,84 @@
+// Write definitions like this
+(Def1) = ((λa a) (λb b))
+
+// You can call a definition by just referencing its name
+// It will be substituted in place of the reference
+(Def2) = ((λa a) Def1)
+
+// Definitions and variables can have names in upper and lower case and contain numbers
+// Names defined in a more inner position shadow names in an outer position
+(def3) = ((λDef1 Def1) (λx λx x))
+
+// The language is affine, but if you use a variable more than once the compiler inserts duplications for you
+// Of course you can always do them manually
+(def4) = λz let {z1 z2} = z; (z1 ((λx (x x x x x)) z2))
+
+// You can use machine numbers and some native numeric operations
+// Numeric operations can only reduce numbers, doing (+ (λx x) 1) will not do anything
+(nums) = λx1 λx2 (* (+ x1 1) (/ (- x2 2) 1))
+
+// You can use numbers on the native match expression
+// The `+` arm binds the `scrutinee`-1 variable to the the value of the number -1
+(Num.pred) = λn 
+  match n { 
+    0: 0
+    +: n-1
+  }
+
+// Write new data types like this
+data Option = (Some val) | None
+data Bool = True | False
+
+// You can have pattern matching on definitions
+// Use `*` to ignore a pattern
+(Option.unwrap_or (Some val) *) = val
+(Option.unwrap_or None      or) = or
+
+(Bool.or True  *) = True
+(Bool.or * True)  = True
+(Bool.or * *)     = False
+
+// Or using a match expression
+(Bool.not) = λbool
+  match bool {
+    True:  False
+    False: True
+  }
+
+// Data types can store values
+data Boxed = (Box val)
+
+// Types with only one constructor can be destructured using `let` or a single matching definition
+(Box.map (Box val) f) = (Box (f val))
+
+(Box.unbox) = λbox
+  let (Box val) = box
+  val
+
+// Use tuples to store two values together without needing to create a new data type
+(Tuple.new fst snd) =
+  let pair = (fst, snd)
+  pair
+
+// Then you can destructure it inside the definition or using `let`
+(Tuple.fst (fst, snd)) = fst
+
+(Tuple.snd) = λpair
+  let (fst, snd) = pair
+  snd
+
+// All files must have a main definition to be run.
+// You can execute a program in HVM with "cargo run -- --run <path to file>"
+// Other options are "--check" (the default mode) to just see if the file is well formed
+// and "--compile" to output hvm-core code.
+(main) = 
+  let tup = (Tuple.new None (Num.pred 5))
+
+  let fst = (Tuple.fst tup)
+  let snd = (Tuple.snd tup)
+
+  let box =     (Box fst)
+  let map =     (Box.map box Option.unwrap_or)
+  let unboxed = ((Box.unbox map) snd)
+
+  (nums 3 unboxed)

@@ -5,27 +5,27 @@ use hvmc::{
   run::Val,
 };
 
-pub fn hvmc_to_net(net: &Net, hvmc_name_to_id: &impl Fn(Val) -> DefId) -> INet {
-  let inodes = hvmc_to_inodes(net, hvmc_name_to_id);
+pub fn hvmc_to_net(net: &Net, hvmc_name_to_id: &impl Fn(Val) -> DefId, lazy: bool) -> INet {
+  let inodes = hvmc_to_inodes(net, hvmc_name_to_id, lazy);
   inodes_to_inet(&inodes)
 }
 
-fn hvmc_to_inodes(net: &Net, hvmc_name_to_id: &impl Fn(Val) -> DefId) -> INodes {
+fn hvmc_to_inodes(net: &Net, hvmc_name_to_id: &impl Fn(Val) -> DefId, lazy: bool) -> INodes {
   let mut inodes = vec![];
   let mut n_vars = 0;
   let net_root = if let Tree::Var { nam } = &net.root { nam } else { "" };
 
   // If we have a tree attached to the net root, convert that first
   if !matches!(&net.root, Tree::Var { .. }) {
-    let mut root = tree_to_inodes(&net.root, "_".to_string(), net_root, &mut n_vars, hvmc_name_to_id);
+    let mut root = tree_to_inodes(&net.root, "_".to_string(), net_root, &mut n_vars, hvmc_name_to_id, lazy);
     inodes.append(&mut root);
   }
   // Convert all the trees forming active pairs.
   for (i, (tree1, tree2)) in net.rdex.iter().enumerate() {
     let tree_root = format!("a{i}");
-    let mut tree1 = tree_to_inodes(tree1, tree_root.clone(), net_root, &mut n_vars, hvmc_name_to_id);
+    let mut tree1 = tree_to_inodes(tree1, tree_root.clone(), net_root, &mut n_vars, hvmc_name_to_id, lazy);
     inodes.append(&mut tree1);
-    let mut tree2 = tree_to_inodes(tree2, tree_root, net_root, &mut n_vars, hvmc_name_to_id);
+    let mut tree2 = tree_to_inodes(tree2, tree_root, net_root, &mut n_vars, hvmc_name_to_id, lazy);
     inodes.append(&mut tree2);
   }
   inodes
@@ -37,6 +37,7 @@ fn tree_to_inodes(
   net_root: &str,
   n_vars: &mut NodeId,
   hvmc_name_to_id: &impl Fn(Val) -> DefId,
+  lazy: bool,
 ) -> INodes {
   fn new_var(n_vars: &mut NodeId) -> String {
     let new_var = format!("x{n_vars}");
@@ -81,7 +82,15 @@ fn tree_to_inodes(
         let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
         let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
         inodes.push(INode {
-          kind: if lab & 1 == 0 { Con { lab: Some((lab >> 1) - 1) } } else { Dup { lab: (lab >> 1) - 1 } },
+          kind: match (lazy, *lab) {
+            (true, 0) => Dup { lab: 0 },
+
+            (true, lab) if lab & 1 == 0 => Con { lab: Some(lab >> 1) },
+            (false, lab) if lab & 1 == 0 => Con { lab: Some((lab >> 1) - 1) },
+
+            (true, _) => Dup { lab: lab >> 1 },
+            (false, _) => Dup { lab: (lab >> 1) - 1 },
+          },
           ports: [subtree_root, lft, rgt],
         });
       }

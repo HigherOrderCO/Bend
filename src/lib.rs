@@ -1,8 +1,8 @@
 #![feature(box_patterns)]
 
 use hvmc::{
-  ast::{book_to_runtime, name_to_val, net_from_runtime, runtime_net_to_runtime_def, show_book, Net},
-  run::{Heap, Rewrites},
+  ast::{book_to_runtime, show_book, Net},
+  run::{Def, Rewrites},
 };
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
 use itertools::Itertools;
@@ -24,14 +24,14 @@ use crate::term::net_to_term::ReadbackErrors;
 
 pub fn check_book(mut book: Book) -> Result<(), String> {
   // TODO: Do the checks without having to do full compilation
-  compile_book(&mut book, Opts::light())?;
+  compile_book(&mut book, CompileOpts::light(), false)?;
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book, opts: Opts) -> Result<CompileResult, String> {
+pub fn compile_book(book: &mut Book, opts: CompileOpts, lazy_mode: bool) -> Result<CompileResult, String> {
   let (main, warnings) = desugar_book(book, opts)?;
-  let (nets, hvmc_names, labels) = book_to_nets(book, main);
-  let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
+  let (nets, hvmc_names, labels) = book_to_nets(book, main, lazy_mode);
+  let mut core_book = nets_to_hvmc(nets, &hvmc_names, lazy_mode)?;
   if opts.pre_reduce {
     pre_reduce_book(&mut core_book, opts.pre_reduce_refs)?;
   }
@@ -41,7 +41,7 @@ pub fn compile_book(book: &mut Book, opts: Opts) -> Result<CompileResult, String
   Ok(CompileResult { core_book, hvmc_names, labels, warnings })
 }
 
-pub fn desugar_book(book: &mut Book, opts: Opts) -> Result<(DefId, Vec<Warning>), String> {
+pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefId, Vec<Warning>), String> {
   let mut warnings = Vec::new();
   let main = book.check_has_main()?;
   book.check_shared_names()?;
@@ -93,31 +93,19 @@ pub fn encode_pattern_matching(book: &mut Book, warnings: &mut Vec<Warning>) -> 
 pub fn run_book(
   mut book: Book,
   mem_size: usize,
-  parallel: bool,
-  debug: bool,
-  linear: bool,
+  run_opts: RunOpts,
   warning_opts: WarningOpts,
-  opts: Opts,
+  compile_opts: CompileOpts,
 ) -> Result<(Term, DefNames, RunInfo), String> {
-  let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, opts)?;
+  let CompileResult { core_book, hvmc_names, labels, warnings } =
+    compile_book(&mut book, compile_opts, run_opts.lazy_mode)?;
 
   display_warnings(warning_opts, &warnings)?;
 
-  fn debug_hook(net: &Net, book: &Book, hvmc_names: &HvmcNames, labels: &Labels, linear: bool) {
-    let net = hvmc_to_net(net, &|id| hvmc_names.hvmc_name_to_id[&id]);
-    let (res_term, errors) = net_to_term(&net, book, labels, linear);
-    println!(
-      "{}{}\n---------------------------------------",
-      errors.display(&book.def_names),
-      res_term.display(&book.def_names)
-    );
-  }
-  let debug_hook =
-    if debug { Some(|net: &_| debug_hook(net, &book, &hvmc_names, &labels, linear)) } else { None };
-
-  let (res_lnet, stats) = run_compiled(&core_book, mem_size, parallel, debug_hook);
-  let net = hvmc_to_net(&res_lnet, &|id| hvmc_names.hvmc_name_to_id[&id]);
-  let (res_term, readback_errors) = net_to_term(&net, &book, &labels, linear);
+  let debug_hook = run_opts.debug_hook(&book, &hvmc_names, &labels);
+  let (res_lnet, stats) = run_compiled(&core_book, mem_size, run_opts, debug_hook);
+  let net = hvmc_to_net(&res_lnet, &|id| hvmc_names.hvmc_name_to_id[&id], run_opts.lazy_mode);
+  let (res_term, readback_errors) = net_to_term(&net, &book, &labels, run_opts.linear);
   let info = RunInfo { stats, readback_errors, net: res_lnet };
   Ok((res_term, book.def_names, info))
 }
@@ -125,34 +113,32 @@ pub fn run_book(
 pub fn run_compiled(
   book: &hvmc::ast::Book,
   mem_size: usize,
-  parallel: bool,
+  run_opts: RunOpts,
   hook: Option<impl FnMut(&Net)>,
 ) -> (Net, RunStats) {
   let runtime_book = book_to_runtime(book);
-  let heap = Heap::init(mem_size);
-  let mut root = hvmc::run::Net::new(&heap);
-  root.boot(name_to_val(DefNames::ENTRY_POINT));
+  let root = &mut hvmc::run::Net::new(mem_size, run_opts.lazy_mode);
 
   let start_time = Instant::now();
 
   if let Some(mut hook) = hook {
-    root.expand(&runtime_book);
-    while !root.rdex.is_empty() {
-      hook(&net_from_runtime(&root));
-      root.reduce(&runtime_book, 1);
-      root.expand(&runtime_book);
+    expand(root, &runtime_book);
+    while !rdex(root).is_empty() {
+      hook(&net_from_runtime(root));
+      reduce(root, &runtime_book, 1);
+      expand(root, &runtime_book);
     }
-  } else if parallel {
-    root.parallel_normal(&runtime_book);
-  } else {
+  } else if run_opts.single_core {
     root.normal(&runtime_book);
+  } else {
+    root.parallel_normal(&runtime_book);
   }
 
   let elapsed = start_time.elapsed().as_secs_f64();
 
-  let net = net_from_runtime(&root);
-  let def = runtime_net_to_runtime_def(&root);
-  let stats = RunStats { rewrites: root.rwts, used: def.node.len(), run_time: elapsed };
+  let net = net_from_runtime(root);
+  let def = runtime_net_to_runtime_def(root);
+  let stats = RunStats { rewrites: root.get_rewrites(), used: def.node.len(), run_time: elapsed };
   (net, stats)
 }
 
@@ -161,7 +147,40 @@ pub fn total_rewrites(rwrts: &Rewrites) -> usize {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
-pub struct Opts {
+pub struct RunOpts {
+  pub single_core: bool,
+  pub debug: bool,
+  pub linear: bool,
+  pub lazy_mode: bool,
+}
+
+impl RunOpts {
+  pub fn lazy() -> Self {
+    Self { lazy_mode: true, single_core: true, ..Self::default() }
+  }
+
+  fn debug_hook<'a>(
+    &'a self,
+    book: &'a Book,
+    hvmc_names: &'a HvmcNames,
+    labels: &'a Labels,
+  ) -> Option<impl FnMut(&Net) + 'a> {
+    self.debug.then_some({
+      |net: &_| {
+        let net = hvmc_to_net(net, &|id| hvmc_names.hvmc_name_to_id[&id], self.lazy_mode);
+        let (res_term, errors) = net_to_term(&net, book, labels, self.linear);
+        println!(
+          "{}{}\n---------------------------------------",
+          errors.display(&book.def_names),
+          res_term.display(&book.def_names)
+        )
+      }
+    })
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CompileOpts {
   /// Enables [term::transform::eta_reduction].
   pub eta: bool,
 
@@ -187,7 +206,7 @@ pub struct Opts {
   pub merge_definitions: bool,
 }
 
-impl Opts {
+impl CompileOpts {
   /// All optimizations enabled.
   pub fn heavy() -> Self {
     Self {
@@ -206,11 +225,17 @@ impl Opts {
   pub fn light() -> Self {
     Self { supercombinators: true, ..Self::default() }
   }
+
+  // Disable optimizations that don't work or are unnecessary on lazy mode
+  pub fn lazy_mode(&mut self) {
+    self.supercombinators = false;
+    self.pre_reduce = false;
+  }
 }
 
-impl Opts {
-  pub fn check(&self) {
-    if !self.supercombinators {
+impl CompileOpts {
+  pub fn check(&self, lazy_mode: bool) {
+    if !self.supercombinators && !lazy_mode {
       println!(
         "Warning: Running in strict mode without enabling the supercombinators pass can lead to some functions expanding infinitely."
       );
@@ -316,4 +341,46 @@ pub struct RunStats {
   pub rewrites: Rewrites,
   pub used: usize,
   pub run_time: f64,
+}
+
+fn expand(net: &mut hvmc::run::Net, book: &hvmc::run::Book) {
+  match net {
+    hvmc::run::Net::Eager(net) => net.net.expand(book),
+    _ => unreachable!(),
+  }
+}
+
+fn reduce(net: &mut hvmc::run::Net, book: &hvmc::run::Book, limit: usize) -> usize {
+  match net {
+    hvmc::run::Net::Eager(net) => net.net.reduce(book, limit),
+    _ => unreachable!(),
+  }
+}
+
+fn rdex(net: &mut hvmc::run::Net) -> &mut Vec<(hvmc::run::Ptr, hvmc::run::Ptr)> {
+  match net {
+    hvmc::run::Net::Lazy(net) => &mut net.net.rdex,
+    hvmc::run::Net::Eager(net) => &mut net.net.rdex,
+  }
+}
+
+fn net_from_runtime(net: &hvmc::run::Net) -> Net {
+  match net {
+    hvmc::run::Net::Lazy(net) => hvmc::ast::net_from_runtime(&net.net),
+    hvmc::run::Net::Eager(net) => hvmc::ast::net_from_runtime(&net.net),
+  }
+}
+
+fn net_to_runtime(rt_net: &mut hvmc::run::Net, net: &Net) {
+  match rt_net {
+    hvmc::run::Net::Lazy(rt_net) => hvmc::ast::net_to_runtime(&mut rt_net.net, net),
+    hvmc::run::Net::Eager(rt_net) => hvmc::ast::net_to_runtime(&mut rt_net.net, net),
+  }
+}
+
+fn runtime_net_to_runtime_def(net: &hvmc::run::Net) -> Def {
+  match net {
+    hvmc::run::Net::Lazy(net) => hvmc::ast::runtime_net_to_runtime_def(&net.net),
+    hvmc::run::Net::Eager(net) => hvmc::ast::runtime_net_to_runtime_def(&net.net),
+  }
 }

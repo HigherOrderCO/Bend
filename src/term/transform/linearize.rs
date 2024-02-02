@@ -262,7 +262,7 @@ fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, mut dup_body: Option<&mu
       val: if i == 1 {
         Box::new(dup_body.as_deref_mut().map_or_else(|| Term::Var { nam: nam.clone() }, std::mem::take))
       } else {
-        Box::new(Term::Var { nam: internal_dup_name(nam, i-1) })
+        Box::new(Term::Var { nam: internal_dup_name(nam, i - 1) })
       },
       nxt: Box::new(std::mem::take(nxt)),
     };

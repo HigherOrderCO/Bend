@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_lazy/str_inc_eta.hvm
+---
+(11, #str λa (105, (102, (109, (109, (112, (33, (120, (112, (115, (109, (101, a))))))))))))

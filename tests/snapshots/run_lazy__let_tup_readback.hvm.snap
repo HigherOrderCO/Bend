@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_lazy/let_tup_readback.hvm
+---
+λa let (b, c) = a; (b c)

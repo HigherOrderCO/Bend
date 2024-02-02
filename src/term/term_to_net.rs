@@ -15,10 +15,10 @@ pub struct HvmcNames {
   pub hvmc_name_to_id: HashMap<Val, DefId>,
 }
 
-pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HvmcNames, Labels) {
+pub fn book_to_nets(book: &Book, main: DefId, lazy: bool) -> (HashMap<String, INet>, HvmcNames, Labels) {
   let mut nets = HashMap::new();
   let mut hvmc_names = HvmcNames::default();
-  let mut labels = Labels::default();
+  let mut labels = Labels::new(lazy);
 
   for def in book.defs.values() {
     for rule in def.rules.iter() {
@@ -341,17 +341,30 @@ impl Op {
   }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Labels {
   pub con: LabelGenerator,
   pub dup: LabelGenerator,
 }
 
-#[derive(Debug, Default)]
+impl Labels {
+  pub fn new(lazy: bool) -> Self {
+    Self { con: LabelGenerator::default(lazy), dup: LabelGenerator::default(lazy) }
+  }
+}
+
+#[derive(Debug)]
 pub struct LabelGenerator {
+  pub lazy: bool,
   pub next: u32,
   pub name_to_label: HashMap<Name, u32>,
   pub label_to_name: HashMap<u32, Name>,
+}
+
+impl LabelGenerator {
+  fn default(lazy: bool) -> Self {
+    Self { lazy, next: lazy.into(), name_to_label: Default::default(), label_to_name: Default::default() }
+  }
 }
 
 impl LabelGenerator {
@@ -373,6 +386,7 @@ impl LabelGenerator {
         }
       },
       Tag::Numeric(lab) => Some(*lab),
+      Tag::Auto if self.lazy => Some(0),
       Tag::Auto => Some(unique()),
       Tag::Static => None,
     }

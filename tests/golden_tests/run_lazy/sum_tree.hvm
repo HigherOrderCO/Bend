@@ -1,0 +1,16 @@
+data Tree = (Leaf x) | (Node x0 x1)
+
+add = λa λb (+ a b)
+
+gen = λn match n {
+  0: (Leaf 1)
+  +: (Node (gen n-1) (gen n-1))
+}
+
+sum = λt
+  match t {
+    Leaf: t.x
+    Node: (add (sum t.x0) (sum t.x1))
+  }
+
+main = (sum (gen 8))

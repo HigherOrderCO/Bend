@@ -1,0 +1,6 @@
+Main = (
+  (SCons "a" SNil),
+  (SCons 'a' (SCons "bc" SNil)),
+  (SCons "ab" (SCons 'c' SNil)),
+  (SCons "ab" (SCons "cd" SNil))
+)

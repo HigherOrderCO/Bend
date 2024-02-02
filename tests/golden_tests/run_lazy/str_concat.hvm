@@ -1,0 +1,4 @@
+concat (SNil) str = str
+concat (SCons c rest1) str2 = (SCons c (concat rest1 str2))
+
+main = (concat "hello " "world")
