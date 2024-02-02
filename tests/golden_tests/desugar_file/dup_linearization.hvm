@@ -1,0 +1,9 @@
+main = 
+  let a = *
+
+  let b = a
+  let c = a
+  let d = a
+  let e = a
+  
+  (a, b, c, d, e)

@@ -258,11 +258,11 @@ fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, mut dup_body: Option<&mu
     *nxt = Term::Dup {
       tag: Tag::Auto,
       fst: make_name(i),
-      snd: if i == uses - 1 { make_name(uses) } else { Some(internal_dup_name(nam, uses)) },
+      snd: if i == uses - 1 { make_name(uses) } else { Some(internal_dup_name(nam, i)) },
       val: if i == 1 {
         Box::new(dup_body.as_deref_mut().map_or_else(|| Term::Var { nam: nam.clone() }, std::mem::take))
       } else {
-        Box::new(Term::Var { nam: internal_dup_name(nam, uses) })
+        Box::new(Term::Var { nam: internal_dup_name(nam, i-1) })
       },
       nxt: Box::new(std::mem::take(nxt)),
     };

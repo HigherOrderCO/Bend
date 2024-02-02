@@ -1,6 +1,6 @@
 use hvmc::ast::{parse_net, show_net};
 use hvml::{
-  compile_book, encode_pattern_matching,
+  compile_book, desugar_book, encode_pattern_matching,
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
   term::{
@@ -170,6 +170,15 @@ fn encode_pattern_match() {
     encode_pattern_matching(&mut book, &mut Vec::new())?;
     book.prune(main, false, &mut Vec::new());
     book.merge_definitions(main.unwrap_or(DefId(u64::MAX)));
+    Ok(book.to_string())
+  })
+}
+
+#[test]
+fn desugar_file() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = do_parse_book(code, path)?;
+    desugar_book(&mut book, Opts::light())?;
     Ok(book.to_string())
   })
 }
