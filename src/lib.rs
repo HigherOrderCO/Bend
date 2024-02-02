@@ -76,6 +76,7 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefId, Vec<Wa
 pub fn encode_pattern_matching(book: &mut Book, warnings: &mut Vec<Warning>) -> Result<(), String> {
   book.resolve_ctrs_in_pats();
   book.check_unbound_pats()?;
+  book.check_ctrs_arities()?;
   book.resolve_refs()?;
   book.desugar_let_destructors();
   book.desugar_implicit_match_binds();
