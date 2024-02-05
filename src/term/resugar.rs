@@ -219,17 +219,20 @@ impl<'a> Reader<'a> {
       Term::App { fun: box Term::App { fun: ctr, arg: box Term::Num { val }, .. }, arg: tail, .. } => {
         let tail = Self::resugar_string(tail, snil);
         let char: String = unsafe { char::from_u32_unchecked(*val as u32) }.into();
-        if let Term::Str { val: tail } = tail {
-          Term::Str { val: char + &tail }
-        } else {
-          // FIXME: warnings are not good with this resugar
-          // Just make the constructor again
-          let fun = Term::App { tag: Tag::Static, fun: ctr.clone(), arg: Box::new(Term::Num { val: *val }) };
-          Term::App { tag: Tag::Static, fun: Box::new(fun), arg: Box::new(tail) }
+        match tail {
+          Term::Str { val: tail } => Term::Str { val: char + &tail },
+          Term::Ref { def_id } if def_id == *snil => Term::Str { val: char },
+          _ => {
+            // FIXME: warnings are not good with this resugar
+            // Just make the constructor again
+            let fun =
+              Term::App { tag: Tag::Static, fun: ctr.clone(), arg: Box::new(Term::Num { val: *val }) };
+            Term::App { tag: Tag::Static, fun: Box::new(fun), arg: Box::new(tail) }
+          }
         }
       }
       // (SNil)
-      Term::Ref { def_id } if def_id == snil => Term::Str { val: String::new() },
+      // Term::Ref { def_id } if def_id == snil => Term::Str { val: String::new() },
       other => std::mem::take(other),
     }
   }

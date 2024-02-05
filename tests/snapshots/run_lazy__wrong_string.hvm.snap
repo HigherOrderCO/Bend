@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_lazy/wrong_string.hvm
 ---
-(SCons (*, 4) (SCons * ""))
+(SCons (*, 4) (SCons * SNil))

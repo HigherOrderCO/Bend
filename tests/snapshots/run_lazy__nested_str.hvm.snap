@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_lazy/nested_str.hvm
 ---
-(((SCons "a" ""), (SCons 97 (SCons "bc" ""))), ((SCons "ab" "c"), (SCons "ab" (SCons "cd" ""))))
+(((SCons "a" SNil), (SCons 97 (SCons "bc" SNil))), ((SCons "ab" "c"), (SCons "ab" (SCons "cd" SNil))))
