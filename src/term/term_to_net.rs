@@ -290,6 +290,7 @@ impl<'a> EncodeTermState<'a> {
 
         Some(Port(tup, 0))
       }
+      Term::Invalid => unreachable!(),
     }
   }
 

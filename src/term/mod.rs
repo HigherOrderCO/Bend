@@ -151,8 +151,9 @@ pub enum Term {
   Ref {
     def_id: DefId,
   },
-  #[default]
   Era,
+  #[default]
+  Invalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -450,7 +451,7 @@ impl Term {
         fst.subst(from, to);
         snd.subst(from, to);
       }
-      Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => (),
+      Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Invalid => (),
     }
   }
 
@@ -480,7 +481,8 @@ impl Term {
       | Term::Ref { .. }
       | Term::Num { .. }
       | Term::Str { .. }
-      | Term::Era => (),
+      | Term::Era
+      | Term::Invalid => (),
     }
   }
 
@@ -551,7 +553,7 @@ impl Term {
             free_vars.extend(fvs);
           }
         }
-        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => {}
+        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Invalid => {}
       }
     }
 
@@ -593,7 +595,12 @@ impl Term {
         Term::Lam { bod, .. } => {
           go(bod, decls, uses);
         }
-        Term::Var { .. } | Term::Num { .. } | Term::Str { .. } | Term::Ref { .. } | Term::Era => (),
+        Term::Var { .. }
+        | Term::Num { .. }
+        | Term::Str { .. }
+        | Term::Ref { .. }
+        | Term::Era
+        | Term::Invalid => (),
       }
     }
     let mut decls = Default::default();
@@ -622,23 +629,30 @@ impl Term {
       let succ = (Pattern::Num(MatchNum::Succ(Some(succ_label))), succ_term);
       Term::Match { scrutinee: Box::new(scrutinee), arms: vec![zero, succ] }
     } else {
-      let match_bind = succ_label.clone().unwrap_or_else(|| Name::new("*"));
+      match succ_label {
+        Some(succ) => {
+          let match_bind = succ.clone();
 
-      if let Some(label) = &succ_label {
-        let new_label = Name(format!("{}-1", label));
-        succ_term.subst(label, &Term::Var { nam: new_label.clone() });
-        succ_label = Some(new_label);
-      }
+          let new_label = Name(format!("{}-1", succ));
+          succ_term.subst(&succ, &Term::Var { nam: new_label.clone() });
+          succ_label = Some(new_label);
 
-      let succ = (Pattern::Num(MatchNum::Succ(Some(succ_label))), succ_term);
+          let succ = (Pattern::Num(MatchNum::Succ(Some(succ_label))), succ_term);
 
-      Term::Let {
-        pat: Pattern::Var(Some(match_bind.clone())),
-        val: Box::new(scrutinee),
-        nxt: Box::new(Term::Match {
-          scrutinee: Box::new(Term::Var { nam: match_bind }),
-          arms: vec![zero, succ],
-        }),
+          Term::Let {
+            pat: Pattern::Var(Some(match_bind.clone())),
+            val: Box::new(scrutinee),
+            nxt: Box::new(Term::Match {
+              scrutinee: Box::new(Term::Var { nam: match_bind }),
+              arms: vec![zero, succ],
+            }),
+          }
+        }
+        None => {
+          let succ = (Pattern::Num(MatchNum::Succ(None)), succ_term);
+
+          Term::Match { scrutinee: Box::new(scrutinee), arms: vec![zero, succ] }
+        }
       }
     }
   }

@@ -81,7 +81,8 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
       }
     }
     Term::List { .. } => unreachable!("Should have been desugared already"),
-    Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => (),
+    Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Invalid => {
+    }
   }
 }
 
@@ -224,7 +225,8 @@ fn term_to_affine(
       }
     }
     Term::List { .. } => unreachable!("Should have been desugared already"),
-    Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } => (),
+    Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Invalid => {
+    }
   };
 }
 

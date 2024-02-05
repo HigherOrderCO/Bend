@@ -322,7 +322,8 @@ fn normal_order_step(term: &mut Term) -> bool {
     | Term::Num { .. }
     | Term::Str { .. }
     | Term::Ref { .. }
-    | Term::Era => false,
+    | Term::Era
+    | Term::Invalid => false,
   }
 }
 
@@ -397,6 +398,7 @@ fn subst_rule_body(term: &mut Term, subst_var: &Name, body: &Term, name_gen: &mu
     | Term::Num { .. }
     | Term::Str { .. }
     | Term::Ref { .. }
-    | Term::Era => (),
+    | Term::Era
+    | Term::Invalid => (),
   }
 }

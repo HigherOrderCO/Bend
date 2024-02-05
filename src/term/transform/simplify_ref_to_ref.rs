@@ -68,6 +68,8 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<DefId, DefId>) -> bo
       subst
     }
     Term::List { .. } => unreachable!("Should have been desugared already"),
-    Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => false,
+    Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Invalid => {
+      false
+    }
   }
 }

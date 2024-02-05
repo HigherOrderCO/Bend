@@ -275,7 +275,9 @@ impl Term {
         }
         Term::Ref { def_id } if *def_id == term_info.rule_id => Detach::Recursive,
         Term::Let { .. } | Term::List { .. } => unreachable!(),
-        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => Detach::Combinator,
+        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Invalid => {
+          Detach::Combinator
+        }
       }
     }
 

@@ -78,6 +78,7 @@ impl Term {
       Term::List { els } => {
         write!(f, "[{}]", DisplayJoin(|| els.iter().map(|el| display!("{}", el.display(def_names))), ", "),)
       }
+      Term::Invalid => write!(f, "<Invalid>"),
     })
   }
 }
@@ -252,6 +253,7 @@ impl ReadbackError {
   pub fn display<'a>(&'a self, def_names: &'a DefNames) -> impl Display + '_ {
     DisplayFn(move |f| match self {
       ReadbackError::InvalidNumericMatch => write!(f, "Invalid Numeric Match"),
+      ReadbackError::InvalidNumericOp => write!(f, "Invalid Numeric Operation"),
       ReadbackError::ReachedRoot => write!(f, "Reached Root"),
       ReadbackError::Cyclic => write!(f, "Cyclic Term"),
       ReadbackError::InvalidBind => write!(f, "Invalid Bind"),

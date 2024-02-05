@@ -4,4 +4,4 @@ input_file: tests/golden_tests/readback_lnet/bad_net.hvm
 ---
 Readback Warning:
 Reached Root
-*
+<Invalid>

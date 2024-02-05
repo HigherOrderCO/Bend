@@ -77,7 +77,8 @@ impl Term {
       | Term::Num { .. }
       | Term::Str { .. }
       | Term::Lnk { .. }
-      | Term::Var { .. } => (),
+      | Term::Var { .. }
+      | Term::Invalid => (),
       Term::Let { pat: _, .. } => {
         unreachable!("Expected destructor let expressions to have been desugared already")
       }
