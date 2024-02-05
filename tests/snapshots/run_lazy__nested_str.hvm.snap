@@ -2,11 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_lazy/nested_str.hvm
 ---
-Readback Warning:
-Invalid String Character value '"a"'
-Invalid String Character value '"bc"'
-Invalid String Character value '"ab"'
-Invalid String Character value '"cd"'
-Invalid String Character value '"ab"'
-
 (((SCons "a" SNil), (SCons 97 (SCons "bc" SNil))), ((SCons "ab" "c"), (SCons "ab" (SCons "cd" SNil))))
