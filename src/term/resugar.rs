@@ -221,6 +221,7 @@ impl<'a> Reader<'a> {
         let char: String = unsafe { char::from_u32_unchecked(*val as u32) }.into();
         match tail {
           Term::Str { val: tail } => Term::Str { val: char + &tail },
+          // (SNil)
           Term::Ref { def_id } if def_id == *snil => Term::Str { val: char },
           _ => {
             // FIXME: warnings are not good with this resugar
@@ -231,8 +232,6 @@ impl<'a> Reader<'a> {
           }
         }
       }
-      // (SNil)
-      // Term::Ref { def_id } if def_id == snil => Term::Str { val: String::new() },
       other => std::mem::take(other),
     }
   }
