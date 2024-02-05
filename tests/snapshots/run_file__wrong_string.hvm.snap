@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/wrong_string.hvm
 ---
-Readback Warning:
-Invalid String Character value '*'
-Invalid String Character value '(*, 4)'
-
-(SCons (*, 4) (SCons * SNil))
+(SCons (*, 4) (SCons * ""))

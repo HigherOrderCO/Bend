@@ -1,23 +1,31 @@
 use super::{
-  builtins::{SCONS, SNIL},
   net_to_term::{ReadbackError, Reader},
   transform::encode_adts::adt_field_tag,
-  Adt, Name, Pattern, Tag, Term,
+  Adt, DefId, Name, Pattern, Tag, Term, LIST, LNIL, SNIL, STRING,
 };
 use std::borrow::BorrowMut;
 
 impl<'a> Reader<'a> {
   pub fn resugar_adts(&mut self, term: &mut Term) {
     match term {
-      Term::Lam { tag, bod, .. } if *tag == Tag::string() => *term = self.resugar_string(std::mem::take(bod)),
-      Term::Lam { tag, bod, .. } if *tag == Tag::list() => *term = self.resugar_list(std::mem::take(bod)),
-
       Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
         let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
           return self.resugar_adts(bod);
         };
 
         self.resugar_adt_cons(term, adt, adt_name);
+
+        match adt_name.0.as_ref() {
+          STRING => {
+            let snil = &self.book.def_names.name_to_id[&Name::new(SNIL)];
+            *term = Self::resugar_string(term, snil);
+          }
+          LIST => {
+            let lnil = &self.book.def_names.name_to_id[&Name::new(LNIL)];
+            *term = Self::resugar_list(term, lnil);
+          }
+          _ => {}
+        }
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => self.resugar_adts(bod),
@@ -141,7 +149,7 @@ impl<'a> Reader<'a> {
   ///     None: 2
   ///   }
   ///   None: 3
-  /// }  
+  /// }
   ///
   /// // Gives the following readback:
   /// λa λb (#Option (a #Option.Some.val λ* λc #Option (c #Option.Some.val λ* 1 2) λ* 3) b)
@@ -205,71 +213,46 @@ impl<'a> Reader<'a> {
     self.resugar_adts(term);
   }
 
-  fn resugar_string(&mut self, term: Term) -> Term {
-    fn go(term: Term, str_term: Term, rd: &mut Reader<'_>) -> Term {
-      match term {
-        Term::Lam { tag, bod, .. } if tag == Tag::string() => go(*bod, str_term, rd),
-        Term::App { tag, arg, .. } if tag == Tag::string_scons_head() => match *arg {
-          Term::Num { val } => match str_term {
-            Term::Str { val: str } => {
-              let char: String = unsafe { char::from_u32_unchecked(val as u32) }.into();
-              Term::Str { val: char + &str }
-            }
-            term => Term::call(rd.book.def_names.get_ref(&Name::new(SCONS)), [Term::Num { val }, term]),
-          },
-          Term::Var { nam } => rd.recover_string_cons(str_term, Term::Var { nam }),
-          mut arg => {
-            rd.resugar_adts(&mut arg);
-            rd.error(ReadbackError::InvalidStrTerm(arg.clone()));
-            rd.recover_string_cons(str_term, arg)
-          }
-        },
-        Term::App { fun, arg, .. } => go(*fun, go(*arg, str_term, rd), rd),
-        Term::Var { .. } => str_term,
-        other => {
-          rd.error(ReadbackError::InvalidStrTerm(other));
-          str_term
-        }
-      }
-    }
-
-    go(term, Term::Str { val: String::new() }, self)
-  }
-
-  fn resugar_list(&mut self, term: Term) -> Term {
-    fn go(term: Term, list: &mut Vec<Term>, rd: &mut Reader<'_>) {
-      match term {
-        Term::Lam { tag, bod, .. } if tag == Tag::list() => go(*bod, list, rd),
-        Term::App { tag, mut arg, .. } if tag == Tag::list_lcons_head() => match *arg {
-          Term::Lam { .. } => {
-            rd.resugar_adts(&mut arg);
-            list.push(*arg);
-          }
-          Term::Var { .. } => list.push(*arg),
-          arg => go(arg, list, rd),
-        },
-        Term::App { mut fun, arg, tag } if tag == Tag::list_lcons_tail() => {
-          rd.resugar_adts(&mut fun);
-          go(*fun, list, rd);
-          go(*arg, list, rd);
-        }
-        Term::Var { .. } => {}
-        other => list.push(other),
-      }
-    }
-    let mut els = Vec::new();
-    go(term, &mut els, self);
-    Term::List { els }
-  }
-
-  /// Recover string constructors when it is not possible to correctly readback a string
-  fn recover_string_cons(&self, mut term: Term, cons: Term) -> Term {
+  fn resugar_string(term: &mut Term, snil: &DefId) -> Term {
     match term {
-      Term::Str { val } if val.is_empty() => term = Term::Var { nam: Name::new(SNIL) },
-      _ => {}
-    };
+      // (SCons Num tail)
+      Term::App { fun: box Term::App { fun: ctr, arg: box Term::Num { val }, .. }, arg: tail, .. } => {
+        let tail = Self::resugar_string(tail, snil);
+        let char: String = unsafe { char::from_u32_unchecked(*val as u32) }.into();
+        if let Term::Str { val: tail } = tail {
+          Term::Str { val: char + &tail }
+        } else {
+          // FIXME: warnings are not good with this resugar
+          // Just make the constructor again
+          let fun = Term::App { tag: Tag::Static, fun: ctr.clone(), arg: Box::new(Term::Num { val: *val }) };
+          Term::App { tag: Tag::Static, fun: Box::new(fun), arg: Box::new(tail) }
+        }
+      }
+      // (SNil)
+      Term::Ref { def_id } if def_id == snil => Term::Str { val: String::new() },
+      other => std::mem::take(other),
+    }
+  }
 
-    Term::call(self.book.def_names.get_ref(&Name::new(SCONS)), [cons, term])
+  fn resugar_list(term: &mut Term, lnil: &DefId) -> Term {
+    match term {
+      // (LCons el tail)
+      Term::App { fun: box Term::App { fun: ctr, arg: el, .. }, arg: tail, .. } => {
+        let tail = Self::resugar_list(tail, lnil);
+        if let Term::List { els: tail } = tail {
+          let mut els = vec![*el.clone()];
+          els.extend(tail);
+          Term::List { els }
+        } else {
+          // Make the constructor again
+          let fun = Term::App { tag: Tag::Static, fun: ctr.clone(), arg: el.clone() };
+          Term::App { tag: Tag::Static, fun: Box::new(fun), arg: Box::new(tail) }
+        }
+      }
+      // (LNil)
+      Term::Ref { def_id } if def_id == lnil => Term::List { els: vec![] },
+      other => std::mem::take(other),
+    }
   }
 
   fn deref(&mut self, term: &mut Term) {

@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nested_list_and_string.hvm
 ---
-Readback Warning:
-Invalid String Character value '*'
-Invalid String Character value '[7, "1234", 9]'
-
 λa [a, (*, 2), (SCons [7, "1234", 9] (SCons a (SCons * "42")))]
