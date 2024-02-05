@@ -55,7 +55,8 @@ impl<'a> Reader<'a> {
       | Term::Var { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
-      | Term::Era => {}
+      | Term::Era
+      | Term::Invalid => {}
     }
   }
 

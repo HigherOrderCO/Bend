@@ -37,7 +37,8 @@ impl Term {
       | Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Ref { .. }
-      | Term::Era => (),
+      | Term::Era
+      | Term::Invalid => (),
 
       Term::Let { .. } => {
         let Term::Let { pat, mut val, mut nxt } = std::mem::take(self) else { unreachable!() };

@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/readback_lnet/invalid_mat_mat.hvm
+---
+Readback Warning:
+Invalid Numeric Match with 4 occurrences
+
+λa match match <Invalid> { 0: 3; +: 4 } { 0: <Invalid>; +: <Invalid> }

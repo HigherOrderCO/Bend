@@ -82,7 +82,8 @@ impl Term {
       | Term::Ref { .. }
       | Term::Num { .. }
       | Term::Str { .. }
-      | Term::Era => (),
+      | Term::Era
+      | Term::Invalid => (),
     }
     Ok(())
   }

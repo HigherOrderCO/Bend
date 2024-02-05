@@ -150,7 +150,8 @@ impl Term {
       | Term::Num { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
-      | Term::Era => {}
+      | Term::Era
+      | Term::Invalid => {}
 
       Term::List { .. } => unreachable!(),
       Term::Match { .. } => unreachable!("Scrutinee of match expression should have been extracted already"),
@@ -244,7 +245,8 @@ impl Term {
       | Term::Num { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
-      | Term::Era => (),
+      | Term::Era
+      | Term::Invalid => (),
       Term::List { .. } => unreachable!(),
     }
     Ok(())

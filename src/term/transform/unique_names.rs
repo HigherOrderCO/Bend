@@ -81,7 +81,12 @@ impl UniqueNameGenerator {
       }
       // Global lam names are already unique, so no need to do anything
       Term::Chn { bod, .. } => self.unique_names_in_term(bod),
-      Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } | Term::Str { .. } => (),
+      Term::Lnk { .. }
+      | Term::Ref { .. }
+      | Term::Era
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Invalid => (),
 
       Term::Let { .. } => {
         unreachable!("Let terms other than tuple destruction should have been desugared already.")

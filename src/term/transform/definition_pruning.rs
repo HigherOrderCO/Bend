@@ -126,7 +126,8 @@ impl Book {
       | Term::Num { .. }
       | Term::Str { .. }
       | Term::List { .. }
-      | Term::Era => (),
+      | Term::Era
+      | Term::Invalid => (),
     }
   }
 

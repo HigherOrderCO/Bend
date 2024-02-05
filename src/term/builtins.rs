@@ -56,7 +56,12 @@ impl Term {
           arm.encode_builtins();
         }
       }
-      Term::Var { .. } | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era => {}
+      Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Ref { .. }
+      | Term::Num { .. }
+      | Term::Era
+      | Term::Invalid => {}
     }
   }
 

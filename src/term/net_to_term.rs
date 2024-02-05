@@ -108,12 +108,19 @@ impl<'a> Reader<'a> {
             let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
             let succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
 
-            let Term::Lam { nam, bod, .. } = succ_term else { unreachable!() };
-
-            Term::new_native_match(scrutinee, zero_term, nam, *bod)
+            match succ_term {
+              Term::Lam { nam, bod, .. } => Term::new_native_match(scrutinee, zero_term, nam, *bod),
+              _ => {
+                self.error(ReadbackError::InvalidNumericMatch);
+                Term::new_native_match(scrutinee, zero_term, None, succ_term)
+              }
+            }
           }
         }
-        _ => unreachable!(),
+        _ => {
+          self.error(ReadbackError::InvalidNumericMatch);
+          Term::Invalid
+        }
       },
       Ref { def_id } => {
         if self.book.is_def_name_generated(def_id) {
@@ -179,11 +186,14 @@ impl<'a> Reader<'a> {
 
           Term::Opx { op: Op::from_hvmc_label(opr), fst: Box::new(fst), snd: Box::new(snd) }
         }
-        _ => unreachable!(),
+        _ => {
+          self.error(ReadbackError::InvalidNumericOp);
+          Term::Invalid
+        }
       },
       Rot => {
         self.error(ReadbackError::ReachedRoot);
-        Term::Era
+        Term::Invalid
       }
       Tup => match next.slot() {
         // If we're visiting a port 0, then it is a Tup.
@@ -302,7 +312,12 @@ impl Term {
         n
       }
       Term::List { .. } => unreachable!(),
-      Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Ref { .. } | Term::Era => 0,
+      Term::Lnk { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era
+      | Term::Invalid => 0,
     };
     if n >= threshold {
       let Split { tag, fst, snd, val } = std::mem::take(split);
@@ -370,7 +385,12 @@ impl Term {
         }
       }
       Term::Let { .. } | Term::List { .. } => unreachable!(),
-      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => {}
+      Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Era
+      | Term::Invalid => {}
     }
   }
 }
@@ -441,6 +461,7 @@ pub struct ReadbackErrors(pub Vec<ReadbackError>);
 #[derive(Debug)]
 pub enum ReadbackError {
   InvalidNumericMatch,
+  InvalidNumericOp,
   ReachedRoot,
   Cyclic,
   InvalidBind,
@@ -454,6 +475,7 @@ impl ReadbackError {
   pub fn can_count(&self) -> bool {
     match self {
       ReadbackError::InvalidNumericMatch => true,
+      ReadbackError::InvalidNumericOp => true,
       ReadbackError::ReachedRoot => true,
       ReadbackError::Cyclic => true,
       ReadbackError::InvalidBind => true,

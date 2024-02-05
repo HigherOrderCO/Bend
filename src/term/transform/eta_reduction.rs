@@ -66,7 +66,8 @@ impl Term {
       | Term::Str { .. }
       | Term::List { .. }
       | Term::Ref { .. }
-      | Term::Era => {}
+      | Term::Era
+      | Term::Invalid => {}
     }
   }
 }
