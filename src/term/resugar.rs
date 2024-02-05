@@ -248,7 +248,8 @@ impl<'a> Reader<'a> {
           Term::Var { .. } => list.push(*arg),
           arg => go(arg, list, rd),
         },
-        Term::App { fun, arg, .. } => {
+        Term::App { mut fun, arg, tag } if tag == Tag::list_lcons_tail() => {
+          rd.resugar_adts(&mut fun);
           go(*fun, list, rd);
           go(*arg, list, rd);
         }

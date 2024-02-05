@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/tup_list_strings.hvm
+---
+([("foo", 0), ("foo", 0), ("foo", 1)], 4)

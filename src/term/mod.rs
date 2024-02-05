@@ -252,6 +252,10 @@ impl Tag {
   pub fn list_lcons_head() -> Self {
     Self::Named(Name::new("List.LCons.head"))
   }
+
+  pub fn list_lcons_tail() -> Self {
+    Self::Named(Name::new("List.LCons.tail"))
+  }
 }
 
 impl Book {
