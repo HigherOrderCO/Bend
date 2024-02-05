@@ -20,6 +20,8 @@ pub mod transform;
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
+use crate::term::builtins::*;
+
 /// The representation of a program.
 #[derive(Debug, Clone, Default)]
 pub struct Book {
@@ -238,23 +240,23 @@ impl DefId {
 
 impl Tag {
   pub fn string() -> Self {
-    Self::Named(Name::new("String"))
+    Self::Named(Name(format!("{STRING}")))
   }
 
   pub fn string_scons_head() -> Self {
-    Self::Named(Name::new("String.SCons.head"))
+    Self::Named(Name(format!("{STRING}.{SCONS}.{HEAD}")))
   }
 
   pub fn list() -> Self {
-    Self::Named(Name::new("List"))
+    Self::Named(Name(format!("{LIST}")))
   }
 
   pub fn list_lcons_head() -> Self {
-    Self::Named(Name::new("List.LCons.head"))
+    Self::Named(Name(format!("{LIST}.{LCONS}.{HEAD}")))
   }
 
   pub fn list_lcons_tail() -> Self {
-    Self::Named(Name::new("List.LCons.tail"))
+    Self::Named(Name(format!("{LIST}.{LCONS}.{TAIL}")))
   }
 }
 
