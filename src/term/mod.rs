@@ -151,8 +151,8 @@ pub enum Term {
   Ref {
     def_id: DefId,
   },
-  #[default]
   Era,
+  #[default]
   Invalid,
 }
 
