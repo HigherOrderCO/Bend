@@ -14,3 +14,4 @@ pub mod resolve_refs;
 pub mod simplify_main_ref;
 pub mod simplify_ref_to_ref;
 pub mod unique_names;
+pub mod inline;

@@ -253,7 +253,7 @@ pub enum OptArgs {
   RefToRef,
   NoRefToRef,
   PreReduce,
-  NoPrereduce,
+  NoPreReduce,
   Supercombinators,
   NoSupercombinators,
   SimplifyMain,
@@ -262,6 +262,8 @@ pub enum OptArgs {
   NoPreReduceRefs,
   Merge,
   NoMerge,
+  Inline,
+  NoInline,
 }
 
 impl OptArgs {
@@ -279,7 +281,7 @@ impl OptArgs {
         RefToRef => opts.ref_to_ref = true,
         NoRefToRef => opts.ref_to_ref = false,
         PreReduce => opts.pre_reduce = true,
-        NoPrereduce => opts.pre_reduce = false,
+        NoPreReduce => opts.pre_reduce = false,
         Supercombinators => opts.supercombinators = true,
         NoSupercombinators => opts.supercombinators = false,
         SimplifyMain => opts.simplify_main = true,
@@ -288,6 +290,8 @@ impl OptArgs {
         NoPreReduceRefs => opts.pre_reduce_refs = false,
         Merge => opts.merge = true,
         NoMerge => opts.merge = false,
+        Inline => opts.inline = true,
+        NoInline => opts.inline = false,
       }
     }
     opts

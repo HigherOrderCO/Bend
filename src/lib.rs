@@ -63,6 +63,9 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefName, Vec<
   if opts.supercombinators {
     book.detach_supercombinators(&main);
   }
+  if opts.inline {
+    book.inline();
+  }
   if opts.ref_to_ref {
     book.simplify_ref_to_ref()?;
   }
@@ -200,6 +203,9 @@ pub struct CompileOpts {
 
   /// Enables [term::transform::definition_merge]
   pub merge: bool,
+
+  /// Enables [term::transform::inline].
+  pub inline: bool,
 }
 
 impl CompileOpts {
@@ -214,6 +220,7 @@ impl CompileOpts {
       simplify_main: true,
       pre_reduce_refs: true,
       merge: true,
+      inline: true,
     }
   }
 
