@@ -27,7 +27,7 @@ pub enum Token {
   #[regex("0[bB][0-1_]+", |lex| from_radix(2, lex).ok())]
   Num(u64),
 
-  #[regex(r#""([^"\\]|\\[tun"])*""#, |lex| normalized_string(lex).ok())]
+  #[regex(r#""([^"\\]|\\[tun"\\])*""#, |lex| normalized_string(lex).ok())]
   Str(String),
 
   #[regex(r#"'\\U[0-9a-fA-F]{1,8}'"#, normalized_char, priority = 2)]
@@ -148,6 +148,8 @@ fn normalized_string(lexer: &mut Lexer<Token>) -> Result<String, ParseIntError> 
   while let Some(char) = chars.next() {
     match char {
       '\\' => match chars.next() {
+        Some('\\') => s.push('\\'),
+        Some('\"') => s.push('\"'),
         Some('n') => s.push('\n'),
         Some('t') => s.push('\t'),
         Some('u') | Some('U') => {
