@@ -1,15 +1,14 @@
-use crate::term::{Book, Name, Pattern, Term};
+use crate::term::{Book, DefName, Pattern, Term};
 use std::collections::HashSet;
 
 impl Book {
   /// Check if the constructors in rule patterns or match patterns are defined.
   pub fn check_unbound_pats(&self) -> Result<(), String> {
-    let is_ctr = |nam: &Name| self.ctrs.contains_key(nam);
-    for def in self.defs.values() {
-      let def_name = self.def_names.name(&def.def_id).unwrap();
+    let is_ctr = |nam: &DefName| self.ctrs.contains_key(nam);
+    for (def_name, def) in self.defs.iter() {
       for rule in &def.rules {
         for pat in &rule.pats {
-          pat.check_unbounds(&is_ctr).map_err(|e| format!("In definition '{}': {}", def_name, e))?;
+          pat.check_unbounds(&is_ctr).map_err(|e| format!("In definition '{def_name}': {e}"))?;
         }
         rule.body.check_unbound_pats(&is_ctr)?;
       }
@@ -19,7 +18,7 @@ impl Book {
 }
 
 impl Pattern {
-  pub fn check_unbounds(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), String> {
+  pub fn check_unbounds(&self, is_ctr: &impl Fn(&DefName) -> bool) -> Result<(), String> {
     let unbounds = self.unbound_pats(is_ctr);
     if let Some(unbound) = unbounds.iter().next() {
       Err(format!("Unbound constructor '{unbound}'"))
@@ -29,7 +28,7 @@ impl Pattern {
   }
 
   /// Given a possibly nested rule pattern, return a set of all used but not declared constructors.
-  pub fn unbound_pats(&self, is_ctr: &impl Fn(&Name) -> bool) -> HashSet<Name> {
+  pub fn unbound_pats(&self, is_ctr: &impl Fn(&DefName) -> bool) -> HashSet<DefName> {
     let mut unbounds = HashSet::new();
     let mut check = vec![self];
     while let Some(pat) = check.pop() {
@@ -53,7 +52,7 @@ impl Pattern {
 }
 
 impl Term {
-  pub fn check_unbound_pats(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), String> {
+  pub fn check_unbound_pats(&self, is_ctr: &impl Fn(&DefName) -> bool) -> Result<(), String> {
     match self {
       Term::Let { pat, val, nxt } => {
         pat.check_unbounds(is_ctr)?;

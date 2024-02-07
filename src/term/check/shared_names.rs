@@ -19,7 +19,7 @@ impl Book {
       }
     }
 
-    for def_name in self.def_names.names() {
+    for def_name in self.defs.keys() {
       if !checked.insert(def_name) {
         return Err(format!("Duplicated top-level name '{def_name}'"));
       }

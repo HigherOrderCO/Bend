@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/var_only.hvm
 ---
-(Foo) = λa λb λf (f a)
-
 (main) = λx match x { false: Foo; true: False }
 
-(False) = #Bool λFalse #Bool λTrue False
+(Foo) = λa λb λf (f a)
 
 (True) = #Bool λFalse #Bool λTrue True
+
+(False) = #Bool λFalse #Bool λTrue False

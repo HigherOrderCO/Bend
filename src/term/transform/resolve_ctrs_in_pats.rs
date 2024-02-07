@@ -1,4 +1,4 @@
-use crate::term::{Book, Name, Pattern, Term};
+use crate::term::{Book, Pattern, Term, VarName};
 
 impl Book {
   /// Resolve Constructor names inside rule patterns and match patterns.
@@ -6,7 +6,7 @@ impl Book {
   /// so no way to know if a particular name belongs to a constructor or is a matched variable.
   /// Therefore we must do it later, here.
   pub fn resolve_ctrs_in_pats(&mut self) {
-    let is_ctr = |nam: &Name| self.ctrs.contains_key(nam);
+    let is_ctr = |nam: &VarName| self.ctrs.contains_key(nam);
     for def in self.defs.values_mut() {
       for rule in &mut def.rules {
         for pat in &mut rule.pats {
@@ -19,7 +19,7 @@ impl Book {
 }
 
 impl Pattern {
-  pub fn resolve_ctrs(&mut self, is_ctr: &impl Fn(&Name) -> bool) {
+  pub fn resolve_ctrs(&mut self, is_ctr: &impl Fn(&VarName) -> bool) {
     match self {
       Pattern::Var(Some(nam)) => {
         if is_ctr(nam) {
@@ -42,7 +42,7 @@ impl Pattern {
 }
 
 impl Term {
-  pub fn resolve_ctrs_in_pats(&mut self, is_ctr: &impl Fn(&Name) -> bool) {
+  pub fn resolve_ctrs_in_pats(&mut self, is_ctr: &impl Fn(&VarName) -> bool) {
     match self {
       Term::Let { pat, val, nxt } => {
         pat.resolve_ctrs(is_ctr);

@@ -1,29 +1,28 @@
 use crate::{
   term::{
-    display::DisplayJoin, Book, DefId, DefNames, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Tag,
-    Term, Type,
+    display::DisplayJoin, Book, DefName, Definition, MatchNum, Op, Origin, Pattern, Rule, Tag, Term, Type,
+    VarName,
   },
   Warning,
 };
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::HashSet;
 
 impl Book {
   /// Extracts adt match terms into pattern matching functions.
   /// Creates rules with potentially nested patterns, so the flattening pass needs to be called after.
   pub fn extract_adt_matches(&mut self, warnings: &mut Vec<Warning>) -> Result<(), String> {
-    let book = &mut MatchesBook::new(&mut self.def_names);
-    for (def_id, def) in &mut self.defs {
-      let def_name = book.def_names.name(def_id).cloned().unwrap();
+    let mut new_defs = vec![];
+    for (def_name, def) in &mut self.defs {
       for rule in def.rules.iter_mut() {
         rule
           .body
-          .extract_adt_matches(&def_name, &self.ctrs, book, &mut 0, warnings)
-          .map_err(|e| format!("In definition '{}': {}", def_name, e))?;
+          .extract_adt_matches(def_name, &self.ctrs, &mut new_defs, &mut 0, warnings)
+          .map_err(|e| format!("In definition '{def_name}': {e}"))?;
       }
     }
-    self.defs.append(&mut book.new_defs);
+    self.defs.extend(new_defs);
     Ok(())
   }
 
@@ -31,25 +30,14 @@ impl Book {
   /// makes num matches have exactly one rule for zero and one rule for succ.
   /// Should be run after pattern matching functions are desugared.
   pub fn normalize_native_matches(&mut self) -> Result<(), String> {
-    for def in self.defs.values_mut() {
+    for (def_name, def) in self.defs.iter_mut() {
       def
         .rule_mut()
         .body
         .normalize_native_matches(&self.ctrs)
-        .map_err(|e| format!("In definition '{}': {}", self.def_names.name(&def.def_id).unwrap(), e))?;
+        .map_err(|e| format!("In definition '{def_name}': {e}"))?;
     }
     Ok(())
-  }
-}
-
-struct MatchesBook<'book> {
-  def_names: &'book mut DefNames,
-  new_defs: BTreeMap<DefId, Definition>,
-}
-
-impl<'book> MatchesBook<'book> {
-  fn new(def_names: &'book mut DefNames) -> Self {
-    Self { def_names, new_defs: BTreeMap::<DefId, Definition>::new() }
   }
 }
 
@@ -57,10 +45,10 @@ impl<'book> MatchesBook<'book> {
 pub enum MatchError {
   Empty,
   Infer(String),
-  Repeated(Name),
-  Missing(HashSet<Name>),
+  Repeated(VarName),
+  Missing(HashSet<DefName>),
   LetPat(Box<MatchError>),
-  Linearize(Name),
+  Linearize(VarName),
 }
 
 impl std::error::Error for MatchError {}
@@ -100,9 +88,9 @@ impl std::fmt::Display for MatchError {
 impl Term {
   fn extract_adt_matches(
     &mut self,
-    def_name: &Name,
-    ctrs: &HashMap<Name, Name>,
-    book: &mut MatchesBook,
+    def_name: &DefName,
+    ctrs: &IndexMap<DefName, DefName>,
+    book: &mut Vec<(DefName, Definition)>,
     match_count: &mut usize,
     warnings: &mut Vec<Warning>,
   ) -> Result<(), MatchError> {
@@ -126,9 +114,7 @@ impl Term {
             let match_term = linearize_match_unscoped_vars(self)?;
             let match_term = linearize_match_free_vars(match_term);
             let Term::Match { scrutinee: box Term::Var { nam }, arms } = match_term else { unreachable!() };
-            let nam = std::mem::take(nam);
-            let arms = std::mem::take(arms);
-            *match_term = match_to_def(nam, &arms, def_name, book, *match_count);
+            *match_term = match_to_def(nam, arms, def_name, book, *match_count);
           }
         }
       }
@@ -167,32 +153,27 @@ impl Term {
 /// Transforms a match into a new definition with every arm of `arms` as a rule.
 /// The result is the new def applied to the scrutinee followed by the free vars of the arms.
 fn match_to_def(
-  scrutinee: Name,
+  scrutinee: &VarName,
   arms: &[(Pattern, Term)],
-  def_name: &Name,
-  book: &mut MatchesBook,
+  def_name: &DefName,
+  new_defs: &mut Vec<(DefName, Definition)>,
   match_count: usize,
 ) -> Term {
-  let rules: Vec<Rule> = arms
+  let rules = arms
     .iter()
     .map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone(), origin: Origin::Generated })
     .collect();
-  let new_name = make_def_name(def_name, &Name::new("match"), match_count);
-  let def_id = book.def_names.insert(new_name);
-  let def = Definition { def_id, rules };
-  book.new_defs.insert(def_id, def);
+  let new_name = DefName::from(format!("{def_name}$match${match_count}"));
+  let def = Definition { name: new_name.clone(), rules };
+  new_defs.push((new_name.clone(), def));
 
-  Term::arg_call(Term::Ref { def_id }, scrutinee)
-}
-
-fn make_def_name(def_name: &Name, ctr: &Name, i: usize) -> Name {
-  Name(format!("{def_name}${ctr}${i}"))
+  Term::arg_call(Term::Ref { def_name: new_name }, scrutinee.clone())
 }
 
 //== Native match normalization ==//
 
 impl Term {
-  fn normalize_native_matches(&mut self, ctrs: &HashMap<Name, Name>) -> Result<(), MatchError> {
+  fn normalize_native_matches(&mut self, ctrs: &IndexMap<DefName, DefName>) -> Result<(), MatchError> {
     match self {
       Term::Match { scrutinee: box Term::Var { nam }, arms } => {
         for (_, body) in arms.iter_mut() {
@@ -300,13 +281,13 @@ fn normalize_num_match(term: &mut Term) -> Result<(), MatchError> {
           pat: Pattern::Var(Some(var.clone())),
           val: Box::new(Term::Opx {
             op: Op::ADD,
-            fst: Box::new(Term::Var { nam: Name::new("%pred") }),
+            fst: Box::new(Term::Var { nam: VarName::new("%pred") }),
             snd: Box::new(Term::Num { val: 1 }),
           }),
           nxt: Box::new(std::mem::take(body)),
         };
 
-        let body = Term::named_lam(Name::new("%pred"), body);
+        let body = Term::named_lam(VarName::new("%pred"), body);
         succ_arm = Some((Pattern::Num(MatchNum::Succ(None)), body));
         break;
       }
@@ -323,10 +304,10 @@ fn normalize_num_match(term: &mut Term) -> Result<(), MatchError> {
   }
 
   let Some(zero_arm) = zero_arm else {
-    return Err(MatchError::Missing(HashSet::from_iter([Name::new("0")])));
+    return Err(MatchError::Missing(["0".to_string().into()].into()));
   };
   let Some(succ_arm) = succ_arm else {
-    return Err(MatchError::Missing(HashSet::from_iter([Name::new("0")])));
+    return Err(MatchError::Missing(["+".to_string().into()].into()));
   };
   *arms = vec![zero_arm, succ_arm];
   Ok(())
@@ -339,7 +320,7 @@ fn normalize_num_match(term: &mut Term) -> Result<(), MatchError> {
 /// Short-circuits if the first pattern is Type::Any.
 fn infer_match_type<'a>(
   pats: impl Iterator<Item = &'a Pattern>,
-  ctrs: &HashMap<Name, Name>,
+  ctrs: &IndexMap<DefName, DefName>,
 ) -> Result<Type, MatchError> {
   let mut match_type = Type::None;
   for pat in pats {
@@ -367,7 +348,7 @@ fn infer_match_type<'a>(
 fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
   let Term::Match { scrutinee: _, arms } = match_term else { unreachable!() };
   // Collect the vars
-  let free_vars: IndexSet<Name> = arms
+  let free_vars: IndexSet<VarName> = arms
     .iter()
     .flat_map(|(pat, term)| term.free_vars().into_keys().filter(|k| !pat.names().contains(k)))
     .collect();
@@ -403,12 +384,12 @@ fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, Mat
     let (decls, uses) = arm.unscoped_vars();
     // Not allowed to declare unscoped var and not use it since we need to extract the match arm.
     if let Some(var) = decls.difference(&uses).next() {
-      return Err(MatchError::Linearize(Name(format!("λ${var}"))));
+      return Err(MatchError::Linearize(format!("λ${var}").into()));
     }
     // Change unscoped var to normal scoped var if it references something outside this match arm.
     let arm_free_vars = uses.difference(&decls);
     for var in arm_free_vars.clone() {
-      arm.subst_unscoped(var, &Term::Var { nam: Name(format!("%match%unscoped%{var}")) });
+      arm.subst_unscoped(var, &Term::Var { nam: format!("%match%unscoped%{var}").into() });
     }
     free_vars.extend(arm_free_vars.cloned());
   }
@@ -419,7 +400,7 @@ fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, Mat
     *body = free_vars
       .iter()
       .rev()
-      .fold(old_body, |body, var| Term::named_lam(Name(format!("%match%unscoped%{var}")), body));
+      .fold(old_body, |body, var| Term::named_lam(format!("%match%unscoped%{var}").into(), body));
   }
 
   // Add apps to the match

@@ -1,12 +1,16 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::term::{Book, DefNames, MatchNum, Name, Pattern, Term};
+use crate::{
+  term::{Book, DefName, MatchNum, Pattern, Term, VarName},
+  ENTRY_POINT, HVM1_ENTRY_POINT,
+};
 
 impl Book {
   /// Decides if names inside a term belong to a Var or to a Ref.
   /// Precondition: Refs are encoded as vars, Constructors are resolved.
   /// Postcondition: Refs are encoded as refs, with the correct def id.
   pub fn resolve_refs(&mut self) -> Result<(), String> {
+    let def_names = self.defs.keys().cloned().collect::<HashSet<_>>();
     for def in self.defs.values_mut() {
       for rule in def.rules.iter_mut() {
         let mut scope = HashMap::new();
@@ -15,7 +19,7 @@ impl Book {
           push_scope(Some(name), &mut scope);
         }
 
-        rule.body.resolve_refs(&self.def_names, &mut scope)?;
+        rule.body.resolve_refs(&def_names, &mut scope)?;
       }
     }
     Ok(())
@@ -25,8 +29,8 @@ impl Book {
 impl Term {
   pub fn resolve_refs<'a>(
     &'a mut self,
-    def_names: &DefNames,
-    scope: &mut HashMap<&'a Name, usize>,
+    def_names: &HashSet<DefName>,
+    scope: &mut HashMap<&'a VarName, usize>,
   ) -> Result<(), String> {
     match self {
       Term::Lam { nam, bod, .. } => {
@@ -65,12 +69,12 @@ impl Term {
       // If variable not defined, we check if it's a ref and swap if it is.
       Term::Var { nam } => {
         if is_var_in_scope(nam, scope) {
-          if matches!(nam.0.as_ref(), DefNames::ENTRY_POINT | DefNames::HVM1_ENTRY_POINT) {
+          if matches!(nam.as_str(), ENTRY_POINT | HVM1_ENTRY_POINT) {
             return Err("Main definition can't be referenced inside the program".to_string());
           }
 
-          if let Some(def_id) = def_names.def_id(nam) {
-            *self = Term::Ref { def_id };
+          if def_names.contains(nam) {
+            *self = Term::r#ref(nam);
           }
         }
       }
@@ -105,21 +109,21 @@ impl Term {
   }
 }
 
-fn push_scope<'a>(name: Option<&'a Name>, scope: &mut HashMap<&'a Name, usize>) {
+fn push_scope<'a>(name: Option<&'a VarName>, scope: &mut HashMap<&'a VarName, usize>) {
   if let Some(name) = name {
     let var_scope = scope.entry(name).or_default();
     *var_scope += 1;
   }
 }
 
-fn pop_scope<'a>(name: Option<&'a Name>, scope: &mut HashMap<&'a Name, usize>) {
+fn pop_scope<'a>(name: Option<&'a VarName>, scope: &mut HashMap<&'a VarName, usize>) {
   if let Some(name) = name {
     let var_scope = scope.entry(name).or_default();
     *var_scope -= 1;
   }
 }
 
-fn is_var_in_scope<'a>(name: &'a Name, scope: &HashMap<&'a Name, usize>) -> bool {
+fn is_var_in_scope<'a>(name: &'a VarName, scope: &HashMap<&'a VarName, usize>) -> bool {
   match scope.get(name) {
     Some(entry) => *entry == 0,
     None => true,

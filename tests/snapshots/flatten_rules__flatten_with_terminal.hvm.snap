@@ -7,9 +7,9 @@ input_file: tests/golden_tests/flatten_rules/flatten_with_terminal.hvm
 
 (main) = (Foo 2 (A B))
 
-(A) = λb #A_t λA #A_t.A.b (A b)
+(Foo$F0 (B)) = B
+(Foo$F0 *) = *
 
 (B) = #B_t λB B
 
-(Foo$F0 (B)) = B
-(Foo$F0 *) = *
+(A) = λb #A_t λA #A_t.A.b (A b)

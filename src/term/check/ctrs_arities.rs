@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::term::{Book, Name, Pattern};
+use crate::term::{Book, DefName, Pattern};
 
 impl Book {
   /// Checks if every constructor pattern of every definition rule has the same arity from the
@@ -10,11 +10,10 @@ impl Book {
   pub fn check_ctrs_arities(&self) -> Result<(), String> {
     let arities = self.ctr_arities();
 
-    for def in self.defs.values() {
-      let def_name = &self.def_names.id_to_name[&def.def_id];
+    for (def_name, def) in self.defs.iter() {
       for rule in def.rules.iter() {
         for pat in rule.pats.iter() {
-          pat.check(&arities).map_err(|err| format!("In definition {}: {}", def_name, err))?;
+          pat.check(&arities).map_err(|e| format!("In definition '{def_name}': {e}"))?;
         }
       }
     }
@@ -23,7 +22,7 @@ impl Book {
   }
 
   /// Returns a hashmap of the constructor name to its arity.
-  pub fn ctr_arities(&self) -> HashMap<Name, usize> {
+  pub fn ctr_arities(&self) -> HashMap<DefName, usize> {
     let mut arities = HashMap::new();
 
     for adt in self.adts.values() {
@@ -37,16 +36,13 @@ impl Book {
 }
 
 impl Pattern {
-  fn check(&self, arities: &HashMap<Name, usize>) -> Result<(), String> {
+  fn check(&self, arities: &HashMap<DefName, usize>) -> Result<(), String> {
     match self {
       Pattern::Ctr(name, args) => {
         let arity = arities.get(name).unwrap();
-        let args = args.len();
-        if *arity != args {
-          return Err(format!(
-            "Arity error. Constructor '{}' expects {} fields, found {}.",
-            name, arity, args
-          ));
+        let n_args = args.len();
+        if *arity != n_args {
+          Err(format!("Arity error. Constructor '{name}' expects {arity} fields, found {n_args}."))
         } else {
           Ok(())
         }

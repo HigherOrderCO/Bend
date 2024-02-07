@@ -1,5 +1,5 @@
-use crate::term::{Adt, Book, MatchNum, Name, Pattern, Term};
-use std::collections::{BTreeMap, HashMap};
+use crate::term::{Adt, Book, DefName, MatchNum, Pattern, Term, VarName};
+use indexmap::IndexMap;
 
 impl Book {
   pub fn desugar_implicit_match_binds(&mut self) {
@@ -12,15 +12,19 @@ impl Book {
 }
 
 impl Term {
-  pub fn desugar_implicit_match_binds(&mut self, ctrs: &HashMap<Name, Name>, adts: &BTreeMap<Name, Adt>) {
+  pub fn desugar_implicit_match_binds(
+    &mut self,
+    ctrs: &IndexMap<DefName, DefName>,
+    adts: &IndexMap<DefName, Adt>,
+  ) {
     match self {
       Term::Match { scrutinee, .. } => {
         let scrutinee = if let Term::Var { nam } = scrutinee.as_ref() {
           nam.clone()
         } else {
-          let nam = Name::new("%temp%scrutinee");
-
           let Term::Match { scrutinee, arms } = std::mem::take(self) else { unreachable!() };
+
+          let nam = VarName::new("%temp%scrutinee");
 
           *self = Term::Let {
             pat: Pattern::Var(Some(nam.clone())),
@@ -39,20 +43,20 @@ impl Term {
           match pat {
             Pattern::Var(_) => (),
             Pattern::Ctr(nam, pat_args) => {
-              let adt = &ctrs[nam];
-              let Adt { ctrs, .. } = &adts[adt];
-              let ctr_args = &ctrs[nam.as_ref()];
+              let adt = ctrs.get(nam).unwrap();
+              let Adt { ctrs, .. } = adts.get(adt).unwrap();
+              let ctr_args = ctrs.get(nam).unwrap();
               if pat_args.is_empty() && !ctr_args.is_empty() {
                 // Implicit ctr args
                 *pat_args =
-                  ctr_args.iter().map(|x| Pattern::Var(Some(Name(format!("{scrutinee}.{x}"))))).collect();
+                  ctr_args.iter().map(|x| Pattern::Var(Some(format!("{scrutinee}.{x}").into()))).collect();
               }
             }
             Pattern::Num(MatchNum::Zero) => (),
             Pattern::Num(MatchNum::Succ(Some(_))) => (),
             Pattern::Num(MatchNum::Succ(p @ None)) => {
               // Implicit num arg
-              *p = Some(Some(Name(format!("{scrutinee}-1"))));
+              *p = Some(Some(format!("{scrutinee}-1").into()));
             }
             Pattern::Tup(_, _) => (),
             Pattern::List(..) => unreachable!(),

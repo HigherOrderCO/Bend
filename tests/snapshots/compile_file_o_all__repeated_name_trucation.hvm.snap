@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/repeated_name_trucation.hvm
 ---
-@2 = (a a)
-@8 = (* @long_name_)
-@long_name_ = (* @8)
+@a = (a a)
+@b = (* @long_name_)
+@long_name_ = (* @b)
 @main = a
-& @long_name_ ~ (@2 a)
+& @long_name_ ~ (@a a)
 

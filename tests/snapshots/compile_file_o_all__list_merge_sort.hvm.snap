@@ -2,27 +2,27 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
 ---
-@Cons = (a (b {4 {8 a {6 b c}} {4 * c}}))
-@J = (a (* a))
-@K = (* (a a))
-@L = {8 a {6 {4 @L {4 @M (b c)}} ({3 (a d) b} {4 {8 d {6 c e}} {4 * e}})}}
-@M = (* @Nil)
-@Map = ({4 @L {4 @M a}} a)
-@N = {8 a {6 {4 @V {4 @W (b (a c))}} (b c)}}
-@Nil = {4 * {4 a a}}
-@P = {8 a {6 {4 @X {4 @Z (b (a c))}} (b c)}}
-@Pure = (a {4 {8 a {6 @Nil b}} {4 * b}})
-@R = {8 {5 a {7 b c}} {6 {9 d {4 @R {4 @S (e (f (g h)))}}} ({11 (i (a {2 @J {2 @K ({4 {8 j {6 k l}} {4 * l}} ({4 {8 c {6 h m}} {4 * m}} n))}})) {13 o e}} ({15 i {17 j f}} ({19 {4 @T {4 @U (o ({4 {8 b {6 d p}} {4 * p}} k))}} g} n)))}}
-@S = (* @Cons)
-@T = {8 a {6 b (c ({4 @R {4 @S (c (a (b d)))}} d))}}
-@U = (* (a a))
-@Unpack = (a ({4 @N {4 @M (a b)}} b))
-@V = {8 a {6 {4 @P {4 @M (b {4 @V {4 @W (c (d e))}})}} ({21 c {23 f b}} ({4 @T {4 @U (f (a d))}} e))}}
-@W = (* (a a))
-@X = {8 a {6 {4 @P {4 @M (b c)}} ({23 d b} ({4 @T {4 @U (d (a e))}} {4 {8 e {6 c f}} {4 * f}}))}}
-@Y = (a {4 {8 a {6 @Nil b}} {4 * b}})
-@Z = (* @Y)
+@Cons = (a (b {8 {4 a {6 b c}} {8 * c}}))
+@Map = ({8 @l {8 @b a}} a)
+@Nil = {8 * {8 a a}}
+@Pure = (a {8 {4 a {6 @Nil b}} {8 * b}})
+@Unpack = (a ({8 @e {8 @b (a b)}} b))
+@a = {4 a {6 {8 @q {8 @c (b (a c))}} (b c)}}
+@b = (* @Nil)
+@c = (* @d)
+@d = (a {8 {4 a {6 @Nil b}} {8 * b}})
+@e = {4 a {6 {8 @g {8 @f (b (a c))}} (b c)}}
+@f = (* (a a))
+@g = {4 a {6 {8 @a {8 @b (b {8 @g {8 @f (c (d e))}})}} ({3 c {23 f b}} ({8 @o {8 @p (f (a d))}} e))}}
+@j = (a (* a))
+@k = (* (a a))
+@l = {4 a {6 {8 @l {8 @b (b c)}} ({5 (a d) b} {8 {4 d {6 c e}} {8 * e}})}}
+@m = {4 {7 a {9 b c}} {6 {11 d {8 @m {8 @n (e (f (g h)))}}} ({13 (i (a {2 @j {2 @k ({8 {4 j {6 k l}} {8 * l}} ({8 {4 c {6 h m}} {8 * m}} n))}})) {15 o e}} ({17 i {19 j f}} ({21 {8 @o {8 @p (o ({8 {4 b {6 d p}} {8 * p}} k))}} g} n)))}}
 @main = (a (b c))
 & @Unpack ~ (a (d c))
 & @Map ~ (b (@Pure d))
+@n = (* @Cons)
+@o = {4 a {6 b (c ({8 @m {8 @n (c (a (b d)))}} d))}}
+@p = (* (a a))
+@q = {4 a {6 {8 @a {8 @b (b c)}} ({23 d b} ({8 @o {8 @p (d (a e))}} {8 {4 e {6 c f}} {8 * f}}))}}
 

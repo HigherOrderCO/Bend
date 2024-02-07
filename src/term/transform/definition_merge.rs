@@ -1,6 +1,8 @@
 use super::simplify_ref_to_ref::subst_ref_to_ref;
-use crate::term::{Book, DefId, Name, Term};
-use std::collections::{BTreeMap, HashMap};
+use crate::term::{Book, DefName, Definition, Origin, Rule, Term};
+use indexmap::{IndexMap, IndexSet};
+use itertools::Itertools;
+use std::collections::BTreeMap;
 
 impl Book {
   /// Merges definitions that have the same structure into one definition.
@@ -8,77 +10,62 @@ impl Book {
   ///
   /// Ignores origin of the rules when merging,
   /// Should not be preceded by passes that cares about the origins.
-  pub fn merge_definitions(&mut self, main: DefId) {
-    let ids: Vec<_> = self.defs.keys().copied().collect();
-    self.merge(main, ids.into_iter());
+  pub fn merge_definitions(&mut self, main: &DefName) {
+    let defs: Vec<_> = self.defs.keys().cloned().collect();
+    self.merge(main, defs.into_iter());
   }
 
-  fn merge(&mut self, main: DefId, defs: impl Iterator<Item = DefId>) {
-    let mut term_map: HashMap<Term, DefId> = HashMap::new();
-    let mut def_id_map: BTreeMap<DefId, DefId> = BTreeMap::new();
+  /// Checks and merges identical definitions given by `defs`.
+  /// We never merge the entrypoint function with something else.
+  fn merge(&mut self, main: &DefName, defs: impl Iterator<Item = DefName>) {
+    // Sets of definitions that are identical, indexed by the body term.
+    let equal_terms = self.collect_terms(defs.filter(|def_name| def_name != main));
 
-    self.collect_terms(defs.filter(|&id| id != main), &mut term_map, &mut def_id_map);
-    self.merge_terms(main, term_map, &def_id_map);
+    // Map of old name to new merged name
+    let mut name_map = BTreeMap::new();
+
+    for (term, equal_defs) in equal_terms {
+      // Create the merged name
+      let new_name = DefName::from(equal_defs.iter().join("_$_"));
+
+      // Write the mapping of old to new names (only if something was merged)
+      if equal_defs.len() > 1 {
+        for name in equal_defs {
+          name_map.insert(name, new_name.clone());
+        }
+      }
+
+      // Create the merged function
+      let new_def = Definition {
+        name: new_name.clone(),
+        rules: vec![Rule { pats: vec![], body: term, origin: Origin::Generated }],
+      };
+      self.defs.insert(new_name, new_def);
+    }
+    self.update_refs(&name_map, main);
   }
 
   fn collect_terms(
     &mut self,
-    def_entries: impl Iterator<Item = DefId>,
-    term_map: &mut HashMap<Term, DefId>,
-    def_id_map: &mut BTreeMap<DefId, DefId>,
-  ) {
-    for id in def_entries {
-      let def = self.defs.get_mut(&id).unwrap();
+    def_entries: impl Iterator<Item = DefName>,
+  ) -> IndexMap<Term, IndexSet<DefName>> {
+    let mut equal_terms: IndexMap<Term, IndexSet<DefName>> = IndexMap::new();
 
+    for def_name in def_entries {
+      let mut def = self.defs.remove(&def_name).unwrap();
       let term = std::mem::take(&mut def.rule_mut().body);
-
-      if let Some(&new) = term_map.get(&term) {
-        def_id_map.insert(new, new);
-        def_id_map.insert(id, new);
-      } else {
-        term_map.insert(term, id);
-      }
-    }
-  }
-
-  fn merge_terms(
-    &mut self,
-    main: DefId,
-    term_map: HashMap<Term, DefId>,
-    def_id_map: &BTreeMap<DefId, DefId>,
-  ) {
-    for (term, id) in term_map {
-      self.defs.get_mut(&id).unwrap().rule_mut().body = term;
+      equal_terms.entry(term).or_default().insert(def_name);
     }
 
-    self.merge_names(def_id_map);
-    self.update_refs(def_id_map, main);
+    equal_terms
   }
 
-  fn merge_names(&mut self, def_id_map: &BTreeMap<DefId, DefId>) {
-    for (old, new) in def_id_map {
-      if old == new {
-        continue;
-      }
-
-      let old_name = self.def_names.name(old).unwrap();
-      let new_name = self.def_names.name(new).unwrap();
-
-      let merged_name = Name(format!("{}_$_{}", new_name, old_name));
-
-      self.def_names.id_to_name.insert(*new, merged_name.clone());
-      self.def_names.name_to_id.insert(merged_name, *new);
-
-      self.remove_def(*old);
-    }
-  }
-
-  fn update_refs(&mut self, def_id_map: &BTreeMap<DefId, DefId>, main: DefId) {
+  fn update_refs(&mut self, name_map: &BTreeMap<DefName, DefName>, main: &DefName) {
     let mut updated_defs = Vec::new();
 
     for def in self.defs.values_mut() {
-      if subst_ref_to_ref(&mut def.rule_mut().body, def_id_map) {
-        updated_defs.push(def.def_id);
+      if subst_ref_to_ref(&mut def.rule_mut().body, name_map) {
+        updated_defs.push(def.name.clone());
       }
     }
 

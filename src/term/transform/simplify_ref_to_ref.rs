@@ -1,6 +1,6 @@
 // Pass for inlining functions that are just a reference to another one.
 
-use crate::term::{Book, DefId, Term};
+use crate::term::{Book, DefName, Term};
 use std::collections::BTreeMap;
 
 impl Book {
@@ -8,23 +8,20 @@ impl Book {
   // substitutes all occurrences of that function to the one being called, avoiding the unnecessary redirect.
   // In case there is a long chain of ref-to-ref-to-ref, we substitute values by the last function in the chain.
   pub fn simplify_ref_to_ref(&mut self) -> Result<(), String> {
-    let mut ref_map: BTreeMap<DefId, DefId> = BTreeMap::new();
+    let mut ref_map: BTreeMap<DefName, DefName> = BTreeMap::new();
     // Find to which defs we're mapping the ones that are just references.
-    for def_id in self.def_names.def_ids() {
-      let mut ref_id = def_id;
+    for def_name in self.defs.keys() {
+      let mut ref_name = def_name;
       let mut is_ref_to_ref = false;
-      while let Term::Ref { def_id: next_ref_id } = &self.defs.get(ref_id).unwrap().rule().body {
-        if next_ref_id == ref_id {
-          return Err(format!(
-            "Definition {} is a reference to itself",
-            self.def_names.name(ref_id).unwrap()
-          ));
+      while let Term::Ref { def_name: next_ref } = &self.defs.get(ref_name).unwrap().rule().body {
+        if next_ref == ref_name {
+          return Err(format!("Definition {def_name} is a reference to itself",));
         }
-        ref_id = next_ref_id;
+        ref_name = next_ref;
         is_ref_to_ref = true;
       }
       if is_ref_to_ref {
-        ref_map.insert(*def_id, *ref_id);
+        ref_map.insert(def_name.clone(), ref_name.clone());
       }
     }
 
@@ -38,11 +35,11 @@ impl Book {
 }
 
 /// Returns whether any substitution happened within the term or not
-pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<DefId, DefId>) -> bool {
+pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<DefName, DefName>) -> bool {
   match term {
-    Term::Ref { def_id } => {
-      if let Some(target_id) = ref_map.get(def_id) {
-        *def_id = *target_id;
+    Term::Ref { def_name } => {
+      if let Some(target_name) = ref_map.get(def_name) {
+        *def_name = target_name.clone();
         true
       } else {
         false
@@ -64,12 +61,16 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<DefId, DefId>) -> bo
       for (_, term) in arms {
         subst |= subst_ref_to_ref(term, ref_map);
       }
-
       subst
     }
-    Term::List { .. } => unreachable!("Should have been desugared already"),
-    Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Invalid => {
-      false
+    Term::List { els } => {
+      let mut subst = false;
+      for e in els {
+        subst |= subst_ref_to_ref(e, ref_map);
+      }
+      subst
     }
+    Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => false,
+    Term::Invalid => unreachable!(),
   }
 }

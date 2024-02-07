@@ -4,8 +4,8 @@ input_file: tests/golden_tests/encode_pattern_match/match_list_sugar.hvm
 ---
 (main) = let %temp%scrutinee = LNil; (main$match$1 %temp%scrutinee)
 
-(LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)
+(main$match$1) = λa #List (a #List.LCons.head λb #List.LCons.tail λc 1 0)
 
 (LNil) = #List λLCons #List λLNil LNil
 
-(main$match$1) = λa #List (a #List.LCons.head λb #List.LCons.tail λc 1 0)
+(LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)

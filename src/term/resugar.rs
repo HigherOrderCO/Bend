@@ -1,7 +1,5 @@
 use super::{
-  net_to_term::{ReadbackError, Reader},
-  transform::encode_adts::adt_field_tag,
-  Adt, DefId, Name, Pattern, Tag, Term, LIST, LNIL, SNIL, STRING,
+  net_to_term::{ReadbackError, Reader}, transform::encode_adts::adt_field_tag, Adt, DefName, Pattern, Tag, Term, LIST, LNIL, SNIL, STRING
 };
 use std::borrow::BorrowMut;
 
@@ -15,14 +13,12 @@ impl<'a> Reader<'a> {
 
         self.resugar_adt_cons(term, adt, adt_name);
 
-        match adt_name.0.as_ref() {
+        match adt_name.0.as_str() {
           STRING => {
-            let snil = &self.book.def_names.name_to_id[&Name::new(SNIL)];
-            *term = Self::resugar_string(term, snil);
+            *term = Self::resugar_string(term);
           }
           LIST => {
-            let lnil = &self.book.def_names.name_to_id[&Name::new(LNIL)];
-            *term = Self::resugar_list(term, lnil);
+            *term = Self::resugar_list(term);
           }
           _ => {}
         }
@@ -84,7 +80,7 @@ impl<'a> Reader<'a> {
   /// // Which gets resugared as:
   /// (Some (Some None))
   /// ```
-  fn resugar_adt_cons(&mut self, term: &mut Term, adt: &Adt, adt_name: &Name) {
+  fn resugar_adt_cons(&mut self, term: &mut Term, adt: &Adt, adt_name: &DefName) {
     let mut app = &mut *term;
     let mut current_arm = None;
 
@@ -130,7 +126,7 @@ impl<'a> Reader<'a> {
       _ => return self.error(ReadbackError::InvalidAdt),
     }
 
-    *cur = self.book.def_names.get_ref(ctr);
+    *cur = Term::r#ref(ctr);
     *term = std::mem::take(app);
 
     self.resugar_adts(term);
@@ -164,7 +160,7 @@ impl<'a> Reader<'a> {
   ///   (None): λ* 3
   /// } b)
   /// ```
-  fn resugar_adt_match(&mut self, term: &mut Term, adt_name: &Name, adt: &Adt) {
+  fn resugar_adt_match(&mut self, term: &mut Term, adt_name: &DefName, adt: &Adt) {
     let mut cur = &mut *term;
     let mut arms = Vec::new();
 
@@ -214,16 +210,16 @@ impl<'a> Reader<'a> {
     self.resugar_adts(term);
   }
 
-  fn resugar_string(term: &mut Term, snil: &DefId) -> Term {
+  fn resugar_string(term: &mut Term) -> Term {
     match term {
       // (SCons Num tail)
       Term::App { fun: box Term::App { fun: ctr, arg: box Term::Num { val }, .. }, arg: tail, .. } => {
-        let tail = Self::resugar_string(tail, snil);
+        let tail = Self::resugar_string(tail);
         let char: String = unsafe { char::from_u32_unchecked(*val as u32) }.into();
         match tail {
           Term::Str { val: tail } => Term::Str { val: char + &tail },
           // (SNil)
-          Term::Ref { def_id } if def_id == *snil => Term::Str { val: char },
+          Term::Ref { def_name } if def_name.as_str() == SNIL => Term::Str { val: char },
           _ => {
             // FIXME: warnings are not good with this resugar
             // Just make the constructor again
@@ -237,11 +233,11 @@ impl<'a> Reader<'a> {
     }
   }
 
-  fn resugar_list(term: &mut Term, lnil: &DefId) -> Term {
+  fn resugar_list(term: &mut Term) -> Term {
     match term {
       // (LCons el tail)
       Term::App { fun: box Term::App { fun: ctr, arg: el, .. }, arg: tail, .. } => {
-        let tail = Self::resugar_list(tail, lnil);
+        let tail = Self::resugar_list(tail);
         if let Term::List { els: tail } = tail {
           let mut els = vec![*el.clone()];
           els.extend(tail);
@@ -253,14 +249,14 @@ impl<'a> Reader<'a> {
         }
       }
       // (LNil)
-      Term::Ref { def_id } if def_id == lnil => Term::List { els: vec![] },
+      Term::Ref { def_name } if def_name.as_str() == LNIL => Term::List { els: vec![] },
       other => std::mem::take(other),
     }
   }
 
   fn deref(&mut self, term: &mut Term) {
-    while let Term::Ref { def_id } = term {
-      let def = &self.book.defs[def_id];
+    while let Term::Ref { def_name } = term {
+      let def = self.book.defs.get(def_name).unwrap();
       *term = def.rule().body.clone();
       term.fix_names(&mut self.namegen.id_counter, self.book);
     }

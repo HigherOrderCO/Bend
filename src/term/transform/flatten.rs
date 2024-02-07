@@ -1,26 +1,28 @@
-use crate::term::{Book, DefId, DefNames, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Term};
-use itertools::Itertools;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+use crate::term::{Book, DefName, Definition, MatchNum, Op, Origin, Pattern, Rule, Term, VarName};
 
 impl Book {
   pub fn flatten_rules(&mut self) {
-    for def_id in self.defs.keys().copied().collect_vec() {
-      let new_defs = flatten_def(&self.defs[&def_id], &mut self.def_names);
-      for def in new_defs {
-        self.defs.insert(def.def_id, def);
-      }
+    let mut new_defs = vec![];
+    for def in self.defs.values() {
+      // Since these definitions don't need further processing it's fine to insert them all at the end.
+      new_defs.append(&mut flatten_def(def));
+    }
+    for def in new_defs {
+      self.defs.insert(def.name.clone(), def);
     }
   }
 }
 
 /// Splits a definition with nested rule patterns into a tree of definitions
 /// with flat patterns, each matching a single layer of patterns.
-fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
+fn flatten_def(def: &Definition) -> Vec<Definition> {
   let mut skip: HashSet<usize> = HashSet::new();
-  let mut new_defs: HashMap<DefId, Definition> = HashMap::new();
+  let mut new_defs: Vec<Definition> = vec![];
 
   // We rebuild this definition rule by rule, with non-nested patterns
-  let mut old_def = Definition { def_id: def.def_id, rules: vec![] };
+  let mut old_def = Definition { name: def.name.clone(), rules: vec![] };
 
   for i in 0 .. def.rules.len() {
     if skip.contains(&i) {
@@ -31,9 +33,13 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
     let must_split = rule.pats.iter().any(|pat| !pat.is_flat());
     if must_split {
       // Create the entry for the new definition name
-      let old_name = def_names.name(&def.def_id).unwrap();
-      let new_name = Name(format!("{}$F{}", old_name, new_defs.len()));
-      let new_def_id = def_names.insert(new_name.clone());
+      let old_name = &def.name;
+      let new_name = DefName::from(format!("{}$F{}", old_name, new_defs.len()));
+
+      // Create the rule that replaces the one being flattened.
+      // Destructs one layer of the nested patterns and calls the following, forwarding the extracted fields.
+      let old_rule = make_old_rule(rule, new_name.clone());
+      old_def.rules.push(old_rule);
 
       // Create a new definition, with one rule for each rule that overlaps patterns with this one (including itself)
       // The rule patterns have one less layer of nesting and receive the destructed fields as extra args.
@@ -41,7 +47,7 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
       for (j, other) in def.rules.iter().enumerate().skip(i) {
         let share_matches = rule.pats.iter().zip(&other.pats).all(|(a, b)| a.shares_matches_with(b));
         if share_matches {
-          let new_rule = make_split_rule(rule, other, def_names);
+          let new_rule = make_split_rule(rule, other);
           new_rules.push(new_rule);
 
           // Skip clauses that are already 100% covered by this one.
@@ -53,28 +59,23 @@ fn flatten_def(def: &Definition, def_names: &mut DefNames) -> Vec<Definition> {
           }
         }
       }
-      let def = Definition { def_id: new_def_id, rules: new_rules };
+      let new_def = Definition { name: new_name, rules: new_rules };
       // Recursively split the newly created def
-      for def in flatten_def(&def, def_names) {
-        new_defs.insert(def.def_id, def);
+      for def in flatten_def(&new_def) {
+        new_defs.push(def);
       }
-
-      // Create the rule that replaces the one being flattened.
-      // Destructs one layer of the nested patterns and calls the following, forwarding the extracted fields.
-      let old_rule = make_old_rule(rule, new_def_id);
-      old_def.rules.push(old_rule);
     } else {
       // If this rule is already flat, just mark it to be inserted back as it is.
       old_def.rules.push(def.rules[i].clone());
     }
   }
-  new_defs.insert(old_def.def_id, old_def);
-  new_defs.into_values().collect()
+  new_defs.push(old_def);
+  new_defs
 }
 
 /// Makes the rule that replaces the original.
 /// The new version of the rule is flat and calls the next layer of pattern matching.
-fn make_old_rule(rule: &Rule, split_def: DefId) -> Rule {
+fn make_old_rule(rule: &Rule, split_def: DefName) -> Rule {
   //(Foo Tic (Bar a b) (Haz c d)) = A
   //(Foo Tic x         y)         = B
   //---------------------------------
@@ -124,12 +125,12 @@ fn make_old_rule(rule: &Rule, split_def: DefId) -> Rule {
       Pattern::List(..) => unreachable!(),
     }
   }
-  let new_body = Term::call(Term::Ref { def_id: split_def }, new_body_args);
+  let new_body = Term::call(Term::Ref { def_name: split_def }, new_body_args);
   Rule { pats: new_pats, body: new_body, origin: rule.origin }
 }
 
 /// Makes one of the new rules, flattening one layer of the original pattern.
-fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> Rule {
+fn make_split_rule(old_rule: &Rule, other_rule: &Rule) -> Rule {
   // (Foo a     (B x P) (C y0 y1)) = F
   // (Foo (A k) (B x Q) y        ) = G
   // -----------------------------
@@ -167,7 +168,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
           new_ctr_args.push(Term::Var { nam: new_nam.clone() });
           new_pats.push(Pattern::Var(Some(new_nam)));
         }
-        let def_ref = def_names.get_ref(rule_arg_name);
+        let def_ref = Term::r#ref(rule_arg_name);
         let new_ctr = Term::call(def_ref, new_ctr_args);
         new_body.subst(other_arg, &new_ctr);
       }
@@ -233,8 +234,8 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule, def_names: &DefNames) -> 
   Rule { pats: new_pats, body: new_body, origin: Origin::Generated }
 }
 
-fn make_var_name(var_count: &mut usize) -> Name {
-  let nam = Name(format!("%x{var_count}"));
+fn make_var_name(var_count: &mut usize) -> VarName {
+  let nam = format!("%x{var_count}");
   *var_count += 1;
-  nam
+  nam.into()
 }

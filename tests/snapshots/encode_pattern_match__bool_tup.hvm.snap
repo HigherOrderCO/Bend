@@ -2,12 +2,12 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool_tup.hvm
 ---
-(foo) = λa let (b, c) = a; (foo$F0 b c)
-
 (main) = (foo (F, T))
 
-(T) = #Bool λT #Bool λF T
+(foo) = λa let (b, c) = a; (foo$F0 b c)
+
+(foo$F0) = λa #Bool (a λb b λ* F)
 
 (F) = #Bool λT #Bool λF F
 
-(foo$F0) = λa #Bool (a λb b λ* F)
+(T) = #Bool λT #Bool λF T

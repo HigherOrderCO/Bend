@@ -5,9 +5,9 @@ input_file: tests/golden_tests/flatten_rules/nested2.hvm
 (Foo %x0 (LCons %x1 %x2)) = (Foo$F0 %x0 %x1 %x2)
 (Foo a b) = (a b)
 
-(LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)
+(Foo$F0 a b (LCons c d)) = (a b c d)
+(Foo$F0 a %x0 %x1) = (a (LCons %x0 %x1))
 
 (LNil) = #List λLCons #List λLNil LNil
 
-(Foo$F0 a b (LCons c d)) = (a b c d)
-(Foo$F0 a %x0 %x1) = (a (LCons %x0 %x1))
+(LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)

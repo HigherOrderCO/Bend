@@ -4,16 +4,16 @@ input_file: tests/golden_tests/encode_pattern_match/weekday.hvm
 ---
 (main) = (λx x Saturday)
 
+(Sunday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Sunday
+
+(Saturday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Saturday
+
+(Friday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Friday
+
+(Thursday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Thursday
+
 (Monday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Monday
 
 (Tuesday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Tuesday
 
 (Wednesday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Wednesday
-
-(Thursday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Thursday
-
-(Friday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Friday
-
-(Saturday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Saturday
-
-(Sunday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Sunday

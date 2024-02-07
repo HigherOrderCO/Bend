@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/let_adt_destructuring.hvm
 ---
-@8 = ({2 {4 a a} b} b)
 @Box = (a {2 {4 a b} b})
+@a = ({2 {4 a a} b} b)
 @main = a
-& @8 ~ (b a)
+& @a ~ (b a)
 & @Box ~ (#1 b)
 

@@ -2,14 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.hvm
 ---
-(Foo) = λ$x let %temp%scrutinee = (Some 1); (Foo$match$1_$_Bar$match$1 %temp%scrutinee $x)
-
-(Bar) = (let %temp%scrutinee = (Some 1); (Foo$match$1_$_Bar$match$1 %temp%scrutinee $x) λ$x *)
-
 (main) = *
 
 (None) = #Maybe λNone #Maybe λSome None
 
 (Some) = λval #Maybe λNone #Maybe λSome #Maybe.Some.val (Some val)
 
-(Foo$match$1_$_Bar$match$1) = λa #Maybe (a λb b #Maybe.Some.val λc λd c)
+(Bar$match$1_$_Foo$match$1) = λa #Maybe (a λb b #Maybe.Some.val λc λd c)
+
+(Foo) = λ$x let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x)
+
+(Bar) = (let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x) λ$x *)

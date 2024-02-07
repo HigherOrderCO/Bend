@@ -5,7 +5,7 @@ use hvml::{
   run_book,
   term::{
     load_book::do_parse_book, net_to_term::net_to_term, parser::parse_term, term_to_compat_net,
-    term_to_net::Labels, Book, DefId, Term,
+    term_to_net::Labels, Book, Term,
   },
   CompileOpts, RunOpts, WarningOpts,
 };
@@ -86,7 +86,7 @@ fn compile_term() {
     term.linearize_vars();
 
     let compat_net = term_to_compat_net(&term, &mut Labels::default());
-    let net = net_to_hvmc(&compat_net, &|def_id| def_id.to_internal())?;
+    let net = net_to_hvmc(&compat_net, &Default::default())?;
 
     Ok(show_net(&net))
   })
@@ -114,9 +114,9 @@ fn run_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let book = do_parse_book(code, path)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, def_names, info) =
+    let (res, info) =
       run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
-    Ok(format!("{}{}", info.readback_errors.display(&def_names), res.display(&def_names)))
+    Ok(format!("{}{}", info.readback_errors.display(), res.display()))
   })
 }
 
@@ -130,8 +130,8 @@ fn run_lazy() {
     desugar_opts.lazy_mode();
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, def_names, info) = run_book(book, 1 << 20, run_opts, WarningOpts::deny_all(), desugar_opts)?;
-    Ok(format!("{}{}", info.readback_errors.display(&def_names), res.display(&def_names)))
+    let (res, info) = run_book(book, 1 << 20, run_opts, WarningOpts::deny_all(), desugar_opts)?;
+    Ok(format!("{}{}", info.readback_errors.display(), res.display()))
   })
 }
 
@@ -140,9 +140,9 @@ fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|code, _| {
     let net = do_parse_net(code)?;
     let book = Book::default();
-    let compat_net = hvmc_to_net(&net, &DefId::from_internal);
+    let compat_net = hvmc_to_net(&net, &Default::default());
     let (term, errors) = net_to_term(&compat_net, &book, &Labels::default(), false);
-    Ok(format!("{}{}", errors.display(&book.def_names), term.display(&book.def_names)))
+    Ok(format!("{}{}", errors.display(), term.display()))
   })
 }
 
@@ -160,7 +160,7 @@ fn flatten_rules() {
     book.check_unbound_pats()?;
     book.extract_adt_matches(&mut Vec::new())?;
     book.flatten_rules();
-    book.prune(main, false, &mut Vec::new());
+    book.prune(main.as_ref(), false, &mut Vec::new());
     Ok(book.to_string())
   })
 }
@@ -182,8 +182,8 @@ fn encode_pattern_match() {
     book.generate_scott_adts();
     book.encode_builtins();
     encode_pattern_matching(&mut book, &mut Vec::new())?;
-    book.prune(main, false, &mut Vec::new());
-    book.merge_definitions(main.unwrap_or(DefId(u64::MAX)));
+    book.prune(main.as_ref(), false, &mut Vec::new());
+    book.merge_definitions(&main.unwrap_or_default());
     Ok(book.to_string())
   })
 }
@@ -216,3 +216,4 @@ fn hangs() {
     if !*lck.read().unwrap() { Ok("Hangs".into()) } else { Err("Doesn't hang".into()) }
   })
 }
+

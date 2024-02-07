@@ -2,14 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/and3.hvm
 ---
-(And) = λa let (b, c) = a; (And$F0 b c)
-
 (main) = (And (F, (T, F)))
 
-(T) = #Bool λT #Bool λF T
-
-(F) = #Bool λT #Bool λF F
+(And) = λa let (b, c) = a; (And$F0 b c)
 
 (And$F0) = λa #Bool (a λb let (c, d) = b; (And$F0$F0 c d) λ* F)
 
 (And$F0$F0) = λa #Bool (a λb #Bool (b T F) λ* F)
+
+(F) = #Bool λT #Bool λF F
+
+(T) = #Bool λT #Bool λF T

@@ -1,11 +1,7 @@
 use hvmc::run::Val;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use shrinkwraprs::Shrinkwrap;
-use std::{
-  collections::{BTreeMap, HashMap},
-  vec,
-};
+use std::{ops::Deref, sync::Arc, vec};
 
 pub mod builtins;
 pub mod check;
@@ -25,30 +21,20 @@ use crate::term::builtins::*;
 /// The representation of a program.
 #[derive(Debug, Clone, Default)]
 pub struct Book {
-  /// Mapping of definition names to ids.
-  pub def_names: DefNames,
-
   /// The function definitions.
-  pub defs: BTreeMap<DefId, Definition>,
+  pub defs: IndexMap<DefName, Definition>,
 
   /// The algebraic datatypes defined by the program
-  pub adts: BTreeMap<Name, Adt>,
+  pub adts: IndexMap<DefName, Adt>,
 
   /// To which type does each constructor belong to.
-  pub ctrs: HashMap<Name, Name>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct DefNames {
-  pub id_to_name: IndexMap<DefId, Name>,
-  pub name_to_id: IndexMap<Name, DefId>,
-  id_count: DefId,
+  pub ctrs: IndexMap<DefName, DefName>,
 }
 
 /// A pattern matching function definition.
 #[derive(Debug, Clone)]
 pub struct Definition {
-  pub def_id: DefId,
+  pub name: DefName,
   pub rules: Vec<Rule>,
 }
 
@@ -72,12 +58,12 @@ pub enum Origin {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MatchNum {
   Zero,
-  Succ(Option<Option<Name>>),
+  Succ(Option<Option<VarName>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Tag {
-  Named(Name),
+  Named(TagName),
   Numeric(u32),
   Auto,
   Static,
@@ -87,21 +73,21 @@ pub enum Tag {
 pub enum Term {
   Lam {
     tag: Tag,
-    nam: Option<Name>,
+    nam: Option<VarName>,
     bod: Box<Term>,
   },
   Var {
-    nam: Name,
+    nam: VarName,
   },
   /// Like a scopeless lambda, where the variable can occur outside the body
   Chn {
     tag: Tag,
-    nam: Name,
+    nam: VarName,
     bod: Box<Term>,
   },
   /// The use of a Channel variable.
   Lnk {
-    nam: Name,
+    nam: VarName,
   },
   Let {
     pat: Pattern,
@@ -119,8 +105,8 @@ pub enum Term {
   },
   Dup {
     tag: Tag,
-    fst: Option<Name>,
-    snd: Option<Name>,
+    fst: Option<VarName>,
+    snd: Option<VarName>,
     val: Box<Term>,
     nxt: Box<Term>,
   },
@@ -149,7 +135,7 @@ pub enum Term {
     arms: Vec<(Pattern, Term)>,
   },
   Ref {
-    def_id: DefId,
+    def_name: DefName,
   },
   Era,
   #[default]
@@ -158,8 +144,8 @@ pub enum Term {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
-  Var(Option<Name>),
-  Ctr(Name, Vec<Pattern>),
+  Var(Option<VarName>),
+  Ctr(DefName, Vec<Pattern>),
   Num(MatchNum),
   Tup(Box<Pattern>, Box<Pattern>),
   List(Vec<Pattern>),
@@ -193,172 +179,52 @@ pub enum Type {
   Any,
   Tup,
   Num,
-  Adt(Name),
+  Adt(DefName),
 }
 
 /// A user defined datatype
 #[derive(Debug, Clone, Default)]
 pub struct Adt {
-  pub ctrs: IndexMap<Name, Vec<Name>>,
+  pub ctrs: IndexMap<DefName, Vec<VarName>>,
   pub origin: Origin,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Shrinkwrap, Hash, PartialOrd, Ord, Default)]
-pub struct Name(pub String);
+#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord, Default)]
+pub struct Name(pub Arc<String>);
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Shrinkwrap, Hash, PartialOrd, Ord, Default)]
-pub struct DefId(pub Val);
+pub type DefName = Name;
+pub type VarName = Name;
+pub type TagName = Name;
 
-pub fn var_id_to_name(mut var_id: Val) -> Name {
+pub fn num_to_name(mut num: Val) -> String {
   let mut name = String::new();
   loop {
-    let c = (var_id % 26) as u8 + b'a';
+    let c = (num % 26) as u8 + b'a';
     name.push(c as char);
-    var_id /= 26;
-    if var_id == 0 {
+    num /= 26;
+    if num == 0 {
       break;
     }
   }
-  Name(name)
-}
-
-impl Name {
-  pub fn new(value: &str) -> Self {
-    Name(value.to_string())
-  }
-}
-
-impl DefId {
-  // TODO: We use this workaround because hvm-core's val_to_name function doesn't work with value 0
-  pub fn to_internal(self) -> Val {
-    *self + 1
-  }
-
-  pub fn from_internal(val: Val) -> Self {
-    Self(val - 1)
-  }
+  name
 }
 
 impl Tag {
-  pub fn string() -> Self {
-    Self::Named(Name(format!("{STRING}")))
+  pub fn adt_name(name: &DefName) -> Self {
+    Self::Named(name.clone())
   }
 
-  pub fn string_scons_head() -> Self {
-    Self::Named(Name(format!("{STRING}.{SCONS}.{HEAD}")))
-  }
-
-  pub fn list() -> Self {
-    Self::Named(Name(format!("{LIST}")))
-  }
-
-  pub fn list_lcons_head() -> Self {
-    Self::Named(Name(format!("{LIST}.{LCONS}.{HEAD}")))
-  }
-
-  pub fn list_lcons_tail() -> Self {
-    Self::Named(Name(format!("{LIST}.{LCONS}.{TAIL}")))
-  }
-}
-
-impl Book {
-  pub fn new() -> Self {
-    Default::default()
-  }
-
-  pub fn get_def(&self, rule_name: &Name) -> Option<&Definition> {
-    self.def_names.def_id(rule_name).and_then(|def_id| self.defs.get(&def_id))
-  }
-
-  // TODO: This get_def/insert_def functions could have an `entry` api instead
-  pub fn get_def_mut(&mut self, rule_name: &Name) -> Option<&mut Definition> {
-    self.def_names.def_id(rule_name).and_then(|def_id| self.defs.get_mut(&def_id))
-  }
-
-  pub fn insert_def(&mut self, name: Name, rules: Vec<Rule>) -> DefId {
-    let def_id = self.def_names.insert(name);
-    let def = Definition { def_id, rules };
-    self.defs.insert(def_id, def);
-    def_id
-  }
-
-  pub fn remove_def(&mut self, def_id: DefId) -> Option<(Name, Definition)> {
-    let def = self.defs.remove(&def_id);
-    let name = self.def_names.remove(def_id);
-    name.zip(def)
-  }
-
-  /// Checks if the name of the definition of the given DefId is generated or written by the user
-  pub fn is_def_name_generated(&self, def_id: DefId) -> bool {
-    self.def_names.name(&def_id).map_or(false, |Name(name)| name.contains('$'))
-  }
-
-  /// Checks if the definition of the given DefId is a built-in
-  pub fn is_builtin(&self, def_id: DefId) -> bool {
-    self.defs.get(&def_id).unwrap().rules[0].origin == Origin::Builtin
-  }
-}
-
-impl DefNames {
-  pub const ENTRY_POINT: &'static str = "main";
-  pub const HVM1_ENTRY_POINT: &'static str = "Main";
-
-  pub fn new() -> Self {
-    Default::default()
-  }
-
-  pub fn name(&self, def_id: &DefId) -> Option<&Name> {
-    self.id_to_name.get(def_id)
-  }
-
-  pub fn def_id(&self, name: &Name) -> Option<DefId> {
-    self.name_to_id.get(name).copied()
-  }
-
-  pub fn contains_name(&self, name: &Name) -> bool {
-    self.name_to_id.contains_key(name)
-  }
-
-  pub fn contains_def_id(&self, def_id: &DefId) -> bool {
-    self.id_to_name.contains_key(def_id)
-  }
-
-  pub fn insert(&mut self, name: Name) -> DefId {
-    let def_id = self.id_count;
-    self.id_count.0 += 1;
-    self.id_to_name.insert(def_id, name.clone());
-    self.name_to_id.insert(name, def_id);
-    def_id
-  }
-
-  pub fn remove(&mut self, def_id: DefId) -> Option<Name> {
-    let nam = self.id_to_name.remove(&def_id);
-    if let Some(nam) = &nam {
-      self.name_to_id.remove(nam);
-    }
-    nam
-  }
-
-  pub fn names(&self) -> impl Iterator<Item = &Name> {
-    self.name_to_id.keys()
-  }
-
-  pub fn def_ids(&self) -> impl Iterator<Item = &DefId> {
-    self.id_to_name.keys()
-  }
-
-  #[track_caller]
-  pub fn get_ref(&self, rule_name: &Name) -> Term {
-    self.def_id(rule_name).map(|def_id| Term::Ref { def_id }).unwrap()
+  pub fn adt_field(adt: &DefName, ctr: &DefName, field: &VarName) -> Self {
+    Self::Named(format!("{adt}.{ctr}.{field}").into())
   }
 }
 
 impl Term {
-  pub fn lam(nam: Option<Name>, bod: Term) -> Self {
+  pub fn lam(nam: Option<VarName>, bod: Term) -> Self {
     Term::Lam { tag: Tag::Static, nam, bod: Box::new(bod) }
   }
 
-  pub fn named_lam(nam: Name, bod: Term) -> Self {
+  pub fn named_lam(nam: VarName, bod: Term) -> Self {
     Term::Lam { tag: Tag::Static, nam: Some(nam), bod: Box::new(bod) }
   }
 
@@ -366,7 +232,7 @@ impl Term {
     Term::Lam { tag: Tag::Static, nam: None, bod: Box::new(bod) }
   }
 
-  pub fn tagged_lam(tag: Tag, nam: Name, bod: Term) -> Self {
+  pub fn tagged_lam(tag: Tag, nam: VarName, bod: Term) -> Self {
     Term::Lam { tag, nam: Some(nam), bod: Box::new(bod) }
   }
 
@@ -380,7 +246,7 @@ impl Term {
 
   /// Make a call term by folding args around a called function term with applications.
   pub fn call(called: Term, args: impl IntoIterator<Item = Term>) -> Self {
-    args.into_iter().fold(called, |acc, arg| Term::app(acc, arg))
+    args.into_iter().fold(called, Term::app)
   }
 
   pub fn tagged_call(tag: Tag, called: Term, args: impl IntoIterator<Item = Term>) -> Self {
@@ -388,24 +254,18 @@ impl Term {
   }
 
   /// Apply a variable to a term by the var name.
-  pub fn arg_call(fun: Term, arg: Name) -> Self {
+  pub fn arg_call(fun: Term, arg: VarName) -> Self {
     Term::app(fun, Term::Var { nam: arg })
   }
 
-  pub fn list(els: impl DoubleEndedIterator<Item = Term>, def_names: &DefNames) -> Self {
-    els.rev().fold(Term::Ref { def_id: def_names.def_id(&Name::new(builtins::LNIL)).unwrap() }, |acc, el| {
-      Term::tagged_call(
-        Tag::Named(Name::new(builtins::LIST)),
-        def_names.get_ref(&Name::new(builtins::LCONS)),
-        [el, acc],
-      )
-    })
+  pub fn r#ref(name: &str) -> Self {
+    Term::Ref { def_name: name.to_string().into() }
   }
 
   /// Substitute the occurrences of a variable in a term with the given term.
   /// Caution: can cause invalid shadowing of variables if used incorrectly.
   /// Ex: Using subst to beta-reduce (@a @b a b) converting it into (@b b).
-  pub fn subst(&mut self, from: &Name, to: &Term) {
+  pub fn subst(&mut self, from: &VarName, to: &Term) {
     match self {
       Term::Lam { nam: Some(nam), .. } if nam == from => (),
       Term::Lam { bod, .. } => bod.subst(from, to),
@@ -456,7 +316,7 @@ impl Term {
   }
 
   /// Substitute the occurrence of an unscoped variable with the given term.
-  pub fn subst_unscoped(&mut self, from: &Name, to: &Term) {
+  pub fn subst_unscoped(&mut self, from: &VarName, to: &Term) {
     match self {
       Term::Lnk { nam } if nam == from => {
         *self = to.clone();
@@ -488,8 +348,8 @@ impl Term {
 
   /// Collects all the free variables that a term has
   /// and the number of times each var is used
-  pub fn free_vars(&self) -> IndexMap<Name, u64> {
-    fn go(term: &Term, free_vars: &mut IndexMap<Name, u64>) {
+  pub fn free_vars(&self) -> IndexMap<VarName, u64> {
+    fn go(term: &Term, free_vars: &mut IndexMap<VarName, u64>) {
       match term {
         Term::Lam { nam: Some(nam), bod, .. } => {
           let mut new_scope = IndexMap::new();
@@ -562,8 +422,9 @@ impl Term {
     free_vars
   }
 
-  pub fn unscoped_vars(&self) -> (IndexSet<Name>, IndexSet<Name>) {
-    fn go(term: &Term, decls: &mut IndexSet<Name>, uses: &mut IndexSet<Name>) {
+  /// Returns the set of declared and the set of used unscoped variables
+  pub fn unscoped_vars(&self) -> (IndexSet<VarName>, IndexSet<VarName>) {
+    fn go(term: &Term, decls: &mut IndexSet<VarName>, uses: &mut IndexSet<VarName>) {
       match term {
         Term::Chn { tag: _, nam, bod } => {
           decls.insert(nam.clone());
@@ -614,14 +475,14 @@ impl Term {
   pub fn new_native_match(
     scrutinee: Self,
     zero_term: Self,
-    mut succ_label: Option<Name>,
+    mut succ_label: Option<TagName>,
     mut succ_term: Self,
   ) -> Self {
     let zero = (Pattern::Num(MatchNum::Zero), zero_term);
 
     if let Term::Var { nam } = &scrutinee {
       if let Some(label) = &succ_label {
-        let new_label = Name(format!("{}-1", nam));
+        let new_label = Name::from(format!("{}-1", nam));
         succ_term.subst(label, &Term::Var { nam: new_label.clone() });
         succ_label = Some(new_label);
       }
@@ -633,7 +494,7 @@ impl Term {
         Some(succ) => {
           let match_bind = succ.clone();
 
-          let new_label = Name(format!("{}-1", succ));
+          let new_label = Name::from(format!("{}-1", succ));
           succ_term.subst(&succ, &Term::Var { nam: new_label.clone() });
           succ_label = Some(new_label);
 
@@ -659,8 +520,8 @@ impl Term {
 }
 
 impl Pattern {
-  pub fn vars(&self) -> impl DoubleEndedIterator<Item = &Option<Name>> {
-    fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Option<Name>>) {
+  pub fn vars(&self) -> impl DoubleEndedIterator<Item = &Option<VarName>> {
+    fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Option<VarName>>) {
       match pat {
         Pattern::Var(nam) => set.push(nam),
         Pattern::Ctr(_, pats) | Pattern::List(pats) => pats.iter().for_each(|pat| go(pat, set)),
@@ -679,8 +540,8 @@ impl Pattern {
     set.into_iter()
   }
 
-  pub fn vars_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Option<Name>> {
-    fn go<'a>(pat: &'a mut Pattern, set: &mut Vec<&'a mut Option<Name>>) {
+  pub fn vars_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Option<VarName>> {
+    fn go<'a>(pat: &'a mut Pattern, set: &mut Vec<&'a mut Option<VarName>>) {
       match pat {
         Pattern::Var(nam) => set.push(nam),
         Pattern::Ctr(_, pats) | Pattern::List(pats) => pats.iter_mut().for_each(|pat| go(pat, set)),
@@ -699,36 +560,36 @@ impl Pattern {
     set.into_iter()
   }
 
-  pub fn names(&self) -> impl DoubleEndedIterator<Item = &Name> {
+  pub fn names(&self) -> impl DoubleEndedIterator<Item = &VarName> {
     self.vars().flatten()
   }
 
-  pub fn names_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Name> {
+  pub fn names_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut VarName> {
     self.vars_mut().flatten()
   }
 
-  pub fn ctrs(&self) -> Vec<Name> {
-    fn go(pat: &Pattern, set: &mut Vec<Name>) {
+  pub fn ctrs(&self) -> Vec<DefName> {
+    fn go(pat: &Pattern, set: &mut Vec<DefName>) {
       match pat {
         Pattern::Ctr(nam, pats) => {
           set.push(nam.clone());
           pats.iter().for_each(|pat| go(pat, set));
         }
         Pattern::List(pats) => {
-          set.push(Name::new(builtins::LCONS));
-          set.push(Name::new(builtins::LNIL));
+          set.push(builtins::LCONS.to_string().into());
+          set.push(builtins::LNIL.to_string().into());
           pats.iter().for_each(|pat| go(pat, set))
         }
         Pattern::Tup(fst, snd) => {
-          set.push(Name::new("(,)"));
+          set.push("(,)".to_string().into());
           go(fst, set);
           go(snd, set);
         }
         Pattern::Num(MatchNum::Zero) => {
-          set.push(Name::new("0"));
+          set.push("0".to_string().into());
         }
         Pattern::Num(MatchNum::Succ(_)) => {
-          set.push(Name::new("+"));
+          set.push("+".to_string().into());
         }
         Pattern::Var(_) => {}
       }
@@ -762,7 +623,7 @@ impl Pattern {
     }
   }
 
-  pub fn to_type(&self, ctrs: &HashMap<Name, Name>) -> Type {
+  pub fn to_type(&self, ctrs: &IndexMap<DefName, DefName>) -> Type {
     match self {
       Pattern::Var(_) => Type::Any,
       Pattern::Ctr(ctr_nam, _) => {
@@ -771,18 +632,17 @@ impl Pattern {
       }
       Pattern::Tup(..) => Type::Tup,
       Pattern::Num(..) => Type::Num,
-      Pattern::List(..) => Type::Adt(Name::new(builtins::LIST)),
+      Pattern::List(..) => Type::Adt(builtins::LIST.to_string().into()),
     }
   }
 
-  pub fn to_term(&self, def_names: &DefNames) -> Term {
+  pub fn to_term(&self) -> Term {
     match self {
       Pattern::Var(None) => Term::Era,
       Pattern::Var(Some(nam)) => Term::Var { nam: nam.clone() },
-      Pattern::Ctr(ctr, args) => Term::call(
-        Term::Ref { def_id: def_names.def_id(ctr).unwrap() },
-        args.iter().map(|arg| arg.to_term(def_names)),
-      ),
+      Pattern::Ctr(ctr, args) => {
+        Term::call(Term::Ref { def_name: ctr.clone() }, args.iter().map(|arg| arg.to_term()))
+      }
       Pattern::Num(MatchNum::Zero) => Term::Num { val: 0 },
       Pattern::Num(MatchNum::Succ(None)) => todo!(),
       Pattern::Num(MatchNum::Succ(Some(Some(nam)))) => Term::Opx {
@@ -791,10 +651,12 @@ impl Pattern {
         snd: Box::new(Term::Num { val: 1 }),
       },
       Pattern::Num(MatchNum::Succ(Some(None))) => Term::Era,
-      Pattern::Tup(fst, snd) => {
-        Term::Tup { fst: Box::new(fst.to_term(def_names)), snd: Box::new(snd.to_term(def_names)) }
+      Pattern::Tup(fst, snd) => Term::Tup { fst: Box::new(fst.to_term()), snd: Box::new(snd.to_term()) },
+      Pattern::List(_) => {
+        let mut p = self.clone();
+        p.encode_builtins();
+        p.to_term()
       }
-      Pattern::List(els) => Term::list(els.iter().map(|el| el.to_term(def_names)), def_names),
     }
   }
 
@@ -851,11 +713,16 @@ impl Definition {
     self.assert_no_pattern_matching_rules();
     &mut self.rules[0]
   }
+
+  /// Checks if the definition is a built-in
+  pub fn is_builtin(&self) -> bool {
+    self.rules[0].origin == Origin::Builtin
+  }
 }
 
 impl Type {
   /// Return the constructors for a given type as patterns.
-  pub fn ctrs(&self, adts: &BTreeMap<Name, Adt>) -> Vec<Pattern> {
+  pub fn ctrs(&self, adts: &IndexMap<DefName, Adt>) -> Vec<Pattern> {
     match self {
       Type::None => vec![],
       Type::Any => vec![],
@@ -877,5 +744,45 @@ impl Type {
           .collect()
       }
     }
+  }
+
+  /// True if the type is an ADT or a builtin equivalent of an ADT (like tups and numbers)
+  pub fn is_ctr_type(&self) -> bool {
+    matches!(self, Type::Adt(_) | Type::Num | Type::Tup)
+  }
+
+  pub fn is_var_type(&self) -> bool {
+    matches!(self, Type::Any)
+  }
+}
+
+impl Name {
+  pub fn new(value: &str) -> Self {
+    Name::from(value.to_string())
+  }
+
+  pub fn is_generated(&self) -> bool {
+    // Generated def names use $ while var names use %
+    self.contains('$') || self.contains('%')
+  }
+}
+
+impl From<String> for Name {
+  fn from(value: String) -> Self {
+    Name(Arc::new(value))
+  }
+}
+
+impl From<Val> for Name {
+  fn from(value: Val) -> Self {
+    num_to_name(value).into()
+  }
+}
+
+impl Deref for Name {
+  type Target = String;
+
+  fn deref(&self) -> &Self::Target {
+    self.0.deref()
   }
 }

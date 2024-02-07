@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/snd.hvm
 ---
-@7 = ([* a] a)
+@a = ([* a] a)
 @main = a
-& @7 ~ ([#0 #42] a)
+& @a ~ ([#0 #42] a)
 

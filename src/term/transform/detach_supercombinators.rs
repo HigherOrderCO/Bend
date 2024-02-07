@@ -1,4 +1,4 @@
-use crate::term::{Book, DefId, DefNames, Definition, Name, Origin, Pattern, Rule, Term};
+use crate::term::{Book, DefName, Definition, Origin, Pattern, Rule, Term, VarName};
 use std::{
   collections::{BTreeMap, HashSet},
   ops::BitAnd,
@@ -7,51 +7,44 @@ use std::{
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
 impl Book {
-  pub fn detach_supercombinators(&mut self, main: DefId) {
+  pub fn detach_supercombinators(&mut self, main: &DefName) {
     let mut combinators = Combinators::new();
 
-    for def in self.defs.values_mut() {
-      let rule_id = def.def_id;
-      if rule_id == main {
+    for (def_name, def) in self.defs.iter_mut() {
+      if def_name == main {
         continue;
       }
 
       let rule = def.rule_mut();
-      rule.body.detach_combinators(rule_id, rule.origin, &mut self.def_names, &mut combinators);
+      rule.body.detach_combinators(def_name, rule.origin, &mut combinators);
     }
 
     // Definitions are not inserted to the book as they are defined to appease the borrow checker.
     // Since we are mut borrowing the rules we can't borrow the book to insert at the same time.
-    self.defs.append(&mut combinators);
+    self.defs.extend(combinators);
   }
 }
 
-type Combinators = BTreeMap<DefId, Definition>;
+type Combinators = BTreeMap<DefName, Definition>;
 
 struct TermInfo<'d> {
   // Number of times a Term has been detached from the current Term
   counter: u32,
-  rule_id: DefId,
+  def_name: DefName,
   rule_type: Origin,
-  def_names: &'d mut DefNames,
-  needed_names: HashSet<Name>,
+  needed_names: HashSet<VarName>,
   combinators: &'d mut Combinators,
 }
 
 impl<'d> TermInfo<'d> {
-  fn new(
-    rule_id: DefId,
-    rule_type: Origin,
-    def_names: &'d mut DefNames,
-    combinators: &'d mut Combinators,
-  ) -> Self {
-    Self { counter: 0, rule_id, rule_type, def_names, needed_names: HashSet::new(), combinators }
+  fn new(def_name: DefName, rule_type: Origin, combinators: &'d mut Combinators) -> Self {
+    Self { counter: 0, def_name, rule_type, needed_names: HashSet::new(), combinators }
   }
-  fn request_name(&mut self, name: &Name) {
+  fn request_name(&mut self, name: &VarName) {
     self.needed_names.insert(name.clone());
   }
 
-  fn provide(&mut self, name: Option<&Name>) {
+  fn provide(&mut self, name: Option<&VarName>) {
     if let Some(name) = name {
       self.needed_names.remove(name);
     }
@@ -61,27 +54,24 @@ impl<'d> TermInfo<'d> {
     self.needed_names.is_empty()
   }
 
-  fn replace_scope(&mut self, new_scope: HashSet<Name>) -> HashSet<Name> {
+  fn replace_scope(&mut self, new_scope: HashSet<VarName>) -> HashSet<VarName> {
     std::mem::replace(&mut self.needed_names, new_scope)
   }
 
-  fn merge_scope(&mut self, target: HashSet<Name>) {
+  fn merge_scope(&mut self, target: HashSet<VarName>) {
     self.needed_names.extend(target);
   }
 
   fn detach_term(&mut self, term: &mut Term) {
-    let name = self.def_names.name(&self.rule_id).unwrap();
-    let comb_name = Name(format!("{name}$S{}", self.counter));
+    let comb_name = DefName::from(format!("{}$S{}", self.def_name, self.counter));
     self.counter += 1;
 
-    let comb_id = self.def_names.insert(comb_name);
-
-    let comb_var = Term::Ref { def_id: comb_id };
+    let comb_var = Term::Ref { def_name: comb_name.clone() };
     let extracted_term = std::mem::replace(term, comb_var);
 
     let rules = vec![Rule { body: extracted_term, pats: Vec::new(), origin: self.rule_type }];
-    let rule = Definition { def_id: comb_id, rules };
-    self.combinators.insert(comb_id, rule);
+    let rule = Definition { name: comb_name.clone(), rules };
+    self.combinators.insert(comb_name, rule);
   }
 }
 
@@ -89,7 +79,7 @@ enum Detach {
   /// Can be detached freely
   Combinator,
   /// Can not be detached
-  Unscoped { lams: HashSet<Name>, vars: HashSet<Name> },
+  Unscoped { lams: HashSet<VarName>, vars: HashSet<VarName> },
   /// Should be detached to make the program not hang
   Recursive,
 }
@@ -99,11 +89,11 @@ impl Detach {
     !matches!(self, Detach::Unscoped { .. })
   }
 
-  fn unscoped_lam(nam: Name) -> Self {
+  fn unscoped_lam(nam: VarName) -> Self {
     Detach::Unscoped { lams: [nam].into(), vars: Default::default() }
   }
 
-  fn unscoped_var(nam: Name) -> Self {
+  fn unscoped_var(nam: VarName) -> Self {
     Detach::Unscoped { lams: Default::default(), vars: [nam].into() }
   }
 }
@@ -146,17 +136,11 @@ impl BitAnd for Detach {
 }
 
 impl Term {
-  pub fn detach_combinators(
-    &mut self,
-    rule_id: DefId,
-    rule_type: Origin,
-    def_names: &mut DefNames,
-    combinators: &mut Combinators,
-  ) {
+  pub fn detach_combinators(&mut self, def_name: &DefName, rule_type: Origin, combinators: &mut Combinators) {
     fn go_lam(term: &mut Term, depth: usize, term_info: &mut TermInfo) -> Detach {
       let parent_scope = term_info.replace_scope(HashSet::new());
 
-      let (nam, bod, unscoped): (Option<&Name>, &mut Term, bool) = match term {
+      let (nam, bod, unscoped): (Option<&VarName>, &mut Term, bool) = match term {
         Term::Lam { nam, bod, .. } => (nam.as_ref(), bod, false),
         Term::Chn { nam, bod, .. } => (Some(nam), bod, true),
         _ => unreachable!(),
@@ -273,7 +257,7 @@ impl Term {
 
           fst_is_super & snd_is_super
         }
-        Term::Ref { def_id } if *def_id == term_info.rule_id => Detach::Recursive,
+        Term::Ref { def_name } if def_name == &term_info.def_name => Detach::Recursive,
         Term::Let { .. } | Term::List { .. } => unreachable!(),
         Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Invalid => {
           Detach::Combinator
@@ -281,7 +265,7 @@ impl Term {
       }
     }
 
-    go(self, 0, &mut TermInfo::new(rule_id, rule_type, def_names, combinators));
+    go(self, 0, &mut TermInfo::new(def_name.clone(), rule_type, combinators));
   }
 
   // We don't want to detach id function, since that's not a net gain in performance or space

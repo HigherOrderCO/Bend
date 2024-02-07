@@ -10,6 +10,6 @@ input_file: tests/golden_tests/encode_pattern_match/bool.hvm
 
 (and3_$_and4) = λa #bool (a λb #bool (b true false) λc false)
 
-(true) = #bool λtrue #bool λfalse true
-
 (false) = #bool λtrue #bool λfalse false
+
+(true) = #bool λtrue #bool λfalse true
