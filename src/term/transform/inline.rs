@@ -58,7 +58,7 @@ impl Term {
     }
   }
 
-  /// Terms that compile to a single node can be inlineable,
+  /// Terms that compile to 0 or 1 inet nodes can be inlineable,
   /// like erasers, variables (at lambda scope), numbers,
   /// lambdas, tuples and superpositions.
   fn is_inlineable(&self) -> bool {
