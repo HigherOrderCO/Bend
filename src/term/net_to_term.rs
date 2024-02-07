@@ -4,7 +4,6 @@ use crate::{
 };
 use hvmc::run::Loc;
 use indexmap::IndexSet;
-use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
