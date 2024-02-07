@@ -19,10 +19,7 @@ pub fn nets_to_hvmc(nets: HashMap<String, INet>, hvmc_names: &HvmcNames) -> Resu
 }
 
 /// Convert an inet-encoded definition into an hvmc AST inet.
-pub fn net_to_hvmc(
-  inet: &INet,
-  hvml_to_hvmc_name: &HashMap<DefName, Val>,
-) -> Result<Net, String> {
+pub fn net_to_hvmc(inet: &INet, hvml_to_hvmc_name: &HashMap<DefName, Val>) -> Result<Net, String> {
   let (net_root, redxs) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(net_root) = net_root {

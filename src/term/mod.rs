@@ -192,6 +192,14 @@ pub struct Adt {
   pub origin: Origin,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AdtEncoding {
+  Scott,
+
+  #[default]
+  TaggedScott,
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord, Default)]
 pub struct Name(pub Arc<String>);
 
@@ -730,11 +738,11 @@ impl Type {
       Type::None => vec![],
       Type::Any => vec![],
       Type::Tup => vec![Pattern::Tup(
-        Box::new(Pattern::Var(Some(Name::new("fst")))),
-        Box::new(Pattern::Var(Some(Name::new("snd")))),
+        Box::new(Pattern::Var(Some(Name::new("%fst")))),
+        Box::new(Pattern::Var(Some(Name::new("%snd")))),
       )],
       Type::Num => {
-        vec![Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Succ(Some(Some(Name::new("pred")))))]
+        vec![Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Succ(Some(Some(Name::new("%pred")))))]
       }
       Type::Adt(adt) => {
         // TODO: Should return just a ref to ctrs and not clone.

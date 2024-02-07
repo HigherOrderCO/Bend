@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/nested_let_tup.hvm
 ---
+TaggedScott:
 (main) = let %temp%scrutinee = let %temp%scrutinee = (10, ((1, ((2, 3), 4)), 3)); (main$match$1 %temp%scrutinee); (main$match$3 %temp%scrutinee)
 
 (main$match$3$F0) = λa λb let (c, d) = b; (main$match$2 c)
@@ -13,3 +14,18 @@ input_file: tests/golden_tests/encode_pattern_match/nested_let_tup.hvm
 (main$match$2) = λa let (b, c) = a; b
 
 (main$match$1) = λa let (b, c) = a; (main$match$1$F0 b c)
+
+Scott:
+(main) = let %temp%scrutinee = let %temp%scrutinee = (10, ((1, ((2, 3), 4)), 3)); (main$match$1 %temp%scrutinee); (main$match$3 %temp%scrutinee)
+
+(main$match$3$F0) = λa λb let (c, d) = b; (main$match$2 c)
+
+(main$match$1$F0) = λa λb let (c, d) = b; c
+
+(main$match$3) = λa let (b, c) = a; (main$match$3$F0 b c)
+
+(main$match$2) = λa let (b, c) = a; b
+
+(main$match$1) = λa let (b, c) = a; (main$match$1$F0 b c)
+
+

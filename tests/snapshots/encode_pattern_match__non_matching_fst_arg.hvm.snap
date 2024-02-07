@@ -2,8 +2,18 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/non_matching_fst_arg.hvm
 ---
+TaggedScott:
 (Foo) = λa λb (#bool (b λc (Foo c c) λd d) a)
 
 (false) = #bool λtrue #bool λfalse false
 
 (true) = #bool λtrue #bool λfalse true
+
+Scott:
+(Foo) = λa λb (b λc (Foo c c) λd d a)
+
+(false) = λtrue λfalse false
+
+(true) = λtrue λfalse true
+
+

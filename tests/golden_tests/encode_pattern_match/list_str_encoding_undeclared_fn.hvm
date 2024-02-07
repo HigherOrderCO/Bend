@@ -2,3 +2,6 @@ main = *
 
 Foo SNil = 0
 Foo *    = 1
+
+Bar (LCons h t) = 0
+Bar * = 1

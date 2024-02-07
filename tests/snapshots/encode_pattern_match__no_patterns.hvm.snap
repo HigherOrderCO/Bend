@@ -2,6 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/no_patterns.hvm
 ---
+TaggedScott:
 (Id_$_Id2) = λx x
 
 (Pair) = λa λb (a, b)
+
+Scott:
+(Id_$_Id2) = λx x
+
+(Pair) = λa λb (a, b)
+
+

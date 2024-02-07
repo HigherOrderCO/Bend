@@ -1,4 +1,4 @@
-use super::{parser::parse_definition_book, Book, DefName, Origin, Pattern, Tag, TagName, Term, VarName};
+use super::{parser::parse_definition_book, Book, DefName, Origin, Pattern, Term};
 use hvmc::run::Val;
 
 const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/term/builtins.hvm"));
@@ -103,23 +103,5 @@ impl Pattern {
       nxt.encode_builtins();
       Pattern::Ctr(DefName::new(LCONS), vec![nxt, acc])
     })
-  }
-}
-
-impl Tag {
-  pub fn string() -> Self {
-    Tag::adt_name(&TagName::new(STRING))
-  }
-
-  pub fn string_scons_head() -> Self {
-    Tag::adt_field(&DefName::new(STRING), &DefName::new(SCONS), &VarName::new(HEAD))
-  }
-
-  pub fn list() -> Self {
-    Tag::adt_name(&TagName::new(LIST))
-  }
-
-  pub fn list_lcons_head() -> Self {
-    Tag::adt_field(&DefName::new(LIST), &DefName::new(LCONS), &VarName::new(HEAD))
   }
 }

@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/var_only.hvm
 ---
+TaggedScott:
 (main) = λx match x { false: Foo; true: False }
 
 (Foo) = λa λb λf (f a)
@@ -9,3 +10,14 @@ input_file: tests/golden_tests/encode_pattern_match/var_only.hvm
 (True) = #Bool λFalse #Bool λTrue True
 
 (False) = #Bool λFalse #Bool λTrue False
+
+Scott:
+(main) = λx match x { false: Foo; true: False }
+
+(Foo) = λa λb λf (f a)
+
+(True) = λFalse λTrue True
+
+(False) = λFalse λTrue False
+
+

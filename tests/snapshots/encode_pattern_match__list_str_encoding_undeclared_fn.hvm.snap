@@ -1,0 +1,27 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared_fn.hvm
+---
+TaggedScott:
+(main) = *
+
+(Foo) = λa #String (a #String.SCons.head λb #String.SCons.tail λc 1 0)
+
+(Bar) = λa #List (a #List.LCons.head λb #List.LCons.tail λc 0 1)
+
+(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
+
+(SNil) = #String λSCons #String λSNil SNil
+
+(LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)
+
+(LNil) = #List λLCons #List λLNil LNil
+
+Scott:
+(main) = *
+
+(Foo) = λa (a λb λc 1 0)
+
+(Bar) = λa (a λb λc 0 1)
+
+

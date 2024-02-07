@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/adt_tup_era.hvm
 ---
+TaggedScott:
 (Main) = (Foo (Pair 1 5))
 
 (Foo) = λa #Tuple (a #Tuple.Pair.a λb #Tuple.Pair.b λc (Foo$F0 b c))
@@ -9,3 +10,14 @@ input_file: tests/golden_tests/encode_pattern_match/adt_tup_era.hvm
 (Foo$F0) = λa #Tuple (a #Tuple.Pair.a λb #Tuple.Pair.b λc λd b)
 
 (Pair) = λa λb #Tuple λPair #Tuple.Pair.b (#Tuple.Pair.a (Pair a) b)
+
+Scott:
+(Main) = (Foo (Pair 1 5))
+
+(Foo) = λa (a λb λc (Foo$F0 b c))
+
+(Foo$F0) = λa (a λb λc λd b)
+
+(Pair) = λa λb λPair (Pair a b)
+
+

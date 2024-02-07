@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/concat.hvm
 ---
+TaggedScott:
 (main) = (String.concat (SCons 97 (SCons 98 SNil)) (SCons 99 (SCons 100 SNil)))
 
 (String.concat) = λa λb (String.concat$match$1 a b)
@@ -11,3 +12,16 @@ input_file: tests/golden_tests/encode_pattern_match/concat.hvm
 (SNil) = #String λSCons #String λSNil SNil
 
 (String.concat$match$1) = λa #String (a #String.SCons.head λb #String.SCons.tail λc λd (SCons b (String.concat c d)) λe e)
+
+Scott:
+(main) = (String.concat (SCons 97 (SCons 98 SNil)) (SCons 99 (SCons 100 SNil)))
+
+(String.concat) = λa λb (String.concat$match$1 a b)
+
+(SCons) = λhead λtail λSCons λSNil (SCons head tail)
+
+(SNil) = λSCons λSNil SNil
+
+(String.concat$match$1) = λa (a λb λc λd (SCons b (String.concat c d)) λe e)
+
+

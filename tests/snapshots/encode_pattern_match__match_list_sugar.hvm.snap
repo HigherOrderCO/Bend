@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_list_sugar.hvm
 ---
+TaggedScott:
 (main) = let %temp%scrutinee = LNil; (main$match$1 %temp%scrutinee)
 
 (main$match$1) = λa #List (a #List.LCons.head λb #List.LCons.tail λc 1 0)
@@ -9,3 +10,14 @@ input_file: tests/golden_tests/encode_pattern_match/match_list_sugar.hvm
 (LNil) = #List λLCons #List λLNil LNil
 
 (LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)
+
+Scott:
+(main) = let %temp%scrutinee = LNil; (main$match$1 %temp%scrutinee)
+
+(main$match$1) = λa (a λb λc 1 0)
+
+(LNil) = λLCons λLNil LNil
+
+(LCons) = λhead λtail λLCons λLNil (LCons head tail)
+
+

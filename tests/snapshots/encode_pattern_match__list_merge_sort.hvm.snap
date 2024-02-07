@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 ---
+TaggedScott:
 (If) = λa #Bool (a λb λc b λd λe e)
 
 (Pure) = λx (Cons x Nil)
@@ -27,3 +28,32 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 (True) = #Bool λTrue #Bool λFalse True
 
 (False) = #Bool λTrue #Bool λFalse False
+
+Scott:
+(If) = λa (a λb λc b λd λe e)
+
+(Pure) = λx (Cons x Nil)
+
+(Map) = λa (a λb λc λd (Cons (d b) (Map c d)) λe Nil)
+
+(MergeSort) = λcmp λxs (Unpack cmp (Map xs Pure))
+
+(Unpack) = λa λb (b λc λd λe (Unpack$F0 e c d) λf Nil a)
+
+(MergePair) = λa λb (b λc λd λe (MergePair$F0 e c d) λf Nil a)
+
+(Merge) = λa λb (b λc λd λe λf (f λg λh λi λj λk (If (i j g) let l = (Cons g h); (Cons j (Merge i k l)) let m = (Cons j k); (Cons g (Merge i m h))) λn λo λp (Cons o p) e c d) λq λr r a)
+
+(MergePair$F0) = λa λb λc (c λd λe λf λg (Cons (Merge f g d) (MergePair f e)) λh λi (Cons i Nil) a b)
+
+(Unpack$F0) = λa λb λc (c λd λe λf λg (Unpack f (MergePair f (Cons g (Cons d e)))) λh λi i a b)
+
+(Nil) = λCons λNil Nil
+
+(Cons) = λhead λtail λCons λNil (Cons head tail)
+
+(True) = λTrue λFalse True
+
+(False) = λTrue λFalse False
+
+

@@ -1,17 +1,26 @@
 use super::{
-  net_to_term::{ReadbackError, Reader}, transform::encode_adts::adt_field_tag, Adt, DefName, Pattern, Tag, Term, LIST, LNIL, SNIL, STRING
+  net_to_term::{ReadbackError, Reader},
+  Adt, AdtEncoding, DefName, Pattern, Tag, Term, LCONS, LIST, LNIL, SNIL, STRING,
 };
 use std::borrow::BorrowMut;
 
 impl<'a> Reader<'a> {
-  pub fn resugar_adts(&mut self, term: &mut Term) {
+  pub fn resugar_adts(&mut self, term: &mut Term, adt_encoding: AdtEncoding) {
+    match adt_encoding {
+      // No way of resugaring simple scott encoded terms.
+      AdtEncoding::Scott => (),
+      AdtEncoding::TaggedScott => self.resugar_tagged_scott(term),
+    }
+  }
+
+  pub fn resugar_tagged_scott(&mut self, term: &mut Term) {
     match term {
       Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
         let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
-          return self.resugar_adts(bod);
+          return self.resugar_tagged_scott(bod);
         };
 
-        self.resugar_adt_cons(term, adt, adt_name);
+        self.resugar_ctr_tagged_scott(term, adt, adt_name);
 
         match adt_name.0.as_str() {
           STRING => {
@@ -24,16 +33,16 @@ impl<'a> Reader<'a> {
         }
       }
 
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => self.resugar_adts(bod),
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => self.resugar_tagged_scott(bod),
 
       Term::App { tag: Tag::Named(adt_name), fun, arg } => {
         let Some((adt_name, adt)) = self.book.adts.get_key_value(adt_name) else {
-          self.resugar_adts(fun);
-          self.resugar_adts(arg);
+          self.resugar_tagged_scott(fun);
+          self.resugar_tagged_scott(arg);
           return;
         };
 
-        self.resugar_adt_match(term, adt_name, adt);
+        self.resugar_match_tagged_scott(term, adt_name, adt);
       }
 
       Term::App { fun: fst, arg: snd, .. }
@@ -42,14 +51,14 @@ impl<'a> Reader<'a> {
       | Term::Dup { val: fst, nxt: snd, .. }
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
-        self.resugar_adts(fst);
-        self.resugar_adts(snd);
+        self.resugar_tagged_scott(fst);
+        self.resugar_tagged_scott(snd);
       }
 
       Term::Match { scrutinee, arms } => {
-        self.resugar_adts(scrutinee);
+        self.resugar_tagged_scott(scrutinee);
         for (_, arm) in arms {
-          self.resugar_adts(arm);
+          self.resugar_tagged_scott(arm);
         }
       }
 
@@ -80,7 +89,7 @@ impl<'a> Reader<'a> {
   /// // Which gets resugared as:
   /// (Some (Some None))
   /// ```
-  fn resugar_adt_cons(&mut self, term: &mut Term, adt: &Adt, adt_name: &DefName) {
+  fn resugar_ctr_tagged_scott(&mut self, term: &mut Term, adt: &Adt, adt_name: &DefName) {
     let mut app = &mut *term;
     let mut current_arm = None;
 
@@ -108,15 +117,15 @@ impl<'a> Reader<'a> {
 
     for field in ctr_args.iter().rev() {
       self.deref(cur);
-      let adt_field_tag = adt_field_tag(adt_name, ctr, field);
+      let expected_tag = Tag::adt_field(adt_name, ctr, field);
 
       match cur {
-        Term::App { tag: Tag::Named(tag_name), .. } if tag_name == &adt_field_tag => {
+        Term::App { tag, .. } if tag == &expected_tag => {
           let Term::App { tag, fun, .. } = cur.borrow_mut() else { unreachable!() };
           *tag = Tag::Static;
           cur = fun;
         }
-        Term::App { tag, .. } => return self.error(ReadbackError::UnexpectedTag(adt_field_tag, tag.clone())),
+        Term::App { tag, .. } => return self.error(ReadbackError::UnexpectedTag(expected_tag, tag.clone())),
         _ => return self.error(ReadbackError::InvalidAdt),
       }
     }
@@ -129,7 +138,7 @@ impl<'a> Reader<'a> {
     *cur = Term::r#ref(ctr);
     *term = std::mem::take(app);
 
-    self.resugar_adts(term);
+    self.resugar_tagged_scott(term);
   }
 
   /// Reconstructs adt-tagged applications as a match term
@@ -160,7 +169,7 @@ impl<'a> Reader<'a> {
   ///   (None): λ* 3
   /// } b)
   /// ```
-  fn resugar_adt_match(&mut self, term: &mut Term, adt_name: &DefName, adt: &Adt) {
+  fn resugar_match_tagged_scott(&mut self, term: &mut Term, adt_name: &DefName, adt: &Adt) {
     let mut cur = &mut *term;
     let mut arms = Vec::new();
 
@@ -174,10 +183,10 @@ impl<'a> Reader<'a> {
           for field in ctr_args {
             self.deref(arm);
 
-            let adt_field_tag = adt_field_tag(adt_name, ctr, field);
+            let expected_tag = Tag::adt_field(adt_name, ctr, field);
 
             match arm {
-              Term::Lam { tag: Tag::Named(tag), .. } if tag == &adt_field_tag => {
+              Term::Lam { tag, .. } if tag == &expected_tag => {
                 let Term::Lam { nam, bod, .. } = arm.borrow_mut() else { unreachable!() };
 
                 args.push(nam.clone().map_or(Pattern::Var(None), |x| Pattern::Var(Some(x))));
@@ -185,13 +194,12 @@ impl<'a> Reader<'a> {
               }
               _ => {
                 if let Term::Lam { tag, .. } = arm {
-                  self.error(ReadbackError::UnexpectedTag(adt_field_tag.clone(), tag.clone()));
+                  self.error(ReadbackError::UnexpectedTag(expected_tag.clone(), tag.clone()));
                 }
 
                 let nam = self.namegen.unique();
                 args.push(Pattern::Var(Some(nam.clone())));
-                let tag = Tag::Named(adt_field_tag);
-                *arm = Term::tagged_app(tag, std::mem::take(arm), Term::Var { nam });
+                *arm = Term::tagged_app(expected_tag, std::mem::take(arm), Term::Var { nam });
               }
             }
           }
@@ -207,7 +215,7 @@ impl<'a> Reader<'a> {
     let arms = arms.into_iter().rev().map(|(pat, term)| (pat, std::mem::take(term))).collect();
     *term = Term::Match { scrutinee, arms };
 
-    self.resugar_adts(term);
+    self.resugar_tagged_scott(term);
   }
 
   fn resugar_string(term: &mut Term) -> Term {
@@ -236,16 +244,19 @@ impl<'a> Reader<'a> {
   fn resugar_list(term: &mut Term) -> Term {
     match term {
       // (LCons el tail)
-      Term::App { fun: box Term::App { fun: ctr, arg: el, .. }, arg: tail, .. } => {
+      Term::App {
+        fun: box Term::App { fun: box Term::Ref { def_name: ctr }, arg: el, .. },
+        arg: tail,
+        ..
+      } => {
         let tail = Self::resugar_list(tail);
-        if let Term::List { els: tail } = tail {
+        if ctr.as_str() == LCONS && let Term::List { els: tail } = tail {
           let mut els = vec![*el.clone()];
           els.extend(tail);
           Term::List { els }
         } else {
           // Make the constructor again
-          let fun = Term::App { tag: Tag::Static, fun: ctr.clone(), arg: el.clone() };
-          Term::App { tag: Tag::Static, fun: Box::new(fun), arg: Box::new(tail) }
+          Term::call(Term::Ref { def_name: ctr.clone() }, [*el.clone(), tail])
         }
       }
       // (LNil)

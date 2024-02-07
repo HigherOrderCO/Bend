@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/and3.hvm
 ---
+TaggedScott:
 (main) = (And (F, (T, F)))
 
 (And) = λa let (b, c) = a; (And$F0 b c)
@@ -13,3 +14,18 @@ input_file: tests/golden_tests/encode_pattern_match/and3.hvm
 (F) = #Bool λT #Bool λF F
 
 (T) = #Bool λT #Bool λF T
+
+Scott:
+(main) = (And (F, (T, F)))
+
+(And) = λa let (b, c) = a; (And$F0 b c)
+
+(And$F0) = λa (a λb let (c, d) = b; (And$F0$F0 c d) λ* F)
+
+(And$F0$F0) = λa (a λb (b T F) λ* F)
+
+(F) = λT λF F
+
+(T) = λT λF T
+
+

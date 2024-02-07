@@ -1,0 +1,25 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared_map.hvm
+---
+TaggedScott:
+(main) = λa λb let a = (main$match$1 a); let b = (main$match$2 b); (a, b)
+
+(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
+
+(SNil) = #String λSCons #String λSNil SNil
+
+(LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)
+
+(LNil) = #List λLCons #List λLNil LNil
+
+(main$match$1) = λa #String (a #String.SCons.head λb #String.SCons.tail λc 1 2)
+
+(main$match$2) = λa #List (a #List.LCons.head λb #List.LCons.tail λc 1 2)
+
+Scott:
+(main) = λa λb let a = (main$match$2_$_main$match$1 a); let b = (main$match$2_$_main$match$1 b); (a, b)
+
+(main$match$2_$_main$match$1) = λa (a λb λc 1 2)
+
+
