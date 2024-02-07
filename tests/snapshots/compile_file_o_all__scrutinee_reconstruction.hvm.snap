@@ -9,6 +9,6 @@ input_file: tests/golden_tests/compile_file_o_all/scrutinee_reconstruction.hvm
 @b = {2 * @c}
 @c = (a (* a))
 @main = a
-& @Option.or ~ (b ({2 * {2 c c}} a))
+& @Option.or ~ (b (@None a))
 & @Some ~ (#5 b)
 

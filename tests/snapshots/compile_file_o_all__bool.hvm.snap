@@ -2,7 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/bool.hvm
 ---
-@Not = (((* (a a)) ((b (* b)) c)) c)
+@Not = ((@fals (@true a)) a)
+@fals = (* (a a))
 @main = a
-& @Not ~ ((b (* b)) a)
+& @Not ~ (@true a)
+@true = (a (* a))
 

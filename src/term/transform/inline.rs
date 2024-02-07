@@ -1,4 +1,4 @@
-use crate::term::{Book, DefName, Definition, Name, Term};
+use crate::term::{Book, DefName, Definition, Term};
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
@@ -58,23 +58,15 @@ impl Term {
     }
   }
 
-  /// Terms that compile to a single root node can be inlineable,
+  /// Terms that compile to a single node can be inlineable,
   /// like erasers, variables (at lambda scope), numbers,
   /// lambdas, tuples and superpositions.
   fn is_inlineable(&self) -> bool {
-    fn go(term: &Term, scope: &mut HashSet<Name>) -> bool {
+    fn go(term: &Term, scope: usize) -> bool {
       match term {
-        Term::Era => true,
-        Term::Var { nam } => scope.contains(nam),
-        Term::Num { .. } => true,
-        Term::Lam { nam, bod, .. } => {
-          if let Some(nam) = nam {
-            scope.insert(nam.clone());
-          }
-          go(bod, scope)
-        }
-        Term::Tup { fst, snd } => go(fst, scope) && go(snd, scope),
-        Term::Sup { fst, snd, .. } => go(fst, scope) && go(snd, scope),
+        Term::Era | Term::Var { .. } | Term::Num { .. } => scope.saturating_sub(1) == 0,
+        Term::Lam { bod, .. } => go(bod, scope + 1),
+        Term::Tup { fst, snd } | Term::Sup { fst, snd, .. } => go(fst, scope + 1) && go(snd, scope + 1),
 
         Term::Chn { .. } | Term::Lnk { .. } => false,
         Term::Str { .. } | Term::List { .. } => false,
@@ -88,6 +80,6 @@ impl Term {
         Term::Invalid => unreachable!(),
       }
     }
-    go(self, &mut HashSet::new())
+    go(self, 0)
   }
 }
