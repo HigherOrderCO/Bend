@@ -65,8 +65,6 @@ impl Book {
 
     for def in self.defs.values_mut() {
       if subst_ref_to_ref(&mut def.rule_mut().body, name_map) {
-        eprintln!("change {} after merge!", def.name);
-        eprintln!("{name_map:#?}");
         updated_defs.push(def.name.clone());
       }
     }

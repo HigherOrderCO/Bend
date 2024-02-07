@@ -125,8 +125,6 @@ impl<'a> Reader<'a> {
       Ref { def_name } => {
         if def_name.is_generated() {
           // Dereference generated names since the user is not aware of them
-          eprintln!("deref {def_name}");
-          eprintln!("{}", self.book.defs.keys().join("\n"));
           let def = &self.book.defs[def_name];
           let mut term = def.rule().body.clone();
           term.fix_names(&mut self.namegen.id_counter, self.book);
