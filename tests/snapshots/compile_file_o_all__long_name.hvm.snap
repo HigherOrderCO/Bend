@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file_o_all/long_name.hvm
----
-@main = (* *)
-
