@@ -3,6 +3,8 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 
 impl Book {
+  /// Finds definitions that can be inlined by the [Term::is_inlineable] criteria
+  /// and applies [Term::inline] for each definition.
   pub fn inline(&mut self) {
     let mut inlineables = HashSet::new();
     for (def_name, def) in self.defs.iter() {
