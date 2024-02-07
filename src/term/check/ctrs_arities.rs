@@ -40,9 +40,9 @@ impl Pattern {
     match self {
       Pattern::Ctr(name, args) => {
         let arity = arities.get(name).unwrap();
-        let n_args = args.len();
-        if *arity != n_args {
-          Err(format!("Arity error. Constructor '{name}' expects {arity} fields, found {n_args}."))
+        let args = args.len();
+        if *arity != args {
+          Err(format!("Arity error. Constructor '{}' expects {} fields, found {}.", name, arity, args))
         } else {
           Ok(())
         }

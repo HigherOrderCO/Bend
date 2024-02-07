@@ -8,10 +8,11 @@
 | `-Oref-to-ref` `-Ono-ref-to-ref` | Disabled | [ref-to-ref](#ref-to-ref) |
 | `-Oprune` `-Ono-prune` | Disabled | [definition-pruning](#definition-pruning) |
 | `-Opre-reduce` `-Ono-pre-reduce` | Disabled | [pre-reduce](#pre-reduce) |
-| `-Opre-reduce-refs` `-Ono-pre-reduce-refs` | Disabled | [pre-reduce-refs](#pre-reduce-refs) | 
+| `-Opre-reduce-refs` `-Ono-pre-reduce-refs` | Disabled | [pre-reduce-refs](#pre-reduce-refs) |
 | `-Osupercombinators` `-Ono-supercombinators` | Enabled  | [supercombinators](#supercombinators) |
 | `-Osimplify-main` `-Ono-simplify-main` | Disabled | [simplify-main](#simplify-main) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
+| `-Oinline` `-Ono-inline` | Disabled | [inline](#inline) |
 
 ## Eta-reduction
 
@@ -209,4 +210,23 @@ main = (a a)
 // -Ono-simplify-main
 @id = (a a)
 @main = @id
+```
+
+# Inline
+
+If enabled, inlines terms that compiles to 0 or 1 inet nodes at lambda level, before pre reduction.
+
+Example:
+```rs
+foo = (2, 3)
+id = λx x
+
+main = (id foo)
+
+// -Oinline, compilation output
+@foo = [#2 #3]
+@id = (a a)
+
+@main = a
+& (b b) ~ ([#2 #3] a)
 ```

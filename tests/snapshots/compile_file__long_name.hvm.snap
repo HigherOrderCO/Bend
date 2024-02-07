@@ -1,6 +1,6 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file_o_all/long_name.hvm
+input_file: tests/golden_tests/compile_file/long_name.hvm
 ---
 @WowThis_is = (a a)
 @main = (* a)
