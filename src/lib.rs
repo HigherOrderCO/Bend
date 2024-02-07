@@ -63,9 +63,6 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefName, Vec<
   if opts.supercombinators {
     book.detach_supercombinators(&main);
   }
-  if opts.inline {
-    book.inline();
-  }
   if opts.ref_to_ref {
     book.simplify_ref_to_ref()?;
   }
@@ -73,6 +70,9 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefName, Vec<
     book.simplify_main_ref(&main);
   }
   book.prune(Some(&main), opts.prune, &mut warnings);
+  if opts.inline {
+    book.inline();
+  }
   if opts.merge {
     book.merge_definitions(&main);
   }

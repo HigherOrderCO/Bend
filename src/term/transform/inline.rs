@@ -4,17 +4,17 @@ use std::collections::HashSet;
 
 impl Book {
   pub fn inline(&mut self) {
-    let mut inlineable = HashSet::new();
+    let mut inlineables = HashSet::new();
     for (def_name, def) in self.defs.iter() {
       def.assert_no_pattern_matching_rules();
       if def.rules[0].body.is_inlineable() {
-        inlineable.insert(def_name.clone());
+        inlineables.insert(def_name.clone());
       }
     }
 
     let defs = self.defs.clone();
-    for (_, def) in &mut self.defs {
-      def.rules[0].body.inline(&inlineable, &defs);
+    for def in self.defs.values_mut() {
+      def.rules[0].body.inline(&inlineables, &defs);
     }
   }
 }

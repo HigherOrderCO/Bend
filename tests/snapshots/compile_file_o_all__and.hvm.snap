@@ -6,6 +6,5 @@ input_file: tests/golden_tests/compile_file_o_all/and.hvm
 @and = (a ({2 (b b) {2 @a (a c)}} c))
 @false = {2 * {2 a a}}
 @main = a
-& @and ~ (@true (@false a))
-@true = {2 a {2 * a}}
+& @and ~ ({2 b {2 * b}} ({2 * {2 c c}} a))
 
