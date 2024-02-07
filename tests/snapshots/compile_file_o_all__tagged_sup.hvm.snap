@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/tagged_sup.hvm
 ---
-@1 = {3 (a a) (b b)}
+@a = {3 (a a) (b b)}
 @c = {5 (a a) (b b)}
 @main = a
-& @1 ~ (@1 (@c a))
+& @a ~ (@a (@c a))
 

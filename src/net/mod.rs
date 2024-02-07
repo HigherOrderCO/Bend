@@ -1,7 +1,7 @@
 pub mod hvmc_to_net;
 pub mod net_to_hvmc;
 
-use crate::term::DefId;
+use crate::term::DefName;
 use hvmc::run::{Lab, Val};
 use NodeKind::*;
 
@@ -11,7 +11,7 @@ pub struct INet {
   nodes: Vec<Node>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Node {
   pub main: Port,
   pub aux1: Port,
@@ -22,7 +22,7 @@ pub struct Node {
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub struct Port(pub NodeId, pub SlotId);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NodeKind {
   /// Root node
   Rot,
@@ -38,7 +38,7 @@ pub enum NodeKind {
   },
   /// Reference to function definitions
   Ref {
-    def_id: DefId,
+    def_name: DefName,
   },
   /// Numbers
   Num {
@@ -76,9 +76,9 @@ impl INet {
     idx
   }
 
-  /// Returns a copy of a node.
-  pub fn node(&self, node: NodeId) -> Node {
-    self.nodes[node as usize]
+  /// Returns a reference to a node.
+  pub fn node(&self, node: NodeId) -> &Node {
+    &self.nodes[node as usize]
   }
 
   /// Returns the value stored at a port, the port on the other side of the given one.

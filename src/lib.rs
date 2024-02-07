@@ -11,8 +11,9 @@ use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::time::Instant;
 use term::{
   book_to_nets, net_to_term,
+  net_to_term::ReadbackErrors,
   term_to_net::{HvmcNames, Labels},
-  Book, DefId, DefNames, Name, Term,
+  Book, DefName, Term,
 };
 
 pub mod hvmc_net;
@@ -21,7 +22,8 @@ pub mod term;
 
 pub use term::load_book::load_file_to_book;
 
-use crate::term::net_to_term::ReadbackErrors;
+pub const ENTRY_POINT: &str = "main";
+pub const HVM1_ENTRY_POINT: &str = "Main";
 
 pub fn check_book(mut book: Book) -> Result<(), String> {
   // TODO: Do the checks without having to do full compilation
@@ -31,7 +33,7 @@ pub fn check_book(mut book: Book) -> Result<(), String> {
 
 pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult, String> {
   let (main, warnings) = desugar_book(book, opts)?;
-  let (nets, hvmc_names, labels) = book_to_nets(book, main);
+  let (nets, hvmc_names, labels) = book_to_nets(book, &main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
   if opts.pre_reduce {
     pre_reduce_book(&mut core_book, opts.pre_reduce_refs)?;
@@ -42,7 +44,7 @@ pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult,
   Ok(CompileResult { core_book, hvmc_names, labels, warnings })
 }
 
-pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefId, Vec<Warning>), String> {
+pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefName, Vec<Warning>), String> {
   let mut warnings = Vec::new();
   let main = book.check_has_main()?;
   book.check_shared_names()?;
@@ -59,17 +61,17 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefId, Vec<Wa
   // sanity check
   book.check_unbound_vars()?;
   if opts.supercombinators {
-    book.detach_supercombinators(main);
+    book.detach_supercombinators(&main);
   }
   if opts.ref_to_ref {
     book.simplify_ref_to_ref()?;
   }
   if opts.simplify_main {
-    book.simplify_main_ref(main);
+    book.simplify_main_ref(&main);
   }
-  book.prune(Some(main), opts.prune, &mut warnings);
-  if opts.merge_definitions {
-    book.merge_definitions(main);
+  book.prune(Some(&main), opts.prune, &mut warnings);
+  if opts.merge {
+    book.merge_definitions(&main);
   }
   Ok((main, warnings))
 }
@@ -99,17 +101,17 @@ pub fn run_book(
   run_opts: RunOpts,
   warning_opts: WarningOpts,
   compile_opts: CompileOpts,
-) -> Result<(Term, DefNames, RunInfo), String> {
+) -> Result<(Term, RunInfo), String> {
   let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, compile_opts)?;
 
   display_warnings(warning_opts, &warnings)?;
 
   let debug_hook = run_opts.debug_hook(&book, &hvmc_names, &labels);
   let (res_lnet, stats) = run_compiled(&core_book, mem_size, run_opts, debug_hook);
-  let net = hvmc_to_net(&res_lnet, &|id| hvmc_names.hvmc_name_to_id[&id]);
+  let net = hvmc_to_net(&res_lnet, &hvmc_names.hvmc_to_hvml);
   let (res_term, readback_errors) = net_to_term(&net, &book, &labels, run_opts.linear);
   let info = RunInfo { stats, readback_errors, net: res_lnet };
-  Ok((res_term, book.def_names, info))
+  Ok((res_term, info))
 }
 
 pub fn run_compiled(
@@ -144,10 +146,6 @@ pub fn run_compiled(
   (net, stats)
 }
 
-pub fn total_rewrites(rwts: &Rewrites) -> usize {
-  rwts.anni + rwts.comm + rwts.eras + rwts.dref + rwts.oper
-}
-
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RunOpts {
   pub single_core: bool,
@@ -169,13 +167,9 @@ impl RunOpts {
   ) -> Option<impl FnMut(&Net) + 'a> {
     self.debug.then_some({
       |net: &_| {
-        let net = hvmc_to_net(net, &|id| hvmc_names.hvmc_name_to_id[&id]);
+        let net = hvmc_to_net(net, &hvmc_names.hvmc_to_hvml);
         let (res_term, errors) = net_to_term(&net, book, labels, self.linear);
-        println!(
-          "{}{}\n---------------------------------------",
-          errors.display(&book.def_names),
-          res_term.display(&book.def_names)
-        )
+        println!("{}{}\n---------------------------------------", errors.display(), res_term.display())
       }
     })
   }
@@ -205,7 +199,7 @@ pub struct CompileOpts {
   pub pre_reduce_refs: bool,
 
   /// Enables [term::transform::definition_merge]
-  pub merge_definitions: bool,
+  pub merge: bool,
 }
 
 impl CompileOpts {
@@ -219,7 +213,7 @@ impl CompileOpts {
       supercombinators: true,
       simplify_main: true,
       pre_reduce_refs: true,
-      merge_definitions: true,
+      merge: true,
     }
   }
 
@@ -318,8 +312,8 @@ impl std::fmt::Debug for CompileResult {
 }
 
 pub enum Warning {
-  MatchOnlyVars { def_name: Name },
-  UnusedDefinition { def_name: Name },
+  MatchOnlyVars { def_name: DefName },
+  UnusedDefinition { def_name: DefName },
 }
 
 impl std::fmt::Display for Warning {

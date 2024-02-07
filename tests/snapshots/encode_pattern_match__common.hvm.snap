@@ -2,31 +2,17 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/common.hvm
 ---
-(True) = #Bool λTrue #Bool λFalse True
+(West) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest West
 
-(False) = #Bool λTrue #Bool λFalse False
+(East) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest East
+
+(South) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest South
+
+(North) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest North
 
 (Filled) = λvalue #Box λFilled #Box λEmpty #Box.Filled.value (Filled value)
 
 (Empty) = #Box λFilled #Box λEmpty Empty
-
-(North) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest North
-
-(South) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest South
-
-(East) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest East
-
-(West) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest West
-
-(Red) = #Light λRed #Light λYellow #Light λGreen Red
-
-(Yellow) = #Light λRed #Light λYellow #Light λGreen Yellow
-
-(Green) = #Light λRed #Light λYellow #Light λGreen Green
-
-(Cons) = λx λxs #List_ λCons #List_ λNil #List_.Cons.xs (#List_.Cons.x (Cons x) xs)
-
-(Nil) = #List_ λCons #List_ λNil Nil
 
 (Some) = λx #Option λSome #Option λNone #Option.Some.x (Some x)
 
@@ -35,3 +21,17 @@ input_file: tests/golden_tests/encode_pattern_match/common.hvm
 (Ok) = λa #Result λOk #Result λErr #Result.Ok.a (Ok a)
 
 (Err) = λb #Result λOk #Result λErr #Result.Err.b (Err b)
+
+(Cons) = λx λxs #List_ λCons #List_ λNil #List_.Cons.xs (#List_.Cons.x (Cons x) xs)
+
+(Nil) = #List_ λCons #List_ λNil Nil
+
+(True) = #Bool λTrue #Bool λFalse True
+
+(False) = #Bool λTrue #Bool λFalse False
+
+(Red) = #Light λRed #Light λYellow #Light λGreen Red
+
+(Yellow) = #Light λRed #Light λYellow #Light λGreen Yellow
+
+(Green) = #Light λRed #Light λYellow #Light λGreen Green

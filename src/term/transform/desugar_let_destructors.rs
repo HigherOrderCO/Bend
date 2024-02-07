@@ -1,4 +1,4 @@
-use crate::term::{Book, Name, Pattern, Term};
+use crate::term::{Book, Pattern, Term, VarName};
 
 impl Book {
   /// Convert let destructor expressions like `let (a, b) = X` into the equivalent match expression.
@@ -51,7 +51,7 @@ impl Term {
         *self = if let Term::Var { .. } = val.as_ref() {
           Term::Match { scrutinee: val, arms }
         } else {
-          let nam = Name::new("%temp%scrutinee");
+          let nam = VarName::new("%temp%scrutinee");
           let pat = Pattern::Var(Some(nam.clone()));
           let scrutinee = Box::new(Term::Var { nam });
           Term::Let { pat, val, nxt: Box::new(Term::Match { scrutinee, arms }) }

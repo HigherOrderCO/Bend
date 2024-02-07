@@ -1,10 +1,10 @@
-use super::{term_to_net::Labels, var_id_to_name, Book, MatchNum, Name, Op, Tag, Term, Val};
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
-  term::Pattern,
+  term::{num_to_name, term_to_net::Labels, Book, MatchNum, Op, Pattern, Tag, TagName, Term, Val, VarName},
 };
 use hvmc::run::Loc;
 use indexmap::IndexSet;
+use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
@@ -61,12 +61,12 @@ impl<'a> Reader<'a> {
   fn read_term(&mut self, next: Port) -> Term {
     if self.dup_paths.is_none() && !self.seen.insert(next) {
       self.error(ReadbackError::Cyclic);
-      return Term::Var { nam: Name::new("...") };
+      return Term::Var { nam: VarName::new("...") };
     }
 
     let node = next.node();
 
-    let term = match self.net.node(node).kind {
+    let term = match &self.net.node(node).kind {
       Era => {
         // Only the main port actually exists in an ERA, the auxes are just an artifact of this representation.
         debug_assert!(next.slot() == 0);
@@ -78,7 +78,7 @@ impl<'a> Reader<'a> {
         0 => {
           let nam = self.namegen.decl_name(self.net, Port(node, 1));
           let bod = self.read_term(self.net.enter_port(Port(node, 2)));
-          Term::Lam { tag: self.labels.con.to_tag(lab), nam, bod: Box::new(bod) }
+          Term::Lam { tag: self.labels.con.to_tag(*lab), nam, bod: Box::new(bod) }
         }
         // If we're visiting a port 1, then it is a variable.
         1 => Term::Var { nam: self.namegen.var_name(next) },
@@ -86,7 +86,7 @@ impl<'a> Reader<'a> {
         2 => {
           let fun = self.read_term(self.net.enter_port(Port(node, 0)));
           let arg = self.read_term(self.net.enter_port(Port(node, 1)));
-          Term::App { tag: self.labels.con.to_tag(lab), fun: Box::new(fun), arg: Box::new(arg) }
+          Term::App { tag: self.labels.con.to_tag(*lab), fun: Box::new(fun), arg: Box::new(arg) }
         }
         _ => unreachable!(),
       },
@@ -99,8 +99,8 @@ impl<'a> Reader<'a> {
           let sel_node = self.net.enter_port(Port(node, 1)).node();
 
           // We expect the pattern matching node to be a CON
-          let sel_kind = self.net.node(sel_node).kind;
-          if sel_kind != (Con { lab: None }) {
+          let sel_kind = &self.net.node(sel_node).kind;
+          if *sel_kind != (Con { lab: None }) {
             // TODO: Is there any case where we expect a different node type here on readback?
             self.error(ReadbackError::InvalidNumericMatch);
             Term::new_native_match(scrutinee, Term::Era, None, Term::Era)
@@ -122,15 +122,18 @@ impl<'a> Reader<'a> {
           Term::Invalid
         }
       },
-      Ref { def_id } => {
-        if self.book.is_def_name_generated(def_id) {
-          let def = self.book.defs.get(&def_id).unwrap();
+      Ref { def_name } => {
+        if def_name.is_generated() {
+          // Dereference generated names since the user is not aware of them
+          eprintln!("deref {def_name}");
+          eprintln!("{}", self.book.defs.keys().join("\n"));
+          let def = &self.book.defs[def_name];
           let mut term = def.rule().body.clone();
           term.fix_names(&mut self.namegen.id_counter, self.book);
 
           term
         } else {
-          Term::Ref { def_id }
+          Term::Ref { def_name: def_name.clone() }
         }
       }
       // If we're visiting a fan node...
@@ -138,12 +141,12 @@ impl<'a> Reader<'a> {
         // If we're visiting a port 0, then it is a pair.
         0 => {
           if let Some(dup_paths) = &mut self.dup_paths {
-            let stack = dup_paths.entry(lab).or_default();
+            let stack = dup_paths.entry(*lab).or_default();
             if let Some(slot) = stack.pop() {
               // Since we had a paired Dup in the path to this Sup,
               // we "decay" the superposition according to the original direction we came from the Dup.
               let term = self.read_term(self.net.enter_port(Port(node, slot)));
-              self.dup_paths.as_mut().unwrap().get_mut(&lab).unwrap().push(slot);
+              self.dup_paths.as_mut().unwrap().get_mut(lab).unwrap().push(slot);
               Some(term)
             } else {
               None
@@ -155,7 +158,7 @@ impl<'a> Reader<'a> {
             // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
             self.decay_or_get_ports(node).map_or_else(
               |(fst, snd)| Term::Sup {
-                tag: self.labels.dup.to_tag(Some(lab)),
+                tag: self.labels.dup.to_tag(Some(*lab)),
                 fst: Box::new(fst),
                 snd: Box::new(snd),
               },
@@ -167,9 +170,9 @@ impl<'a> Reader<'a> {
         // Also, that means we found a dup, so we store it to read later.
         1 | 2 => {
           if let Some(dup_paths) = &mut self.dup_paths {
-            dup_paths.entry(lab).or_default().push(next.slot());
+            dup_paths.entry(*lab).or_default().push(next.slot());
             let term = self.read_term(self.net.enter_port(Port(node, 0)));
-            self.dup_paths.as_mut().unwrap().entry(lab).or_default().pop().unwrap();
+            self.dup_paths.as_mut().unwrap().entry(*lab).or_default().pop().unwrap();
             term
           } else {
             self.scope.insert(node);
@@ -178,13 +181,13 @@ impl<'a> Reader<'a> {
         }
         _ => unreachable!(),
       },
-      Num { val } => Term::Num { val },
+      Num { val } => Term::Num { val: *val },
       Op2 { opr } => match next.slot() {
         2 => {
           let fst = self.read_term(self.net.enter_port(Port(node, 0)));
           let snd = self.read_term(self.net.enter_port(Port(node, 1)));
 
-          Term::Opx { op: Op::from_hvmc_label(opr), fst: Box::new(fst), snd: Box::new(snd) }
+          Term::Opx { op: Op::from_hvmc_label(*opr), fst: Box::new(fst), snd: Box::new(snd) }
         }
         _ => {
           self.error(ReadbackError::InvalidNumericOp);
@@ -244,13 +247,13 @@ impl<'a> Reader<'a> {
     let fst_port = self.net.enter_port(Port(node, 1));
     let snd_port = self.net.enter_port(Port(node, 2));
 
-    let node_kind = self.net.node(node).kind;
+    let node_kind = &self.net.node(node).kind;
 
     // This is not valid for all kinds of nodes, only CON/TUP/DUP, due to their interaction rules.
     if matches!(node_kind, Con { .. } | Tup | Dup { .. }) {
       match (fst_port, snd_port) {
         (Port(fst_node, 1), Port(snd_node, 2)) if fst_node == snd_node => {
-          if self.net.node(fst_node).kind == node_kind {
+          if self.net.node(fst_node).kind == *node_kind {
             self.scope.remove(&fst_node);
 
             let port_zero = self.net.enter_port(Port(fst_node, 0));
@@ -276,8 +279,8 @@ impl<'a> Reader<'a> {
 #[derive(Default)]
 struct Split {
   tag: Option<Tag>,
-  fst: Option<Name>,
-  snd: Option<Name>,
+  fst: Option<VarName>,
+  snd: Option<VarName>,
   val: Term,
 }
 
@@ -337,9 +340,9 @@ impl Term {
   }
 
   pub fn fix_names(&mut self, id_counter: &mut Val, book: &Book) {
-    fn fix_name(nam: &mut Option<Name>, id_counter: &mut Val, bod: &mut Term) {
+    fn fix_name(nam: &mut Option<VarName>, id_counter: &mut Val, bod: &mut Term) {
       if let Some(nam) = nam {
-        let name = var_id_to_name(*id_counter);
+        let name = VarName::from(num_to_name(*id_counter));
         *id_counter += 1;
         bod.subst(nam, &Term::Var { nam: name.clone() });
         *nam = name;
@@ -351,9 +354,9 @@ impl Term {
         fix_name(nam, id_counter, bod);
         bod.fix_names(id_counter, book);
       }
-      Term::Ref { def_id } => {
-        if book.is_def_name_generated(*def_id) {
-          let def = book.defs.get(def_id).unwrap();
+      Term::Ref { def_name } => {
+        if def_name.is_generated() {
+          let def = book.defs.get(def_name).unwrap();
           let mut term = def.rule().body.clone();
           term.fix_names(id_counter, book);
           *self = term;
@@ -405,27 +408,26 @@ pub struct NameGen {
 
 impl NameGen {
   // Given a port, returns its name, or assigns one if it wasn't named yet.
-  fn var_name(&mut self, var_port: Port) -> Name {
+  fn var_name(&mut self, var_port: Port) -> VarName {
     let id = self.var_port_to_id.entry(var_port).or_insert_with(|| {
       let id = self.id_counter;
       self.id_counter += 1;
       id
     });
-
-    var_id_to_name(*id)
+    VarName::from(num_to_name(*id))
   }
 
-  fn decl_name(&mut self, net: &INet, var_port: Port) -> Option<Name> {
+  fn decl_name(&mut self, net: &INet, var_port: Port) -> Option<VarName> {
     // If port is linked to an erase node, return an unused variable
     let var_use = net.enter_port(var_port);
-    let var_kind = net.node(var_use.node()).kind;
-    (var_kind != Era).then(|| self.var_name(var_port))
+    let var_kind = &net.node(var_use.node()).kind;
+    (*var_kind != Era).then(|| self.var_name(var_port))
   }
 
-  pub fn unique(&mut self) -> Name {
+  pub fn unique(&mut self) -> VarName {
     let id = self.id_counter;
     self.id_counter += 1;
-    var_id_to_name(id)
+    VarName::from(num_to_name(id))
   }
 }
 
@@ -468,7 +470,7 @@ pub enum ReadbackError {
   InvalidAdt,
   InvalidAdtMatch,
   InvalidStrTerm(Term),
-  UnexpectedTag(Name, Tag),
+  UnexpectedTag(TagName, Tag),
 }
 
 impl ReadbackError {

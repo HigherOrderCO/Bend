@@ -2,18 +2,18 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/definition_merge.hvm
 ---
-(Foo) = λa #Either (a #Either.Left.value λb λc (#Either (c #Either.Left.value λd λe (Foo$F0 e d) #Either.Right.value λf λg (Foo$F1 g f)) b) #Either.Right.value λh λi (#Either (i #Either.Left.value λj λk (Foo$F2_$_Foo$F3 k j) #Either.Right.value λl λm (Foo$F2_$_Foo$F3 m l)) h))
-
-(True) = #Bool λTrue #Bool λFalse True
-
 (False) = #Bool λTrue #Bool λFalse False
+
+(Foo$F3_$_Foo$F2) = λa #Bool (a λb #Bool (b 3 3) λc #Bool (c 3 3))
+
+(Foo$F1) = λa #Bool (a λb #Bool (b 2 2) λc #Bool (c 2 2))
+
+(Foo$F0) = λa #Bool (a λb #Bool (b 1 1) λc #Bool (c 1 1))
 
 (Left) = λvalue #Either λLeft #Either λRight #Either.Left.value (Left value)
 
 (Right) = λvalue #Either λLeft #Either λRight #Either.Right.value (Right value)
 
-(Foo$F0) = λa #Bool (a λb #Bool (b 1 1) λc #Bool (c 1 1))
+(True) = #Bool λTrue #Bool λFalse True
 
-(Foo$F1) = λa #Bool (a λb #Bool (b 2 2) λc #Bool (c 2 2))
-
-(Foo$F2_$_Foo$F3) = λa #Bool (a λb #Bool (b 3 3) λc #Bool (c 3 3))
+(Foo) = λa #Either (a #Either.Left.value λb λc (#Either (c #Either.Left.value λd λe (Foo$F0 e d) #Either.Right.value λf λg (Foo$F1 g f)) b) #Either.Right.value λh λi (#Either (i #Either.Left.value λj λk (Foo$F3_$_Foo$F2 k j) #Either.Right.value λl λm (Foo$F3_$_Foo$F2 m l)) h))

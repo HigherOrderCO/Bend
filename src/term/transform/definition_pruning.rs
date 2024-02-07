@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-  term::{Adt, Book, DefId, Name, Origin, Tag, Term},
+  term::{Adt, Book, DefName, Origin, Tag, Term},
   Warning,
 };
 use indexmap::IndexSet;
@@ -22,28 +22,28 @@ enum Used {
   Unused,
 }
 
-type Definitions = HashMap<DefId, Used>;
+type Definitions = HashMap<DefName, Used>;
 
 impl Book {
   /// If `prune_all`, removes all unused definitions and adts starting from Main.
   /// Otherwise, prunes only the builtins not accessible from any non-built-in definition
-  pub fn prune(&mut self, main: Option<DefId>, prune_all: bool, warnings: &mut Vec<Warning>) {
+  pub fn prune(&mut self, main: Option<&DefName>, prune_all: bool, warnings: &mut Vec<Warning>) {
     let mut used = Definitions::new();
 
     if let Some(main) = main {
-      let def = self.defs.get(&main).unwrap();
-      used.insert(main, Used::Main);
+      let def = self.defs.get(main).unwrap();
+      used.insert(main.clone(), Used::Main);
       self.find_used_definitions(&def.rule().body, Used::Main, &mut used);
     }
 
     // Even if we don't prune all the defs, we need check what built-ins are accessible through user code
     if !prune_all {
-      for (def_id, def) in &self.defs {
+      for (def_name, def) in &self.defs {
         // This needs to be done for each rule in case the pass it's ran from has not encoded the pattern match
         // E.g.: the `flatten_rules` golden test
         for rule in &def.rules {
           if rule.origin != Origin::Builtin {
-            match used.entry(*def_id) {
+            match used.entry(def_name.clone()) {
               Entry::Vacant(e) => _ = e.insert(Used::Unused),
               Entry::Occupied(e) if *e.get() != Used::Unused => continue,
               _ => {}
@@ -55,29 +55,29 @@ impl Book {
       }
     }
 
-    let ids = self.def_names.def_ids().copied().collect::<IndexSet<DefId>>();
+    let names = self.defs.keys().cloned().collect::<IndexSet<DefName>>();
 
     // Filter defs from the 'used' hashmap that are not accessible from main
-    let filter = |(id, used)| if used == Used::Unused { None } else { Some(id) };
-    let used: IndexSet<DefId> = used.into_iter().filter_map(filter).collect();
+    let filter = |(name, used)| if used == Used::Unused { None } else { Some(name) };
+    let used: IndexSet<DefName> = used.into_iter().filter_map(filter).collect();
 
-    let unused = ids.difference(&used).copied();
+    let unused = names.difference(&used).cloned();
 
     self.prune_unused(unused, prune_all, warnings);
   }
 
   fn prune_unused(
     &mut self,
-    unused: impl IntoIterator<Item = DefId>,
+    unused: impl IntoIterator<Item = DefName>,
     prune_all: bool,
     warnings: &mut Vec<Warning>,
   ) {
-    for unused_id in unused {
-      if prune_all || self.is_builtin(unused_id) {
-        self.remove_def(unused_id);
-      } else if !self.is_def_name_generated(unused_id) {
-        let def_name = self.def_names.name(&unused_id).unwrap().clone();
-        warnings.push(Warning::UnusedDefinition { def_name });
+    for def_name in unused {
+      let def = &self.defs[&def_name];
+      if prune_all || def.is_builtin() {
+        self.defs.remove(&def_name);
+      } else if !def_name.is_generated() {
+        warnings.push(Warning::UnusedDefinition { def_name: def_name.clone() });
       }
     }
   }
@@ -85,9 +85,9 @@ impl Book {
   /// Finds all used definitions on every term that can have a def_id.
   fn find_used_definitions(&self, term: &Term, used: Used, uses: &mut Definitions) {
     match term {
-      Term::Ref { def_id } => match self.def_names.name(def_id).and_then(|key| self.ctrs.get(key)) {
+      Term::Ref { def_name } => match self.ctrs.get(def_name) {
         Some(name) => self.insert_ctrs_used(name, uses),
-        None => self.insert_used(*def_id, used, uses),
+        None => self.insert_used(def_name, used, uses),
       },
 
       Term::Lam { tag: Tag::Named(name), bod, .. } | Term::Chn { tag: Tag::Named(name), bod, .. } => {
@@ -131,21 +131,21 @@ impl Book {
     }
   }
 
-  fn insert_used(&self, def_id: DefId, used: Used, uses: &mut Definitions) {
-    let Entry::Vacant(e) = uses.entry(def_id) else { return };
+  fn insert_used(&self, def_name: &DefName, used: Used, uses: &mut Definitions) {
+    let Entry::Vacant(e) = uses.entry(def_name.clone()) else { return };
     e.insert(used);
 
     // This needs to be done for each rule in case the pass it's ran from has not encoded the pattern match
     // E.g.: the `flatten_rules` golden test
-    for rule in &self.defs.get(&def_id).unwrap().rules {
+    for rule in &self.defs[def_name].rules {
       self.find_used_definitions(&rule.body, used, uses);
     }
   }
 
-  fn insert_ctrs_used(&self, name: &Name, uses: &mut Definitions) {
+  fn insert_ctrs_used(&self, name: &DefName, uses: &mut Definitions) {
     if let Some(Adt { ctrs, .. }) = self.adts.get(name) {
       for (ctr, _) in ctrs {
-        self.insert_used(self.def_names.def_id(ctr).unwrap(), Used::Adt, uses);
+        self.insert_used(ctr, Used::Adt, uses);
       }
     }
   }

@@ -1,6 +1,6 @@
 // Pass to give all variables in a definition unique names.
 
-use crate::term::{var_id_to_name, Book, Name, Pattern, Term};
+use crate::term::{Book, Pattern, Term, VarName};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -25,12 +25,12 @@ type VarId = Val;
 
 #[derive(Default)]
 pub struct UniqueNameGenerator {
-  name_map: HashMap<Name, Vec<VarId>>,
+  name_map: HashMap<VarName, Vec<VarId>>,
   name_count: VarId,
 }
 
 impl UniqueNameGenerator {
-  // Recursive implementation of unique names pass.
+  // Recursively assign an id to each variable in the term, then convert each id into a unique name.
   pub fn unique_names_in_term(&mut self, term: &mut Term) {
     match term {
       // Terms that create names
@@ -38,8 +38,10 @@ impl UniqueNameGenerator {
         // Put the name in scope and assign it a unique id.
         // Convert the lambda body and then remove it from scope.
         // Return a lambda with the newly created name
-        self.push(nam.as_ref());
-        self.unique_names_in_term(bod);
+        {
+          self.push(nam.as_ref());
+          self.unique_names_in_term(bod);
+        }
         *nam = self.pop(nam.as_ref());
       }
       Term::Let { pat: Pattern::Var(nam), val, nxt } => {
@@ -95,29 +97,33 @@ impl UniqueNameGenerator {
     }
   }
 
-  fn push(&mut self, nam: Option<&Name>) {
+  fn push(&mut self, nam: Option<&VarName>) {
     if let Some(name) = nam {
-      self.name_map.entry(name.clone()).or_default().push(self.name_count);
+      if let Some(ids) = self.name_map.get_mut(name) {
+        ids.push(self.name_count);
+      } else {
+        self.name_map.insert(name.clone(), vec![self.name_count]);
+      }
       self.name_count += 1;
     }
   }
 
-  fn pop(&mut self, nam: Option<&Name>) -> Option<Name> {
+  fn pop(&mut self, nam: Option<&VarName>) -> Option<VarName> {
     if let Some(name) = nam {
-      let new_name = self.name_map.get_mut(name).unwrap().pop().unwrap();
+      let var_id = self.name_map.get_mut(name).unwrap().pop().unwrap();
       if self.name_map[name].is_empty() {
         self.name_map.remove(name);
       }
-      Some(var_id_to_name(new_name))
+      Some(VarName::from(var_id))
     } else {
       None
     }
   }
 
-  fn use_var(&self, nam: &Name) -> Name {
+  fn use_var(&self, nam: &VarName) -> VarName {
     if let Some(vars) = self.name_map.get(nam) {
       let var_id = *vars.last().unwrap();
-      var_id_to_name(var_id)
+      VarName::from(var_id)
     } else {
       // Skip unbound variables.
       // With this, we can use this function before checking for unbound vars.

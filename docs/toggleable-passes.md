@@ -11,6 +11,7 @@
 | `-Opre-reduce-refs` `-Ono-pre-reduce-refs` | Disabled | [pre-reduce-refs](#pre-reduce-refs) | 
 | `-Osupercombinators` `-Ono-supercombinators` | Enabled  | [supercombinators](#supercombinators) |
 | `-Osimplify-main` `-Ono-simplify-main` | Disabled | [simplify-main](#simplify-main) |
+| `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
 
 ## Eta-reduction
 
@@ -83,6 +84,35 @@ Id = λx x
 Id2 = Id
 
 Main = (Id 42)
+```
+
+## Definition-merging
+
+If enabled, merges definitions that are identical at the term level.
+
+Since it runs on hvm-lang terms, it does not merge inets that become identical after [compile-time reduction](#pre-reduce).
+
+Example:
+```rs
+// Original program
+id = λx x
+also_id = λx x
+main = (id also_id)
+
+// After definition merging
+id_$_also_id = λx x
+main = (id also_id)
+
+// -Ono-merge, compilation output
+@also_id = (a a)
+@id = (a a)
+@main = a
+& @id ~ (@also_id a)
+
+// -Omerge, compilation output
+@a = (a a)
+@main = a
+& @a ~ (@a a)
 ```
 
 ## Pre-reduce

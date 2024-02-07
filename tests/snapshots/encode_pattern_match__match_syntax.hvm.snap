@@ -4,8 +4,8 @@ input_file: tests/golden_tests/encode_pattern_match/match_syntax.hvm
 ---
 (head) = λx (head$match$1 x)
 
-(Cons) = λx λxs #List_ λCons #List_ λNil #List_.Cons.xs (#List_.Cons.x (Cons x) xs)
+(head$match$1) = λa #List_ (a #List_.Cons.x λb #List_.Cons.xs λc b Nil)
 
 (Nil) = #List_ λCons #List_ λNil Nil
 
-(head$match$1) = λa #List_ (a #List_.Cons.x λb #List_.Cons.xs λc b Nil)
+(Cons) = λx λxs #List_ λCons #List_ λNil #List_.Cons.xs (#List_.Cons.x (Cons x) xs)

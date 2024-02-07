@@ -2,16 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.hvm
 ---
-(Foo) = λa #MyType (a #MyType.A.a λb 100 #MyType.B.b λc 200 #MyType.C.c λd 200 #MyType.D.d1 λe #MyType.D.d2 λf 200 #MyType.E.e1 λg #MyType.E.e2 λh 200)
-
 (main) = (Foo A 2)
 
-(A) = λa #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.A.a (A a)
+(Foo) = λa #MyType (a #MyType.A.a λb 100 #MyType.B.b λc 200 #MyType.C.c λd 200 #MyType.D.d1 λe #MyType.D.d2 λf 200 #MyType.E.e1 λg #MyType.E.e2 λh 200)
 
-(B) = λb #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.B.b (B b)
-
-(C) = λc #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.C.c (C c)
+(E) = λe1 λe2 #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.E.e2 (#MyType.E.e1 (E e1) e2)
 
 (D) = λd1 λd2 #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.D.d2 (#MyType.D.d1 (D d1) d2)
 
-(E) = λe1 λe2 #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.E.e2 (#MyType.E.e1 (E e1) e2)
+(C) = λc #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.C.c (C c)
+
+(B) = λb #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.B.b (B b)
+
+(A) = λa #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.A.a (A a)

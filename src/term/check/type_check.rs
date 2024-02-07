@@ -1,26 +1,24 @@
-use crate::term::{Book, DefId, Definition, Name, Pattern, Type};
-use std::collections::HashMap;
+use crate::term::{Book, DefName, Definition, Pattern, Type};
+use indexmap::IndexMap;
 
-pub type DefinitionTypes = HashMap<DefId, Vec<Type>>;
+pub type DefinitionTypes = IndexMap<DefName, Vec<Type>>;
 
 impl Book {
   /// Returns a HashMap from the definition id to the inferred pattern types
   /// and checks the rules arities based on the first rule arity.
   /// Expects patterns to be flattened.
   pub fn infer_def_types(&self) -> Result<DefinitionTypes, String> {
-    let mut def_types = HashMap::new();
-    for (def_id, def) in &self.defs {
-      let def_type = def
-        .infer_type(&self.ctrs)
-        .map_err(|e| format!("In definition '{}': {}", self.def_names.name(def_id).unwrap(), e))?;
-      def_types.insert(*def_id, def_type);
+    let mut def_types = IndexMap::new();
+    for (def_name, def) in &self.defs {
+      let def_type = def.infer_type(&self.ctrs).map_err(|e| format!("In definition '{def_name}': {e}"))?;
+      def_types.insert(def_name.clone(), def_type);
     }
     Ok(def_types)
   }
 }
 
 impl Definition {
-  pub fn infer_type(&self, ctrs: &HashMap<Name, Name>) -> Result<Vec<Type>, String> {
+  pub fn infer_type(&self, ctrs: &IndexMap<DefName, DefName>) -> Result<Vec<Type>, String> {
     let mut arg_types = vec![];
 
     for arg_idx in 0 .. self.arity() {
@@ -33,7 +31,7 @@ impl Definition {
 
 pub fn infer_arg_type<'a>(
   pats: impl Iterator<Item = &'a Pattern>,
-  ctrs: &HashMap<Name, Name>,
+  ctrs: &IndexMap<DefName, DefName>,
 ) -> Result<Type, String> {
   let mut arg_type = Type::Any;
   for pat in pats {
@@ -55,10 +53,8 @@ fn unify(new: Type, old: &mut Type) -> Result<(), String> {
 
 impl Book {
   pub fn check_arity(&self) -> Result<(), String> {
-    for (def_id, def) in self.defs.iter() {
-      def
-        .check_arity()
-        .map_err(|e| format!("In definition '{}': {}", self.def_names.name(def_id).unwrap(), e))?;
+    for (def_name, def) in self.defs.iter() {
+      def.check_arity().map_err(|e| format!("In definition '{def_name}': {e}"))?;
     }
     Ok(())
   }

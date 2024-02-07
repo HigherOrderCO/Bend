@@ -2,14 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_reverse.hvm
 ---
-@A = {6 a {4 {2 @A {2 @nil {2 @B {2 (b b) ({2 {6 a {4 @nil c}} {2 * c}} d)}}}} d}}
-@B = {6 a {4 {2 @B {2 (b b) (c d)}} (c {2 {6 a {4 d e}} {2 * e}})}}
-@cons = (a (b {2 {6 a {4 b c}} {2 * c}}))
+@a = {4 a {6 {2 @a {2 @nil {2 @b {2 (b b) ({2 {4 a {6 @nil c}} {2 * c}} d)}}}} d}}
+@b = {4 a {6 {2 @b {2 (b b) (c d)}} (c {2 {4 a {6 d e}} {2 * e}})}}
+@cons = (a (b {2 {4 a {6 b c}} {2 * c}}))
 @main = a
 & @reverse ~ (b a)
 & @cons ~ (#3 (c b))
 & @cons ~ (#2 (d c))
 & @cons ~ (#1 (@nil d))
 @nil = {2 * {2 a a}}
-@reverse = ({2 @A {2 @nil a}} a)
+@reverse = ({2 @a {2 @nil a}} a)
 

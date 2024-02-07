@@ -1,38 +1,39 @@
-use super::{Book, DefId, DefNames, Name, Op, Pattern, Tag, Term};
 use crate::{
   net::{INet, NodeKind::*, Port, ROOT},
-  term::MatchNum,
+  term::{num_to_name, Book, DefName, MatchNum, Op, Pattern, Tag, Term, VarName},
+  ENTRY_POINT,
 };
 use hvmc::{
-  ast::{name_to_val, val_to_name},
+  ast::name_to_val,
   run::{Loc, Val},
 };
 use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Debug, Default)]
 pub struct HvmcNames {
-  pub id_to_hvmc_name: HashMap<DefId, Val>,
-  pub hvmc_name_to_id: HashMap<Val, DefId>,
+  pub hvml_to_hvmc: HashMap<DefName, Val>,
+  pub hvmc_to_hvml: HashMap<Val, DefName>,
 }
 
-pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HvmcNames, Labels) {
+pub fn book_to_nets(book: &Book, main: &DefName) -> (HashMap<String, INet>, HvmcNames, Labels) {
   let mut nets = HashMap::new();
   let mut hvmc_names = HvmcNames::default();
   let mut labels = Labels::default();
+  let mut generated_count = 0;
 
   for def in book.defs.values() {
     for rule in def.rules.iter() {
       let net = term_to_compat_net(&rule.body, &mut labels);
 
-      let name = if def.def_id == main {
-        DefNames::ENTRY_POINT.to_string()
+      let name = if def.name == *main {
+        ENTRY_POINT.to_string()
       } else {
-        def_id_to_hvmc_name(book, def.def_id, &nets)
+        def_name_to_hvmc_name(&def.name, &nets, &mut generated_count)
       };
 
       let val = name_to_val(&name);
-      hvmc_names.id_to_hvmc_name.insert(def.def_id, val);
-      hvmc_names.hvmc_name_to_id.insert(val, def.def_id);
+      hvmc_names.hvml_to_hvmc.insert(def.name.clone(), val);
+      hvmc_names.hvmc_to_hvml.insert(val, def.name.clone());
       nets.insert(name, net);
     }
   }
@@ -48,7 +49,11 @@ pub fn book_to_nets(book: &Book, main: DefId) -> (HashMap<String, INet>, HvmcNam
 ///   If not: Truncates the rule name into 4 chars
 /// Them checks if the given hashmap already contains the resulted name,
 /// if it does, falls back into converting its DefId and succeeding ones until a unique name is found.
-fn def_id_to_hvmc_name(book: &Book, def_id: DefId, nets: &HashMap<String, INet>) -> String {
+fn def_name_to_hvmc_name(
+  def_name: &DefName,
+  nets: &HashMap<String, INet>,
+  generated_count: &mut Val,
+) -> String {
   fn truncate(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
       None => s,
@@ -56,20 +61,27 @@ fn def_id_to_hvmc_name(book: &Book, def_id: DefId, nets: &HashMap<String, INet>)
     }
   }
 
-  fn gen_unique_name(def_id: DefId, nets: &HashMap<String, INet>) -> String {
-    let name = val_to_name(def_id.to_internal());
-    if nets.contains_key(&name) { gen_unique_name(DefId(def_id.0 + 1), nets) } else { name }
+  fn gen_unique_name(generated_count: &mut Val, nets: &HashMap<String, INet>) -> String {
+    let mut id = *generated_count;
+    *generated_count += 1;
+    loop {
+      let name = num_to_name(id);
+      if nets.contains_key(&name) {
+        id += 1;
+      } else {
+        return name;
+      }
+    }
   }
 
-  if book.is_def_name_generated(def_id) {
-    gen_unique_name(def_id, nets)
+  if def_name.is_generated() {
+    gen_unique_name(generated_count, nets)
   } else {
-    let Name(name) = book.def_names.name(&def_id).unwrap();
-    let name = truncate(name, 10);
-    if !(nets.contains_key(name) || name.eq(DefNames::ENTRY_POINT)) {
+    let name = truncate(def_name, 10);
+    if !(nets.contains_key(name) || name.eq(ENTRY_POINT)) {
       name.to_owned()
     } else {
-      gen_unique_name(def_id, nets)
+      gen_unique_name(generated_count, nets)
     }
   }
 }
@@ -99,9 +111,9 @@ pub fn term_to_compat_net(term: &Term, labels: &mut Labels) -> INet {
 #[derive(Debug)]
 struct EncodeTermState<'a> {
   inet: INet,
-  scope: HashMap<Name, Vec<usize>>,
+  scope: HashMap<VarName, Vec<usize>>,
   vars: Vec<(Port, Option<Port>)>,
-  global_vars: HashMap<Name, (Port, Port)>,
+  global_vars: HashMap<VarName, (Port, Port)>,
   labels: &'a mut Labels,
 }
 
@@ -213,8 +225,8 @@ impl<'a> EncodeTermState<'a> {
         None
       }
       // core: @def_id
-      Term::Ref { def_id } => {
-        let node = self.inet.new_node(Ref { def_id: *def_id });
+      Term::Ref { def_name } => {
+        let node = self.inet.new_node(Ref { def_name: def_name.clone() });
         self.inet.link(Port(node, 1), Port(node, 2));
         self.inet.link(up, Port(node, 0));
         Some(Port(node, 0))
@@ -294,14 +306,14 @@ impl<'a> EncodeTermState<'a> {
     }
   }
 
-  fn push_scope(&mut self, name: &Option<Name>, decl_port: Port) {
+  fn push_scope(&mut self, name: &Option<VarName>, decl_port: Port) {
     if let Some(name) = name {
       self.scope.entry(name.clone()).or_default().push(self.vars.len());
       self.vars.push((decl_port, None));
     }
   }
 
-  fn pop_scope(&mut self, name: &Option<Name>, decl_port: Port) {
+  fn pop_scope(&mut self, name: &Option<VarName>, decl_port: Port) {
     if let Some(name) = name {
       self.scope.get_mut(name).unwrap().pop().unwrap();
     } else {
@@ -351,8 +363,8 @@ pub struct Labels {
 #[derive(Debug, Default)]
 pub struct LabelGenerator {
   pub next: u32,
-  pub name_to_label: HashMap<Name, u32>,
-  pub label_to_name: HashMap<u32, Name>,
+  pub name_to_label: HashMap<VarName, u32>,
+  pub label_to_name: HashMap<u32, VarName>,
 }
 
 impl LabelGenerator {

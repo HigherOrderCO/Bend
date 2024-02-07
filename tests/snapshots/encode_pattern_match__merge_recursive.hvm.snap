@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/merge_recursive.hvm
 ---
-(foo_1_$_bar_1) = λx (x foo_2_$_bar_2)
-
 (foo_2_$_bar_2) = λa λb (a, b)
+
+(foo_1_$_bar_1) = λx (x foo_2_$_bar_2)

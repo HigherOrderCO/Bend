@@ -1,10 +1,8 @@
 use std::fmt::{self, Display};
 
-use crate::term::Name;
-
 use super::{
   net_to_term::{ReadbackError, ReadbackErrors},
-  Book, DefId, DefNames, Definition, MatchNum, Op, Pattern, Rule, Tag, Term, Type,
+  Book, DefName, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term, Type,
 };
 
 macro_rules! display {
@@ -14,46 +12,37 @@ macro_rules! display {
 }
 
 impl Term {
-  fn display_app<'a>(&'a self, tag: &'a Tag, def_names: &'a DefNames) -> impl Display + 'a {
+  fn display_app<'a>(&'a self, tag: &'a Tag) -> impl Display + 'a {
     DisplayFn(move |f| match self {
       Term::App { tag: tag2, fun, arg } if tag2 == tag => {
-        write!(f, "{} {}", fun.display_app(tag, def_names), arg.display(def_names))
+        write!(f, "{} {}", fun.display_app(tag), arg.display())
       }
-      _ => write!(f, "{}", self.display(def_names)),
+      _ => write!(f, "{}", self.display()),
     })
   }
-  pub fn display<'a>(&'a self, def_names: &'a DefNames) -> impl Display + 'a {
+  pub fn display(&self) -> impl Display + '_ {
     DisplayFn(move |f| match self {
       Term::Lam { tag, nam, bod } => {
-        write!(
-          f,
-          "{}λ{} {}",
-          tag.display_padded(),
-          nam.as_ref().map_or("*", |x| x.as_str()),
-          bod.display(def_names)
-        )
+        write!(f, "{}λ{} {}", tag.display_padded(), nam.as_ref().map_or("*", |x| x.as_str()), bod.display())
       }
       Term::Var { nam } => write!(f, "{nam}"),
       Term::Chn { tag, nam, bod } => {
-        write!(f, "{}λ${} {}", tag.display_padded(), nam, bod.display(def_names))
+        write!(f, "{}λ${} {}", tag.display_padded(), nam, bod.display())
       }
       Term::Lnk { nam } => write!(f, "${nam}"),
       Term::Let { pat, val, nxt } => {
-        write!(f, "let {} = {}; {}", pat, val.display(def_names), nxt.display(def_names))
+        write!(f, "let {} = {}; {}", pat, val.display(), nxt.display())
       }
-      Term::Ref { def_id } => write!(f, "{}", def_names.name(def_id).unwrap()),
+      Term::Ref { def_name } => write!(f, "{def_name}"),
       Term::App { tag, fun, arg } => {
-        write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag, def_names), arg.display(def_names))
+        write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag), arg.display())
       }
       Term::Match { scrutinee, arms } => {
         write!(
           f,
           "match {} {{ {} }}",
-          scrutinee.display(def_names),
-          DisplayJoin(
-            || arms.iter().map(|(pat, term)| display!("{}: {}", pat, term.display(def_names))),
-            "; "
-          ),
+          scrutinee.display(),
+          DisplayJoin(|| arms.iter().map(|(pat, term)| display!("{}: {}", pat, term.display())), "; "),
         )
       }
       Term::Dup { tag, fst, snd, val, nxt } => write!(
@@ -62,21 +51,21 @@ impl Term {
         tag.display(),
         fst.as_ref().map_or("*", |x| x.as_str()),
         snd.as_ref().map_or("*", |x| x.as_str()),
-        val.display(def_names),
-        nxt.display(def_names)
+        val.display(),
+        nxt.display()
       ),
       Term::Sup { tag, fst, snd } => {
-        write!(f, "{}{{{} {}}}", tag.display(), fst.display(def_names), snd.display(def_names))
+        write!(f, "{}{{{} {}}}", tag.display(), fst.display(), snd.display())
       }
       Term::Era => write!(f, "*"),
       Term::Num { val } => write!(f, "{val}"),
       Term::Str { val } => write!(f, "{val:?}"),
       Term::Opx { op, fst, snd } => {
-        write!(f, "({} {} {})", op, fst.display(def_names), snd.display(def_names))
+        write!(f, "({} {} {})", op, fst.display(), snd.display())
       }
-      Term::Tup { fst, snd } => write!(f, "({}, {})", fst.display(def_names), snd.display(def_names)),
+      Term::Tup { fst, snd } => write!(f, "({}, {})", fst.display(), snd.display()),
       Term::List { els } => {
-        write!(f, "[{}]", DisplayJoin(|| els.iter().map(|el| display!("{}", el.display(def_names))), ", "),)
+        write!(f, "[{}]", DisplayJoin(|| els.iter().map(|el| display!("{}", el.display())), ", "),)
       }
       Term::Invalid => write!(f, "<Invalid>"),
     })
@@ -118,25 +107,25 @@ impl fmt::Display for Pattern {
 }
 
 impl Rule {
-  pub fn display<'a>(&'a self, def_id: &'a DefId, def_names: &'a DefNames) -> impl Display + 'a {
+  pub fn display<'a>(&'a self, def_name: &'a DefName) -> impl Display + 'a {
     display!(
       "({}{}) = {}",
-      def_names.name(def_id).unwrap(),
+      def_name,
       DisplayJoin(|| self.pats.iter().map(|x| display!(" {x}")), ""),
-      self.body.display(def_names)
+      self.body.display()
     )
   }
 }
 
 impl Definition {
-  pub fn display<'a>(&'a self, def_names: &'a DefNames) -> impl Display + 'a {
-    DisplayJoin(|| self.rules.iter().map(|x| x.display(&self.def_id, def_names)), "\n")
+  pub fn display(&self) -> impl Display + '_ {
+    DisplayJoin(|| self.rules.iter().map(|x| x.display(&self.name)), "\n")
   }
 }
 
 impl fmt::Display for Book {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", DisplayJoin(|| self.defs.values().map(|x| x.display(&self.def_names)), "\n\n"))
+    write!(f, "{}", DisplayJoin(|| self.defs.values().map(|x| x.display()), "\n\n"))
   }
 }
 
@@ -221,7 +210,7 @@ where
 }
 
 impl ReadbackErrors {
-  pub fn display<'a>(&'a self, def_names: &'a DefNames) -> impl fmt::Display + '_ {
+  pub fn display(&self) -> impl fmt::Display + '_ {
     DisplayFn(move |f| {
       if self.0.is_empty() {
         return Ok(());
@@ -233,12 +222,12 @@ impl ReadbackErrors {
         if err.can_count() {
           *err_counts.entry(err).or_insert(0) += 1;
         } else {
-          writeln!(f, "{}", err.display(def_names))?;
+          writeln!(f, "{}", err.display())?;
         }
       }
 
       for (err, count) in err_counts {
-        write!(f, "{}", err.display(def_names))?;
+        write!(f, "{}", err.display())?;
         if count > 1 {
           writeln!(f, " with {} occurrences", count)?;
         }
@@ -250,7 +239,7 @@ impl ReadbackErrors {
 }
 
 impl ReadbackError {
-  pub fn display<'a>(&'a self, def_names: &'a DefNames) -> impl Display + '_ {
+  pub fn display(&self) -> impl Display + '_ {
     DisplayFn(move |f| match self {
       ReadbackError::InvalidNumericMatch => write!(f, "Invalid Numeric Match"),
       ReadbackError::InvalidNumericOp => write!(f, "Invalid Numeric Operation"),
@@ -268,7 +257,7 @@ impl ReadbackError {
       }
       ReadbackError::InvalidAdtMatch => write!(f, "Invalid Adt Match"),
       ReadbackError::InvalidStrTerm(term) => {
-        write!(f, "Invalid String Character value '{}'", term.display(def_names))
+        write!(f, "Invalid String Character value '{}'", term.display())
       }
     })
   }

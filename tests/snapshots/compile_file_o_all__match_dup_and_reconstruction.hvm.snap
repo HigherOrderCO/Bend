@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/match_dup_and_reconstruction.hvm
 ---
-@9 = {4 a (b [b a])}
-@Boxed = (a {2 {4 a b} b})
-@Got = ({3 {2 @9 (a b)} a} b)
+@Boxed = (a {4 {2 a b} b})
+@Got = ({3 {4 @a (a b)} a} b)
+@a = {2 a (b [b a])}
 @main = a
 & @Got ~ (b a)
 & @Boxed ~ (#10 b)

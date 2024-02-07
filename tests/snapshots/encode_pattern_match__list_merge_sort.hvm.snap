@@ -16,14 +16,14 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 
 (Merge) = λa λb (#List_ (b #List_.Cons.head λc #List_.Cons.tail λd λe λf (#List_ (f #List_.Cons.head λg #List_.Cons.tail λh λi λj λk (If (i j g) let l = (Cons g h); (Cons j (Merge i k l)) let m = (Cons j k); (Cons g (Merge i m h))) λn λo λp (Cons o p)) e c d) λq λr r) a)
 
-(True) = #Bool λTrue #Bool λFalse True
-
-(False) = #Bool λTrue #Bool λFalse False
-
-(Cons) = λhead λtail #List_ λCons #List_ λNil #List_.Cons.tail (#List_.Cons.head (Cons head) tail)
-
-(Nil) = #List_ λCons #List_ λNil Nil
+(MergePair$F0) = λa λb λc (#List_ (c #List_.Cons.head λd #List_.Cons.tail λe λf λg (Cons (Merge f g d) (MergePair f e)) λh λi (Cons i Nil)) a b)
 
 (Unpack$F0) = λa λb λc (#List_ (c #List_.Cons.head λd #List_.Cons.tail λe λf λg (Unpack f (MergePair f (Cons g (Cons d e)))) λh λi i) a b)
 
-(MergePair$F0) = λa λb λc (#List_ (c #List_.Cons.head λd #List_.Cons.tail λe λf λg (Cons (Merge f g d) (MergePair f e)) λh λi (Cons i Nil)) a b)
+(Nil) = #List_ λCons #List_ λNil Nil
+
+(Cons) = λhead λtail #List_ λCons #List_ λNil #List_.Cons.tail (#List_.Cons.head (Cons head) tail)
+
+(True) = #Bool λTrue #Bool λFalse True
+
+(False) = #Bool λTrue #Bool λFalse False

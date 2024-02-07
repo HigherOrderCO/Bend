@@ -7,7 +7,7 @@ input_file: tests/golden_tests/flatten_rules/double_unwrap_box.hvm
 
 (Main) = (DoubleUnbox (Box (Box 0)) 5)
 
-(Box) = λx #Boxed λBox #Boxed.Box.x (Box x)
-
 (DoubleUnbox$F0 (Box x) *) = x
 (DoubleUnbox$F0 * x) = x
+
+(Box) = λx #Boxed λBox #Boxed.Box.x (Box x)

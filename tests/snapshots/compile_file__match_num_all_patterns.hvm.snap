@@ -13,13 +13,13 @@ input_file: tests/golden_tests/compile_file/match_num_all_patterns.hvm
 // WARNING: Unused definition 'zero_succ_var'.
 // WARNING: Unused definition 'succ_zero_var'.
 // WARNING: Unused definition 'succ_zero_succ'.
-@B = (?<(#0 (a a)) b> b)
-@H = (<+ #1 <- #1 a>> a)
-@I = (<+ #1 <- #1 a>> a)
-@J = (<+ #2 a> a)
+@a = (?<(#0 (a a)) b> b)
+@b = (<+ #1 <- #1 a>> a)
+@c = (<+ #1 <- #1 a>> a)
+@d = (<+ #2 a> a)
 @main = #0
 @succ_var = (?<(#0 (a a)) b> b)
-@succ_var_z = (?<(a @J) b> b)
+@succ_var_z = (?<(a @d) b> b)
 & #0 ~ <+ #1 a>
 @succ_zero = (?<(#0 (a a)) b> b)
 @succ_zero_ = (?<(#0 (a a)) b> b)
@@ -27,6 +27,6 @@ input_file: tests/golden_tests/compile_file/match_num_all_patterns.hvm
 @var_zero = (a a)
 @zero_succ = (?<(#0 (a a)) b> b)
 @zero_succ_ = (?<(#0 (a a)) b> b)
-@zero_var = (?<(#0 @H) a> a)
-@zero_var_s = (?<(#0 @I) a> a)
+@zero_var = (?<(#0 @c) a> a)
+@zero_var_s = (?<(#0 @b) a> a)
 

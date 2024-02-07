@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/unscoped_supercombinator.hvm
 ---
-@7 = (a ((a b) b))
-@8 = (a ((a b) b))
-@Foo = ((@7 (@8 a)) a)
+@Foo = ((@b (@a a)) a)
+@a = (a ((a b) b))
+@b = (a ((a b) b))
 @main = a
 & @Foo ~ (* a)
 

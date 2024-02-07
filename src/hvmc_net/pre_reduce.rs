@@ -2,7 +2,7 @@
 // This is a useful optimization on its own, but also required by an hvm-core optimization.
 
 use crate::{
-  expand, net_from_runtime, net_to_runtime, rdex, reduce, runtime_net_to_runtime_def, term::DefNames,
+  expand, net_from_runtime, net_to_runtime, rdex, reduce, runtime_net_to_runtime_def, ENTRY_POINT,
 };
 use hvmc::{
   ast::{book_from_runtime, name_to_val, Book},
@@ -26,7 +26,7 @@ pub fn pre_reduce_book(book: &mut Book, cross_refs: bool) -> Result<(), String> 
     boot(rt, fid);
     expand(rt, rt_book);
 
-    let fully_reduce = cross_refs && nam != DefNames::ENTRY_POINT;
+    let fully_reduce = cross_refs && nam != ENTRY_POINT;
     let iters = if fully_reduce {
       let mut iters = 0;
       // TODO: If I just call `rt.normal` some terms expand infinitely, so I put this workaround.

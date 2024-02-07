@@ -2,6 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/expr.hvm
 ---
+(Div) = #Op λAdd #Op λSub #Op λMul #Op λDiv Div
+
+(Mul) = #Op λAdd #Op λSub #Op λMul #Op λDiv Mul
+
+(Sub) = #Op λAdd #Op λSub #Op λMul #Op λDiv Sub
+
+(Add) = #Op λAdd #Op λSub #Op λMul #Op λDiv Add
+
 (Var) = λname #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Var.name (Var name)
 
 (Num) = λval #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Num.val (Num val)
@@ -19,11 +27,3 @@ input_file: tests/golden_tests/encode_pattern_match/expr.hvm
 (Tup) = λfst λsnd #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Tup.snd (#Expr.Tup.fst (Tup fst) snd)
 
 (Op2) = λop λfst λsnd #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Op2.snd (#Expr.Op2.fst (#Expr.Op2.op (Op2 op) fst) snd)
-
-(Add) = #Op λAdd #Op λSub #Op λMul #Op λDiv Add
-
-(Sub) = #Op λAdd #Op λSub #Op λMul #Op λDiv Sub
-
-(Mul) = #Op λAdd #Op λSub #Op λMul #Op λDiv Mul
-
-(Div) = #Op λAdd #Op λSub #Op λMul #Op λDiv Div

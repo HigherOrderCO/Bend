@@ -1,8 +1,8 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
-  check_book, compile_book, desugar_book, load_file_to_book, run_book, total_rewrites, CompileOpts, RunInfo,
-  RunOpts, WarnState, WarningOpts,
+  check_book, compile_book, desugar_book, load_file_to_book, run_book, CompileOpts, RunInfo, RunOpts,
+  WarnState, WarningOpts,
 };
 use std::{path::PathBuf, vec::IntoIter};
 
@@ -197,17 +197,17 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
 
       let mem_size = mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
       let run_opts = RunOpts { single_core, debug, linear, lazy_mode };
-      let (res_term, def_names, RunInfo { stats, readback_errors, net }) =
+      let (res_term, RunInfo { stats, readback_errors, net }) =
         run_book(book, mem_size, run_opts, warning_opts, opts)?;
 
-      let total_rewrites = total_rewrites(&stats.rewrites) as f64;
+      let total_rewrites = stats.rewrites.total() as f64;
       let rps = total_rewrites / stats.run_time / 1_000_000.0;
 
       if cli.verbose {
         println!("\n{}", show_net(&net));
       }
 
-      println!("{}{}", readback_errors.display(&def_names), res_term.display(&def_names));
+      println!("{}{}", readback_errors.display(), res_term.display());
 
       if arg_stats {
         println!("\nRWTS   : {}", total_rewrites);
@@ -260,6 +260,8 @@ pub enum OptArgs {
   NoSimplifyMain,
   PreReduceRefs,
   NoPreReduceRefs,
+  Merge,
+  NoMerge,
 }
 
 impl OptArgs {
@@ -284,6 +286,8 @@ impl OptArgs {
         NoSimplifyMain => opts.simplify_main = false,
         PreReduceRefs => opts.pre_reduce_refs = true,
         NoPreReduceRefs => opts.pre_reduce_refs = false,
+        Merge => opts.merge = true,
+        NoMerge => opts.merge = false,
       }
     }
     opts

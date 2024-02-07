@@ -4,8 +4,8 @@ input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_in_arm.hv
 ---
 (main) = λx (main$match$1 x)
 
-(T) = #bool λT #bool λF T
+(main$match$1) = λa #bool (a λ$x $x λb b)
 
 (F) = #bool λT #bool λF F
 
-(main$match$1) = λa #bool (a λ$x $x λb b)
+(T) = #bool λT #bool λF T

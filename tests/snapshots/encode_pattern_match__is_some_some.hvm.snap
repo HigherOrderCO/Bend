@@ -2,12 +2,12 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/is_some_some.hvm
 ---
-(some_some) = λa #Option (a #Option.Some.x λb (some_some$F0 b) 0)
-
 (main) = (some_some (Some 1))
 
-(Some) = λx #Option λSome #Option λNone #Option.Some.x (Some x)
+(some_some) = λa #Option (a #Option.Some.x λb (some_some$F0 b) 0)
+
+(some_some$F0) = λa #Option (a #Option.Some.x λb 1 0)
 
 (None) = #Option λSome #Option λNone None
 
-(some_some$F0) = λa #Option (a #Option.Some.x λb 1 0)
+(Some) = λx #Option λSome #Option λNone #Option.Some.x (Some x)

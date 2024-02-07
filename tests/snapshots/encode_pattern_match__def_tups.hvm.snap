@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/def_tups.hvm
 ---
-(go) = λa let (b, c) = a; (go$F0 b c)
-
 (main) = (go (1, (2, (3, (4, 5)))))
+
+(go) = λa let (b, c) = a; (go$F0 b c)
 
 (go$F0) = λa λb let (c, d) = b; (go$F0$F0 a c d)
 

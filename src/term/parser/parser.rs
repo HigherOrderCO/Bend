@@ -1,6 +1,6 @@
 use crate::term::{
   parser::lexer::{LexingError, Token},
-  Adt, Book, MatchNum, Name, Op, Origin, Pattern, Rule, Tag, Term,
+  Adt, Book, DefName, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Tag, Term, VarName,
 };
 use chumsky::{
   error::RichReason,
@@ -13,8 +13,9 @@ use chumsky::{
   span::SimpleSpan,
   IterParser, Parser,
 };
+use indexmap::map::Entry;
 use logos::{Logos, SpannedIter};
-use std::{collections::hash_map::Entry, iter::Map, ops::Range, path::Path};
+use std::{iter::Map, ops::Range, path::Path};
 
 // hvml grammar description:
 // <Book>    ::= <TopLevel>*
@@ -118,19 +119,19 @@ fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  select!(Token::Name(name) => Name(name))
+  select!(Token::Name(name) => Name::from(name))
 }
 
 /// A top level name that not accepts `-`.
-fn tl_name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
+fn tl_name<'a, I>() -> impl Parser<'a, I, DefName, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  select!(Token::Name(name) => Name(name)).validate(|out, span, emitter| {
+  select!(Token::Name(name) => name).validate(|out, span, emitter| {
     if out.contains('-') {
       emitter.emit(Rich::custom(span, "Names with '-' are not supported at top level."));
     }
-    out
+    DefName::from(out)
   })
 }
 
@@ -141,7 +142,7 @@ where
   just(Token::Hash).ignore_then(name()).or_not().map(move |x| x.map_or_else(|| default.clone(), Tag::Named))
 }
 
-fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
+fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<VarName>, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -403,7 +404,7 @@ where
   })
 }
 
-fn rule_pattern<'a, I>() -> impl Parser<'a, I, (Name, Vec<Pattern>), extra::Err<Rich<'a, Token>>>
+fn rule_pattern<'a, I>() -> impl Parser<'a, I, (DefName, Vec<Pattern>), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -415,7 +416,7 @@ where
 /// This rule always emits an error when it parses successfully
 /// It is used to report a parsing error that would be unclear otherwise
 fn rule_body_missing_paren<'a, I>()
--> impl Parser<'a, I, ((Name, Vec<Pattern>), Term), extra::Err<Rich<'a, Token>>>
+-> impl Parser<'a, I, ((DefName, Vec<Pattern>), Term), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -437,7 +438,7 @@ where
     .boxed()
 }
 
-fn rule<'a, I>(rule_type: Origin) -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
+fn rule<'a, I>(rule_type: Origin) -> impl Parser<'a, I, (DefName, Rule), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -446,7 +447,9 @@ where
     .map(move |((name, pats), body)| (name, Rule { pats, body, origin: rule_type }))
 }
 
-fn datatype<'a, I>(origin: Origin) -> impl Parser<'a, I, (Name, Adt, SimpleSpan), extra::Err<Rich<'a, Token>>>
+fn datatype<'a, I>(
+  origin: Origin,
+) -> impl Parser<'a, I, (DefName, Adt, SimpleSpan), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -462,7 +465,7 @@ where
   data
     .ignore_then(tl_name())
     .then_ignore(just(Token::Equals))
-    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, Vec<Name>)>>())
+    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(DefName, Vec<VarName>)>>())
     .map_with_span(move |(name, ctrs), span| (name, Adt { ctrs: ctrs.into_iter().collect(), origin }, span))
 }
 
@@ -482,11 +485,11 @@ where
 fn collect_book(mut book: Book, program: Vec<TopLevel>, emit: &mut Emitter<Rich<'_, Token>>) -> Book {
   for top_level in program {
     match top_level {
-      TopLevel::Rule((nam, rule)) => {
-        if let Some(def) = book.get_def_mut(&nam) {
+      TopLevel::Rule((name, rule)) => {
+        if let Some(def) = book.defs.get_mut(&name) {
           def.rules.push(rule);
         } else {
-          book.insert_def(nam, vec![rule]);
+          book.defs.insert(name.clone(), Definition { name, rules: vec![rule] });
         }
       }
       TopLevel::Adt((nam, adt, span)) => match book.adts.get(&nam) {
@@ -521,6 +524,6 @@ fn collect_book(mut book: Book, program: Vec<TopLevel>, emit: &mut Emitter<Rich<
 }
 
 enum TopLevel {
-  Rule((Name, Rule)),
-  Adt((Name, Adt, SimpleSpan)),
+  Rule((DefName, Rule)),
+  Adt((DefName, Adt, SimpleSpan)),
 }
