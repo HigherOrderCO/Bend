@@ -1,0 +1,4 @@
+// Check that the ctr in the middle are interpreted correctly
+data tup = (pair a b)
+
+main = (LCons (SCons 'a' (pair 'b' (SCons 'c' SNil))) (LCons 1 (pair 2 (LCons 3 (LCons 4 LNil)))))

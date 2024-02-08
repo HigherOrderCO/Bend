@@ -2,7 +2,7 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
   check_book, compile_book, desugar_book, load_file_to_book, run_book,
-  term::{AdtEncoding, Name},
+  term::{display::display_readback_errors, AdtEncoding, Name},
   CompileOpts, RunInfo, RunOpts, WarnState, WarningOpts,
 };
 use std::{path::PathBuf, vec::IntoIter};
@@ -211,7 +211,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
         println!("\n{}", show_net(&net));
       }
 
-      println!("{}{}", readback_errors.display(), res_term.display());
+      println!("{}{}", display_readback_errors(&readback_errors), res_term.display());
 
       if arg_stats {
         println!("\nRWTS   : {}", total_rewrites);

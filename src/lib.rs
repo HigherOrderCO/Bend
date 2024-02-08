@@ -11,9 +11,10 @@ use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::time::Instant;
 use term::{
   book_to_nets,
-  net_to_term::{net_to_term, ReadbackErrors},
+  display::display_readback_errors,
+  net_to_term::net_to_term,
   term_to_net::{HvmcNames, Labels},
-  AdtEncoding, Book, DefName, Name, Term,
+  AdtEncoding, Book, DefName, Name, ReadbackError, Term,
 };
 
 pub mod hvmc_net;
@@ -123,11 +124,17 @@ pub fn run_book(
 
   display_warnings(warning_opts, &warnings)?;
 
-  let debug_hook = run_opts.debug_hook(&book, &hvmc_names, &labels, &compile_opts.adt_encoding);
+  // Run
+  let debug_hook = run_opts.debug_hook(&book, &hvmc_names, &labels);
   let (res_lnet, stats) = run_compiled(&core_book, mem_size, run_opts, debug_hook, &book.hvmc_entrypoint());
+
+  // Readback
   let net = hvmc_to_net(&res_lnet, &hvmc_names.hvmc_to_hvml);
-  let (res_term, readback_errors) =
-    net_to_term(&net, &book, &labels, run_opts.linear, compile_opts.adt_encoding);
+  let (mut res_term, mut readback_errors) = net_to_term(&net, &book, &labels, run_opts.linear);
+  let resugar_errs = res_term.resugar_adts(&book, compile_opts.adt_encoding);
+  res_term.resugar_builtins();
+
+  readback_errors.extend(resugar_errs);
   let info = RunInfo { stats, readback_errors, net: res_lnet };
   Ok((res_term, info))
 }
@@ -204,13 +211,16 @@ impl RunOpts {
     book: &'a Book,
     hvmc_names: &'a HvmcNames,
     labels: &'a Labels,
-    adt_encoding: &'a AdtEncoding,
   ) -> Option<impl FnMut(&Net) + 'a> {
     self.debug.then_some({
       |net: &_| {
         let net = hvmc_to_net(net, &hvmc_names.hvmc_to_hvml);
-        let (res_term, errors) = net_to_term(&net, book, labels, self.linear, *adt_encoding);
-        println!("{}{}\n---------------------------------------", errors.display(), res_term.display())
+        let (res_term, errors) = net_to_term(&net, book, labels, self.linear);
+        println!(
+          "{}{}\n---------------------------------------",
+          display_readback_errors(&errors),
+          res_term.display()
+        )
       }
     })
   }
@@ -316,8 +326,8 @@ impl WarningOpts {
   }
 
   /// Filters warnings based on the enabled flags.
-  pub fn filter<'a>(&'a self, wrns: &'a [Warning], ws: WarnState) -> Vec<&Warning> {
-    wrns
+  pub fn filter<'a>(&'a self, warns: &'a [Warning], ws: WarnState) -> Vec<&Warning> {
+    warns
       .iter()
       .filter(|w| {
         (match w {
@@ -378,7 +388,7 @@ impl std::fmt::Display for Warning {
 
 pub struct RunInfo {
   pub stats: RunStats,
-  pub readback_errors: ReadbackErrors,
+  pub readback_errors: Vec<ReadbackError>,
   pub net: Net,
 }
 

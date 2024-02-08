@@ -12,6 +12,8 @@ pub mod inline;
 pub mod linearize;
 pub mod resolve_ctrs_in_pats;
 pub mod resolve_refs;
+pub mod resugar_adts;
+pub mod resugar_builtins;
 pub mod simplify_main_ref;
 pub mod simplify_ref_to_ref;
 pub mod unique_names;

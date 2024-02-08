@@ -95,24 +95,11 @@ fn make_pattern_matching_case(
   let only_var_left = fst_rule.pats[crnt_arg_idx ..].iter().all(|p| matches!(p, Pattern::Var(_)));
   let is_fst_rule_irrefutable = all_args_done || only_var_left;
 
-  let (new_match, old_matches) = match_path.split_last().unzip();
-
-  let old_args: Vec<VarName> = old_matches
-    .unwrap_or_default()
-    .iter()
-    .flat_map(|pat| pat.vars())
-    .enumerate()
-    .map(|(i, _)| format!("%x{i}").into())
-    .collect();
-  let new_args: Vec<VarName> = new_match
-    .map(|pat| pat.vars().enumerate().map(|(i, _)| format!("%y{i}").into()).collect())
-    .unwrap_or(vec![]);
-
   if is_fst_rule_irrefutable {
     // First rule will always be selected, generate leaf case.
-    make_leaf_case(book, fst_rule, fst_rule_idx, match_path, old_args, new_args, adt_encoding)
+    make_leaf_case(book, fst_rule, fst_rule_idx, match_path, adt_encoding)
   } else {
-    make_match_case(book, def, def_type, crnt_rules, match_path, old_args, new_args, adt_encoding)
+    make_match_case(book, def, def_type, crnt_rules, match_path, adt_encoding)
   }
 }
 
@@ -124,8 +111,6 @@ fn make_match_case(
   def_type: &[Type],
   crnt_rules: Vec<usize>,
   match_path: Vec<Pattern>,
-  old_args: Vec<VarName>,
-  new_args: Vec<VarName>,
   adt_encoding: AdtEncoding,
 ) -> Term {
   let next_arg_idx = match_path.len();
@@ -149,6 +134,8 @@ fn make_match_case(
     let next_case = make_pattern_matching_case(book, def, def_type, next_rules, match_path, adt_encoding);
     next_cases.push(next_case);
   }
+
+  let (old_args, new_args) = args_from_match_path(&match_path);
 
   // Encode the current pattern matching, calling the subfunctions
   let match_var = VarName::new("x");
@@ -209,10 +196,9 @@ fn make_leaf_case(
   rule: &Rule,
   rule_idx: usize,
   match_path: Vec<Pattern>,
-  old_args: Vec<VarName>,
-  new_args: Vec<VarName>,
   adt_encoding: AdtEncoding,
 ) -> Term {
+  let (old_args, new_args) = args_from_match_path(&match_path);
   let args = &mut old_args.iter().chain(new_args.iter()).cloned();
 
   // The term we're building
@@ -279,6 +265,21 @@ fn add_arg_lams(
     // First arg, no new vars.
     None => term,
   }
+}
+
+fn args_from_match_path(match_path: &[Pattern]) -> (Vec<VarName>, Vec<VarName>) {
+  let (new_match, old_matches) = match_path.split_last().unzip();
+  let old_args: Vec<VarName> = old_matches
+    .unwrap_or_default()
+    .iter()
+    .flat_map(|pat| pat.vars())
+    .enumerate()
+    .map(|(i, _)| format!("%x{i}").into())
+    .collect();
+  let new_args: Vec<VarName> = new_match
+    .map(|pat| pat.vars().enumerate().map(|(i, _)| format!("%y{i}").into()).collect())
+    .unwrap_or(vec![]);
+  (old_args, new_args)
 }
 
 /* Functions used to normalize generated part of the def */

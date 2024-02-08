@@ -4,8 +4,8 @@ use hvml::{
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
   term::{
-    load_book::do_parse_book, net_to_term::net_to_term, parser::parse_term, term_to_compat_net,
-    term_to_net::Labels, AdtEncoding, Book, Name, Term,
+    display::display_readback_errors, load_book::do_parse_book, net_to_term::net_to_term, parser::parse_term,
+    term_to_compat_net, term_to_net::Labels, AdtEncoding, Book, Name, Term,
   },
   CompileOpts, RunOpts, WarningOpts,
 };
@@ -117,7 +117,7 @@ fn run_file() {
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) =
       run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
-    Ok(format!("{}{}", info.readback_errors.display(), res.display()))
+    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res.display()))
   })
 }
 
@@ -132,7 +132,7 @@ fn run_lazy() {
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) = run_book(book, 1 << 20, run_opts, WarningOpts::deny_all(), desugar_opts, None)?;
-    Ok(format!("{}{}", info.readback_errors.display(), res.display()))
+    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res.display()))
   })
 }
 
@@ -142,9 +142,8 @@ fn readback_lnet() {
     let net = do_parse_net(code)?;
     let book = Book::default();
     let compat_net = hvmc_to_net(&net, &Default::default());
-    let (term, errors) =
-      net_to_term(&compat_net, &book, &Labels::default(), false, hvml::term::AdtEncoding::TaggedScott);
-    Ok(format!("{}{}", errors.display(), term.display()))
+    let (term, errors) = net_to_term(&compat_net, &book, &Labels::default(), false);
+    Ok(format!("{}{}", display_readback_errors(&errors), term.display()))
   })
 }
 
@@ -248,6 +247,6 @@ fn run_entrypoint() {
       CompileOpts::heavy(),
       Some(Name::new("foo")),
     )?;
-    Ok(format!("{}{}", info.readback_errors.display(), res.display()))
+    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res.display()))
   })
 }
