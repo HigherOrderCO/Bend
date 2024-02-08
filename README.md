@@ -46,7 +46,7 @@ hvml compile <file>
 ```
 This will output the compiled file to stdout.
 
-There are optional toggleable passes through the CLI. [Click here](docs/toggleable-passes.md) to learn about them.
+There are compiler options through the CLI. [Click here](docs/compiler-options.md) to learn about them.
 
 ## Syntax
 
@@ -57,7 +57,7 @@ Here's a lambda where the body is the variable `x`:
 id = λx x
 ```
 
-Lambdas can also be defined using `@`. 
+Lambdas can also be defined using `@`.
 To discard the variable and not bind it to any name, use `*`:
 ```hs
 True  = @t @* t
@@ -78,7 +78,7 @@ Parentheses around lambdas are optional. Lambdas have a high precedence
 (λx a b) == ((λx a) b) != (λx (a b))
 ```
 
-`*` can also be used to define an eraser term.  
+`*` can also be used to define an eraser term.
 It compiles to an `inet` node with only one port that deletes anything that’s plugged into it.
 ```rs
 era = *

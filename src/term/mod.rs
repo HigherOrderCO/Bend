@@ -791,7 +791,7 @@ impl Deref for Name {
 }
 
 impl Book {
-  pub fn entrypoint(&self) -> String {
+  pub fn hvmc_entrypoint(&self) -> String {
     if let Some(nam) = &self.entrypoint { nam.to_string() } else { ENTRY_POINT.to_string() }
   }
 }

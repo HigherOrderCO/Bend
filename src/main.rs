@@ -1,7 +1,8 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
-  check_book, compile_book, desugar_book, load_file_to_book, run_book, term::Name, CompileOpts, RunInfo, RunOpts, WarnState, WarningOpts
+  check_book, compile_book, desugar_book, load_file_to_book, run_book, term::Name, CompileOpts, RunInfo,
+  RunOpts, WarnState, WarningOpts,
 };
 use std::{path::PathBuf, vec::IntoIter};
 
@@ -14,7 +15,7 @@ struct Cli {
   #[arg(short, long, global = true)]
   pub verbose: bool,
 
-  #[arg(short = 'e', long, global = true)]
+  #[arg(short = 'e', long, global = true, help = "Use other entrypoint rather than main or Main")]
   pub entrypoint: Option<Name>,
 }
 

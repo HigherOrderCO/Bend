@@ -1,4 +1,4 @@
-# Passes
+# Options
 
 |  flag          | Default  | What it does? |
 |----------------|----------|---------------|
@@ -13,6 +13,7 @@
 | `-Osimplify-main` `-Ono-simplify-main` | Disabled | [simplify-main](#simplify-main) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
 | `-Oinline` `-Ono-inline` | Disabled | [inline](#inline) |
+| `-e` `--entrypoint` | `Main \| main` | Use another definition as entrypoint, rather than `main` or `Main`. |
 
 ## Eta-reduction
 
