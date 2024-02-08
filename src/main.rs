@@ -1,8 +1,7 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
-  check_book, compile_book, desugar_book, load_file_to_book, run_book, CompileOpts, RunInfo, RunOpts,
-  WarnState, WarningOpts,
+  check_book, compile_book, desugar_book, load_file_to_book, run_book, term::Name, CompileOpts, RunInfo, RunOpts, WarnState, WarningOpts
 };
 use std::{path::PathBuf, vec::IntoIter};
 
@@ -14,6 +13,9 @@ struct Cli {
 
   #[arg(short, long, global = true)]
   pub verbose: bool,
+
+  #[arg(short = 'e', long, global = true)]
+  pub entrypoint: Option<Name>,
 }
 
 #[derive(Subcommand, Clone, Debug)]
@@ -168,14 +170,14 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
 
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
-      let compiled = compile_book(&mut book, opts)?;
+      let compiled = compile_book(&mut book, opts, cli.entrypoint)?;
       hvml::display_warnings(warning_opts, &compiled.warnings)?;
       print!("{}", show_book(&compiled.core_book));
     }
     Mode::Desugar { path } => {
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
-      desugar_book(&mut book, CompileOpts::default())?;
+      desugar_book(&mut book, CompileOpts::default(), None)?;
       println!("{book}");
     }
     Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, cli_opts, wopts, lazy_mode } => {
@@ -198,7 +200,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       let mem_size = mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
       let run_opts = RunOpts { single_core, debug, linear, lazy_mode };
       let (res_term, RunInfo { stats, readback_errors, net }) =
-        run_book(book, mem_size, run_opts, warning_opts, opts)?;
+        run_book(book, mem_size, run_opts, warning_opts, opts, cli.entrypoint)?;
 
       let total_rewrites = stats.rewrites.total() as f64;
       let rps = total_rewrites / stats.run_time / 1_000_000.0;

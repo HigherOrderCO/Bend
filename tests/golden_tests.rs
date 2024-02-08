@@ -96,7 +96,7 @@ fn compile_term() {
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::heavy())?;
+    let compiled = compile_book(&mut book, CompileOpts::heavy(), None)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -104,7 +104,7 @@ fn compile_file_o_all() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::light())?;
+    let compiled = compile_book(&mut book, CompileOpts::light(), None)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -115,7 +115,7 @@ fn run_file() {
     let book = do_parse_book(code, path)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) =
-      run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
+      run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
     Ok(format!("{}{}", info.readback_errors.display(), res.display()))
   })
 }
@@ -130,7 +130,7 @@ fn run_lazy() {
     desugar_opts.lazy_mode();
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, info) = run_book(book, 1 << 20, run_opts, WarningOpts::deny_all(), desugar_opts)?;
+    let (res, info) = run_book(book, 1 << 20, run_opts, WarningOpts::deny_all(), desugar_opts, None)?;
     Ok(format!("{}{}", info.readback_errors.display(), res.display()))
   })
 }
@@ -150,7 +150,7 @@ fn readback_lnet() {
 fn flatten_rules() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let main = book.check_has_main().ok();
+    let main = book.check_has_entrypoint(None).ok();
     book.check_shared_names()?;
     book.encode_builtins();
     book.resolve_ctrs_in_pats();
@@ -177,7 +177,7 @@ fn parse_file() {
 fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let main = book.check_has_main().ok();
+    let main = book.check_has_entrypoint(None).ok();
     book.check_shared_names()?;
     book.generate_scott_adts();
     book.encode_builtins();
@@ -192,7 +192,7 @@ fn encode_pattern_match() {
 fn desugar_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    desugar_book(&mut book, CompileOpts::light())?;
+    desugar_book(&mut book, CompileOpts::light(), None)?;
     Ok(book.to_string())
   })
 }
@@ -208,7 +208,8 @@ fn hangs() {
     let lck = Arc::new(RwLock::new(false));
     let got = lck.clone();
     std::thread::spawn(move || {
-      let _ = run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy());
+      let _ =
+        run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None);
       *got.write().unwrap() = true;
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
@@ -216,4 +217,3 @@ fn hangs() {
     if !*lck.read().unwrap() { Ok("Hangs".into()) } else { Err("Doesn't hang".into()) }
   })
 }
-

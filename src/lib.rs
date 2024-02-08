@@ -13,7 +13,7 @@ use term::{
   book_to_nets, net_to_term,
   net_to_term::ReadbackErrors,
   term_to_net::{HvmcNames, Labels},
-  Book, DefName, Term,
+  Book, DefName, Name, Term,
 };
 
 pub mod hvmc_net;
@@ -27,26 +27,34 @@ pub const HVM1_ENTRY_POINT: &str = "Main";
 
 pub fn check_book(mut book: Book) -> Result<(), String> {
   // TODO: Do the checks without having to do full compilation
-  compile_book(&mut book, CompileOpts::light())?;
+  compile_book(&mut book, CompileOpts::light(), None)?;
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult, String> {
-  let (main, warnings) = desugar_book(book, opts)?;
+pub fn compile_book(
+  book: &mut Book,
+  opts: CompileOpts,
+  entrypoint: Option<Name>,
+) -> Result<CompileResult, String> {
+  let (main, warnings) = desugar_book(book, opts, entrypoint)?;
   let (nets, hvmc_names, labels) = book_to_nets(book, &main);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
   if opts.pre_reduce {
-    pre_reduce_book(&mut core_book, opts.pre_reduce_refs)?;
+    pre_reduce_book(&mut core_book, opts.pre_reduce_refs, book.entrypoint())?;
   }
   if opts.prune {
-    prune_defs(&mut core_book);
+    prune_defs(&mut core_book, book.entrypoint());
   }
   Ok(CompileResult { core_book, hvmc_names, labels, warnings })
 }
 
-pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(DefName, Vec<Warning>), String> {
+pub fn desugar_book(
+  book: &mut Book,
+  opts: CompileOpts,
+  entrypoint: Option<Name>,
+) -> Result<(DefName, Vec<Warning>), String> {
   let mut warnings = Vec::new();
-  let main = book.check_has_main()?;
+  let main = book.check_has_entrypoint(entrypoint)?;
   book.check_shared_names()?;
   book.generate_scott_adts();
   book.encode_builtins();
@@ -104,8 +112,10 @@ pub fn run_book(
   run_opts: RunOpts,
   warning_opts: WarningOpts,
   compile_opts: CompileOpts,
+  entrypoint: Option<Name>,
 ) -> Result<(Term, RunInfo), String> {
-  let CompileResult { core_book, hvmc_names, labels, warnings } = compile_book(&mut book, compile_opts)?;
+  let CompileResult { core_book, hvmc_names, labels, warnings } =
+    compile_book(&mut book, compile_opts, entrypoint)?;
 
   display_warnings(warning_opts, &warnings)?;
 

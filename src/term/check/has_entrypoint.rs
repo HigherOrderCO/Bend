@@ -1,10 +1,20 @@
 use crate::{
-  term::{Book, DefName},
+  term::{Book, DefName, Name},
   ENTRY_POINT, HVM1_ENTRY_POINT,
 };
 
 impl Book {
-  pub fn check_has_main(&self) -> Result<DefName, String> {
+  pub fn check_has_entrypoint(&mut self, nam: Option<Name>) -> Result<DefName, String> {
+    if let Some(nam) = nam {
+      match self.defs.get(&nam) {
+        Some(_) => {
+          self.main = Some(nam.clone());
+          return Ok(nam);
+        }
+        None => return Err(format!("File has no '{nam}' definition")),
+      }
+    }
+
     match (self.defs.get(&DefName::new(ENTRY_POINT)), self.defs.get(&DefName::new(HVM1_ENTRY_POINT))) {
       (None, None) => Err("File has no 'main' definition".to_string()),
       (Some(_), Some(_)) => Err("File has both 'Main' and 'main' definitions".to_string()),
@@ -14,6 +24,7 @@ impl Book {
         } else if !main.rules[0].pats.is_empty() {
           Err("Main definition can't have any arguments".to_string())
         } else {
+          self.main = None;
           Ok(main.name.clone())
         }
       }
