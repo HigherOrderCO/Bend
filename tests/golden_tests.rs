@@ -5,7 +5,7 @@ use hvml::{
   run_book,
   term::{
     load_book::do_parse_book, net_to_term::net_to_term, parser::parse_term, term_to_compat_net,
-    term_to_net::Labels, Book, Term,
+    term_to_net::Labels, Book, Name, Term,
   },
   CompileOpts, RunOpts, WarningOpts,
 };
@@ -215,5 +215,31 @@ fn hangs() {
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
 
     if !*lck.read().unwrap() { Ok("Hangs".into()) } else { Err("Doesn't hang".into()) }
+  })
+}
+
+#[test]
+fn compile_entrypoint() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = do_parse_book(code, path)?;
+    let compiled = compile_book(&mut book, CompileOpts::light(), Some(Name::new("foo")))?;
+    Ok(format!("{:?}", compiled))
+  })
+}
+
+#[test]
+fn run_entrypoint() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let book = do_parse_book(code, path)?;
+    // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
+    let (res, info) = run_book(
+      book,
+      1 << 20,
+      RunOpts::default(),
+      WarningOpts::deny_all(),
+      CompileOpts::heavy(),
+      Some(Name::new("foo")),
+    )?;
+    Ok(format!("{}{}", info.readback_errors.display(), res.display()))
   })
 }
