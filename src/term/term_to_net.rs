@@ -25,7 +25,7 @@ pub fn book_to_nets(book: &Book, main: &DefName) -> (HashMap<String, INet>, Hvmc
     for rule in def.rules.iter() {
       let net = term_to_compat_net(&rule.body, &mut labels);
 
-      let name = if def.name == *main && book.main.is_none() {
+      let name = if def.name == *main && book.entrypoint.is_none() {
         ENTRY_POINT.to_string()
       } else {
         def_name_to_hvmc_name(&def.name, &nets, &mut generated_count)

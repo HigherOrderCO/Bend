@@ -30,8 +30,8 @@ pub struct Book {
   /// To which type does each constructor belong to.
   pub ctrs: IndexMap<DefName, DefName>,
 
-  /// A custom or default entrypoint.
-  pub main: Option<Name>,
+  /// A custom or default "main" entrypoint.
+  pub entrypoint: Option<Name>,
 }
 
 /// A pattern matching function definition.
@@ -792,6 +792,6 @@ impl Deref for Name {
 
 impl Book {
   pub fn entrypoint(&self) -> String {
-    if let Some(nam) = &self.main { nam.to_string() } else { ENTRY_POINT.to_string() }
+    if let Some(nam) = &self.entrypoint { nam.to_string() } else { ENTRY_POINT.to_string() }
   }
 }

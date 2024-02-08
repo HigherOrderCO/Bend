@@ -8,7 +8,7 @@ impl Book {
     if let Some(nam) = nam {
       match self.defs.get(&nam) {
         Some(_) => {
-          self.main = Some(nam.clone());
+          self.entrypoint = Some(nam.clone());
           return Ok(nam);
         }
         None => return Err(format!("File has no '{nam}' definition")),
@@ -24,7 +24,6 @@ impl Book {
         } else if !main.rules[0].pats.is_empty() {
           Err("Main definition can't have any arguments".to_string())
         } else {
-          self.main = None;
           Ok(main.name.clone())
         }
       }

@@ -120,11 +120,32 @@ pub fn run_book(
   display_warnings(warning_opts, &warnings)?;
 
   let debug_hook = run_opts.debug_hook(&book, &hvmc_names, &labels);
-  let (res_lnet, stats) = run_compiled(&core_book, mem_size, run_opts, debug_hook);
+  let (res_lnet, stats) = run_compiled(&core_book, mem_size, run_opts, debug_hook, &book.entrypoint());
   let net = hvmc_to_net(&res_lnet, &hvmc_names.hvmc_to_hvml);
   let (res_term, readback_errors) = net_to_term(&net, &book, &labels, run_opts.linear);
   let info = RunInfo { stats, readback_errors, net: res_lnet };
   Ok((res_term, info))
+}
+
+trait Init {
+  fn init(mem_size: usize, lazy: bool, entrypoint: &str) -> Self;
+}
+
+impl Init for hvmc::run::Net {
+  // same code from Net::new but it receives the entrypoint
+  fn init(size: usize, lazy: bool, entrypoint: &str) -> Self {
+    if lazy {
+      let mem = Box::leak(hvmc::run::Heap::<true>::init(size)) as *mut _;
+      let net = hvmc::run::NetFields::<true>::new(unsafe { &*mem });
+      net.boot(hvmc::ast::name_to_val(entrypoint));
+      hvmc::run::Net::Lazy(hvmc::run::StaticNet { mem, net })
+    } else {
+      let mem = Box::leak(hvmc::run::Heap::<false>::init(size)) as *mut _;
+      let net = hvmc::run::NetFields::<false>::new(unsafe { &*mem });
+      net.boot(hvmc::ast::name_to_val(entrypoint));
+      hvmc::run::Net::Eager(hvmc::run::StaticNet { mem, net })
+    }
+  }
 }
 
 pub fn run_compiled(
@@ -132,9 +153,10 @@ pub fn run_compiled(
   mem_size: usize,
   run_opts: RunOpts,
   hook: Option<impl FnMut(&Net)>,
+  entrypoint: &str,
 ) -> (Net, RunStats) {
   let runtime_book = book_to_runtime(book);
-  let root = &mut hvmc::run::Net::new(mem_size, run_opts.lazy_mode);
+  let root = &mut hvmc::run::Net::init(mem_size, run_opts.lazy_mode, entrypoint);
 
   let start_time = Instant::now();
 
