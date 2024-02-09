@@ -246,7 +246,7 @@ impl CliWarnOpts {
     let subcmd_name = matches.subcommand_name().expect("To have a subcommand");
     let argm = matches.subcommand_matches(subcmd_name).expect("To have a subcommand");
 
-    if let Some(wopts_id_seq) = argm.get_many::<clap::Id>("WOpts") {
+    if let Some(wopts_id_seq) = argm.get_many::<clap::Id>("CliWarnOpts") {
       let allows = &mut self.allows.into_iter();
       let denies = &mut self.denies.into_iter();
       let warns = &mut self.warns.into_iter();
