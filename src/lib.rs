@@ -216,11 +216,7 @@ impl RunOpts {
       |net: &_| {
         let net = hvmc_to_net(net, &hvmc_names.hvmc_to_hvml);
         let (res_term, errors) = net_to_term(&net, book, labels, self.linear);
-        println!(
-          "{}{}\n---------------------------------------",
-          display_readback_errors(&errors),
-          res_term.display()
-        )
+        println!("{}{}\n---------------------------------------", display_readback_errors(&errors), res_term,)
       }
     })
   }
