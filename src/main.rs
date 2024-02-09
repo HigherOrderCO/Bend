@@ -211,7 +211,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
         println!("\n{}", show_net(&net));
       }
 
-      println!("{}{}", display_readback_errors(&readback_errors), res_term.display());
+      println!("{}{}", display_readback_errors(&readback_errors), res_term);
 
       if arg_stats {
         println!("\nRWTS   : {}", total_rewrites);

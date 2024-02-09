@@ -117,7 +117,7 @@ fn run_file() {
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) =
       run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
-    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res.display()))
+    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }
 
@@ -132,7 +132,7 @@ fn run_lazy() {
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) = run_book(book, 1 << 20, run_opts, WarningOpts::deny_all(), desugar_opts, None)?;
-    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res.display()))
+    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }
 
@@ -143,7 +143,7 @@ fn readback_lnet() {
     let book = Book::default();
     let compat_net = hvmc_to_net(&net, &Default::default());
     let (term, errors) = net_to_term(&compat_net, &book, &Labels::default(), false);
-    Ok(format!("{}{}", display_readback_errors(&errors), term.display()))
+    Ok(format!("{}{}", display_readback_errors(&errors), term))
   })
 }
 
@@ -247,6 +247,6 @@ fn run_entrypoint() {
       CompileOpts::heavy(),
       Some(Name::new("foo")),
     )?;
-    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res.display()))
+    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }
