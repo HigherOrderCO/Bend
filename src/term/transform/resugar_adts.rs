@@ -1,4 +1,4 @@
-use crate::term::{net_to_term::ReadbackError, Adt, AdtEncoding, Book, DefName, Pattern, Tag, Term, VarName};
+use crate::term::{net_to_term::ReadbackError, Adt, AdtEncoding, Book, Name, Pattern, Tag, Term};
 
 impl Term {
   pub fn resugar_adts(&mut self, book: &Book, adt_encoding: AdtEncoding) -> Vec<ReadbackError> {
@@ -41,20 +41,20 @@ impl Term {
         fst.resugar_tagged_scott(book, errs);
         snd.resugar_tagged_scott(book, errs);
       }
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         scrutinee.resugar_tagged_scott(book, errs);
         for (_, arm) in arms {
           arm.resugar_tagged_scott(book, errs);
         }
       }
-      Term::List { .. } => unreachable!(),
+      Term::Lst { .. } => unreachable!(),
       Term::Lnk { .. }
       | Term::Num { .. }
       | Term::Var { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
-      | Term::Invalid => {}
+      | Term::Err => {}
     }
   }
 
@@ -78,7 +78,7 @@ impl Term {
     &mut self,
     book: &Book,
     adt: &Adt,
-    adt_name: &DefName,
+    adt_name: &Name,
     errs: &mut Vec<ReadbackError>,
   ) {
     let mut app = &mut *self;
@@ -175,7 +175,7 @@ impl Term {
   fn resugar_match_tagged_scott(
     &mut self,
     book: &Book,
-    adt_name: &DefName,
+    adt_name: &Name,
     adt: &Adt,
     errs: &mut Vec<ReadbackError>,
   ) {
@@ -203,7 +203,7 @@ impl Term {
                   errs.push(ReadbackError::UnexpectedTag(expected_tag.clone(), tag.clone()));
                 }
 
-                let arg = VarName::from(format!("{ctr}.{field}"));
+                let arg = Name::from(format!("{ctr}.{field}"));
                 args.push(Pattern::Var(Some(arg.clone())));
                 *arm = Term::tagged_app(expected_tag, std::mem::take(arm), Term::Var { nam: arg });
               }
@@ -222,7 +222,7 @@ impl Term {
 
     let scrutinee = Box::new(std::mem::take(cur));
     let arms = arms.into_iter().rev().map(|(pat, term)| (pat, std::mem::take(term))).collect();
-    *self = Term::Match { scrutinee, arms };
+    *self = Term::Mat { matched: scrutinee, arms };
 
     self.resugar_tagged_scott(book, errs);
   }

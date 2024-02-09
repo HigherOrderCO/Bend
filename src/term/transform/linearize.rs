@@ -1,4 +1,4 @@
-use crate::term::{Book, MatchNum, Pattern, Tag, Term, VarName};
+use crate::term::{Book, MatchNum, Name, Pattern, Tag, Term};
 use hvmc::run::Val;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -37,7 +37,7 @@ impl Term {
   }
 }
 
-fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<VarName, Val>) {
+fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<Name, Val>) {
   match term {
     // Var users
     Term::Var { nam } => {
@@ -70,7 +70,7 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<VarName, Val>) {
       count_var_uses_in_term(fst, uses);
       count_var_uses_in_term(snd, uses);
     }
-    Term::Match { scrutinee, arms } => {
+    Term::Mat { matched: scrutinee, arms } => {
       count_var_uses_in_term(scrutinee, uses);
       for (rule, term) in arms {
         if let Pattern::Num(MatchNum::Succ(Some(nam))) = rule {
@@ -80,19 +80,18 @@ fn count_var_uses_in_term(term: &Term, uses: &mut HashMap<VarName, Val>) {
         count_var_uses_in_term(term, uses);
       }
     }
-    Term::List { .. } => unreachable!("Should have been desugared already"),
-    Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Invalid => {
-    }
+    Term::Lst { .. } => unreachable!("Should have been desugared already"),
+    Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {}
   }
 }
 
 /// Var-declaring terms
 fn term_with_bind_to_affine(
   term: &mut Term,
-  nam: &mut Option<VarName>,
-  var_uses: &mut HashMap<VarName, Val>,
-  inst_count: &mut HashMap<VarName, Val>,
-  let_bodies: &mut HashMap<VarName, Term>,
+  nam: &mut Option<Name>,
+  var_uses: &mut HashMap<Name, Val>,
+  inst_count: &mut HashMap<Name, Val>,
+  let_bodies: &mut HashMap<Name, Term>,
 ) {
   if let Some(name) = nam {
     if var_uses.contains_key(name) {
@@ -108,10 +107,10 @@ fn term_with_bind_to_affine(
 
 fn term_to_affine(
   term: &mut Term,
-  var_uses: &mut HashMap<VarName, Val>,
+  var_uses: &mut HashMap<Name, Val>,
   // Count to number of times a `Term::Var { nam }` has been reached without being linearized out
-  inst_count: &mut HashMap<VarName, Val>,
-  let_bodies: &mut HashMap<VarName, Term>,
+  inst_count: &mut HashMap<Name, Val>,
+  let_bodies: &mut HashMap<Name, Term>,
 ) {
   match term {
     Term::Lam { nam, bod, .. } => term_with_bind_to_affine(bod, nam, var_uses, inst_count, let_bodies),
@@ -212,7 +211,7 @@ fn term_to_affine(
       term_to_affine(fst, var_uses, inst_count, let_bodies);
       term_to_affine(snd, var_uses, inst_count, let_bodies);
     }
-    Term::Match { scrutinee, arms } => {
+    Term::Mat { matched: scrutinee, arms } => {
       term_to_affine(scrutinee, var_uses, inst_count, let_bodies);
       for (rule, term) in arms {
         match rule {
@@ -224,13 +223,12 @@ fn term_to_affine(
         }
       }
     }
-    Term::List { .. } => unreachable!("Should have been desugared already"),
-    Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Invalid => {
-    }
+    Term::Lst { .. } => unreachable!("Should have been desugared already"),
+    Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Err => {}
   };
 }
 
-fn get_var_uses(nam: Option<&VarName>, var_uses: &HashMap<VarName, Val>) -> Val {
+fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, Val>) -> Val {
   nam.and_then(|nam| var_uses.get(nam).copied()).unwrap_or_default()
 }
 
@@ -244,7 +242,7 @@ fn get_var_uses(nam: Option<&VarName>, var_uses: &HashMap<VarName, Val>) -> Val 
 /// let {x3 x4}     = x2_dup;
 /// nxt
 /// ```
-fn make_dup_tree(nam: &VarName, nxt: &mut Term, uses: Val, mut dup_body: Option<&mut Term>) {
+fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: Val, mut dup_body: Option<&mut Term>) {
   let free_vars = &mut nxt.free_vars();
 
   if let Some(ref body) = dup_body {
@@ -271,7 +269,7 @@ fn make_dup_tree(nam: &VarName, nxt: &mut Term, uses: Val, mut dup_body: Option<
   }
 }
 
-fn duplicate_lam(nam: &mut Option<VarName>, nxt: &mut Term, uses: Val) {
+fn duplicate_lam(nam: &mut Option<Name>, nxt: &mut Term, uses: Val) {
   match uses {
     0 => *nam = None,
     1 => *nam = Some(dup_name(nam.as_ref().unwrap(), 1)),
@@ -279,19 +277,19 @@ fn duplicate_lam(nam: &mut Option<VarName>, nxt: &mut Term, uses: Val) {
   }
 }
 
-fn duplicate_let(nam: &VarName, nxt: &mut Term, uses: Val, let_body: &mut Term) {
+fn duplicate_let(nam: &Name, nxt: &mut Term, uses: Val, let_body: &mut Term) {
   make_dup_tree(nam, nxt, uses, Some(let_body));
 }
 
-fn dup_name(nam: &VarName, uses: Val) -> VarName {
+fn dup_name(nam: &Name, uses: Val) -> Name {
   format!("{nam}_{uses}").into()
 }
 
-fn internal_dup_name(nam: &VarName, uses: Val) -> VarName {
+fn internal_dup_name(nam: &Name, uses: Val) -> Name {
   format!("{}_dup", dup_name(nam, uses)).into()
 }
 
-fn add_var(nam: Option<&VarName>, uses: &mut HashMap<VarName, Val>) {
+fn add_var(nam: Option<&Name>, uses: &mut HashMap<Name, Val>) {
   if let Some(nam) = nam {
     uses.entry(nam.clone()).or_insert(0);
   }

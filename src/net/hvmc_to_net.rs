@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::term::DefName;
+use crate::term::Name;
 
 use super::{INet, INode, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use hvmc::{
@@ -8,12 +8,12 @@ use hvmc::{
   run::Val,
 };
 
-pub fn hvmc_to_net(net: &Net, hvmc_to_hvml: &HashMap<Val, DefName>) -> INet {
+pub fn hvmc_to_net(net: &Net, hvmc_to_hvml: &HashMap<Val, Name>) -> INet {
   let inodes = hvmc_to_inodes(net, hvmc_to_hvml);
   inodes_to_inet(&inodes)
 }
 
-fn hvmc_to_inodes(net: &Net, hvmc_to_hvml: &HashMap<Val, DefName>) -> INodes {
+fn hvmc_to_inodes(net: &Net, hvmc_to_hvml: &HashMap<Val, Name>) -> INodes {
   let mut inodes = vec![];
   let mut n_vars = 0;
   let net_root = if let Tree::Var { nam } = &net.root { nam } else { "" };
@@ -39,7 +39,7 @@ fn tree_to_inodes(
   tree_root: String,
   net_root: &str,
   n_vars: &mut NodeId,
-  hvmc_to_hvml: &HashMap<Val, DefName>,
+  hvmc_to_hvml: &HashMap<Val, Name>,
 ) -> INodes {
   fn new_var(n_vars: &mut NodeId) -> String {
     let new_var = format!("x{n_vars}");

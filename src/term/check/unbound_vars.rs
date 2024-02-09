@@ -1,4 +1,4 @@
-use crate::term::{Book, Pattern, Term, VarName};
+use crate::term::{Book, Name, Pattern, Term};
 use hvmc::run::Val;
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -22,7 +22,7 @@ impl Book {
 impl Term {
   /// Checks that all variables are bound.
   /// Precondition: References have been resolved, implicit binds have been solved.
-  pub fn check_unbound_vars<'a>(&'a self, scope: &mut HashMap<&'a VarName, Val>) -> Result<(), String> {
+  pub fn check_unbound_vars<'a>(&'a self, scope: &mut HashMap<&'a Name, Val>) -> Result<(), String> {
     let mut globals = HashMap::new();
     check_uses(self, scope, &mut globals)?;
 
@@ -49,8 +49,8 @@ impl Term {
 /// Globals has how many times a global var name was declared and used.
 pub fn check_uses<'a>(
   term: &'a Term,
-  scope: &mut HashMap<&'a VarName, Val>,
-  globals: &mut HashMap<&'a VarName, (usize, usize)>,
+  scope: &mut HashMap<&'a Name, Val>,
+  globals: &mut HashMap<&'a Name, (usize, usize)>,
 ) -> Result<(), String> {
   // TODO: Don't stop at the first error
   match term {
@@ -95,7 +95,7 @@ pub fn check_uses<'a>(
       check_uses(fst, scope, globals)?;
       check_uses(snd, scope, globals)?;
     }
-    Term::Match { scrutinee, arms } => {
+    Term::Mat { matched: scrutinee, arms } => {
       check_uses(scrutinee, scope, globals)?;
       for (pat, term) in arms {
         pat.names().for_each(|nam| push_scope(Some(nam), scope));
@@ -105,19 +105,19 @@ pub fn check_uses<'a>(
         pat.names().for_each(|nam| pop_scope(Some(nam), scope));
       }
     }
-    Term::List { .. } => unreachable!(),
-    Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Invalid => (),
+    Term::Lst { .. } => unreachable!(),
+    Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => (),
   }
   Ok(())
 }
 
-fn push_scope<'a>(nam: Option<&'a VarName>, scope: &mut HashMap<&'a VarName, Val>) {
+fn push_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, Val>) {
   if let Some(nam) = nam {
     *scope.entry(nam).or_default() += 1;
   }
 }
 
-fn pop_scope<'a>(nam: Option<&'a VarName>, scope: &mut HashMap<&'a VarName, Val>) {
+fn pop_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, Val>) {
   if let Some(nam) = nam {
     let Entry::Occupied(n_declarations) = scope.entry(nam).and_modify(|e| *e -= 1) else { unreachable!() };
 

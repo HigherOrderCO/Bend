@@ -1,5 +1,5 @@
 use super::{
-  net_to_term::ReadbackError, Book, DefName, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term, Type,
+  net_to_term::ReadbackError, Book, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term, Type,
 };
 use std::fmt;
 
@@ -55,11 +55,11 @@ impl fmt::Display for Term {
       Term::Let { pat, val, nxt } => {
         write!(f, "let {} = {}; {}", pat, val, nxt)
       }
-      Term::Ref { def_name } => write!(f, "{def_name}"),
+      Term::Ref { nam: def_name } => write!(f, "{def_name}"),
       Term::App { tag, fun, arg } => {
         write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag), arg)
       }
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         write!(
           f,
           "match {} {{ {} }}",
@@ -80,10 +80,10 @@ impl fmt::Display for Term {
         write!(f, "({} {} {})", op, fst, snd)
       }
       Term::Tup { fst, snd } => write!(f, "({}, {})", fst, snd),
-      Term::List { els } => {
+      Term::Lst { els } => {
         write!(f, "[{}]", DisplayJoin(|| els.iter(), ", "),)
       }
-      Term::Invalid => write!(f, "<Invalid>"),
+      Term::Err => write!(f, "<Invalid>"),
     }
   }
 }
@@ -109,13 +109,13 @@ impl fmt::Display for Pattern {
       }
       Pattern::Num(num) => write!(f, "{num}"),
       Pattern::Tup(fst, snd) => write!(f, "({}, {})", fst, snd,),
-      Pattern::List(pats) => write!(f, "[{}]", DisplayJoin(|| pats.iter(), ", ")),
+      Pattern::Lst(pats) => write!(f, "[{}]", DisplayJoin(|| pats.iter(), ", ")),
     }
   }
 }
 
 impl Rule {
-  pub fn display<'a>(&'a self, def_name: &'a DefName) -> impl fmt::Display + 'a {
+  pub fn display<'a>(&'a self, def_name: &'a Name) -> impl fmt::Display + 'a {
     display!(
       "({}{}) = {}",
       def_name,

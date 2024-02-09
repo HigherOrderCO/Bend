@@ -1,4 +1,4 @@
-use crate::term::{Book, DefName, Definition, Origin, Pattern, Rule, Term, VarName};
+use crate::term::{Book, Definition, Name, Origin, Pattern, Rule, Term};
 use std::{
   collections::{BTreeMap, HashSet},
   ops::BitAnd,
@@ -7,7 +7,7 @@ use std::{
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
 impl Book {
-  pub fn detach_supercombinators(&mut self, main: &DefName) {
+  pub fn detach_supercombinators(&mut self, main: &Name) {
     let mut combinators = Combinators::new();
 
     for (def_name, def) in self.defs.iter_mut() {
@@ -25,26 +25,26 @@ impl Book {
   }
 }
 
-type Combinators = BTreeMap<DefName, Definition>;
+type Combinators = BTreeMap<Name, Definition>;
 
 struct TermInfo<'d> {
   // Number of times a Term has been detached from the current Term
   counter: u32,
-  def_name: DefName,
+  def_name: Name,
   rule_type: Origin,
-  needed_names: HashSet<VarName>,
+  needed_names: HashSet<Name>,
   combinators: &'d mut Combinators,
 }
 
 impl<'d> TermInfo<'d> {
-  fn new(def_name: DefName, rule_type: Origin, combinators: &'d mut Combinators) -> Self {
+  fn new(def_name: Name, rule_type: Origin, combinators: &'d mut Combinators) -> Self {
     Self { counter: 0, def_name, rule_type, needed_names: HashSet::new(), combinators }
   }
-  fn request_name(&mut self, name: &VarName) {
+  fn request_name(&mut self, name: &Name) {
     self.needed_names.insert(name.clone());
   }
 
-  fn provide(&mut self, name: Option<&VarName>) {
+  fn provide(&mut self, name: Option<&Name>) {
     if let Some(name) = name {
       self.needed_names.remove(name);
     }
@@ -54,19 +54,19 @@ impl<'d> TermInfo<'d> {
     self.needed_names.is_empty()
   }
 
-  fn replace_scope(&mut self, new_scope: HashSet<VarName>) -> HashSet<VarName> {
+  fn replace_scope(&mut self, new_scope: HashSet<Name>) -> HashSet<Name> {
     std::mem::replace(&mut self.needed_names, new_scope)
   }
 
-  fn merge_scope(&mut self, target: HashSet<VarName>) {
+  fn merge_scope(&mut self, target: HashSet<Name>) {
     self.needed_names.extend(target);
   }
 
   fn detach_term(&mut self, term: &mut Term) {
-    let comb_name = DefName::from(format!("{}$S{}", self.def_name, self.counter));
+    let comb_name = Name::from(format!("{}$S{}", self.def_name, self.counter));
     self.counter += 1;
 
-    let comb_var = Term::Ref { def_name: comb_name.clone() };
+    let comb_var = Term::Ref { nam: comb_name.clone() };
     let extracted_term = std::mem::replace(term, comb_var);
 
     let rules = vec![Rule { body: extracted_term, pats: Vec::new(), origin: self.rule_type }];
@@ -79,7 +79,7 @@ enum Detach {
   /// Can be detached freely
   Combinator,
   /// Can not be detached
-  Unscoped { lams: HashSet<VarName>, vars: HashSet<VarName> },
+  Unscoped { lams: HashSet<Name>, vars: HashSet<Name> },
   /// Should be detached to make the program not hang
   Recursive,
 }
@@ -89,11 +89,11 @@ impl Detach {
     !matches!(self, Detach::Unscoped { .. })
   }
 
-  fn unscoped_lam(nam: VarName) -> Self {
+  fn unscoped_lam(nam: Name) -> Self {
     Detach::Unscoped { lams: [nam].into(), vars: Default::default() }
   }
 
-  fn unscoped_var(nam: VarName) -> Self {
+  fn unscoped_var(nam: Name) -> Self {
     Detach::Unscoped { lams: Default::default(), vars: [nam].into() }
   }
 }
@@ -136,11 +136,11 @@ impl BitAnd for Detach {
 }
 
 impl Term {
-  pub fn detach_combinators(&mut self, def_name: &DefName, rule_type: Origin, combinators: &mut Combinators) {
+  pub fn detach_combinators(&mut self, def_name: &Name, rule_type: Origin, combinators: &mut Combinators) {
     fn go_lam(term: &mut Term, depth: usize, term_info: &mut TermInfo) -> Detach {
       let parent_scope = term_info.replace_scope(HashSet::new());
 
-      let (nam, bod, unscoped): (Option<&VarName>, &mut Term, bool) = match term {
+      let (nam, bod, unscoped): (Option<&Name>, &mut Term, bool) = match term {
         Term::Lam { nam, bod, .. } => (nam.as_ref(), bod, false),
         Term::Chn { nam, bod, .. } => (Some(nam), bod, true),
         _ => unreachable!(),
@@ -229,7 +229,7 @@ impl Term {
 
           val_detach & nxt_detach
         }
-        Term::Match { scrutinee, arms } => {
+        Term::Mat { matched: scrutinee, arms } => {
           let mut detach = go(scrutinee, depth + 1, term_info);
           let parent_scope = term_info.replace_scope(HashSet::new());
 
@@ -257,11 +257,9 @@ impl Term {
 
           fst_is_super & snd_is_super
         }
-        Term::Ref { def_name } if def_name == &term_info.def_name => Detach::Recursive,
-        Term::Let { .. } | Term::List { .. } => unreachable!(),
-        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Invalid => {
-          Detach::Combinator
-        }
+        Term::Ref { nam: def_name } if def_name == &term_info.def_name => Detach::Recursive,
+        Term::Let { .. } | Term::Lst { .. } => unreachable!(),
+        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => Detach::Combinator,
       }
     }
 

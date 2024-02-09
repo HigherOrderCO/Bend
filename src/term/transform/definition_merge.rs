@@ -1,5 +1,5 @@
 use super::simplify_ref_to_ref::subst_ref_to_ref;
-use crate::term::{Book, DefName, Definition, Origin, Rule, Term};
+use crate::term::{Book, Definition, Name, Origin, Rule, Term};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use std::collections::BTreeMap;
@@ -10,14 +10,14 @@ impl Book {
   ///
   /// Ignores origin of the rules when merging,
   /// Should not be preceded by passes that cares about the origins.
-  pub fn merge_definitions(&mut self, main: &DefName) {
+  pub fn merge_definitions(&mut self, main: &Name) {
     let defs: Vec<_> = self.defs.keys().cloned().collect();
     self.merge(main, defs.into_iter());
   }
 
   /// Checks and merges identical definitions given by `defs`.
   /// We never merge the entrypoint function with something else.
-  fn merge(&mut self, main: &DefName, defs: impl Iterator<Item = DefName>) {
+  fn merge(&mut self, main: &Name, defs: impl Iterator<Item = Name>) {
     // Sets of definitions that are identical, indexed by the body term.
     let equal_terms = self.collect_terms(defs.filter(|def_name| def_name != main));
 
@@ -26,7 +26,7 @@ impl Book {
 
     for (term, equal_defs) in equal_terms {
       // Create the merged name
-      let new_name = DefName::from(equal_defs.iter().join("_$_"));
+      let new_name = Name::from(equal_defs.iter().join("_$_"));
 
       // Write the mapping of old to new names (only if something was merged)
       if equal_defs.len() > 1 {
@@ -45,11 +45,8 @@ impl Book {
     self.update_refs(&name_map, main);
   }
 
-  fn collect_terms(
-    &mut self,
-    def_entries: impl Iterator<Item = DefName>,
-  ) -> IndexMap<Term, IndexSet<DefName>> {
-    let mut equal_terms: IndexMap<Term, IndexSet<DefName>> = IndexMap::new();
+  fn collect_terms(&mut self, def_entries: impl Iterator<Item = Name>) -> IndexMap<Term, IndexSet<Name>> {
+    let mut equal_terms: IndexMap<Term, IndexSet<Name>> = IndexMap::new();
 
     for def_name in def_entries {
       let mut def = self.defs.remove(&def_name).unwrap();
@@ -60,7 +57,7 @@ impl Book {
     equal_terms
   }
 
-  fn update_refs(&mut self, name_map: &BTreeMap<DefName, DefName>, main: &DefName) {
+  fn update_refs(&mut self, name_map: &BTreeMap<Name, Name>, main: &Name) {
     let mut updated_defs = Vec::new();
 
     for def in self.defs.values_mut() {

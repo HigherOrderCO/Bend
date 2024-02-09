@@ -1,7 +1,7 @@
-use crate::term::{Book, DefName, Definition, Pattern, Type};
+use crate::term::{Book, Definition, Name, Pattern, Type};
 use indexmap::IndexMap;
 
-pub type DefinitionTypes = IndexMap<DefName, Vec<Type>>;
+pub type DefinitionTypes = IndexMap<Name, Vec<Type>>;
 
 impl Book {
   /// Returns a HashMap from the definition id to the inferred pattern types
@@ -18,7 +18,7 @@ impl Book {
 }
 
 impl Definition {
-  pub fn infer_type(&self, ctrs: &IndexMap<DefName, DefName>) -> Result<Vec<Type>, String> {
+  pub fn infer_type(&self, ctrs: &IndexMap<Name, Name>) -> Result<Vec<Type>, String> {
     let mut arg_types = vec![];
 
     for arg_idx in 0 .. self.arity() {
@@ -31,7 +31,7 @@ impl Definition {
 
 pub fn infer_arg_type<'a>(
   pats: impl Iterator<Item = &'a Pattern>,
-  ctrs: &IndexMap<DefName, DefName>,
+  ctrs: &IndexMap<Name, Name>,
 ) -> Result<Type, String> {
   let mut arg_type = Type::Any;
   for pat in pats {

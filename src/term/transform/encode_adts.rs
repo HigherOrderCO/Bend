@@ -1,4 +1,4 @@
-use crate::term::{AdtEncoding, Book, DefName, Definition, Rule, Tag, Term, VarName};
+use crate::term::{AdtEncoding, Book, Definition, Name, Rule, Tag, Term};
 
 impl Book {
   pub fn encode_adts(&mut self, adt_encoding: AdtEncoding) {
@@ -19,10 +19,10 @@ impl Book {
 }
 
 fn encode_ctr(
-  adt_name: &DefName,
-  ctr_args: Vec<VarName>,
-  ctrs: Vec<DefName>,
-  ctr_name: &DefName,
+  adt_name: &Name,
+  ctr_args: Vec<Name>,
+  ctrs: Vec<Name>,
+  ctr_name: &Name,
   adt_encoding: AdtEncoding,
 ) -> Term {
   match adt_encoding {

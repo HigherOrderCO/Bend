@@ -1,6 +1,6 @@
 use crate::{
   net::{INet, NodeKind::*, Port, ROOT},
-  term::{num_to_name, Book, DefName, MatchNum, Op, Pattern, Tag, Term, VarName},
+  term::{num_to_name, Book, MatchNum, Name, Op, Pattern, Tag, Term},
   ENTRY_POINT,
 };
 use hvmc::{
@@ -11,11 +11,11 @@ use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Debug, Default)]
 pub struct HvmcNames {
-  pub hvml_to_hvmc: HashMap<DefName, Val>,
-  pub hvmc_to_hvml: HashMap<Val, DefName>,
+  pub hvml_to_hvmc: HashMap<Name, Val>,
+  pub hvmc_to_hvml: HashMap<Val, Name>,
 }
 
-pub fn book_to_nets(book: &Book, main: &DefName) -> (HashMap<String, INet>, HvmcNames, Labels) {
+pub fn book_to_nets(book: &Book, main: &Name) -> (HashMap<String, INet>, HvmcNames, Labels) {
   let mut nets = HashMap::new();
   let mut hvmc_names = HvmcNames::default();
   let mut labels = Labels::default();
@@ -49,11 +49,7 @@ pub fn book_to_nets(book: &Book, main: &DefName) -> (HashMap<String, INet>, Hvmc
 ///   If not: Truncates the rule name into 4 chars
 /// Them checks if the given hashmap already contains the resulted name,
 /// if it does, falls back into converting its DefId and succeeding ones until a unique name is found.
-fn def_name_to_hvmc_name(
-  def_name: &DefName,
-  nets: &HashMap<String, INet>,
-  generated_count: &mut Val,
-) -> String {
+fn def_name_to_hvmc_name(def_name: &Name, nets: &HashMap<String, INet>, generated_count: &mut Val) -> String {
   fn truncate(s: &str, max_chars: usize) -> &str {
     match s.char_indices().nth(max_chars) {
       None => s,
@@ -111,9 +107,9 @@ pub fn term_to_compat_net(term: &Term, labels: &mut Labels) -> INet {
 #[derive(Debug)]
 struct EncodeTermState<'a> {
   inet: INet,
-  scope: HashMap<VarName, Vec<usize>>,
+  scope: HashMap<Name, Vec<usize>>,
   vars: Vec<(Port, Option<Port>)>,
-  global_vars: HashMap<VarName, (Port, Port)>,
+  global_vars: HashMap<Name, (Port, Port)>,
   labels: &'a mut Labels,
 }
 
@@ -165,7 +161,7 @@ impl<'a> EncodeTermState<'a> {
         Some(Port(app, 2))
       }
       // core: & cond ~  (zero succ) ret
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         let if_ = self.inet.new_node(Mat);
 
         let cond = self.encode_term(scrutinee, Port(if_, 0));
@@ -225,7 +221,7 @@ impl<'a> EncodeTermState<'a> {
         None
       }
       // core: @def_id
-      Term::Ref { def_name } => {
+      Term::Ref { nam: def_name } => {
         let node = self.inet.new_node(Ref { def_name: def_name.clone() });
         self.inet.link(Port(node, 1), Port(node, 2));
         self.inet.link(up, Port(node, 0));
@@ -277,8 +273,8 @@ impl<'a> EncodeTermState<'a> {
         self.inet.link(Port(node, 1), Port(node, 2));
         Some(Port(node, 0))
       }
-      Term::Str { .. } => unreachable!(),  // Removed in desugar str
-      Term::List { .. } => unreachable!(), // Removed in desugar list
+      Term::Str { .. } => unreachable!(), // Removed in desugar str
+      Term::Lst { .. } => unreachable!(), // Removed in desugar list
       // core: & fst ~ <op snd ret>
       Term::Opx { op, fst, snd } => {
         let opx = self.inet.new_node(Op2 { opr: op.to_hvmc_label() });
@@ -302,18 +298,18 @@ impl<'a> EncodeTermState<'a> {
 
         Some(Port(tup, 0))
       }
-      Term::Invalid => unreachable!(),
+      Term::Err => unreachable!(),
     }
   }
 
-  fn push_scope(&mut self, name: &Option<VarName>, decl_port: Port) {
+  fn push_scope(&mut self, name: &Option<Name>, decl_port: Port) {
     if let Some(name) = name {
       self.scope.entry(name.clone()).or_default().push(self.vars.len());
       self.vars.push((decl_port, None));
     }
   }
 
-  fn pop_scope(&mut self, name: &Option<VarName>, decl_port: Port) {
+  fn pop_scope(&mut self, name: &Option<Name>, decl_port: Port) {
     if let Some(name) = name {
       self.scope.get_mut(name).unwrap().pop().unwrap();
     } else {
@@ -363,8 +359,8 @@ pub struct Labels {
 #[derive(Debug, Default)]
 pub struct LabelGenerator {
   pub next: u32,
-  pub name_to_label: HashMap<VarName, u32>,
-  pub label_to_name: HashMap<u32, VarName>,
+  pub name_to_label: HashMap<Name, u32>,
+  pub label_to_name: HashMap<u32, Name>,
 }
 
 impl LabelGenerator {

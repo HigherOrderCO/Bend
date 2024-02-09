@@ -1,6 +1,6 @@
 use crate::term::{
   parser::lexer::{LexingError, Token},
-  Adt, Book, DefName, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Tag, Term, VarName,
+  Adt, Book, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Tag, Term,
 };
 use chumsky::{
   error::RichReason,
@@ -42,7 +42,7 @@ use std::{iter::Map, ops::Range, path::Path};
 // <Number> ::= <number_token> // [0-9]+
 // <Tag>    ::= "#" <Name>
 
-pub fn parse_definition_book(
+pub fn parse_book(
   code: &str,
   default_book: impl Fn() -> Book,
   rule_type: Origin,
@@ -123,7 +123,7 @@ where
 }
 
 /// A top level name that not accepts `-`.
-fn tl_name<'a, I>() -> impl Parser<'a, I, DefName, extra::Err<Rich<'a, Token>>>
+fn tl_name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -131,7 +131,7 @@ where
     if out.contains('-') {
       emitter.emit(Rich::custom(span, "Names with '-' are not supported at top level."));
     }
-    DefName::from(out)
+    Name::from(out)
   })
 }
 
@@ -142,7 +142,7 @@ where
   just(Token::Hash).ignore_then(name()).or_not().map(move |x| x.map_or_else(|| default.clone(), Tag::Named))
 }
 
-fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<VarName>, extra::Err<Rich<'a, Token>>>
+fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -268,27 +268,9 @@ where
         Some(nam) => Term::Let {
           pat: Pattern::Var(Some(nam.clone())),
           val: Box::new(scrutinee),
-          nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam }), arms }),
+          nxt: Box::new(Term::Mat { matched: Box::new(Term::Var { nam }), arms }),
         },
-        None => Term::Match { scrutinee: Box::new(scrutinee), arms },
-      })
-      .boxed();
-
-    let native_match = just(Token::Match)
-      .ignore_then(name())
-      .then_ignore(just(Token::LBracket))
-      .then_ignore(select!(Token::Num(0) => ()))
-      .then_ignore(just(Token::Colon))
-      .then(term.clone())
-      .then_ignore(term_sep.clone())
-      .then_ignore(just(Token::Add))
-      .then_ignore(just(Token::Colon))
-      .then(term.clone())
-      .then_ignore(term_sep.clone())
-      .then_ignore(just(Token::RBracket))
-      .map(|((nam, zero), succ)| Term::Match {
-        scrutinee: Box::new(Term::Var { nam }),
-        arms: vec![(Pattern::Num(MatchNum::Zero), zero), (Pattern::Num(MatchNum::Succ(None)), succ)],
+        None => Term::Mat { matched: Box::new(scrutinee), arms },
       })
       .boxed();
 
@@ -328,27 +310,11 @@ where
       .separated_by(just(Token::Comma).or_not())
       .collect()
       .delimited_by(just(Token::LBrace), just(Token::RBrace))
-      .map(|els| Term::List { els })
+      .map(|els| Term::Lst { els })
       .boxed();
 
     choice((
-      global_var,
-      var,
-      number,
-      list,
-      str,
-      chr,
-      sup,
-      tup,
-      global_lam,
-      lam,
-      dup,
-      let_,
-      native_match,
-      match_,
-      num_op,
-      app,
-      era,
+      global_var, var, number, list, str, chr, sup, tup, global_lam, lam, dup, let_, match_, num_op, app, era,
     ))
   })
 }
@@ -392,7 +358,7 @@ where
       .separated_by(just(Token::Comma).or_not())
       .collect()
       .delimited_by(just(Token::LBrace), just(Token::RBrace))
-      .map(Pattern::List)
+      .map(Pattern::Lst)
       .boxed();
 
     let zero = select!(Token::Num(0) => Pattern::Num(MatchNum::Zero));
@@ -404,7 +370,7 @@ where
   })
 }
 
-fn rule_pattern<'a, I>() -> impl Parser<'a, I, (DefName, Vec<Pattern>), extra::Err<Rich<'a, Token>>>
+fn rule_pattern<'a, I>() -> impl Parser<'a, I, (Name, Vec<Pattern>), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -416,7 +382,7 @@ where
 /// This rule always emits an error when it parses successfully
 /// It is used to report a parsing error that would be unclear otherwise
 fn rule_body_missing_paren<'a, I>()
--> impl Parser<'a, I, ((DefName, Vec<Pattern>), Term), extra::Err<Rich<'a, Token>>>
+-> impl Parser<'a, I, ((Name, Vec<Pattern>), Term), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -438,7 +404,7 @@ where
     .boxed()
 }
 
-fn rule<'a, I>(rule_type: Origin) -> impl Parser<'a, I, (DefName, Rule), extra::Err<Rich<'a, Token>>>
+fn rule<'a, I>(rule_type: Origin) -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -447,9 +413,7 @@ where
     .map(move |((name, pats), body)| (name, Rule { pats, body, origin: rule_type }))
 }
 
-fn datatype<'a, I>(
-  origin: Origin,
-) -> impl Parser<'a, I, (DefName, Adt, SimpleSpan), extra::Err<Rich<'a, Token>>>
+fn datatype<'a, I>(origin: Origin) -> impl Parser<'a, I, (Name, Adt, SimpleSpan), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -465,7 +429,7 @@ where
   data
     .ignore_then(tl_name())
     .then_ignore(just(Token::Equals))
-    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(DefName, Vec<VarName>)>>())
+    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, Vec<Name>)>>())
     .map_with_span(move |(name, ctrs), span| (name, Adt { ctrs: ctrs.into_iter().collect(), origin }, span))
 }
 
@@ -524,6 +488,6 @@ fn collect_book(mut book: Book, program: Vec<TopLevel>, emit: &mut Emitter<Rich<
 }
 
 enum TopLevel {
-  Rule((DefName, Rule)),
-  Adt((DefName, Adt, SimpleSpan)),
+  Rule((Name, Rule)),
+  Adt((Name, Adt, SimpleSpan)),
 }

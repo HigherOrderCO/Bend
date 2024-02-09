@@ -1,6 +1,6 @@
 use crate::term::{
   check::type_check::DefinitionTypes, transform::unique_names::UniqueNameGenerator, AdtEncoding, Book,
-  DefName, Definition, MatchNum, Pattern, Rule, Tag, Term, Type, VarName,
+  Definition, MatchNum, Name, Pattern, Rule, Tag, Term, Type,
 };
 
 impl Book {
@@ -35,12 +35,7 @@ fn make_non_pattern_matching_def(def: &mut Definition) {
 /// For functions that do pattern match,
 ///  we break them into a tree of small matching functions
 ///  with the original rule bodies at the end.
-fn make_pattern_matching_def(
-  book: &mut Book,
-  def_name: &DefName,
-  def_type: &[Type],
-  adt_encoding: AdtEncoding,
-) {
+fn make_pattern_matching_def(book: &mut Book, def_name: &Name, def_type: &[Type], adt_encoding: AdtEncoding) {
   // First push the pattern bound vars into the rule body
   let rules = &mut book.defs.get_mut(def_name).unwrap().rules;
   for rule in rules.iter_mut() {
@@ -119,7 +114,7 @@ fn make_match_case(
   // Create the subfunctions
   let mut next_cases = vec![];
   let next_ctrs = if next_type.is_var_type() {
-    vec![Pattern::Var(Some(VarName::new("x")))]
+    vec![Pattern::Var(Some(Name::new("x")))]
   } else {
     next_type.ctrs(&book.adts)
   };
@@ -138,7 +133,7 @@ fn make_match_case(
   let (old_args, new_args) = args_from_match_path(&match_path);
 
   // Encode the current pattern matching, calling the subfunctions
-  let match_var = VarName::new("x");
+  let match_var = Name::new("x");
   // The match term itself
   let term = encode_match(next_type, &match_var, next_cases.into_iter(), adt_encoding);
   // The calls to the args of previous matches
@@ -152,7 +147,7 @@ fn make_match_case(
 
 fn encode_match(
   match_type: &Type,
-  match_var: &VarName,
+  match_var: &Name,
   mut arms: impl Iterator<Item = Term>,
   adt_encoding: AdtEncoding,
 ) -> Term {
@@ -163,17 +158,17 @@ fn encode_match(
     // let (%fst, %snd) = x; (arm[0] %fst %snd)
     Type::Tup => Term::Let {
       pat: Pattern::Tup(
-        Box::new(Pattern::Var(Some(VarName::new("%fst")))),
-        Box::new(Pattern::Var(Some(VarName::new("%snd")))),
+        Box::new(Pattern::Var(Some(Name::new("%fst")))),
+        Box::new(Pattern::Var(Some(Name::new("%snd")))),
       ),
       val: Box::new(Term::Var { nam: match_var.clone() }),
-      nxt: Box::new(Term::call(arms.next().unwrap(), [Term::Var { nam: VarName::new("%fst") }, Term::Var {
-        nam: VarName::new("%snd"),
+      nxt: Box::new(Term::call(arms.next().unwrap(), [Term::Var { nam: Name::new("%fst") }, Term::Var {
+        nam: Name::new("%snd"),
       }])),
     },
     // match x {0: arm[0]; +: arm[1]}
-    Type::Num => Term::Match {
-      scrutinee: Box::new(Term::Var { nam: match_var.clone() }),
+    Type::Num => Term::Mat {
+      matched: Box::new(Term::Var { nam: match_var.clone() }),
       arms: vec![
         (Pattern::Num(MatchNum::Zero), arms.next().unwrap()),
         (Pattern::Num(MatchNum::Succ(None)), arms.next().unwrap()),
@@ -236,8 +231,8 @@ fn add_non_match_arg_lams(body: Term, pats: &[Pattern]) -> Term {
 /// Adds the argument lambdas to the term, with new args followed by old args.
 fn add_arg_lams(
   term: Term,
-  old_args: Vec<VarName>,
-  new_args: Vec<VarName>,
+  old_args: Vec<Name>,
+  new_args: Vec<Name>,
   last_pat: Option<&Pattern>,
   book: &Book,
   adt_encoding: AdtEncoding,
@@ -267,16 +262,16 @@ fn add_arg_lams(
   }
 }
 
-fn args_from_match_path(match_path: &[Pattern]) -> (Vec<VarName>, Vec<VarName>) {
+fn args_from_match_path(match_path: &[Pattern]) -> (Vec<Name>, Vec<Name>) {
   let (new_match, old_matches) = match_path.split_last().unzip();
-  let old_args: Vec<VarName> = old_matches
+  let old_args: Vec<Name> = old_matches
     .unwrap_or_default()
     .iter()
     .flat_map(|pat| pat.vars())
     .enumerate()
     .map(|(i, _)| format!("%x{i}").into())
     .collect();
-  let new_args: Vec<VarName> = new_match
+  let new_args: Vec<Name> = new_match
     .map(|pat| pat.vars().enumerate().map(|(i, _)| format!("%y{i}").into()).collect())
     .unwrap_or(vec![]);
   (old_args, new_args)
@@ -285,7 +280,7 @@ fn args_from_match_path(match_path: &[Pattern]) -> (Vec<VarName>, Vec<VarName>) 
 /* Functions used to normalize generated part of the def */
 
 /// Name for a variable to be substituted with the rule body.
-fn rule_body_subst_var(rule_idx: usize) -> VarName {
+fn rule_body_subst_var(rule_idx: usize) -> Name {
   format!("%rule_subst_{rule_idx}").into()
 }
 
@@ -326,7 +321,7 @@ fn normal_order_step(term: &mut Term) -> bool {
         _ => normal_order_step(fun) || normal_order_step(arg),
       }
     }
-    Term::Match { scrutinee, arms } => {
+    Term::Mat { matched: scrutinee, arms } => {
       if normal_order_step(scrutinee) {
         return true;
       }
@@ -337,7 +332,7 @@ fn normal_order_step(term: &mut Term) -> bool {
       }
       false
     }
-    Term::List { els } => {
+    Term::Lst { els } => {
       for el in els {
         if normal_order_step(el) {
           return true;
@@ -357,7 +352,7 @@ fn normal_order_step(term: &mut Term) -> bool {
     | Term::Str { .. }
     | Term::Ref { .. }
     | Term::Era
-    | Term::Invalid => false,
+    | Term::Err => false,
   }
 }
 
@@ -370,7 +365,7 @@ fn normal_order_step(term: &mut Term) -> bool {
 ///     `(foo) = λx let (%fst, %snd) = x; (λa λb <Rule body> %fst %snd)`
 ///   Instead, we want to generate this:
 ///     `(foo) = λx let (%fst, %snd) = x; <Rule body>`
-fn subst_rule_body(term: &mut Term, subst_var: &VarName, body: &Term, name_gen: &mut UniqueNameGenerator) {
+fn subst_rule_body(term: &mut Term, subst_var: &Name, body: &Term, name_gen: &mut UniqueNameGenerator) {
   fn leading_apps(term: &mut Term) -> (&mut Term, usize) {
     if let Term::App { tag: _, fun, arg: _ } = term {
       let (term, n_apps) = leading_apps(fun);
@@ -407,13 +402,13 @@ fn subst_rule_body(term: &mut Term, subst_var: &VarName, body: &Term, name_gen: 
       term.subst(subst_var, body);
     }
 
-    Term::Match { scrutinee, arms } => {
+    Term::Mat { matched: scrutinee, arms } => {
       subst_rule_body(scrutinee, subst_var, body, name_gen);
       for (_, arm) in arms {
         subst_rule_body(arm, subst_var, body, name_gen);
       }
     }
-    Term::List { els } => {
+    Term::Lst { els } => {
       for el in els {
         subst_rule_body(el, subst_var, body, name_gen);
       }
@@ -433,6 +428,6 @@ fn subst_rule_body(term: &mut Term, subst_var: &VarName, body: &Term, name_gen: 
     | Term::Str { .. }
     | Term::Ref { .. }
     | Term::Era
-    | Term::Invalid => (),
+    | Term::Err => (),
   }
 }

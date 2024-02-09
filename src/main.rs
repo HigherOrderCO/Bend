@@ -36,13 +36,13 @@ enum Mode {
       long_help = r#"Enables or disables the given optimizations
       supercombinators is enabled by default."#,
     )]
-    cli_opts: Vec<OptArgs>,
+    comp_opts: Vec<OptArgs>,
 
     #[arg(short = 'L', help = "Lazy mode")]
     lazy_mode: bool,
 
     #[command(flatten)]
-    wopts: WOpts,
+    warn_opts: CliWarnOpts,
 
     #[arg(help = "Path to the input file")]
     path: PathBuf,
@@ -77,10 +77,10 @@ enum Mode {
       long_help = r#"Enables or disables the given optimizations
       supercombinators is enabled by default."#,
     )]
-    cli_opts: Vec<OptArgs>,
+    comp_opts: Vec<OptArgs>,
 
     #[command(flatten)]
-    wopts: WOpts,
+    warn_opts: CliWarnOpts,
   },
   /// Runs the lambda-term level desugaring passes.
   Desugar {
@@ -91,7 +91,7 @@ enum Mode {
 
 #[derive(Args, Debug, Clone)]
 #[group(multiple = true)]
-struct WOpts {
+struct CliWarnOpts {
   #[arg(
     short = 'W',
     long = "warn",
@@ -162,9 +162,9 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       verbose(&book);
       check_book(book)?;
     }
-    Mode::Compile { path, cli_opts, wopts, lazy_mode } => {
-      let warning_opts = wopts.get_warning_opts(WarningOpts::default());
-      let mut opts = OptArgs::opts_from_cli(&cli_opts);
+    Mode::Compile { path, comp_opts, warn_opts, lazy_mode } => {
+      let warning_opts = warn_opts.get_warning_opts(WarningOpts::default());
+      let mut opts = OptArgs::opts_from_cli(&comp_opts);
 
       if lazy_mode {
         opts.lazy_mode()
@@ -173,7 +173,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
       let compiled = compile_book(&mut book, opts, cli.entrypoint)?;
-      hvml::display_warnings(warning_opts, &compiled.warnings)?;
+      hvml::display_warnings(&compiled.warnings, warning_opts)?;
       print!("{}", show_book(&compiled.core_book));
     }
     Mode::Desugar { path } => {
@@ -182,12 +182,22 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       desugar_book(&mut book, CompileOpts::default(), None)?;
       println!("{book}");
     }
-    Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, cli_opts, wopts, lazy_mode } => {
+    Mode::Run {
+      path,
+      mem,
+      debug,
+      mut single_core,
+      linear,
+      arg_stats,
+      comp_opts: cli_opts,
+      warn_opts,
+      lazy_mode,
+    } => {
       if debug && lazy_mode {
         return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".to_string());
       }
 
-      let warning_opts = wopts.get_warning_opts(WarningOpts::allow_all());
+      let warning_opts = warn_opts.get_warning_opts(WarningOpts::allow_all());
       let mut opts = OptArgs::opts_from_cli(&cli_opts);
       opts.check(lazy_mode);
 
@@ -228,7 +238,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
   Ok(())
 }
 
-impl WOpts {
+impl CliWarnOpts {
   fn get_warning_opts(self, mut warning_opts: WarningOpts) -> WarningOpts {
     let cmd = Cli::command();
     let matches = cmd.get_matches();

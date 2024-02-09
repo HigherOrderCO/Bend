@@ -1,4 +1,4 @@
-use super::{parser::parse_definition_book, Book, DefName, Origin, Pattern, Term};
+use super::{parser::parse_book, Book, Name, Origin, Pattern, Term};
 use hvmc::run::Val;
 
 const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/term/builtins.hvm"));
@@ -16,7 +16,7 @@ pub const SCONS: &str = "SCons";
 
 impl Book {
   pub fn builtins() -> Book {
-    parse_definition_book(BUILTINS, Book::default, Origin::Builtin)
+    parse_book(BUILTINS, Book::default, Origin::Builtin)
       .expect("Error parsing builtin file, this should not happen")
   }
 
@@ -33,7 +33,7 @@ impl Book {
 impl Term {
   fn encode_builtins(&mut self) {
     match self {
-      Term::List { els } => *self = Term::encode_list(std::mem::take(els)),
+      Term::Lst { els } => *self = Term::encode_list(std::mem::take(els)),
       Term::Str { val } => *self = Term::encode_str(val),
       Term::Let { pat, val, nxt } => {
         pat.encode_builtins();
@@ -49,19 +49,14 @@ impl Term {
         fst.encode_builtins();
         snd.encode_builtins();
       }
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         scrutinee.encode_builtins();
         for (pat, arm) in arms {
           pat.encode_builtins();
           arm.encode_builtins();
         }
       }
-      Term::Var { .. }
-      | Term::Lnk { .. }
-      | Term::Ref { .. }
-      | Term::Num { .. }
-      | Term::Era
-      | Term::Invalid => {}
+      Term::Var { .. } | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era | Term::Err => {}
     }
   }
 
@@ -82,7 +77,7 @@ impl Term {
 impl Pattern {
   pub fn encode_builtins(&mut self) {
     match self {
-      Pattern::List(pats) => *self = Self::encode_list(std::mem::take(pats)),
+      Pattern::Lst(pats) => *self = Self::encode_list(std::mem::take(pats)),
       Pattern::Ctr(_, pats) => {
         for pat in pats {
           pat.encode_builtins();
@@ -97,11 +92,11 @@ impl Pattern {
   }
 
   fn encode_list(elements: Vec<Pattern>) -> Pattern {
-    let lnil = Pattern::Var(Some(DefName::new(LNIL)));
+    let lnil = Pattern::Var(Some(Name::new(LNIL)));
 
     elements.into_iter().rfold(lnil, |acc, mut nxt| {
       nxt.encode_builtins();
-      Pattern::Ctr(DefName::new(LCONS), vec![nxt, acc])
+      Pattern::Ctr(Name::new(LCONS), vec![nxt, acc])
     })
   }
 }
