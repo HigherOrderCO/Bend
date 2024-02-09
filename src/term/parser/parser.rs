@@ -1,6 +1,6 @@
 use crate::term::{
   parser::lexer::{LexingError, Token},
-  Adt, Book, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Tag, Term,
+  Adt, Book, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term,
 };
 use chumsky::{
   error::RichReason,
@@ -45,9 +45,9 @@ use std::{iter::Map, ops::Range, path::Path};
 pub fn parse_book(
   code: &str,
   default_book: impl Fn() -> Book,
-  rule_type: Origin,
+  builtin: bool,
 ) -> Result<Book, Vec<Rich<Token>>> {
-  book(default_book, rule_type).parse(token_stream(code)).into_result()
+  book(default_book, builtin).parse(token_stream(code)).into_result()
 }
 
 pub fn parse_term(code: &str) -> Result<Term, Vec<Rich<Token>>> {
@@ -404,16 +404,16 @@ where
     .boxed()
 }
 
-fn rule<'a, I>(rule_type: Origin) -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
+fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   rule_body_missing_paren()
     .or(rule_pattern().then(term()))
-    .map(move |((name, pats), body)| (name, Rule { pats, body, origin: rule_type }))
+    .map(move |((name, pats), body)| (name, Rule { pats, body }))
 }
 
-fn datatype<'a, I>(origin: Origin) -> impl Parser<'a, I, (Name, Adt, SimpleSpan), extra::Err<Rich<'a, Token>>>
+fn datatype<'a, I>(builtin: bool) -> impl Parser<'a, I, (Name, Adt, SimpleSpan), extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
@@ -430,30 +430,38 @@ where
     .ignore_then(tl_name())
     .then_ignore(just(Token::Equals))
     .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, Vec<Name>)>>())
-    .map_with_span(move |(name, ctrs), span| (name, Adt { ctrs: ctrs.into_iter().collect(), origin }, span))
+    .map_with_span(move |(name, ctrs), span| (name, Adt { ctrs: ctrs.into_iter().collect(), builtin }, span))
 }
 
 fn book<'a, I>(
   default_book: impl Fn() -> Book,
-  origin: Origin,
+  builtin: bool,
 ) -> impl Parser<'a, I, Book, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let top_level = choice((datatype(origin).map(TopLevel::Adt), rule(origin).map(TopLevel::Rule)));
+  let top_level = choice((datatype(builtin).map(TopLevel::Adt), rule().map(TopLevel::Rule)));
 
-  top_level.repeated().collect().validate(move |program, _, emit| collect_book(default_book(), program, emit))
+  top_level
+    .repeated()
+    .collect()
+    .validate(move |program, _, emit| collect_book(default_book(), program, builtin, emit))
 }
 
 /// Collect rules and adts into a book
-fn collect_book(mut book: Book, program: Vec<TopLevel>, emit: &mut Emitter<Rich<'_, Token>>) -> Book {
+fn collect_book(
+  mut book: Book,
+  program: Vec<TopLevel>,
+  builtin: bool,
+  emit: &mut Emitter<Rich<'_, Token>>,
+) -> Book {
   for top_level in program {
     match top_level {
       TopLevel::Rule((name, rule)) => {
         if let Some(def) = book.defs.get_mut(&name) {
           def.rules.push(rule);
         } else {
-          book.defs.insert(name.clone(), Definition { name, rules: vec![rule] });
+          book.defs.insert(name.clone(), Definition { name, rules: vec![rule], builtin });
         }
       }
       TopLevel::Adt((nam, adt, span)) => match book.adts.get(&nam) {
@@ -464,7 +472,7 @@ fn collect_book(mut book: Book, program: Vec<TopLevel>, emit: &mut Emitter<Rich<
               Entry::Vacant(e) => _ = e.insert(nam.clone()),
               Entry::Occupied(e) => emit.emit(Rich::custom(
                 span,
-                if book.adts[e.get()].origin == Origin::Builtin {
+                if book.adts[e.get()].builtin {
                   format!("{} is a built-in constructor and should not be overridden.", e.key())
                 } else {
                   format!("Repeated constructor '{}'", e.key())
@@ -475,7 +483,7 @@ fn collect_book(mut book: Book, program: Vec<TopLevel>, emit: &mut Emitter<Rich<
         }
         Some(adt) => emit.emit(Rich::custom(
           span,
-          if adt.origin == Origin::Builtin {
+          if adt.builtin {
             format!("{} is a built-in datatype and should not be overridden.", nam)
           } else {
             format!("Repeated datatype '{}'", nam)

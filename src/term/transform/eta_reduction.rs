@@ -5,9 +5,10 @@ impl Book {
   /// Assumes that variables are linear (used exactly once).
   pub fn eta_reduction(&mut self, reduce_all: bool) {
     for def in self.defs.values_mut() {
+      let builtin = def.builtin;
       let rule = def.rule_mut();
 
-      if reduce_all || rule.origin != Origin::User {
+      if reduce_all || builtin {
         rule.body.eta_reduction();
       }
     }

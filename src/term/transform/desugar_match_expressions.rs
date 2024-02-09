@@ -1,7 +1,5 @@
 use crate::{
-  term::{
-    display::DisplayJoin, Book, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Tag, Term, Type,
-  },
+  term::{display::DisplayJoin, Book, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term, Type},
   Warning,
 };
 use indexmap::{IndexMap, IndexSet};
@@ -17,7 +15,7 @@ impl Book {
       for rule in def.rules.iter_mut() {
         rule
           .body
-          .extract_adt_matches(def_name, &self.ctrs, &mut new_defs, &mut 0, warnings)
+          .extract_adt_matches(def_name, def.builtin, &self.ctrs, &mut new_defs, &mut 0, warnings)
           .map_err(|e| format!("In definition '{def_name}': {e}"))?;
       }
     }
@@ -88,6 +86,7 @@ impl Term {
   fn extract_adt_matches(
     &mut self,
     def_name: &Name,
+    builtin: bool,
     ctrs: &IndexMap<Name, Name>,
     new_defs: &mut Vec<(Name, Definition)>,
     match_count: &mut usize,
@@ -100,7 +99,7 @@ impl Term {
           warnings.push(crate::Warning::MatchOnlyVars { def_name: def_name.clone() });
         }
         for (_, term) in arms.iter_mut() {
-          term.extract_adt_matches(def_name, ctrs, new_defs, match_count, warnings)?;
+          term.extract_adt_matches(def_name, builtin, ctrs, new_defs, match_count, warnings)?;
         }
         let matched_type = infer_match_type(arms.iter().map(|(x, _)| x), ctrs)?;
         match matched_type {
@@ -113,13 +112,13 @@ impl Term {
             let match_term = linearize_match_unscoped_vars(self)?;
             let match_term = linearize_match_free_vars(match_term);
             let Term::Mat { matched: box Term::Var { nam }, arms } = match_term else { unreachable!() };
-            *match_term = match_to_def(nam, arms, def_name, new_defs, *match_count);
+            *match_term = match_to_def(nam, arms, def_name, builtin, new_defs, *match_count);
           }
         }
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.extract_adt_matches(def_name, ctrs, new_defs, match_count, warnings)?;
+        bod.extract_adt_matches(def_name, builtin, ctrs, new_defs, match_count, warnings)?;
       }
       Term::App { fun: fst, arg: snd, .. }
       | Term::Let { pat: Pattern::Var(_), val: fst, nxt: snd }
@@ -127,8 +126,8 @@ impl Term {
       | Term::Tup { fst, snd }
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
-        fst.extract_adt_matches(def_name, ctrs, new_defs, match_count, warnings)?;
-        snd.extract_adt_matches(def_name, ctrs, new_defs, match_count, warnings)?;
+        fst.extract_adt_matches(def_name, builtin, ctrs, new_defs, match_count, warnings)?;
+        snd.extract_adt_matches(def_name, builtin, ctrs, new_defs, match_count, warnings)?;
       }
       Term::Var { .. }
       | Term::Lnk { .. }
@@ -152,21 +151,19 @@ impl Term {
 /// Transforms a match into a new definition with every arm of `arms` as a rule.
 /// The result is the new def applied to the scrutinee followed by the free vars of the arms.
 fn match_to_def(
-  scrutinee: &Name,
+  matched_var: &Name,
   arms: &[(Pattern, Term)],
   def_name: &Name,
+  builtin: bool,
   new_defs: &mut Vec<(Name, Definition)>,
   match_count: usize,
 ) -> Term {
-  let rules = arms
-    .iter()
-    .map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone(), origin: Origin::Generated })
-    .collect();
+  let rules = arms.iter().map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone() }).collect();
   let new_name = Name::from(format!("{def_name}$match${match_count}"));
-  let def = Definition { name: new_name.clone(), rules };
+  let def = Definition { name: new_name.clone(), rules, builtin };
   new_defs.push((new_name.clone(), def));
 
-  Term::arg_call(Term::Ref { nam: new_name }, scrutinee.clone())
+  Term::arg_call(Term::Ref { nam: new_name }, matched_var.clone())
 }
 
 //== Native match normalization ==//

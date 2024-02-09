@@ -5,11 +5,11 @@ input_file: tests/golden_tests/compile_file_o_all/adt_option_and.hvm
 @None = {4 * {4 a a}}
 @Some = (a {4 {2 a b} {4 * b}})
 @a = (* @None)
-@b = {2 a ({4 @c {4 @a (a b)}} b)}
-@c = {2 a (b {4 {2 [b a] c} {4 * c}})}
-@d = ({4 @b {4 @a a}} a)
+@b = {2 a ({4 @d {4 @a (a b)}} b)}
+@d = {2 a (b {4 {2 [b a] c} {4 * c}})}
+@e = ({4 @b {4 @a a}} a)
 @main = a
-& @d ~ (b (c a))
+& @e ~ (b (c a))
 & @Some ~ (#3 c)
 & @Some ~ (#1 b)
 

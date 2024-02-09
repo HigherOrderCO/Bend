@@ -38,6 +38,7 @@ pub struct Book {
 pub struct Definition {
   pub name: Name,
   pub rules: Vec<Rule>,
+  pub builtin: bool,
 }
 
 /// A pattern matching rule of a definition.
@@ -45,16 +46,6 @@ pub struct Definition {
 pub struct Rule {
   pub pats: Vec<Pattern>,
   pub body: Term,
-  pub origin: Origin,
-}
-
-/// Whether something is built-in, auto generated or written by the user
-#[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub enum Origin {
-  #[default]
-  User,
-  Builtin,
-  Generated,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -188,7 +179,7 @@ pub enum Type {
 #[derive(Debug, Clone, Default)]
 pub struct Adt {
   pub ctrs: IndexMap<Name, Vec<Name>>,
-  pub origin: Origin,
+  pub builtin: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -715,11 +706,6 @@ impl Definition {
   pub fn rule_mut(&mut self) -> &mut Rule {
     self.assert_no_pattern_matching_rules();
     &mut self.rules[0]
-  }
-
-  /// Checks if the definition is a built-in
-  pub fn is_builtin(&self) -> bool {
-    self.rules[0].origin == Origin::Builtin
   }
 }
 

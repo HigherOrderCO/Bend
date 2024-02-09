@@ -1,6 +1,6 @@
 use super::{
   parser::{parse_book, parser::error_to_msg},
-  Book, Origin,
+  Book,
 };
 use itertools::Itertools;
 use std::path::Path;
@@ -12,7 +12,7 @@ pub fn load_file_to_book(path: &Path) -> Result<Book, String> {
 }
 
 pub fn do_parse_book(code: &str, path: &Path) -> Result<Book, String> {
-  match parse_book(code, Book::builtins, Origin::User) {
+  match parse_book(code, Book::builtins, false) {
     Ok(book) => Ok(book),
     Err(errs) => Err(errs.iter().map(|e| error_to_msg(e, code, path)).join("\n")),
   }

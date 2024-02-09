@@ -3,9 +3,9 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.hvm
 ---
 TaggedScott:
-(main) = (Foo A 2)
-
 (Foo) = λa #MyType (a #MyType.A.a λb 100 #MyType.B.b λc 200 #MyType.C.c λd 200 #MyType.D.d1 λe #MyType.D.d2 λf 200 #MyType.E.e1 λg #MyType.E.e2 λh 200)
+
+(main) = (Foo A 2)
 
 (E) = λe1 λe2 #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.E.e2 (#MyType.E.e1 (E e1) e2)
 
@@ -18,9 +18,9 @@ TaggedScott:
 (A) = λa #MyType λA #MyType λB #MyType λC #MyType λD #MyType λE #MyType.A.a (A a)
 
 Scott:
-(main) = (Foo A 2)
-
 (Foo) = λa (a λb 100 λc 200 λd 200 λe λf 200 λg λh 200)
+
+(main) = (Foo A 2)
 
 (E) = λe1 λe2 λA λB λC λD λE (E e1 e2)
 

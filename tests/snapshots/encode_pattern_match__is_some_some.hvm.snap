@@ -3,9 +3,9 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/is_some_some.hvm
 ---
 TaggedScott:
-(main) = (some_some (Some 1))
-
 (some_some) = λa #Option (a #Option.Some.x λb (some_some$F0 b) 0)
+
+(main) = (some_some (Some 1))
 
 (some_some$F0) = λa #Option (a #Option.Some.x λb 1 0)
 
@@ -14,9 +14,9 @@ TaggedScott:
 (Some) = λx #Option λSome #Option λNone #Option.Some.x (Some x)
 
 Scott:
-(main) = (some_some (Some 1))
-
 (some_some) = λa (a λb (some_some$F0 b) 0)
+
+(main) = (some_some (Some 1))
 
 (some_some$F0) = λa (a λb 1 0)
 

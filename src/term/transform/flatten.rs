@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::term::{Book, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Term};
+use crate::term::{Book, Definition, MatchNum, Name, Op, Pattern, Rule, Term};
 
 impl Book {
   pub fn flatten_rules(&mut self) {
@@ -22,7 +22,7 @@ fn flatten_def(def: &Definition) -> Vec<Definition> {
   let mut new_defs: Vec<Definition> = vec![];
 
   // We rebuild this definition rule by rule, with non-nested patterns
-  let mut old_def = Definition { name: def.name.clone(), rules: vec![] };
+  let mut old_def = Definition { name: def.name.clone(), rules: vec![], builtin: def.builtin };
 
   for i in 0 .. def.rules.len() {
     if skip.contains(&i) {
@@ -59,7 +59,7 @@ fn flatten_def(def: &Definition) -> Vec<Definition> {
           }
         }
       }
-      let new_def = Definition { name: new_name, rules: new_rules };
+      let new_def = Definition { name: new_name, rules: new_rules, builtin: def.builtin };
       // Recursively split the newly created def
       for def in flatten_def(&new_def) {
         new_defs.push(def);
@@ -126,7 +126,7 @@ fn make_old_rule(rule: &Rule, split_def: Name) -> Rule {
     }
   }
   let new_body = Term::call(Term::Ref { nam: split_def }, new_body_args);
-  Rule { pats: new_pats, body: new_body, origin: rule.origin }
+  Rule { pats: new_pats, body: new_body }
 }
 
 /// Makes one of the new rules, flattening one layer of the original pattern.
@@ -231,7 +231,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule) -> Rule {
       }
     }
   }
-  Rule { pats: new_pats, body: new_body, origin: Origin::Generated }
+  Rule { pats: new_pats, body: new_body }
 }
 
 fn make_var_name(var_count: &mut usize) -> Name {

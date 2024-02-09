@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-  term::{Adt, AdtEncoding, Book, Name, Origin, Tag, Term, LCONS, LNIL, SCONS, SNIL},
+  term::{Adt, AdtEncoding, Book, Name, Tag, Term, LCONS, LNIL, SCONS, SNIL},
   Warning,
 };
 use indexmap::IndexSet;
@@ -47,8 +47,8 @@ impl Book {
       for (def_name, def) in &self.defs {
         // This needs to be done for each rule in case the pass it's ran from has not encoded the pattern match
         // E.g.: the `flatten_rules` golden test
-        for rule in &def.rules {
-          if rule.origin != Origin::Builtin {
+        if !def.builtin {
+          for rule in &def.rules {
             match used.entry(def_name.clone()) {
               Entry::Vacant(e) => _ = e.insert(Used::Unused),
               Entry::Occupied(e) if *e.get() != Used::Unused => continue,
@@ -79,7 +79,7 @@ impl Book {
   ) {
     for def_name in unused {
       let def = &self.defs[&def_name];
-      if prune_all || def.is_builtin() {
+      if prune_all || def.builtin {
         self.defs.remove(&def_name);
       } else if !def_name.is_generated() {
         warnings.push(Warning::UnusedDefinition { def_name: def_name.clone() });

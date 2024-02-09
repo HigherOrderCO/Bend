@@ -3,18 +3,18 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/var_only.hvm
 ---
 TaggedScott:
-(main) = λx match x { false: Foo; true: False }
-
 (Foo) = λa λb λf (f a)
+
+(main) = λx match x { false: Foo; true: False }
 
 (True) = #Bool λFalse #Bool λTrue True
 
 (False) = #Bool λFalse #Bool λTrue False
 
 Scott:
-(main) = λx match x { false: Foo; true: False }
-
 (Foo) = λa λb λf (f a)
+
+(main) = λx match x { false: Foo; true: False }
 
 (True) = λFalse λTrue True
 

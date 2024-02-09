@@ -3,18 +3,18 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/ntup_sum.hvm
 ---
 TaggedScott:
-(main) = (ntupSum ((1, 3), (3, (2, 1))))
-
 (ntupSum) = λa let (b, c) = a; (ntupSum$F0 b c)
+
+(main) = (ntupSum ((1, 3), (3, (2, 1))))
 
 (ntupSum$F0) = λa let (b, c) = a; λd let (e, f) = d; (ntupSum$F0$F0 b c e f)
 
 (ntupSum$F0$F0) = λa λb λc λd let (e, f) = d; (+ a (+ b (+ c (+ e f))))
 
 Scott:
-(main) = (ntupSum ((1, 3), (3, (2, 1))))
-
 (ntupSum) = λa let (b, c) = a; (ntupSum$F0 b c)
+
+(main) = (ntupSum ((1, 3), (3, (2, 1))))
 
 (ntupSum$F0) = λa let (b, c) = a; λd let (e, f) = d; (ntupSum$F0$F0 b c e f)
 
