@@ -3,29 +3,29 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.hvm
 ---
 TaggedScott:
+(Foo) = λ$x let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x)
+
+(Bar) = (let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x) λ$x *)
+
 (main) = *
+
+(Bar$match$1_$_Foo$match$1) = λa #Maybe (a λb b #Maybe.Some.val λc λd c)
 
 (None) = #Maybe λNone #Maybe λSome None
 
 (Some) = λval #Maybe λNone #Maybe λSome #Maybe.Some.val (Some val)
 
-(Bar$match$1_$_Foo$match$1) = λa #Maybe (a λb b #Maybe.Some.val λc λd c)
-
+Scott:
 (Foo) = λ$x let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x)
 
 (Bar) = (let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x) λ$x *)
 
-Scott:
 (main) = *
+
+(Bar$match$1_$_Foo$match$1) = λa (a λb b λc λd c)
 
 (None) = λNone λSome None
 
 (Some) = λval λNone λSome (Some val)
-
-(Bar$match$1_$_Foo$match$1) = λa (a λb b λc λd c)
-
-(Foo) = λ$x let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x)
-
-(Bar) = (let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x) λ$x *)
 
 

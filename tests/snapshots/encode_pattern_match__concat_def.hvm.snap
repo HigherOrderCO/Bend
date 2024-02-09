@@ -3,18 +3,18 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/concat_def.hvm
 ---
 TaggedScott:
-(main) = (concat (SCons 97 (SCons 98 SNil)) (SCons 99 (SCons 100 SNil)))
-
 (concat) = λa #String (a #String.SCons.head λb #String.SCons.tail λc λd (SCons b (concat c d)) λe e)
+
+(main) = (concat (SCons 97 (SCons 98 SNil)) (SCons 99 (SCons 100 SNil)))
 
 (SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
 
 (SNil) = #String λSCons #String λSNil SNil
 
 Scott:
-(main) = (concat (SCons 97 (SCons 98 SNil)) (SCons 99 (SCons 100 SNil)))
-
 (concat) = λa (a λb λc λd (SCons b (concat c d)) λe e)
+
+(main) = (concat (SCons 97 (SCons 98 SNil)) (SCons 99 (SCons 100 SNil)))
 
 (SCons) = λhead λtail λSCons λSNil (SCons head tail)
 

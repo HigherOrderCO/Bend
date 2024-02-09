@@ -1,4 +1,4 @@
-use crate::term::{Book, Definition, Name, Origin, Pattern, Rule, Term};
+use crate::term::{Book, Definition, Name, Pattern, Rule, Term};
 use std::{
   collections::{BTreeMap, HashSet},
   ops::BitAnd,
@@ -15,8 +15,9 @@ impl Book {
         continue;
       }
 
+      let builtin = def.builtin;
       let rule = def.rule_mut();
-      rule.body.detach_combinators(def_name, rule.origin, &mut combinators);
+      rule.body.detach_combinators(def_name, builtin, &mut combinators);
     }
 
     // Definitions are not inserted to the book as they are defined to appease the borrow checker.
@@ -31,14 +32,14 @@ struct TermInfo<'d> {
   // Number of times a Term has been detached from the current Term
   counter: u32,
   def_name: Name,
-  rule_type: Origin,
+  builtin: bool,
   needed_names: HashSet<Name>,
   combinators: &'d mut Combinators,
 }
 
 impl<'d> TermInfo<'d> {
-  fn new(def_name: Name, rule_type: Origin, combinators: &'d mut Combinators) -> Self {
-    Self { counter: 0, def_name, rule_type, needed_names: HashSet::new(), combinators }
+  fn new(def_name: Name, builtin: bool, combinators: &'d mut Combinators) -> Self {
+    Self { counter: 0, def_name, builtin, needed_names: HashSet::new(), combinators }
   }
   fn request_name(&mut self, name: &Name) {
     self.needed_names.insert(name.clone());
@@ -69,8 +70,8 @@ impl<'d> TermInfo<'d> {
     let comb_var = Term::Ref { nam: comb_name.clone() };
     let extracted_term = std::mem::replace(term, comb_var);
 
-    let rules = vec![Rule { body: extracted_term, pats: Vec::new(), origin: self.rule_type }];
-    let rule = Definition { name: comb_name.clone(), rules };
+    let rules = vec![Rule { body: extracted_term, pats: Vec::new() }];
+    let rule = Definition { name: comb_name.clone(), rules, builtin: self.builtin };
     self.combinators.insert(comb_name, rule);
   }
 }
@@ -136,7 +137,7 @@ impl BitAnd for Detach {
 }
 
 impl Term {
-  pub fn detach_combinators(&mut self, def_name: &Name, rule_type: Origin, combinators: &mut Combinators) {
+  pub fn detach_combinators(&mut self, def_name: &Name, builtin: bool, combinators: &mut Combinators) {
     fn go_lam(term: &mut Term, depth: usize, term_info: &mut TermInfo) -> Detach {
       let parent_scope = term_info.replace_scope(HashSet::new());
 
@@ -263,7 +264,7 @@ impl Term {
       }
     }
 
-    go(self, 0, &mut TermInfo::new(def_name.clone(), rule_type, combinators));
+    go(self, 0, &mut TermInfo::new(def_name.clone(), builtin, combinators));
   }
 
   // We don't want to detach id function, since that's not a net gain in performance or space

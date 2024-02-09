@@ -29,7 +29,7 @@ impl Book {
 fn make_non_pattern_matching_def(def: &mut Definition) {
   let rule = def.rules.first_mut().unwrap();
   let body = add_non_match_arg_lams(std::mem::take(&mut rule.body), &rule.pats);
-  def.rules = vec![Rule { pats: vec![], body, origin: rule.origin }];
+  def.rules = vec![Rule { pats: vec![], body }];
 }
 
 /// For functions that do pattern match,
@@ -41,7 +41,6 @@ fn make_pattern_matching_def(book: &mut Book, def_name: &Name, def_type: &[Type]
   for rule in rules.iter_mut() {
     rule.body = add_non_match_arg_lams(std::mem::take(&mut rule.body), &rule.pats);
   }
-  let origin = rules[0].origin;
 
   // Generate scott-encoded pattern matching
   let def = &book.defs[def_name];
@@ -67,7 +66,7 @@ fn make_pattern_matching_def(book: &mut Book, def_name: &Name, def_type: &[Type]
 
   // Put the new body back into the definition.
   let def = book.defs.get_mut(def_name).unwrap();
-  def.rules = vec![Rule { pats: vec![], body: new_body, origin }];
+  def.rules = vec![Rule { pats: vec![], body: new_body }];
 }
 
 /// Builds the encoding for the patterns in a pattern matching function.

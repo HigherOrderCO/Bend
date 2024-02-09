@@ -3,9 +3,9 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool_tup.hvm
 ---
 TaggedScott:
-(main) = (foo (F, T))
-
 (foo) = λa let (b, c) = a; (foo$F0 b c)
+
+(main) = (foo (F, T))
 
 (foo$F0) = λa #Bool (a λb b λ* F)
 
@@ -14,9 +14,9 @@ TaggedScott:
 (T) = #Bool λT #Bool λF T
 
 Scott:
-(main) = (foo (F, T))
-
 (foo) = λa let (b, c) = a; (foo$F0 b c)
+
+(main) = (foo (F, T))
 
 (foo$F0) = λa (a λb b λ* F)
 

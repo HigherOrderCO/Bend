@@ -1,4 +1,4 @@
-use super::{parser::parse_book, Book, Name, Origin, Pattern, Term};
+use super::{parser::parse_book, Book, Name, Pattern, Term};
 use hvmc::run::Val;
 
 const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/term/builtins.hvm"));
@@ -16,8 +16,7 @@ pub const SCONS: &str = "SCons";
 
 impl Book {
   pub fn builtins() -> Book {
-    parse_book(BUILTINS, Book::default, Origin::Builtin)
-      .expect("Error parsing builtin file, this should not happen")
+    parse_book(BUILTINS, Book::default, true).expect("Error parsing builtin file, this should not happen")
   }
 
   pub fn encode_builtins(&mut self) {

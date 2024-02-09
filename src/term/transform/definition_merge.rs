@@ -1,5 +1,5 @@
 use super::simplify_ref_to_ref::subst_ref_to_ref;
-use crate::term::{Book, Definition, Name, Origin, Rule, Term};
+use crate::term::{Book, Definition, Name, Rule, Term};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use std::collections::BTreeMap;
@@ -25,22 +25,29 @@ impl Book {
     let mut name_map = BTreeMap::new();
 
     for (term, equal_defs) in equal_terms {
-      // Create the merged name
+      // def1_$_def2_$_def3
       let new_name = Name::from(equal_defs.iter().join("_$_"));
 
-      // Write the mapping of old to new names (only if something was merged)
+      // Builtin origin takes precedence
+      let builtin = equal_defs.iter().any(|nam| self.defs[nam].builtin);
+
       if equal_defs.len() > 1 {
+        // Merging some defs
+        // Add the merged def
+        let new_def =
+          Definition { name: new_name.clone(), rules: vec![Rule { pats: vec![], body: term }], builtin };
+        self.defs.insert(new_name.clone(), new_def);
+        // Remove the old ones and write the map of old names to new ones.
         for name in equal_defs {
+          self.defs.remove(&name);
           name_map.insert(name, new_name.clone());
         }
+      } else {
+        // Not merging, just put the body back
+        let def_name = equal_defs.into_iter().next().unwrap();
+        let def = self.defs.get_mut(&def_name).unwrap();
+        def.rule_mut().body = term;
       }
-
-      // Create the merged function
-      let new_def = Definition {
-        name: new_name.clone(),
-        rules: vec![Rule { pats: vec![], body: term, origin: Origin::Generated }],
-      };
-      self.defs.insert(new_name, new_def);
     }
     self.update_refs(&name_map, main);
   }
@@ -49,7 +56,7 @@ impl Book {
     let mut equal_terms: IndexMap<Term, IndexSet<Name>> = IndexMap::new();
 
     for def_name in def_entries {
-      let mut def = self.defs.remove(&def_name).unwrap();
+      let def = self.defs.get_mut(&def_name).unwrap();
       let term = std::mem::take(&mut def.rule_mut().body);
       equal_terms.entry(term).or_default().insert(def_name);
     }

@@ -11,9 +11,9 @@ TaggedScott:
 
 (and3_$_and4) = λa #bool (a λb #bool (b true false) λc false)
 
-(false) = #bool λtrue #bool λfalse false
-
 (true) = #bool λtrue #bool λfalse true
+
+(false) = #bool λtrue #bool λfalse false
 
 Scott:
 (not) = λa (a false true)
@@ -24,8 +24,8 @@ Scott:
 
 (and3_$_and4) = λa (a λb (b true false) λc false)
 
-(false) = λtrue λfalse false
-
 (true) = λtrue λfalse true
+
+(false) = λtrue λfalse false
 
 

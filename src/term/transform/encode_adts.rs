@@ -9,8 +9,8 @@ impl Book {
 
         let body = encode_ctr(adt_name, args.clone(), ctrs, ctr_name, adt_encoding);
 
-        let rules = vec![Rule { pats: vec![], body, origin: adt.origin }];
-        let def = Definition { name: ctr_name.clone(), rules };
+        let rules = vec![Rule { pats: vec![], body }];
+        let def = Definition { name: ctr_name.clone(), rules, builtin: adt.builtin };
         defs.push((ctr_name.clone(), def));
       }
     }

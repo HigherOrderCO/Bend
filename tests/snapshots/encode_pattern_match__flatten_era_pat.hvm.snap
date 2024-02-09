@@ -3,13 +3,13 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/flatten_era_pat.hvm
 ---
 TaggedScott:
-(main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)
-
 (Fn1) = λa let (b, c) = a; λd (Fn1$F0 b c d)
 
 (Fn2) = λa let (b, c) = a; (Fn2$F0 b c)
 
 (Fn3) = λa let (b, c) = a; λd (Fn3$F0 b c d)
+
+(main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)
 
 (Fn3$F0) = λa match a { 0: λ* λ* 0; +: λb λ* λ* b }
 
@@ -20,13 +20,13 @@ TaggedScott:
 (Fn1$F0) = λa λb let (c, d) = b; λ* c
 
 Scott:
-(main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)
-
 (Fn1) = λa let (b, c) = a; λd (Fn1$F0 b c d)
 
 (Fn2) = λa let (b, c) = a; (Fn2$F0 b c)
 
 (Fn3) = λa let (b, c) = a; λd (Fn3$F0 b c d)
+
+(main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)
 
 (Fn3$F0) = λa match a { 0: λ* λ* 0; +: λb λ* λ* b }
 
