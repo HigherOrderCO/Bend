@@ -1,9 +1,7 @@
 // Reduce the compiled networks, solving any annihilations and commutations.
 // This is a useful optimization on its own, but also required by an hvm-core optimization.
 
-use crate::{
-  expand, net_from_runtime, net_to_runtime, rdex, reduce, runtime_net_to_runtime_def, ENTRY_POINT,
-};
+use crate::{expand, net_from_runtime, net_to_runtime, rdex, reduce, runtime_net_to_runtime_def};
 use hvmc::{
   ast::{book_from_runtime, name_to_val, Book},
   run::{Net, Ptr, OP2, REF},
@@ -14,7 +12,7 @@ const MAX_ITERS: usize = 100_000;
 /// Reduces the definitions in the book individually, except for main.
 /// If cross_refs, will deref and try to find the smallest net.
 /// Otherwise, just apply node~node interactions.
-pub fn pre_reduce_book(book: &mut Book, cross_refs: bool) -> Result<(), String> {
+pub fn pre_reduce_book(book: &mut Book, cross_refs: bool, entrypoint: String) -> Result<(), String> {
   let rt_book = &mut hvmc::ast::book_to_runtime(book);
   for (nam, net) in book.iter() {
     // Skip unnecessary work
@@ -26,7 +24,7 @@ pub fn pre_reduce_book(book: &mut Book, cross_refs: bool) -> Result<(), String> 
     boot(rt, fid);
     expand(rt, rt_book);
 
-    let fully_reduce = cross_refs && nam != ENTRY_POINT;
+    let fully_reduce = cross_refs && *nam != entrypoint;
     let iters = if fully_reduce {
       let mut iters = 0;
       // TODO: If I just call `rt.normal` some terms expand infinitely, so I put this workaround.

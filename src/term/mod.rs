@@ -16,7 +16,7 @@ pub mod transform;
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
-use crate::term::builtins::*;
+use crate::{term::builtins::*, ENTRY_POINT};
 
 /// The representation of a program.
 #[derive(Debug, Clone, Default)]
@@ -29,6 +29,9 @@ pub struct Book {
 
   /// To which type does each constructor belong to.
   pub ctrs: IndexMap<DefName, DefName>,
+
+  /// A custom or default "main" entrypoint.
+  pub entrypoint: Option<Name>,
 }
 
 /// A pattern matching function definition.
@@ -784,5 +787,11 @@ impl Deref for Name {
 
   fn deref(&self) -> &Self::Target {
     self.0.deref()
+  }
+}
+
+impl Book {
+  pub fn hvmc_entrypoint(&self) -> String {
+    if let Some(nam) = &self.entrypoint { nam.to_string() } else { ENTRY_POINT.to_string() }
   }
 }

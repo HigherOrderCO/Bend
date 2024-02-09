@@ -1,4 +1,4 @@
-# Passes
+# Options
 
 |  flag          | Default  | What it does? |
 |----------------|----------|---------------|
@@ -13,6 +13,7 @@
 | `-Osimplify-main` `-Ono-simplify-main` | Disabled | [simplify-main](#simplify-main) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
 | `-Oinline` `-Ono-inline` | Disabled | [inline](#inline) |
+| `-e` `--entrypoint` | `Main \| main` | [entrypoint](#entrypoint) |
 
 ## Eta-reduction
 
@@ -229,4 +230,29 @@ main = (id foo)
 
 @main = a
 & (b b) ~ ([#2 #3] a)
+```
+
+## Entrypoint
+
+If given the option, use another definition as entrypoint rather than `main` or `Main`.
+
+> By default, HVM-Lang searches for a function named either `main` or `Main` to use as entrypoint to a program, but it is possible to use a different entrypoint with the `-e --entrypoint` option.
+
+Example:
+```
+// program
+Main = (λx x λx x)
+
+// compilation output, both `Main` and `main` compile to a `@main` definition
+@main = a
+& (b b) ~ ((c c) a)
+
+// program
+// Normally would fail as the program does not have a `main` definition.
+run = (λx x λx x)
+
+// compilation output using `--entrypoint run`.
+// No `@main` definition is created.
+@run = a
+& (b b) ~ ((c c) a)
 ```

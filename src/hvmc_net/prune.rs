@@ -1,14 +1,13 @@
-use crate::ENTRY_POINT;
 use hvmc::{
   ast::{val_to_name, Book, Tree},
   run::Val,
 };
 use std::collections::HashSet;
 
-pub fn prune_defs(book: &mut Book) {
+pub fn prune_defs(book: &mut Book, entrypoint: String) {
   let mut used_defs = HashSet::new();
-  // On hvmc, the entry point is always "main"
-  let mut to_visit = vec![ENTRY_POINT.to_string()];
+  // Start visiting the given entrypoint
+  let mut to_visit = vec![entrypoint.clone()];
 
   while let Some(nam) = to_visit.pop() {
     let def = &book[&nam];
@@ -19,7 +18,7 @@ pub fn prune_defs(book: &mut Book) {
     }
   }
   let used_defs = used_defs.into_iter().map(val_to_name).collect::<HashSet<_>>();
-  book.retain(|nam, _| used_defs.contains(nam) || nam == ENTRY_POINT);
+  book.retain(|nam, _| used_defs.contains(nam) || *nam == entrypoint);
 }
 
 fn used_defs_in_tree(tree: &Tree, used_defs: &mut HashSet<Val>, to_visit: &mut Vec<String>) {
