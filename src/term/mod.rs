@@ -9,7 +9,6 @@ pub mod display;
 pub mod load_book;
 pub mod net_to_term;
 pub mod parser;
-pub mod resugar;
 pub mod term_to_net;
 pub mod transform;
 

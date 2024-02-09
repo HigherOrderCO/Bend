@@ -5,4 +5,4 @@ input_file: tests/golden_tests/run_file/adt_match_wrong_tag.hvm
 Readback Warning:
 Unexpected tag found during Adt readback, expected '#Option.Some.val', but found '#wrong_tag'
 
-λa match a { (Some c): #Option.Some.val (#wrong_tag λb b c); (None): * }
+λa match a { (Some Some.val): #Option.Some.val (#wrong_tag λb b Some.val); (None): * }

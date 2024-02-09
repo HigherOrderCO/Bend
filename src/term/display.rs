@@ -1,8 +1,7 @@
 use std::fmt::{self, Display};
 
 use super::{
-  net_to_term::{ReadbackError, ReadbackErrors},
-  Book, DefName, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term, Type,
+  net_to_term::ReadbackError, Book, DefName, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term, Type,
 };
 
 macro_rules! display {
@@ -209,33 +208,31 @@ where
   }
 }
 
-impl ReadbackErrors {
-  pub fn display(&self) -> impl fmt::Display + '_ {
-    DisplayFn(move |f| {
-      if self.0.is_empty() {
-        return Ok(());
-      }
+pub fn display_readback_errors(errs: &[ReadbackError]) -> impl fmt::Display + '_ {
+  DisplayFn(move |f| {
+    if errs.is_empty() {
+      return Ok(());
+    }
 
-      writeln!(f, "Readback Warning:")?;
-      let mut err_counts = std::collections::HashMap::new();
-      for err in &self.0 {
-        if err.can_count() {
-          *err_counts.entry(err).or_insert(0) += 1;
-        } else {
-          writeln!(f, "{}", err.display())?;
-        }
+    writeln!(f, "Readback Warning:")?;
+    let mut err_counts = std::collections::HashMap::new();
+    for err in errs {
+      if err.can_count() {
+        *err_counts.entry(err).or_insert(0) += 1;
+      } else {
+        writeln!(f, "{}", err.display())?;
       }
+    }
 
-      for (err, count) in err_counts {
-        write!(f, "{}", err.display())?;
-        if count > 1 {
-          writeln!(f, " with {} occurrences", count)?;
-        }
+    for (err, count) in err_counts {
+      write!(f, "{}", err.display())?;
+      if count > 1 {
+        writeln!(f, " with {} occurrences", count)?;
       }
+    }
 
-      writeln!(f)
-    })
-  }
+    writeln!(f)
+  })
 }
 
 impl ReadbackError {
