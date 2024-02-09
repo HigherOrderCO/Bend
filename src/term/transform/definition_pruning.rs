@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-  term::{Adt, AdtEncoding, Book, DefName, Origin, Tag, Term, LCONS, LNIL, SCONS, SNIL},
+  term::{Adt, AdtEncoding, Book, Name, Origin, Tag, Term, LCONS, LNIL, SCONS, SNIL},
   Warning,
 };
 use indexmap::IndexSet;
@@ -22,14 +22,14 @@ enum Used {
   Unused,
 }
 
-type Definitions = HashMap<DefName, Used>;
+type Definitions = HashMap<Name, Used>;
 
 impl Book {
   /// If `prune_all`, removes all unused definitions and adts starting from Main.
   /// Otherwise, prunes only the builtins not accessible from any non-built-in definition
   pub fn prune(
     &mut self,
-    main: Option<&DefName>,
+    main: Option<&Name>,
     prune_all: bool,
     adt_encoding: AdtEncoding,
     warnings: &mut Vec<Warning>,
@@ -63,9 +63,9 @@ impl Book {
 
     // Filter defs from the 'used' hashmap that are not accessible from main
     let filter = |(name, used)| if used == Used::Unused { None } else { Some(name) };
-    let used: IndexSet<DefName> = used.into_iter().filter_map(filter).collect();
+    let used: IndexSet<Name> = used.into_iter().filter_map(filter).collect();
 
-    let names = self.defs.keys().cloned().collect::<IndexSet<DefName>>();
+    let names = self.defs.keys().cloned().collect::<IndexSet<Name>>();
     let unused = names.difference(&used).cloned();
 
     self.prune_unused(unused, prune_all, warnings);
@@ -73,7 +73,7 @@ impl Book {
 
   fn prune_unused(
     &mut self,
-    unused: impl IntoIterator<Item = DefName>,
+    unused: impl IntoIterator<Item = Name>,
     prune_all: bool,
     warnings: &mut Vec<Warning>,
   ) {
@@ -98,7 +98,7 @@ impl Book {
     self.find_manual_adt_encoding(term, uses, adt_encoding);
 
     match term {
-      Term::Ref { def_name } => match self.ctrs.get(def_name) {
+      Term::Ref { nam: def_name } => match self.ctrs.get(def_name) {
         Some(name) => self.insert_ctrs_used(name, uses, adt_encoding),
         None => self.insert_used(def_name, used, uses, adt_encoding),
       },
@@ -115,24 +115,24 @@ impl Book {
         self.find_used_definitions(fst, used, uses, adt_encoding);
         self.find_used_definitions(snd, used, uses, adt_encoding);
       }
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         self.find_used_definitions(scrutinee, used, uses, adt_encoding);
         for (_, term) in arms {
           self.find_used_definitions(term, used, uses, adt_encoding);
         }
       }
-      Term::List { els } => {
-        self.insert_ctrs_used(&DefName::new(LCONS), uses, adt_encoding);
-        self.insert_ctrs_used(&DefName::new(LNIL), uses, adt_encoding);
+      Term::Lst { els } => {
+        self.insert_ctrs_used(&Name::new(LCONS), uses, adt_encoding);
+        self.insert_ctrs_used(&Name::new(LNIL), uses, adt_encoding);
         for term in els {
           self.find_used_definitions(term, used, uses, adt_encoding);
         }
       }
       Term::Str { .. } => {
-        self.insert_ctrs_used(&DefName::new(SCONS), uses, adt_encoding);
-        self.insert_ctrs_used(&DefName::new(SNIL), uses, adt_encoding);
+        self.insert_ctrs_used(&Name::new(SCONS), uses, adt_encoding);
+        self.insert_ctrs_used(&Name::new(SNIL), uses, adt_encoding);
       }
-      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era | Term::Invalid => (),
+      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era | Term::Err => (),
     }
   }
 
@@ -154,7 +154,7 @@ impl Book {
     }
   }
 
-  fn insert_used(&self, def_name: &DefName, used: Used, uses: &mut Definitions, adt_encoding: AdtEncoding) {
+  fn insert_used(&self, def_name: &Name, used: Used, uses: &mut Definitions, adt_encoding: AdtEncoding) {
     if let Entry::Vacant(e) = uses.entry(def_name.clone()) {
       e.insert(used);
 
@@ -166,7 +166,7 @@ impl Book {
     }
   }
 
-  fn insert_ctrs_used(&self, name: &DefName, uses: &mut Definitions, adt_encoding: AdtEncoding) {
+  fn insert_ctrs_used(&self, name: &Name, uses: &mut Definitions, adt_encoding: AdtEncoding) {
     if let Some(Adt { ctrs, .. }) = self.adts.get(name) {
       for (ctr, _) in ctrs {
         self.insert_used(ctr, Used::Adt, uses, adt_encoding);

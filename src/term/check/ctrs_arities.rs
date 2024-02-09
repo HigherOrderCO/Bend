@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::term::{Book, DefName, Pattern};
+use crate::term::{Book, Name, Pattern};
 
 impl Book {
   /// Checks if every constructor pattern of every definition rule has the same arity from the
@@ -22,7 +22,7 @@ impl Book {
   }
 
   /// Returns a hashmap of the constructor name to its arity.
-  pub fn ctr_arities(&self) -> HashMap<DefName, usize> {
+  pub fn ctr_arities(&self) -> HashMap<Name, usize> {
     let mut arities = HashMap::new();
 
     for adt in self.adts.values() {
@@ -36,7 +36,7 @@ impl Book {
 }
 
 impl Pattern {
-  fn check(&self, arities: &HashMap<DefName, usize>) -> Result<(), String> {
+  fn check(&self, arities: &HashMap<Name, usize>) -> Result<(), String> {
     match self {
       Pattern::Ctr(name, args) => {
         let arity = arities.get(name).unwrap();
@@ -51,7 +51,7 @@ impl Pattern {
         fst.check(arities)?;
         snd.check(arities)
       }
-      Pattern::List(els) => {
+      Pattern::Lst(els) => {
         for el in els {
           el.check(arities)?;
         }

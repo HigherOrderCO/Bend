@@ -1,10 +1,10 @@
 use crate::{
-  term::{Book, DefName, Name},
+  term::{Book, Name},
   ENTRY_POINT, HVM1_ENTRY_POINT,
 };
 
 impl Book {
-  pub fn check_has_entrypoint(&mut self, nam: Option<Name>) -> Result<DefName, String> {
+  pub fn check_has_entrypoint(&mut self, nam: Option<Name>) -> Result<Name, String> {
     if let Some(nam) = nam {
       match self.defs.get(&nam) {
         Some(_) => {
@@ -15,7 +15,7 @@ impl Book {
       }
     }
 
-    match (self.defs.get(&DefName::new(ENTRY_POINT)), self.defs.get(&DefName::new(HVM1_ENTRY_POINT))) {
+    match (self.defs.get(&Name::new(ENTRY_POINT)), self.defs.get(&Name::new(HVM1_ENTRY_POINT))) {
       (None, None) => Err("File has no 'main' definition".to_string()),
       (Some(_), Some(_)) => Err("File has both 'Main' and 'main' definitions".to_string()),
       (None, Some(main)) | (Some(main), None) => {

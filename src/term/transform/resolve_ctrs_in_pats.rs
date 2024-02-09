@@ -1,4 +1,4 @@
-use crate::term::{Book, Pattern, Term, VarName};
+use crate::term::{Book, Name, Pattern, Term};
 
 impl Book {
   /// Resolve Constructor names inside rule patterns and match patterns.
@@ -6,7 +6,7 @@ impl Book {
   /// so no way to know if a particular name belongs to a constructor or is a matched variable.
   /// Therefore we must do it later, here.
   pub fn resolve_ctrs_in_pats(&mut self) {
-    let is_ctr = |nam: &VarName| self.ctrs.contains_key(nam);
+    let is_ctr = |nam: &Name| self.ctrs.contains_key(nam);
     for def in self.defs.values_mut() {
       for rule in &mut def.rules {
         for pat in &mut rule.pats {
@@ -19,14 +19,14 @@ impl Book {
 }
 
 impl Pattern {
-  pub fn resolve_ctrs(&mut self, is_ctr: &impl Fn(&VarName) -> bool) {
+  pub fn resolve_ctrs(&mut self, is_ctr: &impl Fn(&Name) -> bool) {
     match self {
       Pattern::Var(Some(nam)) => {
         if is_ctr(nam) {
           *self = Pattern::Ctr(nam.clone(), vec![]);
         }
       }
-      Pattern::Ctr(_, args) | Pattern::List(args) => {
+      Pattern::Ctr(_, args) | Pattern::Lst(args) => {
         for arg in args {
           arg.resolve_ctrs(is_ctr);
         }
@@ -42,14 +42,14 @@ impl Pattern {
 }
 
 impl Term {
-  pub fn resolve_ctrs_in_pats(&mut self, is_ctr: &impl Fn(&VarName) -> bool) {
+  pub fn resolve_ctrs_in_pats(&mut self, is_ctr: &impl Fn(&Name) -> bool) {
     match self {
       Term::Let { pat, val, nxt } => {
         pat.resolve_ctrs(is_ctr);
         val.resolve_ctrs_in_pats(is_ctr);
         nxt.resolve_ctrs_in_pats(is_ctr);
       }
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         scrutinee.resolve_ctrs_in_pats(is_ctr);
         for (pat, body) in arms {
           pat.resolve_ctrs(is_ctr);
@@ -70,9 +70,9 @@ impl Term {
       | Term::Ref { .. }
       | Term::Num { .. }
       | Term::Str { .. }
-      | Term::List { .. }
+      | Term::Lst { .. }
       | Term::Era
-      | Term::Invalid => (),
+      | Term::Err => (),
     }
   }
 }

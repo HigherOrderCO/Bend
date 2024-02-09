@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::term::{Book, DefName, Definition, MatchNum, Op, Origin, Pattern, Rule, Term, VarName};
+use crate::term::{Book, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Term};
 
 impl Book {
   pub fn flatten_rules(&mut self) {
@@ -34,7 +34,7 @@ fn flatten_def(def: &Definition) -> Vec<Definition> {
     if must_split {
       // Create the entry for the new definition name
       let old_name = &def.name;
-      let new_name = DefName::from(format!("{}$F{}", old_name, new_defs.len()));
+      let new_name = Name::from(format!("{}$F{}", old_name, new_defs.len()));
 
       // Create the rule that replaces the one being flattened.
       // Destructs one layer of the nested patterns and calls the following, forwarding the extracted fields.
@@ -75,7 +75,7 @@ fn flatten_def(def: &Definition) -> Vec<Definition> {
 
 /// Makes the rule that replaces the original.
 /// The new version of the rule is flat and calls the next layer of pattern matching.
-fn make_old_rule(rule: &Rule, split_def: DefName) -> Rule {
+fn make_old_rule(rule: &Rule, split_def: Name) -> Rule {
   //(Foo Tic (Bar a b) (Haz c d)) = A
   //(Foo Tic x         y)         = B
   //---------------------------------
@@ -122,10 +122,10 @@ fn make_old_rule(rule: &Rule, split_def: DefName) -> Rule {
         new_pats.push(Pattern::Num(MatchNum::Succ(Some(Some(var_name)))));
       }
       Pattern::Num(MatchNum::Succ(None)) => unreachable!(),
-      Pattern::List(..) => unreachable!(),
+      Pattern::Lst(..) => unreachable!(),
     }
   }
-  let new_body = Term::call(Term::Ref { def_name: split_def }, new_body_args);
+  let new_body = Term::call(Term::Ref { nam: split_def }, new_body_args);
   Rule { pats: new_pats, body: new_body, origin: rule.origin }
 }
 
@@ -226,7 +226,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule) -> Rule {
       (Pattern::Num(MatchNum::Succ(None)), _) => unreachable!(
         "In pattern matching function position, number patterns can't have their lambda detached"
       ),
-      (Pattern::List(..), _) | (_, Pattern::List(..)) => {
+      (Pattern::Lst(..), _) | (_, Pattern::Lst(..)) => {
         unreachable!("List syntax should have been already desugared")
       }
     }
@@ -234,7 +234,7 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule) -> Rule {
   Rule { pats: new_pats, body: new_body, origin: Origin::Generated }
 }
 
-fn make_var_name(var_count: &mut usize) -> VarName {
+fn make_var_name(var_count: &mut usize) -> Name {
   let nam = format!("%x{var_count}");
   *var_count += 1;
   nam.into()

@@ -1,6 +1,6 @@
 use crate::{
   net::{INet, NodeId, NodeKind, Port, ROOT},
-  term::{num_to_name, term_to_net::HvmcNames, DefName},
+  term::{num_to_name, term_to_net::HvmcNames, Name},
 };
 use hvmc::{
   ast::{Book, Net, Tree},
@@ -19,7 +19,7 @@ pub fn nets_to_hvmc(nets: HashMap<String, INet>, hvmc_names: &HvmcNames) -> Resu
 }
 
 /// Convert an inet-encoded definition into an hvmc AST inet.
-pub fn net_to_hvmc(inet: &INet, hvml_to_hvmc_name: &HashMap<DefName, Val>) -> Result<Net, String> {
+pub fn net_to_hvmc(inet: &INet, hvml_to_hvmc_name: &HashMap<Name, Val>) -> Result<Net, String> {
   let (net_root, redxs) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(net_root) = net_root {
@@ -43,7 +43,7 @@ fn net_tree_to_hvmc_tree(
   inet: &INet,
   tree_root: NodeId,
   port_to_var_id: &mut HashMap<Port, VarId>,
-  hvml_to_hvmc_name: &HashMap<DefName, Val>,
+  hvml_to_hvmc_name: &HashMap<Name, Val>,
 ) -> Tree {
   match &inet.node(tree_root).kind {
     NodeKind::Era => Tree::Era,
@@ -87,7 +87,7 @@ fn var_or_subtree(
   inet: &INet,
   src_port: Port,
   port_to_var_id: &mut HashMap<Port, VarId>,
-  hvml_to_hvmc_name: &HashMap<DefName, Val>,
+  hvml_to_hvmc_name: &HashMap<Name, Val>,
 ) -> Tree {
   let dst_port = inet.enter_port(src_port);
   if dst_port.slot() == 0 {

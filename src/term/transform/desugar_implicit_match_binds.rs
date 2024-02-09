@@ -1,4 +1,4 @@
-use crate::term::{Adt, Book, DefName, MatchNum, Pattern, Term, VarName};
+use crate::term::{Adt, Book, MatchNum, Name, Pattern, Term};
 use indexmap::IndexMap;
 
 impl Book {
@@ -12,30 +12,26 @@ impl Book {
 }
 
 impl Term {
-  pub fn desugar_implicit_match_binds(
-    &mut self,
-    ctrs: &IndexMap<DefName, DefName>,
-    adts: &IndexMap<DefName, Adt>,
-  ) {
+  pub fn desugar_implicit_match_binds(&mut self, ctrs: &IndexMap<Name, Name>, adts: &IndexMap<Name, Adt>) {
     match self {
-      Term::Match { scrutinee, .. } => {
+      Term::Mat { matched: scrutinee, .. } => {
         let scrutinee = if let Term::Var { nam } = scrutinee.as_ref() {
           nam.clone()
         } else {
-          let Term::Match { scrutinee, arms } = std::mem::take(self) else { unreachable!() };
+          let Term::Mat { matched: scrutinee, arms } = std::mem::take(self) else { unreachable!() };
 
-          let nam = VarName::new("%temp%scrutinee");
+          let nam = Name::new("%temp%scrutinee");
 
           *self = Term::Let {
             pat: Pattern::Var(Some(nam.clone())),
             val: scrutinee,
-            nxt: Box::new(Term::Match { scrutinee: Box::new(Term::Var { nam: nam.clone() }), arms }),
+            nxt: Box::new(Term::Mat { matched: Box::new(Term::Var { nam: nam.clone() }), arms }),
           };
 
           nam
         };
 
-        let (Term::Match { arms, .. } | Term::Let { nxt: box Term::Match { arms, .. }, .. }) = self else {
+        let (Term::Mat { arms, .. } | Term::Let { nxt: box Term::Mat { arms, .. }, .. }) = self else {
           unreachable!()
         };
 
@@ -59,7 +55,7 @@ impl Term {
               *p = Some(Some(format!("{scrutinee}-1").into()));
             }
             Pattern::Tup(_, _) => (),
-            Pattern::List(..) => unreachable!(),
+            Pattern::Lst(..) => unreachable!(),
           }
           body.desugar_implicit_match_binds(ctrs, adts);
         }
@@ -82,11 +78,11 @@ impl Term {
       | Term::Str { .. }
       | Term::Lnk { .. }
       | Term::Var { .. }
-      | Term::Invalid => (),
+      | Term::Err => (),
       Term::Let { pat: _, .. } => {
         unreachable!("Expected destructor let expressions to have been desugared already")
       }
-      Term::List { .. } => unreachable!("Should have been desugared already"),
+      Term::Lst { .. } => unreachable!("Should have been desugared already"),
     }
   }
 }

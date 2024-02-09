@@ -1,6 +1,6 @@
 // Pass to give all variables in a definition unique names.
 
-use crate::term::{Book, Pattern, Term, VarName};
+use crate::term::{Book, Name, Pattern, Term};
 use hvmc::run::Val;
 use std::collections::HashMap;
 
@@ -25,7 +25,7 @@ type VarId = Val;
 
 #[derive(Default)]
 pub struct UniqueNameGenerator {
-  name_map: HashMap<VarName, Vec<VarId>>,
+  name_map: HashMap<Name, Vec<VarId>>,
   name_count: VarId,
 }
 
@@ -61,7 +61,7 @@ impl UniqueNameGenerator {
         *snd = self.pop(snd.as_ref());
         *fst = self.pop(fst.as_ref());
       }
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         self.unique_names_in_term(scrutinee);
         for (pat, term) in arms {
           pat.names().for_each(|nam| self.push(Some(nam)));
@@ -83,21 +83,16 @@ impl UniqueNameGenerator {
       }
       // Global lam names are already unique, so no need to do anything
       Term::Chn { bod, .. } => self.unique_names_in_term(bod),
-      Term::Lnk { .. }
-      | Term::Ref { .. }
-      | Term::Era
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Invalid => (),
+      Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } | Term::Str { .. } | Term::Err => (),
 
       Term::Let { .. } => {
         unreachable!("Let terms other than tuple destruction should have been desugared already.")
       }
-      Term::List { .. } => unreachable!("Should have been desugared already."),
+      Term::Lst { .. } => unreachable!("Should have been desugared already."),
     }
   }
 
-  fn push(&mut self, nam: Option<&VarName>) {
+  fn push(&mut self, nam: Option<&Name>) {
     if let Some(name) = nam {
       if let Some(ids) = self.name_map.get_mut(name) {
         ids.push(self.name_count);
@@ -108,22 +103,22 @@ impl UniqueNameGenerator {
     }
   }
 
-  fn pop(&mut self, nam: Option<&VarName>) -> Option<VarName> {
+  fn pop(&mut self, nam: Option<&Name>) -> Option<Name> {
     if let Some(name) = nam {
       let var_id = self.name_map.get_mut(name).unwrap().pop().unwrap();
       if self.name_map[name].is_empty() {
         self.name_map.remove(name);
       }
-      Some(VarName::from(var_id))
+      Some(Name::from(var_id))
     } else {
       None
     }
   }
 
-  fn use_var(&self, nam: &VarName) -> VarName {
+  fn use_var(&self, nam: &Name) -> Name {
     if let Some(vars) = self.name_map.get(nam) {
       let var_id = *vars.last().unwrap();
-      VarName::from(var_id)
+      Name::from(var_id)
     } else {
       // Skip unbound variables.
       // With this, we can use this function before checking for unbound vars.

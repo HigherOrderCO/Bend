@@ -53,7 +53,7 @@ impl Term {
         fst.eta_reduction();
         snd.eta_reduction();
       }
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         scrutinee.eta_reduction();
         for (pat, term) in arms {
           debug_assert!(pat.is_detached_num_match());
@@ -64,10 +64,10 @@ impl Term {
       | Term::Var { .. }
       | Term::Num { .. }
       | Term::Str { .. }
-      | Term::List { .. }
+      | Term::Lst { .. }
       | Term::Ref { .. }
       | Term::Era
-      | Term::Invalid => {}
+      | Term::Err => {}
     }
   }
 }

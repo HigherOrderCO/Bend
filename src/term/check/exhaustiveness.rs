@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 
 use super::type_check::DefinitionTypes;
-use crate::term::{Adt, Book, DefName, MatchNum, Pattern, Rule, Type};
+use crate::term::{Adt, Book, MatchNum, Name, Pattern, Rule, Type};
 
 impl Book {
   /// For each pattern-matching definition, check that any given value will match at least one of the rules.
@@ -18,12 +18,12 @@ impl Book {
 }
 
 fn check_pattern(
-  match_path: &mut Vec<DefName>,
-  adts: &IndexMap<DefName, Adt>,
+  match_path: &mut Vec<Name>,
+  adts: &IndexMap<Name, Adt>,
   rules: &[Rule],
   types: &[Type],
   rules_to_check: Vec<usize>,
-  def_name: &DefName,
+  def_name: &Name,
 ) -> Result<(), String> {
   if let Some(pat_type) = types.first() {
     // For each constructor of the pattern, which rules match with it.
@@ -31,11 +31,11 @@ fn check_pattern(
     // TODO: Should check if it's a constructor type and use Pattern::is_flat_subset_of.
     let rules_matching_ctrs = match pat_type {
       // We can skip non pattern matching arguments
-      Type::Any => IndexMap::from([(DefName::new("_"), rules_to_check)]),
+      Type::Any => IndexMap::from([(Name::new("_"), rules_to_check)]),
       Type::Adt(adt_nam) => {
         let adt = &adts[adt_nam];
         // For each constructor, which rules do we need to check.
-        let mut next_rules_to_check: IndexMap<DefName, Vec<usize>> =
+        let mut next_rules_to_check: IndexMap<Name, Vec<usize>> =
           adt.ctrs.keys().cloned().map(|ctr| (ctr, vec![])).collect();
         for rule_idx in rules_to_check {
           let pat = &rules[rule_idx].pats[match_path.len()];
@@ -49,19 +49,19 @@ fn check_pattern(
         }
         next_rules_to_check
       }
-      Type::Tup => IndexMap::from([(DefName::new("(_,_)"), rules_to_check)]),
+      Type::Tup => IndexMap::from([(Name::new("(_,_)"), rules_to_check)]),
       Type::Num => {
-        let mut next_rules_to_check: IndexMap<DefName, Vec<usize>> =
-          IndexMap::from([(DefName::new("0"), vec![]), (DefName::new("+"), vec![])]);
+        let mut next_rules_to_check: IndexMap<Name, Vec<usize>> =
+          IndexMap::from([(Name::new("0"), vec![]), (Name::new("+"), vec![])]);
         for rule_idx in rules_to_check {
           let pat = &rules[rule_idx].pats[match_path.len()];
           match pat {
             Pattern::Var(_) => next_rules_to_check.values_mut().for_each(|x| x.push(rule_idx)),
             Pattern::Num(MatchNum::Zero) => {
-              next_rules_to_check.get_mut(&DefName::new("0")).unwrap().push(rule_idx);
+              next_rules_to_check.get_mut(&Name::new("0")).unwrap().push(rule_idx);
             }
             Pattern::Num(MatchNum::Succ { .. }) => {
-              next_rules_to_check.get_mut(&DefName::new("+")).unwrap().push(rule_idx);
+              next_rules_to_check.get_mut(&Name::new("+")).unwrap().push(rule_idx);
             }
             _ => unreachable!(),
           }
@@ -88,10 +88,10 @@ fn check_pattern(
 
 /// Returns a string with the first pattern not covered by the definition.
 fn get_missing_pattern(
-  match_path: &[DefName],
-  missing_ctr: &DefName,
+  match_path: &[Name],
+  missing_ctr: &Name,
   remaining_types: &[Type],
-  adts: &IndexMap<DefName, Adt>,
+  adts: &IndexMap<Name, Adt>,
 ) -> String {
   let mut missing_set: Vec<_> = match_path.iter().map(ToString::to_string).collect();
   missing_set.push(missing_ctr.to_string());
@@ -102,7 +102,7 @@ fn get_missing_pattern(
 }
 
 // TODO: Should not reimplement builtins constructor names and instead be in terms of Type::ctrs and Pattern::ctrs.
-fn first_ctr_of_type(typ: &Type, adts: &IndexMap<DefName, Adt>) -> String {
+fn first_ctr_of_type(typ: &Type, adts: &IndexMap<Name, Adt>) -> String {
   match typ {
     Type::Any => "_".to_string(),
     Type::Tup => "(_,_)".to_string(),

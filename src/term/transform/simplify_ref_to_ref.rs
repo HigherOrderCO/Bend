@@ -1,6 +1,6 @@
 // Pass for inlining functions that are just a reference to another one.
 
-use crate::term::{Book, DefName, Term};
+use crate::term::{Book, Name, Term};
 use std::collections::BTreeMap;
 
 impl Book {
@@ -8,12 +8,12 @@ impl Book {
   // substitutes all occurrences of that function to the one being called, avoiding the unnecessary redirect.
   // In case there is a long chain of ref-to-ref-to-ref, we substitute values by the last function in the chain.
   pub fn simplify_ref_to_ref(&mut self) -> Result<(), String> {
-    let mut ref_map: BTreeMap<DefName, DefName> = BTreeMap::new();
+    let mut ref_map: BTreeMap<Name, Name> = BTreeMap::new();
     // Find to which defs we're mapping the ones that are just references.
     for def_name in self.defs.keys() {
       let mut ref_name = def_name;
       let mut is_ref_to_ref = false;
-      while let Term::Ref { def_name: next_ref } = &self.defs.get(ref_name).unwrap().rule().body {
+      while let Term::Ref { nam: next_ref } = &self.defs.get(ref_name).unwrap().rule().body {
         if next_ref == ref_name {
           return Err(format!("Definition {def_name} is a reference to itself",));
         }
@@ -35,9 +35,9 @@ impl Book {
 }
 
 /// Returns whether any substitution happened within the term or not
-pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<DefName, DefName>) -> bool {
+pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool {
   match term {
-    Term::Ref { def_name } => {
+    Term::Ref { nam: def_name } => {
       if let Some(target_name) = ref_map.get(def_name) {
         *def_name = target_name.clone();
         true
@@ -56,14 +56,14 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<DefName, DefName>) -
       let snd_subst = subst_ref_to_ref(snd, ref_map);
       fst_subst | snd_subst
     }
-    Term::Match { scrutinee, arms } => {
+    Term::Mat { matched: scrutinee, arms } => {
       let mut subst = subst_ref_to_ref(scrutinee, ref_map);
       for (_, term) in arms {
         subst |= subst_ref_to_ref(term, ref_map);
       }
       subst
     }
-    Term::List { els } => {
+    Term::Lst { els } => {
       let mut subst = false;
       for e in els {
         subst |= subst_ref_to_ref(e, ref_map);
@@ -71,6 +71,6 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<DefName, DefName>) -
       subst
     }
     Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => false,
-    Term::Invalid => unreachable!(),
+    Term::Err => unreachable!(),
   }
 }

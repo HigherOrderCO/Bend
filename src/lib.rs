@@ -6,15 +6,14 @@ use hvmc::{
   run::{Def, Rewrites},
 };
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
-use itertools::Itertools;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::time::Instant;
 use term::{
   book_to_nets,
-  display::display_readback_errors,
+  display::{display_readback_errors, DisplayJoin},
   net_to_term::net_to_term,
   term_to_net::{HvmcNames, Labels},
-  AdtEncoding, Book, DefName, Name, ReadbackError, Term,
+  AdtEncoding, Book, Name, ReadbackError, Term,
 };
 
 pub mod hvmc_net;
@@ -53,7 +52,7 @@ pub fn desugar_book(
   book: &mut Book,
   opts: CompileOpts,
   entrypoint: Option<Name>,
-) -> Result<(DefName, Vec<Warning>), String> {
+) -> Result<(Name, Vec<Warning>), String> {
   let mut warnings = Vec::new();
   let main = book.check_has_entrypoint(entrypoint)?;
   book.check_shared_names()?;
@@ -122,7 +121,7 @@ pub fn run_book(
   let CompileResult { core_book, hvmc_names, labels, warnings } =
     compile_book(&mut book, compile_opts, entrypoint)?;
 
-  display_warnings(warning_opts, &warnings)?;
+  display_warnings(&warnings, warning_opts)?;
 
   // Run
   let debug_hook = run_opts.debug_hook(&book, &hvmc_names, &labels);
@@ -336,16 +335,17 @@ impl WarningOpts {
 }
 
 /// Either just prints warnings or returns Err when any denied was produced.
-pub fn display_warnings(warning_opts: WarningOpts, warnings: &[Warning]) -> Result<(), String> {
+pub fn display_warnings(warnings: &[Warning], warning_opts: WarningOpts) -> Result<(), String> {
   let warns = warning_opts.filter(warnings, WarnState::Warn);
   if !warns.is_empty() {
-    let warns = warns.iter().join("\n");
-    eprintln!("Warnings:\n{warns}");
+    eprintln!("Warnings:\n{}", DisplayJoin(|| warns.iter(), "\n"));
   }
   let denies = warning_opts.filter(warnings, WarnState::Deny);
   if !denies.is_empty() {
-    let denies = denies.iter().join("\n");
-    return Err(format!("{denies}\nCould not run the code because of the previous warnings"));
+    return Err(format!(
+      "{}\nCould not run the code because of the previous warnings",
+      DisplayJoin(|| denies.iter(), "\n")
+    ));
   }
   Ok(())
 }
@@ -367,8 +367,8 @@ impl std::fmt::Debug for CompileResult {
 }
 
 pub enum Warning {
-  MatchOnlyVars { def_name: DefName },
-  UnusedDefinition { def_name: DefName },
+  MatchOnlyVars { def_name: Name },
+  UnusedDefinition { def_name: Name },
 }
 
 impl std::fmt::Display for Warning {

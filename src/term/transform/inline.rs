@@ -1,4 +1,4 @@
-use crate::term::{Book, DefName, Definition, Term};
+use crate::term::{Book, Definition, Name, Term};
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
@@ -22,9 +22,9 @@ impl Book {
 }
 
 impl Term {
-  fn inline(&mut self, inlineables: &HashSet<DefName>, defs: &IndexMap<DefName, Definition>) {
+  fn inline(&mut self, inlineables: &HashSet<Name>, defs: &IndexMap<Name, Definition>) {
     match self {
-      Term::Ref { def_name } => {
+      Term::Ref { nam: def_name } => {
         if inlineables.contains(def_name) {
           *self = defs.get(def_name).unwrap().rules[0].body.clone();
         }
@@ -41,7 +41,7 @@ impl Term {
         snd.inline(inlineables, defs);
       }
 
-      Term::Match { arms, .. } => {
+      Term::Mat { arms, .. } => {
         for (_, bod) in arms {
           bod.inline(inlineables, defs);
         }
@@ -53,10 +53,10 @@ impl Term {
       | Term::Let { .. }
       | Term::Num { .. }
       | Term::Str { .. }
-      | Term::List { .. }
+      | Term::Lst { .. }
       | Term::Era => {}
 
-      Term::Invalid => unreachable!(),
+      Term::Err => unreachable!(),
     }
   }
 
@@ -71,15 +71,15 @@ impl Term {
         Term::Tup { fst, snd } | Term::Sup { fst, snd, .. } => go(fst, scope + 1) && go(snd, scope + 1),
 
         Term::Chn { .. } | Term::Lnk { .. } => false,
-        Term::Str { .. } | Term::List { .. } => false,
+        Term::Str { .. } | Term::Lst { .. } => false,
         Term::Let { .. } => false,
         Term::App { .. } => false,
         Term::Dup { .. } => false,
         Term::Opx { .. } => false,
-        Term::Match { .. } => false,
+        Term::Mat { .. } => false,
         Term::Ref { .. } => false,
 
-        Term::Invalid => unreachable!(),
+        Term::Err => unreachable!(),
       }
     }
     go(self, 0)

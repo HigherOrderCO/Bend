@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-  term::{Book, DefName, MatchNum, Pattern, Term, VarName},
+  term::{Book, MatchNum, Name, Pattern, Term},
   ENTRY_POINT, HVM1_ENTRY_POINT,
 };
 
@@ -29,8 +29,8 @@ impl Book {
 impl Term {
   pub fn resolve_refs<'a>(
     &'a mut self,
-    def_names: &HashSet<DefName>,
-    scope: &mut HashMap<&'a VarName, usize>,
+    def_names: &HashSet<Name>,
+    scope: &mut HashMap<&'a Name, usize>,
   ) -> Result<(), String> {
     match self {
       Term::Lam { nam, bod, .. } => {
@@ -86,7 +86,7 @@ impl Term {
         fst.resolve_refs(def_names, scope)?;
         snd.resolve_refs(def_names, scope)?;
       }
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         scrutinee.resolve_refs(def_names, scope)?;
         for (pat, term) in arms {
           let nam = if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat { nam.as_ref() } else { None };
@@ -97,33 +97,28 @@ impl Term {
           pop_scope(nam, scope);
         }
       }
-      Term::List { .. } => unreachable!("Should have been desugared already"),
-      Term::Lnk { .. }
-      | Term::Ref { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Era
-      | Term::Invalid => (),
+      Term::Lst { .. } => unreachable!("Should have been desugared already"),
+      Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => (),
     }
     Ok(())
   }
 }
 
-fn push_scope<'a>(name: Option<&'a VarName>, scope: &mut HashMap<&'a VarName, usize>) {
+fn push_scope<'a>(name: Option<&'a Name>, scope: &mut HashMap<&'a Name, usize>) {
   if let Some(name) = name {
     let var_scope = scope.entry(name).or_default();
     *var_scope += 1;
   }
 }
 
-fn pop_scope<'a>(name: Option<&'a VarName>, scope: &mut HashMap<&'a VarName, usize>) {
+fn pop_scope<'a>(name: Option<&'a Name>, scope: &mut HashMap<&'a Name, usize>) {
   if let Some(name) = name {
     let var_scope = scope.entry(name).or_default();
     *var_scope -= 1;
   }
 }
 
-fn is_var_in_scope<'a>(name: &'a VarName, scope: &HashMap<&'a VarName, usize>) -> bool {
+fn is_var_in_scope<'a>(name: &'a Name, scope: &HashMap<&'a Name, usize>) -> bool {
   match scope.get(name) {
     Some(entry) => *entry == 0,
     None => true,

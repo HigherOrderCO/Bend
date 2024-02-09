@@ -11,7 +11,7 @@ impl Term {
     match self {
       // (SCons Num tail)
       Term::App {
-        fun: box Term::App { fun: box Term::Ref { def_name: ctr }, arg: box head, .. },
+        fun: box Term::App { fun: box Term::Ref { nam: ctr }, arg: box head, .. },
         arg: box tail,
         ..
       } => {
@@ -32,19 +32,19 @@ impl Term {
           if tail == (Term::Str { val: String::new() }) {
             tail = Term::r#ref(SNIL);
           }
-          *self = Term::call(Term::Ref { def_name: ctr.clone() }, [head, tail]);
+          *self = Term::call(Term::Ref { nam: ctr.clone() }, [head, tail]);
         }
       }
       // (SNil)
-      Term::Ref { def_name } if def_name.as_str() == SNIL => *self = Term::Str { val: String::new() },
+      Term::Ref { nam: def_name } if def_name.as_str() == SNIL => *self = Term::Str { val: String::new() },
 
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         scrutinee.resugar_strings();
         for (_, arm) in arms {
           arm.resugar_strings();
         }
       }
-      Term::List { els } => {
+      Term::Lst { els } => {
         for el in els {
           el.resugar_strings();
         }
@@ -67,7 +67,7 @@ impl Term {
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
-      | Term::Invalid => {}
+      | Term::Err => {}
     }
   }
 
@@ -76,7 +76,7 @@ impl Term {
     match self {
       // (LCons el tail)
       Term::App {
-        fun: box Term::App { fun: box Term::Ref { def_name: ctr }, arg: box head, .. },
+        fun: box Term::App { fun: box Term::Ref { nam: ctr }, arg: box head, .. },
         arg: box tail,
         ..
       } => {
@@ -85,25 +85,25 @@ impl Term {
         let head = std::mem::take(head);
         let tail = std::mem::take(tail);
 
-        if ctr.as_str() == LCONS && let Term::List { els: tail } = tail {
+        if ctr.as_str() == LCONS && let Term::Lst { els: tail } = tail {
           // If well formed list, cons the next element to the list being formed
           let mut els = vec![head];
           els.extend(tail);
-          *self = Term::List { els };
+          *self = Term::Lst { els };
         } else {
-          *self = Term::call(Term::Ref { def_name: ctr.clone() }, [head, tail]);
+          *self = Term::call(Term::Ref { nam: ctr.clone() }, [head, tail]);
         }
       }
       // (LNil)
-      Term::Ref { def_name } if def_name.as_str() == LNIL => *self = Term::List { els: vec![] },
+      Term::Ref { nam: def_name } if def_name.as_str() == LNIL => *self = Term::Lst { els: vec![] },
 
-      Term::Match { scrutinee, arms } => {
-        scrutinee.resugar_lists();
+      Term::Mat { matched, arms } => {
+        matched.resugar_lists();
         for (_, arm) in arms {
           arm.resugar_lists();
         }
       }
-      Term::List { els } => {
+      Term::Lst { els } => {
         for el in els {
           el.resugar_lists();
         }
@@ -126,7 +126,7 @@ impl Term {
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
-      | Term::Invalid => {}
+      | Term::Err => {}
     }
   }
 }

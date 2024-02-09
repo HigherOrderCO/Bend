@@ -1,6 +1,6 @@
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
-  term::{num_to_name, term_to_net::Labels, Book, MatchNum, Op, Pattern, Tag, Term, Val, VarName},
+  term::{num_to_name, term_to_net::Labels, Book, MatchNum, Name, Op, Pattern, Tag, Term, Val},
 };
 use hvmc::run::Loc;
 use indexmap::IndexSet;
@@ -57,14 +57,14 @@ impl<'a> Reader<'a> {
   fn read_term(&mut self, next: Port) -> Term {
     if self.dup_paths.is_none() && !self.seen.insert(next) {
       self.error(ReadbackError::Cyclic);
-      return Term::Var { nam: VarName::new("...") };
+      return Term::Var { nam: Name::new("...") };
     }
 
     let node = next.node();
 
     let term = match &self.net.node(node).kind {
       Era => {
-        // Only the main port actually exists in an ERA, the auxes are just an artifact of this representation.
+        // Only the main port actually exists in an ERA, the aux ports are just an artifact of this representation.
         debug_assert!(next.slot() == 0);
         Term::Era
       }
@@ -115,7 +115,7 @@ impl<'a> Reader<'a> {
         }
         _ => {
           self.error(ReadbackError::InvalidNumericMatch);
-          Term::Invalid
+          Term::Err
         }
       },
       Ref { def_name } => {
@@ -127,7 +127,7 @@ impl<'a> Reader<'a> {
 
           term
         } else {
-          Term::Ref { def_name: def_name.clone() }
+          Term::Ref { nam: def_name.clone() }
         }
       }
       // If we're visiting a fan node...
@@ -185,12 +185,12 @@ impl<'a> Reader<'a> {
         }
         _ => {
           self.error(ReadbackError::InvalidNumericOp);
-          Term::Invalid
+          Term::Err
         }
       },
       Rot => {
         self.error(ReadbackError::ReachedRoot);
-        Term::Invalid
+        Term::Err
       }
       Tup => match next.slot() {
         // If we're visiting a port 0, then it is a Tup.
@@ -273,8 +273,8 @@ impl<'a> Reader<'a> {
 #[derive(Default)]
 struct Split {
   tag: Option<Tag>,
-  fst: Option<VarName>,
-  snd: Option<VarName>,
+  fst: Option<Name>,
+  snd: Option<Name>,
   val: Term,
 }
 
@@ -301,20 +301,15 @@ impl Term {
       | Term::Opx { fst, snd, .. } => {
         fst.insert_split(split, threshold)? + snd.insert_split(split, threshold)?
       }
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         let mut n = scrutinee.insert_split(split, threshold)?;
         for arm in arms {
           n += arm.1.insert_split(split, threshold)?;
         }
         n
       }
-      Term::List { .. } => unreachable!(),
-      Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era
-      | Term::Invalid => 0,
+      Term::Lst { .. } => unreachable!(),
+      Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Ref { .. } | Term::Era | Term::Err => 0,
     };
     if n >= threshold {
       let Split { tag, fst, snd, val } = std::mem::take(split);
@@ -334,9 +329,9 @@ impl Term {
   }
 
   pub fn fix_names(&mut self, id_counter: &mut Val, book: &Book) {
-    fn fix_name(nam: &mut Option<VarName>, id_counter: &mut Val, bod: &mut Term) {
+    fn fix_name(nam: &mut Option<Name>, id_counter: &mut Val, bod: &mut Term) {
       if let Some(nam) = nam {
-        let name = VarName::from(num_to_name(*id_counter));
+        let name = Name::from(num_to_name(*id_counter));
         *id_counter += 1;
         bod.subst(nam, &Term::Var { nam: name.clone() });
         *nam = name;
@@ -348,7 +343,7 @@ impl Term {
         fix_name(nam, id_counter, bod);
         bod.fix_names(id_counter, book);
       }
-      Term::Ref { def_name } => {
+      Term::Ref { nam: def_name } => {
         if def_name.is_generated() {
           let def = book.defs.get(def_name).unwrap();
           let mut term = def.rule().body.clone();
@@ -370,7 +365,7 @@ impl Term {
         fst.fix_names(id_counter, book);
         snd.fix_names(id_counter, book);
       }
-      Term::Match { scrutinee, arms } => {
+      Term::Mat { matched: scrutinee, arms } => {
         scrutinee.fix_names(id_counter, book);
 
         for (rule, term) in arms {
@@ -381,13 +376,8 @@ impl Term {
           term.fix_names(id_counter, book);
         }
       }
-      Term::Let { .. } | Term::List { .. } => unreachable!(),
-      Term::Var { .. }
-      | Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Era
-      | Term::Invalid => {}
+      Term::Let { .. } | Term::Lst { .. } => unreachable!(),
+      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {}
     }
   }
 }
@@ -402,26 +392,26 @@ pub struct NameGen {
 
 impl NameGen {
   // Given a port, returns its name, or assigns one if it wasn't named yet.
-  fn var_name(&mut self, var_port: Port) -> VarName {
+  fn var_name(&mut self, var_port: Port) -> Name {
     let id = self.var_port_to_id.entry(var_port).or_insert_with(|| {
       let id = self.id_counter;
       self.id_counter += 1;
       id
     });
-    VarName::from(num_to_name(*id))
+    Name::from(*id)
   }
 
-  fn decl_name(&mut self, net: &INet, var_port: Port) -> Option<VarName> {
+  fn decl_name(&mut self, net: &INet, var_port: Port) -> Option<Name> {
     // If port is linked to an erase node, return an unused variable
     let var_use = net.enter_port(var_port);
     let var_kind = &net.node(var_use.node()).kind;
     (*var_kind != Era).then(|| self.var_name(var_port))
   }
 
-  pub fn unique(&mut self) -> VarName {
+  pub fn unique(&mut self) -> Name {
     let id = self.id_counter;
     self.id_counter += 1;
-    VarName::from(num_to_name(id))
+    Name::from(id)
   }
 }
 

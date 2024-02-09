@@ -1,7 +1,7 @@
 pub mod hvmc_to_net;
 pub mod net_to_hvmc;
 
-use crate::term::DefName;
+use crate::term::Name;
 use hvmc::run::{Lab, Val};
 use NodeKind::*;
 
@@ -38,7 +38,7 @@ pub enum NodeKind {
   },
   /// Reference to function definitions
   Ref {
-    def_name: DefName,
+    def_name: Name,
   },
   /// Numbers
   Num {

@@ -1,7 +1,6 @@
 use crate::{
   term::{
-    display::DisplayJoin, Book, DefName, Definition, MatchNum, Op, Origin, Pattern, Rule, Tag, Term, Type,
-    VarName,
+    display::DisplayJoin, Book, Definition, MatchNum, Name, Op, Origin, Pattern, Rule, Tag, Term, Type,
   },
   Warning,
 };
@@ -45,10 +44,10 @@ impl Book {
 pub enum MatchError {
   Empty,
   Infer(String),
-  Repeated(VarName),
-  Missing(HashSet<DefName>),
+  Repeated(Name),
+  Missing(HashSet<Name>),
   LetPat(Box<MatchError>),
-  Linearize(VarName),
+  Linearize(Name),
 }
 
 impl std::error::Error for MatchError {}
@@ -88,20 +87,20 @@ impl std::fmt::Display for MatchError {
 impl Term {
   fn extract_adt_matches(
     &mut self,
-    def_name: &DefName,
-    ctrs: &IndexMap<DefName, DefName>,
-    book: &mut Vec<(DefName, Definition)>,
+    def_name: &Name,
+    ctrs: &IndexMap<Name, Name>,
+    new_defs: &mut Vec<(Name, Definition)>,
     match_count: &mut usize,
     warnings: &mut Vec<Warning>,
   ) -> Result<(), MatchError> {
     match self {
-      Term::Match { scrutinee: box Term::Var { .. }, arms } => {
+      Term::Mat { matched: box Term::Var { .. }, arms } => {
         let all_vars = arms.iter().all(|(pat, ..)| matches!(pat, Pattern::Var(..)));
         if all_vars && arms.len() > 1 {
           warnings.push(crate::Warning::MatchOnlyVars { def_name: def_name.clone() });
         }
         for (_, term) in arms.iter_mut() {
-          term.extract_adt_matches(def_name, ctrs, book, match_count, warnings)?;
+          term.extract_adt_matches(def_name, ctrs, new_defs, match_count, warnings)?;
         }
         let matched_type = infer_match_type(arms.iter().map(|(x, _)| x), ctrs)?;
         match matched_type {
@@ -113,14 +112,14 @@ impl Term {
             *match_count += 1;
             let match_term = linearize_match_unscoped_vars(self)?;
             let match_term = linearize_match_free_vars(match_term);
-            let Term::Match { scrutinee: box Term::Var { nam }, arms } = match_term else { unreachable!() };
-            *match_term = match_to_def(nam, arms, def_name, book, *match_count);
+            let Term::Mat { matched: box Term::Var { nam }, arms } = match_term else { unreachable!() };
+            *match_term = match_to_def(nam, arms, def_name, new_defs, *match_count);
           }
         }
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.extract_adt_matches(def_name, ctrs, book, match_count, warnings)?;
+        bod.extract_adt_matches(def_name, ctrs, new_defs, match_count, warnings)?;
       }
       Term::App { fun: fst, arg: snd, .. }
       | Term::Let { pat: Pattern::Var(_), val: fst, nxt: snd }
@@ -128,8 +127,8 @@ impl Term {
       | Term::Tup { fst, snd }
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
-        fst.extract_adt_matches(def_name, ctrs, book, match_count, warnings)?;
-        snd.extract_adt_matches(def_name, ctrs, book, match_count, warnings)?;
+        fst.extract_adt_matches(def_name, ctrs, new_defs, match_count, warnings)?;
+        snd.extract_adt_matches(def_name, ctrs, new_defs, match_count, warnings)?;
       }
       Term::Var { .. }
       | Term::Lnk { .. }
@@ -137,10 +136,10 @@ impl Term {
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
-      | Term::Invalid => {}
+      | Term::Err => {}
 
-      Term::List { .. } => unreachable!(),
-      Term::Match { .. } => unreachable!("Scrutinee of match expression should have been extracted already"),
+      Term::Lst { .. } => unreachable!(),
+      Term::Mat { .. } => unreachable!("Scrutinee of match expression should have been extracted already"),
       Term::Let { pat, .. } => {
         unreachable!("Destructor let expression should have been desugared already. {pat}")
       }
@@ -153,29 +152,29 @@ impl Term {
 /// Transforms a match into a new definition with every arm of `arms` as a rule.
 /// The result is the new def applied to the scrutinee followed by the free vars of the arms.
 fn match_to_def(
-  scrutinee: &VarName,
+  scrutinee: &Name,
   arms: &[(Pattern, Term)],
-  def_name: &DefName,
-  new_defs: &mut Vec<(DefName, Definition)>,
+  def_name: &Name,
+  new_defs: &mut Vec<(Name, Definition)>,
   match_count: usize,
 ) -> Term {
   let rules = arms
     .iter()
     .map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone(), origin: Origin::Generated })
     .collect();
-  let new_name = DefName::from(format!("{def_name}$match${match_count}"));
+  let new_name = Name::from(format!("{def_name}$match${match_count}"));
   let def = Definition { name: new_name.clone(), rules };
   new_defs.push((new_name.clone(), def));
 
-  Term::arg_call(Term::Ref { def_name: new_name }, scrutinee.clone())
+  Term::arg_call(Term::Ref { nam: new_name }, scrutinee.clone())
 }
 
 //== Native match normalization ==//
 
 impl Term {
-  fn normalize_native_matches(&mut self, ctrs: &IndexMap<DefName, DefName>) -> Result<(), MatchError> {
+  fn normalize_native_matches(&mut self, ctrs: &IndexMap<Name, Name>) -> Result<(), MatchError> {
     match self {
-      Term::Match { scrutinee: box Term::Var { nam }, arms } => {
+      Term::Mat { matched: box Term::Var { nam }, arms } => {
         for (_, body) in arms.iter_mut() {
           body.normalize_native_matches(ctrs)?;
         }
@@ -208,7 +207,7 @@ impl Term {
           Type::Adt(_) => unreachable!("Adt match expressions should have been removed earlier"),
         }
       }
-      Term::Match { .. } => unreachable!("Scrutinee of match expression should have been extracted already"),
+      Term::Mat { .. } => unreachable!("Scrutinee of match expression should have been extracted already"),
       Term::Let { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
       | Term::Tup { fst, snd }
@@ -227,8 +226,8 @@ impl Term {
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
-      | Term::Invalid => (),
-      Term::List { .. } => unreachable!(),
+      | Term::Err => (),
+      Term::Lst { .. } => unreachable!(),
     }
     Ok(())
   }
@@ -236,7 +235,7 @@ impl Term {
 
 /// Transforms a match on Num with any possible patterns into 'match x {0: ...; +: @x-1 ...}'.
 fn normalize_num_match(term: &mut Term) -> Result<(), MatchError> {
-  let Term::Match { scrutinee: _, arms } = term else { unreachable!() };
+  let Term::Mat { matched: _, arms } = term else { unreachable!() };
 
   let mut zero_arm = None;
   for (pat, body) in arms.iter_mut() {
@@ -281,13 +280,13 @@ fn normalize_num_match(term: &mut Term) -> Result<(), MatchError> {
           pat: Pattern::Var(Some(var.clone())),
           val: Box::new(Term::Opx {
             op: Op::ADD,
-            fst: Box::new(Term::Var { nam: VarName::new("%pred") }),
+            fst: Box::new(Term::Var { nam: Name::new("%pred") }),
             snd: Box::new(Term::Num { val: 1 }),
           }),
           nxt: Box::new(std::mem::take(body)),
         };
 
-        let body = Term::named_lam(VarName::new("%pred"), body);
+        let body = Term::named_lam(Name::new("%pred"), body);
         succ_arm = Some((Pattern::Num(MatchNum::Succ(None)), body));
         break;
       }
@@ -320,7 +319,7 @@ fn normalize_num_match(term: &mut Term) -> Result<(), MatchError> {
 /// Short-circuits if the first pattern is Type::Any.
 fn infer_match_type<'a>(
   pats: impl Iterator<Item = &'a Pattern>,
-  ctrs: &IndexMap<DefName, DefName>,
+  ctrs: &IndexMap<Name, Name>,
 ) -> Result<Type, MatchError> {
   let mut match_type = Type::None;
   for pat in pats {
@@ -346,9 +345,9 @@ fn infer_match_type<'a>(
 /// Makes the rules extractable and linear (no need for dups when variable used in both rules)
 // TODO: Deal with unscoped lambdas/vars.
 fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
-  let Term::Match { scrutinee: _, arms } = match_term else { unreachable!() };
+  let Term::Mat { matched: _, arms } = match_term else { unreachable!() };
   // Collect the vars
-  let free_vars: IndexSet<VarName> = arms
+  let free_vars: IndexSet<Name> = arms
     .iter()
     .flat_map(|(pat, term)| term.free_vars().into_keys().filter(|k| !pat.names().contains(k)))
     .collect();
@@ -370,14 +369,14 @@ fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
   loop {
     match match_term {
       Term::App { tag: _, fun, arg: _ } => match_term = fun.as_mut(),
-      Term::Match { .. } => return match_term,
+      Term::Mat { .. } => return match_term,
       _ => unreachable!(),
     }
   }
 }
 
 fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, MatchError> {
-  let Term::Match { scrutinee: _, arms } = match_term else { unreachable!() };
+  let Term::Mat { matched: _, arms } = match_term else { unreachable!() };
   // Collect the vars
   let mut free_vars = IndexSet::new();
   for (_, arm) in arms.iter_mut() {
@@ -414,7 +413,7 @@ fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, Mat
   loop {
     match match_term {
       Term::App { tag: _, fun, arg: _ } => match_term = fun.as_mut(),
-      Term::Match { .. } => return Ok(match_term),
+      Term::Mat { .. } => return Ok(match_term),
       _ => unreachable!(),
     }
   }
