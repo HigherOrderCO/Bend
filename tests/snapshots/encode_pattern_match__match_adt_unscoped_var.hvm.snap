@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.hvm
 ---
+TaggedScott:
 (main) = *
 
 (None) = #Maybe λNone #Maybe λSome None
@@ -13,3 +14,18 @@ input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.hvm
 (Foo) = λ$x let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x)
 
 (Bar) = (let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x) λ$x *)
+
+Scott:
+(main) = *
+
+(None) = λNone λSome None
+
+(Some) = λval λNone λSome (Some val)
+
+(Bar$match$1_$_Foo$match$1) = λa (a λb b λc λd c)
+
+(Foo) = λ$x let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x)
+
+(Bar) = (let %temp%scrutinee = (Some 1); (Bar$match$1_$_Foo$match$1 %temp%scrutinee $x) λ$x *)
+
+

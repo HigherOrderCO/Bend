@@ -10,10 +10,10 @@ use itertools::Itertools;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::time::Instant;
 use term::{
-  book_to_nets, net_to_term,
-  net_to_term::ReadbackErrors,
+  book_to_nets,
+  net_to_term::{net_to_term, ReadbackErrors},
   term_to_net::{HvmcNames, Labels},
-  Book, DefName, Name, Term,
+  AdtEncoding, Book, DefName, Name, Term,
 };
 
 pub mod hvmc_net;
@@ -56,9 +56,9 @@ pub fn desugar_book(
   let mut warnings = Vec::new();
   let main = book.check_has_entrypoint(entrypoint)?;
   book.check_shared_names()?;
-  book.generate_scott_adts();
+  book.encode_adts(opts.adt_encoding);
   book.encode_builtins();
-  encode_pattern_matching(book, &mut warnings)?;
+  encode_pattern_matching(book, &mut warnings, opts.adt_encoding)?;
   // sanity check
   book.check_unbound_vars()?;
   book.normalize_native_matches()?;
@@ -77,7 +77,7 @@ pub fn desugar_book(
   if opts.simplify_main {
     book.simplify_main_ref(&main);
   }
-  book.prune(Some(&main), opts.prune, &mut warnings);
+  book.prune(Some(&main), opts.prune, opts.adt_encoding, &mut warnings);
   if opts.inline {
     book.inline();
   }
@@ -87,7 +87,11 @@ pub fn desugar_book(
   Ok((main, warnings))
 }
 
-pub fn encode_pattern_matching(book: &mut Book, warnings: &mut Vec<Warning>) -> Result<(), String> {
+pub fn encode_pattern_matching(
+  book: &mut Book,
+  warnings: &mut Vec<Warning>,
+  adt_encoding: AdtEncoding,
+) -> Result<(), String> {
   book.check_arity()?;
   book.resolve_ctrs_in_pats();
   book.check_unbound_pats()?;
@@ -102,7 +106,7 @@ pub fn encode_pattern_matching(book: &mut Book, warnings: &mut Vec<Warning>) -> 
   book.flatten_rules();
   let def_types = book.infer_def_types()?;
   book.check_exhaustive_patterns(&def_types)?;
-  book.encode_pattern_matching_functions(&def_types);
+  book.encode_pattern_matching_functions(&def_types, adt_encoding);
   Ok(())
 }
 
@@ -119,10 +123,11 @@ pub fn run_book(
 
   display_warnings(warning_opts, &warnings)?;
 
-  let debug_hook = run_opts.debug_hook(&book, &hvmc_names, &labels);
+  let debug_hook = run_opts.debug_hook(&book, &hvmc_names, &labels, &compile_opts.adt_encoding);
   let (res_lnet, stats) = run_compiled(&core_book, mem_size, run_opts, debug_hook, &book.hvmc_entrypoint());
   let net = hvmc_to_net(&res_lnet, &hvmc_names.hvmc_to_hvml);
-  let (res_term, readback_errors) = net_to_term(&net, &book, &labels, run_opts.linear);
+  let (res_term, readback_errors) =
+    net_to_term(&net, &book, &labels, run_opts.linear, compile_opts.adt_encoding);
   let info = RunInfo { stats, readback_errors, net: res_lnet };
   Ok((res_term, info))
 }
@@ -199,11 +204,12 @@ impl RunOpts {
     book: &'a Book,
     hvmc_names: &'a HvmcNames,
     labels: &'a Labels,
+    adt_encoding: &'a AdtEncoding,
   ) -> Option<impl FnMut(&Net) + 'a> {
     self.debug.then_some({
       |net: &_| {
         let net = hvmc_to_net(net, &hvmc_names.hvmc_to_hvml);
-        let (res_term, errors) = net_to_term(&net, book, labels, self.linear);
+        let (res_term, errors) = net_to_term(&net, book, labels, self.linear, *adt_encoding);
         println!("{}{}\n---------------------------------------", errors.display(), res_term.display())
       }
     })
@@ -212,6 +218,9 @@ impl RunOpts {
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CompileOpts {
+  /// Selects the encoding for the ADT syntax.
+  pub adt_encoding: AdtEncoding,
+
   /// Enables [term::transform::eta_reduction].
   pub eta: bool,
 
@@ -253,6 +262,7 @@ impl CompileOpts {
       pre_reduce_refs: true,
       merge: true,
       inline: true,
+      adt_encoding: Default::default(),
     }
   }
 

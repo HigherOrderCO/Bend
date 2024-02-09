@@ -1,8 +1,9 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvmc::ast::{show_book, show_net};
 use hvml::{
-  check_book, compile_book, desugar_book, load_file_to_book, run_book, term::Name, CompileOpts, RunInfo,
-  RunOpts, WarnState, WarningOpts,
+  check_book, compile_book, desugar_book, load_file_to_book, run_book,
+  term::{AdtEncoding, Name},
+  CompileOpts, RunInfo, RunOpts, WarnState, WarningOpts,
 };
 use std::{path::PathBuf, vec::IntoIter};
 
@@ -267,6 +268,8 @@ pub enum OptArgs {
   NoMerge,
   Inline,
   NoInline,
+  AdtScott,
+  AdtTaggedScott,
 }
 
 impl OptArgs {
@@ -295,6 +298,8 @@ impl OptArgs {
         NoMerge => opts.merge = false,
         Inline => opts.inline = true,
         NoInline => opts.inline = false,
+        AdtScott => opts.adt_encoding = AdtEncoding::Scott,
+        AdtTaggedScott => opts.adt_encoding = AdtEncoding::TaggedScott,
       }
     }
     opts

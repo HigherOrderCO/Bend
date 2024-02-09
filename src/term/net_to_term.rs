@@ -1,6 +1,8 @@
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
-  term::{num_to_name, term_to_net::Labels, Book, MatchNum, Op, Pattern, Tag, TagName, Term, Val, VarName},
+  term::{
+    num_to_name, term_to_net::Labels, AdtEncoding, Book, MatchNum, Op, Pattern, Tag, Term, Val, VarName,
+  },
 };
 use hvmc::run::Loc;
 use indexmap::IndexSet;
@@ -8,7 +10,13 @@ use std::collections::{HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
 /// Converts an Interaction-INet to a Lambda Calculus term
-pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (Term, ReadbackErrors) {
+pub fn net_to_term(
+  net: &INet,
+  book: &Book,
+  labels: &Labels,
+  linear: bool,
+  adt_encoding: AdtEncoding,
+) -> (Term, ReadbackErrors) {
   let mut reader = Reader {
     net,
     labels,
@@ -40,7 +48,7 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
     debug_assert_eq!(result, None);
   }
 
-  reader.resugar_adts(&mut term);
+  reader.resugar_adts(&mut term, adt_encoding);
 
   (term, reader.errors)
 }
@@ -467,7 +475,7 @@ pub enum ReadbackError {
   InvalidAdt,
   InvalidAdtMatch,
   InvalidStrTerm(Term),
-  UnexpectedTag(TagName, Tag),
+  UnexpectedTag(Tag, Tag),
 }
 
 impl ReadbackError {

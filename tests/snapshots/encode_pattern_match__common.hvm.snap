@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/common.hvm
 ---
+TaggedScott:
 (West) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest West
 
 (East) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest East
@@ -35,3 +36,40 @@ input_file: tests/golden_tests/encode_pattern_match/common.hvm
 (Yellow) = #Light λRed #Light λYellow #Light λGreen Yellow
 
 (Green) = #Light λRed #Light λYellow #Light λGreen Green
+
+Scott:
+(West) = λNorth λSouth λEast λWest West
+
+(East) = λNorth λSouth λEast λWest East
+
+(South) = λNorth λSouth λEast λWest South
+
+(North) = λNorth λSouth λEast λWest North
+
+(Filled) = λvalue λFilled λEmpty (Filled value)
+
+(Empty) = λFilled λEmpty Empty
+
+(Some) = λx λSome λNone (Some x)
+
+(None) = λSome λNone None
+
+(Ok) = λa λOk λErr (Ok a)
+
+(Err) = λb λOk λErr (Err b)
+
+(Cons) = λx λxs λCons λNil (Cons x xs)
+
+(Nil) = λCons λNil Nil
+
+(True) = λTrue λFalse True
+
+(False) = λTrue λFalse False
+
+(Red) = λRed λYellow λGreen Red
+
+(Yellow) = λRed λYellow λGreen Yellow
+
+(Green) = λRed λYellow λGreen Green
+
+

@@ -248,7 +248,7 @@ impl ReadbackError {
       ReadbackError::InvalidBind => write!(f, "Invalid Bind"),
       ReadbackError::InvalidAdt => write!(f, "Invalid Adt"),
       ReadbackError::UnexpectedTag(exp, fnd) => {
-        write!(f, "Unexpected tag found during Adt readback, expected '#{}', but found ", exp)?;
+        write!(f, "Unexpected tag found during Adt readback, expected '{}', but found ", exp.display())?;
 
         match fnd {
           Tag::Static => write!(f, "no tag"),

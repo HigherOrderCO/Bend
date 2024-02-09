@@ -10,7 +10,7 @@ rustup-show:
   rustup show
 
 test:
-  cargo test --workspace
+  cargo insta test --workspace
 
 clippy:
   cargo clippy

@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool_tup.hvm
 ---
+TaggedScott:
 (main) = (foo (F, T))
 
 (foo) = λa let (b, c) = a; (foo$F0 b c)
@@ -11,3 +12,16 @@ input_file: tests/golden_tests/encode_pattern_match/bool_tup.hvm
 (F) = #Bool λT #Bool λF F
 
 (T) = #Bool λT #Bool λF T
+
+Scott:
+(main) = (foo (F, T))
+
+(foo) = λa let (b, c) = a; (foo$F0 b c)
+
+(foo$F0) = λa (a λb b λ* F)
+
+(F) = λT λF F
+
+(T) = λT λF T
+
+

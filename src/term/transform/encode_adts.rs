@@ -1,15 +1,15 @@
-use crate::term::{Book, DefName, Definition, Rule, Tag, TagName, Term, VarName};
+use crate::term::{AdtEncoding, Book, DefName, Definition, Rule, Tag, Term, VarName};
 
 impl Book {
-  pub fn generate_scott_adts(&mut self) {
+  pub fn encode_adts(&mut self, adt_encoding: AdtEncoding) {
     let mut defs = vec![];
     for (adt_name, adt) in &self.adts {
       for (ctr_name, args) in &adt.ctrs {
         let ctrs: Vec<_> = adt.ctrs.keys().cloned().collect();
 
-        let lam = make_lam(adt_name, args.clone(), ctrs, ctr_name);
+        let body = encode_ctr(adt_name, args.clone(), ctrs, ctr_name, adt_encoding);
 
-        let rules = vec![Rule { pats: vec![], body: lam, origin: adt.origin }];
+        let rules = vec![Rule { pats: vec![], body, origin: adt.origin }];
         let def = Definition { name: ctr_name.clone(), rules };
         defs.push((ctr_name.clone(), def));
       }
@@ -18,22 +18,33 @@ impl Book {
   }
 }
 
-fn make_lam(adt_name: &DefName, ctr_args: Vec<VarName>, ctrs: Vec<DefName>, ctr_name: &DefName) -> Term {
-  let ctr = Term::Var { nam: ctr_name.clone() };
-
-  let app = ctr_args.iter().cloned().fold(ctr, |acc, nam| {
-    let tag = Tag::Named(adt_field_tag(adt_name, ctr_name, &nam));
-    Term::tagged_app(tag, acc, Term::Var { nam })
-  });
-
-  let lam = ctrs
-    .into_iter()
-    .rev()
-    .fold(app, |acc, arg| Term::tagged_lam(Tag::Named(adt_name.clone()), arg.clone(), acc));
-
-  ctr_args.into_iter().rev().fold(lam, |acc, arg| Term::named_lam(arg, acc))
-}
-
-pub fn adt_field_tag(adt_name: &DefName, ctr_name: &DefName, field_name: &VarName) -> TagName {
-  format!("{}.{}.{}", adt_name, ctr_name, field_name).into()
+fn encode_ctr(
+  adt_name: &DefName,
+  ctr_args: Vec<VarName>,
+  ctrs: Vec<DefName>,
+  ctr_name: &DefName,
+  adt_encoding: AdtEncoding,
+) -> Term {
+  match adt_encoding {
+    // λarg1 λarg2 λarg3 λctr1 λctr2 (ctr2 arg1 arg2 arg3)
+    AdtEncoding::Scott => {
+      let ctr = Term::Var { nam: ctr_name.clone() };
+      let app = ctr_args.iter().cloned().fold(ctr, Term::arg_call);
+      let lam = ctrs.into_iter().rev().fold(app, |acc, arg| Term::named_lam(arg.clone(), acc));
+      ctr_args.into_iter().rev().fold(lam, |acc, arg| Term::named_lam(arg, acc))
+    }
+    // λarg1 λarg2 #type λctr1 #type λctr2 #type.ctr2.arg2(#type.ctr2.arg1(ctr2 arg1) arg2)
+    AdtEncoding::TaggedScott => {
+      let ctr = Term::Var { nam: ctr_name.clone() };
+      let app = ctr_args.iter().cloned().fold(ctr, |acc, nam| {
+        let tag = Tag::adt_field(adt_name, ctr_name, &nam);
+        Term::tagged_app(tag, acc, Term::Var { nam })
+      });
+      let lam = ctrs
+        .into_iter()
+        .rev()
+        .fold(app, |acc, arg| Term::tagged_lam(Tag::adt_name(adt_name), arg.clone(), acc));
+      ctr_args.into_iter().rev().fold(lam, |acc, arg| Term::named_lam(arg, acc))
+    }
+  }
 }

@@ -1,17 +1,21 @@
 use crate::term::{
-  check::type_check::DefinitionTypes, transform::unique_names::UniqueNameGenerator, Book, DefName,
-  Definition, MatchNum, Pattern, Rule, Tag, Term, Type, VarName,
+  check::type_check::DefinitionTypes, transform::unique_names::UniqueNameGenerator, AdtEncoding, Book,
+  DefName, Definition, MatchNum, Pattern, Rule, Tag, Term, Type, VarName,
 };
 
 impl Book {
-  pub fn encode_pattern_matching_functions(&mut self, def_types: &DefinitionTypes) {
+  pub fn encode_pattern_matching_functions(
+    &mut self,
+    def_types: &DefinitionTypes,
+    adt_encoding: AdtEncoding,
+  ) {
     let def_names = self.defs.keys().cloned().collect::<Vec<_>>();
     for def_name in def_names {
       let def_type = &def_types[&def_name];
 
       let is_matching_def = def_type.iter().any(|t| matches!(t, Type::Adt(_) | Type::Tup | Type::Num));
       if is_matching_def {
-        make_pattern_matching_def(self, &def_name, def_type);
+        make_pattern_matching_def(self, &def_name, def_type, adt_encoding);
       } else {
         // For functions with only one rule that doesn't pattern match,
         // we just move the variables from arg to body.
@@ -31,7 +35,12 @@ fn make_non_pattern_matching_def(def: &mut Definition) {
 /// For functions that do pattern match,
 ///  we break them into a tree of small matching functions
 ///  with the original rule bodies at the end.
-fn make_pattern_matching_def(book: &mut Book, def_name: &DefName, def_type: &[Type]) {
+fn make_pattern_matching_def(
+  book: &mut Book,
+  def_name: &DefName,
+  def_type: &[Type],
+  adt_encoding: AdtEncoding,
+) {
   // First push the pattern bound vars into the rule body
   let rules = &mut book.defs.get_mut(def_name).unwrap().rules;
   for rule in rules.iter_mut() {
@@ -42,7 +51,7 @@ fn make_pattern_matching_def(book: &mut Book, def_name: &DefName, def_type: &[Ty
   // Generate scott-encoded pattern matching
   let def = &book.defs[def_name];
   let crnt_rules = (0 .. def.rules.len()).collect();
-  let mut new_body = make_pattern_matching_case(book, def, def_type, crnt_rules, vec![]);
+  let mut new_body = make_pattern_matching_case(book, def, def_type, crnt_rules, vec![], adt_encoding);
 
   // Simplify the generated term
   new_body.eta_reduction();
@@ -73,6 +82,7 @@ fn make_pattern_matching_case(
   def_type: &[Type],
   crnt_rules: Vec<usize>,
   match_path: Vec<Pattern>,
+  adt_encoding: AdtEncoding,
 ) -> Term {
   // This is safe since we check exhaustiveness earlier.
   let fst_rule_idx = crnt_rules[0];
@@ -100,9 +110,9 @@ fn make_pattern_matching_case(
 
   if is_fst_rule_irrefutable {
     // First rule will always be selected, generate leaf case.
-    make_leaf_case(book, fst_rule, fst_rule_idx, match_path, old_args, new_args)
+    make_leaf_case(book, fst_rule, fst_rule_idx, match_path, old_args, new_args, adt_encoding)
   } else {
-    make_match_case(book, def, def_type, crnt_rules, match_path, old_args, new_args)
+    make_match_case(book, def, def_type, crnt_rules, match_path, old_args, new_args, adt_encoding)
   }
 }
 
@@ -116,6 +126,7 @@ fn make_match_case(
   match_path: Vec<Pattern>,
   old_args: Vec<VarName>,
   new_args: Vec<VarName>,
+  adt_encoding: AdtEncoding,
 ) -> Term {
   let next_arg_idx = match_path.len();
   let next_type = &def_type[next_arg_idx];
@@ -135,45 +146,61 @@ fn make_match_case(
       .collect();
     let mut match_path = match_path.clone();
     match_path.push(pat.clone());
-    let next_case = make_pattern_matching_case(book, def, def_type, next_rules, match_path);
+    let next_case = make_pattern_matching_case(book, def, def_type, next_rules, match_path, adt_encoding);
     next_cases.push(next_case);
   }
 
   // Encode the current pattern matching, calling the subfunctions
   let match_var = VarName::new("x");
   // The match term itself
-  let term = match next_type {
+  let term = encode_match(next_type, &match_var, next_cases.into_iter(), adt_encoding);
+  // The calls to the args of previous matches
+  let term = old_args.iter().chain(new_args.iter()).cloned().fold(term, Term::arg_call);
+  // Lambda for pattern matched value
+  let term = Term::named_lam(match_var, term);
+  // The bindings of the previous args
+  let term = add_arg_lams(term, old_args, new_args, match_path.last(), book, adt_encoding);
+  term
+}
+
+fn encode_match(
+  match_type: &Type,
+  match_var: &VarName,
+  mut arms: impl Iterator<Item = Term>,
+  adt_encoding: AdtEncoding,
+) -> Term {
+  match match_type {
     Type::None => unreachable!(),
-    Type::Any => Term::arg_call(std::mem::take(&mut next_cases[0]), match_var.clone()),
+    // (arm[0] x)
+    Type::Any => Term::arg_call(arms.next().unwrap(), match_var.clone()),
+    // let (%fst, %snd) = x; (arm[0] %fst %snd)
     Type::Tup => Term::Let {
       pat: Pattern::Tup(
         Box::new(Pattern::Var(Some(VarName::new("%fst")))),
         Box::new(Pattern::Var(Some(VarName::new("%snd")))),
       ),
       val: Box::new(Term::Var { nam: match_var.clone() }),
-      nxt: Box::new(Term::call(std::mem::take(&mut next_cases[0]), [
-        Term::Var { nam: VarName::new("%fst") },
-        Term::Var { nam: VarName::new("%snd") },
-      ])),
+      nxt: Box::new(Term::call(arms.next().unwrap(), [Term::Var { nam: VarName::new("%fst") }, Term::Var {
+        nam: VarName::new("%snd"),
+      }])),
     },
+    // match x {0: arm[0]; +: arm[1]}
     Type::Num => Term::Match {
       scrutinee: Box::new(Term::Var { nam: match_var.clone() }),
       arms: vec![
-        (Pattern::Num(MatchNum::Zero), std::mem::take(&mut next_cases[0])),
-        (Pattern::Num(MatchNum::Succ(None)), std::mem::take(&mut next_cases[1])),
+        (Pattern::Num(MatchNum::Zero), arms.next().unwrap()),
+        (Pattern::Num(MatchNum::Succ(None)), arms.next().unwrap()),
       ],
     },
-    Type::Adt(adt_name) => {
-      Term::tagged_call(Tag::Named(adt_name.clone()), Term::Var { nam: match_var.clone() }, next_cases)
-    }
-  };
-  // The calls to the args of previous matches
-  let term = old_args.iter().chain(new_args.iter()).cloned().fold(term, Term::arg_call);
-  // Lambda for pattern matched value
-  let term = Term::named_lam(match_var, term);
-  // The bindings of the previous args
-  let term = add_arg_lams(term, old_args, new_args, match_path.last(), book);
-  term
+    Type::Adt(adt_name) => match adt_encoding {
+      // (x arm[0] arm[1] ...)
+      AdtEncoding::Scott => Term::call(Term::Var { nam: match_var.clone() }, arms),
+      // #adt_name(x arm[0] arm[1] ...)
+      AdtEncoding::TaggedScott => {
+        Term::tagged_call(Tag::adt_name(adt_name), Term::Var { nam: match_var.clone() }, arms)
+      }
+    },
+  }
 }
 
 /// Builds the function calling one of the original rule bodies.
@@ -184,6 +211,7 @@ fn make_leaf_case(
   match_path: Vec<Pattern>,
   old_args: Vec<VarName>,
   new_args: Vec<VarName>,
+  adt_encoding: AdtEncoding,
 ) -> Term {
   let args = &mut old_args.iter().chain(new_args.iter()).cloned();
 
@@ -207,7 +235,7 @@ fn make_leaf_case(
     }
   });
   // Add the lambdas for the matched args.
-  let term = add_arg_lams(term, old_args, new_args, match_path.last(), book);
+  let term = add_arg_lams(term, old_args, new_args, match_path.last(), book, adt_encoding);
 
   term
 }
@@ -226,6 +254,7 @@ fn add_arg_lams(
   new_args: Vec<VarName>,
   last_pat: Option<&Pattern>,
   book: &Book,
+  adt_encoding: AdtEncoding,
 ) -> Term {
   // Add lams for old vars
   let term = old_args.into_iter().rev().fold(term, |term, arg| Term::named_lam(arg, term));
@@ -237,8 +266,12 @@ fn add_arg_lams(
       new_args.into_iter().rev().zip(args.iter().rev()).fold(term, |term, (new_arg, pat)| {
         let adt = &book.ctrs[ctr];
         let Pattern::Var(Some(field)) = pat else { unreachable!() };
-        let tag = Tag::Named(format!("{adt}.{ctr}.{field}").into());
-        Term::Lam { tag, nam: Some(new_arg), bod: Box::new(term) }
+        match adt_encoding {
+          AdtEncoding::Scott => Term::Lam { tag: Tag::Static, nam: Some(new_arg), bod: Box::new(term) },
+          AdtEncoding::TaggedScott => {
+            Term::Lam { tag: Tag::adt_field(adt, ctr, field), nam: Some(new_arg), bod: Box::new(term) }
+          }
+        }
       })
     }
     // New vars from other pats

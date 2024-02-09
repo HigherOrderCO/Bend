@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_in_arm.hvm
 ---
+TaggedScott:
 (main) = λx (main$match$1 x)
 
 (main$match$1) = λa #bool (a λ$x $x λb b)
@@ -9,3 +10,14 @@ input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_in_arm.hv
 (F) = #bool λT #bool λF F
 
 (T) = #bool λT #bool λF T
+
+Scott:
+(main) = λx (main$match$1 x)
+
+(main$match$1) = λa (a λ$x $x λb b)
+
+(F) = λT λF F
+
+(T) = λT λF T
+
+
