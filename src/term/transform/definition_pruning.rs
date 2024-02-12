@@ -116,8 +116,8 @@ impl Book {
           to_find.push(fst);
           to_find.push(snd);
         }
-        Term::Mat { matched: scrutinee, arms } => {
-          to_find.push(scrutinee);
+        Term::Mat { matched, arms } => {
+          to_find.push(matched);
           for (_, bod) in arms {
             to_find.push(bod);
           }

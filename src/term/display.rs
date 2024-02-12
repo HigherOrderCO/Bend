@@ -59,11 +59,11 @@ impl fmt::Display for Term {
       Term::App { tag, fun, arg } => {
         write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag), arg)
       }
-      Term::Mat { matched: scrutinee, arms } => {
+      Term::Mat { matched, arms } => {
         write!(
           f,
           "match {} {{ {} }}",
-          scrutinee,
+          matched,
           DisplayJoin(|| arms.iter().map(|(pat, term)| display!("{}: {}", pat, term)), "; "),
         )
       }

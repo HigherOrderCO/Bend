@@ -17,17 +17,17 @@ impl Term {
 
     while let Some(term) = to_desugar.pop() {
       match term {
-        Term::Mat { matched: scrutinee, .. } => {
-          let scrutinee = if let Term::Var { nam } = scrutinee.as_ref() {
+        Term::Mat { matched, .. } => {
+          let matched = if let Term::Var { nam } = matched.as_ref() {
             nam.clone()
           } else {
-            let Term::Mat { matched: scrutinee, arms } = std::mem::take(term) else { unreachable!() };
+            let Term::Mat { matched, arms } = std::mem::take(term) else { unreachable!() };
 
-            let nam = Name::new("%temp%scrutinee");
+            let nam = Name::new("%matched");
 
             *term = Term::Let {
               pat: Pattern::Var(Some(nam.clone())),
-              val: scrutinee,
+              val: matched,
               nxt: Box::new(Term::Mat { matched: Box::new(Term::Var { nam: nam.clone() }), arms }),
             };
 
@@ -48,14 +48,14 @@ impl Term {
                 if pat_args.is_empty() && !ctr_args.is_empty() {
                   // Implicit ctr args
                   *pat_args =
-                    ctr_args.iter().map(|x| Pattern::Var(Some(format!("{scrutinee}.{x}").into()))).collect();
+                    ctr_args.iter().map(|field| Pattern::Var(Some(format!("{matched}.{field}").into()))).collect();
                 }
               }
               Pattern::Num(MatchNum::Zero) => (),
               Pattern::Num(MatchNum::Succ(Some(_))) => (),
               Pattern::Num(MatchNum::Succ(p @ None)) => {
                 // Implicit num arg
-                *p = Some(Some(format!("{scrutinee}-1").into()));
+                *p = Some(Some(format!("{matched}-1").into()));
               }
               Pattern::Tup(_, _) => (),
               Pattern::Lst(..) => unreachable!(),

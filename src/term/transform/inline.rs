@@ -8,15 +8,14 @@ impl Book {
   pub fn inline(&mut self) {
     let mut inlineables = HashSet::new();
     for (def_name, def) in self.defs.iter() {
-      def.assert_no_pattern_matching_rules();
-      if def.rules[0].body.is_inlineable() {
+      if def.rule().body.is_inlineable() {
         inlineables.insert(def_name.clone());
       }
     }
 
     let defs = self.defs.clone();
     for def in self.defs.values_mut() {
-      def.rules[0].body.inline(&inlineables, &defs);
+      def.rule_mut().body.inline(&inlineables, &defs);
     }
   }
 }
@@ -29,7 +28,7 @@ impl Term {
       match term {
         Term::Ref { nam: def_name } => {
           if inlineables.contains(def_name) {
-            *term = defs.get(def_name).unwrap().rules[0].body.clone();
+            *term = defs.get(def_name).unwrap().rule().body.clone();
           }
         }
 

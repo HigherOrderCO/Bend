@@ -71,7 +71,7 @@ impl Term {
           to_resolve.push(fst);
           to_resolve.push(snd);
         }
-        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.resolve_ctrs_in_pats(is_ctr),
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => to_resolve.push(bod),
         Term::Var { .. }
         | Term::Lnk { .. }
         | Term::Ref { .. }

@@ -23,8 +23,8 @@ impl Term {
         fst.desugar_let_destructors();
         snd.desugar_let_destructors();
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.desugar_let_destructors();
+      Term::Mat { matched, arms } => {
+        matched.desugar_let_destructors();
         for (_, arm) in arms {
           arm.desugar_let_destructors();
         }

@@ -48,8 +48,8 @@ impl Term {
         fst.encode_builtins();
         snd.encode_builtins();
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.encode_builtins();
+      Term::Mat { matched, arms } => {
+        matched.encode_builtins();
         for (pat, arm) in arms {
           pat.encode_builtins();
           arm.encode_builtins();

@@ -95,8 +95,8 @@ pub fn check_uses<'a>(
       check_uses(fst, scope, globals)?;
       check_uses(snd, scope, globals)?;
     }
-    Term::Mat { matched: scrutinee, arms } => {
-      check_uses(scrutinee, scope, globals)?;
+    Term::Mat { matched, arms } => {
+      check_uses(matched, scope, globals)?;
       for (pat, term) in arms {
         pat.names().for_each(|nam| push_scope(Some(nam), scope));
 

@@ -54,8 +54,8 @@ impl Term {
         fst.eta_reduction();
         snd.eta_reduction();
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.eta_reduction();
+      Term::Mat { matched, arms } => {
+        matched.eta_reduction();
         for (pat, term) in arms {
           debug_assert!(pat.is_detached_num_match());
           term.eta_reduction();
