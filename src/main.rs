@@ -84,6 +84,15 @@ enum Mode {
   },
   /// Runs the lambda-term level desugaring passes.
   Desugar {
+    #[arg(
+      short = 'O',
+      value_delimiter = ' ',
+      action = clap::ArgAction::Append,
+      long_help = r#"Enables or disables the given optimizations
+      supercombinators is enabled by default."#,
+    )]
+    comp_opts: Vec<OptArgs>,
+
     #[arg(help = "Path to the input file")]
     path: PathBuf,
   },
@@ -176,10 +185,13 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       hvml::display_warnings(&compiled.warnings, warning_opts)?;
       print!("{}", show_book(&compiled.core_book));
     }
-    Mode::Desugar { path } => {
+    Mode::Desugar { path, comp_opts } => {
       let mut book = load_file_to_book(&path)?;
       verbose(&book);
-      desugar_book(&mut book, CompileOpts::default(), None)?;
+
+      let opts = OptArgs::opts_from_cli(&comp_opts);
+
+      desugar_book(&mut book, opts, None)?;
       println!("{book}");
     }
     Mode::Run {
@@ -189,7 +201,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       mut single_core,
       linear,
       arg_stats,
-      comp_opts: cli_opts,
+      comp_opts,
       warn_opts,
       lazy_mode,
     } => {
@@ -198,7 +210,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       }
 
       let warning_opts = warn_opts.get_warning_opts(WarningOpts::allow_all());
-      let mut opts = OptArgs::opts_from_cli(&cli_opts);
+      let mut opts = OptArgs::opts_from_cli(&comp_opts);
       opts.check(lazy_mode);
 
       if lazy_mode {
