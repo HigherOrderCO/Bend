@@ -1,2 +1,2 @@
-data String = (SCons head tail) | (SNil)
-data List   = (LCons head tail) | (LNil)
+data String = (String.cons head tail) | (String.nil)
+data List   = (List.cons head tail) | (List.nil)

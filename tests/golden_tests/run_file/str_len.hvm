@@ -1,5 +1,5 @@
 String.len s = (String.len.go s 0)
-String.len.go (SNil) x = x
-String.len.go (SCons hd tl) x = (String.len.go tl (+ x 1))
+String.len.go (String.nil) x = x
+String.len.go (String.cons hd tl) x = (String.len.go tl (+ x 1))
 
 main = (String.len "λx 🐼")

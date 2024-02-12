@@ -4,15 +4,15 @@ use hvmc::run::Val;
 const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/term/builtins.hvm"));
 
 pub const LIST: &str = "List";
-pub const LCONS: &str = "LCons";
-pub const LNIL: &str = "LNil";
+pub const LCONS: &str = "List.cons";
+pub const LNIL: &str = "List.nil";
 
 pub const HEAD: &str = "head";
 pub const TAIL: &str = "tail";
 
 pub const STRING: &str = "String";
-pub const SNIL: &str = "SNil";
-pub const SCONS: &str = "SCons";
+pub const SCONS: &str = "String.cons";
+pub const SNIL: &str = "String.nil";
 
 impl Book {
   pub fn builtins() -> Book {

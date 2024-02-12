@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/readback_list_other_ctr.hvm
 ---
-(LCons (SCons 97 (pair 98 "c")) (LCons 1 (pair 2 [3, 4])))
+(List.cons (String.cons 97 (pair 98 "c")) (List.cons 1 (pair 2 [3, 4])))

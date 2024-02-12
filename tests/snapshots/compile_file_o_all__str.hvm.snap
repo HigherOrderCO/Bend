@@ -2,13 +2,13 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/str.hvm
 ---
-@SCons = (a (b {2 {6 a {4 b c}} {2 * c}}))
-@SNil = {2 * {2 a a}}
+@String.con = (a (b {2 {6 a {4 b c}} {2 * c}}))
+@String.nil = {2 * {2 a a}}
 @main = a
-& @SCons ~ (#109 (b a))
-& @SCons ~ (#97 (c b))
-& @SCons ~ (#105 (d c))
-& @SCons ~ (#110 (e d))
-& @SCons ~ (#32 (f e))
-& @SCons ~ (#61 (@SNil f))
+& @String.con ~ (#109 (b a))
+& @String.con ~ (#97 (c b))
+& @String.con ~ (#105 (d c))
+& @String.con ~ (#110 (e d))
+& @String.con ~ (#32 (f e))
+& @String.con ~ (#61 (@String.nil f))
 

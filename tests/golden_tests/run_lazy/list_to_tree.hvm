@@ -1,6 +1,6 @@
 List.len list = (List.len.go list 0)
 List.len.go [] count = count
-List.len.go (LCons x xs) count = (List.len.go xs (+ count 1))
+List.len.go (List.cons x xs) count = (List.len.go xs (+ count 1))
 
 Take.go n list =
   match (== n 0) {
@@ -8,7 +8,7 @@ Take.go n list =
   | +: []
   }
 Take n [] = []
-Take n (LCons x xs) = (LCons x (Take.go (- n 1) xs))
+Take n (List.cons x xs) = (List.cons x (Take.go (- n 1) xs))
 
 Drop.go n list =
   match (== n 0) {
@@ -16,7 +16,7 @@ Drop.go n list =
   | +: list
   }
 Drop n [] = []
-Drop n (LCons x xs) = (Drop.go (- n 1) xs)
+Drop n (List.cons x xs) = (Drop.go (- n 1) xs)
 
 List.toTree [] = *
 List.toTree [x] = x

@@ -1,1 +1,1 @@
-main = λa λb (SCons a (SCons 'b' (SCons 'c' (SCons b  SNil))))
+main = λa λb (String.cons a (String.cons 'b' (String.cons 'c' (String.cons b  String.nil))))

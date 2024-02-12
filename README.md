@@ -103,13 +103,13 @@ Strings are delimited by `"` `"` and support Unicode characters.
 ```rs
 main = "Hello, 🌎"
 ```
-A string is desugared to a String data type containing two constructors, `SCons` and `SNil`.
+A string is desugared to a String data type containing two constructors, `String.cons` and `String.nil`.
 ```rs
 // These two are equivalent
 StrEx1 = "Hello"
 
-data String = (SCons head tail) | SNil
-StrEx2 = (SCons 'H' (SCons 'e', (SCons 'l' (SCons 'l', (SCons 'o' SNil)))))
+data String = (String.cons head tail) | String.nil
+StrEx2 = (String.cons 'H' (String.cons 'e', (String.cons 'l' (String.cons 'l', (String.cons 'o' String.nil)))))
 ```
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
@@ -121,13 +121,13 @@ Lists are delimited by `[` `]` and elements can be optionally separated by `,`.
 ```rs
 ids = [3, 6, 9 12 16]
 ```
-A list is desugared to a List data type containing two constructors, `LCons` and `LNil`.
+A list is desugared to a List data type containing two constructors, `List.cons` and `List.nil`.
 ```rs
 // These two are equivalent
 ListEx1 = [1, 2, 3]
 
-data List = (LCons head tail) | (LNil)
-ListEx2 = (LCons 1 (LCons 2 (LCons 3 LNil)))
+data List = (List.cons head tail) | (List.nil)
+ListEx2 = (List.cons 1 (List.cons 2 (List.cons 3 List.nil)))
 ```
 
 ### More features

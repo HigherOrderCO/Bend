@@ -5,17 +5,17 @@ input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared
 TaggedScott:
 (main) = *
 
-(Foo) = λa #String (a #String.SCons.head λb #String.SCons.tail λc 1 0)
+(Foo) = λa #String (a #String.String.cons.head λb #String.String.cons.tail λc 1 0)
 
-(Bar) = λa #List (a #List.LCons.head λb #List.LCons.tail λc 0 1)
+(Bar) = λa #List (a #List.List.cons.head λb #List.List.cons.tail λc 0 1)
 
-(SCons) = λhead λtail #String λSCons #String λSNil #String.SCons.tail (#String.SCons.head (SCons head) tail)
+(String.cons) = λhead λtail #String λString.cons #String λString.nil #String.String.cons.tail (#String.String.cons.head (String.cons head) tail)
 
-(SNil) = #String λSCons #String λSNil SNil
+(String.nil) = #String λString.cons #String λString.nil String.nil
 
-(LCons) = λhead λtail #List λLCons #List λLNil #List.LCons.tail (#List.LCons.head (LCons head) tail)
+(List.cons) = λhead λtail #List λList.cons #List λList.nil #List.List.cons.tail (#List.List.cons.head (List.cons head) tail)
 
-(LNil) = #List λLCons #List λLNil LNil
+(List.nil) = #List λList.cons #List λList.nil List.nil
 
 Scott:
 (main) = *
