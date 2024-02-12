@@ -243,12 +243,13 @@ impl<'a> Reader<'a> {
 
     let node_kind = &self.net.node(node).kind;
 
+    // Eta-reduce the readback inet.
     // This is not valid for all kinds of nodes, only CON/TUP/DUP, due to their interaction rules.
     if matches!(node_kind, Con { .. } | Tup | Dup { .. }) {
       match (fst_port, snd_port) {
         (Port(fst_node, 1), Port(snd_node, 2)) if fst_node == snd_node => {
           if self.net.node(fst_node).kind == *node_kind {
-            self.scope.remove(&fst_node);
+            self.scope.shift_remove(&fst_node);
 
             let port_zero = self.net.enter_port(Port(fst_node, 0));
             let term = self.read_term(port_zero);
