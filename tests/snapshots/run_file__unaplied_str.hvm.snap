@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/unaplied_str.hvm
 ---
-λa λb (SCons a (SCons 98 (SCons 99 (SCons b SNil))))
+λa λb (String.cons a (String.cons 98 (String.cons 99 (String.cons b String.nil))))

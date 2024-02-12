@@ -1,4 +1,4 @@
 data Override
-  = (SCons any)
+  = (String.cons any)
 
-main = (SCons "any")
+main = (String.cons "any")

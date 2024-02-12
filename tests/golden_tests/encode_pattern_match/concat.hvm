@@ -1,7 +1,7 @@
 String.concat = @a @b
   match a {
-    SNil: b;
-    (SCons hd tl): (SCons hd (String.concat tl b))
+    String.nil: b;
+    (String.cons hd tl): (String.cons hd (String.concat tl b))
   }
 
 main = (String.concat "ab" "cd")

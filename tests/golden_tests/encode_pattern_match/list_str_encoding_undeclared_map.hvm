@@ -1,10 +1,10 @@
 main = @a @b 
   let a =  match a {
-    SCons: 1
-    SNil : 2
+    String.cons: 1
+    String.nil : 2
   };
   let b =  match b {
-    (LCons h t): 1
-    (LNil) : 2
+    (List.cons h t): 1
+    (List.nil) : 2
   };
   (a, b)

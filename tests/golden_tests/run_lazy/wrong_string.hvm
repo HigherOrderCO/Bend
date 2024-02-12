@@ -1,1 +1,1 @@
-Main = (SCons (*, 4) (SCons * SNil))
+Main = (String.cons (*, 4) (String.cons * String.nil))

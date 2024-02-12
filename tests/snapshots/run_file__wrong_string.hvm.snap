@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/wrong_string.hvm
 ---
-(SCons (*, 4) (SCons * SNil))
+(String.cons (*, 4) (String.cons * String.nil))

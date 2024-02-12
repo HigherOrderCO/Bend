@@ -1,1 +1,5 @@
-main = @a [a, (*, 2), (SCons [7, "1234", 9] (SCons a (SCons * (SCons '4' (SCons '2' SNil)))))]
+main = @a [
+  a,
+  (*, 2),
+  (String.cons [7, "1234", 9] (String.cons a (String.cons * (String.cons '4' (String.cons '2' String.nil)))))
+]

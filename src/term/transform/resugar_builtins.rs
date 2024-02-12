@@ -6,10 +6,10 @@ impl Term {
     self.resugar_lists();
   }
 
-  /// Rebuilds the String syntax sugar, converting `(SCons 97 SNil)` into `"a"`.
+  /// Rebuilds the String syntax sugar, converting `(Cons 97 Nil)` into `"a"`.
   pub fn resugar_strings(&mut self) {
     match self {
-      // (SCons Num tail)
+      // (String.cons Num tail)
       Term::App {
         fun: box Term::App { fun: box Term::Ref { nam: ctr }, arg: box head, .. },
         arg: box tail,
@@ -31,14 +31,14 @@ impl Term {
         } else {
           // Otherwise rebuild the constructor with the new tail
 
-          // Create `(SCons head SNil)` instead of `(SCons head "")`
+          // Create `(Cons head Nil)` instead of `(Cons head "")`
           if tail == (Term::Str { val: String::new() }) {
             tail = Term::r#ref(SNIL);
           }
           *self = Term::call(Term::Ref { nam: ctr.clone() }, [head, tail]);
         }
       }
-      // (SNil)
+      // (String.nil)
       Term::Ref { nam: def_name } if def_name.as_str() == SNIL => *self = Term::Str { val: String::new() },
 
       Term::Mat { matched, arms } => {
@@ -74,10 +74,10 @@ impl Term {
     }
   }
 
-  /// Rebuilds the List syntax sugar, converting `(LCons head LNil)` into `[head]`.
+  /// Rebuilds the List syntax sugar, converting `(Cons head Nil)` into `[head]`.
   pub fn resugar_lists(&mut self) {
     match self {
-      // (LCons el tail)
+      // (List.cons el tail)
       Term::App {
         fun: box Term::App { fun: box Term::Ref { nam: ctr }, arg: box head, .. },
         arg: box tail,
@@ -99,7 +99,7 @@ impl Term {
           *self = Term::call(Term::Ref { nam: ctr.clone() }, [head, tail]);
         }
       }
-      // (LNil)
+      // (List.nil)
       Term::Ref { nam: def_name } if def_name.as_str() == LNIL => *self = Term::Lst { els: vec![] },
 
       Term::Mat { matched, arms } => {

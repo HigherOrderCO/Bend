@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_lazy/nested_list_and_string.hvm
 ---
-λa [a, (*, 2), (SCons [7, "1234", 9] (SCons a (SCons * "42")))]
+λa [a, (*, 2), (String.cons [7, "1234", 9] (String.cons a (String.cons * "42")))]

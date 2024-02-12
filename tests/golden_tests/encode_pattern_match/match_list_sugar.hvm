@@ -1,5 +1,5 @@
 main =
-  match LNil {
+  match List.nil {
   | []: 0
   |  *: 1
   }

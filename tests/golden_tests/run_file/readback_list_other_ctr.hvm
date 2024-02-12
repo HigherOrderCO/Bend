@@ -1,4 +1,7 @@
 // Check that the ctr in the middle are interpreted correctly
 data tup = (pair a b)
 
-main = (LCons (SCons 'a' (pair 'b' (SCons 'c' SNil))) (LCons 1 (pair 2 (LCons 3 (LCons 4 LNil)))))
+main = (List.cons
+  (String.cons 'a' (pair 'b' (String.cons 'c' String.nil)))
+  (List.cons 1 (pair 2 (List.cons 3 (List.cons 4 List.nil))))
+)
