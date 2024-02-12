@@ -80,7 +80,7 @@ impl Book {
     for def_name in unused {
       let def = &self.defs[&def_name];
       if prune_all || def.builtin {
-        self.defs.remove(&def_name);
+        self.defs.swap_remove(&def_name);
       } else if !def_name.is_generated() {
         warnings.push(Warning::UnusedDefinition { def_name: def_name.clone() });
       }

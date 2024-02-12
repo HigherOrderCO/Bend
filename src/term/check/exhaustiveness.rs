@@ -10,7 +10,7 @@ impl Book {
     for (def_name, def) in &self.defs {
       let types = &def_types[def_name];
       let rules_to_check = (0 .. def.rules.len()).collect();
-      check_pattern(&mut vec![], &self.adts, &def.rules, types, rules_to_check, def_name)
+      check_pattern(&[], &self.adts, &def.rules, types, rules_to_check, def_name)
         .map_err(|e| format!("In definition '{def_name}': {e}"))?;
     }
     Ok(())
@@ -18,7 +18,7 @@ impl Book {
 }
 
 fn check_pattern(
-  match_path: &mut Vec<Name>,
+  match_path: &[Name],
   adts: &IndexMap<Name, Adt>,
   rules: &[Rule],
   types: &[Type],
@@ -78,9 +78,9 @@ fn check_pattern(
         return Err(format!("Non-exhaustive pattern. Hint: ({} {}) not covered.", def_name, missing));
       }
 
-      let mut match_path = match_path.clone();
+      let mut match_path = match_path.to_owned();
       match_path.push(ctr);
-      check_pattern(&mut match_path, adts, rules, &types[1 ..], matching_rules, def_name)?;
+      check_pattern(&match_path, adts, rules, &types[1 ..], matching_rules, def_name)?;
     }
   }
   Ok(())

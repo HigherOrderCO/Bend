@@ -379,7 +379,9 @@ fn subst_rule_body(term: &mut Term, subst_var: &Name, body: &Term, name_gen: &mu
       // Reduce the surrounding applications.
       // They should never be more than the lambdas for receiving arguments.
       let (subst_term, n_apps) = leading_apps(term);
-      if let Term::Var { nam } = subst_term && nam == subst_var {
+      if let Term::Var { nam } = subst_term
+        && nam == subst_var
+      {
         // Subst and reduce the surrounding application
         subst_term.subst(subst_var, body);
         // So that we don't have name conflicts with the generated term.
@@ -391,7 +393,7 @@ fn subst_rule_body(term: &mut Term, subst_var: &Name, body: &Term, name_gen: &mu
         }
       } else {
         // Normal App, not a rule body substitution
-        let Term::App { tag: _, fun, arg } = term else {unreachable!()}; // to appease the borrow checker
+        let Term::App { tag: _, fun, arg } = term else { unreachable!() }; // to appease the borrow checker
         subst_rule_body(fun, subst_var, body, name_gen);
         subst_rule_body(arg, subst_var, body, name_gen);
       }

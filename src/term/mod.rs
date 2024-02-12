@@ -351,7 +351,7 @@ impl Term {
         Term::Lam { nam: Some(nam), bod, .. } => {
           let mut new_scope = IndexMap::new();
           go(bod, &mut new_scope);
-          new_scope.remove(nam);
+          new_scope.shift_remove(nam);
 
           free_vars.extend(new_scope);
         }
@@ -366,7 +366,7 @@ impl Term {
           go(nxt, &mut new_scope);
 
           for bind in pat.names() {
-            new_scope.remove(bind);
+            new_scope.shift_remove(bind);
           }
 
           free_vars.extend(new_scope);
@@ -377,8 +377,8 @@ impl Term {
           let mut new_scope = IndexMap::new();
           go(nxt, &mut new_scope);
 
-          fst.as_ref().map(|fst| new_scope.remove(fst));
-          snd.as_ref().map(|snd| new_scope.remove(snd));
+          fst.as_ref().map(|fst| new_scope.shift_remove(fst));
+          snd.as_ref().map(|snd| new_scope.shift_remove(snd));
 
           free_vars.extend(new_scope);
         }
@@ -397,7 +397,7 @@ impl Term {
             go(term, &mut new_scope);
 
             if let Pattern::Num(MatchNum::Succ(Some(Some(nam)))) = rule {
-              new_scope.remove(nam);
+              new_scope.shift_remove(nam);
             }
 
             free_vars.extend(new_scope);

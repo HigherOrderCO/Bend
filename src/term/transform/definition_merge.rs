@@ -39,7 +39,7 @@ impl Book {
         self.defs.insert(new_name.clone(), new_def);
         // Remove the old ones and write the map of old names to new ones.
         for name in equal_defs {
-          self.defs.remove(&name);
+          self.defs.swap_remove(&name);
           name_map.insert(name, new_name.clone());
         }
       } else {
