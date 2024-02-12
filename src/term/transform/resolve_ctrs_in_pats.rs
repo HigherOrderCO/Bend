@@ -56,8 +56,8 @@ impl Term {
           to_resolve.push(val);
           to_resolve.push(nxt);
         }
-        Term::Mat { matched: scrutinee, arms } => {
-          scrutinee.resolve_ctrs_in_pats(is_ctr);
+        Term::Mat { matched, arms } => {
+          to_resolve.push(matched);
           for (pat, body) in arms {
             pat.resolve_ctrs(is_ctr);
             to_resolve.push(body);
