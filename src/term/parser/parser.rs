@@ -396,7 +396,7 @@ where
 
   rule_pattern()
     .then(terms.validate(|terms, span, emit| {
-      emit.emit(Rich::custom(span, format!("Missing Parenthesis around rule body")));
+      emit.emit(Rich::custom(span, "Missing parenthesis around rule body"));
       terms
     }))
     .map(|(rule, (_, app))| (rule, app))

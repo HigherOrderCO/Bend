@@ -20,7 +20,10 @@ impl Term {
         let head = std::mem::take(head);
         let mut tail = std::mem::take(tail);
 
-        if ctr.as_str() == SCONS && let Term::Num{ val } = head && let Term::Str { val: tail } = tail {
+        if ctr.as_str() == SCONS
+          && let Term::Num { val } = head
+          && let Term::Str { val: tail } = tail
+        {
           // If well formed string, add the next character to the string we're building
           let head = unsafe { char::from_u32_unchecked(val as u32) }.to_string();
           let str = head + &tail;
@@ -85,7 +88,9 @@ impl Term {
         let head = std::mem::take(head);
         let tail = std::mem::take(tail);
 
-        if ctr.as_str() == LCONS && let Term::Lst { els: tail } = tail {
+        if ctr.as_str() == LCONS
+          && let Term::Lst { els: tail } = tail
+        {
           // If well formed list, cons the next element to the list being formed
           let mut els = vec![head];
           els.extend(tail);
