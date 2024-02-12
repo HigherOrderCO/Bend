@@ -23,40 +23,44 @@ impl Book {
 
 impl Term {
   fn inline(&mut self, inlineables: &HashSet<Name>, defs: &IndexMap<Name, Definition>) {
-    match self {
-      Term::Ref { nam: def_name } => {
-        if inlineables.contains(def_name) {
-          *self = defs.get(def_name).unwrap().rules[0].body.clone();
+    let mut to_inline = vec![self];
+
+    while let Some(term) = to_inline.pop() {
+      match term {
+        Term::Ref { nam: def_name } => {
+          if inlineables.contains(def_name) {
+            *term = defs.get(def_name).unwrap().rules[0].body.clone();
+          }
         }
-      }
 
-      Term::Lam { bod, .. } => bod.inline(inlineables, defs),
+        Term::Lam { bod, .. } => to_inline.push(bod),
 
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Opx { fst, snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Tup { fst, snd } => {
-        fst.inline(inlineables, defs);
-        snd.inline(inlineables, defs);
-      }
-
-      Term::Mat { arms, .. } => {
-        for (_, bod) in arms {
-          bod.inline(inlineables, defs);
+        Term::App { fun: fst, arg: snd, .. }
+        | Term::Dup { val: fst, nxt: snd, .. }
+        | Term::Opx { fst, snd, .. }
+        | Term::Sup { fst, snd, .. }
+        | Term::Tup { fst, snd } => {
+          to_inline.push(fst);
+          to_inline.push(snd);
         }
+
+        Term::Mat { arms, .. } => {
+          for (_, bod) in arms {
+            to_inline.push(bod);
+          }
+        }
+
+        Term::Var { .. }
+        | Term::Chn { .. }
+        | Term::Lnk { .. }
+        | Term::Let { .. }
+        | Term::Num { .. }
+        | Term::Str { .. }
+        | Term::Lst { .. }
+        | Term::Era => {}
+
+        Term::Err => unreachable!(),
       }
-
-      Term::Var { .. }
-      | Term::Chn { .. }
-      | Term::Lnk { .. }
-      | Term::Let { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Lst { .. }
-      | Term::Era => {}
-
-      Term::Err => unreachable!(),
     }
   }
 

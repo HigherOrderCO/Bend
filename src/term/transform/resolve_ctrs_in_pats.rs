@@ -20,22 +20,26 @@ impl Book {
 
 impl Pattern {
   pub fn resolve_ctrs(&mut self, is_ctr: &impl Fn(&Name) -> bool) {
-    match self {
-      Pattern::Var(Some(nam)) => {
-        if is_ctr(nam) {
-          *self = Pattern::Ctr(nam.clone(), vec![]);
+    let mut to_resolve = vec![self];
+
+    while let Some(pat) = to_resolve.pop() {
+      match pat {
+        Pattern::Var(Some(nam)) => {
+          if is_ctr(nam) {
+            *pat = Pattern::Ctr(nam.clone(), vec![]);
+          }
         }
-      }
-      Pattern::Ctr(_, args) | Pattern::Lst(args) => {
-        for arg in args {
-          arg.resolve_ctrs(is_ctr);
+        Pattern::Ctr(_, args) | Pattern::Lst(args) => {
+          for arg in args {
+            to_resolve.push(arg);
+          }
         }
-      }
-      Pattern::Var(None) => (),
-      Pattern::Num(_) => (),
-      Pattern::Tup(fst, snd) => {
-        fst.resolve_ctrs(is_ctr);
-        snd.resolve_ctrs(is_ctr);
+        Pattern::Var(None) => (),
+        Pattern::Num(_) => (),
+        Pattern::Tup(fst, snd) => {
+          to_resolve.push(fst);
+          to_resolve.push(snd);
+        }
       }
     }
   }
@@ -43,36 +47,40 @@ impl Pattern {
 
 impl Term {
   pub fn resolve_ctrs_in_pats(&mut self, is_ctr: &impl Fn(&Name) -> bool) {
-    match self {
-      Term::Let { pat, val, nxt } => {
-        pat.resolve_ctrs(is_ctr);
-        val.resolve_ctrs_in_pats(is_ctr);
-        nxt.resolve_ctrs_in_pats(is_ctr);
-      }
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.resolve_ctrs_in_pats(is_ctr);
-        for (pat, body) in arms {
+    let mut to_resolve = vec![self];
+
+    while let Some(pat) = to_resolve.pop() {
+      match pat {
+        Term::Let { pat, val, nxt } => {
           pat.resolve_ctrs(is_ctr);
-          body.resolve_ctrs_in_pats(is_ctr);
+          to_resolve.push(val);
+          to_resolve.push(nxt);
         }
+        Term::Mat { matched: scrutinee, arms } => {
+          scrutinee.resolve_ctrs_in_pats(is_ctr);
+          for (pat, body) in arms {
+            pat.resolve_ctrs(is_ctr);
+            to_resolve.push(body);
+          }
+        }
+        Term::App { fun: fst, arg: snd, .. }
+        | Term::Tup { fst, snd }
+        | Term::Dup { val: fst, nxt: snd, .. }
+        | Term::Sup { fst, snd, .. }
+        | Term::Opx { fst, snd, .. } => {
+          to_resolve.push(fst);
+          to_resolve.push(snd);
+        }
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.resolve_ctrs_in_pats(is_ctr),
+        Term::Var { .. }
+        | Term::Lnk { .. }
+        | Term::Ref { .. }
+        | Term::Num { .. }
+        | Term::Str { .. }
+        | Term::Lst { .. }
+        | Term::Era
+        | Term::Err => (),
       }
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.resolve_ctrs_in_pats(is_ctr);
-        snd.resolve_ctrs_in_pats(is_ctr);
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.resolve_ctrs_in_pats(is_ctr),
-      Term::Var { .. }
-      | Term::Lnk { .. }
-      | Term::Ref { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Lst { .. }
-      | Term::Era
-      | Term::Err => (),
     }
   }
 }
