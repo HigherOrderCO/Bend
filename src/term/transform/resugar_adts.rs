@@ -41,8 +41,8 @@ impl Term {
         fst.resugar_tagged_scott(book, errs);
         snd.resugar_tagged_scott(book, errs);
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.resugar_tagged_scott(book, errs);
+      Term::Mat { matched, arms } => {
+        matched.resugar_tagged_scott(book, errs);
         for (_, arm) in arms {
           arm.resugar_tagged_scott(book, errs);
         }
@@ -220,9 +220,9 @@ impl Term {
       }
     }
 
-    let scrutinee = Box::new(std::mem::take(cur));
+    let matched = Box::new(std::mem::take(cur));
     let arms = arms.into_iter().rev().map(|(pat, term)| (pat, std::mem::take(term))).collect();
-    *self = Term::Mat { matched: scrutinee, arms };
+    *self = Term::Mat { matched, arms };
 
     self.resugar_tagged_scott(book, errs);
   }

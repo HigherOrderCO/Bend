@@ -86,8 +86,8 @@ impl Term {
         fst.resolve_refs(def_names, scope)?;
         snd.resolve_refs(def_names, scope)?;
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.resolve_refs(def_names, scope)?;
+      Term::Mat { matched, arms } => {
+        matched.resolve_refs(def_names, scope)?;
         for (pat, term) in arms {
           let nam = if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat { nam.as_ref() } else { None };
           push_scope(nam, scope);

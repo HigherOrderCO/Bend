@@ -56,8 +56,8 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool
       let snd_subst = subst_ref_to_ref(snd, ref_map);
       fst_subst | snd_subst
     }
-    Term::Mat { matched: scrutinee, arms } => {
-      let mut subst = subst_ref_to_ref(scrutinee, ref_map);
+    Term::Mat { matched, arms } => {
+      let mut subst = subst_ref_to_ref(matched, ref_map);
       for (_, term) in arms {
         subst |= subst_ref_to_ref(term, ref_map);
       }

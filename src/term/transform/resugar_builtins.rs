@@ -38,8 +38,8 @@ impl Term {
       // (SNil)
       Term::Ref { nam: def_name } if def_name.as_str() == SNIL => *self = Term::Str { val: String::new() },
 
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.resugar_strings();
+      Term::Mat { matched, arms } => {
+        matched.resugar_strings();
         for (_, arm) in arms {
           arm.resugar_strings();
         }

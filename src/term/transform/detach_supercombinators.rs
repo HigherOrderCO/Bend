@@ -230,8 +230,8 @@ impl Term {
 
           val_detach & nxt_detach
         }
-        Term::Mat { matched: scrutinee, arms } => {
-          let mut detach = go(scrutinee, depth + 1, term_info);
+        Term::Mat { matched, arms } => {
+          let mut detach = go(matched, depth + 1, term_info);
           let parent_scope = term_info.replace_scope(HashSet::new());
 
           for (pat, term) in arms {

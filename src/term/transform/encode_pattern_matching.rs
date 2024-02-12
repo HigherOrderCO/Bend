@@ -320,8 +320,8 @@ fn normal_order_step(term: &mut Term) -> bool {
         _ => normal_order_step(fun) || normal_order_step(arg),
       }
     }
-    Term::Mat { matched: scrutinee, arms } => {
-      if normal_order_step(scrutinee) {
+    Term::Mat { matched, arms } => {
+      if normal_order_step(matched) {
         return true;
       }
       for (_, arm) in arms {
@@ -401,8 +401,8 @@ fn subst_rule_body(term: &mut Term, subst_var: &Name, body: &Term, name_gen: &mu
       term.subst(subst_var, body);
     }
 
-    Term::Mat { matched: scrutinee, arms } => {
-      subst_rule_body(scrutinee, subst_var, body, name_gen);
+    Term::Mat { matched, arms } => {
+      subst_rule_body(matched, subst_var, body, name_gen);
       for (_, arm) in arms {
         subst_rule_body(arm, subst_var, body, name_gen);
       }

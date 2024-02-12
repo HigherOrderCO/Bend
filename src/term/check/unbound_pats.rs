@@ -59,8 +59,8 @@ impl Term {
         val.check_unbound_pats(is_ctr)?;
         nxt.check_unbound_pats(is_ctr)?;
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.check_unbound_pats(is_ctr)?;
+      Term::Mat { matched, arms } => {
+        matched.check_unbound_pats(is_ctr)?;
         for (pat, body) in arms {
           pat.check_unbounds(is_ctr)?;
           body.check_unbound_pats(is_ctr)?;

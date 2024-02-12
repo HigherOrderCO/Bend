@@ -209,19 +209,19 @@ impl<'a> Reader<'a> {
     term
   }
 
-  /// Enters both ports 1 and 2 of a node,  
-  /// Returning a Term if is possible to simplify the net, or the Terms on the two ports of the node.  
+  /// Enters both ports 1 and 2 of a node,
+  /// Returning a Term if is possible to simplify the net, or the Terms on the two ports of the node.
   /// The two possible outcomes are always equivalent.
-  ///   
-  /// If:  
-  ///  - The node Kind is CON/TUP/DUP  
-  ///  - Both ports 1 and 2 are connected to the same node on slots 1 and 2 respectively  
-  ///  - That node Kind is the same as the given node Kind  
   ///
-  /// Then:  
+  /// If:
+  ///  - The node Kind is CON/TUP/DUP
+  ///  - Both ports 1 and 2 are connected to the same node on slots 1 and 2 respectively
+  ///  - That node Kind is the same as the given node Kind
+  ///
+  /// Then:
   ///   Reads the port 0 of the connected node, and returns that term.
   ///
-  /// Otherwise:  
+  /// Otherwise:
   ///   Returns the terms on ports 1 and 2 of the given node.
   ///
   /// # Example
@@ -230,7 +230,7 @@ impl<'a> Reader<'a> {
   /// // λa let (a, b) = a; (a, b)
   /// ([a b] [a b])
   ///
-  /// // The node `(a, b)` is just a reconstruction of the destructuring of `a`,  
+  /// // The node `(a, b)` is just a reconstruction of the destructuring of `a`,
   /// // So we can skip both steps and just return the "value" unchanged:
   ///
   /// // λa a
@@ -301,8 +301,8 @@ impl Term {
       | Term::Opx { fst, snd, .. } => {
         fst.insert_split(split, threshold)? + snd.insert_split(split, threshold)?
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        let mut n = scrutinee.insert_split(split, threshold)?;
+      Term::Mat { matched, arms } => {
+        let mut n = matched.insert_split(split, threshold)?;
         for arm in arms {
           n += arm.1.insert_split(split, threshold)?;
         }
@@ -365,8 +365,8 @@ impl Term {
         fst.fix_names(id_counter, book);
         snd.fix_names(id_counter, book);
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.fix_names(id_counter, book);
+      Term::Mat { matched, arms } => {
+        matched.fix_names(id_counter, book);
 
         for (rule, term) in arms {
           if let Pattern::Num(MatchNum::Succ(Some(nam))) = rule {

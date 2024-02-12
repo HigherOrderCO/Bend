@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-  term::{Adt, AdtEncoding, Book, Name, Tag, Term, LCONS, LNIL, SCONS, SNIL},
+  term::{Adt, AdtEncoding, Book, Name, Tag, Term, LIST, STRING},
   Warning,
 };
 use indexmap::IndexSet;
@@ -95,44 +95,44 @@ impl Book {
     uses: &mut Definitions,
     adt_encoding: AdtEncoding,
   ) {
-    self.find_manual_adt_encoding(term, uses, adt_encoding);
+    let mut to_find = vec![term];
 
-    match term {
-      Term::Ref { nam: def_name } => match self.ctrs.get(def_name) {
-        Some(name) => self.insert_ctrs_used(name, uses, adt_encoding),
-        None => self.insert_used(def_name, used, uses, adt_encoding),
-      },
+    while let Some(term) = to_find.pop() {
+      self.find_manual_adt_encoding(term, uses, adt_encoding);
 
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        self.find_used_definitions(bod, used, uses, adt_encoding)
-      }
-      Term::Let { val: fst, nxt: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::App { fun: fst, arg: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Opx { fst, snd, .. } => {
-        self.find_used_definitions(fst, used, uses, adt_encoding);
-        self.find_used_definitions(snd, used, uses, adt_encoding);
-      }
-      Term::Mat { matched: scrutinee, arms } => {
-        self.find_used_definitions(scrutinee, used, uses, adt_encoding);
-        for (_, term) in arms {
-          self.find_used_definitions(term, used, uses, adt_encoding);
+      match term {
+        Term::Ref { nam: def_name } => match self.ctrs.get(def_name) {
+          Some(name) => self.insert_ctrs_used(name, uses, adt_encoding),
+          None => self.insert_used(def_name, used, uses, adt_encoding),
+        },
+
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => to_find.push(bod),
+        Term::Let { val: fst, nxt: snd, .. }
+        | Term::Dup { val: fst, nxt: snd, .. }
+        | Term::App { fun: fst, arg: snd, .. }
+        | Term::Sup { fst, snd, .. }
+        | Term::Tup { fst, snd }
+        | Term::Opx { fst, snd, .. } => {
+          to_find.push(fst);
+          to_find.push(snd);
         }
-      }
-      Term::Lst { els } => {
-        self.insert_ctrs_used(&Name::new(LCONS), uses, adt_encoding);
-        self.insert_ctrs_used(&Name::new(LNIL), uses, adt_encoding);
-        for term in els {
-          self.find_used_definitions(term, used, uses, adt_encoding);
+        Term::Mat { matched, arms } => {
+          to_find.push(matched);
+          for (_, bod) in arms {
+            to_find.push(bod);
+          }
         }
+        Term::Lst { els } => {
+          self.insert_ctrs_used(&Name::new(LIST), uses, adt_encoding);
+          for term in els {
+            to_find.push(term);
+          }
+        }
+        Term::Str { .. } => {
+          self.insert_ctrs_used(&Name::new(STRING), uses, adt_encoding);
+        }
+        Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era | Term::Err => (),
       }
-      Term::Str { .. } => {
-        self.insert_ctrs_used(&Name::new(SCONS), uses, adt_encoding);
-        self.insert_ctrs_used(&Name::new(SNIL), uses, adt_encoding);
-      }
-      Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era | Term::Err => (),
     }
   }
 

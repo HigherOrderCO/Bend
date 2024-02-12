@@ -37,27 +37,32 @@ impl Book {
 
 impl Pattern {
   fn check(&self, arities: &HashMap<Name, usize>) -> Result<(), String> {
-    match self {
-      Pattern::Ctr(name, args) => {
-        let arity = arities.get(name).unwrap();
-        let args = args.len();
-        if *arity != args {
-          Err(format!("Arity error. Constructor '{}' expects {} fields, found {}.", name, arity, args))
-        } else {
-          Ok(())
+    let mut to_check = vec![self];
+
+    while let Some(pat) = to_check.pop() {
+      match pat {
+        Pattern::Ctr(name, args) => {
+          let arity = arities.get(name).unwrap();
+          let args = args.len();
+          if *arity != args {
+            return Err(format!(
+              "Arity error. Constructor '{}' expects {} fields, found {}.",
+              name, arity, args
+            ));
+          }
         }
-      }
-      Pattern::Tup(fst, snd) => {
-        fst.check(arities)?;
-        snd.check(arities)
-      }
-      Pattern::Lst(els) => {
-        for el in els {
-          el.check(arities)?;
+        Pattern::Tup(fst, snd) => {
+          to_check.push(fst);
+          to_check.push(snd);
         }
-        Ok(())
+        Pattern::Lst(els) => {
+          for el in els {
+            to_check.push(el);
+          }
+        }
+        Pattern::Var(..) | Pattern::Num(..) => {}
       }
-      Pattern::Var(..) | Pattern::Num(..) => Ok(()),
     }
+    Ok(())
   }
 }

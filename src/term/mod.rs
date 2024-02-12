@@ -283,8 +283,8 @@ impl Term {
           nxt.subst(from, to);
         }
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.subst(from, to);
+      Term::Mat { matched, arms } => {
+        matched.subst(from, to);
 
         for (rule, term) in arms {
           let can_subst;
@@ -318,8 +318,8 @@ impl Term {
       Term::Lnk { nam } if nam == from => {
         *self = to.clone();
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        scrutinee.subst_unscoped(from, to);
+      Term::Mat { matched, arms } => {
+        matched.subst_unscoped(from, to);
         arms.iter_mut().for_each(|(_, arm)| arm.subst_unscoped(from, to));
       }
       Term::Lst { els } => els.iter_mut().for_each(|el| el.subst_unscoped(from, to)),
@@ -389,8 +389,8 @@ impl Term {
           go(fst, free_vars);
           go(snd, free_vars);
         }
-        Term::Mat { matched: scrutinee, arms } => {
-          go(scrutinee, free_vars);
+        Term::Mat { matched, arms } => {
+          go(matched, free_vars);
 
           for (rule, term) in arms {
             let mut new_scope = IndexMap::new();
@@ -430,8 +430,8 @@ impl Term {
         Term::Lnk { nam } => {
           uses.insert(nam.clone());
         }
-        Term::Mat { matched: scrutinee, arms } => {
-          go(scrutinee, decls, uses);
+        Term::Mat { matched, arms } => {
+          go(matched, decls, uses);
           for (_, arm) in arms {
             go(arm, decls, uses);
           }

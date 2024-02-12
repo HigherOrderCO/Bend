@@ -161,10 +161,10 @@ impl<'a> EncodeTermState<'a> {
         Some(Port(app, 2))
       }
       // core: & cond ~  (zero succ) ret
-      Term::Mat { matched: scrutinee, arms } => {
+      Term::Mat { matched, arms } => {
         let if_ = self.inet.new_node(Mat);
 
-        let cond = self.encode_term(scrutinee, Port(if_, 0));
+        let cond = self.encode_term(matched, Port(if_, 0));
         self.link_local(Port(if_, 0), cond);
 
         debug_assert!(matches!(arms[0].0, Pattern::Num(MatchNum::Zero)));

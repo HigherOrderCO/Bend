@@ -61,8 +61,8 @@ impl UniqueNameGenerator {
         *snd = self.pop(snd.as_ref());
         *fst = self.pop(fst.as_ref());
       }
-      Term::Mat { matched: scrutinee, arms } => {
-        self.unique_names_in_term(scrutinee);
+      Term::Mat { matched, arms } => {
+        self.unique_names_in_term(matched);
         for (pat, term) in arms {
           pat.names().for_each(|nam| self.push(Some(nam)));
           self.unique_names_in_term(term);
