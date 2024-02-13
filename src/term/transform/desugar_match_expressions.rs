@@ -4,7 +4,7 @@ use crate::{
 };
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 impl Book {
   /// Extracts adt match terms into pattern matching functions.
@@ -340,11 +340,11 @@ fn infer_match_type<'a>(
 
 /// Converts free vars inside the match arms into lambdas with applications to give them the external value.
 /// Makes the rules extractable and linear (no need for dups when variable used in both rules)
-// TODO: Deal with unscoped lambdas/vars.
 fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
   let Term::Mat { matched: _, arms } = match_term else { unreachable!() };
-  // Collect the vars
-  let free_vars: IndexSet<Name> = arms
+  // Collect the vars.
+  // We need consistent iteration order.
+  let free_vars: BTreeSet<Name> = arms
     .iter()
     .flat_map(|(pat, term)| term.free_vars().into_keys().filter(|k| !pat.names().contains(k)))
     .collect();

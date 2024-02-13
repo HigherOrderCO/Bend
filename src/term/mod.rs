@@ -1,7 +1,7 @@
 use hvmc::run::Val;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use std::{ops::Deref, sync::Arc, vec};
+use std::{collections::HashMap, ops::Deref, sync::Arc, vec};
 
 pub mod builtins;
 pub mod check;
@@ -345,13 +345,13 @@ impl Term {
 
   /// Collects all the free variables that a term has
   /// and the number of times each var is used
-  pub fn free_vars(&self) -> IndexMap<Name, u64> {
-    fn go(term: &Term, free_vars: &mut IndexMap<Name, u64>) {
+  pub fn free_vars(&self) -> HashMap<Name, u64> {
+    fn go(term: &Term, free_vars: &mut HashMap<Name, u64>) {
       match term {
         Term::Lam { nam: Some(nam), bod, .. } => {
-          let mut new_scope = IndexMap::new();
+          let mut new_scope = Default::default();
           go(bod, &mut new_scope);
-          new_scope.shift_remove(nam);
+          new_scope.remove(nam);
 
           free_vars.extend(new_scope);
         }
@@ -362,11 +362,11 @@ impl Term {
         Term::Let { pat, val, nxt } => {
           go(val, free_vars);
 
-          let mut new_scope = IndexMap::new();
+          let mut new_scope = Default::default();
           go(nxt, &mut new_scope);
 
           for bind in pat.names() {
-            new_scope.shift_remove(bind);
+            new_scope.remove(bind);
           }
 
           free_vars.extend(new_scope);
@@ -374,11 +374,11 @@ impl Term {
         Term::Dup { fst, snd, val, nxt, .. } => {
           go(val, free_vars);
 
-          let mut new_scope = IndexMap::new();
+          let mut new_scope = Default::default();
           go(nxt, &mut new_scope);
 
-          fst.as_ref().map(|fst| new_scope.shift_remove(fst));
-          snd.as_ref().map(|snd| new_scope.shift_remove(snd));
+          fst.as_ref().map(|fst| new_scope.remove(fst));
+          snd.as_ref().map(|snd| new_scope.remove(snd));
 
           free_vars.extend(new_scope);
         }
@@ -393,11 +393,11 @@ impl Term {
           go(matched, free_vars);
 
           for (rule, term) in arms {
-            let mut new_scope = IndexMap::new();
+            let mut new_scope = Default::default();
             go(term, &mut new_scope);
 
             if let Pattern::Num(MatchNum::Succ(Some(Some(nam)))) = rule {
-              new_scope.shift_remove(nam);
+              new_scope.remove(nam);
             }
 
             free_vars.extend(new_scope);
@@ -405,7 +405,7 @@ impl Term {
         }
         Term::Lst { els } => {
           for el in els {
-            let mut fvs = IndexMap::new();
+            let mut fvs = Default::default();
             go(el, &mut fvs);
             free_vars.extend(fvs);
           }
@@ -414,7 +414,7 @@ impl Term {
       }
     }
 
-    let mut free_vars = IndexMap::new();
+    let mut free_vars = Default::default();
     go(self, &mut free_vars);
     free_vars
   }

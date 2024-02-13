@@ -3,8 +3,7 @@ use crate::{
   term::{num_to_name, term_to_net::Labels, Book, MatchNum, Name, Op, Pattern, Tag, Term, Val},
 };
 use hvmc::run::Loc;
-use indexmap::IndexSet;
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
 /// Converts an Interaction-INet to a Lambda Calculus term
@@ -22,7 +21,7 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
 
   let mut term = reader.read_term(net.enter_port(ROOT));
 
-  while let Some(node) = reader.scope.pop() {
+  while let Some(node) = reader.scope.pop_first() {
     let val = reader.read_term(reader.net.enter_port(Port(node, 0)));
     let fst = reader.namegen.decl_name(net, Port(node, 1));
     let snd = reader.namegen.decl_name(net, Port(node, 2));
@@ -41,6 +40,9 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
   }
   (term, reader.errors)
 }
+
+// BTreeSet for consistent readback of dups
+type Scope = BTreeSet<NodeId>;
 
 pub struct Reader<'a> {
   pub book: &'a Book,
@@ -249,7 +251,7 @@ impl<'a> Reader<'a> {
       match (fst_port, snd_port) {
         (Port(fst_node, 1), Port(snd_node, 2)) if fst_node == snd_node => {
           if self.net.node(fst_node).kind == *node_kind {
-            self.scope.shift_remove(&fst_node);
+            self.scope.remove(&fst_node);
 
             let port_zero = self.net.enter_port(Port(fst_node, 0));
             let term = self.read_term(port_zero);
@@ -382,8 +384,6 @@ impl Term {
     }
   }
 }
-
-type Scope = IndexSet<NodeId>;
 
 #[derive(Default)]
 pub struct NameGen {
