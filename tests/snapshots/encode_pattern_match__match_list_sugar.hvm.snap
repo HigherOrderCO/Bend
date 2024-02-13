@@ -3,21 +3,17 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_list_sugar.hvm
 ---
 TaggedScott:
-(main) = let %matched = List.nil; (main$match$1 %matched)
+(main) = #List (List.nil #List.List.cons.head λ* #List.List.cons.tail λ* 1 0)
 
-(main$match$1) = λa #List (a #List.List.cons.head λb #List.List.cons.tail λc 1 0)
+(List.nil) = #List λ* #List λb b
 
-(List.nil) = #List λList.cons #List λList.nil List.nil
-
-(List.cons) = λhead λtail #List λList.cons #List λList.nil #List.List.cons.tail (#List.List.cons.head (List.cons head) tail)
+(List.cons) = λa λb #List λc #List λ* #List.List.cons.tail (#List.List.cons.head (c a) b)
 
 Scott:
-(main) = let %matched = List.nil; (main$match$1 %matched)
+(main) = (List.nil λ* λ* 1 0)
 
-(main$match$1) = λa (a λb λc 1 0)
+(List.nil) = λ* λb b
 
-(List.nil) = λList.cons λList.nil List.nil
-
-(List.cons) = λhead λtail λList.cons λList.nil (List.cons head tail)
+(List.cons) = λa λb λc λ* (c a b)
 
 

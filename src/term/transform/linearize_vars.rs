@@ -1,4 +1,4 @@
-use crate::term::{Book, MatchNum, Name, Pattern, Tag, Term};
+use crate::term::{Book, Name, Pattern, Tag, Term};
 use std::collections::HashMap;
 
 /// Erases variables that weren't used, dups the ones that were used more than once.
@@ -35,18 +35,24 @@ impl Term {
 }
 
 /// Var-declaring terms
-fn term_with_bind_to_affine(term: &mut Term, nam: &mut Option<Name>, inst_count: &mut HashMap<Name, u64>) {
+fn term_with_binds_to_affine<'a>(
+  term: &mut Term,
+  nams: impl IntoIterator<Item = &'a mut Option<Name>>,
+  inst_count: &mut HashMap<Name, u64>,
+) {
   term_to_affine(term, inst_count);
 
-  if nam.is_some() {
-    let instantiated_count = get_var_uses(nam.as_ref(), inst_count);
-    duplicate_lam(nam, term, instantiated_count);
+  for nam in nams {
+    if nam.is_some() {
+      let instantiated_count = get_var_uses(nam.as_ref(), inst_count);
+      duplicate_lam(nam, term, instantiated_count);
+    }
   }
 }
 
 fn term_to_affine(term: &mut Term, inst_count: &mut HashMap<Name, u64>) {
   match term {
-    Term::Lam { nam, bod, .. } => term_with_bind_to_affine(bod, nam, inst_count),
+    Term::Lam { nam, bod, .. } => term_with_binds_to_affine(bod, [nam], inst_count),
 
     Term::Let { pat: Pattern::Var(Some(nam)), val, nxt } => {
       term_to_affine(nxt, inst_count);
@@ -115,16 +121,13 @@ fn term_to_affine(term: &mut Term, inst_count: &mut HashMap<Name, u64>) {
       term_to_affine(snd, inst_count);
     }
 
-    Term::Mat { matched, arms } => {
-      term_to_affine(matched, inst_count);
-      for (rule, term) in arms {
-        match rule {
-          Pattern::Num(MatchNum::Succ(Some(nam))) => {
-            term_with_bind_to_affine(term, nam, inst_count);
-          }
-          Pattern::Num(_) => term_to_affine(term, inst_count),
-          _ => unreachable!(),
-        }
+    Term::Mat { args, rules } => {
+      for arg in args {
+        term_to_affine(arg, inst_count);
+      }
+      for rule in rules {
+        let nams = rule.pats.iter_mut().flat_map(|p| p.bind_or_eras_mut());
+        term_with_binds_to_affine(&mut rule.body, nams, inst_count)
       }
     }
 
@@ -154,9 +157,7 @@ fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: u64, mut dup_body: Option<&mu
       fst: Some(dup_name(nam, i)),
       snd: if i == uses - 1 { Some(dup_name(nam, uses)) } else { Some(internal_dup_name(nam, i)) },
       val: if i == 1 {
-        Box::new(
-          dup_body.as_deref_mut().map_or_else(|| Term::Var { nam: nam.clone() }, |x| std::mem::take(x)),
-        )
+        Box::new(dup_body.as_mut().map_or_else(|| Term::Var { nam: nam.clone() }, |x| std::mem::take(x)))
       } else {
         Box::new(Term::Var { nam: internal_dup_name(nam, i - 1) })
       },

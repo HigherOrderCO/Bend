@@ -60,12 +60,19 @@ impl UniqueNameGenerator {
         *snd = self.pop(snd.as_ref());
         *fst = self.pop(fst.as_ref());
       }
-      Term::Mat { matched, arms } => {
-        self.unique_names_in_term(matched);
-        for (pat, term) in arms {
-          pat.names().for_each(|nam| self.push(Some(nam)));
-          self.unique_names_in_term(term);
-          pat.names_mut().rev().for_each(|nam| *nam = self.pop(Some(nam)).unwrap());
+      Term::Mat { args, rules } => {
+        for arg in args {
+          self.unique_names_in_term(arg);
+        }
+        for rule in rules {
+          rule.pats.iter().flat_map(|p| p.binds()).for_each(|nam| self.push(Some(nam)));
+          self.unique_names_in_term(&mut rule.body);
+          rule
+            .pats
+            .iter_mut()
+            .flat_map(|p| p.binds_mut())
+            .rev()
+            .for_each(|nam| *nam = self.pop(Some(nam)).unwrap());
         }
       }
 

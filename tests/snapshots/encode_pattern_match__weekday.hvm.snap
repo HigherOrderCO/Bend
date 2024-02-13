@@ -3,37 +3,37 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/weekday.hvm
 ---
 TaggedScott:
-(main) = (λx x Saturday)
+(main) = (λa a Saturday)
 
-(Sunday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Sunday
+(Sunday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λg g
 
-(Saturday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Saturday
+(Saturday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λf #Weekday λ* f
 
-(Friday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Friday
+(Friday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λe #Weekday λ* #Weekday λ* e
 
-(Thursday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Thursday
+(Thursday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λd #Weekday λ* #Weekday λ* #Weekday λ* d
 
-(Monday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Monday
+(Monday) = #Weekday λa #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* a
 
-(Tuesday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Tuesday
+(Tuesday) = #Weekday λ* #Weekday λb #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* b
 
-(Wednesday) = #Weekday λMonday #Weekday λTuesday #Weekday λWednesday #Weekday λThursday #Weekday λFriday #Weekday λSaturday #Weekday λSunday Wednesday
+(Wednesday) = #Weekday λ* #Weekday λ* #Weekday λc #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* c
 
 Scott:
-(main) = (λx x Saturday)
+(main) = (λa a Saturday)
 
-(Sunday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Sunday
+(Sunday) = λ* λ* λ* λ* λ* λ* λg g
 
-(Saturday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Saturday
+(Saturday) = λ* λ* λ* λ* λ* λf λ* f
 
-(Friday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Friday
+(Friday) = λ* λ* λ* λ* λe λ* λ* e
 
-(Thursday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Thursday
+(Thursday) = λ* λ* λ* λd λ* λ* λ* d
 
-(Monday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Monday
+(Monday) = λa λ* λ* λ* λ* λ* λ* a
 
-(Tuesday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Tuesday
+(Tuesday) = λ* λb λ* λ* λ* λ* λ* b
 
-(Wednesday) = λMonday λTuesday λWednesday λThursday λFriday λSaturday λSunday Wednesday
+(Wednesday) = λ* λ* λc λ* λ* λ* λ* c
 
 

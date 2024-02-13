@@ -18,12 +18,12 @@ pub struct DisplayJoin<F, S>(pub F, pub S);
 impl<F, I, S> fmt::Display for DisplayJoin<F, S>
 where
   F: (Fn() -> I),
-  I: Iterator,
+  I: IntoIterator,
   I::Item: fmt::Display,
   S: fmt::Display,
 {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    for (i, x) in self.0().enumerate() {
+    for (i, x) in self.0().into_iter().enumerate() {
       if i != 0 {
         self.1.fmt(f)?;
       }
@@ -59,12 +59,15 @@ impl fmt::Display for Term {
       Term::App { tag, fun, arg } => {
         write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag), arg)
       }
-      Term::Mat { matched, arms } => {
+      Term::Mat { args, rules } => {
         write!(
           f,
           "match {} {{ {} }}",
-          matched,
-          DisplayJoin(|| arms.iter().map(|(pat, term)| display!("{}: {}", pat, term)), "; "),
+          DisplayJoin(|| args, ", "),
+          DisplayJoin(
+            || rules.iter().map(|rule| display!("{}: {}", DisplayJoin(|| &rule.pats, " "), rule.body)),
+            "; "
+          ),
         )
       }
       Term::Dup { tag, fst, snd, val, nxt } => {
@@ -109,7 +112,8 @@ impl fmt::Display for Pattern {
       }
       Pattern::Num(num) => write!(f, "{num}"),
       Pattern::Tup(fst, snd) => write!(f, "({}, {})", fst, snd,),
-      Pattern::Lst(pats) => write!(f, "[{}]", DisplayJoin(|| pats.iter(), ", ")),
+      Pattern::Lst(pats) => write!(f, "[{}]", DisplayJoin(|| pats, ", ")),
+      Pattern::Err => write!(f, "<Invalid>"),
     }
   }
 }
@@ -185,7 +189,6 @@ impl fmt::Display for Type {
       Type::Tup => write!(f, "tup"),
       Type::Num => write!(f, "num"),
       Type::Adt(nam) => write!(f, "{nam}"),
-      Type::None => unreachable!(),
     }
   }
 }

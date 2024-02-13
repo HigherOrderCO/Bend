@@ -2,6 +2,18 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_lambda.hvm
 ---
-In definition 'main':
-  Unable to linearize variable λ$x in a match block.
+TaggedScott:
+(main) = (#Maybe ((Some 1) λ$x * #Maybe.Some.val λc c) $x)
+
+(Some) = λa #Maybe λ* #Maybe λc #Maybe.Some.val (c a)
+
+(None) = #Maybe λa #Maybe λ* a
+
+Scott:
+(main) = (Some 1 λ$x * λc c $x)
+
+(Some) = λa λ* λc (c a)
+
+(None) = λa λ* a
+
 

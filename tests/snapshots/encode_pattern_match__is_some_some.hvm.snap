@@ -3,25 +3,21 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/is_some_some.hvm
 ---
 TaggedScott:
-(some_some) = λa #Option (a #Option.Some.x λb (some_some$F0 b) 0)
+(some_some) = λa #Option (a #Option.Some.x λb #Option (b #Option.Some.x λ* 1 0) 0)
 
 (main) = (some_some (Some 1))
 
-(some_some$F0) = λa #Option (a #Option.Some.x λb 1 0)
+(None) = #Option λ* #Option λb b
 
-(None) = #Option λSome #Option λNone None
-
-(Some) = λx #Option λSome #Option λNone #Option.Some.x (Some x)
+(Some) = λa #Option λb #Option λ* #Option.Some.x (b a)
 
 Scott:
-(some_some) = λa (a λb (some_some$F0 b) 0)
+(some_some) = λa (a λb (b λ* 1 0) 0)
 
 (main) = (some_some (Some 1))
 
-(some_some$F0) = λa (a λb 1 0)
+(None) = λ* λb b
 
-(None) = λSome λNone None
-
-(Some) = λx λSome λNone (Some x)
+(Some) = λa λb λ* (b a)
 
 

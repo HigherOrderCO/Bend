@@ -40,6 +40,7 @@ impl Pattern {
           to_resolve.push(fst);
           to_resolve.push(snd);
         }
+        Pattern::Err => unreachable!(),
       }
     }
   }
@@ -56,11 +57,15 @@ impl Term {
           to_resolve.push(val);
           to_resolve.push(nxt);
         }
-        Term::Mat { matched, arms } => {
-          to_resolve.push(matched);
-          for (pat, body) in arms {
-            pat.resolve_ctrs(is_ctr);
-            to_resolve.push(body);
+        Term::Mat { args, rules } => {
+          for arg in args {
+            to_resolve.push(arg);
+          }
+          for rule in rules {
+            for pat in &mut rule.pats {
+              pat.resolve_ctrs(is_ctr);
+            }
+            to_resolve.push(&mut rule.body);
           }
         }
         Term::App { fun: fst, arg: snd, .. }

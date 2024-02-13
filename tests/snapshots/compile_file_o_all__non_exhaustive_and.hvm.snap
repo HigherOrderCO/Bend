@@ -3,6 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/non_exhaustive_and.hvm
 ---
 In definition 'Bool.and':
-  Non-exhaustive pattern. Hint:
-    (Bool.and T F) not covered.
+  Non-exhaustive pattern matching. Hint:
+    Case 'F' not covered.
 

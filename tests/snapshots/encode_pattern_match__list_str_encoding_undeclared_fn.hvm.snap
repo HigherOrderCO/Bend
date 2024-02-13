@@ -5,23 +5,23 @@ input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared
 TaggedScott:
 (main) = *
 
-(Foo) = λa #String (a #String.String.cons.head λb #String.String.cons.tail λc 1 0)
+(Foo) = λa #String (a #String.String.cons.head λ* #String.String.cons.tail λ* 1 0)
 
-(Bar) = λa #List (a #List.List.cons.head λb #List.List.cons.tail λc 0 1)
+(Bar) = λa #List (a #List.List.cons.head λ* #List.List.cons.tail λ* 0 1)
 
-(String.cons) = λhead λtail #String λString.cons #String λString.nil #String.String.cons.tail (#String.String.cons.head (String.cons head) tail)
+(String.cons) = λa λb #String λc #String λ* #String.String.cons.tail (#String.String.cons.head (c a) b)
 
-(String.nil) = #String λString.cons #String λString.nil String.nil
+(String.nil) = #String λ* #String λb b
 
-(List.cons) = λhead λtail #List λList.cons #List λList.nil #List.List.cons.tail (#List.List.cons.head (List.cons head) tail)
+(List.cons) = λa λb #List λc #List λ* #List.List.cons.tail (#List.List.cons.head (c a) b)
 
-(List.nil) = #List λList.cons #List λList.nil List.nil
+(List.nil) = #List λ* #List λb b
 
 Scott:
 (main) = *
 
-(Foo) = λa (a λb λc 1 0)
+(Foo) = λa (a λ* λ* 1 0)
 
-(Bar) = λa (a λb λc 0 1)
+(Bar) = λa (a λ* λ* 0 1)
 
 

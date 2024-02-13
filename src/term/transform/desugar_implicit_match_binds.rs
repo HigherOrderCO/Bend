@@ -1,5 +1,4 @@
-use crate::term::{Adt, Book, MatchNum, Name, Pattern, Term};
-use indexmap::IndexMap;
+use crate::term::{Adts, Book, Constructors, MatchNum, Name, Pattern, Term};
 
 impl Book {
   pub fn desugar_implicit_match_binds(&mut self) {
@@ -12,58 +11,70 @@ impl Book {
 }
 
 impl Term {
-  pub fn desugar_implicit_match_binds(&mut self, ctrs: &IndexMap<Name, Name>, adts: &IndexMap<Name, Adt>) {
+  pub fn desugar_implicit_match_binds(&mut self, ctrs: &Constructors, adts: &Adts) {
     let mut to_desugar = vec![self];
 
     while let Some(term) = to_desugar.pop() {
       match term {
-        Term::Mat { matched, .. } => {
-          let matched = if let Term::Var { nam } = matched.as_ref() {
-            nam.clone()
-          } else {
-            let Term::Mat { matched, arms } = std::mem::take(term) else { unreachable!() };
-
-            let nam = Name::from("%matched");
-
-            *term = Term::Let {
-              pat: Pattern::Var(Some(nam.clone())),
-              val: matched,
-              nxt: Box::new(Term::Mat { matched: Box::new(Term::Var { nam: nam.clone() }), arms }),
-            };
-
-            nam
-          };
-
-          let (Term::Mat { arms, .. } | Term::Let { nxt: box Term::Mat { arms, .. }, .. }) = term else {
-            unreachable!()
-          };
-
-          for (pat, body) in arms {
-            match pat {
-              Pattern::Var(_) => (),
-              Pattern::Ctr(nam, pat_args) => {
-                let adt = ctrs.get(nam).unwrap();
-                let Adt { ctrs, .. } = adts.get(adt).unwrap();
-                let ctr_args = ctrs.get(nam).unwrap();
-                if pat_args.is_empty() && !ctr_args.is_empty() {
-                  // Implicit ctr args
-                  *pat_args = ctr_args
-                    .iter()
-                    .map(|field| Pattern::Var(Some(Name::new(format!("{matched}.{field}")))))
-                    .collect();
-                }
-              }
-              Pattern::Num(MatchNum::Zero) => (),
-              Pattern::Num(MatchNum::Succ(Some(_))) => (),
-              Pattern::Num(MatchNum::Succ(p @ None)) => {
-                // Implicit num arg
-                *p = Some(Some(Name::new(format!("{matched}-1"))));
-              }
-              Pattern::Tup(_, _) => (),
-              Pattern::Lst(..) => unreachable!(),
+        Term::Mat { args, rules } => {
+          // Make all the matched terms variables
+          let mut match_args = vec![];
+          for arg in args.iter_mut() {
+            if let Term::Var { nam } = arg {
+              match_args.push((nam.clone(), None))
+            } else {
+              let nam = Name::new(format!("%matched_{}", match_args.len()));
+              let arg = std::mem::replace(arg, Term::Var { nam: nam.clone() });
+              match_args.push((nam, Some(arg)));
             }
-            to_desugar.push(body);
           }
+
+          // Make implicit match binds explicit
+          for rule in rules.iter_mut() {
+            for ((nam, _), pat) in match_args.iter().zip(rule.pats.iter_mut()) {
+              match pat {
+                Pattern::Var(_) => (),
+                Pattern::Ctr(ctr_nam, pat_args) => {
+                  let adt = &adts[ctrs.get(ctr_nam).unwrap()];
+                  let ctr_args = adt.ctrs.get(ctr_nam).unwrap();
+                  if pat_args.is_empty() && !ctr_args.is_empty() {
+                    // Implicit ctr args
+                    *pat_args = ctr_args
+                      .iter()
+                      .map(|field| Pattern::Var(Some(Name::new(format!("{nam}.{field}")))))
+                      .collect();
+                  }
+                }
+                Pattern::Num(MatchNum::Zero) => (),
+                Pattern::Num(MatchNum::Succ(Some(_))) => (),
+                Pattern::Num(MatchNum::Succ(p @ None)) => {
+                  // Implicit num arg
+                  *p = Some(Some(Name::new(format!("{nam}-1"))));
+                }
+                Pattern::Tup(_, _) => (),
+                Pattern::Lst(..) => unreachable!(),
+                Pattern::Err => unreachable!(),
+              }
+            }
+          }
+
+          // Add the binds to the extracted term vars.
+          *term = match_args.into_iter().rev().fold(std::mem::take(term), |nxt, (nam, val)| {
+            if let Some(val) = val {
+              // Non-Var term that was extracted.
+              Term::Let { pat: Pattern::Var(Some(nam)), val: Box::new(val), nxt: Box::new(nxt) }
+            } else {
+              nxt
+            }
+          });
+
+          // Add the next values to check
+          let mut term = term;
+          while let Term::Let { nxt, .. } = term {
+            term = nxt;
+          }
+          let Term::Mat { args: _, rules } = term else { unreachable!() };
+          to_desugar.extend(rules.iter_mut().map(|r| &mut r.body));
         }
         Term::Let { pat: Pattern::Var(_), val: fst, nxt: snd }
         | Term::App { fun: fst, arg: snd, .. }

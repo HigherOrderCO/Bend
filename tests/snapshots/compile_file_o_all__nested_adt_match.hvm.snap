@@ -2,11 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/nested_adt_match.hvm
 ---
-@Some = (a {4 {2 a b} {4 * b}})
+@Some = (a {2 {4 a b} {2 * b}})
 @main = a
-& @main$match$1 ~ (b a)
-& @Some ~ (c b)
-& @Some ~ (#1 c)
-@main$match$1 = ({4 @main$match$1$S0 {4 #0 a}} a)
-@main$match$1$S0 = {2 {4 {2 a a} {4 #0 b}} b}
-
+& @Some ~ (b {2 {4 {2 {4 c c} {2 #0 d}} d} {2 #0 a}})
+& @Some ~ (#1 b)

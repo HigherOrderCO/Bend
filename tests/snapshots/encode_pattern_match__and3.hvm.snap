@@ -3,29 +3,21 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/and3.hvm
 ---
 TaggedScott:
-(And) = λa let (b, c) = a; (And$F0 b c)
+(And) = λa let (b, c) = a; (#Bool (b λd let (f, g) = d; (#Bool (f λh #Bool (h T F) λ* F) g) λ* F) c)
 
 (main) = (And (F, (T, F)))
 
-(And$F0) = λa #Bool (a λb let (c, d) = b; (And$F0$F0 c d) λ* F)
+(F) = #Bool λ* #Bool λb b
 
-(And$F0$F0) = λa #Bool (a λb #Bool (b T F) λ* F)
-
-(F) = #Bool λT #Bool λF F
-
-(T) = #Bool λT #Bool λF T
+(T) = #Bool λa #Bool λ* a
 
 Scott:
-(And) = λa let (b, c) = a; (And$F0 b c)
+(And) = λa let (b, c) = a; (b λd let (f, g) = d; (f λh (h T F) λ* F g) λ* F c)
 
 (main) = (And (F, (T, F)))
 
-(And$F0) = λa (a λb let (c, d) = b; (And$F0$F0 c d) λ* F)
+(F) = λ* λb b
 
-(And$F0$F0) = λa (a λb (b T F) λ* F)
-
-(F) = λT λF F
-
-(T) = λT λF T
+(T) = λa λ* a
 
 

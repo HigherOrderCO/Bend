@@ -1,4 +1,4 @@
-use crate::term::{Book, Name, Pattern, Term};
+use crate::term::{Book, Name, Pattern, Rule, Term};
 
 impl Book {
   /// Convert let destructor expressions like `let (a, b) = X` into the equivalent match expression.
@@ -23,10 +23,12 @@ impl Term {
         fst.desugar_let_destructors();
         snd.desugar_let_destructors();
       }
-      Term::Mat { matched, arms } => {
-        matched.desugar_let_destructors();
-        for (_, arm) in arms {
-          arm.desugar_let_destructors();
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.desugar_let_destructors();
+        }
+        for rule in rules {
+          rule.body.desugar_let_destructors();
         }
       }
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
@@ -46,15 +48,15 @@ impl Term {
         val.desugar_let_destructors();
         nxt.desugar_let_destructors();
 
-        let arms = vec![(pat, *nxt)];
+        let rules = vec![Rule { pats: vec![pat], body: *nxt }];
 
         *self = if let Term::Var { .. } = val.as_ref() {
-          Term::Mat { matched: val, arms }
+          Term::Mat { args: vec![*val], rules }
         } else {
-          let nam = Name::from("%temp%scrutinee");
+          let nam = Name::from("%matched");
           let pat = Pattern::Var(Some(nam.clone()));
-          let scrutinee = Box::new(Term::Var { nam });
-          Term::Let { pat, val, nxt: Box::new(Term::Mat { matched: scrutinee, arms }) }
+          let args = vec![Term::Var { nam }];
+          Term::Let { pat, val, nxt: Box::new(Term::Mat { args, rules }) }
         };
       }
       Term::Lst { .. } => unreachable!("Should have been desugared already"),

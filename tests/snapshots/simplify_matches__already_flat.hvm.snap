@@ -1,0 +1,33 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/already_flat.hvm
+---
+(Rule1) = λa a
+
+(Rule2) = λ* λc c
+
+(Rule3) = λa λb λc λd (a b c d)
+
+(Rule4) = λa match a { (CtrA): λc c; (CtrB d): d }
+
+(Rule5) = λa λb (match a { (CtrA1 c): λd (c d); (CtrA2 g h): λi (g h i); (CtrA3 m): λn (match n { (CtrB0): λo (CtrA3 o); (CtrB1 s): λt (CtrA3 t s); (CtrB2 x): λy (CtrA3 y (CtrB2 x)); (CtrB3 db): λeb (eb db) } m) } b)
+
+(Rule6) = λa a
+
+(CtrB3) = λa #Baz λ* #Baz λ* #Baz λ* #Baz λe #Baz.CtrB3.b (e a)
+
+(CtrB2) = λa #Baz λ* #Baz λ* #Baz λd #Baz λ* #Baz.CtrB2.b (d a)
+
+(CtrB1) = λa #Baz λ* #Baz λc #Baz λ* #Baz λ* #Baz.CtrB1.b (c a)
+
+(CtrB0) = #Baz λa #Baz λ* #Baz λ* #Baz λ* a
+
+(CtrA) = #Foo λa #Foo λ* a
+
+(CtrB) = λa #Foo λ* #Foo λc #Foo.CtrB.x (c a)
+
+(CtrA1) = λa #Bar λb #Bar λ* #Bar λ* #Bar.CtrA1.a (b a)
+
+(CtrA2) = λa λb #Bar λ* #Bar λd #Bar λ* #Bar.CtrA2.a2 (#Bar.CtrA2.a1 (d a) b)
+
+(CtrA3) = λa #Bar λ* #Bar λ* #Bar λd #Bar.CtrA3.a (d a)

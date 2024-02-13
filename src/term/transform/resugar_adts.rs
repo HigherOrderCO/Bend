@@ -1,4 +1,4 @@
-use crate::term::{net_to_term::ReadbackError, Adt, AdtEncoding, Book, Name, Pattern, Tag, Term};
+use crate::term::{net_to_term::ReadbackError, Adt, AdtEncoding, Book, Name, Pattern, Rule, Tag, Term};
 
 impl Term {
   pub fn resugar_adts(&mut self, book: &Book, adt_encoding: AdtEncoding) -> Vec<ReadbackError> {
@@ -41,10 +41,12 @@ impl Term {
         fst.resugar_tagged_scott(book, errs);
         snd.resugar_tagged_scott(book, errs);
       }
-      Term::Mat { matched, arms } => {
-        matched.resugar_tagged_scott(book, errs);
-        for (_, arm) in arms {
-          arm.resugar_tagged_scott(book, errs);
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.resugar_tagged_scott(book, errs);
+        }
+        for rule in rules {
+          rule.body.resugar_tagged_scott(book, errs);
         }
       }
       Term::Lst { .. } => unreachable!(),
@@ -210,7 +212,7 @@ impl Term {
             }
           }
 
-          arms.push((Pattern::Ctr(ctr.clone(), args), arm));
+          arms.push((vec![Pattern::Ctr(ctr.clone(), args)], arm));
           cur = &mut *fun;
         }
         _ => {
@@ -220,9 +222,10 @@ impl Term {
       }
     }
 
-    let matched = Box::new(std::mem::take(cur));
-    let arms = arms.into_iter().rev().map(|(pat, term)| (pat, std::mem::take(term))).collect();
-    *self = Term::Mat { matched, arms };
+    let args = vec![std::mem::take(cur)];
+    let rules =
+      arms.into_iter().rev().map(|(pats, term)| Rule { pats, body: std::mem::take(term) }).collect();
+    *self = Term::Mat { args, rules };
 
     self.resugar_tagged_scott(book, errs);
   }

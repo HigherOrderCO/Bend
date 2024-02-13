@@ -14,11 +14,7 @@ pub fn book_to_nets(book: &Book) -> (HashMap<String, INet>, Labels) {
     for rule in def.rules.iter() {
       let net = term_to_compat_net(&rule.body, &mut labels);
 
-      let name = if def.name == *main {
-        book.hvmc_entrypoint().to_string()
-      } else {
-        def.name.0.to_string()
-      };
+      let name = if def.name == *main { book.hvmc_entrypoint().to_string() } else { def.name.0.to_string() };
 
       nets.insert(name, net);
     }
@@ -109,16 +105,19 @@ impl<'a> EncodeTermState<'a> {
         Some(Port(app, 2))
       }
       // core: & cond ~  (zero succ) ret
-      Term::Mat { matched, arms } => {
+      Term::Mat { args, rules } => {
+        // At this point should be only simple num matches.
+        let arg = args.iter().next().unwrap();
+        debug_assert!(matches!(rules[0].pats[..], [Pattern::Num(MatchNum::Zero)]));
+        debug_assert!(matches!(rules[1].pats[..], [Pattern::Num(MatchNum::Succ(None))]));
+
         let if_ = self.inet.new_node(Mat);
 
-        let cond = self.encode_term(matched, Port(if_, 0));
+        let cond = self.encode_term(arg, Port(if_, 0));
         self.link_local(Port(if_, 0), cond);
 
-        debug_assert!(matches!(arms[0].0, Pattern::Num(MatchNum::Zero)));
-        debug_assert!(matches!(arms[1].0, Pattern::Num(MatchNum::Succ(None))));
-        let zero = &arms[0].1;
-        let succ = &arms[1].1;
+        let zero = &rules[0].body;
+        let succ = &rules[1].body;
 
         let sel = self.inet.new_node(Con { lab: None });
         self.inet.link(Port(sel, 0), Port(if_, 1));

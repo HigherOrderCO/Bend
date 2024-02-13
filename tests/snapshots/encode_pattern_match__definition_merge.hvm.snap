@@ -3,37 +3,25 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/definition_merge.hvm
 ---
 TaggedScott:
-(Foo) = λa #Either (a #Either.Left.value λb λc (#Either (c #Either.Left.value λd λe (Foo$F0 e d) #Either.Right.value λf λg (Foo$F1 g f)) b) #Either.Right.value λh λi (#Either (i #Either.Left.value λj λk (Foo$F3_$_Foo$F2 k j) #Either.Right.value λl λm (Foo$F3_$_Foo$F2 m l)) h))
+(Foo) = λa λb (#Either (a #Either.Left.value λc λd (#Bool (c λe #Either (e #Either.Left.value λg #Bool (g 1 1) #Either.Right.value λj #Bool (j 2 2)) λm #Either (m #Either.Left.value λo #Bool (o 1 1) #Either.Right.value λr #Bool (r 2 2))) d) #Either.Right.value λu λv (#Bool (u λw #Either (w #Either.Left.value λy #Bool (y 3 3) #Either.Right.value λbb #Bool (bb 3 3)) λeb #Either (eb #Either.Left.value λgb #Bool (gb 3 3) #Either.Right.value λjb #Bool (jb 3 3))) v)) b)
 
-(Foo$F3_$_Foo$F2) = λa #Bool (a λb #Bool (b 3 3) λc #Bool (c 3 3))
+(False) = #Bool λ* #Bool λb b
 
-(False) = #Bool λTrue #Bool λFalse False
+(True) = #Bool λa #Bool λ* a
 
-(Foo$F1) = λa #Bool (a λb #Bool (b 2 2) λc #Bool (c 2 2))
+(Right) = λa #Either λ* #Either λc #Either.Right.value (c a)
 
-(Foo$F0) = λa #Bool (a λb #Bool (b 1 1) λc #Bool (c 1 1))
-
-(Left) = λvalue #Either λLeft #Either λRight #Either.Left.value (Left value)
-
-(Right) = λvalue #Either λLeft #Either λRight #Either.Right.value (Right value)
-
-(True) = #Bool λTrue #Bool λFalse True
+(Left) = λa #Either λb #Either λ* #Either.Left.value (b a)
 
 Scott:
-(Foo) = λa (a λb λc (c λd λe (Foo$F0 e d) λf λg (Foo$F1 g f) b) λh λi (i λj λk (Foo$F3_$_Foo$F2 k j) λl λm (Foo$F3_$_Foo$F2 m l) h))
+(Foo) = λa λb (a λc λd (c λe (e λg (g 1 1) λj (j 2 2)) λm (m λo (o 1 1) λr (r 2 2)) d) λu λv (u λw (w λy (y 3 3) λbb (bb 3 3)) λeb (eb λgb (gb 3 3) λjb (jb 3 3)) v) b)
 
-(Foo$F3_$_Foo$F2) = λa (a λb (b 3 3) λc (c 3 3))
+(False) = λ* λb b
 
-(False) = λTrue λFalse False
+(True) = λa λ* a
 
-(Foo$F1) = λa (a λb (b 2 2) λc (c 2 2))
+(Right) = λa λ* λc (c a)
 
-(Foo$F0) = λa (a λb (b 1 1) λc (c 1 1))
-
-(Left) = λvalue λLeft λRight (Left value)
-
-(Right) = λvalue λLeft λRight (Right value)
-
-(True) = λTrue λFalse True
+(Left) = λa λb λ* (b a)
 
 

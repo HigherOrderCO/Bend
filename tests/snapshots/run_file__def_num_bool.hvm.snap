@@ -3,7 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/def_num_bool.hvm
 ---
 In definition 'go':
-  Non-exhaustive pattern. Hint:
-    (go + true) not covered.
-    (go + false) not covered.
+  Non-exhaustive pattern matching. Hint:
+    Case '+' not covered.
 

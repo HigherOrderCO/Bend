@@ -3,7 +3,7 @@
 
 use diagnostics::{Info, Warning};
 use hvmc::{
-  ast::{Net, self},
+  ast::{self, Net},
   dispatch_dyn_net,
   host::Host,
   run::{DynNet, Net as RtNet, Rewrites},
@@ -12,10 +12,16 @@ use hvmc::{
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{
-  str::FromStr, sync::{Arc, Mutex}, time::Instant
+  str::FromStr,
+  sync::{Arc, Mutex},
+  time::Instant,
 };
 use term::{
-  book_to_nets, display::{display_readback_errors, DisplayJoin}, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding, Book, Ctx, ReadbackError, Term
+  book_to_nets,
+  display::{display_readback_errors, DisplayJoin},
+  net_to_term::net_to_term,
+  term_to_net::Labels,
+  AdtEncoding, Book, Ctx, ReadbackError, Term,
 };
 
 pub mod diagnostics;
@@ -28,12 +34,12 @@ pub use term::load_book::load_file_to_book;
 pub const ENTRY_POINT: &str = "main";
 pub const HVM1_ENTRY_POINT: &str = "Main";
 
-/// These are the names of builtin defs that are not in the hvm-lang book, but 
+/// These are the names of builtin defs that are not in the hvm-lang book, but
 /// are present in the hvm-core book. They are implemented using Rust code by
 /// [`create_host`] and they can not be rewritten as hvm-lang functions.
 pub const CORE_BUILTINS: [&str; 2] = ["HVM.log", "HVM.black_box"];
 
-/// Creates a host with the hvm-core pŕimitive definitions built-in.
+/// Creates a host with the hvm-core primitive definitions built-in.
 /// This needs the book as an Arc because the closure that logs
 /// data needs access to the book.
 pub fn create_host(hvml_book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOpts) -> Arc<Mutex<Host>> {
@@ -69,7 +75,7 @@ pub fn check_book(book: &mut Book) -> Result<(), Info> {
 
 pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult, Info> {
   let warns = desugar_book(book, opts)?;
-  let (nets, labels) = book_to_nets(&book);
+  let (nets, labels) = book_to_nets(book);
   let mut core_book = nets_to_hvmc(nets)?;
   if opts.pre_reduce {
     pre_reduce_book(&mut core_book, book.hvmc_entrypoint())?;
@@ -83,19 +89,43 @@ pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult,
 pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, Info> {
   let mut ctx = Ctx::new(book);
 
-  ctx.set_entrypoint();
   ctx.check_shared_names();
+  ctx.set_entrypoint();
+
   ctx.book.encode_adts(opts.adt_encoding);
   ctx.book.encode_builtins();
-  encode_pattern_matching(&mut ctx, opts.adt_encoding)?;
-  ctx.check_unbound_vars()?; // sanity check
-  ctx.normalize_native_matches()?;
+
+  ctx.book.resolve_ctrs_in_pats();
+  ctx.resolve_refs()?;
+
+  ctx.check_match_arity()?;
+  ctx.check_unbound_pats()?;
+
+  ctx.book.desugar_let_destructors();
+  ctx.book.desugar_implicit_match_binds();
+
+  ctx.check_ctrs_arities()?;
+  // Must be between [`Book::desugar_implicit_match_binds`] and [`Ctx::linearize_simple_matches`]
   ctx.check_unbound_vars()?;
+
+  ctx.book.convert_match_def_to_term();
+  ctx.simplify_matches()?;
+  ctx.linearize_simple_matches()?;
+  ctx.book.encode_simple_matches(opts.adt_encoding);
+
+  // sanity check
+  ctx.check_unbound_vars()?;
+
   ctx.book.make_var_names_unique();
   ctx.book.linearize_vars();
-  ctx.book.eta_reduction(opts.eta);
-  ctx.check_unbound_vars()?; // sanity check
 
+  // sanity check
+  ctx.check_unbound_vars()?;
+
+  // Optimizing passes
+  if opts.eta {
+    ctx.book.eta_reduction();
+  }
   if opts.supercombinators {
     ctx.book.detach_supercombinators();
   }
@@ -118,26 +148,6 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, 
   if !ctx.info.has_errors() { Ok(ctx.info.warns) } else { Err(ctx.info) }
 }
 
-pub fn encode_pattern_matching(ctx: &mut Ctx, adt_encoding: AdtEncoding) -> Result<(), Info> {
-  ctx.check_arity()?;
-  ctx.book.resolve_ctrs_in_pats();
-  ctx.check_unbound_pats()?;
-  ctx.check_ctrs_arities()?;
-  ctx.resolve_refs()?;
-  ctx.book.desugar_let_destructors();
-  ctx.book.desugar_implicit_match_binds();
-  // This call to unbound vars needs to be after desugar_implicit_match_binds,
-  // since we need the generated pattern names, like `x-1`, `ctr.field`.
-  ctx.check_unbound_vars()?;
-  ctx.linearize_matches()?;
-  ctx.extract_adt_matches()?;
-  ctx.book.flatten_rules();
-  let def_types = ctx.infer_def_types()?;
-  ctx.check_exhaustive_patterns(&def_types)?;
-  ctx.book.encode_pattern_matching_functions(&def_types, adt_encoding);
-  Ok(())
-}
-
 pub fn run_book(
   mut book: Book,
   mem_size: usize,
@@ -157,10 +167,10 @@ pub fn run_book(
 
   // Run
   let debug_hook = run_opts.debug_hook(&book, &labels);
-  let host = create_host(book.clone(), labels.clone(), compile_opts.clone());
+  let host = create_host(book.clone(), labels.clone(), compile_opts);
   host.lock().unwrap().insert_book(&core_book);
 
-  let (res_lnet, stats) = run_compiled(host, mem_size, run_opts, debug_hook, &book.hvmc_entrypoint());
+  let (res_lnet, stats) = run_compiled(host, mem_size, run_opts, debug_hook, book.hvmc_entrypoint());
 
   // Readback
   let net = hvmc_to_net(&res_lnet);
@@ -173,38 +183,36 @@ pub fn run_book(
   Ok((res_term, info))
 }
 
-
 /// Utility function to count the amount of nodes in an hvm-core AST net
 pub fn count_nodes<'l>(net: &'l hvmc::ast::Net) -> usize {
   let mut visit: Vec<&'l hvmc::ast::Tree> = vec![&net.root];
   let mut count = 0usize;
   for (l, r) in &net.rdex {
-    visit.push(&l);
-    visit.push(&r);
+    visit.push(l);
+    visit.push(r);
   }
   while let Some(tree) = visit.pop() {
     match tree {
-          ast::Tree::Ctr { lft, rgt, .. }
-        | ast::Tree::Op2 { lft, rgt, .. } => {
-          count += 1;
-          visit.push(lft);
-          visit.push(rgt);
-        },
-        ast::Tree::Op1 { rgt, .. } => {
-          count += 1;
-          visit.push(rgt);
-        },
-        ast::Tree::Mat { sel, ret } => {
-          count += 1;
-          visit.push(sel);
-          visit.push(ret);
-        },
-        ast::Tree::Var { .. } => (),
-        _ => {
-          count += 1;
-        }
+      ast::Tree::Ctr { lft, rgt, .. } | ast::Tree::Op2 { lft, rgt, .. } => {
+        count += 1;
+        visit.push(lft);
+        visit.push(rgt);
+      }
+      ast::Tree::Op1 { rgt, .. } => {
+        count += 1;
+        visit.push(rgt);
+      }
+      ast::Tree::Mat { sel, ret } => {
+        count += 1;
+        visit.push(sel);
+        visit.push(ret);
+      }
+      ast::Tree::Var { .. } => (),
+      _ => {
+        count += 1;
+      }
     };
-  };
+  }
   count
 }
 
@@ -228,7 +236,7 @@ pub fn run_compiled(
     if let Some(mut hook) = hook {
       root.expand();
       while !root.rdex.is_empty() {
-        hook(&host.lock().unwrap().readback(&root));
+        hook(&host.lock().unwrap().readback(root));
         root.reduce(1);
         root.expand();
       }
@@ -241,9 +249,9 @@ pub fn run_compiled(
       }
       root.expand();
       while !root.rdex.is_empty() {
-        let old_rwts = root.rwts.total() as u64;
+        let old_rwts = root.rwts.total();
         root.reduce(max_rwts);
-        let delta_rwts = root.rwts.total() as u64 - old_rwts;
+        let delta_rwts = root.rwts.total() - old_rwts;
         if (max_rwts as u64) < delta_rwts {
           eprintln!("Warning: Exceeded max rwts");
           break;
@@ -259,7 +267,7 @@ pub fn run_compiled(
     let elapsed = start_time.elapsed().as_secs_f64();
 
 
-    let net = host.lock().unwrap().readback(&root);
+    let net = host.lock().unwrap().readback(root);
 
     // TODO I don't quite understand this code
     // How would it be implemented in the new version?

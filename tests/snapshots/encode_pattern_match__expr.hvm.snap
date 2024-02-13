@@ -3,57 +3,57 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/expr.hvm
 ---
 TaggedScott:
-(Div) = #Op λAdd #Op λSub #Op λMul #Op λDiv Div
+(Div) = #Op λ* #Op λ* #Op λ* #Op λd d
 
-(Mul) = #Op λAdd #Op λSub #Op λMul #Op λDiv Mul
+(Mul) = #Op λ* #Op λ* #Op λc #Op λ* c
 
-(Sub) = #Op λAdd #Op λSub #Op λMul #Op λDiv Sub
+(Sub) = #Op λ* #Op λb #Op λ* #Op λ* b
 
-(Add) = #Op λAdd #Op λSub #Op λMul #Op λDiv Add
+(Add) = #Op λa #Op λ* #Op λ* #Op λ* a
 
-(Var) = λname #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Var.name (Var name)
+(Var) = λa #Expr λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr.Var.name (b a)
 
-(Num) = λval #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Num.val (Num val)
+(Num) = λa #Expr λ* #Expr λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr.Num.val (c a)
 
-(App) = λfun λarg #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.App.arg (#Expr.App.fun (App fun) arg)
+(App) = λa λb #Expr λ* #Expr λ* #Expr λe #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr.App.arg (#Expr.App.fun (e a) b)
 
-(Fun) = λname λbody #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Fun.body (#Expr.Fun.name (Fun name) body)
+(Fun) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λf #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr.Fun.body (#Expr.Fun.name (f a) b)
 
-(If) = λcond λthen λelse #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.If.else (#Expr.If.then (#Expr.If.cond (If cond) then) else)
+(If) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λh #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr.If.else (#Expr.If.then (#Expr.If.cond (h a) b) c)
 
-(Let) = λbind λval λnext #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Let.next (#Expr.Let.val (#Expr.Let.bind (Let bind) val) next)
+(Let) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λi #Expr λ* #Expr λ* #Expr λ* #Expr.Let.next (#Expr.Let.val (#Expr.Let.bind (i a) b) c)
 
-(Dup) = λfst λsnd λval λnext #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Dup.next (#Expr.Dup.val (#Expr.Dup.snd (#Expr.Dup.fst (Dup fst) snd) val) next)
+(Dup) = λa λb λc λd #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λk #Expr λ* #Expr λ* #Expr.Dup.next (#Expr.Dup.val (#Expr.Dup.snd (#Expr.Dup.fst (k a) b) c) d)
 
-(Tup) = λfst λsnd #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Tup.snd (#Expr.Tup.fst (Tup fst) snd)
+(Tup) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λj #Expr λ* #Expr.Tup.snd (#Expr.Tup.fst (j a) b)
 
-(Op2) = λop λfst λsnd #Expr λVar #Expr λNum #Expr λApp #Expr λFun #Expr λIf #Expr λLet #Expr λDup #Expr λTup #Expr λOp2 #Expr.Op2.snd (#Expr.Op2.fst (#Expr.Op2.op (Op2 op) fst) snd)
+(Op2) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λl #Expr.Op2.snd (#Expr.Op2.fst (#Expr.Op2.op (l a) b) c)
 
 Scott:
-(Div) = λAdd λSub λMul λDiv Div
+(Div) = λ* λ* λ* λd d
 
-(Mul) = λAdd λSub λMul λDiv Mul
+(Mul) = λ* λ* λc λ* c
 
-(Sub) = λAdd λSub λMul λDiv Sub
+(Sub) = λ* λb λ* λ* b
 
-(Add) = λAdd λSub λMul λDiv Add
+(Add) = λa λ* λ* λ* a
 
-(Var) = λname λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Var name)
+(Var) = λa λb λ* λ* λ* λ* λ* λ* λ* λ* (b a)
 
-(Num) = λval λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Num val)
+(Num) = λa λ* λc λ* λ* λ* λ* λ* λ* λ* (c a)
 
-(App) = λfun λarg λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (App fun arg)
+(App) = λa λb λ* λ* λe λ* λ* λ* λ* λ* λ* (e a b)
 
-(Fun) = λname λbody λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Fun name body)
+(Fun) = λa λb λ* λ* λ* λf λ* λ* λ* λ* λ* (f a b)
 
-(If) = λcond λthen λelse λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (If cond then else)
+(If) = λa λb λc λ* λ* λ* λ* λh λ* λ* λ* λ* (h a b c)
 
-(Let) = λbind λval λnext λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Let bind val next)
+(Let) = λa λb λc λ* λ* λ* λ* λ* λi λ* λ* λ* (i a b c)
 
-(Dup) = λfst λsnd λval λnext λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Dup fst snd val next)
+(Dup) = λa λb λc λd λ* λ* λ* λ* λ* λ* λk λ* λ* (k a b c d)
 
-(Tup) = λfst λsnd λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Tup fst snd)
+(Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
 
-(Op2) = λop λfst λsnd λVar λNum λApp λFun λIf λLet λDup λTup λOp2 (Op2 op fst snd)
+(Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)
 
 

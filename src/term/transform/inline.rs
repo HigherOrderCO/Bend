@@ -43,9 +43,9 @@ impl Term {
           to_inline.push(snd);
         }
 
-        Term::Mat { arms, .. } => {
-          for (_, bod) in arms {
-            to_inline.push(bod);
+        Term::Mat { rules, .. } => {
+          for rule in rules {
+            to_inline.push(&mut rule.body);
           }
         }
 

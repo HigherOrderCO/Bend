@@ -1,9 +1,9 @@
 main = @a @b 
-  let a =  match a {
+  let a = match a {
     String.cons: 1
     String.nil : 2
   };
-  let b =  match b {
+  let b = match b {
     (List.cons h t): 1
     (List.nil) : 2
   };

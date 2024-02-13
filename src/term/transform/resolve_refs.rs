@@ -1,6 +1,7 @@
 use crate::{
   diagnostics::Info,
-  term::{Ctx, MatchNum, Name, Pattern, Term}, CORE_BUILTINS
+  term::{Ctx, Name, Pattern, Term},
+  CORE_BUILTINS,
 };
 use std::{
   collections::{HashMap, HashSet},
@@ -16,7 +17,7 @@ impl Display for ReferencedMainErr {
   }
 }
 
-impl<'book> Ctx<'book> {
+impl Ctx<'_> {
   /// Decides if names inside a term belong to a Var or to a Ref.
   /// Precondition: Refs are encoded as vars, Constructors are resolved.
   /// Postcondition: Refs are encoded as refs, with the correct def id.
@@ -28,12 +29,12 @@ impl<'book> Ctx<'book> {
       for rule in def.rules.iter_mut() {
         let mut scope = HashMap::new();
 
-        for name in rule.pats.iter().flat_map(Pattern::names) {
+        for name in rule.pats.iter().flat_map(Pattern::binds) {
           push_scope(Some(name), &mut scope);
         }
 
         let res = rule.body.resolve_refs(&def_names, self.book.entrypoint.as_ref(), &mut scope);
-        self.info.take_err(res, Some(&def_name));
+        self.info.take_err(res, Some(def_name));
       }
     }
 
@@ -63,13 +64,13 @@ impl Term {
       Term::Let { pat, val, nxt } => {
         val.resolve_refs(def_names, main, scope)?;
 
-        for nam in pat.names() {
+        for nam in pat.binds() {
           push_scope(Some(nam), scope);
         }
 
         nxt.resolve_refs(def_names, main, scope)?;
 
-        for nam in pat.names() {
+        for nam in pat.binds() {
           pop_scope(Some(nam), scope);
         }
       }
@@ -91,7 +92,7 @@ impl Term {
             }
           }
 
-          if def_names.contains(nam) || CORE_BUILTINS.contains(&nam.0.as_ref().as_ref()) {
+          if def_names.contains(nam) || CORE_BUILTINS.contains(&nam.0.as_ref()) {
             *self = Term::r#ref(nam);
           }
         }
@@ -104,15 +105,20 @@ impl Term {
         fst.resolve_refs(def_names, main, scope)?;
         snd.resolve_refs(def_names, main, scope)?;
       }
-      Term::Mat { matched, arms } => {
-        matched.resolve_refs(def_names, main, scope)?;
-        for (pat, term) in arms {
-          let nam = if let Pattern::Num(MatchNum::Succ(Some(nam))) = pat { nam.as_ref() } else { None };
-          push_scope(nam, scope);
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.resolve_refs(def_names, main, scope)?;
+        }
+        for rule in rules {
+          for nam in rule.pats.iter().flat_map(|p| p.bind_or_eras()) {
+            push_scope(nam.as_ref(), scope);
+          }
 
-          term.resolve_refs(def_names, main, scope)?;
+          rule.body.resolve_refs(def_names, main, scope)?;
 
-          pop_scope(nam, scope);
+          for nam in rule.pats.iter().flat_map(|p| p.bind_or_eras()).rev() {
+            pop_scope(nam.as_ref(), scope);
+          }
         }
       }
       Term::Lst { .. } => unreachable!("Should have been desugared already"),

@@ -5,24 +5,23 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
 @Cons = (a (b {4 {6 a {8 b c}} {4 * c}}))
 @If$S0 = (a (* a))
 @If$S1 = (* (a a))
-@Map = ({4 @Map$S0 {4 @Unpack$S1_$_MergePair$S1_$_Map$S1 a}} a)
-@Map$S0 = {6 a {8 {4 @Map$S0 {4 @Unpack$S1_$_MergePair$S1_$_Map$S1 (b c)}} ({5 (a d) b} {4 {6 d {8 c e}} {4 * e}})}}
-@Merge$S0 = {6 {7 a {9 b c}} {8 {11 d {4 @Merge$S0 {4 @Merge$S1 (e (f (g h)))}}} ({13 (i (a {2 @If$S0 {2 @If$S1 ({4 {6 j {8 k l}} {4 * l}} ({4 {6 c {8 h m}} {4 * m}} n))}})) {15 o e}} ({17 i {19 j f}} ({21 {4 @Merge$S2 {4 @Merge$S3 (o ({4 {6 b {8 d p}} {4 * p}} k))}} g} n)))}}
+@Map = ({4 @Map$S0 {4 @Unpack$S3_$_MergePair$S4_$_Map$S1 a}} a)
+@Map$S0 = {6 a {8 {4 @Map$S0 {4 @Unpack$S3_$_MergePair$S4_$_Map$S1 (b c)}} ({5 (a d) b} {4 {6 d {8 c e}} {4 * e}})}}
+@Merge$S0 = {6 {9 a {11 b c}} {8 {7 d {4 @Merge$S0 {4 @Merge$S1 (e (f (g h)))}}} ({19 (i (a {2 @If$S0 {2 @If$S1 ({4 {6 j {8 k l}} {4 * l}} ({4 {6 c {8 h m}} {4 * m}} n))}})) {21 o e}} ({15 i {17 j f}} ({13 {4 @Merge$S2 {4 @Merge$S3 (o ({4 {6 b {8 d p}} {4 * p}} k))}} g} n)))}}
 @Merge$S1 = (* @Cons)
 @Merge$S2 = {6 a {8 b (c ({4 @Merge$S0 {4 @Merge$S1 (c (a (b d)))}} d))}}
 @Merge$S3 = (* (a a))
-@MergePair$F0$S0 = {6 a {8 {4 @MergePair$S0 {4 @Unpack$S1_$_MergePair$S1_$_Map$S1 (b c)}} ({23 d b} ({4 @Merge$S2 {4 @Merge$S3 (d (a e))}} {4 {6 e {8 c f}} {4 * f}}))}}
-@MergePair$F0$S1 = (a {4 {6 a {8 @Nil b}} {4 * b}})
-@MergePair$F0$S2 = (* @MergePair$F0$S1)
-@MergePair$S0 = {6 a {8 {4 @MergePair$F0$S0 {4 @MergePair$F0$S2 (b (a c))}} (b c)}}
+@MergePair$S0 = {6 a {8 {4 @MergePair$S3 {4 @Unpack$S3_$_MergePair$S4_$_Map$S1 (b c)}} ({23 d b} ({4 @Merge$S2 {4 @Merge$S3 (d (a e))}} {4 {6 e {8 c f}} {4 * f}}))}}
+@MergePair$S1 = (a {4 {6 a {8 @Nil b}} {4 * b}})
+@MergePair$S2 = (* @MergePair$S1)
+@MergePair$S3 = {6 a {8 {4 @MergePair$S0 {4 @MergePair$S2 (b (a c))}} (b c)}}
 @Nil = {4 * {4 a a}}
 @Pure = (a {4 {6 a {8 @Nil b}} {4 * b}})
-@Unpack = (a ({4 @Unpack$S0 {4 @Unpack$S1_$_MergePair$S1_$_Map$S1 (a b)}} b))
-@Unpack$F0$S0 = {6 a {8 {4 @MergePair$S0 {4 @Unpack$S1_$_MergePair$S1_$_Map$S1 (b {4 @Unpack$F0$S0 {4 @Unpack$F0$S1 (c (d e))}})}} ({3 c {23 f b}} ({4 @Merge$S2 {4 @Merge$S3 (f (a d))}} e))}}
-@Unpack$F0$S1 = (* (a a))
-@Unpack$S0 = {6 a {8 {4 @Unpack$F0$S0 {4 @Unpack$F0$S1 (b (a c))}} (b c)}}
-@Unpack$S1_$_MergePair$S1_$_Map$S1 = (* @Nil)
+@Unpack = (a ({4 @Unpack$S2 {4 @Unpack$S3_$_MergePair$S4_$_Map$S1 (a b)}} b))
+@Unpack$S0 = {6 a {8 {4 @MergePair$S3 {4 @Unpack$S3_$_MergePair$S4_$_Map$S1 (b {4 @Unpack$S0 {4 @Unpack$S1 (c (d e))}})}} ({3 c {23 f b}} ({4 @Merge$S2 {4 @Merge$S3 (f (a d))}} e))}}
+@Unpack$S1 = (* (a a))
+@Unpack$S2 = {6 a {8 {4 @Unpack$S0 {4 @Unpack$S1 (b (a c))}} (b c)}}
+@Unpack$S3_$_MergePair$S4_$_Map$S1 = (* @Nil)
 @main = (a (b c))
 & @Unpack ~ (a (d c))
 & @Map ~ (b (@Pure d))
-

@@ -1,7 +1,6 @@
 use hvml::{
   compile_book, desugar_book,
   diagnostics::Info,
-  encode_pattern_matching,
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
   term::{
@@ -184,20 +183,28 @@ fn readback_lnet() {
 }
 
 #[test]
-fn flatten_rules() {
+fn simplify_matches() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     let mut ctx = Ctx::new(&mut book);
-    ctx.set_entrypoint();
     ctx.check_shared_names();
+    ctx.set_entrypoint();
+    ctx.book.encode_adts(AdtEncoding::TaggedScott);
     ctx.book.encode_builtins();
     ctx.book.resolve_ctrs_in_pats();
-    ctx.book.encode_adts(AdtEncoding::TaggedScott);
+    ctx.resolve_refs()?;
+    ctx.check_match_arity()?;
+    ctx.check_unbound_pats()?;
+    ctx.book.convert_match_def_to_term();
     ctx.book.desugar_let_destructors();
     ctx.book.desugar_implicit_match_binds();
-    ctx.check_unbound_pats()?;
-    ctx.extract_adt_matches()?;
-    ctx.book.flatten_rules();
+    ctx.check_ctrs_arities()?;
+    ctx.check_unbound_vars()?;
+    ctx.simplify_matches()?;
+    ctx.linearize_simple_matches()?;
+    ctx.check_unbound_vars()?;
+    ctx.book.make_var_names_unique();
+    ctx.book.linearize_vars();
     ctx.prune(false, AdtEncoding::TaggedScott);
     Ok(ctx.book.to_string())
   })
@@ -218,13 +225,26 @@ fn encode_pattern_match() {
     for adt_encoding in [AdtEncoding::TaggedScott, AdtEncoding::Scott] {
       let mut book = do_parse_book(code, path)?;
       let mut ctx = Ctx::new(&mut book);
-      ctx.set_entrypoint();
       ctx.check_shared_names();
+      ctx.set_entrypoint();
       ctx.book.encode_adts(adt_encoding);
       ctx.book.encode_builtins();
-      encode_pattern_matching(&mut ctx, adt_encoding)?;
+      ctx.book.resolve_ctrs_in_pats();
+      ctx.resolve_refs()?;
+      ctx.check_match_arity()?;
+      ctx.check_unbound_pats()?;
+      ctx.book.convert_match_def_to_term();
+      ctx.book.desugar_let_destructors();
+      ctx.book.desugar_implicit_match_binds();
+      ctx.check_ctrs_arities()?;
+      ctx.check_unbound_vars()?;
+      ctx.simplify_matches()?;
+      ctx.linearize_simple_matches()?;
+      ctx.book.encode_simple_matches(adt_encoding);
+      ctx.check_unbound_vars()?;
+      ctx.book.make_var_names_unique();
+      ctx.book.linearize_vars();
       ctx.prune(false, adt_encoding);
-      ctx.book.merge_definitions();
 
       writeln!(result, "{adt_encoding:?}:").unwrap();
       writeln!(result, "{}\n", ctx.book).unwrap();

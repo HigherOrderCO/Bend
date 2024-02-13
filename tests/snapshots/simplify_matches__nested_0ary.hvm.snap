@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/nested_0ary.hvm
+---
+(Unpack) = λa λb (match b { (Cons c d): λe (match d { (Cons f g): λh λi (h (Cons i (Cons f g))); (Nil): λ* λq q } e c); (Nil): λ* Nil } a)
+
+(Nil) = #list λ* #list λb b
+
+(Cons) = λa λb #list λc #list λ* #list.Cons.tail (#list.Cons.head (c a) b)

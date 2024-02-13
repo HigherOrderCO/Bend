@@ -123,7 +123,7 @@ fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  // FIXME: bug with chunsky when using with `.repeated`
+  // FIXME: bug with chumsky when using with `.repeated`
   // select!(Token::Name(name) => Name::from(name)).labelled("<Name>")
 
   any()
@@ -209,6 +209,7 @@ where
   );
 
   let term_sep = just(Token::Semicolon).or_not();
+  let list_sep = just(Token::Comma).or_not();
 
   recursive(|term| {
     // *
@@ -275,25 +276,42 @@ where
       .map(|((pat, val), nxt)| Term::Let { pat, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
-    // '|'? pat: term
-    let match_arm = just(Token::Or)
-      .or_not()
-      .ignore_then(pattern().then_ignore(just(Token::Colon)).then(term.clone()).boxed());
+    let match_arg = name().then_ignore(just(Token::Equals)).or_not().then(term.clone());
+    let match_args =
+      match_arg.separated_by(list_sep.clone()).at_least(1).allow_trailing().collect::<Vec<_>>();
 
-    // match (scrutinee | <name> = value) { pat: term;... }
-    let match_ = just(Token::Match)
-      .ignore_then(name().then_ignore(just(Token::Equals)).or_not())
+    // '|'? pat+: term
+    let match_rule = just(Token::Or)
+      .or_not()
+      .ignore_then(pattern().repeated().at_least(1).collect::<Vec<_>>())
+      .then_ignore(just(Token::Colon))
       .then(term.clone())
+      .map(|(pats, body)| Rule { pats, body });
+    let match_rules = match_rule.separated_by(term_sep.clone()).at_least(1).allow_trailing().collect();
+
+    // match ((scrutinee | <name> = value),?)+ { pat+: term;... }
+    let match_ = just(Token::Match)
+      .ignore_then(match_args)
       .then_ignore(just(Token::LBracket))
-      .then(match_arm.separated_by(term_sep.clone()).allow_trailing().collect())
+      .then(match_rules)
       .then_ignore(just(Token::RBracket))
-      .map(|((bind, scrutinee), arms)| match bind {
-        Some(nam) => Term::Let {
-          pat: Pattern::Var(Some(nam.clone())),
-          val: Box::new(scrutinee),
-          nxt: Box::new(Term::Mat { matched: Box::new(Term::Var { nam }), arms }),
-        },
-        None => Term::Mat { matched: Box::new(scrutinee), arms },
+      .map(|(args, rules)| {
+        let mut args_no_bind = vec![];
+        let mut binds = vec![];
+        for (bind, arg) in args {
+          if let Some(bind) = bind {
+            args_no_bind.push(Term::Var { nam: bind.clone() });
+            binds.push((bind, arg));
+          } else {
+            args_no_bind.push(arg);
+          }
+        }
+        let mat = Term::Mat { args: args_no_bind, rules };
+        binds.into_iter().rev().fold(mat, |acc, (bind, arg)| Term::Let {
+          pat: Pattern::Var(Some(bind)),
+          val: Box::new(arg),
+          nxt: Box::new(acc),
+        })
       })
       .boxed();
 
@@ -419,9 +437,9 @@ where
   }));
 
   let paren_lhs = just(Token::LParen)
-    .ignore_then(lhs.clone().map_err(|err| map_unexpected_eof::<I>(err, Token::Name(STRINGS.get("<Name>")))))
+    .ignore_then(lhs.clone().map_err(|err| map_unexpected_eof(err, Token::Name(STRINGS.get("<Name>")))))
     .then_ignore(just(Token::RParen))
-    .then_ignore(just(Token::Equals).map_err(|err| map_unexpected_eof::<I>(err, Token::Equals)));
+    .then_ignore(just(Token::Equals).map_err(|err| map_unexpected_eof(err, Token::Equals)));
 
   choice((just_lhs, paren_lhs))
 }
@@ -447,16 +465,13 @@ where
   let data_name = tl_name().map_with_span(|name, span| (name, span));
 
   soft_keyword("data")
-    .ignore_then(data_name.map_err(|err| map_unexpected_eof::<I>(err, Token::Name(STRINGS.get("<Name>")))))
+    .ignore_then(data_name.map_err(|err| map_unexpected_eof(err, Token::Name(STRINGS.get("<Name>")))))
     .then_ignore(just(Token::Equals))
-    .then(ctrs.map_err(|err| map_unexpected_eof::<I>(err, Token::Name(STRINGS.get("constructor")))))
+    .then(ctrs.map_err(|err| map_unexpected_eof(err, Token::Name(STRINGS.get("constructor")))))
     .map(move |(name, ctrs)| TopLevel::Adt(name, ctrs))
 }
 
-fn map_unexpected_eof<'a, I>(err: Rich<'a, Token>, expected_token: Token) -> Rich<'a, Token>
-where
-  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
-{
+fn map_unexpected_eof(err: Rich<Token>, expected_token: Token) -> Rich<Token> {
   if err.found().is_none() {
     // Not using Error::expected_found here to not merge with other expected_found errors
     Rich::custom(*err.span(), format!("found end of input expected {}", expected_token))

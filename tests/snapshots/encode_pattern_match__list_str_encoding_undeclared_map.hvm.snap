@@ -3,23 +3,17 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared_map.hvm
 ---
 TaggedScott:
-(main) = λa λb let a = (main$match$1 a); let b = (main$match$2 b); (a, b)
+(main) = λa λb (#String (a #String.String.cons.head λ* #String.String.cons.tail λ* 1 2), #List (b #List.List.cons.head λ* #List.List.cons.tail λ* 1 2))
 
-(String.cons) = λhead λtail #String λString.cons #String λString.nil #String.String.cons.tail (#String.String.cons.head (String.cons head) tail)
+(String.cons) = λa λb #String λc #String λ* #String.String.cons.tail (#String.String.cons.head (c a) b)
 
-(String.nil) = #String λString.cons #String λString.nil String.nil
+(String.nil) = #String λ* #String λb b
 
-(List.cons) = λhead λtail #List λList.cons #List λList.nil #List.List.cons.tail (#List.List.cons.head (List.cons head) tail)
+(List.cons) = λa λb #List λc #List λ* #List.List.cons.tail (#List.List.cons.head (c a) b)
 
-(List.nil) = #List λList.cons #List λList.nil List.nil
-
-(main$match$1) = λa #String (a #String.String.cons.head λb #String.String.cons.tail λc 1 2)
-
-(main$match$2) = λa #List (a #List.List.cons.head λb #List.List.cons.tail λc 1 2)
+(List.nil) = #List λ* #List λb b
 
 Scott:
-(main) = λa λb let a = (main$match$2_$_main$match$1 a); let b = (main$match$2_$_main$match$1 b); (a, b)
-
-(main$match$2_$_main$match$1) = λa (a λb λc 1 2)
+(main) = λa λb ((a λ* λ* 1 2), (b λ* λ* 1 2))
 
 

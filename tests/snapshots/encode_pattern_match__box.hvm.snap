@@ -5,11 +5,11 @@ input_file: tests/golden_tests/encode_pattern_match/box.hvm
 TaggedScott:
 (unbox) = λa #box (a #box.new.val λb b)
 
-(new) = λval #box λnew #box.new.val (new val)
+(new) = λa #box λb #box.new.val (b a)
 
 Scott:
 (unbox) = λa (a λb b)
 
-(new) = λval λnew (new val)
+(new) = λa λb (b a)
 
 

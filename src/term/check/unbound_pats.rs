@@ -13,7 +13,7 @@ impl Display for UnboundCtrErr {
   }
 }
 
-impl<'book> Ctx<'book> {
+impl Ctx<'_> {
   /// Check if the constructors in rule patterns or match patterns are defined.
   pub fn check_unbound_pats(&mut self) -> Result<(), Info> {
     self.info.start_pass();
@@ -23,11 +23,11 @@ impl<'book> Ctx<'book> {
       for rule in &def.rules {
         for pat in &rule.pats {
           let res = pat.check_unbounds(&is_ctr);
-          self.info.take_err(res, Some(&def_name));
+          self.info.take_err(res, Some(def_name));
         }
 
         let res = rule.body.check_unbound_pats(&is_ctr);
-        self.info.take_err(res, Some(&def_name));
+        self.info.take_err(res, Some(def_name));
       }
     }
 
@@ -59,6 +59,7 @@ impl Pattern {
         }
         Pattern::Lst(args) => args.iter().for_each(|arg| check.push(arg)),
         Pattern::Var(_) | Pattern::Num(_) => {}
+        Pattern::Err => unreachable!(),
       }
     }
     unbounds
@@ -73,11 +74,15 @@ impl Term {
         val.check_unbound_pats(is_ctr)?;
         nxt.check_unbound_pats(is_ctr)?;
       }
-      Term::Mat { matched, arms } => {
-        matched.check_unbound_pats(is_ctr)?;
-        for (pat, body) in arms {
-          pat.check_unbounds(is_ctr)?;
-          body.check_unbound_pats(is_ctr)?;
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.check_unbound_pats(is_ctr)?;
+        }
+        for rule in rules {
+          for pat in &rule.pats {
+            pat.check_unbounds(is_ctr)?;
+          }
+          rule.body.check_unbound_pats(is_ctr)?;
         }
       }
       Term::App { fun: fst, arg: snd, .. }

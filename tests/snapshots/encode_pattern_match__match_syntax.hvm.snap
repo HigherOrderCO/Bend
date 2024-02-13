@@ -3,21 +3,17 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_syntax.hvm
 ---
 TaggedScott:
-(head) = λx (head$match$1 x)
+(head) = λa #List_ (a #List_.Cons.x λc #List_.Cons.xs λ* c Nil)
 
-(head$match$1) = λa #List_ (a #List_.Cons.x λb #List_.Cons.xs λc b Nil)
+(Nil) = #List_ λ* #List_ λb b
 
-(Nil) = #List_ λCons #List_ λNil Nil
-
-(Cons) = λx λxs #List_ λCons #List_ λNil #List_.Cons.xs (#List_.Cons.x (Cons x) xs)
+(Cons) = λa λb #List_ λc #List_ λ* #List_.Cons.xs (#List_.Cons.x (c a) b)
 
 Scott:
-(head) = λx (head$match$1 x)
+(head) = λa (a λc λ* c Nil)
 
-(head$match$1) = λa (a λb λc b Nil)
+(Nil) = λ* λb b
 
-(Nil) = λCons λNil Nil
-
-(Cons) = λx λxs λCons λNil (Cons x xs)
+(Cons) = λa λb λc λ* (c a b)
 
 

@@ -3,17 +3,17 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/non_matching_fst_arg.hvm
 ---
 TaggedScott:
-(Foo) = λa λb (#bool (b λc (Foo c c) λd d) a)
+(Foo) = λa λb (#bool (b λc let {e e_2} = c; (Foo e e_2) λf f) a)
 
-(false) = #bool λtrue #bool λfalse false
+(false) = #bool λ* #bool λb b
 
-(true) = #bool λtrue #bool λfalse true
+(true) = #bool λa #bool λ* a
 
 Scott:
-(Foo) = λa λb (b λc (Foo c c) λd d a)
+(Foo) = λa λb (b λc let {e e_2} = c; (Foo e e_2) λf f a)
 
-(false) = λtrue λfalse false
+(false) = λ* λb b
 
-(true) = λtrue λfalse true
+(true) = λa λ* a
 
 

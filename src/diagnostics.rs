@@ -1,12 +1,11 @@
 use crate::term::{
   check::{
-    ctrs_arities::ArityErr, exhaustiveness::ExhaustivenessErr, set_entrypoint::EntryErr,
-    shared_names::TopLevelErr, type_check::InferErr, unbound_pats::UnboundCtrErr,
+    set_entrypoint::EntryErr, shared_names::TopLevelErr, unbound_pats::UnboundCtrErr,
     unbound_vars::UnboundVarErr,
   },
   display::DisplayFn,
   transform::{
-    extract_adt_matches::MatchErr, resolve_refs::ReferencedMainErr, simplify_ref_to_ref::CyclicDefErr,
+    encode_pattern_matching::MatchErr, resolve_refs::ReferencedMainErr, simplify_ref_to_ref::CyclicDefErr,
   },
   Name,
 };
@@ -67,7 +66,7 @@ impl Info {
     if self.err_counter == 0 { Ok(t) } else { Err(std::mem::take(self)) }
   }
 
-  pub fn display<'a>(&'a self, verbose: bool) -> impl Display + 'a {
+  pub fn display(&self, verbose: bool) -> impl Display + '_ {
     DisplayFn(move |f| {
       write!(f, "{}", self.errs.iter().map(|err| err.display(verbose)).join("\n"))?;
 
@@ -103,13 +102,10 @@ impl From<&str> for Info {
 
 #[derive(Debug, Clone)]
 pub enum Error {
-  Exhaustiveness(ExhaustivenessErr),
   MainRef(ReferencedMainErr),
-  AdtMatch(MatchErr),
+  Match(MatchErr),
   UnboundVar(UnboundVarErr),
   UnboundCtr(UnboundCtrErr),
-  Infer(InferErr),
-  Arity(ArityErr),
   Cyclic(CyclicDefErr),
   EntryPoint(EntryErr),
   TopLevel(TopLevelErr),
@@ -125,25 +121,15 @@ impl Display for Error {
 impl Error {
   pub fn display(&self, verbose: bool) -> impl Display + '_ {
     DisplayFn(move |f| match self {
-      Error::Exhaustiveness(err) if verbose => write!(f, "{}", err.display_with_limit(usize::MAX)),
-      Error::Exhaustiveness(err) => write!(f, "{err}"),
-      Error::AdtMatch(err) => write!(f, "{err}"),
+      Error::Match(err) => write!(f, "{}", err.display(verbose)),
       Error::UnboundVar(err) => write!(f, "{err}"),
       Error::UnboundCtr(err) => write!(f, "{err}"),
       Error::MainRef(err) => write!(f, "{err}"),
-      Error::Infer(err) => write!(f, "{err}"),
-      Error::Arity(err) => write!(f, "{err}"),
       Error::Cyclic(err) => write!(f, "{err}"),
       Error::EntryPoint(err) => write!(f, "{err}"),
       Error::TopLevel(err) => write!(f, "{err}"),
       Error::Custom(err) => write!(f, "{err}"),
     })
-  }
-}
-
-impl From<ExhaustivenessErr> for Error {
-  fn from(value: ExhaustivenessErr) -> Self {
-    Self::Exhaustiveness(value)
   }
 }
 
@@ -155,7 +141,7 @@ impl From<ReferencedMainErr> for Error {
 
 impl From<MatchErr> for Error {
   fn from(value: MatchErr) -> Self {
-    Self::AdtMatch(value)
+    Self::Match(value)
   }
 }
 
@@ -168,18 +154,6 @@ impl From<UnboundVarErr> for Error {
 impl From<UnboundCtrErr> for Error {
   fn from(value: UnboundCtrErr) -> Self {
     Self::UnboundCtr(value)
-  }
-}
-
-impl From<InferErr> for Error {
-  fn from(value: InferErr) -> Self {
-    Self::Infer(value)
-  }
-}
-
-impl From<ArityErr> for Error {
-  fn from(value: ArityErr) -> Self {
-    Self::Arity(value)
   }
 }
 
