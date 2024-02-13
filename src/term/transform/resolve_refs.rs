@@ -69,7 +69,7 @@ impl Term {
       // If variable not defined, we check if it's a ref and swap if it is.
       Term::Var { nam } => {
         if is_var_in_scope(nam, scope) {
-          if matches!(nam.as_str(), ENTRY_POINT | HVM1_ENTRY_POINT) {
+          if matches!(nam.as_ref(), ENTRY_POINT | HVM1_ENTRY_POINT) {
             return Err("Main definition can't be referenced inside the program".to_string());
           }
 

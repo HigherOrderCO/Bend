@@ -194,17 +194,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       desugar_book(&mut book, opts, None)?;
       println!("{book}");
     }
-    Mode::Run {
-      path,
-      mem,
-      debug,
-      mut single_core,
-      linear,
-      arg_stats,
-      comp_opts,
-      warn_opts,
-      lazy_mode,
-    } => {
+    Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, comp_opts, warn_opts, lazy_mode } => {
       if debug && lazy_mode {
         return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".to_string());
       }

@@ -1,7 +1,7 @@
 use super::{
   net_to_term::ReadbackError, Book, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term, Type,
 };
-use std::fmt;
+use std::{fmt, ops::Deref};
 
 /* Some aux structures for things that are not so simple to display */
 
@@ -265,5 +265,5 @@ impl Tag {
 }
 
 fn var_as_str(nam: &Option<Name>) -> &str {
-  nam.as_ref().map_or("*", |x| x.as_str())
+  nam.as_ref().map_or("*", Name::deref)
 }

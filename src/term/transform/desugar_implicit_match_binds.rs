@@ -47,8 +47,10 @@ impl Term {
                 let ctr_args = ctrs.get(nam).unwrap();
                 if pat_args.is_empty() && !ctr_args.is_empty() {
                   // Implicit ctr args
-                  *pat_args =
-                    ctr_args.iter().map(|field| Pattern::Var(Some(format!("{matched}.{field}").into()))).collect();
+                  *pat_args = ctr_args
+                    .iter()
+                    .map(|field| Pattern::Var(Some(format!("{matched}.{field}").into())))
+                    .collect();
                 }
               }
               Pattern::Num(MatchNum::Zero) => (),

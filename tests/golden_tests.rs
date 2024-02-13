@@ -186,7 +186,7 @@ fn encode_pattern_match() {
       book.encode_builtins();
       encode_pattern_matching(&mut book, &mut Vec::new(), adt_encoding)?;
       book.prune(main.as_ref(), false, adt_encoding, &mut Vec::new());
-      book.merge_definitions(&main.clone().unwrap_or_default());
+      book.merge_definitions(&main.clone().unwrap_or(Name::new("")));
 
       writeln!(result, "{adt_encoding:?}:").unwrap();
       writeln!(result, "{book}\n").unwrap();

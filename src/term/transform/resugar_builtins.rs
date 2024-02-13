@@ -20,7 +20,7 @@ impl Term {
         let head = std::mem::take(head);
         let mut tail = std::mem::take(tail);
 
-        if ctr.as_str() == SCONS
+        if ctr.as_ref() == SCONS
           && let Term::Num { val } = head
           && let Term::Str { val: tail } = tail
         {
@@ -39,7 +39,7 @@ impl Term {
         }
       }
       // (String.nil)
-      Term::Ref { nam: def_name } if def_name.as_str() == SNIL => *self = Term::Str { val: String::new() },
+      Term::Ref { nam: def_name } if def_name.as_ref() == SNIL => *self = Term::Str { val: String::new() },
 
       Term::Mat { matched, arms } => {
         matched.resugar_strings();
@@ -88,7 +88,7 @@ impl Term {
         let head = std::mem::take(head);
         let tail = std::mem::take(tail);
 
-        if ctr.as_str() == LCONS
+        if ctr.as_ref() == LCONS
           && let Term::Lst { els: tail } = tail
         {
           // If well formed list, cons the next element to the list being formed
@@ -100,7 +100,7 @@ impl Term {
         }
       }
       // (List.nil)
-      Term::Ref { nam: def_name } if def_name.as_str() == LNIL => *self = Term::Lst { els: vec![] },
+      Term::Ref { nam: def_name } if def_name.as_ref() == LNIL => *self = Term::Lst { els: vec![] },
 
       Term::Mat { matched, arms } => {
         matched.resugar_lists();

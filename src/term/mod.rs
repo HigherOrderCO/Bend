@@ -190,8 +190,8 @@ pub enum AdtEncoding {
   TaggedScott,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord, Default)]
-pub struct Name(pub Arc<String>);
+#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
+pub struct Name(pub Arc<str>);
 
 pub fn num_to_name(mut num: Val) -> String {
   let mut name = String::new();
@@ -758,7 +758,7 @@ impl Name {
 
 impl From<String> for Name {
   fn from(value: String) -> Self {
-    Name(Arc::new(value))
+    Name(Arc::from(value))
   }
 }
 
@@ -769,10 +769,16 @@ impl From<Val> for Name {
 }
 
 impl Deref for Name {
-  type Target = String;
+  type Target = str;
 
   fn deref(&self) -> &Self::Target {
     self.0.deref()
+  }
+}
+
+impl AsRef<str> for Name {
+  fn as_ref(&self) -> &str {
+    self.0.as_ref()
   }
 }
 
