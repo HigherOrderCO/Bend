@@ -4,7 +4,7 @@ use std::{fmt, num::ParseIntError};
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(error=LexingError)]
 pub enum Token {
-  #[regex("[_.a-zA-Z][_.a-zA-Z0-9-]*", |lex| lex.slice().parse().ok())]
+  #[regex("[_.a-zA-Z][_.a-zA-Z0-9-]*", |lex| lex.slice().parse().ok(), priority = 3)]
   Name(String),
 
   #[regex("@|λ")]
