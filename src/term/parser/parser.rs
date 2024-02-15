@@ -124,6 +124,7 @@ where
       let Token::Name(name) = t else { unreachable!() };
       Name::from(name)
     })
+    .or(just(Token::Data).to(Name("data".into())))
     .labelled("<Name>")
 }
 
@@ -158,7 +159,7 @@ fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, 
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  choice((any().filter(|a| matches!(a, Token::Asterisk)).map(|_| None), name().map(Some)))
+  choice((any().filter(|a| matches!(a, Token::Asterisk)).to(None), name().map(Some)))
 }
 
 fn num_oper<'a, I>() -> impl Parser<'a, I, Op, extra::Err<Rich<'a, Token>>>
@@ -376,8 +377,7 @@ where
       .map(Pattern::Lst)
       .boxed();
 
-    let zero =
-      any().filter(|t| matches!(t, Token::Num(0))).map(|_| Pattern::Num(MatchNum::Zero)).labelled("0");
+    let zero = any().filter(|t| matches!(t, Token::Num(0))).to(Pattern::Num(MatchNum::Zero)).labelled("0");
 
     let succ = just(Token::Add)
       .ignore_then(name_or_era().or_not())
@@ -420,8 +420,13 @@ fn rule<'a, I>() -> impl Parser<'a, I, TopLevel, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let unclosed_terms =
-    term().and_is(rule_pattern().not().rewind()).repeated().at_least(1).collect::<Vec<Term>>().boxed();
+  let unclosed_terms = term()
+    .and_is(just(Token::Data).not().rewind())
+    .and_is(rule_pattern().not().rewind())
+    .repeated()
+    .at_least(1)
+    .collect::<Vec<Term>>()
+    .boxed();
 
   rule_pattern()
     .then(term()
@@ -464,7 +469,7 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   if err.found().is_none() {
-    // Not using Error::expected_found here to not merge with others expected_found errors
+    // Not using Error::expected_found here to not merge with other expected_found errors
     Rich::custom(*err.span(), format!("found end of input expected {}", expected_token))
   } else {
     err
@@ -478,8 +483,7 @@ fn book<'a, I>(
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let top_level = choice((datatype(), rule()));
-  top_level
+  choice((datatype(), rule()))
     .repeated()
     .collect()
     .validate(move |program, _, emit| collect_book(default_book(), program, builtin, emit))

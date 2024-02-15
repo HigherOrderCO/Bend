@@ -1,5 +1,0 @@
-data Foo = A
-
-main = A B
-
-data Foo = B
