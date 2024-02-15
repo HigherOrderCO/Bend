@@ -139,9 +139,9 @@ where
       let Token::Name(name) = t else { unreachable!() };
       name
     })
-    .validate(|out, e, emitter| {
+    .validate(|out, span, emitter| {
       if out.contains('-') {
-        emitter.emit(Rich::custom(e, "Names with '-' are not supported at top level."));
+        emitter.emit(Rich::custom(span, "Names with '-' are not supported at top level."));
       }
       Name::from(out)
     })
@@ -195,8 +195,8 @@ where
   let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::Lnk { nam: name }).boxed();
 
   let number = select!(Token::Num(num) => Term::Num{val: num}).or(
-    select!(Token::Error(LexingError::InvalidNumberLiteral) => ()).validate(|_, e, emit| {
-      emit.emit(Rich::custom(e, "found invalid number literal expected number"));
+    select!(Token::Error(LexingError::InvalidNumberLiteral) => ()).validate(|_, span, emit| {
+      emit.emit(Rich::custom(span, "found invalid number literal expected number"));
       Term::Num { val: 0 }
     }),
   );
@@ -255,9 +255,9 @@ where
     // let a = ...
     // let (a, b) = ...
     let let_ = just(Token::Let)
-      .ignore_then(pattern().validate(|pat, e, emit| {
+      .ignore_then(pattern().validate(|pat, span, emit| {
         if matches!(&pat, Pattern::Num(..)) {
-          emit.emit(Rich::custom(e, "Numbers not supported in let."));
+          emit.emit(Rich::custom(span, "Numbers not supported in let."));
         }
         pat
       }))
@@ -433,9 +433,9 @@ where
       // FIXME: This is used to report a parsing error that would be unclear otherwise
       // couldn't implement it in terms of `.recover(via_parser(...))`
       .then(unclosed_terms.or_not()).validate(
-        |(body, unclosed_terms), e, emit| match unclosed_terms {
+        |(body, unclosed_terms), span, emit| match unclosed_terms {
           Some(t) => {
-            emit.emit(Rich::custom(e, "Missing Parenthesis around rule body"));
+            emit.emit(Rich::custom(span, "Missing Parenthesis around rule body"));
             fold(t, body, Term::app)
           }
           None => body,
@@ -448,14 +448,14 @@ fn datatype<'a, I>() -> impl Parser<'a, I, TopLevel, extra::Err<Rich<'a, Token>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let arity_0 = tl_name().map_with_span(|nam, e| ((nam, vec![]), e));
+  let arity_0 = tl_name().map_with_span(|nam, span| ((nam, vec![]), span));
   let arity_n = tl_name()
     .then(name().repeated().collect::<Vec<_>>())
     .delimited_by(just(Token::LParen), just(Token::RParen))
-    .map_with_span(|(nam, args), e| ((nam, args), e));
+    .map_with_span(|(nam, args), span| ((nam, args), span));
 
   let ctrs = arity_0.or(arity_n).separated_by(just(Token::Or)).at_least(1).collect();
-  let data_name = tl_name().map_with_span(|name, e| (name, e));
+  let data_name = tl_name().map_with_span(|name, span| (name, span));
 
   just(Token::Data)
     .ignore_then(data_name.map_err(|err| map_unexpected_eof::<I>(err, Token::Name("<Name>".to_string()))))
