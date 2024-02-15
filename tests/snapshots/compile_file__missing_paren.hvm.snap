@@ -1,0 +1,10 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/missing_paren.hvm
+---
+At tests/golden_tests/compile_file/missing_paren.hvm:2:11: Missing Parenthesis around rule body
+[0m  2 | Bar a b = [4m[31mFoo * (+ a b)[0m
+At tests/golden_tests/compile_file/missing_paren.hvm:3:7: Missing Parenthesis around rule body
+[0m  3 | Baz = [4m[31m* *[0m
+At tests/golden_tests/compile_file/missing_paren.hvm:5:8: Missing Parenthesis around rule body
+[0m  5 | main = [4m[31mFoo Baz[0m

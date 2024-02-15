@@ -1,0 +1,5 @@
+Foo a b = a b
+Bar a b = Foo * (+ a b)
+Baz = * *
+
+main = Foo Baz

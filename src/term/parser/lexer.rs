@@ -3,8 +3,9 @@ use std::{fmt, num::ParseIntError};
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(error=LexingError)]
+#[logos(skip r"[ \t\n\f]+")]
 pub enum Token {
-  #[regex("[_.a-zA-Z][_.a-zA-Z0-9-]*", |lex| lex.slice().parse().ok(), priority = 3)]
+  #[regex("[_.a-zA-Z][_.a-zA-Z0-9-]*", |lex| lex.slice().parse().ok())]
   Name(String),
 
   #[regex("@|λ")]
@@ -22,9 +23,9 @@ pub enum Token {
   #[token("=")]
   Equals,
 
-  #[regex("[0-9_]+", |lex| from_radix(10, lex).ok(), priority = 2)]
-  #[regex("0[xX][0-9a-fA-F_]+", |lex| from_radix(16, lex).ok())]
-  #[regex("0[bB][0-1_]+", |lex| from_radix(2, lex).ok())]
+  #[regex("0[bB][0-9a-zA-Z_]+", |lex| from_radix(2, lex))]
+  #[regex("0[xX][0-9a-zA-Z_]+", |lex| from_radix(16, lex))]
+  #[regex("[0-9][0-9a-zA-Z_]*", |lex| from_radix(10, lex))]
   Num(u64),
 
   #[regex(r#""([^"\\]|\\[tun"\\])*""#, |lex| normalized_string(lex).ok())]
@@ -126,8 +127,8 @@ pub enum Token {
   #[token("/*", comment)]
   MultiLineComment,
 
-  #[regex(r"[ \t\f\r\n]+", logos::skip)]
-  Whitespace,
+  #[token("data")]
+  Data,
 
   Error(LexingError),
 }
@@ -176,6 +177,14 @@ pub enum LexingError {
 
   #[default]
   InvalidCharacter,
+
+  InvalidNumberLiteral,
+}
+
+impl From<ParseIntError> for LexingError {
+  fn from(_: ParseIntError) -> Self {
+    LexingError::InvalidNumberLiteral
+  }
 }
 
 // Lexer for nested multi-line comments
@@ -247,6 +256,7 @@ impl fmt::Display for Token {
       Self::Dollar => write!(f, "$"),
       Self::Let => write!(f, "let"),
       Self::Match => write!(f, "match"),
+      Self::Data => write!(f, "data"),
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),
       Self::Str(s) => write!(f, "\"{s}\""),
@@ -280,7 +290,7 @@ impl fmt::Display for Token {
       Self::RBrace => write!(f, "]"),
       Self::SingleLineComment => write!(f, "<SingleLineComment>"),
       Self::MultiLineComment => write!(f, "<MultiLineComment>"),
-      Self::Whitespace => write!(f, "<Whitespace>"),
+      Self::Error(LexingError::InvalidNumberLiteral) => write!(f, "<InvalidNumberLiteral>"),
       Self::Error(LexingError::InvalidCharacter) => write!(f, "<InvalidCharacter>"),
       Self::Error(LexingError::UnclosedComment) => write!(f, "<UnclosedComment>"),
     }

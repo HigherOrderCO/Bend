@@ -3,17 +3,19 @@ use crate::term::{
   Adt, Book, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term,
 };
 use chumsky::{
-  error::RichReason,
+  error::{Error, RichReason},
   extra,
   input::{Emitter, SpannedInput, Stream, ValueInput},
   prelude::{Input, Rich},
-  primitive::{choice, end, just},
+  primitive::{any, choice, just},
   recursive::recursive,
   select,
   span::SimpleSpan,
+  util::MaybeRef,
   IterParser, Parser,
 };
-use indexmap::map::Entry;
+use indexmap::{map::Entry, IndexMap};
+use itertools::fold;
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range, path::Path};
 
@@ -66,24 +68,25 @@ pub fn error_to_msg(err: &Rich<'_, Token>, code: &str, path: &Path) -> String {
     _ => err.reason(),
   };
   let path = format!("{}:{lin}:{col}", path.display());
-  format!("At {}: {}\n{}", path, reason, highlight_error::highlight_error(start, end, code))
+  format!("At {}: {}\n{}", path, reason, highlight_error::highlight_error(usize::min(start, end), end, code))
 }
 
 fn line_and_col_of_byte(until: usize, src: &str) -> (usize, usize) {
-  let mut line = 1; // Line number starts at 1.
-  let mut col = 0;
+  // Line and column numbers starts at 1.
+  let mut line = 1;
+  let mut col = 1;
   let mut gone = 0;
   for char in src.chars() {
+    if gone >= until {
+      break;
+    }
     let char_len = char.len_utf8();
     gone += char_len;
     if char == '\n' {
       line += 1;
-      col = 0;
+      col = 1;
     } else {
       col += char_len;
-    }
-    if gone >= until {
-      break;
     }
   }
   (line, col)
@@ -108,18 +111,20 @@ fn token_stream(
 
 // Parsers
 
-fn soft_keyword<'a, I>(keyword: &'a str) -> impl Parser<'a, I, (), extra::Err<Rich<'a, Token>>>
-where
-  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
-{
-  select!(Token::Name(name) if name == keyword => ())
-}
-
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  select!(Token::Name(name) => Name::from(name))
+  // FIXME: bug with chunsky when using with `.repeated`
+  // select!(Token::Name(name) => Name::from(name)).labelled("<Name>")
+
+  any()
+    .filter(|t| matches!(t, Token::Name(_)))
+    .map(|t| {
+      let Token::Name(name) = t else { unreachable!() };
+      Name::from(name)
+    })
+    .labelled("<Name>")
 }
 
 /// A top level name that not accepts `-`.
@@ -127,12 +132,19 @@ fn tl_name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  select!(Token::Name(name) => name).validate(|out, span, emitter| {
-    if out.contains('-') {
-      emitter.emit(Rich::custom(span, "Names with '-' are not supported at top level."));
-    }
-    Name::from(out)
-  })
+  any()
+    .filter(|t| matches!(t, Token::Name(_)))
+    .map(|t| {
+      let Token::Name(name) = t else { unreachable!() };
+      name
+    })
+    .validate(|out, e, emitter| {
+      if out.contains('-') {
+        emitter.emit(Rich::custom(e, "Names with '-' are not supported at top level."));
+      }
+      Name::from(out)
+    })
+    .labelled("<Name>")
 }
 
 fn tag<'a, I>(default: Tag) -> impl Parser<'a, I, Tag, extra::Err<Rich<'a, Token>>>
@@ -146,7 +158,7 @@ fn name_or_era<'a, I>() -> impl Parser<'a, I, Option<Name>, extra::Err<Rich<'a, 
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  choice((select!(Token::Asterisk => None), name().map(Some)))
+  choice((any().filter(|a| matches!(a, Token::Asterisk)).map(|_| None), name().map(Some)))
 }
 
 fn num_oper<'a, I>() -> impl Parser<'a, I, Op, extra::Err<Rich<'a, Token>>>
@@ -180,7 +192,14 @@ where
 {
   let var = name().map(|name| Term::Var { nam: name }).boxed();
   let global_var = just(Token::Dollar).ignore_then(name()).map(|name| Term::Lnk { nam: name }).boxed();
-  let number = select!(Token::Num(num) => Term::Num{val: num});
+
+  let number = select!(Token::Num(num) => Term::Num{val: num}).or(
+    select!(Token::Error(LexingError::InvalidNumberLiteral) => ()).validate(|_, e, emit| {
+      emit.emit(Rich::custom(e, "found invalid number literal expected number"));
+      Term::Num { val: 0 }
+    }),
+  );
+
   let term_sep = just(Token::Semicolon).or_not();
 
   recursive(|term| {
@@ -235,9 +254,9 @@ where
     // let a = ...
     // let (a, b) = ...
     let let_ = just(Token::Let)
-      .ignore_then(pattern().validate(|pat, span, emit| {
+      .ignore_then(pattern().validate(|pat, e, emit| {
         if matches!(&pat, Pattern::Num(..)) {
-          emit.emit(Rich::custom(span, "Numbers not supported in let."));
+          emit.emit(Rich::custom(e, "Numbers not supported in let."));
         }
         pat
       }))
@@ -249,13 +268,9 @@ where
       .boxed();
 
     // '|'? pat: term
-    let match_arm = just(Token::Or).or_not().ignore_then(
-      pattern()
-        .or(just(Token::Add).map(|_| Pattern::Num(MatchNum::Succ(None))))
-        .then_ignore(just(Token::Colon))
-        .then(term.clone())
-        .boxed(),
-    );
+    let match_arm = just(Token::Or)
+      .or_not()
+      .ignore_then(pattern().then_ignore(just(Token::Colon)).then(term.clone()).boxed());
 
     // match (scrutinee | <name> = value) { pat: term;... }
     let match_ = just(Token::Match)
@@ -361,10 +376,14 @@ where
       .map(Pattern::Lst)
       .boxed();
 
-    let zero = select!(Token::Num(0) => Pattern::Num(MatchNum::Zero));
+    let zero =
+      any().filter(|t| matches!(t, Token::Num(0))).map(|_| Pattern::Num(MatchNum::Zero)).labelled("0");
 
-    let succ =
-      just(Token::Add).ignore_then(name_or_era()).map(|nam| Pattern::Num(MatchNum::Succ(Some(nam)))).boxed();
+    let succ = just(Token::Add)
+      .ignore_then(name_or_era().or_not())
+      .map(|nam| Pattern::Num(MatchNum::Succ(nam)))
+      .labelled("+")
+      .boxed();
 
     choice((zero, succ, var, ctr, list, tup))
   })
@@ -375,62 +394,81 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   let lhs = tl_name().then(pattern().repeated().collect()).boxed();
-  choice((lhs.clone(), lhs.clone().delimited_by(just(Token::LParen), just(Token::RParen))))
-    .then_ignore(just(Token::Equals))
+
+  let just_lhs = lhs.clone().then_ignore(just(Token::Equals).map_err(|err: Rich<'a, Token>| {
+    Error::<I>::expected_found(
+      [
+        Some(MaybeRef::Val(Token::Add)),
+        Some(MaybeRef::Val(Token::LParen)),
+        Some(MaybeRef::Val(Token::LBrace)),
+        Some(MaybeRef::Val(Token::Equals)),
+      ],
+      None,
+      *err.span(),
+    )
+  }));
+
+  let paren_lhs = lhs
+    .clone()
+    .delimited_by(just(Token::LParen), just(Token::RParen))
+    .then_ignore(just(Token::Equals).map_err(|err| map_unexpected_eof::<I>(err, Token::Equals)));
+
+  choice((just_lhs, paren_lhs))
 }
 
-/// This rule always emits an error when it parses successfully
-/// It is used to report a parsing error that would be unclear otherwise
-fn rule_body_missing_paren<'a, I>()
--> impl Parser<'a, I, ((Name, Vec<Pattern>), Term), extra::Err<Rich<'a, Token>>>
+fn rule<'a, I>() -> impl Parser<'a, I, TopLevel, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let terms = tag(Tag::Static)
-    .then(term())
-    .foldl(term().and_is(soft_keyword("data").not()).repeated().at_least(1), |(tag, fun), arg| {
-      (tag.clone(), Term::App { tag, fun: Box::new(fun), arg: Box::new(arg) })
-    });
-
-  let end_of_rule = end().or(soft_keyword("data")).rewind();
+  let unclosed_terms =
+    term().and_is(rule_pattern().not().rewind()).repeated().at_least(1).collect::<Vec<Term>>().boxed();
 
   rule_pattern()
-    .then(terms.validate(|terms, span, emit| {
-      emit.emit(Rich::custom(span, "Missing parenthesis around rule body"));
-      terms
-    }))
-    .map(|(rule, (_, app))| (rule, app))
-    .then_ignore(end_of_rule)
-    .boxed()
+    .then(term()
+      // FIXME: This is used to report a parsing error that would be unclear otherwise
+      // couldn't implement it in terms of `.recover(via_parser(...))`
+      .then(unclosed_terms.or_not()).validate(
+        |(body, unclosed_terms), e, emit| match unclosed_terms {
+          Some(t) => {
+            emit.emit(Rich::custom(e, "Missing Parenthesis around rule body"));
+            fold(t, body, Term::app)
+          }
+          None => body,
+        },
+      ))
+    .map(move |((name, pats), body)| TopLevel::Rule((name, Rule { pats, body })))
 }
 
-fn rule<'a, I>() -> impl Parser<'a, I, (Name, Rule), extra::Err<Rich<'a, Token>>>
+fn datatype<'a, I>() -> impl Parser<'a, I, TopLevel, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  rule_body_missing_paren()
-    .or(rule_pattern().then(term()))
-    .map(move |((name, pats), body)| (name, Rule { pats, body }))
-}
-
-fn datatype<'a, I>(builtin: bool) -> impl Parser<'a, I, (Name, Adt, SimpleSpan), extra::Err<Rich<'a, Token>>>
-where
-  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
-{
-  let arity_0 = tl_name().map(|nam| (nam, vec![]));
+  let arity_0 = tl_name().map_with_span(|nam, e| ((nam, vec![]), e));
   let arity_n = tl_name()
     .then(name().repeated().collect::<Vec<_>>())
     .delimited_by(just(Token::LParen), just(Token::RParen))
-    .map(|(nam, args)| (nam, args));
-  let ctr = arity_0.or(arity_n);
+    .map_with_span(|(nam, args), e| ((nam, args), e));
 
-  let data = soft_keyword("data");
+  let ctrs = arity_0.or(arity_n).separated_by(just(Token::Or)).at_least(1).collect();
+  let data_name = tl_name().map_with_span(|name, e| (name, e));
 
-  data
-    .ignore_then(tl_name())
+  just(Token::Data)
+    .ignore_then(data_name.map_err(|err| map_unexpected_eof::<I>(err, Token::Name("<Name>".to_string()))))
     .then_ignore(just(Token::Equals))
-    .then(ctr.separated_by(just(Token::Or)).collect::<Vec<(Name, Vec<Name>)>>())
-    .map_with_span(move |(name, ctrs), span| (name, Adt { ctrs: ctrs.into_iter().collect(), builtin }, span))
+    .then(ctrs.map_err(|err| map_unexpected_eof::<I>(err, Token::Name("constructor".to_string()))))
+    .map(move |(name, ctrs)| TopLevel::Adt(name, ctrs))
+}
+
+fn map_unexpected_eof<'a, I>(err: Rich<'a, Token>, expected_token: Token) -> Rich<'a, Token>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  if err.found().is_none() {
+    // Not using Error::expected_found here to not merge with others expected_found errors
+    Rich::custom(*err.span(), format!("found end of input expected {}", expected_token))
+  } else {
+    err
+  }
 }
 
 fn book<'a, I>(
@@ -440,8 +478,7 @@ fn book<'a, I>(
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let top_level = choice((datatype(builtin).map(TopLevel::Adt), rule().map(TopLevel::Rule)));
-
+  let top_level = choice((datatype(), rule()));
   top_level
     .repeated()
     .collect()
@@ -464,11 +501,12 @@ fn collect_book(
           book.defs.insert(name.clone(), Definition { name, rules: vec![rule], builtin });
         }
       }
-      TopLevel::Adt((nam, adt, span)) => match book.adts.get(&nam) {
+      TopLevel::Adt((nam, nam_span), adt) => match book.adts.get(&nam) {
         None => {
-          book.adts.insert(nam.clone(), adt.clone());
-          for (ctr, _) in adt.ctrs {
-            match book.ctrs.entry(ctr) {
+          let (ctrs, spans): (IndexMap<_, _>, Vec<_>) = adt.into_iter().unzip();
+
+          for ((ctr, _), span) in ctrs.iter().zip(spans.into_iter()) {
+            match book.ctrs.entry(ctr.clone()) {
               Entry::Vacant(e) => _ = e.insert(nam.clone()),
               Entry::Occupied(e) => emit.emit(Rich::custom(
                 span,
@@ -480,9 +518,12 @@ fn collect_book(
               )),
             }
           }
+
+          let adt = Adt { ctrs, builtin };
+          book.adts.insert(nam.clone(), adt);
         }
         Some(adt) => emit.emit(Rich::custom(
-          span,
+          nam_span,
           if adt.builtin {
             format!("{} is a built-in datatype and should not be overridden.", nam)
           } else {
@@ -497,5 +538,5 @@ fn collect_book(
 
 enum TopLevel {
   Rule((Name, Rule)),
-  Adt((Name, Adt, SimpleSpan)),
+  Adt((Name, SimpleSpan), Vec<((Name, Vec<Name>), SimpleSpan)>),
 }

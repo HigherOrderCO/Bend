@@ -20,13 +20,14 @@ default = ["cli"]
 cli = ["dep:clap"]
 
 [dependencies]
-chumsky = "= 1.0.0-alpha.4"
+# Later versions of the alpha contains bugs that changes the parser errors
+chumsky = { version = "= 1.0.0-alpha.4", features = ["label"]}
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 highlight_error = "0.1.1"
 hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core" }
 indexmap = "2.2.3"
 itertools = "0.11.0"
-logos = "0.13.0"
+logos = "0.14.0"
 
 [dev-dependencies]
 insta = "1.34.0"
