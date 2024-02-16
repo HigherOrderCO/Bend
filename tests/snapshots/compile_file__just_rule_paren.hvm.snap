@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/just_rule_paren.hvm
+---
+At tests/golden_tests/compile_file/just_rule_paren.hvm:1:6: found end of input expected =
+[0m 1 | (rule[4m[31m)[0m

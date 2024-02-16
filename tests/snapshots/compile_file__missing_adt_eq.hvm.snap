@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/missing_adt_eq.hvm
+---
+At tests/golden_tests/compile_file/missing_adt_eq.hvm:1:9: found end of input expected '='
+[0m  1 | data Adt[0m
