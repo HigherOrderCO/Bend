@@ -15,7 +15,6 @@ use chumsky::{
   IterParser, Parser,
 };
 use indexmap::{map::Entry, IndexMap};
-use itertools::fold;
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range, path::Path};
 
@@ -414,8 +413,7 @@ where
     )
   }));
 
-  let paren_lhs = 
-    just(Token::LParen)
+  let paren_lhs = just(Token::LParen)
     .ignore_then(lhs.clone().map_err(|err| map_unexpected_eof::<I>(err, Token::Name("<Name>".into()))))
     .then_ignore(just(Token::RParen))
     .then_ignore(just(Token::Equals).map_err(|err| map_unexpected_eof::<I>(err, Token::Equals)));
@@ -427,28 +425,7 @@ fn rule<'a, I>() -> impl Parser<'a, I, TopLevel, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  let unclosed_terms = term()
-    .and_is(soft_keyword("data").not().rewind())
-    .and_is(rule_pattern().not().rewind())
-    .repeated()
-    .at_least(1)
-    .collect::<Vec<Term>>()
-    .boxed();
-
-  rule_pattern()
-    .then(term()
-      // FIXME: This is used to report a parsing error that would be unclear otherwise
-      // couldn't implement it in terms of `.recover(via_parser(...))`
-      .then(unclosed_terms.or_not()).validate(
-        |(body, unclosed_terms), span, emit| match unclosed_terms {
-          Some(t) => {
-            emit.emit(Rich::custom(span, "Missing Parenthesis around rule body"));
-            fold(t, body, Term::app)
-          }
-          None => body,
-        },
-      ))
-    .map(move |((name, pats), body)| TopLevel::Rule((name, Rule { pats, body })))
+  rule_pattern().then(term()).map(move |((name, pats), body)| TopLevel::Rule((name, Rule { pats, body })))
 }
 
 fn datatype<'a, I>() -> impl Parser<'a, I, TopLevel, extra::Err<Rich<'a, Token>>>
