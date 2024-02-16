@@ -111,6 +111,13 @@ fn token_stream(
 
 // Parsers
 
+fn soft_keyword<'a, I>(keyword: &'static str) -> impl Parser<'a, I, (), extra::Err<Rich<'a, Token>>>
+where
+  I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
+{
+  any().filter(move |t| matches!(t, Token::Name(n) if n.as_str() == keyword)).to(()).labelled(keyword)
+}
+
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -124,7 +131,6 @@ where
       let Token::Name(name) = t else { unreachable!() };
       Name::from(name)
     })
-    .or(just(Token::Data).to(Name("data".into())))
     .labelled("<Name>")
 }
 
@@ -134,7 +140,7 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   any()
-    .filter(|t| matches!(t, Token::Name(_)))
+    .filter(|t| matches!(t, Token::Name(n) if n.as_str() != "data"))
     .map(|t| {
       let Token::Name(name) = t else { unreachable!() };
       name
@@ -408,9 +414,10 @@ where
     )
   }));
 
-  let paren_lhs = lhs
-    .clone()
-    .delimited_by(just(Token::LParen), just(Token::RParen))
+  let paren_lhs = 
+    just(Token::LParen)
+    .ignore_then(lhs.clone().map_err(|err| map_unexpected_eof::<I>(err, Token::Name("<Name>".into()))))
+    .then_ignore(just(Token::RParen))
     .then_ignore(just(Token::Equals).map_err(|err| map_unexpected_eof::<I>(err, Token::Equals)));
 
   choice((just_lhs, paren_lhs))
@@ -421,7 +428,7 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   let unclosed_terms = term()
-    .and_is(just(Token::Data).not().rewind())
+    .and_is(soft_keyword("data").not().rewind())
     .and_is(rule_pattern().not().rewind())
     .repeated()
     .at_least(1)
@@ -457,7 +464,7 @@ where
   let ctrs = arity_0.or(arity_n).separated_by(just(Token::Or)).at_least(1).collect();
   let data_name = tl_name().map_with_span(|name, span| (name, span));
 
-  just(Token::Data)
+  soft_keyword("data")
     .ignore_then(data_name.map_err(|err| map_unexpected_eof::<I>(err, Token::Name("<Name>".to_string()))))
     .then_ignore(just(Token::Equals))
     .then(ctrs.map_err(|err| map_unexpected_eof::<I>(err, Token::Name("constructor".to_string()))))

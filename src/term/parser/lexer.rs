@@ -127,9 +127,6 @@ pub enum Token {
   #[token("/*", comment)]
   MultiLineComment,
 
-  #[token("data")]
-  Data,
-
   Error(LexingError),
 }
 
@@ -256,7 +253,6 @@ impl fmt::Display for Token {
       Self::Dollar => write!(f, "$"),
       Self::Let => write!(f, "let"),
       Self::Match => write!(f, "match"),
-      Self::Data => write!(f, "data"),
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),
       Self::Str(s) => write!(f, "\"{s}\""),
