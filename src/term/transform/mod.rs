@@ -10,6 +10,8 @@ pub mod eta_reduction;
 pub mod flatten;
 pub mod inline;
 pub mod linearize;
+pub mod linearize_matches;
+pub mod normalize_native_matches;
 pub mod resolve_ctrs_in_pats;
 pub mod resolve_refs;
 pub mod resugar_adts;
