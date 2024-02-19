@@ -2,10 +2,7 @@ use indexmap::IndexMap;
 
 use crate::term::{Book, MatchNum, Name, Op, Pattern, Tag, Term, Type};
 
-use super::{
-  extract_adt_matches::{infer_match_type, MatchError},
-  linearize_matches,
-};
+use super::extract_adt_matches::{infer_match_type, MatchError};
 
 impl Book {
   /// Converts tuple and var matches into let expressions,
@@ -51,10 +48,7 @@ impl Term {
           Type::Tup => unreachable!(),
           // Matching on nums is a primitive operation, we can leave it as is.
           // Not extracting into a separate definition allows us to create very specific inets with the MATCH node.
-          Type::Num => {
-            // let match_term = linearize_matches::linearize_match_free_vars(self);
-            normalize_num_match(self)?;
-          }
+          Type::Num => normalize_num_match(self)?,
           Type::Adt(_) => unreachable!("Adt match expressions should have been removed earlier"),
         }
       }

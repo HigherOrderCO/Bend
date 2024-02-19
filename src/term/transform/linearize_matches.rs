@@ -30,10 +30,7 @@ impl Term {
         match matched_type {
           // Don't extract non-adt matches.
           Type::None | Type::Any => (),
-          Type::Num => {
-            let match_term = linearize_match_free_vars(self);
-            // normalize_num_match(match_term)?;
-          }
+          Type::Num => _ = linearize_match_free_vars(self),
           // TODO: Instead of extracting tuple matches, we should flatten one layer and check sub-patterns for something to extract.
           // For now, to prevent extraction we can use `let (a, b) = ...;`
           Type::Adt(_) | Type::Tup => {

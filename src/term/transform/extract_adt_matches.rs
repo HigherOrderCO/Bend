@@ -5,8 +5,6 @@ use crate::{
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
-use super::linearize_matches;
-
 impl Book {
   /// Extracts adt match terms into pattern matching functions.
   /// Creates rules with potentially nested patterns, so the flattening pass needs to be called after.
@@ -78,16 +76,6 @@ impl Term {
   }
 }
 
-fn get_match_reference(mut match_term: &mut Term) -> &mut Term {
-  loop {
-    match match_term {
-      Term::App { tag: _, fun, arg: _ } => match_term = fun.as_mut(),
-      Term::Mat { .. } => return match_term,
-      _ => unreachable!(),
-    }
-  }
-}
-
 impl Term {
   fn extract(
     &mut self,
@@ -110,9 +98,6 @@ impl Term {
           // For now, to prevent extraction we can use `let (a, b) = ...;`
           Type::Adt(_) | Type::Tup => {
             *match_count += 1;
-            // let match_term = linearize_matches::linearize_match_unscoped_vars(self)?;
-            // let match_term = linearize_matches::linearize_match_free_vars(match_term);
-            // let match_term = get_match_reference(self);
             let Term::Mat { matched: box Term::Var { nam }, arms } = self else { unreachable!() };
             *self = match_to_def(nam, arms, def_name, builtin, new_defs, *match_count);
           }
