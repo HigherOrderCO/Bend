@@ -173,7 +173,6 @@ fn duplicate_lam(nam: &mut Option<Name>, nxt: &mut Term, uses: Val) {
   }
 }
 
-#[allow(dead_code)]
 fn duplicate_let(nam: &Name, nxt: &mut Term, uses: Val, let_body: &mut Term) {
   make_dup_tree(nam, nxt, uses, Some(let_body));
 }
@@ -184,11 +183,4 @@ fn dup_name(nam: &Name, uses: Val) -> Name {
 
 fn internal_dup_name(nam: &Name, uses: Val) -> Name {
   format!("{}_dup", dup_name(nam, uses)).into()
-}
-
-#[allow(dead_code)]
-fn add_var(nam: Option<&Name>, uses: &mut HashMap<Name, Val>) {
-  if let Some(nam) = nam {
-    uses.entry(nam.clone()).or_insert(0);
-  }
 }
