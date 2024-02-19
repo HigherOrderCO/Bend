@@ -52,8 +52,8 @@ impl Term {
           // Matching on nums is a primitive operation, we can leave it as is.
           // Not extracting into a separate definition allows us to create very specific inets with the MATCH node.
           Type::Num => {
-            let match_term = linearize_matches::linearize_match_free_vars(self);
-            normalize_num_match(match_term)?;
+            // let match_term = linearize_matches::linearize_match_free_vars(self);
+            normalize_num_match(self)?;
           }
           Type::Adt(_) => unreachable!("Adt match expressions should have been removed earlier"),
         }

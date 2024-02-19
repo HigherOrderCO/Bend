@@ -1,11 +1,77 @@
 use std::collections::BTreeSet;
 
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 
-use crate::term::{Name, Term};
+use crate::term::{Book, Name, Pattern, Term, Type};
 
-use super::extract_adt_matches::MatchError;
+use super::extract_adt_matches::{infer_match_type, MatchError};
+
+impl Book {
+  pub fn linearize_matches(&mut self) {
+    for def in self.defs.values_mut() {
+      def.rule_mut().body.linearize_matches(&self.ctrs).unwrap();
+    }
+  }
+}
+
+impl Term {
+  fn linearize_matches(&mut self, ctrs: &IndexMap<Name, Name>) -> Result<(), MatchError> {
+    match self {
+      Term::Mat { matched: box Term::Var { .. }, arms } => {
+        for (_, body) in arms.iter_mut() {
+          body.linearize_matches(ctrs).unwrap();
+        }
+        let matched_type = infer_match_type(arms.iter().map(|(x, _)| x), ctrs)?;
+        match matched_type {
+          // Don't extract non-adt matches.
+          Type::None | Type::Any => (),
+          Type::Num => {
+            let match_term = linearize_match_free_vars(self);
+            // normalize_num_match(match_term)?;
+          }
+          // TODO: Instead of extracting tuple matches, we should flatten one layer and check sub-patterns for something to extract.
+          // For now, to prevent extraction we can use `let (a, b) = ...;`
+          Type::Adt(_) | Type::Tup => {
+            let match_term = linearize_match_unscoped_vars(self)?;
+            linearize_match_free_vars(match_term);
+          }
+        }
+      }
+
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+        bod.linearize_matches(ctrs)?;
+      }
+
+      Term::Let { pat: Pattern::Var(..), val: fst, nxt: snd }
+      | Term::Tup { fst, snd }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. }
+      | Term::App { fun: fst, arg: snd, .. } => {
+        fst.linearize_matches(ctrs)?;
+        snd.linearize_matches(ctrs)?;
+      }
+
+      Term::Lst { .. } => unreachable!(),
+      Term::Mat { .. } => unreachable!("Scrutinee of match expression should have been extracted already"),
+      Term::Let { pat, .. } => {
+        unreachable!("Destructor let expression should have been desugared already. {pat}")
+      }
+
+      Term::Str { .. }
+      | Term::Lnk { .. }
+      | Term::Var { .. }
+      | Term::Num { .. }
+      | Term::Ref { .. }
+      | Term::Era => {}
+
+      Term::Err => todo!(),
+    };
+
+    Ok(())
+  }
+}
 
 /// Converts free vars inside the match arms into lambdas with applications to give them the external value.
 /// Makes the rules extractable and linear (no need for dups when variable used in both rules)

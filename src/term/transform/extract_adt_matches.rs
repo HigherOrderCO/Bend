@@ -78,6 +78,16 @@ impl Term {
   }
 }
 
+fn get_match_reference(mut match_term: &mut Term) -> &mut Term {
+  loop {
+    match match_term {
+      Term::App { tag: _, fun, arg: _ } => match_term = fun.as_mut(),
+      Term::Mat { .. } => return match_term,
+      _ => unreachable!(),
+    }
+  }
+}
+
 impl Term {
   fn extract(
     &mut self,
@@ -89,6 +99,9 @@ impl Term {
   ) -> Result<(), MatchError> {
     match self {
       Term::Mat { matched: box Term::Var { .. }, arms } => {
+        for (_, body) in arms.iter_mut() {
+          body.extract(def_name, builtin, ctrs, new_defs, match_count)?;
+        }
         let matched_type = infer_match_type(arms.iter().map(|(x, _)| x), ctrs)?;
         match matched_type {
           // Don't extract non-adt matches.
@@ -97,10 +110,11 @@ impl Term {
           // For now, to prevent extraction we can use `let (a, b) = ...;`
           Type::Adt(_) | Type::Tup => {
             *match_count += 1;
-            let match_term = linearize_matches::linearize_match_unscoped_vars(self)?;
-            let match_term = linearize_matches::linearize_match_free_vars(match_term);
-            let Term::Mat { matched: box Term::Var { nam }, arms } = match_term else { unreachable!() };
-            *match_term = match_to_def(nam, arms, def_name, builtin, new_defs, *match_count);
+            // let match_term = linearize_matches::linearize_match_unscoped_vars(self)?;
+            // let match_term = linearize_matches::linearize_match_free_vars(match_term);
+            // let match_term = get_match_reference(self);
+            let Term::Mat { matched: box Term::Var { nam }, arms } = self else { unreachable!() };
+            *self = match_to_def(nam, arms, def_name, builtin, new_defs, *match_count);
           }
         }
       }
