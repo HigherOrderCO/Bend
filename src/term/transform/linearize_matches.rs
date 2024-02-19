@@ -8,10 +8,14 @@ use crate::term::{Book, Name, Pattern, Term, Type};
 use super::extract_adt_matches::{infer_match_type, MatchError};
 
 impl Book {
-  pub fn linearize_matches(&mut self) {
+  pub fn linearize_matches(&mut self) -> Result<(), String> {
     for def in self.defs.values_mut() {
-      def.rule_mut().body.linearize_matches(&self.ctrs).unwrap();
+      for rule in def.rules.iter_mut() {
+        rule.body.linearize_matches(&self.ctrs).map_err(|e| format!("In definition '{}': {e}", def.name))?;
+      }
     }
+
+    Ok(())
   }
 }
 
