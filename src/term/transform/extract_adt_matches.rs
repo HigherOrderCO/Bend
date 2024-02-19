@@ -1,9 +1,11 @@
 use crate::{
-  term::{display::DisplayJoin, Book, Definition, Name, Pattern, Term, Type},
+  term::{display::DisplayJoin, Book, Definition, Name, Pattern, Rule, Term, Type},
   Warning,
 };
 use indexmap::IndexMap;
 use std::collections::HashSet;
+
+use super::linearize_matches;
 
 impl Book {
   /// Extracts adt match terms into pattern matching functions.
@@ -42,7 +44,7 @@ impl Term {
         for (_, term) in arms.iter_mut() {
           term.extract_adt_matches(def_name, builtin, ctrs, new_defs, match_count, warnings)?;
         }
-        Term::linearize_matches(self, def_name, builtin, ctrs, new_defs, match_count)?;
+        Term::extract(self, def_name, builtin, ctrs, new_defs, match_count)?;
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
@@ -76,7 +78,89 @@ impl Term {
   }
 }
 
+impl Term {
+  fn extract(
+    &mut self,
+    def_name: &Name,
+    builtin: bool,
+    ctrs: &IndexMap<Name, Name>,
+    new_defs: &mut Vec<(Name, Definition)>,
+    match_count: &mut usize,
+  ) -> Result<(), MatchError> {
+    match self {
+      Term::Mat { matched: box Term::Var { .. }, arms } => {
+        let matched_type = infer_match_type(arms.iter().map(|(x, _)| x), ctrs)?;
+        for (_, term) in arms.iter_mut() {
+          term.extract(def_name, builtin, ctrs, new_defs, match_count)?;
+        }
+        match matched_type {
+          // Don't extract non-adt matches.
+          Type::None | Type::Any | Type::Num => (),
+          // TODO: Instead of extracting tuple matches, we should flatten one layer and check sub-patterns for something to extract.
+          // For now, to prevent extraction we can use `let (a, b) = ...;`
+          Type::Adt(_) | Type::Tup => {
+            *match_count += 1;
+            let match_term = linearize_matches::linearize_match_unscoped_vars(self)?;
+            let match_term = linearize_matches::linearize_match_free_vars(match_term);
+            let Term::Mat { matched: box Term::Var { nam }, arms } = match_term else { unreachable!() };
+            *match_term = match_to_def(nam, arms, def_name, builtin, new_defs, *match_count);
+          }
+        }
+      }
+
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+        bod.extract(def_name, builtin, ctrs, new_defs, match_count)?;
+      }
+
+      Term::Let { pat: Pattern::Var(..), val: fst, nxt: snd }
+      | Term::Tup { fst, snd }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. }
+      | Term::App { fun: fst, arg: snd, .. } => {
+        fst.extract(def_name, builtin, ctrs, new_defs, match_count)?;
+        snd.extract(def_name, builtin, ctrs, new_defs, match_count)?;
+      }
+
+      Term::Lst { .. } => unreachable!(),
+      Term::Mat { .. } => unreachable!("Scrutinee of match expression should have been extracted already"),
+      Term::Let { pat, .. } => {
+        unreachable!("Destructor let expression should have been desugared already. {pat}")
+      }
+
+      Term::Str { .. }
+      | Term::Lnk { .. }
+      | Term::Var { .. }
+      | Term::Num { .. }
+      | Term::Ref { .. }
+      | Term::Era => {}
+
+      Term::Err => todo!(),
+    };
+
+    Ok(())
+  }
+}
+
 //== Common ==//
+
+/// Transforms a match into a new definition with every arm of `arms` as a rule.
+/// The result is the new def applied to the scrutinee followed by the free vars of the arms.
+fn match_to_def(
+  matched_var: &Name,
+  arms: &[(Pattern, Term)],
+  def_name: &Name,
+  builtin: bool,
+  new_defs: &mut Vec<(Name, Definition)>,
+  match_count: usize,
+) -> Term {
+  let rules = arms.iter().map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone() }).collect();
+  let new_name = Name::from(format!("{def_name}$match${match_count}"));
+  let def = Definition { name: new_name.clone(), rules, builtin };
+  new_defs.push((new_name.clone(), def));
+
+  Term::arg_call(Term::Ref { nam: new_name }, matched_var.clone())
+}
 
 /// Finds the expected type of the matched argument.
 /// Errors on incompatible types.

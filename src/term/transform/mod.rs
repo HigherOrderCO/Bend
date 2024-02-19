@@ -2,7 +2,7 @@ pub mod definition_merge;
 pub mod definition_pruning;
 pub mod desugar_implicit_match_binds;
 pub mod desugar_let_destructors;
-pub mod desugar_match_expressions;
+pub mod extract_adt_matches;
 pub mod detach_supercombinators;
 pub mod encode_adts;
 pub mod encode_pattern_matching;

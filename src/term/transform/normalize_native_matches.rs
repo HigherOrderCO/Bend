@@ -3,7 +3,7 @@ use indexmap::IndexMap;
 use crate::term::{Book, MatchNum, Name, Op, Pattern, Tag, Term, Type};
 
 use super::{
-  desugar_match_expressions::{infer_match_type, MatchError},
+  extract_adt_matches::{infer_match_type, MatchError},
   linearize_matches,
 };
 
