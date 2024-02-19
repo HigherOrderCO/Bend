@@ -90,9 +90,6 @@ impl Term {
     match self {
       Term::Mat { matched: box Term::Var { .. }, arms } => {
         let matched_type = infer_match_type(arms.iter().map(|(x, _)| x), ctrs)?;
-        for (_, term) in arms.iter_mut() {
-          term.extract(def_name, builtin, ctrs, new_defs, match_count)?;
-        }
         match matched_type {
           // Don't extract non-adt matches.
           Type::None | Type::Any | Type::Num => (),

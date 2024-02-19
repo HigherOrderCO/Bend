@@ -28,17 +28,7 @@ pub fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
   let old_match = std::mem::take(match_term);
   *match_term = free_vars.into_iter().fold(old_match, Term::arg_call);
 
-  // Get a reference to the match again
-  // It returns a reference and not an owned value because we want
-  //  to keep the new surrounding Apps but still modify the match further.
-  let mut match_term = match_term;
-  loop {
-    match match_term {
-      Term::App { tag: _, fun, arg: _ } => match_term = fun.as_mut(),
-      Term::Mat { .. } => return match_term,
-      _ => unreachable!(),
-    }
-  }
+  get_match_reference(match_term)
 }
 
 pub fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, MatchError> {
@@ -72,14 +62,17 @@ pub fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term,
   let old_match = std::mem::take(match_term);
   *match_term = free_vars.into_iter().fold(old_match, |acc, nam| Term::call(acc, [Term::Lnk { nam }]));
 
-  // Get a reference to the match again
-  // It returns a reference and not an owned value because we want
-  //  to keep the new surrounding Apps but still modify the match further.
-  let mut match_term = match_term;
+  Ok(get_match_reference(match_term))
+}
+
+/// Get a reference to the match again
+/// It returns a reference and not an owned value because we want
+/// to keep the new surrounding Apps but still modify the match further.
+fn get_match_reference(mut match_term: &mut Term) -> &mut Term {
   loop {
     match match_term {
       Term::App { tag: _, fun, arg: _ } => match_term = fun.as_mut(),
-      Term::Mat { .. } => return Ok(match_term),
+      Term::Mat { .. } => return match_term,
       _ => unreachable!(),
     }
   }
