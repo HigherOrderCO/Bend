@@ -1,6 +1,6 @@
 use crate::{
-  diagnostics::Error,
-  term::{Book, MatchNum, Name, Pattern, Term},
+  diagnostics::{Error, Info},
+  term::{Ctx, MatchNum, Name, Pattern, Term},
 };
 use std::{
   collections::{HashMap, HashSet},
@@ -16,15 +16,15 @@ impl Display for ReferencedMain {
   }
 }
 
-impl Book {
+impl Ctx {
   /// Decides if names inside a term belong to a Var or to a Ref.
   /// Precondition: Refs are encoded as vars, Constructors are resolved.
   /// Postcondition: Refs are encoded as refs, with the correct def id.
-  pub fn resolve_refs(&mut self) -> Result<(), String> {
+  pub fn resolve_refs(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 
-    let def_names = self.defs.keys().cloned().collect::<HashSet<_>>();
-    for (def_name, def) in &mut self.defs {
+    let def_names = self.book.defs.keys().cloned().collect::<HashSet<_>>();
+    for (def_name, def) in &mut self.book.defs {
       for rule in def.rules.iter_mut() {
         let mut scope = HashMap::new();
 
@@ -32,7 +32,7 @@ impl Book {
           push_scope(Some(name), &mut scope);
         }
 
-        let res = rule.body.resolve_refs(&def_names, self.entrypoint.as_ref(), &mut scope);
+        let res = rule.body.resolve_refs(&def_names, self.book.entrypoint.as_ref(), &mut scope);
         self.info.errs.extend(res.map_err(|e| Error::MainRef(def_name.clone(), e)).err());
       }
     }

@@ -1,6 +1,6 @@
 use crate::term::{
   check::{
-    ctrs_arities::ArityErr, exhaustiveness::ExhaustivenessErr, has_entrypoint::EntryErr,
+    ctrs_arities::ArityErr, exhaustiveness::ExhaustivenessErr, set_entrypoint::EntryErr,
     shared_names::TopLevelErr, type_check::InferErr, unbound_pats::UnboundCtr, unbound_vars::UnboundVar,
   },
   transform::{
@@ -15,7 +15,7 @@ use std::fmt::{Display, Formatter};
 pub struct Info {
   err_counter: usize,
   pub errs: Vec<Error>,
-  pub warnings: Vec<Warning>,
+  pub warns: Vec<Warning>,
 }
 
 impl Info {
@@ -31,12 +31,26 @@ impl Info {
   /// Checks if any error was emitted since the start of the pass,  
   /// Returning all the current errors as a `Err(String)`.  
   /// Otherwise, returns the given arg as an `Ok(T)`.
-  pub fn fatal<T>(&mut self, t: T) -> Result<T, String> {
-    if self.errs.len() == self.err_counter { Ok(t) } else { Err(self.take_errs()) }
+  pub fn fatal<T>(&mut self, t: T) -> Result<T, Info> {
+    if self.errs.len() == self.err_counter { Ok(t) } else { Err(std::mem::take(self)) }
   }
+}
 
-  pub fn take_errs(&mut self) -> String {
-    std::mem::take(&mut self.errs).into_iter().join("\n")
+impl Display for Info {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.errs.iter().join("\n"))
+  }
+}
+
+impl From<String> for Info {
+  fn from(value: String) -> Self {
+    Info { err_counter: 0, errs: vec![Error::Custom(value)], warns: Vec::new() }
+  }
+}
+
+impl From<&str> for Info {
+  fn from(value: &str) -> Self {
+    Info::from(value.to_string())
   }
 }
 
@@ -53,6 +67,7 @@ pub enum Error {
   Cyclic(CyclicDef),
   EntryPoint(EntryErr),
   TopLevel(TopLevelErr),
+  Custom(String),
 }
 
 impl Display for Error {
@@ -68,6 +83,7 @@ impl Display for Error {
       Error::Cyclic(err @ CyclicDef(def)) => write!(f, "Definition '{def}' {err}"),
       Error::EntryPoint(err) => write!(f, "{err}"),
       Error::TopLevel(err) => write!(f, "{err}"),
+      Error::Custom(err) => write!(f, "{err}"),
     }
   }
 }
@@ -75,12 +91,6 @@ impl Display for Error {
 impl From<EntryErr> for Error {
   fn from(value: EntryErr) -> Self {
     Self::EntryPoint(value)
-  }
-}
-
-impl From<TopLevelErr> for Error {
-  fn from(value: TopLevelErr) -> Self {
-    Self::TopLevel(value)
   }
 }
 

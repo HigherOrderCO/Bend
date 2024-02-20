@@ -1,8 +1,8 @@
 use std::{collections::HashMap, fmt::Display};
 
 use crate::{
-  diagnostics::Error,
-  term::{Book, Name, Pattern},
+  diagnostics::{Error, Info},
+  term::{Book, Ctx, Name, Pattern},
 };
 
 #[derive(Debug, Clone)]
@@ -14,16 +14,16 @@ impl Display for ArityErr {
   }
 }
 
-impl Book {
+impl Ctx {
   /// Checks if every constructor pattern of every definition rule has the same arity from the
   /// defined adt constructor.
   ///
   /// Constructors should be already resolved.
-  pub fn check_ctrs_arities(&mut self) -> Result<(), String> {
+  pub fn check_ctrs_arities(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 
-    let arities = self.ctr_arities();
-    for (def_name, def) in self.defs.iter() {
+    let arities = self.book.ctr_arities();
+    for (def_name, def) in self.book.defs.iter() {
       for rule in def.rules.iter() {
         for pat in rule.pats.iter() {
           let res = pat.check(&arities).map_err(|e| Error::Arity(def_name.clone(), e)).err();
@@ -34,7 +34,9 @@ impl Book {
 
     self.info.fatal(())
   }
+}
 
+impl Book {
   /// Returns a hashmap of the constructor name to its arity.
   pub fn ctr_arities(&self) -> HashMap<Name, usize> {
     let mut arities = HashMap::new();

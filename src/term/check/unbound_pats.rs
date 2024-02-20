@@ -1,6 +1,6 @@
 use crate::{
-  diagnostics::Error,
-  term::{Book, Name, Pattern, Term},
+  diagnostics::{Error, Info},
+  term::{Ctx, Name, Pattern, Term},
 };
 use std::{collections::HashSet, fmt::Display};
 
@@ -13,13 +13,13 @@ impl Display for UnboundCtr {
   }
 }
 
-impl Book {
+impl Ctx {
   /// Check if the constructors in rule patterns or match patterns are defined.
-  pub fn check_unbound_pats(&mut self) -> Result<(), String> {
+  pub fn check_unbound_pats(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 
-    let is_ctr = |nam: &Name| self.ctrs.contains_key(nam);
-    for (def_name, def) in self.defs.iter() {
+    let is_ctr = |nam: &Name| self.book.ctrs.contains_key(nam);
+    for (def_name, def) in self.book.defs.iter() {
       for rule in &def.rules {
         for pat in &rule.pats {
           let res = pat.check_unbounds(&is_ctr);

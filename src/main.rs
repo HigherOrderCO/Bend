@@ -1,7 +1,9 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvmc::ast::show_net;
 use hvml::{
-  check_book, compile_book, desugar_book, load_file_to_book, run_book,
+  check_book, compile_book, desugar_book,
+  diagnostics::Info,
+  load_file_to_book, run_book,
   term::{display::display_readback_errors, AdtEncoding, Book, Name},
   CompileOpts, RunInfo, RunOpts, WarnState, WarningOpts,
 };
@@ -145,34 +147,30 @@ fn mem_parser(arg: &str) -> Result<usize, String> {
 }
 
 fn main() {
-  fn run() -> Result<(), String> {
-    #[cfg(not(feature = "cli"))]
-    compile_error!("The 'cli' feature is needed for the hvm-lang cli");
+  #[cfg(not(feature = "cli"))]
+  compile_error!("The 'cli' feature is needed for the hvm-lang cli");
 
-    let mut cli = Cli::parse();
-    let arg_verbose = cli.verbose;
-    let entrypoint = cli.entrypoint.take();
-
-    let book = |path: &Path| {
-      let mut book = load_file_to_book(&path)?;
-      book.entrypoint = entrypoint;
-
-      if arg_verbose {
-        println!("{book}");
-      }
-
-      Ok(book)
-    };
-
-    execute_cli_mode(cli, book)
-  }
-
-  if let Err(e) = run() {
+  let cli = Cli::parse();
+  if let Err(e) = execute_cli_mode(cli) {
     eprintln!("{e}");
   }
 }
 
-fn execute_cli_mode(cli: Cli, load_book: impl FnOnce(&Path) -> Result<Book, String>) -> Result<(), String> {
+fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
+  let arg_verbose = cli.verbose;
+  let entrypoint = cli.entrypoint.take();
+
+  let load_book = |path: &Path| -> Result<Book, Info> {
+    let mut book = load_file_to_book(&path).map_err(Info::from)?;
+    book.entrypoint = entrypoint;
+
+    if arg_verbose {
+      println!("{book}");
+    }
+
+    Ok(book)
+  };
+
   match cli.mode {
     Mode::Check { path } => {
       let book = load_book(&path)?;
@@ -188,18 +186,18 @@ fn execute_cli_mode(cli: Cli, load_book: impl FnOnce(&Path) -> Result<Book, Stri
 
       let book = load_book(&path)?;
       let compiled = compile_book(book, opts)?;
-      println!("{}", compiled.display_with_opts(warning_opts)?);
+      println!("{}", compiled.display_with_warns(warning_opts)?);
     }
     Mode::Desugar { path, comp_opts } => {
       let opts = OptArgs::opts_from_cli(&comp_opts);
-      let mut book = load_book(&path)?;
-
-      desugar_book(&mut book, opts)?;
-      println!("{book}");
+      let book = load_book(&path)?;
+      // TODO: Shoudn't the desugar have `warn_opts` too? maybe WarningOpts::allow_all() by default
+      let (book, _warns) = desugar_book(book, opts)?;
+      println!("{}", book);
     }
     Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, comp_opts, warn_opts, lazy_mode } => {
       if debug && lazy_mode {
-        return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".to_string());
+        return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".into());
       }
 
       let warning_opts = warn_opts.get_warning_opts(WarningOpts::allow_all());

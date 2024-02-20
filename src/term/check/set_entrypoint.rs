@@ -1,5 +1,5 @@
 use crate::{
-  term::{Book, Definition, Name},
+  term::{Book, Ctx, Definition, Name},
   ENTRY_POINT, HVM1_ENTRY_POINT,
 };
 use std::fmt::Display;
@@ -28,58 +28,56 @@ impl Display for EntryErr {
   }
 }
 
-impl Book {
+impl Ctx {
   pub fn set_entrypoint(&mut self) {
     let mut main = None;
 
-    match self.get_possible_entry_points() {
+    match self.book.get_possible_entry_points() {
       (Some(entry), None, None) | (None, Some(entry), None) | (None, None, Some(entry)) => {
-        match self.validate_entry_point(entry) {
+        match validate_entry_point(entry) {
           Ok(name) => main = Some(name),
           Err(err) => self.info.error(err),
         }
       }
 
       (Some(a), Some(b), None) | (None, Some(a), Some(b)) | (Some(a), None, Some(b)) => {
-        let entry = self.validate_entry_point(a);
-
         self.info.error(EntryErr::Multiple(vec![a.name.clone(), b.name.clone()]));
 
-        match entry {
+        match validate_entry_point(a) {
           Ok(name) => main = Some(name),
           Err(err) => self.info.error(err),
         }
       }
 
       (Some(a), Some(b), Some(c)) => {
-        let entry = self.validate_entry_point(a);
-
         self.info.error(EntryErr::Multiple(vec![a.name.clone(), b.name.clone(), c.name.clone()]));
 
-        match entry {
+        match validate_entry_point(a) {
           Ok(name) => main = Some(name),
           Err(err) => self.info.error(err),
         }
       }
 
       (None, None, None) => {
-        self.info.error(EntryErr::NotFound(self.entrypoint.clone().unwrap_or(Name::new(ENTRY_POINT))))
+        self.info.error(EntryErr::NotFound(self.book.entrypoint.clone().unwrap_or(Name::new(ENTRY_POINT))))
       }
     }
 
-    self.entrypoint = main;
+    self.book.entrypoint = main;
   }
+}
 
-  fn validate_entry_point(&self, entry: &Definition) -> Result<Name, EntryErr> {
-    if entry.rules.len() > 1 {
-      Err(EntryErr::MultipleRules)
-    } else if !entry.rules[0].pats.is_empty() {
-      Err(EntryErr::Arguments)
-    } else {
-      Ok(entry.name.clone())
-    }
+fn validate_entry_point(entry: &Definition) -> Result<Name, EntryErr> {
+  if entry.rules.len() > 1 {
+    Err(EntryErr::MultipleRules)
+  } else if !entry.rules[0].pats.is_empty() {
+    Err(EntryErr::Arguments)
+  } else {
+    Ok(entry.name.clone())
   }
+}
 
+impl Book {
   fn get_possible_entry_points(&self) -> (Option<&Definition>, Option<&Definition>, Option<&Definition>) {
     let custom = self.entrypoint.as_ref().map(|e| self.defs.get(e)).flatten();
     let main = self.defs.get(&Name::new(ENTRY_POINT));

@@ -1,6 +1,9 @@
 // Pass for inlining functions that are just a reference to another one.
 
-use crate::term::{Book, Name, Term};
+use crate::{
+  diagnostics::Info,
+  term::{Ctx, Name, Term},
+};
 use std::{collections::BTreeMap, fmt::Display};
 
 #[derive(Debug, Clone)]
@@ -12,19 +15,19 @@ impl Display for CyclicDef {
   }
 }
 
-impl Book {
+impl Ctx {
   // When we find a function that is simply directly calling another function,
   // substitutes all occurrences of that function to the one being called, avoiding the unnecessary redirect.
   // In case there is a long chain of ref-to-ref-to-ref, we substitute values by the last function in the chain.
-  pub fn simplify_ref_to_ref(&mut self) -> Result<(), String> {
+  pub fn simplify_ref_to_ref(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 
     let mut ref_map: BTreeMap<Name, Name> = BTreeMap::new();
     // Find to which defs we're mapping the ones that are just references.
-    'outer: for def_name in self.defs.keys() {
+    'outer: for def_name in self.book.defs.keys() {
       let mut ref_name = def_name;
       let mut is_ref_to_ref = false;
-      while let Term::Ref { nam: next_ref } = &self.defs.get(ref_name).unwrap().rule().body {
+      while let Term::Ref { nam: next_ref } = &self.book.defs.get(ref_name).unwrap().rule().body {
         if next_ref == ref_name {
           self.info.error(CyclicDef(def_name.clone()));
           continue 'outer;
@@ -38,7 +41,7 @@ impl Book {
     }
 
     // Substitute all the occurrences of ref-to-ref.
-    for body in self.defs.values_mut().map(|def| &mut def.rule_mut().body) {
+    for body in self.book.defs.values_mut().map(|def| &mut def.rule_mut().body) {
       subst_ref_to_ref(body, &ref_map);
     }
 

@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
 use crate::{
-  diagnostics::Error,
-  term::{Book, Definition, Name, Pattern, Type},
+  diagnostics::{Error, Info},
+  term::{Ctx, Definition, Name, Pattern, Type},
 };
 use indexmap::IndexMap;
 
@@ -27,17 +27,17 @@ impl Display for InferErr {
   }
 }
 
-impl Book {
+impl Ctx {
   /// Returns a HashMap from the definition id to the inferred pattern types
   /// and checks the rules arities based on the first rule arity.
   /// Expects patterns to be flattened.
-  pub fn infer_def_types(&mut self) -> Result<DefinitionTypes, String> {
+  pub fn infer_def_types(&mut self) -> Result<DefinitionTypes, Info> {
     self.info.start_pass();
 
     let mut def_types = IndexMap::new();
 
-    for (def_name, def) in &self.defs {
-      match def.infer_type(&self.ctrs) {
+    for (def_name, def) in &self.book.defs {
+      match def.infer_type(&self.book.ctrs) {
         Ok(def_type) => _ = def_types.insert(def_name.clone(), def_type),
         Err(e) => self.info.error(e),
       }
@@ -82,11 +82,11 @@ fn unify(new: Type, old: &mut Type) -> Result<(), InferErr> {
   Ok(())
 }
 
-impl Book {
-  pub fn check_arity(&mut self) -> Result<(), String> {
+impl Ctx {
+  pub fn check_arity(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 
-    for (def_name, def) in self.defs.iter() {
+    for (def_name, def) in self.book.defs.iter() {
       if let Err(e) = def.check_arity() {
         self.info.error(Error::Infer(def_name.clone(), e))
       };

@@ -1,6 +1,6 @@
 use crate::{
-  diagnostics::Error,
-  term::{Book, Name, Pattern, Term},
+  diagnostics::{Error, Info},
+  term::{Ctx, Name, Pattern, Term},
 };
 use hvmc::run::Val;
 use std::{
@@ -31,12 +31,12 @@ impl Display for UnboundVar {
   }
 }
 
-impl Book {
+impl Ctx {
   /// Checks that there are no unbound variables in all definitions.
-  pub fn check_unbound_vars(&mut self) -> Result<(), String> {
+  pub fn check_unbound_vars(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 
-    for (def_name, def) in self.defs.iter_mut() {
+    for (def_name, def) in self.book.defs.iter_mut() {
       let mut errs = Vec::new();
       for rule in &mut def.rules {
         let mut scope = HashMap::new();

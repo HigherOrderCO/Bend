@@ -1,35 +1,35 @@
 use crate::{
-  diagnostics::Error,
-  term::{display::DisplayJoin, Book, Definition, Name, Pattern, Rule, Term, Type},
+  diagnostics::{Error, Info},
+  term::{display::DisplayJoin, Ctx, Definition, Name, Pattern, Rule, Term, Type},
   Warning,
 };
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
-impl Book {
+impl Ctx {
   /// Extracts adt match terms into pattern matching functions.
   /// Creates rules with potentially nested patterns, so the flattening pass needs to be called after.
-  pub fn extract_adt_matches(&mut self) -> Result<(), String> {
+  pub fn extract_adt_matches(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 
     let mut new_defs = Vec::new();
 
-    for (def_name, def) in &mut self.defs {
+    for (def_name, def) in &mut self.book.defs {
       for rule in def.rules.iter_mut() {
         let res = rule.body.extract_adt_matches(
           def_name,
           def.builtin,
-          &self.ctrs,
+          &self.book.ctrs,
           &mut new_defs,
           &mut 0,
-          &mut self.info.warnings,
+          &mut self.info.warns,
         );
 
         self.info.errs.extend(res.map_err(|e| Error::AdtMatch(def_name.clone(), e)).err());
       }
     }
 
-    self.info.fatal(new_defs).map(|defs| self.defs.extend(defs))
+    self.info.fatal(new_defs).map(|defs| self.book.defs.extend(defs))
   }
 }
 

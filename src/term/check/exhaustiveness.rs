@@ -1,7 +1,7 @@
 use super::type_check::DefinitionTypes;
 use crate::{
-  diagnostics::Error,
-  term::{Adt, Book, MatchNum, Name, Pattern, Rule, Type},
+  diagnostics::{Error, Info},
+  term::{Adt, Ctx, MatchNum, Name, Pattern, Rule, Type},
 };
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -20,16 +20,16 @@ impl Display for ExhaustivenessErr {
   }
 }
 
-impl Book {
+impl Ctx {
   /// For each pattern-matching definition, check that any given value will match at least one of the rules.
   /// We assume that all patterns have been type checked already.
-  pub fn check_exhaustive_patterns(&mut self, def_types: &DefinitionTypes) -> Result<(), String> {
+  pub fn check_exhaustive_patterns(&mut self, def_types: &DefinitionTypes) -> Result<(), Info> {
     self.info.start_pass();
 
-    for (def_name, def) in &self.defs {
+    for (def_name, def) in &self.book.defs {
       let types = &def_types[def_name];
       let rules_to_check = (0 .. def.rules.len()).collect();
-      let res = check_pattern(&[], &self.adts, &def.rules, types, rules_to_check, def_name);
+      let res = check_pattern(&[], &self.book.adts, &def.rules, types, rules_to_check, def_name);
       self.info.errs.extend(res.map_err(|e| Error::Exhaustiveness(def_name.clone(), e)).err());
     }
 

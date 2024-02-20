@@ -1,7 +1,7 @@
 use hvmc::run::Val;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
-use std::{collections::HashMap, ops::Deref, sync::Arc, vec};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 pub mod builtins;
 pub mod check;
@@ -17,6 +17,18 @@ pub use term_to_net::{book_to_nets, term_to_compat_net};
 
 use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
 
+#[derive(Debug, Clone, Default)]
+pub struct Ctx {
+  pub book: Book,
+  pub info: Info,
+}
+
+impl Ctx {
+  pub fn new(book: Book) -> Ctx {
+    Ctx { book, info: Info::default() }
+  }
+}
+
 /// The representation of a program.
 #[derive(Debug, Clone, Default)]
 pub struct Book {
@@ -31,8 +43,6 @@ pub struct Book {
 
   /// A custom or default "main" entrypoint.
   pub entrypoint: Option<Name>,
-
-  pub info: Info,
 }
 
 /// A pattern matching function definition.

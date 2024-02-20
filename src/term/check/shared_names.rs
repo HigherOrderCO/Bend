@@ -2,7 +2,7 @@ use std::{collections::HashMap, fmt::Display};
 
 use crate::{
   diagnostics::Error,
-  term::{Book, Name},
+  term::{Ctx, Name},
 };
 
 #[derive(Debug, Clone)]
@@ -14,20 +14,20 @@ impl Display for TopLevelErr {
   }
 }
 
-impl Book {
+impl Ctx {
   /// Checks if exists shared names from definitions, adts and constructors.
   pub fn check_shared_names(&mut self) {
     let mut checked = HashMap::<&Name, usize>::new();
 
-    for adt_name in self.adts.keys() {
+    for adt_name in self.book.adts.keys() {
       *checked.entry(adt_name).or_default() += 1;
     }
 
-    for ctr_name in self.ctrs.keys() {
+    for ctr_name in self.book.ctrs.keys() {
       *checked.entry(ctr_name).or_default() += 1;
     }
 
-    for def_name in self.defs.keys() {
+    for def_name in self.book.defs.keys() {
       *checked.entry(def_name).or_default() += 1;
     }
 

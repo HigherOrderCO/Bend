@@ -1,21 +1,25 @@
-use std::collections::BTreeSet;
-
+use super::extract_adt_matches::{infer_match_type, MatchError};
+use crate::{
+  diagnostics::{Error, Info},
+  term::{Ctx, Name, Pattern, Term, Type},
+};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use std::collections::BTreeSet;
 
-use crate::term::{Book, Name, Pattern, Term, Type};
+impl Ctx {
+  pub fn linearize_matches(&mut self) -> Result<(), Info> {
+    self.info.start_pass();
 
-use super::extract_adt_matches::{infer_match_type, MatchError};
-
-impl Book {
-  pub fn linearize_matches(&mut self) -> Result<(), String> {
-    for def in self.defs.values_mut() {
+    for (def_name, def) in &mut self.book.defs {
       for rule in def.rules.iter_mut() {
-        rule.body.linearize_matches(&self.ctrs).map_err(|e| format!("In definition '{}': {e}", def.name))?;
+        let res = rule.body.linearize_matches(&self.book.ctrs);
+
+        self.info.errs.extend(res.map_err(|e| Error::AdtMatch(def_name.clone(), e)).err());
       }
     }
 
-    Ok(())
+    self.info.fatal(())
   }
 }
 

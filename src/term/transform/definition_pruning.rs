@@ -2,7 +2,7 @@ use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
   diagnostics::Warning,
-  term::{Adt, AdtEncoding, Book, Name, Tag, Term, LIST, STRING},
+  term::{Adt, AdtEncoding, Book, Ctx, Name, Tag, Term, LIST, STRING},
 };
 use indexmap::IndexSet;
 
@@ -24,21 +24,21 @@ enum Used {
 
 type Definitions = HashMap<Name, Used>;
 
-impl Book {
+impl Ctx {
   /// If `prune_all`, removes all unused definitions and adts starting from Main.
   /// Otherwise, prunes only the builtins not accessible from any non-built-in definition
   pub fn prune(&mut self, prune_all: bool, adt_encoding: AdtEncoding) {
     let mut used = Definitions::new();
 
-    if let Some(main) = &self.entrypoint {
-      let def = self.defs.get(main).unwrap();
+    if let Some(main) = &self.book.entrypoint {
+      let def = self.book.defs.get(main).unwrap();
       used.insert(main.clone(), Used::Main);
-      self.find_used_definitions(&def.rule().body, Used::Main, &mut used, adt_encoding);
+      self.book.find_used_definitions(&def.rule().body, Used::Main, &mut used, adt_encoding);
     }
 
     // Even if we don't prune all the defs, we need check what built-ins are accessible through user code
     if !prune_all {
-      for (def_name, def) in &self.defs {
+      for (def_name, def) in &self.book.defs {
         // This needs to be done for each rule in case the pass it's ran from has not encoded the pattern match
         // E.g.: the `flatten_rules` golden test
         if !def.builtin {
@@ -49,7 +49,7 @@ impl Book {
               _ => {}
             }
 
-            self.find_used_definitions(&rule.body, Used::Unused, &mut used, adt_encoding);
+            self.book.find_used_definitions(&rule.body, Used::Unused, &mut used, adt_encoding);
           }
         }
       }
@@ -59,7 +59,7 @@ impl Book {
     let filter = |(name, used)| if used == Used::Unused { None } else { Some(name) };
     let used: IndexSet<Name> = used.into_iter().filter_map(filter).collect();
 
-    let names = self.defs.keys().cloned().collect::<IndexSet<Name>>();
+    let names = self.book.defs.keys().cloned().collect::<IndexSet<Name>>();
     let unused = names.difference(&used).cloned();
 
     self.prune_unused(unused, prune_all);
@@ -67,15 +67,17 @@ impl Book {
 
   fn prune_unused(&mut self, unused: impl IntoIterator<Item = Name>, prune_all: bool) {
     for def_name in unused {
-      let def = &self.defs[&def_name];
+      let def = &self.book.defs[&def_name];
       if prune_all || def.builtin {
-        self.defs.swap_remove(&def_name);
+        self.book.defs.swap_remove(&def_name);
       } else if !def_name.is_generated() {
-        self.info.warnings.push(Warning::UnusedDefinition(def_name.clone()));
+        self.info.warns.push(Warning::UnusedDefinition(def_name.clone()));
       }
     }
   }
+}
 
+impl Book {
   /// Finds all used definitions on every term that can have a def_id.
   fn find_used_definitions(
     &self,

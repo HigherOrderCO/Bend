@@ -2,19 +2,19 @@ use indexmap::IndexMap;
 
 use super::extract_adt_matches::{infer_match_type, MatchError};
 use crate::{
-  diagnostics::Error,
-  term::{Book, MatchNum, Name, Op, Pattern, Tag, Term, Type},
+  diagnostics::{Error, Info},
+  term::{Ctx, MatchNum, Name, Op, Pattern, Tag, Term, Type},
 };
 
-impl Book {
+impl Ctx {
   /// Converts tuple and var matches into let expressions,
   /// makes num matches have exactly one rule for zero and one rule for succ.
   /// Should be run after pattern matching functions are desugared.
-  pub fn normalize_native_matches(&mut self) -> Result<(), String> {
+  pub fn normalize_native_matches(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 
-    for (def_name, def) in self.defs.iter_mut() {
-      let res = def.rule_mut().body.normalize_native_matches(&self.ctrs);
+    for (def_name, def) in self.book.defs.iter_mut() {
+      let res = def.rule_mut().body.normalize_native_matches(&self.book.ctrs);
       self.info.errs.extend(res.map_err(|e| Error::AdtMatch(def_name.clone(), e)).err());
     }
 
