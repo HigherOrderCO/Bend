@@ -4,9 +4,9 @@ use crate::term::{Book, Name, Term};
 use std::{collections::BTreeMap, fmt::Display};
 
 #[derive(Debug, Clone)]
-pub struct ClyclicDef(pub Name);
+pub struct CyclicDef(pub Name);
 
-impl Display for ClyclicDef {
+impl Display for CyclicDef {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "is a reference to itself")
   }
@@ -26,7 +26,7 @@ impl Book {
       let mut is_ref_to_ref = false;
       while let Term::Ref { nam: next_ref } = &self.defs.get(ref_name).unwrap().rule().body {
         if next_ref == ref_name {
-          self.info.error(ClyclicDef(def_name.clone()));
+          self.info.error(CyclicDef(def_name.clone()));
           continue 'outer;
         }
         ref_name = next_ref;

@@ -4,7 +4,7 @@ use crate::term::{
     shared_names::TopLevelErr, type_check::InferErr, unbound_pats::UnboundCtr, unbound_vars::UnboundVar,
   },
   transform::{
-    extract_adt_matches::MatchError, resolve_refs::ReferencedMain, simplify_ref_to_ref::ClyclicDef,
+    extract_adt_matches::MatchError, resolve_refs::ReferencedMain, simplify_ref_to_ref::CyclicDef,
   },
   Name,
 };
@@ -50,7 +50,7 @@ pub enum Error {
   UnboundCtr(Name, UnboundCtr),
   Infer(Name, InferErr),
   Arity(Name, ArityErr),
-  Clyclic(ClyclicDef),
+  Cyclic(CyclicDef),
   EntryPoint(EntryErr),
   TopLevel(TopLevelErr),
 }
@@ -65,7 +65,7 @@ impl Display for Error {
       Error::MainRef(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
       Error::Infer(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
       Error::Arity(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
-      Error::Clyclic(err @ ClyclicDef(def)) => write!(f, "Definition '{def}' {err}"),
+      Error::Cyclic(err @ CyclicDef(def)) => write!(f, "Definition '{def}' {err}"),
       Error::EntryPoint(err) => write!(f, "{err}"),
       Error::TopLevel(err) => write!(f, "{err}"),
     }
@@ -84,9 +84,9 @@ impl From<TopLevelErr> for Error {
   }
 }
 
-impl From<ClyclicDef> for Error {
-  fn from(value: ClyclicDef) -> Self {
-    Self::Clyclic(value)
+impl From<CyclicDef> for Error {
+  fn from(value: CyclicDef) -> Self {
+    Self::Cyclic(value)
   }
 }
 
