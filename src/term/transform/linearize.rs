@@ -76,9 +76,10 @@ fn term_to_affine(term: &mut Term, inst_count: &mut HashMap<Name, Val>) {
     }
 
     Term::Let { pat: Pattern::Var(None), val, nxt } => {
+      term_to_affine(nxt, inst_count);
+
       if val.has_unscoped() {
         term_to_affine(val, inst_count);
-        term_to_affine(nxt, inst_count);
       } else {
         let Term::Let { nxt, .. } = std::mem::take(term) else { unreachable!() };
         *term = *nxt;
