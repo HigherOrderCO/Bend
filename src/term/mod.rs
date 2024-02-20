@@ -786,6 +786,9 @@ impl AsRef<str> for Name {
 
 impl Book {
   pub fn hvmc_entrypoint(&self) -> String {
-    if let Some(nam) = &self.entrypoint { nam.to_string() } else { ENTRY_POINT.to_string() }
+    match self.entrypoint.as_ref().map(|e| e.0.as_ref()) {
+      Some("main" | "Main") | None => ENTRY_POINT.to_string(),
+      Some(nam) => nam.to_string(),
+    }
   }
 }

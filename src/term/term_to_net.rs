@@ -15,18 +15,19 @@ pub struct HvmcNames {
   pub hvmc_to_hvml: HashMap<Val, Name>,
 }
 
-pub fn book_to_nets(book: &Book, main: &Name) -> (HashMap<String, INet>, HvmcNames, Labels) {
+pub fn book_to_nets(book: &Book) -> (HashMap<String, INet>, HvmcNames, Labels) {
   let mut nets = HashMap::new();
   let mut hvmc_names = HvmcNames::default();
   let mut labels = Labels::default();
   let mut generated_count = 0;
+  let main = book.entrypoint.as_ref().unwrap();
 
   for def in book.defs.values() {
     for rule in def.rules.iter() {
       let net = term_to_compat_net(&rule.body, &mut labels);
 
-      let name = if def.name == *main && book.entrypoint.is_none() {
-        ENTRY_POINT.to_string()
+      let name = if def.name == *main {
+        book.hvmc_entrypoint()
       } else {
         def_name_to_hvmc_name(&def.name, &nets, &mut generated_count)
       };

@@ -27,10 +27,10 @@ type Definitions = HashMap<Name, Used>;
 impl Book {
   /// If `prune_all`, removes all unused definitions and adts starting from Main.
   /// Otherwise, prunes only the builtins not accessible from any non-built-in definition
-  pub fn prune(&mut self, main: Option<&Name>, prune_all: bool, adt_encoding: AdtEncoding) {
+  pub fn prune(&mut self, prune_all: bool, adt_encoding: AdtEncoding) {
     let mut used = Definitions::new();
 
-    if let Some(main) = main {
+    if let Some(main) = &self.entrypoint {
       let def = self.defs.get(main).unwrap();
       used.insert(main.clone(), Used::Main);
       self.find_used_definitions(&def.rule().body, Used::Main, &mut used, adt_encoding);

@@ -29,7 +29,7 @@ impl Display for EntryErr {
 }
 
 impl Book {
-  pub fn check_has_entrypoint(&mut self) -> Option<Name> {
+  pub fn set_entrypoint(&mut self) {
     let mut main = None;
 
     match self.get_possible_entry_points() {
@@ -67,7 +67,7 @@ impl Book {
       }
     }
 
-    main
+    self.entrypoint = main;
   }
 
   fn validate_entry_point(&self, entry: &Definition) -> Result<Name, EntryErr> {

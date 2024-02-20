@@ -157,7 +157,7 @@ fn readback_lnet() {
 fn flatten_rules() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let main = book.check_has_entrypoint();
+    book.set_entrypoint();
     book.check_shared_names();
     book.encode_builtins();
     book.resolve_ctrs_in_pats();
@@ -167,7 +167,7 @@ fn flatten_rules() {
     book.check_unbound_pats()?;
     book.extract_adt_matches()?;
     book.flatten_rules();
-    book.prune(main.as_ref(), false, AdtEncoding::TaggedScott);
+    book.prune(false, AdtEncoding::TaggedScott);
     Ok(book.to_string())
   })
 }
@@ -186,13 +186,13 @@ fn encode_pattern_match() {
     let mut result = String::new();
     for adt_encoding in [AdtEncoding::TaggedScott, AdtEncoding::Scott] {
       let mut book = do_parse_book(code, path)?;
-      let main = book.check_has_entrypoint();
+      book.set_entrypoint();
       book.check_shared_names();
       book.encode_adts(adt_encoding);
       book.encode_builtins();
-      encode_pattern_matching(&mut book, main.as_ref(), adt_encoding)?;
-      book.prune(main.as_ref(), false, adt_encoding);
-      book.merge_definitions(main.as_ref());
+      encode_pattern_matching(&mut book, adt_encoding)?;
+      book.prune(false, adt_encoding);
+      book.merge_definitions();
 
       writeln!(result, "{adt_encoding:?}:").unwrap();
       writeln!(result, "{book}\n").unwrap();

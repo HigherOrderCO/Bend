@@ -14,7 +14,7 @@ use term::{
   display::{display_readback_errors, DisplayJoin},
   net_to_term::net_to_term,
   term_to_net::{HvmcNames, Labels},
-  AdtEncoding, Book, Name, ReadbackError, Term,
+  AdtEncoding, Book, ReadbackError, Term,
 };
 
 pub mod diagnostics;
@@ -34,8 +34,8 @@ pub fn check_book(book: Book) -> Result<(), String> {
 }
 
 pub fn compile_book(mut book: Book, opts: CompileOpts) -> Result<CompileResult, String> {
-  let main = desugar_book(&mut book, opts)?;
-  let (nets, hvmc_names, labels) = book_to_nets(&mut book, &main);
+  desugar_book(&mut book, opts)?;
+  let (nets, hvmc_names, labels) = book_to_nets(&mut book);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
   if opts.pre_reduce {
     pre_reduce_book(&mut core_book, opts.pre_reduce_refs, book.hvmc_entrypoint())?;
@@ -46,12 +46,12 @@ pub fn compile_book(mut book: Book, opts: CompileOpts) -> Result<CompileResult, 
   Ok(CompileResult { book, core_book, hvmc_names, labels })
 }
 
-pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Name, String> {
-  let main = book.check_has_entrypoint();
+pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<(), String> {
+  book.set_entrypoint();
   book.check_shared_names();
   book.encode_adts(opts.adt_encoding);
   book.encode_builtins();
-  encode_pattern_matching(book, main.as_ref(), opts.adt_encoding)?;
+  encode_pattern_matching(book, opts.adt_encoding)?;
   // sanity check
   book.check_unbound_vars()?;
   book.normalize_native_matches()?;
@@ -63,37 +63,33 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Name, String> 
   book.check_unbound_vars()?;
 
   if opts.supercombinators {
-    book.detach_supercombinators(main.as_ref());
+    book.detach_supercombinators();
   }
   if opts.ref_to_ref {
     book.simplify_ref_to_ref()?;
   }
-  if main.as_ref().is_some() && opts.simplify_main {
-    book.simplify_main_ref(main.as_ref().unwrap());
+  if opts.simplify_main {
+    book.simplify_main_ref();
   }
 
-  book.prune(main.as_ref(), opts.prune, opts.adt_encoding);
+  book.prune(opts.prune, opts.adt_encoding);
 
   if opts.inline {
     book.inline();
   }
   if opts.merge {
-    book.merge_definitions(main.as_ref());
+    book.merge_definitions();
   }
 
-  if book.info.errs.is_empty() { Ok(main.unwrap()) } else { Err(book.info.take_errs()) }
+  if book.info.errs.is_empty() { Ok(()) } else { Err(book.info.take_errs()) }
 }
 
-pub fn encode_pattern_matching(
-  book: &mut Book,
-  main: Option<&Name>,
-  adt_encoding: AdtEncoding,
-) -> Result<(), String> {
+pub fn encode_pattern_matching(book: &mut Book, adt_encoding: AdtEncoding) -> Result<(), String> {
   book.check_arity()?;
   book.resolve_ctrs_in_pats();
   book.check_unbound_pats()?;
   book.check_ctrs_arities()?;
-  book.resolve_refs(main)?;
+  book.resolve_refs()?;
   book.desugar_let_destructors();
   book.desugar_implicit_match_binds();
   // This call to unbound vars needs to be after desugar_implicit_match_binds,
