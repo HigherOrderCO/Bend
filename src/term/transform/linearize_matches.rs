@@ -28,11 +28,9 @@ impl Term {
         }
         let matched_type = infer_match_type(arms.iter().map(|(x, _)| x), ctrs)?;
         match matched_type {
-          // Don't extract non-adt matches.
+          // Don't linearize non-adt matches.
           Type::None | Type::Any => (),
           Type::Num => _ = linearize_match_free_vars(self),
-          // TODO: Instead of extracting tuple matches, we should flatten one layer and check sub-patterns for something to extract.
-          // For now, to prevent extraction we can use `let (a, b) = ...;`
           Type::Adt(_) | Type::Tup => {
             let match_term = linearize_match_unscoped_vars(self)?;
             linearize_match_free_vars(match_term);

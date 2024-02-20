@@ -399,9 +399,6 @@ impl Term {
             for var in rule.names() {
               new_scope.remove(var);
             }
-            // if let Pattern::Num(MatchNum::Succ(Some(Some(nam)))) = rule {
-            //   new_scope.remove(nam);
-            // }
 
             free_vars.extend(new_scope);
           }
