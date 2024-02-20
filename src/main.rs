@@ -2,10 +2,13 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvmc::ast::show_net;
 use hvml::{
   check_book, compile_book, desugar_book, load_file_to_book, run_book,
-  term::{display::display_readback_errors, AdtEncoding, Name},
+  term::{display::display_readback_errors, AdtEncoding, Book, Name},
   CompileOpts, RunInfo, RunOpts, WarnState, WarningOpts,
 };
-use std::{path::PathBuf, vec::IntoIter};
+use std::{
+  path::{Path, PathBuf},
+  vec::IntoIter,
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -146,29 +149,33 @@ fn main() {
     #[cfg(not(feature = "cli"))]
     compile_error!("The 'cli' feature is needed for the hvm-lang cli");
 
-    let cli = Cli::parse();
+    let mut cli = Cli::parse();
     let arg_verbose = cli.verbose;
+    let entrypoint = cli.entrypoint.take();
 
-    let verbose = |book: &_| {
+    let book = |path: &Path| {
+      let mut book = load_file_to_book(&path)?;
+      book.entrypoint = entrypoint;
+
       if arg_verbose {
         println!("{book}");
       }
+
+      Ok(book)
     };
 
-    execute_cli_mode(cli, &verbose)?;
-
-    Ok(())
+    execute_cli_mode(cli, book)
   }
+
   if let Err(e) = run() {
     eprintln!("{e}");
   }
 }
 
-fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(), String> {
+fn execute_cli_mode(cli: Cli, load_book: impl FnOnce(&Path) -> Result<Book, String>) -> Result<(), String> {
   match cli.mode {
     Mode::Check { path } => {
-      let book = load_file_to_book(&path)?;
-      verbose(&book);
+      let book = load_book(&path)?;
       check_book(book)?;
     }
     Mode::Compile { path, comp_opts, warn_opts, lazy_mode } => {
@@ -179,18 +186,13 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
         opts.lazy_mode()
       }
 
-      let mut book = load_file_to_book(&path)?;
-      book.entrypoint = cli.entrypoint;
-      verbose(&book);
-
+      let book = load_book(&path)?;
       let compiled = compile_book(book, opts)?;
       println!("{}", compiled.display_with_opts(warning_opts)?);
     }
     Mode::Desugar { path, comp_opts } => {
-      let mut book = load_file_to_book(&path)?;
-      verbose(&book);
-
       let opts = OptArgs::opts_from_cli(&comp_opts);
+      let mut book = load_book(&path)?;
 
       desugar_book(&mut book, opts)?;
       println!("{book}");
@@ -209,9 +211,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
         opts.lazy_mode()
       }
 
-      let mut book = load_file_to_book(&path)?;
-      book.entrypoint = cli.entrypoint;
-      verbose(&book);
+      let book = load_book(&path)?;
 
       let mem_size = mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
       let run_opts = RunOpts { single_core, debug, linear, lazy_mode };
