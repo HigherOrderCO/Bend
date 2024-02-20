@@ -396,8 +396,8 @@ impl Term {
             let mut new_scope = Default::default();
             go(term, &mut new_scope);
 
-            if let Pattern::Num(MatchNum::Succ(Some(Some(nam)))) = rule {
-              new_scope.remove(nam);
+            for var in rule.names() {
+              new_scope.remove(var);
             }
 
             free_vars.extend(new_scope);

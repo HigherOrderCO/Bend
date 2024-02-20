@@ -102,6 +102,7 @@ pub fn encode_pattern_matching(
   // This call to unbound vars needs to be after desugar_implicit_match_binds,
   // since we need the generated pattern names, like `x-1`, `ctr.field`.
   book.check_unbound_vars()?;
+  book.linearize_matches()?;
   book.extract_adt_matches(warnings)?;
   book.flatten_rules();
   let def_types = book.infer_def_types()?;
