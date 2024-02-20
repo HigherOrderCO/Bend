@@ -8,9 +8,9 @@ use std::{
 };
 
 #[derive(Debug, Clone)]
-pub struct ReferencedMain;
+pub struct ReferencedMainErr;
 
-impl Display for ReferencedMain {
+impl Display for ReferencedMainErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "Main definition can't be referenced inside the program")
   }
@@ -47,7 +47,7 @@ impl Term {
     def_names: &HashSet<Name>,
     main: Option<&Name>,
     scope: &mut HashMap<&'a Name, usize>,
-  ) -> Result<(), ReferencedMain> {
+  ) -> Result<(), ReferencedMainErr> {
     match self {
       Term::Lam { nam, bod, .. } => {
         push_scope(nam.as_ref(), scope);
@@ -87,7 +87,7 @@ impl Term {
         if is_var_in_scope(nam, scope) {
           if let Some(main) = main {
             if nam == main {
-              return Err(ReferencedMain);
+              return Err(ReferencedMainErr);
             }
           }
 

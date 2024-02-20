@@ -42,7 +42,7 @@ impl Term {
     new_defs: &mut Vec<(Name, Definition)>,
     match_count: &mut usize,
     warnings: &mut Vec<Warning>,
-  ) -> Result<(), MatchError> {
+  ) -> Result<(), MatchErr> {
     match self {
       Term::Mat { matched: box Term::Var { .. }, arms } => {
         let all_vars = arms.iter().all(|(pat, ..)| matches!(pat, Pattern::Var(..)));
@@ -94,7 +94,7 @@ impl Term {
     ctrs: &IndexMap<Name, Name>,
     new_defs: &mut Vec<(Name, Definition)>,
     match_count: &mut usize,
-  ) -> Result<(), MatchError> {
+  ) -> Result<(), MatchErr> {
     match self {
       Term::Mat { matched: box Term::Var { .. }, arms } => {
         for (_, body) in arms.iter_mut() {
@@ -174,7 +174,7 @@ fn match_to_def(
 pub fn infer_match_type<'a>(
   pats: impl Iterator<Item = &'a Pattern>,
   ctrs: &IndexMap<Name, Name>,
-) -> Result<Type, MatchError> {
+) -> Result<Type, MatchErr> {
   let mut match_type = Type::None;
   for pat in pats {
     let new_type = pat.to_type(ctrs);
@@ -187,48 +187,48 @@ pub fn infer_match_type<'a>(
       (Type::Tup, Type::Tup) => (),
       (Type::Num, Type::Num) => (),
       (Type::Adt(nam_new), Type::Adt(nam_old)) if &nam_new == nam_old => (),
-      (new, old) => return Err(MatchError::Infer(new, old.clone())),
+      (new, old) => return Err(MatchErr::Infer(new, old.clone())),
     };
   }
   Ok(match_type)
 }
 
 #[derive(Debug, Clone)]
-pub enum MatchError {
+pub enum MatchErr {
   Empty,
   Infer(Type, Type),
   Repeated(Name),
   Missing(HashSet<Name>),
-  LetPat(Box<MatchError>),
+  LetPat(Box<MatchErr>),
   Linearize(Name),
 }
 
-impl std::fmt::Display for MatchError {
+impl std::fmt::Display for MatchErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     fn ctrs_plural_or_sing(n: usize) -> &'static str {
       if n > 1 { "constructors" } else { "a constructor" }
     }
 
     match self {
-      MatchError::Empty => write!(f, "Empty match block found"),
-      MatchError::Infer(new, old) => write!(f, "Type mismatch. Found '{}' expected {}.", new, old),
-      MatchError::Repeated(bind) => write!(f, "Repeated var name in a match block: {}", bind),
-      MatchError::Missing(names) => {
+      MatchErr::Empty => write!(f, "Empty match block found"),
+      MatchErr::Infer(new, old) => write!(f, "Type mismatch. Found '{}' expected {}.", new, old),
+      MatchErr::Repeated(bind) => write!(f, "Repeated var name in a match block: {}", bind),
+      MatchErr::Missing(names) => {
         let constructor = ctrs_plural_or_sing(names.len());
         let missing = DisplayJoin(|| names.iter(), ", ");
         write!(f, "Missing {constructor} in a match block: {missing}")
       }
-      MatchError::LetPat(err) => {
+      MatchErr::LetPat(err) => {
         let let_err = err.to_string().replace("match block", "let bind");
         write!(f, "{let_err}")?;
 
-        if matches!(err.as_ref(), MatchError::Missing(_)) {
+        if matches!(err.as_ref(), MatchErr::Missing(_)) {
           write!(f, "\nConsider using a match block instead")?;
         }
 
         Ok(())
       }
-      MatchError::Linearize(var) => write!(f, "Unable to linearize variable {var} in a match block."),
+      MatchErr::Linearize(var) => write!(f, "Unable to linearize variable {var} in a match block."),
     }
   }
 }

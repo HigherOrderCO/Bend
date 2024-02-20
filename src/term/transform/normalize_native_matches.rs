@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 
-use super::extract_adt_matches::{infer_match_type, MatchError};
+use super::extract_adt_matches::{infer_match_type, MatchErr};
 use crate::{
   diagnostics::{Error, Info},
   term::{Ctx, MatchNum, Name, Op, Pattern, Tag, Term, Type},
@@ -23,7 +23,7 @@ impl Ctx {
 }
 
 impl Term {
-  fn normalize_native_matches(&mut self, ctrs: &IndexMap<Name, Name>) -> Result<(), MatchError> {
+  fn normalize_native_matches(&mut self, ctrs: &IndexMap<Name, Name>) -> Result<(), MatchErr> {
     match self {
       Term::Mat { matched: box Term::Var { nam }, arms } => {
         for (_, body) in arms.iter_mut() {
@@ -32,7 +32,7 @@ impl Term {
         let matched_type = infer_match_type(arms.iter().map(|(x, _)| x), ctrs)?;
         match matched_type {
           Type::None => {
-            return Err(MatchError::Empty);
+            return Err(MatchErr::Empty);
           }
           // This match is useless, will always go with the first rule.
           // TODO: Throw a warning in this case
@@ -81,7 +81,7 @@ impl Term {
 }
 
 /// Transforms a match on Num with any possible patterns into 'match x {0: ...; +: @x-1 ...}'.
-fn normalize_num_match(term: &mut Term) -> Result<(), MatchError> {
+fn normalize_num_match(term: &mut Term) -> Result<(), MatchErr> {
   let Term::Mat { matched: _, arms } = term else { unreachable!() };
 
   let mut zero_arm = None;
@@ -150,10 +150,10 @@ fn normalize_num_match(term: &mut Term) -> Result<(), MatchError> {
   }
 
   let Some(zero_arm) = zero_arm else {
-    return Err(MatchError::Missing(["0".to_string().into()].into()));
+    return Err(MatchErr::Missing(["0".to_string().into()].into()));
   };
   let Some(succ_arm) = succ_arm else {
-    return Err(MatchError::Missing(["+".to_string().into()].into()));
+    return Err(MatchErr::Missing(["+".to_string().into()].into()));
   };
   *arms = vec![zero_arm, succ_arm];
   Ok(())

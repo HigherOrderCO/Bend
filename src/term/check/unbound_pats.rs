@@ -5,9 +5,9 @@ use crate::{
 use std::{collections::HashSet, fmt::Display};
 
 #[derive(Debug, Clone)]
-pub struct UnboundCtr(Name);
+pub struct UnboundCtrErr(Name);
 
-impl Display for UnboundCtr {
+impl Display for UnboundCtrErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "Unbound constructor '{}'", self.0)
   }
@@ -36,9 +36,9 @@ impl Ctx {
 }
 
 impl Pattern {
-  pub fn check_unbounds(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), UnboundCtr> {
+  pub fn check_unbounds(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), UnboundCtrErr> {
     let unbounds = self.unbound_pats(is_ctr);
-    if let Some(unbound) = unbounds.iter().next() { Err(UnboundCtr(unbound.clone())) } else { Ok(()) }
+    if let Some(unbound) = unbounds.iter().next() { Err(UnboundCtrErr(unbound.clone())) } else { Ok(()) }
   }
 
   /// Given a possibly nested rule pattern, return a set of all used but not declared constructors.
@@ -66,7 +66,7 @@ impl Pattern {
 }
 
 impl Term {
-  pub fn check_unbound_pats(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), UnboundCtr> {
+  pub fn check_unbound_pats(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), UnboundCtrErr> {
     match self {
       Term::Let { pat, val, nxt } => {
         pat.check_unbounds(is_ctr)?;

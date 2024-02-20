@@ -1,10 +1,11 @@
 use crate::term::{
   check::{
     ctrs_arities::ArityErr, exhaustiveness::ExhaustivenessErr, set_entrypoint::EntryErr,
-    shared_names::TopLevelErr, type_check::InferErr, unbound_pats::UnboundCtr, unbound_vars::UnboundVar,
+    shared_names::TopLevelErr, type_check::InferErr, unbound_pats::UnboundCtrErr,
+    unbound_vars::UnboundVarErr,
   },
   transform::{
-    extract_adt_matches::MatchError, resolve_refs::ReferencedMain, simplify_ref_to_ref::CyclicDef,
+    extract_adt_matches::MatchErr, resolve_refs::ReferencedMainErr, simplify_ref_to_ref::CyclicDefErr,
   },
   Name,
 };
@@ -58,13 +59,13 @@ impl From<&str> for Info {
 #[derive(Debug, Clone)]
 pub enum Error {
   Exhaustiveness(Name, ExhaustivenessErr),
-  MainRef(Name, ReferencedMain),
-  AdtMatch(Name, MatchError),
-  UnboundVar(Name, UnboundVar),
-  UnboundCtr(Name, UnboundCtr),
+  MainRef(Name, ReferencedMainErr),
+  AdtMatch(Name, MatchErr),
+  UnboundVar(Name, UnboundVarErr),
+  UnboundCtr(Name, UnboundCtrErr),
   Infer(Name, InferErr),
   Arity(Name, ArityErr),
-  Cyclic(CyclicDef),
+  Cyclic(CyclicDefErr),
   EntryPoint(EntryErr),
   TopLevel(TopLevelErr),
   Custom(String),
@@ -80,7 +81,7 @@ impl Display for Error {
       Error::MainRef(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
       Error::Infer(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
       Error::Arity(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
-      Error::Cyclic(err @ CyclicDef(def)) => write!(f, "Definition '{def}' {err}"),
+      Error::Cyclic(err @ CyclicDefErr(def)) => write!(f, "Definition '{def}' {err}"),
       Error::EntryPoint(err) => write!(f, "{err}"),
       Error::TopLevel(err) => write!(f, "{err}"),
       Error::Custom(err) => write!(f, "{err}"),
@@ -94,8 +95,8 @@ impl From<EntryErr> for Error {
   }
 }
 
-impl From<CyclicDef> for Error {
-  fn from(value: CyclicDef) -> Self {
+impl From<CyclicDefErr> for Error {
+  fn from(value: CyclicDefErr) -> Self {
     Self::Cyclic(value)
   }
 }

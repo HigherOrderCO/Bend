@@ -9,16 +9,16 @@ use std::{
 };
 
 #[derive(Debug, Clone)]
-pub enum UnboundVar {
+pub enum UnboundVarErr {
   Local(Name),
   Global { var: Name, declared: usize, used: usize },
 }
 
-impl Display for UnboundVar {
+impl Display for UnboundVarErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      UnboundVar::Local(var) => write!(f, "Unbound variable '{var}'"),
-      UnboundVar::Global { var, declared, used } => match (declared, used) {
+      UnboundVarErr::Local(var) => write!(f, "Unbound variable '{var}'"),
+      UnboundVarErr::Global { var, declared, used } => match (declared, used) {
         (0, _) => write!(f, "Unbound unscoped variable '${var}'"),
         (_, 0) => write!(f, "Unscoped variable from lambda 'λ${var}' is never used"),
         (1, _) => write!(f, "Unscoped variable '${var}' used more than once"),
@@ -60,14 +60,14 @@ impl Term {
   pub fn check_unbound_vars<'a>(
     &'a mut self,
     scope: &mut HashMap<&'a Name, Val>,
-    errs: &mut Vec<UnboundVar>,
+    errs: &mut Vec<UnboundVarErr>,
   ) {
     let mut globals = HashMap::new();
     check_uses(self, scope, &mut globals, errs);
 
     // Check global vars
     for (nam, (declared, used)) in globals.into_iter().filter(|(_, (d, u))| !(*d == 1 && *u == 1)) {
-      errs.push(UnboundVar::Global { var: nam.clone(), declared, used });
+      errs.push(UnboundVarErr::Global { var: nam.clone(), declared, used });
     }
   }
 }
@@ -78,7 +78,7 @@ pub fn check_uses<'a>(
   term: &'a mut Term,
   scope: &mut HashMap<&'a Name, Val>,
   globals: &mut HashMap<&'a Name, (usize, usize)>,
-  errs: &mut Vec<UnboundVar>,
+  errs: &mut Vec<UnboundVarErr>,
 ) {
   match term {
     Term::Lam { nam, bod, .. } => {
@@ -88,7 +88,7 @@ pub fn check_uses<'a>(
     }
     Term::Var { nam } => {
       if !scope.contains_key(nam) {
-        errs.push(UnboundVar::Local(nam.clone()));
+        errs.push(UnboundVarErr::Local(nam.clone()));
         *term = Term::Err;
       }
     }
