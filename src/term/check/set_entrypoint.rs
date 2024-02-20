@@ -30,12 +30,13 @@ impl Display for EntryErr {
 
 impl Ctx {
   pub fn set_entrypoint(&mut self) {
-    let mut main = None;
+    let mut entrypoint = None;
 
-    match self.book.get_possible_entry_points() {
+    let (custom, main, hvm1_main) = self.book.get_possible_entry_points();
+    match (custom, main, hvm1_main) {
       (Some(entry), None, None) | (None, Some(entry), None) | (None, None, Some(entry)) => {
         match validate_entry_point(entry) {
-          Ok(name) => main = Some(name),
+          Ok(name) => entrypoint = Some(name),
           Err(err) => self.info.error(err),
         }
       }
@@ -44,7 +45,7 @@ impl Ctx {
         self.info.error(EntryErr::Multiple(vec![a.name.clone(), b.name.clone()]));
 
         match validate_entry_point(a) {
-          Ok(name) => main = Some(name),
+          Ok(name) => entrypoint = Some(name),
           Err(err) => self.info.error(err),
         }
       }
@@ -53,7 +54,7 @@ impl Ctx {
         self.info.error(EntryErr::Multiple(vec![a.name.clone(), b.name.clone(), c.name.clone()]));
 
         match validate_entry_point(a) {
-          Ok(name) => main = Some(name),
+          Ok(name) => entrypoint = Some(name),
           Err(err) => self.info.error(err),
         }
       }
@@ -63,7 +64,7 @@ impl Ctx {
       }
     }
 
-    self.book.entrypoint = main;
+    self.book.entrypoint = entrypoint;
   }
 }
 
