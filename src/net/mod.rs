@@ -5,7 +5,7 @@ use crate::term::Name;
 use hvmc::run::{Lab, Val};
 use NodeKind::*;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 /// Net representation used only as an intermediate for converting to hvm-core format
 pub struct INet {
   nodes: Vec<Node>,

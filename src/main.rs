@@ -1,5 +1,5 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
-use hvmc::ast::{show_book, show_net};
+use hvmc::ast::show_net;
 use hvml::{
   check_book, compile_book, desugar_book, load_file_to_book, run_book,
   term::{display::display_readback_errors, AdtEncoding, Name},
@@ -151,7 +151,7 @@ fn main() {
 
     let verbose = |book: &_| {
       if arg_verbose {
-        println!("{book:?}");
+        println!("{book}");
       }
     };
 
@@ -180,10 +180,11 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
       }
 
       let mut book = load_file_to_book(&path)?;
+      book.entrypoint = cli.entrypoint;
       verbose(&book);
-      let compiled = compile_book(&mut book, opts, cli.entrypoint)?;
-      hvml::display_warnings(&compiled.warnings, warning_opts)?;
-      print!("{}", show_book(&compiled.core_book));
+
+      let compiled = compile_book(book, opts)?;
+      println!("{}", compiled.display_with_opts(warning_opts)?);
     }
     Mode::Desugar { path, comp_opts } => {
       let mut book = load_file_to_book(&path)?;
@@ -191,7 +192,7 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
 
       let opts = OptArgs::opts_from_cli(&comp_opts);
 
-      desugar_book(&mut book, opts, None)?;
+      desugar_book(&mut book, opts)?;
       println!("{book}");
     }
     Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, comp_opts, warn_opts, lazy_mode } => {
@@ -208,13 +209,14 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
         opts.lazy_mode()
       }
 
-      let book = load_file_to_book(&path)?;
+      let mut book = load_file_to_book(&path)?;
+      book.entrypoint = cli.entrypoint;
       verbose(&book);
 
       let mem_size = mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
       let run_opts = RunOpts { single_core, debug, linear, lazy_mode };
       let (res_term, RunInfo { stats, readback_errors, net }) =
-        run_book(book, mem_size, run_opts, warning_opts, opts, cli.entrypoint)?;
+        run_book(book, mem_size, run_opts, warning_opts, opts)?;
 
       let total_rewrites = stats.rewrites.total() as f64;
       let rps = total_rewrites / stats.run_time / 1_000_000.0;

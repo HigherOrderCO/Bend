@@ -1,8 +1,8 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
+  diagnostics::Warning,
   term::{Adt, AdtEncoding, Book, Name, Tag, Term, LIST, STRING},
-  Warning,
 };
 use indexmap::IndexSet;
 
@@ -27,13 +27,7 @@ type Definitions = HashMap<Name, Used>;
 impl Book {
   /// If `prune_all`, removes all unused definitions and adts starting from Main.
   /// Otherwise, prunes only the builtins not accessible from any non-built-in definition
-  pub fn prune(
-    &mut self,
-    main: Option<&Name>,
-    prune_all: bool,
-    adt_encoding: AdtEncoding,
-    warnings: &mut Vec<Warning>,
-  ) {
+  pub fn prune(&mut self, main: Option<&Name>, prune_all: bool, adt_encoding: AdtEncoding) {
     let mut used = Definitions::new();
 
     if let Some(main) = main {
@@ -68,21 +62,16 @@ impl Book {
     let names = self.defs.keys().cloned().collect::<IndexSet<Name>>();
     let unused = names.difference(&used).cloned();
 
-    self.prune_unused(unused, prune_all, warnings);
+    self.prune_unused(unused, prune_all);
   }
 
-  fn prune_unused(
-    &mut self,
-    unused: impl IntoIterator<Item = Name>,
-    prune_all: bool,
-    warnings: &mut Vec<Warning>,
-  ) {
+  fn prune_unused(&mut self, unused: impl IntoIterator<Item = Name>, prune_all: bool) {
     for def_name in unused {
       let def = &self.defs[&def_name];
       if prune_all || def.builtin {
         self.defs.swap_remove(&def_name);
       } else if !def_name.is_generated() {
-        warnings.push(Warning::UnusedDefinition { def_name: def_name.clone() });
+        self.info.warnings.push(Warning::UnusedDefinition(def_name.clone()));
       }
     }
   }

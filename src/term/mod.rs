@@ -15,7 +15,7 @@ pub mod transform;
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
-use crate::{term::builtins::*, ENTRY_POINT};
+use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
 
 /// The representation of a program.
 #[derive(Debug, Clone, Default)]
@@ -31,6 +31,8 @@ pub struct Book {
 
   /// A custom or default "main" entrypoint.
   pub entrypoint: Option<Name>,
+
+  pub info: Info,
 }
 
 /// A pattern matching function definition.

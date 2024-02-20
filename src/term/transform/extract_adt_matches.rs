@@ -1,4 +1,5 @@
 use crate::{
+  diagnostics::Error,
   term::{display::DisplayJoin, Book, Definition, Name, Pattern, Rule, Term, Type},
   Warning,
 };
@@ -8,18 +9,27 @@ use std::collections::HashSet;
 impl Book {
   /// Extracts adt match terms into pattern matching functions.
   /// Creates rules with potentially nested patterns, so the flattening pass needs to be called after.
-  pub fn extract_adt_matches(&mut self, warnings: &mut Vec<Warning>) -> Result<(), String> {
-    let mut new_defs = vec![];
+  pub fn extract_adt_matches(&mut self) -> Result<(), String> {
+    self.info.start_pass();
+
+    let mut new_defs = Vec::new();
+
     for (def_name, def) in &mut self.defs {
       for rule in def.rules.iter_mut() {
-        rule
-          .body
-          .extract_adt_matches(def_name, def.builtin, &self.ctrs, &mut new_defs, &mut 0, warnings)
-          .map_err(|e| format!("In definition '{def_name}': {e}"))?;
+        let res = rule.body.extract_adt_matches(
+          def_name,
+          def.builtin,
+          &self.ctrs,
+          &mut new_defs,
+          &mut 0,
+          &mut self.info.warnings,
+        );
+
+        self.info.errs.extend(res.map_err(|e| Error::AdtMatch(def_name.clone(), e)).err());
       }
     }
-    self.defs.extend(new_defs);
-    Ok(())
+
+    self.info.fatal(new_defs).map(|defs| self.defs.extend(defs))
   }
 }
 
@@ -37,7 +47,7 @@ impl Term {
       Term::Mat { matched: box Term::Var { .. }, arms } => {
         let all_vars = arms.iter().all(|(pat, ..)| matches!(pat, Pattern::Var(..)));
         if all_vars && arms.len() > 1 {
-          warnings.push(crate::Warning::MatchOnlyVars { def_name: def_name.clone() });
+          warnings.push(Warning::MatchOnlyVars(def_name.clone()));
         }
         for (_, term) in arms.iter_mut() {
           term.extract_adt_matches(def_name, builtin, ctrs, new_defs, match_count, warnings)?;
@@ -177,25 +187,21 @@ pub fn infer_match_type<'a>(
       (Type::Tup, Type::Tup) => (),
       (Type::Num, Type::Num) => (),
       (Type::Adt(nam_new), Type::Adt(nam_old)) if &nam_new == nam_old => (),
-      (new, old) => {
-        return Err(MatchError::Infer(format!("Type mismatch. Found '{}' expected {}.", new, old)));
-      }
+      (new, old) => return Err(MatchError::Infer(new, old.clone())),
     };
   }
   Ok(match_type)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum MatchError {
   Empty,
-  Infer(String),
+  Infer(Type, Type),
   Repeated(Name),
   Missing(HashSet<Name>),
   LetPat(Box<MatchError>),
   Linearize(Name),
 }
-
-impl std::error::Error for MatchError {}
 
 impl std::fmt::Display for MatchError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -205,7 +211,7 @@ impl std::fmt::Display for MatchError {
 
     match self {
       MatchError::Empty => write!(f, "Empty match block found"),
-      MatchError::Infer(err) => write!(f, "{err}"),
+      MatchError::Infer(new, old) => write!(f, "Type mismatch. Found '{}' expected {}.", new, old),
       MatchError::Repeated(bind) => write!(f, "Repeated var name in a match block: {}", bind),
       MatchError::Missing(names) => {
         let constructor = ctrs_plural_or_sing(names.len());

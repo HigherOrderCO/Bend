@@ -1,24 +1,38 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Display};
 
-use crate::term::{Book, Name, Pattern};
+use crate::{
+  diagnostics::Error,
+  term::{Book, Name, Pattern},
+};
+
+#[derive(Debug, Clone)]
+pub struct ArityErr(Name, usize, usize);
+
+impl Display for ArityErr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Arity error. Constructor '{}' expects {} fields, found {}.", self.0, self.1, self.2)
+  }
+}
 
 impl Book {
   /// Checks if every constructor pattern of every definition rule has the same arity from the
   /// defined adt constructor.
   ///
   /// Constructors should be already resolved.
-  pub fn check_ctrs_arities(&self) -> Result<(), String> {
-    let arities = self.ctr_arities();
+  pub fn check_ctrs_arities(&mut self) -> Result<(), String> {
+    self.info.start_pass();
 
+    let arities = self.ctr_arities();
     for (def_name, def) in self.defs.iter() {
       for rule in def.rules.iter() {
         for pat in rule.pats.iter() {
-          pat.check(&arities).map_err(|e| format!("In definition '{def_name}': {e}"))?;
+          let res = pat.check(&arities).map_err(|e| Error::Arity(def_name.clone(), e)).err();
+          self.info.errs.extend(res);
         }
       }
     }
 
-    Ok(())
+    self.info.fatal(())
   }
 
   /// Returns a hashmap of the constructor name to its arity.
@@ -36,7 +50,7 @@ impl Book {
 }
 
 impl Pattern {
-  fn check(&self, arities: &HashMap<Name, usize>) -> Result<(), String> {
+  fn check(&self, arities: &HashMap<Name, usize>) -> Result<(), ArityErr> {
     let mut to_check = vec![self];
 
     while let Some(pat) = to_check.pop() {
@@ -45,10 +59,7 @@ impl Pattern {
           let arity = arities.get(name).unwrap();
           let args = args.len();
           if *arity != args {
-            return Err(format!(
-              "Arity error. Constructor '{}' expects {} fields, found {}.",
-              name, arity, args
-            ));
+            return Err(ArityErr(name.clone(), *arity, args));
           }
         }
         Pattern::Tup(fst, snd) => {

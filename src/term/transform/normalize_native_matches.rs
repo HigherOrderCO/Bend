@@ -1,22 +1,24 @@
 use indexmap::IndexMap;
 
-use crate::term::{Book, MatchNum, Name, Op, Pattern, Tag, Term, Type};
-
 use super::extract_adt_matches::{infer_match_type, MatchError};
+use crate::{
+  diagnostics::Error,
+  term::{Book, MatchNum, Name, Op, Pattern, Tag, Term, Type},
+};
 
 impl Book {
   /// Converts tuple and var matches into let expressions,
   /// makes num matches have exactly one rule for zero and one rule for succ.
   /// Should be run after pattern matching functions are desugared.
   pub fn normalize_native_matches(&mut self) -> Result<(), String> {
+    self.info.start_pass();
+
     for (def_name, def) in self.defs.iter_mut() {
-      def
-        .rule_mut()
-        .body
-        .normalize_native_matches(&self.ctrs)
-        .map_err(|e| format!("In definition '{def_name}': {e}"))?;
+      let res = def.rule_mut().body.normalize_native_matches(&self.ctrs);
+      self.info.errs.extend(res.map_err(|e| Error::AdtMatch(def_name.clone(), e)).err());
     }
-    Ok(())
+
+    self.info.fatal(())
   }
 }
 

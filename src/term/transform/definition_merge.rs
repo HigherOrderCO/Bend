@@ -10,16 +10,16 @@ impl Book {
   ///
   /// Ignores origin of the rules when merging,
   /// Should not be preceded by passes that cares about the origins.
-  pub fn merge_definitions(&mut self, main: &Name) {
+  pub fn merge_definitions(&mut self, main: Option<&Name>) {
     let defs: Vec<_> = self.defs.keys().cloned().collect();
     self.merge(main, defs.into_iter());
   }
 
   /// Checks and merges identical definitions given by `defs`.
   /// We never merge the entrypoint function with something else.
-  fn merge(&mut self, main: &Name, defs: impl Iterator<Item = Name>) {
+  fn merge(&mut self, main: Option<&Name>, defs: impl Iterator<Item = Name>) {
     // Sets of definitions that are identical, indexed by the body term.
-    let equal_terms = self.collect_terms(defs.filter(|def_name| def_name != main));
+    let equal_terms = self.collect_terms(defs.filter(|def_name| !main.is_some_and(|m| m == def_name)));
 
     // Map of old name to new merged name
     let mut name_map = BTreeMap::new();
@@ -64,7 +64,7 @@ impl Book {
     equal_terms
   }
 
-  fn update_refs(&mut self, name_map: &BTreeMap<Name, Name>, main: &Name) {
+  fn update_refs(&mut self, name_map: &BTreeMap<Name, Name>, main: Option<&Name>) {
     let mut updated_defs = Vec::new();
 
     for def in self.defs.values_mut() {

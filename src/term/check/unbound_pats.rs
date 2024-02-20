@@ -1,30 +1,44 @@
-use crate::term::{Book, Name, Pattern, Term};
-use std::collections::HashSet;
+use crate::{
+  diagnostics::Error,
+  term::{Book, Name, Pattern, Term},
+};
+use std::{collections::HashSet, fmt::Display};
+
+#[derive(Debug, Clone)]
+pub struct UnboundCtr(Name);
+
+impl Display for UnboundCtr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Unbound constructor '{}'", self.0)
+  }
+}
 
 impl Book {
   /// Check if the constructors in rule patterns or match patterns are defined.
-  pub fn check_unbound_pats(&self) -> Result<(), String> {
+  pub fn check_unbound_pats(&mut self) -> Result<(), String> {
+    self.info.start_pass();
+
     let is_ctr = |nam: &Name| self.ctrs.contains_key(nam);
     for (def_name, def) in self.defs.iter() {
       for rule in &def.rules {
         for pat in &rule.pats {
-          pat.check_unbounds(&is_ctr).map_err(|e| format!("In definition '{def_name}': {e}"))?;
+          let res = pat.check_unbounds(&is_ctr);
+          self.info.errs.extend(res.map_err(|e| Error::UnboundCtr(def_name.clone(), e)).err())
         }
-        rule.body.check_unbound_pats(&is_ctr)?;
+
+        let res = rule.body.check_unbound_pats(&is_ctr);
+        self.info.errs.extend(res.map_err(|e| Error::UnboundCtr(def_name.clone(), e)).err())
       }
     }
-    Ok(())
+
+    self.info.fatal(())
   }
 }
 
 impl Pattern {
-  pub fn check_unbounds(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), String> {
+  pub fn check_unbounds(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), UnboundCtr> {
     let unbounds = self.unbound_pats(is_ctr);
-    if let Some(unbound) = unbounds.iter().next() {
-      Err(format!("Unbound constructor '{unbound}'"))
-    } else {
-      Ok(())
-    }
+    if let Some(unbound) = unbounds.iter().next() { Err(UnboundCtr(unbound.clone())) } else { Ok(()) }
   }
 
   /// Given a possibly nested rule pattern, return a set of all used but not declared constructors.
@@ -52,7 +66,7 @@ impl Pattern {
 }
 
 impl Term {
-  pub fn check_unbound_pats(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), String> {
+  pub fn check_unbound_pats(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), UnboundCtr> {
     match self {
       Term::Let { pat, val, nxt } => {
         pat.check_unbounds(is_ctr)?;

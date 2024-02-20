@@ -1,29 +1,60 @@
-use crate::term::{Book, Definition, Name, Pattern, Type};
+use std::fmt::Display;
+
+use crate::{
+  diagnostics::Error,
+  term::{Book, Definition, Name, Pattern, Type},
+};
 use indexmap::IndexMap;
 
 pub type DefinitionTypes = IndexMap<Name, Vec<Type>>;
+
+#[derive(Debug, Clone)]
+pub enum InferErr {
+  TypeMismatch(Name, Name),
+  ArityMismatch(usize, usize),
+}
+
+impl Display for InferErr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      InferErr::TypeMismatch(new, old) => {
+        write!(f, "Type mismatch. Found '{new}' expected {old}.")
+      }
+      InferErr::ArityMismatch(found, expected) => {
+        write!(f, "Arity error. Found {found} arguments, expected {expected}")
+      }
+    }
+  }
+}
 
 impl Book {
   /// Returns a HashMap from the definition id to the inferred pattern types
   /// and checks the rules arities based on the first rule arity.
   /// Expects patterns to be flattened.
-  pub fn infer_def_types(&self) -> Result<DefinitionTypes, String> {
+  pub fn infer_def_types(&mut self) -> Result<DefinitionTypes, String> {
+    self.info.start_pass();
+
     let mut def_types = IndexMap::new();
+
     for (def_name, def) in &self.defs {
-      let def_type = def.infer_type(&self.ctrs).map_err(|e| format!("In definition '{def_name}': {e}"))?;
-      def_types.insert(def_name.clone(), def_type);
+      match def.infer_type(&self.ctrs) {
+        Ok(def_type) => _ = def_types.insert(def_name.clone(), def_type),
+        Err(e) => self.info.error(e),
+      }
     }
-    Ok(def_types)
+
+    self.info.fatal(def_types)
   }
 }
 
 impl Definition {
-  pub fn infer_type(&self, ctrs: &IndexMap<Name, Name>) -> Result<Vec<Type>, String> {
+  pub fn infer_type(&self, ctrs: &IndexMap<Name, Name>) -> Result<Vec<Type>, Error> {
     let mut arg_types = vec![];
 
     for arg_idx in 0 .. self.arity() {
       let pats = self.rules.iter().map(|r| &r.pats[arg_idx]);
-      arg_types.push(infer_arg_type(pats, ctrs)?);
+      let value = infer_arg_type(pats, ctrs).map_err(|e| Error::Infer(self.name.clone(), e))?;
+      arg_types.push(value);
     }
     Ok(arg_types)
   }
@@ -32,7 +63,7 @@ impl Definition {
 pub fn infer_arg_type<'a>(
   pats: impl Iterator<Item = &'a Pattern>,
   ctrs: &IndexMap<Name, Name>,
-) -> Result<Type, String> {
+) -> Result<Type, InferErr> {
   let mut arg_type = Type::Any;
   for pat in pats {
     unify(pat.to_type(ctrs), &mut arg_type)?;
@@ -40,10 +71,10 @@ pub fn infer_arg_type<'a>(
   Ok(arg_type)
 }
 
-fn unify(new: Type, old: &mut Type) -> Result<(), String> {
+fn unify(new: Type, old: &mut Type) -> Result<(), InferErr> {
   match (new, &old) {
     (Type::Adt(new), Type::Adt(old)) if &new != old => {
-      return Err(format!("Type mismatch. Found '{}' expected {}.", new, old));
+      return Err(InferErr::TypeMismatch(new, old.clone()));
     }
     (new, Type::Any) => *old = new,
     _ => (),
@@ -52,20 +83,25 @@ fn unify(new: Type, old: &mut Type) -> Result<(), String> {
 }
 
 impl Book {
-  pub fn check_arity(&self) -> Result<(), String> {
+  pub fn check_arity(&mut self) -> Result<(), String> {
+    self.info.start_pass();
+
     for (def_name, def) in self.defs.iter() {
-      def.check_arity().map_err(|e| format!("In definition '{def_name}': {e}"))?;
+      if let Err(e) = def.check_arity() {
+        self.info.error(Error::Infer(def_name.clone(), e))
+      };
     }
-    Ok(())
+
+    self.info.fatal(())
   }
 }
 
 impl Definition {
-  pub fn check_arity(&self) -> Result<(), String> {
+  pub fn check_arity(&self) -> Result<(), InferErr> {
     let expected_arity = self.arity();
     for rule in &self.rules {
       if rule.arity() != expected_arity {
-        return Err(format!("Arity error. Found {} arguments, expected {}", rule.arity(), expected_arity));
+        return Err(InferErr::ArityMismatch(rule.arity(), expected_arity));
       }
     }
     Ok(())

@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/double_main.hvm
 ---
-File has both 'Main' and 'main' definitions
+File has both 'main' and 'Main' definitions

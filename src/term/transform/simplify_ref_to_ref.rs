@@ -1,21 +1,33 @@
 // Pass for inlining functions that are just a reference to another one.
 
 use crate::term::{Book, Name, Term};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, fmt::Display};
+
+#[derive(Debug, Clone)]
+pub struct ClyclicDef(pub Name);
+
+impl Display for ClyclicDef {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "is a reference to itself")
+  }
+}
 
 impl Book {
   // When we find a function that is simply directly calling another function,
   // substitutes all occurrences of that function to the one being called, avoiding the unnecessary redirect.
   // In case there is a long chain of ref-to-ref-to-ref, we substitute values by the last function in the chain.
   pub fn simplify_ref_to_ref(&mut self) -> Result<(), String> {
+    self.info.start_pass();
+
     let mut ref_map: BTreeMap<Name, Name> = BTreeMap::new();
     // Find to which defs we're mapping the ones that are just references.
-    for def_name in self.defs.keys() {
+    'outer: for def_name in self.defs.keys() {
       let mut ref_name = def_name;
       let mut is_ref_to_ref = false;
       while let Term::Ref { nam: next_ref } = &self.defs.get(ref_name).unwrap().rule().body {
         if next_ref == ref_name {
-          return Err(format!("Definition {def_name} is a reference to itself",));
+          self.info.error(ClyclicDef(def_name.clone()));
+          continue 'outer;
         }
         ref_name = next_ref;
         is_ref_to_ref = true;
@@ -30,7 +42,7 @@ impl Book {
       subst_ref_to_ref(body, &ref_map);
     }
 
-    Ok(())
+    self.info.fatal(())
   }
 }
 
