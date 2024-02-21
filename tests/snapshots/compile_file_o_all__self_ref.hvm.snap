@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/self_ref.hvm
 ---
 In definition 'Foo':
-  Definition is a reference to itself
+  Definition is a reference to itself.
 In definition 'main':
-  Definition is a reference to itself
+  Definition is a reference to itself.
 

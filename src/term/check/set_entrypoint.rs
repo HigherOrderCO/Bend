@@ -15,15 +15,15 @@ pub enum EntryErr {
 impl Display for EntryErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      EntryErr::NotFound(name) => write!(f, "File has no '{name}' definition"),
+      EntryErr::NotFound(name) => write!(f, "File has no '{name}' definition."),
       EntryErr::Multiple(fnd) if fnd.len() == 2 => {
-        write!(f, "File has both '{}' and '{}' definitions", fnd[0], fnd[1])
+        write!(f, "File has both '{}' and '{}' definitions.", fnd[0], fnd[1])
       }
       EntryErr::Multiple(fnd) => {
-        write!(f, "File has '{}', '{}' and '{}' definitions", fnd[0], fnd[1], fnd[2])
+        write!(f, "File has '{}', '{}' and '{}' definitions.", fnd[0], fnd[1], fnd[2])
       }
-      EntryErr::MultipleRules => write!(f, "Main definition can't have more than one rule"),
-      EntryErr::Arguments => write!(f, "Main definition can't have any arguments"),
+      EntryErr::MultipleRules => write!(f, "Main definition can't have more than one rule."),
+      EntryErr::Arguments => write!(f, "Main definition can't have any arguments."),
     }
   }
 }

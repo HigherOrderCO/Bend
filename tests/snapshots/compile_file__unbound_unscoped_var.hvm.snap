@@ -3,5 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/unbound_unscoped_var.hvm
 ---
 In definition 'main':
-  Unbound unscoped variable '$a'
+  Unbound unscoped variable '$a'.
 

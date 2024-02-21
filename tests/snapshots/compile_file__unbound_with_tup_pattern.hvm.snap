@@ -3,5 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/unbound_with_tup_pattern.hvm
 ---
 In definition 'Foo':
-  Unbound variable 'a'
+  Unbound variable 'a'.
 

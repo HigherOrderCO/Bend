@@ -9,7 +9,7 @@ pub struct UnboundCtrErr(Name);
 
 impl Display for UnboundCtrErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Unbound constructor '{}'", self.0)
+    write!(f, "Unbound constructor '{}'.", self.0)
   }
 }
 

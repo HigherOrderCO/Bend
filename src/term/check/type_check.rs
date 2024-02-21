@@ -21,7 +21,7 @@ impl Display for InferErr {
         write!(f, "Type mismatch. Found '{new}' expected {old}.")
       }
       InferErr::ArityMismatch(found, expected) => {
-        write!(f, "Arity error. Found {found} arguments, expected {expected}")
+        write!(f, "Arity error. Found {found} arguments, expected {expected}.")
       }
     }
   }

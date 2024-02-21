@@ -11,7 +11,7 @@ pub struct CyclicDefErr;
 
 impl Display for CyclicDefErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Definition is a reference to itself")
+    write!(f, "Definition is a reference to itself.")
   }
 }
 

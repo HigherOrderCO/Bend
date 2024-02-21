@@ -8,6 +8,6 @@ In definition 'Bar':
     (Bar A A C) not covered.
     (Bar A A D) not covered.
     (Bar A A E) not covered.
-    (Bar A A F) not covered. ... and 2 others
+    (Bar A A F) not covered. ... and 2 others.
     Use the --verbose option to see all cases.
 

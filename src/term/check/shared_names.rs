@@ -7,7 +7,7 @@ pub struct TopLevelErr(Name);
 
 impl Display for TopLevelErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Duplicated top-level name '{}'", self.0)
+    write!(f, "Duplicated top-level name '{}'.", self.0)
   }
 }
 

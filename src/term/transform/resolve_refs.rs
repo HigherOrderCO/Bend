@@ -12,7 +12,7 @@ pub struct ReferencedMainErr;
 
 impl Display for ReferencedMainErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Main definition can't be referenced inside the program")
+    write!(f, "Main definition can't be referenced inside the program.")
   }
 }
 
