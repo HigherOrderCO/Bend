@@ -4,6 +4,7 @@ use crate::term::{
     shared_names::TopLevelErr, type_check::InferErr, unbound_pats::UnboundCtrErr,
     unbound_vars::UnboundVarErr,
   },
+  display::DisplayFn,
   transform::{
     extract_adt_matches::MatchErr, resolve_refs::ReferencedMainErr, simplify_ref_to_ref::CyclicDefErr,
   },
@@ -15,7 +16,7 @@ use std::{
   fmt::{Display, Formatter},
 };
 
-pub const INDENT_SIZE: usize = 2;
+pub const ERR_INDENT_SIZE: usize = 2;
 
 #[derive(Debug, Clone, Default)]
 pub struct Info {
@@ -65,31 +66,32 @@ impl Info {
   pub fn fatal<T>(&mut self, t: T) -> Result<T, Info> {
     if self.err_counter == 0 { Ok(t) } else { Err(std::mem::take(self)) }
   }
+
+  pub fn display<'a>(&'a self, verbose: bool) -> impl Display + 'a {
+    DisplayFn(move |f| {
+      write!(f, "{}", self.errs.iter().map(|err| err.display(verbose)).join("\n"))?;
+
+      for (def_name, errs) in &self.errs_with_def {
+        writeln!(f, "In definition '{def_name}':")?;
+        for err in errs {
+          writeln!(f, "{:ERR_INDENT_SIZE$}{}", "", err.display(verbose))?;
+        }
+      }
+
+      Ok(())
+    })
+  }
 }
 
 impl Display for Info {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.errs.iter().join("\n"))?;
-
-    for (def_name, errs) in &self.errs_with_def {
-      writeln!(f, "In definition '{def_name}':")?;
-      for err in errs {
-        writeln!(f, "{:INDENT_SIZE$}{}", "", err)?;
-      }
-    }
-
-    Ok(())
+    write!(f, "{}", self.display(false))
   }
 }
 
 impl From<String> for Info {
   fn from(value: String) -> Self {
-    Info {
-      err_counter: 0,
-      errs: vec![Error::Custom(value)],
-      errs_with_def: BTreeMap::new(),
-      warns: Vec::new(),
-    }
+    Info { errs: vec![Error::Custom(value)], ..Default::default() }
   }
 }
 
@@ -116,7 +118,14 @@ pub enum Error {
 
 impl Display for Error {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match self {
+    write!(f, "{}", self.display(false))
+  }
+}
+
+impl Error {
+  pub fn display(&self, verbose: bool) -> impl Display + '_ {
+    DisplayFn(move |f| match self {
+      Error::Exhaustiveness(err) if verbose => write!(f, "{}", err.display_with_limit(usize::MAX)),
       Error::Exhaustiveness(err) => write!(f, "{err}"),
       Error::AdtMatch(err) => write!(f, "{err}"),
       Error::UnboundVar(err) => write!(f, "{err}"),
@@ -128,7 +137,7 @@ impl Display for Error {
       Error::EntryPoint(err) => write!(f, "{err}"),
       Error::TopLevel(err) => write!(f, "{err}"),
       Error::Custom(err) => write!(f, "{err}"),
-    }
+    })
   }
 }
 

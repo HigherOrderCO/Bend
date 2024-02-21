@@ -5,7 +5,7 @@ use std::{fmt, ops::Deref};
 
 /* Some aux structures for things that are not so simple to display */
 
-struct DisplayFn<F: Fn(&mut fmt::Formatter) -> fmt::Result>(F);
+pub struct DisplayFn<F: Fn(&mut fmt::Formatter) -> fmt::Result>(pub F);
 
 impl<F: Fn(&mut fmt::Formatter) -> fmt::Result> fmt::Display for DisplayFn<F> {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

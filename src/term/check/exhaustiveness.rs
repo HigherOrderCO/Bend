@@ -1,23 +1,31 @@
 use super::type_check::DefinitionTypes;
 use crate::{
-  diagnostics::{Info, INDENT_SIZE},
+  diagnostics::{Info, ERR_INDENT_SIZE},
   term::{Adt, Ctx, MatchNum, Name, Pattern, Rule, Type},
 };
 use indexmap::IndexMap;
 use itertools::Itertools;
 use std::fmt::Display;
 
+pub const PATTERN_ERROR_LIMIT: usize = 5;
+
 #[derive(Debug, Clone)]
 pub struct ExhaustivenessErr(Name, Vec<String>);
 
+impl ExhaustivenessErr {
+  pub fn display_with_limit(&self, limit: usize) -> String {
+    let ident = ERR_INDENT_SIZE * 2;
+    let hints =
+      self.1.iter().take(limit).map(|pat| format!("{:ident$}({} {pat}) not covered.", "", self.0)).join("\n");
+
+    let etc = if self.1.len() > limit { " ..." } else { "" };
+    format!("Non-exhaustive pattern. Hint:\n{}{etc}", hints)
+  }
+}
+
 impl Display for ExhaustivenessErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    let ident = INDENT_SIZE * 2;
-    write!(
-      f,
-      "Non-exhaustive pattern. Hint:\n{}",
-      self.1.iter().map(|s| format!("{:ident$}({} {s}) not covered.", "", self.0)).join("\n")
-    )
+    write!(f, "{}", self.display_with_limit(PATTERN_ERROR_LIMIT))
   }
 }
 

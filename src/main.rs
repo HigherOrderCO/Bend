@@ -151,8 +151,10 @@ fn main() {
   compile_error!("The 'cli' feature is needed for the hvm-lang cli");
 
   let cli = Cli::parse();
+  let arg_verbose = cli.verbose;
+
   if let Err(e) = execute_cli_mode(cli) {
-    eprintln!("{e}");
+    eprintln!("{}", e.display(arg_verbose))
   }
 }
 

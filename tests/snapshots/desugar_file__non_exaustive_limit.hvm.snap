@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/desugar_file/non_exaustive_limit.hvm
+---
+In definition 'Bar':
+  Non-exhaustive pattern. Hint:
+    (Bar A A B) not covered.
+    (Bar A A C) not covered.
+    (Bar A A D) not covered.
+    (Bar A A E) not covered.
+    (Bar A A F) not covered. ...
+
