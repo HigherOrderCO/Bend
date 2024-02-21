@@ -29,6 +29,7 @@ pub enum Token {
   Num(u64),
 
   #[regex(r#""([^"\\]|\\[tun"\\])*""#, |lex| normalized_string(lex).ok())]
+  #[regex(r#"`([^`\\]|\\[tun`\\])*`"#, |lex| normalized_string(lex).ok())]
   Str(String),
 
   #[regex(r#"'\\U[0-9a-fA-F]{1,8}'"#, normalized_char, priority = 2)]
