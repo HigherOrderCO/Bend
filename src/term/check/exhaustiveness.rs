@@ -23,7 +23,7 @@ impl ExhaustivenessErr {
 
     let len = self.1.len();
     if len > limit {
-      str.push_str(&format!(" ... and {} others\n{:ident$}{}", len - limit, "", ERROR_LIMIT_HINT))
+      str.push_str(&format!(" ... and {} others.\n{:ident$}{}", len - limit, "", ERROR_LIMIT_HINT))
     }
 
     str
