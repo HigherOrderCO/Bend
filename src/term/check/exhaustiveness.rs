@@ -7,7 +7,8 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use std::fmt::Display;
 
-pub const PATTERN_ERROR_LIMIT: usize = 5;
+const PATTERN_ERROR_LIMIT: usize = 5;
+const ERROR_LIMIT_HINT: &str = "Use the --verbose option to see all cases.";
 
 #[derive(Debug, Clone)]
 pub struct ExhaustivenessErr(Name, Vec<String>);
@@ -18,8 +19,14 @@ impl ExhaustivenessErr {
     let hints =
       self.1.iter().take(limit).map(|pat| format!("{:ident$}({} {pat}) not covered.", "", self.0)).join("\n");
 
-    let etc = if self.1.len() > limit { " ..." } else { "" };
-    format!("Non-exhaustive pattern. Hint:\n{}{etc}", hints)
+    let mut str = format!("Non-exhaustive pattern. Hint:\n{}", hints);
+
+    let len = self.1.len();
+    if len > limit {
+      str.push_str(&format!(" ... and {} others\n{:ident$}{}", len - limit, "", ERROR_LIMIT_HINT))
+    }
+
+    str
   }
 }
 
