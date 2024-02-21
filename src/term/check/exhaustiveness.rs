@@ -1,6 +1,6 @@
 use super::type_check::DefinitionTypes;
 use crate::{
-  diagnostics::{Error, Info},
+  diagnostics::{Info, INDENT_SIZE},
   term::{Adt, Ctx, MatchNum, Name, Pattern, Rule, Type},
 };
 use indexmap::IndexMap;
@@ -12,10 +12,11 @@ pub struct ExhaustivenessErr(Name, Vec<String>);
 
 impl Display for ExhaustivenessErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let ident = INDENT_SIZE * 2;
     write!(
       f,
       "Non-exhaustive pattern. Hint:\n{}",
-      self.1.iter().map(|s| format!("    ({} {s}) not covered.", self.0)).join("\n")
+      self.1.iter().map(|s| format!("{:ident$}({} {s}) not covered.", "", self.0)).join("\n")
     )
   }
 }
@@ -30,7 +31,7 @@ impl Ctx {
       let types = &def_types[def_name];
       let rules_to_check = (0 .. def.rules.len()).collect();
       let res = check_pattern(&[], &self.book.adts, &def.rules, types, rules_to_check, def_name);
-      self.info.errs.extend(res.map_err(|e| Error::Exhaustiveness(def_name.clone(), e)).err());
+      self.info.take_err(res, Some(&def_name));
     }
 
     self.info.fatal(())

@@ -2,5 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/non_exhaustive_tree.hvm
 ---
-In definition 'Warp': Non-exhaustive pattern. Hint:
+In definition 'Warp':
+  Non-exhaustive pattern. Hint:
     (Warp _ Leaf Both) not covered.
+

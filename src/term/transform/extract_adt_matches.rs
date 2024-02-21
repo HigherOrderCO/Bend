@@ -1,5 +1,5 @@
 use crate::{
-  diagnostics::{Error, Info},
+  diagnostics::Info,
   term::{display::DisplayJoin, Ctx, Definition, Name, Pattern, Rule, Term, Type},
   Warning,
 };
@@ -25,7 +25,7 @@ impl Ctx {
           &mut self.info.warns,
         );
 
-        self.info.errs.extend(res.map_err(|e| Error::AdtMatch(def_name.clone(), e)).err());
+        self.info.take_err(res, Some(&def_name));
       }
     }
 

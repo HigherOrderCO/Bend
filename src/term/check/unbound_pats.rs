@@ -1,5 +1,5 @@
 use crate::{
-  diagnostics::{Error, Info},
+  diagnostics::Info,
   term::{Ctx, Name, Pattern, Term},
 };
 use std::{collections::HashSet, fmt::Display};
@@ -23,11 +23,11 @@ impl Ctx {
       for rule in &def.rules {
         for pat in &rule.pats {
           let res = pat.check_unbounds(&is_ctr);
-          self.info.errs.extend(res.map_err(|e| Error::UnboundCtr(def_name.clone(), e)).err())
+          self.info.take_err(res, Some(&def_name));
         }
 
         let res = rule.body.check_unbound_pats(&is_ctr);
-        self.info.errs.extend(res.map_err(|e| Error::UnboundCtr(def_name.clone(), e)).err())
+        self.info.take_err(res, Some(&def_name));
       }
     }
 

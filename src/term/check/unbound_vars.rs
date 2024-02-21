@@ -1,5 +1,5 @@
 use crate::{
-  diagnostics::{Error, Info},
+  diagnostics::Info,
   term::{Ctx, Name, Pattern, Term},
 };
 use hvmc::run::Val;
@@ -47,7 +47,9 @@ impl Ctx {
         rule.body.check_unbound_vars(&mut scope, &mut errs);
       }
 
-      self.info.errs.extend(errs.into_iter().map(|e| Error::UnboundVar(def_name.clone(), e)));
+      for err in errs {
+        self.info.def_error(def_name.clone(), err);
+      }
     }
 
     self.info.fatal(())

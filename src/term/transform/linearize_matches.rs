@@ -1,6 +1,6 @@
 use super::extract_adt_matches::{infer_match_type, MatchErr};
 use crate::{
-  diagnostics::{Error, Info},
+  diagnostics::Info,
   term::{Ctx, Name, Pattern, Term, Type},
 };
 use indexmap::{IndexMap, IndexSet};
@@ -15,7 +15,7 @@ impl Ctx {
       for rule in def.rules.iter_mut() {
         let res = rule.body.linearize_matches(&self.book.ctrs);
 
-        self.info.errs.extend(res.map_err(|e| Error::AdtMatch(def_name.clone(), e)).err());
+        self.info.take_err(res, Some(&def_name));
       }
     }
 

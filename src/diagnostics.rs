@@ -10,42 +10,86 @@ use crate::term::{
   Name,
 };
 use itertools::Itertools;
-use std::fmt::{Display, Formatter};
+use std::{
+  collections::BTreeMap,
+  fmt::{Display, Formatter},
+};
+
+pub const INDENT_SIZE: usize = 2;
 
 #[derive(Debug, Clone, Default)]
 pub struct Info {
   err_counter: usize,
-  pub errs: Vec<Error>,
+  errs: Vec<Error>,
+  errs_with_def: BTreeMap<Name, Vec<Error>>,
   pub warns: Vec<Warning>,
 }
 
 impl Info {
   pub fn error<E: Into<Error>>(&mut self, e: E) {
+    self.err_counter += 1;
     self.errs.push(e.into())
   }
 
-  /// Updates the internal counter to the current number of errors
+  pub fn def_error<E: Into<Error>>(&mut self, name: Name, e: E) {
+    self.err_counter += 1;
+    let entry = self.errs_with_def.entry(name).or_default();
+    entry.push(e.into());
+  }
+
+  pub fn take_err<T, E: Into<Error>>(&mut self, result: Result<T, E>, def_name: Option<&Name>) -> Option<T> {
+    match result {
+      Ok(t) => Some(t),
+      Err(e) => {
+        match def_name {
+          None => self.error(e),
+          Some(def) => self.def_error(def.clone(), e),
+        }
+        None
+      }
+    }
+  }
+
+  pub fn has_errors(&self) -> bool {
+    !(self.errs.is_empty() && self.errs_with_def.is_empty())
+  }
+
+  /// Resets the internal counter
   pub fn start_pass(&mut self) {
-    self.err_counter = self.errs.len();
+    self.err_counter = 0;
   }
 
   /// Checks if any error was emitted since the start of the pass,  
-  /// Returning all the current errors as a `Err(String)`.  
+  /// Returning all the current information as a `Err(Info)`, replacing `&mut self` with an empty one.  
   /// Otherwise, returns the given arg as an `Ok(T)`.
   pub fn fatal<T>(&mut self, t: T) -> Result<T, Info> {
-    if self.errs.len() == self.err_counter { Ok(t) } else { Err(std::mem::take(self)) }
+    if self.err_counter == 0 { Ok(t) } else { Err(std::mem::take(self)) }
   }
 }
 
 impl Display for Info {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.errs.iter().join("\n"))
+    write!(f, "{}", self.errs.iter().join("\n"))?;
+
+    for (def_name, errs) in &self.errs_with_def {
+      writeln!(f, "In definition '{def_name}':")?;
+      for err in errs {
+        writeln!(f, "{:INDENT_SIZE$}{}", "", err)?;
+      }
+    }
+
+    Ok(())
   }
 }
 
 impl From<String> for Info {
   fn from(value: String) -> Self {
-    Info { err_counter: 0, errs: vec![Error::Custom(value)], warns: Vec::new() }
+    Info {
+      err_counter: 0,
+      errs: vec![Error::Custom(value)],
+      errs_with_def: BTreeMap::new(),
+      warns: Vec::new(),
+    }
   }
 }
 
@@ -55,16 +99,15 @@ impl From<&str> for Info {
   }
 }
 
-// TODO: Merge errors that reference the same definition
 #[derive(Debug, Clone)]
 pub enum Error {
-  Exhaustiveness(Name, ExhaustivenessErr),
-  MainRef(Name, ReferencedMainErr),
-  AdtMatch(Name, MatchErr),
-  UnboundVar(Name, UnboundVarErr),
-  UnboundCtr(Name, UnboundCtrErr),
-  Infer(Name, InferErr),
-  Arity(Name, ArityErr),
+  Exhaustiveness(ExhaustivenessErr),
+  MainRef(ReferencedMainErr),
+  AdtMatch(MatchErr),
+  UnboundVar(UnboundVarErr),
+  UnboundCtr(UnboundCtrErr),
+  Infer(InferErr),
+  Arity(ArityErr),
   Cyclic(CyclicDefErr),
   EntryPoint(EntryErr),
   TopLevel(TopLevelErr),
@@ -74,18 +117,66 @@ pub enum Error {
 impl Display for Error {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
-      Error::Exhaustiveness(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
-      Error::AdtMatch(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
-      Error::UnboundVar(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
-      Error::UnboundCtr(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
-      Error::MainRef(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
-      Error::Infer(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
-      Error::Arity(def_name, err) => write!(f, "In definition '{def_name}': {err}"),
-      Error::Cyclic(err @ CyclicDefErr(def)) => write!(f, "Definition '{def}' {err}"),
+      Error::Exhaustiveness(err) => write!(f, "{err}"),
+      Error::AdtMatch(err) => write!(f, "{err}"),
+      Error::UnboundVar(err) => write!(f, "{err}"),
+      Error::UnboundCtr(err) => write!(f, "{err}"),
+      Error::MainRef(err) => write!(f, "{err}"),
+      Error::Infer(err) => write!(f, "{err}"),
+      Error::Arity(err) => write!(f, "{err}"),
+      Error::Cyclic(err) => write!(f, "{err}"),
       Error::EntryPoint(err) => write!(f, "{err}"),
       Error::TopLevel(err) => write!(f, "{err}"),
       Error::Custom(err) => write!(f, "{err}"),
     }
+  }
+}
+
+impl From<ExhaustivenessErr> for Error {
+  fn from(value: ExhaustivenessErr) -> Self {
+    Self::Exhaustiveness(value)
+  }
+}
+
+impl From<ReferencedMainErr> for Error {
+  fn from(value: ReferencedMainErr) -> Self {
+    Self::MainRef(value)
+  }
+}
+
+impl From<MatchErr> for Error {
+  fn from(value: MatchErr) -> Self {
+    Self::AdtMatch(value)
+  }
+}
+
+impl From<UnboundVarErr> for Error {
+  fn from(value: UnboundVarErr) -> Self {
+    Self::UnboundVar(value)
+  }
+}
+
+impl From<UnboundCtrErr> for Error {
+  fn from(value: UnboundCtrErr) -> Self {
+    Self::UnboundCtr(value)
+  }
+}
+
+impl From<InferErr> for Error {
+  fn from(value: InferErr) -> Self {
+    Self::Infer(value)
+  }
+}
+
+impl From<ArityErr> for Error {
+  fn from(value: ArityErr) -> Self {
+    Self::Arity(value)
+  }
+}
+
+impl From<CyclicDefErr> for Error {
+  fn from(value: CyclicDefErr) -> Self {
+    Self::Cyclic(value)
   }
 }
 
@@ -95,9 +186,9 @@ impl From<EntryErr> for Error {
   }
 }
 
-impl From<CyclicDefErr> for Error {
-  fn from(value: CyclicDefErr) -> Self {
-    Self::Cyclic(value)
+impl From<TopLevelErr> for Error {
+  fn from(value: TopLevelErr) -> Self {
+    Self::TopLevel(value)
   }
 }
 

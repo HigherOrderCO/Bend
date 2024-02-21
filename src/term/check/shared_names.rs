@@ -1,9 +1,6 @@
 use std::{collections::HashMap, fmt::Display};
 
-use crate::{
-  diagnostics::Error,
-  term::{Ctx, Name},
-};
+use crate::term::{Ctx, Name};
 
 #[derive(Debug, Clone)]
 pub struct TopLevelErr(Name);
@@ -33,7 +30,7 @@ impl Ctx {
 
     for (name, n) in checked.into_iter() {
       if n > 1 {
-        self.info.error(Error::TopLevel(TopLevelErr(name.clone())));
+        self.info.error(TopLevelErr(name.clone()));
       }
     }
   }

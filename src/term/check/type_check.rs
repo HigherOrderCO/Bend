@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use crate::{
-  diagnostics::{Error, Info},
+  diagnostics::Info,
   term::{Ctx, Definition, Name, Pattern, Type},
 };
 use indexmap::IndexMap;
@@ -39,7 +39,7 @@ impl Ctx {
     for (def_name, def) in &self.book.defs {
       match def.infer_type(&self.book.ctrs) {
         Ok(def_type) => _ = def_types.insert(def_name.clone(), def_type),
-        Err(e) => self.info.error(e),
+        Err(e) => self.info.def_error(def_name.clone(), e),
       }
     }
 
@@ -48,12 +48,12 @@ impl Ctx {
 }
 
 impl Definition {
-  pub fn infer_type(&self, ctrs: &IndexMap<Name, Name>) -> Result<Vec<Type>, Error> {
+  pub fn infer_type(&self, ctrs: &IndexMap<Name, Name>) -> Result<Vec<Type>, InferErr> {
     let mut arg_types = vec![];
 
     for arg_idx in 0 .. self.arity() {
       let pats = self.rules.iter().map(|r| &r.pats[arg_idx]);
-      let value = infer_arg_type(pats, ctrs).map_err(|e| Error::Infer(self.name.clone(), e))?;
+      let value = infer_arg_type(pats, ctrs)?;
       arg_types.push(value);
     }
     Ok(arg_types)
@@ -88,7 +88,7 @@ impl Ctx {
 
     for (def_name, def) in self.book.defs.iter() {
       if let Err(e) = def.check_arity() {
-        self.info.error(Error::Infer(def_name.clone(), e))
+        self.info.def_error(def_name.clone(), e)
       };
     }
 

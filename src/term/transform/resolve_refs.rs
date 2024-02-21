@@ -1,5 +1,5 @@
 use crate::{
-  diagnostics::{Error, Info},
+  diagnostics::Info,
   term::{Ctx, MatchNum, Name, Pattern, Term},
 };
 use std::{
@@ -33,7 +33,7 @@ impl Ctx {
         }
 
         let res = rule.body.resolve_refs(&def_names, self.book.entrypoint.as_ref(), &mut scope);
-        self.info.errs.extend(res.map_err(|e| Error::MainRef(def_name.clone(), e)).err());
+        self.info.take_err(res, Some(&def_name));
       }
     }
 

@@ -83,7 +83,7 @@ pub fn desugar_book(book: Book, opts: CompileOpts) -> Result<(Book, Vec<Warning>
     ctx.book.merge_definitions();
   }
 
-  if ctx.info.errs.is_empty() { Ok((ctx.book, ctx.info.warns)) } else { Err(ctx.info) }
+  if !ctx.info.has_errors() { Ok((ctx.book, ctx.info.warns)) } else { Err(ctx.info) }
 }
 
 pub fn encode_pattern_matching(ctx: &mut Ctx, adt_encoding: AdtEncoding) -> Result<(), Info> {

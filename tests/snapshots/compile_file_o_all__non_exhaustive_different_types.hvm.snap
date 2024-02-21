@@ -2,6 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/non_exhaustive_different_types.hvm
 ---
-In definition 'foo': Non-exhaustive pattern. Hint:
+In definition 'foo':
+  Non-exhaustive pattern. Hint:
     (foo f1 f2 t3 f4) not covered.
     (foo f1 f2 t3 t4) not covered.
+

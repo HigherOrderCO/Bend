@@ -2,5 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/match_adt_non_exhaustive.hvm
 ---
-In definition 'main$match$1$F0': Non-exhaustive pattern. Hint:
+In definition 'main$match$1$F0':
+  Non-exhaustive pattern. Hint:
     (main$match$1$F0 Some) not covered.
+

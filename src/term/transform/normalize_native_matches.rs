@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 
 use super::extract_adt_matches::{infer_match_type, MatchErr};
 use crate::{
-  diagnostics::{Error, Info},
+  diagnostics::Info,
   term::{Ctx, MatchNum, Name, Op, Pattern, Tag, Term, Type},
 };
 
@@ -15,7 +15,7 @@ impl Ctx {
 
     for (def_name, def) in self.book.defs.iter_mut() {
       let res = def.rule_mut().body.normalize_native_matches(&self.book.ctrs);
-      self.info.errs.extend(res.map_err(|e| Error::AdtMatch(def_name.clone(), e)).err());
+      self.info.take_err(res, Some(&def_name));
     }
 
     self.info.fatal(())

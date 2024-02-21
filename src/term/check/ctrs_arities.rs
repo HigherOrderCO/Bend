@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fmt::Display};
 
 use crate::{
-  diagnostics::{Error, Info},
+  diagnostics::Info,
   term::{Book, Ctx, Name, Pattern},
 };
 
@@ -26,8 +26,8 @@ impl Ctx {
     for (def_name, def) in self.book.defs.iter() {
       for rule in def.rules.iter() {
         for pat in rule.pats.iter() {
-          let res = pat.check(&arities).map_err(|e| Error::Arity(def_name.clone(), e)).err();
-          self.info.errs.extend(res);
+          let res = pat.check(&arities);
+          self.info.take_err(res, Some(&def_name));
         }
       }
     }
