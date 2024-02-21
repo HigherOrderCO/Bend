@@ -1,1 +1,4 @@
-Main = `abc369*`
+(Concat String.nil ys) = ys
+(Concat (String.cons x xs) ys) = (String.cons x (Concat xs ys))
+
+Main = (Concat "abc369*`" `asdf"asdf`)
