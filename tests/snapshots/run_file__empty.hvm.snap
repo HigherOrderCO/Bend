@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/empty.hvm
 ---
-File has no 'main' definition
+File has no 'main' definition.

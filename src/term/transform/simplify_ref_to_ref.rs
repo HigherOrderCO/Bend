@@ -1,21 +1,36 @@
 // Pass for inlining functions that are just a reference to another one.
 
-use crate::term::{Book, Name, Term};
-use std::collections::BTreeMap;
+use crate::{
+  diagnostics::Info,
+  term::{Ctx, Name, Term},
+};
+use std::{collections::BTreeMap, fmt::Display};
 
-impl Book {
+#[derive(Debug, Clone)]
+pub struct CyclicDefErr;
+
+impl Display for CyclicDefErr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Definition is a reference to itself.")
+  }
+}
+
+impl Ctx {
   // When we find a function that is simply directly calling another function,
   // substitutes all occurrences of that function to the one being called, avoiding the unnecessary redirect.
   // In case there is a long chain of ref-to-ref-to-ref, we substitute values by the last function in the chain.
-  pub fn simplify_ref_to_ref(&mut self) -> Result<(), String> {
+  pub fn simplify_ref_to_ref(&mut self) -> Result<(), Info> {
+    self.info.start_pass();
+
     let mut ref_map: BTreeMap<Name, Name> = BTreeMap::new();
     // Find to which defs we're mapping the ones that are just references.
-    for def_name in self.defs.keys() {
+    'outer: for def_name in self.book.defs.keys() {
       let mut ref_name = def_name;
       let mut is_ref_to_ref = false;
-      while let Term::Ref { nam: next_ref } = &self.defs.get(ref_name).unwrap().rule().body {
+      while let Term::Ref { nam: next_ref } = &self.book.defs.get(ref_name).unwrap().rule().body {
         if next_ref == ref_name {
-          return Err(format!("Definition {def_name} is a reference to itself",));
+          self.info.def_error(def_name.clone(), CyclicDefErr);
+          continue 'outer;
         }
         ref_name = next_ref;
         is_ref_to_ref = true;
@@ -26,11 +41,11 @@ impl Book {
     }
 
     // Substitute all the occurrences of ref-to-ref.
-    for body in self.defs.values_mut().map(|def| &mut def.rule_mut().body) {
+    for body in self.book.defs.values_mut().map(|def| &mut def.rule_mut().body) {
       subst_ref_to_ref(body, &ref_map);
     }
 
-    Ok(())
+    self.info.fatal(())
   }
 }
 

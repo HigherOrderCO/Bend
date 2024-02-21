@@ -2,4 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/unscoped_dup_use.hvm
 ---
-In definition 'main': Unscoped variable '$a' used more than once
+In definition 'main':
+  Unscoped variable '$a' used more than once.
+

@@ -7,11 +7,11 @@ use std::{
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
 impl Book {
-  pub fn detach_supercombinators(&mut self, main: &Name) {
+  pub fn detach_supercombinators(&mut self) {
     let mut combinators = Combinators::new();
 
     for (def_name, def) in self.defs.iter_mut() {
-      if def_name == main {
+      if self.entrypoint.as_ref().is_some_and(|m| m == def_name) {
         continue;
       }
 

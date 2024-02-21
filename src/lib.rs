@@ -1,6 +1,7 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
 
+use diagnostics::{Info, Warning};
 use hvmc::{
   ast::{book_to_runtime, show_book, Net},
   run::{Def, Rewrites},
@@ -13,9 +14,10 @@ use term::{
   display::{display_readback_errors, DisplayJoin},
   net_to_term::net_to_term,
   term_to_net::{HvmcNames, Labels},
-  AdtEncoding, Book, Name, ReadbackError, Term,
+  AdtEncoding, Book, Ctx, ReadbackError, Term,
 };
 
+pub mod diagnostics;
 pub mod hvmc_net;
 pub mod net;
 pub mod term;
@@ -25,19 +27,16 @@ pub use term::load_book::load_file_to_book;
 pub const ENTRY_POINT: &str = "main";
 pub const HVM1_ENTRY_POINT: &str = "Main";
 
-pub fn check_book(mut book: Book) -> Result<(), String> {
+pub fn check_book(book: Book) -> Result<(), Info> {
   // TODO: Do the checks without having to do full compilation
-  compile_book(&mut book, CompileOpts::light(), None)?;
+  // TODO: Shouldn't the check mode show warnings?
+  compile_book(book, CompileOpts::light())?;
   Ok(())
 }
 
-pub fn compile_book(
-  book: &mut Book,
-  opts: CompileOpts,
-  entrypoint: Option<Name>,
-) -> Result<CompileResult, String> {
-  let (main, warnings) = desugar_book(book, opts, entrypoint)?;
-  let (nets, hvmc_names, labels) = book_to_nets(book, &main);
+pub fn compile_book(book: Book, opts: CompileOpts) -> Result<CompileResult, Info> {
+  let (book, warns) = desugar_book(book, opts)?;
+  let (nets, hvmc_names, labels) = book_to_nets(&book);
   let mut core_book = nets_to_hvmc(nets, &hvmc_names)?;
   if opts.pre_reduce {
     pre_reduce_book(&mut core_book, opts.pre_reduce_refs, book.hvmc_entrypoint())?;
@@ -45,82 +44,77 @@ pub fn compile_book(
   if opts.prune {
     prune_defs(&mut core_book, book.hvmc_entrypoint());
   }
-  Ok(CompileResult { core_book, hvmc_names, labels, warnings })
+
+  Ok(CompileResult { book, warns, core_book, hvmc_names, labels })
 }
 
-pub fn desugar_book(
-  book: &mut Book,
-  opts: CompileOpts,
-  entrypoint: Option<Name>,
-) -> Result<(Name, Vec<Warning>), String> {
-  let mut warnings = Vec::new();
-  let main = book.check_has_entrypoint(entrypoint)?;
-  book.check_shared_names()?;
-  book.encode_adts(opts.adt_encoding);
-  book.encode_builtins();
-  encode_pattern_matching(book, &mut warnings, opts.adt_encoding)?;
-  // sanity check
-  book.check_unbound_vars()?;
-  book.normalize_native_matches()?;
-  book.check_unbound_vars()?;
-  book.make_var_names_unique();
-  book.linearize_vars();
-  book.eta_reduction(opts.eta);
-  // sanity check
-  book.check_unbound_vars()?;
+pub fn desugar_book(book: Book, opts: CompileOpts) -> Result<(Book, Vec<Warning>), Info> {
+  let mut ctx = Ctx::new(book);
+
+  ctx.set_entrypoint();
+  ctx.check_shared_names();
+  ctx.book.encode_adts(opts.adt_encoding);
+  ctx.book.encode_builtins();
+  encode_pattern_matching(&mut ctx, opts.adt_encoding)?;
+  ctx.check_unbound_vars()?; // sanity check
+  ctx.normalize_native_matches()?;
+  ctx.check_unbound_vars()?;
+  ctx.book.make_var_names_unique();
+  ctx.book.linearize_vars();
+  ctx.book.eta_reduction(opts.eta);
+  ctx.check_unbound_vars()?; // sanity check
+
   if opts.supercombinators {
-    book.detach_supercombinators(&main);
+    ctx.book.detach_supercombinators();
   }
   if opts.ref_to_ref {
-    book.simplify_ref_to_ref()?;
+    ctx.simplify_ref_to_ref()?;
   }
   if opts.simplify_main {
-    book.simplify_main_ref(&main);
+    ctx.book.simplify_main_ref();
   }
-  book.prune(Some(&main), opts.prune, opts.adt_encoding, &mut warnings);
+
+  ctx.prune(opts.prune, opts.adt_encoding);
+
   if opts.inline {
-    book.inline();
+    ctx.book.inline();
   }
   if opts.merge {
-    book.merge_definitions(&main);
+    ctx.book.merge_definitions();
   }
-  Ok((main, warnings))
+
+  if !ctx.info.has_errors() { Ok((ctx.book, ctx.info.warns)) } else { Err(ctx.info) }
 }
 
-pub fn encode_pattern_matching(
-  book: &mut Book,
-  warnings: &mut Vec<Warning>,
-  adt_encoding: AdtEncoding,
-) -> Result<(), String> {
-  book.check_arity()?;
-  book.resolve_ctrs_in_pats();
-  book.check_unbound_pats()?;
-  book.check_ctrs_arities()?;
-  book.resolve_refs()?;
-  book.desugar_let_destructors();
-  book.desugar_implicit_match_binds();
+pub fn encode_pattern_matching(ctx: &mut Ctx, adt_encoding: AdtEncoding) -> Result<(), Info> {
+  ctx.check_arity()?;
+  ctx.book.resolve_ctrs_in_pats();
+  ctx.check_unbound_pats()?;
+  ctx.check_ctrs_arities()?;
+  ctx.resolve_refs()?;
+  ctx.book.desugar_let_destructors();
+  ctx.book.desugar_implicit_match_binds();
   // This call to unbound vars needs to be after desugar_implicit_match_binds,
   // since we need the generated pattern names, like `x-1`, `ctr.field`.
-  book.check_unbound_vars()?;
-  book.linearize_matches()?;
-  book.extract_adt_matches(warnings)?;
-  book.flatten_rules();
-  let def_types = book.infer_def_types()?;
-  book.check_exhaustive_patterns(&def_types)?;
-  book.encode_pattern_matching_functions(&def_types, adt_encoding);
+  ctx.check_unbound_vars()?;
+  ctx.linearize_matches()?;
+  ctx.extract_adt_matches()?;
+  ctx.book.flatten_rules();
+  let def_types = ctx.infer_def_types()?;
+  ctx.check_exhaustive_patterns(&def_types)?;
+  ctx.book.encode_pattern_matching_functions(&def_types, adt_encoding);
   Ok(())
 }
 
 pub fn run_book(
-  mut book: Book,
+  book: Book,
   mem_size: usize,
   run_opts: RunOpts,
   warning_opts: WarningOpts,
   compile_opts: CompileOpts,
-  entrypoint: Option<Name>,
-) -> Result<(Term, RunInfo), String> {
-  let CompileResult { core_book, hvmc_names, labels, warnings } =
-    compile_book(&mut book, compile_opts, entrypoint)?;
+) -> Result<(Term, RunInfo), Info> {
+  let CompileResult { book, warns: warnings, core_book, hvmc_names, labels } =
+    compile_book(book, compile_opts)?;
 
   display_warnings(&warnings, warning_opts)?;
 
@@ -327,8 +321,8 @@ impl WarningOpts {
       .iter()
       .filter(|w| {
         (match w {
-          Warning::MatchOnlyVars { .. } => self.match_only_vars,
-          Warning::UnusedDefinition { .. } => self.unused_defs,
+          Warning::MatchOnlyVars(_) => self.match_only_vars,
+          Warning::UnusedDefinition(_) => self.unused_defs,
         }) == ws
       })
       .collect()
@@ -352,34 +346,26 @@ pub fn display_warnings(warnings: &[Warning], warning_opts: WarningOpts) -> Resu
 }
 
 pub struct CompileResult {
+  pub book: Book,
+  pub warns: Vec<Warning>,
   pub core_book: hvmc::ast::Book,
   pub hvmc_names: HvmcNames,
   pub labels: Labels,
-  pub warnings: Vec<Warning>,
 }
 
 impl std::fmt::Debug for CompileResult {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    for warn in &self.warnings {
+    for warn in &self.warns {
       writeln!(f, "// WARNING: {}", warn)?;
     }
     write!(f, "{}", show_book(&self.core_book))
   }
 }
 
-pub enum Warning {
-  MatchOnlyVars { def_name: Name },
-  UnusedDefinition { def_name: Name },
-}
-
-impl std::fmt::Display for Warning {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      Warning::MatchOnlyVars { def_name } => {
-        write!(f, "Match expression at definition '{def_name}' only uses var patterns.")
-      }
-      Warning::UnusedDefinition { def_name } => write!(f, "Unused definition '{def_name}'."),
-    }
+impl CompileResult {
+  pub fn display_with_warns(&self, opts: WarningOpts) -> Result<String, String> {
+    display_warnings(&self.warns, opts)?;
+    Ok(show_book(&self.core_book))
   }
 }
 

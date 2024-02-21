@@ -10,16 +10,18 @@ impl Book {
   ///
   /// Ignores origin of the rules when merging,
   /// Should not be preceded by passes that cares about the origins.
-  pub fn merge_definitions(&mut self, main: &Name) {
+  pub fn merge_definitions(&mut self) {
     let defs: Vec<_> = self.defs.keys().cloned().collect();
-    self.merge(main, defs.into_iter());
+    self.merge(defs.into_iter());
   }
 
   /// Checks and merges identical definitions given by `defs`.
   /// We never merge the entrypoint function with something else.
-  fn merge(&mut self, main: &Name, defs: impl Iterator<Item = Name>) {
+  fn merge(&mut self, defs: impl Iterator<Item = Name>) {
+    let name = self.entrypoint.clone();
     // Sets of definitions that are identical, indexed by the body term.
-    let equal_terms = self.collect_terms(defs.filter(|def_name| def_name != main));
+    let equal_terms =
+      self.collect_terms(defs.filter(|def_name| !name.as_ref().is_some_and(|m| m == def_name)));
 
     // Map of old name to new merged name
     let mut name_map = BTreeMap::new();
@@ -49,7 +51,7 @@ impl Book {
         def.rule_mut().body = term;
       }
     }
-    self.update_refs(&name_map, main);
+    self.update_refs(&name_map);
   }
 
   fn collect_terms(&mut self, def_entries: impl Iterator<Item = Name>) -> IndexMap<Term, IndexSet<Name>> {
@@ -64,7 +66,7 @@ impl Book {
     equal_terms
   }
 
-  fn update_refs(&mut self, name_map: &BTreeMap<Name, Name>, main: &Name) {
+  fn update_refs(&mut self, name_map: &BTreeMap<Name, Name>) {
     let mut updated_defs = Vec::new();
 
     for def in self.defs.values_mut() {
@@ -74,7 +76,7 @@ impl Book {
     }
 
     if !updated_defs.is_empty() {
-      self.merge(main, updated_defs.into_iter());
+      self.merge(updated_defs.into_iter());
     }
   }
 }

@@ -1,11 +1,13 @@
 use hvmc::ast::{parse_net, show_net};
 use hvml::{
-  compile_book, desugar_book, encode_pattern_matching,
+  compile_book, desugar_book,
+  diagnostics::Info,
+  encode_pattern_matching,
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
   term::{
     display::display_readback_errors, load_book::do_parse_book, net_to_term::net_to_term, parser::parse_term,
-    term_to_compat_net, term_to_net::Labels, AdtEncoding, Book, Name, Term,
+    term_to_compat_net, term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term,
   },
   CompileOpts, RunOpts, WarningOpts,
 };
@@ -33,7 +35,7 @@ const TESTS_PATH: &str = "/tests/golden_tests/";
 
 fn run_single_golden_test(
   path: &Path,
-  run: &dyn Fn(&str, &Path) -> Result<String, String>,
+  run: &dyn Fn(&str, &Path) -> Result<String, Info>,
 ) -> Result<(), String> {
   let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
   let file_name = path.to_str().and_then(|path| path.rsplit_once(TESTS_PATH)).unwrap().1;
@@ -42,7 +44,7 @@ fn run_single_golden_test(
   let file_path = format!("{}{}", &TESTS_PATH[1 ..], file_name);
   let file_path = Path::new(&file_path);
 
-  let result: String = run(&code, file_path).unwrap_or_else(|err| err);
+  let result: String = run(&code, file_path).unwrap_or_else(|err| err.to_string());
 
   let mut settings = insta::Settings::clone_current();
   settings.set_prepend_module_to_snapshot(false);
@@ -56,7 +58,7 @@ fn run_single_golden_test(
   Ok(())
 }
 
-fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str, &Path) -> Result<String, String>) {
+fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str, &Path) -> Result<String, Info>) {
   let root = PathBuf::from(format!(
     "{}{TESTS_PATH}{}",
     env!("CARGO_MANIFEST_DIR"),
@@ -82,7 +84,13 @@ fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str, &Path) -> Result<Stri
 fn compile_term() {
   run_golden_test_dir(function_name!(), &|code, _| {
     let mut term = do_parse_term(code)?;
-    term.check_unbound_vars(&mut HashMap::new())?;
+    let mut vec = Vec::new();
+    term.check_unbound_vars(&mut HashMap::new(), &mut vec);
+
+    if !vec.is_empty() {
+      return Err(vec.into_iter().join("\n").into());
+    }
+
     term.make_var_names_unique();
     term.linearize_vars();
 
@@ -96,16 +104,16 @@ fn compile_term() {
 #[test]
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::heavy(), None)?;
+    let book = do_parse_book(code, path)?;
+    let compiled = compile_book(book, CompileOpts::heavy())?;
     Ok(format!("{:?}", compiled))
   })
 }
 #[test]
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::light(), None)?;
+    let book = do_parse_book(code, path)?;
+    let compiled = compile_book(book, CompileOpts::light())?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -116,7 +124,7 @@ fn run_file() {
     let book = do_parse_book(code, path)?;
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) =
-      run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
+      run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }
@@ -131,7 +139,7 @@ fn run_lazy() {
     desugar_opts.lazy_mode();
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, info) = run_book(book, 1 << 20, run_opts, WarningOpts::deny_all(), desugar_opts, None)?;
+    let (res, info) = run_book(book, 1 << 20, run_opts, WarningOpts::deny_all(), desugar_opts)?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }
@@ -150,19 +158,20 @@ fn readback_lnet() {
 #[test]
 fn flatten_rules() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book(code, path)?;
-    let main = book.check_has_entrypoint(None).ok();
-    book.check_shared_names()?;
-    book.encode_builtins();
-    book.resolve_ctrs_in_pats();
-    book.encode_adts(AdtEncoding::TaggedScott);
-    book.desugar_let_destructors();
-    book.desugar_implicit_match_binds();
-    book.check_unbound_pats()?;
-    book.extract_adt_matches(&mut Vec::new())?;
-    book.flatten_rules();
-    book.prune(main.as_ref(), false, AdtEncoding::TaggedScott, &mut Vec::new());
-    Ok(book.to_string())
+    let book = do_parse_book(code, path)?;
+    let mut ctx = Ctx::new(book);
+    ctx.set_entrypoint();
+    ctx.check_shared_names();
+    ctx.book.encode_builtins();
+    ctx.book.resolve_ctrs_in_pats();
+    ctx.book.encode_adts(AdtEncoding::TaggedScott);
+    ctx.book.desugar_let_destructors();
+    ctx.book.desugar_implicit_match_binds();
+    ctx.check_unbound_pats()?;
+    ctx.extract_adt_matches()?;
+    ctx.book.flatten_rules();
+    ctx.prune(false, AdtEncoding::TaggedScott);
+    Ok(ctx.book.to_string())
   })
 }
 
@@ -179,17 +188,18 @@ fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut result = String::new();
     for adt_encoding in [AdtEncoding::TaggedScott, AdtEncoding::Scott] {
-      let mut book = do_parse_book(code, path)?;
-      let main = book.check_has_entrypoint(None).ok();
-      book.check_shared_names()?;
-      book.encode_adts(adt_encoding);
-      book.encode_builtins();
-      encode_pattern_matching(&mut book, &mut Vec::new(), adt_encoding)?;
-      book.prune(main.as_ref(), false, adt_encoding, &mut Vec::new());
-      book.merge_definitions(&main.clone().unwrap_or(Name::new("")));
+      let book = do_parse_book(code, path)?;
+      let mut ctx = Ctx::new(book);
+      ctx.set_entrypoint();
+      ctx.check_shared_names();
+      ctx.book.encode_adts(adt_encoding);
+      ctx.book.encode_builtins();
+      encode_pattern_matching(&mut ctx, adt_encoding)?;
+      ctx.prune(false, adt_encoding);
+      ctx.book.merge_definitions();
 
       writeln!(result, "{adt_encoding:?}:").unwrap();
-      writeln!(result, "{book}\n").unwrap();
+      writeln!(result, "{}\n", ctx.book).unwrap();
     }
     Ok(result)
   })
@@ -198,8 +208,8 @@ fn encode_pattern_match() {
 #[test]
 fn desugar_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book(code, path)?;
-    desugar_book(&mut book, CompileOpts::light(), None)?;
+    let book = do_parse_book(code, path)?;
+    let (book, _) = desugar_book(book, CompileOpts::light())?;
     Ok(book.to_string())
   })
 }
@@ -215,8 +225,7 @@ fn hangs() {
     let lck = Arc::new(RwLock::new(false));
     let got = lck.clone();
     std::thread::spawn(move || {
-      let _ =
-        run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None);
+      let _ = run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy());
       *got.write().unwrap() = true;
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
@@ -229,7 +238,8 @@ fn hangs() {
 fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::light(), Some(Name::new("foo")))?;
+    book.entrypoint = Some(Name::new("foo"));
+    let compiled = compile_book(book, CompileOpts::light())?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -237,16 +247,11 @@ fn compile_entrypoint() {
 #[test]
 fn run_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let book = do_parse_book(code, path)?;
+    let mut book = do_parse_book(code, path)?;
+    book.entrypoint = Some(Name::new("foo"));
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, info) = run_book(
-      book,
-      1 << 20,
-      RunOpts::default(),
-      WarningOpts::deny_all(),
-      CompileOpts::heavy(),
-      Some(Name::new("foo")),
-    )?;
+    let (res, info) =
+      run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }

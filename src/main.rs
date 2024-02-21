@@ -1,11 +1,16 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
-use hvmc::ast::{show_book, show_net};
+use hvmc::ast::show_net;
 use hvml::{
-  check_book, compile_book, desugar_book, load_file_to_book, run_book,
-  term::{display::display_readback_errors, AdtEncoding, Name},
+  check_book, compile_book, desugar_book,
+  diagnostics::Info,
+  load_file_to_book, run_book,
+  term::{display::display_readback_errors, AdtEncoding, Book, Name},
   CompileOpts, RunInfo, RunOpts, WarnState, WarningOpts,
 };
-use std::{path::PathBuf, vec::IntoIter};
+use std::{
+  path::{Path, PathBuf},
+  vec::IntoIter,
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -142,33 +147,35 @@ fn mem_parser(arg: &str) -> Result<usize, String> {
 }
 
 fn main() {
-  fn run() -> Result<(), String> {
-    #[cfg(not(feature = "cli"))]
-    compile_error!("The 'cli' feature is needed for the hvm-lang cli");
+  #[cfg(not(feature = "cli"))]
+  compile_error!("The 'cli' feature is needed for the hvm-lang cli");
 
-    let cli = Cli::parse();
-    let arg_verbose = cli.verbose;
+  let cli = Cli::parse();
+  let arg_verbose = cli.verbose;
 
-    let verbose = |book: &_| {
-      if arg_verbose {
-        println!("{book:?}");
-      }
-    };
-
-    execute_cli_mode(cli, &verbose)?;
-
-    Ok(())
-  }
-  if let Err(e) = run() {
-    eprintln!("{e}");
+  if let Err(e) = execute_cli_mode(cli) {
+    eprintln!("{}", e.display(arg_verbose))
   }
 }
 
-fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(), String> {
+fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
+  let arg_verbose = cli.verbose;
+  let entrypoint = cli.entrypoint.take();
+
+  let load_book = |path: &Path| -> Result<Book, Info> {
+    let mut book = load_file_to_book(&path).map_err(Info::from)?;
+    book.entrypoint = entrypoint;
+
+    if arg_verbose {
+      println!("{book}");
+    }
+
+    Ok(book)
+  };
+
   match cli.mode {
     Mode::Check { path } => {
-      let book = load_file_to_book(&path)?;
-      verbose(&book);
+      let book = load_book(&path)?;
       check_book(book)?;
     }
     Mode::Compile { path, comp_opts, warn_opts, lazy_mode } => {
@@ -179,24 +186,20 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
         opts.lazy_mode()
       }
 
-      let mut book = load_file_to_book(&path)?;
-      verbose(&book);
-      let compiled = compile_book(&mut book, opts, cli.entrypoint)?;
-      hvml::display_warnings(&compiled.warnings, warning_opts)?;
-      print!("{}", show_book(&compiled.core_book));
+      let book = load_book(&path)?;
+      let compiled = compile_book(book, opts)?;
+      println!("{}", compiled.display_with_warns(warning_opts)?);
     }
     Mode::Desugar { path, comp_opts } => {
-      let mut book = load_file_to_book(&path)?;
-      verbose(&book);
-
       let opts = OptArgs::opts_from_cli(&comp_opts);
-
-      desugar_book(&mut book, opts, None)?;
-      println!("{book}");
+      let book = load_book(&path)?;
+      // TODO: Shoudn't the desugar have `warn_opts` too? maybe WarningOpts::allow_all() by default
+      let (book, _warns) = desugar_book(book, opts)?;
+      println!("{}", book);
     }
     Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, comp_opts, warn_opts, lazy_mode } => {
       if debug && lazy_mode {
-        return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".to_string());
+        return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".into());
       }
 
       let warning_opts = warn_opts.get_warning_opts(WarningOpts::allow_all());
@@ -208,13 +211,12 @@ fn execute_cli_mode(cli: Cli, verbose: &dyn Fn(&hvml::term::Book)) -> Result<(),
         opts.lazy_mode()
       }
 
-      let book = load_file_to_book(&path)?;
-      verbose(&book);
+      let book = load_book(&path)?;
 
       let mem_size = mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
       let run_opts = RunOpts { single_core, debug, linear, lazy_mode };
       let (res_term, RunInfo { stats, readback_errors, net }) =
-        run_book(book, mem_size, run_opts, warning_opts, opts, cli.entrypoint)?;
+        run_book(book, mem_size, run_opts, warning_opts, opts)?;
 
       let total_rewrites = stats.rewrites.total() as f64;
       let rps = total_rewrites / stats.run_time / 1_000_000.0;

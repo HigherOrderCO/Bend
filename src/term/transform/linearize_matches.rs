@@ -1,26 +1,30 @@
-use std::collections::BTreeSet;
-
+use super::extract_adt_matches::{infer_match_type, MatchErr};
+use crate::{
+  diagnostics::Info,
+  term::{Ctx, Name, Pattern, Term, Type},
+};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use std::collections::BTreeSet;
 
-use crate::term::{Book, Name, Pattern, Term, Type};
+impl Ctx {
+  pub fn linearize_matches(&mut self) -> Result<(), Info> {
+    self.info.start_pass();
 
-use super::extract_adt_matches::{infer_match_type, MatchError};
-
-impl Book {
-  pub fn linearize_matches(&mut self) -> Result<(), String> {
-    for def in self.defs.values_mut() {
+    for (def_name, def) in &mut self.book.defs {
       for rule in def.rules.iter_mut() {
-        rule.body.linearize_matches(&self.ctrs).map_err(|e| format!("In definition '{}': {e}", def.name))?;
+        let res = rule.body.linearize_matches(&self.book.ctrs);
+
+        self.info.take_err(res, Some(&def_name));
       }
     }
 
-    Ok(())
+    self.info.fatal(())
   }
 }
 
 impl Term {
-  fn linearize_matches(&mut self, ctrs: &IndexMap<Name, Name>) -> Result<(), MatchError> {
+  fn linearize_matches(&mut self, ctrs: &IndexMap<Name, Name>) -> Result<(), MatchErr> {
     match self {
       Term::Mat { matched: box Term::Var { .. }, arms } => {
         for (_, body) in arms.iter_mut() {
@@ -96,7 +100,7 @@ pub fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
   get_match_reference(match_term)
 }
 
-pub fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, MatchError> {
+pub fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, MatchErr> {
   let Term::Mat { matched: _, arms } = match_term else { unreachable!() };
   // Collect the vars
   let mut free_vars = IndexSet::new();
@@ -104,7 +108,7 @@ pub fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term,
     let (decls, uses) = arm.unscoped_vars();
     // Not allowed to declare unscoped var and not use it since we need to extract the match arm.
     if let Some(var) = decls.difference(&uses).next() {
-      return Err(MatchError::Linearize(format!("λ${var}").into()));
+      return Err(MatchErr::Linearize(format!("λ${var}").into()));
     }
     // Change unscoped var to normal scoped var if it references something outside this match arm.
     let arm_free_vars = uses.difference(&decls);
