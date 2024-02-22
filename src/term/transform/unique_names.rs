@@ -1,7 +1,6 @@
 // Pass to give all variables in a definition unique names.
 
 use crate::term::{Book, Name, Pattern, Term};
-use hvmc::run::Val;
 use std::collections::HashMap;
 
 impl Book {
@@ -21,7 +20,7 @@ impl Term {
   }
 }
 
-type VarId = Val;
+type VarId = u64;
 
 #[derive(Default)]
 pub struct UniqueNameGenerator {

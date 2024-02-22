@@ -28,7 +28,7 @@ impl Display for EntryErr {
   }
 }
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   pub fn set_entrypoint(&mut self) {
     let mut entrypoint = None;
 

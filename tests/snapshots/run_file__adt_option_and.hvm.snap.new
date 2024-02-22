@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+assertion_line: 56
+input_file: tests/golden_tests/run_file/adt_option_and.hvm
+---
+λa match a { (Some b): λc (λd match d { (Some e): λf (Some (f, e)); (None): λ* None } c b); (None): λ* None }

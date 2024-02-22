@@ -1,5 +1,4 @@
 use super::{parser::parse_book, Book, Name, Pattern, Term};
-use hvmc::run::Val;
 
 const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/term/builtins.hvm"));
 
@@ -68,7 +67,7 @@ impl Term {
 
   fn encode_str(val: &str) -> Term {
     val.chars().rfold(Term::r#ref(SNIL), |acc, char| {
-      Term::call(Term::r#ref(SCONS), [Term::Num { val: Val::from(char) }, acc])
+      Term::call(Term::r#ref(SCONS), [Term::Num { val: u64::from(char) }, acc])
     })
   }
 }

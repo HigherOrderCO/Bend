@@ -36,7 +36,7 @@ impl Display for ExhaustivenessErr {
   }
 }
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   /// For each pattern-matching definition, check that any given value will match at least one of the rules.
   /// We assume that all patterns have been type checked already.
   pub fn check_exhaustive_patterns(&mut self, def_types: &DefinitionTypes) -> Result<(), Info> {

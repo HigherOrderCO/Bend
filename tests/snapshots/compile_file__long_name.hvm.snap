@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/long_name.hvm
 ---
-@WowThis_is = (a a)
+@WowThis_is_a_very_long_name_no_way_ItFits = (a a)
 @main = (* a)
-& @WowThis_is ~ (* a)
+& @WowThis_is_a_very_long_name_no_way_ItFits ~ (* a)
 

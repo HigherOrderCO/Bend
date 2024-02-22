@@ -1,8 +1,8 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-  diagnostics::Warning,
   term::{Adt, AdtEncoding, Book, Ctx, Name, Tag, Term, LIST, STRING},
+  diagnostics::Warning, CORE_BUILTINS,
 };
 use indexmap::IndexSet;
 
@@ -24,7 +24,7 @@ enum Used {
 
 type Definitions = HashMap<Name, Used>;
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   /// If `prune_all`, removes all unused definitions and adts starting from Main.
   /// Otherwise, prunes only the builtins not accessible from any non-built-in definition
   pub fn prune(&mut self, prune_all: bool, adt_encoding: AdtEncoding) {
@@ -148,6 +148,9 @@ impl Book {
   fn insert_used(&self, def_name: &Name, used: Used, uses: &mut Definitions, adt_encoding: AdtEncoding) {
     if let Entry::Vacant(e) = uses.entry(def_name.clone()) {
       e.insert(used);
+      if CORE_BUILTINS.contains(&def_name.0.as_ref().as_ref()) {
+        return;
+      }
 
       // This needs to be done for each rule in case the pass it's ran from has not encoded the pattern match
       // E.g.: the `flatten_rules` golden test

@@ -2,5 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/tagged_lam.hvm
 ---
-@main = [#3 #4]
+@main = a
+& [{2 <+ #1 b> b} {2 {3 <* c d> c} d}] ~ {2 #2 a}
 

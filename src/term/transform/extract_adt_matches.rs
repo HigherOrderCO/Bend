@@ -6,7 +6,7 @@ use crate::{
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   /// Extracts adt match terms into pattern matching functions.
   /// Creates rules with potentially nested patterns, so the flattening pass needs to be called after.
   pub fn extract_adt_matches(&mut self) -> Result<(), Info> {

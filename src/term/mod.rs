@@ -1,4 +1,3 @@
-use hvmc::run::Val;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use std::{collections::HashMap, ops::Deref, sync::Arc};
@@ -17,14 +16,14 @@ pub use term_to_net::{book_to_nets, term_to_compat_net};
 
 use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
 
-#[derive(Debug, Clone, Default)]
-pub struct Ctx {
-  pub book: Book,
+#[derive(Debug)]
+pub struct Ctx<'book> {
+  pub book: &'book mut Book,
   pub info: Info,
 }
 
-impl Ctx {
-  pub fn new(book: Book) -> Ctx {
+impl<'book> Ctx<'book> {
+  pub fn new(book: &mut Book) -> Ctx {
     Ctx { book, info: Info::default() }
   }
 }
@@ -205,7 +204,7 @@ pub enum AdtEncoding {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
 pub struct Name(pub Arc<str>);
 
-pub fn num_to_name(mut num: Val) -> String {
+pub fn num_to_name(mut num: u64) -> String {
   let mut name = String::new();
   loop {
     let c = (num % 26) as u8 + b'a';
@@ -774,9 +773,15 @@ impl From<String> for Name {
   }
 }
 
-impl From<Val> for Name {
-  fn from(value: Val) -> Self {
+impl From<u64> for Name {
+  fn from(value: u64) -> Self {
     num_to_name(value).into()
+  }
+}
+
+impl From<u32> for Name {
+  fn from(value: u32) -> Self {
+    num_to_name(value as u64).into()
   }
 }
 

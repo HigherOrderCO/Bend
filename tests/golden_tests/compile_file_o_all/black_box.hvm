@@ -1,0 +1,2 @@
+def_that_uses_black_box = (* (HVM.black_box 6) 7)
+main = def_that_uses_black_box

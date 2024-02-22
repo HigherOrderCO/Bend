@@ -1,0 +1,4 @@
+main = let k = #a{0 1}; match k {
+    0: 1
+    +p: (+ p 2)
+}

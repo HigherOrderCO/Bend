@@ -1,5 +1,4 @@
 use clap::{Args, CommandFactory, Parser, Subcommand};
-use hvmc::ast::show_net;
 use hvml::{
   check_book, compile_book, desugar_book,
   diagnostics::Info,
@@ -54,8 +53,11 @@ enum Mode {
   },
   /// Compiles the program and runs it with the hvm.
   Run {
-    #[arg(short, long, help = "How much memory to allocate for the runtime", default_value = "1G", value_parser = mem_parser)]
-    mem: usize,
+    #[arg(short = 'm', long = "mem", help = "How much memory to allocate for the runtime", default_value = "1G", value_parser = mem_parser)]
+    max_mem: u64,
+
+    #[arg(short = 'r', long = "rwts", help = "Maximium amount of rewrites", value_parser = mem_parser)]
+    max_rwts: Option<u64>,
 
     #[arg(short = 'd', help = "Debug mode (print each reduction step)")]
     debug: bool,
@@ -134,7 +136,7 @@ struct CliWarnOpts {
   pub allows: Vec<WarningArgs>,
 }
 
-fn mem_parser(arg: &str) -> Result<usize, String> {
+fn mem_parser(arg: &str) -> Result<u64, String> {
   let (base, mult) = match arg.to_lowercase().chars().last() {
     None => return Err("Mem size argument is empty".to_string()),
     Some('k') => (&arg[0 .. arg.len() - 1], 1 << 10),
@@ -142,7 +144,7 @@ fn mem_parser(arg: &str) -> Result<usize, String> {
     Some('g') => (&arg[0 .. arg.len() - 1], 1 << 30),
     Some(_) => (arg, 1),
   };
-  let base = base.parse::<usize>().map_err(|e| e.to_string())?;
+  let base = base.parse::<u64>().map_err(|e| e.to_string())?;
   Ok(base * mult)
 }
 
@@ -175,8 +177,8 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
 
   match cli.mode {
     Mode::Check { path } => {
-      let book = load_book(&path)?;
-      check_book(book)?;
+      let mut book = load_book(&path)?;
+      check_book(&mut book)?;
     }
     Mode::Compile { path, comp_opts, warn_opts, lazy_mode } => {
       let warning_opts = warn_opts.get_warning_opts(WarningOpts::default());
@@ -186,18 +188,29 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
         opts.lazy_mode()
       }
 
-      let book = load_book(&path)?;
-      let compiled = compile_book(book, opts)?;
+      let mut book = load_book(&path)?;
+      let compiled = compile_book(&mut book, opts)?;
       println!("{}", compiled.display_with_warns(warning_opts)?);
     }
     Mode::Desugar { path, comp_opts } => {
       let opts = OptArgs::opts_from_cli(&comp_opts);
-      let book = load_book(&path)?;
+      let mut book = load_book(&path)?;
       // TODO: Shoudn't the desugar have `warn_opts` too? maybe WarningOpts::allow_all() by default
-      let (book, _warns) = desugar_book(book, opts)?;
+      let _warns = desugar_book(&mut book, opts)?;
       println!("{}", book);
     }
-    Mode::Run { path, mem, debug, mut single_core, linear, arg_stats, comp_opts, warn_opts, lazy_mode } => {
+    Mode::Run {
+      path,
+      max_mem,
+      max_rwts,
+      debug,
+      mut single_core,
+      linear,
+      arg_stats,
+      comp_opts,
+      warn_opts,
+      lazy_mode,
+    } => {
       if debug && lazy_mode {
         return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".into());
       }
@@ -213,16 +226,18 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
 
       let book = load_book(&path)?;
 
-      let mem_size = mem / std::mem::size_of::<(hvmc::run::APtr, hvmc::run::APtr)>();
-      let run_opts = RunOpts { single_core, debug, linear, lazy_mode };
-      let (res_term, RunInfo { stats, readback_errors, net }) =
-        run_book(book, mem_size, run_opts, warning_opts, opts)?;
+      let mem_size = max_mem / std::mem::size_of::<hvmc::run::Node>() as u64;
+      let run_opts =
+        RunOpts { single_core, debug, linear, lazy_mode, max_memory: mem_size, max_rewrites: max_rwts };
+      let (res_term, RunInfo { stats, readback_errors, net, book: _, labels: _ }) =
+        run_book(book, max_mem as usize, run_opts, warning_opts, opts)?;
 
       let total_rewrites = stats.rewrites.total() as f64;
       let rps = total_rewrites / stats.run_time / 1_000_000.0;
+      let size = stats.used;
 
       if cli.verbose {
-        println!("\n{}", show_net(&net));
+        println!("\n{}", net);
       }
 
       println!("{}{}", display_readback_errors(&readback_errors), res_term);
@@ -236,6 +251,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
         println!("- OPER : {}", stats.rewrites.oper);
         println!("TIME   : {:.3} s", stats.run_time);
         println!("RPS    : {:.3} m", rps);
+        println!("SIZE   : {} nodes", size);
       }
     }
   };
@@ -276,8 +292,6 @@ pub enum OptArgs {
   NoSupercombinators,
   SimplifyMain,
   NoSimplifyMain,
-  PreReduceRefs,
-  NoPreReduceRefs,
   Merge,
   NoMerge,
   Inline,
@@ -306,8 +320,6 @@ impl OptArgs {
         NoSupercombinators => opts.supercombinators = false,
         SimplifyMain => opts.simplify_main = true,
         NoSimplifyMain => opts.simplify_main = false,
-        PreReduceRefs => opts.pre_reduce_refs = true,
-        NoPreReduceRefs => opts.pre_reduce_refs = false,
         Merge => opts.merge = true,
         NoMerge => opts.merge = false,
         Inline => opts.inline = true,
