@@ -28,6 +28,7 @@ impl Book {
 
 type Combinators = BTreeMap<Name, Definition>;
 
+#[derive(Debug)]
 struct TermInfo<'d> {
   // Number of times a Term has been detached from the current Term
   counter: u32,
@@ -76,6 +77,7 @@ impl<'d> TermInfo<'d> {
   }
 }
 
+#[derive(Debug)]
 enum Detach {
   /// Can be detached freely
   Combinator,
@@ -153,7 +155,9 @@ impl Term {
         detach = detach & Detach::unscoped_lam(nam.cloned().unwrap());
       }
 
-      term_info.provide(nam);
+      if !unscoped {
+        term_info.provide(nam);
+      }
 
       if detach.can_detach() && !term.is_id() && depth != 0 && term_info.has_no_free_vars() {
         term_info.detach_term(term);
