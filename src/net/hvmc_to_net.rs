@@ -76,7 +76,7 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
       }
       Tree::Var { .. } => unreachable!(),
       Tree::Ref { nam } => {
-        let kind = Ref { def_name: Name::new(nam.clone()) };
+        let kind = Ref { def_name: Name::new(nam) };
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }

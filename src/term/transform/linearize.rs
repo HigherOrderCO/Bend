@@ -178,11 +178,7 @@ fn duplicate_let(nam: &Name, nxt: &mut Term, uses: u64, let_body: &mut Term) {
 }
 
 fn dup_name(nam: &Name, uses: u64) -> Name {
-  if uses == 1 {
-    Name::new(format!("{nam}"))
-  } else {
-    Name::new(format!("{nam}_{uses}"))
-  }
+  if uses == 1 { nam.clone() } else { Name::new(format!("{nam}_{uses}")) }
 }
 
 fn internal_dup_name(nam: &Name, uses: u64) -> Name {

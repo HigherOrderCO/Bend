@@ -1,7 +1,7 @@
 use indexmap::{IndexMap, IndexSet};
 use interner::global::GlobalString;
 use itertools::Itertools;
-use std::{collections::HashMap, ops::Deref};
+use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
 pub mod builtins;
 pub mod check;
@@ -15,9 +15,8 @@ pub mod transform;
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
-use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
-
 use self::parser::lexer::STRINGS;
+use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
 
 #[derive(Debug)]
 pub struct Ctx<'book> {
@@ -277,6 +276,10 @@ impl Term {
 
   pub fn r#ref(name: &str) -> Self {
     Term::Ref { nam: name.into() }
+  }
+
+  pub fn str(str: &str) -> Self {
+    Term::Str { val: STRINGS.get(str) }
   }
 
   /// Substitute the occurrences of a variable in a term with the given term.
@@ -766,9 +769,7 @@ impl Type {
 }
 
 impl Name {
-  /// For constructing a name when you have an owned String.  
-  /// If you have an `&str` prefer to use `Name::From<&str>`
-  pub fn new(value: String) -> Name {
+  pub fn new<'a, V: Into<Cow<'a, str>>>(value: V) -> Name {
     Name(STRINGS.get(value))
   }
 
@@ -800,6 +801,12 @@ impl Deref for Name {
   type Target = str;
 
   fn deref(&self) -> &Self::Target {
+    &self.0
+  }
+}
+
+impl AsRef<str> for Name {
+  fn as_ref(&self) -> &str {
     &self.0
   }
 }
