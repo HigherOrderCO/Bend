@@ -126,7 +126,7 @@ pub enum Term {
     val: u64,
   },
   Str {
-    val: String,
+    val: GlobalString,
   },
   Lst {
     els: Vec<Term>,

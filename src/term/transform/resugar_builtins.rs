@@ -1,4 +1,4 @@
-use crate::term::{Term, LCONS, LNIL, SCONS, SNIL};
+use crate::term::{parser::lexer::STRINGS, Term, LCONS, LNIL, SCONS, SNIL};
 
 impl Term {
   pub fn resugar_builtins(&mut self) {
@@ -27,19 +27,19 @@ impl Term {
           // If well formed string, add the next character to the string we're building
           let head = unsafe { char::from_u32_unchecked(val as u32) }.to_string();
           let str = head + &tail;
-          *self = Term::Str { val: str }
+          *self = Term::Str { val: STRINGS.get(str) }
         } else {
           // Otherwise rebuild the constructor with the new tail
 
           // Create `(Cons head Nil)` instead of `(Cons head "")`
-          if tail == (Term::Str { val: String::new() }) {
+          if matches!(&tail, Term::Str { val } if val.is_empty()) {
             tail = Term::r#ref(SNIL);
           }
           *self = Term::call(Term::Ref { nam: ctr.clone() }, [head, tail]);
         }
       }
       // (String.nil)
-      Term::Ref { nam: def_name } if def_name == SNIL => *self = Term::Str { val: String::new() },
+      Term::Ref { nam: def_name } if def_name == SNIL => *self = Term::Str { val: STRINGS.get("") },
 
       Term::Mat { matched, arms } => {
         matched.resugar_strings();
