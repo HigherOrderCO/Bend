@@ -179,7 +179,11 @@ fn duplicate_let(nam: &Name, nxt: &mut Term, uses: Val, let_body: &mut Term) {
 }
 
 fn dup_name(nam: &Name, uses: Val) -> Name {
-  format!("{nam}_{uses}").into()
+  if uses == 1 {
+    format!("{nam}").into()
+  } else {
+    format!("{nam}_{uses}").into()
+  }
 }
 
 fn internal_dup_name(nam: &Name, uses: Val) -> Name {
