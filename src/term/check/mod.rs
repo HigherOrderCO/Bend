@@ -1,5 +1,5 @@
 pub mod ctrs_arities;
-pub mod exhaustiveness;
+pub mod match_arity;
 pub mod set_entrypoint;
 pub mod shared_names;
 pub mod type_check;

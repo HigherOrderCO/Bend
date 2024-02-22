@@ -165,7 +165,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
   let entrypoint = cli.entrypoint.take();
 
   let load_book = |path: &Path| -> Result<Book, Info> {
-    let mut book = load_file_to_book(&path).map_err(Info::from)?;
+    let mut book = load_file_to_book(path).map_err(Info::from)?;
     book.entrypoint = entrypoint;
 
     if arg_verbose {

@@ -1,3 +1,5 @@
+use self::{check::type_check::infer_type, parser::lexer::STRINGS};
+use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
 use indexmap::{IndexMap, IndexSet};
 use interner::global::GlobalString;
 use itertools::Itertools;
@@ -15,16 +17,13 @@ pub mod transform;
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
-use self::parser::lexer::STRINGS;
-use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
-
 #[derive(Debug)]
 pub struct Ctx<'book> {
   pub book: &'book mut Book,
   pub info: Info,
 }
 
-impl<'book> Ctx<'book> {
+impl Ctx<'_> {
   pub fn new(book: &mut Book) -> Ctx {
     Ctx { book, info: Info::default() }
   }
@@ -37,14 +36,17 @@ pub struct Book {
   pub defs: IndexMap<Name, Definition>,
 
   /// The algebraic datatypes defined by the program
-  pub adts: IndexMap<Name, Adt>,
+  pub adts: Adts,
 
   /// To which type does each constructor belong to.
-  pub ctrs: IndexMap<Name, Name>,
+  pub ctrs: Constructors,
 
   /// A custom or default "main" entrypoint.
   pub entrypoint: Option<Name>,
 }
+
+pub type Adts = IndexMap<Name, Adt>;
+pub type Constructors = IndexMap<Name, Name>;
 
 /// A pattern matching function definition.
 #[derive(Debug, Clone)]
@@ -55,24 +57,10 @@ pub struct Definition {
 }
 
 /// A pattern matching rule of a definition.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub struct Rule {
   pub pats: Vec<Pattern>,
   pub body: Term,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum MatchNum {
-  Zero,
-  Succ(Option<Option<Name>>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum Tag {
-  Named(Name),
-  Numeric(u32),
-  Auto,
-  Static,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
@@ -137,8 +125,8 @@ pub enum Term {
     snd: Box<Term>,
   },
   Mat {
-    matched: Box<Term>,
-    arms: Vec<(Pattern, Term)>,
+    args: Vec<Term>,
+    rules: Vec<Rule>,
   },
   Ref {
     nam: Name,
@@ -148,13 +136,29 @@ pub enum Term {
   Err,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Pattern {
   Var(Option<Name>),
   Ctr(Name, Vec<Pattern>),
   Num(MatchNum),
   Tup(Box<Pattern>, Box<Pattern>),
   Lst(Vec<Pattern>),
+  #[default]
+  Err,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum MatchNum {
+  Zero,
+  Succ(Option<Option<Name>>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Tag {
+  Named(Name),
+  Numeric(u32),
+  Auto,
+  Static,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -181,7 +185,6 @@ pub enum Op {
 /// Pattern types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
-  None,
   Any,
   Tup,
   Num,
@@ -252,6 +255,10 @@ impl Term {
     Term::Lam { tag, nam: Some(nam), bod: Box::new(bod) }
   }
 
+  pub fn var_or_era(nam: Option<Name>) -> Self {
+    if let Some(nam) = nam { Term::Var { nam } } else { Term::Era }
+  }
+
   pub fn app(fun: Term, arg: Term) -> Self {
     Term::App { tag: Tag::Static, fun: Box::new(fun), arg: Box::new(arg) }
   }
@@ -296,7 +303,7 @@ impl Term {
       Term::Lnk { .. } => (),
       Term::Let { pat, val, nxt } => {
         val.subst(from, to);
-        if !pat.names().contains(from) {
+        if !pat.binds().contains(from) {
           nxt.subst(from, to);
         }
       }
@@ -306,20 +313,13 @@ impl Term {
           nxt.subst(from, to);
         }
       }
-      Term::Mat { matched, arms } => {
-        matched.subst(from, to);
-
-        for (rule, term) in arms {
-          let can_subst;
-
-          if let Pattern::Num(MatchNum::Succ(Some(Some(nam)))) = rule {
-            can_subst = nam != from;
-          } else {
-            can_subst = true;
-          };
-
-          if can_subst {
-            term.subst(from, to);
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.subst(from, to);
+        }
+        for rule in rules {
+          if !rule.pats.iter().flat_map(|p| p.binds()).contains(from) {
+            rule.body.subst(from, to);
           }
         }
       }
@@ -341,9 +341,9 @@ impl Term {
       Term::Lnk { nam } if nam == from => {
         *self = to.clone();
       }
-      Term::Mat { matched, arms } => {
-        matched.subst_unscoped(from, to);
-        arms.iter_mut().for_each(|(_, arm)| arm.subst_unscoped(from, to));
+      Term::Mat { args, rules } => {
+        args.iter_mut().for_each(|arg| arg.subst_unscoped(from, to));
+        rules.iter_mut().for_each(|rule| rule.body.subst_unscoped(from, to));
       }
       Term::Lst { els } => els.iter_mut().for_each(|el| el.subst_unscoped(from, to)),
       Term::Chn { bod, .. } | Term::Lam { bod, .. } => bod.subst_unscoped(from, to),
@@ -388,7 +388,7 @@ impl Term {
           let mut new_scope = Default::default();
           go(nxt, &mut new_scope);
 
-          for bind in pat.names() {
+          for bind in pat.binds() {
             new_scope.remove(bind);
           }
 
@@ -412,15 +412,16 @@ impl Term {
           go(fst, free_vars);
           go(snd, free_vars);
         }
-        Term::Mat { matched, arms } => {
-          go(matched, free_vars);
-
-          for (rule, term) in arms {
+        Term::Mat { args, rules } => {
+          for arg in args {
+            go(arg, free_vars);
+          }
+          for rule in rules {
             let mut new_scope = Default::default();
-            go(term, &mut new_scope);
+            go(&rule.body, &mut new_scope);
 
-            for var in rule.names() {
-              new_scope.remove(var);
+            for nam in rule.pats.iter().flat_map(|p| p.binds()) {
+              new_scope.remove(nam);
             }
 
             free_vars.extend(new_scope);
@@ -453,10 +454,12 @@ impl Term {
         Term::Lnk { nam } => {
           uses.insert(nam.clone());
         }
-        Term::Mat { matched, arms } => {
-          go(matched, decls, uses);
-          for (_, arm) in arms {
-            go(arm, decls, uses);
+        Term::Mat { args, rules } => {
+          for arg in args {
+            go(arg, decls, uses);
+          }
+          for rule in rules {
+            go(&rule.body, decls, uses);
           }
         }
         Term::Lst { els } => {
@@ -486,77 +489,94 @@ impl Term {
     (decls, uses)
   }
 
-  /// Creates a new [`Term::Match`] from the given terms.
-  /// If `scrutinee` is not a `Term::Var`, creates a let binding containing the match in its body
-  pub fn new_native_match(
-    scrutinee: Self,
-    zero_term: Self,
-    mut succ_label: Option<Name>,
-    mut succ_term: Self,
-  ) -> Self {
-    let zero = (Pattern::Num(MatchNum::Zero), zero_term);
-
-    if let Term::Var { nam } = &scrutinee {
-      if let Some(label) = &succ_label {
-        let new_label = Name::new(format!("{}-1", nam));
-        succ_term.subst(label, &Term::Var { nam: new_label.clone() });
-        succ_label = Some(new_label);
-      }
-
-      let succ = (Pattern::Num(MatchNum::Succ(Some(succ_label))), succ_term);
-      Term::Mat { matched: Box::new(scrutinee), arms: vec![zero, succ] }
-    } else {
-      match succ_label {
-        Some(succ) => {
-          let match_bind = succ.clone();
-
-          let new_label = Name::new(format!("{}-1", succ));
-          succ_term.subst(&succ, &Term::Var { nam: new_label.clone() });
-          succ_label = Some(new_label);
-
-          let succ = (Pattern::Num(MatchNum::Succ(Some(succ_label))), succ_term);
-
-          Term::Let {
-            pat: Pattern::Var(Some(match_bind.clone())),
-            val: Box::new(scrutinee),
-            nxt: Box::new(Term::Mat {
-              matched: Box::new(Term::Var { nam: match_bind }),
-              arms: vec![zero, succ],
-            }),
-          }
+  pub fn is_simple_match(&self, ctrs: &Constructors, adts: &Adts) -> bool {
+    // A match term
+    let Term::Mat { args, rules } = self else {
+      return false;
+    };
+    // With 1 argument
+    if args.len() != 1 {
+      return false;
+    }
+    // The argument is a variable
+    if !matches!(args[0], Term::Var { .. }) {
+      return false;
+    }
+    // Each arm only has 1 pattern for the 1 argument
+    if rules.iter().any(|r| r.pats.len() != 1) {
+      return false;
+    }
+    // The match is over a valid type
+    let Ok(typ) = infer_type(rules.iter().map(|r| &r.pats[0]), ctrs) else {
+      return false;
+    };
+    // The match has one arm for each constructor, matching the constructors in adt declaration order
+    match typ {
+      Type::Any => {
+        if rules.len() != 1 {
+          return false;
         }
-        None => {
-          let succ = (Pattern::Num(MatchNum::Succ(None)), succ_term);
-
-          Term::Mat { matched: Box::new(scrutinee), arms: vec![zero, succ] }
+        if !matches!(rules[0].pats.as_slice(), [Pattern::Var(_)]) {
+          return false;
+        }
+      }
+      Type::Tup => {
+        if rules.len() != 1 {
+          return false;
+        }
+        if !matches!(rules[0].pats.as_slice(), [Pattern::Tup(box Pattern::Var(_), box Pattern::Var(_))]) {
+          return false;
+        }
+      }
+      Type::Num => {
+        if rules.len() != 2 {
+          return false;
+        }
+        if !matches!(rules[0].pats[0], Pattern::Num(MatchNum::Zero)) {
+          return false;
+        }
+        if !matches!(rules[1].pats[0], Pattern::Num(MatchNum::Succ(Some(_)))) {
+          return false;
+        }
+      }
+      Type::Adt(adt) => {
+        let ctrs = &adts[&adt].ctrs;
+        if rules.len() != ctrs.len() {
+          return false;
+        }
+        for (rule, (ctr, args)) in rules.iter().zip(ctrs.iter()) {
+          if let Pattern::Ctr(rule_ctr, rule_args) = &rule.pats[0] {
+            if ctr != rule_ctr {
+              return false;
+            }
+            if rule_args.len() != args.len() {
+              return false;
+            }
+            if rule_args.iter().any(|arg| !matches!(arg, Pattern::Var(_))) {
+              return false;
+            }
+          } else {
+            return false;
+          }
         }
       }
     }
+
+    true
   }
 }
 
 impl Pattern {
-  pub fn vars(&self) -> impl DoubleEndedIterator<Item = &Option<Name>> {
-    fn go<'a>(pat: &'a Pattern, set: &mut Vec<&'a Option<Name>>) {
-      match pat {
-        Pattern::Var(nam) => set.push(nam),
-        Pattern::Ctr(_, pats) | Pattern::Lst(pats) => pats.iter().for_each(|pat| go(pat, set)),
-        Pattern::Tup(fst, snd) => {
-          go(fst, set);
-          go(snd, set);
-        }
-        Pattern::Num(MatchNum::Succ(Some(nam))) => {
-          set.push(nam);
-        }
-        Pattern::Num(_) => {}
-      }
-    }
-    let mut set = Vec::new();
-    go(self, &mut set);
-    set.into_iter()
+  pub fn bind_or_eras(&self) -> impl DoubleEndedIterator<Item = &Option<Name>> {
+    self.iter().filter_map(|pat| match pat {
+      Pattern::Var(nam) => Some(nam),
+      Pattern::Num(MatchNum::Succ(nam)) => nam.as_ref(),
+      _ => None,
+    })
   }
 
-  pub fn vars_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Option<Name>> {
+  pub fn bind_or_eras_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Option<Name>> {
+    // Can't have a Pattern::iter_mut() since it has a tree-like structure.
     fn go<'a>(pat: &'a mut Pattern, set: &mut Vec<&'a mut Option<Name>>) {
       match pat {
         Pattern::Var(nam) => set.push(nam),
@@ -569,6 +589,7 @@ impl Pattern {
           set.push(nam);
         }
         Pattern::Num(_) => {}
+        Pattern::Err => unreachable!(),
       }
     }
     let mut set = Vec::new();
@@ -576,43 +597,53 @@ impl Pattern {
     set.into_iter()
   }
 
-  pub fn names(&self) -> impl DoubleEndedIterator<Item = &Name> {
-    self.vars().flatten()
+  pub fn binds(&self) -> impl DoubleEndedIterator<Item = &Name> {
+    self.bind_or_eras().flatten()
   }
 
-  pub fn names_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Name> {
-    self.vars_mut().flatten()
+  pub fn binds_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Name> {
+    self.bind_or_eras_mut().flatten()
   }
 
-  pub fn ctrs(&self) -> Vec<Name> {
-    fn go(pat: &Pattern, set: &mut Vec<Name>) {
-      match pat {
-        Pattern::Ctr(nam, pats) => {
-          set.push(nam.clone());
-          pats.iter().for_each(|pat| go(pat, set));
-        }
-        Pattern::Lst(pats) => {
-          set.push(builtins::LCONS.into());
-          set.push(builtins::LNIL.into());
-          pats.iter().for_each(|pat| go(pat, set))
-        }
-        Pattern::Tup(fst, snd) => {
-          set.push("(,)".into());
-          go(fst, set);
-          go(snd, set);
-        }
-        Pattern::Num(MatchNum::Zero) => {
-          set.push("0".into());
-        }
-        Pattern::Num(MatchNum::Succ(_)) => {
-          set.push("+".into());
-        }
-        Pattern::Var(_) => {}
-      }
+  /// Returns an iterator over each immediate child sub-pattern of `self`.
+  /// Considers Lists as its own pattern and not a sequence of Cons.
+  pub fn children<'a>(&'a self) -> Box<dyn DoubleEndedIterator<Item = &'a Pattern> + 'a> {
+    match self {
+      Pattern::Ctr(_, children) => Box::new(children.iter()),
+      Pattern::Var(_) => Box::new([].iter()),
+      Pattern::Num(_) => Box::new([].iter()),
+      Pattern::Tup(fst, snd) => Box::new([fst.as_ref(), snd.as_ref()].into_iter()),
+      Pattern::Lst(els) => Box::new(els.iter()),
+      Pattern::Err => unreachable!(),
     }
-    let mut set = Vec::new();
-    go(self, &mut set);
-    set
+  }
+
+  /// Returns an iterator over each subpattern in depth-first, left to right order.
+  // TODO: Not lazy.
+  pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Pattern> {
+    let mut to_visit = vec![self];
+    let mut els = vec![];
+    while let Some(pat) = to_visit.pop() {
+      to_visit.extend(pat.children().rev());
+      els.push(pat);
+    }
+    els.into_iter()
+  }
+
+  pub fn ctr_name(&self) -> Option<Name> {
+    match self {
+      Pattern::Var(_) => None,
+      Pattern::Ctr(nam, _) => Some(nam.clone()),
+      Pattern::Num(MatchNum::Zero) => Some(Name::new("0")),
+      Pattern::Num(MatchNum::Succ(_)) => Some(Name::new("+")),
+      Pattern::Tup(_, _) => Some(Name::new("(,)")),
+      Pattern::Lst(_) => todo!(),
+      Pattern::Err => unreachable!(),
+    }
+  }
+
+  pub fn is_wildcard(&self) -> bool {
+    matches!(self, Pattern::Var(_))
   }
 
   pub fn is_detached_num_match(&self) -> bool {
@@ -628,7 +659,7 @@ impl Pattern {
   }
 
   /// True if this pattern has no nested subpatterns.
-  pub fn is_flat(&self) -> bool {
+  pub fn is_simple(&self) -> bool {
     match self {
       Pattern::Var(_) => true,
       Pattern::Ctr(_, args) | Pattern::Lst(args) => args.iter().all(|arg| matches!(arg, Pattern::Var(_))),
@@ -636,10 +667,11 @@ impl Pattern {
       Pattern::Tup(fst, snd) => {
         matches!(fst.as_ref(), Pattern::Var(_)) && matches!(snd.as_ref(), Pattern::Var(_))
       }
+      Pattern::Err => unreachable!(),
     }
   }
 
-  pub fn to_type(&self, ctrs: &IndexMap<Name, Name>) -> Type {
+  pub fn to_type(&self, ctrs: &Constructors) -> Type {
     match self {
       Pattern::Var(_) => Type::Any,
       Pattern::Ctr(ctr_nam, _) => {
@@ -649,13 +681,13 @@ impl Pattern {
       Pattern::Tup(..) => Type::Tup,
       Pattern::Num(..) => Type::Num,
       Pattern::Lst(..) => Type::Adt(builtins::LIST.into()),
+      Pattern::Err => unreachable!(),
     }
   }
 
   pub fn to_term(&self) -> Term {
     match self {
-      Pattern::Var(None) => Term::Era,
-      Pattern::Var(Some(nam)) => Term::Var { nam: nam.clone() },
+      Pattern::Var(nam) => Term::var_or_era(nam.clone()),
       Pattern::Ctr(ctr, args) => {
         Term::call(Term::Ref { nam: ctr.clone() }, args.iter().map(|arg| arg.to_term()))
       }
@@ -674,11 +706,12 @@ impl Pattern {
         p.encode_builtins();
         p.to_term()
       }
+      Pattern::Err => unreachable!(),
     }
   }
 
   /// True if both patterns are equal (match the same expressions) without considering nested patterns.
-  pub fn flat_equals(&self, other: &Pattern) -> bool {
+  pub fn simple_equals(&self, other: &Pattern) -> bool {
     match (self, other) {
       (Pattern::Ctr(a, _), Pattern::Ctr(b, _)) if a == b => true,
       (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => true,
@@ -692,13 +725,13 @@ impl Pattern {
 
   /// True if this pattern matches a subset of the other pattern, without considering nested patterns.
   /// That is, when something matches the ctr of self if it also matches other.
-  pub fn is_flat_subset_of(&self, other: &Pattern) -> bool {
-    self.flat_equals(other) || matches!(other, Pattern::Var(_))
+  pub fn simple_subset_of(&self, other: &Pattern) -> bool {
+    self.simple_equals(other) || matches!(other, Pattern::Var(_))
   }
 
   /// True if the two pattern will match some common expressions.
-  pub fn shares_matches_with(&self, other: &Pattern) -> bool {
-    self.flat_equals(other) || matches!(self, Pattern::Var(_)) || matches!(other, Pattern::Var(_))
+  pub fn shares_simple_matches_with(&self, other: &Pattern) -> bool {
+    self.simple_equals(other) || matches!(self, Pattern::Var(_)) || matches!(other, Pattern::Var(_))
   }
 }
 
@@ -734,10 +767,9 @@ impl Definition {
 
 impl Type {
   /// Return the constructors for a given type as patterns.
-  pub fn ctrs(&self, adts: &IndexMap<Name, Adt>) -> Vec<Pattern> {
+  pub fn ctrs(&self, adts: &Adts) -> Vec<Pattern> {
     match self {
-      Type::None => vec![],
-      Type::Any => vec![],
+      Type::Any => vec![Pattern::Var(None)],
       Type::Tup => vec![Pattern::Tup(
         Box::new(Pattern::Var(Some("%fst".into()))),
         Box::new(Pattern::Var(Some("%snd".into()))),

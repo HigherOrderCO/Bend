@@ -3,73 +3,73 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/common.hvm
 ---
 TaggedScott:
-(West) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest West
+(West) = #Direction λ* #Direction λ* #Direction λ* #Direction λd d
 
-(East) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest East
+(East) = #Direction λ* #Direction λ* #Direction λc #Direction λ* c
 
-(South) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest South
+(South) = #Direction λ* #Direction λb #Direction λ* #Direction λ* b
 
-(North) = #Direction λNorth #Direction λSouth #Direction λEast #Direction λWest North
+(North) = #Direction λa #Direction λ* #Direction λ* #Direction λ* a
 
-(Filled) = λvalue #Box λFilled #Box λEmpty #Box.Filled.value (Filled value)
+(Filled) = λa #Box λb #Box λ* #Box.Filled.value (b a)
 
-(Empty) = #Box λFilled #Box λEmpty Empty
+(Empty) = #Box λ* #Box λb b
 
-(Some) = λx #Option λSome #Option λNone #Option.Some.x (Some x)
+(Some) = λa #Option λb #Option λ* #Option.Some.x (b a)
 
-(None) = #Option λSome #Option λNone None
+(None) = #Option λ* #Option λb b
 
-(Ok) = λa #Result λOk #Result λErr #Result.Ok.a (Ok a)
+(Ok) = λa #Result λb #Result λ* #Result.Ok.a (b a)
 
-(Err) = λb #Result λOk #Result λErr #Result.Err.b (Err b)
+(Err) = λa #Result λ* #Result λc #Result.Err.b (c a)
 
-(Cons) = λx λxs #List_ λCons #List_ λNil #List_.Cons.xs (#List_.Cons.x (Cons x) xs)
+(Cons) = λa λb #List_ λc #List_ λ* #List_.Cons.xs (#List_.Cons.x (c a) b)
 
-(Nil) = #List_ λCons #List_ λNil Nil
+(Nil) = #List_ λ* #List_ λb b
 
-(True) = #Bool λTrue #Bool λFalse True
+(True) = #Bool λa #Bool λ* a
 
-(False) = #Bool λTrue #Bool λFalse False
+(False) = #Bool λ* #Bool λb b
 
-(Red) = #Light λRed #Light λYellow #Light λGreen Red
+(Red) = #Light λa #Light λ* #Light λ* a
 
-(Yellow) = #Light λRed #Light λYellow #Light λGreen Yellow
+(Yellow) = #Light λ* #Light λb #Light λ* b
 
-(Green) = #Light λRed #Light λYellow #Light λGreen Green
+(Green) = #Light λ* #Light λ* #Light λc c
 
 Scott:
-(West) = λNorth λSouth λEast λWest West
+(West) = λ* λ* λ* λd d
 
-(East) = λNorth λSouth λEast λWest East
+(East) = λ* λ* λc λ* c
 
-(South) = λNorth λSouth λEast λWest South
+(South) = λ* λb λ* λ* b
 
-(North) = λNorth λSouth λEast λWest North
+(North) = λa λ* λ* λ* a
 
-(Filled) = λvalue λFilled λEmpty (Filled value)
+(Filled) = λa λb λ* (b a)
 
-(Empty) = λFilled λEmpty Empty
+(Empty) = λ* λb b
 
-(Some) = λx λSome λNone (Some x)
+(Some) = λa λb λ* (b a)
 
-(None) = λSome λNone None
+(None) = λ* λb b
 
-(Ok) = λa λOk λErr (Ok a)
+(Ok) = λa λb λ* (b a)
 
-(Err) = λb λOk λErr (Err b)
+(Err) = λa λ* λc (c a)
 
-(Cons) = λx λxs λCons λNil (Cons x xs)
+(Cons) = λa λb λc λ* (c a b)
 
-(Nil) = λCons λNil Nil
+(Nil) = λ* λb b
 
-(True) = λTrue λFalse True
+(True) = λa λ* a
 
-(False) = λTrue λFalse False
+(False) = λ* λb b
 
-(Red) = λRed λYellow λGreen Red
+(Red) = λa λ* λ* a
 
-(Yellow) = λRed λYellow λGreen Yellow
+(Yellow) = λ* λb λ* b
 
-(Green) = λRed λYellow λGreen Green
+(Green) = λ* λ* λc c
 
 

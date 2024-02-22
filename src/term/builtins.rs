@@ -47,11 +47,15 @@ impl Term {
         fst.encode_builtins();
         snd.encode_builtins();
       }
-      Term::Mat { matched, arms } => {
-        matched.encode_builtins();
-        for (pat, arm) in arms {
-          pat.encode_builtins();
-          arm.encode_builtins();
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.encode_builtins();
+        }
+        for rule in rules {
+          for pat in &mut rule.pats {
+            pat.encode_builtins();
+          }
+          rule.body.encode_builtins();
         }
       }
       Term::Var { .. } | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era | Term::Err => {}
@@ -86,6 +90,7 @@ impl Pattern {
         snd.encode_builtins();
       }
       Pattern::Var(..) | Pattern::Num(..) => {}
+      Pattern::Err => unreachable!(),
     }
   }
 

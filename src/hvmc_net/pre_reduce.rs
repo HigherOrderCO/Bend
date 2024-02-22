@@ -64,7 +64,7 @@ pub fn pre_reduce_book(book: &mut Book, entrypoint: &str) -> Result<(), String> 
     }
     // Place the reduced net back into the def map
     dispatch_dyn_net!(&mut rt => {
-      *net = host.readback(&rt);
+      *net = host.readback(rt);
     });
   }
   Ok(())

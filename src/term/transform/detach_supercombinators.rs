@@ -234,14 +234,19 @@ impl Term {
 
           val_detach & nxt_detach
         }
-        Term::Mat { matched, arms } => {
-          let mut detach = go(matched, depth + 1, term_info);
+        Term::Mat { args, rules } => {
+          let mut detach = Detach::Combinator;
+          for arg in args {
+            detach = detach & go(arg, depth + 1, term_info);
+          }
           let parent_scope = term_info.replace_scope(HashSet::new());
 
-          for (pat, term) in arms {
-            debug_assert!(pat.is_detached_num_match());
+          for rule in rules {
+            for pat in &rule.pats {
+              debug_assert!(pat.is_detached_num_match());
+            }
 
-            let arm_detach = match go(term, depth + 1, term_info) {
+            let arm_detach = match go(&mut rule.body, depth + 1, term_info) {
               // If the recursive ref reached here, it is not in a active position
               Detach::Recursive => Detach::Combinator,
               detach => detach,

@@ -21,10 +21,10 @@ cli = ["dep:clap"]
 
 [dependencies]
 # Later versions of the alpha contains bugs that changes the parser errors
-chumsky = { version = "= 1.0.0-alpha.4", features = ["label"]}
+chumsky = { version = "= 1.0.0-alpha.4", features = ["label"] }
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 highlight_error = "0.1.1"
-hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core"  }
+hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core" }
 indexmap = "2.2.3"
 interner = "0.2.1"
 itertools = "0.11.0"

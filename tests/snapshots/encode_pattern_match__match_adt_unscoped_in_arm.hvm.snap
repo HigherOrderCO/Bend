@@ -3,21 +3,17 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_in_arm.hvm
 ---
 TaggedScott:
-(main) = λx (main$match$1 x)
+(main) = λa #bool (a λ$x $x λd d)
 
-(main$match$1) = λa #bool (a λ$x $x λb b)
+(F) = #bool λ* #bool λb b
 
-(F) = #bool λT #bool λF F
-
-(T) = #bool λT #bool λF T
+(T) = #bool λa #bool λ* a
 
 Scott:
-(main) = λx (main$match$1 x)
+(main) = λa (a λ$x $x λd d)
 
-(main$match$1) = λa (a λ$x $x λb b)
+(F) = λ* λb b
 
-(F) = λT λF F
-
-(T) = λT λF T
+(T) = λa λ* a
 
 

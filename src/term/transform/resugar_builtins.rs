@@ -41,10 +41,12 @@ impl Term {
       // (String.nil)
       Term::Ref { nam: def_name } if def_name == SNIL => *self = Term::str(""),
 
-      Term::Mat { matched, arms } => {
-        matched.resugar_strings();
-        for (_, arm) in arms {
-          arm.resugar_strings();
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.resugar_strings();
+        }
+        for rule in rules {
+          rule.body.resugar_strings();
         }
       }
       Term::Lst { els } => {
@@ -102,10 +104,12 @@ impl Term {
       // (List.nil)
       Term::Ref { nam: def_name } if def_name == LNIL => *self = Term::Lst { els: vec![] },
 
-      Term::Mat { matched, arms } => {
-        matched.resugar_lists();
-        for (_, arm) in arms {
-          arm.resugar_lists();
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.resugar_lists();
+        }
+        for rule in rules {
+          rule.body.resugar_lists();
         }
       }
       Term::Lst { els } => {

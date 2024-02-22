@@ -3,14 +3,9 @@ use crate::term::*;
 impl Book {
   /// Applies eta-reduction to all generated definitions, converting occurrences of `@x (f x)` into just `f`.
   /// Assumes that variables are linear (used exactly once).
-  pub fn eta_reduction(&mut self, reduce_all: bool) {
+  pub fn eta_reduction(&mut self) {
     for def in self.defs.values_mut() {
-      let builtin = def.builtin;
-      let rule = def.rule_mut();
-
-      if reduce_all || builtin {
-        rule.body.eta_reduction();
-      }
+      def.rule_mut().body.eta_reduction();
     }
   }
 }
@@ -54,11 +49,15 @@ impl Term {
         fst.eta_reduction();
         snd.eta_reduction();
       }
-      Term::Mat { matched, arms } => {
-        matched.eta_reduction();
-        for (pat, term) in arms {
-          debug_assert!(pat.is_detached_num_match());
-          term.eta_reduction();
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.eta_reduction();
+        }
+        for rule in rules {
+          for pat in &rule.pats {
+            debug_assert!(pat.is_detached_num_match());
+          }
+          rule.body.eta_reduction();
         }
       }
       Term::Lnk { .. }

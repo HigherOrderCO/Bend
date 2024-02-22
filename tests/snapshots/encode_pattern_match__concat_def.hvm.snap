@@ -3,21 +3,21 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/concat_def.hvm
 ---
 TaggedScott:
-(concat) = λa #String (a #String.String.cons.head λb #String.String.cons.tail λc λd (String.cons b (concat c d)) λe e)
+(concat) = λa λb (#String (a #String.String.cons.head λc #String.String.cons.tail λd λe (String.cons c (concat d e)) λi i) b)
 
 (main) = (concat (String.cons 97 (String.cons 98 String.nil)) (String.cons 99 (String.cons 100 String.nil)))
 
-(String.cons) = λhead λtail #String λString.cons #String λString.nil #String.String.cons.tail (#String.String.cons.head (String.cons head) tail)
+(String.cons) = λa λb #String λc #String λ* #String.String.cons.tail (#String.String.cons.head (c a) b)
 
-(String.nil) = #String λString.cons #String λString.nil String.nil
+(String.nil) = #String λ* #String λb b
 
 Scott:
-(concat) = λa (a λb λc λd (String.cons b (concat c d)) λe e)
+(concat) = λa λb (a λc λd λe (String.cons c (concat d e)) λi i b)
 
 (main) = (concat (String.cons 97 (String.cons 98 String.nil)) (String.cons 99 (String.cons 100 String.nil)))
 
-(String.cons) = λhead λtail λString.cons λString.nil (String.cons head tail)
+(String.cons) = λa λb λc λ* (c a b)
 
-(String.nil) = λString.cons λString.nil String.nil
+(String.nil) = λ* λb b
 
 

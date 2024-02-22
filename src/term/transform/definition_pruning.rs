@@ -1,8 +1,9 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
+  diagnostics::Warning,
   term::{Adt, AdtEncoding, Book, Ctx, Name, Tag, Term, LIST, STRING},
-  diagnostics::Warning, CORE_BUILTINS,
+  CORE_BUILTINS,
 };
 use indexmap::IndexSet;
 
@@ -24,7 +25,7 @@ enum Used {
 
 type Definitions = HashMap<Name, Used>;
 
-impl<'book> Ctx<'book> {
+impl Ctx<'_> {
   /// If `prune_all`, removes all unused definitions and adts starting from Main.
   /// Otherwise, prunes only the builtins not accessible from any non-built-in definition
   pub fn prune(&mut self, prune_all: bool, adt_encoding: AdtEncoding) {
@@ -107,10 +108,12 @@ impl Book {
           to_find.push(fst);
           to_find.push(snd);
         }
-        Term::Mat { matched, arms } => {
-          to_find.push(matched);
-          for (_, bod) in arms {
-            to_find.push(bod);
+        Term::Mat { args, rules } => {
+          for arg in args {
+            to_find.push(arg);
+          }
+          for rule in rules {
+            to_find.push(&rule.body);
           }
         }
         Term::Lst { els } => {
@@ -148,7 +151,7 @@ impl Book {
   fn insert_used(&self, def_name: &Name, used: Used, uses: &mut Definitions, adt_encoding: AdtEncoding) {
     if let Entry::Vacant(e) = uses.entry(def_name.clone()) {
       e.insert(used);
-      if CORE_BUILTINS.contains(&def_name.0.as_ref().as_ref()) {
+      if CORE_BUILTINS.contains(&def_name.0.as_ref()) {
         return;
       }
 

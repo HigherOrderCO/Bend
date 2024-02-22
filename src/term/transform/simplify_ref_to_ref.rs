@@ -15,7 +15,7 @@ impl Display for CyclicDefErr {
   }
 }
 
-impl<'book> Ctx<'book> {
+impl Ctx<'_> {
   // When we find a function that is simply directly calling another function,
   // substitutes all occurrences of that function to the one being called, avoiding the unnecessary redirect.
   // In case there is a long chain of ref-to-ref-to-ref, we substitute values by the last function in the chain.
@@ -71,10 +71,13 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool
       let snd_subst = subst_ref_to_ref(snd, ref_map);
       fst_subst | snd_subst
     }
-    Term::Mat { matched, arms } => {
-      let mut subst = subst_ref_to_ref(matched, ref_map);
-      for (_, term) in arms {
-        subst |= subst_ref_to_ref(term, ref_map);
+    Term::Mat { args, rules } => {
+      let mut subst = false;
+      for arg in args {
+        subst |= subst_ref_to_ref(arg, ref_map);
+      }
+      for rule in rules {
+        subst |= subst_ref_to_ref(&mut rule.body, ref_map);
       }
       subst
     }

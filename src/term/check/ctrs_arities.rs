@@ -1,20 +1,11 @@
-use std::{collections::HashMap, fmt::Display};
+use std::collections::HashMap;
 
 use crate::{
   diagnostics::Info,
-  term::{Book, Ctx, Name, Pattern},
+  term::{transform::encode_pattern_matching::MatchErr, Book, Ctx, Name, Pattern, Term},
 };
 
-#[derive(Debug, Clone)]
-pub struct ArityErr(Name, usize, usize);
-
-impl Display for ArityErr {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Arity error. Constructor '{}' expects {} fields, found {}.", self.0, self.1, self.2)
-  }
-}
-
-impl<'book> Ctx<'book> {
+impl Ctx<'_> {
   /// Checks if every constructor pattern of every definition rule has the same arity from the
   /// defined adt constructor.
   ///
@@ -26,9 +17,11 @@ impl<'book> Ctx<'book> {
     for (def_name, def) in self.book.defs.iter() {
       for rule in def.rules.iter() {
         for pat in rule.pats.iter() {
-          let res = pat.check(&arities);
-          self.info.take_err(res, Some(&def_name));
+          let res = pat.check_ctrs_arities(&arities);
+          self.info.take_err(res, Some(def_name));
         }
+        let res = rule.body.check_ctrs_arities(&arities);
+        self.info.take_err(res, Some(def_name));
       }
     }
 
@@ -52,16 +45,16 @@ impl Book {
 }
 
 impl Pattern {
-  fn check(&self, arities: &HashMap<Name, usize>) -> Result<(), ArityErr> {
+  fn check_ctrs_arities(&self, arities: &HashMap<Name, usize>) -> Result<(), MatchErr> {
     let mut to_check = vec![self];
 
     while let Some(pat) = to_check.pop() {
       match pat {
         Pattern::Ctr(name, args) => {
-          let arity = arities.get(name).unwrap();
-          let args = args.len();
-          if *arity != args {
-            return Err(ArityErr(name.clone(), *arity, args));
+          let expected = arities.get(name).unwrap();
+          let found = args.len();
+          if *expected != found {
+            return Err(MatchErr::CtrArityMismatch(name.clone(), found, *expected));
           }
         }
         Pattern::Tup(fst, snd) => {
@@ -74,7 +67,54 @@ impl Pattern {
           }
         }
         Pattern::Var(..) | Pattern::Num(..) => {}
+        Pattern::Err => unreachable!(),
       }
+    }
+    Ok(())
+  }
+}
+
+impl Term {
+  pub fn check_ctrs_arities(&self, arities: &HashMap<Name, usize>) -> Result<(), MatchErr> {
+    match self {
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.check_ctrs_arities(arities)?;
+        }
+        for rule in rules {
+          for pat in &rule.pats {
+            pat.check_ctrs_arities(arities)?;
+          }
+          rule.body.check_ctrs_arities(arities)?;
+        }
+      }
+      Term::Let { pat, val, nxt } => {
+        pat.check_ctrs_arities(arities)?;
+        val.check_ctrs_arities(arities)?;
+        nxt.check_ctrs_arities(arities)?;
+      }
+
+      Term::Lst { els } => {
+        for el in els {
+          el.check_ctrs_arities(arities)?;
+        }
+      }
+      Term::App { fun: fst, arg: snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. } => {
+        fst.check_ctrs_arities(arities)?;
+        snd.check_ctrs_arities(arities)?;
+      }
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.check_ctrs_arities(arities)?,
+      Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era
+      | Term::Err => {}
     }
     Ok(())
   }

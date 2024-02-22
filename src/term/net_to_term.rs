@@ -1,3 +1,4 @@
+use super::Rule;
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
   term::{num_to_name, term_to_net::Labels, Book, MatchNum, Name, Op, Pattern, Tag, Term},
@@ -309,10 +310,11 @@ impl Term {
       | Term::Opx { fst, snd, .. } => {
         fst.insert_split(split, threshold)? + snd.insert_split(split, threshold)?
       }
-      Term::Mat { matched, arms } => {
-        let mut n = matched.insert_split(split, threshold)?;
-        for arm in arms {
-          n += arm.1.insert_split(split, threshold)?;
+      Term::Mat { args, rules } => {
+        debug_assert_eq!(args.len(), 1);
+        let mut n = args[0].insert_split(split, threshold)?;
+        for rule in rules {
+          n += rule.body.insert_split(split, threshold)?;
         }
         n
       }
@@ -373,19 +375,61 @@ impl Term {
         fst.fix_names(id_counter, book);
         snd.fix_names(id_counter, book);
       }
-      Term::Mat { matched, arms } => {
-        matched.fix_names(id_counter, book);
+      Term::Mat { args, rules } => {
+        for arg in args {
+          arg.fix_names(id_counter, book);
+        }
 
-        for (rule, term) in arms {
-          if let Pattern::Num(MatchNum::Succ(Some(nam))) = rule {
-            fix_name(nam, id_counter, term);
+        for rule in rules {
+          for nam in rule.pats.iter_mut().flat_map(|p| p.bind_or_eras_mut()) {
+            fix_name(nam, id_counter, &mut rule.body);
           }
 
-          term.fix_names(id_counter, book);
+          rule.body.fix_names(id_counter, book);
         }
       }
       Term::Let { .. } | Term::Lst { .. } => unreachable!(),
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {}
+    }
+  }
+
+  /// Creates a new [`Term::Match`] from the given terms.
+  /// If `scrutinee` is not a `Term::Var`, creates a let binding containing the match in its body
+  fn new_native_match(arg: Self, zero_term: Self, mut succ_label: Option<Name>, mut succ_term: Self) -> Self {
+    let zero = Rule { pats: vec![Pattern::Num(MatchNum::Zero)], body: zero_term };
+
+    if let Term::Var { nam } = &arg {
+      if let Some(label) = &succ_label {
+        let new_label = Name::new(format!("{}-1", nam));
+        succ_term.subst(label, &Term::Var { nam: new_label.clone() });
+        succ_label = Some(new_label);
+      }
+
+      let succ = Rule { pats: vec![Pattern::Num(MatchNum::Succ(Some(succ_label)))], body: succ_term };
+      Term::Mat { args: vec![arg], rules: vec![zero, succ] }
+    } else {
+      match succ_label {
+        Some(succ) => {
+          let match_bind = succ.clone();
+
+          let new_label = Name::new(format!("{}-1", succ));
+          succ_term.subst(&succ, &Term::Var { nam: new_label.clone() });
+          succ_label = Some(new_label);
+
+          let succ = Rule { pats: vec![Pattern::Num(MatchNum::Succ(Some(succ_label)))], body: succ_term };
+
+          Term::Let {
+            pat: Pattern::Var(Some(match_bind.clone())),
+            val: Box::new(arg),
+            nxt: Box::new(Term::Mat { args: vec![Term::Var { nam: match_bind }], rules: vec![zero, succ] }),
+          }
+        }
+        None => {
+          let succ = Rule { pats: vec![Pattern::Num(MatchNum::Succ(None))], body: succ_term };
+
+          Term::Mat { args: vec![arg], rules: vec![zero, succ] }
+        }
+      }
     }
   }
 }

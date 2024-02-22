@@ -3,25 +3,21 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool_tup.hvm
 ---
 TaggedScott:
-(foo) = λa let (b, c) = a; (foo$F0 b c)
+(foo) = λa let (b, c) = a; (#Bool (b λd d λ* F) c)
 
 (main) = (foo (F, T))
 
-(foo$F0) = λa #Bool (a λb b λ* F)
+(F) = #Bool λ* #Bool λb b
 
-(F) = #Bool λT #Bool λF F
-
-(T) = #Bool λT #Bool λF T
+(T) = #Bool λa #Bool λ* a
 
 Scott:
-(foo) = λa let (b, c) = a; (foo$F0 b c)
+(foo) = λa let (b, c) = a; (b λd d λ* F c)
 
 (main) = (foo (F, T))
 
-(foo$F0) = λa (a λb b λ* F)
+(F) = λ* λb b
 
-(F) = λT λF F
-
-(T) = λT λF T
+(T) = λa λ* a
 
 

@@ -5,27 +5,31 @@ input_file: tests/golden_tests/encode_pattern_match/bool.hvm
 TaggedScott:
 (not) = λa #bool (a false true)
 
-(and) = λa #bool (a λb #bool (b true false) λc #bool (c false false))
+(and) = λa λb (#bool (a λc #bool (c true false) λg #bool (g false false)) b)
 
-(and2) = λa #bool (a λb b λc false)
+(and2) = λa λb (#bool (a λc c λ* false) b)
 
-(and3_$_and4) = λa #bool (a λb #bool (b true false) λc false)
+(and3) = λa λb (#bool (a λc #bool (c true false) λ* false) b)
 
-(true) = #bool λtrue #bool λfalse true
+(and4) = λa λb (#bool (a λc #bool (c true false) λ* false) b)
 
-(false) = #bool λtrue #bool λfalse false
+(false) = #bool λ* #bool λb b
+
+(true) = #bool λa #bool λ* a
 
 Scott:
 (not) = λa (a false true)
 
-(and) = λa (a λb (b true false) λc (c false false))
+(and) = λa λb (a λc (c true false) λg (g false false) b)
 
-(and2) = λa (a λb b λc false)
+(and2) = λa λb (a λc c λ* false b)
 
-(and3_$_and4) = λa (a λb (b true false) λc false)
+(and3) = λa λb (a λc (c true false) λ* false b)
 
-(true) = λtrue λfalse true
+(and4) = λa λb (a λc (c true false) λ* false b)
 
-(false) = λtrue λfalse false
+(false) = λ* λb b
+
+(true) = λa λ* a
 
 

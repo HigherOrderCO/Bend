@@ -11,7 +11,7 @@ impl Display for TopLevelErr {
   }
 }
 
-impl<'book> Ctx<'book> {
+impl Ctx<'_> {
   /// Checks if exists shared names from definitions, adts and constructors.
   pub fn check_shared_names(&mut self) {
     let mut checked = HashMap::<&Name, usize>::new();

@@ -2,7 +2,10 @@ use crate::{
   diagnostics::Info,
   term::{Ctx, Name, Pattern, Term},
 };
-use std::{collections::{hash_map::Entry, HashMap}, fmt::Display};
+use std::{
+  collections::{hash_map::Entry, HashMap},
+  fmt::Display,
+};
 
 #[derive(Debug, Clone)]
 pub enum UnboundVarErr {
@@ -27,7 +30,7 @@ impl Display for UnboundVarErr {
   }
 }
 
-impl<'book> Ctx<'book> {
+impl Ctx<'_> {
   /// Checks that there are no unbound variables in all definitions.
   pub fn check_unbound_vars(&mut self) -> Result<(), Info> {
     self.info.start_pass();
@@ -37,7 +40,7 @@ impl<'book> Ctx<'book> {
       for rule in &mut def.rules {
         let mut scope = HashMap::new();
         for pat in &rule.pats {
-          pat.names().for_each(|nam| push_scope(Some(nam), &mut scope));
+          pat.binds().for_each(|nam| push_scope(Some(nam), &mut scope));
         }
 
         rule.body.check_unbound_vars(&mut scope, &mut errs);
@@ -122,14 +125,16 @@ pub fn check_uses<'a>(
       check_uses(fst, scope, globals, errs);
       check_uses(snd, scope, globals, errs);
     }
-    Term::Mat { matched, arms } => {
-      check_uses(matched, scope, globals, errs);
-      for (pat, term) in arms {
-        pat.names().for_each(|nam| push_scope(Some(nam), scope));
+    Term::Mat { args, rules } => {
+      for arg in args {
+        check_uses(arg, scope, globals, errs);
+      }
+      for rule in rules {
+        rule.pats.iter().flat_map(|p| p.binds()).for_each(|nam| push_scope(Some(nam), scope));
 
-        check_uses(term, scope, globals, errs);
+        check_uses(&mut rule.body, scope, globals, errs);
 
-        pat.names().for_each(|nam| pop_scope(Some(nam), scope));
+        rule.pats.iter().flat_map(|p| p.binds()).rev().for_each(|nam| pop_scope(Some(nam), scope));
       }
     }
     Term::Lst { .. } => unreachable!(),

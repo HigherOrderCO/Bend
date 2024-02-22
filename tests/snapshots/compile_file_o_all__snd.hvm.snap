@@ -3,6 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/snd.hvm
 ---
 @main = a
-& @snd$match$1 ~ ([#0 #42] a)
-@snd$match$1 = ([* a] a)
-
+& @snd ~ ([#0 #42] a)
+@snd = ([* a] a)

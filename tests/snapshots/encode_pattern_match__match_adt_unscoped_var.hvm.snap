@@ -3,29 +3,25 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.hvm
 ---
 TaggedScott:
-(Foo) = λ$x let %matched = (Some 1); (Bar$match$1_$_Foo$match$1 %matched $x)
+(Foo) = λ$x #Maybe ((Some 1) $x #Maybe.Some.val λc c)
 
-(Bar) = (let %matched = (Some 1); (Bar$match$1_$_Foo$match$1 %matched $x) λ$x *)
+(Bar) = (#Maybe ((Some 1) $x #Maybe.Some.val λc c) λ$x *)
 
 (main) = *
 
-(Bar$match$1_$_Foo$match$1) = λa #Maybe (a λb b #Maybe.Some.val λc λd c)
+(Some) = λa #Maybe λ* #Maybe λc #Maybe.Some.val (c a)
 
-(None) = #Maybe λNone #Maybe λSome None
-
-(Some) = λval #Maybe λNone #Maybe λSome #Maybe.Some.val (Some val)
+(None) = #Maybe λa #Maybe λ* a
 
 Scott:
-(Foo) = λ$x let %matched = (Some 1); (Bar$match$1_$_Foo$match$1 %matched $x)
+(Foo) = λ$x (Some 1 $x λc c)
 
-(Bar) = (let %matched = (Some 1); (Bar$match$1_$_Foo$match$1 %matched $x) λ$x *)
+(Bar) = (Some 1 $x λc c λ$x *)
 
 (main) = *
 
-(Bar$match$1_$_Foo$match$1) = λa (a λb b λc λd c)
+(Some) = λa λ* λc (c a)
 
-(None) = λNone λSome None
-
-(Some) = λval λNone λSome (Some val)
+(None) = λa λ* a
 
 

@@ -3,21 +3,21 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/var_only.hvm
 ---
 TaggedScott:
-(Foo) = λa λb λf (f a)
+(Foo) = λa λ* λe (e a)
 
-(main) = λx match x { false: Foo; true: False }
+(main) = λ* Foo
 
-(True) = #Bool λFalse #Bool λTrue True
+(True) = #Bool λ* #Bool λb b
 
-(False) = #Bool λFalse #Bool λTrue False
+(False) = #Bool λa #Bool λ* a
 
 Scott:
-(Foo) = λa λb λf (f a)
+(Foo) = λa λ* λe (e a)
 
-(main) = λx match x { false: Foo; true: False }
+(main) = λ* Foo
 
-(True) = λFalse λTrue True
+(True) = λ* λb b
 
-(False) = λFalse λTrue False
+(False) = λa λ* a
 
 

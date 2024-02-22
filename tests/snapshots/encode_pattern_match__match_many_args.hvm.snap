@@ -1,0 +1,55 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/match_many_args.hvm
+---
+TaggedScott:
+(tail_tail) = λa #L (a #L.C.h λb #L.C.t λc (#L (c #L.C.h λ* #L.C.t λe λ* e λ* N) b) N)
+
+(or) = λa λb (#Option (b #Option.Some.val λc λ* c λf f) a)
+
+(or2) = λa λb (#Option (a #Option.Some.val λc λ* c λf f) b)
+
+(map) = λa λb (#Option (b #Option.Some.val λc λd (d c) λ* None) a)
+
+(map2) = λa λb (#Option (b #Option.Some.val λc λd (d c) λ* None) a)
+
+(flatten) = λa #Option (a #Option.Some.val λb #Option (b #Option.Some.val λc (Some c) None) None)
+
+(map_pair) = λa λb λc (#L (b #L.C.h λd #L.C.t λe λf λg (#L (g #L.C.h λh #L.C.t λi λj λk λl (C (j k h) (map_pair l i)) λ* λ* λ* N) f d e) λ* λ* N) a c)
+
+(main) = *
+
+(None) = #Option λ* #Option λb b
+
+(Some) = λa #Option λb #Option λ* #Option.Some.val (b a)
+
+(N) = #L λ* #L λb b
+
+(C) = λa λb #L λc #L λ* #L.C.t (#L.C.h (c a) b)
+
+Scott:
+(tail_tail) = λa (a λb λc (c λ* λe λ* e λ* N b) N)
+
+(or) = λa λb (b λc λ* c λf f a)
+
+(or2) = λa λb (a λc λ* c λf f b)
+
+(map) = λa λb (b λc λd (d c) λ* None a)
+
+(map2) = λa λb (b λc λd (d c) λ* None a)
+
+(flatten) = λa (a λb (b λc (Some c) None) None)
+
+(map_pair) = λa λb λc (b λd λe λf λg (g λh λi λj λk λl (C (j k h) (map_pair l i)) λ* λ* λ* N f d e) λ* λ* N a c)
+
+(main) = *
+
+(None) = λ* λb b
+
+(Some) = λa λb λ* (b a)
+
+(N) = λ* λb b
+
+(C) = λa λb λc λ* (c a b)
+
+
