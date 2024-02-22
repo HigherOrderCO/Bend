@@ -108,12 +108,12 @@ pub fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term,
     let (decls, uses) = arm.unscoped_vars();
     // Not allowed to declare unscoped var and not use it since we need to extract the match arm.
     if let Some(var) = decls.difference(&uses).next() {
-      return Err(MatchErr::Linearize(format!("λ${var}").into()));
+      return Err(MatchErr::Linearize(Name::new(format!("λ${var}"))));
     }
     // Change unscoped var to normal scoped var if it references something outside this match arm.
     let arm_free_vars = uses.difference(&decls);
     for var in arm_free_vars.clone() {
-      arm.subst_unscoped(var, &Term::Var { nam: format!("%match%unscoped%{var}").into() });
+      arm.subst_unscoped(var, &Term::Var { nam: Name::new(format!("%match%unscoped%{var}")) });
     }
     free_vars.extend(arm_free_vars.cloned());
   }
@@ -124,7 +124,7 @@ pub fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term,
     *body = free_vars
       .iter()
       .rev()
-      .fold(old_body, |body, var| Term::named_lam(format!("%match%unscoped%{var}").into(), body));
+      .fold(old_body, |body, var| Term::named_lam(Name::new(format!("%match%unscoped%{var}")), body));
   }
 
   // Add apps to the match

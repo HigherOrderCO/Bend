@@ -60,7 +60,7 @@ impl<'a> Reader<'a> {
   fn read_term(&mut self, next: Port) -> Term {
     if self.dup_paths.is_none() && !self.seen.insert(next) {
       self.error(ReadbackError::Cyclic);
-      return Term::Var { nam: Name::new("...") };
+      return Term::Var { nam: Name::from("...") };
     }
 
     let node = next.node();
@@ -339,7 +339,7 @@ impl Term {
   pub fn fix_names(&mut self, id_counter: &mut u64, book: &Book) {
     fn fix_name(nam: &mut Option<Name>, id_counter: &mut u64, bod: &mut Term) {
       if let Some(nam) = nam {
-        let name = Name::from(num_to_name(*id_counter));
+        let name = Name::new(num_to_name(*id_counter));
         *id_counter += 1;
         bod.subst(nam, &Term::Var { nam: name.clone() });
         *nam = name;

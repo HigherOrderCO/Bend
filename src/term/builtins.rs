@@ -90,11 +90,11 @@ impl Pattern {
   }
 
   fn encode_list(elements: Vec<Pattern>) -> Pattern {
-    let lnil = Pattern::Var(Some(Name::new(LNIL)));
+    let lnil = Pattern::Var(Some(Name::from(LNIL)));
 
     elements.into_iter().rfold(lnil, |acc, mut nxt| {
       nxt.encode_builtins();
-      Pattern::Ctr(Name::new(LCONS), vec![nxt, acc])
+      Pattern::Ctr(Name::from(LCONS), vec![nxt, acc])
     })
   }
 }

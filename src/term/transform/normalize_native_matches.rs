@@ -127,13 +127,13 @@ fn normalize_num_match(term: &mut Term) -> Result<(), MatchErr> {
           pat: Pattern::Var(Some(var.clone())),
           val: Box::new(Term::Opx {
             op: Op::ADD,
-            fst: Box::new(Term::Var { nam: Name::new("%pred") }),
+            fst: Box::new(Term::Var { nam: Name::from("%pred") }),
             snd: Box::new(Term::Num { val: 1 }),
           }),
           nxt: Box::new(std::mem::take(body)),
         };
 
-        let body = Term::named_lam(Name::new("%pred"), body);
+        let body = Term::named_lam(Name::from("%pred"), body);
         succ_arm = Some((Pattern::Num(MatchNum::Succ(None)), body));
         break;
       }
@@ -150,10 +150,10 @@ fn normalize_num_match(term: &mut Term) -> Result<(), MatchErr> {
   }
 
   let Some(zero_arm) = zero_arm else {
-    return Err(MatchErr::Missing(["0".to_string().into()].into()));
+    return Err(MatchErr::Missing(["0".into()].into()));
   };
   let Some(succ_arm) = succ_arm else {
-    return Err(MatchErr::Missing(["+".to_string().into()].into()));
+    return Err(MatchErr::Missing(["+".into()].into()));
   };
   *arms = vec![zero_arm, succ_arm];
   Ok(())

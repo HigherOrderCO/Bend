@@ -1,12 +1,15 @@
+use interner::global::{GlobalPool, GlobalString};
 use logos::{FilterResult, Lexer, Logos};
 use std::{fmt, num::ParseIntError};
+
+pub static STRINGS: GlobalPool<String> = GlobalPool::new();
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(error=LexingError)]
 #[logos(skip r"[ \t\n\f]+")]
 pub enum Token {
-  #[regex("[_.a-zA-Z][_.a-zA-Z0-9-]*", |lex| lex.slice().parse().ok())]
-  Name(String),
+  #[regex("[_.a-zA-Z][_.a-zA-Z0-9-]*", |lex| lex.slice().parse().ok().map(|s: String| STRINGS.get(s)))]
+  Name(GlobalString),
 
   #[regex("@|λ")]
   Lambda,

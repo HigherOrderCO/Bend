@@ -69,7 +69,7 @@ fn check_pattern(
     // TODO: Should check if it's a constructor type and use Pattern::is_flat_subset_of.
     let rules_matching_ctrs = match pat_type {
       // We can skip non pattern matching arguments
-      Type::Any => IndexMap::from([(Name::new("_"), rules_to_check)]),
+      Type::Any => IndexMap::from([(Name::from("_"), rules_to_check)]),
       Type::Adt(adt_nam) => {
         let adt = &adts[adt_nam];
         // For each constructor, which rules do we need to check.
@@ -87,19 +87,19 @@ fn check_pattern(
         }
         next_rules_to_check
       }
-      Type::Tup => IndexMap::from([(Name::new("(_,_)"), rules_to_check)]),
+      Type::Tup => IndexMap::from([(Name::from("(_,_)"), rules_to_check)]),
       Type::Num => {
         let mut next_rules_to_check: IndexMap<Name, Vec<usize>> =
-          IndexMap::from([(Name::new("0"), vec![]), (Name::new("+"), vec![])]);
+          IndexMap::from([(Name::from("0"), vec![]), (Name::from("+"), vec![])]);
         for rule_idx in rules_to_check {
           let pat = &rules[rule_idx].pats[match_path.len()];
           match pat {
             Pattern::Var(_) => next_rules_to_check.values_mut().for_each(|x| x.push(rule_idx)),
             Pattern::Num(MatchNum::Zero) => {
-              next_rules_to_check.get_mut(&Name::new("0")).unwrap().push(rule_idx);
+              next_rules_to_check.get_mut(&Name::from("0")).unwrap().push(rule_idx);
             }
             Pattern::Num(MatchNum::Succ { .. }) => {
-              next_rules_to_check.get_mut(&Name::new("+")).unwrap().push(rule_idx);
+              next_rules_to_check.get_mut(&Name::from("+")).unwrap().push(rule_idx);
             }
             _ => unreachable!(),
           }

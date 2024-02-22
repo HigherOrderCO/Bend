@@ -203,7 +203,7 @@ impl Term {
                   errs.push(ReadbackError::UnexpectedTag(expected_tag.clone(), tag.clone()));
                 }
 
-                let arg = Name::from(format!("{ctr}.{field}"));
+                let arg = Name::new(format!("{ctr}.{field}"));
                 args.push(Pattern::Var(Some(arg.clone())));
                 *arm = Term::tagged_app(expected_tag, std::mem::take(arm), Term::Var { nam: arg });
               }
