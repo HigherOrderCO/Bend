@@ -7,7 +7,7 @@ use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use std::collections::BTreeSet;
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   pub fn linearize_matches(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 

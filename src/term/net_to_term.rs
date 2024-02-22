@@ -1,8 +1,7 @@
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
-  term::{num_to_name, term_to_net::Labels, Book, MatchNum, Name, Op, Pattern, Tag, Term, Val},
+  term::{num_to_name, term_to_net::Labels, Book, MatchNum, Name, Op, Pattern, Tag, Term},
 };
-use hvmc::run::Loc;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
@@ -14,6 +13,7 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
     book,
     dup_paths: if linear { None } else { Some(Default::default()) },
     scope: Default::default(),
+    seen_fans: Default::default(),
     namegen: Default::default(),
     seen: Default::default(),
     errors: Default::default(),
@@ -51,6 +51,7 @@ pub struct Reader<'a> {
   labels: &'a Labels,
   dup_paths: Option<HashMap<u32, Vec<SlotId>>>,
   scope: Scope,
+  seen_fans: Scope,
   seen: HashSet<Port>,
   errors: Vec<ReadbackError>,
 }
@@ -171,7 +172,9 @@ impl<'a> Reader<'a> {
             self.dup_paths.as_mut().unwrap().entry(*lab).or_default().pop().unwrap();
             term
           } else {
-            self.scope.insert(node);
+            if self.seen_fans.insert(node) {
+              self.scope.insert(node);
+            }
             Term::Var { nam: self.namegen.var_name(next) }
           }
         }
@@ -201,7 +204,9 @@ impl<'a> Reader<'a> {
           .map_or_else(|(fst, snd)| Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, |term| term),
         // If we're visiting a port 1 or 2, then it is a variable.
         1 | 2 => {
-          self.scope.insert(node);
+          if self.seen_fans.insert(node) {
+            self.scope.insert(node);
+          }
           Term::Var { nam: self.namegen.var_name(next) }
         }
         _ => unreachable!(),
@@ -331,8 +336,8 @@ impl Term {
     }
   }
 
-  pub fn fix_names(&mut self, id_counter: &mut Val, book: &Book) {
-    fn fix_name(nam: &mut Option<Name>, id_counter: &mut Val, bod: &mut Term) {
+  pub fn fix_names(&mut self, id_counter: &mut u64, book: &Book) {
+    fn fix_name(nam: &mut Option<Name>, id_counter: &mut u64, bod: &mut Term) {
       if let Some(nam) = nam {
         let name = Name::from(num_to_name(*id_counter));
         *id_counter += 1;
@@ -387,8 +392,8 @@ impl Term {
 
 #[derive(Default)]
 pub struct NameGen {
-  pub var_port_to_id: HashMap<Port, Val>,
-  pub id_counter: Val,
+  pub var_port_to_id: HashMap<Port, u64>,
+  pub id_counter: u64,
 }
 
 impl NameGen {
@@ -417,26 +422,26 @@ impl NameGen {
 }
 
 impl Op {
-  fn from_hvmc_label(value: Loc) -> Op {
+  pub fn from_hvmc_label(value: hvmc::ops::Op) -> Op {
+    use hvmc::ops::Op as RtOp;
     match value {
-      hvmc::run::ADD => Op::ADD,
-      hvmc::run::SUB => Op::SUB,
-      hvmc::run::MUL => Op::MUL,
-      hvmc::run::DIV => Op::DIV,
-      hvmc::run::MOD => Op::MOD,
-      hvmc::run::EQ => Op::EQ,
-      hvmc::run::NE => Op::NE,
-      hvmc::run::LT => Op::LT,
-      hvmc::run::GT => Op::GT,
-      hvmc::run::LTE => Op::LTE,
-      hvmc::run::GTE => Op::GTE,
-      hvmc::run::AND => Op::AND,
-      hvmc::run::OR => Op::OR,
-      hvmc::run::XOR => Op::XOR,
-      hvmc::run::LSH => Op::LSH,
-      hvmc::run::RSH => Op::RSH,
-      hvmc::run::NOT => Op::NOT,
-      _ => panic!("Invalid Op value: `{}`", value),
+      RtOp::Add => Op::ADD,
+      RtOp::Sub => Op::SUB,
+      RtOp::Mul => Op::MUL,
+      RtOp::Div => Op::DIV,
+      RtOp::Mod => Op::MOD,
+      RtOp::Eq => Op::EQ,
+      RtOp::Ne => Op::NE,
+      RtOp::Lt => Op::LT,
+      RtOp::Gt => Op::GT,
+      RtOp::Lte => Op::LTE,
+      RtOp::Gte => Op::GTE,
+      RtOp::And => Op::AND,
+      RtOp::Or => Op::OR,
+      RtOp::Xor => Op::XOR,
+      RtOp::Lsh => Op::LSH,
+      RtOp::Rsh => Op::RSH,
+      RtOp::Not => Op::NOT,
     }
   }
 }

@@ -6,7 +6,7 @@ use crate::{
   term::{Ctx, MatchNum, Name, Op, Pattern, Tag, Term, Type},
 };
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   /// Converts tuple and var matches into let expressions,
   /// makes num matches have exactly one rule for zero and one rule for succ.
   /// Should be run after pattern matching functions are desugared.

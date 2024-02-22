@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/and.hvm
 ---
-@a = (* @false)
-@and = (a ({2 (b b) {2 @a (a c)}} c))
+@and = (a ({2 (b b) {2 @and$S0 (a c)}} c))
+@and$S0 = (* @false)
 @false = {2 * {2 a a}}
 @main = a
 & @and ~ (@true (@false a))

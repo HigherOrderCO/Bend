@@ -14,7 +14,7 @@ impl Display for ArityErr {
   }
 }
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   /// Checks if every constructor pattern of every definition rule has the same arity from the
   /// defined adt constructor.
   ///

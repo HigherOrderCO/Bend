@@ -1,0 +1,1 @@
+Main = λa Main

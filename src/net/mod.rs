@@ -2,7 +2,7 @@ pub mod hvmc_to_net;
 pub mod net_to_hvmc;
 
 use crate::term::Name;
-use hvmc::run::{Lab, Val};
+pub type HvmlLab = u32;
 use NodeKind::*;
 
 #[derive(Debug, Clone)]
@@ -30,11 +30,11 @@ pub enum NodeKind {
   Era,
   /// Lambdas and applications
   Con {
-    lab: Option<Lab>,
+    lab: Option<HvmlLab>,
   },
   Tup,
   Dup {
-    lab: Lab,
+    lab: HvmlLab,
   },
   /// Reference to function definitions
   Ref {
@@ -42,25 +42,25 @@ pub enum NodeKind {
   },
   /// Numbers
   Num {
-    val: Val,
+    val: u64,
   },
   /// Numeric operations
   Op2 {
-    opr: Lab,
+    opr: hvmc::ops::Op,
   },
   /// Pattern matching on numbers
   Mat,
 }
 
-pub type NodeId = Val;
-pub type SlotId = Val;
+pub type NodeId = u64;
+pub type SlotId = u64;
 
 /// The ROOT port is on the deadlocked root node at address 0.
 pub const ROOT: Port = Port(0, 1);
 pub const TAG_WIDTH: u32 = 4;
-pub const TAG: u32 = Val::BITS - TAG_WIDTH;
-pub const LABEL_MASK: Val = (1 << TAG) - 1;
-pub const TAG_MASK: Val = !LABEL_MASK;
+pub const TAG: u32 = u64::BITS - TAG_WIDTH;
+pub const LABEL_MASK: u64 = (1 << TAG) - 1;
+pub const TAG_MASK: u64 = !LABEL_MASK;
 
 impl INet {
   /// Create a new net, with a deadlocked root node.

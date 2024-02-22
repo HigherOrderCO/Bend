@@ -27,7 +27,7 @@ impl Display for InferErr {
   }
 }
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   /// Returns a HashMap from the definition id to the inferred pattern types
   /// and checks the rules arities based on the first rule arity.
   /// Expects patterns to be flattened.
@@ -82,7 +82,7 @@ fn unify(new: Type, old: &mut Type) -> Result<(), InferErr> {
   Ok(())
 }
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   pub fn check_arity(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 

@@ -13,7 +13,7 @@ impl Display for UnboundCtrErr {
   }
 }
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   /// Check if the constructors in rule patterns or match patterns are defined.
   pub fn check_unbound_pats(&mut self) -> Result<(), Info> {
     self.info.start_pass();

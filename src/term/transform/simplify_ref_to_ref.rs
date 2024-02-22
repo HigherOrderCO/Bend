@@ -15,7 +15,7 @@ impl Display for CyclicDefErr {
   }
 }
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   // When we find a function that is simply directly calling another function,
   // substitutes all occurrences of that function to the one being called, avoiding the unnecessary redirect.
   // In case there is a long chain of ref-to-ref-to-ref, we substitute values by the last function in the chain.

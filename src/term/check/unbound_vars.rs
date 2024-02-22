@@ -2,11 +2,7 @@ use crate::{
   diagnostics::Info,
   term::{Ctx, Name, Pattern, Term},
 };
-use hvmc::run::Val;
-use std::{
-  collections::{hash_map::Entry, HashMap},
-  fmt::Display,
-};
+use std::{collections::{hash_map::Entry, HashMap}, fmt::Display};
 
 #[derive(Debug, Clone)]
 pub enum UnboundVarErr {
@@ -31,7 +27,7 @@ impl Display for UnboundVarErr {
   }
 }
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   /// Checks that there are no unbound variables in all definitions.
   pub fn check_unbound_vars(&mut self) -> Result<(), Info> {
     self.info.start_pass();
@@ -59,9 +55,10 @@ impl Ctx {
 impl Term {
   /// Checks that all variables are bound.
   /// Precondition: References have been resolved, implicit binds have been solved.
+
   pub fn check_unbound_vars<'a>(
     &'a mut self,
-    scope: &mut HashMap<&'a Name, Val>,
+    scope: &mut HashMap<&'a Name, u64>,
     errs: &mut Vec<UnboundVarErr>,
   ) {
     let mut globals = HashMap::new();
@@ -78,7 +75,7 @@ impl Term {
 /// Globals has how many times a global var name was declared and used.
 pub fn check_uses<'a>(
   term: &'a mut Term,
-  scope: &mut HashMap<&'a Name, Val>,
+  scope: &mut HashMap<&'a Name, u64>,
   globals: &mut HashMap<&'a Name, (usize, usize)>,
   errs: &mut Vec<UnboundVarErr>,
 ) {
@@ -140,13 +137,13 @@ pub fn check_uses<'a>(
   }
 }
 
-fn push_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, Val>) {
+fn push_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, u64>) {
   if let Some(nam) = nam {
     *scope.entry(nam).or_default() += 1;
   }
 }
 
-fn pop_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, Val>) {
+fn pop_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, u64>) {
   if let Some(nam) = nam {
     let Entry::Occupied(n_declarations) = scope.entry(nam).and_modify(|e| *e -= 1) else { unreachable!() };
 

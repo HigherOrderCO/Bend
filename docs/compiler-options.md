@@ -8,7 +8,6 @@
 | `-Oref-to-ref` `-Ono-ref-to-ref` | Disabled | [ref-to-ref](#ref-to-ref) |
 | `-Oprune` `-Ono-prune` | Disabled | [definition-pruning](#definition-pruning) |
 | `-Opre-reduce` `-Ono-pre-reduce` | Disabled | [pre-reduce](#pre-reduce) |
-| `-Opre-reduce-refs` `-Ono-pre-reduce-refs` | Disabled | [pre-reduce-refs](#pre-reduce-refs) |
 | `-Osupercombinators` `-Ono-supercombinators` | Enabled  | [supercombinators](#supercombinators) |
 | `-Osimplify-main` `-Ono-simplify-main` | Disabled | [simplify-main](#simplify-main) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
@@ -119,32 +118,7 @@ main = (id also_id)
 
 ## Pre-reduce
 
-Normalizes all functions, solving annihilations and commutations, except main.
-
-Example:
-```rs
-// program
-id = λx x
-foo = (id 42)
-main = foo
-
-// -Opre-reduce, compilation output
-@foo = #42
-@id = (a a)
-@main = @foo
-
-// -Ono-pre-reduce, compilation output
-@foo = a
-& @id ~ (#42 a)
-@id = (a a)
-@main = @foo
-```
-
-## Pre-reduce-refs
-
-Is triggered only if the [pre-reduce](#pre-reduce) option is enabled.
-
-If enabled, the pre-reduce pass will also reduce reference applications, leading to full normalization of each compiled net.
+Normalizes all functions except main, dereferencing definitions in active positions, and solving annihilations and commutations. It does not reduce [builtin definitions](builtin_defs), such as `HVM.log`.
 
 Example:
 ```rs
@@ -154,22 +128,9 @@ bar = (+ foo foo)
 
 main = (bar)
 
-// -Opre-reduce-refs, compilation output
+// -Opre-reduce, compilation output
 @bar = #8
 @foo = #4
-@main = @bar
-
-// -Ono-pre-reduce-refs, compilation output
-@bar = a
-& @foo ~ <+ @foo a>
-@foo = #4
-@main = @bar
-
-// -Ono-pre-reduce, compilation output
-@bar = a
-& @foo ~ <+ @foo a>
-@foo = a
-& #2 ~ <+ #2 a>
 @main = @bar
 ```
 

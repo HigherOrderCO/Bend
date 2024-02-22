@@ -1,25 +1,13 @@
 use crate::{
   net::{INet, NodeKind::*, Port, ROOT},
-  term::{num_to_name, Book, MatchNum, Name, Op, Pattern, Tag, Term},
-  ENTRY_POINT,
-};
-use hvmc::{
-  ast::name_to_val,
-  run::{Loc, Val},
+  term::{Book, MatchNum, Name, Op, Pattern, Tag, Term},
 };
 use std::collections::{hash_map::Entry, HashMap};
 
-#[derive(Debug, Default)]
-pub struct HvmcNames {
-  pub hvml_to_hvmc: HashMap<Name, Val>,
-  pub hvmc_to_hvml: HashMap<Val, Name>,
-}
-
-pub fn book_to_nets(book: &Book) -> (HashMap<String, INet>, HvmcNames, Labels) {
+pub fn book_to_nets(book: &Book) -> (HashMap<String, INet>, Labels) {
   let mut nets = HashMap::new();
-  let mut hvmc_names = HvmcNames::default();
   let mut labels = Labels::default();
-  let mut generated_count = 0;
+
   let main = book.entrypoint.as_ref().unwrap();
 
   for def in book.defs.values() {
@@ -29,12 +17,9 @@ pub fn book_to_nets(book: &Book) -> (HashMap<String, INet>, HvmcNames, Labels) {
       let name = if def.name == *main {
         book.hvmc_entrypoint()
       } else {
-        def_name_to_hvmc_name(&def.name, &nets, &mut generated_count)
+        def.name.0.to_string()
       };
 
-      let val = name_to_val(&name);
-      hvmc_names.hvml_to_hvmc.insert(def.name.clone(), val);
-      hvmc_names.hvmc_to_hvml.insert(val, def.name.clone());
       nets.insert(name, net);
     }
   }
@@ -42,45 +27,7 @@ pub fn book_to_nets(book: &Book) -> (HashMap<String, INet>, HvmcNames, Labels) {
   labels.con.finish();
   labels.dup.finish();
 
-  (nets, hvmc_names, labels)
-}
-
-/// Converts rules names to unique names compatible with hvm-core:
-///   If the rule is compiler-generated: Convert the DefId value into a new name
-///   If not: Truncates the rule name into 4 chars
-/// Them checks if the given hashmap already contains the resulted name,
-/// if it does, falls back into converting its DefId and succeeding ones until a unique name is found.
-fn def_name_to_hvmc_name(def_name: &Name, nets: &HashMap<String, INet>, generated_count: &mut Val) -> String {
-  fn truncate(s: &str, max_chars: usize) -> &str {
-    match s.char_indices().nth(max_chars) {
-      None => s,
-      Some((idx, _)) => &s[.. idx],
-    }
-  }
-
-  fn gen_unique_name(generated_count: &mut Val, nets: &HashMap<String, INet>) -> String {
-    let mut id = *generated_count;
-    *generated_count += 1;
-    loop {
-      let name = num_to_name(id);
-      if nets.contains_key(&name) {
-        id += 1;
-      } else {
-        return name;
-      }
-    }
-  }
-
-  if def_name.is_generated() {
-    gen_unique_name(generated_count, nets)
-  } else {
-    let name = truncate(def_name, 10);
-    if !(nets.contains_key(name) || name.eq(ENTRY_POINT)) {
-      name.to_owned()
-    } else {
-      gen_unique_name(generated_count, nets)
-    }
-  }
+  (nets, labels)
 }
 
 /// Converts an IC term into an IC net.
@@ -328,25 +275,26 @@ impl<'a> EncodeTermState<'a> {
 }
 
 impl Op {
-  pub fn to_hvmc_label(self) -> Loc {
+  pub fn to_hvmc_label(self) -> hvmc::ops::Op {
+    use hvmc::ops::Op as RtOp;
     match self {
-      Op::ADD => 0x0,
-      Op::SUB => 0x1,
-      Op::MUL => 0x2,
-      Op::DIV => 0x3,
-      Op::MOD => 0x4,
-      Op::EQ => 0x5,
-      Op::NE => 0x6,
-      Op::LT => 0x7,
-      Op::GT => 0x8,
-      Op::LTE => 0x9,
-      Op::GTE => 0xa,
-      Op::AND => 0xb,
-      Op::OR => 0xc,
-      Op::XOR => 0xd,
-      Op::LSH => 0xe,
-      Op::RSH => 0xf,
-      Op::NOT => 0x10,
+      Op::ADD => RtOp::Add,
+      Op::SUB => RtOp::Sub,
+      Op::MUL => RtOp::Mul,
+      Op::DIV => RtOp::Div,
+      Op::MOD => RtOp::Mod,
+      Op::EQ => RtOp::Eq,
+      Op::NE => RtOp::Ne,
+      Op::LT => RtOp::Lt,
+      Op::GT => RtOp::Gt,
+      Op::LTE => RtOp::Lte,
+      Op::GTE => RtOp::Gte,
+      Op::AND => RtOp::And,
+      Op::OR => RtOp::Or,
+      Op::XOR => RtOp::Xor,
+      Op::LSH => RtOp::Lsh,
+      Op::RSH => RtOp::Rsh,
+      Op::NOT => RtOp::Not,
     }
   }
 }

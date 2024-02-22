@@ -1,6 +1,6 @@
 use crate::{
   diagnostics::Info,
-  term::{Ctx, MatchNum, Name, Pattern, Term},
+  term::{Ctx, MatchNum, Name, Pattern, Term}, CORE_BUILTINS
 };
 use std::{
   collections::{HashMap, HashSet},
@@ -16,7 +16,7 @@ impl Display for ReferencedMainErr {
   }
 }
 
-impl Ctx {
+impl<'book> Ctx<'book> {
   /// Decides if names inside a term belong to a Var or to a Ref.
   /// Precondition: Refs are encoded as vars, Constructors are resolved.
   /// Postcondition: Refs are encoded as refs, with the correct def id.
@@ -91,7 +91,7 @@ impl Term {
             }
           }
 
-          if def_names.contains(nam) {
+          if def_names.contains(nam) || CORE_BUILTINS.contains(&nam.0.as_ref().as_ref()) {
             *self = Term::r#ref(nam);
           }
         }
