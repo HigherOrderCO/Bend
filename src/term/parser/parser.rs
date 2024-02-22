@@ -337,9 +337,9 @@ where
       .boxed();
 
     choice((
-      // OBS: num_op has to be before app, idk why?
-      // OBS: app has to be before `tup` fto not overflow on huge app terms
-      // TODO: What happens on huge `tup` terms?
+      // OBS: `num_op` has to be before app, idk why?
+      // OBS: `app` has to be before `tup` to not overflow on huge app terms
+      // TODO: What happens on huge `tup` and other terms?
       num_op, app, tup, global_var, var, number, list, str, chr, sup, global_lam, lam, dup, let_, match_, era,
     ))
   })
