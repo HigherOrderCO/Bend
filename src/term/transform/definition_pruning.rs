@@ -114,13 +114,13 @@ impl Book {
           }
         }
         Term::Lst { els } => {
-          self.insert_ctrs_used(&Name::new(LIST), uses, adt_encoding);
+          self.insert_ctrs_used(&Name::from(LIST), uses, adt_encoding);
           for term in els {
             to_find.push(term);
           }
         }
         Term::Str { .. } => {
-          self.insert_ctrs_used(&Name::new(STRING), uses, adt_encoding);
+          self.insert_ctrs_used(&Name::from(STRING), uses, adt_encoding);
         }
         Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era | Term::Err => (),
       }

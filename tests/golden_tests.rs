@@ -266,7 +266,7 @@ fn hangs() {
 fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    book.entrypoint = Some(Name::new("foo"));
+    book.entrypoint = Some(Name::from("foo"));
     let compiled = compile_book(&mut book, CompileOpts::light())?;
     Ok(format!("{:?}", compiled))
   })
@@ -276,7 +276,7 @@ fn compile_entrypoint() {
 fn run_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    book.entrypoint = Some(Name::new("foo"));
+    book.entrypoint = Some(Name::from("foo"));
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) =
       run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;

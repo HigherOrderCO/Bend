@@ -75,7 +75,7 @@ pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult,
     pre_reduce_book(&mut core_book, book.hvmc_entrypoint())?;
   }
   if opts.prune {
-    prune_defs(&mut core_book, book.hvmc_entrypoint());
+    prune_defs(&mut core_book, book.hvmc_entrypoint().to_string());
   }
   Ok(CompileResult { core_book, labels, warns })
 }

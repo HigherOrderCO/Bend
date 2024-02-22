@@ -161,7 +161,7 @@ fn match_to_def(
   match_count: usize,
 ) -> Term {
   let rules = arms.iter().map(|(pat, term)| Rule { pats: vec![pat.clone()], body: term.clone() }).collect();
-  let new_name = Name::from(format!("{def_name}$match${match_count}"));
+  let new_name = Name::new(format!("{def_name}$match${match_count}"));
   let def = Definition { name: new_name.clone(), rules, builtin };
   new_defs.push((new_name.clone(), def));
 

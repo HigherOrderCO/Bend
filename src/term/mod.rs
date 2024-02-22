@@ -1,6 +1,7 @@
 use indexmap::{IndexMap, IndexSet};
+use interner::global::GlobalString;
 use itertools::Itertools;
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{borrow::Cow, collections::HashMap, ops::Deref};
 
 pub mod builtins;
 pub mod check;
@@ -14,6 +15,7 @@ pub mod transform;
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
+use self::parser::lexer::STRINGS;
 use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
 
 #[derive(Debug)]
@@ -123,7 +125,7 @@ pub enum Term {
     val: u64,
   },
   Str {
-    val: String,
+    val: GlobalString,
   },
   Lst {
     els: Vec<Term>,
@@ -201,8 +203,14 @@ pub enum AdtEncoding {
   TaggedScott,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, PartialOrd, Ord)]
-pub struct Name(pub Arc<str>);
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct Name(GlobalString);
+
+impl PartialEq<str> for Name {
+  fn eq(&self, other: &str) -> bool {
+    &**self == other
+  }
+}
 
 pub fn num_to_name(mut num: u64) -> String {
   let mut name = String::new();
@@ -223,7 +231,7 @@ impl Tag {
   }
 
   pub fn adt_field(adt: &Name, ctr: &Name, field: &Name) -> Self {
-    Self::Named(format!("{adt}.{ctr}.{field}").into())
+    Self::Named(Name::new(format!("{adt}.{ctr}.{field}")))
   }
 }
 
@@ -267,7 +275,11 @@ impl Term {
   }
 
   pub fn r#ref(name: &str) -> Self {
-    Term::Ref { nam: name.to_string().into() }
+    Term::Ref { nam: name.into() }
+  }
+
+  pub fn str(str: &str) -> Self {
+    Term::Str { val: STRINGS.get(str) }
   }
 
   /// Substitute the occurrences of a variable in a term with the given term.
@@ -486,7 +498,7 @@ impl Term {
 
     if let Term::Var { nam } = &scrutinee {
       if let Some(label) = &succ_label {
-        let new_label = Name::from(format!("{}-1", nam));
+        let new_label = Name::new(format!("{}-1", nam));
         succ_term.subst(label, &Term::Var { nam: new_label.clone() });
         succ_label = Some(new_label);
       }
@@ -498,7 +510,7 @@ impl Term {
         Some(succ) => {
           let match_bind = succ.clone();
 
-          let new_label = Name::from(format!("{}-1", succ));
+          let new_label = Name::new(format!("{}-1", succ));
           succ_term.subst(&succ, &Term::Var { nam: new_label.clone() });
           succ_label = Some(new_label);
 
@@ -580,20 +592,20 @@ impl Pattern {
           pats.iter().for_each(|pat| go(pat, set));
         }
         Pattern::Lst(pats) => {
-          set.push(builtins::LCONS.to_string().into());
-          set.push(builtins::LNIL.to_string().into());
+          set.push(builtins::LCONS.into());
+          set.push(builtins::LNIL.into());
           pats.iter().for_each(|pat| go(pat, set))
         }
         Pattern::Tup(fst, snd) => {
-          set.push("(,)".to_string().into());
+          set.push("(,)".into());
           go(fst, set);
           go(snd, set);
         }
         Pattern::Num(MatchNum::Zero) => {
-          set.push("0".to_string().into());
+          set.push("0".into());
         }
         Pattern::Num(MatchNum::Succ(_)) => {
-          set.push("+".to_string().into());
+          set.push("+".into());
         }
         Pattern::Var(_) => {}
       }
@@ -636,7 +648,7 @@ impl Pattern {
       }
       Pattern::Tup(..) => Type::Tup,
       Pattern::Num(..) => Type::Num,
-      Pattern::Lst(..) => Type::Adt(builtins::LIST.to_string().into()),
+      Pattern::Lst(..) => Type::Adt(builtins::LIST.into()),
     }
   }
 
@@ -727,11 +739,11 @@ impl Type {
       Type::None => vec![],
       Type::Any => vec![],
       Type::Tup => vec![Pattern::Tup(
-        Box::new(Pattern::Var(Some(Name::new("%fst")))),
-        Box::new(Pattern::Var(Some(Name::new("%snd")))),
+        Box::new(Pattern::Var(Some("%fst".into()))),
+        Box::new(Pattern::Var(Some("%snd".into()))),
       )],
       Type::Num => {
-        vec![Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Succ(Some(Some(Name::new("%pred")))))]
+        vec![Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Succ(Some(Some("%pred".into()))))]
       }
       Type::Adt(adt) => {
         // TODO: Should return just a ref to ctrs and not clone.
@@ -757,8 +769,8 @@ impl Type {
 }
 
 impl Name {
-  pub fn new(value: &str) -> Self {
-    Name::from(value.to_string())
+  pub fn new<'a, V: Into<Cow<'a, str>>>(value: V) -> Name {
+    Name(STRINGS.get(value))
   }
 
   pub fn is_generated(&self) -> bool {
@@ -767,21 +779,21 @@ impl Name {
   }
 }
 
-impl From<String> for Name {
-  fn from(value: String) -> Self {
-    Name(Arc::from(value))
+impl From<&str> for Name {
+  fn from(value: &str) -> Self {
+    Name(STRINGS.get(value))
   }
 }
 
 impl From<u64> for Name {
   fn from(value: u64) -> Self {
-    num_to_name(value).into()
+    num_to_name(value).as_str().into()
   }
 }
 
 impl From<u32> for Name {
   fn from(value: u32) -> Self {
-    num_to_name(value as u64).into()
+    num_to_name(value as u64).as_str().into()
   }
 }
 
@@ -789,21 +801,21 @@ impl Deref for Name {
   type Target = str;
 
   fn deref(&self) -> &Self::Target {
-    self.0.deref()
+    &self.0
   }
 }
 
 impl AsRef<str> for Name {
   fn as_ref(&self) -> &str {
-    self.0.as_ref()
+    &self.0
   }
 }
 
 impl Book {
-  pub fn hvmc_entrypoint(&self) -> String {
-    match self.entrypoint.as_ref().map(|e| e.0.as_ref()) {
-      Some("main" | "Main") | None => ENTRY_POINT.to_string(),
-      Some(nam) => nam.to_string(),
+  pub fn hvmc_entrypoint(&self) -> &str {
+    match self.entrypoint.as_ref().map(|e| e.as_ref()) {
+      Some("main" | "Main") | None => ENTRY_POINT,
+      Some(nam) => nam,
     }
   }
 }

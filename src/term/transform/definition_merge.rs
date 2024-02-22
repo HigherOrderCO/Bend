@@ -28,7 +28,7 @@ impl Book {
 
     for (term, equal_defs) in equal_terms {
       // def1_$_def2_$_def3
-      let new_name = Name::from(equal_defs.iter().join("_$_"));
+      let new_name = Name::new(equal_defs.iter().join("_$_"));
 
       // Builtin origin takes precedence
       let builtin = equal_defs.iter().any(|nam| self.defs[nam].builtin);

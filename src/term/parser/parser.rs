@@ -18,6 +18,8 @@ use indexmap::{map::Entry, IndexMap};
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range, path::Path};
 
+use super::lexer::STRINGS;
+
 // hvml grammar description:
 // <Book>    ::= <TopLevel>*
 // <TopLevel> ::= (<Def> | <Data>)
@@ -114,7 +116,7 @@ fn soft_keyword<'a, I>(keyword: &'static str) -> impl Parser<'a, I, (), extra::E
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
-  any().filter(move |t| matches!(t, Token::Name(n) if n.as_str() == keyword)).to(()).labelled(keyword)
+  any().filter(move |t| matches!(t, Token::Name(n) if n == keyword)).to(()).labelled(keyword)
 }
 
 fn name<'a, I>() -> impl Parser<'a, I, Name, extra::Err<Rich<'a, Token>>>
@@ -127,8 +129,8 @@ where
   any()
     .filter(|t| matches!(t, Token::Name(_)))
     .map(|t| {
-      let Token::Name(name) = t else { unreachable!() };
-      Name::from(name)
+      let Token::Name(n) = t else { unreachable!() };
+      Name(n)
     })
     .labelled("<Name>")
 }
@@ -139,7 +141,7 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   any()
-    .filter(|t| matches!(t, Token::Name(n) if n.as_str() != "data"))
+    .filter(|t| matches!(t, Token::Name(n) if n != "data"))
     .map(|t| {
       let Token::Name(name) = t else { unreachable!() };
       name
@@ -148,7 +150,7 @@ where
       if out.contains('-') {
         emitter.emit(Rich::custom(span, "Names with '-' are not supported at top level."));
       }
-      Name::from(out)
+      Name(out)
     })
     .labelled("<Name>")
 }
@@ -335,7 +337,10 @@ where
       .boxed();
 
     choice((
-      global_var, var, number, list, str, chr, sup, tup, global_lam, lam, dup, let_, match_, num_op, app, era,
+      // OBS: `num_op` has to be before app, idk why?
+      // OBS: `app` has to be before `tup` to not overflow on huge app terms
+      // TODO: What happens on huge `tup` and other terms?
+      num_op, app, tup, global_var, var, number, list, str, chr, sup, global_lam, lam, dup, let_, match_, era,
     ))
   })
 }
@@ -414,7 +419,7 @@ where
   }));
 
   let paren_lhs = just(Token::LParen)
-    .ignore_then(lhs.clone().map_err(|err| map_unexpected_eof::<I>(err, Token::Name("<Name>".into()))))
+    .ignore_then(lhs.clone().map_err(|err| map_unexpected_eof::<I>(err, Token::Name(STRINGS.get("<Name>")))))
     .then_ignore(just(Token::RParen))
     .then_ignore(just(Token::Equals).map_err(|err| map_unexpected_eof::<I>(err, Token::Equals)));
 
@@ -442,9 +447,9 @@ where
   let data_name = tl_name().map_with_span(|name, span| (name, span));
 
   soft_keyword("data")
-    .ignore_then(data_name.map_err(|err| map_unexpected_eof::<I>(err, Token::Name("<Name>".to_string()))))
+    .ignore_then(data_name.map_err(|err| map_unexpected_eof::<I>(err, Token::Name(STRINGS.get("<Name>")))))
     .then_ignore(just(Token::Equals))
-    .then(ctrs.map_err(|err| map_unexpected_eof::<I>(err, Token::Name("constructor".to_string()))))
+    .then(ctrs.map_err(|err| map_unexpected_eof::<I>(err, Token::Name(STRINGS.get("constructor")))))
     .map(move |(name, ctrs)| TopLevel::Adt(name, ctrs))
 }
 

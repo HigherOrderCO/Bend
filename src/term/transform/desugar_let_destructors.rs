@@ -51,7 +51,7 @@ impl Term {
         *self = if let Term::Var { .. } = val.as_ref() {
           Term::Mat { matched: val, arms }
         } else {
-          let nam = Name::new("%temp%scrutinee");
+          let nam = Name::from("%temp%scrutinee");
           let pat = Pattern::Var(Some(nam.clone()));
           let scrutinee = Box::new(Term::Var { nam });
           Term::Let { pat, val, nxt: Box::new(Term::Mat { matched: scrutinee, arms }) }

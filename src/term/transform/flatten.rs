@@ -34,7 +34,7 @@ fn flatten_def(def: &Definition) -> Vec<Definition> {
     if must_split {
       // Create the entry for the new definition name
       let old_name = &def.name;
-      let new_name = Name::from(format!("{}$F{}", old_name, new_defs.len()));
+      let new_name = Name::new(format!("{}$F{}", old_name, new_defs.len()));
 
       // Create the rule that replaces the one being flattened.
       // Destructs one layer of the nested patterns and calls the following, forwarding the extracted fields.
@@ -237,5 +237,5 @@ fn make_split_rule(old_rule: &Rule, other_rule: &Rule) -> Rule {
 fn make_var_name(var_count: &mut usize) -> Name {
   let nam = format!("%x{var_count}");
   *var_count += 1;
-  nam.into()
+  Name::new(nam)
 }

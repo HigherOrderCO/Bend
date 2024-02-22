@@ -20,26 +20,26 @@ impl Term {
         let head = std::mem::take(head);
         let mut tail = std::mem::take(tail);
 
-        if ctr.as_ref() == SCONS
+        if ctr == SCONS
           && let Term::Num { val } = head
           && let Term::Str { val: tail } = tail
         {
           // If well formed string, add the next character to the string we're building
           let head = unsafe { char::from_u32_unchecked(val as u32) }.to_string();
           let str = head + &tail;
-          *self = Term::Str { val: str }
+          *self = Term::str(&str);
         } else {
           // Otherwise rebuild the constructor with the new tail
 
           // Create `(Cons head Nil)` instead of `(Cons head "")`
-          if tail == (Term::Str { val: String::new() }) {
+          if matches!(&tail, Term::Str { val } if val.is_empty()) {
             tail = Term::r#ref(SNIL);
           }
           *self = Term::call(Term::Ref { nam: ctr.clone() }, [head, tail]);
         }
       }
       // (String.nil)
-      Term::Ref { nam: def_name } if def_name.as_ref() == SNIL => *self = Term::Str { val: String::new() },
+      Term::Ref { nam: def_name } if def_name == SNIL => *self = Term::str(""),
 
       Term::Mat { matched, arms } => {
         matched.resugar_strings();
@@ -88,7 +88,7 @@ impl Term {
         let head = std::mem::take(head);
         let tail = std::mem::take(tail);
 
-        if ctr.as_ref() == LCONS
+        if ctr == LCONS
           && let Term::Lst { els: tail } = tail
         {
           // If well formed list, cons the next element to the list being formed
@@ -100,7 +100,7 @@ impl Term {
         }
       }
       // (List.nil)
-      Term::Ref { nam: def_name } if def_name.as_ref() == LNIL => *self = Term::Lst { els: vec![] },
+      Term::Ref { nam: def_name } if def_name == LNIL => *self = Term::Lst { els: vec![] },
 
       Term::Mat { matched, arms } => {
         matched.resugar_lists();

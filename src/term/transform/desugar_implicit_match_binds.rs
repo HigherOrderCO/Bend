@@ -23,7 +23,7 @@ impl Term {
           } else {
             let Term::Mat { matched, arms } = std::mem::take(term) else { unreachable!() };
 
-            let nam = Name::new("%matched");
+            let nam = Name::from("%matched");
 
             *term = Term::Let {
               pat: Pattern::Var(Some(nam.clone())),
@@ -49,7 +49,7 @@ impl Term {
                   // Implicit ctr args
                   *pat_args = ctr_args
                     .iter()
-                    .map(|field| Pattern::Var(Some(format!("{matched}.{field}").into())))
+                    .map(|field| Pattern::Var(Some(Name::new(format!("{matched}.{field}")))))
                     .collect();
                 }
               }
@@ -57,7 +57,7 @@ impl Term {
               Pattern::Num(MatchNum::Succ(Some(_))) => (),
               Pattern::Num(MatchNum::Succ(p @ None)) => {
                 // Implicit num arg
-                *p = Some(Some(format!("{matched}-1").into()));
+                *p = Some(Some(Name::new(format!("{matched}-1"))));
               }
               Pattern::Tup(_, _) => (),
               Pattern::Lst(..) => unreachable!(),

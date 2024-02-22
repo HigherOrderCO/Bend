@@ -26,7 +26,7 @@ impl hvmc::run::AsDef for InertDef {
 ///
 /// It does not reduce interactions that use builtin defs, as they are
 /// assumed to be side-effectful
-pub fn pre_reduce_book(book: &mut Book, entrypoint: String) -> Result<(), String> {
+pub fn pre_reduce_book(book: &mut Book, entrypoint: &str) -> Result<(), String> {
   /// Maximum amount of rewrites that
   const MAX_RWTS: usize = 100_000;
   // Create a host

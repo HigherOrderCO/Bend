@@ -60,7 +60,7 @@ impl<'book> Ctx<'book> {
       }
 
       (None, None, None) => {
-        self.info.error(EntryErr::NotFound(self.book.entrypoint.clone().unwrap_or(Name::new(ENTRY_POINT))))
+        self.info.error(EntryErr::NotFound(self.book.entrypoint.clone().unwrap_or(Name::from(ENTRY_POINT))))
       }
     }
 
@@ -81,8 +81,8 @@ fn validate_entry_point(entry: &Definition) -> Result<Name, EntryErr> {
 impl Book {
   fn get_possible_entry_points(&self) -> (Option<&Definition>, Option<&Definition>, Option<&Definition>) {
     let custom = self.entrypoint.as_ref().map(|e| self.defs.get(e)).flatten();
-    let main = self.defs.get(&Name::new(ENTRY_POINT));
-    let hvm1_main = self.defs.get(&Name::new(HVM1_ENTRY_POINT));
+    let main = self.defs.get(&Name::from(ENTRY_POINT));
+    let hvm1_main = self.defs.get(&Name::from(HVM1_ENTRY_POINT));
     (custom, main, hvm1_main)
   }
 }

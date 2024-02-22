@@ -1,12 +1,15 @@
+use interner::global::{GlobalPool, GlobalString};
 use logos::{FilterResult, Lexer, Logos};
 use std::{fmt, num::ParseIntError};
+
+pub static STRINGS: GlobalPool<String> = GlobalPool::new();
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(error=LexingError)]
 #[logos(skip r"[ \t\n\f]+")]
 pub enum Token {
-  #[regex("[_.a-zA-Z][_.a-zA-Z0-9-]*", |lex| lex.slice().parse().ok())]
-  Name(String),
+  #[regex("[_.a-zA-Z][_.a-zA-Z0-9-]*", |lex| lex.slice().parse().ok().map(|s: String| STRINGS.get(s)))]
+  Name(GlobalString),
 
   #[regex("@|λ")]
   Lambda,
@@ -30,7 +33,7 @@ pub enum Token {
 
   #[regex(r#""([^"\\]|\\[tun"\\])*""#, |lex| normalized_string(lex).ok())]
   #[regex(r#"`([^`\\]|\\[tun`\\])*`"#, |lex| normalized_string(lex).ok())]
-  Str(String),
+  Str(GlobalString),
 
   #[regex(r#"'\\U[0-9a-fA-F]{1,8}'"#, normalized_char, priority = 2)]
   // Since '.' is just covering any ascii char, we need to make the
@@ -137,7 +140,7 @@ fn from_radix(radix: u32, lexer: &mut Lexer<Token>) -> Result<u64, ParseIntError
   u64::from_str_radix(slice, radix)
 }
 
-fn normalized_string(lexer: &mut Lexer<Token>) -> Result<String, ParseIntError> {
+fn normalized_string(lexer: &mut Lexer<Token>) -> Result<GlobalString, ParseIntError> {
   let slice = lexer.slice();
   let slice = &slice[1 .. slice.len() - 1];
 
@@ -166,7 +169,7 @@ fn normalized_string(lexer: &mut Lexer<Token>) -> Result<String, ParseIntError> 
       other => s.push(other),
     }
   }
-  Ok(s)
+  Ok(STRINGS.get(s))
 }
 
 #[derive(Default, Debug, PartialEq, Clone)]

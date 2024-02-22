@@ -113,7 +113,7 @@ fn make_match_case(
   // Create the subfunctions
   let mut next_cases = vec![];
   let next_ctrs = if next_type.is_var_type() {
-    vec![Pattern::Var(Some(Name::new("x")))]
+    vec![Pattern::Var(Some(Name::from("x")))]
   } else {
     next_type.ctrs(&book.adts)
   };
@@ -132,7 +132,7 @@ fn make_match_case(
   let (old_args, new_args) = args_from_match_path(&match_path);
 
   // Encode the current pattern matching, calling the subfunctions
-  let match_var = Name::new("x");
+  let match_var = Name::from("x");
   // The match term itself
   let term = encode_match(next_type, &match_var, next_cases.into_iter(), adt_encoding);
   // The calls to the args of previous matches
@@ -157,12 +157,12 @@ fn encode_match(
     // let (%fst, %snd) = x; (arm[0] %fst %snd)
     Type::Tup => Term::Let {
       pat: Pattern::Tup(
-        Box::new(Pattern::Var(Some(Name::new("%fst")))),
-        Box::new(Pattern::Var(Some(Name::new("%snd")))),
+        Box::new(Pattern::Var(Some(Name::from("%fst")))),
+        Box::new(Pattern::Var(Some(Name::from("%snd")))),
       ),
       val: Box::new(Term::Var { nam: match_var.clone() }),
-      nxt: Box::new(Term::call(arms.next().unwrap(), [Term::Var { nam: Name::new("%fst") }, Term::Var {
-        nam: Name::new("%snd"),
+      nxt: Box::new(Term::call(arms.next().unwrap(), [Term::Var { nam: Name::from("%fst") }, Term::Var {
+        nam: Name::from("%snd"),
       }])),
     },
     // match x {0: arm[0]; +: arm[1]}
@@ -268,10 +268,10 @@ fn args_from_match_path(match_path: &[Pattern]) -> (Vec<Name>, Vec<Name>) {
     .iter()
     .flat_map(|pat| pat.vars())
     .enumerate()
-    .map(|(i, _)| format!("%x{i}").into())
+    .map(|(i, _)| Name::new(format!("%x{i}")))
     .collect();
   let new_args: Vec<Name> = new_match
-    .map(|pat| pat.vars().enumerate().map(|(i, _)| format!("%y{i}").into()).collect())
+    .map(|pat| pat.vars().enumerate().map(|(i, _)| Name::new(format!("%y{i}"))).collect())
     .unwrap_or(vec![]);
   (old_args, new_args)
 }
@@ -280,7 +280,7 @@ fn args_from_match_path(match_path: &[Pattern]) -> (Vec<Name>, Vec<Name>) {
 
 /// Name for a variable to be substituted with the rule body.
 fn rule_body_subst_var(rule_idx: usize) -> Name {
-  format!("%rule_subst_{rule_idx}").into()
+  Name::new(format!("%rule_subst_{rule_idx}"))
 }
 
 /// Beta reduces a term.
