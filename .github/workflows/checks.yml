@@ -1,0 +1,62 @@
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry ~/.cargo/git target
+          key: ${{ runner.os }}-client-${{ hashFiles('**/Cargo.lock') }}
+      - run: RUSTFLAGS="-D warnings" cargo check --all-targets
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry ~/.cargo/git target
+          key: ${{ runner.os }}-client-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo test
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry ~/.cargo/git target
+          key: ${{ runner.os }}-client-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo clippy
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+      - uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry ~/.cargo/git target
+          key: ${{ runner.os }}-client-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo fmt --check
+  cspell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: streetsidesoftware/cspell-action@v5
+        with:
+          incremental_files_only: false
+          config: ./cspell.json
+          files: "**/*.rs **/*.md"

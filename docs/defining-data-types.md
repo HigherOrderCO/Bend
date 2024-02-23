@@ -15,7 +15,7 @@ data Option = (Some val) | None
 
 If the data type has a single constructor, it can be destructured using `let`:
 ```rs
-// A Box is a wrapper around a valuee.
+// A Box is a wrapper around a value.
 data Boxed = (Box val)
 
 let (Box value) = boxed; value

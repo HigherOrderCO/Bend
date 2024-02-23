@@ -260,7 +260,7 @@ fn switch_rule_submatch(
   let args = new_args.clone().chain(old_args).collect::<Vec<_>>();
 
   // Make the match cases of the nested submatch, filtering out the rules
-  // that don't match the crnt ctr.
+  // that don't match the current ctr.
   let rules =
     rules.iter().filter_map(|rule| switch_rule_submatch_arm(rule, ctr, nested_fields)).collect::<Vec<_>>();
 

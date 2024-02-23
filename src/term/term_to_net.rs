@@ -156,8 +156,8 @@ impl<'a> EncodeTermState<'a> {
           "Unbound variable {nam}. Expected this check to be already done"
         );
         let var_stack = &self.scope[nam];
-        let crnt_var = *var_stack.last().unwrap();
-        let (declare_port, use_port) = self.vars.get_mut(crnt_var).unwrap();
+        let cur_var = *var_stack.last().unwrap();
+        let (declare_port, use_port) = self.vars.get_mut(cur_var).unwrap();
         debug_assert!(use_port.is_none(), "Variable {nam} used more than once");
         self.inet.link(up, *declare_port);
         *use_port = Some(up);
