@@ -56,7 +56,7 @@ enum Mode {
     #[arg(short = 'm', long = "mem", help = "How much memory to allocate for the runtime", default_value = "1G", value_parser = mem_parser)]
     max_mem: u64,
 
-    #[arg(short = 'r', long = "rwts", help = "Maximium amount of rewrites", value_parser = mem_parser)]
+    #[arg(short = 'r', long = "rwts", help = "Maximum amount of rewrites", value_parser = mem_parser)]
     max_rwts: Option<u64>,
 
     #[arg(short = 'd', help = "Debug mode (print each reduction step)")]
