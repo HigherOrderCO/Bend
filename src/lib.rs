@@ -37,27 +37,56 @@ pub const HVM1_ENTRY_POINT: &str = "Main";
 /// These are the names of builtin defs that are not in the hvm-lang book, but
 /// are present in the hvm-core book. They are implemented using Rust code by
 /// [`create_host`] and they can not be rewritten as hvm-lang functions.
-pub const CORE_BUILTINS: [&str; 2] = ["HVM.log", "HVM.black_box"];
+pub const CORE_BUILTINS: [&str; 3] = ["HVM.log", "HVM.black_box", "HVM.print"];
 
 /// Creates a host with the hvm-core primitive definitions built-in.
 /// This needs the book as an Arc because the closure that logs
 /// data needs access to the book.
-pub fn create_host(hvml_book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOpts) -> Arc<Mutex<Host>> {
+pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOpts) -> Arc<Mutex<Host>> {
   let host = Arc::new(Mutex::new(Host::default()));
-  let host_clone = host.clone();
   host.lock().unwrap().insert_def(
     "HVM.log",
-    hvmc::host::DefRef::Owned(Box::new(LogDef::new(move |wire| {
-      let host = host_clone.lock().unwrap();
-      let tree = host.readback_tree(&wire);
-      let net = hvmc::ast::Net { root: tree, rdex: vec![] };
-      let net = hvmc_to_net(&net);
-      let (mut term, mut readback_errors) = net_to_term(&net, &hvml_book, &labels, false);
-      let resugar_errs = term.resugar_adts(&hvml_book, compile_opts.adt_encoding);
-      term.resugar_builtins();
+    hvmc::host::DefRef::Owned(Box::new(LogDef::new({
+      let host = host.clone();
+      let book = book.clone();
+      let labels = labels.clone();
+      move |wire| {
+        let host = host.lock().unwrap();
+        let tree = host.readback_tree(&wire);
+        let net = hvmc::ast::Net { root: tree, rdex: vec![] };
+        let net = hvmc_to_net(&net);
+        let (mut term, mut readback_errors) = net_to_term(&net, &book, &labels, false);
+        let resugar_errs = term.resugar_adts(&book, compile_opts.adt_encoding);
+        term.resugar_builtins();
 
-      readback_errors.extend(resugar_errs);
-      println!("{}{}", display_readback_errors(&readback_errors), term);
+        readback_errors.extend(resugar_errs);
+        println!("{}{}", display_readback_errors(&readback_errors), term);
+      }
+    }))),
+  );
+  host.lock().unwrap().insert_def(
+    "HVM.print",
+    hvmc::host::DefRef::Owned(Box::new(LogDef::new({
+      let host = host.clone();
+      let book = book.clone();
+      let labels = labels.clone();
+      move |wire| {
+        let host = host.lock().unwrap();
+        let tree = host.readback_tree(&wire);
+        let net = hvmc::ast::Net { root: tree, rdex: vec![] };
+        let net = hvmc_to_net(&net);
+        let (mut term, mut readback_errors) = net_to_term(&net, &book, &labels, false);
+        let resugar_errs = term.resugar_adts(&book, compile_opts.adt_encoding);
+        term.resugar_builtins();
+
+        readback_errors.extend(resugar_errs);
+        match term {
+          Term::Str { val } => {
+            println!("{}", val);
+          },
+          _ => (),
+        }
+      }
     }))),
   );
   let book = ast::Book::from_str("@HVM.black_box = (x x)").unwrap();
