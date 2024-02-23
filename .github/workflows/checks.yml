@@ -14,7 +14,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - uses: actions/cache@v2
         with:
-          path: ~/.cargo/registry ~/.cargo/git target
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
           key: ${{ runner.os }}-check-${{ hashFiles('**/Cargo.lock') }}
       - run: RUSTFLAGS="-D warnings" cargo check --all-targets
   test:
@@ -24,7 +27,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - uses: actions/cache@v2
         with:
-          path: ~/.cargo/registry ~/.cargo/git target
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
           key: ${{ runner.os }}-test-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo test
   clippy:
@@ -36,7 +42,10 @@ jobs:
           components: clippy
       - uses: actions/cache@v2
         with:
-          path: ~/.cargo/registry ~/.cargo/git target
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
           key: ${{ runner.os }}-clippy-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo clippy
   fmt:
@@ -46,10 +55,6 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
-      - uses: actions/cache@v2
-        with:
-          path: ~/.cargo/registry ~/.cargo/git target
-          key: ${{ runner.os }}-fmt-${{ hashFiles('**/Cargo.lock') }}
       - run: cargo fmt --check
   cspell:
     runs-on: ubuntu-latest
