@@ -55,8 +55,8 @@ pub fn pre_reduce_book(book: &mut Book, entrypoint: &str) -> Result<(), String> 
 
     // Move interactions with inert defs back into the net rdex array
     for def in host.defs.values() {
-      if let Some(def) = def.downcast_ref::<&Def<InertDef>>() {
-        let mut stored_redexes = def.data.data.0.lock().unwrap();
+      if let Some(def) = def.downcast_ref::<InertDef>() {
+        let mut stored_redexes = def.data.0.lock().unwrap();
         dispatch_dyn_net!(&mut rt => {
           rt.rdex.extend(core::mem::take(&mut *stored_redexes));
         })
