@@ -1,6 +1,6 @@
-use crate::term::{Book, Definition, Name, Pattern, Rule, Term};
+use crate::term::{Book, Definition, MatchNum, Name, Pattern, Rule, Term};
 use std::{
-  collections::{BTreeMap, HashSet},
+  collections::{BTreeMap, BTreeSet},
   ops::BitAnd,
 };
 
@@ -34,13 +34,13 @@ struct TermInfo<'d> {
   counter: u32,
   def_name: Name,
   builtin: bool,
-  needed_names: HashSet<Name>,
+  needed_names: BTreeSet<Name>,
   combinators: &'d mut Combinators,
 }
 
 impl<'d> TermInfo<'d> {
   fn new(def_name: Name, builtin: bool, combinators: &'d mut Combinators) -> Self {
-    Self { counter: 0, def_name, builtin, needed_names: HashSet::new(), combinators }
+    Self { counter: 0, def_name, builtin, needed_names: BTreeSet::new(), combinators }
   }
   fn request_name(&mut self, name: &Name) {
     self.needed_names.insert(name.clone());
@@ -56,11 +56,11 @@ impl<'d> TermInfo<'d> {
     self.needed_names.is_empty()
   }
 
-  fn replace_scope(&mut self, new_scope: HashSet<Name>) -> HashSet<Name> {
+  fn replace_scope(&mut self, new_scope: BTreeSet<Name>) -> BTreeSet<Name> {
     std::mem::replace(&mut self.needed_names, new_scope)
   }
 
-  fn merge_scope(&mut self, target: HashSet<Name>) {
+  fn merge_scope(&mut self, target: BTreeSet<Name>) {
     self.needed_names.extend(target);
   }
 
@@ -82,7 +82,7 @@ enum Detach {
   /// Can be detached freely
   Combinator,
   /// Can not be detached
-  Unscoped { lams: HashSet<Name>, vars: HashSet<Name> },
+  Unscoped { lams: BTreeSet<Name>, vars: BTreeSet<Name> },
   /// Should be detached to make the program not hang
   Recursive,
 }
@@ -117,8 +117,8 @@ impl BitAnd for Detach {
         lams.extend(rhs_lams);
         vars.extend(rhs_vars);
 
-        let res_lams: HashSet<_> = lams.difference(&vars).cloned().collect();
-        let res_vars: HashSet<_> = vars.difference(&lams).cloned().collect();
+        let res_lams: BTreeSet<_> = lams.difference(&vars).cloned().collect();
+        let res_vars: BTreeSet<_> = vars.difference(&lams).cloned().collect();
 
         if res_lams.is_empty() && res_vars.is_empty() {
           Detach::Combinator
@@ -141,7 +141,7 @@ impl BitAnd for Detach {
 impl Term {
   pub fn detach_combinators(&mut self, def_name: &Name, builtin: bool, combinators: &mut Combinators) {
     fn go_lam(term: &mut Term, depth: usize, term_info: &mut TermInfo) -> Detach {
-      let parent_scope = term_info.replace_scope(HashSet::new());
+      let parent_scope = term_info.replace_scope(BTreeSet::new());
 
       let (nam, bod, unscoped): (Option<&Name>, &mut Term, bool) = match term {
         Term::Lam { nam, bod, .. } => (nam.as_ref(), bod, false),
@@ -174,10 +174,10 @@ impl Term {
         Term::Chn { .. } => go_lam(term, depth, term_info),
 
         Term::App { fun, arg, .. } => {
-          let parent_scope = term_info.replace_scope(HashSet::new());
+          let parent_scope = term_info.replace_scope(BTreeSet::new());
 
           let fun_detach = go(fun, depth + 1, term_info);
-          let fun_scope = term_info.replace_scope(HashSet::new());
+          let fun_scope = term_info.replace_scope(BTreeSet::new());
 
           let arg_detach = go(arg, depth + 1, term_info);
           let arg_scope = term_info.replace_scope(parent_scope);
@@ -239,9 +239,9 @@ impl Term {
           for arg in args {
             detach = detach & go(arg, depth + 1, term_info);
           }
-          let parent_scope = term_info.replace_scope(HashSet::new());
+          let parent_scope = term_info.replace_scope(BTreeSet::new());
 
-          for rule in rules {
+          for rule in rules.iter_mut() {
             for pat in &rule.pats {
               debug_assert!(pat.is_detached_num_match());
             }
@@ -253,13 +253,51 @@ impl Term {
             };
 
             // It is expected that match arms were already linearized
-            println!("{:?}", term_info.needed_names);
-            // FIXME
-            debug_assert!(term_info.has_no_free_vars());
             detach = detach & arm_detach;
           }
 
-          term_info.replace_scope(parent_scope);
+          // This happens when a var is used in only one arm so it is not linearized
+          if !term_info.has_no_free_vars() {
+            for rule in rules {
+              let (arm_body, already_extracted) = match rule.pats[0] {
+                Pattern::Num(MatchNum::Zero) => (&mut rule.body, false),
+                _ => match &mut rule.body {
+                  Term::Lam { bod, .. } => (bod.as_mut(), false),
+                  Term::Ref { nam } => {
+                    let extracted = term_info.combinators.get_mut(nam).unwrap();
+                    let Term::Lam { ref mut bod, .. } = &mut extracted.rules[0].body else { unreachable!() };
+                    (bod.as_mut(), true)
+                  }
+                  _ => unreachable!(),
+                },
+              };
+
+              let term = std::mem::take(arm_body);
+
+              let body_vars = term.free_vars();
+
+              let term = term_info.needed_names.iter().rev().fold(term, |acc, arg| {
+                if body_vars.contains_key(arg) {
+                  Term::named_lam(arg.clone(), acc)
+                } else {
+                  Term::lam(None, acc)
+                }
+              });
+
+              *arm_body = term;
+              if !already_extracted {
+                term_info.detach_term(&mut rule.body);
+              }
+            }
+
+            let mat = std::mem::take(term);
+            *term = term_info
+              .needed_names
+              .iter()
+              .fold(mat, |acc, arg| Term::app(acc, Term::Var { nam: arg.clone() }));
+          }
+
+          term_info.merge_scope(parent_scope);
           detach
         }
         Term::Sup { fst, snd, .. } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {

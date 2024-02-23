@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/adt_option_and.hvm
 ---
-λa match a { (Some b): λc (match c { (Some d): λe (Some (e, d)); (None): λ* None } b); (None): λ* None }
+λa λb match a { (Some c): match b { (Some d): (Some (c, d)); (None): None }; (None): None }

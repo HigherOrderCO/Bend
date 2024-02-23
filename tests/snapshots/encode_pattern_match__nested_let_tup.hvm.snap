@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/nested_let_tup.hvm
 ---
 TaggedScott:
-(main) = let (k, l) = let (b, c) = (10, ((1, ((2, 3), 4)), 3)); (let (d, *) = c; λ* d b); (let (m, *) = l; λ* let (s, *) = m; s k)
+(main) = let (*, k) = let (*, c) = (10, ((1, ((2, 3), 4)), 3)); let (d, *) = c; d; let (l, *) = k; let (q, *) = l; q
 
 Scott:
-(main) = let (k, l) = let (b, c) = (10, ((1, ((2, 3), 4)), 3)); (let (d, *) = c; λ* d b); (let (m, *) = l; λ* let (s, *) = m; s k)
-
-
+(main) = let (*, k) = let (*, c) = (10, ((1, ((2, 3), 4)), 3)); let (d, *) = c; d; let (l, *) = k; let (q, *) = l; q

@@ -3,21 +3,19 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/flatten_era_pat.hvm
 ---
 TaggedScott:
-(Fn1) = λa λb (let (c, d) = a; λe (let (f, *) = d; λ* λ* f c e) b)
+(Fn1) = λa λ* let (*, d) = a; let (e, *) = d; e
 
-(Fn2) = λa let (b, c) = a; (let (d, e) = c; λf (let (g, *) = e; λ* λ* g f d) b)
+(Fn2) = λa let (*, c) = a; let (*, e) = c; let (f, *) = e; f
 
-(Fn3) = λa λb (let (c, d) = a; λe (match c { 0: λ* λ* 0; +: λi λ* λ* i } d e) b)
+(Fn3) = λa λb let (c, d) = a; (match c { 0: λ* λ* 0; +: λh λ* λ* h } d b)
 
 (main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)
 
 Scott:
-(Fn1) = λa λb (let (c, d) = a; λe (let (f, *) = d; λ* λ* f c e) b)
+(Fn1) = λa λ* let (*, d) = a; let (e, *) = d; e
 
-(Fn2) = λa let (b, c) = a; (let (d, e) = c; λf (let (g, *) = e; λ* λ* g f d) b)
+(Fn2) = λa let (*, c) = a; let (*, e) = c; let (f, *) = e; f
 
-(Fn3) = λa λb (let (c, d) = a; λe (match c { 0: λ* λ* 0; +: λi λ* λ* i } d e) b)
+(Fn3) = λa λb let (c, d) = a; (match c { 0: λ* λ* 0; +: λh λ* λ* h } d b)
 
 (main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)
-
-
