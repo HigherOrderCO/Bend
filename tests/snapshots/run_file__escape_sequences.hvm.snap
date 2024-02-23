@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/escape_sequences.hvm
+---
+At tests/golden_tests/run_file/escape_sequences.hvm:11:47: found '<InvalidCharacter>' expected '(', '#', '$', <Name>, '[', '{', 'λ', 'let', 'match', or '*'
+[0m  11 |   ((String.from_list ['\n', '\r', '\t', '\0', [4m[31m'[0m\"', '\'', '\uAFE'])[0m
