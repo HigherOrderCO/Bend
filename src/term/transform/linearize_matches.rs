@@ -5,7 +5,7 @@ use crate::{
 };
 use indexmap::IndexSet;
 use itertools::Itertools;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 impl Ctx<'_> {
   /// Linearizes the variables between match cases, transforming them into combinators when possible.
@@ -78,12 +78,31 @@ pub fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
   let Term::Mat { args: _, rules } = match_term else { unreachable!() };
   // Collect the vars.
   // We need consistent iteration order.
-  let free_vars: BTreeSet<Name> = rules
-    .iter()
-    .flat_map(|r| {
-      r.body.free_vars().into_keys().filter(|k| !r.pats.iter().flat_map(|p| p.binds()).contains(k))
-    })
-    .collect();
+
+  let mut acc: BTreeMap<Name, u64> = BTreeMap::new();
+  rules.iter().for_each(|r| {
+    let fvs = r.body.free_vars().into_iter();
+    for (k, v) in fvs {
+      if !r.pats.iter().flat_map(|p| p.binds()).contains(&k) {
+        match acc.entry(k) {
+          std::collections::btree_map::Entry::Occupied(mut o) => *o.get_mut() += v,
+          std::collections::btree_map::Entry::Vacant(vc) => {
+            vc.insert(v);
+          }
+        };
+      }
+    }
+  });
+  let free_vars: BTreeSet<Name> = acc.into_iter().filter(|(_, v)| *v >= 2).map(|(k, _)| k).collect();
+
+  // panic!("{acc:?}");
+
+  // let free_vars: BTreeSet<Name> = rules
+  //   .iter()
+  //   .flat_map(|r| {
+  //     r.body.free_vars().into_keys().filter(|k| !r.pats.iter().flat_map(|p| p.binds()).contains(k))
+  //   })
+  //   .collect();
 
   // Add lambdas to the arms
   for rule in rules {

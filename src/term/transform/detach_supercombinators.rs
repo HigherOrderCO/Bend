@@ -253,8 +253,9 @@ impl Term {
             };
 
             // It is expected that match arms were already linearized
+            println!("{:?}", term_info.needed_names);
+            // FIXME
             debug_assert!(term_info.has_no_free_vars());
-
             detach = detach & arm_detach;
           }
 
