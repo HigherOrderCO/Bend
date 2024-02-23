@@ -1,7 +1,7 @@
 use super::Rule;
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
-  term::{num_to_name, term_to_net::Labels, Book, MatchNum, Name, Op, Pattern, Tag, Term},
+  term::{num_to_name, term_to_net::Labels, Book, Name, NumCtr, Op, Pattern, Tag, Term},
 };
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -396,7 +396,7 @@ impl Term {
   /// Creates a new [`Term::Match`] from the given terms.
   /// If `scrutinee` is not a `Term::Var`, creates a let binding containing the match in its body
   fn new_native_match(arg: Self, zero_term: Self, mut succ_label: Option<Name>, mut succ_term: Self) -> Self {
-    let zero = Rule { pats: vec![Pattern::Num(MatchNum::Zero)], body: zero_term };
+    let zero = Rule { pats: vec![Pattern::Num(NumCtr::Num(0))], body: zero_term };
 
     if let Term::Var { nam } = &arg {
       if let Some(label) = &succ_label {
@@ -405,7 +405,7 @@ impl Term {
         succ_label = Some(new_label);
       }
 
-      let succ = Rule { pats: vec![Pattern::Num(MatchNum::Succ(Some(succ_label)))], body: succ_term };
+      let succ = Rule { pats: vec![Pattern::Num(NumCtr::Succ(1, Some(succ_label)))], body: succ_term };
       Term::Mat { args: vec![arg], rules: vec![zero, succ] }
     } else {
       match succ_label {
@@ -416,7 +416,7 @@ impl Term {
           succ_term.subst(&succ, &Term::Var { nam: new_label.clone() });
           succ_label = Some(new_label);
 
-          let succ = Rule { pats: vec![Pattern::Num(MatchNum::Succ(Some(succ_label)))], body: succ_term };
+          let succ = Rule { pats: vec![Pattern::Num(NumCtr::Succ(1, Some(succ_label)))], body: succ_term };
 
           Term::Let {
             pat: Pattern::Var(Some(match_bind.clone())),
@@ -425,7 +425,7 @@ impl Term {
           }
         }
         None => {
-          let succ = Rule { pats: vec![Pattern::Num(MatchNum::Succ(None))], body: succ_term };
+          let succ = Rule { pats: vec![Pattern::Num(NumCtr::Succ(1, None))], body: succ_term };
 
           Term::Mat { args: vec![arg], rules: vec![zero, succ] }
         }

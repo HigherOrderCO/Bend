@@ -1,11 +1,12 @@
+use indexmap::IndexSet;
 use itertools::Itertools;
 
 use crate::{
   diagnostics::Info,
   term::{
-    check::type_check::infer_type,
+    check::type_check::infer_match_arg_type,
     transform::encode_pattern_matching::{ExhaustivenessErr, MatchErr},
-    Adts, Constructors, Ctx, Definition, MatchNum, Name, Pattern, Rule, Term, Type,
+    Adts, Constructors, Ctx, Definition, Name, NumCtr, Pattern, Rule, Term, Type,
   },
 };
 
@@ -101,16 +102,15 @@ fn simplify_match_expression(
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, MatchErr> {
-  let fst_row_irrefutable = matches!(infer_type(&rules[0].pats, ctrs), Ok(Type::Any));
-  let fst_col_type = infer_type(rules.iter().map(|r| &r.pats[0]), ctrs)?;
+  let fst_row_irrefutable = rules[0].pats.iter().all(|p| p.is_wildcard());
+  let fst_col_type = infer_match_arg_type(rules, 0, ctrs)?;
 
   if fst_row_irrefutable {
     irrefutable_fst_row_rule(args, rules, ctrs, adts)
   } else if fst_col_type == Type::Any {
     var_rule(args, rules, ctrs, adts)
   } else {
-    let adt_ctrs = fst_col_type.ctrs(adts);
-    switch_rule(args, rules, adt_ctrs, ctrs, adts)
+    switch_rule(args, rules, fst_col_type, ctrs, adts)
   }
 }
 
@@ -202,22 +202,63 @@ fn var_rule(args: &[Term], rules: &[Rule], ctrs: &Constructors, adts: &Adts) -> 
 fn switch_rule(
   args: &[Term],
   rules: &[Rule],
-  adt_ctrs: Vec<Pattern>,
+  typ: Type,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, MatchErr> {
   let mut new_rules = vec![];
+
+  let adt_ctrs = match typ {
+    Type::Num => {
+      // Since numbers have infinite (2^60) constructors, they require special treatment.
+      let mut ctrs = IndexSet::new();
+      for rule in rules {
+        ctrs.insert(rule.pats[0].clone());
+        if rule.pats[0].is_wildcard() {
+          break;
+        }
+      }
+
+      Vec::from_iter(ctrs)
+    }
+    _ => typ.ctrs(adts),
+  };
+
+  // Check valid number match
+  match typ {
+    Type::Num => {
+      // Number match without + must have a default case
+      if !rules.iter().any(|r| r.pats[0].is_wildcard()) {
+        return Err(MatchErr::NotExhaustive(ExhaustivenessErr(vec![Name::from("+")])));
+      }
+    }
+    Type::NumSucc(exp) => {
+      // Number match with + can't have number larger than that in the +
+      // TODO: could be just a warning.
+      for rule in rules {
+        if let Pattern::Num(NumCtr::Num(got)) = rule.pats[0]
+          && got >= exp
+        {
+          return Err(MatchErr::MalformedNumSucc(
+            rule.pats[0].clone(),
+            Pattern::Num(NumCtr::Succ(exp, None)),
+          ));
+        }
+      }
+    }
+    _ => (),
+  }
+
   for ctr in adt_ctrs {
     // Create the matched constructor and the name of the bound variables.
     let Term::Var { nam: arg_nam } = &args[0] else { unreachable!() };
     let nested_fields = switch_rule_nested_fields(arg_nam, &ctr);
-    let matched_ctr = switch_rule_matched_ctr(ctr, &nested_fields);
+    let matched_ctr = switch_rule_matched_ctr(ctr.clone(), &nested_fields);
     let mut body = switch_rule_submatch(args, rules, &matched_ctr, &nested_fields)?;
     body.simplify_matches(ctrs, adts)?;
     let pats = vec![matched_ctr];
     new_rules.push(Rule { pats, body });
   }
-
   let term = Term::Mat { args: vec![args[0].clone()], rules: new_rules };
   Ok(term)
 }
@@ -281,11 +322,12 @@ fn switch_rule_submatch_arm(rule: &Rule, ctr: &Pattern, nested_fields: &[Option<
     // match x ... {(Ctr p0_0...) ...: Body; ...}
     // becomes
     // match x {(Ctr x%field0 ...): match x1 ... {p0_0 ...: Body; ...}; ...}
-    let mut pats = if let Pattern::Num(MatchNum::Succ(Some(var))) = &rule.pats[0] {
+    let mut pats = match &rule.pats[0] {
       // Since the variable in the succ ctr is not a nested pattern, we need this special case.
-      vec![Pattern::Var(var.clone())]
-    } else {
-      rule.pats[0].children().cloned().collect::<Vec<_>>()
+      Pattern::Num(NumCtr::Succ(_, Some(var))) => vec![Pattern::Var(var.clone())],
+      // Similarly for the default case in a num match
+      Pattern::Var(var) => vec![Pattern::Var(var.clone())],
+      _ => rule.pats[0].children().cloned().collect::<Vec<_>>()
     };
     if pats.is_empty() {
       // We say that a unit variant always has an unused wildcard nested

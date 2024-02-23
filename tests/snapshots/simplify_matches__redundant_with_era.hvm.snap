@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/redundant_with_era.hvm
 ---
-(Fn2) = λa λb (match a { 0: λc (match c { (e, f): λg (match f { (*, i): λ* λ* i } g e) } *); +m: λn (match n { (o, p): λq (match p { (*, s): λ* λ* s } q o) } m) } b)
+(Fn2) = λa λb (match a { 0: λc (match c { (e, f): λg (match f { (*, i): λ* λ* i } g e) } *); 1+m: λn (match n { (o, p): λq (match p { (*, s): λ* λ* s } q o) } m) } b)
 
 (main) = *

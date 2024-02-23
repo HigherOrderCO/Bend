@@ -4,7 +4,7 @@ Node = λx0 λx1 #Tree λl #Tree λn (n x0 x1)
 
 swap = λn match n {
   0: λx0 λx1 (Node x0 x1)
-  +: λx0 λx1 (Node x1 x0)
+  1+: λx0 λx1 (Node x1 x0)
 }
 
 warp = λa
@@ -43,7 +43,7 @@ sort = λa
 
 gen = λn match n {
   0: λx (Leaf x)
-  +: λx (Node (gen n-1 (* x 2)) (gen n-1 (+ (* x 2) 1)))
+  1+: λx (Node (gen n-1 (* x 2)) (gen n-1 (+ (* x 2) 1)))
 }
 
 rev = λa

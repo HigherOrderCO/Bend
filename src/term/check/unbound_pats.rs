@@ -59,7 +59,6 @@ impl Pattern {
         }
         Pattern::Lst(args) => args.iter().for_each(|arg| check.push(arg)),
         Pattern::Var(_) | Pattern::Num(_) => {}
-        Pattern::Err => unreachable!(),
       }
     }
     unbounds

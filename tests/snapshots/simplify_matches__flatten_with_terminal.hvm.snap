@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/flatten_with_terminal.hvm
 ---
-(Foo) = λa λb (match a { 0: λc match c { (A e): match e { (B): B } }; +*: λ* * } b)
+(Foo) = λa λb (match a { 0: λc match c { (A e): match e { (B): B } }; *: λ* * } b)
 
 (main) = (Foo 2 (A B))
 

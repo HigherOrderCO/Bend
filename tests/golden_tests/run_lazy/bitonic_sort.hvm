@@ -4,7 +4,7 @@ data Error = Err
 // Atomic Swapper
 (Swap n a b) = match n {
   0: (Both a b)
-  +: (Both b a)
+  1+: (Both b a)
 }
 
 // Swaps distant values in parallel; corresponds to a Red Box
@@ -31,7 +31,7 @@ data Error = Err
 // Generates a tree of depth `n`
 (Gen n x) = match n {
   0: (Leaf x)
-  +: (Both (Gen n-1 (* x 2)) (Gen n-1 (+ (* x 2) 1)))
+  1+: (Both (Gen n-1 (* x 2)) (Gen n-1 (+ (* x 2) 1)))
 }
 
 // Reverses a tree

@@ -1,0 +1,25 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/match_num_pred.hvm
+---
+TaggedScott:
+(pred) = λa match a { 0: 0; 1+: λc c }
+
+(pred2) = λa match a { 0: 0; 1+: λc match c { 0: 0; 1+: λe e } }
+
+(pred3) = λa match a { 0: 0; 1+: λc match c { 0: 0; 1+: λe match e { 0: 0; 1+: λg g } } }
+
+(pred4) = λa match a { 0: 0; 1+: λc match c { 0: 0; 1+: λe match e { 0: 0; 1+: λg match g { 0: 0; 1+: λi (- (+ i 4) 4) } } } }
+
+(main) = *
+
+Scott:
+(pred) = λa match a { 0: 0; 1+: λc c }
+
+(pred2) = λa match a { 0: 0; 1+: λc match c { 0: 0; 1+: λe e } }
+
+(pred3) = λa match a { 0: 0; 1+: λc match c { 0: 0; 1+: λe match e { 0: 0; 1+: λg g } } }
+
+(pred4) = λa match a { 0: 0; 1+: λc match c { 0: 0; 1+: λe match e { 0: 0; 1+: λg match g { 0: 0; 1+: λi (- (+ i 4) 4) } } } }
+
+(main) = *

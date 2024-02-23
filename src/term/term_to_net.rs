@@ -1,6 +1,6 @@
 use crate::{
   net::{INet, NodeKind::*, Port, ROOT},
-  term::{Book, MatchNum, Name, Op, Pattern, Tag, Term},
+  term::{Book, Name, NumCtr, Op, Pattern, Tag, Term},
 };
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -108,8 +108,8 @@ impl<'a> EncodeTermState<'a> {
       Term::Mat { args, rules } => {
         // At this point should be only simple num matches.
         let arg = args.iter().next().unwrap();
-        debug_assert!(matches!(rules[0].pats[..], [Pattern::Num(MatchNum::Zero)]));
-        debug_assert!(matches!(rules[1].pats[..], [Pattern::Num(MatchNum::Succ(None))]));
+        debug_assert!(matches!(rules[0].pats[..], [Pattern::Num(NumCtr::Num(0))]));
+        debug_assert!(matches!(rules[1].pats[..], [Pattern::Num(NumCtr::Succ(1, None))]));
 
         let if_ = self.inet.new_node(Mat);
 

@@ -90,7 +90,6 @@ impl Pattern {
         snd.encode_builtins();
       }
       Pattern::Var(..) | Pattern::Num(..) => {}
-      Pattern::Err => unreachable!(),
     }
   }
 

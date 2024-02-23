@@ -1,7 +1,7 @@
 use super::encode_pattern_matching::MatchErr;
 use crate::{
   diagnostics::Info,
-  term::{check::type_check::infer_type, Constructors, Ctx, Name, Pattern, Term, Type},
+  term::{Ctx, Name, Pattern, Term},
 };
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
@@ -36,6 +36,7 @@ impl Term {
             lift_match_vars(self, lift_all_vars);
           }
         }
+        linearize_match_free_vars(self);
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {

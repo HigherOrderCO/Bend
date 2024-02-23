@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/match_num_succ_complex.hvm
+---
+[[5, 5, 0, 0, 0, 6], [5, 5, 0, 0, 0, 6], [5, 5, 0, 0, 0, 6]]

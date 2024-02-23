@@ -55,7 +55,7 @@ impl Term {
         }
         for rule in rules {
           for pat in &rule.pats {
-            debug_assert!(pat.is_detached_num_match());
+            debug_assert!(pat.is_native_num_match());
           }
           rule.body.eta_reduction();
         }
