@@ -134,12 +134,16 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, 
   ctx.book.desugar_implicit_match_binds();
 
   ctx.check_ctrs_arities()?;
-  // Must be between [`Book::desugar_implicit_match_binds`] and [`Ctx::linearize_simple_matches`]
+  // Must be between [`Book::desugar_implicit_match_binds`] and [`Ctx::linearize_matches`]
   ctx.check_unbound_vars()?;
 
   ctx.book.convert_match_def_to_term();
   ctx.simplify_matches()?;
-  ctx.linearize_simple_matches()?;
+
+  if !matches!(opts.linearize_matches, OptLevel::Disabled) {
+    ctx.linearize_matches()?;
+  }
+
   ctx.book.encode_simple_matches(opts.adt_encoding);
 
   // sanity check
@@ -155,8 +159,8 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, 
   if opts.eta {
     ctx.book.eta_reduction();
   }
-  if opts.supercombinators {
-    ctx.book.detach_supercombinators();
+  if opts.lift_combinators {
+    ctx.book.lift_combinators(matches!(opts.linearize_matches, OptLevel::Extra));
   }
   if opts.ref_to_ref {
     ctx.simplify_ref_to_ref()?;
@@ -332,6 +336,14 @@ impl RunOpts {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
+pub enum OptLevel {
+  #[default]
+  Disabled,
+  Enabled,
+  Extra,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
 pub struct CompileOpts {
   /// Selects the encoding for the ADT syntax.
   pub adt_encoding: AdtEncoding,
@@ -348,8 +360,11 @@ pub struct CompileOpts {
   /// Enables [hvmc_net::pre_reduce].
   pub pre_reduce: bool,
 
-  /// Enables [term::transform::detach_supercombinators].
-  pub supercombinators: bool,
+  /// Enables [term::transform::linearize_matches].
+  pub linearize_matches: OptLevel,
+
+  /// Enables [term::transform::lift_combinators].
+  pub lift_combinators: bool,
 
   /// Enables [term::transform::simplify_main_ref].
   pub simplify_main: bool,
@@ -369,11 +384,12 @@ impl CompileOpts {
       ref_to_ref: true,
       prune: true,
       pre_reduce: true,
-      supercombinators: true,
+      lift_combinators: true,
       simplify_main: true,
       merge: true,
       inline: true,
       adt_encoding: Default::default(),
+      linearize_matches: OptLevel::Extra,
     }
   }
 
@@ -387,23 +403,26 @@ impl CompileOpts {
     Self { adt_encoding: self.adt_encoding, ..Self::default() }
   }
 
-  /// All optimizations disabled, except detach supercombinators.
+  /// All optimizations disabled, except lift_combinators and linearize_matches
   pub fn light() -> Self {
-    Self { supercombinators: true, ..Self::default() }
+    Self { lift_combinators: true, linearize_matches: OptLevel::Extra, ..Self::default() }
   }
 
   // Disable optimizations that don't work or are unnecessary on lazy mode
   pub fn lazy_mode(&mut self) {
-    self.supercombinators = false;
+    self.lift_combinators = false;
+    if let OptLevel::Extra = self.linearize_matches {
+      self.linearize_matches = OptLevel::Enabled;
+    }
     self.pre_reduce = false;
   }
 }
 
 impl CompileOpts {
   pub fn check(&self, lazy_mode: bool) {
-    if !self.supercombinators && !lazy_mode {
+    if !self.lift_combinators && !lazy_mode {
       println!(
-        "Warning: Running in strict mode without enabling the supercombinators pass can lead to some functions expanding infinitely."
+        "Warning: Running in strict mode without enabling the lift_combinators pass can lead to some functions expanding infinitely."
       );
     }
   }

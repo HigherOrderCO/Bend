@@ -8,7 +8,7 @@
 | `-Oref-to-ref` `-Ono-ref-to-ref` | Disabled | [ref-to-ref](#ref-to-ref) |
 | `-Oprune` `-Ono-prune` | Disabled | [definition-pruning](#definition-pruning) |
 | `-Opre-reduce` `-Ono-pre-reduce` | Disabled | [pre-reduce](#pre-reduce) |
-| `-Osupercombinators` `-Ono-supercombinators` | Enabled  | [supercombinators](#supercombinators) |
+| `-Olift_combinators` `-Ono-lift_combinators` | Enabled  | [lift-combinators](#lift-combinators) |
 | `-Osimplify-main` `-Ono-simplify-main` | Disabled | [simplify-main](#simplify-main) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
 | `-Oinline` `-Ono-inline` | Disabled | [inline](#inline) |
@@ -134,7 +134,7 @@ main = (bar)
 @main = @bar
 ```
 
-## Supercombinators
+## Lift-Combinators
 
 Extracts closed terms to new definitions. See [lazy definitions](lazy-definitions#automatic-optimization).
 Since HVM-Core is an eager runtime, this pass is enabled by default to prevent infinite expansions.

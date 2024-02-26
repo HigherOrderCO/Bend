@@ -9,12 +9,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 impl Ctx<'_> {
   /// Linearizes the variables between match cases, transforming them into combinators when possible.
-  pub fn linearize_simple_matches(&mut self) -> Result<(), Info> {
+  pub fn linearize_matches(&mut self) -> Result<(), Info> {
     self.info.start_pass();
 
     for (def_name, def) in self.book.defs.iter_mut() {
       for rule in def.rules.iter_mut() {
-        let res = rule.body.linearize_simple_matches(&self.book.ctrs);
+        let res = rule.body.linearize_matches(&self.book.ctrs);
         self.info.take_err(res, Some(def_name));
       }
     }
@@ -24,11 +24,11 @@ impl Ctx<'_> {
 }
 
 impl Term {
-  fn linearize_simple_matches(&mut self, ctrs: &Constructors) -> Result<(), MatchErr> {
+  fn linearize_matches(&mut self, ctrs: &Constructors) -> Result<(), MatchErr> {
     match self {
       Term::Mat { args: _, rules } => {
         for rule in rules.iter_mut() {
-          rule.body.linearize_simple_matches(ctrs).unwrap();
+          rule.body.linearize_matches(ctrs).unwrap();
         }
         let matched_type = infer_type(rules.iter().map(|r| &r.pats[0]), ctrs)?;
         match matched_type {
@@ -40,7 +40,7 @@ impl Term {
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.linearize_simple_matches(ctrs)?;
+        bod.linearize_matches(ctrs)?;
       }
 
       Term::Let { pat: Pattern::Var(..), val: fst, nxt: snd }
@@ -49,8 +49,8 @@ impl Term {
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. }
       | Term::App { fun: fst, arg: snd, .. } => {
-        fst.linearize_simple_matches(ctrs)?;
-        snd.linearize_simple_matches(ctrs)?;
+        fst.linearize_matches(ctrs)?;
+        snd.linearize_matches(ctrs)?;
       }
 
       Term::Lst { .. } => unreachable!(),
@@ -84,25 +84,12 @@ pub fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
     let fvs = r.body.free_vars().into_iter();
     for (k, v) in fvs {
       if !r.pats.iter().flat_map(|p| p.binds()).contains(&k) {
-        match acc.entry(k) {
-          std::collections::btree_map::Entry::Occupied(mut o) => *o.get_mut() += v,
-          std::collections::btree_map::Entry::Vacant(vc) => {
-            vc.insert(v);
-          }
-        };
+        // Counts the number of arms that the var is used
+        *acc.entry(k).or_insert(0) += u64::min(v, 1);
       }
     }
   });
   let free_vars: BTreeSet<Name> = acc.into_iter().filter(|(_, v)| *v >= 2).map(|(k, _)| k).collect();
-
-  // panic!("{acc:?}");
-
-  // let free_vars: BTreeSet<Name> = rules
-  //   .iter()
-  //   .flat_map(|r| {
-  //     r.body.free_vars().into_keys().filter(|k| !r.pats.iter().flat_map(|p| p.binds()).contains(k))
-  //   })
-  //   .collect();
 
   // Add lambdas to the arms
   for rule in rules {
