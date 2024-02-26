@@ -421,7 +421,7 @@ impl CompileOpts {
   // Disable optimizations that don't work or are unnecessary on lazy mode
   pub fn lazy_mode(&mut self) {
     self.lift_combinators = false;
-    if let OptLevel::Extra = self.linearize_matches {
+    if self.linearize_matches.is_extra() {
       self.linearize_matches = OptLevel::Enabled;
     }
     self.pre_reduce = false;
