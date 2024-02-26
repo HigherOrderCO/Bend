@@ -306,8 +306,8 @@ impl OptArgs {
     let mut opts = CompileOpts::light();
     for arg in args {
       match arg {
-        All => opts = CompileOpts::heavy(),
-        NoAll => opts = CompileOpts::default(),
+        All => opts = opts.set_all(),
+        NoAll => opts = opts.set_no_all(),
         Eta => opts.eta = true,
         NoEta => opts.eta = false,
         Prune => opts.prune = true,

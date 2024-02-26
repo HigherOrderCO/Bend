@@ -377,6 +377,16 @@ impl CompileOpts {
     }
   }
 
+  /// Set all opts as true and keep the current adt encoding.
+  pub fn set_all(self) -> Self {
+    Self { adt_encoding: self.adt_encoding, ..Self::heavy() }
+  }
+
+  /// Set all opts as false and keep the current adt encoding.
+  pub fn set_no_all(self) -> Self {
+    Self { adt_encoding: self.adt_encoding, ..Self::default() }
+  }
+
   /// All optimizations disabled, except detach supercombinators.
   pub fn light() -> Self {
     Self { supercombinators: true, ..Self::default() }
