@@ -16,7 +16,7 @@ pub fn nets_to_hvmc(nets: HashMap<String, INet>) -> Result<Book, String> {
 
 /// Convert an inet-encoded definition into an hvmc AST inet.
 pub fn net_to_hvmc(inet: &INet) -> Result<Net, String> {
-  let (net_root, redxs) = get_tree_roots(inet)?;
+  let (net_root, redexes) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(net_root) = net_root {
     // If there is a root tree connected to the root node
@@ -27,7 +27,7 @@ pub fn net_to_hvmc(inet: &INet) -> Result<Net, String> {
     Tree::Var { nam: num_to_name(0) }
   };
   let mut rdex = vec![];
-  for [root0, root1] in redxs {
+  for [root0, root1] in redexes {
     let rdex0 = net_tree_to_hvmc_tree(inet, root0, &mut port_to_var_id);
     let rdex1 = net_tree_to_hvmc_tree(inet, root1, &mut port_to_var_id);
     rdex.push((rdex0, rdex1));
@@ -99,7 +99,7 @@ type VarId = NodeId;
 /// Returns them as the root of the root tree and the active pairs of the net.
 /// Active pairs are found by a right-to-left, depth-first search.
 fn get_tree_roots(inet: &INet) -> Result<(Option<NodeId>, Vec<[NodeId; 2]>), String> {
-  let mut redx_roots: Vec<[NodeId; 2]> = vec![];
+  let mut redex_roots: Vec<[NodeId; 2]> = vec![];
   let mut movements: Vec<Movement> = vec![];
   let mut root_set = HashSet::from([ROOT.node()]);
   let mut explored_nodes = vec![false; inet.nodes.len()];
@@ -124,12 +124,12 @@ fn get_tree_roots(inet: &INet) -> Result<(Option<NodeId>, Vec<[NodeId; 2]>), Str
     match movement {
       Movement::Down(node_id) => explore_down_link(inet, node_id, &mut explored_nodes, &mut movements),
       Movement::Side(node_id) => {
-        explore_side_link(inet, node_id, &mut movements, &mut redx_roots, &mut root_set)?;
+        explore_side_link(inet, node_id, &mut movements, &mut redex_roots, &mut root_set)?;
       }
     }
   }
 
-  Ok((root_tree_root, redx_roots))
+  Ok((root_tree_root, redex_roots))
 }
 
 enum Movement {
@@ -164,7 +164,7 @@ fn explore_side_link(
   inet: &INet,
   node_id: NodeId,
   movements: &mut Vec<Movement>,
-  redx_roots: &mut Vec<[NodeId; 2]>,
+  redex_roots: &mut Vec<[NodeId; 2]>,
   root_set: &mut HashSet<NodeId>,
 ) -> Result<(), String> {
   let new_roots = go_up_tree(inet, node_id)?;
@@ -172,7 +172,7 @@ fn explore_side_link(
   if !root_set.contains(&new_roots[0]) && !root_set.contains(&new_roots[1]) {
     movements.push(Movement::Down(new_roots[0]));
     movements.push(Movement::Down(new_roots[1]));
-    redx_roots.push(new_roots);
+    redex_roots.push(new_roots);
     root_set.insert(new_roots[0]);
     root_set.insert(new_roots[1]);
   }
@@ -183,18 +183,18 @@ fn explore_side_link(
 /// Returns the active pair at the root of this tree.
 fn go_up_tree(inet: &INet, start_node: NodeId) -> Result<[NodeId; 2], String> {
   let mut explored_nodes = HashSet::new();
-  let mut crnt_node = start_node;
+  let mut cur_node = start_node;
   loop {
-    if !explored_nodes.insert(crnt_node) {
+    if !explored_nodes.insert(cur_node) {
       return Err("Found term that compiles into an inet with a vicious cycle".to_string());
     }
 
-    let up = inet.enter_port(Port(crnt_node, 0));
+    let up = inet.enter_port(Port(cur_node, 0));
 
     if up.slot() == 0 || up == ROOT {
-      return Ok([up.node(), crnt_node]);
+      return Ok([up.node(), cur_node]);
     }
 
-    crnt_node = up.node();
+    cur_node = up.node();
   }
 }

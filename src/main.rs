@@ -56,7 +56,7 @@ enum Mode {
     #[arg(short = 'm', long = "mem", help = "How much memory to allocate for the runtime", default_value = "1G", value_parser = mem_parser)]
     max_mem: u64,
 
-    #[arg(short = 'r', long = "rwts", help = "Maximium amount of rewrites", value_parser = mem_parser)]
+    #[arg(short = 'r', long = "rwts", help = "Maximum amount of rewrites", value_parser = mem_parser)]
     max_rwts: Option<u64>,
 
     #[arg(short = 'd', help = "Debug mode (print each reduction step)")]
@@ -195,7 +195,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
     Mode::Desugar { path, comp_opts } => {
       let opts = OptArgs::opts_from_cli(&comp_opts);
       let mut book = load_book(&path)?;
-      // TODO: Shoudn't the desugar have `warn_opts` too? maybe WarningOpts::allow_all() by default
+      // TODO: Shouldn't the desugar have `warn_opts` too? maybe WarningOpts::allow_all() by default
       let _warns = desugar_book(&mut book, opts)?;
       println!("{}", book);
     }
@@ -264,9 +264,9 @@ impl CliWarnOpts {
     let matches = cmd.get_matches();
 
     let subcmd_name = matches.subcommand_name().expect("To have a subcommand");
-    let argm = matches.subcommand_matches(subcmd_name).expect("To have a subcommand");
+    let arg_matches = matches.subcommand_matches(subcmd_name).expect("To have a subcommand");
 
-    if let Some(wopts_id_seq) = argm.get_many::<clap::Id>("CliWarnOpts") {
+    if let Some(wopts_id_seq) = arg_matches.get_many::<clap::Id>("CliWarnOpts") {
       let allows = &mut self.allows.into_iter();
       let denies = &mut self.denies.into_iter();
       let warns = &mut self.warns.into_iter();

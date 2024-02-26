@@ -32,7 +32,7 @@ A superposition `{a b}` compiles to a Constructor node too. The difference here 
 Additionally, nodes have labels. We use the label to store data in the node's memory, which can be used for various purposes.
 
 ```
-  0 - Points to the sup occurence          0 - Points to the duplicated value
+  0 - Points to the sup occurrence         0 - Points to the duplicated value
   |                                        |
   # Superposition                          # Duplication
  / \                                      / \

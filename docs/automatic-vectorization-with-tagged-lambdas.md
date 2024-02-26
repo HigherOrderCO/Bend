@@ -5,7 +5,7 @@ We have seen in [Dups and Sups](dups-and-sups.md) that duplications and superpos
 Tagged applications will only annihilate lambdas with the same tag.
 ```rs
 
-// V appllication's tag
+// V application's tag
   #A(#A λx(body) arg)
 //    ^ lambda's tag
 // The tag must go before the term.
