@@ -118,7 +118,7 @@ main = (id also_id)
 
 ## Pre-reduce
 
-Normalizes all functions except main, dereferencing definitions in active positions, and solving annihilations and commutations. It does not reduce [builtin definitions](builtin_defs), such as `HVM.log`.
+Normalizes all functions except main, dereferencing definitions in active positions, and solving annihilations and commutations. It does not reduce [builtin definitions](builtin-defs.md), such as `HVM.log`.
 
 Example:
 ```rs

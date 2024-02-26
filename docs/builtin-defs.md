@@ -27,9 +27,34 @@ Reached Root
 
 This will happen whenever there are free variables inside the logged term, or [scopeless lambdas](using-scopeless-lambdas.md) which bind variables that are used outside the logged term.
 
+## `HVM.print`
+
+This is very similar to `HVM.log`. However, it can only log strings. It prints these strings directly to stdout, without wrapping them in quotes or escaping them.
+
+With `HVM.log`:
+```rs
+main = (HVM.log "Hi" "Hello world")
+
+// Program output:
+"Hi"
+"Hello world"
+```
+However, with `HVM.print`:
+```rs
+main = (HVM.print "Hi" "Hello world")
+
+// Program output:
+Hi
+"Hello world"
+```
+
+This can be very useful, for example, to print strings with newlines in multiple lines.
+
+When the first argument is not a string `HVM.print` returns the second argument and no side effects are produced (In other words, it fails silently).
+
 ## `HVM.black_box`
 
-`HVM.black_box` is simply the identity function, but it does not get [pre-reduced](compiler-options#pre-reduce). This makes it possible to prevent some redexes from getting pre-reduced. 
+`HVM.black_box` is simply the identity function, but it does not get [pre-reduced](compiler-options.md#pre-reduce). This makes it possible to prevent some redexes from getting pre-reduced. 
 
 Example without `HVM.black_box`
 ```rs
