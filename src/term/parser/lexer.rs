@@ -31,15 +31,15 @@ pub enum Token {
   #[regex("[0-9][0-9a-zA-Z_]*", |lex| from_radix(10, lex))]
   Num(u64),
 
-  #[regex(r#""([^"\\]|\\[tun"\\])*""#, |lex| normalized_string(lex).ok())]
-  #[regex(r#"`([^`\\]|\\[tun`\\])*`"#, |lex| normalized_string(lex).ok())]
+  #[regex(r#""([^"\\]|\\[0tunr'"\\])*""#, |lex| normalized_string(lex).ok())]
+  #[regex(r#"`([^`\\]|\\[0tunr`'"\\])*`"#, |lex| normalized_string(lex).ok())]
   Str(GlobalString),
 
   #[regex(r#"'\\U[0-9a-fA-F]{1,8}'"#, normalized_char, priority = 2)]
   // Since '.' is just covering any ascii char, we need to make the
   // regex match any possible character of the unicode general category
   #[regex(
-    r#"'(\p{L}|\p{M}|\p{N}|\p{P}|\p{S}|\p{Z}|\p{C}|\p{Emoji}|\\u[0-9a-fA-F]{1,4}|\\[tn'])'"#,
+    r#"'(\p{L}|\p{M}|\p{N}|\p{P}|\p{S}|\p{Z}|\p{C}|\p{Emoji}|\\u[0-9a-fA-F]{1,4}|\\[0tunr`'"\\])'"#,
     normalized_char
   )]
   Char(u64),
@@ -140,38 +140,6 @@ fn from_radix(radix: u32, lexer: &mut Lexer<Token>) -> Result<u64, ParseIntError
   u64::from_str_radix(slice, radix)
 }
 
-fn normalized_string(lexer: &mut Lexer<Token>) -> Result<GlobalString, ParseIntError> {
-  let slice = lexer.slice();
-  let slice = &slice[1 .. slice.len() - 1];
-
-  let mut s = String::new();
-  let chars = &mut slice.chars();
-
-  while let Some(char) = chars.next() {
-    match char {
-      '\\' => match chars.next() {
-        Some('\\') => s.push('\\'),
-        Some('\"') => s.push('\"'),
-        Some('n') => s.push('\n'),
-        Some('t') => s.push('\t'),
-        Some('u') | Some('U') => {
-          let hex = chars.take(8).collect::<String>();
-          let hex_val = u32::from_str_radix(&hex, 16)?;
-          let char = char::from_u32(hex_val).unwrap_or(char::REPLACEMENT_CHARACTER);
-          s.push(char);
-        }
-        Some(other) => {
-          s.push('\\');
-          s.push(other);
-        }
-        None => s.push('\\'),
-      },
-      other => s.push(other),
-    }
-  }
-  Ok(STRINGS.get(s))
-}
-
 #[derive(Default, Debug, PartialEq, Clone)]
 pub enum LexingError {
   UnclosedComment,
@@ -227,20 +195,61 @@ fn comment(lexer: &mut Lexer<'_, Token>) -> FilterResult<(), LexingError> {
   FilterResult::Skip
 }
 
+fn normalized_string(lexer: &mut Lexer<Token>) -> Result<GlobalString, ParseIntError> {
+  let slice = lexer.slice();
+  let slice = &slice[1 .. slice.len() - 1];
+
+  let mut s = String::new();
+  let chars = &mut slice.chars();
+
+  while let Some(char) = chars.next() {
+    match char {
+      '\\' => match chars.next() {
+        Some('\\') => s.push('\\'),
+        Some('`') => s.push('`'),
+        Some('\'') => s.push('\''),
+        Some('\"') => s.push('\"'),
+        Some('n') => s.push('\n'),
+        Some('r') => s.push('\r'),
+        Some('t') => s.push('\t'),
+        Some('u') | Some('U') => {
+          let hex = chars.take(8).collect::<String>();
+          let hex_val = u32::from_str_radix(&hex, 16)?;
+          let char = char::from_u32(hex_val).unwrap_or(char::REPLACEMENT_CHARACTER);
+          s.push(char);
+        }
+        Some('0') => s.push('\0'),
+        Some(other) => {
+          s.push('\\');
+          s.push(other);
+        }
+        None => s.push('\\'),
+      },
+      other => s.push(other),
+    }
+  }
+  Ok(STRINGS.get(s))
+}
+
 fn normalized_char(lexer: &mut Lexer<Token>) -> Option<u64> {
   let slice = lexer.slice();
   let slice = &slice[1 .. slice.len() - 1];
   let chars = &mut slice.chars();
   let c = match chars.next()? {
     '\\' => match chars.next() {
-      Some('n') => '\n',
-      Some('t') => '\t',
+      Some('\\') => '\\',
+      Some('`') => '`',
+      Some('\"') => '\"',
       Some('\'') => '\'',
+      Some('n') => '\n',
+      Some('r') => '\r',
+      Some('t') => '\t',
       Some('u') | Some('U') => {
         let hex = chars.take(8).collect::<String>();
         let hex_val = u32::from_str_radix(&hex, 16).unwrap();
         char::from_u32(hex_val).unwrap_or(char::REPLACEMENT_CHARACTER)
       }
+      Some('0') => '\0',
       Some(..) => return None,
       None => '\\',
     },
