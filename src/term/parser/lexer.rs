@@ -32,14 +32,14 @@ pub enum Token {
   Num(u64),
 
   #[regex(r#""([^"\\]|\\[0tunr'"\\])*""#, |lex| normalized_string(lex).ok())]
-  #[regex(r#"`([^`\\]|\\[0tunr`"\\])*`"#, |lex| normalized_string(lex).ok())]
+  #[regex(r#"`([^`\\]|\\[0tunr`'"\\])*`"#, |lex| normalized_string(lex).ok())]
   Str(GlobalString),
 
   #[regex(r#"'\\U[0-9a-fA-F]{1,8}'"#, normalized_char, priority = 2)]
   // Since '.' is just covering any ascii char, we need to make the
   // regex match any possible character of the unicode general category
   #[regex(
-    r#"'(\p{L}|\p{M}|\p{N}|\p{P}|\p{S}|\p{Z}|\p{C}|\p{Emoji}|\\u[0-9a-fA-F]{1,4}|\\[0tunr'"\\])'"#,
+    r#"'(\p{L}|\p{M}|\p{N}|\p{P}|\p{S}|\p{Z}|\p{C}|\p{Emoji}|\\u[0-9a-fA-F]{1,4}|\\[0tunr`'"\\])'"#,
     normalized_char
   )]
   Char(u64),
@@ -206,6 +206,7 @@ fn normalized_string(lexer: &mut Lexer<Token>) -> Result<GlobalString, ParseIntE
     match char {
       '\\' => match chars.next() {
         Some('\\') => s.push('\\'),
+        Some('`') => s.push('`'),
         Some('\'') => s.push('\''),
         Some('\"') => s.push('\"'),
         Some('n') => s.push('\n'),
@@ -237,11 +238,12 @@ fn normalized_char(lexer: &mut Lexer<Token>) -> Option<u64> {
   let c = match chars.next()? {
     '\\' => match chars.next() {
       Some('\\') => '\\',
+      Some('`') => '`',
       Some('\"') => '\"',
+      Some('\'') => '\'',
       Some('n') => '\n',
       Some('r') => '\r',
       Some('t') => '\t',
-      Some('\'') => '\'',
       Some('u') | Some('U') => {
         let hex = chars.take(8).collect::<String>();
         let hex_val = u32::from_str_radix(&hex, 16).unwrap();

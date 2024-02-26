@@ -8,5 +8,5 @@ String.from_list (List.cons x xs) = (String.cons x (String.from_list xs))
 (Join (List.cons x xs)) = (Concat x (Join xs))
 
 main =
-  ((String.from_list ['\n', '\r', '\t', '\0', '\"', '\'', '\uAFE'])
-  , (Join ["\n", "\r", "\t", "\0", "\"", "\'", "\uAFE"]))
+  ((String.from_list ['\n', '\r', '\t', '\0', '\"', '\'', '\uAFE', '\`'])
+  , (Join ["\n", "\r", "\t", "\0", "\"", "\'", "\uAFE", `\``]))
