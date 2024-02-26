@@ -1,0 +1,6 @@
+Map f xs = match xs {
+ List.nil: List.nil
+ (List.cons x xs): (List.cons (f x) (Map f xs))
+}
+
+main = (Map @a a [1 2 3])

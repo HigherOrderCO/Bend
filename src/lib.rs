@@ -83,7 +83,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOp
         match term {
           Term::Str { val } => {
             println!("{}", val);
-          },
+          }
           _ => (),
         }
       }
@@ -140,8 +140,8 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, 
   ctx.book.convert_match_def_to_term();
   ctx.simplify_matches()?;
 
-  if !matches!(opts.linearize_matches, OptLevel::Disabled) {
-    ctx.linearize_matches()?;
+  if opts.linearize_matches.enabled() {
+    ctx.linearize_matches(opts.linearize_matches.is_extra())?;
   }
 
   ctx.book.encode_simple_matches(opts.adt_encoding);
@@ -160,7 +160,7 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, 
     ctx.book.eta_reduction();
   }
   if opts.lift_combinators {
-    ctx.book.lift_combinators(matches!(opts.linearize_matches, OptLevel::Extra));
+    ctx.book.lift_combinators();
   }
   if opts.ref_to_ref {
     ctx.simplify_ref_to_ref()?;
@@ -341,6 +341,16 @@ pub enum OptLevel {
   Disabled,
   Enabled,
   Extra,
+}
+
+impl OptLevel {
+  pub fn enabled(&self) -> bool {
+    !matches!(self, OptLevel::Disabled)
+  }
+
+  pub fn is_extra(&self) -> bool {
+    matches!(self, OptLevel::Extra)
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default)]

@@ -9,12 +9,12 @@ use std::collections::{BTreeMap, BTreeSet};
 
 impl Ctx<'_> {
   /// Linearizes the variables between match cases, transforming them into combinators when possible.
-  pub fn linearize_matches(&mut self) -> Result<(), Info> {
+  pub fn linearize_matches(&mut self, linearize_extra: bool) -> Result<(), Info> {
     self.info.start_pass();
 
     for (def_name, def) in self.book.defs.iter_mut() {
       for rule in def.rules.iter_mut() {
-        let res = rule.body.linearize_matches(&self.book.ctrs);
+        let res = rule.body.linearize_matches(&self.book.ctrs, linearize_extra);
         self.info.take_err(res, Some(def_name));
       }
     }
@@ -24,23 +24,23 @@ impl Ctx<'_> {
 }
 
 impl Term {
-  fn linearize_matches(&mut self, ctrs: &Constructors) -> Result<(), MatchErr> {
+  fn linearize_matches(&mut self, ctrs: &Constructors, linearize_extra: bool) -> Result<(), MatchErr> {
     match self {
       Term::Mat { args: _, rules } => {
         for rule in rules.iter_mut() {
-          rule.body.linearize_matches(ctrs).unwrap();
+          rule.body.linearize_matches(ctrs, linearize_extra).unwrap();
         }
         let matched_type = infer_type(rules.iter().map(|r| &r.pats[0]), ctrs)?;
         match matched_type {
-          Type::Num | Type::Tup | Type::Any => _ = linearize_match_free_vars(self),
+          Type::Num | Type::Tup | Type::Any => _ = linearize_match_free_vars(self, linearize_extra),
           Type::Adt(_) => {
-            linearize_match_free_vars(self);
+            linearize_match_free_vars(self, linearize_extra);
           }
         }
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.linearize_matches(ctrs)?;
+        bod.linearize_matches(ctrs, linearize_extra)?;
       }
 
       Term::Let { pat: Pattern::Var(..), val: fst, nxt: snd }
@@ -49,8 +49,8 @@ impl Term {
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. }
       | Term::App { fun: fst, arg: snd, .. } => {
-        fst.linearize_matches(ctrs)?;
-        snd.linearize_matches(ctrs)?;
+        fst.linearize_matches(ctrs, linearize_extra)?;
+        snd.linearize_matches(ctrs, linearize_extra)?;
       }
 
       Term::Lst { .. } => unreachable!(),
@@ -74,22 +74,28 @@ impl Term {
 
 /// Converts free vars inside the match arms into lambdas with applications to give them the external value.
 /// Makes the rules extractable and linear (no need for dups when variable used in both rules)
-pub fn linearize_match_free_vars(match_term: &mut Term) -> &mut Term {
+pub fn linearize_match_free_vars(match_term: &mut Term, linearize_extra: bool) -> &mut Term {
   let Term::Mat { args: _, rules } = match_term else { unreachable!() };
+
+  let free = rules.iter().flat_map(|rule| {
+    rule.body.free_vars().into_iter().filter(|(name, _)| !rule.pats.iter().any(|p| p.binds().contains(name)))
+  });
+
   // Collect the vars.
   // We need consistent iteration order.
-
-  let mut acc: BTreeMap<Name, u64> = BTreeMap::new();
-  rules.iter().for_each(|r| {
-    let fvs = r.body.free_vars().into_iter();
-    for (k, v) in fvs {
-      if !r.pats.iter().flat_map(|p| p.binds()).contains(&k) {
-        // Counts the number of arms that the var is used
-        *acc.entry(k).or_insert(0) += u64::min(v, 1);
-      }
-    }
-  });
-  let free_vars: BTreeSet<Name> = acc.into_iter().filter(|(_, v)| *v >= 2).map(|(k, _)| k).collect();
+  let free_vars: BTreeSet<Name> = if linearize_extra {
+    free.map(|(name, _)| name).collect()
+  } else {
+    free
+      .fold(BTreeMap::new(), |mut acc, (name, count)| {
+        *acc.entry(name).or_insert(0) += count.min(1);
+        acc
+      })
+      .into_iter()
+      .filter(|(_, count)| *count >= 2)
+      .map(|(name, _)| name)
+      .collect()
+  };
 
   // Add lambdas to the arms
   for rule in rules {

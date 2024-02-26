@@ -201,7 +201,7 @@ fn simplify_matches() {
     ctx.check_ctrs_arities()?;
     ctx.check_unbound_vars()?;
     ctx.simplify_matches()?;
-    ctx.linearize_matches()?;
+    ctx.linearize_matches(true)?;
     ctx.check_unbound_vars()?;
     ctx.book.make_var_names_unique();
     ctx.book.linearize_vars();
@@ -239,7 +239,7 @@ fn encode_pattern_match() {
       ctx.check_ctrs_arities()?;
       ctx.check_unbound_vars()?;
       ctx.simplify_matches()?;
-      ctx.linearize_matches()?;
+      ctx.linearize_matches(true)?;
       ctx.book.encode_simple_matches(adt_encoding);
       ctx.check_unbound_vars()?;
       ctx.book.make_var_names_unique();

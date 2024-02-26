@@ -1,4 +1,4 @@
-use crate::term::{Book, Definition, MatchNum, Name, Pattern, Rule, Term};
+use crate::term::{Book, Definition, Name, Rule, Term};
 use std::{
   collections::{BTreeMap, BTreeSet},
   ops::BitAnd,
@@ -7,7 +7,7 @@ use std::{
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
 impl Book {
-  pub fn lift_combinators(&mut self, lift_matches: bool) {
+  pub fn lift_combinators(&mut self) {
     let mut combinators = Combinators::new();
 
     for (def_name, def) in self.defs.iter_mut() {
@@ -17,7 +17,7 @@ impl Book {
 
       let builtin = def.builtin;
       let rule = def.rule_mut();
-      rule.body.lift_combinators(def_name, lift_matches, builtin, &mut combinators);
+      rule.body.lift_combinators(def_name, builtin, &mut combinators);
     }
 
     // Definitions are not inserted to the book as they are defined to appease the borrow checker.
@@ -33,15 +33,15 @@ struct TermInfo<'d> {
   // Number of times a Term has been detached from the current Term
   counter: u32,
   def_name: Name,
-  lift_matches: bool,
+
   builtin: bool,
   needed_names: BTreeSet<Name>,
   combinators: &'d mut Combinators,
 }
 
 impl<'d> TermInfo<'d> {
-  fn new(def_name: Name, lift_matches: bool, builtin: bool, combinators: &'d mut Combinators) -> Self {
-    Self { counter: 0, def_name, lift_matches, builtin, needed_names: BTreeSet::new(), combinators }
+  fn new(def_name: Name, builtin: bool, combinators: &'d mut Combinators) -> Self {
+    Self { counter: 0, def_name, builtin, needed_names: BTreeSet::new(), combinators }
   }
   fn request_name(&mut self, name: &Name) {
     self.needed_names.insert(name.clone());
@@ -140,14 +140,8 @@ impl BitAnd for Detach {
 }
 
 impl Term {
-  pub fn lift_combinators(
-    &mut self,
-    def_name: &Name,
-    lift_matches: bool,
-    builtin: bool,
-    combinators: &mut Combinators,
-  ) {
-    self.go_lift(0, &mut TermInfo::new(def_name.clone(), lift_matches, builtin, combinators));
+  pub fn lift_combinators(&mut self, def_name: &Name, builtin: bool, combinators: &mut Combinators) {
+    self.go_lift(0, &mut TermInfo::new(def_name.clone(), builtin, combinators));
   }
 
   fn go_lift(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
@@ -287,41 +281,6 @@ impl Term {
       };
 
       detach = detach & arm_detach;
-    }
-
-    // This happens when a var is used in only one arm so it is not linearized
-    if term_info.lift_matches && !term_info.has_no_free_vars() {
-      for rule in rules {
-        let (arm_body, already_extracted) = match rule.pats[0] {
-          Pattern::Num(MatchNum::Zero) => (&mut rule.body, false),
-          _ => match &mut rule.body {
-            Term::Lam { bod, .. } => (bod.as_mut(), false),
-            Term::Ref { nam } => {
-              let extracted = term_info.combinators.get_mut(nam).unwrap();
-              let Term::Lam { ref mut bod, .. } = &mut extracted.rules[0].body else { unreachable!() };
-              (bod.as_mut(), true)
-            }
-            _ => unreachable!(),
-          },
-        };
-
-        let term = std::mem::take(arm_body);
-
-        let body_vars = term.free_vars();
-
-        let term = term_info.needed_names.iter().rev().fold(term, |acc, arg| {
-          if body_vars.contains_key(arg) { Term::named_lam(arg.clone(), acc) } else { Term::lam(None, acc) }
-        });
-
-        *arm_body = term;
-        if !already_extracted {
-          term_info.detach_term(&mut rule.body);
-        }
-      }
-
-      let mat = std::mem::take(self);
-      *self =
-        term_info.needed_names.iter().fold(mat, |acc, arg| Term::app(acc, Term::Var { nam: arg.clone() }));
     }
 
     term_info.merge_scope(parent_scope);
