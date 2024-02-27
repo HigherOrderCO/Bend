@@ -11,5 +11,3 @@ Scott:
 (cheese) = let {a a_2} = (+ 2 3); (match a { 0: λ* 653323; +: λd λe (+ e d) } a_2)
 
 (main) = cheese
-
-

@@ -15,5 +15,3 @@ Scott:
 (Main) = (Foo (Pair 1 5))
 
 (Pair) = λa λb λc (c a b)
-
-

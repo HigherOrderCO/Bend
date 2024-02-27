@@ -8,7 +8,8 @@
 | `-Oref-to-ref` `-Ono-ref-to-ref` | Disabled | [ref-to-ref](#ref-to-ref) |
 | `-Oprune` `-Ono-prune` | Disabled | [definition-pruning](#definition-pruning) |
 | `-Opre-reduce` `-Ono-pre-reduce` | Disabled | [pre-reduce](#pre-reduce) |
-| `-Osupercombinators` `-Ono-supercombinators` | Enabled  | [supercombinators](#supercombinators) |
+| `-Olinearize-matches` `-Olinearize-matches-extra` `-Ono-linearize-matches` | Extra  | [linearize-matches](#linearize-matches) |
+| `-Ofloat_combinators` `-Ono-float_combinators` | Enabled  | [float-combinators](#float-combinators) |
 | `-Osimplify-main` `-Ono-simplify-main` | Disabled | [simplify-main](#simplify-main) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
 | `-Oinline` `-Ono-inline` | Disabled | [inline](#inline) |
@@ -134,7 +135,30 @@ main = (bar)
 @main = @bar
 ```
 
-## Supercombinators
+## linearize-matches
+
+Linearizes the variables between match cases, transforming them into combinators when possible.  
+When the `linearize-matches` option is used, linearizes only vars that are used in more than one arm.
+
+Example:
+```rs
+λa λb match a { 0: b; +: b }
+
+// Is transformed to
+λa λb (match a { 0: λc c; +: λd d } b)
+```
+
+When the `linearize-matches-extra` option is used, linearizes all vars used in the arms.
+
+example:
+```rs
+λa λb λc match a { 0: b; +: c }
+
+// Is transformed to
+λa λb λc (match a { 0: λd λ* d; +: λ* λe e } b c)
+```
+
+## float-combinators
 
 Extracts closed terms to new definitions. See [lazy definitions](lazy-definitions#automatic-optimization).
 Since HVM-Core is an eager runtime, this pass is enabled by default to prevent infinite expansions.

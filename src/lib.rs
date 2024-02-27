@@ -83,7 +83,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOp
         match term {
           Term::Str { val } => {
             println!("{}", val);
-          },
+          }
           _ => (),
         }
       }
@@ -134,12 +134,16 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, 
   ctx.book.desugar_implicit_match_binds();
 
   ctx.check_ctrs_arities()?;
-  // Must be between [`Book::desugar_implicit_match_binds`] and [`Ctx::linearize_simple_matches`]
+  // Must be between [`Book::desugar_implicit_match_binds`] and [`Ctx::linearize_matches`]
   ctx.check_unbound_vars()?;
 
   ctx.book.convert_match_def_to_term();
   ctx.simplify_matches()?;
-  ctx.linearize_simple_matches()?;
+
+  if opts.linearize_matches.enabled() {
+    ctx.linearize_simple_matches(opts.linearize_matches.is_extra())?;
+  }
+
   ctx.book.encode_simple_matches(opts.adt_encoding);
 
   // sanity check
@@ -155,8 +159,8 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, 
   if opts.eta {
     ctx.book.eta_reduction();
   }
-  if opts.supercombinators {
-    ctx.book.detach_supercombinators();
+  if opts.float_combinators {
+    ctx.book.float_combinators();
   }
   if opts.ref_to_ref {
     ctx.simplify_ref_to_ref()?;
@@ -332,6 +336,24 @@ impl RunOpts {
 }
 
 #[derive(Clone, Copy, Debug, Default)]
+pub enum OptLevel {
+  #[default]
+  Disabled,
+  Enabled,
+  Extra,
+}
+
+impl OptLevel {
+  pub fn enabled(&self) -> bool {
+    !matches!(self, OptLevel::Disabled)
+  }
+
+  pub fn is_extra(&self) -> bool {
+    matches!(self, OptLevel::Extra)
+  }
+}
+
+#[derive(Clone, Copy, Debug, Default)]
 pub struct CompileOpts {
   /// Selects the encoding for the ADT syntax.
   pub adt_encoding: AdtEncoding,
@@ -348,8 +370,11 @@ pub struct CompileOpts {
   /// Enables [hvmc_net::pre_reduce].
   pub pre_reduce: bool,
 
-  /// Enables [term::transform::detach_supercombinators].
-  pub supercombinators: bool,
+  /// Enables [term::transform::linearize_matches].
+  pub linearize_matches: OptLevel,
+
+  /// Enables [term::transform::float_combinators].
+  pub float_combinators: bool,
 
   /// Enables [term::transform::simplify_main_ref].
   pub simplify_main: bool,
@@ -369,11 +394,12 @@ impl CompileOpts {
       ref_to_ref: true,
       prune: true,
       pre_reduce: true,
-      supercombinators: true,
+      float_combinators: true,
       simplify_main: true,
       merge: true,
       inline: true,
       adt_encoding: Default::default(),
+      linearize_matches: OptLevel::Extra,
     }
   }
 
@@ -387,24 +413,34 @@ impl CompileOpts {
     Self { adt_encoding: self.adt_encoding, ..Self::default() }
   }
 
-  /// All optimizations disabled, except detach supercombinators.
+  /// All optimizations disabled, except float_combinators and linearize_matches
   pub fn light() -> Self {
-    Self { supercombinators: true, ..Self::default() }
+    Self { float_combinators: true, linearize_matches: OptLevel::Extra, ..Self::default() }
   }
 
   // Disable optimizations that don't work or are unnecessary on lazy mode
   pub fn lazy_mode(&mut self) {
-    self.supercombinators = false;
+    self.float_combinators = false;
+    if self.linearize_matches.is_extra() {
+      self.linearize_matches = OptLevel::Enabled;
+    }
     self.pre_reduce = false;
   }
 }
 
 impl CompileOpts {
   pub fn check(&self, lazy_mode: bool) {
-    if !self.supercombinators && !lazy_mode {
-      println!(
-        "Warning: Running in strict mode without enabling the supercombinators pass can lead to some functions expanding infinitely."
-      );
+    if !lazy_mode {
+      if !self.float_combinators {
+        println!(
+          "Warning: Running in strict mode without enabling the float_combinators pass can lead to some functions expanding infinitely."
+        );
+      }
+      if !self.linearize_matches.enabled() {
+        println!(
+          "Warning: Running in strict mode without enabling the linearize_matches pass can lead to some functions expanding infinitely."
+        );
+      }
     }
   }
 }

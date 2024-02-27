@@ -7,5 +7,3 @@ TaggedScott:
 
 Scott:
 (main) = let (k, l) = let (b, c) = (10, ((1, ((2, 3), 4)), 3)); (let (d, *) = c; λ* d b); (let (m, *) = l; λ* let (s, *) = m; s k)
-
-

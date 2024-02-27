@@ -11,5 +11,3 @@ Scott:
 (go) = λa let (b, c) = a; (let (d, e) = c; λf (let (g, h) = e; λi λj (let (k, l) = h; λm λn λo (+ (+ (+ (+ l k) o) n) m) i j g) f d) b)
 
 (main) = (go (1, (2, (3, (4, 5)))))
-
-

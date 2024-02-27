@@ -4,7 +4,7 @@ use hvml::{
   diagnostics::Info,
   load_file_to_book, run_book,
   term::{display::display_readback_errors, AdtEncoding, Book, Name},
-  CompileOpts, RunInfo, RunOpts, WarnState, WarningOpts,
+  CompileOpts, OptLevel, RunInfo, RunOpts, WarnState, WarningOpts,
 };
 use std::{
   path::{Path, PathBuf},
@@ -38,7 +38,7 @@ enum Mode {
       value_delimiter = ' ',
       action = clap::ArgAction::Append,
       long_help = r#"Enables or disables the given optimizations
-      supercombinators is enabled by default."#,
+      float_combinators is enabled by default on strict mode."#,
     )]
     comp_opts: Vec<OptArgs>,
 
@@ -82,7 +82,7 @@ enum Mode {
       value_delimiter = ' ',
       action = clap::ArgAction::Append,
       long_help = r#"Enables or disables the given optimizations
-      supercombinators is enabled by default."#,
+      float_combinators is enabled by default on strict mode."#,
     )]
     comp_opts: Vec<OptArgs>,
 
@@ -91,12 +91,15 @@ enum Mode {
   },
   /// Runs the lambda-term level desugaring passes.
   Desugar {
+    #[arg(short = 'L', help = "Lazy mode")]
+    lazy_mode: bool,
+
     #[arg(
       short = 'O',
       value_delimiter = ' ',
       action = clap::ArgAction::Append,
       long_help = r#"Enables or disables the given optimizations
-      supercombinators is enabled by default."#,
+      float_combinators is enabled by default on strict mode."#,
     )]
     comp_opts: Vec<OptArgs>,
 
@@ -185,15 +188,18 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
       let mut opts = OptArgs::opts_from_cli(&comp_opts);
 
       if lazy_mode {
-        opts.lazy_mode()
+        opts.lazy_mode();
       }
 
       let mut book = load_book(&path)?;
       let compiled = compile_book(&mut book, opts)?;
       println!("{}", compiled.display_with_warns(warning_opts)?);
     }
-    Mode::Desugar { path, comp_opts } => {
-      let opts = OptArgs::opts_from_cli(&comp_opts);
+    Mode::Desugar { path, comp_opts, lazy_mode } => {
+      let mut opts = OptArgs::opts_from_cli(&comp_opts);
+      if lazy_mode {
+        opts.lazy_mode();
+      }
       let mut book = load_book(&path)?;
       // TODO: Shouldn't the desugar have `warn_opts` too? maybe WarningOpts::allow_all() by default
       let _warns = desugar_book(&mut book, opts)?;
@@ -221,7 +227,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
 
       if lazy_mode {
         single_core = true;
-        opts.lazy_mode()
+        opts.lazy_mode();
       }
 
       let book = load_book(&path)?;
@@ -288,8 +294,11 @@ pub enum OptArgs {
   NoRefToRef,
   PreReduce,
   NoPreReduce,
-  Supercombinators,
-  NoSupercombinators,
+  LinearizeMatches,
+  LinearizeMatchesExtra,
+  NoLinearizeMatches,
+  FloatCombinators,
+  NoFloatCombinators,
   SimplifyMain,
   NoSimplifyMain,
   Merge,
@@ -316,16 +325,21 @@ impl OptArgs {
         NoRefToRef => opts.ref_to_ref = false,
         PreReduce => opts.pre_reduce = true,
         NoPreReduce => opts.pre_reduce = false,
-        Supercombinators => opts.supercombinators = true,
-        NoSupercombinators => opts.supercombinators = false,
+        FloatCombinators => opts.float_combinators = true,
+        NoFloatCombinators => opts.float_combinators = false,
         SimplifyMain => opts.simplify_main = true,
         NoSimplifyMain => opts.simplify_main = false,
         Merge => opts.merge = true,
         NoMerge => opts.merge = false,
         Inline => opts.inline = true,
         NoInline => opts.inline = false,
+
         AdtScott => opts.adt_encoding = AdtEncoding::Scott,
         AdtTaggedScott => opts.adt_encoding = AdtEncoding::TaggedScott,
+
+        LinearizeMatches => opts.linearize_matches = OptLevel::Enabled,
+        LinearizeMatchesExtra => opts.linearize_matches = OptLevel::Extra,
+        NoLinearizeMatches => opts.linearize_matches = OptLevel::Disabled,
       }
     }
     opts
