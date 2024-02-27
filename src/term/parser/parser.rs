@@ -405,26 +405,27 @@ where
       .map(Pattern::Lst)
       .boxed();
 
-    let num = any()
+    let num_val = any()
       .filter(|t| matches!(t, Token::Num(_)))
       .map(|t| {
         let Token::Num(n) = t else { unreachable!() };
         n
-      })
-      .labelled("<Num>");
+      });
 
-    let num_pat = num.map(|n| Pattern::Num(NumCtr::Num(n)));
+    let num = num_val.map(|n| Pattern::Num(NumCtr::Num(n))).labelled("<Num>");
 
-    let succ_pat = num
+    let succ = num_val
       .then_ignore(just(Token::Add))
       .then(name_or_era().or_not())
       .map(|(num, nam)| Pattern::Num(NumCtr::Succ(num, nam)))
       .labelled("<Num>+")
       .boxed();
 
-    let chr_pat = select!(Token::Char(c) => Pattern::Num(NumCtr::Num(c))).labelled("<Char>").boxed();
+    let chr = select!(Token::Char(c) => Pattern::Num(NumCtr::Num(c))).labelled("<Char>").boxed();
 
-    choice((succ_pat, num_pat, chr_pat, var, ctr, list, tup))
+    let str = select!(Token::Str(s) => Pattern::Str(s)).labelled("<String>").boxed();
+
+    choice((succ, num, chr, str, var, ctr, list, tup))
   })
 }
 

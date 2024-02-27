@@ -66,7 +66,7 @@ impl Pattern {
             to_check.push(el);
           }
         }
-        Pattern::Var(..) | Pattern::Num(..) => {}
+        Pattern::Var(..) | Pattern::Num(..) | Pattern::Str(_) => {}
       }
     }
     Ok(())

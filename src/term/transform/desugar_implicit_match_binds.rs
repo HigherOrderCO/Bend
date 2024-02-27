@@ -52,7 +52,8 @@ impl Term {
                   *p = Some(Some(Name::new(format!("{nam}-{n}"))));
                 }
                 Pattern::Tup(_, _) => (),
-                Pattern::Lst(..) => unreachable!(),
+                Pattern::Lst(..) => (),
+                Pattern::Str(..) => (),
               }
             }
           }

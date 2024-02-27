@@ -147,6 +147,7 @@ pub enum Pattern {
   Num(NumCtr),
   Tup(Box<Pattern>, Box<Pattern>),
   Lst(Vec<Pattern>),
+  Str(GlobalString),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -640,6 +641,7 @@ impl Pattern {
           set.push(nam);
         }
         Pattern::Num(_) => {}
+        Pattern::Str(_) => {}
       }
     }
     let mut set = Vec::new();
@@ -664,6 +666,7 @@ impl Pattern {
       Pattern::Num(_) => Box::new([].iter()),
       Pattern::Tup(fst, snd) => Box::new([fst.as_ref(), snd.as_ref()].into_iter()),
       Pattern::Lst(els) => Box::new(els.iter()),
+      Pattern::Str(_) => Box::new([].iter()),
     }
   }
 
@@ -687,6 +690,7 @@ impl Pattern {
       Pattern::Num(NumCtr::Succ(num, _)) => Some(Name::new(format!("{num}+"))),
       Pattern::Tup(_, _) => Some(Name::new("(,)")),
       Pattern::Lst(_) => todo!(),
+      Pattern::Str(_) => todo!(),
     }
   }
 
@@ -702,11 +706,12 @@ impl Pattern {
   pub fn is_simple(&self) -> bool {
     match self {
       Pattern::Var(_) => true,
-      Pattern::Ctr(_, args) | Pattern::Lst(args) => args.iter().all(|arg| matches!(arg, Pattern::Var(_))),
+      Pattern::Ctr(_, args) => args.iter().all(|arg| matches!(arg, Pattern::Var(_))),
       Pattern::Num(_) => true,
       Pattern::Tup(fst, snd) => {
         matches!(fst.as_ref(), Pattern::Var(_)) && matches!(snd.as_ref(), Pattern::Var(_))
       }
+      Pattern::Lst(_) | Pattern::Str(_) => todo!(),
     }
   }
 
@@ -721,6 +726,7 @@ impl Pattern {
       Pattern::Num(NumCtr::Num(_)) => Type::Num,
       Pattern::Num(NumCtr::Succ(n, _)) => Type::NumSucc(*n),
       Pattern::Lst(..) => Type::Adt(builtins::LIST.into()),
+      Pattern::Str(..) => Type::Adt(builtins::STRING.into()),
     }
   }
 
@@ -736,11 +742,7 @@ impl Pattern {
       Pattern::Num(NumCtr::Succ(val, Some(Some(nam)))) => Term::add_num(Term::Var { nam: nam.clone() }, *val),
       Pattern::Num(NumCtr::Succ(_, Some(None))) => Term::Era,
       Pattern::Tup(fst, snd) => Term::Tup { fst: Box::new(fst.to_term()), snd: Box::new(snd.to_term()) },
-      Pattern::Lst(_) => {
-        let mut p = self.clone();
-        p.encode_builtins();
-        p.to_term()
-      }
+      Pattern::Lst(_) | Pattern::Str(_) => todo!(),
     }
   }
 

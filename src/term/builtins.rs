@@ -1,4 +1,4 @@
-use super::{parser::parse_book, Book, Name, Pattern, Term};
+use super::{parser::parse_book, Book, Name, NumCtr, Pattern, Term};
 
 const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/term/builtins.hvm"));
 
@@ -80,6 +80,7 @@ impl Pattern {
   pub fn encode_builtins(&mut self) {
     match self {
       Pattern::Lst(pats) => *self = Self::encode_list(std::mem::take(pats)),
+      Pattern::Str(str) => *self = Self::encode_str(str),
       Pattern::Ctr(_, pats) => {
         for pat in pats {
           pat.encode_builtins();
@@ -94,11 +95,20 @@ impl Pattern {
   }
 
   fn encode_list(elements: Vec<Pattern>) -> Pattern {
-    let lnil = Pattern::Var(Some(Name::from(LNIL)));
+    let lnil = Pattern::Ctr(Name::from(LNIL), vec![]);
 
     elements.into_iter().rfold(lnil, |acc, mut nxt| {
       nxt.encode_builtins();
       Pattern::Ctr(Name::from(LCONS), vec![nxt, acc])
+    })
+  }
+
+  fn encode_str(str: &str) -> Pattern {
+    let lnil = Pattern::Ctr(Name::from(LNIL), vec![]);
+
+    str.chars().rfold(lnil, |tail, head| {
+      let head = Pattern::Num(NumCtr::Num(head as u64));
+      Pattern::Ctr(Name::from(LCONS), vec![head, tail])
     })
   }
 }

@@ -36,6 +36,7 @@ impl Pattern {
         }
         Pattern::Var(None) => (),
         Pattern::Num(_) => (),
+        Pattern::Str(_) => (),
         Pattern::Tup(fst, snd) => {
           to_resolve.push(fst);
           to_resolve.push(snd);
