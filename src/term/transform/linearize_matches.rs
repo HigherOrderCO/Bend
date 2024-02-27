@@ -13,7 +13,7 @@ impl Ctx<'_> {
 
     for (def_name, def) in self.book.defs.iter_mut() {
       for rule in def.rules.iter_mut() {
-        let res = rule.body.linearize_simple_matches(&self.book.ctrs, lift_all_vars);
+        let res = rule.body.linearize_simple_matches(lift_all_vars);
         self.info.take_err(res, Some(def_name));
       }
     }
@@ -23,24 +23,17 @@ impl Ctx<'_> {
 }
 
 impl Term {
-  fn linearize_simple_matches(&mut self, ctrs: &Constructors, lift_all_vars: bool) -> Result<(), MatchErr> {
+  fn linearize_simple_matches(&mut self, lift_all_vars: bool) -> Result<(), MatchErr> {
     match self {
       Term::Mat { args: _, rules } => {
         for rule in rules.iter_mut() {
-          rule.body.linearize_simple_matches(ctrs, lift_all_vars).unwrap();
+          rule.body.linearize_simple_matches(lift_all_vars).unwrap();
         }
-        let matched_type = infer_type(rules.iter().map(|r| &r.pats[0]), ctrs)?;
-        match matched_type {
-          Type::Num | Type::Tup | Type::Any => _ = lift_match_vars(self, lift_all_vars),
-          Type::Adt(_) => {
-            lift_match_vars(self, lift_all_vars);
-          }
-        }
-        linearize_match_free_vars(self);
+        lift_match_vars(self, lift_all_vars);
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.linearize_simple_matches(ctrs, lift_all_vars)?;
+        bod.linearize_simple_matches(lift_all_vars)?;
       }
 
       Term::Let { pat: Pattern::Var(..), val: fst, nxt: snd }
@@ -49,8 +42,8 @@ impl Term {
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. }
       | Term::App { fun: fst, arg: snd, .. } => {
-        fst.linearize_simple_matches(ctrs, lift_all_vars)?;
-        snd.linearize_simple_matches(ctrs, lift_all_vars)?;
+        fst.linearize_simple_matches(lift_all_vars)?;
+        snd.linearize_simple_matches(lift_all_vars)?;
       }
 
       Term::Lst { .. } => unreachable!(),

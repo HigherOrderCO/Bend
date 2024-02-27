@@ -327,7 +327,7 @@ fn switch_rule_submatch_arm(rule: &Rule, ctr: &Pattern, nested_fields: &[Option<
       Pattern::Num(NumCtr::Succ(_, Some(var))) => vec![Pattern::Var(var.clone())],
       // Similarly for the default case in a num match
       Pattern::Var(var) => vec![Pattern::Var(var.clone())],
-      _ => rule.pats[0].children().cloned().collect::<Vec<_>>()
+      _ => rule.pats[0].children().cloned().collect::<Vec<_>>(),
     };
     if pats.is_empty() {
       // We say that a unit variant always has an unused wildcard nested

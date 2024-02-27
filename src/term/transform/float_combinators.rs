@@ -271,7 +271,7 @@ impl Term {
 
     for rule in rules.iter_mut() {
       for pat in &rule.pats {
-        debug_assert!(pat.is_detached_num_match());
+        debug_assert!(pat.is_native_num_match());
       }
 
       let arm_detach = match rule.body.go_float(depth + 1, term_info) {
