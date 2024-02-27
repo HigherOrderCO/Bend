@@ -130,6 +130,53 @@ data List = (List.cons head tail) | (List.nil)
 ListEx2 = (List.cons 1 (List.cons 2 (List.cons 3 List.nil)))
 ```
 
+Match different kinds of terms, both matches are equivalent:
+```rs
+match list {
+  (List.cons hd tl):  (Some hd)
+  List.nil:  None
+}
+
+match list {
+  List.cons:  (Some list.head)
+  List.nil:  None
+}
+
+match bind = list {
+  List.cons:  (Some bind.head)
+  List.nil:  None
+}
+```
+
+Match native numbers:
+```rs
+match 4 {
+  0:  "zero"
+  5:  "five"
+  4:  "four"
+  _:  "other"
+}
+```
+
+Which is the equivalent of nesting match terms:
+```rs
+match 4 {
+  0: "zero"
+  1+a: match (- a 4) {
+    0: "five"
+    _:  ...
+  }
+}
+```
+
+Match multiple terms:
+```rs
+match True, True {
+  True True:  True
+  _ _: False
+}
+```
+
 ### More features
 
 Key:
