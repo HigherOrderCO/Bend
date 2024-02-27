@@ -7,7 +7,7 @@ use std::{
 /// Replaces closed Terms (i.e. without free variables) with a Ref to the extracted term
 /// Precondition: Vars must have been sanitized
 impl Book {
-  pub fn lift_combinators(&mut self) {
+  pub fn float_combinators(&mut self) {
     let mut combinators = Combinators::new();
 
     for (def_name, def) in self.defs.iter_mut() {
@@ -17,7 +17,7 @@ impl Book {
 
       let builtin = def.builtin;
       let rule = def.rule_mut();
-      rule.body.lift_combinators(def_name, builtin, &mut combinators);
+      rule.body.float_combinators(def_name, builtin, &mut combinators);
     }
 
     // Definitions are not inserted to the book as they are defined to appease the borrow checker.
@@ -140,18 +140,18 @@ impl BitAnd for Detach {
 }
 
 impl Term {
-  pub fn lift_combinators(&mut self, def_name: &Name, builtin: bool, combinators: &mut Combinators) {
-    self.go_lift(0, &mut TermInfo::new(def_name.clone(), builtin, combinators));
+  pub fn float_combinators(&mut self, def_name: &Name, builtin: bool, combinators: &mut Combinators) {
+    self.go_float(0, &mut TermInfo::new(def_name.clone(), builtin, combinators));
   }
 
-  fn go_lift(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
+  fn go_float(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
     match self {
       Term::Lam { .. } | Term::Chn { .. } if self.is_id() => Detach::Combinator,
 
-      Term::Lam { .. } => self.lift_lam(depth, term_info),
-      Term::Chn { .. } => self.lift_lam(depth, term_info),
-      Term::App { .. } => self.lift_app(depth, term_info),
-      Term::Mat { .. } => self.lift_mat(depth, term_info),
+      Term::Lam { .. } => self.float_lam(depth, term_info),
+      Term::Chn { .. } => self.float_lam(depth, term_info),
+      Term::App { .. } => self.float_app(depth, term_info),
+      Term::Mat { .. } => self.float_mat(depth, term_info),
 
       Term::Var { nam } => {
         term_info.request_name(nam);
@@ -161,8 +161,8 @@ impl Term {
       Term::Lnk { nam } => Detach::unscoped_var(nam.clone()),
 
       Term::Let { pat, val, nxt } => {
-        let val_detach = val.go_lift(depth + 1, term_info);
-        let nxt_detach = nxt.go_lift(depth + 1, term_info);
+        let val_detach = val.go_float(depth + 1, term_info);
+        let nxt_detach = nxt.go_float(depth + 1, term_info);
 
         for nam in pat.bind_or_eras() {
           term_info.provide(nam.as_ref());
@@ -172,8 +172,8 @@ impl Term {
       }
 
       Term::Dup { fst, snd, val, nxt, .. } => {
-        let val_detach = val.go_lift(depth + 1, term_info);
-        let nxt_detach = nxt.go_lift(depth + 1, term_info);
+        let val_detach = val.go_float(depth + 1, term_info);
+        let nxt_detach = nxt.go_float(depth + 1, term_info);
 
         term_info.provide(fst.as_ref());
         term_info.provide(snd.as_ref());
@@ -182,8 +182,8 @@ impl Term {
       }
 
       Term::Sup { fst, snd, .. } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
-        let fst_is_super = fst.go_lift(depth + 1, term_info);
-        let snd_is_super = snd.go_lift(depth + 1, term_info);
+        let fst_is_super = fst.go_float(depth + 1, term_info);
+        let snd_is_super = snd.go_float(depth + 1, term_info);
 
         fst_is_super & snd_is_super
       }
@@ -195,7 +195,7 @@ impl Term {
     }
   }
 
-  fn lift_lam(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
+  fn float_lam(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
     let (nam, bod, unscoped): (Option<&Name>, &mut Term, bool) = match self {
       Term::Lam { nam, bod, .. } => (nam.as_ref(), bod, false),
       Term::Chn { nam, bod, .. } => (Some(nam), bod, true),
@@ -204,7 +204,7 @@ impl Term {
 
     let parent_scope = term_info.replace_scope(BTreeSet::new());
 
-    let mut detach = bod.go_lift(depth + 1, term_info);
+    let mut detach = bod.go_float(depth + 1, term_info);
 
     if unscoped {
       detach = detach & Detach::unscoped_lam(nam.cloned().unwrap());
@@ -221,15 +221,15 @@ impl Term {
     detach
   }
 
-  fn lift_app(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
+  fn float_app(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
     let Term::App { fun, arg, .. } = self else { unreachable!() };
 
     let parent_scope = term_info.replace_scope(BTreeSet::new());
 
-    let fun_detach = fun.go_lift(depth + 1, term_info);
+    let fun_detach = fun.go_float(depth + 1, term_info);
     let fun_scope = term_info.replace_scope(BTreeSet::new());
 
-    let arg_detach = arg.go_lift(depth + 1, term_info);
+    let arg_detach = arg.go_float(depth + 1, term_info);
     let arg_scope = term_info.replace_scope(parent_scope);
 
     let detach = match fun_detach {
@@ -260,12 +260,12 @@ impl Term {
     detach
   }
 
-  fn lift_mat(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
+  fn float_mat(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
     let Term::Mat { args, rules } = self else { unreachable!() };
 
     let mut detach = Detach::Combinator;
     for arg in args {
-      detach = detach & arg.go_lift(depth + 1, term_info);
+      detach = detach & arg.go_float(depth + 1, term_info);
     }
     let parent_scope = term_info.replace_scope(BTreeSet::new());
 
@@ -274,7 +274,7 @@ impl Term {
         debug_assert!(pat.is_detached_num_match());
       }
 
-      let arm_detach = match rule.body.go_lift(depth + 1, term_info) {
+      let arm_detach = match rule.body.go_float(depth + 1, term_info) {
         // If the recursive ref reached here, it is not in a active position
         Detach::Recursive => Detach::Combinator,
         detach => detach,

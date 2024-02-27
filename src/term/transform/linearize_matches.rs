@@ -3,18 +3,17 @@ use crate::{
   diagnostics::Info,
   term::{check::type_check::infer_type, Constructors, Ctx, Name, Pattern, Term, Type},
 };
-use indexmap::IndexSet;
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
 
 impl Ctx<'_> {
   /// Linearizes the variables between match cases, transforming them into combinators when possible.
-  pub fn linearize_matches(&mut self, linearize_extra: bool) -> Result<(), Info> {
+  pub fn linearize_matches(&mut self, lift_all_vars: bool) -> Result<(), Info> {
     self.info.start_pass();
 
     for (def_name, def) in self.book.defs.iter_mut() {
       for rule in def.rules.iter_mut() {
-        let res = rule.body.linearize_matches(&self.book.ctrs, linearize_extra);
+        let res = rule.body.linearize_matches(&self.book.ctrs, lift_all_vars);
         self.info.take_err(res, Some(def_name));
       }
     }
@@ -24,23 +23,23 @@ impl Ctx<'_> {
 }
 
 impl Term {
-  fn linearize_matches(&mut self, ctrs: &Constructors, linearize_extra: bool) -> Result<(), MatchErr> {
+  fn linearize_matches(&mut self, ctrs: &Constructors, lift_all_vars: bool) -> Result<(), MatchErr> {
     match self {
       Term::Mat { args: _, rules } => {
         for rule in rules.iter_mut() {
-          rule.body.linearize_matches(ctrs, linearize_extra).unwrap();
+          rule.body.linearize_matches(ctrs, lift_all_vars).unwrap();
         }
         let matched_type = infer_type(rules.iter().map(|r| &r.pats[0]), ctrs)?;
         match matched_type {
-          Type::Num | Type::Tup | Type::Any => _ = linearize_match_free_vars(self, linearize_extra),
+          Type::Num | Type::Tup | Type::Any => _ = lift_match_vars(self, lift_all_vars),
           Type::Adt(_) => {
-            linearize_match_free_vars(self, linearize_extra);
+            lift_match_vars(self, lift_all_vars);
           }
         }
       }
 
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.linearize_matches(ctrs, linearize_extra)?;
+        bod.linearize_matches(ctrs, lift_all_vars)?;
       }
 
       Term::Let { pat: Pattern::Var(..), val: fst, nxt: snd }
@@ -49,8 +48,8 @@ impl Term {
       | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. }
       | Term::App { fun: fst, arg: snd, .. } => {
-        fst.linearize_matches(ctrs, linearize_extra)?;
-        snd.linearize_matches(ctrs, linearize_extra)?;
+        fst.linearize_matches(ctrs, lift_all_vars)?;
+        snd.linearize_matches(ctrs, lift_all_vars)?;
       }
 
       Term::Lst { .. } => unreachable!(),
@@ -74,7 +73,12 @@ impl Term {
 
 /// Converts free vars inside the match arms into lambdas with applications to give them the external value.
 /// Makes the rules extractable and linear (no need for dups when variable used in both rules)
-pub fn linearize_match_free_vars(match_term: &mut Term, linearize_extra: bool) -> &mut Term {
+///
+/// If `lift_all_vars`, acts on all variables found in the arms,
+/// Otherwise, only lift vars that are used on more than one arm.
+///
+/// Obs: This does not interact unscoped variables
+pub fn lift_match_vars(match_term: &mut Term, lift_all_vars: bool) -> &mut Term {
   let Term::Mat { args: _, rules } = match_term else { unreachable!() };
 
   let free = rules.iter().flat_map(|rule| {
@@ -83,7 +87,7 @@ pub fn linearize_match_free_vars(match_term: &mut Term, linearize_extra: bool) -
 
   // Collect the vars.
   // We need consistent iteration order.
-  let free_vars: BTreeSet<Name> = if linearize_extra {
+  let free_vars: BTreeSet<Name> = if lift_all_vars {
     free.map(|(name, _)| name).collect()
   } else {
     free
@@ -108,40 +112,6 @@ pub fn linearize_match_free_vars(match_term: &mut Term, linearize_extra: bool) -
   *match_term = free_vars.into_iter().fold(old_match, Term::arg_call);
 
   get_match_reference(match_term)
-}
-
-pub fn linearize_match_unscoped_vars(match_term: &mut Term) -> Result<&mut Term, MatchErr> {
-  let Term::Mat { args: _, rules } = match_term else { unreachable!() };
-  // Collect the vars
-  let mut free_vars = IndexSet::new();
-  for rule in rules.iter_mut() {
-    let (decls, uses) = rule.body.unscoped_vars();
-    // Not allowed to declare unscoped var and not use it since we need to extract the match arm.
-    if let Some(var) = decls.difference(&uses).next() {
-      return Err(MatchErr::Linearize(Name::new(format!("λ${var}"))));
-    }
-    // Change unscoped var to normal scoped var if it references something outside this match arm.
-    let arm_free_vars = uses.difference(&decls);
-    for var in arm_free_vars.clone() {
-      rule.body.subst_unscoped(var, &Term::Var { nam: Name::new(format!("%match%unscoped%{var}")) });
-    }
-    free_vars.extend(arm_free_vars.cloned());
-  }
-
-  // Add lambdas to the arms
-  for rule in rules {
-    let old_body = std::mem::take(&mut rule.body);
-    rule.body = free_vars
-      .iter()
-      .rev()
-      .fold(old_body, |body, var| Term::named_lam(Name::new(format!("%match%unscoped%{var}")), body));
-  }
-
-  // Add apps to the match
-  let old_match = std::mem::take(match_term);
-  *match_term = free_vars.into_iter().fold(old_match, |acc, nam| Term::call(acc, [Term::Lnk { nam }]));
-
-  Ok(get_match_reference(match_term))
 }
 
 /// Get a reference to the match again

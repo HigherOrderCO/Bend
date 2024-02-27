@@ -49,4 +49,4 @@ The lambda terms without free variables are extracted to new definitions.
 ToMachine0 = λp (+ 1 (ToMachine p))
 ToMachine = λn (n ToMachine0 0)
 ```
-Definitions are lazy in the runtime. Lifting lambda terms to new definitions will prevent infinite expansion.
+Definitions are lazy in the runtime. Floating lambda terms into new definitions will prevent infinite expansion.

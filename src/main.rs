@@ -38,7 +38,7 @@ enum Mode {
       value_delimiter = ' ',
       action = clap::ArgAction::Append,
       long_help = r#"Enables or disables the given optimizations
-      lift_combinators is enabled by default on strict mode."#,
+      float_combinators is enabled by default on strict mode."#,
     )]
     comp_opts: Vec<OptArgs>,
 
@@ -82,7 +82,7 @@ enum Mode {
       value_delimiter = ' ',
       action = clap::ArgAction::Append,
       long_help = r#"Enables or disables the given optimizations
-      lift_combinators is enabled by default on strict mode."#,
+      float_combinators is enabled by default on strict mode."#,
     )]
     comp_opts: Vec<OptArgs>,
 
@@ -99,7 +99,7 @@ enum Mode {
       value_delimiter = ' ',
       action = clap::ArgAction::Append,
       long_help = r#"Enables or disables the given optimizations
-      lift_combinators is enabled by default on strict mode."#,
+      float_combinators is enabled by default on strict mode."#,
     )]
     comp_opts: Vec<OptArgs>,
 
@@ -297,8 +297,8 @@ pub enum OptArgs {
   LinearizeMatches,
   LinearizeMatchesExtra,
   NoLinearizeMatches,
-  LiftCombinators,
-  NoLiftCombinators,
+  FloatCombinators,
+  NoFloatCombinators,
   SimplifyMain,
   NoSimplifyMain,
   Merge,
@@ -325,8 +325,8 @@ impl OptArgs {
         NoRefToRef => opts.ref_to_ref = false,
         PreReduce => opts.pre_reduce = true,
         NoPreReduce => opts.pre_reduce = false,
-        LiftCombinators => opts.lift_combinators = true,
-        NoLiftCombinators => opts.lift_combinators = false,
+        FloatCombinators => opts.float_combinators = true,
+        NoFloatCombinators => opts.float_combinators = false,
         SimplifyMain => opts.simplify_main = true,
         NoSimplifyMain => opts.simplify_main = false,
         Merge => opts.merge = true,

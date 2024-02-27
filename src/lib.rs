@@ -159,8 +159,8 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, 
   if opts.eta {
     ctx.book.eta_reduction();
   }
-  if opts.lift_combinators {
-    ctx.book.lift_combinators();
+  if opts.float_combinators {
+    ctx.book.float_combinators();
   }
   if opts.ref_to_ref {
     ctx.simplify_ref_to_ref()?;
@@ -373,8 +373,8 @@ pub struct CompileOpts {
   /// Enables [term::transform::linearize_matches].
   pub linearize_matches: OptLevel,
 
-  /// Enables [term::transform::lift_combinators].
-  pub lift_combinators: bool,
+  /// Enables [term::transform::float_combinators].
+  pub float_combinators: bool,
 
   /// Enables [term::transform::simplify_main_ref].
   pub simplify_main: bool,
@@ -394,7 +394,7 @@ impl CompileOpts {
       ref_to_ref: true,
       prune: true,
       pre_reduce: true,
-      lift_combinators: true,
+      float_combinators: true,
       simplify_main: true,
       merge: true,
       inline: true,
@@ -413,14 +413,14 @@ impl CompileOpts {
     Self { adt_encoding: self.adt_encoding, ..Self::default() }
   }
 
-  /// All optimizations disabled, except lift_combinators and linearize_matches
+  /// All optimizations disabled, except float_combinators and linearize_matches
   pub fn light() -> Self {
-    Self { lift_combinators: true, linearize_matches: OptLevel::Extra, ..Self::default() }
+    Self { float_combinators: true, linearize_matches: OptLevel::Extra, ..Self::default() }
   }
 
   // Disable optimizations that don't work or are unnecessary on lazy mode
   pub fn lazy_mode(&mut self) {
-    self.lift_combinators = false;
+    self.float_combinators = false;
     if self.linearize_matches.is_extra() {
       self.linearize_matches = OptLevel::Enabled;
     }
@@ -430,9 +430,9 @@ impl CompileOpts {
 
 impl CompileOpts {
   pub fn check(&self, lazy_mode: bool) {
-    if !self.lift_combinators && !lazy_mode {
+    if !self.float_combinators && !lazy_mode {
       println!(
-        "Warning: Running in strict mode without enabling the lift_combinators pass can lead to some functions expanding infinitely."
+        "Warning: Running in strict mode without enabling the float_combinators pass can lead to some functions expanding infinitely."
       );
     }
   }
