@@ -1,0 +1,22 @@
+if 0 t f = f
+if 1 t f = t
+
+if2 n t f = match n {
+  0: f
+  1+: t
+  n: f
+}
+
+if3 n t f = match n {
+  0: f
+  *: t
+  1+: t
+}
+
+if4 n t f = match n {
+  0: f
+  1+: t
+  1: t
+}
+
+main = (if2 1 2 3)

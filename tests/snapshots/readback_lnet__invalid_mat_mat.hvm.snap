@@ -5,4 +5,4 @@ input_file: tests/golden_tests/readback_lnet/invalid_mat_mat.hvm
 Readback Warning:
 Invalid Numeric Match (4 occurrences)
 
-λa match match <Invalid> { 0: 3; +: 4 } { 0: <Invalid>; +: <Invalid> }
+λa match match <Invalid> { 0: 3; 1+*: 4 } { 0: <Invalid>; 1+: <Invalid> }

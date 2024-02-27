@@ -1,11 +1,11 @@
 sum_pred = @a @b match a {
   0: match b {
     0: 0
-    +: b-1
+    1+: b-1
   };
-  +: match b {
+  1+: match b {
     0: a-1
-    +: (+ a-1 b-1)
+    1+: (+ a-1 b-1)
   }
 }
 

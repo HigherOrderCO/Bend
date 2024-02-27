@@ -29,4 +29,3 @@ input_file: tests/golden_tests/compile_file/match_num_all_patterns.hvm
 @zero_var$S0 = (<+ #1 <- #1 a>> a)
 @zero_var_succ = (?<(#0 @zero_var_succ$S0) a> a)
 @zero_var_succ$S0 = (<+ #1 <- #1 a>> a)
-

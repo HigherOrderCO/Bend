@@ -1,0 +1,18 @@
+pred 0 = 0
+pred 1+x = x
+
+pred2 2+x = x
+pred2 * = 0
+
+pred3 0 = 0
+pred3 1 = 0
+pred3 2 = 0
+pred3 3+x-3 = x-3
+
+pred4 0 = 0
+pred4 1 = 0
+pred4 2 = 0
+pred4 3 = 0
+pred4 n = (- n 4)
+
+main = *

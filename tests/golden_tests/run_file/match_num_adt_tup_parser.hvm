@@ -1,0 +1,15 @@
+// Testing various forms of pattern matching
+data Result = (Ok val) | (Err err)
+
+Parse state (String.cons '(' xs) = (Ok ('(', xs, state))
+Parse state (String.cons ')' xs) = (Ok (')', xs, state))
+Parse state (String.cons '\n' xs) = (Ok (0, xs, state))
+Parse state xs = (Err (xs, state))
+
+main =
+  let str = "(+";
+  let state = *;
+  match (Parse state str) {
+    (Ok (val, xs, state)): (val, (Parse state xs))
+    err: err
+  }

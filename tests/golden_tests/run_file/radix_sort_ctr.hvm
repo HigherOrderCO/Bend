@@ -3,7 +3,7 @@ data Arr = Null | (Leaf x) | (Node a b)
 
 (Swap s a b) = match s {
   0: (Both a b)
-  +: (Both b a)
+  1+: (Both b a)
 }
 
 // Sort : Arr -> Arr
@@ -76,7 +76,7 @@ data Arr = Null | (Leaf x) | (Node a b)
 (Gen n) = (Gen.go n 0)
   (Gen.go n x) = match n {
     0: (Leaf x)
-    +:
+    1+:
       let x = (<< x 1)
       let y = (| x 1)
       (Node (Gen.go n-1 x) (Gen.go n-1 y))

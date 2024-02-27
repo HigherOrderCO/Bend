@@ -37,34 +37,34 @@ impl Term {
           _ => {}
         }
       }
-      Term::Lam { bod, .. } => bod.eta_reduction(),
-      Term::Let { pat: _, val, nxt } | Term::Dup { tag: _, fst: _, snd: _, val, nxt } => {
-        val.eta_reduction();
-        nxt.eta_reduction();
-      }
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { op: _, fst, snd } => {
-        fst.eta_reduction();
-        snd.eta_reduction();
-      }
+      Term::Lam { tag: _, nam: None, bod } => bod.eta_reduction(),
+
       Term::Mat { args, rules } => {
         for arg in args {
           arg.eta_reduction();
         }
         for rule in rules {
-          for pat in &rule.pats {
-            debug_assert!(pat.is_detached_num_match());
-          }
           rule.body.eta_reduction();
         }
+      }
+      Term::Lst { els } => {
+        for el in els {
+          el.eta_reduction();
+        }
+      }
+      Term::Let { val: fst, nxt: snd, .. }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::App { fun: fst, arg: snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. } => {
+        fst.eta_reduction();
+        snd.eta_reduction();
       }
       Term::Lnk { .. }
       | Term::Var { .. }
       | Term::Num { .. }
       | Term::Str { .. }
-      | Term::Lst { .. }
       | Term::Ref { .. }
       | Term::Era
       | Term::Err => {}

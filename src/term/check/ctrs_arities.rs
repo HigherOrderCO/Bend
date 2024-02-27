@@ -67,7 +67,6 @@ impl Pattern {
           }
         }
         Pattern::Var(..) | Pattern::Num(..) => {}
-        Pattern::Err => unreachable!(),
       }
     }
     Ok(())

@@ -1,7 +1,6 @@
-use super::Rule;
 use crate::{
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
-  term::{num_to_name, term_to_net::Labels, Book, MatchNum, Name, Op, Pattern, Tag, Term},
+  term::{num_to_name, term_to_net::Labels, Book, Name, Op, Pattern, Tag, Term},
 };
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -103,16 +102,16 @@ impl<'a> Reader<'a> {
           if *sel_kind != (Con { lab: None }) {
             // TODO: Is there any case where we expect a different node type here on readback?
             self.error(ReadbackError::InvalidNumericMatch);
-            Term::new_native_match(scrutinee, Term::Era, None, Term::Era)
+            Term::native_num_match(scrutinee, Term::Era, Term::Era, None)
           } else {
             let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
             let succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
 
             match succ_term {
-              Term::Lam { nam, bod, .. } => Term::new_native_match(scrutinee, zero_term, nam, *bod),
+              Term::Lam { nam, bod, .. } => Term::native_num_match(scrutinee, zero_term, *bod, Some(nam)),
               _ => {
                 self.error(ReadbackError::InvalidNumericMatch);
-                Term::new_native_match(scrutinee, zero_term, None, succ_term)
+                Term::native_num_match(scrutinee, zero_term, succ_term, None)
               }
             }
           }
@@ -390,46 +389,6 @@ impl Term {
       }
       Term::Let { .. } | Term::Lst { .. } => unreachable!(),
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {}
-    }
-  }
-
-  /// Creates a new [`Term::Match`] from the given terms.
-  /// If `scrutinee` is not a `Term::Var`, creates a let binding containing the match in its body
-  fn new_native_match(arg: Self, zero_term: Self, mut succ_label: Option<Name>, mut succ_term: Self) -> Self {
-    let zero = Rule { pats: vec![Pattern::Num(MatchNum::Zero)], body: zero_term };
-
-    if let Term::Var { nam } = &arg {
-      if let Some(label) = &succ_label {
-        let new_label = Name::new(format!("{}-1", nam));
-        succ_term.subst(label, &Term::Var { nam: new_label.clone() });
-        succ_label = Some(new_label);
-      }
-
-      let succ = Rule { pats: vec![Pattern::Num(MatchNum::Succ(Some(succ_label)))], body: succ_term };
-      Term::Mat { args: vec![arg], rules: vec![zero, succ] }
-    } else {
-      match succ_label {
-        Some(succ) => {
-          let match_bind = succ.clone();
-
-          let new_label = Name::new(format!("{}-1", succ));
-          succ_term.subst(&succ, &Term::Var { nam: new_label.clone() });
-          succ_label = Some(new_label);
-
-          let succ = Rule { pats: vec![Pattern::Num(MatchNum::Succ(Some(succ_label)))], body: succ_term };
-
-          Term::Let {
-            pat: Pattern::Var(Some(match_bind.clone())),
-            val: Box::new(arg),
-            nxt: Box::new(Term::Mat { args: vec![Term::Var { nam: match_bind }], rules: vec![zero, succ] }),
-          }
-        }
-        None => {
-          let succ = Rule { pats: vec![Pattern::Num(MatchNum::Succ(None))], body: succ_term };
-
-          Term::Mat { args: vec![arg], rules: vec![zero, succ] }
-        }
-      }
     }
   }
 }

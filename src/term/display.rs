@@ -1,6 +1,4 @@
-use super::{
-  net_to_term::ReadbackError, Book, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term, Type,
-};
+use super::{net_to_term::ReadbackError, Book, Definition, Name, NumCtr, Op, Pattern, Rule, Tag, Term, Type};
 use std::{fmt, ops::Deref};
 
 /* Some aux structures for things that are not so simple to display */
@@ -113,7 +111,6 @@ impl fmt::Display for Pattern {
       Pattern::Num(num) => write!(f, "{num}"),
       Pattern::Tup(fst, snd) => write!(f, "({}, {})", fst, snd,),
       Pattern::Lst(pats) => write!(f, "[{}]", DisplayJoin(|| pats, ", ")),
-      Pattern::Err => write!(f, "<Invalid>"),
     }
   }
 }
@@ -141,13 +138,13 @@ impl fmt::Display for Book {
   }
 }
 
-impl fmt::Display for MatchNum {
+impl fmt::Display for NumCtr {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
-      MatchNum::Zero => write!(f, "0"),
-      MatchNum::Succ(None) => write!(f, "+"),
-      MatchNum::Succ(Some(None)) => write!(f, "+*"),
-      MatchNum::Succ(Some(Some(nam))) => write!(f, "+{nam}"),
+      NumCtr::Num(n) => write!(f, "{n}"),
+      NumCtr::Succ(n, None) => write!(f, "{n}+"),
+      NumCtr::Succ(n, Some(None)) => write!(f, "{n}+*"),
+      NumCtr::Succ(n, Some(Some(nam))) => write!(f, "{n}+{nam}"),
     }
   }
 }
@@ -188,6 +185,7 @@ impl fmt::Display for Type {
       Type::Any => write!(f, "any"),
       Type::Tup => write!(f, "tup"),
       Type::Num => write!(f, "num"),
+      Type::NumSucc(n) => write!(f, "{n}+"),
       Type::Adt(nam) => write!(f, "{nam}"),
     }
   }

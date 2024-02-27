@@ -1,4 +1,4 @@
-use crate::term::{Adts, Book, Constructors, MatchNum, Name, Pattern, Term};
+use crate::term::{Adts, Book, Constructors, Name, NumCtr, Pattern, Term};
 
 impl Book {
   pub fn desugar_implicit_match_binds(&mut self) {
@@ -45,15 +45,14 @@ impl Term {
                       .collect();
                   }
                 }
-                Pattern::Num(MatchNum::Zero) => (),
-                Pattern::Num(MatchNum::Succ(Some(_))) => (),
-                Pattern::Num(MatchNum::Succ(p @ None)) => {
+                Pattern::Num(NumCtr::Num(_)) => (),
+                Pattern::Num(NumCtr::Succ(_, Some(_))) => (),
+                Pattern::Num(NumCtr::Succ(n, p @ None)) => {
                   // Implicit num arg
-                  *p = Some(Some(Name::new(format!("{nam}-1"))));
+                  *p = Some(Some(Name::new(format!("{nam}-{n}"))));
                 }
                 Pattern::Tup(_, _) => (),
                 Pattern::Lst(..) => unreachable!(),
-                Pattern::Err => unreachable!(),
               }
             }
           }

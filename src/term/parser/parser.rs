@@ -1,6 +1,6 @@
 use crate::term::{
   parser::lexer::{LexingError, Token},
-  Adt, Book, Definition, MatchNum, Name, Op, Pattern, Rule, Tag, Term,
+  Adt, Book, Definition, Name, NumCtr, Op, Pattern, Rule, Tag, Term,
 };
 use chumsky::{
   error::{Error, RichReason},
@@ -405,15 +405,26 @@ where
       .map(Pattern::Lst)
       .boxed();
 
-    let zero = any().filter(|t| matches!(t, Token::Num(0))).to(Pattern::Num(MatchNum::Zero)).labelled("0");
+    let num = any()
+      .filter(|t| matches!(t, Token::Num(_)))
+      .map(|t| {
+        let Token::Num(n) = t else { unreachable!() };
+        n
+      })
+      .labelled("<Num>");
 
-    let succ = just(Token::Add)
-      .ignore_then(name_or_era().or_not())
-      .map(|nam| Pattern::Num(MatchNum::Succ(nam)))
-      .labelled("+")
+    let num_pat = num.map(|n| Pattern::Num(NumCtr::Num(n)));
+
+    let succ_pat = num
+      .then_ignore(just(Token::Add))
+      .then(name_or_era().or_not())
+      .map(|(num, nam)| Pattern::Num(NumCtr::Succ(num, nam)))
+      .labelled("<Num>+")
       .boxed();
 
-    choice((zero, succ, var, ctr, list, tup))
+    let chr_pat = select!(Token::Char(c) => Pattern::Num(NumCtr::Num(c))).labelled("<Char>").boxed();
+
+    choice((succ_pat, num_pat, chr_pat, var, ctr, list, tup))
   })
 }
 

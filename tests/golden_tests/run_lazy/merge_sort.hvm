@@ -9,7 +9,7 @@ merge (Cons x xs) (Nil) = (Cons x xs)
 merge (Cons x xs) (Cons y ys) = 
   let t = match (< x y) {
     0: λaλbλcλt(t c a b)
-    +: λaλbλcλt(t a b c)
+    1+: λaλbλcλt(t a b c)
   }
 
   let t = (t (Cons x) λx(x) (Cons y))
@@ -21,7 +21,7 @@ sum (Cons h t) = (+ h (sum t))
 
 range n = match n {
   0: λx (Leaf x)
-  +: λx (Node (range n-1 (+ (* x 2) 1)) (range n-1 (* x 2)))
+  1+: λx (Node (range n-1 (+ (* x 2) 1)) (range n-1 (* x 2)))
 }
 
 main = (sum (sort (range 4 0)))

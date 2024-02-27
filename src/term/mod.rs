@@ -1,9 +1,13 @@
-use self::{check::type_check::infer_type, parser::lexer::STRINGS};
+use self::{check::type_check::infer_match_arg_type, parser::lexer::STRINGS};
 use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
 use indexmap::{IndexMap, IndexSet};
 use interner::global::GlobalString;
 use itertools::Itertools;
-use std::{borrow::Cow, collections::HashMap, ops::Deref};
+use std::{
+  borrow::Cow,
+  collections::{HashMap, HashSet},
+  ops::Deref,
+};
 
 pub mod builtins;
 pub mod check;
@@ -136,21 +140,19 @@ pub enum Term {
   Err,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
   Var(Option<Name>),
   Ctr(Name, Vec<Pattern>),
-  Num(MatchNum),
+  Num(NumCtr),
   Tup(Box<Pattern>, Box<Pattern>),
   Lst(Vec<Pattern>),
-  #[default]
-  Err,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum MatchNum {
-  Zero,
-  Succ(Option<Option<Name>>),
+pub enum NumCtr {
+  Num(u64),
+  Succ(u64, Option<Option<Name>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -185,9 +187,15 @@ pub enum Op {
 /// Pattern types.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Type {
+  /// Variables/wildcards.
   Any,
+  /// A native tuple.
   Tup,
+  /// A sequence of arbitrary numbers ending in a variable.
   Num,
+  /// A strictly incrementing sequence of numbers starting from 0, ending in a + ctr.
+  NumSucc(u64),
+  /// Adt constructors declared with the `data` syntax.
   Adt(Name),
 }
 
@@ -239,6 +247,7 @@ impl Tag {
 }
 
 impl Term {
+  /* Common construction patterns */
   pub fn lam(nam: Option<Name>, bod: Term) -> Self {
     Term::Lam { tag: Tag::Static, nam, bod: Box::new(bod) }
   }
@@ -288,6 +297,30 @@ impl Term {
   pub fn str(str: &str) -> Self {
     Term::Str { val: STRINGS.get(str) }
   }
+
+  pub fn native_num_match(arg: Term, zero: Term, succ: Term, succ_var: Option<Option<Name>>) -> Term {
+    let zero = Rule { pats: vec![Pattern::Num(NumCtr::Num(0))], body: zero };
+    let succ = Rule { pats: vec![Pattern::Num(NumCtr::Succ(1, succ_var))], body: succ };
+    Term::Mat { args: vec![arg], rules: vec![zero, succ] }
+  }
+
+  pub fn sub_num(arg: Term, val: u64) -> Term {
+    if val == 0 {
+      arg
+    } else {
+      Term::Opx { op: Op::SUB, fst: Box::new(arg), snd: Box::new(Term::Num { val }) }
+    }
+  }
+
+  pub fn add_num(arg: Term, val: u64) -> Term {
+    if val == 0 {
+      arg
+    } else {
+      Term::Opx { op: Op::ADD, fst: Box::new(arg), snd: Box::new(Term::Num { val }) }
+    }
+  }
+
+  /* Common checks and transformations */
 
   /// Substitute the occurrences of a variable in a term with the given term.
   /// Caution: can cause invalid shadowing of variables if used incorrectly.
@@ -507,7 +540,7 @@ impl Term {
       return false;
     }
     // The match is over a valid type
-    let Ok(typ) = infer_type(rules.iter().map(|r| &r.pats[0]), ctrs) else {
+    let Ok(typ) = infer_match_arg_type(rules, 0, ctrs) else {
       return false;
     };
     // The match has one arm for each constructor, matching the constructors in adt declaration order
@@ -529,14 +562,32 @@ impl Term {
         }
       }
       Type::Num => {
-        if rules.len() != 2 {
+        let mut nums = HashSet::new();
+        for rule in rules {
+          if let Pattern::Num(NumCtr::Num(n)) = &rule.pats[0] {
+            if nums.contains(n) {
+              return false;
+            }
+            nums.insert(*n);
+          }
+        }
+      }
+      Type::NumSucc(n) => {
+        if rules.len() as u64 != n + 1 {
           return false;
         }
-        if !matches!(rules[0].pats[0], Pattern::Num(MatchNum::Zero)) {
-          return false;
-        }
-        if !matches!(rules[1].pats[0], Pattern::Num(MatchNum::Succ(Some(_)))) {
-          return false;
+        for (i, _) in rules.iter().enumerate() {
+          if i as u64 == n {
+            let Pattern::Num(NumCtr::Succ(n_pat, Some(_))) = &rules[i].pats[0] else { return false };
+            if n != *n_pat {
+              return false;
+            }
+          } else {
+            let Pattern::Num(NumCtr::Num(i_pat)) = &rules[i].pats[0] else { return false };
+            if i as u64 != *i_pat {
+              return false;
+            }
+          }
         }
       }
       Type::Adt(adt) => {
@@ -570,7 +621,7 @@ impl Pattern {
   pub fn bind_or_eras(&self) -> impl DoubleEndedIterator<Item = &Option<Name>> {
     self.iter().filter_map(|pat| match pat {
       Pattern::Var(nam) => Some(nam),
-      Pattern::Num(MatchNum::Succ(nam)) => nam.as_ref(),
+      Pattern::Num(NumCtr::Succ(_, nam)) => nam.as_ref(),
       _ => None,
     })
   }
@@ -585,11 +636,10 @@ impl Pattern {
           go(fst, set);
           go(snd, set);
         }
-        Pattern::Num(MatchNum::Succ(Some(nam))) => {
+        Pattern::Num(NumCtr::Succ(_, Some(nam))) => {
           set.push(nam);
         }
         Pattern::Num(_) => {}
-        Pattern::Err => unreachable!(),
       }
     }
     let mut set = Vec::new();
@@ -614,7 +664,6 @@ impl Pattern {
       Pattern::Num(_) => Box::new([].iter()),
       Pattern::Tup(fst, snd) => Box::new([fst.as_ref(), snd.as_ref()].into_iter()),
       Pattern::Lst(els) => Box::new(els.iter()),
-      Pattern::Err => unreachable!(),
     }
   }
 
@@ -634,11 +683,10 @@ impl Pattern {
     match self {
       Pattern::Var(_) => None,
       Pattern::Ctr(nam, _) => Some(nam.clone()),
-      Pattern::Num(MatchNum::Zero) => Some(Name::new("0")),
-      Pattern::Num(MatchNum::Succ(_)) => Some(Name::new("+")),
+      Pattern::Num(NumCtr::Num(num)) => Some(Name::new(format!("{num}"))),
+      Pattern::Num(NumCtr::Succ(num, _)) => Some(Name::new(format!("{num}+"))),
       Pattern::Tup(_, _) => Some(Name::new("(,)")),
       Pattern::Lst(_) => todo!(),
-      Pattern::Err => unreachable!(),
     }
   }
 
@@ -646,16 +694,8 @@ impl Pattern {
     matches!(self, Pattern::Var(_))
   }
 
-  pub fn is_detached_num_match(&self) -> bool {
-    if let Pattern::Num(num) = self {
-      match num {
-        MatchNum::Zero => true,
-        MatchNum::Succ(None) => true,
-        MatchNum::Succ(Some(_)) => false,
-      }
-    } else {
-      false
-    }
+  pub fn is_native_num_match(&self) -> bool {
+    matches!(self, Pattern::Num(NumCtr::Num(0) | NumCtr::Succ(1, _)))
   }
 
   /// True if this pattern has no nested subpatterns.
@@ -667,7 +707,6 @@ impl Pattern {
       Pattern::Tup(fst, snd) => {
         matches!(fst.as_ref(), Pattern::Var(_)) && matches!(snd.as_ref(), Pattern::Var(_))
       }
-      Pattern::Err => unreachable!(),
     }
   }
 
@@ -679,9 +718,9 @@ impl Pattern {
         Type::Adt(adt_nam.clone())
       }
       Pattern::Tup(..) => Type::Tup,
-      Pattern::Num(..) => Type::Num,
+      Pattern::Num(NumCtr::Num(_)) => Type::Num,
+      Pattern::Num(NumCtr::Succ(n, _)) => Type::NumSucc(*n),
       Pattern::Lst(..) => Type::Adt(builtins::LIST.into()),
-      Pattern::Err => unreachable!(),
     }
   }
 
@@ -691,22 +730,17 @@ impl Pattern {
       Pattern::Ctr(ctr, args) => {
         Term::call(Term::Ref { nam: ctr.clone() }, args.iter().map(|arg| arg.to_term()))
       }
-      Pattern::Num(MatchNum::Zero) => Term::Num { val: 0 },
+      Pattern::Num(NumCtr::Num(val)) => Term::Num { val: *val },
       // Succ constructor with no variable is not a valid term, only a compiler intermediate for a MAT inet node.
-      Pattern::Num(MatchNum::Succ(None)) => unreachable!(),
-      Pattern::Num(MatchNum::Succ(Some(Some(nam)))) => Term::Opx {
-        op: Op::ADD,
-        fst: Box::new(Term::Var { nam: nam.clone() }),
-        snd: Box::new(Term::Num { val: 1 }),
-      },
-      Pattern::Num(MatchNum::Succ(Some(None))) => Term::Era,
+      Pattern::Num(NumCtr::Succ(_, None)) => unreachable!(),
+      Pattern::Num(NumCtr::Succ(val, Some(Some(nam)))) => Term::add_num(Term::Var { nam: nam.clone() }, *val),
+      Pattern::Num(NumCtr::Succ(_, Some(None))) => Term::Era,
       Pattern::Tup(fst, snd) => Term::Tup { fst: Box::new(fst.to_term()), snd: Box::new(snd.to_term()) },
       Pattern::Lst(_) => {
         let mut p = self.clone();
         p.encode_builtins();
         p.to_term()
       }
-      Pattern::Err => unreachable!(),
     }
   }
 
@@ -714,8 +748,8 @@ impl Pattern {
   pub fn simple_equals(&self, other: &Pattern) -> bool {
     match (self, other) {
       (Pattern::Ctr(a, _), Pattern::Ctr(b, _)) if a == b => true,
-      (Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Zero)) => true,
-      (Pattern::Num(MatchNum::Succ(_)), Pattern::Num(MatchNum::Succ(_))) => true,
+      (Pattern::Num(NumCtr::Num(a)), Pattern::Num(NumCtr::Num(b))) if a == b => true,
+      (Pattern::Num(NumCtr::Succ(a, _)), Pattern::Num(NumCtr::Succ(b, _))) if a == b => true,
       (Pattern::Tup(_, _), Pattern::Tup(_, _)) => true,
       (Pattern::Lst(_), Pattern::Lst(_)) => true,
       (Pattern::Var(_), Pattern::Var(_)) => true,
@@ -774,9 +808,12 @@ impl Type {
         Box::new(Pattern::Var(Some("%fst".into()))),
         Box::new(Pattern::Var(Some("%snd".into()))),
       )],
-      Type::Num => {
-        vec![Pattern::Num(MatchNum::Zero), Pattern::Num(MatchNum::Succ(Some(Some("%pred".into()))))]
+      Type::NumSucc(n) => {
+        let mut ctrs = (0 .. *n).map(|n| Pattern::Num(NumCtr::Num(n))).collect::<Vec<_>>();
+        ctrs.push(Pattern::Num(NumCtr::Succ(*n, Some(Some("%pred".into())))));
+        ctrs
       }
+      Type::Num => unreachable!(),
       Type::Adt(adt) => {
         // TODO: Should return just a ref to ctrs and not clone.
         adts[adt]

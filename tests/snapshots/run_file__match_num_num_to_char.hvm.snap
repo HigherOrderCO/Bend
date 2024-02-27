@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/match_num_num_to_char.hvm
+---
+(([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10], [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 1152921504606846975]), [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 0])

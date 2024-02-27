@@ -5,8 +5,8 @@ use itertools::Itertools;
 use crate::{
   diagnostics::ERR_INDENT_SIZE,
   term::{
-    check::type_check::infer_type, display::DisplayFn, AdtEncoding, Adts, Book, Constructors, MatchNum, Name,
-    Pattern, Rule, Tag, Term, Type,
+    check::type_check::infer_match_arg_type, display::DisplayFn, AdtEncoding, Adts, Book, Constructors, Name,
+    NumCtr, Pattern, Rule, Tag, Term, Type,
   },
 };
 
@@ -63,50 +63,135 @@ fn encode_match(
   adts: &Adts,
   adt_encoding: AdtEncoding,
 ) -> Term {
-  let typ = infer_type(rules.iter().map(|r| &r.pats[0]), ctrs).unwrap();
+  let typ = infer_match_arg_type(&rules, 0, ctrs).unwrap();
   match typ {
-    // Just move the match into a let term
     Type::Any | Type::Tup => {
-      let rule = rules.into_iter().next().unwrap();
-      Term::Let { pat: rule.pats.into_iter().next().unwrap(), val: Box::new(arg), nxt: Box::new(rule.body) }
+      let fst_rule = rules.into_iter().next().unwrap();
+      encode_var(arg, fst_rule)
     }
-    // Detach the variable from the match, converting into a native num match
-    Type::Num => {
-      let mut rules = rules;
-      let Pattern::Num(MatchNum::Succ(Some(var))) =
-        std::mem::replace(&mut rules[1].pats[0], Pattern::Num(MatchNum::Succ(None)))
-      else {
-        unreachable!()
-      };
-      rules[1].body = Term::lam(var, std::mem::take(&mut rules[1].body));
-      Term::Mat { args: vec![arg], rules }
-    }
+    Type::NumSucc(_) => encode_num_succ(arg, rules),
+    Type::Num => encode_num(arg, rules),
     // ADT Encoding depends on compiler option
-    Type::Adt(adt) => {
-      match adt_encoding {
-        // (x @field1 @field2 ... body1  @field1 body2 ...)
-        AdtEncoding::Scott => {
-          let mut arms = vec![];
-          for rule in rules {
-            let body = rule.body;
-            let body = rule.pats[0].binds().rev().fold(body, |bod, nam| Term::named_lam(nam.clone(), bod));
-            arms.push(body);
-          }
-          Term::call(arg, arms)
-        }
-        // #adt_name(x arm[0] arm[1] ...)
-        AdtEncoding::TaggedScott => {
-          let mut arms = vec![];
-          for (rule, (ctr, fields)) in rules.into_iter().zip(&adts[&adt].ctrs) {
-            let body =
-              rule.pats[0].binds().rev().zip(fields.iter().rev()).fold(rule.body, |bod, (var, field)| {
-                Term::tagged_lam(Tag::adt_field(&adt, ctr, field), var.clone(), bod)
-              });
-            arms.push(body);
-          }
-          Term::tagged_call(Tag::adt_name(&adt), arg, arms)
-        }
+    Type::Adt(adt) => encode_adt(arg, rules, adt, adt_encoding, adts),
+  }
+}
+
+/// Just move the match into a let term
+fn encode_var(arg: Term, rule: Rule) -> Term {
+  Term::Let { pat: rule.pats.into_iter().next().unwrap(), val: Box::new(arg), nxt: Box::new(rule.body) }
+}
+
+/// Convert into a sequence of native matches, decrementing by 1 each match.
+/// match n {0: A; 1: B; 2+: (C n-2)} converted to
+/// match n {0: A; 1+: @%x match %x {0: B; 1+: @n-2 (C n-2)}}
+fn encode_num_succ(arg: Term, mut rules: Vec<Rule>) -> Term {
+  let last_rule = rules.pop().unwrap();
+
+  let match_var = Name::from("%x");
+
+  // @n-2 (C n-2)
+  let Pattern::Num(NumCtr::Succ(_, Some(last_var))) = last_rule.pats.into_iter().next().unwrap() else {
+    unreachable!()
+  };
+  let last_arm = Term::lam(last_var, last_rule.body);
+
+  rules.into_iter().rev().fold(last_arm, |term, rule| {
+    let rules = vec![Rule { pats: vec![Pattern::Num(NumCtr::Num(0))], body: rule.body }, Rule {
+      pats: vec![Pattern::Num(NumCtr::Succ(1, None))],
+      body: term,
+    }];
+
+    let Pattern::Num(NumCtr::Num(num)) = rule.pats.into_iter().next().unwrap() else { unreachable!() };
+    if num == 0 {
+      Term::Mat { args: vec![arg.clone()], rules }
+    } else {
+      let mat = Term::Mat { args: vec![Term::Var { nam: match_var.clone() }], rules };
+      Term::named_lam(match_var.clone(), mat)
+    }
+  })
+}
+
+/// Convert into a sequence of native matches on (- n num_case)
+/// match n {a: A; b: B; n: (C n)} converted to
+/// match (- n a) {0: A; 1+: @%p match (- %p b-a-1) { 0: B; 1+: @%p let n = (+ %p b+1); (C n)}}
+fn encode_num(arg: Term, mut rules: Vec<Rule>) -> Term {
+  fn go(
+    mut rules: impl Iterator<Item = Rule>,
+    last_rule: Rule,
+    prev_num: Option<u64>,
+    arg: Option<Term>,
+  ) -> Term {
+    let rule = rules.next();
+    match (prev_num, rule) {
+      // Num matches must have at least 2 rules (1 num and 1 var).
+      // The first rule can't also be the last.
+      (None, None) => unreachable!(),
+      // First match
+      // match (- n a) {0: A; 1+: ...}
+      (None, Some(rule)) => {
+        let Pattern::Num(NumCtr::Num(val)) = &rule.pats[0] else { unreachable!() };
+        Term::native_num_match(
+          Term::sub_num(arg.unwrap(), *val),
+          rule.body,
+          go(rules, last_rule, Some(*val), None),
+          None,
+        )
       }
+      // Middle match
+      // @%p match (- %p b-a-1) { 0: B; 1+: ... }
+      (Some(prev_num), Some(rule)) => {
+        let Pattern::Num(NumCtr::Num(val)) = &rule.pats[0] else { unreachable!() };
+        let pred_nam = Name::from("%p");
+        Term::named_lam(
+          pred_nam.clone(),
+          Term::native_num_match(
+            Term::sub_num(Term::Var { nam: pred_nam }, val.wrapping_sub(prev_num).wrapping_sub(1)),
+            rule.body,
+            go(rules, last_rule, Some(*val), None),
+            None,
+          ),
+        )
+      }
+      // Last match
+      // @%p let n = (+ %p b+1); (C n)
+      (Some(prev_num), None) => {
+        let pred_nam = Name::from("%p");
+        Term::named_lam(pred_nam.clone(), Term::Let {
+          pat: last_rule.pats.into_iter().next().unwrap(),
+          val: Box::new(Term::add_num(Term::Var { nam: pred_nam }, prev_num.wrapping_add(1))),
+          nxt: Box::new(last_rule.body),
+        })
+      }
+    }
+  }
+
+  let last_rule = rules.pop().unwrap();
+  go(rules.into_iter(), last_rule, None, Some(arg))
+}
+
+fn encode_adt(arg: Term, rules: Vec<Rule>, adt: Name, adt_encoding: AdtEncoding, adts: &Adts) -> Term {
+  match adt_encoding {
+    // (x @field1 @field2 ... body1  @field1 body2 ...)
+    AdtEncoding::Scott => {
+      let mut arms = vec![];
+      for rule in rules {
+        let body = rule.body;
+        let body = rule.pats[0].binds().rev().fold(body, |bod, nam| Term::named_lam(nam.clone(), bod));
+        arms.push(body);
+      }
+      Term::call(arg, arms)
+    }
+    // #adt_name(x arm[0] arm[1] ...)
+    AdtEncoding::TaggedScott => {
+      let mut arms = vec![];
+      for (rule, (ctr, fields)) in rules.into_iter().zip(&adts[&adt].ctrs) {
+        let body =
+          rule.pats[0].binds().rev().zip(fields.iter().rev()).fold(rule.body, |bod, (var, field)| {
+            Term::tagged_lam(Tag::adt_field(&adt, ctr, field), var.clone(), bod)
+          });
+        arms.push(body);
+      }
+      Term::tagged_call(Tag::adt_name(&adt), arg, arms)
     }
   }
 }
@@ -120,6 +205,7 @@ pub enum MatchErr {
   TypeMismatch(Type, Type),
   ArityMismatch(usize, usize),
   CtrArityMismatch(Name, usize, usize),
+  MalformedNumSucc(Pattern, Pattern),
 }
 
 #[derive(Debug, Clone)]
@@ -155,6 +241,9 @@ impl MatchErr {
         f,
         "Constructor arity mismatch in pattern matching. Constructor '{ctr}' expects {exp} fields, found {got}."
       ),
+      MatchErr::MalformedNumSucc(got, exp) => {
+        write!(f, "Expected a sequence of incrementing numbers ending with '{exp}', found '{got}'.")
+      }
     })
   }
 }

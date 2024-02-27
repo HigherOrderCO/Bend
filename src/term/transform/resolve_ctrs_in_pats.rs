@@ -40,7 +40,6 @@ impl Pattern {
           to_resolve.push(fst);
           to_resolve.push(snd);
         }
-        Pattern::Err => unreachable!(),
       }
     }
   }
