@@ -298,9 +298,9 @@ impl Term {
     Term::Str { val: STRINGS.get(str) }
   }
 
-  pub fn native_num_match(arg: Term, zero: Term, succ: Term) -> Term {
+  pub fn native_num_match(arg: Term, zero: Term, succ: Term, succ_var: Option<Option<Name>>) -> Term {
     let zero = Rule { pats: vec![Pattern::Num(NumCtr::Num(0))], body: zero };
-    let succ = Rule { pats: vec![Pattern::Num(NumCtr::Succ(1, None))], body: succ };
+    let succ = Rule { pats: vec![Pattern::Num(NumCtr::Succ(1, succ_var))], body: succ };
     Term::Mat { args: vec![arg], rules: vec![zero, succ] }
   }
 
@@ -695,16 +695,7 @@ impl Pattern {
   }
 
   pub fn is_native_num_match(&self) -> bool {
-    if let Pattern::Num(ctr) = self {
-      match ctr {
-        NumCtr::Num(0) => true,
-        NumCtr::Num(_) => false,
-        NumCtr::Succ(1, None) => true,
-        NumCtr::Succ(_, _) => false,
-      }
-    } else {
-      false
-    }
+    matches!(self, Pattern::Num(NumCtr::Num(0) | NumCtr::Succ(1, _)))
   }
 
   /// True if this pattern has no nested subpatterns.
@@ -758,9 +749,7 @@ impl Pattern {
     match (self, other) {
       (Pattern::Ctr(a, _), Pattern::Ctr(b, _)) if a == b => true,
       (Pattern::Num(NumCtr::Num(a)), Pattern::Num(NumCtr::Num(b))) if a == b => true,
-      (Pattern::Num(NumCtr::Num(_)), Pattern::Num(NumCtr::Num(_))) => false,
       (Pattern::Num(NumCtr::Succ(a, _)), Pattern::Num(NumCtr::Succ(b, _))) if a == b => true,
-      (Pattern::Num(NumCtr::Succ(_, _)), Pattern::Num(NumCtr::Succ(_, _))) => false,
       (Pattern::Tup(_, _), Pattern::Tup(_, _)) => true,
       (Pattern::Lst(_), Pattern::Lst(_)) => true,
       (Pattern::Var(_), Pattern::Var(_)) => true,

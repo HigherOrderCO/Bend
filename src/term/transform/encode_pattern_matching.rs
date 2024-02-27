@@ -134,6 +134,7 @@ fn encode_num(arg: Term, mut rules: Vec<Rule>) -> Term {
           Term::sub_num(arg.unwrap(), *val),
           rule.body,
           go(rules, last_rule, Some(*val), None),
+          None,
         )
       }
       // Middle match
@@ -147,6 +148,7 @@ fn encode_num(arg: Term, mut rules: Vec<Rule>) -> Term {
             Term::sub_num(Term::Var { nam: pred_nam }, val.wrapping_sub(prev_num).wrapping_sub(1)),
             rule.body,
             go(rules, last_rule, Some(*val), None),
+            None,
           ),
         )
       }
