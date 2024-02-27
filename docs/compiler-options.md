@@ -138,7 +138,7 @@ main = (bar)
 ## linearize-matches
 
 Linearizes the variables between match cases, transforming them into combinators when possible.  
-When `linearize-matches` linearizes only vars that are used in more than one arm.
+When the `linearize-matches` option is used, linearizes only vars that are used in more than one arm.
 
 Example:
 ```rs
@@ -148,7 +148,7 @@ Example:
 λa λb (match a { 0: λc c; +: λd d } b)
 ```
 
-When `linearize-matches-extra`, linearizes all vars used in the arms.
+When the `linearize-matches-extra` option is used, linearizes all vars used in the arms.
 
 example:
 ```rs
