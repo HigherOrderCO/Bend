@@ -144,7 +144,7 @@ Example:
 ```rs
 λa λb match a { 0: b; +: b }
 
-// Is tranformed to
+// Is transformed to
 λa λb (match a { 0: λc c; +: λd d } b)
 ```
 
@@ -154,7 +154,7 @@ example:
 ```rs
 λa λb λc match a { 0: b; +: c }
 
-// Is tranformed to
+// Is transformed to
 λa λb λc (match a { 0: λd λ* d; +: λ* λe e } b c)
 ```
 
