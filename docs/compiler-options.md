@@ -8,6 +8,7 @@
 | `-Oref-to-ref` `-Ono-ref-to-ref` | Disabled | [ref-to-ref](#ref-to-ref) |
 | `-Oprune` `-Ono-prune` | Disabled | [definition-pruning](#definition-pruning) |
 | `-Opre-reduce` `-Ono-pre-reduce` | Disabled | [pre-reduce](#pre-reduce) |
+| `-Olinearize-matches` `-Olinearize-matches-extra` `-Ono-linearize-matches` | Extra  | [linearize-matches](#linearize-matches) |
 | `-Ofloat_combinators` `-Ono-float_combinators` | Enabled  | [float-combinators](#float-combinators) |
 | `-Osimplify-main` `-Ono-simplify-main` | Disabled | [simplify-main](#simplify-main) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
@@ -132,6 +133,29 @@ main = (bar)
 @bar = #8
 @foo = #4
 @main = @bar
+```
+
+## linearize-matches
+
+Linearizes the variables between match cases, transforming them into combinators when possible.  
+When `linearize-matches` linearizes only vars that are used in more than one arm.
+
+Example:
+```rs
+λa λb match a { 0: b; +: b }
+
+// Is tranformed to
+λa λb (match a { 0: λc c; +: λd d } b)
+```
+
+When `linearize-matches-extra`, linearizes all vars used in the arms.
+
+example:
+```rs
+λa λb λc match a { 0: b; +: c }
+
+// Is tranformed to
+λa λb λc (match a { 0: λd λ* d; +: λ* λe e } b c)
 ```
 
 ## float-combinators

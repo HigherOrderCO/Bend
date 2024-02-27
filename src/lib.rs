@@ -141,7 +141,7 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, 
   ctx.simplify_matches()?;
 
   if opts.linearize_matches.enabled() {
-    ctx.linearize_matches(opts.linearize_matches.is_extra())?;
+    ctx.linearize_simple_matches(opts.linearize_matches.is_extra())?;
   }
 
   ctx.book.encode_simple_matches(opts.adt_encoding);
@@ -430,10 +430,17 @@ impl CompileOpts {
 
 impl CompileOpts {
   pub fn check(&self, lazy_mode: bool) {
-    if !self.float_combinators && !lazy_mode {
-      println!(
-        "Warning: Running in strict mode without enabling the float_combinators pass can lead to some functions expanding infinitely."
-      );
+    if !lazy_mode {
+      if !self.float_combinators {
+        println!(
+          "Warning: Running in strict mode without enabling the float_combinators pass can lead to some functions expanding infinitely."
+        );
+      }
+      if !self.linearize_matches.enabled() {
+        println!(
+          "Warning: Running in strict mode without enabling the linearize_matches pass can lead to some functions expanding infinitely."
+        );
+      }
     }
   }
 }
