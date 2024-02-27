@@ -64,4 +64,6 @@ jobs:
         with:
           incremental_files_only: false
           config: ./cspell.json
-          files: "**/*.rs **/*.md"
+          files: |
+            **/*.rs
+            **/*.md
