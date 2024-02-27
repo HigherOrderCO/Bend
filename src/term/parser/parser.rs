@@ -405,12 +405,10 @@ where
       .map(Pattern::Lst)
       .boxed();
 
-    let num_val = any()
-      .filter(|t| matches!(t, Token::Num(_)))
-      .map(|t| {
-        let Token::Num(n) = t else { unreachable!() };
-        n
-      });
+    let num_val = any().filter(|t| matches!(t, Token::Num(_))).map(|t| {
+      let Token::Num(n) = t else { unreachable!() };
+      n
+    });
 
     let num = num_val.map(|n| Pattern::Num(NumCtr::Num(n))).labelled("<Num>");
 
