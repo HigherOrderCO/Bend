@@ -413,16 +413,18 @@ where
       })
       .labelled("<Num>");
 
-    let num_ctr = num.map(|n| Pattern::Num(NumCtr::Num(n)));
+    let num_pat = num.map(|n| Pattern::Num(NumCtr::Num(n)));
 
-    let succ_ctr = num
+    let succ_pat = num
       .then_ignore(just(Token::Add))
       .then(name_or_era().or_not())
       .map(|(num, nam)| Pattern::Num(NumCtr::Succ(num, nam)))
       .labelled("<Num>+")
       .boxed();
 
-    choice((succ_ctr, num_ctr, var, ctr, list, tup))
+    let chr_pat = select!(Token::Char(c) => Pattern::Num(NumCtr::Num(c))).labelled("<Char>").boxed();
+
+    choice((succ_pat, num_pat, chr_pat, var, ctr, list, tup))
   })
 }
 
