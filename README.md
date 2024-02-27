@@ -130,7 +130,7 @@ data List = (List.cons head tail) | (List.nil)
 ListEx2 = (List.cons 1 (List.cons 2 (List.cons 3 List.nil)))
 ```
 
-Match different kinds of terms, both matches are equivalent:
+It's possible to match different kinds of terms. These three forms are equivalent:
 ```rs
 match list {
   (List.cons hd tl):  (Some hd)
@@ -162,7 +162,7 @@ Which is the equivalent of nesting match terms:
 ```rs
 match 4 {
   0: "zero"
-  1+a: match (- a 4) {
+  1+a: match (- (+ a (+ 0 1)) 5) {
     0: "five"
     _:  ...
   }
@@ -171,9 +171,10 @@ match 4 {
 
 Match multiple terms:
 ```rs
-match True, True {
-  True True:  True
-  _ _: False
+λa λb match a, b {
+  (Some True) (x, y): (Some (x, y))
+  (Some False) (x, y): (Some (y, x))
+  None *: None
 }
 ```
 
