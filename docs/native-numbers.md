@@ -34,19 +34,19 @@ main = (~ 42 10)
 
 HVM-lang also includes a `match` syntax for native numbers. The `0` case is chosen when `n` is 0, and the `+` case is chosen when `n` is greater than 0. The previous number, by default, bound to `n-1`.
 ```rs
-Number.to_church = λn λf λx 
+Number.to_church = λn λf λx
   match n {
     0: x
     1+: (f (Number.to_church n-1 f x))
   }
 // Alternative syntax
-Number.to_church = λn λf λx 
+Number.to_church = λn λf λx
   match n {
     0: x
     1+p: (f (Number.to_church p f x))
   }
 // Alternative syntax with name binding
-Number.to_church = λn λf λx 
+Number.to_church = λn λf λx
   match num = n {
     0: x
     1+: (f (Number.to_church num-1 f x)
@@ -62,7 +62,7 @@ fibonacci = λn // n is the argument
     0: 0
     // If the number is 1, then return 1
     1: 1
-    // Otherwise, and return the sum of (fib (n-2 + 1)) and (fib n-2)
+    // Otherwise, return the sum of (fib (n-2 + 1)) and (fib n-2)
     2+: (+ (fibonacci (+ n-2 1)) (fibonacci n-2))
   }
 
