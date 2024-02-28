@@ -191,6 +191,7 @@ Other features are described in the following documentation files:
 
 - &#128215; Lazy definitions: [Making recursive definitions lazy](docs/lazy-definitions.md)
 - &#128215; Data types: [Defining data types](docs/defining-data-types.md)
+- &#128215; Pattern matching: [Pattern matching](docs/pattern-matching.md)
 - &#128215; Native numbers and operations: [Native numbers](docs/native-numbers.md)
 - &#128215; Builtin definitions: [Builtin definitions](docs/builtin-defs.md)
 - &#128217; Duplications and superpositions: [Dups and sups](docs/dups-and-sups.md)
