@@ -63,6 +63,8 @@ fibonacci = λn // n is the argument
     // If the number is 1, then return 1
     1: 1
     // Otherwise, return the sum of (fib (n-2 + 1)) and (fib n-2)
+    // The successor pattern provides a `var`-`successor number` bind
+    // and it's also possible to define other bind name `2+x`
     2+: (+ (fibonacci (+ n-2 1)) (fibonacci n-2))
   }
 
