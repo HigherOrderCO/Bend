@@ -15,6 +15,7 @@
     "ctrs",
     "datatypes",
     "desugared",
+    "desugars",
     "dref",
     "dups",
     "effectful",

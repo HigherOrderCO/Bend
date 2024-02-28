@@ -17,7 +17,7 @@ Foo = @arg1 @arg2 @arg3 match arg1 arg2 arg3 {
 }
 ```
 
-Pattern matching on numers has two forms.
+Pattern matching on numbers has two forms.
 With the successor pattern it will expect a sequence of numbers up to the `n+var` pattern:
 ```rust
 match n {
