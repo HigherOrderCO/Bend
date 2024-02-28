@@ -22,7 +22,7 @@
 (Num.pred) = λn 
   match n { 
     0: 0
-    +: n-1
+    1+: n-1
   }
 
 // Write new data types like this
