@@ -58,7 +58,7 @@ impl Pattern {
           check.push(snd);
         }
         Pattern::Lst(args) => args.iter().for_each(|arg| check.push(arg)),
-        Pattern::Var(_) | Pattern::Num(_) => {}
+        Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => {}
       }
     }
     unbounds

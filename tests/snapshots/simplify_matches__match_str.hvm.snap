@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/match_str.hvm
+---
+(is_as) = λa match a { (String.cons b c): (match b { 65: λd (match d { (String.cons f g): λh (match f { 115: λ* λj (match j { (String.cons * *): λ* 0; (String.nil): λ* 2 } *); *: λ* λ* 0 } h g); (String.nil): λ* 0 } *); 97: λhb (match hb { (String.cons jb kb): λlb (match jb { 115: λ* λnb (match nb { (String.cons * *): λ* 0; (String.nil): λ* 2 } *); *: λ* λ* 0 } lb kb); (String.nil): λ* 0 } *); *: λ* 0 } c); (String.nil): 1 }
+
+(main) = *
