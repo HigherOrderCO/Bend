@@ -6,10 +6,10 @@ input_file: tests/golden_tests/simplify_matches/nested.hvm
 
 (CtrC) = #Baz λa a
 
-(CtrB2) = λa λb #Bar λ* #Bar λd #Bar.CtrB2.b (#Bar.CtrB2.a (d a) b)
+(CtrB2) = λa λb #Bar λ* #Bar λd #Bar (d a b)
 
-(CtrB1) = λa #Bar λb #Bar λ* #Bar.CtrB1.b (b a)
+(CtrB1) = λa #Bar λb #Bar λ* #Bar (b a)
 
-(CtrB) = λa #Foo λ* #Foo λc #Foo.CtrB.a (c a)
+(CtrB) = λa #Foo λ* #Foo λc #Foo (c a)
 
-(CtrA) = λa λb #Foo λc #Foo λ* #Foo.CtrA.b (#Foo.CtrA.a (c a) b)
+(CtrA) = λa λb #Foo λc #Foo λ* #Foo (c a b)

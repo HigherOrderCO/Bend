@@ -63,24 +63,23 @@ impl Term {
       }
       Term::Let { pat, val, nxt } => {
         val.resolve_refs(def_names, main, scope)?;
-
-        for nam in pat.binds() {
-          push_scope(Some(nam), scope);
+        for nam in pat.bind_or_eras() {
+          push_scope(nam.as_ref(), scope);
         }
-
         nxt.resolve_refs(def_names, main, scope)?;
-
-        for nam in pat.binds() {
-          pop_scope(Some(nam), scope);
+        for nam in pat.bind_or_eras() {
+          pop_scope(nam.as_ref(), scope);
         }
       }
-      Term::Dup { tag: _, fst, snd, val, nxt } => {
+      Term::Dup { tag: _, bnd, val, nxt } => {
         val.resolve_refs(def_names, main, scope)?;
-        push_scope(fst.as_ref(), scope);
-        push_scope(snd.as_ref(), scope);
+        for bnd in bnd.iter() {
+          push_scope(bnd.as_ref(), scope);
+        }
         nxt.resolve_refs(def_names, main, scope)?;
-        pop_scope(fst.as_ref(), scope);
-        pop_scope(snd.as_ref(), scope);
+        for bnd in bnd.iter() {
+          pop_scope(bnd.as_ref(), scope);
+        }
       }
 
       // If variable not defined, we check if it's a ref and swap if it is.
@@ -98,12 +97,14 @@ impl Term {
         }
       }
       Term::Chn { bod, .. } => bod.resolve_refs(def_names, main, scope)?,
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Opx { fst, snd, .. } => {
+      Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
         fst.resolve_refs(def_names, main, scope)?;
         snd.resolve_refs(def_names, main, scope)?;
+      }
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
+        for el in els {
+          el.resolve_refs(def_names, main, scope)?;
+        }
       }
       Term::Mat { args, rules } => {
         for arg in args {
@@ -121,7 +122,7 @@ impl Term {
           }
         }
       }
-      Term::Lst { .. } => unreachable!("Should have been desugared already"),
+
       Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => (),
     }
     Ok(())

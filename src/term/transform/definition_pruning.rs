@@ -102,8 +102,6 @@ impl Book {
         Term::Let { val: fst, nxt: snd, .. }
         | Term::Dup { val: fst, nxt: snd, .. }
         | Term::App { fun: fst, arg: snd, .. }
-        | Term::Sup { fst, snd, .. }
-        | Term::Tup { fst, snd }
         | Term::Opx { fst, snd, .. } => {
           to_find.push(fst);
           to_find.push(snd);
@@ -114,6 +112,11 @@ impl Book {
           }
           for rule in rules {
             to_find.push(&rule.body);
+          }
+        }
+        Term::Sup { els, .. } | Term::Tup { els } => {
+          for el in els {
+            to_find.push(el);
           }
         }
         Term::Lst { els } => {

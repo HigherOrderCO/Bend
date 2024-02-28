@@ -16,9 +16,7 @@ impl Term {
     match self {
       Term::Let { pat: Pattern::Var(_), val: fst, nxt: snd }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
       | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.desugar_let_destructors();
         snd.desugar_let_destructors();
@@ -29,6 +27,11 @@ impl Term {
         }
         for rule in rules {
           rule.body.desugar_let_destructors();
+        }
+      }
+      Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
+        for el in els {
+          el.desugar_let_destructors();
         }
       }
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
@@ -59,7 +62,6 @@ impl Term {
           Term::Let { pat, val, nxt: Box::new(Term::Mat { args, rules }) }
         };
       }
-      Term::Lst { .. } => unreachable!("Should have been desugared already"),
     }
   }
 }

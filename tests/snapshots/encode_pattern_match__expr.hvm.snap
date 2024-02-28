@@ -11,23 +11,23 @@ TaggedScott:
 
 (Add) = #Op λa #Op λ* #Op λ* #Op λ* a
 
-(Var) = λa #Expr λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr.Var.name (b a)
+(Var) = λa #Expr λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (b a)
 
-(Num) = λa #Expr λ* #Expr λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr.Num.val (c a)
+(Num) = λa #Expr λ* #Expr λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (c a)
 
-(App) = λa λb #Expr λ* #Expr λ* #Expr λe #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr.App.arg (#Expr.App.fun (e a) b)
+(App) = λa λb #Expr λ* #Expr λ* #Expr λe #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (e a b)
 
-(Fun) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λf #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr.Fun.body (#Expr.Fun.name (f a) b)
+(Fun) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λf #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (f a b)
 
-(If) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λh #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr.If.else (#Expr.If.then (#Expr.If.cond (h a) b) c)
+(If) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λh #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (h a b c)
 
-(Let) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λi #Expr λ* #Expr λ* #Expr λ* #Expr.Let.next (#Expr.Let.val (#Expr.Let.bind (i a) b) c)
+(Let) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λi #Expr λ* #Expr λ* #Expr λ* #Expr (i a b c)
 
-(Dup) = λa λb λc λd #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λk #Expr λ* #Expr λ* #Expr.Dup.next (#Expr.Dup.val (#Expr.Dup.snd (#Expr.Dup.fst (k a) b) c) d)
+(Dup) = λa λb λc λd #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λk #Expr λ* #Expr λ* #Expr (k a b c d)
 
-(Tup) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λj #Expr λ* #Expr.Tup.snd (#Expr.Tup.fst (j a) b)
+(Tup) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λj #Expr λ* #Expr (j a b)
 
-(Op2) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λl #Expr.Op2.snd (#Expr.Op2.fst (#Expr.Op2.op (l a) b) c)
+(Op2) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λl #Expr (l a b c)
 
 Scott:
 (Div) = λ* λ* λ* λd d
@@ -55,5 +55,3 @@ Scott:
 (Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
 
 (Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)
-
-

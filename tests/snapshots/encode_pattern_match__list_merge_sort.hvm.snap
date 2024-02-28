@@ -7,19 +7,19 @@ TaggedScott:
 
 (Pure) = λa (Cons a Nil)
 
-(Map) = λa λb (#List_ (a #List_.Cons.head λc #List_.Cons.tail λd λe let {f f_2} = e; (Cons (f c) (Map d f_2)) λ* Nil) b)
+(Map) = λa λb (#List_ (a #List_ λc #List_ λd λe let {f f_2} = e; (Cons (f c) (Map d f_2)) λ* Nil) b)
 
 (MergeSort) = λa λb (Unpack a (Map b Pure))
 
-(Unpack) = λa λb (#List_ (b #List_.Cons.head λc #List_.Cons.tail λd λe (#List_ (d #List_.Cons.head λf #List_.Cons.tail λg λh λi let {o o_2} = h; (Unpack o (MergePair o_2 (Cons i (Cons f g)))) λ* λq q) e c) λ* Nil) a)
+(Unpack) = λa λb (#List_ (b #List_ λc #List_ λd λe (#List_ (d #List_ λf #List_ λg λh λi let {o o_2} = h; (Unpack o (MergePair o_2 (Cons i (Cons f g)))) λ* λq q) e c) λ* Nil) a)
 
-(MergePair) = λa λb (#List_ (b #List_.Cons.head λc #List_.Cons.tail λd λe (#List_ (d #List_.Cons.head λf #List_.Cons.tail λg λh λi let {m m_2} = h; (Cons (Merge m i f) (MergePair m_2 g)) λ* λo (Cons o Nil)) e c) λ* Nil) a)
+(MergePair) = λa λb (#List_ (b #List_ λc #List_ λd λe (#List_ (d #List_ λf #List_ λg λh λi let {m m_2} = h; (Cons (Merge m i f) (MergePair m_2 g)) λ* λo (Cons o Nil)) e c) λ* Nil) a)
 
-(Merge) = λa λb λc (#List_ (b #List_.Cons.head λd #List_.Cons.tail λe λf λg (#List_ (g #List_.Cons.head λh #List_.Cons.tail λi λj λk λl let {m m_2} = i; let {n n_dup} = h; let {n_2 n_3} = n_dup; let {o o_2} = l; let {p p_dup} = k; let {p_2 p_3} = p_dup; let {q q_dup} = j; let {q_2 q_3} = q_dup; (If (q p n) (Cons p_2 (Merge q_2 o (Cons n_2 m))) (Cons n_3 (Merge q_3 (Cons p_3 o_2) m_2))) λ* λu λv (Cons u v)) f d e) λ* λcb cb) a c)
+(Merge) = λa λb λc (#List_ (b #List_ λd #List_ λe λf λg (#List_ (g #List_ λh #List_ λi λj λk λl let {m m_2} = i; let {n n_2 n_3} = h; let {o o_2} = l; let {p p_2 p_3} = k; let {q q_2 q_3} = j; (If (q p n) (Cons p_2 (Merge q_2 o (Cons n_2 m))) (Cons n_3 (Merge q_3 (Cons p_3 o_2) m_2))) λ* λu λv (Cons u v)) f d e) λ* λcb cb) a c)
 
 (Nil) = #List_ λ* #List_ λb b
 
-(Cons) = λa λb #List_ λc #List_ λ* #List_.Cons.tail (#List_.Cons.head (c a) b)
+(Cons) = λa λb #List_ λc #List_ λ* #List_ (c a b)
 
 (False) = #Bool λ* #Bool λb b
 
@@ -38,7 +38,7 @@ Scott:
 
 (MergePair) = λa λb (b λc λd λe (d λf λg λh λi let {m m_2} = h; (Cons (Merge m i f) (MergePair m_2 g)) λ* λo (Cons o Nil) e c) λ* Nil a)
 
-(Merge) = λa λb λc (b λd λe λf λg (g λh λi λj λk λl let {m m_2} = i; let {n n_dup} = h; let {n_2 n_3} = n_dup; let {o o_2} = l; let {p p_dup} = k; let {p_2 p_3} = p_dup; let {q q_dup} = j; let {q_2 q_3} = q_dup; (If (q p n) (Cons p_2 (Merge q_2 o (Cons n_2 m))) (Cons n_3 (Merge q_3 (Cons p_3 o_2) m_2))) λ* λu λv (Cons u v) f d e) λ* λcb cb a c)
+(Merge) = λa λb λc (b λd λe λf λg (g λh λi λj λk λl let {m m_2} = i; let {n n_2 n_3} = h; let {o o_2} = l; let {p p_2 p_3} = k; let {q q_2 q_3} = j; (If (q p n) (Cons p_2 (Merge q_2 o (Cons n_2 m))) (Cons n_3 (Merge q_3 (Cons p_3 o_2) m_2))) λ* λu λv (Cons u v) f d e) λ* λcb cb a c)
 
 (Nil) = λ* λb b
 
@@ -47,5 +47,3 @@ Scott:
 (False) = λ* λb b
 
 (True) = λa λ* a
-
-

@@ -11,19 +11,19 @@ TaggedScott:
 
 (North) = #Direction λa #Direction λ* #Direction λ* #Direction λ* a
 
-(Filled) = λa #Box λb #Box λ* #Box.Filled.value (b a)
+(Filled) = λa #Box λb #Box λ* #Box (b a)
 
 (Empty) = #Box λ* #Box λb b
 
-(Some) = λa #Option λb #Option λ* #Option.Some.x (b a)
+(Some) = λa #Option λb #Option λ* #Option (b a)
 
 (None) = #Option λ* #Option λb b
 
-(Ok) = λa #Result λb #Result λ* #Result.Ok.a (b a)
+(Ok) = λa #Result λb #Result λ* #Result (b a)
 
-(Err) = λa #Result λ* #Result λc #Result.Err.b (c a)
+(Err) = λa #Result λ* #Result λc #Result (c a)
 
-(Cons) = λa λb #List_ λc #List_ λ* #List_.Cons.xs (#List_.Cons.x (c a) b)
+(Cons) = λa λb #List_ λc #List_ λ* #List_ (c a b)
 
 (Nil) = #List_ λ* #List_ λb b
 
@@ -71,5 +71,3 @@ Scott:
 (Yellow) = λ* λb λ* b
 
 (Green) = λ* λ* λc c
-
-

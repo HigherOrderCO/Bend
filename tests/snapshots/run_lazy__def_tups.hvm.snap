@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_lazy/def_tups.hvm
 ---
-15
+(15, 15)

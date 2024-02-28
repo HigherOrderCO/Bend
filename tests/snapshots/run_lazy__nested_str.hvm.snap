@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_lazy/nested_str.hvm
 ---
-(((String.cons "a" String.nil), (String.cons 97 (String.cons "bc" String.nil))), ((String.cons "ab" "c"), (String.cons "ab" (String.cons "cd" String.nil))))
+((String.cons "a" String.nil), ((String.cons 97 (String.cons "bc" String.nil)), ((String.cons "ab" "c"), (String.cons "ab" (String.cons "cd" String.nil)))))

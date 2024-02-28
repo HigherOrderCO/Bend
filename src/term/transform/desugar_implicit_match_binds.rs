@@ -51,7 +51,7 @@ impl Term {
                   // Implicit num arg
                   *p = Some(Some(Name::new(format!("{nam}-{n}"))));
                 }
-                Pattern::Tup(_, _) => (),
+                Pattern::Tup(..) => (),
                 Pattern::Lst(..) => (),
                 Pattern::Str(..) => (),
               }
@@ -76,11 +76,14 @@ impl Term {
           let Term::Mat { args: _, rules } = term else { unreachable!() };
           to_desugar.extend(rules.iter_mut().map(|r| &mut r.body));
         }
+        Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
+          for el in els {
+            to_desugar.push(el);
+          }
+        }
         Term::Let { pat: Pattern::Var(_), val: fst, nxt: snd }
         | Term::App { fun: fst, arg: snd, .. }
         | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Tup { fst, snd }
-        | Term::Sup { fst, snd, .. }
         | Term::Opx { fst, snd, .. } => {
           to_desugar.push(fst);
           to_desugar.push(snd);
@@ -96,7 +99,6 @@ impl Term {
         Term::Let { pat: _, .. } => {
           unreachable!("Expected destructor let expressions to have been desugared already")
         }
-        Term::Lst { .. } => unreachable!("Should have been desugared already"),
       }
     }
   }

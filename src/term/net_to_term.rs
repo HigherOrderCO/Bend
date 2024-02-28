@@ -154,11 +154,7 @@ impl<'a> Reader<'a> {
           .unwrap_or_else(|| {
             // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
             self.decay_or_get_ports(node).map_or_else(
-              |(fst, snd)| Term::Sup {
-                tag: self.labels.dup.to_tag(Some(*lab)),
-                fst: Box::new(fst),
-                snd: Box::new(snd),
-              },
+              |(fst, snd)| Term::Sup { tag: self.labels.dup.to_tag(Some(*lab)), els: vec![fst, snd] },
               |term| term,
             )
           })
@@ -201,7 +197,7 @@ impl<'a> Reader<'a> {
         // If we're visiting a port 0, then it is a Tup.
         0 => self
           .decay_or_get_ports(node)
-          .map_or_else(|(fst, snd)| Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, |term| term),
+          .map_or_else(|(fst, snd)| Term::Tup { els: vec![fst, snd] }, |term| term),
         // If we're visiting a port 1 or 2, then it is a variable.
         1 | 2 => {
           if self.seen_fans.insert(node) {
@@ -303,11 +299,16 @@ impl Term {
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.insert_split(split, threshold)?,
       Term::Let { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
       | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.insert_split(split, threshold)? + snd.insert_split(split, threshold)?
+      }
+      Term::Sup { els, .. } | Term::Tup { els } => {
+        let mut n = 0;
+        for el in els {
+          n += el.insert_split(split, threshold)?;
+        }
+        n
       }
       Term::Mat { args, rules } => {
         debug_assert_eq!(args.len(), 1);
@@ -320,16 +321,15 @@ impl Term {
       Term::Lst { .. } => unreachable!(),
       Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Ref { .. } | Term::Era | Term::Err => 0,
     };
+
     if n >= threshold {
       let Split { tag, fst, snd, val } = std::mem::take(split);
       let nxt = Box::new(std::mem::take(self));
       *self = match tag {
-        None => Term::Let {
-          pat: Pattern::Tup(Box::new(Pattern::Var(fst)), Box::new(Pattern::Var(snd))),
-          val: Box::new(val),
-          nxt,
-        },
-        Some(tag) => Term::Dup { tag, fst, snd, val: Box::new(val), nxt },
+        None => {
+          Term::Let { pat: Pattern::Tup(vec![Pattern::Var(fst), Pattern::Var(snd)]), val: Box::new(val), nxt }
+        }
+        Some(tag) => Term::Dup { tag, bnd: vec![fst, snd], val: Box::new(val), nxt },
       };
       None
     } else {
@@ -360,19 +360,22 @@ impl Term {
           *self = term;
         }
       }
-      Term::Dup { fst, snd, val, nxt, .. } => {
+      Term::Dup { bnd, val, nxt, .. } => {
         val.fix_names(id_counter, book);
-        fix_name(fst, id_counter, nxt);
-        fix_name(snd, id_counter, nxt);
+        for bnd in bnd {
+          fix_name(bnd, id_counter, nxt);
+        }
         nxt.fix_names(id_counter, book);
       }
       Term::Chn { bod, .. } => bod.fix_names(id_counter, book),
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Opx { op: _, fst, snd } => {
+      Term::App { fun: fst, arg: snd, .. } | Term::Opx { op: _, fst, snd } => {
         fst.fix_names(id_counter, book);
         snd.fix_names(id_counter, book);
+      }
+      Term::Sup { els, .. } | Term::Tup { els } => {
+        for el in els {
+          el.fix_names(id_counter, book);
+        }
       }
       Term::Mat { args, rules } => {
         for arg in args {

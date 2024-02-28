@@ -47,7 +47,7 @@ impl fmt::Display for Term {
       }
       Term::Var { nam } => write!(f, "{nam}"),
       Term::Chn { tag, nam, bod } => {
-        write!(f, "{}λ${} {}", tag.display_padded(), nam, bod)
+        write!(f, "{}λ${} {}", tag.display_padded(), var_as_str(nam), bod)
       }
       Term::Lnk { nam } => write!(f, "${nam}"),
       Term::Let { pat, val, nxt } => {
@@ -68,11 +68,11 @@ impl fmt::Display for Term {
           ),
         )
       }
-      Term::Dup { tag, fst, snd, val, nxt } => {
-        write!(f, "let {}{{{} {}}} = {}; {}", tag, var_as_str(fst), var_as_str(snd), val, nxt)
+      Term::Dup { tag, bnd, val, nxt } => {
+        write!(f, "let {}{{{}}} = {}; {}", tag, DisplayJoin(|| bnd.iter().map(var_as_str), " "), val, nxt)
       }
-      Term::Sup { tag, fst, snd } => {
-        write!(f, "{}{{{} {}}}", tag, fst, snd)
+      Term::Sup { tag, els } => {
+        write!(f, "{}{{{}}}", tag, DisplayJoin(|| els, " "))
       }
       Term::Era => write!(f, "*"),
       Term::Num { val } => write!(f, "{val}"),
@@ -80,10 +80,8 @@ impl fmt::Display for Term {
       Term::Opx { op, fst, snd } => {
         write!(f, "({} {} {})", op, fst, snd)
       }
-      Term::Tup { fst, snd } => write!(f, "({}, {})", fst, snd),
-      Term::Lst { els } => {
-        write!(f, "[{}]", DisplayJoin(|| els.iter(), ", "),)
-      }
+      Term::Tup { els } => write!(f, "({})", DisplayJoin(|| els.iter(), ", "),),
+      Term::Lst { els } => write!(f, "[{}]", DisplayJoin(|| els.iter(), ", "),),
       Term::Err => write!(f, "<Invalid>"),
     }
   }
@@ -109,7 +107,7 @@ impl fmt::Display for Pattern {
         write!(f, "({}{})", nam, DisplayJoin(|| pats.iter().map(|p| display!(" {p}")), ""))
       }
       Pattern::Num(num) => write!(f, "{num}"),
-      Pattern::Tup(fst, snd) => write!(f, "({}, {})", fst, snd,),
+      Pattern::Tup(pats) => write!(f, "({})", DisplayJoin(|| pats, ", ")),
       Pattern::Lst(pats) => write!(f, "[{}]", DisplayJoin(|| pats, ", ")),
       Pattern::Str(str) => write!(f, "\"{str}\""),
     }
@@ -184,7 +182,7 @@ impl fmt::Display for Type {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
       Type::Any => write!(f, "any"),
-      Type::Tup => write!(f, "tup"),
+      Type::Tup(n) => write!(f, "tup{n}"),
       Type::Num => write!(f, "num"),
       Type::NumSucc(n) => write!(f, "{n}+"),
       Type::Adt(nam) => write!(f, "{nam}"),

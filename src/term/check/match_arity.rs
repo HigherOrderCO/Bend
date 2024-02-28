@@ -45,15 +45,13 @@ impl Term {
         }
       }
 
-      Term::Lst { els } => {
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
         for el in els {
           el.check_match_arity()?;
         }
       }
       Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
       | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. }
       | Term::Let { val: fst, nxt: snd, .. } => {
         fst.check_match_arity()?;

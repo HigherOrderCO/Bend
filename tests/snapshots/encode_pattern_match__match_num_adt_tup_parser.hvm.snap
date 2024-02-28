@@ -3,22 +3,22 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_num_adt_tup_parser.hvm
 ---
 TaggedScott:
-(Parse) = λa λb (#String (b #String.String.cons.head λc #String.String.cons.tail λd λe (match (- c 40) { 0: λf λg (Ok (40, (g, f))); 1+: λk match k { 0: λl λm (Ok (41, (m, l))); 1+: λq match (- q 18446744073709551584) { 0: λr λs (Ok (0, (s, r))); 1+: λw λy λz (Err ((String.cons (+ w 11) z), y)) } } } e d) λeb (Err (String.nil, eb))) a)
+(Parse) = λa λb (#String (b #String λc #String λd λe (match (- c 40) { 0: λf λg (Ok (40, g, f)); 1+: λk match k { 0: λl λm (Ok (41, m, l)); 1+: λq match (- q 18446744073709551584) { 0: λr λs (Ok (0, s, r)); 1+: λw λy λz (Err ((String.cons (+ w 11) z), y)) } } } e d) λeb (Err (String.nil, eb))) a)
 
-(main) = #Result ((Parse * (String.cons 40 (String.cons 43 String.nil))) #Result.Ok.val λd let (e, f) = d; (let (g, h) = f; λi (i, (Parse h g)) e) #Result.Err.err λm (Err m))
+(main) = #Result ((Parse * (String.cons 40 (String.cons 43 String.nil))) #Result λd let (e, f, g) = d; (e, (Parse g f)) #Result λk (Err k))
 
-(String.cons) = λa λb #String λc #String λ* #String.String.cons.tail (#String.String.cons.head (c a) b)
+(String.cons) = λa λb #String λc #String λ* #String (c a b)
 
 (String.nil) = #String λ* #String λb b
 
-(Err) = λa #Result λ* #Result λc #Result.Err.err (c a)
+(Err) = λa #Result λ* #Result λc #Result (c a)
 
-(Ok) = λa #Result λb #Result λ* #Result.Ok.val (b a)
+(Ok) = λa #Result λb #Result λ* #Result (b a)
 
 Scott:
-(Parse) = λa λb (b λc λd λe (match (- c 40) { 0: λf λg (Ok (40, (g, f))); 1+: λk match k { 0: λl λm (Ok (41, (m, l))); 1+: λq match (- q 18446744073709551584) { 0: λr λs (Ok (0, (s, r))); 1+: λw λy λz (Err ((String.cons (+ w 11) z), y)) } } } e d) λeb (Err (String.nil, eb)) a)
+(Parse) = λa λb (b λc λd λe (match (- c 40) { 0: λf λg (Ok (40, g, f)); 1+: λk match k { 0: λl λm (Ok (41, m, l)); 1+: λq match (- q 18446744073709551584) { 0: λr λs (Ok (0, s, r)); 1+: λw λy λz (Err ((String.cons (+ w 11) z), y)) } } } e d) λeb (Err (String.nil, eb)) a)
 
-(main) = (Parse * (String.cons 40 (String.cons 43 String.nil)) λd let (e, f) = d; (let (g, h) = f; λi (i, (Parse h g)) e) λm (Err m))
+(main) = (Parse * (String.cons 40 (String.cons 43 String.nil)) λd let (e, f, g) = d; (e, (Parse g f)) λk (Err k))
 
 (String.cons) = λa λb λc λ* (c a b)
 

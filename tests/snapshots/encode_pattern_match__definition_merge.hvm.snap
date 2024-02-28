@@ -3,15 +3,15 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/definition_merge.hvm
 ---
 TaggedScott:
-(Foo) = λa λb (#Either (a #Either.Left.value λc λd (#Bool (c λe #Either (e #Either.Left.value λg #Bool (g 1 1) #Either.Right.value λj #Bool (j 2 2)) λm #Either (m #Either.Left.value λo #Bool (o 1 1) #Either.Right.value λr #Bool (r 2 2))) d) #Either.Right.value λu λv (#Bool (u λw #Either (w #Either.Left.value λy #Bool (y 3 3) #Either.Right.value λbb #Bool (bb 3 3)) λeb #Either (eb #Either.Left.value λgb #Bool (gb 3 3) #Either.Right.value λjb #Bool (jb 3 3))) v)) b)
+(Foo) = λa λb (#Either (a #Either λc λd (#Bool (c λe #Either (e #Either λg #Bool (g 1 1) #Either λj #Bool (j 2 2)) λm #Either (m #Either λo #Bool (o 1 1) #Either λr #Bool (r 2 2))) d) #Either λu λv (#Bool (u λw #Either (w #Either λy #Bool (y 3 3) #Either λbb #Bool (bb 3 3)) λeb #Either (eb #Either λgb #Bool (gb 3 3) #Either λjb #Bool (jb 3 3))) v)) b)
 
 (False) = #Bool λ* #Bool λb b
 
 (True) = #Bool λa #Bool λ* a
 
-(Right) = λa #Either λ* #Either λc #Either.Right.value (c a)
+(Right) = λa #Either λ* #Either λc #Either (c a)
 
-(Left) = λa #Either λb #Either λ* #Either.Left.value (b a)
+(Left) = λa #Either λb #Either λ* #Either (b a)
 
 Scott:
 (Foo) = λa λb (a λc λd (c λe (e λg (g 1 1) λj (j 2 2)) λm (m λo (o 1 1) λr (r 2 2)) d) λu λv (u λw (w λy (y 3 3) λbb (bb 3 3)) λeb (eb λgb (gb 3 3) λjb (jb 3 3)) v) b)
@@ -23,5 +23,3 @@ Scott:
 (Right) = λa λ* λc (c a)
 
 (Left) = λa λb λ* (b a)
-
-

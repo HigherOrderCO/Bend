@@ -47,7 +47,7 @@ impl Term {
           rule.body.eta_reduction();
         }
       }
-      Term::Lst { els } => {
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
         for el in els {
           el.eta_reduction();
         }
@@ -55,8 +55,6 @@ impl Term {
       Term::Let { val: fst, nxt: snd, .. }
       | Term::Dup { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.eta_reduction();
         snd.eta_reduction();

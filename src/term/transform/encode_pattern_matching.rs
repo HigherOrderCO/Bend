@@ -32,14 +32,14 @@ impl Term {
         }
         let arg = std::mem::take(&mut args[0]);
         let rules = std::mem::take(rules);
-        *self = encode_match(arg, rules, ctrs, adts, adt_encoding);
+        *self = encode_match(arg, rules, ctrs, adt_encoding);
       }
-      Term::Lst { els } => els.iter_mut().for_each(|e| e.encode_simple_matches(ctrs, adts, adt_encoding)),
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
+        els.iter_mut().for_each(|e| e.encode_simple_matches(ctrs, adts, adt_encoding))
+      }
       Term::Let { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
       | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.encode_simple_matches(ctrs, adts, adt_encoding);
         snd.encode_simple_matches(ctrs, adts, adt_encoding);
@@ -56,23 +56,17 @@ impl Term {
   }
 }
 
-fn encode_match(
-  arg: Term,
-  rules: Vec<Rule>,
-  ctrs: &Constructors,
-  adts: &Adts,
-  adt_encoding: AdtEncoding,
-) -> Term {
+fn encode_match(arg: Term, rules: Vec<Rule>, ctrs: &Constructors, adt_encoding: AdtEncoding) -> Term {
   let typ = infer_match_arg_type(&rules, 0, ctrs).unwrap();
   match typ {
-    Type::Any | Type::Tup => {
+    Type::Any | Type::Tup(_) => {
       let fst_rule = rules.into_iter().next().unwrap();
       encode_var(arg, fst_rule)
     }
     Type::NumSucc(_) => encode_num_succ(arg, rules),
     Type::Num => encode_num(arg, rules),
     // ADT Encoding depends on compiler option
-    Type::Adt(adt) => encode_adt(arg, rules, adt, adt_encoding, adts),
+    Type::Adt(adt) => encode_adt(arg, rules, adt, adt_encoding),
   }
 }
 
@@ -169,7 +163,7 @@ fn encode_num(arg: Term, mut rules: Vec<Rule>) -> Term {
   go(rules.into_iter(), last_rule, None, Some(arg))
 }
 
-fn encode_adt(arg: Term, rules: Vec<Rule>, adt: Name, adt_encoding: AdtEncoding, adts: &Adts) -> Term {
+fn encode_adt(arg: Term, rules: Vec<Rule>, adt: Name, adt_encoding: AdtEncoding) -> Term {
   match adt_encoding {
     // (x @field1 @field2 ... body1  @field1 body2 ...)
     AdtEncoding::Scott => {
@@ -184,11 +178,11 @@ fn encode_adt(arg: Term, rules: Vec<Rule>, adt: Name, adt_encoding: AdtEncoding,
     // #adt_name(x arm[0] arm[1] ...)
     AdtEncoding::TaggedScott => {
       let mut arms = vec![];
-      for (rule, (ctr, fields)) in rules.into_iter().zip(&adts[&adt].ctrs) {
-        let body =
-          rule.pats[0].binds().rev().zip(fields.iter().rev()).fold(rule.body, |bod, (var, field)| {
-            Term::tagged_lam(Tag::adt_field(&adt, ctr, field), var.clone(), bod)
-          });
+      for rule in rules.into_iter() {
+        let body = rule.pats[0]
+          .binds()
+          .rev()
+          .fold(rule.body, |bod, var| Term::tagged_lam(Tag::adt_name(&adt), var.clone(), bod));
         arms.push(body);
       }
       Term::tagged_call(Tag::adt_name(&adt), arg, arms)

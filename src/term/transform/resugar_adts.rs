@@ -32,11 +32,14 @@ impl Term {
         }
       }
 
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
+        for el in els {
+          el.resugar_tagged_scott(book, errs);
+        }
+      }
       Term::App { fun: fst, arg: snd, .. }
       | Term::Let { val: fst, nxt: snd, .. }
-      | Term::Tup { fst, snd }
       | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.resugar_tagged_scott(book, errs);
         snd.resugar_tagged_scott(book, errs);
@@ -49,7 +52,6 @@ impl Term {
           rule.body.resugar_tagged_scott(book, errs);
         }
       }
-      Term::Lst { .. } => unreachable!(),
       Term::Lnk { .. }
       | Term::Num { .. }
       | Term::Var { .. }
@@ -71,7 +73,7 @@ impl Term {
   /// (Some (Some None))
   ///
   /// // Gives the following readback:
-  /// #Option λa #Option λ* #Option.Some.val (a #Option λb #Option λ* #Option.Some.val (b #Option λ* #Option λc c))
+  /// #Option λa #Option λ* #Option (a #Option λb #Option λ* #Option (b #Option λ* #Option λc c))
   ///
   /// // Which gets resugared as:
   /// (Some (Some None))
@@ -112,8 +114,8 @@ impl Term {
 
     let mut cur = &mut *app;
 
-    for field in ctr_args.iter().rev() {
-      let expected_tag = Tag::adt_field(adt_name, ctr, field);
+    for _ in ctr_args.iter().rev() {
+      let expected_tag = Tag::adt_name(adt_name);
 
       match cur {
         Term::App { tag, .. } if tag == &expected_tag => {
@@ -163,7 +165,7 @@ impl Term {
   /// }
   ///
   /// // Gives the following readback:
-  /// λa λb (#Option (a #Option.Some.val λ* λc #Option (c #Option.Some.val λ* 1 2) λ* 3) b)
+  /// λa λb (#Option (a #Option λ* λc #Option (c #Option λ* 1 2) λ* 3) b)
   ///
   /// // Which gets resugared as:
   /// λa λb (match a {
@@ -191,7 +193,7 @@ impl Term {
           let mut arm = arg.as_mut();
 
           for field in ctr_args {
-            let expected_tag = Tag::adt_field(adt_name, ctr, field);
+            let expected_tag = Tag::adt_name(adt_name);
 
             match arm {
               Term::Lam { tag, .. } if tag == &expected_tag => {

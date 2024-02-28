@@ -4,10 +4,10 @@ input_file: tests/golden_tests/compile_file_o_all/adt_option_and.hvm
 ---
 @None = {2 * {2 a a}}
 @Option.and = ({2 @Option.and$S2 {2 @Option.and$S3_$_Option.and$S1 a}} a)
-@Option.and$S0 = {4 a (b {2 {4 [b a] c} {2 * c}})}
-@Option.and$S2 = {4 a ({2 @Option.and$S0 {2 @Option.and$S3_$_Option.and$S1 (a b)}} b)}
+@Option.and$S0 = {2 a (b {2 {2 [b a] c} {2 * c}})}
+@Option.and$S2 = {2 a ({2 @Option.and$S0 {2 @Option.and$S3_$_Option.and$S1 (a b)}} b)}
 @Option.and$S3_$_Option.and$S1 = (* @None)
-@Some = (a {2 {4 a b} {2 * b}})
+@Some = (a {2 {2 a b} {2 * b}})
 @main = a
 & @Option.and ~ (b (c a))
 & @Some ~ (#3 c)

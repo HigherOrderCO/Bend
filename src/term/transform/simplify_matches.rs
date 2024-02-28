@@ -47,16 +47,14 @@ impl Term {
         *self = bind_extracted_args(extracted, std::mem::take(self));
       }
 
-      Term::Lst { els } => {
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
         for el in els {
           el.simplify_matches(ctrs, adts)?;
         }
       }
       Term::Let { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
       | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.simplify_matches(ctrs, adts)?;
         snd.simplify_matches(ctrs, adts)?;

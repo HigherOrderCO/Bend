@@ -6,4 +6,4 @@ input_file: tests/golden_tests/simplify_matches/nested2.hvm
 
 (List.nil) = #List λ* #List λb b
 
-(List.cons) = λa λb #List λc #List λ* #List.List.cons.tail (#List.List.cons.head (c a) b)
+(List.cons) = λa λb #List λc #List λ* #List (c a b)

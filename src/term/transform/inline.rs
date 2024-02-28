@@ -32,32 +32,32 @@ impl Term {
           }
         }
 
-        Term::Lam { bod, .. } => to_inline.push(bod),
-
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => to_inline.push(bod),
+        Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
+          for el in els {
+            to_inline.push(el);
+          }
+        }
         Term::App { fun: fst, arg: snd, .. }
         | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Opx { fst, snd, .. }
-        | Term::Sup { fst, snd, .. }
-        | Term::Tup { fst, snd } => {
+        | Term::Opx { fst, snd, .. } => {
           to_inline.push(fst);
           to_inline.push(snd);
         }
-
-        Term::Mat { rules, .. } => {
+        Term::Mat { args, rules } => {
+          for arg in args {
+            to_inline.push(arg);
+          }
           for rule in rules {
             to_inline.push(&mut rule.body);
           }
         }
-
         Term::Var { .. }
-        | Term::Chn { .. }
         | Term::Lnk { .. }
         | Term::Let { .. }
         | Term::Num { .. }
         | Term::Str { .. }
-        | Term::Lst { .. }
         | Term::Era => {}
-
         Term::Err => unreachable!(),
       }
     }
@@ -71,7 +71,10 @@ impl Term {
       match term {
         Term::Era | Term::Var { .. } | Term::Num { .. } => scope.saturating_sub(1) == 0,
         Term::Lam { bod, .. } => go(bod, scope + 1),
-        Term::Tup { fst, snd } | Term::Sup { fst, snd, .. } => go(fst, scope + 1) && go(snd, scope + 1),
+        Term::Sup { els, .. } | Term::Tup { els } => match els.as_slice() {
+          [fst, snd] => go(fst, scope + 1) && go(snd, scope + 1),
+          _ => false,
+        },
 
         Term::Chn { .. } | Term::Lnk { .. } => false,
         Term::Str { .. } | Term::Lst { .. } => false,

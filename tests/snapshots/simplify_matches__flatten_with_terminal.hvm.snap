@@ -8,4 +8,4 @@ input_file: tests/golden_tests/simplify_matches/flatten_with_terminal.hvm
 
 (B) = #B_t λa a
 
-(A) = λa #A_t λb #A_t.A.b (b a)
+(A) = λa #A_t λb #A_t (b a)

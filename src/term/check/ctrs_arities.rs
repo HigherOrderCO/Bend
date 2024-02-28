@@ -57,11 +57,7 @@ impl Pattern {
             return Err(MatchErr::CtrArityMismatch(name.clone(), found, *expected));
           }
         }
-        Pattern::Tup(fst, snd) => {
-          to_check.push(fst);
-          to_check.push(snd);
-        }
-        Pattern::Lst(els) => {
+        Pattern::Lst(els) | Pattern::Tup(els) => {
           for el in els {
             to_check.push(el);
           }
@@ -93,15 +89,13 @@ impl Term {
         nxt.check_ctrs_arities(arities)?;
       }
 
-      Term::Lst { els } => {
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
         for el in els {
           el.check_ctrs_arities(arities)?;
         }
       }
       Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
       | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.check_ctrs_arities(arities)?;
         snd.check_ctrs_arities(arities)?;

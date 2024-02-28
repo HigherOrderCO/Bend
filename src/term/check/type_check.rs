@@ -32,7 +32,7 @@ fn unify(old: Type, new: Type) -> Result<Type, MatchErr> {
     (Type::NumSucc(n), Type::Num) => Ok(Type::NumSucc(n)),
     (Type::NumSucc(a), Type::NumSucc(b)) if a == b => Ok(Type::NumSucc(a)),
 
-    (Type::Tup, Type::Tup) => Ok(Type::Tup),
+    (Type::Tup(a), Type::Tup(b)) if a == b => Ok(Type::Tup(a)),
 
     (old, new) => Err(MatchErr::TypeMismatch(new, old)),
   }

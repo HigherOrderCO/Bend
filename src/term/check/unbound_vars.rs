@@ -95,7 +95,9 @@ pub fn check_uses<'a>(
       }
     }
     Term::Chn { nam, bod, .. } => {
-      globals.entry(nam).or_default().0 += 1;
+      if let Some(nam) = nam {
+        globals.entry(nam).or_default().0 += 1;
+      }
       check_uses(bod, scope, globals, errs);
     }
     Term::Lnk { nam } => {
@@ -107,21 +109,27 @@ pub fn check_uses<'a>(
       check_uses(nxt, scope, globals, errs);
       pop_scope(nam.as_ref(), scope);
     }
-    Term::Dup { fst, snd, val, nxt, .. }
-    | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
+    Term::Dup { bnd, val, nxt, .. } => {
       check_uses(val, scope, globals, errs);
-      push_scope(fst.as_ref(), scope);
-      push_scope(snd.as_ref(), scope);
+      for bnd in bnd.iter() {
+        push_scope(bnd.as_ref(), scope);
+      }
       check_uses(nxt, scope, globals, errs);
-      pop_scope(fst.as_ref(), scope);
-      pop_scope(snd.as_ref(), scope);
+      for bnd in bnd.iter() {
+        pop_scope(bnd.as_ref(), scope);
+      }
     }
-    Term::Let { .. } => unreachable!(),
-    Term::App { fun, arg, .. } => {
-      check_uses(fun, scope, globals, errs);
-      check_uses(arg, scope, globals, errs);
+    Term::Let { pat, val, nxt } => {
+      check_uses(val, scope, globals, errs);
+      for bnd in pat.bind_or_eras() {
+        push_scope(bnd.as_ref(), scope);
+      }
+      check_uses(nxt, scope, globals, errs);
+      for bnd in pat.bind_or_eras() {
+        pop_scope(bnd.as_ref(), scope);
+      }
     }
-    Term::Tup { fst, snd } | Term::Sup { fst, snd, .. } | Term::Opx { fst, snd, .. } => {
+    Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
       check_uses(fst, scope, globals, errs);
       check_uses(snd, scope, globals, errs);
     }
@@ -137,7 +145,11 @@ pub fn check_uses<'a>(
         rule.pats.iter().flat_map(|p| p.binds()).rev().for_each(|nam| pop_scope(Some(nam), scope));
       }
     }
-    Term::Lst { .. } => unreachable!(),
+    Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
+      for el in els {
+        check_uses(el, scope, globals, errs);
+      }
+    }
     Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => (),
   }
 }

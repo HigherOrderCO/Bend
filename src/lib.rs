@@ -42,7 +42,7 @@ pub const CORE_BUILTINS: [&str; 3] = ["HVM.log", "HVM.black_box", "HVM.print"];
 /// Creates a host with the hvm-core primitive definitions built-in.
 /// This needs the book as an Arc because the closure that logs
 /// data needs access to the book.
-pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOpts) -> Arc<Mutex<Host>> {
+pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncoding) -> Arc<Mutex<Host>> {
   let host = Arc::new(Mutex::new(Host::default()));
   host.lock().unwrap().insert_def(
     "HVM.log",
@@ -54,13 +54,8 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOp
         let host = host.lock().unwrap();
         let tree = host.readback_tree(&wire);
         let net = hvmc::ast::Net { root: tree, rdex: vec![] };
-        let net = hvmc_to_net(&net);
-        let (mut term, mut readback_errors) = net_to_term(&net, &book, &labels, false);
-        let resugar_errs = term.resugar_adts(&book, compile_opts.adt_encoding);
-        term.resugar_builtins();
-
-        readback_errors.extend(resugar_errs);
-        println!("{}{}", display_readback_errors(&readback_errors), term);
+        let (term, errs) = readback_hvmc(&net, &book, &labels, false, adt_encoding);
+        println!("{}{}", display_readback_errors(&errs), term);
       }
     }))),
   );
@@ -74,12 +69,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOp
         let host = host.lock().unwrap();
         let tree = host.readback_tree(&wire);
         let net = hvmc::ast::Net { root: tree, rdex: vec![] };
-        let net = hvmc_to_net(&net);
-        let (mut term, mut readback_errors) = net_to_term(&net, &book, &labels, false);
-        let resugar_errs = term.resugar_adts(&book, compile_opts.adt_encoding);
-        term.resugar_builtins();
-
-        readback_errors.extend(resugar_errs);
+        let (term, _errs) = readback_hvmc(&net, &book, &labels, false, adt_encoding);
         if let Term::Str { val } = term {
           println!("{val}");
         }
@@ -197,18 +187,14 @@ pub fn run_book(
 
   // Run
   let debug_hook = run_opts.debug_hook(&book, &labels);
-  let host = create_host(book.clone(), labels.clone(), compile_opts);
+  let host = create_host(book.clone(), labels.clone(), compile_opts.adt_encoding);
   host.lock().unwrap().insert_book(&core_book);
 
   let (res_lnet, stats) = run_compiled(host, mem_size, run_opts, debug_hook, book.hvmc_entrypoint());
 
-  // Readback
-  let net = hvmc_to_net(&res_lnet);
-  let (mut res_term, mut readback_errors) = net_to_term(&net, &book, &labels, run_opts.linear);
-  let resugar_errs = res_term.resugar_adts(&book, compile_opts.adt_encoding);
-  res_term.resugar_builtins();
+  let (res_term, readback_errors) =
+    readback_hvmc(&res_lnet, &book, &labels, run_opts.linear, compile_opts.adt_encoding);
 
-  readback_errors.extend(resugar_errs);
   let info = RunInfo { stats, readback_errors, net: res_lnet, book, labels };
   Ok((res_term, info))
 }
@@ -304,6 +290,24 @@ pub fn run_compiled(
     let stats = RunStats { rewrites: root.rwts, used: count_nodes(&net), run_time: elapsed };
     (net, stats)
   })
+}
+
+pub fn readback_hvmc(
+  net: &Net,
+  book: &Arc<Book>,
+  labels: &Arc<Labels>,
+  linear: bool,
+  adt_encoding: AdtEncoding,
+) -> (Term, Vec<ReadbackError>) {
+  let net = hvmc_to_net(net);
+  let (mut term, mut readback_errors) = net_to_term(&net, book, labels, linear);
+
+  let resugar_errs = term.resugar_adts(book, adt_encoding);
+  term.resugar_builtins();
+
+  readback_errors.extend(resugar_errs);
+
+  (term, readback_errors)
 }
 
 #[derive(Clone, Copy, Debug, Default)]

@@ -1,5 +1,9 @@
 use crate::{
-  net::{INet, NodeKind::*, Port, ROOT},
+  net::{
+    INet,
+    NodeKind::{self, *},
+    Port, ROOT,
+  },
   term::{Book, Name, NumCtr, Op, Pattern, Tag, Term},
 };
 use std::collections::{hash_map::Entry, HashMap};
@@ -83,7 +87,9 @@ impl<'a> EncodeTermState<'a> {
       // core: (var_use bod)
       Term::Chn { tag, nam, bod } => {
         let fun = self.inet.new_node(Con { lab: self.labels.con.generate(tag) });
-        self.global_vars.entry(nam.clone()).or_default().0 = Port(fun, 1);
+        if let Some(nam) = nam {
+          self.global_vars.entry(nam.clone()).or_default().0 = Port(fun, 1);
+        }
         let bod = self.encode_term(bod, Port(fun, 2));
         self.link_local(Port(fun, 2), bod);
         Some(Port(fun, 0))
@@ -129,22 +135,30 @@ impl<'a> EncodeTermState<'a> {
 
         Some(Port(if_, 2))
       }
-      // A dup becomes a dup node too. Ports:
+      // A dup becomes a dup node too. Ports for dups of size 2:
       // - 0: points to the value projected.
       // - 1: points to the occurrence of the first variable.
       // - 2: points to the occurrence of the second variable.
       // core: & val ~ {lab fst snd} (val not necessarily main port)
-      Term::Dup { fst, snd, val, nxt, tag } => {
-        let dup = self.inet.new_node(Dup { lab: self.labels.dup.generate(tag).unwrap() });
+      // Dups with more than 2 variables become a list-like node tree of n-1 nodes.
+      // All the nodes of a dup tree have the same label.
+      // `@x dup #i {x0 x1 x2 x3}; A` => `({i x0 {i x1 {i x2 x3}}} A)`
+      Term::Dup { tag, bnd, val, nxt } => {
+        let lab = self.labels.dup.generate(tag).unwrap();
+        let (main, aux) = self.make_node_list(Dup { lab }, bnd.len());
 
-        let val = self.encode_term(val, Port(dup, 0));
-        self.link_local(Port(dup, 0), val);
+        let val = self.encode_term(val, main);
+        self.link_local(main, val);
 
-        self.push_scope(fst, Port(dup, 1));
-        self.push_scope(snd, Port(dup, 2));
+        for (bnd, aux) in bnd.iter().zip(aux.iter()) {
+          self.push_scope(bnd, *aux);
+        }
+
         let nxt = self.encode_term(nxt, up);
-        self.pop_scope(snd, Port(dup, 2));
-        self.pop_scope(fst, Port(dup, 1));
+
+        for (bnd, aux) in bnd.iter().rev().zip(aux.iter().rev()) {
+          self.pop_scope(bnd, *aux);
+        }
 
         nxt
       }
@@ -174,17 +188,20 @@ impl<'a> EncodeTermState<'a> {
         self.inet.link(up, Port(node, 0));
         Some(Port(node, 0))
       }
-      Term::Let { pat: Pattern::Tup(box Pattern::Var(l_nam), box Pattern::Var(r_nam)), val, nxt } => {
-        let dup = self.inet.new_node(Tup);
+      Term::Let { pat: Pattern::Tup(args), val, nxt } => {
+        let nams = args.iter().map(|arg| if let Pattern::Var(nam) = arg { nam } else { unreachable!() });
+        let (main, aux) = self.make_node_list(Tup, args.len());
 
-        let val = self.encode_term(val, Port(dup, 0));
-        self.link_local(Port(dup, 0), val);
+        let val = self.encode_term(val, main);
+        self.link_local(main, val);
 
-        self.push_scope(l_nam, Port(dup, 1));
-        self.push_scope(r_nam, Port(dup, 2));
+        for (nam, aux) in nams.clone().zip(aux.iter()) {
+          self.push_scope(nam, *aux);
+        }
         let nxt = self.encode_term(nxt, up);
-        self.pop_scope(r_nam, Port(dup, 2));
-        self.pop_scope(l_nam, Port(dup, 1));
+        for (nam, aux) in nams.rev().zip(aux.iter().rev()) {
+          self.pop_scope(nam, *aux);
+        }
 
         nxt
       }
@@ -197,16 +214,16 @@ impl<'a> EncodeTermState<'a> {
         self.encode_term(nxt, up)
       }
       Term::Let { .. } => unreachable!(), // Removed in earlier pass
-      Term::Sup { tag, fst, snd } => {
-        let sup = self.inet.new_node(Dup { lab: self.labels.dup.generate(tag).unwrap() });
+      Term::Sup { tag, els } => {
+        let lab = self.labels.dup.generate(tag).unwrap();
+        let (main, aux) = self.make_node_list(Dup { lab }, els.len());
 
-        let fst = self.encode_term(fst, Port(sup, 1));
-        self.link_local(Port(sup, 1), fst);
+        for (el, aux) in els.iter().zip(aux) {
+          let el = self.encode_term(el, aux);
+          self.link_local(aux, el);
+        }
 
-        let snd = self.encode_term(snd, Port(sup, 2));
-        self.link_local(Port(sup, 2), snd);
-
-        Some(Port(sup, 0))
+        Some(main)
       }
       Term::Era => {
         let era = self.inet.new_node(Era);
@@ -234,16 +251,14 @@ impl<'a> EncodeTermState<'a> {
 
         Some(Port(opx, 2))
       }
-      Term::Tup { fst, snd } => {
-        let tup = self.inet.new_node(Tup);
+      Term::Tup { els } => {
+        let (main, aux) = self.make_node_list(Tup, els.len());
+        for (el, aux) in els.iter().zip(aux.iter()) {
+          let el = self.encode_term(el, *aux);
+          self.link_local(*aux, el);
+        }
 
-        let fst = self.encode_term(fst, Port(tup, 1));
-        self.link_local(Port(tup, 1), fst);
-
-        let snd = self.encode_term(snd, Port(tup, 2));
-        self.link_local(Port(tup, 2), snd);
-
-        Some(Port(tup, 0))
+        Some(main)
       }
       Term::Err => unreachable!(),
     }
@@ -270,6 +285,24 @@ impl<'a> EncodeTermState<'a> {
     if let Some(ptr_b) = ptr_b {
       self.inet.link(ptr_a, ptr_b);
     }
+  }
+
+  /// Adds a list-like tree of nodes of the same kind to the inet.
+  /// Doesn't attach this tree to anything
+  fn make_node_list(&mut self, kind: NodeKind, num_ports: usize) -> (Port, Vec<Port>) {
+    debug_assert!(num_ports >= 2);
+    let nodes: Vec<_> = (0 .. num_ports - 1).map(|_| self.inet.new_node(kind.clone())).collect();
+
+    let mut up = Some(Port(nodes[0], 2));
+    for &node in nodes.iter().skip(1) {
+      self.link_local(Port(node, 0), up);
+      up = Some(Port(node, 2));
+    }
+
+    let main_port = Port(nodes[0], 0);
+    let mut aux_ports = nodes.iter().map(|n| Port(*n, 1)).collect::<Vec<_>>();
+    aux_ports.push(Port(*nodes.last().unwrap(), 2));
+    (main_port, aux_ports)
   }
 }
 

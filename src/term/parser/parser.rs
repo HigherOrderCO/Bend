@@ -220,44 +220,36 @@ where
       .then_ignore(just(Token::Lambda))
       .then(name_or_era())
       .then(term.clone())
-      .map(|((tag, name), body)| Term::Lam { tag, nam: name, bod: Box::new(body) })
+      .map(|((tag, nam), bod)| Term::Lam { tag, nam, bod: Box::new(bod) })
       .boxed();
 
     // #tag? λ$x body
     let global_lam = tag(Tag::Static)
       .then_ignore(just(Token::Lambda))
-      .then(just(Token::Dollar).ignore_then(name()))
+      .then(just(Token::Dollar).ignore_then(name_or_era()))
       .then(term.clone())
-      .map(|((tag, name), body)| Term::Chn { tag, nam: name, bod: Box::new(body) })
+      .map(|((tag, nam), bod)| Term::Chn { tag, nam, bod: Box::new(bod) })
       .boxed();
 
     // #tag {fst snd}
     let sup = tag(Tag::Auto)
       .then_ignore(just(Token::LBracket))
-      .then(term.clone())
-      .then(term.clone())
+      .then(term.clone().separated_by(list_sep.clone()).at_least(2).collect())
       .then_ignore(just(Token::RBracket))
-      .map(|((tag, fst), snd)| Term::Sup { tag, fst: Box::new(fst), snd: Box::new(snd) })
+      .map(|(tag, els)| Term::Sup { tag, els })
       .boxed();
 
     // let #tag? {x1 x2} = body; next
     let dup = just(Token::Let)
       .ignore_then(tag(Tag::Auto))
       .then_ignore(just(Token::LBracket))
-      .then(name_or_era())
-      .then(name_or_era())
+      .then(name_or_era().separated_by(list_sep.clone()).at_least(2).collect())
       .then_ignore(just(Token::RBracket))
       .then_ignore(just(Token::Equals))
       .then(term.clone())
       .then_ignore(term_sep.clone())
       .then(term.clone())
-      .map(|((((tag, fst), snd), val), next)| Term::Dup {
-        tag,
-        fst,
-        snd,
-        val: Box::new(val),
-        nxt: Box::new(next),
-      })
+      .map(|(((tag, bnd), val), next)| Term::Dup { tag, bnd, val: Box::new(val), nxt: Box::new(next) })
       .boxed();
 
     // let a = ...
@@ -339,8 +331,8 @@ where
       .separated_by(just(Token::Comma))
       .at_least(2)
       .collect::<Vec<Term>>()
-      .map(|xs| make_tup_tree(&xs, |a, b| Term::Tup { fst: Box::new(a), snd: Box::new(b) }))
       .delimited_by(just(Token::LParen), just(Token::RParen))
+      .map(|els| Term::Tup { els })
       .boxed();
 
     let str = select!(Token::Str(s) => Term::Str { val: s }).boxed();
@@ -363,18 +355,6 @@ where
   })
 }
 
-fn make_tup_tree<A: Clone>(xs: &[A], make: fn(A, A) -> A) -> A {
-  match xs {
-    [] => unreachable!(),
-    [x] => x.clone(),
-    xs => {
-      let half = xs.len() / 2;
-      let (x, y) = xs.split_at(half);
-      make(make_tup_tree(x, make), make_tup_tree(y, make))
-    }
-  }
-}
-
 fn pattern<'a, I>() -> impl Parser<'a, I, Pattern, extra::Err<Rich<'a, Token>>>
 where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
@@ -394,7 +374,7 @@ where
       .at_least(2)
       .collect::<Vec<Pattern>>()
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|xs| make_tup_tree(&xs, |a, b| Pattern::Tup(Box::new(a), Box::new(b))))
+      .map(Pattern::Tup)
       .boxed();
 
     let list = pattern

@@ -4,6 +4,6 @@ input_file: tests/golden_tests/compile_term/lets.hvm
 ---
 a
 & (b b) ~ (c (d (e a)))
-& (f f) ~ {9 (g (h (i e))) {11 g {13 h i}}}
-& (j j) ~ {5 (k (l d)) {7 k l}}
+& (f f) ~ {7 (g (h (i e))) {7 g {7 h i}}}
+& (j j) ~ {5 (k (l d)) {5 k l}}
 & (m m) ~ {3 (n c) n}
