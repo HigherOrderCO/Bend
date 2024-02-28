@@ -137,6 +137,8 @@ match list {
   List.nil:  None
 }
 
+// If we don't provide field bindings, it will implicitly use
+// the fields of the declared data type
 match list {
   List.cons:  (Some list.head)
   List.nil:  None
