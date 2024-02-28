@@ -104,11 +104,11 @@ impl Pattern {
   }
 
   fn encode_str(str: &str) -> Pattern {
-    let lnil = Pattern::Ctr(Name::from(LNIL), vec![]);
+    let lnil = Pattern::Ctr(Name::from(SNIL), vec![]);
 
     str.chars().rfold(lnil, |tail, head| {
       let head = Pattern::Num(NumCtr::Num(head as u64));
-      Pattern::Ctr(Name::from(LCONS), vec![head, tail])
+      Pattern::Ctr(Name::from(SCONS), vec![head, tail])
     })
   }
 }
