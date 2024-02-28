@@ -39,38 +39,40 @@ impl Term {
   ///
   /// See `[simplify_match_expression]` for more information.
   pub fn simplify_matches(&mut self, ctrs: &Constructors, adts: &Adts) -> Result<(), MatchErr> {
-    match self {
-      Term::Mat { args, rules } => {
-        let (new_args, extracted) = extract_args(args);
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
+      match self {
+        Term::Mat { args, rules } => {
+          let (new_args, extracted) = extract_args(args);
 
-        *self = simplify_match_expression(&new_args, rules, ctrs, adts)?;
-        *self = bind_extracted_args(extracted, std::mem::take(self));
-      }
-
-      Term::Lst { els } => {
-        for el in els {
-          el.simplify_matches(ctrs, adts)?;
+          let term = simplify_match_expression(&new_args, rules, ctrs, adts)?;
+          *self = bind_extracted_args(extracted, term);
         }
+
+        Term::Lst { els } => {
+          for el in els {
+            el.simplify_matches(ctrs, adts)?;
+          }
+        }
+        Term::Let { val: fst, nxt: snd, .. }
+        | Term::App { fun: fst, arg: snd, .. }
+        | Term::Tup { fst, snd }
+        | Term::Dup { val: fst, nxt: snd, .. }
+        | Term::Sup { fst, snd, .. }
+        | Term::Opx { fst, snd, .. } => {
+          fst.simplify_matches(ctrs, adts)?;
+          snd.simplify_matches(ctrs, adts)?;
+        }
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.simplify_matches(ctrs, adts)?,
+        Term::Var { .. }
+        | Term::Lnk { .. }
+        | Term::Num { .. }
+        | Term::Str { .. }
+        | Term::Ref { .. }
+        | Term::Era => (),
+        Term::Err => unreachable!(),
       }
-      Term::Let { val: fst, nxt: snd, .. }
-      | Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.simplify_matches(ctrs, adts)?;
-        snd.simplify_matches(ctrs, adts)?;
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.simplify_matches(ctrs, adts)?,
-      Term::Var { .. }
-      | Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era => (),
-      Term::Err => unreachable!(),
-    }
-    Ok(())
+      Ok(())
+    })
   }
 }
 

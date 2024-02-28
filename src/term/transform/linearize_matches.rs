@@ -24,44 +24,46 @@ impl Ctx<'_> {
 
 impl Term {
   fn linearize_simple_matches(&mut self, lift_all_vars: bool) -> Result<(), MatchErr> {
-    match self {
-      Term::Mat { args: _, rules } => {
-        for rule in rules.iter_mut() {
-          rule.body.linearize_simple_matches(lift_all_vars).unwrap();
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
+      match self {
+        Term::Mat { args: _, rules } => {
+          for rule in rules.iter_mut() {
+            rule.body.linearize_simple_matches(lift_all_vars).unwrap();
+          }
+          lift_match_vars(self, lift_all_vars);
         }
-        lift_match_vars(self, lift_all_vars);
-      }
 
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.linearize_simple_matches(lift_all_vars)?;
-      }
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+          bod.linearize_simple_matches(lift_all_vars)?;
+        }
 
-      Term::Let { pat: Pattern::Var(..), val: fst, nxt: snd }
-      | Term::Tup { fst, snd }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { fst, snd, .. }
-      | Term::App { fun: fst, arg: snd, .. } => {
-        fst.linearize_simple_matches(lift_all_vars)?;
-        snd.linearize_simple_matches(lift_all_vars)?;
-      }
+        Term::Let { pat: Pattern::Var(..), val: fst, nxt: snd }
+        | Term::Tup { fst, snd }
+        | Term::Dup { val: fst, nxt: snd, .. }
+        | Term::Sup { fst, snd, .. }
+        | Term::Opx { fst, snd, .. }
+        | Term::App { fun: fst, arg: snd, .. } => {
+          fst.linearize_simple_matches(lift_all_vars)?;
+          snd.linearize_simple_matches(lift_all_vars)?;
+        }
 
-      Term::Lst { .. } => unreachable!(),
-      Term::Let { pat, .. } => {
-        unreachable!("Destructor let expression should have been desugared already. {pat}")
-      }
+        Term::Lst { .. } => unreachable!(),
+        Term::Let { pat, .. } => {
+          unreachable!("Destructor let expression should have been desugared already. {pat}")
+        }
 
-      Term::Str { .. }
-      | Term::Lnk { .. }
-      | Term::Var { .. }
-      | Term::Num { .. }
-      | Term::Ref { .. }
-      | Term::Era => {}
+        Term::Str { .. }
+        | Term::Lnk { .. }
+        | Term::Var { .. }
+        | Term::Num { .. }
+        | Term::Ref { .. }
+        | Term::Era => {}
 
-      Term::Err => todo!(),
-    };
+        Term::Err => todo!(),
+      };
 
-    Ok(())
+      Ok(())
+    })
   }
 }
 

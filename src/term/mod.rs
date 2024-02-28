@@ -140,6 +140,44 @@ pub enum Term {
   Err,
 }
 
+impl Drop for Term {
+  fn drop(&mut self) {
+    let mut stack = vec![self];
+
+    while let Some(term) = stack.pop() {
+      match term {
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+          stack.push(bod);
+        }
+        Term::Let { val: fst, nxt: snd, .. }
+        | Term::App { fun: fst, arg: snd, .. }
+        | Term::Tup { fst, snd }
+        | Term::Dup { val: fst, nxt: snd, .. }
+        | Term::Sup { fst, snd, .. }
+        | Term::Opx { fst, snd, .. } => {
+          stack.push(fst);
+          stack.push(snd);
+        }
+        Term::Mat { args, rules } => {
+          for arg in args.iter_mut() {
+            stack.push(arg);
+          }
+
+          for Rule { body, .. } in rules.iter_mut() {
+            stack.push(body);
+          }
+        }
+        Term::Lst { els } => {
+          for el in els.iter_mut() {
+            stack.push(el);
+          }
+        }
+        _ => {}
+      }
+    }
+  }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
   Var(Option<Name>),

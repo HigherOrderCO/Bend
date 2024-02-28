@@ -1,0 +1,4 @@
+MakeLongStr 0   acc = acc
+MakeLongStr 1+p acc = (String.cons '*' (MakeLongStr p acc))
+
+main = (MakeLongStr 16339 String.nil)

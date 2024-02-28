@@ -80,7 +80,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOp
         term.resugar_builtins();
 
         readback_errors.extend(resugar_errs);
-        if let Term::Str { val } = term {
+        if let Term::Str { ref val } = term {
           println!("{val}");
         }
       }
