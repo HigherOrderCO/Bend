@@ -11,7 +11,7 @@ pub fn prune_defs(book: &mut Book, entrypoint: String) {
   while let Some(nam) = to_visit.pop() {
     let def = &book[&nam];
     used_defs_in_tree(&def.root, &mut used_defs, &mut to_visit);
-    for (a, b) in &def.rdex {
+    for (a, b) in &def.redexes {
       used_defs_in_tree(a, &mut used_defs, &mut to_visit);
       used_defs_in_tree(b, &mut used_defs, &mut to_visit);
     }

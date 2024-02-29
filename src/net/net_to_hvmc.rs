@@ -16,7 +16,7 @@ pub fn nets_to_hvmc(nets: HashMap<String, INet>) -> Result<Book, String> {
 
 /// Convert an inet-encoded definition into an hvmc AST inet.
 pub fn net_to_hvmc(inet: &INet) -> Result<Net, String> {
-  let (net_root, redexes) = get_tree_roots(inet)?;
+  let (net_root, net_redexes) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(net_root) = net_root {
     // If there is a root tree connected to the root node
@@ -26,13 +26,13 @@ pub fn net_to_hvmc(inet: &INet) -> Result<Net, String> {
     port_to_var_id.insert(inet.enter_port(ROOT), 0);
     Tree::Var { nam: num_to_name(0) }
   };
-  let mut rdex = vec![];
-  for [root0, root1] in redexes {
-    let rdex0 = net_tree_to_hvmc_tree(inet, root0, &mut port_to_var_id);
-    let rdex1 = net_tree_to_hvmc_tree(inet, root1, &mut port_to_var_id);
-    rdex.push((rdex0, rdex1));
+  let mut redexes = vec![];
+  for [root0, root1] in net_redexes {
+    let root0 = net_tree_to_hvmc_tree(inet, root0, &mut port_to_var_id);
+    let root1 = net_tree_to_hvmc_tree(inet, root1, &mut port_to_var_id);
+    redexes.push((root0, root1));
   }
-  Ok(Net { root, rdex })
+  Ok(Net { root, redexes })
 }
 
 fn net_tree_to_hvmc_tree(inet: &INet, tree_root: NodeId, port_to_var_id: &mut HashMap<Port, VarId>) -> Tree {
