@@ -1,11 +1,12 @@
-#![allow(dead_code)]
 use self::{check::type_check::infer_match_arg_type, parser::lexer::STRINGS};
 use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
 use indexmap::{IndexMap, IndexSet};
 use interner::global::GlobalString;
 use itertools::Itertools;
 use std::{
-  borrow::Cow, collections::{HashMap, HashSet}, mem, ops::Deref
+  borrow::Cow,
+  collections::{HashMap, HashSet},
+  ops::Deref,
 };
 
 pub mod builtins;
@@ -66,7 +67,6 @@ pub struct Rule {
   pub body: Term,
 }
 
-#[derive(derive_destructure2::remove_trait_impls)]
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
 pub enum Term {
   Lam {
@@ -140,78 +140,51 @@ pub enum Term {
   Err,
 }
 
-// impl Drop for Term {
-//   fn drop(&mut self) {
-//     let mut stack = vec![mem::take(self)];
-
-//     while let Some(mut term) = stack.pop() {
-//       match &mut term {
-//         Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-//           stack.push(std::mem::take(bod));
-//         }
-//         Term::Let { val: fst, nxt: snd, .. }
-//         | Term::App { fun: fst, arg: snd, .. }
-//         | Term::Tup { fst, snd }
-//         | Term::Dup { val: fst, nxt: snd, .. }
-//         | Term::Sup { fst, snd, .. }
-//         | Term::Opx { fst, snd, .. } => {
-//           stack.push(std::mem::take(fst));
-//           stack.push(std::mem::take(snd));
-//         }
-//         Term::Mat { args, rules } => {
-//           for arg in std::mem::take(args).into_iter() {
-//             stack.push(arg);
-//           }
-
-//           for Rule { body, .. } in std::mem::take(rules).into_iter()  {
-//             stack.push(body);
-//           }
-//         }
-//         Term::Lst { els } => {
-//           for el in std::mem::take(els).into_iter()  {
-//             stack.push(el);
-//           }
-//         }
-//         _ => {}
-//       }
-//     }
-//   }
-// }
-
 impl Drop for Term {
   fn drop(&mut self) {
-    let mut stack = vec![mem::take(self)];
+    if matches!(self, Term::Era | Term::Err) {
+      return;
+    }
 
-    while let Some(term) = stack.pop() {
-      match term.remove_trait_impls() {
-        TermWithoutTraitImpls::Lam { bod, .. } | TermWithoutTraitImpls::Chn { bod, .. } => {
-          stack.push(*bod);
-        }
-        TermWithoutTraitImpls::Let { val: fst, nxt: snd, .. }
-        | TermWithoutTraitImpls::App { fun: fst, arg: snd, .. }
-        | TermWithoutTraitImpls::Tup { fst, snd }
-        | TermWithoutTraitImpls::Dup { val: fst, nxt: snd, .. }
-        | TermWithoutTraitImpls::Sup { fst, snd, .. }
-        | TermWithoutTraitImpls::Opx { fst, snd, .. } => {
-          stack.push(*fst);
-          stack.push(*snd);
-        }
-        TermWithoutTraitImpls::Mat { args, rules } => {
-          for arg in args.into_iter() {
-            stack.push(arg);
-          }
+    let mut stack = vec![];
+    self.take_children(&mut stack);
 
-          for Rule { body, .. } in rules.into_iter()  {
-            stack.push(body);
-          }
-        }
-        TermWithoutTraitImpls::Lst { els } => {
-          for el in els.into_iter()  {
-            stack.push(el);
-          }
-        }
-        _ => {}
+    while let Some(mut term) = stack.pop() {
+      term.take_children(&mut stack)
+    }
+  }
+}
+
+impl Term {
+  fn take_children(&mut self, stack: &mut Vec<Term>) {
+    match self {
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+        stack.push(std::mem::take(bod.as_mut()));
       }
+      Term::Let { val: fst, nxt: snd, .. }
+      | Term::App { fun: fst, arg: snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. } => {
+        stack.push(std::mem::take(fst.as_mut()));
+        stack.push(std::mem::take(snd.as_mut()));
+      }
+      Term::Mat { args, rules } => {
+        for arg in std::mem::take(args).into_iter() {
+          stack.push(arg);
+        }
+
+        for Rule { body, .. } in std::mem::take(rules).into_iter() {
+          stack.push(body);
+        }
+      }
+      Term::Lst { els } => {
+        for el in std::mem::take(els).into_iter() {
+          stack.push(el);
+        }
+      }
+      _ => {}
     }
   }
 }
