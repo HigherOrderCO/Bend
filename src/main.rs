@@ -232,9 +232,8 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
 
       let book = load_book(&path)?;
 
-      let mem_size = max_mem / std::mem::size_of::<hvmc::run::Node>() as u64;
       let run_opts =
-        RunOpts { single_core, debug, linear, lazy_mode, max_memory: mem_size, max_rewrites: max_rwts };
+        RunOpts { single_core, debug, linear, lazy_mode, max_memory: max_mem, max_rewrites: max_rwts };
       let (res_term, RunInfo { stats, readback_errors, net, book: _, labels: _ }) =
         run_book(book, max_mem as usize, run_opts, warning_opts, opts)?;
 

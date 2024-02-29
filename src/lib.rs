@@ -6,7 +6,7 @@ use hvmc::{
   ast::{self, Net},
   dispatch_dyn_net,
   host::Host,
-  run::{DynNet, Net as RtNet, Rewrites},
+  run::{DynNet, Heap, Rewrites},
   stdlib::LogDef,
 };
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
@@ -53,7 +53,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOp
       move |wire| {
         let host = host.lock().unwrap();
         let tree = host.readback_tree(&wire);
-        let net = hvmc::ast::Net { root: tree, rdex: vec![] };
+        let net = hvmc::ast::Net { root: tree, redexes: vec![] };
         let net = hvmc_to_net(&net);
         let (mut term, mut readback_errors) = net_to_term(&net, &book, &labels, false);
         let resugar_errs = term.resugar_adts(&book, compile_opts.adt_encoding);
@@ -73,7 +73,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOp
       move |wire| {
         let host = host.lock().unwrap();
         let tree = host.readback_tree(&wire);
-        let net = hvmc::ast::Net { root: tree, rdex: vec![] };
+        let net = hvmc::ast::Net { root: tree, redexes: vec![] };
         let net = hvmc_to_net(&net);
         let (mut term, mut readback_errors) = net_to_term(&net, &book, &labels, false);
         let resugar_errs = term.resugar_adts(&book, compile_opts.adt_encoding);
@@ -217,7 +217,7 @@ pub fn run_book(
 pub fn count_nodes<'l>(net: &'l hvmc::ast::Net) -> usize {
   let mut visit: Vec<&'l hvmc::ast::Tree> = vec![&net.root];
   let mut count = 0usize;
-  for (l, r) in &net.rdex {
+  for (l, r) in &net.redexes {
     visit.push(l);
     visit.push(r);
   }
@@ -253,7 +253,7 @@ pub fn run_compiled(
   hook: Option<impl FnMut(&Net)>,
   entrypoint: &str,
 ) -> (Net, RunStats) {
-  let heap = RtNet::<hvmc::run::Lazy>::init_heap(mem_size);
+  let heap = Heap::new_bytes(mem_size);
   let mut root = DynNet::new(&heap, run_opts.lazy_mode);
   let max_rwts = run_opts.max_rewrites.map(|x| x.clamp(usize::MIN as u64, usize::MAX as u64) as usize);
   // Expect won't be reached because there's
@@ -265,7 +265,7 @@ pub fn run_compiled(
 
     if let Some(mut hook) = hook {
       root.expand();
-      while !root.rdex.is_empty() {
+      while !root.redexes.is_empty() {
         hook(&host.lock().unwrap().readback(root));
         root.reduce(1);
         root.expand();
@@ -278,7 +278,7 @@ pub fn run_compiled(
         panic!("Parallel mode does not yet support rewrite limit");
       }
       root.expand();
-      while !root.rdex.is_empty() {
+      while !root.redexes.is_empty() {
         let old_rwts = root.rwts.total();
         root.reduce(max_rwts);
         let delta_rwts = root.rwts.total() - old_rwts;

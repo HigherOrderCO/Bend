@@ -41,11 +41,11 @@ pub fn pre_reduce_book(book: &mut Book, entrypoint: &str) -> Result<(), String> 
 
   for (nam, net) in book.iter_mut() {
     // Skip unnecessary work
-    if net.rdex.is_empty() || *nam == entrypoint {
+    if net.redexes.is_empty() || *nam == entrypoint {
       continue;
     }
 
-    let area = hvmc::run::Net::<hvmc::run::Lazy>::init_heap(1 << 18);
+    let area = hvmc::run::Heap::new_words(1 << 18);
     let mut rt = hvmc::run::DynNet::new(&area, false);
     dispatch_dyn_net!(&mut rt => {
       rt.boot(host.defs.get(nam).expect("No function."));
@@ -53,12 +53,12 @@ pub fn pre_reduce_book(book: &mut Book, entrypoint: &str) -> Result<(), String> 
       rt.reduce(MAX_RWTS);
     });
 
-    // Move interactions with inert defs back into the net rdex array
+    // Move interactions with inert defs back into the net redexes array
     for def in host.defs.values() {
       if let Some(def) = def.downcast_ref::<InertDef>() {
         let mut stored_redexes = def.data.0.lock().unwrap();
         dispatch_dyn_net!(&mut rt => {
-          rt.rdex.extend(core::mem::take(&mut *stored_redexes));
+          rt.redexes.extend(core::mem::take(&mut *stored_redexes));
         })
       }
     }
