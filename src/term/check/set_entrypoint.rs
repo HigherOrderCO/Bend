@@ -9,7 +9,6 @@ pub enum EntryErr {
   NotFound(Name),
   Multiple(Vec<Name>),
   MultipleRules,
-  Arguments(usize, usize),
 }
 
 impl Display for EntryErr {
@@ -23,21 +22,23 @@ impl Display for EntryErr {
         write!(f, "File has '{}', '{}' and '{}' definitions.", fnd[0], fnd[1], fnd[2])
       }
       EntryErr::MultipleRules => write!(f, "Main definition can't have more than one rule."),
-      EntryErr::Arguments(expected, got) => {
-        write!(f, "Main definition expects {expected} arguments, got {got}.")
-      }
     }
   }
 }
 
 impl Ctx<'_> {
-  pub fn set_entrypoint(&mut self, given_arguments: usize) {
+  pub fn set_entrypoint(&mut self) {
+    // already setted
+    if self.book.entrypoint.is_some() {
+      return;
+    }
+
     let mut entrypoint = None;
 
     let (custom, main, hvm1_main) = self.book.get_possible_entry_points();
     match (custom, main, hvm1_main) {
       (Some(entry), None, None) | (None, Some(entry), None) | (None, None, Some(entry)) => {
-        match validate_entry_point(entry, given_arguments) {
+        match validate_entry_point(entry) {
           Ok(name) => entrypoint = Some(name),
           Err(err) => self.info.error(err),
         }
@@ -46,7 +47,7 @@ impl Ctx<'_> {
       (Some(a), Some(b), None) | (None, Some(a), Some(b)) | (Some(a), None, Some(b)) => {
         self.info.error(EntryErr::Multiple(vec![a.name.clone(), b.name.clone()]));
 
-        match validate_entry_point(a, given_arguments) {
+        match validate_entry_point(a) {
           Ok(name) => entrypoint = Some(name),
           Err(err) => self.info.error(err),
         }
@@ -55,7 +56,7 @@ impl Ctx<'_> {
       (Some(a), Some(b), Some(c)) => {
         self.info.error(EntryErr::Multiple(vec![a.name.clone(), b.name.clone(), c.name.clone()]));
 
-        match validate_entry_point(a, given_arguments) {
+        match validate_entry_point(a) {
           Ok(name) => entrypoint = Some(name),
           Err(err) => self.info.error(err),
         }
@@ -70,14 +71,8 @@ impl Ctx<'_> {
   }
 }
 
-fn validate_entry_point(entry: &Definition, given_arguments: usize) -> Result<Name, EntryErr> {
-  if entry.rules.len() > 1 {
-    Err(EntryErr::MultipleRules)
-  } else if entry.rules[0].pats.len() != given_arguments {
-    Err(EntryErr::Arguments(entry.rules[0].pats.len(), given_arguments))
-  } else {
-    Ok(entry.name.clone())
-  }
+fn validate_entry_point(entry: &Definition) -> Result<Name, EntryErr> {
+  if entry.rules.len() > 1 { Err(EntryErr::MultipleRules) } else { Ok(entry.name.clone()) }
 }
 
 impl Book {

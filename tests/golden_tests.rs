@@ -109,7 +109,7 @@ fn compile_term() {
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, None, CompileOpts::heavy())?;
+    let compiled = compile_book(&mut book, CompileOpts::heavy())?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -117,7 +117,7 @@ fn compile_file_o_all() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, None, CompileOpts::light())?;
+    let compiled = compile_book(&mut book, CompileOpts::light())?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -189,7 +189,7 @@ fn simplify_matches() {
     let mut book = do_parse_book(code, path)?;
     let mut ctx = Ctx::new(&mut book);
     ctx.check_shared_names();
-    ctx.set_entrypoint(0);
+    ctx.set_entrypoint();
     ctx.book.encode_adts(AdtEncoding::TaggedScott);
     ctx.book.encode_builtins();
     ctx.book.resolve_ctrs_in_pats();
@@ -227,7 +227,7 @@ fn encode_pattern_match() {
       let mut book = do_parse_book(code, path)?;
       let mut ctx = Ctx::new(&mut book);
       ctx.check_shared_names();
-      ctx.set_entrypoint(0);
+      ctx.set_entrypoint();
       ctx.book.encode_adts(adt_encoding);
       ctx.book.encode_builtins();
       ctx.book.resolve_ctrs_in_pats();
@@ -258,7 +258,7 @@ fn encode_pattern_match() {
 fn desugar_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    desugar_book(&mut book, None, CompileOpts::light())?;
+    desugar_book(&mut book, CompileOpts::light())?;
     Ok(book.to_string())
   })
 }
@@ -289,7 +289,7 @@ fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::from("foo"));
-    let compiled = compile_book(&mut book, None, CompileOpts::light())?;
+    let compiled = compile_book(&mut book, CompileOpts::light())?;
     Ok(format!("{:?}", compiled))
   })
 }

@@ -199,7 +199,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
       }
 
       let mut book = load_book(&path)?;
-      let compiled = compile_book(&mut book, None, opts)?;
+      let compiled = compile_book(&mut book, opts)?;
       println!("{}", compiled.display_with_warns(warning_opts)?);
     }
     Mode::Desugar { path, comp_opts, lazy_mode } => {
@@ -209,7 +209,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
       }
       let mut book = load_book(&path)?;
       // TODO: Shouldn't the desugar have `warn_opts` too? maybe WarningOpts::allow_all() by default
-      let _warns = desugar_book(&mut book, None, opts)?;
+      let _warns = desugar_book(&mut book, opts)?;
       println!("{}", book);
     }
     Mode::Run {

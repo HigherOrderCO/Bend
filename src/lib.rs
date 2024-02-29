@@ -95,16 +95,12 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOp
 pub fn check_book(book: &mut Book) -> Result<(), Info> {
   // TODO: Do the checks without having to do full compilation
   // TODO: Shouldn't the check mode show warnings?
-  compile_book(book, None, CompileOpts::light())?;
+  compile_book(book, CompileOpts::light())?;
   Ok(())
 }
 
-pub fn compile_book(
-  book: &mut Book,
-  args: Option<Vec<Term>>,
-  opts: CompileOpts,
-) -> Result<CompileResult, Info> {
-  let warns = desugar_book(book, args, opts)?;
+pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult, Info> {
+  let warns = desugar_book(book, opts)?;
   let (nets, labels) = book_to_nets(book);
 
   let mut core_book = nets_to_hvmc(nets)?;
@@ -117,17 +113,11 @@ pub fn compile_book(
   Ok(CompileResult { core_book, labels, warns })
 }
 
-pub fn desugar_book(
-  book: &mut Book,
-  args: Option<Vec<Term>>,
-  opts: CompileOpts,
-) -> Result<Vec<Warning>, Info> {
+pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, Info> {
   let mut ctx = Ctx::new(book);
 
   ctx.check_shared_names();
-  ctx.set_entrypoint(if let Some(args) = &args { args.len() } else { 0 });
-
-  ctx.book.apply_args(args)?;
+  ctx.set_entrypoint();
 
   ctx.book.encode_adts(opts.adt_encoding);
   ctx.book.encode_builtins();
@@ -197,7 +187,10 @@ pub fn run_book(
   compile_opts: CompileOpts,
   args: Option<Vec<Term>>,
 ) -> Result<(Term, RunInfo), Info> {
-  let CompileResult { core_book, labels, warns } = compile_book(&mut book, args, compile_opts)?;
+  let mut ctx = Ctx::new(&mut book);
+  ctx.set_entrypoint();
+  ctx.book.apply_args(args)?;
+  let CompileResult { core_book, labels, warns } = compile_book(&mut book, compile_opts)?;
 
   // Turn the book into an Arc so that we can use it for logging, debugging, etc.
   // from anywhere else in the program
