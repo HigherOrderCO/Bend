@@ -132,6 +132,7 @@ fn linear_readback() {
       RunOpts { linear: true, ..Default::default() },
       WarningOpts::deny_all(),
       CompileOpts::heavy(),
+      None,
     )?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   });
@@ -143,14 +144,14 @@ fn run_file() {
       let book = do_parse_book(code, path)?;
       // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
       let (res, info) =
-        run_book(book, 1 << 24, RunOpts::lazy(), WarningOpts::deny_all(), CompileOpts::heavy())?;
+        run_book(book, 1 << 24, RunOpts::lazy(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
       Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
     }),
     (&|code, path| {
       let book = do_parse_book(code, path)?;
       // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
       let (res, info) =
-        run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
+        run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
       Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
     }),
   ])
@@ -166,7 +167,7 @@ fn run_lazy() {
     desugar_opts.lazy_mode();
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, info) = run_book(book, 1 << 24, run_opts, WarningOpts::deny_all(), desugar_opts)?;
+    let (res, info) = run_book(book, 1 << 24, run_opts, WarningOpts::deny_all(), desugar_opts, None)?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }
@@ -188,7 +189,7 @@ fn simplify_matches() {
     let mut book = do_parse_book(code, path)?;
     let mut ctx = Ctx::new(&mut book);
     ctx.check_shared_names();
-    ctx.set_entrypoint();
+    ctx.set_entrypoint(0);
     ctx.book.encode_adts(AdtEncoding::TaggedScott);
     ctx.book.encode_builtins();
     ctx.book.resolve_ctrs_in_pats();
@@ -226,7 +227,7 @@ fn encode_pattern_match() {
       let mut book = do_parse_book(code, path)?;
       let mut ctx = Ctx::new(&mut book);
       ctx.check_shared_names();
-      ctx.set_entrypoint();
+      ctx.set_entrypoint(0);
       ctx.book.encode_adts(adt_encoding);
       ctx.book.encode_builtins();
       ctx.book.resolve_ctrs_in_pats();
@@ -273,7 +274,8 @@ fn hangs() {
     let lck = Arc::new(RwLock::new(false));
     let got = lck.clone();
     std::thread::spawn(move || {
-      let _ = run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy());
+      let _ =
+        run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None);
       *got.write().unwrap() = true;
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
@@ -299,7 +301,7 @@ fn run_entrypoint() {
     book.entrypoint = Some(Name::from("foo"));
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) =
-      run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
+      run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }

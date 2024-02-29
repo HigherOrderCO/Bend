@@ -91,7 +91,7 @@ enum Mode {
         chumsky::error::RichReason::Many(errs) => format!("{}", &errs[0]),
         _ => format!("{}", e[0].reason()),
       }))]
-    arguments: Vec<hvml::term::Term>,
+    arguments: Option<Vec<hvml::term::Term>>,
 
     #[command(flatten)]
     warn_opts: CliWarnOpts,

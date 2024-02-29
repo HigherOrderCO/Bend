@@ -190,9 +190,9 @@ pub fn run_book(
   run_opts: RunOpts,
   warning_opts: WarningOpts,
   compile_opts: CompileOpts,
-  args: Vec<Term>,
+  args: Option<Vec<Term>>,
 ) -> Result<(Term, RunInfo), Info> {
-  let CompileResult { core_book, labels, warns } = compile_book(&mut book, Some(args), compile_opts)?;
+  let CompileResult { core_book, labels, warns } = compile_book(&mut book, args, compile_opts)?;
 
   // Turn the book into an Arc so that we can use it for logging, debugging, etc.
   // from anywhere else in the program
