@@ -139,6 +139,7 @@ pub enum Term {
   #[default]
   Err,
 }
+
 impl Clone for Term {
   fn clone(&self) -> Self {
     stacker::maybe_grow(1024 * 32, 1024 * 1024, move || match self {
