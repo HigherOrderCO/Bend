@@ -10,14 +10,18 @@ use hvmc::{
   stdlib::LogDef,
 };
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
-use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::{net_to_hvmc, nets_to_hvmc}};
+use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{
   str::FromStr,
   sync::{Arc, Mutex},
   time::Instant,
 };
 use term::{
-  book_to_nets, display::{display_readback_errors, DisplayJoin}, net_to_term::net_to_term, term_to_compat_net, term_to_net::Labels, AdtEncoding, Book, Ctx, ReadbackError, Term
+  book_to_nets,
+  display::{display_readback_errors, DisplayJoin},
+  net_to_term::net_to_term,
+  term_to_net::Labels,
+  AdtEncoding, Book, Ctx, ReadbackError, Term,
 };
 
 pub mod diagnostics;
@@ -95,20 +99,15 @@ pub fn check_book(book: &mut Book) -> Result<(), Info> {
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book, args: Option<Vec<Term>>, opts: CompileOpts) -> Result<CompileResult, Info> {
-  let warns = desugar_book(book, opts)?;
-  let (nets, mut labels) = book_to_nets(book);
+pub fn compile_book(
+  book: &mut Book,
+  args: Option<Vec<Term>>,
+  opts: CompileOpts,
+) -> Result<CompileResult, Info> {
+  let warns = desugar_book(book, args, opts)?;
+  let (nets, labels) = book_to_nets(book);
 
-  let mut net_args = Vec::new();
-  if let Some(args) = args {
-    for term in &args {
-      let inet = term_to_compat_net(term, &mut labels);
-      let net = net_to_hvmc(&inet).expect("");
-      net_args.push(net);
-    }
-  }
-
-  let mut core_book = nets_to_hvmc(nets, net_args, book.hvmc_entrypoint())?;
+  let mut core_book = nets_to_hvmc(nets)?;
   if opts.pre_reduce {
     pre_reduce_book(&mut core_book, book.hvmc_entrypoint())?;
   }
@@ -118,11 +117,17 @@ pub fn compile_book(book: &mut Book, args: Option<Vec<Term>>, opts: CompileOpts)
   Ok(CompileResult { core_book, labels, warns })
 }
 
-pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, Info> {
+pub fn desugar_book(
+  book: &mut Book,
+  args: Option<Vec<Term>>,
+  opts: CompileOpts,
+) -> Result<Vec<Warning>, Info> {
   let mut ctx = Ctx::new(book);
 
   ctx.check_shared_names();
-  ctx.set_entrypoint();
+  ctx.set_entrypoint(if let Some(args) = &args { args.len() } else { 0 });
+
+  ctx.book.apply_args(args)?;
 
   ctx.book.encode_adts(opts.adt_encoding);
   ctx.book.encode_builtins();

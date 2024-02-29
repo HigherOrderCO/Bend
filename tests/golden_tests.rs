@@ -258,7 +258,7 @@ fn encode_pattern_match() {
 fn desugar_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    desugar_book(&mut book, CompileOpts::light())?;
+    desugar_book(&mut book, None, CompileOpts::light())?;
     Ok(book.to_string())
   })
 }
