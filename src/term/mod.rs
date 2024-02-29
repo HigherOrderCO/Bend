@@ -67,7 +67,7 @@ pub struct Rule {
   pub body: Term,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, PartialEq, Eq, Hash)]
 pub enum Term {
   Lam {
     tag: Tag,
@@ -138,6 +138,31 @@ pub enum Term {
   Era,
   #[default]
   Err,
+}
+impl Clone for Term {
+  fn clone(&self) -> Self {
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || match self {
+      Self::Lam { tag, nam, bod } => Self::Lam { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
+      Self::Var { nam } => Self::Var { nam: nam.clone() },
+      Self::Chn { tag, nam, bod } => Self::Chn { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
+      Self::Lnk { nam } => Self::Lnk { nam: nam.clone() },
+      Self::Let { pat, val, nxt } => Self::Let { pat: pat.clone(), val: val.clone(), nxt: nxt.clone() },
+      Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
+      Self::Tup { fst, snd } => Self::Tup { fst: fst.clone(), snd: snd.clone() },
+      Self::Dup { tag, fst, snd, val, nxt } => {
+        Self::Dup { tag: tag.clone(), fst: fst.clone(), snd: snd.clone(), val: val.clone(), nxt: nxt.clone() }
+      }
+      Self::Sup { tag, fst, snd } => Self::Sup { tag: tag.clone(), fst: fst.clone(), snd: snd.clone() },
+      Self::Num { val } => Self::Num { val: val.clone() },
+      Self::Str { val } => Self::Str { val: val.clone() },
+      Self::Lst { els } => Self::Lst { els: els.clone() },
+      Self::Opx { op, fst, snd } => Self::Opx { op: op.clone(), fst: fst.clone(), snd: snd.clone() },
+      Self::Mat { args, rules } => Self::Mat { args: args.clone(), rules: rules.clone() },
+      Self::Ref { nam } => Self::Ref { nam: nam.clone() },
+      Self::Era => Self::Era,
+      Self::Err => Self::Err,
+    })
+  }
 }
 
 impl Drop for Term {
