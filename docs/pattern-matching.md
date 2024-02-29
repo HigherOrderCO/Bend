@@ -23,13 +23,6 @@ Pattern matching on numbers has two forms.
 With the successor pattern `n+var` it will expect to cover every case up to `n`:
 
 ```rust
-// Error: Case '2' not covered.
-match n {
-  1: B;
-  0: A;
-  3+: ...;
-}
-
 match n {
   0: A
   1: B
@@ -44,6 +37,13 @@ match n {
     ...
     1+var: (N var)
   }
+}
+
+// Error: Case '2' not covered.
+match n {
+  1: B;
+  0: A;
+  3+: ...;
 }
 ```
 
