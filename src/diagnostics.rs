@@ -5,7 +5,8 @@ use crate::term::{
   },
   display::DisplayFn,
   transform::{
-    apply_args::ArgError, encode_pattern_matching::MatchErr, resolve_refs::ReferencedMainErr, simplify_ref_to_ref::CyclicDefErr
+    apply_args::ArgError, encode_pattern_matching::MatchErr, resolve_refs::ReferencedMainErr,
+    simplify_ref_to_ref::CyclicDefErr,
   },
   Name,
 };
