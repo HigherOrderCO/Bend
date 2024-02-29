@@ -109,7 +109,7 @@ fn compile_term() {
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::heavy())?;
+    let compiled = compile_book(&mut book, None, CompileOpts::heavy())?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -117,7 +117,7 @@ fn compile_file_o_all() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::light())?;
+    let compiled = compile_book(&mut book, None, CompileOpts::light())?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -287,7 +287,7 @@ fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::from("foo"));
-    let compiled = compile_book(&mut book, CompileOpts::light())?;
+    let compiled = compile_book(&mut book, None, CompileOpts::light())?;
     Ok(format!("{:?}", compiled))
   })
 }

@@ -86,6 +86,13 @@ enum Mode {
     )]
     comp_opts: Vec<OptArgs>,
 
+    #[arg(value_parser = |arg: &str| hvml::term::parser::parse_term(arg)
+      .map_err(|e| match e[0].reason() {
+        chumsky::error::RichReason::Many(errs) => format!("{}", &errs[0]),
+        _ => format!("{}", e[0].reason()),
+      }))]
+    arguments: Vec<hvml::term::Term>,
+
     #[command(flatten)]
     warn_opts: CliWarnOpts,
   },
@@ -192,7 +199,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
       }
 
       let mut book = load_book(&path)?;
-      let compiled = compile_book(&mut book, opts)?;
+      let compiled = compile_book(&mut book, None, opts)?;
       println!("{}", compiled.display_with_warns(warning_opts)?);
     }
     Mode::Desugar { path, comp_opts, lazy_mode } => {
@@ -216,6 +223,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
       comp_opts,
       warn_opts,
       lazy_mode,
+      arguments,
     } => {
       if debug && lazy_mode {
         return Err("Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".into());
@@ -235,7 +243,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
       let run_opts =
         RunOpts { single_core, debug, linear, lazy_mode, max_memory: max_mem, max_rewrites: max_rwts };
       let (res_term, RunInfo { stats, readback_errors, net, book: _, labels: _ }) =
-        run_book(book, max_mem as usize, run_opts, warning_opts, opts)?;
+        run_book(book, max_mem as usize, run_opts, warning_opts, opts, arguments)?;
 
       let total_rewrites = stats.rewrites.total() as f64;
       let rps = total_rewrites / stats.run_time / 1_000_000.0;

@@ -71,8 +71,8 @@ impl Ctx<'_> {
 fn validate_entry_point(entry: &Definition) -> Result<Name, EntryErr> {
   if entry.rules.len() > 1 {
     Err(EntryErr::MultipleRules)
-  } else if !entry.rules[0].pats.is_empty() {
-    Err(EntryErr::Arguments)
+  // } else if !entry.rules[0].pats.is_empty() {
+  //   Err(EntryErr::Arguments)
   } else {
     Ok(entry.name.clone())
   }

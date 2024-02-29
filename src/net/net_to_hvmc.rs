@@ -5,10 +5,16 @@ use hvmc::ast::{Book, Net, Tree};
 use std::collections::{HashMap, HashSet};
 
 /// Converts the inet-encoded definitions into an hvmc AST Book.
-pub fn nets_to_hvmc(nets: HashMap<String, INet>) -> Result<Book, String> {
+pub fn nets_to_hvmc(nets: HashMap<String, INet>, args: Vec<Net>, entrypoint: &str) -> Result<Book, String> {
   let mut book = Book::default();
   for (name, inet) in nets {
-    let net = net_to_hvmc(&inet)?;
+    let mut net = net_to_hvmc(&inet)?;
+    if name == entrypoint {
+      for arg in args.clone() {
+        net.rdex.extend(arg.rdex);
+        net.apply_tree(arg.root);
+      }
+    }
     book.insert(name, net);
   }
   Ok(book)

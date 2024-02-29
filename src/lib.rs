@@ -10,18 +10,14 @@ use hvmc::{
   stdlib::LogDef,
 };
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
-use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
+use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::{net_to_hvmc, nets_to_hvmc}};
 use std::{
   str::FromStr,
   sync::{Arc, Mutex},
   time::Instant,
 };
 use term::{
-  book_to_nets,
-  display::{display_readback_errors, DisplayJoin},
-  net_to_term::net_to_term,
-  term_to_net::Labels,
-  AdtEncoding, Book, Ctx, ReadbackError, Term,
+  book_to_nets, display::{display_readback_errors, DisplayJoin}, net_to_term::net_to_term, term_to_compat_net, term_to_net::Labels, AdtEncoding, Book, Ctx, ReadbackError, Term
 };
 
 pub mod diagnostics;
@@ -95,14 +91,24 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, compile_opts: CompileOp
 pub fn check_book(book: &mut Book) -> Result<(), Info> {
   // TODO: Do the checks without having to do full compilation
   // TODO: Shouldn't the check mode show warnings?
-  compile_book(book, CompileOpts::light())?;
+  compile_book(book, None, CompileOpts::light())?;
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult, Info> {
+pub fn compile_book(book: &mut Book, args: Option<Vec<Term>>, opts: CompileOpts) -> Result<CompileResult, Info> {
   let warns = desugar_book(book, opts)?;
-  let (nets, labels) = book_to_nets(book);
-  let mut core_book = nets_to_hvmc(nets)?;
+  let (nets, mut labels) = book_to_nets(book);
+
+  let mut net_args = Vec::new();
+  if let Some(args) = args {
+    for term in &args {
+      let inet = term_to_compat_net(term, &mut labels);
+      let net = net_to_hvmc(&inet).expect("");
+      net_args.push(net);
+    }
+  }
+
+  let mut core_book = nets_to_hvmc(nets, net_args, book.hvmc_entrypoint())?;
   if opts.pre_reduce {
     pre_reduce_book(&mut core_book, book.hvmc_entrypoint())?;
   }
@@ -184,8 +190,9 @@ pub fn run_book(
   run_opts: RunOpts,
   warning_opts: WarningOpts,
   compile_opts: CompileOpts,
+  args: Vec<Term>,
 ) -> Result<(Term, RunInfo), Info> {
-  let CompileResult { core_book, labels, warns } = compile_book(&mut book, compile_opts)?;
+  let CompileResult { core_book, labels, warns } = compile_book(&mut book, Some(args), compile_opts)?;
 
   // Turn the book into an Arc so that we can use it for logging, debugging, etc.
   // from anywhere else in the program
