@@ -90,8 +90,8 @@ fn term_to_affine(term: &mut Term, inst_count: &mut HashMap<Name, u64>) {
         term_to_affine(val, inst_count);
       } else {
         let Term::Let { nxt, .. } = term else { unreachable!() };
-        let nxt = std::mem::take(nxt);
-        *term = *nxt;
+        let nxt = std::mem::take(nxt.as_mut());
+        *term = nxt;
       }
     }
 
