@@ -189,7 +189,7 @@ pub fn run_book(
 ) -> Result<(Term, RunInfo), Info> {
   let mut ctx = Ctx::new(&mut book);
   ctx.set_entrypoint();
-  ctx.book.apply_args(args)?;
+  ctx.apply_args(args)?;
   let CompileResult { core_book, labels, warns } = compile_book(&mut book, compile_opts)?;
 
   // Turn the book into an Arc so that we can use it for logging, debugging, etc.

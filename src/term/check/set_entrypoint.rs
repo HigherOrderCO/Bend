@@ -28,7 +28,7 @@ impl Display for EntryErr {
 
 impl Ctx<'_> {
   pub fn set_entrypoint(&mut self) {
-    // already setted
+    // already set
     if self.book.entrypoint.is_some() {
       return;
     }
