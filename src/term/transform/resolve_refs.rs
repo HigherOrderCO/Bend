@@ -49,82 +49,86 @@ impl Term {
     main: Option<&Name>,
     scope: &mut HashMap<&'a Name, usize>,
   ) -> Result<(), ReferencedMainErr> {
-    match self {
-      Term::Lam { nam, bod, .. } => {
-        push_scope(nam.as_ref(), scope);
-        bod.resolve_refs(def_names, main, scope)?;
-        pop_scope(nam.as_ref(), scope);
-      }
-      Term::Let { pat: Pattern::Var(nam), val, nxt } => {
-        val.resolve_refs(def_names, main, scope)?;
-        push_scope(nam.as_ref(), scope);
-        nxt.resolve_refs(def_names, main, scope)?;
-        pop_scope(nam.as_ref(), scope);
-      }
-      Term::Let { pat, val, nxt } => {
-        val.resolve_refs(def_names, main, scope)?;
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
+      match self {
+        Term::Lam { nam, bod, .. } => {
+          push_scope(nam.as_ref(), scope);
+          bod.resolve_refs(def_names, main, scope)?;
+          pop_scope(nam.as_ref(), scope);
+        }
+        Term::Let { pat: Pattern::Var(nam), val, nxt } => {
+          val.resolve_refs(def_names, main, scope)?;
+          push_scope(nam.as_ref(), scope);
+          nxt.resolve_refs(def_names, main, scope)?;
+          pop_scope(nam.as_ref(), scope);
+        }
+        Term::Let { pat, val, nxt } => {
+          val.resolve_refs(def_names, main, scope)?;
 
-        for nam in pat.binds() {
-          push_scope(Some(nam), scope);
+          for nam in pat.binds() {
+            push_scope(Some(nam), scope);
+          }
+
+          nxt.resolve_refs(def_names, main, scope)?;
+
+          for nam in pat.binds() {
+            pop_scope(Some(nam), scope);
+          }
+        }
+        Term::Dup { tag: _, fst, snd, val, nxt } => {
+          val.resolve_refs(def_names, main, scope)?;
+          push_scope(fst.as_ref(), scope);
+          push_scope(snd.as_ref(), scope);
+          nxt.resolve_refs(def_names, main, scope)?;
+          pop_scope(fst.as_ref(), scope);
+          pop_scope(snd.as_ref(), scope);
         }
 
-        nxt.resolve_refs(def_names, main, scope)?;
+        // If variable not defined, we check if it's a ref and swap if it is.
+        Term::Var { nam } => {
+          if is_var_in_scope(nam, scope) {
+            if let Some(main) = main {
+              if nam == main {
+                return Err(ReferencedMainErr);
+              }
+            }
 
-        for nam in pat.binds() {
-          pop_scope(Some(nam), scope);
-        }
-      }
-      Term::Dup { tag: _, fst, snd, val, nxt } => {
-        val.resolve_refs(def_names, main, scope)?;
-        push_scope(fst.as_ref(), scope);
-        push_scope(snd.as_ref(), scope);
-        nxt.resolve_refs(def_names, main, scope)?;
-        pop_scope(fst.as_ref(), scope);
-        pop_scope(snd.as_ref(), scope);
-      }
-
-      // If variable not defined, we check if it's a ref and swap if it is.
-      Term::Var { nam } => {
-        if is_var_in_scope(nam, scope) {
-          if let Some(main) = main {
-            if nam == main {
-              return Err(ReferencedMainErr);
+            if def_names.contains(nam) || CORE_BUILTINS.contains(&nam.0.as_ref()) {
+              *self = Term::r#ref(nam);
             }
           }
+        }
+        Term::Chn { bod, .. } => bod.resolve_refs(def_names, main, scope)?,
+        Term::App { fun: fst, arg: snd, .. }
+        | Term::Sup { fst, snd, .. }
+        | Term::Tup { fst, snd }
+        | Term::Opx { fst, snd, .. } => {
+          fst.resolve_refs(def_names, main, scope)?;
+          snd.resolve_refs(def_names, main, scope)?;
+        }
+        Term::Mat { args, rules } => {
+          for arg in args {
+            arg.resolve_refs(def_names, main, scope)?;
+          }
+          for rule in rules {
+            for nam in rule.pats.iter().flat_map(|p| p.bind_or_eras()) {
+              push_scope(nam.as_ref(), scope);
+            }
 
-          if def_names.contains(nam) || CORE_BUILTINS.contains(&nam.0.as_ref()) {
-            *self = Term::r#ref(nam);
+            rule.body.resolve_refs(def_names, main, scope)?;
+
+            for nam in rule.pats.iter().flat_map(|p| p.bind_or_eras()).rev() {
+              pop_scope(nam.as_ref(), scope);
+            }
           }
         }
-      }
-      Term::Chn { bod, .. } => bod.resolve_refs(def_names, main, scope)?,
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Opx { fst, snd, .. } => {
-        fst.resolve_refs(def_names, main, scope)?;
-        snd.resolve_refs(def_names, main, scope)?;
-      }
-      Term::Mat { args, rules } => {
-        for arg in args {
-          arg.resolve_refs(def_names, main, scope)?;
-        }
-        for rule in rules {
-          for nam in rule.pats.iter().flat_map(|p| p.bind_or_eras()) {
-            push_scope(nam.as_ref(), scope);
-          }
-
-          rule.body.resolve_refs(def_names, main, scope)?;
-
-          for nam in rule.pats.iter().flat_map(|p| p.bind_or_eras()).rev() {
-            pop_scope(nam.as_ref(), scope);
-          }
+        Term::Lst { .. } => unreachable!("Should have been desugared already"),
+        Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {
+          ()
         }
       }
-      Term::Lst { .. } => unreachable!("Should have been desugared already"),
-      Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => (),
-    }
-    Ok(())
+      Ok(())
+    })
   }
 }
 

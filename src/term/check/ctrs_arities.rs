@@ -75,46 +75,48 @@ impl Pattern {
 
 impl Term {
   pub fn check_ctrs_arities(&self, arities: &HashMap<Name, usize>) -> Result<(), MatchErr> {
-    match self {
-      Term::Mat { args, rules } => {
-        for arg in args {
-          arg.check_ctrs_arities(arities)?;
-        }
-        for rule in rules {
-          for pat in &rule.pats {
-            pat.check_ctrs_arities(arities)?;
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
+      match self {
+        Term::Mat { args, rules } => {
+          for arg in args {
+            arg.check_ctrs_arities(arities)?;
           }
-          rule.body.check_ctrs_arities(arities)?;
+          for rule in rules {
+            for pat in &rule.pats {
+              pat.check_ctrs_arities(arities)?;
+            }
+            rule.body.check_ctrs_arities(arities)?;
+          }
         }
-      }
-      Term::Let { pat, val, nxt } => {
-        pat.check_ctrs_arities(arities)?;
-        val.check_ctrs_arities(arities)?;
-        nxt.check_ctrs_arities(arities)?;
-      }
+        Term::Let { pat, val, nxt } => {
+          pat.check_ctrs_arities(arities)?;
+          val.check_ctrs_arities(arities)?;
+          nxt.check_ctrs_arities(arities)?;
+        }
 
-      Term::Lst { els } => {
-        for el in els {
-          el.check_ctrs_arities(arities)?;
+        Term::Lst { els } => {
+          for el in els {
+            el.check_ctrs_arities(arities)?;
+          }
         }
+        Term::App { fun: fst, arg: snd, .. }
+        | Term::Tup { fst, snd }
+        | Term::Dup { val: fst, nxt: snd, .. }
+        | Term::Sup { fst, snd, .. }
+        | Term::Opx { fst, snd, .. } => {
+          fst.check_ctrs_arities(arities)?;
+          snd.check_ctrs_arities(arities)?;
+        }
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.check_ctrs_arities(arities)?,
+        Term::Var { .. }
+        | Term::Lnk { .. }
+        | Term::Num { .. }
+        | Term::Str { .. }
+        | Term::Ref { .. }
+        | Term::Era
+        | Term::Err => {}
       }
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.check_ctrs_arities(arities)?;
-        snd.check_ctrs_arities(arities)?;
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.check_ctrs_arities(arities)?,
-      Term::Var { .. }
-      | Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era
-      | Term::Err => {}
-    }
-    Ok(())
+      Ok(())
+    })
   }
 }

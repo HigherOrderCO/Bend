@@ -67,7 +67,7 @@ pub struct Rule {
   pub body: Term,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Default, PartialEq, Eq, Hash)]
 pub enum Term {
   Lam {
     tag: Tag,
@@ -138,6 +138,81 @@ pub enum Term {
   Era,
   #[default]
   Err,
+}
+
+impl Clone for Term {
+  fn clone(&self) -> Self {
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || match self {
+      Self::Lam { tag, nam, bod } => Self::Lam { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
+      Self::Var { nam } => Self::Var { nam: nam.clone() },
+      Self::Chn { tag, nam, bod } => Self::Chn { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
+      Self::Lnk { nam } => Self::Lnk { nam: nam.clone() },
+      Self::Let { pat, val, nxt } => Self::Let { pat: pat.clone(), val: val.clone(), nxt: nxt.clone() },
+      Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
+      Self::Tup { fst, snd } => Self::Tup { fst: fst.clone(), snd: snd.clone() },
+      Self::Dup { tag, fst, snd, val, nxt } => {
+        Self::Dup { tag: tag.clone(), fst: fst.clone(), snd: snd.clone(), val: val.clone(), nxt: nxt.clone() }
+      }
+      Self::Sup { tag, fst, snd } => Self::Sup { tag: tag.clone(), fst: fst.clone(), snd: snd.clone() },
+      Self::Num { val } => Self::Num { val: val.clone() },
+      Self::Str { val } => Self::Str { val: val.clone() },
+      Self::Lst { els } => Self::Lst { els: els.clone() },
+      Self::Opx { op, fst, snd } => Self::Opx { op: op.clone(), fst: fst.clone(), snd: snd.clone() },
+      Self::Mat { args, rules } => Self::Mat { args: args.clone(), rules: rules.clone() },
+      Self::Ref { nam } => Self::Ref { nam: nam.clone() },
+      Self::Era => Self::Era,
+      Self::Err => Self::Err,
+    })
+  }
+}
+
+impl Drop for Term {
+  fn drop(&mut self) {
+    if matches!(self, Term::Era | Term::Err) {
+      return;
+    }
+
+    let mut stack = vec![];
+    self.take_children(&mut stack);
+
+    while let Some(mut term) = stack.pop() {
+      term.take_children(&mut stack)
+    }
+  }
+}
+
+impl Term {
+  fn take_children(&mut self, stack: &mut Vec<Term>) {
+    match self {
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+        stack.push(std::mem::take(bod.as_mut()));
+      }
+      Term::Let { val: fst, nxt: snd, .. }
+      | Term::App { fun: fst, arg: snd, .. }
+      | Term::Tup { fst, snd }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Sup { fst, snd, .. }
+      | Term::Opx { fst, snd, .. } => {
+        stack.push(std::mem::take(fst.as_mut()));
+        stack.push(std::mem::take(snd.as_mut()));
+      }
+      Term::Mat { args, rules } => {
+        for arg in std::mem::take(args).into_iter() {
+          stack.push(arg);
+        }
+
+        for Rule { body, .. } in std::mem::take(rules).into_iter() {
+          stack.push(body);
+        }
+      }
+      Term::Lst { els } => {
+        for el in std::mem::take(els).into_iter() {
+          stack.push(el);
+        }
+      }
+      _ => {}
+    }
+  }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

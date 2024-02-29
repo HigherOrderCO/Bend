@@ -221,6 +221,7 @@ dependencies = [
  "interner",
  "itertools",
  "logos",
+ "stacker",
  "stdext",
  "walkdir",
 ]

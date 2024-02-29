@@ -39,38 +39,40 @@ impl Term {
   ///
   /// See `[simplify_match_expression]` for more information.
   pub fn simplify_matches(&mut self, ctrs: &Constructors, adts: &Adts) -> Result<(), MatchErr> {
-    match self {
-      Term::Mat { args, rules } => {
-        let (new_args, extracted) = extract_args(args);
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
+      match self {
+        Term::Mat { args, rules } => {
+          let (new_args, extracted) = extract_args(args);
 
-        *self = simplify_match_expression(&new_args, rules, ctrs, adts)?;
-        *self = bind_extracted_args(extracted, std::mem::take(self));
-      }
-
-      Term::Lst { els } => {
-        for el in els {
-          el.simplify_matches(ctrs, adts)?;
+          let term = simplify_match_expression(new_args, std::mem::take(rules), ctrs, adts)?;
+          *self = bind_extracted_args(extracted, term);
         }
+
+        Term::Lst { els } => {
+          for el in els {
+            el.simplify_matches(ctrs, adts)?;
+          }
+        }
+        Term::Let { val: fst, nxt: snd, .. }
+        | Term::App { fun: fst, arg: snd, .. }
+        | Term::Tup { fst, snd }
+        | Term::Dup { val: fst, nxt: snd, .. }
+        | Term::Sup { fst, snd, .. }
+        | Term::Opx { fst, snd, .. } => {
+          fst.simplify_matches(ctrs, adts)?;
+          snd.simplify_matches(ctrs, adts)?;
+        }
+        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.simplify_matches(ctrs, adts)?,
+        Term::Var { .. }
+        | Term::Lnk { .. }
+        | Term::Num { .. }
+        | Term::Str { .. }
+        | Term::Ref { .. }
+        | Term::Era => (),
+        Term::Err => unreachable!(),
       }
-      Term::Let { val: fst, nxt: snd, .. }
-      | Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.simplify_matches(ctrs, adts)?;
-        snd.simplify_matches(ctrs, adts)?;
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.simplify_matches(ctrs, adts)?,
-      Term::Var { .. }
-      | Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era => (),
-      Term::Err => unreachable!(),
-    }
-    Ok(())
+      Ok(())
+    })
   }
 }
 
@@ -97,13 +99,13 @@ impl Term {
 /// For Var matches, we skip creating the surrounding match term since it's
 /// redundant. (would be simply match x {x: ...})
 fn simplify_match_expression(
-  args: &[Term],
-  rules: &[Rule],
+  args: Vec<Term>,
+  rules: Vec<Rule>,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, MatchErr> {
   let fst_row_irrefutable = rules[0].pats.iter().all(|p| p.is_wildcard());
-  let fst_col_type = infer_match_arg_type(rules, 0, ctrs)?;
+  let fst_col_type = infer_match_arg_type(&rules, 0, ctrs)?;
 
   if fst_row_irrefutable {
     irrefutable_fst_row_rule(args, rules, ctrs, adts)
@@ -118,16 +120,19 @@ fn simplify_match_expression(
 /// An optimization to not generate unnecessary pattern matching when we
 /// know the first case always matches.
 fn irrefutable_fst_row_rule(
-  args: &[Term],
-  rules: &[Rule],
+  args: Vec<Term>,
+  mut rules: Vec<Rule>,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, MatchErr> {
-  let mut term = rules[0].body.clone();
+  rules.truncate(1);
+
+  let Rule { pats, body: mut term } = rules.pop().unwrap();
   term.simplify_matches(ctrs, adts)?;
-  let term = rules[0].pats.iter().zip(args).fold(term, |term, (pat, arg)| Term::Let {
-    pat: pat.clone(),
-    val: Box::new(arg.clone()),
+
+  let term = pats.into_iter().zip(args).fold(term, |term, (pat, arg)| Term::Let {
+    pat,
+    val: Box::new(arg),
     nxt: Box::new(term),
   });
   Ok(term)
@@ -138,18 +143,25 @@ fn irrefutable_fst_row_rule(
 /// `match x0 ... xN { var p1 ... pN: (Body var p1 ... pN) }`
 /// becomes
 /// `match x1 ... xN { p1 ... pN: let var = x0; (Body var p1 ... pN) }`
-fn var_rule(args: &[Term], rules: &[Rule], ctrs: &Constructors, adts: &Adts) -> Result<Term, MatchErr> {
+fn var_rule(
+  mut args: Vec<Term>,
+  rules: Vec<Rule>,
+  ctrs: &Constructors,
+  adts: &Adts,
+) -> Result<Term, MatchErr> {
   let mut new_rules = vec![];
-  for rule in rules {
-    let body = Term::Let {
-      pat: rule.pats[0].clone(),
-      val: Box::new(args[0].clone()),
-      nxt: Box::new(rule.body.clone()),
-    };
-    let new_rule = Rule { pats: rule.pats[1 ..].to_vec(), body };
+  for mut rule in rules {
+    let rest = rule.pats.split_off(1);
+
+    let body =
+      Term::Let { pat: rule.pats.pop().unwrap(), val: Box::new(args[0].clone()), nxt: Box::new(rule.body) };
+
+    let new_rule = Rule { pats: rest, body };
     new_rules.push(new_rule);
   }
-  let mut term = Term::Mat { args: args[1 ..].to_vec(), rules: new_rules };
+
+  let rest = args.split_off(1);
+  let mut term = Term::Mat { args: rest, rules: new_rules };
   term.simplify_matches(ctrs, adts)?;
   Ok(term)
 }
@@ -200,8 +212,8 @@ fn var_rule(args: &[Term], rules: &[Rule], ctrs: &Constructors, adts: &Adts) -> 
 /// }
 /// ```
 fn switch_rule(
-  args: &[Term],
-  rules: &[Rule],
+  mut args: Vec<Term>,
+  rules: Vec<Rule>,
   typ: Type,
   ctrs: &Constructors,
   adts: &Adts,
@@ -212,7 +224,7 @@ fn switch_rule(
     Type::Num => {
       // Since numbers have infinite (2^60) constructors, they require special treatment.
       let mut ctrs = IndexSet::new();
-      for rule in rules {
+      for rule in &rules {
         ctrs.insert(rule.pats[0].clone());
         if rule.pats[0].is_wildcard() {
           break;
@@ -235,7 +247,7 @@ fn switch_rule(
     Type::NumSucc(exp) => {
       // Number match with + can't have number larger than that in the +
       // TODO: could be just a warning.
-      for rule in rules {
+      for rule in &rules {
         if let Pattern::Num(NumCtr::Num(got)) = rule.pats[0]
           && got >= exp
         {
@@ -254,12 +266,13 @@ fn switch_rule(
     let Term::Var { nam: arg_nam } = &args[0] else { unreachable!() };
     let nested_fields = switch_rule_nested_fields(arg_nam, &ctr);
     let matched_ctr = switch_rule_matched_ctr(ctr.clone(), &nested_fields);
-    let mut body = switch_rule_submatch(args, rules, &matched_ctr, &nested_fields)?;
+    let mut body = switch_rule_submatch(&args, &rules, &matched_ctr, &nested_fields)?;
     body.simplify_matches(ctrs, adts)?;
     let pats = vec![matched_ctr];
     new_rules.push(Rule { pats, body });
   }
-  let term = Term::Mat { args: vec![args[0].clone()], rules: new_rules };
+  args.truncate(1);
+  let term = Term::Mat { args, rules: new_rules };
   Ok(term)
 }
 

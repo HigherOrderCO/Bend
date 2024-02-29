@@ -58,162 +58,166 @@ pub struct Reader<'a> {
 
 impl<'a> Reader<'a> {
   fn read_term(&mut self, next: Port) -> Term {
-    if self.dup_paths.is_none() && !self.seen.insert(next) {
-      self.error(ReadbackError::Cyclic);
-      return Term::Var { nam: Name::from("...") };
-    }
-
-    let node = next.node();
-
-    let term = match &self.net.node(node).kind {
-      Era => {
-        // Only the main port actually exists in an ERA, the aux ports are just an artifact of this representation.
-        debug_assert!(next.slot() == 0);
-        Term::Era
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
+      if self.dup_paths.is_none() && !self.seen.insert(next) {
+        self.error(ReadbackError::Cyclic);
+        return Term::Var { nam: Name::from("...") };
       }
-      // If we're visiting a con node...
-      Con { lab } => match next.slot() {
-        // If we're visiting a port 0, then it is a lambda.
-        0 => {
-          let nam = self.namegen.decl_name(self.net, Port(node, 1));
-          let bod = self.read_term(self.net.enter_port(Port(node, 2)));
-          Term::Lam { tag: self.labels.con.to_tag(*lab), nam, bod: Box::new(bod) }
+
+      let node = next.node();
+
+      let term = match &self.net.node(node).kind {
+        Era => {
+          // Only the main port actually exists in an ERA, the aux ports are just an artifact of this representation.
+          debug_assert!(next.slot() == 0);
+          Term::Era
         }
-        // If we're visiting a port 1, then it is a variable.
-        1 => Term::Var { nam: self.namegen.var_name(next) },
-        // If we're visiting a port 2, then it is an application.
-        2 => {
-          let fun = self.read_term(self.net.enter_port(Port(node, 0)));
-          let arg = self.read_term(self.net.enter_port(Port(node, 1)));
-          Term::App { tag: self.labels.con.to_tag(*lab), fun: Box::new(fun), arg: Box::new(arg) }
-        }
-        _ => unreachable!(),
-      },
-      Mat => match next.slot() {
-        2 => {
-          // Read the matched expression
-          let scrutinee = self.read_term(self.net.enter_port(Port(node, 0)));
+        // If we're visiting a con node...
+        Con { lab } => match next.slot() {
+          // If we're visiting a port 0, then it is a lambda.
+          0 => {
+            let nam = self.namegen.decl_name(self.net, Port(node, 1));
+            let bod = self.read_term(self.net.enter_port(Port(node, 2)));
+            Term::Lam { tag: self.labels.con.to_tag(*lab), nam, bod: Box::new(bod) }
+          }
+          // If we're visiting a port 1, then it is a variable.
+          1 => Term::Var { nam: self.namegen.var_name(next) },
+          // If we're visiting a port 2, then it is an application.
+          2 => {
+            let fun = self.read_term(self.net.enter_port(Port(node, 0)));
+            let arg = self.read_term(self.net.enter_port(Port(node, 1)));
+            Term::App { tag: self.labels.con.to_tag(*lab), fun: Box::new(fun), arg: Box::new(arg) }
+          }
+          _ => unreachable!(),
+        },
+        Mat => match next.slot() {
+          2 => {
+            // Read the matched expression
+            let scrutinee = self.read_term(self.net.enter_port(Port(node, 0)));
 
-          // Read the pattern matching node
-          let sel_node = self.net.enter_port(Port(node, 1)).node();
+            // Read the pattern matching node
+            let sel_node = self.net.enter_port(Port(node, 1)).node();
 
-          // We expect the pattern matching node to be a CON
-          let sel_kind = &self.net.node(sel_node).kind;
-          if *sel_kind != (Con { lab: None }) {
-            // TODO: Is there any case where we expect a different node type here on readback?
-            self.error(ReadbackError::InvalidNumericMatch);
-            Term::native_num_match(scrutinee, Term::Era, Term::Era, None)
-          } else {
-            let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
-            let succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
+            // We expect the pattern matching node to be a CON
+            let sel_kind = &self.net.node(sel_node).kind;
+            if *sel_kind != (Con { lab: None }) {
+              // TODO: Is there any case where we expect a different node type here on readback?
+              self.error(ReadbackError::InvalidNumericMatch);
+              Term::native_num_match(scrutinee, Term::Era, Term::Era, None)
+            } else {
+              let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
+              let mut succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
 
-            match succ_term {
-              Term::Lam { nam, bod, .. } => Term::native_num_match(scrutinee, zero_term, *bod, Some(nam)),
-              _ => {
-                self.error(ReadbackError::InvalidNumericMatch);
-                Term::native_num_match(scrutinee, zero_term, succ_term, None)
+              match &mut succ_term {
+                Term::Lam { nam, bod, .. } => {
+                  Term::native_num_match(scrutinee, zero_term, std::mem::take(bod), Some(nam.take()))
+                }
+                _ => {
+                  self.error(ReadbackError::InvalidNumericMatch);
+                  Term::native_num_match(scrutinee, zero_term, succ_term, None)
+                }
               }
             }
           }
-        }
-        _ => {
-          self.error(ReadbackError::InvalidNumericMatch);
-          Term::Err
-        }
-      },
-      Ref { def_name } => {
-        if def_name.is_generated() {
-          // Dereference generated names since the user is not aware of them
-          let def = &self.book.defs[def_name];
-          let mut term = def.rule().body.clone();
-          term.fix_names(&mut self.namegen.id_counter, self.book);
+          _ => {
+            self.error(ReadbackError::InvalidNumericMatch);
+            Term::Err
+          }
+        },
+        Ref { def_name } => {
+          if def_name.is_generated() {
+            // Dereference generated names since the user is not aware of them
+            let def = &self.book.defs[def_name];
+            let mut term = def.rule().body.clone();
+            term.fix_names(&mut self.namegen.id_counter, self.book);
 
-          term
-        } else {
-          Term::Ref { nam: def_name.clone() }
+            term
+          } else {
+            Term::Ref { nam: def_name.clone() }
+          }
         }
-      }
-      // If we're visiting a fan node...
-      Dup { lab } => match next.slot() {
-        // If we're visiting a port 0, then it is a pair.
-        0 => {
-          if let Some(dup_paths) = &mut self.dup_paths {
-            let stack = dup_paths.entry(*lab).or_default();
-            if let Some(slot) = stack.pop() {
-              // Since we had a paired Dup in the path to this Sup,
-              // we "decay" the superposition according to the original direction we came from the Dup.
-              let term = self.read_term(self.net.enter_port(Port(node, slot)));
-              self.dup_paths.as_mut().unwrap().get_mut(lab).unwrap().push(slot);
-              Some(term)
+        // If we're visiting a fan node...
+        Dup { lab } => match next.slot() {
+          // If we're visiting a port 0, then it is a pair.
+          0 => {
+            if let Some(dup_paths) = &mut self.dup_paths {
+              let stack = dup_paths.entry(*lab).or_default();
+              if let Some(slot) = stack.pop() {
+                // Since we had a paired Dup in the path to this Sup,
+                // we "decay" the superposition according to the original direction we came from the Dup.
+                let term = self.read_term(self.net.enter_port(Port(node, slot)));
+                self.dup_paths.as_mut().unwrap().get_mut(lab).unwrap().push(slot);
+                Some(term)
+              } else {
+                None
+              }
             } else {
               None
             }
-          } else {
-            None
+            .unwrap_or_else(|| {
+              // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
+              self.decay_or_get_ports(node).map_or_else(
+                |(fst, snd)| Term::Sup {
+                  tag: self.labels.dup.to_tag(Some(*lab)),
+                  fst: Box::new(fst),
+                  snd: Box::new(snd),
+                },
+                |term| term,
+              )
+            })
           }
-          .unwrap_or_else(|| {
-            // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
-            self.decay_or_get_ports(node).map_or_else(
-              |(fst, snd)| Term::Sup {
-                tag: self.labels.dup.to_tag(Some(*lab)),
-                fst: Box::new(fst),
-                snd: Box::new(snd),
-              },
-              |term| term,
-            )
-          })
+          // If we're visiting a port 1 or 2, then it is a variable.
+          // Also, that means we found a dup, so we store it to read later.
+          1 | 2 => {
+            if let Some(dup_paths) = &mut self.dup_paths {
+              dup_paths.entry(*lab).or_default().push(next.slot());
+              let term = self.read_term(self.net.enter_port(Port(node, 0)));
+              self.dup_paths.as_mut().unwrap().entry(*lab).or_default().pop().unwrap();
+              term
+            } else {
+              if self.seen_fans.insert(node) {
+                self.scope.insert(node);
+              }
+              Term::Var { nam: self.namegen.var_name(next) }
+            }
+          }
+          _ => unreachable!(),
+        },
+        Num { val } => Term::Num { val: *val },
+        Op2 { opr } => match next.slot() {
+          2 => {
+            let fst = self.read_term(self.net.enter_port(Port(node, 0)));
+            let snd = self.read_term(self.net.enter_port(Port(node, 1)));
+
+            Term::Opx { op: Op::from_hvmc_label(*opr), fst: Box::new(fst), snd: Box::new(snd) }
+          }
+          _ => {
+            self.error(ReadbackError::InvalidNumericOp);
+            Term::Err
+          }
+        },
+        Rot => {
+          self.error(ReadbackError::ReachedRoot);
+          Term::Err
         }
-        // If we're visiting a port 1 or 2, then it is a variable.
-        // Also, that means we found a dup, so we store it to read later.
-        1 | 2 => {
-          if let Some(dup_paths) = &mut self.dup_paths {
-            dup_paths.entry(*lab).or_default().push(next.slot());
-            let term = self.read_term(self.net.enter_port(Port(node, 0)));
-            self.dup_paths.as_mut().unwrap().entry(*lab).or_default().pop().unwrap();
-            term
-          } else {
+        Tup => match next.slot() {
+          // If we're visiting a port 0, then it is a Tup.
+          0 => self
+            .decay_or_get_ports(node)
+            .map_or_else(|(fst, snd)| Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, |term| term),
+          // If we're visiting a port 1 or 2, then it is a variable.
+          1 | 2 => {
             if self.seen_fans.insert(node) {
               self.scope.insert(node);
             }
             Term::Var { nam: self.namegen.var_name(next) }
           }
-        }
-        _ => unreachable!(),
-      },
-      Num { val } => Term::Num { val: *val },
-      Op2 { opr } => match next.slot() {
-        2 => {
-          let fst = self.read_term(self.net.enter_port(Port(node, 0)));
-          let snd = self.read_term(self.net.enter_port(Port(node, 1)));
+          _ => unreachable!(),
+        },
+      };
 
-          Term::Opx { op: Op::from_hvmc_label(*opr), fst: Box::new(fst), snd: Box::new(snd) }
-        }
-        _ => {
-          self.error(ReadbackError::InvalidNumericOp);
-          Term::Err
-        }
-      },
-      Rot => {
-        self.error(ReadbackError::ReachedRoot);
-        Term::Err
-      }
-      Tup => match next.slot() {
-        // If we're visiting a port 0, then it is a Tup.
-        0 => self
-          .decay_or_get_ports(node)
-          .map_or_else(|(fst, snd)| Term::Tup { fst: Box::new(fst), snd: Box::new(snd) }, |term| term),
-        // If we're visiting a port 1 or 2, then it is a variable.
-        1 | 2 => {
-          if self.seen_fans.insert(node) {
-            self.scope.insert(node);
-          }
-          Term::Var { nam: self.namegen.var_name(next) }
-        }
-        _ => unreachable!(),
-      },
-    };
-
-    term
+      term
+    })
   }
 
   /// Enters both ports 1 and 2 of a node,
