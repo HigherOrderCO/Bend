@@ -143,14 +143,14 @@ fn run_file() {
       let book = do_parse_book(code, path)?;
       // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
       let (res, info) =
-        run_book(book, 1 << 20, RunOpts::lazy(), WarningOpts::deny_all(), CompileOpts::heavy())?;
+        run_book(book, 1 << 24, RunOpts::lazy(), WarningOpts::deny_all(), CompileOpts::heavy())?;
       Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
     }),
     (&|code, path| {
       let book = do_parse_book(code, path)?;
       // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
       let (res, info) =
-        run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
+        run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
       Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
     }),
   ])
@@ -166,7 +166,7 @@ fn run_lazy() {
     desugar_opts.lazy_mode();
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, info) = run_book(book, 1 << 20, run_opts, WarningOpts::deny_all(), desugar_opts)?;
+    let (res, info) = run_book(book, 1 << 24, run_opts, WarningOpts::deny_all(), desugar_opts)?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }
@@ -299,7 +299,7 @@ fn run_entrypoint() {
     book.entrypoint = Some(Name::from("foo"));
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) =
-      run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
+      run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }
