@@ -5,19 +5,16 @@ impl Book {
     if let Some(main) = &self.entrypoint
       && let Some(args) = args
     {
-      let mut args = args.into_iter();
-      let main_rule = &mut self.defs[main].rules[0];
-      let main_body = &mut main_rule.body;
+      let main_def = &mut self.defs[main];
 
-      for pat in &main_rule.pats {
-        if let Pattern::Var(Some(x)) = pat {
-          main_body.subst(x, &args.next().unwrap());
-        } else {
-          return Err(format!("Expected a variable pattern, but found '{pat}'."));
-        }
+      if !main_def.rules[0].pats.iter().all(|pat| matches!(pat, Pattern::Var(Some(..)))) {
+        return Err("Main definition should contain only var patterns.".into());
       }
 
-      main_rule.pats.clear();
+      main_def.convert_match_def_to_term();
+      let main_body = &mut self.defs[main].rule_mut().body;
+
+      *main_body = Term::call(main_body.clone(), args);
     }
     Ok(())
   }

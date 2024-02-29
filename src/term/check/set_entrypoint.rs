@@ -23,7 +23,9 @@ impl Display for EntryErr {
         write!(f, "File has '{}', '{}' and '{}' definitions.", fnd[0], fnd[1], fnd[2])
       }
       EntryErr::MultipleRules => write!(f, "Main definition can't have more than one rule."),
-      EntryErr::Arguments(expected, got) => write!(f, "Main definition expects {expected} arguments, got {got}."),
+      EntryErr::Arguments(expected, got) => {
+        write!(f, "Main definition expects {expected} arguments, got {got}.")
+      }
     }
   }
 }
@@ -71,7 +73,7 @@ impl Ctx<'_> {
 fn validate_entry_point(entry: &Definition, given_arguments: usize) -> Result<Name, EntryErr> {
   if entry.rules.len() > 1 {
     Err(EntryErr::MultipleRules)
-  } else if !(entry.rules[0].pats.len() == given_arguments) {
+  } else if entry.rules[0].pats.len() != given_arguments {
     Err(EntryErr::Arguments(entry.rules[0].pats.len(), given_arguments))
   } else {
     Ok(entry.name.clone())
