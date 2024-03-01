@@ -31,13 +31,13 @@ impl Ctx<'_> {
         self.info.def_error(entrypoint.clone(), ArgError::PatternArgError);
       }
 
-      let expected = main_def.rules[0].pats.len();
-      let got = if let Some(args) = &args { args.len() } else { 0 };
-      if expected != got {
-        self.info.error(ArgError::ArityArgError { expected, got });
-      }
-
       if let Some(args) = args {
+        let expected = main_def.rules[0].pats.len();
+        let got = args.len();
+        if expected != got {
+          self.info.error(ArgError::ArityArgError { expected, got });
+        }
+
         main_def.convert_match_def_to_term();
         let main_body = &mut self.book.defs[entrypoint].rule_mut().body;
 
