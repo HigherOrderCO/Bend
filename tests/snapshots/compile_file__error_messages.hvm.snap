@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/error_messages.hvm
+---
+Duplicated top-level name 'A'.
+Duplicated top-level name 'B'.
+In definition 'Foo':
+  Unbound constructor 'C'.
+  Unbound constructor 'D'.
+In definition 'Foo2':
+  Unbound constructor 'E'.
