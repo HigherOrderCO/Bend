@@ -28,11 +28,6 @@ impl Display for EntryErr {
 
 impl Ctx<'_> {
   pub fn set_entrypoint(&mut self) {
-    // already set
-    if self.book.entrypoint.is_some() {
-      return;
-    }
-
     let mut entrypoint = None;
 
     let (custom, main, hvm1_main) = self.book.get_possible_entry_points();

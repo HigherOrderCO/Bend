@@ -24,25 +24,25 @@ impl Ctx<'_> {
   pub fn apply_args(&mut self, args: Option<Vec<Term>>) -> Result<(), Info> {
     self.info.start_pass();
 
-    if let Some(entrypoint) = &self.book.entrypoint
-      && let Some(args) = args
-    {
+    if let Some(entrypoint) = &self.book.entrypoint {
       let main_def = &mut self.book.defs[entrypoint];
-      let expected = main_def.rules[0].pats.len();
-      let got = args.len();
 
       if !main_def.rules[0].pats.iter().all(|pat| matches!(pat, Pattern::Var(Some(..)))) {
         self.info.def_error(entrypoint.clone(), ArgError::PatternArgError);
       }
 
+      let expected = main_def.rules[0].pats.len();
+      let got = if let Some(args) = &args { args.len() } else { 0 };
       if expected != got {
         self.info.error(ArgError::ArityArgError { expected, got });
       }
 
-      main_def.convert_match_def_to_term();
-      let main_body = &mut self.book.defs[entrypoint].rule_mut().body;
+      if let Some(args) = args {
+        main_def.convert_match_def_to_term();
+        let main_body = &mut self.book.defs[entrypoint].rule_mut().body;
 
-      *main_body = Term::call(main_body.clone(), args);
+        *main_body = Term::call(main_body.clone(), args);
+      }
     }
 
     self.info.fatal(())
