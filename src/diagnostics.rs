@@ -69,7 +69,7 @@ impl Info {
 
   pub fn display(&self, verbose: bool) -> impl Display + '_ {
     DisplayFn(move |f| {
-      write!(f, "{}", self.errs.iter().map(|err| err.display(verbose)).join("\n"))?;
+      writeln!(f, "{}", self.errs.iter().map(|err| err.display(verbose)).join("\n"))?;
 
       for (def_name, errs) in &self.errs_with_def {
         writeln!(f, "In definition '{def_name}':")?;

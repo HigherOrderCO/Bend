@@ -1,0 +1,9 @@
+data A = (A)
+data B = (B)
+
+Foo (C) = *
+Foo (D) = *
+
+Foo2 (E) = *
+
+Main = *
