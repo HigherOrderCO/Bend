@@ -1,4 +1,6 @@
-use std::{collections::HashMap, fmt::Display};
+use std::fmt::Display;
+
+use indexmap::IndexMap;
 
 use crate::term::{Ctx, Name};
 
@@ -14,7 +16,7 @@ impl Display for TopLevelErr {
 impl Ctx<'_> {
   /// Checks if exists shared names from definitions, adts and constructors.
   pub fn check_shared_names(&mut self) {
-    let mut checked = HashMap::<&Name, usize>::new();
+    let mut checked = IndexMap::<&Name, usize>::new();
 
     for adt_name in self.book.adts.keys() {
       *checked.entry(adt_name).or_default() += 1;

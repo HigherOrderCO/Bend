@@ -154,10 +154,10 @@ impl Clone for Term {
         Self::Dup { tag: tag.clone(), fst: fst.clone(), snd: snd.clone(), val: val.clone(), nxt: nxt.clone() }
       }
       Self::Sup { tag, fst, snd } => Self::Sup { tag: tag.clone(), fst: fst.clone(), snd: snd.clone() },
-      Self::Num { val } => Self::Num { val: val.clone() },
+      Self::Num { val } => Self::Num { val: *val },
       Self::Str { val } => Self::Str { val: val.clone() },
       Self::Lst { els } => Self::Lst { els: els.clone() },
-      Self::Opx { op, fst, snd } => Self::Opx { op: op.clone(), fst: fst.clone(), snd: snd.clone() },
+      Self::Opx { op, fst, snd } => Self::Opx { op: *op, fst: fst.clone(), snd: snd.clone() },
       Self::Mat { args, rules } => Self::Mat { args: args.clone(), rules: rules.clone() },
       Self::Ref { nam } => Self::Ref { nam: nam.clone() },
       Self::Era => Self::Era,

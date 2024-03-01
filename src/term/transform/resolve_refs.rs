@@ -124,7 +124,6 @@ impl Term {
         }
         Term::Lst { .. } => unreachable!("Should have been desugared already"),
         Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {
-          ()
         }
       }
       Ok(())
