@@ -41,7 +41,7 @@ macro_rules! display {
 
 impl fmt::Display for Term {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
+    Term::recursive_call(move || match self {
       Term::Lam { tag, nam, bod } => {
         write!(f, "{}λ{} {}", tag.display_padded(), var_as_str(nam), bod)
       }
@@ -83,7 +83,7 @@ impl fmt::Display for Term {
       Term::Tup { els } => write!(f, "({})", DisplayJoin(|| els.iter(), ", "),),
       Term::Lst { els } => write!(f, "[{}]", DisplayJoin(|| els.iter(), ", "),),
       Term::Err => write!(f, "<Invalid>"),
-    }
+    })
   }
 }
 

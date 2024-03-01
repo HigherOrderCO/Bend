@@ -14,7 +14,7 @@ impl Term {
   /// Eta-reduces a term and any subterms.
   /// Expects variables to be linear.
   pub fn eta_reduction(&mut self) {
-    match self {
+    Term::recursive_call(move || match self {
       Term::Lam { tag: lam_tag, nam: Some(lam_var), bod } => {
         bod.eta_reduction();
         match bod.as_mut() {
@@ -37,35 +37,12 @@ impl Term {
           _ => {}
         }
       }
-      Term::Lam { tag: _, nam: None, bod } => bod.eta_reduction(),
 
-      Term::Mat { args, rules } => {
-        for arg in args {
-          arg.eta_reduction();
-        }
-        for rule in rules {
-          rule.body.eta_reduction();
+      _ => {
+        for child in self.children_mut() {
+          child.eta_reduction()
         }
       }
-      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-        for el in els {
-          el.eta_reduction();
-        }
-      }
-      Term::Let { val: fst, nxt: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::App { fun: fst, arg: snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.eta_reduction();
-        snd.eta_reduction();
-      }
-      Term::Lnk { .. }
-      | Term::Var { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era
-      | Term::Err => {}
-    }
+    })
   }
 }

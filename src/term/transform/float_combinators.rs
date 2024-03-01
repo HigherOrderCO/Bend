@@ -145,7 +145,7 @@ impl Term {
   }
 
   fn go_float(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
-    match self {
+    Term::recursive_call(move || match self {
       Term::Lam { .. } | Term::Chn { .. } if self.is_id() => Detach::Combinator,
 
       Term::Lam { .. } => self.float_lam(depth, term_info),
@@ -160,42 +160,19 @@ impl Term {
 
       Term::Lnk { nam } => Detach::unscoped_var(nam.clone()),
 
-      Term::Let { pat, val, nxt } => {
-        let val_detach = val.go_float(depth + 1, term_info);
-        let nxt_detach = nxt.go_float(depth + 1, term_info);
-
-        for nam in pat.bind_or_eras() {
-          term_info.provide(nam.as_ref());
-        }
-
-        val_detach & nxt_detach
-      }
-
-      Term::Dup { bnd, val, nxt, .. } => {
-        let val_detach = val.go_float(depth + 1, term_info);
-        let nxt_detach = nxt.go_float(depth + 1, term_info);
-
-        for bnd in bnd {
-          term_info.provide(bnd.as_ref());
-        }
-
-        val_detach & nxt_detach
-      }
-
-      Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
-        els.iter_mut().map(|el| el.go_float(depth + 1, term_info)).fold(Detach::Combinator, |a, b| a & b)
-      }
-      Term::Opx { fst, snd, .. } => {
-        let fst_is_super = fst.go_float(depth + 1, term_info);
-        let snd_is_super = snd.go_float(depth + 1, term_info);
-
-        fst_is_super & snd_is_super
-      }
-
       Term::Ref { nam: def_name } if def_name == &term_info.def_name => Detach::Recursive,
 
-      Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => Detach::Combinator,
-    }
+      _ => {
+        let mut detach = Detach::Combinator;
+        for (child, binds) in self.children_mut_with_binds() {
+          detach = detach & child.go_float(depth + 1, term_info);
+          for bind in binds {
+            term_info.provide(bind.as_ref());
+          }
+        }
+        detach
+      }
+    })
   }
 
   fn float_lam(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {

@@ -12,7 +12,7 @@ impl Term {
   }
 
   fn resugar_tagged_scott(&mut self, book: &Book, errs: &mut Vec<ReadbackError>) {
-    match self {
+    Term::recursive_call(move || match self {
       Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
         if let Some((adt_name, adt)) = book.adts.get_key_value(adt_name) {
           self.resugar_ctr_tagged_scott(book, adt, adt_name, errs);
@@ -20,8 +20,6 @@ impl Term {
           bod.resugar_tagged_scott(book, errs);
         }
       }
-
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.resugar_tagged_scott(book, errs),
 
       Term::App { tag: Tag::Named(adt_name), fun, arg } => {
         if let Some((adt_name, adt)) = book.adts.get_key_value(adt_name) {
@@ -32,34 +30,12 @@ impl Term {
         }
       }
 
-      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-        for el in els {
-          el.resugar_tagged_scott(book, errs);
+      _ => {
+        for child in self.children_mut() {
+          child.resugar_tagged_scott(book, errs);
         }
       }
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Let { val: fst, nxt: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.resugar_tagged_scott(book, errs);
-        snd.resugar_tagged_scott(book, errs);
-      }
-      Term::Mat { args, rules } => {
-        for arg in args {
-          arg.resugar_tagged_scott(book, errs);
-        }
-        for rule in rules {
-          rule.body.resugar_tagged_scott(book, errs);
-        }
-      }
-      Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Var { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era
-      | Term::Err => {}
-    }
+    })
   }
 
   /// Reconstructs adt-tagged lambdas as their constructors

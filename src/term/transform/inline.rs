@@ -32,33 +32,11 @@ impl Term {
           }
         }
 
-        Term::Lam { bod, .. } | Term::Chn { bod, .. } => to_inline.push(bod),
-        Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
-          for el in els {
-            to_inline.push(el);
+        _ => {
+          for child in term.children_mut() {
+            to_inline.push(child);
           }
         }
-        Term::App { fun: fst, arg: snd, .. }
-        | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Opx { fst, snd, .. } => {
-          to_inline.push(fst);
-          to_inline.push(snd);
-        }
-        Term::Mat { args, rules } => {
-          for arg in args {
-            to_inline.push(arg);
-          }
-          for rule in rules {
-            to_inline.push(&mut rule.body);
-          }
-        }
-        Term::Var { .. }
-        | Term::Lnk { .. }
-        | Term::Let { .. }
-        | Term::Num { .. }
-        | Term::Str { .. }
-        | Term::Era => {}
-        Term::Err => unreachable!(),
       }
     }
   }
@@ -68,7 +46,7 @@ impl Term {
   /// lambdas, tuples and superpositions.
   fn is_inlineable(&self) -> bool {
     fn go(term: &Term, scope: usize) -> bool {
-      match term {
+      Term::recursive_call(move || match term {
         Term::Era | Term::Var { .. } | Term::Num { .. } => scope.saturating_sub(1) == 0,
         Term::Lam { bod, .. } => go(bod, scope + 1),
         Term::Sup { els, .. } | Term::Tup { els } => match els.as_slice() {
@@ -86,7 +64,7 @@ impl Term {
         Term::Ref { .. } => false,
 
         Term::Err => unreachable!(),
-      }
+      })
     }
     go(self, 0)
   }

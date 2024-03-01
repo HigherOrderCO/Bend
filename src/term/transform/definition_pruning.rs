@@ -97,28 +97,6 @@ impl Book {
           Some(name) => self.insert_ctrs_used(name, uses, adt_encoding),
           None => self.insert_used(def_name, used, uses, adt_encoding),
         },
-
-        Term::Lam { bod, .. } | Term::Chn { bod, .. } => to_find.push(bod),
-        Term::Let { val: fst, nxt: snd, .. }
-        | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::App { fun: fst, arg: snd, .. }
-        | Term::Opx { fst, snd, .. } => {
-          to_find.push(fst);
-          to_find.push(snd);
-        }
-        Term::Mat { args, rules } => {
-          for arg in args {
-            to_find.push(arg);
-          }
-          for rule in rules {
-            to_find.push(&rule.body);
-          }
-        }
-        Term::Sup { els, .. } | Term::Tup { els } => {
-          for el in els {
-            to_find.push(el);
-          }
-        }
         Term::Lst { els } => {
           self.insert_ctrs_used(&Name::from(LIST), uses, adt_encoding);
           for term in els {
@@ -128,7 +106,11 @@ impl Book {
         Term::Str { .. } => {
           self.insert_ctrs_used(&Name::from(STRING), uses, adt_encoding);
         }
-        Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Era | Term::Err => (),
+        _ => {
+          for child in term.children() {
+            to_find.push(child);
+          }
+        }
       }
     }
   }

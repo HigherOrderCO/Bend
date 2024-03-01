@@ -76,28 +76,11 @@ impl Term {
           let Term::Mat { args: _, rules } = term else { unreachable!() };
           to_desugar.extend(rules.iter_mut().map(|r| &mut r.body));
         }
-        Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
-          for el in els {
-            to_desugar.push(el);
+
+        _ => {
+          for child in term.children_mut() {
+            to_desugar.push(child);
           }
-        }
-        Term::Let { pat: Pattern::Var(_), val: fst, nxt: snd }
-        | Term::App { fun: fst, arg: snd, .. }
-        | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Opx { fst, snd, .. } => {
-          to_desugar.push(fst);
-          to_desugar.push(snd);
-        }
-        Term::Lam { bod, .. } | Term::Chn { bod, .. } => to_desugar.push(bod),
-        Term::Era
-        | Term::Ref { .. }
-        | Term::Num { .. }
-        | Term::Str { .. }
-        | Term::Lnk { .. }
-        | Term::Var { .. }
-        | Term::Err => (),
-        Term::Let { pat: _, .. } => {
-          unreachable!("Expected destructor let expressions to have been desugared already")
         }
       }
     }

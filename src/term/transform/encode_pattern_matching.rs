@@ -23,7 +23,7 @@ impl Book {
 
 impl Term {
   pub fn encode_simple_matches(&mut self, ctrs: &Constructors, adts: &Adts, adt_encoding: AdtEncoding) {
-    match self {
+    Term::recursive_call(move || match self {
       Term::Mat { .. } => {
         debug_assert!(self.is_simple_match(ctrs, adts), "{self}");
         let Term::Mat { args, rules } = self else { unreachable!() };
@@ -34,25 +34,13 @@ impl Term {
         let rules = std::mem::take(rules);
         *self = encode_match(arg, rules, ctrs, adt_encoding);
       }
-      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-        els.iter_mut().for_each(|e| e.encode_simple_matches(ctrs, adts, adt_encoding))
+
+      _ => {
+        for child in self.children_mut() {
+          child.encode_simple_matches(ctrs, adts, adt_encoding)
+        }
       }
-      Term::Let { val: fst, nxt: snd, .. }
-      | Term::App { fun: fst, arg: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.encode_simple_matches(ctrs, adts, adt_encoding);
-        snd.encode_simple_matches(ctrs, adts, adt_encoding);
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.encode_simple_matches(ctrs, adts, adt_encoding),
-      Term::Var { .. }
-      | Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era
-      | Term::Err => {}
-    }
+    })
   }
 }
 
@@ -170,7 +158,7 @@ fn encode_adt(arg: Term, rules: Vec<Rule>, adt: Name, adt_encoding: AdtEncoding)
       let mut arms = vec![];
       for rule in rules {
         let body = rule.body;
-        let body = rule.pats[0].binds().rev().fold(body, |bod, nam| Term::named_lam(nam.clone(), bod));
+        let body = rule.pats[0].named_binds().rev().fold(body, |bod, nam| Term::named_lam(nam.clone(), bod));
         arms.push(body);
       }
       Term::call(arg, arms)
@@ -180,7 +168,7 @@ fn encode_adt(arg: Term, rules: Vec<Rule>, adt: Name, adt_encoding: AdtEncoding)
       let mut arms = vec![];
       for rule in rules.into_iter() {
         let body = rule.pats[0]
-          .binds()
+          .named_binds()
           .rev()
           .fold(rule.body, |bod, var| Term::tagged_lam(Tag::adt_name(&adt), var.clone(), bod));
         arms.push(body);

@@ -46,43 +46,12 @@ impl Term {
   pub fn resolve_ctrs_in_pats(&mut self, is_ctr: &impl Fn(&Name) -> bool) {
     let mut to_resolve = vec![self];
 
-    while let Some(pat) = to_resolve.pop() {
-      match pat {
-        Term::Let { pat, val, nxt } => {
-          pat.resolve_ctrs(is_ctr);
-          to_resolve.push(val);
-          to_resolve.push(nxt);
-        }
-        Term::Mat { args, rules } => {
-          for arg in args {
-            to_resolve.push(arg);
-          }
-          for rule in rules {
-            for pat in &mut rule.pats {
-              pat.resolve_ctrs(is_ctr);
-            }
-            to_resolve.push(&mut rule.body);
-          }
-        }
-        Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
-          for el in els {
-            to_resolve.push(el);
-          }
-        }
-        Term::App { fun: fst, arg: snd, .. }
-        | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Opx { fst, snd, .. } => {
-          to_resolve.push(fst);
-          to_resolve.push(snd);
-        }
-        Term::Lam { bod, .. } | Term::Chn { bod, .. } => to_resolve.push(bod),
-        Term::Var { .. }
-        | Term::Lnk { .. }
-        | Term::Ref { .. }
-        | Term::Num { .. }
-        | Term::Str { .. }
-        | Term::Era
-        | Term::Err => (),
+    while let Some(term) = to_resolve.pop() {
+      for pat in term.patterns_mut() {
+        pat.resolve_ctrs(is_ctr);
+      }
+      for child in term.children_mut() {
+        to_resolve.push(child);
       }
     }
   }

@@ -253,7 +253,7 @@ impl Tag {
 
 impl Clone for Term {
   fn clone(&self) -> Self {
-    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || match self {
+    Self::recursive_call(move || match self {
       Self::Lam { tag, nam, bod } => Self::Lam { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
       Self::Var { nam } => Self::Var { nam: nam.clone() },
       Self::Chn { tag, nam, bod } => Self::Chn { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
@@ -398,150 +398,587 @@ impl Term {
     }
   }
 
+  /* Iterators */
+  pub fn children(&self) -> impl DoubleEndedIterator<Item = &Self> + Clone {
+    #[derive(Clone)]
+    struct Children<'a> {
+      pub term: &'a Term,
+      pub front: isize,
+      pub back: isize,
+    }
+
+    impl<'a> Iterator for Children<'a> {
+      type Item = &'a Term;
+
+      fn next(&mut self) -> Option<Self::Item> {
+        if self.front > self.back {
+          return None;
+        }
+        let next = self.front as usize;
+        self.front += 1;
+
+        match self.term {
+          Term::Mat { args, rules } => {
+            if next < args.len() {
+              args.get(next)
+            } else {
+              rules.get(next - args.len()).map(|r| &r.body)
+            }
+          }
+          Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => els.get(next),
+          Term::Let { val: fst, nxt: snd, .. }
+          | Term::App { fun: fst, arg: snd, .. }
+          | Term::Dup { val: fst, nxt: snd, .. }
+          | Term::Opx { fst, snd, .. } => {
+            if next == 0 {
+              Some(fst)
+            } else if next == 1 {
+              Some(snd)
+            } else {
+              None
+            }
+          }
+          Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+            if next == 0 {
+              Some(bod)
+            } else {
+              None
+            }
+          }
+          Term::Var { .. }
+          | Term::Lnk { .. }
+          | Term::Num { .. }
+          | Term::Str { .. }
+          | Term::Ref { .. }
+          | Term::Era
+          | Term::Err => None,
+        }
+      }
+    }
+
+    impl<'a> DoubleEndedIterator for Children<'a> {
+      fn next_back(&mut self) -> Option<Self::Item> {
+        if self.back < self.front {
+          return None;
+        }
+        let next = self.back as usize;
+        self.back -= 1;
+        match &self.term {
+          Term::Mat { args, rules } => {
+            if next < args.len() {
+              args.get(next)
+            } else {
+              rules.get(next - args.len()).map(|r| &r.body)
+            }
+          }
+          Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => els.get(next),
+          Term::Let { val: fst, nxt: snd, .. }
+          | Term::App { fun: fst, arg: snd, .. }
+          | Term::Dup { val: fst, nxt: snd, .. }
+          | Term::Opx { fst, snd, .. } => {
+            if next == 0 {
+              Some(fst)
+            } else if next == 1 {
+              Some(snd)
+            } else {
+              None
+            }
+          }
+          Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+            if next == 0 {
+              Some(bod)
+            } else {
+              None
+            }
+          }
+          Term::Var { .. }
+          | Term::Lnk { .. }
+          | Term::Num { .. }
+          | Term::Str { .. }
+          | Term::Ref { .. }
+          | Term::Era
+          | Term::Err => None,
+        }
+      }
+    }
+
+    impl<'a> From<&'a Term> for Children<'a> {
+      fn from(value: &'a Term) -> Self {
+        let front = 0;
+        let back = match value {
+          Term::Var { .. }
+          | Term::Lnk { .. }
+          | Term::Num { .. }
+          | Term::Str { .. }
+          | Term::Ref { .. }
+          | Term::Era
+          | Term::Err => -1,
+          Term::Lam { .. } | Term::Chn { .. } => 0,
+          Term::Let { .. } | Term::App { .. } | Term::Dup { .. } | Term::Opx { .. } => 1,
+          Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => els.len() as isize - 1,
+          Term::Mat { args, rules } => (args.len() + rules.len()) as isize - 1,
+        };
+        Children { term: value, front, back }
+      }
+    }
+
+    Children::from(self)
+  }
+
+  pub fn children_mut(&mut self) -> Vec<&mut Self> {
+    match self {
+      Term::Mat { args, rules } => {
+        let args = args.iter_mut();
+        let rules = rules.iter_mut().map(|r| &mut r.body);
+        args.chain(rules).collect()
+      }
+      Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => els.iter_mut().collect(),
+      Term::Let { val: fst, nxt: snd, .. }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Opx { fst, snd, .. }
+      | Term::App { fun: fst, arg: snd, .. } => {
+        vec![fst, snd]
+      }
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+        vec![bod]
+      }
+      Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era
+      | Term::Err => vec![],
+    }
+  }
+
+  /// An iterator over the subterms with an iterator over the binds
+  /// introduced by the current term for each subterm.
+  ///
+  /// Example: A lambda introduces 1 bind for it's only subterm,
+  /// while a let expression introduces 0 binds for the value and
+  /// many binds for the next term.
+  pub fn children_with_binds(
+    &self,
+  ) -> impl DoubleEndedIterator<Item = (&Self, impl DoubleEndedIterator<Item = &Option<Name>>)> + Clone {
+    type Binds<'a> = Box<dyn DoubleEndedIterator<Item = &'a Option<Name>> + 'a>;
+    #[derive(Clone)]
+    struct Children<'a> {
+      pub term: &'a Term,
+      pub front: isize,
+      pub back: isize,
+    }
+
+    impl<'a> Iterator for Children<'a> {
+      type Item = (&'a Term, Binds<'a>);
+
+      fn next(&mut self) -> Option<Self::Item> {
+        if self.front > self.back {
+          return None;
+        }
+        let next = self.front as usize;
+        self.front += 1;
+
+        match self.term {
+          Term::Mat { args, rules } => {
+            if next < args.len() {
+              args.get(next).map(no_bind)
+            } else {
+              rules.get(next - args.len()).map(|r| pat_bind(&r.pats, &r.body))
+            }
+          }
+          Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => els.get(next).map(no_bind),
+          Term::Let { pat, val, nxt } => {
+            if next == 0 {
+              Some(no_bind(val))
+            } else {
+              Some(pat_bind(std::slice::from_ref(pat), nxt))
+            }
+          }
+          Term::App { fun: fst, arg: snd, .. }
+          | Term::Dup { val: fst, nxt: snd, .. }
+          | Term::Opx { fst, snd, .. } => {
+            if next == 0 {
+              Some(no_bind(fst))
+            } else {
+              Some(no_bind(snd))
+            }
+          }
+          Term::Lam { bod, nam, .. } => Some((bod, Box::new([nam].into_iter()))),
+          Term::Chn { bod, .. } => Some(no_bind(bod)),
+          Term::Var { .. }
+          | Term::Lnk { .. }
+          | Term::Num { .. }
+          | Term::Str { .. }
+          | Term::Ref { .. }
+          | Term::Era
+          | Term::Err => None,
+        }
+      }
+    }
+
+    impl<'a> DoubleEndedIterator for Children<'a> {
+      fn next_back(&mut self) -> Option<Self::Item> {
+        if self.back < self.front {
+          return None;
+        }
+        let next = self.back as usize;
+        self.back -= 1;
+        match &self.term {
+          Term::Mat { args, rules } => {
+            if next < args.len() {
+              args.get(next).map(no_bind)
+            } else {
+              rules.get(next - args.len()).map(|r| pat_bind(&r.pats, &r.body))
+            }
+          }
+          Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => els.get(next).map(no_bind),
+          Term::Let { pat, val, nxt } => {
+            if next == 0 {
+              Some(no_bind(val))
+            } else if next == 1 {
+              Some(pat_bind(std::slice::from_ref(pat), nxt))
+            } else {
+              None
+            }
+          }
+          Term::Dup { bnd, val, nxt, .. } => {
+            if next == 0 {
+              Some(no_bind(val))
+            } else if next == 1 {
+              Some((nxt, Box::new(bnd.iter())))
+            } else {
+              None
+            }
+          }
+          Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
+            if next == 0 {
+              Some(no_bind(fst))
+            } else if next == 1 {
+              Some(no_bind(snd))
+            } else {
+              None
+            }
+          }
+          Term::Lam { nam, bod, .. } | Term::Chn { nam, bod, .. } => {
+            if next == 0 {
+              Some((bod, Box::new([nam].into_iter())))
+            } else {
+              None
+            }
+          }
+          Term::Var { .. }
+          | Term::Lnk { .. }
+          | Term::Num { .. }
+          | Term::Str { .. }
+          | Term::Ref { .. }
+          | Term::Era
+          | Term::Err => None,
+        }
+      }
+    }
+
+    impl<'a> From<&'a Term> for Children<'a> {
+      fn from(value: &'a Term) -> Self {
+        let front = 0;
+        let back = match value {
+          Term::Var { .. }
+          | Term::Lnk { .. }
+          | Term::Num { .. }
+          | Term::Str { .. }
+          | Term::Ref { .. }
+          | Term::Era
+          | Term::Err => -1,
+          Term::Lam { .. } | Term::Chn { .. } => 0,
+          Term::Let { .. } | Term::App { .. } | Term::Dup { .. } | Term::Opx { .. } => 1,
+          Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => els.len() as isize - 1,
+          Term::Mat { args, rules } => (args.len() + rules.len()) as isize - 1,
+        };
+        Children { term: value, front, back }
+      }
+    }
+
+    fn no_bind(body: &Term) -> (&Term, Binds) {
+      (body, Box::new([].into_iter()))
+    }
+    fn pat_bind<'a>(pats: &'a [Pattern], body: &'a Term) -> (&'a Term, Binds<'a>) {
+      let binds = pats.iter().flat_map(|p| p.binds());
+      (body, Box::new(binds))
+    }
+
+    Children::from(self)
+  }
+
+  pub fn children_mut_with_binds(&mut self) -> Vec<(&mut Self, Vec<&Option<Name>>)> {
+    match self {
+      Term::Mat { args, rules } => {
+        let args = args.iter_mut().map(|arg| (arg, vec![]));
+        let rules =
+          rules.iter_mut().map(|r| (&mut r.body, r.pats.iter_mut().flat_map(|p| p.binds()).collect()));
+        args.chain(rules).collect()
+      }
+      Term::Let { pat, val, nxt } => {
+        vec![(val.as_mut(), vec![]), (nxt.as_mut(), pat.binds().collect())]
+      }
+      Term::Dup { bnd, val, nxt, .. } => {
+        vec![(val.as_mut(), vec![]), (nxt, bnd.iter().collect())]
+      }
+      Term::Lam { nam, bod, .. } => {
+        vec![(bod.as_mut(), vec![nam])]
+      }
+      Term::Chn { bod, .. } => {
+        vec![(bod.as_mut(), vec![])]
+      }
+      Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
+        els.iter_mut().map(|el| (el, vec![])).collect()
+      }
+      Term::Opx { fst, snd, .. } | Term::App { fun: fst, arg: snd, .. } => {
+        vec![(fst.as_mut(), vec![]), (snd.as_mut(), vec![])]
+      }
+      Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era
+      | Term::Err => vec![],
+    }
+  }
+
+  pub fn children_mut_with_binds_mut(&mut self) -> Vec<(&mut Self, Vec<&mut Option<Name>>)> {
+    match self {
+      Term::Mat { args, rules } => {
+        let args = args.iter_mut().map(|arg| (arg, vec![]));
+        let rules =
+          rules.iter_mut().map(|r| (&mut r.body, r.pats.iter_mut().flat_map(|p| p.binds_mut()).collect()));
+        args.chain(rules).collect()
+      }
+      Term::Let { pat, val, nxt } => {
+        vec![(val.as_mut(), vec![]), (nxt.as_mut(), pat.binds_mut().collect())]
+      }
+      Term::Dup { bnd, val, nxt, .. } => {
+        vec![(val.as_mut(), vec![]), (nxt, bnd.iter_mut().collect())]
+      }
+      Term::Lam { nam, bod, .. } => {
+        vec![(bod.as_mut(), vec![nam])]
+      }
+      Term::Chn { bod, .. } => {
+        vec![(bod.as_mut(), vec![])]
+      }
+      Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
+        els.iter_mut().map(|el| (el, vec![])).collect()
+      }
+      Term::Opx { fst, snd, .. } | Term::App { fun: fst, arg: snd, .. } => {
+        vec![(fst.as_mut(), vec![]), (snd.as_mut(), vec![])]
+      }
+      Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era
+      | Term::Err => vec![],
+    }
+  }
+
+  pub fn patterns(&self) -> impl DoubleEndedIterator<Item = &Pattern> {
+    struct Patterns<'a> {
+      pub term: &'a Term,
+      pub front: isize,
+      pub back: isize,
+    }
+
+    impl<'a> Iterator for Patterns<'a> {
+      type Item = &'a Pattern;
+
+      fn next(&mut self) -> Option<Self::Item> {
+        if self.front > self.back {
+          return None;
+        }
+        let next = self.front as usize;
+        self.front += 1;
+
+        match &self.term {
+          Term::Mat { args, rules } => {
+            if !args.is_empty()
+              && let Some(rule) = rules.get(next / args.len())
+            {
+              rule.pats.get(next % args.len())
+            } else {
+              None
+            }
+          }
+          Term::Let { pat, .. } => Some(pat),
+
+          Term::Lam { .. }
+          | Term::Chn { .. }
+          | Term::App { .. }
+          | Term::Dup { .. }
+          | Term::Opx { .. }
+          | Term::Tup { .. }
+          | Term::Sup { .. }
+          | Term::Lst { .. }
+          | Term::Var { .. }
+          | Term::Lnk { .. }
+          | Term::Num { .. }
+          | Term::Str { .. }
+          | Term::Ref { .. }
+          | Term::Era
+          | Term::Err => None,
+        }
+      }
+    }
+
+    impl<'a> DoubleEndedIterator for Patterns<'a> {
+      fn next_back(&mut self) -> Option<Self::Item> {
+        if self.back < self.front {
+          return None;
+        }
+        let next = self.back as usize;
+        self.back -= 1;
+
+        match &self.term {
+          Term::Mat { args, rules } => {
+            if !args.is_empty()
+              && let Some(rule) = rules.get(next / args.len())
+            {
+              rule.pats.get(next % args.len())
+            } else {
+              None
+            }
+          }
+          Term::Let { pat, .. } => Some(pat),
+          Term::Lam { .. }
+          | Term::Chn { .. }
+          | Term::App { .. }
+          | Term::Dup { .. }
+          | Term::Opx { .. }
+          | Term::Tup { .. }
+          | Term::Sup { .. }
+          | Term::Lst { .. }
+          | Term::Var { .. }
+          | Term::Lnk { .. }
+          | Term::Num { .. }
+          | Term::Str { .. }
+          | Term::Ref { .. }
+          | Term::Era
+          | Term::Err => None,
+        }
+      }
+    }
+
+    impl<'a> From<&'a Term> for Patterns<'a> {
+      fn from(value: &'a Term) -> Self {
+        let front = 0;
+        let back = match value {
+          Term::Mat { args, rules } => (args.len() * rules.len()) as isize - 1,
+          Term::Let { .. } => 0,
+          Term::Tup { .. }
+          | Term::Sup { .. }
+          | Term::Lst { .. }
+          | Term::App { .. }
+          | Term::Dup { .. }
+          | Term::Opx { .. }
+          | Term::Lam { .. }
+          | Term::Var { .. }
+          | Term::Chn { .. }
+          | Term::Lnk { .. }
+          | Term::Num { .. }
+          | Term::Str { .. }
+          | Term::Ref { .. }
+          | Term::Era
+          | Term::Err => -1,
+        };
+        Patterns { term: value, front, back }
+      }
+    }
+
+    Patterns::from(self)
+  }
+
+  pub fn patterns_mut<'a>(&'a mut self) -> Box<dyn DoubleEndedIterator<Item = &'a mut Pattern> + 'a> {
+    match self {
+      Term::Mat { rules, .. } => Box::new(rules.iter_mut().flat_map(|r| r.pats.iter_mut())),
+      Term::Let { pat, .. } => Box::new([pat].into_iter()),
+
+      Term::Lam { .. }
+      | Term::Var { .. }
+      | Term::Chn { .. }
+      | Term::Lnk { .. }
+      | Term::App { .. }
+      | Term::Tup { .. }
+      | Term::Dup { .. }
+      | Term::Sup { .. }
+      | Term::Num { .. }
+      | Term::Str { .. }
+      | Term::Lst { .. }
+      | Term::Opx { .. }
+      | Term::Ref { .. }
+      | Term::Era
+      | Term::Err => Box::new([].into_iter()),
+    }
+  }
+
   /* Common checks and transformations */
+  pub fn recursive_call<R, F>(f: F) -> R
+  where
+    F: FnOnce() -> R,
+  {
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, f)
+  }
 
   /// Substitute the occurrences of a variable in a term with the given term.
   /// Caution: can cause invalid shadowing of variables if used incorrectly.
   /// Ex: Using subst to beta-reduce (@a @b a b) converting it into (@b b).
   pub fn subst(&mut self, from: &Name, to: &Term) {
-    match self {
-      Term::Lam { nam: Some(nam), .. } if nam == from => (),
-      Term::Lam { bod, .. } => bod.subst(from, to),
+    Term::recursive_call(move || match self {
       Term::Var { nam } if nam == from => *self = to.clone(),
-      Term::Var { .. } => (),
-      // Only substitute scoped variables.
-      Term::Chn { bod, .. } => bod.subst(from, to),
-      Term::Lnk { .. } => (),
-      Term::Let { pat, val, nxt } => {
-        val.subst(from, to);
-        if !pat.binds().contains(from) {
-          nxt.subst(from, to);
-        }
-      }
-      Term::Dup { tag: _, bnd, val, nxt } => {
-        val.subst(from, to);
-        if bnd.iter().all(|var| var != from) {
-          nxt.subst(from, to);
-        }
-      }
-      Term::Mat { args, rules } => {
-        for arg in args {
-          arg.subst(from, to);
-        }
-        for rule in rules {
-          if !rule.pats.iter().flat_map(|p| p.binds()).contains(from) {
-            rule.body.subst(from, to);
+
+      _ => {
+        for (child, binds) in self.children_mut_with_binds() {
+          if !binds.iter().flat_map(|b| b.as_ref()).contains(from) {
+            child.subst(from, to);
           }
         }
       }
-      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-        els.iter_mut().for_each(|el| el.subst(from, to))
-      }
-      Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
-        fst.subst(from, to);
-        snd.subst(from, to);
-      }
-      Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => (),
-    }
+    })
   }
 
   /// Substitute the occurrence of an unscoped variable with the given term.
   pub fn subst_unscoped(&mut self, from: &Name, to: &Term) {
-    match self {
+    Term::recursive_call(move || match self {
       Term::Lnk { nam } if nam == from => {
         *self = to.clone();
       }
-      Term::Mat { args, rules } => {
-        args.iter_mut().for_each(|arg| arg.subst_unscoped(from, to));
-        rules.iter_mut().for_each(|rule| rule.body.subst_unscoped(from, to));
+
+      _ => {
+        for child in self.children_mut() {
+          child.subst_unscoped(from, to);
+        }
       }
-      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-        els.iter_mut().for_each(|el| el.subst_unscoped(from, to))
-      }
-      Term::Chn { bod, .. } | Term::Lam { bod, .. } => bod.subst_unscoped(from, to),
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Let { val: fst, nxt: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.subst(from, to);
-        snd.subst(from, to);
-      }
-      Term::Var { .. }
-      | Term::Lnk { .. }
-      | Term::Ref { .. }
-      | Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Era
-      | Term::Err => (),
-    }
+    })
   }
 
   /// Collects all the free variables that a term has
   /// and the number of times each var is used
   pub fn free_vars(&self) -> HashMap<Name, u64> {
     fn go(term: &Term, free_vars: &mut HashMap<Name, u64>) {
-      match term {
-        Term::Lam { nam: Some(nam), bod, .. } => {
-          let mut new_scope = Default::default();
-          go(bod, &mut new_scope);
-          new_scope.remove(nam);
-
-          free_vars.extend(new_scope);
-        }
-        Term::Lam { nam: None, bod, .. } => go(bod, free_vars),
+      Term::recursive_call(move || match term {
         Term::Var { nam } => *free_vars.entry(nam.clone()).or_default() += 1,
-        Term::Chn { bod, .. } => go(bod, free_vars),
-        Term::Lnk { .. } => {}
-        Term::Let { pat, val, nxt } => {
-          go(val, free_vars);
 
-          let mut new_scope = Default::default();
-          go(nxt, &mut new_scope);
-
-          for bind in pat.binds() {
-            new_scope.remove(bind);
-          }
-
-          free_vars.extend(new_scope);
-        }
-        Term::Dup { bnd, val, nxt, .. } => {
-          go(val, free_vars);
-
-          let mut new_scope = Default::default();
-          go(nxt, &mut new_scope);
-
-          for bnd in bnd.iter().flatten() {
-            new_scope.remove(bnd);
-          }
-
-          free_vars.extend(new_scope);
-        }
-        Term::App { fun: fst, arg: snd, .. } | Term::Opx { op: _, fst, snd } => {
-          go(fst, free_vars);
-          go(snd, free_vars);
-        }
-        Term::Mat { args, rules } => {
-          for arg in args {
-            go(arg, free_vars);
-          }
-          for rule in rules {
+        _ => {
+          for (child, binds) in term.children_with_binds() {
             let mut new_scope = Default::default();
-            go(&rule.body, &mut new_scope);
+            go(child, &mut new_scope);
 
-            for nam in rule.pats.iter().flat_map(|p| p.binds()) {
+            for nam in binds.flatten() {
               new_scope.remove(nam);
             }
 
             free_vars.extend(new_scope);
           }
         }
-        Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-          for el in els {
-            go(el, free_vars);
-          }
-        }
-        Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {}
-      }
+      })
     }
 
     let mut free_vars = Default::default();
@@ -552,7 +989,7 @@ impl Term {
   /// Returns the set of declared and the set of used unscoped variables
   pub fn unscoped_vars(&self) -> (IndexSet<Name>, IndexSet<Name>) {
     fn go(term: &Term, decls: &mut IndexSet<Name>, uses: &mut IndexSet<Name>) {
-      match term {
+      Term::recursive_call(move || match term {
         Term::Chn { tag: _, nam, bod } => {
           if let Some(nam) = nam {
             decls.insert(nam.clone());
@@ -562,32 +999,13 @@ impl Term {
         Term::Lnk { nam } => {
           uses.insert(nam.clone());
         }
-        Term::Mat { args, rules } => {
-          for arg in args {
-            go(arg, decls, uses);
-          }
-          for rule in rules {
-            go(&rule.body, decls, uses);
+
+        _ => {
+          for child in term.children() {
+            go(child, decls, uses);
           }
         }
-        Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-          for el in els {
-            go(el, decls, uses);
-          }
-        }
-        Term::Let { val: fst, nxt: snd, .. }
-        | Term::App { fun: fst, arg: snd, .. }
-        | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Opx { fst, snd, .. } => {
-          go(fst, decls, uses);
-          go(snd, decls, uses);
-        }
-        Term::Lam { bod, .. } => {
-          go(bod, decls, uses);
-        }
-        Term::Var { .. } | Term::Num { .. } | Term::Str { .. } | Term::Ref { .. } | Term::Era | Term::Err => {
-        }
-      }
+      })
     }
     let mut decls = Default::default();
     let mut uses = Default::default();
@@ -692,7 +1110,7 @@ impl Term {
 }
 
 impl Pattern {
-  pub fn bind_or_eras(&self) -> impl DoubleEndedIterator<Item = &Option<Name>> {
+  pub fn binds(&self) -> impl DoubleEndedIterator<Item = &Option<Name>> {
     self.iter().filter_map(|pat| match pat {
       Pattern::Var(nam) => Some(nam),
       Pattern::Num(NumCtr::Succ(_, nam)) => nam.as_ref(),
@@ -700,7 +1118,7 @@ impl Pattern {
     })
   }
 
-  pub fn bind_or_eras_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Option<Name>> {
+  pub fn binds_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Option<Name>> {
     // Can't have a Pattern::iter_mut() since it has a tree-like structure.
     fn go<'a>(pat: &'a mut Pattern, set: &mut Vec<&'a mut Option<Name>>) {
       match pat {
@@ -720,21 +1138,66 @@ impl Pattern {
     set.into_iter()
   }
 
-  pub fn binds(&self) -> impl DoubleEndedIterator<Item = &Name> {
-    self.bind_or_eras().flatten()
+  pub fn named_binds(&self) -> impl DoubleEndedIterator<Item = &Name> {
+    self.binds().flatten()
   }
 
-  pub fn binds_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Name> {
-    self.bind_or_eras_mut().flatten()
+  pub fn named_binds_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Name> {
+    self.binds_mut().flatten()
   }
 
   /// Returns an iterator over each immediate child sub-pattern of `self`.
   /// Considers Lists as its own pattern and not a sequence of Cons.
-  pub fn children<'a>(&'a self) -> Box<dyn DoubleEndedIterator<Item = &'a Pattern> + 'a> {
-    match self {
-      Pattern::Ctr(_, pats) | Pattern::Tup(pats) | Pattern::Lst(pats) => Box::new(pats.iter()),
-      Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => Box::new([].iter()),
+  pub fn children(&self) -> impl DoubleEndedIterator<Item = &Pattern> {
+    struct Children<'a> {
+      pat: &'a Pattern,
+      front: isize,
+      back: isize,
     }
+    impl<'a> Iterator for Children<'a> {
+      type Item = &'a Pattern;
+
+      fn next(&mut self) -> Option<Self::Item> {
+        if self.front > self.back {
+          return None;
+        }
+        let next = self.front as usize;
+        self.front += 1;
+
+        match &self.pat {
+          Pattern::Ctr(_, els) | Pattern::Tup(els) | Pattern::Lst(els) => els.get(next),
+          Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => None,
+        }
+      }
+    }
+
+    impl<'a> DoubleEndedIterator for Children<'a> {
+      fn next_back(&mut self) -> Option<Self::Item> {
+        if self.back < self.front {
+          return None;
+        }
+        let next = self.back as usize;
+        self.back -= 1;
+
+        match &self.pat {
+          Pattern::Ctr(_, els) | Pattern::Tup(els) | Pattern::Lst(els) => els.get(next),
+          Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => None,
+        }
+      }
+    }
+
+    impl<'a> From<&'a Pattern> for Children<'a> {
+      fn from(value: &'a Pattern) -> Self {
+        let front = 0;
+        let back = match value {
+          Pattern::Ctr(_, els) | Pattern::Tup(els) | Pattern::Lst(els) => els.len() as isize - 1,
+          Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => -1,
+        };
+        Children { pat: value, front, back }
+      }
+    }
+
+    Children::from(self)
   }
 
   /// Returns an iterator over each subpattern in depth-first, left to right order.

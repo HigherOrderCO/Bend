@@ -51,7 +51,7 @@ impl Ctx<'_> {
 
 /// Returns whether any substitution happened within the term or not
 pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool {
-  match term {
+  Term::recursive_call(move || match term {
     Term::Ref { nam: def_name } => {
       if let Some(target_name) = ref_map.get(def_name) {
         *def_name = target_name.clone();
@@ -60,33 +60,13 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool
         false
       }
     }
-    Term::Lam { bod, .. } | Term::Chn { bod, .. } => subst_ref_to_ref(bod, ref_map),
-    Term::App { fun: fst, arg: snd, .. }
-    | Term::Let { val: fst, nxt: snd, .. }
-    | Term::Dup { val: fst, nxt: snd, .. }
-    | Term::Opx { fst, snd, .. } => {
-      let fst_subst = subst_ref_to_ref(fst, ref_map);
-      let snd_subst = subst_ref_to_ref(snd, ref_map);
-      fst_subst | snd_subst
-    }
-    Term::Mat { args, rules } => {
+
+    _ => {
       let mut subst = false;
-      for arg in args {
-        subst |= subst_ref_to_ref(arg, ref_map);
-      }
-      for rule in rules {
-        subst |= subst_ref_to_ref(&mut rule.body, ref_map);
+      for child in term.children_mut() {
+        subst |= subst_ref_to_ref(child, ref_map);
       }
       subst
     }
-    Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-      let mut subst = false;
-      for e in els {
-        subst |= subst_ref_to_ref(e, ref_map);
-      }
-      subst
-    }
-    Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era => false,
-    Term::Err => unreachable!(),
-  }
+  })
 }
