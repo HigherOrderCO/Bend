@@ -5,7 +5,8 @@ use crate::term::{
   },
   display::DisplayFn,
   transform::{
-    encode_pattern_matching::MatchErr, resolve_refs::ReferencedMainErr, simplify_ref_to_ref::CyclicDefErr,
+    apply_args::ArgError, encode_pattern_matching::MatchErr, resolve_refs::ReferencedMainErr,
+    simplify_ref_to_ref::CyclicDefErr,
   },
   Name,
 };
@@ -59,8 +60,8 @@ impl Info {
     self.err_counter = 0;
   }
 
-  /// Checks if any error was emitted since the start of the pass,  
-  /// Returning all the current information as a `Err(Info)`, replacing `&mut self` with an empty one.  
+  /// Checks if any error was emitted since the start of the pass,
+  /// Returning all the current information as a `Err(Info)`, replacing `&mut self` with an empty one.
   /// Otherwise, returns the given arg as an `Ok(T)`.
   pub fn fatal<T>(&mut self, t: T) -> Result<T, Info> {
     if self.err_counter == 0 { Ok(t) } else { Err(std::mem::take(self)) }
@@ -110,6 +111,7 @@ pub enum Error {
   EntryPoint(EntryErr),
   TopLevel(TopLevelErr),
   Custom(String),
+  ArgError(ArgError),
 }
 
 impl Display for Error {
@@ -129,6 +131,7 @@ impl Error {
       Error::EntryPoint(err) => write!(f, "{err}"),
       Error::TopLevel(err) => write!(f, "{err}"),
       Error::Custom(err) => write!(f, "{err}"),
+      Error::ArgError(err) => write!(f, "{err}"),
     })
   }
 }
@@ -172,6 +175,12 @@ impl From<EntryErr> for Error {
 impl From<TopLevelErr> for Error {
   fn from(value: TopLevelErr) -> Self {
     Self::TopLevel(value)
+  }
+}
+
+impl From<ArgError> for Error {
+  fn from(value: ArgError) -> Self {
+    Self::ArgError(value)
   }
 }
 

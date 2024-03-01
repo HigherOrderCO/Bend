@@ -9,7 +9,6 @@ pub enum EntryErr {
   NotFound(Name),
   Multiple(Vec<Name>),
   MultipleRules,
-  Arguments,
 }
 
 impl Display for EntryErr {
@@ -23,7 +22,6 @@ impl Display for EntryErr {
         write!(f, "File has '{}', '{}' and '{}' definitions.", fnd[0], fnd[1], fnd[2])
       }
       EntryErr::MultipleRules => write!(f, "Main definition can't have more than one rule."),
-      EntryErr::Arguments => write!(f, "Main definition can't have any arguments."),
     }
   }
 }
@@ -69,13 +67,7 @@ impl Ctx<'_> {
 }
 
 fn validate_entry_point(entry: &Definition) -> Result<Name, EntryErr> {
-  if entry.rules.len() > 1 {
-    Err(EntryErr::MultipleRules)
-  } else if !entry.rules[0].pats.is_empty() {
-    Err(EntryErr::Arguments)
-  } else {
-    Ok(entry.name.clone())
-  }
+  if entry.rules.len() > 1 { Err(EntryErr::MultipleRules) } else { Ok(entry.name.clone()) }
 }
 
 impl Book {
