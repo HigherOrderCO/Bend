@@ -109,7 +109,7 @@ fn compile_term() {
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::heavy())?;
+    let compiled = compile_book(&mut book, CompileOpts::heavy(), None)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -117,7 +117,7 @@ fn compile_file_o_all() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::light())?;
+    let compiled = compile_book(&mut book, CompileOpts::light(), None)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -132,6 +132,7 @@ fn linear_readback() {
       RunOpts { linear: true, ..Default::default() },
       WarningOpts::deny_all(),
       CompileOpts::heavy(),
+      None,
     )?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   });
@@ -143,14 +144,14 @@ fn run_file() {
       let book = do_parse_book(code, path)?;
       // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
       let (res, info) =
-        run_book(book, 1 << 20, RunOpts::lazy(), WarningOpts::deny_all(), CompileOpts::heavy())?;
+        run_book(book, 1 << 24, RunOpts::lazy(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
       Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
     }),
     (&|code, path| {
       let book = do_parse_book(code, path)?;
       // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
       let (res, info) =
-        run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
+        run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
       Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
     }),
   ])
@@ -166,7 +167,7 @@ fn run_lazy() {
     desugar_opts.lazy_mode();
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, info) = run_book(book, 1 << 20, run_opts, WarningOpts::deny_all(), desugar_opts)?;
+    let (res, info) = run_book(book, 1 << 24, run_opts, WarningOpts::deny_all(), desugar_opts, None)?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }
@@ -257,7 +258,7 @@ fn encode_pattern_match() {
 fn desugar_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    desugar_book(&mut book, CompileOpts::light())?;
+    desugar_book(&mut book, CompileOpts::light(), None)?;
     Ok(book.to_string())
   })
 }
@@ -273,7 +274,8 @@ fn hangs() {
     let lck = Arc::new(RwLock::new(false));
     let got = lck.clone();
     std::thread::spawn(move || {
-      let _ = run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy());
+      let _ =
+        run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None);
       *got.write().unwrap() = true;
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
@@ -287,7 +289,7 @@ fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::from("foo"));
-    let compiled = compile_book(&mut book, CompileOpts::light())?;
+    let compiled = compile_book(&mut book, CompileOpts::light(), None)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -299,7 +301,7 @@ fn run_entrypoint() {
     book.entrypoint = Some(Name::from("foo"));
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) =
-      run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy())?;
+      run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
   })
 }

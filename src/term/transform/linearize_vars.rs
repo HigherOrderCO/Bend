@@ -42,9 +42,12 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, u64>) {
       match get_var_uses(Some(nam), var_uses) {
         0 => {
           if val.has_unscoped() {
-            // If the erased let has an unscoped variable inside, we can't erase it.
             term_to_affine(val, var_uses);
-            let Term::Let { val, nxt, .. } = std::mem::take(term) else { unreachable!() };
+
+            let Term::Let { val, nxt, .. } = term else { unreachable!() };
+            let val = std::mem::take(val);
+            let nxt = std::mem::take(nxt);
+
             *term = Term::Let { pat: Pattern::Var(None), val, nxt };
           } else {
             *term = std::mem::take(nxt.as_mut());
@@ -69,8 +72,9 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, u64>) {
       if val.has_unscoped() {
         term_to_affine(val, var_uses);
       } else {
-        let Term::Let { nxt, .. } = std::mem::take(term) else { unreachable!() };
-        *term = *nxt;
+        let Term::Let { nxt, .. } = term else { unreachable!() };
+        let nxt = std::mem::take(nxt.as_mut());
+        *term = nxt;
       }
     }
 

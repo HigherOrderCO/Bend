@@ -6,7 +6,7 @@ use hvmc::{
   ast::{self, Net},
   dispatch_dyn_net,
   host::Host,
-  run::{DynNet, Net as RtNet, Rewrites},
+  run::{DynNet, Heap, Rewrites},
   stdlib::LogDef,
 };
 use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
@@ -53,7 +53,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
       move |wire| {
         let host = host.lock().unwrap();
         let tree = host.readback_tree(&wire);
-        let net = hvmc::ast::Net { root: tree, rdex: vec![] };
+        let net = hvmc::ast::Net { root: tree, redexes: vec![] };
         let (term, errs) = readback_hvmc(&net, &book, &labels, false, adt_encoding);
         println!("{}{}", display_readback_errors(&errs), term);
       }
@@ -68,9 +68,9 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
       move |wire| {
         let host = host.lock().unwrap();
         let tree = host.readback_tree(&wire);
-        let net = hvmc::ast::Net { root: tree, rdex: vec![] };
+        let net = hvmc::ast::Net { root: tree, redexes: vec![] };
         let (term, _errs) = readback_hvmc(&net, &book, &labels, false, adt_encoding);
-        if let Term::Str { val } = term {
+        if let Term::Str { val } = &term {
           println!("{val}");
         }
       }
@@ -85,13 +85,18 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
 pub fn check_book(book: &mut Book) -> Result<(), Info> {
   // TODO: Do the checks without having to do full compilation
   // TODO: Shouldn't the check mode show warnings?
-  compile_book(book, CompileOpts::light())?;
+  compile_book(book, CompileOpts::light(), None)?;
   Ok(())
 }
 
-pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult, Info> {
-  let warns = desugar_book(book, opts)?;
+pub fn compile_book(
+  book: &mut Book,
+  opts: CompileOpts,
+  args: Option<Vec<Term>>,
+) -> Result<CompileResult, Info> {
+  let warns = desugar_book(book, opts, args)?;
   let (nets, labels) = book_to_nets(book);
+
   let mut core_book = nets_to_hvmc(nets)?;
   if opts.pre_reduce {
     pre_reduce_book(&mut core_book, book.hvmc_entrypoint())?;
@@ -102,11 +107,16 @@ pub fn compile_book(book: &mut Book, opts: CompileOpts) -> Result<CompileResult,
   Ok(CompileResult { core_book, labels, warns })
 }
 
-pub fn desugar_book(book: &mut Book, opts: CompileOpts) -> Result<Vec<Warning>, Info> {
+pub fn desugar_book(
+  book: &mut Book,
+  opts: CompileOpts,
+  args: Option<Vec<Term>>,
+) -> Result<Vec<Warning>, Info> {
   let mut ctx = Ctx::new(book);
 
   ctx.check_shared_names();
   ctx.set_entrypoint();
+  ctx.apply_args(args)?;
 
   ctx.book.encode_adts(opts.adt_encoding);
   ctx.book.encode_builtins();
@@ -174,8 +184,9 @@ pub fn run_book(
   run_opts: RunOpts,
   warning_opts: WarningOpts,
   compile_opts: CompileOpts,
+  args: Option<Vec<Term>>,
 ) -> Result<(Term, RunInfo), Info> {
-  let CompileResult { core_book, labels, warns } = compile_book(&mut book, compile_opts)?;
+  let CompileResult { core_book, labels, warns } = compile_book(&mut book, compile_opts, args)?;
 
   // Turn the book into an Arc so that we can use it for logging, debugging, etc.
   // from anywhere else in the program
@@ -203,7 +214,7 @@ pub fn run_book(
 pub fn count_nodes<'l>(net: &'l hvmc::ast::Net) -> usize {
   let mut visit: Vec<&'l hvmc::ast::Tree> = vec![&net.root];
   let mut count = 0usize;
-  for (l, r) in &net.rdex {
+  for (l, r) in &net.redexes {
     visit.push(l);
     visit.push(r);
   }
@@ -239,7 +250,7 @@ pub fn run_compiled(
   hook: Option<impl FnMut(&Net)>,
   entrypoint: &str,
 ) -> (Net, RunStats) {
-  let heap = RtNet::<hvmc::run::Lazy>::init_heap(mem_size);
+  let heap = Heap::new_bytes(mem_size);
   let mut root = DynNet::new(&heap, run_opts.lazy_mode);
   let max_rwts = run_opts.max_rewrites.map(|x| x.clamp(usize::MIN as u64, usize::MAX as u64) as usize);
   // Expect won't be reached because there's
@@ -251,7 +262,7 @@ pub fn run_compiled(
 
     if let Some(mut hook) = hook {
       root.expand();
-      while !root.rdex.is_empty() {
+      while !root.redexes.is_empty() {
         hook(&host.lock().unwrap().readback(root));
         root.reduce(1);
         root.expand();
@@ -264,7 +275,7 @@ pub fn run_compiled(
         panic!("Parallel mode does not yet support rewrite limit");
       }
       root.expand();
-      while !root.rdex.is_empty() {
+      while !root.redexes.is_empty() {
         let old_rwts = root.rwts.total();
         root.reduce(max_rwts);
         let delta_rwts = root.rwts.total() - old_rwts;

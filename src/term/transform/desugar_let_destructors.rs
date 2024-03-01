@@ -46,7 +46,10 @@ impl Term {
       | Term::Err => (),
 
       Term::Let { .. } => {
-        let Term::Let { pat, mut val, mut nxt } = std::mem::take(self) else { unreachable!() };
+        let Term::Let { pat, val, nxt } = self else { unreachable!() };
+        let pat = pat.clone();
+        let mut val = std::mem::take(val);
+        let mut nxt = std::mem::take(nxt);
 
         val.desugar_let_destructors();
         nxt.desugar_let_destructors();

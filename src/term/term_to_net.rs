@@ -68,200 +68,202 @@ impl<'a> EncodeTermState<'a> {
   /// `global_vars` has the same information for global lambdas. Must be linked outside this function.
   /// Expects variables to be affine, refs to be stored as Refs and all names to be bound.
   fn encode_term(&mut self, term: &Term, up: Port) -> Option<Port> {
-    match term {
-      // A lambda becomes to a con node. Ports:
-      // - 0: points to where the lambda occurs.
-      // - 1: points to the lambda variable.
-      // - 2: points to the lambda body.
-      // core: (var_use bod)
-      Term::Lam { tag, nam, bod } => {
-        let fun = self.inet.new_node(Con { lab: self.labels.con.generate(tag) });
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
+      match term {
+        // A lambda becomes to a con node. Ports:
+        // - 0: points to where the lambda occurs.
+        // - 1: points to the lambda variable.
+        // - 2: points to the lambda body.
+        // core: (var_use bod)
+        Term::Lam { tag, nam, bod } => {
+          let fun = self.inet.new_node(Con { lab: self.labels.con.generate(tag) });
 
-        self.push_scope(nam, Port(fun, 1));
-        let bod = self.encode_term(bod, Port(fun, 2));
-        self.pop_scope(nam, Port(fun, 1));
-        self.link_local(Port(fun, 2), bod);
+          self.push_scope(nam, Port(fun, 1));
+          let bod = self.encode_term(bod, Port(fun, 2));
+          self.pop_scope(nam, Port(fun, 1));
+          self.link_local(Port(fun, 2), bod);
 
-        Some(Port(fun, 0))
-      }
-      // core: (var_use bod)
-      Term::Chn { tag, nam, bod } => {
-        let fun = self.inet.new_node(Con { lab: self.labels.con.generate(tag) });
-        if let Some(nam) = nam {
-          self.global_vars.entry(nam.clone()).or_default().0 = Port(fun, 1);
+          Some(Port(fun, 0))
         }
-        let bod = self.encode_term(bod, Port(fun, 2));
-        self.link_local(Port(fun, 2), bod);
-        Some(Port(fun, 0))
-      }
-      // An application becomes to a con node too. Ports:
-      // - 0: points to the function being applied.
-      // - 1: points to the function's argument.
-      // - 2: points to where the application occurs.
-      // core: & fun ~ (arg ret) (fun not necessarily main port)
-      Term::App { tag, fun, arg } => {
-        let app = self.inet.new_node(Con { lab: self.labels.con.generate(tag) });
-
-        let fun = self.encode_term(fun, Port(app, 0));
-        self.link_local(Port(app, 0), fun);
-
-        let arg = self.encode_term(arg, Port(app, 1));
-        self.link_local(Port(app, 1), arg);
-
-        Some(Port(app, 2))
-      }
-      // core: & cond ~  (zero succ) ret
-      Term::Mat { args, rules } => {
-        // At this point should be only simple num matches.
-        let arg = args.iter().next().unwrap();
-        debug_assert!(matches!(rules[0].pats[..], [Pattern::Num(NumCtr::Num(0))]));
-        debug_assert!(matches!(rules[1].pats[..], [Pattern::Num(NumCtr::Succ(1, None))]));
-
-        let if_ = self.inet.new_node(Mat);
-
-        let cond = self.encode_term(arg, Port(if_, 0));
-        self.link_local(Port(if_, 0), cond);
-
-        let zero = &rules[0].body;
-        let succ = &rules[1].body;
-
-        let sel = self.inet.new_node(Con { lab: None });
-        self.inet.link(Port(sel, 0), Port(if_, 1));
-        let zero = self.encode_term(zero, Port(sel, 1));
-        self.link_local(Port(sel, 1), zero);
-
-        let succ = self.encode_term(succ, Port(sel, 2));
-        self.link_local(Port(sel, 2), succ);
-
-        Some(Port(if_, 2))
-      }
-      // A dup becomes a dup node too. Ports for dups of size 2:
-      // - 0: points to the value projected.
-      // - 1: points to the occurrence of the first variable.
-      // - 2: points to the occurrence of the second variable.
-      // core: & val ~ {lab fst snd} (val not necessarily main port)
-      // Dups with more than 2 variables become a list-like node tree of n-1 nodes.
-      // All the nodes of a dup tree have the same label.
-      // `@x dup #i {x0 x1 x2 x3}; A` => `({i x0 {i x1 {i x2 x3}}} A)`
-      Term::Dup { tag, bnd, val, nxt } => {
-        let lab = self.labels.dup.generate(tag).unwrap();
-        let (main, aux) = self.make_node_list(Dup { lab }, bnd.len());
-
-        let val = self.encode_term(val, main);
-        self.link_local(main, val);
-
-        for (bnd, aux) in bnd.iter().zip(aux.iter()) {
-          self.push_scope(bnd, *aux);
+        // core: (var_use bod)
+        Term::Chn { tag, nam, bod } => {
+          let fun = self.inet.new_node(Con { lab: self.labels.con.generate(tag) });
+          if let Some(nam) = nam {
+            self.global_vars.entry(nam.clone()).or_default().0 = Port(fun, 1);
+          }
+          let bod = self.encode_term(bod, Port(fun, 2));
+          self.link_local(Port(fun, 2), bod);
+          Some(Port(fun, 0))
         }
+        // An application becomes to a con node too. Ports:
+        // - 0: points to the function being applied.
+        // - 1: points to the function's argument.
+        // - 2: points to where the application occurs.
+        // core: & fun ~ (arg ret) (fun not necessarily main port)
+        Term::App { tag, fun, arg } => {
+          let app = self.inet.new_node(Con { lab: self.labels.con.generate(tag) });
 
-        let nxt = self.encode_term(nxt, up);
+          let fun = self.encode_term(fun, Port(app, 0));
+          self.link_local(Port(app, 0), fun);
 
-        for (bnd, aux) in bnd.iter().rev().zip(aux.iter().rev()) {
-          self.pop_scope(bnd, *aux);
+          let arg = self.encode_term(arg, Port(app, 1));
+          self.link_local(Port(app, 1), arg);
+
+          Some(Port(app, 2))
         }
+        // core: & cond ~  (zero succ) ret
+        Term::Mat { args, rules } => {
+          // At this point should be only simple num matches.
+          let arg = args.iter().next().unwrap();
+          debug_assert!(matches!(rules[0].pats[..], [Pattern::Num(NumCtr::Num(0))]));
+          debug_assert!(matches!(rules[1].pats[..], [Pattern::Num(NumCtr::Succ(1, None))]));
 
-        nxt
-      }
-      Term::Var { nam } => {
-        // We assume this variable to be valid, bound and correctly scoped.
-        // This pass must be done before.
-        debug_assert!(
-          self.scope.contains_key(nam),
-          "Unbound variable {nam}. Expected this check to be already done"
-        );
-        let var_stack = &self.scope[nam];
-        let cur_var = *var_stack.last().unwrap();
-        let (declare_port, use_port) = self.vars.get_mut(cur_var).unwrap();
-        debug_assert!(use_port.is_none(), "Variable {nam} used more than once");
-        self.inet.link(up, *declare_port);
-        *use_port = Some(up);
-        Some(*declare_port)
-      }
-      Term::Lnk { nam } => {
-        self.global_vars.entry(nam.clone()).or_default().1 = up;
-        None
-      }
-      // core: @def_id
-      Term::Ref { nam: def_name } => {
-        let node = self.inet.new_node(Ref { def_name: def_name.clone() });
-        self.inet.link(Port(node, 1), Port(node, 2));
-        self.inet.link(up, Port(node, 0));
-        Some(Port(node, 0))
-      }
-      Term::Let { pat: Pattern::Tup(args), val, nxt } => {
-        let nams = args.iter().map(|arg| if let Pattern::Var(nam) = arg { nam } else { unreachable!() });
-        let (main, aux) = self.make_node_list(Tup, args.len());
+          let if_ = self.inet.new_node(Mat);
 
-        let val = self.encode_term(val, main);
-        self.link_local(main, val);
+          let cond = self.encode_term(arg, Port(if_, 0));
+          self.link_local(Port(if_, 0), cond);
 
-        for (nam, aux) in nams.clone().zip(aux.iter()) {
-          self.push_scope(nam, *aux);
+          let zero = &rules[0].body;
+          let succ = &rules[1].body;
+
+          let sel = self.inet.new_node(Con { lab: None });
+          self.inet.link(Port(sel, 0), Port(if_, 1));
+          let zero = self.encode_term(zero, Port(sel, 1));
+          self.link_local(Port(sel, 1), zero);
+
+          let succ = self.encode_term(succ, Port(sel, 2));
+          self.link_local(Port(sel, 2), succ);
+
+          Some(Port(if_, 2))
         }
-        let nxt = self.encode_term(nxt, up);
-        for (nam, aux) in nams.rev().zip(aux.iter().rev()) {
-          self.pop_scope(nam, *aux);
+        // A dup becomes a dup node too. Ports for dups of size 2:
+        // - 0: points to the value projected.
+        // - 1: points to the occurrence of the first variable.
+        // - 2: points to the occurrence of the second variable.
+        // core: & val ~ {lab fst snd} (val not necessarily main port)
+        // Dups with more than 2 variables become a list-like node tree of n-1 nodes.
+        // All the nodes of a dup tree have the same label.
+        // `@x dup #i {x0 x1 x2 x3}; A` => `({i x0 {i x1 {i x2 x3}}} A)`
+        Term::Dup { tag, bnd, val, nxt } => {
+          let lab = self.labels.dup.generate(tag).unwrap();
+          let (main, aux) = self.make_node_list(Dup { lab }, bnd.len());
+
+          let val = self.encode_term(val, main);
+          self.link_local(main, val);
+
+          for (bnd, aux) in bnd.iter().zip(aux.iter()) {
+            self.push_scope(bnd, *aux);
+          }
+
+          let nxt = self.encode_term(nxt, up);
+
+          for (bnd, aux) in bnd.iter().rev().zip(aux.iter().rev()) {
+            self.pop_scope(bnd, *aux);
+          }
+
+          nxt
         }
-
-        nxt
-      }
-      Term::Let { pat: Pattern::Var(None), val, nxt } => {
-        let nod = self.inet.new_node(Era);
-        let val = self.encode_term(val, Port(nod, 0));
-
-        self.link_local(Port(nod, 0), val);
-
-        self.encode_term(nxt, up)
-      }
-      Term::Let { .. } => unreachable!(), // Removed in earlier pass
-      Term::Sup { tag, els } => {
-        let lab = self.labels.dup.generate(tag).unwrap();
-        let (main, aux) = self.make_node_list(Dup { lab }, els.len());
-
-        for (el, aux) in els.iter().zip(aux) {
-          let el = self.encode_term(el, aux);
-          self.link_local(aux, el);
+        Term::Var { nam } => {
+          // We assume this variable to be valid, bound and correctly scoped.
+          // This pass must be done before.
+          debug_assert!(
+            self.scope.contains_key(nam),
+            "Unbound variable {nam}. Expected this check to be already done"
+          );
+          let var_stack = &self.scope[nam];
+          let cur_var = *var_stack.last().unwrap();
+          let (declare_port, use_port) = self.vars.get_mut(cur_var).unwrap();
+          debug_assert!(use_port.is_none(), "Variable {nam} used more than once");
+          self.inet.link(up, *declare_port);
+          *use_port = Some(up);
+          Some(*declare_port)
         }
-
-        Some(main)
-      }
-      Term::Era => {
-        let era = self.inet.new_node(Era);
-        self.inet.link(Port(era, 1), Port(era, 2));
-        Some(Port(era, 0))
-      }
-      // core: #val
-      Term::Num { val } => {
-        let node = self.inet.new_node(Num { val: *val });
-        // This representation only has nodes of arity 2, so we connect the two aux ports that are not used.
-        self.inet.link(Port(node, 1), Port(node, 2));
-        Some(Port(node, 0))
-      }
-      Term::Str { .. } => unreachable!(), // Removed in desugar str
-      Term::Lst { .. } => unreachable!(), // Removed in desugar list
-      // core: & fst ~ <op snd ret>
-      Term::Opx { op, fst, snd } => {
-        let opx = self.inet.new_node(Op2 { opr: op.to_hvmc_label() });
-
-        let fst_port = self.encode_term(fst, Port(opx, 0));
-        self.link_local(Port(opx, 0), fst_port);
-
-        let snd_port = self.encode_term(snd, Port(opx, 1));
-        self.link_local(Port(opx, 1), snd_port);
-
-        Some(Port(opx, 2))
-      }
-      Term::Tup { els } => {
-        let (main, aux) = self.make_node_list(Tup, els.len());
-        for (el, aux) in els.iter().zip(aux.iter()) {
-          let el = self.encode_term(el, *aux);
-          self.link_local(*aux, el);
+        Term::Lnk { nam } => {
+          self.global_vars.entry(nam.clone()).or_default().1 = up;
+          None
         }
+        // core: @def_id
+        Term::Ref { nam: def_name } => {
+          let node = self.inet.new_node(Ref { def_name: def_name.clone() });
+          self.inet.link(Port(node, 1), Port(node, 2));
+          self.inet.link(up, Port(node, 0));
+          Some(Port(node, 0))
+        }
+        Term::Let { pat: Pattern::Tup(args), val, nxt } => {
+          let nams = args.iter().map(|arg| if let Pattern::Var(nam) = arg { nam } else { unreachable!() });
+          let (main, aux) = self.make_node_list(Tup, args.len());
 
-        Some(main)
+          let val = self.encode_term(val, main);
+          self.link_local(main, val);
+
+          for (nam, aux) in nams.clone().zip(aux.iter()) {
+            self.push_scope(nam, *aux);
+          }
+          let nxt = self.encode_term(nxt, up);
+          for (nam, aux) in nams.rev().zip(aux.iter().rev()) {
+            self.pop_scope(nam, *aux);
+          }
+
+          nxt
+        }
+        Term::Let { pat: Pattern::Var(None), val, nxt } => {
+          let nod = self.inet.new_node(Era);
+          let val = self.encode_term(val, Port(nod, 0));
+
+          self.link_local(Port(nod, 0), val);
+
+          self.encode_term(nxt, up)
+        }
+        Term::Let { .. } => unreachable!(), // Removed in earlier pass
+        Term::Sup { tag, els } => {
+          let lab = self.labels.dup.generate(tag).unwrap();
+          let (main, aux) = self.make_node_list(Dup { lab }, els.len());
+
+          for (el, aux) in els.iter().zip(aux) {
+            let el = self.encode_term(el, aux);
+            self.link_local(aux, el);
+          }
+
+          Some(main)
+        }
+        Term::Era => {
+          let era = self.inet.new_node(Era);
+          self.inet.link(Port(era, 1), Port(era, 2));
+          Some(Port(era, 0))
+        }
+        // core: #val
+        Term::Num { val } => {
+          let node = self.inet.new_node(Num { val: *val });
+          // This representation only has nodes of arity 2, so we connect the two aux ports that are not used.
+          self.inet.link(Port(node, 1), Port(node, 2));
+          Some(Port(node, 0))
+        }
+        Term::Str { .. } => unreachable!(), // Removed in desugar str
+        Term::Lst { .. } => unreachable!(), // Removed in desugar list
+        // core: & fst ~ <op snd ret>
+        Term::Opx { op, fst, snd } => {
+          let opx = self.inet.new_node(Op2 { opr: op.to_hvmc_label() });
+
+          let fst_port = self.encode_term(fst, Port(opx, 0));
+          self.link_local(Port(opx, 0), fst_port);
+
+          let snd_port = self.encode_term(snd, Port(opx, 1));
+          self.link_local(Port(opx, 1), snd_port);
+
+          Some(Port(opx, 2))
+        }
+        Term::Tup { els } => {
+          let (main, aux) = self.make_node_list(Tup, els.len());
+          for (el, aux) in els.iter().zip(aux.iter()) {
+            let el = self.encode_term(el, *aux);
+            self.link_local(*aux, el);
+          }
+
+          Some(main)
+        }
+        Term::Err => unreachable!(),
       }
-      Term::Err => unreachable!(),
-    }
+    })
   }
 
   fn push_scope(&mut self, name: &Option<Name>, decl_port: Port) {

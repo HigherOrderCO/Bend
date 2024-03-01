@@ -142,20 +142,20 @@ When the `linearize-matches` option is used, linearizes only vars that are used 
 
 Example:
 ```rs
-λa λb match a { 0: b; +: b }
+λa λb match a { 0: b; 1+: b }
 
 // Is transformed to
-λa λb (match a { 0: λc c; +: λd d } b)
+λa λb (match a { 0: λc c; 1+: λd d } b)
 ```
 
 When the `linearize-matches-extra` option is used, linearizes all vars used in the arms.
 
 example:
 ```rs
-λa λb λc match a { 0: b; +: c }
+λa λb λc match a { 0: b; 1+: c }
 
 // Is transformed to
-λa λb λc (match a { 0: λd λ* d; +: λ* λe e } b c)
+λa λb λc (match a { 0: λd λ* d; 1+: λ* λe e } b c)
 ```
 
 ## float-combinators
