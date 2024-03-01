@@ -6,7 +6,7 @@ pub static STRINGS: GlobalPool<String> = GlobalPool::new();
 
 #[derive(Logos, Debug, PartialEq, Clone)]
 #[logos(error=LexingError)]
-#[logos(skip r"[ \t\n\f]+")]
+#[logos(skip r"[ \t\r\n\f]+")]
 pub enum Token {
   #[regex("[_.a-zA-Z][_.a-zA-Z0-9-]*", |lex| lex.slice().parse().ok().map(|s: String| STRINGS.get(s)))]
   Name(GlobalString),
