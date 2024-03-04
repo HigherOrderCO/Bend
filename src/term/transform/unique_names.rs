@@ -50,27 +50,39 @@ impl UniqueNameGenerator {
         self.unique_names_in_term(nxt);
         *nam = self.pop(nam.as_ref());
       }
-      Term::Dup { tag: _, fst, snd, val, nxt }
-      | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
+      Term::Dup { tag: _, bnd, val, nxt } => {
         self.unique_names_in_term(val);
 
-        self.push(fst.as_ref());
-        self.push(snd.as_ref());
+        for bnd in bnd.iter() {
+          self.push(bnd.as_ref());
+        }
         self.unique_names_in_term(nxt);
-        *snd = self.pop(snd.as_ref());
-        *fst = self.pop(fst.as_ref());
+        for bnd in bnd.iter_mut().rev() {
+          *bnd = self.pop(bnd.as_ref());
+        }
+      }
+      Term::Let { pat, val, nxt } => {
+        self.unique_names_in_term(val);
+
+        for bnd in pat.bind_or_eras() {
+          self.push(bnd.as_ref());
+        }
+        self.unique_names_in_term(nxt);
+        for bnd in pat.bind_or_eras_mut().rev() {
+          *bnd = self.pop(bnd.as_ref());
+        }
       }
       Term::Mat { args, rules } => {
         for arg in args {
           self.unique_names_in_term(arg);
         }
         for rule in rules {
-          rule.pats.iter().flat_map(|p| p.binds()).for_each(|nam| self.push(Some(nam)));
+          rule.pats.iter().flat_map(|p| p.bind_or_eras().flatten()).for_each(|nam| self.push(Some(nam)));
           self.unique_names_in_term(&mut rule.body);
           rule
             .pats
             .iter_mut()
-            .flat_map(|p| p.binds_mut())
+            .flat_map(|p| p.bind_or_eras_mut().flatten())
             .rev()
             .for_each(|nam| *nam = self.pop(Some(nam)).unwrap());
         }
@@ -80,21 +92,18 @@ impl UniqueNameGenerator {
       Term::Var { nam } => *nam = self.use_var(nam),
 
       // Others
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Opx { fst, snd, .. } => {
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
+        for el in els {
+          self.unique_names_in_term(el);
+        }
+      }
+      Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
         self.unique_names_in_term(fst);
         self.unique_names_in_term(snd);
       }
       // Global lam names are already unique, so no need to do anything
       Term::Chn { bod, .. } => self.unique_names_in_term(bod),
       Term::Lnk { .. } | Term::Ref { .. } | Term::Era | Term::Num { .. } | Term::Str { .. } | Term::Err => (),
-
-      Term::Let { .. } => {
-        unreachable!("Let terms other than tuple destruction should have been desugared already.")
-      }
-      Term::Lst { .. } => unreachable!("Should have been desugared already."),
     }
   }
 

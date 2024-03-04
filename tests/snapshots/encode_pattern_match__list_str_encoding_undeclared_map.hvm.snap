@@ -3,17 +3,15 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared_map.hvm
 ---
 TaggedScott:
-(main) = λa λb (#String (a #String.String.cons.head λ* #String.String.cons.tail λ* 1 2), #List (b #List.List.cons.head λ* #List.List.cons.tail λ* 1 2))
+(main) = λa λb (#String (a #String λ* #String λ* 1 2), #List (b #List λ* #List λ* 1 2))
 
-(String.cons) = λa λb #String λc #String λ* #String.String.cons.tail (#String.String.cons.head (c a) b)
+(String.cons) = λa λb #String λc #String λ* #String (c a b)
 
 (String.nil) = #String λ* #String λb b
 
-(List.cons) = λa λb #List λc #List λ* #List.List.cons.tail (#List.List.cons.head (c a) b)
+(List.cons) = λa λb #List λc #List λ* #List (c a b)
 
 (List.nil) = #List λ* #List λb b
 
 Scott:
 (main) = λa λb ((a λ* λ* 1 2), (b λ* λ* 1 2))
-
-

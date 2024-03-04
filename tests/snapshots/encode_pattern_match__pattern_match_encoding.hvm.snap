@@ -3,19 +3,19 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.hvm
 ---
 TaggedScott:
-(Foo) = λa #MyType (a #MyType.A.a λ* 100 #MyType.B.b λ* 200 #MyType.C.c λ* 200 #MyType.D.d1 λ* #MyType.D.d2 λ* 200 #MyType.E.e1 λ* #MyType.E.e2 λ* 200)
+(Foo) = λa #MyType (a #MyType λ* 100 #MyType λ* 200 #MyType λ* 200 #MyType λ* #MyType λ* 200 #MyType λ* #MyType λ* 200)
 
 (main) = (Foo A 2)
 
-(E) = λa λb #MyType λ* #MyType λ* #MyType λ* #MyType λ* #MyType λg #MyType.E.e2 (#MyType.E.e1 (g a) b)
+(E) = λa λb #MyType λ* #MyType λ* #MyType λ* #MyType λ* #MyType λg #MyType (g a b)
 
-(D) = λa λb #MyType λ* #MyType λ* #MyType λ* #MyType λf #MyType λ* #MyType.D.d2 (#MyType.D.d1 (f a) b)
+(D) = λa λb #MyType λ* #MyType λ* #MyType λ* #MyType λf #MyType λ* #MyType (f a b)
 
-(C) = λa #MyType λ* #MyType λ* #MyType λd #MyType λ* #MyType λ* #MyType.C.c (d a)
+(C) = λa #MyType λ* #MyType λ* #MyType λd #MyType λ* #MyType λ* #MyType (d a)
 
-(B) = λa #MyType λ* #MyType λc #MyType λ* #MyType λ* #MyType λ* #MyType.B.b (c a)
+(B) = λa #MyType λ* #MyType λc #MyType λ* #MyType λ* #MyType λ* #MyType (c a)
 
-(A) = λa #MyType λb #MyType λ* #MyType λ* #MyType λ* #MyType λ* #MyType.A.a (b a)
+(A) = λa #MyType λb #MyType λ* #MyType λ* #MyType λ* #MyType λ* #MyType (b a)
 
 Scott:
 (Foo) = λa (a λ* 100 λ* 200 λ* 200 λ* λ* 200 λ* λ* 200)
@@ -31,5 +31,3 @@ Scott:
 (B) = λa λ* λc λ* λ* λ* (c a)
 
 (A) = λa λb λ* λ* λ* λ* (b a)
-
-

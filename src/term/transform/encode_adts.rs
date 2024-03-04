@@ -37,7 +37,7 @@ fn encode_ctr(
     AdtEncoding::TaggedScott => {
       let ctr = Term::Var { nam: ctr_name.clone() };
       let app = ctr_args.iter().cloned().fold(ctr, |acc, nam| {
-        let tag = Tag::adt_field(adt_name, ctr_name, &nam);
+        let tag = Tag::adt_name(adt_name);
         Term::tagged_app(tag, acc, Term::Var { nam })
       });
       let lam = ctrs

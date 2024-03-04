@@ -80,7 +80,7 @@ pub enum Term {
   /// Like a scopeless lambda, where the variable can occur outside the body
   Chn {
     tag: Tag,
-    nam: Name,
+    nam: Option<Name>,
     bod: Box<Term>,
   },
   /// The use of a Channel variable.
@@ -98,20 +98,17 @@ pub enum Term {
     arg: Box<Term>,
   },
   Tup {
-    fst: Box<Term>,
-    snd: Box<Term>,
+    els: Vec<Term>,
   },
   Dup {
     tag: Tag,
-    fst: Option<Name>,
-    snd: Option<Name>,
+    bnd: Vec<Option<Name>>,
     val: Box<Term>,
     nxt: Box<Term>,
   },
   Sup {
     tag: Tag,
-    fst: Box<Term>,
-    snd: Box<Term>,
+    els: Vec<Term>,
   },
   Num {
     val: u64,
@@ -140,87 +137,12 @@ pub enum Term {
   Err,
 }
 
-impl Clone for Term {
-  fn clone(&self) -> Self {
-    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || match self {
-      Self::Lam { tag, nam, bod } => Self::Lam { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
-      Self::Var { nam } => Self::Var { nam: nam.clone() },
-      Self::Chn { tag, nam, bod } => Self::Chn { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
-      Self::Lnk { nam } => Self::Lnk { nam: nam.clone() },
-      Self::Let { pat, val, nxt } => Self::Let { pat: pat.clone(), val: val.clone(), nxt: nxt.clone() },
-      Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
-      Self::Tup { fst, snd } => Self::Tup { fst: fst.clone(), snd: snd.clone() },
-      Self::Dup { tag, fst, snd, val, nxt } => {
-        Self::Dup { tag: tag.clone(), fst: fst.clone(), snd: snd.clone(), val: val.clone(), nxt: nxt.clone() }
-      }
-      Self::Sup { tag, fst, snd } => Self::Sup { tag: tag.clone(), fst: fst.clone(), snd: snd.clone() },
-      Self::Num { val } => Self::Num { val: *val },
-      Self::Str { val } => Self::Str { val: val.clone() },
-      Self::Lst { els } => Self::Lst { els: els.clone() },
-      Self::Opx { op, fst, snd } => Self::Opx { op: *op, fst: fst.clone(), snd: snd.clone() },
-      Self::Mat { args, rules } => Self::Mat { args: args.clone(), rules: rules.clone() },
-      Self::Ref { nam } => Self::Ref { nam: nam.clone() },
-      Self::Era => Self::Era,
-      Self::Err => Self::Err,
-    })
-  }
-}
-
-impl Drop for Term {
-  fn drop(&mut self) {
-    if matches!(self, Term::Era | Term::Err) {
-      return;
-    }
-
-    let mut stack = vec![];
-    self.take_children(&mut stack);
-
-    while let Some(mut term) = stack.pop() {
-      term.take_children(&mut stack)
-    }
-  }
-}
-
-impl Term {
-  fn take_children(&mut self, stack: &mut Vec<Term>) {
-    match self {
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        stack.push(std::mem::take(bod.as_mut()));
-      }
-      Term::Let { val: fst, nxt: snd, .. }
-      | Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        stack.push(std::mem::take(fst.as_mut()));
-        stack.push(std::mem::take(snd.as_mut()));
-      }
-      Term::Mat { args, rules } => {
-        for arg in std::mem::take(args).into_iter() {
-          stack.push(arg);
-        }
-
-        for Rule { body, .. } in std::mem::take(rules).into_iter() {
-          stack.push(body);
-        }
-      }
-      Term::Lst { els } => {
-        for el in std::mem::take(els).into_iter() {
-          stack.push(el);
-        }
-      }
-      _ => {}
-    }
-  }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
   Var(Option<Name>),
   Ctr(Name, Vec<Pattern>),
   Num(NumCtr),
-  Tup(Box<Pattern>, Box<Pattern>),
+  Tup(Vec<Pattern>),
   Lst(Vec<Pattern>),
   Str(GlobalString),
 }
@@ -266,7 +188,7 @@ pub enum Type {
   /// Variables/wildcards.
   Any,
   /// A native tuple.
-  Tup,
+  Tup(usize),
   /// A sequence of arbitrary numbers ending in a variable.
   Num,
   /// A strictly incrementing sequence of numbers starting from 0, ending in a + ctr.
@@ -299,6 +221,18 @@ impl PartialEq<str> for Name {
   }
 }
 
+impl PartialEq<Option<Name>> for Name {
+  fn eq(&self, other: &Option<Name>) -> bool {
+    if let Some(other) = other.as_ref() { self == other } else { false }
+  }
+}
+
+impl PartialEq<Name> for Option<Name> {
+  fn eq(&self, other: &Name) -> bool {
+    other.eq(self)
+  }
+}
+
 pub fn num_to_name(mut num: u64) -> String {
   let mut name = String::new();
   loop {
@@ -316,9 +250,78 @@ impl Tag {
   pub fn adt_name(name: &Name) -> Self {
     Self::Named(name.clone())
   }
+}
 
-  pub fn adt_field(adt: &Name, ctr: &Name, field: &Name) -> Self {
-    Self::Named(Name::new(format!("{adt}.{ctr}.{field}")))
+impl Clone for Term {
+  fn clone(&self) -> Self {
+    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || match self {
+      Self::Lam { tag, nam, bod } => Self::Lam { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
+      Self::Var { nam } => Self::Var { nam: nam.clone() },
+      Self::Chn { tag, nam, bod } => Self::Chn { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
+      Self::Lnk { nam } => Self::Lnk { nam: nam.clone() },
+      Self::Let { pat, val, nxt } => Self::Let { pat: pat.clone(), val: val.clone(), nxt: nxt.clone() },
+      Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
+      Self::Tup { els } => Self::Tup { els: els.clone() },
+      Self::Dup { tag, bnd, val, nxt } => {
+        Self::Dup { tag: tag.clone(), bnd: bnd.clone(), val: val.clone(), nxt: nxt.clone() }
+      }
+      Self::Sup { tag, els } => Self::Sup { tag: tag.clone(), els: els.clone() },
+      Self::Num { val } => Self::Num { val: *val },
+      Self::Str { val } => Self::Str { val: val.clone() },
+      Self::Lst { els } => Self::Lst { els: els.clone() },
+      Self::Opx { op, fst, snd } => Self::Opx { op: *op, fst: fst.clone(), snd: snd.clone() },
+      Self::Mat { args, rules } => Self::Mat { args: args.clone(), rules: rules.clone() },
+      Self::Ref { nam } => Self::Ref { nam: nam.clone() },
+      Self::Era => Self::Era,
+      Self::Err => Self::Err,
+    })
+  }
+}
+
+impl Drop for Term {
+  fn drop(&mut self) {
+    impl Term {
+      fn take_children(&mut self, stack: &mut Vec<Term>) {
+        match self {
+          Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
+            stack.push(std::mem::take(bod.as_mut()));
+          }
+          Term::Let { val: fst, nxt: snd, .. }
+          | Term::App { fun: fst, arg: snd, .. }
+          | Term::Dup { val: fst, nxt: snd, .. }
+          | Term::Opx { fst, snd, .. } => {
+            stack.push(std::mem::take(fst.as_mut()));
+            stack.push(std::mem::take(snd.as_mut()));
+          }
+          Term::Mat { args, rules } => {
+            for arg in std::mem::take(args).into_iter() {
+              stack.push(arg);
+            }
+
+            for Rule { body, .. } in std::mem::take(rules).into_iter() {
+              stack.push(body);
+            }
+          }
+          Term::Lst { els } | Term::Tup { els } | Term::Sup { els, .. } => {
+            for el in std::mem::take(els).into_iter() {
+              stack.push(el);
+            }
+          }
+          _ => {}
+        }
+      }
+    }
+
+    if matches!(self, Term::Era | Term::Err) {
+      return;
+    }
+
+    let mut stack = vec![];
+    self.take_children(&mut stack);
+
+    while let Some(mut term) = stack.pop() {
+      term.take_children(&mut stack)
+    }
   }
 }
 
@@ -416,9 +419,9 @@ impl Term {
           nxt.subst(from, to);
         }
       }
-      Term::Dup { tag: _, fst, snd, val, nxt } => {
+      Term::Dup { tag: _, bnd, val, nxt } => {
         val.subst(from, to);
-        if fst.as_ref().map_or(true, |fst| fst != from) && snd.as_ref().map_or(true, |snd| snd != from) {
+        if bnd.iter().all(|var| var != from) {
           nxt.subst(from, to);
         }
       }
@@ -432,11 +435,10 @@ impl Term {
           }
         }
       }
-      Term::Lst { els } => els.iter_mut().for_each(|el| el.subst(from, to)),
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Opx { fst, snd, .. } => {
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
+        els.iter_mut().for_each(|el| el.subst(from, to))
+      }
+      Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
         fst.subst(from, to);
         snd.subst(from, to);
       }
@@ -454,13 +456,13 @@ impl Term {
         args.iter_mut().for_each(|arg| arg.subst_unscoped(from, to));
         rules.iter_mut().for_each(|rule| rule.body.subst_unscoped(from, to));
       }
-      Term::Lst { els } => els.iter_mut().for_each(|el| el.subst_unscoped(from, to)),
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
+        els.iter_mut().for_each(|el| el.subst_unscoped(from, to))
+      }
       Term::Chn { bod, .. } | Term::Lam { bod, .. } => bod.subst_unscoped(from, to),
       Term::App { fun: fst, arg: snd, .. }
       | Term::Let { val: fst, nxt: snd, .. }
       | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
-      | Term::Tup { fst, snd }
       | Term::Opx { fst, snd, .. } => {
         fst.subst(from, to);
         snd.subst(from, to);
@@ -503,21 +505,19 @@ impl Term {
 
           free_vars.extend(new_scope);
         }
-        Term::Dup { fst, snd, val, nxt, .. } => {
+        Term::Dup { bnd, val, nxt, .. } => {
           go(val, free_vars);
 
           let mut new_scope = Default::default();
           go(nxt, &mut new_scope);
 
-          fst.as_ref().map(|fst| new_scope.remove(fst));
-          snd.as_ref().map(|snd| new_scope.remove(snd));
+          for bnd in bnd.iter().flatten() {
+            new_scope.remove(bnd);
+          }
 
           free_vars.extend(new_scope);
         }
-        Term::App { fun: fst, arg: snd, .. }
-        | Term::Tup { fst, snd }
-        | Term::Sup { fst, snd, .. }
-        | Term::Opx { op: _, fst, snd } => {
+        Term::App { fun: fst, arg: snd, .. } | Term::Opx { op: _, fst, snd } => {
           go(fst, free_vars);
           go(snd, free_vars);
         }
@@ -536,11 +536,9 @@ impl Term {
             free_vars.extend(new_scope);
           }
         }
-        Term::Lst { els } => {
+        Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
           for el in els {
-            let mut fvs = Default::default();
-            go(el, &mut fvs);
-            free_vars.extend(fvs);
+            go(el, free_vars);
           }
         }
         Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {}
@@ -557,7 +555,9 @@ impl Term {
     fn go(term: &Term, decls: &mut IndexSet<Name>, uses: &mut IndexSet<Name>) {
       match term {
         Term::Chn { tag: _, nam, bod } => {
-          decls.insert(nam.clone());
+          if let Some(nam) = nam {
+            decls.insert(nam.clone());
+          }
           go(bod, decls, uses);
         }
         Term::Lnk { nam } => {
@@ -571,16 +571,14 @@ impl Term {
             go(&rule.body, decls, uses);
           }
         }
-        Term::Lst { els } => {
+        Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
           for el in els {
             go(el, decls, uses);
           }
         }
         Term::Let { val: fst, nxt: snd, .. }
         | Term::App { fun: fst, arg: snd, .. }
-        | Term::Tup { fst, snd }
         | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Sup { fst, snd, .. }
         | Term::Opx { fst, snd, .. } => {
           go(fst, decls, uses);
           go(snd, decls, uses);
@@ -629,11 +627,12 @@ impl Term {
           return false;
         }
       }
-      Type::Tup => {
+      Type::Tup(_) => {
         if rules.len() != 1 {
           return false;
         }
-        if !matches!(rules[0].pats.as_slice(), [Pattern::Tup(box Pattern::Var(_), box Pattern::Var(_))]) {
+        let Pattern::Tup(args) = &rules[0].pats[0] else { return false };
+        if args.iter().any(|p| !matches!(p, Pattern::Var(_))) {
           return false;
         }
       }
@@ -707,10 +706,8 @@ impl Pattern {
     fn go<'a>(pat: &'a mut Pattern, set: &mut Vec<&'a mut Option<Name>>) {
       match pat {
         Pattern::Var(nam) => set.push(nam),
-        Pattern::Ctr(_, pats) | Pattern::Lst(pats) => pats.iter_mut().for_each(|pat| go(pat, set)),
-        Pattern::Tup(fst, snd) => {
-          go(fst, set);
-          go(snd, set);
+        Pattern::Ctr(_, pats) | Pattern::Lst(pats) | Pattern::Tup(pats) => {
+          pats.iter_mut().for_each(|pat| go(pat, set))
         }
         Pattern::Num(NumCtr::Succ(_, Some(nam))) => {
           set.push(nam);
@@ -736,12 +733,8 @@ impl Pattern {
   /// Considers Lists as its own pattern and not a sequence of Cons.
   pub fn children<'a>(&'a self) -> Box<dyn DoubleEndedIterator<Item = &'a Pattern> + 'a> {
     match self {
-      Pattern::Ctr(_, children) => Box::new(children.iter()),
-      Pattern::Var(_) => Box::new([].iter()),
-      Pattern::Num(_) => Box::new([].iter()),
-      Pattern::Tup(fst, snd) => Box::new([fst.as_ref(), snd.as_ref()].into_iter()),
-      Pattern::Lst(els) => Box::new(els.iter()),
-      Pattern::Str(_) => Box::new([].iter()),
+      Pattern::Ctr(_, pats) | Pattern::Tup(pats) | Pattern::Lst(pats) => Box::new(pats.iter()),
+      Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => Box::new([].iter()),
     }
   }
 
@@ -763,7 +756,7 @@ impl Pattern {
       Pattern::Ctr(nam, _) => Some(nam.clone()),
       Pattern::Num(NumCtr::Num(num)) => Some(Name::new(format!("{num}"))),
       Pattern::Num(NumCtr::Succ(num, _)) => Some(Name::new(format!("{num}+"))),
-      Pattern::Tup(_, _) => Some(Name::new("(,)")),
+      Pattern::Tup(pats) => Some(Name::new(format!("({})", ",".repeat(pats.len())))),
       Pattern::Lst(_) => todo!(),
       Pattern::Str(_) => todo!(),
     }
@@ -781,11 +774,8 @@ impl Pattern {
   pub fn is_simple(&self) -> bool {
     match self {
       Pattern::Var(_) => true,
-      Pattern::Ctr(_, args) => args.iter().all(|arg| matches!(arg, Pattern::Var(_))),
+      Pattern::Ctr(_, args) | Pattern::Tup(args) => args.iter().all(|arg| matches!(arg, Pattern::Var(_))),
       Pattern::Num(_) => true,
-      Pattern::Tup(fst, snd) => {
-        matches!(fst.as_ref(), Pattern::Var(_)) && matches!(snd.as_ref(), Pattern::Var(_))
-      }
       Pattern::Lst(_) | Pattern::Str(_) => todo!(),
     }
   }
@@ -797,7 +787,7 @@ impl Pattern {
         let adt_nam = ctrs.get(ctr_nam).expect("Unknown constructor '{ctr_nam}'");
         Type::Adt(adt_nam.clone())
       }
-      Pattern::Tup(..) => Type::Tup,
+      Pattern::Tup(args) => Type::Tup(args.len()),
       Pattern::Num(NumCtr::Num(_)) => Type::Num,
       Pattern::Num(NumCtr::Succ(n, _)) => Type::NumSucc(*n),
       Pattern::Lst(..) => Type::Adt(builtins::LIST.into()),
@@ -816,7 +806,7 @@ impl Pattern {
       Pattern::Num(NumCtr::Succ(_, None)) => unreachable!(),
       Pattern::Num(NumCtr::Succ(val, Some(Some(nam)))) => Term::add_num(Term::Var { nam: nam.clone() }, *val),
       Pattern::Num(NumCtr::Succ(_, Some(None))) => Term::Era,
-      Pattern::Tup(fst, snd) => Term::Tup { fst: Box::new(fst.to_term()), snd: Box::new(snd.to_term()) },
+      Pattern::Tup(args) => Term::Tup { els: args.iter().map(|p| p.to_term()).collect() },
       Pattern::Lst(_) | Pattern::Str(_) => todo!(),
     }
   }
@@ -827,7 +817,7 @@ impl Pattern {
       (Pattern::Ctr(a, _), Pattern::Ctr(b, _)) if a == b => true,
       (Pattern::Num(NumCtr::Num(a)), Pattern::Num(NumCtr::Num(b))) if a == b => true,
       (Pattern::Num(NumCtr::Succ(a, _)), Pattern::Num(NumCtr::Succ(b, _))) if a == b => true,
-      (Pattern::Tup(_, _), Pattern::Tup(_, _)) => true,
+      (Pattern::Tup(a), Pattern::Tup(b)) if a.len() == b.len() => true,
       (Pattern::Lst(_), Pattern::Lst(_)) => true,
       (Pattern::Var(_), Pattern::Var(_)) => true,
       _ => false,
@@ -881,10 +871,9 @@ impl Type {
   pub fn ctrs(&self, adts: &Adts) -> Vec<Pattern> {
     match self {
       Type::Any => vec![Pattern::Var(None)],
-      Type::Tup => vec![Pattern::Tup(
-        Box::new(Pattern::Var(Some("%fst".into()))),
-        Box::new(Pattern::Var(Some("%snd".into()))),
-      )],
+      Type::Tup(len) => {
+        vec![Pattern::Tup((0 .. *len).map(|i| Pattern::Var(Some(Name::new(format!("%x{i}"))))).collect())]
+      }
       Type::NumSucc(n) => {
         let mut ctrs = (0 .. *n).map(|n| Pattern::Num(NumCtr::Num(n))).collect::<Vec<_>>();
         ctrs.push(Pattern::Num(NumCtr::Succ(*n, Some(Some("%pred".into())))));
@@ -906,7 +895,7 @@ impl Type {
 
   /// True if the type is an ADT or a builtin equivalent of an ADT (like tups and numbers)
   pub fn is_ctr_type(&self) -> bool {
-    matches!(self, Type::Adt(_) | Type::Num | Type::Tup)
+    matches!(self, Type::Adt(_) | Type::Num | Type::Tup(_))
   }
 
   pub fn is_var_type(&self) -> bool {

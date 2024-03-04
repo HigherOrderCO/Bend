@@ -53,11 +53,7 @@ impl Pattern {
           }
           check.extend(args.iter());
         }
-        Pattern::Tup(fst, snd) => {
-          check.push(fst);
-          check.push(snd);
-        }
-        Pattern::Lst(args) => args.iter().for_each(|arg| check.push(arg)),
+        Pattern::Tup(args) | Pattern::Lst(args) => args.iter().for_each(|arg| check.push(arg)),
         Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => {}
       }
     }
@@ -85,16 +81,18 @@ impl Term {
             rule.body.check_unbound_pats(is_ctr)?;
           }
         }
+        Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
+          for el in els {
+            el.check_unbound_pats(is_ctr)?;
+          }
+        }
         Term::App { fun: fst, arg: snd, .. }
-        | Term::Tup { fst, snd }
         | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Sup { fst, snd, .. }
         | Term::Opx { fst, snd, .. } => {
           fst.check_unbound_pats(is_ctr)?;
           snd.check_unbound_pats(is_ctr)?;
         }
         Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.check_unbound_pats(is_ctr)?,
-        Term::Lst { .. } => unreachable!(),
         Term::Var { .. }
         | Term::Lnk { .. }
         | Term::Ref { .. }

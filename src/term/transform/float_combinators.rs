@@ -171,17 +171,21 @@ impl Term {
         val_detach & nxt_detach
       }
 
-      Term::Dup { fst, snd, val, nxt, .. } => {
+      Term::Dup { bnd, val, nxt, .. } => {
         let val_detach = val.go_float(depth + 1, term_info);
         let nxt_detach = nxt.go_float(depth + 1, term_info);
 
-        term_info.provide(fst.as_ref());
-        term_info.provide(snd.as_ref());
+        for bnd in bnd {
+          term_info.provide(bnd.as_ref());
+        }
 
         val_detach & nxt_detach
       }
 
-      Term::Sup { fst, snd, .. } | Term::Tup { fst, snd } | Term::Opx { fst, snd, .. } => {
+      Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
+        els.iter_mut().map(|el| el.go_float(depth + 1, term_info)).fold(Detach::Combinator, |a, b| a & b)
+      }
+      Term::Opx { fst, snd, .. } => {
         let fst_is_super = fst.go_float(depth + 1, term_info);
         let snd_is_super = snd.go_float(depth + 1, term_info);
 
@@ -190,7 +194,6 @@ impl Term {
 
       Term::Ref { nam: def_name } if def_name == &term_info.def_name => Detach::Recursive,
 
-      Term::Lst { .. } => unreachable!(),
       Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => Detach::Combinator,
     }
   }
@@ -198,7 +201,7 @@ impl Term {
   fn float_lam(&mut self, depth: usize, term_info: &mut TermInfo) -> Detach {
     let (nam, bod, unscoped): (Option<&Name>, &mut Term, bool) = match self {
       Term::Lam { nam, bod, .. } => (nam.as_ref(), bod, false),
-      Term::Chn { nam, bod, .. } => (Some(nam), bod, true),
+      Term::Chn { nam, bod, .. } => (nam.as_ref(), bod, true),
       _ => unreachable!(),
     };
 

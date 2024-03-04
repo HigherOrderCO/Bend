@@ -40,12 +40,15 @@ impl Term {
       }
       Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.encode_builtins(),
       Term::App { fun: fst, arg: snd, .. }
-      | Term::Tup { fst, snd }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. }
       | Term::Dup { val: fst, nxt: snd, .. } => {
         fst.encode_builtins();
         snd.encode_builtins();
+      }
+      Term::Sup { els, .. } | Term::Tup { els } => {
+        for el in els {
+          el.encode_builtins();
+        }
       }
       Term::Mat { args, rules } => {
         for arg in args {
@@ -81,14 +84,10 @@ impl Pattern {
     match self {
       Pattern::Lst(pats) => *self = Self::encode_list(std::mem::take(pats)),
       Pattern::Str(str) => *self = Self::encode_str(str),
-      Pattern::Ctr(_, pats) => {
+      Pattern::Ctr(_, pats) | Pattern::Tup(pats) => {
         for pat in pats {
           pat.encode_builtins();
         }
-      }
-      Pattern::Tup(fst, snd) => {
-        fst.encode_builtins();
-        snd.encode_builtins();
       }
       Pattern::Var(..) | Pattern::Num(..) => {}
     }

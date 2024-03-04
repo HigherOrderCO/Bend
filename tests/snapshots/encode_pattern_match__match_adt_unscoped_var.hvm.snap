@@ -3,13 +3,13 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.hvm
 ---
 TaggedScott:
-(Foo) = λ$x #Maybe ((Some 1) $x #Maybe.Some.val λc c)
+(Foo) = λ$x #Maybe ((Some 1) $x #Maybe λc c)
 
-(Bar) = (#Maybe ((Some 1) $x #Maybe.Some.val λc c) λ$x *)
+(Bar) = (#Maybe ((Some 1) $x #Maybe λc c) λ$x *)
 
 (main) = *
 
-(Some) = λa #Maybe λ* #Maybe λc #Maybe.Some.val (c a)
+(Some) = λa #Maybe λ* #Maybe λc #Maybe (c a)
 
 (None) = #Maybe λa #Maybe λ* a
 
@@ -23,5 +23,3 @@ Scott:
 (Some) = λa λ* λc (c a)
 
 (None) = λa λ* a
-
-

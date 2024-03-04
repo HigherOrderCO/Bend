@@ -6,4 +6,4 @@ input_file: tests/golden_tests/simplify_matches/nested_0ary.hvm
 
 (Nil) = #list λ* #list λb b
 
-(Cons) = λa λb #list λc #list λ* #list.Cons.tail (#list.Cons.head (c a) b)
+(Cons) = λa λb #list λc #list λ* #list (c a b)

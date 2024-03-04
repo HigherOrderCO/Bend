@@ -64,8 +64,6 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool
     Term::App { fun: fst, arg: snd, .. }
     | Term::Let { val: fst, nxt: snd, .. }
     | Term::Dup { val: fst, nxt: snd, .. }
-    | Term::Sup { fst, snd, .. }
-    | Term::Tup { fst, snd }
     | Term::Opx { fst, snd, .. } => {
       let fst_subst = subst_ref_to_ref(fst, ref_map);
       let snd_subst = subst_ref_to_ref(snd, ref_map);
@@ -81,7 +79,7 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool
       }
       subst
     }
-    Term::Lst { els } => {
+    Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
       let mut subst = false;
       for e in els {
         subst |= subst_ref_to_ref(e, ref_map);

@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/let_adt_destructuring.hvm
 ---
-@Box = (a {2 {4 a b} b})
-@Unbox = ({2 {4 a a} b} b)
+@Box = (a {2 {2 a b} b})
+@Unbox = ({2 {2 a a} b} b)
 @main = a
 & @Unbox ~ (b a)
 & @Box ~ (#1 b)

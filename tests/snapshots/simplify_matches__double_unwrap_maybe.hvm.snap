@@ -8,4 +8,4 @@ input_file: tests/golden_tests/simplify_matches/double_unwrap_maybe.hvm
 
 (None) = #Maybe λ* #Maybe λb b
 
-(Some) = λa #Maybe λb #Maybe λ* #Maybe.Some.x (b a)
+(Some) = λa #Maybe λb #Maybe λ* #Maybe (b a)

@@ -29,7 +29,7 @@ impl Pattern {
             *pat = Pattern::Ctr(nam.clone(), vec![]);
           }
         }
-        Pattern::Ctr(_, args) | Pattern::Lst(args) => {
+        Pattern::Ctr(_, args) | Pattern::Lst(args) | Pattern::Tup(args) => {
           for arg in args {
             to_resolve.push(arg);
           }
@@ -37,10 +37,6 @@ impl Pattern {
         Pattern::Var(None) => (),
         Pattern::Num(_) => (),
         Pattern::Str(_) => (),
-        Pattern::Tup(fst, snd) => {
-          to_resolve.push(fst);
-          to_resolve.push(snd);
-        }
       }
     }
   }
@@ -68,10 +64,13 @@ impl Term {
             to_resolve.push(&mut rule.body);
           }
         }
+        Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
+          for el in els {
+            to_resolve.push(el);
+          }
+        }
         Term::App { fun: fst, arg: snd, .. }
-        | Term::Tup { fst, snd }
         | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Sup { fst, snd, .. }
         | Term::Opx { fst, snd, .. } => {
           to_resolve.push(fst);
           to_resolve.push(snd);
@@ -82,7 +81,6 @@ impl Term {
         | Term::Ref { .. }
         | Term::Num { .. }
         | Term::Str { .. }
-        | Term::Lst { .. }
         | Term::Era
         | Term::Err => (),
       }

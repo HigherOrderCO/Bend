@@ -26,7 +26,7 @@ impl Term {
     term_to_affine(self, &mut HashMap::new());
   }
 
-  /// Returns false wether the term has no unscoped terms,
+  /// Returns false whether the term has no unscoped terms,
   /// or all its unscoped binds and usage pairs are within the term.
   fn has_unscoped(&self) -> bool {
     let (decl, uses) = self.unscoped_vars();
@@ -34,60 +34,43 @@ impl Term {
   }
 }
 
-/// Var-declaring terms
-fn term_with_binds_to_affine<'a>(
-  term: &mut Term,
-  nams: impl IntoIterator<Item = &'a mut Option<Name>>,
-  inst_count: &mut HashMap<Name, u64>,
-) {
-  term_to_affine(term, inst_count);
-
-  for nam in nams {
-    if nam.is_some() {
-      let instantiated_count = get_var_uses(nam.as_ref(), inst_count);
-      duplicate_lam(nam, term, instantiated_count);
-    }
-  }
-}
-
-fn term_to_affine(term: &mut Term, inst_count: &mut HashMap<Name, u64>) {
+fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, u64>) {
   match term {
-    Term::Lam { nam, bod, .. } => term_with_binds_to_affine(bod, [nam], inst_count),
-
     Term::Let { pat: Pattern::Var(Some(nam)), val, nxt } => {
-      term_to_affine(nxt, inst_count);
+      term_to_affine(nxt, var_uses);
 
-      match get_var_uses(Some(nam), inst_count) {
+      match get_var_uses(Some(nam), var_uses) {
         0 => {
           if val.has_unscoped() {
-            term_to_affine(val, inst_count);
+            term_to_affine(val, var_uses);
 
             let Term::Let { val, nxt, .. } = term else { unreachable!() };
             let val = std::mem::take(val);
             let nxt = std::mem::take(nxt);
 
             *term = Term::Let { pat: Pattern::Var(None), val, nxt };
-
-            return;
+          } else {
+            *term = std::mem::take(nxt.as_mut());
           }
         }
         1 => {
-          term_to_affine(val, inst_count);
-          nxt.subst(&dup_name(nam, 1), val.as_ref());
+          term_to_affine(val, var_uses);
+          nxt.subst(nam, val.as_ref());
+          *term = std::mem::take(nxt.as_mut());
         }
         instantiated_count => {
-          term_to_affine(val, inst_count);
-          duplicate_let(nam, nxt, instantiated_count, val);
+          term_to_affine(val, var_uses);
+          duplicate_term(nam, nxt, instantiated_count, Some(val));
+          *term = std::mem::take(nxt.as_mut());
         }
       }
-      *term = std::mem::take(nxt.as_mut());
     }
 
     Term::Let { pat: Pattern::Var(None), val, nxt } => {
-      term_to_affine(nxt, inst_count);
+      term_to_affine(nxt, var_uses);
 
       if val.has_unscoped() {
-        term_to_affine(val, inst_count);
+        term_to_affine(val, var_uses);
       } else {
         let Term::Let { nxt, .. } = term else { unreachable!() };
         let nxt = std::mem::take(nxt.as_mut());
@@ -95,97 +78,95 @@ fn term_to_affine(term: &mut Term, inst_count: &mut HashMap<Name, u64>) {
       }
     }
 
-    Term::Dup { fst, snd, val, nxt, .. }
-    | Term::Let { pat: Pattern::Tup(box Pattern::Var(fst), box Pattern::Var(snd)), val, nxt } => {
-      term_to_affine(val, inst_count);
-      term_to_affine(nxt, inst_count);
-      let uses_fst = get_var_uses(fst.as_ref(), inst_count);
-      let uses_snd = get_var_uses(snd.as_ref(), inst_count);
-      duplicate_lam(fst, nxt, uses_fst);
-      duplicate_lam(snd, nxt, uses_snd);
+    Term::Lam { nam, bod, .. } => term_with_binds_to_affine(bod, [nam], var_uses),
+    Term::Dup { bnd, val, nxt, .. } => {
+      term_to_affine(val, var_uses);
+      term_with_binds_to_affine(nxt, bnd, var_uses);
     }
-
-    Term::Let { .. } => unreachable!(),
+    Term::Let { pat, val, nxt } => {
+      term_to_affine(val, var_uses);
+      term_with_binds_to_affine(nxt, pat.bind_or_eras_mut(), var_uses);
+    }
 
     // Var-using terms
     Term::Var { nam } => {
-      let instantiated_count = inst_count.entry(nam.clone()).or_default();
+      let instantiated_count = var_uses.entry(nam.clone()).or_default();
       *instantiated_count += 1;
 
       *nam = dup_name(nam, *instantiated_count);
     }
 
     // Others
-    Term::Chn { bod, .. } => term_to_affine(bod, inst_count),
-    Term::App { fun: fst, arg: snd, .. }
-    | Term::Sup { fst, snd, .. }
-    | Term::Tup { fst, snd }
-    | Term::Opx { fst, snd, .. } => {
-      term_to_affine(fst, inst_count);
-      term_to_affine(snd, inst_count);
+    Term::Chn { bod, .. } => term_to_affine(bod, var_uses),
+    Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
+      term_to_affine(fst, var_uses);
+      term_to_affine(snd, var_uses);
     }
-
     Term::Mat { args, rules } => {
       for arg in args {
-        term_to_affine(arg, inst_count);
+        term_to_affine(arg, var_uses);
       }
       for rule in rules {
         let nams = rule.pats.iter_mut().flat_map(|p| p.bind_or_eras_mut());
-        term_with_binds_to_affine(&mut rule.body, nams, inst_count)
+        term_with_binds_to_affine(&mut rule.body, nams, var_uses)
+      }
+    }
+    Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
+      for el in els {
+        term_to_affine(el, var_uses);
       }
     }
 
-    Term::Lst { .. } => unreachable!("Should have been desugared already"),
     Term::Era | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Err => {}
   };
+}
+
+/// Var-declaring terms
+fn term_with_binds_to_affine<'a>(
+  term: &mut Term,
+  nams: impl IntoIterator<Item = &'a mut Option<Name>>,
+  var_uses: &mut HashMap<Name, u64>,
+) {
+  term_to_affine(term, var_uses);
+
+  for nam in nams {
+    if nam.is_some() {
+      let instantiated_count = get_var_uses(nam.as_ref(), var_uses);
+      duplicate_bind(nam, term, instantiated_count);
+    }
+  }
 }
 
 fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, u64>) -> u64 {
   nam.and_then(|nam| var_uses.get(nam).copied()).unwrap_or_default()
 }
 
-// TODO: Is there a difference between a list of dups and a complete binary tree of dups?
-//
-/// # Example
+/// Creates the duplication bindings for variables used multiple times.
 ///
-/// ```txt
-/// let {x1 x1_dup} = body;
-/// let {x2 x2_dup} = x1_dup;
-/// let {x3 x4}     = x2_dup;
-/// nxt
-/// ```
-fn make_dup_tree(nam: &Name, nxt: &mut Term, uses: u64, mut dup_body: Option<&mut Term>) {
-  for i in (1 .. uses).rev() {
-    *nxt = Term::Dup {
-      tag: Tag::Auto,
-      fst: Some(dup_name(nam, i)),
-      snd: if i == uses - 1 { Some(dup_name(nam, uses)) } else { Some(internal_dup_name(nam, i)) },
-      val: if i == 1 {
-        Box::new(dup_body.as_mut().map_or_else(|| Term::Var { nam: nam.clone() }, |x| std::mem::take(x)))
-      } else {
-        Box::new(Term::Var { nam: internal_dup_name(nam, i - 1) })
-      },
-      nxt: Box::new(std::mem::take(nxt)),
-    };
+/// Example:
+///
+/// `@x (x x x x)` becomes `@x let {x0 x1 x2 x3} = x; (x0 x1 x2 x3)`.
+///
+/// `let x = @y y; (x x x)` becomes `let {x0 x1 x2} = @y y; (x0 x1 x2)`.
+fn duplicate_term(nam: &Name, nxt: &mut Term, uses: u64, dup_body: Option<&mut Term>) {
+  debug_assert!(uses > 1);
+
+  *nxt = Term::Dup {
+    tag: Tag::Auto,
+    bnd: (1 .. uses + 1).map(|i| Some(dup_name(nam, i))).collect(),
+    val: Box::new(dup_body.map_or_else(|| Term::Var { nam: nam.clone() }, std::mem::take)),
+    nxt: Box::new(std::mem::take(nxt)),
   }
 }
 
-fn duplicate_lam(nam: &mut Option<Name>, nxt: &mut Term, uses: u64) {
+fn duplicate_bind(nam: &mut Option<Name>, nxt: &mut Term, uses: u64) {
   match uses {
     0 => *nam = None,
     1 => *nam = Some(dup_name(nam.as_ref().unwrap(), 1)),
-    uses => make_dup_tree(nam.as_ref().unwrap(), nxt, uses, None),
+    uses => duplicate_term(nam.as_ref().unwrap(), nxt, uses, None),
   }
-}
-
-fn duplicate_let(nam: &Name, nxt: &mut Term, uses: u64, let_body: &mut Term) {
-  make_dup_tree(nam, nxt, uses, Some(let_body));
 }
 
 fn dup_name(nam: &Name, uses: u64) -> Name {
   if uses == 1 { nam.clone() } else { Name::new(format!("{nam}_{uses}")) }
-}
-
-fn internal_dup_name(nam: &Name, uses: u64) -> Name {
-  Name::new(format!("{}_dup", dup_name(nam, uses)))
 }

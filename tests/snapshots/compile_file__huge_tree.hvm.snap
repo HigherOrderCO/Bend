@@ -1,9 +1,9 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/huge_matrix.hvm
+input_file: tests/golden_tests/compile_file/huge_tree.hvm
 ---
-@Leaf = (a {2 * {2 {4 a b} b}})
-@Node = (a (b (c (d {2 {12 a {10 b {8 c {6 d e}}}} {2 * e}}))))
+@Leaf = (a {2 * {2 {2 a b} b}})
+@Node = (a (b (c (d {2 {2 a {2 b {2 c {2 d e}}}} {2 * e}}))))
 @main = a
 & @Node ~ (b (c (d (e a))))
 & @Leaf ~ (#0 e)
@@ -68578,4 +68578,3 @@ input_file: tests/golden_tests/compile_file/huge_matrix.hvm
 & @Leaf ~ (#0 jlxd)
 & @Leaf ~ (#1 ilxd)
 & @Leaf ~ (#1 hlxd)
-

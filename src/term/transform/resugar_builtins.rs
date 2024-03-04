@@ -51,16 +51,14 @@ impl Term {
           rule.body.resugar_strings();
         }
       }
-      Term::Lst { els } => {
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
         for el in els {
           el.resugar_strings();
         }
       }
       Term::App { fun: fst, arg: snd, .. }
       | Term::Let { val: fst, nxt: snd, .. }
-      | Term::Tup { fst, snd }
       | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.resugar_strings();
         snd.resugar_strings();
@@ -114,16 +112,14 @@ impl Term {
           rule.body.resugar_lists();
         }
       }
-      Term::Lst { els } => {
+      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
         for el in els {
           el.resugar_lists();
         }
       }
       Term::App { fun: fst, arg: snd, .. }
       | Term::Let { val: fst, nxt: snd, .. }
-      | Term::Tup { fst, snd }
       | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Sup { fst, snd, .. }
       | Term::Opx { fst, snd, .. } => {
         fst.resugar_lists();
         snd.resugar_lists();
