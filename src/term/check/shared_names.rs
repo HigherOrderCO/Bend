@@ -17,6 +17,8 @@ impl Display for TopLevelErr {
 }
 
 impl Ctx<'_> {
+  /// Checks if exists shared names from definitions, adts and constructors, allowing constructors
+  /// share the adt name once.
   pub fn check_shared_names(&mut self) {
     let mut checked = IndexMap::<&Name, NameInfo>::new();
 
@@ -62,9 +64,9 @@ impl NameInfo {
 impl NameInfo {
   fn with_ctr(&mut self, current_name: &Name, info: &mut diagnostics::Info) {
     match self.kind {
-      NameKind::Adt => {} // Catch by the parser
+      NameKind::Adt => {} // Error caught by the parser
       NameKind::Def => info.error(TopLevelErr(current_name.clone())),
-      NameKind::Ctr => {} // Catch by the parser
+      NameKind::Ctr => {} // Error caught by the parser
     }
   }
 
