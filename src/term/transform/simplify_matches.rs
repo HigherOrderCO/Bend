@@ -42,11 +42,11 @@ impl Term {
     stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
       match self {
         Term::Mat { args, rules } => {
-          let (new_args, extracted) = extract_args(args);
+          let extracted = extract_args(args);
+          let args = std::mem::take(args);
           let rules = std::mem::take(rules);
-
-          *self = simplify_match_expression(new_args, rules, ctrs, adts)?;
-          *self = bind_extracted_args(extracted, std::mem::take(self));
+          let term = simplify_match_expression(args, rules, ctrs, adts)?;
+          *self = bind_extracted_args(extracted, term);
         }
 
         Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
@@ -371,26 +371,27 @@ fn switch_rule_submatch_arm(rule: &Rule, ctr: &Pattern, nested_fields: &[Option<
   }
 }
 
-fn extract_args(args: &mut [Term]) -> (Vec<Term>, Vec<(Name, Term)>) {
-  let mut new_args = vec![];
+/// Swaps non-Var arguments in a match by vars with generated names,
+/// returning a vec with the extracted args and what they were replaced by.
+///
+/// `match Term {...}` => `match %match_arg0 {...}` + `vec![(%match_arg0, Term)])`
+fn extract_args(args: &mut [Term]) -> Vec<(Name, Term)> {
   let mut extracted = vec![];
 
   for (i, arg) in args.iter_mut().enumerate() {
-    if matches!(arg, Term::Var { .. }) {
-      new_args.push(std::mem::take(arg));
-    } else {
+    if !matches!(arg, Term::Var { .. }) {
       let nam = Name::new(format!("%match_arg{i}"));
-
-      let old_arg = std::mem::take(arg);
-      extracted.push((nam.clone(), old_arg));
-
-      let new_arg = Term::Var { nam };
-      new_args.push(new_arg);
+      let new_arg = Term::Var { nam: nam.clone() };
+      let old_arg = std::mem::replace(arg, new_arg);
+      extracted.push((nam, old_arg));
     }
   }
-  (new_args, extracted)
+  extracted
 }
 
+/// Binds the arguments that were extracted from a match with [`extract_args`];
+///
+/// `vec![(%match_arg0, arg)]` + `term` => `let %match_arg0 = arg; term`
 fn bind_extracted_args(extracted: Vec<(Name, Term)>, term: Term) -> Term {
   extracted.into_iter().rev().fold(term, |term, (nam, val)| Term::Let {
     pat: Pattern::Var(Some(nam)),
