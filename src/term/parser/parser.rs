@@ -14,7 +14,7 @@ use chumsky::{
   util::MaybeRef,
   IterParser, Parser,
 };
-use indexmap::{map::Entry, IndexMap};
+use indexmap::map::Entry;
 use logos::{Logos, SpannedIter};
 use std::{iter::Map, ops::Range, path::Path};
 
@@ -521,14 +521,14 @@ fn collect_book(
       }
       TopLevel::Adt((nam, nam_span), adt) => match book.adts.get(&nam) {
         None => {
-          let (ctrs, spans): (IndexMap<_, _>, Vec<_>) = adt.into_iter().unzip();
+          let (ctrs, spans): (Vec<(_, _)>, Vec<_>) = adt.into_iter().unzip();
 
           for ((ctr, _), span) in ctrs.iter().zip(spans.into_iter()) {
             match book.ctrs.entry(ctr.clone()) {
               Entry::Vacant(e) => _ = e.insert(nam.clone()),
               Entry::Occupied(e) => emit.emit(Rich::custom(
                 span,
-                if book.adts[e.get()].builtin {
+                if book.adts.get(e.get()).is_some_and(|adt| adt.builtin) {
                   format!("{} is a built-in constructor and should not be overridden.", e.key())
                 } else {
                   format!("Repeated constructor '{}'", e.key())
@@ -537,7 +537,7 @@ fn collect_book(
             }
           }
 
-          let adt = Adt { ctrs, builtin };
+          let adt = Adt { ctrs: ctrs.into_iter().collect(), builtin };
           book.adts.insert(nam.clone(), adt);
         }
         Some(adt) => emit.emit(Rich::custom(
