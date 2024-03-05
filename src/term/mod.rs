@@ -163,23 +163,22 @@ pub enum Tag {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Op {
-  ADD,
-  SUB,
-  MUL,
-  DIV,
-  MOD,
-  EQ,
-  NE,
-  LT,
-  GT,
-  LTE,
-  GTE,
-  AND,
-  OR,
-  XOR,
-  LSH,
-  RSH,
-  NOT,
+  Add,
+  Sub,
+  Mul,
+  Div,
+  Mod,
+  Eq,
+  Ne,
+  Lt,
+  Gt,
+  Lte,
+  Gte,
+  And,
+  Or,
+  Xor,
+  Shl,
+  Shr,
 }
 
 /// Pattern types.
@@ -387,7 +386,7 @@ impl Term {
     if val == 0 {
       arg
     } else {
-      Term::Opx { op: Op::SUB, fst: Box::new(arg), snd: Box::new(Term::Num { val }) }
+      Term::Opx { op: Op::Sub, fst: Box::new(arg), snd: Box::new(Term::Num { val }) }
     }
   }
 
@@ -395,7 +394,7 @@ impl Term {
     if val == 0 {
       arg
     } else {
-      Term::Opx { op: Op::ADD, fst: Box::new(arg), snd: Box::new(Term::Num { val }) }
+      Term::Opx { op: Op::Add, fst: Box::new(arg), snd: Box::new(Term::Num { val }) }
     }
   }
 

@@ -27,11 +27,8 @@ fn used_defs_in_tree(tree: &Tree, used_defs: &mut HashSet<String>, to_visit: &mu
         to_visit.push(nam.clone());
       }
     }
-    Tree::Ctr { lft, rgt, .. } | Tree::Op2 { lft, rgt, .. } | Tree::Mat { sel: lft, ret: rgt } => {
+    Tree::Ctr { lft, rgt, .. } | Tree::Op { rhs: lft, out: rgt, .. } | Tree::Mat { sel: lft, ret: rgt } => {
       used_defs_in_tree(lft, used_defs, to_visit);
-      used_defs_in_tree(rgt, used_defs, to_visit);
-    }
-    Tree::Op1 { rgt, .. } => {
       used_defs_in_tree(rgt, used_defs, to_visit);
     }
     Tree::Var { .. } | Tree::Num { .. } | Tree::Era => (),
