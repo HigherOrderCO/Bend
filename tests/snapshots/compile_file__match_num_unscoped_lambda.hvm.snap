@@ -2,11 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/match_num_unscoped_lambda.hvm
 ---
-// WARNING:
+// Warnings:
 In definition 'lambda_in':
-  Definition is unusued.
+  Definition is unused.
 In definition 'lambda_out':
-  Definition is unusued.
+  Definition is unused.
 
 @lambda_in = (?<((a a) (b (c b))) (c d)> d)
 @lambda_out = (?<(a (b b)) c> (a c))

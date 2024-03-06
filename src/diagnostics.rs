@@ -208,7 +208,7 @@ impl Display for WarningType {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
       WarningType::MatchOnlyVars => write!(f, "Match expression at definition only uses var patterns."),
-      WarningType::UnusedDefinition => write!(f, "Definition is unusued."),
+      WarningType::UnusedDefinition => write!(f, "Definition is unused."),
       WarningType::RepeatedBind(warn) => write!(f, "{warn}"),
     }
   }

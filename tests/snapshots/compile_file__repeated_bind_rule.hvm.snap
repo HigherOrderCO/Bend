@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/repeated_bind_rule.hvm
 ---
-// WARNING:
+// Warnings:
 In definition 'Foo':
   Repeated bind inside rule pattern: 'a'.
 

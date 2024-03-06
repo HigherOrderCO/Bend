@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/repeated_bind_match.hvm
 ---
-// WARNING:
+// Warnings:
 In definition 'main':
   Repeated bind inside match arm: 'x'.
 
