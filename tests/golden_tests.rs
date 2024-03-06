@@ -266,7 +266,7 @@ fn desugar_file() {
 #[test]
 #[ignore = "to not delay golden tests execution"]
 fn hangs() {
-  let expected_normalization_time = 1;
+  let expected_normalization_time = 5;
 
   run_golden_test_dir(function_name!(), &|code, path| {
     let book = do_parse_book(code, path)?;

@@ -1,6 +1,5 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
-#![feature(trusted_len)]
 
 use diagnostics::{Info, Warning};
 use hvmc::{
