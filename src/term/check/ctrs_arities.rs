@@ -49,20 +49,15 @@ impl Pattern {
     let mut to_check = vec![self];
 
     while let Some(pat) = to_check.pop() {
-      match pat {
-        Pattern::Ctr(name, args) => {
-          let expected = arities.get(name).unwrap();
-          let found = args.len();
-          if *expected != found {
-            return Err(MatchErr::CtrArityMismatch(name.clone(), found, *expected));
-          }
+      if let Pattern::Ctr(name, args) = pat {
+        let expected = arities.get(name).unwrap();
+        let found = args.len();
+        if *expected != found {
+          return Err(MatchErr::CtrArityMismatch(name.clone(), found, *expected));
         }
-        Pattern::Lst(els) | Pattern::Tup(els) => {
-          for el in els {
-            to_check.push(el);
-          }
-        }
-        Pattern::Var(..) | Pattern::Num(..) | Pattern::Str(_) => {}
+      }
+      for child in pat.children() {
+        to_check.push(child);
       }
     }
     Ok(())
@@ -71,44 +66,12 @@ impl Pattern {
 
 impl Term {
   pub fn check_ctrs_arities(&self, arities: &HashMap<Name, usize>) -> Result<(), MatchErr> {
-    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
-      match self {
-        Term::Mat { args, rules } => {
-          for arg in args {
-            arg.check_ctrs_arities(arities)?;
-          }
-          for rule in rules {
-            for pat in &rule.pats {
-              pat.check_ctrs_arities(arities)?;
-            }
-            rule.body.check_ctrs_arities(arities)?;
-          }
-        }
-        Term::Let { pat, val, nxt } => {
-          pat.check_ctrs_arities(arities)?;
-          val.check_ctrs_arities(arities)?;
-          nxt.check_ctrs_arities(arities)?;
-        }
-
-        Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-          for el in els {
-            el.check_ctrs_arities(arities)?;
-          }
-        }
-        Term::App { fun: fst, arg: snd, .. }
-        | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Opx { fst, snd, .. } => {
-          fst.check_ctrs_arities(arities)?;
-          snd.check_ctrs_arities(arities)?;
-        }
-        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.check_ctrs_arities(arities)?,
-        Term::Var { .. }
-        | Term::Lnk { .. }
-        | Term::Num { .. }
-        | Term::Str { .. }
-        | Term::Ref { .. }
-        | Term::Era
-        | Term::Err => {}
+    Term::recursive_call(move || {
+      for pat in self.patterns() {
+        pat.check_ctrs_arities(arities)?;
+      }
+      for child in self.children() {
+        child.check_ctrs_arities(arities)?;
       }
       Ok(())
     })

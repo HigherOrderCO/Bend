@@ -1,0 +1,4 @@
+main x = match (match x {0: 0; 1+: x-1}) {
+  0: 0
+  1+x-2: x-2
+}

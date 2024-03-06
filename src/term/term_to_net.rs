@@ -68,7 +68,7 @@ impl<'a> EncodeTermState<'a> {
   /// `global_vars` has the same information for global lambdas. Must be linked outside this function.
   /// Expects variables to be affine, refs to be stored as Refs and all names to be bound.
   fn encode_term(&mut self, term: &Term, up: Port) -> Option<Port> {
-    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
+    Term::recursive_call(move || {
       match term {
         // A lambda becomes to a con node. Ports:
         // - 0: points to where the lambda occurs.

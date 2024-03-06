@@ -13,46 +13,17 @@ impl Book {
 
 impl Term {
   pub fn desugar_let_destructors(&mut self) {
-    match self {
-      Term::Let { pat: Pattern::Var(_), val: fst, nxt: snd }
-      | Term::App { fun: fst, arg: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.desugar_let_destructors();
-        snd.desugar_let_destructors();
+    Term::recursive_call(move || {
+      for child in self.children_mut() {
+        child.desugar_let_destructors();
       }
-      Term::Mat { args, rules } => {
-        for arg in args {
-          arg.desugar_let_destructors();
-        }
-        for rule in rules {
-          rule.body.desugar_let_destructors();
-        }
-      }
-      Term::Sup { els, .. } | Term::Lst { els } | Term::Tup { els } => {
-        for el in els {
-          el.desugar_let_destructors();
-        }
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.desugar_let_destructors();
-      }
-      Term::Num { .. }
-      | Term::Str { .. }
-      | Term::Var { .. }
-      | Term::Lnk { .. }
-      | Term::Ref { .. }
-      | Term::Era
-      | Term::Err => (),
 
-      Term::Let { .. } => {
-        let Term::Let { pat, val, nxt } = self else { unreachable!() };
-        let pat = pat.clone();
-        let mut val = std::mem::take(val);
-        let mut nxt = std::mem::take(nxt);
-
-        val.desugar_let_destructors();
-        nxt.desugar_let_destructors();
+      if let Term::Let { pat, val, nxt } = self
+        && !pat.is_wildcard()
+      {
+        let pat = std::mem::replace(pat, Pattern::Var(None));
+        let val = std::mem::take(val);
+        let nxt = std::mem::take(nxt);
 
         let rules = vec![Rule { pats: vec![pat], body: *nxt }];
 
@@ -65,6 +36,6 @@ impl Term {
           Term::Let { pat, val, nxt: Box::new(Term::Mat { args, rules }) }
         };
       }
-    }
+    })
   }
 }

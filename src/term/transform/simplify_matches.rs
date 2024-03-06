@@ -39,7 +39,7 @@ impl Term {
   ///
   /// See `[simplify_match_expression]` for more information.
   pub fn simplify_matches(&mut self, ctrs: &Constructors, adts: &Adts) -> Result<(), MatchErr> {
-    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
+    Term::recursive_call(move || {
       match self {
         Term::Mat { args, rules } => {
           let extracted = extract_args(args);
@@ -49,26 +49,11 @@ impl Term {
           *self = bind_extracted_args(extracted, term);
         }
 
-        Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-          for el in els {
-            el.simplify_matches(ctrs, adts)?;
+        _ => {
+          for child in self.children_mut() {
+            child.simplify_matches(ctrs, adts)?;
           }
         }
-        Term::Let { val: fst, nxt: snd, .. }
-        | Term::App { fun: fst, arg: snd, .. }
-        | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Opx { fst, snd, .. } => {
-          fst.simplify_matches(ctrs, adts)?;
-          snd.simplify_matches(ctrs, adts)?;
-        }
-        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.simplify_matches(ctrs, adts)?,
-        Term::Var { .. }
-        | Term::Lnk { .. }
-        | Term::Num { .. }
-        | Term::Str { .. }
-        | Term::Ref { .. }
-        | Term::Era => (),
-        Term::Err => unreachable!(),
       }
       Ok(())
     })
@@ -277,7 +262,7 @@ fn switch_rule(
 
 fn switch_rule_nested_fields(arg_nam: &Name, ctr: &Pattern) -> Vec<Option<Name>> {
   let mut nested_fields = vec![];
-  let old_vars = ctr.bind_or_eras();
+  let old_vars = ctr.binds();
   for old_var in old_vars {
     let new_nam = if let Some(field) = old_var {
       // Name of constructor field
@@ -297,7 +282,7 @@ fn switch_rule_nested_fields(arg_nam: &Name, ctr: &Pattern) -> Vec<Option<Name>>
 
 fn switch_rule_matched_ctr(mut ctr: Pattern, nested_fields: &[Option<Name>]) -> Pattern {
   let mut nested_fields = nested_fields.iter().cloned();
-  ctr.bind_or_eras_mut().for_each(|var| *var = nested_fields.next().unwrap());
+  ctr.binds_mut().for_each(|var| *var = nested_fields.next().unwrap());
   ctr
 }
 

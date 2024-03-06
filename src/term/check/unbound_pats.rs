@@ -46,16 +46,12 @@ impl Pattern {
     let mut unbounds = HashSet::new();
     let mut check = vec![self];
     while let Some(pat) = check.pop() {
-      match pat {
-        Pattern::Ctr(nam, args) => {
-          if !is_ctr(nam) {
-            unbounds.insert(nam.clone());
-          }
-          check.extend(args.iter());
+      if let Pattern::Ctr(nam, _) = pat {
+        if !is_ctr(nam) {
+          unbounds.insert(nam.clone());
         }
-        Pattern::Tup(args) | Pattern::Lst(args) => args.iter().for_each(|arg| check.push(arg)),
-        Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => {}
       }
+      check.extend(pat.children());
     }
     unbounds
   }
@@ -63,43 +59,12 @@ impl Pattern {
 
 impl Term {
   pub fn check_unbound_pats(&self, is_ctr: &impl Fn(&Name) -> bool) -> Result<(), UnboundCtrErr> {
-    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
-      match self {
-        Term::Let { pat, val, nxt } => {
-          pat.check_unbounds(is_ctr)?;
-          val.check_unbound_pats(is_ctr)?;
-          nxt.check_unbound_pats(is_ctr)?;
-        }
-        Term::Mat { args, rules } => {
-          for arg in args {
-            arg.check_unbound_pats(is_ctr)?;
-          }
-          for rule in rules {
-            for pat in &rule.pats {
-              pat.check_unbounds(is_ctr)?;
-            }
-            rule.body.check_unbound_pats(is_ctr)?;
-          }
-        }
-        Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-          for el in els {
-            el.check_unbound_pats(is_ctr)?;
-          }
-        }
-        Term::App { fun: fst, arg: snd, .. }
-        | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Opx { fst, snd, .. } => {
-          fst.check_unbound_pats(is_ctr)?;
-          snd.check_unbound_pats(is_ctr)?;
-        }
-        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.check_unbound_pats(is_ctr)?,
-        Term::Var { .. }
-        | Term::Lnk { .. }
-        | Term::Ref { .. }
-        | Term::Num { .. }
-        | Term::Str { .. }
-        | Term::Era
-        | Term::Err => (),
+    Term::recursive_call(move || {
+      for pat in self.patterns() {
+        pat.check_unbounds(is_ctr)?;
+      }
+      for child in self.children() {
+        child.check_unbound_pats(is_ctr)?;
       }
       Ok(())
     })

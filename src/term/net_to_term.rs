@@ -58,7 +58,7 @@ pub struct Reader<'a> {
 
 impl<'a> Reader<'a> {
   fn read_term(&mut self, next: Port) -> Term {
-    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
+    Term::recursive_call(move || {
       if self.dup_paths.is_none() && !self.seen.insert(next) {
         self.error(ReadbackError::Cyclic);
         return Term::Var { nam: Name::from("...") };
@@ -389,7 +389,7 @@ impl Term {
         }
 
         for rule in rules {
-          for nam in rule.pats.iter_mut().flat_map(|p| p.bind_or_eras_mut()) {
+          for nam in rule.pats.iter_mut().flat_map(|p| p.binds_mut()) {
             fix_name(nam, id_counter, &mut rule.body);
           }
 

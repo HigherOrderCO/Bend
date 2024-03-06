@@ -19,7 +19,12 @@ impl Display for ReferencedMainErr {
 
 impl Ctx<'_> {
   /// Decides if names inside a term belong to a Var or to a Ref.
+  /// Converts `Term::Var(nam)` into `Term::Ref(nam)` when the name
+  /// refers to a function definition and there is no variable in
+  /// scope shadowing that definition.
+  ///
   /// Precondition: Refs are encoded as vars, Constructors are resolved.
+  ///
   /// Postcondition: Refs are encoded as refs, with the correct def id.
   pub fn resolve_refs(&mut self) -> Result<(), Info> {
     self.info.start_pass();
@@ -29,7 +34,7 @@ impl Ctx<'_> {
       for rule in def.rules.iter_mut() {
         let mut scope = HashMap::new();
 
-        for name in rule.pats.iter().flat_map(Pattern::binds) {
+        for name in rule.pats.iter().flat_map(Pattern::named_binds) {
           push_scope(Some(name), &mut scope);
         }
 
@@ -49,82 +54,31 @@ impl Term {
     main: Option<&Name>,
     scope: &mut HashMap<&'a Name, usize>,
   ) -> Result<(), ReferencedMainErr> {
-    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
-      match self {
-        Term::Lam { nam, bod, .. } => {
-          push_scope(nam.as_ref(), scope);
-          bod.resolve_refs(def_names, main, scope)?;
-          pop_scope(nam.as_ref(), scope);
-        }
-        Term::Let { pat: Pattern::Var(nam), val, nxt } => {
-          val.resolve_refs(def_names, main, scope)?;
-          push_scope(nam.as_ref(), scope);
-          nxt.resolve_refs(def_names, main, scope)?;
-          pop_scope(nam.as_ref(), scope);
-        }
-        Term::Let { pat, val, nxt } => {
-          val.resolve_refs(def_names, main, scope)?;
-          for nam in pat.bind_or_eras() {
-            push_scope(nam.as_ref(), scope);
-          }
-          nxt.resolve_refs(def_names, main, scope)?;
-          for nam in pat.bind_or_eras() {
-            pop_scope(nam.as_ref(), scope);
-          }
-        }
-        Term::Dup { tag: _, bnd, val, nxt } => {
-          val.resolve_refs(def_names, main, scope)?;
-          for bnd in bnd.iter() {
-            push_scope(bnd.as_ref(), scope);
-          }
-          nxt.resolve_refs(def_names, main, scope)?;
-          for bnd in bnd.iter() {
-            pop_scope(bnd.as_ref(), scope);
-          }
+    Term::recursive_call(move || {
+      if let Term::Var { nam } = self
+        && is_var_in_scope(nam, scope)
+      {
+        // If the variable is actually a reference to main, don't swap and return an error.
+        if let Some(main) = main
+          && nam == main
+        {
+          return Err(ReferencedMainErr);
         }
 
-        // If variable not defined, we check if it's a ref and swap if it is.
-        Term::Var { nam } => {
-          if is_var_in_scope(nam, scope) {
-            if let Some(main) = main {
-              if nam == main {
-                return Err(ReferencedMainErr);
-              }
-            }
-
-            if def_names.contains(nam) || CORE_BUILTINS.contains(&nam.0.as_ref()) {
-              *self = Term::r#ref(nam);
-            }
-          }
+        // If the variable is actually a reference to a function, swap the term.
+        if def_names.contains(nam) || CORE_BUILTINS.contains(&nam.0.as_ref()) {
+          *self = Term::r#ref(nam);
         }
-        Term::Chn { bod, .. } => bod.resolve_refs(def_names, main, scope)?,
-        Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
-          fst.resolve_refs(def_names, main, scope)?;
-          snd.resolve_refs(def_names, main, scope)?;
-        }
-        Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-          for el in els {
-            el.resolve_refs(def_names, main, scope)?;
-          }
-        }
-        Term::Mat { args, rules } => {
-          for arg in args {
-            arg.resolve_refs(def_names, main, scope)?;
-          }
-          for rule in rules {
-            for nam in rule.pats.iter().flat_map(|p| p.bind_or_eras()) {
-              push_scope(nam.as_ref(), scope);
-            }
+      }
 
-            rule.body.resolve_refs(def_names, main, scope)?;
-
-            for nam in rule.pats.iter().flat_map(|p| p.bind_or_eras()).rev() {
-              pop_scope(nam.as_ref(), scope);
-            }
-          }
+      for (child, binds) in self.children_mut_with_binds() {
+        let binds: Vec<_> = binds.collect();
+        for bind in binds.iter() {
+          push_scope(bind.as_ref(), scope);
         }
-
-        Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {
+        child.resolve_refs(def_names, main, scope)?;
+        for bind in binds.iter() {
+          pop_scope(bind.as_ref(), scope);
         }
       }
       Ok(())

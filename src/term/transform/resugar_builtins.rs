@@ -43,36 +43,11 @@ impl Term {
       // (String.nil)
       Term::Ref { nam: def_name } if def_name == SNIL => *self = Term::str(""),
 
-      Term::Mat { args, rules } => {
-        for arg in args {
-          arg.resugar_strings();
-        }
-        for rule in rules {
-          rule.body.resugar_strings();
+      _ => {
+        for child in self.children_mut() {
+          child.resugar_strings();
         }
       }
-      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-        for el in els {
-          el.resugar_strings();
-        }
-      }
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Let { val: fst, nxt: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.resugar_strings();
-        snd.resugar_strings();
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.resugar_strings();
-      }
-      Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Var { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era
-      | Term::Err => {}
     }
   }
 
@@ -104,36 +79,11 @@ impl Term {
       // (List.nil)
       Term::Ref { nam: def_name } if def_name == LNIL => *self = Term::Lst { els: vec![] },
 
-      Term::Mat { args, rules } => {
-        for arg in args {
-          arg.resugar_lists();
-        }
-        for rule in rules {
-          rule.body.resugar_lists();
+      _ => {
+        for child in self.children_mut() {
+          child.resugar_lists();
         }
       }
-      Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-        for el in els {
-          el.resugar_lists();
-        }
-      }
-      Term::App { fun: fst, arg: snd, .. }
-      | Term::Let { val: fst, nxt: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
-      | Term::Opx { fst, snd, .. } => {
-        fst.resugar_lists();
-        snd.resugar_lists();
-      }
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-        bod.resugar_lists();
-      }
-      Term::Lnk { .. }
-      | Term::Num { .. }
-      | Term::Var { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era
-      | Term::Err => {}
     }
   }
 }

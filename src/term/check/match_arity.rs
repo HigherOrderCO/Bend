@@ -33,39 +33,19 @@ impl Definition {
 
 impl Term {
   pub fn check_match_arity(&self) -> Result<(), MatchErr> {
-    stacker::maybe_grow(1024 * 32, 1024 * 1024, move || {
-      match self {
-        Term::Mat { args, rules } => {
-          let expected = args.len();
-          for rule in rules {
-            let found = rule.pats.len();
-            if found != expected {
-              return Err(MatchErr::ArityMismatch(found, expected));
-            }
-            rule.body.check_match_arity()?;
+    Term::recursive_call(move || {
+      if let Term::Mat { args, rules } = self {
+        let expected = args.len();
+        for rule in rules {
+          let found = rule.pats.len();
+          if found != expected {
+            return Err(MatchErr::ArityMismatch(found, expected));
           }
         }
+      }
 
-        Term::Lst { els } | Term::Sup { els, .. } | Term::Tup { els } => {
-          for el in els {
-            el.check_match_arity()?;
-          }
-        }
-        Term::App { fun: fst, arg: snd, .. }
-        | Term::Dup { val: fst, nxt: snd, .. }
-        | Term::Opx { fst, snd, .. }
-        | Term::Let { val: fst, nxt: snd, .. } => {
-          fst.check_match_arity()?;
-          snd.check_match_arity()?;
-        }
-        Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.check_match_arity()?,
-        Term::Var { .. }
-        | Term::Lnk { .. }
-        | Term::Num { .. }
-        | Term::Str { .. }
-        | Term::Ref { .. }
-        | Term::Era
-        | Term::Err => {}
+      for child in self.children() {
+        child.check_match_arity()?;
       }
       Ok(())
     })
