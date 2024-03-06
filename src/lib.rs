@@ -531,7 +531,7 @@ pub struct CompileResult {
 impl std::fmt::Debug for CompileResult {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     if !self.warns.0.is_empty() {
-      writeln!(f, "// WARNING:\n{}", self.warns)?;
+      writeln!(f, "// Warnings:\n{}", self.warns)?;
     }
     write!(f, "{}", self.core_book)
   }
