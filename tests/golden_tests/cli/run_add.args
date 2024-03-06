@@ -1,0 +1,4 @@
+run
+tests/golden_tests/cli/run_add.hvm
+3
+6

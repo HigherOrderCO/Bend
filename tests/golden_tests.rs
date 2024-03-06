@@ -15,6 +15,7 @@ use std::{
   collections::HashMap,
   fmt::Write,
   fs,
+  io::Read,
   path::{Path, PathBuf},
   str::FromStr,
   sync::{Arc, RwLock},
@@ -303,5 +304,22 @@ fn run_entrypoint() {
     let (res, info) =
       run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+  })
+}
+
+#[test]
+fn cli() {
+  run_golden_test_dir(function_name!(), &|_code, path| {
+    let mut args_path = PathBuf::from(path);
+    assert!(args_path.set_extension("args"));
+
+    let mut args_buf = String::with_capacity(16);
+    let mut args_file = fs::File::open(args_path).expect("File exists");
+    args_file.read_to_string(&mut args_buf).expect("Read args");
+    let args = args_buf.lines();
+
+    let output = std::process::Command::new("cargo").arg("run").args(args).output().expect("Run process");
+
+    Ok(format!("{}", String::from_utf8_lossy(&output.stdout)))
   })
 }

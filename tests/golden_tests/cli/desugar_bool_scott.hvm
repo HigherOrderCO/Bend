@@ -1,0 +1,3 @@
+data Boolean = True | False
+
+main = True
