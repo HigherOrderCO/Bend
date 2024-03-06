@@ -10,10 +10,28 @@ impl Book {
 }
 
 impl Definition {
-  /// Converts a pattern matching function with multiple rules and args, into a single rule without pattern matching.
+  /// Converts a pattern matching function with multiple rules and args, into a
+  /// single rule without pattern matching.
+  ///
   /// Moves the pattern matching of the rules into a complex match expression.
   ///
-  /// Preconditions: Rule arities must be correct
+  /// Example:
+  ///
+  /// ```hvm
+  /// if True then else = then
+  /// if False then else = else
+  /// ```
+  ///
+  /// becomes
+  ///
+  /// ```hvm
+  /// if = @%x0 @%x1 @%x2 match %x0, %x1, %x2 {
+  ///   True then else: then
+  ///   False then else: else
+  /// }
+  /// ```
+  ///
+  /// Preconditions: Rule arities must be correct.
   pub fn convert_match_def_to_term(&mut self) {
     let rule = def_rules_to_match(std::mem::take(&mut self.rules));
     self.rules = vec![rule];

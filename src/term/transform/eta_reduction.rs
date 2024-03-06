@@ -14,34 +14,27 @@ impl Term {
   /// Eta-reduces a term and any subterms.
   /// Expects variables to be linear.
   pub fn eta_reduction(&mut self) {
-    Term::recursive_call(move || match self {
-      Term::Lam { tag: lam_tag, nam: Some(lam_var), bod } => {
-        bod.eta_reduction();
-        match bod.as_mut() {
-          Term::App { tag: arg_tag, fun, arg: box Term::Var { nam: var_nam } }
-            if lam_var == var_nam && lam_tag == arg_tag =>
-          {
-            *self = std::mem::take(fun.as_mut());
-          }
-          _ => {}
-        }
+    Term::recursive_call(move || {
+      for child in self.children_mut() {
+        child.eta_reduction()
       }
-      Term::Chn { tag: chn_tag, nam: chn_var, bod } => {
-        bod.eta_reduction();
-        match bod.as_mut() {
-          Term::App { tag: arg_tag, fun, arg: box Term::Lnk { nam: var_nam } }
-            if chn_var == var_nam && chn_tag == arg_tag =>
-          {
-            *self = std::mem::take(fun.as_mut());
-          }
-          _ => {}
+      match self {
+        Term::Lam {
+          tag: lam_tag,
+          nam: lam_var,
+          bod: box Term::App { tag: arg_tag, fun, arg: box Term::Var { nam: var_nam } },
+        } if lam_var == var_nam && lam_tag == arg_tag => {
+          *self = std::mem::take(fun.as_mut());
         }
-      }
+        Term::Chn {
+          tag: chn_tag,
+          nam: chn_var,
+          bod: box Term::App { tag: arg_tag, fun, arg: box Term::Lnk { nam: var_nam } },
+        } if chn_var == var_nam && chn_tag == arg_tag => {
+          *self = std::mem::take(fun.as_mut());
+        }
 
-      _ => {
-        for child in self.children_mut() {
-          child.eta_reduction()
-        }
+        _ => {}
       }
     })
   }

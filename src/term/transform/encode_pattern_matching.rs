@@ -23,22 +23,17 @@ impl Book {
 
 impl Term {
   pub fn encode_simple_matches(&mut self, ctrs: &Constructors, adts: &Adts, adt_encoding: AdtEncoding) {
-    Term::recursive_call(move || match self {
-      Term::Mat { .. } => {
+    Term::recursive_call(move || {
+      for child in self.children_mut() {
+        child.encode_simple_matches(ctrs, adts, adt_encoding)
+      }
+
+      if let Term::Mat { .. } = self {
         debug_assert!(self.is_simple_match(ctrs, adts), "{self}");
         let Term::Mat { args, rules } = self else { unreachable!() };
-        for rule in rules.iter_mut() {
-          rule.body.encode_simple_matches(ctrs, adts, adt_encoding);
-        }
         let arg = std::mem::take(&mut args[0]);
         let rules = std::mem::take(rules);
         *self = encode_match(arg, rules, ctrs, adt_encoding);
-      }
-
-      _ => {
-        for child in self.children_mut() {
-          child.encode_simple_matches(ctrs, adts, adt_encoding)
-        }
       }
     })
   }

@@ -97,20 +97,17 @@ impl Book {
           Some(name) => self.insert_ctrs_used(name, uses, adt_encoding),
           None => self.insert_used(def_name, used, uses, adt_encoding),
         },
-        Term::Lst { els } => {
+        Term::Lst { .. } => {
           self.insert_ctrs_used(&Name::from(LIST), uses, adt_encoding);
-          for term in els {
-            to_find.push(term);
-          }
         }
         Term::Str { .. } => {
           self.insert_ctrs_used(&Name::from(STRING), uses, adt_encoding);
         }
-        _ => {
-          for child in term.children() {
-            to_find.push(child);
-          }
-        }
+        _ => {}
+      }
+
+      for child in term.children() {
+        to_find.push(child);
       }
     }
   }

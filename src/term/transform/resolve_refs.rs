@@ -19,7 +19,12 @@ impl Display for ReferencedMainErr {
 
 impl Ctx<'_> {
   /// Decides if names inside a term belong to a Var or to a Ref.
+  /// Converts `Term::Var(nam)` into `Term::Ref(nam)` when the name
+  /// refers to a function definition and there is no variable in
+  /// scope shadowing that definition.
+  ///
   /// Precondition: Refs are encoded as vars, Constructors are resolved.
+  ///
   /// Postcondition: Refs are encoded as refs, with the correct def id.
   pub fn resolve_refs(&mut self) -> Result<(), Info> {
     self.info.start_pass();
@@ -50,32 +55,30 @@ impl Term {
     scope: &mut HashMap<&'a Name, usize>,
   ) -> Result<(), ReferencedMainErr> {
     Term::recursive_call(move || {
-      match self {
-        // If variable not defined, we check if it's a ref and swap if it is.
-        Term::Var { nam } => {
-          if is_var_in_scope(nam, scope) {
-            if let Some(main) = main {
-              if nam == main {
-                return Err(ReferencedMainErr);
-              }
-            }
-
-            if def_names.contains(nam) || CORE_BUILTINS.contains(&nam.0.as_ref()) {
-              *self = Term::r#ref(nam);
-            }
-          }
+      if let Term::Var { nam } = self
+        && is_var_in_scope(nam, scope)
+      {
+        // If the variable is actually a reference to main, don't swap and return an error.
+        if let Some(main) = main
+          && nam == main
+        {
+          return Err(ReferencedMainErr);
         }
-        _ => {
-          for (child, binds) in self.children_mut_with_binds() {
-            let binds: Vec<_> = binds.collect();
-            for bind in binds.iter() {
-              push_scope(bind.as_ref(), scope);
-            }
-            child.resolve_refs(def_names, main, scope)?;
-            for bind in binds.iter() {
-              pop_scope(bind.as_ref(), scope);
-            }
-          }
+
+        // If the variable is actually a reference to a function, swap the term.
+        if def_names.contains(nam) || CORE_BUILTINS.contains(&nam.0.as_ref()) {
+          *self = Term::r#ref(nam);
+        }
+      }
+
+      for (child, binds) in self.children_mut_with_binds() {
+        let binds: Vec<_> = binds.collect();
+        for bind in binds.iter() {
+          push_scope(bind.as_ref(), scope);
+        }
+        child.resolve_refs(def_names, main, scope)?;
+        for bind in binds.iter() {
+          pop_scope(bind.as_ref(), scope);
         }
       }
       Ok(())

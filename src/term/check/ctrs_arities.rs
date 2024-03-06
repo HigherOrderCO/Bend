@@ -49,20 +49,15 @@ impl Pattern {
     let mut to_check = vec![self];
 
     while let Some(pat) = to_check.pop() {
-      match pat {
-        Pattern::Ctr(name, args) => {
-          let expected = arities.get(name).unwrap();
-          let found = args.len();
-          if *expected != found {
-            return Err(MatchErr::CtrArityMismatch(name.clone(), found, *expected));
-          }
+      if let Pattern::Ctr(name, args) = pat {
+        let expected = arities.get(name).unwrap();
+        let found = args.len();
+        if *expected != found {
+          return Err(MatchErr::CtrArityMismatch(name.clone(), found, *expected));
         }
-        Pattern::Lst(els) | Pattern::Tup(els) => {
-          for el in els {
-            to_check.push(el);
-          }
-        }
-        Pattern::Var(..) | Pattern::Num(..) | Pattern::Str(_) => {}
+      }
+      for child in pat.children() {
+        to_check.push(child);
       }
     }
     Ok(())

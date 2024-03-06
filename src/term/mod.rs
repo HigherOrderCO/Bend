@@ -846,6 +846,15 @@ impl Pattern {
     }
   }
 
+  pub fn children_mut(&mut self) -> ChildrenIter<&mut Pattern> {
+    match self {
+      Pattern::Ctr(_, els) | Pattern::Tup(els) | Pattern::Lst(els) => {
+        ChildrenIter::Many(Box::new(els.iter_mut()))
+      }
+      Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => ChildrenIter::zero(),
+    }
+  }
+
   /// Returns an iterator over each subpattern in depth-first, left to right order.
   // TODO: Not lazy.
   pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Pattern> + Clone {

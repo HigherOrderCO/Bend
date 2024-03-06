@@ -46,16 +46,12 @@ impl Pattern {
     let mut unbounds = HashSet::new();
     let mut check = vec![self];
     while let Some(pat) = check.pop() {
-      match pat {
-        Pattern::Ctr(nam, args) => {
-          if !is_ctr(nam) {
-            unbounds.insert(nam.clone());
-          }
-          check.extend(args.iter());
+      if let Pattern::Ctr(nam, _) = pat {
+        if !is_ctr(nam) {
+          unbounds.insert(nam.clone());
         }
-        Pattern::Tup(args) | Pattern::Lst(args) => args.iter().for_each(|arg| check.push(arg)),
-        Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => {}
       }
+      check.extend(pat.children());
     }
     unbounds
   }

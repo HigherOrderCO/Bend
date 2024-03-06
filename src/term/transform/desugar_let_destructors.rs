@@ -13,20 +13,17 @@ impl Book {
 
 impl Term {
   pub fn desugar_let_destructors(&mut self) {
-    Term::recursive_call(move || match self {
-      // Only transform `let`s that are not on variables.
-      Term::Let { pat: Pattern::Var(_), .. } => {
-        for child in self.children_mut() {
-          child.desugar_let_destructors();
-        }
+    Term::recursive_call(move || {
+      for child in self.children_mut() {
+        child.desugar_let_destructors();
       }
-      Term::Let { pat, val, nxt } => {
-        let pat = std::mem::replace(pat, Pattern::Var(None));
-        let mut val = std::mem::take(val);
-        let mut nxt = std::mem::take(nxt);
 
-        val.desugar_let_destructors();
-        nxt.desugar_let_destructors();
+      if let Term::Let { pat, val, nxt } = self
+        && !pat.is_wildcard()
+      {
+        let pat = std::mem::replace(pat, Pattern::Var(None));
+        let val = std::mem::take(val);
+        let nxt = std::mem::take(nxt);
 
         let rules = vec![Rule { pats: vec![pat], body: *nxt }];
 
@@ -38,12 +35,6 @@ impl Term {
           let args = vec![Term::Var { nam }];
           Term::Let { pat, val, nxt: Box::new(Term::Mat { args, rules }) }
         };
-      }
-
-      _ => {
-        for child in self.children_mut() {
-          child.desugar_let_destructors();
-        }
       }
     })
   }

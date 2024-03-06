@@ -25,18 +25,14 @@ impl Term {
     let mut to_inline = vec![self];
 
     while let Some(term) = to_inline.pop() {
-      match term {
-        Term::Ref { nam: def_name } => {
-          if inlineables.contains(def_name) {
-            *term = defs.get(def_name).unwrap().rule().body.clone();
-          }
+      if let Term::Ref { nam: def_name } = term {
+        if inlineables.contains(def_name) {
+          *term = defs.get(def_name).unwrap().rule().body.clone();
         }
+      }
 
-        _ => {
-          for child in term.children_mut() {
-            to_inline.push(child);
-          }
-        }
+      for child in term.children_mut() {
+        to_inline.push(child);
       }
     }
   }
