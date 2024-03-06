@@ -21,20 +21,20 @@ pub const ERR_INDENT_SIZE: usize = 2;
 #[derive(Debug, Clone, Default)]
 pub struct Info {
   err_counter: usize,
-  errs: Vec<Error>,
-  errs_with_def: BTreeMap<Name, Vec<Error>>,
+  book_errs: Vec<Error>,
+  rule_errs: BTreeMap<Name, Vec<Error>>,
   pub warns: Warnings,
 }
 
 impl Info {
   pub fn error<E: Into<Error>>(&mut self, e: E) {
     self.err_counter += 1;
-    self.errs.push(e.into())
+    self.book_errs.push(e.into())
   }
 
   pub fn def_error<E: Into<Error>>(&mut self, name: Name, e: E) {
     self.err_counter += 1;
-    let entry = self.errs_with_def.entry(name).or_default();
+    let entry = self.rule_errs.entry(name).or_default();
     entry.push(e.into());
   }
 
@@ -52,7 +52,7 @@ impl Info {
   }
 
   pub fn has_errors(&self) -> bool {
-    !(self.errs.is_empty() && self.errs_with_def.is_empty())
+    !(self.book_errs.is_empty() && self.rule_errs.is_empty())
   }
 
   /// Resets the internal counter
@@ -73,9 +73,9 @@ impl Info {
 
   pub fn display(&self, verbose: bool) -> impl Display + '_ {
     DisplayFn(move |f| {
-      writeln!(f, "{}", self.errs.iter().map(|err| err.display(verbose)).join("\n"))?;
+      writeln!(f, "{}", self.book_errs.iter().map(|err| err.display(verbose)).join("\n"))?;
 
-      for (def_name, errs) in &self.errs_with_def {
+      for (def_name, errs) in &self.rule_errs {
         in_definition(def_name, f)?;
         for err in errs {
           writeln!(f, "{:ERR_INDENT_SIZE$}{}", "", err.display(verbose))?;
@@ -99,7 +99,7 @@ impl Display for Info {
 
 impl From<String> for Info {
   fn from(value: String) -> Self {
-    Info { errs: vec![Error::Custom(value)], ..Default::default() }
+    Info { book_errs: vec![Error::Custom(value)], ..Default::default() }
   }
 }
 
