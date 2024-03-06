@@ -82,34 +82,33 @@ pub fn check_uses<'a>(
   globals: &mut HashMap<&'a Name, (usize, usize)>,
   errs: &mut Vec<UnboundVarErr>,
 ) {
-  Term::recursive_call(move || {
-    match term {
-      Term::Var { nam } => {
-        if !scope.contains_key(nam) {
-          errs.push(UnboundVarErr::Local(nam.clone()));
-          *term = Term::Err;
-        }
+  Term::recursive_call(move || match term {
+    Term::Var { nam } => {
+      if !scope.contains_key(nam) {
+        errs.push(UnboundVarErr::Local(nam.clone()));
+        *term = Term::Err;
       }
-      Term::Chn { nam, bod, .. } => {
-        if let Some(nam) = nam {
-          globals.entry(nam).or_default().0 += 1;
-        }
-        check_uses(bod, scope, globals, errs);
+    }
+    Term::Chn { nam, bod, .. } => {
+      if let Some(nam) = nam {
+        globals.entry(nam).or_default().0 += 1;
       }
-      Term::Lnk { nam } => {
-        globals.entry(nam).or_default().1 += 1;
-      }
+      check_uses(bod, scope, globals, errs);
+    }
+    Term::Lnk { nam } => {
+      globals.entry(nam).or_default().1 += 1;
+    }
 
-      _ => {
-        for (child, binds) in term.children_mut_with_binds() {
-          // TODO: how to avoid creating this vec for the binds?
-          for bind in binds.iter() {
-            push_scope(bind.as_ref(), scope);
-          }
-          check_uses(child, scope, globals, errs);
-          for bind in binds.iter().rev() {
-            pop_scope(bind.as_ref(), scope);
-          }
+    _ => {
+      for (child, binds) in term.children_mut_with_binds() {
+        let binds: Vec<_> = binds.collect();
+
+        for bind in binds.iter() {
+          push_scope(bind.as_ref(), scope);
+        }
+        check_uses(child, scope, globals, errs);
+        for bind in binds.iter().rev() {
+          pop_scope(bind.as_ref(), scope);
         }
       }
     }

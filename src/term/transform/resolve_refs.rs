@@ -67,6 +67,7 @@ impl Term {
         }
         _ => {
           for (child, binds) in self.children_mut_with_binds() {
+            let binds: Vec<_> = binds.collect();
             for bind in binds.iter() {
               push_scope(bind.as_ref(), scope);
             }

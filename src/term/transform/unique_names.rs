@@ -35,6 +35,7 @@ impl UniqueNameGenerator {
       Term::Var { nam } => *nam = self.use_var(nam),
       _ => {
         for (child, binds) in term.children_mut_with_binds_mut() {
+          let binds: Vec<_> = binds.collect();
           for bind in binds.iter() {
             self.push(bind.as_ref());
           }
