@@ -1,7 +1,7 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
 
-use diagnostics::{Info, Warning};
+use diagnostics::{Info, WarningType, Warnings};
 use hvmc::{
   ast::{self, Net},
   dispatch_dyn_net,
@@ -17,11 +17,8 @@ use std::{
   time::Instant,
 };
 use term::{
-  book_to_nets,
-  display::{display_readback_errors, DisplayJoin},
-  net_to_term::net_to_term,
-  term_to_net::Labels,
-  AdtEncoding, Book, Ctx, ReadbackError, Term,
+  book_to_nets, display::display_readback_errors, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding,
+  Book, Ctx, ReadbackError, Term,
 };
 
 pub mod diagnostics;
@@ -107,11 +104,7 @@ pub fn compile_book(
   Ok(CompileResult { core_book, labels, warns })
 }
 
-pub fn desugar_book(
-  book: &mut Book,
-  opts: CompileOpts,
-  args: Option<Vec<Term>>,
-) -> Result<Vec<Warning>, Info> {
+pub fn desugar_book(book: &mut Book, opts: CompileOpts, args: Option<Vec<Term>>) -> Result<Warnings, Info> {
   let mut ctx = Ctx::new(book);
 
   ctx.check_shared_names();
@@ -123,6 +116,7 @@ pub fn desugar_book(
 
   ctx.book.resolve_ctrs_in_pats();
   ctx.resolve_refs()?;
+  ctx.check_repeated_binds();
 
   ctx.check_match_arity()?;
   ctx.check_unbound_pats()?;
@@ -194,7 +188,7 @@ pub fn run_book(
   let book = Arc::new(book);
   let labels = Arc::new(labels);
 
-  display_warnings(&warns, warning_opts)?;
+  display_warnings(warns, warning_opts)?;
 
   // Run
   let debug_hook = run_opts.debug_hook(&book, &labels);
@@ -462,6 +456,7 @@ impl CompileOpts {
 pub struct WarningOpts {
   pub match_only_vars: WarnState,
   pub unused_defs: WarnState,
+  pub repeated_bind: WarnState,
 }
 
 #[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -474,65 +469,77 @@ pub enum WarnState {
 
 impl WarningOpts {
   pub fn allow_all() -> Self {
-    Self { match_only_vars: WarnState::Allow, unused_defs: WarnState::Allow }
+    Self { match_only_vars: WarnState::Allow, unused_defs: WarnState::Allow, repeated_bind: WarnState::Allow }
   }
 
   pub fn deny_all() -> Self {
-    Self { match_only_vars: WarnState::Deny, unused_defs: WarnState::Deny }
+    Self { match_only_vars: WarnState::Deny, unused_defs: WarnState::Deny, repeated_bind: WarnState::Deny }
   }
 
   pub fn warn_all() -> Self {
-    Self { match_only_vars: WarnState::Warn, unused_defs: WarnState::Warn }
+    Self { match_only_vars: WarnState::Warn, unused_defs: WarnState::Warn, repeated_bind: WarnState::Warn }
   }
 
-  /// Filters warnings based on the enabled flags.
-  pub fn filter<'a>(&'a self, warns: &'a [Warning], ws: WarnState) -> Vec<&Warning> {
+  /// Split warnings into two based on its Warn or Deny WarnState.
+  pub fn split(&self, warns: Warnings) -> (Warnings, Warnings) {
+    let mut warn = Warnings::default();
+    let mut deny = Warnings::default();
+
     warns
-      .iter()
-      .filter(|w| {
-        (match w {
-          Warning::MatchOnlyVars(_) => self.match_only_vars,
-          Warning::UnusedDefinition(_) => self.unused_defs,
-        }) == ws
-      })
-      .collect()
+      .0
+      .into_iter()
+      .flat_map(|(def, warns)| warns.into_iter().map(move |warn| (def.clone(), warn)))
+      .for_each(|(def, w)| {
+        let ws = match w {
+          WarningType::MatchOnlyVars => self.match_only_vars,
+          WarningType::UnusedDefinition => self.unused_defs,
+          WarningType::RepeatedBind(_) => self.repeated_bind,
+        };
+
+        match ws {
+          WarnState::Allow => {}
+          WarnState::Warn => warn.0.entry(def).or_default().push(w),
+          WarnState::Deny => deny.0.entry(def).or_default().push(w),
+        };
+      });
+
+    (warn, deny)
   }
 }
 
 /// Either just prints warnings or returns Err when any denied was produced.
-pub fn display_warnings(warnings: &[Warning], warning_opts: WarningOpts) -> Result<(), String> {
-  let warns = warning_opts.filter(warnings, WarnState::Warn);
-  if !warns.is_empty() {
-    eprintln!("Warnings:\n{}", DisplayJoin(|| warns.iter(), "\n"));
+pub fn display_warnings(warnings: Warnings, warning_opts: WarningOpts) -> Result<(), String> {
+  let (warns, denies) = warning_opts.split(warnings);
+
+  if !warns.0.is_empty() {
+    eprintln!("Warnings:\n{}", warns);
   }
-  let denies = warning_opts.filter(warnings, WarnState::Deny);
-  if !denies.is_empty() {
-    return Err(format!(
-      "{}\nCould not run the code because of the previous warnings",
-      DisplayJoin(|| denies.iter(), "\n")
-    ));
+
+  if !denies.0.is_empty() {
+    return Err(format!("{denies}\nCould not run the code because of the previous warnings."));
   }
+
   Ok(())
 }
 
 pub struct CompileResult {
-  pub warns: Vec<Warning>,
+  pub warns: Warnings,
   pub core_book: hvmc::ast::Book,
   pub labels: Labels,
 }
 
 impl std::fmt::Debug for CompileResult {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    for warn in &self.warns {
-      writeln!(f, "// WARNING: {}", warn)?;
+    if !self.warns.0.is_empty() {
+      writeln!(f, "// WARNING:\n{}", self.warns)?;
     }
     write!(f, "{}", self.core_book)
   }
 }
 
 impl CompileResult {
-  pub fn display_with_warns(&self, opts: WarningOpts) -> Result<String, String> {
-    display_warnings(&self.warns, opts)?;
+  pub fn display_with_warns(self, opts: WarningOpts) -> Result<String, String> {
+    display_warnings(self.warns, opts)?;
     Ok(self.core_book.to_string())
   }
 }

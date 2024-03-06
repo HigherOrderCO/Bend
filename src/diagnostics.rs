@@ -1,7 +1,7 @@
 use crate::term::{
   check::{
-    set_entrypoint::EntryErr, shared_names::TopLevelErr, unbound_pats::UnboundCtrErr,
-    unbound_vars::UnboundVarErr,
+    repeated_bind::RepeatedBindWarn, set_entrypoint::EntryErr, shared_names::TopLevelErr,
+    unbound_pats::UnboundCtrErr, unbound_vars::UnboundVarErr,
   },
   display::DisplayFn,
   transform::{
@@ -23,7 +23,7 @@ pub struct Info {
   err_counter: usize,
   errs: Vec<Error>,
   errs_with_def: BTreeMap<Name, Vec<Error>>,
-  pub warns: Vec<Warning>,
+  pub warns: Warnings,
 }
 
 impl Info {
@@ -67,12 +67,16 @@ impl Info {
     if self.err_counter == 0 { Ok(t) } else { Err(std::mem::take(self)) }
   }
 
+  pub fn warning<W: Into<WarningType>>(&mut self, def_name: Name, warning: W) {
+    self.warns.0.entry(def_name).or_default().push(warning.into());
+  }
+
   pub fn display(&self, verbose: bool) -> impl Display + '_ {
     DisplayFn(move |f| {
       writeln!(f, "{}", self.errs.iter().map(|err| err.display(verbose)).join("\n"))?;
 
       for (def_name, errs) in &self.errs_with_def {
-        writeln!(f, "In definition '{def_name}':")?;
+        in_definition(def_name, f)?;
         for err in errs {
           writeln!(f, "{:ERR_INDENT_SIZE$}{}", "", err.display(verbose))?;
         }
@@ -81,6 +85,10 @@ impl Info {
       Ok(())
     })
   }
+}
+
+fn in_definition(def_name: &Name, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+  writeln!(f, "In definition '{def_name}':")
 }
 
 impl Display for Info {
@@ -112,6 +120,7 @@ pub enum Error {
   TopLevel(TopLevelErr),
   Custom(String),
   ArgError(ArgError),
+  RepeatedBind(RepeatedBindWarn),
 }
 
 impl Display for Error {
@@ -132,6 +141,7 @@ impl Error {
       Error::TopLevel(err) => write!(f, "{err}"),
       Error::Custom(err) => write!(f, "{err}"),
       Error::ArgError(err) => write!(f, "{err}"),
+      Error::RepeatedBind(err) => write!(f, "{err}"),
     })
   }
 }
@@ -184,19 +194,41 @@ impl From<ArgError> for Error {
   }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct Warnings(pub BTreeMap<Name, Vec<WarningType>>);
+
 #[derive(Debug, Clone)]
-pub enum Warning {
-  MatchOnlyVars(Name),
-  UnusedDefinition(Name),
+pub enum WarningType {
+  MatchOnlyVars,
+  UnusedDefinition,
+  RepeatedBind(RepeatedBindWarn),
 }
 
-impl Display for Warning {
+impl Display for WarningType {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match self {
-      Warning::MatchOnlyVars(def_name) => {
-        write!(f, "Match expression at definition '{def_name}' only uses var patterns.")
-      }
-      Warning::UnusedDefinition(def_name) => write!(f, "Unused definition '{def_name}'."),
+      WarningType::MatchOnlyVars => write!(f, "Match expression at definition only uses var patterns."),
+      WarningType::UnusedDefinition => write!(f, "Definition is unusued."),
+      WarningType::RepeatedBind(warn) => write!(f, "{warn}"),
     }
+  }
+}
+
+impl Display for Warnings {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    for (def_name, warns) in &self.0 {
+      in_definition(def_name, f)?;
+      for warn in warns {
+        writeln!(f, "{:ERR_INDENT_SIZE$}{}", "", warn)?;
+      }
+    }
+
+    Ok(())
+  }
+}
+
+impl From<RepeatedBindWarn> for WarningType {
+  fn from(value: RepeatedBindWarn) -> Self {
+    Self::RepeatedBind(value)
   }
 }

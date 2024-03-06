@@ -2,17 +2,30 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/match_num_all_patterns.hvm
 ---
-// WARNING: Unused definition 'zero_succ'.
-// WARNING: Unused definition 'succ_zero'.
-// WARNING: Unused definition 'var_zero'.
-// WARNING: Unused definition 'var_succ'.
-// WARNING: Unused definition 'zero_var'.
-// WARNING: Unused definition 'succ_var'.
-// WARNING: Unused definition 'zero_var_succ'.
-// WARNING: Unused definition 'succ_var_zero'.
-// WARNING: Unused definition 'zero_succ_var'.
-// WARNING: Unused definition 'succ_zero_var'.
-// WARNING: Unused definition 'succ_zero_succ'.
+// WARNING:
+In definition 'succ_var':
+  Definition is unusued.
+In definition 'succ_var_zero':
+  Definition is unusued.
+In definition 'succ_zero':
+  Definition is unusued.
+In definition 'succ_zero_succ':
+  Definition is unusued.
+In definition 'succ_zero_var':
+  Definition is unusued.
+In definition 'var_succ':
+  Definition is unusued.
+In definition 'var_zero':
+  Definition is unusued.
+In definition 'zero_succ':
+  Definition is unusued.
+In definition 'zero_succ_var':
+  Definition is unusued.
+In definition 'zero_var':
+  Definition is unusued.
+In definition 'zero_var_succ':
+  Definition is unusued.
+
 @main = #0
 @succ_var = (?<(#0 (a a)) b> b)
 @succ_var_zero = (?<(a @succ_var_zero$S0) b> b)

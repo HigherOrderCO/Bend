@@ -1,7 +1,7 @@
 use std::collections::{hash_map::Entry, HashMap};
 
 use crate::{
-  diagnostics::Warning,
+  diagnostics::WarningType,
   term::{Adt, AdtEncoding, Book, Ctx, Name, Tag, Term, LIST, STRING},
   CORE_BUILTINS,
 };
@@ -72,7 +72,7 @@ impl Ctx<'_> {
       if prune_all || def.builtin {
         self.book.defs.swap_remove(&def_name);
       } else if !def_name.is_generated() {
-        self.info.warns.push(Warning::UnusedDefinition(def_name.clone()));
+        self.info.warning(def_name.clone(), WarningType::UnusedDefinition);
       }
     }
   }

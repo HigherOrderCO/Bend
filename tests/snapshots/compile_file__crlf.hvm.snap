@@ -2,6 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/crlf.hvm
 ---
-// WARNING: Unused definition 'a'.
+// WARNING:
+In definition 'a':
+  Definition is unusued.
+
 @a = #1
 @main = #2
