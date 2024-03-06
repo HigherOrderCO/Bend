@@ -1,0 +1,5 @@
+Foo = λ* 0
+
+Bar = Foo
+
+Main = (Bar *)

@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/compile_pre_reduce.hvm
+---
+@I = #5
+@main = *

@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/desugar_bool_tagged.hvm
+---
+(main) = True
+
+(False) = #Boolean λ* #Boolean λb b
+
+(True) = #Boolean λa #Boolean λ* a

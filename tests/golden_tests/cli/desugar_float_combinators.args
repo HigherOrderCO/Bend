@@ -1,0 +1,3 @@
+desugar
+tests/golden_tests/cli/desugar_float_combinators.hvm
+-Ofloat-combinators
