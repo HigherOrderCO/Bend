@@ -85,21 +85,11 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      Tree::Op1 { opr, lft, rgt } => {
-        // Add port 1 as a new Num node.
-        let lft_name = new_var(n_vars);
-        let num_name = new_var(n_vars);
-        inodes.push(INode { kind: Num { val: *lft }, ports: [lft_name.clone(), num_name.clone(), num_name] });
-        // Swap ports 0 and 1 and transform into OP2.
-        let kind = Op2 { opr: *opr };
-        let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [lft_name, subtree_root, rgt] });
-      }
-      Tree::Op2 { opr, lft, rgt } => {
-        let kind = Op2 { opr: *opr };
-        let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
-        let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, lft, rgt] });
+      Tree::Op { op, rhs, out } => {
+        let kind = Op2 { opr: *op };
+        let rhs = process_node_subtree(rhs, net_root, &mut subtrees, n_vars);
+        let out = process_node_subtree(out, net_root, &mut subtrees, n_vars);
+        inodes.push(INode { kind, ports: [subtree_root, rhs, out] });
       }
       Tree::Mat { sel, ret } => {
         let kind = Mat;

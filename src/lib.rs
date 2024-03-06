@@ -9,7 +9,7 @@ use hvmc::{
   run::{DynNet, Heap, Rewrites},
   stdlib::LogDef,
 };
-use hvmc_net::{pre_reduce::pre_reduce_book, prune::prune_defs};
+use hvmc_net::prune::prune_defs;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{
   str::FromStr,
@@ -99,7 +99,7 @@ pub fn compile_book(
 
   let mut core_book = nets_to_hvmc(nets)?;
   if opts.pre_reduce {
-    pre_reduce_book(&mut core_book, book.hvmc_entrypoint())?;
+    core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), 1 << 24, 100_000)?;
   }
   if opts.prune {
     prune_defs(&mut core_book, book.hvmc_entrypoint().to_string());
@@ -220,14 +220,15 @@ pub fn count_nodes<'l>(net: &'l hvmc::ast::Net) -> usize {
   }
   while let Some(tree) = visit.pop() {
     match tree {
-      ast::Tree::Ctr { lft, rgt, .. } | ast::Tree::Op2 { lft, rgt, .. } => {
+      ast::Tree::Ctr { lft, rgt, .. } => {
         count += 1;
         visit.push(lft);
         visit.push(rgt);
       }
-      ast::Tree::Op1 { rgt, .. } => {
+      ast::Tree::Op { rhs, out, .. } => {
         count += 1;
-        visit.push(rgt);
+        visit.push(rhs);
+        visit.push(out);
       }
       ast::Tree::Mat { sel, ret } => {
         count += 1;
