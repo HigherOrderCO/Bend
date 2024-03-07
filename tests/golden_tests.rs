@@ -23,6 +23,10 @@ use std::{
 use stdext::function_name;
 use walkdir::WalkDir;
 
+fn format_output(output: std::process::Output) -> String {
+  format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout))
+}
+
 fn do_parse_term(code: &str) -> Result<Term, String> {
   parse_term(code).map_err(|errs| errs.into_iter().map(|e| e.to_string()).join("\n"))
 }
@@ -147,12 +151,7 @@ fn run_file() {
         .output()
         .expect("Run process");
 
-      Ok(format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout)))
-      // let book = do_parse_book(code, path)?;
-      // // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-      // let (res, info) =
-      //   run_book(book, 1 << 24, RunOpts::lazy(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
-      // Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+      Ok(format_output(output))
     }),
     (&|_code, path| {
       let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
@@ -160,12 +159,7 @@ fn run_file() {
         .output()
         .expect("Run process");
 
-      Ok(format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout)))
-      // let book = do_parse_book(code, path)?;
-      // // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-      // let (res, info) =
-      //   run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
-      // Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+      Ok(format_output(output))
     }),
   ])
 }
@@ -333,6 +327,6 @@ fn cli() {
     let output =
       std::process::Command::new(env!("CARGO_BIN_EXE_hvml")).args(args).output().expect("Run command");
 
-    Ok(format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout)))
+    Ok(format_output(output))
   })
 }
