@@ -1,0 +1,6 @@
+data Pair
+  = (Pair fst snd)
+
+Pair.get f (Pair fst snd) = (f fst snd)
+
+main = (Pair.get @x @y (+ x y) (Pair 40 2))

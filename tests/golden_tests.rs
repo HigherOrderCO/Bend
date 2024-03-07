@@ -15,6 +15,7 @@ use std::{
   collections::HashMap,
   fmt::Write,
   fs,
+  io::Read,
   path::{Path, PathBuf},
   str::FromStr,
   sync::{Arc, RwLock},
@@ -72,7 +73,7 @@ fn run_golden_test_dir_multiple(test_name: &str, run: &[&dyn Fn(&str, &Path) -> 
 
   let walker = WalkDir::new(&root).sort_by_file_name().max_depth(2).into_iter().filter_entry(|e| {
     let path = e.path();
-    path == root || (path.is_file() && path.extension().is_some_and(|x| x == "hvm"))
+    path == root || path.is_dir() || (path.is_file() && path.extension().is_some_and(|x| x == "hvm"))
   });
 
   for entry in walker {
@@ -303,5 +304,23 @@ fn run_entrypoint() {
     let (res, info) =
       run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
     Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+  })
+}
+
+#[test]
+fn cli() {
+  run_golden_test_dir(function_name!(), &|_code, path| {
+    let mut args_path = PathBuf::from(path);
+    assert!(args_path.set_extension("args"));
+
+    let mut args_buf = String::with_capacity(16);
+    let mut args_file = fs::File::open(args_path).expect("File exists");
+    args_file.read_to_string(&mut args_buf).expect("Read args");
+    let args = args_buf.lines();
+
+    let output =
+      std::process::Command::new("cargo").arg("run").arg("-q").args(args).output().expect("Run process");
+
+    Ok(format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout)))
   })
 }

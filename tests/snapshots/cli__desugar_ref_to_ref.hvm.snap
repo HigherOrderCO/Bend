@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/desugar_ref_to_ref.hvm
+---
+(Foo) = λ* 0
+
+(Bar) = Foo
+
+(Main) = (Foo *)

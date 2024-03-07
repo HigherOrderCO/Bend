@@ -1,0 +1,3 @@
+desugar
+tests/golden_tests/cli/desugar_ref_to_ref.hvm
+-Oref-to-ref

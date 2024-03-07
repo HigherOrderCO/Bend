@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/desugar_simplify_main.hvm
+---
+(id) = λa a
+
+(main) = λa a

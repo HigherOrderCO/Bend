@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/desugar_eta.hvm
+---
+(id) = λa a
+
+(id2) = id
+
+(main) = (id2 42)

@@ -1,0 +1,10 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/compile_all.hvm
+---
+@Pair = (a (b {2 {2 a {2 b c}} c}))
+@Pair.get = (a ({2 @Pair.get$S0 (a b)} b))
+@Pair.get$S0 = {2 a {2 b ((a (b c)) c)}}
+@main = a
+& @Pair.get ~ ((<+ b c> (b c)) (d a))
+& @Pair ~ (#40 (#2 d))

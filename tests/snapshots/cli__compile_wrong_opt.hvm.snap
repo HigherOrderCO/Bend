@@ -1,0 +1,10 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/compile_wrong_opt.hvm
+---
+error: invalid value 'foo' for '-O <COMP_OPTS>'
+  [possible values: all, no-all, eta, no-eta, prune, no-prune, ref-to-ref, no-ref-to-ref, pre-reduce, no-pre-reduce, linearize-matches, linearize-matches-extra, no-linearize-matches, float-combinators, no-float-combinators, simplify-main, no-simplify-main, merge, no-merge, inline, no-inline, adt-scott, adt-tagged-scott]
+
+  tip: a similar value exists: 'float-combinators'
+
+For more information, try '--help'.

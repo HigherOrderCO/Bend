@@ -1,0 +1,1 @@
+main = λa λb match a { 0: b; 1+: b }

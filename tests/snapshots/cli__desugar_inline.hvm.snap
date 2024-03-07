@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/desugar_inline.hvm
+---
+(id) = λa a
+
+(main) = (λa a λa a)

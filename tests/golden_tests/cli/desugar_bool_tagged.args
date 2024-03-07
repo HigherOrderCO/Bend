@@ -1,0 +1,3 @@
+desugar
+tests/golden_tests/cli/desugar_bool_tagged.hvm
+-Oadt-tagged-scott

@@ -1,0 +1,3 @@
+id = λx x
+
+main = id

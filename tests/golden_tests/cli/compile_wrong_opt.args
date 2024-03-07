@@ -1,0 +1,3 @@
+compile
+tests/golden_tests/cli/compile_wrong_opt.hvm
+-Ofoo

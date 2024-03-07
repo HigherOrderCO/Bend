@@ -1,0 +1,11 @@
+compile
+tests/golden_tests/cli/compile_no_opts.hvm
+-Ono-all
+-Ono-eta
+-Ono-prune
+-Ono-ref-to-ref
+-Ono-pre-reduce
+-Ono-float-combinators
+-Ono-simplify-main
+-Ono-merge
+-Ono-inline
