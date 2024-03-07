@@ -3,7 +3,9 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/compile_pre_reduce.hvm
 ---
 Warnings:
-Unused definition 'I'.
+In definition 'I':
+  Definition is unused.
+
 
 @I = #5
 @main = *
