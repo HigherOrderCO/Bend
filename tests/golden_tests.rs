@@ -141,19 +141,31 @@ fn linear_readback() {
 #[test]
 fn run_file() {
   run_golden_test_dir_multiple(function_name!(), &[
-    (&|code, path| {
-      let book = do_parse_book(code, path)?;
-      // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-      let (res, info) =
-        run_book(book, 1 << 24, RunOpts::lazy(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
-      Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+    (&|_code, path| {
+      let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
+        .args(["run", path.to_str().unwrap(), "-Dall", "-Oall", "-L"])
+        .output()
+        .expect("Run process");
+
+      Ok(format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout)))
+      // let book = do_parse_book(code, path)?;
+      // // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
+      // let (res, info) =
+      //   run_book(book, 1 << 24, RunOpts::lazy(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
+      // Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
     }),
-    (&|code, path| {
-      let book = do_parse_book(code, path)?;
-      // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-      let (res, info) =
-        run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
-      Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+    (&|_code, path| {
+      let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
+        .args(["run", path.to_str().unwrap(), "-Dall", "-Oall"])
+        .output()
+        .expect("Run process");
+
+      Ok(format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout)))
+      // let book = do_parse_book(code, path)?;
+      // // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
+      // let (res, info) =
+      //   run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
+      // Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
     }),
   ])
 }
@@ -319,7 +331,7 @@ fn cli() {
     let args = args_buf.lines();
 
     let output =
-      std::process::Command::new("cargo").arg("run").arg("-q").args(args).output().expect("Run process");
+      std::process::Command::new(env!("CARGO_BIN_EXE_hvml")).args(args).output().expect("Run command");
 
     Ok(format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout)))
   })
