@@ -298,7 +298,7 @@ where
           }
         }
         let mat = Term::Mat { args: args_no_bind, rules };
-        binds.into_iter().rev().fold(mat, |acc, (bind, arg)| Term::Let {
+        binds.into_iter().rfold(mat, |acc, (bind, arg)| Term::Let {
           pat: Pattern::Var(Some(bind)),
           val: Box::new(arg),
           nxt: Box::new(acc),
