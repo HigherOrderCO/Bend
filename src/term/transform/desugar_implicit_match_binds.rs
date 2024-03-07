@@ -1,6 +1,29 @@
 use crate::term::{Adts, Book, Constructors, Name, NumCtr, Pattern, Term};
 
 impl Book {
+  /// Converts implicit match binds into explicit ones, using the
+  /// field names specified in the ADT declaration or the default
+  /// names for builtin constructors.
+  ///
+  /// Example:
+  /// ```hvm
+  /// data MyList = (Cons h t) | Nil
+  /// match x y {
+  ///   0 Nil: (A)
+  ///   0 Cons: (B y.h y.t)
+  ///   1+ Nil: (C x-1)
+  ///   1+p (Cons x xs): (D p x xs)
+  /// }
+  /// ```
+  /// becomes
+  /// ```hvm
+  /// match x y {
+  ///   0 Nil: (A)
+  ///   0 (Cons y.h y.t): (B y.h y.t)
+  ///   1+x-1 Nil: (C x-1)
+  ///   1+p (Cons x xs): (D p x xs)
+  /// }
+  /// ```
   pub fn desugar_implicit_match_binds(&mut self) {
     for def in self.defs.values_mut() {
       for rule in &mut def.rules {
@@ -16,6 +39,7 @@ impl Term {
       for child in self.children_mut() {
         child.desugar_implicit_match_binds(ctrs, adts);
       }
+
       if let Term::Mat { args, rules } = self {
         // Make all the matched terms variables
         let mut match_args = vec![];
@@ -59,7 +83,7 @@ impl Term {
         }
 
         // Add the binds to the extracted term vars.
-        *self = match_args.into_iter().rev().fold(std::mem::take(self), |nxt, (nam, val)| {
+        *self = match_args.into_iter().rfold(std::mem::take(self), |nxt, (nam, val)| {
           if let Some(val) = val {
             // Non-Var term that was extracted.
             Term::Let { pat: Pattern::Var(Some(nam)), val: Box::new(val), nxt: Box::new(nxt) }

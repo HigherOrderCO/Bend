@@ -30,21 +30,19 @@ fn encode_ctr(
     AdtEncoding::Scott => {
       let ctr = Term::Var { nam: ctr_name.clone() };
       let app = ctr_args.iter().cloned().fold(ctr, Term::arg_call);
-      let lam = ctrs.into_iter().rev().fold(app, |acc, arg| Term::named_lam(arg.clone(), acc));
-      ctr_args.into_iter().rev().fold(lam, |acc, arg| Term::named_lam(arg, acc))
+      let lam = ctrs.into_iter().rfold(app, |acc, arg| Term::named_lam(arg, acc));
+      ctr_args.into_iter().rfold(lam, |acc, arg| Term::named_lam(arg, acc))
     }
     // λarg1 λarg2 #type λctr1 #type λctr2 #type.ctr2.arg2(#type.ctr2.arg1(ctr2 arg1) arg2)
     AdtEncoding::TaggedScott => {
       let ctr = Term::Var { nam: ctr_name.clone() };
-      let app = ctr_args.iter().cloned().fold(ctr, |acc, nam| {
-        let tag = Tag::adt_name(adt_name);
-        Term::tagged_app(tag, acc, Term::Var { nam })
-      });
-      let lam = ctrs
-        .into_iter()
-        .rev()
-        .fold(app, |acc, arg| Term::tagged_lam(Tag::adt_name(adt_name), arg.clone(), acc));
-      ctr_args.into_iter().rev().fold(lam, |acc, arg| Term::named_lam(arg, acc))
+      let app = ctr_args
+        .iter()
+        .cloned()
+        .fold(ctr, |acc, nam| Term::tagged_app(Tag::adt_name(adt_name), acc, Term::Var { nam }));
+      let lam =
+        ctrs.into_iter().rfold(app, |acc, arg| Term::tagged_lam(Tag::adt_name(adt_name), Some(arg), acc));
+      ctr_args.into_iter().rfold(lam, |acc, arg| Term::named_lam(arg, acc))
     }
   }
 }

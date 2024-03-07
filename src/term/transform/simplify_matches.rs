@@ -378,7 +378,7 @@ fn extract_args(args: &mut [Term]) -> Vec<(Name, Term)> {
 ///
 /// `vec![(%match_arg0, arg)]` + `term` => `let %match_arg0 = arg; term`
 fn bind_extracted_args(extracted: Vec<(Name, Term)>, term: Term) -> Term {
-  extracted.into_iter().rev().fold(term, |term, (nam, val)| Term::Let {
+  extracted.into_iter().rfold(term, |term, (nam, val)| Term::Let {
     pat: Pattern::Var(Some(nam)),
     val: Box::new(val),
     nxt: Box::new(term),

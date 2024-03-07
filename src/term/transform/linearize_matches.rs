@@ -53,7 +53,7 @@ pub fn lift_match_vars(match_term: &mut Term, lift_all_vars: bool) -> &mut Term 
       .body
       .free_vars()
       .into_iter()
-      .filter(|(name, _)| !rule.pats.iter().any(|p| p.named_binds().contains(name)))
+      .filter(|(name, _)| !rule.pats.iter().any(|p| p.binds().flatten().contains(name)))
   });
 
   // Collect the vars.
@@ -75,7 +75,7 @@ pub fn lift_match_vars(match_term: &mut Term, lift_all_vars: bool) -> &mut Term 
   // Add lambdas to the arms
   for rule in rules {
     let old_body = std::mem::take(&mut rule.body);
-    rule.body = free_vars.iter().rev().fold(old_body, |body, var| Term::named_lam(var.clone(), body));
+    rule.body = free_vars.iter().cloned().rfold(old_body, |body, nam| Term::named_lam(nam, body));
   }
 
   // Add apps to the match

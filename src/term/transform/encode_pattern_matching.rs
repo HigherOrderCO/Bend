@@ -11,7 +11,16 @@ use crate::{
 };
 
 impl Book {
-  /// Encodes pattern matching expressions in the book functions according to the adt_encoding.
+  /// Encodes simple pattern matching expressions in the book into
+  /// their native/core form.
+  /// See [`super::simplify_matches::simplify_match_expression`] for
+  /// the meaning of "simple" used here.
+  ///
+  /// ADT matches are encoded based on `adt_encoding`.
+  ///
+  /// Num matches are encoded as a sequence of native num matches (on 0 and 1+).
+  ///
+  /// Var and pair matches become a let expression.
   pub fn encode_simple_matches(&mut self, adt_encoding: AdtEncoding) {
     for def in self.defs.values_mut() {
       for rule in &mut def.rules {
@@ -72,7 +81,7 @@ fn encode_num_succ(arg: Term, mut rules: Vec<Rule>) -> Term {
   };
   let last_arm = Term::lam(last_var, last_rule.body);
 
-  rules.into_iter().rev().fold(last_arm, |term, rule| {
+  rules.into_iter().rfold(last_arm, |term, rule| {
     let rules = vec![Rule { pats: vec![Pattern::Num(NumCtr::Num(0))], body: rule.body }, Rule {
       pats: vec![Pattern::Num(NumCtr::Succ(1, None))],
       body: term,
@@ -152,8 +161,7 @@ fn encode_adt(arg: Term, rules: Vec<Rule>, adt: Name, adt_encoding: AdtEncoding)
     AdtEncoding::Scott => {
       let mut arms = vec![];
       for rule in rules {
-        let body = rule.body;
-        let body = rule.pats[0].named_binds().rev().fold(body, |bod, nam| Term::named_lam(nam.clone(), bod));
+        let body = rule.pats[0].binds().cloned().rfold(rule.body, |bod, nam| Term::lam(nam, bod));
         arms.push(body);
       }
       Term::call(arg, arms)
@@ -163,9 +171,9 @@ fn encode_adt(arg: Term, rules: Vec<Rule>, adt: Name, adt_encoding: AdtEncoding)
       let mut arms = vec![];
       for rule in rules.into_iter() {
         let body = rule.pats[0]
-          .named_binds()
-          .rev()
-          .fold(rule.body, |bod, var| Term::tagged_lam(Tag::adt_name(&adt), var.clone(), bod));
+          .binds()
+          .cloned()
+          .rfold(rule.body, |bod, nam| Term::tagged_lam(Tag::adt_name(&adt), nam, bod));
         arms.push(body);
       }
       Term::tagged_call(Tag::adt_name(&adt), arg, arms)

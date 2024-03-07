@@ -34,8 +34,8 @@ impl Ctx<'_> {
       for rule in def.rules.iter_mut() {
         let mut scope = HashMap::new();
 
-        for name in rule.pats.iter().flat_map(Pattern::named_binds) {
-          push_scope(Some(name), &mut scope);
+        for name in rule.pats.iter().flat_map(Pattern::binds) {
+          push_scope(name.as_ref(), &mut scope);
         }
 
         let res = rule.body.resolve_refs(&def_names, self.book.entrypoint.as_ref(), &mut scope);
@@ -72,12 +72,11 @@ impl Term {
       }
 
       for (child, binds) in self.children_mut_with_binds() {
-        let binds: Vec<_> = binds.collect();
-        for bind in binds.iter() {
+        for bind in binds.clone() {
           push_scope(bind.as_ref(), scope);
         }
         child.resolve_refs(def_names, main, scope)?;
-        for bind in binds.iter() {
+        for bind in binds.rev() {
           pop_scope(bind.as_ref(), scope);
         }
       }

@@ -40,7 +40,7 @@ impl Ctx<'_> {
       for rule in &mut def.rules {
         let mut scope = HashMap::new();
         for pat in &rule.pats {
-          pat.named_binds().for_each(|nam| push_scope(Some(nam), &mut scope));
+          pat.binds().for_each(|nam| push_scope(nam.as_ref(), &mut scope));
         }
 
         rule.body.check_unbound_vars(&mut scope, &mut errs);
@@ -101,13 +101,11 @@ pub fn check_uses<'a>(
 
     _ => {
       for (child, binds) in term.children_mut_with_binds() {
-        let binds: Vec<_> = binds.collect();
-
-        for bind in binds.iter() {
+        for bind in binds.clone() {
           push_scope(bind.as_ref(), scope);
         }
         check_uses(child, scope, globals, errs);
-        for bind in binds.iter().rev() {
+        for bind in binds.rev() {
           pop_scope(bind.as_ref(), scope);
         }
       }
