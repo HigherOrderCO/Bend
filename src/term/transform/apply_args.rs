@@ -21,6 +21,16 @@ impl Display for ArgError {
 }
 
 impl Ctx<'_> {
+  /// Applies the arguments to the program being run by applying them to the main function.
+  ///
+  /// Example:
+  /// ```hvm
+  /// main x1 x2 x3 = (MainBody x1 x2 x3)
+  /// ```
+  /// Calling with `hvml run <file> arg1 arg2 arg3`, it becomes:
+  /// ```hvm
+  /// main = (λx1 λx2 λx3 (MainBody x1 x2 x3) arg1 arg2 arg3)
+  /// ```
   pub fn apply_args(&mut self, args: Option<Vec<Term>>) -> Result<(), Info> {
     self.info.start_pass();
 
