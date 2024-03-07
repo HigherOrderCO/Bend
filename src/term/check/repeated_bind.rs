@@ -23,7 +23,7 @@ impl Ctx<'_> {
       for rule in &def.rules {
         let mut binds = HashSet::new();
         for pat in &rule.pats {
-          for nam in pat.named_binds() {
+          for nam in pat.binds().flatten() {
             if !binds.insert(nam) {
               self.info.warning(def_name.clone(), RepeatedBindWarn::Rule(nam.clone()));
             }
@@ -52,7 +52,7 @@ impl Term {
         for rule in rules {
           let mut binds = HashSet::new();
           for pat in &rule.pats {
-            for nam in pat.named_binds() {
+            for nam in pat.binds().flatten() {
               if !binds.insert(nam) {
                 repeated.push(RepeatedBindWarn::Match(nam.clone()));
               }
