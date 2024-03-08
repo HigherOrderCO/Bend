@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/bitonic_sort_lam.hvm
 ---
+Lazy mode:
+
+32640
+
+Strict mode:
+
 32640

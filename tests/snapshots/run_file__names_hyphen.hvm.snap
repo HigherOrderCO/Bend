@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/names_hyphen.hvm
 ---
+Lazy mode:
+
+1
+
+Strict mode:
+
 1

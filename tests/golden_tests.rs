@@ -48,7 +48,12 @@ fn run_single_golden_test(
   let file_path = format!("{}{}", &TESTS_PATH[1 ..], file_name);
   let file_path = Path::new(&file_path);
 
-  let results = run.iter().map(|x| x(&code, file_path).unwrap_or_else(|err| err.to_string()));
+  let mut results: HashMap<&Path, Vec<String>> = HashMap::new();
+  for fun in run {
+    let result = fun(&code, file_path).unwrap_or_else(|err| err.to_string());
+    results.entry(file_path).or_default().push(result);
+  }
+  let results = results.into_values().map(|v| v.join("\n")).collect_vec();
 
   let mut settings = insta::Settings::clone_current();
   settings.set_prepend_module_to_snapshot(false);
@@ -151,7 +156,7 @@ fn run_file() {
         .output()
         .expect("Run process");
 
-      Ok(format_output(output))
+      Ok(format!("Lazy mode:\n{}", format_output(output)))
     }),
     (&|_code, path| {
       let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
@@ -159,7 +164,7 @@ fn run_file() {
         .output()
         .expect("Run process");
 
-      Ok(format_output(output))
+      Ok(format!("Strict mode:\n{}", format_output(output)))
     }),
   ])
 }

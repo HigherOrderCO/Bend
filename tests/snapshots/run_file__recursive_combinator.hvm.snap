@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/recursive_combinator.hvm
 ---
+Lazy mode:
+
+0
+
+Strict mode:
+
 0

@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/linearize_match.hvm
 ---
+Lazy mode:
+
+λa match a { 0: λb b; 1+c: λd (+ c d) }
+
+Strict mode:
+
 λa match a { 0: λb b; 1+c: λd (+ c d) }

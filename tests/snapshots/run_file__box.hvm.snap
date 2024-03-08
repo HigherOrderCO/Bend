@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/box.hvm
 ---
+Lazy mode:
+
+(Box 10)
+
+Strict mode:
+
 (Box 10)

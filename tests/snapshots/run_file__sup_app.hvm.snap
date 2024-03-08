@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/sup_app.hvm
 ---
+Lazy mode:
+
+#id{3 3}
+
+Strict mode:
+
 #id{3 3}

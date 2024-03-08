@@ -2,6 +2,18 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/num_match_missing_var.hvm
 ---
+Lazy mode:
+
+In definition 'if':
+  Non-exhaustive pattern matching. Hint:
+    Case '+' not covered.
+In definition 'if4':
+  Expected a sequence of incrementing numbers ending with '1+', found '1'.
+
+
+
+Strict mode:
+
 In definition 'if':
   Non-exhaustive pattern matching. Hint:
     Case '+' not covered.

@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/recursive_match_native.hvm
 ---
+Lazy mode:
+
+512
+
+Strict mode:
+
 512

@@ -2,6 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/readback_hvm1_main.hvm
 ---
+Lazy mode:
+
 In definition 'Main':
   Main definition can't be referenced inside the program.
 
+
+
+Strict mode:
+
+In definition 'Main':
+  Main definition can't be referenced inside the program.
