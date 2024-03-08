@@ -5,7 +5,7 @@ use crate::term::{
   },
   display::DisplayFn,
   transform::{
-    apply_args::ArgError, encode_pattern_matching::MatchErr, resolve_refs::ReferencedMainErr,
+    apply_args::PatternArgError, encode_pattern_matching::MatchErr, resolve_refs::ReferencedMainErr,
     simplify_ref_to_ref::CyclicDefErr,
   },
   Name,
@@ -119,7 +119,7 @@ pub enum Error {
   EntryPoint(EntryErr),
   TopLevel(TopLevelErr),
   Custom(String),
-  ArgError(ArgError),
+  PatternArgError(PatternArgError),
   RepeatedBind(RepeatedBindWarn),
 }
 
@@ -140,7 +140,7 @@ impl Error {
       Error::EntryPoint(err) => write!(f, "{err}"),
       Error::TopLevel(err) => write!(f, "{err}"),
       Error::Custom(err) => write!(f, "{err}"),
-      Error::ArgError(err) => write!(f, "{err}"),
+      Error::PatternArgError(err) => write!(f, "{err}"),
       Error::RepeatedBind(err) => write!(f, "{err}"),
     })
   }
@@ -188,9 +188,9 @@ impl From<TopLevelErr> for Error {
   }
 }
 
-impl From<ArgError> for Error {
-  fn from(value: ArgError) -> Self {
-    Self::ArgError(value)
+impl From<PatternArgError> for Error {
+  fn from(value: PatternArgError) -> Self {
+    Self::PatternArgError(value)
   }
 }
 
