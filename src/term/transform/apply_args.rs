@@ -6,17 +6,11 @@ use crate::{
 };
 
 #[derive(Clone, Debug)]
-pub enum ArgError {
-  PatternArgError,
-  ArityArgError { expected: usize, got: usize },
-}
+pub struct PatternArgError(Pattern);
 
-impl Display for ArgError {
+impl Display for PatternArgError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      ArgError::PatternArgError => write!(f, ""),
-      ArgError::ArityArgError { expected, got } => write!(f, "Expected {expected} arguments, got {got}."),
-    }
+    write!(f, "Expected a variable pattern, found '{}'.", self.0)
   }
 }
 
@@ -37,17 +31,13 @@ impl Ctx<'_> {
     if let Some(entrypoint) = &self.book.entrypoint {
       let main_def = &mut self.book.defs[entrypoint];
 
-      if !main_def.rules[0].pats.iter().all(|pat| matches!(pat, Pattern::Var(Some(..)))) {
-        self.info.def_error(entrypoint.clone(), ArgError::PatternArgError);
+      for pat in &main_def.rules[0].pats {
+        if !matches!(pat, Pattern::Var(Some(..))) {
+          self.info.def_error(entrypoint.clone(), PatternArgError(pat.clone()));
+        }
       }
 
       if let Some(args) = args {
-        let expected = main_def.rules[0].pats.len();
-        let got = args.len();
-        if expected != got {
-          self.info.error(ArgError::ArityArgError { expected, got });
-        }
-
         main_def.convert_match_def_to_term();
         let main_body = &mut self.book.defs[entrypoint].rule_mut().body;
 
