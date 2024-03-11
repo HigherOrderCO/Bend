@@ -23,6 +23,10 @@ use std::{
 use stdext::function_name;
 use walkdir::WalkDir;
 
+fn format_output(output: std::process::Output) -> String {
+  format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout))
+}
+
 fn do_parse_term(code: &str) -> Result<Term, String> {
   parse_term(code).map_err(|errs| errs.into_iter().map(|e| e.to_string()).join("\n"))
 }
@@ -44,7 +48,12 @@ fn run_single_golden_test(
   let file_path = format!("{}{}", &TESTS_PATH[1 ..], file_name);
   let file_path = Path::new(&file_path);
 
-  let results = run.iter().map(|x| x(&code, file_path).unwrap_or_else(|err| err.to_string()));
+  let mut results: HashMap<&Path, Vec<String>> = HashMap::new();
+  for fun in run {
+    let result = fun(&code, file_path).unwrap_or_else(|err| err.to_string());
+    results.entry(file_path).or_default().push(result);
+  }
+  let results = results.into_values().map(|v| v.join("\n")).collect_vec();
 
   let mut settings = insta::Settings::clone_current();
   settings.set_prepend_module_to_snapshot(false);
@@ -141,19 +150,21 @@ fn linear_readback() {
 #[test]
 fn run_file() {
   run_golden_test_dir_multiple(function_name!(), &[
-    (&|code, path| {
-      let book = do_parse_book(code, path)?;
-      // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-      let (res, info) =
-        run_book(book, 1 << 24, RunOpts::lazy(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
-      Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+    (&|_code, path| {
+      let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
+        .args(["run", path.to_str().unwrap(), "-Dall", "-Oall", "-L"])
+        .output()
+        .expect("Run process");
+
+      Ok(format!("Lazy mode:\n{}", format_output(output)))
     }),
-    (&|code, path| {
-      let book = do_parse_book(code, path)?;
-      // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-      let (res, info) =
-        run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
-      Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+    (&|_code, path| {
+      let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
+        .args(["run", path.to_str().unwrap(), "-Dall", "-Oall"])
+        .output()
+        .expect("Run process");
+
+      Ok(format!("Strict mode:\n{}", format_output(output)))
     }),
   ])
 }
@@ -319,8 +330,8 @@ fn cli() {
     let args = args_buf.lines();
 
     let output =
-      std::process::Command::new("cargo").arg("run").arg("-q").args(args).output().expect("Run process");
+      std::process::Command::new(env!("CARGO_BIN_EXE_hvml")).args(args).output().expect("Run command");
 
-    Ok(format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout)))
+    Ok(format_output(output))
   })
 }

@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/str_backtick.hvm
 ---
+Lazy mode:
+
+"abc369*`asdf\"asdf"
+
+Strict mode:
+
 "abc369*`asdf\"asdf"

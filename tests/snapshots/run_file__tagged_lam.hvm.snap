@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/tagged_lam.hvm
 ---
+Lazy mode:
+
+(3, 4)
+
+Strict mode:
+
 (3, 4)

@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/exp.hvm
 ---
+Lazy mode:
+
+λa λb (a (a (a (a b))))
+
+Strict mode:
+
 λa λb (a (a (a (a b))))

@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/unaplied_str.hvm
 ---
+Lazy mode:
+
+λa λb (String.cons a (String.cons 98 (String.cons 99 (String.cons b String.nil))))
+
+Strict mode:
+
 λa λb (String.cons a (String.cons 98 (String.cons 99 (String.cons b String.nil))))

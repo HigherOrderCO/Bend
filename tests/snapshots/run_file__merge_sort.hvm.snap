@@ -2,4 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/merge_sort.hvm
 ---
+Lazy mode:
+
+120
+
+Strict mode:
+
 120

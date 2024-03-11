@@ -2,4 +2,12 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/print.hvm
 ---
+Lazy mode:
+
+hello world
+"goodbye world"
+
+Strict mode:
+
+hello world
 "goodbye world"
