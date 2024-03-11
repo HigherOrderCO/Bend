@@ -1,7 +1,7 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
 
-use diagnostics::{Info, WarningType, Warnings};
+use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity};
 use hvmc::{
   ast::{self, Net},
   dispatch_dyn_net,
@@ -16,10 +16,7 @@ use std::{
   sync::{Arc, Mutex},
   time::Instant,
 };
-use term::{
-  book_to_nets, display::display_readback_errors, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding,
-  Book, Ctx, ReadbackError, Term,
-};
+use term::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding, Book, Ctx, Term};
 
 pub mod diagnostics;
 pub mod hvmc_net;
@@ -52,7 +49,8 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
         let tree = host.readback_tree(&wire);
         let net = hvmc::ast::Net { root: tree, redexes: vec![] };
         let (term, errs) = readback_hvmc(&net, &book, &labels, false, adt_encoding);
-        println!("{}{}", display_readback_errors(&errs), term);
+        eprint!("{errs}");
+        println!("{term}");
       }
     }))),
   );
@@ -79,37 +77,42 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
   host
 }
 
-pub fn check_book(book: &mut Book) -> Result<(), Info> {
+pub fn check_book(book: &mut Book) -> Result<(), Diagnostics> {
   // TODO: Do the checks without having to do full compilation
-  // TODO: Shouldn't the check mode show warnings?
-  compile_book(book, true, CompileOpts::light(), None)?;
+  let res = compile_book(book, CompileOpts::light(), DiagnosticsConfig::new(Severity::Warning, false), None)?;
+  print!("{}", res.diagnostics);
   Ok(())
 }
 
 pub fn compile_book(
   book: &mut Book,
-  lazy_mode: bool,
   opts: CompileOpts,
+  diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
-) -> Result<CompileResult, Info> {
-  let warns = desugar_book(book, opts, args)?;
+) -> Result<CompileResult, Diagnostics> {
+  let mut diagnostics = desugar_book(book, opts, diagnostics_cfg, args)?;
   let (nets, labels) = book_to_nets(book);
 
-  let mut core_book = nets_to_hvmc(nets)?;
+  let mut core_book = nets_to_hvmc(nets, &mut diagnostics)?;
+
   if opts.pre_reduce {
     core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), 1 << 24, 100_000)?;
   }
   if opts.prune {
     prune_defs(&mut core_book, book.hvmc_entrypoint().to_string());
   }
-  if !lazy_mode {
-    mutual_recursion::check_cycles(&core_book)?;
-  }
-  Ok(CompileResult { core_book, labels, warns })
+  mutual_recursion::check_cycles(&core_book, &mut diagnostics)?;
+
+  Ok(CompileResult { core_book, labels, diagnostics })
 }
 
-pub fn desugar_book(book: &mut Book, opts: CompileOpts, args: Option<Vec<Term>>) -> Result<Warnings, Info> {
-  let mut ctx = Ctx::new(book);
+pub fn desugar_book(
+  book: &mut Book,
+  opts: CompileOpts,
+  diagnostics_cfg: DiagnosticsConfig,
+  args: Option<Vec<Term>>,
+) -> Result<Diagnostics, Diagnostics> {
+  let mut ctx = Ctx::new(book, diagnostics_cfg);
 
   ctx.check_shared_names();
   ctx.set_entrypoint();
@@ -136,7 +139,7 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts, args: Option<Vec<Term>>)
   ctx.simplify_matches()?;
 
   if opts.linearize_matches.enabled() {
-    ctx.linearize_simple_matches(opts.linearize_matches.is_extra())?;
+    ctx.book.linearize_simple_matches(opts.linearize_matches.is_extra());
   }
 
   ctx.book.encode_simple_matches(opts.adt_encoding);
@@ -173,19 +176,24 @@ pub fn desugar_book(book: &mut Book, opts: CompileOpts, args: Option<Vec<Term>>)
     ctx.book.merge_definitions();
   }
 
-  if !ctx.info.has_errors() { Ok(ctx.info.warns) } else { Err(ctx.info) }
+  if !ctx.info.has_errors() { Ok(ctx.info) } else { Err(ctx.info) }
 }
 
 pub fn run_book(
   mut book: Book,
-  mem_size: usize,
+  max_memory: usize,
   run_opts: RunOpts,
-  warning_opts: WarningOpts,
   compile_opts: CompileOpts,
+  diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
-) -> Result<(Term, RunInfo), Info> {
-  let CompileResult { core_book, labels, warns } =
-    compile_book(&mut book, run_opts.lazy_mode, compile_opts, args)?;
+) -> Result<(Term, RunInfo), Diagnostics> {
+  let CompileResult { core_book, labels, diagnostics } =
+    compile_book(&mut book, compile_opts, diagnostics_cfg, args)?;
+
+  // TODO: Printing should be taken care by the cli module, but we'd
+  // like to print any warnings before running so that the user can
+  // cancel the run if a problem is detected.
+  eprint!("{diagnostics}");
 
   // Turn the book into an Arc so that we can use it for logging, debugging, etc.
   // from anywhere else in the program
@@ -193,19 +201,17 @@ pub fn run_book(
   let book = Arc::new(book);
   let labels = Arc::new(labels);
 
-  display_warnings(warns, warning_opts)?;
-
   // Run
   let debug_hook = run_opts.debug_hook(&book, &labels);
   let host = create_host(book.clone(), labels.clone(), compile_opts.adt_encoding);
   host.lock().unwrap().insert_book(&core_book);
 
-  let (res_lnet, stats) = run_compiled(host, mem_size, run_opts, debug_hook, book.hvmc_entrypoint());
+  let (res_lnet, stats) = run_compiled(host, max_memory, run_opts, debug_hook, book.hvmc_entrypoint());
 
-  let (res_term, readback_errors) =
+  let (res_term, diagnostics) =
     readback_hvmc(&res_lnet, &book, &labels, run_opts.linear, compile_opts.adt_encoding);
 
-  let info = RunInfo { stats, readback_errors, net: res_lnet, book, labels };
+  let info = RunInfo { stats, diagnostics, net: res_lnet, book, labels };
   Ok((res_term, info))
 }
 
@@ -252,7 +258,7 @@ pub fn run_compiled(
 ) -> (Net, RunStats) {
   let heap = Heap::new_bytes(mem_size);
   let mut root = DynNet::new(&heap, run_opts.lazy_mode);
-  let max_rwts = run_opts.max_rewrites.map(|x| x.clamp(usize::MIN as u64, usize::MAX as u64) as usize);
+  let max_rwts = run_opts.max_rewrites.map(|x| x.clamp(usize::MIN, usize::MAX));
   // Expect won't be reached because there's
   // a pass that checks this.
   dispatch_dyn_net!(&mut root => {
@@ -309,16 +315,19 @@ pub fn readback_hvmc(
   labels: &Arc<Labels>,
   linear: bool,
   adt_encoding: AdtEncoding,
-) -> (Term, Vec<ReadbackError>) {
+) -> (Term, Diagnostics) {
+  let mut diags = Diagnostics::default();
   let net = hvmc_to_net(net);
-  let (mut term, mut readback_errors) = net_to_term(&net, book, labels, linear);
+  let mut term = net_to_term(&net, book, labels, linear, &mut diags);
 
   let resugar_errs = term.resugar_adts(book, adt_encoding);
   term.resugar_builtins();
 
-  readback_errors.extend(resugar_errs);
+  for err in resugar_errs {
+    diags.add_diagnostic(err, Severity::Warning, DiagnosticOrigin::Readback);
+  }
 
-  (term, readback_errors)
+  (term, diags)
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -327,8 +336,8 @@ pub struct RunOpts {
   pub debug: bool,
   pub linear: bool,
   pub lazy_mode: bool,
-  pub max_memory: u64,
-  pub max_rewrites: Option<u64>,
+  pub max_memory: usize,
+  pub max_rewrites: Option<usize>,
 }
 
 impl RunOpts {
@@ -340,8 +349,10 @@ impl RunOpts {
     self.debug.then_some({
       |net: &_| {
         let net = hvmc_to_net(net);
-        let (res_term, errors) = net_to_term(&net, book, labels, self.linear);
-        println!("{}{}\n---------------------------------------", display_readback_errors(&errors), res_term,)
+        let mut diags = Diagnostics::default();
+        let res_term = net_to_term(&net, book, labels, self.linear, &mut diags);
+        eprint!("{diags}");
+        println!("{}\n---------------------------------------", res_term);
       }
     })
   }
@@ -457,101 +468,15 @@ impl CompileOpts {
   }
 }
 
-#[derive(Default, Clone, Copy)]
-pub struct WarningOpts {
-  pub match_only_vars: WarnState,
-  pub unused_defs: WarnState,
-  pub repeated_bind: WarnState,
-}
-
-#[derive(Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum WarnState {
-  #[default]
-  Warn,
-  Allow,
-  Deny,
-}
-
-impl WarningOpts {
-  pub fn allow_all() -> Self {
-    Self { match_only_vars: WarnState::Allow, unused_defs: WarnState::Allow, repeated_bind: WarnState::Allow }
-  }
-
-  pub fn deny_all() -> Self {
-    Self { match_only_vars: WarnState::Deny, unused_defs: WarnState::Deny, repeated_bind: WarnState::Deny }
-  }
-
-  pub fn warn_all() -> Self {
-    Self { match_only_vars: WarnState::Warn, unused_defs: WarnState::Warn, repeated_bind: WarnState::Warn }
-  }
-
-  /// Split warnings into two based on its Warn or Deny WarnState.
-  pub fn split(&self, warns: Warnings) -> (Warnings, Warnings) {
-    let mut warn = Warnings::default();
-    let mut deny = Warnings::default();
-
-    warns
-      .0
-      .into_iter()
-      .flat_map(|(def, warns)| warns.into_iter().map(move |warn| (def.clone(), warn)))
-      .for_each(|(def, w)| {
-        let ws = match w {
-          WarningType::MatchOnlyVars => self.match_only_vars,
-          WarningType::UnusedDefinition => self.unused_defs,
-          WarningType::RepeatedBind(_) => self.repeated_bind,
-        };
-
-        match ws {
-          WarnState::Allow => {}
-          WarnState::Warn => warn.0.entry(def).or_default().push(w),
-          WarnState::Deny => deny.0.entry(def).or_default().push(w),
-        };
-      });
-
-    (warn, deny)
-  }
-}
-
-/// Either just prints warnings or returns Err when any denied was produced.
-pub fn display_warnings(warnings: Warnings, warning_opts: WarningOpts) -> Result<(), String> {
-  let (warns, denies) = warning_opts.split(warnings);
-
-  if !warns.0.is_empty() {
-    eprintln!("Warnings:\n{}", warns);
-  }
-
-  if !denies.0.is_empty() {
-    return Err(format!("{denies}\nCould not run the code because of the previous warnings."));
-  }
-
-  Ok(())
-}
-
 pub struct CompileResult {
-  pub warns: Warnings,
+  pub diagnostics: Diagnostics,
   pub core_book: hvmc::ast::Book,
   pub labels: Labels,
 }
 
-impl std::fmt::Debug for CompileResult {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    if !self.warns.0.is_empty() {
-      writeln!(f, "// Warnings:\n{}", self.warns)?;
-    }
-    write!(f, "{}", self.core_book)
-  }
-}
-
-impl CompileResult {
-  pub fn display_with_warns(self, opts: WarningOpts) -> Result<String, String> {
-    display_warnings(self.warns, opts)?;
-    Ok(self.core_book.to_string())
-  }
-}
-
 pub struct RunInfo {
   pub stats: RunStats,
-  pub readback_errors: Vec<ReadbackError>,
+  pub diagnostics: Diagnostics,
   pub net: Net,
   pub book: Arc<Book>,
   pub labels: Arc<Labels>,

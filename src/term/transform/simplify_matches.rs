@@ -1,22 +1,27 @@
-use indexmap::IndexSet;
-use itertools::Itertools;
-
 use crate::{
-  diagnostics::Info,
+  diagnostics::{Diagnostics, ToStringVerbose, ERR_INDENT_SIZE},
   term::{
-    check::type_check::infer_match_arg_type,
-    transform::encode_pattern_matching::{ExhaustivenessErr, MatchErr},
+    check::type_check::{infer_match_arg_type, TypeMismatchErr},
+    display::{DisplayFn, DisplayJoin},
     Adts, Constructors, Ctx, Definition, Name, NumCtr, Pattern, Rule, Term, Type,
   },
 };
+use indexmap::IndexSet;
+use itertools::Itertools;
+
+pub enum SimplifyMatchErr {
+  NotExhaustive(Vec<Name>),
+  TypeMismatch(TypeMismatchErr),
+  MalformedNumSucc(Pattern, Pattern),
+}
 
 impl Ctx<'_> {
-  pub fn simplify_matches(&mut self) -> Result<(), Info> {
+  pub fn simplify_matches(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
     for (def_name, def) in self.book.defs.iter_mut() {
       let res = def.simplify_matches(&self.book.ctrs, &self.book.adts);
-      self.info.take_err(res, Some(def_name));
+      self.info.take_rule_err(res, def_name.clone());
     }
 
     self.info.fatal(())
@@ -24,7 +29,7 @@ impl Ctx<'_> {
 }
 
 impl Definition {
-  pub fn simplify_matches(&mut self, ctrs: &Constructors, adts: &Adts) -> Result<(), MatchErr> {
+  pub fn simplify_matches(&mut self, ctrs: &Constructors, adts: &Adts) -> Result<(), SimplifyMatchErr> {
     for rule in self.rules.iter_mut() {
       rule.body.simplify_matches(ctrs, adts)?;
     }
@@ -38,7 +43,7 @@ impl Term {
   /// simple (non-nested) patterns, and one rule for each constructor.
   ///
   /// See `[simplify_match_expression]` for more information.
-  pub fn simplify_matches(&mut self, ctrs: &Constructors, adts: &Adts) -> Result<(), MatchErr> {
+  pub fn simplify_matches(&mut self, ctrs: &Constructors, adts: &Adts) -> Result<(), SimplifyMatchErr> {
     Term::recursive_call(move || {
       match self {
         Term::Mat { args, rules } => {
@@ -87,7 +92,7 @@ fn simplify_match_expression(
   rules: Vec<Rule>,
   ctrs: &Constructors,
   adts: &Adts,
-) -> Result<Term, MatchErr> {
+) -> Result<Term, SimplifyMatchErr> {
   let fst_row_irrefutable = rules[0].pats.iter().all(|p| p.is_wildcard());
   let fst_col_type = infer_match_arg_type(&rules, 0, ctrs)?;
 
@@ -108,7 +113,7 @@ fn irrefutable_fst_row_rule(
   mut rules: Vec<Rule>,
   ctrs: &Constructors,
   adts: &Adts,
-) -> Result<Term, MatchErr> {
+) -> Result<Term, SimplifyMatchErr> {
   rules.truncate(1);
 
   let Rule { pats, body: mut term } = rules.pop().unwrap();
@@ -132,7 +137,7 @@ fn var_rule(
   rules: Vec<Rule>,
   ctrs: &Constructors,
   adts: &Adts,
-) -> Result<Term, MatchErr> {
+) -> Result<Term, SimplifyMatchErr> {
   let mut new_rules = vec![];
   for mut rule in rules {
     let rest = rule.pats.split_off(1);
@@ -201,7 +206,7 @@ fn switch_rule(
   typ: Type,
   ctrs: &Constructors,
   adts: &Adts,
-) -> Result<Term, MatchErr> {
+) -> Result<Term, SimplifyMatchErr> {
   let mut new_rules = vec![];
 
   let adt_ctrs = match typ {
@@ -225,7 +230,7 @@ fn switch_rule(
     Type::Num => {
       // Number match without + must have a default case
       if !rules.iter().any(|r| r.pats[0].is_wildcard()) {
-        return Err(MatchErr::NotExhaustive(ExhaustivenessErr(vec![Name::from("+")])));
+        return Err(SimplifyMatchErr::NotExhaustive(vec![Name::from("+")]));
       }
     }
     Type::NumSucc(exp) => {
@@ -235,7 +240,7 @@ fn switch_rule(
         if let Pattern::Num(NumCtr::Num(got)) = rule.pats[0]
           && got >= exp
         {
-          return Err(MatchErr::MalformedNumSucc(
+          return Err(SimplifyMatchErr::MalformedNumSucc(
             rule.pats[0].clone(),
             Pattern::Num(NumCtr::Succ(exp, None)),
           ));
@@ -291,7 +296,7 @@ fn switch_rule_submatch(
   rules: &[Rule],
   ctr: &Pattern,
   nested_fields: &[Option<Name>],
-) -> Result<Term, MatchErr> {
+) -> Result<Term, SimplifyMatchErr> {
   // Create the nested match expression.
   let new_args = nested_fields.iter().cloned().map(Term::var_or_era);
   let old_args = args[1 ..].iter().cloned();
@@ -304,7 +309,7 @@ fn switch_rule_submatch(
 
   if rules.is_empty() {
     // TODO: Return the full pattern
-    return Err(MatchErr::NotExhaustive(ExhaustivenessErr(vec![ctr.ctr_name().unwrap()])));
+    return Err(SimplifyMatchErr::NotExhaustive(vec![ctr.ctr_name().unwrap()]));
   }
 
   let mat = Term::Mat { args, rules };
@@ -383,4 +388,53 @@ fn bind_extracted_args(extracted: Vec<(Name, Term)>, term: Term) -> Term {
     val: Box::new(val),
     nxt: Box::new(term),
   })
+}
+
+const PATTERN_ERROR_LIMIT: usize = 5;
+const ERROR_LIMIT_HINT: &str = "Use the --verbose option to see all cases.";
+
+impl SimplifyMatchErr {
+  pub fn display(&self, verbose: bool) -> impl std::fmt::Display + '_ {
+    let limit = if verbose { usize::MAX } else { PATTERN_ERROR_LIMIT };
+    DisplayFn(move |f| match self {
+      SimplifyMatchErr::NotExhaustive(cases) => {
+        let ident = ERR_INDENT_SIZE * 2;
+        let hints = DisplayJoin(
+          || {
+            cases
+              .iter()
+              .take(limit)
+              .map(|pat| DisplayFn(move |f| write!(f, "{:ident$}Case '{pat}' not covered.", "")))
+          },
+          "\n",
+        );
+        write!(f, "Non-exhaustive pattern matching. Hint:\n{}", hints)?;
+
+        let len = cases.len();
+        if len > limit {
+          write!(f, " ... and {} others.\n{:ident$}{}", len - limit, "", ERROR_LIMIT_HINT)?;
+        }
+
+        Ok(())
+      }
+      SimplifyMatchErr::TypeMismatch(err) => {
+        write!(f, "{}", err.to_string_verbose(verbose))
+      }
+      SimplifyMatchErr::MalformedNumSucc(got, exp) => {
+        write!(f, "Expected a sequence of incrementing numbers ending with '{exp}', found '{got}'.")
+      }
+    })
+  }
+}
+
+impl ToStringVerbose for SimplifyMatchErr {
+  fn to_string_verbose(&self, verbose: bool) -> String {
+    format!("{}", self.display(verbose))
+  }
+}
+
+impl From<TypeMismatchErr> for SimplifyMatchErr {
+  fn from(value: TypeMismatchErr) -> Self {
+    SimplifyMatchErr::TypeMismatch(value)
+  }
 }

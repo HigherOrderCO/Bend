@@ -1,5 +1,9 @@
 use self::{check::type_check::infer_match_arg_type, parser::lexer::STRINGS};
-use crate::{diagnostics::Info, term::builtins::*, ENTRY_POINT};
+use crate::{
+  diagnostics::{Diagnostics, DiagnosticsConfig},
+  term::builtins::*,
+  ENTRY_POINT,
+};
 use indexmap::{IndexMap, IndexSet};
 use interner::global::GlobalString;
 use itertools::Itertools;
@@ -24,12 +28,12 @@ pub use term_to_net::{book_to_nets, term_to_compat_net};
 #[derive(Debug)]
 pub struct Ctx<'book> {
   pub book: &'book mut Book,
-  pub info: Info,
+  pub info: Diagnostics,
 }
 
 impl Ctx<'_> {
-  pub fn new(book: &mut Book) -> Ctx {
-    Ctx { book, info: Info::default() }
+  pub fn new(book: &mut Book, diagnostics_cfg: DiagnosticsConfig) -> Ctx {
+    Ctx { book, info: Diagnostics::new(diagnostics_cfg) }
   }
 }
 

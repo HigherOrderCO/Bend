@@ -3,13 +3,12 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/unscoped_never_used.hvm
 ---
 Lazy mode:
-
+Errors:
 In definition 'main':
   Unscoped variable from lambda 'λ$x' is never used.
 
 
-
 Strict mode:
-
+Errors:
 In definition 'main':
   Unscoped variable from lambda 'λ$x' is never used.

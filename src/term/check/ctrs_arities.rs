@@ -1,16 +1,22 @@
 use std::collections::HashMap;
 
 use crate::{
-  diagnostics::Info,
-  term::{transform::encode_pattern_matching::MatchErr, Book, Ctx, Name, Pattern, Term},
+  diagnostics::{Diagnostics, ToStringVerbose},
+  term::{Book, Ctx, Name, Pattern, Term},
 };
 
+pub struct CtrArityMismatchErr {
+  ctr_name: Name,
+  expected: usize,
+  found: usize,
+}
+
 impl Ctx<'_> {
-  /// Checks if every constructor pattern of every definition rule has the same arity from the
-  /// defined adt constructor.
+  /// Checks if every constructor pattern of every definition rule
+  /// has the same arity from the defined adt constructor.
   ///
   /// Constructors should be already resolved.
-  pub fn check_ctrs_arities(&mut self) -> Result<(), Info> {
+  pub fn check_ctrs_arities(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
     let arities = self.book.ctr_arities();
@@ -18,10 +24,10 @@ impl Ctx<'_> {
       for rule in def.rules.iter() {
         for pat in rule.pats.iter() {
           let res = pat.check_ctrs_arities(&arities);
-          self.info.take_err(res, Some(def_name));
+          self.info.take_rule_err(res, def_name.clone());
         }
         let res = rule.body.check_ctrs_arities(&arities);
-        self.info.take_err(res, Some(def_name));
+        self.info.take_rule_err(res, def_name.clone());
       }
     }
 
@@ -45,15 +51,15 @@ impl Book {
 }
 
 impl Pattern {
-  fn check_ctrs_arities(&self, arities: &HashMap<Name, usize>) -> Result<(), MatchErr> {
+  fn check_ctrs_arities(&self, arities: &HashMap<Name, usize>) -> Result<(), CtrArityMismatchErr> {
     let mut to_check = vec![self];
 
     while let Some(pat) = to_check.pop() {
-      if let Pattern::Ctr(name, args) = pat {
-        let expected = arities.get(name).unwrap();
+      if let Pattern::Ctr(ctr_name, args) = pat {
+        let expected = arities.get(ctr_name).unwrap();
         let found = args.len();
         if *expected != found {
-          return Err(MatchErr::CtrArityMismatch(name.clone(), found, *expected));
+          return Err(CtrArityMismatchErr { ctr_name: ctr_name.clone(), found, expected: *expected });
         }
       }
       for child in pat.children() {
@@ -65,7 +71,7 @@ impl Pattern {
 }
 
 impl Term {
-  pub fn check_ctrs_arities(&self, arities: &HashMap<Name, usize>) -> Result<(), MatchErr> {
+  pub fn check_ctrs_arities(&self, arities: &HashMap<Name, usize>) -> Result<(), CtrArityMismatchErr> {
     Term::recursive_call(move || {
       for pat in self.patterns() {
         pat.check_ctrs_arities(arities)?;
@@ -75,5 +81,14 @@ impl Term {
       }
       Ok(())
     })
+  }
+}
+
+impl ToStringVerbose for CtrArityMismatchErr {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    format!(
+      "Constructor arity mismatch in pattern matching. Constructor '{}' expects {} fields, found {}.",
+      self.ctr_name, self.expected, self.found
+    )
   }
 }

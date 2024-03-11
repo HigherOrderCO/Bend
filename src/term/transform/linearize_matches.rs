@@ -1,39 +1,28 @@
-use super::encode_pattern_matching::MatchErr;
-use crate::{
-  diagnostics::Info,
-  term::{Ctx, Name, Term},
-};
+use crate::term::{Book, Name, Term};
 use itertools::Itertools;
 use std::collections::{BTreeMap, BTreeSet};
 
-impl Ctx<'_> {
+impl Book {
   /// Linearizes the variables between match cases, transforming them into combinators when possible.
-  pub fn linearize_simple_matches(&mut self, lift_all_vars: bool) -> Result<(), Info> {
-    self.info.start_pass();
-
-    for (def_name, def) in self.book.defs.iter_mut() {
+  pub fn linearize_simple_matches(&mut self, lift_all_vars: bool) {
+    for def in self.defs.values_mut() {
       for rule in def.rules.iter_mut() {
-        let res = rule.body.linearize_simple_matches(lift_all_vars);
-        self.info.take_err(res, Some(def_name));
+        rule.body.linearize_simple_matches(lift_all_vars);
       }
     }
-
-    self.info.fatal(())
   }
 }
 
 impl Term {
-  fn linearize_simple_matches(&mut self, lift_all_vars: bool) -> Result<(), MatchErr> {
+  fn linearize_simple_matches(&mut self, lift_all_vars: bool) {
     Term::recursive_call(move || {
       for child in self.children_mut() {
-        child.linearize_simple_matches(lift_all_vars)?;
+        child.linearize_simple_matches(lift_all_vars);
       }
 
       if let Term::Mat { .. } = self {
         lift_match_vars(self, lift_all_vars);
       }
-
-      Ok(())
     })
   }
 }

@@ -1,11 +1,12 @@
-use std::collections::{hash_map::Entry, HashMap};
-
 use crate::{
-  diagnostics::WarningType,
+  diagnostics::{ToStringVerbose, WarningType},
   term::{Adt, AdtEncoding, Book, Ctx, Name, Tag, Term, LIST, STRING},
   CORE_BUILTINS,
 };
 use indexmap::IndexSet;
+use std::collections::{hash_map::Entry, HashMap};
+
+struct UnusedDefinitionWarning;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Used {
@@ -72,7 +73,7 @@ impl Ctx<'_> {
       if prune_all || def.builtin {
         self.book.defs.swap_remove(&def_name);
       } else if !def_name.is_generated() {
-        self.info.warning(def_name.clone(), WarningType::UnusedDefinition);
+        self.info.add_rule_warning(UnusedDefinitionWarning, WarningType::UnusedDefinition, def_name);
       }
     }
   }
@@ -151,5 +152,11 @@ impl Book {
         self.insert_used(ctr, Used::Adt, uses, adt_encoding);
       }
     }
+  }
+}
+
+impl ToStringVerbose for UnusedDefinitionWarning {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    "Definition is unused.".to_string()
   }
 }

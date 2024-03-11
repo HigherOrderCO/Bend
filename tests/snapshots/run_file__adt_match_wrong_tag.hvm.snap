@@ -3,15 +3,17 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/adt_match_wrong_tag.hvm
 ---
 Lazy mode:
+Warnings:
+During readback:
+  Unexpected tag found during Adt readback, expected '#Option', but found '#wrong_tag'.
+  Invalid Adt Match.
 
-Readback Warning:
-Unexpected tag found during Adt readback, expected '#Option', but found '#wrong_tag'
-Invalid Adt Match
 λa match a { (Some Some.val): #Option (#wrong_tag λb b Some.val); (None): * }
 
 Strict mode:
+Warnings:
+During readback:
+  Unexpected tag found during Adt readback, expected '#Option', but found '#wrong_tag'.
+  Invalid Adt Match.
 
-Readback Warning:
-Unexpected tag found during Adt readback, expected '#Option', but found '#wrong_tag'
-Invalid Adt Match
 λa match a { (Some Some.val): #Option (#wrong_tag λb b Some.val); (None): * }

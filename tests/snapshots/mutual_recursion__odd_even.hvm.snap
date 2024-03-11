@@ -2,7 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/mutual_recursion/odd_even.hvm
 ---
+Errors:
 Mutual recursion cycle detected in compiled functions:
-Cycle 1: isEven -> isOdd -> isEven
-This program will expand infinitely in strict evaluation mode.
-Read https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md for more information.
+  Cycle 1: isEven -> isOdd -> isEven
+  This program will expand infinitely in strict evaluation mode.
+  Read https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md for more information.

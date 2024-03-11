@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/wrong_string.hvm
 ---
 Lazy mode:
-
 (String.cons (*, 4) (String.cons * String.nil))
 
 Strict mode:
-
 (String.cons (*, 4) (String.cons * String.nil))

@@ -1,20 +1,19 @@
 use hvml::{
   compile_book, desugar_book,
-  diagnostics::Info,
+  diagnostics::{Diagnostics, DiagnosticsConfig, Severity, ToStringVerbose},
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
   term::{
-    display::display_readback_errors, load_book::do_parse_book, net_to_term::net_to_term, parser::parse_term,
-    term_to_compat_net, term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term,
+    load_book::do_parse_book, net_to_term::net_to_term, parser::parse_term, term_to_compat_net,
+    term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term,
   },
-  CompileOpts, RunOpts, WarningOpts,
+  CompileOpts, RunOpts,
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
 use std::{
   collections::HashMap,
   fmt::Write,
-  fs,
   io::Read,
   path::{Path, PathBuf},
   str::FromStr,
@@ -24,7 +23,7 @@ use stdext::function_name;
 use walkdir::WalkDir;
 
 fn format_output(output: std::process::Output) -> String {
-  format!("{}\n{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout))
+  format!("{}{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout))
 }
 
 fn do_parse_term(code: &str) -> Result<Term, String> {
@@ -39,9 +38,9 @@ const TESTS_PATH: &str = "/tests/golden_tests/";
 
 fn run_single_golden_test(
   path: &Path,
-  run: &[&dyn Fn(&str, &Path) -> Result<String, Info>],
+  run: &[&dyn Fn(&str, &Path) -> Result<String, Diagnostics>],
 ) -> Result<(), String> {
-  let code = fs::read_to_string(path).map_err(|e| e.to_string())?;
+  let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
   let file_name = path.to_str().and_then(|path| path.rsplit_once(TESTS_PATH)).unwrap().1;
 
   // unfortunately we need to do this
@@ -69,11 +68,14 @@ fn run_single_golden_test(
   Ok(())
 }
 
-fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str, &Path) -> Result<String, Info>) {
+fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str, &Path) -> Result<String, Diagnostics>) {
   run_golden_test_dir_multiple(test_name, &[run])
 }
 
-fn run_golden_test_dir_multiple(test_name: &str, run: &[&dyn Fn(&str, &Path) -> Result<String, Info>]) {
+fn run_golden_test_dir_multiple(
+  test_name: &str,
+  run: &[&dyn Fn(&str, &Path) -> Result<String, Diagnostics>],
+) {
   let root = PathBuf::from(format!(
     "{}{TESTS_PATH}{}",
     env!("CARGO_MANIFEST_DIR"),
@@ -103,13 +105,13 @@ fn compile_term() {
     term.check_unbound_vars(&mut HashMap::new(), &mut vec);
 
     if !vec.is_empty() {
-      return Err(vec.into_iter().join("\n").into());
+      return Err(vec.into_iter().map(|e| e.to_string_verbose(true)).join("\n").into());
     }
 
     term.make_var_names_unique();
     term.linearize_vars();
     let compat_net = term_to_compat_net(&term, &mut Default::default());
-    let net = net_to_hvmc(&compat_net)?;
+    let net = net_to_hvmc(&compat_net).map_err(|e| e.to_string_verbose(true))?;
 
     Ok(format!("{}", net))
   })
@@ -118,33 +120,36 @@ fn compile_term() {
 #[test]
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Warning, true);
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, true /*ignore check_cycles*/, CompileOpts::heavy(), None)?;
-    Ok(format!("{:?}", compiled))
+    let res = compile_book(&mut book, CompileOpts::heavy(), diagnostics_cfg, None)?;
+    Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
 #[test]
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Warning, true);
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, true /*ignore check_cycles*/, CompileOpts::light(), None)?;
-    Ok(format!("{:?}", compiled))
+    let res = compile_book(&mut book, CompileOpts::light(), diagnostics_cfg, None)?;
+    Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
 
 #[test]
 fn linear_readback() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let book = do_parse_book(code, path)?;
     let (res, info) = run_book(
       book,
       1 << 20,
       RunOpts { linear: true, ..Default::default() },
-      WarningOpts::deny_all(),
       CompileOpts::heavy(),
+      diagnostics_cfg,
       None,
     )?;
-    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+    Ok(format!("{}{}", info.diagnostics, res))
   });
 }
 #[test]
@@ -172,6 +177,10 @@ fn run_file() {
 #[test]
 fn run_lazy() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let diagnostics_cfg = DiagnosticsConfig {
+      mutual_recursion_cycle: Severity::Allow,
+      ..DiagnosticsConfig::new(Severity::Error, true)
+    };
     let book = do_parse_book(code, path)?;
 
     let mut desugar_opts = CompileOpts::heavy();
@@ -179,8 +188,8 @@ fn run_lazy() {
     desugar_opts.lazy_mode();
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, info) = run_book(book, 1 << 24, run_opts, WarningOpts::deny_all(), desugar_opts, None)?;
-    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+    let (res, info) = run_book(book, 1 << 24, run_opts, desugar_opts, diagnostics_cfg, None)?;
+    Ok(format!("{}{}", info.diagnostics, res))
   })
 }
 
@@ -190,16 +199,18 @@ fn readback_lnet() {
     let net = do_parse_net(code)?;
     let book = Book::default();
     let compat_net = hvmc_to_net(&net);
-    let (term, errors) = net_to_term(&compat_net, &book, &Labels::default(), false);
-    Ok(format!("{}{}", display_readback_errors(&errors), term))
+    let mut diags = Diagnostics::default();
+    let term = net_to_term(&compat_net, &book, &Labels::default(), false, &mut diags);
+    Ok(format!("{}{}", diags, term))
   })
 }
 
 #[test]
 fn simplify_matches() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let mut book = do_parse_book(code, path)?;
-    let mut ctx = Ctx::new(&mut book);
+    let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
     ctx.check_shared_names();
     ctx.set_entrypoint();
     ctx.book.encode_adts(AdtEncoding::TaggedScott);
@@ -214,7 +225,7 @@ fn simplify_matches() {
     ctx.check_ctrs_arities()?;
     ctx.check_unbound_vars()?;
     ctx.simplify_matches()?;
-    ctx.linearize_simple_matches(true)?;
+    ctx.book.linearize_simple_matches(true);
     ctx.check_unbound_vars()?;
     ctx.book.make_var_names_unique();
     ctx.book.linearize_vars();
@@ -236,8 +247,9 @@ fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut result = String::new();
     for adt_encoding in [AdtEncoding::TaggedScott, AdtEncoding::Scott] {
+      let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
       let mut book = do_parse_book(code, path)?;
-      let mut ctx = Ctx::new(&mut book);
+      let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
       ctx.check_shared_names();
       ctx.set_entrypoint();
       ctx.book.encode_adts(adt_encoding);
@@ -252,7 +264,7 @@ fn encode_pattern_match() {
       ctx.check_ctrs_arities()?;
       ctx.check_unbound_vars()?;
       ctx.simplify_matches()?;
-      ctx.linearize_simple_matches(true)?;
+      ctx.book.linearize_simple_matches(true);
       ctx.book.encode_simple_matches(adt_encoding);
       ctx.check_unbound_vars()?;
       ctx.book.make_var_names_unique();
@@ -269,8 +281,9 @@ fn encode_pattern_match() {
 #[test]
 fn desugar_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let mut book = do_parse_book(code, path)?;
-    desugar_book(&mut book, CompileOpts::light(), None)?;
+    desugar_book(&mut book, CompileOpts::light(), diagnostics_cfg, None)?;
     Ok(book.to_string())
   })
 }
@@ -281,40 +294,42 @@ fn hangs() {
   let expected_normalization_time = 5;
 
   run_golden_test_dir(function_name!(), &|code, path| {
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let book = do_parse_book(code, path)?;
 
     let lck = Arc::new(RwLock::new(false));
     let got = lck.clone();
     std::thread::spawn(move || {
-      let _ =
-        run_book(book, 1 << 20, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None);
+      let _ = run_book(book, 1 << 20, RunOpts::default(), CompileOpts::heavy(), diagnostics_cfg, None);
       *got.write().unwrap() = true;
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
 
-    if !*lck.read().unwrap() { Ok("Hangs".into()) } else { Err("Doesn't hang".into()) }
+    if !*lck.read().unwrap() { Ok("Hangs".into()) } else { Err("Doesn't hang".to_string().into()) }
   })
 }
 
 #[test]
 fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::from("foo"));
-    let compiled = compile_book(&mut book, true /*ignore check_cycles*/, CompileOpts::light(), None)?;
-    Ok(format!("{:?}", compiled))
+    let res = compile_book(&mut book, CompileOpts::light(), diagnostics_cfg, None)?;
+    Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
 
 #[test]
 fn run_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::from("foo"));
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) =
-      run_book(book, 1 << 24, RunOpts::default(), WarningOpts::deny_all(), CompileOpts::heavy(), None)?;
-    Ok(format!("{}{}", display_readback_errors(&info.readback_errors), res))
+      run_book(book, 1 << 24, RunOpts::default(), CompileOpts::heavy(), diagnostics_cfg, None)?;
+    Ok(format!("{}{}", info.diagnostics, res))
   })
 }
 
@@ -325,7 +340,7 @@ fn cli() {
     assert!(args_path.set_extension("args"));
 
     let mut args_buf = String::with_capacity(16);
-    let mut args_file = fs::File::open(args_path).expect("File exists");
+    let mut args_file = std::fs::File::open(args_path).expect("File exists");
     args_file.read_to_string(&mut args_buf).expect("Read args");
     let args = args_buf.lines();
 
@@ -339,8 +354,12 @@ fn cli() {
 #[test]
 fn mutual_recursion() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let diagnostics_cfg = DiagnosticsConfig {
+      mutual_recursion_cycle: Severity::Error,
+      ..DiagnosticsConfig::new(Severity::Allow, true)
+    };
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, false, CompileOpts::light(), None)?;
-    Ok(format!("{:?}", compiled))
+    let res = compile_book(&mut book, CompileOpts::light(), diagnostics_cfg, None)?;
+    Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }

@@ -1,16 +1,4 @@
-use crate::term::{
-  check::{
-    repeated_bind::RepeatedBindWarn, set_entrypoint::EntryErr, shared_names::TopLevelErr,
-    unbound_pats::UnboundCtrErr, unbound_vars::UnboundVarErr,
-  },
-  display::DisplayFn,
-  transform::{
-    apply_args::PatternArgError, encode_pattern_matching::MatchErr, resolve_refs::ReferencedMainErr,
-    simplify_ref_to_ref::CyclicDefErr,
-  },
-  Name,
-};
-use itertools::Itertools;
+use crate::term::{display::DisplayFn, Name};
 use std::{
   collections::BTreeMap,
   fmt::{Display, Formatter},
@@ -19,40 +7,129 @@ use std::{
 pub const ERR_INDENT_SIZE: usize = 2;
 
 #[derive(Debug, Clone, Default)]
-pub struct Info {
+pub struct Diagnostics {
   err_counter: usize,
-  book_errs: Vec<Error>,
-  rule_errs: BTreeMap<Name, Vec<Error>>,
-  pub warns: Warnings,
+  pub diagnostics: BTreeMap<DiagnosticOrigin, Vec<Diagnostic>>,
+  config: DiagnosticsConfig,
 }
 
-impl Info {
-  pub fn error<E: Into<Error>>(&mut self, e: E) {
-    self.err_counter += 1;
-    self.book_errs.push(e.into())
+#[derive(Debug, Clone, Copy)]
+pub struct DiagnosticsConfig {
+  pub verbose: bool,
+  pub match_only_vars: Severity,
+  pub unused_definition: Severity,
+  pub repeated_bind: Severity,
+  pub mutual_recursion_cycle: Severity,
+}
+
+#[derive(Debug, Clone)]
+pub struct Diagnostic {
+  message: String,
+  severity: Severity,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum DiagnosticOrigin {
+  /// An error from the relationship between multiple top-level definitions.
+  Book,
+  /// An error in a pattern-matching function definition rule.
+  Rule(Name),
+  /// An error in a compiled inet.
+  Inet(String),
+  /// An error during readback of hvm-core run results.
+  Readback,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Severity {
+  Error,
+  Warning,
+  Allow,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum WarningType {
+  MatchOnlyVars,
+  UnusedDefinition,
+  RepeatedBind,
+  MutualRecursionCycle,
+}
+
+pub trait ToStringVerbose {
+  fn to_string_verbose(&self, verbose: bool) -> String;
+}
+
+impl Diagnostics {
+  pub fn new(config: DiagnosticsConfig) -> Self {
+    Self { err_counter: 0, diagnostics: Default::default(), config }
   }
 
-  pub fn def_error<E: Into<Error>>(&mut self, name: Name, e: E) {
+  pub fn add_book_error(&mut self, err: impl ToStringVerbose) {
     self.err_counter += 1;
-    let entry = self.rule_errs.entry(name).or_default();
-    entry.push(e.into());
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Book);
   }
 
-  pub fn take_err<T, E: Into<Error>>(&mut self, result: Result<T, E>, def_name: Option<&Name>) -> Option<T> {
+  pub fn add_rule_error(&mut self, err: impl ToStringVerbose, def_name: Name) {
+    self.err_counter += 1;
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Rule(def_name));
+  }
+
+  pub fn add_inet_error(&mut self, err: impl ToStringVerbose, def_name: String) {
+    self.err_counter += 1;
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Inet(def_name));
+  }
+
+  pub fn add_rule_warning(&mut self, warn: impl ToStringVerbose, warn_type: WarningType, def_name: Name) {
+    let severity = self.config.warning_severity(warn_type);
+    if severity == Severity::Error {
+      self.err_counter += 1;
+    }
+    self.add_diagnostic(warn, severity, DiagnosticOrigin::Rule(def_name));
+  }
+
+  pub fn add_book_warning(&mut self, warn: impl ToStringVerbose, warn_type: WarningType) {
+    let severity = self.config.warning_severity(warn_type);
+    if severity == Severity::Error {
+      self.err_counter += 1;
+    }
+    self.add_diagnostic(warn, severity, DiagnosticOrigin::Book);
+  }
+
+  pub fn add_diagnostic(&mut self, msg: impl ToStringVerbose, severity: Severity, orig: DiagnosticOrigin) {
+    let diag = Diagnostic { message: msg.to_string_verbose(self.config.verbose), severity };
+    self.diagnostics.entry(orig).or_default().push(diag)
+  }
+
+  pub fn take_rule_err<T, E: ToStringVerbose>(&mut self, result: Result<T, E>, def_name: Name) -> Option<T> {
     match result {
       Ok(t) => Some(t),
       Err(e) => {
-        match def_name {
-          None => self.error(e),
-          Some(def) => self.def_error(def.clone(), e),
-        }
+        self.add_rule_error(e, def_name);
         None
       }
     }
   }
 
+  pub fn take_inet_err<T, E: ToStringVerbose>(
+    &mut self,
+    result: Result<T, E>,
+    def_name: String,
+  ) -> Option<T> {
+    match result {
+      Ok(t) => Some(t),
+      Err(e) => {
+        self.add_inet_error(e, def_name);
+        None
+      }
+    }
+  }
+
+  pub fn has_severity(&self, severity: Severity) -> bool {
+    self.diagnostics.values().any(|errs| errs.iter().any(|e| e.severity == severity))
+  }
+
   pub fn has_errors(&self) -> bool {
-    !(self.book_errs.is_empty() && self.rule_errs.is_empty())
+    self.has_severity(Severity::Error)
   }
 
   /// Resets the internal counter
@@ -63,172 +140,129 @@ impl Info {
   /// Checks if any error was emitted since the start of the pass,
   /// Returning all the current information as a `Err(Info)`, replacing `&mut self` with an empty one.
   /// Otherwise, returns the given arg as an `Ok(T)`.
-  pub fn fatal<T>(&mut self, t: T) -> Result<T, Info> {
+  pub fn fatal<T>(&mut self, t: T) -> Result<T, Diagnostics> {
     if self.err_counter == 0 { Ok(t) } else { Err(std::mem::take(self)) }
   }
 
-  pub fn warning<W: Into<WarningType>>(&mut self, def_name: Name, warning: W) {
-    self.warns.0.entry(def_name).or_default().push(warning.into());
-  }
-
-  pub fn display(&self, verbose: bool) -> impl Display + '_ {
+  /// Returns a Display that prints the diagnostics with one of the given severities.
+  pub fn display_with_severity(&self, severity: Severity) -> impl std::fmt::Display + '_ {
     DisplayFn(move |f| {
-      writeln!(f, "{}", self.book_errs.iter().map(|err| err.display(verbose)).join("\n"))?;
-
-      for (def_name, errs) in &self.rule_errs {
-        in_definition(def_name, f)?;
-        for err in errs {
-          writeln!(f, "{:ERR_INDENT_SIZE$}{}", "", err.display(verbose))?;
-        }
+      fn filter<'a>(
+        errs: impl IntoIterator<Item = &'a Diagnostic>,
+        severity: Severity,
+      ) -> impl Iterator<Item = &'a Diagnostic> {
+        errs.into_iter().filter(move |err| err.severity == severity)
       }
 
+      let mut has_msg = false;
+      for (orig, errs) in &self.diagnostics {
+        let mut errs = filter(errs, severity).peekable();
+        if errs.peek().is_some() {
+          match orig {
+            DiagnosticOrigin::Book => {
+              for err in errs {
+                writeln!(f, "{err}")?;
+              }
+            }
+            DiagnosticOrigin::Rule(nam) => {
+              writeln!(f, "In definition '{nam}':")?;
+              for err in errs {
+                writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
+              }
+            }
+            DiagnosticOrigin::Inet(nam) => {
+              writeln!(f, "In compiled inet '{nam}':")?;
+              for err in errs {
+                writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
+              }
+            }
+            DiagnosticOrigin::Readback => {
+              writeln!(f, "During readback:")?;
+              for err in errs {
+                writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
+              }
+            }
+          }
+          has_msg = true;
+        }
+      }
+      if has_msg {
+        writeln!(f)?;
+      }
       Ok(())
     })
   }
 }
 
-fn in_definition(def_name: &Name, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-  writeln!(f, "In definition '{def_name}':")
-}
-
-impl Display for Info {
+impl Display for Diagnostics {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.display(false))
-  }
-}
-
-impl From<String> for Info {
-  fn from(value: String) -> Self {
-    Info { book_errs: vec![Error::Custom(value)], ..Default::default() }
-  }
-}
-
-impl From<&str> for Info {
-  fn from(value: &str) -> Self {
-    Info::from(value.to_string())
-  }
-}
-
-#[derive(Debug, Clone)]
-pub enum Error {
-  MainRef(ReferencedMainErr),
-  Match(MatchErr),
-  UnboundVar(UnboundVarErr),
-  UnboundCtr(UnboundCtrErr),
-  Cyclic(CyclicDefErr),
-  EntryPoint(EntryErr),
-  TopLevel(TopLevelErr),
-  Custom(String),
-  PatternArgError(PatternArgError),
-  RepeatedBind(RepeatedBindWarn),
-}
-
-impl Display for Error {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.display(false))
-  }
-}
-
-impl Error {
-  pub fn display(&self, verbose: bool) -> impl Display + '_ {
-    DisplayFn(move |f| match self {
-      Error::Match(err) => write!(f, "{}", err.display(verbose)),
-      Error::UnboundVar(err) => write!(f, "{err}"),
-      Error::UnboundCtr(err) => write!(f, "{err}"),
-      Error::MainRef(err) => write!(f, "{err}"),
-      Error::Cyclic(err) => write!(f, "{err}"),
-      Error::EntryPoint(err) => write!(f, "{err}"),
-      Error::TopLevel(err) => write!(f, "{err}"),
-      Error::Custom(err) => write!(f, "{err}"),
-      Error::PatternArgError(err) => write!(f, "{err}"),
-      Error::RepeatedBind(err) => write!(f, "{err}"),
-    })
-  }
-}
-
-impl From<ReferencedMainErr> for Error {
-  fn from(value: ReferencedMainErr) -> Self {
-    Self::MainRef(value)
-  }
-}
-
-impl From<MatchErr> for Error {
-  fn from(value: MatchErr) -> Self {
-    Self::Match(value)
-  }
-}
-
-impl From<UnboundVarErr> for Error {
-  fn from(value: UnboundVarErr) -> Self {
-    Self::UnboundVar(value)
-  }
-}
-
-impl From<UnboundCtrErr> for Error {
-  fn from(value: UnboundCtrErr) -> Self {
-    Self::UnboundCtr(value)
-  }
-}
-
-impl From<CyclicDefErr> for Error {
-  fn from(value: CyclicDefErr) -> Self {
-    Self::Cyclic(value)
-  }
-}
-
-impl From<EntryErr> for Error {
-  fn from(value: EntryErr) -> Self {
-    Self::EntryPoint(value)
-  }
-}
-
-impl From<TopLevelErr> for Error {
-  fn from(value: TopLevelErr) -> Self {
-    Self::TopLevel(value)
-  }
-}
-
-impl From<PatternArgError> for Error {
-  fn from(value: PatternArgError) -> Self {
-    Self::PatternArgError(value)
-  }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct Warnings(pub BTreeMap<Name, Vec<WarningType>>);
-
-#[derive(Debug, Clone)]
-pub enum WarningType {
-  MatchOnlyVars,
-  UnusedDefinition,
-  RepeatedBind(RepeatedBindWarn),
-}
-
-impl Display for WarningType {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match self {
-      WarningType::MatchOnlyVars => write!(f, "Match expression at definition only uses var patterns."),
-      WarningType::UnusedDefinition => write!(f, "Definition is unused."),
-      WarningType::RepeatedBind(warn) => write!(f, "{warn}"),
+    if self.has_severity(Severity::Warning) {
+      write!(f, "Warnings:\n{}", self.display_with_severity(Severity::Warning))?;
     }
-  }
-}
-
-impl Display for Warnings {
-  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    for (def_name, warns) in &self.0 {
-      in_definition(def_name, f)?;
-      for warn in warns {
-        writeln!(f, "{:ERR_INDENT_SIZE$}{}", "", warn)?;
-      }
+    if self.has_severity(Severity::Error) {
+      write!(f, "Errors:\n{}", self.display_with_severity(Severity::Error))?;
     }
-
     Ok(())
   }
 }
 
-impl From<RepeatedBindWarn> for WarningType {
-  fn from(value: RepeatedBindWarn) -> Self {
-    Self::RepeatedBind(value)
+impl From<String> for Diagnostics {
+  fn from(value: String) -> Self {
+    Self {
+      diagnostics: BTreeMap::from_iter([(DiagnosticOrigin::Book, vec![Diagnostic {
+        message: value,
+        severity: Severity::Error,
+      }])]),
+      ..Default::default()
+    }
+  }
+}
+
+impl DiagnosticsConfig {
+  pub fn new(severity: Severity, verbose: bool) -> Self {
+    Self {
+      match_only_vars: severity,
+      unused_definition: severity,
+      repeated_bind: severity,
+      mutual_recursion_cycle: severity,
+      verbose,
+    }
+  }
+
+  pub fn warning_severity(&self, warn: WarningType) -> Severity {
+    match warn {
+      WarningType::MatchOnlyVars => self.match_only_vars,
+      WarningType::UnusedDefinition => self.unused_definition,
+      WarningType::RepeatedBind => self.repeated_bind,
+      WarningType::MutualRecursionCycle => self.mutual_recursion_cycle,
+    }
+  }
+}
+
+impl Default for DiagnosticsConfig {
+  fn default() -> Self {
+    Self::new(Severity::Warning, false)
+  }
+}
+
+impl Diagnostic {
+  pub fn error(msg: impl ToString) -> Self {
+    Diagnostic { message: msg.to_string(), severity: Severity::Error }
+  }
+
+  pub fn warning(msg: impl ToString) -> Self {
+    Diagnostic { message: msg.to_string(), severity: Severity::Warning }
+  }
+}
+
+impl Display for Diagnostic {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    write!(f, "{}", self.message)
+  }
+}
+
+impl ToStringVerbose for &str {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    self.to_string()
   }
 }

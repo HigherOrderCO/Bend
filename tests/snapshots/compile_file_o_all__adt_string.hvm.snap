@@ -2,5 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/adt_string.hvm
 ---
+Errors:
 At tests/golden_tests/compile_file_o_all/adt_string.hvm:1:6: String is a built-in datatype and should not be overridden.
 [0m  1 | data [4m[31mString[0m = S[0m

@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/list_reverse.hvm
 ---
 Lazy mode:
-
 (cons 1 (cons 2 (cons 3 nil)))
 
 Strict mode:
-
 (cons 1 (cons 2 (cons 3 nil)))

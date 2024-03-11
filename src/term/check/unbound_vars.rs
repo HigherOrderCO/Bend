@@ -1,11 +1,8 @@
 use crate::{
-  diagnostics::Info,
+  diagnostics::{Diagnostics, ToStringVerbose},
   term::{Ctx, Name, Term},
 };
-use std::{
-  collections::{hash_map::Entry, HashMap},
-  fmt::Display,
-};
+use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Debug, Clone)]
 pub enum UnboundVarErr {
@@ -13,26 +10,9 @@ pub enum UnboundVarErr {
   Global { var: Name, declared: usize, used: usize },
 }
 
-impl Display for UnboundVarErr {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      UnboundVarErr::Local(var) => write!(f, "Unbound variable '{var}'."),
-      UnboundVarErr::Global { var, declared, used } => match (declared, used) {
-        (0, _) => write!(f, "Unbound unscoped variable '${var}'."),
-        (_, 0) => write!(f, "Unscoped variable from lambda 'λ${var}' is never used."),
-        (1, _) => write!(f, "Unscoped variable '${var}' used more than once."),
-        (_, 1) => write!(f, "Unscoped lambda 'λ${var}' declared more than once."),
-        (_, _) => {
-          write!(f, "Unscoped lambda 'λ${var}' and unscoped variable '${var}' used more than once.")
-        }
-      },
-    }
-  }
-}
-
 impl Ctx<'_> {
   /// Checks that there are no unbound variables in all definitions.
-  pub fn check_unbound_vars(&mut self) -> Result<(), Info> {
+  pub fn check_unbound_vars(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
     for (def_name, def) in self.book.defs.iter_mut() {
@@ -47,7 +27,7 @@ impl Ctx<'_> {
       }
 
       for err in errs {
-        self.info.def_error(def_name.clone(), err);
+        self.info.add_rule_error(err, def_name.clone());
       }
     }
 
@@ -125,6 +105,23 @@ fn pop_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, u64>) {
 
     if *n_declarations.get() == 0 {
       n_declarations.remove();
+    }
+  }
+}
+
+impl ToStringVerbose for UnboundVarErr {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    match self {
+      UnboundVarErr::Local(var) => format!("Unbound variable '{var}'."),
+      UnboundVarErr::Global { var, declared, used } => match (declared, used) {
+        (0, _) => format!("Unbound unscoped variable '${var}'."),
+        (_, 0) => format!("Unscoped variable from lambda 'λ${var}' is never used."),
+        (1, _) => format!("Unscoped variable '${var}' used more than once."),
+        (_, 1) => format!("Unscoped lambda 'λ${var}' declared more than once."),
+        (_, _) => {
+          format!("Unscoped lambda 'λ${var}' and unscoped variable '${var}' used more than once.")
+        }
+      },
     }
   }
 }

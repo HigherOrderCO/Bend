@@ -13,7 +13,7 @@ cd hvm-lang
 
 Install using cargo:
 ```bash
-cargo install --path .
+cargo install --path . --locked
 ```
 
 ## Usage

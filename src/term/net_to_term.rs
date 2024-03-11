@@ -1,4 +1,5 @@
 use crate::{
+  diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
   term::{num_to_name, term_to_net::Labels, Book, Name, Op, Pattern, Tag, Term},
 };
@@ -6,7 +7,13 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 // TODO: Display scopeless lambdas as such
 /// Converts an Interaction-INet to a Lambda Calculus term
-pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (Term, Vec<ReadbackError>) {
+pub fn net_to_term(
+  net: &INet,
+  book: &Book,
+  labels: &Labels,
+  linear: bool,
+  diagnostics: &mut Diagnostics,
+) -> Term {
   let mut reader = Reader {
     net,
     labels,
@@ -38,7 +45,9 @@ pub fn net_to_term(net: &INet, book: &Book, labels: &Labels, linear: bool) -> (T
     let result = term.insert_split(split, uses);
     debug_assert_eq!(result, None);
   }
-  (term, reader.errors)
+
+  reader.report_errors(diagnostics);
+  term
 }
 
 // BTreeSet for consistent readback of dups
@@ -56,7 +65,7 @@ pub struct Reader<'a> {
   errors: Vec<ReadbackError>,
 }
 
-impl<'a> Reader<'a> {
+impl Reader<'_> {
   fn read_term(&mut self, next: Port) -> Term {
     Term::recursive_call(move || {
       if self.dup_paths.is_none() && !self.seen.insert(next) {
@@ -277,6 +286,19 @@ impl<'a> Reader<'a> {
   pub fn error(&mut self, error: ReadbackError) {
     self.errors.push(error);
   }
+
+  pub fn report_errors(&mut self, diagnostics: &mut Diagnostics) {
+    let mut err_counts = std::collections::HashMap::new();
+    for err in &self.errors {
+      *err_counts.entry(*err).or_insert(0) += 1;
+    }
+
+    for (err, count) in err_counts {
+      let count_msg = if count > 1 { format!(" ({count} occurrences)") } else { "".to_string() };
+      let msg = format!("{}{}", err, count_msg);
+      diagnostics.add_diagnostic(msg.as_str(), Severity::Warning, DiagnosticOrigin::Readback);
+    }
+  }
 }
 
 /// Represents `let (fst, snd) = val` if `tag` is `None`, and `dup#tag fst snd = val` otherwise.
@@ -473,33 +495,13 @@ fn is_op_swapped(op: hvmc::ops::Op) -> bool {
   )
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ReadbackError {
   InvalidNumericMatch,
   InvalidNumericOp,
   ReachedRoot,
   Cyclic,
   InvalidBind,
-  InvalidAdt,
-  InvalidAdtMatch,
-  InvalidStrTerm(Term),
-  UnexpectedTag(Tag, Tag),
-}
-
-impl ReadbackError {
-  pub fn can_count(&self) -> bool {
-    match self {
-      ReadbackError::InvalidNumericMatch => true,
-      ReadbackError::InvalidNumericOp => true,
-      ReadbackError::ReachedRoot => true,
-      ReadbackError::Cyclic => true,
-      ReadbackError::InvalidBind => true,
-      ReadbackError::InvalidAdt => true,
-      ReadbackError::InvalidAdtMatch => true,
-      ReadbackError::InvalidStrTerm(_) => false,
-      ReadbackError::UnexpectedTag(..) => false,
-    }
-  }
 }
 
 impl PartialEq for ReadbackError {
@@ -513,5 +515,17 @@ impl Eq for ReadbackError {}
 impl std::hash::Hash for ReadbackError {
   fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
     core::mem::discriminant(self).hash(state);
+  }
+}
+
+impl std::fmt::Display for ReadbackError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      ReadbackError::InvalidNumericMatch => write!(f, "Invalid Numeric Match."),
+      ReadbackError::InvalidNumericOp => write!(f, "Invalid Numeric Operation."),
+      ReadbackError::ReachedRoot => write!(f, "Reached Root."),
+      ReadbackError::Cyclic => write!(f, "Cyclic Term."),
+      ReadbackError::InvalidBind => write!(f, "Invalid Bind."),
+    }
   }
 }

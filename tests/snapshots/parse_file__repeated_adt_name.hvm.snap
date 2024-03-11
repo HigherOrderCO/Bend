@@ -2,5 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/repeated_adt_name.hvm
 ---
+Errors:
 At tests/golden_tests/parse_file/repeated_adt_name.hvm:2:6: Repeated datatype 'Foo'
 [0m  2 | data [4m[31mFoo[0m = B[0m

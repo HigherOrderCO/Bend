@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_sup.hvm
 ---
 Lazy mode:
-
 #a{1 2}
 
 Strict mode:
-
 #a{1 2}

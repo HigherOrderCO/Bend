@@ -1,18 +1,9 @@
-use std::fmt::Display;
-
 use crate::{
-  diagnostics::Info,
+  diagnostics::{Diagnostics, ToStringVerbose},
   term::{Ctx, Pattern, Term},
 };
 
-#[derive(Clone, Debug)]
-pub struct PatternArgError(Pattern);
-
-impl Display for PatternArgError {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Expected a variable pattern, found '{}'.", self.0)
-  }
-}
+struct PatternArgError(Pattern);
 
 impl Ctx<'_> {
   /// Applies the arguments to the program being run by applying them to the main function.
@@ -25,7 +16,7 @@ impl Ctx<'_> {
   /// ```hvm
   /// main = (λx1 λx2 λx3 (MainBody x1 x2 x3) arg1 arg2 arg3)
   /// ```
-  pub fn apply_args(&mut self, args: Option<Vec<Term>>) -> Result<(), Info> {
+  pub fn apply_args(&mut self, args: Option<Vec<Term>>) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
     if let Some(entrypoint) = &self.book.entrypoint {
@@ -33,7 +24,7 @@ impl Ctx<'_> {
 
       for pat in &main_def.rules[0].pats {
         if !matches!(pat, Pattern::Var(Some(..))) {
-          self.info.def_error(entrypoint.clone(), PatternArgError(pat.clone()));
+          self.info.add_rule_error(PatternArgError(pat.clone()), entrypoint.clone());
         }
       }
 
@@ -46,5 +37,11 @@ impl Ctx<'_> {
     }
 
     self.info.fatal(())
+  }
+}
+
+impl ToStringVerbose for PatternArgError {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    format!("Expected the entrypoint to only have variable pattern, found '{}'.", self.0)
   }
 }

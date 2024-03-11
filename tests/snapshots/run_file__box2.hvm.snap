@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/box2.hvm
 ---
 Lazy mode:
-
 (Box 4)
 
 Strict mode:
-
 (Box 4)

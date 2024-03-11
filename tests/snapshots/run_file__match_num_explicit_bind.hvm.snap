@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_num_explicit_bind.hvm
 ---
 Lazy mode:
-
 3
 
 Strict mode:
-
 3

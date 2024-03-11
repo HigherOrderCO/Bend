@@ -3,6 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/names_hyphen_toplevel.hvm
 ---
 Lazy mode:
+Errors:
 At tests/golden_tests/run_file/names_hyphen_toplevel.hvm:1:1: Names with '-' are not supported at top level.
 [0m  1 | [4m[31mthis-is-not-allowed[0m = 1[0m
 At tests/golden_tests/run_file/names_hyphen_toplevel.hvm:3:6: Names with '-' are not supported at top level.
@@ -11,8 +12,8 @@ At tests/golden_tests/run_file/names_hyphen_toplevel.hvm:3:16: Names with '-' ar
 [0m  3 | data Foo-Bar = [4m[31mBaz-Qux[0m
 
 
-
 Strict mode:
+Errors:
 At tests/golden_tests/run_file/names_hyphen_toplevel.hvm:1:1: Names with '-' are not supported at top level.
 [0m  1 | [4m[31mthis-is-not-allowed[0m = 1[0m
 At tests/golden_tests/run_file/names_hyphen_toplevel.hvm:3:6: Names with '-' are not supported at top level.
