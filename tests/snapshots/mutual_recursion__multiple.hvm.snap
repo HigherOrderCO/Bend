@@ -1,8 +1,10 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/mutual_recursion/odd_even.hvm
+input_file: tests/golden_tests/mutual_recursion/multiple.hvm
 ---
 Mutual recursion cycle detected in compiled funcions:
-Cycle 1: isEven -> isOdd
+Cycle 1: A -> B -> C
+Cycle 2: H -> I
+Cycle 3: M -> N
 This program will expand infinitely in strict evaluation mode.
 Read https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md for more information.

@@ -13,7 +13,17 @@ pub fn check_cycles(book: &Book) -> Result<(), String> {
   let graph = Graph::from(book);
   let cycles = graph.cycles();
 
-  if cycles.is_empty() { Ok(()) } else { Err(pretty_print_cycles(&cycles)) }
+  if cycles.is_empty() {
+    Ok(())
+  } else {
+    Err(format!(
+      "{}\n{}\n{}\n{}",
+      "Mutual recursion cycle detected in compiled funcions:",
+      pretty_print_cycles(&cycles),
+      "This program will expand infinitely in strict evaluation mode.",
+      "Read https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md for more information."
+    ))
+  }
 }
 
 fn pretty_print_cycles(cycles: &[Vec<Ref>]) -> String {
