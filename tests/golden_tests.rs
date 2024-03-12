@@ -119,7 +119,7 @@ fn compile_term() {
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::heavy(), None)?;
+    let compiled = compile_book(&mut book, true /*ignore check_cycles*/, CompileOpts::heavy(), None)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -127,7 +127,7 @@ fn compile_file_o_all() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compiled = compile_book(&mut book, CompileOpts::light(), None)?;
+    let compiled = compile_book(&mut book, true /*ignore check_cycles*/, CompileOpts::light(), None)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -301,7 +301,7 @@ fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::from("foo"));
-    let compiled = compile_book(&mut book, CompileOpts::light(), None)?;
+    let compiled = compile_book(&mut book, true /*ignore check_cycles*/, CompileOpts::light(), None)?;
     Ok(format!("{:?}", compiled))
   })
 }
@@ -333,5 +333,14 @@ fn cli() {
       std::process::Command::new(env!("CARGO_BIN_EXE_hvml")).args(args).output().expect("Run command");
 
     Ok(format_output(output))
+  })
+}
+
+#[test]
+fn mutual_recursion() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = do_parse_book(code, path)?;
+    let compiled = compile_book(&mut book, false, CompileOpts::light(), None)?;
+    Ok(format!("{:?}", compiled))
   })
 }

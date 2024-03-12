@@ -36,6 +36,7 @@
     "interner",
     "itertools",
     "lcons",
+    "linearization",
     "linearizes",
     "linearizing",
     "lnet",

@@ -199,7 +199,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Info> {
       }
 
       let mut book = load_book(&path)?;
-      let compiled = compile_book(&mut book, opts, None)?;
+      let compiled = compile_book(&mut book, lazy_mode, opts, None)?;
       println!("{}", compiled.display_with_warns(warning_opts)?);
     }
     Mode::Desugar { path, comp_opts, lazy_mode } => {

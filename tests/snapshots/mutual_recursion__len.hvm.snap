@@ -1,0 +1,19 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/mutual_recursion/len.hvm
+---
+@Len = ({2 @Len$S1 {2 #0 a}} a)
+@Len$S0 = {2 a b}
+& #1 ~ <+ c b>
+& @Len ~ (a c)
+@Len$S1 = {2 * @Len$S0}
+@List.cons = (a (b {2 {2 a {2 b c}} {2 * c}}))
+@List.nil = {2 * {2 a a}}
+@main = a
+& @Len ~ (b a)
+& @List.cons ~ (* (c b))
+& @List.cons ~ (* (d c))
+& @List.cons ~ (* (e d))
+& @List.cons ~ (* (f e))
+& @List.cons ~ (* (g f))
+& @List.cons ~ (* (@List.nil g))
