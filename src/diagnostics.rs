@@ -245,16 +245,6 @@ impl Default for DiagnosticsConfig {
   }
 }
 
-impl Diagnostic {
-  pub fn error(msg: impl ToString) -> Self {
-    Diagnostic { message: msg.to_string(), severity: Severity::Error }
-  }
-
-  pub fn warning(msg: impl ToString) -> Self {
-    Diagnostic { message: msg.to_string(), severity: Severity::Warning }
-  }
-}
-
 impl Display for Diagnostic {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", self.message)
