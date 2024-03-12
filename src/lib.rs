@@ -261,11 +261,10 @@ pub fn run_compiled(
     let start_time = Instant::now();
 
     if let Some(mut hook) = hook {
-      root.expand();
       while !root.redexes.is_empty() {
-        hook(&host.lock().unwrap().readback(root));
+        let readback = host.lock().unwrap().readback(root);
+        hook(&readback);
         root.reduce(1);
-        root.expand();
       }
     } else if let Some(mut max_rwts) = max_rwts {
       if run_opts.lazy_mode {
