@@ -294,18 +294,15 @@ fn hangs() {
   let expected_normalization_time = 5;
 
   run_golden_test_dir(function_name!(), &|code, path| {
-    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Warning, true);
     let book = do_parse_book(code, path)?;
 
-    let lck = Arc::new(RwLock::new(false));
-    let got = lck.clone();
-    std::thread::spawn(move || {
-      let _ = run_book(book, 1 << 20, RunOpts::default(), CompileOpts::heavy(), diagnostics_cfg, None);
-      *got.write().unwrap() = true;
+    let thread = std::thread::spawn(move || {
+      run_book(book, 1 << 20, RunOpts::default(), CompileOpts::heavy(), diagnostics_cfg, None)
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
 
-    if !*lck.read().unwrap() { Ok("Hangs".into()) } else { Err("Doesn't hang".to_string().into()) }
+    if !thread.is_finished() { Ok("Hangs".into()) } else { Err("Doesn't hang".to_string().into()) }
   })
 }
 
