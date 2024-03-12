@@ -66,7 +66,7 @@ impl<'d> TermInfo<'d> {
   }
 
   fn detach_term(&mut self, term: &mut Term) {
-    let comb_name = Name::new(format!("{}$S{}", self.def_name, self.counter));
+    let comb_name = Name::new(format!("{}$C{}", self.def_name, self.counter));
     self.counter += 1;
 
     let comb_var = Term::Ref { nam: comb_name.clone() };

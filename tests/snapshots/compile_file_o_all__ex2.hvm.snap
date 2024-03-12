@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
 ---
-@E = (* @E$S0)
-@E$S0 = (* (a a))
+@E = (* @E$C0)
+@E$C0 = (* (a a))
 @I = (a (* ((a b) (* b))))
 @c2 = ({3 (a b) (c a)} (c b))
 @decO = ((@decO (@low (@E a))) (* ((a b) (* b))))
@@ -16,4 +16,3 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
 @run = ((@runO (@runI (@E a))) a)
 @runI = ((@lowO (@lowI (@E (@runO (@runI (@E a)))))) a)
 @runO = ((@decO (@low (@E (@lowO (@lowI (@E (@runO (@runI (@E a))))))))) a)
-

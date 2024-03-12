@@ -3,10 +3,10 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/scrutinee_reconstruction.hvm
 ---
 @None = {2 * {2 a a}}
-@Option.or = ({3 {2 @Option.or$S1 {2 @Option.or$S2 (a b)}} a} b)
-@Option.or$S0 = (a (* a))
-@Option.or$S1 = {2 * @Option.or$S0}
-@Option.or$S2 = (* (a a))
+@Option.or = ({3 {2 @Option.or$C1 {2 @Option.or$C2 (a b)}} a} b)
+@Option.or$C0 = (a (* a))
+@Option.or$C1 = {2 * @Option.or$C0}
+@Option.or$C2 = (* (a a))
 @Some = (a {2 {2 a b} {2 * b}})
 @main = a
 & @Option.or ~ (b (@None a))

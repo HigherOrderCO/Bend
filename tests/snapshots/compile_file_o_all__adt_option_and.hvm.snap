@@ -3,10 +3,10 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/adt_option_and.hvm
 ---
 @None = {2 * {2 a a}}
-@Option.and = ({2 @Option.and$S2 {2 @Option.and$S3_$_Option.and$S1 a}} a)
-@Option.and$S0 = {2 a (b {2 {2 [b a] c} {2 * c}})}
-@Option.and$S2 = {2 a ({2 @Option.and$S0 {2 @Option.and$S3_$_Option.and$S1 (a b)}} b)}
-@Option.and$S3_$_Option.and$S1 = (* @None)
+@Option.and = ({2 @Option.and$C2 {2 @Option.and$C3_$_Option.and$C1 a}} a)
+@Option.and$C0 = {2 a (b {2 {2 [b a] c} {2 * c}})}
+@Option.and$C2 = {2 a ({2 @Option.and$C0 {2 @Option.and$C3_$_Option.and$C1 (a b)}} b)}
+@Option.and$C3_$_Option.and$C1 = (* @None)
 @Some = (a {2 {2 a b} {2 * b}})
 @main = a
 & @Option.and ~ (b (c a))

@@ -4,8 +4,7 @@ input_file: tests/golden_tests/compile_file_o_all/sum_predicates.hvm
 ---
 @main = a
 & @sum_pred ~ (#8 (#5 a))
-@sum_pred = (?<(@sum_pred$S0 @sum_pred$S2) a> a)
-@sum_pred$S0 = (?<(#0 (a a)) b> b)
-@sum_pred$S1 = (a (<+ a b> b))
-@sum_pred$S2 = (a (?<((b b) @sum_pred$S1) (a c)> c))
-
+@sum_pred = (?<(@sum_pred$C0 @sum_pred$C2) a> a)
+@sum_pred$C0 = (?<(#0 (a a)) b> b)
+@sum_pred$C1 = (a (<+ a b> b))
+@sum_pred$C2 = (a (?<((b b) @sum_pred$C1) (a c)> c))
