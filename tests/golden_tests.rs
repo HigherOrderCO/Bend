@@ -17,7 +17,6 @@ use std::{
   io::Read,
   path::{Path, PathBuf},
   str::FromStr,
-  sync::{Arc, RwLock},
 };
 use stdext::function_name;
 use walkdir::WalkDir;
@@ -36,10 +35,9 @@ fn do_parse_net(code: &str) -> Result<hvmc::ast::Net, String> {
 
 const TESTS_PATH: &str = "/tests/golden_tests/";
 
-fn run_single_golden_test(
-  path: &Path,
-  run: &[&dyn Fn(&str, &Path) -> Result<String, Diagnostics>],
-) -> Result<(), String> {
+type RunFn = dyn Fn(&str, &Path) -> Result<String, Diagnostics>;
+
+fn run_single_golden_test(path: &Path, run: &[&RunFn]) -> Result<(), String> {
   let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
   let file_name = path.to_str().and_then(|path| path.rsplit_once(TESTS_PATH)).unwrap().1;
 
@@ -68,14 +66,11 @@ fn run_single_golden_test(
   Ok(())
 }
 
-fn run_golden_test_dir(test_name: &str, run: &dyn Fn(&str, &Path) -> Result<String, Diagnostics>) {
+fn run_golden_test_dir(test_name: &str, run: &RunFn) {
   run_golden_test_dir_multiple(test_name, &[run])
 }
 
-fn run_golden_test_dir_multiple(
-  test_name: &str,
-  run: &[&dyn Fn(&str, &Path) -> Result<String, Diagnostics>],
-) {
+fn run_golden_test_dir_multiple(test_name: &str, run: &[&RunFn]) {
   let root = PathBuf::from(format!(
     "{}{TESTS_PATH}{}",
     env!("CARGO_MANIFEST_DIR"),
@@ -293,7 +288,7 @@ fn desugar_file() {
 fn hangs() {
   let expected_normalization_time = 5;
 
-  run_golden_test_dir(function_name!(), &|code, path| {
+  run_golden_test_dir(function_name!(), &move |code, path| {
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Warning, true);
     let book = do_parse_book(code, path)?;
 
