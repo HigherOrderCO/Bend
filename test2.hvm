@@ -1,0 +1,6 @@
+data Nat = Z | (S p)
+Y = λf #Lazy λid (id λx #Lazy λid (id f #Lazy λid (id x x)) λx #Lazy λid (id f #Lazy λid (id x x)))
+data Stream = (Stream.cons head tail)
+take l Z = List.nil
+take (Stream.cons head tail) (S p) = (List.cons head #Lazy λid (id take tail p))
+main = ((Y λnats λn λp (p n (nats (S n)))) Z λa λb a)

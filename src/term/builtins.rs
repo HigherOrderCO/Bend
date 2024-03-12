@@ -72,7 +72,7 @@ impl Term {
     })
   }
 
-  fn encode_str(val: &str) -> Term {
+  pub fn encode_str(val: &str) -> Term {
     val.chars().rfold(Term::r#ref(SNIL), |acc, char| {
       Term::call(Term::r#ref(SCONS), [Term::Num { val: u64::from(char) }, acc])
     })

@@ -2,22 +2,22 @@
 #![feature(let_chains)]
 
 use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity};
+use builtins::create_host;
 use hvmc::{
   ast::{self, Net},
   dispatch_dyn_net,
   host::Host,
   run::{DynNet, Heap, Rewrites},
-  stdlib::LogDef,
 };
 use hvmc_net::{mutual_recursion, prune::prune_defs};
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{
-  str::FromStr,
   sync::{Arc, Mutex},
   time::Instant,
 };
 use term::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding, Book, Ctx, Term};
 
+pub mod builtins;
 pub mod diagnostics;
 pub mod hvmc_net;
 pub mod net;
@@ -27,55 +27,6 @@ pub use term::load_book::load_file_to_book;
 
 pub const ENTRY_POINT: &str = "main";
 pub const HVM1_ENTRY_POINT: &str = "Main";
-
-/// These are the names of builtin defs that are not in the hvm-lang book, but
-/// are present in the hvm-core book. They are implemented using Rust code by
-/// [`create_host`] and they can not be rewritten as hvm-lang functions.
-pub const CORE_BUILTINS: [&str; 3] = ["HVM.log", "HVM.black_box", "HVM.print"];
-
-/// Creates a host with the hvm-core primitive definitions built-in.
-/// This needs the book as an Arc because the closure that logs
-/// data needs access to the book.
-pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncoding) -> Arc<Mutex<Host>> {
-  let host = Arc::new(Mutex::new(Host::default()));
-  host.lock().unwrap().insert_def(
-    "HVM.log",
-    hvmc::host::DefRef::Owned(Box::new(LogDef::new({
-      let host = host.clone();
-      let book = book.clone();
-      let labels = labels.clone();
-      move |wire| {
-        let host = host.lock().unwrap();
-        let tree = host.readback_tree(&wire);
-        let net = hvmc::ast::Net { root: tree, redexes: vec![] };
-        let (term, errs) = readback_hvmc(&net, &book, &labels, false, adt_encoding);
-        eprint!("{errs}");
-        println!("{term}");
-      }
-    }))),
-  );
-  host.lock().unwrap().insert_def(
-    "HVM.print",
-    hvmc::host::DefRef::Owned(Box::new(LogDef::new({
-      let host = host.clone();
-      let book = book.clone();
-      let labels = labels.clone();
-      move |wire| {
-        let host = host.lock().unwrap();
-        let tree = host.readback_tree(&wire);
-        let net = hvmc::ast::Net { root: tree, redexes: vec![] };
-        let (term, _errs) = readback_hvmc(&net, &book, &labels, false, adt_encoding);
-        if let Term::Str { val } = &term {
-          println!("{val}");
-        }
-      }
-    }))),
-  );
-  let book = ast::Book::from_str("@HVM.black_box = (x x)").unwrap();
-  host.lock().unwrap().insert_book(&book);
-
-  host
-}
 
 pub fn check_book(book: &mut Book) -> Result<(), Diagnostics> {
   // TODO: Do the checks without having to do full compilation
@@ -96,7 +47,7 @@ pub fn compile_book(
   let mut core_book = nets_to_hvmc(nets, &mut diagnostics)?;
 
   if opts.pre_reduce {
-    core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), 1 << 24, 100_000)?;
+    core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), 1 << 24, 100_000);
   }
   if opts.prune {
     prune_defs(&mut core_book, book.hvmc_entrypoint().to_string());

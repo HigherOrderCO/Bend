@@ -1,0 +1,22 @@
+Char.rot13 x = 
+	match (| (& (>= x 'A') (<= x 'Z')) (& (>= x 'a') (<= x 'z'))) {
+	0: x
+	1+: 
+		let x = (+ x 13)
+		match (| 
+			(& (> x 'Z') (< x (+ 'a' 13)))
+			(> x 'z')
+		) {
+			0:  x
+			1+: (- x 26)
+		}
+	}
+String.rot13 (String.cons head tail) = (String.cons 
+	(Char.rot13 head) 
+	(String.rot13 tail)
+)
+String.rot13 String.nil = String.nil
+main = (HVM.print "Text to encrypt with rot13:" 
+	HVM.query λtext 
+	(HVM.print (String.rot13 text) *
+	))

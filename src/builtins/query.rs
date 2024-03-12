@@ -1,0 +1,38 @@
+use std::sync::{Arc, Mutex};
+
+use hvmc::{
+  host::{DefRef, Host},
+  run::{LabSet, Port, Trg, Wire},
+  stdlib::HostedDef,
+};
+
+use crate::{
+  builtins::util::{AsDefFunction, FunctionLikeHosted},
+  term::{term_to_net::Labels, Term},
+};
+
+pub(crate) fn make_query_def(host: Arc<Mutex<Host>>, labels: Arc<Labels>) -> DefRef {
+  struct Query0 {
+    host: Arc<Mutex<Host>>,
+    labels: Arc<Labels>,
+  }
+  impl AsDefFunction for Query0 {
+    fn call<M: hvmc::run::Mode>(&self, net: &mut hvmc::run::Net<M>, input: Wire, output: Wire) {
+      let app_node = net.create_node(hvmc::run::Tag::Ctr, 0);
+      let mut buf = String::new();
+      let _ = std::io::stdin().read_line(&mut buf);
+      let text = Term::encode_str(&buf);
+      let mut labs = (*self.labels).clone();
+      let text = crate::term::term_to_net::term_to_compat_net(&text, &mut labs);
+      net.link_wire_port(output, app_node.p2);
+      let Ok(text) = crate::net::net_to_hvmc::net_to_hvmc(&text) else {
+        net.link_port_port(Port::ERA, app_node.p1);
+        net.link_wire_port(input, app_node.p0);
+        return;
+      };
+      let _text = self.host.lock().unwrap().encode_net(net, Trg::port(app_node.p1), &text);
+      net.link_wire_port(input, app_node.p0);
+    }
+  }
+  unsafe { HostedDef::new_hosted(LabSet::ALL, FunctionLikeHosted(Query0 { host, labels })) }
+}
