@@ -4,19 +4,22 @@
 
 export CARGO_TERM_COLOR := "always"
 
-all: rustup-show test clippy fmt sort audit
+all: rustup-show check fmt clippy test sort audit
 
 rustup-show:
   rustup show
 
-test:
-  cargo insta test --workspace
-
-clippy:
-  cargo clippy
+check:
+  cargo check --all-targets
 
 fmt:
   cargo fmt --all -- --check
+
+clippy:
+  cargo clippy --all-targets
+
+test:
+  cargo insta test --workspace
 
 sort:
   cargo sort --check --workspace
