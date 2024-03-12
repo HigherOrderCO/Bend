@@ -4,11 +4,11 @@ input_file: tests/golden_tests/compile_file_o_all/repeated_name_trucation.hvm
 ---
 Warnings:
 Mutual recursion cycle detected in compiled functions:
-  Cycle 1: long_name_that_truncates -> long_name_that_truncates$S0 -> long_name_that_truncates
+  Cycle 1: long_name_that_truncates -> long_name_that_truncates$C0 -> long_name_that_truncates
   This program will expand infinitely in strict evaluation mode.
   Read https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md for more information.
 
-@long_name_that_truncates = (* @long_name_that_truncates$S0)
-@long_name_that_truncates$S0 = (* @long_name_that_truncates)
+@long_name_that_truncates = (* @long_name_that_truncates$C0)
+@long_name_that_truncates$C0 = (* @long_name_that_truncates)
 @main = a
 & @long_name_that_truncates ~ ((b b) a)
