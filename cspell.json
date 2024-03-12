@@ -50,6 +50,7 @@
     "opre",
     "oprune",
     "oref",
+    "peekable",
     "postcondition",
     "readback",
     "redex",
