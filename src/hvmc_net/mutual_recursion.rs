@@ -13,10 +13,10 @@ pub fn check_cycles(book: &Book) -> Result<(), String> {
   let graph = Graph::from(book);
   let cycles = graph.cycles();
 
-  if cycles.is_empty() { Ok(()) } else { Err(pprint_cycles(&cycles)) }
+  if cycles.is_empty() { Ok(()) } else { Err(pretty_print_cycles(&cycles)) }
 }
 
-fn pprint_cycles(cycles: &[Vec<Ref>]) -> String {
+fn pretty_print_cycles(cycles: &[Vec<Ref>]) -> String {
   cycles
     .iter()
     .enumerate()
@@ -114,8 +114,8 @@ impl Graph {
   }
 
   pub fn add(&mut self, r#ref: Ref, dependency: Ref) {
-    self.0.entry(r#ref).or_insert_with(RefSet::new).insert(dependency.clone());
-    self.0.entry(dependency).or_insert_with(RefSet::new);
+    self.0.entry(r#ref).or_default().insert(dependency.clone());
+    self.0.entry(dependency).or_default();
   }
 
   pub fn get(&self, r#ref: &Ref) -> Option<&RefSet> {
