@@ -9,7 +9,7 @@ use hvmc::{
   run::{DynNet, Heap, Rewrites},
   stdlib::LogDef,
 };
-use hvmc_net::prune::prune_defs;
+use hvmc_net::{mutual_recursion, prune::prune_defs};
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{
   str::FromStr,
@@ -82,12 +82,13 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
 pub fn check_book(book: &mut Book) -> Result<(), Info> {
   // TODO: Do the checks without having to do full compilation
   // TODO: Shouldn't the check mode show warnings?
-  compile_book(book, CompileOpts::light(), None)?;
+  compile_book(book, true, CompileOpts::light(), None)?;
   Ok(())
 }
 
 pub fn compile_book(
   book: &mut Book,
+  lazy_mode: bool,
   opts: CompileOpts,
   args: Option<Vec<Term>>,
 ) -> Result<CompileResult, Info> {
@@ -100,6 +101,9 @@ pub fn compile_book(
   }
   if opts.prune {
     prune_defs(&mut core_book, book.hvmc_entrypoint().to_string());
+  }
+  if !lazy_mode {
+    mutual_recursion::check_cycles(&core_book)?;
   }
   Ok(CompileResult { core_book, labels, warns })
 }
@@ -180,7 +184,8 @@ pub fn run_book(
   compile_opts: CompileOpts,
   args: Option<Vec<Term>>,
 ) -> Result<(Term, RunInfo), Info> {
-  let CompileResult { core_book, labels, warns } = compile_book(&mut book, compile_opts, args)?;
+  let CompileResult { core_book, labels, warns } =
+    compile_book(&mut book, run_opts.lazy_mode, compile_opts, args)?;
 
   // Turn the book into an Arc so that we can use it for logging, debugging, etc.
   // from anywhere else in the program

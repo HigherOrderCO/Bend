@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/mutual_recursion/odd_even.hvm
+---
+Cycle 1: isEven -> isOdd

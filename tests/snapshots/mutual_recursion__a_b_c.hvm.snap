@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/mutual_recursion/a_b_c.hvm
+---
+Cycle 1: A -> B -> C
