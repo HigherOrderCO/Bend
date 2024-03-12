@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/mutual_recursion/a_b_c.hvm
 ---
-Mutual recursion cycle detected in compiled funcions:
+Mutual recursion cycle detected in compiled functions:
 Cycle 1: A -> B -> C
 This program will expand infinitely in strict evaluation mode.
 Read https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md for more information.

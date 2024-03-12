@@ -18,7 +18,7 @@ pub fn check_cycles(book: &Book) -> Result<(), String> {
   } else {
     Err(format!(
       "{}\n{}\n{}\n{}",
-      "Mutual recursion cycle detected in compiled funcions:",
+      "Mutual recursion cycle detected in compiled functions:",
       pretty_print_cycles(&cycles),
       "This program will expand infinitely in strict evaluation mode.",
       "Read https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md for more information."

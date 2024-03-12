@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/mutual_recursion/multiple.hvm
 ---
-Mutual recursion cycle detected in compiled funcions:
+Mutual recursion cycle detected in compiled functions:
 Cycle 1: A -> B -> C
 Cycle 2: H -> I
 Cycle 3: M -> N
