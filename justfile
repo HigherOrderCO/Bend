@@ -26,9 +26,3 @@ audit:
 
 install:
   cargo install --locked cargo-sort cargo-audit
-
-llcheck:
-  cargo watch -x llcheck
-
-extras:
-  cargo install --locked cargo-watch cargo-limit amber

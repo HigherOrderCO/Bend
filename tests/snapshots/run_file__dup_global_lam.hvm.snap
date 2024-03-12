@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/dup_global_lam.hvm
 ---
 Lazy mode:
-
 λa a
 
 Strict mode:
-
 λa a

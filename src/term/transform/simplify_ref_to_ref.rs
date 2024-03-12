@@ -1,25 +1,36 @@
-// Pass for inlining functions that are just a reference to another one.
-
 use crate::{
-  diagnostics::Info,
+  diagnostics::{Diagnostics, ToStringVerbose},
   term::{Ctx, Name, Term},
 };
-use std::{collections::BTreeMap, fmt::Display};
+use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub struct CyclicDefErr;
 
-impl Display for CyclicDefErr {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Definition is a reference to itself.")
-  }
-}
-
 impl Ctx<'_> {
-  // When we find a function that is simply directly calling another function,
-  // substitutes all occurrences of that function to the one being called, avoiding the unnecessary redirect.
-  // In case there is a long chain of ref-to-ref-to-ref, we substitute values by the last function in the chain.
-  pub fn simplify_ref_to_ref(&mut self) -> Result<(), Info> {
+  /// Substitutes all references of functions that are just
+  /// references to other functions by the function they reference.
+  ///
+  /// In case there is a long chain of ref-to-ref-to-ref, we
+  /// substitute values by the last function in the chain.
+  ///
+  /// ### Example:
+  /// ```hvm
+  /// A = @x @y (x y)
+  /// B = A
+  /// C = B
+  /// main = @x (C x)
+  /// ```
+  /// becomes
+  /// ```hvm
+  /// A = @x @y (x y)
+  /// B = A
+  /// C = A
+  /// main = @x (A x)
+  /// ```
+  /// Functions `B` and `C` will no longer be referenced anywhere in
+  /// the program.
+  pub fn simplify_ref_to_ref(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
     let mut ref_map: BTreeMap<Name, Name> = BTreeMap::new();
@@ -29,7 +40,7 @@ impl Ctx<'_> {
       let mut is_ref_to_ref = false;
       while let Term::Ref { nam: next_ref } = &self.book.defs.get(ref_name).unwrap().rule().body {
         if next_ref == ref_name {
-          self.info.def_error(def_name.clone(), CyclicDefErr);
+          self.info.add_rule_error(CyclicDefErr, def_name.clone());
           continue 'outer;
         }
         ref_name = next_ref;
@@ -69,4 +80,10 @@ pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool
       subst
     }
   })
+}
+
+impl ToStringVerbose for CyclicDefErr {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    "Definition is a reference to itself.".to_string()
+  }
 }

@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/list_to_tree.hvm
 ---
 Lazy mode:
-
 ((1, 2), (3, (4, 5)))
 
 Strict mode:
-
 ((1, 2), (3, (4, 5)))

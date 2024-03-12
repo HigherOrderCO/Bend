@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/escape_sequences.hvm
 ---
 Lazy mode:
-
 ("\n\r\t\0\"'\u{afe}`", "\n\r\t\0\"'\u{afe}`")
 
 Strict mode:
-
 ("\n\r\t\0\"'\u{afe}`", "\n\r\t\0\"'\u{afe}`")

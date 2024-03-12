@@ -1,13 +1,6 @@
-use std::fmt::Display;
-
-use itertools::Itertools;
-
-use crate::{
-  diagnostics::ERR_INDENT_SIZE,
-  term::{
-    check::type_check::infer_match_arg_type, display::DisplayFn, AdtEncoding, Adts, Book, Constructors, Name,
-    NumCtr, Pattern, Rule, Tag, Term, Type,
-  },
+use crate::term::{
+  check::type_check::infer_match_arg_type, AdtEncoding, Adts, Book, Constructors, Name, NumCtr, Pattern,
+  Rule, Tag, Term, Type,
 };
 
 impl Book {
@@ -178,86 +171,5 @@ fn encode_adt(arg: Term, rules: Vec<Rule>, adt: Name, adt_encoding: AdtEncoding)
       }
       Term::tagged_call(Tag::adt_name(&adt), arg, arms)
     }
-  }
-}
-
-#[derive(Debug, Clone)]
-pub enum MatchErr {
-  RepeatedBind(Name),
-  LetPat(Box<MatchErr>),
-  Linearize(Name),
-  NotExhaustive(ExhaustivenessErr),
-  TypeMismatch(Type, Type),
-  ArityMismatch(usize, usize),
-  CtrArityMismatch(Name, usize, usize),
-  MalformedNumSucc(Pattern, Pattern),
-}
-
-#[derive(Debug, Clone)]
-pub struct ExhaustivenessErr(pub Vec<Name>);
-
-const PATTERN_ERROR_LIMIT: usize = 5;
-const ERROR_LIMIT_HINT: &str = "Use the --verbose option to see all cases.";
-
-impl MatchErr {
-  pub fn display(&self, verbose: bool) -> impl std::fmt::Display + '_ {
-    DisplayFn(move |f| match self {
-      MatchErr::RepeatedBind(bind) => write!(f, "Repeated var name in a match block: {}", bind),
-      MatchErr::LetPat(err) => {
-        let let_err = err.to_string().replace("match block", "let bind");
-        write!(f, "{let_err}")?;
-
-        if matches!(err.as_ref(), MatchErr::NotExhaustive(..)) {
-          write!(f, "\nConsider using a match block instead")?;
-        }
-
-        Ok(())
-      }
-      MatchErr::Linearize(var) => write!(f, "Unable to linearize variable {var} in a match block."),
-      MatchErr::NotExhaustive(err) if verbose => write!(f, "{}", err.display_with_limit(usize::MAX)),
-      MatchErr::NotExhaustive(err) => write!(f, "{err}"),
-      MatchErr::TypeMismatch(got, exp) => {
-        write!(f, "Type mismatch in pattern matching. Expected '{exp}', found '{got}'.")
-      }
-      MatchErr::ArityMismatch(got, exp) => {
-        write!(f, "Arity mismatch in pattern matching. Expected {exp} patterns, found {got}.")
-      }
-      MatchErr::CtrArityMismatch(ctr, got, exp) => write!(
-        f,
-        "Constructor arity mismatch in pattern matching. Constructor '{ctr}' expects {exp} fields, found {got}."
-      ),
-      MatchErr::MalformedNumSucc(got, exp) => {
-        write!(f, "Expected a sequence of incrementing numbers ending with '{exp}', found '{got}'.")
-      }
-    })
-  }
-}
-
-impl std::fmt::Display for MatchErr {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.display(false))
-  }
-}
-
-impl ExhaustivenessErr {
-  pub fn display_with_limit(&self, limit: usize) -> String {
-    let ident = ERR_INDENT_SIZE * 2;
-    let hints =
-      self.0.iter().take(limit).map(|pat| format!("{:ident$}Case '{pat}' not covered.", "")).join("\n");
-
-    let mut str = format!("Non-exhaustive pattern matching. Hint:\n{}", hints);
-
-    let len = self.0.len();
-    if len > limit {
-      str.push_str(&format!(" ... and {} others.\n{:ident$}{}", len - limit, "", ERROR_LIMIT_HINT))
-    }
-
-    str
-  }
-}
-
-impl Display for ExhaustivenessErr {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.display_with_limit(PATTERN_ERROR_LIMIT))
   }
 }

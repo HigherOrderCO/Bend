@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/lam_op2.hvm
 ---
 Lazy mode:
-
 λa (+ a 2)
 
 Strict mode:
-
 λa (+ a 2)

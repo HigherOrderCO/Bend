@@ -2,6 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/desugar_simplify_main.hvm
 ---
+Warnings:
+In definition 'id':
+  Definition is unused.
+
 (id) = λa a
 
 (main) = λa a

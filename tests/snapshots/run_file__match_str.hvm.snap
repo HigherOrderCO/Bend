@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_str.hvm
 ---
 Lazy mode:
-
 [2, 2, 1, 0, 0, 0]
 
 Strict mode:
-
 [2, 2, 1, 0, 0, 0]

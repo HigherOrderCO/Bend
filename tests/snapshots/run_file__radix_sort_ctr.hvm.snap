@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/radix_sort_ctr.hvm
 ---
 Lazy mode:
-
 120
 
 Strict mode:
-
 120

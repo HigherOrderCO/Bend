@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/cyclic_dup.hvm
 ---
+Errors:
 In definition 'main':
   Unbound variable 'y1'.
-

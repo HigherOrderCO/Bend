@@ -1,19 +1,13 @@
-use crate::term::{Ctx, Name, Term};
-use std::{collections::HashSet, fmt::Display};
+use crate::{
+  diagnostics::{ToStringVerbose, WarningType},
+  term::{Ctx, Name, Term},
+};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub enum RepeatedBindWarn {
   Rule(Name),
   Match(Name),
-}
-
-impl Display for RepeatedBindWarn {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      RepeatedBindWarn::Rule(bind) => write!(f, "Repeated bind inside rule pattern: '{bind}'."),
-      RepeatedBindWarn::Match(bind) => write!(f, "Repeated bind inside match arm: '{bind}'."),
-    }
-  }
 }
 
 impl Ctx<'_> {
@@ -25,7 +19,11 @@ impl Ctx<'_> {
         for pat in &rule.pats {
           for nam in pat.binds().flatten() {
             if !binds.insert(nam) {
-              self.info.warning(def_name.clone(), RepeatedBindWarn::Rule(nam.clone()));
+              self.info.add_rule_warning(
+                RepeatedBindWarn::Rule(nam.clone()),
+                WarningType::RepeatedBind,
+                def_name.clone(),
+              );
             }
           }
         }
@@ -33,8 +31,8 @@ impl Ctx<'_> {
         let mut repeated_in_matches = Vec::new();
         rule.body.check_repeated_binds(&mut repeated_in_matches);
 
-        for repeated in repeated_in_matches {
-          self.info.warning(def_name.clone(), repeated);
+        for warn in repeated_in_matches {
+          self.info.add_rule_warning(warn, WarningType::RepeatedBind, def_name.clone());
         }
       }
     }
@@ -66,5 +64,14 @@ impl Term {
         }
       }
     })
+  }
+}
+
+impl ToStringVerbose for RepeatedBindWarn {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    match self {
+      RepeatedBindWarn::Rule(bind) => format!("Repeated bind inside rule pattern: '{bind}'."),
+      RepeatedBindWarn::Match(bind) => format!("Repeated bind inside match arm: '{bind}'."),
+    }
   }
 }

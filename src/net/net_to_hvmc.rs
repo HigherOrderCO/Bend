@@ -1,21 +1,31 @@
 use super::{INet, NodeId, NodeKind, Port, ROOT};
 
-use crate::term::num_to_name;
+use crate::{
+  diagnostics::{Diagnostics, ToStringVerbose},
+  term::num_to_name,
+};
 use hvmc::ast::{Book, Net, Tree};
 use std::collections::{HashMap, HashSet};
 
+pub struct ViciousCycleErr;
+
 /// Converts the inet-encoded definitions into an hvmc AST Book.
-pub fn nets_to_hvmc(nets: HashMap<String, INet>) -> Result<Book, String> {
+pub fn nets_to_hvmc(nets: HashMap<String, INet>, info: &mut Diagnostics) -> Result<Book, Diagnostics> {
+  info.start_pass();
+
   let mut book = Book::default();
   for (name, inet) in nets {
-    let net = net_to_hvmc(&inet)?;
-    book.insert(name, net);
+    let res = net_to_hvmc(&inet);
+    if let Some(net) = info.take_inet_err(res, name.clone()) {
+      book.insert(name, net);
+    }
   }
-  Ok(book)
+
+  info.fatal(book)
 }
 
 /// Convert an inet-encoded definition into an hvmc AST inet.
-pub fn net_to_hvmc(inet: &INet) -> Result<Net, String> {
+pub fn net_to_hvmc(inet: &INet) -> Result<Net, ViciousCycleErr> {
   let (net_root, net_redexes) = get_tree_roots(inet)?;
   let mut port_to_var_id: HashMap<Port, VarId> = HashMap::new();
   let root = if let Some(net_root) = net_root {
@@ -98,7 +108,7 @@ type VarId = NodeId;
 /// Finds the roots of all the trees in the inet.
 /// Returns them as the root of the root tree and the active pairs of the net.
 /// Active pairs are found by a right-to-left, depth-first search.
-fn get_tree_roots(inet: &INet) -> Result<(Option<NodeId>, Vec<[NodeId; 2]>), String> {
+fn get_tree_roots(inet: &INet) -> Result<(Option<NodeId>, Vec<[NodeId; 2]>), ViciousCycleErr> {
   let mut redex_roots: Vec<[NodeId; 2]> = vec![];
   let mut movements: Vec<Movement> = vec![];
   let mut root_set = HashSet::from([ROOT.node()]);
@@ -166,7 +176,7 @@ fn explore_side_link(
   movements: &mut Vec<Movement>,
   redex_roots: &mut Vec<[NodeId; 2]>,
   root_set: &mut HashSet<NodeId>,
-) -> Result<(), String> {
+) -> Result<(), ViciousCycleErr> {
   let new_roots = go_up_tree(inet, node_id)?;
   // If this is a new tree, explore it downwards
   if !root_set.contains(&new_roots[0]) && !root_set.contains(&new_roots[1]) {
@@ -181,12 +191,12 @@ fn explore_side_link(
 
 /// Goes up a node tree, starting from some given node.
 /// Returns the active pair at the root of this tree.
-fn go_up_tree(inet: &INet, start_node: NodeId) -> Result<[NodeId; 2], String> {
+fn go_up_tree(inet: &INet, start_node: NodeId) -> Result<[NodeId; 2], ViciousCycleErr> {
   let mut explored_nodes = HashSet::new();
   let mut cur_node = start_node;
   loop {
     if !explored_nodes.insert(cur_node) {
-      return Err("Found term that compiles into an inet with a vicious cycle".to_string());
+      return Err(ViciousCycleErr);
     }
 
     let up = inet.enter_port(Port(cur_node, 0));
@@ -196,5 +206,11 @@ fn go_up_tree(inet: &INet, start_node: NodeId) -> Result<[NodeId; 2], String> {
     }
 
     cur_node = up.node();
+  }
+}
+
+impl ToStringVerbose for ViciousCycleErr {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    "Found term that compiles into an inet with a vicious cycle".into()
   }
 }

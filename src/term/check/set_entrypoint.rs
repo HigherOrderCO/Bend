@@ -1,29 +1,14 @@
 use crate::{
+  diagnostics::ToStringVerbose,
   term::{Book, Ctx, Definition, Name},
   ENTRY_POINT, HVM1_ENTRY_POINT,
 };
-use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub enum EntryErr {
   NotFound(Name),
   Multiple(Vec<Name>),
   MultipleRules,
-}
-
-impl Display for EntryErr {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      EntryErr::NotFound(name) => write!(f, "File has no '{name}' definition."),
-      EntryErr::Multiple(fnd) if fnd.len() == 2 => {
-        write!(f, "File has both '{}' and '{}' definitions.", fnd[0], fnd[1])
-      }
-      EntryErr::Multiple(fnd) => {
-        write!(f, "File has '{}', '{}' and '{}' definitions.", fnd[0], fnd[1], fnd[2])
-      }
-      EntryErr::MultipleRules => write!(f, "Main definition can't have more than one rule."),
-    }
-  }
 }
 
 impl Ctx<'_> {
@@ -35,30 +20,31 @@ impl Ctx<'_> {
       (Some(entry), None, None) | (None, Some(entry), None) | (None, None, Some(entry)) => {
         match validate_entry_point(entry) {
           Ok(name) => entrypoint = Some(name),
-          Err(err) => self.info.error(err),
+          Err(err) => self.info.add_book_error(err),
         }
       }
 
       (Some(a), Some(b), None) | (None, Some(a), Some(b)) | (Some(a), None, Some(b)) => {
-        self.info.error(EntryErr::Multiple(vec![a.name.clone(), b.name.clone()]));
+        self.info.add_book_error(EntryErr::Multiple(vec![a.name.clone(), b.name.clone()]));
 
         match validate_entry_point(a) {
           Ok(name) => entrypoint = Some(name),
-          Err(err) => self.info.error(err),
+          Err(err) => self.info.add_book_error(err),
         }
       }
 
       (Some(a), Some(b), Some(c)) => {
-        self.info.error(EntryErr::Multiple(vec![a.name.clone(), b.name.clone(), c.name.clone()]));
+        self.info.add_book_error(EntryErr::Multiple(vec![a.name.clone(), b.name.clone(), c.name.clone()]));
 
         match validate_entry_point(a) {
           Ok(name) => entrypoint = Some(name),
-          Err(err) => self.info.error(err),
+          Err(err) => self.info.add_book_error(err),
         }
       }
 
       (None, None, None) => {
-        self.info.error(EntryErr::NotFound(self.book.entrypoint.clone().unwrap_or(Name::from(ENTRY_POINT))))
+        let entrypoint = self.book.entrypoint.clone().unwrap_or(Name::from(ENTRY_POINT));
+        self.info.add_book_error(EntryErr::NotFound(entrypoint))
       }
     }
 
@@ -76,5 +62,20 @@ impl Book {
     let main = self.defs.get(&Name::from(ENTRY_POINT));
     let hvm1_main = self.defs.get(&Name::from(HVM1_ENTRY_POINT));
     (custom, main, hvm1_main)
+  }
+}
+
+impl ToStringVerbose for EntryErr {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    match self {
+      EntryErr::NotFound(name) => format!("File has no '{name}' definition."),
+      EntryErr::Multiple(fnd) if fnd.len() == 2 => {
+        format!("File has both '{}' and '{}' definitions.", fnd[0], fnd[1])
+      }
+      EntryErr::Multiple(fnd) => {
+        format!("File has '{}', '{}' and '{}' definitions.", fnd[0], fnd[1], fnd[2])
+      }
+      EntryErr::MultipleRules => "Main definition can't have more than one rule.".to_string(),
+    }
   }
 }

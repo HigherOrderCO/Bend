@@ -2,5 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/error_messages.hvm
 ---
+Errors:
 At tests/golden_tests/compile_file/error_messages.hvm:3:10: Repeated constructor 'B'
 [0m  3 | data C = [4m[31m(B)[0m

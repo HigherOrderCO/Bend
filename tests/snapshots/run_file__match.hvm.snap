@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match.hvm
 ---
 Lazy mode:
-
 λ* λa a
 
 Strict mode:
-
 λ* λa a

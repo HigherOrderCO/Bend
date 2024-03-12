@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/chars.hvm
 ---
 Lazy mode:
-
 "ሴ!7"
 
 Strict mode:
-
 "ሴ!7"

@@ -1,4 +1,4 @@
-use super::{net_to_term::ReadbackError, Book, Definition, Name, NumCtr, Op, Pattern, Rule, Tag, Term, Type};
+use super::{Book, Definition, Name, NumCtr, Op, Pattern, Rule, Tag, Term, Type};
 use std::{fmt, ops::Deref};
 
 /* Some aux structures for things that are not so simple to display */
@@ -187,58 +187,6 @@ impl fmt::Display for Type {
       Type::Adt(nam) => write!(f, "{nam}"),
     }
   }
-}
-
-impl fmt::Display for ReadbackError {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      ReadbackError::InvalidNumericMatch => write!(f, "Invalid Numeric Match"),
-      ReadbackError::InvalidNumericOp => write!(f, "Invalid Numeric Operation"),
-      ReadbackError::ReachedRoot => write!(f, "Reached Root"),
-      ReadbackError::Cyclic => write!(f, "Cyclic Term"),
-      ReadbackError::InvalidBind => write!(f, "Invalid Bind"),
-      ReadbackError::InvalidAdt => write!(f, "Invalid Adt"),
-      ReadbackError::UnexpectedTag(exp, fnd) => {
-        write!(f, "Unexpected tag found during Adt readback, expected '{exp}', but found ")?;
-
-        match fnd {
-          Tag::Static => write!(f, "no tag"),
-          _ => write!(f, "'{fnd}'"),
-        }
-      }
-      ReadbackError::InvalidAdtMatch => write!(f, "Invalid Adt Match"),
-      ReadbackError::InvalidStrTerm(term) => {
-        write!(f, "Invalid String Character value '{term}'")
-      }
-    }
-  }
-}
-
-pub fn display_readback_errors(errs: &[ReadbackError]) -> impl fmt::Display + '_ {
-  DisplayFn(move |f| {
-    if errs.is_empty() {
-      return Ok(());
-    }
-
-    writeln!(f, "Readback Warning:")?;
-    let mut err_counts = std::collections::HashMap::new();
-    for err in errs {
-      if err.can_count() {
-        *err_counts.entry(err).or_insert(0) += 1;
-      } else {
-        writeln!(f, "{err}")?;
-      }
-    }
-
-    for (err, count) in err_counts {
-      write!(f, "{err}")?;
-      if count > 1 {
-        writeln!(f, " ({count} occurrences)")?;
-      }
-    }
-
-    writeln!(f)
-  })
 }
 
 impl Term {

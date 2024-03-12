@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/unused_unscoped_bind.hvm
 ---
+Errors:
 In definition 'main':
   Unscoped variable from lambda 'λ$a' is never used.
-

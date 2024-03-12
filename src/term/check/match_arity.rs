@@ -1,17 +1,21 @@
 use crate::{
-  diagnostics::Info,
-  term::{transform::encode_pattern_matching::MatchErr, Ctx, Definition, Term},
+  diagnostics::{Diagnostics, ToStringVerbose},
+  term::{Ctx, Definition, Term},
 };
+
+pub struct MatchArityMismatchErr {
+  expected: usize,
+  found: usize,
+}
 
 impl Ctx<'_> {
   /// Checks that the number of arguments in every pattern matching rule is consistent.
-  pub fn check_match_arity(&mut self) -> Result<(), Info> {
+  pub fn check_match_arity(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
     for (def_name, def) in self.book.defs.iter() {
-      if let Err(e) = def.check_match_arity() {
-        self.info.def_error(def_name.clone(), e)
-      };
+      let res = def.check_match_arity();
+      self.info.take_rule_err(res, def_name.clone());
     }
 
     self.info.fatal(())
@@ -19,11 +23,12 @@ impl Ctx<'_> {
 }
 
 impl Definition {
-  pub fn check_match_arity(&self) -> Result<(), MatchErr> {
-    let expected_arity = self.arity();
+  pub fn check_match_arity(&self) -> Result<(), MatchArityMismatchErr> {
+    let expected = self.arity();
     for rule in &self.rules {
-      if rule.arity() != expected_arity {
-        return Err(MatchErr::ArityMismatch(rule.arity(), expected_arity));
+      let found = rule.arity();
+      if found != expected {
+        return Err(MatchArityMismatchErr { found, expected });
       }
       rule.body.check_match_arity()?;
     }
@@ -32,14 +37,14 @@ impl Definition {
 }
 
 impl Term {
-  pub fn check_match_arity(&self) -> Result<(), MatchErr> {
+  pub fn check_match_arity(&self) -> Result<(), MatchArityMismatchErr> {
     Term::recursive_call(move || {
       if let Term::Mat { args, rules } = self {
         let expected = args.len();
         for rule in rules {
           let found = rule.pats.len();
           if found != expected {
-            return Err(MatchErr::ArityMismatch(found, expected));
+            return Err(MatchArityMismatchErr { found, expected });
           }
         }
       }
@@ -49,5 +54,11 @@ impl Term {
       }
       Ok(())
     })
+  }
+}
+
+impl ToStringVerbose for MatchArityMismatchErr {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    format!("Arity mismatch in pattern matching. Expected {} patterns, found {}.", self.expected, self.found)
   }
 }

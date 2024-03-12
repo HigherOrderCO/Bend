@@ -1,21 +1,15 @@
 use crate::{
-  diagnostics::Info,
+  diagnostics::{Diagnostics, ToStringVerbose},
   term::{Ctx, Name, Pattern, Term},
 };
-use std::{collections::HashSet, fmt::Display};
+use std::collections::HashSet;
 
 #[derive(Debug, Clone)]
 pub struct UnboundCtrErr(Name);
 
-impl Display for UnboundCtrErr {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Unbound constructor '{}'.", self.0)
-  }
-}
-
 impl Ctx<'_> {
   /// Check if the constructors in rule patterns or match patterns are defined.
-  pub fn check_unbound_pats(&mut self) -> Result<(), Info> {
+  pub fn check_unbound_pats(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
     let is_ctr = |nam: &Name| self.book.ctrs.contains_key(nam);
@@ -23,11 +17,11 @@ impl Ctx<'_> {
       for rule in &def.rules {
         for pat in &rule.pats {
           let res = pat.check_unbounds(&is_ctr);
-          self.info.take_err(res, Some(def_name));
+          self.info.take_rule_err(res, def_name.clone());
         }
 
         let res = rule.body.check_unbound_pats(&is_ctr);
-        self.info.take_err(res, Some(def_name));
+        self.info.take_rule_err(res, def_name.clone());
       }
     }
 
@@ -68,5 +62,11 @@ impl Term {
       }
       Ok(())
     })
+  }
+}
+
+impl ToStringVerbose for UnboundCtrErr {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    format!("Unbound constructor '{}'.", self.0)
   }
 }

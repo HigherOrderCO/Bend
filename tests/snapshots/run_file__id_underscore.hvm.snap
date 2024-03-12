@@ -3,9 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/id_underscore.hvm
 ---
 Lazy mode:
-
 (2, 3)
 
 Strict mode:
-
 (2, 3)

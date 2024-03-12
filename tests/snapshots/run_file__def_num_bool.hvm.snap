@@ -3,15 +3,14 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/def_num_bool.hvm
 ---
 Lazy mode:
-
+Errors:
 In definition 'go':
   Non-exhaustive pattern matching. Hint:
     Case '+' not covered.
 
 
-
 Strict mode:
-
+Errors:
 In definition 'go':
   Non-exhaustive pattern matching. Hint:
     Case '+' not covered.

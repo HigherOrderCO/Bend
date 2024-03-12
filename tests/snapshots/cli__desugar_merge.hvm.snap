@@ -2,6 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/desugar_merge.hvm
 ---
+Warnings:
+In definition 'Z':
+  Definition is unused.
+
 (F_$_Z) = λ* λb b
 
 (main) = F_$_Z

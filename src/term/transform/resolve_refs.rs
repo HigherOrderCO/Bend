@@ -1,21 +1,12 @@
 use crate::{
-  diagnostics::Info,
+  diagnostics::{Diagnostics, ToStringVerbose},
   term::{Ctx, Name, Pattern, Term},
   CORE_BUILTINS,
 };
-use std::{
-  collections::{HashMap, HashSet},
-  fmt::Display,
-};
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]
 pub struct ReferencedMainErr;
-
-impl Display for ReferencedMainErr {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    write!(f, "Main definition can't be referenced inside the program.")
-  }
-}
 
 impl Ctx<'_> {
   /// Decides if names inside a term belong to a Var or to a Ref.
@@ -26,7 +17,7 @@ impl Ctx<'_> {
   /// Precondition: Refs are encoded as vars, Constructors are resolved.
   ///
   /// Postcondition: Refs are encoded as refs, with the correct def id.
-  pub fn resolve_refs(&mut self) -> Result<(), Info> {
+  pub fn resolve_refs(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
     let def_names = self.book.defs.keys().cloned().collect::<HashSet<_>>();
@@ -39,7 +30,7 @@ impl Ctx<'_> {
         }
 
         let res = rule.body.resolve_refs(&def_names, self.book.entrypoint.as_ref(), &mut scope);
-        self.info.take_err(res, Some(def_name));
+        self.info.take_rule_err(res, def_name.clone());
       }
     }
 
@@ -103,5 +94,11 @@ fn is_var_in_scope<'a>(name: &'a Name, scope: &HashMap<&'a Name, usize>) -> bool
   match scope.get(name) {
     Some(entry) => *entry == 0,
     None => true,
+  }
+}
+
+impl ToStringVerbose for ReferencedMainErr {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    "Main definition can't be referenced inside the program.".to_string()
   }
 }

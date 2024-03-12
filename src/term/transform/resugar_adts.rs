@@ -1,7 +1,16 @@
-use crate::term::{net_to_term::ReadbackError, Adt, AdtEncoding, Book, Name, Pattern, Rule, Tag, Term};
+use crate::{
+  diagnostics::ToStringVerbose,
+  term::{Adt, AdtEncoding, Book, Name, Pattern, Rule, Tag, Term},
+};
+
+pub enum AdtReadbackError {
+  InvalidAdt,
+  InvalidAdtMatch,
+  UnexpectedTag(Tag, Tag),
+}
 
 impl Term {
-  pub fn resugar_adts(&mut self, book: &Book, adt_encoding: AdtEncoding) -> Vec<ReadbackError> {
+  pub fn resugar_adts(&mut self, book: &Book, adt_encoding: AdtEncoding) -> Vec<AdtReadbackError> {
     let mut errs = Default::default();
     match adt_encoding {
       // No way of resugaring simple scott encoded terms.
@@ -11,7 +20,7 @@ impl Term {
     errs
   }
 
-  fn resugar_tagged_scott(&mut self, book: &Book, errs: &mut Vec<ReadbackError>) {
+  fn resugar_tagged_scott(&mut self, book: &Book, errs: &mut Vec<AdtReadbackError>) {
     Term::recursive_call(move || match self {
       Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
         if let Some((adt_name, adt)) = book.adts.get_key_value(adt_name) {
@@ -59,7 +68,7 @@ impl Term {
     book: &Book,
     adt: &Adt,
     adt_name: &Name,
-    errs: &mut Vec<ReadbackError>,
+    errs: &mut Vec<AdtReadbackError>,
   ) {
     let mut app = &mut *self;
     let mut current_arm = None;
@@ -69,7 +78,7 @@ impl Term {
         Term::Lam { tag: Tag::Named(tag), nam, bod } if tag == adt_name => {
           if let Some(nam) = nam {
             if current_arm.is_some() {
-              errs.push(ReadbackError::InvalidAdt);
+              errs.push(AdtReadbackError::InvalidAdt);
               return;
             }
             current_arm = Some((nam.clone(), ctr));
@@ -77,14 +86,14 @@ impl Term {
           app = bod;
         }
         _ => {
-          errs.push(ReadbackError::InvalidAdt);
+          errs.push(AdtReadbackError::InvalidAdt);
           return;
         }
       }
     }
 
     let Some((arm_name, (ctr, ctr_args))) = current_arm else {
-      errs.push(ReadbackError::InvalidAdt);
+      errs.push(AdtReadbackError::InvalidAdt);
       return;
     };
 
@@ -100,11 +109,11 @@ impl Term {
           cur = fun.as_mut();
         }
         Term::App { tag, .. } => {
-          errs.push(ReadbackError::UnexpectedTag(expected_tag, tag.clone()));
+          errs.push(AdtReadbackError::UnexpectedTag(expected_tag, tag.clone()));
           return;
         }
         _ => {
-          errs.push(ReadbackError::InvalidAdt);
+          errs.push(AdtReadbackError::InvalidAdt);
           return;
         }
       }
@@ -113,7 +122,7 @@ impl Term {
     match cur {
       Term::Var { nam } if nam == &arm_name => {}
       _ => {
-        errs.push(ReadbackError::InvalidAdt);
+        errs.push(AdtReadbackError::InvalidAdt);
         return;
       }
     }
@@ -157,7 +166,7 @@ impl Term {
     book: &Book,
     adt_name: &Name,
     adt: &Adt,
-    errs: &mut Vec<ReadbackError>,
+    errs: &mut Vec<AdtReadbackError>,
   ) {
     let mut cur = &mut *self;
     let mut arms = Vec::new();
@@ -180,7 +189,7 @@ impl Term {
               }
               _ => {
                 if let Term::Lam { tag, .. } = arm {
-                  errs.push(ReadbackError::UnexpectedTag(expected_tag.clone(), tag.clone()));
+                  errs.push(AdtReadbackError::UnexpectedTag(expected_tag.clone(), tag.clone()));
                 }
 
                 let arg = Name::new(format!("{ctr}.{field}"));
@@ -194,7 +203,7 @@ impl Term {
           cur = &mut *fun;
         }
         _ => {
-          errs.push(ReadbackError::InvalidAdtMatch);
+          errs.push(AdtReadbackError::InvalidAdtMatch);
           return;
         }
       }
@@ -206,5 +215,18 @@ impl Term {
     *self = Term::Mat { args, rules };
 
     self.resugar_tagged_scott(book, errs);
+  }
+}
+
+impl ToStringVerbose for AdtReadbackError {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    match self {
+      AdtReadbackError::InvalidAdt => "Invalid Adt.".to_string(),
+      AdtReadbackError::InvalidAdtMatch => "Invalid Adt Match.".to_string(),
+      AdtReadbackError::UnexpectedTag(expected, found) => {
+        let found = if let Tag::Static = found { "no tag".to_string() } else { format!("'{found}'") };
+        format!("Unexpected tag found during Adt readback, expected '{}', but found {}.", expected, found)
+      }
+    }
   }
 }
