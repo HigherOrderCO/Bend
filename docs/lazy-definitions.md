@@ -40,7 +40,7 @@ This code will work as expected, because `Nat.add` is unrolled lazily only when 
 
 ### Automatic optimization
 
-HVM-lang carries out [float-combinators](compiler-options#float-combinators) and [linearize-matches](compiler-options#linearize-matches) optimizations through the CLI, which is active by default in strict mode.
+HVM-lang carries out [match linearization](compiler-options#linearize-matches) and [combinator floating](compiler-options#float-combinators) optimizations, enabled through the CLI, which is active by default in strict mode.
 
 Consider the code below:
 
