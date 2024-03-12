@@ -19,8 +19,6 @@ main = (Nat.add (S (S (S Z))) (S Z))
 
 Because of that, is recommended to use [supercombinator](https://en.wikipedia.org/wiki/Supercombinator) formulation to make terms be unrolled lazily, preventing infinite expansion in recursive function bodies.
 
-Supercombinators are simply closed terms. Supercombinator formulation is writing the program as a composition of supercombinators. In this case, `Nat.add` can be a supercombinator.
-
 ```rs
 data Nat = Z | (S p)
 
@@ -36,17 +34,23 @@ This code will work as expected, because `Nat.add` is unrolled lazily only when 
 
 ### Automatic optimization
 
-HVM-lang carries out an optimization automatically:
+HVM-lang carries out a [float-combinators](compiler-options#float-combinators) optimization through the CLI, which is active by default in strict mode.
 
 Consider the code below:
+
 ```rs
 Zero = λf λx x
 Succ = λn λf λx (f n)
 ToMachine = λn (n λp (+ 1 (ToMachine p)) 0)
 ```
+
 The lambda terms without free variables are extracted to new definitions.
+
 ```rs
 ToMachine0 = λp (+ 1 (ToMachine p))
 ToMachine = λn (n ToMachine0 0)
 ```
+
 Definitions are lazy in the runtime. Floating lambda terms into new definitions will prevent infinite expansion.
+
+It's important to note that preventing infinite expansion through simple mutual recursion doesn't imply that a program lacks infinite expansion entirely or that it will terminate.
