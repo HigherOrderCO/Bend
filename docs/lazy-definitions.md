@@ -19,22 +19,28 @@ main = (Nat.add (S (S (S Z))) (S Z))
 
 Because of that, is recommended to use [supercombinator](https://en.wikipedia.org/wiki/Supercombinator) formulation to make terms be unrolled lazily, preventing infinite expansion in recursive function bodies.
 
-```rs
-data Nat = Z | (S p)
+The `Nat.add` definition below can be a supercombinator if linearized.
 
+```rs
 Nat.add = λaλb match a {
 	Z: b
 	(S p): (S (Nat.add p b))
 }
+```
 
-main = (Nat.add (S (S (S Z))) (S Z))
+```rs
+// Linearized Nat.add
+Nat.add = λa match a {
+	Z: λb b
+	(S p): λb (S (Nat.add p b))
+}
 ```
 
 This code will work as expected, because `Nat.add` is unrolled lazily only when it is used as an argument to a lambda.
 
 ### Automatic optimization
 
-HVM-lang carries out a [float-combinators](compiler-options#float-combinators) optimization through the CLI, which is active by default in strict mode.
+HVM-lang carries out [float-combinators](compiler-options#float-combinators) and [linearize-matches](compiler-options#linearize-matches) optimizations through the CLI, which is active by default in strict mode.
 
 Consider the code below:
 
