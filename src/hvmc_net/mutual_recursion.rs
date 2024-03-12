@@ -30,7 +30,10 @@ fn pretty_print_cycles(cycles: &[Vec<Ref>]) -> String {
   cycles
     .iter()
     .enumerate()
-    .map(|(i, cycles)| format!("Cycle {}: {}", 1 + i, cycles.join(" -> ")))
+    .map(|(i, cycle)| {
+      let cycle_str = cycle.iter().chain(cycle.first()).cloned().collect::<Vec<_>>().join(" -> ");
+      format!("Cycle {}: {}", 1 + i, cycle_str)
+    })
     .collect::<Vec<String>>()
     .join("\n")
 }

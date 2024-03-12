@@ -17,7 +17,7 @@ Nat.add = (Y λaddλaλb match a {
 main = (Nat.add (S (S (S Z))) (S Z))
 ```
 
-Because of that, is recommended to use [supercombinator](https://en.wikipedia.org/wiki/Supercombinator) formulation to make terms be unrolled lazily, preventing infinite expansion in recursive function bodies.
+Because of that, its recommended to use a [supercombinator](https://en.wikipedia.org/wiki/Supercombinator) formulation to make terms be unrolled lazily, preventing infinite expansion in recursive function bodies.
 
 The `Nat.add` definition below can be a supercombinator if linearized.
 
