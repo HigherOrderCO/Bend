@@ -1,0 +1,6 @@
+data Nat = (Z) | (S nat)
+
+(U60ToNat 0)   = Z
+(U60ToNat 1+p) = (S (U60ToNat p))
+
+(Main n) = (U60ToNat n)
