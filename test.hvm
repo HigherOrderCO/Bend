@@ -1,1 +1,0 @@
-main = ((HVM.store "file.txt" "Hello HVM :)") "File written.")

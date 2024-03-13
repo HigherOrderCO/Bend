@@ -26,6 +26,7 @@ struct ReadbackData {
   adt_encoding: AdtEncoding,
 }
 
+/// Adds the filesystem definitions (`HVM.store` and `HVM.load`) to the book
 pub(crate) fn add_fs_defs(
   book: Arc<Book>,
   host: Arc<Mutex<Host>>,

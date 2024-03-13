@@ -1,6 +1,6 @@
 use crate::{
-  diagnostics::{Diagnostics, ToStringVerbose},
   builtins::CORE_BUILTINS,
+  diagnostics::{Diagnostics, ToStringVerbose},
   term::{Ctx, Name, Pattern, Term},
 };
 use std::collections::{HashMap, HashSet};

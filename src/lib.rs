@@ -1,8 +1,8 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
 
-use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity};
 use builtins::create_host;
+use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity};
 use hvmc::{
   ast::{self, Net},
   dispatch_dyn_net,

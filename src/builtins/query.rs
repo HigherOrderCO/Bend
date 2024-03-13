@@ -21,7 +21,9 @@ pub(crate) fn make_query_def(host: Arc<Mutex<Host>>, labels: Arc<Labels>) -> Def
       let app_node = net.create_node(hvmc::run::Tag::Ctr, 0);
       let mut buf = String::new();
       let _ = std::io::stdin().read_line(&mut buf);
-      let text = Term::encode_str(&buf);
+      // strip trailing newline
+      let buf = buf.strip_suffix("\n").unwrap_or(&buf);
+      let text = Term::encode_str(buf);
       let mut labs = (*self.labels).clone();
       let text = crate::term::term_to_net::term_to_compat_net(&text, &mut labs);
       net.link_wire_port(output, app_node.p2);

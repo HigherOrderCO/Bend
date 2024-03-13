@@ -5,6 +5,17 @@ use hvmc::{
 
 /// This utility struct implements `AsArcDef`
 /// It is a wrapper around a type, and makes it act like a function.
+///
+/// ```txt
+/// FunctionLike[x] ~ (a b)
+/// ---
+/// <x as AsDefFunction>::call(a, b)
+///
+/// FunctionLike[x] ~ {lab a b} // (if lab != 0)
+/// ---
+/// FunctionLike[x] ~ a & FunctionLike[x] ~ b
+/// ```
+
 pub(crate) struct FunctionLike<T: AsDefFunction>(pub T);
 
 pub trait AsDefFunction: Send + Sync + 'static {

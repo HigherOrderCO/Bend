@@ -16,6 +16,7 @@ use crate::{
 
 use self::query::make_query_def;
 
+pub mod exit;
 pub mod fs;
 pub mod query;
 pub mod util;
@@ -23,9 +24,10 @@ pub mod util;
 /// These are the names of builtin defs that are not in the hvm-lang book, but
 /// are present in the hvm-core book. They are implemented using Rust code by
 /// [`create_host`] and they can not be rewritten as hvm-lang functions.
-pub const CORE_BUILTINS: [&str; 6] =
-  ["HVM.log", "HVM.black_box", "HVM.print", "HVM.query", "HVM.store", "HVM.load"];
-pub const CORE_BUILTINS_USES: [&[&str]; 6] = [&[], &[], &[], &[SCONS, SNIL], &[], &[]];
+pub const CORE_BUILTINS: [&str; 7] =
+  ["HVM.log", "HVM.black_box", "HVM.print", "HVM.query", "HVM.store", "HVM.load", "HVM.exit"];
+/// List of definition names used by the core builtins
+pub const CORE_BUILTINS_USES: [&[&str]; 7] = [&[], &[], &[], &[SCONS, SNIL], &[], &[], &[]];
 
 /// Creates a host with the hvm-core primitive definitions built-in.
 /// This needs the book as an Arc because the closure that logs
@@ -58,6 +60,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
   });
   host.lock().unwrap().insert_def("HVM.query", make_query_def(host.clone(), labels.clone()));
   fs::add_fs_defs(book.clone(), host.clone(), labels.clone(), adt_encoding.clone());
+  exit::add_exit_def(host.clone());
   let book = ast::Book::from_str("@HVM.black_box = (x x)").unwrap();
   host.lock().unwrap().insert_book(&book);
 

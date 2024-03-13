@@ -1,6 +1,6 @@
 use crate::{
-  diagnostics::{ToStringVerbose, WarningType},
   builtins::{CORE_BUILTINS, CORE_BUILTINS_USES},
+  diagnostics::{ToStringVerbose, WarningType},
   term::{Adt, AdtEncoding, Book, Ctx, Name, Tag, Term, LIST, STRING},
 };
 use indexmap::IndexSet;
