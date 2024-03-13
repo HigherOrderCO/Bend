@@ -59,7 +59,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
     })
   });
   host.lock().unwrap().insert_def("HVM.query", make_query_def(host.clone(), labels.clone()));
-  fs::add_fs_defs(book.clone(), host.clone(), labels.clone(), adt_encoding.clone());
+  fs::add_fs_defs(book.clone(), host.clone(), labels.clone(), adt_encoding);
   exit::add_exit_def(host.clone());
   let book = ast::Book::from_str("@HVM.black_box = (x x)").unwrap();
   host.lock().unwrap().insert_book(&book);

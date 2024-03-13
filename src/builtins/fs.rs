@@ -95,10 +95,8 @@ pub(crate) fn add_fs_defs(
         let contents = self
           .filename
           .clone()
-          .map(|filename| std::fs::read(filename).ok())
-          .flatten()
-          .map(|x| std::str::from_utf8(&x).map(|x| x.to_string()).ok())
-          .flatten()
+          .and_then(|filename| std::fs::read(filename).ok())
+          .and_then(|x| std::str::from_utf8(&x).map(|x| x.to_string()).ok())
           .unwrap_or(String::from(""));
         let contents = Term::encode_str(&contents);
         let mut labels = (*self.readback_data.labels).clone();

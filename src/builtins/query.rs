@@ -22,7 +22,7 @@ pub(crate) fn make_query_def(host: Arc<Mutex<Host>>, labels: Arc<Labels>) -> Def
       let mut buf = String::new();
       let _ = std::io::stdin().read_line(&mut buf);
       // strip trailing newline
-      let buf = buf.strip_suffix("\n").unwrap_or(&buf);
+      let buf = buf.strip_suffix('\n').unwrap_or(&buf);
       let text = Term::encode_str(buf);
       let mut labs = (*self.labels).clone();
       let text = crate::term::term_to_net::term_to_compat_net(&text, &mut labs);
@@ -32,7 +32,7 @@ pub(crate) fn make_query_def(host: Arc<Mutex<Host>>, labels: Arc<Labels>) -> Def
         net.link_wire_port(input, app_node.p0);
         return;
       };
-      let _text = self.host.lock().unwrap().encode_net(net, Trg::port(app_node.p1), &text);
+      self.host.lock().unwrap().encode_net(net, Trg::port(app_node.p1), &text);
       net.link_wire_port(input, app_node.p0);
     }
   }
