@@ -39,7 +39,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
       move |tree| {
         let net = hvmc::ast::Net { root: tree, redexes: vec![] };
         let (term, errs) = readback_hvmc(&net, &book, &labels, false, adt_encoding);
-        println!("{}{}", display_readback_errors(&errs), term);
+        println!("{}{}", errs.display_with_severity(crate::diagnostics::Severity::Error), term);
       }
     })
   });
