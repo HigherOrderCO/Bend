@@ -136,6 +136,26 @@ pub fn desugar_book(
   ctx.check_unbound_vars()?;
 
   ctx.book.convert_match_def_to_term();
+
+  // TODO: We give variables fresh names before the match
+  // simplification to avoid `foo a a = a` binding to the wrong
+  // variable (it should be the second `a`). Ideally we'd like this
+  // pass to create the binds in the correct order, but to do that we
+  // have to reverse the order of the created let expressions when we
+  // have multiple consecutive var binds without a match in between,
+  // and I couldn't think of a simple way of doing that.
+  //
+  // In the paper this is not a problem because all var matches are
+  // pushed to the end, so it only needs to fix it in the irrefutable
+  // rule case. We could maybe do the opposite and do all var matches
+  // first, when it would also become easy to deal with. But this
+  // would potentially generate suboptimal lambda terms, need to think
+  // more about it.
+  //
+  // We technically still generate the let bindings in the wrong order
+  // but since lets can float between the binds it uses in its body
+  // and the places where its variable is used, this is not a problem.
+  ctx.book.make_var_names_unique();
   ctx.simplify_matches()?;
 
   if opts.linearize_matches.enabled() {
