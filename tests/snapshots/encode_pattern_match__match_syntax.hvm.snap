@@ -3,14 +3,14 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_syntax.hvm
 ---
 TaggedScott:
-(head) = λa #List_ (a #List_ λc #List_ λ* c Nil)
+(head) = λa #List_ (a #List_ λb #List_ λ* b Nil)
 
 (Nil) = #List_ λ* #List_ λb b
 
 (Cons) = λa λb #List_ λc #List_ λ* #List_ (c a b)
 
 Scott:
-(head) = λa (a λc λ* c Nil)
+(head) = λa (a λb λ* b Nil)
 
 (Nil) = λ* λb b
 

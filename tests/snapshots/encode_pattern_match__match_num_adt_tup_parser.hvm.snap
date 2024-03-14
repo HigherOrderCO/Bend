@@ -3,9 +3,9 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_num_adt_tup_parser.hvm
 ---
 TaggedScott:
-(Parse) = λa λb (#String (b #String λc #String λd λe (match (- c 40) { 0: λf λg (Ok (40, g, f)); 1+: λk match k { 0: λl λm (Ok (41, m, l)); 1+: λq match (- q 18446744073709551584) { 0: λr λs (Ok (0, s, r)); 1+: λw λy λz (Err ((String.cons (+ w 11) z), y)) } } } e d) λeb (Err (String.nil, eb))) a)
+(Parse) = λa λb (#String (b #String λc #String λd λe (match (- c 40) { 0: λf λg (Ok (40, g, f)); 1+: λi match i { 0: λj λk (Ok (41, k, j)); 1+: λm match (- m 18446744073709551584) { 0: λn λo (Ok (0, o, n)); 1+: λq λs λt (Err ((String.cons (+ q 11) t), s)) } } } e d) λu (Err (String.nil, u))) a)
 
-(main) = #Result ((Parse * (String.cons 40 (String.cons 43 String.nil))) #Result λd let (e, f, g) = d; (e, (Parse g f)) #Result λk (Err k))
+(main) = #Result ((Parse * (String.cons 40 (String.cons 43 String.nil))) #Result λd let (e, f, g) = d; (e, (Parse g f)) #Result λh (Err h))
 
 (String.cons) = λa λb #String λc #String λ* #String (c a b)
 
@@ -16,9 +16,9 @@ TaggedScott:
 (Ok) = λa #Result λb #Result λ* #Result (b a)
 
 Scott:
-(Parse) = λa λb (b λc λd λe (match (- c 40) { 0: λf λg (Ok (40, g, f)); 1+: λk match k { 0: λl λm (Ok (41, m, l)); 1+: λq match (- q 18446744073709551584) { 0: λr λs (Ok (0, s, r)); 1+: λw λy λz (Err ((String.cons (+ w 11) z), y)) } } } e d) λeb (Err (String.nil, eb)) a)
+(Parse) = λa λb (b λc λd λe (match (- c 40) { 0: λf λg (Ok (40, g, f)); 1+: λi match i { 0: λj λk (Ok (41, k, j)); 1+: λm match (- m 18446744073709551584) { 0: λn λo (Ok (0, o, n)); 1+: λq λs λt (Err ((String.cons (+ q 11) t), s)) } } } e d) λu (Err (String.nil, u)) a)
 
-(main) = (Parse * (String.cons 40 (String.cons 43 String.nil)) λd let (e, f, g) = d; (e, (Parse g f)) λk (Err k))
+(main) = (Parse * (String.cons 40 (String.cons 43 String.nil)) λd let (e, f, g) = d; (e, (Parse g f)) λh (Err h))
 
 (String.cons) = λa λb λc λ* (c a b)
 

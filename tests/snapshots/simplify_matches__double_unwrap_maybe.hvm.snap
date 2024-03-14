@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/double_unwrap_maybe.hvm
 ---
-(DoubleUnwrap) = λa λb (match a { (Some c): λd (match c { (Some e): λ* e; (None): λh h } d); (None): λl l } b)
+(DoubleUnwrap) = λa λb (match a { (Some c): λd (match c { (Some e): λ* e; (None): λg g } d); (None): λi i } b)
 
 (Main) = (DoubleUnwrap (Some None) 5)
 

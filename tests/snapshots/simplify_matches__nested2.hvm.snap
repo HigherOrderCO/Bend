@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/nested2.hvm
 ---
-(Foo) = λa λb (match b { (List.cons c d): λe (match d { (List.cons f g): λh λi (h i f g); (List.nil): λn λo (n (List.cons o List.nil)) } e c); (List.nil): λu (u List.nil) } a)
+(Foo) = λa λb (match b { (List.cons c d): λe (match d { (List.cons f g): λh λi (h i f g); (List.nil): λj λk (j (List.cons k List.nil)) } e c); (List.nil): λm (m List.nil) } a)
 
 (List.nil) = #List λ* #List λb b
 

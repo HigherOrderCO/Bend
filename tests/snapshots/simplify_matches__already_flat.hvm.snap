@@ -4,13 +4,13 @@ input_file: tests/golden_tests/simplify_matches/already_flat.hvm
 ---
 (Rule1) = λa a
 
-(Rule2) = λ* λc c
+(Rule2) = λ* λb b
 
 (Rule3) = λa λb λc λd (a b c d)
 
 (Rule4) = λa match a { (CtrA): λc c; (CtrB d): d }
 
-(Rule5) = λa λb (match a { (CtrA1 c): λd (c d); (CtrA2 g h): λi (g h i); (CtrA3 m): λn (match n { (CtrB0): λo (CtrA3 o); (CtrB1 s): λt (CtrA3 t s); (CtrB2 x): λy (CtrA3 y (CtrB2 x)); (CtrB3 db): λeb (eb db) } m) } b)
+(Rule5) = λa λb (match a { (CtrA1 c): λd (c d); (CtrA2 e f): λg (e f g); (CtrA3 h): λi (match i { (CtrB0): λj (CtrA3 j); (CtrB1 l): λm (CtrA3 m l); (CtrB2 n): λo (CtrA3 o (CtrB2 n)); (CtrB3 p): λq (q p) } h) } b)
 
 (Rule6) = λa a
 
