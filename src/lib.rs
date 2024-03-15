@@ -4,7 +4,7 @@
 use builtins::create_host;
 use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity};
 use hvmc::{
-  ast::{self, Net},
+  ast::Net,
   dispatch_dyn_net,
   host::Host,
   run::{DynNet, Heap, Rewrites},
@@ -196,27 +196,13 @@ pub fn count_nodes<'l>(net: &'l hvmc::ast::Net) -> usize {
     visit.push(r);
   }
   while let Some(tree) = visit.pop() {
-    match tree {
-      ast::Tree::Ctr { lft, rgt, .. } => {
-        count += 1;
-        visit.push(lft);
-        visit.push(rgt);
-      }
-      ast::Tree::Op { rhs, out, .. } => {
-        count += 1;
-        visit.push(rhs);
-        visit.push(out);
-      }
-      ast::Tree::Mat { sel, ret } => {
-        count += 1;
-        visit.push(sel);
-        visit.push(ret);
-      }
-      ast::Tree::Var { .. } => (),
-      _ => {
-        count += 1;
-      }
-    };
+    // If it is not 0-ary, then we'll count it as a node.
+    if tree.children().next().is_some() {
+      count += 1;
+    }
+    for subtree in tree.children() {
+      visit.push(subtree);
+    }
   }
   count
 }
