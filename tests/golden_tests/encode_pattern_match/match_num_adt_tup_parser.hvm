@@ -1,5 +1,5 @@
 // Testing various forms of pattern matching
-data Result = (Ok val) | (Err err)
+data Result_ = (Ok val) | (Err err)
 
 Parse state (String.cons '(' xs) = (Ok ('(', xs, state))
 Parse state (String.cons ')' xs) = (Ok (')', xs, state))

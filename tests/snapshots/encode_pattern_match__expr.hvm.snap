@@ -11,6 +11,10 @@ TaggedScott:
 
 (Add) = #Op λa #Op λ* #Op λ* #Op λ* a
 
+(Op2) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λl #Expr (l a b c)
+
+(Tup) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λj #Expr λ* #Expr (j a b)
+
 (Var) = λa #Expr λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (b a)
 
 (Num) = λa #Expr λ* #Expr λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (c a)
@@ -25,10 +29,6 @@ TaggedScott:
 
 (Dup) = λa λb λc λd #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λk #Expr λ* #Expr λ* #Expr (k a b c d)
 
-(Tup) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λj #Expr λ* #Expr (j a b)
-
-(Op2) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λl #Expr (l a b c)
-
 Scott:
 (Div) = λ* λ* λ* λd d
 
@@ -37,6 +37,10 @@ Scott:
 (Sub) = λ* λb λ* λ* b
 
 (Add) = λa λ* λ* λ* a
+
+(Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)
+
+(Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
 
 (Var) = λa λb λ* λ* λ* λ* λ* λ* λ* λ* (b a)
 
@@ -51,7 +55,3 @@ Scott:
 (Let) = λa λb λc λ* λ* λ* λ* λ* λi λ* λ* λ* (i a b c)
 
 (Dup) = λa λb λc λd λ* λ* λ* λ* λ* λ* λk λ* λ* (k a b c d)
-
-(Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
-
-(Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)

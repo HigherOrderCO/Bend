@@ -6,7 +6,7 @@ data Option
   = (Some x)
   | None
 
-data Result
+data Result_
   = (Ok a)
   | (Err b)
 

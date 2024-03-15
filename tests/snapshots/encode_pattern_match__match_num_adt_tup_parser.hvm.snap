@@ -5,15 +5,15 @@ input_file: tests/golden_tests/encode_pattern_match/match_num_adt_tup_parser.hvm
 TaggedScott:
 (Parse) = λa λb (#String (b #String λc #String λd λe (match (- c 40) { 0: λf λg (Ok (40, g, f)); 1+: λi match i { 0: λj λk (Ok (41, k, j)); 1+: λm match (- m 18446744073709551584) { 0: λn λo (Ok (0, o, n)); 1+: λq λs λt (Err ((String.cons (+ q 11) t), s)) } } } e d) λu (Err (String.nil, u))) a)
 
-(main) = #Result ((Parse * (String.cons 40 (String.cons 43 String.nil))) #Result λd let (e, f, g) = d; (e, (Parse g f)) #Result λh (Err h))
+(main) = #Result_ ((Parse * (String.cons 40 (String.cons 43 String.nil))) #Result_ λd let (e, f, g) = d; (e, (Parse g f)) #Result_ λh (Err h))
 
 (String.cons) = λa λb #String λc #String λ* #String (c a b)
 
 (String.nil) = #String λ* #String λb b
 
-(Err) = λa #Result λ* #Result λc #Result (c a)
+(Err) = λa #Result_ λ* #Result_ λc #Result_ (c a)
 
-(Ok) = λa #Result λb #Result λ* #Result (b a)
+(Ok) = λa #Result_ λb #Result_ λ* #Result_ (b a)
 
 Scott:
 (Parse) = λa λb (b λc λd λe (match (- c 40) { 0: λf λg (Ok (40, g, f)); 1+: λi match i { 0: λj λk (Ok (41, k, j)); 1+: λm match (- m 18446744073709551584) { 0: λn λo (Ok (0, o, n)); 1+: λq λs λt (Err ((String.cons (+ q 11) t), s)) } } } e d) λu (Err (String.nil, u)) a)
