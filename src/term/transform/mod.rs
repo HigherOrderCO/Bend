@@ -1,4 +1,5 @@
 pub mod apply_args;
+pub mod apply_use;
 pub mod definition_merge;
 pub mod definition_pruning;
 pub mod desugar_implicit_match_binds;

@@ -331,6 +331,7 @@ impl Term {
       | Term::Opx { fst, snd, .. } => {
         fst.insert_split(split, threshold)? + snd.insert_split(split, threshold)?
       }
+      Term::Use { .. } => unreachable!(),
       Term::Sup { els, .. } | Term::Tup { els } => {
         let mut n = 0;
         for el in els {
@@ -418,7 +419,7 @@ impl Term {
           rule.body.fix_names(id_counter, book);
         }
       }
-      Term::Let { .. } | Term::Lst { .. } => unreachable!(),
+      Term::Let { .. } | Term::Use { .. } | Term::Lst { .. } => unreachable!(),
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {}
     }
   }

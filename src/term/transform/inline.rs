@@ -53,6 +53,7 @@ impl Term {
         Term::Chn { .. } | Term::Lnk { .. } => false,
         Term::Str { .. } | Term::Lst { .. } => false,
         Term::Let { .. } => false,
+        Term::Use { .. } => unreachable!(),
         Term::App { .. } => false,
         Term::Dup { .. } => false,
         Term::Opx { .. } => false,

@@ -215,6 +215,7 @@ impl EncodeTermState<'_> {
           self.encode_term(nxt, up)
         }
         Term::Let { .. } => unreachable!(), // Removed in earlier pass
+        Term::Use { .. } => unreachable!(), // Removed in earlier pass
         Term::Sup { tag, els } => {
           let lab = self.labels.dup.generate(tag).unwrap();
           let (main, aux) = self.make_node_list(Dup { lab }, els.len());

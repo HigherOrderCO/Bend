@@ -53,6 +53,9 @@ impl fmt::Display for Term {
       Term::Let { pat, val, nxt } => {
         write!(f, "let {} = {}; {}", pat, val, nxt)
       }
+      Term::Use { nam, val, nxt } => {
+        write!(f, "use {} = {}; {}", nam, val, nxt)
+      }
       Term::Ref { nam: def_name } => write!(f, "{def_name}"),
       Term::App { tag, fun, arg } => {
         write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag), arg)

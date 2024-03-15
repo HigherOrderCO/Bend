@@ -61,7 +61,13 @@ impl Term {
           rule.body.encode_builtins();
         }
       }
-      Term::Var { .. } | Term::Lnk { .. } | Term::Ref { .. } | Term::Num { .. } | Term::Era | Term::Err => {}
+      Term::Use { .. }
+      | Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Ref { .. }
+      | Term::Num { .. }
+      | Term::Era
+      | Term::Err => {}
     }
   }
 
