@@ -18,9 +18,10 @@ pub enum SimplifyMatchErr {
 impl Ctx<'_> {
   pub fn simplify_matches(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
+    let name_gen = &mut 0;
 
     for (def_name, def) in self.book.defs.iter_mut() {
-      let res = def.simplify_matches(&self.book.ctrs, &self.book.adts);
+      let res = def.simplify_matches(&self.book.ctrs, &self.book.adts, name_gen);
       self.info.take_rule_err(res, def_name.clone());
     }
 
@@ -29,8 +30,12 @@ impl Ctx<'_> {
 }
 
 impl Definition {
-  pub fn simplify_matches(&mut self, ctrs: &Constructors, adts: &Adts) -> Result<(), SimplifyMatchErr> {
-    let name_gen = &mut 0;
+  pub fn simplify_matches(
+    &mut self,
+    ctrs: &Constructors,
+    adts: &Adts,
+    name_gen: &mut usize,
+  ) -> Result<(), SimplifyMatchErr> {
     for rule in self.rules.iter_mut() {
       rule.body.simplify_matches(ctrs, adts, name_gen)?;
     }
@@ -42,6 +47,9 @@ impl Term {
   /// Converts match expressions with multiple matched arguments and
   /// arbitrary patterns into matches on a single value, with only
   /// simple (non-nested) patterns, and one rule for each constructor.
+  ///
+  /// The `name_gen` is used to generate fresh variable names for
+  /// substitution to avoid name clashes.
   ///
   /// See `[simplify_match_expression]` for more information.
   pub fn simplify_matches(
@@ -354,14 +362,8 @@ fn switch_rule_submatch_arm(rule: &Rule, ctr: &Pattern, nested_fields: &[Option<
     let body = rule.body.clone();
     Some(Rule { pats, body })
   } else if rule.pats[0].is_wildcard() {
-    // Var, reconstruct the value matched in the expression above.
-    // match x ... {var ...: Body; ...}
-    // becomes
-    // match x {
-    //   (Ctr x%field0 ...): match x1 ... {
-    //     x%field0 ...: let var = (Ctr x%field0 ...); Body;
-    //   ... };
-    // ... }
+    // Use `subst` to replace the pattern variable in the body
+    // of the rule with the term that represents the matched constructor.
     let mut body = rule.body.clone();
     if let Pattern::Var(Some(nam)) = &rule.pats[0] {
       body.subst(nam, &ctr.to_term());
