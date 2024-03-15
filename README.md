@@ -89,6 +89,21 @@ A let term binds some value to the next term, in this case `(* result 2)`:
 let result = (+ 1 2); (* result 2)
 ```
 
+The use term inline clones of some value to the next term:
+```rs
+use result = (+ 1 2); (* result result)
+
+// Equivalent to
+(* (+ 1 2) (+ 1 2))
+```
+The same term with `let` duplicates the value:
+```rs
+let result = (+ 1 2); (* result result)
+
+// Equivalent to
+let {result_1 result_2} = (+ 1 2); (* result_1 result_2)
+```
+
 It is possible to define tuples:
 ```rs
 tup = (2, 2)
