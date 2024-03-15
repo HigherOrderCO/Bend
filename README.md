@@ -89,7 +89,7 @@ A let term binds some value to the next term, in this case `(* result 2)`:
 let result = (+ 1 2); (* result 2)
 ```
 
-The use term inline clones of some value to the next term:
+The `use` term inlines clones of some value to the next term:
 ```rs
 use result = (+ 1 2); (* result result)
 
