@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/bits_dec.hvm
 ---
-(Data.Bits.dec) = λa match a { (Data.Bits.e): Data.Bits.e; (Data.Bits.o c): match c { (Data.Bits.e): Data.Bits.e; (Data.Bits.o e): (Data.Bits.i (Data.Bits.dec e)); (Data.Bits.i g): (Data.Bits.i (Data.Bits.dec g)) }; (Data.Bits.i i): match i { (Data.Bits.e): (Data.Bits.o Data.Bits.e); (Data.Bits.o k): (Data.Bits.o k); (Data.Bits.i m): (Data.Bits.o m) } }
+(Data.Bits.dec) = λa match a { (Data.Bits.e): Data.Bits.e; (Data.Bits.o c): match c { (Data.Bits.e): Data.Bits.e; (Data.Bits.o e): (Data.Bits.i (Data.Bits.dec e)); (Data.Bits.i f): (Data.Bits.i (Data.Bits.dec f)) }; (Data.Bits.i g): match g { (Data.Bits.e): (Data.Bits.o Data.Bits.e); (Data.Bits.o i): (Data.Bits.o i); (Data.Bits.i j): (Data.Bits.o j) } }
 
 (Data.Bits.i) = λa #Data.Bits λ* #Data.Bits λ* #Data.Bits λd #Data.Bits (d a)
 

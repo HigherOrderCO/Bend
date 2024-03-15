@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/nested.hvm
 ---
-(Rule) = λa match a { (CtrA b c): (match c { (CtrB1 d): λe (e d); (CtrB2 h i): λj (match h { (CtrC): λk λl (k l) } j i) } b); (CtrB p): p }
+(Rule) = λa match a { (CtrA b c): (match c { (CtrB1 d): λe (e d); (CtrB2 f g): λh (match f { (CtrC): λi λj (i j) } h g) } b); (CtrB l): l }
 
 (CtrC) = #Baz λa a
 

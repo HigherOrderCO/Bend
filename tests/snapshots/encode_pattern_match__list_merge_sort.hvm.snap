@@ -3,19 +3,19 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 ---
 TaggedScott:
-(If) = λa λb λc (#Bool (a λd λ* d λ* λj j) b c)
+(If) = λa λb λc (#Bool (a λd λ* d λ* λh h) b c)
 
 (Pure) = λa (Cons a Nil)
 
-(Map) = λa λb (#List_ (a #List_ λc #List_ λd λe let {f f_2} = e; (Cons (f c) (Map d f_2)) λ* Nil) b)
+(Map) = λa λb (#List_ (a #List_ λc #List_ λd λe let {e e_2} = e; (Cons (e c) (Map d e_2)) λ* Nil) b)
 
 (MergeSort) = λa λb (Unpack a (Map b Pure))
 
-(Unpack) = λa λb (#List_ (b #List_ λc #List_ λd λe (#List_ (d #List_ λf #List_ λg λh λi let {o o_2} = h; (Unpack o (MergePair o_2 (Cons i (Cons f g)))) λ* λq q) e c) λ* Nil) a)
+(Unpack) = λa λb (#List_ (b #List_ λc #List_ λd λe (#List_ (d #List_ λf #List_ λg λh let {h h_2} = h; λi (Unpack h (MergePair h_2 (Cons i (Cons f g)))) λ* λk k) e c) λ* Nil) a)
 
-(MergePair) = λa λb (#List_ (b #List_ λc #List_ λd λe (#List_ (d #List_ λf #List_ λg λh λi let {m m_2} = h; (Cons (Merge m i f) (MergePair m_2 g)) λ* λo (Cons o Nil)) e c) λ* Nil) a)
+(MergePair) = λa λb (#List_ (b #List_ λc #List_ λd λe (#List_ (d #List_ λf #List_ λg λh let {h h_2} = h; λi (Cons (Merge h i f) (MergePair h_2 g)) λ* λk (Cons k Nil)) e c) λ* Nil) a)
 
-(Merge) = λa λb λc (#List_ (b #List_ λd #List_ λe λf λg (#List_ (g #List_ λh #List_ λi λj λk λl let {m m_2} = i; let {n n_2 n_3} = h; let {o o_2} = l; let {p p_2 p_3} = k; let {q q_2 q_3} = j; (If (q p n) (Cons p_2 (Merge q_2 o (Cons n_2 m))) (Cons n_3 (Merge q_3 (Cons p_3 o_2) m_2))) λ* λu λv (Cons u v)) f d e) λ* λcb cb) a c)
+(Merge) = λa λb λc (#List_ (b #List_ λd #List_ λe λf λg (#List_ (g #List_ λh let {h h_2 h_3} = h; #List_ λi let {i i_2} = i; λj let {j j_2 j_3} = j; λk let {k k_2 k_3} = k; λl let {l l_2} = l; (If (j k h) (Cons k_2 (Merge j_2 l (Cons h_2 i))) (Cons h_3 (Merge j_3 (Cons k_3 l_2) i_2))) λ* λp λq (Cons p q)) f d e) λ* λt t) a c)
 
 (Nil) = #List_ λ* #List_ λb b
 
@@ -26,19 +26,19 @@ TaggedScott:
 (True) = #Bool λa #Bool λ* a
 
 Scott:
-(If) = λa λb λc (a λd λ* d λ* λj j b c)
+(If) = λa λb λc (a λd λ* d λ* λh h b c)
 
 (Pure) = λa (Cons a Nil)
 
-(Map) = λa λb (a λc λd λe let {f f_2} = e; (Cons (f c) (Map d f_2)) λ* Nil b)
+(Map) = λa λb (a λc λd λe let {e e_2} = e; (Cons (e c) (Map d e_2)) λ* Nil b)
 
 (MergeSort) = λa λb (Unpack a (Map b Pure))
 
-(Unpack) = λa λb (b λc λd λe (d λf λg λh λi let {o o_2} = h; (Unpack o (MergePair o_2 (Cons i (Cons f g)))) λ* λq q e c) λ* Nil a)
+(Unpack) = λa λb (b λc λd λe (d λf λg λh let {h h_2} = h; λi (Unpack h (MergePair h_2 (Cons i (Cons f g)))) λ* λk k e c) λ* Nil a)
 
-(MergePair) = λa λb (b λc λd λe (d λf λg λh λi let {m m_2} = h; (Cons (Merge m i f) (MergePair m_2 g)) λ* λo (Cons o Nil) e c) λ* Nil a)
+(MergePair) = λa λb (b λc λd λe (d λf λg λh let {h h_2} = h; λi (Cons (Merge h i f) (MergePair h_2 g)) λ* λk (Cons k Nil) e c) λ* Nil a)
 
-(Merge) = λa λb λc (b λd λe λf λg (g λh λi λj λk λl let {m m_2} = i; let {n n_2 n_3} = h; let {o o_2} = l; let {p p_2 p_3} = k; let {q q_2 q_3} = j; (If (q p n) (Cons p_2 (Merge q_2 o (Cons n_2 m))) (Cons n_3 (Merge q_3 (Cons p_3 o_2) m_2))) λ* λu λv (Cons u v) f d e) λ* λcb cb a c)
+(Merge) = λa λb λc (b λd λe λf λg (g λh let {h h_2 h_3} = h; λi let {i i_2} = i; λj let {j j_2 j_3} = j; λk let {k k_2 k_3} = k; λl let {l l_2} = l; (If (j k h) (Cons k_2 (Merge j_2 l (Cons h_2 i))) (Cons h_3 (Merge j_3 (Cons k_3 l_2) i_2))) λ* λp λq (Cons p q) f d e) λ* λt t a c)
 
 (Nil) = λ* λb b
 

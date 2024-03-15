@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/concat.hvm
 ---
 TaggedScott:
-(String.concat) = λa λb (#String (a #String λc #String λd λe (String.cons c (String.concat d e)) λh h) b)
+(String.concat) = λa λb (#String (a #String λc #String λd λe (String.cons c (String.concat d e)) λf f) b)
 
 (main) = (String.concat (String.cons 97 (String.cons 98 String.nil)) (String.cons 99 (String.cons 100 String.nil)))
 
@@ -12,7 +12,7 @@ TaggedScott:
 (String.nil) = #String λ* #String λb b
 
 Scott:
-(String.concat) = λa λb (a λc λd λe (String.cons c (String.concat d e)) λh h b)
+(String.concat) = λa λb (a λc λd λe (String.cons c (String.concat d e)) λf f b)
 
 (main) = (String.concat (String.cons 97 (String.cons 98 String.nil)) (String.cons 99 (String.cons 100 String.nil)))
 

@@ -18,9 +18,10 @@ pub enum SimplifyMatchErr {
 impl Ctx<'_> {
   pub fn simplify_matches(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
+    let name_gen = &mut 0;
 
     for (def_name, def) in self.book.defs.iter_mut() {
-      let res = def.simplify_matches(&self.book.ctrs, &self.book.adts);
+      let res = def.simplify_matches(&self.book.ctrs, &self.book.adts, name_gen);
       self.info.take_rule_err(res, def_name.clone());
     }
 
@@ -29,9 +30,14 @@ impl Ctx<'_> {
 }
 
 impl Definition {
-  pub fn simplify_matches(&mut self, ctrs: &Constructors, adts: &Adts) -> Result<(), SimplifyMatchErr> {
+  pub fn simplify_matches(
+    &mut self,
+    ctrs: &Constructors,
+    adts: &Adts,
+    name_gen: &mut usize,
+  ) -> Result<(), SimplifyMatchErr> {
     for rule in self.rules.iter_mut() {
-      rule.body.simplify_matches(ctrs, adts)?;
+      rule.body.simplify_matches(ctrs, adts, name_gen)?;
     }
     Ok(())
   }
@@ -42,21 +48,29 @@ impl Term {
   /// arbitrary patterns into matches on a single value, with only
   /// simple (non-nested) patterns, and one rule for each constructor.
   ///
+  /// The `name_gen` is used to generate fresh variable names for
+  /// substitution to avoid name clashes.
+  ///
   /// See `[simplify_match_expression]` for more information.
-  pub fn simplify_matches(&mut self, ctrs: &Constructors, adts: &Adts) -> Result<(), SimplifyMatchErr> {
+  pub fn simplify_matches(
+    &mut self,
+    ctrs: &Constructors,
+    adts: &Adts,
+    name_gen: &mut usize,
+  ) -> Result<(), SimplifyMatchErr> {
     Term::recursive_call(move || {
       match self {
         Term::Mat { args, rules } => {
           let extracted = extract_args(args);
           let args = std::mem::take(args);
           let rules = std::mem::take(rules);
-          let term = simplify_match_expression(args, rules, ctrs, adts)?;
+          let term = simplify_match_expression(args, rules, ctrs, adts, name_gen)?;
           *self = bind_extracted_args(extracted, term);
         }
 
         _ => {
           for child in self.children_mut() {
-            child.simplify_matches(ctrs, adts)?;
+            child.simplify_matches(ctrs, adts, name_gen)?;
           }
         }
       }
@@ -92,16 +106,17 @@ fn simplify_match_expression(
   rules: Vec<Rule>,
   ctrs: &Constructors,
   adts: &Adts,
+  name_gen: &mut usize,
 ) -> Result<Term, SimplifyMatchErr> {
   let fst_row_irrefutable = rules[0].pats.iter().all(|p| p.is_wildcard());
   let fst_col_type = infer_match_arg_type(&rules, 0, ctrs)?;
 
   if fst_row_irrefutable {
-    irrefutable_fst_row_rule(args, rules, ctrs, adts)
+    irrefutable_fst_row_rule(args, rules, ctrs, adts, name_gen)
   } else if fst_col_type == Type::Any {
-    var_rule(args, rules, ctrs, adts)
+    var_rule(args, rules, ctrs, adts, name_gen)
   } else {
-    switch_rule(args, rules, fst_col_type, ctrs, adts)
+    switch_rule(args, rules, fst_col_type, ctrs, adts, name_gen)
   }
 }
 
@@ -113,17 +128,19 @@ fn irrefutable_fst_row_rule(
   mut rules: Vec<Rule>,
   ctrs: &Constructors,
   adts: &Adts,
+  name_gen: &mut usize,
 ) -> Result<Term, SimplifyMatchErr> {
   rules.truncate(1);
 
   let Rule { pats, body: mut term } = rules.pop().unwrap();
-  term.simplify_matches(ctrs, adts)?;
+  term.simplify_matches(ctrs, adts, name_gen)?;
 
-  let term = pats.into_iter().zip(args).fold(term, |term, (pat, arg)| Term::Let {
-    pat,
-    val: Box::new(arg),
-    nxt: Box::new(term),
-  });
+  for (pat, arg) in pats.iter().zip(args.iter()) {
+    for bind in pat.binds().flatten() {
+      term.subst(bind, arg);
+    }
+  }
+
   Ok(term)
 }
 
@@ -137,13 +154,17 @@ fn var_rule(
   rules: Vec<Rule>,
   ctrs: &Constructors,
   adts: &Adts,
+  name_gen: &mut usize,
 ) -> Result<Term, SimplifyMatchErr> {
   let mut new_rules = vec![];
   for mut rule in rules {
     let rest = rule.pats.split_off(1);
 
-    let body =
-      Term::Let { pat: rule.pats.pop().unwrap(), val: Box::new(args[0].clone()), nxt: Box::new(rule.body) };
+    let pat = rule.pats.pop().unwrap();
+    let mut body = rule.body;
+    if let Pattern::Var(Some(nam)) = &pat {
+      body.subst(nam, &args[0]);
+    }
 
     let new_rule = Rule { pats: rest, body };
     new_rules.push(new_rule);
@@ -151,7 +172,7 @@ fn var_rule(
 
   let rest = args.split_off(1);
   let mut term = Term::Mat { args: rest, rules: new_rules };
-  term.simplify_matches(ctrs, adts)?;
+  term.simplify_matches(ctrs, adts, name_gen)?;
   Ok(term)
 }
 
@@ -206,6 +227,7 @@ fn switch_rule(
   typ: Type,
   ctrs: &Constructors,
   adts: &Adts,
+  name_gen: &mut usize,
 ) -> Result<Term, SimplifyMatchErr> {
   let mut new_rules = vec![];
 
@@ -253,10 +275,10 @@ fn switch_rule(
   for ctr in adt_ctrs {
     // Create the matched constructor and the name of the bound variables.
     let Term::Var { nam: arg_nam } = &args[0] else { unreachable!() };
-    let nested_fields = switch_rule_nested_fields(arg_nam, &ctr);
+    let nested_fields = switch_rule_nested_fields(arg_nam, &ctr, name_gen);
     let matched_ctr = switch_rule_matched_ctr(ctr.clone(), &nested_fields);
     let mut body = switch_rule_submatch(&args, &rules, &matched_ctr, &nested_fields)?;
-    body.simplify_matches(ctrs, adts)?;
+    body.simplify_matches(ctrs, adts, name_gen)?;
     let pats = vec![matched_ctr];
     new_rules.push(Rule { pats, body });
   }
@@ -265,13 +287,14 @@ fn switch_rule(
   Ok(term)
 }
 
-fn switch_rule_nested_fields(arg_nam: &Name, ctr: &Pattern) -> Vec<Option<Name>> {
+fn switch_rule_nested_fields(arg_nam: &Name, ctr: &Pattern, name_gen: &mut usize) -> Vec<Option<Name>> {
   let mut nested_fields = vec![];
   let old_vars = ctr.binds();
   for old_var in old_vars {
+    *name_gen += 1;
     let new_nam = if let Some(field) = old_var {
       // Name of constructor field
-      Name::new(format!("{arg_nam}%{field}"))
+      Name::new(format!("{arg_nam}%{field}%{name_gen}"))
     } else {
       // Name of var pattern
       arg_nam.clone()
@@ -339,20 +362,16 @@ fn switch_rule_submatch_arm(rule: &Rule, ctr: &Pattern, nested_fields: &[Option<
     let body = rule.body.clone();
     Some(Rule { pats, body })
   } else if rule.pats[0].is_wildcard() {
-    // Var, reconstruct the value matched in the expression above.
-    // match x ... {var ...: Body; ...}
-    // becomes
-    // match x {
-    //   (Ctr x%field0 ...): match x1 ... {
-    //     x%field0 ...: let var = (Ctr x%field0 ...); Body;
-    //   ... };
-    // ... }
+    // Use `subst` to replace the pattern variable in the body
+    // of the rule with the term that represents the matched constructor.
+    let mut body = rule.body.clone();
+    if let Pattern::Var(Some(nam)) = &rule.pats[0] {
+      body.subst(nam, &ctr.to_term());
+    }
+
     let nested_var_pats = nested_fields.iter().cloned().map(Pattern::Var);
     let old_pats = rule.pats[1 ..].iter().cloned();
     let pats = nested_var_pats.chain(old_pats).collect_vec();
-
-    let body =
-      Term::Let { pat: rule.pats[0].clone(), val: Box::new(ctr.to_term()), nxt: Box::new(rule.body.clone()) };
 
     Some(Rule { pats, body })
   } else {

@@ -3,11 +3,11 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_many_args.hvm
 ---
 TaggedScott:
-(tail_tail) = λa #L (a #L λb #L λc (#L (c #L λ* #L λe λ* e λ* N) b) N)
+(tail_tail) = λa #L (a #L λ* #L λc #L (c #L λ* #L λe e N) N)
 
-(or) = λa λb (#Option (b #Option λc λ* c λf f) a)
+(or) = λa λb (#Option (b #Option λc λ* c λe e) a)
 
-(or2) = λa λb (#Option (a #Option λc λ* c λf f) b)
+(or2) = λa λb (#Option (a #Option λc λ* c λe e) b)
 
 (map) = λa λb (#Option (b #Option λc λd (d c) λ* None) a)
 
@@ -28,11 +28,11 @@ TaggedScott:
 (C) = λa λb #L λc #L λ* #L (c a b)
 
 Scott:
-(tail_tail) = λa (a λb λc (c λ* λe λ* e λ* N b) N)
+(tail_tail) = λa (a λ* λc (c λ* λe e N) N)
 
-(or) = λa λb (b λc λ* c λf f a)
+(or) = λa λb (b λc λ* c λe e a)
 
-(or2) = λa λb (a λc λ* c λf f b)
+(or2) = λa λb (a λc λ* c λe e b)
 
 (map) = λa λb (b λc λd (d c) λ* None a)
 

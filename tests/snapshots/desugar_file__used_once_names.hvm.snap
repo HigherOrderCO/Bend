@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/used_once_names.hvm
 ---
-(foo) = λa λb λc let {d d_2} = c; (a b (d d_2))
+(foo) = λa λb λc let {c c_2} = c; (a b (c c_2))
 
 (main) = (foo 2 3 λa a)
