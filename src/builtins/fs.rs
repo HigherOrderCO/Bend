@@ -4,7 +4,7 @@ use hvmc::{
   ast, dispatch_dyn_net,
   host::Host,
   run::{LabSet, Port, Trg, Wire},
-  stdlib::{ArcDef, HostedDef, IDENTITY},
+  stdlib::{ArcDef, HostedDef},
 };
 use term_to_net::term_to_compat_net;
 
@@ -25,6 +25,12 @@ struct ReadbackData {
   labels: Arc<Labels>,
   adt_encoding: AdtEncoding,
 }
+
+const VICIOUS_CIRCLE_MSG: &str = "Found vicious circle";
+const FILENAME_NOT_VALID_MSG: &str = "Filename is not valid string.";
+const CONTENTS_NOT_VALID_MSG: &str = "Content is not valid string.";
+const FS_ERROR_MSG: &str = "Filesystem error: ";
+const INVALID_UTF8_MSG: &str = "UTF-8 error: ";
 
 /// Adds the filesystem definitions (`HVM.store` and `HVM.load`) to the book
 pub(crate) fn add_fs_defs(
@@ -69,6 +75,8 @@ pub(crate) fn add_fs_defs(
       if self.save {
         let (wire, port) = net.create_wire();
         let slf = self.clone();
+        let mut labels = (*self.readback_data.labels).clone();
+        let host = self.readback_data.host.clone();
         let readback_node = hvmc::stdlib::readback(
           self.readback_data.host.clone(),
           port,
@@ -81,29 +89,65 @@ pub(crate) fn add_fs_defs(
                 None
               };
               // Save file
-              if let (Some(filename), Some(contents)) = (slf.filename, contents) {
-                let _ = std::fs::write(filename, contents);
+              let result = match (slf.filename, contents) {
+                (None, _) => {
+                  Term::encode_err(Term::encode_str(FILENAME_NOT_VALID_MSG))
+                },
+                (_, None) => {
+                  Term::encode_err(Term::encode_str(CONTENTS_NOT_VALID_MSG))
+                },
+                (Some(filename), Some(contents)) => {
+                  match std::fs::write(filename, contents) {
+                    Ok(_) => Term::encode_ok(Term::Era),
+                    Err(e) => Term::encode_err(Term::encode_str(&format!("{FS_ERROR_MSG}{e}"))),
+                  }
+                },
+              };
+              let result = term_to_compat_net(&result, &mut labels);
+              match net_to_hvmc(&result) {
+                  Ok(result) => {
+                    // Return λx (x result)
+                    let app = net.create_node(hvmc::run::Tag::Ctr, 0);
+                    let lam = net.create_node(hvmc::run::Tag::Ctr, 0);
+                    host.lock().unwrap().encode_net(net, Trg::port(app.p1), &result);
+                    net.link_wire_port(wire, Port::ERA);
+                    net.link_port_port(app.p0, lam.p1);
+                    net.link_port_port(app.p2, lam.p2);
+
+                    net.link_wire_port(output, lam.p0);
+                  },
+                  Err(_) => {
+                    // If this happens, we can't even report an error to
+                    // the hvm program, so simply print an error, and plug in an ERA
+                    // The other option would be panicking.
+                    eprintln!("{VICIOUS_CIRCLE_MSG}");
+                    net.link_wire_port(output, Port::ERA);
+                  },
               }
-              net.link_wire_port(wire, Port::ERA);
-              net.link_wire_port(output, Port::new_ref(unsafe { IDENTITY.as_ref().unwrap() }));
             })
           },
         );
         net.link_wire_port(input, readback_node);
       } else {
         let app = net.create_node(hvmc::run::Tag::Ctr, 0);
-        let contents = self
+        let result = self
           .filename
-          .clone()
-          .and_then(|filename| std::fs::read(filename).ok())
-          .and_then(|x| std::str::from_utf8(&x).map(|x| x.to_string()).ok())
-          .unwrap_or(String::from(""));
-        let contents = Term::encode_str(&contents);
+          .as_ref()
+          .ok_or(FILENAME_NOT_VALID_MSG.to_owned())
+          .and_then(|filename| std::fs::read(filename).map_err(|e| format!("{FS_ERROR_MSG}{e}")))
+          .and_then(|x| {
+            std::str::from_utf8(&x).map(|x| x.to_string()).map_err(|e| format!("{INVALID_UTF8_MSG}{e}"))
+          });
+        let result = match result {
+          Ok(s) => Term::encode_ok(Term::encode_str(&s)),
+          Err(s) => Term::encode_err(Term::encode_str(&s)),
+        };
         let mut labels = (*self.readback_data.labels).clone();
-        let contents = term_to_compat_net(&contents, &mut labels);
-        if let Ok(contents) = net_to_hvmc(&contents) {
-          self.readback_data.host.lock().unwrap().encode_net(net, Trg::port(app.p1), &contents);
+        let result = term_to_compat_net(&result, &mut labels);
+        if let Ok(result) = net_to_hvmc(&result) {
+          self.readback_data.host.lock().unwrap().encode_net(net, Trg::port(app.p1), &result);
         } else {
+          eprintln!("{VICIOUS_CIRCLE_MSG}");
           net.link_port_port(Port::ERA, app.p1);
         }
         net.link_wire_port(output, app.p2);

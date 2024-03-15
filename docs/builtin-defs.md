@@ -2,6 +2,16 @@
 
 HVM-lang includes some built-in definitions that can make certain tasks easier, such as debugging, benchmarking, etc. These definitions are "special", and can't be implemented using regular HVM code.
 
+### On errors.
+
+Some of the functions may error. `hvm-lang` defines a builtin `Result` ADT which looks like this:
+
+```
+data Result = (Ok val) | (Err val)
+```
+
+This allows hvm-lang to do basic error handling. Right now, `val` is meant to be opaque; `val`'s type is not stable and might change from one update to another.
+
 ## `HVM.log`
 
 Reads back its first argument and displays it on stdout, then returns its second argument. 
@@ -52,46 +62,53 @@ This can be very useful, for example, to print strings with newlines in multiple
 
 When the first argument is not a string `HVM.print` returns the second argument and no side effects are produced (In other words, it fails silently).
 
-
 ## `HVM.query`
 
-`HVM.query` reads a line from standard input, and calls its argument with a string containing the user's input. It expects the standard input to be valid utf-8 (if it isn't, it passes an empty string).
+`HVM.query` reads a line from standard input, and calls its argument with a `Result` that might contain a string containing the user's input. It expects the standard input to be valid utf-8.
 
 Here's an example program using `HVM.query`
 ```rs
 Join (String.nil) x = x
 Join (String.cons head tail) x = (String.cons head (Join tail x))
-main = (((HVM.print "What's your name?") HVM.query) λname (HVM.print (Join "Hi, " (Join name "!"))) *)
+main = (((HVM.print "What's your name?") HVM.query) λresult match result {
+	(Result.ok name): (HVM.print (Join "Hi, " (Join name "!")) *)
+	(Result.err err): err
+})
 ```
 This program also shows using the return value of `HVM.print` (which is the identity function) to block `HVM.query` from reducing too early. If we used a naive version of the program, which is this:
 ```rs
-main = (HVM.print "What's your name?" (HVM.query λname (HVM.print (Join "Hi, " (Join name "!")) *)))
+main = (HVM.print "What's your name?" (HVM.query λresult match result {
+	(Result.ok name): (HVM.print (Join "Hi, " (Join name "!")) *)
+	(Result.err err): err
+}))
 ```
-We would get asked our name after typing it in (or not, depending on evaluation order).
+We would get asked our name after typing it in.
 
 ## `HVM.store`
 
-`HVM.store` writes a string to a file, then returns the identity function.
+`HVM.store` writes a string to a file, and calls its return value with a `Result` (the `Result`, if it's `Result.ok`, contains `ERA`).
 
 Example:
 
 ```rs
-main = (HVM.store "file.txt" "These are the file contents" "Return value of the program")
+main = (HVM.store "file.txt" "These are the file contents" λres match res {
+	(Ok *): "Return value of program"
+	(Err err): err
+})
 ```
-
-On failure, it does nothing
 
 ## `HVM.load`
 
-`HVM.load`, given a filename, reads the file and passes the contents of the file to its argument
+`HVM.load`, given a filename, reads the file and passes a `Result` that might contain the contents of the file to its argument
 
 ```rs
 Join (String.nil) x = x
 Join (String.cons head tail) x = (String.cons head (Join tail x))
-main = (HVM.load "file.txt" λcontents (HVM.print (Join "File contents: " contents)) "Program return value")
+main = (HVM.load "file.txt" λres match res {
+	(Result.ok contents): (HVM.print (Join "File contents: " contents) "Program return value")
+	(Result.err err): err
+})
 ```
-
-On failure, it does nothing
 
 ## `HVM.exit`
 
@@ -102,7 +119,7 @@ main = (HVM.exit #42)
 // Outputs nothing, but `hvml`'s status code will be 42.
 ```
 
-On failure, it exits with a -1 exit status code.
+On failure, it terminates the process with a -1 exit status code.
 
 ## `HVM.black_box`
 
