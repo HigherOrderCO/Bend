@@ -332,13 +332,13 @@ impl Op {
   }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Labels {
   pub con: LabelGenerator,
   pub dup: LabelGenerator,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct LabelGenerator {
   pub next: u32,
   pub name_to_label: HashMap<Name, u32>,

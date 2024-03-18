@@ -7,6 +7,7 @@ use crate::{
 use hvmc::ast::{Book, Net, Tree};
 use std::collections::{HashMap, HashSet};
 
+#[derive(Debug, Clone)]
 pub struct ViciousCycleErr;
 
 /// Converts the inet-encoded definitions into an hvmc AST Book.

@@ -11,6 +11,10 @@ TaggedScott:
 
 (North) = #Direction λa #Direction λ* #Direction λ* #Direction λ* a
 
+(Green) = #Light λ* #Light λ* #Light λc c
+
+(Yellow) = #Light λ* #Light λb #Light λ* b
+
 (Filled) = λa #Box λb #Box λ* #Box (b a)
 
 (Empty) = #Box λ* #Box λb b
@@ -19,9 +23,9 @@ TaggedScott:
 
 (None) = #Option λ* #Option λb b
 
-(Ok) = λa #Result λb #Result λ* #Result (b a)
+(Ok) = λa #Result_ λb #Result_ λ* #Result_ (b a)
 
-(Err) = λa #Result λ* #Result λc #Result (c a)
+(Err) = λa #Result_ λ* #Result_ λc #Result_ (c a)
 
 (Cons) = λa λb #List_ λc #List_ λ* #List_ (c a b)
 
@@ -33,10 +37,6 @@ TaggedScott:
 
 (Red) = #Light λa #Light λ* #Light λ* a
 
-(Yellow) = #Light λ* #Light λb #Light λ* b
-
-(Green) = #Light λ* #Light λ* #Light λc c
-
 Scott:
 (West) = λ* λ* λ* λd d
 
@@ -45,6 +45,10 @@ Scott:
 (South) = λ* λb λ* λ* b
 
 (North) = λa λ* λ* λ* a
+
+(Green) = λ* λ* λc c
+
+(Yellow) = λ* λb λ* b
 
 (Filled) = λa λb λ* (b a)
 
@@ -67,7 +71,3 @@ Scott:
 (False) = λ* λb b
 
 (Red) = λa λ* λ* a
-
-(Yellow) = λ* λb λ* b
-
-(Green) = λ* λ* λc c

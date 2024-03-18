@@ -1,7 +1,7 @@
 use crate::{
+  builtins::{CORE_BUILTINS, CORE_BUILTINS_USES},
   diagnostics::{ToStringVerbose, WarningType},
   term::{Adt, AdtEncoding, Book, Ctx, Name, Tag, Term, LIST, STRING},
-  CORE_BUILTINS,
 };
 use indexmap::IndexSet;
 use std::collections::{hash_map::Entry, HashMap};
@@ -134,7 +134,10 @@ impl Book {
   fn insert_used(&self, def_name: &Name, used: Used, uses: &mut Definitions, adt_encoding: AdtEncoding) {
     if let Entry::Vacant(e) = uses.entry(def_name.clone()) {
       e.insert(used);
-      if CORE_BUILTINS.contains(&def_name.0.as_ref()) {
+      if let Some(position) = CORE_BUILTINS.iter().position(|x| x == &def_name.0.as_ref()) {
+        for def_name in CORE_BUILTINS_USES[position] {
+          self.insert_used(&Name::new(*def_name), used, uses, adt_encoding);
+        }
         return;
       }
 

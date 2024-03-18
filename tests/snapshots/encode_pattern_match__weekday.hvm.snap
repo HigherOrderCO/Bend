@@ -13,11 +13,11 @@ TaggedScott:
 
 (Thursday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λd #Weekday λ* #Weekday λ* #Weekday λ* d
 
-(Monday) = #Weekday λa #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* a
+(Wednesday) = #Weekday λ* #Weekday λ* #Weekday λc #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* c
 
 (Tuesday) = #Weekday λ* #Weekday λb #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* b
 
-(Wednesday) = #Weekday λ* #Weekday λ* #Weekday λc #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* c
+(Monday) = #Weekday λa #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* a
 
 Scott:
 (main) = (λa a Saturday)
@@ -30,10 +30,8 @@ Scott:
 
 (Thursday) = λ* λ* λ* λd λ* λ* λ* d
 
-(Monday) = λa λ* λ* λ* λ* λ* λ* a
+(Wednesday) = λ* λ* λc λ* λ* λ* λ* c
 
 (Tuesday) = λ* λb λ* λ* λ* λ* λ* b
 
-(Wednesday) = λ* λ* λc λ* λ* λ* λ* c
-
-
+(Monday) = λa λ* λ* λ* λ* λ* λ* a

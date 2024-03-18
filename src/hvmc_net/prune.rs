@@ -1,7 +1,7 @@
 use hvmc::ast::{Book, Tree};
 use std::collections::HashSet;
 
-use crate::CORE_BUILTINS;
+use crate::builtins::CORE_BUILTINS;
 
 pub fn prune_defs(book: &mut Book, entrypoint: String) {
   let mut used_defs = HashSet::from_iter(CORE_BUILTINS.iter().map(|x| x.to_string()));

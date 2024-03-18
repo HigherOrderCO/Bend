@@ -13,6 +13,10 @@ pub const STRING: &str = "String";
 pub const SCONS: &str = "String.cons";
 pub const SNIL: &str = "String.nil";
 
+pub const RESULT: &str = "Result";
+pub const RESULT_OK: &str = "Result.ok";
+pub const RESULT_ERR: &str = "Result.err";
+
 impl Book {
   pub fn builtins() -> Book {
     parse_book(BUILTINS, Book::default, true).expect("Error parsing builtin file, this should not happen")
@@ -72,10 +76,17 @@ impl Term {
     })
   }
 
-  fn encode_str(val: &str) -> Term {
+  pub fn encode_str(val: &str) -> Term {
     val.chars().rfold(Term::r#ref(SNIL), |acc, char| {
       Term::call(Term::r#ref(SCONS), [Term::Num { val: u64::from(char) }, acc])
     })
+  }
+  pub fn encode_ok(val: Term) -> Term {
+    Term::call(Term::r#ref(RESULT_OK), [val])
+  }
+
+  pub fn encode_err(val: Term) -> Term {
+    Term::call(Term::r#ref(RESULT_ERR), [val])
   }
 }
 

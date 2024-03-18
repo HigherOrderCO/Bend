@@ -1,7 +1,7 @@
 use crate::{
+  builtins::CORE_BUILTINS,
   diagnostics::{Diagnostics, ToStringVerbose},
   term::{Ctx, Name, Pattern, Term},
-  CORE_BUILTINS,
 };
 use std::collections::{HashMap, HashSet};
 

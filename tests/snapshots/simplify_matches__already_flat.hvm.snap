@@ -22,12 +22,12 @@ input_file: tests/golden_tests/simplify_matches/already_flat.hvm
 
 (CtrB0) = #Baz λa #Baz λ* #Baz λ* #Baz λ* a
 
+(CtrA3) = λa #Bar λ* #Bar λ* #Bar λd #Bar (d a)
+
+(CtrA2) = λa λb #Bar λ* #Bar λd #Bar λ* #Bar (d a b)
+
 (CtrA) = #Foo λa #Foo λ* a
 
 (CtrB) = λa #Foo λ* #Foo λc #Foo (c a)
 
 (CtrA1) = λa #Bar λb #Bar λ* #Bar λ* #Bar (b a)
-
-(CtrA2) = λa λb #Bar λ* #Bar λd #Bar λ* #Bar (d a b)
-
-(CtrA3) = λa #Bar λ* #Bar λ* #Bar λd #Bar (d a)
