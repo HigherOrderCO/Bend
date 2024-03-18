@@ -20,6 +20,9 @@ pub enum Token {
   #[token("let")]
   Let,
 
+  #[token("use")]
+  Use,
+
   #[token("match")]
   Match,
 
@@ -265,6 +268,7 @@ impl fmt::Display for Token {
       Self::Lambda => write!(f, "λ"),
       Self::Dollar => write!(f, "$"),
       Self::Let => write!(f, "let"),
+      Self::Use => write!(f, "use"),
       Self::Match => write!(f, "match"),
       Self::Equals => write!(f, "="),
       Self::Num(num) => write!(f, "{num}"),

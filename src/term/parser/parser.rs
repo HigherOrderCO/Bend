@@ -267,6 +267,16 @@ where
       .map(|((pat, val), nxt)| Term::Let { pat, val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
+    // use a = val ';'? nxt
+    let use_ = just(Token::Use)
+      .ignore_then(name())
+      .then_ignore(just(Token::Equals))
+      .then(term.clone())
+      .then_ignore(term_sep.clone())
+      .then(term.clone())
+      .map(|((nam, val), nxt)| Term::Use { nam, val: Box::new(val), nxt: Box::new(nxt) })
+      .boxed();
+
     let match_arg = name().then_ignore(just(Token::Equals)).or_not().then(term.clone());
     let match_args =
       match_arg.separated_by(list_sep.clone()).at_least(1).allow_trailing().collect::<Vec<_>>();
@@ -349,7 +359,8 @@ where
       // OBS: `num_op` has to be before app, idk why?
       // OBS: `app` has to be before `tup` to not overflow on huge app terms
       // TODO: What happens on huge `tup` and other terms?
-      num_op, app, tup, global_var, var, number, list, str, chr, sup, global_lam, lam, dup, let_, match_, era,
+      num_op, app, tup, global_var, var, number, list, str, chr, sup, global_lam, lam, dup, let_, use_,
+      match_, era,
     ))
   })
 }

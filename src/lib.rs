@@ -68,6 +68,7 @@ pub fn desugar_book(
   ctx.check_shared_names();
   ctx.set_entrypoint();
   ctx.apply_args(args)?;
+  ctx.book.apply_use();
 
   ctx.book.encode_adts(opts.adt_encoding);
   ctx.book.encode_builtins();
