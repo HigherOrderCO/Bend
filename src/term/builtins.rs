@@ -17,6 +17,10 @@ pub const RESULT: &str = "Result";
 pub const RESULT_OK: &str = "Result.ok";
 pub const RESULT_ERR: &str = "Result.err";
 
+pub const NAT: &str = "Nat";
+pub const NAT_SUCC: &str = "Nat.succ";
+pub const NAT_ZERO: &str = "Nat.zero";
+
 impl Book {
   pub fn builtins() -> Book {
     parse_book(BUILTINS, Book::default, true).expect("Error parsing builtin file, this should not happen")
@@ -37,6 +41,7 @@ impl Term {
     match self {
       Term::Lst { els } => *self = Term::encode_list(std::mem::take(els)),
       Term::Str { val } => *self = Term::encode_str(val),
+      Term::Nat { val } => *self = Term::encode_nat(*val),
       Term::Let { pat, val, nxt } => {
         pat.encode_builtins();
         val.encode_builtins();
@@ -87,6 +92,11 @@ impl Term {
       Term::call(Term::r#ref(SCONS), [Term::Num { val: u64::from(char) }, acc])
     })
   }
+
+  pub fn encode_nat(val: u64) -> Term {
+    (0 .. val).fold(Term::r#ref(NAT_ZERO), |acc, _| Term::app(Term::r#ref(NAT_SUCC), acc))
+  }
+
   pub fn encode_ok(val: Term) -> Term {
     Term::call(Term::r#ref(RESULT_OK), [val])
   }

@@ -24,10 +24,10 @@ input_file: tests/golden_tests/cli/debug_u60_to_nat.hvm
 ---------------------------------------
 (S (S (S (S Z))))
 ---------------------------------------
-(S (S (S #Nat λ* #Nat λa #Nat (a Z))))
+(S (S (S #Nat_ λ* #Nat_ λa #Nat_ (a Z))))
 ---------------------------------------
-(S (S #Nat λ* #Nat λa #Nat (a #Nat λ* #Nat λb #Nat (b Z))))
+(S (S #Nat_ λ* #Nat_ λa #Nat_ (a #Nat_ λ* #Nat_ λb #Nat_ (b Z))))
 ---------------------------------------
-(S #Nat λ* #Nat λa #Nat (a #Nat λ* #Nat λb #Nat (b #Nat λ* #Nat λc #Nat (c Z))))
+(S #Nat_ λ* #Nat_ λa #Nat_ (a #Nat_ λ* #Nat_ λb #Nat_ (b #Nat_ λ* #Nat_ λc #Nat_ (c Z))))
 ---------------------------------------
 (S (S (S (S Z))))

@@ -122,6 +122,9 @@ pub enum Term {
   Num {
     val: u64,
   },
+  Nat {
+    val: u64,
+  },
   Str {
     val: GlobalString,
   },
@@ -316,6 +319,7 @@ impl Clone for Term {
       }
       Self::Sup { tag, els } => Self::Sup { tag: tag.clone(), els: els.clone() },
       Self::Num { val } => Self::Num { val: *val },
+      Self::Nat { val } => Self::Nat { val: *val },
       Self::Str { val } => Self::Str { val: val.clone() },
       Self::Lst { els } => Self::Lst { els: els.clone() },
       Self::Opx { op, fst, snd } => Self::Opx { op: *op, fst: fst.clone(), snd: snd.clone() },
@@ -464,6 +468,7 @@ impl Term {
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
+      | Term::Nat { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
@@ -487,6 +492,7 @@ impl Term {
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
+      | Term::Nat { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
@@ -531,6 +537,7 @@ impl Term {
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
+      | Term::Nat { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
@@ -568,6 +575,7 @@ impl Term {
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
+      | Term::Nat { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
@@ -607,6 +615,7 @@ impl Term {
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
+      | Term::Nat { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
@@ -631,6 +640,7 @@ impl Term {
       | Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
+      | Term::Nat { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
@@ -655,6 +665,7 @@ impl Term {
       | Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
+      | Term::Nat { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era

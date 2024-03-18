@@ -51,14 +51,14 @@ impl Term {
         },
 
         Term::Chn { .. } | Term::Lnk { .. } => false,
-        Term::Str { .. } | Term::Lst { .. } => false,
         Term::Let { .. } => false,
-        Term::Use { .. } => unreachable!(),
         Term::App { .. } => false,
         Term::Dup { .. } => false,
         Term::Opx { .. } => false,
         Term::Mat { .. } => false,
         Term::Ref { .. } => false,
+
+        Term::Nat { .. } | Term::Str { .. } | Term::Lst { .. } | Term::Use { .. } => unreachable!(),
 
         Term::Err => unreachable!(),
       })
