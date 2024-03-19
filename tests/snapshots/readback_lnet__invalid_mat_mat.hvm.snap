@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/readback_lnet/invalid_mat_mat.hvm
----
-Errors:
-invalid legacy match
