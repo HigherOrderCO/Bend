@@ -4,6 +4,6 @@ input_file: tests/golden_tests/cli/desugar_bool_scott.hvm
 ---
 (main) = True
 
-(False) = λ* λb b
-
 (True) = λa λ* a
+
+(False) = λ* λb b

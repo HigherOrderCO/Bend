@@ -13,9 +13,9 @@ TaggedScott:
 
 (and4) = λa λb (#bool (a λc #bool (c true false) λ* false) b)
 
-(false) = #bool λ* #bool λb b
-
 (true) = #bool λa #bool λ* a
+
+(false) = #bool λ* #bool λb b
 
 Scott:
 (not) = λa (a false true)
@@ -28,8 +28,6 @@ Scott:
 
 (and4) = λa λb (a λc (c true false) λ* false b)
 
-(false) = λ* λb b
-
 (true) = λa λ* a
 
-
+(false) = λ* λb b

@@ -5,33 +5,33 @@ input_file: tests/golden_tests/encode_pattern_match/weekday.hvm
 TaggedScott:
 (main) = (λa a Saturday)
 
-(Sunday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λg g
-
-(Saturday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λf #Weekday λ* f
-
-(Friday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λe #Weekday λ* #Weekday λ* e
-
-(Thursday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λd #Weekday λ* #Weekday λ* #Weekday λ* d
-
-(Wednesday) = #Weekday λ* #Weekday λ* #Weekday λc #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* c
+(Monday) = #Weekday λa #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* a
 
 (Tuesday) = #Weekday λ* #Weekday λb #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* b
 
-(Monday) = #Weekday λa #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* a
+(Wednesday) = #Weekday λ* #Weekday λ* #Weekday λc #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* c
+
+(Thursday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λd #Weekday λ* #Weekday λ* #Weekday λ* d
+
+(Friday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λe #Weekday λ* #Weekday λ* e
+
+(Saturday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λf #Weekday λ* f
+
+(Sunday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λg g
 
 Scott:
 (main) = (λa a Saturday)
 
-(Sunday) = λ* λ* λ* λ* λ* λ* λg g
-
-(Saturday) = λ* λ* λ* λ* λ* λf λ* f
-
-(Friday) = λ* λ* λ* λ* λe λ* λ* e
-
-(Thursday) = λ* λ* λ* λd λ* λ* λ* d
-
-(Wednesday) = λ* λ* λc λ* λ* λ* λ* c
+(Monday) = λa λ* λ* λ* λ* λ* λ* a
 
 (Tuesday) = λ* λb λ* λ* λ* λ* λ* b
 
-(Monday) = λa λ* λ* λ* λ* λ* λ* a
+(Wednesday) = λ* λ* λc λ* λ* λ* λ* c
+
+(Thursday) = λ* λ* λ* λd λ* λ* λ* d
+
+(Friday) = λ* λ* λ* λ* λe λ* λ* e
+
+(Saturday) = λ* λ* λ* λ* λ* λf λ* f
+
+(Sunday) = λ* λ* λ* λ* λ* λ* λg g

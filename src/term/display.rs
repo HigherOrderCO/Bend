@@ -79,6 +79,7 @@ impl fmt::Display for Term {
       }
       Term::Era => write!(f, "*"),
       Term::Num { val } => write!(f, "{val}"),
+      Term::Nat { val } => write!(f, "#{val}"),
       Term::Str { val } => write!(f, "{val:?}"),
       Term::Opx { op, fst, snd } => {
         write!(f, "({} {} {})", op, fst, snd)

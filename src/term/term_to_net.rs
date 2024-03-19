@@ -239,8 +239,9 @@ impl EncodeTermState<'_> {
           self.inet.link(Port(node, 1), Port(node, 2));
           Some(Port(node, 0))
         }
-        Term::Str { .. } => unreachable!(), // Removed in desugar str
-        Term::Lst { .. } => unreachable!(), // Removed in desugar list
+        Term::Nat { .. } => unreachable!(), // Removed in encode_nat
+        Term::Str { .. } => unreachable!(), // Removed in encode_str
+        Term::Lst { .. } => unreachable!(), // Removed in encode_list
         // core: & fst ~ <op snd ret>
         Term::Opx { op, fst, snd } => {
           let opx = self.inet.new_node(Op2 { opr: op.to_hvmc_label() });

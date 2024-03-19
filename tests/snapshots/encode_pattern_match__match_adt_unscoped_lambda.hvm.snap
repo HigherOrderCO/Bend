@@ -5,13 +5,13 @@ input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_lambda.hv
 TaggedScott:
 (main) = (#Maybe ((Some 1) λ$x * #Maybe λc c) $x)
 
-(Some) = λa #Maybe λ* #Maybe λc #Maybe (c a)
-
 (None) = #Maybe λa #Maybe λ* a
+
+(Some) = λa #Maybe λ* #Maybe λc #Maybe (c a)
 
 Scott:
 (main) = (Some 1 λ$x * λc c $x)
 
-(Some) = λa λ* λc (c a)
-
 (None) = λa λ* a
+
+(Some) = λa λ* λc (c a)

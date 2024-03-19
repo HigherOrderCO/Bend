@@ -11,9 +11,9 @@ TaggedScott:
 
 (String.nil) = #String λ* #String λb b
 
-(Err) = λa #Result_ λ* #Result_ λc #Result_ (c a)
-
 (Ok) = λa #Result_ λb #Result_ λ* #Result_ (b a)
+
+(Err) = λa #Result_ λ* #Result_ λc #Result_ (c a)
 
 Scott:
 (Parse) = λa λb (b λc λd λe (match (- c 40) { 0: λf λg (Ok (40, g, f)); 1+: λi match i { 0: λj λk (Ok (41, k, j)); 1+: λm match (- m 18446744073709551584) { 0: λn λo (Ok (0, o, n)); 1+: λq λs λt (Err ((String.cons (+ q 11) t), s)) } } } e d) λu (Err (String.nil, u)) a)
@@ -24,6 +24,6 @@ Scott:
 
 (String.nil) = λ* λb b
 
-(Err) = λa λ* λc (c a)
-
 (Ok) = λa λb λ* (b a)
+
+(Err) = λa λ* λc (c a)

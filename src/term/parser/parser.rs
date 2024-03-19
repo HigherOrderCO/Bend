@@ -207,6 +207,13 @@ where
     }),
   );
 
+  let nat = just(Token::Hash).ignore_then(select!(Token::Num(num) => Term::Nat { val: num }).or(
+    select!(Token::Error(LexingError::InvalidNumberLiteral) => ()).validate(|_, span, emit| {
+      emit.emit(Rich::custom(span, "found invalid nat literal expected number"));
+      Term::Nat { val: 0 }
+    }),
+  ));
+
   let term_sep = just(Token::Semicolon).or_not();
   let list_sep = just(Token::Comma).or_not();
 
@@ -359,7 +366,7 @@ where
       // OBS: `num_op` has to be before app, idk why?
       // OBS: `app` has to be before `tup` to not overflow on huge app terms
       // TODO: What happens on huge `tup` and other terms?
-      num_op, app, tup, global_var, var, number, list, str, chr, sup, global_lam, lam, dup, let_, use_,
+      num_op, app, tup, global_var, var, number, nat, list, str, chr, sup, global_lam, lam, dup, let_, use_,
       match_, era,
     ))
   })

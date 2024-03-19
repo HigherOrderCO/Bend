@@ -347,7 +347,7 @@ impl Term {
         }
         n
       }
-      Term::Lst { .. } => unreachable!(),
+      Term::Nat { .. } | Term::Lst { .. } => unreachable!(),
       Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Ref { .. } | Term::Era | Term::Err => 0,
     };
 
@@ -419,7 +419,7 @@ impl Term {
           rule.body.fix_names(id_counter, book);
         }
       }
-      Term::Let { .. } | Term::Use { .. } | Term::Lst { .. } => unreachable!(),
+      Term::Let { .. } | Term::Use { .. } | Term::Nat { .. } | Term::Lst { .. } => unreachable!(),
       Term::Var { .. } | Term::Lnk { .. } | Term::Num { .. } | Term::Str { .. } | Term::Era | Term::Err => {}
     }
   }

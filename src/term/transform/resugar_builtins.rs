@@ -1,14 +1,41 @@
-use crate::term::{Term, LCONS, LNIL, SCONS, SNIL};
+use crate::term::{Term, LCONS, LNIL, NAT_SUCC, NAT_ZERO, SCONS, SNIL};
 
 impl Term {
   pub fn resugar_builtins(&mut self) {
     self.resugar_strings();
+    self.resugar_nats();
     self.resugar_lists();
+  }
+
+  pub fn resugar_nats(&mut self) {
+    Term::recursive_call(move || match self {
+      // (Nat.succ pred)
+      Term::App { fun: box Term::Ref { nam: ctr }, arg: box pred, .. } => {
+        pred.resugar_nats();
+
+        if ctr == NAT_SUCC {
+          if let Term::Nat { val } = pred {
+            *self = Term::Nat { val: *val + 1 };
+          } else {
+            let n = std::mem::take(pred);
+            *self = Term::call(Term::Ref { nam: ctr.clone() }, [n]);
+          }
+        }
+      }
+      // (Nat.zero)
+      Term::Ref { nam: def_name } if def_name == NAT_ZERO => *self = Term::Nat { val: 0 },
+
+      _ => {
+        for child in self.children_mut() {
+          child.resugar_nats();
+        }
+      }
+    });
   }
 
   /// Rebuilds the String syntax sugar, converting `(Cons 97 Nil)` into `"a"`.
   pub fn resugar_strings(&mut self) {
-    match self {
+    Term::recursive_call(move || match self {
       // (String.cons Num tail)
       Term::App {
         fun: box Term::App { fun: box Term::Ref { nam: ctr }, arg: box head, .. },
@@ -48,12 +75,12 @@ impl Term {
           child.resugar_strings();
         }
       }
-    }
+    });
   }
 
   /// Rebuilds the List syntax sugar, converting `(Cons head Nil)` into `[head]`.
   pub fn resugar_lists(&mut self) {
-    match self {
+    Term::recursive_call(move || match self {
       // (List.cons el tail)
       Term::App {
         fun: box Term::App { fun: box Term::Ref { nam: ctr }, arg: box head, .. },
@@ -84,6 +111,6 @@ impl Term {
           child.resugar_lists();
         }
       }
-    }
+    });
   }
 }

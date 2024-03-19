@@ -7,15 +7,15 @@ TaggedScott:
 
 (main) = (some_some (Some 1))
 
-(None) = #Option λ* #Option λb b
-
 (Some) = λa #Option λb #Option λ* #Option (b a)
+
+(None) = #Option λ* #Option λb b
 
 Scott:
 (some_some) = λa (a λb (b λ* 1 0) 0)
 
 (main) = (some_some (Some 1))
 
-(None) = λ* λb b
-
 (Some) = λa λb λ* (b a)
+
+(None) = λ* λb b

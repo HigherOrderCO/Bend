@@ -19,13 +19,13 @@ TaggedScott:
 
 (main) = *
 
-(None) = #Option λ* #Option λb b
-
-(Some) = λa #Option λb #Option λ* #Option (b a)
+(C) = λa λb #L λc #L λ* #L (c a b)
 
 (N) = #L λ* #L λb b
 
-(C) = λa λb #L λc #L λ* #L (c a b)
+(Some) = λa #Option λb #Option λ* #Option (b a)
+
+(None) = #Option λ* #Option λb b
 
 Scott:
 (tail_tail) = λa (a λ* λc (c λ* λe e N) N)
@@ -44,10 +44,10 @@ Scott:
 
 (main) = *
 
-(None) = λ* λb b
-
-(Some) = λa λb λ* (b a)
+(C) = λa λb λc λ* (c a b)
 
 (N) = λ* λb b
 
-(C) = λa λb λc λ* (c a b)
+(Some) = λa λb λ* (b a)
+
+(None) = λ* λb b
