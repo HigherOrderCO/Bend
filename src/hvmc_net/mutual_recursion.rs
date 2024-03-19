@@ -95,17 +95,16 @@ impl Graph {
 fn collect_refs(current: Ref, tree: &Tree, graph: &mut Graph) {
   match tree {
     Tree::Ref { nam } => graph.add(current, nam.clone()),
-    Tree::Ctr { box lft, rgt, .. } => {
-      if let Tree::Ref { nam } = lft {
-        graph.add(current.clone(), nam.clone());
+    Tree::Ctr { ports, .. } => {
+      if let Some(last) = ports.last() {
+        collect_refs(current, last, graph);
       }
-      collect_refs(current, rgt, graph);
     }
-    Tree::Op { rhs: fst, out: snd, .. } | Tree::Mat { sel: fst, ret: snd } => {
-      collect_refs(current.clone(), fst, graph);
-      collect_refs(current, snd, graph);
+    tree => {
+      for subtree in tree.children() {
+        collect_refs(current.clone(), subtree, graph);
+      }
     }
-    Tree::Era | Tree::Num { .. } | Tree::Var { .. } => (),
   }
 }
 

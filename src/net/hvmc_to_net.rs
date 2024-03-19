@@ -17,6 +17,7 @@ fn hvmc_to_inodes(net: &Net) -> INodes {
     let mut root = tree_to_inodes(&net.root, "_".to_string(), net_root, &mut n_vars);
     inodes.append(&mut root);
   }
+
   // Convert all the trees forming active pairs.
   for (i, (tree1, tree2)) in net.redexes.iter().enumerate() {
     let tree_root = format!("a{i}");
@@ -28,13 +29,13 @@ fn hvmc_to_inodes(net: &Net) -> INodes {
   inodes
 }
 
-fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut NodeId) -> INodes {
-  fn new_var(n_vars: &mut NodeId) -> String {
-    let new_var = format!("x{n_vars}");
-    *n_vars += 1;
-    new_var
-  }
+fn new_var(n_vars: &mut NodeId) -> String {
+  let new_var = format!("x{n_vars}");
+  *n_vars += 1;
+  new_var
+}
 
+fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut NodeId) -> INodes {
   fn process_node_subtree<'a>(
     subtree: &'a Tree,
     net_root: &str,
@@ -42,11 +43,63 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
     n_vars: &mut NodeId,
   ) -> String {
     if let Tree::Var { nam } = subtree {
-      if nam == net_root { "_".to_string() } else { nam.clone() }
+      return if nam == net_root { "_".to_string() } else { nam.clone() };
+    }
+    if let Tree::Ctr { ports, .. } = subtree {
+      if ports.len() == 1 {
+        return process_node_subtree(&ports[0], net_root, subtrees, n_vars);
+      }
+    }
+
+    let var = new_var(n_vars);
+    subtrees.push((var.clone(), subtree));
+    var
+  }
+
+  fn process_ctr<'a>(
+    inodes: &mut Vec<INode>,
+    lab: u16,
+    ports: &'a [Tree],
+    net_root: &str,
+    principal: String,
+    subtrees: &mut Vec<(String, &'a Tree)>,
+    n_vars: &mut NodeId,
+  ) {
+    fn process_sub_ctr<'a>(
+      inodes: &mut Vec<INode>,
+      lab: u16,
+      ports: &'a [Tree],
+      net_root: &str,
+      subtrees: &mut Vec<(String, &'a Tree)>,
+      n_vars: &mut NodeId,
+    ) -> String {
+      if ports.len() == 1 {
+        process_node_subtree(&ports[0], net_root, subtrees, n_vars)
+      } else {
+        let principal = new_var(n_vars);
+        process_ctr(inodes, lab, ports, net_root, principal.clone(), subtrees, n_vars);
+        principal
+      }
+    }
+    if ports.is_empty() {
+      let inner = new_var(n_vars);
+      inodes.push(INode { kind: Era, ports: [principal, inner.clone(), inner] });
+    } else if ports.len() == 1 {
+      subtrees.push((principal, &ports[0]));
     } else {
-      let var = new_var(n_vars);
-      subtrees.push((var.clone(), subtree));
-      var
+      // build a 2-ary node
+      let kind = if lab == 0 {
+        Con { lab: None }
+      } else if lab == 1 {
+        Tup
+      } else if lab & 1 == 0 {
+        Con { lab: Some((lab as u32 >> 1) - 1) }
+      } else {
+        Dup { lab: (lab as u32 >> 1) - 1 }
+      };
+      let rgt = process_sub_ctr(inodes, lab, &ports[1 ..], net_root, subtrees, n_vars);
+      let lft = process_node_subtree(&ports[0], net_root, subtrees, n_vars);
+      inodes.push(INode { kind, ports: [principal.clone(), lft.clone(), rgt.clone()] });
     }
   }
 
@@ -58,21 +111,8 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
         let var = new_var(n_vars);
         inodes.push(INode { kind: Era, ports: [subtree_root, var.clone(), var] });
       }
-      Tree::Ctr { lft, rgt, lab } => {
-        let lft = process_node_subtree(lft, net_root, &mut subtrees, n_vars);
-        let rgt = process_node_subtree(rgt, net_root, &mut subtrees, n_vars);
-        inodes.push(INode {
-          kind: if *lab == 0 {
-            Con { lab: None }
-          } else if *lab == 1 {
-            Tup
-          } else if lab & 1 == 0 {
-            Con { lab: Some((*lab as u32 >> 1) - 1) }
-          } else {
-            Dup { lab: (*lab as u32 >> 1) - 1 }
-          },
-          ports: [subtree_root, lft, rgt],
-        });
+      Tree::Ctr { lab, ports } => {
+        process_ctr(&mut inodes, *lab, ports, net_root, subtree_root, &mut subtrees, n_vars)
       }
       Tree::Var { .. } => unreachable!(),
       Tree::Ref { nam } => {
@@ -91,11 +131,23 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
         let out = process_node_subtree(out, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, rhs, out] });
       }
-      Tree::Mat { sel, ret } => {
+      Tree::Mat { zero, succ, out } => {
         let kind = Mat;
-        let sel = process_node_subtree(sel, net_root, &mut subtrees, n_vars);
-        let ret = process_node_subtree(ret, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, sel, ret] });
+        let zero = process_node_subtree(zero, net_root, &mut subtrees, n_vars);
+        let succ = process_node_subtree(succ, net_root, &mut subtrees, n_vars);
+        let sel_var = new_var(n_vars);
+        inodes.push(INode { kind: Con { lab: None }, ports: [sel_var.clone(), zero, succ] });
+        let ret = process_node_subtree(out, net_root, &mut subtrees, n_vars);
+        inodes.push(INode { kind, ports: [subtree_root, sel_var, ret] });
+      }
+      Tree::Adt { .. } => {
+        // FIXME: hvm-core will implement a desugaring pass
+        // that will handle desugaring Adts nodes for us.
+        // It doesn't yet do this. However, we aren't creating Adt nodes
+        // either, so it's impossible for this to happen.
+
+        // should have been desugared earlier
+        unreachable!()
       }
     }
   }

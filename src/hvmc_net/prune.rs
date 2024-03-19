@@ -21,16 +21,12 @@ pub fn prune_defs(book: &mut Book, entrypoint: String) {
 }
 
 fn used_defs_in_tree(tree: &Tree, used_defs: &mut HashSet<String>, to_visit: &mut Vec<String>) {
-  match tree {
-    Tree::Ref { nam } => {
-      if used_defs.insert(nam.clone()) {
-        to_visit.push(nam.clone());
-      }
+  if let Tree::Ref { nam } = tree {
+    if used_defs.insert(nam.clone()) {
+      to_visit.push(nam.clone());
     }
-    Tree::Ctr { lft, rgt, .. } | Tree::Op { rhs: lft, out: rgt, .. } | Tree::Mat { sel: lft, ret: rgt } => {
-      used_defs_in_tree(lft, used_defs, to_visit);
-      used_defs_in_tree(rgt, used_defs, to_visit);
-    }
-    Tree::Var { .. } | Tree::Num { .. } | Tree::Era => (),
+  }
+  for subtree in tree.children() {
+    used_defs_in_tree(subtree, used_defs, to_visit);
   }
 }

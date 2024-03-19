@@ -51,24 +51,32 @@ fn net_tree_to_hvmc_tree(inet: &INet, tree_root: NodeId, port_to_var_id: &mut Ha
     NodeKind::Era => Tree::Era,
     NodeKind::Con { lab: None } => Tree::Ctr {
       lab: 0,
-      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
+      ports: vec![
+        var_or_subtree(inet, Port(tree_root, 1), port_to_var_id),
+        var_or_subtree(inet, Port(tree_root, 2), port_to_var_id),
+      ],
     },
     NodeKind::Tup => Tree::Ctr {
       lab: 1,
-      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
+      ports: vec![
+        var_or_subtree(inet, Port(tree_root, 1), port_to_var_id),
+        var_or_subtree(inet, Port(tree_root, 2), port_to_var_id),
+      ],
     },
     NodeKind::Con { lab: Some(lab) } => Tree::Ctr {
       #[allow(clippy::identity_op)]
       lab: (*lab as u16 + 1) << 1 | 0,
-      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
+      ports: vec![
+        var_or_subtree(inet, Port(tree_root, 1), port_to_var_id),
+        var_or_subtree(inet, Port(tree_root, 2), port_to_var_id),
+      ],
     },
     NodeKind::Dup { lab } => Tree::Ctr {
       lab: (*lab as u16 + 1) << 1 | 1,
-      lft: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),
-      rgt: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
+      ports: vec![
+        var_or_subtree(inet, Port(tree_root, 1), port_to_var_id),
+        var_or_subtree(inet, Port(tree_root, 2), port_to_var_id),
+      ],
     },
     NodeKind::Ref { def_name } => Tree::Ref { nam: def_name.to_string() },
     NodeKind::Num { val } => Tree::Num { val: *val },
@@ -77,10 +85,18 @@ fn net_tree_to_hvmc_tree(inet: &INet, tree_root: NodeId, port_to_var_id: &mut Ha
       rhs: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),
       out: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
     },
-    NodeKind::Mat => Tree::Mat {
-      sel: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),
-      ret: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
-    },
+    NodeKind::Mat => {
+      let node = inet.node(inet.enter_port(Port(tree_root, 1)).node());
+      if node.kind != (NodeKind::Con { lab: None }) {
+        panic!("hvm-lang produced an INet where the first port is not a Con node. This is not supported.");
+      }
+
+      Tree::Mat {
+        zero: Box::new(var_or_subtree(inet, inet.enter_port(node.aux1), port_to_var_id)),
+        succ: Box::new(var_or_subtree(inet, inet.enter_port(node.aux2), port_to_var_id)),
+        out: Box::new(var_or_subtree(inet, Port(tree_root, 2), port_to_var_id)),
+      }
+    }
     NodeKind::Rot => unreachable!(),
   }
 }
