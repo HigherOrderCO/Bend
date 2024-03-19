@@ -7,15 +7,15 @@ TaggedScott:
 
 (main) = (And (F, T, F))
 
-(F) = #Bool λ* #Bool λb b
-
 (T) = #Bool λa #Bool λ* a
+
+(F) = #Bool λ* #Bool λb b
 
 Scott:
 (And) = λa let (b, c, d) = a; (b λe λf (e λh (h T F) λ* F f) λ* λ* F c d)
 
 (main) = (And (F, T, F))
 
-(F) = λ* λb b
-
 (T) = λa λ* a
+
+(F) = λ* λb b

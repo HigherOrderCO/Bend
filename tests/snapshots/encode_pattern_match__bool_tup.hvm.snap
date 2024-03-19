@@ -7,17 +7,15 @@ TaggedScott:
 
 (main) = (foo (F, T))
 
-(F) = #Bool λ* #Bool λb b
-
 (T) = #Bool λa #Bool λ* a
+
+(F) = #Bool λ* #Bool λb b
 
 Scott:
 (foo) = λa let (b, c) = a; (b λd d λ* F c)
 
 (main) = (foo (F, T))
 
-(F) = λ* λb b
-
 (T) = λa λ* a
 
-
+(F) = λ* λb b

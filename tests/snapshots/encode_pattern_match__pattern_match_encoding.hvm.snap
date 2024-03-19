@@ -7,27 +7,27 @@ TaggedScott:
 
 (main) = (Foo A 2)
 
-(E) = λa λb #MyType λ* #MyType λ* #MyType λ* #MyType λ* #MyType λg #MyType (g a b)
-
-(D) = λa λb #MyType λ* #MyType λ* #MyType λ* #MyType λf #MyType λ* #MyType (f a b)
-
-(C) = λa #MyType λ* #MyType λ* #MyType λd #MyType λ* #MyType λ* #MyType (d a)
+(A) = λa #MyType λb #MyType λ* #MyType λ* #MyType λ* #MyType λ* #MyType (b a)
 
 (B) = λa #MyType λ* #MyType λc #MyType λ* #MyType λ* #MyType λ* #MyType (c a)
 
-(A) = λa #MyType λb #MyType λ* #MyType λ* #MyType λ* #MyType λ* #MyType (b a)
+(C) = λa #MyType λ* #MyType λ* #MyType λd #MyType λ* #MyType λ* #MyType (d a)
+
+(D) = λa λb #MyType λ* #MyType λ* #MyType λ* #MyType λf #MyType λ* #MyType (f a b)
+
+(E) = λa λb #MyType λ* #MyType λ* #MyType λ* #MyType λ* #MyType λg #MyType (g a b)
 
 Scott:
 (Foo) = λa (a λ* 100 λ* 200 λ* 200 λ* λ* 200 λ* λ* 200)
 
 (main) = (Foo A 2)
 
-(E) = λa λb λ* λ* λ* λ* λg (g a b)
-
-(D) = λa λb λ* λ* λ* λf λ* (f a b)
-
-(C) = λa λ* λ* λd λ* λ* (d a)
+(A) = λa λb λ* λ* λ* λ* (b a)
 
 (B) = λa λ* λc λ* λ* λ* (c a)
 
-(A) = λa λb λ* λ* λ* λ* (b a)
+(C) = λa λ* λ* λd λ* λ* (d a)
+
+(D) = λa λb λ* λ* λ* λf λ* (f a b)
+
+(E) = λa λb λ* λ* λ* λ* λg (g a b)

@@ -3,22 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/expr.hvm
 ---
 TaggedScott:
-(Div) = #Op λ* #Op λ* #Op λ* #Op λd d
-
-(Mul) = #Op λ* #Op λ* #Op λc #Op λ* c
-
-(Sub) = #Op λ* #Op λb #Op λ* #Op λ* b
-
-(Add) = #Op λa #Op λ* #Op λ* #Op λ* a
-
-(Op2) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λl #Expr (l a b c)
-
-(Tup) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λj #Expr λ* #Expr (j a b)
-
-(Dup) = λa λb λc λd #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λk #Expr λ* #Expr λ* #Expr (k a b c d)
-
-(Let) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λi #Expr λ* #Expr λ* #Expr λ* #Expr (i a b c)
-
 (Var) = λa #Expr λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (b a)
 
 (Num) = λa #Expr λ* #Expr λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (c a)
@@ -29,23 +13,23 @@ TaggedScott:
 
 (If) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λh #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (h a b c)
 
+(Let) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λi #Expr λ* #Expr λ* #Expr λ* #Expr (i a b c)
+
+(Dup) = λa λb λc λd #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λk #Expr λ* #Expr λ* #Expr (k a b c d)
+
+(Tup) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λj #Expr λ* #Expr (j a b)
+
+(Op2) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λl #Expr (l a b c)
+
+(Add) = #Op λa #Op λ* #Op λ* #Op λ* a
+
+(Sub) = #Op λ* #Op λb #Op λ* #Op λ* b
+
+(Mul) = #Op λ* #Op λ* #Op λc #Op λ* c
+
+(Div) = #Op λ* #Op λ* #Op λ* #Op λd d
+
 Scott:
-(Div) = λ* λ* λ* λd d
-
-(Mul) = λ* λ* λc λ* c
-
-(Sub) = λ* λb λ* λ* b
-
-(Add) = λa λ* λ* λ* a
-
-(Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)
-
-(Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
-
-(Dup) = λa λb λc λd λ* λ* λ* λ* λ* λ* λk λ* λ* (k a b c d)
-
-(Let) = λa λb λc λ* λ* λ* λ* λ* λi λ* λ* λ* (i a b c)
-
 (Var) = λa λb λ* λ* λ* λ* λ* λ* λ* λ* (b a)
 
 (Num) = λa λ* λc λ* λ* λ* λ* λ* λ* λ* (c a)
@@ -55,3 +39,19 @@ Scott:
 (Fun) = λa λb λ* λ* λ* λf λ* λ* λ* λ* λ* (f a b)
 
 (If) = λa λb λc λ* λ* λ* λ* λh λ* λ* λ* λ* (h a b c)
+
+(Let) = λa λb λc λ* λ* λ* λ* λ* λi λ* λ* λ* (i a b c)
+
+(Dup) = λa λb λc λd λ* λ* λ* λ* λ* λ* λk λ* λ* (k a b c d)
+
+(Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
+
+(Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)
+
+(Add) = λa λ* λ* λ* a
+
+(Sub) = λ* λb λ* λ* b
+
+(Mul) = λ* λ* λc λ* c
+
+(Div) = λ* λ* λ* λd d

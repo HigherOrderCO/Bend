@@ -3,22 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/common.hvm
 ---
 TaggedScott:
-(West) = #Direction λ* #Direction λ* #Direction λ* #Direction λd d
-
-(East) = #Direction λ* #Direction λ* #Direction λc #Direction λ* c
-
-(South) = #Direction λ* #Direction λb #Direction λ* #Direction λ* b
-
-(North) = #Direction λa #Direction λ* #Direction λ* #Direction λ* a
-
-(Green) = #Light λ* #Light λ* #Light λc c
-
-(Yellow) = #Light λ* #Light λb #Light λ* b
-
-(Red) = #Light λa #Light λ* #Light λ* a
-
-(False) = #Bool λ* #Bool λb b
-
 (Filled) = λa #Box λb #Box λ* #Box (b a)
 
 (Empty) = #Box λ* #Box λb b
@@ -37,23 +21,23 @@ TaggedScott:
 
 (True) = #Bool λa #Bool λ* a
 
+(False) = #Bool λ* #Bool λb b
+
+(Red) = #Light λa #Light λ* #Light λ* a
+
+(Yellow) = #Light λ* #Light λb #Light λ* b
+
+(Green) = #Light λ* #Light λ* #Light λc c
+
+(North) = #Direction λa #Direction λ* #Direction λ* #Direction λ* a
+
+(South) = #Direction λ* #Direction λb #Direction λ* #Direction λ* b
+
+(East) = #Direction λ* #Direction λ* #Direction λc #Direction λ* c
+
+(West) = #Direction λ* #Direction λ* #Direction λ* #Direction λd d
+
 Scott:
-(West) = λ* λ* λ* λd d
-
-(East) = λ* λ* λc λ* c
-
-(South) = λ* λb λ* λ* b
-
-(North) = λa λ* λ* λ* a
-
-(Green) = λ* λ* λc c
-
-(Yellow) = λ* λb λ* b
-
-(Red) = λa λ* λ* a
-
-(False) = λ* λb b
-
 (Filled) = λa λb λ* (b a)
 
 (Empty) = λ* λb b
@@ -71,3 +55,19 @@ Scott:
 (Nil) = λ* λb b
 
 (True) = λa λ* a
+
+(False) = λ* λb b
+
+(Red) = λa λ* λ* a
+
+(Yellow) = λ* λb λ* b
+
+(Green) = λ* λ* λc c
+
+(North) = λa λ* λ* λ* a
+
+(South) = λ* λb λ* λ* b
+
+(East) = λ* λ* λc λ* c
+
+(West) = λ* λ* λ* λd d

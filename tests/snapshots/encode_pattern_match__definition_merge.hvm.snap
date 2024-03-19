@@ -5,21 +5,21 @@ input_file: tests/golden_tests/encode_pattern_match/definition_merge.hvm
 TaggedScott:
 (Foo) = λa λb (#Either (a #Either λc λd (#Bool (c λe #Either (e #Either λg #Bool (g 1 1) #Either λj #Bool (j 2 2)) λm #Either (m #Either λo #Bool (o 1 1) #Either λr #Bool (r 2 2))) d) #Either λu λv (#Bool (u λw #Either (w #Either λy #Bool (y 3 3) #Either λbb #Bool (bb 3 3)) λeb #Either (eb #Either λgb #Bool (gb 3 3) #Either λjb #Bool (jb 3 3))) v)) b)
 
-(False) = #Bool λ* #Bool λb b
-
-(True) = #Bool λa #Bool λ* a
+(Left) = λa #Either λb #Either λ* #Either (b a)
 
 (Right) = λa #Either λ* #Either λc #Either (c a)
 
-(Left) = λa #Either λb #Either λ* #Either (b a)
+(True) = #Bool λa #Bool λ* a
+
+(False) = #Bool λ* #Bool λb b
 
 Scott:
 (Foo) = λa λb (a λc λd (c λe (e λg (g 1 1) λj (j 2 2)) λm (m λo (o 1 1) λr (r 2 2)) d) λu λv (u λw (w λy (y 3 3) λbb (bb 3 3)) λeb (eb λgb (gb 3 3) λjb (jb 3 3)) v) b)
 
-(False) = λ* λb b
-
-(True) = λa λ* a
+(Left) = λa λb λ* (b a)
 
 (Right) = λa λ* λc (c a)
 
-(Left) = λa λb λ* (b a)
+(True) = λa λ* a
+
+(False) = λ* λb b

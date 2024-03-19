@@ -14,20 +14,20 @@ input_file: tests/golden_tests/simplify_matches/already_flat.hvm
 
 (Rule6) = λa a
 
-(CtrB3) = λa #Baz λ* #Baz λ* #Baz λ* #Baz λe #Baz (e a)
-
-(CtrB2) = λa #Baz λ* #Baz λ* #Baz λd #Baz λ* #Baz (d a)
-
-(CtrB1) = λa #Baz λ* #Baz λc #Baz λ* #Baz λ* #Baz (c a)
-
-(CtrB0) = #Baz λa #Baz λ* #Baz λ* #Baz λ* a
-
-(CtrA3) = λa #Bar λ* #Bar λ* #Bar λd #Bar (d a)
-
-(CtrA2) = λa λb #Bar λ* #Bar λd #Bar λ* #Bar (d a b)
-
-(CtrA1) = λa #Bar λb #Bar λ* #Bar λ* #Bar (b a)
+(CtrA) = #Foo λa #Foo λ* a
 
 (CtrB) = λa #Foo λ* #Foo λc #Foo (c a)
 
-(CtrA) = #Foo λa #Foo λ* a
+(CtrA1) = λa #Bar λb #Bar λ* #Bar λ* #Bar (b a)
+
+(CtrA2) = λa λb #Bar λ* #Bar λd #Bar λ* #Bar (d a b)
+
+(CtrA3) = λa #Bar λ* #Bar λ* #Bar λd #Bar (d a)
+
+(CtrB0) = #Baz λa #Baz λ* #Baz λ* #Baz λ* a
+
+(CtrB1) = λa #Baz λ* #Baz λc #Baz λ* #Baz λ* #Baz (c a)
+
+(CtrB2) = λa #Baz λ* #Baz λ* #Baz λd #Baz λ* #Baz (d a)
+
+(CtrB3) = λa #Baz λ* #Baz λ* #Baz λ* #Baz λe #Baz (e a)

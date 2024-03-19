@@ -5,23 +5,23 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
 @Cons = (a (b {4 {4 a {4 b c}} {4 * c}}))
 @If$C0 = (a (* a))
 @If$C1 = (* (a a))
-@Map = ({4 @Map$C0 {4 @Unpack$C3_$_MergePair$C4_$_Map$C1 a}} a)
-@Map$C0 = {4 a {4 {4 @Map$C0 {4 @Unpack$C3_$_MergePair$C4_$_Map$C1 (b c)}} ({7 (a d) b} {4 {4 d {4 c e}} {4 * e}})}}
-@Merge$C0 = {4 {9 a {9 b c}} {4 {11 d {4 @Merge$C0 {4 @Merge$C1 (e (f (g h)))}}} ({13 (i (a {2 @If$C0 {2 @If$C1 ({4 {4 j {4 k l}} {4 * l}} ({4 {4 c {4 h m}} {4 * m}} n))}})) {13 o e}} ({15 i {15 j f}} ({17 {4 @Merge$C2 {4 @Merge$C3 (o ({4 {4 b {4 d p}} {4 * p}} k))}} g} n)))}}
+@Map = ({4 @Map$C0 {4 @Map$C1_$_MergePair$C4_$_Unpack$C3 a}} a)
+@Map$C0 = {4 a {4 {4 @Map$C0 {4 @Map$C1_$_MergePair$C4_$_Unpack$C3 (b c)}} ({3 (a d) b} {4 {4 d {4 c e}} {4 * e}})}}
+@Map$C1_$_MergePair$C4_$_Unpack$C3 = (* @Nil)
+@Merge$C0 = {4 {5 a {5 b c}} {4 {7 d {4 @Merge$C0 {4 @Merge$C1 (e (f (g h)))}}} ({9 (i (a {2 @If$C0 {2 @If$C1 ({4 {4 j {4 k l}} {4 * l}} ({4 {4 c {4 h m}} {4 * m}} n))}})) {9 o e}} ({11 i {11 j f}} ({13 {4 @Merge$C2 {4 @Merge$C3 (o ({4 {4 b {4 d p}} {4 * p}} k))}} g} n)))}}
 @Merge$C1 = (* @Cons)
 @Merge$C2 = {4 a {4 b (c ({4 @Merge$C0 {4 @Merge$C1 (c (a (b d)))}} d))}}
 @Merge$C3 = (* (a a))
-@MergePair$C0 = {4 a {4 {4 @MergePair$C3 {4 @Unpack$C3_$_MergePair$C4_$_Map$C1 (b c)}} ({5 d b} ({4 @Merge$C2 {4 @Merge$C3 (d (a e))}} {4 {4 e {4 c f}} {4 * f}}))}}
+@MergePair$C0 = {4 a {4 {4 @MergePair$C3 {4 @Map$C1_$_MergePair$C4_$_Unpack$C3 (b c)}} ({15 d b} ({4 @Merge$C2 {4 @Merge$C3 (d (a e))}} {4 {4 e {4 c f}} {4 * f}}))}}
 @MergePair$C1 = (a {4 {4 a {4 @Nil b}} {4 * b}})
 @MergePair$C2 = (* @MergePair$C1)
 @MergePair$C3 = {4 a {4 {4 @MergePair$C0 {4 @MergePair$C2 (b (a c))}} (b c)}}
 @Nil = {4 * {4 a a}}
 @Pure = (a {4 {4 a {4 @Nil b}} {4 * b}})
-@Unpack = (a ({4 @Unpack$C2 {4 @Unpack$C3_$_MergePair$C4_$_Map$C1 (a b)}} b))
-@Unpack$C0 = {4 a {4 {4 @MergePair$C3 {4 @Unpack$C3_$_MergePair$C4_$_Map$C1 (b {4 @Unpack$C0 {4 @Unpack$C1 (c (d e))}})}} ({3 c {5 f b}} ({4 @Merge$C2 {4 @Merge$C3 (f (a d))}} e))}}
+@Unpack = (a ({4 @Unpack$C2 {4 @Map$C1_$_MergePair$C4_$_Unpack$C3 (a b)}} b))
+@Unpack$C0 = {4 a {4 {4 @MergePair$C3 {4 @Map$C1_$_MergePair$C4_$_Unpack$C3 (b {4 @Unpack$C0 {4 @Unpack$C1 (c (d e))}})}} ({17 c {15 f b}} ({4 @Merge$C2 {4 @Merge$C3 (f (a d))}} e))}}
 @Unpack$C1 = (* (a a))
 @Unpack$C2 = {4 a {4 {4 @Unpack$C0 {4 @Unpack$C1 (b (a c))}} (b c)}}
-@Unpack$C3_$_MergePair$C4_$_Map$C1 = (* @Nil)
 @main = (a (b c))
 & @Unpack ~ (a (d c))
 & @Map ~ (b (@Pure d))

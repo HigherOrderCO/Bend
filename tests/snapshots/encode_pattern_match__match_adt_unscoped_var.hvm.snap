@@ -9,9 +9,9 @@ TaggedScott:
 
 (main) = *
 
-(Some) = λa #Maybe λ* #Maybe λc #Maybe (c a)
-
 (None) = #Maybe λa #Maybe λ* a
+
+(Some) = λa #Maybe λ* #Maybe λc #Maybe (c a)
 
 Scott:
 (Foo) = λ$x (Some 1 $x λc c)
@@ -20,6 +20,6 @@ Scott:
 
 (main) = *
 
-(Some) = λa λ* λc (c a)
-
 (None) = λa λ* a
+
+(Some) = λa λ* λc (c a)

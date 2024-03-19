@@ -5,15 +5,13 @@ input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_in_arm.hv
 TaggedScott:
 (main) = λa #bool (a λ$x $x λd d)
 
-(F) = #bool λ* #bool λb b
-
 (T) = #bool λa #bool λ* a
+
+(F) = #bool λ* #bool λb b
 
 Scott:
 (main) = λa (a λ$x $x λd d)
 
-(F) = λ* λb b
-
 (T) = λa λ* a
 
-
+(F) = λ* λb b

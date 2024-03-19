@@ -7,15 +7,15 @@ TaggedScott:
 
 (main) = λ* Foo
 
-(True) = #Bool λ* #Bool λb b
-
 (False) = #Bool λa #Bool λ* a
+
+(True) = #Bool λ* #Bool λb b
 
 Scott:
 (Foo) = λa λ* λc (c a)
 
 (main) = λ* Foo
 
-(True) = λ* λb b
-
 (False) = λa λ* a
+
+(True) = λ* λb b
