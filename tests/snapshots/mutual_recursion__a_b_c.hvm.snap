@@ -3,7 +3,19 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/mutual_recursion/a_b_c.hvm
 ---
 Errors:
-Mutual recursion cycle detected in compiled functions:
-  Cycle 1: A -> B -> C -> A
-  This program will expand infinitely in strict evaluation mode.
-  Read https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md for more information.
+Seems like you're trying to run some recursive function(s) on strict-mode:
+A
+B
+C
+
+Due to the ultra-greedy nature of strict-mode, that might result in infinite loops.
+
+You have 2 options:
+
+1. Easy Fix: use lazy-mode.
+
+Just append the `-L` option to `HVM-Lang`, and it will run in lazy-mode. It has the advantage of not doing wasteful work, having an improved complexity class, and being compatible with unrestricted recursion! It has a small overhead though, and isn't compatible with GPU.
+
+2. Hard Fix: use combinators.
+
+By converting your program to use combinators, you can avoid the direct recursive calls that result in loops. If you use the built-in `data` and `match` syntaxes, HVM-Lang usually does this for you, but it couldn't handle your program. See here for more info: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md.
