@@ -50,8 +50,8 @@ enum Mode {
   },
   /// Compiles the program and runs it with the hvm.
   Run {
-    #[arg(short = 'm', long = "mem", help = "How much memory to allocate for the runtime", default_value = "1G", value_parser = mem_parser)]
-    max_memory: usize,
+    #[arg(short = 'm', long = "mem", help = "How much memory to allocate for the runtime", value_parser = mem_parser)]
+    max_memory: Option<usize>,
 
     #[arg(short = 'r', long = "rwts", help = "Maximum amount of rewrites", value_parser = mem_parser)]
     max_rewrites: Option<usize>,

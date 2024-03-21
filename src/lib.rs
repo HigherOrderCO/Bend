@@ -47,7 +47,7 @@ pub fn compile_book(
   let mut core_book = nets_to_hvmc(nets, &mut diagnostics)?;
 
   if opts.pre_reduce {
-    core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), 1 << 24, 100_000);
+    core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), None, 100_000);
   }
   if opts.prune {
     prune_defs(&mut core_book, book.hvmc_entrypoint().to_string());
@@ -153,7 +153,7 @@ pub fn desugar_book(
 
 pub fn run_book(
   mut book: Book,
-  max_memory: usize,
+  max_memory: Option<usize>,
   run_opts: RunOpts,
   compile_opts: CompileOpts,
   diagnostics_cfg: DiagnosticsConfig,
@@ -209,12 +209,12 @@ pub fn count_nodes<'l>(net: &'l hvmc::ast::Net) -> usize {
 
 pub fn run_compiled(
   host: Arc<Mutex<Host>>,
-  mem_size: usize,
+  mem_size: Option<usize>,
   run_opts: RunOpts,
   hook: Option<impl FnMut(&Net)>,
   entrypoint: &str,
 ) -> (Net, RunStats) {
-  let heap = Heap::new_bytes(mem_size);
+  let heap = Heap::new(mem_size).expect("memory allocation failed");
   let mut root = DynNet::new(&heap, run_opts.lazy_mode);
   let max_rwts = run_opts.max_rewrites.map(|x| x.clamp(usize::MIN, usize::MAX));
   // Expect won't be reached because there's
@@ -293,7 +293,7 @@ pub struct RunOpts {
   pub debug: bool,
   pub linear: bool,
   pub lazy_mode: bool,
-  pub max_memory: usize,
+  pub max_memory: Option<usize>,
   pub max_rewrites: Option<usize>,
 }
 

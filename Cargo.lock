@@ -207,8 +207,8 @@ checksum = "809e18805660d7b6b2e2b9f316a5099521b5998d5cba4dda11b5157a21aaef03"
 
 [[package]]
 name = "hvm-core"
-version = "0.2.19"
-source = "git+https://github.com/HigherOrderCO/hvm-core.git?branch=feature/sc-506/smart-pointer-def-api#fcb44d972fca4c026a714ab6770788ac4c7b3741"
+version = "0.2.20"
+source = "git+https://github.com/HigherOrderCO/hvm-core.git#acbc4295283472925426eee97a2f85e4686adba2"
 dependencies = [
  "arrayvec",
  "clap",
