@@ -12,6 +12,7 @@ I
 ...
 
 Due to the ultra-greedy nature of strict-mode, that might result in infinite loops.
+If the float-combinators optimization is not on, we recommend activating it.
 
 You have 2 options:
 
@@ -19,6 +20,9 @@ You have 2 options:
 
 Just append the `-L` option to `HVM-Lang`, and it will run in lazy-mode. It has the advantage of not doing wasteful work, having an improved complexity class, and being compatible with unrestricted recursion! It has a small overhead though, and isn't compatible with GPU.
 
-2. Hard Fix: use combinators.
+2. Hard Fix: refactor the program to use lazy references.
 
-By converting your program to use combinators, you can avoid the direct recursive calls that result in loops. If you use the built-in `data` and `match` syntaxes, HVM-Lang usually does this for you, but it couldn't handle your program. See here for more info: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md.
+When a function reference is in head position of an application or is duplicated by the non-linear use of a `let` expression it will be greedly expanded, leading to an infinite loop.
+If the application is used written as a combinator, it will automatically lifted to a lazy reference, which usually breaks the recursion cycle. Alternatively, by using the built-in `data` and `match` syntax, hvm-lang will try to do this automatically.
+For let expressions where the variable is non-linear (used more than once), you can instead employ `use` expressions to statically duplicate the offending recursive term.
+See here for more info: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md.
