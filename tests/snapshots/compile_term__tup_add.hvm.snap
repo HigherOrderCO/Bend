@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/tup_add.hvm
 ---
 a
-& [#1 #2] ~ [<+ b a> b]
+  & [#1 #2] ~ [<+ b a> b]

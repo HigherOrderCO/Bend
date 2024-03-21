@@ -3,6 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/match_tup.hvm
 ---
 @Sum = ([<+ a b> a] b)
-@main = a
-& @Sum ~ ([#7 #3] a)
 
+@main = a
+  & @Sum ~ ([#7 #3] a)

@@ -9,6 +9,8 @@ Mutual recursion cycle detected in compiled functions:
   Read https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md for more information.
 
 @long_name_that_truncates = (* @long_name_that_truncates$C0)
+
 @long_name_that_truncates$C0 = (* @long_name_that_truncates)
+
 @main = a
-& @long_name_that_truncates ~ ((b b) a)
+  & @long_name_that_truncates ~ ((b b) a)

@@ -7,5 +7,6 @@ In definition 'Foo':
   Repeated bind inside rule pattern: 'a'.
 
 @Foo = (* (a a))
+
 @main = a
-& @Foo ~ (#1 (#2 a))
+  & @Foo ~ (#1 (#2 a))

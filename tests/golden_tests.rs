@@ -138,7 +138,7 @@ fn linear_readback() {
     let book = do_parse_book(code, path)?;
     let (res, info) = run_book(
       book,
-      1 << 20,
+      None,
       RunOpts { linear: true, ..Default::default() },
       CompileOpts::heavy(),
       diagnostics_cfg,
@@ -183,7 +183,7 @@ fn run_lazy() {
     desugar_opts.lazy_mode();
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, info) = run_book(book, 1 << 24, run_opts, desugar_opts, diagnostics_cfg, None)?;
+    let (res, info) = run_book(book, None, run_opts, desugar_opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", info.diagnostics, res))
   })
 }
@@ -293,7 +293,7 @@ fn hangs() {
     let book = do_parse_book(code, path)?;
 
     let thread = std::thread::spawn(move || {
-      run_book(book, 1 << 20, RunOpts::default(), CompileOpts::heavy(), diagnostics_cfg, None)
+      run_book(book, None, RunOpts::default(), CompileOpts::heavy(), diagnostics_cfg, None)
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
 
@@ -318,9 +318,7 @@ fn run_entrypoint() {
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::from("foo"));
-    // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
-    let (res, info) =
-      run_book(book, 1 << 24, RunOpts::default(), CompileOpts::heavy(), diagnostics_cfg, None)?;
+    let (res, info) = run_book(book, None, RunOpts::default(), CompileOpts::heavy(), diagnostics_cfg, None)?;
     Ok(format!("{}{}", info.diagnostics, res))
   })
 }

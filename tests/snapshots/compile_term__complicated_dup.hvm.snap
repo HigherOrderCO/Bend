@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/complicated_dup.hvm
 ---
 ({5 (a b) (c d)} e)
-& ((f {3 a c}) b) ~ ((f d) e)
+  & ((f {3 a c}) b) ~ ((f d) e)
