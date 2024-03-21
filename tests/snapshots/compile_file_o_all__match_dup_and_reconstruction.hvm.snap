@@ -3,8 +3,11 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/match_dup_and_reconstruction.hvm
 ---
 @Boxed = (a {2 {2 a b} b})
+
 @Got = ({3 {2 @Got$C0 (a b)} a} b)
+
 @Got$C0 = {2 a (b [b a])}
+
 @main = a
-& @Got ~ (b a)
-& @Boxed ~ (#10 b)
+  & @Got ~ (b a)
+  & @Boxed ~ (#10 b)

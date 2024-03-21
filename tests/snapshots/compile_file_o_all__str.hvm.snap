@@ -3,11 +3,13 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/str.hvm
 ---
 @String.cons = (a (b {2 {2 a {2 b c}} {2 * c}}))
+
 @String.nil = {2 * {2 a a}}
+
 @main = a
-& @String.cons ~ (#109 (b a))
-& @String.cons ~ (#97 (c b))
-& @String.cons ~ (#105 (d c))
-& @String.cons ~ (#110 (e d))
-& @String.cons ~ (#32 (f e))
-& @String.cons ~ (#61 (@String.nil f))
+  & @String.cons ~ (#109 (b a))
+  & @String.cons ~ (#97 (c b))
+  & @String.cons ~ (#105 (d c))
+  & @String.cons ~ (#110 (e d))
+  & @String.cons ~ (#32 (f e))
+  & @String.cons ~ (#61 (@String.nil f))

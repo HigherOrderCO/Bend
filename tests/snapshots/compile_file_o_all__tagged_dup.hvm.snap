@@ -3,7 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/tagged_dup.hvm
 ---
 @main = a
-& (b b) ~ {3 (c (d (e (f (g a))))) c}
-& (h h) ~ {3 f g}
-& (i i) ~ {3 d e}
-
+  & (b b) ~ {3 (c (d (e (f (g a))))) c}
+  & (h h) ~ {3 f g}
+  & (i i) ~ {3 d e}

@@ -3,12 +3,17 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_reverse.hvm
 ---
 @concat$C0 = {2 a {2 {2 @concat$C0 {2 (b b) (c d)}} (c {2 {2 a {2 d e}} {2 * e}})}}
+
 @cons = (a (b {2 {2 a {2 b c}} {2 * c}}))
+
 @main = a
-& @reverse ~ (b a)
-& @cons ~ (#3 (c b))
-& @cons ~ (#2 (d c))
-& @cons ~ (#1 (@nil d))
+  & @reverse ~ (b a)
+  & @cons ~ (#3 (c b))
+  & @cons ~ (#2 (d c))
+  & @cons ~ (#1 (@nil d))
+
 @nil = {2 * {2 a a}}
+
 @reverse = ({2 @reverse$C0 {2 @nil a}} a)
+
 @reverse$C0 = {2 a {2 {2 @reverse$C0 {2 @nil {2 @concat$C0 {2 (b b) ({2 {2 a {2 @nil c}} {2 * c}} d)}}}} d}}

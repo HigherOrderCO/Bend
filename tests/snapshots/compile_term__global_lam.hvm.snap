@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/global_lam.hvm
 ---
 a
-& (b (c c)) ~ (b a)
+  & (b (c c)) ~ (b a)

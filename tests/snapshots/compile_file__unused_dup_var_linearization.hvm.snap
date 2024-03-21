@@ -3,5 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/unused_dup_var_linearization.hvm
 ---
 @main = a
-& (b b) ~ {3 (c a) c}
-
+  & (b b) ~ {3 (c a) c}

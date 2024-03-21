@@ -3,8 +3,9 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/merge_definitions.hvm
 ---
 @false_$_snd = (* (a a))
-@main = (* a)
-& @true_$_fst ~ (@true_$_fst (b a))
-& @false_$_snd ~ (@false_$_snd (* b))
-@true_$_fst = (a (* a))
 
+@main = (* a)
+  & @true_$_fst ~ (@true_$_fst (b a))
+  & @false_$_snd ~ (@false_$_snd (* b))
+
+@true_$_fst = (a (* a))

@@ -3,6 +3,8 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/recursive_combinator_inactive.hvm
 ---
 @Foo = (?<{3 @Foo @Foo} @Foo$C0 a> a)
+
 @Foo$C0 = (a (* a))
+
 @main = a
-& @Foo ~ (#0 a)
+  & @Foo ~ (#0 a)

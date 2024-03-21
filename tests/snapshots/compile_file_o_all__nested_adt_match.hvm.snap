@@ -3,6 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/nested_adt_match.hvm
 ---
 @Some = (a {2 {2 a b} {2 * b}})
+
 @main = a
-& @Some ~ (b {2 {2 {2 {2 c c} {2 #0 d}} d} {2 #0 a}})
-& @Some ~ (#1 b)
+  & @Some ~ (b {2 {2 {2 {2 c c} {2 #0 d}} d} {2 #0 a}})
+  & @Some ~ (#1 b)
