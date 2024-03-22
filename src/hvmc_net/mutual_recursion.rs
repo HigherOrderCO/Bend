@@ -17,32 +17,36 @@ pub fn check_cycles(book: &Book, diagnostics: &mut Diagnostics) -> Result<(), Di
   let cycles = graph.cycles();
 
   if !cycles.is_empty() {
-    let msg = format!(
-      "{}\n{}\n{:ERR_INDENT_SIZE$}{}\n{:ERR_INDENT_SIZE$}{}",
-      "Mutual recursion cycle detected in compiled functions:",
-      pretty_print_cycles(&cycles),
-      "",
-      "This program will expand infinitely in strict evaluation mode.",
-      "",
-      "Read https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md for more information."
-    );
-
+    let msg = format!(include_str!("mutual_recursion.message"), cycles = show_cycles(&cycles));
     diagnostics.add_book_warning(msg.as_str(), WarningType::MutualRecursionCycle);
   }
 
   diagnostics.fatal(())
 }
 
-fn pretty_print_cycles(cycles: &[Vec<Ref>]) -> String {
-  cycles
+fn show_cycles(cycles: &[Vec<Ref>]) -> String {
+  let tail = &format!("\n{:ERR_INDENT_SIZE$}* ...", "");
+  let tail = if cycles.len() > 5 { tail } else { "" };
+
+  let mut cycles = cycles
     .iter()
-    .enumerate()
-    .map(|(i, cycle)| {
-      let cycle_str = cycle.iter().chain(cycle.first()).cloned().collect::<Vec<_>>().join(" -> ");
-      format!("{:ERR_INDENT_SIZE$}Cycle {}: {}", "", 1 + i, cycle_str)
+    .take(5)
+    .map(|cycle| {
+      let cycle_str = cycle
+        .iter()
+        .filter(|nam| !nam.contains("$C"))
+        .chain(cycle.first())
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(" -> ");
+      format!("{:ERR_INDENT_SIZE$}* {}", "", cycle_str)
     })
     .collect::<Vec<String>>()
-    .join("\n")
+    .join("\n");
+
+  cycles.push_str(tail);
+
+  cycles
 }
 
 impl Graph {

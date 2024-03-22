@@ -1,14 +1,6 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/mutual_recursion/multiple.hvm
----
-Errors:
 Seems like you're trying to run some recursive function(s) on strict-mode.
 The following recursive cycles are not compatible with strict-mode the way these functions were written:
-  * A -> B -> C -> A
-  * H -> I -> H
-  * M -> M
-  * N -> N
+{cycles}
 
 Due to the ultra-greedy nature of strict-mode, that might result in infinite loops.
 If the float-combinators optimization is not on, we recommend activating it.
