@@ -14,5 +14,9 @@ Just append the `-L` option to `HVM-Lang`, and it will run in lazy-mode. It has 
 
 When a function reference is in head position of an application or is duplicated by the non-linear use of a `let` expression it will be greedly expanded, leading to an infinite loop.
 If the application is used written as a combinator, it will automatically lifted to a lazy reference, which usually breaks the recursion cycle. Alternatively, by using the built-in `data` and `match` syntax, hvm-lang will try to do this automatically.
+(e.g. If pattern matching on scott-encoded ADTs, write @a @x(x @a (Foo a) a) instead of @a @x(x (Foo a)))
+
 For let expressions where the variable is non-linear (used more than once), you can instead employ `use` expressions to statically duplicate the offending recursive term.
+(e.g. write Foo = @f use x = Foo; (f x x) instead of Foo = @f let x = Foo; (f x x))
+
 See here for more info: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md.

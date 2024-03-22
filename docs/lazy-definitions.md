@@ -1,42 +1,59 @@
 # Making recursive definitions lazy
 
-The HVM-Core is an eager runtime, for both CPU and parallel GPU implementations. Terms that use recursive terms will unroll indefinitely.
+In strict-mode, terms that use recursive terms will unroll indefinitely.
 
-This means that for example, the following code will hang, despite being technically correct and working on Haskell:
+This is a simple piece of code that works on many other functional programming languages, but hangs on HVM:
 
-```rs
-data Nat = Z | (S p)
+```rust
+Cons = λx λxs λcons λnil (cons x xs)
+Nil  =        λcons λnil nil
 
+Map = λf λlist
+  let cons = λx λxs (Cons (f x) (Map f xs))
+  let nil = Nil
+  (list cons nil)
+
+Main = (Map λx (+ x 1) (Cons 1 Nil))
+```
+
+The recursive `Map` definition never gets reduced.
+Using the debug mode `-d` we can see the steps:
+
+```
+(Map λa (+ a 1) (Cons 1 Nil))
+---------------------------------------
+(Map λa (+ a 1) λb λ* (b 1 Nil))
+---------------------------------------
+(Cons (λa (+ a 1) 1) (Map λa (+ a 1) Nil))
+---------------------------------------
+(Cons (λa (+ a 1) 1) (Nil λb λc (Cons (λa (+ a 1) b) (Map λa (+ a 1) c)) Nil))
+---------------------------------------
+...
+```
+
+For similar reasons, if we try using Y combinator it also won't work.
+
+```rust
 Y = λf (λx (f (x x)) λx (f (x x)))
 
-Nat.add = (Y λaddλaλb match a {
-	Z: b
-	(S p): (S (add p b))
-})
-
-main = (Nat.add (S (S (S Z))) (S Z))
+Map = (Y λrec λf λlist
+  let cons = λx λxs (Cons (f x) (rec f xs))
+  let nil = Nil
+  (list cons nil f))
 ```
 
-Because of that, its recommended to use a [supercombinator](https://en.wikipedia.org/wiki/Supercombinator) formulation to make terms be unrolled lazily, preventing infinite expansion in recursive function bodies.
+By linearizing `f`, the `Map` function "fully reduces" first and then applies `f`.
 
-The `Nat.add` definition below can be a supercombinator if linearized.
-
-```rs
-Nat.add = λaλb match a {
-	Z: b
-	(S p): (S (Nat.add p b))
-}
+```rust
+Map = λf λlist
+  let cons = λx λxs λf (Cons (f x) (Map f xs))
+  let nil = λf Nil
+  (list cons nil f)
 ```
 
-```rs
-// Linearized Nat.add
-Nat.add = λa match a {
-	Z: λb b
-	(S p): λb (S (Nat.add p b))
-}
-```
+This code will work as expected, since `cons` and `nil` are lambdas without free variables, they will be automatically floated to new definitions if the [float-combinators](compiler-options#float-combinators) option is active, allowing them to be unrolled lazily by hvm.
 
-This code will work as expected, because `Nat.add` is unrolled lazily only when it is used as an argument to a lambda.
+It's recommended to use a [supercombinator](https://en.wikipedia.org/wiki/Supercombinator) formulation to make terms be unrolled lazily, preventing infinite expansion in recursive function bodies.
 
 ### Automatic optimization
 
