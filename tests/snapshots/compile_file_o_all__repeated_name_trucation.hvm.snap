@@ -5,7 +5,7 @@ input_file: tests/golden_tests/compile_file_o_all/repeated_name_trucation.hvm
 Warnings:
 Seems like you're trying to run some recursive function(s) on strict-mode.
 The following recursive cycles are not compatible with strict-mode the way these functions were written:
-  * long_name_that_truncates -> long_name_that_truncates$C0 -> long_name_that_truncates
+  * long_name_that_truncates -> long_name_that_truncates
 
 Due to the ultra-greedy nature of strict-mode, that might result in infinite loops.
 If the float-combinators optimization is not on, we recommend activating it.

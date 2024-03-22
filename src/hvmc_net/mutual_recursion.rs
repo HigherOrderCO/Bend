@@ -32,7 +32,13 @@ fn show_cycles(cycles: &[Vec<Ref>]) -> String {
     .iter()
     .take(5)
     .map(|cycle| {
-      let cycle_str = cycle.iter().chain(cycle.first()).cloned().collect::<Vec<_>>().join(" -> ");
+      let cycle_str = cycle
+        .iter()
+        .filter(|nam| !nam.contains("$"))
+        .chain(cycle.first())
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(" -> ");
       format!("{:ERR_INDENT_SIZE$}* {}", "", cycle_str)
     })
     .collect::<Vec<String>>()
