@@ -14,7 +14,7 @@ You have 2 options:
 
 1. Easy Fix: use lazy-mode.
 
-Just append the `-L` option to `HVM-Lang`, and it will run in lazy-mode. It has the advantage of not doing wasteful work, having an improved complexity class, and being compatible with unrestricted recursion! It has a small overhead though, and isn't compatible with GPU.
+Just append the `-L` option to `HVM-Lang`, and it will run in lazy-mode. It has the advantage of not doing wasteful work, having an improved complexity class, and being compatible with unrestricted recursion. It has a small overhead though, and isn't compatible with GPU.
 
 2. Hard Fix: refactor the program to use lazy references.
 
