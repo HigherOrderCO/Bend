@@ -1,8 +1,8 @@
 # Making recursive definitions lazy
 
-In strict-mode, terms that use recursive terms will unroll indefinitely.
+In strict-mode, some types of recursive terms will unroll indefinitely.
 
-This is a simple piece of code that works on many other functional programming languages, but hangs on HVM:
+This is a simple piece of code that works on many other functional programming languages, including hvm's lazy-mode, but hangs on strict-mode:
 
 ```rust
 Cons = λx λxs λcons λnil (cons x xs)
@@ -54,6 +54,8 @@ Map = λf λlist
 This code will work as expected, since `cons` and `nil` are lambdas without free variables, they will be automatically floated to new definitions if the [float-combinators](compiler-options#float-combinators) option is active, allowing them to be unrolled lazily by hvm.
 
 It's recommended to use a [supercombinator](https://en.wikipedia.org/wiki/Supercombinator) formulation to make terms be unrolled lazily, preventing infinite expansion in recursive function bodies.
+
+If you have a set of mutually recursive functions, you only need to make one of the steps lazy. This might be useful when doing micro-optimizations, since it's possible to avoid part of the small performance cost of linearizing lambdas.
 
 ### Automatic optimization
 

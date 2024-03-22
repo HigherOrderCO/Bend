@@ -1,4 +1,4 @@
-use crate::diagnostics::{Diagnostics, WarningType};
+use crate::diagnostics::{Diagnostics, WarningType, ERR_INDENT_SIZE};
 use hvmc::ast::{Book, Tree};
 use indexmap::{IndexMap, IndexSet};
 use std::fmt::Debug;
@@ -17,18 +17,30 @@ pub fn check_cycles(book: &Book, diagnostics: &mut Diagnostics) -> Result<(), Di
   let cycles = graph.cycles();
 
   if !cycles.is_empty() {
-    let msg = format!(include_str!("mutual_recursion.message"), refs = show_refs(&cycles));
+    let msg = format!(include_str!("mutual_recursion.message"), cycles = show_cycles(&cycles));
     diagnostics.add_book_warning(msg.as_str(), WarningType::MutualRecursionCycle);
   }
 
   diagnostics.fatal(())
 }
 
-fn show_refs(cycles: &[Vec<Ref>]) -> String {
-  use itertools::Itertools;
+fn show_cycles(cycles: &[Vec<Ref>]) -> String {
+  let tail = &format!("\n{:ERR_INDENT_SIZE$}* ...", "");
+  let tail = if cycles.len() > 5 { tail } else { "" };
 
-  let cycles = cycles.concat();
-  cycles.iter().take(5).join("\n") + if cycles.len() > 5 { "\n..." } else { "" }
+  let mut cycles = cycles
+    .iter()
+    .take(5)
+    .map(|cycle| {
+      let cycle_str = cycle.iter().chain(cycle.first()).cloned().collect::<Vec<_>>().join(" -> ");
+      format!("{:ERR_INDENT_SIZE$}* {}", "", cycle_str)
+    })
+    .collect::<Vec<String>>()
+    .join("\n");
+
+  cycles.push_str(tail);
+
+  cycles
 }
 
 impl Graph {
