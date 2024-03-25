@@ -4,6 +4,8 @@ use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use std::collections::BTreeMap;
 
+pub const MERGE_SEPARATOR: &str = "_$_";
+
 impl Book {
   /// Merges definitions that have the same structure into one definition.
   /// Expects variables to be linear.
@@ -28,7 +30,7 @@ impl Book {
 
     for (term, equal_defs) in equal_terms {
       // def1_$_def2_$_def3
-      let new_name = Name::new(equal_defs.iter().join("_$_"));
+      let new_name = Name::new(equal_defs.iter().join(MERGE_SEPARATOR));
 
       // Builtin origin takes precedence
       let builtin = equal_defs.iter().any(|nam| self.defs[nam].builtin);

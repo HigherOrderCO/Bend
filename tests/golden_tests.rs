@@ -349,7 +349,9 @@ fn mutual_recursion() {
       ..DiagnosticsConfig::new(Severity::Allow, true)
     };
     let mut book = do_parse_book(code, path)?;
-    let res = compile_book(&mut book, CompileOpts::light(), diagnostics_cfg, None)?;
+    let mut opts = CompileOpts::light();
+    opts.merge = true;
+    let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
