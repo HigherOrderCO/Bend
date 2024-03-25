@@ -1,4 +1,7 @@
-use crate::diagnostics::{Diagnostics, WarningType, ERR_INDENT_SIZE};
+use crate::{
+  diagnostics::{Diagnostics, WarningType, ERR_INDENT_SIZE},
+  term::transform::definition_merge::MERGE_SEPARATOR,
+};
 use hvmc::ast::{Book, Tree};
 use indexmap::{IndexMap, IndexSet};
 use std::fmt::Debug;
@@ -157,9 +160,9 @@ impl Debug for Graph {
 fn combinations_from_merges(cycle: Vec<Ref>) -> Vec<Vec<Ref>> {
   let mut combinations: Vec<Vec<Ref>> = vec![vec![]];
   for r#ref in cycle {
-    if let Some(index) = r#ref.find("_$_") {
+    if let Some(index) = r#ref.find(MERGE_SEPARATOR) {
       let (left, right) = r#ref.split_at(index);
-      let right = &right[3 ..]; // skip "_$_"
+      let right = &right[MERGE_SEPARATOR.len() ..]; // skip merge separator
       let mut new_combinations = Vec::new();
       for combination in &combinations {
         let mut left_comb = combination.clone();
