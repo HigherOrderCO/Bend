@@ -12,6 +12,10 @@
 
 (qux) = {0 qux}
 
+(tup) = (tup, 1, 0)
+
 (list) = [0 list]
+
+(A x) = let {a b} = A; (a b x)
 
 (Main) = list
