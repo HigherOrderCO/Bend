@@ -141,7 +141,7 @@ impl Term {
 
 impl Term {
   pub fn float_children_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Term> {
-    multi_iterator!(FloatIter { Zero, Two, Vec, Mat, App });
+    multi_iterator!(FloatIter { Zero, Two, Vec, Mat, App, Swt });
     match self {
       Term::App { fun, arg, .. } => {
         let mut args = vec![arg.as_mut()];
@@ -153,11 +153,15 @@ impl Term {
         args.push(app);
         FloatIter::App(args)
       }
-      Term::Mat { args, rules } => {
-        FloatIter::Mat(args.iter_mut().chain(rules.iter_mut().map(|r| &mut r.body)))
+      Term::Mat { arg, rules } => {
+        FloatIter::Mat([arg.as_mut()].into_iter().chain(rules.iter_mut().map(|r| &mut r.2)))
+      }
+      Term::Swt { arg, rules } => {
+        FloatIter::Swt([arg.as_mut()].into_iter().chain(rules.iter_mut().map(|r| &mut r.1)))
       }
       Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => FloatIter::Vec(els),
-      Term::Let { val: fst, nxt: snd, .. }
+      Term::Ltp { val: fst, nxt: snd, .. }
+      | Term::Let { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::Dup { val: fst, nxt: snd, .. }
       | Term::Opx { fst, snd, .. } => FloatIter::Two([fst.as_mut(), snd.as_mut()]),

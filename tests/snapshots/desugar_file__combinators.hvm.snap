@@ -30,7 +30,7 @@ input_file: tests/golden_tests/desugar_file/combinators.hvm
 
 (A$C0) = let {b c} = A; λd (b c d)
 
-(B$C0) = let (c, d) = B; λe (c d e)
+(B$C0) = let (b, c) = B; λd (b c d)
 
 (List.ignore$C0) = #List λ* #List λd (List.ignore d List.ignore)
 
