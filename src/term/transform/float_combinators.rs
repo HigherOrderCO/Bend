@@ -17,7 +17,7 @@ impl Book {
 
       let builtin = def.builtin;
       let rule = def.rule_mut();
-      rule.body.float_combinators(&mut combinators, &mut name_gen, &slf, def_name.clone(), builtin);
+      rule.body.float_combinators(&mut combinators, &mut name_gen, &slf, def_name, builtin);
     }
 
     self.defs.extend(combinators);
@@ -30,7 +30,7 @@ impl Term {
     combinators: &mut Combinators,
     name_gen: &mut usize,
     book: &Book,
-    def_name: Name,
+    def_name: &Name,
     builtin: bool,
   ) {
     Term::recursive_call(move || {
@@ -39,22 +39,22 @@ impl Term {
           continue;
         }
 
-        term.float_combinators(combinators, name_gen, book, def_name.clone(), builtin);
+        term.float_combinators(combinators, name_gen, book, def_name, builtin);
 
         match term {
           Term::App { .. } => {
             if term.free_vars().is_empty() && !term.has_unscoped_diff() {
-              float_combinator(&def_name, name_gen, term, builtin, combinators);
+              float_combinator(def_name, name_gen, term, builtin, combinators);
             }
           }
 
-          Term::Sup { els, .. } => els
-            .iter_mut()
-            .for_each(|e| e.float_combinators(combinators, name_gen, book, def_name.clone(), builtin)),
+          Term::Sup { els, .. } => {
+            els.iter_mut().for_each(|e| e.float_combinators(combinators, name_gen, book, def_name, builtin))
+          }
 
-          term if term.is_combinator() => float_combinator(&def_name, name_gen, term, builtin, combinators),
+          term if term.is_combinator() => float_combinator(def_name, name_gen, term, builtin, combinators),
 
-          _ => term.float_combinators(combinators, name_gen, book, def_name.clone(), builtin),
+          _ => term.float_combinators(combinators, name_gen, book, def_name, builtin),
         }
       }
     })
