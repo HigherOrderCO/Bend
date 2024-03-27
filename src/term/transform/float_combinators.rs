@@ -1,11 +1,24 @@
+use indexmap::IndexSet;
+
 use crate::term::{Book, Definition, Name, Rule, Term};
 use std::collections::BTreeMap;
 
 type Combinators = BTreeMap<Name, Definition>;
 
 impl Book {
+  /// Extracts unsafe terms into new definitions.
+  ///
+  /// Precondition: Variables must have been sanitized.
+  ///
+  /// The term is floated if it:
+  /// - Is an Application without free variables.
+  /// - Is a Superposition.
+  /// - Is a combinator.
+  /// The term is not floated if it:
+  /// - Is safe or has unscoped variables.
   pub fn float_combinators(&mut self) {
     let mut combinators = Combinators::new();
+    let mut safe_defs = IndexSet::new();
 
     let slf = self.clone();
     for (def_name, def) in self.defs.iter_mut() {
@@ -17,7 +30,7 @@ impl Book {
 
       let builtin = def.builtin;
       let rule = def.rule_mut();
-      rule.body.float_combinators(&mut combinators, &mut name_gen, &slf, def_name, builtin);
+      rule.body.float_combinators(&mut combinators, &mut name_gen, &slf, def_name, builtin, &mut safe_defs);
     }
 
     self.defs.extend(combinators);
@@ -32,35 +45,42 @@ impl Term {
     book: &Book,
     def_name: &Name,
     builtin: bool,
+    safe_defs: &mut IndexSet<Name>,
   ) {
     Term::recursive_call(move || {
       for term in self.children_mut() {
-        if term.is_constant() || term.is_safe(book) || term.has_unscoped_diff() {
+        // Don't float if it's safe or has unscoped variables.
+        if term.is_safe(book, safe_defs) || term.has_unscoped_diff() {
           continue;
         }
 
-        term.float_combinators(combinators, name_gen, book, def_name, builtin);
+        // Recusively float the children terms.
+        term.float_combinators(combinators, name_gen, book, def_name, builtin, safe_defs);
 
         match term {
+          // If it is an Application without free variables like '(bar 0)', float into a new definition.
           Term::App { .. } => {
             if term.free_vars().is_empty() && !term.has_unscoped_diff() {
               float_combinator(def_name, name_gen, term, builtin, combinators);
             }
           }
 
-          Term::Sup { els, .. } => {
-            els.iter_mut().for_each(|e| e.float_combinators(combinators, name_gen, book, def_name, builtin))
-          }
+          // If it is a Superposition, float every child element.
+          Term::Sup { els, .. } => els
+            .iter_mut()
+            .for_each(|e| e.float_combinators(combinators, name_gen, book, def_name, builtin, safe_defs)),
 
+          // If it is a combinator, float into a new definition.
           term if term.is_combinator() => float_combinator(def_name, name_gen, term, builtin, combinators),
 
-          _ => term.float_combinators(combinators, name_gen, book, def_name, builtin),
+          _ => continue,
         }
       }
     })
   }
 }
 
+/// Inserts a new definition for the given term in the combinators map.
 fn float_combinator(
   def_name: &Name,
   name_gen: &mut usize,
@@ -80,27 +100,26 @@ fn float_combinator(
 }
 
 impl Term {
-  pub fn is_safe(&self, book: &Book) -> bool {
+  /// A term can be considered safe if it is:
+  /// - A Number or an Eraser.
+  /// - A Tuple or Superposition where all elements are constants.
+  /// - A constant Lambda, e.g a nullary constructor.
+  /// - A Reference with safe body.
+  pub fn is_safe(&self, book: &Book, safe_defs: &mut IndexSet<Name>) -> bool {
     Term::recursive_call(move || match self {
-      // A number or an eraser is safe.
       Term::Num { .. } | Term::Era => true,
 
-      // A tuple or superposition with only constant elements is safe.
-      Term::Tup { els } | Term::Sup { els, .. } => els.iter().all(Term::is_constant),
+      Term::Tup { els } | Term::Sup { els, .. } => els.iter().all(|e| Term::is_safe(e, book, safe_defs)),
 
-      // A constant lambda sequence is safe.
-      Term::Lam { bod: box Term::Var { .. }, .. } => self.is_constant_lambda(),
+      Term::Lam { .. } => self.is_constant_lambda(book, safe_defs),
 
-      // A lambda with a safe body is safe.
-      Term::Lam { bod, .. } => bod.is_safe(book),
-
-      // A ref to a function with a safe body is safe if the function is in the book and its body is safe.
       Term::Ref { nam } => {
-        if let Some(definition) = book.defs.get(nam) {
-          definition.rule().body.is_safe(book)
-        } else {
-          false
-        }
+        !safe_defs.insert(nam.clone())
+          || if let Some(definition) = book.defs.get(nam) {
+            definition.rule().body.is_safe(book, safe_defs)
+          } else {
+            false
+          }
       }
 
       // TODO?: Any term that, when fully expanded, becomes a supercombinator is safe.
@@ -109,18 +128,8 @@ impl Term {
     })
   }
 
-  pub fn is_constant(&self) -> bool {
-    match self {
-      Term::Num { .. } => true,
-      Term::Era => true,
-      Term::Tup { els } | Term::Sup { els, .. } => els.iter().all(Term::is_constant),
-      Term::Lam { .. } => self.is_constant_lambda(),
-      _ => false,
-    }
-  }
-
   /// Checks if the term is a lambda sequence with the body being a variable in the scope or a reference.
-  fn is_constant_lambda(&self) -> bool {
+  fn is_constant_lambda(&self, book: &Book, safe_defs: &mut IndexSet<Name>) -> bool {
     let mut current = self;
     let mut scope = Vec::new();
 
@@ -134,15 +143,16 @@ impl Term {
     match current {
       Term::Var { nam } if scope.contains(&nam) => true,
       Term::Ref { .. } => true,
-      other => other.is_constant(),
+      term => term.is_safe(book, safe_defs),
     }
   }
 
-  fn is_combinator(&self) -> bool {
+  /// A term is a combinator if it is a lambda abstraction without free variables.
+  pub fn is_combinator(&self) -> bool {
     matches!(self, Term::Lam { .. } if self.free_vars().is_empty())
   }
 
-  fn has_unscoped_diff(&self) -> bool {
+  pub fn has_unscoped_diff(&self) -> bool {
     let (declared, used) = self.unscoped_vars();
     declared.difference(&used).count() != 0
   }
