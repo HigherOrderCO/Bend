@@ -53,7 +53,7 @@ impl Term {
           continue;
         }
 
-        // Recusively float the children terms.
+        // Recursively float the children terms.
         term.float_combinators(combinators, name_gen, book, def_name, builtin, seen);
 
         match term {
