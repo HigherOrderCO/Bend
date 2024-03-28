@@ -14,10 +14,8 @@ impl Book {
   /// Precondition: Variables must have been sanitized.
   ///
   /// The floating algorithm follows these rules:
-  /// - Don't extract safe terms or terms that contains unscoped variables.
-  /// - Extract if it is a closed Application
-  /// - Extract if it is a supercombinator
-  /// - Float every element of a Superposition
+  /// - Recusively float every child term.
+  /// - Extract if it is a combinator and not is a safe term.
   pub fn float_combinators(&mut self) {
     let mut combinators = Combinators::new();
 
@@ -71,8 +69,8 @@ fn float_combinator(
   let comb_name = Name::new(format!("{}$C{}", def_name, *name_gen));
   *name_gen += 1;
 
-  let comb_var = Term::Ref { nam: comb_name.clone() };
-  let extracted_term = std::mem::replace(term, comb_var);
+  let comb_ref = Term::Ref { nam: comb_name.clone() };
+  let extracted_term = std::mem::replace(term, comb_ref);
 
   let rules = vec![Rule { body: extracted_term, pats: Vec::new() }];
   let rule = Definition { name: comb_name.clone(), rules, builtin };
@@ -136,17 +134,13 @@ impl Term {
   }
 
   fn is_combinator(&self) -> bool {
-    self.is_closed()
-  }
-
-  pub fn is_closed(&self) -> bool {
     self.free_vars().is_empty() && !self.has_unscoped_diff() && !matches!(self, Term::Ref { .. })
   }
 }
 
 impl Term {
   pub fn float_children_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Term> {
-    multi_iterator!(FloatIter { Zero, One, Two, Vec, Mat, App });
+    multi_iterator!(FloatIter { Zero, Two, Vec, Mat, App });
     match self {
       Term::App { fun, arg, .. } => {
         let mut args = vec![arg.as_mut()];
@@ -166,7 +160,7 @@ impl Term {
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::Dup { val: fst, nxt: snd, .. }
       | Term::Opx { fst, snd, .. } => FloatIter::Two([fst.as_mut(), snd.as_mut()]),
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => FloatIter::One([bod.as_mut()]),
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.float_children_mut(),
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }

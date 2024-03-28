@@ -12,11 +12,11 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
 
 @Merge$C1 = {4 a {4 b (c ({4 @Merge$C0 {4 (* @Cons) (c (a (b d)))}} d))}}
 
-@MergePair$C0 = (a {4 {4 a {4 @Nil b}} {4 * b}})
+@MergePair$C0 = (* (a {4 {4 a {4 @Nil b}} {4 * b}}))
 
 @MergePair$C1 = {4 a {4 {4 @MergePair$C2 {4 (* @Nil) (b c)}} ({15 d b} ({4 @Merge$C1 {4 (* (e e)) (d (a f))}} {4 {4 f {4 c g}} {4 * g}}))}}
 
-@MergePair$C2 = {4 a {4 {4 @MergePair$C1 {4 (* @MergePair$C0) (b (a c))}} (b c)}}
+@MergePair$C2 = {4 a {4 {4 @MergePair$C1 {4 @MergePair$C0 (b (a c))}} (b c)}}
 
 @Nil = {4 * {4 a a}}
 
