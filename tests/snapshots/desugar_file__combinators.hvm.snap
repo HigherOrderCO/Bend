@@ -12,6 +12,8 @@ input_file: tests/golden_tests/desugar_file/combinators.hvm
 
 (qux) = {0 qux}
 
+(clax) = (λa a clax$C0)
+
 (tup) = (tup, 1, 0)
 
 (list) = (List.cons 0 list$C0)
@@ -31,5 +33,7 @@ input_file: tests/golden_tests/desugar_file/combinators.hvm
 (B$C0) = let (c, d) = B; λe (c d e)
 
 (List.ignore$C0) = #List λ* #List λd (List.ignore d List.ignore)
+
+(clax$C0) = λ* λ* λ* λe (clax e)
 
 (list$C0) = (List.cons list List.nil)

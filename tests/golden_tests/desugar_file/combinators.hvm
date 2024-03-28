@@ -12,12 +12,14 @@
 
 (qux) = {0 qux}
 
+(clax) = (λx x λa λb λc λd (clax d))
+
 (tup) = (tup, 1, 0)
 
 (list) = [0 list]
 
-(A x) = (let {a b} = A; @c (a b c) x)
+(A x) = (let {a b} = A; λc (a b c) x)
 
-(B x) = (let (a, b) = B; @c (a b c) x)
+(B x) = (let (a, b) = B; λc (a b c) x)
 
 (Main) = list

@@ -15,7 +15,8 @@ impl Book {
   ///
   /// The floating algorithm follows these rules:
   /// - Recursively float every child term.
-  /// - Extract if it is a combinator and not is a safe term.
+  /// - Extract if it is a combinator and is not a safe term.
+  /// See [`Term::is_safe`] for what is considered safe here.
   pub fn float_combinators(&mut self) {
     let mut combinators = Combinators::new();
 
