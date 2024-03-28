@@ -53,11 +53,6 @@ impl Term {
       // Recursively float the children terms.
       term.float_combinators(combinators, name_gen, book, def_name, builtin, seen);
 
-      // Don't float if it has unscoped variables.
-      if term.has_unscoped_diff() {
-        continue;
-      }
-
       if term.is_combinator() && !term.is_safe(book, seen) {
         float_combinator(def_name, name_gen, term, builtin, combinators);
       }
