@@ -14,7 +14,7 @@ impl Book {
   /// Precondition: Variables must have been sanitized.
   ///
   /// The floating algorithm follows these rules:
-  /// - Recusively float every child term.
+  /// - Recursively float every child term.
   /// - Extract if it is a combinator and not is a safe term.
   pub fn float_combinators(&mut self) {
     let mut combinators = Combinators::new();
