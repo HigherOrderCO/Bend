@@ -1,6 +1,9 @@
 use indexmap::IndexSet;
 
-use crate::term::{Book, Definition, Name, Rule, Term};
+use crate::{
+  multi_iterator,
+  term::{Book, Definition, Name, Rule, Term},
+};
 use std::collections::BTreeMap;
 
 type Combinators = BTreeMap<Name, Definition>;
@@ -46,13 +49,13 @@ impl Term {
     builtin: bool,
     seen: &mut IndexSet<Name>,
   ) {
-    for term in self.children_mut() {
+    for term in self.float_children_mut() {
       // Recursively float the children terms.
       term.float_combinators(combinators, name_gen, book, def_name, builtin, seen);
 
       // Don't float if it has unscoped variables.
       if term.has_unscoped_diff() {
-        return;
+        continue;
       }
 
       if term.is_combinator() && !term.is_safe(book, seen) {
@@ -85,7 +88,7 @@ impl Term {
   /// A term can be considered safe if it is:
   /// - A Number or an Eraser.
   /// - A Tuple or Superposition where all elements are safe.
-  /// - A constant Lambda, e.g. a nullary constructor.
+  /// - A safe Lambda, e.g. a nullary constructor or a lambda with safe body.
   /// - A Reference with safe body.
   pub fn is_safe(&self, book: &Book, seen: &mut IndexSet<Name>) -> bool {
     Term::recursive_call(move || match self {
@@ -93,7 +96,7 @@ impl Term {
 
       Term::Tup { els } | Term::Sup { els, .. } => els.iter().all(|e| Term::is_safe(e, book, seen)),
 
-      Term::Lam { .. } => self.is_constant_lambda(book, seen),
+      Term::Lam { .. } => self.is_safe_lambda(book, seen),
 
       Term::Ref { nam } => {
         if seen.contains(nam) {
@@ -113,7 +116,7 @@ impl Term {
   }
 
   /// Checks if the term is a lambda sequence with the body being a variable in the scope or a reference.
-  fn is_constant_lambda(&self, book: &Book, seen: &mut IndexSet<Name>) -> bool {
+  fn is_safe_lambda(&self, book: &Book, seen: &mut IndexSet<Name>) -> bool {
     let mut current = self;
     let mut scope = Vec::new();
 
@@ -131,21 +134,52 @@ impl Term {
     }
   }
 
-  /// A term is a supercombinator if it is a lambda abstraction without free variables.
-  pub fn is_supercombinator(&self) -> bool {
-    matches!(self, Term::Lam { .. } if self.free_vars().is_empty())
-  }
-
   pub fn has_unscoped_diff(&self) -> bool {
     let (declared, used) = self.unscoped_vars();
-    declared.difference(&used).count() != 0
+
+    declared.difference(&used).count() != 0 || used.difference(&declared).count() != 0
   }
 
   fn is_combinator(&self) -> bool {
-    self.is_supercombinator() || self.is_closed_app()
+    self.is_closed()
   }
 
-  fn is_closed_app(&self) -> bool {
-    matches!(self, Term::App { .. }) && self.free_vars().is_empty() && !self.has_unscoped_diff()
+  pub fn is_closed(&self) -> bool {
+    self.free_vars().is_empty() && !self.has_unscoped_diff() && !matches!(self, Term::Ref { .. })
+  }
+}
+
+impl Term {
+  pub fn float_children_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Term> {
+    multi_iterator!(FloatIter { Zero, One, Two, Vec, Mat, App });
+    match self {
+      Term::App { fun, arg, .. } => {
+        let mut args = vec![arg.as_mut()];
+        let mut app = fun.as_mut();
+        while let Term::App { fun, arg, .. } = app {
+          args.push(arg);
+          app = fun;
+        }
+        args.push(app);
+        FloatIter::App(args)
+      }
+      Term::Mat { args, rules } => {
+        FloatIter::Mat(args.iter_mut().chain(rules.iter_mut().map(|r| &mut r.body)))
+      }
+      Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => FloatIter::Vec(els),
+      Term::Let { val: fst, nxt: snd, .. }
+      | Term::Use { val: fst, nxt: snd, .. }
+      | Term::Dup { val: fst, nxt: snd, .. }
+      | Term::Opx { fst, snd, .. } => FloatIter::Two([fst.as_mut(), snd.as_mut()]),
+      Term::Lam { bod, .. } | Term::Chn { bod, .. } => FloatIter::One([bod.as_mut()]),
+      Term::Var { .. }
+      | Term::Lnk { .. }
+      | Term::Num { .. }
+      | Term::Nat { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era
+      | Term::Err => FloatIter::Zero([]),
+    }
   }
 }

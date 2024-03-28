@@ -16,6 +16,8 @@
 
 (list) = [0 list]
 
-(A x) = let {a b} = A; (a b x)
+(A x) = (let {a b} = A; @c (a b c) x)
+
+(B x) = (let (a, b) = B; @c (a b c) x)
 
 (Main) = list
