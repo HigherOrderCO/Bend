@@ -13,7 +13,7 @@ impl Book {
   /// The floating algorithm follows these rules:
   /// - Don't extract safe terms or terms that contains unscoped variables.
   /// - Extract if it is a closed Application
-  /// - Extract if it is a combinator
+  /// - Extract if it is a supercombinator
   /// - Float every element of a Superposition
   pub fn float_combinators(&mut self) {
     let mut combinators = Combinators::new();
@@ -46,36 +46,19 @@ impl Term {
     builtin: bool,
     seen: &mut IndexSet<Name>,
   ) {
-    Term::recursive_call(move || {
-      for term in self.children_mut() {
-        // Don't float if it's safe or has unscoped variables.
-        if term.is_safe(book, seen) || term.has_unscoped_diff() {
-          continue;
-        }
+    for term in self.children_mut() {
+      // Recursively float the children terms.
+      term.float_combinators(combinators, name_gen, book, def_name, builtin, seen);
 
-        // Recursively float the children terms.
-        term.float_combinators(combinators, name_gen, book, def_name, builtin, seen);
-
-        match term {
-          // If it is an Application without free variables like '(bar 0)', float into a new definition.
-          Term::App { .. } => {
-            if term.free_vars().is_empty() && !term.has_unscoped_diff() {
-              float_combinator(def_name, name_gen, term, builtin, combinators);
-            }
-          }
-
-          // If it is a Superposition, float every child element.
-          Term::Sup { els, .. } => els
-            .iter_mut()
-            .for_each(|e| e.float_combinators(combinators, name_gen, book, def_name, builtin, seen)),
-
-          // If it is a combinator, float into a new definition.
-          term if term.is_combinator() => float_combinator(def_name, name_gen, term, builtin, combinators),
-
-          _ => continue,
-        }
+      // Don't float if it has unscoped variables.
+      if term.has_unscoped_diff() {
+        return;
       }
-    })
+
+      if term.is_combinator() && !term.is_safe(book, seen) {
+        float_combinator(def_name, name_gen, term, builtin, combinators);
+      }
+    }
   }
 }
 
@@ -148,13 +131,21 @@ impl Term {
     }
   }
 
-  /// A term is a combinator if it is a lambda abstraction without free variables.
-  pub fn is_combinator(&self) -> bool {
+  /// A term is a supercombinator if it is a lambda abstraction without free variables.
+  pub fn is_supercombinator(&self) -> bool {
     matches!(self, Term::Lam { .. } if self.free_vars().is_empty())
   }
 
   pub fn has_unscoped_diff(&self) -> bool {
     let (declared, used) = self.unscoped_vars();
     declared.difference(&used).count() != 0
+  }
+
+  fn is_combinator(&self) -> bool {
+    self.is_supercombinator() || self.is_closed_app()
+  }
+
+  fn is_closed_app(&self) -> bool {
+    matches!(self, Term::App { .. }) && self.free_vars().is_empty() && !self.has_unscoped_diff()
   }
 }

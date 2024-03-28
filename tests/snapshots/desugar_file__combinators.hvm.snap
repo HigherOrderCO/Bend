@@ -6,7 +6,7 @@ input_file: tests/golden_tests/desugar_file/combinators.hvm
 
 (bar) = λa λb (a bar b)
 
-(List.ignore) = λa λ* #List (a List.ignore$C1 0)
+(List.ignore) = λa λ* #List (a #List λ* List.ignore$C0 0)
 
 (baz) = {0 1 2 3 λa a foo}
 
@@ -25,8 +25,6 @@ input_file: tests/golden_tests/desugar_file/combinators.hvm
 (List.nil) = #List λ* #List λb b
 
 (List.ignore$C0) = #List λd (List.ignore d List.ignore)
-
-(List.ignore$C1) = #List λ* List.ignore$C0
 
 (list$C0) = (List.cons 0)
 
