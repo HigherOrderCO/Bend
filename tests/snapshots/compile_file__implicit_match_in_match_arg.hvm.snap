@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/implicit_match_in_match_arg.hvm
----
-@main = (?<#0 (a a) ?<#0 (b b) c>> c)

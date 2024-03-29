@@ -19,5 +19,3 @@ Scott:
 (bar_1) = λa (a bar_2)
 
 (bar_2) = λa λb (a, b)
-
-
