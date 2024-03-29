@@ -860,6 +860,12 @@ impl Name {
   }
 }
 
+impl Default for Name {
+  fn default() -> Self {
+    Self::from("")
+  }
+}
+
 impl From<&str> for Name {
   fn from(value: &str) -> Self {
     Name(STRINGS.get(value))

@@ -4,4 +4,4 @@ input_file: tests/golden_tests/compile_file/wrong_ctr_var_arity.hvm
 ---
 Errors:
 In definition 'foo':
-  Constructor arity mismatch in pattern matching. Constructor 'pair' expects 2 fields, found 0.
+  Incorrect arity for constructor 'pair' of type 'Tup' in pattern matching rule. Expected 2 fields, found 0

@@ -219,9 +219,8 @@ fn simplify_matches() {
     ctx.check_shared_names();
     ctx.set_entrypoint();
     ctx.book.encode_adts(AdtEncoding::TaggedScott);
-    ctx.book.resolve_ctrs_in_pats();
-    ctx.check_unbound_ctr()?;
-    ctx.check_ctrs_arities()?;
+    ctx.fix_match_defs()?;
+    ctx.book.apply_use();
     ctx.book.encode_builtins();
     ctx.resolve_refs()?;
     ctx.fix_match_terms()?;
@@ -254,9 +253,8 @@ fn encode_pattern_match() {
       ctx.check_shared_names();
       ctx.set_entrypoint();
       ctx.book.encode_adts(adt_encoding);
-      ctx.book.resolve_ctrs_in_pats();
-      ctx.check_unbound_ctr()?;
-      ctx.check_ctrs_arities()?;
+      ctx.fix_match_defs()?;
+      ctx.book.apply_use();
       ctx.book.encode_builtins();
       ctx.resolve_refs()?;
       ctx.fix_match_terms()?;

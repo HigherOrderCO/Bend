@@ -4,4 +4,4 @@ input_file: tests/golden_tests/compile_file/wrong_ctr_arity.hvm
 ---
 Errors:
 In definition 'Bar':
-  Constructor arity mismatch in pattern matching. Constructor 'Box' expects 1 fields, found 2.
+  Incorrect arity for constructor 'Box' of type 'Boxed' in pattern matching rule. Expected 1 fields, found 2

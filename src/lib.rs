@@ -71,9 +71,7 @@ pub fn desugar_book(
 
   ctx.book.encode_adts(opts.adt_encoding);
 
-  ctx.book.resolve_ctrs_in_pats();
-  ctx.check_unbound_ctr()?;
-  ctx.check_ctrs_arities()?;
+  ctx.fix_match_defs()?;
 
   ctx.apply_args(args)?;
   ctx.book.apply_use();

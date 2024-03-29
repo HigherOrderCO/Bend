@@ -1,9 +1,8 @@
-use std::collections::{BTreeSet, HashSet};
-
 use crate::{
   diagnostics::{Diagnostics, ToStringVerbose, WarningType},
   term::{builtins, Adts, Constructors, Ctx, Definition, Name, NumCtr, Pattern, Rule, Term},
 };
+use std::collections::{BTreeSet, HashSet};
 
 pub enum DesugarMatchDefErr {
   AdtNotExhaustive { adt: Name, ctr: Name },

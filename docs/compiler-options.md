@@ -142,20 +142,20 @@ When the `linearize-matches` option is used, linearizes only vars that are used 
 
 Example:
 ```rs
-λa λb match a { 0: b; 1+: b }
+λa λb switch a { 0: b; _: b }
 
 // Is transformed to
-λa λb (match a { 0: λc c; 1+: λd d } b)
+λa λb (switch a { 0: λc c; _: λd d } b)
 ```
 
-When the `linearize-matches-extra` option is used, linearizes all vars used in the arms.
+When the `linearize-matches-extra` option is used, it linearizes all vars used in the arms.
 
 example:
 ```rs
-λa λb λc match a { 0: b; 1+: c }
+λa λb λc switch a { 0: b; _: c }
 
 // Is transformed to
-λa λb λc (match a { 0: λd λ* d; 1+: λ* λe e } b c)
+λa λb λc (switch a { 0: λd λ* d; _: λ* λe e } b c)
 ```
 
 ## float-combinators
@@ -224,7 +224,7 @@ If given the option, use another definition as entrypoint rather than `main` or 
 > By default, HVM-Lang searches for a function named either `main` or `Main` to use as entrypoint to a program, but it is possible to use a different entrypoint with the `-e --entrypoint` option.
 
 Example:
-```
+```rust
 // program
 Main = (λx x λx x)
 
