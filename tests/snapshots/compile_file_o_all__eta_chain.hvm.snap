@@ -2,4 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/eta_chain.hvm
 ---
-@main = (<+ a b> (<+ c a> (c b)))
+@Bar = @Baz
+
+@Baz = (<+ a b> (<+ c a> (c b)))
+
+@Foo = @Bar
+
+@main = a
+  & @Foo ~ a

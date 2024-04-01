@@ -5,7 +5,6 @@ pub mod definition_pruning;
 pub mod desugar_match_defs;
 pub mod encode_adts;
 pub mod encode_match_terms;
-pub mod eta_reduction;
 pub mod fix_match_defs;
 pub mod fix_match_terms;
 pub mod float_combinators;

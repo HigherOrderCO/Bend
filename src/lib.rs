@@ -46,8 +46,14 @@ pub fn compile_book(
 
   let mut core_book = nets_to_hvmc(nets, &mut diagnostics)?;
 
+  if opts.eta {
+    core_book.values_mut().for_each(Net::eta_reduce);
+  }
   if opts.pre_reduce {
     core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), None, 100_000);
+  }
+  if opts.eta {
+    core_book.values_mut().for_each(Net::eta_reduce);
   }
   if opts.prune {
     prune_defs(&mut core_book, book.hvmc_entrypoint().to_string());
@@ -101,9 +107,6 @@ pub fn desugar_book(
   ctx.check_unbound_vars()?;
 
   // Optimizing passes
-  if opts.eta {
-    ctx.book.eta_reduction();
-  }
   if opts.float_combinators {
     ctx.book.float_combinators();
   }
