@@ -52,6 +52,9 @@ pub fn compile_book(
   if opts.pre_reduce {
     core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), None, 100_000);
   }
+  if opts.eta {
+    core_book.values_mut().for_each(Net::eta_reduce);
+  }
   if opts.prune {
     prune_defs(&mut core_book, book.hvmc_entrypoint().to_string());
   }
