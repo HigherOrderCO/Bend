@@ -142,12 +142,12 @@ pub enum Term {
   /// Pattern matching on an ADT.
   Mat {
     arg: Box<Term>,
-    rules: Vec<(Option<Name>, Vec<Option<Name>>, Term)>,
+    rules: Vec<MatchRule>,
   },
   /// Native pattern matching on numbers
   Swt {
     arg: Box<Term>,
-    rules: Vec<(NumCtr, Term)>,
+    rules: Vec<SwitchRule>,
   },
   Ref {
     nam: Name,
@@ -156,6 +156,9 @@ pub enum Term {
   #[default]
   Err,
 }
+
+pub type MatchRule = (Option<Name>, Vec<Option<Name>>, Term);
+pub type SwitchRule = (NumCtr, Term);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {

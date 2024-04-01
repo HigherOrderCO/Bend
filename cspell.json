@@ -12,6 +12,7 @@
     "callcc",
     "chumsky",
     "combinators",
+    "concat",
     "ctrs",
     "Dall",
     "datatypes",

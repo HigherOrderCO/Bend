@@ -1,4 +1,4 @@
-use crate::term::{AdtEncoding, Book, Constructors, Name, NumCtr, Tag, Term};
+use crate::term::{AdtEncoding, Book, Constructors, MatchRule, Name, NumCtr, SwitchRule, Tag, Term};
 
 impl Book {
   /// Encodes pattern matching expressions in the book into their
@@ -38,12 +38,7 @@ impl Term {
   }
 }
 
-fn encode_match(
-  arg: Term,
-  rules: Vec<(Option<Name>, Vec<Option<Name>>, Term)>,
-  ctrs: &Constructors,
-  adt_encoding: AdtEncoding,
-) -> Term {
+fn encode_match(arg: Term, rules: Vec<MatchRule>, ctrs: &Constructors, adt_encoding: AdtEncoding) -> Term {
   let adt = ctrs.get(rules[0].0.as_ref().unwrap()).unwrap();
 
   // ADT Encoding depends on compiler option
@@ -73,7 +68,7 @@ fn encode_match(
 /// Convert into a sequence of native matches, decrementing by 1 each match.
 /// match n {0: A; 1: B; 2+: (C n-2)} converted to
 /// match n {0: A; 1+: @%x match %x {0: B; 1+: @n-2 (C n-2)}}
-fn encode_switch(arg: Term, mut rules: Vec<(NumCtr, Term)>) -> Term {
+fn encode_switch(arg: Term, mut rules: Vec<SwitchRule>) -> Term {
   let last_rule = rules.pop().unwrap();
 
   let match_var = Name::from("%x");

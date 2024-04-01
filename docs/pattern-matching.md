@@ -106,18 +106,18 @@ To ensure that recursive pattern matching functions don't loop in strict mode, i
 
 Pattern matching equations also support matching on non-consecutive numbers:
 ```rust
-Parse '(' = Token.LParen
-Parse ')' = Token.RParen
+Parse '(' = Token.LParenthesis
+Parse ')' = Token.RParenthesis
 Parse 'λ' = Token.Lambda
 Parse  n  = (Token.Name n)
 ```
 This is compiled to a cascade of `switch` expressions, from smallest value to largest.
 ```rust
 Parse = λarg0 switch matched = (- arg0 '(') {
-  0: Token.LParen
+  0: Token.LParenthesis
   // ')' + 1 - '(' is resolved during compile time
   _: switch matched = (- matched-1 ( ')'-1-'(' ) {
-    0: Token.RParen
+    0: Token.RParenthesis
     _: switch matched = (- matched-1 ( 'λ'-1-')' ) {
       0: Token.Lambda
       _: use n = (+ 1 matched-1); (Token.Name n)

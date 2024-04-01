@@ -1,6 +1,6 @@
 use crate::{
   diagnostics::{Diagnostics, ToStringVerbose, WarningType},
-  term::{Adts, Constructors, Ctx, Name, NumCtr, Term},
+  term::{Adts, Constructors, Ctx, MatchRule, Name, NumCtr, Term},
 };
 use std::collections::HashMap;
 
@@ -99,54 +99,14 @@ impl Term {
 
     let (arg_nam, arg) = extract_match_arg(arg);
 
-    // Normalize arms
+    // Normalize arms, making one arm for each constructor of the matched adt.
     if let Some(ctr_nam) = &rules[0].0
       && let Some(adt_nam) = ctrs.get(ctr_nam)
     {
       let adt_ctrs = &adts[adt_nam].ctrs;
 
-      // For each arm, decide to which arm of the fixed match they map to.
-      let mut bodies = HashMap::<&Name, Option<Term>>::from_iter(adt_ctrs.iter().map(|(ctr, _)| (ctr, None)));
-      for rule_idx in 0 .. rules.len() {
-        if let Some(ctr_nam) = &rules[rule_idx].0
-          && let Some(found_adt) = ctrs.get(ctr_nam)
-        {
-          // Ctr arm
-          if found_adt == adt_nam {
-            let body = bodies.get_mut(ctr_nam).unwrap();
-            if body.is_none() {
-              // Use this rule for this constructor
-              *body = Some(rules[rule_idx].2.clone());
-            } else {
-              errs.push(FixMatchErr::RedundantArm { ctr: ctr_nam.clone() });
-            }
-          } else {
-            errs.push(FixMatchErr::AdtMismatch {
-              expected: adt_nam.clone(),
-              found: found_adt.clone(),
-              ctr: ctr_nam.clone(),
-            })
-          }
-        } else {
-          // Var arm
-          if rule_idx != rules.len() - 1 {
-            errs.push(FixMatchErr::UnreachableMatchArms { var: rules[rule_idx].0.clone() });
-            rules.truncate(rule_idx + 1);
-          }
-          // Use this rule for all remaining constructors
-          for (ctr, body) in bodies.iter_mut() {
-            if body.is_none() {
-              let mut new_body = rules[rule_idx].2.clone();
-              if let Some(var) = &rules[rule_idx].0 {
-                new_body.subst(var, &rebuild_ctr(&arg_nam, ctr, &adts[adt_nam].ctrs[&**ctr]));
-              }
-              *body = Some(new_body);
-            }
-          }
-
-          break;
-        }
-      }
+      // Decide which constructor corresponds to which arm of the match.
+      let mut bodies = fixed_match_arms(rules, &arg_nam, adt_nam, adt_ctrs.keys(), ctrs, adts, errs);
 
       // Build the match arms, with all constructors
       let mut new_rules = vec![];
@@ -162,6 +122,7 @@ impl Term {
       }
       *rules = new_rules;
     } else {
+      // First arm was not matching a constructor, convert into a use term.
       errs.push(FixMatchErr::IrrefutableMatch { var: rules[0].0.clone() });
 
       let match_var = rules[0].0.take();
@@ -233,6 +194,63 @@ fn apply_arg(term: Term, arg_nam: Name, arg: Option<Term>) -> Term {
   } else {
     term
   }
+}
+
+/// Given the rules of a match term, return the bodies that match
+/// each of the constructors of the matched ADT.
+///
+/// If no rules match a certain constructor, return None in the map,
+/// indicating a non-exhaustive match.
+fn fixed_match_arms<'a>(
+  rules: &mut Vec<MatchRule>,
+  arg_nam: &Name,
+  adt_nam: &Name,
+  adt_ctrs: impl Iterator<Item = &'a Name>,
+  ctrs: &Constructors,
+  adts: &Adts,
+  errs: &mut Vec<FixMatchErr>,
+) -> HashMap<&'a Name, Option<Term>> {
+  let mut bodies = HashMap::<&Name, Option<Term>>::from_iter(adt_ctrs.map(|ctr| (ctr, None)));
+  for rule_idx in 0 .. rules.len() {
+    if let Some(ctr_nam) = &rules[rule_idx].0
+      && let Some(found_adt) = ctrs.get(ctr_nam)
+    {
+      // Ctr arm, use the body of this rule for this constructor.
+      if found_adt == adt_nam {
+        let body = bodies.get_mut(ctr_nam).unwrap();
+        if body.is_none() {
+          // Use this rule for this constructor
+          *body = Some(rules[rule_idx].2.clone());
+        } else {
+          errs.push(FixMatchErr::RedundantArm { ctr: ctr_nam.clone() });
+        }
+      } else {
+        errs.push(FixMatchErr::AdtMismatch {
+          expected: adt_nam.clone(),
+          found: found_adt.clone(),
+          ctr: ctr_nam.clone(),
+        })
+      }
+    } else {
+      // Var arm, use the body of this rule for all non-covered constructors.
+      for (ctr, body) in bodies.iter_mut() {
+        if body.is_none() {
+          let mut new_body = rules[rule_idx].2.clone();
+          if let Some(var) = &rules[rule_idx].0 {
+            new_body.subst(var, &rebuild_ctr(arg_nam, ctr, &adts[adt_nam].ctrs[&**ctr]));
+          }
+          *body = Some(new_body);
+        }
+      }
+
+      if rule_idx != rules.len() - 1 {
+        errs.push(FixMatchErr::UnreachableMatchArms { var: rules[rule_idx].0.clone() });
+        rules.truncate(rule_idx + 1);
+      }
+      break;
+    }
+  }
+  bodies
 }
 
 fn match_field(arg: &Name, field: &Name) -> Name {

@@ -194,7 +194,7 @@ fn tup_rule(
     let pat = rule.pats[0].clone();
     let old_pats = rule.pats.split_off(1);
 
-    // Extract subpats from the tuple pattern
+    // Extract subpatterns from the tuple pattern
     let mut new_pats = match pat {
       Pattern::Tup(sub_pats) => sub_pats,
       Pattern::Var(var) => {
@@ -387,7 +387,7 @@ fn switch_rule(
     for rule in &rules {
       let old_pats = rule.pats[1 ..].to_vec();
       match &rule.pats[0] {
-        // Same ctr, extract subpats.
+        // Same ctr, extract subpatterns.
         // (Ctr pat0_0 ... pat0_m) pat1 ... patN: body
         // becomes
         // pat0_0 ... pat0_m pat1 ... patN: body
