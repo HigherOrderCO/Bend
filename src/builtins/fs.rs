@@ -46,11 +46,9 @@ pub(crate) fn add_fs_defs(
   }
   impl AsDefFunction for Fs0 {
     fn call<M: hvmc::run::Mode>(&self, net: &mut hvmc::run::Net<M>, input: Wire, output: Wire) {
-      let (wire, port) = net.create_wire();
       let slf = self.clone();
-      let readback_node = hvmc::stdlib::readback(slf.readback_data.host.clone(), port, move |net, tree| {
+      hvmc::stdlib::readback(net, slf.readback_data.host.clone(), Trg::wire(input), move |net, tree| {
         dispatch_dyn_net!(net => {
-          net.link_wire_port(wire, Port::ERA);
           let (term, _errs) = readback_hvmc(&ast::Net { root: tree,redexes: vec![]} , &slf.readback_data.book, &slf.readback_data.labels, false, slf.readback_data.adt_encoding);
           let filename = if let Term::Str { ref val } = term {
             Some(val.to_string())
@@ -60,7 +58,6 @@ pub(crate) fn add_fs_defs(
           net.link_wire_port(output, ArcDef::new_arc_port(LabSet::ALL, FunctionLike(Fs1 { readback_data: slf.readback_data, save: slf.save, filename  })));
         })
       });
-      net.link_wire_port(input, readback_node);
     }
   }
 
@@ -73,61 +70,54 @@ pub(crate) fn add_fs_defs(
   impl AsDefFunction for Fs1 {
     fn call<M: hvmc::run::Mode>(&self, net: &mut hvmc::run::Net<M>, input: Wire, output: Wire) {
       if self.save {
-        let (wire, port) = net.create_wire();
         let slf = self.clone();
         let mut labels = (*self.readback_data.labels).clone();
         let host = self.readback_data.host.clone();
-        let readback_node = hvmc::stdlib::readback(
-          self.readback_data.host.clone(),
-          port,
-          move |net, tree| {
-            dispatch_dyn_net!(net => {
-              let (term, _errs) = readback_hvmc(&ast::Net { root: tree,redexes: vec![]} , &slf.readback_data.book, &slf.readback_data.labels, false, slf.readback_data.adt_encoding);
-              let contents = if let Term::Str { ref val } = term {
-                Some(val.to_string())
-              } else {
-                None
-              };
-              // Save file
-              let result = match (slf.filename, contents) {
-                (None, _) => {
-                  Term::encode_err(Term::encode_str(FILENAME_NOT_VALID_MSG))
-                },
-                (_, None) => {
-                  Term::encode_err(Term::encode_str(CONTENTS_NOT_VALID_MSG))
-                },
-                (Some(filename), Some(contents)) => {
-                  match std::fs::write(filename, contents) {
-                    Ok(_) => Term::encode_ok(Term::Era),
-                    Err(e) => Term::encode_err(Term::encode_str(&format!("{FS_ERROR_MSG}{e}"))),
-                  }
-                },
-              };
-              let result = term_to_compat_net(&result, &mut labels);
-              match net_to_hvmc(&result) {
-                  Ok(result) => {
-                    // Return λx (x result)
-                    let app = net.create_node(hvmc::run::Tag::Ctr, 0);
-                    let lam = net.create_node(hvmc::run::Tag::Ctr, 0);
-                    host.lock().unwrap().encode_net(net, Trg::port(app.p1), &result);
-                    net.link_wire_port(wire, Port::ERA);
-                    net.link_port_port(app.p0, lam.p1);
-                    net.link_port_port(app.p2, lam.p2);
+        hvmc::stdlib::readback(net, self.readback_data.host.clone(), Trg::wire(input), move |net, tree| {
+          dispatch_dyn_net!(net => {
+            let (term, _errs) = readback_hvmc(&ast::Net { root: tree,redexes: vec![]} , &slf.readback_data.book, &slf.readback_data.labels, false, slf.readback_data.adt_encoding);
+            let contents = if let Term::Str { ref val } = term {
+              Some(val.to_string())
+            } else {
+              None
+            };
+            // Save file
+            let result = match (slf.filename, contents) {
+              (None, _) => {
+                Term::encode_err(Term::encode_str(FILENAME_NOT_VALID_MSG))
+              },
+              (_, None) => {
+                Term::encode_err(Term::encode_str(CONTENTS_NOT_VALID_MSG))
+              },
+              (Some(filename), Some(contents)) => {
+                match std::fs::write(filename, contents) {
+                  Ok(_) => Term::encode_ok(Term::Era),
+                  Err(e) => Term::encode_err(Term::encode_str(&format!("{FS_ERROR_MSG}{e}"))),
+                }
+              },
+            };
+            let result = term_to_compat_net(&result, &mut labels);
+            match net_to_hvmc(&result) {
+                Ok(result) => {
+                  // Return λx (x result)
+                  let app = net.create_node(hvmc::run::Tag::Ctr, 0);
+                  let lam = net.create_node(hvmc::run::Tag::Ctr, 0);
+                  host.lock().unwrap().encode_net(net, Trg::port(app.p1), &result);
+                  net.link_port_port(app.p0, lam.p1);
+                  net.link_port_port(app.p2, lam.p2);
 
-                    net.link_wire_port(output, lam.p0);
-                  },
-                  Err(_) => {
-                    // If this happens, we can't even report an error to
-                    // the hvm program, so simply print an error, and plug in an ERA
-                    // The other option would be panicking.
-                    eprintln!("{VICIOUS_CIRCLE_MSG}");
-                    net.link_wire_port(output, Port::ERA);
-                  },
-              }
-            })
-          },
-        );
-        net.link_wire_port(input, readback_node);
+                  net.link_wire_port(output, lam.p0);
+                },
+                Err(_) => {
+                  // If this happens, we can't even report an error to
+                  // the hvm program, so simply print an error, and plug in an ERA
+                  // The other option would be panicking.
+                  eprintln!("{VICIOUS_CIRCLE_MSG}");
+                  net.link_wire_port(output, Port::ERA);
+                },
+            }
+          })
+        });
       } else {
         let app = net.create_node(hvmc::run::Tag::Ctr, 0);
         let result = self

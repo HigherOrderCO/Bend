@@ -207,8 +207,8 @@ checksum = "809e18805660d7b6b2e2b9f316a5099521b5998d5cba4dda11b5157a21aaef03"
 
 [[package]]
 name = "hvm-core"
-version = "0.2.21"
-source = "git+https://github.com/HigherOrderCO/hvm-core.git#f92475b7102d514311e24a41492ae8f1e6a9b2d3"
+version = "0.2.22"
+source = "git+https://github.com/HigherOrderCO/hvm-core.git?branch=lazy-readback#3c414cefc65d2b9e3a50160c8ae18f313f7c43ac"
 dependencies = [
  "arrayvec",
  "clap",
