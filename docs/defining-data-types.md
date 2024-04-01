@@ -21,25 +21,12 @@ data Boxed = (Box val)
 let (Box value) = boxed; value
 ```
 
-For more complex types, there are two pattern syntaxes for matching data types.  
-
-One of them binds implicitly the matched variable name plus `.` and the field names on each constructor:
-
+The fields of the constructor that is being destructured with the `match` are bound to the matched variable plus `.` and the field names.
 ```rs
 Option.map = λoption λf
   match option {
     Some: (Some (f option.val))
     None: None
-  }
-```
-
-And another one, which deconstructs the matched variable with explicit bindings:
-
-```rs
-Option.map = λoption λf
-  match option {
-    (Some value): (Some (f value))
-    (None): None
   }
 ```
 
@@ -59,5 +46,7 @@ data Boolean = True | False
 (Option.is_both_some (Some lft_val) (Some rgt_val)) = True
 (Option.is_both_some lft rgt) = False
 ```
+
+You can read more about pattern matching rules in [Pattern matching](docs/pattern-matching.md).
 
 In conclusion, the `data` keyword is very useful as it allows you to easily create data types and deconstruct them.

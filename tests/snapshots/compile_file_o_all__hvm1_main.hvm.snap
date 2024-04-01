@@ -3,4 +3,3 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/hvm1_main.hvm
 ---
 @main = (a a)
-

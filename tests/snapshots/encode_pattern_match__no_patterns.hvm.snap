@@ -15,5 +15,3 @@ Scott:
 (Id2) = λa a
 
 (Pair) = λa λb (a, b)
-
-

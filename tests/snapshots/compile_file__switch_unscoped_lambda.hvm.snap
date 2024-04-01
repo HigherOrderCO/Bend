@@ -1,6 +1,6 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/match_num_unscoped_lambda.hvm
+input_file: tests/golden_tests/compile_file/switch_unscoped_lambda.hvm
 ---
 Warnings:
 In definition 'lambda_in':

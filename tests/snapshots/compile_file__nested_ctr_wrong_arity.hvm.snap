@@ -4,4 +4,4 @@ input_file: tests/golden_tests/compile_file/nested_ctr_wrong_arity.hvm
 ---
 Errors:
 In definition 'fst_fst':
-  Constructor arity mismatch in pattern matching. Constructor 'Pair' expects 2 fields, found 1.
+  Incorrect arity for constructor 'Pair' of type 'Pair' in pattern matching rule. Expected 2 fields, found 1

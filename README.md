@@ -50,7 +50,7 @@ There are compiler options through the CLI. [Click here](docs/compiler-options.m
 
 ## Syntax
 
-HVM-Lang files consists of a series of definitions, which bind a name to a term. Terms can be lambdas, applications, or other terms.
+HVM-Lang files consists of a series of definitions, which bind a name to a term. Terms include lambda-calculus abstractions and applications, numbers, tuples, among others.
 
 Here's a lambda where the body is the variable `x`:
 ```rs
@@ -104,6 +104,9 @@ let result = (+ 1 2); (* result result)
 let {result_1 result_2} = (+ 1 2); (* result_1 result_2)
 ```
 
+Duplications efficiently share the same value between two locations, only cloning a value when it's actually needed, but their exact behaviour is slightly more complicated than that and escapes normal lambda-calculus rules.
+You can read more about it in [Dups and sups](docs/dups-and-sups.md).
+
 It is possible to define tuples:
 ```rs
 tup = (2, 2)
@@ -144,54 +147,52 @@ ListEx1 = [1, 2, 3]
 data List = (List.cons head tail) | (List.nil)
 ListEx2 = (List.cons 1 (List.cons 2 (List.cons 3 List.nil)))
 ```
-
-It's possible to match different kinds of terms. These three forms are equivalent:
+Hvm-lang supports pattern matching through `match` and `switch` terms.
+`match` pattern matches on constructors declared with `data`.
 ```rs
-match list {
-  (List.cons hd tl):  (Some hd)
-  List.nil:  None
+data Option = (Some val) | None
+// 'match' implicitly binds a variable for each field in the constructor.
+// The name of the bound variable depends on the name of the argument.
+map f x = match x {
+  Some:  (Some (f x.val))
+  None:  None
 }
 
-// If we don't provide field bindings, it will implicitly use
-// the fields of the declared data type
-match list {
-  List.cons:  (Some list.head)
-  List.nil:  None
-}
-
-match bind = list {
-  List.cons:  (Some bind.head)
-  List.nil:  None
-}
+// You can give a name to the match argument to access its fields.
+TakeErr fallible_fn x errs =
+  match res = (fallible_fn x) {
+    // We can now access res.val.
+    // If no name is given, it will be inaccessible.
+    Result.ok: ((Some res.val), errs)
+    Result.err: (None, (List.cons res.val errs))
+  }
 ```
 
-Match native numbers:
+`switch` pattern matches on native numbers:
 ```rs
-match 4 {
+match x = 4 {
+  // From '0' to n, ending with the default case '_'.
   0:  "zero"
-  5:  "five"
-  4:  "four"
-  _:  "other"
+  1:  "one"
+  2:  "two"
+  // The default case binds the name <arg>-<n>
+  // where 'arg' is the name of the argument and 'n' is the next number.
+  // In this case, it's 'x-3', which will have value (4 - 3) = 1
+  _:  (String.concat "other: " (String.from_num x-3))
 }
 ```
 
 Which is the equivalent of nesting match terms:
 ```rs
-match 4 {
+match x = 4 {
   0: "zero"
-  1+a: match (- (+ a (+ 0 1)) 5) {
-    0: "five"
-    _:  ...
+  _: match x-1 {
+    0: "one"
+    _:  use x-2 = x-1-1; match x-2 {
+      0: "two"
+      _: use x-3 = x-2-1; (String.concat "other: " (String.from_num x-3))
+    }
   }
-}
-```
-
-Match multiple terms:
-```rs
-λa λb match a, b {
-  (Some True) (x, y): (Some (x, y))
-  (Some False) (x, y): (Some (y, x))
-  None *: None
 }
 ```
 

@@ -54,5 +54,6 @@ This works because the `Bool`-tagged application in `not` passes through the `Li
 The tagged lambda and applications are compiled to `inet` nodes with different tag values for each data type. This allows them to commute, read [HVM-Core](https://github.com/HigherOrderCO/hvm-core/tree/main#language) to learn more about it.
 
 ### Limitations
+To be able to vectorize as described here:
 - The function must not be recursive
 - There must not be labels in common between the function and what you want to vectorize over
