@@ -5,4 +5,8 @@ input_file: tests/golden_tests/compile_file_o_all/extracted_match_pred.hvm
 @main = a
   & @val ~ (#1 a)
 
-@val = (?<#0 @val a> a)
+@val = (?<#0 @val$C0 a> a)
+
+@val$C0 = @valS
+
+@valS = @val

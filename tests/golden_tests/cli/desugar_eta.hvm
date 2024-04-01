@@ -1,4 +1,0 @@
-id x = x
-id2 x = (id x)
-
-main = (id2 42)
