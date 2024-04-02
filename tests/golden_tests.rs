@@ -357,3 +357,27 @@ fn mutual_recursion() {
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
+
+#[test]
+fn io() {
+  run_golden_test_dir_multiple(function_name!(), &[
+    (&|code, path| {
+      let book = do_parse_book(code, path)?;
+
+      let mut desugar_opts = CompileOpts::light();
+      desugar_opts.lazy_mode();
+
+      // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
+      let (res, info) =
+        run_book(book, None, RunOpts::lazy(), desugar_opts, DiagnosticsConfig::default(), None)?;
+      Ok(format!("Lazy mode:\n{}{}", info.diagnostics, res))
+    }),
+    (&|code, path| {
+      let book = do_parse_book(code, path)?;
+
+      let (res, info) =
+        run_book(book, None, RunOpts::default(), CompileOpts::light(), DiagnosticsConfig::default(), None)?;
+      Ok(format!("Strict mode:\n{}{}", info.diagnostics, res))
+    }),
+  ])
+}
