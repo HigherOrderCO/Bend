@@ -30,5 +30,7 @@ See here for more info: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs
 
 @long_name_that_truncates = (* (* @long_name_that_truncates))
 
+@long_name_that_truncates_too = (a a)
+
 @main = a
-  & @long_name_that_truncates ~ ((b b) a)
+  & @long_name_that_truncates ~ (@long_name_that_truncates_too a)
