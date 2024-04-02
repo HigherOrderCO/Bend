@@ -9,7 +9,7 @@ use hvmc::{
   host::Host,
   run::{DynNet, Heap, Rewrites},
 };
-use hvmc_net::{mutual_recursion, prune::prune_defs};
+use hvmc_net::mutual_recursion;
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{
   sync::{Arc, Mutex},
@@ -63,7 +63,7 @@ pub fn compile_book(
     diagnostics.fatal(())?;
   }
   if opts.prune {
-    prune_defs(&mut core_book, book.hvmc_entrypoint().to_string());
+    core_book.prune(&[book.hvmc_entrypoint().to_string()]);
   }
   mutual_recursion::check_cycles(&core_book, &mut diagnostics)?;
 
