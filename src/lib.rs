@@ -49,15 +49,15 @@ pub fn compile_book(
   if opts.eta {
     core_book.values_mut().for_each(Net::eta_reduce);
   }
+  if opts.pre_reduce {
+    core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), None, 100_000);
+  }
   if opts.inline {
     diagnostics.start_pass();
     if let Err(e) = core_book.inline() {
       diagnostics.add_book_error(e);
     }
     diagnostics.fatal(())?;
-  }
-  if opts.pre_reduce {
-    core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), None, 100_000);
   }
   if opts.eta {
     core_book.values_mut().for_each(Net::eta_reduce);
