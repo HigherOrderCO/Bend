@@ -5,12 +5,10 @@
 | `-Oall`        | Disabled | Enables all compiler passes |
 | `-Ono-all`     | Disabled | Disables all compiler passes |
 | `-Oeta` `-Ono-eta` | Disabled | [eta-reduction](#eta-reduction) |
-| `-Oref-to-ref` `-Ono-ref-to-ref` | Disabled | [ref-to-ref](#ref-to-ref) |
 | `-Oprune` `-Ono-prune` | Disabled | [definition-pruning](#definition-pruning) |
 | `-Opre-reduce` `-Ono-pre-reduce` | Disabled | [pre-reduce](#pre-reduce) |
 | `-Olinearize-matches` `-Olinearize-matches-extra` `-Ono-linearize-matches` | Extra  | [linearize-matches](#linearize-matches) |
 | `-Ofloat_combinators` `-Ono-float_combinators` | Enabled  | [float-combinators](#float-combinators) |
-| `-Osimplify-main` `-Ono-simplify-main` | Disabled | [simplify-main](#simplify-main) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
 | `-Oinline` `-Ono-inline` | Disabled | [inline](#inline) |
 | `-e` `--entrypoint` | `Main \| main` | [entrypoint](#entrypoint) |
@@ -32,34 +30,6 @@ id_id = id
 
 // -Ono-eta
 id_id = λz (id z)
-```
-
-## Ref-to-ref
-
-If enabled, When a function that is simply directly calling another function, substitutes all occurrences of that function to the one being called.
-
-Example:
-```rs
-// program
-Foo = λ* 0
-
-Bar = Foo
-
-Main = (Bar *)
-
-// -Oref-to-ref
-Foo = λ* 0
-
-Bar = Foo
-
-Main = (Foo *) // Call `Bar` is resolved to a call to `Foo`.
-
-// -Ono-ref-to-ref
-(Foo) = λ* 0
-
-(Bar) = Foo
-
-(Main) = (Bar *)
 ```
 
 ## Definition-pruning
@@ -137,7 +107,7 @@ main = (bar)
 
 ## linearize-matches
 
-Linearizes the variables between match cases, transforming them into combinators when possible.  
+Linearizes the variables between match cases, transforming them into combinators when possible.
 When the `linearize-matches` option is used, linearizes only vars that are used in more than one arm.
 
 Example:
@@ -177,25 +147,6 @@ Nil  = λc λn n
 
 fold = λinit λf λxs (xs λh λt (fold (f init h) f t) init)
 // Here we need to extract `λh λt (fold (f init h) f t)` to not expand `fold` infinitely, but it will not be extracted because of the free variable `init`.
-```
-
-## Simplify-main
-
-If enabled, when directly calling another function, substitute the ref with a copy of its body.
-
-Example:
-```rs
-// program
-id = λx x
-main = id
-
-// -Osimplify-main
-@id = (a a)
-main = (a a)
-
-// -Ono-simplify-main
-@id = (a a)
-@main = @id
 ```
 
 # Inline

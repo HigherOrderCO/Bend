@@ -55,6 +55,13 @@ pub fn compile_book(
   if opts.eta {
     core_book.values_mut().for_each(Net::eta_reduce);
   }
+  if opts.inline {
+    diagnostics.start_pass();
+    if let Err(e) = core_book.inline() {
+      diagnostics.add_book_error(e);
+    }
+    diagnostics.fatal(())?;
+  }
   if opts.prune {
     prune_defs(&mut core_book, book.hvmc_entrypoint().to_string());
   }
@@ -110,18 +117,9 @@ pub fn desugar_book(
   if opts.float_combinators {
     ctx.book.float_combinators();
   }
-  if opts.ref_to_ref {
-    ctx.simplify_ref_to_ref()?;
-  }
-  if opts.simplify_main {
-    ctx.book.simplify_main_ref();
-  }
 
   ctx.prune(opts.prune, opts.adt_encoding);
 
-  if opts.inline {
-    ctx.book.inline();
-  }
   if opts.merge {
     ctx.book.merge_definitions();
   }
@@ -319,9 +317,6 @@ pub struct CompileOpts {
   /// Enables [term::transform::eta_reduction].
   pub eta: bool,
 
-  /// Enables [term::transform::simplify_ref_to_ref].
-  pub ref_to_ref: bool,
-
   /// Enables [term::transform::definition_pruning] and [hvmc_net::prune].
   pub prune: bool,
 
@@ -333,9 +328,6 @@ pub struct CompileOpts {
 
   /// Enables [term::transform::float_combinators].
   pub float_combinators: bool,
-
-  /// Enables [term::transform::simplify_main_ref].
-  pub simplify_main: bool,
 
   /// Enables [term::transform::definition_merge]
   pub merge: bool,
@@ -349,11 +341,9 @@ impl CompileOpts {
   pub fn heavy() -> Self {
     Self {
       eta: true,
-      ref_to_ref: true,
       prune: true,
       pre_reduce: true,
       float_combinators: true,
-      simplify_main: true,
       merge: true,
       inline: true,
       adt_encoding: Default::default(),

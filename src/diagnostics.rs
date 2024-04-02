@@ -270,3 +270,14 @@ impl ToStringVerbose for String {
     self.clone()
   }
 }
+
+impl ToStringVerbose for hvmc::transform::TransformError {
+  fn to_string_verbose(&self, _verbose: bool) -> String {
+    match self {
+      hvmc::transform::TransformError::InfiniteRefCycle(..) => {
+        format!("During inlining:\n{:ERR_INDENT_SIZE$}{self}", "")
+      }
+      _ => unreachable!(),
+    }
+  }
+}

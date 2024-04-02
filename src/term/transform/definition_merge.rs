@@ -1,4 +1,3 @@
-use super::simplify_ref_to_ref::subst_ref_to_ref;
 use crate::term::{Book, Definition, Name, Rule, Term};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
@@ -72,7 +71,7 @@ impl Book {
     let mut updated_defs = Vec::new();
 
     for def in self.defs.values_mut() {
-      if subst_ref_to_ref(&mut def.rule_mut().body, name_map) {
+      if Term::subst_ref_to_ref(&mut def.rule_mut().body, name_map) {
         updated_defs.push(def.name.clone());
       }
     }
@@ -80,5 +79,30 @@ impl Book {
     if !updated_defs.is_empty() {
       self.merge(updated_defs.into_iter());
     }
+  }
+}
+
+impl Term {
+  /// Performs reference substitution within a term replacing any references found in
+  /// `ref_map` with their corresponding targets.
+  pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool {
+    Term::recursive_call(move || match term {
+      Term::Ref { nam: def_name } => {
+        if let Some(target_name) = ref_map.get(def_name) {
+          *def_name = target_name.clone();
+          true
+        } else {
+          false
+        }
+      }
+
+      _ => {
+        let mut subst = false;
+        for child in term.children_mut() {
+          subst |= Term::subst_ref_to_ref(child, ref_map);
+        }
+        subst
+      }
+    })
   }
 }

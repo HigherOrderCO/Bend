@@ -8,9 +8,7 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
 
 @c2 = ({3 (a b) (c a)} (c b))
 
-@decI = @low
-
-@decO = ((@decO (@decI (@E a))) (* ((a b) (* b))))
+@decO = ((@decO (@low (@E a))) (* ((a b) (* b))))
 
 @low = ((@lowO (@lowI (@E a))) a)
 
@@ -26,4 +24,4 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
 
 @runI = ((@lowO (@lowI (@E (@runO (@runI (@E a)))))) a)
 
-@runO = ((@decO (@decI (@E (@lowO (@lowI (@E (@runO (@runI (@E a))))))))) a)
+@runO = ((@decO (@low (@E (@lowO (@lowI (@E (@runO (@runI (@E a))))))))) a)
