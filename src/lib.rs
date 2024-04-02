@@ -1,7 +1,7 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
 
-use builtins::create_host;
+use builtins::{create_host, CORE_BUILTINS_USES};
 use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity};
 use hvmc::{
   ast::Net,
@@ -63,7 +63,10 @@ pub fn compile_book(
     diagnostics.fatal(())?;
   }
   if opts.prune {
-    core_book.prune(&[book.hvmc_entrypoint().to_string()]);
+    let mut prune_entrypoints = vec![book.hvmc_entrypoint().to_string()];
+    let mut builtin_uses = CORE_BUILTINS_USES.concat().iter().map(|x| x.to_string()).collect::<Vec<_>>();
+    prune_entrypoints.append(&mut builtin_uses);
+    core_book.prune(&prune_entrypoints);
   }
   mutual_recursion::check_cycles(&core_book, &mut diagnostics)?;
 
