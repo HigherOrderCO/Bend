@@ -207,8 +207,8 @@ checksum = "809e18805660d7b6b2e2b9f316a5099521b5998d5cba4dda11b5157a21aaef03"
 
 [[package]]
 name = "hvm-core"
-version = "0.2.21"
-source = "git+https://github.com/HigherOrderCO/hvm-core.git#9aec78bc2e586dd3dc0890241e3cd12fae89d851"
+version = "0.2.22"
+source = "git+https://github.com/HigherOrderCO/hvm-core.git#35eca587dd92bd36f0095ac69361301a94f52cd8"
 dependencies = [
  "arrayvec",
  "clap",
