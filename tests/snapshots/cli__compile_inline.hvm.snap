@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/compile_inline.hvm
+---
+@id = (a a)
+
+@main = a
+  & @id ~ (@id a)
