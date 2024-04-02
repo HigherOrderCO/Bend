@@ -1,4 +1,3 @@
-use super::simplify_ref_to_ref::subst_ref_to_ref;
 use crate::term::{Book, Definition, Name, Rule, Term};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
@@ -72,7 +71,7 @@ impl Book {
     let mut updated_defs = Vec::new();
 
     for def in self.defs.values_mut() {
-      if subst_ref_to_ref(&mut def.rule_mut().body, name_map) {
+      if Term::subst_ref_to_ref(&mut def.rule_mut().body, name_map) {
         updated_defs.push(def.name.clone());
       }
     }

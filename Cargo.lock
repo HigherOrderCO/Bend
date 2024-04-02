@@ -208,12 +208,13 @@ checksum = "809e18805660d7b6b2e2b9f316a5099521b5998d5cba4dda11b5157a21aaef03"
 [[package]]
 name = "hvm-core"
 version = "0.2.21"
-source = "git+https://github.com/HigherOrderCO/hvm-core.git#f92475b7102d514311e24a41492ae8f1e6a9b2d3"
+source = "git+https://github.com/HigherOrderCO/hvm-core.git#9aec78bc2e586dd3dc0890241e3cd12fae89d851"
 dependencies = [
  "arrayvec",
  "clap",
  "nohash-hasher",
  "stacker",
+ "thiserror",
 ]
 
 [[package]]
@@ -397,9 +398,9 @@ dependencies = [
 
 [[package]]
 name = "stdext"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6012f6ef4d674ce7021a8b0f5093f7e339f54d4ba04fc1f9c901659459b4f35b"
+checksum = "4af28eeb7c18ac2dbdb255d40bee63f203120e1db6b0024b177746ebec7049c1"
 
 [[package]]
 name = "strsim"
@@ -416,6 +417,26 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "thiserror"
+version = "1.0.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "03468839009160513471e86a034bb2c5c0e4baae3b43f79ffc55c4a5427b3297"
+dependencies = [
+ "thiserror-impl",
+]
+
+[[package]]
+name = "thiserror-impl"
+version = "1.0.58"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c61f3ba182994efc43764a46c018c347bc492c79f024e705f46567b418f6d4f7"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

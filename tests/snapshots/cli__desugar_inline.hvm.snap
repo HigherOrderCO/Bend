@@ -4,4 +4,4 @@ input_file: tests/golden_tests/cli/desugar_inline.hvm
 ---
 (id) = λa a
 
-(main) = (λa a λa a)
+(main) = (id id)

@@ -7,7 +7,11 @@ use crate::{
 use indexmap::{IndexMap, IndexSet};
 use interner::global::GlobalString;
 use itertools::Itertools;
-use std::{borrow::Cow, collections::HashMap, ops::Deref};
+use std::{
+  borrow::Cow,
+  collections::{BTreeMap, HashMap},
+  ops::Deref,
+};
 
 pub mod builtins;
 pub mod check;
@@ -697,6 +701,28 @@ impl Term {
 
       for child in self.children_mut() {
         child.subst_unscoped(from, to);
+      }
+    })
+  }
+
+  /// Returns whether any substitution happened within the term or not
+  pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool {
+    Term::recursive_call(move || match term {
+      Term::Ref { nam: def_name } => {
+        if let Some(target_name) = ref_map.get(def_name) {
+          *def_name = target_name.clone();
+          true
+        } else {
+          false
+        }
+      }
+
+      _ => {
+        let mut subst = false;
+        for child in term.children_mut() {
+          subst |= Term::subst_ref_to_ref(child, ref_map);
+        }
+        subst
       }
     })
   }
