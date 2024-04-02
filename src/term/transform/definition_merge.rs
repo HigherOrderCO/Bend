@@ -81,3 +81,28 @@ impl Book {
     }
   }
 }
+
+impl Term {
+  /// Performs reference substitution within a term replacing any references found in
+  /// `ref_map` with their corresponding targets.
+  pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool {
+    Term::recursive_call(move || match term {
+      Term::Ref { nam: def_name } => {
+        if let Some(target_name) = ref_map.get(def_name) {
+          *def_name = target_name.clone();
+          true
+        } else {
+          false
+        }
+      }
+
+      _ => {
+        let mut subst = false;
+        for child in term.children_mut() {
+          subst |= Term::subst_ref_to_ref(child, ref_map);
+        }
+        subst
+      }
+    })
+  }
+}

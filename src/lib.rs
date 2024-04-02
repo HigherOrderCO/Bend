@@ -2,7 +2,7 @@
 #![feature(let_chains)]
 
 use builtins::create_host;
-use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity, ERR_INDENT_SIZE};
+use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity};
 use hvmc::{
   ast::Net,
   dispatch_dyn_net,
@@ -50,7 +50,11 @@ pub fn compile_book(
     core_book.values_mut().for_each(Net::eta_reduce);
   }
   if opts.inline {
-    core_book.inline().map_err(|e| format!("Inline:\n{:ERR_INDENT_SIZE$}{e}", ""))?;
+    diagnostics.start_pass();
+    if let Err(e) = core_book.inline() {
+      diagnostics.add_book_error(e);
+    }
+    diagnostics.fatal(())?;
   }
   if opts.pre_reduce {
     core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), None, 100_000);

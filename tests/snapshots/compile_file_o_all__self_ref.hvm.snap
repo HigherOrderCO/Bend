@@ -3,5 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/self_ref.hvm
 ---
 Errors:
-Inline:
+During inlining:
   infinite reference cycle in `@Foo`

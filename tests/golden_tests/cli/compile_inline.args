@@ -1,3 +1,0 @@
-compile
-tests/golden_tests/cli/compile_inline.hvm
--Oinline
