@@ -93,7 +93,6 @@ pub fn desugar_book(
   ctx.fix_match_defs()?;
 
   ctx.apply_args(args)?;
-  ctx.book.apply_use();
 
   ctx.book.encode_builtins();
 
@@ -118,6 +117,8 @@ pub fn desugar_book(
   // sanity check
   ctx.check_unbound_vars()?;
 
+  ctx.book.make_var_names_unique();
+  ctx.book.apply_use();
   ctx.book.make_var_names_unique();
   ctx.book.linearize_vars();
 
