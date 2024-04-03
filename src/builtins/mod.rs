@@ -8,7 +8,7 @@ use hvmc::{ast, host::Host, stdlib::LogDef};
 use crate::{
   readback_hvmc,
   term::{
-    builtins::{SCONS, SNIL},
+    builtins::{RESULT_ERR, RESULT_OK, SCONS, SNIL},
     term_to_net::Labels,
     AdtEncoding, Book, Term,
   },
@@ -27,7 +27,8 @@ pub mod util;
 pub const CORE_BUILTINS: [&str; 7] =
   ["HVM.log", "HVM.black_box", "HVM.print", "HVM.query", "HVM.store", "HVM.load", "HVM.exit"];
 /// List of definition names used by the core builtins
-pub const CORE_BUILTINS_USES: [&[&str]; 7] = [&[], &[], &[], &[SCONS, SNIL], &[], &[], &[]];
+pub const CORE_BUILTINS_USES: [&[&str]; 7] =
+  [&[], &[], &[], &[SCONS, SNIL], &[RESULT_OK, RESULT_ERR], &[RESULT_OK, RESULT_ERR], &[]];
 
 /// Creates a host with the hvm-core primitive definitions built-in.
 /// This needs the book as an Arc because the closure that logs
