@@ -381,3 +381,17 @@ fn io() {
     }),
   ])
 }
+
+#[test]
+fn no_optimization() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = do_parse_book(code, path)?;
+
+    let mut compile_opts = CompileOpts::light();
+    compile_opts = compile_opts.set_no_all();
+    compile_opts.adt_encoding = AdtEncoding::Scott;
+
+    let res = compile_book(&mut book, compile_opts, DiagnosticsConfig::default(), None)?;
+    Ok(format!("{}", res.core_book))
+  })
+}

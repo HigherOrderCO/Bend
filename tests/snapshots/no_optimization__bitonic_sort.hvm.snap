@@ -1,0 +1,66 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/no_optimization/bitonic_sort.hvm
+---
+@Both = (a (b (* ((a (b c)) c))))
+
+@Down = ({17 a b} (((c d) ((e (f g)) h)) h))
+  & @Both ~ (i (j g))
+  & @Flow ~ (b (f j))
+  & @Flow ~ (a (e i))
+  & @Leaf ~ (c d)
+
+@Err = (a a)
+
+@Flow = ({15 a b} (((c d) ((e (f g)) h)) h))
+  & @Down ~ (a (i g))
+  & @Warp ~ (b (e (f i)))
+  & @Leaf ~ (c d)
+
+@Gen = (?<a ({21 b c} d) e> ({19 f {19 <* #2 g> <* #2 <+ #1 h>>}} e))
+  & @Gen ~ (c (h i))
+  & @Both ~ (j (i d))
+  & @Gen ~ (b (g j))
+  & @Leaf ~ (f a)
+
+@Join = (((* @Err) ((a (b c)) d)) (((* @Err) ((e (f g)) c)) d))
+  & @Both ~ (h (i g))
+  & @Both ~ (b (f i))
+  & @Both ~ (a (e h))
+
+@Leaf = (a ((a b) (* b)))
+
+@Rev = (((a b) ((c (d e)) f)) f)
+  & @Both ~ (g (h e))
+  & @Rev ~ (c h)
+  & @Rev ~ (d g)
+  & @Leaf ~ (a b)
+
+@Sort = (a (((b c) ((d (e f)) g)) g))
+  & @Flow ~ (a (h f))
+  & @Both ~ (i (j h))
+  & @Sort ~ (#1 (e j))
+  & @Sort ~ (#0 (d i))
+  & @Leaf ~ (b c)
+
+@Sum = (((a a) ((b (c d)) e)) e)
+  & @Sum ~ (b <+ f d>)
+  & @Sum ~ (c f)
+
+@Swap = (?<a (* b) c> ({3 d e} ({5 f g} c)))
+  & @Both ~ (g (e b))
+  & @Both ~ (d (f a))
+
+@Warp = ({7 a {7 b c}} ((({11 <> d <^ a e>> f} g) ((h (i j)) k)) ({9 (({13 d l} m) ((* (* @Err)) g)) ((* @Err) ((n (o p)) j))} k)))
+  & @Join ~ (q (r p))
+  & @Warp ~ (c (i (o r)))
+  & @Warp ~ (b (h (n q)))
+  & @Swap ~ (e (s (t m)))
+  & @Leaf ~ (l t)
+  & @Leaf ~ (f s)
+
+@main = a
+  & @Sum ~ (b a)
+  & @Sort ~ (#0 (c b))
+  & @Rev ~ (d c)
+  & @Gen ~ (#4 (#0 d))
