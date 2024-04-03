@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/io/load_fail.hvm
+---
+Lazy mode:
+"Filesystem error: No such file or directory (os error 2)"
+Strict mode:
+"Filesystem error: No such file or directory (os error 2)"
