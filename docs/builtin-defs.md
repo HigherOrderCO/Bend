@@ -71,15 +71,15 @@ Here's an example program using `HVM.query`
 Join (String.nil) x = x
 Join (String.cons head tail) x = (String.cons head (Join tail x))
 main = (((HVM.print "What's your name?") HVM.query) λresult match result {
-	(Result.ok name): (HVM.print (Join "Hi, " (Join name "!")) *)
-	(Result.err err): err
+	Result.ok: (HVM.print (Join "Hi, " (Join result.val "!")) *)
+	Result.err: result.val
 })
 ```
 This program also shows using the return value of `HVM.print` (which is the identity function) to block `HVM.query` from reducing too early. If we used a naive version of the program, which is this:
 ```rs
 main = (HVM.print "What's your name?" (HVM.query λresult match result {
-	(Result.ok name): (HVM.print (Join "Hi, " (Join name "!")) *)
-	(Result.err err): err
+	Result.ok: (HVM.print (Join "Hi, " (Join result.val "!")) *)
+	Result.err: result.val
 }))
 ```
 We would get asked our name after typing it in.
@@ -92,8 +92,8 @@ Example:
 
 ```rs
 main = (HVM.store "file.txt" "These are the file contents" λres match res {
-	(Ok *): "Return value of program"
-	(Err err): err
+	Result.ok: "Return value of program"
+	Result.err: res.val
 })
 ```
 
@@ -105,8 +105,8 @@ main = (HVM.store "file.txt" "These are the file contents" λres match res {
 Join (String.nil) x = x
 Join (String.cons head tail) x = (String.cons head (Join tail x))
 main = (HVM.load "file.txt" λres match res {
-	(Result.ok contents): (HVM.print (Join "File contents: " contents) "Program return value")
-	(Result.err err): err
+	Result.ok: (HVM.print (Join "File contents: " res.val) "Program return value")
+	Result.err: res.val
 })
 ```
 

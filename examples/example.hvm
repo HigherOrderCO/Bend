@@ -17,12 +17,12 @@
 // Numeric operations can only reduce numbers, doing (+ (λx x) 1) will not do anything
 (nums) = λx1 λx2 (* (+ x1 1) (/ (- x2 2) 1))
 
-// You can use numbers on the native match expression
-// The `+` arm binds the `scrutinee`-1 variable to the the value of the number -1
+// You can use 'switch' to pattern match native numbers
+// The `_` arm binds the `scrutinee`-1 variable to the the value of the number -1
 (Num.pred) = λn 
-  match n { 
+  switch n { 
     0: 0
-    1+: n-1
+    _: n-1
   }
 
 // Write new data types like this
