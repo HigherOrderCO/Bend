@@ -1,0 +1,24 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/no_optimization/sum_tree.hvm
+---
+@Leaf = (a ((a b) (* b)))
+
+@Node = (a (b (* ((a (b c)) c))))
+
+@add = (<+ a b> (a b))
+
+@gen = (?<a ({3 b c} d) e> e)
+  & @Node ~ (f (g d))
+  & @gen ~ (c g)
+  & @gen ~ (b f)
+  & @Leaf ~ (#1 a)
+
+@main = a
+  & @sum ~ (b a)
+  & @gen ~ (#8 b)
+
+@sum = (((a a) ((b (c d)) e)) e)
+  & @add ~ (f (g d))
+  & @sum ~ (c g)
+  & @sum ~ (b f)

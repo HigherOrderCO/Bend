@@ -1,0 +1,22 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/no_optimization/list_reverse.hvm
+---
+@concat = (((a (b c)) (d e)) ({3 f d} e))
+  & @concat ~ (b (f g))
+  & @cons ~ (a (g c))
+
+@cons = (a (b ((a (b c)) (* c))))
+
+@main = a
+  & @reverse ~ (b a)
+  & @cons ~ (#3 (c b))
+  & @cons ~ (#2 (d c))
+  & @cons ~ (#1 (@nil d))
+
+@nil = (* (a a))
+
+@reverse = (((a (b c)) (@nil d)) d)
+  & @concat ~ (e (f c))
+  & @cons ~ (a (@nil f))
+  & @reverse ~ (b e)
