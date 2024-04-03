@@ -4,29 +4,29 @@ input_file: tests/golden_tests/no_optimization/bitonic_sort.hvm
 ---
 @Both = (a (b (* ((a (b c)) c))))
 
-@Down = ({17 a b} (((c d) ((e (f g)) h)) h))
-  & @Both ~ (i (j g))
-  & @Flow ~ (b (f j))
-  & @Flow ~ (a (e i))
-  & @Leaf ~ (c d)
+@Down = (a (((b (* c)) ((d (e ({15 f g} h))) (a i))) i))
+  & @Both ~ (j (k h))
+  & @Flow ~ (g (e k))
+  & @Flow ~ (f (d j))
+  & @Leaf ~ (b c)
 
 @Err = (a a)
 
-@Flow = ({15 a b} (((c d) ((e (f g)) h)) h))
-  & @Down ~ (a (i g))
-  & @Warp ~ (b (e (f i)))
-  & @Leaf ~ (c d)
+@Flow = (a (((b (* c)) ((d (e ({13 f g} h))) (a i))) i))
+  & @Down ~ (f (j h))
+  & @Warp ~ (g (d (e j)))
+  & @Leaf ~ (b c)
 
-@Gen = (?<a ({21 b c} d) e> ({19 f {19 <* #2 g> <* #2 <+ #1 h>>}} e))
+@Gen = (?<a ({19 b c} d) e> ({17 f {17 <* #2 g> <* #2 <+ #1 h>>}} e))
   & @Gen ~ (c (h i))
   & @Both ~ (j (i d))
   & @Gen ~ (b (g j))
   & @Leaf ~ (f a)
 
-@Join = (((* @Err) ((a (b c)) d)) (((* @Err) ((e (f g)) c)) d))
-  & @Both ~ (h (i g))
-  & @Both ~ (b (f i))
-  & @Both ~ (a (e h))
+@Join = (((* (* @Err)) ((a (b (((* (* (* @Err))) ((c (d (e (f g)))) (a (b h)))) h))) (i j))) (i j))
+  & @Both ~ (k (l g))
+  & @Both ~ (f (d l))
+  & @Both ~ (e (c k))
 
 @Leaf = (a ((a b) (* b)))
 
@@ -36,11 +36,11 @@ input_file: tests/golden_tests/no_optimization/bitonic_sort.hvm
   & @Rev ~ (d g)
   & @Leaf ~ (a b)
 
-@Sort = (a (((b c) ((d (e f)) g)) g))
-  & @Flow ~ (a (h f))
-  & @Both ~ (i (j h))
-  & @Sort ~ (#1 (e j))
-  & @Sort ~ (#0 (d i))
+@Sort = (a (((b (* c)) ((d (e (f g))) (a h))) h))
+  & @Flow ~ (f (i g))
+  & @Both ~ (j (k i))
+  & @Sort ~ (#1 (e k))
+  & @Sort ~ (#0 (d j))
   & @Leaf ~ (b c)
 
 @Sum = (((a a) ((b (c d)) e)) e)
@@ -51,13 +51,13 @@ input_file: tests/golden_tests/no_optimization/bitonic_sort.hvm
   & @Both ~ (g (e b))
   & @Both ~ (d (f a))
 
-@Warp = ({7 a {7 b c}} ((({11 <> d <^ a e>> f} g) ((h (i j)) k)) ({9 (({13 d l} m) ((* (* @Err)) g)) ((* @Err) ((n (o p)) j))} k)))
-  & @Join ~ (q (r p))
-  & @Warp ~ (c (i (o r)))
-  & @Warp ~ (b (h (n q)))
-  & @Swap ~ (e (s (t m)))
-  & @Leaf ~ (l t)
-  & @Leaf ~ (f s)
+@Warp = (a (((b (c ((({7 d e} (f ({9 <> d <^ f g>> h} i))) ((* (* (* (* @Err)))) (c (b j)))) j))) ((k (l (m (((* (* (* (* @Err)))) ((n (o ({11 p q} (r (s t))))) (m (k (l u))))) u)))) (a (v w)))) (v w)))
+  & @Join ~ (x (y t))
+  & @Warp ~ (q (s (o y)))
+  & @Warp ~ (p (r (n x)))
+  & @Swap ~ (g (z (ab i)))
+  & @Leaf ~ (e ab)
+  & @Leaf ~ (h z)
 
 @main = a
   & @Sum ~ (b a)

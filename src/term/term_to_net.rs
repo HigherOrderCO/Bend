@@ -113,11 +113,12 @@ impl EncodeTermState<'_> {
         }
         Term::Mat { .. } => unreachable!("Should've been desugared already"),
         // core: & arg ~ ?<(zero succ) ret>
-        Term::Swt { arg, rules } => {
+        Term::Swt { arg, with, rules } => {
           // At this point should be only num matches of 0 and succ.
-          debug_assert!(rules.len() == 2);
-          debug_assert!(matches!(rules[0].0, NumCtr::Num(0)));
-          debug_assert!(matches!(rules[1].0, NumCtr::Succ(None)));
+          assert!(with.is_empty());
+          assert!(rules.len() == 2);
+          assert!(matches!(rules[0].0, NumCtr::Num(0)));
+          assert!(matches!(rules[1].0, NumCtr::Succ(None)));
 
           let mat = self.inet.new_node(Mat);
 

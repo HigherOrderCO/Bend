@@ -270,10 +270,10 @@ impl Term {
       Term::Let {
         nam: Some(arg.clone()),
         val: Box::new(bind),
-        nxt: Box::new(Term::Mat { arg: Box::new(Term::Var { nam: arg }), rules: arms }),
+        nxt: Box::new(Term::Mat { arg: Box::new(Term::Var { nam: arg }), with: vec![], rules: arms }),
       }
     } else {
-      Term::Mat { arg: Box::new(Term::Var { nam: arg }), rules: arms }
+      Term::Mat { arg: Box::new(Term::Var { nam: arg }), with: vec![], rules: arms }
     };
   }
 }

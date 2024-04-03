@@ -95,7 +95,7 @@ impl Term {
   }
 
   fn fix_match(&mut self, errs: &mut Vec<FixMatchErr>, ctrs: &Constructors, adts: &Adts) {
-    let Term::Mat { arg, rules } = self else { unreachable!() };
+    let Term::Mat { arg, with: _, rules } = self else { unreachable!() };
 
     let (arg_nam, arg) = extract_match_arg(arg);
 
@@ -140,7 +140,7 @@ impl Term {
   /// Check that all numbers are in order and no cases are skipped.
   /// Also check that we have a default case at the end, binding the pred.
   fn fix_switch(&mut self, errs: &mut Vec<FixMatchErr>) {
-    let Term::Swt { arg, rules } = self else { unreachable!() };
+    let Term::Swt { arg, with: _, rules } = self else { unreachable!() };
 
     let (arg_nam, arg) = extract_match_arg(arg);
 

@@ -5,13 +5,13 @@ input_file: tests/golden_tests/encode_pattern_match/bool.hvm
 TaggedScott:
 (not) = λa #bool (a false true)
 
-(and) = λa λb (#bool (a λc #bool (c true false) λd #bool (d false false)) b)
+(and) = λa #bool (a λb #bool (b true false) λc #bool (c false false))
 
-(and2) = λa λb (#bool (a λc c λ* false) b)
+(and2) = λa #bool (a λb b λ* false)
 
-(and3) = λa λb (#bool (a λc #bool (c true false) λ* false) b)
+(and3) = λa #bool (a λb #bool (b true false) λ* false)
 
-(and4) = λa λb (#bool (a λc #bool (c true false) λ* false) b)
+(and4) = λa #bool (a λb #bool (b true false) λ* false)
 
 (true) = #bool λa #bool λ* a
 
@@ -20,13 +20,13 @@ TaggedScott:
 Scott:
 (not) = λa (a false true)
 
-(and) = λa λb (a λc (c true false) λd (d false false) b)
+(and) = λa (a λb (b true false) λc (c false false))
 
-(and2) = λa λb (a λc c λ* false b)
+(and2) = λa (a λb b λ* false)
 
-(and3) = λa λb (a λc (c true false) λ* false b)
+(and3) = λa (a λb (b true false) λ* false)
 
-(and4) = λa λb (a λc (c true false) λ* false b)
+(and4) = λa (a λb (b true false) λ* false)
 
 (true) = λa λ* a
 

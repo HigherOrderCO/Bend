@@ -10,7 +10,7 @@ input_file: tests/golden_tests/simplify_matches/already_flat.hvm
 
 (Rule4) = λ%arg0 match %arg0 { CtrA: λx x; CtrB: %arg0.x }
 
-(Rule5) = λ%arg0 λ%arg1 (match %arg0 { CtrA1: λ%arg1 (%arg0.a %arg1); CtrA2: λ%arg1 (%arg0.a1 %arg0.a2 %arg1); CtrA3: λ%arg1 (match %arg1 { CtrB0: λ%arg0.a (CtrA3 %arg0.a); CtrB1: λ%arg0.a (CtrA3 %arg0.a %arg1.b); CtrB2: λ%arg0.a (CtrA3 %arg0.a (CtrB2 %arg1.b)); CtrB3: λ%arg0.a (%arg0.a %arg1.b) } %arg0.a) } %arg1)
+(Rule5) = λ%arg0 match %arg0 { CtrA1: λ%arg1 (%arg0.a %arg1); CtrA2: λ%arg1 (%arg0.a1 %arg0.a2 %arg1); CtrA3: λ%arg1 (match %arg1 { CtrB0: λ%arg0.a (CtrA3 %arg0.a); CtrB1: λ%arg0.a (CtrA3 %arg0.a %arg1.b); CtrB2: λ%arg0.a (CtrA3 %arg0.a (CtrB2 %arg1.b)); CtrB3: λ%arg0.a (%arg0.a %arg1.b) } %arg0.a) }
 
 (Rule6) = λ%arg0 %arg0
 

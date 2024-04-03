@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/definition_merge.hvm
 ---
 TaggedScott:
-(Foo) = λa λb (#Either (a #Either λc λd (#Bool (c λe #Either (e #Either λf #Bool (f 1 1) #Either λg #Bool (g 2 2)) λh #Either (h #Either λi #Bool (i 1 1) #Either λj #Bool (j 2 2))) d) #Either λk λl (#Bool (k λm #Either (m #Either λn #Bool (n 3 3) #Either λo #Bool (o 3 3)) λp #Either (p #Either λq #Bool (q 3 3) #Either λr #Bool (r 3 3))) l)) b)
+(Foo) = λa #Either (a #Either λb #Bool (b λc #Either (c #Either λd #Bool (d 1 1) #Either λe #Bool (e 2 2)) λf #Either (f #Either λg #Bool (g 1 1) #Either λh #Bool (h 2 2))) #Either λi #Bool (i λj #Either (j #Either λk #Bool (k 3 3) #Either λl #Bool (l 3 3)) λm #Either (m #Either λn #Bool (n 3 3) #Either λo #Bool (o 3 3))))
 
 (Left) = λa #Either λb #Either λ* #Either (b a)
 
@@ -14,7 +14,7 @@ TaggedScott:
 (False) = #Bool λ* #Bool λb b
 
 Scott:
-(Foo) = λa λb (a λc λd (c λe (e λf (f 1 1) λg (g 2 2)) λh (h λi (i 1 1) λj (j 2 2)) d) λk λl (k λm (m λn (n 3 3) λo (o 3 3)) λp (p λq (q 3 3) λr (r 3 3)) l) b)
+(Foo) = λa (a λb (b λc (c λd (d 1 1) λe (e 2 2)) λf (f λg (g 1 1) λh (h 2 2))) λi (i λj (j λk (k 3 3) λl (l 3 3)) λm (m λn (n 3 3) λo (o 3 3))))
 
 (Left) = λa λb λ* (b a)
 

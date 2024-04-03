@@ -170,9 +170,9 @@ pub enum OptArgs {
 }
 
 impl OptArgs {
-  fn opts_from_cli(args: &Vec<Self>) -> CompileOpts {
+  fn opts_from_cli(args: &Vec<Self>, lazy_mode: bool) -> CompileOpts {
     use OptArgs::*;
-    let mut opts = CompileOpts::light();
+    let mut opts = if lazy_mode { CompileOpts::default_lazy() } else { CompileOpts::default_strict() };
     for arg in args {
       match arg {
         All => opts = opts.set_all(),
@@ -252,10 +252,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
         warn_opts,
       );
 
-      let mut opts = OptArgs::opts_from_cli(&comp_opts);
-      if lazy_mode {
-        opts.lazy_mode();
-      }
+      let opts = OptArgs::opts_from_cli(&comp_opts, lazy_mode);
 
       let mut book = load_book(&path)?;
       let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
@@ -271,10 +268,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
         warn_opts,
       );
 
-      let mut opts = OptArgs::opts_from_cli(&comp_opts);
-      if lazy_mode {
-        opts.lazy_mode();
-      }
+      let opts = OptArgs::opts_from_cli(&comp_opts, lazy_mode);
 
       let mut book = load_book(&path)?;
       let diagnostics = desugar_book(&mut book, opts, diagnostics_cfg, None)?;
@@ -305,12 +299,17 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let diagnostics_cfg =
         set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), lazy_mode, warn_opts);
 
-      let mut compile_opts = OptArgs::opts_from_cli(&comp_opts);
-      compile_opts.check(lazy_mode);
+      let compile_opts = OptArgs::opts_from_cli(&comp_opts, lazy_mode);
 
       if lazy_mode {
+        if !single_core {
+          eprintln!(
+            "Warning: Parallel mode not yet implemented for lazy mode. Using single-core mode. Use the '-1' option to hide this message."
+          );
+        }
         single_core = true;
-        compile_opts.lazy_mode();
+      } else {
+        compile_opts.check_for_strict();
       }
 
       let run_opts = RunOpts { single_core, debug, linear, lazy_mode, max_memory, max_rewrites };

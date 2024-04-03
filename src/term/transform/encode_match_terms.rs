@@ -25,11 +25,13 @@ impl Term {
         child.encode_matches(ctrs, adt_encoding)
       }
 
-      if let Term::Mat { arg, rules } = self {
+      if let Term::Mat { arg, with, rules } = self {
+        assert!(with.is_empty());
         let arg = std::mem::take(arg.as_mut());
         let rules = std::mem::take(rules);
         *self = encode_match(arg, rules, ctrs, adt_encoding);
-      } else if let Term::Swt { arg, rules } = self {
+      } else if let Term::Swt { arg, with, rules } = self {
+        assert!(with.is_empty());
         let arg = std::mem::take(arg.as_mut());
         let rules = std::mem::take(rules);
         *self = encode_switch(arg, rules);
@@ -84,9 +86,9 @@ fn encode_switch(arg: Term, mut rules: Vec<SwitchRule>) -> Term {
 
     let NumCtr::Num(num) = rule.0 else { unreachable!() };
     if num == 0 {
-      Term::Swt { arg: Box::new(arg.clone()), rules }
+      Term::Swt { arg: Box::new(arg.clone()), with: vec![], rules }
     } else {
-      let swt = Term::Swt { arg: Box::new(Term::Var { nam: match_var.clone() }), rules };
+      let swt = Term::Swt { arg: Box::new(Term::Var { nam: match_var.clone() }), with: vec![], rules };
       Term::named_lam(match_var.clone(), swt)
     }
   })

@@ -343,7 +343,7 @@ impl Term {
   fn insert_split(&mut self, split: &mut Split, threshold: usize) -> Option<usize> {
     Term::recursive_call(move || {
       let mut n = match self {
-        Term::Var { nam } => usize::from(split.fst.as_ref() == Some(nam) || split.snd.as_ref() == Some(nam)),
+        Term::Var { nam } => usize::from(split.fst == *nam || split.snd == *nam),
         _ => 0,
       };
       for child in self.children_mut() {

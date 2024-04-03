@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/switch_in_switch_arg.hvm
+---
+TaggedScott:
+(main) = λa let {a a_2} = a; switch switch a_2 { 0: 0; _: λb b } { 0: 0; _: λ* a }
+
+Scott:
+(main) = λa let {a a_2} = a; switch switch a_2 { 0: 0; _: λb b } { 0: 0; _: λ* a }
