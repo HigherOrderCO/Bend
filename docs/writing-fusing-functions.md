@@ -129,8 +129,10 @@ false = λt λf f
 not = λboolean (boolean false true)
 fusing_not = λboolean λt λf (boolean f t)
 // Creates a Church numeral out of a native number
-to_church 0 = λf λx x
-to_church 1+p = λf λx (f (to_church p f x))
+to_church n = switch n {
+	0: λf λx x
+	_: λf λx (f (to_church n-1 f x))
+}
 main =
 	let two = λf λx (f (f x))
 	let two_pow_512 = ((to_church 512) two) // Composition of church-encoded numbers is equivalent to exponentiation.

@@ -22,19 +22,15 @@ impl Book {
 
 impl Term {
   pub fn apply_use(&mut self) {
-    Term::recursive_call(move || match self {
-      Term::Use { nam, val, nxt } => {
-        val.apply_use();
-        nxt.apply_use();
-
-        nxt.subst(nam, val);
-        *self = std::mem::take(nxt);
-      }
-      other => {
-        for children in other.children_mut() {
-          children.apply_use();
-        }
+    Term::recursive_call(|| {
+      for children in self.children_mut() {
+        children.apply_use();
       }
     });
+
+    if let Term::Use { nam, val, nxt } = self {
+      nxt.subst(nam, val);
+      *self = std::mem::take(nxt);
+    }
   }
 }

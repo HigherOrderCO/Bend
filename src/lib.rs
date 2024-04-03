@@ -30,7 +30,8 @@ pub const HVM1_ENTRY_POINT: &str = "Main";
 
 pub fn check_book(book: &mut Book) -> Result<(), Diagnostics> {
   // TODO: Do the checks without having to do full compilation
-  let res = compile_book(book, CompileOpts::light(), DiagnosticsConfig::new(Severity::Warning, false), None)?;
+  let res =
+    compile_book(book, CompileOpts::default_lazy(), DiagnosticsConfig::new(Severity::Warning, false), None)?;
   print!("{}", res.diagnostics);
   Ok(())
 }
@@ -49,8 +50,11 @@ pub fn compile_book(
   if opts.eta {
     core_book.values_mut().for_each(Net::eta_reduce);
   }
+
+  mutual_recursion::check_cycles(&core_book, &mut diagnostics)?;
+
   if opts.pre_reduce {
-    core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), None, 100_000);
+    core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), Some(1_000_000), 100_000);
   }
   if opts.eta {
     core_book.values_mut().for_each(Net::eta_reduce);
@@ -68,7 +72,6 @@ pub fn compile_book(
     prune_entrypoints.append(&mut builtin_uses);
     core_book.prune(&prune_entrypoints);
   }
-  mutual_recursion::check_cycles(&core_book, &mut diagnostics)?;
 
   Ok(CompileResult { core_book, labels, diagnostics })
 }
@@ -101,9 +104,14 @@ pub fn desugar_book(
 
   ctx.check_unbound_vars()?;
 
-  if opts.linearize_matches.enabled() {
-    ctx.book.linearize_matches(opts.linearize_matches.is_extra());
+  // Auto match linearization
+  match opts.linearize_matches {
+    OptLevel::Disabled => (),
+    OptLevel::Enabled => ctx.book.linearize_match_lambdas(),
+    OptLevel::Extra => ctx.book.linearize_matches(),
   }
+  // Manual match linearization
+  ctx.book.linearize_match_with();
 
   ctx.book.encode_matches(opts.adt_encoding);
 
@@ -340,8 +348,9 @@ pub struct CompileOpts {
 }
 
 impl CompileOpts {
-  /// All optimizations enabled.
-  pub fn heavy() -> Self {
+  /// Set all opts as true and keep the current adt encoding.
+  #[must_use]
+  pub fn set_all(self) -> Self {
     Self {
       eta: true,
       prune: true,
@@ -349,49 +358,39 @@ impl CompileOpts {
       float_combinators: true,
       merge: true,
       inline: true,
-      adt_encoding: Default::default(),
+      adt_encoding: self.adt_encoding,
       linearize_matches: OptLevel::Extra,
     }
   }
 
-  /// Set all opts as true and keep the current adt encoding.
-  pub fn set_all(self) -> Self {
-    Self { adt_encoding: self.adt_encoding, ..Self::heavy() }
-  }
-
   /// Set all opts as false and keep the current adt encoding.
+  #[must_use]
   pub fn set_no_all(self) -> Self {
     Self { adt_encoding: self.adt_encoding, ..Self::default() }
   }
 
   /// All optimizations disabled, except float_combinators and linearize_matches
-  pub fn light() -> Self {
-    Self { float_combinators: true, linearize_matches: OptLevel::Extra, ..Self::default() }
+  pub fn default_strict() -> Self {
+    Self { float_combinators: true, linearize_matches: OptLevel::Enabled, ..Self::default() }
   }
 
   // Disable optimizations that don't work or are unnecessary on lazy mode
-  pub fn lazy_mode(&mut self) {
-    self.float_combinators = false;
-    if self.linearize_matches.is_extra() {
-      self.linearize_matches = OptLevel::Enabled;
-    }
-    self.pre_reduce = false;
+  pub fn default_lazy() -> Self {
+    Self { linearize_matches: OptLevel::Enabled, ..Self::default() }
   }
 }
 
 impl CompileOpts {
-  pub fn check(&self, lazy_mode: bool) {
-    if !lazy_mode {
-      if !self.float_combinators {
-        println!(
-          "Warning: Running in strict mode without enabling the float_combinators pass can lead to some functions expanding infinitely."
-        );
-      }
-      if !self.linearize_matches.enabled() {
-        println!(
-          "Warning: Running in strict mode without enabling the linearize_matches pass can lead to some functions expanding infinitely."
-        );
-      }
+  pub fn check_for_strict(&self) {
+    if !self.float_combinators {
+      println!(
+        "Warning: Running in strict mode without enabling the float_combinators pass can lead to some functions expanding infinitely."
+      );
+    }
+    if !self.linearize_matches.enabled() {
+      println!(
+        "Warning: Running in strict mode without enabling the linearize_matches pass can lead to some functions expanding infinitely."
+      );
     }
   }
 }

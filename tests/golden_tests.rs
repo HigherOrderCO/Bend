@@ -125,7 +125,8 @@ fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Warning, true);
     let mut book = do_parse_book(code, path)?;
-    let res = compile_book(&mut book, CompileOpts::heavy(), diagnostics_cfg, None)?;
+    let opts = CompileOpts::default_strict().set_all();
+    let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
@@ -134,7 +135,7 @@ fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Warning, true);
     let mut book = do_parse_book(code, path)?;
-    let res = compile_book(&mut book, CompileOpts::light(), diagnostics_cfg, None)?;
+    let res = compile_book(&mut book, CompileOpts::default_strict(), diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
@@ -144,11 +145,12 @@ fn linear_readback() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let book = do_parse_book(code, path)?;
+    let compile_opts = CompileOpts::default_strict().set_all();
     let (res, info) = run_book(
       book,
       None,
       RunOpts { linear: true, ..Default::default() },
-      CompileOpts::heavy(),
+      compile_opts,
       diagnostics_cfg,
       None,
     )?;
@@ -161,7 +163,7 @@ fn run_file() {
   run_golden_test_dir_multiple(function_name!(), &[
     (&|_code, path| {
       let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
-        .args(["run", path.to_str().unwrap(), "-Dall", "-Oall", "-L"])
+        .args(["run", path.to_str().unwrap(), "-Dall", "-Oall", "-Olinearize-matches", "-L", "-1"])
         .output()
         .expect("Run process");
 
@@ -183,13 +185,13 @@ fn run_lazy() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let diagnostics_cfg = DiagnosticsConfig {
       mutual_recursion_cycle: Severity::Allow,
+      unused_definition: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
     };
     let book = do_parse_book(code, path)?;
 
-    let mut desugar_opts = CompileOpts::heavy();
+    let desugar_opts = CompileOpts::default_lazy();
     let run_opts = RunOpts::lazy();
-    desugar_opts.lazy_mode();
 
     // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) = run_book(book, None, run_opts, desugar_opts, diagnostics_cfg, None)?;
@@ -226,7 +228,8 @@ fn simplify_matches() {
     ctx.fix_match_terms()?;
     ctx.desugar_match_defs()?;
     ctx.check_unbound_vars()?;
-    ctx.book.linearize_matches(true);
+    ctx.book.linearize_match_lambdas();
+    ctx.book.linearize_match_with();
     ctx.check_unbound_vars()?;
     ctx.prune(false, AdtEncoding::TaggedScott);
 
@@ -260,7 +263,8 @@ fn encode_pattern_match() {
       ctx.fix_match_terms()?;
       ctx.desugar_match_defs()?;
       ctx.check_unbound_vars()?;
-      ctx.book.linearize_matches(true);
+      ctx.book.linearize_match_lambdas();
+      ctx.book.linearize_match_with();
       ctx.book.encode_matches(adt_encoding);
       ctx.check_unbound_vars()?;
       ctx.book.make_var_names_unique();
@@ -280,7 +284,7 @@ fn desugar_file() {
     let mut diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     diagnostics_cfg.unused_definition = Severity::Allow;
     let mut book = do_parse_book(code, path)?;
-    desugar_book(&mut book, CompileOpts::light(), diagnostics_cfg, None)?;
+    desugar_book(&mut book, CompileOpts::default_strict(), diagnostics_cfg, None)?;
     Ok(book.to_string())
   })
 }
@@ -293,9 +297,10 @@ fn hangs() {
   run_golden_test_dir(function_name!(), &move |code, path| {
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Warning, true);
     let book = do_parse_book(code, path)?;
+    let compile_opts = CompileOpts::default_strict().set_all();
 
     let thread = std::thread::spawn(move || {
-      run_book(book, None, RunOpts::default(), CompileOpts::heavy(), diagnostics_cfg, None)
+      run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
 
@@ -309,7 +314,7 @@ fn compile_entrypoint() {
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::from("foo"));
-    let res = compile_book(&mut book, CompileOpts::light(), diagnostics_cfg, None)?;
+    let res = compile_book(&mut book, CompileOpts::default_strict(), diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
@@ -320,7 +325,8 @@ fn run_entrypoint() {
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::from("foo"));
-    let (res, info) = run_book(book, None, RunOpts::default(), CompileOpts::heavy(), diagnostics_cfg, None)?;
+    let compile_opts = CompileOpts::default_strict().set_all();
+    let (res, info) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", info.diagnostics, res))
   })
 }
@@ -351,7 +357,7 @@ fn mutual_recursion() {
       ..DiagnosticsConfig::new(Severity::Allow, true)
     };
     let mut book = do_parse_book(code, path)?;
-    let mut opts = CompileOpts::light();
+    let mut opts = CompileOpts::default_strict();
     opts.merge = true;
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
@@ -364,8 +370,7 @@ fn io() {
     (&|code, path| {
       let book = do_parse_book(code, path)?;
 
-      let mut desugar_opts = CompileOpts::light();
-      desugar_opts.lazy_mode();
+      let desugar_opts = CompileOpts::default_lazy();
 
       // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
       let (res, info) =
@@ -375,8 +380,14 @@ fn io() {
     (&|code, path| {
       let book = do_parse_book(code, path)?;
 
-      let (res, info) =
-        run_book(book, None, RunOpts::default(), CompileOpts::light(), DiagnosticsConfig::default(), None)?;
+      let (res, info) = run_book(
+        book,
+        None,
+        RunOpts::default(),
+        CompileOpts::default_strict(),
+        DiagnosticsConfig::default(),
+        None,
+      )?;
       Ok(format!("Strict mode:\n{}{}", info.diagnostics, res))
     }),
   ])
@@ -387,8 +398,7 @@ fn no_optimization() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
 
-    let mut compile_opts = CompileOpts::light();
-    compile_opts = compile_opts.set_no_all();
+    let mut compile_opts = CompileOpts::default_strict().set_no_all();
     compile_opts.adt_encoding = AdtEncoding::Scott;
 
     let res = compile_book(&mut book, compile_opts, DiagnosticsConfig::default(), None)?;

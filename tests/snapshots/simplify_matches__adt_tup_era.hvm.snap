@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/adt_tup_era.hvm
+---
+(Foo) = λ%arg0 match %arg0 { Pair: match %arg0.a { Pair: %arg0.a.a } }
+
+(Main) = (Foo (Pair 1 5))
+
+(Pair) = λa λb #Tuple λPair #Tuple (Pair a b)

@@ -219,6 +219,7 @@ where
   let num_term = number.map(|val| Term::Num { val });
 
   let term_sep = just(Token::Semicolon).or_not();
+  let list_sep = just(Token::Comma).or_not();
 
   recursive(|term| {
     // *
@@ -243,7 +244,7 @@ where
     // #tag {fst snd}
     let sup = tag(Tag::Auto)
       .then_ignore(just(Token::LBracket))
-      .then(term.clone().separated_by(just(Token::Comma).or_not()).at_least(2).collect())
+      .then(term.clone().separated_by(list_sep.clone()).at_least(2).allow_trailing().collect())
       .then_ignore(just(Token::RBracket))
       .map(|(tag, els)| Term::Sup { tag, els })
       .boxed();
@@ -252,7 +253,7 @@ where
     let dup = just(Token::Let)
       .ignore_then(tag(Tag::Auto))
       .then_ignore(just(Token::LBracket))
-      .then(name_or_era().separated_by(just(Token::Comma).or_not()).at_least(2).collect())
+      .then(name_or_era().separated_by(list_sep.clone()).at_least(2).allow_trailing().collect())
       .then_ignore(just(Token::RBracket))
       .then_ignore(just(Token::Equals))
       .then(term.clone())
@@ -284,6 +285,10 @@ where
     // (name '=')? term
     let match_arg = name().then_ignore(just(Token::Equals)).or_not().then(term.clone()).boxed();
 
+    let with = soft_keyword("with")
+      .ignore_then(name().separated_by(list_sep.clone()).at_least(1).allow_trailing().collect())
+      .boxed();
+
     let lnil = just(Token::LBrace)
       .ignore_then(just(Token::RBrace))
       .ignored()
@@ -306,18 +311,20 @@ where
     // match ((scrutinee | <name> = value),?)+ { pat+: term;... }
     let match_ = just(Token::Match)
       .ignore_then(match_arg.clone())
+      .then(with.clone().or_not())
       .then_ignore(just(Token::LBracket))
       .then(match_rules)
       .then_ignore(just(Token::RBracket))
-      .map(|((bind, arg), rules)| {
+      .map(|(((bind, arg), with), rules)| {
+        let with = with.unwrap_or_default();
         if let Some(bind) = bind {
           Term::Let {
             nam: Some(bind.clone()),
             val: Box::new(arg),
-            nxt: Box::new(Term::Mat { arg: Box::new(Term::Var { nam: bind }), rules }),
+            nxt: Box::new(Term::Mat { arg: Box::new(Term::Var { nam: bind }), with, rules }),
           }
         } else {
-          Term::Mat { arg: Box::new(arg), rules }
+          Term::Mat { arg: Box::new(arg), with, rules }
         }
       })
       .boxed();
@@ -331,18 +338,20 @@ where
 
     let switch = just(Token::Switch)
       .ignore_then(match_arg)
+      .then(with.clone().or_not())
       .then_ignore(just(Token::LBracket))
       .then(switch_rules)
       .then_ignore(just(Token::RBracket))
-      .map(|((bind, arg), rules)| {
+      .map(|(((bind, arg), with), rules)| {
+        let with = with.unwrap_or_default();
         if let Some(bind) = bind {
           Term::Let {
             nam: Some(bind.clone()),
             val: Box::new(arg),
-            nxt: Box::new(Term::Swt { arg: Box::new(Term::Var { nam: bind }), rules }),
+            nxt: Box::new(Term::Swt { arg: Box::new(Term::Var { nam: bind }), with, rules }),
           }
         } else {
-          Term::Swt { arg: Box::new(arg), rules }
+          Term::Swt { arg: Box::new(arg), with, rules }
         }
       })
       .boxed();

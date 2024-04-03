@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/no_optimization/list_reverse.hvm
 ---
-@concat = (((a (b c)) (d e)) ({3 f d} e))
-  & @concat ~ (b (f g))
-  & @cons ~ (a (g c))
+@concat = (((a (b (c d))) ((e e) (f g))) (f g))
+  & @cons ~ (a (h d))
+  & @concat ~ (b (c h))
 
 @cons = (a (b ((a (b c)) (* c))))
 

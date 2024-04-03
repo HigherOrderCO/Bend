@@ -60,19 +60,31 @@ impl fmt::Display for Term {
       Term::App { tag, fun, arg } => {
         write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag), arg)
       }
-      Term::Mat { arg, rules } => {
+      Term::Mat { arg, with, rules } => {
+        let with: Box<dyn std::fmt::Display> = if with.is_empty() {
+          Box::new(display!(""))
+        } else {
+          Box::new(display!(" with {}", DisplayJoin(|| with, ", ")))
+        };
         write!(
           f,
-          "match {} {{ {} }}",
+          "match {}{} {{ {} }}",
           arg,
+          with,
           DisplayJoin(|| rules.iter().map(|rule| display!("{}: {}", var_as_str(&rule.0), rule.2)), "; "),
         )
       }
-      Term::Swt { arg, rules } => {
+      Term::Swt { arg, with, rules } => {
+        let with: Box<dyn std::fmt::Display> = if with.is_empty() {
+          Box::new(display!(""))
+        } else {
+          Box::new(display!(" with {}", DisplayJoin(|| with, ", ")))
+        };
         write!(
           f,
-          "switch {} {{ {} }}",
+          "switch {}{} {{ {} }}",
           arg,
+          with,
           DisplayJoin(|| rules.iter().map(|rule| display!("{}: {}", rule.0, rule.1)), "; "),
         )
       }

@@ -32,24 +32,12 @@ main = (~ 42 10)
 // But not the same thing as (~ 42 *) (!)
 ```
 
-HVM-lang also includes a `match` syntax for native numbers. The `0` case is chosen when `n` is 0, and the `+` case is chosen when `n` is greater than 0. The previous number, by default, bound to `n-1`.
+HVM-lang also includes a `switch` syntax for pattern-matching native numbers. The `0` case is chosen when `n` is 0, and the `_` case is chosen when `n` is greater than 0. The previous number, by default, bound to `n-1`.
 ```rs
 Number.to_church = λn λf λx
-  match n {
+  switch n {
     0: x
-    1+: (f (Number.to_church n-1 f x))
-  }
-// Alternative syntax
-Number.to_church = λn λf λx
-  match n {
-    0: x
-    1+p: (f (Number.to_church p f x))
-  }
-// Alternative syntax with name binding
-Number.to_church = λn λf λx
-  match num = n {
-    0: x
-    1+: (f (Number.to_church num-1 f x)
+    _: (f (Number.to_church n-1 f x))
   }
 ```
 
@@ -57,15 +45,14 @@ Using everything we learned, we can write a program that calculates the n-th Fib
 
 ```rs
 fibonacci = λn // n is the argument
-  match n {
+  switch n {
     // If the number is 0, then return 0
     0: 0
     // If the number is 1, then return 1
     1: 1
     // Otherwise, return the sum of (fib (n-2 + 1)) and (fib n-2)
     // The successor pattern provides a `var`-`successor number` bind
-    // and it's also possible to define other bind name `2+x`
-    2+: (+ (fibonacci (+ n-2 1)) (fibonacci n-2))
+    _: (+ (fibonacci (+ n-2 1)) (fibonacci n-2))
   }
 
 main = (fibonacci 15)

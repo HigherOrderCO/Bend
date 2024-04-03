@@ -30,6 +30,8 @@ pub(crate) fn add_exit_def(host: Arc<Mutex<Host>>) {
         net.normal_from(input.clone());
         exit(net, input.load_target());
       } else {
+        // The manual deref converts the type of (exit, exit) into Dynamic
+        #[allow(clippy::explicit_auto_deref)]
         net.link_wire_port(input, Port::new_ref(&*Def::new(LabSet::ALL, (exit, exit))));
       }
 

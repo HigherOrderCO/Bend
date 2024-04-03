@@ -142,11 +142,13 @@ pub enum Term {
   /// Pattern matching on an ADT.
   Mat {
     arg: Box<Term>,
+    with: Vec<Name>,
     rules: Vec<MatchRule>,
   },
   /// Native pattern matching on numbers
   Swt {
     arg: Box<Term>,
+    with: Vec<Name>,
     rules: Vec<SwitchRule>,
   },
   Ref {
@@ -287,6 +289,18 @@ impl PartialEq<Name> for Option<Name> {
   }
 }
 
+impl PartialEq<Option<&Name>> for Name {
+  fn eq(&self, other: &Option<&Name>) -> bool {
+    if let Some(other) = other { &self == other } else { false }
+  }
+}
+
+impl PartialEq<Name> for Option<&Name> {
+  fn eq(&self, other: &Name) -> bool {
+    other.eq(self)
+  }
+}
+
 pub fn num_to_name(mut num: u64) -> String {
   let mut name = String::new();
   loop {
@@ -327,8 +341,12 @@ impl Clone for Term {
       Self::Str { val } => Self::Str { val: val.clone() },
       Self::Lst { els } => Self::Lst { els: els.clone() },
       Self::Opx { op, fst, snd } => Self::Opx { op: *op, fst: fst.clone(), snd: snd.clone() },
-      Self::Mat { arg, rules } => Self::Mat { arg: arg.clone(), rules: rules.clone() },
-      Self::Swt { arg, rules } => Self::Swt { arg: arg.clone(), rules: rules.clone() },
+      Self::Mat { arg, with, rules } => {
+        Self::Mat { arg: arg.clone(), with: with.clone(), rules: rules.clone() }
+      }
+      Self::Swt { arg, with, rules } => {
+        Self::Swt { arg: arg.clone(), with: with.clone(), rules: rules.clone() }
+      }
       Self::Ref { nam } => Self::Ref { nam: nam.clone() },
       Self::Era => Self::Era,
       Self::Err => Self::Err,
@@ -352,13 +370,13 @@ impl Drop for Term {
             stack.push(std::mem::take(fst.as_mut()));
             stack.push(std::mem::take(snd.as_mut()));
           }
-          Term::Mat { arg, rules } => {
+          Term::Mat { arg, with: _, rules } => {
             stack.push(std::mem::take(arg));
             for (_ctr, _fields, body) in std::mem::take(rules).into_iter() {
               stack.push(body);
             }
           }
-          Term::Swt { arg, rules } => {
+          Term::Swt { arg, with: _, rules } => {
             stack.push(std::mem::take(arg));
             for (_nam, body) in std::mem::take(rules).into_iter() {
               stack.push(body);
@@ -442,7 +460,7 @@ impl Term {
   pub fn switch(arg: Term, zero: Term, succ: Term, succ_var: Option<Name>) -> Term {
     let zero = (NumCtr::Num(0), zero);
     let succ = (NumCtr::Succ(succ_var), succ);
-    Term::Swt { arg: Box::new(arg), rules: vec![zero, succ] }
+    Term::Swt { arg: Box::new(arg), with: vec![], rules: vec![zero, succ] }
   }
 
   pub fn sub_num(arg: Term, val: u64) -> Term {
@@ -465,10 +483,10 @@ impl Term {
   pub fn children(&self) -> impl DoubleEndedIterator<Item = &Term> + Clone {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
     match self {
-      Term::Mat { arg, rules } => {
+      Term::Mat { arg, with: _, rules } => {
         ChildrenIter::Mat([arg.as_ref()].into_iter().chain(rules.iter().map(|r| &r.2)))
       }
-      Term::Swt { arg, rules } => {
+      Term::Swt { arg, with: _, rules } => {
         ChildrenIter::Swt([arg.as_ref()].into_iter().chain(rules.iter().map(|r| &r.1)))
       }
       Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => ChildrenIter::Vec(els),
@@ -493,10 +511,10 @@ impl Term {
   pub fn children_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Term> {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
     match self {
-      Term::Mat { arg, rules } => {
+      Term::Mat { arg, with: _, rules } => {
         ChildrenIter::Mat([arg.as_mut()].into_iter().chain(rules.iter_mut().map(|r| &mut r.2)))
       }
-      Term::Swt { arg, rules } => {
+      Term::Swt { arg, with: _, rules } => {
         ChildrenIter::Swt([arg.as_mut()].into_iter().chain(rules.iter_mut().map(|r| &mut r.1)))
       }
       Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => ChildrenIter::Vec(els),
@@ -531,12 +549,12 @@ impl Term {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
     multi_iterator!(BindsIter { Zero, One, Dup, Mat });
     match self {
-      Term::Mat { arg, rules } => ChildrenIter::Mat(
+      Term::Mat { arg, with: _, rules } => ChildrenIter::Mat(
         [(arg.as_ref(), BindsIter::Zero([]))]
           .into_iter()
           .chain(rules.iter().map(|r| (&r.2, BindsIter::Mat(r.1.iter())))),
       ),
-      Term::Swt { arg, rules } => {
+      Term::Swt { arg, with: _, rules } => {
         ChildrenIter::Swt([(arg.as_ref(), BindsIter::Zero([]))].into_iter().chain(rules.iter().map(|r| {
           match &r.0 {
             NumCtr::Num(_) => (&r.1, BindsIter::Zero([])),
@@ -577,17 +595,17 @@ impl Term {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
     multi_iterator!(BindsIter { Zero, One, Dup, Mat });
     match self {
-      Term::Mat { arg, rules } => ChildrenIter::Mat(
+      Term::Mat { arg, with: _, rules } => ChildrenIter::Mat(
         [(arg.as_mut(), BindsIter::Zero([]))]
           .into_iter()
           .chain(rules.iter_mut().map(|r| (&mut r.2, BindsIter::Mat(r.1.iter())))),
       ),
-      Term::Swt { arg, rules } => ChildrenIter::Swt([(arg.as_mut(), BindsIter::Zero([]))].into_iter().chain(
-        rules.iter_mut().map(|r| match &r.0 {
+      Term::Swt { arg, with: _, rules } => ChildrenIter::Swt(
+        [(arg.as_mut(), BindsIter::Zero([]))].into_iter().chain(rules.iter_mut().map(|r| match &r.0 {
           NumCtr::Num(_) => (&mut r.1, BindsIter::Zero([])),
           NumCtr::Succ(nam) => (&mut r.1, BindsIter::One([nam])),
-        }),
-      )),
+        })),
+      ),
       Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => {
         ChildrenIter::Vec(els.iter_mut().map(|el| (el, BindsIter::Zero([]))))
       }
@@ -620,17 +638,17 @@ impl Term {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
     multi_iterator!(BindsIter { Zero, One, Dup, Mat });
     match self {
-      Term::Mat { arg, rules } => ChildrenIter::Mat(
+      Term::Mat { arg, with: _, rules } => ChildrenIter::Mat(
         [(arg.as_mut(), BindsIter::Zero([]))]
           .into_iter()
           .chain(rules.iter_mut().map(|r| (&mut r.2, BindsIter::Mat(r.1.iter_mut())))),
       ),
-      Term::Swt { arg, rules } => ChildrenIter::Swt([(arg.as_mut(), BindsIter::Zero([]))].into_iter().chain(
-        rules.iter_mut().map(|r| match &mut r.0 {
+      Term::Swt { arg, with: _, rules } => ChildrenIter::Swt(
+        [(arg.as_mut(), BindsIter::Zero([]))].into_iter().chain(rules.iter_mut().map(|r| match &mut r.0 {
           NumCtr::Num(_) => (&mut r.1, BindsIter::Zero([])),
           NumCtr::Succ(nam) => (&mut r.1, BindsIter::One([nam])),
-        }),
-      )),
+        })),
+      ),
       Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => {
         ChildrenIter::Vec(els.iter_mut().map(|el| (el, BindsIter::Zero([]))))
       }
@@ -673,32 +691,36 @@ impl Term {
   /// Expects var bind information to be properly stored in match expressions,
   /// so it must run AFTER `fix_match_terms`.
   pub fn subst(&mut self, from: &Name, to: &Term) {
-    Term::recursive_call(move || match self {
-      Term::Var { nam } if nam == from => *self = to.clone(),
-
-      _ => {
-        for (child, binds) in self.children_mut_with_binds() {
-          if !binds.flat_map(|b| b.as_ref()).contains(from) {
-            child.subst(from, to);
-          }
+    Term::recursive_call(|| {
+      for (child, binds) in self.children_mut_with_binds() {
+        if !binds.flat_map(|b| b.as_ref()).contains(from) {
+          child.subst(from, to);
         }
       }
-    })
+    });
+
+    if let Term::Var { nam } = self
+      && nam == from
+    {
+      *self = to.clone();
+    }
   }
 
   /// Substitute the occurrence of an unscoped variable with the given term.
   pub fn subst_unscoped(&mut self, from: &Name, to: &Term) {
-    Term::recursive_call(move || {
-      if let Term::Lnk { nam } = self
-        && nam == from
-      {
-        *self = to.clone();
-      }
-
+    Term::recursive_call(|| {
+      // We don't check the unscoped binds because there can be only one bind of an unscoped var.
+      // TODO: potentially there could be some situation where this causes an incorrect program to compile?
       for child in self.children_mut() {
         child.subst_unscoped(from, to);
       }
-    })
+    });
+
+    if let Term::Lnk { nam } = self
+      && nam == from
+    {
+      *self = to.clone();
+    }
   }
 
   /// Collects all the free variables that a term has

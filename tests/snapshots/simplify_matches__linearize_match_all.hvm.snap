@@ -1,0 +1,27 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/linearize_match_all.hvm
+---
+(A) = λa switch a { 0: λb λc (b c); _: λb λc (a-1 b c) }
+
+(B) = λa λb λc (switch c { 0: λa λb (a b); _: λa λb (a b c-1) } a b)
+
+(C) = λa λb λc switch c { 0: (a b); _: (a b c-1) }
+
+(D) = λa switch a { 0: λb λc c; _: λb λc (a-1 c) }
+
+(E) = λ%arg0 match %arg0 { Cons: λ%arg1 (match %arg1 { Cons: λ%arg0.h λ%arg0.t (%arg0.h %arg0.t %arg1.h %arg1.t); Nil: λ%arg0.h λ%arg0.t (Cons %arg0.h %arg0.t Nil) } %arg0.h %arg0.t); Nil: λ%arg1 (Nil %arg1) }
+
+(A2) = λa match a { Cons: λb λc (a.h a.t b c); Nil: λb λc (b c) }
+
+(B2) = λa λb λc (match c { Cons: λa λb (a b c.h c.t); Nil: λa λb (a b) } a b)
+
+(C2) = λa λb λc match c { Cons: (a b c.h c.t); Nil: (a b) }
+
+(D2) = λa match a { Cons: λb λc (a.h a.t b c); Nil: λb λc (b c) }
+
+(main) = *
+
+(Cons) = λh λt #ConsList λCons #ConsList λNil #ConsList (Cons h t)
+
+(Nil) = #ConsList λCons #ConsList λNil Nil

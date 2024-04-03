@@ -42,7 +42,7 @@ impl Definition {
 
     let args = (0 .. self.arity()).map(|i| Name::new(format!("%arg{i}"))).collect::<Vec<_>>();
     let rules = std::mem::take(&mut self.rules);
-    match simplify_rule_match(args.clone(), rules, ctrs, adts) {
+    match simplify_rule_match(args.clone(), rules, vec![], ctrs, adts) {
       Ok(body) => {
         let body = args.into_iter().rfold(body, |body, arg| Term::lam(Some(arg), body));
         self.rules = vec![Rule { pats: vec![], body }];
@@ -93,15 +93,14 @@ fn fix_repeated_binds(rules: &mut [Rule]) -> Vec<DesugarMatchDefErr> {
 ///
 /// If no patterns match one of the constructors, returns a non-exhaustive match error.
 ///
-/// ===========================================================================
-///
-
-///
 /// Any nested subpatterns are extracted and moved into a nested match
 /// expression, together with the remaining match arguments.
+///
+/// Linearizes all the arguments that are used in at least one of the bodies.
 fn simplify_rule_match(
   args: Vec<Name>,
   mut rules: Vec<Rule>,
+  with: Vec<Name>,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, DesugarMatchDefErr> {
@@ -112,10 +111,10 @@ fn simplify_rule_match(
   } else {
     let typ = Type::infer_from_def_arg(&rules, 0, ctrs)?;
     match typ {
-      Type::Any => var_rule(args, rules, ctrs, adts),
-      Type::Tup(tup_len) => tup_rule(args, rules, tup_len, ctrs, adts),
-      Type::Num => num_rule(args, rules, ctrs, adts),
-      Type::Adt(adt_name) => switch_rule(args, rules, adt_name, ctrs, adts),
+      Type::Any => var_rule(args, rules, with, ctrs, adts),
+      Type::Tup(tup_len) => tup_rule(args, rules, with, tup_len, ctrs, adts),
+      Type::Num => num_rule(args, rules, with, ctrs, adts),
+      Type::Adt(adt_name) => switch_rule(args, rules, with, adt_name, ctrs, adts),
     }
   }
 }
@@ -141,6 +140,7 @@ fn irrefutable_fst_row_rule(args: Vec<Name>, rule: Rule) -> Term {
 fn var_rule(
   mut args: Vec<Name>,
   rules: Vec<Rule>,
+  mut with: Vec<Name>,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, DesugarMatchDefErr> {
@@ -160,7 +160,9 @@ fn var_rule(
     new_rules.push(new_rule);
   }
 
-  simplify_rule_match(new_args, new_rules, ctrs, adts)
+  with.push(arg);
+
+  simplify_rule_match(new_args, new_rules, with, ctrs, adts)
 }
 
 /// Tuple rule.
@@ -181,6 +183,7 @@ fn var_rule(
 fn tup_rule(
   mut args: Vec<Name>,
   rules: Vec<Rule>,
+  with: Vec<Name>,
   tup_len: usize,
   ctrs: &Constructors,
   adts: &Adts,
@@ -215,7 +218,7 @@ fn tup_rule(
 
   let bnd = new_args.clone().map(Some).collect();
   let args = new_args.chain(old_args).collect();
-  let nxt = simplify_rule_match(args, new_rules, ctrs, adts)?;
+  let nxt = simplify_rule_match(args, new_rules, with, ctrs, adts)?;
   let term = Term::Ltp { bnd, val: Box::new(Term::Var { nam: arg }), nxt: Box::new(nxt) };
 
   Ok(term)
@@ -224,6 +227,7 @@ fn tup_rule(
 fn num_rule(
   mut args: Vec<Name>,
   rules: Vec<Rule>,
+  with: Vec<Name>,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, DesugarMatchDefErr> {
@@ -248,7 +252,7 @@ fn num_rule(
     .collect::<Vec<_>>();
 
   // Number cases
-  let mut bodies = vec![];
+  let mut num_bodies = vec![];
   for num in nums.iter() {
     let mut new_rules = vec![];
     for rule in rules.iter() {
@@ -269,8 +273,8 @@ fn num_rule(
         _ => (),
       }
     }
-    let body = simplify_rule_match(args.clone(), new_rules, ctrs, adts)?;
-    bodies.push(body);
+    let body = simplify_rule_match(args.clone(), new_rules, with.clone(), ctrs, adts)?;
+    num_bodies.push(body);
   }
 
   // Default case
@@ -287,12 +291,21 @@ fn num_rule(
       new_rules.push(rule);
     }
   }
-  let default_body = simplify_rule_match(args, new_rules, ctrs, adts)?;
+  let mut default_with = with.clone();
+  default_with.push(pred_var.clone());
+  let default_body = simplify_rule_match(args.clone(), new_rules, default_with, ctrs, adts)?;
 
-  let term = bodies.into_iter().enumerate().rfold(default_body, |term, (i, body)| {
+  // Linearize previously matched vars and current args.
+  let swt_with = with.into_iter().chain(args).collect::<Vec<_>>();
+
+  let term = num_bodies.into_iter().enumerate().rfold(default_body, |term, (i, body)| {
     let zero = (NumCtr::Num(0), body);
     let succ = (NumCtr::Succ(Some(pred_var.clone())), term);
-    let mut swt = Term::Swt { arg: Box::new(Term::Var { nam: match_var.clone() }), rules: vec![zero, succ] };
+    let mut swt = Term::Swt {
+      arg: Box::new(Term::Var { nam: match_var.clone() }),
+      with: swt_with.clone(),
+      rules: vec![zero, succ],
+    };
 
     let val = if i > 0 {
       // let %matched = (%matched-1 +1 +num_i-1 - num_i)
@@ -371,6 +384,7 @@ fn num_rule(
 fn switch_rule(
   mut args: Vec<Name>,
   rules: Vec<Rule>,
+  with: Vec<Name>,
   adt_name: Name,
   ctrs: &Constructors,
   adts: &Adts,
@@ -422,10 +436,14 @@ fn switch_rule(
       return Err(DesugarMatchDefErr::AdtNotExhaustive { adt: adt_name, ctr: ctr.clone() });
     }
 
-    let body = simplify_rule_match(args, new_rules, ctrs, adts)?;
+    let body = simplify_rule_match(args, new_rules, with.clone(), ctrs, adts)?;
     new_arms.push((Some(ctr.clone()), new_args.map(Some).collect(), body));
   }
-  let term = Term::Mat { arg: Box::new(Term::Var { nam: arg }), rules: new_arms };
+
+  // Linearize previously matched vars and current args.
+  let mat_with = with.into_iter().chain(old_args).collect::<Vec<_>>();
+
+  let term = Term::Mat { arg: Box::new(Term::Var { nam: arg }), with: mat_with, rules: new_arms };
   Ok(term)
 }
 
