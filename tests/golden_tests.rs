@@ -380,8 +380,14 @@ fn io() {
     (&|code, path| {
       let book = do_parse_book(code, path)?;
 
-      let (res, info) =
-        run_book(book, None, RunOpts::default(), CompileOpts::default_strict(), DiagnosticsConfig::default(), None)?;
+      let (res, info) = run_book(
+        book,
+        None,
+        RunOpts::default(),
+        CompileOpts::default_strict(),
+        DiagnosticsConfig::default(),
+        None,
+      )?;
       Ok(format!("Strict mode:\n{}{}", info.diagnostics, res))
     }),
   ])
