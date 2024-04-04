@@ -93,7 +93,7 @@ pub enum Term {
     nxt: Box<Term>,
   },
   Use {
-    nam: Name,
+    nam: Option<Name>,
     val: Box<Term>,
     nxt: Box<Term>,
   },
@@ -612,7 +612,9 @@ impl Term {
       Term::Let { nam, val, nxt, .. } => {
         ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([&*nam]))])
       }
-      Term::Use { .. } => todo!(),
+      Term::Use { nam, val, nxt } => {
+        ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([&*nam]))])
+      }
       Term::Ltp { bnd, val, nxt, .. } | Term::Dup { bnd, val, nxt, .. } => {
         ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::Dup(bnd.iter()))])
       }
@@ -652,7 +654,9 @@ impl Term {
       Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => {
         ChildrenIter::Vec(els.iter_mut().map(|el| (el, BindsIter::Zero([]))))
       }
-      Term::Use { .. } => todo!(),
+      Term::Use { nam, val, nxt } => {
+        ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([nam]))])
+      }
       Term::Let { nam, val, nxt, .. } => {
         ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([nam]))])
       }

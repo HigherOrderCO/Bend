@@ -279,7 +279,7 @@ where
       .then(term.clone())
       .then_ignore(term_sep.clone())
       .then(term.clone())
-      .map(|((nam, val), nxt)| Term::Use { nam, val: Box::new(val), nxt: Box::new(nxt) })
+      .map(|((nam, val), nxt)| Term::Use { nam: Some(nam), val: Box::new(val), nxt: Box::new(nxt) })
       .boxed();
 
     // (name '=')? term

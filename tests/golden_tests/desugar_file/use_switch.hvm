@@ -1,0 +1,5 @@
+main =
+  @a @b @c use e = (b c) switch a with e {
+    0: e
+    _: (a-1 e)
+  }

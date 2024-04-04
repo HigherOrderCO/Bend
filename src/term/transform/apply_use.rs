@@ -28,7 +28,7 @@ impl Term {
       }
     });
 
-    if let Term::Use { nam, val, nxt } = self {
+    if let Term::Use { nam: Some(nam), val, nxt } = self {
       nxt.subst(nam, val);
       *self = std::mem::take(nxt);
     }

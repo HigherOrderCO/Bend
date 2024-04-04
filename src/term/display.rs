@@ -54,6 +54,7 @@ impl fmt::Display for Term {
         write!(f, "let {} = {}; {}", var_as_str(nam), val, nxt)
       }
       Term::Use { nam, val, nxt } => {
+        let Some(nam) = nam else { unreachable!() };
         write!(f, "use {} = {}; {}", nam, val, nxt)
       }
       Term::Ref { nam: def_name } => write!(f, "{def_name}"),
