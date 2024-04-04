@@ -347,11 +347,6 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
     Mode::Run { lazy_mode, run_opts, comp_opts, transform_opts, warn_opts, arguments, path } => {
       let RunArgs { max_memory, max_rewrites, debug, mut single_core, linear, arg_stats } = run_opts;
-      if debug && lazy_mode {
-        return Err(Diagnostics::from(
-          "Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".to_string(),
-        ));
-      }
 
       let diagnostics_cfg =
         set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), lazy_mode, warn_opts);

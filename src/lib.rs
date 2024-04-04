@@ -228,10 +228,25 @@ pub fn run_compiled(
     let start_time = Instant::now();
 
     if let Some(mut hook) = hook {
-      while !root.redexes.is_empty() {
-        let readback = host.lock().unwrap().readback(root);
-        hook(&readback);
-        root.reduce(1);
+      if run_opts.lazy_mode == true {
+        let mut visit = vec![hvmc::run::Port::new_var(root.root.addr())];
+        while let Some(prev) = visit.pop() {
+          let next = root.weak_normal(prev, root.root.clone());
+
+          let readback = host.lock().unwrap().readback(root);
+          hook(&readback);
+
+          if next.is_full_node() {
+            visit.push(hvmc::run::Port::new_var(next.addr()));
+            visit.push(hvmc::run::Port::new_var(next.addr().other_half()));
+          }
+        }
+      } else {
+        while !root.redexes.is_empty() {
+          let readback = host.lock().unwrap().readback(root);
+          hook(&readback);
+          root.reduce(1);
+        }
       }
     } else if let Some(mut max_rwts) = max_rwts {
       if run_opts.lazy_mode {
