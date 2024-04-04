@@ -10,7 +10,7 @@ pub const ERR_INDENT_SIZE: usize = 2;
 pub struct Diagnostics {
   err_counter: usize,
   pub diagnostics: BTreeMap<DiagnosticOrigin, Vec<Diagnostic>>,
-  config: DiagnosticsConfig,
+  pub config: DiagnosticsConfig,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -21,7 +21,7 @@ pub struct DiagnosticsConfig {
   pub unreachable_match: Severity,
   pub unused_definition: Severity,
   pub repeated_bind: Severity,
-  pub mutual_recursion_cycle: Severity,
+  pub recursion_cycle: Severity,
 }
 
 #[derive(Debug, Clone)]
@@ -42,11 +42,11 @@ pub enum DiagnosticOrigin {
   Readback,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Severity {
-  Error,
-  Warning,
   Allow,
+  Warning,
+  Error,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -56,7 +56,7 @@ pub enum WarningType {
   UnreachableMatch,
   UnusedDefinition,
   RepeatedBind,
-  MutualRecursionCycle,
+  RecursionCycle,
 }
 
 pub trait ToStringVerbose {
@@ -230,16 +230,24 @@ impl DiagnosticsConfig {
       unreachable_match: severity,
       unused_definition: severity,
       repeated_bind: severity,
-      mutual_recursion_cycle: severity,
+      recursion_cycle: severity,
       verbose,
     }
+  }
+
+  pub fn default_strict() -> Self {
+    Self { recursion_cycle: Severity::Error, ..Self::default() }
+  }
+
+  pub fn default_lazy() -> Self {
+    Self { recursion_cycle: Severity::Allow, ..Self::default() }
   }
 
   pub fn warning_severity(&self, warn: WarningType) -> Severity {
     match warn {
       WarningType::UnusedDefinition => self.unused_definition,
       WarningType::RepeatedBind => self.repeated_bind,
-      WarningType::MutualRecursionCycle => self.mutual_recursion_cycle,
+      WarningType::RecursionCycle => self.recursion_cycle,
       WarningType::IrrefutableMatch => self.irrefutable_match,
       WarningType::RedundantMatch => self.redundant_match,
       WarningType::UnreachableMatch => self.unreachable_match,

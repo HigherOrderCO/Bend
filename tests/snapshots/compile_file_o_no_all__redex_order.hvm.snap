@@ -1,6 +1,6 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/no_optimization/redex_order.hvm
+input_file: tests/golden_tests/compile_file_o_no_all/redex_order.hvm
 ---
 @a = (a a)
 

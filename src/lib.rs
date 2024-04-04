@@ -2,14 +2,14 @@
 #![feature(let_chains)]
 
 use builtins::{create_host, CORE_BUILTINS_USES};
-use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity};
+use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity, WarningType};
 use hvmc::{
   ast::Net,
   dispatch_dyn_net,
   host::Host,
   run::{DynNet, Heap, Rewrites},
 };
-use hvmc_net::mutual_recursion;
+use hvmc_net::{mutual_recursion, pre_reduce::pre_reduce};
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{
   sync::{Arc, Mutex},
@@ -53,12 +53,14 @@ pub fn compile_book(
 
   mutual_recursion::check_cycles(&core_book, &mut diagnostics)?;
 
-  if opts.pre_reduce {
-    core_book.pre_reduce(&|x| x == book.hvmc_entrypoint(), Some(1_000_000), 100_000);
+  if opts.pre_reduce || diagnostics.config.warning_severity(WarningType::RecursionCycle) > Severity::Allow {
+    pre_reduce(&mut core_book, book.hvmc_entrypoint(), None, !opts.pre_reduce, &mut diagnostics)?;
   }
+
   if opts.eta {
     core_book.values_mut().for_each(Net::eta_reduce);
   }
+
   if opts.inline {
     diagnostics.start_pass();
     if let Err(e) = core_book.inline() {
@@ -66,6 +68,7 @@ pub fn compile_book(
     }
     diagnostics.fatal(())?;
   }
+
   if opts.prune {
     let mut prune_entrypoints = vec![book.hvmc_entrypoint().to_string()];
     let mut builtin_uses = CORE_BUILTINS_USES.concat().iter().map(|x| x.to_string()).collect::<Vec<_>>();

@@ -210,7 +210,7 @@ pub enum WarningArgs {
   UnreachableMatch,
   UnusedDefinition,
   RepeatedBind,
-  MutualRecursionCycle,
+  RecursionCycle,
 }
 
 fn main() {
@@ -371,7 +371,7 @@ fn set_warning_cfg_from_cli(
         cfg.unused_definition = severity;
         cfg.repeated_bind = severity;
         if !lazy_mode {
-          cfg.mutual_recursion_cycle = severity;
+          cfg.recursion_cycle = severity;
         }
       }
       WarningArgs::IrrefutableMatch => cfg.irrefutable_match = severity,
@@ -379,12 +379,14 @@ fn set_warning_cfg_from_cli(
       WarningArgs::UnreachableMatch => cfg.unreachable_match = severity,
       WarningArgs::UnusedDefinition => cfg.unused_definition = severity,
       WarningArgs::RepeatedBind => cfg.repeated_bind = severity,
-      WarningArgs::MutualRecursionCycle => cfg.mutual_recursion_cycle = severity,
+      WarningArgs::RecursionCycle => cfg.recursion_cycle = severity,
     }
   }
 
-  if !lazy_mode {
-    cfg.mutual_recursion_cycle = Severity::Warning;
+  if lazy_mode {
+    cfg.recursion_cycle = Severity::Allow;
+  } else {
+    cfg.recursion_cycle = Severity::Error;
   }
 
   let cmd = Cli::command();
