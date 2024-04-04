@@ -48,7 +48,7 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-clippy-${{ hashFiles('**/Cargo.lock') }}
-      - run: cargo clippy
+      - run: RUSTFLAGS="-D warnings" cargo clippy
   fmt:
     runs-on: ubuntu-latest
     steps:
