@@ -228,7 +228,7 @@ pub fn run_compiled(
     let start_time = Instant::now();
 
     if let Some(mut hook) = hook {
-      if run_opts.lazy_mode == true {
+      if run_opts.lazy_mode {
         let mut visit = vec![hvmc::run::Port::new_var(root.root.addr())];
         while let Some(prev) = visit.pop() {
           let next = root.weak_normal(prev, root.root.clone());
