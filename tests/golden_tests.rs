@@ -212,12 +212,12 @@ fn run_lazy() {
     let compile_opts = CompileOpts::default_lazy();
     let diagnostics_cfg = DiagnosticsConfig {
       recursion_cycle: Severity::Allow,
+      recursion_pre_reduce: Severity::Allow,
       unused_definition: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
     };
     let run_opts = RunOpts::lazy();
 
-    // 1 million nodes for the test runtime. Smaller doesn't seem to make it any faster
     let (res, info) = run_book(book, None, run_opts, compile_opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", info.diagnostics, res))
   })

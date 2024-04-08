@@ -29,3 +29,5 @@ For let expressions where the variable is non-linear (used more than once), you 
 (e.g. write 'Foo = @f use x = Foo; (f x x)' instead of 'Foo = @f let x = Foo; (f x x)')
 
 See here for more info: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md.
+
+You can disable this check altogether with the "-Arecursion-cycle" compiler option.

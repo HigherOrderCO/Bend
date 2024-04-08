@@ -2,6 +2,7 @@ use clap::{Args, CommandFactory, Parser, Subcommand};
 use hvml::{
   check_book, compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
+  hvmc_net::pre_reduce::MAX_REWRITES_DEFAULT,
   load_file_to_book, run_book,
   term::{AdtEncoding, Book, Name},
   CompileOpts, OptLevel, RunInfo, RunOpts,
@@ -25,6 +26,24 @@ struct Cli {
 enum Mode {
   /// Checks that the program is syntactically and semantically correct.
   Check {
+    #[arg(
+      short = 'O',
+      value_delimiter = ' ',
+      action = clap::ArgAction::Append,
+      long_help = r#"Enables or disables the given optimizations
+      float_combinators is enabled by default on strict mode."#,
+    )]
+    comp_opts: Vec<OptArgs>,
+
+    #[command(flatten)]
+    transform_opts: TransformOpts,
+
+    #[arg(short = 'L', help = "Lazy mode")]
+    lazy_mode: bool,
+
+    #[command(flatten)]
+    warn_opts: CliWarnOpts,
+
     #[arg(help = "Path to the input file")]
     path: PathBuf,
   },
@@ -39,6 +58,9 @@ enum Mode {
     )]
     comp_opts: Vec<OptArgs>,
 
+    #[command(flatten)]
+    transform_opts: TransformOpts,
+
     #[arg(short = 'L', help = "Lazy mode")]
     lazy_mode: bool,
 
@@ -50,29 +72,11 @@ enum Mode {
   },
   /// Compiles the program and runs it with the hvm.
   Run {
-    #[arg(short = 'm', long = "mem", help = "How much memory to allocate for the runtime", value_parser = mem_parser)]
-    max_memory: Option<usize>,
-
-    #[arg(short = 'r', long = "rwts", help = "Maximum amount of rewrites", value_parser = mem_parser)]
-    max_rewrites: Option<usize>,
-
-    #[arg(short = 'd', help = "Debug mode (print each reduction step)")]
-    debug: bool,
-
-    #[arg(short = '1', help = "Single-core mode (no parallelism)")]
-    single_core: bool,
-
     #[arg(short = 'L', help = "Lazy mode")]
     lazy_mode: bool,
 
-    #[arg(short = 'l', help = "Linear readback (show explicit dups)")]
-    linear: bool,
-
-    #[arg(short = 's', long = "stats", help = "Shows runtime stats and rewrite counts")]
-    arg_stats: bool,
-
-    #[arg(help = "Path to the input file")]
-    path: PathBuf,
+    #[command(flatten)]
+    run_opts: RunArgs,
 
     #[arg(
       short = 'O',
@@ -83,15 +87,21 @@ enum Mode {
     )]
     comp_opts: Vec<OptArgs>,
 
-    #[arg(value_parser = |arg: &str| hvml::term::parser::parse_term(arg)
-      .map_err(|e| match e[0].reason() {
-        chumsky::error::RichReason::Many(errs) => format!("{}", &errs[0]),
-        _ => format!("{}", e[0].reason()),
-      }))]
-    arguments: Option<Vec<hvml::term::Term>>,
+    #[command(flatten)]
+    transform_opts: TransformOpts,
 
     #[command(flatten)]
     warn_opts: CliWarnOpts,
+
+    #[arg(help = "Path to the input file")]
+    path: PathBuf,
+
+    #[arg(value_parser = |arg: &str| hvml::term::parser::parse_term(arg)
+    .map_err(|e| match e[0].reason() {
+      chumsky::error::RichReason::Many(errs) => format!("{}", &errs[0]),
+      _ => format!("{}", e[0].reason()),
+    }))]
+    arguments: Option<Vec<hvml::term::Term>>,
   },
   /// Runs the lambda-term level desugaring passes.
   Desugar {
@@ -104,6 +114,9 @@ enum Mode {
     )]
     comp_opts: Vec<OptArgs>,
 
+    #[command(flatten)]
+    transform_opts: TransformOpts,
+
     #[arg(short = 'L', help = "Lazy mode")]
     lazy_mode: bool,
 
@@ -113,6 +126,50 @@ enum Mode {
     #[arg(help = "Path to the input file")]
     path: PathBuf,
   },
+}
+
+#[derive(Args, Clone, Debug)]
+struct TransformOpts {
+  /// Names of the definitions that should not get pre-reduced.
+  ///
+  /// For programs that don't take arguments
+  /// and don't have side effects this is usually the entry point of the
+  /// program (otherwise, the whole program will get reduced to normal form).
+  #[arg(long = "pre-reduce-skip", value_delimiter = ' ', action = clap::ArgAction::Append)]
+  pre_reduce_skip: Vec<String>,
+
+  /// How much memory to allocate when pre-reducing.
+  /// If not specified, allocate an amount proportional to the rewrite limit.
+  ///
+  /// Supports abbreviations such as '4G' or '400M'.
+  #[arg(long = "pre-reduce-memory", value_parser = parse_abbrev_number::<usize>)]
+  pre_reduce_memory: Option<usize>,
+
+  /// Maximum amount of rewrites to do when pre-reducing.
+  ///
+  /// Supports abbreviations such as '4G' or '400M'.
+  #[arg(long = "pre-reduce-rewrites", default_value_t = MAX_REWRITES_DEFAULT, value_parser = parse_abbrev_number::<u64>)]
+  pre_reduce_rewrites: u64,
+}
+#[derive(Args, Clone, Debug)]
+struct RunArgs {
+  #[arg(short = 'm', long = "mem", help = "How much memory to allocate for the runtime", value_parser = parse_abbrev_number::<usize>)]
+  max_memory: Option<usize>,
+
+  #[arg(short = 'r', long = "rwts", help = "Maximum amount of rewrites", value_parser = parse_abbrev_number::<usize>)]
+  max_rewrites: Option<usize>,
+
+  #[arg(short = 'd', help = "Debug mode (print each reduction step)")]
+  debug: bool,
+
+  #[arg(short = '1', help = "Single-core mode (no parallelism)")]
+  single_core: bool,
+
+  #[arg(short = 'l', help = "Linear readback (show explicit dups)")]
+  linear: bool,
+
+  #[arg(short = 's', long = "stats", help = "Shows runtime stats and rewrite counts")]
+  arg_stats: bool,
 }
 
 #[derive(Args, Debug, Clone)]
@@ -169,37 +226,41 @@ pub enum OptArgs {
   AdtTaggedScott,
 }
 
-impl OptArgs {
-  fn opts_from_cli(args: &Vec<Self>, lazy_mode: bool) -> CompileOpts {
-    use OptArgs::*;
-    let mut opts = if lazy_mode { CompileOpts::default_lazy() } else { CompileOpts::default_strict() };
-    for arg in args {
-      match arg {
-        All => opts = opts.set_all(),
-        NoAll => opts = opts.set_no_all(),
-        Eta => opts.eta = true,
-        NoEta => opts.eta = false,
-        Prune => opts.prune = true,
-        NoPrune => opts.prune = false,
-        PreReduce => opts.pre_reduce = true,
-        NoPreReduce => opts.pre_reduce = false,
-        FloatCombinators => opts.float_combinators = true,
-        NoFloatCombinators => opts.float_combinators = false,
-        Merge => opts.merge = true,
-        NoMerge => opts.merge = false,
-        Inline => opts.inline = true,
-        NoInline => opts.inline = false,
+fn compile_opts_from_cli(args: &Vec<OptArgs>, transform_opts: TransformOpts, lazy_mode: bool) -> CompileOpts {
+  use OptArgs::*;
+  let mut opts = if lazy_mode { CompileOpts::default_lazy() } else { CompileOpts::default_strict() };
 
-        AdtScott => opts.adt_encoding = AdtEncoding::Scott,
-        AdtTaggedScott => opts.adt_encoding = AdtEncoding::TaggedScott,
+  for arg in args {
+    match arg {
+      All => opts = opts.set_all(),
+      NoAll => opts = opts.set_no_all(),
+      Eta => opts.eta = true,
+      NoEta => opts.eta = false,
+      Prune => opts.prune = true,
+      NoPrune => opts.prune = false,
+      PreReduce => opts.pre_reduce = true,
+      NoPreReduce => opts.pre_reduce = false,
+      FloatCombinators => opts.float_combinators = true,
+      NoFloatCombinators => opts.float_combinators = false,
+      Merge => opts.merge = true,
+      NoMerge => opts.merge = false,
+      Inline => opts.inline = true,
+      NoInline => opts.inline = false,
 
-        LinearizeMatches => opts.linearize_matches = OptLevel::Enabled,
-        LinearizeMatchesExtra => opts.linearize_matches = OptLevel::Extra,
-        NoLinearizeMatches => opts.linearize_matches = OptLevel::Disabled,
-      }
+      AdtScott => opts.adt_encoding = AdtEncoding::Scott,
+      AdtTaggedScott => opts.adt_encoding = AdtEncoding::TaggedScott,
+
+      LinearizeMatches => opts.linearize_matches = OptLevel::Enabled,
+      LinearizeMatchesExtra => opts.linearize_matches = OptLevel::Extra,
+      NoLinearizeMatches => opts.linearize_matches = OptLevel::Disabled,
     }
-    opts
   }
+
+  opts.pre_reduce_memory = transform_opts.pre_reduce_memory;
+  opts.pre_reduce_rewrites = transform_opts.pre_reduce_rewrites;
+  opts.pre_reduce_skip = transform_opts.pre_reduce_skip.into_iter().map(Name::new).collect();
+
+  opts
 }
 
 #[derive(clap::ValueEnum, Clone, Debug)]
@@ -211,6 +272,7 @@ pub enum WarningArgs {
   UnusedDefinition,
   RepeatedBind,
   RecursionCycle,
+  RecursionPreReduce,
 }
 
 fn main() {
@@ -240,19 +302,25 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
   };
 
   match cli.mode {
-    Mode::Check { path } => {
-      let mut book = load_book(&path)?;
-      check_book(&mut book)?;
-    }
-
-    Mode::Compile { path, comp_opts, warn_opts, lazy_mode } => {
+    Mode::Check { comp_opts, transform_opts, lazy_mode, warn_opts, path } => {
       let diagnostics_cfg = set_warning_cfg_from_cli(
-        DiagnosticsConfig::new(Severity::Warning, arg_verbose),
+        if lazy_mode { DiagnosticsConfig::default_lazy() } else { DiagnosticsConfig::default_strict() },
         lazy_mode,
         warn_opts,
       );
+      let compile_opts = compile_opts_from_cli(&comp_opts, transform_opts, lazy_mode);
 
-      let opts = OptArgs::opts_from_cli(&comp_opts, lazy_mode);
+      let mut book = load_book(&path)?;
+      check_book(&mut book, diagnostics_cfg, compile_opts)?;
+    }
+
+    Mode::Compile { path, comp_opts, warn_opts, lazy_mode, transform_opts } => {
+      let diagnostics_cfg = set_warning_cfg_from_cli(
+        if lazy_mode { DiagnosticsConfig::default_lazy() } else { DiagnosticsConfig::default_strict() },
+        lazy_mode,
+        warn_opts,
+      );
+      let opts = compile_opts_from_cli(&comp_opts, transform_opts, lazy_mode);
 
       let mut book = load_book(&path)?;
       let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
@@ -261,14 +329,14 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       println!("{}", compile_res.core_book);
     }
 
-    Mode::Desugar { path, comp_opts, warn_opts, lazy_mode } => {
+    Mode::Desugar { path, comp_opts, warn_opts, lazy_mode, transform_opts } => {
       let diagnostics_cfg = set_warning_cfg_from_cli(
-        DiagnosticsConfig::new(Severity::Warning, arg_verbose),
+        if lazy_mode { DiagnosticsConfig::default_lazy() } else { DiagnosticsConfig::default_strict() },
         lazy_mode,
         warn_opts,
       );
 
-      let opts = OptArgs::opts_from_cli(&comp_opts, lazy_mode);
+      let opts = compile_opts_from_cli(&comp_opts, transform_opts, lazy_mode);
 
       let mut book = load_book(&path)?;
       let diagnostics = desugar_book(&mut book, opts, diagnostics_cfg, None)?;
@@ -277,19 +345,8 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       println!("{book}");
     }
 
-    Mode::Run {
-      path,
-      max_memory,
-      max_rewrites,
-      debug,
-      mut single_core,
-      linear,
-      arg_stats,
-      comp_opts,
-      warn_opts,
-      lazy_mode,
-      arguments,
-    } => {
+    Mode::Run { lazy_mode, run_opts, comp_opts, transform_opts, warn_opts, arguments, path } => {
+      let RunArgs { max_memory, max_rewrites, debug, mut single_core, linear, arg_stats } = run_opts;
       if debug && lazy_mode {
         return Err(Diagnostics::from(
           "Unsupported configuration, can not use debug mode `-d` with lazy mode `-L`".to_string(),
@@ -299,7 +356,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let diagnostics_cfg =
         set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), lazy_mode, warn_opts);
 
-      let compile_opts = OptArgs::opts_from_cli(&comp_opts, lazy_mode);
+      let compile_opts = compile_opts_from_cli(&comp_opts, transform_opts, lazy_mode);
 
       if lazy_mode {
         if !single_core {
@@ -345,16 +402,26 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
   Ok(())
 }
 
-fn mem_parser(arg: &str) -> Result<usize, String> {
-  let (base, mult) = match arg.to_lowercase().chars().last() {
+/// Turn a string representation of a number, such as '1G' or '400K', into a
+/// number.
+///
+/// This return a [`u64`] instead of [`usize`] to ensure that parsing CLI args
+/// doesn't fail on 32-bit systems. We want it to fail later on, when attempting
+/// to run the program.
+fn parse_abbrev_number<T: TryFrom<u64>>(arg: &str) -> Result<T, String>
+where
+  <T as TryFrom<u64>>::Error: core::fmt::Debug,
+{
+  let (base, scale) = match arg.to_lowercase().chars().last() {
     None => return Err("Mem size argument is empty".to_string()),
-    Some('k') => (&arg[0 .. arg.len() - 1], 1 << 10),
-    Some('m') => (&arg[0 .. arg.len() - 1], 1 << 20),
-    Some('g') => (&arg[0 .. arg.len() - 1], 1 << 30),
+    Some('k') => (&arg[0 .. arg.len() - 1], 1u64 << 10),
+    Some('m') => (&arg[0 .. arg.len() - 1], 1u64 << 20),
+    Some('g') => (&arg[0 .. arg.len() - 1], 1u64 << 30),
+    Some('t') => (&arg[0 .. arg.len() - 1], 1u64 << 40),
     Some(_) => (arg, 1),
   };
-  let base = base.parse::<usize>().map_err(|e| e.to_string())?;
-  Ok(base * mult)
+  let base = base.parse::<u64>().map_err(|e| e.to_string())?;
+  (base * scale).try_into().map_err(|e| format!("{:?}", e))
 }
 
 fn set_warning_cfg_from_cli(
@@ -380,13 +447,8 @@ fn set_warning_cfg_from_cli(
       WarningArgs::UnusedDefinition => cfg.unused_definition = severity,
       WarningArgs::RepeatedBind => cfg.repeated_bind = severity,
       WarningArgs::RecursionCycle => cfg.recursion_cycle = severity,
+      WarningArgs::RecursionPreReduce => cfg.recursion_pre_reduce = severity,
     }
-  }
-
-  if lazy_mode {
-    cfg.recursion_cycle = Severity::Allow;
-  } else {
-    cfg.recursion_cycle = Severity::Error;
   }
 
   let cmd = Cli::command();

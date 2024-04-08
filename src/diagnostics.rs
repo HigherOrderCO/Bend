@@ -22,6 +22,7 @@ pub struct DiagnosticsConfig {
   pub unused_definition: Severity,
   pub repeated_bind: Severity,
   pub recursion_cycle: Severity,
+  pub recursion_pre_reduce: Severity,
 }
 
 #[derive(Debug, Clone)]
@@ -57,6 +58,7 @@ pub enum WarningType {
   UnusedDefinition,
   RepeatedBind,
   RecursionCycle,
+  RecursionPreReduce,
 }
 
 pub trait ToStringVerbose {
@@ -231,16 +233,17 @@ impl DiagnosticsConfig {
       unused_definition: severity,
       repeated_bind: severity,
       recursion_cycle: severity,
+      recursion_pre_reduce: severity,
       verbose,
     }
   }
 
   pub fn default_strict() -> Self {
-    Self { recursion_cycle: Severity::Error, ..Self::default() }
+    Self { recursion_cycle: Severity::Error, recursion_pre_reduce: Severity::Error, ..Self::default() }
   }
 
   pub fn default_lazy() -> Self {
-    Self { recursion_cycle: Severity::Allow, ..Self::default() }
+    Self { recursion_cycle: Severity::Allow, recursion_pre_reduce: Severity::Allow, ..Self::default() }
   }
 
   pub fn warning_severity(&self, warn: WarningType) -> Severity {
@@ -248,6 +251,7 @@ impl DiagnosticsConfig {
       WarningType::UnusedDefinition => self.unused_definition,
       WarningType::RepeatedBind => self.repeated_bind,
       WarningType::RecursionCycle => self.recursion_cycle,
+      WarningType::RecursionPreReduce => self.recursion_pre_reduce,
       WarningType::IrrefutableMatch => self.irrefutable_match,
       WarningType::RedundantMatch => self.redundant_match,
       WarningType::UnreachableMatch => self.unreachable_match,

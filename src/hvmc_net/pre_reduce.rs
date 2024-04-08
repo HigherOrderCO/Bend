@@ -1,37 +1,40 @@
-use crate::{diagnostics::Diagnostics, term::Name};
+use crate::{
+  diagnostics::{Diagnostics, WarningType},
+  term::display::DisplayJoin,
+};
 use hvmc::{ast::Book, transform::pre_reduce::PreReduceStats};
 
-const MAX_REWRITES_DEFAULT: u64 = 100;
+pub const MAX_REWRITES_DEFAULT: u64 = 100_000;
 
 pub fn pre_reduce(
   book: &mut Book,
   entrypoint: &str,
-  max_rwts: Option<u64>,
+  max_rewrites: u64,
+  max_memory: Option<usize>,
   check_only: bool,
   diags: &mut Diagnostics,
 ) -> Result<(), Diagnostics> {
   diags.start_pass();
 
-  let max_rwts = max_rwts.unwrap_or(MAX_REWRITES_DEFAULT);
-
   // It would be even better if we could also set a memory limit and
   // catch the cases where the limit is broken.
   // However, the allocator just panics, and catching it is a mess.
   // For now, we just choose a reasonable amount.
-  // 100 nodes per max_rwts.
-  let max_memory = max_rwts as usize * 8 * 1000;
-  let max_memory = Some(max_memory);
+  // 1000 nodes per max_rwts (800MB for 100k reductions).
+  let max_memory = max_memory.or(Some(max_rewrites as usize * 8 * 1000));
 
   let orig_book = if check_only { Some(book.clone()) } else { None };
 
-  let PreReduceStats { not_normal, .. } = book.pre_reduce(&|x| x == entrypoint, max_memory, max_rwts);
+  let PreReduceStats { not_normal, .. } = book.pre_reduce(&|x| x == entrypoint, max_memory, max_rewrites);
 
-  for not_normal in not_normal {
-    // TODO: Reverse the generated names to get actual function names.
-    diags.add_rule_error(
-      format!("Unable to normalize function {not_normal}, it is likely that it will loop in strict mode. If this function is doing heavy processing that you're sure will terminate, we recommend moving its data to the main function."),
-      Name::new(not_normal),
+  if !not_normal.is_empty() {
+    let msg = format!(
+      include_str!("pre_reduce.message"),
+      // TODO: Reverse the generated names to get actual function names.
+      not_normal = DisplayJoin(|| &not_normal, ", "),
+      max_rewrites = max_rewrites
     );
+    diags.add_book_warning(msg, WarningType::RecursionPreReduce);
   }
 
   if let Some(orig_book) = orig_book {

@@ -9,13 +9,16 @@ use hvmc::{
   host::Host,
   run::{DynNet, Heap, Rewrites},
 };
-use hvmc_net::{mutual_recursion, pre_reduce::pre_reduce};
+use hvmc_net::{
+  mutual_recursion,
+  pre_reduce::{pre_reduce, MAX_REWRITES_DEFAULT},
+};
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
 use std::{
   sync::{Arc, Mutex},
   time::Instant,
 };
-use term::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding, Book, Ctx, Term};
+use term::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term};
 
 pub mod builtins;
 pub mod diagnostics;
@@ -28,10 +31,13 @@ pub use term::load_book::load_file_to_book;
 pub const ENTRY_POINT: &str = "main";
 pub const HVM1_ENTRY_POINT: &str = "Main";
 
-pub fn check_book(book: &mut Book) -> Result<(), Diagnostics> {
+pub fn check_book(
+  book: &mut Book,
+  diagnostics_cfg: DiagnosticsConfig,
+  compile_opts: CompileOpts,
+) -> Result<(), Diagnostics> {
   // TODO: Do the checks without having to do full compilation
-  let res =
-    compile_book(book, CompileOpts::default_lazy(), DiagnosticsConfig::new(Severity::Warning, false), None)?;
+  let res = compile_book(book, compile_opts, diagnostics_cfg, None)?;
   print!("{}", res.diagnostics);
   Ok(())
 }
@@ -42,7 +48,7 @@ pub fn compile_book(
   diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
 ) -> Result<CompileResult, Diagnostics> {
-  let mut diagnostics = desugar_book(book, opts, diagnostics_cfg, args)?;
+  let mut diagnostics = desugar_book(book, opts.clone(), diagnostics_cfg, args)?;
   let (nets, labels) = book_to_nets(book);
 
   let mut core_book = nets_to_hvmc(nets, &mut diagnostics)?;
@@ -53,8 +59,16 @@ pub fn compile_book(
 
   mutual_recursion::check_cycles(&core_book, &mut diagnostics)?;
 
-  if opts.pre_reduce || diagnostics.config.warning_severity(WarningType::RecursionCycle) > Severity::Allow {
-    pre_reduce(&mut core_book, book.hvmc_entrypoint(), None, !opts.pre_reduce, &mut diagnostics)?;
+  if opts.pre_reduce || diagnostics.config.warning_severity(WarningType::RecursionPreReduce) > Severity::Allow
+  {
+    pre_reduce(
+      &mut core_book,
+      book.hvmc_entrypoint(),
+      opts.pre_reduce_rewrites,
+      opts.pre_reduce_memory,
+      !opts.pre_reduce,
+      &mut diagnostics,
+    )?;
   }
 
   if opts.eta {
@@ -151,7 +165,7 @@ pub fn run_book(
   args: Option<Vec<Term>>,
 ) -> Result<(Term, RunInfo), Diagnostics> {
   let CompileResult { core_book, labels, diagnostics } =
-    compile_book(&mut book, compile_opts, diagnostics_cfg, args)?;
+    compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args)?;
 
   // TODO: Printing should be taken care by the cli module, but we'd
   // like to print any warnings before running so that the user can
@@ -164,8 +178,8 @@ pub fn run_book(
   let book = Arc::new(book);
   let labels = Arc::new(labels);
 
-  // Run
   let debug_hook = run_opts.debug_hook(&book, &labels);
+
   let host = create_host(book.clone(), labels.clone(), compile_opts.adt_encoding);
   host.lock().unwrap().insert_book(&core_book);
 
@@ -208,8 +222,6 @@ pub fn run_compiled(
   let heap = Heap::new(mem_size).expect("memory allocation failed");
   let mut root = DynNet::new(&heap, run_opts.lazy_mode);
   let max_rwts = run_opts.max_rewrites.map(|x| x.clamp(usize::MIN, usize::MAX));
-  // Expect won't be reached because there's
-  // a pass that checks this.
   dispatch_dyn_net!(&mut root => {
     root.boot(host.lock().unwrap().defs.get(entrypoint).expect("No main function."));
 
@@ -245,13 +257,12 @@ pub fn run_compiled(
     } else {
       root.normal();
     }
+
     let elapsed = start_time.elapsed().as_secs_f64();
 
 
     let net = host.lock().unwrap().readback(root);
 
-    // TODO I don't quite understand this code
-    // How would it be implemented in the new version?
     let stats = RunStats { rewrites: root.rwts, used: count_nodes(&net), run_time: elapsed };
     (net, stats)
   })
@@ -324,7 +335,7 @@ impl OptLevel {
   }
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct CompileOpts {
   /// Selects the encoding for the ADT syntax.
   pub adt_encoding: AdtEncoding,
@@ -349,6 +360,12 @@ pub struct CompileOpts {
 
   /// Enables [term::transform::inline].
   pub inline: bool,
+
+  pub pre_reduce_memory: Option<usize>,
+
+  pub pre_reduce_rewrites: u64,
+
+  pub pre_reduce_skip: Vec<Name>,
 }
 
 impl CompileOpts {
@@ -362,29 +379,32 @@ impl CompileOpts {
       float_combinators: true,
       merge: true,
       inline: true,
-      adt_encoding: self.adt_encoding,
       linearize_matches: OptLevel::Extra,
+      ..self
     }
   }
 
   /// Set all opts as false and keep the current adt encoding.
   #[must_use]
   pub fn set_no_all(self) -> Self {
-    Self { adt_encoding: self.adt_encoding, ..Self::default() }
+    Self {
+      adt_encoding: self.adt_encoding,
+      pre_reduce_memory: self.pre_reduce_memory,
+      pre_reduce_rewrites: self.pre_reduce_rewrites,
+      ..Self::default()
+    }
   }
 
   /// All optimizations disabled, except float_combinators and linearize_matches
   pub fn default_strict() -> Self {
-    Self { float_combinators: true, linearize_matches: OptLevel::Enabled, ..Self::default() }
+    Self { float_combinators: true, ..Self::default() }
   }
 
   // Disable optimizations that don't work or are unnecessary on lazy mode
   pub fn default_lazy() -> Self {
-    Self { linearize_matches: OptLevel::Enabled, ..Self::default() }
+    Self::default()
   }
-}
 
-impl CompileOpts {
   pub fn check_for_strict(&self) {
     if !self.float_combinators {
       println!(
@@ -395,6 +415,24 @@ impl CompileOpts {
       println!(
         "Warning: Running in strict mode without enabling the linearize_matches pass can lead to some functions expanding infinitely."
       );
+    }
+  }
+}
+
+impl Default for CompileOpts {
+  fn default() -> Self {
+    Self {
+      eta: false,
+      prune: false,
+      pre_reduce: false,
+      linearize_matches: OptLevel::Enabled,
+      float_combinators: false,
+      merge: false,
+      inline: false,
+      adt_encoding: AdtEncoding::default(),
+      pre_reduce_memory: None,
+      pre_reduce_rewrites: MAX_REWRITES_DEFAULT,
+      pre_reduce_skip: vec![],
     }
   }
 }
