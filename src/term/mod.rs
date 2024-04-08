@@ -356,51 +356,36 @@ impl Clone for Term {
 
 impl Drop for Term {
   fn drop(&mut self) {
-    impl Term {
-      fn take_children(&mut self, stack: &mut Vec<Term>) {
-        match self {
-          Term::Lam { bod, .. } | Term::Chn { bod, .. } => {
-            stack.push(std::mem::take(bod.as_mut()));
-          }
-          Term::Let { val: fst, nxt: snd, .. }
-          | Term::Use { val: fst, nxt: snd, .. }
-          | Term::App { fun: fst, arg: snd, .. }
-          | Term::Dup { val: fst, nxt: snd, .. }
-          | Term::Opx { fst, snd, .. } => {
-            stack.push(std::mem::take(fst.as_mut()));
-            stack.push(std::mem::take(snd.as_mut()));
-          }
-          Term::Mat { arg, with: _, rules } => {
-            stack.push(std::mem::take(arg));
-            for (_ctr, _fields, body) in std::mem::take(rules).into_iter() {
-              stack.push(body);
-            }
-          }
-          Term::Swt { arg, with: _, rules } => {
-            stack.push(std::mem::take(arg));
-            for (_nam, body) in std::mem::take(rules).into_iter() {
-              stack.push(body);
-            }
-          }
-          Term::Lst { els } | Term::Tup { els } | Term::Sup { els, .. } => {
-            for el in std::mem::take(els).into_iter() {
-              stack.push(el);
-            }
-          }
-          _ => {}
-        }
+    loop {
+      // Each iteration moves a child with nested nodes to the last child.
+      // When no nested on the left, we can just drop it and they'll be handled
+      // by the special cases;
+      let mut i = self.children_mut().filter(|x| x.children().next().is_some());
+
+      // No nested children, just drop everything
+      let Some(b) = i.next() else { break };
+
+      // Only one child with nested nodes, move it up to be the new root.
+      // Non-nested (height=0) children are dropped recursively.
+      if { i }.next().is_none() {
+        *self = std::mem::take(b);
+        continue;
       }
-    }
 
-    if matches!(self, Term::Era | Term::Err) {
-      return;
-    }
-
-    let mut stack = vec![];
-    self.take_children(&mut stack);
-
-    while let Some(mut term) = stack.pop() {
-      term.take_children(&mut stack)
+      // Rotate the tree right:
+      // ```text
+      //     a            b
+      //    / \          / \
+      //   b   e   ->   c   a
+      //  / \              / \
+      // c   d            d   e
+      // ```
+      let tmp = Term::Err;
+      let d = std::mem::replace(b.children_mut().next_back().unwrap(), tmp);
+      let b = std::mem::replace(b, d);
+      let a = std::mem::replace(self, b);
+      let tmp = std::mem::replace(self.children_mut().next_back().unwrap(), a);
+      std::mem::forget(tmp);
     }
   }
 }
