@@ -1,7 +1,7 @@
 use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
-  term::{num_to_name, term_to_net::Labels, Book, Name, Op, Tag, Term},
+  term::{num_to_name, term_to_net::Labels, Book, Name, Tag, Term},
 };
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -209,13 +209,13 @@ impl Reader<'_> {
           }
           _ => unreachable!(),
         },
-        Num { val } => Term::Num { val: *val },
+        Num { val } => Term::Num { val: *val & ((1 << 60) - 1) },
         Op2 { opr } => match next.slot() {
           2 => {
             let fst = self.read_term(self.net.enter_port(Port(node, 0)));
             let snd = self.read_term(self.net.enter_port(Port(node, 1)));
             let (opr, fst, snd) = if is_op_swapped(*opr) { (opr.swap(), snd, fst) } else { (*opr, fst, snd) };
-            Term::Opx { op: Op::from_hvmc_label(opr), fst: Box::new(fst), snd: Box::new(snd) }
+            Term::Opx { opr, fst: Box::new(fst), snd: Box::new(snd) }
           }
           _ => {
             self.error(ReadbackError::InvalidNumericOp);
@@ -426,43 +426,14 @@ impl NameGen {
   }
 }
 
-impl Op {
-  pub fn from_hvmc_label(value: hvmc::ops::Op) -> Op {
-    use hvmc::ops::Op as RtOp;
-    match value {
-      RtOp::Add => Op::Add,
-      RtOp::Sub => Op::Sub,
-      RtOp::Mul => Op::Mul,
-      RtOp::Div => Op::Div,
-      RtOp::Mod => Op::Mod,
-      RtOp::Eq => Op::Eq,
-      RtOp::Ne => Op::Ne,
-      RtOp::Lt => Op::Lt,
-      RtOp::Gt => Op::Gt,
-      RtOp::Lte => Op::Lte,
-      RtOp::Gte => Op::Gte,
-      RtOp::And => Op::And,
-      RtOp::Or => Op::Or,
-      RtOp::Xor => Op::Xor,
-      RtOp::Shl => Op::Shl,
-      RtOp::Shr => Op::Shr,
-      RtOp::SubS => unreachable!(),
-      RtOp::DivS => unreachable!(),
-      RtOp::ModS => unreachable!(),
-      RtOp::ShlS => unreachable!(),
-      RtOp::ShrS => unreachable!(),
-    }
-  }
-}
-
 fn is_op_swapped(op: hvmc::ops::Op) -> bool {
   matches!(
-    op,
-    hvmc::ops::Op::ShlS
-      | hvmc::ops::Op::ShrS
-      | hvmc::ops::Op::SubS
-      | hvmc::ops::Op::DivS
-      | hvmc::ops::Op::ModS
+    op.op,
+    hvmc::ops::IntOp::ShlS
+      | hvmc::ops::IntOp::ShrS
+      | hvmc::ops::IntOp::SubS
+      | hvmc::ops::IntOp::DivS
+      | hvmc::ops::IntOp::RemS
   )
 }
 

@@ -324,8 +324,11 @@ fn hangs() {
   run_golden_test_dir(function_name!(), &move |code, path| {
     let book = do_parse_book(code, path)?;
     let compile_opts = CompileOpts { pre_reduce: false, ..CompileOpts::default_strict().set_all() };
-    let diagnostics_cfg =
-      DiagnosticsConfig { recursion_cycle: Severity::Allow, ..DiagnosticsConfig::default_strict() };
+    let diagnostics_cfg = DiagnosticsConfig {
+      recursion_cycle: Severity::Allow,
+      recursion_pre_reduce: Severity::Allow,
+      ..DiagnosticsConfig::default_strict()
+    };
 
     let thread = std::thread::spawn(move || {
       run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)

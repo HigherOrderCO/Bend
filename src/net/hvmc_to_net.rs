@@ -121,7 +121,7 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
       Tree::Num { val } => {
-        let kind = Num { val: *val };
+        let kind = Num { val: *val as u64 };
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
