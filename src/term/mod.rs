@@ -18,6 +18,7 @@ pub mod parser;
 pub mod term_to_net;
 pub mod transform;
 
+pub use hvmc::ops::{IntOp, Op, Ty as OpType};
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_compat_net};
 
@@ -135,7 +136,7 @@ pub enum Term {
   },
   /// A numeric operation between built-in numbers.
   Opx {
-    op: Op,
+    opr: Op,
     fst: Box<Term>,
     snd: Box<Term>,
   },
@@ -184,26 +185,6 @@ pub enum Tag {
   Numeric(u32),
   Auto,
   Static,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Op {
-  Add,
-  Sub,
-  Mul,
-  Div,
-  Mod,
-  Eq,
-  Ne,
-  Lt,
-  Gt,
-  Lte,
-  Gte,
-  And,
-  Or,
-  Xor,
-  Shl,
-  Shr,
 }
 
 /// A user defined datatype
@@ -340,7 +321,7 @@ impl Clone for Term {
       Self::Nat { val } => Self::Nat { val: *val },
       Self::Str { val } => Self::Str { val: val.clone() },
       Self::Lst { els } => Self::Lst { els: els.clone() },
-      Self::Opx { op, fst, snd } => Self::Opx { op: *op, fst: fst.clone(), snd: snd.clone() },
+      Self::Opx { opr, fst, snd } => Self::Opx { opr: *opr, fst: fst.clone(), snd: snd.clone() },
       Self::Mat { arg, with, rules } => {
         Self::Mat { arg: arg.clone(), with: with.clone(), rules: rules.clone() }
       }
@@ -452,7 +433,11 @@ impl Term {
     if val == 0 {
       arg
     } else {
-      Term::Opx { op: Op::Sub, fst: Box::new(arg), snd: Box::new(Term::Num { val }) }
+      Term::Opx {
+        opr: Op { ty: OpType::U60, op: IntOp::Sub },
+        fst: Box::new(arg),
+        snd: Box::new(Term::Num { val }),
+      }
     }
   }
 
@@ -460,7 +445,11 @@ impl Term {
     if val == 0 {
       arg
     } else {
-      Term::Opx { op: Op::Add, fst: Box::new(arg), snd: Box::new(Term::Num { val }) }
+      Term::Opx {
+        opr: Op { ty: OpType::U60, op: IntOp::Add },
+        fst: Box::new(arg),
+        snd: Box::new(Term::Num { val }),
+      }
     }
   }
 

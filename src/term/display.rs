@@ -1,4 +1,4 @@
-use super::{Book, Definition, Name, NumCtr, Op, Pattern, Rule, Tag, Term};
+use super::{Book, Definition, Name, NumCtr, Pattern, Rule, Tag, Term};
 use std::{fmt, ops::Deref};
 
 /* Some aux structures for things that are not so simple to display */
@@ -103,8 +103,8 @@ impl fmt::Display for Term {
       Term::Num { val } => write!(f, "{val}"),
       Term::Nat { val } => write!(f, "#{val}"),
       Term::Str { val } => write!(f, "{val:?}"),
-      Term::Opx { op, fst, snd } => {
-        write!(f, "({} {} {})", op, fst, snd)
+      Term::Opx { opr, fst, snd } => {
+        write!(f, "({} {} {})", opr, fst, snd)
       }
       Term::Lst { els } => write!(f, "[{}]", DisplayJoin(|| els.iter(), ", "),),
       Term::Err => write!(f, "<Invalid>"),
@@ -167,29 +167,6 @@ impl fmt::Display for NumCtr {
     match self {
       NumCtr::Num(n) => write!(f, "{n}"),
       NumCtr::Succ(_) => write!(f, "_"),
-    }
-  }
-}
-
-impl fmt::Display for Op {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      Op::Add => write!(f, "+"),
-      Op::Sub => write!(f, "-"),
-      Op::Mul => write!(f, "*"),
-      Op::Div => write!(f, "/"),
-      Op::Mod => write!(f, "%"),
-      Op::Eq => write!(f, "=="),
-      Op::Ne => write!(f, "!="),
-      Op::Lt => write!(f, "<"),
-      Op::Gt => write!(f, ">"),
-      Op::Lte => write!(f, "<="),
-      Op::Gte => write!(f, ">="),
-      Op::And => write!(f, "&"),
-      Op::Or => write!(f, "|"),
-      Op::Xor => write!(f, "^"),
-      Op::Shl => write!(f, "<<"),
-      Op::Shr => write!(f, ">>"),
     }
   }
 }

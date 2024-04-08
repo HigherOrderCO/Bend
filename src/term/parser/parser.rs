@@ -1,6 +1,6 @@
 use crate::term::{
   parser::lexer::{LexingError, Token},
-  Adt, Book, Definition, Name, NumCtr, Op, Pattern, Rule, Tag, Term, LNIL, SNIL,
+  Adt, Book, Definition, IntOp, Name, NumCtr, Op, OpType, Pattern, Rule, Tag, Term, LNIL, SNIL,
 };
 use chumsky::{
   error::{Error, RichReason},
@@ -174,22 +174,22 @@ where
   I: ValueInput<'a, Token = Token, Span = SimpleSpan>,
 {
   select! {
-    Token::Add => Op::Add,
-    Token::Sub => Op::Sub,
-    Token::Asterisk => Op::Mul,
-    Token::Div => Op::Div,
-    Token::Mod => Op::Mod,
-    Token::EqualsEquals => Op::Eq,
-    Token::NotEquals => Op::Ne,
-    Token::Ltn => Op::Lt,
-    Token::Gtn => Op::Gt,
-    Token::Lte => Op::Lte,
-    Token::Gte => Op::Gte,
-    Token::And => Op::And,
-    Token::Or => Op::Or,
-    Token::Xor => Op::Xor,
-    Token::Shl => Op::Shl,
-    Token::Shr => Op::Shr,
+    Token::Add => Op{ ty: OpType::U60, op: IntOp::Add },
+    Token::Sub => Op{ ty: OpType::U60, op: IntOp::Sub },
+    Token::Asterisk => Op{ ty: OpType::U60, op: IntOp::Mul },
+    Token::Div => Op{ ty: OpType::U60, op: IntOp::Div },
+    Token::Mod => Op{ ty: OpType::U60, op: IntOp::Rem },
+    Token::EqualsEquals => Op{ ty: OpType::U60, op: IntOp::Eq },
+    Token::NotEquals => Op{ ty: OpType::U60, op: IntOp::Ne },
+    Token::Ltn => Op{ ty: OpType::U60, op: IntOp::Lt },
+    Token::Gtn => Op{ ty: OpType::U60, op: IntOp::Gt },
+    Token::Lte => Op{ ty: OpType::U60, op: IntOp::Le },
+    Token::Gte => Op{ ty: OpType::U60, op: IntOp::Ge },
+    Token::And => Op{ ty: OpType::U60, op: IntOp::And },
+    Token::Or => Op{ ty: OpType::U60, op: IntOp::Or },
+    Token::Xor => Op{ ty: OpType::U60, op: IntOp::Xor },
+    Token::Shl => Op{ ty: OpType::U60, op: IntOp::Shl },
+    Token::Shr => Op{ ty: OpType::U60, op: IntOp::Shr },
   }
 }
 
@@ -371,7 +371,7 @@ where
       .then(term.clone())
       .then(term.clone())
       .delimited_by(just(Token::LParen), just(Token::RParen))
-      .map(|((op, fst), snd)| Term::Opx { op, fst: Box::new(fst), snd: Box::new(snd) })
+      .map(|((opr, fst), snd)| Term::Opx { opr, fst: Box::new(fst), snd: Box::new(snd) })
       .boxed();
 
     // (x, ..n)

@@ -79,7 +79,7 @@ fn net_tree_to_hvmc_tree(inet: &INet, tree_root: NodeId, port_to_var_id: &mut Ha
       ],
     },
     NodeKind::Ref { def_name } => Tree::Ref { nam: def_name.to_string() },
-    NodeKind::Num { val } => Tree::Num { val: *val },
+    NodeKind::Num { val } => Tree::Num { val: *val as i64 },
     NodeKind::Op2 { opr } => Tree::Op {
       op: *opr,
       rhs: Box::new(var_or_subtree(inet, Port(tree_root, 1), port_to_var_id)),

@@ -4,7 +4,7 @@ use crate::{
     NodeKind::{self, *},
     Port, ROOT,
   },
-  term::{Book, Name, NumCtr, Op, Tag, Term},
+  term::{Book, Name, NumCtr, Tag, Term},
 };
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -244,8 +244,8 @@ impl EncodeTermState<'_> {
         Term::Str { .. } => unreachable!(), // Removed in encode_str
         Term::Lst { .. } => unreachable!(), // Removed in encode_list
         // core: & fst ~ <op snd ret>
-        Term::Opx { op, fst, snd } => {
-          let opx = self.inet.new_node(Op2 { opr: op.to_hvmc_label() });
+        Term::Opx { opr, fst, snd } => {
+          let opx = self.inet.new_node(Op2 { opr: *opr });
 
           let fst_port = self.encode_term(fst, Port(opx, 0));
           self.link_local(Port(opx, 0), fst_port);
@@ -308,30 +308,6 @@ impl EncodeTermState<'_> {
     let mut aux_ports = nodes.iter().map(|n| Port(*n, 1)).collect::<Vec<_>>();
     aux_ports.push(Port(*nodes.last().unwrap(), 2));
     (main_port, aux_ports)
-  }
-}
-
-impl Op {
-  pub fn to_hvmc_label(self) -> hvmc::ops::Op {
-    use hvmc::ops::Op as RtOp;
-    match self {
-      Op::Add => RtOp::Add,
-      Op::Sub => RtOp::Sub,
-      Op::Mul => RtOp::Mul,
-      Op::Div => RtOp::Div,
-      Op::Mod => RtOp::Mod,
-      Op::Eq => RtOp::Eq,
-      Op::Ne => RtOp::Ne,
-      Op::Lt => RtOp::Lt,
-      Op::Gt => RtOp::Gt,
-      Op::Lte => RtOp::Lte,
-      Op::Gte => RtOp::Gte,
-      Op::And => RtOp::And,
-      Op::Or => RtOp::Or,
-      Op::Xor => RtOp::Xor,
-      Op::Shl => RtOp::Shl,
-      Op::Shr => RtOp::Shr,
-    }
   }
 }
 
