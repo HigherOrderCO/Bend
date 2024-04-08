@@ -2,6 +2,12 @@
 
 HVM-Lang is a lambda-calculus based language and serves as an Intermediate Representation for HVM-Core, offering a higher level syntax for writing programs based on the [Interaction-Calculus](https://github.com/VictorTaelin/Interaction-Calculus#interaction-calculus).
 
+Compilers that want to target the HVM should compile the source language to HVM-lang, which takes care of converting interaction calculus into the underlying interaction networks.
+
+Note that HVM-lang is untyped and does not guarantee correctness or soundness. Compilers that don't want to implement the necessary check can instead transpile to the [Kind language](https://github.com/HigherOrderCO/kind2), which compiles to HVM-lang and implements type-level checking.
+
+Programmers looking for an HVM-based programming language should also use Kind, which is designed to be user-interfacing.
+
 ## Installation
 
 With the nightly version of rust installed, clone the repository:
