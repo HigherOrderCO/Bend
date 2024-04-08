@@ -227,54 +227,23 @@ pub fn run_compiled(
 
     let start_time = Instant::now();
 
-    if let Some(mut hook) = hook {
-      if run_opts.lazy_mode {
-        let mut visit = vec![hvmc::run::Port::new_var(root.root.addr())];
-        while let Some(prev) = visit.pop() {
-          let next = root.weak_normal(prev, root.root.clone());
-
-          let readback = host.lock().unwrap().readback(root);
-          hook(&readback);
-
-          if next.is_full_node() {
-            visit.push(hvmc::run::Port::new_var(next.addr()));
-            visit.push(hvmc::run::Port::new_var(next.addr().other_half()));
-          }
+    match (hook, run_opts.lazy_mode, max_rwts) {
+      (Some(hook), true, _) => normal_lazy_debug(hook, host.clone(), root),
+      (Some(hook), false, _) => normal_strict_debug(hook, host.clone(), root),
+      (_, lazy_mode, Some(max_rwts)) if !lazy_mode => {
+        if !run_opts.single_core {
+          panic!("Parallel mode does not yet support rewrite limit");
         }
-      } else {
-        while !root.redexes.is_empty() {
-          let readback = host.lock().unwrap().readback(root);
-          hook(&readback);
-          root.reduce(1);
-        }
-      }
-    } else if let Some(mut max_rwts) = max_rwts {
-      if run_opts.lazy_mode {
+        normal_strict_rwts(max_rwts, root);
+      },
+      (_, true, Some(_)) => {
         panic!("Lazy mode does not yet support rewrite limit");
-      }
-      if !run_opts.single_core {
-        panic!("Parallel mode does not yet support rewrite limit");
-      }
-      root.expand();
-      while !root.redexes.is_empty() {
-        let old_rwts = root.rwts.total();
-        root.reduce(max_rwts);
-        let delta_rwts = root.rwts.total() - old_rwts;
-        if (max_rwts as u64) < delta_rwts {
-          eprintln!("Warning: Exceeded max rwts");
-          break;
-        }
-        max_rwts -= delta_rwts as usize;
-        root.expand();
-      }
-    } else if !run_opts.single_core {
-      root.parallel_normal();
-    } else {
-      root.normal();
+      },
+      (_, false, None) if !run_opts.single_core => root.parallel_normal(),
+      _ => root.normal(),
     }
 
     let elapsed = start_time.elapsed().as_secs_f64();
-
 
     let net = host.lock().unwrap().readback(root);
 
@@ -302,6 +271,52 @@ pub fn readback_hvmc(
   }
 
   (term, diags)
+}
+
+fn normal_lazy_debug<M: hvmc::run::Mode>(
+  mut hook: impl FnMut(&Net),
+  host: Arc<Mutex<Host>>,
+  root: &mut hvmc::run::Net<M>,
+) {
+  let mut visit = vec![hvmc::run::Port::new_var(root.root.addr())];
+  while let Some(prev) = visit.pop() {
+    let next = root.weak_normal(prev, root.root.clone());
+
+    let readback = host.lock().unwrap().readback(root);
+    hook(&readback);
+
+    if next.is_full_node() {
+      visit.push(hvmc::run::Port::new_var(next.addr()));
+      visit.push(hvmc::run::Port::new_var(next.addr().other_half()));
+    }
+  }
+}
+
+fn normal_strict_debug<M: hvmc::run::Mode>(
+  mut hook: impl FnMut(&Net),
+  host: Arc<Mutex<Host>>,
+  root: &mut hvmc::run::Net<M>,
+) {
+  while !root.redexes.is_empty() {
+    let readback = host.lock().unwrap().readback(root);
+    hook(&readback);
+    root.reduce(1);
+  }
+}
+
+fn normal_strict_rwts<M: hvmc::run::Mode>(mut max_rwts: usize, root: &mut hvmc::run::Net<M>) {
+  root.expand();
+  while !root.redexes.is_empty() {
+    let old_rwts = root.rwts.total();
+    root.reduce(max_rwts);
+    let delta_rwts = root.rwts.total() - old_rwts;
+    if (max_rwts as u64) < delta_rwts {
+      eprintln!("Warning: Exceeded max rwts");
+      break;
+    }
+    max_rwts -= delta_rwts as usize;
+    root.expand();
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
