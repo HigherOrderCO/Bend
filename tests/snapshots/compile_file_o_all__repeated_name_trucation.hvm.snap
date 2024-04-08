@@ -27,6 +27,7 @@ For let expressions where the variable is non-linear (used more than once), you 
 
 See here for more info: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md.
 
+You can disable this check altogether with the "-Arecursion-cycle" compiler option.
 
 @long_name_that_truncates = (* (* @long_name_that_truncates))
 

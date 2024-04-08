@@ -1,11 +1,12 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/mutual_recursion/a_b_c.hvm
+input_file: tests/golden_tests/compile_file_o_no_all/sum_tree.hvm
 ---
 Errors:
 Seems like you're trying to run some recursive function(s) on strict-mode.
 The following recursive cycles are not compatible with strict-mode the way these functions were written:
-  * A -> B -> C -> A
+  * gen -> gen
+  * sum -> sum
 
 Due to the ultra-greedy nature of strict-mode, that might result in infinite loops.
 If the float-combinators optimization is not on, we recommend activating it.

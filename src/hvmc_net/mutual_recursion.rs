@@ -21,7 +21,7 @@ pub fn check_cycles(book: &Book, diagnostics: &mut Diagnostics) -> Result<(), Di
 
   if !cycles.is_empty() {
     let msg = format!(include_str!("mutual_recursion.message"), cycles = show_cycles(cycles));
-    diagnostics.add_book_warning(msg.as_str(), WarningType::MutualRecursionCycle);
+    diagnostics.add_book_warning(msg.as_str(), WarningType::RecursionCycle);
   }
 
   diagnostics.fatal(())
