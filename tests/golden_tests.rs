@@ -420,14 +420,34 @@ fn io() {
 }
 
 #[test]
-fn examples() {
-  run_golden_test_dir(function_name!(), &|code, path| {
-    let book = do_parse_book(code, path)?;
+fn examples() -> Result<(), Diagnostics> {
+  let examples_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples");
+
+  for entry in WalkDir::new(examples_path)
+    .min_depth(1)
+    .into_iter()
+    .filter_map(|e| e.ok())
+    .filter(|e| e.path().extension().map_or(false, |ext| ext == "hvm"))
+  {
+    let path = entry.path();
+    eprintln!("Testing {}", path.display());
+    let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+
+    let book = do_parse_book(&code, path).unwrap();
     let mut compile_opts = CompileOpts::default_strict();
     compile_opts.linearize_matches = hvml::OptLevel::Extra;
     let diagnostics_cfg = DiagnosticsConfig::default_strict();
-    let (res, info) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let (res, _) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
 
-    Ok(format!("{}{}", info.diagnostics, res))
-  })
+    let mut settings = insta::Settings::clone_current();
+    settings.set_prepend_module_to_snapshot(false);
+    settings.set_omit_expression(true);
+    settings.set_input_file(path);
+
+    settings.bind(|| {
+      assert_snapshot!(format!("examples__{}", path.file_name().unwrap().to_str().unwrap()), res);
+    });
+  }
+
+  Ok(())
 }
