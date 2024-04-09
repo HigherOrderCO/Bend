@@ -418,3 +418,16 @@ fn io() {
     }),
   ])
 }
+
+#[test]
+fn examples() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let book = do_parse_book(code, path)?;
+    let mut compile_opts = CompileOpts::default_strict();
+    compile_opts.linearize_matches = hvml::OptLevel::Extra;
+    let diagnostics_cfg = DiagnosticsConfig::default_strict();
+    let (res, info) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+
+    Ok(format!("{}{}", info.diagnostics, res))
+  })
+}

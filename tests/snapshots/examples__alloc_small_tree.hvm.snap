@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/examples/alloc_small_tree.hvm
+---
+λa λ* a

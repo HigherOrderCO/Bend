@@ -1,0 +1,18 @@
+data Bool = True | False
+
+data Tree
+  = (Node lft rgt)
+  | (Leaf val)
+
+and True True = True
+and _    _    = False
+
+all (Node lft rgt) = (and (all lft) (all rgt))
+all (Leaf val)     = val
+
+main = (all (gen 8))
+
+gen = λn switch n {
+  0: (Leaf True)
+  _: let tree = (gen n-1); (Node tree tree)
+}
