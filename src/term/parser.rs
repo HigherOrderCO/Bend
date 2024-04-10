@@ -753,13 +753,9 @@ impl<'a> TermParser<'a> {
         continue;
       }
       if c == '/' && self.input().get(*self.index() ..).unwrap_or_default().starts_with("//") {
-        loop {
-          if let Some(c) = self.peek_one() {
-            if c != '\n' {
-              self.advance_one();
-            } else {
-              break;
-            }
+        while let Some(c) = self.peek_one() {
+          if c != '\n' {
+            self.advance_one();
           } else {
             break;
           }
