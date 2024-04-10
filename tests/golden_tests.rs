@@ -451,3 +451,16 @@ fn examples() -> Result<(), Diagnostics> {
 
   Ok(())
 }
+
+#[test]
+fn scott_triggers_unused() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = do_parse_book(code, path)?;
+    let mut opts = CompileOpts::default_strict();
+    opts.adt_encoding = AdtEncoding::Scott;
+    let diagnostics_cfg =
+      DiagnosticsConfig { unused_definition: Severity::Error, ..DiagnosticsConfig::default_strict() };
+    let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
+    Ok(format!("{}{}", res.diagnostics, res.core_book))
+  })
+}
