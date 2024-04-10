@@ -107,10 +107,10 @@ impl Book {
           None => self.insert_used(def_name, used, uses, adt_encoding),
         },
         Term::Lst { .. } => {
-          self.insert_ctrs_used(&Name::from(LIST), uses, adt_encoding);
+          self.insert_ctrs_used(&Name::new(LIST), uses, adt_encoding);
         }
         Term::Str { .. } => {
-          self.insert_ctrs_used(&Name::from(STRING), uses, adt_encoding);
+          self.insert_ctrs_used(&Name::new(STRING), uses, adt_encoding);
         }
         _ => {}
       }

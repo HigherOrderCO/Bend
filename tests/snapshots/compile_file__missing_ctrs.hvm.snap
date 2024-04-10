@@ -3,5 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/missing_ctrs.hvm
 ---
 Errors:
-At tests/golden_tests/compile_file/missing_ctrs.hvm:1:12: found end of input expected constructor
-[0m  1 | data Adt =[4m[31m[0m [0m
+In tests/golden_tests/compile_file/missing_ctrs.hvm :
+[1m- expected:[0m datatype constructor name
+[1m- detected:[0m end of input

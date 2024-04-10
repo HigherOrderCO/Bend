@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use crate::{
   diagnostics::ToStringVerbose,
+  maybe_grow,
   term::{Adt, AdtEncoding, Book, Name, Tag, Term},
 };
 
@@ -23,7 +24,7 @@ impl Term {
   }
 
   fn resugar_tagged_scott(&mut self, book: &Book, errs: &mut Vec<AdtReadbackError>) {
-    Term::recursive_call(move || match self {
+    maybe_grow(|| match self {
       Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
         if let Some((adt_name, adt)) = book.adts.get_key_value(adt_name) {
           self.resugar_ctr_tagged_scott(book, adt, adt_name, errs);
@@ -245,7 +246,7 @@ impl Term {
     let (arg, bind) = if let Term::Var { nam } = cur {
       (nam.clone(), None)
     } else {
-      (Name::from("%matched"), Some(std::mem::take(cur)))
+      (Name::new("%matched"), Some(std::mem::take(cur)))
     };
 
     // Subst the unique readback names for the field names.

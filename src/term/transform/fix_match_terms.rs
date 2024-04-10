@@ -1,5 +1,6 @@
 use crate::{
   diagnostics::{Diagnostics, ToStringVerbose, WarningType},
+  maybe_grow,
   term::{Adts, Constructors, Ctx, MatchRule, Name, NumCtr, Term},
 };
 use std::collections::HashMap;
@@ -76,7 +77,7 @@ impl Ctx<'_> {
 
 impl Term {
   fn fix_match_terms(&mut self, ctrs: &Constructors, adts: &Adts) -> Vec<FixMatchErr> {
-    Term::recursive_call(move || {
+    maybe_grow(|| {
       let mut errs = Vec::new();
 
       for child in self.children_mut() {
@@ -182,7 +183,7 @@ fn extract_match_arg(arg: &mut Term) -> (Name, Option<Term>) {
   if let Term::Var { nam } = arg {
     (nam.clone(), None)
   } else {
-    let nam = Name::from("%matched");
+    let nam = Name::new("%matched");
     let arg = std::mem::replace(arg, Term::Var { nam: nam.clone() });
     (nam, Some(arg))
   }

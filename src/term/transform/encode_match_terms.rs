@@ -1,4 +1,7 @@
-use crate::term::{AdtEncoding, Book, Constructors, MatchRule, Name, NumCtr, SwitchRule, Tag, Term};
+use crate::{
+  maybe_grow,
+  term::{AdtEncoding, Book, Constructors, MatchRule, Name, NumCtr, SwitchRule, Tag, Term},
+};
 
 impl Book {
   /// Encodes pattern matching expressions in the book into their
@@ -20,7 +23,7 @@ impl Book {
 
 impl Term {
   pub fn encode_matches(&mut self, ctrs: &Constructors, adt_encoding: AdtEncoding) {
-    Term::recursive_call(move || {
+    maybe_grow(|| {
       for child in self.children_mut() {
         child.encode_matches(ctrs, adt_encoding)
       }
@@ -73,7 +76,7 @@ fn encode_match(arg: Term, rules: Vec<MatchRule>, ctrs: &Constructors, adt_encod
 fn encode_switch(arg: Term, mut rules: Vec<SwitchRule>) -> Term {
   let last_rule = rules.pop().unwrap();
 
-  let match_var = Name::from("%x");
+  let match_var = Name::new("%x");
 
   // @n-2 (C n-2)
   let NumCtr::Succ(last_var) = last_rule.0 else { unreachable!() };

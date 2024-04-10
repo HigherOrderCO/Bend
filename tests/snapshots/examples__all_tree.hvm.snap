@@ -1,5 +1,5 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/examples/all_tree.hvm
+input_file: examples/all_tree.hvm
 ---
 True

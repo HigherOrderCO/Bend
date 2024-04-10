@@ -1,4 +1,7 @@
-use crate::term::{Term, LCONS, LNIL, NAT_SUCC, NAT_ZERO, SCONS, SNIL};
+use crate::{
+  maybe_grow,
+  term::{Term, LCONS, LNIL, NAT_SUCC, NAT_ZERO, SCONS, SNIL},
+};
 
 impl Term {
   pub fn resugar_builtins(&mut self) {
@@ -8,7 +11,7 @@ impl Term {
   }
 
   pub fn resugar_nats(&mut self) {
-    Term::recursive_call(move || match self {
+    maybe_grow(|| match self {
       // (Nat.succ pred)
       Term::App { fun: box Term::Ref { nam: ctr }, arg: box pred, .. } => {
         pred.resugar_nats();
@@ -35,7 +38,7 @@ impl Term {
 
   /// Rebuilds the String syntax sugar, converting `(Cons 97 Nil)` into `"a"`.
   pub fn resugar_strings(&mut self) {
-    Term::recursive_call(move || match self {
+    maybe_grow(|| match self {
       // (String.cons Num tail)
       Term::App {
         fun: box Term::App { fun: box Term::Ref { nam: ctr }, arg: box head, .. },
@@ -80,7 +83,7 @@ impl Term {
 
   /// Rebuilds the List syntax sugar, converting `(Cons head Nil)` into `[head]`.
   pub fn resugar_lists(&mut self) {
-    Term::recursive_call(move || match self {
+    maybe_grow(|| match self {
       // (List.cons el tail)
       Term::App {
         fun: box Term::App { fun: box Term::Ref { nam: ctr }, arg: box head, .. },

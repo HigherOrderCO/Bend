@@ -1,4 +1,7 @@
-use crate::term::{Book, Name, NumCtr, Tag, Term};
+use crate::{
+  maybe_grow,
+  term::{Book, Name, NumCtr, Tag, Term},
+};
 use std::collections::{BTreeSet, HashSet};
 
 impl Book {
@@ -63,7 +66,7 @@ impl Term {
   /// }
   /// ```
   pub fn linearize_match_lambdas(&mut self) {
-    Term::recursive_call(move || match self {
+    maybe_grow(|| match self {
       Term::Lam { .. } => {
         let mut term_owned = std::mem::take(self);
         let mut term = &mut term_owned;
@@ -139,7 +142,7 @@ impl Term {
   }
 
   fn linearize_matches(&mut self) {
-    Term::recursive_call(move || {
+    maybe_grow(|| {
       for child in self.children_mut() {
         child.linearize_matches();
       }
@@ -151,7 +154,7 @@ impl Term {
   }
 
   fn linearize_match_with(&mut self) {
-    Term::recursive_call(|| {
+    maybe_grow(|| {
       for child in self.children_mut() {
         child.linearize_match_with();
       }

@@ -4,8 +4,8 @@ use hvml::{
   net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
   run_book,
   term::{
-    load_book::do_parse_book, net_to_term::net_to_term, parser::parse_term, term_to_compat_net,
-    term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term,
+    load_book::do_parse_book, net_to_term::net_to_term, parser::TermParser, term_to_compat_net,
+    term_to_net::Labels, AdtEncoding, Book, Ctx, Name,
   },
   CompileOpts, RunOpts,
 };
@@ -23,14 +23,6 @@ use walkdir::WalkDir;
 
 fn format_output(output: std::process::Output) -> String {
   format!("{}{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout))
-}
-
-fn do_parse_term(code: &str) -> Result<Term, String> {
-  parse_term(code).map_err(|errs| errs.into_iter().map(|e| e.to_string()).join("\n"))
-}
-
-fn do_parse_net(code: &str) -> Result<hvmc::ast::Net, String> {
-  hvmc::ast::Net::from_str(code)
 }
 
 const TESTS_PATH: &str = "/tests/golden_tests/";
@@ -103,7 +95,7 @@ fn run_golden_test_dir_multiple(test_name: &str, run: &[&RunFn]) {
 #[test]
 fn compile_term() {
   run_golden_test_dir(function_name!(), &|code, _| {
-    let mut term = do_parse_term(code)?;
+    let mut term = TermParser::new_term(code)?;
     let mut vec = Vec::new();
     term.check_unbound_vars(&mut HashMap::new(), &mut vec);
 
@@ -226,7 +218,7 @@ fn run_lazy() {
 #[test]
 fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|code, _| {
-    let net = do_parse_net(code)?;
+    let net = hvmc::ast::Net::from_str(code)?;
     let book = Book::default();
     let compat_net = hvmc_to_net(&net);
     let mut diags = Diagnostics::default();
@@ -349,7 +341,7 @@ fn hangs() {
 fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    book.entrypoint = Some(Name::from("foo"));
+    book.entrypoint = Some(Name::new("foo"));
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let res = compile_book(&mut book, CompileOpts::default_strict(), diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
@@ -360,7 +352,7 @@ fn compile_entrypoint() {
 fn run_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    book.entrypoint = Some(Name::from("foo"));
+    book.entrypoint = Some(Name::new("foo"));
     let compile_opts = CompileOpts::default_strict().set_all();
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let (res, info) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;

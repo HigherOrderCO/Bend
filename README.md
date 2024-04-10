@@ -138,7 +138,7 @@ StrEx2 = (String.cons 'H' (String.cons 'e', (String.cons 'l' (String.cons 'l', (
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
 ```
-main = '\u4242'
+main = '\u{4242}'
 ```
 
 Lists are delimited by `[` `]` and elements can be optionally separated by `,`.

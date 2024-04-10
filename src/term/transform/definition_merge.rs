@@ -1,4 +1,7 @@
-use crate::term::{Book, Definition, Name, Rule, Term};
+use crate::{
+  maybe_grow,
+  term::{Book, Definition, Name, Rule, Term},
+};
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use std::collections::BTreeMap;
@@ -86,7 +89,7 @@ impl Term {
   /// Performs reference substitution within a term replacing any references found in
   /// `ref_map` with their corresponding targets.
   pub fn subst_ref_to_ref(term: &mut Term, ref_map: &BTreeMap<Name, Name>) -> bool {
-    Term::recursive_call(move || match term {
+    maybe_grow(|| match term {
       Term::Ref { nam: def_name } => {
         if let Some(target_name) = ref_map.get(def_name) {
           *def_name = target_name.clone();

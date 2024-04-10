@@ -1,4 +1,7 @@
-use crate::term::{Book, Term};
+use crate::{
+  maybe_grow,
+  term::{Book, Term},
+};
 
 impl Book {
   /// Inline copies of the declared bind in the `use` expression.
@@ -22,7 +25,7 @@ impl Book {
 
 impl Term {
   pub fn apply_use(&mut self) {
-    Term::recursive_call(|| {
+    maybe_grow(|| {
       for children in self.children_mut() {
         children.apply_use();
       }

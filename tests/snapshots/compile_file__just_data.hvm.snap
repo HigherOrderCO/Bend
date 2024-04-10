@@ -3,5 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/just_data.hvm
 ---
 Errors:
-At tests/golden_tests/compile_file/just_data.hvm:1:5: found end of input expected <Name>
-[0m 1 | data[0m
+In tests/golden_tests/compile_file/just_data.hvm :
+[1m- expected:[0m datatype name
+[1m- detected:[0m end of input

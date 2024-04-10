@@ -1,4 +1,5 @@
-use super::{parser::parse_book, Book, Name, Pattern, Term};
+use super::{parser::TermParser, Book, Name, Pattern, Term};
+use crate::maybe_grow;
 
 const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/term/builtins.hvm"));
 
@@ -23,7 +24,8 @@ pub const NAT_ZERO: &str = "Nat.zero";
 
 impl Book {
   pub fn builtins() -> Book {
-    parse_book(BUILTINS, Book::default, true).expect("Error parsing builtin file, this should not happen")
+    TermParser::new_book(BUILTINS, Book::default(), true)
+      .expect("Error parsing builtin file, this should not happen")
   }
 
   pub fn encode_builtins(&mut self) {
@@ -38,7 +40,7 @@ impl Book {
 
 impl Term {
   fn encode_builtins(&mut self) {
-    Term::recursive_call(move || match self {
+    maybe_grow(|| match self {
       Term::Lst { els } => *self = Term::encode_list(std::mem::take(els)),
       Term::Str { val } => *self = Term::encode_str(val),
       Term::Nat { val } => *self = Term::encode_nat(*val),
@@ -91,20 +93,20 @@ impl Pattern {
   }
 
   fn encode_list(elements: Vec<Pattern>) -> Pattern {
-    let lnil = Pattern::Ctr(Name::from(LNIL), vec![]);
+    let lnil = Pattern::Ctr(Name::new(LNIL), vec![]);
 
     elements.into_iter().rfold(lnil, |acc, mut nxt| {
       nxt.encode_builtins();
-      Pattern::Ctr(Name::from(LCONS), vec![nxt, acc])
+      Pattern::Ctr(Name::new(LCONS), vec![nxt, acc])
     })
   }
 
   fn encode_str(str: &str) -> Pattern {
-    let lnil = Pattern::Ctr(Name::from(SNIL), vec![]);
+    let lnil = Pattern::Ctr(Name::new(SNIL), vec![]);
 
     str.chars().rfold(lnil, |tail, head| {
       let head = Pattern::Num(head as u64);
-      Pattern::Ctr(Name::from(SCONS), vec![head, tail])
+      Pattern::Ctr(Name::new(SCONS), vec![head, tail])
     })
   }
 }

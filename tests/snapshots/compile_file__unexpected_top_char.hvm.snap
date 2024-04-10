@@ -3,5 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/unexpected_top_char.hvm
 ---
 Errors:
-At tests/golden_tests/compile_file/unexpected_top_char.hvm:1:1: found end of input expected data, <Name>, or '('
+In tests/golden_tests/compile_file/unexpected_top_char.hvm :
+[1m- expected:[0m top-level definition
+[1m- detected:[0m
 [0m 1 | [4m[31m*[0m

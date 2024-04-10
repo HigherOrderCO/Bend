@@ -3,5 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/just_paren.hvm
 ---
 Errors:
-At tests/golden_tests/compile_file/just_paren.hvm:2:1: found end of input expected <Name>
-[0m  2 | [4m[31m([0m
+In tests/golden_tests/compile_file/just_paren.hvm :
+[1m- expected:[0m function name
+[1m- detected:[0m end of input
