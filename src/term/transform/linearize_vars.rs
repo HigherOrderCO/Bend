@@ -1,4 +1,7 @@
-use crate::term::{Book, Name, Tag, Term};
+use crate::{
+  maybe_grow,
+  term::{Book, Name, Tag, Term},
+};
 use std::collections::HashMap;
 
 /// Erases variables that weren't used, dups the ones that were used more than once.
@@ -35,7 +38,7 @@ impl Term {
 }
 
 fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, u64>) {
-  Term::recursive_call(move || match term {
+  maybe_grow(|| match term {
     Term::Let { nam: Some(nam), val, nxt } => {
       // TODO: This is swapping the order of how the bindings are
       // used, since it's not following the usual AST order (first

@@ -19,7 +19,7 @@ struct Cli {
   pub verbose: bool,
 
   #[arg(short = 'e', long, global = true, help = "Use other entrypoint rather than main or Main")]
-  pub entrypoint: Option<Name>,
+  pub entrypoint: Option<String>,
 }
 
 #[derive(Subcommand, Clone, Debug)]
@@ -96,11 +96,7 @@ enum Mode {
     #[arg(help = "Path to the input file")]
     path: PathBuf,
 
-    #[arg(value_parser = |arg: &str| hvml::term::parser::parse_term(arg)
-    .map_err(|e| match e[0].reason() {
-      chumsky::error::RichReason::Many(errs) => format!("{}", &errs[0]),
-      _ => format!("{}", e[0].reason()),
-    }))]
+    #[arg(value_parser = |arg: &str| hvml::term::parser::TermParser::new_term(arg))]
     arguments: Option<Vec<hvml::term::Term>>,
   },
   /// Runs the lambda-term level desugaring passes.
@@ -292,7 +288,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
   let load_book = |path: &Path| -> Result<Book, Diagnostics> {
     let mut book = load_file_to_book(path)?;
-    book.entrypoint = entrypoint;
+    book.entrypoint = entrypoint.map(Name::new);
 
     if arg_verbose {
       println!("{book}");

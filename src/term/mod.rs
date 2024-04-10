@@ -1,6 +1,7 @@
-use self::parser::lexer::STRINGS;
+use self::parser::STRINGS;
 use crate::{
   diagnostics::{Diagnostics, DiagnosticsConfig},
+  maybe_grow,
   term::builtins::*,
   ENTRY_POINT,
 };
@@ -303,7 +304,7 @@ impl Tag {
 
 impl Clone for Term {
   fn clone(&self) -> Self {
-    Self::recursive_call(move || match self {
+    maybe_grow(|| match self {
       Self::Lam { tag, nam, bod } => Self::Lam { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
       Self::Var { nam } => Self::Var { nam: nam.clone() },
       Self::Chn { tag, nam, bod } => Self::Chn { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
@@ -416,7 +417,7 @@ impl Term {
   }
 
   pub fn r#ref(name: &str) -> Self {
-    Term::Ref { nam: name.into() }
+    Term::Ref { nam: Name::new(name) }
   }
 
   pub fn str(str: &str) -> Self {
@@ -654,12 +655,6 @@ impl Term {
   }
 
   /* Common checks and transformations */
-  pub fn recursive_call<R, F>(f: F) -> R
-  where
-    F: FnOnce() -> R,
-  {
-    stacker::maybe_grow(1024 * 32, 1024 * 1024, f)
-  }
 
   /// Substitute the occurrences of a variable in a term with the given term.
   ///
@@ -669,7 +664,7 @@ impl Term {
   /// Expects var bind information to be properly stored in match expressions,
   /// so it must run AFTER `fix_match_terms`.
   pub fn subst(&mut self, from: &Name, to: &Term) {
-    Term::recursive_call(|| {
+    maybe_grow(|| {
       for (child, binds) in self.children_mut_with_binds() {
         if !binds.flat_map(|b| b.as_ref()).contains(from) {
           child.subst(from, to);
@@ -686,7 +681,7 @@ impl Term {
 
   /// Substitute the occurrence of an unscoped variable with the given term.
   pub fn subst_unscoped(&mut self, from: &Name, to: &Term) {
-    Term::recursive_call(|| {
+    maybe_grow(|| {
       // We don't check the unscoped binds because there can be only one bind of an unscoped var.
       // TODO: potentially there could be some situation where this causes an incorrect program to compile?
       for child in self.children_mut() {
@@ -705,7 +700,7 @@ impl Term {
   /// and the number of times each var is used
   pub fn free_vars(&self) -> HashMap<Name, u64> {
     fn go(term: &Term, free_vars: &mut HashMap<Name, u64>) {
-      Term::recursive_call(move || {
+      maybe_grow(|| {
         if let Term::Var { nam } = term {
           *free_vars.entry(nam.clone()).or_default() += 1;
         }
@@ -731,7 +726,7 @@ impl Term {
   /// Returns the set of declared and the set of used unscoped variables
   pub fn unscoped_vars(&self) -> (IndexSet<Name>, IndexSet<Name>) {
     fn go(term: &Term, decls: &mut IndexSet<Name>, uses: &mut IndexSet<Name>) {
-      Term::recursive_call(move || {
+      maybe_grow(|| {
         match term {
           Term::Chn { nam: Some(nam), .. } => {
             decls.insert(nam.clone());
@@ -865,25 +860,19 @@ impl Name {
 
 impl Default for Name {
   fn default() -> Self {
-    Self::from("")
-  }
-}
-
-impl From<&str> for Name {
-  fn from(value: &str) -> Self {
-    Name(STRINGS.get(value))
+    Self::new("")
   }
 }
 
 impl From<u64> for Name {
   fn from(value: u64) -> Self {
-    num_to_name(value).as_str().into()
+    Name::new(num_to_name(value).as_str())
   }
 }
 
 impl From<u32> for Name {
   fn from(value: u32) -> Self {
-    num_to_name(value as u64).as_str().into()
+    Name::new(num_to_name(value as u64).as_str())
   }
 }
 

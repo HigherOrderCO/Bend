@@ -1,5 +1,6 @@
 use crate::{
   diagnostics::{Diagnostics, ToStringVerbose},
+  maybe_grow,
   term::{Ctx, Name, Term},
 };
 use std::collections::{hash_map::Entry, HashMap};
@@ -62,7 +63,7 @@ pub fn check_uses<'a>(
   globals: &mut HashMap<&'a Name, (usize, usize)>,
   errs: &mut Vec<UnboundVarErr>,
 ) {
-  Term::recursive_call(move || match term {
+  maybe_grow(move || match term {
     Term::Var { nam } => {
       if !scope.contains_key(nam) {
         errs.push(UnboundVarErr::Local(nam.clone()));

@@ -1,5 +1,5 @@
-this-is-not-allowed = 1
+data Foo-Bar = (Baz-Qux field-hyph)
 
-data Foo-Bar = Baz-Qux
+fun-with-hyphen = 1
 
-main = (this-is-not-allowed Baz-Qux)
+main = (Baz-Qux fun-with-hyphen)

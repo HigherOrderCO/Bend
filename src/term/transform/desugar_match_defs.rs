@@ -499,8 +499,8 @@ impl Pattern {
       }
       Pattern::Tup(args) => Type::Tup(args.len()),
       Pattern::Num(_) => Type::Num,
-      Pattern::Lst(..) => Type::Adt(builtins::LIST.into()),
-      Pattern::Str(..) => Type::Adt(builtins::STRING.into()),
+      Pattern::Lst(..) => Type::Adt(Name::new(builtins::LIST)),
+      Pattern::Str(..) => Type::Adt(Name::new(builtins::STRING)),
     }
   }
 }

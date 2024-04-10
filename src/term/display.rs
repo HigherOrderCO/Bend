@@ -1,4 +1,5 @@
 use super::{Book, Definition, Name, NumCtr, Pattern, Rule, Tag, Term};
+use crate::maybe_grow;
 use std::{fmt, ops::Deref};
 
 /* Some aux structures for things that are not so simple to display */
@@ -41,7 +42,7 @@ macro_rules! display {
 
 impl fmt::Display for Term {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    Term::recursive_call(move || match self {
+    maybe_grow(|| match self {
       Term::Lam { tag, nam, bod } => {
         write!(f, "{}λ{} {}", tag.display_padded(), var_as_str(nam), bod)
       }

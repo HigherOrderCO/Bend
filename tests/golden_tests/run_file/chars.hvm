@@ -1,1 +1,1 @@
-main = (String.cons '\u1234' (String.cons '!' (String.cons '7' String.nil)))
+main = (String.cons '\u{1234}' (String.cons '!' (String.cons '7' String.nil)))

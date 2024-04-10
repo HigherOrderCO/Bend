@@ -1,5 +1,0 @@
-main =
-  match List.nil {
-  | []: 0
-  |  *: 1
-  }

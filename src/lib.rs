@@ -486,3 +486,10 @@ pub struct RunStats {
   pub used: usize,
   pub run_time: f64,
 }
+
+fn maybe_grow<R, F>(f: F) -> R
+where
+  F: FnOnce() -> R,
+{
+  stacker::maybe_grow(1024 * 32, 1024 * 1024, f)
+}

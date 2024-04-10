@@ -1,7 +1,7 @@
 use indexmap::IndexSet;
 
 use crate::{
-  multi_iterator,
+  maybe_grow, multi_iterator,
   term::{Book, Definition, Name, Rule, Term},
 };
 use std::collections::BTreeMap;
@@ -85,7 +85,7 @@ impl Term {
   /// - A safe Lambda, e.g. a nullary constructor or a lambda with safe body.
   /// - A Reference with safe body.
   pub fn is_safe(&self, book: &Book, seen: &mut IndexSet<Name>) -> bool {
-    Term::recursive_call(move || match self {
+    maybe_grow(|| match self {
       Term::Num { .. } | Term::Era => true,
 
       Term::Tup { els } | Term::Sup { els, .. } => els.iter().all(|e| Term::is_safe(e, book, seen)),

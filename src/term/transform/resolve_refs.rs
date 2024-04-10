@@ -1,6 +1,7 @@
 use crate::{
   builtins::CORE_BUILTINS,
   diagnostics::{Diagnostics, ToStringVerbose},
+  maybe_grow,
   term::{Ctx, Name, Pattern, Term},
 };
 use std::collections::{HashMap, HashSet};
@@ -45,7 +46,7 @@ impl Term {
     main: Option<&Name>,
     scope: &mut HashMap<&'a Name, usize>,
   ) -> Result<(), ReferencedMainErr> {
-    Term::recursive_call(move || {
+    maybe_grow(move || {
       if let Term::Var { nam } = self
         && is_var_in_scope(nam, scope)
       {

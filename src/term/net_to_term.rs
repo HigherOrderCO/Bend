@@ -1,5 +1,6 @@
 use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
+  maybe_grow,
   net::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
   term::{num_to_name, term_to_net::Labels, Book, Name, Tag, Term},
 };
@@ -68,10 +69,10 @@ pub struct Reader<'a> {
 
 impl Reader<'_> {
   fn read_term(&mut self, next: Port) -> Term {
-    Term::recursive_call(move || {
+    maybe_grow(|| {
       if self.dup_paths.is_none() && !self.seen.insert(next) {
         self.error(ReadbackError::Cyclic);
-        return Term::Var { nam: Name::from("...") };
+        return Term::Var { nam: Name::new("...") };
       }
 
       let node = next.node();
@@ -122,7 +123,7 @@ impl Reader<'_> {
                 Term::Lam { nam, bod, .. } => {
                   // Extract non-var args so we can refer to the pred.
                   let (arg, bind) = if let Term::Var { nam } = &mut arg {
-                    (std::mem::replace(nam, Name::from("")), None)
+                    (std::mem::take(nam), None)
                   } else {
                     (self.namegen.unique(), Some(arg))
                   };
@@ -341,7 +342,7 @@ impl Term {
   /// This has the effect of inserting the split at the lowest common ancestor
   /// of all of the uses of `fst` and `snd`.
   fn insert_split(&mut self, split: &mut Split, threshold: usize) -> Option<usize> {
-    Term::recursive_call(move || {
+    maybe_grow(|| {
       let mut n = match self {
         Term::Var { nam } => usize::from(split.fst == *nam || split.snd == *nam),
         _ => 0,
@@ -374,7 +375,7 @@ impl Term {
       }
     }
 
-    Term::recursive_call(move || match self {
+    maybe_grow(|| match self {
       Term::Ref { nam: def_name } => {
         if def_name.is_generated() {
           let def = book.defs.get(def_name).unwrap();

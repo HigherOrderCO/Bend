@@ -1,6 +1,9 @@
 // Pass to give all variables in a definition unique names.
 
-use crate::term::{Book, Name, Term};
+use crate::{
+  maybe_grow,
+  term::{Book, Name, Term},
+};
 use std::collections::HashMap;
 
 impl Book {
@@ -31,7 +34,7 @@ pub struct UniqueNameGenerator {
 impl UniqueNameGenerator {
   // Recursively assign an id to each variable in the term, then convert each id into a unique name.
   pub fn unique_names_in_term(&mut self, term: &mut Term) {
-    Term::recursive_call(move || match term {
+    maybe_grow(|| match term {
       Term::Var { nam } => *nam = self.use_var(nam),
       _ => {
         for (child, binds) in term.children_mut_with_binds_mut() {
