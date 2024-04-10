@@ -38,6 +38,14 @@ impl Ctx<'_> {
       self.book.find_used_definitions(&def.rule().body, Used::Main, &mut used, adt_encoding);
     }
 
+    if let AdtEncoding::Scott = adt_encoding {
+      for (def_name, def) in &self.book.defs {
+        if !def.builtin && self.book.ctrs.get(def_name).is_some() {
+          used.insert(def_name.clone(), Used::Adt);
+        }
+      }
+    }
+
     // Even if we don't prune all the defs, we need check what built-ins are accessible through user code
     if !prune_all {
       for (def_name, def) in &self.book.defs {
