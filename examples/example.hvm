@@ -19,8 +19,8 @@
 
 // You can use 'switch' to pattern match native numbers
 // The `_` arm binds the `scrutinee`-1 variable to the the value of the number -1
-(Num.pred) = λn 
-  switch n { 
+(Num.pred) = λn
+  switch n {
     0: 0
     _: n-1
   }
@@ -52,8 +52,9 @@ data Boxed = (Box val)
 (Box.map (Box val) f) = (Box (f val))
 
 (Box.unbox) = λbox
-  let (Box val) = box
-  val
+  match box {
+    Box: box.val
+  }
 
 // Use tuples to store two values together without needing to create a new data type
 (Tuple.new fst snd) =
@@ -71,7 +72,7 @@ data Boxed = (Box val)
 // You can execute a program in HVM with "cargo run -- --run <path to file>"
 // Other options are "--check" (the default mode) to just see if the file is well formed
 // and "--compile" to output hvm-core code.
-(main) = 
+(main) =
   let tup = (Tuple.new None (Num.pred 5))
 
   let fst = (Tuple.fst tup)
