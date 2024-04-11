@@ -1,14 +1,12 @@
-use std::sync::{Arc, Mutex};
-
+use super::util::FunctionLikeHosted;
+use crate::builtins::util::AsDefFunction;
 use hvmc::{
   host::Host,
   run::{Def, LabSet, Mode, Net, Port, Tag, Wire},
   stdlib::HostedDef,
 };
-
-use crate::builtins::util::AsDefFunction;
-
-use super::util::FunctionLikeHosted;
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 pub(crate) fn add_exit_def(host: Arc<Mutex<Host>>) {
   /// `HVM.exit`.
@@ -50,6 +48,5 @@ pub(crate) fn add_exit_def(host: Arc<Mutex<Host>>) {
 
   host
     .lock()
-    .unwrap()
     .insert_def("HVM.exit", unsafe { HostedDef::new_hosted(LabSet::ALL, FunctionLikeHosted(ExitDef)) });
 }
