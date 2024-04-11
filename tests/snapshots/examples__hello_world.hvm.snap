@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: examples/hello_world.hvm
+---
+*

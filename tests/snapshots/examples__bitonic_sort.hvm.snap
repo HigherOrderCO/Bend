@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: examples/bitonic_sort.hvm
+---
+523776

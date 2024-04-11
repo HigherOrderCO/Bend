@@ -1,0 +1,28 @@
+// Sorts a list
+
+// sort : List -> List
+(Sort [])         = []
+(Sort (List.cons x xs)) = (Insert x (Sort xs))
+
+// Insert : U60 -> List -> List
+(Insert v [])          = (List.cons v [])
+(Insert v (List.cons x xs)) = (SwapGT (> v x) v x xs)
+
+// SwapGT : U60 -> U60 -> U60 -> List -> List
+(SwapGT 0 v x xs) = (List.cons v (List.cons x xs))
+(SwapGT _ v x xs) = (List.cons x (Insert v xs))
+
+// Generates a random list
+(Rnd 0 s) = []
+(Rnd n s) = (List.cons s (Rnd (- n 1) (% (+ (* s 1664525) 1013904223) 4294967296)))
+
+// Sums a list
+(Sum [])         = 0
+(Sum (List.cons x xs)) = (+ x (Sum xs))
+
+(Main) =
+  let n = 10
+  (Sum (Sort (Rnd (* 2 50) n)))
+
+// Use an argument from cli
+// (Main n) = (Sum (Sort (Rnd (* 2 50) n)))
