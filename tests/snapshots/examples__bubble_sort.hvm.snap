@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: examples/bubble_sort.hvm
+---
+188329834594
