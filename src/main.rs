@@ -89,7 +89,7 @@ enum Mode {
     #[arg(help = "Path to the input file")]
     path: PathBuf,
 
-    #[arg(value_parser = |arg: &str| hvml::term::parser::TermParser::new_term(arg))]
+    #[arg(value_parser = |arg: &str| hvml::term::parser::TermParser::new(arg).parse_term())]
     arguments: Option<Vec<hvml::term::Term>>,
   },
   /// Runs the lambda-term level desugaring passes.

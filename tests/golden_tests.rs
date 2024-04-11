@@ -97,7 +97,7 @@ fn run_golden_test_dir_multiple(test_name: &str, run: &[&RunFn]) {
 #[test]
 fn compile_term() {
   run_golden_test_dir(function_name!(), &|code, _| {
-    let mut term = TermParser::new_term(code)?;
+    let mut term = TermParser::new(code).parse_term()?;
     let mut vec = Vec::new();
     term.check_unbound_vars(&mut HashMap::new(), &mut vec);
 

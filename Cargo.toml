@@ -20,7 +20,7 @@ default = ["cli"]
 cli = ["dep:clap"]
 
 [dependencies]
-TSPL = "0.0.9"
+TSPL = { git = "https://github.com/developedby/TSPL.git", branch = "fix-hvml-bugs" }
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 highlight_error = "0.1.1"
 hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core.git", branch = "hvm32-compat" }

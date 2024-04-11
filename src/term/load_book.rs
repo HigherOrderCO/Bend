@@ -8,5 +8,7 @@ pub fn load_file_to_book(path: &Path) -> Result<Book, String> {
 }
 
 pub fn do_parse_book(code: &str, path: &Path) -> Result<Book, String> {
-  TermParser::new_book(code, Book::builtins(), false).map_err(|e| format!("In {} :\n{}", path.display(), e))
+  TermParser::new(code)
+    .parse_book(Book::builtins(), false)
+    .map_err(|e| format!("In {} :\n{}", path.display(), e))
 }
