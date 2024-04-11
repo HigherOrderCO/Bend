@@ -1,22 +1,20 @@
-use std::sync::{Arc, Mutex};
-
+use crate::{
+  builtins::util::{AsDefFunction, FunctionLike, FunctionLikeHosted},
+  net::net_to_hvmc::net_to_hvmc,
+  readback_hvmc,
+  term::{
+    term_to_net::{term_to_compat_net, Labels},
+    AdtEncoding, Book, Term,
+  },
+};
 use hvmc::{
   ast, dispatch_dyn_net,
   host::Host,
   run::{LabSet, Port, Trg, Wire},
   stdlib::{ArcDef, HostedDef},
 };
-use term_to_net::term_to_compat_net;
-
-use crate::{
-  builtins::util::{AsDefFunction, FunctionLike, FunctionLikeHosted},
-  net::net_to_hvmc::net_to_hvmc,
-  readback_hvmc,
-  term::{
-    term_to_net::{self, Labels},
-    AdtEncoding, Book, Term,
-  },
-};
+use parking_lot::Mutex;
+use std::sync::Arc;
 
 #[derive(Clone)]
 struct ReadbackData {
@@ -102,7 +100,7 @@ pub(crate) fn add_fs_defs(
                   // Return λx (x result)
                   let app = net.create_node(hvmc::run::Tag::Ctr, 0);
                   let lam = net.create_node(hvmc::run::Tag::Ctr, 0);
-                  host.lock().unwrap().encode_net(net, Trg::port(app.p1), &result);
+                  host.lock().encode_net(net, Trg::port(app.p1), &result);
                   net.link_port_port(app.p0, lam.p1);
                   net.link_port_port(app.p2, lam.p2);
 
@@ -135,7 +133,7 @@ pub(crate) fn add_fs_defs(
         let mut labels = (*self.readback_data.labels).clone();
         let result = term_to_compat_net(&result, &mut labels);
         if let Ok(result) = net_to_hvmc(&result) {
-          self.readback_data.host.lock().unwrap().encode_net(net, Trg::port(app.p1), &result);
+          self.readback_data.host.lock().encode_net(net, Trg::port(app.p1), &result);
         } else {
           eprintln!("{VICIOUS_CIRCLE_MSG}");
           net.link_port_port(Port::ERA, app.p1);
@@ -146,13 +144,13 @@ pub(crate) fn add_fs_defs(
     }
   }
   let readback_data = ReadbackData { book, host: host.clone(), labels, adt_encoding };
-  host.lock().unwrap().insert_def("HVM.store", unsafe {
+  host.lock().insert_def("HVM.store", unsafe {
     HostedDef::new_hosted(
       LabSet::ALL,
       FunctionLikeHosted(Fs0 { readback_data: readback_data.clone(), save: true }),
     )
   });
-  host.lock().unwrap().insert_def("HVM.load", unsafe {
+  host.lock().insert_def("HVM.load", unsafe {
     HostedDef::new_hosted(
       LabSet::ALL,
       FunctionLikeHosted(Fs0 { readback_data: readback_data.clone(), save: false }),

@@ -1,10 +1,4 @@
-use std::{
-  str::FromStr,
-  sync::{Arc, Mutex},
-};
-
-use hvmc::{ast, host::Host, stdlib::LogDef};
-
+use self::query::make_query_def;
 use crate::{
   readback_hvmc,
   term::{
@@ -13,8 +7,9 @@ use crate::{
     AdtEncoding, Book, Term,
   },
 };
-
-use self::query::make_query_def;
+use hvmc::{ast, host::Host, stdlib::LogDef};
+use parking_lot::Mutex;
+use std::{str::FromStr, sync::Arc};
 
 pub mod exit;
 pub mod fs;
@@ -35,7 +30,7 @@ pub const CORE_BUILTINS_USES: [&[&str]; 7] =
 /// data needs access to the book.
 pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncoding) -> Arc<Mutex<Host>> {
   let host = Arc::new(Mutex::new(Host::default()));
-  host.lock().unwrap().insert_def("HVM.log", unsafe {
+  host.lock().insert_def("HVM.log", unsafe {
     LogDef::new(host.clone(), {
       let book = book.clone();
       let labels = labels.clone();
@@ -46,7 +41,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
       }
     })
   });
-  host.lock().unwrap().insert_def("HVM.print", unsafe {
+  host.lock().insert_def("HVM.print", unsafe {
     LogDef::new(host.clone(), {
       let book = book.clone();
       let labels = labels.clone();
@@ -59,11 +54,11 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
       }
     })
   });
-  host.lock().unwrap().insert_def("HVM.query", make_query_def(host.clone(), labels.clone()));
+  host.lock().insert_def("HVM.query", make_query_def(host.clone(), labels.clone()));
   fs::add_fs_defs(book.clone(), host.clone(), labels.clone(), adt_encoding);
   exit::add_exit_def(host.clone());
   let book = ast::Book::from_str("@HVM.black_box = (x x)").unwrap();
-  host.lock().unwrap().insert_book(&book);
+  host.lock().insert_book(&book);
 
   host
 }

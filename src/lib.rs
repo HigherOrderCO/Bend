@@ -14,10 +14,8 @@ use hvmc_net::{
   pre_reduce::{pre_reduce, MAX_REWRITES_DEFAULT},
 };
 use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
-use std::{
-  sync::{Arc, Mutex},
-  time::Instant,
-};
+use parking_lot::Mutex;
+use std::{sync::Arc, time::Instant};
 use term::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term};
 
 pub mod builtins;
@@ -181,7 +179,7 @@ pub fn run_book(
   let debug_hook = run_opts.debug_hook(&book, &labels);
 
   let host = create_host(book.clone(), labels.clone(), compile_opts.adt_encoding);
-  host.lock().unwrap().insert_book(&core_book);
+  host.lock().insert_book(&core_book);
 
   let (res_lnet, stats) = run_compiled(host, max_memory, run_opts, debug_hook, book.hvmc_entrypoint());
 
@@ -223,7 +221,7 @@ pub fn run_compiled(
   let mut root = DynNet::new(&heap, run_opts.lazy_mode);
   let max_rwts = run_opts.max_rewrites.map(|x| x.clamp(usize::MIN, usize::MAX));
   dispatch_dyn_net!(&mut root => {
-    root.boot(host.lock().unwrap().defs.get(entrypoint).expect("No main function."));
+    root.boot(host.lock().defs.get(entrypoint).expect("No main function."));
 
     let start_time = Instant::now();
 
@@ -245,7 +243,7 @@ pub fn run_compiled(
 
     let elapsed = start_time.elapsed().as_secs_f64();
 
-    let net = host.lock().unwrap().readback(root);
+    let net = host.lock().readback(root);
 
     let stats = RunStats { rewrites: root.rwts, used: count_nodes(&net), run_time: elapsed };
     (net, stats)
@@ -282,7 +280,7 @@ fn normal_lazy_debug<M: hvmc::run::Mode>(
   while let Some(prev) = visit.pop() {
     let next = root.weak_normal(prev, root.root.clone());
 
-    let readback = host.lock().unwrap().readback(root);
+    let readback = host.lock().readback(root);
     hook(&readback);
 
     if next.is_full_node() {
@@ -298,7 +296,7 @@ fn normal_strict_debug<M: hvmc::run::Mode>(
   root: &mut hvmc::run::Net<M>,
 ) {
   while !root.redexes.is_empty() {
-    let readback = host.lock().unwrap().readback(root);
+    let readback = host.lock().readback(root);
     hook(&readback);
     root.reduce(1);
   }
