@@ -341,7 +341,7 @@ impl RunOpts {
         let res_term = net_to_term(&net, book, labels, self.linear, &mut diags);
         eprint!("{diags}");
         if self.pretty {
-          println!("{}\n---------------------------------------", res_term.pretty(0));
+          println!("{}\n---------------------------------------", res_term.display_pretty(0));
         } else {
           println!("{}\n---------------------------------------", res_term);
         }

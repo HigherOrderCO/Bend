@@ -379,7 +379,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
       eprint!("{diagnostics}");
       if pretty {
-        println!("{}", res_term.pretty(0))
+        println!("{}", res_term.display_pretty(0))
       } else {
         println!("{}", res_term);
       }
