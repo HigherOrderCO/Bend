@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/run_pretty.hvm
+---
+λ* λa switch a {
+  0: λb switch b {
+    0: "ba"
+    _: "ta"
+  }
+  _: λ* "ata"
+}
