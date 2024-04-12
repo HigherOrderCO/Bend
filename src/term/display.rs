@@ -206,114 +206,120 @@ fn var_as_str(nam: &Option<Name>) -> &str {
 
 impl Term {
   pub fn display_pretty(&self, tab: usize) -> impl fmt::Display + '_ {
-    DisplayFn(move |f| match self {
-      Term::Lam { tag, nam, bod } => {
-        write!(f, "{}λ{} {}", tag.display_padded(), var_as_str(nam), bod.display_pretty(tab))
-      }
+    maybe_grow(|| {
+      DisplayFn(move |f| match self {
+        Term::Lam { tag, nam, bod } => {
+          write!(f, "{}λ{} {}", tag.display_padded(), var_as_str(nam), bod.display_pretty(tab))
+        }
 
-      Term::Var { nam } => write!(f, "{nam}"),
+        Term::Var { nam } => write!(f, "{nam}"),
 
-      Term::Chn { tag, nam, bod } => {
-        write!(f, "{}λ${} {}", tag, var_as_str(nam), bod.display_pretty(tab))
-      }
+        Term::Chn { tag, nam, bod } => {
+          write!(f, "{}λ${} {}", tag, var_as_str(nam), bod.display_pretty(tab))
+        }
 
-      Term::Lnk { nam } => write!(f, "${nam}"),
+        Term::Lnk { nam } => write!(f, "${nam}"),
 
-      Term::Let { nam, val, nxt } => {
-        write!(f, "let {} = {};\n{}", var_as_str(nam), val.display_pretty(tab), nxt.display_pretty(tab))
-      }
+        Term::Let { nam, val, nxt } => {
+          write!(f, "let {} = {};\n{}", var_as_str(nam), val.display_pretty(tab), nxt.display_pretty(tab))
+        }
 
-      Term::Use { nam, val, nxt } => {
-        write!(f, "use {} = {};\n{}", var_as_str(nam), val.display_pretty(tab), nxt.display_pretty(tab))
-      }
+        Term::Use { nam, val, nxt } => {
+          write!(f, "use {} = {};\n{}", var_as_str(nam), val.display_pretty(tab), nxt.display_pretty(tab))
+        }
 
-      Term::App { tag, fun, arg } => {
-        write!(f, "{}({} {})", tag.display_padded(), fun.display_pretty(tab), arg.display_pretty(tab))
-      }
+        Term::App { tag, fun, arg } => {
+          write!(f, "{}({} {})", tag.display_padded(), fun.display_pretty(tab), arg.display_pretty(tab))
+        }
 
-      Term::Ltp { bnd, val, nxt } => {
-        write!(
-          f,
-          "let ({}) = {};\n{}",
-          DisplayJoin(|| bnd.iter().map(var_as_str), ", "),
-          val.display_pretty(tab),
-          nxt.display_pretty(tab),
-        )
-      }
-
-      Term::Tup { els } => write!(f, "({})", DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), " ")),
-
-      Term::Dup { tag, bnd, val, nxt } => {
-        write!(
-          f,
-          "let {}{{{}}} = {};\n{}",
-          tag.display_padded(),
-          DisplayJoin(|| bnd.iter().map(var_as_str), " "),
-          val.display_pretty(tab),
-          nxt.display_pretty(tab),
-        )
-      }
-
-      Term::Sup { tag, els } => {
-        write!(
-          f,
-          "{}{{{}}}",
-          tag.display_padded(),
-          DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), " ")
-        )
-      }
-
-      Term::Lst { els } => write!(f, "[{}]", DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), " ")),
-
-      Term::Opx { opr, fst, snd } => {
-        write!(f, "({} {} {})", opr, fst.display_pretty(tab), snd.display_pretty(tab))
-      }
-
-      Term::Mat { arg, with, rules } => {
-        let with: Box<dyn std::fmt::Display> = if with.is_empty() {
-          Box::new(DisplayFn(|f| write!(f, "")))
-        } else {
-          Box::new(DisplayFn(|f| {
-            write!(f, "with {}", DisplayJoin(|| with.iter().map(|e| e.to_string()), ", "))
-          }))
-        };
-        writeln!(f, "match {} {}{{", arg.display_pretty(tab), with)?;
-        for rule in rules {
-          writeln!(
+        Term::Ltp { bnd, val, nxt } => {
+          write!(
             f,
-            "{:tab$}{}: {}",
-            "",
-            var_as_str(&rule.0),
-            rule.2.display_pretty(tab + 2),
-            tab = tab + 2
-          )?;
+            "let ({}) = {};\n{}",
+            DisplayJoin(|| bnd.iter().map(var_as_str), ", "),
+            val.display_pretty(tab),
+            nxt.display_pretty(tab),
+          )
         }
-        write!(f, "{:tab$}}}", "")?;
-        Ok(())
-      }
 
-      Term::Swt { arg, with, rules } => {
-        let with: Box<dyn std::fmt::Display> = if with.is_empty() {
-          Box::new(DisplayFn(|f| write!(f, "")))
-        } else {
-          Box::new(DisplayFn(|f| {
-            write!(f, "with {}", DisplayJoin(|| with.iter().map(|e| e.to_string()), ", "))
-          }))
-        };
-        writeln!(f, "switch {} {}{{", arg.display_pretty(tab), with)?;
-        for rule in rules {
-          writeln!(f, "{:tab$}{}: {}", "", rule.0, rule.1.display_pretty(tab + 2), tab = tab + 2)?;
+        Term::Tup { els } => {
+          write!(f, "({})", DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), " "))
         }
-        write!(f, "{:tab$}}}", "")?;
-        Ok(())
-      }
 
-      Term::Nat { val } => write!(f, "#{val}"),
-      Term::Num { val } => write!(f, "{val}"),
-      Term::Str { val } => write!(f, "{val:?}"),
-      Term::Ref { nam } => write!(f, "{nam}"),
-      Term::Era => write!(f, "*"),
-      Term::Err => write!(f, "<Error>"),
+        Term::Dup { tag, bnd, val, nxt } => {
+          write!(
+            f,
+            "let {}{{{}}} = {};\n{}",
+            tag.display_padded(),
+            DisplayJoin(|| bnd.iter().map(var_as_str), " "),
+            val.display_pretty(tab),
+            nxt.display_pretty(tab),
+          )
+        }
+
+        Term::Sup { tag, els } => {
+          write!(
+            f,
+            "{}{{{}}}",
+            tag.display_padded(),
+            DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), " ")
+          )
+        }
+
+        Term::Lst { els } => {
+          write!(f, "[{}]", DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), " "))
+        }
+
+        Term::Opx { opr, fst, snd } => {
+          write!(f, "({} {} {})", opr, fst.display_pretty(tab), snd.display_pretty(tab))
+        }
+
+        Term::Mat { arg, with, rules } => {
+          let with: Box<dyn std::fmt::Display> = if with.is_empty() {
+            Box::new(DisplayFn(|f| write!(f, "")))
+          } else {
+            Box::new(DisplayFn(|f| {
+              write!(f, "with {}", DisplayJoin(|| with.iter().map(|e| e.to_string()), ", "))
+            }))
+          };
+          writeln!(f, "match {} {}{{", arg.display_pretty(tab), with)?;
+          for rule in rules {
+            writeln!(
+              f,
+              "{:tab$}{}: {}",
+              "",
+              var_as_str(&rule.0),
+              rule.2.display_pretty(tab + 2),
+              tab = tab + 2
+            )?;
+          }
+          write!(f, "{:tab$}}}", "")?;
+          Ok(())
+        }
+
+        Term::Swt { arg, with, rules } => {
+          let with: Box<dyn std::fmt::Display> = if with.is_empty() {
+            Box::new(DisplayFn(|f| write!(f, "")))
+          } else {
+            Box::new(DisplayFn(|f| {
+              write!(f, "with {}", DisplayJoin(|| with.iter().map(|e| e.to_string()), ", "))
+            }))
+          };
+          writeln!(f, "switch {} {}{{", arg.display_pretty(tab), with)?;
+          for rule in rules {
+            writeln!(f, "{:tab$}{}: {}", "", rule.0, rule.1.display_pretty(tab + 2), tab = tab + 2)?;
+          }
+          write!(f, "{:tab$}}}", "")?;
+          Ok(())
+        }
+
+        Term::Nat { val } => write!(f, "#{val}"),
+        Term::Num { val } => write!(f, "{val}"),
+        Term::Str { val } => write!(f, "{val:?}"),
+        Term::Ref { nam } => write!(f, "{nam}"),
+        Term::Era => write!(f, "*"),
+        Term::Err => write!(f, "<Error>"),
+      })
     })
   }
 }
