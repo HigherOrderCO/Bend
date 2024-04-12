@@ -384,7 +384,6 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
         println!("{}", res_term);
       }
 
-
       if arg_stats {
         println!("\nRWTS   : {}", total_rewrites);
         println!("- ANNI : {}", stats.rewrites.anni);
