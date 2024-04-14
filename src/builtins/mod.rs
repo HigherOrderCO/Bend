@@ -36,6 +36,7 @@ pub fn create_host(book: Arc<Book>, labels: Arc<Labels>, adt_encoding: AdtEncodi
       let labels = labels.clone();
       move |tree| {
         let net = hvmc::ast::Net { root: tree, redexes: vec![] };
+        if net == hvmc::ast::Net::default() { return }
         let (term, errs) = readback_hvmc(&net, &book, &labels, false, adt_encoding);
         println!("{}{}", errs.display_with_severity(crate::diagnostics::Severity::Error), term);
       }
