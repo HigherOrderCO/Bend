@@ -1,15 +1,12 @@
 use crate::{
   maybe_grow,
   term::{
-    display::DisplayFn, Adt, Book, Definition, IntOp, MatchRule, Name, NumCtr, Op, OpType, Pattern, Rule,
-    SwitchRule, Tag, Term,
+    display::DisplayFn, Adt, Book, Definition, IntOp, MatchRule, Name, Op, OpType, Pattern, Rule, Tag, Term,
+    STRINGS,
   },
 };
 use highlight_error::highlight_error;
-use interner::global::GlobalPool;
 use TSPL::Parser;
-
-pub static STRINGS: GlobalPool<String> = GlobalPool::new();
 
 // hvml grammar description:
 // <Book>       ::= (<Data> | <Rule>)*
@@ -32,9 +29,9 @@ pub static STRINGS: GlobalPool<String> = GlobalPool::new();
 // <List>       ::= "[" (<Term> ","?)* "]"
 // <String>     ::= "\"" (escape sequence | [^"])* "\""
 // <Char>       ::= "'" (escape sequence | [^']) "'"
-// <Match>      ::= "match" (<Term> | <Name> "=" <Term>) ("with" <Var> (","? <Var>)*)? "{" <MatchArm>+ "}"
+// <Match>      ::= "match" <Name> ("=" <Term>)? ("with" <Var> (","? <Var>)*)? "{" <MatchArm>+ "}"
 // <MatchArm>   ::= "|"? <Pattern> ":" <Term> ";"?
-// <Switch>     ::= "match" (<Term> | <Name> "=" <Term>) ("with" <Var> (","? <Var>)*)? "{" <SwitchArm>+ "}"
+// <Switch>     ::= "switch" <Name> ("=" <Term>)? ("with" <Var> (","? <Var>)*)? "{" <SwitchArm>+ "}"
 // <SwitchArm>  ::= "|"? (<Num>|"_") ":" <Term> ";"?
 // <Var>        ::= <Name>
 // <UnscopedVar>::= "$" <Name>
@@ -172,7 +169,7 @@ impl<'a> TermParser<'a> {
           Pattern::Num(char as u64)
         }
         // Number
-        c if c.is_numeric() => {
+        c if c.is_ascii_digit() => {
           let num = self.parse_u64()?;
           Pattern::Num(num)
         }
@@ -261,7 +258,7 @@ impl<'a> TermParser<'a> {
         '#' => {
           let Some(head) = self.peek_many(2) else { return self.expected("tagged term or nat") };
           let head = head.chars().collect::<Vec<_>>();
-          if head[1].is_numeric() {
+          if head[1].is_ascii_digit() {
             // Nat
             self.consume("#")?;
             let val = self.parse_u64()?;
@@ -301,7 +298,7 @@ impl<'a> TermParser<'a> {
           Term::Num { val: chr as u64 }
         }
         // Native num
-        c if c.is_numeric() => {
+        c if c.is_ascii_digit() => {
           let val = self.parse_u64()?;
           Term::Num { val }
         }
@@ -358,79 +355,12 @@ impl<'a> TermParser<'a> {
             }
           } else if self.try_consume("match") {
             // match
-            let arg_ini_idx = *self.index();
-            let mut arg = self.parse_term()?;
-            let arg_end_idx = *self.index();
-
-            let (bnd, arg) = if self.skip_starts_with("=") {
-              if let Term::Var { nam } = &mut arg {
-                self.consume("=")?;
-                let term = self.parse_term()?;
-                (Some(std::mem::take(nam)), term)
-              } else {
-                return self.expected_spanned("var", arg_ini_idx, arg_end_idx);
-              }
-            } else {
-              (None, arg)
-            };
-            let with = if self.try_consume("with") {
-              let mut with = vec![self.parse_hvml_name()?];
-              while !self.skip_starts_with("{") {
-                self.try_consume(",");
-                with.push(self.parse_hvml_name()?);
-              }
-              with
-            } else {
-              vec![]
-            };
+            let (bnd, arg, with) = self.parse_match_arg()?;
             let rules = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
-            if let Some(bnd) = bnd {
-              Term::Let {
-                nam: Some(bnd.clone()),
-                val: Box::new(arg),
-                nxt: Box::new(Term::Mat { arg: Box::new(Term::Var { nam: bnd }), with, rules }),
-              }
-            } else {
-              Term::Mat { arg: Box::new(arg), with, rules }
-            }
+            Term::Mat { arg: Box::new(arg), bnd: Some(bnd), with, arms: rules }
           } else if self.try_consume("switch") {
             // switch
-            let arg_ini_idx = *self.index();
-            let mut arg = self.parse_term()?;
-            let arg_end_idx = *self.index();
-
-            let (bnd, arg) = if self.skip_starts_with("=") {
-              if let Term::Var { nam } = &mut arg {
-                self.consume("=")?;
-                let term = self.parse_term()?;
-                (Some(std::mem::take(nam)), term)
-              } else {
-                return self.expected_spanned("var", arg_ini_idx, arg_end_idx);
-              }
-            } else {
-              (None, arg)
-            };
-            let with = if self.try_consume("with") {
-              let mut with = vec![self.parse_hvml_name()?];
-              while !self.skip_starts_with("{") {
-                self.try_consume(",");
-                with.push(self.parse_hvml_name()?);
-              }
-              with
-            } else {
-              vec![]
-            };
-            // TODO: we could enforce correct switches at the parser level to get a spanned error.
-            let rules = self.list_like(|p| p.parse_switch_arm(), "{", "}", ";", false, 1)?;
-            if let Some(bnd) = bnd {
-              Term::Let {
-                nam: Some(bnd.clone()),
-                val: Box::new(arg),
-                nxt: Box::new(Term::Swt { arg: Box::new(Term::Var { nam: bnd }), with, rules }),
-              }
-            } else {
-              Term::Swt { arg: Box::new(arg), with, rules }
-            }
+            self.parse_switch()?
           } else {
             // var
             let nam = self.labelled(|p| p.parse_hvml_name(), "term")?;
@@ -522,6 +452,22 @@ impl<'a> TermParser<'a> {
     Ok(Tag::Named(nam))
   }
 
+  fn parse_match_arg(&mut self) -> Result<(Name, Term, Vec<Name>), String> {
+    let bnd = self.parse_hvml_name()?;
+    let arg = if self.try_consume("=") { self.parse_term()? } else { Term::Var { nam: bnd.clone() } };
+    let with = if self.try_consume("with") {
+      let mut with = vec![self.parse_hvml_name()?];
+      while !self.skip_starts_with("{") {
+        self.try_consume(",");
+        with.push(self.parse_hvml_name()?);
+      }
+      with
+    } else {
+      vec![]
+    };
+    Ok((bnd, arg, with))
+  }
+
   fn parse_match_arm(&mut self) -> Result<MatchRule, String> {
     self.try_consume("|");
     let nam = self.parse_name_or_era()?;
@@ -530,23 +476,40 @@ impl<'a> TermParser<'a> {
     Ok((nam, vec![], bod))
   }
 
-  fn parse_switch_arm(&mut self) -> Result<SwitchRule, String> {
-    self.try_consume("|");
-    let Some(head) = self.skip_peek_one() else { return self.expected("switch pattern") };
-    let ctr = match head {
-      '_' => {
-        self.consume("_")?;
-        NumCtr::Succ(None)
-      }
-      c if c.is_numeric() => {
-        let val = self.parse_u64()?;
-        NumCtr::Num(val)
-      }
-      _ => return self.expected("switch pattern"),
-    };
-    self.consume(":")?;
-    let bod = self.parse_term()?;
-    Ok((ctr, bod))
+  fn parse_switch(&mut self) -> Result<Term, String> {
+    let (bnd, arg, with) = self.parse_match_arg()?;
+    self.consume("{")?;
+    let mut expected_num = 0;
+    let mut arms = vec![];
+    let mut to_continue = true;
+    while to_continue && !self.skip_starts_with("}") {
+      self.try_consume("|");
+      let Some(head) = self.skip_peek_one() else { return self.expected("switch pattern") };
+      match head {
+        '_' => {
+          if expected_num == 0 {
+            return self.expected("0");
+          } else {
+            self.consume("_")?;
+            to_continue = false;
+          }
+        }
+        c if c.is_ascii_digit() => {
+          let val = self.parse_u64()?;
+          if val != expected_num {
+            return self.expected(&expected_num.to_string());
+          }
+        }
+        _ => return self.expected("switch pattern"),
+      };
+      self.consume(":")?;
+      arms.push(self.parse_term()?);
+      self.try_consume(";");
+      expected_num += 1;
+    }
+    let pred = Some(Name::new(format!("{}-{}", bnd, arms.len() - 1)));
+    self.consume("}")?;
+    Ok(Term::Swt { arg: Box::new(arg), bnd: Some(bnd), with, pred, arms })
   }
 
   /* Utils */

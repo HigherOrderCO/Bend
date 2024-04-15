@@ -1,6 +1,6 @@
 use crate::{
   diagnostics::{Diagnostics, ToStringVerbose, WarningType},
-  term::{builtins, Adts, Constructors, Ctx, Definition, Name, NumCtr, Pattern, Rule, Term},
+  term::{builtins, Adts, Constructors, Ctx, Definition, Name, Pattern, Rule, Term},
 };
 use std::collections::{BTreeSet, HashSet};
 
@@ -99,15 +99,15 @@ fn fix_repeated_binds(rules: &mut [Rule]) -> Vec<DesugarMatchDefErr> {
 /// Linearizes all the arguments that are used in at least one of the bodies.
 fn simplify_rule_match(
   args: Vec<Name>,
-  mut rules: Vec<Rule>,
+  rules: Vec<Rule>,
   with: Vec<Name>,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, DesugarMatchDefErr> {
   if args.is_empty() {
-    Ok(std::mem::take(&mut rules[0].body))
+    Ok(rules.into_iter().next().unwrap().body)
   } else if rules[0].pats.iter().all(|p| p.is_wildcard()) {
-    Ok(irrefutable_fst_row_rule(args, std::mem::take(&mut rules[0])))
+    Ok(irrefutable_fst_row_rule(args, rules.into_iter().next().unwrap()))
   } else {
     let typ = Type::infer_from_def_arg(&rules, 0, ctrs)?;
     match typ {
@@ -239,8 +239,7 @@ fn num_rule(
   let arg = args[0].clone();
   let args = args.split_off(1);
 
-  let match_var = Name::new(format!("{arg}%matched"));
-  let pred_var = Name::new(format!("{arg}%matched-1"));
+  let pred_var = Name::new(format!("{arg}-1"));
 
   // Since numbers have infinite (2^60) constructors, they require special treatment.
   // We first iterate over each present number then get the default.
@@ -299,32 +298,21 @@ fn num_rule(
   let swt_with = with.into_iter().chain(args).collect::<Vec<_>>();
 
   let term = num_bodies.into_iter().enumerate().rfold(default_body, |term, (i, body)| {
-    let zero = (NumCtr::Num(0), body);
-    let succ = (NumCtr::Succ(Some(pred_var.clone())), term);
-    let mut swt = Term::Swt {
-      arg: Box::new(Term::Var { nam: match_var.clone() }),
-      with: swt_with.clone(),
-      rules: vec![zero, succ],
-    };
-
     let val = if i > 0 {
-      // let %matched = (%matched-1 +1 +num_i-1 - num_i)
-      //  switch %matched { 0: body_i; _: acc }
+      //  switch arg = (pred +1 +num_i-1 - num_i) { 0: body_i; _: acc }
       // nums[i] >= nums[i-1]+1, so we do a sub here.
       Term::sub_num(Term::Var { nam: pred_var.clone() }, nums[i] - 1 - nums[i - 1])
     } else {
-      // let %matched = (arg -num_0);
-      //  switch %matched { 0: body_0; _: acc}
+      //  switch arg = (arg -num_0) { 0: body_0; _: acc}
       Term::sub_num(Term::Var { nam: arg.clone() }, nums[i])
     };
 
-    if let Term::Var { .. } = &val {
-      // No need to create a let expression if it's just a rename.
-      // We know that the bound value is a uniquely named var, so we can subst.
-      swt.subst(&match_var, &val);
-      swt
-    } else {
-      Term::Let { nam: Some(match_var.clone()), val: Box::new(val), nxt: Box::new(swt) }
+    Term::Swt {
+      arg: Box::new(val),
+      bnd: Some(arg.clone()),
+      with: swt_with.clone(),
+      pred: Some(pred_var.clone()),
+      arms: vec![body, term],
     }
   });
 
@@ -443,7 +431,12 @@ fn switch_rule(
   // Linearize previously matched vars and current args.
   let mat_with = with.into_iter().chain(old_args).collect::<Vec<_>>();
 
-  let term = Term::Mat { arg: Box::new(Term::Var { nam: arg }), with: mat_with, rules: new_arms };
+  let term = Term::Mat {
+    arg: Box::new(Term::Var { nam: arg.clone() }),
+    bnd: Some(arg.clone()),
+    with: mat_with,
+    arms: new_arms,
+  };
   Ok(term)
 }
 

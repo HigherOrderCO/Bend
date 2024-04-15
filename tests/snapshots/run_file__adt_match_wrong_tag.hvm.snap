@@ -7,11 +7,11 @@ Warnings:
 During readback:
   Unexpected tag found during Adt readback, expected '#Option', but found '#wrong_tag'.
 
-λa match a { Some: #Option (#wrong_tag λb b a.val); None: * }
+λa match a = a { Some: #Option (#wrong_tag λb b a.val); None: * }
 
 Strict mode:
 Warnings:
 During readback:
   Unexpected tag found during Adt readback, expected '#Option', but found '#wrong_tag'.
 
-λa match a { Some: #Option (#wrong_tag λb b a.val); None: * }
+λa match a = a { Some: #Option (#wrong_tag λb b a.val); None: * }

@@ -5,7 +5,7 @@ use crate::{
     NodeKind::{self, *},
     Port, ROOT,
   },
-  term::{Book, Name, NumCtr, Tag, Term},
+  term::{Book, Name, Tag, Term},
 };
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -43,8 +43,8 @@ pub fn term_to_compat_net(term: &Term, labels: &mut Labels) -> INet {
 
   let main = state.encode_term(term, ROOT);
 
-  for (decl_port, use_port) in std::mem::take(&mut state.global_vars).into_values() {
-    state.inet.link(decl_port, use_port);
+  for (decl_port, use_port) in state.global_vars.values() {
+    state.inet.link(*decl_port, *use_port);
   }
   if Some(ROOT) != main {
     state.link_local(ROOT, main);
@@ -114,20 +114,18 @@ impl EncodeTermState<'_> {
         }
         Term::Mat { .. } => unreachable!("Should've been desugared already"),
         // core: & arg ~ ?<(zero succ) ret>
-        Term::Swt { arg, with, rules } => {
+        Term::Swt { arg, bnd: _, with, pred: _, arms: rules } => {
           // At this point should be only num matches of 0 and succ.
           assert!(with.is_empty());
           assert!(rules.len() == 2);
-          assert!(matches!(rules[0].0, NumCtr::Num(0)));
-          assert!(matches!(rules[1].0, NumCtr::Succ(None)));
 
           let mat = self.inet.new_node(Mat);
 
           let arg = self.encode_term(arg, Port(mat, 0));
           self.link_local(Port(mat, 0), arg);
 
-          let zero = &rules[0].1;
-          let succ = &rules[1].1;
+          let zero = &rules[0];
+          let succ = &rules[1];
 
           let sel = self.inet.new_node(Con { lab: None });
           self.inet.link(Port(sel, 0), Port(mat, 1));

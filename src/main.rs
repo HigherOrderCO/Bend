@@ -116,6 +116,9 @@ enum Mode {
     #[command(flatten)]
     transform_opts: TransformOpts,
 
+    #[arg(short = 'p', help = "Debug and normalization pretty printing")]
+    pretty: bool,
+
     #[arg(short = 'L', help = "Lazy mode")]
     lazy_mode: bool,
 
@@ -328,7 +331,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       println!("{}", compile_res.core_book);
     }
 
-    Mode::Desugar { path, comp_opts, warn_opts, lazy_mode, transform_opts } => {
+    Mode::Desugar { path, comp_opts, warn_opts, pretty, lazy_mode, transform_opts } => {
       let diagnostics_cfg = set_warning_cfg_from_cli(
         if lazy_mode { DiagnosticsConfig::default_lazy() } else { DiagnosticsConfig::default_strict() },
         lazy_mode,
@@ -341,7 +344,11 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let diagnostics = desugar_book(&mut book, opts, diagnostics_cfg, None)?;
 
       eprint!("{diagnostics}");
-      println!("{book}");
+      if pretty {
+        println!("{}", book.display_pretty())
+      } else {
+        println!("{book}");
+      }
     }
 
     Mode::Run { lazy_mode, run_opts, pretty, comp_opts, transform_opts, warn_opts, arguments, path } => {

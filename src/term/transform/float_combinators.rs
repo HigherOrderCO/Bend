@@ -153,11 +153,11 @@ impl Term {
         args.push(app);
         FloatIter::App(args)
       }
-      Term::Mat { arg, with: _, rules } => {
-        FloatIter::Mat([arg.as_mut()].into_iter().chain(rules.iter_mut().map(|r| &mut r.2)))
+      Term::Mat { arg, bnd: _, with: _, arms } => {
+        FloatIter::Mat([arg.as_mut()].into_iter().chain(arms.iter_mut().map(|r| &mut r.2)))
       }
-      Term::Swt { arg, with: _, rules } => {
-        FloatIter::Swt([arg.as_mut()].into_iter().chain(rules.iter_mut().map(|r| &mut r.1)))
+      Term::Swt { arg, bnd: _, with: _, pred: _, arms } => {
+        FloatIter::Swt([arg.as_mut()].into_iter().chain(arms.iter_mut()))
       }
       Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => FloatIter::Vec(els),
       Term::Ltp { val: fst, nxt: snd, .. }
