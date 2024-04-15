@@ -75,6 +75,9 @@ enum Mode {
     #[arg(short = 'L', help = "Lazy mode")]
     lazy_mode: bool,
 
+    #[arg(short = 'p', help = "Debug and normalization pretty printing")]
+    pretty: bool,
+
     #[command(flatten)]
     run_opts: RunArgs,
 
@@ -341,7 +344,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       println!("{book}");
     }
 
-    Mode::Run { lazy_mode, run_opts, comp_opts, transform_opts, warn_opts, arguments, path } => {
+    Mode::Run { lazy_mode, run_opts, pretty, comp_opts, transform_opts, warn_opts, arguments, path } => {
       let RunArgs { max_memory, max_rewrites, debug, mut single_core, linear, arg_stats } = run_opts;
 
       let diagnostics_cfg =
@@ -360,7 +363,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
         compile_opts.check_for_strict();
       }
 
-      let run_opts = RunOpts { single_core, debug, linear, lazy_mode, max_memory, max_rewrites };
+      let run_opts = RunOpts { single_core, debug, linear, lazy_mode, max_memory, max_rewrites, pretty };
 
       let book = load_book(&path)?;
       let (res_term, RunInfo { stats, diagnostics, net, book: _, labels: _ }) =
@@ -375,7 +378,11 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       }
 
       eprint!("{diagnostics}");
-      println!("{res_term}");
+      if pretty {
+        println!("{}", res_term.display_pretty(0))
+      } else {
+        println!("{}", res_term);
+      }
 
       if arg_stats {
         println!("\nRWTS   : {}", total_rewrites);

@@ -325,6 +325,7 @@ pub struct RunOpts {
   pub lazy_mode: bool,
   pub max_memory: Option<usize>,
   pub max_rewrites: Option<usize>,
+  pub pretty: bool,
 }
 
 impl RunOpts {
@@ -339,7 +340,11 @@ impl RunOpts {
         let mut diags = Diagnostics::default();
         let res_term = net_to_term(&net, book, labels, self.linear, &mut diags);
         eprint!("{diags}");
-        println!("{}\n---------------------------------------", res_term);
+        if self.pretty {
+          println!("{}\n---------------------------------------", res_term.display_pretty(0));
+        } else {
+          println!("{}\n---------------------------------------", res_term);
+        }
       }
     })
   }
