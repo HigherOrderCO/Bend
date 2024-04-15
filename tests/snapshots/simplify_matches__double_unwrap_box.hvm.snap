@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/double_unwrap_box.hvm
 ---
-(DoubleUnbox) = λ%arg0 match %arg0 { Box: match %arg0.x { Box: λ%arg1 %arg0.x.x } }
+(DoubleUnbox) = λ%arg0 match %arg0 = %arg0 { Box: match %arg0.x = %arg0.x { Box: λ%arg1 %arg0.x.x } }
 
 (Main) = (DoubleUnbox (Box (Box 0)) 5)
 

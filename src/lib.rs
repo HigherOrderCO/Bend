@@ -121,7 +121,7 @@ pub fn desugar_book(
   // Auto match linearization
   match opts.linearize_matches {
     OptLevel::Disabled => (),
-    OptLevel::Enabled => ctx.book.linearize_match_lambdas(),
+    OptLevel::Enabled => ctx.book.linearize_match_binds(),
     OptLevel::Extra => ctx.book.linearize_matches(),
   }
   // Manual match linearization

@@ -1,17 +1,15 @@
 use crate::{
   diagnostics::{Diagnostics, ToStringVerbose, WarningType},
   maybe_grow,
-  term::{Adts, Constructors, Ctx, MatchRule, Name, NumCtr, Term},
+  term::{Adts, Constructors, Ctx, MatchRule, Name, Term},
 };
 use std::collections::HashMap;
 
 enum FixMatchErr {
   AdtMismatch { expected: Name, found: Name, ctr: Name },
   NonExhaustiveMatch { typ: Name, missing: Name },
-  NumMismatch { expected: NumCtr, found: NumCtr },
   IrrefutableMatch { var: Option<Name> },
   UnreachableMatchArms { var: Option<Name> },
-  ExtraSwitchArms,
   RedundantArm { ctr: Name },
 }
 
@@ -52,11 +50,9 @@ impl Ctx<'_> {
 
         for err in errs {
           match err {
-            FixMatchErr::ExtraSwitchArms { .. }
-            | FixMatchErr::AdtMismatch { .. }
-            | FixMatchErr::NumMismatch { .. }
-            | FixMatchErr::NonExhaustiveMatch { .. } => self.info.add_rule_error(err, def.name.clone()),
-
+            FixMatchErr::AdtMismatch { .. } | FixMatchErr::NonExhaustiveMatch { .. } => {
+              self.info.add_rule_error(err, def.name.clone())
+            }
             FixMatchErr::IrrefutableMatch { .. } => {
               self.info.add_rule_warning(err, WarningType::IrrefutableMatch, def.name.clone())
             }
@@ -87,8 +83,6 @@ impl Term {
 
       if let Term::Mat { .. } = self {
         self.fix_match(&mut errs, ctrs, adts);
-      } else if let Term::Swt { .. } = self {
-        self.fix_switch(&mut errs);
       }
 
       errs
@@ -96,9 +90,8 @@ impl Term {
   }
 
   fn fix_match(&mut self, errs: &mut Vec<FixMatchErr>, ctrs: &Constructors, adts: &Adts) {
-    let Term::Mat { arg, with: _, rules } = self else { unreachable!() };
-
-    let (arg_nam, arg) = extract_match_arg(arg);
+    let Term::Mat { arg: _, bnd, with: _, arms: rules } = self else { unreachable!() };
+    let bnd = bnd.clone().unwrap();
 
     // Normalize arms, making one arm for each constructor of the matched adt.
     if let Some(ctr_nam) = &rules[0].0
@@ -107,12 +100,12 @@ impl Term {
       let adt_ctrs = &adts[adt_nam].ctrs;
 
       // Decide which constructor corresponds to which arm of the match.
-      let mut bodies = fixed_match_arms(rules, &arg_nam, adt_nam, adt_ctrs.keys(), ctrs, adts, errs);
+      let mut bodies = fixed_match_arms(&bnd, rules, adt_nam, adt_ctrs.keys(), ctrs, adts, errs);
 
       // Build the match arms, with all constructors
       let mut new_rules = vec![];
       for (ctr, fields) in adt_ctrs.iter() {
-        let fields = fields.iter().map(|f| Some(match_field(&arg_nam, f))).collect::<Vec<_>>();
+        let fields = fields.iter().map(|f| Some(match_field(&bnd, f))).collect::<Vec<_>>();
         let body = if let Some(Some(body)) = bodies.remove(ctr) {
           body
         } else {
@@ -125,75 +118,12 @@ impl Term {
     } else {
       // First arm was not matching a constructor, convert into a use term.
       errs.push(FixMatchErr::IrrefutableMatch { var: rules[0].0.clone() });
-
       let match_var = rules[0].0.take();
       *self = std::mem::take(&mut rules[0].2);
       if let Some(var) = match_var {
-        self.subst(&var, &Term::Var { nam: arg_nam.clone() });
+        self.subst(&var, &Term::Var { nam: bnd.clone() });
       }
     }
-
-    *self = apply_arg(std::mem::take(self), arg_nam, arg);
-  }
-
-  /// For switches, the only necessary change is to add the implicit pred bind to the AST.
-  ///
-  /// Check that all numbers are in order and no cases are skipped.
-  /// Also check that we have a default case at the end, binding the pred.
-  fn fix_switch(&mut self, errs: &mut Vec<FixMatchErr>) {
-    let Term::Swt { arg, with: _, rules } = self else { unreachable!() };
-
-    let (arg_nam, arg) = extract_match_arg(arg);
-
-    let mut has_num = false;
-    let len = rules.len();
-    for i in 0 .. len {
-      let ctr = &mut rules[i].0;
-      match ctr {
-        NumCtr::Num(n) if i as u64 == *n => {
-          has_num = true;
-        }
-        NumCtr::Num(n) => {
-          errs.push(FixMatchErr::NumMismatch { expected: NumCtr::Num(i as u64), found: NumCtr::Num(*n) });
-          break;
-        }
-        NumCtr::Succ(pred) => {
-          if !has_num {
-            errs.push(FixMatchErr::NumMismatch {
-              expected: NumCtr::Num(i as u64),
-              found: NumCtr::Succ(pred.clone()),
-            });
-            break;
-          }
-          *pred = Some(Name::new(format!("{arg_nam}-{i}")));
-          if i != len - 1 {
-            errs.push(FixMatchErr::ExtraSwitchArms);
-            rules.truncate(i + 1);
-            break;
-          }
-        }
-      }
-    }
-
-    *self = apply_arg(std::mem::take(self), arg_nam, arg);
-  }
-}
-
-fn extract_match_arg(arg: &mut Term) -> (Name, Option<Term>) {
-  if let Term::Var { nam } = arg {
-    (nam.clone(), None)
-  } else {
-    let nam = Name::new("%matched");
-    let arg = std::mem::replace(arg, Term::Var { nam: nam.clone() });
-    (nam, Some(arg))
-  }
-}
-
-fn apply_arg(term: Term, arg_nam: Name, arg: Option<Term>) -> Term {
-  if let Some(arg) = arg {
-    Term::Let { nam: Some(arg_nam), val: Box::new(arg), nxt: Box::new(term) }
-  } else {
-    term
   }
 }
 
@@ -203,8 +133,8 @@ fn apply_arg(term: Term, arg_nam: Name, arg: Option<Term>) -> Term {
 /// If no rules match a certain constructor, return None in the map,
 /// indicating a non-exhaustive match.
 fn fixed_match_arms<'a>(
+  bnd: &Name,
   rules: &mut Vec<MatchRule>,
-  arg_nam: &Name,
   adt_nam: &Name,
   adt_ctrs: impl Iterator<Item = &'a Name>,
   ctrs: &Constructors,
@@ -238,7 +168,7 @@ fn fixed_match_arms<'a>(
         if body.is_none() {
           let mut new_body = rules[rule_idx].2.clone();
           if let Some(var) = &rules[rule_idx].0 {
-            new_body.subst(var, &rebuild_ctr(arg_nam, ctr, &adts[adt_nam].ctrs[&**ctr]));
+            new_body.subst(var, &rebuild_ctr(bnd, ctr, &adts[adt_nam].ctrs[&**ctr]));
           }
           *body = Some(new_body);
         }
@@ -273,11 +203,6 @@ impl ToStringVerbose for FixMatchErr {
       FixMatchErr::NonExhaustiveMatch { typ, missing } => {
         format!("Non-exhaustive 'match' expression of type '{typ}'. Case '{missing}' not covered.")
       }
-      FixMatchErr::NumMismatch { expected, found } => {
-        format!(
-          "Malformed 'switch' expression. Expected case '{expected}', found '{found}'. Switch expressions must go from 0 to the desired value without skipping any cases and ending with the default case."
-        )
-      }
       FixMatchErr::IrrefutableMatch { var } => format!(
         "Irrefutable 'match' expression. All cases after '{}' will be ignored. If this is not a mistake, consider using a 'let' expression instead.",
         var.as_ref().unwrap_or(&Name::new("*"))
@@ -286,9 +211,6 @@ impl ToStringVerbose for FixMatchErr {
         "Unreachable arms in 'match' expression. All cases after '{}' will be ignored.",
         var.as_ref().unwrap_or(&Name::new("*"))
       ),
-      FixMatchErr::ExtraSwitchArms => {
-        "Extra arms in 'switch' expression. No rules should come after the default.".to_string()
-      }
       FixMatchErr::RedundantArm { ctr } => {
         format!("Redundant arm in 'match' expression. Case '{ctr}' appears more than once.")
       }

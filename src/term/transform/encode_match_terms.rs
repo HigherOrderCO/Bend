@@ -1,6 +1,6 @@
 use crate::{
   maybe_grow,
-  term::{AdtEncoding, Book, Constructors, MatchRule, Name, NumCtr, SwitchRule, Tag, Term},
+  term::{AdtEncoding, Adts, Book, Constructors, MatchRule, Name, Tag, Term},
 };
 
 impl Book {
@@ -15,36 +15,55 @@ impl Book {
   pub fn encode_matches(&mut self, adt_encoding: AdtEncoding) {
     for def in self.defs.values_mut() {
       for rule in &mut def.rules {
-        rule.body.encode_matches(&self.ctrs, adt_encoding);
+        rule.body.encode_matches(&self.ctrs, &self.adts, adt_encoding);
       }
     }
   }
 }
 
 impl Term {
-  pub fn encode_matches(&mut self, ctrs: &Constructors, adt_encoding: AdtEncoding) {
+  pub fn encode_matches(&mut self, ctrs: &Constructors, adts: &Adts, adt_encoding: AdtEncoding) {
     maybe_grow(|| {
       for child in self.children_mut() {
-        child.encode_matches(ctrs, adt_encoding)
+        child.encode_matches(ctrs, adts, adt_encoding)
       }
 
-      if let Term::Mat { arg, with, rules } = self {
+      if let Term::Mat { arg, bnd, with, arms: rules } = self {
         assert!(with.is_empty());
+        let bnd = std::mem::take(bnd).unwrap();
         let arg = std::mem::take(arg.as_mut());
         let rules = std::mem::take(rules);
-        *self = encode_match(arg, rules, ctrs, adt_encoding);
-      } else if let Term::Swt { arg, with, rules } = self {
+        *self = encode_match(bnd, arg, rules, ctrs, adts, adt_encoding);
+      } else if let Term::Swt { arg, bnd, with, pred, arms: rules } = self {
         assert!(with.is_empty());
+        let bnd = std::mem::take(bnd).unwrap();
         let arg = std::mem::take(arg.as_mut());
+        let pred = std::mem::take(pred);
         let rules = std::mem::take(rules);
-        *self = encode_switch(arg, rules);
+        *self = encode_switch(bnd, arg, pred, rules);
       }
     })
   }
 }
 
-fn encode_match(arg: Term, rules: Vec<MatchRule>, ctrs: &Constructors, adt_encoding: AdtEncoding) -> Term {
-  let adt = ctrs.get(rules[0].0.as_ref().unwrap()).unwrap();
+fn encode_match(
+  bnd: Name,
+  arg: Term,
+  mut rules: Vec<MatchRule>,
+  ctrs: &Constructors,
+  adts: &Adts,
+  adt_encoding: AdtEncoding,
+) -> Term {
+  let adt_nam = ctrs.get(rules[0].0.as_ref().unwrap()).unwrap();
+
+  // Add a `use` term reconstructing the matched variable to each arm.
+  for rule in rules.iter_mut() {
+    let ctr = rule.0.clone().unwrap();
+    let fields = adts[adt_nam].ctrs[&ctr].iter().map(|f| Term::Var { nam: Name::new(format!("{bnd}.{f}")) });
+    let orig = Term::call(Term::Ref { nam: ctr }, fields);
+    rule.2 =
+      Term::Use { nam: Some(bnd.clone()), val: Box::new(orig), nxt: Box::new(std::mem::take(&mut rule.2)) };
+  }
 
   // ADT Encoding depends on compiler option
   match adt_encoding {
@@ -62,96 +81,46 @@ fn encode_match(arg: Term, rules: Vec<MatchRule>, ctrs: &Constructors, adt_encod
       let mut arms = vec![];
       for rule in rules.into_iter() {
         let body =
-          rule.1.iter().cloned().rfold(rule.2, |bod, nam| Term::tagged_lam(Tag::adt_name(adt), nam, bod));
+          rule.1.iter().cloned().rfold(rule.2, |bod, nam| Term::tagged_lam(Tag::adt_name(adt_nam), nam, bod));
         arms.push(body);
       }
-      Term::tagged_call(Tag::adt_name(adt), arg, arms)
+      Term::tagged_call(Tag::adt_name(adt_nam), arg, arms)
     }
   }
 }
 
-/// Convert into a sequence of native matches, decrementing by 1 each match.
-/// match n {0: A; 1: B; 2+: (C n-2)} converted to
-/// match n {0: A; 1+: @%x match %x {0: B; 1+: @n-2 (C n-2)}}
-fn encode_switch(arg: Term, mut rules: Vec<SwitchRule>) -> Term {
-  let last_rule = rules.pop().unwrap();
-
-  let match_var = Name::new("%x");
-
-  // @n-2 (C n-2)
-  let NumCtr::Succ(last_var) = last_rule.0 else { unreachable!() };
-  let last_arm = Term::lam(last_var, last_rule.1);
-
-  rules.into_iter().rfold(last_arm, |term, rule| {
-    let zero = (NumCtr::Num(0), rule.1);
-    let one = (NumCtr::Succ(None), term);
-    let rules = vec![zero, one];
-
-    let NumCtr::Num(num) = rule.0 else { unreachable!() };
-    if num == 0 {
-      Term::Swt { arg: Box::new(arg.clone()), with: vec![], rules }
+/// Convert into a sequence of native switches, decrementing by 1 each switch.
+/// switch n {0: A; 1: B; _: (C n-2)} converted to
+/// switch n {0: A; _: @%x match %x {0: B; _: @n-2 (C n-2)}}
+fn encode_switch(bnd: Name, arg: Term, pred: Option<Name>, mut rules: Vec<Term>) -> Term {
+  // Add a `use` term reconstructing the matched variable to each arm.
+  let n_nums = rules.len() - 1;
+  for (i, rule) in rules.iter_mut().enumerate() {
+    let orig = if i != n_nums {
+      Term::Num { val: i as u64 }
     } else {
-      let swt = Term::Swt { arg: Box::new(Term::Var { nam: match_var.clone() }), with: vec![], rules };
+      Term::add_num(Term::Var { nam: pred.clone().unwrap() }, n_nums as u64)
+    };
+    *rule = Term::Use { nam: Some(bnd.clone()), val: Box::new(orig), nxt: Box::new(std::mem::take(rule)) };
+  }
+
+  // Create the cascade of switches
+  let match_var = Name::new("%x");
+  let (succ, nums) = rules.split_last_mut().unwrap();
+  let last_arm = Term::lam(pred, std::mem::take(succ));
+  nums.iter_mut().enumerate().rfold(last_arm, |term, (i, rule)| {
+    let arms = vec![std::mem::take(rule), term];
+    if i == 0 {
+      Term::Swt { arg: Box::new(arg.clone()), bnd: Some(bnd.clone()), with: vec![], pred: None, arms }
+    } else {
+      let swt = Term::Swt {
+        arg: Box::new(Term::Var { nam: match_var.clone() }),
+        bnd: Some(match_var.clone()),
+        with: vec![],
+        pred: None,
+        arms,
+      };
       Term::named_lam(match_var.clone(), swt)
     }
   })
 }
-
-/* /// Convert into a sequence of native matches on (- n num_case)
-/// match n {a: A; b: B; n: (C n)} converted to
-/// match (- n a) {0: A; 1+: @%p match (- %p b-a-1) { 0: B; 1+: @%p let n = (+ %p b+1); (C n)}}
-fn encode_num(arg: Term, mut rules: Vec<Rule>) -> Term {
-  fn go(
-    mut rules: impl Iterator<Item = Rule>,
-    last_rule: Rule,
-    prev_num: Option<u64>,
-    arg: Option<Term>,
-  ) -> Term {
-    let rule = rules.next();
-    match (prev_num, rule) {
-      // Num matches must have at least 2 rules (1 num and 1 var).
-      // The first rule can't also be the last.
-      (None, None) => unreachable!(),
-      // First match
-      // match (- n a) {0: A; 1+: ...}
-      (None, Some(rule)) => {
-        let Pattern::Num(NumCtr::Num(val)) = &rule.pats[0] else { unreachable!() };
-        Term::switch(
-          Term::sub_num(arg.unwrap(), *val),
-          rule.body,
-          go(rules, last_rule, Some(*val), None),
-          None,
-        )
-      }
-      // Middle match
-      // @%p match (- %p b-a-1) { 0: B; 1+: ... }
-      (Some(prev_num), Some(rule)) => {
-        let Pattern::Num(NumCtr::Num(val)) = &rule.pats[0] else { unreachable!() };
-        let pred_nam = Name::from("%p");
-        Term::named_lam(
-          pred_nam.clone(),
-          Term::switch(
-            Term::sub_num(Term::Var { nam: pred_nam }, val.wrapping_sub(prev_num).wrapping_sub(1)),
-            rule.body,
-            go(rules, last_rule, Some(*val), None),
-            None,
-          ),
-        )
-      }
-      // Last match
-      // @%p let n = (+ %p b+1); (C n)
-      (Some(prev_num), None) => {
-        let pred_nam = Name::from("%p");
-        Term::named_lam(pred_nam.clone(), Term::Let {
-          pat: last_rule.pats.into_iter().next().unwrap(),
-          val: Box::new(Term::add_num(Term::Var { nam: pred_nam }, prev_num.wrapping_add(1))),
-          nxt: Box::new(last_rule.body),
-        })
-      }
-    }
-  }
-
-  let last_rule = rules.pop().unwrap();
-  go(rules.into_iter(), last_rule, None, Some(arg))
-}
- */

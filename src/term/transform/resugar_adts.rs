@@ -268,13 +268,9 @@ impl Term {
     let arms = arms.into_iter().collect::<Vec<_>>();
 
     *self = if let Some(bind) = bind {
-      Term::Let {
-        nam: Some(arg.clone()),
-        val: Box::new(bind),
-        nxt: Box::new(Term::Mat { arg: Box::new(Term::Var { nam: arg }), with: vec![], rules: arms }),
-      }
+      Term::Mat { arg: Box::new(bind), bnd: Some(arg.clone()), with: vec![], arms }
     } else {
-      Term::Mat { arg: Box::new(Term::Var { nam: arg }), with: vec![], rules: arms }
+      Term::Mat { arg: Box::new(Term::Var { nam: arg.clone() }), bnd: Some(arg.clone()), with: vec![], arms }
     };
   }
 }

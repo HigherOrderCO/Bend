@@ -1,5 +1,5 @@
 Take_ n list =
-  switch (== n 0) {
+  switch _ = (== n 0) {
   | 0: (Take n list)
   | _: []
   }

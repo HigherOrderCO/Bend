@@ -1,4 +1,4 @@
-use super::{Book, Definition, Name, NumCtr, Pattern, Rule, Tag, Term};
+use super::{Book, Definition, Name, Pattern, Rule, Tag, Term};
 use crate::maybe_grow;
 use std::{fmt, ops::Deref};
 
@@ -62,7 +62,7 @@ impl fmt::Display for Term {
       Term::App { tag, fun, arg } => {
         write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag), arg)
       }
-      Term::Mat { arg, with, rules } => {
+      Term::Mat { arg, bnd, with, arms: rules } => {
         let with: Box<dyn std::fmt::Display> = if with.is_empty() {
           Box::new(display!(""))
         } else {
@@ -70,25 +70,28 @@ impl fmt::Display for Term {
         };
         write!(
           f,
-          "match {}{} {{ {} }}",
+          "match {} = {}{} {{ {} }}",
+          bnd.as_ref().unwrap(),
           arg,
           with,
           DisplayJoin(|| rules.iter().map(|rule| display!("{}: {}", var_as_str(&rule.0), rule.2)), "; "),
         )
       }
-      Term::Swt { arg, with, rules } => {
+      Term::Swt { arg, bnd, with, pred: _, arms } => {
         let with: Box<dyn std::fmt::Display> = if with.is_empty() {
           Box::new(display!(""))
         } else {
           Box::new(display!(" with {}", DisplayJoin(|| with, ", ")))
         };
-        write!(
-          f,
-          "switch {}{} {{ {} }}",
-          arg,
-          with,
-          DisplayJoin(|| rules.iter().map(|rule| display!("{}: {}", rule.0, rule.1)), "; "),
-        )
+        let arms = DisplayJoin(
+          || {
+            arms.iter().enumerate().map(|(i, rule)| {
+              display!("{}: {}", if i == arms.len() - 1 { "_".to_string() } else { i.to_string() }, rule)
+            })
+          },
+          "; ",
+        );
+        write!(f, "switch {} = {}{} {{ {} }}", bnd.as_ref().unwrap(), arg, with, arms)
       }
       Term::Ltp { bnd, val, nxt } => {
         write!(f, "let ({}) = {}; {}", DisplayJoin(|| bnd.iter().map(var_as_str), ", "), val, nxt)
@@ -160,15 +163,6 @@ impl fmt::Display for Definition {
 impl fmt::Display for Book {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     write!(f, "{}", DisplayJoin(|| self.defs.values(), "\n\n"))
-  }
-}
-
-impl fmt::Display for NumCtr {
-  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      NumCtr::Num(n) => write!(f, "{n}"),
-      NumCtr::Succ(_) => write!(f, "_"),
-    }
   }
 }
 

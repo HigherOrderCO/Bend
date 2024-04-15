@@ -114,7 +114,7 @@ impl Reader<'_> {
             if *sel_kind != (Con { lab: None }) {
               // TODO: Is there any case where we expect a different node type here on readback?
               self.error(ReadbackError::InvalidNumericMatch);
-              Term::switch(arg, Term::Era, Term::Era, None)
+              Term::switch(arg, self.namegen.unique(), Term::Err, Term::Err)
             } else {
               let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
               let mut succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
@@ -136,7 +136,7 @@ impl Reader<'_> {
                     bod.subst(nam, &Term::Var { nam: Name::new(format!("{arg}-1")) });
                   }
 
-                  let swt = Term::switch(Term::Var { nam: arg.clone() }, zero_term, *bod, nam);
+                  let swt = Term::switch(Term::Var { nam: arg.clone() }, arg.clone(), zero_term, *bod);
                   if let Some(bind) = bind {
                     Term::Let { nam: Some(arg), val: Box::new(bind), nxt: Box::new(swt) }
                   } else {
@@ -145,7 +145,7 @@ impl Reader<'_> {
                 }
                 _ => {
                   self.error(ReadbackError::InvalidNumericMatch);
-                  Term::switch(arg, zero_term, succ_term, None)
+                  Term::switch(arg, self.namegen.unique(), zero_term, succ_term)
                 }
               }
             }

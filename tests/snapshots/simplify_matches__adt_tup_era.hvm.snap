@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/adt_tup_era.hvm
 ---
-(Foo) = λ%arg0 match %arg0 { Pair: match %arg0.a { Pair: %arg0.a.a } }
+(Foo) = λ%arg0 match %arg0 = %arg0 { Pair: match %arg0.a = %arg0.a { Pair: %arg0.a.a } }
 
 (Main) = (Foo (Pair 1 5))
 
