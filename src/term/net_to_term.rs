@@ -25,6 +25,8 @@ pub fn net_to_term(
     namegen: Default::default(),
     seen: Default::default(),
     errors: Default::default(),
+    vars: Default::default(),
+    unsc_vars: Default::default(),
   };
 
   let mut term = reader.read_term(net.enter_port(ROOT));
@@ -47,6 +49,19 @@ pub fn net_to_term(
     debug_assert_eq!(result, None);
   }
 
+  fn switch_lam_to_chn(term: &mut Term, unsc: &HashSet<Name>) {
+    if let Term::Lam { tag, nam: Some(nam), bod } = term {
+      if unsc.contains(nam) {
+        *term = Term::Chn { tag: std::mem::take(tag), nam: Some(nam.clone()), bod: std::mem::take(bod) }
+      }
+    }
+    for child in term.children_mut() {
+      switch_lam_to_chn(child, unsc);
+    }
+  }
+
+  switch_lam_to_chn(&mut term, &reader.unsc_vars);
+
   reader.report_errors(diagnostics);
   term
 }
@@ -65,6 +80,8 @@ pub struct Reader<'a> {
   seen_fans: Scope,
   seen: HashSet<Port>,
   errors: Vec<ReadbackError>,
+  vars: HashSet<Name>,
+  unsc_vars: HashSet<Name>,
 }
 
 impl Reader<'_> {
@@ -88,11 +105,22 @@ impl Reader<'_> {
           // If we're visiting a port 0, then it is a lambda.
           0 => {
             let nam = self.namegen.decl_name(self.net, Port(node, 1));
+            if let Some(nam) = &nam {
+              self.vars.insert(nam.clone());
+            }
             let bod = self.read_term(self.net.enter_port(Port(node, 2)));
             Term::Lam { tag: self.labels.con.to_tag(*lab), nam, bod: Box::new(bod) }
           }
           // If we're visiting a port 1, then it is a variable.
-          1 => Term::Var { nam: self.namegen.var_name(next) },
+          1 => {
+            let nam = self.namegen.var_name(next);
+            if self.vars.contains(&nam) {
+              Term::Var { nam }
+            } else {
+              self.unsc_vars.insert(nam.clone());
+              Term::Lnk { nam }
+            }
+          }
           // If we're visiting a port 2, then it is an application.
           2 => {
             let fun = self.read_term(self.net.enter_port(Port(node, 0)));
