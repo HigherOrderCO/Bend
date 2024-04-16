@@ -487,16 +487,12 @@ impl Term {
     }
     for (child, binds) in self.children_with_binds() {
       let binds: Vec<_> = binds.collect();
-      for bind in binds.iter() {
-        if let Some(nam) = bind {
-          scope.push(nam.clone());
-        }
+      for bind in binds.iter().copied().flatten() {
+        scope.push(bind.clone());
       }
       child.collect_unscoped(unscoped, scope);
-      for bind in binds.into_iter() {
-        if let Some(_) = bind {
-          scope.pop();
-        }
+      for _bind in binds.into_iter().flatten() {
+        scope.pop();
       }
     }
   }
