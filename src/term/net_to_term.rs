@@ -25,8 +25,6 @@ pub fn net_to_term(
     namegen: Default::default(),
     seen: Default::default(),
     errors: Default::default(),
-    vars: Default::default(),
-    unscoped_vars: Default::default(),
   };
 
   let mut term = reader.read_term(net.enter_port(ROOT));
@@ -49,20 +47,13 @@ pub fn net_to_term(
     debug_assert_eq!(result, None);
   }
 
-  fn switch_lam_to_chn(term: &mut Term, unscoped_vars: &HashSet<Name>) {
-    if let Term::Lam { tag, nam: Some(nam), bod } = term {
-      if unscoped_vars.contains(nam) {
-        *term = Term::Chn { tag: std::mem::take(tag), nam: Some(nam.clone()), bod: std::mem::take(bod) }
-      }
-    }
-    for child in term.children_mut() {
-      switch_lam_to_chn(child, unscoped_vars);
-    }
-  }
-
-  switch_lam_to_chn(&mut term, &reader.unscoped_vars);
-
   reader.report_errors(diagnostics);
+
+  let mut unscoped = HashSet::new();
+  let mut scope = Vec::new();
+  term.collect_unscoped(&mut unscoped, &mut scope);
+  term.apply_unscoped(&unscoped);
+
   term
 }
 
@@ -80,8 +71,6 @@ pub struct Reader<'a> {
   seen_fans: Scope,
   seen: HashSet<Port>,
   errors: Vec<ReadbackError>,
-  vars: HashSet<Name>,
-  unscoped_vars: HashSet<Name>,
 }
 
 impl Reader<'_> {
@@ -105,24 +94,11 @@ impl Reader<'_> {
           // If we're visiting a port 0, then it is a lambda.
           0 => {
             let nam = self.namegen.decl_name(self.net, Port(node, 1));
-            if let Some(nam) = &nam {
-              if !self.unscoped_vars.contains(nam) {
-                self.vars.insert(nam.clone());
-              }
-            }
             let bod = self.read_term(self.net.enter_port(Port(node, 2)));
             Term::Lam { tag: self.labels.con.to_tag(*lab), nam, bod: Box::new(bod) }
           }
           // If we're visiting a port 1, then it is a variable.
-          1 => {
-            let nam = self.namegen.var_name(next);
-            if self.vars.contains(&nam) {
-              Term::Var { nam }
-            } else {
-              self.unscoped_vars.insert(nam.clone());
-              Term::Lnk { nam }
-            }
-          }
+          1 => Term::Var { nam: self.namegen.var_name(next) },
           // If we're visiting a port 2, then it is an application.
           2 => {
             let fun = self.read_term(self.net.enter_port(Port(node, 0)));
@@ -499,6 +475,43 @@ impl std::fmt::Display for ReadbackError {
       ReadbackError::ReachedRoot => write!(f, "Reached Root."),
       ReadbackError::Cyclic => write!(f, "Cyclic Term."),
       ReadbackError::InvalidBind => write!(f, "Invalid Bind."),
+    }
+  }
+}
+
+impl Term {
+  pub fn collect_unscoped(&self, unscoped: &mut HashSet<Name>, scope: &mut Vec<Name>) {
+    match self {
+      Term::Var { nam } if !scope.contains(nam) => _ = unscoped.insert(nam.clone()),
+      _ => {}
+    }
+    for (child, binds) in self.children_with_binds() {
+      let binds: Vec<_> = binds.collect();
+      for bind in binds.iter() {
+        if let Some(nam) = bind {
+          scope.push(nam.clone());
+        }
+      }
+      child.collect_unscoped(unscoped, scope);
+      for bind in binds.into_iter() {
+        if let Some(_) = bind {
+          scope.pop();
+        }
+      }
+    }
+  }
+
+  pub fn apply_unscoped(&mut self, unscoped: &HashSet<Name>) {
+    match self {
+      Term::Var { nam } if unscoped.contains(nam) => *self = Term::Lnk { nam: std::mem::take(nam) },
+      Term::Lam { tag, nam: Some(nam), bod } if unscoped.contains(nam) => {
+        *self =
+          Term::Chn { tag: std::mem::take(tag), nam: Some(std::mem::take(nam)), bod: std::mem::take(bod) };
+      }
+      _ => {}
+    }
+    for child in self.children_mut() {
+      child.apply_unscoped(unscoped);
     }
   }
 }
