@@ -48,6 +48,12 @@ pub fn net_to_term(
   }
 
   reader.report_errors(diagnostics);
+
+  let mut unscoped = HashSet::new();
+  let mut scope = Vec::new();
+  term.collect_unscoped(&mut unscoped, &mut scope);
+  term.apply_unscoped(&unscoped);
+
   term
 }
 
@@ -469,6 +475,39 @@ impl std::fmt::Display for ReadbackError {
       ReadbackError::ReachedRoot => write!(f, "Reached Root."),
       ReadbackError::Cyclic => write!(f, "Cyclic Term."),
       ReadbackError::InvalidBind => write!(f, "Invalid Bind."),
+    }
+  }
+}
+
+impl Term {
+  pub fn collect_unscoped(&self, unscoped: &mut HashSet<Name>, scope: &mut Vec<Name>) {
+    match self {
+      Term::Var { nam } if !scope.contains(nam) => _ = unscoped.insert(nam.clone()),
+      _ => {}
+    }
+    for (child, binds) in self.children_with_binds() {
+      let binds: Vec<_> = binds.collect();
+      for bind in binds.iter().copied().flatten() {
+        scope.push(bind.clone());
+      }
+      child.collect_unscoped(unscoped, scope);
+      for _bind in binds.into_iter().flatten() {
+        scope.pop();
+      }
+    }
+  }
+
+  pub fn apply_unscoped(&mut self, unscoped: &HashSet<Name>) {
+    match self {
+      Term::Var { nam } if unscoped.contains(nam) => *self = Term::Lnk { nam: std::mem::take(nam) },
+      Term::Lam { tag, nam: Some(nam), bod } if unscoped.contains(nam) => {
+        *self =
+          Term::Chn { tag: std::mem::take(tag), nam: Some(std::mem::take(nam)), bod: std::mem::take(bod) };
+      }
+      _ => {}
+    }
+    for child in self.children_mut() {
+      child.apply_unscoped(unscoped);
     }
   }
 }
