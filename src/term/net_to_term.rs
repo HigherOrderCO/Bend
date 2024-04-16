@@ -26,7 +26,7 @@ pub fn net_to_term(
     seen: Default::default(),
     errors: Default::default(),
     vars: Default::default(),
-    uncoped_vars: Default::default(),
+    unscoped_vars: Default::default(),
   };
 
   let mut term = reader.read_term(net.enter_port(ROOT));
@@ -49,18 +49,18 @@ pub fn net_to_term(
     debug_assert_eq!(result, None);
   }
 
-  fn switch_lam_to_chn(term: &mut Term, uncoped_vars: &HashSet<Name>) {
+  fn switch_lam_to_chn(term: &mut Term, unscoped_vars: &HashSet<Name>) {
     if let Term::Lam { tag, nam: Some(nam), bod } = term {
-      if uncoped_vars.contains(nam) {
+      if unscoped_vars.contains(nam) {
         *term = Term::Chn { tag: std::mem::take(tag), nam: Some(nam.clone()), bod: std::mem::take(bod) }
       }
     }
     for child in term.children_mut() {
-      switch_lam_to_chn(child, uncoped_vars);
+      switch_lam_to_chn(child, unscoped_vars);
     }
   }
 
-  switch_lam_to_chn(&mut term, &reader.uncoped_vars);
+  switch_lam_to_chn(&mut term, &reader.unscoped_vars);
 
   reader.report_errors(diagnostics);
   term
@@ -81,7 +81,7 @@ pub struct Reader<'a> {
   seen: HashSet<Port>,
   errors: Vec<ReadbackError>,
   vars: HashSet<Name>,
-  uncoped_vars: HashSet<Name>,
+  unscoped_vars: HashSet<Name>,
 }
 
 impl Reader<'_> {
@@ -106,7 +106,7 @@ impl Reader<'_> {
           0 => {
             let nam = self.namegen.decl_name(self.net, Port(node, 1));
             if let Some(nam) = &nam {
-              if !self.uncoped_vars.contains(&nam) {
+              if !self.unscoped_vars.contains(nam) {
                 self.vars.insert(nam.clone());
               }
             }
@@ -119,7 +119,7 @@ impl Reader<'_> {
             if self.vars.contains(&nam) {
               Term::Var { nam }
             } else {
-              self.uncoped_vars.insert(nam.clone());
+              self.unscoped_vars.insert(nam.clone());
               Term::Lnk { nam }
             }
           }
