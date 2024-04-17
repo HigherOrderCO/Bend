@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use crate::{
   diagnostics::ToStringVerbose,
   maybe_grow,
-  term::{Adt, AdtEncoding, Book, Name, Tag, Term},
+  term::{Adt, AdtEncoding, Book, Name, Pattern, Tag, Term},
 };
 
 pub enum AdtReadbackError {
@@ -25,7 +25,7 @@ impl Term {
 
   fn resugar_tagged_scott(&mut self, book: &Book, errs: &mut Vec<AdtReadbackError>) {
     maybe_grow(|| match self {
-      Term::Lam { tag: Tag::Named(adt_name), bod, .. } | Term::Chn { tag: Tag::Named(adt_name), bod, .. } => {
+      Term::Lam { tag: Tag::Named(adt_name), bod, .. } => {
         if let Some((adt_name, adt)) = book.adts.get_key_value(adt_name) {
           self.resugar_ctr_tagged_scott(book, adt, adt_name, errs);
         } else {
@@ -79,7 +79,7 @@ impl Term {
     // One lambda per ctr of this adt
     for ctr in &adt.ctrs {
       match app {
-        Term::Lam { tag: Tag::Named(tag), nam, bod } if tag == adt_name => {
+        Term::Lam { tag: Tag::Named(tag), pat: box Pattern::Var(nam), bod } if tag == adt_name => {
           if let Some(nam) = nam {
             if current_arm.is_some() {
               errs.push(AdtReadbackError::MalformedCtr(adt_name.clone()));
@@ -196,7 +196,7 @@ impl Term {
           for _ in ctr_args.iter() {
             match arm {
               Term::Lam { tag, .. } if tag == &expected_tag => {
-                let Term::Lam { nam, bod, .. } = arm else { unreachable!() };
+                let Term::Lam { pat: box Pattern::Var(nam), bod, .. } = arm else { unreachable!() };
                 fields.push(nam.clone());
                 arm = bod;
               }

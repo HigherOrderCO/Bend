@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/exp.hvm
 ---
 @main = a
-  & ({3 (b c) (d b)} (d c)) ~ (({5 (e f) (g e)} (g f)) a)
+  & ({2 (b c) (d b)} (d c)) ~ (({6 (e f) (g e)} (g f)) a)

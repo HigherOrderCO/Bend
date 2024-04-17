@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/weekday.hvm
 ---
-@Saturday = {2 * {2 * {2 * {2 * {2 * {2 a {2 * a}}}}}}}
+@Saturday = {4 * {4 * {4 * {4 * {4 * {4 a {4 * a}}}}}}}
 
 @main = a
   & (b b) ~ (@Saturday a)

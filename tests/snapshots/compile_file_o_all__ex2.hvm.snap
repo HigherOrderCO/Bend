@@ -6,7 +6,7 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
 
 @I = (a (* ((a b) (* b))))
 
-@c2 = ({3 (a b) (c a)} (c b))
+@c2 = ({2 (a b) (c a)} (c b))
 
 @decO = ((@decO (@low (@E a))) (* ((a b) (* b))))
 

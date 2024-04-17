@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/desugar_file/erased_let_linearization.hvm
----
-(main) = λ* *

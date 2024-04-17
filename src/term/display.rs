@@ -1,4 +1,4 @@
-use super::{Book, Definition, Name, Pattern, Rule, Tag, Term};
+use super::{Book, Definition, FanKind, Name, Pattern, Rule, Tag, Term};
 use crate::maybe_grow;
 use std::{fmt, ops::Deref};
 
@@ -43,16 +43,13 @@ macro_rules! display {
 impl fmt::Display for Term {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     maybe_grow(|| match self {
-      Term::Lam { tag, nam, bod } => {
-        write!(f, "{}λ{} {}", tag.display_padded(), var_as_str(nam), bod)
+      Term::Lam { tag, pat, bod } => {
+        write!(f, "{}λ{} {}", tag.display_padded(), pat, bod)
       }
       Term::Var { nam } => write!(f, "{nam}"),
-      Term::Chn { tag, nam, bod } => {
-        write!(f, "{}λ${} {}", tag.display_padded(), var_as_str(nam), bod)
-      }
       Term::Lnk { nam } => write!(f, "${nam}"),
-      Term::Let { nam, val, nxt } => {
-        write!(f, "let {} = {}; {}", var_as_str(nam), val, nxt)
+      Term::Let { pat, val, nxt } => {
+        write!(f, "let {} = {}; {}", pat, val, nxt)
       }
       Term::Use { nam, val, nxt } => {
         let Some(nam) = nam else { unreachable!() };
@@ -93,16 +90,8 @@ impl fmt::Display for Term {
         );
         write!(f, "switch {} = {}{} {{ {} }}", bnd.as_ref().unwrap(), arg, with, arms)
       }
-      Term::Ltp { bnd, val, nxt } => {
-        write!(f, "let ({}) = {}; {}", DisplayJoin(|| bnd.iter().map(var_as_str), ", "), val, nxt)
-      }
-      Term::Tup { els } => write!(f, "({})", DisplayJoin(|| els.iter(), ", "),),
-      Term::Dup { tag, bnd, val, nxt } => {
-        write!(f, "let {}{{{}}} = {}; {}", tag, DisplayJoin(|| bnd.iter().map(var_as_str), " "), val, nxt)
-      }
-      Term::Sup { tag, els } => {
-        write!(f, "{}{{{}}}", tag, DisplayJoin(|| els, " "))
-      }
+      Term::Fan { fan: FanKind::Tup, tag, els } => write!(f, "{}({})", tag, DisplayJoin(|| els.iter(), ", ")),
+      Term::Fan { fan: FanKind::Dup, tag, els } => write!(f, "{}{{{}}}", tag, DisplayJoin(|| els, " ")),
       Term::Era => write!(f, "*"),
       Term::Num { val } => write!(f, "{val}"),
       Term::Nat { val } => write!(f, "#{val}"),
@@ -132,11 +121,13 @@ impl fmt::Display for Pattern {
     match self {
       Pattern::Var(None) => write!(f, "*"),
       Pattern::Var(Some(nam)) => write!(f, "{nam}"),
+      Pattern::Chn(nam) => write!(f, "${nam}"),
       Pattern::Ctr(nam, pats) => {
         write!(f, "({}{})", nam, DisplayJoin(|| pats.iter().map(|p| display!(" {p}")), ""))
       }
       Pattern::Num(num) => write!(f, "{num}"),
-      Pattern::Tup(pats) => write!(f, "({})", DisplayJoin(|| pats, ", ")),
+      Pattern::Fan(FanKind::Tup, tag, pats) => write!(f, "{}({})", tag, DisplayJoin(|| pats, ", ")),
+      Pattern::Fan(FanKind::Dup, tag, pats) => write!(f, "{}{{{}}}", tag, DisplayJoin(|| pats, " ")),
       Pattern::Lst(pats) => write!(f, "[{}]", DisplayJoin(|| pats, ", ")),
       Pattern::Str(str) => write!(f, "\"{str}\""),
     }
@@ -229,27 +220,16 @@ impl Term {
   pub fn display_pretty(&self, tab: usize) -> impl fmt::Display + '_ {
     maybe_grow(|| {
       DisplayFn(move |f| match self {
-        Term::Lam { tag, nam, bod } => {
-          write!(f, "{}λ{} {}", tag.display_padded(), var_as_str(nam), bod.display_pretty(tab))
+        Term::Lam { tag, pat, bod } => {
+          write!(f, "{}λ{} {}", tag.display_padded(), pat, bod.display_pretty(tab))
         }
 
         Term::Var { nam } => write!(f, "{nam}"),
 
-        Term::Chn { tag, nam, bod } => {
-          write!(f, "{}λ${} {}", tag, var_as_str(nam), bod.display_pretty(tab))
-        }
-
         Term::Lnk { nam } => write!(f, "${nam}"),
 
-        Term::Let { nam, val, nxt } => {
-          write!(
-            f,
-            "let {} = {};\n{:tab$}{}",
-            var_as_str(nam),
-            val.display_pretty(tab),
-            "",
-            nxt.display_pretty(tab)
-          )
+        Term::Let { pat, val, nxt } => {
+          write!(f, "let {} = {};\n{:tab$}{}", pat, val.display_pretty(tab), "", nxt.display_pretty(tab))
         }
 
         Term::Use { nam, val, nxt } => {
@@ -273,34 +253,11 @@ impl Term {
           )
         }
 
-        Term::Ltp { bnd, val, nxt } => {
-          write!(
-            f,
-            "let ({}) = {};\n{:tab$}{}",
-            DisplayJoin(|| bnd.iter().map(var_as_str), ", "),
-            val.display_pretty(tab),
-            "",
-            nxt.display_pretty(tab),
-          )
+        Term::Fan { fan: FanKind::Tup, tag, els } => {
+          write!(f, "{}({})", tag, DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), ", "))
         }
 
-        Term::Tup { els } => {
-          write!(f, "({})", DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), " "))
-        }
-
-        Term::Dup { tag, bnd, val, nxt } => {
-          write!(
-            f,
-            "let {}{{{}}} = {};\n{:tab$}{}",
-            tag.display_padded(),
-            DisplayJoin(|| bnd.iter().map(var_as_str), " "),
-            val.display_pretty(tab),
-            "",
-            nxt.display_pretty(tab),
-          )
-        }
-
-        Term::Sup { tag, els } => {
+        Term::Fan { fan: FanKind::Dup, tag, els } => {
           write!(
             f,
             "{}{{{}}}",

@@ -1,1 +1,0 @@
-(main) = @x let q = *; let * = q; let * = @y (y x); *

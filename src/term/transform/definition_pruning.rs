@@ -128,9 +128,7 @@ impl Book {
       // If using the tagged scott encoding of ADTs, we also mark a constructor
       // as used if the user manually encoded a ctr or match (or any other use of the ctr tags).
       AdtEncoding::TaggedScott => match term {
-        Term::Lam { tag: Tag::Named(name), .. }
-        | Term::Chn { tag: Tag::Named(name), .. }
-        | Term::App { tag: Tag::Named(name), .. } => {
+        Term::Lam { tag: Tag::Named(name), .. } | Term::App { tag: Tag::Named(name), .. } => {
           // We don't check dup/sup tags because they use a separate label scope.
           self.insert_ctrs_used(name, uses, adt_encoding);
         }

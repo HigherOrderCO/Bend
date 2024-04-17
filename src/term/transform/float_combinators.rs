@@ -88,7 +88,7 @@ impl Term {
     maybe_grow(|| match self {
       Term::Num { .. } | Term::Era => true,
 
-      Term::Tup { els } | Term::Sup { els, .. } => els.iter().all(|e| Term::is_safe(e, book, seen)),
+      Term::Fan { els, .. } => els.iter().all(|e| Term::is_safe(e, book, seen)),
 
       Term::Lam { .. } => self.is_safe_lambda(book, seen),
 
@@ -114,10 +114,8 @@ impl Term {
     let mut current = self;
     let mut scope = Vec::new();
 
-    while let Term::Lam { nam, bod, .. } = current {
-      if let Some(nam) = nam {
-        scope.push(nam);
-      }
+    while let Term::Lam { bod, .. } = current {
+      scope.extend(current.pattern().unwrap().binds().filter_map(|x| x.as_ref()));
       current = bod;
     }
 
@@ -140,18 +138,20 @@ impl Term {
 }
 
 impl Term {
-  pub fn float_children_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Term> {
+  pub fn float_children_mut(&mut self) -> impl Iterator<Item = &mut Term> {
     multi_iterator!(FloatIter { Zero, Two, Vec, Mat, App, Swt });
     match self {
-      Term::App { fun, arg, .. } => {
-        let mut args = vec![arg.as_mut()];
-        let mut app = fun.as_mut();
-        while let Term::App { fun, arg, .. } = app {
-          args.push(arg);
-          app = fun;
-        }
-        args.push(app);
-        FloatIter::App(args)
+      Term::App { .. } => {
+        let mut next = Some(self);
+        FloatIter::App(std::iter::from_fn(move || {
+          let cur = next.take();
+          if let Some(Term::App { fun, arg, .. }) = cur {
+            next = Some(&mut *fun);
+            Some(&mut **arg)
+          } else {
+            cur
+          }
+        }))
       }
       Term::Mat { arg, bnd: _, with: _, arms } => {
         FloatIter::Mat([arg.as_mut()].into_iter().chain(arms.iter_mut().map(|r| &mut r.2)))
@@ -159,13 +159,11 @@ impl Term {
       Term::Swt { arg, bnd: _, with: _, pred: _, arms } => {
         FloatIter::Swt([arg.as_mut()].into_iter().chain(arms.iter_mut()))
       }
-      Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => FloatIter::Vec(els),
-      Term::Ltp { val: fst, nxt: snd, .. }
-      | Term::Let { val: fst, nxt: snd, .. }
+      Term::Fan { els, .. } | Term::Lst { els } => FloatIter::Vec(els),
+      Term::Let { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
       | Term::Opx { fst, snd, .. } => FloatIter::Two([fst.as_mut(), snd.as_mut()]),
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => bod.float_children_mut(),
+      Term::Lam { bod, .. } => bod.float_children_mut(),
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }

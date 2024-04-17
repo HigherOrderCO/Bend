@@ -1,4 +1,4 @@
-use super::{INet, NodeId, NodeKind, Port, ROOT};
+use super::{CtrKind, INet, NodeId, NodeKind, Port, ROOT};
 
 use crate::{
   diagnostics::{Diagnostics, ToStringVerbose},
@@ -49,30 +49,8 @@ pub fn net_to_hvmc(inet: &INet) -> Result<Net, ViciousCycleErr> {
 fn net_tree_to_hvmc_tree(inet: &INet, tree_root: NodeId, port_to_var_id: &mut HashMap<Port, VarId>) -> Tree {
   match &inet.node(tree_root).kind {
     NodeKind::Era => Tree::Era,
-    NodeKind::Con { lab: None } => Tree::Ctr {
-      lab: 0,
-      ports: vec![
-        var_or_subtree(inet, Port(tree_root, 1), port_to_var_id),
-        var_or_subtree(inet, Port(tree_root, 2), port_to_var_id),
-      ],
-    },
-    NodeKind::Tup => Tree::Ctr {
-      lab: 1,
-      ports: vec![
-        var_or_subtree(inet, Port(tree_root, 1), port_to_var_id),
-        var_or_subtree(inet, Port(tree_root, 2), port_to_var_id),
-      ],
-    },
-    NodeKind::Con { lab: Some(lab) } => Tree::Ctr {
-      #[allow(clippy::identity_op)]
-      lab: (*lab as u16 + 1) << 1 | 0,
-      ports: vec![
-        var_or_subtree(inet, Port(tree_root, 1), port_to_var_id),
-        var_or_subtree(inet, Port(tree_root, 2), port_to_var_id),
-      ],
-    },
-    NodeKind::Dup { lab } => Tree::Ctr {
-      lab: (*lab as u16 + 1) << 1 | 1,
+    NodeKind::Ctr(kind) => Tree::Ctr {
+      lab: kind.to_lab(),
       ports: vec![
         var_or_subtree(inet, Port(tree_root, 1), port_to_var_id),
         var_or_subtree(inet, Port(tree_root, 2), port_to_var_id),
@@ -87,7 +65,7 @@ fn net_tree_to_hvmc_tree(inet: &INet, tree_root: NodeId, port_to_var_id: &mut Ha
     },
     NodeKind::Mat => {
       let node = inet.node(inet.enter_port(Port(tree_root, 1)).node());
-      if node.kind != (NodeKind::Con { lab: None }) {
+      if node.kind != NodeKind::Ctr(CtrKind::Con(None)) {
         panic!("hvm-lang produced an INet where the first port is not a Con node. This is not supported.");
       }
 

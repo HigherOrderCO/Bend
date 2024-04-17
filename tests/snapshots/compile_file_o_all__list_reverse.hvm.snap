@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_reverse.hvm
 ---
-@concat$C0 = {2 a {2 {2 @concat$C0 {2 (b b) (c d)}} (c {2 {2 a {2 d e}} {2 * e}})}}
+@concat$C0 = {4 a {4 {4 @concat$C0 {4 (b b) (c d)}} (c {4 {4 a {4 d e}} {4 * e}})}}
 
-@cons = (a (b {2 {2 a {2 b c}} {2 * c}}))
+@cons = (a (b {4 {4 a {4 b c}} {4 * c}}))
 
 @main = a
   & @reverse ~ (b a)
@@ -12,8 +12,8 @@ input_file: tests/golden_tests/compile_file_o_all/list_reverse.hvm
   & @cons ~ (#2 (d c))
   & @cons ~ (#1 (@nil d))
 
-@nil = {2 * {2 a a}}
+@nil = {4 * {4 a a}}
 
-@reverse = ({2 @reverse$C0 {2 @nil a}} a)
+@reverse = ({4 @reverse$C0 {4 @nil a}} a)
 
-@reverse$C0 = {2 a {2 {2 @reverse$C0 {2 @nil {2 @concat$C0 {2 (b b) ({2 {2 a {2 @nil c}} {2 * c}} d)}}}} d}}
+@reverse$C0 = {4 a {4 {4 @reverse$C0 {4 @nil {4 @concat$C0 {4 (b b) ({4 {4 a {4 @nil c}} {4 * c}} d)}}}} d}}

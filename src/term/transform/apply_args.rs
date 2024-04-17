@@ -33,7 +33,7 @@ impl Ctx<'_> {
 
       for pat in main_def.rules[0].pats.iter().rev() {
         if let Pattern::Var(var) = pat {
-          main_body = Term::lam(var.clone(), main_body);
+          main_body = Term::lam(Pattern::Var(var.clone()), main_body);
         } else {
           self.info.add_rule_error(
             format!("Expected the entrypoint function to only have variable patterns, found '{pat}'."),

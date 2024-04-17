@@ -2,7 +2,7 @@ pub mod hvmc_to_net;
 pub mod net_to_hvmc;
 
 use crate::term::Name;
-pub type HvmlLab = u32;
+pub type HvmlLab = u16;
 use NodeKind::*;
 
 #[derive(Debug, Clone)]
@@ -28,28 +28,46 @@ pub enum NodeKind {
   Rot,
   /// Erasure nodes
   Era,
-  /// Lambdas and applications
-  Con {
-    lab: Option<HvmlLab>,
-  },
-  Tup,
-  Dup {
-    lab: HvmlLab,
-  },
+  /// Binary combinators
+  Ctr(CtrKind),
   /// Reference to function definitions
-  Ref {
-    def_name: Name,
-  },
+  Ref { def_name: Name },
   /// Numbers
-  Num {
-    val: u64,
-  },
+  Num { val: u64 },
   /// Numeric operations
-  Op2 {
-    opr: hvmc::ops::Op,
-  },
+  Op2 { opr: hvmc::ops::Op },
   /// Pattern matching on numbers
   Mat,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CtrKind {
+  Con(Option<HvmlLab>),
+  Tup(Option<HvmlLab>),
+  Dup(HvmlLab),
+}
+
+impl CtrKind {
+  fn to_lab(self) -> HvmlLab {
+    #[allow(clippy::identity_op)]
+    match self {
+      CtrKind::Con(None) => 0,
+      CtrKind::Con(Some(x)) => ((x + 1) << 2) | 0b00,
+      CtrKind::Tup(None) => 1,
+      CtrKind::Tup(Some(x)) => ((x + 1) << 2) | 0b01,
+      CtrKind::Dup(x) => (x << 2) | 0b10,
+    }
+  }
+  fn from_lab(lab: u16) -> Self {
+    match (lab >> 2, lab & 0b11) {
+      (0, 0b00) => CtrKind::Con(None),
+      (x, 0b00) => CtrKind::Con(Some(x - 1)),
+      (0, 0b01) => CtrKind::Tup(None),
+      (x, 0b01) => CtrKind::Tup(Some(x - 1)),
+      (x, 0b10) => CtrKind::Dup(x),
+      _ => unreachable!(),
+    }
+  }
 }
 
 pub type NodeId = u64;
