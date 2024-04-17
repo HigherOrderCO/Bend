@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/360_no_scope.hvm
+---
+Lazy mode:
+360
+
+Strict mode:
+360
