@@ -1,5 +1,8 @@
 use super::{INet, INode, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
-use crate::term::Name;
+use crate::{
+  net::{CtrKind, NodeKind},
+  term::Name,
+};
 use hvmc::ast::{Net, Tree};
 
 pub fn hvmc_to_net(net: &Net) -> INet {
@@ -88,15 +91,7 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
       subtrees.push((principal, &ports[0]));
     } else {
       // build a 2-ary node
-      let kind = if lab == 0 {
-        Con { lab: None }
-      } else if lab == 1 {
-        Tup
-      } else if lab & 1 == 0 {
-        Con { lab: Some((lab as u32 >> 1) - 1) }
-      } else {
-        Dup { lab: (lab as u32 >> 1) - 1 }
-      };
+      let kind = NodeKind::Ctr(CtrKind::from_lab(lab));
       let rgt = process_sub_ctr(inodes, lab, &ports[1 ..], net_root, subtrees, n_vars);
       let lft = process_node_subtree(&ports[0], net_root, subtrees, n_vars);
       inodes.push(INode { kind, ports: [principal.clone(), lft.clone(), rgt.clone()] });
@@ -136,7 +131,7 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
         let zero = process_node_subtree(zero, net_root, &mut subtrees, n_vars);
         let succ = process_node_subtree(succ, net_root, &mut subtrees, n_vars);
         let sel_var = new_var(n_vars);
-        inodes.push(INode { kind: Con { lab: None }, ports: [sel_var.clone(), zero, succ] });
+        inodes.push(INode { kind: NodeKind::Ctr(CtrKind::Con(None)), ports: [sel_var.clone(), zero, succ] });
         let ret = process_node_subtree(out, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, sel_var, ret] });
       }

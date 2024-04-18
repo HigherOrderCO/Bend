@@ -83,12 +83,11 @@ impl Pattern {
     match self {
       Pattern::Lst(pats) => *self = Self::encode_list(std::mem::take(pats)),
       Pattern::Str(str) => *self = Self::encode_str(str),
-      Pattern::Ctr(_, pats) | Pattern::Tup(pats) => {
-        for pat in pats {
+      _ => {
+        for pat in self.children_mut() {
           pat.encode_builtins();
         }
       }
-      Pattern::Var(..) | Pattern::Num(..) => {}
     }
   }
 

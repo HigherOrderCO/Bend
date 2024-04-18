@@ -1,7 +1,7 @@
 use crate::{
   diagnostics::{Diagnostics, ToStringVerbose},
   maybe_grow,
-  term::{Ctx, Name, Term},
+  term::{Ctx, Name, Pattern, Term},
 };
 use std::collections::{hash_map::Entry, HashMap};
 
@@ -60,7 +60,7 @@ impl Term {
 pub fn check_uses<'a>(
   term: &'a mut Term,
   scope: &mut HashMap<&'a Name, u64>,
-  globals: &mut HashMap<&'a Name, (usize, usize)>,
+  globals: &mut HashMap<Name, (usize, usize)>,
   errs: &mut Vec<UnboundVarErr>,
 ) {
   maybe_grow(move || match term {
@@ -70,17 +70,14 @@ pub fn check_uses<'a>(
         *term = Term::Err;
       }
     }
-    Term::Chn { nam, bod, .. } => {
-      if let Some(nam) = nam {
-        globals.entry(nam).or_default().0 += 1;
-      }
-      check_uses(bod, scope, globals, errs);
-    }
     Term::Lnk { nam } => {
-      globals.entry(nam).or_default().1 += 1;
+      globals.entry(nam.clone()).or_default().1 += 1;
     }
 
     _ => {
+      if let Some(pat) = term.pattern() {
+        check_global_binds(pat, globals)
+      }
       for (child, binds) in term.children_mut_with_binds() {
         for bind in binds.clone() {
           push_scope(bind.as_ref(), scope);
@@ -92,6 +89,19 @@ pub fn check_uses<'a>(
       }
     }
   })
+}
+
+pub fn check_global_binds(pat: &Pattern, globals: &mut HashMap<Name, (usize, usize)>) {
+  match pat {
+    Pattern::Chn(nam) => {
+      globals.entry(nam.clone()).or_default().0 += 1;
+    }
+    _ => {
+      for child in pat.children() {
+        check_global_binds(child, globals)
+      }
+    }
+  }
 }
 
 fn push_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, u64>) {

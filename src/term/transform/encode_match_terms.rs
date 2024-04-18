@@ -1,6 +1,6 @@
 use crate::{
   maybe_grow,
-  term::{AdtEncoding, Adts, Book, Constructors, MatchRule, Name, Tag, Term},
+  term::{AdtEncoding, Adts, Book, Constructors, MatchRule, Name, Pattern, Tag, Term},
 };
 
 impl Book {
@@ -66,27 +66,17 @@ fn encode_match(
   }
 
   // ADT Encoding depends on compiler option
-  match adt_encoding {
-    // (x @field1 @field2 ... body1  @field1 body2 ...)
-    AdtEncoding::Scott => {
-      let mut arms = vec![];
-      for rule in rules {
-        let body = rule.1.iter().cloned().rfold(rule.2, |bod, nam| Term::lam(nam, bod));
-        arms.push(body);
-      }
-      Term::call(arg, arms)
-    }
-    // #adt_name(x arm[0] arm[1] ...)
-    AdtEncoding::TaggedScott => {
-      let mut arms = vec![];
-      for rule in rules.into_iter() {
-        let body =
-          rule.1.iter().cloned().rfold(rule.2, |bod, nam| Term::tagged_lam(Tag::adt_name(adt_nam), nam, bod));
-        arms.push(body);
-      }
-      Term::tagged_call(Tag::adt_name(adt_nam), arg, arms)
-    }
+  let tag = match adt_encoding {
+    AdtEncoding::Scott => Tag::Static,
+    AdtEncoding::TaggedScott => Tag::adt_name(adt_nam),
+  };
+  let mut arms = vec![];
+  for rule in rules.into_iter() {
+    let body =
+      rule.1.iter().cloned().rfold(rule.2, |bod, nam| Term::tagged_lam(tag.clone(), Pattern::Var(nam), bod));
+    arms.push(body);
   }
+  Term::tagged_call(tag.clone(), arg, arms)
 }
 
 /// Convert into a sequence of native switches, decrementing by 1 each switch.
@@ -107,7 +97,7 @@ fn encode_switch(bnd: Name, arg: Term, pred: Option<Name>, mut rules: Vec<Term>)
   // Create the cascade of switches
   let match_var = Name::new("%x");
   let (succ, nums) = rules.split_last_mut().unwrap();
-  let last_arm = Term::lam(pred, std::mem::take(succ));
+  let last_arm = Term::lam(Pattern::Var(pred), std::mem::take(succ));
   nums.iter_mut().enumerate().rfold(last_arm, |term, (i, rule)| {
     let arms = vec![std::mem::take(rule), term];
     if i == 0 {
@@ -120,7 +110,7 @@ fn encode_switch(bnd: Name, arg: Term, pred: Option<Name>, mut rules: Vec<Term>)
         pred: None,
         arms,
       };
-      Term::named_lam(match_var.clone(), swt)
+      Term::lam(Pattern::Var(Some(match_var.clone())), swt)
     }
   })
 }

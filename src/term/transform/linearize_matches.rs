@@ -1,6 +1,6 @@
 use crate::{
   maybe_grow,
-  term::{Book, Name, Term},
+  term::{Book, Name, Pattern, Term},
 };
 use std::collections::{BTreeSet, HashSet};
 
@@ -43,16 +43,13 @@ impl Term {
     match self {
       // Binding terms
       // Extract them in case they are preceding a match.
-      Term::Lam { bod, .. } => {
+      Term::Lam { pat, bod, .. } if !pat.has_unscoped() => {
         let bod = std::mem::take(bod.as_mut());
         let term = std::mem::replace(self, bod);
         bind_terms.push(term);
         self.linearize_match_binds_go(bind_terms);
       }
-      Term::Let { val, nxt, .. }
-      | Term::Ltp { val, nxt, .. }
-      | Term::Dup { val, nxt, .. }
-      | Term::Use { val, nxt, .. } => {
+      Term::Let { val, nxt, .. } | Term::Use { val, nxt, .. } => {
         val.linearize_match_binds_go(vec![]);
         let nxt = std::mem::take(nxt.as_mut());
         let term = std::mem::replace(self, nxt);
@@ -114,15 +111,8 @@ impl Term {
     while let Some(term) = bind_terms.pop() {
       // Get the binds in the term we want to push down.
       let binds: Vec<Name> = match &term {
-        Term::Dup { bnd, .. } | Term::Ltp { bnd, .. } => bnd.iter().flatten().cloned().collect(),
-        Term::Lam { nam, .. } | Term::Let { nam, .. } | Term::Use { nam, .. } => {
-          if let Some(nam) = nam {
-            vec![nam.clone()]
-          } else {
-            vec![]
-          }
-        }
-        _ => unreachable!(),
+        Term::Use { nam, .. } => nam.iter().cloned().collect(),
+        _ => term.pattern().unwrap().binds().filter_map(|x| x.clone()).collect(),
       };
 
       if binds.iter().all(|bnd| !vars.contains(bnd)) {
@@ -168,11 +158,7 @@ impl Term {
   ) {
     *self = bind_terms.into_iter().rfold(std::mem::take(self), |acc, mut term| {
       match &mut term {
-        Term::Lam { bod: nxt, .. }
-        | Term::Let { nxt, .. }
-        | Term::Ltp { nxt, .. }
-        | Term::Dup { nxt, .. }
-        | Term::Use { nxt, .. } => {
+        Term::Lam { bod: nxt, .. } | Term::Let { nxt, .. } | Term::Use { nxt, .. } => {
           *nxt.as_mut() = acc;
         }
         _ => unreachable!(),
@@ -251,14 +237,16 @@ pub fn lift_match_vars(match_term: &mut Term) -> &mut Term {
       with.retain(|with| !vars_to_lift.contains(with));
       for arm in arms {
         let old_body = std::mem::take(&mut arm.2);
-        arm.2 = vars_to_lift.iter().cloned().rfold(old_body, |body, nam| Term::named_lam(nam, body));
+        arm.2 =
+          vars_to_lift.iter().cloned().rfold(old_body, |body, nam| Term::lam(Pattern::Var(Some(nam)), body));
       }
     }
     Term::Swt { arg: _, bnd: _, with, pred: _, arms } => {
       with.retain(|with| !vars_to_lift.contains(with));
       for arm in arms {
         let old_body = std::mem::take(arm);
-        *arm = vars_to_lift.iter().cloned().rfold(old_body, |body, nam| Term::named_lam(nam, body));
+        *arm =
+          vars_to_lift.iter().cloned().rfold(old_body, |body, nam| Term::lam(Pattern::Var(Some(nam)), body));
       }
     }
     _ => unreachable!(),
@@ -308,15 +296,18 @@ impl Term {
         // Linearize the vars in the `with` clause, but only the used ones.
         let with = retain_used_names(std::mem::take(with), rules.iter().map(|r| &r.2));
         for rule in rules {
-          rule.2 =
-            with.iter().rfold(std::mem::take(&mut rule.2), |bod, nam| Term::lam(Some(nam.clone()), bod));
+          rule.2 = with
+            .iter()
+            .rfold(std::mem::take(&mut rule.2), |bod, nam| Term::lam(Pattern::Var(Some(nam.clone())), bod));
         }
         *self = Term::call(std::mem::take(self), with.into_iter().map(|nam| Term::Var { nam }));
       }
       Term::Swt { arg: _, bnd: _, with, pred: _, arms } => {
         let with = retain_used_names(std::mem::take(with), arms.iter());
         for arm in arms {
-          *arm = with.iter().rfold(std::mem::take(arm), |bod, nam| Term::lam(Some(nam.clone()), bod));
+          *arm = with
+            .iter()
+            .rfold(std::mem::take(arm), |bod, nam| Term::lam(Pattern::Var(Some(nam.clone())), bod));
         }
         *self = Term::call(std::mem::take(self), with.into_iter().map(|nam| Term::Var { nam }));
       }

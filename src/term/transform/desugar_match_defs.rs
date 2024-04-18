@@ -1,6 +1,6 @@
 use crate::{
   diagnostics::{Diagnostics, ToStringVerbose, WarningType},
-  term::{builtins, Adts, Constructors, Ctx, Definition, Name, Pattern, Rule, Term},
+  term::{builtins, Adts, Constructors, Ctx, Definition, FanKind, Name, Pattern, Rule, Tag, Term},
 };
 use std::collections::{BTreeSet, HashSet};
 
@@ -44,7 +44,7 @@ impl Definition {
     let rules = std::mem::take(&mut self.rules);
     match simplify_rule_match(args.clone(), rules, vec![], ctrs, adts) {
       Ok(body) => {
-        let body = args.into_iter().rfold(body, |body, arg| Term::lam(Some(arg), body));
+        let body = args.into_iter().rfold(body, |body, arg| Term::lam(Pattern::Var(Some(arg)), body));
         self.rules = vec![Rule { pats: vec![], body }];
       }
       Err(e) => errs.push(e),
@@ -112,7 +112,7 @@ fn simplify_rule_match(
     let typ = Type::infer_from_def_arg(&rules, 0, ctrs)?;
     match typ {
       Type::Any => var_rule(args, rules, with, ctrs, adts),
-      Type::Tup(tup_len) => tup_rule(args, rules, with, tup_len, ctrs, adts),
+      Type::Fan(fan, tag, tup_len) => fan_rule(args, rules, with, fan, tag, tup_len, ctrs, adts),
       Type::Num => num_rule(args, rules, with, ctrs, adts),
       Type::Adt(adt_name) => switch_rule(args, rules, with, adt_name, ctrs, adts),
     }
@@ -180,17 +180,20 @@ fn var_rule(
 ///     (Body p0_0 ... p0_M p1 ... pN)
 /// }
 /// ```
-fn tup_rule(
+#[allow(clippy::too_many_arguments)]
+fn fan_rule(
   mut args: Vec<Name>,
   rules: Vec<Rule>,
   with: Vec<Name>,
-  tup_len: usize,
+  fan: FanKind,
+  tag: Tag,
+  len: usize,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, DesugarMatchDefErr> {
   let arg = args[0].clone();
   let old_args = args.split_off(1);
-  let new_args = (0 .. tup_len).map(|i| Name::new(format!("{arg}.{i}")));
+  let new_args = (0 .. len).map(|i| Name::new(format!("{arg}.{i}")));
 
   let mut new_rules = vec![];
   for mut rule in rules {
@@ -199,11 +202,12 @@ fn tup_rule(
 
     // Extract subpatterns from the tuple pattern
     let mut new_pats = match pat {
-      Pattern::Tup(sub_pats) => sub_pats,
+      Pattern::Fan(.., sub_pats) => sub_pats,
       Pattern::Var(var) => {
         if let Some(var) = var {
           // Rebuild the tuple if it was a var pattern
-          let tup = Term::Tup { els: new_args.clone().map(|nam| Term::Var { nam }).collect() };
+          let tup =
+            Term::Fan { fan, tag: tag.clone(), els: new_args.clone().map(|nam| Term::Var { nam }).collect() };
           rule.body.subst(&var, &tup);
         }
         new_args.clone().map(|nam| Pattern::Var(Some(nam))).collect()
@@ -216,10 +220,14 @@ fn tup_rule(
     new_rules.push(new_rule);
   }
 
-  let bnd = new_args.clone().map(Some).collect();
+  let bnd = new_args.clone().map(|x| Pattern::Var(Some(x))).collect();
   let args = new_args.chain(old_args).collect();
   let nxt = simplify_rule_match(args, new_rules, with, ctrs, adts)?;
-  let term = Term::Ltp { bnd, val: Box::new(Term::Var { nam: arg }), nxt: Box::new(nxt) };
+  let term = Term::Let {
+    pat: Box::new(Pattern::Fan(fan, tag.clone(), bnd)),
+    val: Box::new(Term::Var { nam: arg }),
+    nxt: Box::new(nxt),
+  };
 
   Ok(term)
 }
@@ -446,7 +454,7 @@ pub enum Type {
   /// Variables/wildcards.
   Any,
   /// A native tuple.
-  Tup(usize),
+  Fan(FanKind, Tag, usize),
   /// A sequence of arbitrary numbers ending in a variable.
   Num,
   /// Adt constructors declared with the `data` syntax.
@@ -467,11 +475,7 @@ impl Type {
         (Type::Any, found) => found,
         (expected, Type::Any) => expected,
 
-        (Type::Adt(expected), Type::Adt(found)) if found == expected => Type::Adt(expected),
-
-        (Type::Num, Type::Num) => Type::Num,
-
-        (Type::Tup(a), Type::Tup(b)) if a == b => Type::Tup(a),
+        (expected, found) if expected == found => expected,
 
         (expected, found) => {
           return Err(DesugarMatchDefErr::TypeMismatch { expected, found, pat: pat.clone() });
@@ -485,12 +489,12 @@ impl Type {
 impl Pattern {
   fn to_type(&self, ctrs: &Constructors) -> Type {
     match self {
-      Pattern::Var(_) => Type::Any,
+      Pattern::Var(_) | Pattern::Chn(_) => Type::Any,
       Pattern::Ctr(ctr_nam, _) => {
         let adt_nam = ctrs.get(ctr_nam).expect("Unknown constructor '{ctr_nam}'");
         Type::Adt(adt_nam.clone())
       }
-      Pattern::Tup(args) => Type::Tup(args.len()),
+      Pattern::Fan(is_tup, tag, args) => Type::Fan(*is_tup, tag.clone(), args.len()),
       Pattern::Num(_) => Type::Num,
       Pattern::Lst(..) => Type::Adt(Name::new(builtins::LIST)),
       Pattern::Str(..) => Type::Adt(Name::new(builtins::STRING)),
@@ -502,7 +506,8 @@ impl std::fmt::Display for Type {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       Type::Any => write!(f, "any"),
-      Type::Tup(n) => write!(f, "{n}-tuple"),
+      Type::Fan(FanKind::Tup, tag, n) => write!(f, "{}{n}-tuple", tag.display_padded()),
+      Type::Fan(FanKind::Dup, tag, n) => write!(f, "{}{n}-dup", tag.display_padded()),
       Type::Num => write!(f, "number"),
       Type::Adt(nam) => write!(f, "{nam}"),
     }

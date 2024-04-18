@@ -73,24 +73,17 @@ pub struct Rule {
 pub enum Term {
   Lam {
     tag: Tag,
-    nam: Option<Name>,
+    pat: Box<Pattern>,
     bod: Box<Term>,
   },
   Var {
     nam: Name,
   },
-  /// Like a scopeless lambda, where the variable can occur outside the body
-  Chn {
-    tag: Tag,
-    nam: Option<Name>,
-    bod: Box<Term>,
-  },
-  /// The use of a Channel variable.
   Lnk {
     nam: Name,
   },
   Let {
-    nam: Option<Name>,
+    pat: Box<Pattern>,
     val: Box<Term>,
     nxt: Box<Term>,
   },
@@ -104,22 +97,9 @@ pub enum Term {
     fun: Box<Term>,
     arg: Box<Term>,
   },
-  /// "let tup" tuple destructor
-  Ltp {
-    bnd: Vec<Option<Name>>,
-    val: Box<Term>,
-    nxt: Box<Term>,
-  },
-  Tup {
-    els: Vec<Term>,
-  },
-  Dup {
-    tag: Tag,
-    bnd: Vec<Option<Name>>,
-    val: Box<Term>,
-    nxt: Box<Term>,
-  },
-  Sup {
+  /// Either a tuple or a superposition
+  Fan {
+    fan: FanKind,
     tag: Tag,
     els: Vec<Term>,
   },
@@ -166,12 +146,20 @@ pub enum Term {
 
 pub type MatchRule = (Option<Name>, Vec<Option<Name>>, Term);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FanKind {
+  Tup,
+  Dup,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
   Var(Option<Name>),
+  Chn(Name),
   Ctr(Name, Vec<Pattern>),
   Num(u64),
-  Tup(Vec<Pattern>),
+  /// Either a tuple or a duplication
+  Fan(FanKind, Tag, Vec<Pattern>),
   Lst(Vec<Pattern>),
   Str(GlobalString),
 }
@@ -179,7 +167,7 @@ pub enum Pattern {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Tag {
   Named(Name),
-  Numeric(u32),
+  Numeric(u16),
   Auto,
   #[default]
   Static,
@@ -302,19 +290,13 @@ impl Tag {
 impl Clone for Term {
   fn clone(&self) -> Self {
     maybe_grow(|| match self {
-      Self::Lam { tag, nam, bod } => Self::Lam { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
+      Self::Lam { tag, pat, bod } => Self::Lam { tag: tag.clone(), pat: pat.clone(), bod: bod.clone() },
       Self::Var { nam } => Self::Var { nam: nam.clone() },
-      Self::Chn { tag, nam, bod } => Self::Chn { tag: tag.clone(), nam: nam.clone(), bod: bod.clone() },
       Self::Lnk { nam } => Self::Lnk { nam: nam.clone() },
-      Self::Let { nam, val, nxt } => Self::Let { nam: nam.clone(), val: val.clone(), nxt: nxt.clone() },
+      Self::Let { pat, val, nxt } => Self::Let { pat: pat.clone(), val: val.clone(), nxt: nxt.clone() },
       Self::Use { nam, val, nxt } => Self::Use { nam: nam.clone(), val: val.clone(), nxt: nxt.clone() },
       Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
-      Self::Ltp { bnd, val, nxt } => Self::Ltp { bnd: bnd.clone(), val: val.clone(), nxt: nxt.clone() },
-      Self::Tup { els } => Self::Tup { els: els.clone() },
-      Self::Dup { tag, bnd, val, nxt } => {
-        Self::Dup { tag: tag.clone(), bnd: bnd.clone(), val: val.clone(), nxt: nxt.clone() }
-      }
-      Self::Sup { tag, els } => Self::Sup { tag: tag.clone(), els: els.clone() },
+      Self::Fan { fan, tag, els } => Self::Fan { fan: *fan, tag: tag.clone(), els: els.clone() },
       Self::Num { val } => Self::Num { val: *val },
       Self::Nat { val } => Self::Nat { val: *val },
       Self::Str { val } => Self::Str { val: val.clone() },
@@ -373,22 +355,20 @@ impl Drop for Term {
   }
 }
 
+impl From<Option<Name>> for Pattern {
+  fn from(value: Option<Name>) -> Self {
+    Pattern::Var(value)
+  }
+}
+
 impl Term {
   /* Common construction patterns */
-  pub fn lam(nam: Option<Name>, bod: Term) -> Self {
-    Term::Lam { tag: Tag::Static, nam, bod: Box::new(bod) }
+  pub fn lam(pat: Pattern, bod: Term) -> Self {
+    Self::tagged_lam(Tag::Static, pat, bod)
   }
 
-  pub fn named_lam(nam: Name, bod: Term) -> Self {
-    Term::Lam { tag: Tag::Static, nam: Some(nam), bod: Box::new(bod) }
-  }
-
-  pub fn erased_lam(bod: Term) -> Self {
-    Term::Lam { tag: Tag::Static, nam: None, bod: Box::new(bod) }
-  }
-
-  pub fn tagged_lam(tag: Tag, nam: Option<Name>, bod: Term) -> Self {
-    Term::Lam { tag, nam, bod: Box::new(bod) }
+  pub fn tagged_lam(tag: Tag, pat: Pattern, bod: Term) -> Self {
+    Term::Lam { tag, pat: Box::new(pat), bod: Box::new(bod) }
   }
 
   pub fn var_or_era(nam: Option<Name>) -> Self {
@@ -396,7 +376,7 @@ impl Term {
   }
 
   pub fn app(fun: Term, arg: Term) -> Self {
-    Term::App { tag: Tag::Static, fun: Box::new(fun), arg: Box::new(arg) }
+    Self::tagged_app(Tag::Static, fun, arg)
   }
 
   pub fn tagged_app(tag: Tag, fun: Term, arg: Term) -> Self {
@@ -454,6 +434,20 @@ impl Term {
     }
   }
 
+  pub fn pattern(&self) -> Option<&Pattern> {
+    match self {
+      Term::Lam { pat, .. } | Term::Let { pat, .. } => Some(pat),
+      _ => None,
+    }
+  }
+
+  pub fn pattern_mut(&mut self) -> Option<&mut Pattern> {
+    match self {
+      Term::Lam { pat, .. } | Term::Let { pat, .. } => Some(pat),
+      _ => None,
+    }
+  }
+
   /* Iterators */
   pub fn children(&self) -> impl DoubleEndedIterator<Item = &Term> + Clone {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
@@ -464,14 +458,12 @@ impl Term {
       Term::Swt { arg, bnd: _, with: _, pred: _, arms } => {
         ChildrenIter::Swt([arg.as_ref()].into_iter().chain(arms))
       }
-      Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => ChildrenIter::Vec(els),
+      Term::Fan { els, .. } | Term::Lst { els } => ChildrenIter::Vec(els),
       Term::Let { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Ltp { val: fst, nxt: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
       | Term::Opx { fst, snd, .. } => ChildrenIter::Two([fst.as_ref(), snd.as_ref()]),
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => ChildrenIter::One([bod.as_ref()]),
+      Term::Lam { bod, .. } => ChildrenIter::One([bod.as_ref()]),
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
@@ -492,14 +484,12 @@ impl Term {
       Term::Swt { arg, bnd: _, with: _, pred: _, arms } => {
         ChildrenIter::Swt([arg.as_mut()].into_iter().chain(arms))
       }
-      Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => ChildrenIter::Vec(els),
+      Term::Fan { els, .. } | Term::Lst { els } => ChildrenIter::Vec(els),
       Term::Let { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Ltp { val: fst, nxt: snd, .. }
-      | Term::Dup { val: fst, nxt: snd, .. }
       | Term::Opx { fst, snd, .. } => ChildrenIter::Two([fst.as_mut(), snd.as_mut()]),
-      Term::Lam { bod, .. } | Term::Chn { bod, .. } => ChildrenIter::One([bod.as_mut()]),
+      Term::Lam { bod, .. } => ChildrenIter::One([bod.as_mut()]),
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
@@ -524,7 +514,7 @@ impl Term {
   ) -> impl DoubleEndedIterator<Item = (&Term, impl DoubleEndedIterator<Item = &Option<Name>> + Clone)> + Clone
   {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
-    multi_iterator!(BindsIter { Zero, One, Two, Dup, Mat });
+    multi_iterator!(BindsIter { Zero, One, Two, Mat, Pat });
     match self {
       Term::Mat { arg, bnd, with: _, arms: rules } => ChildrenIter::Mat(
         [(arg.as_ref(), BindsIter::Zero([]))]
@@ -540,23 +530,19 @@ impl Term {
             .chain([(succ, BindsIter::Two([bnd, pred]))]),
         )
       }
-      Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => {
+      Term::Fan { els, .. } | Term::Lst { els } => {
         ChildrenIter::Vec(els.iter().map(|el| (el, BindsIter::Zero([]))))
       }
-      Term::Let { nam, val, nxt, .. } => {
-        ChildrenIter::Two([(val.as_ref(), BindsIter::Zero([])), (nxt.as_ref(), BindsIter::One([nam]))])
+      Term::Let { pat, val, nxt, .. } => {
+        ChildrenIter::Two([(val.as_ref(), BindsIter::Zero([])), (nxt.as_ref(), BindsIter::Pat(pat.binds()))])
       }
       Term::Use { nam, val, nxt, .. } => {
         ChildrenIter::Two([(val.as_ref(), BindsIter::Zero([])), (nxt.as_ref(), BindsIter::One([nam]))])
       }
-      Term::Ltp { bnd, val, nxt, .. } | Term::Dup { bnd, val, nxt, .. } => {
-        ChildrenIter::Two([(val.as_ref(), BindsIter::Zero([])), (nxt.as_ref(), BindsIter::Dup(bnd))])
-      }
       Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
         ChildrenIter::Two([(fst.as_ref(), BindsIter::Zero([])), (snd.as_ref(), BindsIter::Zero([]))])
       }
-      Term::Lam { nam, bod, .. } => ChildrenIter::One([(bod.as_ref(), BindsIter::One([nam]))]),
-      Term::Chn { bod, .. } => ChildrenIter::One([(bod.as_ref(), BindsIter::Zero([]))]),
+      Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_ref(), BindsIter::Pat(pat.binds()))]),
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
@@ -574,7 +560,7 @@ impl Term {
   ) -> impl DoubleEndedIterator<Item = (&mut Term, impl DoubleEndedIterator<Item = &Option<Name>> + Clone)>
   {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
-    multi_iterator!(BindsIter { Zero, One, Two, Dup, Mat });
+    multi_iterator!(BindsIter { Zero, One, Two, Mat, Pat });
     match self {
       Term::Mat { arg, bnd, with: _, arms: rules } => {
         let bnd = &*bnd;
@@ -592,23 +578,19 @@ impl Term {
             .chain([(succ, BindsIter::Two([bnd, &*pred]))]),
         )
       }
-      Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => {
+      Term::Fan { els, .. } | Term::Lst { els } => {
         ChildrenIter::Vec(els.iter_mut().map(|el| (el, BindsIter::Zero([]))))
       }
-      Term::Let { nam, val, nxt, .. } => {
-        ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([&*nam]))])
+      Term::Let { pat, val, nxt, .. } => {
+        ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::Pat(pat.binds()))])
       }
       Term::Use { nam, val, nxt } => {
         ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([&*nam]))])
       }
-      Term::Ltp { bnd, val, nxt, .. } | Term::Dup { bnd, val, nxt, .. } => {
-        ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::Dup(bnd.iter()))])
-      }
       Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
         ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
       }
-      Term::Lam { nam, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::One([&*nam]))]),
-      Term::Chn { bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Zero([]))]),
+      Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds()))]),
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
@@ -625,7 +607,7 @@ impl Term {
     &mut self,
   ) -> impl DoubleEndedIterator<Item = (&mut Term, impl DoubleEndedIterator<Item = &mut Option<Name>>)> {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
-    multi_iterator!(BindsIter { Zero, One, Dup, Mat });
+    multi_iterator!(BindsIter { Zero, One, Mat, Pat });
     match self {
       Term::Mat { arg, bnd: _, with: _, arms: rules } => ChildrenIter::Mat(
         [(arg.as_mut(), BindsIter::Zero([]))]
@@ -641,23 +623,20 @@ impl Term {
             .chain([(succ, BindsIter::One([pred]))]),
         )
       }
-      Term::Tup { els } | Term::Sup { els, .. } | Term::Lst { els } => {
+      Term::Fan { els, .. } | Term::Lst { els } => {
         ChildrenIter::Vec(els.iter_mut().map(|el| (el, BindsIter::Zero([]))))
       }
       Term::Use { nam, val, nxt } => {
         ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([nam]))])
       }
-      Term::Let { nam, val, nxt, .. } => {
-        ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([nam]))])
-      }
-      Term::Ltp { bnd, val, nxt, .. } | Term::Dup { bnd, val, nxt, .. } => {
-        ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::Dup(bnd))])
-      }
+      Term::Let { pat, val, nxt, .. } => ChildrenIter::Two([
+        (val.as_mut(), BindsIter::Zero([])),
+        (nxt.as_mut(), BindsIter::Pat(pat.binds_mut())),
+      ]),
       Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
         ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
       }
-      Term::Lam { nam, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::One([nam]))]),
-      Term::Chn { bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Zero([]))]),
+      Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds_mut()))]),
       Term::Var { .. }
       | Term::Lnk { .. }
       | Term::Num { .. }
@@ -714,7 +693,7 @@ impl Term {
   /// Collects all the free variables that a term has
   /// and the number of times each var is used
   pub fn free_vars(&self) -> HashMap<Name, u64> {
-    fn go(term: &Term, free_vars: &mut HashMap<Name, u64>) {
+    fn go_term(term: &Term, free_vars: &mut HashMap<Name, u64>) {
       maybe_grow(|| {
         if let Term::Var { nam } = term {
           *free_vars.entry(nam.clone()).or_default() += 1;
@@ -722,7 +701,7 @@ impl Term {
 
         for (child, binds) in term.children_with_binds() {
           let mut new_scope = Default::default();
-          go(child, &mut new_scope);
+          go_term(child, &mut new_scope);
 
           for nam in binds.flatten() {
             new_scope.remove(nam);
@@ -734,32 +713,41 @@ impl Term {
     }
 
     let mut free_vars = Default::default();
-    go(self, &mut free_vars);
+    go_term(self, &mut free_vars);
     free_vars
   }
 
   /// Returns the set of declared and the set of used unscoped variables
   pub fn unscoped_vars(&self) -> (IndexSet<Name>, IndexSet<Name>) {
-    fn go(term: &Term, decls: &mut IndexSet<Name>, uses: &mut IndexSet<Name>) {
+    fn go_pat(pat: &Pattern, decls: &mut IndexSet<Name>) {
       maybe_grow(|| {
-        match term {
-          Term::Chn { nam: Some(nam), .. } => {
-            decls.insert(nam.clone());
-          }
-          Term::Lnk { nam } => {
-            uses.insert(nam.clone());
-          }
-          _ => {}
+        if let Pattern::Chn(name) = pat {
+          decls.insert(name.clone());
+        }
+
+        for child in pat.children() {
+          go_pat(child, decls);
+        }
+      })
+    }
+    fn go_term(term: &Term, decls: &mut IndexSet<Name>, uses: &mut IndexSet<Name>) {
+      maybe_grow(|| {
+        if let Term::Lnk { nam } = term {
+          uses.insert(nam.clone());
+        }
+
+        if let Some(pat) = term.pattern() {
+          go_pat(pat, decls)
         }
 
         for child in term.children() {
-          go(child, decls, uses);
+          go_term(child, decls, uses);
         }
       })
     }
     let mut decls = Default::default();
     let mut uses = Default::default();
-    go(self, &mut decls, &mut uses);
+    go_term(self, &mut decls, &mut uses);
     (decls, uses)
   }
 }
@@ -790,16 +778,16 @@ impl Pattern {
   pub fn children(&self) -> impl DoubleEndedIterator<Item = &Pattern> + Clone {
     multi_iterator!(ChildrenIter { Zero, Vec });
     match self {
-      Pattern::Ctr(_, els) | Pattern::Tup(els) | Pattern::Lst(els) => ChildrenIter::Vec(els.iter()),
-      Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => ChildrenIter::Zero([]),
+      Pattern::Ctr(_, els) | Pattern::Fan(.., els) | Pattern::Lst(els) => ChildrenIter::Vec(els.iter()),
+      Pattern::Var(_) | Pattern::Chn(_) | Pattern::Num(_) | Pattern::Str(_) => ChildrenIter::Zero([]),
     }
   }
 
   pub fn children_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Pattern> {
     multi_iterator!(ChildrenIter { Zero, Vec });
     match self {
-      Pattern::Ctr(_, els) | Pattern::Tup(els) | Pattern::Lst(els) => ChildrenIter::Vec(els.iter_mut()),
-      Pattern::Var(_) | Pattern::Num(_) | Pattern::Str(_) => ChildrenIter::Zero([]),
+      Pattern::Ctr(_, els) | Pattern::Fan(.., els) | Pattern::Lst(els) => ChildrenIter::Vec(els.iter_mut()),
+      Pattern::Var(_) | Pattern::Chn(_) | Pattern::Num(_) | Pattern::Str(_) => ChildrenIter::Zero([]),
     }
   }
 
@@ -816,18 +804,29 @@ impl Pattern {
   }
 
   pub fn is_wildcard(&self) -> bool {
-    matches!(self, Pattern::Var(_))
+    matches!(self, Pattern::Var(_) | Pattern::Chn(_))
   }
 
   pub fn to_term(&self) -> Term {
     match self {
       Pattern::Var(nam) => Term::var_or_era(nam.clone()),
+      Pattern::Chn(nam) => Term::Lnk { nam: nam.clone() },
       Pattern::Ctr(ctr, args) => {
         Term::call(Term::Ref { nam: ctr.clone() }, args.iter().map(|arg| arg.to_term()))
       }
       Pattern::Num(val) => Term::Num { val: *val },
-      Pattern::Tup(args) => Term::Tup { els: args.iter().map(|p| p.to_term()).collect() },
+      Pattern::Fan(fan, tag, args) => {
+        Term::Fan { fan: *fan, tag: tag.clone(), els: args.iter().map(|p| p.to_term()).collect() }
+      }
       Pattern::Lst(_) | Pattern::Str(_) => todo!(),
+    }
+  }
+
+  pub fn has_unscoped(&self) -> bool {
+    match self {
+      Pattern::Chn(_) => true,
+      Pattern::Var(_) | Pattern::Str(_) | Pattern::Num(_) => false,
+      Pattern::Ctr(_, x) | Pattern::Fan(_, _, x) | Pattern::Lst(x) => x.iter().any(|x| x.has_unscoped()),
     }
   }
 }

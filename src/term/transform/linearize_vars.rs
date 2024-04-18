@@ -1,6 +1,6 @@
 use crate::{
   maybe_grow,
-  term::{Book, Name, Tag, Term},
+  term::{Book, FanKind, Name, Pattern, Tag, Term},
 };
 use std::collections::HashMap;
 
@@ -26,61 +26,34 @@ impl Book {
 
 impl Term {
   pub fn linearize_vars(&mut self) {
-    term_to_affine(self, &mut HashMap::new());
-  }
-
-  /// Returns false whether the term has no unscoped terms,
-  /// or all its unscoped binds and usage pairs are within the term.
-  fn has_unscoped(&self) -> bool {
-    let (decl, uses) = self.unscoped_vars();
-    decl.symmetric_difference(&uses).count() > 0
+    term_to_linear(self, &mut HashMap::new());
   }
 }
 
-fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, u64>) {
+fn term_to_linear(term: &mut Term, var_uses: &mut HashMap<Name, u64>) {
   maybe_grow(|| match term {
-    Term::Let { nam: Some(nam), val, nxt } => {
+    Term::Let { pat: box Pattern::Var(Some(nam)), val, nxt } => {
       // TODO: This is swapping the order of how the bindings are
       // used, since it's not following the usual AST order (first
       // val, then nxt). Doesn't change behaviour, but looks strange.
-      term_to_affine(nxt, var_uses);
+      term_to_linear(nxt, var_uses);
 
-      match get_var_uses(Some(nam), var_uses) {
+      let uses = get_var_uses(Some(nam), var_uses);
+      term_to_linear(val, var_uses);
+      match uses {
         0 => {
-          if val.has_unscoped() {
-            term_to_affine(val, var_uses);
-
-            let Term::Let { val, nxt, .. } = term else { unreachable!() };
-            let val = std::mem::take(val);
-            let nxt = std::mem::take(nxt);
-
-            *term = Term::Let { nam: None, val, nxt };
-          } else {
-            *term = std::mem::take(nxt.as_mut());
-          }
+          let Term::Let { pat, .. } = term else { unreachable!() };
+          **pat = Pattern::Var(None);
         }
         1 => {
-          term_to_affine(val, var_uses);
           nxt.subst(nam, val.as_ref());
           *term = std::mem::take(nxt.as_mut());
         }
-        instantiated_count => {
-          term_to_affine(val, var_uses);
-          duplicate_term(nam, nxt, instantiated_count, Some(val));
-          *term = std::mem::take(nxt.as_mut());
+        _ => {
+          let new_pat = duplicate_pat(nam, uses);
+          let Term::Let { pat, .. } = term else { unreachable!() };
+          *pat = new_pat;
         }
-      }
-    }
-
-    Term::Let { nam: None, val, nxt } => {
-      term_to_affine(nxt, var_uses);
-
-      if val.has_unscoped() {
-        term_to_affine(val, var_uses);
-      } else {
-        let Term::Let { nxt, .. } = term else { unreachable!() };
-        let nxt = std::mem::take(nxt.as_mut());
-        *term = nxt;
       }
     }
 
@@ -92,7 +65,7 @@ fn term_to_affine(term: &mut Term, var_uses: &mut HashMap<Name, u64>) {
 
     _ => {
       for (child, binds) in term.children_mut_with_binds_mut() {
-        term_to_affine(child, var_uses);
+        term_to_linear(child, var_uses);
 
         for bind in binds {
           let uses = get_var_uses(bind.as_ref(), var_uses);
@@ -124,12 +97,19 @@ fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, u64>) -> u64 {
 fn duplicate_term(nam: &Name, nxt: &mut Term, uses: u64, dup_body: Option<&mut Term>) {
   debug_assert!(uses > 1);
 
-  *nxt = Term::Dup {
-    tag: Tag::Auto,
-    bnd: (1 .. uses + 1).map(|i| Some(dup_name(nam, i))).collect(),
+  *nxt = Term::Let {
+    pat: duplicate_pat(nam, uses),
     val: Box::new(dup_body.map_or_else(|| Term::Var { nam: nam.clone() }, std::mem::take)),
     nxt: Box::new(std::mem::take(nxt)),
   }
+}
+
+fn duplicate_pat(nam: &Name, uses: u64) -> Box<Pattern> {
+  Box::new(Pattern::Fan(
+    FanKind::Dup,
+    Tag::Auto,
+    (1 .. uses + 1).map(|i| Pattern::Var(Some(dup_name(nam, i)))).collect(),
+  ))
 }
 
 fn dup_name(nam: &Name, uses: u64) -> Name {
