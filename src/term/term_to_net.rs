@@ -73,14 +73,13 @@ pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, ViciousCycle
 
 #[derive(Debug)]
 struct EncodeTermState<'t, 'l> {
-  // inet: INet,
   scope: HashMap<Name, Vec<Place<'t>>>,
   global_vars: HashMap<Name, Place<'t>>,
-  labels: &'l mut Labels,
   wires: Vec<Option<Place<'t>>>,
-  name_idx: u64,
   redexes: Vec<LoanedMut<'t, (Tree, Tree)>>,
+  name_idx: u64,
   created_nodes: usize,
+  labels: &'l mut Labels,
 }
 
 fn count_nodes(tree: &Tree) -> usize {
