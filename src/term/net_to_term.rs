@@ -512,17 +512,30 @@ impl Term {
   }
 
   pub fn apply_unscoped(&mut self, unscoped: &HashSet<Name>) {
-    match self {
-      Term::Var { nam } if unscoped.contains(nam) => *self = Term::Lnk { nam: std::mem::take(nam) },
-      Term::Lam { pat: box Pattern::Var(Some(nam)), .. } if unscoped.contains(nam) => {
-        let nam = std::mem::take(nam);
-        let Term::Lam { pat, .. } = self else { unreachable!() };
-        **pat = Pattern::Chn(nam);
-      }
-      _ => {}
+    if let Term::Var { nam } = self
+      && unscoped.contains(nam)
+    {
+      *self = Term::Lnk { nam: std::mem::take(nam) }
+    }
+    if let Some(pat) = self.pattern_mut() {
+      pat.apply_unscoped(unscoped);
     }
     for child in self.children_mut() {
       child.apply_unscoped(unscoped);
+    }
+  }
+}
+
+impl Pattern {
+  fn apply_unscoped(&mut self, unscoped: &HashSet<Name>) {
+    if let Pattern::Var(Some(nam)) = self
+      && unscoped.contains(nam)
+    {
+      let nam = std::mem::take(nam);
+      *self = Pattern::Chn(nam);
+    }
+    for child in self.children_mut() {
+      child.apply_unscoped(unscoped)
     }
   }
 }
