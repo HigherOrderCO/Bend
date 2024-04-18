@@ -163,6 +163,7 @@ impl Term {
       Term::Let { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::Opx { fst, snd, .. } => FloatIter::Two([fst.as_mut(), snd.as_mut()]),
+      Term::Bnd { .. } => unreachable!(),
       Term::Lam { bod, .. } => bod.float_children_mut(),
       Term::Var { .. }
       | Term::Lnk { .. }
