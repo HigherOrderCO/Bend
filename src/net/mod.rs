@@ -1,5 +1,4 @@
 pub mod hvmc_to_net;
-pub mod net_to_hvmc;
 
 use crate::term::Name;
 pub type HvmlLab = u16;
@@ -48,7 +47,7 @@ pub enum CtrKind {
 }
 
 impl CtrKind {
-  fn to_lab(self) -> HvmlLab {
+  pub fn to_lab(self) -> HvmlLab {
     #[allow(clippy::identity_op)]
     match self {
       CtrKind::Con(None) => 0,

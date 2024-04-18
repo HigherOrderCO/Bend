@@ -20,7 +20,7 @@ pub mod transform;
 
 pub use hvmc::ops::{IntOp, Op, Ty as OpType};
 pub use net_to_term::{net_to_term, ReadbackError};
-pub use term_to_net::{book_to_nets, term_to_compat_net};
+pub use term_to_net::{book_to_nets, term_to_net};
 
 pub static STRINGS: GlobalPool<String> = GlobalPool::new();
 #[derive(Debug)]

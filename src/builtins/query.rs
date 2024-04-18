@@ -24,9 +24,8 @@ pub(crate) fn make_query_def(host: Arc<Mutex<Host>>, labels: Arc<Labels>) -> Def
       let buf = buf.strip_suffix('\n').unwrap_or(&buf);
       let text = Term::encode_ok(Term::encode_str(buf));
       let mut labs = (*self.labels).clone();
-      let text = crate::term::term_to_net::term_to_compat_net(&text, &mut labs);
       net.link_wire_port(output, app_node.p2);
-      let Ok(text) = crate::net::net_to_hvmc::net_to_hvmc(&text) else {
+      let Ok(text) = crate::term::term_to_net::term_to_net(&text, &mut labs) else {
         net.link_port_port(Port::ERA, app_node.p1);
         net.link_wire_port(input, app_node.p0);
         return;
