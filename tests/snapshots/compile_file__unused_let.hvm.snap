@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/unused_let.hvm
+---
+@main = ({2 <+ a *> {2 a b}} b)
