@@ -16,9 +16,9 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
 
 @lowO = (a ((((a b) (* (* b))) c) (* (* c))))
 
-@main = a
-  & @run ~ (b a)
-  & @c2 ~ (@I (@E b))
+@main = b
+  & @run ~ (a b)
+  & @c2 ~ (@I (@E a))
 
 @run = ((@runO (@runI (@E a))) a)
 

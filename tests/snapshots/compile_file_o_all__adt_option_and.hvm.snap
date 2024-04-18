@@ -12,7 +12,7 @@ input_file: tests/golden_tests/compile_file_o_all/adt_option_and.hvm
 
 @Some = (a {4 {4 a b} {4 * b}})
 
-@main = a
-  & @Option.and ~ (b (c a))
-  & @Some ~ (#3 c)
-  & @Some ~ (#1 b)
+@main = c
+  & @Option.and ~ (a (b c))
+  & @Some ~ (#1 a)
+  & @Some ~ (#3 b)

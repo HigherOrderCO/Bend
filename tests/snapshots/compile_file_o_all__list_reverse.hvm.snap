@@ -6,11 +6,11 @@ input_file: tests/golden_tests/compile_file_o_all/list_reverse.hvm
 
 @cons = (a (b {4 {4 a {4 b c}} {4 * c}}))
 
-@main = a
-  & @reverse ~ (b a)
-  & @cons ~ (#3 (c b))
-  & @cons ~ (#2 (d c))
-  & @cons ~ (#1 (@nil d))
+@main = d
+  & @reverse ~ (c d)
+  & @cons ~ (#3 (b c))
+  & @cons ~ (#2 (a b))
+  & @cons ~ (#1 (@nil a))
 
 @nil = {4 * {4 a a}}
 

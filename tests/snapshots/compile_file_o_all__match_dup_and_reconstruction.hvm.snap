@@ -8,6 +8,6 @@ input_file: tests/golden_tests/compile_file_o_all/match_dup_and_reconstruction.h
 
 @Got$C0 = {4 a (b [b a])}
 
-@main = a
-  & @Got ~ (b a)
-  & @Boxed ~ (#10 b)
+@main = b
+  & @Got ~ (a b)
+  & @Boxed ~ (#10 a)

@@ -8,10 +8,10 @@ input_file: tests/golden_tests/compile_file/redex_order.hvm
 
 @c = (a a)
 
-@foo = (a b)
-  & @a ~ (c b)
-  & @b ~ (d c)
-  & @c ~ (a d)
+@foo = (a d)
+  & @a ~ (c d)
+  & @b ~ (b c)
+  & @c ~ (a b)
 
 @foo2 = a
   & @a ~ (@foo2$C1 a)

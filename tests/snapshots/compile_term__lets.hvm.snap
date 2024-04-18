@@ -2,8 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/lets.hvm
 ---
-a
-  & (b b) ~ (c (d (e a)))
-  & (f f) ~ {10 (g (h (i e))) {10 g {10 h i}}}
-  & (j j) ~ {6 (k (l d)) {6 k l}}
-  & (m m) ~ {2 (n c) n}
+o
+  & (a a) ~ *
+  & (b b) ~ {2 (f g) f}
+  & (c c) ~ {6 (h (i j)) {6 h i}}
+  & (d d) ~ {10 (k (l (m n))) {10 k {10 l m}}}
+  & (e e) ~ (g (j (n o)))

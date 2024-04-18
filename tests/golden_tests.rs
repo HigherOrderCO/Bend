@@ -1,11 +1,11 @@
 use hvml::{
   compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity, ToStringVerbose},
-  net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::net_to_hvmc},
+  net::hvmc_to_net::hvmc_to_net,
   run_book,
   term::{
-    load_book::do_parse_book, net_to_term::net_to_term, parser::TermParser, term_to_compat_net,
-    term_to_net::Labels, AdtEncoding, Book, Ctx, Name,
+    load_book::do_parse_book, net_to_term::net_to_term, parser::TermParser, term_to_net, term_to_net::Labels,
+    AdtEncoding, Book, Ctx, Name,
   },
   CompileOpts, RunOpts,
 };
@@ -105,8 +105,7 @@ fn compile_term() {
 
     term.make_var_names_unique();
     term.linearize_vars();
-    let compat_net = term_to_compat_net(&term, &mut Default::default());
-    let net = net_to_hvmc(&compat_net).map_err(|e| e.to_string_verbose(true))?;
+    let net = term_to_net(&term, &mut Default::default()).map_err(|e| e.to_string_verbose(true))?;
 
     Ok(format!("{}", net))
   })

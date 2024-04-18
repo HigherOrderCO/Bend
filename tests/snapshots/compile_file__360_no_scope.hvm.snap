@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/360_no_scope.hvm
 ---
-@main = a
-  & {5 {2 b c} {2 d e}} ~ {2 {5 d c} {5 e a}}
-  & (f g) ~ (#360 b)
-  & (h h) ~ (g f)
+@main = h
+  & (b a) ~ (#360 d)
+  & (a b) ~ (c c)
+  & {5 {2 d f} {2 e g}} ~ {2 {5 e f} {5 g h}}
