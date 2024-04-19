@@ -4,5 +4,5 @@ input_file: tests/golden_tests/compile_file_o_all/var_shadows_ref.hvm
 ---
 @a = (a a)
 
-@main = a
-  & @a ~ ((b b) a)
+@main = b
+  & @a ~ ((a a) b)

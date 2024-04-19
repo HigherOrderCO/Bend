@@ -4,5 +4,5 @@ input_file: tests/golden_tests/compile_file_o_all/weekday.hvm
 ---
 @Saturday = {4 * {4 * {4 * {4 * {4 * {4 a {4 * a}}}}}}}
 
-@main = a
-  & (b b) ~ (@Saturday a)
+@main = b
+  & (a a) ~ (@Saturday b)

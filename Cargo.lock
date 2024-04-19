@@ -209,6 +209,7 @@ dependencies = [
  "insta",
  "interner",
  "itertools",
+ "loaned",
  "parking_lot",
  "stacker",
  "stdext",
@@ -269,6 +270,12 @@ name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
+
+[[package]]
+name = "loaned"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da2f64517bfbf7127b8418da518c2e437722b272c07c87dd17576c0c0f8d6a1d"
 
 [[package]]
 name = "lock_api"

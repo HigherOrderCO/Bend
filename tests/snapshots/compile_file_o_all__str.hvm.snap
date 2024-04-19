@@ -6,10 +6,10 @@ input_file: tests/golden_tests/compile_file_o_all/str.hvm
 
 @String.nil = {4 * {4 a a}}
 
-@main = a
-  & @String.cons ~ (#109 (b a))
-  & @String.cons ~ (#97 (c b))
-  & @String.cons ~ (#105 (d c))
-  & @String.cons ~ (#110 (e d))
-  & @String.cons ~ (#32 (f e))
-  & @String.cons ~ (#61 (@String.nil f))
+@main = f
+  & @String.cons ~ (#109 (e f))
+  & @String.cons ~ (#97 (d e))
+  & @String.cons ~ (#105 (c d))
+  & @String.cons ~ (#110 (b c))
+  & @String.cons ~ (#32 (a b))
+  & @String.cons ~ (#61 (@String.nil a))

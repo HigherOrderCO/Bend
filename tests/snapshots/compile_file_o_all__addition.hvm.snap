@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/addition.hvm
 ---
-@main = a
-  & (b c) ~ (#8 a)
-  & #1 ~ <+ #1 <+ b c>>
+@main = c
+  & (a b) ~ (#8 c)
+  & #1 ~ <+ #1 <+ a b>>

@@ -13,7 +13,7 @@ use hvmc_net::{
   mutual_recursion,
   pre_reduce::{pre_reduce, MAX_REWRITES_DEFAULT},
 };
-use net::{hvmc_to_net::hvmc_to_net, net_to_hvmc::nets_to_hvmc};
+use net::hvmc_to_net::hvmc_to_net;
 use parking_lot::Mutex;
 use std::{sync::Arc, time::Instant};
 use term::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term};
@@ -47,9 +47,7 @@ pub fn compile_book(
   args: Option<Vec<Term>>,
 ) -> Result<CompileResult, Diagnostics> {
   let mut diagnostics = desugar_book(book, opts.clone(), diagnostics_cfg, args)?;
-  let (nets, labels) = book_to_nets(book);
-
-  let mut core_book = nets_to_hvmc(nets, &mut diagnostics)?;
+  let (mut core_book, labels) = book_to_nets(book, &mut diagnostics)?;
 
   if opts.eta {
     core_book.values_mut().for_each(Net::eta_reduce);

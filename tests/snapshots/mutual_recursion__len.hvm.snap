@@ -4,19 +4,19 @@ input_file: tests/golden_tests/mutual_recursion/len.hvm
 ---
 @Len = ({4 @Len$C0 {4 #0 a}} a)
 
-@Len$C0 = {4 * {4 a b}}
-  & #1 ~ <+ c b>
-  & @Len ~ (a c)
+@Len$C0 = {4 * {4 a c}}
+  & #1 ~ <+ b c>
+  & @Len ~ (a b)
 
 @List.cons = (a (b {4 {4 a {4 b c}} {4 * c}}))
 
 @List.nil = {4 * {4 a a}}
 
-@main = a
-  & @Len ~ (b a)
-  & @List.cons ~ (* (c b))
-  & @List.cons ~ (* (d c))
-  & @List.cons ~ (* (e d))
-  & @List.cons ~ (* (f e))
-  & @List.cons ~ (* (g f))
-  & @List.cons ~ (* (@List.nil g))
+@main = g
+  & @Len ~ (f g)
+  & @List.cons ~ (* (e f))
+  & @List.cons ~ (* (d e))
+  & @List.cons ~ (* (c d))
+  & @List.cons ~ (* (b c))
+  & @List.cons ~ (* (a b))
+  & @List.cons ~ (* (@List.nil a))

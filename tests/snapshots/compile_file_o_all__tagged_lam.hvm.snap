@@ -2,5 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/tagged_lam.hvm
 ---
-@main = a
-  & [{4 <+ #1 b> b} {4 {2 <* c d> c} d}] ~ {4 #2 a}
+@main = d
+  & [{4 <+ #1 a> a} {4 {2 <* b c> b} c}] ~ {4 #2 d}
