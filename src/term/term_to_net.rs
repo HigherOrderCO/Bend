@@ -48,8 +48,7 @@ pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, ViciousCycle
   let mut net = Net::default();
 
   let mut state = EncodeTermState {
-    scope: Default::default(),
-    global_vars: Default::default(),
+    vars: Default::default(),
     wires: Default::default(),
     redexes: Default::default(),
     name_idx: 0,
@@ -73,8 +72,7 @@ pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, ViciousCycle
 
 #[derive(Debug)]
 struct EncodeTermState<'t, 'l> {
-  scope: HashMap<Name, Vec<Place<'t>>>,
-  global_vars: HashMap<Name, Place<'t>>,
+  vars: HashMap<(bool, Name), Place<'t>>,
   wires: Vec<Option<Place<'t>>>,
   redexes: Vec<LoanedMut<'t, (Tree, Tree)>>,
   name_idx: u64,
@@ -104,9 +102,10 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
   fn encode_term(&mut self, term: &Term, up: Place<'t>) {
     maybe_grow(|| {
       match term {
-        Term::Lnk { nam } => self.link_global(nam, up),
-        Term::Ref { nam } => self.link(up, Place::Tree(LoanedMut::new(Tree::Ref { nam: nam.to_string() }))),
         Term::Era => self.link(up, Place::Tree(LoanedMut::new(Tree::Era))),
+        Term::Var { nam } => self.link_var(false, nam, up),
+        Term::Lnk { nam } => self.link_var(true, nam, up),
+        Term::Ref { nam } => self.link(up, Place::Tree(LoanedMut::new(Tree::Ref { nam: nam.to_string() }))),
         Term::Num { val } => self.link(up, Place::Tree(LoanedMut::new(Tree::Num { val: *val as i64 }))),
         // A lambda becomes to a con node. Ports:
         // - 0: points to where the lambda occurs.
@@ -150,16 +149,6 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           self.encode_term(&rules[1], Place::Hole(succ));
           self.link(up, Place::Hole(out));
         }
-        Term::Var { nam } => {
-          // We assume this variable to be valid, bound and correctly scoped.
-          // This pass must be done before.
-          debug_assert!(
-            self.scope.get(nam).is_some_and(|x| !x.is_empty()),
-            "Unbound variable {nam}. Expected this check to be already done"
-          );
-          let down = self.scope.get_mut(nam).unwrap().pop().unwrap();
-          self.link(up, down);
-        }
         Term::Let { pat, val, nxt } => {
           let wire = self.new_wire();
           self.encode_term(val, Place::Wire(wire));
@@ -198,8 +187,8 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
   fn encode_pat(&mut self, pat: &Pattern, up: Place<'t>) {
     maybe_grow(|| match pat {
       Pattern::Var(None) => self.link(up, Place::Tree(LoanedMut::new(Tree::Era))),
-      Pattern::Var(Some(name)) => self.scope.entry(name.clone()).or_default().push(up),
-      Pattern::Chn(name) => self.link_global(name, up),
+      Pattern::Var(Some(name)) => self.link_var(false, name, up),
+      Pattern::Chn(name) => self.link_var(true, name, up),
       Pattern::Fan(fan, tag, els) => {
         let kind = self.fan_kind(fan, tag);
         self.make_node_list(kind, up, els.iter().map(|el| |slf: &mut Self, up| slf.encode_pat(el, up)));
@@ -272,8 +261,8 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
     if *fan == FanKind::Tup { Tup(lab) } else { Dup(lab.unwrap()) }
   }
 
-  fn link_global(&mut self, name: &Name, place: Place<'t>) {
-    match self.global_vars.entry(name.clone()) {
+  fn link_var(&mut self, global: bool, name: &Name, place: Place<'t>) {
+    match self.vars.entry((global, name.clone())) {
       Entry::Occupied(e) => {
         let other = e.remove();
         self.link(place, other);
