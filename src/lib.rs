@@ -111,6 +111,8 @@ pub fn desugar_book(
 
   ctx.resolve_refs()?;
 
+  ctx.book.apply_bnd();
+
   ctx.fix_match_terms()?;
   ctx.desugar_match_defs()?;
 

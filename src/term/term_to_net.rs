@@ -173,12 +173,12 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           self.encode_term(snd, Place::Hole(rhs));
           self.link(up, Place::Hole(out));
         }
-        // Removed in earlier passes:
-        Term::Use { .. }
-        | Term::Mat { .. }
-        | Term::Nat { .. }
-        | Term::Str { .. }
-        | Term::Lst { .. }
+        Term::Use { .. }  // Removed in earlier pass
+        | Term::Bnd { .. } // Removed in earlier pass
+        | Term::Mat { .. } // Removed in earlier pass
+        | Term::Nat { .. } // Removed in encode_nat
+        | Term::Str { .. } // Removed in encode_str
+        | Term::Lst { .. } // Removed in encode_list
         | Term::Err => unreachable!(),
       }
     })

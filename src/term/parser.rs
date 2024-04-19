@@ -15,7 +15,7 @@ use TSPL::Parser;
 // <Pattern>    ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number> | "(" <Pattern> ("," <Pattern>)+ ")"
 // <Term>       ::=
 //   <Number> | <NumOp> | <Tup> | <App> | <Group> | <Nat> | <Lam> | <UnscopedLam> |
-//   <Use> | <Dup> | <LetTup> | <Let> | <Match> | <Switch> | <Era> | <UnscopedVar> | <Var>
+//   <Use> | <Dup> | <LetTup> | <Let> | <Bind> | <Match> | <Switch> | <Era> | <UnscopedVar> | <Var>
 // <Lam>        ::= <Tag>? ("λ"|"@") <NameEra> <Term>
 // <UnscopedLam>::= <Tag>? ("λ"|"@") "$" <Name> <Term>
 // <NumOp>      ::= "(" <Operator> <Term> <Term> ")"
@@ -24,6 +24,8 @@ use TSPL::Parser;
 // <Group>      ::= "(" <Term> ")"
 // <Use>        ::= "use" <Name> "=" <Term> ";"? <Term>
 // <Let>        ::= "let" <NameEra> "=" <Term> ";"? <Term>
+// <Bind>       ::= "do" <Name> "{" <Ask> "}"
+// <Ask>        ::= "ask" <Pattern> "=" <Term> ";" <Term> | <Term>
 // <LetTup>     ::= "let" "(" <NameEra> ("," <NameEra>)+ ")" "=" <Term> ";"? <Term>
 // <Dup>        ::= "let" <Tag>? "{" <NameEra> (","? <NameEra>)+ "}" "=" <Term> ";"? <Term>
 // <List>       ::= "[" (<Term> ","?)* "]"
@@ -335,6 +337,12 @@ impl<'a> TermParser<'a> {
           } else if self.try_consume("switch") {
             // switch
             self.parse_switch()?
+          } else if self.try_consume("do ") {
+            let fun = self.parse_name()?;
+            self.consume("{")?;
+            let ask = self.parse_ask(Name::new(fun))?;
+            self.consume("}")?;
+            ask
           } else {
             // var
             let nam = self.labelled(|p| p.parse_hvml_name(), "term")?;
@@ -343,6 +351,21 @@ impl<'a> TermParser<'a> {
         }
       };
       Ok(term)
+    })
+  }
+
+  fn parse_ask(&mut self, fun: Name) -> Result<Term, String> {
+    maybe_grow(|| {
+      if self.try_consume("ask") {
+        let ask = self.parse_pattern(true)?;
+        self.consume("=")?;
+        let val = self.parse_term()?;
+        self.try_consume(";");
+        let nxt = self.parse_ask(fun.clone())?;
+        Ok(Term::Bnd { fun, ask: Box::new(ask), val: Box::new(val), nxt: Box::new(nxt) })
+      } else {
+        self.parse_term()
+      }
     })
   }
 

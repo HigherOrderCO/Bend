@@ -1,0 +1,8 @@
+Result.bind (Result.ok val) f = (f val)
+Result.bind err _ = err
+
+Main = do Result.bind {
+  ask y = (HVM.store "file.txt" "Alice");
+  ask x = (HVM.load "file.txt");
+  x
+}

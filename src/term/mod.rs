@@ -87,6 +87,12 @@ pub enum Term {
     val: Box<Term>,
     nxt: Box<Term>,
   },
+  Bnd {
+    fun: Name,
+    ask: Box<Pattern>,
+    val: Box<Term>,
+    nxt: Box<Term>,
+  },
   Use {
     nam: Option<Name>,
     val: Box<Term>,
@@ -294,6 +300,9 @@ impl Clone for Term {
       Self::Var { nam } => Self::Var { nam: nam.clone() },
       Self::Lnk { nam } => Self::Lnk { nam: nam.clone() },
       Self::Let { pat, val, nxt } => Self::Let { pat: pat.clone(), val: val.clone(), nxt: nxt.clone() },
+      Self::Bnd { fun, ask, val, nxt } => {
+        Self::Bnd { fun: fun.clone(), ask: ask.clone(), val: val.clone(), nxt: nxt.clone() }
+      }
       Self::Use { nam, val, nxt } => Self::Use { nam: nam.clone(), val: val.clone(), nxt: nxt.clone() },
       Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
       Self::Fan { fan, tag, els } => Self::Fan { fan: *fan, tag: tag.clone(), els: els.clone() },
@@ -460,6 +469,7 @@ impl Term {
       }
       Term::Fan { els, .. } | Term::Lst { els } => ChildrenIter::Vec(els),
       Term::Let { val: fst, nxt: snd, .. }
+      | Term::Bnd { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
       | Term::Opx { fst, snd, .. } => ChildrenIter::Two([fst.as_ref(), snd.as_ref()]),
@@ -486,6 +496,7 @@ impl Term {
       }
       Term::Fan { els, .. } | Term::Lst { els } => ChildrenIter::Vec(els),
       Term::Let { val: fst, nxt: snd, .. }
+      | Term::Bnd { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
       | Term::Opx { fst, snd, .. } => ChildrenIter::Two([fst.as_mut(), snd.as_mut()]),
@@ -536,6 +547,9 @@ impl Term {
       Term::Let { pat, val, nxt, .. } => {
         ChildrenIter::Two([(val.as_ref(), BindsIter::Zero([])), (nxt.as_ref(), BindsIter::Pat(pat.binds()))])
       }
+      Term::Bnd { ask, val, nxt, .. } => {
+        ChildrenIter::Two([(val.as_ref(), BindsIter::Zero([])), (nxt.as_ref(), BindsIter::Pat(ask.binds()))])
+      }
       Term::Use { nam, val, nxt, .. } => {
         ChildrenIter::Two([(val.as_ref(), BindsIter::Zero([])), (nxt.as_ref(), BindsIter::One([nam]))])
       }
@@ -583,6 +597,9 @@ impl Term {
       }
       Term::Let { pat, val, nxt, .. } => {
         ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::Pat(pat.binds()))])
+      }
+      Term::Bnd { val, nxt, .. } => {
+        ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::Zero([]))])
       }
       Term::Use { nam, val, nxt } => {
         ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([&*nam]))])
@@ -632,6 +649,10 @@ impl Term {
       Term::Let { pat, val, nxt, .. } => ChildrenIter::Two([
         (val.as_mut(), BindsIter::Zero([])),
         (nxt.as_mut(), BindsIter::Pat(pat.binds_mut())),
+      ]),
+      Term::Bnd { ask, val, nxt, .. } => ChildrenIter::Two([
+        (val.as_mut(), BindsIter::Zero([])),
+        (nxt.as_mut(), BindsIter::Pat(ask.binds_mut())),
       ]),
       Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
         ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
