@@ -199,10 +199,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
 
   fn link(&mut self, a: Place<'t>, b: Place<'t>) {
     match (a, b) {
-      (Place::Tree(a), Place::Tree(b)) => self.redexes.push(LoanedMut::merge(Default::default(), |r, m| {
-        m.place(b, &mut r.0);
-        m.place(a, &mut r.1);
-      })),
+      (Place::Tree(a), Place::Tree(b)) => self.redexes.push((b, a).into()),
       (Place::Tree(t), Place::Hole(h)) | (Place::Hole(h), Place::Tree(t)) => {
         t.place(h);
       }

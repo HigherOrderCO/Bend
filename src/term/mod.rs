@@ -15,11 +15,13 @@ pub mod display;
 pub mod load_book;
 pub mod net_to_term;
 pub mod parser;
+pub mod readback;
 pub mod term_to_net;
 pub mod transform;
 
 pub use hvmc::ops::{IntOp, Op, Ty as OpType};
 pub use net_to_term::{net_to_term, ReadbackError};
+pub use readback::readback;
 pub use term_to_net::{book_to_nets, term_to_net};
 
 pub static STRINGS: GlobalPool<String> = GlobalPool::new();
@@ -168,6 +170,12 @@ pub enum Pattern {
   Fan(FanKind, Tag, Vec<Pattern>),
   Lst(Vec<Pattern>),
   Str(GlobalString),
+}
+
+impl Default for Pattern {
+  fn default() -> Self {
+    Pattern::Var(None)
+  }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]

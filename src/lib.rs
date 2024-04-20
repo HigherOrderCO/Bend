@@ -26,6 +26,8 @@ pub mod term;
 
 pub use term::load_book::load_file_to_book;
 
+use crate::term::readback;
+
 pub const ENTRY_POINT: &str = "main";
 pub const HVM1_ENTRY_POINT: &str = "Main";
 
@@ -263,8 +265,7 @@ pub fn readback_hvmc(
   adt_encoding: AdtEncoding,
 ) -> (Term, Diagnostics) {
   let mut diags = Diagnostics::default();
-  let net = hvmc_to_net(net);
-  let mut term = net_to_term(&net, book, labels, linear, &mut diags);
+  let mut term = readback(net, book, labels, linear, &mut diags);
 
   let resugar_errs = term.resugar_adts(book, adt_encoding);
   term.resugar_builtins();
@@ -341,9 +342,8 @@ impl RunOpts {
   fn debug_hook<'a>(&'a self, book: &'a Book, labels: &'a Labels) -> Option<impl FnMut(&Net) + 'a> {
     self.debug.then_some({
       |net: &_| {
-        let net = hvmc_to_net(net);
         let mut diags = Diagnostics::default();
-        let res_term = net_to_term(&net, book, labels, self.linear, &mut diags);
+        let res_term = readback(net, book, labels, self.linear, &mut diags);
         eprint!("{diags}");
         if self.pretty {
           println!("{}\n---------------------------------------", res_term.display_pretty(0));

@@ -57,7 +57,7 @@ impl CtrKind {
       CtrKind::Dup(x) => (x << 2) | 0b10,
     }
   }
-  fn from_lab(lab: u16) -> Self {
+  pub fn from_lab(lab: u16) -> Self {
     match (lab >> 2, lab & 0b11) {
       (0, 0b00) => CtrKind::Con(None),
       (x, 0b00) => CtrKind::Con(Some(x - 1)),
