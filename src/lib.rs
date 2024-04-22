@@ -1,7 +1,7 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
 
-use builtins::{create_host, CORE_BUILTINS_USES};
+use builtins::CORE_BUILTINS_USES;
 use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity, WarningType};
 use hvmc::{
   ast::Net,
@@ -160,14 +160,17 @@ pub fn desugar_book(
 }
 
 pub fn run_book(
-  mut book: Book,
-  max_memory: Option<usize>,
-  run_opts: RunOpts,
-  compile_opts: CompileOpts,
+  _book: Book,
+  _max_memory: Option<usize>,
+  _run_opts: RunOpts,
+  _compile_opts: CompileOpts,
   diagnostics_cfg: DiagnosticsConfig,
-  args: Option<Vec<Term>>,
+  _args: Option<Vec<Term>>,
 ) -> Result<(Term, RunInfo), Diagnostics> {
-  let CompileResult { core_book, labels, diagnostics } =
+  let mut diags = Diagnostics::new(diagnostics_cfg);
+  diags.add_book_error("Execution not yet implemented for hvm32");
+  Err(diags)
+  /* let CompileResult { core_book, labels, diagnostics } =
     compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args)?;
 
   // TODO: Printing should be taken care by the cli module, but we'd
@@ -192,7 +195,7 @@ pub fn run_book(
     readback_hvmc(&res_lnet, &book, &labels, run_opts.linear, compile_opts.adt_encoding);
 
   let info = RunInfo { stats, diagnostics, net: res_lnet, book, labels };
-  Ok((res_term, info))
+  Ok((res_term, info)) */
 }
 
 /// Utility function to count the amount of nodes in an hvm-core AST net
@@ -338,7 +341,7 @@ impl RunOpts {
     Self { lazy_mode: true, single_core: true, ..Self::default() }
   }
 
-  fn debug_hook<'a>(&'a self, book: &'a Book, labels: &'a Labels) -> Option<impl FnMut(&Net) + 'a> {
+  fn _debug_hook<'a>(&'a self, book: &'a Book, labels: &'a Labels) -> Option<impl FnMut(&Net) + 'a> {
     self.debug.then_some({
       |net: &_| {
         let net = hvmc_to_net(net);
@@ -413,7 +416,8 @@ impl CompileOpts {
     Self {
       eta: true,
       prune: true,
-      pre_reduce: true,
+      // TODO: disabled while execution not implemented for hvm32
+      pre_reduce: false,
       float_combinators: true,
       merge: true,
       inline: true,
@@ -435,7 +439,7 @@ impl CompileOpts {
 
   /// All optimizations disabled, except float_combinators and linearize_matches
   pub fn default_strict() -> Self {
-    Self { float_combinators: true, ..Self::default() }
+    Self { float_combinators: true, linearize_matches: OptLevel::Extra, ..Self::default() }
   }
 
   // Disable optimizations that don't work or are unnecessary on lazy mode

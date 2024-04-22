@@ -2,8 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/black_box.hvm
 ---
-@def_that_uses_black_box = (a b)
-  & @HVM.black_box ~ (a <* #7 b>)
+@def_that_uses_black_box = (a c)
+  & $(b $(#113 c)) ~ #2
+  & @HVM.black_box ~ (a b)
 
 @main = a
-  & @def_that_uses_black_box ~ (#6 a)
+  & @def_that_uses_black_box ~ (#97 a)

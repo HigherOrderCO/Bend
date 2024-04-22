@@ -1,12 +1,14 @@
 use crate::{
   maybe_grow,
   term::{
-    display::DisplayFn, Adt, Book, Definition, FanKind, IntOp, MatchRule, Name, Op, OpType, Pattern, Rule,
-    Tag, Term, STRINGS,
+    display::DisplayFn, Adt, Book, Definition, FanKind, MatchRule, Name, Op, Pattern, Rule, Tag, Term,
+    STRINGS,
   },
 };
 use highlight_error::highlight_error;
 use TSPL::Parser;
+
+use super::NumType;
 
 // hvml grammar description:
 // <Book>       ::= (<Data> | <Rule>)*
@@ -179,13 +181,13 @@ impl<'a> TermParser<'a> {
         '\'' => {
           unexpected_tag(self)?;
           let char = self.parse_quoted_char()?;
-          Pattern::Num(char as u64)
+          Pattern::Num(char as u32)
         }
         // Number
         c if c.is_ascii_digit() => {
           unexpected_tag(self)?;
           let num = self.parse_u64()?;
-          Pattern::Num(num)
+          Pattern::Num(num as u32)
         }
         // Channel
         '$' => {
@@ -224,9 +226,7 @@ impl<'a> TermParser<'a> {
           let starts_with_oper = self.skip_peek_one().map_or(false, |c| "+-*/%&|<>^=!".contains(c));
           if starts_with_oper {
             let opr = self.parse_oper()?;
-            if self.skip_starts_with(",")
-              && let Op { ty: _, op: IntOp::Mul } = opr
-            {
+            if self.skip_starts_with(",") && opr == Op::MUL {
               // jk, actually a tuple
               let mut els = vec![Term::Era];
               while self.try_consume(",") {
@@ -304,13 +304,13 @@ impl<'a> TermParser<'a> {
         '\'' => {
           unexpected_tag(self)?;
           let chr = self.parse_quoted_char()?;
-          Term::Num { val: chr as u64 }
+          Term::Num { typ: NumType::U24, val: chr as u32 }
         }
         // Native num
         c if c.is_ascii_digit() => {
           unexpected_tag(self)?;
           let val = self.parse_u64()?;
-          Term::Num { val }
+          Term::Num { typ: NumType::U24, val: val as u32 }
         }
         _ => {
           unexpected_tag(self)?;
@@ -371,37 +371,37 @@ impl<'a> TermParser<'a> {
 
   fn parse_oper(&mut self) -> Result<Op, String> {
     let opr = if self.try_consume("+") {
-      Op { ty: OpType::U60, op: IntOp::Add }
+      Op::ADD
     } else if self.try_consume("-") {
-      Op { ty: OpType::U60, op: IntOp::Sub }
+      Op::SUB
     } else if self.try_consume("*") {
-      Op { ty: OpType::U60, op: IntOp::Mul }
+      Op::MUL
     } else if self.try_consume("/") {
-      Op { ty: OpType::U60, op: IntOp::Div }
+      Op::DIV
     } else if self.try_consume("%") {
-      Op { ty: OpType::U60, op: IntOp::Rem }
+      Op::REM
     } else if self.try_consume("<<") {
-      Op { ty: OpType::U60, op: IntOp::Shl }
+      Op::SHL
     } else if self.try_consume(">>") {
-      Op { ty: OpType::U60, op: IntOp::Shr }
+      Op::SHR
     } else if self.try_consume("<=") {
-      Op { ty: OpType::U60, op: IntOp::Le }
+      Op::LTE
     } else if self.try_consume(">=") {
-      Op { ty: OpType::U60, op: IntOp::Ge }
+      Op::GTE
     } else if self.try_consume("<") {
-      Op { ty: OpType::U60, op: IntOp::Lt }
+      Op::LTN
     } else if self.try_consume(">") {
-      Op { ty: OpType::U60, op: IntOp::Gt }
+      Op::GTN
     } else if self.try_consume("==") {
-      Op { ty: OpType::U60, op: IntOp::Eq }
+      Op::EQL
     } else if self.try_consume("!=") {
-      Op { ty: OpType::U60, op: IntOp::Ne }
+      Op::NEQ
     } else if self.try_consume("&") {
-      Op { ty: OpType::U60, op: IntOp::And }
+      Op::AND
     } else if self.try_consume("|") {
-      Op { ty: OpType::U60, op: IntOp::Or }
+      Op::OR
     } else if self.try_consume("^") {
-      Op { ty: OpType::U60, op: IntOp::Xor }
+      Op::XOR
     } else {
       return self.expected("numeric operator");
     };
@@ -435,9 +435,11 @@ impl<'a> TermParser<'a> {
     let tag = if self.skip_peek_one() == Some('#')
       && !self.peek_many(2).is_some_and(|x| x.chars().nth(1).unwrap().is_ascii_digit())
     {
-      self.advance_one();
+      let ctx = highlight_error(index, index + 1, self.input);
+      return Err(format!("Tagged terms not supported for hvm32.\n{ctx}"));
+      /* self.advance_one();
       let nam = self.labelled(|p| p.parse_hvml_name(), "tag name")?;
-      Some(Tag::Named(nam))
+      Some(Tag::Named(nam)) */
     } else {
       None
     };

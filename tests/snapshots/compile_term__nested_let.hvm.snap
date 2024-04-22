@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/nested_let.hvm
 ---
 a
-  & [[#2 #4] [#3 #6]] ~ [[* *] [a *]]
+  & ((#33 #65) (#49 #97)) ~ ((* *) (a *))

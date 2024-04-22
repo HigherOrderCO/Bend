@@ -18,7 +18,6 @@ pub mod parser;
 pub mod term_to_net;
 pub mod transform;
 
-pub use hvmc::ops::{IntOp, Op, Ty as OpType};
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_net};
 
@@ -110,7 +109,8 @@ pub enum Term {
     els: Vec<Term>,
   },
   Num {
-    val: u64,
+    typ: NumType,
+    val: u32,
   },
   Nat {
     val: u64,
@@ -158,12 +158,49 @@ pub enum FanKind {
   Dup,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Op {
+  ADD,
+  SUB,
+  MUL,
+  DIV,
+  REM,
+  EQL,
+  NEQ,
+  LTN,
+  GTN,
+  LTE,
+  GTE,
+  AND,
+  OR,
+  XOR,
+  SHL,
+  SHR,
+  // a^b
+  POW,
+  /// log_a(b)
+  LOG,
+  /// atan(a, b)
+  ATN,
+  /// ceil(a) + floor(b)
+  RND,
+  /// 0u24
+  ZER,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NumType {
+  U24 = 1,
+  I24 = 2,
+  F24 = 3,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
   Var(Option<Name>),
   Chn(Name),
   Ctr(Name, Vec<Pattern>),
-  Num(u64),
+  Num(u32),
   /// Either a tuple or a duplication
   Fan(FanKind, Tag, Vec<Pattern>),
   Lst(Vec<Pattern>),
@@ -188,9 +225,9 @@ pub struct Adt {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AdtEncoding {
+  #[default]
   Scott,
 
-  #[default]
   TaggedScott,
 }
 
@@ -306,7 +343,7 @@ impl Clone for Term {
       Self::Use { nam, val, nxt } => Self::Use { nam: nam.clone(), val: val.clone(), nxt: nxt.clone() },
       Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
       Self::Fan { fan, tag, els } => Self::Fan { fan: *fan, tag: tag.clone(), els: els.clone() },
-      Self::Num { val } => Self::Num { val: *val },
+      Self::Num { typ, val } => Self::Num { typ: *typ, val: *val },
       Self::Nat { val } => Self::Nat { val: *val },
       Self::Str { val } => Self::Str { val: val.clone() },
       Self::Lst { els } => Self::Lst { els: els.clone() },
@@ -414,27 +451,19 @@ impl Term {
     Term::Str { val: STRINGS.get(str) }
   }
 
-  pub fn sub_num(arg: Term, val: u64) -> Term {
+  pub fn sub_num(arg: Term, val: u32, typ: NumType) -> Term {
     if val == 0 {
       arg
     } else {
-      Term::Opx {
-        opr: Op { ty: OpType::U60, op: IntOp::Sub },
-        fst: Box::new(arg),
-        snd: Box::new(Term::Num { val }),
-      }
+      Term::Opx { opr: Op::SUB, fst: Box::new(arg), snd: Box::new(Term::Num { typ, val }) }
     }
   }
 
-  pub fn add_num(arg: Term, val: u64) -> Term {
+  pub fn add_num(arg: Term, val: u32, typ: NumType) -> Term {
     if val == 0 {
       arg
     } else {
-      Term::Opx {
-        opr: Op { ty: OpType::U60, op: IntOp::Add },
-        fst: Box::new(arg),
-        snd: Box::new(Term::Num { val }),
-      }
+      Term::Opx { opr: Op::ADD, fst: Box::new(arg), snd: Box::new(Term::Num { typ, val }) }
     }
   }
 
@@ -786,6 +815,45 @@ impl Term {
   }
 }
 
+impl From<Op> for u8 {
+  fn from(value: Op) -> Self {
+    match value {
+      Op::ADD => 0x0,
+      Op::SUB => 0x1,
+      Op::MUL => 0x2,
+      Op::DIV => 0x3,
+      Op::REM => 0x4,
+      Op::EQL => 0x5,
+      Op::NEQ => 0x6,
+      Op::LTN => 0x7,
+      Op::GTN => 0x8,
+      Op::LTE => 0x9,
+      Op::GTE => 0xa,
+      Op::AND => 0xb,
+      Op::OR => 0xc,
+      Op::XOR => 0xd,
+      Op::SHL => 0xe,
+      Op::SHR => 0xf,
+      Op::POW => 0xb,
+      Op::LOG => 0xc,
+      Op::ATN => 0xd,
+      Op::RND => 0xe,
+      Op::ZER => 0xf,
+    }
+  }
+}
+
+impl From<u8> for NumType {
+  fn from(value: u8) -> Self {
+    match value {
+      x if x == NumType::U24 as u8 => NumType::U24,
+      x if x == NumType::I24 as u8 => NumType::I24,
+      x if x == NumType::F24 as u8 => NumType::F24,
+      _ => unreachable!(),
+    }
+  }
+}
+
 impl Pattern {
   pub fn binds(&self) -> impl DoubleEndedIterator<Item = &Option<Name>> + Clone {
     self.iter().filter_map(|pat| match pat {
@@ -848,7 +916,7 @@ impl Pattern {
       Pattern::Ctr(ctr, args) => {
         Term::call(Term::Ref { nam: ctr.clone() }, args.iter().map(|arg| arg.to_term()))
       }
-      Pattern::Num(val) => Term::Num { val: *val },
+      Pattern::Num(val) => Term::Num { typ: NumType::U24, val: *val },
       Pattern::Fan(fan, tag, args) => {
         Term::Fan { fan: *fan, tag: tag.clone(), els: args.iter().map(|p| p.to_term()).collect() }
       }

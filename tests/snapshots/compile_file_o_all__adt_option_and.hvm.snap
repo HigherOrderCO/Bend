@@ -2,17 +2,18 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/adt_option_and.hvm
 ---
-@None = {4 * {4 a a}}
+@None = (* (a a))
 
-@Option.and = ({4 @Option.and$C1 {4 (* @None) a}} a)
+@Option.and = ((@Option.and$C1 ((* @None) a)) a)
 
-@Option.and$C0 = {4 a (b {4 {4 [b a] c} {4 * c}})}
+@Option.and$C0 = (b (a c))
+  & @Some ~ ((a b) c)
 
-@Option.and$C1 = {4 a ({4 @Option.and$C0 {4 (* @None) (a b)}} b)}
+@Option.and$C1 = (a ((@Option.and$C0 ((* @None) (a b))) b))
 
-@Some = (a {4 {4 a b} {4 * b}})
+@Some = (a ((a b) (* b)))
 
 @main = c
   & @Option.and ~ (a (b c))
-  & @Some ~ (#1 a)
-  & @Some ~ (#3 b)
+  & @Some ~ (#17 a)
+  & @Some ~ (#49 b)

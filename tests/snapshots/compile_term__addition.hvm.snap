@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/addition.hvm
 ---
-c
-  & (a b) ~ (#8 c)
-  & #1 ~ <+ #1 <+ a b>>
+d
+  & (b c) ~ (#129 d)
+  & $(a $(b c)) ~ #0
+  & $(#17 $(#17 a)) ~ #0

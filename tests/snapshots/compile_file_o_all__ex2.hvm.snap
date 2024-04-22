@@ -6,15 +6,28 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
 
 @I = (a (* ((a b) (* b))))
 
-@c2 = ({2 (a b) (c a)} (c b))
+@O = (a ((a b) (* (* b))))
 
-@decO = ((@decO (@low (@E a))) (* ((a b) (* b))))
+@c2 = ({(b c) (a b)} (a c))
+
+@dec = ((@decO (@decI (@E a))) a)
+
+@decI = a
+  & @low ~ a
+
+@decO = (a c)
+  & @I ~ (b c)
+  & @dec ~ (a b)
 
 @low = ((@lowO (@lowI (@E a))) a)
 
-@lowI = (a (((* ((a b) (* b))) c) (* (* c))))
+@lowI = (a c)
+  & @O ~ (b c)
+  & @I ~ (a b)
 
-@lowO = (a ((((a b) (* (* b))) c) (* (* c))))
+@lowO = (a c)
+  & @O ~ (b c)
+  & @O ~ (a b)
 
 @main = b
   & @run ~ (a b)
@@ -22,6 +35,12 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
 
 @run = ((@runO (@runI (@E a))) a)
 
-@runI = ((@lowO (@lowI (@E (@runO (@runI (@E a)))))) a)
+@runI = (a d)
+  & @run ~ (c d)
+  & @dec ~ (b c)
+  & @I ~ (a b)
 
-@runO = ((@decO (@low (@E (@lowO (@lowI (@E (@runO (@runI (@E a))))))))) a)
+@runO = (a d)
+  & @run ~ (c d)
+  & @dec ~ (b c)
+  & @O ~ (a b)

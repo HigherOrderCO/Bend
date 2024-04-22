@@ -2,14 +2,15 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/scrutinee_reconstruction.hvm
 ---
-@None = {4 * {4 a a}}
+@None = (* (a a))
 
-@Option.or = ({4 @Option.or$C0 {4 (a a) b}} b)
+@Option.or = ((@Option.or$C0 ((a a) b)) b)
 
-@Option.or$C0 = {4 a (* {4 {4 a b} {4 * b}})}
+@Option.or$C0 = (a (* b))
+  & @Some ~ (a b)
 
-@Some = (a {4 {4 a b} {4 * b}})
+@Some = (a ((a b) (* b)))
 
 @main = b
   & @Option.or ~ (a (@None b))
-  & @Some ~ (#5 a)
+  & @Some ~ (#81 a)

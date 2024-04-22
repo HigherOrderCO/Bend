@@ -6,6 +6,6 @@ Warnings:
 In definition 'a':
   Definition is unused.
 
-@a = #1
+@a = #17
 
-@main = #2
+@main = #33

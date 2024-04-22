@@ -2,12 +2,13 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/match_dup_and_reconstruction.hvm
 ---
-@Boxed = (a {4 {4 a b} b})
+@Boxed = (a ((a b) b))
 
-@Got = ({4 @Got$C0 a} a)
+@Got = ((@Got$C0 a) a)
 
-@Got$C0 = {4 {2 a b} [{4 {4 a c} c} b]}
+@Got$C0 = ({a c} (b c))
+  & @Boxed ~ (a b)
 
 @main = b
   & @Got ~ (a b)
-  & @Boxed ~ (#10 a)
+  & @Boxed ~ (#161 a)

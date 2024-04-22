@@ -1,4 +1,4 @@
-use super::{Book, Definition, FanKind, Name, Pattern, Rule, Tag, Term};
+use super::{Book, Definition, FanKind, Name, Op, Pattern, Rule, Tag, Term};
 use crate::maybe_grow;
 use std::{fmt, ops::Deref};
 
@@ -114,7 +114,7 @@ impl fmt::Display for Term {
       Term::Fan { fan: FanKind::Tup, tag, els } => write!(f, "{}({})", tag, DisplayJoin(|| els.iter(), ", ")),
       Term::Fan { fan: FanKind::Dup, tag, els } => write!(f, "{}{{{}}}", tag, DisplayJoin(|| els, " ")),
       Term::Era => write!(f, "*"),
-      Term::Num { val } => write!(f, "{val}"),
+      Term::Num { typ: _, val } => write!(f, "{val}"),
       Term::Nat { val } => write!(f, "#{val}"),
       Term::Str { val } => write!(f, "{val:?}"),
       Term::Opx { opr, fst, snd } => {
@@ -194,6 +194,34 @@ impl Term {
         _ => write!(f, "{}", self),
       })
     })
+  }
+}
+
+impl fmt::Display for Op {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match self {
+      Op::ADD => write!(f, "+"),
+      Op::SUB => write!(f, "-"),
+      Op::MUL => write!(f, "*"),
+      Op::DIV => write!(f, "/"),
+      Op::REM => write!(f, "%"),
+      Op::EQL => write!(f, "=="),
+      Op::NEQ => write!(f, "!="),
+      Op::LTN => write!(f, "<"),
+      Op::GTN => write!(f, ">"),
+      Op::LTE => write!(f, "<="),
+      Op::GTE => write!(f, ">="),
+      Op::AND => write!(f, "&"),
+      Op::OR => write!(f, "|"),
+      Op::XOR => write!(f, "^"),
+      Op::SHL => write!(f, "<<"),
+      Op::SHR => write!(f, ">>"),
+      Op::POW => todo!(),
+      Op::LOG => todo!(),
+      Op::ATN => todo!(),
+      Op::RND => todo!(),
+      Op::ZER => todo!(),
+    }
   }
 }
 
@@ -352,7 +380,7 @@ impl Term {
         }
 
         Term::Nat { val } => write!(f, "#{val}"),
-        Term::Num { val } => write!(f, "{val}"),
+        Term::Num { typ: _, val } => write!(f, "{val}"),
         Term::Str { val } => write!(f, "{val:?}"),
         Term::Ref { nam } => write!(f, "{nam}"),
         Term::Era => write!(f, "*"),

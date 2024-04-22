@@ -8,4 +8,4 @@ In compiled inet 'disconnected_self_lam':
 In compiled inet 'dup_self':
   Found term that compiles into an inet with a vicious cycle
 
-@main = [@dup_self @disconnected_self_lam]
+@main = (@dup_self @disconnected_self_lam)

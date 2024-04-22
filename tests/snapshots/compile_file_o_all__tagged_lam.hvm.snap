@@ -2,5 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/tagged_lam.hvm
 ---
-@main = d
-  & [{4 <+ #1 a> a} {4 {2 <* b c> b} c}] ~ {4 #2 d}
+Errors:
+In tests/golden_tests/compile_file_o_all/tagged_lam.hvm :
+Tagged terms not supported for hvm32.
+[0m  1 | main =[4m[31m [0m#foo ((#foo @x (+ x 1), #foo @x (* x x)) 2)[0m

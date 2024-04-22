@@ -62,7 +62,6 @@ pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, ViciousCycle
   let EncodeTermState { created_nodes, .. } = { state };
 
   let found_nodes = net.trees().map(count_nodes).sum::<usize>();
-
   if created_nodes != found_nodes {
     Err(ViciousCycleErr)?
   }
@@ -106,7 +105,10 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         Term::Var { nam } => self.link_var(false, nam, up),
         Term::Lnk { nam } => self.link_var(true, nam, up),
         Term::Ref { nam } => self.link(up, Place::Tree(LoanedMut::new(Tree::Ref { nam: nam.to_string() }))),
-        Term::Num { val } => self.link(up, Place::Tree(LoanedMut::new(Tree::Num { val: *val as i64 }))),
+        Term::Num { typ, val } => {
+          let val = (*val << 4) | (*typ as u32);
+          self.link(up, Place::Tree(LoanedMut::new(Tree::Num { val })))
+        }
         // A lambda becomes to a con node. Ports:
         // - 0: points to where the lambda occurs.
         // - 1: points to the lambda variable.
@@ -162,16 +164,16 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         }
         // core: & fst ~ <op snd ret>
         Term::Opx { opr, fst, snd } => {
-          self.created_nodes += 1;
-          let ((rhs, out), lhs) =
-            LoanedMut::loan_with(Tree::Op { op: *opr, rhs: hole(), out: hole() }, |t, l| {
-              let Tree::Op { rhs, out, .. } = t else { unreachable!() };
-              (l.loan_mut(rhs), l.loan_mut(out))
-            });
+          let opr_val = *opr as u32; // SYM
+          let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
+          let node1 = self.new_opr();
+          let node2 = self.new_opr();
 
-          self.encode_term(fst, Place::Tree(lhs));
-          self.encode_term(snd, Place::Hole(rhs));
-          self.link(up, Place::Hole(out));
+          self.link(oper, node1.0);
+          self.encode_term(fst, node1.1);
+          self.link(node1.2, node2.0);
+          self.encode_term(snd, node2.1);
+          self.link(up, node2.2);
         }
         Term::Use { .. }  // Removed in earlier pass
         | Term::Bnd { .. } // Removed in earlier pass
@@ -231,6 +233,16 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
       });
     let (a, b) = ports.split_at_mut(1);
     (Place::Tree(node), Place::Hole(&mut a[0]), Place::Hole(&mut b[0]))
+  }
+
+  fn new_opr(&mut self) -> (Place<'t>, Place<'t>, Place<'t>) {
+    self.created_nodes += 1;
+    let ((fst, snd), node) =
+      LoanedMut::loan_with(Tree::Op { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) }, |t, l| {
+        let Tree::Op { fst, snd } = t else { unreachable!() };
+        (l.loan_mut(fst), l.loan_mut(snd))
+      });
+    (Place::Tree(node), Place::Hole(fst), Place::Hole(snd))
   }
 
   /// Adds a list-like tree of nodes of the same kind to the inet.
@@ -312,22 +324,20 @@ impl LabelGenerator {
   // If some tag and new generate a new label, otherwise return the generated label.
   // If none use the implicit label counter.
   fn generate(&mut self, tag: &Tag) -> Option<u16> {
-    let mut unique = || {
-      let lab = self.next;
-      self.next += 1;
-      lab
-    };
     match tag {
-      Tag::Named(name) => match self.name_to_label.entry(name.clone()) {
-        Entry::Occupied(e) => Some(*e.get()),
-        Entry::Vacant(e) => {
-          let lab = unique();
-          self.label_to_name.insert(lab, name.clone());
-          Some(*e.insert(lab))
-        }
-      },
+      Tag::Named(_name) => {
+        todo!("Named tags not implemented for hvm32");
+        /* match self.name_to_label.entry(name.clone()) {
+          Entry::Occupied(e) => Some(*e.get()),
+          Entry::Vacant(e) => {
+            let lab = unique();
+            self.label_to_name.insert(lab, name.clone());
+            Some(*e.insert(lab))
+          }
+        } */
+      }
       Tag::Numeric(lab) => Some(*lab),
-      Tag::Auto => Some(unique()),
+      Tag::Auto => Some(0),
       Tag::Static => None,
     }
   }

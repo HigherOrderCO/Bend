@@ -16,7 +16,7 @@ input_file: tests/golden_tests/compile_file_o_no_all/redex_order.hvm
 @foo2 = c
   & @a ~ (b c)
   & @b ~ (a b)
-  & @c ~ (#0 a)
+  & @c ~ (#1 a)
 
 @main = a
   & @foo ~ (@foo2 a)

@@ -32,9 +32,9 @@ pub enum NodeKind {
   /// Reference to function definitions
   Ref { def_name: Name },
   /// Numbers
-  Num { val: u64 },
+  Num { val: u32 },
   /// Numeric operations
-  Op2 { opr: hvmc::ops::Op },
+  Op2,
   /// Pattern matching on numbers
   Mat,
 }
@@ -51,10 +51,11 @@ impl CtrKind {
     #[allow(clippy::identity_op)]
     match self {
       CtrKind::Con(None) => 0,
-      CtrKind::Con(Some(x)) => ((x + 1) << 2) | 0b00,
-      CtrKind::Tup(None) => 1,
-      CtrKind::Tup(Some(x)) => ((x + 1) << 2) | 0b01,
-      CtrKind::Dup(x) => (x << 2) | 0b10,
+      CtrKind::Con(Some(_)) => todo!("Tagged lambdas/applications not implemented for hvm32"),
+      CtrKind::Tup(None) => 0,
+      CtrKind::Tup(Some(_)) => todo!("Tagged tuples not implemented for hvm32"),
+      CtrKind::Dup(0) => 1,
+      CtrKind::Dup(_) => todo!("Tagged dups/sups not implemented for hvm32"),
     }
   }
   fn from_lab(lab: u16) -> Self {

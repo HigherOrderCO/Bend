@@ -20,7 +20,6 @@ clippy:
 
 test:
   cargo insta test --workspace
-  cargo insta test --workspace -- --ignored
 
 sort:
   cargo sort --check --workspace

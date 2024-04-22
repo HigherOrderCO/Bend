@@ -2,7 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/add_args.hvm
 ---
-@add = (<+ a b> (a b))
+@add = (a (b c))
+  & $(a $(b c)) ~ #0
 
 @main = (a (b c))
   & @add ~ (a (b c))

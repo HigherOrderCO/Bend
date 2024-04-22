@@ -2,5 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/complicated_dup.hvm
 ---
-({6 (a b) (d e)} f)
-  & ((c {2 a d}) b) ~ ((c e) f)
+({(a b) (d e)} f)
+  & ((c {a d}) b) ~ ((c e) f)

@@ -17,7 +17,7 @@ input_file: tests/golden_tests/compile_file/redex_order.hvm
   & @a ~ (@foo2$C1 a)
 
 @foo2$C0 = a
-  & @c ~ (#0 a)
+  & @c ~ (#1 a)
 
 @foo2$C1 = a
   & @b ~ (@foo2$C0 a)

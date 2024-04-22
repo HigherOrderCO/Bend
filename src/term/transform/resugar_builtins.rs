@@ -1,6 +1,6 @@
 use crate::{
   maybe_grow,
-  term::{Term, LCONS, LNIL, NAT_SUCC, NAT_ZERO, SCONS, SNIL},
+  term::{NumType, Term, LCONS, LNIL, NAT_SUCC, NAT_ZERO, SCONS, SNIL},
 };
 
 impl Term {
@@ -49,11 +49,11 @@ impl Term {
         tail.resugar_strings();
 
         if ctr == SCONS
-          && let Term::Num { val } = head
+          && let Term::Num { typ: NumType::U24, val } = head
           && let Term::Str { val: tail } = tail
         {
           // If well formed string, add the next character to the string we're building
-          let head = unsafe { char::from_u32_unchecked(*val as u32) }.to_string();
+          let head = unsafe { char::from_u32_unchecked(*val) }.to_string();
           let str = head + &tail;
           *self = Term::str(&str);
         } else {

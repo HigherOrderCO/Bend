@@ -147,6 +147,7 @@ fn compile_file_o_no_all() {
 }
 
 #[test]
+#[ignore = "while readback is not implemented for hvm32"]
 fn linear_readback() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let book = do_parse_book(code, path)?;
@@ -165,6 +166,7 @@ fn linear_readback() {
 }
 
 #[test]
+#[ignore = "while execution is not implemented for hvm32"]
 fn run_file() {
   run_golden_test_dir_multiple(function_name!(), &[
     (&|_code, path| {
@@ -197,6 +199,7 @@ fn run_file() {
 }
 
 #[test]
+#[ignore = "while lazy execution is not implemented for hvm32"]
 fn run_lazy() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let book = do_parse_book(code, path)?;
@@ -215,6 +218,7 @@ fn run_lazy() {
 }
 
 #[test]
+#[ignore = "while readback is not implemented for hvm32"]
 fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|code, _| {
     let net = hvmc::ast::Net::from_str(code)?;
@@ -313,7 +317,7 @@ fn desugar_file() {
 }
 
 #[test]
-#[ignore = "to not delay golden tests execution"]
+#[ignore = "while execution is not implemented for hvm32"]
 fn hangs() {
   let expected_normalization_time = 5;
 
@@ -346,13 +350,17 @@ fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
-    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
+    let diagnostics_cfg = DiagnosticsConfig {
+      recursion_pre_reduce: Severity::Allow,
+      ..DiagnosticsConfig::new(Severity::Error, true)
+    };
     let res = compile_book(&mut book, CompileOpts::default_strict(), diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
 
 #[test]
+#[ignore = "while execution is not implemented for hvm32"]
 fn run_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
@@ -396,6 +404,7 @@ fn mutual_recursion() {
 }
 
 #[test]
+#[ignore = "while execution is not implemented for hvm32"]
 fn io() {
   run_golden_test_dir_multiple(function_name!(), &[
     (&|code, path| {
@@ -416,6 +425,7 @@ fn io() {
 }
 
 #[test]
+#[ignore = "while execution is not implemented for hvm32"]
 fn examples() -> Result<(), Diagnostics> {
   let examples_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples");
 

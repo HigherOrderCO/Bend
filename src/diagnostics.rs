@@ -239,7 +239,8 @@ impl DiagnosticsConfig {
   }
 
   pub fn default_strict() -> Self {
-    Self { recursion_cycle: Severity::Error, recursion_pre_reduce: Severity::Error, ..Self::default() }
+    // TODO: Pre-reduce recursion check disabled while execution not implemented for hvm32
+    Self { recursion_cycle: Severity::Error, recursion_pre_reduce: Severity::Allow, ..Self::default() }
   }
 
   pub fn default_lazy() -> Self {

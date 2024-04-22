@@ -9,4 +9,4 @@ In definition 'Foo':
 @Foo = (* (a a))
 
 @main = a
-  & @Foo ~ (#1 (#2 a))
+  & @Foo ~ (#17 (#33 a))

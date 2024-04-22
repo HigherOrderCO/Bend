@@ -4,9 +4,9 @@ input_file: tests/golden_tests/cli/compile_inline.hvm
 ---
 @Era = *
 
-@Num = #42
+@Num = #673
 
 @RefToRef = *
 
 @main = a
-  & * ~ (#42 (* a))
+  & * ~ (#673 (* a))

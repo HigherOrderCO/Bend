@@ -1,22 +1,20 @@
-use crate::{
-  diagnostics::{Diagnostics, WarningType},
-  term::display::DisplayJoin,
-};
-use hvmc::{ast::Book, transform::pre_reduce::PreReduceStats};
+use crate::diagnostics::Diagnostics;
+use hvmc::ast::Book;
 
 pub const MAX_REWRITES_DEFAULT: u64 = 100_000;
 
 pub fn pre_reduce(
-  book: &mut Book,
-  entrypoint: &str,
-  max_rewrites: u64,
-  max_memory: Option<usize>,
-  check_only: bool,
+  _book: &mut Book,
+  _entrypoint: &str,
+  _max_rewrites: u64,
+  _max_memory: Option<usize>,
+  _check_only: bool,
   diags: &mut Diagnostics,
 ) -> Result<(), Diagnostics> {
   diags.start_pass();
 
-  // It would be even better if we could also set a memory limit and
+  diags.add_book_error("Pre-reduce not yet implemented for hvm32");
+  /* // It would be even better if we could also set a memory limit and
   // catch the cases where the limit is broken.
   // However, the allocator just panics, and catching it is a mess.
   // For now, we just choose a reasonable amount.
@@ -39,7 +37,7 @@ pub fn pre_reduce(
 
   if let Some(orig_book) = orig_book {
     *book = orig_book;
-  }
+  } */
 
   diags.fatal(())
 }

@@ -1,4 +1,4 @@
-use super::{parser::TermParser, Book, Name, Pattern, Term};
+use super::{parser::TermParser, Book, Name, NumType, Pattern, Term};
 use crate::maybe_grow;
 
 const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/term/builtins.hvm"));
@@ -61,7 +61,7 @@ impl Term {
 
   pub fn encode_str(val: &str) -> Term {
     val.chars().rfold(Term::r#ref(SNIL), |acc, char| {
-      Term::call(Term::r#ref(SCONS), [Term::Num { val: char as u64 }, acc])
+      Term::call(Term::r#ref(SCONS), [Term::Num { typ: NumType::U24, val: char as u32 }, acc])
     })
   }
 
@@ -104,7 +104,7 @@ impl Pattern {
     let lnil = Pattern::Ctr(Name::new(SNIL), vec![]);
 
     str.chars().rfold(lnil, |tail, head| {
-      let head = Pattern::Num(head as u64);
+      let head = Pattern::Num(head as u32);
       Pattern::Ctr(Name::new(SCONS), vec![head, tail])
     })
   }

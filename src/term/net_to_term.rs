@@ -2,11 +2,9 @@ use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
   maybe_grow,
   net::{CtrKind::*, INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
-  term::{num_to_name, term_to_net::Labels, Book, Name, Pattern, Tag, Term},
+  term::{num_to_name, term_to_net::Labels, Book, FanKind, Name, Pattern, Tag, Term},
 };
 use std::collections::{BTreeSet, HashMap, HashSet};
-
-use super::FanKind;
 
 // TODO: Display scopeless lambdas as such
 /// Converts an Interaction-INet to a Lambda Calculus term
@@ -213,13 +211,16 @@ impl Reader<'_> {
             _ => unreachable!(),
           }
         }
-        Num { val } => Term::Num { val: *val & ((1 << 60) - 1) },
-        Op2 { opr } => match next.slot() {
+        Num { val: _ } => {
+          todo!("Readback of numbers not yet implemented for hvm32");
+          /* Term::Num { typ: NumType::from(*val as u8 & 0xF), val: *val >> 4 } */
+        }
+        Op2 => match next.slot() {
           2 => {
-            let fst = self.read_term(self.net.enter_port(Port(node, 0)));
+            todo!("Readback of numeric operations not yet implemented for hvm32");
+            /* let fst = self.read_term(self.net.enter_port(Port(node, 0)));
             let snd = self.read_term(self.net.enter_port(Port(node, 1)));
-            let (opr, fst, snd) = if is_op_swapped(*opr) { (opr.swap(), snd, fst) } else { (*opr, fst, snd) };
-            Term::Opx { opr, fst: Box::new(fst), snd: Box::new(snd) }
+            Term::Opx { opr: *opr, fst: Box::new(fst), snd: Box::new(snd) } */
           }
           _ => {
             self.error(ReadbackError::InvalidNumericOp);
@@ -427,17 +428,6 @@ impl NameGen {
     self.id_counter += 1;
     Name::from(id)
   }
-}
-
-fn is_op_swapped(op: hvmc::ops::Op) -> bool {
-  matches!(
-    op.op,
-    hvmc::ops::IntOp::ShlS
-      | hvmc::ops::IntOp::ShrS
-      | hvmc::ops::IntOp::SubS
-      | hvmc::ops::IntOp::DivS
-      | hvmc::ops::IntOp::RemS
-  )
 }
 
 #[derive(Debug, Clone, Copy)]
