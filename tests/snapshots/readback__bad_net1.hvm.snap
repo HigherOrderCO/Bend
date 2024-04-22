@@ -10,4 +10,4 @@ Warnings:
 During readback:
   Mismatched polarities (2 occurrences)
 
-let #0{* a} = λ* $b; λ$b a
+let #0{<Invalid> a} = λ<Invalid> $b; λ$b a

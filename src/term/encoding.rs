@@ -192,7 +192,9 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         let kind = CtrKind::Fan(*fan, tag.clone());
         self.make_node_list(kind, up, els.iter().map(|el| |slf: &mut Self, up| slf.encode_pat(el, up)));
       }
-      Pattern::Ctr(_, _) | Pattern::Num(_) | Pattern::Lst(_) | Pattern::Str(_) => unreachable!(),
+      Pattern::Ctr(_, _) | Pattern::Num(_) | Pattern::Lst(_) | Pattern::Str(_) | Pattern::Err => {
+        unreachable!()
+      }
     })
   }
 

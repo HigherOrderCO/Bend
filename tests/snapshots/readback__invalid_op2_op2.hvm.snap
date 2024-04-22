@@ -15,4 +15,4 @@ During readback:
   Detected unbound variable (2 occurrences)
   Mismatched polarities (4 occurrences)
 
-λ* (+ (+ <Invalid> 1) (1 <Invalid>))
+λ<Invalid> (+ (+ <Invalid> 1) (1 <Invalid>))

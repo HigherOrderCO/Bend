@@ -158,7 +158,7 @@ pub enum FanKind {
   Dup,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Default, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
   Var(Option<Name>),
   Chn(Name),
@@ -168,12 +168,8 @@ pub enum Pattern {
   Fan(FanKind, Tag, Vec<Pattern>),
   Lst(Vec<Pattern>),
   Str(GlobalString),
-}
-
-impl Default for Pattern {
-  fn default() -> Self {
-    Pattern::Var(None)
-  }
+  #[default]
+  Err,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -819,7 +815,9 @@ impl Pattern {
     multi_iterator!(ChildrenIter { Zero, Vec });
     match self {
       Pattern::Ctr(_, els) | Pattern::Fan(.., els) | Pattern::Lst(els) => ChildrenIter::Vec(els.iter()),
-      Pattern::Var(_) | Pattern::Chn(_) | Pattern::Num(_) | Pattern::Str(_) => ChildrenIter::Zero([]),
+      Pattern::Var(_) | Pattern::Chn(_) | Pattern::Num(_) | Pattern::Str(_) | Pattern::Err => {
+        ChildrenIter::Zero([])
+      }
     }
   }
 
@@ -827,7 +825,9 @@ impl Pattern {
     multi_iterator!(ChildrenIter { Zero, Vec });
     match self {
       Pattern::Ctr(_, els) | Pattern::Fan(.., els) | Pattern::Lst(els) => ChildrenIter::Vec(els.iter_mut()),
-      Pattern::Var(_) | Pattern::Chn(_) | Pattern::Num(_) | Pattern::Str(_) => ChildrenIter::Zero([]),
+      Pattern::Var(_) | Pattern::Chn(_) | Pattern::Num(_) | Pattern::Str(_) | Pattern::Err => {
+        ChildrenIter::Zero([])
+      }
     }
   }
 
@@ -859,13 +859,14 @@ impl Pattern {
         Term::Fan { fan: *fan, tag: tag.clone(), els: args.iter().map(|p| p.to_term()).collect() }
       }
       Pattern::Lst(_) | Pattern::Str(_) => todo!(),
+      Pattern::Err => Term::Err,
     }
   }
 
   pub fn has_unscoped(&self) -> bool {
     match self {
       Pattern::Chn(_) => true,
-      Pattern::Var(_) | Pattern::Str(_) | Pattern::Num(_) => false,
+      Pattern::Var(_) | Pattern::Str(_) | Pattern::Num(_) | Pattern::Err => false,
       Pattern::Ctr(_, x) | Pattern::Fan(_, _, x) | Pattern::Lst(x) => x.iter().any(|x| x.has_unscoped()),
     }
   }
