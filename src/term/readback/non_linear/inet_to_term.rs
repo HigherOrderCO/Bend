@@ -15,22 +15,15 @@ use super::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
 
 // TODO: Display scopeless lambdas as such
 /// Converts an Interaction-INet to a Lambda Calculus term
-pub fn inet_to_term(
-  net: &INet,
-  book: &Book,
-  labels: &Labels,
-  linear: bool,
-  diagnostics: &mut Diagnostics,
-) -> Term {
+pub fn inet_to_term(net: &INet, book: &Book, labels: &Labels, diagnostics: &mut Diagnostics) -> Term {
   let mut reader = Reader {
     net,
     labels,
     book,
-    dup_paths: if linear { None } else { Some(Default::default()) },
+    dup_paths: Default::default(),
     scope: Default::default(),
     seen_fans: Default::default(),
     namegen: Default::default(),
-    seen: Default::default(),
     errors: Default::default(),
   };
 
@@ -69,22 +62,16 @@ pub struct Reader<'a> {
   pub namegen: NameGen,
   net: &'a INet,
   labels: &'a Labels,
-  dup_paths: Option<HashMap<u16, Vec<SlotId>>>,
+  dup_paths: HashMap<u16, Vec<SlotId>>,
   /// Store for floating/unscoped terms, like dups and let tups.
   scope: Scope,
   seen_fans: Scope,
-  seen: HashSet<Port>,
   errors: Vec<ReadbackError>,
 }
 
 impl Reader<'_> {
   fn read_term(&mut self, next: Port) -> Term {
     maybe_grow(|| {
-      if self.dup_paths.is_none() && !self.seen.insert(next) {
-        self.error(ReadbackError::Cyclic);
-        return Term::Var { nam: Name::new("...") };
-      }
-
       let node = next.node();
 
       let term = match &self.net.node(node).kind {
@@ -117,14 +104,12 @@ impl Reader<'_> {
             // If we're visiting a port 0, then it is a pair.
             0 => {
               if fan == FanKind::Dup
-                && let Some(dup_paths) = &mut self.dup_paths
-                && let stack = dup_paths.entry(*lab).or_default()
-                && let Some(slot) = stack.pop()
+                && let Some(slot) = self.dup_paths.entry(*lab).or_default().pop()
               {
                 // Since we had a paired Dup in the path to this Sup,
                 // we "decay" the superposition according to the original direction we came from the Dup.
                 let term = self.read_term(self.net.enter_port(Port(node, slot)));
-                self.dup_paths.as_mut().unwrap().get_mut(lab).unwrap().push(slot);
+                self.dup_paths.get_mut(lab).unwrap().push(slot);
                 term
               } else {
                 // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
@@ -136,12 +121,10 @@ impl Reader<'_> {
             // If we're visiting a port 1 or 2, then it is a variable.
             // Also, that means we found a dup, so we store it to read later.
             1 | 2 => {
-              if fan == FanKind::Dup
-                && let Some(dup_paths) = &mut self.dup_paths
-              {
-                dup_paths.entry(*lab).or_default().push(next.slot());
+              if fan == FanKind::Dup {
+                self.dup_paths.entry(*lab).or_default().push(next.slot());
                 let term = self.read_term(self.net.enter_port(Port(node, 0)));
-                self.dup_paths.as_mut().unwrap().entry(*lab).or_default().pop().unwrap();
+                self.dup_paths.entry(*lab).or_default().pop().unwrap();
                 term
               } else {
                 if self.seen_fans.insert(node) {
@@ -437,7 +420,6 @@ pub enum ReadbackError {
   InvalidNumericMatch,
   InvalidNumericOp,
   ReachedRoot,
-  Cyclic,
 }
 
 impl PartialEq for ReadbackError {
@@ -460,7 +442,6 @@ impl std::fmt::Display for ReadbackError {
       ReadbackError::InvalidNumericMatch => write!(f, "Invalid Numeric Match."),
       ReadbackError::InvalidNumericOp => write!(f, "Invalid Numeric Operation."),
       ReadbackError::ReachedRoot => write!(f, "Reached Root."),
-      ReadbackError::Cyclic => write!(f, "Cyclic Term."),
     }
   }
 }

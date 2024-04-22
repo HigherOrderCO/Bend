@@ -15,5 +15,5 @@ use inet_to_term::*;
 
 pub fn readback_non_linear(net: &Net, book: &Book, labels: &Labels, info: &mut Diagnostics) -> Term {
   let inet = hvmc_to_inet(net);
-  inet_to_term(&inet, book, labels, false, info)
+  inet_to_term(&inet, book, labels, info)
 }
