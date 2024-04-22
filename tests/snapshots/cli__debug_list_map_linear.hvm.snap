@@ -12,15 +12,15 @@ input_file: tests/golden_tests/cli/debug_list_map_linear.hvm
 ---------------------------------------
 (Map Inc #List λa #List λ* #List (a 1 #List λb #List λ* #List (b 41 #List λc #List λ* #List (c 255 #List λd #List λ* #List (d 90 List.nil)))))
 ---------------------------------------
-(#List (#List λa #List λb λc let {d e} = c; (List.cons (d a) (Map e b)) 1 #List λf #List λ* #List (f 41 #List λg #List λ* #List (g 255 #List λh #List λ* #List (h 90 List.nil)))) Inc)
+(#List (#List λa #List λb λc let {d e} = $h; (List.cons (d $f) (Map e $g)) 1 #List λ$f #List λ* #List (a 41 #List λ$g #List λ* #List (b 255 #List λ$h #List λ* #List (c 90 List.nil)))) Inc)
 ---------------------------------------
 (List.cons (Inc 1) (Map Inc #List λa #List λ* #List (a 41 #List λb #List λ* #List (b 255 #List λc #List λ* #List (c 90 List.nil)))))
 ---------------------------------------
-(List.cons (Inc 1) (#List (#List λa #List λb λc let {d e} = c; (List.cons (d a) (Map e b)) 41 #List λf #List λ* #List (f 255 #List λg #List λ* #List (g 90 List.nil))) Inc))
+(List.cons (Inc 1) (#List (#List λa #List λb λc let {d e} = c; (List.cons (d $f) (Map e $g)) 41 #List λ$f #List λ* #List (a 255 #List λ$g #List λ* #List (b 90 List.nil))) Inc))
 ---------------------------------------
 (List.cons (Inc 1) (List.cons (Inc 41) (Map Inc #List λa #List λ* #List (a 255 #List λb #List λ* #List (b 90 List.nil)))))
 ---------------------------------------
-(List.cons (Inc 1) (List.cons (Inc 41) (#List (#List λa #List λb λc let {d e} = c; (List.cons (d a) (Map e b)) 255 #List λf #List λ* #List (f 90 List.nil)) Inc)))
+(List.cons (Inc 1) (List.cons (Inc 41) (#List (#List λa #List λb λc let {d e} = c; (List.cons (d $f) (Map e b)) 255 #List λ$f #List λ* #List (a 90 List.nil)) Inc)))
 ---------------------------------------
 (List.cons (Inc 1) (List.cons (Inc 41) (List.cons (Inc 255) (Map Inc #List λa #List λ* #List (a 90 List.nil)))))
 ---------------------------------------

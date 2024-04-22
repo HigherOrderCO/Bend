@@ -6,4 +6,4 @@ non-linear:
 λa 0
 
 linear:
-λa 0
+λa let * = (a 123); 0

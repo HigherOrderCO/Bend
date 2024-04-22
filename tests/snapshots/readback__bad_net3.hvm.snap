@@ -6,4 +6,4 @@ non-linear:
 λa λb a
 
 linear:
-λa λb let #0{c d} = a; c
+λ#0{a *} λ* a

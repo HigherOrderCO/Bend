@@ -6,4 +6,4 @@ non-linear:
 let (a, *) = let (c, b) = ((2, 4), (3, 6)); b; a
 
 linear:
-let (a, *) = let (c, b) = ((2, 4), (3, 6)); b; a
+let ((*, *), (a, *)) = ((2, 4), (3, 6)); a

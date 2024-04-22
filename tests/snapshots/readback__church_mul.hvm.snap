@@ -6,4 +6,4 @@ non-linear:
 λa λb (a (a (a (a (a (a b))))))
 
 linear:
-λa λb let #0{c $g} = (let #1{d $h} = a; d let #1{e f} = $h; (e (f #0{$g b}))); c
+λ#1{a #1{b c}} let #0{d $e} = (a (b (c #0{$e $f}))); λ$f d
