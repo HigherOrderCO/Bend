@@ -1,6 +1,6 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/cli/debug_list_map.hvm
+input_file: tests/golden_tests/cli/debug_list_map_lazy.hvm
 ---
 #List λa #List λ* #List (a $b $c)
 ---------------------------------------
