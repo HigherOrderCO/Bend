@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/readback/complicated_dup.hvm
+---
+non-linear:
+λa (λ$b (a ($b $c)) λ$c (a ($b $c)))
+
+linear:
+λa let #0{c f} = a; let #0{d g} = ($b $e); (λ$b (c d) λ$e (f g))

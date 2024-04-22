@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/readback/bad_net3.hvm
+---
+non-linear:
+λa λb a
+
+linear:
+λa λb let #0{c d} = a; c

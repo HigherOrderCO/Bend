@@ -147,24 +147,6 @@ fn compile_file_o_no_all() {
 }
 
 #[test]
-fn linear_readback() {
-  run_golden_test_dir(function_name!(), &|code, path| {
-    let book = do_parse_book(code, path)?;
-    let compile_opts = CompileOpts::default_strict().set_all();
-    let diagnostics_cfg = DiagnosticsConfig::default_strict();
-    let (res, info) = run_book(
-      book,
-      None,
-      RunOpts { linear: true, ..Default::default() },
-      compile_opts,
-      diagnostics_cfg,
-      None,
-    )?;
-    Ok(format!("{}{}", info.diagnostics, res))
-  });
-}
-
-#[test]
 fn run_file() {
   run_golden_test_dir_multiple(function_name!(), &[
     (&|_code, path| {
@@ -215,14 +197,19 @@ fn run_lazy() {
 }
 
 #[test]
-fn readback_lnet() {
+fn readback() {
   run_golden_test_dir(function_name!(), &|code, _| {
     let net = hvmc::ast::Net::from_str(code)?;
     let book = Book::default();
     let compat_net = hvmc_to_net(&net);
-    let mut diags = Diagnostics::default();
-    let term = net_to_term(&compat_net, &book, &Labels::default(), false, &mut diags);
-    Ok(format!("{}{}", diags, term))
+    let mut non_linear_diags = Diagnostics::default();
+    let non_linear_term = net_to_term(&compat_net, &book, &Labels::default(), false, &mut non_linear_diags);
+    let mut linear_diags = Diagnostics::default();
+    let linear_term = net_to_term(&compat_net, &book, &Labels::default(), true, &mut linear_diags);
+    Ok(format!(
+      "non-linear:\n{}{}\n\nlinear:\n{}{}",
+      non_linear_diags, non_linear_term, linear_diags, linear_term
+    ))
   })
 }
 
