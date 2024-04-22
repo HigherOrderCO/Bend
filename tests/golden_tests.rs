@@ -203,9 +203,11 @@ fn readback() {
     let net = hvmc::ast::Net::from_str(code)?;
     let book = Book::default();
     let mut non_linear_diags = Diagnostics::default();
-    let non_linear_term = hvml::term::readback(&net, &book, &Labels::default(), false, &mut non_linear_diags);
+    let non_linear_term =
+      hvml::term::readback(&net, &book, &Labels::default(), false, &mut non_linear_diags, AdtEncoding::Scott);
     let mut linear_diags = Diagnostics::default();
-    let linear_term = hvml::term::readback(&net, &book, &Labels::default(), true, &mut linear_diags);
+    let linear_term =
+      hvml::term::readback(&net, &book, &Labels::default(), true, &mut linear_diags, AdtEncoding::Scott);
     Ok(format!(
       "non-linear:\n{}{}\n\nlinear:\n{}{}",
       non_linear_diags, non_linear_term, linear_diags, linear_term

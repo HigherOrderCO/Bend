@@ -2,7 +2,7 @@
 #![feature(let_chains)]
 
 use builtins::{create_host, CORE_BUILTINS_USES};
-use diagnostics::{DiagnosticOrigin, Diagnostics, DiagnosticsConfig, Severity, WarningType};
+use diagnostics::{Diagnostics, DiagnosticsConfig, Severity, WarningType};
 use hvmc::{
   ast::Net,
   dispatch_dyn_net,
@@ -182,7 +182,7 @@ pub fn run_book(
   let book = Arc::new(book);
   let labels = Arc::new(labels);
 
-  let debug_hook = run_opts.debug_hook(&book, &labels);
+  let debug_hook = run_opts.debug_hook(&book, &labels, compile_opts.adt_encoding);
 
   let host = create_host(book.clone(), labels.clone(), compile_opts.adt_encoding);
   host.lock().insert_book(&core_book);
@@ -190,7 +190,7 @@ pub fn run_book(
   let (res_lnet, stats) = run_compiled(host, max_memory, run_opts, debug_hook, book.hvmc_entrypoint());
 
   let (res_term, diagnostics) =
-    readback_hvmc(&res_lnet, &book, &labels, run_opts.linear, compile_opts.adt_encoding);
+    readback_with_errors(&res_lnet, &book, &labels, run_opts.linear, compile_opts.adt_encoding);
 
   let info = RunInfo { stats, diagnostics, net: res_lnet, book, labels };
   Ok((res_term, info))
@@ -256,7 +256,7 @@ pub fn run_compiled(
   })
 }
 
-pub fn readback_hvmc(
+pub fn readback_with_errors(
   net: &Net,
   book: &Arc<Book>,
   labels: &Arc<Labels>,
@@ -264,14 +264,7 @@ pub fn readback_hvmc(
   adt_encoding: AdtEncoding,
 ) -> (Term, Diagnostics) {
   let mut diags = Diagnostics::default();
-  let mut term = readback(net, book, labels, linear, &mut diags);
-
-  let resugar_errs = term.resugar_adts(book, adt_encoding);
-  term.resugar_builtins();
-
-  for err in resugar_errs {
-    diags.add_diagnostic(err, Severity::Warning, DiagnosticOrigin::Readback);
-  }
+  let term = readback(net, book, labels, linear, &mut diags, adt_encoding);
 
   (term, diags)
 }
@@ -338,11 +331,16 @@ impl RunOpts {
     Self { lazy_mode: true, single_core: true, ..Self::default() }
   }
 
-  fn debug_hook<'a>(&'a self, book: &'a Book, labels: &'a Labels) -> Option<impl FnMut(&Net) + 'a> {
+  fn debug_hook<'a>(
+    &'a self,
+    book: &'a Book,
+    labels: &'a Labels,
+    adt_encoding: AdtEncoding,
+  ) -> Option<impl FnMut(&Net) + 'a> {
     self.debug.then_some({
-      |net: &_| {
+      move |net: &_| {
         let mut diags = Diagnostics::default();
-        let res_term = readback(net, book, labels, self.linear, &mut diags);
+        let res_term = readback(net, book, labels, self.linear, &mut diags, adt_encoding);
         eprint!("{diags}");
         if self.pretty {
           println!("{}\n---------------------------------------", res_term.display_pretty(0));

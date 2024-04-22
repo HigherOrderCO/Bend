@@ -1,6 +1,6 @@
 use crate::{
   builtins::util::{AsDefFunction, FunctionLike, FunctionLikeHosted},
-  readback_hvmc,
+  readback_with_errors,
   term::{
     term_to_net::{term_to_net, Labels},
     AdtEncoding, Book, Term,
@@ -46,7 +46,7 @@ pub(crate) fn add_fs_defs(
       let slf = self.clone();
       hvmc::stdlib::readback(net, slf.readback_data.host.clone(), Trg::wire(input), move |net, tree| {
         dispatch_dyn_net!(net => {
-          let (term, _errs) = readback_hvmc(&ast::Net { root: tree,redexes: vec![]} , &slf.readback_data.book, &slf.readback_data.labels, false, slf.readback_data.adt_encoding);
+          let (term, _errs) = readback_with_errors(&ast::Net { root: tree,redexes: vec![]} , &slf.readback_data.book, &slf.readback_data.labels, false, slf.readback_data.adt_encoding);
           let filename = if let Term::Str { ref val } = term {
             Some(val.to_string())
           } else {
@@ -72,7 +72,7 @@ pub(crate) fn add_fs_defs(
         let host = self.readback_data.host.clone();
         hvmc::stdlib::readback(net, self.readback_data.host.clone(), Trg::wire(input), move |net, tree| {
           dispatch_dyn_net!(net => {
-            let (term, _errs) = readback_hvmc(&ast::Net { root: tree,redexes: vec![]} , &slf.readback_data.book, &slf.readback_data.labels, false, slf.readback_data.adt_encoding);
+            let (term, _errs) = readback_with_errors(&ast::Net { root: tree,redexes: vec![]} , &slf.readback_data.book, &slf.readback_data.labels, false, slf.readback_data.adt_encoding);
             let contents = if let Term::Str { ref val } = term {
               Some(val.to_string())
             } else {

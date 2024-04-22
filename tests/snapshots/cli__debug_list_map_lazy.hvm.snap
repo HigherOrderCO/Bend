@@ -2,78 +2,78 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/debug_list_map_lazy.hvm
 ---
-#List λa #List λ* #List (a $b $c)
+(List.cons $b $c)
 ---------------------------------------
-#List λa #List λ* #List (a $b $c)
+(List.cons $b $c)
 ---------------------------------------
-#List λa #List λ* #List (a $b $c)
+(List.cons $b $c)
 ---------------------------------------
-#List λa #List λ* #List (a $b $c)
+(List.cons $b $c)
 ---------------------------------------
-#List λa #List λ* #List (a $b $c)
+(List.cons $b $c)
 ---------------------------------------
-#List λa #List λ* #List (a $b $c)
+(List.cons $b $c)
 ---------------------------------------
-#List λa #List λ* #List (a $b $c)
+(List.cons $b $c)
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d $e))
+(List.cons $b (List.cons $d $e))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d $e))
+(List.cons $b (List.cons $d $e))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d $e))
+(List.cons $b (List.cons $d $e))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d $e))
+(List.cons $b (List.cons $d $e))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d $e))
+(List.cons $b (List.cons $d $e))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d $e))
+(List.cons $b (List.cons $d $e))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d $e))
+(List.cons $b (List.cons $d $e))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f $g)))
+(List.cons $b (List.cons $d (List.cons $f $g)))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f $g)))
+(List.cons $b (List.cons $d (List.cons $f $g)))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f $g)))
+(List.cons $b (List.cons $d (List.cons $f $g)))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f $g)))
+(List.cons $b (List.cons $d (List.cons $f $g)))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f $g)))
+(List.cons $b (List.cons $d (List.cons $f $g)))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f $g)))
+(List.cons $b (List.cons $d (List.cons $f $g)))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f $g)))
+(List.cons $b (List.cons $d (List.cons $f $g)))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h $i))))
+(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h $i))))
+(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h $i))))
+(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h $i))))
+(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h $i))))
+(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h $i))))
+(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h $i))))
+(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h #List λ* #List λi i))))
+[$b, $d, $f, $h]
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h #List λ* #List λi i))))
+[$b, $d, $f, $h]
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h #List λ* #List λi i))))
+[$b, $d, $f, $h]
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h #List λ* #List λi i))))
+[$b, $d, $f, $h]
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g $h #List λ* #List λi i))))
+[$b, $d, $f, $h]
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e $f #List λg #List λ* #List (g 91 #List λ* #List λh h))))
+[$b, $d, $f, 91]
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c $d #List λe #List λ* #List (e 256 #List λf #List λ* #List (f 91 #List λ* #List λg g))))
+[$b, $d, 256, 91]
 ---------------------------------------
-#List λa #List λ* #List (a $b #List λc #List λ* #List (c 42 #List λd #List λ* #List (d 256 #List λe #List λ* #List (e 91 #List λ* #List λf f))))
+[$b, 42, 256, 91]
 ---------------------------------------
-#List λa #List λ* #List (a 2 #List λb #List λ* #List (b 42 #List λc #List λ* #List (c 256 #List λd #List λ* #List (d 91 #List λ* #List λe e))))
+[2, 42, 256, 91]
 ---------------------------------------
 [2, 42, 256, 91]
