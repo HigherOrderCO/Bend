@@ -6,4 +6,8 @@ non-linear:
 λa λb a
 
 linear:
+Warnings:
+During readback:
+  Mismatched polarities
+
 λ#0{a *} λ* a

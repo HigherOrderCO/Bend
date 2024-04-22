@@ -358,7 +358,7 @@ impl<'n> Reader<'_, 'n> {
   }
 
   pub fn report_errors(&mut self, diagnostics: &mut Diagnostics) {
-    let mut err_counts = std::collections::HashMap::new();
+    let mut err_counts = std::collections::BTreeMap::new();
     for err in &self.errors {
       *err_counts.entry(*err).or_insert(0) += 1;
     }
@@ -500,26 +500,12 @@ fn is_op_swapped(op: hvmc::ops::Op) -> bool {
   )
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ReadbackError {
   InvalidNumericMatch,
   InvalidNumericOp,
   ReachedRoot,
   UnboundVar,
-}
-
-impl PartialEq for ReadbackError {
-  fn eq(&self, other: &Self) -> bool {
-    core::mem::discriminant(self) == core::mem::discriminant(other)
-  }
-}
-
-impl Eq for ReadbackError {}
-
-impl std::hash::Hash for ReadbackError {
-  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-    core::mem::discriminant(self).hash(state);
-  }
 }
 
 impl std::fmt::Display for ReadbackError {

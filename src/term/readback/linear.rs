@@ -7,7 +7,7 @@ use hvmc::ast::{Net, Tree};
 use loaned::{drop, LoanedMut};
 
 use crate::{
-  diagnostics::Diagnostics,
+  diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
   term::{
     encoding::{CtrKind, Labels},
     num_to_name,
@@ -16,7 +16,7 @@ use crate::{
   },
 };
 
-pub fn readback_linear(net: &Net, book: &Book, labels: &Labels, _: &mut Diagnostics) -> Term {
+pub fn readback_linear(net: &Net, book: &Book, labels: &Labels, info: &mut Diagnostics) -> Term {
   let mut root = hole();
 
   let mut readback = Readback {
@@ -28,9 +28,12 @@ pub fn readback_linear(net: &Net, book: &Book, labels: &Labels, _: &mut Diagnost
     root: None,
     garbage_terms: vec![],
     garbage_pats: vec![],
+    errors: vec![],
   };
 
   readback.readback(net);
+
+  readback.report_errors(info);
 
   let Readback { garbage_terms, garbage_pats, .. } = { readback };
   drop!(LoanedMut::<Vec<Term>>::from(garbage_terms));
@@ -39,26 +42,6 @@ pub fn readback_linear(net: &Net, book: &Book, labels: &Labels, _: &mut Diagnost
   normalize_vars(book, &mut root);
 
   root
-}
-
-#[derive(Debug)]
-enum Target<'t> {
-  PosTerm(LoanedMut<'t, Term>),
-  NegTerm(&'t mut Term),
-  PosPat(&'t mut Pattern),
-  NegPat(LoanedMut<'t, Pattern>),
-  NegRoot,
-}
-
-use Target::*;
-
-impl<'t> Target<'t> {
-  fn polarity(&self) -> Polarity {
-    match self {
-      PosTerm(_) | PosPat(_) => Polarity::Pos,
-      NegTerm(_) | NegPat(_) | NegRoot => Polarity::Neg,
-    }
-  }
 }
 
 struct Readback<'c, 't, 'n> {
@@ -70,6 +53,7 @@ struct Readback<'c, 't, 'n> {
   root: Option<LoanedMut<'t, Term>>,
   garbage_terms: Vec<LoanedMut<'t, Term>>,
   garbage_pats: Vec<LoanedMut<'t, Pattern>>,
+  errors: Vec<ReadbackError>,
 }
 
 macro_rules! sym {
@@ -89,9 +73,13 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
     }
 
     for (i, (lft, rgt)) in net.redexes.iter().enumerate() {
-      let Some(p) = self.polarity_vars[i] else { todo!() };
+      let Some(p) = self.polarity_vars[i] else {
+        self.error(ReadbackError::DisconnectedSubnet);
+        continue;
+      };
       if !p.is_concrete() {
-        todo!()
+        self.error(ReadbackError::DisconnectedSubnet);
+        continue;
       }
       let (pos, neg) = if p == Polarity::Pos { (lft, rgt) } else { (rgt, lft) };
       let t = self._read_pos(pos);
@@ -99,6 +87,11 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
     }
 
     self.root.take().unwrap_or_default().place(self.lets.take().unwrap());
+
+    for target in std::mem::take(&mut self.vars).into_iter().filter_map(|x| x.1.ok()) {
+      self.error(ReadbackError::UnboundVar);
+      self.trash(target);
+    }
   }
 
   fn infer_polarity(&mut self, tree: &'n Tree, mut polarity: Polarity) -> Polarity {
@@ -156,7 +149,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
         }
       }
       _ => {
-        self.report_polarity_error();
+        self.error(ReadbackError::InvalidPolarity);
         a
       }
     }
@@ -205,15 +198,11 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
         }
       },
       Tree::Op { .. } | Tree::Mat { .. } => {
-        self.report_polarity_error();
+        self.error(ReadbackError::InvalidPolarity);
         PosTerm(hole())
       }
       Tree::Adt { .. } => unimplemented!(),
     }
-  }
-
-  fn report_polarity_error(&mut self) {
-    println!("POLARITY ERROR");
   }
 
   fn read_neg(&mut self, tree: &'n Tree, up: Target<'t>) {
@@ -290,7 +279,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
         }
       }
       Tree::Num { .. } | Tree::Ref { .. } => {
-        self.report_polarity_error();
+        self.error(ReadbackError::InvalidPolarity);
         self.link(up, NegPat(hole()));
       }
       Tree::Adt { .. } => unimplemented!(),
@@ -335,20 +324,10 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
         self.root = Some(LoanedMut::new(Term::Var { nam }));
       }
       // push data from polarity errors to garbage:
-      (NegPat(a), NegPat(b)) => {
-        self.garbage_pats.push(a);
-        self.garbage_pats.push(b);
+      (a, b) => {
+        self.trash(a);
+        self.trash(b);
       }
-      sym!(NegPat(p), NegTerm(_) | NegRoot) => self.garbage_pats.push(p),
-      (NegTerm(_) | NegRoot, NegTerm(_) | NegRoot) => {}
-      (PosTerm(a), PosTerm(b)) => {
-        self.garbage_terms.push(a);
-        self.garbage_terms.push(b);
-      }
-      sym!(PosTerm(a), PosPat(_)) => {
-        self.garbage_terms.push(a);
-      }
-      (PosPat(_), PosPat(_)) => {}
     }
   }
 
@@ -372,6 +351,51 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
     self.name_idx += 1;
     nam
   }
+
+  fn trash(&mut self, target: Target<'t>) {
+    match target {
+      PosTerm(t) => self.garbage_terms.push(t),
+      NegPat(t) => self.garbage_pats.push(t),
+      _ => {}
+    }
+  }
+
+  pub fn error(&mut self, error: ReadbackError) {
+    self.errors.push(error);
+  }
+
+  pub fn report_errors(&mut self, diagnostics: &mut Diagnostics) {
+    let mut err_counts = std::collections::BTreeMap::new();
+    for err in &self.errors {
+      *err_counts.entry(*err).or_insert(0) += 1;
+    }
+
+    for (err, count) in err_counts {
+      let count_msg = if count > 1 { format!(" ({count} occurrences)") } else { "".to_string() };
+      let msg = format!("{}{}", err, count_msg);
+      diagnostics.add_diagnostic(msg.as_str(), Severity::Warning, DiagnosticOrigin::Readback);
+    }
+  }
+}
+
+#[derive(Debug)]
+enum Target<'t> {
+  PosTerm(LoanedMut<'t, Term>),
+  NegTerm(&'t mut Term),
+  PosPat(&'t mut Pattern),
+  NegPat(LoanedMut<'t, Pattern>),
+  NegRoot,
+}
+
+use Target::*;
+
+impl<'t> Target<'t> {
+  fn polarity(&self) -> Polarity {
+    match self {
+      PosTerm(_) | PosPat(_) => Polarity::Pos,
+      NegTerm(_) | NegPat(_) | NegRoot => Polarity::Neg,
+    }
+  }
 }
 
 /// A polarity value; positive represents the creation of a value and negative
@@ -384,7 +408,7 @@ enum Polarity {
   Neg,
   /// The concrete value is not yet known, and is based on a polarity variable.
   ///
-  /// The `bool` indicates if this polarity is negated from the variable.
+  /// The `bool` indicates if self polarity is negated from the variable.
   Var(bool, usize),
 }
 
@@ -417,4 +441,21 @@ impl BitXor<bool> for Polarity {
 
 fn hole<T: Default>() -> T {
   T::default()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ReadbackError {
+  UnboundVar,
+  InvalidPolarity,
+  DisconnectedSubnet,
+}
+
+impl std::fmt::Display for ReadbackError {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      ReadbackError::UnboundVar => write!(f, "Detected unbound variable"),
+      ReadbackError::InvalidPolarity => write!(f, "Mismatched polarities"),
+      ReadbackError::DisconnectedSubnet => write!(f, "Could not print disconnected subnet"),
+    }
+  }
 }

@@ -10,4 +10,9 @@ During readback:
 λa (+ (+ <Invalid> 1) (1 <Invalid>))
 
 linear:
+Warnings:
+During readback:
+  Detected unbound variable (2 occurrences)
+  Mismatched polarities (4 occurrences)
+
 λ* (+ (+ <Invalid> 1) (1 <Invalid>))

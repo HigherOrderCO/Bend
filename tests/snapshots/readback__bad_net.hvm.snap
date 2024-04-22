@@ -10,4 +10,8 @@ During readback:
 <Invalid>
 
 linear:
+Warnings:
+During readback:
+  Detected unbound variable
+
 <Invalid>
