@@ -1,3 +1,304 @@
+//! Linear readback, directly from interaction combinator trees.
+//!
+//! ## The Algorithm
+//!
+//! To explain the algorithm, let's look at a simple case, the interaction net
+//! `((123 x) x)`:
+//!
+//! ```text
+//!        |   ((123 x) x)
+//!       / \
+//!      /   \ <---- node 0
+//!     /_____\
+//!      |   |
+//!     /    |
+//!    |     |
+//!   / \    |
+//!  /   \ <-|------ node 1
+//! /_____\  |
+//!  |   |   |
+//! 123  |   |
+//!       \_/
+//!        x
+//! ```
+//!
+//! This corresponds to the term `@f (f 123)`.
+//!
+//! Note that:
+//! - node 0 and node 1 are both CON nodes, but node 0 is a lambda node whilst
+//!   node 1 is an application node
+//! - in the net, node 1 is the left child of node 0, but in the term, it is the
+//!   right child
+//!
+//! Because of how the nodes are stored, when traversing the net, we can only
+//! enter nodes through their principal ports (from tree parent to child).
+//!
+//! Thus, to read the net back properly, we need to be able to:
+//! 1. distinguish between applications and lambdas
+//! 2. communicate terms across wires
+//!
+//! Let's look at these one at a time.
+//!
+//! ### Distinguishing lambdas and applications
+//!
+//! To distinguishing lambdas and applications, we need to determine the
+//! *polarity* of each port in the net. The polarity of a port is either `+` or
+//! `-`, and `+` ports can only be connected to `-` ports (and vice versa).
+//!
+//! Semantically, positive ports represent the creation of a value, and negative
+//! ports represent the destruction of a value. (Though this is an arbitrary
+//! choice.)
+//!
+//! For this interaction system, there are a few more rules for polarity:
+//! - the polarity of a free port is always `-`
+//! - the polarity of the ports of a CON node is either `+(+ -)` or `-(- +)`
+//!   (that is, port 0 and port 1 have the same polarity, and port 2 has the
+//!   opposite)
+//!
+//! Using this information, we can completely label the above diagram with a
+//! simple top-down recursive pass:
+//!
+//! ```text
+//!        -
+//!        |
+//!        +
+//!       / \
+//!      /   \ <---- node 0
+//!     /_____\
+//!      +   -
+//!     /    |
+//!    -     |
+//!   / \    |
+//!  /   \ <-|------ node 1
+//! /_____\  |
+//!  -   +   |
+//!  |   |   |
+//!  +   |   |
+//! 123  |   |
+//!       \_/
+//!        x
+//! ```
+//!
+//! In fact, in general, if you know the polarity of one port of a tree, you can
+//! trivially determine the polarity of every other port.
+//!
+//! The difficulty, then, comes when we're reading interaction nets with active
+//! pairs:
+//!
+//! ```text
+//!                    redex 0
+//!              /--------'--------\
+//!   tree 0      tree 1    tree 2
+//! /----'----\   /--'--\   /--'--\
+//!        |           _______      ((a b) b)
+//!        |          /       \     & (c c) ~ (123 a)
+//!        |         |         |
+//!       / \       / \       / \
+//!      /   \     /   \     /   \
+//!     /_____\   /_____\   /_____\
+//!      |   |     |   |     |   |
+//!     /    |      \_/     123  |
+//!    |     |       c           |
+//!   / \    |                   |
+//!  /   \   |                   |
+//! /_____\  |                   |
+//!  |   |   |                   |
+//!  |    \_/                    |
+//!  |     b                     |
+//!   \_________________________/
+//!                a
+//! ```
+//!
+//! If we were to simply iterate over the trees here, we would run into a
+//! problem at tree 1 -- we have no way of knowing the polarity of any of its
+//! ports. We would have to first label tree 0, then tree 2, before being able
+//! to label tree 1.
+//!
+//! Thus, when computing the polarities, we support propagating polarity
+//! *variables*. Specifically, we create a polarity variable for each active
+//! pair, and then traverse the tree, performing a process of polarity
+//! inference/unification.
+//!
+//! For example:
+//!
+//! Start by labelling tree 0, since we know the polarity of the free port:
+//! ```text
+//!        -           _______      ((a b) b)
+//!        |          /       \     & (c c) ~ (123 a)
+//!        +         |         |
+//!       / \       / \       / \
+//!      /   \     /   \     /   \
+//!     /_____\   /_____\   /_____\
+//!      +   -     |   |     |   |
+//!     /    |      \_/     123  |
+//!    -     |       c           |
+//!   / \    |                   |
+//!  /   \   |                   |
+//! /_____\  |                   |
+//!  -   +   |                   |
+//!  |    \_/                    |
+//!  |     b                     |
+//!   \_________________________/
+//!                a
+//! ```
+//!
+//! Introduce the polarity variable `p`, and label tree 1 (P is the opposite
+//! polarity of p):
+//! ```text
+//!        -           _______      ((a b) b)
+//!        |          /       \     & (c c) ~ (123 a)
+//!        +         p         |
+//!       / \       / \       / \
+//!      /   \     /   \     /   \
+//!     /_____\   /_____\   /_____\
+//!      +   -     p   P     |   |
+//!     /    |      \_/     123  |
+//!    -     |       c           |
+//!   / \    |                   |
+//!  /   \   |                   |
+//! /_____\  |                   |
+//!  -   +   |                   |
+//!  |    \_/                    |
+//!  |     b                     |
+//!   \_________________________/
+//!                a
+//!
+//! Now label tree 2:
+//! ```text
+//!        -           _______      ((a b) b)
+//!        |          /       \     & (c c) ~ (123 a)
+//!        +         p         P
+//!       / \       / \       / \
+//!      /   \     /   \     /   \
+//!     /_____\   /_____\   /_____\
+//!      +   -     p   P     P   p
+//!     /    |      \_/      |   |
+//!    -     |       c       p   |
+//!   / \    |              123  |
+//!  /   \   |                   |
+//! /_____\  |                   |
+//!  -   +   |                   |
+//!  |    \_/                    |
+//!  |     b                     |
+//!   \_________________________/
+//!                a
+//! ```
+//!
+//! Note that we now have a connection between a `-` port and a `p` port. This
+//! means that `p = +`, so we can update our graph:
+//! ```text
+//!        -           _______      ((a b) b)
+//!        |          /       \     & (c c) ~ (123 a)
+//!        +         +         -
+//!       / \       / \       / \
+//!      /   \     /   \     /   \
+//!     /_____\   /_____\   /_____\
+//!      +   -     +   -     -   +
+//!     /    |      \_/      |   |
+//!    -     |       c       +   |
+//!   / \    |              123  |
+//!  /   \   |                   |
+//! /_____\  |                   |
+//!  -   +   |                   |
+//!  |    \_/                    |
+//!  |     b                     |
+//!   \_________________________/
+//!                a
+//! ```
+//!
+//! And now our graph is fully labeled.
+//!
+//! When the net is fully connected, this algorithm can successfully label all
+//! of the ports of the net.
+//!
+//! When there are disconnected subnets, however, there may be multiple valid
+//! solutions; in these cases, the readback algorithm simply ignores the
+//! problematic subnets and issues a warning.
+//!
+//! In many cases, though, the polarity of disconnected subnets can be
+//! determined, since our interaction system has nodes that can only be read
+//! back as one polarity (e.g. reference nodes are always positive).
+//!
+//! # Communicating terms across wires
+//!
+//! Going back to our simpler example:
+//!
+//! ```text
+//!        |   ((123 x) x)
+//!       / \
+//!      /   \ <---- node 0
+//!     /_____\
+//!      |   |
+//!     /    |
+//!    |     |
+//!   / \    |
+//!  /   \ <-|------ node 1
+//! /_____\  |
+//!  |   |   |
+//! 123  |   |
+//!       \_/
+//!        x
+//! ```
+//!
+//! Because node 1 is a child of node 0, yet the term for node 1 is a child of
+//! the term for node 0, after we traverse node 1, we need some way to
+//! communicate that term across the `x` wire to node 0.
+//!
+//! In this case, since it needs to be transferred "forwards", it's pretty clear
+//! how one might do this: simply add `("x", term_1)` to a hashmap once we've
+//! traversed node 0 and and then retrieve it when we traverse node 1.
+//!
+//! However, sometimes we need to be able to transfer terms "backwards" across
+//! wires.
+//!
+//! Thus, we need to create a system where both terms and term *holes* can be
+//! transferred. For this, we use the `loaned` crate, which supplies a
+//! `LoanedMut<'t, Term>` type that can represent terms with holes.
+//!
+//! In particular, we will associate a `Target<'t>` with every part, where a
+//! target can either one of:
+//! - `LoanedMut<'t, Term>` (a term, `+`)
+//! - `&'t mut Term` (a term hole, `-`)
+//! - `LoanedMut<'t, Pattern>` (a pattern, `-`)
+//! - `&'t mut Pattern` (a pattern hole, `+`)
+//!
+//! The targets associated with connected ports will be linked with
+//! `Readback::link`:
+//! - linking a term with a term hole or a pattern with a pattern hole simply
+//!   fills the hole using `LoanedMut::place`
+//! - linking a term with a pattern creates a `let pat = term` statement
+//! - linking a term hole with a pattern hole fills each with a new variable
+//!
+//! For the above example, then:
+//! - visit node 0
+//!   - this is a lambda, so we create a term with two holes, `@?p ?t`, and
+//!     label the ports thusly:
+//!     - port 0: `@?p ?t` (`+`, term)
+//!     - port 1: `?p` (`+`, pattern hole)
+//!     - port 2: `?t` (`-`, term hole)
+//!   - this is the root node, so `@?b ?t` is the root term
+//!   - visit the left child, node 1 (with uplink `?a`)
+//!     - this is an application:
+//!       - port 0: `?u` (`-`, term hole)
+//!       - port 1: `?v` (`-`, term hole)
+//!       - port 2: `(?u ?v)` (`+`, term)
+//!     - we link port 0, `?u`, up to `?p` (pattern hole)
+//!       - these are both holes so we create a new variable, `a`, and fill them
+//!         both with it
+//!     - visit the left child, `123` (with uplink `?v`)
+//!       - this is a number node:
+//!         - port 0: `123`
+//!       - we link port 0, `123`, up to `?v`
+//!         - we simply fill the term hole `?v` with the term `123`
+//!     - visit the right child, `x` (with uplink `(a ?v)`)
+//!       - this is a variable; add ``("x", `(a 123)`)`` to the hashmap
+//!       - we link port 0, `123`, up to `?v`
+//!   - visit the right child, `x` (with uplink `?t`)
+//!       - this is a variable; remove ``("x", `(a 123)`)`` from the hashmap
+//!       - link `(a 123)` to `?t`
+//!         - we simply fill the term hole `?t` with the term `(a 123)`
+//! - we're finished, the root term is now `@a (a 123)`
+
 use std::{
   collections::{hash_map::Entry, HashMap},
   ops::{BitXor, Not},
@@ -45,15 +346,29 @@ pub fn readback_linear(net: &Net, book: &Book, labels: &Labels, info: &mut Diagn
 }
 
 struct Readback<'c, 't, 'n> {
+  /// The value of all our polarity variables, if known yet.
   polarity_vars: Vec<Option<Polarity>>,
+
+  /// A map from hvm-core variable names to either `Target`s or `Polar`:
+  /// - `Ok`: a definite `Target`
+  /// - `Err`: only a `Polarity`
+  ///
+  /// After polarity inference, `Err`s are treated equivalently to missing entries.
   vars: HashMap<&'n str, Result<Target<'t>, Polarity>>,
-  labels: &'c Labels,
-  name_idx: u64,
+
+  /// Where to insert let statements; optional only so it can be temporarily
+  /// moved; it's generally safe to `.unwrap()`.
   lets: Option<&'t mut Term>,
-  root: Option<LoanedMut<'t, Term>>,
+
+  // Dropping `LoanedMut`s panic, so we push them to these vecs instead, so that
+  // we can dispose of the data once `'t` expires.
   garbage_terms: Vec<LoanedMut<'t, Term>>,
   garbage_pats: Vec<LoanedMut<'t, Pattern>>,
+
+  root: Option<LoanedMut<'t, Term>>,
   errors: Vec<ReadbackError>,
+  labels: &'c Labels,
+  name_idx: u64,
 }
 
 macro_rules! sym {
@@ -64,15 +379,26 @@ macro_rules! sym {
 
 impl<'c, 't, 'n> Readback<'c, 't, 'n> {
   fn readback(&mut self, net: &'n Net) {
+    // Theoretically, first, we want to infer the polarities for the root tree.
+    // However, since we definitely know the polarity of the free port, it' more
+    // efficient to skip that step and go straight to reading it back.
     self.read_pos(&net.root, NegRoot);
 
+    // Create one polarity variable for each redex
     self.polarity_vars.resize(net.redexes.len(), None);
+
+    // Infer polarities for every redex
     for (i, (l, r)) in net.redexes.iter().enumerate() {
       let p = self.infer_polarity(l, Polarity::Var(false, i));
       self.infer_polarity(r, !p);
     }
 
+    // Now that all of the polarities are known (or as known as possible), we
+    // can now read the redexes back:
     for (i, (lft, rgt)) in net.redexes.iter().enumerate() {
+      // If we still don't know the polarity of the redex, there must be a
+      // disconnected subnet with too little information to readback. Give a
+      // warning and move on.
       let Some(p) = self.polarity_vars[i] else {
         self.error(ReadbackError::DisconnectedSubnet);
         continue;
@@ -86,26 +412,43 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
       self.read_neg(neg, t);
     }
 
+    // We've finished creating lets, so we place the root at the bottom of the
+    // let chain.
     self.root.take().unwrap_or_default().place(self.lets.take().unwrap());
 
+    // If we have any entries remaining in the hashmap, issue warnings and push
+    // their targets to the garbage vectors.
     for target in std::mem::take(&mut self.vars).into_iter().filter_map(|x| x.1.ok()) {
       self.error(ReadbackError::UnboundVar);
       self.trash(target);
     }
   }
 
+  /// Infer polarity values for each port in this tree, based on a polarity
+  /// value for the root (which may be a variable), unifying with the rest of
+  /// the information we've recorded so far.
+  ///
+  /// Returns the polarity of the root of this tree, potentially further refined
+  /// due to unification.
+  ///
+  /// We treat numbers and reference nodes as always positive, and match and
+  /// operation nodes as always negative. It is possible to have
+  /// opposite-polarity versions of these in certain programs, but we have no
+  /// good way to read them back, and treating them as constant polarity
+  /// increases the number of disconnected subnets we can read back.
   fn infer_polarity(&mut self, tree: &'n Tree, mut polarity: Polarity) -> Polarity {
     match tree {
+      // Erasers can be positive or negative.
       Tree::Era => polarity,
-      Tree::Num { .. } | Tree::Ref { .. } => self.equate_polarity(polarity, Polarity::Pos),
+      Tree::Num { .. } | Tree::Ref { .. } => self.unify_polarities(polarity, Polarity::Pos),
       Tree::Op { rhs, out, .. } => {
-        polarity = self.equate_polarity(polarity, Polarity::Neg);
+        polarity = self.unify_polarities(polarity, Polarity::Neg);
         self.infer_polarity(rhs, Polarity::Pos);
         self.infer_polarity(out, Polarity::Neg);
         polarity
       }
       Tree::Mat { zero, succ, out } => {
-        polarity = self.equate_polarity(polarity, Polarity::Neg);
+        polarity = self.unify_polarities(polarity, Polarity::Neg);
         self.infer_polarity(zero, Polarity::Pos);
         self.infer_polarity(succ, Polarity::Pos);
         self.infer_polarity(out, Polarity::Neg);
@@ -125,7 +468,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
             Ok(t) => !t.polarity(),
             Err(p) => *p,
           };
-          self.equate_polarity(polarity, !other_polarity)
+          self.unify_polarities(polarity, !other_polarity)
         }
         Entry::Vacant(e) => {
           e.insert(Err(polarity));
@@ -136,13 +479,15 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
     }
   }
 
-  fn equate_polarity(&mut self, a: Polarity, b: Polarity) -> Polarity {
+  /// Update the values of our polarity variables based on an equation between
+  /// two polarities.
+  fn unify_polarities(&mut self, a: Polarity, b: Polarity) -> Polarity {
     match (a, b) {
-      _ if a == b => a,
+      _ if a == b => a, // already equivalent, no-op
       sym!(Polarity::Var(inv, id), p) => {
         let val = &mut self.polarity_vars[id];
         if let Some(q) = *val {
-          self.equate_polarity(p, q ^ inv)
+          self.unify_polarities(p, q ^ inv)
         } else {
           *val = Some(p ^ inv);
           p
@@ -155,6 +500,8 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
     }
   }
 
+  /// Given a negative-polarity uplink, read back from a `Tree` with a positive
+  /// root port.
   fn read_pos(&mut self, tree: &'n Tree, up: Target<'t>) {
     match tree {
       Tree::Var { nam } => self.link_var(nam, up),
@@ -165,6 +512,10 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
     }
   }
 
+  /// Read back from a `Tree` with a positive root port, returning a downlink.
+  ///
+  /// Panics if this is a variable (as a `Target` may not be available for it
+  /// yet).
   fn _read_pos(&mut self, tree: &'n Tree) -> Target<'t> {
     match tree {
       Tree::Var { .. } => unreachable!(),
@@ -172,6 +523,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
       Tree::Num { val } => PosTerm(LoanedMut::new(Term::Num { val: *val as u64 })),
       Tree::Ref { nam } => PosTerm(LoanedMut::new(Term::Ref { nam: Name::new(nam) })),
       Tree::Ctr { lab, ports } => match self.labels.to_ctr_kind(*lab) {
+        // lambda
         CtrKind::Con(tag) => {
           let [fst, snd] = &ports[..] else { unimplemented!() };
           let ((pat, bod), ret) =
@@ -185,6 +537,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
           self.read_pos(snd, NegTerm(bod));
           PosTerm(ret)
         }
+        // tuple / superposition
         CtrKind::Fan(fan, tag) => {
           let (els, ret) =
             LoanedMut::loan_with(Term::Fan { fan, tag, els: vec![hole(); ports.len()] }, |node, l| {
@@ -205,11 +558,14 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
     }
   }
 
+  /// Given a positive-polarity uplink, read back from a `Tree` with a negative
+  /// root port.
   fn read_neg(&mut self, tree: &'n Tree, up: Target<'t>) {
     match tree {
       Tree::Var { nam } => self.link_var(nam, up),
       Tree::Era => self.link(up, NegPat(LoanedMut::new(Pattern::Var(None)))),
       Tree::Ctr { lab, ports } => match self.labels.to_ctr_kind(*lab) {
+        // application
         CtrKind::Con(tag) => {
           let [fst, snd] = &ports[..] else { unimplemented!() };
           let ((fun, arg), ret) =
@@ -221,6 +577,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
           self.read_pos(fst, NegTerm(arg));
           self.read_neg(snd, PosTerm(ret));
         }
+        // tuple destructure / duplication
         CtrKind::Fan(fan, tag) => {
           let (els, ret) =
             LoanedMut::loan_with(Pattern::Fan(fan, tag, vec![hole(); ports.len()]), |node, l| {
@@ -296,7 +653,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
         Err(p) => {
           let q = x.polarity();
           let _ = e.insert(Ok(x));
-          self.equate_polarity(p, !q);
+          self.unify_polarities(p, !q);
         }
       },
       Entry::Vacant(e) => {
@@ -307,7 +664,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
 
   fn link(&mut self, a: Target<'t>, b: Target<'t>) {
     // report polarity errors
-    self.equate_polarity(a.polarity(), !b.polarity());
+    self.unify_polarities(a.polarity(), !b.polarity());
     match (a, b) {
       sym!(PosTerm(a), NegTerm(b)) => a.place(b),
       sym!(PosPat(a), NegPat(b)) => b.place(a),
@@ -340,6 +697,11 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
     v.place(&mut **val);
   }
 
+  /// Insert all lets created in the callback into `into`, returning a hole at
+  /// the base of the let chain.
+  ///
+  /// This is purely aesthetic; `f(); into` would be a valid implementation of
+  /// this function.
   fn collect_lets(&mut self, into: &'t mut Term, f: impl FnOnce(&mut Self)) -> &'t mut Term {
     let old_lets = std::mem::replace(&mut self.lets, Some(into));
     f(self);
@@ -384,6 +746,8 @@ enum Target<'t> {
   NegTerm(&'t mut Term),
   PosPat(&'t mut Pattern),
   NegPat(LoanedMut<'t, Pattern>),
+  /// The root term is handled specially so that top-level lets are handled
+  /// nicely.
   NegRoot,
 }
 
