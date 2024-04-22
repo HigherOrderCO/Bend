@@ -15,7 +15,7 @@ use crate::{
   },
 };
 
-pub fn readback_linear(net: &Net, _: &Book, labels: &Labels, _: &mut Diagnostics) -> Term {
+pub fn readback_linear(net: &Net, book: &Book, labels: &Labels, _: &mut Diagnostics) -> Term {
   let mut root = hole();
 
   let mut readback = Readback {
@@ -35,7 +35,7 @@ pub fn readback_linear(net: &Net, _: &Book, labels: &Labels, _: &mut Diagnostics
   drop!(LoanedMut::<Vec<Term>>::from(garbage_terms));
   drop!(LoanedMut::<Vec<Pattern>>::from(garbage_pats));
 
-  normalize_vars(&mut root);
+  normalize_vars(book, &mut root);
 
   root
 }
@@ -97,7 +97,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
       self.read_neg(neg, t);
     }
 
-    self.root.take().unwrap().place(self.lets.take().unwrap());
+    self.root.take().unwrap_or_default().place(self.lets.take().unwrap());
   }
 
   fn infer_polarity(&mut self, tree: &'n Tree, mut polarity: Polarity) -> Polarity {

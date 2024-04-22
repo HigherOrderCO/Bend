@@ -1,15 +1,15 @@
 use std::collections::{hash_map::Entry, HashMap};
 
-use crate::term::{num_to_name, Name, Pattern, Term};
+use crate::term::{num_to_name, Book, Name, Pattern, Term};
 
-pub fn normalize_vars(term: &mut Term) {
-  NormalizeVarsState::default().visit_term(term)
+pub fn normalize_vars(book: &Book, term: &mut Term) {
+  NormalizeVarsState { vars: Default::default(), name_idx: 0, book }.visit_term(term)
 }
 
-#[derive(Default)]
-struct NormalizeVarsState<'t> {
+struct NormalizeVarsState<'t, 'b> {
   vars: HashMap<Name, Var<'t>>,
   name_idx: u64,
+  book: &'b Book,
 }
 
 enum Var<'t> {
@@ -17,7 +17,7 @@ enum Var<'t> {
   Later(&'t mut Term),
 }
 
-impl<'t> NormalizeVarsState<'t> {
+impl<'t> NormalizeVarsState<'t, '_> {
   fn gen_name(&mut self) -> Name {
     let nam = Name::new(num_to_name(self.name_idx));
     self.name_idx += 1;
@@ -47,8 +47,8 @@ impl<'t> NormalizeVarsState<'t> {
         self.visit_term(nxt);
         self.exit_pattern(pat);
       }
-      Term::Swt { arg, pred, arms, .. } => {
-        let bnd = if let Term::Var { nam } = &**arg
+      Term::Swt { arg, bnd, pred, arms, .. } => {
+        let new_bnd = if let Term::Var { nam } = &**arg
           && let Some(Var::Bound(var)) = self.vars.get(nam)
           && let Term::Var { nam } = var
         {
@@ -57,16 +57,21 @@ impl<'t> NormalizeVarsState<'t> {
           None
         };
         self.visit_term(arg);
+        let new_bnd = new_bnd.unwrap_or_else(|| self.gen_name());
         let [zero, succ] = &mut arms[..] else { unreachable!() };
         self.visit_term(zero);
-        let bnd = bnd.unwrap_or_else(|| self.gen_name());
-        let new_pred = Name::new(format!("{bnd}-1"));
+        let new_pred = Name::new(format!("{new_bnd}-1"));
         let mut pat = self.enter_var_binding(pred.clone().unwrap(), new_pred);
         self.visit_term(succ);
         self.exit_pattern(&mut pat);
+        *pred = None;
+        *bnd = Some(new_bnd);
       }
-      Term::Ref { .. } => {
-        // TODO
+      Term::Ref { nam } => {
+        if nam.is_generated() {
+          *term = self.book.defs[&*nam].rules[0].body.clone();
+          self.visit_term(term);
+        }
       }
       _ => {
         for child in term.children_mut() {
