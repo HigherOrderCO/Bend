@@ -6,4 +6,4 @@ input_file: tests/golden_tests/cli/desugar_bool_tagged.hvm
 
 (True) = #Boolean λa #Boolean λ* a
 
-(False) = #Boolean λ* #Boolean λb b
+(False) = #Boolean λ* #Boolean λa a

@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/linearize_match.hvm
 ---
 Lazy mode:
-λa switch a = a { 0: λb b; _: λd (+ a-1 d) }
+λa switch a = a { 0: λb b; _: λd (+ a-1 d); }
 
 Strict mode:
-λa switch a = a { 0: λb b; _: λd (+ a-1 d) }
+λa switch a = a { 0: λb b; _: λd (+ a-1 d); }

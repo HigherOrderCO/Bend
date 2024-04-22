@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/switch_in_switch_arg.hvm
 ---
 TaggedScott:
-(main) = λa switch x = switch x = a { 0: 0; _: λb b } { 0: 0; _: λc (+ c 1) }
+(main) = λa switch switch a { 0: 0; _: λb b; } { 0: 0; _: λc (+ c 1); }
 
 Scott:
-(main) = λa switch x = switch x = a { 0: 0; _: λb b } { 0: 0; _: λc (+ c 1) }
+(main) = λa switch switch a { 0: 0; _: λb b; } { 0: 0; _: λc (+ c 1); }

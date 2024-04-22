@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/readback_lnet/match.hvm
 ---
-let c = 1; switch c = c { 0: λa a; _: c-1 }
+switch a = 1 { 0: λb b; _: a-1; }

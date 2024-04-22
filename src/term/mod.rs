@@ -414,11 +414,6 @@ impl Term {
     Term::Str { val: STRINGS.get(str) }
   }
 
-  pub fn switch(arg: Term, bnd: Name, zero: Term, succ: Term) -> Term {
-    let pred = Some(Name::new(format!("{bnd}-1")));
-    Term::Swt { arg: Box::new(arg), bnd: Some(bnd), with: vec![], pred, arms: vec![zero, succ] }
-  }
-
   pub fn sub_num(arg: Term, val: u64) -> Term {
     if val == 0 {
       arg
@@ -525,20 +520,20 @@ impl Term {
   ) -> impl DoubleEndedIterator<Item = (&Term, impl DoubleEndedIterator<Item = &Option<Name>> + Clone)> + Clone
   {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
-    multi_iterator!(BindsIter { Zero, One, Two, Mat, Pat });
+    multi_iterator!(BindsIter { Zero, One, Mat, Pat });
     match self {
-      Term::Mat { arg, bnd, with: _, arms: rules } => ChildrenIter::Mat(
+      Term::Mat { arg, bnd: _, with: _, arms: rules } => ChildrenIter::Mat(
         [(arg.as_ref(), BindsIter::Zero([]))]
           .into_iter()
-          .chain(rules.iter().map(move |r| (&r.2, BindsIter::Mat([bnd].into_iter().chain(r.1.iter()))))),
+          .chain(rules.iter().map(move |r| (&r.2, BindsIter::Mat(r.1.iter())))),
       ),
-      Term::Swt { arg, bnd, with: _, pred, arms: rules } => {
+      Term::Swt { arg, bnd: _, with: _, pred, arms: rules } => {
         let (succ, nums) = rules.split_last().unwrap();
         ChildrenIter::Swt(
           [(arg.as_ref(), BindsIter::Zero([]))]
             .into_iter()
-            .chain(nums.iter().map(move |x| (x, BindsIter::One([bnd]))))
-            .chain([(succ, BindsIter::Two([bnd, pred]))]),
+            .chain(nums.iter().map(move |x| (x, BindsIter::Zero([]))))
+            .chain([(succ, BindsIter::One([pred]))]),
         )
       }
       Term::Fan { els, .. } | Term::Lst { els } => {
@@ -574,22 +569,20 @@ impl Term {
   ) -> impl DoubleEndedIterator<Item = (&mut Term, impl DoubleEndedIterator<Item = &Option<Name>> + Clone)>
   {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt });
-    multi_iterator!(BindsIter { Zero, One, Two, Mat, Pat });
+    multi_iterator!(BindsIter { Zero, One, Mat, Pat });
     match self {
-      Term::Mat { arg, bnd, with: _, arms: rules } => {
-        let bnd = &*bnd;
-        ChildrenIter::Mat([(arg.as_mut(), BindsIter::Zero([]))].into_iter().chain(
-          rules.iter_mut().map(move |r| (&mut r.2, BindsIter::Mat([bnd].into_iter().chain(r.1.iter())))),
-        ))
-      }
-      Term::Swt { arg, bnd, with: _, pred, arms: rules } => {
-        let bnd = &*bnd;
+      Term::Mat { arg, bnd: _, with: _, arms: rules } => ChildrenIter::Mat(
+        [(arg.as_mut(), BindsIter::Zero([]))]
+          .into_iter()
+          .chain(rules.iter_mut().map(move |r| (&mut r.2, BindsIter::Mat(r.1.iter())))),
+      ),
+      Term::Swt { arg, bnd: _, with: _, pred, arms: rules } => {
         let (succ, nums) = rules.split_last_mut().unwrap();
         ChildrenIter::Swt(
           [(arg.as_mut(), BindsIter::Zero([]))]
             .into_iter()
-            .chain(nums.iter_mut().map(move |x| (x, BindsIter::One([bnd]))))
-            .chain([(succ, BindsIter::Two([bnd, &*pred]))]),
+            .chain(nums.iter_mut().map(move |x| (x, BindsIter::Zero([]))))
+            .chain([(succ, BindsIter::One([&*pred]))]),
         )
       }
       Term::Fan { els, .. } | Term::Lst { els } => {
@@ -629,14 +622,14 @@ impl Term {
       Term::Mat { arg, bnd: _, with: _, arms: rules } => ChildrenIter::Mat(
         [(arg.as_mut(), BindsIter::Zero([]))]
           .into_iter()
-          .chain(rules.iter_mut().map(|r| (&mut r.2, BindsIter::Mat(r.1.iter_mut())))),
+          .chain(rules.iter_mut().map(move |r| (&mut r.2, BindsIter::Mat(r.1.iter_mut())))),
       ),
       Term::Swt { arg, bnd: _, with: _, pred, arms: rules } => {
         let (succ, nums) = rules.split_last_mut().unwrap();
         ChildrenIter::Swt(
           [(arg.as_mut(), BindsIter::Zero([]))]
             .into_iter()
-            .chain(nums.iter_mut().map(|x| (x, BindsIter::Zero([]))))
+            .chain(nums.iter_mut().map(move |x| (x, BindsIter::Zero([]))))
             .chain([(succ, BindsIter::One([pred]))]),
         )
       }
@@ -676,8 +669,11 @@ impl Term {
   /// Caution: can cause invalid shadowing of variables if used incorrectly.
   /// Ex: Using subst to beta-reduce `(@a @b a b)` converting it into `@b b`.
   ///
-  /// Expects var bind information to be properly stored in match expressions,
+  /// NOTE: Expects var bind information to be properly stored in match expressions,
   /// so it must run AFTER `fix_match_terms`.
+  ///
+  /// NOTE: Since it doesn't (can't) handle `with` clauses in match terms,
+  /// it must be run only AFTER `with` linearization.
   pub fn subst(&mut self, from: &Name, to: &Term) {
     maybe_grow(|| {
       for (child, binds) in self.children_mut_with_binds() {
@@ -770,6 +766,23 @@ impl Term {
     let mut uses = Default::default();
     go_term(self, &mut decls, &mut uses);
     (decls, uses)
+  }
+
+  pub fn has_unscoped(&self) -> bool {
+    maybe_grow(|| {
+      let mut has_unscoped = match self {
+        Term::Let { pat, .. } if pat.has_unscoped() => true,
+        Term::Lnk { .. } => true,
+        _ => false,
+      };
+      for child in self.children() {
+        if has_unscoped {
+          return true;
+        }
+        has_unscoped |= child.has_unscoped()
+      }
+      has_unscoped
+    })
   }
 }
 

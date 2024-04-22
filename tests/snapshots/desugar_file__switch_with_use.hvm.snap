@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/switch_with_use.hvm
 ---
-(main) = λa λb λc (switch a = c { 0: λd λ* λ* d; _: λg λh λ* λ* (g h) } (a b))
+(main) = λa λb λc (switch c { 0: λd λ* λ* d; _: λe λf λ* λ* (e f); } (a b))

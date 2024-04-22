@@ -253,16 +253,14 @@ impl Term {
     // ex: reading `@a(a @b@c(b c))` we create `@a match a{A: (a.field1 a.field2)}`,
     // changing `b` to `a.field1` and `c` to `a.field2`.
     for (ctr, fields, body) in arms.iter_mut() {
-      let mut new_fields = vec![];
       for (field_idx, field) in fields.iter().enumerate() {
         if let Some(old_field) = field {
           let field_name = &adt.ctrs[ctr.as_ref().unwrap()][field_idx];
           let new_field = Name::new(format!("{arg}.{field_name}"));
-          new_fields.push(Some(new_field.clone()));
           body.subst(old_field, &Term::Var { nam: new_field });
         }
       }
-      *fields = new_fields;
+      *fields = vec![];
     }
 
     let arms = arms.into_iter().collect::<Vec<_>>();

@@ -116,55 +116,37 @@ impl Reader<'_> {
         Mat => match next.slot() {
           2 => {
             // Read the matched expression
-            let mut arg = self.read_term(self.net.enter_port(Port(node, 0)));
+            let arg = self.read_term(self.net.enter_port(Port(node, 0)));
+            let bnd = if let Term::Var { nam } = &arg { nam.clone() } else { self.namegen.unique() };
 
             // Read the pattern matching node
             let sel_node = self.net.enter_port(Port(node, 1)).node();
 
             // We expect the pattern matching node to be a CON
             let sel_kind = &self.net.node(sel_node).kind;
-            if *sel_kind != Ctr(Con(None)) {
-              // TODO: Is there any case where we expect a different node type here on readback?
-              self.error(ReadbackError::InvalidNumericMatch);
-              Term::switch(arg, self.namegen.unique(), Term::Err, Term::Err)
-            } else {
+            let (zero, succ) = if *sel_kind == Ctr(Con(None)) {
               let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
               let mut succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
 
               match &mut succ_term {
                 Term::Lam { pat: box Pattern::Var(nam), bod, .. } => {
-                  // Extract non-var args so we can refer to the pred.
-                  let (arg, bind) = if let Term::Var { nam } = &mut arg {
-                    (std::mem::take(nam), None)
-                  } else {
-                    (self.namegen.unique(), Some(arg))
-                  };
-
-                  let nam = std::mem::take(nam);
-                  let mut bod = std::mem::take(bod);
-
-                  // Rename the pred variable to indicate it's arg-1.
+                  let mut bod = std::mem::take(bod.as_mut());
                   if let Some(nam) = &nam {
-                    bod.subst(nam, &Term::Var { nam: Name::new(format!("{arg}-1")) });
+                    bod.subst(nam, &Term::Var { nam: Name::new(format!("{bnd}-1")) });
                   }
-
-                  let swt = Term::switch(Term::Var { nam: arg.clone() }, arg.clone(), zero_term, *bod);
-                  if let Some(bind) = bind {
-                    Term::Let {
-                      pat: Box::new(Pattern::Var(Some(arg))),
-                      val: Box::new(bind),
-                      nxt: Box::new(swt),
-                    }
-                  } else {
-                    swt
-                  }
+                  (zero_term, bod)
                 }
                 _ => {
                   self.error(ReadbackError::InvalidNumericMatch);
-                  Term::switch(arg, self.namegen.unique(), zero_term, succ_term)
+                  (zero_term, succ_term)
                 }
               }
-            }
+            } else {
+              // TODO: Is there any case where we expect a different node type here on readback?
+              self.error(ReadbackError::InvalidNumericMatch);
+              (Term::Err, Term::Err)
+            };
+            Term::Swt { arg: Box::new(arg), bnd: Some(bnd), with: vec![], pred: None, arms: vec![zero, succ] }
           }
           _ => {
             self.error(ReadbackError::InvalidNumericMatch);
@@ -495,47 +477,63 @@ impl std::fmt::Display for ReadbackError {
 
 impl Term {
   pub fn collect_unscoped(&self, unscoped: &mut HashSet<Name>, scope: &mut Vec<Name>) {
-    match self {
+    maybe_grow(|| match self {
       Term::Var { nam } if !scope.contains(nam) => _ = unscoped.insert(nam.clone()),
-      _ => {}
-    }
-    for (child, binds) in self.children_with_binds() {
-      let binds: Vec<_> = binds.collect();
-      for bind in binds.iter().copied().flatten() {
-        scope.push(bind.clone());
+      Term::Swt { arg, bnd, with: _, pred: _, arms } => {
+        arg.collect_unscoped(unscoped, scope);
+        arms[0].collect_unscoped(unscoped, scope);
+        if let Some(bnd) = bnd {
+          scope.push(Name::new(format!("{bnd}-1")));
+        }
+        arms[1].collect_unscoped(unscoped, scope);
+        if bnd.is_some() {
+          scope.pop();
+        }
       }
-      child.collect_unscoped(unscoped, scope);
-      for _bind in binds.into_iter().flatten() {
-        scope.pop();
+      _ => {
+        for (child, binds) in self.children_with_binds() {
+          let binds: Vec<_> = binds.collect();
+          for bind in binds.iter().copied().flatten() {
+            scope.push(bind.clone());
+          }
+          child.collect_unscoped(unscoped, scope);
+          for _bind in binds.into_iter().flatten() {
+            scope.pop();
+          }
+        }
       }
-    }
+    })
   }
 
   pub fn apply_unscoped(&mut self, unscoped: &HashSet<Name>) {
-    if let Term::Var { nam } = self
-      && unscoped.contains(nam)
-    {
-      *self = Term::Lnk { nam: std::mem::take(nam) }
-    }
-    if let Some(pat) = self.pattern_mut() {
-      pat.apply_unscoped(unscoped);
-    }
-    for child in self.children_mut() {
-      child.apply_unscoped(unscoped);
-    }
+    maybe_grow(|| {
+      if let Term::Var { nam } = self
+        && unscoped.contains(nam)
+      {
+        *self = Term::Lnk { nam: std::mem::take(nam) }
+      }
+      if let Some(pat) = self.pattern_mut() {
+        pat.apply_unscoped(unscoped);
+      }
+      for child in self.children_mut() {
+        child.apply_unscoped(unscoped);
+      }
+    })
   }
 }
 
 impl Pattern {
   fn apply_unscoped(&mut self, unscoped: &HashSet<Name>) {
-    if let Pattern::Var(Some(nam)) = self
-      && unscoped.contains(nam)
-    {
-      let nam = std::mem::take(nam);
-      *self = Pattern::Chn(nam);
-    }
-    for child in self.children_mut() {
-      child.apply_unscoped(unscoped)
-    }
+    maybe_grow(|| {
+      if let Pattern::Var(Some(nam)) = self
+        && unscoped.contains(nam)
+      {
+        let nam = std::mem::take(nam);
+        *self = Pattern::Chn(nam);
+      }
+      for child in self.children_mut() {
+        child.apply_unscoped(unscoped)
+      }
+    })
   }
 }
