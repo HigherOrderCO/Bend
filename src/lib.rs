@@ -20,7 +20,6 @@ use term::{encode_book, encoding::Labels, AdtEncoding, Book, Ctx, Name, Term};
 pub mod builtins;
 pub mod diagnostics;
 pub mod hvmc_net;
-pub mod net;
 pub mod term;
 
 pub use term::load_book::load_file_to_book;
