@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/addition_const.hvm
 ---
 @main = a
-  & $(#17 $(#33 a)) ~ #0
+  & $(#17 $(#33 a)) ~ #16

@@ -160,6 +160,7 @@ pub enum FanKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Op {
+  SET,
   ADD,
   SUB,
   MUL,
@@ -169,13 +170,12 @@ pub enum Op {
   NEQ,
   LTN,
   GTN,
-  LTE,
-  GTE,
   AND,
   OR,
   XOR,
   SHL,
   SHR,
+  ZER,
   // a^b
   POW,
   /// log_a(b)
@@ -184,8 +184,6 @@ pub enum Op {
   ATN,
   /// ceil(a) + floor(b)
   RND,
-  /// 0u24
-  ZER,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -818,27 +816,26 @@ impl Term {
 impl From<Op> for u8 {
   fn from(value: Op) -> Self {
     match value {
-      Op::ADD => 0x0,
-      Op::SUB => 0x1,
-      Op::MUL => 0x2,
-      Op::DIV => 0x3,
-      Op::REM => 0x4,
-      Op::EQL => 0x5,
-      Op::NEQ => 0x6,
-      Op::LTN => 0x7,
-      Op::GTN => 0x8,
-      Op::LTE => 0x9,
-      Op::GTE => 0xa,
-      Op::AND => 0xb,
-      Op::OR => 0xc,
-      Op::XOR => 0xd,
-      Op::SHL => 0xe,
-      Op::SHR => 0xf,
+      Op::SET => 0x0,
+      Op::ADD => 0x1,
+      Op::SUB => 0x2,
+      Op::MUL => 0x3,
+      Op::DIV => 0x4,
+      Op::REM => 0x5,
+      Op::EQL => 0x6,
+      Op::NEQ => 0x7,
+      Op::LTN => 0x8,
+      Op::GTN => 0x9,
+      Op::AND => 0xa,
+      Op::OR => 0xb,
+      Op::XOR => 0xc,
+      Op::SHL => 0xd,
+      Op::SHR => 0xe,
+      Op::ZER => 0xf,
       Op::POW => 0xb,
       Op::LOG => 0xc,
       Op::ATN => 0xd,
       Op::RND => 0xe,
-      Op::ZER => 0xf,
     }
   }
 }

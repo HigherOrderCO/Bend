@@ -384,10 +384,6 @@ impl<'a> TermParser<'a> {
       Op::SHL
     } else if self.try_consume(">>") {
       Op::SHR
-    } else if self.try_consume("<=") {
-      Op::LTE
-    } else if self.try_consume(">=") {
-      Op::GTE
     } else if self.try_consume("<") {
       Op::LTN
     } else if self.try_consume(">") {

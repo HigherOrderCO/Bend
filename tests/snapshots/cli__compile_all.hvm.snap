@@ -10,5 +10,5 @@ input_file: tests/golden_tests/cli/compile_all.hvm
 
 @main = e
   & @Pair.get ~ ((a (b c)) (d e))
-  & $(a $(b c)) ~ #0
+  & $(a $(b c)) ~ #16
   & @Pair ~ (#641 (#33 d))

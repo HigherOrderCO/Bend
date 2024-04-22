@@ -164,8 +164,8 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         }
         // core: & fst ~ <op snd ret>
         Term::Opx { opr, fst, snd } => {
-          let opr_val = *opr as u32; // SYM
-          let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
+          // 4 bits to signal that we move the oper, 4 bits to store the oper to be moved.
+          let oper = Place::Tree(LoanedMut::new(Tree::Num { val: (*opr as u32) << 4 }));
           let node1 = self.new_opr();
           let node2 = self.new_opr();
 

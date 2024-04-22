@@ -3,8 +3,8 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/match_mult_linearization.hvm
 ---
 @main = (?(((a (b (d e))) (f (g (i (k l))))) m) m)
-  & $(c $(d e)) ~ #0
-  & $(a $(b c)) ~ #0
-  & $(j $(k l)) ~ #0
-  & $(h $(i j)) ~ #0
-  & $(f $(g h)) ~ #0
+  & $(c $(d e)) ~ #16
+  & $(a $(b c)) ~ #16
+  & $(j $(k l)) ~ #16
+  & $(h $(i j)) ~ #16
+  & $(f $(g h)) ~ #16

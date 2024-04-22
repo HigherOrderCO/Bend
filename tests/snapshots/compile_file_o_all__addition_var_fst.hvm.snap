@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/addition_var_fst.hvm
 ---
 @main = (a b)
-  & $(a $(#17 b)) ~ #0
+  & $(a $(#17 b)) ~ #16

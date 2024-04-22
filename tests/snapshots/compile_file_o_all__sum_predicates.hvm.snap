@@ -10,6 +10,6 @@ input_file: tests/golden_tests/compile_file_o_all/sum_predicates.hvm
 @sum_pred$C0 = (?((#1 (a a)) b) b)
 
 @sum_pred$C1 = (b (a c))
-  & $(a $(b c)) ~ #0
+  & $(a $(b c)) ~ #16
 
 @sum_pred$C2 = (b (?(((a a) @sum_pred$C1) (b c)) c))

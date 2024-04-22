@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/match_tup.hvm
 ---
 @Sum = ((a b) c)
-  & $(a $(b c)) ~ #0
+  & $(a $(b c)) ~ #16
 
 @main = a
   & @Sum ~ ((#113 #49) a)

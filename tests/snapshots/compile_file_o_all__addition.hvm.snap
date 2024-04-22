@@ -4,5 +4,5 @@ input_file: tests/golden_tests/compile_file_o_all/addition.hvm
 ---
 @main = d
   & (b c) ~ (#129 d)
-  & $(a $(b c)) ~ #0
-  & $(#17 $(#17 a)) ~ #0
+  & $(a $(b c)) ~ #16
+  & $(#17 $(#17 a)) ~ #16

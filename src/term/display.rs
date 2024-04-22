@@ -209,8 +209,6 @@ impl fmt::Display for Op {
       Op::NEQ => write!(f, "!="),
       Op::LTN => write!(f, "<"),
       Op::GTN => write!(f, ">"),
-      Op::LTE => write!(f, "<="),
-      Op::GTE => write!(f, ">="),
       Op::AND => write!(f, "&"),
       Op::OR => write!(f, "|"),
       Op::XOR => write!(f, "^"),
@@ -221,6 +219,7 @@ impl fmt::Display for Op {
       Op::ATN => todo!(),
       Op::RND => todo!(),
       Op::ZER => todo!(),
+      Op::SET => todo!(),
     }
   }
 }
