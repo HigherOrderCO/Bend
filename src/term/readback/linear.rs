@@ -12,11 +12,11 @@ use crate::{
   term::{num_to_name, term_to_net::Labels, Book, FanKind, Name, Pattern, Term},
 };
 
-pub fn readback(net: &Net, _: &Book, labels: &Labels, _: bool, _: &mut Diagnostics) -> Term {
+pub fn readback_linear(net: &Net, _: &Book, labels: &Labels, _: &mut Diagnostics) -> Term {
   let mut root = hole();
 
   let mut readback = Readback {
-    redexes: Default::default(),
+    polarity_vars: Default::default(),
     vars: Default::default(),
     lets: Some(&mut root),
     labels,
@@ -33,38 +33,6 @@ pub fn readback(net: &Net, _: &Book, labels: &Labels, _: bool, _: &mut Diagnosti
   drop!(LoanedMut::<Vec<Pattern>>::from(garbage_pats));
 
   root
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-enum Polarity {
-  Pos,
-  Neg,
-  Var(bool, usize),
-}
-
-impl Polarity {
-  fn is_concrete(&self) -> bool {
-    !matches!(self, Polarity::Var(..))
-  }
-}
-
-impl Not for Polarity {
-  type Output = Self;
-  fn not(self) -> Self::Output {
-    match self {
-      Polarity::Pos => Polarity::Neg,
-      Polarity::Neg => Polarity::Pos,
-      Polarity::Var(inv, id) => Polarity::Var(!inv, id),
-    }
-  }
-}
-
-impl BitXor<bool> for Polarity {
-  type Output = Self;
-
-  fn bitxor(self, rhs: bool) -> Self::Output {
-    if rhs { !self } else { self }
-  }
 }
 
 #[derive(Debug)]
@@ -88,7 +56,7 @@ impl<'t> Target<'t> {
 }
 
 struct Readback<'c, 't, 'n> {
-  redexes: Vec<(bool, Option<Polarity>)>,
+  polarity_vars: Vec<Option<Polarity>>,
   vars: HashMap<&'n str, Result<Target<'t>, Polarity>>,
   labels: &'c Labels,
   name_idx: u64,
@@ -108,139 +76,40 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
   fn readback(&mut self, net: &'n Net) {
     self.read_pos(&net.root, NegRoot);
 
-    // dbg!(net);
-
-    self.redexes.resize(net.redexes.len(), (false, None));
+    self.polarity_vars.resize(net.redexes.len(), None);
     for (i, (l, r)) in net.redexes.iter().enumerate() {
-      // dbg!(i);
-      let mut p = self.refine_polarity(l, Polarity::Var(false, i));
-      // dbg!(p);
-      // if !p.is_concrete() {
-      p = !self.refine_polarity(r, !p);
-      _ = p;
-      // dbg!(p);
-      // }
-      // // dbg!(i);
-      // if p.is_concrete() {
-      //   self.redexes[i].0 = true;
-      //   self.process_redex(p, l, r);
-      // }
+      let p = self.infer_polarity(l, Polarity::Var(false, i));
+      self.infer_polarity(r, !p);
     }
 
-    for (i, (l, r)) in net.redexes.iter().enumerate() {
-      if self.redexes[i].0 {
-        continue;
-      }
-      let Some(p) = self.redexes[i].1 else { todo!() };
+    for (i, (lft, rgt)) in net.redexes.iter().enumerate() {
+      let Some(p) = self.polarity_vars[i] else { todo!() };
       if !p.is_concrete() {
         todo!()
       }
-      self.process_redex(p, l, r);
+      let (pos, neg) = if p == Polarity::Pos { (lft, rgt) } else { (rgt, lft) };
+      let t = self._read_pos(pos);
+      self.read_neg(neg, t);
     }
 
     self.root.take().unwrap().place(self.lets.take().unwrap());
   }
 
-  fn process_redex(&mut self, p: Polarity, l: &'n Tree, r: &'n Tree) {
-    debug_assert!(p.is_concrete());
-    let (p, n) = if p == Polarity::Pos { (l, r) } else { (r, l) };
-    let t = self._read_pos(p);
-    self.read_neg(n, t);
-  }
-
-  fn link(&mut self, a: Target<'t>, b: Target<'t>) {
-    // report polarity errors
-    self.equate_polarity(a.polarity(), !b.polarity());
-    match (a, b) {
-      sym!(PosTerm(a), NegTerm(b)) => a.place(b),
-      sym!(PosPat(a), NegPat(b)) => b.place(a),
-      sym!(PosPat(a), NegTerm(b)) => {
-        let nam = self.gen_name();
-        *a = Pattern::Var(Some(nam.clone()));
-        *b = Term::Var { nam };
-      }
-      sym!(PosTerm(t), NegPat(p)) => self.insert_let(p, t),
-      sym!(PosTerm(t), NegRoot) => self.root = Some(t),
-      sym!(PosPat(p), NegRoot) => {
-        let nam = self.gen_name();
-        *p = Pattern::Var(Some(nam.clone()));
-        self.root = Some(LoanedMut::new(Term::Var { nam }));
-      }
-      // push data from polarity errors to garbage:
-      (NegPat(a), NegPat(b)) => {
-        self.garbage_pats.push(a);
-        self.garbage_pats.push(b);
-      }
-      sym!(NegPat(p), NegTerm(_) | NegRoot) => self.garbage_pats.push(p),
-      (NegTerm(_) | NegRoot, NegTerm(_) | NegRoot) => {}
-      (PosTerm(a), PosTerm(b)) => {
-        self.garbage_terms.push(a);
-        self.garbage_terms.push(b);
-      }
-      sym!(PosTerm(a), PosPat(_)) => {
-        self.garbage_terms.push(a);
-      }
-      (PosPat(_), PosPat(_)) => {}
-    }
-  }
-
-  fn insert_let(&mut self, p: LoanedMut<'t, Pattern>, v: LoanedMut<'t, Term>) {
-    let lets = self.lets.take().unwrap();
-    *lets = Term::Let { pat: hole(), val: hole(), nxt: hole() };
-    let Term::Let { pat, val, nxt } = lets else { unreachable!() };
-    self.lets = Some(nxt);
-    p.place(&mut **pat);
-    v.place(&mut **val);
-  }
-
-  fn collect_lets(&mut self, into: &'t mut Term, f: impl FnOnce(&mut Self)) -> &'t mut Term {
-    let old_lets = std::mem::replace(&mut self.lets, Some(into));
-    f(self);
-    std::mem::replace(&mut self.lets, old_lets).unwrap()
-  }
-
-  fn gen_name(&mut self) -> Name {
-    let nam = Name::new(num_to_name(self.name_idx));
-    self.name_idx += 1;
-    nam
-  }
-
-  fn equate_polarity(&mut self, a: Polarity, b: Polarity) -> Polarity {
-    use Polarity::*;
-    match (a, b) {
-      (Pos, Pos) | (Neg, Neg) => a,
-      sym!(Pos, Neg) => {
-        self.report_polarity_error();
-        a
-      }
-      _ if a == b => a,
-      sym!(Var(inv, id), p) => {
-        let r = &mut self.redexes[id].1;
-        if let Some(q) = *r {
-          self.equate_polarity(p, q ^ inv)
-        } else {
-          *r = Some(p ^ inv);
-          p
-        }
-      }
-    }
-  }
-
-  fn refine_polarity(&mut self, tree: &'n Tree, mut polarity: Polarity) -> Polarity {
+  fn infer_polarity(&mut self, tree: &'n Tree, mut polarity: Polarity) -> Polarity {
     match tree {
       Tree::Era => polarity,
       Tree::Num { .. } | Tree::Ref { .. } => self.equate_polarity(polarity, Polarity::Pos),
       Tree::Op { rhs, out, .. } => {
         polarity = self.equate_polarity(polarity, Polarity::Neg);
-        self.refine_polarity(rhs, Polarity::Pos);
-        self.refine_polarity(out, Polarity::Neg);
+        self.infer_polarity(rhs, Polarity::Pos);
+        self.infer_polarity(out, Polarity::Neg);
         polarity
       }
       Tree::Mat { zero, succ, out } => {
         polarity = self.equate_polarity(polarity, Polarity::Neg);
-        self.refine_polarity(zero, Polarity::Pos);
-        self.refine_polarity(succ, Polarity::Pos);
-        self.refine_polarity(out, Polarity::Neg);
+        self.infer_polarity(zero, Polarity::Pos);
+        self.infer_polarity(succ, Polarity::Pos);
+        self.infer_polarity(out, Polarity::Neg);
         polarity
       }
       Tree::Ctr { lab, ports } => {
@@ -250,13 +119,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
         };
         for (i, port) in ports.iter().enumerate() {
           let invert = invert_first && (i != ports.len() - 1);
-          // dbg!(invert);
-          let out = self.refine_polarity(port, polarity ^ invert) ^ invert;
-          // dbg!(invert, polarity, out, polarity ^ invert, port);
-          polarity = self.equate_polarity(polarity, out);
-          // if polarity.is_concrete() {
-          //   break;
-          // }
+          polarity = self.infer_polarity(port, polarity ^ invert) ^ invert;
         }
         polarity
       }
@@ -266,7 +129,6 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
             Ok(t) => !t.polarity(),
             Err(p) => *p,
           };
-          // dbg!(nam, polarity, other_polarity);
           self.equate_polarity(polarity, !other_polarity)
         }
         Entry::Vacant(e) => {
@@ -275,6 +137,25 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
         }
       },
       Tree::Adt { .. } => unimplemented!(),
+    }
+  }
+
+  fn equate_polarity(&mut self, a: Polarity, b: Polarity) -> Polarity {
+    match (a, b) {
+      _ if a == b => a,
+      sym!(Polarity::Var(inv, id), p) => {
+        let val = &mut self.polarity_vars[id];
+        if let Some(q) = *val {
+          self.equate_polarity(p, q ^ inv)
+        } else {
+          *val = Some(p ^ inv);
+          p
+        }
+      }
+      _ => {
+        self.report_polarity_error();
+        a
+      }
     }
   }
 
@@ -442,6 +323,104 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
         e.insert(Ok(x));
       }
     }
+  }
+
+  fn link(&mut self, a: Target<'t>, b: Target<'t>) {
+    // report polarity errors
+    self.equate_polarity(a.polarity(), !b.polarity());
+    match (a, b) {
+      sym!(PosTerm(a), NegTerm(b)) => a.place(b),
+      sym!(PosPat(a), NegPat(b)) => b.place(a),
+      sym!(PosPat(a), NegTerm(b)) => {
+        let nam = self.gen_name();
+        *a = Pattern::Var(Some(nam.clone()));
+        *b = Term::Var { nam };
+      }
+      sym!(PosTerm(t), NegPat(p)) => self.insert_let(p, t),
+      sym!(PosTerm(t), NegRoot) => self.root = Some(t),
+      sym!(PosPat(p), NegRoot) => {
+        let nam = self.gen_name();
+        *p = Pattern::Var(Some(nam.clone()));
+        self.root = Some(LoanedMut::new(Term::Var { nam }));
+      }
+      // push data from polarity errors to garbage:
+      (NegPat(a), NegPat(b)) => {
+        self.garbage_pats.push(a);
+        self.garbage_pats.push(b);
+      }
+      sym!(NegPat(p), NegTerm(_) | NegRoot) => self.garbage_pats.push(p),
+      (NegTerm(_) | NegRoot, NegTerm(_) | NegRoot) => {}
+      (PosTerm(a), PosTerm(b)) => {
+        self.garbage_terms.push(a);
+        self.garbage_terms.push(b);
+      }
+      sym!(PosTerm(a), PosPat(_)) => {
+        self.garbage_terms.push(a);
+      }
+      (PosPat(_), PosPat(_)) => {}
+    }
+  }
+
+  fn insert_let(&mut self, p: LoanedMut<'t, Pattern>, v: LoanedMut<'t, Term>) {
+    let lets = self.lets.take().unwrap();
+    *lets = Term::Let { pat: hole(), val: hole(), nxt: hole() };
+    let Term::Let { pat, val, nxt } = lets else { unreachable!() };
+    self.lets = Some(nxt);
+    p.place(&mut **pat);
+    v.place(&mut **val);
+  }
+
+  fn collect_lets(&mut self, into: &'t mut Term, f: impl FnOnce(&mut Self)) -> &'t mut Term {
+    let old_lets = std::mem::replace(&mut self.lets, Some(into));
+    f(self);
+    std::mem::replace(&mut self.lets, old_lets).unwrap()
+  }
+
+  fn gen_name(&mut self) -> Name {
+    let nam = Name::new(num_to_name(self.name_idx));
+    self.name_idx += 1;
+    nam
+  }
+}
+
+/// A polarity value; positive represents the creation of a value and negative
+/// represents the destruction.
+///
+/// All wires in the net must be between a positive and a negative port.
+#[derive(Debug, Clone, Copy, PartialEq)]
+enum Polarity {
+  Pos,
+  Neg,
+  /// The concrete value is not yet known, and is based on a polarity variable.
+  ///
+  /// The `bool` indicates if this polarity is negated from the variable.
+  Var(bool, usize),
+}
+
+impl Polarity {
+  fn is_concrete(&self) -> bool {
+    !matches!(self, Polarity::Var(..))
+  }
+}
+
+/// Negates a polarity.
+impl Not for Polarity {
+  type Output = Self;
+  fn not(self) -> Self::Output {
+    match self {
+      Polarity::Pos => Polarity::Neg,
+      Polarity::Neg => Polarity::Pos,
+      Polarity::Var(inv, id) => Polarity::Var(!inv, id),
+    }
+  }
+}
+
+/// Negates a polarity if the bool is `true`.
+impl BitXor<bool> for Polarity {
+  type Output = Self;
+
+  fn bitxor(self, rhs: bool) -> Self::Output {
+    if rhs { !self } else { self }
   }
 }
 

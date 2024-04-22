@@ -13,10 +13,9 @@ use hvmc_net::{
   mutual_recursion,
   pre_reduce::{pre_reduce, MAX_REWRITES_DEFAULT},
 };
-use net::hvmc_to_net::hvmc_to_net;
 use parking_lot::Mutex;
 use std::{sync::Arc, time::Instant};
-use term::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term};
+use term::{book_to_nets, term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term};
 
 pub mod builtins;
 pub mod diagnostics;

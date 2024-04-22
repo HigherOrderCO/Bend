@@ -1,11 +1,8 @@
-use super::{INet, INode, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
-use crate::{
-  net::{CtrKind, NodeKind},
-  term::Name,
-};
+use super::{INet, INode, INodes, NodeId, NodeKind, NodeKind::*, Port, SlotId, ROOT};
+use crate::{net::CtrKind, term::Name};
 use hvmc::ast::{Net, Tree};
 
-pub fn hvmc_to_net(net: &Net) -> INet {
+pub fn hvmc_to_inet(net: &Net) -> INet {
   let inodes = hvmc_to_inodes(net);
   inodes_to_inet(&inodes)
 }

@@ -1,16 +1,16 @@
 use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
   maybe_grow,
-  net::{CtrKind::*, INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
-  term::{num_to_name, term_to_net::Labels, Book, Name, Pattern, Tag, Term},
+  net::CtrKind::*,
+  term::{num_to_name, term_to_net::Labels, Book, FanKind, Name, Pattern, Tag, Term},
 };
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use super::FanKind;
+use super::{INet, NodeId, NodeKind::*, Port, SlotId, ROOT};
 
 // TODO: Display scopeless lambdas as such
 /// Converts an Interaction-INet to a Lambda Calculus term
-pub fn net_to_term(
+pub fn inet_to_term(
   net: &INet,
   book: &Book,
   labels: &Labels,
@@ -446,7 +446,6 @@ pub enum ReadbackError {
   InvalidNumericOp,
   ReachedRoot,
   Cyclic,
-  InvalidBind,
 }
 
 impl PartialEq for ReadbackError {
@@ -470,7 +469,6 @@ impl std::fmt::Display for ReadbackError {
       ReadbackError::InvalidNumericOp => write!(f, "Invalid Numeric Operation."),
       ReadbackError::ReachedRoot => write!(f, "Reached Root."),
       ReadbackError::Cyclic => write!(f, "Cyclic Term."),
-      ReadbackError::InvalidBind => write!(f, "Invalid Bind."),
     }
   }
 }
