@@ -15,7 +15,7 @@ use hvmc_net::{
 };
 use parking_lot::Mutex;
 use std::{sync::Arc, time::Instant};
-use term::{book_to_nets, term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term};
+use term::{encode_book, encoding::Labels, AdtEncoding, Book, Ctx, Name, Term};
 
 pub mod builtins;
 pub mod diagnostics;
@@ -48,7 +48,7 @@ pub fn compile_book(
   args: Option<Vec<Term>>,
 ) -> Result<CompileResult, Diagnostics> {
   let mut diagnostics = desugar_book(book, opts.clone(), diagnostics_cfg, args)?;
-  let (mut core_book, labels) = book_to_nets(book, &mut diagnostics)?;
+  let (mut core_book, labels) = encode_book(book, &mut diagnostics)?;
 
   if opts.eta {
     core_book.values_mut().for_each(Net::eta_reduce);

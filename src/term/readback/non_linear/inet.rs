@@ -1,4 +1,4 @@
-use crate::{net::CtrKind, term::Name};
+use crate::term::Name;
 use NodeKind::*;
 
 #[derive(Debug, Clone)]
@@ -25,7 +25,7 @@ pub enum NodeKind {
   /// Erasure nodes
   Era,
   /// Binary combinators
-  Ctr(CtrKind),
+  Ctr(u16),
   /// Reference to function definitions
   Ref { def_name: Name },
   /// Numbers

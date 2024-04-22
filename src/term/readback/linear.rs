@@ -8,10 +8,11 @@ use loaned::{drop, LoanedMut};
 
 use crate::{
   diagnostics::Diagnostics,
-  net::CtrKind,
   term::{
-    num_to_name, readback::normalize_vars::normalize_vars, term_to_net::Labels, Book, FanKind, Name, Pattern,
-    Term,
+    encoding::{CtrKind, Labels},
+    num_to_name,
+    readback::normalize_vars::normalize_vars,
+    Book, Name, Pattern, Term,
   },
 };
 
@@ -118,10 +119,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
         polarity
       }
       Tree::Ctr { lab, ports } => {
-        let invert_first = match CtrKind::from_lab(*lab) {
-          CtrKind::Con(_) => true,
-          CtrKind::Tup(_) | CtrKind::Dup(_) => false,
-        };
+        let invert_first = matches!(self.labels.to_ctr_kind(*lab), CtrKind::Con(_));
         for (i, port) in ports.iter().enumerate() {
           let invert = invert_first && (i != ports.len() - 1);
           polarity = self.infer_polarity(port, polarity ^ invert) ^ invert;
@@ -180,10 +178,9 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
       Tree::Era => PosTerm(LoanedMut::new(Term::Era)),
       Tree::Num { val } => PosTerm(LoanedMut::new(Term::Num { val: *val as u64 })),
       Tree::Ref { nam } => PosTerm(LoanedMut::new(Term::Ref { nam: Name::new(nam) })),
-      Tree::Ctr { lab, ports } => match CtrKind::from_lab(*lab) {
-        CtrKind::Con(lab) => {
+      Tree::Ctr { lab, ports } => match self.labels.to_ctr_kind(*lab) {
+        CtrKind::Con(tag) => {
           let [fst, snd] = &ports[..] else { unimplemented!() };
-          let tag = self.labels.con.to_tag(lab);
           let ((pat, bod), ret) =
             LoanedMut::loan_with(Term::Lam { tag, pat: hole(), bod: hole() }, |node, l| {
               let Term::Lam { pat, bod, .. } = node else { unreachable!() };
@@ -195,12 +192,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
           self.read_pos(snd, NegTerm(bod));
           PosTerm(ret)
         }
-        kind @ (CtrKind::Tup(_) | CtrKind::Dup(_)) => {
-          let (fan, tag) = match kind {
-            CtrKind::Tup(l) => (FanKind::Tup, self.labels.tup.to_tag(l)),
-            CtrKind::Dup(l) => (FanKind::Dup, self.labels.dup.to_tag(Some(l))),
-            CtrKind::Con(_) => unreachable!(),
-          };
+        CtrKind::Fan(fan, tag) => {
           let (els, ret) =
             LoanedMut::loan_with(Term::Fan { fan, tag, els: vec![hole(); ports.len()] }, |node, l| {
               let Term::Fan { els, .. } = node else { unreachable!() };
@@ -228,10 +220,9 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
     match tree {
       Tree::Var { nam } => self.link_var(nam, up),
       Tree::Era => self.link(up, NegPat(LoanedMut::new(Pattern::Var(None)))),
-      Tree::Ctr { lab, ports } => match CtrKind::from_lab(*lab) {
-        CtrKind::Con(lab) => {
+      Tree::Ctr { lab, ports } => match self.labels.to_ctr_kind(*lab) {
+        CtrKind::Con(tag) => {
           let [fst, snd] = &ports[..] else { unimplemented!() };
-          let tag = self.labels.con.to_tag(lab);
           let ((fun, arg), ret) =
             LoanedMut::loan_with(Term::App { tag, fun: hole(), arg: hole() }, |node, l| {
               let Term::App { fun, arg, .. } = node else { unreachable!() };
@@ -241,12 +232,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
           self.read_pos(fst, NegTerm(arg));
           self.read_neg(snd, PosTerm(ret));
         }
-        kind @ (CtrKind::Tup(_) | CtrKind::Dup(_)) => {
-          let (fan, tag) = match kind {
-            CtrKind::Tup(l) => (FanKind::Tup, self.labels.tup.to_tag(l)),
-            CtrKind::Dup(l) => (FanKind::Dup, self.labels.dup.to_tag(Some(l))),
-            CtrKind::Con(_) => unreachable!(),
-          };
+        CtrKind::Fan(fan, tag) => {
           let (els, ret) =
             LoanedMut::loan_with(Pattern::Fan(fan, tag, vec![hole(); ports.len()]), |node, l| {
               let Pattern::Fan(.., els) = node else { unreachable!() };

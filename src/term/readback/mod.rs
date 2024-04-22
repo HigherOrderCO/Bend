@@ -2,7 +2,7 @@ use hvmc::ast::Net;
 
 use crate::diagnostics::{DiagnosticOrigin, Diagnostics, Severity};
 
-use super::{term_to_net::Labels, AdtEncoding, Book, Term};
+use super::{encoding::Labels, AdtEncoding, Book, Term};
 
 mod linear;
 mod non_linear;

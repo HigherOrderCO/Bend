@@ -2,7 +2,7 @@ use crate::{
   builtins::util::{AsDefFunction, FunctionLike, FunctionLikeHosted},
   readback_with_errors,
   term::{
-    term_to_net::{term_to_net, Labels},
+    encoding::{encode_term, Labels},
     AdtEncoding, Book, Term,
   },
 };
@@ -93,7 +93,7 @@ pub(crate) fn add_fs_defs(
                 }
               },
             };
-            match term_to_net(&result, &mut labels) {
+            match encode_term(&result, &mut labels) {
                 Ok(result) => {
                   // Return λx (x result)
                   let app = net.create_node(hvmc::run::Tag::Ctr, 0);
@@ -129,7 +129,7 @@ pub(crate) fn add_fs_defs(
           Err(s) => Term::encode_err(Term::encode_str(&s)),
         };
         let mut labels = (*self.readback_data.labels).clone();
-        if let Ok(result) = term_to_net(&result, &mut labels) {
+        if let Ok(result) = encode_term(&result, &mut labels) {
           self.readback_data.host.lock().encode_net(net, Trg::port(app.p1), &result);
         } else {
           eprintln!("{VICIOUS_CIRCLE_MSG}");

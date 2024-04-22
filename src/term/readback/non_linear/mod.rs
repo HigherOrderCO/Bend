@@ -2,7 +2,7 @@ use hvmc::ast::Net;
 
 use crate::{
   diagnostics::Diagnostics,
-  term::{term_to_net::Labels, Book, Term},
+  term::{encoding::Labels, Book, Term},
 };
 
 mod hvmc_to_inet;

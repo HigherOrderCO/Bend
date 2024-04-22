@@ -3,7 +3,7 @@ use crate::{
   readback_with_errors,
   term::{
     builtins::{RESULT_ERR, RESULT_OK, SCONS, SNIL},
-    term_to_net::Labels,
+    encoding::Labels,
     AdtEncoding, Book, Term,
   },
 };

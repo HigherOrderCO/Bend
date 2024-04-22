@@ -3,9 +3,9 @@ use hvml::{
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity, ToStringVerbose},
   run_book,
   term::{
+    encoding::{encode_term, Labels},
     load_book::do_parse_book,
     parser::TermParser,
-    term_to_net::{term_to_net, Labels},
     AdtEncoding, Book, Ctx, Name,
   },
   CompileOpts, RunOpts,
@@ -106,7 +106,7 @@ fn compile_term() {
 
     term.make_var_names_unique();
     term.linearize_vars();
-    let net = term_to_net(&term, &mut Default::default()).map_err(|e| e.to_string_verbose(true))?;
+    let net = encode_term(&term, &mut Default::default()).map_err(|e| e.to_string_verbose(true))?;
 
     Ok(format!("{}", net))
   })

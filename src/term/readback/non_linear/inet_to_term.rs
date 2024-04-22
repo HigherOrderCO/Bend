@@ -1,8 +1,13 @@
 use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
   maybe_grow,
-  net::CtrKind::*,
-  term::{num_to_name, term_to_net::Labels, Book, FanKind, Name, Pattern, Tag, Term},
+  term::{
+    encoding::{
+      CtrKind::{self, *},
+      Labels,
+    },
+    num_to_name, Book, FanKind, Name, Pattern, Tag, Term,
+  },
 };
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -36,11 +41,8 @@ pub fn inet_to_term(
     let fst = reader.namegen.decl_name(net, Port(node, 1));
     let snd = reader.namegen.decl_name(net, Port(node, 2));
 
-    let (fan, tag) = match reader.net.node(node).kind {
-      Ctr(Tup(lab)) => (FanKind::Tup, reader.labels.tup.to_tag(lab)),
-      Ctr(Dup(lab)) => (FanKind::Dup, reader.labels.dup.to_tag(Some(lab))),
-      _ => unreachable!(),
-    };
+    let Ctr(lab) = reader.net.node(node).kind else { unreachable!() };
+    let CtrKind::Fan(fan, tag) = labels.to_ctr_kind(lab) else { unreachable!() };
 
     let split = &mut Split { fan, tag, fst, snd, val };
 
@@ -92,26 +94,64 @@ impl Reader<'_> {
           Term::Era
         }
         // If we're visiting a con node...
-        Ctr(Con(lab)) => match next.slot() {
-          // If we're visiting a port 0, then it is a lambda.
-          0 => {
-            let nam = self.namegen.decl_name(self.net, Port(node, 1));
-            let bod = self.read_term(self.net.enter_port(Port(node, 2)));
-            Term::Lam {
-              tag: self.labels.con.to_tag(*lab),
-              pat: Box::new(Pattern::Var(nam)),
-              bod: Box::new(bod),
+        Ctr(lab) => match self.labels.to_ctr_kind(*lab) {
+          Con(tag) => match next.slot() {
+            // If we're visiting a port 0, then it is a lambda.
+            0 => {
+              let nam = self.namegen.decl_name(self.net, Port(node, 1));
+              let bod = self.read_term(self.net.enter_port(Port(node, 2)));
+              Term::Lam { tag, pat: Box::new(Pattern::Var(nam)), bod: Box::new(bod) }
             }
-          }
-          // If we're visiting a port 1, then it is a variable.
-          1 => Term::Var { nam: self.namegen.var_name(next) },
-          // If we're visiting a port 2, then it is an application.
-          2 => {
-            let fun = self.read_term(self.net.enter_port(Port(node, 0)));
-            let arg = self.read_term(self.net.enter_port(Port(node, 1)));
-            Term::App { tag: self.labels.con.to_tag(*lab), fun: Box::new(fun), arg: Box::new(arg) }
-          }
-          _ => unreachable!(),
+            // If we're visiting a port 1, then it is a variable.
+            1 => Term::Var { nam: self.namegen.var_name(next) },
+            // If we're visiting a port 2, then it is an application.
+            2 => {
+              let fun = self.read_term(self.net.enter_port(Port(node, 0)));
+              let arg = self.read_term(self.net.enter_port(Port(node, 1)));
+              Term::App { tag, fun: Box::new(fun), arg: Box::new(arg) }
+            }
+            _ => unreachable!(),
+          },
+          // If we're visiting a fan node...
+          Fan(fan, tag) => match next.slot() {
+            // If we're visiting a port 0, then it is a pair.
+            0 => {
+              if fan == FanKind::Dup
+                && let Some(dup_paths) = &mut self.dup_paths
+                && let stack = dup_paths.entry(*lab).or_default()
+                && let Some(slot) = stack.pop()
+              {
+                // Since we had a paired Dup in the path to this Sup,
+                // we "decay" the superposition according to the original direction we came from the Dup.
+                let term = self.read_term(self.net.enter_port(Port(node, slot)));
+                self.dup_paths.as_mut().unwrap().get_mut(lab).unwrap().push(slot);
+                term
+              } else {
+                // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
+                self
+                  .decay_or_get_ports(node)
+                  .map_or_else(|(fst, snd)| Term::Fan { fan, tag, els: vec![fst, snd] }, |term| term)
+              }
+            }
+            // If we're visiting a port 1 or 2, then it is a variable.
+            // Also, that means we found a dup, so we store it to read later.
+            1 | 2 => {
+              if fan == FanKind::Dup
+                && let Some(dup_paths) = &mut self.dup_paths
+              {
+                dup_paths.entry(*lab).or_default().push(next.slot());
+                let term = self.read_term(self.net.enter_port(Port(node, 0)));
+                self.dup_paths.as_mut().unwrap().entry(*lab).or_default().pop().unwrap();
+                term
+              } else {
+                if self.seen_fans.insert(node) {
+                  self.scope.insert(node);
+                }
+                Term::Var { nam: self.namegen.var_name(next) }
+              }
+            }
+            _ => unreachable!(),
+          },
         },
         Mat => match next.slot() {
           2 => {
@@ -124,7 +164,7 @@ impl Reader<'_> {
 
             // We expect the pattern matching node to be a CON
             let sel_kind = &self.net.node(sel_node).kind;
-            let (zero, succ) = if *sel_kind == Ctr(Con(None)) {
+            let (zero, succ) = if *sel_kind == Ctr(0) {
               let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
               let mut succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
 
@@ -163,54 +203,6 @@ impl Reader<'_> {
             term
           } else {
             Term::Ref { nam: def_name.clone() }
-          }
-        }
-        // If we're visiting a fan node...
-        Ctr(kind @ (Dup(_) | Tup(_))) => {
-          let (fan, lab) = match *kind {
-            Tup(lab) => (FanKind::Tup, lab),
-            Dup(lab) => (FanKind::Dup, Some(lab)),
-            _ => unreachable!(),
-          };
-          match next.slot() {
-            // If we're visiting a port 0, then it is a pair.
-            0 => {
-              if fan == FanKind::Dup
-                && let Some(dup_paths) = &mut self.dup_paths
-                && let stack = dup_paths.entry(lab.unwrap()).or_default()
-                && let Some(slot) = stack.pop()
-              {
-                // Since we had a paired Dup in the path to this Sup,
-                // we "decay" the superposition according to the original direction we came from the Dup.
-                let term = self.read_term(self.net.enter_port(Port(node, slot)));
-                self.dup_paths.as_mut().unwrap().get_mut(&lab.unwrap()).unwrap().push(slot);
-                term
-              } else {
-                // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
-                self.decay_or_get_ports(node).map_or_else(
-                  |(fst, snd)| Term::Fan { fan, tag: self.labels[fan].to_tag(lab), els: vec![fst, snd] },
-                  |term| term,
-                )
-              }
-            }
-            // If we're visiting a port 1 or 2, then it is a variable.
-            // Also, that means we found a dup, so we store it to read later.
-            1 | 2 => {
-              if fan == FanKind::Dup
-                && let Some(dup_paths) = &mut self.dup_paths
-              {
-                dup_paths.entry(lab.unwrap()).or_default().push(next.slot());
-                let term = self.read_term(self.net.enter_port(Port(node, 0)));
-                self.dup_paths.as_mut().unwrap().entry(lab.unwrap()).or_default().pop().unwrap();
-                term
-              } else {
-                if self.seen_fans.insert(node) {
-                  self.scope.insert(node);
-                }
-                Term::Var { nam: self.namegen.var_name(next) }
-              }
-            }
-            _ => unreachable!(),
           }
         }
         Num { val } => Term::Num { val: *val & ((1 << 60) - 1) },

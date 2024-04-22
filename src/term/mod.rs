@@ -12,15 +12,15 @@ use std::{borrow::Cow, collections::HashMap, ops::Deref};
 pub mod builtins;
 pub mod check;
 pub mod display;
+pub mod encoding;
 pub mod load_book;
 pub mod parser;
 pub mod readback;
-pub mod term_to_net;
 pub mod transform;
 
+pub use encoding::{encode_book, encode_term};
 pub use hvmc::ops::{IntOp, Op, Ty as OpType};
 pub use readback::readback;
-pub use term_to_net::{book_to_nets, term_to_net};
 
 pub static STRINGS: GlobalPool<String> = GlobalPool::new();
 #[derive(Debug)]
