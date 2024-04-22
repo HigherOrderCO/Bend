@@ -690,3 +690,203 @@ fn add_ctx_to_msg(msg: &str, ini_idx: usize, end_idx: usize, file: &str) -> Stri
   let ctx = highlight_error(ini_idx, end_idx, file);
   format!("{msg}\n{ctx}")
 }
+
+// flavour py
+// ==========
+
+pub mod flavour_py {
+  use hvmc::ops::Op;
+
+  use crate::term::{Name, Pattern};
+
+  #[derive(Clone, Debug)]
+  pub enum Term {
+    // "None"
+    None,
+    // [a-zA-Z_]+
+    Var { nam: Name },
+    // [0-9_]+
+    Num { val: u64 },
+    // {fun}(args,)
+    Call { fun: Box<Term>, args: Vec<Term> },
+    // "fun" {pat} -> {bod}
+    Lam { pat: Pattern, bod: Stmt },
+    // {nam} "{" {fields} "}"
+    Enum { nam: Name, fields: Vec<(Name, Term)> },
+    // {lhs} {op} {rhs}
+    Bin { op: Op, lhs: Box<Term>, rhs: Box<Term> },
+  }
+
+  #[derive(Clone, Debug)]
+  pub struct MatchArm {
+    pub lft: Option<Name>,
+    pub rgt: Stmt,
+  }
+
+  #[derive(Clone, Debug)]
+  pub enum Stmt {
+    // {bind} = {val}\n {nxt}
+    Assign { bind: Pattern, val: Box<Term>, nxt: Box<Stmt> },
+    // "if" {cond} ":"
+    //  {then}
+    // "else" ":"
+    //  {otherwise}
+    If { cond: Box<Term>, then: Box<Stmt>, otherwise: Box<Stmt> },
+    // "match" {arg} ":"
+    //   case {lft} ":" {rgt}
+    Match { arg: Box<Term>, arms: Vec<MatchArm> },
+    // "return" {expr}
+    Return { term: Box<Term> },
+  }
+
+  #[derive(Clone, Debug)]
+  pub enum Declaration {
+    // "def" {name} "(" {params} ")" ":" {body}
+    Def { name: Name, params: Vec<Name>, body: Stmt },
+    // "enum"
+    Enum { name: Name },
+  }
+}
+
+const PREC: &[&[IntOp]] = &[&[IntOp::Add, IntOp::Sub], &[IntOp::Mul, IntOp::Div]];
+
+impl<'a> TermParser<'a> {
+  fn parse_primary_py(&mut self) -> Result<flavour_py::Term, String> {
+    self.skip_trivia();
+    let Some(head) = self.skip_peek_one() else { return self.expected("primary")? };
+    let res = match head {
+      '(' => {
+        self.consume("(")?;
+        let ret = self.parse_term_py()?;
+        self.consume(")")?;
+        ret
+      }
+      c if c.is_ascii_digit() => {
+        let val = self.parse_u64()?;
+        flavour_py::Term::Num { val }
+      }
+      _ => {
+        let nam = self.parse_hvml_name()?;
+        if self.try_consume("{") { todo!() } else { flavour_py::Term::Var { nam } }
+      }
+    };
+    Ok(res)
+  }
+
+  fn parse_term_py(&mut self) -> Result<flavour_py::Term, String> {
+    self.skip_trivia();
+    if self.try_consume("fun") {
+      let nam = self.parse_hvml_name()?;
+      self.consume("=>")?;
+      let bod = self.parse_stmt_py()?;
+      Ok(flavour_py::Term::Lam { pat: Pattern::Var(Some(nam)), bod })
+    } else {
+      self.parse_infix_py(0)
+    }
+  }
+
+  fn parse_call(&mut self) -> Result<flavour_py::Term, String> {
+    let mut args = Vec::new();
+    let fun = self.parse_primary_py()?;
+    if self.try_consume("(") {
+      args = self.list_like(|p| p.parse_term_py(), "", ")", ",", true, 0)?;
+    }
+    if args.is_empty() { Ok(fun) } else { Ok(flavour_py::Term::Call { fun: Box::new(fun), args }) }
+  }
+
+  fn parse_infix_py(&mut self, prec: usize) -> Result<flavour_py::Term, String> {
+    if prec > PREC.len() - 1 {
+      return self.parse_call();
+    }
+    let mut lhs = self.parse_infix_py(prec + 1)?;
+    while let Some(op) = self.get_op() {
+      if PREC.iter().position(|&r| r.contains(&op)).unwrap_or(usize::MAX) < prec {
+        break;
+      }
+      let op = self.parse_oper()?;
+      let rhs = self.parse_infix_py(prec + 1)?;
+      self.skip_trivia();
+      lhs = flavour_py::Term::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+    }
+    Ok(lhs)
+  }
+
+  fn get_op(&mut self) -> Option<IntOp> {
+    match self.skip_peek_one() {
+      Some('+') => Some(IntOp::Add),
+      Some('-') => Some(IntOp::Sub),
+      Some('*') => Some(IntOp::Mul),
+      Some('/') => Some(IntOp::Div),
+      _ => None,
+    }
+  }
+
+  fn parse_stmt_py(&mut self) -> Result<flavour_py::Stmt, String> {
+    self.skip_trivia();
+    if self.try_consume("return ") {
+      let term = self.parse_term_py()?;
+      self.try_consume(";");
+      Ok(flavour_py::Stmt::Return { term: Box::new(term) })
+    } else if self.try_consume("if ") {
+      let cond = self.parse_term_py()?;
+      self.consume(":")?;
+      let then = self.parse_stmt_py()?;
+      let mut otherwise = flavour_py::Stmt::Return { term: Box::new(flavour_py::Term::None) };
+      if self.try_consume("else") {
+        self.consume(":")?;
+        otherwise = self.parse_stmt_py()?;
+      }
+      Ok(flavour_py::Stmt::If { cond: Box::new(cond), then: Box::new(then), otherwise: Box::new(otherwise) })
+    } else if self.try_consume("match ") {
+      let scrutinee = self.parse_term_py()?;
+      self.consume(":")?;
+      let mut arms = Vec::new();
+      while self.try_consume("case ") {
+        let pat = self.parse_name_or_era()?;
+        self.consume(":")?;
+        let body = self.parse_stmt_py()?;
+        arms.push(flavour_py::MatchArm { lft: pat, rgt: body })
+      }
+      Ok(flavour_py::Stmt::Match { arg: Box::new(scrutinee), arms })
+    } else {
+      // assignment
+      let pat = self.parse_pattern(true)?;
+      self.consume("=")?;
+      let val = self.parse_term_py()?;
+      let nxt = self.parse_stmt_py()?;
+      Ok(flavour_py::Stmt::Assign { bind: pat, val: Box::new(val), nxt: Box::new(nxt) })
+    }
+  }
+
+  fn parse_declaration_py(&mut self) -> Result<flavour_py::Declaration, String> {
+    self.skip_trivia();
+    if self.try_consume("def") {
+      let name = self.parse_hvml_name()?;
+      let params = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 0)?;
+      self.consume(":")?;
+      let stmt = self.parse_stmt_py()?;
+      Ok(flavour_py::Declaration::Def { name, params, body: stmt })
+    } else if self.try_consume("enum") {
+      todo!()
+    } else {
+      Err("Expected def or enum".to_string())
+    }
+  }
+}
+
+//#[cfg(test)]
+mod test {
+  use super::TermParser;
+
+  //#[test]
+  fn parse_def() {
+    let src = r#"
+      def add_two(x):
+        result = x + 2
+        return result
+    "#;
+    let mut p = TermParser::new(src);
+    let x = p.parse_declaration_py().unwrap();
+    println!("{x:?}")
+  }
+}
