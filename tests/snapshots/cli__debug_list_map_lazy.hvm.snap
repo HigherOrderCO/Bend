@@ -2,77 +2,221 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/debug_list_map_lazy.hvm
 ---
-(List.cons $b $c)
+Warnings:
+During readback:
+  Detected Unbound Variable. (2 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (2 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (2 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (2 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (2 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (2 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (2 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (3 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (3 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (3 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (3 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (3 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (3 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (3 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (5 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (5 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (5 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (5 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (5 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (5 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (5 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (4 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (3 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable. (2 occurrences)
+
+Warnings:
+During readback:
+  Detected Unbound Variable.
+
+(List.cons <Invalid> <Invalid>)
 ---------------------------------------
-(List.cons $b $c)
+(List.cons <Invalid> <Invalid>)
 ---------------------------------------
-(List.cons $b $c)
+(List.cons <Invalid> <Invalid>)
 ---------------------------------------
-(List.cons $b $c)
+(List.cons <Invalid> <Invalid>)
 ---------------------------------------
-(List.cons $b $c)
+(List.cons <Invalid> <Invalid>)
 ---------------------------------------
-(List.cons $b $c)
+(List.cons <Invalid> <Invalid>)
 ---------------------------------------
-(List.cons $b $c)
+(List.cons <Invalid> <Invalid>)
 ---------------------------------------
-(List.cons $b (List.cons $d $e))
+(List.cons <Invalid> (List.cons <Invalid> <Invalid>))
 ---------------------------------------
-(List.cons $b (List.cons $d $e))
+(List.cons <Invalid> (List.cons <Invalid> <Invalid>))
 ---------------------------------------
-(List.cons $b (List.cons $d $e))
+(List.cons <Invalid> (List.cons <Invalid> <Invalid>))
 ---------------------------------------
-(List.cons $b (List.cons $d $e))
+(List.cons <Invalid> (List.cons <Invalid> <Invalid>))
 ---------------------------------------
-(List.cons $b (List.cons $d $e))
+(List.cons <Invalid> (List.cons <Invalid> <Invalid>))
 ---------------------------------------
-(List.cons $b (List.cons $d $e))
+(List.cons <Invalid> (List.cons <Invalid> <Invalid>))
 ---------------------------------------
-(List.cons $b (List.cons $d $e))
+(List.cons <Invalid> (List.cons <Invalid> <Invalid>))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f $g)))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>)))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f $g)))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>)))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f $g)))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>)))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f $g)))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>)))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f $g)))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>)))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f $g)))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>)))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f $g)))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>)))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>))))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>))))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>))))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>))))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>))))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>))))
 ---------------------------------------
-(List.cons $b (List.cons $d (List.cons $f (List.cons $h $i))))
+(List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> (List.cons <Invalid> <Invalid>))))
 ---------------------------------------
-[$b, $d, $f, $h]
+[<Invalid>, <Invalid>, <Invalid>, <Invalid>]
 ---------------------------------------
-[$b, $d, $f, $h]
+[<Invalid>, <Invalid>, <Invalid>, <Invalid>]
 ---------------------------------------
-[$b, $d, $f, $h]
+[<Invalid>, <Invalid>, <Invalid>, <Invalid>]
 ---------------------------------------
-[$b, $d, $f, $h]
+[<Invalid>, <Invalid>, <Invalid>, <Invalid>]
 ---------------------------------------
-[$b, $d, $f, $h]
+[<Invalid>, <Invalid>, <Invalid>, <Invalid>]
 ---------------------------------------
-[$b, $d, $f, 91]
+[<Invalid>, <Invalid>, <Invalid>, 91]
 ---------------------------------------
-[$b, $d, 256, 91]
+[<Invalid>, <Invalid>, 256, 91]
 ---------------------------------------
-[$b, 42, 256, 91]
+[<Invalid>, 42, 256, 91]
 ---------------------------------------
 [2, 42, 256, 91]
 ---------------------------------------
