@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/use_shadow.hvm
 ---
-(main) = λa let {a a_2} = a; λb (a a_2 b)
+(main) = λa let {b c} = a; λd (b c d)

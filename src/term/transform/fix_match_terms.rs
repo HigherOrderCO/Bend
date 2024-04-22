@@ -85,6 +85,42 @@ impl Term {
         self.fix_match(&mut errs, ctrs, adts);
       }
 
+      // Add a use term to each arm rebuilding the matched variable
+      match self {
+        Term::Mat { arg: _, bnd, with: _, arms } => {
+          for (ctr, fields, body) in arms {
+            if let Some(ctr) = ctr {
+              *body = Term::Use {
+                nam: bnd.clone(),
+                val: Box::new(Term::call(
+                  Term::Ref { nam: ctr.clone() },
+                  fields.iter().flatten().cloned().map(|nam| Term::Var { nam }),
+                )),
+                nxt: Box::new(std::mem::take(body)),
+              };
+            }
+          }
+        }
+        Term::Swt { arg: _, bnd, with: _, pred, arms } => {
+          let n_nums = arms.len() - 1;
+          for (i, arm) in arms.iter_mut().enumerate() {
+            let orig = if i == n_nums {
+              Term::add_num(Term::Var { nam: pred.clone().unwrap() }, i as u64)
+            } else {
+              Term::Num { val: i as u64 }
+            };
+            *arm = Term::Use { nam: bnd.clone(), val: Box::new(orig), nxt: Box::new(std::mem::take(arm)) };
+          }
+        }
+        _ => {}
+      }
+
+      // Remove the bound name
+      match self {
+        Term::Mat { bnd, .. } | Term::Swt { bnd, .. } => *bnd = None,
+        _ => {}
+      }
+
       errs
     })
   }
@@ -121,7 +157,11 @@ impl Term {
       let match_var = rules[0].0.take();
       *self = std::mem::take(&mut rules[0].2);
       if let Some(var) = match_var {
-        self.subst(&var, &Term::Var { nam: bnd.clone() });
+        *self = Term::Use {
+          nam: Some(var),
+          val: Box::new(Term::Var { nam: bnd }),
+          nxt: Box::new(std::mem::take(self)),
+        };
       }
     }
   }
@@ -168,7 +208,11 @@ fn fixed_match_arms<'a>(
         if body.is_none() {
           let mut new_body = rules[rule_idx].2.clone();
           if let Some(var) = &rules[rule_idx].0 {
-            new_body.subst(var, &rebuild_ctr(bnd, ctr, &adts[adt_nam].ctrs[&**ctr]));
+            new_body = Term::Use {
+              nam: Some(var.clone()),
+              val: Box::new(rebuild_ctr(bnd, ctr, &adts[adt_nam].ctrs[&**ctr])),
+              nxt: Box::new(new_body),
+            };
           }
           *body = Some(new_body);
         }

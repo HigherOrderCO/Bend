@@ -239,12 +239,16 @@ fn simplify_matches() {
     ctx.fix_match_defs()?;
     ctx.book.encode_builtins();
     ctx.resolve_refs()?;
-    ctx.fix_match_terms()?;
     ctx.desugar_match_defs()?;
+    ctx.fix_match_terms()?;
     ctx.check_unbound_vars()?;
+    ctx.book.make_var_names_unique();
     ctx.book.linearize_match_binds();
     ctx.book.linearize_match_with();
     ctx.check_unbound_vars()?;
+    ctx.book.make_var_names_unique();
+    ctx.book.apply_use();
+    ctx.book.make_var_names_unique();
     ctx.prune(false, AdtEncoding::TaggedScott);
 
     Ok(ctx.book.to_string())
@@ -273,9 +277,10 @@ fn encode_pattern_match() {
       ctx.fix_match_defs()?;
       ctx.book.encode_builtins();
       ctx.resolve_refs()?;
-      ctx.fix_match_terms()?;
       ctx.desugar_match_defs()?;
+      ctx.fix_match_terms()?;
       ctx.check_unbound_vars()?;
+      ctx.book.make_var_names_unique();
       ctx.book.linearize_match_binds();
       ctx.book.linearize_match_with();
       ctx.book.encode_matches(adt_encoding);

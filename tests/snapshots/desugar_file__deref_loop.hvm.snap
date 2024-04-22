@@ -10,6 +10,6 @@ input_file: tests/golden_tests/desugar_file/deref_loop.hvm
 
 (succ) = λa #nat λb #nat λ* #nat (b a)
 
-(zero) = #nat λ* #nat λb b
+(zero) = #nat λ* #nat λa a
 
 (foo$C0) = (bar 0)

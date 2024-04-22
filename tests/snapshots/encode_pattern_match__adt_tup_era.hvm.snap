@@ -3,14 +3,14 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/adt_tup_era.hvm
 ---
 TaggedScott:
-(Foo) = λa #Tuple (a #Tuple λb #Tuple λ* #Tuple (b #Tuple λd #Tuple λ* d))
+(Foo) = λa #Tuple (a #Tuple λb #Tuple λc (#Tuple (b #Tuple λd #Tuple λ* λ* d) c))
 
 (Main) = (Foo (Pair 1 5))
 
 (Pair) = λa λb #Tuple λc #Tuple (c a b)
 
 Scott:
-(Foo) = λa (a λb λ* (b λd λ* d))
+(Foo) = λa (a λb λc (b λd λ* λ* d c))
 
 (Main) = (Foo (Pair 1 5))
 

@@ -7,7 +7,7 @@ TaggedScott:
 
 (Fn2) = λa let (*, c) = a; let (*, e) = c; let (f, *) = e; f
 
-(Fn3) = λa λ* let (c, *) = a; switch %arg0.0 = c { 0: 0; _: λe (+ e 1) }
+(Fn3) = λa let (b, *) = a; switch b { 0: λ* 0; _: λe λ* (+ e 1); }
 
 (main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)
 
@@ -16,6 +16,6 @@ Scott:
 
 (Fn2) = λa let (*, c) = a; let (*, e) = c; let (f, *) = e; f
 
-(Fn3) = λa λ* let (c, *) = a; switch %arg0.0 = c { 0: 0; _: λe (+ e 1) }
+(Fn3) = λa let (b, *) = a; switch b { 0: λ* 0; _: λe λ* (+ e 1); }
 
 (main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)

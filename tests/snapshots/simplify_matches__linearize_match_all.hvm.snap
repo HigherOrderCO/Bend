@@ -2,26 +2,26 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/linearize_match_all.hvm
 ---
-(A) = λa switch a = a { 0: λb λc (b c); _: λb λc (a-1 b c) }
+(A) = λa switch a { 0: λb λc (b c); _ d: λe λf (d e f); }
 
-(B) = λa λb λc (switch c = c { 0: λa λb (a b); _: λa λb (a b c-1) } a b)
+(B) = λa λb λc (switch c { 0: λd λe (d e); _ f: λg λh (g h f); } a b)
 
-(C) = λa λb λc switch c = c { 0: (a b); _: (a b c-1) }
+(C) = λa λb λc switch c { 0: (a b); _ d: (a b d); }
 
-(D) = λa switch a = a { 0: λb λc c; _: λb λc (a-1 c) }
+(D) = λa switch a { 0: λb λc c; _ d: λe λf (d f); }
 
-(E) = λ%arg0 match %arg0 = %arg0 { Cons: λ%arg1 (match %arg1 = %arg1 { Cons: λ%arg0.h λ%arg0.t (%arg0.h %arg0.t %arg1.h %arg1.t); Nil: λ%arg0.h λ%arg0.t (Cons %arg0.h %arg0.t Nil) } %arg0.h %arg0.t); Nil: λ%arg1 (Nil %arg1) }
+(E) = λa match a { Cons b c: λd (match d { Cons e f: λg λh (g h e f); Nil: λi λj (Cons i j Nil); } b c); Nil: λk (Nil k); }
 
-(A2) = λa match a = a { Cons: λb λc (a.h a.t b c); Nil: λb λc (b c) }
+(A2) = λa match a { Cons b c: λd λe (b c d e); Nil: λf λg (f g); }
 
-(B2) = λa λb λc (match c = c { Cons: λa λb (a b c.h c.t); Nil: λa λb (a b) } a b)
+(B2) = λa λb λc (match c { Cons d e: λf λg (f g d e); Nil: λh λi (h i); } a b)
 
-(C2) = λa λb λc match c = c { Cons: (a b c.h c.t); Nil: (a b) }
+(C2) = λa λb λc match c { Cons d e: (a b d e); Nil: (a b); }
 
-(D2) = λa match a = a { Cons: λb λc (a.h a.t b c); Nil: λb λc (b c) }
+(D2) = λa match a { Cons b c: λd λe (b c d e); Nil: λf λg (f g); }
 
 (main) = *
 
-(Cons) = λh λt #ConsList λCons #ConsList λNil #ConsList (Cons h t)
+(Cons) = λa λb #ConsList λc #ConsList λd #ConsList (c a b)
 
-(Nil) = #ConsList λCons #ConsList λNil Nil
+(Nil) = #ConsList λa #ConsList λb b

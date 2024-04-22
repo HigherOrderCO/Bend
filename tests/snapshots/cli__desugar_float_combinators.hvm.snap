@@ -2,12 +2,12 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/desugar_float_combinators.hvm
 ---
-(Z) = λ* λb b
+(Z) = λ* λa a
 
-(S) = λa λb let {b b_2} = b; λc (b (a b_2 c))
+(S) = λa λb let {c d} = b; λe (c (a d e))
 
 (get) = λa (a get$C0 0)
 
 (main) = (get (S (S Z)))
 
-(get$C0) = λb (+ b 1)
+(get$C0) = λa (+ a 1)

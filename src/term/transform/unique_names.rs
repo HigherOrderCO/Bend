@@ -34,18 +34,24 @@ pub struct UniqueNameGenerator {
 impl UniqueNameGenerator {
   // Recursively assign an id to each variable in the term, then convert each id into a unique name.
   pub fn unique_names_in_term(&mut self, term: &mut Term) {
-    maybe_grow(|| match term {
+    match term {
       Term::Var { nam } => *nam = self.use_var(nam),
-      _ => {
-        for (child, binds) in term.children_mut_with_binds_mut() {
-          let binds: Vec<_> = binds.collect();
-          for bind in binds.iter() {
-            self.push(bind.as_ref());
-          }
-          self.unique_names_in_term(child);
-          for bind in binds.into_iter().rev() {
-            *bind = self.pop(bind.as_ref());
-          }
+      Term::Mat { with, .. } | Term::Swt { with, .. } => {
+        for nam in with {
+          *nam = self.use_var(nam);
+        }
+      }
+      _ => {}
+    }
+    maybe_grow(|| {
+      for (child, binds) in term.children_mut_with_binds_mut() {
+        let binds: Vec<_> = binds.collect();
+        for bind in binds.iter() {
+          self.push(bind.as_ref());
+        }
+        self.unique_names_in_term(child);
+        for bind in binds.into_iter().rev() {
+          *bind = self.pop(bind.as_ref());
         }
       }
     })

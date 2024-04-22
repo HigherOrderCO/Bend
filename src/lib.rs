@@ -113,10 +113,13 @@ pub fn desugar_book(
 
   ctx.book.apply_bnd();
 
-  ctx.fix_match_terms()?;
   ctx.desugar_match_defs()?;
 
+  ctx.fix_match_terms()?;
+
   ctx.check_unbound_vars()?;
+
+  ctx.book.make_var_names_unique();
 
   // Auto match linearization
   match opts.linearize_matches {
@@ -150,6 +153,8 @@ pub fn desugar_book(
   if opts.merge {
     ctx.book.merge_definitions();
   }
+
+  ctx.book.make_var_names_unique();
 
   if !ctx.info.has_errors() { Ok(ctx.info) } else { Err(ctx.info) }
 }

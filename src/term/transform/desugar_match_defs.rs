@@ -12,6 +12,7 @@ pub enum DesugarMatchDefErr {
 }
 
 impl Ctx<'_> {
+  /// Converts equational-style pattern matching function definitions into trees of match terms.
   pub fn desugar_match_defs(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
@@ -127,7 +128,7 @@ fn irrefutable_fst_row_rule(args: Vec<Name>, rule: Rule) -> Term {
   for (arg, pat) in args.into_iter().zip(rule.pats.into_iter()) {
     let Pattern::Var(var) = pat else { unreachable!() };
     if let Some(var) = var {
-      term.subst(&var, &Term::Var { nam: arg });
+      term = Term::Use { nam: Some(var), val: Box::new(Term::Var { nam: arg }), nxt: Box::new(term) };
     }
   }
   term
@@ -153,7 +154,11 @@ fn var_rule(
     let pat = rule.pats.pop().unwrap();
 
     if let Pattern::Var(Some(nam)) = &pat {
-      rule.body.subst(nam, &Term::Var { nam: arg.clone() });
+      rule.body = Term::Use {
+        nam: Some(nam.clone()),
+        val: Box::new(Term::Var { nam: arg.clone() }),
+        nxt: Box::new(std::mem::take(&mut rule.body)),
+      };
     }
 
     let new_rule = Rule { pats: new_pats, body: rule.body };
@@ -208,7 +213,8 @@ fn fan_rule(
           // Rebuild the tuple if it was a var pattern
           let tup =
             Term::Fan { fan, tag: tag.clone(), els: new_args.clone().map(|nam| Term::Var { nam }).collect() };
-          rule.body.subst(&var, &tup);
+          rule.body =
+            Term::Use { nam: Some(var), val: Box::new(tup), nxt: Box::new(std::mem::take(&mut rule.body)) };
         }
         new_args.clone().map(|nam| Pattern::Var(Some(nam))).collect()
       }
@@ -272,7 +278,11 @@ fn num_rule(
         Pattern::Var(var) => {
           let mut body = rule.body.clone();
           if let Some(var) = var {
-            body.subst(var, &Term::Num { val: *num });
+            body = Term::Use {
+              nam: Some(var.clone()),
+              val: Box::new(Term::Num { val: *num }),
+              nxt: Box::new(std::mem::take(&mut body)),
+            };
           }
           let rule = Rule { pats: rule.pats[1 ..].to_vec(), body };
           new_rules.push(rule);
@@ -292,7 +302,7 @@ fn num_rule(
       if let Some(var) = var {
         let last_num = *nums.last().unwrap();
         let var_recovered = Term::add_num(Term::Var { nam: pred_var.clone() }, 1 + last_num);
-        body.subst(var, &var_recovered);
+        body = Term::Use { nam: Some(var.clone()), val: Box::new(var_recovered), nxt: Box::new(body) };
       }
       let rule = Rule { pats: rule.pats[1 ..].to_vec(), body };
       new_rules.push(rule);
@@ -419,7 +429,8 @@ fn switch_rule(
           let reconstructed_var =
             Term::call(Term::Ref { nam: ctr.clone() }, new_args.clone().map(|nam| Term::Var { nam }));
           if let Some(var) = var {
-            body.subst(var, &reconstructed_var);
+            body =
+              Term::Use { nam: Some(var.clone()), val: Box::new(reconstructed_var), nxt: Box::new(body) };
           }
           let rule = Rule { pats, body };
           new_rules.push(rule);

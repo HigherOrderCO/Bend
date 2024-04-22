@@ -3,13 +3,13 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_auto_linearization.hvm
 ---
 TaggedScott:
-(switch_linearization) = λa switch a = a { 0: λb let {b b_2 b_3} = b; let {c c_2} = 2; let {d e} = c; let (f, g) = (0, b); (b_2 c_2 d e (0, b_3) f g); _: λh let {h h_2 h_3} = h; λi let {i i_2 i_3} = i; let {j j_2} = 2; let {k l} = j; let (m, n) = ((+ h 1), i); (h_2 i_2 j_2 k l ((+ h_3 1), i_3) m n) }
+(switch_linearization) = λa let {a a_2 a_3 a_4} = a; λb let {b b_2 b_3 b_4 b_5} = b; let (c, d) = (a, b); let {d d_2} = d; let {c c_2} = c; switch a_2 { 0: let {e e_2} = 2; let {f g} = e; (b_2 e_2 f g (a_3, b_3) c d); _: λh let {i i_2} = 2; let {j k} = i; (h b_4 i_2 j k (a_4, b_5) c_2 d_2); }
 
-(match_linearization) = λa #Nat (a #Nat λb let {b b_2 b_3} = b; λc let {c c_2 c_3} = c; let {d d_2} = 2; let {e f} = d; let (g, h) = ((Nat.succ b), c); (b_2 c_2 d_2 e f ((Nat.succ b_3), c_3) g h) λi let {i i_2 i_3} = i; let {j j_2} = 2; let {k l} = j; let (m, n) = (Nat.zero, i); (i_2 j_2 k l (Nat.zero, i_3) m n))
+(match_linearization) = λa let {a a_2 a_3 a_4} = a; λb let {b b_2 b_3 b_4 b_5} = b; let (c, d) = (a, b); let {d d_2} = d; let {c c_2} = c; #Nat (a_2 #Nat λe let {f f_2} = 2; let {g h} = f; (e b_2 f_2 g h (a_3, b_3) c d) let {i i_2} = 2; let {j k} = i; (b_4 i_2 j k (a_4, b_5) c_2 d_2))
 
-(switch_shadowed_field) = λa λb switch a = a { 0: b; _: λc c }
+(switch_shadowed_field) = λa switch a { 0: λb b; _: λc λ* c; }
 
-(match_shadowed_field) = λa λb λc #List (a #List λd #List λe (List.cons d e) (List.cons b c))
+(match_shadowed_field) = λa #List (a #List λb #List λc λ* λ* (List.cons b c) λf λg (List.cons f g))
 
 (List.cons) = λa λb #List λc #List λ* #List (c a b)
 
@@ -20,18 +20,14 @@ TaggedScott:
 (Nat.zero) = #Nat λ* #Nat λb b
 
 Scott:
-(switch_linearization) = λa switch a = a { 0: λb let {b b_2 b_3} = b; let {c c_2} = 2; let {d e} = c; let (f, g) = (0, b); (b_2 c_2 d e (0, b_3) f g); _: λh let {h h_2 h_3} = h; λi let {i i_2 i_3} = i; let {j j_2} = 2; let {k l} = j; let (m, n) = ((+ h 1), i); (h_2 i_2 j_2 k l ((+ h_3 1), i_3) m n) }
+(switch_linearization) = λa let {a a_2 a_3 a_4} = a; λb let {b b_2 b_3 b_4 b_5} = b; let (c, d) = (a, b); let {d d_2} = d; let {c c_2} = c; switch a_2 { 0: let {e e_2} = 2; let {f g} = e; (b_2 e_2 f g (a_3, b_3) c d); _: λh let {i i_2} = 2; let {j k} = i; (h b_4 i_2 j k (a_4, b_5) c_2 d_2); }
 
-(match_linearization) = λa (a λb let {b b_2 b_3} = b; λc let {c c_2 c_3} = c; let {d d_2} = 2; let {e f} = d; let (g, h) = ((Nat.succ b), c); (b_2 c_2 d_2 e f ((Nat.succ b_3), c_3) g h) λi let {i i_2 i_3} = i; let {j j_2} = 2; let {k l} = j; let (m, n) = (Nat.zero, i); (i_2 j_2 k l (Nat.zero, i_3) m n))
+(match_linearization) = λa let {a a_2 a_3 a_4} = a; λb let {b b_2 b_3 b_4 b_5} = b; let (c, d) = (a, b); let {d d_2} = d; let {c c_2} = c; (a_2 λe let {f f_2} = 2; let {g h} = f; (e b_2 f_2 g h (a_3, b_3) c d) let {i i_2} = 2; let {j k} = i; (b_4 i_2 j k (a_4, b_5) c_2 d_2))
 
-(switch_shadowed_field) = λa λb switch a = a { 0: b; _: λc c }
+(switch_shadowed_field) = λa switch a { 0: λb b; _: λc λ* c; }
 
-(match_shadowed_field) = λa λb λc (a λd λe (List.cons d e) (List.cons b c))
+(match_shadowed_field) = λa (a λb λc λ* λ* (List.cons b c) λf λg (List.cons f g))
 
 (List.cons) = λa λb λc λ* (c a b)
 
 (List.nil) = λ* λb b
-
-(Nat.succ) = λa λb λ* (b a)
-
-(Nat.zero) = λ* λb b

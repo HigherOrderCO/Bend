@@ -2,14 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/nested.hvm
 ---
-(Rule) = λ%arg0 match %arg0 = %arg0 { CtrA: (match %arg0.b = %arg0.b { CtrB1: λ%arg0.a (%arg0.a %arg0.b.b); CtrB2: λ%arg0.a (match %arg0.b.a = %arg0.b.a { CtrC: λ%arg0.a λ%arg0.b.b (%arg0.a %arg0.b.b) } %arg0.a %arg0.b.b) } %arg0.a); CtrB: %arg0.a }
+(Rule) = λa match a { CtrA b c: (match c { CtrB1 d: λe (e d); CtrB2 f g: λh (match f { CtrC: λi λj (i j); } h g); } b); CtrB k: k; }
 
-(CtrA) = λa λb #Foo λCtrA #Foo λCtrB #Foo (CtrA a b)
+(CtrA) = λa λb #Foo λc #Foo λd #Foo (c a b)
 
-(CtrB) = λa #Foo λCtrA #Foo λCtrB #Foo (CtrB a)
+(CtrB) = λa #Foo λb #Foo λc #Foo (c a)
 
-(CtrB1) = λb #Bar λCtrB1 #Bar λCtrB2 #Bar (CtrB1 b)
+(CtrB1) = λa #Bar λb #Bar λc #Bar (b a)
 
-(CtrB2) = λa λb #Bar λCtrB1 #Bar λCtrB2 #Bar (CtrB2 a b)
+(CtrB2) = λa λb #Bar λc #Bar λd #Bar (d a b)
 
-(CtrC) = #Baz λCtrC CtrC
+(CtrC) = #Baz λa a

@@ -2,7 +2,7 @@ use crate::{
   maybe_grow,
   term::{Book, Name, Pattern, Term},
 };
-use std::collections::{BTreeSet, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 /* Linearize preceding binds */
 
@@ -40,7 +40,7 @@ impl Term {
   }
 
   fn linearize_match_binds_go(&mut self, mut bind_terms: Vec<Term>) {
-    match self {
+    maybe_grow(|| match self {
       // Binding terms
       // Extract them in case they are preceding a match.
       Term::Lam { pat, bod, .. } if !pat.has_unscoped() => {
@@ -51,15 +51,21 @@ impl Term {
       }
       Term::Let { val, nxt, .. } | Term::Use { val, nxt, .. } => {
         val.linearize_match_binds_go(vec![]);
-        let nxt = std::mem::take(nxt.as_mut());
-        let term = std::mem::replace(self, nxt);
-        bind_terms.push(term);
-        self.linearize_match_binds_go(bind_terms);
+        if val.has_unscoped() {
+          // Terms with unscoped can't be linearized since their names must be unique.
+          nxt.linearize_match_binds_go(vec![]);
+          self.wrap_with_bind_terms(bind_terms);
+        } else {
+          let nxt = std::mem::take(nxt.as_mut());
+          let term = std::mem::replace(self, nxt);
+          bind_terms.push(term);
+          self.linearize_match_binds_go(bind_terms);
+        }
       }
 
       // Matching terms
       Term::Mat { .. } | Term::Swt { .. } => {
-        self.linearize_match(bind_terms);
+        self.linearize_binds_single_match(bind_terms);
       }
 
       // Others
@@ -71,72 +77,51 @@ impl Term {
         // Recover the extracted terms
         term.wrap_with_bind_terms(bind_terms);
       }
-    }
+    })
   }
 
-  fn linearize_match(&mut self, mut bind_terms: Vec<Term>) {
-    // The used vars are any free vars in the argument,
-    // the match bind and the ctr field binds.
-    let (vars, with, mut arms) = match self {
-      Term::Mat { arg, bnd, with, arms } => {
-        let mut vars = arg.free_vars().into_keys().collect::<HashSet<_>>();
-        if let Some(bnd) = bnd {
-          vars.insert(bnd.clone());
-        }
-        for arm in arms.iter() {
-          vars.extend(arm.1.iter().flatten().cloned());
-        }
-
+  fn linearize_binds_single_match(&mut self, bind_terms: Vec<Term>) {
+    let (used_vars, with, arms) = match self {
+      Term::Mat { arg, bnd: _, with, arms } => {
+        let vars = arg.free_vars().into_keys().collect::<HashSet<_>>();
         let arms = arms.iter_mut().map(|arm| &mut arm.2).collect::<Vec<_>>();
-
         (vars, with, arms)
       }
-      Term::Swt { arg, bnd, with, pred, arms } => {
-        let mut vars = arg.free_vars().into_keys().collect::<HashSet<_>>();
-        if let Some(bnd) = bnd {
-          vars.insert(bnd.clone());
-        }
-        if let Some(pred) = pred {
-          vars.insert(pred.clone());
-        }
-
+      Term::Swt { arg, bnd: _, with, pred: _, arms } => {
+        let vars = arg.free_vars().into_keys().collect::<HashSet<_>>();
         let arms = arms.iter_mut().collect();
-
         (vars, with, arms)
       }
       _ => unreachable!(),
     };
 
-    // Move binding terms inwards, up to the first bind used in the match.
-    while let Some(term) = bind_terms.pop() {
-      // Get the binds in the term we want to push down.
-      let binds: Vec<Name> = match &term {
-        Term::Use { nam, .. } => nam.iter().cloned().collect(),
-        _ => term.pattern().unwrap().binds().filter_map(|x| x.clone()).collect(),
-      };
+    let (non_linearized, linearized) = fixed_and_linearized_terms(used_vars, bind_terms);
 
-      if binds.iter().all(|bnd| !vars.contains(bnd)) {
-        // If possible, move term inside, wrapping around each arm.
-        for arm in arms.iter_mut() {
-          arm.wrap_with_bind_terms([term.clone()]);
-        }
-        // Since this bind doesn't exist anymore,
-        // we have to remove it from the `with` clause.
-        with.retain(|var| !binds.contains(var));
-      } else {
-        // Otherwise we stop and put this term back to be put in it's original position.
-        bind_terms.push(term);
-        break;
-      }
-    }
-
-    // Recurse
+    // Add the linearized terms to the arms and recurse
     for arm in arms {
+      arm.wrap_with_bind_terms(linearized.clone());
       arm.linearize_match_binds_go(vec![]);
     }
 
-    // Recover any leftover bind terms that were not moved
-    self.wrap_with_bind_terms(bind_terms);
+    // Remove the linearized binds from the with clause
+    let linearized_binds = linearized
+      .iter()
+      .flat_map(|t| match t {
+        Term::Lam { pat, .. } | Term::Let { pat, .. } => pat.binds().flatten().collect::<Vec<_>>(),
+        Term::Use { nam, .. } => {
+          if let Some(nam) = nam {
+            vec![nam]
+          } else {
+            vec![]
+          }
+        }
+        _ => unreachable!(),
+      })
+      .collect::<HashSet<_>>();
+    with.retain(|w| !linearized_binds.contains(w));
+
+    // Add the non-linearized terms back to before the match
+    self.wrap_with_bind_terms(non_linearized);
   }
 
   /// Given a term `self` and a sequence of `bind_terms`, wrap `self` with those binds.
@@ -166,6 +151,131 @@ impl Term {
       term
     });
   }
+}
+
+/// Separates the bind terms surround the match in two partitions,
+/// one to be linearized, one to stay where they where.
+///
+/// We try to move down any binds that would become eta-reducible with linearization
+/// and that will not introduce extra duplications.
+///
+/// This requires the bind to follow some rules:
+/// * Can only depend on binds that will be moved
+/// * Can't come before any bind that will not be moved.
+/// * Must be a scoped bind.
+///
+/// Examples:
+///
+/// ```hvm
+/// @a @b @c switch b { 0: c; _: (c b-1) }
+/// // Will linearize `c` but not `a` since it comes before a lambda that can't be moved
+/// // Becomes
+/// @a @b switch b { 0: @c c; _: @c (c b-1) }
+/// ```
+///
+/// ```hvm
+/// @a let b = a; @c let e = b; let d = c; switch a { 0: X; _: Y }
+/// // Will not linearize `let b = a` since it would duplicate `a`
+/// // Will linearize `c` since it's a lambda that is not depended on by the argument
+/// // Will not linearize `let e = b` since it would duplicate `b`
+/// // Will linearize `let d = c` since it depends only on variables that will be moved
+/// // and is not depended on by the argument
+/// ```
+fn fixed_and_linearized_terms(used_in_arg: HashSet<Name>, bind_terms: Vec<Term>) -> (Vec<Term>, Vec<Term>) {
+  let fixed_binds = binds_fixed_by_dependency(used_in_arg, &bind_terms);
+
+  let mut fixed = VecDeque::new();
+  let mut linearized = VecDeque::new();
+  let mut stop = false;
+  for term in bind_terms.into_iter().rev() {
+    let to_linearize = match &term {
+      Term::Use { nam, .. } => nam.as_ref().map_or(true, |nam| !fixed_binds.contains(nam)),
+      Term::Let { pat, .. } => pat.binds().flatten().all(|nam| !fixed_binds.contains(nam)),
+      Term::Lam { pat, .. } => pat.binds().flatten().all(|nam| !fixed_binds.contains(nam)),
+      _ => unreachable!(),
+    };
+    let to_linearize = to_linearize && !stop;
+    if to_linearize {
+      linearized.push_front(term);
+    } else {
+      if matches!(term, Term::Lam { .. }) {
+        stop = true;
+      }
+      fixed.push_front(term);
+    }
+  }
+  (fixed.into_iter().collect(), linearized.into_iter().collect())
+}
+
+/// Get which binds are fixed because they are in the dependency graph
+/// of a free var or of a var used in the match arg.
+fn binds_fixed_by_dependency(mut fixed_binds: HashSet<Name>, bind_terms: &[Term]) -> HashSet<Name> {
+  // Find the use dependencies of each bind
+  let mut binds = vec![];
+  let mut dependency_digraph = HashMap::new();
+  for term in bind_terms {
+    // Gather what are the binds of this term and what vars it is directly using
+    let (term_binds, term_uses) = match term {
+      Term::Lam { pat, .. } => {
+        let binds = pat.binds().flatten().cloned().collect::<Vec<_>>();
+        (binds, vec![])
+      }
+      Term::Let { pat, val, .. } => {
+        let binds = pat.binds().flatten().cloned().collect::<Vec<_>>();
+        let uses = val.free_vars().into_keys().collect();
+        (binds, uses)
+      }
+      Term::Use { nam, val, .. } => {
+        let binds = if let Some(nam) = nam { vec![nam.clone()] } else { vec![] };
+        let uses = val.free_vars().into_keys().collect();
+        (binds, uses)
+      }
+      _ => unreachable!(),
+    };
+
+    for bind in term_binds {
+      dependency_digraph.insert(bind.clone(), term_uses.clone());
+      binds.push(bind);
+    }
+  }
+
+  // Mark binds that depend on free vars as fixed
+  for (bind, deps) in dependency_digraph.iter() {
+    if deps.iter().any(|dep| !binds.contains(dep)) {
+      fixed_binds.insert(bind.clone());
+    }
+  }
+
+  // Convert to undirected graph
+  let mut dependency_graph: HashMap<Name, HashSet<Name>> =
+    HashMap::from_iter(binds.iter().map(|k| (k.clone(), HashSet::new())));
+  for (bind, deps) in dependency_digraph {
+    for dep in deps {
+      if !binds.contains(&dep) {
+        dependency_graph.insert(dep.clone(), HashSet::new());
+      }
+      dependency_graph.get_mut(&dep).unwrap().insert(bind.clone());
+      dependency_graph.get_mut(&bind).unwrap().insert(dep);
+    }
+  }
+
+  // Find which binds are connected to the vars used in the match arg or to free vars.
+  let mut used_component = HashSet::new();
+  let mut visited = HashSet::new();
+  let mut to_visit = fixed_binds.iter().collect::<Vec<_>>();
+  while let Some(node) = to_visit.pop() {
+    if visited.contains(node) {
+      continue;
+    }
+    used_component.insert(node.clone());
+    visited.insert(node);
+
+    // Add these dependencies to be checked (if it's not a free var in the match arg)
+    if let Some(deps) = dependency_graph.get(node) {
+      to_visit.extend(deps);
+    }
+  }
+  used_component
 }
 
 /* Linearize all used vars */

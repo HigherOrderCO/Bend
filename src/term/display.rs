@@ -69,36 +69,47 @@ impl fmt::Display for Term {
       Term::App { tag, fun, arg } => {
         write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag), arg)
       }
-      Term::Mat { arg, bnd, with, arms: rules } => {
-        let with: Box<dyn std::fmt::Display> = if with.is_empty() {
-          Box::new(display!(""))
-        } else {
-          Box::new(display!(" with {}", DisplayJoin(|| with, ", ")))
-        };
-        write!(
-          f,
-          "match {} = {}{} {{ {} }}",
-          bnd.as_ref().unwrap(),
-          arg,
-          with,
-          DisplayJoin(|| rules.iter().map(|rule| display!("{}: {}", var_as_str(&rule.0), rule.2)), "; "),
-        )
+      Term::Mat { arg, bnd, with, arms } => {
+        write!(f, "match ")?;
+        if let Some(bnd) = bnd {
+          write!(f, "{} = ", bnd)?;
+        }
+        write!(f, "{} ", arg)?;
+        if !with.is_empty() {
+          write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+        }
+        write!(f, "{{ ")?;
+        for arm in arms {
+          write!(f, "{}", var_as_str(&arm.0))?;
+          for var in &arm.1 {
+            write!(f, " {}", var_as_str(var))?;
+          }
+          write!(f, ": {}; ", arm.2)?;
+        }
+        write!(f, "}}")
       }
-      Term::Swt { arg, bnd, with, pred: _, arms } => {
-        let with: Box<dyn std::fmt::Display> = if with.is_empty() {
-          Box::new(display!(""))
-        } else {
-          Box::new(display!(" with {}", DisplayJoin(|| with, ", ")))
-        };
-        let arms = DisplayJoin(
-          || {
-            arms.iter().enumerate().map(|(i, rule)| {
-              display!("{}: {}", if i == arms.len() - 1 { "_".to_string() } else { i.to_string() }, rule)
-            })
-          },
-          "; ",
-        );
-        write!(f, "switch {} = {}{} {{ {} }}", bnd.as_ref().unwrap(), arg, with, arms)
+      Term::Swt { arg, bnd, with, pred, arms } => {
+        write!(f, "switch ")?;
+        if let Some(bnd) = bnd {
+          write!(f, "{bnd} = ")?;
+        }
+        write!(f, "{arg} ")?;
+        if !with.is_empty() {
+          write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+        }
+        write!(f, "{{ ")?;
+        for (i, arm) in arms.iter().enumerate() {
+          if i == arms.len() - 1 {
+            write!(f, "_")?;
+            if let Some(pred) = pred {
+              write!(f, " {pred}")?;
+            }
+          } else {
+            write!(f, "{i}")?;
+          }
+          write!(f, ": {arm}; ")?;
+        }
+        write!(f, "}}")
       }
       Term::Fan { fan: FanKind::Tup, tag, els } => write!(f, "{}({})", tag, DisplayJoin(|| els.iter(), ", ")),
       Term::Fan { fan: FanKind::Dup, tag, els } => write!(f, "{}{{{}}}", tag, DisplayJoin(|| els, " ")),
@@ -297,47 +308,47 @@ impl Term {
         }
 
         Term::Mat { bnd, arg, with, arms } => {
-          let with: Box<dyn std::fmt::Display> = if with.is_empty() {
-            Box::new(DisplayFn(|f| write!(f, "")))
-          } else {
-            Box::new(DisplayFn(|f| {
-              write!(f, "with {}", DisplayJoin(|| with.iter().map(|e| e.to_string()), ", "))
-            }))
-          };
-          writeln!(f, "match {} = {} {}{{", var_as_str(bnd), arg.display_pretty(tab), with)?;
-          for rule in arms {
-            writeln!(
-              f,
-              "{:tab$}{}: {};",
-              "",
-              var_as_str(&rule.0),
-              rule.2.display_pretty(tab + 4),
-              tab = tab + 2
-            )?;
+          write!(f, "match ")?;
+          if let Some(bnd) = bnd {
+            write!(f, "{} = ", bnd)?;
           }
-          write!(f, "{:tab$}}}", "")?;
-          Ok(())
+          write!(f, "{} ", arg.display_pretty(tab))?;
+          if !with.is_empty() {
+            write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+          }
+          write!(f, "{{ ")?;
+          for arm in arms {
+            write!(f, "\n{:tab$}{}", "", var_as_str(&arm.0), tab = tab + 2)?;
+            for var in &arm.1 {
+              write!(f, " {}", var_as_str(var))?;
+            }
+            write!(f, ": {}; ", arm.2.display_pretty(tab + 4))?;
+          }
+          write!(f, "\n{:tab$}}}", "")
         }
 
-        Term::Swt { bnd, arg, with, pred: _, arms } => {
-          let with: Box<dyn std::fmt::Display> = if with.is_empty() {
-            Box::new(display!(""))
-          } else {
-            Box::new(display!(" with {}", DisplayJoin(|| with, ", ")))
-          };
-          writeln!(f, "switch {} = {} {}{{", var_as_str(bnd), arg.display_pretty(tab), with)?;
-          for (i, rule) in arms.iter().enumerate() {
-            writeln!(
-              f,
-              "{:tab$}{}: {};",
-              "",
-              if i == arms.len() - 1 { "_".to_string() } else { i.to_string() },
-              rule.display_pretty(tab + 4),
-              tab = tab + 2
-            )?;
+        Term::Swt { bnd, arg, with, pred, arms } => {
+          write!(f, "switch ")?;
+          if let Some(bnd) = bnd {
+            write!(f, "{bnd} = ")?;
           }
-          write!(f, "{:tab$}}}", "")?;
-          Ok(())
+          write!(f, "{} ", arg.display_pretty(tab))?;
+          if !with.is_empty() {
+            write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+          }
+          writeln!(f, "{{")?;
+          for (i, arm) in arms.iter().enumerate() {
+            if i == arms.len() - 1 {
+              write!(f, "{:tab$}_", "", tab = tab + 2)?;
+              if let Some(pred) = pred {
+                write!(f, " {pred}")?;
+              }
+            } else {
+              write!(f, "{:tab$}{i}", "", tab = tab + 2)?;
+            }
+            writeln!(f, ": {};", arm.display_pretty(tab + 4))?;
+          }
+          write!(f, "{:tab$}}}", "")
         }
 
         Term::Nat { val } => write!(f, "#{val}"),

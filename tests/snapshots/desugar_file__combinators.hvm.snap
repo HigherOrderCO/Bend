@@ -26,14 +26,14 @@ input_file: tests/golden_tests/desugar_file/combinators.hvm
 
 (List.cons) = λa λb #List λc #List λ* #List (c a b)
 
-(List.nil) = #List λ* #List λb b
+(List.nil) = #List λ* #List λa a
 
-(A$C0) = let {b c} = A; λd (b c d)
+(A$C0) = let {a b} = A; λc (a b c)
 
-(B$C0) = let (b, c) = B; λd (b c d)
+(B$C0) = let (a, b) = B; λc (a b c)
 
-(List.ignore$C0) = #List λ* #List λc λ* (List.ignore c List.ignore)
+(List.ignore$C0) = #List λ* #List λa λ* (List.ignore a List.ignore)
 
-(clax$C0) = λ* λ* λ* λe (clax e)
+(clax$C0) = λ* λ* λ* λa (clax a)
 
 (list$C0) = (List.cons list List.nil)
