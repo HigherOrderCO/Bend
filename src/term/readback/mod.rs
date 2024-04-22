@@ -6,6 +6,7 @@ use super::{term_to_net::Labels, Book, Term};
 
 mod linear;
 mod non_linear;
+mod normalize_vars;
 
 pub fn readback(net: &Net, book: &Book, labels: &Labels, linear: bool, info: &mut Diagnostics) -> Term {
   if linear {

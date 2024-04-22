@@ -9,7 +9,10 @@ use loaned::{drop, LoanedMut};
 use crate::{
   diagnostics::Diagnostics,
   net::CtrKind,
-  term::{num_to_name, term_to_net::Labels, Book, FanKind, Name, Pattern, Term},
+  term::{
+    num_to_name, readback::normalize_vars::normalize_vars, term_to_net::Labels, Book, FanKind, Name, Pattern,
+    Term,
+  },
 };
 
 pub fn readback_linear(net: &Net, _: &Book, labels: &Labels, _: &mut Diagnostics) -> Term {
@@ -31,6 +34,8 @@ pub fn readback_linear(net: &Net, _: &Book, labels: &Labels, _: &mut Diagnostics
   let Readback { garbage_terms, garbage_pats, .. } = { readback };
   drop!(LoanedMut::<Vec<Term>>::from(garbage_terms));
   drop!(LoanedMut::<Vec<Pattern>>::from(garbage_pats));
+
+  normalize_vars(&mut root);
 
   root
 }
