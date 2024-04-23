@@ -2,8 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/eta.hvm
 ---
-Lazy mode:
-λa a
-
 Strict mode:
-λa a
+
+Result: Id
+- ITRS: 1
+- TIME: 0.00s
+- MIPS: 2.38

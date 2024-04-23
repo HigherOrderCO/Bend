@@ -117,7 +117,7 @@ impl fmt::Display for Term {
       Term::Num { typ: _, val } => write!(f, "{val}"),
       Term::Nat { val } => write!(f, "#{val}"),
       Term::Str { val } => write!(f, "{val:?}"),
-      Term::Opx { opr, fst, snd } => {
+      Term::Opr { opr, fst, snd } => {
         write!(f, "({} {} {})", opr, fst, snd)
       }
       Term::Lst { els } => write!(f, "[{}]", DisplayJoin(|| els.iter(), ", "),),
@@ -212,14 +212,9 @@ impl fmt::Display for Op {
       Op::AND => write!(f, "&"),
       Op::OR => write!(f, "|"),
       Op::XOR => write!(f, "^"),
-      Op::SHL => write!(f, "<<"),
-      Op::SHR => write!(f, ">>"),
       Op::POW => todo!(),
       Op::LOG => todo!(),
       Op::ATN => todo!(),
-      Op::RND => todo!(),
-      Op::ZER => todo!(),
-      Op::SET => todo!(),
     }
   }
 }
@@ -330,7 +325,7 @@ impl Term {
           write!(f, "[{}]", DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), " "))
         }
 
-        Term::Opx { opr, fst, snd } => {
+        Term::Opr { opr, fst, snd } => {
           write!(f, "({} {} {})", opr, fst.display_pretty(tab), snd.display_pretty(tab))
         }
 

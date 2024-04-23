@@ -2,8 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/and.hvm
 ---
-Lazy mode:
-false
-
 Strict mode:
-false
+
+Result: false
+- ITRS: 11
+- TIME: 0.00s
+- MIPS: 9.00

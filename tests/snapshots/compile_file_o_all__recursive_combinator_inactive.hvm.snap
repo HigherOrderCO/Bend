@@ -7,4 +7,4 @@ input_file: tests/golden_tests/compile_file_o_all/recursive_combinator_inactive.
 @Foo$C0 = {@Foo @Foo}
 
 @main = a
-  & @Foo ~ (#1 a)
+  & @Foo ~ (0 a)

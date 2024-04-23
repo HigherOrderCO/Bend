@@ -4,11 +4,10 @@ input_file: tests/golden_tests/cli/compile_all.hvm
 ---
 @Pair = (a (b ((a (b c)) c)))
 
-@Pair.get = (a ((@Pair.get$C0 (a b)) b))
+@Pair.get = (a ((@Pair.get__C0 (a b)) b))
 
-@Pair.get$C0 = (a (b ((a (b c)) c)))
+@Pair.get__C0 = (a (b ((a (b c)) c)))
 
-@main = e
-  & @Pair.get ~ ((a (b c)) (d e))
-  & $(a $(b c)) ~ #16
-  & @Pair ~ (#641 (#33 d))
+@main = d
+  & @Pair.get ~ (($(:[+] $(a b)) (a b)) (c d))
+  & @Pair ~ (40 (2 c))

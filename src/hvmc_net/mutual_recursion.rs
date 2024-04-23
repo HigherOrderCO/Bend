@@ -39,7 +39,7 @@ fn show_cycles(mut cycles: Vec<Vec<Ref>>) -> String {
     .map(|cycle| {
       let cycle_str = cycle
         .iter()
-        .filter(|nam| !nam.contains("$C"))
+        .filter(|nam| !nam.contains("__C"))
         .chain(cycle.first())
         .cloned()
         .collect::<Vec<_>>()

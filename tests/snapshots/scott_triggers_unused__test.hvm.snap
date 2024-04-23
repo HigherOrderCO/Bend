@@ -4,6 +4,6 @@ input_file: tests/golden_tests/scott_triggers_unused/test.hvm
 ---
 @f = (* (a a))
 
-@main = ((#1 (#17 a)) a)
+@main = ((0 (1 a)) a)
 
 @t = (a (* a))

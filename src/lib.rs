@@ -15,7 +15,7 @@ use hvmc_net::{
 };
 use net::hvmc_to_net::hvmc_to_net;
 use parking_lot::Mutex;
-use std::{sync::Arc, time::Instant};
+use std::{process::Output, str::FromStr, sync::Arc, time::Instant};
 use term::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, AdtEncoding, Book, Ctx, Name, Term};
 
 pub mod builtins;
@@ -160,42 +160,45 @@ pub fn desugar_book(
 }
 
 pub fn run_book(
-  _book: Book,
+  mut book: Book,
   _max_memory: Option<usize>,
-  _run_opts: RunOpts,
-  _compile_opts: CompileOpts,
+  run_opts: RunOpts,
+  compile_opts: CompileOpts,
   diagnostics_cfg: DiagnosticsConfig,
-  _args: Option<Vec<Term>>,
-) -> Result<(Term, RunInfo), Diagnostics> {
-  let mut diags = Diagnostics::new(diagnostics_cfg);
-  diags.add_book_error("Execution not yet implemented for hvm32");
-  Err(diags)
-  /* let CompileResult { core_book, labels, diagnostics } =
+  args: Option<Vec<Term>>,
+) -> Result<(Term, String, Diagnostics), Diagnostics> {
+  let CompileResult { core_book, labels, diagnostics } =
     compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args)?;
-
   // TODO: Printing should be taken care by the cli module, but we'd
   // like to print any warnings before running so that the user can
   // cancel the run if a problem is detected.
   eprint!("{diagnostics}");
 
-  // Turn the book into an Arc so that we can use it for logging, debugging, etc.
-  // from anywhere else in the program
-  // This "freezes" the book and prevents further modification.
-  let book = Arc::new(book);
-  let labels = Arc::new(labels);
+  let out_path = ".out.hvm";
+  std::fs::write(out_path, core_book.to_string()).map_err(|x| x.to_string())?;
+  let Output { status, stdout, stderr } = std::process::Command::new("hvm")
+    .arg("run")
+    .arg(out_path)
+    .output()
+    .map_err(|x| format!("While running hvm: {x}"))?;
 
-  let debug_hook = run_opts.debug_hook(&book, &labels);
+  let out = String::from_utf8_lossy(&stdout);
+  let err = String::from_utf8_lossy(&stderr);
+  let status = if !status.success() { status.to_string() } else { String::new() };
 
-  let host = create_host(book.clone(), labels.clone(), compile_opts.adt_encoding);
-  host.lock().insert_book(&core_book);
+  let Some((_, result)) = out.split_once("Result: ") else {
+    return Err(format!("Error reading result from hvm. Output :\n{}{}{}", err, status, out).into());
+  };
+  let Some((result, stats)) = result.split_once('\n') else {
+    return Err(format!("Error reading result from hvm. Output :\n{}{}{}", err, status, out).into());
+  };
+  let Ok(net) = hvmc::ast::Net::from_str(result) else {
+    return Err(format!("Error reading result from hvm. Output :\n{}{}{}", err, status, out).into());
+  };
 
-  let (res_lnet, stats) = run_compiled(host, max_memory, run_opts, debug_hook, book.hvmc_entrypoint());
-
-  let (res_term, diagnostics) =
-    readback_hvmc(&res_lnet, &book, &labels, run_opts.linear, compile_opts.adt_encoding);
-
-  let info = RunInfo { stats, diagnostics, net: res_lnet, book, labels };
-  Ok((res_term, info)) */
+  let (term, diags) =
+    readback_hvmc(&net, &Arc::new(book), &Arc::new(labels), run_opts.linear, compile_opts.adt_encoding);
+  Ok((term, stats.to_string(), diags))
 }
 
 /// Utility function to count the amount of nodes in an hvm-core AST net
@@ -483,14 +486,6 @@ pub struct CompileResult {
   pub diagnostics: Diagnostics,
   pub core_book: hvmc::ast::Book,
   pub labels: Labels,
-}
-
-pub struct RunInfo {
-  pub stats: RunStats,
-  pub diagnostics: Diagnostics,
-  pub net: Net,
-  pub book: Arc<Book>,
-  pub labels: Arc<Labels>,
 }
 
 pub struct RunStats {

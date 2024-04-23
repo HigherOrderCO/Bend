@@ -67,7 +67,7 @@ fn float_combinator(
   builtin: bool,
   combinators: &mut BTreeMap<Name, Definition>,
 ) {
-  let comb_name = Name::new(format!("{}$C{}", def_name, *name_gen));
+  let comb_name = Name::new(format!("{}__C{}", def_name, *name_gen));
   *name_gen += 1;
 
   let comb_ref = Term::Ref { nam: comb_name.clone() };
@@ -162,7 +162,7 @@ impl Term {
       Term::Fan { els, .. } | Term::Lst { els } => FloatIter::Vec(els),
       Term::Let { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
-      | Term::Opx { fst, snd, .. } => FloatIter::Two([fst.as_mut(), snd.as_mut()]),
+      | Term::Opr { fst, snd, .. } => FloatIter::Two([fst.as_mut(), snd.as_mut()]),
       Term::Bnd { .. } => unreachable!(),
       Term::Lam { bod, .. } => bod.float_children_mut(),
       Term::Var { .. }

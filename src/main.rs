@@ -5,7 +5,7 @@ use hvml::{
   hvmc_net::pre_reduce::MAX_REWRITES_DEFAULT,
   load_file_to_book, run_book,
   term::{AdtEncoding, Book, Name},
-  CompileOpts, OptLevel, RunInfo, RunOpts,
+  CompileOpts, OptLevel, RunOpts,
 };
 use std::path::{Path, PathBuf};
 
@@ -352,7 +352,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
     }
 
     Mode::Run { lazy_mode, run_opts, pretty, comp_opts, transform_opts, warn_opts, arguments, path } => {
-      let RunArgs { max_memory, max_rewrites, debug, mut single_core, linear, arg_stats } = run_opts;
+      let RunArgs { max_memory, max_rewrites, debug, mut single_core, linear, arg_stats: _ } = run_opts;
 
       let diagnostics_cfg =
         set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), lazy_mode, warn_opts);
@@ -373,35 +373,11 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let run_opts = RunOpts { single_core, debug, linear, lazy_mode, max_memory, max_rewrites, pretty };
 
       let book = load_book(&path)?;
-      let (res_term, RunInfo { stats, diagnostics, net, book: _, labels: _ }) =
+      let (term, stats, diags) =
         run_book(book, max_memory, run_opts, compile_opts, diagnostics_cfg, arguments)?;
 
-      let total_rewrites = stats.rewrites.total() as f64;
-      let rps = total_rewrites / stats.run_time / 1_000_000.0;
-      let size = stats.used;
-
-      if cli.verbose {
-        println!("{net}");
-      }
-
-      eprint!("{diagnostics}");
-      if pretty {
-        println!("{}", res_term.display_pretty(0))
-      } else {
-        println!("{}", res_term);
-      }
-
-      if arg_stats {
-        println!("\nRWTS   : {}", total_rewrites);
-        println!("- ANNI : {}", stats.rewrites.anni);
-        println!("- COMM : {}", stats.rewrites.comm);
-        println!("- ERAS : {}", stats.rewrites.eras);
-        println!("- DREF : {}", stats.rewrites.dref);
-        println!("- OPER : {}", stats.rewrites.oper);
-        println!("TIME   : {:.3} s", stats.run_time);
-        println!("RPS    : {:.3} m", rps);
-        println!("SIZE   : {} nodes", size);
-      }
+      eprintln!("{diags}");
+      println!("Result: {term}\n{stats}");
     }
   };
   Ok(())

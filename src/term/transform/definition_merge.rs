@@ -6,7 +6,7 @@ use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use std::collections::BTreeMap;
 
-pub const MERGE_SEPARATOR: &str = "_$_";
+pub const MERGE_SEPARATOR: &str = "__M_";
 
 impl Book {
   /// Merges definitions that have the same structure into one definition.

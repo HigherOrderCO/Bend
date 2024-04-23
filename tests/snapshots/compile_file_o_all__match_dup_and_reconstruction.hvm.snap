@@ -11,4 +11,4 @@ input_file: tests/golden_tests/compile_file_o_all/match_dup_and_reconstruction.h
 
 @main = b
   & @Got ~ (a b)
-  & @Boxed ~ (#161 a)
+  & @Boxed ~ (10 a)

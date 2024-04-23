@@ -5,4 +5,4 @@ input_file: tests/golden_tests/compile_entrypoint/foo.hvm
 @bar = (a a)
 
 @foo = a
-  & @bar ~ (#33 a)
+  & @bar ~ (2 a)

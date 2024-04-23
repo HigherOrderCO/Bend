@@ -5,9 +5,7 @@ input_file: tests/golden_tests/compile_file_o_all/eta_chain.hvm
 @Bar = a
   & @Baz ~ a
 
-@Baz = (a (b (c e)))
-  & $(a $(d e)) ~ #16
-  & $(b $(c d)) ~ #16
+@Baz = ($(:[+] $(b c)) ($(:[+] $(a b)) (a c)))
 
 @Foo = a
   & @Bar ~ a

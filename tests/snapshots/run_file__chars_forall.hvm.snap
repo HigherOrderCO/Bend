@@ -2,8 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/chars_forall.hvm
 ---
-Lazy mode:
-8704
-
 Strict mode:
-8704
+
+Result: 8704
+- ITRS: 1
+- TIME: 0.00s
+- MIPS: 1.17

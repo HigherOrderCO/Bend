@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_reverse.hvm
 ---
-@concat = ((@concat$C0 ((a a) b)) b)
+@concat = ((@concat__C0 ((a a) b)) b)
 
-@concat$C0 = (a (b (c e)))
+@concat__C0 = (a (b (c e)))
   & @cons ~ (a (d e))
   & @concat ~ (b (c d))
 
@@ -12,15 +12,15 @@ input_file: tests/golden_tests/compile_file_o_all/list_reverse.hvm
 
 @main = d
   & @reverse ~ (c d)
-  & @cons ~ (#49 (b c))
-  & @cons ~ (#33 (a b))
-  & @cons ~ (#17 (@nil a))
+  & @cons ~ (3 (b c))
+  & @cons ~ (2 (a b))
+  & @cons ~ (1 (@nil a))
 
 @nil = (* (a a))
 
-@reverse = ((@reverse$C0 (@nil a)) a)
+@reverse = ((@reverse__C0 (@nil a)) a)
 
-@reverse$C0 = (c (a e))
+@reverse__C0 = (c (a e))
   & @concat ~ (b (d e))
   & @reverse ~ (a b)
   & @cons ~ (c (@nil d))

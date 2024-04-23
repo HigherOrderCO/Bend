@@ -4,22 +4,38 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
 ---
 @Cons = (a (b ((a (b c)) (* c))))
 
-@False_$_Nil = (* (a a))
+@False__M_Nil = (* (a a))
 
 @If = (((a (* a)) ((* (b b)) c)) c)
 
-@Map = ((@Map$C0 ((* @False_$_Nil) a)) a)
+@Map = ((@Map__C0 ((* @False__M_Nil) a)) a)
 
-@Map$C0 = (a (c ({(a b) d} f)))
+@Map__C0 = (a (c ({(a b) d} f)))
   & @Cons ~ (b (e f))
   & @Map ~ (c (d e))
 
-@Merge = (b ((@Merge$C2 ((* (a a)) (b c))) c))
+@Merge = (b ((@Merge__C2 ((* (a a)) (b c))) c))
 
-@Merge$C0 = (* a)
+@MergePair = (a ((@MergePair__C2 ((* @False__M_Nil) (a b))) b))
+
+@MergePair__C0 = (* (a b))
+  & @Cons ~ (a (@False__M_Nil b))
+
+@MergePair__C1 = (c (f ({a e} (b h))))
+  & @Cons ~ (d (g h))
+  & @Merge ~ (a (b (c d)))
+  & @MergePair ~ (e (f g))
+
+@MergePair__C2 = (b ((@MergePair__C1 (@MergePair__C0 (a (b c)))) (a c)))
+
+@MergeSort = (a (b d))
+  & @Unpack ~ (a (c d))
+  & @Map ~ (b (@Pure c))
+
+@Merge__C0 = (* a)
   & @Cons ~ a
 
-@Merge$C1 = ({b {g l}} ({h q} ({(a (b c)) {e m}} ({a {d n}} ({f o} t)))))
+@Merge__C1 = ({b {g l}} ({h q} ({(a (b c)) {e m}} ({a {d n}} ({f o} t)))))
   & @If ~ (c (k (s t)))
   & @Cons ~ (d (j k))
   & @Merge ~ (e (f (i j)))
@@ -28,35 +44,19 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
   & @Merge ~ (m (p (q r)))
   & @Cons ~ (n (o p))
 
-@Merge$C2 = (b (c (a ((@Merge$C1 (@Merge$C0 (a (b (c d))))) d))))
-
-@MergePair = (a ((@MergePair$C2 ((* @False_$_Nil) (a b))) b))
-
-@MergePair$C0 = (* (a b))
-  & @Cons ~ (a (@False_$_Nil b))
-
-@MergePair$C1 = (c (f ({a e} (b h))))
-  & @Cons ~ (d (g h))
-  & @Merge ~ (a (b (c d)))
-  & @MergePair ~ (e (f g))
-
-@MergePair$C2 = (b ((@MergePair$C1 (@MergePair$C0 (a (b c)))) (a c)))
-
-@MergeSort = (a (b d))
-  & @Unpack ~ (a (c d))
-  & @Map ~ (b (@Pure c))
+@Merge__C2 = (b (c (a ((@Merge__C1 (@Merge__C0 (a (b (c d))))) d))))
 
 @Pure = (a b)
-  & @Cons ~ (a (@False_$_Nil b))
+  & @Cons ~ (a (@False__M_Nil b))
 
-@Unpack = (a ((@Unpack$C1 ((* @False_$_Nil) (a b))) b))
+@Unpack = (a ((@Unpack__C1 ((* @False__M_Nil) (a b))) b))
 
-@Unpack$C0 = (d (e ({a b} (c i))))
+@Unpack__C0 = (d (e ({a b} (c i))))
   & @Unpack ~ (a (h i))
   & @MergePair ~ (b (g h))
   & @Cons ~ (c (f g))
   & @Cons ~ (d (e f))
 
-@Unpack$C1 = (c ((@Unpack$C0 ((* (a a)) (b (c d)))) (b d)))
+@Unpack__C1 = (c ((@Unpack__C0 ((* (a a)) (b (c d)))) (b d)))
 
 @main = @MergeSort

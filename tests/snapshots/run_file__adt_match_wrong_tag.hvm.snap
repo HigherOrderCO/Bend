@@ -2,16 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/adt_match_wrong_tag.hvm
 ---
-Lazy mode:
-Warnings:
-During readback:
-  Unexpected tag found during Adt readback, expected '#Option', but found '#wrong_tag'.
-
-λa match a = a { Some: #Option (#wrong_tag λb b a.val); None: *; }
-
 Strict mode:
-Warnings:
-During readback:
-  Unexpected tag found during Adt readback, expected '#Option', but found '#wrong_tag'.
-
-λa match a = a { Some: #Option (#wrong_tag λb b a.val); None: *; }
+Errors:
+In tests/golden_tests/run_file/adt_match_wrong_tag.hvm :
+Tagged terms not supported for hvm32.
+[0m  3 | main = λa[4m[31m [0m#Option (a #wrong_tag λb b *)[0m

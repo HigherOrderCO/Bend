@@ -34,7 +34,7 @@ pub enum NodeKind {
   /// Numbers
   Num { val: u32 },
   /// Numeric operations
-  Op2,
+  Opr,
   /// Pattern matching on numbers
   Mat,
 }

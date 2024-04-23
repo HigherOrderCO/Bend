@@ -12,7 +12,7 @@ use std::{
 use hvmc::ast::{Net, Tree};
 use loaned::LoanedMut;
 
-use super::{num_to_name, FanKind};
+use super::{num_to_name, FanKind, Op};
 
 #[derive(Debug, Clone)]
 pub struct ViciousCycleErr;
@@ -162,18 +162,41 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           let kind = self.fan_kind(fan, tag);
           self.make_node_list(kind, up, els.iter().map(|el| |slf: &mut Self, up| slf.encode_term(el, up)));
         }
-        // core: & fst ~ <op snd ret>
-        Term::Opx { opr, fst, snd } => {
-          // 4 bits to signal that we move the oper, 4 bits to store the oper to be moved.
-          let oper = Place::Tree(LoanedMut::new(Tree::Num { val: (*opr as u32) << 4 }));
-          let node1 = self.new_opr();
-          let node2 = self.new_opr();
-
-          self.link(oper, node1.0);
-          self.encode_term(fst, node1.1);
-          self.link(node1.2, node2.0);
-          self.encode_term(snd, node2.1);
-          self.link(up, node2.2);
+        // core: & [opr] ~ $(fst $(snd ret))
+        Term::Opr { opr, fst, snd } => {
+          // Partially apply
+          match (fst.as_ref(), snd.as_ref()) {
+            // Put oper in fst
+            (Term::Num { typ: _, val }, snd) => {
+              let num_val = (*val << 4) | opr.to_native_tag();
+              let fst = Place::Tree(LoanedMut::new(Tree::Num { val: num_val }));
+              let node = self.new_opr();
+              self.link(fst, node.0);
+              self.encode_term(snd, node.1);
+              self.link(up, node.2);
+            }
+            // Put oper in snd
+            (fst, Term::Num { typ: _, val }) => {
+              let num_val = (*val << 4) | opr.to_native_tag();
+              let snd = Place::Tree(LoanedMut::new(Tree::Num { val: num_val }));
+              let node = self.new_opr();
+              self.encode_term(fst, node.0);
+              self.link(snd, node.1);
+              self.link(up, node.2);
+            }
+            // Put oper as symbol, flip with fst
+            (fst, snd) => {
+              let opr_val = (opr.to_native_tag() << 4) | 0x1000_0000;
+              let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
+              let node1 = self.new_opr();
+              self.encode_term(fst, node1.0);
+              self.link(oper, node1.1);
+              let node2 = self.new_opr();
+              self.link(node1.2, node2.0);
+              self.encode_term(snd, node2.1);
+              self.link(up, node2.2);
+            }
+          }
         }
         Term::Use { .. }  // Removed in earlier pass
         | Term::Bnd { .. } // Removed in earlier pass
@@ -360,6 +383,28 @@ impl LabelGenerator {
 
 fn hole<T: Default>() -> T {
   T::default()
+}
+
+impl Op {
+  fn to_native_tag(self) -> u32 {
+    match self {
+      Op::ADD => 0x4,
+      Op::SUB => 0x5,
+      Op::MUL => 0x6,
+      Op::DIV => 0x7,
+      Op::REM => 0x8,
+      Op::EQL => 0x9,
+      Op::NEQ => 0xa,
+      Op::LTN => 0xb,
+      Op::GTN => 0xc,
+      Op::AND => 0xd,
+      Op::OR => 0xe,
+      Op::XOR => 0xf,
+      Op::ATN => 0xd,
+      Op::LOG => 0xe,
+      Op::POW => 0xf,
+    }
+  }
 }
 
 impl ToStringVerbose for ViciousCycleErr {

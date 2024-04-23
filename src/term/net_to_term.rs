@@ -1,12 +1,18 @@
 use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
   maybe_grow,
-  net::{CtrKind::*, INet, NodeId, NodeKind::*, Port, SlotId, ROOT},
+  net::{
+    CtrKind::*,
+    INet, NodeId,
+    NodeKind::{self, *},
+    Port, SlotId, ROOT,
+  },
   term::{num_to_name, term_to_net::Labels, Book, FanKind, Name, Pattern, Tag, Term},
 };
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-// TODO: Display scopeless lambdas as such
+use super::{NumType, Op};
+
 /// Converts an Interaction-INet to a Lambda Calculus term
 pub fn net_to_term(
   net: &INet,
@@ -83,7 +89,7 @@ impl Reader<'_> {
 
       let node = next.node();
 
-      let term = match &self.net.node(node).kind {
+      match &self.net.node(node).kind {
         Era => {
           // Only the main port actually exists in an ERA, the aux ports are just an artifact of this representation.
           debug_assert!(next.slot() == 0);
@@ -211,16 +217,69 @@ impl Reader<'_> {
             _ => unreachable!(),
           }
         }
-        Num { val: _ } => {
-          todo!("Readback of numbers not yet implemented for hvm32");
-          /* Term::Num { typ: NumType::from(*val as u8 & 0xF), val: *val >> 4 } */
-        }
-        Op2 => match next.slot() {
+        Num { val } => Term::Num { typ: NumType::from(*val as u8 & 0xF), val: (*val >> 4) & 0x00FF_FFFF },
+        Opr => match next.slot() {
           2 => {
-            todo!("Readback of numeric operations not yet implemented for hvm32");
-            /* let fst = self.read_term(self.net.enter_port(Port(node, 0)));
-            let snd = self.read_term(self.net.enter_port(Port(node, 1)));
-            Term::Opx { opr: *opr, fst: Box::new(fst), snd: Box::new(snd) } */
+            let port0_kind = self.net.node(self.net.enter_port(Port(node, 0)).node()).kind.clone();
+            if port0_kind == NodeKind::Opr {
+              // Second half of a numeric operation
+              let fst = self.read_term(self.net.enter_port(Port(node, 0)));
+              if let Term::Opr { opr, fst, snd: _ } = &fst {
+                let (flip, arg) = self.read_opr_arg(self.net.enter_port(Port(node, 1)));
+                let snd = Box::new(match arg {
+                  NumArg::Num(typ, val) => Term::Num { typ, val },
+                  NumArg::Oth(term) => term,
+                  NumArg::Sym(_) | NumArg::Par(_, _) => {
+                    self.error(ReadbackError::InvalidNumericOp);
+                    Term::Err
+                  }
+                });
+                let (fst, snd) = if flip { (snd, fst.clone()) } else { (fst.clone(), snd) };
+                Term::Opr { opr: *opr, fst, snd }
+              } else {
+                self.error(ReadbackError::InvalidNumericOp);
+                Term::Err
+              }
+            } else {
+              // First half of a numeric operation
+              let (flip0, arg0) = self.read_opr_arg(self.net.enter_port(Port(node, 0)));
+              let (flip1, arg1) = self.read_opr_arg(self.net.enter_port(Port(node, 1)));
+              let (arg0, arg1) = if flip0 != flip1 { (arg1, arg0) } else { (arg0, arg1) };
+              use NumArg::*;
+              match (arg0, arg1) {
+                (Sym(opr), Num(typ, val)) | (Num(typ, val), Sym(opr)) => Term::Opr {
+                  opr: Op::from_native_tag(opr, typ),
+                  fst: Box::new(Term::Num { typ, val }),
+                  snd: Box::new(Term::Err),
+                },
+                (Num(typ, num1), Par(opr, num2)) | (Par(opr, num1), Num(typ, num2)) => Term::Opr {
+                  opr: Op::from_native_tag(opr, typ),
+                  fst: Box::new(Term::Num { typ, val: num1 }),
+                  snd: Box::new(Term::Num { typ, val: num2 }),
+                },
+                // No type, so assuming u24
+                (Sym(opr), Oth(term)) | (Oth(term), Sym(opr)) => Term::Opr {
+                  opr: Op::from_native_tag(opr, NumType::U24),
+                  fst: Box::new(term),
+                  snd: Box::new(Term::Err),
+                },
+
+                (Par(opr, num), Oth(term)) => Term::Opr {
+                  opr: Op::from_native_tag(opr, NumType::U24),
+                  fst: Box::new(Term::Num { typ: NumType::U24, val: num }),
+                  snd: Box::new(term),
+                },
+                (Oth(term), Par(opr, num)) => Term::Opr {
+                  opr: Op::from_native_tag(opr, NumType::U24),
+                  fst: Box::new(term),
+                  snd: Box::new(Term::Num { typ: NumType::U24, val: num }),
+                },
+                _ => {
+                  self.error(ReadbackError::InvalidNumericOp);
+                  Term::Err
+                }
+              }
+            }
           }
           _ => {
             self.error(ReadbackError::InvalidNumericOp);
@@ -231,10 +290,33 @@ impl Reader<'_> {
           self.error(ReadbackError::ReachedRoot);
           Term::Err
         }
-      };
-
-      term
+      }
     })
+  }
+
+  fn read_opr_arg(&mut self, next: Port) -> (bool, NumArg) {
+    let node = next.node();
+    match &self.net.node(node).kind {
+      Num { val } => {
+        self.seen.insert(next);
+        let flipped = ((val >> 28) & 0x1) != 0;
+        let typ = val & 0xf;
+        let val = (val >> 4) & 0x00ff_ffff;
+        let arg = match typ {
+          // Sym
+          0x0 => NumArg::Sym(val & 0xf),
+          // Num
+          0x1 ..= 0x3 => NumArg::Num(NumType::from(typ as u8), val),
+          // Partial
+          opr => NumArg::Par(opr, val),
+        };
+        (flipped, arg)
+      }
+      _ => {
+        let term = self.read_term(next);
+        (false, NumArg::Oth(term))
+      }
+    }
   }
 
   /// Enters both ports 1 and 2 of a node,
@@ -310,6 +392,54 @@ impl Reader<'_> {
     }
   }
 }
+
+/// Argument for a Opr node
+enum NumArg {
+  Sym(u32),
+  Num(NumType, u32),
+  Par(u32, u32),
+  Oth(Term),
+}
+
+impl Op {
+  fn from_native_tag(val: u32, typ: NumType) -> Op {
+    match val {
+      0x4 => Op::ADD,
+      0x5 => Op::SUB,
+      0x6 => Op::MUL,
+      0x7 => Op::DIV,
+      0x8 => Op::REM,
+      0x9 => Op::EQL,
+      0xa => Op::NEQ,
+      0xb => Op::LTN,
+      0xc => Op::GTN,
+      0xd => {
+        if typ == NumType::F24 {
+          Op::ATN
+        } else {
+          Op::AND
+        }
+      }
+      0xe => {
+        if typ == NumType::F24 {
+          Op::LOG
+        } else {
+          Op::OR
+        }
+      }
+      0xf => {
+        if typ == NumType::F24 {
+          Op::POW
+        } else {
+          Op::XOR
+        }
+      }
+      _ => unreachable!(),
+    }
+  }
+}
+
+/* Insertion of dups in the middle of the term */
 
 /// Represents `let #tag(fst, snd) = val` / `let #tag{fst snd} = val`
 struct Split {
@@ -399,6 +529,8 @@ impl Term {
   }
 }
 
+/* Variable name generation */
+
 #[derive(Default)]
 pub struct NameGen {
   pub var_port_to_id: HashMap<Port, u64>,
@@ -429,6 +561,8 @@ impl NameGen {
     Name::from(id)
   }
 }
+
+/* Readback errors */
 
 #[derive(Debug, Clone, Copy)]
 pub enum ReadbackError {
@@ -464,6 +598,8 @@ impl std::fmt::Display for ReadbackError {
     }
   }
 }
+
+/* Recover unscoped vars */
 
 impl Term {
   pub fn collect_unscoped(&self, unscoped: &mut HashSet<Name>, scope: &mut Vec<Name>) {

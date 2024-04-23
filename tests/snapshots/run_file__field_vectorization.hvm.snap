@@ -2,8 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/field_vectorization.hvm
 ---
-Lazy mode:
-(Cons T (Cons T (Cons F (Cons T Nil))))
-
 Strict mode:
-(Cons T (Cons T (Cons F (Cons T Nil))))
+
+Result: T
+- ITRS: 127
+- TIME: 0.00s
+- MIPS: 19.50

@@ -2,7 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/addition.hvm
 ---
-@main = d
-  & (b c) ~ (#129 d)
-  & $(a $(b c)) ~ #16
-  & $(#17 $(#17 a)) ~ #16
+@main = c
+  & (a b) ~ (8 c)
+  & $(1 $(:[+] $(a b))) ~ [+1]

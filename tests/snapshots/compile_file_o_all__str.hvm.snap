@@ -7,9 +7,9 @@ input_file: tests/golden_tests/compile_file_o_all/str.hvm
 @String.nil = (* (a a))
 
 @main = f
-  & @String.cons ~ (#1745 (e f))
-  & @String.cons ~ (#1553 (d e))
-  & @String.cons ~ (#1681 (c d))
-  & @String.cons ~ (#1761 (b c))
-  & @String.cons ~ (#513 (a b))
-  & @String.cons ~ (#977 (@String.nil a))
+  & @String.cons ~ (109 (e f))
+  & @String.cons ~ (97 (d e))
+  & @String.cons ~ (105 (c d))
+  & @String.cons ~ (110 (b c))
+  & @String.cons ~ (32 (a b))
+  & @String.cons ~ (61 (@String.nil a))

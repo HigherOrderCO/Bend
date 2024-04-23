@@ -5,4 +5,4 @@ input_file: tests/golden_tests/compile_file_o_all/fst.hvm
 @Fst = ((a *) a)
 
 @main = a
-  & @Fst ~ ((#65 #129) a)
+  & @Fst ~ ((4 8) a)

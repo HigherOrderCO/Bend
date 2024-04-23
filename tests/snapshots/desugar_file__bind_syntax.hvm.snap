@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/bind_syntax.hvm
 ---
-(Result.bind) = λa λb (a Result.bind$C1 Result.bind$C0 b)
+(Result.bind) = λa λb (a Result.bind__C1 Result.bind__C0 b)
 
 (Main) = (Result.bind (HVM.store (String.cons 102 (String.cons 105 (String.cons 108 (String.cons 101 (String.cons 46 (String.cons 116 (String.cons 120 (String.cons 116 String.nil)))))))) (String.cons 65 (String.cons 108 (String.cons 105 (String.cons 99 (String.cons 101 String.nil)))))) λ* (Result.bind (HVM.load (String.cons 102 (String.cons 105 (String.cons 108 (String.cons 101 (String.cons 46 (String.cons 116 (String.cons 120 (String.cons 116 String.nil))))))))) λa a))
 
@@ -14,6 +14,6 @@ input_file: tests/golden_tests/desugar_file/bind_syntax.hvm
 
 (Result.err) = λa λ* λb (b a)
 
-(Result.bind$C0) = λa λ* (Result.err a)
+(Result.bind__C0) = λa λ* (Result.err a)
 
-(Result.bind$C1) = λa λb (b a)
+(Result.bind__C1) = λa λb (b a)

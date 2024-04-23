@@ -4,7 +4,7 @@ input_file: tests/golden_tests/compile_file/ref_to_ref.hvm
 ---
 @A1 = @A2
 
-@A2 = #17
+@A2 = 1
 
 @B1 = @B2
 
@@ -14,7 +14,7 @@ input_file: tests/golden_tests/compile_file/ref_to_ref.hvm
 
 @B4 = @B5
 
-@B5 = #33
+@B5 = 2
 
 @C1 = @B4
 

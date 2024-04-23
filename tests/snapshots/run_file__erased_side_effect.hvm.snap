@@ -2,8 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/erased_side_effect.hvm
 ---
-Lazy mode:
-123
-
 Strict mode:
-123
+
+Result: 123
+- ITRS: 6
+- TIME: 0.00s
+- MIPS: 5.44

@@ -2,8 +2,13 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/exp.hvm
 ---
-Lazy mode:
-λa λb (a (a (a (a b))))
-
 Strict mode:
-λa λb (a (a (a (a b))))
+Warnings:
+During readback:
+  Reached Root.
+
+
+Result: λa λb let (e, d) = $c; (<Invalid> λ$c d e)
+- ITRS: 8
+- TIME: 0.00s
+- MIPS: 4.81

@@ -122,7 +122,7 @@ pub enum Term {
     els: Vec<Term>,
   },
   /// A numeric operation between built-in numbers.
-  Opx {
+  Opr {
     opr: Op,
     fst: Box<Term>,
     snd: Box<Term>,
@@ -160,7 +160,6 @@ pub enum FanKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Op {
-  SET,
   ADD,
   SUB,
   MUL,
@@ -173,17 +172,12 @@ pub enum Op {
   AND,
   OR,
   XOR,
-  SHL,
-  SHR,
-  ZER,
-  // a^b
-  POW,
-  /// log_a(b)
-  LOG,
   /// atan(a, b)
   ATN,
-  /// ceil(a) + floor(b)
-  RND,
+  /// log_a(b)
+  LOG,
+  // a^b
+  POW,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -345,7 +339,7 @@ impl Clone for Term {
       Self::Nat { val } => Self::Nat { val: *val },
       Self::Str { val } => Self::Str { val: val.clone() },
       Self::Lst { els } => Self::Lst { els: els.clone() },
-      Self::Opx { opr, fst, snd } => Self::Opx { opr: *opr, fst: fst.clone(), snd: snd.clone() },
+      Self::Opr { opr, fst, snd } => Self::Opr { opr: *opr, fst: fst.clone(), snd: snd.clone() },
       Self::Mat { arg, bnd, with, arms } => {
         Self::Mat { arg: arg.clone(), bnd: bnd.clone(), with: with.clone(), arms: arms.clone() }
       }
@@ -453,7 +447,7 @@ impl Term {
     if val == 0 {
       arg
     } else {
-      Term::Opx { opr: Op::SUB, fst: Box::new(arg), snd: Box::new(Term::Num { typ, val }) }
+      Term::Opr { opr: Op::SUB, fst: Box::new(arg), snd: Box::new(Term::Num { typ, val }) }
     }
   }
 
@@ -461,7 +455,7 @@ impl Term {
     if val == 0 {
       arg
     } else {
-      Term::Opx { opr: Op::ADD, fst: Box::new(arg), snd: Box::new(Term::Num { typ, val }) }
+      Term::Opr { opr: Op::ADD, fst: Box::new(arg), snd: Box::new(Term::Num { typ, val }) }
     }
   }
 
@@ -494,7 +488,7 @@ impl Term {
       | Term::Bnd { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Opx { fst, snd, .. } => ChildrenIter::Two([fst.as_ref(), snd.as_ref()]),
+      | Term::Opr { fst, snd, .. } => ChildrenIter::Two([fst.as_ref(), snd.as_ref()]),
       Term::Lam { bod, .. } => ChildrenIter::One([bod.as_ref()]),
       Term::Var { .. }
       | Term::Lnk { .. }
@@ -521,7 +515,7 @@ impl Term {
       | Term::Bnd { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Opx { fst, snd, .. } => ChildrenIter::Two([fst.as_mut(), snd.as_mut()]),
+      | Term::Opr { fst, snd, .. } => ChildrenIter::Two([fst.as_mut(), snd.as_mut()]),
       Term::Lam { bod, .. } => ChildrenIter::One([bod.as_mut()]),
       Term::Var { .. }
       | Term::Lnk { .. }
@@ -575,7 +569,7 @@ impl Term {
       Term::Use { nam, val, nxt, .. } => {
         ChildrenIter::Two([(val.as_ref(), BindsIter::Zero([])), (nxt.as_ref(), BindsIter::One([nam]))])
       }
-      Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
+      Term::App { fun: fst, arg: snd, .. } | Term::Opr { fst, snd, .. } => {
         ChildrenIter::Two([(fst.as_ref(), BindsIter::Zero([])), (snd.as_ref(), BindsIter::Zero([]))])
       }
       Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_ref(), BindsIter::Pat(pat.binds()))]),
@@ -624,7 +618,7 @@ impl Term {
       Term::Use { nam, val, nxt } => {
         ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([&*nam]))])
       }
-      Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
+      Term::App { fun: fst, arg: snd, .. } | Term::Opr { fst, snd, .. } => {
         ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
       }
       Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds()))]),
@@ -674,7 +668,7 @@ impl Term {
         (val.as_mut(), BindsIter::Zero([])),
         (nxt.as_mut(), BindsIter::Pat(ask.binds_mut())),
       ]),
-      Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
+      Term::App { fun: fst, arg: snd, .. } | Term::Opr { fst, snd, .. } => {
         ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
       }
       Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds_mut()))]),
@@ -810,33 +804,6 @@ impl Term {
       }
       has_unscoped
     })
-  }
-}
-
-impl From<Op> for u8 {
-  fn from(value: Op) -> Self {
-    match value {
-      Op::SET => 0x0,
-      Op::ADD => 0x1,
-      Op::SUB => 0x2,
-      Op::MUL => 0x3,
-      Op::DIV => 0x4,
-      Op::REM => 0x5,
-      Op::EQL => 0x6,
-      Op::NEQ => 0x7,
-      Op::LTN => 0x8,
-      Op::GTN => 0x9,
-      Op::AND => 0xa,
-      Op::OR => 0xb,
-      Op::XOR => 0xc,
-      Op::SHL => 0xd,
-      Op::SHR => 0xe,
-      Op::ZER => 0xf,
-      Op::POW => 0xb,
-      Op::LOG => 0xc,
-      Op::ATN => 0xd,
-      Op::RND => 0xe,
-    }
   }
 }
 

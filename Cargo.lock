@@ -186,7 +186,7 @@ checksum = "809e18805660d7b6b2e2b9f316a5099521b5998d5cba4dda11b5157a21aaef03"
 [[package]]
 name = "hvm-core"
 version = "0.2.24"
-source = "git+https://github.com/HigherOrderCO/hvm-core.git?branch=hvm32-compat#e341cef8ab0cbaed249b92d71a2f4b6dd056efae"
+source = "git+https://github.com/HigherOrderCO/hvm-core.git?branch=hvm32-compat#29c563f7a2a75d720708e981145a6f0dc084bdf6"
 dependencies = [
  "TSPL",
  "arrayvec",
@@ -475,11 +475,11 @@ checksum = "ac3b87c63620426dd9b991e5ce0329eff545bccbbb34f3be09ff6fb6ab51b7b6"
 
 [[package]]
 name = "winapi-util"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f29e6f9198ba0d26b4c9f07dbe6f9ed633e1f3d5b8b414090084349e46a52596"
+checksum = "134306a13c5647ad6453e8deaec55d3a44d6021970129e6188735e74bf546697"
 dependencies = [
- "winapi",
+ "windows-sys",
 ]
 
 [[package]]

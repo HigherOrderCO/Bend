@@ -2,8 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/chars.hvm
 ---
-Lazy mode:
-"ሴ!7"
-
 Strict mode:
-"ሴ!7"
+
+Result: λa λ* (a 4660 λb λ* (b 33 λc λ* (c 55 "")))
+- ITRS: 10
+- TIME: 0.00s
+- MIPS: 4.25

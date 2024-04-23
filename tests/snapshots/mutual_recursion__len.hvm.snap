@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/mutual_recursion/len.hvm
 ---
-@Len = ((@Len$C0 (#1 a)) a)
+@Len = ((@Len__C0 (0 a)) a)
 
-@Len$C0 = (* (a c))
-  & $(#17 $(b c)) ~ #16
+@Len__C0 = (* (a c))
+  & $(b c) ~ [+1]
   & @Len ~ (a b)
 
 @List.cons = (a (b ((a (b c)) (* c))))

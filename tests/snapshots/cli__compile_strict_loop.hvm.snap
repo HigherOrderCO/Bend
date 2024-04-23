@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/compile_strict_loop.hvm
 ---
-@A = (((* (a b)) (#1 c)) c)
+@A = (((* (a b)) (0 c)) c)
   & @A ~ (a b)
 
 @List.cons = (a (b ((a (b c)) (* c))))
@@ -11,5 +11,5 @@ input_file: tests/golden_tests/cli/compile_strict_loop.hvm
 
 @main = c
   & @A ~ (b c)
-  & @List.cons ~ (#65 (a b))
-  & @List.cons ~ (#65 (@List.nil a))
+  & @List.cons ~ (4 (a b))
+  & @List.cons ~ (4 (@List.nil a))

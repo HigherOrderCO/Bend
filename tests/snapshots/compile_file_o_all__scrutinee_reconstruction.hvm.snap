@@ -13,4 +13,4 @@ input_file: tests/golden_tests/compile_file_o_all/scrutinee_reconstruction.hvm
 
 @main = b
   & @Option.or ~ (a (@None b))
-  & @Some ~ (#81 a)
+  & @Some ~ (5 a)

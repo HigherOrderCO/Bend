@@ -9,4 +9,4 @@ input_file: tests/golden_tests/compile_file_o_all/example.hvm
   & (a a) ~ (@Def1 b)
 
 @main = a
-  & @Def2 ~ (#17 a)
+  & @Def2 ~ (1 a)

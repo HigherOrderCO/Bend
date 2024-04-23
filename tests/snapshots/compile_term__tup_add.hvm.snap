@@ -2,6 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/tup_add.hvm
 ---
-c
-  & (#17 #33) ~ (a b)
-  & $(a $(b c)) ~ #16
+b
+  & (1 2) ~ ($(:[+] $(a b)) a)

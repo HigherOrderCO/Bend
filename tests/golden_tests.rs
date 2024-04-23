@@ -16,6 +16,7 @@ use std::{
   fmt::Write,
   io::Read,
   path::{Path, PathBuf},
+  process::Output,
   str::FromStr,
 };
 use stdext::function_name;
@@ -153,7 +154,7 @@ fn linear_readback() {
     let book = do_parse_book(code, path)?;
     let compile_opts = CompileOpts::default_strict().set_all();
     let diagnostics_cfg = DiagnosticsConfig::default_strict();
-    let (res, info) = run_book(
+    let (term, _, diags) = run_book(
       book,
       None,
       RunOpts { linear: true, ..Default::default() },
@@ -161,15 +162,16 @@ fn linear_readback() {
       diagnostics_cfg,
       None,
     )?;
-    Ok(format!("{}{}", info.diagnostics, res))
+    let res = format!("{diags}{term}");
+    Ok(res)
   });
 }
 
 #[test]
-#[ignore = "while execution is not implemented for hvm32"]
+//#[ignore = "while execution is not implemented for hvm32"]
 fn run_file() {
   run_golden_test_dir_multiple(function_name!(), &[
-    (&|_code, path| {
+    /* (&|_code, path| {
       let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
         .args([
           "run",
@@ -186,10 +188,10 @@ fn run_file() {
         .expect("Run process");
 
       Ok(format!("Lazy mode:\n{}", format_output(output)))
-    }),
+    }), */
     (&|_code, path| {
       let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
-        .args(["run", path.to_str().unwrap(), "-Dall", "-Oall"])
+        .args(["run", path.to_str().unwrap(), "-Dall", "-A=recursion-pre-reduce", "-Oall"])
         .output()
         .expect("Run process");
 
@@ -212,13 +214,13 @@ fn run_lazy() {
     };
     let run_opts = RunOpts::lazy();
 
-    let (res, info) = run_book(book, None, run_opts, compile_opts, diagnostics_cfg, None)?;
-    Ok(format!("{}{}", info.diagnostics, res))
+    let (term, _, diags) = run_book(book, None, run_opts, compile_opts, diagnostics_cfg, None)?;
+    let res = format!("{diags}{term}");
+    Ok(res)
   })
 }
 
 #[test]
-#[ignore = "while readback is not implemented for hvm32"]
 fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|code, _| {
     let net = hvmc::ast::Net::from_str(code)?;
@@ -317,7 +319,7 @@ fn desugar_file() {
 }
 
 #[test]
-#[ignore = "while execution is not implemented for hvm32"]
+//#[ignore = "while execution is not implemented for hvm32"]
 fn hangs() {
   let expected_normalization_time = 5;
 
@@ -360,15 +362,19 @@ fn compile_entrypoint() {
 }
 
 #[test]
-#[ignore = "while execution is not implemented for hvm32"]
+//#[ignore = "while execution is not implemented for hvm32"]
 fn run_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
     let compile_opts = CompileOpts::default_strict().set_all();
-    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
-    let (res, info) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
-    Ok(format!("{}{}", info.diagnostics, res))
+    let diagnostics_cfg = DiagnosticsConfig {
+      recursion_pre_reduce: Severity::Allow,
+      ..DiagnosticsConfig::new(Severity::Error, true)
+    };
+    let (term, _, diags) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let res = format!("{diags}{term}");
+    Ok(res)
   })
 }
 
@@ -404,28 +410,33 @@ fn mutual_recursion() {
 }
 
 #[test]
-#[ignore = "while execution is not implemented for hvm32"]
+#[ignore = "while IO is not implemented for hvm32"]
 fn io() {
   run_golden_test_dir_multiple(function_name!(), &[
-    (&|code, path| {
+    /* (&|code, path| {
       let book = do_parse_book(code, path)?;
       let compile_opts = CompileOpts::default_lazy();
       let diagnostics_cfg = DiagnosticsConfig::default_lazy();
-      let (res, info) = run_book(book, None, RunOpts::lazy(), compile_opts, diagnostics_cfg, None)?;
-      Ok(format!("Lazy mode:\n{}{}", info.diagnostics, res))
-    }),
+      let Output { status, stdout, stderr } =
+        run_book(book, None, RunOpts::lazy(), compile_opts, diagnostics_cfg, None)?;
+      let stderr = String::from_utf8_lossy(&stderr);
+      let status = if !status.success() { format!("\n{status}") } else { String::new() };
+      let stdout = String::from_utf8_lossy(&stdout);
+      Ok(format!("Lazy mode:\n{}{}{}", stderr, status, stdout))
+    }), */
     (&|code, path| {
       let book = do_parse_book(code, path)?;
       let compile_opts = CompileOpts::default_strict();
       let diagnostics_cfg = DiagnosticsConfig::default_strict();
-      let (res, info) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
-      Ok(format!("Strict mode:\n{}{}", info.diagnostics, res))
+      let (term, _, diags) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+      let res = format!("{diags}{term}");
+      Ok(format!("Strict mode:\n{res}"))
     }),
   ])
 }
 
 #[test]
-#[ignore = "while execution is not implemented for hvm32"]
+//#[ignore = "while execution is not implemented for hvm32"]
 fn examples() -> Result<(), Diagnostics> {
   let examples_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples");
 
@@ -443,7 +454,8 @@ fn examples() -> Result<(), Diagnostics> {
     let mut compile_opts = CompileOpts::default_strict();
     compile_opts.linearize_matches = hvml::OptLevel::Extra;
     let diagnostics_cfg = DiagnosticsConfig::default_strict();
-    let (res, _) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let (term, _, diags) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let res = format!("{diags}{term}");
 
     let mut settings = insta::Settings::clone_current();
     settings.set_prepend_module_to_snapshot(false);
