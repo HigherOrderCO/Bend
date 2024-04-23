@@ -6,6 +6,7 @@ use crate::{
   },
 };
 use highlight_error::highlight_error;
+use indexmap::IndexMap;
 use TSPL::Parser;
 
 use super::NumType;
@@ -696,6 +697,8 @@ fn add_ctx_to_msg(msg: &str, ini_idx: usize, end_idx: usize, file: &str) -> Stri
 
 pub mod flavour_py {
   use hvmc::ops::Op;
+  use indexmap::IndexMap;
+  use interner::global::GlobalString;
 
   use crate::term::{Name, Pattern};
 
@@ -715,6 +718,10 @@ pub mod flavour_py {
     Enum { nam: Name, fields: Vec<(Name, Term)> },
     // {lhs} {op} {rhs}
     Bin { op: Op, lhs: Box<Term>, rhs: Box<Term> },
+    // "'" ... "'"
+    Str { val: GlobalString },
+    // "[" ... "]"
+    Lst { els: Vec<Term> },
   }
 
   #[derive(Clone, Debug)]
@@ -746,17 +753,32 @@ pub mod flavour_py {
     pub fields: Vec<Name>,
   }
 
+  // "def" {name} "(" {params} ")" ":" {body}
   #[derive(Clone, Debug)]
-  pub enum Declaration {
-    // "def" {name} "(" {params} ")" ":" {body}
-    Def { name: Name, params: Vec<Name>, body: Stmt },
-    // "enum" "{" {variants} "}"
-    Enum { name: Name, variants: Vec<Variant> },
+  pub struct Definition {
+    pub name: Name,
+    pub params: Vec<Name>,
+    pub body: Stmt,
+  }
+
+  // "enum" "{" {variants} "}"
+  #[derive(Clone, Debug)]
+  pub struct Enum {
+    pub name: Name,
+    pub variants: Vec<Variant>,
+  }
+
+  #[derive(Clone, Debug)]
+  pub enum TopLevel {
+    Def(Definition),
+    Enum(Enum),
   }
 
   #[derive(Debug, Clone)]
   pub struct Program {
-    pub decls: Vec<Declaration>,
+    pub enums: IndexMap<Name, Enum>,
+    pub defs: IndexMap<Name, Definition>,
+    pub variants: IndexMap<Name, Name>,
   }
 }
 
@@ -772,6 +794,15 @@ impl<'a> TermParser<'a> {
         let ret = self.parse_term_py()?;
         self.consume(")")?;
         ret
+      }
+      '[' => {
+        let els = self.list_like(|p| p.parse_term_py(), "[", "]", ",", true, 0)?;
+        flavour_py::Term::Lst { els }
+      }
+      '\"' => {
+        let str = self.parse_quoted_string()?;
+        let val = STRINGS.get(str);
+        flavour_py::Term::Str { val }
       }
       c if c.is_ascii_digit() => {
         let val = self.parse_u64()?;
@@ -882,23 +913,23 @@ impl<'a> TermParser<'a> {
     }
   }
 
-  fn parse_declaration_py(&mut self) -> Result<flavour_py::Declaration, String> {
+  fn parse_declaration_py(&mut self) -> Result<flavour_py::TopLevel, String> {
     self.skip_trivia();
     if self.try_consume("def") {
       let name = self.parse_hvml_name()?;
       let params = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 0)?;
       self.consume(":")?;
-      let stmt = self.parse_stmt_py()?;
-      Ok(flavour_py::Declaration::Def { name, params, body: stmt })
+      let body = self.parse_stmt_py()?;
+      Ok(flavour_py::TopLevel::Def(flavour_py::Definition { name, params, body }))
     } else if self.try_consume("enum") {
       let name = self.parse_hvml_name()?;
       let mut variants = Vec::new();
       if self.try_consume("{") {
         variants = self.list_like(|p| p.parse_variant(), "", "}", ",", true, 1)?;
       }
-      Ok(flavour_py::Declaration::Enum { name, variants })
+      Ok(flavour_py::TopLevel::Enum(flavour_py::Enum { name, variants }))
     } else {
-      Err("Expected def or enum".to_string())
+      self.expected("Enum or Def declaration")?
     }
   }
 
@@ -912,20 +943,42 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_program_py(&mut self) -> Result<flavour_py::Program, String> {
-    self.skip_trivia();
-    let mut decls = Vec::new();
+    let mut enums = IndexMap::<Name, flavour_py::Enum>::new();
+    let mut defs = IndexMap::<Name, flavour_py::Definition>::new();
+    let mut variants = IndexMap::<Name, Name>::new();
     while !self.is_eof() {
-      decls.push(self.parse_declaration_py()?);
+      match self.parse_declaration_py()? {
+        flavour_py::TopLevel::Def(def) => match defs.entry(def.name.clone()) {
+          indexmap::map::Entry::Occupied(o) => {
+            return Err(format!("Repeated definition '{}'.", o.get().name));
+          }
+          indexmap::map::Entry::Vacant(v) => _ = v.insert(def),
+        },
+        flavour_py::TopLevel::Enum(r#enum) => match enums.entry(r#enum.name.clone()) {
+          indexmap::map::Entry::Occupied(o) => return Err(format!("Repeated enum '{}'.", o.get().name)),
+          indexmap::map::Entry::Vacant(v) => {
+            for variant in r#enum.variants.iter() {
+              match variants.entry(variant.name.clone()) {
+                indexmap::map::Entry::Occupied(_) => {
+                  return Err(format!("Repeated variant '{}'.", variant.name));
+                }
+                indexmap::map::Entry::Vacant(v) => _ = v.insert(r#enum.name.clone()),
+              }
+            }
+            v.insert(r#enum);
+          }
+        },
+      }
     }
-    Ok(flavour_py::Program { decls })
+    Ok(flavour_py::Program { enums, defs, variants })
   }
 }
 
-//#[cfg(test)]
+#[cfg(test)]
 mod test {
   use super::TermParser;
 
-  //#[test]
+  #[test]
   fn parse_def() {
     let src = r#"
       enum Maybe {
@@ -935,6 +988,7 @@ mod test {
 
       def add_two(x):
         result = x + 2
+        s = [1, "aaa"]
         return Some { value: result }
     "#;
     let mut p = TermParser::new(src);
