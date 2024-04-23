@@ -739,12 +739,24 @@ pub mod flavour_py {
     Return { term: Box<Term> },
   }
 
+  // Name "{" fields, "}"
+  #[derive(Clone, Debug)]
+  pub struct Variant {
+    pub name: Name,
+    pub fields: Vec<Name>,
+  }
+
   #[derive(Clone, Debug)]
   pub enum Declaration {
     // "def" {name} "(" {params} ")" ":" {body}
     Def { name: Name, params: Vec<Name>, body: Stmt },
-    // "enum"
-    Enum { name: Name },
+    // "enum" "{" {variants} "}"
+    Enum { name: Name, variants: Vec<Variant> },
+  }
+
+  #[derive(Debug, Clone)]
+  pub struct Program {
+    pub decls: Vec<Declaration>,
   }
 }
 
@@ -767,10 +779,22 @@ impl<'a> TermParser<'a> {
       }
       _ => {
         let nam = self.parse_hvml_name()?;
-        if self.try_consume("{") { todo!() } else { flavour_py::Term::Var { nam } }
+        if self.try_consume("{") {
+          let fields = self.list_like(|p| p.parse_field_py(), "", "}", ",", true, 0)?;
+          flavour_py::Term::Enum { nam, fields }
+        } else {
+          flavour_py::Term::Var { nam }
+        }
       }
     };
     Ok(res)
+  }
+
+  fn parse_field_py(&mut self) -> Result<(Name, flavour_py::Term), String> {
+    let field_name = self.parse_hvml_name()?;
+    self.consume(":")?;
+    let value = self.parse_term_py()?;
+    Ok((field_name, value))
   }
 
   fn parse_term_py(&mut self) -> Result<flavour_py::Term, String> {
@@ -867,10 +891,33 @@ impl<'a> TermParser<'a> {
       let stmt = self.parse_stmt_py()?;
       Ok(flavour_py::Declaration::Def { name, params, body: stmt })
     } else if self.try_consume("enum") {
-      todo!()
+      let name = self.parse_hvml_name()?;
+      let mut variants = Vec::new();
+      if self.try_consume("{") {
+        variants = self.list_like(|p| p.parse_variant(), "", "}", ",", true, 1)?;
+      }
+      Ok(flavour_py::Declaration::Enum { name, variants })
     } else {
       Err("Expected def or enum".to_string())
     }
+  }
+
+  fn parse_variant(&mut self) -> Result<flavour_py::Variant, String> {
+    let name = self.parse_hvml_name()?;
+    let mut fields = Vec::new();
+    if self.try_consume("{") {
+      fields = self.list_like(|p| p.parse_hvml_name(), "", "}", ",", true, 0)?;
+    }
+    Ok(flavour_py::Variant { name, fields })
+  }
+
+  fn parse_program_py(&mut self) -> Result<flavour_py::Program, String> {
+    self.skip_trivia();
+    let mut decls = Vec::new();
+    while !self.is_eof() {
+      decls.push(self.parse_declaration_py()?);
+    }
+    Ok(flavour_py::Program { decls })
   }
 }
 
@@ -881,12 +928,17 @@ mod test {
   //#[test]
   fn parse_def() {
     let src = r#"
+      enum Maybe {
+        Some { value },
+        None,
+      }
+
       def add_two(x):
         result = x + 2
-        return result
+        return Some { value: result }
     "#;
     let mut p = TermParser::new(src);
-    let x = p.parse_declaration_py().unwrap();
+    let x = p.parse_program_py().unwrap();
     println!("{x:?}")
   }
 }
