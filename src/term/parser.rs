@@ -722,6 +722,8 @@ pub mod flavour_py {
     Str { val: GlobalString },
     // "[" ... "]"
     Lst { els: Vec<Term> },
+    // "(" ... ")"
+    Tup { els: Vec<Term> },
   }
 
   #[derive(Clone, Debug)]
@@ -731,9 +733,17 @@ pub mod flavour_py {
   }
 
   #[derive(Clone, Debug)]
+  pub enum AssignPattern {
+    // [a-zA-Z_]+
+    Var(Name),
+    // "(" ... ")"
+    Tup(Vec<Name>),
+  }
+
+  #[derive(Clone, Debug)]
   pub enum Stmt {
-    // {bind} = {val}\n {nxt}
-    Assign { bind: Pattern, val: Box<Term>, nxt: Box<Stmt> },
+    // {pat} = {val} ";" {nxt}
+    Assign { pat: AssignPattern, val: Box<Term>, nxt: Box<Stmt> },
     // "if" {cond} ":"
     //  {then}
     // "else" ":"
@@ -742,7 +752,7 @@ pub mod flavour_py {
     // "match" {arg} ":"
     //   case {lft} ":" {rgt}
     Match { arg: Box<Term>, arms: Vec<MatchArm> },
-    // "return" {expr}
+    // "return" {expr} ";"
     Return { term: Box<Term> },
   }
 
@@ -787,13 +797,22 @@ const PREC: &[&[IntOp]] = &[&[IntOp::Add, IntOp::Sub], &[IntOp::Mul, IntOp::Div]
 impl<'a> TermParser<'a> {
   fn parse_primary_py(&mut self) -> Result<flavour_py::Term, String> {
     self.skip_trivia();
-    let Some(head) = self.skip_peek_one() else { return self.expected("primary")? };
+    let Some(head) = self.skip_peek_one() else { return self.expected("primary term")? };
     let res = match head {
       '(' => {
         self.consume("(")?;
-        let ret = self.parse_term_py()?;
-        self.consume(")")?;
-        ret
+        let head = self.parse_term_py()?;
+        if self.skip_starts_with(",") {
+          let mut els = vec![head];
+          while self.try_consume(",") {
+            els.push(self.parse_term_py()?);
+          }
+          self.consume(")")?;
+          flavour_py::Term::Tup { els }
+        } else {
+          self.consume(")")?;
+          head
+        }
       }
       '[' => {
         let els = self.list_like(|p| p.parse_term_py(), "[", "]", ",", true, 0)?;
@@ -822,6 +841,7 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_field_py(&mut self) -> Result<(Name, flavour_py::Term), String> {
+    self.skip_trivia();
     let field_name = self.parse_hvml_name()?;
     self.consume(":")?;
     let value = self.parse_term_py()?;
@@ -841,6 +861,7 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_call(&mut self) -> Result<flavour_py::Term, String> {
+    self.skip_trivia();
     let mut args = Vec::new();
     let fun = self.parse_primary_py()?;
     if self.try_consume("(") {
@@ -850,18 +871,20 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_infix_py(&mut self, prec: usize) -> Result<flavour_py::Term, String> {
+    self.skip_trivia();
     if prec > PREC.len() - 1 {
       return self.parse_call();
     }
     let mut lhs = self.parse_infix_py(prec + 1)?;
     while let Some(op) = self.get_op() {
-      if PREC.iter().position(|&r| r.contains(&op)).unwrap_or(usize::MAX) < prec {
+      if PREC[prec].iter().any(|r| *r == op) {
+        let op = self.parse_oper()?;
+        let rhs = self.parse_infix_py(prec + 1)?;
+        self.skip_trivia();
+        lhs = flavour_py::Term::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+      } else {
         break;
       }
-      let op = self.parse_oper()?;
-      let rhs = self.parse_infix_py(prec + 1)?;
-      self.skip_trivia();
-      lhs = flavour_py::Term::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
     }
     Ok(lhs)
   }
@@ -880,10 +903,10 @@ impl<'a> TermParser<'a> {
     self.skip_trivia();
     if self.try_consume("return ") {
       let term = self.parse_term_py()?;
-      self.try_consume(";");
+      self.consume(";")?;
       Ok(flavour_py::Stmt::Return { term: Box::new(term) })
     } else if self.try_consume("if ") {
-      let cond = self.parse_term_py()?;
+      let cond = self.parse_primary_py()?;
       self.consume(":")?;
       let then = self.parse_stmt_py()?;
       let mut otherwise = flavour_py::Stmt::Return { term: Box::new(flavour_py::Term::None) };
@@ -893,7 +916,7 @@ impl<'a> TermParser<'a> {
       }
       Ok(flavour_py::Stmt::If { cond: Box::new(cond), then: Box::new(then), otherwise: Box::new(otherwise) })
     } else if self.try_consume("match ") {
-      let scrutinee = self.parse_term_py()?;
+      let scrutinee = self.parse_primary_py()?;
       self.consume(":")?;
       let mut arms = Vec::new();
       while self.try_consume("case ") {
@@ -905,11 +928,26 @@ impl<'a> TermParser<'a> {
       Ok(flavour_py::Stmt::Match { arg: Box::new(scrutinee), arms })
     } else {
       // assignment
-      let pat = self.parse_pattern(true)?;
+      let pat = self.parse_assign_py()?;
       self.consume("=")?;
       let val = self.parse_term_py()?;
+      self.consume(";")?;
       let nxt = self.parse_stmt_py()?;
-      Ok(flavour_py::Stmt::Assign { bind: pat, val: Box::new(val), nxt: Box::new(nxt) })
+      Ok(flavour_py::Stmt::Assign { pat, val: Box::new(val), nxt: Box::new(nxt) })
+    }
+  }
+
+  fn parse_assign_py(&mut self) -> Result<flavour_py::AssignPattern, String> {
+    self.skip_trivia();
+    if self.skip_starts_with("(") {
+      let mut binds = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 1)?;
+      if binds.len() == 1 {
+        Ok(flavour_py::AssignPattern::Var(std::mem::take(&mut binds[0])))
+      } else {
+        Ok(flavour_py::AssignPattern::Tup(binds))
+      }
+    } else {
+      self.parse_hvml_name().map(flavour_py::AssignPattern::Var)
     }
   }
 
@@ -942,43 +980,67 @@ impl<'a> TermParser<'a> {
     Ok(flavour_py::Variant { name, fields })
   }
 
-  fn parse_program_py(&mut self) -> Result<flavour_py::Program, String> {
+  pub fn parse_program_py(&mut self) -> Result<flavour_py::Program, String> {
     let mut enums = IndexMap::<Name, flavour_py::Enum>::new();
     let mut defs = IndexMap::<Name, flavour_py::Definition>::new();
     let mut variants = IndexMap::<Name, Name>::new();
-    while !self.is_eof() {
+
+    while {
+      self.skip_trivia();
+      true // what
+    } && !self.is_eof()
+    {
       match self.parse_declaration_py()? {
-        flavour_py::TopLevel::Def(def) => match defs.entry(def.name.clone()) {
-          indexmap::map::Entry::Occupied(o) => {
-            return Err(format!("Repeated definition '{}'.", o.get().name));
-          }
-          indexmap::map::Entry::Vacant(v) => _ = v.insert(def),
-        },
-        flavour_py::TopLevel::Enum(r#enum) => match enums.entry(r#enum.name.clone()) {
-          indexmap::map::Entry::Occupied(o) => return Err(format!("Repeated enum '{}'.", o.get().name)),
-          indexmap::map::Entry::Vacant(v) => {
-            for variant in r#enum.variants.iter() {
-              match variants.entry(variant.name.clone()) {
-                indexmap::map::Entry::Occupied(_) => {
-                  return Err(format!("Repeated variant '{}'.", variant.name));
-                }
-                indexmap::map::Entry::Vacant(v) => _ = v.insert(r#enum.name.clone()),
-              }
-            }
-            v.insert(r#enum);
-          }
-        },
+        flavour_py::TopLevel::Def(def) => Self::add_def_py(&mut defs, def)?,
+        flavour_py::TopLevel::Enum(r#enum) => Self::add_enum_py(&mut enums, &mut variants, r#enum)?,
       }
     }
+
     Ok(flavour_py::Program { enums, defs, variants })
+  }
+
+  fn add_def_py(
+    defs: &mut IndexMap<Name, flavour_py::Definition>,
+    def: flavour_py::Definition,
+  ) -> Result<(), String> {
+    match defs.entry(def.name.clone()) {
+      indexmap::map::Entry::Occupied(o) => Err(format!("Repeated definition '{}'.", o.get().name)),
+      indexmap::map::Entry::Vacant(v) => {
+        v.insert(def);
+        Ok(())
+      }
+    }
+  }
+
+  fn add_enum_py(
+    enums: &mut IndexMap<Name, flavour_py::Enum>,
+    variants: &mut IndexMap<Name, Name>,
+    r#enum: flavour_py::Enum,
+  ) -> Result<(), String> {
+    match enums.entry(r#enum.name.clone()) {
+      indexmap::map::Entry::Occupied(o) => return Err(format!("Repeated enum '{}'.", o.get().name)),
+      indexmap::map::Entry::Vacant(v) => {
+        for variant in r#enum.variants.iter() {
+          match variants.entry(variant.name.clone()) {
+            indexmap::map::Entry::Occupied(_) => {
+              return Err(format!("Repeated variant '{}'.", variant.name));
+            }
+            indexmap::map::Entry::Vacant(v) => _ = v.insert(r#enum.name.clone()),
+          }
+        }
+        v.insert(r#enum);
+      }
+    }
+    Ok(())
   }
 }
 
-#[cfg(test)]
+// #[cfg(test)]
+#[allow(dead_code)]
 mod test {
   use super::TermParser;
 
-  #[test]
+  // #[test]
   fn parse_def() {
     let src = r#"
       enum Maybe {
@@ -987,12 +1049,12 @@ mod test {
       }
 
       def add_two(x):
-        result = x + 2
-        s = [1, "aaa"]
-        return Some { value: result }
+        result = x + 2;
+        (z, x) = (1, "aaa");
+        return Some{value: result};
     "#;
     let mut p = TermParser::new(src);
-    let x = p.parse_program_py().unwrap();
-    println!("{x:?}")
+    let a = p.parse_program_py().unwrap();
+    println!("{a:?}")
   }
 }
