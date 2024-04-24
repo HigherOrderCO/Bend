@@ -25,19 +25,18 @@
 //! This corresponds to the term `@f (f 123)`.
 //!
 //! Note that:
-//! - node 0 and node 1 are both CON nodes, but node 0 is a lambda node whilst
-//!   node 1 is an application node
+//! - node 0 and node 1 are both CON nodes, but node 0 corresponds to a lambda
+//!   term whilst node 1 corresponds to an application node
 //! - in the net, node 1 is the left child of node 0, but in the term, it is the
 //!   right child
 //!
-//! Because of how the nodes are stored, when traversing the net, we can only
-//! enter nodes through their principal ports (from tree parent to child).
+//! Also, because of how the nodes are stored, when traversing the net, we can
+//! only enter nodes through their principal ports (from tree parent to child),
+//! so the readback algorithm must be structured as a series of top-down
+//! traversals of the trees in the net.
 //!
-//! Thus, to read the net back properly, we need to be able to:
-//! 1. distinguish between applications and lambdas
-//! 2. communicate terms across wires
-//!
-//! Let's look at these one at a time.
+//! To read the net back properly, we first need to be able to distinguish
+//! between applications and lambdas.
 //!
 //! ### Distinguishing lambdas and applications
 //!
@@ -45,9 +44,8 @@
 //! *polarity* of each port in the net. The polarity of a port is either `+` or
 //! `-`, and `+` ports can only be connected to `-` ports (and vice versa).
 //!
-//! Semantically, positive ports represent the creation of a value, and negative
-//! ports represent the destruction of a value. (Though this is an arbitrary
-//! choice.)
+//! Semantically, positive ports represent the production of a value, and
+//! negative ports represent the consumption of a value.
 //!
 //! For this interaction system, there are a few more rules for polarity:
 //! - the polarity of a free port is always `-`
@@ -82,8 +80,7 @@
 //! In fact, in general, if you know the polarity of one port of a tree, you can
 //! trivially determine the polarity of every other port.
 //!
-//! The difficulty, then, comes when we're reading interaction nets with active
-//! pairs:
+//! The difficulty, then, comes when reading interaction nets with active pairs:
 //!
 //! ```text
 //!                    redex 0
@@ -185,7 +182,7 @@
 //! ```
 //!
 //! Note that we now have a connection between a `-` port and a `p` port. This
-//! means that `p = +`, so we can update our graph:
+//! means that `p = +`, so we can update our diagram:
 //! ```text
 //!        -           _______      ((a b) b)
 //!        |          /       \     & (c c) ~ (123 a)
@@ -212,16 +209,30 @@
 //! of the ports of the net.
 //!
 //! When there are disconnected subnets, however, there may be multiple valid
-//! solutions; in these cases, the readback algorithm simply ignores the
-//! problematic subnets and issues a warning.
+//! solutions. If the polarity can not be unambiguously determined, the readback
+//! algorithm will skip the problematic subnets and issue a warning.
 //!
-//! In many cases, though, the polarity of disconnected subnets can be
+//! In many cases, though, the polarity of disconnected subnets *can* be
 //! determined, since our interaction system has nodes that can only be read
 //! back as one polarity (e.g. reference nodes are always positive).
 //!
-//! # Communicating terms across wires
+//! ### Labeling ports with AST nodes/holes
 //!
-//! Going back to our simpler example:
+//! Now that we know the polarities of every port, we need to label each port
+//! with either an AST node (either a term or a pattern), or a hole that must be
+//! filled with an AST node (either a term hole or a pattern hole).
+//!
+//! Ports with polarity `+` will either get a term or a pattern hole, and ports
+//! with polarity `-` will either get a term hole or a pattern.
+//!
+//! The labels of connected ports will then be linked as follows:
+//! - linking a term with a term hole or a pattern with a pattern hole simply
+//!   fills the hole with the node
+//! - linking a term with a pattern creates a `let pattern = term` statement
+//! - linking a term hole with a pattern hole fills each with a new variable
+//!
+//! Going back to our simpler example (which, if you recall, corresponds to the
+//! term `@f (f 123)`):
 //!
 //! ```text
 //!        |   ((123 x) x)
@@ -240,64 +251,48 @@
 //!        x
 //! ```
 //!
-//! Because node 1 is a child of node 0, yet the term for node 1 is a child of
-//! the term for node 0, after we traverse node 1, we need some way to
-//! communicate that term across the `x` wire to node 0.
-//!
-//! In this case, since it needs to be transferred "forwards", it's pretty clear
-//! how one might do this: simply add `("x", term_1)` to a hashmap once we've
-//! traversed node 0 and and then retrieve it when we traverse node 1.
-//!
-//! However, sometimes we need to be able to transfer terms "backwards" across
-//! wires.
-//!
-//! Thus, we need to create a system where both terms and term *holes* can be
-//! transferred. For this, we use the `loaned` crate, which supplies a
-//! `LoanedMut<'t, Term>` type that can represent terms with holes.
-//!
-//! In particular, we will associate a `Target<'t>` with every part, where a
-//! target can either one of:
-//! - `LoanedMut<'t, Term>` (a term, `+`)
-//! - `&'t mut Term` (a term hole, `-`)
-//! - `LoanedMut<'t, Pattern>` (a pattern, `-`)
-//! - `&'t mut Pattern` (a pattern hole, `+`)
-//!
-//! The targets associated with connected ports will be linked with
-//! `Readback::link`:
-//! - linking a term with a term hole or a pattern with a pattern hole simply
-//!   fills the hole using `LoanedMut::place`
-//! - linking a term with a pattern creates a `let pat = term` statement
-//! - linking a term hole with a pattern hole fills each with a new variable
-//!
-//! For the above example, then:
+//! We traverse the tree as follows:
 //! - visit node 0
-//!   - this is a lambda, so we create a term with two holes, `@?p ?t`, and
-//!     label the ports thusly:
+//!   - port 0 has `+` polarity, so this is a lambda
+//!   - we create a term with two holes, `@?p ?t`, and label the ports thusly:
 //!     - port 0: `@?p ?t` (`+`, term)
 //!     - port 1: `?p` (`+`, pattern hole)
 //!     - port 2: `?t` (`-`, term hole)
-//!   - this is the root node, so `@?b ?t` is the root term
-//!   - visit the left child, node 1 (with uplink `?p`)
-//!     - this is an application:
+//!   - this is the root node, so `@?p ?t` is the root term
+//!   - visit the left child, node 1 (via port 1, `?p`)
+//!     - port 0 has `-` polarity, so this is an application:
 //!       - port 0: `?u` (`-`, term hole)
 //!       - port 1: `?v` (`-`, term hole)
 //!       - port 2: `(?u ?v)` (`+`, term)
-//!     - we link port 0, `?u`, up to `?p` (pattern hole)
+//!     - we link port 0, `?u`, to the uplink `?p` (pattern hole)
 //!       - these are both holes so we create a new variable, `a`, and fill them
 //!         both with it
-//!     - visit the left child, `123` (with uplink `?v`)
+//!     - visit the left child, `123` (via port 1, `?v`)
 //!       - this is a number node:
-//!         - port 0: `123`
-//!       - we link port 0, `123`, up to `?v`
+//!         - port 0: `123` (`+`, term)
+//!       - we link port 0, `123`, to the uplink `?v`
 //!         - we simply fill the term hole `?v` with the term `123`
-//!     - visit the right child, `x` (with uplink `(a ?v)`)
-//!       - this is a variable; add ``("x", `(a 123)`)`` to the hashmap
-//!       - we link port 0, `123`, up to `?v`
-//!   - visit the right child, `x` (with uplink `?t`)
-//!       - this is a variable; remove ``("x", `(a 123)`)`` from the hashmap
+//!     - visit the right child, `x` (via port 2, which is now `(a 123)`)
+//!       - this is `x`, an aux-aux wire; add ``("x", `(a 123)`)`` to a hashmap
+//!   - visit the right child, `x` (via port 2, `?t`)
+//!       - this is `x`; remove ``("x", `(a 123)`)`` from the hashmap
 //!       - link `(a 123)` to `?t`
 //!         - we simply fill the term hole `?t` with the term `(a 123)`
-//! - we're finished, the root term is now `@a (a 123)`
+//! - we're finished; the root term is now `@a (a 123)`
+//!
+//! ## Implementation
+//!
+//! To implement this algorithm, we need to create a system where both AST nodes
+//! and AST *holes* can be transferred. For this, we use the `loaned` crate,
+//! which supplies a `LoanedMut<'t, T>` type that allows transferring values
+//! with live interior mutable references.
+//!
+//! Thus, we will associate a `Target<'t>` with every port, where a target can
+//! be one of:
+//! - `LoanedMut<'t, Term>` (a term)
+//! - `&'t mut Term` (a term hole)
+//! - `LoanedMut<'t, Pattern>` (a pattern)
+//! - `&'t mut Pattern` (a pattern hole)
 
 use std::{
   collections::{hash_map::Entry, HashMap},
