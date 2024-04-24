@@ -794,6 +794,18 @@ pub mod flavour_py {
 
 const PREC: &[&[IntOp]] = &[&[IntOp::Add, IntOp::Sub], &[IntOp::Mul, IntOp::Div]];
 
+struct Indent(isize);
+
+impl Indent {
+  fn enter_level(&mut self) {
+    self.0 = self.0 + 2;
+  }
+
+  fn exit_level(&mut self) {
+    self.0 = self.0 - 2;
+  }
+}
+
 impl<'a> TermParser<'a> {
   fn parse_primary_py(&mut self) -> Result<flavour_py::Term, String> {
     self.skip_trivia();
@@ -853,7 +865,7 @@ impl<'a> TermParser<'a> {
     if self.try_consume("fun") {
       let nam = self.parse_hvml_name()?;
       self.consume("=>")?;
-      let bod = self.parse_stmt_py()?;
+      let bod = self.parse_stmt_py(&mut Indent(0))?;
       Ok(flavour_py::Term::Lam { pat: Pattern::Var(Some(nam)), bod })
     } else {
       self.parse_infix_py(0)
@@ -899,8 +911,46 @@ impl<'a> TermParser<'a> {
     }
   }
 
-  fn parse_stmt_py(&mut self) -> Result<flavour_py::Stmt, String> {
-    self.skip_trivia();
+  fn skip_newlines(&mut self) -> Result<(), String> {
+    while let Some(c) = self.peek_one() {
+      if c == '\n' {
+        self.advance_one();
+      } else {
+        break;
+      }
+    }
+    Ok(())
+  }
+
+  fn skip_exact_spaces(&mut self, mut count: isize, block: bool) -> Result<bool, String> {
+    while let Some(c) = self.peek_one() {
+      if c == '\n' {
+        self.advance_one();
+      } else {
+        break;
+      }
+    }
+    if count <= 0 {
+      self.skip_spaces();
+      return Ok(false);
+    }
+    while let Some(c) = self.peek_one() {
+      if c.is_ascii_whitespace() {
+        count = count - 1;
+        self.advance_one();
+      } else {
+        break;
+      }
+    }
+    dbg!(count);
+    if block {
+      return Ok(count == 0 && !self.is_eof());
+    }
+    if count == 0 { Ok(true) } else { Err(format!("Indentation error '{count}'")) }
+  }
+
+  fn parse_stmt_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
+    self.skip_exact_spaces(indent.0, false)?;
     if self.try_consume("return ") {
       let term = self.parse_term_py()?;
       self.consume(";")?;
@@ -908,23 +958,35 @@ impl<'a> TermParser<'a> {
     } else if self.try_consume("if ") {
       let cond = self.parse_primary_py()?;
       self.consume(":")?;
-      let then = self.parse_stmt_py()?;
+      indent.enter_level();
+      let then = self.parse_stmt_py(indent)?;
+      indent.exit_level();
       let mut otherwise = flavour_py::Stmt::Return { term: Box::new(flavour_py::Term::None) };
       if self.try_consume("else") {
         self.consume(":")?;
-        otherwise = self.parse_stmt_py()?;
+        indent.enter_level();
+        otherwise = self.parse_stmt_py(indent)?;
+        indent.exit_level();
       }
       Ok(flavour_py::Stmt::If { cond: Box::new(cond), then: Box::new(then), otherwise: Box::new(otherwise) })
     } else if self.try_consume("match ") {
       let scrutinee = self.parse_primary_py()?;
       self.consume(":")?;
       let mut arms = Vec::new();
-      while self.try_consume("case ") {
+      indent.enter_level();
+      loop {
+        if !self.skip_exact_spaces(indent.0, true)? {
+          break;
+        }
+        self.consume("case")?;
         let pat = self.parse_name_or_era()?;
         self.consume(":")?;
-        let body = self.parse_stmt_py()?;
+        indent.enter_level();
+        let body = self.parse_stmt_py(indent)?;
+        indent.exit_level();
         arms.push(flavour_py::MatchArm { lft: pat, rgt: body })
       }
+      indent.exit_level();
       Ok(flavour_py::Stmt::Match { arg: Box::new(scrutinee), arms })
     } else {
       // assignment
@@ -932,13 +994,12 @@ impl<'a> TermParser<'a> {
       self.consume("=")?;
       let val = self.parse_term_py()?;
       self.consume(";")?;
-      let nxt = self.parse_stmt_py()?;
+      let nxt = self.parse_stmt_py(indent)?;
       Ok(flavour_py::Stmt::Assign { pat, val: Box::new(val), nxt: Box::new(nxt) })
     }
   }
 
   fn parse_assign_py(&mut self) -> Result<flavour_py::AssignPattern, String> {
-    self.skip_trivia();
     if self.skip_starts_with("(") {
       let mut binds = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 1)?;
       if binds.len() == 1 {
@@ -951,27 +1012,41 @@ impl<'a> TermParser<'a> {
     }
   }
 
-  fn parse_declaration_py(&mut self) -> Result<flavour_py::TopLevel, String> {
-    self.skip_trivia();
+  fn parse_declaration_py(&mut self, indent: &mut Indent) -> Result<flavour_py::TopLevel, String> {
+    self.skip_exact_spaces(indent.0, false)?;
     if self.try_consume("def") {
       let name = self.parse_hvml_name()?;
       let params = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 0)?;
       self.consume(":")?;
-      let body = self.parse_stmt_py()?;
+      indent.enter_level();
+      let body = self.parse_stmt_py(indent)?;
+      indent.exit_level();
       Ok(flavour_py::TopLevel::Def(flavour_py::Definition { name, params, body }))
     } else if self.try_consume("enum") {
       let name = self.parse_hvml_name()?;
       let mut variants = Vec::new();
-      if self.try_consume("{") {
-        variants = self.list_like(|p| p.parse_variant(), "", "}", ",", true, 1)?;
+      self.consume(":")?;
+      indent.enter_level();
+      loop {
+        if !self.skip_exact_spaces(indent.0, true)? {
+          break;
+        }
+        let name = self.parse_hvml_name()?;
+        let mut fields = Vec::new();
+        if self.skip_starts_with("{") {
+          fields = self.list_like(|p| p.parse_hvml_name(), "{", "}", ",", true, 0)?;
+        }
+        variants.push(flavour_py::Variant { name, fields });
       }
+      indent.exit_level();
       Ok(flavour_py::TopLevel::Enum(flavour_py::Enum { name, variants }))
     } else {
       self.expected("Enum or Def declaration")?
     }
   }
 
-  fn parse_variant(&mut self) -> Result<flavour_py::Variant, String> {
+  fn parse_variant(&mut self, indent: &Indent) -> Result<flavour_py::Variant, String> {
+    self.skip_exact_spaces(indent.0, false)?;
     let name = self.parse_hvml_name()?;
     let mut fields = Vec::new();
     if self.try_consume("{") {
@@ -986,14 +1061,15 @@ impl<'a> TermParser<'a> {
     let mut variants = IndexMap::<Name, Name>::new();
 
     while {
-      self.skip_trivia();
-      true // what
+      self.skip_newlines()?;
+      true
     } && !self.is_eof()
     {
-      match self.parse_declaration_py()? {
+      match self.parse_declaration_py(&mut Indent(0))? {
         flavour_py::TopLevel::Def(def) => Self::add_def_py(&mut defs, def)?,
         flavour_py::TopLevel::Enum(r#enum) => Self::add_enum_py(&mut enums, &mut variants, r#enum)?,
       }
+      self.skip_spaces();
     }
 
     Ok(flavour_py::Program { enums, defs, variants })
@@ -1035,23 +1111,26 @@ impl<'a> TermParser<'a> {
   }
 }
 
-// #[cfg(test)]
+#[cfg(test)]
 #[allow(dead_code)]
 mod test {
   use super::TermParser;
 
-  // #[test]
+  #[test]
   fn parse_def() {
     let src = r#"
-      enum Maybe {
-        Some { value },
-        None,
-      }
 
-      def add_two(x):
-        result = x + 2;
-        (z, x) = (1, "aaa");
-        return Some{value: result};
+def add_two(x):
+  result = x + 2;
+  (z, x) = (1, "aaa");
+  match x:
+    case Some:
+      if y:
+        return 1;
+      else:
+        return 3;
+    case None:
+      return 2;
     "#;
     let mut p = TermParser::new(src);
     let a = p.parse_program_py().unwrap();
