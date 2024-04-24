@@ -273,8 +273,9 @@ checksum = "0717cef1bc8b636c6e1c1bbdefc09e6322da8a9321966e8928ef80d20f7f770f"
 
 [[package]]
 name = "loaned"
-version = "0.1.0"
-source = "git+https://github.com/tjjfvi/loaned.git#0d984602c1cae533a50d3547a9806a2f41b20ec8"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f16fbe026127b8ff026fcc7419ddf201d47807295690de255bb68fced2ba15af"
 
 [[package]]
 name = "lock_api"
