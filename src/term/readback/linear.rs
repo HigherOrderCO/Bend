@@ -360,8 +360,8 @@ struct Readback<'c, 't, 'n> {
   /// moved; it's generally safe to `.unwrap()`.
   lets: Option<&'t mut Term>,
 
-  // Dropping `LoanedMut`s panic, so we push them to these vecs instead, so that
-  // we can dispose of the data once `'t` expires.
+  // Dropping `LoanedMut`s panic, so we push them to these vectors instead, so
+  // that we can dispose of the data once `'t` expires.
   garbage_terms: Vec<LoanedMut<'t, Term>>,
   garbage_pats: Vec<LoanedMut<'t, Pattern>>,
 
