@@ -58,7 +58,6 @@ pub fn readback_non_linear(net: &Net, book: &Book, labels: &Labels, diagnostics:
   term
 }
 
-// BTreeSet for consistent readback of dups
 type Scope<'n> = IndexSet<NodeId<'n>>;
 
 pub struct Reader<'a, 'n> {
