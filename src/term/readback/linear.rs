@@ -277,7 +277,7 @@
 //!     - port 1: `?p` (`+`, pattern hole)
 //!     - port 2: `?t` (`-`, term hole)
 //!   - this is the root node, so `@?b ?t` is the root term
-//!   - visit the left child, node 1 (with uplink `?a`)
+//!   - visit the left child, node 1 (with uplink `?p`)
 //!     - this is an application:
 //!       - port 0: `?u` (`-`, term hole)
 //!       - port 1: `?v` (`-`, term hole)
