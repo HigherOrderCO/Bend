@@ -520,7 +520,7 @@ impl<'c, 't, 'n> Readback<'c, 't, 'n> {
     match tree {
       Tree::Var { .. } => unreachable!(),
       Tree::Era => PosTerm(LoanedMut::new(Term::Era)),
-      Tree::Num { val } => PosTerm(LoanedMut::new(Term::Num { val: *val as u64 })),
+      Tree::Num { val } => PosTerm(LoanedMut::new(Term::Num { val: *val as u64 & ((1 << 60) - 1) })),
       Tree::Ref { nam } => PosTerm(LoanedMut::new(Term::Ref { nam: Name::new(nam) })),
       Tree::Ctr { lab, ports } => match self.labels.to_ctr_kind(*lab) {
         // lambda
