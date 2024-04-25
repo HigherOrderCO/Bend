@@ -17,6 +17,7 @@ pub mod net_to_term;
 pub mod parser;
 pub mod term_to_net;
 pub mod transform;
+pub mod flavour_py;
 
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_net};

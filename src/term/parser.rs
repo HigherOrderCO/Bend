@@ -11,6 +11,8 @@ use TSPL::Parser;
 
 use super::NumType;
 
+use super::flavour_py;
+
 // hvml grammar description:
 // <Book>       ::= (<Data> | <Rule>)*
 // <Data>       ::= "data" <Name> "=" ( <Name> | "(" <Name> (<Name>)* ")" )+
@@ -695,104 +697,7 @@ fn add_ctx_to_msg(msg: &str, ini_idx: usize, end_idx: usize, file: &str) -> Stri
 // flavour py
 // ==========
 
-pub mod flavour_py {
-  use hvmc::ops::Op;
-  use indexmap::IndexMap;
-  use interner::global::GlobalString;
-
-  use crate::term::{Name, Pattern};
-
-  #[derive(Clone, Debug)]
-  pub enum Term {
-    // "None"
-    None,
-    // [a-zA-Z_]+
-    Var { nam: Name },
-    // [0-9_]+
-    Num { val: u64 },
-    // {fun}(args,)
-    Call { fun: Box<Term>, args: Vec<Term> },
-    // "fun" {pat} -> {bod}
-    Lam { pat: Pattern, bod: Stmt },
-    // {nam} "{" {fields} "}"
-    Enum { nam: Name, fields: Vec<(Name, Term)> },
-    // {lhs} {op} {rhs}
-    Bin { op: Op, lhs: Box<Term>, rhs: Box<Term> },
-    // "'" ... "'"
-    Str { val: GlobalString },
-    // "[" ... "]"
-    Lst { els: Vec<Term> },
-    // "(" ... ")"
-    Tup { els: Vec<Term> },
-  }
-
-  #[derive(Clone, Debug)]
-  pub struct MatchArm {
-    pub lft: Option<Name>,
-    pub rgt: Stmt,
-  }
-
-  #[derive(Clone, Debug)]
-  pub enum AssignPattern {
-    // [a-zA-Z_]+
-    Var(Name),
-    // "(" ... ")"
-    Tup(Vec<Name>),
-  }
-
-  #[derive(Clone, Debug)]
-  pub enum Stmt {
-    // {pat} = {val} ";" {nxt}
-    Assign { pat: AssignPattern, val: Box<Term>, nxt: Box<Stmt> },
-    // "if" {cond} ":"
-    //  {then}
-    // "else" ":"
-    //  {otherwise}
-    If { cond: Box<Term>, then: Box<Stmt>, otherwise: Box<Stmt> },
-    // "match" {arg} ":"
-    //   case {lft} ":" {rgt}
-    Match { arg: Box<Term>, arms: Vec<MatchArm> },
-    // "return" {expr} ";"
-    Return { term: Box<Term> },
-  }
-
-  // Name "{" fields, "}"
-  #[derive(Clone, Debug)]
-  pub struct Variant {
-    pub name: Name,
-    pub fields: Vec<Name>,
-  }
-
-  // "def" {name} "(" {params} ")" ":" {body}
-  #[derive(Clone, Debug)]
-  pub struct Definition {
-    pub name: Name,
-    pub params: Vec<Name>,
-    pub body: Stmt,
-  }
-
-  // "enum" "{" {variants} "}"
-  #[derive(Clone, Debug)]
-  pub struct Enum {
-    pub name: Name,
-    pub variants: Vec<Variant>,
-  }
-
-  #[derive(Clone, Debug)]
-  pub enum TopLevel {
-    Def(Definition),
-    Enum(Enum),
-  }
-
-  #[derive(Debug, Clone)]
-  pub struct Program {
-    pub enums: IndexMap<Name, Enum>,
-    pub defs: IndexMap<Name, Definition>,
-    pub variants: IndexMap<Name, Name>,
-  }
-}
-
-const PREC: &[&[IntOp]] = &[&[IntOp::Add, IntOp::Sub], &[IntOp::Mul, IntOp::Div]];
+const PREC: &[&[Op]] = &[&[Op::ADD, Op::SUB], &[Op::MUL, Op::DIV]];
 
 struct Indent(isize);
 
@@ -901,12 +806,12 @@ impl<'a> TermParser<'a> {
     Ok(lhs)
   }
 
-  fn get_op(&mut self) -> Option<IntOp> {
+  fn get_op(&mut self) -> Option<Op> {
     match self.skip_peek_one() {
-      Some('+') => Some(IntOp::Add),
-      Some('-') => Some(IntOp::Sub),
-      Some('*') => Some(IntOp::Mul),
-      Some('/') => Some(IntOp::Div),
+      Some('+') => Some(Op::ADD),
+      Some('-') => Some(Op::SUB),
+      Some('*') => Some(Op::MUL),
+      Some('/') => Some(Op::DIV),
       _ => None,
     }
   }
@@ -922,7 +827,7 @@ impl<'a> TermParser<'a> {
     Ok(())
   }
 
-  fn skip_exact_spaces(&mut self, mut count: isize, block: bool) -> Result<bool, String> {
+  fn skip_exact_indent(&mut self, Indent(mut count): &Indent, block: bool) -> Result<bool, String> {
     while let Some(c) = self.peek_one() {
       if c == '\n' {
         self.advance_one();
@@ -950,7 +855,7 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_stmt_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
-    self.skip_exact_spaces(indent.0, false)?;
+    self.skip_exact_indent(indent, false)?;
     if self.try_consume("return ") {
       self.parse_return_py()
     } else if self.try_consume("if ") {
@@ -974,7 +879,7 @@ impl<'a> TermParser<'a> {
     indent.enter_level();
     let then = self.parse_stmt_py(indent)?;
     indent.exit_level();
-    self.skip_exact_spaces(indent.0, false)?;
+    self.skip_exact_indent(indent, false)?;
     self.consume("else")?;
     self.consume(":")?;
     indent.enter_level();
@@ -985,17 +890,21 @@ impl<'a> TermParser<'a> {
 
   fn parse_match_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
     let scrutinee = self.parse_primary_py()?;
+    let mut bind = None;
+    if self.try_consume("as") {
+      bind = Some(self.parse_hvml_name()?);
+    }
     self.consume(":")?;
     let mut arms = Vec::new();
     indent.enter_level();
     loop {
-      if !self.skip_exact_spaces(indent.0, true)? {
+      if !self.skip_exact_indent(indent, true)? {
         break;
       }
       arms.push(self.parse_case_py(indent)?);
     }
     indent.exit_level();
-    Ok(flavour_py::Stmt::Match { arg: Box::new(scrutinee), arms })
+    Ok(flavour_py::Stmt::Match { arg: Box::new(scrutinee), bind, arms })
   }
 
   fn parse_case_py(&mut self, indent: &mut Indent) -> Result<flavour_py::MatchArm, String> {
@@ -1031,7 +940,7 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_top_level_py(&mut self, indent: &mut Indent) -> Result<flavour_py::TopLevel, String> {
-    self.skip_exact_spaces(indent.0, false)?;
+    self.skip_exact_indent(indent, false)?;
     if self.try_consume("def") {
       Ok(flavour_py::TopLevel::Def(self.parse_def_py(indent)?))
     } else if self.try_consume("enum") {
@@ -1057,7 +966,7 @@ impl<'a> TermParser<'a> {
     self.consume(":")?;
     indent.enter_level();
     loop {
-      if !self.skip_exact_spaces(indent.0, true)? {
+      if !self.skip_exact_indent(indent, true)? {
         break;
       }
       let name = self.parse_hvml_name()?;
@@ -1065,9 +974,10 @@ impl<'a> TermParser<'a> {
       if self.skip_starts_with("{") {
         fields = self.list_like(|p| p.parse_hvml_name(), "{", "}", ",", true, 0)?;
       }
-      variants.push(flavour_py::Variant { name, fields });
+      variants.push((name.clone(), flavour_py::Variant { name, fields }));
     }
     indent.exit_level();
+    let variants = variants.into_iter().collect();
     Ok(flavour_py::Enum { name, variants })
   }
 
@@ -1110,10 +1020,10 @@ impl<'a> TermParser<'a> {
     r#enum: flavour_py::Enum,
   ) -> Result<(), String> {
     match enums.entry(r#enum.name.clone()) {
-      indexmap::map::Entry::Occupied(o) => return Err(format!("Repeated enum '{}'.", o.get().name)),
+      indexmap::map::Entry::Occupied(o) => return Err(format!("Repeated enum '{}'.", o.key())),
       indexmap::map::Entry::Vacant(v) => {
-        for variant in r#enum.variants.iter() {
-          match variants.entry(variant.name.clone()) {
+        for (name, variant) in r#enum.variants.iter() {
+          match variants.entry(name.clone()) {
             indexmap::map::Entry::Occupied(_) => {
               return Err(format!("Repeated variant '{}'.", variant.name));
             }
@@ -1135,23 +1045,19 @@ mod test {
   #[test]
   fn parse_def() {
     let src = r#"
-enum Foo:
-  Foo { x, y }
+enum Point:
+  Point { x, y }
 
 def add_two(x):
-  result = x + 2;
-  (z, x) = (1, "aaa");
-  match x:
-    case Some:
-      if y:
-        return 1;
-      else:
-        return 3;
-    case None:
-      return 2;
+  //result = x + 2;
+  //(z, x) = (1, "aaa");
+  match Point{ y: 2, x: 1 } as p:
+    case Point:
+      return p.x;
     "#;
     let mut p = TermParser::new(src);
-    let a = p.parse_program_py().unwrap();
+    let mut a = p.parse_program_py().unwrap();
+    a.order_enums();
     println!("{a:?}")
   }
 }
