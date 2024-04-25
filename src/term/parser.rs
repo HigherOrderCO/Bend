@@ -798,11 +798,11 @@ struct Indent(isize);
 
 impl Indent {
   fn enter_level(&mut self) {
-    self.0 = self.0 + 2;
+    self.0 += 2;
   }
 
   fn exit_level(&mut self) {
-    self.0 = self.0 - 2;
+    self.0 -= 2;
   }
 }
 
@@ -936,17 +936,17 @@ impl<'a> TermParser<'a> {
     }
     while let Some(c) = self.peek_one() {
       if c.is_ascii_whitespace() {
-        count = count - 1;
+        count -= 1;
         self.advance_one();
       } else {
         break;
       }
     }
-    dbg!(count);
     if block {
       return Ok(count == 0 && !self.is_eof());
     }
-    if count == 0 { Ok(true) } else { Err(format!("Indentation error '{count}'")) }
+    // TODO: add the current line in Err
+    if count == 0 { Ok(true) } else { Err("Indentation error".to_string()) }
   }
 
   fn parse_stmt_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
@@ -974,13 +974,12 @@ impl<'a> TermParser<'a> {
     indent.enter_level();
     let then = self.parse_stmt_py(indent)?;
     indent.exit_level();
-    let mut otherwise = flavour_py::Stmt::Return { term: Box::new(flavour_py::Term::None) };
-    if self.try_consume("else") {
-      self.consume(":")?;
-      indent.enter_level();
-      otherwise = self.parse_stmt_py(indent)?;
-      indent.exit_level();
-    }
+    self.skip_exact_spaces(indent.0, false)?;
+    self.consume("else")?;
+    self.consume(":")?;
+    indent.enter_level();
+    let otherwise = self.parse_stmt_py(indent)?;
+    indent.exit_level();
     Ok(flavour_py::Stmt::If { cond: Box::new(cond), then: Box::new(then), otherwise: Box::new(otherwise) })
   }
 
@@ -1136,6 +1135,8 @@ mod test {
   #[test]
   fn parse_def() {
     let src = r#"
+enum Foo:
+  Foo { x, y }
 
 def add_two(x):
   result = x + 2;
