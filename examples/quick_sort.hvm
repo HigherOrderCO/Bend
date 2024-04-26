@@ -18,7 +18,7 @@ data Tree = Leaf | (Node l m r)
 
 // Generates a random list
 (Rnd 0 s) = (List.nil)
-(Rnd n s) = (List.cons s (Rnd (- n 1) (% (+ (* s 1664525) 1013904223) 4294967296)))
+(Rnd n s) = (List.cons s (Rnd (- n 1) (% (+ (* s 1664525) 1013904223) 4294967295)))
 
 // Sums all elements in a concatenation tree
 (Sum Leaf)         = 0
@@ -27,7 +27,7 @@ data Tree = Leaf | (Node l m r)
 // Sorts and sums n random numbers
 (Main) =
   let n = 12
-  (Sum (Sort (Rnd (<< 1 n) 1)))
+  (Sum (Sort (Rnd (* 2 n) 1)))
 
 // Use an argument from cli
 // (Main n) = (Sum (Sort (Rnd (<< 1 n) 1)))
