@@ -1,4 +1,5 @@
 mod order_enums;
+pub mod to_lang;
 
 use indexmap::IndexMap;
 use interner::global::GlobalString;

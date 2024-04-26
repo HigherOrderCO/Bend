@@ -1048,16 +1048,13 @@ mod test {
 enum Point:
   Point { x, y }
 
-def add_two(x):
-  //result = x + 2;
-  //(z, x) = (1, "aaa");
-  match Point{ y: 2, x: 1 } as p:
-    case Point:
-      return p.x;
+def identity(x):
+  return x;
     "#;
     let mut p = TermParser::new(src);
     let mut a = p.parse_program_py().unwrap();
     a.order_enums();
-    println!("{a:?}")
+    let out = a.to_lang(crate::term::Book::default());
+    println!("{out}");
   }
 }
