@@ -13,14 +13,10 @@ input_file: tests/golden_tests/compile_file/redex_order.hvm
   & @b ~ (b c)
   & @c ~ (a b)
 
-@foo2 = a
-  & @a ~ (@foo2__C1 a)
-
-@foo2__C0 = a
+@foo2 = c
+  & @a ~ (b c)
+  & @b ~ (a b)
   & @c ~ (0 a)
-
-@foo2__C1 = a
-  & @b ~ (@foo2__C0 a)
 
 @main = a
   & @foo ~ (@foo2 a)

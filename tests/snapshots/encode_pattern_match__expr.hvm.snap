@@ -2,34 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/expr.hvm
 ---
-TaggedScott:
-(Var) = λa #Expr λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (b a)
-
-(Num) = λa #Expr λ* #Expr λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (c a)
-
-(App) = λa λb #Expr λ* #Expr λ* #Expr λe #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (e a b)
-
-(Fun) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λf #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (f a b)
-
-(If) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λh #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr (h a b c)
-
-(Let) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λi #Expr λ* #Expr λ* #Expr λ* #Expr (i a b c)
-
-(Dup) = λa λb λc λd #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λk #Expr λ* #Expr λ* #Expr (k a b c d)
-
-(Tup) = λa λb #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λj #Expr λ* #Expr (j a b)
-
-(Op2) = λa λb λc #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λ* #Expr λl #Expr (l a b c)
-
-(Add) = #Op λa #Op λ* #Op λ* #Op λ* a
-
-(Sub) = #Op λ* #Op λb #Op λ* #Op λ* b
-
-(Mul) = #Op λ* #Op λ* #Op λc #Op λ* c
-
-(Div) = #Op λ* #Op λ* #Op λ* #Op λd d
-
-Scott:
 (Var) = λa λb λ* λ* λ* λ* λ* λ* λ* λ* (b a)
 
 (Num) = λa λ* λc λ* λ* λ* λ* λ* λ* λ* (c a)

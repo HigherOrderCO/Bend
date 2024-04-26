@@ -2,9 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/bitonic_sort.hvm
 ---
-Strict mode:
-
-Result: 120
-- ITRS: 9333
-- TIME: 0.00s
-- MIPS: 44.97
+120

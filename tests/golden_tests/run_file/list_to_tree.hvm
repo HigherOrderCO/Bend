@@ -24,6 +24,6 @@ List.toTree xs =
   let half = (/ (List.len xs) 2);
   let x = (Take half xs);
   let y = (Drop half xs);
-  ((List.toTree x), (List.toTree y))
+  {(List.toTree x), (List.toTree y)}
 
 Main = (List.toTree [1, 2, 3, 4, 5])

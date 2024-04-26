@@ -2,9 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/and.hvm
 ---
-Strict mode:
-
-Result: false
-- ITRS: 11
-- TIME: 0.00s
-- MIPS: 9.00
+false

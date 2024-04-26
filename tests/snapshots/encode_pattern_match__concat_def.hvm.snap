@@ -2,16 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/concat_def.hvm
 ---
-TaggedScott:
-(concat) = λa #String (a #String λb #String λc λd (String.cons b (concat c d)) λe e)
-
-(main) = (concat (String.cons 97 (String.cons 98 String.nil)) (String.cons 99 (String.cons 100 String.nil)))
-
-(String.cons) = λa λb #String λc #String λ* #String (c a b)
-
-(String.nil) = #String λ* #String λb b
-
-Scott:
 (concat) = λa (a λb λc λd (String.cons b (concat c d)) λe e)
 
 (main) = (concat (String.cons 97 (String.cons 98 String.nil)) (String.cons 99 (String.cons 100 String.nil)))

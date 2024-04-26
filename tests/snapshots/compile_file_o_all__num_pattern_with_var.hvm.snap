@@ -2,11 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/num_pattern_with_var.hvm
 ---
-@Foo = (((* 0) (@Foo$C1 a)) a)
+@Foo = (((* 0) (@Foo__C1 a)) a)
 
-@Foo$C0 = ($([+0000001] a) a)
+@Foo__C0 = ($([+1] a) a)
 
-@Foo$C1 = (?((0 @Foo$C0) a) a)
+@Foo__C1 = (?((0 @Foo__C0) a) a)
 
 @main = a
   & @Foo ~ (@true (3 a))

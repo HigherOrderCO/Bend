@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/readback_lnet/fst_snd.hvm
 ---
-(λa let (*, b) = a; b (λc let (d, *) = c; d ((1, 3), 2)))
+(λa a (λb b {{1 3} 2}))

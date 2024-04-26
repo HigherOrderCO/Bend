@@ -2,5 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/debug_u60_to_nat.hvm
 ---
-Errors:
-Execution not yet implemented for hvm32
+error: unexpected argument '-d' found
+
+  tip: to pass '-d' as a value, use '-- -d'
+
+Usage: hvml run [OPTIONS] <PATH> [ARGUMENTS]...
+
+For more information, try '--help'.

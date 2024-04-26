@@ -2,42 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/common.hvm
 ---
-TaggedScott:
-(Filled) = λa #Box λb #Box λ* #Box (b a)
-
-(Empty) = #Box λ* #Box λb b
-
-(Some) = λa #Option λb #Option λ* #Option (b a)
-
-(None) = #Option λ* #Option λb b
-
-(Ok) = λa #Result_ λb #Result_ λ* #Result_ (b a)
-
-(Err) = λa #Result_ λ* #Result_ λc #Result_ (c a)
-
-(Cons) = λa λb #List_ λc #List_ λ* #List_ (c a b)
-
-(Nil) = #List_ λ* #List_ λb b
-
-(True) = #Bool λa #Bool λ* a
-
-(False) = #Bool λ* #Bool λb b
-
-(Red) = #Light λa #Light λ* #Light λ* a
-
-(Yellow) = #Light λ* #Light λb #Light λ* b
-
-(Green) = #Light λ* #Light λ* #Light λc c
-
-(North) = #Direction λa #Direction λ* #Direction λ* #Direction λ* a
-
-(South) = #Direction λ* #Direction λb #Direction λ* #Direction λ* b
-
-(East) = #Direction λ* #Direction λ* #Direction λc #Direction λ* c
-
-(West) = #Direction λ* #Direction λ* #Direction λ* #Direction λd d
-
-Scott:
 (Filled) = λa λb λ* (b a)
 
 (Empty) = λ* λb b

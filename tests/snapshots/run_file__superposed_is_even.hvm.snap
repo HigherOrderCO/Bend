@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/superposed_is_even.hvm
 ---
-Lazy mode:
-#0{#1{T F} #2{T F}}
-
-Strict mode:
-#0{#1{T F} #2{T F}}
+{{T F} {T F}}

@@ -5,10 +5,10 @@ input_file: tests/golden_tests/compile_file_o_all/sum_predicates.hvm
 @main = a
   & @sum_pred ~ (8 (5 a))
 
-@sum_pred = (?((@sum_pred$C0 @sum_pred$C2) a) a)
+@sum_pred = (?((@sum_pred__C1 @sum_pred__C2) a) a)
 
-@sum_pred$C0 = (?((0 (a a)) b) b)
+@sum_pred__C0 = (a ($(:[+] $(a b)) b))
 
-@sum_pred$C1 = (a ($(:[+] $(a b)) b))
+@sum_pred__C1 = (?((0 (a a)) b) b)
 
-@sum_pred$C2 = (b (?(((a a) @sum_pred$C1) (b c)) c))
+@sum_pred__C2 = (b (?(((a a) @sum_pred__C0) (b c)) c))

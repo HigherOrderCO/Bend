@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/adt_option_and.hvm
 ---
-Lazy mode:
-λa match a = a { Some: λc match c = c { Some: (Some (a.val, c.val)); None: None; }; None: λ* None; }
-
-Strict mode:
-λa match a = a { Some: λc (match c = c { Some: λe (Some (e, c.val)); None: λ* None; } a.val); None: λ* None; }
+λa (a λa λb (b λa λb (Some (b, a)) λ* None a) λ* None)

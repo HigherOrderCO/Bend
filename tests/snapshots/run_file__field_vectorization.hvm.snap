@@ -2,9 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/field_vectorization.hvm
 ---
-Strict mode:
-
-Result: T
-- ITRS: 127
-- TIME: 0.00s
-- MIPS: 19.50
+T

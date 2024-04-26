@@ -2,9 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/kind_compiled_tree_sum.hvm
 ---
-Strict mode:
-
-Result: 16678913
-- ITRS: 4456402
-- TIME: 0.13s
-- MIPS: 34.23
+16678913

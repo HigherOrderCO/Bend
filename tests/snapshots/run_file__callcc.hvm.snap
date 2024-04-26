@@ -2,9 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/callcc.hvm
 ---
-Strict mode:
-
-Result: 52
-- ITRS: 12
-- TIME: 0.00s
-- MIPS: 7.73
+52

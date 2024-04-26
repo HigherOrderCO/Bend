@@ -29,8 +29,10 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
   & @O ~ (b c)
   & @O ~ (a b)
 
-@main = b
-  & @run ~ (a b)
+@main = a
+  & @run ~ (@main__C0 a)
+
+@main__C0 = a
   & @c2 ~ (@I (@E a))
 
 @run = ((@runO (@runI (@E a))) a)

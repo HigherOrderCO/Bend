@@ -2,16 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool_tup.hvm
 ---
-TaggedScott:
-(foo) = λa let (b, c) = a; (#Bool (b λd d λ* F) c)
-
-(main) = (foo (F, T))
-
-(T) = #Bool λa #Bool λ* a
-
-(F) = #Bool λ* #Bool λb b
-
-Scott:
 (foo) = λa let (b, c) = a; (b λd d λ* F c)
 
 (main) = (foo (F, T))

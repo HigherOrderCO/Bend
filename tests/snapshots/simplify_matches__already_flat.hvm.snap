@@ -14,20 +14,20 @@ input_file: tests/golden_tests/simplify_matches/already_flat.hvm
 
 (Rule6) = λa a
 
-(CtrA) = #Foo λa #Foo λb a
+(CtrA) = λa λb a
 
-(CtrB) = λa #Foo λb #Foo λc #Foo (c a)
+(CtrB) = λa λb λc (c a)
 
-(CtrA1) = λa #Bar λb #Bar λc #Bar λd #Bar (b a)
+(CtrA1) = λa λb λc λd (b a)
 
-(CtrA2) = λa λb #Bar λc #Bar λd #Bar λe #Bar (d a b)
+(CtrA2) = λa λb λc λd λe (d a b)
 
-(CtrA3) = λa #Bar λb #Bar λc #Bar λd #Bar (d a)
+(CtrA3) = λa λb λc λd (d a)
 
-(CtrB0) = #Baz λa #Baz λb #Baz λc #Baz λd a
+(CtrB0) = λa λb λc λd a
 
-(CtrB1) = λa #Baz λb #Baz λc #Baz λd #Baz λe #Baz (c a)
+(CtrB1) = λa λb λc λd λe (c a)
 
-(CtrB2) = λa #Baz λb #Baz λc #Baz λd #Baz λe #Baz (d a)
+(CtrB2) = λa λb λc λd λe (d a)
 
-(CtrB3) = λa #Baz λb #Baz λc #Baz λd #Baz λe #Baz (e a)
+(CtrB3) = λa λb λc λd λe (e a)

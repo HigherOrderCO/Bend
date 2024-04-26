@@ -2,9 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/def_tups.hvm
 ---
-Strict mode:
-
-Result: 15
-- ITRS: 19
-- TIME: 0.00s
-- MIPS: 8.24
+15

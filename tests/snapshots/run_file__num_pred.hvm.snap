@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/num_pred.hvm
 ---
-Lazy mode:
-42
-
-Strict mode:
 42

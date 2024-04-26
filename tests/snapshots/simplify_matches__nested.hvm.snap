@@ -4,12 +4,12 @@ input_file: tests/golden_tests/simplify_matches/nested.hvm
 ---
 (Rule) = λa match a { CtrA b c: (match c { CtrB1 d: λe (e d); CtrB2 f g: λh (match f { CtrC: λi λj (i j); } h g); } b); CtrB k: k; }
 
-(CtrA) = λa λb #Foo λc #Foo λd #Foo (c a b)
+(CtrA) = λa λb λc λd (c a b)
 
-(CtrB) = λa #Foo λb #Foo λc #Foo (c a)
+(CtrB) = λa λb λc (c a)
 
-(CtrB1) = λa #Bar λb #Bar λc #Bar (b a)
+(CtrB1) = λa λb λc (b a)
 
-(CtrB2) = λa λb #Bar λc #Bar λd #Bar (d a b)
+(CtrB2) = λa λb λc λd (d a b)
 
-(CtrC) = #Baz λa a
+(CtrC) = λa a

@@ -2,18 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/definition_merge.hvm
 ---
-TaggedScott:
-(Foo) = λa #Either (a #Either λb #Bool (b λc #Either (c #Either λd #Bool (d 1 1) #Either λe #Bool (e 2 2)) λf #Either (f #Either λg #Bool (g 1 1) #Either λh #Bool (h 2 2))) #Either λi #Bool (i λj #Either (j #Either λk #Bool (k 3 3) #Either λl #Bool (l 3 3)) λm #Either (m #Either λn #Bool (n 3 3) #Either λo #Bool (o 3 3))))
-
-(Left) = λa #Either λb #Either λ* #Either (b a)
-
-(Right) = λa #Either λ* #Either λc #Either (c a)
-
-(True) = #Bool λa #Bool λ* a
-
-(False) = #Bool λ* #Bool λb b
-
-Scott:
 (Foo) = λa (a λb (b λc (c λd (d 1 1) λe (e 2 2)) λf (f λg (g 1 1) λh (h 2 2))) λi (i λj (j λk (k 3 3) λl (l 3 3)) λm (m λn (n 3 3) λo (o 3 3))))
 
 (Left) = λa λb λ* (b a)

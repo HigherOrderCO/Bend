@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/names_hyphen_toplevel.hvm
 ---
-Lazy mode:
-(Baz-Qux 1)
-
-Strict mode:
-(Baz-Qux 1)
+λa (a fun-with-hyphen)

@@ -2,9 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/chars_lambda.hvm
 ---
-Strict mode:
-
-Result: 955
-- ITRS: 1
-- TIME: 0.00s
-- MIPS: 2.43
+955

@@ -8,6 +8,8 @@ input_file: tests/golden_tests/cli/compile_all.hvm
 
 @Pair.get__C0 = (a (b ((a (b c)) c)))
 
-@main = d
-  & @Pair.get ~ (($(:[+] $(a b)) (a b)) (c d))
-  & @Pair ~ (40 (2 c))
+@main = b
+  & @Pair.get ~ (@main__C0 (a b))
+  & @Pair ~ (40 (2 a))
+
+@main__C0 = ($(:[+] $(a b)) (a b))

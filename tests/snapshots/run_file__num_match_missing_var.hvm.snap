@@ -2,15 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/num_match_missing_var.hvm
 ---
-Lazy mode:
-Errors:
-In tests/golden_tests/run_file/num_match_missing_var.hvm :
-[1m- expected:[0m '}'
-[1m- detected:[0m
-[0m  7 |   [4m[31m_[0m: f[0m
-
-
-Strict mode:
 Errors:
 In tests/golden_tests/run_file/num_match_missing_var.hvm :
 [1m- expected:[0m '}'

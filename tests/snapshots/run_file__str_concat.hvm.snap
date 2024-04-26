@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/str_concat.hvm
 ---
-Lazy mode:
-"hello world"
-
-Strict mode:
-"hello world"
+λa λ* (a 104 λb λ* (b 101 λc λ* (c 108 λd λ* (d 108 λe λ* (e 111 λf λ* (f 32 λg λ* (g 119 λh λ* (h 111 λi λ* (i 114 λj λ* (j 108 λk λ* (k 100 String.nil)))))))))))

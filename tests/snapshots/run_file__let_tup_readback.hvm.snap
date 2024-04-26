@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/let_tup_readback.hvm
 ---
-Lazy mode:
-λa let (b, c) = a; (b c)
+Warnings:
+During readback:
+  Reached Root.
 
-Strict mode:
-λa let (b, c) = a; (b c)
+λa ($b (a λc (<Invalid> λ$b c)))

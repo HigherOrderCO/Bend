@@ -6,6 +6,6 @@ Warnings:
 In definition 'Z':
   Definition is unused.
 
-(F_$_Z) = λ* λa a
+(F__M_Z) = λ* λa a
 
-(main) = F_$_Z
+(main) = F__M_Z

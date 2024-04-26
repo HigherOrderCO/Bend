@@ -2,9 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/adt_match.hvm
 ---
-Strict mode:
-
-Result: λa λ* (a 2)
-- ITRS: 18
-- TIME: 0.00s
-- MIPS: 8.43
+λa λ* (a 2)

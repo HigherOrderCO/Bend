@@ -4,9 +4,9 @@ input_file: tests/golden_tests/compile_file_o_all/scrutinee_reconstruction.hvm
 ---
 @None = (* (a a))
 
-@Option.or = ((@Option.or$C0 ((a a) b)) b)
+@Option.or = ((@Option.or__C0 ((a a) b)) b)
 
-@Option.or$C0 = (a (* b))
+@Option.or__C0 = (a (* b))
   & @Some ~ (a b)
 
 @Some = (a ((a b) (* b)))

@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nested_str.hvm
 ---
-Lazy mode:
-((String.cons "a" String.nil), ((String.cons 97 (String.cons "bc" String.nil)), ((String.cons "ab" "c"), (String.cons "ab" (String.cons "cd" String.nil)))))
-
-Strict mode:
-((String.cons "a" String.nil), ((String.cons 97 (String.cons "bc" String.nil)), ((String.cons "ab" "c"), (String.cons "ab" (String.cons "cd" String.nil)))))
+λa λb λc λd λ* (d λe λ* (e 97 λf λ* (f 98 String.nil)) λg λ* (g λh λ* (h 99 λi λ* (i 100 String.nil)) String.nil))

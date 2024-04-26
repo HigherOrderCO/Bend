@@ -2,22 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared_fn.hvm
 ---
-TaggedScott:
-(main) = *
-
-(Foo) = λa #String (a #String λ* #String λ* 1 0)
-
-(Bar) = λa #List (a #List λ* #List λ* 0 1)
-
-(String.cons) = λa λb #String λc #String λ* #String (c a b)
-
-(String.nil) = #String λ* #String λb b
-
-(List.cons) = λa λb #List λc #List λ* #List (c a b)
-
-(List.nil) = #List λ* #List λb b
-
-Scott:
 (main) = *
 
 (Foo) = λa (a λ* λ* 1 0)

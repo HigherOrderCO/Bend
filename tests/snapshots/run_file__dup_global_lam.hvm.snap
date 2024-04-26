@@ -2,9 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/dup_global_lam.hvm
 ---
-Strict mode:
-
-Result: λa a
-- ITRS: 2
-- TIME: 0.00s
-- MIPS: 2.00
+λa a

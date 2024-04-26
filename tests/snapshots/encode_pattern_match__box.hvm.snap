@@ -2,12 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/box.hvm
 ---
-TaggedScott:
-(unbox) = λa #box (a #box λb b)
-
-(new) = λa #box λb #box (b a)
-
-Scott:
 (unbox) = λa (a λb b)
 
 (new) = λa λb (b a)

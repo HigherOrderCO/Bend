@@ -2,4 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/switch_in_switch_arg.hvm
 ---
-@main = (?((0 (a a)) ?((0 ($([+1] b) b)) c)) c)
+@main = (?((0 (a a)) ?((0 @main__C0) b)) b)
+
+@main__C0 = ($([+1] a) a)

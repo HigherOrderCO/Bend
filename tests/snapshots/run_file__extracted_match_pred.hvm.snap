@@ -2,9 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/extracted_match_pred.hvm
 ---
-Strict mode:
-
-Result: 0
-- ITRS: 13
-- TIME: 0.00s
-- MIPS: 5.15
+valZ

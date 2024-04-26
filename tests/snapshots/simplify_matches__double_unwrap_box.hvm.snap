@@ -6,4 +6,4 @@ input_file: tests/golden_tests/simplify_matches/double_unwrap_box.hvm
 
 (Main) = (DoubleUnbox (Box (Box 0)) 5)
 
-(Box) = λa #Boxed λb #Boxed (b a)
+(Box) = λa λb (b a)
