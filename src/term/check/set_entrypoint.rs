@@ -1,5 +1,4 @@
 use crate::{
-  diagnostics::ToStringVerbose,
   term::{Book, Ctx, Definition, Name},
   ENTRY_POINT, HVM1_ENTRY_POINT,
 };
@@ -65,17 +64,17 @@ impl Book {
   }
 }
 
-impl ToStringVerbose for EntryErr {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
+impl std::fmt::Display for EntryErr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      EntryErr::NotFound(name) => format!("File has no '{name}' definition."),
+      EntryErr::NotFound(name) => write!(f, "File has no '{name}' definition."),
       EntryErr::Multiple(fnd) if fnd.len() == 2 => {
-        format!("File has both '{}' and '{}' definitions.", fnd[0], fnd[1])
+        write!(f, "File has both '{}' and '{}' definitions.", fnd[0], fnd[1])
       }
       EntryErr::Multiple(fnd) => {
-        format!("File has '{}', '{}' and '{}' definitions.", fnd[0], fnd[1], fnd[2])
+        write!(f, "File has '{}', '{}' and '{}' definitions.", fnd[0], fnd[1], fnd[2])
       }
-      EntryErr::MultipleRules => "Main definition can't have more than one rule.".to_string(),
+      EntryErr::MultipleRules => write!(f, "Main definition can't have more than one rule."),
     }
   }
 }

@@ -217,7 +217,33 @@ impl Reader<'_> {
             _ => unreachable!(),
           }
         }
-        Num { val } => Term::Num { typ: NumType::from(*val as u8 & 0xF), val: (*val >> 4) & 0x00FF_FFFF },
+        Num { val: _ } => {
+          let (flp, arg) = self.read_opr_arg(next);
+          match arg {
+            NumArg::Sym(opr) => Term::Opr {
+              opr: Op::from_native_tag(opr, NumType::U24),
+              fst: Box::new(Term::Err),
+              snd: Box::new(Term::Err),
+            },
+            NumArg::Num(typ, val) => Term::Num { typ, val },
+            NumArg::Par(opr, val) => {
+              if flp {
+                Term::Opr {
+                  opr: Op::from_native_tag(opr, NumType::U24),
+                  fst: Box::new(Term::Num { typ: NumType::U24, val }),
+                  snd: Box::new(Term::Err),
+                }
+              } else {
+                Term::Opr {
+                  opr: Op::from_native_tag(opr, NumType::U24),
+                  fst: Box::new(Term::Err),
+                  snd: Box::new(Term::Num { typ: NumType::U24, val }),
+                }
+              }
+            }
+            NumArg::Oth(_) => unreachable!(),
+          }
+        }
         Opr => match next.slot() {
           2 => {
             let port0_kind = self.net.node(self.net.enter_port(Port(node, 0)).node()).kind.clone();
@@ -306,7 +332,7 @@ impl Reader<'_> {
           // Sym
           0x0 => NumArg::Sym(val & 0xf),
           // Num
-          0x1 ..= 0x3 => NumArg::Num(NumType::from(typ as u8), val),
+          0x1 ..= 0x3 => NumArg::Num(NumType::from_native_tag(typ), val),
           // Partial
           opr => NumArg::Par(opr, val),
         };
@@ -434,6 +460,17 @@ impl Op {
           Op::XOR
         }
       }
+      _ => unreachable!(),
+    }
+  }
+}
+
+impl NumType {
+  fn from_native_tag(value: u32) -> Self {
+    match value {
+      x if x == NumType::U24 as u32 => NumType::U24,
+      x if x == NumType::I24 as u32 => NumType::I24,
+      x if x == NumType::F24 as u32 => NumType::F24,
       _ => unreachable!(),
     }
   }

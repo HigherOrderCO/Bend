@@ -1,5 +1,5 @@
 use crate::{
-  diagnostics::{Diagnostics, ToStringVerbose, WarningType},
+  diagnostics::{Diagnostics, WarningType},
   term::{builtins, Adts, Constructors, Ctx, Definition, FanKind, Name, NumType, Pattern, Rule, Tag, Term},
 };
 use std::collections::{BTreeSet, HashSet};
@@ -525,23 +525,24 @@ impl std::fmt::Display for Type {
   }
 }
 
-impl ToStringVerbose for DesugarMatchDefErr {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
+impl std::fmt::Display for DesugarMatchDefErr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       DesugarMatchDefErr::AdtNotExhaustive { adt, ctr } => {
-        format!("Non-exhaustive pattern matching rule. Constructor '{ctr}' of type '{adt}' not covered")
+        write!(f, "Non-exhaustive pattern matching rule. Constructor '{ctr}' of type '{adt}' not covered")
       }
       DesugarMatchDefErr::TypeMismatch { expected, found, pat } => {
-        format!(
+        write!(
+          f,
           "Type mismatch in pattern matching rule. Expected a constructor of type '{}', found '{}' with type '{}'.",
           expected, pat, found
         )
       }
       DesugarMatchDefErr::NumMissingDefault => {
-        "Non-exhaustive pattern matching rule. Default case of number type not covered.".to_string()
+        write!(f, "Non-exhaustive pattern matching rule. Default case of number type not covered.")
       }
       DesugarMatchDefErr::RepeatedBind { bind } => {
-        format!("Repeated bind in pattern matching rule: '{bind}'.")
+        write!(f, "Repeated bind in pattern matching rule: '{bind}'.")
       }
     }
   }

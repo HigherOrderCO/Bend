@@ -59,13 +59,9 @@ impl CtrKind {
     }
   }
   fn from_lab(lab: u16) -> Self {
-    match (lab >> 2, lab & 0b11) {
-      (0, 0b00) => CtrKind::Con(None),
-      (x, 0b00) => CtrKind::Con(Some(x - 1)),
-      (0, 0b01) => CtrKind::Tup(None),
-      (x, 0b01) => CtrKind::Tup(Some(x - 1)),
-      (x, 0b10) => CtrKind::Dup(x),
-      _ => unreachable!(),
+    match lab {
+      0 => CtrKind::Con(None),
+      n => CtrKind::Dup(n - 1),
     }
   }
 }

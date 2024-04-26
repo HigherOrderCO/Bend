@@ -215,14 +215,6 @@ pub struct Adt {
   pub builtin: bool,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum AdtEncoding {
-  #[default]
-  Scott,
-
-  TaggedScott,
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Name(GlobalString);
 
@@ -804,17 +796,6 @@ impl Term {
       }
       has_unscoped
     })
-  }
-}
-
-impl From<u8> for NumType {
-  fn from(value: u8) -> Self {
-    match value {
-      x if x == NumType::U24 as u8 => NumType::U24,
-      x if x == NumType::I24 as u8 => NumType::I24,
-      x if x == NumType::F24 as u8 => NumType::F24,
-      _ => unreachable!(),
-    }
   }
 }
 

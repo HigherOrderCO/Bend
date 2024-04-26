@@ -1,5 +1,5 @@
 use crate::{
-  diagnostics::{Diagnostics, ToStringVerbose},
+  diagnostics::Diagnostics,
   maybe_grow,
   net::CtrKind::{self, *},
   term::{Book, Name, Pattern, Tag, Term},
@@ -44,7 +44,7 @@ pub fn book_to_nets(book: &Book, info: &mut Diagnostics) -> Result<(hvmc::ast::B
 }
 
 /// Converts an LC term into an IC net.
-pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, ViciousCycleErr> {
+pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, String> {
   let mut net = Net::default();
 
   let mut state = EncodeTermState {
@@ -63,7 +63,7 @@ pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, ViciousCycle
 
   let found_nodes = net.trees().map(count_nodes).sum::<usize>();
   if created_nodes != found_nodes {
-    Err(ViciousCycleErr)?
+    return Err("Found term that compiles into an inet with a vicious cycle".into());
   }
 
   Ok(net)
@@ -369,7 +369,13 @@ impl LabelGenerator {
     match label {
       Some(label) => match self.label_to_name.get(&label) {
         Some(name) => Tag::Named(name.clone()),
-        None => Tag::Numeric(label),
+        None => {
+          if label == 0 {
+            Tag::Auto
+          } else {
+            Tag::Numeric(label)
+          }
+        }
       },
       None => Tag::Static,
     }
@@ -404,11 +410,5 @@ impl Op {
       Op::LOG => 0xe,
       Op::POW => 0xf,
     }
-  }
-}
-
-impl ToStringVerbose for ViciousCycleErr {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
-    "Found term that compiles into an inet with a vicious cycle".into()
   }
 }
