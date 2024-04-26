@@ -88,11 +88,7 @@ impl Term {
         let child_is_safe = child.is_safe(ctx);
         let child_size = child.size();
 
-        let extract_for_size = if is_combinator {
-          size > ctx.max_size
-        } else {
-          ctx.def_size > ctx.max_size
-        };
+        let extract_for_size = if is_combinator { size > ctx.max_size } else { ctx.def_size > ctx.max_size };
 
         if child.is_combinator() && child_size > 0 && (!child_is_safe || extract_for_size) {
           ctx.def_size -= child_size;
