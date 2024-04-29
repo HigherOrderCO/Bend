@@ -1,4 +1,4 @@
-use crate::term::{self, Name};
+use crate::term;
 
 use super::{AssignPattern, Definition, Program, Stmt, Term};
 
@@ -32,28 +32,31 @@ impl Definition {
   }
 }
 
+impl AssignPattern {
+  pub fn to_lang(self) -> term::Pattern {
+    match self {
+      AssignPattern::Var(name) => term::Pattern::Var(Some(name)),
+      AssignPattern::Tup(names) => term::Pattern::Fan(
+        term::FanKind::Dup,
+        term::Tag::Static,
+        names.into_iter().map(|name| term::Pattern::Var(Some(name))).collect(),
+      ),
+    }
+  }
+}
+
 impl Stmt {
   pub fn to_lang(self) -> term::Term {
     match self {
       Stmt::Assign { pat, val, nxt } => {
-        let pat = match pat {
-          AssignPattern::Var(name) => term::Pattern::Var(Some(name)),
-          AssignPattern::Tup(names) => term::Pattern::Fan(
-            term::FanKind::Dup,
-            term::Tag::Static,
-            names.into_iter().map(|name| term::Pattern::Var(Some(name))).collect(),
-          ),
-        };
+        let pat = pat.to_lang();
         let val = val.to_lang();
         let nxt = nxt.to_lang();
         term::Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) }
       }
       Stmt::If { cond, then, otherwise } => {
-        let arms = vec![
-          (Some(Name::new("True")), vec![], then.to_lang()),
-          (Some(Name::new("False")), vec![], otherwise.to_lang()),
-        ];
-        term::Term::Mat { arg: Box::new(cond.to_lang()), bnd: None, with: Vec::new(), arms }
+        let arms = vec![otherwise.to_lang(), then.to_lang()];
+        term::Term::Swt { arg: Box::new(cond.to_lang()), bnd: None, with: Vec::new(), pred: None, arms }
       }
       Stmt::Match { arg, bind, arms: old_arms } => {
         let arg = arg.to_lang();
@@ -79,7 +82,7 @@ impl Term {
         term::Term::call(fun.to_lang(), args)
       }
       Term::Lam { pat, bod } => {
-        term::Term::Lam { tag: term::Tag::Static, pat: Box::new(pat), bod: Box::new(bod.to_lang()) }
+        term::Term::Lam { tag: term::Tag::Static, pat: Box::new(pat.to_lang()), bod: Box::new(bod.to_lang()) }
       }
       Term::Enum { nam, fields } => {
         let fun = term::Term::Var { nam };

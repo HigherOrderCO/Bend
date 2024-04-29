@@ -697,7 +697,8 @@ fn add_ctx_to_msg(msg: &str, ini_idx: usize, end_idx: usize, file: &str) -> Stri
 // flavour py
 // ==========
 
-const PREC: &[&[Op]] = &[&[Op::ADD, Op::SUB], &[Op::MUL, Op::DIV]];
+const PREC: &[&[Op]] =
+  &[&[Op::EQL, Op::NEQ], &[Op::LTN], &[Op::GTN], &[Op::ADD, Op::SUB], &[Op::MUL, Op::DIV]];
 
 struct Indent(isize);
 
@@ -745,6 +746,11 @@ impl<'a> TermParser<'a> {
         flavour_py::Term::Num { val: val as u32 }
       }
       _ => {
+        if self.try_consume("True") {
+          return Ok(flavour_py::Term::Num { val: 1 });
+        } else if self.try_consume("False") {
+          return Ok(flavour_py::Term::Num { val: 0 });
+        }
         let nam = self.parse_hvml_name()?;
         if self.try_consume("{") {
           let fields = self.list_like(|p| p.parse_field_py(), "", "}", ",", true, 0)?;
@@ -768,10 +774,10 @@ impl<'a> TermParser<'a> {
   fn parse_term_py(&mut self) -> Result<flavour_py::Term, String> {
     self.skip_trivia();
     if self.try_consume("fun") {
-      let nam = self.parse_hvml_name()?;
+      let pat = self.parse_assign_pattern_py()?;
       self.consume("=>")?;
       let bod = self.parse_stmt_py(&mut Indent(0))?;
-      Ok(flavour_py::Term::Lam { pat: Pattern::Var(Some(nam)), bod })
+      Ok(flavour_py::Term::Lam { pat, bod })
     } else {
       self.parse_infix_py(0)
     }
@@ -812,6 +818,8 @@ impl<'a> TermParser<'a> {
       Some('-') => Some(Op::SUB),
       Some('*') => Some(Op::MUL),
       Some('/') => Some(Op::DIV),
+      Some('>') => Some(Op::GTN),
+      Some('<') => Some(Op::LTN),
       _ => None,
     }
   }
@@ -874,7 +882,7 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_if_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
-    let cond = self.parse_primary_py()?;
+    let cond = self.parse_term_py()?;
     self.consume(":")?;
     indent.enter_level();
     let then = self.parse_stmt_py(indent)?;
@@ -1050,6 +1058,15 @@ enum Point:
 
 def identity(x):
   return x;
+
+def true():
+  return True;
+
+def fib(n):
+  if n < 2:
+    return n;
+  else:
+    return fib(n - 1) + fib(n - 2);
     "#;
     let mut p = TermParser::new(src);
     let mut a = p.parse_program_py().unwrap();

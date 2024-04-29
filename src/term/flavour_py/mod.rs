@@ -4,7 +4,7 @@ pub mod to_lang;
 use indexmap::IndexMap;
 use interner::global::GlobalString;
 
-use crate::term::{Name, Pattern};
+use crate::term::Name;
 
 use super::Op;
 
@@ -19,12 +19,12 @@ pub enum Term {
   // {fun}(args,)
   Call { fun: Box<Term>, args: Vec<Term> },
   // "fun" {pat} -> {bod}
-  Lam { pat: Pattern, bod: Stmt },
+  Lam { pat: AssignPattern, bod: Stmt },
   // {nam} "{" {fields} "}"
   Enum { nam: Name, fields: Vec<(Name, Term)> },
   // {lhs} {op} {rhs}
   Bin { op: Op, lhs: Box<Term>, rhs: Box<Term> },
-  // "'" ... "'"
+  // "\"" ... "\""
   Str { val: GlobalString },
   // "[" ... "]"
   Lst { els: Vec<Term> },
