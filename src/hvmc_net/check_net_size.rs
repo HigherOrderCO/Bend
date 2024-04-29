@@ -7,9 +7,10 @@ pub fn check_net_sizes(book: &Book, diagnostics: &mut Diagnostics) -> Result<(),
   diagnostics.start_pass();
 
   for (name, net) in &book.nets {
-    if count_nodes(net) > MAX_NET_SIZE {
+    let nodes = count_nodes(net);
+    if nodes > MAX_NET_SIZE {
       diagnostics.add_rule_error(
-        "Definition is too large for hvm. Please break it into smaller pieces.",
+        format!("Definition is too large for hvm (size={nodes}, max size={MAX_NET_SIZE}). Please break it into smaller pieces."),
         Name::new(name),
       );
     }
