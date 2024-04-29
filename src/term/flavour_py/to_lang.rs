@@ -73,7 +73,7 @@ impl Term {
     match self {
       Term::None => term::Term::Era,
       Term::Var { nam } => term::Term::Var { nam },
-      Term::Num { val } => term::Term::Num { val },
+      Term::Num { val } => term::Term::Num { typ: term::NumType::U24, val },
       Term::Call { fun, args } => {
         let args = args.into_iter().map(Self::to_lang);
         term::Term::call(fun.to_lang(), args)
@@ -87,7 +87,7 @@ impl Term {
         term::Term::call(fun, args)
       }
       Term::Bin { op, lhs, rhs } => {
-        term::Term::Opx { opr: op, fst: Box::new(lhs.to_lang()), snd: Box::new(rhs.to_lang()) }
+        term::Term::Opr { opr: op, fst: Box::new(lhs.to_lang()), snd: Box::new(rhs.to_lang()) }
       }
       Term::Str { val } => term::Term::Str { val },
       Term::Lst { els } => term::Term::Lst { els: els.into_iter().map(Self::to_lang).collect() },

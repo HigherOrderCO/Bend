@@ -15,7 +15,7 @@ pub enum Term {
   // [a-zA-Z_]+
   Var { nam: Name },
   // [0-9_]+
-  Num { val: u64 },
+  Num { val: u32 },
   // {fun}(args,)
   Call { fun: Box<Term>, args: Vec<Term> },
   // "fun" {pat} -> {bod}

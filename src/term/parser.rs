@@ -742,7 +742,7 @@ impl<'a> TermParser<'a> {
       }
       c if c.is_ascii_digit() => {
         let val = self.parse_u64()?;
-        flavour_py::Term::Num { val }
+        flavour_py::Term::Num { val: val as u32 }
       }
       _ => {
         let nam = self.parse_hvml_name()?;
