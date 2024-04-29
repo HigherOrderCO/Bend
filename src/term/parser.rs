@@ -311,7 +311,7 @@ impl<'a> TermParser<'a> {
         }
         _ => {
           unexpected_tag(self)?;
-          if self.try_consume("use") {
+          if self.try_consume_keyword("use") {
             // Use
             let nam = self.parse_hvml_name()?;
             self.consume("=")?;
@@ -319,22 +319,22 @@ impl<'a> TermParser<'a> {
             self.try_consume(";");
             let nxt = self.parse_term()?;
             Term::Use { nam: Some(nam), val: Box::new(val), nxt: Box::new(nxt) }
-          } else if self.try_consume("let") {
+          } else if self.try_consume_keyword("let") {
             let pat = self.parse_pattern(true)?;
             self.consume("=")?;
             let val = self.parse_term()?;
             self.try_consume(";");
             let nxt = self.parse_term()?;
             Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) }
-          } else if self.try_consume("match") {
+          } else if self.try_consume_keyword("match") {
             // match
             let (bnd, arg, with) = self.parse_match_arg()?;
             let rules = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
             Term::Mat { arg: Box::new(arg), bnd: Some(bnd), with, arms: rules }
-          } else if self.try_consume("switch") {
+          } else if self.try_consume_keyword("switch") {
             // switch
             self.parse_switch()?
-          } else if self.try_consume("do ") {
+          } else if self.try_consume_keyword("do") {
             let fun = self.parse_name()?;
             self.consume("{")?;
             let ask = self.parse_ask(Name::new(fun))?;
@@ -353,7 +353,7 @@ impl<'a> TermParser<'a> {
 
   fn parse_ask(&mut self, fun: Name) -> Result<Term, String> {
     maybe_grow(|| {
-      if self.try_consume("ask") {
+      if self.try_consume_keyword("ask") {
         let ask = self.parse_pattern(true)?;
         self.consume("=")?;
         let val = self.parse_term()?;
@@ -395,6 +395,22 @@ impl<'a> TermParser<'a> {
       return self.expected("numeric operator");
     };
     Ok(opr)
+  }
+
+  fn try_consume_keyword(&mut self, keyword: &str) -> bool {
+    self.skip_trivia();
+
+    if !self.starts_with(keyword) {
+      return false;
+    }
+    let input = &self.input()[*self.index() + keyword.len() ..];
+    let next_is_name = input.chars().next().map_or(false, is_name_char);
+    if !next_is_name {
+      self.consume(keyword).unwrap();
+      true
+    } else {
+      false
+    }
   }
 
   fn parse_top_level_name(&mut self) -> Result<Name, String> {
@@ -459,7 +475,7 @@ impl<'a> TermParser<'a> {
   fn parse_match_arg(&mut self) -> Result<(Name, Term, Vec<Name>), String> {
     let bnd = self.parse_hvml_name()?;
     let arg = if self.try_consume("=") { self.parse_term()? } else { Term::Var { nam: bnd.clone() } };
-    let with = if self.try_consume("with") {
+    let with = if self.try_consume_keyword("with") {
       let mut with = vec![self.parse_hvml_name()?];
       while !self.skip_starts_with("{") {
         self.try_consume(",");
@@ -629,6 +645,10 @@ impl<'a> Parser<'a> for TermParser<'a> {
       self.expected(format!("'{text}'").as_str())
     }
   }
+}
+
+fn is_name_char(c: char) -> bool {
+  c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/'
 }
 
 impl Book {
