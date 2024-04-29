@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_mult_linearization.hvm
 ---
-Lazy mode:
-λa switch a = a { 0: λb λc λd (+ (+ b c) d); _: λf λg λh (+ (+ (+ a-1 f) g) h); }
+Warnings:
+During readback:
+  Invalid Numeric Match.
 
-Strict mode:
-λa switch a = a { 0: λb λc λd (+ (+ b c) d); _: λf λg λh (+ (+ (+ a-1 f) g) h); }
+λa switch a = a { 0: λa λb λc (+ (+ a b) c); _: λa λb λc λd (+ (+ (+ a b) c) d); }

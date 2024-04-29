@@ -14,7 +14,7 @@
 
 // Generates a random list
 (Rnd 0 s) = []
-(Rnd n s) = (List.cons s (Rnd (- n 1) (% (+ (* s 1664525) 1013904223) 4294967296)))
+(Rnd n s) = (List.cons s (Rnd (- n 1) (% (+ (* s 1664525) 1013904223) 4294967295)))
 
 // Sums a list
 (Sum [])         = 0

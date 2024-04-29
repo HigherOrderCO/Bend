@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/simple_tup.hvm
 ---
-[#0 #42]
+(0 42)

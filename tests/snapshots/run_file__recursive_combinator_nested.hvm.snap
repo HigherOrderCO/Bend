@@ -2,8 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/recursive_combinator_nested.hvm
 ---
-Lazy mode:
-#a{8 0}
-
-Strict mode:
-#a{8 0}
+Errors:
+In tests/golden_tests/run_file/recursive_combinator_nested.hvm :
+Tagged terms not supported for hvm32.
+[0m   3 |   0: ([4m[31m#[0ma {Foo @* a} 9);[0m

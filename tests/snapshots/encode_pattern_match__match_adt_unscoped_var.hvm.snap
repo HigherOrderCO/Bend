@@ -2,18 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.hvm
 ---
-TaggedScott:
-(Foo) = λ$x #Maybe ((Some 1) $x #Maybe λa a)
-
-(Bar) = (#Maybe ((Some 1) $x #Maybe λa a) λ$x *)
-
-(main) = *
-
-(None) = #Maybe λa #Maybe λ* a
-
-(Some) = λa #Maybe λ* #Maybe λc #Maybe (c a)
-
-Scott:
 (Foo) = λ$x (Some 1 $x λa a)
 
 (Bar) = (Some 1 $x λa a λ$x *)

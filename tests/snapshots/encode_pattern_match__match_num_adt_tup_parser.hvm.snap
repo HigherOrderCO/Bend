@@ -2,20 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_num_adt_tup_parser.hvm
 ---
-TaggedScott:
-(Parse) = λa λb (#String (b #String λc #String λd λe (switch (- c 10) { 0: λf λg (Ok (0, g, f)); _: λh λi λj (switch (- h 29) { 0: λk λl (Ok (40, l, k)); _: λm λn λo (switch m { 0: λp λq (Ok (41, q, p)); _: λr λs λt (Err ((String.cons (+ r 42) t), s)); } n o); } i j); } e d) λu (Err (String.nil, u))) a)
-
-(main) = #Result_ ((Parse * (String.cons 40 (String.cons 43 String.nil))) #Result_ λc let (d, e, f) = c; (d, (Parse f e)) #Result_ λg (Err g))
-
-(String.cons) = λa λb #String λc #String λ* #String (c a b)
-
-(String.nil) = #String λ* #String λb b
-
-(Ok) = λa #Result_ λb #Result_ λ* #Result_ (b a)
-
-(Err) = λa #Result_ λ* #Result_ λc #Result_ (c a)
-
-Scott:
 (Parse) = λa λb (b λc λd λe (switch (- c 10) { 0: λf λg (Ok (0, g, f)); _: λh λi λj (switch (- h 29) { 0: λk λl (Ok (40, l, k)); _: λm λn λo (switch m { 0: λp λq (Ok (41, q, p)); _: λr λs λt (Err ((String.cons (+ r 42) t), s)); } n o); } i j); } e d) λu (Err (String.nil, u)) a)
 
 (main) = (Parse * (String.cons 40 (String.cons 43 String.nil)) λc let (d, e, f) = c; (d, (Parse f e)) λg (Err g))

@@ -2,13 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_vars.hvm
 ---
-Lazy mode:
-Errors:
-In definition 'main':
-  Irrefutable 'match' expression. All cases after 'true' will be ignored. If this is not a mistake, consider using a 'let' expression instead.
-
-
-Strict mode:
 Errors:
 In definition 'main':
   Irrefutable 'match' expression. All cases after 'true' will be ignored. If this is not a mistake, consider using a 'let' expression instead.

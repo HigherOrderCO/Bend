@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_num_succ_complex.hvm
 ---
-Lazy mode:
-[[5, 5, 0, 0, 0, 6], [5, 5, 0, 0, 0, 6]]
-
-Strict mode:
-[[5, 5, 0, 0, 0, 6], [5, 5, 0, 0, 0, 6]]
+λa λ* (a λb λ* (b 5 λc λ* (c 5 λd λ* (d 0 λe λ* (e 12 λf λ* (f 0 λg λ* (g 6 List.nil)))))) λh λ* (h λi λ* (i 5 λj λ* (j 5 λk λ* (k 0 λl λ* (l 12 λm λ* (m 0 λn λ* (n 6 List.nil)))))) List.nil))

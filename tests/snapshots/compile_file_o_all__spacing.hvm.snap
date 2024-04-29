@@ -2,5 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/spacing.hvm
 ---
-@main = ({2 b c} d)
+@main = ({b c} d)
   & (a a) ~ (b (c d))

@@ -1,5 +1,5 @@
 use crate::{
-  diagnostics::{Diagnostics, ToStringVerbose},
+  diagnostics::Diagnostics,
   maybe_grow,
   term::{Ctx, Name, Pattern, Term},
 };
@@ -120,17 +120,17 @@ fn pop_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, u64>) {
   }
 }
 
-impl ToStringVerbose for UnboundVarErr {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
+impl std::fmt::Display for UnboundVarErr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      UnboundVarErr::Local(var) => format!("Unbound variable '{var}'."),
+      UnboundVarErr::Local(var) => write!(f, "Unbound variable '{var}'."),
       UnboundVarErr::Global { var, declared, used } => match (declared, used) {
-        (0, _) => format!("Unbound unscoped variable '${var}'."),
-        (_, 0) => format!("Unscoped variable from lambda 'λ${var}' is never used."),
-        (1, _) => format!("Unscoped variable '${var}' used more than once."),
-        (_, 1) => format!("Unscoped lambda 'λ${var}' declared more than once."),
+        (0, _) => write!(f, "Unbound unscoped variable '${var}'."),
+        (_, 0) => write!(f, "Unscoped variable from lambda 'λ${var}' is never used."),
+        (1, _) => write!(f, "Unscoped variable '${var}' used more than once."),
+        (_, 1) => write!(f, "Unscoped lambda 'λ${var}' declared more than once."),
         (_, _) => {
-          format!("Unscoped lambda 'λ${var}' and unscoped variable '${var}' used more than once.")
+          write!(f, "Unscoped lambda 'λ${var}' and unscoped variable '${var}' used more than once.")
         }
       },
     }

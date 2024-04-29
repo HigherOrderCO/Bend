@@ -2,22 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool.hvm
 ---
-TaggedScott:
-(not) = λa #bool (a false true)
-
-(and) = λa #bool (a λb #bool (b true false) λc #bool (c false false))
-
-(and2) = λa #bool (a λb b λ* false)
-
-(and3) = λa #bool (a λb #bool (b true false) λ* false)
-
-(and4) = λa #bool (a λb #bool (b true false) λ* false)
-
-(true) = #bool λa #bool λ* a
-
-(false) = #bool λ* #bool λb b
-
-Scott:
 (not) = λa (a false true)
 
 (and) = λa (a λb (b true false) λc (c false false))

@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: examples/queue.hvm
 ---
-[1, 2, 3]
+λa λ* (a 1 λb λ* (b 2 λc λ* (c 3 List.nil)))

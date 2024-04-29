@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: examples/fusing_not.hvm
 ---
-λa λb λc (a b c)
+λa λb λc (a c b)

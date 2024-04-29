@@ -2,30 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.hvm
 ---
-TaggedScott:
-(If) = λa #Bool (a λb λ* b λ* λe e)
-
-(Pure) = λa (Cons a Nil)
-
-(Map) = λa #List_ (a #List_ λb #List_ λc λd let {d d_2} = d; (Cons (d b) (Map c d_2)) λ* Nil)
-
-(MergeSort) = λa λb (Unpack a (Map b Pure))
-
-(Unpack) = λa λb (#List_ (b #List_ λc #List_ λd λe (#List_ (d #List_ λf #List_ λg λh let {h h_2} = h; λi (Unpack h (MergePair h_2 (Cons i (Cons f g)))) λ* λk k) e c) λ* Nil) a)
-
-(MergePair) = λa λb (#List_ (b #List_ λc #List_ λd λe (#List_ (d #List_ λf #List_ λg λh let {h h_2} = h; λi (Cons (Merge h i f) (MergePair h_2 g)) λ* λk (Cons k Nil)) e c) λ* Nil) a)
-
-(Merge) = λa λb (#List_ (b #List_ λc #List_ λd λe λf (#List_ (f #List_ λg let {g g_2 g_3} = g; #List_ λh let {h h_2} = h; λi let {i i_2 i_3} = i; λj let {j j_2 j_3} = j; λk let {k k_2} = k; (If (i j g) (Cons j_2 (Merge i_2 k (Cons g_2 h))) (Cons g_3 (Merge i_3 (Cons j_3 k_2) h_2))) λ* λo λp (Cons o p)) e c d) λ* λr r) a)
-
-(True) = #Bool λa #Bool λ* a
-
-(False) = #Bool λ* #Bool λb b
-
-(Cons) = λa λb #List_ λc #List_ λ* #List_ (c a b)
-
-(Nil) = #List_ λ* #List_ λb b
-
-Scott:
 (If) = λa (a λb λ* b λ* λe e)
 
 (Pure) = λa (Cons a Nil)

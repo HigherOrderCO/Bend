@@ -41,26 +41,39 @@ data Arr = Null | (Leaf x) | (Node a b)
   let r = (Swap (& n 4) r Free)
   let r = (Swap (& n 8) r Free)
   let r = (Swap (& n 16) r Free)
+  (Radix2 n r)
+
+(Radix2 n r) =
   let r = (Swap (& n 32) r Free)
   let r = (Swap (& n 64) r Free)
   let r = (Swap (& n 128) r Free)
   let r = (Swap (& n 256) r Free)
   let r = (Swap (& n 512) r Free)
+  (Radix3 n r)
+
+(Radix3 n r) =
   let r = (Swap (& n 1024) r Free)
   let r = (Swap (& n 2048) r Free)
   let r = (Swap (& n 4096) r Free)
   let r = (Swap (& n 8192) r Free)
   let r = (Swap (& n 16384) r Free)
+  (Radix4 n r)
+
+(Radix4 n r) =
   let r = (Swap (& n 32768) r Free)
   let r = (Swap (& n 65536) r Free)
   let r = (Swap (& n 131072) r Free)
   let r = (Swap (& n 262144) r Free)
   let r = (Swap (& n 524288) r Free)
+  (Radix5 n r)
+
+(Radix5 n r) =
   let r = (Swap (& n 1048576) r Free)
   let r = (Swap (& n 2097152) r Free)
   let r = (Swap (& n 4194304) r Free)
   let r = (Swap (& n 8388608) r Free)
   r
+
 
 // Reverse : Arr -> Arr
 (Reverse Null)       = Null
@@ -77,9 +90,10 @@ data Arr = Null | (Leaf x) | (Node a b)
   (Gen.go n x) = switch n {
     0: (Leaf x)
     _:
-      let x = (<< x 1)
-      let y = (| x 1)
-      (Node (Gen.go n-1 x) (Gen.go n-1 y))
+      let a = (* x 2)
+      let b = (| (* x 2) 1)
+      (Node (Gen.go n-1 a) (Gen.go n-1 b))
   }
 
 Main = (Sum (Sort (Reverse (Gen 4))))
+//Main = (Sort 0)

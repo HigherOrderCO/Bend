@@ -1,2 +1,0 @@
-def_that_uses_black_box = @a (* (HVM.black_box a) 7)
-main = (def_that_uses_black_box 6)

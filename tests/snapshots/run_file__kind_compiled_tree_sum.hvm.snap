@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/kind_compiled_tree_sum.hvm
 ---
-Lazy mode:
-2147385345
-
-Strict mode:
-2147385345
+16678913

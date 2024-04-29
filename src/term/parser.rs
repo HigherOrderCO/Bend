@@ -1,12 +1,14 @@
 use crate::{
   maybe_grow,
   term::{
-    display::DisplayFn, Adt, Book, Definition, FanKind, IntOp, MatchRule, Name, Op, OpType, Pattern, Rule,
-    Tag, Term, STRINGS,
+    display::DisplayFn, Adt, Book, Definition, FanKind, MatchRule, Name, Op, Pattern, Rule, Tag, Term,
+    STRINGS,
   },
 };
 use highlight_error::highlight_error;
 use TSPL::Parser;
+
+use super::NumType;
 
 // hvml grammar description:
 // <Book>       ::= (<Data> | <Rule>)*
@@ -82,7 +84,7 @@ impl<'a> TermParser<'a> {
   fn parse_datatype(&mut self, builtin: bool) -> Result<(Name, Adt), String> {
     // data name = ctr (| ctr)*
     self.consume("data")?;
-    let name = self.labelled(|p| p.parse_hvml_name(), "datatype name")?;
+    let name = self.labelled(|p| p.parse_top_level_name(), "datatype name")?;
     self.consume("=")?;
     let mut ctrs = vec![self.parse_datatype_ctr()?];
     while self.try_consume("|") {
@@ -94,27 +96,26 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_datatype_ctr(&mut self) -> Result<(Name, Vec<Name>), String> {
-    if self.skip_starts_with("(") {
+    if self.try_consume("(") {
       // (name field*)
+      let name = self.parse_top_level_name()?;
       let field_parser = |p: &mut Self| p.labelled(|p| p.parse_hvml_name(), "datatype constructor field");
-      let mut els = self.list_like(field_parser, "(", ")", "", false, 1)?;
-      let fields = els.split_off(1);
-      let name = els.into_iter().next().unwrap();
+      let fields = self.list_like(field_parser, "", ")", "", false, 0)?;
       Ok((name, fields))
     } else {
       // name
-      let name = self.labelled(|p| p.parse_hvml_name(), "datatype constructor name")?;
+      let name = self.labelled(|p| p.parse_top_level_name(), "datatype constructor name")?;
       Ok((name, vec![]))
     }
   }
 
   fn parse_rule(&mut self) -> Result<(Name, Rule), String> {
     let (name, pats) = if self.try_consume("(") {
-      let name = self.labelled(|p| p.parse_hvml_name(), "function name")?;
+      let name = self.labelled(|p| p.parse_top_level_name(), "function name")?;
       let pats = self.list_like(|p| p.parse_pattern(false), "", ")", "", false, 0)?;
       (name, pats)
     } else {
-      let name = self.labelled(|p| p.parse_hvml_name(), "top-level definition")?;
+      let name = self.labelled(|p| p.parse_top_level_name(), "top-level definition")?;
       let mut pats = vec![];
       while !self.skip_starts_with("=") {
         pats.push(self.parse_pattern(false)?);
@@ -179,13 +180,13 @@ impl<'a> TermParser<'a> {
         '\'' => {
           unexpected_tag(self)?;
           let char = self.parse_quoted_char()?;
-          Pattern::Num(char as u64)
+          Pattern::Num(char as u32)
         }
         // Number
         c if c.is_ascii_digit() => {
           unexpected_tag(self)?;
           let num = self.parse_u64()?;
-          Pattern::Num(num)
+          Pattern::Num(num as u32)
         }
         // Channel
         '$' => {
@@ -224,9 +225,7 @@ impl<'a> TermParser<'a> {
           let starts_with_oper = self.skip_peek_one().map_or(false, |c| "+-*/%&|<>^=!".contains(c));
           if starts_with_oper {
             let opr = self.parse_oper()?;
-            if self.skip_starts_with(",")
-              && let Op { ty: _, op: IntOp::Mul } = opr
-            {
+            if self.skip_starts_with(",") && opr == Op::MUL {
               // jk, actually a tuple
               let mut els = vec![Term::Era];
               while self.try_consume(",") {
@@ -239,7 +238,7 @@ impl<'a> TermParser<'a> {
               let fst = self.parse_term()?;
               let snd = self.parse_term()?;
               self.consume(")")?;
-              Term::Opx { opr, fst: Box::new(fst), snd: Box::new(snd) }
+              Term::Opr { opr, fst: Box::new(fst), snd: Box::new(snd) }
             }
           } else {
             // Tup or App
@@ -304,13 +303,13 @@ impl<'a> TermParser<'a> {
         '\'' => {
           unexpected_tag(self)?;
           let chr = self.parse_quoted_char()?;
-          Term::Num { val: chr as u64 }
+          Term::Num { typ: NumType::U24, val: chr as u32 }
         }
         // Native num
         c if c.is_ascii_digit() => {
           unexpected_tag(self)?;
           let val = self.parse_u64()?;
-          Term::Num { val }
+          Term::Num { typ: NumType::U24, val: val as u32 }
         }
         _ => {
           unexpected_tag(self)?;
@@ -371,41 +370,45 @@ impl<'a> TermParser<'a> {
 
   fn parse_oper(&mut self) -> Result<Op, String> {
     let opr = if self.try_consume("+") {
-      Op { ty: OpType::U60, op: IntOp::Add }
+      Op::ADD
     } else if self.try_consume("-") {
-      Op { ty: OpType::U60, op: IntOp::Sub }
+      Op::SUB
     } else if self.try_consume("*") {
-      Op { ty: OpType::U60, op: IntOp::Mul }
+      Op::MUL
     } else if self.try_consume("/") {
-      Op { ty: OpType::U60, op: IntOp::Div }
+      Op::DIV
     } else if self.try_consume("%") {
-      Op { ty: OpType::U60, op: IntOp::Rem }
-    } else if self.try_consume("<<") {
-      Op { ty: OpType::U60, op: IntOp::Shl }
-    } else if self.try_consume(">>") {
-      Op { ty: OpType::U60, op: IntOp::Shr }
-    } else if self.try_consume("<=") {
-      Op { ty: OpType::U60, op: IntOp::Le }
-    } else if self.try_consume(">=") {
-      Op { ty: OpType::U60, op: IntOp::Ge }
+      Op::REM
     } else if self.try_consume("<") {
-      Op { ty: OpType::U60, op: IntOp::Lt }
+      Op::LTN
     } else if self.try_consume(">") {
-      Op { ty: OpType::U60, op: IntOp::Gt }
+      Op::GTN
     } else if self.try_consume("==") {
-      Op { ty: OpType::U60, op: IntOp::Eq }
+      Op::EQL
     } else if self.try_consume("!=") {
-      Op { ty: OpType::U60, op: IntOp::Ne }
+      Op::NEQ
     } else if self.try_consume("&") {
-      Op { ty: OpType::U60, op: IntOp::And }
+      Op::AND
     } else if self.try_consume("|") {
-      Op { ty: OpType::U60, op: IntOp::Or }
+      Op::OR
     } else if self.try_consume("^") {
-      Op { ty: OpType::U60, op: IntOp::Xor }
+      Op::XOR
     } else {
       return self.expected("numeric operator");
     };
     Ok(opr)
+  }
+
+  fn parse_top_level_name(&mut self) -> Result<Name, String> {
+    let ini_idx = *self.index();
+    let nam = self.parse_hvml_name()?;
+    let end_idx = *self.index();
+    if nam.contains("__") {
+      let ctx = highlight_error(ini_idx, end_idx, self.input());
+      Err(format!("Top-level names are not allowed to contain \"__\".\n{ctx}"))
+    } else {
+      Ok(nam)
+    }
   }
 
   fn parse_hvml_name(&mut self) -> Result<Name, String> {
@@ -435,9 +438,11 @@ impl<'a> TermParser<'a> {
     let tag = if self.skip_peek_one() == Some('#')
       && !self.peek_many(2).is_some_and(|x| x.chars().nth(1).unwrap().is_ascii_digit())
     {
-      self.advance_one();
+      let ctx = highlight_error(index, index + 1, self.input);
+      return Err(format!("Tagged terms not supported for hvm32.\n{ctx}"));
+      /* self.advance_one();
       let nam = self.labelled(|p| p.parse_hvml_name(), "tag name")?;
-      Some(Tag::Named(nam))
+      Some(Tag::Named(nam)) */
     } else {
       None
     };

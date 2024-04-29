@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/def_tups.hvm
 ---
-Lazy mode:
-15
-
-Strict mode:
 15

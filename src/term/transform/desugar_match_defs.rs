@@ -1,6 +1,6 @@
 use crate::{
-  diagnostics::{Diagnostics, ToStringVerbose, WarningType},
-  term::{builtins, Adts, Constructors, Ctx, Definition, FanKind, Name, Pattern, Rule, Tag, Term},
+  diagnostics::{Diagnostics, WarningType},
+  term::{builtins, Adts, Constructors, Ctx, Definition, FanKind, Name, NumType, Pattern, Rule, Tag, Term},
 };
 use std::collections::{BTreeSet, HashSet};
 
@@ -280,7 +280,7 @@ fn num_rule(
           if let Some(var) = var {
             body = Term::Use {
               nam: Some(var.clone()),
-              val: Box::new(Term::Num { val: *num }),
+              val: Box::new(Term::Num { typ: NumType::U24, val: *num }),
               nxt: Box::new(std::mem::take(&mut body)),
             };
           }
@@ -301,7 +301,7 @@ fn num_rule(
       let mut body = rule.body.clone();
       if let Some(var) = var {
         let last_num = *nums.last().unwrap();
-        let var_recovered = Term::add_num(Term::Var { nam: pred_var.clone() }, 1 + last_num);
+        let var_recovered = Term::add_num(Term::Var { nam: pred_var.clone() }, 1 + last_num, NumType::U24);
         body = Term::Use { nam: Some(var.clone()), val: Box::new(var_recovered), nxt: Box::new(body) };
       }
       let rule = Rule { pats: rule.pats[1 ..].to_vec(), body };
@@ -319,10 +319,10 @@ fn num_rule(
     let val = if i > 0 {
       //  switch arg = (pred +1 +num_i-1 - num_i) { 0: body_i; _: acc }
       // nums[i] >= nums[i-1]+1, so we do a sub here.
-      Term::sub_num(Term::Var { nam: pred_var.clone() }, nums[i] - 1 - nums[i - 1])
+      Term::sub_num(Term::Var { nam: pred_var.clone() }, nums[i] - 1 - nums[i - 1], NumType::U24)
     } else {
       //  switch arg = (arg -num_0) { 0: body_0; _: acc}
-      Term::sub_num(Term::Var { nam: arg.clone() }, nums[i])
+      Term::sub_num(Term::Var { nam: arg.clone() }, nums[i], NumType::U24)
     };
 
     Term::Swt {
@@ -525,23 +525,24 @@ impl std::fmt::Display for Type {
   }
 }
 
-impl ToStringVerbose for DesugarMatchDefErr {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
+impl std::fmt::Display for DesugarMatchDefErr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
       DesugarMatchDefErr::AdtNotExhaustive { adt, ctr } => {
-        format!("Non-exhaustive pattern matching rule. Constructor '{ctr}' of type '{adt}' not covered")
+        write!(f, "Non-exhaustive pattern matching rule. Constructor '{ctr}' of type '{adt}' not covered")
       }
       DesugarMatchDefErr::TypeMismatch { expected, found, pat } => {
-        format!(
+        write!(
+          f,
           "Type mismatch in pattern matching rule. Expected a constructor of type '{}', found '{}' with type '{}'.",
           expected, pat, found
         )
       }
       DesugarMatchDefErr::NumMissingDefault => {
-        "Non-exhaustive pattern matching rule. Default case of number type not covered.".to_string()
+        write!(f, "Non-exhaustive pattern matching rule. Default case of number type not covered.")
       }
       DesugarMatchDefErr::RepeatedBind { bind } => {
-        format!("Repeated bind in pattern matching rule: '{bind}'.")
+        write!(f, "Repeated bind in pattern matching rule: '{bind}'.")
       }
     }
   }

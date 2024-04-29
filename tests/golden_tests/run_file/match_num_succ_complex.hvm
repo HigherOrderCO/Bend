@@ -10,7 +10,15 @@ min2 a b = switch a {
   }
 }
 
-main = [
-  [(min1 5 10) (min1 10 5) (min1 0 12) (min1 12 0) (min1 0 0) (min1 6 6)]
-  [(min2 5 10) (min2 10 5) (min2 0 12) (min2 12 0) (min2 0 0) (min2 6 6)]
-]
+map f xs = match xs {
+  List.cons: (List.cons (f xs.head) (map f xs.tail))
+  List.nil: List.nil
+}
+
+vals = [(5, 10) (10, 5) (0, 12) (12 0) (0 0) (6 6)]
+
+main =
+  let f1 = @x let (a, b) = x; (min1 a b)
+  let f2 = @x let (a, b) = x; (min2 a b)
+  let a = [f1 f2]
+  (map @a (map a vals) a)

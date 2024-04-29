@@ -2,14 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/deref_loop.hvm
 ---
-(foo) = λa #nat (a #nat λb b foo$C0)
+(foo) = λa (a λb b foo__C0)
 
 (bar) = (foo 1)
 
 (main) = (foo 0)
 
-(succ) = λa #nat λb #nat λ* #nat (b a)
+(succ) = λa λb λ* (b a)
 
-(zero) = #nat λ* #nat λa a
+(zero) = λ* λa a
 
-(foo$C0) = (bar 0)
+(foo__C0) = (bar 0)

@@ -4,7 +4,7 @@ input_file: tests/golden_tests/compile_file/inlining.hvm
 ---
 @Era = *
 
-@Num = #42
+@Num = 42
 
 @RefToRef = @Era
 

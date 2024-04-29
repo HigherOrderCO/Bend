@@ -2,7 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/example.hvm
 ---
-@Def1 = (a a)
+@Def1 = c
+  & (a a) ~ ((b b) c)
+
+@Def2 = b
+  & (a a) ~ (@Def1 b)
 
 @main = a
-  & @Def1 ~ (#1 a)
+  & @Def2 ~ (1 a)

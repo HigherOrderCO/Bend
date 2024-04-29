@@ -2,8 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/tagged_lam.hvm
 ---
-Lazy mode:
-(3, 4)
-
-Strict mode:
-(3, 4)
+Errors:
+In tests/golden_tests/run_file/tagged_lam.hvm :
+Tagged terms not supported for hvm32.
+[0m  1 | main =[4m[31m [0m#foo ((#foo @x (+ x 1), #foo @x (* x x)) 2)[0m

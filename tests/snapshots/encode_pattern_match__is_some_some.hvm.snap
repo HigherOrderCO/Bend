@@ -2,16 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/is_some_some.hvm
 ---
-TaggedScott:
-(some_some) = λa #Option (a #Option λb #Option (b #Option λ* 1 0) 0)
-
-(main) = (some_some (Some 1))
-
-(Some) = λa #Option λb #Option λ* #Option (b a)
-
-(None) = #Option λ* #Option λb b
-
-Scott:
 (some_some) = λa (a λb (b λ* 1 0) 0)
 
 (main) = (some_some (Some 1))

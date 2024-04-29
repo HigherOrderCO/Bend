@@ -2,12 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/compile_all.hvm
 ---
-@Pair = (a (b {4 {4 a {4 b c}} c}))
+@Pair = (a (b ((a (b c)) c)))
 
-@Pair.get = (a ({4 @Pair.get$C0 (a b)} b))
+@Pair.get = (a ((@Pair.get__C0 (a b)) b))
 
-@Pair.get$C0 = {4 a {4 b ((a (b c)) c)}}
+@Pair.get__C0 = (a (b ((a (b c)) c)))
 
-@main = d
-  & @Pair.get ~ ((<+ a b> (a b)) (c d))
-  & @Pair ~ (#40 (#2 c))
+@main = b
+  & @Pair.get ~ (@main__C0 (a b))
+  & @Pair ~ (40 (2 a))
+
+@main__C0 = ($(:[+] $(a b)) (a b))

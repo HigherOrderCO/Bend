@@ -116,15 +116,15 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
       Tree::Num { val } => {
-        let kind = Num { val: *val as u64 };
+        let kind = Num { val: *val };
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
       }
-      Tree::Op { op, rhs, out } => {
-        let kind = Op2 { opr: *op };
-        let rhs = process_node_subtree(rhs, net_root, &mut subtrees, n_vars);
-        let out = process_node_subtree(out, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, rhs, out] });
+      Tree::Op { fst, snd } => {
+        let kind = NodeKind::Opr;
+        let fst = process_node_subtree(fst, net_root, &mut subtrees, n_vars);
+        let snd = process_node_subtree(snd, net_root, &mut subtrees, n_vars);
+        inodes.push(INode { kind, ports: [subtree_root, fst, snd] });
       }
       Tree::Mat { zero, succ, out } => {
         let kind = Mat;
@@ -134,15 +134,6 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
         inodes.push(INode { kind: NodeKind::Ctr(CtrKind::Con(None)), ports: [sel_var.clone(), zero, succ] });
         let ret = process_node_subtree(out, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, sel_var, ret] });
-      }
-      Tree::Adt { .. } => {
-        // FIXME: hvm-core will implement a desugaring pass
-        // that will handle desugaring Adts nodes for us.
-        // It doesn't yet do this. However, we aren't creating Adt nodes
-        // either, so it's impossible for this to happen.
-
-        // should have been desugared earlier
-        unreachable!()
       }
     }
   }

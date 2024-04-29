@@ -2,7 +2,13 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/eta_chain.hvm
 ---
-@Baz = (<+ a b> (<+ c a> (c b)))
+@Bar = a
+  & @Baz ~ a
+
+@Baz = ($(:[+] $(b c)) ($(:[+] $(a b)) (a c)))
+
+@Foo = a
+  & @Bar ~ a
 
 @main = a
-  & @Baz ~ a
+  & @Foo ~ a

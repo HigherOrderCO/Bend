@@ -2,30 +2,61 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
 ---
-@Cons = (a (b {8 {8 a {8 b c}} {8 * c}}))
+@Cons = (a (b ((a (b c)) (* c))))
 
-@Map$C0 = {8 a {8 {8 @Map$C0 {8 (* @Nil) (b c)}} ({2 (a d) b} {8 {8 d {8 c e}} {8 * e}})}}
+@False__M_Nil = (* (a a))
 
-@Merge$C0 = (* @Cons)
+@If = (((a (* a)) ((* (b b)) c)) c)
 
-@Merge$C1 = {8 {6 a {6 b c}} {8 {10 d {8 @Merge$C1 {8 @Merge$C0 (e (f (g h)))}}} ({14 (i (a {4 (j (* j)) {4 (* (k k)) ({8 {8 l {8 m n}} {8 * n}} ({8 {8 c {8 h o}} {8 * o}} p))}})) {14 q e}} ({18 i {18 l f}} ({22 {8 @Merge$C2 {8 (* (r r)) (q ({8 {8 b {8 d s}} {8 * s}} m))}} g} p)))}}
+@Map = ((@Map__C0 ((* @False__M_Nil) a)) a)
 
-@Merge$C2 = {8 a {8 b (c ({8 @Merge$C1 {8 @Merge$C0 (c (a (b d)))}} d))}}
+@Map__C0 = (a (c ({(a b) d} f)))
+  & @Cons ~ (b (e f))
+  & @Map ~ (c (d e))
 
-@MergePair$C0 = (* (a {8 {8 a {8 @Nil b}} {8 * b}}))
+@Merge = (b ((@Merge__C2 ((* (a a)) (b c))) c))
 
-@MergePair$C1 = {8 a {8 {8 @MergePair$C2 {8 (* @Nil) (b c)}} ({26 d b} ({8 @Merge$C2 {8 (* (e e)) (d (a f))}} {8 {8 f {8 c g}} {8 * g}}))}}
+@MergePair = (a ((@MergePair__C2 ((* @False__M_Nil) (a b))) b))
 
-@MergePair$C2 = {8 a {8 {8 @MergePair$C1 {8 @MergePair$C0 (b (a c))}} (b c)}}
+@MergePair__C0 = (* (a b))
+  & @Cons ~ (a (@False__M_Nil b))
 
-@MergeSort = (a ({8 @Map$C0 {8 (* @Nil) (@Pure {8 @Unpack$C1 {8 (* @Nil) (a b)}})}} b))
+@MergePair__C1 = (c (f ({a e} (b h))))
+  & @Cons ~ (d (g h))
+  & @Merge ~ (a (b (c d)))
+  & @MergePair ~ (e (f g))
 
-@Nil = {8 * {8 a a}}
+@MergePair__C2 = (b ((@MergePair__C1 (@MergePair__C0 (a (b c)))) (a c)))
 
-@Pure = (a {8 {8 a {8 @Nil b}} {8 * b}})
+@MergeSort = (a (b d))
+  & @Unpack ~ (a (c d))
+  & @Map ~ (b (@Pure c))
 
-@Unpack$C0 = {8 a {8 {8 @MergePair$C2 {8 (* @Nil) (b {8 @Unpack$C0 {8 (* (c c)) (d (e f))}})}} ({30 d {26 g b}} ({8 @Merge$C2 {8 (* (h h)) (g (a e))}} f))}}
+@Merge__C0 = (* a)
+  & @Cons ~ a
 
-@Unpack$C1 = {8 a {8 {8 @Unpack$C0 {8 (* (b b)) (c (a d))}} (c d)}}
+@Merge__C1 = ({b {g l}} ({h q} ({(a (b c)) {e m}} ({a {d n}} ({f o} t)))))
+  & @If ~ (c (k (s t)))
+  & @Cons ~ (d (j k))
+  & @Merge ~ (e (f (i j)))
+  & @Cons ~ (g (h i))
+  & @Cons ~ (l (r s))
+  & @Merge ~ (m (p (q r)))
+  & @Cons ~ (n (o p))
+
+@Merge__C2 = (b (c (a ((@Merge__C1 (@Merge__C0 (a (b (c d))))) d))))
+
+@Pure = (a b)
+  & @Cons ~ (a (@False__M_Nil b))
+
+@Unpack = (a ((@Unpack__C1 ((* @False__M_Nil) (a b))) b))
+
+@Unpack__C0 = (d (e ({a b} (c i))))
+  & @Unpack ~ (a (h i))
+  & @MergePair ~ (b (g h))
+  & @Cons ~ (c (f g))
+  & @Cons ~ (d (e f))
+
+@Unpack__C1 = (c ((@Unpack__C0 ((* (a a)) (b (c d)))) (b d)))
 
 @main = @MergeSort

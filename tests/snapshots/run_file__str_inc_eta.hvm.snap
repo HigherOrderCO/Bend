@@ -2,8 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/str_inc_eta.hvm
 ---
-Lazy mode:
-(11, #str λa (105, (102, (109, (109, (112, (33, (120, (112, (115, (109, (101, a))))))))))))
-
-Strict mode:
-(11, #str λa (105, (102, (109, (109, (112, (33, (120, (112, (115, (109, (101, a))))))))))))
+Errors:
+In tests/golden_tests/run_file/str_inc_eta.hvm :
+Tagged terms not supported for hvm32.
+[0m  1 | (StrInc (len, buf)) = (len,[4m[31m [0m#str λx (StrGo len #str (buf x)))[0m

@@ -22,6 +22,6 @@ input_file: tests/golden_tests/simplify_matches/linearize_match_all.hvm
 
 (main) = *
 
-(Cons) = λa λb #ConsList λc #ConsList λd #ConsList (c a b)
+(Cons) = λa λb λc λd (c a b)
 
-(Nil) = #ConsList λa #ConsList λb b
+(Nil) = λa λb b

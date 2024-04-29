@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/readback_lnet/nested_tup.hvm
 ---
-((1, 2), (4, (3, 5)))
+{{1 2} {4 {3 5}}}

@@ -2,12 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/def_tups.hvm
 ---
-TaggedScott:
-(go) = λa let (b, c) = a; let (d, e) = c; let (f, g) = e; let (h, i) = g; (+ (+ (+ (+ i h) f) d) b)
-
-(main) = (go (1, (2, (3, (4, 5)))))
-
-Scott:
 (go) = λa let (b, c) = a; let (d, e) = c; let (f, g) = e; let (h, i) = g; (+ (+ (+ (+ i h) f) d) b)
 
 (main) = (go (1, (2, (3, (4, 5)))))

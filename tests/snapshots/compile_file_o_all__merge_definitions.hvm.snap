@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/merge_definitions.hvm
 ---
-@false_$_snd = (* (a a))
+@false__M_snd = (* (a a))
 
 @main = (* b)
-  & @true_$_fst ~ (@true_$_fst (a b))
-  & @false_$_snd ~ (@false_$_snd (* a))
+  & @true__M_fst ~ (@true__M_fst (a b))
+  & @false__M_snd ~ (@false__M_snd (* a))
 
-@true_$_fst = (a (* a))
+@true__M_fst = (a (* a))

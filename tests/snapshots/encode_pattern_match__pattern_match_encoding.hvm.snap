@@ -2,22 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.hvm
 ---
-TaggedScott:
-(Foo) = λa #MyType (a #MyType λ* 100 #MyType λ* 200 #MyType λ* 200 #MyType λ* #MyType λ* 200 #MyType λ* #MyType λ* 200)
-
-(main) = (Foo A 2)
-
-(A) = λa #MyType λb #MyType λ* #MyType λ* #MyType λ* #MyType λ* #MyType (b a)
-
-(B) = λa #MyType λ* #MyType λc #MyType λ* #MyType λ* #MyType λ* #MyType (c a)
-
-(C) = λa #MyType λ* #MyType λ* #MyType λd #MyType λ* #MyType λ* #MyType (d a)
-
-(D) = λa λb #MyType λ* #MyType λ* #MyType λ* #MyType λf #MyType λ* #MyType (f a b)
-
-(E) = λa λb #MyType λ* #MyType λ* #MyType λ* #MyType λ* #MyType λg #MyType (g a b)
-
-Scott:
 (Foo) = λa (a λ* 100 λ* 200 λ* 200 λ* λ* 200 λ* λ* 200)
 
 (main) = (Foo A 2)

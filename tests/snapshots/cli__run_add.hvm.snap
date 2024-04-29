@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/run_add.hvm
 ---
-9
+Result: 9

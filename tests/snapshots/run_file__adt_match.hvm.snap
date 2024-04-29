@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/adt_match.hvm
 ---
-Lazy mode:
-(Some 2)
-
-Strict mode:
-(Some 2)
+λa λ* (a 2)

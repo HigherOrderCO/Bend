@@ -6,34 +6,34 @@ input_file: tests/golden_tests/desugar_file/combinators.hvm
 
 (bar) = λa λb (a bar b)
 
-(List.ignore) = λa #List (a List.ignore$C0 λ* 0)
+(List.ignore) = λa λ* (a List.ignore__C0 0)
 
 (baz) = {0 1 2 3 λa a foo}
 
 (qux) = {0 qux}
 
-(clax) = (λa a clax$C0)
+(clax) = (λa a clax__C0)
 
 (tup) = (tup, 1, 0)
 
-(list) = (List.cons 0 list$C0)
+(list) = (List.cons 0 list__C0)
 
-(A) = λa (A$C0 a)
+(A) = λa (A__C0 a)
 
-(B) = λa (B$C0 a)
+(B) = λa (B__C0 a)
 
 (Main) = list
 
-(List.cons) = λa λb #List λc #List λ* #List (c a b)
+(List.cons) = λa λb λc λ* (c a b)
 
-(List.nil) = #List λ* #List λa a
+(List.nil) = λ* λa a
 
-(A$C0) = let {a b} = A; λc (a b c)
+(A__C0) = let {a b} = A; λc (a b c)
 
-(B$C0) = let (a, b) = B; λc (a b c)
+(B__C0) = let (a, b) = B; λc (a b c)
 
-(List.ignore$C0) = #List λ* #List λa λ* (List.ignore a List.ignore)
+(List.ignore__C0) = λ* λa (List.ignore a List.ignore)
 
-(clax$C0) = λ* λ* λ* λa (clax a)
+(clax__C0) = λ* λ* λ* λa (clax a)
 
-(list$C0) = (List.cons list List.nil)
+(list__C0) = (List.cons list List.nil)

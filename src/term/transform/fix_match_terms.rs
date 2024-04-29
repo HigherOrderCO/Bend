@@ -1,7 +1,7 @@
 use crate::{
-  diagnostics::{Diagnostics, ToStringVerbose, WarningType},
+  diagnostics::{Diagnostics, WarningType},
   maybe_grow,
-  term::{Adts, Constructors, Ctx, MatchRule, Name, Term},
+  term::{Adts, Constructors, Ctx, MatchRule, Name, NumType, Term},
 };
 use std::collections::HashMap;
 
@@ -105,9 +105,9 @@ impl Term {
           let n_nums = arms.len() - 1;
           for (i, arm) in arms.iter_mut().enumerate() {
             let orig = if i == n_nums {
-              Term::add_num(Term::Var { nam: pred.clone().unwrap() }, i as u64)
+              Term::add_num(Term::Var { nam: pred.clone().unwrap() }, i as u32, NumType::U24)
             } else {
-              Term::Num { val: i as u64 }
+              Term::Num { typ: NumType::U24, val: i as u32 }
             };
             *arm = Term::Use { nam: bnd.clone(), val: Box::new(orig), nxt: Box::new(std::mem::take(arm)) };
           }
@@ -238,25 +238,28 @@ fn rebuild_ctr(arg: &Name, ctr: &Name, fields: &[Name]) -> Term {
   Term::call(ctr, fields)
 }
 
-impl ToStringVerbose for FixMatchErr {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
+impl std::fmt::Display for FixMatchErr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      FixMatchErr::AdtMismatch { expected, found, ctr } => format!(
+      FixMatchErr::AdtMismatch { expected, found, ctr } => write!(
+        f,
         "Type mismatch in 'match' expression: Expected a constructor of type '{expected}', found '{ctr}' of type '{found}'"
       ),
       FixMatchErr::NonExhaustiveMatch { typ, missing } => {
-        format!("Non-exhaustive 'match' expression of type '{typ}'. Case '{missing}' not covered.")
+        write!(f, "Non-exhaustive 'match' expression of type '{typ}'. Case '{missing}' not covered.")
       }
-      FixMatchErr::IrrefutableMatch { var } => format!(
+      FixMatchErr::IrrefutableMatch { var } => write!(
+        f,
         "Irrefutable 'match' expression. All cases after '{}' will be ignored. If this is not a mistake, consider using a 'let' expression instead.",
         var.as_ref().unwrap_or(&Name::new("*"))
       ),
-      FixMatchErr::UnreachableMatchArms { var } => format!(
+      FixMatchErr::UnreachableMatchArms { var } => write!(
+        f,
         "Unreachable arms in 'match' expression. All cases after '{}' will be ignored.",
         var.as_ref().unwrap_or(&Name::new("*"))
       ),
       FixMatchErr::RedundantArm { ctr } => {
-        format!("Redundant arm in 'match' expression. Case '{ctr}' appears more than once.")
+        write!(f, "Redundant arm in 'match' expression. Case '{ctr}' appears more than once.")
       }
     }
   }

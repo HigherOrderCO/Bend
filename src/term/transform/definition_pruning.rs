@@ -1,12 +1,10 @@
 use crate::{
-  builtins::{CORE_BUILTINS, CORE_BUILTINS_USES},
-  diagnostics::{ToStringVerbose, WarningType},
-  term::{Adt, AdtEncoding, Book, Ctx, Name, Tag, Term, LIST, STRING},
+  diagnostics::WarningType,
+  maybe_grow,
+  term::{Adt, Book, Ctx, Name, Term, LIST, STRING},
 };
 use indexmap::IndexSet;
 use std::collections::{hash_map::Entry, HashMap};
-
-struct UnusedDefinitionWarning;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Used {
@@ -29,20 +27,18 @@ type Definitions = HashMap<Name, Used>;
 impl Ctx<'_> {
   /// If `prune_all`, removes all unused definitions and adts starting from Main.
   /// Otherwise, prunes only the builtins not accessible from any non-built-in definition
-  pub fn prune(&mut self, prune_all: bool, adt_encoding: AdtEncoding) {
+  pub fn prune(&mut self, prune_all: bool) {
     let mut used = Definitions::new();
 
     if let Some(main) = &self.book.entrypoint {
       let def = self.book.defs.get(main).unwrap();
       used.insert(main.clone(), Used::Main);
-      self.book.find_used_definitions(&def.rule().body, Used::Main, &mut used, adt_encoding);
+      self.book.find_used_definitions(&def.rule().body, Used::Main, &mut used);
     }
 
-    if let AdtEncoding::Scott = adt_encoding {
-      for (def_name, def) in &self.book.defs {
-        if !def.builtin && self.book.ctrs.get(def_name).is_some() {
-          used.insert(def_name.clone(), Used::Adt);
-        }
+    for (def_name, def) in &self.book.defs {
+      if !def.builtin && self.book.ctrs.get(def_name).is_some() {
+        used.insert(def_name.clone(), Used::Adt);
       }
     }
 
@@ -59,7 +55,7 @@ impl Ctx<'_> {
               _ => {}
             }
 
-            self.book.find_used_definitions(&rule.body, Used::Unused, &mut used, adt_encoding);
+            self.book.find_used_definitions(&rule.body, Used::Unused, &mut used);
           }
         }
       }
@@ -81,7 +77,7 @@ impl Ctx<'_> {
       if prune_all || def.builtin {
         self.book.defs.shift_remove(&def_name);
       } else if !def_name.is_generated() {
-        self.info.add_rule_warning(UnusedDefinitionWarning, WarningType::UnusedDefinition, def_name);
+        self.info.add_rule_warning("Definition is unused.", WarningType::UnusedDefinition, def_name);
       }
     }
   }
@@ -89,83 +85,49 @@ impl Ctx<'_> {
 
 impl Book {
   /// Finds all used definitions on every term that can have a def_id.
-  fn find_used_definitions(
-    &self,
-    term: &Term,
-    used: Used,
-    uses: &mut Definitions,
-    adt_encoding: AdtEncoding,
-  ) {
-    let mut to_find = vec![term];
+  fn find_used_definitions(&self, term: &Term, used: Used, uses: &mut Definitions) {
+    maybe_grow(|| {
+      let mut to_find = vec![term];
 
-    while let Some(term) = to_find.pop() {
-      self.find_manual_adt_encoding(term, uses, adt_encoding);
-
-      match term {
-        Term::Ref { nam: def_name } => match self.ctrs.get(def_name) {
-          Some(name) => self.insert_ctrs_used(name, uses, adt_encoding),
-          None => self.insert_used(def_name, used, uses, adt_encoding),
-        },
-        Term::Lst { .. } => {
-          self.insert_ctrs_used(&Name::new(LIST), uses, adt_encoding);
+      while let Some(term) = to_find.pop() {
+        match term {
+          Term::Ref { nam: def_name } => match self.ctrs.get(def_name) {
+            Some(name) => self.insert_ctrs_used(name, uses),
+            None => self.insert_used(def_name, used, uses),
+          },
+          Term::Lst { .. } => {
+            self.insert_ctrs_used(&Name::new(LIST), uses);
+          }
+          Term::Str { .. } => {
+            self.insert_ctrs_used(&Name::new(STRING), uses);
+          }
+          _ => {}
         }
-        Term::Str { .. } => {
-          self.insert_ctrs_used(&Name::new(STRING), uses, adt_encoding);
-        }
-        _ => {}
-      }
 
-      for child in term.children() {
-        to_find.push(child);
+        for child in term.children() {
+          to_find.push(child);
+        }
       }
-    }
+    })
   }
 
-  /// If the current term is a manual encoding of a constructor or adt, we marked it as used.
-  fn find_manual_adt_encoding(&self, term: &Term, uses: &mut Definitions, adt_encoding: AdtEncoding) {
-    match adt_encoding {
-      AdtEncoding::Scott => (),
-      // If using the tagged scott encoding of ADTs, we also mark a constructor
-      // as used if the user manually encoded a ctr or match (or any other use of the ctr tags).
-      AdtEncoding::TaggedScott => match term {
-        Term::Lam { tag: Tag::Named(name), .. } | Term::App { tag: Tag::Named(name), .. } => {
-          // We don't check dup/sup tags because they use a separate label scope.
-          self.insert_ctrs_used(name, uses, adt_encoding);
-        }
-        _ => (),
-      },
-    }
-  }
-
-  fn insert_used(&self, def_name: &Name, used: Used, uses: &mut Definitions, adt_encoding: AdtEncoding) {
+  fn insert_used(&self, def_name: &Name, used: Used, uses: &mut Definitions) {
     if let Entry::Vacant(e) = uses.entry(def_name.clone()) {
       e.insert(used);
-      if let Some(position) = CORE_BUILTINS.iter().position(|x| x == &def_name.0.as_ref()) {
-        for def_name in CORE_BUILTINS_USES[position] {
-          self.insert_used(&Name::new(*def_name), used, uses, adt_encoding);
-        }
-        return;
-      }
 
       // This needs to be done for each rule in case the pass it's ran from has not encoded the pattern match
       // E.g.: the `flatten_rules` golden test
       for rule in &self.defs[def_name].rules {
-        self.find_used_definitions(&rule.body, used, uses, adt_encoding);
+        self.find_used_definitions(&rule.body, used, uses);
       }
     }
   }
 
-  fn insert_ctrs_used(&self, name: &Name, uses: &mut Definitions, adt_encoding: AdtEncoding) {
+  fn insert_ctrs_used(&self, name: &Name, uses: &mut Definitions) {
     if let Some(Adt { ctrs, .. }) = self.adts.get(name) {
       for (ctr, _) in ctrs {
-        self.insert_used(ctr, Used::Adt, uses, adt_encoding);
+        self.insert_used(ctr, Used::Adt, uses);
       }
     }
-  }
-}
-
-impl ToStringVerbose for UnusedDefinitionWarning {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
-    "Definition is unused.".to_string()
   }
 }

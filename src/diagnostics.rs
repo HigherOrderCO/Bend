@@ -22,7 +22,6 @@ pub struct DiagnosticsConfig {
   pub unused_definition: Severity,
   pub repeated_bind: Severity,
   pub recursion_cycle: Severity,
-  pub recursion_pre_reduce: Severity,
 }
 
 #[derive(Debug, Clone)]
@@ -58,11 +57,6 @@ pub enum WarningType {
   UnusedDefinition,
   RepeatedBind,
   RecursionCycle,
-  RecursionPreReduce,
-}
-
-pub trait ToStringVerbose {
-  fn to_string_verbose(&self, verbose: bool) -> String;
 }
 
 impl Diagnostics {
@@ -70,22 +64,22 @@ impl Diagnostics {
     Self { err_counter: 0, diagnostics: Default::default(), config }
   }
 
-  pub fn add_book_error(&mut self, err: impl ToStringVerbose) {
+  pub fn add_book_error(&mut self, err: impl std::fmt::Display) {
     self.err_counter += 1;
     self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Book);
   }
 
-  pub fn add_rule_error(&mut self, err: impl ToStringVerbose, def_name: Name) {
+  pub fn add_rule_error(&mut self, err: impl std::fmt::Display, def_name: Name) {
     self.err_counter += 1;
     self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Rule(def_name));
   }
 
-  pub fn add_inet_error(&mut self, err: impl ToStringVerbose, def_name: String) {
+  pub fn add_inet_error(&mut self, err: impl std::fmt::Display, def_name: String) {
     self.err_counter += 1;
     self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Inet(def_name));
   }
 
-  pub fn add_rule_warning(&mut self, warn: impl ToStringVerbose, warn_type: WarningType, def_name: Name) {
+  pub fn add_rule_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType, def_name: Name) {
     let severity = self.config.warning_severity(warn_type);
     if severity == Severity::Error {
       self.err_counter += 1;
@@ -93,7 +87,7 @@ impl Diagnostics {
     self.add_diagnostic(warn, severity, DiagnosticOrigin::Rule(def_name));
   }
 
-  pub fn add_book_warning(&mut self, warn: impl ToStringVerbose, warn_type: WarningType) {
+  pub fn add_book_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType) {
     let severity = self.config.warning_severity(warn_type);
     if severity == Severity::Error {
       self.err_counter += 1;
@@ -101,12 +95,16 @@ impl Diagnostics {
     self.add_diagnostic(warn, severity, DiagnosticOrigin::Book);
   }
 
-  pub fn add_diagnostic(&mut self, msg: impl ToStringVerbose, severity: Severity, orig: DiagnosticOrigin) {
-    let diag = Diagnostic { message: msg.to_string_verbose(self.config.verbose), severity };
+  pub fn add_diagnostic(&mut self, msg: impl ToString, severity: Severity, orig: DiagnosticOrigin) {
+    let diag = Diagnostic { message: msg.to_string(), severity };
     self.diagnostics.entry(orig).or_default().push(diag)
   }
 
-  pub fn take_rule_err<T, E: ToStringVerbose>(&mut self, result: Result<T, E>, def_name: Name) -> Option<T> {
+  pub fn take_rule_err<T, E: std::fmt::Display>(
+    &mut self,
+    result: Result<T, E>,
+    def_name: Name,
+  ) -> Option<T> {
     match result {
       Ok(t) => Some(t),
       Err(e) => {
@@ -116,7 +114,7 @@ impl Diagnostics {
     }
   }
 
-  pub fn take_inet_err<T, E: ToStringVerbose>(
+  pub fn take_inet_err<T, E: std::fmt::Display>(
     &mut self,
     result: Result<T, E>,
     def_name: String,
@@ -233,17 +231,17 @@ impl DiagnosticsConfig {
       unused_definition: severity,
       repeated_bind: severity,
       recursion_cycle: severity,
-      recursion_pre_reduce: severity,
       verbose,
     }
   }
 
   pub fn default_strict() -> Self {
-    Self { recursion_cycle: Severity::Error, recursion_pre_reduce: Severity::Error, ..Self::default() }
+    // TODO: Pre-reduce recursion check disabled while execution not implemented for hvm32
+    Self { recursion_cycle: Severity::Error, ..Self::default() }
   }
 
   pub fn default_lazy() -> Self {
-    Self { recursion_cycle: Severity::Allow, recursion_pre_reduce: Severity::Allow, ..Self::default() }
+    Self { recursion_cycle: Severity::Allow, ..Self::default() }
   }
 
   pub fn warning_severity(&self, warn: WarningType) -> Severity {
@@ -251,7 +249,6 @@ impl DiagnosticsConfig {
       WarningType::UnusedDefinition => self.unused_definition,
       WarningType::RepeatedBind => self.repeated_bind,
       WarningType::RecursionCycle => self.recursion_cycle,
-      WarningType::RecursionPreReduce => self.recursion_pre_reduce,
       WarningType::IrrefutableMatch => self.irrefutable_match,
       WarningType::RedundantMatch => self.redundant_match,
       WarningType::UnreachableMatch => self.unreachable_match,
@@ -268,28 +265,5 @@ impl Default for DiagnosticsConfig {
 impl Display for Diagnostic {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", self.message)
-  }
-}
-
-impl ToStringVerbose for &str {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
-    self.to_string()
-  }
-}
-
-impl ToStringVerbose for String {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
-    self.clone()
-  }
-}
-
-impl ToStringVerbose for hvmc::transform::TransformError {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
-    match self {
-      hvmc::transform::TransformError::InfiniteRefCycle(..) => {
-        format!("During inlining:\n{:ERR_INDENT_SIZE$}{self}", "")
-      }
-      _ => unreachable!(),
-    }
   }
 }

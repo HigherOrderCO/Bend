@@ -4,7 +4,7 @@ input_file: tests/golden_tests/compile_term/lets.hvm
 ---
 o
   & (a a) ~ *
-  & (b b) ~ {2 (f g) f}
-  & (c c) ~ {6 (h (i j)) {6 h i}}
-  & (d d) ~ {10 (k (l (m n))) {10 k {10 l m}}}
+  & (b b) ~ {(f g) f}
+  & (c c) ~ {(h (i j)) {h i}}
+  & (d d) ~ {(k (l (m n))) {k {l m}}}
   & (e e) ~ (g (j (n o)))

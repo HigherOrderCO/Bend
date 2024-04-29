@@ -2,18 +2,25 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_reverse.hvm
 ---
-@concat$C0 = {4 a {4 {4 @concat$C0 {4 (b b) (c d)}} (c {4 {4 a {4 d e}} {4 * e}})}}
+@concat = ((@concat__C0 ((a a) b)) b)
 
-@cons = (a (b {4 {4 a {4 b c}} {4 * c}}))
+@concat__C0 = (a (b (c e)))
+  & @cons ~ (a (d e))
+  & @concat ~ (b (c d))
+
+@cons = (a (b ((a (b c)) (* c))))
 
 @main = d
   & @reverse ~ (c d)
-  & @cons ~ (#3 (b c))
-  & @cons ~ (#2 (a b))
-  & @cons ~ (#1 (@nil a))
+  & @cons ~ (3 (b c))
+  & @cons ~ (2 (a b))
+  & @cons ~ (1 (@nil a))
 
-@nil = {4 * {4 a a}}
+@nil = (* (a a))
 
-@reverse = ({4 @reverse$C0 {4 @nil a}} a)
+@reverse = ((@reverse__C0 (@nil a)) a)
 
-@reverse$C0 = {4 a {4 {4 @reverse$C0 {4 @nil {4 @concat$C0 {4 (b b) ({4 {4 a {4 @nil c}} {4 * c}} d)}}}} d}}
+@reverse__C0 = (c (a e))
+  & @concat ~ (b (d e))
+  & @reverse ~ (a b)
+  & @cons ~ (c (@nil d))

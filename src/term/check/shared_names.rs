@@ -1,11 +1,6 @@
-use std::fmt::Display;
-
+use crate::term::{Ctx, Name};
 use indexmap::IndexMap;
-
-use crate::{
-  diagnostics::ToStringVerbose,
-  term::{Ctx, Name},
-};
+use std::fmt::Display;
 
 #[derive(Debug, Clone)]
 pub struct RepeatedTopLevelNameErr {
@@ -89,10 +84,10 @@ impl Display for NameKind {
   }
 }
 
-impl ToStringVerbose for RepeatedTopLevelNameErr {
-  fn to_string_verbose(&self, _verbose: bool) -> String {
+impl std::fmt::Display for RepeatedTopLevelNameErr {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     let mut snd = self.kind_snd.to_string();
     snd[0 .. 1].make_ascii_uppercase();
-    format!("{} '{}' has the same name as a previously defined {}", snd, self.name, self.kind_fst)
+    write!(f, "{} '{}' has the same name as a previously defined {}", snd, self.name, self.kind_fst)
   }
 }

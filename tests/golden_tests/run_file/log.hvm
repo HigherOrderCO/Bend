@@ -1,2 +1,0 @@
-data Option = (Some val) | None
-main = (HVM.log (Some (HVM.log (+ 42 17) "Hello world")) "Hi")

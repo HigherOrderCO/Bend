@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nat_add_num.hvm
 ---
-Lazy mode:
-(Nat.succ (Nat.succ (Nat.succ (Nat.succ 0))))
-
-Strict mode:
-(Nat.succ (Nat.succ (Nat.succ (Nat.succ 0))))
+λa λ* (a λb λ* (b λc λ* (c λd λ* (d 0))))

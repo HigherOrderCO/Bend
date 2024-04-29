@@ -18,7 +18,6 @@ pub mod parser;
 pub mod term_to_net;
 pub mod transform;
 
-pub use hvmc::ops::{IntOp, Op, Ty as OpType};
 pub use net_to_term::{net_to_term, ReadbackError};
 pub use term_to_net::{book_to_nets, term_to_net};
 
@@ -110,7 +109,8 @@ pub enum Term {
     els: Vec<Term>,
   },
   Num {
-    val: u64,
+    typ: NumType,
+    val: u32,
   },
   Nat {
     val: u64,
@@ -122,7 +122,7 @@ pub enum Term {
     els: Vec<Term>,
   },
   /// A numeric operation between built-in numbers.
-  Opx {
+  Opr {
     opr: Op,
     fst: Box<Term>,
     snd: Box<Term>,
@@ -158,12 +158,41 @@ pub enum FanKind {
   Dup,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Op {
+  ADD,
+  SUB,
+  MUL,
+  DIV,
+  REM,
+  EQL,
+  NEQ,
+  LTN,
+  GTN,
+  AND,
+  OR,
+  XOR,
+  /// atan(a, b)
+  ATN,
+  /// log_a(b)
+  LOG,
+  // a^b
+  POW,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum NumType {
+  U24 = 1,
+  I24 = 2,
+  F24 = 3,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Pattern {
   Var(Option<Name>),
   Chn(Name),
   Ctr(Name, Vec<Pattern>),
-  Num(u64),
+  Num(u32),
   /// Either a tuple or a duplication
   Fan(FanKind, Tag, Vec<Pattern>),
   Lst(Vec<Pattern>),
@@ -184,14 +213,6 @@ pub enum Tag {
 pub struct Adt {
   pub ctrs: IndexMap<Name, Vec<Name>>,
   pub builtin: bool,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum AdtEncoding {
-  Scott,
-
-  #[default]
-  TaggedScott,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -306,11 +327,11 @@ impl Clone for Term {
       Self::Use { nam, val, nxt } => Self::Use { nam: nam.clone(), val: val.clone(), nxt: nxt.clone() },
       Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
       Self::Fan { fan, tag, els } => Self::Fan { fan: *fan, tag: tag.clone(), els: els.clone() },
-      Self::Num { val } => Self::Num { val: *val },
+      Self::Num { typ, val } => Self::Num { typ: *typ, val: *val },
       Self::Nat { val } => Self::Nat { val: *val },
       Self::Str { val } => Self::Str { val: val.clone() },
       Self::Lst { els } => Self::Lst { els: els.clone() },
-      Self::Opx { opr, fst, snd } => Self::Opx { opr: *opr, fst: fst.clone(), snd: snd.clone() },
+      Self::Opr { opr, fst, snd } => Self::Opr { opr: *opr, fst: fst.clone(), snd: snd.clone() },
       Self::Mat { arg, bnd, with, arms } => {
         Self::Mat { arg: arg.clone(), bnd: bnd.clone(), with: with.clone(), arms: arms.clone() }
       }
@@ -414,27 +435,19 @@ impl Term {
     Term::Str { val: STRINGS.get(str) }
   }
 
-  pub fn sub_num(arg: Term, val: u64) -> Term {
+  pub fn sub_num(arg: Term, val: u32, typ: NumType) -> Term {
     if val == 0 {
       arg
     } else {
-      Term::Opx {
-        opr: Op { ty: OpType::U60, op: IntOp::Sub },
-        fst: Box::new(arg),
-        snd: Box::new(Term::Num { val }),
-      }
+      Term::Opr { opr: Op::SUB, fst: Box::new(arg), snd: Box::new(Term::Num { typ, val }) }
     }
   }
 
-  pub fn add_num(arg: Term, val: u64) -> Term {
+  pub fn add_num(arg: Term, val: u32, typ: NumType) -> Term {
     if val == 0 {
       arg
     } else {
-      Term::Opx {
-        opr: Op { ty: OpType::U60, op: IntOp::Add },
-        fst: Box::new(arg),
-        snd: Box::new(Term::Num { val }),
-      }
+      Term::Opr { opr: Op::ADD, fst: Box::new(arg), snd: Box::new(Term::Num { typ, val }) }
     }
   }
 
@@ -467,7 +480,7 @@ impl Term {
       | Term::Bnd { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Opx { fst, snd, .. } => ChildrenIter::Two([fst.as_ref(), snd.as_ref()]),
+      | Term::Opr { fst, snd, .. } => ChildrenIter::Two([fst.as_ref(), snd.as_ref()]),
       Term::Lam { bod, .. } => ChildrenIter::One([bod.as_ref()]),
       Term::Var { .. }
       | Term::Lnk { .. }
@@ -494,7 +507,7 @@ impl Term {
       | Term::Bnd { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
-      | Term::Opx { fst, snd, .. } => ChildrenIter::Two([fst.as_mut(), snd.as_mut()]),
+      | Term::Opr { fst, snd, .. } => ChildrenIter::Two([fst.as_mut(), snd.as_mut()]),
       Term::Lam { bod, .. } => ChildrenIter::One([bod.as_mut()]),
       Term::Var { .. }
       | Term::Lnk { .. }
@@ -548,7 +561,7 @@ impl Term {
       Term::Use { nam, val, nxt, .. } => {
         ChildrenIter::Two([(val.as_ref(), BindsIter::Zero([])), (nxt.as_ref(), BindsIter::One([nam]))])
       }
-      Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
+      Term::App { fun: fst, arg: snd, .. } | Term::Opr { fst, snd, .. } => {
         ChildrenIter::Two([(fst.as_ref(), BindsIter::Zero([])), (snd.as_ref(), BindsIter::Zero([]))])
       }
       Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_ref(), BindsIter::Pat(pat.binds()))]),
@@ -597,7 +610,7 @@ impl Term {
       Term::Use { nam, val, nxt } => {
         ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([&*nam]))])
       }
-      Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
+      Term::App { fun: fst, arg: snd, .. } | Term::Opr { fst, snd, .. } => {
         ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
       }
       Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds()))]),
@@ -647,7 +660,7 @@ impl Term {
         (val.as_mut(), BindsIter::Zero([])),
         (nxt.as_mut(), BindsIter::Pat(ask.binds_mut())),
       ]),
-      Term::App { fun: fst, arg: snd, .. } | Term::Opx { fst, snd, .. } => {
+      Term::App { fun: fst, arg: snd, .. } | Term::Opr { fst, snd, .. } => {
         ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
       }
       Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds_mut()))]),
@@ -848,7 +861,7 @@ impl Pattern {
       Pattern::Ctr(ctr, args) => {
         Term::call(Term::Ref { nam: ctr.clone() }, args.iter().map(|arg| arg.to_term()))
       }
-      Pattern::Num(val) => Term::Num { val: *val },
+      Pattern::Num(val) => Term::Num { typ: NumType::U24, val: *val },
       Pattern::Fan(fan, tag, args) => {
         Term::Fan { fan: *fan, tag: tag.clone(), els: args.iter().map(|p| p.to_term()).collect() }
       }

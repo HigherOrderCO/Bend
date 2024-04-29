@@ -4,6 +4,6 @@ input_file: tests/golden_tests/simplify_matches/nested_0ary.hvm
 ---
 (Unpack) = λa λb (match b { Cons c d: λe (match d { Cons f g: λh λi (h (Cons i (Cons f g))); Nil: λj λk k; } e c); Nil: λl Nil; } a)
 
-(Cons) = λa λb #list λc #list λd #list (c a b)
+(Cons) = λa λb λc λd (c a b)
 
-(Nil) = #list λa #list λb b
+(Nil) = λa λb b

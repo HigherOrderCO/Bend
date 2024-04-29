@@ -1,11 +1,11 @@
 use hvml::{
   compile_book, desugar_book,
-  diagnostics::{Diagnostics, DiagnosticsConfig, Severity, ToStringVerbose},
+  diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   net::hvmc_to_net::hvmc_to_net,
   run_book,
   term::{
-    load_book::do_parse_book, net_to_term::net_to_term, parser::TermParser, term_to_net, term_to_net::Labels,
-    AdtEncoding, Book, Ctx, Name,
+    load_book::do_parse_book, net_to_term::net_to_term, parser::TermParser, term_to_net::Labels, Book, Ctx,
+    Name,
   },
   CompileOpts, RunOpts,
 };
@@ -21,15 +21,17 @@ use std::{
 use stdext::function_name;
 use walkdir::WalkDir;
 
-fn format_output(output: std::process::Output) -> String {
-  format!("{}{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout))
-}
+// Since running a program requires messing with stdout and stderr,
+// if we run multiple at the same time, their outputs can get mixed.
+// So we put a mutex to execute only one "run" test at a time.
+static RUN_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 const TESTS_PATH: &str = "/tests/golden_tests/";
 
 type RunFn = dyn Fn(&str, &Path) -> Result<String, Diagnostics>;
 
 fn run_single_golden_test(path: &Path, run: &[&RunFn]) -> Result<(), String> {
+  println!("{}", path.display());
   let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
   let file_name = path.to_str().and_then(|path| path.rsplit_once(TESTS_PATH)).unwrap().1;
 
@@ -100,12 +102,12 @@ fn compile_term() {
     term.check_unbound_vars(&mut HashMap::new(), &mut vec);
 
     if !vec.is_empty() {
-      return Err(vec.into_iter().map(|e| e.to_string_verbose(true)).join("\n").into());
+      return Err(vec.into_iter().map(|e| e.to_string()).join("\n").into());
     }
 
     term.make_var_names_unique();
     term.linearize_vars();
-    let net = term_to_net(&term, &mut Default::default()).map_err(|e| e.to_string_verbose(true))?;
+    let net = hvml::term::term_to_net(&term, &mut Default::default()).map_err(|e| e.to_string())?;
 
     Ok(format!("{}", net))
   })
@@ -116,7 +118,9 @@ fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     let compile_opts = CompileOpts::default_strict();
-    let diagnostics_cfg = DiagnosticsConfig::default_strict();
+    let mut diagnostics_cfg = DiagnosticsConfig::default_strict();
+    diagnostics_cfg.unused_definition = Severity::Allow;
+
     let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
@@ -127,8 +131,10 @@ fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     let opts = CompileOpts::default_strict().set_all();
-    let diagnostics_cfg =
-      DiagnosticsConfig { recursion_cycle: Severity::Warning, ..DiagnosticsConfig::default_strict() };
+    let mut diagnostics_cfg = DiagnosticsConfig::default_strict();
+    diagnostics_cfg.recursion_cycle = Severity::Warning;
+    diagnostics_cfg.unused_definition = Severity::Allow;
+
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
@@ -138,8 +144,7 @@ fn compile_file_o_all() {
 fn compile_file_o_no_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compile_opts =
-      CompileOpts { adt_encoding: AdtEncoding::Scott, ..CompileOpts::default_strict().set_no_all() };
+    let compile_opts = CompileOpts::default_strict().set_no_all();
     let diagnostics_cfg = DiagnosticsConfig::default_strict();
     let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None)?;
     Ok(format!("{}", res.core_book))
@@ -152,65 +157,48 @@ fn linear_readback() {
     let book = do_parse_book(code, path)?;
     let compile_opts = CompileOpts::default_strict().set_all();
     let diagnostics_cfg = DiagnosticsConfig::default_strict();
-    let (res, info) = run_book(
-      book,
-      None,
-      RunOpts { linear: true, ..Default::default() },
-      compile_opts,
-      diagnostics_cfg,
-      None,
-    )?;
-    Ok(format!("{}{}", info.diagnostics, res))
+    let (term, _, diags) =
+      run_book(book, RunOpts { linear: true, ..Default::default() }, compile_opts, diagnostics_cfg, None)?;
+    let res = format!("{diags}{term}");
+    Ok(res)
   });
 }
 
 #[test]
 fn run_file() {
-  run_golden_test_dir_multiple(function_name!(), &[
-    (&|_code, path| {
-      let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
-        .args([
-          "run",
-          path.to_str().unwrap(),
-          "-Dall",
-          "-A=recursion-cycle",
-          "-O=all",
-          "-O=linearize-matches",
-          "-O=no-pre-reduce",
-          "-L",
-          "-1",
-        ])
-        .output()
-        .expect("Run process");
+  run_golden_test_dir_multiple(function_name!(), &[(&|code, path| {
+    let _guard = RUN_MUTEX.lock().unwrap();
+    let book = do_parse_book(code, path)?;
+    let compile_opts = CompileOpts::default_strict();
+    let diagnostics_cfg = DiagnosticsConfig {
+      unused_definition: Severity::Allow,
+      ..DiagnosticsConfig::new(Severity::Error, true)
+    };
+    let run_opts = RunOpts::default();
 
-      Ok(format!("Lazy mode:\n{}", format_output(output)))
-    }),
-    (&|_code, path| {
-      let output = std::process::Command::new(env!("CARGO_BIN_EXE_hvml"))
-        .args(["run", path.to_str().unwrap(), "-Dall", "-Oall"])
-        .output()
-        .expect("Run process");
-
-      Ok(format!("Strict mode:\n{}", format_output(output)))
-    }),
-  ])
+    let (term, _, diags) = run_book(book, run_opts, compile_opts, diagnostics_cfg, None)?;
+    let res = format!("{diags}{term}");
+    Ok(res)
+  })])
 }
 
 #[test]
+#[ignore = "while lazy execution is not implemented for hvm32"]
 fn run_lazy() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let _guard = RUN_MUTEX.lock().unwrap();
     let book = do_parse_book(code, path)?;
     let compile_opts = CompileOpts::default_lazy();
     let diagnostics_cfg = DiagnosticsConfig {
       recursion_cycle: Severity::Allow,
-      recursion_pre_reduce: Severity::Allow,
       unused_definition: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
     };
     let run_opts = RunOpts::lazy();
 
-    let (res, info) = run_book(book, None, run_opts, compile_opts, diagnostics_cfg, None)?;
-    Ok(format!("{}{}", info.diagnostics, res))
+    let (term, _, diags) = run_book(book, run_opts, compile_opts, diagnostics_cfg, None)?;
+    let res = format!("{diags}{term}");
+    Ok(res)
   })
 }
 
@@ -235,7 +223,7 @@ fn simplify_matches() {
 
     ctx.check_shared_names();
     ctx.set_entrypoint();
-    ctx.book.encode_adts(AdtEncoding::TaggedScott);
+    ctx.book.encode_adts();
     ctx.fix_match_defs()?;
     ctx.book.encode_builtins();
     ctx.resolve_refs()?;
@@ -249,7 +237,7 @@ fn simplify_matches() {
     ctx.book.make_var_names_unique();
     ctx.book.apply_use();
     ctx.book.make_var_names_unique();
-    ctx.prune(false, AdtEncoding::TaggedScott);
+    ctx.prune(false);
 
     Ok(ctx.book.to_string())
   })
@@ -267,33 +255,30 @@ fn parse_file() {
 fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut result = String::new();
-    for adt_encoding in [AdtEncoding::TaggedScott, AdtEncoding::Scott] {
-      let diagnostics_cfg = DiagnosticsConfig::default_strict();
-      let mut book = do_parse_book(code, path)?;
-      let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
-      ctx.check_shared_names();
-      ctx.set_entrypoint();
-      ctx.book.encode_adts(adt_encoding);
-      ctx.fix_match_defs()?;
-      ctx.book.encode_builtins();
-      ctx.resolve_refs()?;
-      ctx.desugar_match_defs()?;
-      ctx.fix_match_terms()?;
-      ctx.check_unbound_vars()?;
-      ctx.book.make_var_names_unique();
-      ctx.book.linearize_match_binds();
-      ctx.book.linearize_match_with();
-      ctx.book.encode_matches(adt_encoding);
-      ctx.check_unbound_vars()?;
-      ctx.book.make_var_names_unique();
-      ctx.book.apply_use();
-      ctx.book.make_var_names_unique();
-      ctx.book.linearize_vars();
-      ctx.prune(false, adt_encoding);
+    let diagnostics_cfg = DiagnosticsConfig::default_strict();
+    let mut book = do_parse_book(code, path)?;
+    let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
+    ctx.check_shared_names();
+    ctx.set_entrypoint();
+    ctx.book.encode_adts();
+    ctx.fix_match_defs()?;
+    ctx.book.encode_builtins();
+    ctx.resolve_refs()?;
+    ctx.desugar_match_defs()?;
+    ctx.fix_match_terms()?;
+    ctx.check_unbound_vars()?;
+    ctx.book.make_var_names_unique();
+    ctx.book.linearize_match_binds();
+    ctx.book.linearize_match_with();
+    ctx.book.encode_matches();
+    ctx.check_unbound_vars()?;
+    ctx.book.make_var_names_unique();
+    ctx.book.apply_use();
+    ctx.book.make_var_names_unique();
+    ctx.book.linearize_vars();
+    ctx.prune(false);
 
-      writeln!(result, "{adt_encoding:?}:").unwrap();
-      writeln!(result, "{}\n", ctx.book).unwrap();
-    }
+    writeln!(result, "{}\n", ctx.book).unwrap();
     Ok(result)
   })
 }
@@ -313,22 +298,18 @@ fn desugar_file() {
 }
 
 #[test]
-#[ignore = "to not delay golden tests execution"]
+#[ignore = "bug - the subprocess created by run_book leaks"]
 fn hangs() {
   let expected_normalization_time = 5;
 
   run_golden_test_dir(function_name!(), &move |code, path| {
+    let _guard = RUN_MUTEX.lock().unwrap();
     let book = do_parse_book(code, path)?;
-    let compile_opts = CompileOpts { pre_reduce: false, ..CompileOpts::default_strict().set_all() };
-    let diagnostics_cfg = DiagnosticsConfig {
-      recursion_cycle: Severity::Allow,
-      recursion_pre_reduce: Severity::Allow,
-      ..DiagnosticsConfig::default_strict()
-    };
+    let compile_opts = CompileOpts::default_strict().set_all();
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Allow, false);
 
-    let thread = std::thread::spawn(move || {
-      run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)
-    });
+    let thread =
+      std::thread::spawn(move || run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None));
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
 
     if !thread.is_finished() {
@@ -346,27 +327,31 @@ fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
-    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
+    let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
     let res = compile_book(&mut book, CompileOpts::default_strict(), diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
 
 #[test]
+#[ignore = "while execution with different entrypoints is not implemented for hvm32"]
 fn run_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let _guard = RUN_MUTEX.lock().unwrap();
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
     let compile_opts = CompileOpts::default_strict().set_all();
-    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
-    let (res, info) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
-    Ok(format!("{}{}", info.diagnostics, res))
+    let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
+    let (term, _, diags) = run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let res = format!("{diags}{term}");
+    Ok(res)
   })
 }
 
 #[test]
 fn cli() {
   run_golden_test_dir(function_name!(), &|_code, path| {
+    let _guard = RUN_MUTEX.lock().unwrap();
     let mut args_path = PathBuf::from(path);
     assert!(args_path.set_extension("args"));
 
@@ -377,8 +362,9 @@ fn cli() {
 
     let output =
       std::process::Command::new(env!("CARGO_BIN_EXE_hvml")).args(args).output().expect("Run command");
-
-    Ok(format_output(output))
+    let res =
+      format!("{}{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout));
+    Ok(res)
   })
 }
 
@@ -396,26 +382,35 @@ fn mutual_recursion() {
 }
 
 #[test]
+#[ignore = "while IO is not implemented for hvm32"]
 fn io() {
   run_golden_test_dir_multiple(function_name!(), &[
-    (&|code, path| {
+    /* (&|code, path| {
+      let _guard = RUN_MUTEX.lock().unwrap();
       let book = do_parse_book(code, path)?;
       let compile_opts = CompileOpts::default_lazy();
       let diagnostics_cfg = DiagnosticsConfig::default_lazy();
-      let (res, info) = run_book(book, None, RunOpts::lazy(), compile_opts, diagnostics_cfg, None)?;
-      Ok(format!("Lazy mode:\n{}{}", info.diagnostics, res))
-    }),
+      let Output { status, stdout, stderr } =
+        run_book(book, None, RunOpts::lazy(), compile_opts, diagnostics_cfg, None)?;
+      let stderr = String::from_utf8_lossy(&stderr);
+      let status = if !status.success() { format!("\n{status}") } else { String::new() };
+      let stdout = String::from_utf8_lossy(&stdout);
+      Ok(format!("Lazy mode:\n{}{}{}", stderr, status, stdout))
+    }), */
     (&|code, path| {
+      let _guard = RUN_MUTEX.lock().unwrap();
       let book = do_parse_book(code, path)?;
       let compile_opts = CompileOpts::default_strict();
       let diagnostics_cfg = DiagnosticsConfig::default_strict();
-      let (res, info) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
-      Ok(format!("Strict mode:\n{}{}", info.diagnostics, res))
+      let (term, _, diags) = run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+      let res = format!("{diags}{term}");
+      Ok(format!("Strict mode:\n{res}"))
     }),
   ])
 }
 
 #[test]
+//#[ignore = "while execution is not implemented for hvm32"]
 fn examples() -> Result<(), Diagnostics> {
   let examples_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples");
 
@@ -425,15 +420,16 @@ fn examples() -> Result<(), Diagnostics> {
     .filter_map(|e| e.ok())
     .filter(|e| e.path().extension().map_or(false, |ext| ext == "hvm"))
   {
+    let _guard = RUN_MUTEX.lock().unwrap();
     let path = entry.path();
     eprintln!("Testing {}", path.display());
     let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
 
     let book = do_parse_book(&code, path).unwrap();
-    let mut compile_opts = CompileOpts::default_strict();
-    compile_opts.linearize_matches = hvml::OptLevel::Extra;
+    let compile_opts = CompileOpts::default_strict();
     let diagnostics_cfg = DiagnosticsConfig::default_strict();
-    let (res, _) = run_book(book, None, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let (term, _, diags) = run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let res = format!("{diags}{term}");
 
     let mut settings = insta::Settings::clone_current();
     settings.set_prepend_module_to_snapshot(false);
@@ -452,8 +448,7 @@ fn examples() -> Result<(), Diagnostics> {
 fn scott_triggers_unused() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let mut opts = CompileOpts::default_strict();
-    opts.adt_encoding = AdtEncoding::Scott;
+    let opts = CompileOpts::default_strict();
     let diagnostics_cfg =
       DiagnosticsConfig { unused_definition: Severity::Error, ..DiagnosticsConfig::default_strict() };
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;

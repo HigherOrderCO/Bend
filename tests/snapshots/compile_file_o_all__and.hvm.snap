@@ -2,11 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/and.hvm
 ---
-@and = (a ({4 (b b) {4 (* @false) (a c)}} c))
+@and = (b (((a a) ((* @false) (b c))) c))
 
-@false = {4 * {4 a a}}
+@false = (* (a a))
 
 @main = a
   & @and ~ (@true (@false a))
 
-@true = {4 a {4 * a}}
+@true = (a (* a))

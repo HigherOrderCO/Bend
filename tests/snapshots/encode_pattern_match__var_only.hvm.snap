@@ -2,16 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/var_only.hvm
 ---
-TaggedScott:
-(Foo) = λa λ* λc (c a)
-
-(main) = λ* Foo
-
-(False) = #Bool λa #Bool λ* a
-
-(True) = #Bool λ* #Bool λb b
-
-Scott:
 (Foo) = λa λ* λc (c a)
 
 (main) = λ* Foo

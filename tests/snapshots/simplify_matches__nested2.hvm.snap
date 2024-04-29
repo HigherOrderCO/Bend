@@ -4,6 +4,6 @@ input_file: tests/golden_tests/simplify_matches/nested2.hvm
 ---
 (Foo) = λa λb (match b { List.cons c d: λe (match d { List.cons f g: λh λi (h i f g); List.nil: λj λk (j (List.cons k List.nil)); } e c); List.nil: λl (l List.nil); } a)
 
-(List.cons) = λa λb #List λc #List λd #List (c a b)
+(List.cons) = λa λb λc λd (c a b)
 
-(List.nil) = #List λa #List λb b
+(List.nil) = λa λb b

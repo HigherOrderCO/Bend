@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/ref_resolution.hvm
 ---
-Lazy mode:
-42
-
-Strict mode:
 42

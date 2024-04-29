@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/addition.hvm
 ---
-Lazy mode:
-10
-
-Strict mode:
 10

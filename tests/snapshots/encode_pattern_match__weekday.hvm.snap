@@ -2,24 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/weekday.hvm
 ---
-TaggedScott:
-(main) = (λa a Saturday)
-
-(Monday) = #Weekday λa #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* a
-
-(Tuesday) = #Weekday λ* #Weekday λb #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* b
-
-(Wednesday) = #Weekday λ* #Weekday λ* #Weekday λc #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* c
-
-(Thursday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λd #Weekday λ* #Weekday λ* #Weekday λ* d
-
-(Friday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λe #Weekday λ* #Weekday λ* e
-
-(Saturday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λf #Weekday λ* f
-
-(Sunday) = #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λ* #Weekday λg g
-
-Scott:
 (main) = (λa a Saturday)
 
 (Monday) = λa λ* λ* λ* λ* λ* λ* a

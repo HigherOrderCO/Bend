@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: examples/quick_sort.hvm
 ---
-8752462477312
+7311046

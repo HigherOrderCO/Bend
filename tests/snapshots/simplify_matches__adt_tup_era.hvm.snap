@@ -6,4 +6,4 @@ input_file: tests/golden_tests/simplify_matches/adt_tup_era.hvm
 
 (Main) = (Foo (Pair 1 5))
 
-(Pair) = λa λb #Tuple λc #Tuple (c a b)
+(Pair) = λa λb λc (c a b)

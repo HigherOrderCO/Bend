@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/erased_side_effect.hvm
 ---
-Lazy mode:
-123
-
-Strict mode:
 123

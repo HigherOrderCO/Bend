@@ -8,7 +8,5 @@ to_church n = switch n {
 	_: λf λx (f (to_church n-1 f x))
 }
 main = 
-	let two = λf λx (f (f x))
-	let two_pow_512 = ((to_church 512) two) // Composition of church-encoded numbers is equivalent to exponentiation.
-	// Self-composes `not` 2^512 times and prints the result.
-	(two_pow_512 fusing_not)  // try replacing this by not. Will it still work?
+	// Self-composes `not` 2^24 times and prints the result.
+	((to_church 0xFFFFFF) fusing_not)  // try replacing this by not. Will it still work?

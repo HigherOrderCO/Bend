@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/str_len.hvm
 ---
-Lazy mode:
-4
-
-Strict mode:
 4

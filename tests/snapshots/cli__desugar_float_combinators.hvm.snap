@@ -6,8 +6,12 @@ input_file: tests/golden_tests/cli/desugar_float_combinators.hvm
 
 (S) = λa λb let {c d} = b; λe (c (a d e))
 
-(get) = λa (a get$C0 0)
+(get) = λa (a get__C0 0)
 
-(main) = (get (S (S Z)))
+(main) = (get main__C1)
 
-(get$C0) = λa (+ a 1)
+(get__C0) = λa (+ a 1)
+
+(main__C0) = (S Z)
+
+(main__C1) = (S main__C0)

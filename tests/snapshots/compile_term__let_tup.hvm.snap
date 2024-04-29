@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/let_tup.hvm
 ---
-[(a (* a)) (* (b b))]
+((a (* a)) (* (b b)))

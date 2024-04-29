@@ -1,1 +1,1 @@
-main = (#id {(λx x) (λx x)} 3)
+main = ({(λx x) (λx x)} 3)
