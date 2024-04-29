@@ -46,21 +46,19 @@ use super::NumType;
 // <Number>     ::= ([0-9]+ | "0x"[0-9a-fA-F]+ | "0b"[01]+)
 // <Operator>   ::= ( "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<<" | ">>" | "<=" | ">=" | "<" | ">" | "^" )
 
-TSPL::new_parser!(TermParser);
+pub struct TermParser<'i> {
+  input: &'i str,
+  index: usize,
+}
 
 impl<'a> TermParser<'a> {
-  // TODO: Since TSPL doesn't expose `new` we need something that creates the parser.
-  pub fn new_book(input: &'a str, default_book: Book, builtin: bool) -> Result<Book, String> {
-    Self::new(input).parse_book(default_book, builtin)
-  }
-
-  pub fn new_term(input: &'a str) -> Result<Term, String> {
-    Self::new(input).parse_term()
+  pub fn new(input: &'a str) -> Self {
+    Self { input, index: 0 }
   }
 
   /* AST parsing functions */
 
-  fn parse_book(&mut self, default_book: Book, builtin: bool) -> Result<Book, String> {
+  pub fn parse_book(&mut self, default_book: Book, builtin: bool) -> Result<Book, String> {
     let mut book = default_book;
     self.skip_trivia();
     while !self.is_eof() {
@@ -69,7 +67,7 @@ impl<'a> TermParser<'a> {
         // adt declaration
         let (nam, adt) = self.parse_datatype(builtin)?;
         let end_idx = *self.index();
-        book.add_adt(nam, adt).map_err(|e| add_ctx(&e, ini_idx, end_idx, self.input()))?;
+        book.add_adt(nam, adt).map_err(|e| add_ctx_to_msg(&e, ini_idx, end_idx, self.input()))?;
       } else {
         // function declaration rule
         let (name, rule) = self.parse_rule()?;
@@ -206,7 +204,7 @@ impl<'a> TermParser<'a> {
     })
   }
 
-  fn parse_term(&mut self) -> Result<Term, String> {
+  pub fn parse_term(&mut self) -> Result<Term, String> {
     maybe_grow(|| {
       let (tag, unexpected_tag) = self.parse_tag()?;
       let Some(head) = self.skip_peek_one() else { return self.expected("term") };
@@ -582,35 +580,11 @@ impl<'a> TermParser<'a> {
     }
   }
 
-  /* Overrides */
-
-  /// Generates an error message for parsing failures, including the highlighted context.
-  ///
-  /// Override to have our own error message.
-  fn expected<T>(&mut self, exp: &str) -> Result<T, String> {
-    let ini_idx = *self.index();
-    let end_idx = *self.index() + 1;
-    self.expected_spanned(exp, ini_idx, end_idx)
-  }
-
   fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> Result<T, String> {
     let ctx = highlight_error(ini_idx, end_idx, self.input());
     let is_eof = self.is_eof();
     let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { write!(f, "\n{ctx}") });
     Err(format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected))
-  }
-
-  /// Consumes an instance of the given string, erroring if it is not found.
-  ///
-  /// Override to have our own error message.
-  fn consume(&mut self, text: &str) -> Result<(), String> {
-    self.skip_trivia();
-    if self.input().get(*self.index() ..).unwrap_or_default().starts_with(text) {
-      *self.index() += text.len();
-      Ok(())
-    } else {
-      self.expected(format!("'{text}'").as_str())
-    }
   }
 
   /// Consumes text if the input starts with it. Otherwise, do nothing.
@@ -623,116 +597,36 @@ impl<'a> TermParser<'a> {
       false
     }
   }
+}
 
-  /// Parses a name from the input, supporting alphanumeric characters, underscores, periods, and hyphens.
+impl<'a> Parser<'a> for TermParser<'a> {
+  fn input(&mut self) -> &'a str {
+    self.input
+  }
+
+  fn index(&mut self) -> &mut usize {
+    &mut self.index
+  }
+
+  /// Generates an error message for parsing failures, including the highlighted context.
   ///
-  /// Override to call our own `expected`.
-  fn parse_name(&mut self) -> Result<String, String> {
-    self.skip_trivia();
-    let name = self.take_while(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/');
-    if name.is_empty() { self.expected("name") } else { Ok(name.to_owned()) }
+  /// Override to have our own error message.
+  fn expected<T>(&mut self, exp: &str) -> Result<T, String> {
+    let ini_idx = *self.index();
+    let end_idx = *self.index() + 1;
+    self.expected_spanned(exp, ini_idx, end_idx)
   }
 
-  // TODO: Override because the lib has a bug where it will error on '_' .
-  /// Parses a u64 from the input, supporting dec, hex (0xNUM), and bin (0bNUM).
-  fn parse_u64(&mut self) -> Result<u64, String> {
+  /// Consumes an instance of the given string, erroring if it is not found.
+  ///
+  /// Override to have our own error message.
+  fn consume(&mut self, text: &str) -> Result<(), String> {
     self.skip_trivia();
-    let radix = match self.peek_many(2) {
-      Some("0x") => {
-        self.advance_many(2);
-        16
-      }
-      Some("0b") => {
-        self.advance_many(2);
-        2
-      }
-      _ => 10,
-    };
-    let num_str = self.take_while(move |c| c.is_digit(radix) || c == '_');
-    let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
-    if num_str.is_empty() {
-      self.expected("numeric digit")
+    if self.input().get(*self.index() ..).unwrap_or_default().starts_with(text) {
+      *self.index() += text.len();
+      Ok(())
     } else {
-      u64::from_str_radix(&num_str, radix).map_err(|e| e.to_string())
-    }
-  }
-
-  // TODO: Override to accept more escape sequences
-  /// Parses a single unicode character, supporting scape sequences.
-  fn parse_char(&mut self) -> Result<char, String> {
-    match self.advance_one() {
-      Some('\\') => match self.advance_one() {
-        Some('u' | 'U') => {
-          self.consume("{")?;
-          let codepoint_str = self.take_while(|c| c.is_ascii_hexdigit());
-          self.consume("}")?;
-          u32::from_str_radix(codepoint_str, 16)
-            .ok()
-            .and_then(std::char::from_u32)
-            .ok_or_else(|| self.expected::<char>("unicode-codepoint").unwrap_err())
-        }
-        Some('n') => Ok('\n'),
-        Some('r') => Ok('\r'),
-        Some('t') => Ok('\t'),
-        Some('\'') => Ok('\''),
-        Some('\"') => Ok('\"'),
-        Some('\\') => Ok('\\'),
-        Some('0') => Ok('\0'),
-        Some(chr) => self.expected(&format!("\\{}", chr)),
-        None => self.expected("escaped-char"),
-      },
-      Some(other) => Ok(other),
-      None => self.expected("char"),
-    }
-  }
-
-  // TODO: Override to accept more escape sequences
-  /// Parses a quoted character, like 'x'.
-  fn parse_quoted_char(&mut self) -> Result<char, String> {
-    self.skip_trivia();
-    self.consume("'")?;
-    let chr = self.parse_char()?;
-    self.consume("'")?;
-    Ok(chr)
-  }
-
-  // TODO: Override to accept more escape sequences
-  /// Parses a quoted string, like "foobar".
-  fn parse_quoted_string(&mut self) -> Result<String, String> {
-    self.skip_trivia();
-    self.consume("\"")?;
-    let mut result = String::new();
-    while let Some(chr) = self.peek_one() {
-      if chr == '"' {
-        break;
-      } else {
-        result.push(self.parse_char()?);
-      }
-    }
-    self.consume("\"")?;
-    Ok(result)
-  }
-
-  // TODO: override to avoid looping on ending in comment without \n
-  /// Consumes the next character in the text.
-  fn skip_trivia(&mut self) {
-    while let Some(c) = self.peek_one() {
-      if c.is_ascii_whitespace() {
-        self.advance_one();
-        continue;
-      }
-      if c == '/' && self.input().get(*self.index() ..).unwrap_or_default().starts_with("//") {
-        while let Some(c) = self.peek_one() {
-          if c != '\n' {
-            self.advance_one();
-          } else {
-            break;
-          }
-        }
-        self.advance_one(); // Skip the newline character as well
-        continue;
-      }
-      break;
+      self.expected(format!("'{text}'").as_str())
     }
   }
 }
@@ -772,7 +666,7 @@ impl Book {
   }
 }
 
-fn add_ctx(msg: &str, ini_idx: usize, end_idx: usize, file: &str) -> String {
+fn add_ctx_to_msg(msg: &str, ini_idx: usize, end_idx: usize, file: &str) -> String {
   let ctx = highlight_error(ini_idx, end_idx, file);
   format!("{msg}\n{ctx}")
 }

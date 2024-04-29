@@ -12,6 +12,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "TSPL"
+version = "0.0.9"
+source = "git+https://github.com/developedby/TSPL.git?branch=fix-hvml-bugs#f72a02d79c399c9fcb7ae0a2d4985c0451124afc"
+dependencies = [
+ "highlight_error",
+]
+
+[[package]]
 name = "anstream"
 version = "0.6.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -167,9 +175,9 @@ checksum = "5443807d6dff69373d433ab9ef5378ad8df50ca6298caf15de6e52e24aaf54d5"
 
 [[package]]
 name = "hashbrown"
-version = "0.14.3"
+version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "290f1a1d9242c78d09ce40a5e87e7554ee637af1351968159f4952f028f75604"
+checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "heck"
@@ -188,7 +196,7 @@ name = "hvm-core"
 version = "0.2.24"
 source = "git+https://github.com/HigherOrderCO/hvm-core.git?branch=hvm32-compat#8bc55acaa14bb18d889e2c80a300a2fadb400d03"
 dependencies = [
- "TSPL",
+ "TSPL 0.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "arrayvec",
  "clap",
  "nohash-hasher",
@@ -201,7 +209,7 @@ dependencies = [
 name = "hvm-lang"
 version = "0.1.0"
 dependencies = [
- "TSPL",
+ "TSPL 0.0.9 (git+https://github.com/developedby/TSPL.git?branch=fix-hvml-bugs)",
  "clap",
  "highlight_error",
  "hvm-core",

@@ -24,7 +24,8 @@ pub const NAT_ZERO: &str = "Nat.zero";
 
 impl Book {
   pub fn builtins() -> Book {
-    TermParser::new_book(BUILTINS, Book::default(), true)
+    TermParser::new(BUILTINS)
+      .parse_book(Book::default(), true)
       .expect("Error parsing builtin file, this should not happen")
   }
 
