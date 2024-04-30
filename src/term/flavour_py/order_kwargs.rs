@@ -30,6 +30,9 @@ impl Stmt {
           arm.rgt.order_kwargs(variants, enums);
         }
       }
+      Stmt::Switch { arg, bind, arms } => {}
+      Stmt::Fold { .. } => {}
+      Stmt::Do { block, .. } => {}
       Stmt::Return { term } => term.order_kwargs(variants, enums),
     }
   }

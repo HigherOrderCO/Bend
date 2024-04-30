@@ -759,11 +759,10 @@ impl<'a> TermParser<'a> {
 
   fn parse_term_py(&mut self) -> Result<flavour_py::Term, String> {
     self.skip_trivia();
-    if self.try_consume("lambda") {
-      let pat = self.parse_assign_pattern_py()?;
-      self.consume(":")?;
+    if self.try_consume_keyword("lambda") {
+      let names = self.list_like(|p| p.parse_hvml_name(), "", ":", ",", true, 1)?;
       let bod = self.parse_stmt_py(&mut Indent(0))?;
-      Ok(flavour_py::Term::Lam { pat, bod })
+      Ok(flavour_py::Term::Lam { names, bod })
     } else {
       self.parse_infix_py(0)
     }
@@ -874,12 +873,18 @@ impl<'a> TermParser<'a> {
 
   fn parse_stmt_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
     self.skip_exact_indent(indent, false)?;
-    if self.try_consume("return ") {
+    if self.try_consume_keyword("return") {
       self.parse_return_py()
-    } else if self.try_consume("if ") {
+    } else if self.try_consume_keyword("if") {
       self.parse_if_py(indent)
-    } else if self.try_consume("match ") {
+    } else if self.try_consume_keyword("match") {
       self.parse_match_py(indent)
+    } else if self.try_consume_keyword("switch") {
+      self.parse_switch_py(indent)
+    } else if self.try_consume_keyword("fold") {
+      self.parse_fold_py(indent)
+    } else if self.try_consume_keyword("do") {
+      self.parse_do_py(indent)
     } else {
       self.parse_assignment_py(indent)
     }
@@ -906,12 +911,17 @@ impl<'a> TermParser<'a> {
     Ok(flavour_py::Stmt::If { cond: Box::new(cond), then: Box::new(then), otherwise: Box::new(otherwise) })
   }
 
-  fn parse_match_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
-    let scrutinee = self.parse_primary_py()?;
+  fn parse_as_bind(&mut self) -> Result<Option<Name>, String> {
     let mut bind = None;
-    if self.try_consume("as") {
+    if self.try_consume_keyword("as") {
       bind = Some(self.parse_hvml_name()?);
     }
+    Ok(bind)
+  }
+
+  fn parse_match_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
+    let scrutinee = self.parse_primary_py()?;
+    let bind = self.parse_as_bind()?;
     self.consume(":")?;
     let mut arms = Vec::new();
     indent.enter_level();
@@ -933,6 +943,92 @@ impl<'a> TermParser<'a> {
     let body = self.parse_stmt_py(indent)?;
     indent.exit_level();
     Ok(flavour_py::MatchArm { lft: pat, rgt: body })
+  }
+
+  fn parse_switch_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
+    let arg = self.parse_term_py()?;
+    let bind = self.parse_as_bind()?;
+    self.consume(":")?;
+    let mut arms = Vec::new();
+
+    indent.enter_level();
+    let mut should_continue = true;
+    let mut expected_num = 0;
+
+    while should_continue && self.skip_exact_indent(indent, true)? {
+      self.consume("case")?;
+      if let Some(c) = self.skip_peek_one() {
+        match c {
+          '_' => {
+            if expected_num == 0 {
+              return self.expected("0");
+            } else {
+              self.consume("_")?;
+              should_continue = false;
+            }
+          }
+          c if c.is_ascii_digit() => {
+            let value = self.parse_u64()?;
+            if value != expected_num {
+              return self.expected(&expected_num.to_string());
+            }
+          }
+          _ => return self.expected("Number pattern"),
+        }
+        self.consume(":")?;
+        indent.enter_level();
+        arms.push(self.parse_stmt_py(indent)?);
+        indent.exit_level();
+        expected_num += 1;
+      } else {
+        self.expected("Switch pattern")?
+      }
+    }
+    indent.exit_level();
+    Ok(flavour_py::Stmt::Switch { arg: Box::new(arg), bind, arms })
+  }
+
+  fn parse_fold_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
+    let fun = self.parse_hvml_name()?;
+    let arg = self.parse_term_py()?;
+    let bind = self.parse_as_bind()?;
+    self.consume(":")?;
+    let mut arms = Vec::new();
+    indent.enter_level();
+    loop {
+      if !self.skip_exact_indent(indent, true)? {
+        break;
+      }
+      arms.push(self.parse_case_py(indent)?);
+    }
+    indent.exit_level();
+    Ok(flavour_py::Stmt::Fold { fun, arg: Box::new(arg), bind, arms })
+  }
+
+  fn parse_do_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
+    let fun = self.parse_hvml_name()?;
+    self.consume(":")?;
+
+    let mut block = Vec::new();
+
+    indent.enter_level();
+    loop {
+      if !self.skip_exact_indent(indent, true)? {
+        break;
+      }
+      if self.try_consume("!") {
+        let pat = self.parse_assign_pattern_py()?;
+        self.consume("=")?;
+        let val = self.parse_term_py()?;
+        self.consume(";")?;
+        block.push(flavour_py::MBind::Ask { pat, val: Box::new(val) });
+      } else {
+        block.push(flavour_py::MBind::Stmt { stmt: Box::new(self.parse_stmt_py(&mut Indent(0))?) })
+      }
+    }
+    indent.exit_level();
+
+    Ok(flavour_py::Stmt::Do { fun, block })
   }
 
   fn parse_assignment_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
@@ -959,9 +1055,9 @@ impl<'a> TermParser<'a> {
 
   fn parse_top_level_py(&mut self, indent: &mut Indent) -> Result<flavour_py::TopLevel, String> {
     self.skip_exact_indent(indent, false)?;
-    if self.try_consume("def") {
+    if self.try_consume_keyword("def") {
       Ok(flavour_py::TopLevel::Def(self.parse_def_py(indent)?))
-    } else if self.try_consume("enum") {
+    } else if self.try_consume_keyword("enum") {
       Ok(flavour_py::TopLevel::Enum(self.parse_enum_py(indent)?))
     } else {
       self.expected("Enum or Def declaration")?
@@ -1066,11 +1162,25 @@ mod test {
 enum Point:
   Point(x, y)
 
+enum Bool:
+  True()
+  False()
+
 def mk_point():
   return Point(y = 2, x = 1);
 
 def identity(x):
   return x;
+
+def lam():
+  return lambda x, y: return x;;
+
+def mtch(b):
+  match b as bool:
+    case True:
+      return 1;
+    case False:
+      return 0;
 
 def true():
   return True;
@@ -1080,9 +1190,28 @@ def fib(n):
     return n;
   else:
     return fib(n - 1) + fib(n - 2);
+
+def swt(n):
+  switch n:
+    case 0:
+      return 42;
+    case _:
+      return 1;
+
+def fld(list):
+  fold List.fold list:
+    case List.cons:
+      return 1;
+    case List.nil:
+      return 2;
+
+def main():
+  do IO.bind:
+    !x = IO.read();
+    return x;
     "#;
     let mut parser = TermParser::new(src);
-    let mut program = parser.parse_program_py().unwrap();
+    let mut program = parser.parse_program_py().inspect_err(|e| println!("{e}")).unwrap();
     program.order_kwargs();
     let out = program.to_lang(crate::term::Book::default());
     println!("{out}");

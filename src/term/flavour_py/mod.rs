@@ -19,7 +19,7 @@ pub enum Term {
   // {fun}(args,)
   Call { fun: Box<Term>, args: Vec<Term>, kwargs: Vec<(Name, Term)> },
   // "lambda" {pat}* ":" {bod}
-  Lam { pat: AssignPattern, bod: Stmt },
+  Lam { names: Vec<Name>, bod: Stmt },
   // {lhs} {op} {rhs}
   Bin { op: Op, lhs: Box<Term>, rhs: Box<Term> },
   // "\"" ... "\""
@@ -53,11 +53,25 @@ pub enum Stmt {
   // "else" ":"
   //  {otherwise}
   If { cond: Box<Term>, then: Box<Stmt>, otherwise: Box<Stmt> },
-  // "match" {arg} ":"
+  // "match" {arg} ":" ("as" {bind})?
   //   case {lft} ":" {rgt}
   Match { arg: Box<Term>, bind: Option<Name>, arms: Vec<MatchArm> },
+  // "switch" {arg} ("as" {bind})?
+  //   case 0..wildcard ":" {rgt}
+  Switch { arg: Box<Term>, bind: Option<Name>, arms: Vec<Stmt> },
+  // "fold" {fun} {arg} ("as" {bind})? ":" {arms}
+  //   case {lft} ":" {rgt}
+  Fold { fun: Name, arg: Box<Term>, bind: Option<Name>, arms: Vec<MatchArm> },
+  // "do" {fun} ":" {block}
+  Do { fun: Name, block: Vec<MBind> },
   // "return" {expr} ";"
   Return { term: Box<Term> },
+}
+
+#[derive(Clone, Debug)]
+pub enum MBind {
+  Ask { pat: AssignPattern, val: Box<Term> },
+  Stmt { stmt: Box<Stmt> },
 }
 
 // Name "(" {fields}* ")"

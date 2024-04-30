@@ -1,4 +1,4 @@
-use crate::term as lang;
+use crate::term::{self as lang, Name};
 
 use super::{AssignPattern, Definition, Program, Stmt, Term};
 
@@ -66,6 +66,9 @@ impl Stmt {
         }
         lang::Term::Mat { arg: Box::new(arg), bnd: bind, with: Vec::new(), arms }
       }
+      Stmt::Switch { arg, bind, arms } => unimplemented!(),
+      Stmt::Fold { fun, arg, bind, arms } => unimplemented!(),
+      Stmt::Do { fun, block } => unimplemented!(),
       Stmt::Return { term } => term.to_lang(),
     }
   }
@@ -82,9 +85,11 @@ impl Term {
         let args = args.into_iter().map(Self::to_lang);
         lang::Term::call(fun.to_lang(), args)
       }
-      Term::Lam { pat, bod } => {
-        lang::Term::Lam { tag: lang::Tag::Static, pat: Box::new(pat.to_lang()), bod: Box::new(bod.to_lang()) }
-      }
+      Term::Lam { names, bod } => names.into_iter().rfold(bod.to_lang(), |acc, nxt| lang::Term::Lam {
+        tag: lang::Tag::Static,
+        pat: Box::new(lang::Pattern::Var(Some(nxt))),
+        bod: Box::new(acc),
+      }),
       Term::Bin { op, lhs, rhs } => {
         lang::Term::Opr { opr: op, fst: Box::new(lhs.to_lang()), snd: Box::new(rhs.to_lang()) }
       }
