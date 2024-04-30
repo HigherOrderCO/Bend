@@ -751,31 +751,17 @@ impl<'a> TermParser<'a> {
         } else if self.try_consume("False") {
           return Ok(flavour_py::Term::Num { val: 0 });
         }
-        let nam = self.parse_hvml_name()?;
-        if self.try_consume("{") {
-          let fields = self.list_like(|p| p.parse_field_py(), "", "}", ",", true, 0)?;
-          flavour_py::Term::Enum { nam, fields }
-        } else {
-          flavour_py::Term::Var { nam }
-        }
+        flavour_py::Term::Var { nam: self.parse_hvml_name()? }
       }
     };
     Ok(res)
   }
 
-  fn parse_field_py(&mut self) -> Result<(Name, flavour_py::Term), String> {
-    self.skip_trivia();
-    let field_name = self.parse_hvml_name()?;
-    self.consume(":")?;
-    let value = self.parse_term_py()?;
-    Ok((field_name, value))
-  }
-
   fn parse_term_py(&mut self) -> Result<flavour_py::Term, String> {
     self.skip_trivia();
-    if self.try_consume("fun") {
+    if self.try_consume("lambda") {
       let pat = self.parse_assign_pattern_py()?;
-      self.consume("=>")?;
+      self.consume(":")?;
       let bod = self.parse_stmt_py(&mut Indent(0))?;
       Ok(flavour_py::Term::Lam { pat, bod })
     } else {
@@ -786,11 +772,35 @@ impl<'a> TermParser<'a> {
   fn parse_call(&mut self) -> Result<flavour_py::Term, String> {
     self.skip_trivia();
     let mut args = Vec::new();
+    let mut kwargs = Vec::new();
     let fun = self.parse_primary_py()?;
     if self.try_consume("(") {
-      args = self.list_like(|p| p.parse_term_py(), "", ")", ",", true, 0)?;
+      loop {
+        if self.try_consume(",") {
+          continue;
+        }
+        if self.try_consume(")") {
+          break;
+        }
+
+        let arg = self.parse_term_py()?;
+        if self.try_consume("=") {
+          if let flavour_py::Term::Var { nam } = arg {
+            let value = self.parse_term_py()?;
+            kwargs.push((nam, value));
+          } else {
+            return Err("Unexpected '='".to_string());
+          }
+        } else {
+          args.push(arg);
+        }
+      }
     }
-    if args.is_empty() { Ok(fun) } else { Ok(flavour_py::Term::Call { fun: Box::new(fun), args }) }
+    if args.is_empty() && kwargs.is_empty() {
+      Ok(fun)
+    } else {
+      Ok(flavour_py::Term::Call { fun: Box::new(fun), args, kwargs })
+    }
   }
 
   fn parse_infix_py(&mut self, prec: usize) -> Result<flavour_py::Term, String> {
@@ -979,8 +989,8 @@ impl<'a> TermParser<'a> {
       }
       let name = self.parse_hvml_name()?;
       let mut fields = Vec::new();
-      if self.skip_starts_with("{") {
-        fields = self.list_like(|p| p.parse_hvml_name(), "{", "}", ",", true, 0)?;
+      if self.skip_starts_with("(") {
+        fields = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 0)?;
       }
       variants.push((name.clone(), flavour_py::Variant { name, fields }));
     }
@@ -1054,7 +1064,10 @@ mod test {
   fn parse_def() {
     let src = r#"
 enum Point:
-  Point { x, y }
+  Point(x, y)
+
+def mk_point():
+  return Point(y = 2, x = 1);
 
 def identity(x):
   return x;
@@ -1068,10 +1081,10 @@ def fib(n):
   else:
     return fib(n - 1) + fib(n - 2);
     "#;
-    let mut p = TermParser::new(src);
-    let mut a = p.parse_program_py().unwrap();
-    a.order_enums();
-    let out = a.to_lang(crate::term::Book::default());
+    let mut parser = TermParser::new(src);
+    let mut program = parser.parse_program_py().unwrap();
+    program.order_kwargs();
+    let out = program.to_lang(crate::term::Book::default());
     println!("{out}");
   }
 }

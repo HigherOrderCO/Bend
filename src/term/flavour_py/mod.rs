@@ -1,4 +1,4 @@
-mod order_enums;
+mod order_kwargs;
 pub mod to_lang;
 
 use indexmap::IndexMap;
@@ -17,11 +17,9 @@ pub enum Term {
   // [0-9_]+
   Num { val: u32 },
   // {fun}(args,)
-  Call { fun: Box<Term>, args: Vec<Term> },
-  // "fun" {pat} -> {bod}
+  Call { fun: Box<Term>, args: Vec<Term>, kwargs: Vec<(Name, Term)> },
+  // "lambda" {pat}* ":" {bod}
   Lam { pat: AssignPattern, bod: Stmt },
-  // {nam} "{" {fields} "}"
-  Enum { nam: Name, fields: Vec<(Name, Term)> },
   // {lhs} {op} {rhs}
   Bin { op: Op, lhs: Box<Term>, rhs: Box<Term> },
   // "\"" ... "\""
@@ -62,7 +60,7 @@ pub enum Stmt {
   Return { term: Box<Term> },
 }
 
-// Name "{" fields, "}"
+// Name "(" {fields}* ")"
 #[derive(Clone, Debug)]
 pub struct Variant {
   pub name: Name,
@@ -77,7 +75,7 @@ pub struct Definition {
   pub body: Stmt,
 }
 
-// "enum" "{" {variants} "}"
+// "enum" ":" {variants}*
 #[derive(Clone, Debug)]
 pub struct Enum {
   pub name: Name,

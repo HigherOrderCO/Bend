@@ -77,17 +77,13 @@ impl Term {
       Term::None => lang::Term::Era,
       Term::Var { nam } => lang::Term::Var { nam },
       Term::Num { val } => lang::Term::Num { typ: lang::NumType::U24, val },
-      Term::Call { fun, args } => {
+      Term::Call { fun, args, kwargs } => {
+        assert!(kwargs.is_empty());
         let args = args.into_iter().map(Self::to_lang);
         lang::Term::call(fun.to_lang(), args)
       }
       Term::Lam { pat, bod } => {
         lang::Term::Lam { tag: lang::Tag::Static, pat: Box::new(pat.to_lang()), bod: Box::new(bod.to_lang()) }
-      }
-      Term::Enum { nam, fields } => {
-        let fun = lang::Term::Var { nam };
-        let args = fields.into_iter().map(|(_, arg)| arg.to_lang()).collect::<Vec<_>>();
-        lang::Term::call(fun, args)
       }
       Term::Bin { op, lhs, rhs } => {
         lang::Term::Opr { opr: op, fst: Box::new(lhs.to_lang()), snd: Box::new(rhs.to_lang()) }
