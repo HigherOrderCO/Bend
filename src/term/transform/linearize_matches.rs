@@ -209,7 +209,9 @@ fn fixed_and_linearized_terms(used_in_arg: HashSet<Name>, bind_terms: Vec<Term>)
 
 /// Get which binds are fixed because they are in the dependency graph
 /// of a free var or of a var used in the match arg.
-fn binds_fixed_by_dependency(mut fixed_binds: HashSet<Name>, bind_terms: &[Term]) -> HashSet<Name> {
+fn binds_fixed_by_dependency(used_in_arg: HashSet<Name>, bind_terms: &[Term]) -> HashSet<Name> {
+  let mut fixed_binds = used_in_arg;
+
   // Find the use dependencies of each bind
   let mut binds = vec![];
   let mut dependency_digraph = HashMap::new();
@@ -275,7 +277,42 @@ fn binds_fixed_by_dependency(mut fixed_binds: HashSet<Name>, bind_terms: &[Term]
       to_visit.extend(deps);
     }
   }
-  used_component
+
+  // Mark lambdas that come before a fixed lambda as also fixed
+  let mut fixed_start = false;
+  let mut fixed_lams = HashSet::new();
+  for term in bind_terms.iter().rev() {
+    if let Term::Lam { pat, .. } = term {
+      if pat.binds().flatten().any(|p| used_component.contains(p)) {
+        fixed_start = true;
+      }
+      if fixed_start {
+        for bind in pat.binds().flatten() {
+          fixed_lams.insert(bind.clone());
+        }
+      }
+    }
+  }
+
+  let mut fixed_binds = used_component;
+
+  // Mark binds that depend on fixed lambdas as also fixed.
+  let mut visited = HashSet::new();
+  let mut to_visit = fixed_lams.iter().collect::<Vec<_>>();
+  while let Some(node) = to_visit.pop() {
+    if visited.contains(node) {
+      continue;
+    }
+    fixed_binds.insert(node.clone());
+    visited.insert(node);
+
+    // Add these dependencies to be checked (if it's not a free var in the match arg)
+    if let Some(deps) = dependency_graph.get(node) {
+      to_visit.extend(deps);
+    }
+  }
+
+  fixed_binds
 }
 
 /* Linearize all used vars */
