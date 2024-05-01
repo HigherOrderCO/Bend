@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: examples/radix_sort.hvm
+---
+120

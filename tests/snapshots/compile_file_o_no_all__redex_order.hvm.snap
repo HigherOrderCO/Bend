@@ -6,7 +6,20 @@ input_file: tests/golden_tests/compile_file_o_no_all/redex_order.hvm
 
 @b = (a a)
 
+@bar = i
+  & @a ~ (d (h i))
+  & @b ~ (a (c d))
+  & @c ~ (0 a)
+  & @c ~ (b c)
+  & @d ~ (1 b)
+  & @b ~ (f (g h))
+  & @c ~ (e f)
+  & @d ~ (2 e)
+  & @c ~ (3 g)
+
 @c = (a a)
+
+@d = (a a)
 
 @foo = (a d)
   & @a ~ (c d)

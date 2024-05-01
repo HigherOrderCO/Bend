@@ -1,0 +1,25 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/redex_order_recursive.hvm
+---
+@add = ((@add__C0 ((a a) b)) b)
+
+@add__C0 = (a (b d))
+  & @add ~ (a (((b c) (* c)) d))
+
+@fold = ((@fold__C1 (@fold__C0 a)) a)
+
+@fold__C0 = (((* (a a)) b) (* b))
+
+@fold__C1 = (a (c e))
+  & @add ~ (b (d e))
+  & @fold ~ (a b)
+  & @fold ~ (c d)
+
+@main = *
+
+@tail_recursive = ((@tail_recursive__C0 (0 a)) a)
+
+@tail_recursive__C0 = (a c)
+  & $(b c) ~ [+1]
+  & @tail_recursive ~ (a b)

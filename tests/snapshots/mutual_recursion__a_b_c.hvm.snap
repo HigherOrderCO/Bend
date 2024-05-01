@@ -3,27 +3,24 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/mutual_recursion/a_b_c.hvm
 ---
 Errors:
-Seems like you're trying to run some recursive function(s) on strict-mode.
-The following recursive cycles are not compatible with strict-mode the way these functions were written:
+Seems like you're trying to run some recursive function(s).
+The following functions were written in a way that create recursive cycles that are not compatible with the strict evaluation of HVM.
   * A -> B -> C -> A
 
 Due to the ultra-greedy nature of strict-mode, that might result in infinite loops.
-If the float-combinators optimization is not on, we recommend activating it.
+You have to refactor these function to use lazy references.
 
-You have 2 options:
+The float-combinators and linearize-matches-extra options can help with doing this automatically.
+They are turned on by default, but if you deactivated them, consider re-enabling.
 
-1. Easy Fix: use lazy-mode.
+When a function reference is in head position of an application it will be greedly expanded, leading to an infinite loop.
+This for example doesn't work: 'Foo = λa λb (b (λc (Foo a c)) a)'
+If the application is written as a combinator, it will automatically lifted to a lazy reference, which usually breaks the recursion cycle.
+The example as combinators: 'Foo = λa λb (b (λc λa (Foo a c)) (λa a) a)
+Alternatively, by using the built-in `data` and `match` syntax, hvm-lang will try to do this automatically.
 
-Just append the `-L` option to `HVM-Lang`, and it will run in lazy-mode. It has the advantage of not doing wasteful work, having an improved complexity class, and being compatible with unrestricted recursion. It has a small overhead though, and isn't compatible with GPU.
-
-2. Hard Fix: refactor the program to use lazy references.
-
-When a function reference is in head position of an application or is duplicated by the non-linear use of a `let` expression it will be greedly expanded, leading to an infinite loop.
-If the application is used written as a combinator, it will automatically lifted to a lazy reference, which usually breaks the recursion cycle. Alternatively, by using the built-in `data` and `match` syntax, hvm-lang will try to do this automatically.
-(e.g. If pattern matching on scott-encoded ADTs, write '@a @x(x @a (Foo a) a)' instead of '@a @x(x (Foo a))')
-
-For let expressions where the variable is non-linear (used more than once), you can instead employ `use` expressions to statically duplicate the offending recursive term.
-(e.g. write 'Foo = @f use x = Foo; (f x x)' instead of 'Foo = @f let x = Foo; (f x x)')
+For let expressions where the variable is non-linear, you can instead employ `use` expressions to statically duplicate the offending recursive term.
+(e.g. write 'Foo = λf use x = Foo; (f x x)' instead of 'Foo = λf let x = Foo; (f x x)')
 
 See here for more info: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md.
 

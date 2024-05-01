@@ -4,4 +4,6 @@ input_file: tests/golden_tests/run_file/match_vars.hvm
 ---
 Errors:
 In definition 'main':
-  Irrefutable 'match' expression. All cases after 'true' will be ignored. If this is not a mistake, consider using a 'let' expression instead.
+  Irrefutable 'match' expression. All cases after variable pattern 'true' will be ignored.
+  Note that to use a 'match' expression, the matched constructors need to be defined in a 'data' definition.
+  If this is not a mistake, consider using a 'let' expression instead.

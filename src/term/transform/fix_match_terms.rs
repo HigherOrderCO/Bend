@@ -1,5 +1,5 @@
 use crate::{
-  diagnostics::{Diagnostics, WarningType},
+  diagnostics::{Diagnostics, WarningType, ERR_INDENT_SIZE},
   maybe_grow,
   term::{Adts, Constructors, Ctx, MatchRule, Name, NumType, Term},
 };
@@ -248,11 +248,24 @@ impl std::fmt::Display for FixMatchErr {
       FixMatchErr::NonExhaustiveMatch { typ, missing } => {
         write!(f, "Non-exhaustive 'match' expression of type '{typ}'. Case '{missing}' not covered.")
       }
-      FixMatchErr::IrrefutableMatch { var } => write!(
-        f,
-        "Irrefutable 'match' expression. All cases after '{}' will be ignored. If this is not a mistake, consider using a 'let' expression instead.",
-        var.as_ref().unwrap_or(&Name::new("*"))
-      ),
+      FixMatchErr::IrrefutableMatch { var } => {
+        writeln!(
+          f,
+          "Irrefutable 'match' expression. All cases after variable pattern '{}' will be ignored.",
+          var.as_ref().unwrap_or(&Name::new("*")),
+        )?;
+        writeln!(
+          f,
+          "{:ERR_INDENT_SIZE$}Note that to use a 'match' expression, the matched constructors need to be defined in a 'data' definition.",
+          "",
+        )?;
+        write!(
+          f,
+          "{:ERR_INDENT_SIZE$}If this is not a mistake, consider using a 'let' expression instead.",
+          ""
+        )
+      }
+
       FixMatchErr::UnreachableMatchArms { var } => write!(
         f,
         "Unreachable arms in 'match' expression. All cases after '{}' will be ignored.",
