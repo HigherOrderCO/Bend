@@ -18,8 +18,8 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.hvm
 
 @main = *
 
-@tail_recursive = ((@tail_recursive__C0 (0 a)) a)
+@tail_recursive = ((@tail_recursive__C0 ((* 0) a)) a)
 
-@tail_recursive__C0 = (a c)
+@tail_recursive__C0 = (a (b d))
+  & @tail_recursive ~ (a (c d))
   & $(b c) ~ [+1]
-  & @tail_recursive ~ (a b)

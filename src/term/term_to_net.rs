@@ -17,8 +17,8 @@ use super::{num_to_name, FanKind, Op};
 #[derive(Debug, Clone)]
 pub struct ViciousCycleErr;
 
-pub fn book_to_nets(book: &Book, info: &mut Diagnostics) -> Result<(hvmc::ast::Book, Labels), Diagnostics> {
-  info.start_pass();
+pub fn book_to_nets(book: &Book, diags: &mut Diagnostics) -> Result<(hvmc::ast::Book, Labels), Diagnostics> {
+  diags.start_pass();
 
   let mut hvmc = hvmc::ast::Book::default();
   let mut labels = Labels::default();
@@ -31,8 +31,11 @@ pub fn book_to_nets(book: &Book, info: &mut Diagnostics) -> Result<(hvmc::ast::B
 
       let name = if def.name == *main { book.hvmc_entrypoint().to_string() } else { def.name.0.to_string() };
 
-      if let Some(net) = info.take_inet_err(net, name.clone()) {
-        hvmc.insert(name, net);
+      match net {
+        Ok(net) => {
+          hvmc.insert(name, net);
+        }
+        Err(err) => diags.add_inet_error(err, name),
       }
     }
   }
@@ -40,7 +43,7 @@ pub fn book_to_nets(book: &Book, info: &mut Diagnostics) -> Result<(hvmc::ast::B
   labels.con.finish();
   labels.dup.finish();
 
-  Ok((hvmc, labels))
+  diags.fatal((hvmc, labels))
 }
 
 /// Converts an LC term into an IC net.

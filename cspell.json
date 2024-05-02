@@ -15,6 +15,7 @@
     "combinators",
     "concat",
     "ctrs",
+    "cuda",
     "Dall",
     "datatypes",
     "Deque",

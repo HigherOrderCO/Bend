@@ -5,8 +5,8 @@ input_file: tests/golden_tests/mutual_recursion/len.hvm
 @Len = ((@Len__C0 (0 a)) a)
 
 @Len__C0 = (* (a c))
-  & $(b c) ~ [+1]
   & @Len ~ (a b)
+  & $(b c) ~ [+1]
 
 @List.cons = (a (b ((a (b c)) (* c))))
 

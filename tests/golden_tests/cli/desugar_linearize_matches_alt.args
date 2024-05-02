@@ -1,0 +1,3 @@
+desugar
+tests/golden_tests/cli/desugar_linearize_matches_alt.hvm
+-Olinearize-matches-alt

@@ -34,9 +34,6 @@ enum Mode {
     )]
     comp_opts: Vec<OptArgs>,
 
-    #[arg(short = 'L', help = "Lazy mode")]
-    lazy_mode: bool,
-
     #[command(flatten)]
     warn_opts: CliWarnOpts,
 
@@ -54,9 +51,6 @@ enum Mode {
     )]
     comp_opts: Vec<OptArgs>,
 
-    #[arg(short = 'L', help = "Lazy mode")]
-    lazy_mode: bool,
-
     #[command(flatten)]
     warn_opts: CliWarnOpts,
 
@@ -65,9 +59,6 @@ enum Mode {
   },
   /// Compiles the program and runs it with the hvm.
   Run {
-    #[arg(short = 'L', help = "Lazy mode")]
-    lazy_mode: bool,
-
     #[arg(short = 'p', help = "Debug and normalization pretty printing")]
     pretty: bool,
 
@@ -105,9 +96,6 @@ enum Mode {
 
     #[arg(short = 'p', help = "Debug and normalization pretty printing")]
     pretty: bool,
-
-    #[arg(short = 'L', help = "Lazy mode")]
-    lazy_mode: bool,
 
     #[command(flatten)]
     warn_opts: CliWarnOpts,
@@ -166,7 +154,7 @@ pub enum OptArgs {
   Prune,
   NoPrune,
   LinearizeMatches,
-  LinearizeMatchesExtra,
+  LinearizeMatchesAlt,
   NoLinearizeMatches,
   FloatCombinators,
   NoFloatCombinators,
@@ -174,11 +162,13 @@ pub enum OptArgs {
   NoMerge,
   Inline,
   NoInline,
+  RecursiveLast,
+  NoRecursiveLast,
 }
 
-fn compile_opts_from_cli(args: &Vec<OptArgs>, lazy_mode: bool) -> CompileOpts {
+fn compile_opts_from_cli(args: &Vec<OptArgs>) -> CompileOpts {
   use OptArgs::*;
-  let mut opts = if lazy_mode { CompileOpts::default_lazy() } else { CompileOpts::default_strict() };
+  let mut opts = CompileOpts::default();
 
   for arg in args {
     match arg {
@@ -194,9 +184,11 @@ fn compile_opts_from_cli(args: &Vec<OptArgs>, lazy_mode: bool) -> CompileOpts {
       NoMerge => opts.merge = false,
       Inline => opts.inline = true,
       NoInline => opts.inline = false,
+      RecursiveLast => opts.recursive_last = true,
+      NoRecursiveLast => opts.recursive_last = false,
 
       LinearizeMatches => opts.linearize_matches = OptLevel::Enabled,
-      LinearizeMatchesExtra => opts.linearize_matches = OptLevel::Extra,
+      LinearizeMatchesAlt => opts.linearize_matches = OptLevel::Alt,
       NoLinearizeMatches => opts.linearize_matches = OptLevel::Disabled,
     }
   }
@@ -242,26 +234,18 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
   };
 
   match cli.mode {
-    Mode::Check { comp_opts, lazy_mode, warn_opts, path } => {
-      let diagnostics_cfg = set_warning_cfg_from_cli(
-        if lazy_mode { DiagnosticsConfig::default_lazy() } else { DiagnosticsConfig::default_strict() },
-        lazy_mode,
-        warn_opts,
-      );
-      let compile_opts = compile_opts_from_cli(&comp_opts, lazy_mode);
+    Mode::Check { comp_opts, warn_opts, path } => {
+      let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
+      let compile_opts = compile_opts_from_cli(&comp_opts);
 
       let mut book = load_book(&path)?;
       let diagnostics = check_book(&mut book, diagnostics_cfg, compile_opts)?;
       eprintln!("{}", diagnostics);
     }
 
-    Mode::Compile { path, comp_opts, warn_opts, lazy_mode } => {
-      let diagnostics_cfg = set_warning_cfg_from_cli(
-        if lazy_mode { DiagnosticsConfig::default_lazy() } else { DiagnosticsConfig::default_strict() },
-        lazy_mode,
-        warn_opts,
-      );
-      let opts = compile_opts_from_cli(&comp_opts, lazy_mode);
+    Mode::Compile { path, comp_opts, warn_opts } => {
+      let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
+      let opts = compile_opts_from_cli(&comp_opts);
 
       let mut book = load_book(&path)?;
       let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
@@ -270,14 +254,10 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       println!("{}", compile_res.core_book);
     }
 
-    Mode::Desugar { path, comp_opts, warn_opts, pretty, lazy_mode } => {
-      let diagnostics_cfg = set_warning_cfg_from_cli(
-        if lazy_mode { DiagnosticsConfig::default_lazy() } else { DiagnosticsConfig::default_strict() },
-        lazy_mode,
-        warn_opts,
-      );
+    Mode::Desugar { path, comp_opts, warn_opts, pretty } => {
+      let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
 
-      let opts = compile_opts_from_cli(&comp_opts, lazy_mode);
+      let opts = compile_opts_from_cli(&comp_opts);
 
       let mut book = load_book(&path)?;
       let diagnostics = desugar_book(&mut book, opts, diagnostics_cfg, None)?;
@@ -290,17 +270,17 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       }
     }
 
-    Mode::Run { lazy_mode, run_opts, pretty, comp_opts, warn_opts, arguments, path } => {
+    Mode::Run { run_opts, pretty, comp_opts, warn_opts, arguments, path } => {
       let RunArgs { linear, print_stats } = run_opts;
 
       let diagnostics_cfg =
-        set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), lazy_mode, warn_opts);
+        set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
 
-      let compile_opts = compile_opts_from_cli(&comp_opts, lazy_mode);
+      let compile_opts = compile_opts_from_cli(&comp_opts);
 
       compile_opts.check_for_strict();
 
-      let run_opts = RunOpts { linear, lazy_mode, pretty };
+      let run_opts = RunOpts { linear_readback: linear, pretty };
 
       let book = load_book(&path)?;
       let (term, stats, diags) = run_book(book, run_opts, compile_opts, diagnostics_cfg, arguments)?;
@@ -319,12 +299,8 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
   Ok(())
 }
 
-fn set_warning_cfg_from_cli(
-  mut cfg: DiagnosticsConfig,
-  lazy_mode: bool,
-  warn_opts: CliWarnOpts,
-) -> DiagnosticsConfig {
-  fn set(cfg: &mut DiagnosticsConfig, severity: Severity, cli_val: WarningArgs, lazy_mode: bool) {
+fn set_warning_cfg_from_cli(mut cfg: DiagnosticsConfig, warn_opts: CliWarnOpts) -> DiagnosticsConfig {
+  fn set(cfg: &mut DiagnosticsConfig, severity: Severity, cli_val: WarningArgs) {
     match cli_val {
       WarningArgs::All => {
         cfg.irrefutable_match = severity;
@@ -332,9 +308,7 @@ fn set_warning_cfg_from_cli(
         cfg.unreachable_match = severity;
         cfg.unused_definition = severity;
         cfg.repeated_bind = severity;
-        if !lazy_mode {
-          cfg.recursion_cycle = severity;
-        }
+        cfg.recursion_cycle = severity;
       }
       WarningArgs::IrrefutableMatch => cfg.irrefutable_match = severity,
       WarningArgs::RedundantMatch => cfg.redundant_match = severity,
@@ -356,9 +330,9 @@ fn set_warning_cfg_from_cli(
     let mut denies = warn_opts.denies.into_iter();
     for id in warn_opts_ids {
       match id.as_ref() {
-        "allows" => set(&mut cfg, Severity::Allow, allows.next().unwrap(), lazy_mode),
-        "denies" => set(&mut cfg, Severity::Error, denies.next().unwrap(), lazy_mode),
-        "warns" => set(&mut cfg, Severity::Warning, warns.next().unwrap(), lazy_mode),
+        "allows" => set(&mut cfg, Severity::Allow, allows.next().unwrap()),
+        "denies" => set(&mut cfg, Severity::Error, denies.next().unwrap()),
+        "warns" => set(&mut cfg, Severity::Warning, warns.next().unwrap()),
         _ => unreachable!(),
       }
     }
