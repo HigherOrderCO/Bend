@@ -132,222 +132,252 @@ impl<'a> TermParser<'a> {
   fn parse_pattern(&mut self, simple: bool) -> Result<Pattern, String> {
     maybe_grow(|| {
       let (tag, unexpected_tag) = self.parse_tag()?;
-      let Some(head) = self.skip_peek_one() else { return self.expected("pattern-matching pattern") };
-      let pat = match head {
-        // Ctr or Tup
-        '(' => {
-          self.consume("(")?;
-          let head_ini_idx = *self.index();
-          let head = self.parse_pattern(simple)?;
-          let head_end_idx = *self.index();
+      self.skip_trivia();
 
-          if simple || self.skip_starts_with(",") {
-            self.consume(",")?;
-            // Tup
-            let mut els = self.list_like(|p| p.parse_pattern(simple), "", ")", ",", true, 1)?;
-            els.insert(0, head);
-            Pattern::Fan(FanKind::Tup, tag.unwrap_or(Tag::Static), els)
-          } else {
-            unexpected_tag(self)?;
-            // Ctr
-            let Pattern::Var(Some(name)) = head else {
-              return self.expected_spanned("constructor name", head_ini_idx, head_end_idx);
-            };
-            let els = self.list_like(|p| p.parse_pattern(simple), "", ")", "", false, 0)?;
-            Pattern::Ctr(name, els)
-          }
+      // Ctr or Tup
+      if self.starts_with("(") {
+        self.consume("(")?;
+        let head_ini_idx = *self.index();
+        let head = self.parse_pattern(simple)?;
+        let head_end_idx = *self.index();
+
+        // Tup
+        if simple || self.skip_starts_with(",") {
+          self.consume(",")?;
+          let mut els = self.list_like(|p| p.parse_pattern(simple), "", ")", ",", true, 1)?;
+          els.insert(0, head);
+          return Ok(Pattern::Fan(FanKind::Tup, tag.unwrap_or(Tag::Static), els));
         }
-        // Dup
-        '{' => {
-          let els = self.list_like(|p| p.parse_pattern(simple), "{", "}", "", false, 0)?;
-          Pattern::Fan(FanKind::Dup, tag.unwrap_or(Tag::Auto), els)
-        }
-        // List
-        '[' if !simple => {
-          unexpected_tag(self)?;
-          let els = self.list_like(|p| p.parse_pattern(simple), "[", "]", ",", false, 0)?;
-          Pattern::Lst(els)
-        }
-        // String
-        '\"' if !simple => {
-          unexpected_tag(self)?;
-          let str = self.parse_quoted_string()?;
-          Pattern::Str(STRINGS.get(str))
-        }
-        // Char
-        '\'' => {
-          unexpected_tag(self)?;
-          let char = self.parse_quoted_char()?;
-          Pattern::Num(char as u32)
-        }
-        // Number
-        c if c.is_ascii_digit() => {
-          unexpected_tag(self)?;
-          let num = self.parse_u64()?;
-          Pattern::Num(num as u32)
-        }
-        // Channel
-        '$' => {
-          unexpected_tag(self)?;
-          self.advance_one();
-          let name = self.parse_hvml_name()?;
-          Pattern::Chn(name)
-        }
-        // Var
-        _ => {
-          unexpected_tag(self)?;
-          let name = self.parse_name_or_era()?;
-          Pattern::Var(name)
-        }
-      };
-      Ok(pat)
+
+        // Ctr
+        unexpected_tag(self)?;
+        let Pattern::Var(Some(name)) = head else {
+          return self.expected_spanned("constructor name", head_ini_idx, head_end_idx);
+        };
+        let els = self.list_like(|p| p.parse_pattern(simple), "", ")", "", false, 0)?;
+        return Ok(Pattern::Ctr(name, els));
+      }
+
+      // Dup
+      if self.starts_with("{") {
+        let els = self.list_like(|p| p.parse_pattern(simple), "{", "}", ",", false, 0)?;
+        return Ok(Pattern::Fan(FanKind::Dup, tag.unwrap_or(Tag::Auto), els));
+      }
+
+      // List
+      if self.starts_with("[") && !simple {
+        unexpected_tag(self)?;
+        let els = self.list_like(|p| p.parse_pattern(simple), "[", "]", ",", false, 0)?;
+        return Ok(Pattern::Lst(els));
+      }
+
+      // String
+      if self.starts_with("\"") && !simple {
+        unexpected_tag(self)?;
+        let str = self.parse_quoted_string()?;
+        return Ok(Pattern::Str(STRINGS.get(str)));
+      }
+
+      // Char
+      if self.starts_with("'") {
+        unexpected_tag(self)?;
+        let char = self.parse_quoted_char()?;
+        return Ok(Pattern::Num(char as u32));
+      }
+
+      // Number
+      if self.peek_one().map_or(false, |c| c.is_ascii_digit()) {
+        unexpected_tag(self)?;
+        let num = self.parse_u64()?;
+        return Ok(Pattern::Num(num as u32));
+      }
+
+      // Channel
+      if self.starts_with("$") {
+        unexpected_tag(self)?;
+        self.advance_one();
+        let name = self.parse_hvml_name()?;
+        return Ok(Pattern::Chn(name));
+      }
+
+      // Var
+      unexpected_tag(self)?;
+      let nam = self.labelled(|p| p.parse_name_or_era(), "pattern-matching pattern")?;
+      Ok(Pattern::Var(nam))
     })
   }
 
   pub fn parse_term(&mut self) -> Result<Term, String> {
     maybe_grow(|| {
       let (tag, unexpected_tag) = self.parse_tag()?;
-      let Some(head) = self.skip_peek_one() else { return self.expected("term") };
-      let term = match head {
-        // Lambda, unscoped lambda
-        'λ' | '@' => {
-          let tag = tag.unwrap_or(Tag::Static);
-          self.advance_one().unwrap();
-          let pat = self.parse_pattern(true)?;
-          let bod = self.parse_term()?;
-          Term::Lam { tag, pat: Box::new(pat), bod: Box::new(bod) }
-        }
-        // App, Tup, Num Op
-        '(' => {
-          self.consume("(")?;
-          let starts_with_oper = self.skip_peek_one().map_or(false, |c| "+-*/%&|<>^=!".contains(c));
-          if starts_with_oper {
-            let opr = self.parse_oper()?;
-            if self.skip_starts_with(",") && opr == Op::MUL {
-              // jk, actually a tuple
-              let mut els = vec![Term::Era];
-              while self.try_consume(",") {
-                els.push(self.parse_term()?);
-              }
-              self.consume(")")?;
-              Term::Fan { fan: FanKind::Tup, tag: tag.unwrap_or(Tag::Static), els }
-            } else {
-              unexpected_tag(self)?;
-              let fst = self.parse_term()?;
-              let snd = self.parse_term()?;
-              self.consume(")")?;
-              Term::Opr { opr, fst: Box::new(fst), snd: Box::new(snd) }
+      self.skip_trivia();
+
+      // Lambda, unscoped lambda
+      if self.starts_with("λ") || self.starts_with("@") {
+        self.advance_one().unwrap();
+        let tag = tag.unwrap_or(Tag::Static);
+        let pat = self.parse_pattern(true)?;
+        let bod = self.parse_term()?;
+        return Ok(Term::Lam { tag, pat: Box::new(pat), bod: Box::new(bod) });
+      }
+
+      // App, Tup, Num Op
+      if self.starts_with("(") {
+        self.consume("(")?;
+
+        // Opr but maybe a tup
+        let starts_with_oper = self.skip_peek_one().map_or(false, |c| "+-*/%&|<>^=!".contains(c));
+        if starts_with_oper {
+          let opr = self.parse_oper()?;
+
+          // jk, actually a tuple
+          if self.skip_starts_with(",") && opr == Op::MUL {
+            let mut els = vec![Term::Era];
+            while self.try_consume(",") {
+              els.push(self.parse_term()?);
             }
-          } else {
-            // Tup or App
-            let head = self.parse_term()?;
-            if self.skip_starts_with(",") {
-              // Tup
-              let mut els = vec![head];
-              while self.try_consume(",") {
-                els.push(self.parse_term()?);
-              }
-              self.consume(")")?;
-              Term::Fan { fan: FanKind::Tup, tag: tag.unwrap_or(Tag::Static), els }
-            } else {
-              // App
-              let els = self.list_like(|p| p.parse_term(), "", ")", "", false, 0)?;
-              els.into_iter().fold(head, |fun, arg| Term::App {
-                tag: tag.clone().unwrap_or(Tag::Static),
-                fun: Box::new(fun),
-                arg: Box::new(arg),
-              })
-            }
+            self.consume(")")?;
+            return Ok(Term::Fan { fan: FanKind::Tup, tag: tag.unwrap_or(Tag::Static), els });
           }
-        }
-        // List
-        '[' => {
+
+          // Opr
           unexpected_tag(self)?;
-          let els = self.list_like(|p| p.parse_term(), "[", "]", ",", false, 0)?;
-          Term::Lst { els }
+          let fst = self.parse_term()?;
+          let snd = self.parse_term()?;
+          self.consume(")")?;
+          return Ok(Term::Opr { opr, fst: Box::new(fst), snd: Box::new(snd) });
         }
-        // Sup
-        '{' => {
-          let els = self.list_like(|p| p.parse_term(), "{", "}", ",", false, 2)?;
-          Term::Fan { fan: FanKind::Dup, tag: tag.unwrap_or(Tag::Auto), els }
-        }
-        // Unscoped var
-        '$' => {
-          unexpected_tag(self)?;
-          self.consume("$")?;
-          let nam = self.parse_hvml_name()?;
-          Term::Lnk { nam }
-        }
-        // Era
-        '*' => {
-          unexpected_tag(self)?;
-          self.consume("*")?;
-          Term::Era
-        }
-        // Nat, tagged lambda, tagged sup, tagged app
-        '#' => {
-          unexpected_tag(self)?;
-          self.consume("#")?;
-          let val = self.parse_u64()?;
-          Term::Nat { val }
-        }
-        // String
-        '"' => {
-          unexpected_tag(self)?;
-          let val = self.parse_quoted_string()?;
-          Term::Str { val: STRINGS.get(val) }
-        }
-        // Char
-        '\'' => {
-          unexpected_tag(self)?;
-          let chr = self.parse_quoted_char()?;
-          Term::Num { typ: NumType::U24, val: chr as u32 }
-        }
-        // Native num
-        c if c.is_ascii_digit() => {
-          unexpected_tag(self)?;
-          let val = self.parse_u64()?;
-          Term::Num { typ: NumType::U24, val: val as u32 }
-        }
-        _ => {
-          unexpected_tag(self)?;
-          if self.try_consume_keyword("use") {
-            // Use
-            let nam = self.parse_hvml_name()?;
-            self.consume("=")?;
-            let val = self.parse_term()?;
-            self.try_consume(";");
-            let nxt = self.parse_term()?;
-            Term::Use { nam: Some(nam), val: Box::new(val), nxt: Box::new(nxt) }
-          } else if self.try_consume_keyword("let") {
-            let pat = self.parse_pattern(true)?;
-            self.consume("=")?;
-            let val = self.parse_term()?;
-            self.try_consume(";");
-            let nxt = self.parse_term()?;
-            Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) }
-          } else if self.try_consume_keyword("match") {
-            // match
-            let (bnd, arg, with) = self.parse_match_arg()?;
-            let rules = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
-            Term::Mat { arg: Box::new(arg), bnd: Some(bnd), with, arms: rules }
-          } else if self.try_consume_keyword("switch") {
-            // switch
-            self.parse_switch()?
-          } else if self.try_consume_keyword("do") {
-            let fun = self.parse_name()?;
-            self.consume("{")?;
-            let ask = self.parse_ask(Name::new(fun))?;
-            self.consume("}")?;
-            ask
-          } else {
-            // var
-            let nam = self.labelled(|p| p.parse_hvml_name(), "term")?;
-            Term::Var { nam }
+
+        // Tup or App
+        let head = self.parse_term()?;
+
+        // Tup
+        if self.skip_starts_with(",") {
+          let mut els = vec![head];
+          while self.try_consume(",") {
+            els.push(self.parse_term()?);
           }
+          self.consume(")")?;
+          return Ok(Term::Fan { fan: FanKind::Tup, tag: tag.unwrap_or(Tag::Static), els });
         }
-      };
-      Ok(term)
+
+        // App
+        let els = self.list_like(|p| p.parse_term(), "", ")", "", false, 0)?;
+        let term = els.into_iter().fold(head, |fun, arg| Term::App {
+          tag: tag.clone().unwrap_or(Tag::Static),
+          fun: Box::new(fun),
+          arg: Box::new(arg),
+        });
+        return Ok(term);
+      }
+
+      // List
+      if self.starts_with("[") {
+        unexpected_tag(self)?;
+        let els = self.list_like(|p| p.parse_term(), "[", "]", ",", false, 0)?;
+        return Ok(Term::Lst { els });
+      }
+
+      // Sup
+      if self.starts_with("{") {
+        let els = self.list_like(|p| p.parse_term(), "{", "}", ",", false, 2)?;
+        return Ok(Term::Fan { fan: FanKind::Dup, tag: tag.unwrap_or(Tag::Auto), els });
+      }
+
+      // Unscoped var
+      if self.starts_with("$") {
+        self.consume("$")?;
+        unexpected_tag(self)?;
+        let nam = self.parse_hvml_name()?;
+        return Ok(Term::Lnk { nam });
+      }
+
+      // Era
+      if self.starts_with("*") {
+        self.consume("*")?;
+        unexpected_tag(self)?;
+        return Ok(Term::Era);
+      }
+
+      // Nat
+      if self.starts_with("#") {
+        self.consume("#")?;
+        unexpected_tag(self)?;
+        let val = self.parse_u64()?;
+        return Ok(Term::Nat { val });
+      }
+
+      // String
+      if self.starts_with("\"") {
+        unexpected_tag(self)?;
+        let str = self.parse_quoted_string()?;
+        return Ok(Term::Str { val: STRINGS.get(str) });
+      }
+
+      // Char
+      if self.starts_with("'") {
+        unexpected_tag(self)?;
+        let char = self.parse_quoted_char()?;
+        return Ok(Term::Num { typ: NumType::U24, val: char as u32 });
+      }
+
+      // Native num
+      if self.peek_one().map_or(false, |c| c.is_ascii_digit()) {
+        unexpected_tag(self)?;
+        let val = self.parse_u64()?;
+        return Ok(Term::Num { typ: NumType::U24, val: val as u32 });
+      }
+
+      // Use
+      if self.try_consume_keyword("use") {
+        unexpected_tag(self)?;
+        let nam = self.parse_hvml_name()?;
+        self.consume("=")?;
+        let val = self.parse_term()?;
+        self.try_consume(";");
+        let nxt = self.parse_term()?;
+        return Ok(Term::Use { nam: Some(nam), val: Box::new(val), nxt: Box::new(nxt) });
+      }
+
+      // Let
+      if self.try_consume_keyword("let") {
+        unexpected_tag(self)?;
+        let pat = self.parse_pattern(true)?;
+        self.consume("=")?;
+        let val = self.parse_term()?;
+        self.try_consume(";");
+        let nxt = self.parse_term()?;
+        return Ok(Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) });
+      }
+
+      // Match
+      if self.try_consume_keyword("match") {
+        unexpected_tag(self)?;
+        let (bnd, arg, with) = self.parse_match_arg()?;
+        let rules = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
+        return Ok(Term::Mat { arg: Box::new(arg), bnd: Some(bnd), with, arms: rules });
+      }
+
+      // Switch
+      if self.try_consume_keyword("switch") {
+        unexpected_tag(self)?;
+        return self.parse_switch();
+      }
+
+      // Do
+      if self.try_consume_keyword("do") {
+        unexpected_tag(self)?;
+        let fun = self.parse_name()?;
+        self.consume("{")?;
+        let ask = self.parse_ask(Name::new(fun))?;
+        self.consume("}")?;
+        return Ok(ask);
+      }
+
+      // Var
+      unexpected_tag(self)?;
+      let nam = self.labelled(|p| p.parse_hvml_name(), "term")?;
+      Ok(Term::Var { nam })
     })
   }
 
