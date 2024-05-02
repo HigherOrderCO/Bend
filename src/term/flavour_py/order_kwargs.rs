@@ -19,6 +19,10 @@ impl Stmt {
         val.order_kwargs(variants, enums);
         nxt.order_kwargs(variants, enums);
       }
+      Stmt::InPlace { val, nxt, .. } => {
+        val.order_kwargs(variants, enums);
+        nxt.order_kwargs(variants, enums);
+      }
       Stmt::If { cond, then, otherwise } => {
         cond.order_kwargs(variants, enums);
         then.order_kwargs(variants, enums);

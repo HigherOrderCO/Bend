@@ -46,9 +46,19 @@ pub enum AssignPattern {
 }
 
 #[derive(Clone, Debug)]
+pub enum InPlaceOp {
+  Add,
+  Sub,
+  Mul,
+  Div,
+}
+
+#[derive(Clone, Debug)]
 pub enum Stmt {
   // {pat} = {val} ";" {nxt}
   Assign { pat: AssignPattern, val: Box<Term>, nxt: Box<Stmt> },
+  // {var} += {val} ";" {nxt}
+  InPlace { op: InPlaceOp, var: Name, val: Box<Term>, nxt: Box<Stmt> },
   // "if" {cond} ":"
   //  {then}
   // "else" ":"
@@ -108,4 +118,15 @@ pub struct Program {
   pub enums: IndexMap<Name, Enum>,
   pub defs: IndexMap<Name, Definition>,
   pub variants: IndexMap<Name, Name>,
+}
+
+impl InPlaceOp {
+  pub fn to_lang_op(self) -> Op {
+    match self {
+      InPlaceOp::Add => Op::ADD,
+      InPlaceOp::Sub => Op::SUB,
+      InPlaceOp::Mul => Op::MUL,
+      InPlaceOp::Div => Op::DIV,
+    }
+  }
 }

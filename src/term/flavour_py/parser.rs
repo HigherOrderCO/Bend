@@ -3,7 +3,9 @@ use TSPL::Parser;
 
 use crate::term::{parser::ParserCommons, Name, Op, STRINGS};
 
-use super::{AssignPattern, Definition, Enum, MBind, MatchArm, Program, Stmt, Term, TopLevel, Variant};
+use super::{
+  AssignPattern, Definition, Enum, InPlaceOp, MBind, MatchArm, Program, Stmt, Term, TopLevel, Variant,
+};
 
 const PREC: &[&[Op]] =
   &[&[Op::EQL, Op::NEQ], &[Op::LTN], &[Op::GTN], &[Op::ADD, Op::SUB], &[Op::MUL, Op::DIV]];
@@ -217,7 +219,49 @@ impl<'a> PyParser<'a> {
     } else if self.try_consume_keyword("do") {
       self.parse_do_py(indent)
     } else {
+      self.parse_in_place(indent)
+    }
+  }
+
+  fn parse_in_place(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+    if self.starts_with("(") {
       self.parse_assignment_py(indent)
+    } else {
+      let name = self.parse_hvml_name()?;
+      if self.skip_starts_with("=") {
+        // it's actually an assignment
+        self.consume("=")?;
+        let val = self.parse_term_py()?;
+        self.consume(";")?;
+        let nxt = self.parse_stmt_py(indent)?;
+        return Ok(Stmt::Assign { pat: AssignPattern::Var(name), val: Box::new(val), nxt: Box::new(nxt) });
+      }
+      let in_place: InPlaceOp;
+      self.skip_spaces();
+      if let Some(s) = self.peek_many(2) {
+        if s == "+=" {
+          self.consume("+=")?;
+          in_place = InPlaceOp::Add;
+        } else if s == "-=" {
+          self.consume("+=")?;
+          in_place = InPlaceOp::Sub;
+        } else if s == "*=" {
+          self.consume("+=")?;
+          in_place = InPlaceOp::Mul;
+        } else if s == "/=" {
+          self.consume("+=")?;
+          in_place = InPlaceOp::Div;
+        } else {
+          return self.expected("in-place operator");
+        }
+
+        let val = self.parse_term_py()?;
+        self.consume(";")?;
+        let nxt = self.parse_stmt_py(indent)?;
+        Ok(Stmt::InPlace { op: in_place, var: name, val: Box::new(val), nxt: Box::new(nxt) })
+      } else {
+        self.expected("in-place operator")?
+      }
     }
   }
 
@@ -513,6 +557,10 @@ def mk_point():
 
 def identity(x):
   return x;
+
+def inc(n):
+  n += 1;
+  return n;
 
 def lam():
   return lambda x, y: return x;;

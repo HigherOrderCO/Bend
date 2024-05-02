@@ -54,6 +54,15 @@ impl Stmt {
         let nxt = nxt.to_lang();
         lang::Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) }
       }
+      Stmt::InPlace { op, var: nam, val, nxt } => lang::Term::Let {
+        pat: Box::new(lang::Pattern::Var(Some(nam.clone()))),
+        val: Box::new(lang::Term::Opr {
+          opr: op.to_lang_op(),
+          fst: Box::new(lang::Term::Var { nam }),
+          snd: Box::new(val.to_lang()),
+        }),
+        nxt: Box::new(nxt.to_lang()),
+      },
       Stmt::If { cond, then, otherwise } => {
         let arms = vec![otherwise.to_lang(), then.to_lang()];
         lang::Term::Swt { arg: Box::new(cond.to_lang()), bnd: None, with: Vec::new(), pred: None, arms }
