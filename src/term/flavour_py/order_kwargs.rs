@@ -30,9 +30,9 @@ impl Stmt {
           arm.rgt.order_kwargs(variants, enums);
         }
       }
-      Stmt::Switch { arg, bind, arms } => {}
-      Stmt::Fold { .. } => {}
-      Stmt::Do { block, .. } => {}
+      Stmt::Switch { .. } => unimplemented!(),
+      Stmt::Fold { .. } => unimplemented!(),
+      Stmt::Do { .. } => unimplemented!(),
       Stmt::Return { term } => term.order_kwargs(variants, enums),
     }
   }
@@ -53,7 +53,7 @@ impl Term {
               index_map.insert(field, index);
             }
 
-            let mut kwargs = std::mem::replace(kwargs, Vec::new());
+            let mut kwargs = std::mem::take(kwargs);
             kwargs.sort_by_key(|i| index_map.get(&i.0).unwrap());
             let new_args = kwargs.into_iter().map(|i| i.1.clone());
             args.extend(new_args);

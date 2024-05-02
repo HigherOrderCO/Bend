@@ -6,12 +6,9 @@ use crate::{
   },
 };
 use highlight_error::highlight_error;
-use indexmap::IndexMap;
 use TSPL::Parser;
 
 use super::NumType;
-
-use super::flavour_py;
 
 // hvml grammar description:
 // <Book>       ::= (<Data> | <Rule>)*
@@ -369,53 +366,6 @@ impl<'a> TermParser<'a> {
     })
   }
 
-  fn parse_oper(&mut self) -> Result<Op, String> {
-    let opr = if self.try_consume("+") {
-      Op::ADD
-    } else if self.try_consume("-") {
-      Op::SUB
-    } else if self.try_consume("*") {
-      Op::MUL
-    } else if self.try_consume("/") {
-      Op::DIV
-    } else if self.try_consume("%") {
-      Op::REM
-    } else if self.try_consume("<") {
-      Op::LTN
-    } else if self.try_consume(">") {
-      Op::GTN
-    } else if self.try_consume("==") {
-      Op::EQL
-    } else if self.try_consume("!=") {
-      Op::NEQ
-    } else if self.try_consume("&") {
-      Op::AND
-    } else if self.try_consume("|") {
-      Op::OR
-    } else if self.try_consume("^") {
-      Op::XOR
-    } else {
-      return self.expected("numeric operator");
-    };
-    Ok(opr)
-  }
-
-  fn try_consume_keyword(&mut self, keyword: &str) -> bool {
-    self.skip_trivia();
-
-    if !self.starts_with(keyword) {
-      return false;
-    }
-    let input = &self.input()[*self.index() + keyword.len() ..];
-    let next_is_name = input.chars().next().map_or(false, is_name_char);
-    if !next_is_name {
-      self.consume(keyword).unwrap();
-      true
-    } else {
-      false
-    }
-  }
-
   fn parse_top_level_name(&mut self) -> Result<Name, String> {
     let ini_idx = *self.index();
     let nam = self.parse_hvml_name()?;
@@ -426,11 +376,6 @@ impl<'a> TermParser<'a> {
     } else {
       Ok(nam)
     }
-  }
-
-  fn parse_hvml_name(&mut self) -> Result<Name, String> {
-    let nam = self.parse_name()?;
-    Ok(Name::new(nam))
   }
 
   fn parse_name_or_era(&mut self) -> Result<Option<Name>, String> {
@@ -534,88 +479,6 @@ impl<'a> TermParser<'a> {
     self.consume("}")?;
     Ok(Term::Swt { arg: Box::new(arg), bnd: Some(bnd), with, pred, arms })
   }
-
-  /* Utils */
-
-  /// Checks if the next characters in the input start with the given string.
-  /// Skips trivia.
-  fn skip_starts_with(&mut self, text: &str) -> bool {
-    self.skip_trivia();
-    self.starts_with(text)
-  }
-
-  fn skip_peek_one(&mut self) -> Option<char> {
-    self.skip_trivia();
-    self.peek_one()
-  }
-
-  /// Parses a list-like structure like "[x1, x2, x3,]".
-  ///
-  /// `parser` is a function that parses an element of the list.
-  ///
-  /// If `hard_sep` the separator between elements is mandatory.
-  /// Always accepts trailing separators.
-  ///
-  /// `min_els` determines how many elements must be parsed at minimum.
-  fn list_like<T>(
-    &mut self,
-    parser: impl Fn(&mut Self) -> Result<T, String>,
-    start: &str,
-    end: &str,
-    sep: &str,
-    hard_sep: bool,
-    min_els: usize,
-  ) -> Result<Vec<T>, String> {
-    self.consume(start)?;
-    let mut els = vec![];
-    for i in 0 .. min_els {
-      els.push(parser(self)?);
-      if hard_sep && !(i == min_els - 1 && self.skip_starts_with(end)) {
-        self.consume(sep)?;
-      } else {
-        self.try_consume(sep);
-      }
-    }
-
-    while !self.try_consume(end) {
-      els.push(parser(self)?);
-      if hard_sep && !self.skip_starts_with(end) {
-        self.consume(sep)?;
-      } else {
-        self.try_consume(sep);
-      }
-    }
-    Ok(els)
-  }
-
-  fn labelled<T>(
-    &mut self,
-    parser: impl Fn(&mut Self) -> Result<T, String>,
-    label: &str,
-  ) -> Result<T, String> {
-    match parser(self) {
-      Ok(val) => Ok(val),
-      Err(_) => self.expected(label),
-    }
-  }
-
-  fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> Result<T, String> {
-    let ctx = highlight_error(ini_idx, end_idx, self.input());
-    let is_eof = self.is_eof();
-    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { write!(f, "\n{ctx}") });
-    Err(format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected))
-  }
-
-  /// Consumes text if the input starts with it. Otherwise, do nothing.
-  fn try_consume(&mut self, text: &str) -> bool {
-    self.skip_trivia();
-    if self.starts_with(text) {
-      self.consume(text).unwrap();
-      true
-    } else {
-      false
-    }
-  }
 }
 
 impl<'a> Parser<'a> for TermParser<'a> {
@@ -694,526 +557,138 @@ fn add_ctx_to_msg(msg: &str, ini_idx: usize, end_idx: usize, file: &str) -> Stri
   format!("{msg}\n{ctx}")
 }
 
-// flavour py
-// ==========
+impl<'a> ParserCommons<'a> for TermParser<'a> {}
 
-const PREC: &[&[Op]] =
-  &[&[Op::EQL, Op::NEQ], &[Op::LTN], &[Op::GTN], &[Op::ADD, Op::SUB], &[Op::MUL, Op::DIV]];
-
-struct Indent(isize);
-
-impl Indent {
-  fn enter_level(&mut self) {
-    self.0 += 2;
+pub trait ParserCommons<'a>: Parser<'a> {
+  fn labelled<T>(
+    &mut self,
+    parser: impl Fn(&mut Self) -> Result<T, String>,
+    label: &str,
+  ) -> Result<T, String> {
+    match parser(self) {
+      Ok(val) => Ok(val),
+      Err(_) => self.expected(label),
+    }
   }
 
-  fn exit_level(&mut self) {
-    self.0 -= 2;
+  fn parse_hvml_name(&mut self) -> Result<Name, String> {
+    let nam = self.parse_name()?;
+    Ok(Name::new(nam))
   }
-}
 
-impl<'a> TermParser<'a> {
-  fn parse_primary_py(&mut self) -> Result<flavour_py::Term, String> {
+  fn skip_peek_one(&mut self) -> Option<char> {
     self.skip_trivia();
-    let Some(head) = self.skip_peek_one() else { return self.expected("primary term")? };
-    let res = match head {
-      '(' => {
-        self.consume("(")?;
-        let head = self.parse_term_py()?;
-        if self.skip_starts_with(",") {
-          let mut els = vec![head];
-          while self.try_consume(",") {
-            els.push(self.parse_term_py()?);
-          }
-          self.consume(")")?;
-          flavour_py::Term::Tup { els }
-        } else {
-          self.consume(")")?;
-          head
-        }
-      }
-      '[' => {
-        let els = self.list_like(|p| p.parse_term_py(), "[", "]", ",", true, 0)?;
-        flavour_py::Term::Lst { els }
-      }
-      '\"' => {
-        let str = self.parse_quoted_string()?;
-        let val = STRINGS.get(str);
-        flavour_py::Term::Str { val }
-      }
-      c if c.is_ascii_digit() => {
-        let val = self.parse_u64()?;
-        flavour_py::Term::Num { val: val as u32 }
-      }
-      _ => {
-        if self.try_consume("True") {
-          return Ok(flavour_py::Term::Num { val: 1 });
-        } else if self.try_consume("False") {
-          return Ok(flavour_py::Term::Num { val: 0 });
-        }
-        flavour_py::Term::Var { nam: self.parse_hvml_name()? }
-      }
-    };
-    Ok(res)
+    self.peek_one()
   }
 
-  fn parse_term_py(&mut self) -> Result<flavour_py::Term, String> {
+  /// Checks if the next characters in the input start with the given string.
+  /// Skips trivia.
+  fn skip_starts_with(&mut self, text: &str) -> bool {
     self.skip_trivia();
-    if self.try_consume_keyword("lambda") {
-      let names = self.list_like(|p| p.parse_hvml_name(), "", ":", ",", true, 1)?;
-      let bod = self.parse_stmt_py(&mut Indent(0))?;
-      Ok(flavour_py::Term::Lam { names, bod })
-    } else {
-      self.parse_infix_py(0)
-    }
+    self.starts_with(text)
   }
 
-  fn parse_call(&mut self) -> Result<flavour_py::Term, String> {
+  fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> Result<T, String> {
+    let ctx = highlight_error(ini_idx, end_idx, self.input());
+    let is_eof = self.is_eof();
+    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { write!(f, "\n{ctx}") });
+    Err(format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected))
+  }
+
+  /// Consumes text if the input starts with it. Otherwise, do nothing.
+  fn try_consume(&mut self, text: &str) -> bool {
     self.skip_trivia();
-    let mut args = Vec::new();
-    let mut kwargs = Vec::new();
-    let fun = self.parse_primary_py()?;
-    if self.try_consume("(") {
-      loop {
-        if self.try_consume(",") {
-          continue;
-        }
-        if self.try_consume(")") {
-          break;
-        }
-
-        let arg = self.parse_term_py()?;
-        if self.try_consume("=") {
-          if let flavour_py::Term::Var { nam } = arg {
-            let value = self.parse_term_py()?;
-            kwargs.push((nam, value));
-          } else {
-            return Err("Unexpected '='".to_string());
-          }
-        } else {
-          args.push(arg);
-        }
-      }
-    }
-    if args.is_empty() && kwargs.is_empty() {
-      Ok(fun)
-    } else {
-      Ok(flavour_py::Term::Call { fun: Box::new(fun), args, kwargs })
-    }
-  }
-
-  fn parse_infix_py(&mut self, prec: usize) -> Result<flavour_py::Term, String> {
-    self.skip_trivia();
-    if prec > PREC.len() - 1 {
-      return self.parse_call();
-    }
-    let mut lhs = self.parse_infix_py(prec + 1)?;
-    while let Some(op) = self.get_op() {
-      if PREC[prec].iter().any(|r| *r == op) {
-        let op = self.parse_oper()?;
-        let rhs = self.parse_infix_py(prec + 1)?;
-        self.skip_trivia();
-        lhs = flavour_py::Term::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
-      } else {
-        break;
-      }
-    }
-    Ok(lhs)
-  }
-
-  fn get_op(&mut self) -> Option<Op> {
-    match self.skip_peek_one() {
-      Some('+') => Some(Op::ADD),
-      Some('-') => Some(Op::SUB),
-      Some('*') => Some(Op::MUL),
-      Some('/') => Some(Op::DIV),
-      Some('>') => Some(Op::GTN),
-      Some('<') => Some(Op::LTN),
-      _ => None,
-    }
-  }
-
-  fn skip_newlines(&mut self) -> Result<(), String> {
-    while let Some(c) = self.peek_one() {
-      if c == '\n' {
-        self.advance_one();
-      } else {
-        break;
-      }
-    }
-    Ok(())
-  }
-
-  fn skip_exact_indent(&mut self, Indent(mut count): &Indent, block: bool) -> Result<bool, String> {
-    while let Some(c) = self.peek_one() {
-      if c == '\n' {
-        self.advance_one();
-      } else {
-        break;
-      }
-    }
-    if count <= 0 {
-      self.skip_spaces();
-      return Ok(false);
-    }
-    while let Some(c) = self.peek_one() {
-      if c.is_ascii_whitespace() {
-        count -= 1;
-        self.advance_one();
-      } else {
-        break;
-      }
-    }
-    if block {
-      return Ok(count == 0 && !self.is_eof());
-    }
-    // TODO: add the current line in Err
-    if count == 0 { Ok(true) } else { Err("Indentation error".to_string()) }
-  }
-
-  fn parse_stmt_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
-    self.skip_exact_indent(indent, false)?;
-    if self.try_consume_keyword("return") {
-      self.parse_return_py()
-    } else if self.try_consume_keyword("if") {
-      self.parse_if_py(indent)
-    } else if self.try_consume_keyword("match") {
-      self.parse_match_py(indent)
-    } else if self.try_consume_keyword("switch") {
-      self.parse_switch_py(indent)
-    } else if self.try_consume_keyword("fold") {
-      self.parse_fold_py(indent)
-    } else if self.try_consume_keyword("do") {
-      self.parse_do_py(indent)
-    } else {
-      self.parse_assignment_py(indent)
-    }
-  }
-
-  fn parse_return_py(&mut self) -> Result<flavour_py::Stmt, String> {
-    let term = self.parse_term_py()?;
-    self.consume(";")?;
-    Ok(flavour_py::Stmt::Return { term: Box::new(term) })
-  }
-
-  fn parse_if_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
-    let cond = self.parse_term_py()?;
-    self.consume(":")?;
-    indent.enter_level();
-    let then = self.parse_stmt_py(indent)?;
-    indent.exit_level();
-    self.skip_exact_indent(indent, false)?;
-    self.consume("else")?;
-    self.consume(":")?;
-    indent.enter_level();
-    let otherwise = self.parse_stmt_py(indent)?;
-    indent.exit_level();
-    Ok(flavour_py::Stmt::If { cond: Box::new(cond), then: Box::new(then), otherwise: Box::new(otherwise) })
-  }
-
-  fn parse_as_bind(&mut self) -> Result<Option<Name>, String> {
-    let mut bind = None;
-    if self.try_consume_keyword("as") {
-      bind = Some(self.parse_hvml_name()?);
-    }
-    Ok(bind)
-  }
-
-  fn parse_match_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
-    let scrutinee = self.parse_primary_py()?;
-    let bind = self.parse_as_bind()?;
-    self.consume(":")?;
-    let mut arms = Vec::new();
-    indent.enter_level();
-    loop {
-      if !self.skip_exact_indent(indent, true)? {
-        break;
-      }
-      arms.push(self.parse_case_py(indent)?);
-    }
-    indent.exit_level();
-    Ok(flavour_py::Stmt::Match { arg: Box::new(scrutinee), bind, arms })
-  }
-
-  fn parse_case_py(&mut self, indent: &mut Indent) -> Result<flavour_py::MatchArm, String> {
-    self.consume("case")?;
-    let pat = self.parse_name_or_era()?;
-    self.consume(":")?;
-    indent.enter_level();
-    let body = self.parse_stmt_py(indent)?;
-    indent.exit_level();
-    Ok(flavour_py::MatchArm { lft: pat, rgt: body })
-  }
-
-  fn parse_switch_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
-    let arg = self.parse_term_py()?;
-    let bind = self.parse_as_bind()?;
-    self.consume(":")?;
-    let mut arms = Vec::new();
-
-    indent.enter_level();
-    let mut should_continue = true;
-    let mut expected_num = 0;
-
-    while should_continue && self.skip_exact_indent(indent, true)? {
-      self.consume("case")?;
-      if let Some(c) = self.skip_peek_one() {
-        match c {
-          '_' => {
-            if expected_num == 0 {
-              return self.expected("0");
-            } else {
-              self.consume("_")?;
-              should_continue = false;
-            }
-          }
-          c if c.is_ascii_digit() => {
-            let value = self.parse_u64()?;
-            if value != expected_num {
-              return self.expected(&expected_num.to_string());
-            }
-          }
-          _ => return self.expected("Number pattern"),
-        }
-        self.consume(":")?;
-        indent.enter_level();
-        arms.push(self.parse_stmt_py(indent)?);
-        indent.exit_level();
-        expected_num += 1;
-      } else {
-        self.expected("Switch pattern")?
-      }
-    }
-    indent.exit_level();
-    Ok(flavour_py::Stmt::Switch { arg: Box::new(arg), bind, arms })
-  }
-
-  fn parse_fold_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
-    let fun = self.parse_hvml_name()?;
-    let arg = self.parse_term_py()?;
-    let bind = self.parse_as_bind()?;
-    self.consume(":")?;
-    let mut arms = Vec::new();
-    indent.enter_level();
-    loop {
-      if !self.skip_exact_indent(indent, true)? {
-        break;
-      }
-      arms.push(self.parse_case_py(indent)?);
-    }
-    indent.exit_level();
-    Ok(flavour_py::Stmt::Fold { fun, arg: Box::new(arg), bind, arms })
-  }
-
-  fn parse_do_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
-    let fun = self.parse_hvml_name()?;
-    self.consume(":")?;
-
-    let mut block = Vec::new();
-
-    indent.enter_level();
-    loop {
-      if !self.skip_exact_indent(indent, true)? {
-        break;
-      }
-      if self.try_consume("!") {
-        let pat = self.parse_assign_pattern_py()?;
-        self.consume("=")?;
-        let val = self.parse_term_py()?;
-        self.consume(";")?;
-        block.push(flavour_py::MBind::Ask { pat, val: Box::new(val) });
-      } else {
-        block.push(flavour_py::MBind::Stmt { stmt: Box::new(self.parse_stmt_py(&mut Indent(0))?) })
-      }
-    }
-    indent.exit_level();
-
-    Ok(flavour_py::Stmt::Do { fun, block })
-  }
-
-  fn parse_assignment_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Stmt, String> {
-    let pat = self.parse_assign_pattern_py()?;
-    self.consume("=")?;
-    let val = self.parse_term_py()?;
-    self.consume(";")?;
-    let nxt = self.parse_stmt_py(indent)?;
-    Ok(flavour_py::Stmt::Assign { pat, val: Box::new(val), nxt: Box::new(nxt) })
-  }
-
-  fn parse_assign_pattern_py(&mut self) -> Result<flavour_py::AssignPattern, String> {
-    if self.skip_starts_with("(") {
-      let mut binds = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 1)?;
-      if binds.len() == 1 {
-        Ok(flavour_py::AssignPattern::Var(std::mem::take(&mut binds[0])))
-      } else {
-        Ok(flavour_py::AssignPattern::Tup(binds))
-      }
-    } else {
-      self.parse_hvml_name().map(flavour_py::AssignPattern::Var)
-    }
-  }
-
-  fn parse_top_level_py(&mut self, indent: &mut Indent) -> Result<flavour_py::TopLevel, String> {
-    self.skip_exact_indent(indent, false)?;
-    if self.try_consume_keyword("def") {
-      Ok(flavour_py::TopLevel::Def(self.parse_def_py(indent)?))
-    } else if self.try_consume_keyword("enum") {
-      Ok(flavour_py::TopLevel::Enum(self.parse_enum_py(indent)?))
-    } else {
-      self.expected("Enum or Def declaration")?
-    }
-  }
-
-  fn parse_def_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Definition, String> {
-    let name = self.parse_hvml_name()?;
-    let params = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 0)?;
-    self.consume(":")?;
-    indent.enter_level();
-    let body = self.parse_stmt_py(indent)?;
-    indent.exit_level();
-    Ok(flavour_py::Definition { name, params, body })
-  }
-
-  fn parse_enum_py(&mut self, indent: &mut Indent) -> Result<flavour_py::Enum, String> {
-    let name = self.parse_hvml_name()?;
-    let mut variants = Vec::new();
-    self.consume(":")?;
-    indent.enter_level();
-    loop {
-      if !self.skip_exact_indent(indent, true)? {
-        break;
-      }
-      let name = self.parse_hvml_name()?;
-      let mut fields = Vec::new();
-      if self.skip_starts_with("(") {
-        fields = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 0)?;
-      }
-      variants.push((name.clone(), flavour_py::Variant { name, fields }));
-    }
-    indent.exit_level();
-    let variants = variants.into_iter().collect();
-    Ok(flavour_py::Enum { name, variants })
-  }
-
-  pub fn parse_program_py(&mut self) -> Result<flavour_py::Program, String> {
-    let mut enums = IndexMap::<Name, flavour_py::Enum>::new();
-    let mut defs = IndexMap::<Name, flavour_py::Definition>::new();
-    let mut variants = IndexMap::<Name, Name>::new();
-
-    while {
-      self.skip_newlines()?;
+    if self.starts_with(text) {
+      self.consume(text).unwrap();
       true
-    } && !self.is_eof()
-    {
-      match self.parse_top_level_py(&mut Indent(0))? {
-        flavour_py::TopLevel::Def(def) => Self::add_def_py(&mut defs, def)?,
-        flavour_py::TopLevel::Enum(r#enum) => Self::add_enum_py(&mut enums, &mut variants, r#enum)?,
-      }
-      self.skip_spaces();
-    }
-
-    Ok(flavour_py::Program { enums, defs, variants })
-  }
-
-  fn add_def_py(
-    defs: &mut IndexMap<Name, flavour_py::Definition>,
-    def: flavour_py::Definition,
-  ) -> Result<(), String> {
-    match defs.entry(def.name.clone()) {
-      indexmap::map::Entry::Occupied(o) => Err(format!("Repeated definition '{}'.", o.get().name)),
-      indexmap::map::Entry::Vacant(v) => {
-        v.insert(def);
-        Ok(())
-      }
+    } else {
+      false
     }
   }
 
-  fn add_enum_py(
-    enums: &mut IndexMap<Name, flavour_py::Enum>,
-    variants: &mut IndexMap<Name, Name>,
-    r#enum: flavour_py::Enum,
-  ) -> Result<(), String> {
-    match enums.entry(r#enum.name.clone()) {
-      indexmap::map::Entry::Occupied(o) => return Err(format!("Repeated enum '{}'.", o.key())),
-      indexmap::map::Entry::Vacant(v) => {
-        for (name, variant) in r#enum.variants.iter() {
-          match variants.entry(name.clone()) {
-            indexmap::map::Entry::Occupied(_) => {
-              return Err(format!("Repeated variant '{}'.", variant.name));
-            }
-            indexmap::map::Entry::Vacant(v) => _ = v.insert(r#enum.name.clone()),
-          }
-        }
-        v.insert(r#enum);
+  fn try_consume_keyword(&mut self, keyword: &str) -> bool {
+    self.skip_trivia();
+
+    if !self.starts_with(keyword) {
+      return false;
+    }
+    let input = &self.input()[*self.index() + keyword.len() ..];
+    let next_is_name = input.chars().next().map_or(false, is_name_char);
+    if !next_is_name {
+      self.consume(keyword).unwrap();
+      true
+    } else {
+      false
+    }
+  }
+
+  /// Parses a list-like structure like "[x1, x2, x3,]".
+  ///
+  /// `parser` is a function that parses an element of the list.
+  ///
+  /// If `hard_sep` the separator between elements is mandatory.
+  /// Always accepts trailing separators.
+  ///
+  /// `min_els` determines how many elements must be parsed at minimum.
+  fn list_like<T>(
+    &mut self,
+    parser: impl Fn(&mut Self) -> Result<T, String>,
+    start: &str,
+    end: &str,
+    sep: &str,
+    hard_sep: bool,
+    min_els: usize,
+  ) -> Result<Vec<T>, String> {
+    self.consume(start)?;
+    let mut els = vec![];
+    for i in 0 .. min_els {
+      els.push(parser(self)?);
+      if hard_sep && !(i == min_els - 1 && self.skip_starts_with(end)) {
+        self.consume(sep)?;
+      } else {
+        self.try_consume(sep);
       }
     }
-    Ok(())
+
+    while !self.try_consume(end) {
+      els.push(parser(self)?);
+      if hard_sep && !self.skip_starts_with(end) {
+        self.consume(sep)?;
+      } else {
+        self.try_consume(sep);
+      }
+    }
+    Ok(els)
   }
-}
 
-#[cfg(test)]
-#[allow(dead_code)]
-mod test {
-  use super::TermParser;
-
-  #[test]
-  fn parse_def() {
-    let src = r#"
-enum Point:
-  Point(x, y)
-
-enum Bool:
-  True()
-  False()
-
-def mk_point():
-  return Point(y = 2, x = 1);
-
-def identity(x):
-  return x;
-
-def lam():
-  return lambda x, y: return x;;
-
-def mtch(b):
-  match b as bool:
-    case True:
-      return 1;
-    case False:
-      return 0;
-
-def true():
-  return True;
-
-def fib(n):
-  if n < 2:
-    return n;
-  else:
-    return fib(n - 1) + fib(n - 2);
-
-def swt(n):
-  switch n:
-    case 0:
-      return 42;
-    case _:
-      return 1;
-
-def fld(list):
-  fold List.fold list:
-    case List.cons:
-      return 1;
-    case List.nil:
-      return 2;
-
-def main():
-  do IO.bind:
-    !x = IO.read();
-    return x;
-    "#;
-    let mut parser = TermParser::new(src);
-    let mut program = parser.parse_program_py().inspect_err(|e| println!("{e}")).unwrap();
-    program.order_kwargs();
-    let out = program.to_lang(crate::term::Book::default());
-    println!("{out}");
+  fn parse_oper(&mut self) -> Result<Op, String> {
+    let opr = if self.try_consume("+") {
+      Op::ADD
+    } else if self.try_consume("-") {
+      Op::SUB
+    } else if self.try_consume("*") {
+      Op::MUL
+    } else if self.try_consume("/") {
+      Op::DIV
+    } else if self.try_consume("%") {
+      Op::REM
+    } else if self.try_consume("<") {
+      Op::LTN
+    } else if self.try_consume(">") {
+      Op::GTN
+    } else if self.try_consume("==") {
+      Op::EQL
+    } else if self.try_consume("!=") {
+      Op::NEQ
+    } else if self.try_consume("&") {
+      Op::AND
+    } else if self.try_consume("|") {
+      Op::OR
+    } else if self.try_consume("^") {
+      Op::XOR
+    } else {
+      return self.expected("numeric operator");
+    };
+    Ok(opr)
   }
 }

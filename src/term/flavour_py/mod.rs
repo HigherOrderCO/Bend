@@ -1,4 +1,5 @@
 mod order_kwargs;
+pub mod parser;
 pub mod to_lang;
 
 use indexmap::IndexMap;
