@@ -1,5 +1,6 @@
 use crate::{
   diagnostics::{Diagnostics, WarningType, ERR_INDENT_SIZE},
+  maybe_grow,
   term::transform::definition_merge::MERGE_SEPARATOR,
 };
 use hvmc::ast::{Book, Tree};
@@ -101,8 +102,9 @@ impl Graph {
   }
 }
 
+/// Collect active refs from the tree.
 fn collect_refs(current: Ref, tree: &Tree, graph: &mut Graph) {
-  match tree {
+  maybe_grow(|| match tree {
     Tree::Ref { nam } => graph.add(current, nam.clone()),
     Tree::Ctr { ports, .. } => {
       if let Some(last) = ports.last() {
@@ -114,7 +116,7 @@ fn collect_refs(current: Ref, tree: &Tree, graph: &mut Graph) {
         collect_refs(current.clone(), subtree, graph);
       }
     }
-  }
+  });
 }
 
 impl From<&Book> for Graph {
@@ -122,11 +124,15 @@ impl From<&Book> for Graph {
     let mut graph = Self::new();
 
     for (r#ref, net) in book.iter() {
-      // Collect active refs from root.
+      // Collect active refs from the root.
       collect_refs(r#ref.clone(), &net.root, &mut graph);
-      for (left, _) in net.redexes.iter() {
-        // If left is an active reference, add to the graph.
+
+      // Collect active refs from redexes.
+      for (left, right) in net.redexes.iter() {
         if let Tree::Ref { nam } = left {
+          graph.add(r#ref.clone(), nam.clone());
+        }
+        if let Tree::Ref { nam } = right {
           graph.add(r#ref.clone(), nam.clone());
         }
       }

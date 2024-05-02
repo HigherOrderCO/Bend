@@ -1,1 +1,1 @@
-main = λa λb switch a { 0: b; _: b }
+main = λa λb λc switch a { 0: b; _: c }

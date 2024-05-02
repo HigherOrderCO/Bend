@@ -235,15 +235,6 @@ impl DiagnosticsConfig {
     }
   }
 
-  pub fn default_strict() -> Self {
-    // TODO: Pre-reduce recursion check disabled while execution not implemented for hvm32
-    Self { recursion_cycle: Severity::Error, ..Self::default() }
-  }
-
-  pub fn default_lazy() -> Self {
-    Self { recursion_cycle: Severity::Allow, ..Self::default() }
-  }
-
   pub fn warning_severity(&self, warn: WarningType) -> Severity {
     match warn {
       WarningType::UnusedDefinition => self.unused_definition,
@@ -258,7 +249,9 @@ impl DiagnosticsConfig {
 
 impl Default for DiagnosticsConfig {
   fn default() -> Self {
-    Self::new(Severity::Warning, false)
+    let mut cfg = Self::new(Severity::Warning, false);
+    cfg.recursion_cycle = Severity::Error;
+    cfg
   }
 }
 

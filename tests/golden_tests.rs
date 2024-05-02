@@ -117,9 +117,8 @@ fn compile_term() {
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compile_opts = CompileOpts::default_strict();
-    let mut diagnostics_cfg = DiagnosticsConfig::default_strict();
-    diagnostics_cfg.unused_definition = Severity::Allow;
+    let compile_opts = CompileOpts::default();
+    let diagnostics_cfg = DiagnosticsConfig { unused_definition: Severity::Allow, ..Default::default() };
 
     let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
@@ -130,10 +129,12 @@ fn compile_file() {
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let opts = CompileOpts::default_strict().set_all();
-    let mut diagnostics_cfg = DiagnosticsConfig::default_strict();
-    diagnostics_cfg.recursion_cycle = Severity::Warning;
-    diagnostics_cfg.unused_definition = Severity::Allow;
+    let opts = CompileOpts::default().set_all();
+    let diagnostics_cfg = DiagnosticsConfig {
+      recursion_cycle: Severity::Warning,
+      unused_definition: Severity::Allow,
+      ..Default::default()
+    };
 
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
@@ -144,8 +145,8 @@ fn compile_file_o_all() {
 fn compile_file_o_no_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let compile_opts = CompileOpts::default_strict().set_no_all();
-    let diagnostics_cfg = DiagnosticsConfig::default_strict();
+    let compile_opts = CompileOpts::default().set_no_all();
+    let diagnostics_cfg = DiagnosticsConfig::default();
     let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None)?;
     Ok(format!("{}", res.core_book))
   })
@@ -154,11 +155,17 @@ fn compile_file_o_no_all() {
 #[test]
 fn linear_readback() {
   run_golden_test_dir(function_name!(), &|code, path| {
+    let _guard = RUN_MUTEX.lock().unwrap();
     let book = do_parse_book(code, path)?;
-    let compile_opts = CompileOpts::default_strict().set_all();
-    let diagnostics_cfg = DiagnosticsConfig::default_strict();
-    let (term, _, diags) =
-      run_book(book, RunOpts { linear: true, ..Default::default() }, compile_opts, diagnostics_cfg, None)?;
+    let compile_opts = CompileOpts::default().set_all();
+    let diagnostics_cfg = DiagnosticsConfig::default();
+    let (term, _, diags) = run_book(
+      book,
+      RunOpts { linear_readback: true, ..Default::default() },
+      compile_opts,
+      diagnostics_cfg,
+      None,
+    )?;
     let res = format!("{diags}{term}");
     Ok(res)
   });
@@ -169,7 +176,7 @@ fn run_file() {
   run_golden_test_dir_multiple(function_name!(), &[(&|code, path| {
     let _guard = RUN_MUTEX.lock().unwrap();
     let book = do_parse_book(code, path)?;
-    let compile_opts = CompileOpts::default_strict();
+    let compile_opts = CompileOpts::default();
     let diagnostics_cfg = DiagnosticsConfig {
       unused_definition: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
@@ -185,8 +192,9 @@ fn run_file() {
 #[test]
 #[ignore = "while lazy execution is not implemented for hvm32"]
 fn run_lazy() {
-  run_golden_test_dir(function_name!(), &|code, path| {
-    let _guard = RUN_MUTEX.lock().unwrap();
+  run_golden_test_dir(function_name!(), &|_code, _path| {
+    todo!()
+    /* let _guard = RUN_MUTEX.lock().unwrap();
     let book = do_parse_book(code, path)?;
     let compile_opts = CompileOpts::default_lazy();
     let diagnostics_cfg = DiagnosticsConfig {
@@ -198,7 +206,7 @@ fn run_lazy() {
 
     let (term, _, diags) = run_book(book, run_opts, compile_opts, diagnostics_cfg, None)?;
     let res = format!("{diags}{term}");
-    Ok(res)
+    Ok(res) */
   })
 }
 
@@ -255,7 +263,7 @@ fn parse_file() {
 fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut result = String::new();
-    let diagnostics_cfg = DiagnosticsConfig::default_strict();
+    let diagnostics_cfg = DiagnosticsConfig::default();
     let mut book = do_parse_book(code, path)?;
     let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
     ctx.check_shared_names();
@@ -286,7 +294,7 @@ fn encode_pattern_match() {
 #[test]
 fn desugar_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let compile_opts = CompileOpts::default_strict();
+    let compile_opts = CompileOpts::default();
     let diagnostics_cfg = DiagnosticsConfig {
       unused_definition: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
@@ -305,7 +313,7 @@ fn hangs() {
   run_golden_test_dir(function_name!(), &move |code, path| {
     let _guard = RUN_MUTEX.lock().unwrap();
     let book = do_parse_book(code, path)?;
-    let compile_opts = CompileOpts::default_strict().set_all();
+    let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Allow, false);
 
     let thread =
@@ -328,7 +336,7 @@ fn compile_entrypoint() {
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
     let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
-    let res = compile_book(&mut book, CompileOpts::default_strict(), diagnostics_cfg, None)?;
+    let res = compile_book(&mut book, CompileOpts::default(), diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
 }
@@ -340,7 +348,7 @@ fn run_entrypoint() {
     let _guard = RUN_MUTEX.lock().unwrap();
     let mut book = do_parse_book(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
-    let compile_opts = CompileOpts::default_strict().set_all();
+    let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
     let (term, _, diags) = run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
     let res = format!("{diags}{term}");
@@ -374,8 +382,7 @@ fn mutual_recursion() {
     let diagnostics_cfg =
       DiagnosticsConfig { recursion_cycle: Severity::Error, ..DiagnosticsConfig::new(Severity::Allow, true) };
     let mut book = do_parse_book(code, path)?;
-    let mut opts = CompileOpts::default_strict();
-    opts.merge = true;
+    let opts = CompileOpts { merge: true, ..CompileOpts::default() };
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })
@@ -400,8 +407,8 @@ fn io() {
     (&|code, path| {
       let _guard = RUN_MUTEX.lock().unwrap();
       let book = do_parse_book(code, path)?;
-      let compile_opts = CompileOpts::default_strict();
-      let diagnostics_cfg = DiagnosticsConfig::default_strict();
+      let compile_opts = CompileOpts::default();
+      let diagnostics_cfg = DiagnosticsConfig::default();
       let (term, _, diags) = run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
       let res = format!("{diags}{term}");
       Ok(format!("Strict mode:\n{res}"))
@@ -410,7 +417,6 @@ fn io() {
 }
 
 #[test]
-//#[ignore = "while execution is not implemented for hvm32"]
 fn examples() -> Result<(), Diagnostics> {
   let examples_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples");
 
@@ -426,8 +432,8 @@ fn examples() -> Result<(), Diagnostics> {
     let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
 
     let book = do_parse_book(&code, path).unwrap();
-    let compile_opts = CompileOpts::default_strict();
-    let diagnostics_cfg = DiagnosticsConfig::default_strict();
+    let compile_opts = CompileOpts::default();
+    let diagnostics_cfg = DiagnosticsConfig::default();
     let (term, _, diags) = run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
     let res = format!("{diags}{term}");
 
@@ -448,9 +454,9 @@ fn examples() -> Result<(), Diagnostics> {
 fn scott_triggers_unused() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
-    let opts = CompileOpts::default_strict();
+    let opts = CompileOpts::default();
     let diagnostics_cfg =
-      DiagnosticsConfig { unused_definition: Severity::Error, ..DiagnosticsConfig::default_strict() };
+      DiagnosticsConfig { unused_definition: Severity::Error, ..DiagnosticsConfig::default() };
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, res.core_book))
   })

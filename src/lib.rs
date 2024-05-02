@@ -6,6 +6,7 @@ use hvmc::ast::Net;
 use hvmc_net::{
   check_net_size::{check_net_sizes, MAX_NET_SIZE},
   mutual_recursion,
+  reorder_redexes::reorder_redexes_recursive_last,
 };
 use net::hvmc_to_net::hvmc_to_net;
 use std::{process::Output, str::FromStr};
@@ -38,6 +39,7 @@ pub fn compile_book(
   args: Option<Vec<Term>>,
 ) -> Result<CompileResult, Diagnostics> {
   let mut diagnostics = desugar_book(book, opts.clone(), diagnostics_cfg, args)?;
+
   let (mut core_book, labels) = book_to_nets(book, &mut diagnostics)?;
 
   if opts.eta {
@@ -45,7 +47,6 @@ pub fn compile_book(
   }
 
   mutual_recursion::check_cycles(&core_book, &mut diagnostics)?;
-
   if opts.eta {
     core_book.values_mut().for_each(Net::eta_reduce);
   }
@@ -64,6 +65,10 @@ pub fn compile_book(
   }
 
   check_net_sizes(&core_book, &mut diagnostics)?;
+
+  if opts.recursive_last {
+    reorder_redexes_recursive_last(&mut core_book);
+  }
 
   Ok(CompileResult { core_book, labels, diagnostics })
 }
@@ -103,8 +108,8 @@ pub fn desugar_book(
   // Auto match linearization
   match opts.linearize_matches {
     OptLevel::Disabled => (),
-    OptLevel::Enabled => ctx.book.linearize_match_binds(),
-    OptLevel::Extra => ctx.book.linearize_matches(),
+    OptLevel::Alt => ctx.book.linearize_match_binds(),
+    OptLevel::Enabled => ctx.book.linearize_matches(),
   }
   // Manual match linearization
   ctx.book.linearize_match_with();
@@ -175,7 +180,7 @@ pub fn run_book(
     return Err(format!("Error reading result from hvm. Output :\n{}{}{}", err, status, out).into());
   };
 
-  let (term, diags) = readback_hvm_net(&net, &book, &labels, run_opts.linear);
+  let (term, diags) = readback_hvm_net(&net, &book, &labels, run_opts.linear_readback);
   Ok((term, stats.to_string(), diags))
 }
 
@@ -189,23 +194,16 @@ pub fn readback_hvm_net(net: &Net, book: &Book, labels: &Labels, linear: bool) -
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RunOpts {
-  pub linear: bool,
-  pub lazy_mode: bool,
+  pub linear_readback: bool,
   pub pretty: bool,
-}
-
-impl RunOpts {
-  pub fn lazy() -> Self {
-    Self { lazy_mode: true, ..Self::default() }
-  }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
 pub enum OptLevel {
-  #[default]
   Disabled,
+  #[default]
   Enabled,
-  Extra,
+  Alt,
 }
 
 impl OptLevel {
@@ -214,7 +212,7 @@ impl OptLevel {
   }
 
   pub fn is_extra(&self) -> bool {
-    matches!(self, OptLevel::Extra)
+    matches!(self, OptLevel::Enabled)
   }
 }
 
@@ -237,6 +235,9 @@ pub struct CompileOpts {
 
   /// Enables [term::transform::inline].
   pub inline: bool,
+
+  /// Enables [hvmc_net::reorder_redexes::reorder_redexes_recursive_last].
+  pub recursive_last: bool,
 }
 
 impl CompileOpts {
@@ -249,24 +250,23 @@ impl CompileOpts {
       float_combinators: true,
       merge: true,
       inline: true,
-      linearize_matches: OptLevel::Extra,
+      recursive_last: true,
+      linearize_matches: OptLevel::Enabled,
     }
   }
 
   /// Set all opts as false and keep the current adt encoding.
   #[must_use]
   pub fn set_no_all(self) -> Self {
-    Self::default()
-  }
-
-  /// All optimizations disabled, except float_combinators and linearize_matches
-  pub fn default_strict() -> Self {
-    Self { float_combinators: true, linearize_matches: OptLevel::Extra, eta: true, ..Self::default() }
-  }
-
-  // Disable optimizations that don't work or are unnecessary on lazy mode
-  pub fn default_lazy() -> Self {
-    Self::default()
+    Self {
+      eta: false,
+      prune: false,
+      linearize_matches: OptLevel::Disabled,
+      float_combinators: false,
+      merge: false,
+      inline: false,
+      recursive_last: false,
+    }
   }
 
   pub fn check_for_strict(&self) {
@@ -284,14 +284,16 @@ impl CompileOpts {
 }
 
 impl Default for CompileOpts {
+  /// Enables eta, linearize_matches, float_combinators and reorder_redexes_recursive_last.
   fn default() -> Self {
     Self {
-      eta: false,
+      eta: true,
       prune: false,
       linearize_matches: OptLevel::Enabled,
-      float_combinators: false,
+      float_combinators: true,
       merge: false,
       inline: false,
+      recursive_last: true,
     }
   }
 }
