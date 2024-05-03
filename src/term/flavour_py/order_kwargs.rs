@@ -2,78 +2,105 @@ use indexmap::IndexMap;
 
 use crate::term::Name;
 
-use super::{Enum, Program, Stmt, Term};
+use super::{Definition, Enum, Program, Stmt, Term, Variant};
+
+struct Ctx<'a> {
+  variants: &'a IndexMap<Name, Name>,
+  enums: &'a IndexMap<Name, Enum>,
+  defs: &'a IndexMap<Name, Definition>,
+}
+
+enum Fetch<'a> {
+  Variant(&'a Variant),
+  Definition(&'a Definition),
+}
+
+impl<'a> Ctx<'a> {
+  fn fetch(&self, name: &Name) -> Option<Fetch> {
+    match self.variants.get(name) {
+      Some(enum_name) => match self.enums.get(enum_name) {
+        Some(r#enum) => r#enum.variants.get(name).map(Fetch::Variant),
+        None => None,
+      },
+      None => self.defs.get(name).map(Fetch::Definition),
+    }
+  }
+}
 
 impl Program {
   pub fn order_kwargs(&mut self) {
+    let ctx = Ctx { variants: &self.variants, enums: &self.enums, defs: &self.defs.clone() };
     for def in self.defs.values_mut() {
-      def.body.order_kwargs(&self.variants, &self.enums);
+      def.body.order_kwargs(&ctx);
     }
   }
 }
 
 impl Stmt {
-  fn order_kwargs(&mut self, variants: &IndexMap<Name, Name>, enums: &IndexMap<Name, Enum>) {
+  fn order_kwargs(&mut self, ctx: &Ctx) {
     match self {
       Stmt::Assign { val, nxt, .. } => {
-        val.order_kwargs(variants, enums);
-        nxt.order_kwargs(variants, enums);
+        val.order_kwargs(ctx);
+        nxt.order_kwargs(ctx);
       }
       Stmt::InPlace { val, nxt, .. } => {
-        val.order_kwargs(variants, enums);
-        nxt.order_kwargs(variants, enums);
+        val.order_kwargs(ctx);
+        nxt.order_kwargs(ctx);
       }
       Stmt::If { cond, then, otherwise } => {
-        cond.order_kwargs(variants, enums);
-        then.order_kwargs(variants, enums);
-        otherwise.order_kwargs(variants, enums);
+        cond.order_kwargs(ctx);
+        then.order_kwargs(ctx);
+        otherwise.order_kwargs(ctx);
       }
       Stmt::Match { arg, arms, .. } => {
-        arg.order_kwargs(variants, enums);
+        arg.order_kwargs(ctx);
         for arm in arms {
-          arm.rgt.order_kwargs(variants, enums);
+          arm.rgt.order_kwargs(ctx);
         }
       }
       Stmt::Switch { .. } => unimplemented!(),
       Stmt::Fold { .. } => unimplemented!(),
       Stmt::Do { .. } => unimplemented!(),
-      Stmt::Return { term } => term.order_kwargs(variants, enums),
+      Stmt::Return { term } => term.order_kwargs(ctx),
     }
   }
 }
 
 impl Term {
-  fn order_kwargs(&mut self, variants: &IndexMap<Name, Name>, enums: &IndexMap<Name, Enum>) {
+  fn order_kwargs(&mut self, ctx: &Ctx) {
     match self {
       Term::Call { fun, args, kwargs } => {
         if let Term::Var { nam } = &**fun {
-          if let Some(enum_name) = variants.get(nam)
-            && let Some(r#enum) = enums.get(enum_name)
-          {
-            let variant = r#enum.variants.get(nam).unwrap();
-
-            let mut index_map = IndexMap::new();
-            for (index, field) in variant.fields.iter().enumerate() {
-              index_map.insert(field, index);
+          if let Some(fetch) = ctx.fetch(nam) {
+            match fetch {
+              Fetch::Variant(variant) => go_order_kwargs(&variant.fields, kwargs, args),
+              Fetch::Definition(def) => go_order_kwargs(&def.params, kwargs, args),
             }
-
-            let mut kwargs = std::mem::take(kwargs);
-            kwargs.sort_by_key(|i| index_map.get(&i.0).unwrap());
-            let new_args = kwargs.into_iter().map(|i| i.1.clone());
-            args.extend(new_args);
           }
         } else {
-          fun.order_kwargs(variants, enums);
-          args.iter_mut().for_each(|a| a.order_kwargs(variants, enums));
+          fun.order_kwargs(ctx);
+          args.iter_mut().for_each(|a| a.order_kwargs(ctx));
         }
       }
-      Term::Lam { bod, .. } => bod.order_kwargs(variants, enums),
+      Term::Lam { bod, .. } => bod.order_kwargs(ctx),
       Term::Bin { lhs, rhs, .. } => {
-        lhs.order_kwargs(variants, enums);
-        rhs.order_kwargs(variants, enums);
+        lhs.order_kwargs(ctx);
+        rhs.order_kwargs(ctx);
       }
-      Term::Lst { els } | Term::Tup { els } => els.iter_mut().for_each(|e| e.order_kwargs(variants, enums)),
+      Term::Lst { els } | Term::Tup { els } => els.iter_mut().for_each(|e| e.order_kwargs(ctx)),
       Term::None | Term::Var { .. } | Term::Num { .. } | Term::Str { .. } => {}
     }
   }
+}
+
+fn go_order_kwargs(names: &[Name], kwargs: &mut Vec<(Name, Term)>, args: &mut Vec<Term>) {
+  let mut index_map = IndexMap::new();
+  for (index, field) in names.iter().enumerate() {
+    index_map.insert(field, index);
+  }
+
+  let mut kwargs = std::mem::take(kwargs);
+  kwargs.sort_by_key(|i| index_map.get(&i.0).unwrap());
+  let new_args = kwargs.into_iter().map(|i| i.1.clone());
+  args.extend(new_args);
 }
