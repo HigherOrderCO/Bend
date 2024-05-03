@@ -5,4 +5,4 @@ input_file: tests/golden_tests/compile_term/wrong_nums.hvm
 Errors:
 [1m- expected:[0m ')'
 [1m- detected:[0m
-[0m  1 | (+ 0b0123456789 [4m[31m0[0mFA)[0m
+[0m  1 | (+ 0b012345 [4m[31m0[0mFA)[0m

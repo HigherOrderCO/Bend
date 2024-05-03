@@ -1,17 +1,12 @@
 use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
   maybe_grow,
-  net::{
-    CtrKind::*,
-    INet, NodeId,
-    NodeKind::{self, *},
-    Port, SlotId, ROOT,
-  },
-  term::{num_to_name, term_to_net::Labels, Book, FanKind, Name, Pattern, Tag, Term},
+  net::{CtrKind, INet, NodeId, NodeKind, Port, SlotId, ROOT},
+  term::{num_to_name, term_to_net::Labels, Book, FanKind, Name, Op, Pattern, Tag, Term},
 };
 use std::collections::{BTreeSet, HashMap, HashSet};
 
-use super::{NumType, Op};
+use super::Num;
 
 /// Converts an Interaction-INet to a Lambda Calculus term
 pub fn net_to_term(
@@ -41,8 +36,8 @@ pub fn net_to_term(
     let snd = reader.namegen.decl_name(net, Port(node, 2));
 
     let (fan, tag) = match reader.net.node(node).kind {
-      Ctr(Tup(lab)) => (FanKind::Tup, reader.labels.tup.to_tag(lab)),
-      Ctr(Dup(lab)) => (FanKind::Dup, reader.labels.dup.to_tag(Some(lab))),
+      NodeKind::Ctr(CtrKind::Tup(lab)) => (FanKind::Tup, reader.labels.tup.to_tag(lab)),
+      NodeKind::Ctr(CtrKind::Dup(lab)) => (FanKind::Dup, reader.labels.dup.to_tag(Some(lab))),
       _ => unreachable!(),
     };
 
@@ -81,6 +76,8 @@ pub struct Reader<'a> {
 
 impl Reader<'_> {
   fn read_term(&mut self, next: Port) -> Term {
+    use CtrKind::*;
+
     maybe_grow(|| {
       if self.dup_paths.is_none() && !self.seen.insert(next) {
         self.error(ReadbackError::Cyclic);
@@ -88,15 +85,14 @@ impl Reader<'_> {
       }
 
       let node = next.node();
-
       match &self.net.node(node).kind {
-        Era => {
+        NodeKind::Era => {
           // Only the main port actually exists in an ERA, the aux ports are just an artifact of this representation.
           debug_assert!(next.slot() == 0);
           Term::Era
         }
         // If we're visiting a con node...
-        Ctr(Con(lab)) => match next.slot() {
+        NodeKind::Ctr(CtrKind::Con(lab)) => match next.slot() {
           // If we're visiting a port 0, then it is a lambda.
           0 => {
             let nam = self.namegen.decl_name(self.net, Port(node, 1));
@@ -117,7 +113,7 @@ impl Reader<'_> {
           }
           _ => unreachable!(),
         },
-        Mat => match next.slot() {
+        NodeKind::Mat => match next.slot() {
           2 => {
             // Read the matched expression
             let arg = self.read_term(self.net.enter_port(Port(node, 0)));
@@ -128,7 +124,7 @@ impl Reader<'_> {
 
             // We expect the pattern matching node to be a CON
             let sel_kind = &self.net.node(sel_node).kind;
-            let (zero, succ) = if *sel_kind == Ctr(Con(None)) {
+            let (zero, succ) = if *sel_kind == NodeKind::Ctr(Con(None)) {
               let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
               let mut succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
 
@@ -157,7 +153,7 @@ impl Reader<'_> {
             Term::Err
           }
         },
-        Ref { def_name } => {
+        NodeKind::Ref { def_name } => {
           if def_name.is_generated() {
             // Dereference generated names since the user is not aware of them
             let def = &self.book.defs[def_name];
@@ -170,7 +166,7 @@ impl Reader<'_> {
           }
         }
         // If we're visiting a fan node...
-        Ctr(kind @ (Dup(_) | Tup(_))) => {
+        NodeKind::Ctr(kind @ (Dup(_) | Tup(_))) => {
           let (fan, lab) = match *kind {
             Tup(lab) => (FanKind::Tup, lab),
             Dup(lab) => (FanKind::Dup, Some(lab)),
@@ -217,7 +213,7 @@ impl Reader<'_> {
             _ => unreachable!(),
           }
         }
-        Num { val: _ } => {
+        NodeKind::Num { val: _ } => {
           let (flp, arg) = self.read_opr_arg(next);
           match arg {
             NumArg::Sym(opr) => Term::Opr {
@@ -225,26 +221,26 @@ impl Reader<'_> {
               fst: Box::new(Term::Err),
               snd: Box::new(Term::Err),
             },
-            NumArg::Num(typ, val) => Term::Num { typ, val },
+            NumArg::Num(typ, val) => Term::Num { val: Num::from_bits_and_type(val, typ) },
             NumArg::Par(opr, val) => {
               if flp {
                 Term::Opr {
                   opr: Op::from_native_tag(opr, NumType::U24),
-                  fst: Box::new(Term::Num { typ: NumType::U24, val }),
+                  fst: Box::new(Term::Num { val: Num::from_bits_and_type(val, NumType::U24) }),
                   snd: Box::new(Term::Err),
                 }
               } else {
                 Term::Opr {
                   opr: Op::from_native_tag(opr, NumType::U24),
                   fst: Box::new(Term::Err),
-                  snd: Box::new(Term::Num { typ: NumType::U24, val }),
+                  snd: Box::new(Term::Num { val: Num::from_bits_and_type(val, NumType::U24) }),
                 }
               }
             }
             NumArg::Oth(_) => unreachable!(),
           }
         }
-        Opr => match next.slot() {
+        NodeKind::Opr => match next.slot() {
           2 => {
             let port0_kind = self.net.node(self.net.enter_port(Port(node, 0)).node()).kind.clone();
             if port0_kind == NodeKind::Opr {
@@ -253,7 +249,7 @@ impl Reader<'_> {
               if let Term::Opr { opr, fst, snd: _ } = &fst {
                 let (flip, arg) = self.read_opr_arg(self.net.enter_port(Port(node, 1)));
                 let snd = Box::new(match arg {
-                  NumArg::Num(typ, val) => Term::Num { typ, val },
+                  NumArg::Num(typ, val) => Term::Num { val: Num::from_bits_and_type(val, typ) },
                   NumArg::Oth(term) => term,
                   NumArg::Sym(_) | NumArg::Par(_, _) => {
                     self.error(ReadbackError::InvalidNumericOp);
@@ -271,34 +267,36 @@ impl Reader<'_> {
               let (flip0, arg0) = self.read_opr_arg(self.net.enter_port(Port(node, 0)));
               let (flip1, arg1) = self.read_opr_arg(self.net.enter_port(Port(node, 1)));
               let (arg0, arg1) = if flip0 != flip1 { (arg1, arg0) } else { (arg0, arg1) };
-              use NumArg::*;
               match (arg0, arg1) {
-                (Sym(opr), Num(typ, val)) | (Num(typ, val), Sym(opr)) => Term::Opr {
+                (NumArg::Sym(opr), NumArg::Num(typ, val)) | (NumArg::Num(typ, val), NumArg::Sym(opr)) => {
+                  Term::Opr {
+                    opr: Op::from_native_tag(opr, typ),
+                    fst: Box::new(Term::Num { val: Num::from_bits_and_type(val, typ) }),
+                    snd: Box::new(Term::Err),
+                  }
+                }
+                (NumArg::Num(typ, num1), NumArg::Par(opr, num2))
+                | (NumArg::Par(opr, num1), NumArg::Num(typ, num2)) => Term::Opr {
                   opr: Op::from_native_tag(opr, typ),
-                  fst: Box::new(Term::Num { typ, val }),
-                  snd: Box::new(Term::Err),
-                },
-                (Num(typ, num1), Par(opr, num2)) | (Par(opr, num1), Num(typ, num2)) => Term::Opr {
-                  opr: Op::from_native_tag(opr, typ),
-                  fst: Box::new(Term::Num { typ, val: num1 }),
-                  snd: Box::new(Term::Num { typ, val: num2 }),
+                  fst: Box::new(Term::Num { val: Num::from_bits_and_type(num1, typ) }),
+                  snd: Box::new(Term::Num { val: Num::from_bits_and_type(num2, typ) }),
                 },
                 // No type, so assuming u24
-                (Sym(opr), Oth(term)) | (Oth(term), Sym(opr)) => Term::Opr {
+                (NumArg::Sym(opr), NumArg::Oth(term)) | (NumArg::Oth(term), NumArg::Sym(opr)) => Term::Opr {
                   opr: Op::from_native_tag(opr, NumType::U24),
                   fst: Box::new(term),
                   snd: Box::new(Term::Err),
                 },
 
-                (Par(opr, num), Oth(term)) => Term::Opr {
+                (NumArg::Par(opr, num), NumArg::Oth(term)) => Term::Opr {
                   opr: Op::from_native_tag(opr, NumType::U24),
-                  fst: Box::new(Term::Num { typ: NumType::U24, val: num }),
+                  fst: Box::new(Term::Num { val: Num::from_bits_and_type(num, NumType::U24) }),
                   snd: Box::new(term),
                 },
-                (Oth(term), Par(opr, num)) => Term::Opr {
+                (NumArg::Oth(term), NumArg::Par(opr, num)) => Term::Opr {
                   opr: Op::from_native_tag(opr, NumType::U24),
                   fst: Box::new(term),
-                  snd: Box::new(Term::Num { typ: NumType::U24, val: num }),
+                  snd: Box::new(Term::Num { val: Num::from_bits_and_type(num, NumType::U24) }),
                 },
                 _ => {
                   self.error(ReadbackError::InvalidNumericOp);
@@ -312,7 +310,7 @@ impl Reader<'_> {
             Term::Err
           }
         },
-        Rot => {
+        NodeKind::Rot => {
           self.error(ReadbackError::ReachedRoot);
           Term::Err
         }
@@ -323,7 +321,7 @@ impl Reader<'_> {
   fn read_opr_arg(&mut self, next: Port) -> (bool, NumArg) {
     let node = next.node();
     match &self.net.node(node).kind {
-      Num { val } => {
+      NodeKind::Num { val } => {
         self.seen.insert(next);
         let flipped = ((val >> 28) & 0x1) != 0;
         let typ = val & 0xf;
@@ -381,7 +379,7 @@ impl Reader<'_> {
 
     // Eta-reduce the readback inet.
     // This is not valid for all kinds of nodes, only CON/TUP/DUP, due to their interaction rules.
-    if matches!(node_kind, Ctr(_)) {
+    if matches!(node_kind, NodeKind::Ctr(_)) {
       match (fst_port, snd_port) {
         (Port(fst_node, 1), Port(snd_node, 2)) if fst_node == snd_node => {
           if self.net.node(fst_node).kind == *node_kind {
@@ -425,6 +423,13 @@ enum NumArg {
   Num(NumType, u32),
   Par(u32, u32),
   Oth(Term),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NumType {
+  U24 = 1,
+  I24 = 2,
+  F24 = 3,
 }
 
 impl Op {
@@ -473,6 +478,12 @@ impl NumType {
       x if x == NumType::F24 as u32 => NumType::F24,
       _ => unreachable!(),
     }
+  }
+}
+
+impl Num {
+  fn from_bits_and_type(bits: u32, typ: NumType) -> Self {
+    Num::from_bits((bits & 0x00ff_ffff) << 4 | (typ as u32))
   }
 }
 
@@ -589,7 +600,7 @@ impl NameGen {
     // If port is linked to an erase node, return an unused variable
     let var_use = net.enter_port(var_port);
     let var_kind = &net.node(var_use.node()).kind;
-    (*var_kind != Era).then(|| self.var_name(var_port))
+    (*var_kind != NodeKind::Era).then(|| self.var_name(var_port))
   }
 
   pub fn unique(&mut self) -> Name {

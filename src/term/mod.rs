@@ -7,7 +7,7 @@ use crate::{
 use indexmap::{IndexMap, IndexSet};
 use interner::global::{GlobalPool, GlobalString};
 use itertools::Itertools;
-use std::{borrow::Cow, collections::HashMap, ops::Deref};
+use std::{borrow::Cow, collections::HashMap, hash::Hash, ops::Deref};
 
 pub mod builtins;
 pub mod check;
@@ -63,7 +63,7 @@ pub struct Definition {
 }
 
 /// A pattern matching rule of a definition.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct Rule {
   pub pats: Vec<Pattern>,
   pub body: Term,
@@ -110,11 +110,10 @@ pub enum Term {
     els: Vec<Term>,
   },
   Num {
-    typ: NumType,
-    val: u32,
+    val: Num,
   },
   Nat {
-    val: u64,
+    val: u32,
   },
   Str {
     val: GlobalString,
@@ -181,11 +180,11 @@ pub enum Op {
   POW,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum NumType {
-  U24 = 1,
-  I24 = 2,
-  F24 = 3,
+#[derive(Debug, Clone, Copy)]
+pub enum Num {
+  U24(u32),
+  I24(i32),
+  F24(f32),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -328,7 +327,7 @@ impl Clone for Term {
       Self::Use { nam, val, nxt } => Self::Use { nam: nam.clone(), val: val.clone(), nxt: nxt.clone() },
       Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
       Self::Fan { fan, tag, els } => Self::Fan { fan: *fan, tag: tag.clone(), els: els.clone() },
-      Self::Num { typ, val } => Self::Num { typ: *typ, val: *val },
+      Self::Num { val } => Self::Num { val: *val },
       Self::Nat { val } => Self::Nat { val: *val },
       Self::Str { val } => Self::Str { val: val.clone() },
       Self::Lst { els } => Self::Lst { els: els.clone() },
@@ -436,19 +435,19 @@ impl Term {
     Term::Str { val: STRINGS.get(str) }
   }
 
-  pub fn sub_num(arg: Term, val: u32, typ: NumType) -> Term {
-    if val == 0 {
+  pub fn sub_num(arg: Term, val: Num) -> Term {
+    if val.is_zero() {
       arg
     } else {
-      Term::Opr { opr: Op::SUB, fst: Box::new(arg), snd: Box::new(Term::Num { typ, val }) }
+      Term::Opr { opr: Op::SUB, fst: Box::new(arg), snd: Box::new(Term::Num { val }) }
     }
   }
 
-  pub fn add_num(arg: Term, val: u32, typ: NumType) -> Term {
-    if val == 0 {
+  pub fn add_num(arg: Term, val: Num) -> Term {
+    if val.is_zero() {
       arg
     } else {
-      Term::Opr { opr: Op::ADD, fst: Box::new(arg), snd: Box::new(Term::Num { typ, val }) }
+      Term::Opr { opr: Op::ADD, fst: Box::new(arg), snd: Box::new(Term::Num { val }) }
     }
   }
 
@@ -800,6 +799,71 @@ impl Term {
   }
 }
 
+impl Num {
+  pub fn is_zero(&self) -> bool {
+    match self {
+      Num::U24(val) => *val == 0,
+      Num::I24(val) => *val == 0,
+      Num::F24(val) => *val == 0.0,
+    }
+  }
+
+  pub fn to_bits(&self) -> u32 {
+    match self {
+      Num::U24(val) => {
+        assert!(*val <= 0xFFFFFF);
+        ((val & 0xFFFFFF) << 4) | 0x1
+      }
+      Num::I24(val) => (((*val as u32) & 0xFFFFFF) << 4) | 0x2,
+      Num::F24(val) => {
+        let bits = val.to_bits();
+        let sign = (bits >> 31) & 0x1;
+        let expo = (bits >> 23) & 0xFF;
+        let mantissa = bits & 0x7FFFFF;
+        assert!(
+          (expo == 0) || (expo == 255) || (64 ..= 127).contains(&expo) || (128 ..= 190).contains(&expo)
+        );
+        let expo = (expo & 0b0011_1111) | ((expo >> 7) << 6);
+        let mantissa = mantissa >> 7;
+        let bits = (sign << 23) | (expo << 16) | mantissa;
+        (bits << 4) | 0x3
+      }
+    }
+  }
+
+  pub fn from_bits(bits: u32) -> Self {
+    match bits & 0xF {
+      0x1 => Num::U24((bits >> 4) & 0xFFFFFF),
+      0x2 => Num::I24((((bits >> 4) & 0xFFFFFF) as i32) << 8 >> 8),
+      0x3 => {
+        let bits = (bits >> 4) & 0xFFFFFF;
+        let sign = (bits >> 23) & 0x1;
+        let expo = (bits >> 16) & 0x7F;
+        let mantissa = bits & 0xFFFF;
+        let i_exp = (expo as i32) - 63;
+        let bits = (sign << 31) | (((i_exp + 127) as u32) << 23) | (mantissa << 7);
+        let bits = if mantissa == 0 && i_exp == -63 { sign << 31 } else { bits };
+        Num::F24(f32::from_bits(bits))
+      }
+      _ => unreachable!("Invalid Num bits"),
+    }
+  }
+}
+
+impl Hash for Num {
+  fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+    self.to_bits().hash(state);
+  }
+}
+
+impl PartialEq for Num {
+  fn eq(&self, other: &Self) -> bool {
+    self.to_bits() == other.to_bits()
+  }
+}
+
+impl Eq for Num {}
+
 impl Pattern {
   pub fn binds(&self) -> impl DoubleEndedIterator<Item = &Option<Name>> + Clone {
     self.iter().filter_map(|pat| match pat {
@@ -862,7 +926,7 @@ impl Pattern {
       Pattern::Ctr(ctr, args) => {
         Term::call(Term::Ref { nam: ctr.clone() }, args.iter().map(|arg| arg.to_term()))
       }
-      Pattern::Num(val) => Term::Num { typ: NumType::U24, val: *val },
+      Pattern::Num(val) => Term::Num { val: Num::U24(*val) },
       Pattern::Fan(fan, tag, args) => {
         Term::Fan { fan: *fan, tag: tag.clone(), els: args.iter().map(|p| p.to_term()).collect() }
       }
@@ -958,5 +1022,37 @@ impl Book {
       Some("main" | "Main") | None => ENTRY_POINT,
       Some(nam) => nam,
     }
+  }
+}
+
+#[test]
+fn num_to_from_bits() {
+  let a = [
+    Num::U24(0),
+    Num::I24(0),
+    Num::F24(0.0),
+    Num::U24(0xFFFFFF),
+    Num::I24(0xFFFFFF),
+    Num::F24(0xFFFFFF as f32),
+    Num::U24(12345),
+    Num::I24(12345),
+    Num::I24(-12345),
+    Num::I24(-0),
+    Num::F24(0.0),
+    Num::F24(-0.0),
+    Num::F24(0.00123),
+    Num::F24(12345.023),
+    Num::F24(-1235.3849),
+    Num::F24(1.0),
+    Num::F24(-1.0),
+    Num::F24(12323658716.0),
+    Num::F24(-12323658716.0),
+    Num::F24(-0.00000000000000001),
+    Num::F24(0.00000000000000001),
+    Num::F24(5447856134985749851.3457896137815694178),
+    Num::F24(-5447856134985749851.3457896137815694178),
+  ];
+  for b in a {
+    assert_eq!(b, Num::from_bits(Num::to_bits(&b)));
   }
 }

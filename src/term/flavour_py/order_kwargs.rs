@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 
 use crate::term::Name;
 
-use super::{Definition, Enum, Program, Stmt, Term, Variant};
+use super::{Definition, Enum, MBind, Program, Stmt, Term, Variant};
 
 struct Ctx<'a> {
   variants: &'a IndexMap<Name, Name>,
@@ -58,9 +58,26 @@ impl Stmt {
           arm.rgt.order_kwargs(ctx);
         }
       }
-      Stmt::Switch { .. } => unimplemented!(),
-      Stmt::Fold { .. } => unimplemented!(),
-      Stmt::Do { .. } => unimplemented!(),
+      Stmt::Switch { arg, arms, .. } => {
+        arg.order_kwargs(ctx);
+        for arm in arms {
+          arm.order_kwargs(ctx);
+        }
+      }
+      Stmt::Fold { arg, arms, .. } => {
+        arg.order_kwargs(ctx);
+        for arm in arms {
+          arm.rgt.order_kwargs(ctx);
+        }
+      }
+      Stmt::Do { block, .. } => {
+        for bind in block {
+          match bind {
+            MBind::Ask { val, .. } => val.order_kwargs(ctx),
+            MBind::Stmt { stmt } => stmt.order_kwargs(ctx),
+          }
+        }
+      }
       Stmt::Return { term } => term.order_kwargs(ctx),
     }
   }

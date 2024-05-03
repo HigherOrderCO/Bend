@@ -1,14 +1,12 @@
 use crate::{
   maybe_grow,
   term::{
-    display::DisplayFn, Adt, Book, Definition, FanKind, MatchRule, Name, Op, Pattern, Rule, Tag, Term,
+    display::DisplayFn, Adt, Book, Definition, FanKind, MatchRule, Name, Num, Op, Pattern, Rule, Tag, Term,
     STRINGS,
   },
 };
 use highlight_error::highlight_error;
 use TSPL::Parser;
-
-use super::NumType;
 
 // hvml grammar description:
 // <Book>       ::= (<Data> | <Rule>)*
@@ -188,8 +186,8 @@ impl<'a> TermParser<'a> {
       // Number
       if self.peek_one().map_or(false, |c| c.is_ascii_digit()) {
         unexpected_tag(self)?;
-        let num = self.parse_u64()?;
-        return Ok(Pattern::Num(num as u32));
+        let num = self.parse_u32()?;
+        return Ok(Pattern::Num(num));
       }
 
       // Channel
@@ -303,7 +301,7 @@ impl<'a> TermParser<'a> {
       if self.starts_with("#") {
         self.consume("#")?;
         unexpected_tag(self)?;
-        let val = self.parse_u64()?;
+        let val = self.parse_u32()?;
         return Ok(Term::Nat { val });
       }
 
@@ -318,14 +316,61 @@ impl<'a> TermParser<'a> {
       if self.starts_with("'") {
         unexpected_tag(self)?;
         let char = self.parse_quoted_char()?;
-        return Ok(Term::Num { typ: NumType::U24, val: char as u32 });
+        return Ok(Term::Num { val: Num::U24(char as u32 & 0x00ff_ffff) });
       }
 
-      // Native num
-      if self.peek_one().map_or(false, |c| c.is_ascii_digit()) {
+      // Native Number
+      if self.peek_one().map_or(false, |c| "0123456789+-".contains(c)) {
         unexpected_tag(self)?;
-        let val = self.parse_u64()?;
-        return Ok(Term::Num { typ: NumType::U24, val: val as u32 });
+
+        let ini_idx = *self.index();
+
+        // Parses sign
+        let sgn = if self.try_consume("+") {
+          Some(1)
+        } else if self.try_consume("-") {
+          Some(-1)
+        } else {
+          None
+        };
+
+        // Parses main value
+        let num = self.parse_u32()?;
+
+        // Parses frac value (Float type)
+        // TODO: Will lead to some rounding errors
+        // TODO: Doesn't cover very large/small numbers
+        let fra = if let Some('.') = self.peek_one() {
+          self.consume(".")?;
+          let ini_idx = *self.index();
+          let fra = self.parse_u32()? as f32;
+          let end_idx = *self.index();
+          let fra = fra / 10f32.powi((end_idx - ini_idx) as i32);
+          Some(fra)
+        } else {
+          None
+        };
+
+        // F24
+        if let Some(fra) = fra {
+          let sgn = sgn.unwrap_or(1);
+          return Ok(Term::Num { val: Num::F24(sgn as f32 * (num as f32 + fra)) });
+        }
+
+        // I24
+        if let Some(sgn) = sgn {
+          let num = sgn * num as i32;
+          if !(-0x00800000 ..= 0x007fffff).contains(&num) {
+            return self.num_range_err(ini_idx, "I24");
+          }
+          return Ok(Term::Num { val: Num::I24(num) });
+        }
+
+        // U24
+        if num >= 1 << 24 {
+          return self.num_range_err(ini_idx, "U24");
+        }
+        return Ok(Term::Num { val: Num::U24(num) });
       }
 
       // Use
@@ -493,7 +538,7 @@ impl<'a> TermParser<'a> {
           }
         }
         c if c.is_ascii_digit() => {
-          let val = self.parse_u64()?;
+          let val = self.parse_u32()?;
           if val != expected_num {
             return self.expected(&expected_num.to_string());
           }
@@ -508,6 +553,115 @@ impl<'a> TermParser<'a> {
     let pred = Some(Name::new(format!("{}-{}", bnd, arms.len() - 1)));
     self.consume("}")?;
     Ok(Term::Swt { arg: Box::new(arg), bnd: Some(bnd), with, pred, arms })
+  }
+
+  fn num_range_err<T>(&mut self, ini_idx: usize, typ: &str) -> Result<T, String> {
+    let ctx = highlight_error(ini_idx, *self.index(), self.input());
+    Err(format!("\x1b[1mNumber literal outside of range for {}.\x1b[0m\n{}", typ, ctx))
+  }
+
+  /* Utils */
+
+  /// Checks if the next characters in the input start with the given string.
+  /// Skips trivia.
+  fn skip_starts_with(&mut self, text: &str) -> bool {
+    self.skip_trivia();
+    self.starts_with(text)
+  }
+
+  fn skip_peek_one(&mut self) -> Option<char> {
+    self.skip_trivia();
+    self.peek_one()
+  }
+
+  /// Parses a list-like structure like "[x1, x2, x3,]".
+  ///
+  /// `parser` is a function that parses an element of the list.
+  ///
+  /// If `hard_sep` the separator between elements is mandatory.
+  /// Always accepts trailing separators.
+  ///
+  /// `min_els` determines how many elements must be parsed at minimum.
+  fn list_like<T>(
+    &mut self,
+    parser: impl Fn(&mut Self) -> Result<T, String>,
+    start: &str,
+    end: &str,
+    sep: &str,
+    hard_sep: bool,
+    min_els: usize,
+  ) -> Result<Vec<T>, String> {
+    self.consume(start)?;
+    let mut els = vec![];
+    for i in 0 .. min_els {
+      els.push(parser(self)?);
+      if hard_sep && !(i == min_els - 1 && self.skip_starts_with(end)) {
+        self.consume(sep)?;
+      } else {
+        self.try_consume(sep);
+      }
+    }
+
+    while !self.try_consume(end) {
+      els.push(parser(self)?);
+      if hard_sep && !self.skip_starts_with(end) {
+        self.consume(sep)?;
+      } else {
+        self.try_consume(sep);
+      }
+    }
+    Ok(els)
+  }
+
+  fn labelled<T>(
+    &mut self,
+    parser: impl Fn(&mut Self) -> Result<T, String>,
+    label: &str,
+  ) -> Result<T, String> {
+    match parser(self) {
+      Ok(val) => Ok(val),
+      Err(_) => self.expected(label),
+    }
+  }
+
+  fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> Result<T, String> {
+    let ctx = highlight_error(ini_idx, end_idx, self.input());
+    let is_eof = self.is_eof();
+    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { write!(f, "\n{ctx}") });
+    Err(format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected))
+  }
+
+  /// Consumes text if the input starts with it. Otherwise, do nothing.
+  fn try_consume(&mut self, text: &str) -> bool {
+    self.skip_trivia();
+    if self.starts_with(text) {
+      self.consume(text).unwrap();
+      true
+    } else {
+      false
+    }
+  }
+
+  fn parse_u32(&mut self) -> Result<u32, String> {
+    self.skip_trivia();
+    let radix = match self.peek_many(2) {
+      Some("0x") => {
+        self.advance_many(2);
+        16
+      }
+      Some("0b") => {
+        self.advance_many(2);
+        2
+      }
+      _ => 10,
+    };
+    let num_str = self.take_while(move |c| c.is_digit(radix) || c == '_');
+    let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
+    if num_str.is_empty() {
+      self.expected("numeric digit")
+    } else {
+      u32::from_str_radix(&num_str, radix).map_err(|e| e.to_string())
+    }
   }
 }
 

@@ -13,8 +13,12 @@
 (SwapGT _ v x xs) = (List.cons x (Insert v xs))
 
 // Generates a random list
-(Rnd 0 s) = []
-(Rnd n s) = (List.cons s (Rnd (- n 1) (% (+ (* s 1664525) 1013904223) 4294967295)))
+(Rnd 0 s) = List.nil
+(Rnd n s) =
+  let s = (^ s (* s 0b10000000000000))
+  let s = (^ s (/ s 0b100000000000000000))
+  let s = (^ s (* s 0b100000))
+  (List.cons s (Rnd (- n 1) s))
 
 // Sums a list
 (Sum [])         = 0
@@ -22,7 +26,7 @@
 
 (Main) =
   let n = 10
-  (Sum (Sort (Rnd (* 2 50) n)))
+  (Sum (Sort (Rnd 0x100 n)))
 
 // Use an argument from cli
-// (Main n) = (Sum (Sort (Rnd (* 2 50) n)))
+// (Main n) = (Sum (Sort (Rnd 0x100 n)))

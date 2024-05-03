@@ -3,5 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/nums.hvm
 ---
 b
-  & $(a b) ~ :[+16777215]
+  & $(a b) ~ [+16777215]
   & $(1000 a) ~ [+5]

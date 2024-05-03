@@ -1,4 +1,4 @@
-use super::{Book, Definition, FanKind, Name, Op, Pattern, Rule, Tag, Term};
+use super::{Book, Definition, FanKind, Name, Num, Op, Pattern, Rule, Tag, Term};
 use crate::maybe_grow;
 use std::{fmt, ops::Deref};
 
@@ -114,7 +114,9 @@ impl fmt::Display for Term {
       Term::Fan { fan: FanKind::Tup, tag, els } => write!(f, "{}({})", tag, DisplayJoin(|| els.iter(), ", ")),
       Term::Fan { fan: FanKind::Dup, tag, els } => write!(f, "{}{{{}}}", tag, DisplayJoin(|| els, " ")),
       Term::Era => write!(f, "*"),
-      Term::Num { typ: _, val } => write!(f, "{val}"),
+      Term::Num { val: Num::U24(val) } => write!(f, "{val}"),
+      Term::Num { val: Num::I24(val) } => write!(f, "{}{}", if *val < 0 { "-" } else { "+" }, val.abs()),
+      Term::Num { val: Num::F24(val) } => write!(f, "{val:.3}"),
       Term::Nat { val } => write!(f, "#{val}"),
       Term::Str { val } => write!(f, "{val:?}"),
       Term::Opr { opr, fst, snd } => {
@@ -374,7 +376,9 @@ impl Term {
         }
 
         Term::Nat { val } => write!(f, "#{val}"),
-        Term::Num { typ: _, val } => write!(f, "{val}"),
+        Term::Num { val: Num::U24(val) } => write!(f, "{val}"),
+        Term::Num { val: Num::I24(val) } => write!(f, "{}{}", if *val < 0 { "-" } else { "+" }, val.abs()),
+        Term::Num { val: Num::F24(val) } => write!(f, "{val:.3}"),
         Term::Str { val } => write!(f, "{val:?}"),
         Term::Ref { nam } => write!(f, "{nam}"),
         Term::Era => write!(f, "*"),
