@@ -1,7 +1,10 @@
 use indexmap::IndexMap;
 use TSPL::Parser;
 
-use crate::term::{parser::ParserCommons, Name, Op, STRINGS};
+use crate::{
+  maybe_grow,
+  term::{parser::ParserCommons, Name, Op, STRINGS},
+};
 
 use super::{
   AssignPattern, Definition, Enum, InPlaceOp, MBind, MatchArm, Program, Stmt, Term, TopLevel, Variant,
@@ -46,6 +49,7 @@ impl<'a> Parser<'a> for PyParser<'a> {
 }
 
 impl<'a> PyParser<'a> {
+  // A primary can be considered as a constant or literal expression.
   fn parse_primary_py(&mut self) -> Result<Term, String> {
     self.skip_trivia();
     let Some(head) = self.skip_peek_one() else { return self.expected("primary term")? };
@@ -113,8 +117,8 @@ impl<'a> PyParser<'a> {
     self.skip_trivia();
     if self.try_consume_keyword("lambda") {
       let names = self.list_like(|p| p.parse_hvml_name(), "", ":", ",", true, 1)?;
-      let bod = self.parse_stmt_py(&mut Indent(0))?;
-      Ok(Term::Lam { names, bod })
+      let bod = self.parse_term_py()?;
+      Ok(Term::Lam { names, bod: Box::new(bod) })
     } else {
       self.parse_infix_py(0)
     }
@@ -155,22 +159,24 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_infix_py(&mut self, prec: usize) -> Result<Term, String> {
-    self.skip_trivia();
-    if prec > PREC.len() - 1 {
-      return self.parse_call();
-    }
-    let mut lhs = self.parse_infix_py(prec + 1)?;
-    while let Some(op) = self.get_op() {
-      if PREC[prec].iter().any(|r| *r == op) {
-        let op = self.parse_oper()?;
-        let rhs = self.parse_infix_py(prec + 1)?;
-        self.skip_trivia();
-        lhs = Term::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
-      } else {
-        break;
+    maybe_grow(|| {
+      self.skip_trivia();
+      if prec > PREC.len() - 1 {
+        return self.parse_call();
       }
-    }
-    Ok(lhs)
+      let mut lhs = self.parse_infix_py(prec + 1)?;
+      while let Some(op) = self.get_op() {
+        if PREC[prec].iter().any(|r| *r == op) {
+          let op = self.parse_oper()?;
+          let rhs = self.parse_infix_py(prec + 1)?;
+          self.skip_trivia();
+          lhs = Term::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+        } else {
+          break;
+        }
+      }
+      Ok(lhs)
+    })
   }
 
   fn get_op(&mut self) -> Option<Op> {
@@ -224,22 +230,24 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_stmt_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
-    self.skip_exact_indent(indent, false)?;
-    if self.try_consume_keyword("return") {
-      self.parse_return_py()
-    } else if self.try_consume_keyword("if") {
-      self.parse_if_py(indent)
-    } else if self.try_consume_keyword("match") {
-      self.parse_match_py(indent)
-    } else if self.try_consume_keyword("switch") {
-      self.parse_switch_py(indent)
-    } else if self.try_consume_keyword("fold") {
-      self.parse_fold_py(indent)
-    } else if self.try_consume_keyword("do") {
-      self.parse_do_py(indent)
-    } else {
-      self.parse_in_place(indent)
-    }
+    maybe_grow(|| {
+      self.skip_exact_indent(indent, false)?;
+      if self.try_consume_keyword("return") {
+        self.parse_return_py()
+      } else if self.try_consume_keyword("if") {
+        self.parse_if_py(indent)
+      } else if self.try_consume_keyword("match") {
+        self.parse_match_py(indent)
+      } else if self.try_consume_keyword("switch") {
+        self.parse_switch_py(indent)
+      } else if self.try_consume_keyword("fold") {
+        self.parse_fold_py(indent)
+      } else if self.try_consume_keyword("do") {
+        self.parse_do_py(indent)
+      } else {
+        self.parse_in_place(indent)
+      }
+    })
   }
 
   fn parse_in_place(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
@@ -585,7 +593,7 @@ def inc_list(list):
   return [x+1 for x in list];
 
 def lam():
-  return lambda x, y: return x;;
+  return lambda x, y: x;
 
 def do_match(b):
   match b as bool:

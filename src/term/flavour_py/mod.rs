@@ -17,10 +17,10 @@ pub enum Term {
   Var { nam: Name },
   // [0-9_]+
   Num { val: u32 },
-  // {fun}(args,)
+  // {fun}({args},{kwargs},)
   Call { fun: Box<Term>, args: Vec<Term>, kwargs: Vec<(Name, Term)> },
-  // "lambda" {pat}* ":" {bod}
-  Lam { names: Vec<Name>, bod: Stmt },
+  // "lambda" {names}* ":" {bod}
+  Lam { names: Vec<Name>, bod: Box<Term> },
   // {lhs} {op} {rhs}
   Bin { op: Op, lhs: Box<Term>, rhs: Box<Term> },
   // "\"" ... "\""
