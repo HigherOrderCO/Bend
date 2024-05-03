@@ -88,6 +88,7 @@ impl Term {
         rhs.order_kwargs(ctx);
       }
       Term::Lst { els } | Term::Tup { els } => els.iter_mut().for_each(|e| e.order_kwargs(ctx)),
+      Term::Comprehension { .. } => {}
       Term::None | Term::Var { .. } | Term::Num { .. } | Term::Str { .. } => {}
     }
   }

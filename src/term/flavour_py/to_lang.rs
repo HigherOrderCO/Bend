@@ -109,6 +109,7 @@ impl Term {
         tag: lang::Tag::Static,
         els: els.into_iter().map(Self::to_lang).collect(),
       },
+      Term::Comprehension { .. } => todo!(),
     }
   }
 }

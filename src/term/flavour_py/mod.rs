@@ -29,6 +29,8 @@ pub enum Term {
   Lst { els: Vec<Term> },
   // "(" ... ")"
   Tup { els: Vec<Term> },
+  // "[" {term} "for" {bind} "in" {iter} ("if" {cond})? "]"
+  Comprehension { term: Box<Term>, bind: Name, iter: Box<Term>, cond: Option<Box<Term>> },
 }
 
 #[derive(Clone, Debug)]

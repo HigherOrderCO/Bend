@@ -65,10 +65,7 @@ impl<'a> PyParser<'a> {
           head
         }
       }
-      '[' => {
-        let els = self.list_like(|p| p.parse_term_py(), "[", "]", ",", true, 0)?;
-        Term::Lst { els }
-      }
+      '[' => self.list_or_comprehension()?,
       '\"' => {
         let str = self.parse_quoted_string()?;
         let val = STRINGS.get(str);
@@ -88,6 +85,28 @@ impl<'a> PyParser<'a> {
       }
     };
     Ok(res)
+  }
+
+  fn list_or_comprehension(&mut self) -> Result<Term, String> {
+    self.consume("[")?;
+    let head = self.parse_term_py()?;
+    if self.try_consume_keyword("for") {
+      let bind = self.parse_hvml_name()?;
+      self.consume("in")?;
+      let iter = self.parse_term_py()?;
+      let mut cond = None;
+      if self.try_consume_keyword("if") {
+        cond = Some(Box::new(self.parse_term_py()?));
+      }
+      self.consume("]")?;
+      Ok(Term::Comprehension { term: Box::new(head), bind, iter: Box::new(iter), cond })
+    } else {
+      let mut head = vec![head];
+      self.try_consume(",");
+      let tail = self.list_like(|p| p.parse_term_py(), "", "]", ",", true, 0)?;
+      head.extend(tail);
+      Ok(Term::Lst { els: head })
+    }
   }
 
   fn parse_term_py(&mut self) -> Result<Term, String> {
@@ -561,6 +580,9 @@ def identity(x):
 def inc(n):
   n += 1;
   return n;
+
+def inc_list(list):
+  return [x+1 for x in list];
 
 def lam():
   return lambda x, y: return x;;
