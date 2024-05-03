@@ -40,6 +40,7 @@
     "insta",
     "interner",
     "itertools",
+    "kwargs",
     "lcons",
     "linearization",
     "linearizes",
@@ -59,6 +60,7 @@
     "oref",
     "peekable",
     "postcondition",
+    "prec",
     "readback",
     "recursively",
     "redex",
@@ -91,13 +93,6 @@
     "walkdir",
     "wopts"
   ],
-  "files": [
-    "**/*.rs",
-    "**/*.md"
-  ],
-  "ignoreRegExpList": [
-    "HexValues",
-    "/λ/g",
-    "/-O/g"
-  ]
+  "files": ["**/*.rs", "**/*.md"],
+  "ignoreRegExpList": ["HexValues", "/λ/g", "/-O/g"]
 }

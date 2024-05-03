@@ -587,7 +587,7 @@ def inc_list(list):
 def lam():
   return lambda x, y: return x;;
 
-def mtch(b):
+def do_match(b):
   match b as bool:
     case True:
       return 1;
