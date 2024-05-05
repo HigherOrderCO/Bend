@@ -23,7 +23,7 @@ cli = ["dep:clap"]
 TSPL = "0.0.9"
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 highlight_error = "0.1.1"
-hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core.git" }
+hvm-core = { git = "https://github.com/HigherOrderCO/hvm-core.git", rev = "51a5d2336f28627e34c135c85859b764ce8ce993" }
 indexmap = "2.2.3"
 interner = "0.2.1"
 itertools = "0.11.0"
