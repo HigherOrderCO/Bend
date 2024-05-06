@@ -366,53 +366,6 @@ impl<'a> TermParser<'a> {
     })
   }
 
-  fn parse_oper(&mut self) -> Result<Op, String> {
-    let opr = if self.try_consume("+") {
-      Op::ADD
-    } else if self.try_consume("-") {
-      Op::SUB
-    } else if self.try_consume("*") {
-      Op::MUL
-    } else if self.try_consume("/") {
-      Op::DIV
-    } else if self.try_consume("%") {
-      Op::REM
-    } else if self.try_consume("<") {
-      Op::LTN
-    } else if self.try_consume(">") {
-      Op::GTN
-    } else if self.try_consume("==") {
-      Op::EQL
-    } else if self.try_consume("!=") {
-      Op::NEQ
-    } else if self.try_consume("&") {
-      Op::AND
-    } else if self.try_consume("|") {
-      Op::OR
-    } else if self.try_consume("^") {
-      Op::XOR
-    } else {
-      return self.expected("numeric operator");
-    };
-    Ok(opr)
-  }
-
-  fn try_consume_keyword(&mut self, keyword: &str) -> bool {
-    self.skip_trivia();
-
-    if !self.starts_with(keyword) {
-      return false;
-    }
-    let input = &self.input()[*self.index() + keyword.len() ..];
-    let next_is_name = input.chars().next().map_or(false, is_name_char);
-    if !next_is_name {
-      self.consume(keyword).unwrap();
-      true
-    } else {
-      false
-    }
-  }
-
   fn parse_top_level_name(&mut self) -> Result<Name, String> {
     let ini_idx = *self.index();
     let nam = self.parse_hvml_name()?;
@@ -423,11 +376,6 @@ impl<'a> TermParser<'a> {
     } else {
       Ok(nam)
     }
-  }
-
-  fn parse_hvml_name(&mut self) -> Result<Name, String> {
-    let nam = self.parse_name()?;
-    Ok(Name::new(nam))
   }
 
   fn parse_name_or_era(&mut self) -> Result<Option<Name>, String> {
@@ -531,88 +479,6 @@ impl<'a> TermParser<'a> {
     self.consume("}")?;
     Ok(Term::Swt { arg: Box::new(arg), bnd: Some(bnd), with, pred, arms })
   }
-
-  /* Utils */
-
-  /// Checks if the next characters in the input start with the given string.
-  /// Skips trivia.
-  fn skip_starts_with(&mut self, text: &str) -> bool {
-    self.skip_trivia();
-    self.starts_with(text)
-  }
-
-  fn skip_peek_one(&mut self) -> Option<char> {
-    self.skip_trivia();
-    self.peek_one()
-  }
-
-  /// Parses a list-like structure like "[x1, x2, x3,]".
-  ///
-  /// `parser` is a function that parses an element of the list.
-  ///
-  /// If `hard_sep` the separator between elements is mandatory.
-  /// Always accepts trailing separators.
-  ///
-  /// `min_els` determines how many elements must be parsed at minimum.
-  fn list_like<T>(
-    &mut self,
-    parser: impl Fn(&mut Self) -> Result<T, String>,
-    start: &str,
-    end: &str,
-    sep: &str,
-    hard_sep: bool,
-    min_els: usize,
-  ) -> Result<Vec<T>, String> {
-    self.consume(start)?;
-    let mut els = vec![];
-    for i in 0 .. min_els {
-      els.push(parser(self)?);
-      if hard_sep && !(i == min_els - 1 && self.skip_starts_with(end)) {
-        self.consume(sep)?;
-      } else {
-        self.try_consume(sep);
-      }
-    }
-
-    while !self.try_consume(end) {
-      els.push(parser(self)?);
-      if hard_sep && !self.skip_starts_with(end) {
-        self.consume(sep)?;
-      } else {
-        self.try_consume(sep);
-      }
-    }
-    Ok(els)
-  }
-
-  fn labelled<T>(
-    &mut self,
-    parser: impl Fn(&mut Self) -> Result<T, String>,
-    label: &str,
-  ) -> Result<T, String> {
-    match parser(self) {
-      Ok(val) => Ok(val),
-      Err(_) => self.expected(label),
-    }
-  }
-
-  fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> Result<T, String> {
-    let ctx = highlight_error(ini_idx, end_idx, self.input());
-    let is_eof = self.is_eof();
-    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { write!(f, "\n{ctx}") });
-    Err(format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected))
-  }
-
-  /// Consumes text if the input starts with it. Otherwise, do nothing.
-  fn try_consume(&mut self, text: &str) -> bool {
-    self.skip_trivia();
-    if self.starts_with(text) {
-      self.consume(text).unwrap();
-      true
-    } else {
-      false
-    }
-  }
 }
 
 impl<'a> Parser<'a> for TermParser<'a> {
@@ -689,4 +555,140 @@ impl Book {
 fn add_ctx_to_msg(msg: &str, ini_idx: usize, end_idx: usize, file: &str) -> String {
   let ctx = highlight_error(ini_idx, end_idx, file);
   format!("{msg}\n{ctx}")
+}
+
+impl<'a> ParserCommons<'a> for TermParser<'a> {}
+
+pub trait ParserCommons<'a>: Parser<'a> {
+  fn labelled<T>(
+    &mut self,
+    parser: impl Fn(&mut Self) -> Result<T, String>,
+    label: &str,
+  ) -> Result<T, String> {
+    match parser(self) {
+      Ok(val) => Ok(val),
+      Err(_) => self.expected(label),
+    }
+  }
+
+  fn parse_hvml_name(&mut self) -> Result<Name, String> {
+    let nam = self.parse_name()?;
+    Ok(Name::new(nam))
+  }
+
+  fn skip_peek_one(&mut self) -> Option<char> {
+    self.skip_trivia();
+    self.peek_one()
+  }
+
+  /// Checks if the next characters in the input start with the given string.
+  /// Skips trivia.
+  fn skip_starts_with(&mut self, text: &str) -> bool {
+    self.skip_trivia();
+    self.starts_with(text)
+  }
+
+  fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> Result<T, String> {
+    let ctx = highlight_error(ini_idx, end_idx, self.input());
+    let is_eof = self.is_eof();
+    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { write!(f, "\n{ctx}") });
+    Err(format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected))
+  }
+
+  /// Consumes text if the input starts with it. Otherwise, do nothing.
+  fn try_consume(&mut self, text: &str) -> bool {
+    self.skip_trivia();
+    if self.starts_with(text) {
+      self.consume(text).unwrap();
+      true
+    } else {
+      false
+    }
+  }
+
+  fn try_consume_keyword(&mut self, keyword: &str) -> bool {
+    self.skip_trivia();
+
+    if !self.starts_with(keyword) {
+      return false;
+    }
+    let input = &self.input()[*self.index() + keyword.len() ..];
+    let next_is_name = input.chars().next().map_or(false, is_name_char);
+    if !next_is_name {
+      self.consume(keyword).unwrap();
+      true
+    } else {
+      false
+    }
+  }
+
+  /// Parses a list-like structure like "[x1, x2, x3,]".
+  ///
+  /// `parser` is a function that parses an element of the list.
+  ///
+  /// If `hard_sep` the separator between elements is mandatory.
+  /// Always accepts trailing separators.
+  ///
+  /// `min_els` determines how many elements must be parsed at minimum.
+  fn list_like<T>(
+    &mut self,
+    parser: impl Fn(&mut Self) -> Result<T, String>,
+    start: &str,
+    end: &str,
+    sep: &str,
+    hard_sep: bool,
+    min_els: usize,
+  ) -> Result<Vec<T>, String> {
+    self.consume(start)?;
+    let mut els = vec![];
+    for i in 0 .. min_els {
+      els.push(parser(self)?);
+      if hard_sep && !(i == min_els - 1 && self.skip_starts_with(end)) {
+        self.consume(sep)?;
+      } else {
+        self.try_consume(sep);
+      }
+    }
+
+    while !self.try_consume(end) {
+      els.push(parser(self)?);
+      if hard_sep && !self.skip_starts_with(end) {
+        self.consume(sep)?;
+      } else {
+        self.try_consume(sep);
+      }
+    }
+    Ok(els)
+  }
+
+  fn parse_oper(&mut self) -> Result<Op, String> {
+    let opr = if self.try_consume("+") {
+      Op::ADD
+    } else if self.try_consume("-") {
+      Op::SUB
+    } else if self.try_consume("*") {
+      Op::MUL
+    } else if self.try_consume("/") {
+      Op::DIV
+    } else if self.try_consume("%") {
+      Op::REM
+    } else if self.try_consume("<") {
+      Op::LTN
+    } else if self.try_consume(">") {
+      Op::GTN
+    } else if self.try_consume("==") {
+      Op::EQL
+    } else if self.try_consume("!=") {
+      Op::NEQ
+    } else if self.try_consume("&") {
+      Op::AND
+    } else if self.try_consume("|") {
+      Op::OR
+    } else if self.try_consume("^") {
+      Op::XOR
+    } else {
+      return self.expected("numeric operator");
+    };
+    Ok(opr)
+  }
 }

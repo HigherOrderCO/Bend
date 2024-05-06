@@ -12,6 +12,7 @@ use std::{borrow::Cow, collections::HashMap, ops::Deref};
 pub mod builtins;
 pub mod check;
 pub mod display;
+pub mod flavour_py;
 pub mod load_book;
 pub mod net_to_term;
 pub mod parser;
