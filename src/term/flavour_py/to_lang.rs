@@ -88,7 +88,7 @@ impl Term {
     match self {
       Term::None => lang::Term::Era,
       Term::Var { nam } => lang::Term::Var { nam },
-      Term::Num { val } => lang::Term::Num { typ: lang::NumType::U24, val },
+      Term::Num { val } => lang::Term::Num { val: lang::Num::U24(val) },
       Term::Call { fun, args, kwargs } => {
         assert!(kwargs.is_empty());
         let args = args.into_iter().map(Self::to_lang);

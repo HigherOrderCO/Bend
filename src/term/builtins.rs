@@ -1,4 +1,4 @@
-use super::{parser::TermParser, Book, Name, NumType, Pattern, Term};
+use super::{parser::TermParser, Book, Name, Num, Pattern, Term};
 use crate::maybe_grow;
 
 const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/term/builtins.hvm"));
@@ -62,11 +62,11 @@ impl Term {
 
   pub fn encode_str(val: &str) -> Term {
     val.chars().rfold(Term::r#ref(SNIL), |acc, char| {
-      Term::call(Term::r#ref(SCONS), [Term::Num { typ: NumType::U24, val: char as u32 }, acc])
+      Term::call(Term::r#ref(SCONS), [Term::Num { val: Num::U24(char as u32 & 0x00ff_ffff) }, acc])
     })
   }
 
-  pub fn encode_nat(val: u64) -> Term {
+  pub fn encode_nat(val: u32) -> Term {
     (0 .. val).fold(Term::r#ref(NAT_ZERO), |acc, _| Term::app(Term::r#ref(NAT_SUCC), acc))
   }
 

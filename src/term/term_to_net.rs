@@ -108,8 +108,8 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         Term::Var { nam } => self.link_var(false, nam, up),
         Term::Lnk { nam } => self.link_var(true, nam, up),
         Term::Ref { nam } => self.link(up, Place::Tree(LoanedMut::new(Tree::Ref { nam: nam.to_string() }))),
-        Term::Num { typ, val } => {
-          let val = (*val << 4) | (*typ as u32);
+        Term::Num { val } => {
+          let val = val.to_bits();
           self.link(up, Place::Tree(LoanedMut::new(Tree::Num { val })))
         }
         // A lambda becomes to a con node. Ports:
@@ -170,18 +170,20 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           // Partially apply
           match (fst.as_ref(), snd.as_ref()) {
             // Put oper in fst
-            (Term::Num { typ: _, val }, snd) => {
-              let num_val = (*val << 4) | opr.to_native_tag();
-              let fst = Place::Tree(LoanedMut::new(Tree::Num { val: num_val }));
+            (Term::Num { val }, snd) => {
+              let val = val.to_bits();
+              let val = (val & 0xffff_fff0) | opr.to_native_tag();
+              let fst = Place::Tree(LoanedMut::new(Tree::Num { val }));
               let node = self.new_opr();
               self.link(fst, node.0);
               self.encode_term(snd, node.1);
               self.link(up, node.2);
             }
             // Put oper in snd
-            (fst, Term::Num { typ: _, val }) => {
-              let num_val = (*val << 4) | opr.to_native_tag();
-              let snd = Place::Tree(LoanedMut::new(Tree::Num { val: num_val }));
+            (fst, Term::Num { val }) => {
+              let val = val.to_bits();
+              let val = (val & 0xffff_fff0) | opr.to_native_tag();
+              let snd = Place::Tree(LoanedMut::new(Tree::Num { val }));
               let node = self.new_opr();
               self.encode_term(fst, node.0);
               self.link(snd, node.1);

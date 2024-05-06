@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_term/f24_oper.hvm
+---
+b
+  & $(1.240 $(:[/] $(a b))) ~ [*4583519]
+  & $(-235.121 a) ~ [+0]

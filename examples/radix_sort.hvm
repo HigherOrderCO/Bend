@@ -36,44 +36,43 @@ data Arr = Null | (Leaf x) | (Node a b)
 // Radix : U60 -> Map
 (Radix n) =
   let r = Used
-  let r = (Swap (& n 1) r Free)
-  let r = (Swap (& n 2) r Free)
-  let r = (Swap (& n 4) r Free)
-  let r = (Swap (& n 8) r Free)
-  let r = (Swap (& n 16) r Free)
+  let r = (Swap (& n 0x1) r Free)
+  let r = (Swap (& n 0x2) r Free)
+  let r = (Swap (& n 0x4) r Free)
+  let r = (Swap (& n 0x8) r Free)
+  let r = (Swap (& n 0x10) r Free)
   (Radix2 n r)
 
 (Radix2 n r) =
-  let r = (Swap (& n 32) r Free)
-  let r = (Swap (& n 64) r Free)
-  let r = (Swap (& n 128) r Free)
-  let r = (Swap (& n 256) r Free)
-  let r = (Swap (& n 512) r Free)
+  let r = (Swap (& n 0x20) r Free)
+  let r = (Swap (& n 0x40) r Free)
+  let r = (Swap (& n 0x80) r Free)
+  let r = (Swap (& n 0x100) r Free)
+  let r = (Swap (& n 0x200) r Free)
   (Radix3 n r)
 
 (Radix3 n r) =
-  let r = (Swap (& n 1024) r Free)
-  let r = (Swap (& n 2048) r Free)
-  let r = (Swap (& n 4096) r Free)
-  let r = (Swap (& n 8192) r Free)
-  let r = (Swap (& n 16384) r Free)
+  let r = (Swap (& n 0x400) r Free)
+  let r = (Swap (& n 0x800) r Free)
+  let r = (Swap (& n 0x1000) r Free)
+  let r = (Swap (& n 0x2000) r Free)
+  let r = (Swap (& n 0x4000) r Free)
   (Radix4 n r)
 
 (Radix4 n r) =
-  let r = (Swap (& n 32768) r Free)
-  let r = (Swap (& n 65536) r Free)
-  let r = (Swap (& n 131072) r Free)
-  let r = (Swap (& n 262144) r Free)
-  let r = (Swap (& n 524288) r Free)
+  let r = (Swap (& n 0x8000) r Free)
+  let r = (Swap (& n 0x10000) r Free)
+  let r = (Swap (& n 0x20000) r Free)
+  let r = (Swap (& n 0x40000) r Free)
+  let r = (Swap (& n 0x80000) r Free)
   (Radix5 n r)
 
 (Radix5 n r) =
-  let r = (Swap (& n 1048576) r Free)
-  let r = (Swap (& n 2097152) r Free)
-  let r = (Swap (& n 4194304) r Free)
-  let r = (Swap (& n 8388608) r Free)
+  let r = (Swap (& n 0x100000) r Free)
+  let r = (Swap (& n 0x200000) r Free)
+  let r = (Swap (& n 0x400000) r Free)
+  let r = (Swap (& n 0x800000) r Free)
   r
-
 
 // Reverse : Arr -> Arr
 (Reverse Null)       = Null
