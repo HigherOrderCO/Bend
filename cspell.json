@@ -19,6 +19,7 @@
     "Dall",
     "datatypes",
     "Deque",
+    "destructures",
     "desugared",
     "desugars",
     "dref",
@@ -29,7 +30,6 @@
     "hexdigit",
     "hvm's",
     "hvmc",
-    "hvml",
     "indexmap",
     "inet",
     "inets",
@@ -40,6 +40,7 @@
     "insta",
     "interner",
     "itertools",
+    "ITRS",
     "kwargs",
     "lcons",
     "linearization",
@@ -58,10 +59,11 @@
     "opre",
     "oprune",
     "oref",
+    "parallelizable",
     "peekable",
     "postcondition",
-    "prec",
     "powi",
+    "prec",
     "readback",
     "recursively",
     "redex",
@@ -77,6 +79,7 @@
     "scrutinee",
     "snil",
     "stdext",
+    "struct",
     "subcmd",
     "submatch",
     "subpattern",
@@ -94,6 +97,13 @@
     "walkdir",
     "wopts"
   ],
-  "files": ["**/*.rs", "**/*.md"],
-  "ignoreRegExpList": ["HexValues", "/λ/g", "/-O/g"]
+  "files": [
+    "**/*.rs",
+    "**/*.md"
+  ],
+  "ignoreRegExpList": [
+    "HexValues",
+    "/λ/g",
+    "/-O/g"
+  ]
 }

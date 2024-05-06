@@ -1,4 +1,4 @@
-use hvml::{
+use bend::{
   compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   net::hvmc_to_net::hvmc_to_net,
@@ -107,7 +107,7 @@ fn compile_term() {
 
     term.make_var_names_unique();
     term.linearize_vars();
-    let net = hvml::term::term_to_net(&term, &mut Default::default()).map_err(|e| e.to_string())?;
+    let net = bend::term::term_to_net(&term, &mut Default::default()).map_err(|e| e.to_string())?;
 
     Ok(format!("{}", net))
   })
@@ -369,7 +369,7 @@ fn cli() {
     let args = args_buf.lines();
 
     let output =
-      std::process::Command::new(env!("CARGO_BIN_EXE_hvml")).args(args).output().expect("Run command");
+      std::process::Command::new(env!("CARGO_BIN_EXE_bend")).args(args).output().expect("Run command");
     let res =
       format!("{}{}", String::from_utf8_lossy(&output.stderr), String::from_utf8_lossy(&output.stdout));
     Ok(res)

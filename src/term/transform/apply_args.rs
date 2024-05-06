@@ -10,7 +10,7 @@ impl Ctx<'_> {
   /// ```hvm
   /// main x1 x2 x3 = (MainBody x1 x2 x3)
   /// ```
-  /// Calling with `hvml run <file> arg1 arg2 arg3`, it becomes:
+  /// Calling with `bend run <file> arg1 arg2 arg3`, it becomes:
   /// ```hvm
   /// main = (λx1 λx2 λx3 (MainBody x1 x2 x3) arg1 arg2 arg3)
   /// ```
