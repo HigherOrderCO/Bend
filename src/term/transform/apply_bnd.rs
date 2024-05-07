@@ -60,7 +60,7 @@ impl Term {
 }
 
 fn make_fun_name(typ: &mut Name) -> Name {
-  Name::new(format!("{typ}/bind")
+  Name::new(format!("{typ}/bind"))
 }
 
 impl fmt::Display for MonadicBindError {
