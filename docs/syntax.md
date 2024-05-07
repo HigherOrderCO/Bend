@@ -181,14 +181,14 @@ The function `go` is available inside the bend body and calls it recursively.
 It is possible to initialize multiple variables:
 
 ```python
-bend x = 1, y = 2 ... while cond(x, y, ...):
+bend x = 1, y = 2 ... while condition(x, y, ...):
 ```
 
 It is equivalent to this inline recursive function:
 
 ```python
 def bend(x, y, ...):
-  if cond(x, y, ...):
+  if condition(x, y, ...):
     ...
     return ... bend(x, y, ...) ...
   else:
@@ -357,7 +357,7 @@ It is desugared to a fold statement:
 ```python
 fold list:
   List/cons:
-    if cond:
+    if condition:
       List/cons(list.head, list.tail)
     else:
       list.tail
@@ -376,7 +376,7 @@ data Name
   = (Ctr1 arg1 arg2)
   | Ctr2
 
-Name (Ctr1 sub_arg1 su_barg2) arg3 = rule0_body
+Name (Ctr1 sub_arg1 sub_arg2) arg3 = rule0_body
 Name Ctr2 arg3 = rule1_body
 ```
 
