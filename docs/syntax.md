@@ -1,6 +1,6 @@
 # Syntax
 
-This file provides a reference of each possible sintax of bend programming language.
+This file provides a reference of each possible syntax of bend programming language.
 
 Click [here](#bend-syntax) to see the bend syntax.
 
@@ -146,7 +146,7 @@ A monadic do block.
 
 Where `x <- ...` performs a monadic operation.
 
-Other statments are allowed inside the `do` block.
+Other statements are allowed inside the `do` block.
 
 ## Expressions
 
@@ -417,7 +417,7 @@ match opt = (Some "Bend") {
 
 A pattern match expression, it can hold a name binding if the matching term is not a variable.
 
-It is possbile to use a _wildcard_ variable or `*` as an exhaustive default case.
+It is possibile to use a _wildcard_ variable or `*` as an exhaustive default case.
 
 Using `;` is optional.
 
