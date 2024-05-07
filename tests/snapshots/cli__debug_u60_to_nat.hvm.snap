@@ -6,6 +6,6 @@ error: unexpected argument '-d' found
 
   tip: to pass '-d' as a value, use '-- -d'
 
-Usage: hvml run [OPTIONS] <PATH> [ARGUMENTS]...
+Usage: bend run [OPTIONS] <PATH> [ARGUMENTS]...
 
 For more information, try '--help'.

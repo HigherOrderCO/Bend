@@ -17,7 +17,7 @@ main = (if true 42 37)
 // so (true 42 37) will do the same thing.
 ```
 
-This is how  a`Not` function that acts on this encoding can be defined
+This is how a `Not` function that acts on this encoding can be defined
 ```rs
 not = λboolean (boolean false true)
 main = (not true) // Outputs λtλf f.
@@ -120,37 +120,33 @@ Broadly speaking, a good rule of thumb in HVM is **push linear lambdas to the to
 
 ## Example
 
-To show the power of fusing, here is a program that self-composes `fusing_not` 2^512 times and prints the result. `2^512` is larger than amount of atoms in the observable universe, and yet HVM is still able to work with it due to its optimal sharing capabilities.
+To show the power of fusing, here is a program that self-composes `fusing_not` 2^24 times and prints the result.
+Currently hvm is not able to handle operations between church numbers so we explicitly convert the native number to a church number in this example (which is very slow).
 
 This program uses [native numbers, which are described here](native-numbers.md).
 ```rs
 true = λt λf t
 false = λt λf f
+
 not = λboolean (boolean false true)
+
 fusing_not = λboolean λt λf (boolean f t)
+
 // Creates a Church numeral out of a native number
 to_church n = switch n {
 	0: λf λx x
 	_: λf λx (f (to_church n-1 f x))
 }
+
 main =
-	let two = λf λx (f (f x))
-	let two_pow_512 = ((to_church 512) two) // Composition of church-encoded numbers is equivalent to exponentiation.
-	// Self-composes `not` 2^512 times and prints the result.
-	(two_pow_512 fusing_not)  // try replacing this by regular not. Will it still work?
+	((to_church 0xFFFFFF) fusing_not)  // try replacing this by regular not. Will it still work?
 ```
 Here is the program's output:
 ```bash
-$ hvml run -s fuse_magic.hvm
-λa λb λc (a b c)
-
-RWTS   : 15374
-- ANNI : 8193
-- COMM : 5116
-- ERAS : 521
-- DREF : 1031
-- OPER : 513
-TIME   : 0.002 s
-RPS    : 9.537 m
+$ bend norm -s fuse_magic.hvm
+Result: λa λb λc (a c b)
+- ITRS: 285212661
+- TIME: 5.67s
+- MIPS: 50.28
 ```
-Only 15374 rewrites! Fusing is really powerful.
+A lot of rewrites, but most of those are just to create the church number.

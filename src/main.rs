@@ -1,11 +1,11 @@
-use clap::{Args, CommandFactory, Parser, Subcommand};
-use hvml::{
+use bend::{
   check_book, compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   load_file_to_book, run_book,
   term::{Book, Name},
   CompileOpts, OptLevel, RunOpts,
 };
+use clap::{Args, CommandFactory, Parser, Subcommand};
 use std::path::{Path, PathBuf};
 
 #[derive(Parser, Debug)]
@@ -80,8 +80,8 @@ enum Mode {
     #[arg(help = "Path to the input file")]
     path: PathBuf,
 
-    #[arg(value_parser = |arg: &str| hvml::term::parser::TermParser::new(arg).parse_term())]
-    arguments: Option<Vec<hvml::term::Term>>,
+    #[arg(value_parser = |arg: &str| bend::term::parser::TermParser::new(arg).parse_term())]
+    arguments: Option<Vec<bend::term::Term>>,
   },
   /// Runs the lambda-term level desugaring passes.
   Desugar {

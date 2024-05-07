@@ -85,7 +85,7 @@ impl<'a> PyParser<'a> {
         } else if self.try_consume("False") {
           return Ok(Term::Num { val: 0 });
         }
-        Term::Var { nam: self.parse_hvml_name()? }
+        Term::Var { nam: self.parse_bend_name()? }
       }
     };
     Ok(res)
@@ -95,7 +95,7 @@ impl<'a> PyParser<'a> {
     self.consume("[")?;
     let head = self.parse_term_py()?;
     if self.try_consume_keyword("for") {
-      let bind = self.parse_hvml_name()?;
+      let bind = self.parse_bend_name()?;
       self.consume("in")?;
       let iter = self.parse_term_py()?;
       let mut cond = None;
@@ -116,7 +116,7 @@ impl<'a> PyParser<'a> {
   fn parse_term_py(&mut self) -> Result<Term, String> {
     self.skip_trivia();
     if self.try_consume_keyword("lambda") {
-      let names = self.list_like(|p| p.parse_hvml_name(), "", ":", ",", true, 1)?;
+      let names = self.list_like(|p| p.parse_bend_name(), "", ":", ",", true, 1)?;
       let bod = self.parse_term_py()?;
       Ok(Term::Lam { names, bod: Box::new(bod) })
     } else {
@@ -254,7 +254,7 @@ impl<'a> PyParser<'a> {
     if self.starts_with("(") {
       self.parse_assignment_py(indent)
     } else {
-      let name = self.parse_hvml_name()?;
+      let name = self.parse_bend_name()?;
       if self.skip_starts_with("=") {
         // it's actually an assignment
         self.consume("=")?;
@@ -316,7 +316,7 @@ impl<'a> PyParser<'a> {
   fn parse_as_bind(&mut self) -> Result<Option<Name>, String> {
     let mut bind = None;
     if self.try_consume_keyword("as") {
-      bind = Some(self.parse_hvml_name()?);
+      bind = Some(self.parse_bend_name()?);
     }
     Ok(bind)
   }
@@ -343,7 +343,7 @@ impl<'a> PyParser<'a> {
         if p.try_consume("_") {
           Ok(None)
         } else {
-          let nam = p.parse_hvml_name()?;
+          let nam = p.parse_bend_name()?;
           Ok(Some(nam))
         }
       },
@@ -405,7 +405,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_fold_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
-    let fun = self.parse_hvml_name()?;
+    let fun = self.parse_bend_name()?;
     let arg = self.parse_term_py()?;
     let bind = self.parse_as_bind()?;
     self.consume(":")?;
@@ -422,7 +422,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_do_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
-    let fun = self.parse_hvml_name()?;
+    let fun = self.parse_bend_name()?;
     self.consume(":")?;
 
     let mut block = Vec::new();
@@ -458,14 +458,14 @@ impl<'a> PyParser<'a> {
 
   fn parse_assign_pattern_py(&mut self) -> Result<AssignPattern, String> {
     if self.skip_starts_with("(") {
-      let mut binds = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 1)?;
+      let mut binds = self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 1)?;
       if binds.len() == 1 {
         Ok(AssignPattern::Var(std::mem::take(&mut binds[0])))
       } else {
         Ok(AssignPattern::Tup(binds))
       }
     } else {
-      self.parse_hvml_name().map(AssignPattern::Var)
+      self.parse_bend_name().map(AssignPattern::Var)
     }
   }
 
@@ -481,8 +481,8 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_def_py(&mut self, indent: &mut Indent) -> Result<Definition, String> {
-    let name = self.parse_hvml_name()?;
-    let params = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 0)?;
+    let name = self.parse_bend_name()?;
+    let params = self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 0)?;
     self.consume(":")?;
     indent.enter_level();
     let body = self.parse_stmt_py(indent)?;
@@ -491,7 +491,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_enum_py(&mut self, indent: &mut Indent) -> Result<Enum, String> {
-    let name = self.parse_hvml_name()?;
+    let name = self.parse_bend_name()?;
     let mut variants = Vec::new();
     self.consume(":")?;
     indent.enter_level();
@@ -499,10 +499,10 @@ impl<'a> PyParser<'a> {
       if !self.skip_exact_indent(indent, true)? {
         break;
       }
-      let name = self.parse_hvml_name()?;
+      let name = self.parse_bend_name()?;
       let mut fields = Vec::new();
       if self.skip_starts_with("(") {
-        fields = self.list_like(|p| p.parse_hvml_name(), "(", ")", ",", true, 0)?;
+        fields = self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 0)?;
       }
       variants.push((name.clone(), Variant { name, fields }));
     }

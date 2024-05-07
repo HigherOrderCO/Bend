@@ -80,6 +80,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1fdabc7756949593fe60f30ec81974b613357de856987752631dea1e3394c80"
 
 [[package]]
+name = "bend"
+version = "0.1.0"
+dependencies = [
+ "TSPL 0.0.9 (git+https://github.com/developedby/TSPL.git?branch=fix-hvml-bugs)",
+ "clap",
+ "highlight_error",
+ "hvm-core",
+ "indexmap",
+ "insta",
+ "interner",
+ "itertools",
+ "loaned",
+ "parking_lot",
+ "stacker",
+ "stdext",
+ "walkdir",
+]
+
+[[package]]
 name = "bitflags"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -203,25 +222,6 @@ dependencies = [
  "parking_lot",
  "stacker",
  "thiserror",
-]
-
-[[package]]
-name = "hvm-lang"
-version = "0.1.0"
-dependencies = [
- "TSPL 0.0.9 (git+https://github.com/developedby/TSPL.git?branch=fix-hvml-bugs)",
- "clap",
- "highlight_error",
- "hvm-core",
- "indexmap",
- "insta",
- "interner",
- "itertools",
- "loaned",
- "parking_lot",
- "stacker",
- "stdext",
- "walkdir",
 ]
 
 [[package]]

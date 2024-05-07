@@ -1,14 +1,14 @@
 [package]
-name = "hvm-lang"
+name = "bend"
 version = "0.1.0"
 edition = "2021"
 
 [lib]
-name = "hvml"
+name = "bend"
 path = "src/lib.rs"
 
 [[bin]]
-name = "hvml"
+name = "bend"
 path = "src/main.rs"
 required-features = ["cli"]
 

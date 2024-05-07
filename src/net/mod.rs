@@ -1,7 +1,7 @@
 pub mod hvmc_to_net;
 
 use crate::term::Name;
-pub type HvmlLab = u16;
+pub type BendLab = u16;
 use NodeKind::*;
 
 #[derive(Debug, Clone)]
@@ -41,13 +41,13 @@ pub enum NodeKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CtrKind {
-  Con(Option<HvmlLab>),
-  Tup(Option<HvmlLab>),
-  Dup(HvmlLab),
+  Con(Option<BendLab>),
+  Tup(Option<BendLab>),
+  Dup(BendLab),
 }
 
 impl CtrKind {
-  pub fn to_lab(self) -> HvmlLab {
+  pub fn to_lab(self) -> BendLab {
     #[allow(clippy::identity_op)]
     match self {
       CtrKind::Con(None) => 0,

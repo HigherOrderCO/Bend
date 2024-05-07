@@ -8,7 +8,7 @@ use crate::{
 use highlight_error::highlight_error;
 use TSPL::Parser;
 
-// hvml grammar description:
+// Bend grammar description:
 // <Book>       ::= (<Data> | <Rule>)*
 // <Data>       ::= "data" <Name> "=" ( <Name> | "(" <Name> (<Name>)* ")" )+
 // <Rule>       ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) "=" <Term>
@@ -95,7 +95,7 @@ impl<'a> TermParser<'a> {
     if self.try_consume("(") {
       // (name field*)
       let name = self.parse_top_level_name()?;
-      let field_parser = |p: &mut Self| p.labelled(|p| p.parse_hvml_name(), "datatype constructor field");
+      let field_parser = |p: &mut Self| p.labelled(|p| p.parse_bend_name(), "datatype constructor field");
       let fields = self.list_like(field_parser, "", ")", "", false, 0)?;
       Ok((name, fields))
     } else {
@@ -194,7 +194,7 @@ impl<'a> TermParser<'a> {
       if self.starts_with("$") {
         unexpected_tag(self)?;
         self.advance_one();
-        let name = self.parse_hvml_name()?;
+        let name = self.parse_bend_name()?;
         return Ok(Pattern::Chn(name));
       }
 
@@ -286,7 +286,7 @@ impl<'a> TermParser<'a> {
       if self.starts_with("$") {
         self.consume("$")?;
         unexpected_tag(self)?;
-        let nam = self.parse_hvml_name()?;
+        let nam = self.parse_bend_name()?;
         return Ok(Term::Lnk { nam });
       }
 
@@ -376,7 +376,7 @@ impl<'a> TermParser<'a> {
       // Use
       if self.try_consume_keyword("use") {
         unexpected_tag(self)?;
-        let nam = self.parse_hvml_name()?;
+        let nam = self.parse_bend_name()?;
         self.consume("=")?;
         let val = self.parse_term()?;
         self.try_consume(";");
@@ -421,7 +421,7 @@ impl<'a> TermParser<'a> {
 
       // Var
       unexpected_tag(self)?;
-      let nam = self.labelled(|p| p.parse_hvml_name(), "term")?;
+      let nam = self.labelled(|p| p.parse_bend_name(), "term")?;
       Ok(Term::Var { nam })
     })
   }
@@ -443,7 +443,7 @@ impl<'a> TermParser<'a> {
 
   fn parse_top_level_name(&mut self) -> Result<Name, String> {
     let ini_idx = *self.index();
-    let nam = self.parse_hvml_name()?;
+    let nam = self.parse_bend_name()?;
     let end_idx = *self.index();
     if nam.contains("__") {
       let ctx = highlight_error(ini_idx, end_idx, self.input());
@@ -459,7 +459,7 @@ impl<'a> TermParser<'a> {
         if p.try_consume("*") {
           Ok(None)
         } else {
-          let nam = p.parse_hvml_name()?;
+          let nam = p.parse_bend_name()?;
           Ok(Some(nam))
         }
       },
@@ -477,9 +477,6 @@ impl<'a> TermParser<'a> {
     {
       let ctx = highlight_error(index, index + 1, self.input);
       return Err(format!("Tagged terms not supported for hvm32.\n{ctx}"));
-      /* self.advance_one();
-      let nam = self.labelled(|p| p.parse_hvml_name(), "tag name")?;
-      Some(Tag::Named(nam)) */
     } else {
       None
     };
@@ -496,13 +493,13 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_match_arg(&mut self) -> Result<(Name, Term, Vec<Name>), String> {
-    let bnd = self.parse_hvml_name()?;
+    let bnd = self.parse_bend_name()?;
     let arg = if self.try_consume("=") { self.parse_term()? } else { Term::Var { nam: bnd.clone() } };
     let with = if self.try_consume_keyword("with") {
-      let mut with = vec![self.parse_hvml_name()?];
+      let mut with = vec![self.parse_bend_name()?];
       while !self.skip_starts_with("{") {
         self.try_consume(",");
-        with.push(self.parse_hvml_name()?);
+        with.push(self.parse_bend_name()?);
       }
       with
     } else {
@@ -755,7 +752,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
   }
 
-  fn parse_hvml_name(&mut self) -> Result<Name, String> {
+  fn parse_bend_name(&mut self) -> Result<Name, String> {
     let nam = self.parse_name()?;
     Ok(Name::new(nam))
   }

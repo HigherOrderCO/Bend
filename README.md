@@ -1,20 +1,20 @@
-# HVM-Lang
+# Bend
 
-HVM-Lang is a lambda-calculus based language and serves as an Intermediate Representation for HVM-Core, offering a higher level syntax for writing programs based on the [Interaction-Calculus](https://github.com/VictorTaelin/Interaction-Calculus#interaction-calculus).
+Bend is a programming language that can run massively parallel programs on the GPU or the CPU using the power of interaction nets and the [HVM](https://github.com/HigherOrderCO/hvm2).
+With Bend, you can write programs for the GPU as easily as you'd write a normal program in your favorite language.
 
-Compilers that want to target the HVM should compile the source language to HVM-lang, which takes care of converting interaction calculus into the underlying interaction networks.
+It is based on the [Interaction-Calculus](https://github.com/VictorTaelin/Interaction-Calculus#interaction-calculus), a variation of the untyped lambda calculus that compiles efficiently to interaction nets.
 
-Note that HVM-lang is untyped and does not guarantee correctness or soundness. Compilers that don't want to implement the necessary check can instead transpile to the [Kind language](https://github.com/HigherOrderCO/kind2), which compiles to HVM-lang and implements type-level checking.
+Currently Bend only supports strict/eager evaluation. If you need lazy, optimal evaluation, we recommend using [HVM1](https://github.com/HigherOrderCO/HVM) for now.
 
-Programmers looking for an HVM-based programming language should also use Kind, which is designed to be user-interfacing.
 
 ## Installation
 
 With the nightly version of rust installed, clone the repository:
 ```bash
-git clone https://github.com/HigherOrderCO/hvm-lang.git
+git clone https://github.com/HigherOrderCO/bend.git
 
-cd hvm-lang
+cd bend
 ```
 
 Install using cargo:
@@ -22,161 +22,208 @@ Install using cargo:
 cargo install --path . --locked
 ```
 
+If you want to run programs directly from Bend, you also need to have [HVM](https://github.com/HigherOrderCO/hvm2) installed.
+
+
 ## Usage
 
-First things first, let's write a basic program that adds the numbers 3 and 2.
+Command   | Usage                 | Description
+--------- | --------------------- | ---
+Check     | `bend check <file>`   | Checks if a program is valid
+Compile   | `bend compile <file>` | Compiles a program to HVM and outputs it to stdout
+Run       | `bend run <file>`     | Compiles and then runs a program in HVM
+Normalize | `bend norm <file>`    | Compiles and then normalizes a program in HVM, outputting the result to stdout
+Desugar   | `bend desugar <file>` | Desugars a program to the core syntax and outputs it to stdout
 
-```hs
-main = (+ 3 2)
-```
 
-HVM-Lang searches for the `main | Main` definitions as entrypoint of the program.
-
-To run a program, use the `run` argument:
+If you want to compile a file to a file, just redirect the output with `>`:
 ```bash
-hvml run <file>
+bend compile <file.bend> > <file.hvm>
 ```
 
-It will show the number 5.
-Adding the `--stats` option displays some runtime stats like time and rewrites.
+There are many compiler options that can be passed through the CLI. You can see the list of options [here](docs/compiler-options.md).
 
-To limit the runtime memory, use the `--mem <size> option.` The default is 1GB:
-```bash
-hvml --mem 65536 run <file>
+
+## Examples
+
+Bend offers two flavors of syntax, a user-friendly python-like syntax (the default) and the core ML/Haskell-like syntax that's used internally by the compiler.
+You can read the full reference for both of them [here](docs/syntax.md), but these examples will use the first one.
+
+To see some more complex examples programs, check out the [examples](examples/) folder.
+
+
+We can start with a basic program that adds the numbers 3 and 2.
+
+```py
+def main:
+  return 2 + 3
 ```
-You can specify the memory size in bytes (default), kilobytes (k), megabytes (m), or gigabytes (g), e.g., `--mem 200m.`
+Normalizing this program will show the number 5.
+Be careful with `run` and `norm`, since they will not show any warnings by default. Before running a new program it's useful to first `check` it.
 
-To compile a program use the `compile` argument:
-```bash
-hvml compile <file>
-```
-This will output the compiled file to stdout.
+Bend programs consist of a series of function definitions, always starting with a function called `main` or `Main`.
 
-There are compiler options through the CLI. [Click here](docs/compiler-options.md) to learn about them.
+Functions can receive arguments both directly and using a lambda abstraction.
+```py
+// These two are equivalent
+def add(x, y):
+  return x + y
 
-## Syntax
-
-HVM-Lang files consists of a series of definitions, which bind a name to a term. Terms include lambda-calculus abstractions and applications, numbers, tuples, among others.
-
-Here's a lambda where the body is the variable `x`:
-```rs
-id = λx x
-```
-
-Lambdas can also be defined using `@`.
-To discard the variable and not bind it to any name, use `*`:
-```hs
-True  = @t @* t
-False = λ* λf f
-```
-
-Applications are enclosed by `(` `)`.
-```rs
-(λx x λx x λx x)
-```
-This term is the same as:
-```rs
-(((λx x) (λx x)) (λx x))
-```
-Parentheses around lambdas are optional. Lambdas have a high precedence
-
-```rust
-(λx a b) == ((λx a) b) != (λx (a b))
+def add2:
+  return lambda x, y: x + y
 ```
 
-`*` can also be used to define an eraser term.
-It compiles to an `inet` node with only one port that deletes anything that’s plugged into it.
-```rs
-era = *
+You can then call this function like this:
+```py
+def main:
+  sum = add(2, 3)
+  return sum
 ```
 
-A let term binds some value to the next term, in this case `(* result 2)`:
-```rs
-let result = (+ 1 2); (* result 2)
+You can bundle multiple values into a single value using a tuple or a struct.
+```py
+// With a tuple
+def Tuple.fst(x):
+  // This destructures the tuple into the two values it holds.
+  // '*' means that the value is discarded and not bound to any variable.
+  (fst, *) = x
+  return fst
+
+// With a struct
+struct Pair(fst, snd):
+def Pair.fst(x):
+  match x:
+    Pair:
+      return x.fst
+
+// We can also directly access the fields of a struct.
+// This requires that we tell the compiler the type of the variable where it is defined.
+def Pair.fst_2(x: Pair):
+  return x.fst
 ```
 
-The `use` term inlines clones of some value to the next term:
-```rs
-use result = (+ 1 2); (* result result)
-
-// Equivalent to
-(* (+ 1 2) (+ 1 2))
-```
-The same term with `let` duplicates the value:
-```rs
-let result = (+ 1 2); (* result result)
-
-// Equivalent to
-let {result_1 result_2} = (+ 1 2); (* result_1 result_2)
+For more complicated data structures, we can use `enum` to define a algebraic data types.
+```py
+enum MyTree:
+  Node(val, ~left, ~right)
+  Leaf
 ```
 
+We can then pattern match on the enum to perform different actions depending on the variant of the value.
+```py
+def Maybe.or_default(x, default):
+  match x:
+    Maybe/some:
+      // We can access the fields of the variant using 'matched.field'
+      return x.val
+    Maybe/none:
+      return default
+```
+
+We use `~` to indicate that a field is recursive.
+This allows us to easily create and consume these recursive data structures with `bend` and `fold`:
+```py
+def MyTree.sum(x):
+  // Sum all the values in the tree.
+  fold x:
+    // The fold is implicitly called for fields marked with '~' in their definition.
+    Node:
+      return val + x.left + x.right
+    Leaf:
+      return 0
+
+def main:
+  bend val = 0 while val < 0:
+    // 'go' calls the bend recursively with the provided values.
+    x = Node(val=val, left=go(val + 1), right=go(val + 1))
+  then:
+    // 'then' is the base case, when the condition fails.
+    x = Leaf
+
+  return MyTree.sum(x)
+```
+
+These are equivalent to inline recursive functions that create a tree and consume it.
+```py
+def MyTree.sum(x):
+  match x:
+    Node:
+      return x.val + MyTree.sum(x.left) + MyTree.sum(x.right)
+    Leaf:
+      return 0
+
+def main_bend(val):
+  if val < 0:
+    return Node(val, main_bend(val + 1), main_bend(val + 1))
+  else:
+    return Leaf
+
+def main:
+  return main_bend(0)
+```
+Making your program around trees is a very good way of making it parallelizable, since each core can be dispatched to work on a different branch of the tree.
+
+*Attention*: Note that despite the ADT syntax sugars, Bend is an *untyped* language and the compiler will not stop you from using values incorrectly, which can lead to very unexpected results.
+For example, the following program will compile just fine even though `!=` is only defined for native numbers:
+```py
+def main:
+  bend val = [0, 1, 2, 3] while val != []:
+    match val:
+      List.cons:
+        x = val.head + go(val.tail)
+      List.nil:
+        x = 0
+  then:
+    x = 0
+  return x
+```
+Normalizing this program will show `λ* *` and not the expected `6`.
+
+It's also important to note that Bend is linear (technically affine), meaning that every variable is only used once. When a variable is used more than once, the compiler will automatically insert a duplication.
 Duplications efficiently share the same value between two locations, only cloning a value when it's actually needed, but their exact behaviour is slightly more complicated than that and escapes normal lambda-calculus rules.
-You can read more about it in [Dups and sups](docs/dups-and-sups.md).
+You can read more about it in [Dups and sups](docs/dups-and-sups.md) and learn how pattern matching avoids this problem in [Pattern matching](docs/pattern-matching.md).
 
-It is possible to define tuples:
-```rs
-tup = (2, 2)
+To use a variable twice without duplicating it, you can use a `use` statement.
+It inlines clones of some value in the statements that follow it.
+```py
+def foo(x):
+  use result = bar(1, x)
+  return (result, result)
+
+// Is equivalent to
+def foo(x):
+  return (bar(1, x), bar(1, x))
+```
+Note that any variable in the `use` will end up being duplicated.
+
+
+Bend supports recursive functions of unrestricted depth:
+```py
+def native_num_to_adt(n):
+  if n == 0:
+    return Nat.zero
+  else:
+    return Nat.succ(native_num_to_adt(n - 1))
+```
+If your recursive function is not based on pattern matching syntax (like `if`, `match`, `fold`, etc) you have to be careful to avoid an infinite loop.
+Since Bend is eagerly executed, some situations will cause function applications to always be expanded, which can lead to looping situations.
+You can read how to avoid this in [Lazy definitions](docs/lazy-definitions.md).
+
+
+Bend has native numbers and operations.
+```py
+def main:
+  a = 1      // A 24 bit unsigned integer.
+  b = +2     // A 24 bit signed integer.
+  c = -3     // Another signed integer, but with negative value.
+  d = 1.0    // A 24 bit floating point number.
+  e = +0.001 // Also a float.
+  return (a * 2, b - c, d / e)
 ```
 
-And destructuring tuples with `let`:
-```rs
-let (x, y) = tup; (+ x y)
-```
-
-Strings are delimited by `"` `"` and support Unicode characters.
-```rs
-main = "Hello, 🌎"
-```
-A string is desugared to a String data type containing two constructors, `String.cons` and `String.nil`.
-```rs
-// These two are equivalent
-StrEx1 = "Hello"
-
-data String = (String.cons head tail) | String.nil
-StrEx2 = (String.cons 'H' (String.cons 'e', (String.cons 'l' (String.cons 'l', (String.cons 'o' String.nil)))))
-```
-
-Characters are delimited by `'` `'` and support Unicode escape sequences. They have a numeric value associated with them.
-```
-main = '\u{4242}'
-```
-
-Lists are delimited by `[` `]` and elements can be optionally separated by `,`.
-```rs
-ids = [3, 6, 9 12 16]
-```
-A list is desugared to a List data type containing two constructors, `List.cons` and `List.nil`.
-```rs
-// These two are equivalent
-ListEx1 = [1, 2, 3]
-
-data List = (List.cons head tail) | (List.nil)
-ListEx2 = (List.cons 1 (List.cons 2 (List.cons 3 List.nil)))
-```
-Hvm-lang supports pattern matching through `match` and `switch` terms.
-`match` pattern matches on constructors declared with `data`.
-```rs
-data Option = (Some val) | None
-// 'match' implicitly binds a variable for each field in the constructor.
-// The name of the bound variable depends on the name of the argument.
-map f x = match x {
-  Some:  (Some (f x.val))
-  None:  None
-}
-
-// You can give a name to the match argument to access its fields.
-TakeErr fallible_fn x errs =
-  match res = (fallible_fn x) {
-    // We can now access res.val.
-    // If no name is given, it will be inaccessible.
-    Result.ok: ((Some res.val), errs)
-    Result.err: (None, (List.cons res.val errs))
-  }
-```
-
-`switch` pattern matches on native numbers:
-```rs
-match x = 4 {
+`switch` pattern matches on unsigned native numbers:
+```py
+switch x = 4:
   // From '0' to n, ending with the default case '_'.
   0:  "zero"
   1:  "one"
@@ -184,23 +231,47 @@ match x = 4 {
   // The default case binds the name <arg>-<n>
   // where 'arg' is the name of the argument and 'n' is the next number.
   // In this case, it's 'x-3', which will have value (4 - 3) = 1
-  _:  (String.concat "other: " (String.from_num x-3))
-}
+  _:  String.concat("other: ", (String.from_num x-3))
 ```
 
-Which is the equivalent of nesting match terms:
+Bend has Lists and Strings, which support Unicode characters.
 ```rs
-match x = 4 {
-  0: "zero"
-  _: match x-1 {
-    0: "one"
-    _:  use x-2 = x-1-1; match x-2 {
-      0: "two"
-      _: use x-3 = x-2-1; (String.concat "other: " (String.from_num x-3))
-    }
-  }
-}
+def main:
+  return ["You: Hello, 🌎", "🌎: Hello, user"]
 ```
+A string is desugared to a String data type containing two constructors, `String.cons` and `String.nil`.
+List also becomes a type with two constructors, `List.cons` and `List.nil`.
+```rs
+// These two are equivalent
+def StrEx:
+  "Hello"
+
+def ids:
+  [1, 2, 3] 
+
+// These types are builtin.
+enum String:
+  String.cons(head, tail)
+  String.nil
+enum List:
+  List.cons(head, tail)
+  List.nil
+def StrEx:
+  String.cons('H', String.cons('e', String.cons('l', String.cons('l', String.cons('o', String.nil)))))
+def ids:
+  List.cons(1, List.cons(2, List.cons(3, List.nil)))
+```
+
+Characters are delimited by `'` `'` and support Unicode escape sequences. They are encoded as a U24 with the unicode codepoint as their value.
+```
+// These two are equivalent
+def chars:
+  ['A', '\u{4242}', '🌎']
+
+def chars2:
+  [65, 0x4242, 0x1F30E]
+```
+
 
 ### More features
 
@@ -219,7 +290,6 @@ Other features are described in the following documentation files:
 - &#128215; CLI arguments: [CLI arguments](docs/cli-arguments.md)
 - &#128217; Duplications and superpositions: [Dups and sups](docs/dups-and-sups.md)
 - &#128217; Scopeless lambdas: [Using scopeless lambdas](docs/using-scopeless-lambdas.md)
-- &#128217; Tagged lambdas and applications: [Automatic vectorization with tagged lambdas](docs/automatic-vectorization-with-tagged-lambdas.md)
 - &#128213;: Fusing functions: [Writing fusing functions](docs/writing-fusing-functions.md)
 
 ## Further reading
