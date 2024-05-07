@@ -88,7 +88,7 @@ pub enum Term {
     nxt: Box<Term>,
   },
   Bnd {
-    fun: Name,
+    typ: Name,
     ask: Box<Pattern>,
     val: Box<Term>,
     nxt: Box<Term>,
@@ -321,8 +321,8 @@ impl Clone for Term {
       Self::Var { nam } => Self::Var { nam: nam.clone() },
       Self::Lnk { nam } => Self::Lnk { nam: nam.clone() },
       Self::Let { pat, val, nxt } => Self::Let { pat: pat.clone(), val: val.clone(), nxt: nxt.clone() },
-      Self::Bnd { fun, ask, val, nxt } => {
-        Self::Bnd { fun: fun.clone(), ask: ask.clone(), val: val.clone(), nxt: nxt.clone() }
+      Self::Bnd { typ: fun, ask, val, nxt } => {
+        Self::Bnd { typ: fun.clone(), ask: ask.clone(), val: val.clone(), nxt: nxt.clone() }
       }
       Self::Use { nam, val, nxt } => Self::Use { nam: nam.clone(), val: val.clone(), nxt: nxt.clone() },
       Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
