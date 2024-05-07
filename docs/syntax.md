@@ -417,7 +417,7 @@ match opt = (Some "Bend") {
 
 A pattern match expression, it can hold a name binding if the matching term is not a variable.
 
-It is possibile to use a _wildcard_ variable or `*` as an exhaustive default case.
+It is possible to use a _wildcard_ variable or `*` as an exhaustive default case.
 
 Using `;` is optional.
 
