@@ -1,6 +1,7 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
 
+use crate::fun::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Term};
 use diagnostics::{Diagnostics, DiagnosticsConfig, ERR_INDENT_SIZE};
 use hvmc::ast::Net;
 use hvmc_net::{
@@ -10,14 +11,14 @@ use hvmc_net::{
 };
 use net::hvmc_to_net::hvmc_to_net;
 use std::{process::Output, str::FromStr};
-use term::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Term};
 
 pub mod diagnostics;
+pub mod fun;
 pub mod hvmc_net;
+pub mod imp;
 pub mod net;
-pub mod term;
 
-pub use term::load_book::load_file_to_book;
+pub use fun::load_book::load_file_to_book;
 
 pub const ENTRY_POINT: &str = "main";
 pub const HVM1_ENTRY_POINT: &str = "Main";
@@ -218,22 +219,22 @@ impl OptLevel {
 
 #[derive(Clone, Debug)]
 pub struct CompileOpts {
-  /// Enables [term::transform::eta_reduction].
+  /// Enables [fun::transform::eta_reduction].
   pub eta: bool,
 
-  /// Enables [term::transform::definition_pruning] and [hvmc_net::prune].
+  /// Enables [fun::transform::definition_pruning] and [hvmc_net::prune].
   pub prune: bool,
 
-  /// Enables [term::transform::linearize_matches].
+  /// Enables [fun::transform::linearize_matches].
   pub linearize_matches: OptLevel,
 
-  /// Enables [term::transform::float_combinators].
+  /// Enables [fun::transform::float_combinators].
   pub float_combinators: bool,
 
-  /// Enables [term::transform::definition_merge]
+  /// Enables [fun::transform::definition_merge]
   pub merge: bool,
 
-  /// Enables [term::transform::inline].
+  /// Enables [fun::transform::inline].
   pub inline: bool,
 
   /// Enables [hvmc_net::reorder_redexes::reorder_redexes_recursive_last].

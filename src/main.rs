@@ -1,9 +1,8 @@
 use bend::{
   check_book, compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
-  load_file_to_book, run_book,
-  term::{Book, Name},
-  CompileOpts, OptLevel, RunOpts,
+  fun::{Book, Name},
+  load_file_to_book, run_book, CompileOpts, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use std::path::{Path, PathBuf};
@@ -80,8 +79,8 @@ enum Mode {
     #[arg(help = "Path to the input file")]
     path: PathBuf,
 
-    #[arg(value_parser = |arg: &str| bend::term::parser::TermParser::new(arg).parse_term())]
-    arguments: Option<Vec<bend::term::Term>>,
+    #[arg(value_parser = |arg: &str| bend::fun::parser::TermParser::new(arg).parse_term())]
+    arguments: Option<Vec<bend::fun::Term>>,
   },
   /// Runs the lambda-term level desugaring passes.
   Desugar {

@@ -1,4 +1,4 @@
-use crate::term::{display::DisplayFn, Name};
+use crate::fun::{display::DisplayFn, Name};
 use std::{
   collections::BTreeMap,
   fmt::{Display, Formatter},

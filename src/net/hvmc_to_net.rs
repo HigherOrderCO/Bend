@@ -1,7 +1,7 @@
 use super::{INet, INode, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use crate::{
+  fun::Name,
   net::{CtrKind, NodeKind},
-  term::Name,
 };
 use hvmc::ast::{Net, Tree};
 
