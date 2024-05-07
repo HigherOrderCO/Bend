@@ -58,9 +58,11 @@ return value
 
 (first, second) = (1, 2)
 return second
+
+{x y} = {2 3}
 ```
 
-Assigns a value to a variable, it's possible to pattern match match tuples.
+Assigns a value to a variable, it's possible to pattern match match tuples and superpositions.
 
 ### In-Place Operation
 
@@ -147,6 +149,39 @@ It is possible to bind a variable name to the matching value. Just like in `matc
 
 For fields notated with `~` in the type definition, the fold function is called implicitly.
 
+### Bend
+
+Bend can be used to create recursive data structures:
+
+```rust
+bend x = 0 while x < 10:
+  left = go(x + 1)
+  right = go(x + 1)
+  result = Tree/Node(left, right)
+then:
+  result = Tree/Leaf(x)
+```
+
+Which binds a variable to the return of an inline recursive function.
+The function `go` is available inside the bend body and calls it recursively.
+
+It is possible to initialize multiple variables:
+
+```python
+bend x = 1, y = 2 ... while cond(x, y, ...):
+```
+
+It is equivalent to this inline recursive function:
+
+```python
+def bend(x, y, ...):
+  if cond(x, y, ...):
+    ...
+    return ... bend(x, y, ...) ...
+  else:
+    return ...
+```
+
 ### Do
 
 ```python
@@ -171,7 +206,7 @@ some_var
 foo/bar
 ```
 
-A variable name can be anything matching the regex `[A-Za-z0-9_.-/]*`.
+A variable can be anything matching the regex `[A-Za-z0-9_.-/]+`.
 
 A variable is a name for some immutable expression. It is possible to rebind variables with the same name.
 
@@ -190,6 +225,18 @@ x => y => y
 
 Lambdas represents anonymous inline functions, it can bind a variable and has an expression as body.
 
+### Unscoped Lambdas and Variables
+
+```python
+$x => $x
+```
+
+Like lambdas, with the exception that the variable starts with a `$` sign. Every unscoped variable in a function must have a unique name and must be used exactly once.
+
+Unscoped variables are not transformed and linearized like normal scoped variables.
+
+Read [using scopeless lambdas](/docs/using-scopeless-lambdas.md) to know more about.
+
 ### Function Call
 
 ```python
@@ -197,6 +244,8 @@ callee(arg_1, arg_2, arg_n)
 ```
 
 A call is written with a callee followed by a list of arguments.
+
+The effect of a function call is to substitute the callee with it's body and replace the arguments by the passed variables.
 
 Accepts partial applications.
 
@@ -207,6 +256,14 @@ Accepts partial applications.
 ```
 
 A Tuple is surrounded by `(` `)` and should contain 2 or more elements. Elements are separated by `,`.
+
+### Superposition
+
+```python
+{1 2 3}
+```
+
+A superposition of values is defined using `{` `}` with at least 2 expressions inside.
 
 ### Numbers and Infix Operations
 
@@ -280,7 +337,20 @@ Expression: The expression to be performed in the iterator element.
 
 Iterator: Binds a name to the list elements.
 
-Condition: Optional, is applied after the list is processed.
+Condition: Optional, is used to filter the list elements.
+
+It is desugared to a fold statement:
+
+```python
+fold list:
+  List/cons:
+    if cond:
+      List/cons(list.head, list.tail)
+    else:
+      list.tail
+  List/nil:
+    List/nil
+```
 
 <div id="core-syntax"></div>
 
@@ -343,9 +413,14 @@ Each constructor is defined by a name followed by its fields. The `~` notation d
 
 ### Variables
 
-A variable name can be anything matching the regex `[A-Za-z0-9_.-/]*`.
+A variable can be anything matching the regex `[A-Za-z0-9_.-/]+`.
 
-... TODO
+A variable is a name for some immutable expression. It is possible to rebind variables with the same name.
+
+```rust
+let x = 1
+let x = (+ x 1)
+```
 
 ### Lambda
 
@@ -375,9 +450,7 @@ A pattern is equivalent to a let:
 λ$x $x
 ```
 
-Same as lambdas, with the exception that the variable starts with a `$` sign.
-
-Every unscoped variable in a function must have a unique name and must be used exactly once.
+Same as lambdas, with the exception that the variable starts with a `$` sign. Every unscoped variable in a function must have a unique name and must be used exactly once.
 
 Unscoped variables are not transformed and linearized like normal scoped variables.
 
@@ -536,7 +609,9 @@ u24 = 42
 'a'
 ```
 
-A Character literal is surrounded with `'`. It is desugared as an u24 number.
+A Character is surrounded with `'`. Accepts unicode characters, unicode escapes in the form '\u{hex value}' and is desugared to the unicode codepoint as an `u24`.
+
+Only supports unicode codepoints up to `0xFFFFFF`.
 
 ### String Literal
 
@@ -544,7 +619,7 @@ A Character literal is surrounded with `'`. It is desugared as an u24 number.
 "Hello"
 ```
 
-A String literal is surrounded with `"`.
+A String literal is surrounded with `"`. Accepts the same values as characters literals.
 
 The syntax above is desugared to:
 
