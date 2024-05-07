@@ -149,6 +149,19 @@ It is possible to bind a variable name to the matching value. Just like in `matc
 
 For fields notated with `~` in the type definition, the fold function is called implicitly.
 
+It is equivalent to the inline recursive function:
+
+```python
+def fold(x):
+  match x:
+    Tree/Node:
+      return x.value + fold(x.left) + fold(x.right)
+    Tree/Leaf:
+      return 0
+...
+fold(Tree/Leaf)
+```
+
 ### Bend
 
 Bend can be used to create recursive data structures:
@@ -363,7 +376,7 @@ data Name
   = (Ctr1 arg1 arg2)
   | Ctr2
 
-Name (Ctr1 subarg1 subarg2) arg3 = rule0_body
+Name (Ctr1 sub_arg1 su_barg2) arg3 = rule0_body
 Name Ctr2 arg3 = rule1_body
 ```
 
