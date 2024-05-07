@@ -106,7 +106,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
       match term {
         Term::Era => self.link(up, Place::Tree(LoanedMut::new(Tree::Era))),
         Term::Var { nam } => self.link_var(false, nam, up),
-        Term::Lnk { nam } => self.link_var(true, nam, up),
+        Term::Link { nam } => self.link_var(true, nam, up),
         Term::Ref { nam } => self.link(up, Place::Tree(LoanedMut::new(Tree::Ref { nam: nam.to_string() }))),
         Term::Num { val } => {
           let val = val.to_bits();
@@ -166,7 +166,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           self.make_node_list(kind, up, els.iter().map(|el| |slf: &mut Self, up| slf.encode_term(el, up)));
         }
         // core: & [opr] ~ $(fst $(snd ret))
-        Term::Opr { opr, fst, snd } => {
+        Term::Oper { opr, fst, snd } => {
           // Partially apply
           match (fst.as_ref(), snd.as_ref()) {
             // Put oper in fst
@@ -204,11 +204,13 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           }
         }
         Term::Use { .. }  // Removed in earlier pass
-        | Term::Bnd { .. } // Removed in earlier pass
+        | Term::Bind { .. } // Removed in earlier pass
         | Term::Mat { .. } // Removed in earlier pass
+        | Term::Bend { .. } // Removed in desugar_bend
+        | Term::Fold { .. } // Removed in desugar_fold
         | Term::Nat { .. } // Removed in encode_nat
         | Term::Str { .. } // Removed in encode_str
-        | Term::Lst { .. } // Removed in encode_list
+        | Term::List { .. } // Removed in encode_list
         | Term::Err => unreachable!(),
       }
     })

@@ -14,7 +14,7 @@ use TSPL::Parser;
 // <Rule>       ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) "=" <Term>
 // <Pattern>    ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number> | "(" <Pattern> ("," <Pattern>)+ ")"
 // <Term>       ::=
-//   <Number> | <NumOp> | <Tup> | <App> | <Group> | <Nat> | <Lam> | <UnscopedLam> |
+//   <Number> | <NumOp> | <Tup> | <App> | <Group> | <Nat> | <Lam> | <UnscopedLam> | <Bend> | <Fold> |
 //   <Use> | <Dup> | <LetTup> | <Let> | <Bind> | <Match> | <Switch> | <Era> | <UnscopedVar> | <Var>
 // <Lam>        ::= <Tag>? ("λ"|"@") <NameEra> <Term>
 // <UnscopedLam>::= <Tag>? ("λ"|"@") "$" <Name> <Term>
@@ -243,7 +243,7 @@ impl<'a> TermParser<'a> {
           let fst = self.parse_term()?;
           let snd = self.parse_term()?;
           self.consume(")")?;
-          return Ok(Term::Opr { opr, fst: Box::new(fst), snd: Box::new(snd) });
+          return Ok(Term::Oper { opr, fst: Box::new(fst), snd: Box::new(snd) });
         }
 
         // Tup or App
@@ -273,7 +273,7 @@ impl<'a> TermParser<'a> {
       if self.starts_with("[") {
         unexpected_tag(self)?;
         let els = self.list_like(|p| p.parse_term(), "[", "]", ",", false, 0)?;
-        return Ok(Term::Lst { els });
+        return Ok(Term::List { els });
       }
 
       // Sup
@@ -287,7 +287,7 @@ impl<'a> TermParser<'a> {
         self.consume("$")?;
         unexpected_tag(self)?;
         let nam = self.parse_bend_name()?;
-        return Ok(Term::Lnk { nam });
+        return Ok(Term::Link { nam });
       }
 
       // Era
@@ -419,6 +419,41 @@ impl<'a> TermParser<'a> {
         return Ok(ask);
       }
 
+      // Bend
+      if self.try_consume_keyword("bend") {
+        unexpected_tag(self)?;
+        let args = self.list_like(
+          |p| {
+            let bind = p.parse_bend_name()?;
+            p.consume("=")?;
+            let init = p.parse_term()?;
+            Ok((bind, init))
+          },
+          "",
+          "while",
+          ",",
+          false,
+          0,
+        )?;
+        let (bind, init): (Vec<_>, Vec<_>) = args.into_iter().unzip();
+        let bind = bind.into_iter().map(Some).collect::<Vec<_>>();
+        let cond = self.parse_term()?;
+        self.consume("{")?;
+        let step = self.parse_term()?;
+        self.consume("}")?;
+        self.consume("then")?;
+        self.consume("{")?;
+        let base = self.parse_term()?;
+        self.consume("}")?;
+        return Ok(Term::Bend {
+          bind,
+          init,
+          cond: Box::new(cond),
+          step: Box::new(step),
+          base: Box::new(base),
+        });
+      }
+
       // Var
       unexpected_tag(self)?;
       let nam = self.labelled(|p| p.parse_bend_name(), "term")?;
@@ -434,7 +469,7 @@ impl<'a> TermParser<'a> {
         let val = self.parse_term()?;
         self.try_consume(";");
         let nxt = self.parse_ask(typ.clone())?;
-        Ok(Term::Bnd { typ, ask: Box::new(ask), val: Box::new(val), nxt: Box::new(nxt) })
+        Ok(Term::Bind { typ, ask: Box::new(ask), val: Box::new(val), nxt: Box::new(nxt) })
       } else {
         self.parse_term()
       }

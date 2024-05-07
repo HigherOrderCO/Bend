@@ -9,7 +9,7 @@ impl Term {
   pub fn expand_generated(&mut self, book: &Book) {
     maybe_grow(|| {
       if let Term::Ref { nam } = &*self {
-        if nam.contains("__") {
+        if nam.is_generated() {
           *self = book.defs.get(nam).unwrap().rule().body.clone();
         }
       }

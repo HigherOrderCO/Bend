@@ -96,11 +96,13 @@ pub fn desugar_book(
 
   ctx.resolve_refs()?;
 
-  ctx.apply_bnd()?;
+  ctx.encode_do_blocks()?;
 
   ctx.desugar_match_defs()?;
 
   ctx.fix_match_terms()?;
+
+  //ctx.desugar_bend()?;
 
   ctx.check_unbound_vars()?;
 

@@ -56,7 +56,7 @@ impl Stmt {
       }
       Stmt::InPlace { op, var: nam, val, nxt } => lang::Term::Let {
         pat: Box::new(lang::Pattern::Var(Some(nam.clone()))),
-        val: Box::new(lang::Term::Opr {
+        val: Box::new(lang::Term::Oper {
           opr: op.to_lang_op(),
           fst: Box::new(lang::Term::Var { nam }),
           snd: Box::new(val.to_lang()),
@@ -100,10 +100,10 @@ impl Term {
         bod: Box::new(acc),
       }),
       Term::Bin { op, lhs, rhs } => {
-        lang::Term::Opr { opr: op, fst: Box::new(lhs.to_lang()), snd: Box::new(rhs.to_lang()) }
+        lang::Term::Oper { opr: op, fst: Box::new(lhs.to_lang()), snd: Box::new(rhs.to_lang()) }
       }
       Term::Str { val } => lang::Term::Str { val },
-      Term::Lst { els } => lang::Term::Lst { els: els.into_iter().map(Self::to_lang).collect() },
+      Term::Lst { els } => lang::Term::List { els: els.into_iter().map(Self::to_lang).collect() },
       Term::Tup { els } => lang::Term::Fan {
         fan: lang::FanKind::Tup,
         tag: lang::Tag::Static,

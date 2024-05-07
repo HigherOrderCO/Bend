@@ -47,15 +47,15 @@ impl fmt::Display for Term {
         write!(f, "{}λ{} {}", tag.display_padded(), pat, bod)
       }
       Term::Var { nam } => write!(f, "{nam}"),
-      Term::Lnk { nam } => write!(f, "${nam}"),
+      Term::Link { nam } => write!(f, "${nam}"),
       Term::Let { pat, val, nxt } => {
         write!(f, "let {} = {}; {}", pat, val, nxt)
       }
-      Term::Bnd { typ, ask, val, nxt } => {
+      Term::Bind { typ, ask, val, nxt } => {
         write!(f, "do {typ} {{ ")?;
         write!(f, "ask {} = {}; ", ask, val)?;
         let mut cur = nxt;
-        while let Term::Bnd { typ: _, ask, val, nxt } = &**cur {
+        while let Term::Bind { typ: _, ask, val, nxt } = &**cur {
           cur = nxt;
           write!(f, "ask {} = {}; ", ask, val)?;
         }
@@ -111,6 +111,39 @@ impl fmt::Display for Term {
         }
         write!(f, "}}")
       }
+      Term::Fold { bnd, arg, with, arms } => {
+        write!(f, "fold ")?;
+        if let Some(bnd) = bnd {
+          write!(f, "{} = ", bnd)?;
+        }
+        write!(f, "{} ", arg)?;
+        if !with.is_empty() {
+          write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+        }
+        write!(f, "{{ ")?;
+        for arm in arms {
+          write!(f, "{}", var_as_str(&arm.0))?;
+          for var in &arm.1 {
+            write!(f, " {}", var_as_str(var))?;
+          }
+          write!(f, ": {}; ", arm.2)?;
+        }
+        write!(f, "}}")
+      }
+      Term::Bend { bind, init, cond, step, base } => {
+        write!(f, "bend ")?;
+        for (bind, init) in bind.iter().zip(init) {
+          if let Some(bind) = bind {
+            write!(f, "{} = ", bind)?;
+          }
+          write!(f, "{}, ", init)?;
+        }
+        write!(f, "while {cond} {{ ")?;
+        write!(f, "{step} ")?;
+        write!(f, "}} then {{ ")?;
+        write!(f, "{base} ")?;
+        write!(f, "}}")
+      }
       Term::Fan { fan: FanKind::Tup, tag, els } => write!(f, "{}({})", tag, DisplayJoin(|| els.iter(), ", ")),
       Term::Fan { fan: FanKind::Dup, tag, els } => write!(f, "{}{{{}}}", tag, DisplayJoin(|| els, " ")),
       Term::Era => write!(f, "*"),
@@ -119,10 +152,10 @@ impl fmt::Display for Term {
       Term::Num { val: Num::F24(val) } => write!(f, "{val:.3}"),
       Term::Nat { val } => write!(f, "#{val}"),
       Term::Str { val } => write!(f, "{val:?}"),
-      Term::Opr { opr, fst, snd } => {
+      Term::Oper { opr, fst, snd } => {
         write!(f, "({} {} {})", opr, fst, snd)
       }
-      Term::Lst { els } => write!(f, "[{}]", DisplayJoin(|| els.iter(), ", "),),
+      Term::List { els } => write!(f, "[{}]", DisplayJoin(|| els.iter(), ", "),),
       Term::Err => write!(f, "<Invalid>"),
     })
   }
@@ -268,27 +301,22 @@ impl Term {
         Term::Lam { tag, pat, bod } => {
           write!(f, "{}λ{} {}", tag.display_padded(), pat, bod.display_pretty(tab))
         }
-
         Term::Var { nam } => write!(f, "{nam}"),
-
-        Term::Lnk { nam } => write!(f, "${nam}"),
-
+        Term::Link { nam } => write!(f, "${nam}"),
         Term::Let { pat, val, nxt } => {
           write!(f, "let {} = {};\n{:tab$}{}", pat, val.display_pretty(tab), "", nxt.display_pretty(tab))
         }
-
-        Term::Bnd { typ, ask, val, nxt } => {
+        Term::Bind { typ, ask, val, nxt } => {
           writeln!(f, "do {typ} {{")?;
           writeln!(f, "{:tab$}ask {} = {};", "", ask, val.display_pretty(tab + 2), tab = tab + 2)?;
           let mut cur = nxt;
-          while let Term::Bnd { typ: _, ask, val, nxt } = &**cur {
+          while let Term::Bind { typ: _, ask, val, nxt } = &**cur {
             cur = nxt;
             writeln!(f, "{:tab$}ask {} = {};", "", ask, val.display_pretty(tab + 2), tab = tab + 2)?;
           }
           writeln!(f, "{:tab$}{}", "", cur.display_pretty(tab + 2), tab = tab + 2)?;
           writeln!(f, "{:tab$}}}", "")
         }
-
         Term::Use { nam, val, nxt } => {
           write!(
             f,
@@ -299,7 +327,6 @@ impl Term {
             nxt.display_pretty(tab)
           )
         }
-
         Term::App { tag, fun, arg } => {
           write!(
             f,
@@ -309,11 +336,9 @@ impl Term {
             arg.display_pretty(tab)
           )
         }
-
         Term::Fan { fan: FanKind::Tup, tag, els } => {
           write!(f, "{}({})", tag, DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), ", "))
         }
-
         Term::Fan { fan: FanKind::Dup, tag, els } => {
           write!(
             f,
@@ -322,15 +347,12 @@ impl Term {
             DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), " ")
           )
         }
-
-        Term::Lst { els } => {
+        Term::List { els } => {
           write!(f, "[{}]", DisplayJoin(|| els.iter().map(|e| e.display_pretty(tab)), " "))
         }
-
-        Term::Opr { opr, fst, snd } => {
+        Term::Oper { opr, fst, snd } => {
           write!(f, "({} {} {})", opr, fst.display_pretty(tab), snd.display_pretty(tab))
         }
-
         Term::Mat { bnd, arg, with, arms } => {
           write!(f, "match ")?;
           if let Some(bnd) = bnd {
@@ -350,7 +372,6 @@ impl Term {
           }
           write!(f, "\n{:tab$}}}", "")
         }
-
         Term::Swt { bnd, arg, with, pred, arms } => {
           write!(f, "switch ")?;
           if let Some(bnd) = bnd {
@@ -374,7 +395,39 @@ impl Term {
           }
           write!(f, "{:tab$}}}", "")
         }
-
+        Term::Fold { bnd, arg, with, arms } => {
+          write!(f, "fold ")?;
+          if let Some(bnd) = bnd {
+            write!(f, "{} = ", bnd)?;
+          }
+          write!(f, "{} ", arg.display_pretty(tab))?;
+          if !with.is_empty() {
+            write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+          }
+          write!(f, "{{ ")?;
+          for arm in arms {
+            write!(f, "\n{:tab$}{}", "", var_as_str(&arm.0), tab = tab + 2)?;
+            for var in &arm.1 {
+              write!(f, " {}", var_as_str(var))?;
+            }
+            write!(f, ": {}; ", arm.2.display_pretty(tab + 4))?;
+          }
+          write!(f, "\n{:tab$}}}", "")
+        }
+        Term::Bend { bind, init, cond, step, base } => {
+          write!(f, "bend ")?;
+          for (bind, init) in bind.iter().zip(init) {
+            if let Some(bind) = bind {
+              write!(f, "{} = ", bind)?;
+            }
+            write!(f, "{}, ", init)?;
+          }
+          writeln!(f, "while {cond} {{")?;
+          writeln!(f, "{:tab$}{}", "", step.display_pretty(tab + 2), tab = tab + 2)?;
+          writeln!(f, "{:tab$}}} then {{", "")?;
+          writeln!(f, "{:tab$}{}", "", base.display_pretty(tab + 2), tab = tab + 2)?;
+          write!(f, "{:tab$}}}", "")
+        }
         Term::Nat { val } => write!(f, "#{val}"),
         Term::Num { val: Num::U24(val) } => write!(f, "{val}"),
         Term::Num { val: Num::I24(val) } => write!(f, "{}{}", if *val < 0 { "-" } else { "+" }, val.abs()),

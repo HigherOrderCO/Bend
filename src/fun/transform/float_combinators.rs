@@ -128,7 +128,7 @@ impl Term {
       | Term::Err
       | Term::Fan { .. }
       | Term::App { .. }
-      | Term::Opr { .. }
+      | Term::Oper { .. }
       | Term::Swt { .. } => self.children().all(|c| c.is_safe(ctx)),
       Term::Lam { .. } => self.is_safe_lambda(ctx),
       Term::Ref { nam } => {
@@ -195,14 +195,20 @@ impl Term {
       Term::Swt { arms, .. } => 2 * (arms.len() - 1),
       Term::Lam { .. } => 1,
       Term::App { .. } => 1,
-      Term::Opr { .. } => 1,
+      Term::Oper { .. } => 1,
       Term::Var { .. } => 0,
-      Term::Lnk { .. } => 0,
+      Term::Link { .. } => 0,
       Term::Use { .. } => 0,
       Term::Num { .. } => 0,
       Term::Ref { .. } => 0,
       Term::Era => 0,
-      Term::Nat { .. } | Term::Str { .. } | Term::Lst { .. } | Term::Bnd { .. } | Term::Err => unreachable!(),
+      Term::Bend { .. }
+      | Term::Fold { .. }
+      | Term::Nat { .. }
+      | Term::Str { .. }
+      | Term::List { .. }
+      | Term::Bind { .. }
+      | Term::Err => unreachable!(),
     }
   }
 
@@ -234,20 +240,20 @@ impl Term {
       Term::Swt { arg, bnd: _, with: _, pred: _, arms } => {
         FloatIter::Swt([arg.as_mut()].into_iter().chain(arms.iter_mut()))
       }
-      Term::Fan { els, .. } | Term::Lst { els } => FloatIter::Vec(els),
+      Term::Fan { els, .. } | Term::List { els } => FloatIter::Vec(els),
       Term::Let { val: fst, nxt: snd, .. }
       | Term::Use { val: fst, nxt: snd, .. }
-      | Term::Opr { fst, snd, .. } => FloatIter::Two([fst.as_mut(), snd.as_mut()]),
-      Term::Bnd { .. } => unreachable!(),
+      | Term::Oper { fst, snd, .. } => FloatIter::Two([fst.as_mut(), snd.as_mut()]),
       Term::Lam { bod, .. } => bod.float_children_mut(),
       Term::Var { .. }
-      | Term::Lnk { .. }
+      | Term::Link { .. }
       | Term::Num { .. }
       | Term::Nat { .. }
       | Term::Str { .. }
       | Term::Ref { .. }
       | Term::Era
       | Term::Err => FloatIter::Zero([]),
+      Term::Bind { .. } | Term::Bend { .. } | Term::Fold { .. } => unreachable!(),
     }
   }
 }

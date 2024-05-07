@@ -1,6 +1,6 @@
 use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
-  fun::{num_to_name, term_to_net::Labels, Book, FanKind, Name, Op, Pattern, Tag, Term},
+  fun::{term_to_net::Labels, Book, FanKind, Name, Op, Pattern, Tag, Term},
   maybe_grow,
   net::{CtrKind, INet, NodeId, NodeKind, Port, SlotId, ROOT},
 };
@@ -153,18 +153,7 @@ impl Reader<'_> {
             Term::Err
           }
         },
-        NodeKind::Ref { def_name } => {
-          if def_name.is_generated() {
-            // Dereference generated names since the user is not aware of them
-            let def = &self.book.defs[def_name];
-            let mut term = def.rule().body.clone();
-            term.fix_names(&mut self.namegen.id_counter, self.book);
-
-            term
-          } else {
-            Term::Ref { nam: def_name.clone() }
-          }
-        }
+        NodeKind::Ref { def_name } => Term::Ref { nam: def_name.clone() },
         // If we're visiting a fan node...
         NodeKind::Ctr(kind @ (Dup(_) | Tup(_))) => {
           let (fan, lab) = match *kind {
@@ -216,7 +205,7 @@ impl Reader<'_> {
         NodeKind::Num { val: _ } => {
           let (flp, arg) = self.read_opr_arg(next);
           match arg {
-            NumArg::Sym(opr) => Term::Opr {
+            NumArg::Sym(opr) => Term::Oper {
               opr: Op::from_native_tag(opr, NumType::U24),
               fst: Box::new(Term::Err),
               snd: Box::new(Term::Err),
@@ -224,13 +213,13 @@ impl Reader<'_> {
             NumArg::Num(typ, val) => Term::Num { val: Num::from_bits_and_type(val, typ) },
             NumArg::Par(opr, val) => {
               if flp {
-                Term::Opr {
+                Term::Oper {
                   opr: Op::from_native_tag(opr, NumType::U24),
                   fst: Box::new(Term::Num { val: Num::from_bits_and_type(val, NumType::U24) }),
                   snd: Box::new(Term::Err),
                 }
               } else {
-                Term::Opr {
+                Term::Oper {
                   opr: Op::from_native_tag(opr, NumType::U24),
                   fst: Box::new(Term::Err),
                   snd: Box::new(Term::Num { val: Num::from_bits_and_type(val, NumType::U24) }),
@@ -246,7 +235,7 @@ impl Reader<'_> {
             if port0_kind == NodeKind::Opr {
               // Second half of a numeric operation
               let fst = self.read_term(self.net.enter_port(Port(node, 0)));
-              if let Term::Opr { opr, fst, snd: _ } = &fst {
+              if let Term::Oper { opr, fst, snd: _ } = &fst {
                 let (flip, arg) = self.read_opr_arg(self.net.enter_port(Port(node, 1)));
                 let snd = Box::new(match arg {
                   NumArg::Num(typ, val) => Term::Num { val: Num::from_bits_and_type(val, typ) },
@@ -257,7 +246,7 @@ impl Reader<'_> {
                   }
                 });
                 let (fst, snd) = if flip { (snd, fst.clone()) } else { (fst.clone(), snd) };
-                Term::Opr { opr: *opr, fst, snd }
+                Term::Oper { opr: *opr, fst, snd }
               } else {
                 self.error(ReadbackError::InvalidNumericOp);
                 Term::Err
@@ -269,31 +258,31 @@ impl Reader<'_> {
               let (arg0, arg1) = if flip0 != flip1 { (arg1, arg0) } else { (arg0, arg1) };
               match (arg0, arg1) {
                 (NumArg::Sym(opr), NumArg::Num(typ, val)) | (NumArg::Num(typ, val), NumArg::Sym(opr)) => {
-                  Term::Opr {
+                  Term::Oper {
                     opr: Op::from_native_tag(opr, typ),
                     fst: Box::new(Term::Num { val: Num::from_bits_and_type(val, typ) }),
                     snd: Box::new(Term::Err),
                   }
                 }
                 (NumArg::Num(typ, num1), NumArg::Par(opr, num2))
-                | (NumArg::Par(opr, num1), NumArg::Num(typ, num2)) => Term::Opr {
+                | (NumArg::Par(opr, num1), NumArg::Num(typ, num2)) => Term::Oper {
                   opr: Op::from_native_tag(opr, typ),
                   fst: Box::new(Term::Num { val: Num::from_bits_and_type(num1, typ) }),
                   snd: Box::new(Term::Num { val: Num::from_bits_and_type(num2, typ) }),
                 },
                 // No type, so assuming u24
-                (NumArg::Sym(opr), NumArg::Oth(term)) | (NumArg::Oth(term), NumArg::Sym(opr)) => Term::Opr {
+                (NumArg::Sym(opr), NumArg::Oth(term)) | (NumArg::Oth(term), NumArg::Sym(opr)) => Term::Oper {
                   opr: Op::from_native_tag(opr, NumType::U24),
                   fst: Box::new(term),
                   snd: Box::new(Term::Err),
                 },
 
-                (NumArg::Par(opr, num), NumArg::Oth(term)) => Term::Opr {
+                (NumArg::Par(opr, num), NumArg::Oth(term)) => Term::Oper {
                   opr: Op::from_native_tag(opr, NumType::U24),
                   fst: Box::new(Term::Num { val: Num::from_bits_and_type(num, NumType::U24) }),
                   snd: Box::new(term),
                 },
-                (NumArg::Oth(term), NumArg::Par(opr, num)) => Term::Opr {
+                (NumArg::Oth(term), NumArg::Par(opr, num)) => Term::Oper {
                   opr: Op::from_native_tag(opr, NumType::U24),
                   fst: Box::new(term),
                   snd: Box::new(Term::Num { val: Num::from_bits_and_type(num, NumType::U24) }),
@@ -545,36 +534,6 @@ impl Term {
       }
     })
   }
-
-  pub fn fix_names(&mut self, id_counter: &mut u64, book: &Book) {
-    fn fix_name(nam: &mut Option<Name>, id_counter: &mut u64, bod: &mut Term) {
-      if let Some(nam) = nam {
-        let name = Name::new(num_to_name(*id_counter));
-        *id_counter += 1;
-        bod.subst(nam, &Term::Var { nam: name.clone() });
-        *nam = name;
-      }
-    }
-
-    maybe_grow(|| match self {
-      Term::Ref { nam: def_name } => {
-        if def_name.is_generated() {
-          let def = book.defs.get(def_name).unwrap();
-          let mut term = def.rule().body.clone();
-          term.fix_names(id_counter, book);
-          *self = term;
-        }
-      }
-      _ => {
-        for (child, bnd) in self.children_mut_with_binds_mut() {
-          for bnd in bnd {
-            fix_name(bnd, id_counter, child);
-            child.fix_names(id_counter, book);
-          }
-        }
-      }
-    })
-  }
 }
 
 /* Variable name generation */
@@ -684,7 +643,7 @@ impl Term {
       if let Term::Var { nam } = self
         && unscoped.contains(nam)
       {
-        *self = Term::Lnk { nam: std::mem::take(nam) }
+        *self = Term::Link { nam: std::mem::take(nam) }
       }
       if let Some(pat) = self.pattern_mut() {
         pat.apply_unscoped(unscoped);

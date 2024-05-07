@@ -42,7 +42,7 @@ impl Book {
 impl Term {
   fn encode_builtins(&mut self) {
     maybe_grow(|| match self {
-      Term::Lst { els } => *self = Term::encode_list(std::mem::take(els)),
+      Term::List { els } => *self = Term::encode_list(std::mem::take(els)),
       Term::Str { val } => *self = Term::encode_str(val),
       Term::Nat { val } => *self = Term::encode_nat(*val),
       _ => {

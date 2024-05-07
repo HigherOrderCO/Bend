@@ -70,7 +70,7 @@ pub fn check_uses<'a>(
         *term = Term::Err;
       }
     }
-    Term::Lnk { nam } => {
+    Term::Link { nam } => {
       globals.entry(nam.clone()).or_default().1 += 1;
     }
 

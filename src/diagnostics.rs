@@ -71,7 +71,7 @@ impl Diagnostics {
 
   pub fn add_rule_error(&mut self, err: impl std::fmt::Display, def_name: Name) {
     self.err_counter += 1;
-    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Rule(def_name));
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Rule(def_name.def_name_from_generated()));
   }
 
   pub fn add_inet_error(&mut self, err: impl std::fmt::Display, def_name: String) {
@@ -84,7 +84,7 @@ impl Diagnostics {
     if severity == Severity::Error {
       self.err_counter += 1;
     }
-    self.add_diagnostic(warn, severity, DiagnosticOrigin::Rule(def_name));
+    self.add_diagnostic(warn, severity, DiagnosticOrigin::Rule(def_name.def_name_from_generated()));
   }
 
   pub fn add_book_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType) {
@@ -169,7 +169,7 @@ impl Diagnostics {
               }
             }
             DiagnosticOrigin::Rule(nam) => {
-              writeln!(f, "In definition '{nam}':")?;
+              writeln!(f, "In definition '{}':", nam)?;
               for err in errs {
                 writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
               }

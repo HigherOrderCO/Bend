@@ -95,7 +95,7 @@ impl Book {
             Some(name) => self.insert_ctrs_used(name, uses),
             None => self.insert_used(def_name, used, uses),
           },
-          Term::Lst { .. } => {
+          Term::List { .. } => {
             self.insert_ctrs_used(&Name::new(LIST), uses);
           }
           Term::Str { .. } => {
