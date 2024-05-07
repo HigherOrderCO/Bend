@@ -1,5 +1,5 @@
-Result.bind (Result.ok val) f = (f val)
-Result.bind err _ = err
+Result/bind (Result.ok val) f = (f val)
+Result/bind err _ = err
 
 safe_div a b = switch b {
   0: (Result.err "Div by 0")
@@ -11,7 +11,7 @@ safe_rem a b = switch b {
   _: (Result.ok (% a b))
 }
 
-Main = do Result.bind {
+Main = do Result {
   ask y = (safe_div 3 2)
   ask x = (safe_rem y 0);
   x

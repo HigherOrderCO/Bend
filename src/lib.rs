@@ -95,7 +95,7 @@ pub fn desugar_book(
 
   ctx.resolve_refs()?;
 
-  ctx.book.apply_bnd();
+  ctx.apply_bnd()?;
 
   ctx.desugar_match_defs()?;
 

@@ -51,11 +51,11 @@ impl fmt::Display for Term {
       Term::Let { pat, val, nxt } => {
         write!(f, "let {} = {}; {}", pat, val, nxt)
       }
-      Term::Bnd { fun, ask, val, nxt } => {
-        write!(f, "do {fun} {{ ")?;
+      Term::Bnd { typ, ask, val, nxt } => {
+        write!(f, "do {typ} {{ ")?;
         write!(f, "ask {} = {}; ", ask, val)?;
         let mut cur = nxt;
-        while let Term::Bnd { fun: _, ask, val, nxt } = &**cur {
+        while let Term::Bnd { typ: _, ask, val, nxt } = &**cur {
           cur = nxt;
           write!(f, "ask {} = {}; ", ask, val)?;
         }
@@ -277,11 +277,11 @@ impl Term {
           write!(f, "let {} = {};\n{:tab$}{}", pat, val.display_pretty(tab), "", nxt.display_pretty(tab))
         }
 
-        Term::Bnd { fun, ask, val, nxt } => {
-          writeln!(f, "do {fun} {{")?;
+        Term::Bnd { typ, ask, val, nxt } => {
+          writeln!(f, "do {typ} {{")?;
           writeln!(f, "{:tab$}ask {} = {};", "", ask, val.display_pretty(tab + 2), tab = tab + 2)?;
           let mut cur = nxt;
-          while let Term::Bnd { fun: _, ask, val, nxt } = &**cur {
+          while let Term::Bnd { typ: _, ask, val, nxt } = &**cur {
             cur = nxt;
             writeln!(f, "{:tab$}ask {} = {};", "", ask, val.display_pretty(tab + 2), tab = tab + 2)?;
           }

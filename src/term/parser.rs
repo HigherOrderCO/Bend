@@ -412,9 +412,9 @@ impl<'a> TermParser<'a> {
       // Do
       if self.try_consume_keyword("do") {
         unexpected_tag(self)?;
-        let fun = self.parse_name()?;
+        let typ = self.parse_name()?;
         self.consume("{")?;
-        let ask = self.parse_ask(Name::new(fun))?;
+        let ask = self.parse_ask(Name::new(typ))?;
         self.consume("}")?;
         return Ok(ask);
       }
@@ -426,15 +426,15 @@ impl<'a> TermParser<'a> {
     })
   }
 
-  fn parse_ask(&mut self, fun: Name) -> Result<Term, String> {
+  fn parse_ask(&mut self, typ: Name) -> Result<Term, String> {
     maybe_grow(|| {
       if self.try_consume_keyword("ask") {
         let ask = self.parse_pattern(true)?;
         self.consume("=")?;
         let val = self.parse_term()?;
         self.try_consume(";");
-        let nxt = self.parse_ask(fun.clone())?;
-        Ok(Term::Bnd { fun, ask: Box::new(ask), val: Box::new(val), nxt: Box::new(nxt) })
+        let nxt = self.parse_ask(typ.clone())?;
+        Ok(Term::Bnd { typ, ask: Box::new(ask), val: Box::new(val), nxt: Box::new(nxt) })
       } else {
         self.parse_term()
       }

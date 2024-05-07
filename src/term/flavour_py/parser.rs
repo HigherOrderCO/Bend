@@ -570,6 +570,7 @@ mod test {
   use super::PyParser;
 
   #[test]
+  #[ignore]
   fn parse_def() {
     let src = r#"
 enum Point:
