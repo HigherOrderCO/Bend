@@ -45,6 +45,9 @@ Enum names must be unique, and should have at least one constructor.
 
 Each constructor is defined by a name followed by its fields. The `~` notation describes a recursive field.
 
+The constructor names inherit the name of their types and become functions (`Tree/Node` and `Tree/Leaf` in this case).
+The exact function they become depends on the encoding.
+
 ## Statements
 
 ### Assignment
@@ -80,18 +83,26 @@ The operations are:
 return "hello"
 ```
 
-Returns the following expression.
+Returns the following expression. All paths or branches should end with a return.
 
 ### If
 
 ```python
-if x:
+if condition:
   return 0
 else:
   return 1
 ```
 
 A branching statement where `else` is mandatory.
+
+The condition must return an `u24` and it is equivalent to a switch statement:
+
+```
+switch _ = condition:
+  0: else
+  _: then
+```
 
 ### Switch
 
@@ -104,7 +115,7 @@ switch x = 4:
 
 A switch for native numbers, the pattern matching cases must start from `0` up to `_` sequentially.
 
-It is possible to bind a variable name to the matching value.
+It is possible to bind a variable name to the matching value, it allows the access to the predecessor `x-2` (in this case) or `bound_var-next_num` (in the general case).
 
 ### Match
 
@@ -118,7 +129,7 @@ match x = Option/none:
 
 A pattern matching statement, the cases must be the constructor names of the matching value.
 
-It is possible to bind a variable name to the matching value.
+It is possible to bind a variable name to the matching value. The fields of the matched constructor are bound to `matched_var.field_name`.
 
 ### Fold
 
@@ -132,7 +143,9 @@ fold x = Tree/leaf:
 
 A fold statement. Reduces the given value with the given match cases.
 
-It is possible to bind a variable name to the matching value.
+It is possible to bind a variable name to the matching value. Just like in `match`, the fields are bound to `matched_var.field_name`.
+
+For fields notated with `~` in the type definition, the fold function is called implicitly.
 
 ### Do
 
@@ -150,21 +163,42 @@ Other statements are allowed inside the `do` block.
 
 ## Expressions
 
+### Variables
+
+```python
+some_var
+
+foo/bar
+```
+
+A variable name can be anything matching the regex `[A-Za-z0-9_.-/]*`.
+
+A variable is a name for some immutable expression. It is possible to rebind variables with the same name.
+
+```python
+x = 1
+x = x + 1
+```
+
 ### Lambdas
 
 ```python
-lambda x, y: y
+x => x
+
+x => y => y
 ```
 
-A lambda abstraction, it can bind one or more variables and has an expression as body.
+Lambdas represents anonymous inline functions, it can bind a variable and has an expression as body.
 
-### Call
+### Function Call
 
 ```python
-callee(arg1, arg2, argn)
+callee(arg_1, arg_2, arg_n)
 ```
 
 A call is written with a callee followed by a list of arguments.
+
+Accepts partial applications.
 
 ### Tuple
 
@@ -172,7 +206,7 @@ A call is written with a callee followed by a list of arguments.
 (3, 9)
 ```
 
-A Tuple is surrounded by `(` `)`, it's elements are separated by `,`.
+A Tuple is surrounded by `(` `)` and should contain 2 or more elements. Elements are separated by `,`.
 
 ### Numbers and Infix Operations
 
@@ -206,7 +240,9 @@ u24 = 42
 'x'
 ```
 
-A Character is surrounded with `'`. It is desugared as a number.
+A Character is surrounded with `'`. Accepts unicode characters, unicode escapes in the form '\u{hex value}' and is desugared to the unicode codepoint as an `u24`.
+
+Only supports unicode codepoints up to `0xFFFFFF`.
 
 ### String Literal
 
@@ -214,7 +250,9 @@ A Character is surrounded with `'`. It is desugared as a number.
 "Hello, World!"
 ```
 
-A String literal is surrounded with `"`.
+A String literal is surrounded with `"`. Accepts the same values as characters literals.
+
+It is desugared to constructor calls of the built-in type String, `String/cons(head, ~tail)` and `String/nil` .
 
 ### List Literal
 
@@ -223,6 +261,8 @@ A String literal is surrounded with `"`.
 ```
 
 A List literal is surrounded by `[` `]`. The elements must be separated by `,`.
+
+It is desugared to constructor calls of the built-in type List, `List/cons(head, ~tail)` and `List/nil` .
 
 ### List Comprehension
 
@@ -277,6 +317,7 @@ A function definition is composed of a sequence of rules, where a rule is the na
 
 A rule pattern can be:
 - A variable.
+- A number.
 - A constructor.
 - A tuple.
 - A superposition.
@@ -290,15 +331,21 @@ Defines an Algebraic Data Type, it should have at least one constructor.
 ```rust
 data Tree
   = (Leaf value)
-  | (Node left right)
+  | (Node ~left ~right)
   | Nil
 ```
 
 `Tree` is the ADT name and it should be unique, except that it can be used once by a constructor name.
 
-Each constructor is defined by a name followed by its fields.
+Each constructor is defined by a name followed by its fields. The `~` notation describes a recursive field.
 
 ## Terms
+
+### Variables
+
+A variable name can be anything matching the regex `[A-Za-z0-9_.-/]*`.
+
+... TODO
 
 ### Lambda
 
@@ -312,7 +359,7 @@ Each constructor is defined by a name followed by its fields.
 λ{x y} x
 ```
 
-Lambdas represents functions, it can be written with `λ` or `@` followed by a pattern and a term.
+Lambdas represents anonymous inline functions, it can be written with `λ` or `@` followed by a pattern and a term.
 
 A pattern is equivalent to a let:
 
@@ -330,12 +377,16 @@ A pattern is equivalent to a let:
 
 Same as lambdas, with the exception that the variable starts with a `$` sign.
 
+Every unscoped variable in a function must have a unique name and must be used exactly once.
+
+Unscoped variables are not transformed and linearized like normal scoped variables.
+
 Read [using scopeless lambdas](/docs/using-scopeless-lambdas.md) to know more about.
 
 ### Application
 
 ```rust
-(fun argn)
+(fun arg_1 arg_2 ... arg_n)
 ```
 
 An application is surrounded by `(` `)`, written in lisp style.
@@ -417,7 +468,9 @@ match opt = (Some "Bend") {
 
 A pattern match expression, it can hold a name binding if the matching term is not a variable.
 
-It is possible to use a _wildcard_ variable or `*` as an exhaustive default case.
+It is possible to use a _wildcard_, a named variable or `*` as default cases.
+
+It is desugared according to the chosen encoding. Read [pattern matching](./pattern-matching.md) to know more.
 
 Using `;` is optional.
 
@@ -447,6 +500,8 @@ Main = do Result.bind {
 Receives a monadic bind function and then expects a block.
 
 The block is followed by `ask` binds and ends with a return term.
+
+The monad bind function should be of type `(Monad a) -> (a -> (Monad b)) -> (Monad b)`.
 
 ### Numbers and operations
 
@@ -510,3 +565,15 @@ The syntax above is desugared to:
 ```
 
 Using `,` is optional.
+
+### Nat Literal
+
+```rust
+#3
+```
+
+The syntax above is desugared to:
+
+```
+(Nat.succ (Nat.succ (Nat.succ List.nil)))
+```
