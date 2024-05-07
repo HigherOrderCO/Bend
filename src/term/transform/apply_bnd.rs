@@ -60,8 +60,7 @@ impl Term {
 }
 
 fn make_fun_name(typ: &mut Name) -> Name {
-  let name: String = [typ, "/", "bind"].into_iter().collect();
-  Name::new(name)
+  Name::new(format!("{typ}/bind")
 }
 
 impl fmt::Display for MonadicBindError {
