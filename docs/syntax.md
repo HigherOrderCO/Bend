@@ -27,6 +27,10 @@ def main:
 
 A definition is composed by a name, a sequence of parameters and a body.
 
+A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names).
+
+Currently they allow the same, except top-level can't have '__' (i use for generated names)
+
 ### Enum
 
 Defines an ADT like enumeration.
@@ -43,10 +47,14 @@ enum Tree:
 
 Enum names must be unique, and should have at least one constructor.
 
-Each constructor is defined by a name followed by its fields. The `~` notation describes a recursive field.
+Each constructor is defined by a name followed by its fields.
+
+The `~` notation indicates a recursive field. To use `fold` statements with a type its recursive fields must be correctly marked with `~`.
 
 The constructor names inherit the name of their types and become functions (`Tree/Node` and `Tree/Leaf` in this case).
 The exact function they become depends on the encoding.
+
+Read [defining data types](./defining-data-types.md) to know more.
 
 ## Statements
 
@@ -278,6 +286,8 @@ A Tuple is surrounded by `(` `)` and should contain 2 or more elements. Elements
 
 A superposition of values is defined using `{` `}` with at least 2 expressions inside.
 
+Read [sups and dups](./dups-and-sups.md) to know more.
+
 ### Numbers and Infix Operations
 
 Currently, bend supports 3 types of numbers: floats, integers and unsigned integers. All of then are 24 bit sized.
@@ -396,6 +406,8 @@ MapMaybe None f = None
 Pair.get (fst, snd) f = (f fst snd)
 ```
 
+A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names).
+
 A function definition is composed of a sequence of rules, where a rule is the name of the function, a sequence of patterns and then the body.
 
 A rule pattern can be:
@@ -406,6 +418,8 @@ A rule pattern can be:
 - A superposition.
 
 The rule body is a `term`, there is no statements in the language.
+
+Read [pattern matching](./pattern-matching.md) to learn about what exactly the rules for pattern matching equations are.
 
 ### Datatype
 
@@ -494,6 +508,8 @@ A tuple is surrounded by `(` `)`, with the difference that it's elements are sep
 ```
 
 A superposition of values is defined using `{` `}` with at least 2 terms inside.
+
+Read [sups and dups](./dups-and-sups.md) to know more.
 
 ### Let-bindings
 
