@@ -1,8 +1,11 @@
 use crate::{
   diagnostics::Diagnostics,
-  fun::{Ctx, Definition, Name, Pattern, Rule, Tag, Term},
+  fun::{Ctx, Definition, Name, Pattern, Rule, Term},
   maybe_grow,
 };
+
+const RECURSIVE_KW: &str = "go";
+const NEW_FN_SEP: &str = "__bend";
 
 impl Ctx<'_> {
   pub fn desugar_bend(&mut self) -> Result<(), Diagnostics> {
@@ -11,7 +14,10 @@ impl Ctx<'_> {
     for def in self.book.defs.values_mut() {
       let mut fresh = 0;
       for rule in def.rules.iter_mut() {
-        rule.body.desugar_bend(&def.name, &mut fresh, &mut new_defs)?;
+        if let Err(err) = rule.body.desugar_bend(&def.name, &mut fresh, &mut new_defs) {
+          self.info.add_rule_error(err, def.name.clone());
+          break;
+        }
       }
     }
 
@@ -44,12 +50,12 @@ impl Term {
         }
         let Term::Bend { bind, init, cond, step, base } = self else { unreachable!() };
 
-        let new_nam = Name::new(format!("{}__bend{}", def_name, fresh));
+        let new_nam = Name::new(format!("{}{}{}", def_name, NEW_FN_SEP, fresh));
         *fresh += 1;
 
         // Gather the free variables
         let mut free_vars = step.free_vars();
-        free_vars.remove(&Name::new("go"));
+        free_vars.remove(&Name::new(RECURSIVE_KW));
         free_vars.extend(base.free_vars());
         free_vars.extend(cond.free_vars());
         for bind in bind.iter().flatten() {
@@ -68,16 +74,9 @@ impl Term {
           pred: Some(Name::new("_-1")),
           arms: vec![std::mem::take(base.as_mut()), std::mem::take(step.as_mut())],
         };
-        let body = bind.iter_mut().rfold(body, |acc, bind| Term::Lam {
-          tag: Tag::Static,
-          pat: Box::new(Pattern::Var(std::mem::take(bind))),
-          bod: Box::new(acc),
-        });
-        let body = free_vars.iter().rfold(body, |acc, nam| Term::Lam {
-          tag: Tag::Static,
-          pat: Box::new(Pattern::Var(Some(nam.clone()))),
-          bod: Box::new(acc),
-        });
+        let body = free_vars.iter().rfold(body, |acc, bind| Term::lam(Pattern::Var(Some(bind.clone())), acc));
+        let body =
+          bind.iter_mut().rfold(body, |acc, bind| Term::lam(Pattern::Var(std::mem::take(bind)), acc));
         let def =
           Definition { name: new_nam.clone(), rules: vec![Rule { pats: vec![], body }], builtin: false };
         new_defs.push(def);
@@ -112,7 +111,7 @@ impl Term {
         if let Some(called) = called
           && let Term::Var { nam } = called
         {
-          if nam == "go" {
+          if nam == RECURSIVE_KW {
             // TODO: Also pass the free vars
             *called = Term::Ref { nam: def_name.clone() };
           }

@@ -13,14 +13,14 @@ pub struct MonadicBindError {
 }
 
 impl Ctx<'_> {
-  pub fn encode_do_blocks(&mut self) -> Result<(), Diagnostics> {
+  pub fn desugar_do_blocks(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
     let def_names = self.book.defs.keys().cloned().collect::<HashSet<_>>();
 
     for def in self.book.defs.values_mut() {
       for rule in def.rules.iter_mut() {
-        if let Err(e) = rule.body.encode_do_blocks(&def_names) {
+        if let Err(e) = rule.body.desugar_do_blocks(&def_names) {
           self.info.add_rule_error(e, def.name.clone());
         }
       }
@@ -31,7 +31,7 @@ impl Ctx<'_> {
 }
 
 impl Term {
-  pub fn encode_do_blocks(&mut self, def_names: &HashSet<Name>) -> Result<(), MonadicBindError> {
+  pub fn desugar_do_blocks(&mut self, def_names: &HashSet<Name>) -> Result<(), MonadicBindError> {
     maybe_grow(|| {
       if let Term::Bind { typ, ask, val, nxt } = self {
         let fun = make_fun_name(typ);
@@ -51,7 +51,7 @@ impl Term {
       }
 
       for children in self.children_mut() {
-        children.encode_do_blocks(def_names)?;
+        children.desugar_do_blocks(def_names)?;
       }
 
       Ok(())

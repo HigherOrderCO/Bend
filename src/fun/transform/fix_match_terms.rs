@@ -81,13 +81,13 @@ impl Term {
         errs.append(&mut e);
       }
 
-      if let Term::Mat { .. } = self {
+      if matches!(self, Term::Mat { .. } | Term::Fold { .. }) {
         self.fix_match(&mut errs, ctrs, adts);
       }
 
       // Add a use term to each arm rebuilding the matched variable
       match self {
-        Term::Mat { arg: _, bnd, with: _, arms } => {
+        Term::Mat { arg: _, bnd, with: _, arms } | Term::Fold { bnd, arg: _, with: _, arms } => {
           for (ctr, fields, body) in arms {
             if let Some(ctr) = ctr {
               *body = Term::Use {
@@ -117,7 +117,7 @@ impl Term {
 
       // Remove the bound name
       match self {
-        Term::Mat { bnd, .. } | Term::Swt { bnd, .. } => *bnd = None,
+        Term::Mat { bnd, .. } | Term::Swt { bnd, .. } | Term::Fold { bnd, .. } => *bnd = None,
         _ => {}
       }
 
@@ -126,17 +126,19 @@ impl Term {
   }
 
   fn fix_match(&mut self, errs: &mut Vec<FixMatchErr>, ctrs: &Constructors, adts: &Adts) {
-    let Term::Mat { arg: _, bnd, with: _, arms: rules } = self else { unreachable!() };
+    let (Term::Mat { arg: _, bnd, with: _, arms } | Term::Fold { bnd, arg: _, with: _, arms }) = self else {
+      unreachable!()
+    };
     let bnd = bnd.clone().unwrap();
 
     // Normalize arms, making one arm for each constructor of the matched adt.
-    if let Some(ctr_nam) = &rules[0].0
+    if let Some(ctr_nam) = &arms[0].0
       && let Some(adt_nam) = ctrs.get(ctr_nam)
     {
       let adt_ctrs = &adts[adt_nam].ctrs;
 
       // Decide which constructor corresponds to which arm of the match.
-      let mut bodies = fixed_match_arms(&bnd, rules, adt_nam, adt_ctrs.keys(), ctrs, adts, errs);
+      let mut bodies = fixed_match_arms(&bnd, arms, adt_nam, adt_ctrs.keys(), ctrs, adts, errs);
 
       // Build the match arms, with all constructors
       let mut new_rules = vec![];
@@ -150,12 +152,12 @@ impl Term {
         };
         new_rules.push((Some(ctr.clone()), fields, body));
       }
-      *rules = new_rules;
+      *arms = new_rules;
     } else {
       // First arm was not matching a constructor, convert into a use term.
-      errs.push(FixMatchErr::IrrefutableMatch { var: rules[0].0.clone() });
-      let match_var = rules[0].0.take();
-      *self = std::mem::take(&mut rules[0].2);
+      errs.push(FixMatchErr::IrrefutableMatch { var: arms[0].0.clone() });
+      let match_var = arms[0].0.take();
+      *self = std::mem::take(&mut arms[0].2);
       if let Some(var) = match_var {
         *self = Term::Use {
           nam: Some(var),

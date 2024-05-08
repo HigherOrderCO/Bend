@@ -1,18 +1,23 @@
-data Bool = True | False
+data Bool = Bool/true | Bool/false
 
 data Tree
-  = (Node lft rgt)
-  | (Leaf val)
+  = (Tree/node ~lft ~rgt) 
+  | (Tree/leaf val)
 
-and True True = True
-and _    _    = False
+and a b = match a {
+  true: b
+  false: false
+}
 
-all (Node lft rgt) = (and (all lft) (all rgt))
-all (Leaf val)     = val
+all tree = fold tree {
+  Tree/node: (and tree.lft tree.rgt)
+  Tree/leaf: tree.val
+}
+
+gen n = switch n {
+  0: (Tree/leaf Bool/true)
+  _: (Tree/node (gen n-1) (gen n-1))
+}
 
 main = (all (gen 8))
 
-gen = λn switch n {
-  0: (Leaf True)
-  _: let tree = (gen n-1); (Node tree tree)
-}

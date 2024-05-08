@@ -410,8 +410,8 @@ impl<'a> TermParser<'a> {
       if self.try_consume_keyword("match") {
         unexpected_tag(self)?;
         let (bnd, arg, with) = self.parse_match_arg()?;
-        let rules = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
-        return Ok(Term::Mat { arg: Box::new(arg), bnd: Some(bnd), with, arms: rules });
+        let arms = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
+        return Ok(Term::Mat { arg: Box::new(arg), bnd: Some(bnd), with, arms });
       }
 
       // Switch
@@ -430,14 +430,21 @@ impl<'a> TermParser<'a> {
         return Ok(ask);
       }
 
+      // Fold
+      if self.try_consume_keyword("fold") {
+        unexpected_tag(self)?;
+        let (bnd, arg, with) = self.parse_match_arg()?;
+        let arms = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
+        return Ok(Term::Fold { arg: Box::new(arg), bnd: Some(bnd), with, arms });
+      }
+
       // Bend
       if self.try_consume_keyword("bend") {
         unexpected_tag(self)?;
         let args = self.list_like(
           |p| {
             let bind = p.parse_bend_name()?;
-            p.consume("=")?;
-            let init = p.parse_term()?;
+            let init = if p.try_consume("=") { p.parse_term()? } else { Term::Var { nam: bind.clone() } };
             Ok((bind, init))
           },
           "",
