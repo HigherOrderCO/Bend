@@ -1,13 +1,12 @@
 use bend::{
   compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
-  net::hvmc_to_net::hvmc_to_net,
-  run_book,
-  term::{
+  fun::{
     load_book::do_parse_book, net_to_term::net_to_term, parser::TermParser, term_to_net::Labels, Book, Ctx,
     Name,
   },
-  CompileOpts, RunOpts,
+  net::hvmc_to_net::hvmc_to_net,
+  run_book, CompileOpts, RunOpts,
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -107,7 +106,7 @@ fn compile_term() {
 
     term.make_var_names_unique();
     term.linearize_vars();
-    let net = bend::term::term_to_net(&term, &mut Default::default()).map_err(|e| e.to_string())?;
+    let net = bend::fun::term_to_net(&term, &mut Default::default()).map_err(|e| e.to_string())?;
 
     Ok(format!("{}", net))
   })

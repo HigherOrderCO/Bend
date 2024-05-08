@@ -1,4 +1,4 @@
-use crate::{diagnostics::Diagnostics, term::Name};
+use crate::{diagnostics::Diagnostics, fun::Name};
 use hvmc::ast::Book;
 
 pub const MAX_NET_SIZE: usize = 32;

@@ -1,6 +1,6 @@
 pub mod hvmc_to_net;
 
-use crate::term::Name;
+use crate::fun::Name;
 pub type BendLab = u16;
 use NodeKind::*;
 

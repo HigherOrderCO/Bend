@@ -1,7 +1,7 @@
 use crate::{
   diagnostics::{Diagnostics, WarningType, ERR_INDENT_SIZE},
+  fun::transform::definition_merge::MERGE_SEPARATOR,
   maybe_grow,
-  term::transform::definition_merge::MERGE_SEPARATOR,
 };
 use hvmc::ast::{Book, Tree};
 use indexmap::{IndexMap, IndexSet};

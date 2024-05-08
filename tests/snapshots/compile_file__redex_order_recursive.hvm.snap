@@ -7,14 +7,14 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.hvm
 @add__C0 = (a (b d))
   & @add ~ (a (((b c) (* c)) d))
 
-@fold = ((@fold__C1 (@fold__C0 a)) a)
+@fold_ = ((@fold___C1 (@fold___C0 a)) a)
 
-@fold__C0 = (((* (a a)) b) (* b))
+@fold___C0 = (((* (a a)) b) (* b))
 
-@fold__C1 = (a (c e))
+@fold___C1 = (a (c e))
   & @add ~ (b (d e))
-  & @fold ~ (a b)
-  & @fold ~ (c d)
+  & @fold_ ~ (a b)
+  & @fold_ ~ (c d)
 
 @main = *
 
