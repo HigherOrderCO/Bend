@@ -113,8 +113,19 @@ impl Expr {
         rhs.order_kwargs(ctx);
       }
       Expr::Lst { els } | Expr::Tup { els } => els.iter_mut().for_each(|e| e.order_kwargs(ctx)),
-      Expr::Comprehension { .. } => {}
-      Expr::None | Expr::Var { .. } | Expr::Num { .. } | Expr::Str { .. } => {}
+      Expr::Comprehension { term, iter, cond, .. } => {
+        term.order_kwargs(ctx);
+        iter.order_kwargs(ctx);
+        if let Some(cond) = cond {
+          cond.order_kwargs(ctx);
+        }
+      }
+      Expr::MapInit { entries } => {
+        for entry in entries {
+          entry.1.order_kwargs(ctx);
+        }
+      }
+      Expr::MapGet { .. } | Expr::None | Expr::Var { .. } | Expr::Num { .. } | Expr::Str { .. } => {}
     }
   }
 }

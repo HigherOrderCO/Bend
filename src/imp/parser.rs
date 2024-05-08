@@ -7,7 +7,7 @@ use crate::{
 };
 
 use super::{
-  AssignPattern, Definition, Enum, Expr, InPlaceOp, MBind, MatchArm, Program, Stmt, TopLevel, Variant,
+  AssignPattern, Definition, Enum, Expr, InPlaceOp, MBind, MapKey, MatchArm, Program, Stmt, TopLevel, Variant
 };
 
 const PREC: &[&[Op]] =
@@ -71,7 +71,6 @@ impl<'a> Parser<'a> for PyParser<'a> {
 }
 
 impl<'a> PyParser<'a> {
-  // A primary can be considered as a constant or literal expression.
   fn parse_expression(&mut self) -> Result<Expr, String> {
     self.skip_trivia();
     let Some(head) = self.skip_peek_one() else { return self.expected("primary term")? };
@@ -91,7 +90,21 @@ impl<'a> PyParser<'a> {
           head
         }
       }
+      '{' => {
+        self.consume("{")?;
+        let mut entries = Vec::new();
+        loop {
+          entries.push(self.parse_map_entry()?);
+          if self.skip_starts_with("}") {
+            break;
+          }
+          self.consume(",")?;
+        }
+        self.consume("}")?;
+        Expr::MapInit { entries }
+      }
       '[' => self.list_or_comprehension()?,
+      '`' => Expr::Num { val: self.parse_symbol()? },
       '\"' => {
         let str = self.parse_quoted_string()?;
         let val = STRINGS.get(str);
@@ -107,10 +120,24 @@ impl<'a> PyParser<'a> {
         } else if self.try_consume("False") {
           return Ok(Expr::Num { val: 0 });
         }
-        Expr::Var { nam: self.parse_bend_name()? }
+        let nam = self.parse_bend_name()?;
+        if self.skip_starts_with("[") {
+          self.consume("[")?;
+          let key = self.parse_map_key()?;
+          self.consume("]")?;
+          return Ok(Expr::MapGet { nam, key });
+        }
+        Expr::Var { nam }
       }
     };
     Ok(res)
+  }
+
+  fn parse_map_entry(&mut self) -> Result<(MapKey, Expr), String> {
+    let key = self.parse_map_key()?;
+    self.consume(":")?;
+    let val = self.parse_expression()?;
+    Ok((key, val))
   }
 
   fn list_or_comprehension(&mut self) -> Result<Expr, String> {
@@ -142,7 +169,7 @@ impl<'a> PyParser<'a> {
       let bod = self.parse_infix_or_lambda()?;
       Ok(Expr::Lam { names, bod: Box::new(bod) })
     } else {
-      self.parse_infix_py(0)
+      self.parse_infix(0)
     }
   }
 
@@ -192,17 +219,17 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_infix_py(&mut self, prec: usize) -> Result<Expr, String> {
+  fn parse_infix(&mut self, prec: usize) -> Result<Expr, String> {
     maybe_grow(|| {
       self.skip_trivia();
       if prec > PREC.len() - 1 {
         return self.parse_call();
       }
-      let mut lhs = self.parse_infix_py(prec + 1)?;
+      let mut lhs = self.parse_infix(prec + 1)?;
       while let Some(op) = self.get_op() {
         if PREC[prec].iter().any(|r| *r == op) {
           let op = self.parse_oper()?;
-          let rhs = self.parse_infix_py(prec + 1)?;
+          let rhs = self.parse_infix(prec + 1)?;
           self.skip_trivia();
           lhs = Expr::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
         } else {
@@ -290,32 +317,65 @@ impl<'a> PyParser<'a> {
     if count == 0 { Ok(true) } else { Err("Indentation error".to_string()) }
   }
 
-  fn parse_stmt_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_statement(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
     maybe_grow(|| {
       self.skip_exact_indent(indent, false)?;
       if self.try_consume_keyword("return") {
-        self.parse_return_py()
+        self.parse_return()
       } else if self.try_consume_keyword("if") {
-        self.parse_if_py(indent)
+        self.parse_if(indent)
       } else if self.try_consume_keyword("match") {
-        self.parse_match_py(indent)
+        self.parse_match(indent)
       } else if self.try_consume_keyword("switch") {
-        self.parse_switch_py(indent)
+        self.parse_switch(indent)
       } else if self.try_consume_keyword("fold") {
-        self.parse_fold_py(indent)
+        self.parse_fold(indent)
       } else if self.try_consume_keyword("bend") {
         self.parse_bend(indent)
       } else if self.try_consume_keyword("do") {
-        self.parse_do_py(indent)
+        self.parse_do(indent)
       } else {
         self.parse_in_place(indent)
       }
     })
   }
 
+  fn parse_symbol(&mut self) -> Result<u32, String> {
+    self.consume("`")?;
+    let mut result = u32::MAX;
+    let mut count = 0;
+    while count < 4 {
+      if self.starts_with("`") {
+        break;
+      }
+      count += 1;
+      let Some(c) = self.advance_one() else { self.expected("symbol")? };
+      let c = c as u8;
+      let nxt = match c {
+        b'A' ..= b'Z' => c - b'A',
+        b'a' ..= b'z' => c - b'a' + 26,
+        b'0' ..= b'9' => c - b'0' + 52,
+        b'+' => 62,
+        b'/' => 63,
+        _ => panic!(),
+      };
+      result = (result << 6) | nxt as u32;
+    }
+    self.consume("`")?;
+    Ok(result)
+  }
+
+  fn parse_map_key(&mut self) -> Result<MapKey, String> {
+    if self.skip_starts_with("`") {
+      Ok(MapKey(self.parse_symbol()?))
+    } else {
+      Ok(MapKey(self.parse_u64()? as u32))
+    }
+  }
+
   fn parse_in_place(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
     if self.starts_with("(") {
-      self.parse_assignment_py(indent)
+      self.parse_assignment(indent)
     } else {
       let name = self.parse_bend_name()?;
       if self.skip_starts_with("=") {
@@ -323,8 +383,21 @@ impl<'a> PyParser<'a> {
         self.consume("=")?;
         let val = self.parse_infix_or_lambda()?;
         self.consume(";")?;
-        let nxt = self.parse_stmt_py(indent)?;
+        let nxt = self.parse_statement(indent)?;
         return Ok(Stmt::Assign { pat: AssignPattern::Var(name), val: Box::new(val), nxt: Box::new(nxt) });
+      } else if self.skip_starts_with("[") {
+        self.consume("[")?;
+        let key = self.parse_map_key()?;
+        self.consume("]")?;
+        self.consume("=")?;
+        let val = self.parse_expression()?;
+        self.consume(";")?;
+        let nxt = self.parse_statement(indent)?;
+        return Ok(Stmt::Assign {
+          pat: AssignPattern::MapSet(name, key),
+          val: Box::new(val),
+          nxt: Box::new(nxt),
+        });
       }
       let in_place: InPlaceOp;
       self.skip_spaces();
@@ -347,7 +420,7 @@ impl<'a> PyParser<'a> {
 
         let val = self.parse_infix_or_lambda()?;
         self.consume(";")?;
-        let nxt = self.parse_stmt_py(indent)?;
+        let nxt = self.parse_statement(indent)?;
         Ok(Stmt::InPlace { op: in_place, var: name, val: Box::new(val), nxt: Box::new(nxt) })
       } else {
         self.expected("in-place operator")?
@@ -355,28 +428,28 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_return_py(&mut self) -> Result<Stmt, String> {
+  fn parse_return(&mut self) -> Result<Stmt, String> {
     let term = self.parse_infix_or_lambda()?;
     self.consume(";")?;
     Ok(Stmt::Return { term: Box::new(term) })
   }
 
-  fn parse_if_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_if(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
     let cond = self.parse_infix_or_lambda()?;
     self.consume(":")?;
     indent.enter_level();
-    let then = self.parse_stmt_py(indent)?;
+    let then = self.parse_statement(indent)?;
     indent.exit_level();
     self.skip_exact_indent(indent, false)?;
     self.consume("else")?;
     self.consume(":")?;
     indent.enter_level();
-    let otherwise = self.parse_stmt_py(indent)?;
+    let otherwise = self.parse_statement(indent)?;
     indent.exit_level();
     Ok(Stmt::If { cond: Box::new(cond), then: Box::new(then), otherwise: Box::new(otherwise) })
   }
 
-  fn parse_match_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_match(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
     let (bind, arg) = self.parse_named_arg()?;
     self.consume(":")?;
     let mut arms = Vec::new();
@@ -385,7 +458,7 @@ impl<'a> PyParser<'a> {
       if !self.skip_exact_indent(indent, true)? {
         break;
       }
-      arms.push(self.parse_case_py(indent)?);
+      arms.push(self.parse_case(indent)?);
     }
     indent.exit_level();
     Ok(Stmt::Match { arg: Box::new(arg), bind, arms })
@@ -405,16 +478,16 @@ impl<'a> PyParser<'a> {
     )
   }
 
-  fn parse_case_py(&mut self, indent: &mut Indent) -> Result<MatchArm, String> {
+  fn parse_case(&mut self, indent: &mut Indent) -> Result<MatchArm, String> {
     let pat = self.name_or_wildcard()?;
     self.consume(":")?;
     indent.enter_level();
-    let body = self.parse_stmt_py(indent)?;
+    let body = self.parse_statement(indent)?;
     indent.exit_level();
     Ok(MatchArm { lft: pat, rgt: body })
   }
 
-  fn parse_switch_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_switch(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
     let (bind, arg) = self.parse_named_arg()?;
     self.consume(":")?;
     let mut arms = Vec::new();
@@ -444,7 +517,7 @@ impl<'a> PyParser<'a> {
         }
         self.consume(":")?;
         indent.enter_level();
-        arms.push(self.parse_stmt_py(indent)?);
+        arms.push(self.parse_statement(indent)?);
         indent.exit_level();
         expected_num += 1;
       } else {
@@ -455,7 +528,7 @@ impl<'a> PyParser<'a> {
     Ok(Stmt::Switch { arg: Box::new(arg), bind, arms })
   }
 
-  fn parse_fold_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_fold(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
     let (bind, arg) = self.parse_named_arg()?;
     self.consume(":")?;
     let mut arms = Vec::new();
@@ -464,7 +537,7 @@ impl<'a> PyParser<'a> {
       if !self.skip_exact_indent(indent, true)? {
         break;
       }
-      arms.push(self.parse_case_py(indent)?);
+      arms.push(self.parse_case(indent)?);
     }
     indent.exit_level();
     Ok(Stmt::Fold { arg: Box::new(arg), bind, arms })
@@ -476,17 +549,17 @@ impl<'a> PyParser<'a> {
     let cond = self.parse_infix_or_lambda()?;
     self.consume(":")?;
     indent.enter_level();
-    let step = self.parse_stmt_py(indent)?;
+    let step = self.parse_statement(indent)?;
     indent.exit_level();
     self.consume("then")?;
     self.consume(":")?;
     indent.enter_level();
-    let base = self.parse_stmt_py(indent)?;
+    let base = self.parse_statement(indent)?;
     indent.exit_level();
     Ok(Stmt::Bend { bind, init, cond: Box::new(cond), step: Box::new(step), base: Box::new(base) })
   }
 
-  fn parse_do_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_do(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
     let fun = self.parse_bend_name()?;
     self.consume(":")?;
 
@@ -498,13 +571,13 @@ impl<'a> PyParser<'a> {
         break;
       }
       if self.try_consume("!") {
-        let pat = self.parse_assign_pattern_py()?;
+        let pat = self.parse_assign_pattern()?;
         self.consume("=")?;
         let val = self.parse_infix_or_lambda()?;
         self.consume(";")?;
         block.push(MBind::Ask { pat, val: Box::new(val) });
       } else {
-        block.push(MBind::Stmt { stmt: Box::new(self.parse_stmt_py(&mut Indent(0))?) })
+        block.push(MBind::Stmt { stmt: Box::new(self.parse_statement(&mut Indent(0))?) })
       }
     }
     indent.exit_level();
@@ -512,16 +585,16 @@ impl<'a> PyParser<'a> {
     Ok(Stmt::Do { fun, block })
   }
 
-  fn parse_assignment_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
-    let pat = self.parse_assign_pattern_py()?;
+  fn parse_assignment(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+    let pat = self.parse_assign_pattern()?;
     self.consume("=")?;
     let val = self.parse_infix_or_lambda()?;
     self.consume(";")?;
-    let nxt = self.parse_stmt_py(indent)?;
+    let nxt = self.parse_statement(indent)?;
     Ok(Stmt::Assign { pat, val: Box::new(val), nxt: Box::new(nxt) })
   }
 
-  fn parse_assign_pattern_py(&mut self) -> Result<AssignPattern, String> {
+  fn parse_assign_pattern(&mut self) -> Result<AssignPattern, String> {
     if self.skip_starts_with("(") {
       let mut binds = self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 1)?;
       if binds.len() == 1 {
@@ -534,28 +607,28 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_top_level_py(&mut self, indent: &mut Indent) -> Result<TopLevel, String> {
+  fn parse_top_level(&mut self, indent: &mut Indent) -> Result<TopLevel, String> {
     self.skip_exact_indent(indent, false)?;
     if self.try_consume_keyword("def") {
-      Ok(TopLevel::Def(self.parse_def_py(indent)?))
+      Ok(TopLevel::Def(self.parse_def(indent)?))
     } else if self.try_consume_keyword("enum") {
-      Ok(TopLevel::Enum(self.parse_enum_py(indent)?))
+      Ok(TopLevel::Enum(self.parse_enum(indent)?))
     } else {
       self.expected("Enum or Def declaration")?
     }
   }
 
-  fn parse_def_py(&mut self, indent: &mut Indent) -> Result<Definition, String> {
+  fn parse_def(&mut self, indent: &mut Indent) -> Result<Definition, String> {
     let name = self.parse_bend_name()?;
     let params = self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 0)?;
     self.consume(":")?;
     indent.enter_level();
-    let body = self.parse_stmt_py(indent)?;
+    let body = self.parse_statement(indent)?;
     indent.exit_level();
     Ok(Definition { name, params, body })
   }
 
-  fn parse_enum_py(&mut self, indent: &mut Indent) -> Result<Enum, String> {
+  fn parse_enum(&mut self, indent: &mut Indent) -> Result<Enum, String> {
     fn parse_variant_field(p: &mut PyParser) -> Result<CtrField, String> {
       let rec = p.try_consume("~");
       let nam = p.parse_bend_name()?;
@@ -582,7 +655,7 @@ impl<'a> PyParser<'a> {
     Ok(Enum { name, variants })
   }
 
-  pub fn parse_program_py(&mut self) -> Result<Program, String> {
+  pub fn parse_program(&mut self) -> Result<Program, String> {
     let mut enums = IndexMap::<Name, Enum>::new();
     let mut defs = IndexMap::<Name, Definition>::new();
     let mut variants = IndexMap::<Name, Name>::new();
@@ -595,7 +668,7 @@ impl<'a> PyParser<'a> {
       if spaces != 0 {
         self.expected("Indentation error")?;
       }
-      match self.parse_top_level_py(&mut Indent(0))? {
+      match self.parse_top_level(&mut Indent(0))? {
         TopLevel::Def(def) => Self::add_def_py(&mut defs, def)?,
         TopLevel::Enum(r#enum) => Self::add_enum_py(&mut enums, &mut variants, r#enum)?,
       }
@@ -651,6 +724,13 @@ enum Point:
 enum Bool:
   True()
   False()
+
+
+def symbols():
+  x = { `x`: 5, 2: 3 };
+  x[`x`] = 2;
+  x[2] = 3;
+  return x[`x`] + `azul`;
 
 def mk_point():
   return Point(y = 2, x = 1);
@@ -710,7 +790,7 @@ def bnd():
 //    return x;
     "#;
     let mut parser = PyParser::new(src);
-    let mut program = parser.parse_program_py().inspect_err(|e| println!("{e}")).unwrap();
+    let mut program = parser.parse_program().inspect_err(|e| println!("{e}")).unwrap();
     program.order_kwargs();
     let out = program.to_fun(crate::fun::Book::default());
     println!("{out}");
