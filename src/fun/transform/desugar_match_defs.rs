@@ -400,7 +400,7 @@ fn switch_rule(
 
   let mut new_arms = vec![];
   for (ctr, fields) in &adts[&adt_name].ctrs {
-    let new_args = fields.iter().map(|f| Name::new(format!("{arg}.{f}")));
+    let new_args = fields.iter().map(|f| Name::new(format!("{}.{}", arg, f.nam)));
     let args = new_args.clone().chain(old_args.clone()).collect();
 
     let mut new_rules = vec![];

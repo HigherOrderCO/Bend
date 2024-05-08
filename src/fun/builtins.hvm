@@ -1,4 +1,4 @@
-data String = (String.cons head tail) | (String.nil)
-data List   = (List.cons head tail) | (List.nil)
+data String = (String.cons head ~tail) | (String.nil)
+data List   = (List.cons head ~tail) | (List.nil)
 data Result = (Result.ok val) | (Result.err val)
-data Nat    = (Nat.succ pred) | (Nat.zero)
+data Nat    = (Nat.succ ~pred) | (Nat.zero)

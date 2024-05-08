@@ -8,6 +8,8 @@ use crate::{
 use highlight_error::highlight_error;
 use TSPL::Parser;
 
+use super::CtrField;
+
 // Bend grammar description:
 // <Book>       ::= (<Data> | <Rule>)*
 // <Data>       ::= "data" <Name> "=" ( <Name> | "(" <Name> (<Name>)* ")" )+
@@ -91,12 +93,19 @@ impl<'a> TermParser<'a> {
     Ok((name, adt))
   }
 
-  fn parse_datatype_ctr(&mut self) -> Result<(Name, Vec<Name>), String> {
+  fn parse_datatype_ctr(&mut self) -> Result<(Name, Vec<CtrField>), String> {
+    // (name  ('~'? field)*)
+    // name
     if self.try_consume("(") {
-      // (name field*)
       let name = self.parse_top_level_name()?;
-      let field_parser = |p: &mut Self| p.labelled(|p| p.parse_bend_name(), "datatype constructor field");
-      let fields = self.list_like(field_parser, "", ")", "", false, 0)?;
+
+      fn parse_field(p: &mut TermParser) -> Result<CtrField, String> {
+        let rec = p.try_consume("~");
+        let nam = p.labelled(|p| p.parse_bend_name(), "datatype constructor field")?;
+        Ok(CtrField { nam, rec })
+      }
+
+      let fields = self.list_like(parse_field, "", ")", "", false, 0)?;
       Ok((name, fields))
     } else {
       // name
@@ -106,6 +115,8 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_rule(&mut self) -> Result<(Name, Rule), String> {
+    // (name pat*) = term
+    // name pat* = term
     let (name, pats) = if self.try_consume("(") {
       let name = self.labelled(|p| p.parse_top_level_name(), "function name")?;
       let pats = self.list_like(|p| p.parse_pattern(false), "", ")", "", false, 0)?;

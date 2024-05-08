@@ -1,6 +1,6 @@
 use crate::{
   diagnostics::{Diagnostics, WarningType, ERR_INDENT_SIZE},
-  fun::{Adts, Constructors, Ctx, MatchRule, Name, Num, Term},
+  fun::{Adts, Constructors, CtrField, Ctx, MatchRule, Name, Num, Term},
   maybe_grow,
 };
 use std::collections::HashMap;
@@ -141,7 +141,7 @@ impl Term {
       // Build the match arms, with all constructors
       let mut new_rules = vec![];
       for (ctr, fields) in adt_ctrs.iter() {
-        let fields = fields.iter().map(|f| Some(match_field(&bnd, f))).collect::<Vec<_>>();
+        let fields = fields.iter().map(|f| Some(match_field(&bnd, &f.nam))).collect::<Vec<_>>();
         let body = if let Some(Some(body)) = bodies.remove(ctr) {
           body
         } else {
@@ -232,9 +232,9 @@ fn match_field(arg: &Name, field: &Name) -> Name {
   Name::new(format!("{arg}.{field}"))
 }
 
-fn rebuild_ctr(arg: &Name, ctr: &Name, fields: &[Name]) -> Term {
+fn rebuild_ctr(arg: &Name, ctr: &Name, fields: &[CtrField]) -> Term {
   let ctr = Term::Ref { nam: ctr.clone() };
-  let fields = fields.iter().map(|f| Term::Var { nam: match_field(arg, f) });
+  let fields = fields.iter().map(|f| Term::Var { nam: match_field(arg, &f.nam) });
   Term::call(ctr, fields)
 }
 

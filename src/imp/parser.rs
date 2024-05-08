@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 use TSPL::Parser;
 
 use crate::{
-  fun::{parser::ParserCommons, Name, Op, STRINGS},
+  fun::{parser::ParserCommons, CtrField, Name, Op, STRINGS},
   maybe_grow,
 };
 
@@ -491,6 +491,12 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_enum_py(&mut self, indent: &mut Indent) -> Result<Enum, String> {
+    fn parse_variant_field(p: &mut PyParser) -> Result<CtrField, String> {
+      let rec = p.try_consume("~");
+      let nam = p.parse_bend_name()?;
+      Ok(CtrField { nam, rec })
+    }
+
     let name = self.parse_bend_name()?;
     let mut variants = Vec::new();
     self.consume(":")?;
@@ -502,7 +508,7 @@ impl<'a> PyParser<'a> {
       let name = self.parse_bend_name()?;
       let mut fields = Vec::new();
       if self.skip_starts_with("(") {
-        fields = self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 0)?;
+        fields = self.list_like(|p| parse_variant_field(p), "(", ")", ",", true, 0)?;
       }
       variants.push((name.clone(), Variant { name, fields }));
     }

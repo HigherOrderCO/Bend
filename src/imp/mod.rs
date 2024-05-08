@@ -5,7 +5,7 @@ pub mod to_lang;
 use indexmap::IndexMap;
 use interner::global::GlobalString;
 
-use crate::fun::{Name, Op};
+use crate::fun::{CtrField, Name, Op};
 
 #[derive(Clone, Debug)]
 pub enum Term {
@@ -89,7 +89,7 @@ pub enum MBind {
 #[derive(Clone, Debug)]
 pub struct Variant {
   pub name: Name,
-  pub fields: Vec<Name>,
+  pub fields: Vec<CtrField>,
 }
 
 // "def" {name} "(" {params} ")" ":" {body}

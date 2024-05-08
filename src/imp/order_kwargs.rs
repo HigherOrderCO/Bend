@@ -90,8 +90,8 @@ impl Term {
         if let Term::Var { nam } = &**fun {
           if let Some(fetch) = ctx.fetch(nam) {
             match fetch {
-              Fetch::Variant(variant) => go_order_kwargs(&variant.fields, kwargs, args),
-              Fetch::Definition(def) => go_order_kwargs(&def.params, kwargs, args),
+              Fetch::Variant(variant) => go_order_kwargs(variant.fields.iter().map(|f| &f.nam), kwargs, args),
+              Fetch::Definition(def) => go_order_kwargs(def.params.iter(), kwargs, args),
             }
           }
         } else {
@@ -111,9 +111,13 @@ impl Term {
   }
 }
 
-fn go_order_kwargs(names: &[Name], kwargs: &mut Vec<(Name, Term)>, args: &mut Vec<Term>) {
+fn go_order_kwargs<'a>(
+  names: impl Iterator<Item = &'a Name>,
+  kwargs: &mut Vec<(Name, Term)>,
+  args: &mut Vec<Term>,
+) {
   let mut index_map = IndexMap::new();
-  for (index, field) in names.iter().enumerate() {
+  for (index, field) in names.enumerate() {
     index_map.insert(field, index);
   }
 

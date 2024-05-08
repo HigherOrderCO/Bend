@@ -222,10 +222,15 @@ pub enum Tag {
 /// A user defined datatype
 #[derive(Debug, Clone, Default)]
 pub struct Adt {
-  pub ctrs: IndexMap<Name, Vec<Name>>,
+  pub ctrs: IndexMap<Name, Vec<CtrField>>,
   pub builtin: bool,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct CtrField {
+  pub nam: Name,
+  pub rec: bool,
+}
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Name(GlobalString);
 
