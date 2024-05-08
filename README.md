@@ -1,5 +1,7 @@
 # Bend
 
+*Note: The latest version of Bend targets an unreleased version of HVM. If you want to use Bend right now, use branch [hvm-core](https://github.com/HigherOrderCO/bend/tree/hvm-core)*.
+
 Bend is a programming language that can run massively parallel programs on the GPU or the CPU using the power of interaction nets and the [HVM](https://github.com/HigherOrderCO/hvm2).
 With Bend, you can write programs for the GPU as easily as you'd write a normal program in your favorite language.
 
