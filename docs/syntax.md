@@ -29,8 +29,6 @@ A definition is composed by a name, a sequence of parameters and a body.
 
 A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names).
 
-Currently they allow the same, except top-level can't have '__' (i use for generated names)
-
 ### Enum
 
 Defines an ADT like enumeration.
