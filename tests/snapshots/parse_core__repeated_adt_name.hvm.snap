@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/parse_core/repeated_adt_name.hvm
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/parse_core/repeated_adt_name.hvm :
+Repeated datatype 'Foo'
+[0m  2 | [4m[31mdata Foo = B
+[0m

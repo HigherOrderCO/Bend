@@ -1,8 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/io/load.hvm
----
-Lazy mode:
-"Contents\n"
-Strict mode:
-"Contents\n"

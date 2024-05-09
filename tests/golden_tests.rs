@@ -113,7 +113,7 @@ fn compile_term() {
 }
 
 #[test]
-fn compile_file() {
+fn compile_core() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     let compile_opts = CompileOpts::default();
@@ -125,7 +125,7 @@ fn compile_file() {
 }
 
 #[test]
-fn compile_file_o_all() {
+fn compile_core_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     let opts = CompileOpts::default().set_all();
@@ -141,7 +141,7 @@ fn compile_file_o_all() {
 }
 
 #[test]
-fn compile_file_o_no_all() {
+fn compile_core_o_no_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut book = do_parse_book(code, path)?;
     let compile_opts = CompileOpts::default().set_no_all();
@@ -171,7 +171,7 @@ fn linear_readback() {
 }
 
 #[test]
-fn run_file() {
+fn run_core() {
   run_golden_test_dir_multiple(function_name!(), &[(&|code, path| {
     let _guard = RUN_MUTEX.lock().unwrap();
     let book = do_parse_book(code, path)?;
@@ -251,7 +251,7 @@ fn simplify_matches() {
 }
 
 #[test]
-fn parse_file() {
+fn parse_core() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let book = do_parse_book(code, path)?;
     Ok(book.to_string())
@@ -291,7 +291,7 @@ fn encode_pattern_match() {
 }
 
 #[test]
-fn desugar_file() {
+fn desugar_core() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let compile_opts = CompileOpts::default();
     let diagnostics_cfg = DiagnosticsConfig {

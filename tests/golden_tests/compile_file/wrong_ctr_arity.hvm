@@ -1,5 +1,0 @@
-data Boxed = (Box val)
-
-Bar (*, (Box x y)) = x
-
-main = *

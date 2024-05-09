@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_core/nested_list_and_string.hvm
+---
+λa λb λ* (b a λc λ* (c λ* 2 λd λ* (d λe λ* (e λf λ* (f 7 λg λ* (g λh λ* (h 49 λi λ* (i 50 λj λ* (j 51 λk λ* (k 52 String.nil)))) λl λ* (l 9 List.nil))) λm λ* (m a (String.cons * (String.cons 52 (String.cons 50 String.nil))))) List.nil)))

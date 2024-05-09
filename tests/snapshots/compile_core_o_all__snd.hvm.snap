@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core_o_all/snd.hvm
+---
+@main = a
+  & @snd ~ ((0 42) a)
+
+@snd = ((* a) a)

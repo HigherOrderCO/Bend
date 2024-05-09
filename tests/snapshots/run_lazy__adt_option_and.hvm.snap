@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_lazy/adt_option_and.hvm
----
-λa match a = a { Some: λc match c = c { Some: (Some (a.val, c.val)); None: None; }; None: λ* None; }

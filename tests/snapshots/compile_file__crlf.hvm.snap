@@ -1,7 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/crlf.hvm
----
-@a = 1
-
-@main = 2

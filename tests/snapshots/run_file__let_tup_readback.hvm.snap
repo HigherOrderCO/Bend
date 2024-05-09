@@ -1,9 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/let_tup_readback.hvm
----
-[4m[1m[33mWarnings:[0m
-[1mDuring readback:[0m
-  Reached Root.
-
-λa ($b (a λc (<Invalid> λ$b c)))

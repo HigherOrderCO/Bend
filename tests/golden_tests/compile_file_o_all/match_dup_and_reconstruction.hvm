@@ -1,7 +1,0 @@
-data Box = (Boxed val)
-
-Got = @a match a {
-  Boxed: (a, a.val)
-}
-
-main = (Got (Boxed 10))

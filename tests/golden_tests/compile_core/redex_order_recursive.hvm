@@ -1,0 +1,13 @@
+tail_recursive = @x (x @pred @acc (tail_recursive pred (+ 1 acc)) @acc 0)
+
+fold_ = @bm (bm
+  @lft @rgt (add (fold_ lft) (fold_ rgt))
+  @s @z (s @s @z z)
+)
+
+add = @a (a 
+  @p @b (add p @s @z (s b))
+  @b b
+)
+
+main = *

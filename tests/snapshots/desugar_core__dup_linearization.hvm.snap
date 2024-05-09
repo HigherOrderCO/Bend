@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/desugar_core/dup_linearization.hvm
+---
+(main) = let {a b c d e} = *; (a, e, d, c, b)

@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core/just_a_name.hvm
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/compile_core/just_a_name.hvm :
+[1m- expected:[0m pattern-matching pattern
+[1m- detected:[0m end of input
+[0m 1 | asdf[4m[31m [0m

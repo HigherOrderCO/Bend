@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core_o_all/bool.hvm
+---
+@Not = ((@fals (@true a)) a)
+
+@fals = (* (a a))
+
+@main = a
+  & @Not ~ (@true a)
+
+@true = (a (* a))

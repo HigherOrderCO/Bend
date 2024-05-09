@@ -1,0 +1,2 @@
+Foo = main
+main = Foo

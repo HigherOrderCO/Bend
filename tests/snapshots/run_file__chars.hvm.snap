@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/chars.hvm
----
-λa λ* (a 4660 λb λ* (b 33 λc λ* (c 55 String.nil)))

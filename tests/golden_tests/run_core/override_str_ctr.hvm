@@ -1,0 +1,4 @@
+data Override
+  = (String.cons any)
+
+main = (String.cons "any")

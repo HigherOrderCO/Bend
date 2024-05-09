@@ -1,3 +1,0 @@
-data String = S
-
-main = S

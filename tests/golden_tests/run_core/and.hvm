@@ -1,0 +1,6 @@
+data bool = true | false
+
+and a false = false
+and a true = a
+
+main = (and true false)

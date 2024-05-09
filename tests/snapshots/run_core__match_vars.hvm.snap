@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_core/match_vars.hvm
+---
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mmain[0m[1m':[0m
+  Irrefutable 'match' expression. All cases after variable pattern 'true' will be ignored.
+  Note that to use a 'match' expression, the matched constructors need to be defined in a 'data' definition.
+  If this is not a mistake, consider using a 'let' expression instead.

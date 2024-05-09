@@ -1,5 +1,0 @@
-data Tup = (pair a b)
-
-(foo pair) = pair
-
-main = *

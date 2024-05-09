@@ -1,9 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/switch_all_patterns.hvm
----
-[4m[1m[31mErrors:[0m
-In tests/golden_tests/compile_file/switch_all_patterns.hvm :
-[1m- expected:[0m 0
-[1m- detected:[0m
-[0m  7 |   [4m[31m_[0m: x-1[0m

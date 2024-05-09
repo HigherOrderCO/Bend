@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core_o_all/example.hvm
+---
+@Def1 = c
+  & (a a) ~ ((b b) c)
+
+@Def2 = b
+  & (a a) ~ (@Def1 b)
+
+@main = a
+  & @Def2 ~ (1 a)

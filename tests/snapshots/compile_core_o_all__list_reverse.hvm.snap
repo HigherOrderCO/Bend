@@ -1,0 +1,26 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core_o_all/list_reverse.hvm
+---
+@concat = ((@concat__C0 ((a a) b)) b)
+
+@concat__C0 = (a (b (c e)))
+  & @concat ~ (b (c d))
+  & @cons ~ (a (d e))
+
+@cons = (a (b ((a (b c)) (* c))))
+
+@main = d
+  & @reverse ~ (c d)
+  & @cons ~ (3 (b c))
+  & @cons ~ (2 (a b))
+  & @cons ~ (1 (@nil a))
+
+@nil = (* (a a))
+
+@reverse = ((@reverse__C0 (@nil a)) a)
+
+@reverse__C0 = (c (a e))
+  & @concat ~ (b (d e))
+  & @reverse ~ (a b)
+  & @cons ~ (c (@nil d))

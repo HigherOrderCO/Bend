@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/repeated_name_truncation.hvm
----
-λ* long_name_that_truncates2

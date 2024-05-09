@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core_o_all/tagged_dup.hvm
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/compile_core_o_all/tagged_dup.hvm :
+Tagged terms not supported for hvm32.
+[0m  2 |   let[4m[31m [0m#i {a b} = @x x;[0m

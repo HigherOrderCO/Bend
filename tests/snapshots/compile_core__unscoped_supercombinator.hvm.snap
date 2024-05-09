@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core/unscoped_supercombinator.hvm
+---
+@Foo = ((@Foo__C1 (@Foo__C0 a)) a)
+
+@Foo__C0 = (a ((a b) b))
+
+@Foo__C1 = (a ((a b) b))
+
+@main = a
+  & @Foo ~ (* a)

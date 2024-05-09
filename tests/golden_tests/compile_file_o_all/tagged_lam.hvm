@@ -1,1 +1,0 @@
-main = #foo ((#foo @x (+ x 1), #foo @x (* x x)) 2)

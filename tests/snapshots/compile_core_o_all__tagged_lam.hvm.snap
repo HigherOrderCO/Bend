@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core_o_all/tagged_lam.hvm
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/compile_core_o_all/tagged_lam.hvm :
+Tagged terms not supported for hvm32.
+[0m  1 | main =[4m[31m [0m#foo ((#foo @x (+ x 1), #foo @x (* x x)) 2)[0m

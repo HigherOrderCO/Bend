@@ -1,8 +1,0 @@
-data _Box = (Box val)
-
-Box.subst (Box x) cmp to = switch _ = (cmp x) {
-  0: (Box x)
-  _: (Box to)
-}
-
-Main = (Box.subst (Box 4) @x (== x 4) (Box 10))

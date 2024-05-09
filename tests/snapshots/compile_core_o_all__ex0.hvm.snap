@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core_o_all/ex0.hvm
+---
+@C_2 = ({(b c) (a b)} (a c))
+
+@S = (a ((a b) (* b)))
+
+@Z = (* (a a))
+
+@main = a
+  & @C_2 ~ (@S (@Z a))

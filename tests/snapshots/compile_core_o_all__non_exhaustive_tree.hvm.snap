@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core_o_all/non_exhaustive_tree.hvm
+---
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mWarp[0m[1m':[0m
+  Non-exhaustive pattern matching rule. Constructor 'Both' of type 'Tree' not covered

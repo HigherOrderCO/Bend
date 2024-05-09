@@ -1,6 +1,0 @@
-Pred = λt switch t {
-  0: 0
-  _: t-1
-}
-
-main = (Pred 3)

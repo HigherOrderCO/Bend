@@ -1,0 +1,4 @@
+main = @a @b @c @d switch a {
+  0: (+ (+ b c) d);
+  _: (+ (+ (+ a-1 b) c) d);
+}

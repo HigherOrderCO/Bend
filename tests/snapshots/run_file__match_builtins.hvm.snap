@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/match_builtins.hvm
----
-{λa λ* (a 101 λb λ* (b 108 λc λ* (c 108 λd λ* (d 111 String.nil)))) λe λ* (e 119 λf λ* (f 111 λg λ* (g 114 λh λ* (h 108 λi λ* (i 100 String.nil)))))}

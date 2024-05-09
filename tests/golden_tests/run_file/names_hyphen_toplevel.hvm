@@ -1,5 +1,0 @@
-data Foo-Bar = (Baz-Qux field-hyph)
-
-fun-with-hyphen = 1
-
-main = (Baz-Qux fun-with-hyphen)

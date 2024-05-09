@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_core/match_mult_linearization.hvm
+---
+[4m[1m[33mWarnings:[0m
+[1mDuring readback:[0m
+  Invalid Numeric Match.
+
+λa switch a = a { 0: λa λb λc (+ (+ a b) c); _: λa λb λc λd (+ (+ (+ a b) c) d); }

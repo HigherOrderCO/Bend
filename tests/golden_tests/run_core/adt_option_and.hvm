@@ -1,0 +1,9 @@
+data Option = (Some val) | None
+
+main = @a @b match a {
+  Some: match b {
+    Some: (Some (a.val, b.val))
+    None: None
+  }
+  None: None
+}

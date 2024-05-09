@@ -1,8 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/sup_reconstruction.hvm
----
-[4m[1m[31mErrors:[0m
-In tests/golden_tests/run_file/sup_reconstruction.hvm :
-Tagged terms not supported for hvm32.
-[0m  1 | main = λa let[4m[31m [0m#s {b c} = a; #s {b c}[0m

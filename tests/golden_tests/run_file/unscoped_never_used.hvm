@@ -1,6 +1,0 @@
-data Bool = T | F
-
-main = @x match x {
-  T : @$x *
-  F : @x *
-}

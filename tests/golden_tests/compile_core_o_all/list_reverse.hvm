@@ -1,0 +1,10 @@
+data list = (cons h t) | nil
+
+reverse (cons h t) = (concat (reverse t) (cons h nil))
+reverse nil = nil
+
+concat (cons h t) x = (cons h (concat t x))
+concat nil x = x
+
+main = (reverse (cons 3 (cons 2 (cons 1 nil))))
+

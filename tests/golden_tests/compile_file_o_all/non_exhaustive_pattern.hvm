@@ -1,7 +1,0 @@
-data Type = A | B | C | D
-
-Foo A B C D = 0
-Foo A B D D = 1
-Foo a b D D = 2
-
-main = (Foo A B C D)

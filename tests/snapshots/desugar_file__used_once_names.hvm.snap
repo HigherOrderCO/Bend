@@ -1,7 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/desugar_file/used_once_names.hvm
----
-(foo) = λa λb λc let {d e} = c; (a b (d e))
-
-(main) = (foo 2 3 λa a)

@@ -1,3 +1,0 @@
-main = @x match x {
-  : *
-}

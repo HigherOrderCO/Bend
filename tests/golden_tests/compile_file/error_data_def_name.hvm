@@ -1,4 +1,0 @@
-data A = A
-A = 0
-
-main = A

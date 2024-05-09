@@ -1,0 +1,21 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_core/ref_to_ref.hvm
+---
+@A1 = @A2
+
+@A2 = 1
+
+@B1 = @B2
+
+@B2 = @B3
+
+@B3 = @B4
+
+@B4 = @B5
+
+@B5 = 2
+
+@C1 = @B4
+
+@main = ((@A1 @B1) @C1)

@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_core/escape_sequences.hvm
+---
+λa (Join (List.cons (String.cons 10 String.nil) (List.cons (String.cons 13 String.nil) (List.cons (String.cons 9 String.nil) (List.cons (String.cons 0 String.nil) (List.cons (String.cons 34 String.nil) (List.cons (String.cons 39 String.nil) (List.cons (String.cons 2814 String.nil) (List.cons (String.cons 92 String.nil) List.nil)))))))))

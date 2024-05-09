@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/lam_op2.hvm
----
-λa (+ a 2)
