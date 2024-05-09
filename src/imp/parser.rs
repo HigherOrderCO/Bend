@@ -716,7 +716,22 @@ mod test {
   use super::PyParser;
 
   #[test]
-  fn parse_def() {
+  fn map_get() {
+    let src = r#"
+def main():
+  x = { 2: 1, 3: 2 };
+  y = id(x[2]);
+  return y + x[3];
+  "#;
+    let mut parser = PyParser::new(src);
+    let mut program = parser.parse_program().inspect_err(|e| println!("{e}")).unwrap();
+    program.gen_map_get();
+    let out = program.to_fun(crate::Book::builtins());
+    println!("{}", out.display_pretty());
+  }
+
+  #[test]
+  fn parse_program() {
     let src = r#"
 enum Point:
   Point(x, y)
@@ -792,7 +807,8 @@ def bnd():
     let mut parser = PyParser::new(src);
     let mut program = parser.parse_program().inspect_err(|e| println!("{e}")).unwrap();
     program.order_kwargs();
-    let out = program.to_fun(crate::fun::Book::default());
+    program.gen_map_get();
+    let out = program.to_fun(crate::Book::builtins());
     println!("{out}");
   }
 }
