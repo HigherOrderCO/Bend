@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use indexmap::IndexMap;
 use TSPL::Parser;
 
@@ -98,17 +100,10 @@ impl<'a> PyParser<'a> {
         Expr::Str { val }
       }
       c if c.is_ascii_digit() => {
-        let val = self.parse_u64()?;
-        Expr::Num { val: val as u32 }
+        let val = self.parse_u32()?;
+        Expr::Num { val }
       }
-      _ => {
-        if self.try_consume("True") {
-          return Ok(Expr::Num { val: 1 });
-        } else if self.try_consume("False") {
-          return Ok(Expr::Num { val: 0 });
-        }
-        Expr::Var { nam: self.parse_bend_name()? }
-      }
+      _ => Expr::Var { nam: self.parse_bend_name()? },
     };
     Ok(res)
   }
@@ -136,7 +131,6 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_infix_or_lambda(&mut self) -> Result<Expr, String> {
-    self.skip_trivia();
     if self.try_consume_keyword("lambda") {
       let names = self.list_like(|p| p.parse_bend_name(), "", ":", ",", true, 1)?;
       let bod = self.parse_infix_or_lambda()?;
@@ -194,7 +188,7 @@ impl<'a> PyParser<'a> {
 
   fn parse_infix_py(&mut self, prec: usize) -> Result<Expr, String> {
     maybe_grow(|| {
-      self.skip_trivia();
+      self.advance_inline_trivia();
       if prec > PREC.len() - 1 {
         return self.parse_call();
       }
@@ -203,7 +197,7 @@ impl<'a> PyParser<'a> {
         if PREC[prec].iter().any(|r| *r == op) {
           let op = self.parse_oper()?;
           let rhs = self.parse_infix_py(prec + 1)?;
-          self.skip_trivia();
+          self.advance_inline_trivia();
           lhs = Expr::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
         } else {
           break;
@@ -377,7 +371,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_match_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
-    let (bind, arg) = self.parse_named_arg()?;
+    let (bind, arg) = self.parse_match_arg()?;
     self.consume(":")?;
     let mut arms = Vec::new();
     indent.enter_level();
@@ -389,6 +383,23 @@ impl<'a> PyParser<'a> {
     }
     indent.exit_level();
     Ok(Stmt::Match { arg: Box::new(arg), bind, arms })
+  }
+
+  fn parse_match_arg(&mut self) -> Result<(Option<Name>, Expr), String> {
+    let ini_idx = *self.index();
+    let arg = self.parse_infix_or_lambda()?;
+    let end_idx = *self.index();
+
+    self.advance_inline_trivia();
+    match (arg, self.starts_with("=")) {
+      (Expr::Var { nam }, true) => {
+        self.consume("=")?;
+        Ok((Some(nam), self.parse_infix_or_lambda()?))
+      }
+      (Expr::Var { nam }, false) => Ok((Some(nam.clone()), Expr::Var { nam })),
+      (_, true) => self.expected_spanned("argument name", ini_idx, end_idx),
+      (arg, false) => Ok((Some(Name::new("%arg")), arg)),
+    }
   }
 
   fn name_or_wildcard(&mut self) -> Result<Option<Name>, String> {
@@ -415,7 +426,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_switch_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
-    let (bind, arg) = self.parse_named_arg()?;
+    let (bind, arg) = self.parse_match_arg()?;
     self.consume(":")?;
     let mut arms = Vec::new();
 
@@ -456,7 +467,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_fold_py(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
-    let (bind, arg) = self.parse_named_arg()?;
+    let (bind, arg) = self.parse_match_arg()?;
     self.consume(":")?;
     let mut arms = Vec::new();
     indent.enter_level();
@@ -471,7 +482,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_bend(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
-    let args = self.list_like(|p| p.parse_named_arg(), "", "while", ",", true, 0)?;
+    let args = self.list_like(|p| p.parse_match_arg(), "", "while", ",", true, 1)?;
     let (bind, init) = args.into_iter().unzip();
     let cond = self.parse_infix_or_lambda()?;
     self.consume(":")?;
@@ -582,7 +593,7 @@ impl<'a> PyParser<'a> {
     Ok(Enum { name, variants })
   }
 
-  pub fn parse_program_py(&mut self) -> Result<Program, String> {
+  pub fn parse_program_py(&mut self, builtins: &HashSet<Name>) -> Result<Program, String> {
     let mut enums = IndexMap::<Name, Enum>::new();
     let mut defs = IndexMap::<Name, Definition>::new();
     let mut variants = IndexMap::<Name, Name>::new();
@@ -596,17 +607,24 @@ impl<'a> PyParser<'a> {
         self.expected("Indentation error")?;
       }
       match self.parse_top_level_py(&mut Indent(0))? {
-        TopLevel::Def(def) => Self::add_def_py(&mut defs, def)?,
-        TopLevel::Enum(r#enum) => Self::add_enum_py(&mut enums, &mut variants, r#enum)?,
+        TopLevel::Def(def) => Self::add_def_py(&mut defs, def, builtins)?,
+        TopLevel::Enum(r#enum) => Self::add_enum_py(&mut enums, &mut variants, r#enum, builtins)?,
       }
     }
 
     Ok(Program { enums, defs, variants })
   }
 
-  fn add_def_py(defs: &mut IndexMap<Name, Definition>, def: Definition) -> Result<(), String> {
+  fn add_def_py(
+    defs: &mut IndexMap<Name, Definition>,
+    def: Definition,
+    builtins: &HashSet<Name>,
+  ) -> Result<(), String> {
+    if builtins.contains(&def.name) {
+      return Err(format!("Built-in function '{}' cannot be overridden.", def.name));
+    }
     match defs.entry(def.name.clone()) {
-      indexmap::map::Entry::Occupied(o) => Err(format!("Repeated definition '{}'.", o.get().name)),
+      indexmap::map::Entry::Occupied(o) => Err(format!("Repeated function definition '{}'.", o.get().name)),
       indexmap::map::Entry::Vacant(v) => {
         v.insert(def);
         Ok(())
@@ -618,11 +636,18 @@ impl<'a> PyParser<'a> {
     enums: &mut IndexMap<Name, Enum>,
     variants: &mut IndexMap<Name, Name>,
     r#enum: Enum,
+    builtins: &HashSet<Name>,
   ) -> Result<(), String> {
+    if builtins.contains(&r#enum.name) {
+      return Err(format!("Built-in type '{}' cannot be overridden.", r#enum.name));
+    }
     match enums.entry(r#enum.name.clone()) {
       indexmap::map::Entry::Occupied(o) => return Err(format!("Repeated enum '{}'.", o.key())),
       indexmap::map::Entry::Vacant(v) => {
         for (name, variant) in r#enum.variants.iter() {
+          if builtins.contains(name) {
+            return Err(format!("Built-in constructor '{}' cannot be overridden.", name));
+          }
           match variants.entry(name.clone()) {
             indexmap::map::Entry::Occupied(_) => {
               return Err(format!("Repeated variant '{}'.", variant.name));
@@ -710,7 +735,7 @@ def bnd():
 //    return x;
     "#;
     let mut parser = PyParser::new(src);
-    let mut program = parser.parse_program_py().inspect_err(|e| println!("{e}")).unwrap();
+    let mut program = parser.parse_program_py(&Default::default()).inspect_err(|e| println!("{e}")).unwrap();
     program.order_kwargs();
     let out = program.to_fun(crate::fun::Book::default());
     println!("{out}");

@@ -1,3 +1,4 @@
+#flavor core
 main a b =
   switch a {
     0: switch b {

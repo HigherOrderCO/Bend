@@ -1,5 +1,5 @@
 use super::{AssignPattern, Definition, Expr, Program, Stmt};
-use crate::fun;
+use crate::fun::{self, Name};
 
 impl Program {
   pub fn to_fun(self, mut book: fun::Book) -> fun::Book {
@@ -73,8 +73,9 @@ impl Stmt {
       }
       Stmt::Switch { arg, bind, arms } => {
         let arg = arg.to_fun();
+        let pred = Some(Name::new(format!("{}-{}", bind.clone().unwrap(), arms.len() - 1)));
         let arms = arms.into_iter().map(Stmt::to_fun).collect();
-        fun::Term::Swt { arg: Box::new(arg), bnd: bind, with: Vec::new(), pred: None, arms }
+        fun::Term::Swt { arg: Box::new(arg), bnd: bind, with: Vec::new(), pred, arms }
       }
       Stmt::Fold { arg, bind, arms } => {
         let arg = arg.to_fun();
