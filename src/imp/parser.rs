@@ -730,7 +730,7 @@ def symbols():
   x = { `x`: 5, 2: 3 };
   x[`x`] = 2;
   x[2] = 3;
-  return x[`x`] + `azul`;
+  return x[`x`] + `foxy`;
 
 def mk_point():
   return Point(y = 2, x = 1);

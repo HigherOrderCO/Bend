@@ -2,3 +2,43 @@ data String = (String.cons head ~tail) | (String.nil)
 data List   = (List.cons head ~tail) | (List.nil)
 data Result = (Result.ok val) | (Result.err val)
 data Nat    = (Nat.succ ~pred) | (Nat.zero)
+data Map    = (Map.node value ~left ~right) | (Map.leaf)
+
+Map/empty = Map.leaf
+
+Map/get map key =
+  match map {
+    Map.leaf: (*, map)
+    Map.node:
+      switch _ = (== 0 key) {
+        0: switch _ = (% key 2) {
+          0:
+            let (got, rest) = (Map/get map.left (/ key 2))
+            (got, (Map.node map.value rest map.right))
+          _:
+            let (got, rest) = (Map/get map.right (/ key 2))
+            (got, (Map.node map.value map.left rest))
+        }
+        _: (map.value, map)
+      }
+  }
+
+Map/set map key value =
+  match map {
+    Map.node:
+      switch _ = (== 0 key) {
+        0: switch _ = (% key 2) {
+          0: (Map.node map.value (Map/set map.left (/ key 2) value) map.right)
+          _: (Map.node map.value map.left (Map/set map.right (/ key 2) value))
+        }
+        _: (Map.node value map.left map.right)
+      }
+    Map.leaf:
+      switch _ = (== 0 key) {
+        0: switch _ = (% key 2) {
+          0: (Map.node * (Map/set Map.leaf (/ key 2) value) Map.leaf)
+          _: (Map.node * Map.leaf (Map/set Map.leaf (/ key 2) value))
+        }
+        _: (Map.node value Map.leaf Map.leaf)
+      }
+  }
