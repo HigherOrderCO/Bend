@@ -1,6 +1,6 @@
 mod order_kwargs;
 pub mod parser;
-pub mod to_lang;
+pub mod to_fun;
 
 use indexmap::IndexMap;
 use interner::global::GlobalString;
@@ -8,7 +8,7 @@ use interner::global::GlobalString;
 use crate::fun::{CtrField, Name, Op};
 
 #[derive(Clone, Debug)]
-pub enum Term {
+pub enum Expr {
   // "None"
   None,
   // [a-zA-Z_]+
@@ -16,19 +16,19 @@ pub enum Term {
   // [0-9_]+
   Num { val: u32 },
   // {fun}({args},{kwargs},)
-  Call { fun: Box<Term>, args: Vec<Term>, kwargs: Vec<(Name, Term)> },
+  Call { fun: Box<Expr>, args: Vec<Expr>, kwargs: Vec<(Name, Expr)> },
   // "lambda" {names}* ":" {bod}
-  Lam { names: Vec<Name>, bod: Box<Term> },
+  Lam { names: Vec<Name>, bod: Box<Expr> },
   // {lhs} {op} {rhs}
-  Bin { op: Op, lhs: Box<Term>, rhs: Box<Term> },
+  Bin { op: Op, lhs: Box<Expr>, rhs: Box<Expr> },
   // "\"" ... "\""
   Str { val: GlobalString },
   // "[" ... "]"
-  Lst { els: Vec<Term> },
+  Lst { els: Vec<Expr> },
   // "(" ... ")"
-  Tup { els: Vec<Term> },
+  Tup { els: Vec<Expr> },
   // "[" {term} "for" {bind} "in" {iter} ("if" {cond})? "]"
-  Comprehension { term: Box<Term>, bind: Name, iter: Box<Term>, cond: Option<Box<Term>> },
+  Comprehension { term: Box<Expr>, bind: Name, iter: Box<Expr>, cond: Option<Box<Expr>> },
 }
 
 #[derive(Clone, Debug)]
@@ -56,32 +56,37 @@ pub enum InPlaceOp {
 #[derive(Clone, Debug)]
 pub enum Stmt {
   // {pat} = {val} ";" {nxt}
-  Assign { pat: AssignPattern, val: Box<Term>, nxt: Box<Stmt> },
+  Assign { pat: AssignPattern, val: Box<Expr>, nxt: Box<Stmt> },
   // {var} += {val} ";" {nxt}
-  InPlace { op: InPlaceOp, var: Name, val: Box<Term>, nxt: Box<Stmt> },
+  InPlace { op: InPlaceOp, var: Name, val: Box<Expr>, nxt: Box<Stmt> },
   // "if" {cond} ":"
   //  {then}
   // "else" ":"
   //  {otherwise}
-  If { cond: Box<Term>, then: Box<Stmt>, otherwise: Box<Stmt> },
+  If { cond: Box<Expr>, then: Box<Stmt>, otherwise: Box<Stmt> },
   // "match" {arg} ":" ("as" {bind})?
   //   case {lft} ":" {rgt}
-  Match { arg: Box<Term>, bind: Option<Name>, arms: Vec<MatchArm> },
+  Match { arg: Box<Expr>, bind: Option<Name>, arms: Vec<MatchArm> },
   // "switch" {arg} ("as" {bind})?
   //   case 0..wildcard ":" {rgt}
-  Switch { arg: Box<Term>, bind: Option<Name>, arms: Vec<Stmt> },
-  // "fold" {fun} {arg} ("as" {bind})? ":" {arms}
+  Switch { arg: Box<Expr>, bind: Option<Name>, arms: Vec<Stmt> },
+  // "bend" ({bind} ("="" {init})?)* "while" {cond} ":"
+  //  {step}
+  // "then" ":"
+  //  {base}
+  Bend { bind: Vec<Option<Name>>, init: Vec<Expr>, cond: Box<Expr>, step: Box<Stmt>, base: Box<Stmt> },
+  // "fold" {arg} ("as" {bind})? ":" {arms}
   //   case {lft} ":" {rgt}
-  Fold { fun: Name, arg: Box<Term>, bind: Option<Name>, arms: Vec<MatchArm> },
+  Fold { arg: Box<Expr>, bind: Option<Name>, arms: Vec<MatchArm> },
   // "do" {fun} ":" {block}
   Do { fun: Name, block: Vec<MBind> },
   // "return" {expr} ";"
-  Return { term: Box<Term> },
+  Return { term: Box<Expr> },
 }
 
 #[derive(Clone, Debug)]
 pub enum MBind {
-  Ask { pat: AssignPattern, val: Box<Term> },
+  Ask { pat: AssignPattern, val: Box<Expr> },
   Stmt { stmt: Box<Stmt> },
 }
 

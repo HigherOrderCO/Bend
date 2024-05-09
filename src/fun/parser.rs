@@ -67,7 +67,7 @@ impl<'a> TermParser<'a> {
         // adt declaration
         let (nam, adt) = self.parse_datatype(builtin)?;
         let end_idx = *self.index();
-        book.add_adt(nam, adt).map_err(|e| add_ctx_to_msg(&e, ini_idx, end_idx, self.input()))?;
+        self.with_ctx(book.add_adt(nam, adt), ini_idx, end_idx)?;
       } else {
         // function declaration rule
         let (name, rule) = self.parse_rule()?;
@@ -499,8 +499,8 @@ impl<'a> TermParser<'a> {
     let nam = self.parse_bend_name()?;
     let end_idx = *self.index();
     if nam.contains("__") {
-      let ctx = highlight_error(ini_idx, end_idx, self.input());
-      Err(format!("Top-level names are not allowed to contain \"__\".\n{ctx}"))
+      let msg = "Top-level names are not allowed to contain \"__\".".to_string();
+      self.with_ctx(Err(msg), ini_idx, end_idx)
     } else {
       Ok(nam)
     }
@@ -523,22 +523,22 @@ impl<'a> TermParser<'a> {
   /// Parses a tag where it may or may not be valid.
   ///
   /// If it is not valid, the returned callback can be used to issue an error.
-  fn parse_tag(&mut self) -> Result<(Option<Tag>, impl FnOnce(&Self) -> Result<(), String>), String> {
+  fn parse_tag(&mut self) -> Result<(Option<Tag>, impl FnOnce(&mut Self) -> Result<(), String>), String> {
     let index = self.index;
     let tag = if self.skip_peek_one() == Some('#')
       && !self.peek_many(2).is_some_and(|x| x.chars().nth(1).unwrap().is_ascii_digit())
     {
-      let ctx = highlight_error(index, index + 1, self.input);
-      return Err(format!("Tagged terms not supported for hvm32.\n{ctx}"));
+      let msg = "Tagged terms not supported for hvm32.".to_string();
+      return self.with_ctx(Err(msg), index, index + 1);
     } else {
       None
     };
     let end_index = self.index;
     let has_tag = tag.is_some();
-    Ok((tag, move |slf: &Self| {
+    Ok((tag, move |slf: &mut Self| {
       if has_tag {
-        let ctx = highlight_error(index, end_index, slf.input);
-        Err(format!("\x1b[1m- unexpected tag:\x1b[0m{}", ctx))
+        let msg = "\x1b[1m- unexpected tag:\x1b[0m".to_string();
+        slf.with_ctx(Err(msg), index, end_index)
       } else {
         Ok(())
       }
@@ -606,112 +606,9 @@ impl<'a> TermParser<'a> {
   }
 
   fn num_range_err<T>(&mut self, ini_idx: usize, typ: &str) -> Result<T, String> {
-    let ctx = highlight_error(ini_idx, *self.index(), self.input());
-    Err(format!("\x1b[1mNumber literal outside of range for {}.\x1b[0m\n{}", typ, ctx))
-  }
-
-  /* Utils */
-
-  /// Checks if the next characters in the input start with the given string.
-  /// Skips trivia.
-  fn skip_starts_with(&mut self, text: &str) -> bool {
-    self.skip_trivia();
-    self.starts_with(text)
-  }
-
-  fn skip_peek_one(&mut self) -> Option<char> {
-    self.skip_trivia();
-    self.peek_one()
-  }
-
-  /// Parses a list-like structure like "[x1, x2, x3,]".
-  ///
-  /// `parser` is a function that parses an element of the list.
-  ///
-  /// If `hard_sep` the separator between elements is mandatory.
-  /// Always accepts trailing separators.
-  ///
-  /// `min_els` determines how many elements must be parsed at minimum.
-  fn list_like<T>(
-    &mut self,
-    parser: impl Fn(&mut Self) -> Result<T, String>,
-    start: &str,
-    end: &str,
-    sep: &str,
-    hard_sep: bool,
-    min_els: usize,
-  ) -> Result<Vec<T>, String> {
-    self.consume(start)?;
-    let mut els = vec![];
-    for i in 0 .. min_els {
-      els.push(parser(self)?);
-      if hard_sep && !(i == min_els - 1 && self.skip_starts_with(end)) {
-        self.consume(sep)?;
-      } else {
-        self.try_consume(sep);
-      }
-    }
-
-    while !self.try_consume(end) {
-      els.push(parser(self)?);
-      if hard_sep && !self.skip_starts_with(end) {
-        self.consume(sep)?;
-      } else {
-        self.try_consume(sep);
-      }
-    }
-    Ok(els)
-  }
-
-  fn labelled<T>(
-    &mut self,
-    parser: impl Fn(&mut Self) -> Result<T, String>,
-    label: &str,
-  ) -> Result<T, String> {
-    match parser(self) {
-      Ok(val) => Ok(val),
-      Err(_) => self.expected(label),
-    }
-  }
-
-  fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> Result<T, String> {
-    let ctx = highlight_error(ini_idx, end_idx, self.input());
-    let is_eof = self.is_eof();
-    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { write!(f, "\n{ctx}") });
-    Err(format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected))
-  }
-
-  /// Consumes text if the input starts with it. Otherwise, do nothing.
-  fn try_consume(&mut self, text: &str) -> bool {
-    self.skip_trivia();
-    if self.starts_with(text) {
-      self.consume(text).unwrap();
-      true
-    } else {
-      false
-    }
-  }
-
-  fn parse_u32(&mut self) -> Result<u32, String> {
-    self.skip_trivia();
-    let radix = match self.peek_many(2) {
-      Some("0x") => {
-        self.advance_many(2);
-        16
-      }
-      Some("0b") => {
-        self.advance_many(2);
-        2
-      }
-      _ => 10,
-    };
-    let num_str = self.take_while(move |c| c.is_digit(radix) || c == '_');
-    let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
-    if num_str.is_empty() {
-      self.expected("numeric digit")
-    } else {
-      u32::from_str_radix(&num_str, radix).map_err(|e| e.to_string())
-    }
+    let msg = format!("\x1b[1mNumber literal outside of range for {}.\x1b[0m", typ);
+    let end_idx = *self.index();
+    self.with_ctx(Err(msg), ini_idx, end_idx)
   }
 }
 
@@ -786,11 +683,6 @@ impl Book {
   }
 }
 
-fn add_ctx_to_msg(msg: &str, ini_idx: usize, end_idx: usize, file: &str) -> String {
-  let ctx = highlight_error(ini_idx, end_idx, file);
-  format!("{msg}\n{ctx}")
-}
-
 impl<'a> ParserCommons<'a> for TermParser<'a> {}
 
 pub trait ParserCommons<'a>: Parser<'a> {
@@ -823,10 +715,22 @@ pub trait ParserCommons<'a>: Parser<'a> {
   }
 
   fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> Result<T, String> {
-    let ctx = highlight_error(ini_idx, end_idx, self.input());
     let is_eof = self.is_eof();
-    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { write!(f, "\n{ctx}") });
-    Err(format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected))
+    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { Ok(()) });
+    let msg = format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected);
+    self.with_ctx(Err(msg), ini_idx, end_idx)
+  }
+
+  fn with_ctx<T>(
+    &mut self,
+    res: Result<T, impl std::fmt::Display>,
+    ini_idx: usize,
+    end_idx: usize,
+  ) -> Result<T, String> {
+    res.map_err(|msg| {
+      let ctx = highlight_error(ini_idx, end_idx, self.input());
+      format!("{msg}\n{ctx}")
+    })
   }
 
   /// Consumes text if the input starts with it. Otherwise, do nothing.
@@ -924,5 +828,27 @@ pub trait ParserCommons<'a>: Parser<'a> {
       return self.expected("numeric operator");
     };
     Ok(opr)
+  }
+
+  fn parse_u32(&mut self) -> Result<u32, String> {
+    self.skip_trivia();
+    let radix = match self.peek_many(2) {
+      Some("0x") => {
+        self.advance_many(2);
+        16
+      }
+      Some("0b") => {
+        self.advance_many(2);
+        2
+      }
+      _ => 10,
+    };
+    let num_str = self.take_while(move |c| c.is_digit(radix) || c == '_');
+    let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
+    if num_str.is_empty() {
+      self.expected("numeric digit")
+    } else {
+      u32::from_str_radix(&num_str, radix).map_err(|e| e.to_string())
+    }
   }
 }
