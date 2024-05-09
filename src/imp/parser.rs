@@ -7,7 +7,7 @@ use crate::{
 };
 
 use super::{
-  AssignPattern, Definition, Enum, Expr, InPlaceOp, MBind, MapKey, MatchArm, Program, Stmt, TopLevel, Variant
+  AssignPattern, Definition, Enum, Expr, InPlaceOp, MBind, MapKey, MatchArm, Program, Stmt, TopLevel, Variant,
 };
 
 const PREC: &[&[Op]] =

@@ -137,11 +137,8 @@ impl MapKey {
 fn map_init(entries: Vec<(MapKey, Expr)>) -> fun::Term {
   let mut map = fun::Term::Ref { nam: fun::Name::new("Map/empty") };
   for (key, value) in entries {
-    map = fun::Term::call(fun::Term::Ref { nam: fun::Name::new("Map/set") }, [
-      map,
-      key.to_fun(),
-      value.to_fun(),
-    ]);
+    map =
+      fun::Term::call(fun::Term::Ref { nam: fun::Name::new("Map/set") }, [map, key.to_fun(), value.to_fun()]);
   }
   map
 }
