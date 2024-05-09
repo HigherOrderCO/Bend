@@ -169,19 +169,19 @@ impl Diagnostics {
               }
             }
             DiagnosticOrigin::Rule(nam) => {
-              writeln!(f, "In definition '{}':", nam)?;
+              writeln!(f, "\x1b[1mIn definition '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
               for err in errs {
                 writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
               }
             }
             DiagnosticOrigin::Inet(nam) => {
-              writeln!(f, "In compiled inet '{nam}':")?;
+              writeln!(f, "\x1b[1mIn compiled inet '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
               for err in errs {
                 writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
               }
             }
             DiagnosticOrigin::Readback => {
-              writeln!(f, "During readback:")?;
+              writeln!(f, "\x1b[1mDuring readback:\x1b[0m")?;
               for err in errs {
                 writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
               }
@@ -201,10 +201,10 @@ impl Diagnostics {
 impl Display for Diagnostics {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     if self.has_severity(Severity::Warning) {
-      write!(f, "Warnings:\n{}", self.display_with_severity(Severity::Warning))?;
+      write!(f, "\x1b[4m\x1b[1m\x1b[33mWarnings:\x1b[0m\n{}", self.display_with_severity(Severity::Warning))?;
     }
     if self.has_severity(Severity::Error) {
-      write!(f, "Errors:\n{}", self.display_with_severity(Severity::Error))?;
+      write!(f, "\x1b[4m\x1b[1m\x1b[31mErrors:\x1b[0m\n{}", self.display_with_severity(Severity::Error))?;
     }
     Ok(())
   }

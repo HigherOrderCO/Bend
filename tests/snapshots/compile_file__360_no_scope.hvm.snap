@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/360_no_scope.hvm
 ---
-Errors:
+[4m[1m[31mErrors:[0m
 In tests/golden_tests/compile_file/360_no_scope.hvm :
 Tagged terms not supported for hvm32.
 [0m   4 |   let[4m[31m [0m#x{#y($e, $f) #y($g, $h)} = #y(#x{$d $f}, #x{$e, $g})[0m

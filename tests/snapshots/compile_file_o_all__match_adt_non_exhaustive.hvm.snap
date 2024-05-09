@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/match_adt_non_exhaustive.hvm
 ---
-Errors:
-In definition 'main':
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mmain[0m[1m':[0m
   Non-exhaustive 'match' expression of type 'Maybe'. Case 'Some' not covered.

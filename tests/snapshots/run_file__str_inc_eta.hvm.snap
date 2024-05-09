@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/str_inc_eta.hvm
 ---
-Errors:
+[4m[1m[31mErrors:[0m
 In tests/golden_tests/run_file/str_inc_eta.hvm :
 Tagged terms not supported for hvm32.
 [0m  1 | (StrInc (len, buf)) = (len,[4m[31m [0m#str λx (StrGo len #str (buf x)))[0m

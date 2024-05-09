@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/desugar_merge.hvm
 ---
-Warnings:
-In definition 'Z':
+[4m[1m[33mWarnings:[0m
+[1mIn definition '[4mZ[0m[1m':[0m
   Definition is unused.
 
 (F__M_Z) = λ* λa a

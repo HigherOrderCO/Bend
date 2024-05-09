@@ -2,26 +2,30 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/mutual_recursion/odd_even.hvm
 ---
-Errors:
-Seems like you're trying to run some recursive function(s).
-The following functions were written in a way that create recursive cycles that are not compatible with the strict evaluation of HVM.
+[4m[1m[31mErrors:[0m
+[1mThe following functions contain recursive cycles incompatible with HVM's strict evaluation:[0m
   * isEven -> isOdd -> isEven
 
-Due to the ultra-greedy nature of strict-mode, that might result in infinite loops.
-You have to refactor these function to use lazy references.
+The greedy eager evaluation of HVM may cause infinite loops.
+[1mRefactor these functions to use lazy references instead of direct function calls.[0m
+A reference is strict when it's being called ('(Foo x)') or when it's used non-linearly ('let x = Foo; (x x)').
+It is lazy when it's an argument ('(x Foo)') or when it's used linearly ('let x = Foo; (x 0)').
 
-The float-combinators and linearize-matches-extra options can help with doing this automatically.
-They are turned on by default, but if you deactivated them, consider re-enabling.
+[1mTry one of these strategies:[0m
+- Use pattern matching with 'match', 'fold', and 'bend' to automatically lift expressions to lazy references.
+- Replace direct calls with combinators. For example, change:
+    'Foo = λa λb (b (λc (Foo a c)) a)'
+  to:
+    'Foo = λa λb (b (λc λa (Foo a c)) (λa a) a)'
+  which is lifted to:
+    'Foo = λa λb (b Foo__C1 Foo_C2 a)'
+- Replace non-linear 'let' expressions with 'use' expressions. For example, change:
+    'Foo = λf let x = Foo; (f x x)'
+  to:
+    'Foo = λf use x = Foo; (f x x)'
+  which inlines to:
+    'Foo = λf (f Foo Foo)'
+- If disabled, re-enable the default 'float-combinators' and 'linearize-matches' compiler options.
 
-When a function reference is in head position of an application it will be greedly expanded, leading to an infinite loop.
-This for example doesn't work: 'Foo = λa λb (b (λc (Foo a c)) a)'
-If the application is written as a combinator, it will automatically lifted to a lazy reference, which usually breaks the recursion cycle.
-The example as combinators: 'Foo = λa λb (b (λc λa (Foo a c)) (λa a) a)
-Alternatively, by using the built-in `data` and `match` syntax, hvm-lang will try to do this automatically.
-
-For let expressions where the variable is non-linear, you can instead employ `use` expressions to statically duplicate the offending recursive term.
-(e.g. write 'Foo = λf use x = Foo; (f x x)' instead of 'Foo = λf let x = Foo; (f x x)')
-
-See here for more info: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md.
-
-You can disable this check altogether with the "-Arecursion-cycle" compiler option.
+For more information, visit: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md.
+To disable this check, use the "-Arecursion-cycle" compiler option.
