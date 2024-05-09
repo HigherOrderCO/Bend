@@ -2,7 +2,7 @@ use indexmap::IndexMap;
 
 use crate::fun::Name;
 
-use super::{Definition, Enum, MBind, Program, Stmt, Term, Variant};
+use super::{Definition, Enum, Expr, MBind, Program, Stmt, Variant};
 
 struct Ctx<'a> {
   variants: &'a IndexMap<Name, Name>,
@@ -70,6 +70,14 @@ impl Stmt {
           arm.rgt.order_kwargs(ctx);
         }
       }
+      Stmt::Bend { bind: _, init, cond, step, base } => {
+        for init in init {
+          init.order_kwargs(ctx);
+        }
+        cond.order_kwargs(ctx);
+        step.order_kwargs(ctx);
+        base.order_kwargs(ctx);
+      }
       Stmt::Do { block, .. } => {
         for bind in block {
           match bind {
@@ -83,11 +91,11 @@ impl Stmt {
   }
 }
 
-impl Term {
+impl Expr {
   fn order_kwargs(&mut self, ctx: &Ctx) {
     match self {
-      Term::Call { fun, args, kwargs } => {
-        if let Term::Var { nam } = &**fun {
+      Expr::Call { fun, args, kwargs } => {
+        if let Expr::Var { nam } = &**fun {
           if let Some(fetch) = ctx.fetch(nam) {
             match fetch {
               Fetch::Variant(variant) => go_order_kwargs(variant.fields.iter().map(|f| &f.nam), kwargs, args),
@@ -99,22 +107,22 @@ impl Term {
           args.iter_mut().for_each(|a| a.order_kwargs(ctx));
         }
       }
-      Term::Lam { bod, .. } => bod.order_kwargs(ctx),
-      Term::Bin { lhs, rhs, .. } => {
+      Expr::Lam { bod, .. } => bod.order_kwargs(ctx),
+      Expr::Bin { lhs, rhs, .. } => {
         lhs.order_kwargs(ctx);
         rhs.order_kwargs(ctx);
       }
-      Term::Lst { els } | Term::Tup { els } => els.iter_mut().for_each(|e| e.order_kwargs(ctx)),
-      Term::Comprehension { .. } => {}
-      Term::None | Term::Var { .. } | Term::Num { .. } | Term::Str { .. } => {}
+      Expr::Lst { els } | Expr::Tup { els } => els.iter_mut().for_each(|e| e.order_kwargs(ctx)),
+      Expr::Comprehension { .. } => {}
+      Expr::None | Expr::Var { .. } | Expr::Num { .. } | Expr::Str { .. } => {}
     }
   }
 }
 
 fn go_order_kwargs<'a>(
   names: impl Iterator<Item = &'a Name>,
-  kwargs: &mut Vec<(Name, Term)>,
-  args: &mut Vec<Term>,
+  kwargs: &mut Vec<(Name, Expr)>,
+  args: &mut Vec<Expr>,
 ) {
   let mut index_map = IndexMap::new();
   for (index, field) in names.enumerate() {
