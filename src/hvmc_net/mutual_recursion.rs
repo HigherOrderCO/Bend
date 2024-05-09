@@ -57,6 +57,7 @@ fn show_cycles(mut cycles: Vec<Vec<Ref>>) -> String {
   cycles
 }
 
+
 impl Graph {
   pub fn cycles(&self) -> Vec<Vec<Ref>> {
     let mut cycles = Vec::new();
