@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/wrong_unicode_escape.hvm
 ---
-Errors:
+[4m[1m[31mErrors:[0m
 [1m- expected:[0m '}'
 [1m- detected:[0m
 [0m  1 | (String.cons '\u{1[4m[31m'[0m "\u2}\u{zxcx}")[0m

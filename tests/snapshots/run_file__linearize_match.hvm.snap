@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/linearize_match.hvm
 ---
-Warnings:
-During readback:
+[4m[1m[33mWarnings:[0m
+[1mDuring readback:[0m
   Invalid Numeric Match.
 
 λa switch a = a { 0: λb b; _: λa λb (+ a b); }

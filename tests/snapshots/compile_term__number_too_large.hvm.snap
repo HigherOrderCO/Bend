@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_term/number_too_large.hvm
 ---
-Errors:
+[4m[1m[31mErrors:[0m
 [1mNumber literal outside of range for U24.[0m
 [0m  1 | [4m[31m0x10000000[0m

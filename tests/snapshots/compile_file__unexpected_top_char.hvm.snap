@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/unexpected_top_char.hvm
 ---
-Errors:
+[4m[1m[31mErrors:[0m
 In tests/golden_tests/compile_file/unexpected_top_char.hvm :
 [1m- expected:[0m top-level definition
 [1m- detected:[0m

@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/warn_and_err.hvm
 ---
-Warnings:
-In definition 'Foo':
+[4m[1m[33mWarnings:[0m
+[1mIn definition '[4mFoo[0m[1m':[0m
   Repeated bind in pattern matching rule: 'a'.
 
-Errors:
-In definition 'Main':
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mMain[0m[1m':[0m
   Unbound variable 'a'.

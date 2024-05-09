@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_sup.hvm
 ---
-Errors:
+[4m[1m[31mErrors:[0m
 In tests/golden_tests/run_file/match_sup.hvm :
 Tagged terms not supported for hvm32.
 [0m  2 |   let k =[4m[31m [0m#a{0 1};[0m

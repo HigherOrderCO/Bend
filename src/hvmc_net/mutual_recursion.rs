@@ -27,10 +27,12 @@ pub fn check_cycles(book: &Book, diagnostics: &mut Diagnostics) -> Result<(), Di
 
   diagnostics.fatal(())
 }
-
 fn show_cycles(mut cycles: Vec<Vec<Ref>>) -> String {
-  let tail = &format!("\n{:ERR_INDENT_SIZE$}* ...", "");
-  let tail = if cycles.len() > 5 { tail } else { "" };
+  let tail = if cycles.len() > 5 {
+    format!("\n{:ERR_INDENT_SIZE$}and {} other cycles...", "", cycles.len() - 5)
+  } else {
+    String::new()
+  };
 
   cycles = cycles.into_iter().flat_map(combinations_from_merges).collect::<Vec<_>>();
 
@@ -50,7 +52,7 @@ fn show_cycles(mut cycles: Vec<Vec<Ref>>) -> String {
     .collect::<Vec<String>>()
     .join("\n");
 
-  cycles.push_str(tail);
+  cycles.push_str(&tail);
 
   cycles
 }

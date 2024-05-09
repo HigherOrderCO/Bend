@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/readback_hvm1_main.hvm
 ---
-Errors:
-In definition 'Main':
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mMain[0m[1m':[0m
   Main definition can't be referenced inside the program.

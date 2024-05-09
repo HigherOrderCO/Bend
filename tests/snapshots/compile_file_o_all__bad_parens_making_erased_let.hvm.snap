@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/bad_parens_making_erased_let.hvm
 ---
-Errors:
-In definition 'main':
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mmain[0m[1m':[0m
   Unbound variable 'two'.
   Unbound variable 'qua'.
