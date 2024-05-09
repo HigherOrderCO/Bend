@@ -63,35 +63,73 @@ pub enum InPlaceOp {
   Div,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum Stmt {
   // {pat} = {val} ";" {nxt}
-  Assign { pat: AssignPattern, val: Box<Expr>, nxt: Box<Stmt> },
+  Assign {
+    pat: AssignPattern,
+    val: Box<Expr>,
+    nxt: Box<Stmt>,
+  },
   // {var} += {val} ";" {nxt}
-  InPlace { op: InPlaceOp, var: Name, val: Box<Expr>, nxt: Box<Stmt> },
+  InPlace {
+    op: InPlaceOp,
+    var: Name,
+    val: Box<Expr>,
+    nxt: Box<Stmt>,
+  },
   // "if" {cond} ":"
   //  {then}
   // "else" ":"
   //  {otherwise}
-  If { cond: Box<Expr>, then: Box<Stmt>, otherwise: Box<Stmt> },
+  If {
+    cond: Box<Expr>,
+    then: Box<Stmt>,
+    otherwise: Box<Stmt>,
+  },
   // "match" {arg} ":" ("as" {bind})?
   //   case {lft} ":" {rgt}
-  Match { arg: Box<Expr>, bind: Option<Name>, arms: Vec<MatchArm> },
+  Match {
+    arg: Box<Expr>,
+    bind: Option<Name>,
+    arms: Vec<MatchArm>,
+  },
   // "switch" {arg} ("as" {bind})?
   //   case 0..wildcard ":" {rgt}
-  Switch { arg: Box<Expr>, bind: Option<Name>, arms: Vec<Stmt> },
+  Switch {
+    arg: Box<Expr>,
+    bind: Option<Name>,
+    arms: Vec<Stmt>,
+  },
   // "bend" ({bind} ("="" {init})?)* "while" {cond} ":"
   //  {step}
   // "then" ":"
   //  {base}
-  Bend { bind: Vec<Option<Name>>, init: Vec<Expr>, cond: Box<Expr>, step: Box<Stmt>, base: Box<Stmt> },
+  Bend {
+    bind: Vec<Option<Name>>,
+    init: Vec<Expr>,
+    cond: Box<Expr>,
+    step: Box<Stmt>,
+    base: Box<Stmt>,
+  },
   // "fold" {arg} ("as" {bind})? ":" {arms}
   //   case {lft} ":" {rgt}
-  Fold { arg: Box<Expr>, bind: Option<Name>, arms: Vec<MatchArm> },
+  Fold {
+    arg: Box<Expr>,
+    bind: Option<Name>,
+    arms: Vec<MatchArm>,
+  },
   // "do" {fun} ":" {block}
-  Do { fun: Name, block: Vec<MBind> },
+  Do {
+    fun: Name,
+    block: Vec<MBind>,
+  },
   // "return" {expr} ";"
-  Return { term: Box<Expr> },
+  Return {
+    term: Box<Expr>,
+  },
+  #[default]
+  Err,
 }
 
 #[derive(Clone, Debug)]

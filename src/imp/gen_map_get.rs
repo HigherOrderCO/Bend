@@ -19,14 +19,14 @@ impl Stmt {
         nxt.gen_map_get(id);
         let substitutions = val.substitute_map_gets(id);
         if !substitutions.is_empty() {
-          *self = gen_get(self.clone(), substitutions);
+          *self = gen_get(self, substitutions);
         }
       }
       Stmt::InPlace { val, nxt, .. } => {
         nxt.gen_map_get(id);
         let substitutions = val.substitute_map_gets(id);
         if !substitutions.is_empty() {
-          *self = gen_get(self.clone(), substitutions);
+          *self = gen_get(self, substitutions);
         }
       }
       Stmt::If { cond, then, otherwise } => {
@@ -34,7 +34,7 @@ impl Stmt {
         otherwise.gen_map_get(id);
         let substitutions = cond.substitute_map_gets(id);
         if !substitutions.is_empty() {
-          *self = gen_get(self.clone(), substitutions);
+          *self = gen_get(self, substitutions);
         }
       }
       Stmt::Match { arg, arms, .. } | Stmt::Fold { arg, arms, .. } => {
@@ -43,7 +43,7 @@ impl Stmt {
         }
         let substitutions = arg.substitute_map_gets(id);
         if !substitutions.is_empty() {
-          *self = gen_get(self.clone(), substitutions);
+          *self = gen_get(self, substitutions);
         }
       }
       Stmt::Switch { arg, arms, .. } => {
@@ -52,17 +52,28 @@ impl Stmt {
         }
         let substitutions = arg.substitute_map_gets(id);
         if !substitutions.is_empty() {
-          *self = gen_get(self.clone(), substitutions);
+          *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Bend { .. } => todo!(),
+      Stmt::Bend { bind: _, init, cond, step, base } => {
+        step.gen_map_get(id);
+        base.gen_map_get(id);
+        let mut substitutions = cond.substitute_map_gets(id);
+        for init in init {
+          substitutions.extend(init.substitute_map_gets(id));
+        }
+        if !substitutions.is_empty() {
+          *self = gen_get(self, substitutions);
+        }
+      }
       Stmt::Do { fun: _, block: _ } => todo!(),
       Stmt::Return { term } => {
         let substitutions = term.substitute_map_gets(id);
         if !substitutions.is_empty() {
-          *self = gen_get(self.clone(), substitutions);
+          *self = gen_get(self, substitutions);
         }
       }
+      Stmt::Err => {}
     }
   }
 }
@@ -118,8 +129,8 @@ impl Expr {
   }
 }
 
-fn gen_get(current: Stmt, substitutions: HashMap<Name, (Name, MapKey)>) -> Stmt {
-  substitutions.into_iter().fold(current, |acc, next| {
+fn gen_get(current: &mut Stmt, substitutions: HashMap<Name, (Name, MapKey)>) -> Stmt {
+  substitutions.into_iter().fold(std::mem::take(current), |acc, next| {
     let (var, (map_var, key)) = next;
     let map_get_call = Expr::Var { nam: Name::new("Map/get") };
     let map_get_call = Expr::Call {

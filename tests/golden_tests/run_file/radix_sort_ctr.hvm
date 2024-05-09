@@ -1,4 +1,4 @@
-data Map = Free | Used | (Both a b)
+data Map_ = Free | Used | (Both a b)
 data Arr = Null | (Leaf x) | (Node a b)
 
 (Swap s a b) = switch s {

@@ -1,3 +1,4 @@
+#flavor core
 data Tree = (Leaf val) | (Both lft rgt)
 
 (U60.swap 0 a b) = (Both a b)
