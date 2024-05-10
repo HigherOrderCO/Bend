@@ -4,14 +4,14 @@ input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.hvm
 ---
 (Foo) = λa (a λ* 100 λ* 200 λ* 200 λ* λ* 200 λ* λ* 200)
 
-(main) = (Foo A 2)
+(main) = (Foo MyType/A 2)
 
-(A) = λa λb λ* λ* λ* λ* (b a)
+(MyType/A) = λa λb λ* λ* λ* λ* (b a)
 
-(B) = λa λ* λc λ* λ* λ* (c a)
+(MyType/B) = λa λ* λc λ* λ* λ* (c a)
 
-(C) = λa λ* λ* λd λ* λ* (d a)
+(MyType/C) = λa λ* λ* λd λ* λ* (d a)
 
-(D) = λa λb λ* λ* λ* λf λ* (f a b)
+(MyType/D) = λa λb λ* λ* λ* λf λ* (f a b)
 
-(E) = λa λb λ* λ* λ* λ* λg (g a b)
+(MyType/E) = λa λb λ* λ* λ* λ* λg (g a b)

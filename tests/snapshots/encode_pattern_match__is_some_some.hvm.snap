@@ -4,8 +4,8 @@ input_file: tests/golden_tests/encode_pattern_match/is_some_some.hvm
 ---
 (some_some) = λa (a λb (b λ* 1 0) 0)
 
-(main) = (some_some (Some 1))
+(main) = (some_some (Option/Some 1))
 
-(Some) = λa λb λ* (b a)
+(Option/Some) = λa λb λ* (b a)
 
-(None) = λ* λb b
+(Option/None) = λ* λb b

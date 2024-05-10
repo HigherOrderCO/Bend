@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/complex_with_case.hvm
 ---
-(map) = λa λb (match b { Node c d e f: λg (Node (map g c) (map g d) (map g e) (map g f)); Leaf h: λi (Leaf (i h)); } a)
+(map) = λa λb (match b { Tree/Node c d e f: λg (Tree/Node (map g c) (map g d) (map g e) (map g f)); Tree/Leaf h: λi (Tree/Leaf (i h)); } a)
 
 (main) = map
 
-(Node) = λa λb λc λd λe λf (e a b c d)
+(Tree/Node) = λa λb λc λd λe λf (e a b c d)
 
-(Leaf) = λa λb λc (c a)
+(Tree/Leaf) = λa λb λc (c a)

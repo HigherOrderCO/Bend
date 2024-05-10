@@ -2,6 +2,6 @@
 data bool = T | F
 
 main = @x match x {
-  T: @$x $x
-  F: @x x
+  Bool/T: @$x $x
+  Bool/F: @x x
 }

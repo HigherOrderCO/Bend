@@ -1,8 +1,8 @@
 // We had a bug where this gave the incorrect error: "Expected a number but found 'a' at definition 'Foo'."
 data bool = false | true
 
-(Foo false a) = 0
-(Foo true 0) = 0
-(Foo true n) = n
+(Foo bool/false a) = 0
+(Foo bool/true 0) = 0
+(Foo bool/true n) = n
 
-Main = (Foo true 3)
+Main = (Foo bool/true 3)

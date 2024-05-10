@@ -15,8 +15,8 @@ data Op
   | Mul
   | Div
 
-main = (Let
-  (Var 0)
-  (Op2 Mul (Op2 Sub (Num 2) (Num 1) (Num 3)))
-  (Dup (Var 1) (Var 2) (Var 0) (App (Var 1) (Var 2)))
+main = (Expr/Let
+  (Expr/Var 0)
+  (Expr/Op2 Op/Mul (Expr/Op2 Op/Sub (Expr/Num 2) (Expr/Num 1) (Expr/Num 3)))
+  (Expr/Dup (Expr/Var 1) (Expr/Var 2) (Expr/Var 0) (Expr/App (Expr/Var 1) (Expr/Var 2)))
 )

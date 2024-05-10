@@ -3,8 +3,8 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/error_messages.hvm
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/compile_file/error_messages.hvm :
-Repeated constructor 'B'
-[0m  3 | [4m[31mdata C = (B)
-[0m  4 | [4m[31m
-[0m  5 | [4m[31m[0mFoo (C) = *[0m
+[1mIn definition '[4mFoo[0m[1m':[0m
+  Unbound constructor 'C' in pattern matching rule.
+  Unbound constructor 'D' in pattern matching rule.
+[1mIn definition '[4mFoo2[0m[1m':[0m
+  Unbound constructor 'E' in pattern matching rule.

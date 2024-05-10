@@ -8,19 +8,19 @@ input_file: tests/golden_tests/compile_file_o_all/list_reverse.hvm
   & @cons ~ (a (d e))
   & @concat ~ (b (c d))
 
-@cons = (a (b ((a (b c)) (* c))))
+@list/cons = (a (b ((a (b c)) (* c))))
+
+@list/nil = (* (a a))
 
 @main = d
   & @reverse ~ (c d)
-  & @cons ~ (3 (b c))
-  & @cons ~ (2 (a b))
-  & @cons ~ (1 (@nil a))
+  & @list/cons ~ (3 (b c))
+  & @list/cons ~ (2 (a b))
+  & @list/cons ~ (1 (@list/nil a))
 
-@nil = (* (a a))
-
-@reverse = ((@reverse__C0 (@nil a)) a)
+@reverse = ((@reverse__C0 (@list/nil a)) a)
 
 @reverse__C0 = (c (a e))
   & @concat ~ (b (d e))
   & @reverse ~ (a b)
-  & @cons ~ (c (@nil d))
+  & @list/cons ~ (c (@list/nil d))

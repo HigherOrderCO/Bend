@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_num_num_to_char.hvm
 ---
-{{λa λ* (a 0 λb λ* (b 1 λc λ* (c 2 λd λ* (d 3 λe λ* (e 4 λf λ* (f 5 λg λ* (g 6 λh λ* (h 7 λi λ* (i 8 λj λ* (j 9 λk λ* (k 10 List.nil))))))))))) λl λ* (l 0 λm λ* (m 1 λn λ* (n 2 λo λ* (o 3 λp λ* (p 4 λq λ* (q 5 λr λ* (r 6 λs λ* (s 7 λt λ* (t 8 λu λ* (u 9 λv λ* (v 16777215 List.nil)))))))))))} λw λ* (w 48 λx λ* (x 49 λy λ* (y 50 λz λ* (z 51 λab λ* (ab 52 λbb λ* (bb 53 λcb λ* (cb 54 λdb λ* (db 55 λeb λ* (eb 56 λfb λ* (fb 57 λgb λ* (gb 0 List.nil)))))))))))}
+{{λa λ* (a 0 λb λ* (b 1 λc λ* (c 2 λd λ* (d 3 λe λ* (e 4 λf λ* (f 5 λg λ* (g 6 λh λ* (h 7 λi λ* (i 8 λj λ* (j 9 λk λ* (k 10 List/nil))))))))))) λl λ* (l 0 λm λ* (m 1 λn λ* (n 2 λo λ* (o 3 λp λ* (p 4 λq λ* (q 5 λr λ* (r 6 λs λ* (s 7 λt λ* (t 8 λu λ* (u 9 λv λ* (v 16777215 List/nil)))))))))))} λw λ* (w 48 λx λ* (x 49 λy λ* (y 50 λz λ* (z 51 λab λ* (ab 52 λbb λ* (bb 53 λcb λ* (cb 54 λdb λ* (db 55 λeb λ* (eb 56 λfb λ* (fb 57 λgb λ* (gb 0 List/nil)))))))))))}

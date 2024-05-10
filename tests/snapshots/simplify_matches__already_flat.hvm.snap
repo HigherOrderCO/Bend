@@ -8,26 +8,26 @@ input_file: tests/golden_tests/simplify_matches/already_flat.hvm
 
 (Rule3) = λa λb λc λd (a b c d)
 
-(Rule4) = λa match a { CtrA: λb b; CtrB c: c; }
+(Rule4) = λa match a { Foo/CtrA: λb b; Foo/CtrB c: c; }
 
-(Rule5) = λa match a { CtrA1 b: λc (b c); CtrA2 d e: λf (d e f); CtrA3 g: λh (match h { CtrB0: λi (CtrA3 i); CtrB1 j: λk (CtrA3 k j); CtrB2 l: λm (CtrA3 m (CtrB2 l)); CtrB3 n: λo (o n); } g); }
+(Rule5) = λa match a { Bar/CtrA1 b: λc (b c); Bar/CtrA2 d e: λf (d e f); Bar/CtrA3 g: λh (match h { Baz/CtrB0: λi (Bar/CtrA3 i); Baz/CtrB1 j: λk (Bar/CtrA3 k j); Baz/CtrB2 l: λm (Bar/CtrA3 m (Baz/CtrB2 l)); Baz/CtrB3 n: λo (o n); } g); }
 
 (Rule6) = λa a
 
-(CtrA) = λa λb a
+(Foo/CtrA) = λa λb a
 
-(CtrB) = λa λb λc (c a)
+(Foo/CtrB) = λa λb λc (c a)
 
-(CtrA1) = λa λb λc λd (b a)
+(Bar/CtrA1) = λa λb λc λd (b a)
 
-(CtrA2) = λa λb λc λd λe (d a b)
+(Bar/CtrA2) = λa λb λc λd λe (d a b)
 
-(CtrA3) = λa λb λc λd (d a)
+(Bar/CtrA3) = λa λb λc λd (d a)
 
-(CtrB0) = λa λb λc λd a
+(Baz/CtrB0) = λa λb λc λd a
 
-(CtrB1) = λa λb λc λd λe (c a)
+(Baz/CtrB1) = λa λb λc λd λe (c a)
 
-(CtrB2) = λa λb λc λd λe (d a)
+(Baz/CtrB2) = λa λb λc λd λe (d a)
 
-(CtrB3) = λa λb λc λd λe (e a)
+(Baz/CtrB3) = λa λb λc λd λe (e a)

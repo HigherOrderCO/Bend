@@ -8,8 +8,8 @@ input_file: tests/golden_tests/desugar_file/deref_loop.hvm
 
 (main) = (foo 0)
 
-(succ) = λa λb λ* (b a)
+(nat/succ) = λa λb λ* (b a)
 
-(zero) = λ* λa a
+(nat/zero) = λ* λa a
 
 (foo__C0) = (bar 0)

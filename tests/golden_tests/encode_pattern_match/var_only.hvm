@@ -5,5 +5,5 @@ data Bool = False | True
 
 main = @x match x {
   false: Foo
-  true: False
+  true: Bool/False
 }

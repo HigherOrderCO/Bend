@@ -2,13 +2,13 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/match_dup_and_reconstruction.hvm
 ---
-@Boxed = (a ((a b) b))
+@Box/Boxed = (a ((a b) b))
 
 @Got = ((@Got__C0 a) a)
 
 @Got__C0 = ({a c} (b c))
-  & @Boxed ~ (a b)
+  & @Box/Boxed ~ (a b)
 
 @main = b
   & @Got ~ (a b)
-  & @Boxed ~ (10 a)
+  & @Box/Boxed ~ (10 a)

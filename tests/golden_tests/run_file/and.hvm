@@ -1,6 +1,6 @@
 data bool = true | false
 
-and a false = false
-and a true = a
+and a bool/false = bool/false
+and a bool/true = a
 
-main = (and true false)
+main = (and bool/true bool/false)

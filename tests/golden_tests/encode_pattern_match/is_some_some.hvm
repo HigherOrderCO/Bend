@@ -1,6 +1,6 @@
 data Option = (Some x) | (None)
 
-some_some (Some (Some x)) = 1
-some_some *               = 0
+some_some (Option/Some (Option/Some x)) = 1
+some_some *                             = 0
 
-main = (some_some (Some 1))
+main = (some_some (Option/Some 1))

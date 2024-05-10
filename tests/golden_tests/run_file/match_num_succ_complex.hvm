@@ -11,8 +11,8 @@ min2 a b = switch a {
 }
 
 map f xs = match xs {
-  List.cons: (List.cons (f xs.head) (map f xs.tail))
-  List.nil: List.nil
+  List/cons: (List/cons (f xs.head) (map f xs.tail))
+  List/nil: List/nil
 }
 
 vals = [(5, 10) (10, 5) (0, 12) (12 0) (0 0) (6 6)]

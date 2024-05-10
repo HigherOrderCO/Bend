@@ -3,7 +3,7 @@
 (is_as "") = 1
 (is_as *) = 0
 
-map f (List.cons x xs) = (List.cons (f x) (map f xs))
+map f (List/cons x xs) = (List/cons (f x) (map f xs))
 map f [] = []
 
 main = (map is_as ["As" "as" "" "Asd" "qwerty" "AAs"])

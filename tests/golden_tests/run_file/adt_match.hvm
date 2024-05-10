@@ -1,13 +1,13 @@
 data Opt = (Some x) | None
 
-Opt.map = @opt @f
+Opt/map = @opt @f
   match opt {
-    Some: (Some (f opt.x));
-    None: None
+    Opt/Some: (Opt/Some (f opt.x));
+    Opt/None: Opt/None
   }
 
 inc = @x (+ x 1)
 
 main =
-  let opt = (Some 1);
-  (Opt.map opt inc)
+  let opt = (Opt/Some 1);
+  (Opt/map opt inc)

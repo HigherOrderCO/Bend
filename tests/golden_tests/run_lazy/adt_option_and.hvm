@@ -1,11 +1,11 @@
 data Option = (Some val) | None
 
-Option.and = @a @b match a {
-  Some: match b {
-    Some: (Some (a.val, b.val))
-    None: None
+Option/and = @a @b match a {
+  Option/Some: match b {
+    Option/Some: (Option/Some (a.val, b.val))
+    Option/None: Option/None
   }
-  None: None
+  Option/None: Option/None
 }
 
-main = Option.and
+main = Option/and

@@ -1,25 +1,26 @@
+// Vectorizes if the adts are encoded with tagged scott encoding
 data Box = (New a)
 data Bool = T | F
 data List_ = (Cons x xs) | Nil
 data Pair = (Tup a b)
 
-(Tup.and (Tup (New T) (New T))) = T
-(Tup.and (Tup a b)) = F
+(Tup.and (Pair/Tup (Box/New Bool/T) (Box/New Bool/T))) = Bool/T
+(Tup.and (Pair/Tup a b)) = Bool/F
 
-(Not T) = F
-(Not F) = T
+(Not Bool/T) = Bool/F
+(Not Bool/F) = Bool/T
 
 main = (Not
   (Tup.and 
-    (Cons 
-      (Tup (New T) (New F))
-      (Cons 
-        (Tup (New F) (New F))
-        (Cons
-          (Tup (New T) (New T))
-          (Cons
-            (Tup (New F) (New T))
-            Nil
+    (List_/Cons 
+      (Pair/Tup (Box/New Bool/T) (Box/New Bool/F))
+      (List_/Cons 
+        (Pair/Tup (Box/New Bool/F) (Box/New Bool/F))
+        (List_/Cons
+          (Pair/Tup (Box/New Bool/T) (Box/New Bool/T))
+          (List_/Cons
+            (Pair/Tup (Box/New Bool/F) (Box/New Bool/T))
+            List_/Nil
           )
         )
       )

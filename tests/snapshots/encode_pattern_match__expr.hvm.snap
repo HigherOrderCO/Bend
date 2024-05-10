@@ -2,28 +2,28 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/expr.hvm
 ---
-(Var) = λa λb λ* λ* λ* λ* λ* λ* λ* λ* (b a)
+(Expr/Var) = λa λb λ* λ* λ* λ* λ* λ* λ* λ* (b a)
 
-(Num) = λa λ* λc λ* λ* λ* λ* λ* λ* λ* (c a)
+(Expr/Num) = λa λ* λc λ* λ* λ* λ* λ* λ* λ* (c a)
 
-(App) = λa λb λ* λ* λe λ* λ* λ* λ* λ* λ* (e a b)
+(Expr/App) = λa λb λ* λ* λe λ* λ* λ* λ* λ* λ* (e a b)
 
-(Fun) = λa λb λ* λ* λ* λf λ* λ* λ* λ* λ* (f a b)
+(Expr/Fun) = λa λb λ* λ* λ* λf λ* λ* λ* λ* λ* (f a b)
 
-(If) = λa λb λc λ* λ* λ* λ* λh λ* λ* λ* λ* (h a b c)
+(Expr/If) = λa λb λc λ* λ* λ* λ* λh λ* λ* λ* λ* (h a b c)
 
-(Let) = λa λb λc λ* λ* λ* λ* λ* λi λ* λ* λ* (i a b c)
+(Expr/Let) = λa λb λc λ* λ* λ* λ* λ* λi λ* λ* λ* (i a b c)
 
-(Dup) = λa λb λc λd λ* λ* λ* λ* λ* λ* λk λ* λ* (k a b c d)
+(Expr/Dup) = λa λb λc λd λ* λ* λ* λ* λ* λ* λk λ* λ* (k a b c d)
 
-(Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
+(Expr/Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
 
-(Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)
+(Expr/Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)
 
-(Add) = λa λ* λ* λ* a
+(Op/Add) = λa λ* λ* λ* a
 
-(Sub) = λ* λb λ* λ* b
+(Op/Sub) = λ* λb λ* λ* b
 
-(Mul) = λ* λ* λc λ* c
+(Op/Mul) = λ* λ* λc λ* c
 
-(Div) = λ* λ* λ* λd d
+(Op/Div) = λ* λ* λ* λd d

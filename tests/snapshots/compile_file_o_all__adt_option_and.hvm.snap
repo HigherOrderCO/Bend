@@ -2,18 +2,18 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/adt_option_and.hvm
 ---
-@None = (* (a a))
+@Option/None = (* (a a))
 
-@Option.and = ((@Option.and__C1 ((* @None) a)) a)
+@Option/Some = (a ((a b) (* b)))
 
-@Option.and__C0 = (b (a c))
-  & @Some ~ ((a b) c)
+@Option/and = ((@Option/and__C1 ((* @Option/None) a)) a)
 
-@Option.and__C1 = (a ((@Option.and__C0 ((* @None) (a b))) b))
+@Option/and__C0 = (b (a c))
+  & @Option/Some ~ ((a b) c)
 
-@Some = (a ((a b) (* b)))
+@Option/and__C1 = (a ((@Option/and__C0 ((* @Option/None) (a b))) b))
 
 @main = c
-  & @Option.and ~ (a (b c))
-  & @Some ~ (1 a)
-  & @Some ~ (3 b)
+  & @Option/and ~ (a (b c))
+  & @Option/Some ~ (1 a)
+  & @Option/Some ~ (3 b)

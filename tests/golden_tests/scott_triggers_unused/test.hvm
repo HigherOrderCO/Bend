@@ -10,4 +10,4 @@
 
 data bool = t | f
 
-main = @b match b { t: 0; f: 1}
+main = @b match b { bool/t: 0; bool/f: 1}

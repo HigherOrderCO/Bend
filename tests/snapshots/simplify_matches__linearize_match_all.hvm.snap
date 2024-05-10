@@ -10,18 +10,18 @@ input_file: tests/golden_tests/simplify_matches/linearize_match_all.hvm
 
 (D) = λa switch a { 0: λb λc c; _ d: λe λf (d f); }
 
-(E) = λa match a { Cons b c: λd (match d { Cons e f: λg λh (g h e f); Nil: λi λj (Cons i j Nil); } b c); Nil: λk (Nil k); }
+(E) = λa match a { ConsList/Cons b c: λd (match d { ConsList/Cons e f: λg λh (g h e f); ConsList/Nil: λi λj (ConsList/Cons i j ConsList/Nil); } b c); ConsList/Nil: λk (ConsList/Nil k); }
 
-(A2) = λa match a { Cons b c: λd λe (b c d e); Nil: λf λg (f g); }
+(A2) = λa match a { ConsList/Cons b c: λd λe (b c d e); ConsList/Nil: λf λg (f g); }
 
-(B2) = λa λb λc (match c { Cons d e: λf λg (f g d e); Nil: λh λi (h i); } a b)
+(B2) = λa λb λc (match c { ConsList/Cons d e: λf λg (f g d e); ConsList/Nil: λh λi (h i); } a b)
 
-(C2) = λa λb λc match c { Cons d e: (a b d e); Nil: (a b); }
+(C2) = λa λb λc match c { ConsList/Cons d e: (a b d e); ConsList/Nil: (a b); }
 
-(D2) = λa match a { Cons b c: λd λe (b c d e); Nil: λf λg (f g); }
+(D2) = λa match a { ConsList/Cons b c: λd λe (b c d e); ConsList/Nil: λf λg (f g); }
 
 (main) = *
 
-(Cons) = λa λb λc λd (c a b)
+(ConsList/Cons) = λa λb λc λd (c a b)
 
-(Nil) = λa λb b
+(ConsList/Nil) = λa λb b

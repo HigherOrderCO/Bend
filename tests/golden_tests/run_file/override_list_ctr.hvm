@@ -1,4 +1,3 @@
-data Override
-  = List.nil
+List/nil = *
 
 main = [λz λk z]

@@ -1,4 +1,4 @@
 data A = A
-A = 0
+A/A = 0
 
-main = A
+main = A/A

@@ -1,8 +1,8 @@
 data nat = (succ pred) | zero
 
 foo = @x match x {
-  succ: x.pred
-  zero: (bar 0)
+  nat/succ: x.pred
+  nat/zero: (bar 0)
 }
 
 bar = (foo 1)

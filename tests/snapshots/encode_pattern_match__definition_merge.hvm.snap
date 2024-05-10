@@ -2,12 +2,12 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/definition_merge.hvm
 ---
-(Foo) = λa (a λb (b λc (c λd (d 1 1) λe (e 2 2)) λf (f λg (g 1 1) λh (h 2 2))) λi (i λj (j λk (k 3 3) λl (l 3 3)) λm (m λn (n 3 3) λo (o 3 3))))
+(Foo) = λa (a λ* λc (c λ* 1 λ* 2) λ* λg (g λ* 3 λ* 3))
 
-(Left) = λa λb λ* (b a)
+(Either/Left) = λa λb λ* (b a)
 
-(Right) = λa λ* λc (c a)
+(Either/Right) = λa λ* λc (c a)
 
-(True) = λa λ* a
+(Bool/Bool/True) = λa λ* a
 
-(False) = λ* λb b
+(Bool/Bool/False) = λ* λb b

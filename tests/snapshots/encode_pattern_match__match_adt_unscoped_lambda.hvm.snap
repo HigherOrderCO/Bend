@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_lambda.hvm
 ---
-(main) = (Some 1 λ$x * λa a $x)
+(main) = (Maybe/Some 1 λ$x * λa a $x)
 
-(None) = λa λ* a
+(Maybe/None) = λa λ* a
 
-(Some) = λa λ* λc (c a)
+(Maybe/Some) = λa λ* λc (c a)

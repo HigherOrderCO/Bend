@@ -2,36 +2,36 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/common.hvm
 ---
-(Filled) = λa λb λ* (b a)
+(Box/Filled) = λa λb λ* (b a)
 
-(Empty) = λ* λb b
+(Box/Empty) = λ* λb b
 
-(Some) = λa λb λ* (b a)
+(Option/Some) = λa λb λ* (b a)
 
-(None) = λ* λb b
+(Option/None) = λ* λb b
 
-(Ok) = λa λb λ* (b a)
+(Result_/Ok) = λa λb λ* (b a)
 
-(Err) = λa λ* λc (c a)
+(Result_/Err) = λa λ* λc (c a)
 
-(Cons) = λa λb λc λ* (c a b)
+(List_/Cons) = λa λb λc λ* (c a b)
 
-(Nil) = λ* λb b
+(List_/Nil) = λ* λb b
 
-(True) = λa λ* a
+(Bool/True) = λa λ* a
 
-(False) = λ* λb b
+(Bool/False) = λ* λb b
 
-(Red) = λa λ* λ* a
+(Light/Red) = λa λ* λ* a
 
-(Yellow) = λ* λb λ* b
+(Light/Yellow) = λ* λb λ* b
 
-(Green) = λ* λ* λc c
+(Light/Green) = λ* λ* λc c
 
-(North) = λa λ* λ* λ* a
+(Direction/North) = λa λ* λ* λ* a
 
-(South) = λ* λb λ* λ* b
+(Direction/South) = λ* λb λ* λ* b
 
-(East) = λ* λ* λc λ* c
+(Direction/East) = λ* λ* λc λ* c
 
-(West) = λ* λ* λ* λd d
+(Direction/West) = λ* λ* λ* λd d

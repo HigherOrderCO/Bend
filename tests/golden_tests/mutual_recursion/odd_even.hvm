@@ -3,7 +3,7 @@ data Bool = True | False
 (if 0 then else) = else
 (if _ then else) = then
 
-(isOdd  n) = (if (== n 0) False (isEven (- n 1)))
-(isEven n) = (if (== n 0) True  (isOdd  (- n 1)))
+(isOdd  n) = (if (== n 0) Bool/False (isEven (- n 1)))
+(isEven n) = (if (== n 0) Bool/True  (isOdd  (- n 1)))
 
 (Main) = (isOdd 4)

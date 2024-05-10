@@ -1,6 +1,6 @@
 data Maybe = None | (Some val)
 
-main = (match x = (Some 1) {
-  None: @$x *
-  Some: x.val
+main = (match x = (Maybe/Some 1) {
+  Maybe/None: @$x *
+  Maybe/Some: x.val
 } $x)

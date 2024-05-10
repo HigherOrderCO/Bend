@@ -8,8 +8,8 @@ input_file: tests/golden_tests/encode_pattern_match/match_auto_linearization.hvm
 
 (switch_shadowed_field) = λa switch a { 0: λb b; _: λc λ* c; }
 
-(match_shadowed_field) = λa (a λb λc λ* λ* (List.cons b c) λf λg (List.cons f g))
+(match_shadowed_field) = λa (a λb λc λ* λ* (List/cons b c) λf λg (List/cons f g))
 
-(List.cons) = λa λb λc λ* (c a b)
+(List/cons) = λa λb λc λ* (c a b)
 
-(List.nil) = λ* λb b
+(List/nil) = λ* λb b

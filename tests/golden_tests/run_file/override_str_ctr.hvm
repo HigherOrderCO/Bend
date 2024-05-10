@@ -1,4 +1,3 @@
-data Override
-  = (String.cons any)
+String/cons = *
 
-main = (String.cons "any")
+main = (String/cons "any")

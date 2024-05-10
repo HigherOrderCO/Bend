@@ -1,5 +1,5 @@
 data Boxed = (Box val)
 
-Bar (*, (Box x y)) = x
+Bar (*, (Boxed/Box x y)) = x
 
 main = *

@@ -1,6 +1,6 @@
 data Tuple = (Pair a b)
 
-(Foo (Pair (Pair a b) c)) = a
+(Foo (Tuple/Pair (Tuple/Pair a b) c)) = a
 (Foo *) = 2
 
-Main = (Foo (Pair 1 5))
+Main = (Foo (Tuple/Pair 1 5))
