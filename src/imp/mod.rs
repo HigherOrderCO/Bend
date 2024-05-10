@@ -1,3 +1,4 @@
+pub mod gen_map_get;
 mod order_kwargs;
 pub mod parser;
 pub mod to_fun;
@@ -29,6 +30,10 @@ pub enum Expr {
   Tup { els: Vec<Expr> },
   // "[" {term} "for" {bind} "in" {iter} ("if" {cond})? "]"
   Comprehension { term: Box<Expr>, bind: Name, iter: Box<Expr>, cond: Option<Box<Expr>> },
+  // "{" {entries} "}"
+  MapInit { entries: Vec<(MapKey, Expr)> },
+  // {name} "[" {key} "]"
+  MapGet { nam: Name, key: MapKey },
 }
 
 #[derive(Clone, Debug)]
@@ -37,12 +42,17 @@ pub struct MatchArm {
   pub rgt: Stmt,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct MapKey(u32);
+
 #[derive(Clone, Debug)]
 pub enum AssignPattern {
   // [a-zA-Z_]+
   Var(Name),
   // "(" ... ")"
   Tup(Vec<Name>),
+  // {name} "[" {key} "]"
+  MapSet(Name, MapKey),
 }
 
 #[derive(Clone, Debug)]

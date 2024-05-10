@@ -1,4 +1,4 @@
-use super::{AssignPattern, Definition, Expr, Program, Stmt};
+use super::{AssignPattern, Definition, Expr, MapKey, Program, Stmt};
 use crate::fun;
 
 impl Program {
@@ -40,6 +40,7 @@ impl AssignPattern {
         fun::Tag::Static,
         names.into_iter().map(|name| fun::Pattern::Var(Some(name))).collect(),
       ),
+      AssignPattern::MapSet(..) => unreachable!(),
     }
   }
 }
@@ -121,6 +122,23 @@ impl Expr {
         els: els.into_iter().map(Self::to_fun).collect(),
       },
       Expr::Comprehension { .. } => todo!(),
+      Expr::MapInit { entries } => map_init(entries),
+      Expr::MapGet { .. } => unreachable!(),
     }
   }
+}
+
+impl MapKey {
+  pub fn to_fun(self) -> fun::Term {
+    fun::Term::Num { val: fun::Num::U24(self.0) }
+  }
+}
+
+fn map_init(entries: Vec<(MapKey, Expr)>) -> fun::Term {
+  let mut map = fun::Term::Ref { nam: fun::Name::new("Map/empty") };
+  for (key, value) in entries {
+    map =
+      fun::Term::call(fun::Term::Ref { nam: fun::Name::new("Map/set") }, [map, key.to_fun(), value.to_fun()]);
+  }
+  map
 }
