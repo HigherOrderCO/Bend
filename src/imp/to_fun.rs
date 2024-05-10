@@ -1,24 +1,5 @@
-use super::{AssignPattern, Definition, Expr, MapKey, Program, Stmt};
+use super::{AssignPattern, Definition, Expr, MapKey, Stmt};
 use crate::fun::{self, Name};
-
-impl Program {
-  pub fn to_fun(self, mut book: fun::Book) -> fun::Book {
-    for (def_name, def) in self.defs {
-      book.defs.insert(def_name, def.to_fun());
-    }
-
-    for (enum_name, r#enum) in self.enums {
-      for variant in r#enum.variants.iter() {
-        book.ctrs.insert(variant.0.clone(), enum_name.clone());
-      }
-      let ctrs = r#enum.variants.into_iter().map(|(k, v)| (k, v.fields)).collect();
-      let adt = fun::Adt { ctrs, builtin: false };
-      book.adts.insert(enum_name, adt);
-    }
-
-    book
-  }
-}
 
 impl Definition {
   pub fn to_fun(self) -> fun::Definition {
@@ -74,7 +55,13 @@ impl Stmt {
       },
       Stmt::If { cond, then, otherwise } => {
         let arms = vec![otherwise.to_fun(), then.to_fun()];
-        fun::Term::Swt { arg: Box::new(cond.to_fun()), bnd: None, with: Vec::new(), pred: None, arms }
+        fun::Term::Swt {
+          arg: Box::new(cond.to_fun()),
+          bnd: Some(Name::new("%")),
+          with: Vec::new(),
+          pred: Some(Name::new("%-1")),
+          arms,
+        }
       }
       Stmt::Match { arg, bind, arms } => {
         let arg = arg.to_fun();

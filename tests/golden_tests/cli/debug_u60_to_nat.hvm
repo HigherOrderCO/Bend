@@ -1,4 +1,3 @@
-#flavor core
 data Nat_ = (Z) | (S nat)
 
 U60ToNat n = switch n {

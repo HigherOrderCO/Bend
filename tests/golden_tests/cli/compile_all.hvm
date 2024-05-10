@@ -1,4 +1,3 @@
-#flavor core
 data Pair
   = (Pair fst snd)
 

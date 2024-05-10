@@ -1,4 +1,3 @@
-#flavor core
 // This program is an example that shows how scopeless lambdas can be used.
 
 Seq a b = a

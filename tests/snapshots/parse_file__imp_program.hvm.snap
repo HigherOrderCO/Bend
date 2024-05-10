@@ -1,0 +1,31 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/parse_file/imp_program.hvm
+---
+(Map/empty) = Map/leaf
+
+(Map/get map key) = match map = map { Map/leaf: (*, map); Map/node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: let (got, rest) = (Map/get map.left (/ key 2)); (got, (Map/node map.value rest map.right)); _ _-1: let (got, rest) = (Map/get map.right (/ key 2)); (got, (Map/node map.value map.left rest)); }; _ _-1: (map.value, map); }; }
+
+(Map/set map key value) = match map = map { Map/node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/node map.value (Map/set map.left (/ key 2) value) map.right); _ _-1: (Map/node map.value map.left (Map/set map.right (/ key 2) value)); }; _ _-1: (Map/node value map.left map.right); }; Map/leaf: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/node * (Map/set Map/leaf (/ key 2) value) Map/leaf); _ _-1: (Map/node * Map/leaf (Map/set Map/leaf (/ key 2) value)); }; _ _-1: (Map/node value Map/leaf Map/leaf); }; }
+
+(symbols) = let x = (Map/set (Map/set Map/empty 4294967281 5) 2 3); let x = (Map/set x 4294967281 2); let x = (Map/set x 2 3); let (map/get%0, x) = (Map/get x 4294967281); (+ map/get%0 4286483570)
+
+(mk_point) = (Point/Point 1 2)
+
+(identity x) = x
+
+(inc n) = let n = (+ n 1); n
+
+(lam) = λx λy x
+
+(do_match b) = match b = b { True: 1; False: 0; }
+
+(true) = Bool/True
+
+(fib n) = switch % = (< n 2) { 0: (+ (fib (- n 1)) (fib (- n 2))); _ %-1: n; }
+
+(swt n) = switch n = n { 0: 42; _ n-1: 1; }
+
+(fld list) = fold list = list { List/cons: 1; List/nil: 2; }
+
+(bnd) = bend x = 0, while (< x 10) { (List/cons x (go (+ x 1))) } then { List/nil }

@@ -1,4 +1,3 @@
-#flavor core
 T = λt λf t
 F = λt λf f
 And = λpλq (p q F)

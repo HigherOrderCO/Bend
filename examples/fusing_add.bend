@@ -1,4 +1,3 @@
-#flavor core
 zero = λs λz z
 succ = λpred λs λz (s pred) // Creates a Scott number out of its predecessor
 

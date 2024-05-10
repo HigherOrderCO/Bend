@@ -1,0 +1,70 @@
+enum Point:
+  Point(x, y)
+
+enum Bool:
+  True()
+  False()
+
+
+def symbols():
+  x = { `x`: 5, 2: 3 };
+  x[`x`] = 2;
+  x[2] = 3;
+  return x[`x`] + `foxy`;
+
+def mk_point():
+  return Point/Point(y = 2, x = 1);
+
+def identity(x):
+  return x;
+
+def inc(n):
+  n += 1;
+  return n;
+
+//def inc_list(list):
+//  return [x+1 for x in list];
+
+def lam():
+  return lambda x, y: x;
+
+def do_match(b):
+  match b:
+    True:
+      return 1;
+    False:
+      return 0;
+
+def true():
+  return Bool/True;
+
+def fib(n):
+  if n < 2:
+    return n;
+  else:
+    return fib(n - 1) + fib(n - 2);
+
+def swt(n):
+  switch n:
+    0:
+      return 42;
+    _:
+      return 1;
+
+def fld(list):
+  fold list:
+    List/cons:
+      return 1;
+    List/nil:
+      return 2;
+
+def bnd():
+  bend x = 0 while x < 10:
+    return List/cons(x go(x + 1));
+  then:
+    return List/nil();
+
+//def main():
+//  do IO.bind:
+//    !x = IO.read();
+//    return x;

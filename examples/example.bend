@@ -1,4 +1,3 @@
-#flavor core
 // Write definitions like this
 (Def1) = ((λa a) (λb b))
 

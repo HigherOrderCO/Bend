@@ -1,9 +1,9 @@
 data Bool = True | False
 
-(_if 0 then else) = else
-(_if _ then else) = then
+(if_ 0 then else) = else
+(if_ _ then else) = then
 
-(isOdd  n) = (_if (== n 0) Bool/False (isEven (- n 1)))
-(isEven n) = (_if (== n 0) Bool/True  (isOdd  (- n 1)))
+(isOdd  n) = (if_ (== n 0) Bool/False (isEven (- n 1)))
+(isEven n) = (if_ (== n 0) Bool/True  (isOdd  (- n 1)))
 
 (Main) = (isOdd 4)

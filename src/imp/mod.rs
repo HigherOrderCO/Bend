@@ -160,19 +160,6 @@ pub struct Enum {
   pub variants: IndexMap<Name, Variant>,
 }
 
-#[derive(Clone, Debug)]
-pub enum TopLevel {
-  Def(Definition),
-  Enum(Enum),
-}
-
-#[derive(Debug, Clone)]
-pub struct Program {
-  pub enums: IndexMap<Name, Enum>,
-  pub defs: IndexMap<Name, Definition>,
-  pub variants: IndexMap<Name, Name>,
-}
-
 impl InPlaceOp {
   pub fn to_lang_op(self) -> Op {
     match self {

@@ -1,4 +1,3 @@
-#flavor core
 Z =    @s @z z
 S = @x @s @z (s (x s z))
 

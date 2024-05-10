@@ -2,13 +2,11 @@ use std::collections::HashMap;
 
 use crate::fun::Name;
 
-use super::{AssignPattern, Expr, Program, Stmt};
+use super::{AssignPattern, Definition, Expr, Stmt};
 
-impl Program {
+impl Definition {
   pub fn gen_map_get(&mut self) {
-    for def in self.defs.values_mut() {
-      def.body.gen_map_get(&mut 0);
-    }
+    self.body.gen_map_get(&mut 0);
   }
 }
 

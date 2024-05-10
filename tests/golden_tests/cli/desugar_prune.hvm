@@ -1,4 +1,3 @@
-#flavor core
 id x = x
 
 main = *

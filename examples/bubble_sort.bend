@@ -1,4 +1,3 @@
-#flavor core
 // Sorts a list
 
 // sort : List -> List

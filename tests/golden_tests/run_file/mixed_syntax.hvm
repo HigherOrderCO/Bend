@@ -1,0 +1,25 @@
+enum Bool:
+  True()
+  False()
+
+data Tree = (node ~lft ~rgt) | (leaf val)
+
+def tree_xor(tree):
+  fold tree:
+    Tree/node:
+      return xor(tree.lft, tree.rgt);
+    Tree/leaf:
+      return tree.val;
+
+(xor Bool/True Bool/False) = Bool/True
+(xor Bool/False Bool/True) = Bool/True
+(xor * *) = Bool/False
+
+main =
+  let depth = 10
+  let tree = bend n=0 while (< n depth) {
+    (Tree/node (go (+ n 1)) (go (+ n 1)))
+  } then {
+    if (% n 2) { (Tree/leaf Bool/True) } else { (Tree/leaf Bool/False) }  
+  }
+  (tree_xor tree)

@@ -1,4 +1,3 @@
-#flavor core
 // A cool trick involving HVM's scopeless lambdas is linear qs:
 
 // Qnew : Queue a
