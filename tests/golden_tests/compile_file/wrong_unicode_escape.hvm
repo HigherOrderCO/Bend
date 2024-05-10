@@ -1,0 +1,1 @@
+main = (String.cons '\u{1' "\u2}\u{zxcx}")

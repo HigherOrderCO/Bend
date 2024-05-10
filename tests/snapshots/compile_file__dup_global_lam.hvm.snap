@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/dup_global_lam.hvm
+---
+@main = d
+  & ({(b c) b} (a a)) ~ (c d)

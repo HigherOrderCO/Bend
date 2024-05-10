@@ -11,8 +11,8 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
 @Map = ((@Map__C0 ((* @False__M_Nil) a)) a)
 
 @Map__C0 = (a (c ({(a b) d} f)))
-  & @Map ~ (c (d e))
   & @Cons ~ (b (e f))
+  & @Map ~ (c (d e))
 
 @Merge = (b ((@Merge__C2 ((* (a a)) (b c))) c))
 
@@ -22,9 +22,9 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
   & @Cons ~ (a (@False__M_Nil b))
 
 @MergePair__C1 = (c (f ({a e} (b h))))
+  & @Cons ~ (d (g h))
   & @Merge ~ (a (b (c d)))
   & @MergePair ~ (e (f g))
-  & @Cons ~ (d (g h))
 
 @MergePair__C2 = (b ((@MergePair__C1 (@MergePair__C0 (a (b c)))) (a c)))
 
@@ -36,12 +36,12 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
   & @Cons ~ a
 
 @Merge__C1 = ({b {g l}} ({h q} ({(a (b c)) {e m}} ({a {d n}} ({f o} t)))))
-  & @Merge ~ (e (f (i j)))
-  & @Merge ~ (m (p (q r)))
   & @If ~ (c (k (s t)))
   & @Cons ~ (d (j k))
+  & @Merge ~ (e (f (i j)))
   & @Cons ~ (g (h i))
   & @Cons ~ (l (r s))
+  &! @Merge ~ (m (p (q r)))
   & @Cons ~ (n (o p))
 
 @Merge__C2 = (b (c (a ((@Merge__C1 (@Merge__C0 (a (b (c d))))) d))))

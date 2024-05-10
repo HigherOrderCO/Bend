@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/op2.hvm
+---
+@main = a
+  & $(1 $([=2] $([&3] $([|4] $([>5] $([<6] $([/7] $([*8] $([-9] $([+10] $([%11] a))))))))))) ~ [!0]

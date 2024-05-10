@@ -1,0 +1,1 @@
+main = (λk λs λz let {s0 s1} = s; (s0 ((k s1) z)) λq λw w)

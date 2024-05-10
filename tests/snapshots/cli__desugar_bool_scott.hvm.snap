@@ -3,6 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/desugar_bool_scott.hvm
 ---
 error: invalid value 'adt-scott' for '-O <COMP_OPTS>'
-  [possible values: all, no-all, eta, no-eta, prune, no-prune, linearize-matches, linearize-matches-alt, no-linearize-matches, float-combinators, no-float-combinators, merge, no-merge, inline, no-inline, recursive-last, no-recursive-last]
+  [possible values: all, no-all, eta, no-eta, prune, no-prune, linearize-matches, linearize-matches-alt, no-linearize-matches, float-combinators, no-float-combinators, merge, no-merge, inline, no-inline]
 
 For more information, try '--help'.

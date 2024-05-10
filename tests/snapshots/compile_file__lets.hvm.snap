@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/lets.hvm
+---
+@main = @main__C0
+  & (a a) ~ *
+
+@main__C0 = n
+  & (a a) ~ (f (i (m n)))
+  & (d d) ~ {(e f) e}
+  & (c c) ~ {(g (h i)) {g h}}
+  & (b b) ~ {(j (k (l m))) {j {k l}}}

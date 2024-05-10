@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/let_tup.hvm
+---
+@main = ((a (* a)) (* (b b)))

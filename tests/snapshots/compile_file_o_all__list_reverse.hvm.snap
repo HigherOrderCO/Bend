@@ -5,8 +5,8 @@ input_file: tests/golden_tests/compile_file_o_all/list_reverse.hvm
 @concat = ((@concat__C0 ((a a) b)) b)
 
 @concat__C0 = (a (b (c e)))
-  & @concat ~ (b (c d))
   & @cons ~ (a (d e))
+  & @concat ~ (b (c d))
 
 @cons = (a (b ((a (b c)) (* c))))
 

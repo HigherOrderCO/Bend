@@ -1,0 +1,1 @@
+main = let x = λa (a a); x

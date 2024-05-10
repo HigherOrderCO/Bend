@@ -3,18 +3,18 @@
 
 use crate::fun::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Term};
 use diagnostics::{Diagnostics, DiagnosticsConfig, ERR_INDENT_SIZE};
-use hvmc::ast::Net;
-use hvmc_net::{
+use hvm::{
+  add_recursive_priority::add_recursive_priority,
   check_net_size::{check_net_sizes, MAX_NET_SIZE},
   mutual_recursion,
-  reorder_redexes::reorder_redexes_recursive_last,
 };
+use hvmc::ast::Net;
 use net::hvmc_to_net::hvmc_to_net;
 use std::{process::Output, str::FromStr};
 
 pub mod diagnostics;
 pub mod fun;
-pub mod hvmc_net;
+pub mod hvm;
 pub mod imp;
 pub mod net;
 
@@ -41,20 +41,20 @@ pub fn compile_book(
 ) -> Result<CompileResult, Diagnostics> {
   let mut diagnostics = desugar_book(book, opts.clone(), diagnostics_cfg, args)?;
 
-  let (mut core_book, labels) = book_to_nets(book, &mut diagnostics)?;
+  let (mut hvm_book, labels) = book_to_nets(book, &mut diagnostics)?;
 
   if opts.eta {
-    core_book.values_mut().for_each(Net::eta_reduce);
+    hvm_book.values_mut().for_each(Net::eta_reduce);
   }
 
-  mutual_recursion::check_cycles(&core_book, &mut diagnostics)?;
+  mutual_recursion::check_cycles(&hvm_book, &mut diagnostics)?;
   if opts.eta {
-    core_book.values_mut().for_each(Net::eta_reduce);
+    hvm_book.values_mut().for_each(Net::eta_reduce);
   }
 
   if opts.inline {
     diagnostics.start_pass();
-    if let Err(e) = core_book.inline() {
+    if let Err(e) = hvm_book.inline() {
       diagnostics.add_book_error(format!("During inlining:\n{:ERR_INDENT_SIZE$}{}", "", e));
     }
     diagnostics.fatal(())?;
@@ -62,16 +62,14 @@ pub fn compile_book(
 
   if opts.prune {
     let prune_entrypoints = vec![book.hvmc_entrypoint().to_string()];
-    core_book.prune(&prune_entrypoints);
+    hvm_book.prune(&prune_entrypoints);
   }
 
-  check_net_sizes(&core_book, &mut diagnostics)?;
+  check_net_sizes(&hvm_book, &mut diagnostics)?;
 
-  if opts.recursive_last {
-    reorder_redexes_recursive_last(&mut core_book);
-  }
+  add_recursive_priority(&mut hvm_book);
 
-  Ok(CompileResult { core_book, labels, diagnostics })
+  Ok(CompileResult { core_book: hvm_book, labels, diagnostics })
 }
 
 pub fn desugar_book(
@@ -238,9 +236,6 @@ pub struct CompileOpts {
 
   /// Enables [fun::transform::inline].
   pub inline: bool,
-
-  /// Enables [hvmc_net::reorder_redexes::reorder_redexes_recursive_last].
-  pub recursive_last: bool,
 }
 
 impl CompileOpts {
@@ -253,7 +248,6 @@ impl CompileOpts {
       float_combinators: true,
       merge: true,
       inline: true,
-      recursive_last: true,
       linearize_matches: OptLevel::Enabled,
     }
   }
@@ -268,7 +262,6 @@ impl CompileOpts {
       float_combinators: false,
       merge: false,
       inline: false,
-      recursive_last: false,
     }
   }
 
@@ -296,7 +289,6 @@ impl Default for CompileOpts {
       float_combinators: true,
       merge: false,
       inline: false,
-      recursive_last: true,
     }
   }
 }
