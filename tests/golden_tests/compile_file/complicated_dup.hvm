@@ -1,0 +1,1 @@
+main = let {x1 x2} = ($a $b); λy let {y1 y2} = y; (λ$a (y1 x1) λ$b (y2 x2))

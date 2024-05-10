@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/addition.hvm
+---
+@main = a
+  & @main__C0 ~ (8 a)
+
+@main__C0 = (a b)
+  & $(1 $(:[+] $(a b))) ~ [+1]

@@ -1,0 +1,1 @@
+main = let tup = (@x@y x, @x@y y); tup

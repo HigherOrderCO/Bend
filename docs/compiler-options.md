@@ -6,12 +6,10 @@
 | `-Ono-all`     | Disabled | Disables all compiler passes |
 | `-Oeta` `-Ono-eta` | Disabled | [eta-reduction](#eta-reduction) |
 | `-Oprune` `-Ono-prune` | Disabled | [definition-pruning](#definition-pruning) |
-| `-Opre-reduce` `-Ono-pre-reduce` | Disabled | [pre-reduce](#pre-reduce) |
-| `-Olinearize-matches` `-Olinearize-matches-extra` `-Ono-linearize-matches` | Enabled  | [linearize-matches](#linearize-matches) |
+| `-Olinearize-matches` `-Olinearize-matches-alt` `-Ono-linearize-matches` | Enabled  | [linearize-matches](#linearize-matches) |
 | `-Ofloat_combinators` `-Ono-float_combinators` | Enabled  | [float-combinators](#float-combinators) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
 | `-Oinline` `-Ono-inline` | Disabled | [inline](#inline) |
-| `-e` `--entrypoint` | `Main \| main` | [entrypoint](#entrypoint) |
 
 ## Eta-reduction
 

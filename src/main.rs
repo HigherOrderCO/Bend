@@ -161,8 +161,6 @@ pub enum OptArgs {
   NoMerge,
   Inline,
   NoInline,
-  RecursiveLast,
-  NoRecursiveLast,
 }
 
 fn compile_opts_from_cli(args: &Vec<OptArgs>) -> CompileOpts {
@@ -183,8 +181,6 @@ fn compile_opts_from_cli(args: &Vec<OptArgs>) -> CompileOpts {
       NoMerge => opts.merge = false,
       Inline => opts.inline = true,
       NoInline => opts.inline = false,
-      RecursiveLast => opts.recursive_last = true,
-      NoRecursiveLast => opts.recursive_last = false,
 
       LinearizeMatches => opts.linearize_matches = OptLevel::Enabled,
       LinearizeMatchesAlt => opts.linearize_matches = OptLevel::Alt,

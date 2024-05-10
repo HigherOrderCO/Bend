@@ -1,10 +1,7 @@
 use bend::{
   compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
-  fun::{
-    load_book::do_parse_core_book, net_to_term::net_to_term, parser::TermParser, term_to_net::Labels, Book,
-    Ctx, Name,
-  },
+  fun::{load_book::do_parse_core_book, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Name},
   net::hvmc_to_net::hvmc_to_net,
   run_book, CompileOpts, RunOpts,
 };
@@ -92,25 +89,6 @@ fn run_golden_test_dir_multiple(test_name: &str, run: &[&RunFn]) {
  The test functions decide how exactly to process the test programs
  and what to save as a snapshot.
 */
-
-#[test]
-fn compile_term() {
-  run_golden_test_dir(function_name!(), &|code, _| {
-    let mut term = TermParser::new(code).parse_term()?;
-    let mut vec = Vec::new();
-    term.check_unbound_vars(&mut HashMap::new(), &mut vec);
-
-    if !vec.is_empty() {
-      return Err(vec.into_iter().map(|e| e.to_string()).join("\n").into());
-    }
-
-    term.make_var_names_unique();
-    term.linearize_vars();
-    let net = bend::fun::term_to_net(&term, &mut Default::default()).map_err(|e| e.to_string())?;
-
-    Ok(format!("{}", net))
-  })
-}
 
 #[test]
 fn compile_file() {

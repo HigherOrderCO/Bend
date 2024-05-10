@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_term/dup_global_lam.hvm
----
-d
-  & ({(b c) b} (a a)) ~ (c d)

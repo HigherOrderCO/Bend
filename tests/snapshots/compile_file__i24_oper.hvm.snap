@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/i24_oper.hvm
+---
+@main = b
+  & $(-1 $(:[*] $(a b))) ~ [+1]
+  & $(+14 a) ~ [-16777204]

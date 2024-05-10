@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_term/tup.hvm
----
-((1 4) (2 3))

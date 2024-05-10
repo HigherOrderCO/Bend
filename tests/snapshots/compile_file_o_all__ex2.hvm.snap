@@ -16,8 +16,8 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.hvm
   & @low ~ a
 
 @decO = (a c)
-  & @dec ~ (a b)
   & @I ~ (b c)
+  & @dec ~ (a b)
 
 @low = ((@lowO (@lowI (@E a))) a)
 

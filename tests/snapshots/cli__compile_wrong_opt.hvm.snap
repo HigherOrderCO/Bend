@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/compile_wrong_opt.hvm
 ---
 error: invalid value 'foo' for '-O <COMP_OPTS>'
-  [possible values: all, no-all, eta, no-eta, prune, no-prune, linearize-matches, linearize-matches-alt, no-linearize-matches, float-combinators, no-float-combinators, merge, no-merge, inline, no-inline, recursive-last, no-recursive-last]
+  [possible values: all, no-all, eta, no-eta, prune, no-prune, linearize-matches, linearize-matches-alt, no-linearize-matches, float-combinators, no-float-combinators, merge, no-merge, inline, no-inline]
 
   tip: a similar value exists: 'float-combinators'
 

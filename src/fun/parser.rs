@@ -409,9 +409,9 @@ impl<'a> TermParser<'a> {
       // Match
       if self.try_consume_keyword("match") {
         unexpected_tag(self)?;
-        let (bnd, arg, with) = self.parse_match_arg()?;
+        let (bnd, arg, with) = self.parse_match_header()?;
         let arms = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
-        return Ok(Term::Mat { arg: Box::new(arg), bnd: Some(bnd), with, arms });
+        return Ok(Term::Mat { arg: Box::new(arg), bnd, with, arms });
       }
 
       // Switch
@@ -433,9 +433,9 @@ impl<'a> TermParser<'a> {
       // Fold
       if self.try_consume_keyword("fold") {
         unexpected_tag(self)?;
-        let (bnd, arg, with) = self.parse_match_arg()?;
+        let (bnd, arg, with) = self.parse_match_header()?;
         let arms = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
-        return Ok(Term::Fold { arg: Box::new(arg), bnd: Some(bnd), with, arms });
+        return Ok(Term::Fold { arg: Box::new(arg), bnd, with, arms });
       }
 
       // Bend
@@ -545,9 +545,25 @@ impl<'a> TermParser<'a> {
     }))
   }
 
-  fn parse_match_arg(&mut self) -> Result<(Name, Term, Vec<Name>), String> {
-    let bnd = self.parse_bend_name()?;
-    let arg = if self.try_consume("=") { self.parse_term()? } else { Term::Var { nam: bnd.clone() } };
+  fn parse_match_arg(&mut self) -> Result<(Option<Name>, Term), String> {
+    let ini_idx = *self.index();
+    let mut arg = self.parse_term()?;
+    let end_idx = *self.index();
+
+    self.skip_trivia();
+    match (&mut arg, self.starts_with("=")) {
+      (Term::Var { nam }, true) => {
+        self.consume("=")?;
+        Ok((Some(std::mem::take(nam)), self.parse_term()?))
+      }
+      (Term::Var { nam }, false) => Ok((Some(nam.clone()), Term::Var { nam: std::mem::take(nam) })),
+      (_, true) => self.expected_spanned("argument name", ini_idx, end_idx),
+      (arg, false) => Ok((Some(Name::new("%arg")), std::mem::take(arg))),
+    }
+  }
+
+  fn parse_match_header(&mut self) -> Result<(Option<Name>, Term, Vec<Name>), String> {
+    let (bnd, arg) = self.parse_match_arg()?;
     let with = if self.try_consume_keyword("with") {
       let mut with = vec![self.parse_bend_name()?];
       while !self.skip_starts_with("{") {
@@ -570,7 +586,7 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_switch(&mut self) -> Result<Term, String> {
-    let (bnd, arg, with) = self.parse_match_arg()?;
+    let (bnd, arg, with) = self.parse_match_header()?;
     self.consume("{")?;
     let mut expected_num = 0;
     let mut arms = vec![];
@@ -600,9 +616,9 @@ impl<'a> TermParser<'a> {
       self.try_consume(";");
       expected_num += 1;
     }
-    let pred = Some(Name::new(format!("{}-{}", bnd, arms.len() - 1)));
+    let pred = Some(Name::new(format!("{}-{}", bnd.as_ref().unwrap(), arms.len() - 1)));
     self.consume("}")?;
-    Ok(Term::Swt { arg: Box::new(arg), bnd: Some(bnd), with, pred, arms })
+    Ok(Term::Swt { arg: Box::new(arg), bnd, with, pred, arms })
   }
 
   fn num_range_err<T>(&mut self, ini_idx: usize, typ: &str) -> Result<T, String> {

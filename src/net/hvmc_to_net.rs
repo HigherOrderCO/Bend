@@ -22,7 +22,7 @@ fn hvmc_to_inodes(net: &Net) -> INodes {
   }
 
   // Convert all the trees forming active pairs.
-  for (i, (tree1, tree2)) in net.redexes.iter().enumerate() {
+  for (i, (_, tree1, tree2)) in net.redexes.iter().enumerate() {
     let tree_root = format!("a{i}");
     let mut tree1 = tree_to_inodes(tree1, tree_root.clone(), net_root, &mut n_vars);
     inodes.append(&mut tree1);

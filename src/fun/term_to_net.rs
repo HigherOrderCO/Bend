@@ -51,6 +51,7 @@ pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, String> {
   let mut net = Net::default();
 
   let mut state = EncodeTermState {
+    lets: Default::default(),
     vars: Default::default(),
     wires: Default::default(),
     redexes: Default::default(),
@@ -74,9 +75,10 @@ pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, String> {
 
 #[derive(Debug)]
 struct EncodeTermState<'t, 'l> {
+  lets: Vec<(&'t Pattern, &'t Term)>,
   vars: HashMap<(bool, Name), Place<'t>>,
   wires: Vec<Option<Place<'t>>>,
-  redexes: Vec<LoanedMut<'t, (Tree, Tree)>>,
+  redexes: Vec<LoanedMut<'t, (bool, Tree, Tree)>>,
   name_idx: u64,
   created_nodes: usize,
   labels: &'l mut Labels,
@@ -101,7 +103,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
   /// `vars` has the information of which ports the variables are declared and used in.
   /// `global_vars` has the same information for global lambdas. Must be linked outside this function.
   /// Expects variables to be linear, refs to be stored as Refs and all names to be bound.
-  fn encode_term(&mut self, term: &Term, up: Place<'t>) {
+  fn encode_term(&mut self, term: &'t Term, up: Place<'t>) {
     maybe_grow(|| {
       match term {
         Term::Era => self.link(up, Place::Tree(LoanedMut::new(Tree::Era))),
@@ -155,10 +157,9 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           self.link(up, Place::Hole(out));
         }
         Term::Let { pat, val, nxt } => {
-          let wire = self.new_wire();
-          self.encode_term(val, Place::Wire(wire));
-          self.encode_pat(pat, Place::Wire(wire));
-
+          // Dups/tup eliminators are not actually scoped like other terms.
+          // They are depended on 
+          self.lets.push((pat, val));
           self.encode_term(nxt, up);
         }
         Term::Fan { fan, tag, els } => {
@@ -213,6 +214,11 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         | Term::List { .. } // Removed in encode_list
         | Term::Err => unreachable!(),
       }
+      while let Some((pat, val)) = self.lets.pop() {
+        let wire = self.new_wire();
+        self.encode_term(val, Place::Wire(wire));
+        self.encode_pat(pat, Place::Wire(wire));
+      }
     })
   }
 
@@ -232,8 +238,8 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
   fn link(&mut self, a: Place<'t>, b: Place<'t>) {
     match (a, b) {
       (Place::Tree(a), Place::Tree(b)) => self.redexes.push(LoanedMut::merge(Default::default(), |r, m| {
-        m.place(b, &mut r.0);
-        m.place(a, &mut r.1);
+        m.place(b, &mut r.1);
+        m.place(a, &mut r.2);
       })),
       (Place::Tree(t), Place::Hole(h)) | (Place::Hole(h), Place::Tree(t)) => {
         t.place(h);
