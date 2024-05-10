@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::fun::Name;
 
-use super::{AssignPattern, Expr, MapKey, Program, Stmt};
+use super::{AssignPattern, Expr, Program, Stmt};
 
 impl Program {
   pub fn gen_map_get(&mut self) {
@@ -78,13 +78,15 @@ impl Stmt {
   }
 }
 
+type Substitutions = HashMap<Name, (Name, Box<Expr>)>;
+
 impl Expr {
-  fn substitute_map_gets(&mut self, id: &mut usize) -> HashMap<Name, (Name, MapKey)> {
-    fn go(e: &mut Expr, substitutions: &mut HashMap<Name, (Name, MapKey)>, id: &mut usize) {
+  fn substitute_map_gets(&mut self, id: &mut usize) -> Substitutions {
+    fn go(e: &mut Expr, substitutions: &mut Substitutions, id: &mut usize) {
       match e {
         Expr::MapGet { nam, key } => {
           let new_var = gen_map_var(id);
-          substitutions.insert(new_var.clone(), (nam.clone(), *key));
+          substitutions.insert(new_var.clone(), (nam.clone(), key.clone()));
           *e = Expr::Var { nam: new_var };
         }
         Expr::Call { fun, args, kwargs } => {
@@ -123,19 +125,19 @@ impl Expr {
         Expr::None | Expr::Str { .. } | Expr::Var { .. } | Expr::Num { .. } => {}
       }
     }
-    let mut substitutions = HashMap::new();
+    let mut substitutions = Substitutions::new();
     go(self, &mut substitutions, id);
     substitutions
   }
 }
 
-fn gen_get(current: &mut Stmt, substitutions: HashMap<Name, (Name, MapKey)>) -> Stmt {
+fn gen_get(current: &mut Stmt, substitutions: Substitutions) -> Stmt {
   substitutions.into_iter().fold(std::mem::take(current), |acc, next| {
     let (var, (map_var, key)) = next;
     let map_get_call = Expr::Var { nam: Name::new("Map/get") };
     let map_get_call = Expr::Call {
       fun: Box::new(map_get_call),
-      args: vec![Expr::Var { nam: map_var.clone() }, Expr::Num { val: key.0 }],
+      args: vec![Expr::Var { nam: map_var.clone() }, *key],
       kwargs: Vec::new(),
     };
     let pat = AssignPattern::Tup(vec![var, map_var]);

@@ -33,7 +33,7 @@ pub enum Expr {
   // "{" {entries} "}"
   MapInit { entries: Vec<(MapKey, Expr)> },
   // {name} "[" {key} "]"
-  MapGet { nam: Name, key: MapKey },
+  MapGet { nam: Name, key: Box<Expr> },
 }
 
 #[derive(Clone, Debug)]
@@ -51,8 +51,8 @@ pub enum AssignPattern {
   Var(Name),
   // "(" ... ")"
   Tup(Vec<Name>),
-  // {name} "[" {key} "]"
-  MapSet(Name, MapKey),
+  // {name} "[" {expr} "]"
+  MapSet(Name, Expr),
 }
 
 #[derive(Clone, Debug)]

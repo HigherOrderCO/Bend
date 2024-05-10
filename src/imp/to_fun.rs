@@ -52,7 +52,7 @@ impl Stmt {
         pat: Box::new(fun::Pattern::Var(Some(map.clone()))),
         val: Box::new(fun::Term::call(fun::Term::Ref { nam: fun::Name::new("Map/set") }, [
           fun::Term::Var { nam: map },
-          fun::Term::Num { val: fun::Num::U24(key.0) },
+          key.to_fun(),
           val.to_fun(),
         ])),
         nxt: Box::new(nxt.to_fun()),
