@@ -1,3 +1,4 @@
+#flavor core
 // size = 1 << 8
 
 Mul = λn λm λs (n (m s))

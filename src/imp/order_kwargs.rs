@@ -87,6 +87,7 @@ impl Stmt {
         }
       }
       Stmt::Return { term } => term.order_kwargs(ctx),
+      Stmt::Err => {}
     }
   }
 }

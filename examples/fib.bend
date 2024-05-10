@@ -1,3 +1,4 @@
+#flavor core
 add = λa λb (+ a b)
 
 fib = λx switch x {

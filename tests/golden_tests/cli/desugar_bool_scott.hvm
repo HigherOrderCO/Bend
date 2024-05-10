@@ -1,3 +1,4 @@
+#flavor core
 data Boolean = True | False
 
 main = True

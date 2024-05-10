@@ -1,3 +1,4 @@
+#flavor core
 Tree.leaf = λnode λleaf leaf
 Tree.node = λval λlft λrgt λnode λleaf (node val lft rgt)
 

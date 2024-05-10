@@ -1,5 +1,5 @@
 use super::{AssignPattern, Definition, Expr, MapKey, Program, Stmt};
-use crate::fun;
+use crate::fun::{self, Name};
 
 impl Program {
   pub fn to_fun(self, mut book: fun::Book) -> fun::Book {
@@ -48,6 +48,15 @@ impl AssignPattern {
 impl Stmt {
   pub fn to_fun(self) -> fun::Term {
     match self {
+      Stmt::Assign { pat: AssignPattern::MapSet(map, key), val, nxt } => fun::Term::Let {
+        pat: Box::new(fun::Pattern::Var(Some(map.clone()))),
+        val: Box::new(fun::Term::call(fun::Term::Ref { nam: fun::Name::new("Map/set") }, [
+          fun::Term::Var { nam: map },
+          fun::Term::Num { val: fun::Num::U24(key.0) },
+          val.to_fun(),
+        ])),
+        nxt: Box::new(nxt.to_fun()),
+      },
       Stmt::Assign { pat, val, nxt } => {
         let pat = pat.to_fun();
         let val = val.to_fun();
@@ -74,8 +83,9 @@ impl Stmt {
       }
       Stmt::Switch { arg, bind, arms } => {
         let arg = arg.to_fun();
+        let pred = Some(Name::new(format!("{}-{}", bind.clone().unwrap(), arms.len() - 1)));
         let arms = arms.into_iter().map(Stmt::to_fun).collect();
-        fun::Term::Swt { arg: Box::new(arg), bnd: bind, with: Vec::new(), pred: None, arms }
+        fun::Term::Swt { arg: Box::new(arg), bnd: bind, with: Vec::new(), pred, arms }
       }
       Stmt::Fold { arg, bind, arms } => {
         let arg = arg.to_fun();
@@ -91,6 +101,7 @@ impl Stmt {
       }
       Stmt::Do { .. } => todo!(),
       Stmt::Return { term } => term.to_fun(),
+      Stmt::Err => fun::Term::Err,
     }
   }
 }
