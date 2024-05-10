@@ -1,6 +1,6 @@
 data Bool = T | F
 
-foo (T, x) = x
-foo * = F
+foo (Bool/T, x) = x
+foo * = Bool/F
 
-main = (foo (F, T))
+main = (foo (Bool/F, Bool/T))

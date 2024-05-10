@@ -1,18 +1,18 @@
 data N = (S pred) | Z
 data B = T | F
 
-(Not T) = F
-(Not F) = T
+(Not B/T) = B/F
+(Not B/F) = B/T
 
 (IsEven n) =
   match n {
-    S: (Not (IsEven n.pred))
-    Z: T
+    N/S: (Not (IsEven n.pred))
+    N/Z: B/T
   }
 
-N0 = Z
-N1 = (S N0)
-N2 = (S N1)
-N3 = (S N2)
+N0 = N/Z
+N1 = (N/S N0)
+N2 = (N/S N1)
+N3 = (N/S N2)
 
 Main = (IsEven {{N0 N1} {N2 N3}})

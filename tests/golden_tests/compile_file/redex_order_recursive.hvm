@@ -1,4 +1,4 @@
-data Tree = (Tree.node lft rgt) | (Tree.leaf val)
+data Tree = (node lft rgt) | (leaf val)
 
 tail_recursive = @x (x @pred @acc (tail_recursive pred (+ 1 acc)) @acc 0)
 
@@ -13,70 +13,70 @@ add = @a (a
 )
 
 List.sum xs acc = match xs {
-  List.nil: acc
-  List.cons: (List.sum xs.tail (+ xs.head acc))
+  List/nil: acc
+  List/cons: (List.sum xs.tail (+ xs.head acc))
 }
 
 List.len xs = match xs {
-  List.nil: 0
-  List.cons: (+ 1 (List.len xs.tail))
+  List/nil: 0
+  List/cons: (+ 1 (List.len xs.tail))
 }
 
 List.len_tr xs acc = match xs {
-  List.nil: acc
-  List.cons: (List.len_tr xs.tail (+ 1 acc))
+  List/nil: acc
+  List/cons: (List.len_tr xs.tail (+ 1 acc))
 }
 
 List.map xs f = match xs {
-  List.nil: List.nil
-  List.cons: (List.cons (f xs.head) (List.map xs.tail f))
+  List/nil: List/nil
+  List/cons: (List/cons (f xs.head) (List.map xs.tail f))
 }
 
 List.concat xs ys = match xs {
-  List.nil: ys
-  List.cons: (List.cons xs.head (List.concat xs.tail ys))
+  List/nil: ys
+  List/cons: (List/cons xs.head (List.concat xs.tail ys))
 }
 
 List.reverse_bad xs = match xs {
-  List.nil: List.nil
-  List.cons: (List.concat (List.reverse_bad xs.tail) (List.cons xs.head List.nil))
+  List/nil: List/nil
+  List/cons: (List.concat (List.reverse_bad xs.tail) (List/cons xs.head List/nil))
 }
 
-List.reverse_tr xs acc = (List.reverse_over xs List.nil)
+List.reverse_tr xs acc = (List.reverse_over xs List/nil)
 
 List.fold xs c n = match xs {
-  List.nil: n
-  List.cons: (c xs.head (List.fold xs.tail c n))
+  List/nil: n
+  List/cons: (c xs.head (List.fold xs.tail c n))
 }
 
 List.reduce xs f acc = match xs {
-  List.nil: acc
-  List.cons: (List.reduce xs.tail f (f acc xs.head))
+  List/nil: acc
+  List/cons: (List.reduce xs.tail f (f acc xs.head))
 }
 
 List.reverse_over xs ys = match xs {
-  List.nil: ys
-  List.cons: (List.reverse_over xs.tail (List.cons xs.head ys))
+  List/nil: ys
+  List/cons: (List.reverse_over xs.tail (List/cons xs.head ys))
 }
 
 Tree.leaves tree = match tree {
-  Tree.leaf: 1
-  Tree.node: (+ (Tree.leaves tree.lft) (Tree.leaves tree.rgt))
+  Tree/leaf: 1
+  Tree/node: (+ (Tree.leaves tree.lft) (Tree.leaves tree.rgt))
 }
 
 Tree.nodes tree = match tree {
-  Tree.leaf: 0
-  Tree.node: (+ 1 (+ (Tree.nodes tree.lft) (Tree.nodes tree.rgt)))
+  Tree/leaf: 0
+  Tree/node: (+ 1 (+ (Tree.nodes tree.lft) (Tree.nodes tree.rgt)))
 }
 
 Tree.height tree = match tree {
-  Tree.leaf: 0
-  Tree.node: (+ 1 (max (Tree.height tree.lft) (Tree.height tree.rgt)))
+  Tree/leaf: 0
+  Tree/node: (+ 1 (max (Tree.height tree.lft) (Tree.height tree.rgt)))
 }
 
 Tree.map tree f = match tree {
-  Tree.leaf: (Tree.leaf (f tree.val))
-  Tree.node: (Tree.node (Tree.map tree.lft f) (Tree.map tree.rgt f))
+  Tree/leaf: (Tree/leaf (f tree.val))
+  Tree/node: (Tree/node (Tree.map tree.lft f) (Tree.map tree.rgt f))
 }
 
 max a b = switch (> a b) {
@@ -85,8 +85,8 @@ max a b = switch (> a b) {
 }
 
 Tree.flip tree = match tree {
-  Tree.leaf: tree
-  Tree.node: (Tree.node (Tree.flip tree.rgt) (Tree.flip tree.lft))
+  Tree/leaf: tree
+  Tree/node: (Tree/node (Tree.flip tree.rgt) (Tree.flip tree.lft))
 }
 
 calc =

@@ -1,6 +1,6 @@
 data bool = true | false
 
-go true  0 = 1
-go false _ = 0
+go bool/true  0 = 1
+go bool/false _ = 0
 
-main = (go true 1)
+main = (go bool/true 1)

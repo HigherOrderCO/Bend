@@ -26,27 +26,27 @@ D = @a @b @c switch a {
 }
 
 // Pattern matching defs linearize all arguments
-E (Cons a b) (Cons c d) = (a b c d)
+E (ConsList/Cons a b) (ConsList/Cons c d) = (a b c d)
 E a b = (a b)
 
 A2 = @a @b @c match a {
-  Cons: (a.h a.t b c)
-  Nil: (b c)
+  ConsList/Cons: (a.h a.t b c)
+  ConsList/Nil: (b c)
 }
 
 B2 = @a @b @c match c with a b {
-  Cons: (a b c.h c.t)
-  Nil: (a b)
+  ConsList/Cons: (a b c.h c.t)
+  ConsList/Nil: (a b)
 }
 
 C2 = @a @b @c match c {
-  Cons: (a b c.h c.t)
-  Nil: (a b)
+  ConsList/Cons: (a b c.h c.t)
+  ConsList/Nil: (a b)
 }
 
 D2 = @a @b @c match a {
-  Cons: (a.h a.t b c)
-  Nil: (b c)
+  ConsList/Cons: (a.h a.t b c)
+  ConsList/Nil: (b c)
 }
 
 main = *

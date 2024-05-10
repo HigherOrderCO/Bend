@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/adt_tup_era.hvm
 ---
-(Foo) = λa match a { Pair b c: (match b { Pair d e: λf d; } c); }
+(Foo) = λa match a { Tuple/Pair b c: (match b { Tuple/Pair d e: λf d; } c); }
 
-(Main) = (Foo (Pair 1 5))
+(Main) = (Foo (Tuple/Pair 1 5))
 
-(Pair) = λa λb λc (c a b)
+(Tuple/Pair) = λa λb λc (c a b)

@@ -3,9 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/override_list_ctr.hvm
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/run_file/override_list_ctr.hvm :
-List.nil is a built-in constructor and should not be overridden.
-[0m  1 | [4m[31mdata Override
-[0m  2 | [4m[31m  = List.nil
-[0m  3 | [4m[31m
-[0m  4 | [4m[31m[0mmain = [λz λk z][0m
+Function 'List/nil' has the same name as a previously defined constructor

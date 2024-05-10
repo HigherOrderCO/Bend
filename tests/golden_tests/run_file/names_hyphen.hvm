@@ -4,11 +4,11 @@ data Done_ = (Done done-var)
 
 toZero n =
   switch n {
-    0: (Done 1)
+    0: (Done_/Done 1)
     _: (toZero n-1)
   }
 
 main =
   match is-done = (toZero 4) {
-    Done: is-done.done-var
+    Done_/Done: is-done.done-var
   }

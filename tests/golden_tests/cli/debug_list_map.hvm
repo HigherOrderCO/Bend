@@ -1,6 +1,6 @@
 #flavor core
 (Map f []) = []
-(Map f (List.cons head tail)) = (List.cons (f head) (Map f tail))
+(Map f (List/cons head tail)) = (List/cons (f head) (Map f tail))
 
 (Inc) = @x (+ x 1)
 

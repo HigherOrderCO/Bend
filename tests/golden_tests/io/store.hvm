@@ -1,6 +1,6 @@
 (Main) =
   use path = "tests/golden_tests/io/store.txt"
   (HVM.store path "(Main) = 0" @result match result {
-    Result.ok: result.val;
-    Result.err: result.val;
+    Result/ok: result.val;
+    Result/err: result.val;
   })

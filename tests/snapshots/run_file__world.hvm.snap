@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/world.hvm
 ---
-λa λ* (a 127758 String.nil)
+λa λ* (a 127758 String/nil)

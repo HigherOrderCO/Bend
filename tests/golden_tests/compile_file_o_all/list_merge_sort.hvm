@@ -1,31 +1,31 @@
 data Bool = True | False
 data List_ = (Cons head tail) | Nil
 
-If True then else = then
-If False then else = else
+If Bool/True then else = then
+If Bool/False then else = else
 
-Pure x = (Cons x Nil)
+Pure x = (List_/Cons x List_/Nil)
 
-Map Nil f = Nil
-Map (Cons h t) f = (Cons (f h) (Map t f))
+Map List_/Nil f = List_/Nil
+Map (List_/Cons h t) f = (List_/Cons (f h) (Map t f))
 
 MergeSort cmp xs = (Unpack cmp (Map xs Pure))
 
-Unpack cmp Nil = Nil
-Unpack cmp (Cons h Nil) = h
+Unpack cmp List_/Nil = List_/Nil
+Unpack cmp (List_/Cons h List_/Nil) = h
 Unpack cmp xs = (Unpack cmp (MergePair cmp xs))
 
-MergePair cmp (Cons h1 (Cons h2 t)) = (Cons (Merge cmp h1 h2) (MergePair cmp t))
+MergePair cmp (List_/Cons h1 (List_/Cons h2 t)) = (List_/Cons (Merge cmp h1 h2) (MergePair cmp t))
 MergePair cmp xs = xs
 
-Merge cmp Nil ys = ys
-Merge cmp xs Nil = xs
-Merge cmp (Cons xh xt) (Cons yh yt) =
+Merge cmp List_/Nil ys = ys
+Merge cmp xs List_/Nil = xs
+Merge cmp (List_/Cons xh xt) (List_/Cons yh yt) =
   (If (cmp xh yh)
-    let ys = (Cons yh yt)
-    (Cons xh (Merge cmp xt ys))
-    let xs = (Cons xh xt)
-    (Cons yh (Merge cmp xs yt))
+    let ys = (List_/Cons yh yt)
+    (List_/Cons xh (Merge cmp xt ys))
+    let xs = (List_/Cons xh xt)
+    (List_/Cons yh (Merge cmp xs yt))
   )
 
 main = MergeSort

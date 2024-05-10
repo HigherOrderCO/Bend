@@ -656,7 +656,7 @@ impl<'a> PyParser<'a> {
       if !self.skip_exact_indent(indent, true)? {
         break;
       }
-      let name = self.parse_bend_name()?;
+      let name = Name::new(format!("{name}/{}", self.parse_bend_name()?));
       let mut fields = Vec::new();
       if self.skip_starts_with("(") {
         fields = self.list_like(|p| parse_variant_field(p), "(", ")", ",", true, 0)?;

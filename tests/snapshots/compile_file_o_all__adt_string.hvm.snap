@@ -7,4 +7,4 @@ In tests/golden_tests/compile_file_o_all/adt_string.hvm :
 String is a built-in datatype and should not be overridden.
 [0m  1 | [4m[31mdata String = S
 [0m  2 | [4m[31m
-[0m  3 | [4m[31m[0mmain = S[0m
+[0m  3 | [4m[31m[0mmain = String/S[0m

@@ -2,16 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool.hvm
 ---
-(not) = λa (a false true)
+(not) = λa (a bool/false bool/true)
 
-(and) = λa (a λb (b true false) λc (c false false))
+(and) = λa (a λb (b bool/true bool/false) λc (c bool/false bool/false))
 
-(and2) = λa (a λb b λ* false)
+(and2) = λa (a λb b λ* bool/false)
 
-(and3) = λa (a λb (b true false) λ* false)
+(and3) = λa (a λb (b bool/true bool/false) λ* bool/false)
 
-(and4) = λa (a λb (b true false) λ* false)
+(and4) = λa (a λb (b bool/true bool/false) λ* bool/false)
 
-(true) = λa λ* a
+(bool/true) = λa λ* a
 
-(false) = λ* λb b
+(bool/false) = λ* λb b

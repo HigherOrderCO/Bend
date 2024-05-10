@@ -1,7 +1,7 @@
-Result/bind (Result.ok val) f = (f val)
+Result/bind (Result/ok val) f = (f val)
 Result/bind err _ = err
 
-Bar x = (Result.err 0)
+Bar x = (Result/err 0)
 
 Foo x y = do Result {
   ask x = (Bar x);

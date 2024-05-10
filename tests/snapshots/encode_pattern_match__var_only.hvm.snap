@@ -6,6 +6,6 @@ input_file: tests/golden_tests/encode_pattern_match/var_only.hvm
 
 (main) = λ* Foo
 
-(False) = λa λ* a
+(Bool/False) = λa λ* a
 
-(True) = λ* λb b
+(Bool/True) = λ* λb b

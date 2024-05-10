@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_in_arm.hvm
 ---
-(main) = λa (a λ$x $x λb b)
+(main) = λ* λ$x $x
 
-(T) = λa λ* a
+(bool/T) = λa λ* a
 
-(F) = λ* λb b
+(bool/F) = λ* λb b

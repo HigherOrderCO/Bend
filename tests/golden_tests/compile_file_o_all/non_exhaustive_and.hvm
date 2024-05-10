@@ -1,6 +1,6 @@
 data Bool = T | F
 
-Bool.and T T = T
-Bool.and F F = F
+Bool.and Bool/T Bool/T = Bool/T
+Bool.and Bool/F Bool/F = Bool/F
 
 Main = *

@@ -1,9 +1,9 @@
 data list = (cons h t) | nil
 
-reverse (cons h t) = (concat (reverse t) (cons h nil))
-reverse nil = nil
+reverse (list/cons h t) = (concat (reverse t) (list/cons h list/nil))
+reverse list/nil = list/nil
 
-concat (cons h t) x = (cons h (concat t x))
-concat nil x = x
+concat (list/cons h t) x = (list/cons h (concat t x))
+concat list/nil x = x
 
-main = (reverse (cons 3 (cons 2 (cons 1 nil))))
+main = (reverse (list/cons 3 (list/cons 2 (list/cons 1 list/nil))))

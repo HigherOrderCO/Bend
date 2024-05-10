@@ -2,7 +2,7 @@
 data A_t = (A b)
 data B_t = B
 
-(Foo 0 (A B)) = B
+(Foo 0 (A_t/A B_t/B)) = B_t/B
 (Foo * *) = *
 
-main = (Foo 2 (A B))
+main = (Foo 2 (A_t/A B_t/B))

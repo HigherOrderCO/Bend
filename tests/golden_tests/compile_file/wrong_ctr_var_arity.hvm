@@ -1,5 +1,5 @@
 data Tup = (pair a b)
 
-(foo pair) = pair
+(foo Tup/pair) = pair
 
 main = *

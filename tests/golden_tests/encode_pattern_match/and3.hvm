@@ -1,6 +1,6 @@
 data Bool = T | F
 
-And (T, T, T) = T
-And * = F
+And (Bool/T, Bool/T, Bool/T) = Bool/T
+And * = Bool/F
 
-main = (And (F, T, F))
+main = (And (Bool/F, Bool/T, Bool/F))

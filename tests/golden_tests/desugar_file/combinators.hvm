@@ -2,10 +2,10 @@
 
 (bar) = λa λb (a bar b)
 
-(List.ignore list ignore) =
+(List/ignore list ignore) =
   match list {
-    List.cons: (List.ignore list.tail (List.ignore))
-    List.nil: 0
+    List/cons: (List/ignore list.tail (List/ignore))
+    List/nil: 0
   }
 
 (baz) = {0 1 2 3 λa a foo}

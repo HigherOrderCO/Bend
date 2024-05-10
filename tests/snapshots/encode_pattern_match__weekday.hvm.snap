@@ -2,18 +2,18 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/weekday.hvm
 ---
-(main) = (λa a Saturday)
+(main) = (λa a Weekday/Saturday)
 
-(Monday) = λa λ* λ* λ* λ* λ* λ* a
+(Weekday/Monday) = λa λ* λ* λ* λ* λ* λ* a
 
-(Tuesday) = λ* λb λ* λ* λ* λ* λ* b
+(Weekday/Tuesday) = λ* λb λ* λ* λ* λ* λ* b
 
-(Wednesday) = λ* λ* λc λ* λ* λ* λ* c
+(Weekday/Wednesday) = λ* λ* λc λ* λ* λ* λ* c
 
-(Thursday) = λ* λ* λ* λd λ* λ* λ* d
+(Weekday/Thursday) = λ* λ* λ* λd λ* λ* λ* d
 
-(Friday) = λ* λ* λ* λ* λe λ* λ* e
+(Weekday/Friday) = λ* λ* λ* λ* λe λ* λ* e
 
-(Saturday) = λ* λ* λ* λ* λ* λf λ* f
+(Weekday/Saturday) = λ* λ* λ* λ* λ* λf λ* f
 
-(Sunday) = λ* λ* λ* λ* λ* λ* λg g
+(Weekday/Sunday) = λ* λ* λ* λ* λ* λ* λg g

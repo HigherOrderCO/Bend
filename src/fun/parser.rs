@@ -84,20 +84,21 @@ impl<'a> TermParser<'a> {
     self.consume("data")?;
     let name = self.labelled(|p| p.parse_top_level_name(), "datatype name")?;
     self.consume("=")?;
-    let mut ctrs = vec![self.parse_datatype_ctr()?];
+    let mut ctrs = vec![self.parse_datatype_ctr(&name)?];
     while self.try_consume("|") {
-      ctrs.push(self.parse_datatype_ctr()?);
+      ctrs.push(self.parse_datatype_ctr(&name)?);
     }
     let ctrs = ctrs.into_iter().collect();
     let adt = Adt { ctrs, builtin };
     Ok((name, adt))
   }
 
-  fn parse_datatype_ctr(&mut self) -> Result<(Name, Vec<CtrField>), String> {
+  fn parse_datatype_ctr(&mut self, typ_name: &Name) -> Result<(Name, Vec<CtrField>), String> {
     // (name  ('~'? field)*)
     // name
     if self.try_consume("(") {
       let name = self.parse_top_level_name()?;
+      let name = Name::new(format!("{typ_name}/{name}"));
 
       fn parse_field(p: &mut TermParser) -> Result<CtrField, String> {
         let rec = p.try_consume("~");
@@ -110,6 +111,7 @@ impl<'a> TermParser<'a> {
     } else {
       // name
       let name = self.labelled(|p| p.parse_top_level_name(), "datatype constructor name")?;
+      let name = Name::new(format!("{typ_name}/{name}"));
       Ok((name, vec![]))
     }
   }

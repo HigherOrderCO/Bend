@@ -1,4 +1,4 @@
 data box = (new val)
 
-unbox (new val) = val
+unbox (box/new val) = val
 unbox x = x

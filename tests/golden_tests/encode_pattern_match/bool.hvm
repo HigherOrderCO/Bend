@@ -1,19 +1,19 @@
 data bool = true | false
 
-not false = true
-not true = false
+not bool/false = bool/true
+not bool/true = bool/false
 
-and false false = false
-and false true = false
-and true false = false
-and true true = true
+and bool/false bool/false = bool/false
+and bool/false bool/true = bool/false
+and bool/true bool/false = bool/false
+and bool/true bool/true = bool/true
 
-and2 true b = b
-and2 false b = false
+and2 bool/true b = b
+and2 bool/false b = bool/false
 
-and3 true true = true
-and3 a b = false
+and3 bool/true bool/true = bool/true
+and3 a b = bool/false
 
-and4 false b = false
-and4 a false = false
-and4 a b = true
+and4 bool/false b = bool/false
+and4 a bool/false = bool/false
+and4 a b = bool/true

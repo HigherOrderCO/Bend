@@ -1,8 +1,8 @@
 data Option = (Some val) | None
 
-Option.or = @a @b match a {
-  Some: a
-  None: b
+Option/or = @a @b match a {
+  Option/Some: a
+  Option/None: b
 }
 
-main = (Option.or (Some 5) (None))
+main = (Option/or (Option/Some 5) (Option/None))

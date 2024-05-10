@@ -2,11 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/and.hvm
 ---
-@and = (b (((a a) ((* @false) (b c))) c))
+@and = (b (((a a) ((* @bool/false) (b c))) c))
 
-@false = (* (a a))
+@bool/false = (* (a a))
+
+@bool/true = (a (* a))
 
 @main = a
-  & @and ~ (@true (@false a))
-
-@true = (a (* a))
+  & @and ~ (@bool/true (@bool/false a))

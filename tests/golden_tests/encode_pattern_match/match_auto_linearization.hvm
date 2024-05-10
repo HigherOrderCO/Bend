@@ -21,8 +21,8 @@ match_linearization =
   use d = (a, b);
   let (e, f) = d;
   match a {
-    Nat.zero: (b c c1 c2 d e f)
-    Nat.succ: (a.pred b c c1 c2 d e f)
+    Nat/zero: (b c c1 c2 d e f)
+    Nat/succ: (a.pred b c c1 c2 d e f)
   }
 
 switch_shadowed_field = @a @a-1 switch a {
@@ -31,6 +31,6 @@ switch_shadowed_field = @a @a-1 switch a {
 }
 
 match_shadowed_field = @a @a.head @a.tail match a {
-  List.nil: (List.cons a.head a.tail)
-  List.cons: (List.cons a.head a.tail)
+  List/nil: (List/cons a.head a.tail)
+  List/cons: (List/cons a.head a.tail)
 }

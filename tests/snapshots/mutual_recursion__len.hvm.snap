@@ -8,15 +8,15 @@ input_file: tests/golden_tests/mutual_recursion/len.hvm
   & $(b c) ~ [+1]
   & @Len ~ (a b)
 
-@List.cons = (a (b ((a (b c)) (* c))))
+@List/cons = (a (b ((a (b c)) (* c))))
 
-@List.nil = (* (a a))
+@List/nil = (* (a a))
 
 @main = g
   & @Len ~ (f g)
-  & @List.cons ~ (* (e f))
-  & @List.cons ~ (* (d e))
-  & @List.cons ~ (* (c d))
-  & @List.cons ~ (* (b c))
-  & @List.cons ~ (* (a b))
-  & @List.cons ~ (* (@List.nil a))
+  & @List/cons ~ (* (e f))
+  & @List/cons ~ (* (d e))
+  & @List/cons ~ (* (c d))
+  & @List/cons ~ (* (b c))
+  & @List/cons ~ (* (a b))
+  & @List/cons ~ (* (@List/nil a))

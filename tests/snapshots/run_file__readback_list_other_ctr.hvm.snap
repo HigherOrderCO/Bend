@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/readback_list_other_ctr.hvm
 ---
-λa λ* (a λb λ* (b 97 λc (c 98 λd λ* (d 99 String.nil))) λe λ* (e 1 λf (f 2 λg λ* (g 3 λh λ* (h 4 List.nil)))))
+λa λ* (a λb λ* (b 97 λc (c 98 λd λ* (d 99 String/nil))) λe λ* (e 1 λf (f 2 λg λ* (g 3 λh λ* (h 4 List/nil)))))

@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_syntax.hvm
 ---
-(head) = λa (a λb λ* b Nil)
+(head) = λa (a λb λ* b List_/Nil)
 
-(Cons) = λa λb λc λ* (c a b)
+(List_/Cons) = λa λb λc λ* (c a b)
 
-(Nil) = λ* λb b
+(List_/Nil) = λ* λb b

@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/bits_dec.hvm
 ---
-(Data.Bits.dec) = λa match a { Data.Bits.e: Data.Bits.e; Data.Bits.o b: match b { Data.Bits.e: Data.Bits.e; Data.Bits.o c: (Data.Bits.i (Data.Bits.dec c)); Data.Bits.i d: (Data.Bits.i (Data.Bits.dec d)); }; Data.Bits.i e: match e { Data.Bits.e: (Data.Bits.o Data.Bits.e); Data.Bits.o f: (Data.Bits.o f); Data.Bits.i g: (Data.Bits.o g); }; }
+(Data.Bits.dec) = λa match a { Data/Bits/e: Data/Bits/e; Data/Bits/o b: match b { Data/Bits/e: Data/Bits/e; Data/Bits/o c: (Data/Bits/i (Data.Bits.dec c)); Data/Bits/i d: (Data/Bits/i (Data.Bits.dec d)); }; Data/Bits/i e: match e { Data/Bits/e: (Data/Bits/o Data/Bits/e); Data/Bits/o f: (Data/Bits/o f); Data/Bits/i g: (Data/Bits/o g); }; }
 
-(Data.Bits.e) = λa λb λc a
+(Data/Bits/e) = λa λb λc a
 
-(Data.Bits.o) = λa λb λc λd (c a)
+(Data/Bits/o) = λa λb λc λd (c a)
 
-(Data.Bits.i) = λa λb λc λd (d a)
+(Data/Bits/i) = λa λb λc λd (d a)

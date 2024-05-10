@@ -4,6 +4,6 @@ input_file: tests/golden_tests/encode_pattern_match/non_matching_fst_arg.hvm
 ---
 (Foo) = λa λb (b λc let {c c_2} = c; (Foo c c_2) λd d a)
 
-(true) = λa λ* a
+(bool/true) = λa λ* a
 
-(false) = λ* λb b
+(bool/false) = λ* λb b

@@ -1,29 +1,29 @@
-List.len list = (List.len.go list 0)
-List.len.go [] count = count
-List.len.go (List.cons x xs) count = (List.len.go xs (+ count 1))
+List/len list = (List/len/go list 0)
+List/len/go [] count = count
+List/len/go (List/cons x xs) count = (List/len/go xs (+ count 1))
 
-Take.go n list =
+Take/go n list =
   switch _ = (== n 0) {
   | 0: (Take n list)
   | _: []
   }
 Take n [] = []
-Take n (List.cons x xs) = (List.cons x (Take.go (- n 1) xs))
+Take n (List/cons x xs) = (List/cons x (Take/go (- n 1) xs))
 
-Drop.go n list =
+Drop/go n list =
   switch _ = (== n 0) {
   | 0: (Drop n list)
   | _: list
   }
 Drop n [] = []
-Drop n (List.cons x xs) = (Drop.go (- n 1) xs)
+Drop n (List/cons x xs) = (Drop/go (- n 1) xs)
 
-List.toTree [] = *
-List.toTree [x] = x
-List.toTree xs =
-  let half = (/ (List.len xs) 2);
+List/toTree [] = *
+List/toTree [x] = x
+List/toTree xs =
+  let half = (/ (List/len xs) 2);
   let x = (Take half xs);
   let y = (Drop half xs);
-  {(List.toTree x), (List.toTree y)}
+  {(List/toTree x), (List/toTree y)}
 
-Main = (List.toTree [1, 2, 3, 4, 5])
+Main = (List/toTree [1, 2, 3, 4, 5])

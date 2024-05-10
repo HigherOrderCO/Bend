@@ -1,7 +1,7 @@
 #flavor core
 A = @a match a {
-  List.cons: (A a.tail)
-  List.nil: 0
+  List/cons: (A a.tail)
+  List/nil: 0
 }
 
 main = (A [4 4])

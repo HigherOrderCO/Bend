@@ -2,27 +2,27 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
 ---
-@Cons = (a (b ((a (b c)) (* c))))
-
-@False__M_Nil = (* (a a))
+@Bool/False__M_List_/Nil = (* (a a))
 
 @If = (((a (* a)) ((* (b b)) c)) c)
 
-@Map = ((@Map__C0 ((* @False__M_Nil) a)) a)
+@List_/Cons = (a (b ((a (b c)) (* c))))
+
+@Map = ((@Map__C0 ((* @Bool/False__M_List_/Nil) a)) a)
 
 @Map__C0 = (a (c ({(a b) d} f)))
-  & @Cons ~ (b (e f))
+  & @List_/Cons ~ (b (e f))
   & @Map ~ (c (d e))
 
 @Merge = (b ((@Merge__C2 ((* (a a)) (b c))) c))
 
-@MergePair = (a ((@MergePair__C2 ((* @False__M_Nil) (a b))) b))
+@MergePair = (a ((@MergePair__C2 ((* @Bool/False__M_List_/Nil) (a b))) b))
 
 @MergePair__C0 = (* (a b))
-  & @Cons ~ (a (@False__M_Nil b))
+  & @List_/Cons ~ (a (@Bool/False__M_List_/Nil b))
 
 @MergePair__C1 = (c (f ({a e} (b h))))
-  & @Cons ~ (d (g h))
+  & @List_/Cons ~ (d (g h))
   & @Merge ~ (a (b (c d)))
   & @MergePair ~ (e (f g))
 
@@ -33,29 +33,29 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.hvm
   & @Map ~ (b (@Pure c))
 
 @Merge__C0 = (* a)
-  & @Cons ~ a
+  & @List_/Cons ~ a
 
 @Merge__C1 = ({b {g l}} ({h q} ({(a (b c)) {e m}} ({a {d n}} ({f o} t)))))
   & @If ~ (c (k (s t)))
-  & @Cons ~ (d (j k))
+  & @List_/Cons ~ (d (j k))
   & @Merge ~ (e (f (i j)))
-  & @Cons ~ (g (h i))
-  & @Cons ~ (l (r s))
+  & @List_/Cons ~ (g (h i))
+  & @List_/Cons ~ (l (r s))
   &! @Merge ~ (m (p (q r)))
-  & @Cons ~ (n (o p))
+  & @List_/Cons ~ (n (o p))
 
 @Merge__C2 = (b (c (a ((@Merge__C1 (@Merge__C0 (a (b (c d))))) d))))
 
 @Pure = (a b)
-  & @Cons ~ (a (@False__M_Nil b))
+  & @List_/Cons ~ (a (@Bool/False__M_List_/Nil b))
 
-@Unpack = (a ((@Unpack__C1 ((* @False__M_Nil) (a b))) b))
+@Unpack = (a ((@Unpack__C1 ((* @Bool/False__M_List_/Nil) (a b))) b))
 
 @Unpack__C0 = (d (e ({a b} (c i))))
   & @Unpack ~ (a (h i))
   & @MergePair ~ (b (g h))
-  & @Cons ~ (c (f g))
-  & @Cons ~ (d (e f))
+  & @List_/Cons ~ (c (f g))
+  & @List_/Cons ~ (d (e f))
 
 @Unpack__C1 = (c ((@Unpack__C0 ((* (a a)) (b (c d)))) (b d)))
 

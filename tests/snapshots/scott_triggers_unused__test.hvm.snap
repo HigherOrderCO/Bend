@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/scott_triggers_unused/test.hvm
 ---
-@f = (* (a a))
+@bool/f = (* (a a))
+
+@bool/t = (a (* a))
 
 @main = ((0 (1 a)) a)
-
-@t = (a (* a))
