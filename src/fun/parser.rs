@@ -406,6 +406,25 @@ impl<'a> TermParser<'a> {
         return Ok(Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) });
       }
 
+      // If
+      if self.try_consume_keyword("if") {
+        let cnd = self.parse_term()?;
+        self.consume("{")?;
+        let thn = self.parse_term()?;
+        self.consume("}")?;
+        self.consume("else")?;
+        self.consume("{")?;
+        let els = self.parse_term()?;
+        self.consume("}")?;
+        return Ok(Term::Swt {
+          arg: Box::new(cnd),
+          bnd: Some(Name::new("%cond")),
+          with: Vec::new(),
+          pred: Some(Name::new("%cond-1")),
+          arms: vec![els, thn],
+        });
+      }
+
       // Match
       if self.try_consume_keyword("match") {
         unexpected_tag(self)?;
