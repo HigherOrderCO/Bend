@@ -120,9 +120,9 @@ impl<'a> PyParser<'a> {
         let nam = self.parse_bend_name()?;
         if self.skip_starts_with("[") {
           self.consume("[")?;
-          let key = self.parse_map_key()?;
+          let key = self.parse_infix_or_lambda()?;
           self.consume("]")?;
-          return Ok(Expr::MapGet { nam, key });
+          return Ok(Expr::MapGet { nam, key: Box::new(key) });
         }
         Expr::Var { nam }
       }
@@ -383,7 +383,7 @@ impl<'a> PyParser<'a> {
         return Ok(Stmt::Assign { pat: AssignPattern::Var(name), val: Box::new(val), nxt: Box::new(nxt) });
       } else if self.skip_starts_with("[") {
         self.consume("[")?;
-        let key = self.parse_map_key()?;
+        let key = self.parse_infix_or_lambda()?;
         self.consume("]")?;
         self.consume("=")?;
         let val = self.parse_expression()?;
@@ -748,7 +748,9 @@ mod test {
 def main():
   x = { 2: 1, 3: 2 };
   y = id(x[2]);
-  return y + x[3];
+  z = 4;
+  x[z] = 4;
+  return y + x[z];
   "#;
     let mut parser = PyParser::new(src);
     let mut program = parser.parse_program(&Default::default()).inspect_err(|e| println!("{e}")).unwrap();
