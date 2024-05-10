@@ -420,7 +420,7 @@ impl<'a> TermParser<'a> {
           arg: Box::new(cnd),
           bnd: Some(Name::new("%cond")),
           with: Vec::new(),
-          pred: Some(Name::new("%cond")),
+          pred: Some(Name::new("%cond-1")),
           arms: vec![els, thn],
         });
       }
