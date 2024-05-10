@@ -1,10 +1,10 @@
 enum Bool:
-  Bool/true()
-  Bool/false()
+  true()
+  false()
 
 enum Tree:
-  Tree/node(~lft, ~rgt)
-  Tree/leaf(val)
+  node(~lft, ~rgt)
+  leaf(val)
 
 def and(a, b):
   match a:
