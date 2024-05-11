@@ -1,4 +1,3 @@
-#flavor core
 data Tree = Leaf | (Node l m r)
 
 // Parallel QuickSort

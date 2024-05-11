@@ -1,4 +1,3 @@
-#flavor core
 true = λt λf t
 false = λt λf f
 not = λboolean (boolean false true)

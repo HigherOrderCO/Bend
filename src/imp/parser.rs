@@ -1,21 +1,14 @@
-use std::collections::HashSet;
-
-use indexmap::IndexMap;
-use TSPL::Parser;
-
+use super::{AssignPattern, Definition, Enum, Expr, InPlaceOp, MBind, MapKey, MatchArm, Stmt, Variant};
 use crate::{
-  fun::{parser::ParserCommons, CtrField, Name, Op, STRINGS},
+  fun::{parser::ParserCommons, Adt, Book, CtrField, Name, Op, STRINGS},
   maybe_grow,
 };
-
-use super::{
-  AssignPattern, Definition, Enum, Expr, InPlaceOp, MBind, MapKey, MatchArm, Program, Stmt, TopLevel, Variant,
-};
+use TSPL::Parser;
 
 const PREC: &[&[Op]] =
   &[&[Op::EQL, Op::NEQ], &[Op::LTN], &[Op::GTN], &[Op::ADD, Op::SUB], &[Op::MUL, Op::DIV]];
 
-struct Indent(isize);
+pub struct Indent(pub isize);
 
 impl Indent {
   fn enter_level(&mut self) {
@@ -28,8 +21,8 @@ impl Indent {
 }
 
 pub struct PyParser<'i> {
-  input: &'i str,
-  index: usize,
+  pub input: &'i str,
+  pub index: usize,
 }
 
 impl<'a> PyParser<'a> {
@@ -248,45 +241,10 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn skip_newlines(&mut self) -> usize {
-    loop {
-      let num_spaces = self.advance_inline_trivia();
-      if self.peek_one() == Some('\r') {
-        self.advance_one();
-      }
-      if self.peek_one() == Some('\n') {
-        self.advance_one();
-      } else {
-        return num_spaces;
-      }
-    }
-  }
-
-  fn advance_inline_trivia(&mut self) -> usize {
-    let mut char_count = 0;
-    while let Some(c) = self.peek_one() {
-      if " \t".contains(c) {
-        self.advance_one();
-        char_count += 1;
-        continue;
-      }
-      if c == '/' && self.input().get(*self.index() ..).unwrap_or_default().starts_with("//") {
-        while let Some(c) = self.peek_one() {
-          if c != '\n' {
-            self.advance_one();
-            char_count += 1;
-          } else {
-            break;
-          }
-        }
-        continue;
-      }
-      break;
-    }
-    char_count
-  }
-
   fn skip_exact_indent(&mut self, Indent(mut count): &Indent, block: bool) -> Result<bool, String> {
+    let expected = count;
+    let ini_idx = *self.index();
+
     while let Some(c) = self.peek_one() {
       if c == '\n' {
         self.advance_one();
@@ -310,7 +268,13 @@ impl<'a> PyParser<'a> {
       return Ok(count == 0 && !self.is_eof());
     }
     // TODO: add the current line in Err
-    if count == 0 { Ok(true) } else { Err("Indentation error".to_string()) }
+    if count == 0 {
+      Ok(true)
+    } else {
+      let msg = format!("Indentation error. Expected {} spaces, got {}.", expected, expected - count);
+      let end_idx = *self.index();
+      self.with_ctx(Err(msg), ini_idx, end_idx)
+    }
   }
 
   fn parse_statement(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
@@ -620,40 +584,39 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_top_level(&mut self, indent: &mut Indent) -> Result<TopLevel, String> {
-    self.skip_exact_indent(indent, false)?;
-    if self.try_consume_keyword("def") {
-      Ok(TopLevel::Def(self.parse_def(indent)?))
-    } else if self.try_consume_keyword("enum") {
-      Ok(TopLevel::Enum(self.parse_enum(indent)?))
-    } else {
-      self.expected("Enum or Def declaration")?
+  pub fn parse_def(&mut self, indent: usize) -> Result<Definition, String> {
+    if indent > 0 {
+      self.expected("Indentation error")?;
     }
-  }
+    let mut indent = Indent(0);
 
-  fn parse_def(&mut self, indent: &mut Indent) -> Result<Definition, String> {
     let name = self.parse_bend_name()?;
     let params = self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 0)?;
     self.consume(":")?;
     indent.enter_level();
-    let body = self.parse_statement(indent)?;
+    let body = self.parse_statement(&mut indent)?;
     indent.exit_level();
     Ok(Definition { name, params, body })
   }
 
-  fn parse_enum(&mut self, indent: &mut Indent) -> Result<Enum, String> {
+  pub fn parse_enum(&mut self, indent: usize) -> Result<Enum, String> {
     fn parse_variant_field(p: &mut PyParser) -> Result<CtrField, String> {
       let rec = p.try_consume("~");
       let nam = p.parse_bend_name()?;
       Ok(CtrField { nam, rec })
     }
 
+    if indent > 0 {
+      self.expected("Indentation error")?;
+    }
+    let mut indent = Indent(0);
+
     let name = self.parse_bend_name()?;
     let mut variants = Vec::new();
     self.consume(":")?;
     indent.enter_level();
     loop {
-      if !self.skip_exact_indent(indent, true)? {
+      if !self.skip_exact_indent(&indent, true)? {
         break;
       }
       let name = Name::new(format!("{name}/{}", self.parse_bend_name()?));
@@ -668,176 +631,54 @@ impl<'a> PyParser<'a> {
     Ok(Enum { name, variants })
   }
 
-  pub fn parse_program(&mut self, builtins: &HashSet<Name>) -> Result<Program, String> {
-    let mut enums = IndexMap::<Name, Enum>::new();
-    let mut defs = IndexMap::<Name, Definition>::new();
-    let mut variants = IndexMap::<Name, Name>::new();
-
-    loop {
-      let spaces = self.skip_newlines();
-      if self.is_eof() {
-        break;
-      }
-      if spaces != 0 {
-        self.expected("Indentation error")?;
-      }
-      match self.parse_top_level(&mut Indent(0))? {
-        TopLevel::Def(def) => Self::add_def(&mut defs, def, builtins)?,
-        TopLevel::Enum(r#enum) => Self::add_enum(&mut enums, &mut variants, r#enum, builtins)?,
-      }
-    }
-
-    Ok(Program { enums, defs, variants })
-  }
-
-  fn add_def(
-    defs: &mut IndexMap<Name, Definition>,
-    def: Definition,
-    builtins: &HashSet<Name>,
+  pub fn add_def(
+    &mut self,
+    mut def: Definition,
+    book: &mut Book,
+    ini_idx: usize,
+    end_idx: usize,
   ) -> Result<(), String> {
-    if builtins.contains(&def.name) {
-      return Err(format!("Built-in function '{}' cannot be overridden.", def.name));
+    if book.defs.contains_key(&def.name) {
+      let msg = format!("Redefinition of function '{}'.", def.name);
+      return self.with_ctx(Err(msg), ini_idx, end_idx);
     }
-    match defs.entry(def.name.clone()) {
-      indexmap::map::Entry::Occupied(o) => Err(format!("Repeated function definition '{}'.", o.get().name)),
-      indexmap::map::Entry::Vacant(v) => {
-        v.insert(def);
-        Ok(())
-      }
+    if book.ctrs.contains_key(&def.name) {
+      let msg = format!("Redefinition of constructor '{}'.", def.name);
+      return self.with_ctx(Err(msg), ini_idx, end_idx);
     }
-  }
-
-  fn add_enum(
-    enums: &mut IndexMap<Name, Enum>,
-    variants: &mut IndexMap<Name, Name>,
-    r#enum: Enum,
-    builtins: &HashSet<Name>,
-  ) -> Result<(), String> {
-    if builtins.contains(&r#enum.name) {
-      return Err(format!("Built-in type '{}' cannot be overridden.", r#enum.name));
-    }
-    match enums.entry(r#enum.name.clone()) {
-      indexmap::map::Entry::Occupied(o) => return Err(format!("Repeated enum '{}'.", o.key())),
-      indexmap::map::Entry::Vacant(v) => {
-        for (name, variant) in r#enum.variants.iter() {
-          if builtins.contains(name) {
-            return Err(format!("Built-in constructor '{}' cannot be overridden.", name));
-          }
-          match variants.entry(name.clone()) {
-            indexmap::map::Entry::Occupied(_) => {
-              return Err(format!("Repeated variant '{}'.", variant.name));
-            }
-            indexmap::map::Entry::Vacant(v) => _ = v.insert(r#enum.name.clone()),
-          }
-        }
-        v.insert(r#enum);
-      }
-    }
+    def.order_kwargs(book)?;
+    def.gen_map_get();
+    let def = def.to_fun();
+    book.defs.insert(def.name.clone(), def);
     Ok(())
   }
-}
 
-#[cfg(test)]
-#[allow(dead_code)]
-mod test {
-  use super::PyParser;
-
-  #[test]
-  fn map_get() {
-    let src = r#"
-def main():
-  x = { 2: 1, 3: 2 };
-  y = id(x[2]);
-  z = 4;
-  x[z] = 4;
-  return y + x[z];
-  "#;
-    let mut parser = PyParser::new(src);
-    let mut program = parser.parse_program(&Default::default()).inspect_err(|e| println!("{e}")).unwrap();
-    program.gen_map_get();
-    let out = program.to_fun(crate::Book::builtins());
-    println!("{}", out.display_pretty());
-  }
-
-  #[test]
-  fn parse_program() {
-    let src = r#"
-enum Point:
-  Point(x, y)
-
-enum Bool:
-  True()
-  False()
-
-
-def symbols():
-  x = { `x`: 5, 2: 3 };
-  x[`x`] = 2;
-  x[2] = 3;
-  return x[`x`] + `foxy`;
-
-def mk_point():
-  return Point(y = 2, x = 1);
-
-def identity(x):
-  return x;
-
-def inc(n):
-  n += 1;
-  return n;
-
-//def inc_list(list):
-//  return [x+1 for x in list];
-
-def lam():
-  return lambda x, y: x;
-
-def do_match(b):
-  match b:
-    True:
-      return 1;
-    False:
-      return 0;
-
-def true():
-  return True;
-
-def fib(n):
-  if n < 2:
-    return n;
-  else:
-    return fib(n - 1) + fib(n - 2);
-
-def swt(n):
-  switch n:
-    0:
-      return 42;
-    _:
-      return 1;
-
-def fld(list):
-  fold list:
-    List.cons:
-      return 1;
-    List.nil:
-      return 2;
-
-def bnd():
-  bend x = 0 while x < 10:
-    return List.cons(x go(x + 1));
-  then:
-    return List.nil();
-
-//def main():
-//  do IO.bind:
-//    !x = IO.read();
-//    return x;
-    "#;
-    let mut parser = PyParser::new(src);
-    let mut program = parser.parse_program(&Default::default()).inspect_err(|e| println!("{e}")).unwrap();
-    program.order_kwargs();
-    program.gen_map_get();
-    let out = program.to_fun(crate::Book::builtins());
-    println!("{out}");
+  pub fn add_enum(
+    &mut self,
+    r#enum: Enum,
+    book: &mut Book,
+    ini_idx: usize,
+    end_idx: usize,
+    builtin: bool,
+  ) -> Result<(), String> {
+    if book.adts.contains_key(&r#enum.name) {
+      let msg = format!("Redefinition of type '{}'.", r#enum.name);
+      return self.with_ctx(Err(msg), ini_idx, end_idx);
+    }
+    let mut adt = Adt { ctrs: Default::default(), builtin };
+    for (name, variant) in r#enum.variants {
+      if book.defs.contains_key(&name) {
+        let msg = format!("Redefinition of function '{}'.", name);
+        return self.with_ctx(Err(msg), ini_idx, end_idx);
+      }
+      if book.ctrs.contains_key(&name) {
+        let msg = format!("Redefinition of constructor '{}'.", variant.name);
+        return self.with_ctx(Err(msg), ini_idx, end_idx);
+      }
+      book.ctrs.insert(name, r#enum.name.clone());
+      adt.ctrs.insert(variant.name, variant.fields);
+    }
+    book.adts.insert(r#enum.name.clone(), adt);
+    Ok(())
   }
 }

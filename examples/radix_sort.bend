@@ -1,4 +1,3 @@
-#flavor core
 data Map_ = Free | Used | (Both a b)
 data Arr = Null | (Leaf x) | (Node a b)
 

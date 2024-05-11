@@ -84,7 +84,6 @@ impl Term {
       if matches!(self, Term::Mat { .. } | Term::Fold { .. }) {
         self.fix_match(&mut errs, ctrs, adts);
       }
-
       // Add a use term to each arm rebuilding the matched variable
       match self {
         Term::Mat { arg: _, bnd, with: _, arms } | Term::Fold { bnd, arg: _, with: _, arms } => {

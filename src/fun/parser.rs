@@ -3,6 +3,7 @@ use crate::{
     display::DisplayFn, Adt, Book, Definition, FanKind, MatchRule, Name, Num, Op, Pattern, Rule, Tag, Term,
     STRINGS,
   },
+  imp::parser::PyParser,
   maybe_grow,
 };
 use highlight_error::highlight_error;
@@ -60,20 +61,34 @@ impl<'a> TermParser<'a> {
 
   pub fn parse_book(&mut self, default_book: Book, builtin: bool) -> Result<Book, String> {
     let mut book = default_book;
-    self.skip_trivia();
+    let mut indent = self.skip_newlines();
     while !self.is_eof() {
       let ini_idx = *self.index();
-      if self.skip_starts_with("data") {
-        // adt declaration
+      if self.try_consume_keyword("enum") {
+        // Imp type definition
+        let mut prs = PyParser { input: self.input, index: *self.index() };
+        let enum_ = prs.parse_enum(indent)?;
+        self.index = prs.index;
+        let end_idx = *self.index();
+        prs.add_enum(enum_, &mut book, ini_idx, end_idx, builtin)?;
+      } else if self.try_consume_keyword("def") {
+        // Imp function definition
+        let mut prs = PyParser { input: self.input, index: *self.index() };
+        let def = prs.parse_def(indent)?;
+        self.index = prs.index;
+        let end_idx = *self.index();
+        prs.add_def(def, &mut book, ini_idx, end_idx)?;
+      } else if self.try_consume_keyword("data") {
+        // Fun type definition
         let (nam, adt) = self.parse_datatype(builtin)?;
         let end_idx = *self.index();
         self.with_ctx(book.add_adt(nam, adt), ini_idx, end_idx)?;
       } else {
-        // function declaration rule
+        // Fun function definition
         let (name, rule) = self.parse_rule()?;
         book.add_rule(name, rule, builtin);
       }
-      self.skip_trivia();
+      indent = self.skip_newlines();
     }
 
     Ok(book)
@@ -81,7 +96,6 @@ impl<'a> TermParser<'a> {
 
   fn parse_datatype(&mut self, builtin: bool) -> Result<(Name, Adt), String> {
     // data name = ctr (| ctr)*
-    self.consume("data")?;
     let name = self.labelled(|p| p.parse_top_level_name(), "datatype name")?;
     self.consume("=")?;
     let mut ctrs = vec![self.parse_datatype_ctr(&name)?];
@@ -749,6 +763,44 @@ pub trait ParserCommons<'a>: Parser<'a> {
   fn skip_starts_with(&mut self, text: &str) -> bool {
     self.skip_trivia();
     self.starts_with(text)
+  }
+
+  fn skip_newlines(&mut self) -> usize {
+    loop {
+      let num_spaces = self.advance_inline_trivia();
+      if self.peek_one() == Some('\r') {
+        self.advance_one();
+      }
+      if self.peek_one() == Some('\n') {
+        self.advance_one();
+      } else {
+        return num_spaces;
+      }
+    }
+  }
+
+  fn advance_inline_trivia(&mut self) -> usize {
+    let mut char_count = 0;
+    while let Some(c) = self.peek_one() {
+      if " \t".contains(c) {
+        self.advance_one();
+        char_count += 1;
+        continue;
+      }
+      if c == '/' && self.input().get(*self.index() ..).unwrap_or_default().starts_with("//") {
+        while let Some(c) = self.peek_one() {
+          if c != '\n' {
+            self.advance_one();
+            char_count += 1;
+          } else {
+            break;
+          }
+        }
+        continue;
+      }
+      break;
+    }
+    char_count
   }
 
   fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> Result<T, String> {

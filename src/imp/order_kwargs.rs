@@ -1,148 +1,162 @@
+use crate::{
+  fun::{Book, Name},
+  imp::{Definition, Expr, MBind, Stmt},
+};
 use indexmap::IndexMap;
 
-use crate::fun::Name;
-
-use super::{Definition, Enum, Expr, MBind, Program, Stmt, Variant};
-
-struct Ctx<'a> {
-  variants: &'a IndexMap<Name, Name>,
-  enums: &'a IndexMap<Name, Enum>,
-  defs: &'a IndexMap<Name, Definition>,
-}
-
-enum Fetch<'a> {
-  Variant(&'a Variant),
-  Definition(&'a Definition),
-}
-
-impl<'a> Ctx<'a> {
-  fn fetch(&self, name: &Name) -> Option<Fetch> {
-    match self.variants.get(name) {
-      Some(enum_name) => match self.enums.get(enum_name) {
-        Some(r#enum) => r#enum.variants.get(name).map(Fetch::Variant),
-        None => None,
-      },
-      None => self.defs.get(name).map(Fetch::Definition),
-    }
-  }
-}
-
-impl Program {
-  pub fn order_kwargs(&mut self) {
-    let ctx = Ctx { variants: &self.variants, enums: &self.enums, defs: &self.defs.clone() };
-    for def in self.defs.values_mut() {
-      def.body.order_kwargs(&ctx);
-    }
+impl Definition {
+  pub fn order_kwargs(&mut self, book: &Book) -> Result<(), String> {
+    self.body.order_kwargs(book).map_err(|e| format!("In function '{}':\n  {}", self.name, e))
   }
 }
 
 impl Stmt {
-  fn order_kwargs(&mut self, ctx: &Ctx) {
+  fn order_kwargs(&mut self, book: &Book) -> Result<(), String> {
     match self {
       Stmt::Assign { val, nxt, .. } => {
-        val.order_kwargs(ctx);
-        nxt.order_kwargs(ctx);
+        val.order_kwargs(book)?;
+        nxt.order_kwargs(book)?;
       }
       Stmt::InPlace { val, nxt, .. } => {
-        val.order_kwargs(ctx);
-        nxt.order_kwargs(ctx);
+        val.order_kwargs(book)?;
+        nxt.order_kwargs(book)?;
       }
       Stmt::If { cond, then, otherwise } => {
-        cond.order_kwargs(ctx);
-        then.order_kwargs(ctx);
-        otherwise.order_kwargs(ctx);
+        cond.order_kwargs(book)?;
+        then.order_kwargs(book)?;
+        otherwise.order_kwargs(book)?;
       }
       Stmt::Match { arg, arms, .. } => {
-        arg.order_kwargs(ctx);
+        arg.order_kwargs(book)?;
         for arm in arms {
-          arm.rgt.order_kwargs(ctx);
+          arm.rgt.order_kwargs(book)?;
         }
       }
       Stmt::Switch { arg, arms, .. } => {
-        arg.order_kwargs(ctx);
+        arg.order_kwargs(book)?;
         for arm in arms {
-          arm.order_kwargs(ctx);
+          arm.order_kwargs(book)?;
         }
       }
       Stmt::Fold { arg, arms, .. } => {
-        arg.order_kwargs(ctx);
+        arg.order_kwargs(book)?;
         for arm in arms {
-          arm.rgt.order_kwargs(ctx);
+          arm.rgt.order_kwargs(book)?;
         }
       }
       Stmt::Bend { bind: _, init, cond, step, base } => {
         for init in init {
-          init.order_kwargs(ctx);
+          init.order_kwargs(book)?;
         }
-        cond.order_kwargs(ctx);
-        step.order_kwargs(ctx);
-        base.order_kwargs(ctx);
+        cond.order_kwargs(book)?;
+        step.order_kwargs(book)?;
+        base.order_kwargs(book)?;
       }
       Stmt::Do { block, .. } => {
         for bind in block {
           match bind {
-            MBind::Ask { val, .. } => val.order_kwargs(ctx),
-            MBind::Stmt { stmt } => stmt.order_kwargs(ctx),
+            MBind::Ask { val, .. } => val.order_kwargs(book)?,
+            MBind::Stmt { stmt } => stmt.order_kwargs(book)?,
           }
         }
       }
-      Stmt::Return { term } => term.order_kwargs(ctx),
+      Stmt::Return { term } => term.order_kwargs(book)?,
       Stmt::Err => {}
     }
+    Ok(())
   }
 }
 
 impl Expr {
-  fn order_kwargs(&mut self, ctx: &Ctx) {
+  fn order_kwargs(&mut self, book: &Book) -> Result<(), String> {
     match self {
+      // Named arguments are only allowed when directly calling a named function.
       Expr::Call { fun, args, kwargs } => {
-        if let Expr::Var { nam } = &**fun {
-          if let Some(fetch) = ctx.fetch(nam) {
-            match fetch {
-              Fetch::Variant(variant) => go_order_kwargs(variant.fields.iter().map(|f| &f.nam), kwargs, args),
-              Fetch::Definition(def) => go_order_kwargs(def.params.iter(), kwargs, args),
+        if !kwargs.is_empty() {
+          if let Expr::Var { nam } = fun.as_ref() {
+            if let Some(names) = get_args_def_or_ctr(nam, book) {
+              go_order_kwargs(&names, args, kwargs)?;
+            } else {
+              return Err(format!(
+                "Named args are only allowed when calling a named function, not when calling variable '{nam}'."
+              ));
             }
+          } else {
+            // TODO: Print expression
+            return Err(
+              "Named args are only allowed when calling a named function, not when calling an expression."
+                .to_string(),
+            );
           }
-        } else {
-          fun.order_kwargs(ctx);
-          args.iter_mut().for_each(|a| a.order_kwargs(ctx));
+        }
+        fun.order_kwargs(book)?;
+        for arg in args {
+          arg.order_kwargs(book)?;
+        }
+        for (_, arg) in kwargs {
+          arg.order_kwargs(book)?;
         }
       }
-      Expr::Lam { bod, .. } => bod.order_kwargs(ctx),
+      Expr::Lam { bod, .. } => bod.order_kwargs(book)?,
       Expr::Bin { lhs, rhs, .. } => {
-        lhs.order_kwargs(ctx);
-        rhs.order_kwargs(ctx);
+        lhs.order_kwargs(book)?;
+        rhs.order_kwargs(book)?;
       }
-      Expr::Lst { els } | Expr::Tup { els } => els.iter_mut().for_each(|e| e.order_kwargs(ctx)),
+      Expr::Lst { els } | Expr::Tup { els } => {
+        for el in els {
+          el.order_kwargs(book)?;
+        }
+      }
       Expr::Comprehension { term, iter, cond, .. } => {
-        term.order_kwargs(ctx);
-        iter.order_kwargs(ctx);
+        term.order_kwargs(book)?;
+        iter.order_kwargs(book)?;
         if let Some(cond) = cond {
-          cond.order_kwargs(ctx);
+          cond.order_kwargs(book)?;
         }
       }
       Expr::MapInit { entries } => {
         for entry in entries {
-          entry.1.order_kwargs(ctx);
+          entry.1.order_kwargs(book)?;
         }
       }
       Expr::MapGet { .. } | Expr::None | Expr::Var { .. } | Expr::Num { .. } | Expr::Str { .. } => {}
     }
+    Ok(())
   }
 }
 
-fn go_order_kwargs<'a>(
-  names: impl Iterator<Item = &'a Name>,
-  kwargs: &mut Vec<(Name, Expr)>,
+fn go_order_kwargs(
+  names: &[Name],
   args: &mut Vec<Expr>,
-) {
-  let mut index_map = IndexMap::new();
-  for (index, field) in names.enumerate() {
-    index_map.insert(field, index);
+  kwargs: &mut Vec<(Name, Expr)>,
+) -> Result<(), String> {
+  if args.len() + kwargs.len() != names.len() {
+    return Err(
+      "Named args are only allowed when calling a function with the exact number of arguments.".to_string(),
+    );
   }
+  let mut kwargs: IndexMap<Name, Expr> = IndexMap::from_iter(kwargs.drain(..));
+  let remaining_names = &names[args.len() ..];
+  for name in remaining_names {
+    if let Some(arg) = kwargs.shift_remove(name) {
+      args.push(arg);
+    } else {
+      return Err(format!("Named arg '{name}' is missing."));
+    }
+  }
+  if let Some(name) = kwargs.keys().next() {
+    return Err(format!("Unexpected named arg in function call {}.", name));
+  }
+  Ok(())
+}
 
-  let mut kwargs = std::mem::take(kwargs);
-  kwargs.sort_by_key(|i| index_map.get(&i.0).unwrap());
-  let new_args = kwargs.into_iter().map(|i| i.1.clone());
-  args.extend(new_args);
+fn get_args_def_or_ctr(name: &Name, book: &Book) -> Option<Vec<Name>> {
+  #[allow(clippy::manual_map)]
+  if let Some(adt_nam) = book.ctrs.get(name) {
+    Some(book.adts[adt_nam].ctrs[name].iter().map(|f| f.nam.clone()).collect())
+  } else if let Some(def) = book.defs.get(name) {
+    Some(def.rules[0].pats.iter().flat_map(|p| p.binds().flatten().cloned()).collect())
+  } else {
+    None
+  }
 }
