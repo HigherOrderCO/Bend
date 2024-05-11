@@ -1,14 +1,14 @@
-enum Bool:
-  True()
-  False()
+type Bool:
+  True
+  False
 
 data Tree = (node ~lft ~rgt) | (leaf val)
 
 def tree_xor(tree):
   fold tree:
-    Tree/node:
+    case Tree/node:
       return xor(tree.lft, tree.rgt);
-    Tree/leaf:
+    case Tree/leaf:
       return tree.val;
 
 (xor Bool/True Bool/False) = Bool/True

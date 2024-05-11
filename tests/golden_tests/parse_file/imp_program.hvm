@@ -1,9 +1,9 @@
-enum Point:
-  Point(x, y)
+type Point:
+  Point { x, y }
 
-enum Bool:
-  True()
-  False()
+type Bool:
+  True
+  False
 
 
 def symbols():
@@ -26,13 +26,13 @@ def inc(n):
 //  return [x+1 for x in list];
 
 def lam():
-  return lambda x, y: x;
+  return lam x, y: x;
 
 def do_match(b):
   match b:
-    True:
+    case True:
       return 1;
-    False:
+    case False:
       return 0;
 
 def true():
@@ -46,16 +46,16 @@ def fib(n):
 
 def swt(n):
   switch n:
-    0:
+    case 0:
       return 42;
-    _:
+    case _:
       return 1;
 
 def fld(list):
   fold list:
-    List/cons:
+    case List/cons:
       return 1;
-    List/nil:
+    case List/nil:
       return 2;
 
 def bnd():

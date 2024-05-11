@@ -29,21 +29,21 @@ A definition is composed by a name, a sequence of parameters and a body.
 
 A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names).
 
-### Enum
+### Type
 
-Defines an ADT like enumeration.
+Defines an algebraic data type.
 
 ```python
-enum Option:
-  Some(value)
+type Option:
+  Some { value }
   None
 
-enum Tree:
-  Node(value, ~left, ~right)
+type Tree:
+  Node { value, ~left, ~right }
   Leaf
 ```
 
-Enum names must be unique, and should have at least one constructor.
+Type names must be unique, and should have at least one constructor.
 
 Each constructor is defined by a name followed by its fields.
 
@@ -59,13 +59,13 @@ Read [defining data types](./defining-data-types.md) to know more.
 ### Assignment
 
 ```python
-value = 2
-return value
+value = 2;
+return value;
 
-(first, second) = (1, 2)
-return second
+(first, second) = (1, 2);
+return second;
 
-{x y} = {2 3}
+{x y} = {2 3};
 ```
 
 Assigns a value to a variable, it's possible to pattern match match tuples and superpositions.
@@ -73,13 +73,14 @@ Assigns a value to a variable, it's possible to pattern match match tuples and s
 ### In-Place Operation
 
 ```python
-x += 1
-return x
+x += 1;
+return x;
 ```
 
 The in-place operation does an infix operation and re-assigns a variable.
 
 The operations are:
+
 - Addition `+=`
 - Subtraction `-=`
 - Multiplication `*=`
@@ -88,7 +89,7 @@ The operations are:
 ### Return
 
 ```python
-return "hello"
+return "hello";
 ```
 
 Returns the following expression. All paths or branches should end with a return.
@@ -97,9 +98,9 @@ Returns the following expression. All paths or branches should end with a return
 
 ```python
 if condition:
-  return 0
+  return 0;
 else:
-  return 1
+  return 1;
 ```
 
 A branching statement where `else` is mandatory.
@@ -108,17 +109,22 @@ The condition must return an `u24` and it is equivalent to a switch statement:
 
 ```
 switch _ = condition:
-  0: else
-  _: then
+  case 0:
+    else
+  case _:
+    then
 ```
 
 ### Switch
 
 ```python
 switch x = 4:
-  0: "Zero"
-  1: "One"
-  _: "Not zero or one"
+  case 0:
+    return "Zero";
+  case 1:
+    return "One";
+  case _:
+    return "Not zero or one";
 ```
 
 A switch for native numbers, the pattern matching cases must start from `0` up to `_` sequentially.
@@ -129,10 +135,10 @@ It is possible to bind a variable name to the matching value, it allows the acce
 
 ```python
 match x = Option/none:
-  Option/some:
-    return x.value
-  Option/none:
-    return 0
+  case Option/some:
+    return x.value;
+  case Option/none:
+    return 0;
 ```
 
 A pattern matching statement, the cases must be the constructor names of the matching value.
@@ -143,10 +149,10 @@ It is possible to bind a variable name to the matching value. The fields of the 
 
 ```python
 fold x = Tree/leaf:
-  Tree/node:
-    return x.value + x.left + x.right
-  Tree/leaf:
-    return 0
+  case Tree/node:
+    return x.value + x.left + x.right;
+  case Tree/leaf:
+    return 0;
 ```
 
 A fold statement. Reduces the given value with the given match cases.
@@ -160,10 +166,10 @@ It is equivalent to the inline recursive function:
 ```python
 def fold(x):
   match x:
-    Tree/Node:
-      return x.value + fold(x.left) + fold(x.right)
-    Tree/Leaf:
-      return 0
+    case Tree/Node:
+      return x.value + fold(x.left) + fold(x.right);
+    case Tree/Leaf:
+      return 0;
 ...
 fold(Tree/Leaf)
 ```
@@ -174,11 +180,11 @@ Bend can be used to create recursive data structures:
 
 ```rust
 bend x = 0 while x < 10:
-  left = go(x + 1)
-  right = go(x + 1)
-  result = Tree/Node(left, right)
+  left = go(x + 1);
+  right = go(x + 1);
+  return Tree/Node(left, right);
 then:
-  result = Tree/Leaf(x)
+  return Tree/Leaf(x);
 ```
 
 Which binds a variable to the return of an inline recursive function.
@@ -205,8 +211,8 @@ def bend(x, y, ...):
 
 ```python
 do Result.bind:
-  x <- safe_div(2, 0)
-  return x
+  x <- safe_div(2, 0);
+  return x;
 ```
 
 A monadic do block.
@@ -230,19 +236,23 @@ A variable can be anything matching the regex `[A-Za-z0-9_.-/]+`.
 A variable is a name for some immutable expression. It is possible to rebind variables with the same name.
 
 ```python
-x = 1
-x = x + 1
+x = 1;
+x = x + 1;
 ```
 
 ### Lambdas
 
 ```python
-x => x
+lam x: x
 
-x => y => y
+lam x, y: y
+
+λx y: x
 ```
 
 Lambdas represents anonymous inline functions, it can bind a variable and has an expression as body.
+
+Using `,` is optional.
 
 ### Unscoped Lambdas and Variables
 
@@ -299,18 +309,28 @@ u24 = 42
 ```
 
 | Operation      | Syntax |
-|----------------|--------|
+| -------------- | ------ |
 | Addition       | x + y  |
 | Subtraction    | x - y  |
-| Multiplication | x * y  |
+| Multiplication | x \* y |
 | Division       | x / y  |
 | Equal          | x == y |
 | Not Equal      | x != y |
 | Less Than      | x < y  |
 | Greater Than   | x > y  |
 | Bitwise And    | x & y  |
-| Bitwise Or     | x | y  |
+| Bitwise Or     | x \| y |
 | Bitwise Xor    | x ^ y  |
+
+### Constructor Literals
+
+```python
+Type/Ctr { field1: 4, field2: 8 }
+
+Type/Ctr(field1 = 4, field2 = 8)
+
+Type/Ctr(4, 8)
+```
 
 ### Character Literal
 
@@ -409,6 +429,7 @@ A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except i
 A function definition is composed of a sequence of rules, where a rule is the name of the function, a sequence of patterns and then the body.
 
 A rule pattern can be:
+
 - A variable.
 - A number.
 - A constructor.
@@ -528,6 +549,7 @@ let $x = (some_fn $x);
 > `*` is an eraser term.
 
 A let term uses a pattern, it can be:
+
 - A variable / unscoped variable.
 - A tuple.
 - A superposition.
@@ -615,11 +637,11 @@ i24 = -42
 u24 = 42
 ```
 
-|   Operation    |  Syntax  |
-|----------------|----------|
+| Operation      | Syntax   |
+| -------------- | -------- |
 | Addition       | (+ x y)  |
 | Subtraction    | (- x y)  |
-| Multiplication | (* x y)  |
+| Multiplication | (\* x y) |
 | Division       | (/ x y)  |
 | Remainder      | (% x y)  |
 | Equal          | (== x y) |

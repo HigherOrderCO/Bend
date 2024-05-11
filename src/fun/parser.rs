@@ -64,10 +64,10 @@ impl<'a> TermParser<'a> {
     let mut indent = self.skip_newlines();
     while !self.is_eof() {
       let ini_idx = *self.index();
-      if self.try_consume_keyword("enum") {
+      if self.try_consume_keyword("type") {
         // Imp type definition
         let mut prs = PyParser { input: self.input, index: *self.index() };
-        let enum_ = prs.parse_enum(indent)?;
+        let enum_ = prs.parse_data_type(indent)?;
         self.index = prs.index;
         let end_idx = *self.index();
         prs.add_enum(enum_, &mut book, ini_idx, end_idx, builtin)?;

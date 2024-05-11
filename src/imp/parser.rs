@@ -8,7 +8,8 @@ use TSPL::Parser;
 const PREC: &[&[Op]] =
   &[&[Op::EQL, Op::NEQ], &[Op::LTN], &[Op::GTN], &[Op::ADD, Op::SUB], &[Op::MUL, Op::DIV]];
 
-pub struct Indent(pub isize);
+#[derive(Debug)]
+struct Indent(isize);
 
 impl Indent {
   fn enter_level(&mut self) {
@@ -67,7 +68,6 @@ impl<'a> Parser<'a> for PyParser<'a> {
 
 impl<'a> PyParser<'a> {
   fn parse_expression(&mut self) -> Result<Expr, String> {
-    self.skip_trivia();
     let Some(head) = self.skip_peek_one() else { return self.expected("primary term")? };
     let res = match head {
       '(' => {
@@ -116,11 +116,21 @@ impl<'a> PyParser<'a> {
           let key = self.parse_infix_or_lambda()?;
           self.consume("]")?;
           return Ok(Expr::MapGet { nam, key: Box::new(key) });
+        } else if self.skip_starts_with("{") {
+          let kwargs = self.list_like(|p| p.data_kwarg(), "{", "}", ",", true, 0)?;
+          return Ok(Expr::Constructor { name: nam, args: Vec::new(), kwargs });
         }
         Expr::Var { nam }
       }
     };
     Ok(res)
+  }
+
+  fn data_kwarg(&mut self) -> Result<(Name, Expr), String> {
+    let nam = self.parse_bend_name()?;
+    self.consume(":")?;
+    let expr = self.parse_infix_or_lambda()?;
+    Ok((nam, expr))
   }
 
   fn parse_map_entry(&mut self) -> Result<(MapKey, Expr), String> {
@@ -153,8 +163,8 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_infix_or_lambda(&mut self) -> Result<Expr, String> {
-    if self.try_consume_keyword("lambda") {
-      let names = self.list_like(|p| p.parse_bend_name(), "", ":", ",", true, 1)?;
+    if self.try_consume_keyword("lam") | self.try_consume("λ") {
+      let names = self.list_like(|p| p.parse_bend_name(), "", ":", ",", false, 1)?;
       let bod = self.parse_infix_or_lambda()?;
       Ok(Expr::Lam { names, bod: Box::new(bod) })
     } else {
@@ -163,7 +173,6 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_call(&mut self) -> Result<Expr, String> {
-    self.skip_trivia();
     let mut args = Vec::new();
     let mut kwargs = Vec::new();
     let fun = self.parse_expression()?;
@@ -230,31 +239,43 @@ impl<'a> PyParser<'a> {
   }
 
   fn get_op(&mut self) -> Option<Op> {
-    match self.skip_peek_one() {
-      Some('+') => Some(Op::ADD),
-      Some('-') => Some(Op::SUB),
-      Some('*') => Some(Op::MUL),
-      Some('/') => Some(Op::DIV),
-      Some('>') => Some(Op::GTN),
-      Some('<') => Some(Op::LTN),
-      _ => None,
-    }
+    let ret = if self.skip_starts_with("+") {
+      Op::ADD
+    } else if self.skip_starts_with("-") {
+      Op::SUB
+    } else if self.skip_starts_with("*") {
+      Op::MUL
+    } else if self.skip_starts_with("/") {
+      Op::DIV
+    } else if self.skip_starts_with("%") {
+      Op::REM
+    } else if self.skip_starts_with("<") {
+      Op::LTN
+    } else if self.skip_starts_with(">") {
+      Op::GTN
+    } else if self.skip_starts_with("==") {
+      Op::EQL
+    } else if self.skip_starts_with("!=") {
+      Op::NEQ
+    } else {
+      return None;
+    };
+    Some(ret)
   }
 
   fn skip_exact_indent(&mut self, Indent(mut count): &Indent, block: bool) -> Result<bool, String> {
     let expected = count;
     let ini_idx = *self.index();
-
+    if count <= 0 {
+      self.skip_spaces();
+      return Ok(false);
+    }
     while let Some(c) = self.peek_one() {
-      if c == '\n' {
+      if c == '\n' || c == '\t' || c == '\r' {
         self.advance_one();
       } else {
         break;
       }
-    }
-    if count <= 0 {
-      self.skip_spaces();
-      return Ok(false);
     }
     while let Some(c) = self.peek_one() {
       if c.is_ascii_whitespace() {
@@ -456,6 +477,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_case(&mut self, indent: &mut Indent) -> Result<MatchArm, String> {
+    self.consume("case")?;
     let pat = self.name_or_wildcard()?;
     self.consume(":")?;
     indent.enter_level();
@@ -474,6 +496,7 @@ impl<'a> PyParser<'a> {
     let mut expected_num = 0;
 
     while should_continue && self.skip_exact_indent(indent, true)? {
+      self.consume("case")?;
       if let Some(c) = self.skip_peek_one() {
         match c {
           '_' => {
@@ -599,7 +622,7 @@ impl<'a> PyParser<'a> {
     Ok(Definition { name, params, body })
   }
 
-  pub fn parse_enum(&mut self, indent: usize) -> Result<Enum, String> {
+  pub fn parse_data_type(&mut self, indent: usize) -> Result<Enum, String> {
     fn parse_variant_field(p: &mut PyParser) -> Result<CtrField, String> {
       let rec = p.try_consume("~");
       let nam = p.parse_bend_name()?;
@@ -621,8 +644,9 @@ impl<'a> PyParser<'a> {
       }
       let name = Name::new(format!("{name}/{}", self.parse_bend_name()?));
       let mut fields = Vec::new();
-      if self.skip_starts_with("(") {
-        fields = self.list_like(|p| parse_variant_field(p), "(", ")", ",", true, 0)?;
+      self.take_while(|p| p == ' '); // ?
+      if self.starts_with("{") {
+        fields = self.list_like(|p| parse_variant_field(p), "{", "}", ",", true, 0)?;
       }
       variants.push((name.clone(), Variant { name, fields }));
     }
