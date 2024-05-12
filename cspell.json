@@ -43,6 +43,7 @@
     "interner",
     "itertools",
     "ITRS",
+    "kwarg",
     "kwargs",
     "lcons",
     "linearization",
@@ -99,13 +100,6 @@
     "walkdir",
     "wopts"
   ],
-  "files": [
-    "**/*.rs",
-    "**/*.md"
-  ],
-  "ignoreRegExpList": [
-    "HexValues",
-    "/λ/g",
-    "/-O/g"
-  ]
+  "files": ["**/*.rs", "**/*.md"],
+  "ignoreRegExpList": ["HexValues", "/λ/g", "/-O/g"]
 }

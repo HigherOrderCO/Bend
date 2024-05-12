@@ -123,7 +123,7 @@ impl Expr {
             arg.order_kwargs(book)?;
           }
         }
-        _ => {}
+        _ => return Err(format!("Constructor '{name}' not found.")),
       },
       Expr::MapInit { entries } => {
         for entry in entries {
