@@ -28,6 +28,8 @@ pub enum Expr {
   Lst { els: Vec<Expr> },
   // "(" ... ")"
   Tup { els: Vec<Expr> },
+  // "{" {els} "}"
+  Sup { els: Vec<Expr> },
   // {name} "{" {kwargs} "}"
   Constructor { name: Name, args: Vec<Expr>, kwargs: Vec<(Name, Expr)> },
   // "[" {term} "for" {bind} "in" {iter} ("if" {cond})? "]"
@@ -53,6 +55,8 @@ pub enum AssignPattern {
   Var(Name),
   // "(" ... ")"
   Tup(Vec<Name>),
+  // "{" ... "}"
+  Sup(Vec<Name>),
   // {name} "[" {expr} "]"
   MapSet(Name, Expr),
 }

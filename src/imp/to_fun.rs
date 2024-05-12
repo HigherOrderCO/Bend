@@ -21,6 +21,11 @@ impl AssignPattern {
         fun::Tag::Static,
         names.into_iter().map(|name| fun::Pattern::Var(Some(name))).collect(),
       ),
+      AssignPattern::Sup(names) => fun::Pattern::Fan(
+        fun::FanKind::Dup,
+        fun::Tag::Auto,
+        names.into_iter().map(|name| fun::Pattern::Var(Some(name))).collect(),
+      ),
       AssignPattern::MapSet(..) => unreachable!(),
     }
   }
@@ -117,6 +122,11 @@ impl Expr {
       Expr::Tup { els } => fun::Term::Fan {
         fan: fun::FanKind::Tup,
         tag: fun::Tag::Static,
+        els: els.into_iter().map(Self::to_fun).collect(),
+      },
+      Expr::Sup { els } => fun::Term::Fan {
+        fan: fun::FanKind::Dup,
+        tag: fun::Tag::Auto,
         els: els.into_iter().map(Self::to_fun).collect(),
       },
       Expr::Constructor { name, args, kwargs } => {

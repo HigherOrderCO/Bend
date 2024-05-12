@@ -107,7 +107,7 @@ impl Expr {
           go(lhs, substitutions, id);
           go(rhs, substitutions, id);
         }
-        Expr::Lst { els } | Expr::Tup { els } => {
+        Expr::Lst { els } | Expr::Tup { els } | Expr::Sup { els } => {
           for el in els {
             go(el, substitutions, id);
           }

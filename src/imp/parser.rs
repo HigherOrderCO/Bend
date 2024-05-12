@@ -87,16 +87,18 @@ impl<'a> PyParser<'a> {
       }
       '{' => {
         self.consume("{")?;
-        let mut entries = Vec::new();
-        loop {
-          entries.push(self.parse_map_entry()?);
-          if self.skip_starts_with("}") {
-            break;
-          }
-          self.consume(",")?;
-        }
-        self.consume("}")?;
-        Expr::MapInit { entries }
+        let head = self.parse_infix_or_lambda()?;
+        if self.skip_starts_with(":") { self.parse_map_init(head)? } else { self.parse_sup(head)? }
+        // let mut entries = Vec::new();
+        // loop {
+        //   entries.push(self.parse_map_entry()?);
+        //   if self.skip_starts_with("}") {
+        //     break;
+        //   }
+        //   self.consume(",")?;
+        // }
+        // self.consume("}")?;
+        // Expr::MapInit { entries }
       }
       '[' => self.list_or_comprehension()?,
       '`' => Expr::Num { val: self.parse_symbol()? },
@@ -124,6 +126,39 @@ impl<'a> PyParser<'a> {
       }
     };
     Ok(res)
+  }
+
+  fn parse_map_init(&mut self, head: Expr) -> Result<Expr, String> {
+    let mut entries = Vec::new();
+    let map_key = match head {
+      Expr::Num { val } => MapKey(val),
+      _ => self.expected("Number keyword")?,
+    };
+    self.consume(":")?;
+    let val = self.parse_expression()?;
+    entries.push((map_key, val));
+    self.try_consume(",");
+    loop {
+      if self.skip_starts_with("}") {
+        break;
+      }
+      entries.push(self.parse_map_entry()?);
+      self.consume(",")?;
+    }
+    self.consume("}")?;
+    Ok(Expr::MapInit { entries })
+  }
+
+  fn parse_sup(&mut self, head: Expr) -> Result<Expr, String> {
+    let mut els = vec![head];
+    loop {
+      if self.skip_starts_with("}") {
+        break;
+      }
+      els.push(self.parse_infix_or_lambda()?);
+    }
+    self.consume("}")?;
+    Ok(Expr::Sup { els })
   }
 
   fn data_kwarg(&mut self) -> Result<(Name, Expr), String> {
@@ -355,7 +390,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_in_place(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
-    if self.starts_with("(") {
+    if self.starts_with("(") || self.starts_with("{") {
       self.parse_assignment(indent)
     } else {
       let name = self.parse_bend_name()?;
@@ -602,6 +637,9 @@ impl<'a> PyParser<'a> {
       } else {
         Ok(AssignPattern::Tup(binds))
       }
+    } else if self.skip_starts_with("{") {
+      let binds = self.list_like(|p| p.parse_bend_name(), "{", "}", "", false, 2)?;
+      Ok(AssignPattern::Sup(binds))
     } else {
       self.parse_bend_name().map(AssignPattern::Var)
     }

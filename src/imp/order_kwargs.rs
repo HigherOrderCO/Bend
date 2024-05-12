@@ -104,7 +104,7 @@ impl Expr {
         lhs.order_kwargs(book)?;
         rhs.order_kwargs(book)?;
       }
-      Expr::Lst { els } | Expr::Tup { els } => {
+      Expr::Lst { els } | Expr::Tup { els } | Expr::Sup { els } => {
         for el in els {
           el.order_kwargs(book)?;
         }
