@@ -205,7 +205,8 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           }
         }
         Term::Use { .. }  // Removed in earlier pass
-        | Term::Bind { .. } // Removed in earlier pass
+        | Term::Do { .. } // Removed in earlier pass
+        | Term::Ask { .. } // Removed in earlier pass
         | Term::Mat { .. } // Removed in earlier pass
         | Term::Bend { .. } // Removed in desugar_bend
         | Term::Fold { .. } // Removed in desugar_fold

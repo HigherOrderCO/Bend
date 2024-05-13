@@ -422,6 +422,17 @@ impl<'a> TermParser<'a> {
         return Ok(Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) });
       }
 
+      // Ask (monadic operation)
+      if self.try_consume_keyword("ask") {
+        unexpected_tag(self)?;
+        let pat = self.parse_pattern(true)?;
+        self.consume("=")?;
+        let val = self.parse_term()?;
+        self.try_consume(";");
+        let nxt = self.parse_term()?;
+        return Ok(Term::Ask { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) });
+      }
+
       // If
       if self.try_consume_keyword("if") {
         let cnd = self.parse_term()?;
@@ -455,14 +466,14 @@ impl<'a> TermParser<'a> {
         return self.parse_switch();
       }
 
-      // Do
+      // Do (monadic block)
       if self.try_consume_keyword("do") {
         unexpected_tag(self)?;
         let typ = self.parse_name()?;
         self.consume("{")?;
-        let ask = self.parse_ask(Name::new(typ))?;
+        let bod = self.parse_term()?;
         self.consume("}")?;
-        return Ok(ask);
+        return Ok(Term::Do { typ: Name::new(typ), bod: Box::new(bod) });
       }
 
       // Fold
@@ -511,21 +522,6 @@ impl<'a> TermParser<'a> {
       unexpected_tag(self)?;
       let nam = self.labelled(|p| p.parse_bend_name(), "term")?;
       Ok(Term::Var { nam })
-    })
-  }
-
-  fn parse_ask(&mut self, typ: Name) -> Result<Term, String> {
-    maybe_grow(|| {
-      if self.try_consume_keyword("ask") {
-        let ask = self.parse_pattern(true)?;
-        self.consume("=")?;
-        let val = self.parse_term()?;
-        self.try_consume(";");
-        let nxt = self.parse_ask(typ.clone())?;
-        Ok(Term::Bind { typ, ask: Box::new(ask), val: Box::new(val), nxt: Box::new(nxt) })
-      } else {
-        self.parse_term()
-      }
     })
   }
 

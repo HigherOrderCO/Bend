@@ -207,7 +207,8 @@ impl Term {
       | Term::Nat { .. }
       | Term::Str { .. }
       | Term::List { .. }
-      | Term::Bind { .. }
+      | Term::Do { .. }
+      | Term::Ask { .. }
       | Term::Err => unreachable!(),
     }
   }
@@ -253,7 +254,7 @@ impl Term {
       | Term::Ref { .. }
       | Term::Era
       | Term::Err => FloatIter::Zero([]),
-      Term::Bind { .. } | Term::Bend { .. } | Term::Fold { .. } => unreachable!(),
+      Term::Do { .. } | Term::Ask { .. } | Term::Bend { .. } | Term::Fold { .. } => unreachable!(),
     }
   }
 }

@@ -64,7 +64,7 @@ def bnd():
   then:
     return List/nil();
 
-//def main():
-//  do IO.bind:
-//    !x = IO.read();
-//    return x;
+def main():
+  do IO.bind:
+    x <- IO.read();
+    return x;

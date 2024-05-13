@@ -67,6 +67,9 @@ pub enum InPlaceOp {
   Sub,
   Mul,
   Div,
+  And,
+  Or,
+  Xor,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -127,8 +130,14 @@ pub enum Stmt {
   },
   // "do" {fun} ":" {block}
   Do {
-    fun: Name,
-    block: Vec<MBind>,
+    typ: Name,
+    bod: Box<Stmt>,
+  },
+  // {pat} <- {val} ";" {nxt}
+  Ask {
+    pat: AssignPattern,
+    val: Box<Expr>,
+    nxt: Box<Stmt>,
   },
   // "return" {expr} ";"
   Return {
@@ -136,12 +145,6 @@ pub enum Stmt {
   },
   #[default]
   Err,
-}
-
-#[derive(Clone, Debug)]
-pub enum MBind {
-  Ask { pat: AssignPattern, val: Box<Expr> },
-  Stmt { stmt: Box<Stmt> },
 }
 
 // Name "(" {fields}* ")"
@@ -173,6 +176,9 @@ impl InPlaceOp {
       InPlaceOp::Sub => Op::SUB,
       InPlaceOp::Mul => Op::MUL,
       InPlaceOp::Div => Op::DIV,
+      InPlaceOp::And => Op::AND,
+      InPlaceOp::Or => Op::OR,
+      InPlaceOp::Xor => Op::XOR,
     }
   }
 }
