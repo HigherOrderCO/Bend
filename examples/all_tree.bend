@@ -1,32 +1,31 @@
-enum Bool:
-  true()
-  false()
+type Bool:
+  true
+  false
 
-enum Tree:
-  node(~lft, ~rgt)
-  leaf(val)
+type Tree:
+  node { ~lft, ~rgt }
+  leaf { val }
 
 def and(a, b):
   match a:
-    Bool/true:
+    case Bool/true:
       return b;
-    Bool/false:
+    case Bool/false:
       return Bool/false;
 
 def all(tree):
   fold tree:
-    Tree/node:
+    case Tree/node:
       return and(tree.lft tree.rgt);
-    Tree/leaf:
+    case Tree/leaf:
       return tree.val;
 
 def gen(n):
   switch n:
-    0:
+    case 0:
       return Tree/leaf(Bool/true);
-    _:
-      return Tree/node(gen(n-1), gen(n-1)); 
+    case _:
+      return Tree/node { lft: gen(n-1), rgt: gen(n-1) };
 
 def main():
   return all(gen(8));
-

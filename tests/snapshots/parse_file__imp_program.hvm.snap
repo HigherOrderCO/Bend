@@ -22,7 +22,7 @@ input_file: tests/golden_tests/parse_file/imp_program.hvm
 
 (true) = Bool/True
 
-(fib n) = switch % = (< n 2) { 0: (+ (fib (- n 1)) (fib (- n 2))); _ %-1: n; }
+(fib n) = switch %pred = (< n 2) { 0: (+ (fib (- n 1)) (fib (- n 2))); _ %pred-1: n; }
 
 (swt n) = switch n = n { 0: 42; _ n-1: 1; }
 

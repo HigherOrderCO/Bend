@@ -5,6 +5,8 @@ use crate::{
 use indexmap::IndexMap;
 
 impl Definition {
+  /// Traverses the program's definitions and adjusts the order of keyword arguments
+  /// in call/constructor expressions to match the order specified in the function or constructor definition.
   pub fn order_kwargs(&mut self, book: &Book) -> Result<(), String> {
     self.body.order_kwargs(book).map_err(|e| format!("In function '{}':\n  {}", self.name, e))
   }
@@ -102,7 +104,7 @@ impl Expr {
         lhs.order_kwargs(book)?;
         rhs.order_kwargs(book)?;
       }
-      Expr::Lst { els } | Expr::Tup { els } => {
+      Expr::Lst { els } | Expr::Tup { els } | Expr::Sup { els } => {
         for el in els {
           el.order_kwargs(book)?;
         }
@@ -114,6 +116,15 @@ impl Expr {
           cond.order_kwargs(book)?;
         }
       }
+      Expr::Constructor { name, args, kwargs } => match get_args_def_or_ctr(name, book) {
+        Some(names) => {
+          go_order_kwargs(&names, args, kwargs)?;
+          for arg in args {
+            arg.order_kwargs(book)?;
+          }
+        }
+        _ => return Err(format!("Constructor '{name}' not found.")),
+      },
       Expr::MapInit { entries } => {
         for entry in entries {
           entry.1.order_kwargs(book)?;

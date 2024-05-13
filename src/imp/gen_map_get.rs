@@ -5,6 +5,10 @@ use crate::fun::Name;
 use super::{AssignPattern, Definition, Expr, Stmt};
 
 impl Definition {
+  /// Generates a map from `Stmt` to `Substitutions` for each definition in the program.
+  /// Iterates over all definitions in the program and applies `gen_map_get` to their bodies.
+  /// It replaces `Expr::MapGet` expressions with variable accesses, introducing
+  /// new variables as necessary to hold intermediate results from map accesses.
   pub fn gen_map_get(&mut self) {
     self.body.gen_map_get(&mut 0);
   }
@@ -103,9 +107,14 @@ impl Expr {
           go(lhs, substitutions, id);
           go(rhs, substitutions, id);
         }
-        Expr::Lst { els } | Expr::Tup { els } => {
+        Expr::Lst { els } | Expr::Tup { els } | Expr::Sup { els } => {
           for el in els {
             go(el, substitutions, id);
+          }
+        }
+        Expr::Constructor { kwargs, .. } => {
+          for (_, arg) in kwargs.iter_mut() {
+            go(arg, substitutions, id);
           }
         }
         Expr::Comprehension { term, iter, cond, .. } => {

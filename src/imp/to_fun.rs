@@ -21,6 +21,11 @@ impl AssignPattern {
         fun::Tag::Static,
         names.into_iter().map(|name| fun::Pattern::Var(Some(name))).collect(),
       ),
+      AssignPattern::Sup(names) => fun::Pattern::Fan(
+        fun::FanKind::Dup,
+        fun::Tag::Auto,
+        names.into_iter().map(|name| fun::Pattern::Var(Some(name))).collect(),
+      ),
       AssignPattern::MapSet(..) => unreachable!(),
     }
   }
@@ -57,9 +62,9 @@ impl Stmt {
         let arms = vec![otherwise.to_fun(), then.to_fun()];
         fun::Term::Swt {
           arg: Box::new(cond.to_fun()),
-          bnd: Some(Name::new("%")),
+          bnd: Some(Name::new("%pred")),
           with: Vec::new(),
-          pred: Some(Name::new("%-1")),
+          pred: Some(Name::new("%pred-1")),
           arms,
         }
       }
@@ -119,6 +124,16 @@ impl Expr {
         tag: fun::Tag::Static,
         els: els.into_iter().map(Self::to_fun).collect(),
       },
+      Expr::Sup { els } => fun::Term::Fan {
+        fan: fun::FanKind::Dup,
+        tag: fun::Tag::Auto,
+        els: els.into_iter().map(Self::to_fun).collect(),
+      },
+      Expr::Constructor { name, args, kwargs } => {
+        assert!(kwargs.is_empty());
+        let args = args.into_iter().map(Self::to_fun);
+        fun::Term::call(fun::Term::Ref { nam: name }, args)
+      }
       Expr::Comprehension { .. } => todo!(),
       Expr::MapInit { entries } => map_init(entries),
       Expr::MapGet { .. } => unreachable!(),
