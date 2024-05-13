@@ -17,7 +17,7 @@ impl Definition {
 impl Stmt {
   fn gen_map_get(&mut self, id: &mut usize) {
     match self {
-      Stmt::Assign { val, nxt, .. } => {
+      Stmt::Assign { val, nxt, .. } | Stmt::Ask { val, nxt, .. } => {
         nxt.gen_map_get(id);
         let substitutions = val.substitute_map_gets(id);
         if !substitutions.is_empty() {
@@ -68,7 +68,7 @@ impl Stmt {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Do { fun: _, block: _ } => todo!(),
+      Stmt::Do { bod, .. } => bod.gen_map_get(id),
       Stmt::Return { term } => {
         let substitutions = term.substitute_map_gets(id);
         if !substitutions.is_empty() {

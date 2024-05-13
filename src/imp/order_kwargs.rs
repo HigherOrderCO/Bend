@@ -1,6 +1,6 @@
 use crate::{
   fun::{Book, Name},
-  imp::{Definition, Expr, MBind, Stmt},
+  imp::{Definition, Expr, Stmt},
 };
 use indexmap::IndexMap;
 
@@ -15,7 +15,7 @@ impl Definition {
 impl Stmt {
   fn order_kwargs(&mut self, book: &Book) -> Result<(), String> {
     match self {
-      Stmt::Assign { val, nxt, .. } => {
+      Stmt::Assign { val, nxt, .. } | Stmt::Ask { val, nxt, .. } => {
         val.order_kwargs(book)?;
         nxt.order_kwargs(book)?;
       }
@@ -54,14 +54,7 @@ impl Stmt {
         step.order_kwargs(book)?;
         base.order_kwargs(book)?;
       }
-      Stmt::Do { block, .. } => {
-        for bind in block {
-          match bind {
-            MBind::Ask { val, .. } => val.order_kwargs(book)?,
-            MBind::Stmt { stmt } => stmt.order_kwargs(book)?,
-          }
-        }
-      }
+      Stmt::Do { bod, .. } => bod.order_kwargs(book)?,
       Stmt::Return { term } => term.order_kwargs(book)?,
       Stmt::Err => {}
     }

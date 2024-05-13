@@ -48,19 +48,9 @@ impl fmt::Display for Term {
       }
       Term::Var { nam } => write!(f, "{nam}"),
       Term::Link { nam } => write!(f, "${nam}"),
-      Term::Let { pat, val, nxt } => {
-        write!(f, "let {} = {}; {}", pat, val, nxt)
-      }
-      Term::Bind { typ, ask, val, nxt } => {
-        write!(f, "do {typ} {{ ")?;
-        write!(f, "ask {} = {}; ", ask, val)?;
-        let mut cur = nxt;
-        while let Term::Bind { typ: _, ask, val, nxt } = &**cur {
-          cur = nxt;
-          write!(f, "ask {} = {}; ", ask, val)?;
-        }
-        write!(f, "{} }}", cur)
-      }
+      Term::Let { pat, val, nxt } => write!(f, "let {} = {}; {}", pat, val, nxt),
+      Term::Do { typ, bod } => write!(f, "do {typ} {{ {bod} }}"),
+      Term::Ask { pat, val, nxt } => write!(f, "ask {pat} = {val}; {nxt}"),
       Term::Use { nam, val, nxt } => {
         let Some(nam) = nam else { unreachable!() };
         write!(f, "use {} = {}; {}", nam, val, nxt)
@@ -306,16 +296,13 @@ impl Term {
         Term::Let { pat, val, nxt } => {
           write!(f, "let {} = {};\n{:tab$}{}", pat, val.display_pretty(tab), "", nxt.display_pretty(tab))
         }
-        Term::Bind { typ, ask, val, nxt } => {
+        Term::Do { typ, bod } => {
           writeln!(f, "do {typ} {{")?;
-          writeln!(f, "{:tab$}ask {} = {};", "", ask, val.display_pretty(tab + 2), tab = tab + 2)?;
-          let mut cur = nxt;
-          while let Term::Bind { typ: _, ask, val, nxt } = &**cur {
-            cur = nxt;
-            writeln!(f, "{:tab$}ask {} = {};", "", ask, val.display_pretty(tab + 2), tab = tab + 2)?;
-          }
-          writeln!(f, "{:tab$}{}", "", cur.display_pretty(tab + 2), tab = tab + 2)?;
-          writeln!(f, "{:tab$}}}", "")
+          writeln!(f, "{:tab$}{}", "", bod.display_pretty(tab + 2), tab = tab + 2)?;
+          write!(f, "{:tab$}}}", "")
+        }
+        Term::Ask { pat, val, nxt } => {
+          write!(f, "ask {} = {};\n{:tab$}{}", pat, val.display_pretty(tab), "", nxt.display_pretty(tab))
         }
         Term::Use { nam, val, nxt } => {
           write!(

@@ -91,7 +91,12 @@ impl Stmt {
         let base = base.to_fun();
         fun::Term::Bend { bind, init, cond: Box::new(cond), step: Box::new(step), base: Box::new(base) }
       }
-      Stmt::Do { .. } => todo!(),
+      Stmt::Do { typ, bod } => fun::Term::Do { typ, bod: Box::new(bod.to_fun()) },
+      Self::Ask { pat, val, nxt } => fun::Term::Ask {
+        pat: Box::new(pat.to_fun()),
+        val: Box::new(val.to_fun()),
+        nxt: Box::new(nxt.to_fun()),
+      },
       Stmt::Return { term } => term.to_fun(),
       Stmt::Err => fun::Term::Err,
     }
