@@ -73,9 +73,9 @@ data IO
 MkStr (String/cons x xs) = λt (t STRING_CONS_TAG x (MkStr xs))
 MkStr (String/nil)       = λt (t STRING_NIL_TAG)
 
-ReadStr s = (s λtag λx λxs switch tag {
+ReadStr s = (s λtag switch tag {
   0: String/nil
-  _: (String/cons x (ReadStr xs))
+  _: λx λxs (String/cons x (ReadStr xs))
 })
 
 MkIO (IO/Done term)                = λt (t IO_DONE_TAG term)
