@@ -150,7 +150,8 @@ pub fn run_book_with_fn(
   compile_opts: CompileOpts,
   diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
-  run_fn: impl Fn(&str) -> Result<Output, String>,
+  cmd: &str,
+  // run_fn: impl Fn(&str) -> Result<Output, String>,
 ) -> Result<(Term, String, Diagnostics), Diagnostics> {
   let CompileResult { core_book, labels, diagnostics } =
     compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args)?;
@@ -162,6 +163,13 @@ pub fn run_book_with_fn(
 
   let out_path = ".out.hvm";
   std::fs::write(out_path, core_book.to_string()).map_err(|x| x.to_string())?;
+  let run_fn = |out_path: &str| {
+    std::process::Command::new("hvm")
+      .arg(cmd)
+      .arg(out_path)
+      .output()
+      .map_err(|e| format!("While running hvm: {e}"))
+  };
   let Output { status, stdout, stderr } = run_fn(out_path)?;
 
   let out = String::from_utf8_lossy(&stdout);
@@ -189,14 +197,7 @@ pub fn run_book(
   diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
 ) -> Result<(Term, String, Diagnostics), Diagnostics> {
-  let run_fn = |out_path: &str| {
-    std::process::Command::new("hvm")
-      .arg("run")
-      .arg(out_path)
-      .output()
-      .map_err(|e| format!("While running hvm: {e}"))
-  };
-  run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, args, run_fn)
+  run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, args, "run")
 }
 
 pub fn readback_hvm_net(net: &Net, book: &Book, labels: &Labels, linear: bool) -> (Term, Diagnostics) {

@@ -2,7 +2,7 @@ use bend::{
   check_book, compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   fun::{Book, Name},
-  load_file_to_book, run_book, run_book_with_fn, CompileOpts, OptLevel, RunOpts,
+  load_file_to_book, run_book_with_fn, CompileOpts, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use std::path::{Path, PathBuf};
@@ -57,11 +57,11 @@ enum Mode {
     path: PathBuf,
   },
   /// Compiles the program and runs it with the Rust HVM implementation.
-  Run(RunArgs2),
+  Run(RunArgs),
   /// Compiles the program and runs it with the C HVM implementation.
-  RunC(RunArgs2),
+  RunC(RunArgs),
   /// Compiles the program and runs it with the Cuda HVM implementation.
-  RunCu(RunArgs2),
+  RunCu(RunArgs),
   /// Runs the lambda-term level desugaring passes.
   Desugar {
     #[arg(
@@ -85,12 +85,12 @@ enum Mode {
 }
 
 #[derive(Args, Clone, Debug)]
-struct RunArgs2 {
+struct RunArgs {
   #[arg(short = 'p', help = "Debug and normalization pretty printing")]
   pretty: bool,
 
   #[command(flatten)]
-  run_opts: RunArgs,
+  run_opts: CliRunOpts,
 
   #[arg(
     short = 'O',
@@ -112,7 +112,7 @@ struct RunArgs2 {
 }
 
 #[derive(Args, Clone, Debug)]
-struct RunArgs {
+struct CliRunOpts {
   #[arg(short = 'l', help = "Linear readback (show explicit dups)")]
   linear: bool,
 
@@ -235,6 +235,12 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
     Ok(book)
   };
 
+  let cmd = match &cli.mode {
+    Mode::RunC(..) => "run-c",
+    Mode::RunCu(..) => "run-cu",
+    _ => "run",
+  };
+
   match cli.mode {
     Mode::Check { comp_opts, warn_opts, path } => {
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
@@ -272,8 +278,10 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       }
     }
 
-    Mode::Run(RunArgs2 { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
-      let RunArgs { linear, print_stats } = run_opts;
+    Mode::Run(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
+    | Mode::RunC(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
+    | Mode::RunCu(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
+      let CliRunOpts { linear, print_stats } = run_opts;
 
       let diagnostics_cfg =
         set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
@@ -285,75 +293,8 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let run_opts = RunOpts { linear_readback: linear, pretty };
 
       let book = load_book(&path)?;
-      let (term, stats, diags) = run_book(book, run_opts, compile_opts, diagnostics_cfg, arguments)?;
-
-      eprint!("{diags}");
-      if pretty {
-        println!("Result:\n{}", term.display_pretty(0));
-      } else {
-        println!("Result: {}", term);
-      }
-      if print_stats {
-        println!("{stats}");
-      }
-    }
-
-    Mode::RunC(RunArgs2 { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
-      let RunArgs { linear, print_stats } = run_opts;
-
-      let diagnostics_cfg =
-        set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
-
-      let compile_opts = compile_opts_from_cli(&comp_opts);
-
-      compile_opts.check_for_strict();
-
-      let run_opts = RunOpts { linear_readback: linear, pretty };
-
-      let book = load_book(&path)?;
-      let run_fn = |out_path: &str| {
-        std::process::Command::new("hvm")
-          .arg("run-c")
-          .arg(out_path)
-          .output()
-          .map_err(|e| format!("While running hvm: {e}"))
-      };
       let (term, stats, diags) =
-        run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_fn)?;
-
-      eprint!("{diags}");
-      if pretty {
-        println!("Result:\n{}", term.display_pretty(0));
-      } else {
-        println!("Result: {}", term);
-      }
-      if print_stats {
-        println!("{stats}");
-      }
-    }
-
-    Mode::RunCu(RunArgs2 { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
-      let RunArgs { linear, print_stats } = run_opts;
-
-      let diagnostics_cfg =
-        set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
-
-      let compile_opts = compile_opts_from_cli(&comp_opts);
-
-      compile_opts.check_for_strict();
-
-      let run_opts = RunOpts { linear_readback: linear, pretty };
-
-      let book = load_book(&path)?;
-      let run_fn = |out_path: &str| {
-        std::process::Command::new("hvm")
-          .arg("run-cu")
-          .arg(out_path)
-          .output()
-          .map_err(|e| format!("While running hvm: {e}"))
-      };
-      let (term, stats, diags) =
-        run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_fn)?;
+        run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, arguments, cmd)?;
 
       eprint!("{diags}");
       if pretty {
