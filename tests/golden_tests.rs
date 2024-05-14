@@ -231,7 +231,13 @@ fn simplify_matches() {
 #[test]
 fn parse_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let book = do_parse_book(code, path, Book::builtins())?;
+    let mut book = do_parse_book(code, path, Book::builtins())?;
+    let mut ctx = Ctx::new(&mut book, Default::default());
+    ctx.set_entrypoint();
+    ctx.book.encode_adts();
+    ctx.book.encode_builtins();
+    ctx.resolve_refs().expect("Resolve refs");
+    ctx.prune(false);
     Ok(book.to_string())
   })
 }
