@@ -73,13 +73,13 @@ pub enum InPlaceOp {
 
 #[derive(Clone, Debug, Default)]
 pub enum Stmt {
-  // {pat} = {val} ";" {nxt}
+  // {pat} = {val} ";"? {nxt}
   Assign {
     pat: AssignPattern,
     val: Box<Expr>,
-    nxt: Box<Stmt>,
+    nxt: Option<Box<Stmt>>,
   },
-  // {var} += {val} ";" {nxt}
+  // {var} += {val} ";"? {nxt}
   InPlace {
     op: InPlaceOp,
     var: Name,
@@ -90,55 +90,71 @@ pub enum Stmt {
   //  {then}
   // "else" ":"
   //  {otherwise}
+  // <nxt>?
   If {
     cond: Box<Expr>,
     then: Box<Stmt>,
     otherwise: Box<Stmt>,
+    nxt: Option<Box<Stmt>>,
   },
   // "match" {arg} ":" ("as" {bind})?
   //   case {lft} ":" {rgt}
+  //   ...
+  // <nxt>?
   Match {
     arg: Box<Expr>,
     bind: Option<Name>,
     arms: Vec<MatchArm>,
+    nxt: Option<Box<Stmt>>,
   },
   // "switch" {arg} ("as" {bind})?
   //   case 0..wildcard ":" {rgt}
+  //   ...
+  // <nxt>?
   Switch {
     arg: Box<Expr>,
     bind: Option<Name>,
     arms: Vec<Stmt>,
+    nxt: Option<Box<Stmt>>,
   },
   // "bend" ({bind} ("="" {init})?)* "while" {cond} ":"
-  //  {step}
+  //   {step}
   // "then" ":"
-  //  {base}
+  //   {base}
+  // <nxt>?
   Bend {
     bind: Vec<Option<Name>>,
     init: Vec<Expr>,
     cond: Box<Expr>,
     step: Box<Stmt>,
     base: Box<Stmt>,
+    nxt: Option<Box<Stmt>>,
   },
   // "fold" {arg} ("as" {bind})? ":" {arms}
   //   case {lft} ":" {rgt}
+  //   ...
+  // <nxt>?
   Fold {
     arg: Box<Expr>,
     bind: Option<Name>,
     arms: Vec<MatchArm>,
+    nxt: Option<Box<Stmt>>,
   },
-  // "do" {fun} ":" {block}
+  // "do" {fun} ":"
+  //   {block}
+  // <nxt>?
   Do {
     typ: Name,
     bod: Box<Stmt>,
+    nxt: Option<Box<Stmt>>,
   },
-  // {pat} <- {val} ";" {nxt}
+  // {pat} <- {val} ";"? {nxt}
   Ask {
     pat: AssignPattern,
     val: Box<Expr>,
     nxt: Box<Stmt>,
   },
-  // "return" {expr} ";"
+  // "return" {expr} ";"?
   Return {
     term: Box<Expr>,
   },

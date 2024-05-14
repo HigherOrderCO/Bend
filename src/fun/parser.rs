@@ -468,19 +468,21 @@ impl<'a> TermParser<'a> {
             Ok((bind, init))
           },
           "",
-          "when",
+          "{",
           ",",
           false,
           0,
         )?;
         let (bind, init): (Vec<_>, Vec<_>) = args.into_iter().unzip();
         let bind = bind.into_iter().map(Some).collect::<Vec<_>>();
+        self.skip_trivia();
+        self.parse_keyword("when")?;
         let cond = self.parse_term()?;
-        self.consume("{")?;
+        self.consume(":")?;
         let step = self.parse_term()?;
-        self.consume("}")?;
-        self.consume("else")?;
-        self.consume("{")?;
+        self.skip_trivia();
+        self.parse_keyword("else")?;
+        self.consume(":")?;
         let base = self.parse_term()?;
         self.consume("}")?;
         return Ok(Term::Bend {
@@ -1049,7 +1051,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
   /// Joins the characters into a u24 and returns it.
   fn parse_quoted_symbol(&mut self) -> ParseResult<u32> {
     self.consume_exactly("`")?;
-    let mut result = u32::MAX;
+    let mut result = 0;
     let mut count = 0;
     while count < 4 {
       if self.starts_with("`") {
