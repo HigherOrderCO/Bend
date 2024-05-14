@@ -2,12 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/imp_program.hvm
 ---
-(Map/empty) = Map/leaf
-
-(Map/get map key) = match map = map { Map/leaf: (*, map); Map/node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: let (got, rest) = (Map/get map.left (/ key 2)); (got, (Map/node map.value rest map.right)); _ _-1: let (got, rest) = (Map/get map.right (/ key 2)); (got, (Map/node map.value map.left rest)); }; _ _-1: (map.value, map); }; }
-
-(Map/set map key value) = match map = map { Map/node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/node map.value (Map/set map.left (/ key 2) value) map.right); _ _-1: (Map/node map.value map.left (Map/set map.right (/ key 2) value)); }; _ _-1: (Map/node value map.left map.right); }; Map/leaf: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/node * (Map/set Map/leaf (/ key 2) value) Map/leaf); _ _-1: (Map/node * Map/leaf (Map/set Map/leaf (/ key 2) value)); }; _ _-1: (Map/node value Map/leaf Map/leaf); }; }
-
 (symbols) = let x = (Map/set (Map/set Map/empty 4294967281 5) 2 3); let x = (Map/set x 4294967281 2); let x = (Map/set x 2 3); let (map/get%0, x) = (Map/get x 4294967281); (+ map/get%0 4286483570)
 
 (mk_point) = (Point/Point 1 2)
@@ -31,3 +25,17 @@ input_file: tests/golden_tests/parse_file/imp_program.hvm
 (bnd) = bend x = 0, while (< x 10) { (List/cons x (go (+ x 1))) } then { List/nil }
 
 (main) = do IO.bind { ask x = IO.read; x }
+
+(List/cons) = λhead λtail λList/cons λList/nil (List/cons head tail)
+
+(List/nil) = λList/cons λList/nil List/nil
+
+(Map/node) = λvalue λleft λright λMap/node λMap/leaf (Map/node value left right)
+
+(Map/leaf) = λMap/node λMap/leaf Map/leaf
+
+(Point/Point) = λx λy λPoint/Point (Point/Point x y)
+
+(Bool/True) = λBool/True λBool/False Bool/True
+
+(Bool/False) = λBool/True λBool/False Bool/False

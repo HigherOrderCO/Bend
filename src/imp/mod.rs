@@ -14,12 +14,14 @@ pub enum Expr {
   None,
   // [a-zA-Z_]+
   Var { nam: Name },
+  // "$" [a-zA-Z_]+
+  Chn { nam: Name },
   // [0-9_]+
   Num { val: u32 },
   // {fun}({args},{kwargs},)
   Call { fun: Box<Expr>, args: Vec<Expr>, kwargs: Vec<(Name, Expr)> },
   // "lambda" {names}* ":" {bod}
-  Lam { names: Vec<Name>, bod: Box<Expr> },
+  Lam { names: Vec<(Name, bool)>, bod: Box<Expr> },
   // {lhs} {op} {rhs}
   Bin { op: Op, lhs: Box<Expr>, rhs: Box<Expr> },
   // "\"" ... "\""
@@ -53,10 +55,12 @@ pub struct MapKey(u32);
 pub enum AssignPattern {
   // [a-zA-Z_]+
   Var(Name),
+  // "$" [a-zA-Z_]+
+  Chn(Name),
   // "(" ... ")"
-  Tup(Vec<Name>),
+  Tup(Vec<AssignPattern>),
   // "{" ... "}"
-  Sup(Vec<Name>),
+  Sup(Vec<AssignPattern>),
   // {name} "[" {expr} "]"
   MapSet(Name, Expr),
 }

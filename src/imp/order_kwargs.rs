@@ -123,7 +123,12 @@ impl Expr {
           entry.1.order_kwargs(book)?;
         }
       }
-      Expr::MapGet { .. } | Expr::None | Expr::Var { .. } | Expr::Num { .. } | Expr::Str { .. } => {}
+      Expr::MapGet { .. }
+      | Expr::None
+      | Expr::Var { .. }
+      | Expr::Chn { .. }
+      | Expr::Num { .. }
+      | Expr::Str { .. } => {}
     }
     Ok(())
   }

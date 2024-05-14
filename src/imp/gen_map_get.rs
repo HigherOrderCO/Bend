@@ -129,7 +129,7 @@ impl Expr {
             go(entry, substitutions, id);
           }
         }
-        Expr::None | Expr::Str { .. } | Expr::Var { .. } | Expr::Num { .. } => {}
+        Expr::None | Expr::Str { .. } | Expr::Var { .. } | Expr::Chn { .. } | Expr::Num { .. } => {}
       }
     }
     let mut substitutions = Substitutions::new();
@@ -147,7 +147,7 @@ fn gen_get(current: &mut Stmt, substitutions: Substitutions) -> Stmt {
       args: vec![Expr::Var { nam: map_var.clone() }, *key],
       kwargs: Vec::new(),
     };
-    let pat = AssignPattern::Tup(vec![var, map_var]);
+    let pat = AssignPattern::Tup(vec![AssignPattern::Var(var), AssignPattern::Var(map_var)]);
 
     Stmt::Assign { pat, val: Box::new(map_get_call), nxt: Box::new(acc) }
   })

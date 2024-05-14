@@ -2,10 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/scape_chars.hvm
 ---
-(Map/empty) = Map/leaf
+(main) = (String/cons 92 (String/cons 32 (String/cons 10 (String/cons 32 (String/cons 9 (String/cons 32 (String/cons 34 String/nil)))))))
 
-(Map/get map key) = match map = map { Map/leaf: (*, map); Map/node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: let (got, rest) = (Map/get map.left (/ key 2)); (got, (Map/node map.value rest map.right)); _ _-1: let (got, rest) = (Map/get map.right (/ key 2)); (got, (Map/node map.value map.left rest)); }; _ _-1: (map.value, map); }; }
+(String/cons) = λhead λtail λString/cons λString/nil (String/cons head tail)
 
-(Map/set map key value) = match map = map { Map/node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/node map.value (Map/set map.left (/ key 2) value) map.right); _ _-1: (Map/node map.value map.left (Map/set map.right (/ key 2) value)); }; _ _-1: (Map/node value map.left map.right); }; Map/leaf: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/node * (Map/set Map/leaf (/ key 2) value) Map/leaf); _ _-1: (Map/node * Map/leaf (Map/set Map/leaf (/ key 2) value)); }; _ _-1: (Map/node value Map/leaf Map/leaf); }; }
-
-(main) = "\\ \n \t \""
+(String/nil) = λString/cons λString/nil String/nil

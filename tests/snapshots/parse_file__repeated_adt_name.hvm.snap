@@ -6,4 +6,5 @@ input_file: tests/golden_tests/parse_file/repeated_adt_name.hvm
 In tests/golden_tests/parse_file/repeated_adt_name.hvm :
 Repeated datatype 'Foo'
 [0m  2 | [4m[31mdata Foo = B
-[0m
+[0m  3 | [4m[31m
+[0m  4 | [4m[31m[0mmain = *[0m
