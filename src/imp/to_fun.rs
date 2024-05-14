@@ -2,101 +2,271 @@ use super::{AssignPattern, Definition, Expr, Stmt};
 use crate::fun::{self, Name};
 
 impl Definition {
-  pub fn to_fun(self) -> fun::Definition {
-    let rule = fun::Rule {
-      pats: self.params.into_iter().map(|param| fun::Pattern::Var(Some(param))).collect(),
-      body: self.body.to_fun(),
+  pub fn to_fun(self) -> Result<fun::Definition, String> {
+    let body = self.body.into_fun().map_err(|e| format!("In function '{}': {}", self.name, e))?;
+    let body = match body {
+      StmtToFun::Return(term) => term,
+      StmtToFun::Assign(..) => {
+        return Err(format!("Function '{}' doesn't end with a return statement", self.name));
+      }
     };
 
-    fun::Definition { name: self.name, rules: vec![rule], builtin: false }
+    let rule =
+      fun::Rule { pats: self.params.into_iter().map(|param| fun::Pattern::Var(Some(param))).collect(), body };
+
+    let def = fun::Definition { name: self.name, rules: vec![rule], builtin: false };
+    Ok(def)
   }
 }
 
 impl AssignPattern {
-  pub fn to_fun(self) -> fun::Pattern {
+  pub fn into_fun(self) -> fun::Pattern {
     match self {
       AssignPattern::Var(name) => fun::Pattern::Var(Some(name)),
       AssignPattern::Chn(name) => fun::Pattern::Chn(name),
-      AssignPattern::Tup(names) => {
-        fun::Pattern::Fan(fun::FanKind::Tup, fun::Tag::Static, names.into_iter().map(Self::to_fun).collect())
-      }
+      AssignPattern::Tup(names) => fun::Pattern::Fan(
+        fun::FanKind::Tup,
+        fun::Tag::Static,
+        names.into_iter().map(Self::into_fun).collect(),
+      ),
       AssignPattern::Sup(names) => {
-        fun::Pattern::Fan(fun::FanKind::Dup, fun::Tag::Auto, names.into_iter().map(Self::to_fun).collect())
+        fun::Pattern::Fan(fun::FanKind::Dup, fun::Tag::Auto, names.into_iter().map(Self::into_fun).collect())
       }
       AssignPattern::MapSet(..) => unreachable!(),
     }
   }
 }
 
+enum StmtToFun {
+  Return(fun::Term),
+  Assign(fun::Pattern, fun::Term),
+}
+
 impl Stmt {
-  pub fn to_fun(self) -> fun::Term {
-    match self {
-      Stmt::Assign { pat: AssignPattern::MapSet(map, key), val, nxt } => fun::Term::Let {
-        pat: Box::new(fun::Pattern::Var(Some(map.clone()))),
-        val: Box::new(fun::Term::call(fun::Term::Ref { nam: fun::Name::new("Map/set") }, [
-          fun::Term::Var { nam: map },
-          key.to_fun(),
-          val.to_fun(),
-        ])),
-        nxt: Box::new(nxt.to_fun()),
-      },
-      Stmt::Assign { pat, val, nxt } => {
-        let pat = pat.to_fun();
-        let val = val.to_fun();
-        let nxt = nxt.to_fun();
-        fun::Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) }
+  fn into_fun(self) -> Result<StmtToFun, String> {
+    // TODO: Refactor this to not repeat everything.
+    // TODO: When we have an error with an assignment, we should show the offending assignment (eg. "{pat} = ...").
+    let stmt_to_fun = match self {
+      Stmt::Assign { pat: AssignPattern::MapSet(map, key), val, nxt: Some(nxt) } => {
+        let (nxt_pat, nxt) = match nxt.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        let term = fun::Term::Let {
+          pat: Box::new(fun::Pattern::Var(Some(map.clone()))),
+          val: Box::new(fun::Term::call(fun::Term::Ref { nam: fun::Name::new("Map/set") }, [
+            fun::Term::Var { nam: map },
+            key.to_fun(),
+            val.to_fun(),
+          ])),
+          nxt: Box::new(nxt),
+        };
+        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
       }
-      Stmt::InPlace { op, var: nam, val, nxt } => fun::Term::Let {
-        pat: Box::new(fun::Pattern::Var(Some(nam.clone()))),
-        val: Box::new(fun::Term::Oper {
-          opr: op.to_lang_op(),
-          fst: Box::new(fun::Term::Var { nam }),
-          snd: Box::new(val.to_fun()),
-        }),
-        nxt: Box::new(nxt.to_fun()),
-      },
-      Stmt::If { cond, then, otherwise } => {
-        let arms = vec![otherwise.to_fun(), then.to_fun()];
-        fun::Term::Swt {
+      Stmt::Assign { pat: AssignPattern::MapSet(..), val: _, nxt: None } => {
+        return Err("Branch ends with map assignment.".to_string());
+      }
+      Stmt::Assign { pat, val, nxt: Some(nxt) } => {
+        let pat = pat.into_fun();
+        let val = val.to_fun();
+        let (nxt_pat, nxt) = match nxt.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        let term = fun::Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) };
+        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+      }
+      Stmt::Assign { pat, val, nxt: None } => {
+        let pat = pat.into_fun();
+        let val = val.to_fun();
+        StmtToFun::Assign(pat, val)
+      }
+      Stmt::InPlace { op, var, val, nxt } => {
+        let (nxt_pat, nxt) = match nxt.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        let term = fun::Term::Let {
+          pat: Box::new(fun::Pattern::Var(Some(var.clone()))),
+          val: Box::new(fun::Term::Oper {
+            opr: op.to_lang_op(),
+            fst: Box::new(fun::Term::Var { nam: var }),
+            snd: Box::new(val.to_fun()),
+          }),
+          nxt: Box::new(nxt),
+        };
+        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+      }
+      Stmt::If { cond, then, otherwise, nxt } => {
+        let (pat, then, else_) = match (then.into_fun()?, otherwise.into_fun()?) {
+          (StmtToFun::Return(t), StmtToFun::Return(e)) => (None, t, e),
+          (StmtToFun::Assign(tp, t), StmtToFun::Assign(ep, e)) if tp == ep => (Some(tp), t, e),
+          (StmtToFun::Assign(..), StmtToFun::Assign(..)) => {
+            return Err("'if' branches end with different assignments.".to_string());
+          }
+          (StmtToFun::Return(..), StmtToFun::Assign(..)) => {
+            return Err(
+              "Expected 'else' branch from 'if' to return, but it ends with assignment.".to_string(),
+            );
+          }
+          (StmtToFun::Assign(..), StmtToFun::Return(..)) => {
+            return Err(
+              "Expected 'else' branch from 'if' to end with assignment, but it returns.".to_string(),
+            );
+          }
+        };
+        let arms = vec![else_, then];
+        let term = fun::Term::Swt {
           arg: Box::new(cond.to_fun()),
           bnd: Some(Name::new("%pred")),
           with: Vec::new(),
           pred: Some(Name::new("%pred-1")),
           arms,
+        };
+        wrap_nxt_assign_stmt(term, nxt, pat)?
+      }
+      Stmt::Match { arg, bind, arms, nxt } => {
+        let arg = arg.to_fun();
+        let mut fun_arms = vec![];
+        let mut arms = arms.into_iter();
+        let fst = arms.next().unwrap();
+        let (fst_pat, fst_rgt) = match fst.rgt.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        fun_arms.push((fst.lft, vec![], fst_rgt));
+        for arm in arms {
+          let (arm_pat, arm_rgt) = match arm.rgt.into_fun()? {
+            StmtToFun::Return(term) => (None, term),
+            StmtToFun::Assign(pat, term) => (Some(pat), term),
+          };
+          match (&arm_pat, &fst_pat) {
+            (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat => {
+              return Err("'match' arms end with different assignments.".to_string());
+            }
+            (Some(_), None) => {
+              return Err("Expected 'match' arms to end with assignment, but it returns.".to_string());
+            }
+            (None, Some(_)) => {
+              return Err("Expected 'match' arms to return, but it ends with assignment.".to_string());
+            }
+            (Some(_), Some(_)) => fun_arms.push((arm.lft, vec![], arm_rgt)),
+            (None, None) => fun_arms.push((arm.lft, vec![], arm_rgt)),
+          }
         }
+        let term = fun::Term::Mat { arg: Box::new(arg), bnd: bind, with: Vec::new(), arms: fun_arms };
+        wrap_nxt_assign_stmt(term, nxt, fst_pat)?
       }
-      Stmt::Match { arg, bind, arms } => {
+      Stmt::Switch { arg, bind, arms, nxt } => {
         let arg = arg.to_fun();
-        let arms = arms.into_iter().map(|arm| (arm.lft, Vec::new(), arm.rgt.to_fun())).collect();
-        fun::Term::Mat { arg: Box::new(arg), bnd: bind, with: Vec::new(), arms }
+        let mut fun_arms = vec![];
+        let mut arms = arms.into_iter();
+        let fst = arms.next().unwrap();
+        let (fst_pat, fst) = match fst.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        fun_arms.push(fst);
+        for arm in arms {
+          let (arm_pat, arm) = match arm.into_fun()? {
+            StmtToFun::Return(term) => (None, term),
+            StmtToFun::Assign(pat, term) => (Some(pat), term),
+          };
+          match (&arm_pat, &fst_pat) {
+            (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat => {
+              return Err("'switch' arms end with different assignments.".to_string());
+            }
+            (Some(_), None) => {
+              return Err("Expected 'switch' arms to end with assignment, but it returns.".to_string());
+            }
+            (None, Some(_)) => {
+              return Err("Expected 'switch' arms to return, but it ends with assignment.".to_string());
+            }
+            (Some(_), Some(_)) => fun_arms.push(arm),
+            (None, None) => fun_arms.push(arm),
+          }
+        }
+        let pred = Some(Name::new(format!("{}-{}", bind.clone().unwrap(), fun_arms.len() - 1)));
+        let term = fun::Term::Swt { arg: Box::new(arg), bnd: bind, with: Vec::new(), pred, arms: fun_arms };
+        wrap_nxt_assign_stmt(term, nxt, fst_pat)?
       }
-      Stmt::Switch { arg, bind, arms } => {
+      Stmt::Fold { arg, bind, arms, nxt } => {
         let arg = arg.to_fun();
-        let pred = Some(Name::new(format!("{}-{}", bind.clone().unwrap(), arms.len() - 1)));
-        let arms = arms.into_iter().map(Stmt::to_fun).collect();
-        fun::Term::Swt { arg: Box::new(arg), bnd: bind, with: Vec::new(), pred, arms }
+        let mut fun_arms = vec![];
+        let mut arms = arms.into_iter();
+        let fst = arms.next().unwrap();
+        let (fst_pat, fst_rgt) = match fst.rgt.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        fun_arms.push((fst.lft, vec![], fst_rgt));
+        for arm in arms {
+          let (arm_pat, arm_rgt) = match arm.rgt.into_fun()? {
+            StmtToFun::Return(term) => (None, term),
+            StmtToFun::Assign(pat, term) => (Some(pat), term),
+          };
+          match (&arm_pat, &fst_pat) {
+            (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat => {
+              return Err("'fold' arms end with different assignments.".to_string());
+            }
+            (Some(_), None) => {
+              return Err("Expected 'fold' arms to end with assignment, but it returns.".to_string());
+            }
+            (None, Some(_)) => {
+              return Err("Expected 'fold' arms to return, but it ends with assignment.".to_string());
+            }
+            (Some(_), Some(_)) => fun_arms.push((arm.lft, vec![], arm_rgt)),
+            (None, None) => fun_arms.push((arm.lft, vec![], arm_rgt)),
+          }
+        }
+        let term = fun::Term::Fold { arg: Box::new(arg), bnd: bind, with: Vec::new(), arms: fun_arms };
+        wrap_nxt_assign_stmt(term, nxt, fst_pat)?
       }
-      Stmt::Fold { arg, bind, arms } => {
-        let arg = arg.to_fun();
-        let arms = arms.into_iter().map(|arm| (arm.lft, Vec::new(), arm.rgt.to_fun())).collect();
-        fun::Term::Fold { arg: Box::new(arg), bnd: bind, with: Vec::new(), arms }
-      }
-      Stmt::Bend { bind, init, cond, step, base } => {
+      Stmt::Bend { bind, init, cond, step, base, nxt } => {
         let init = init.into_iter().map(Expr::to_fun).collect();
         let cond = cond.to_fun();
-        let step = step.to_fun();
-        let base = base.to_fun();
-        fun::Term::Bend { bind, init, cond: Box::new(cond), step: Box::new(step), base: Box::new(base) }
+        let (pat, step, base) = match (step.into_fun()?, base.into_fun()?) {
+          (StmtToFun::Return(s), StmtToFun::Return(b)) => (None, s, b),
+          (StmtToFun::Assign(sp, s), StmtToFun::Assign(bp, b)) if sp == bp => (Some(sp), s, b),
+          (StmtToFun::Assign(..), StmtToFun::Assign(..)) => {
+            return Err("'bend' branches end with different assignments.".to_string());
+          }
+          (StmtToFun::Return(..), StmtToFun::Assign(..)) => {
+            return Err(
+              "Expected 'else' branch from 'bend' to return, but it ends with assignment.".to_string(),
+            );
+          }
+          (StmtToFun::Assign(..), StmtToFun::Return(..)) => {
+            return Err(
+              "Expected 'else' branch from 'bend' to end with assignment, but it returns.".to_string(),
+            );
+          }
+        };
+        let term =
+          fun::Term::Bend { bind, init, cond: Box::new(cond), step: Box::new(step), base: Box::new(base) };
+        wrap_nxt_assign_stmt(term, nxt, pat)?
       }
-      Stmt::Do { typ, bod } => fun::Term::Do { typ, bod: Box::new(bod.to_fun()) },
-      Self::Ask { pat, val, nxt } => fun::Term::Ask {
-        pat: Box::new(pat.to_fun()),
-        val: Box::new(val.to_fun()),
-        nxt: Box::new(nxt.to_fun()),
-      },
-      Stmt::Return { term } => term.to_fun(),
-      Stmt::Err => fun::Term::Err,
-    }
+      Stmt::Do { typ, bod, nxt } => {
+        let (pat, bod) = match bod.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        let term = fun::Term::Do { typ, bod: Box::new(bod) };
+        wrap_nxt_assign_stmt(term, nxt, pat)?
+      }
+      Self::Ask { pat, val, nxt } => {
+        let (nxt_pat, nxt) = match nxt.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        let term =
+          fun::Term::Ask { pat: Box::new(pat.into_fun()), val: Box::new(val.to_fun()), nxt: Box::new(nxt) };
+        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+      }
+      Stmt::Return { term } => StmtToFun::Return(term.to_fun()),
+      Stmt::Err => unreachable!(),
+    };
+    Ok(stmt_to_fun)
   }
 }
 
@@ -151,4 +321,29 @@ fn map_init(entries: Vec<(Expr, Expr)>) -> fun::Term {
       fun::Term::call(fun::Term::Ref { nam: fun::Name::new("Map/set") }, [map, key.to_fun(), value.to_fun()]);
   }
   map
+}
+
+/// If the statement was a return, returns it, erroring if there is another after it.
+/// Otherwise, turns it into a 'let' and returns the next statement.
+fn wrap_nxt_assign_stmt(
+  term: fun::Term,
+  nxt: Option<Box<Stmt>>,
+  pat: Option<fun::Pattern>,
+) -> Result<StmtToFun, String> {
+  if let Some(nxt) = nxt {
+    if let Some(pat) = pat {
+      let (nxt_pat, nxt) = match nxt.into_fun()? {
+        StmtToFun::Return(term) => (None, term),
+        StmtToFun::Assign(pat, term) => (Some(pat), term),
+      };
+      let term = fun::Term::Let { pat: Box::new(pat), val: Box::new(term), nxt: Box::new(nxt) };
+      if let Some(pat) = nxt_pat { Ok(StmtToFun::Assign(pat, term)) } else { Ok(StmtToFun::Return(term)) }
+    } else {
+      Err("Statement ends with return but is not at end of function.".to_string())
+    }
+  } else if let Some(pat) = pat {
+    Ok(StmtToFun::Assign(pat, term))
+  } else {
+    Ok(StmtToFun::Return(term))
+  }
 }

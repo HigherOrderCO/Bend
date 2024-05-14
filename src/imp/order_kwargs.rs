@@ -15,7 +15,13 @@ impl Definition {
 impl Stmt {
   fn order_kwargs(&mut self, book: &Book) -> Result<(), String> {
     match self {
-      Stmt::Assign { val, nxt, .. } | Stmt::Ask { val, nxt, .. } => {
+      Stmt::Assign { val, nxt, .. } => {
+        val.order_kwargs(book)?;
+        if let Some(nxt) = nxt {
+          nxt.order_kwargs(book)?;
+        }
+      }
+      Stmt::Ask { val, nxt, .. } => {
         val.order_kwargs(book)?;
         nxt.order_kwargs(book)?;
       }
@@ -23,38 +29,58 @@ impl Stmt {
         val.order_kwargs(book)?;
         nxt.order_kwargs(book)?;
       }
-      Stmt::If { cond, then, otherwise } => {
+      Stmt::If { cond, then, otherwise, nxt } => {
         cond.order_kwargs(book)?;
         then.order_kwargs(book)?;
         otherwise.order_kwargs(book)?;
+        if let Some(nxt) = nxt {
+          nxt.order_kwargs(book)?;
+        }
       }
-      Stmt::Match { arg, arms, .. } => {
+      Stmt::Match { arg, arms, nxt, .. } => {
         arg.order_kwargs(book)?;
         for arm in arms {
           arm.rgt.order_kwargs(book)?;
         }
+        if let Some(nxt) = nxt {
+          nxt.order_kwargs(book)?;
+        }
       }
-      Stmt::Switch { arg, arms, .. } => {
+      Stmt::Switch { arg, arms, nxt, .. } => {
         arg.order_kwargs(book)?;
         for arm in arms {
           arm.order_kwargs(book)?;
         }
+        if let Some(nxt) = nxt {
+          nxt.order_kwargs(book)?;
+        }
       }
-      Stmt::Fold { arg, arms, .. } => {
+      Stmt::Fold { arg, arms, nxt, .. } => {
         arg.order_kwargs(book)?;
         for arm in arms {
           arm.rgt.order_kwargs(book)?;
         }
+        if let Some(nxt) = nxt {
+          nxt.order_kwargs(book)?;
+        }
       }
-      Stmt::Bend { bind: _, init, cond, step, base } => {
+      Stmt::Bend { bind: _, init, cond, step, base, nxt } => {
         for init in init {
           init.order_kwargs(book)?;
         }
         cond.order_kwargs(book)?;
         step.order_kwargs(book)?;
         base.order_kwargs(book)?;
+        if let Some(nxt) = nxt {
+          nxt.order_kwargs(book)?;
+        }
       }
-      Stmt::Do { bod, .. } => bod.order_kwargs(book)?,
+      Stmt::Do { typ: _, bod, nxt } => {
+        bod.order_kwargs(book)?;
+        if let Some(nxt) = nxt {
+          nxt.order_kwargs(book)?;
+        }
+      }
       Stmt::Return { term } => term.order_kwargs(book)?,
       Stmt::Err => {}
     }

@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/imp_program.hvm
 ---
-(symbols) = let x = (Map/set (Map/set Map/empty 4294967281 5) 2 3); let x = (Map/set x 4294967281 2); let x = (Map/set x 2 3); let (map/get%0, x) = (Map/get x 4294967281); (+ map/get%0 4286483570)
+(symbols) = let x = (Map/set (Map/set Map/empty 49 5) 2 3); let x = (Map/set x 49 2); let x = (Map/set x 2 3); let (map/get%0, x) = (Map/get x 49); (+ map/get%0 8293490)
 
 (mk_point) = (Point/Point 1 2)
 

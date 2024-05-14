@@ -17,49 +17,70 @@ impl Definition {
 impl Stmt {
   fn gen_map_get(&mut self, id: &mut usize) {
     match self {
-      Stmt::Assign { val, nxt, .. } | Stmt::Ask { val, nxt, .. } => {
+      Stmt::Assign { pat: _, val, nxt } => {
+        if let Some(nxt) = nxt {
+          nxt.gen_map_get(id);
+        }
+        let substitutions = val.substitute_map_gets(id);
+        if !substitutions.is_empty() {
+          *self = gen_get(self, substitutions);
+        }
+      }
+      Stmt::Ask { pat: _, val, nxt } => {
         nxt.gen_map_get(id);
         let substitutions = val.substitute_map_gets(id);
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::InPlace { val, nxt, .. } => {
+      Stmt::InPlace { op: _, var: _, val, nxt } => {
         nxt.gen_map_get(id);
         let substitutions = val.substitute_map_gets(id);
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::If { cond, then, otherwise } => {
+      Stmt::If { cond, then, otherwise, nxt } => {
         then.gen_map_get(id);
         otherwise.gen_map_get(id);
+        if let Some(nxt) = nxt {
+          nxt.gen_map_get(id);
+        }
         let substitutions = cond.substitute_map_gets(id);
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Match { arg, arms, .. } | Stmt::Fold { arg, arms, .. } => {
+      Stmt::Match { bind: _, arg, arms, nxt } | Stmt::Fold { bind: _, arg, arms, nxt } => {
         for arm in arms.iter_mut() {
           arm.rgt.gen_map_get(id);
         }
+        if let Some(nxt) = nxt {
+          nxt.gen_map_get(id);
+        }
         let substitutions = arg.substitute_map_gets(id);
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Switch { arg, arms, .. } => {
+      Stmt::Switch { bind: _, arg, arms, nxt } => {
         for arm in arms.iter_mut() {
           arm.gen_map_get(id);
         }
+        if let Some(nxt) = nxt {
+          nxt.gen_map_get(id);
+        }
         let substitutions = arg.substitute_map_gets(id);
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Bend { bind: _, init, cond, step, base } => {
+      Stmt::Bend { bind: _, init, cond, step, base, nxt } => {
         step.gen_map_get(id);
         base.gen_map_get(id);
+        if let Some(nxt) = nxt {
+          nxt.gen_map_get(id);
+        }
         let mut substitutions = cond.substitute_map_gets(id);
         for init in init {
           substitutions.extend(init.substitute_map_gets(id));
@@ -68,7 +89,12 @@ impl Stmt {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Do { bod, .. } => bod.gen_map_get(id),
+      Stmt::Do { typ: _, bod, nxt } => {
+        bod.gen_map_get(id);
+        if let Some(nxt) = nxt {
+          nxt.gen_map_get(id);
+        }
+      }
       Stmt::Return { term } => {
         let substitutions = term.substitute_map_gets(id);
         if !substitutions.is_empty() {
@@ -149,7 +175,7 @@ fn gen_get(current: &mut Stmt, substitutions: Substitutions) -> Stmt {
     };
     let pat = AssignPattern::Tup(vec![AssignPattern::Var(var), AssignPattern::Var(map_var)]);
 
-    Stmt::Assign { pat, val: Box::new(map_get_call), nxt: Box::new(acc) }
+    Stmt::Assign { pat, val: Box::new(map_get_call), nxt: Some(Box::new(acc)) }
   })
 }
 
