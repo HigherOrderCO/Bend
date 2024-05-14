@@ -284,7 +284,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
     Mode::GenC(GenArgs { comp_opts, io, warn_opts, path })
     | Mode::GenCu(GenArgs { comp_opts, io, warn_opts, path }) => {
       if io && !gen_supports_io {
-        Err(format!("Selected mode does not support io."))?;
+        Err("Selected mode does not support io.".to_string())?;
       }
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
       let opts = compile_opts_from_cli(&comp_opts);
@@ -336,7 +336,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let CliRunOpts { linear, print_stats } = run_opts;
 
       if io && !run_supports_io {
-        Err(format!("Selected mode does not support io."))?;
+        Err("Selected mode does not support io.".to_string())?;
       }
 
       let diagnostics_cfg =
