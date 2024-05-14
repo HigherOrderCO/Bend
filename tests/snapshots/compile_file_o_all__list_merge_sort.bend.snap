@@ -38,7 +38,7 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.bend
 @Merge__C1 = ({b {g l}} ({h q} ({(a (b c)) {e m}} ({a {d n}} ({f o} t)))))
   & @If ~ (c (k (s t)))
   & @List_/Cons ~ (d (j k))
-  & @Merge ~ (e (f (i j)))
+  &! @Merge ~ (e (f (i j)))
   & @List_/Cons ~ (g (h i))
   & @List_/Cons ~ (l (r s))
   &! @Merge ~ (m (p (q r)))

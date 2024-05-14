@@ -70,7 +70,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @Tree.flip__C1 = (c (a e))
   & @Tree/node ~ (b (d e))
-  & @Tree.flip ~ (a b)
+  &! @Tree.flip ~ (a b)
   &! @Tree.flip ~ (c d)
 
 @Tree.height = ((@Tree.height__C0 ((* 0) a)) a)
@@ -78,13 +78,13 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 @Tree.height__C0 = (a (c f))
   & $(e f) ~ [+1]
   & @max ~ (b (d e))
-  & @Tree.height ~ (a b)
+  &! @Tree.height ~ (a b)
   &! @Tree.height ~ (c d)
 
 @Tree.leaves = ((@Tree.leaves__C0 ((* 1) a)) a)
 
 @Tree.leaves__C0 = (a (b d))
-  & @Tree.leaves ~ (a $(:[+] $(c d)))
+  &! @Tree.leaves ~ (a $(:[+] $(c d)))
   &! @Tree.leaves ~ (b c)
 
 @Tree.map = ((@Tree.map__C1 (@Tree.map__C0 a)) a)
@@ -94,14 +94,14 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @Tree.map__C1 = (a (d ({b e} g)))
   & @Tree/node ~ (c (f g))
-  & @Tree.map ~ (a (b c))
+  &! @Tree.map ~ (a (b c))
   &! @Tree.map ~ (d (e f))
 
 @Tree.nodes = ((@Tree.nodes__C0 ((* 0) a)) a)
 
 @Tree.nodes__C0 = (a (b e))
   & $(d e) ~ [+1]
-  & @Tree.nodes ~ (a $(:[+] $(c d)))
+  &! @Tree.nodes ~ (a $(:[+] $(c d)))
   &! @Tree.nodes ~ (b c)
 
 @Tree/leaf = (a (* ((a b) b)))
@@ -123,7 +123,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @fold___C1 = (a (c e))
   & @add ~ (b (d e))
-  & @fold_ ~ (a b)
+  &! @fold_ ~ (a b)
   &! @fold_ ~ (c d)
 
 @main = *

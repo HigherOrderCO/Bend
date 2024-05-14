@@ -42,13 +42,11 @@ fn add_priority_next_in_cycle(net: &mut Net, nxt: &String) {
       if let Tree::Ref { nam } = a {
         if nam == nxt {
           *pri = true;
-          break;
         }
       }
       if let Tree::Ref { nam } = b {
         if nam == nxt {
           *pri = true;
-          break;
         }
       }
     }
