@@ -1,6 +1,6 @@
 # Bend
 
-*Note: The latest version of Bend targets an unreleased version of HVM. If you want to use Bend right now, use branch [hvm-core](https://github.com/HigherOrderCO/bend/tree/hvm-core)*.
+_Note: The latest version of Bend targets an unreleased version of HVM. If you want to use Bend right now, use branch [hvm-core](https://github.com/HigherOrderCO/bend/tree/hvm-core)_.
 
 Bend is a programming language that can run massively parallel programs on the GPU or the CPU using the power of interaction nets and the [HVM](https://github.com/HigherOrderCO/hvm).
 With Bend, you can write programs for the GPU as easily as you'd write a normal program in your favorite language.
@@ -9,10 +9,10 @@ It is based on the [Interaction-Calculus](https://github.com/VictorTaelin/Intera
 
 Currently Bend only supports strict/eager evaluation. If you need lazy, optimal evaluation, we recommend using [HVM1](https://github.com/HigherOrderCO/HVM1) for now.
 
-
 ## Installation
 
 With the nightly version of rust installed, clone the repository:
+
 ```bash
 git clone https://github.com/HigherOrderCO/bend.git
 
@@ -20,31 +20,36 @@ cd bend
 ```
 
 Install using cargo:
+
 ```bash
 cargo install --path . --locked
 ```
 
 If you want to run programs directly from Bend, you also need to have [HVM](https://github.com/HigherOrderCO/hvm2) installed.
 
-
 ## Usage
 
-Command   | Usage                 | Description
---------- | --------------------- | ---
-Check     | `bend check <file>`   | Checks if a program is valid
-Compile   | `bend compile <file>` | Compiles a program to HVM and outputs it to stdout
-Run       | `bend run <file>`     | Compiles and then runs a program in HVM
-Normalize | `bend norm <file>`    | Compiles and then normalizes a program in HVM, outputting the result to stdout
-Desugar   | `bend desugar <file>` | Desugars a program to the core syntax and outputs it to stdout
+| Command | Usage                 | Description                                                       |
+| ------- | --------------------- | ----------------------------------------------------------------- |
+| Check   | `bend check <file>`   | Checks if a program is valid                                      |
+| GenHvm  | `bend gen-hvm <file>` | Compiles a program to HVM and outputs it to stdout                |
+| Run     | `bend run <file>`     | Compiles and then runs a program with the Rust HVM implementation |
+| Run-C   | `bend run-c <file>`   | Compiles and then runs a program with the C HVM implementation    |
+| Run-Cu  | `bend run-cu <file>`  | Compiles and then runs a program with the Cuda HVM implementation |
+| Gen-C   | `bend gen-c <file>`   | Compiles the program to standalone C                              |
+| Gen-Cu  | `bend gen-cu <file>`  | Compiles the program to standalone Cuda                           |
+| Desugar | `bend desugar <file>` | Desugars a program to the core syntax and outputs it to stdout    |
 
+If your program uses IO, it should return an IO value and you need to run it with --io. See [using io](docs/using-io.md), for more details.
+If your program doesn't return an IO value, then you should not run it with --io
 
 If you want to compile a file to a file, just redirect the output with `>`:
+
 ```bash
 bend compile <file.bend> > <file.hvm>
 ```
 
 There are many compiler options that can be passed through the CLI. You can see the list of options [here](docs/compiler-options.md).
-
 
 ## Examples
 
@@ -53,19 +58,20 @@ You can read the full reference for both of them [here](docs/syntax.md), but the
 
 To see some more complex examples programs, check out the [examples](examples/) folder.
 
-
 We can start with a basic program that adds the numbers 3 and 2.
 
 ```py
 def main:
   return 2 + 3
 ```
+
 Normalizing this program will show the number 5.
 Be careful with `run` and `norm`, since they will not show any warnings by default. Before running a new program it's useful to first `check` it.
 
 Bend programs consist of a series of function definitions, always starting with a function called `main` or `Main`.
 
 Functions can receive arguments both directly and using a lambda abstraction.
+
 ```py
 // These two are equivalent
 def add(x, y):
@@ -76,6 +82,7 @@ def add2:
 ```
 
 You can then call this function like this:
+
 ```py
 def main:
   sum = add(2, 3)
@@ -83,6 +90,7 @@ def main:
 ```
 
 You can bundle multiple values into a single value using a tuple or a struct.
+
 ```py
 // With a tuple
 def Tuple.fst(x):
@@ -105,6 +113,7 @@ def Pair.fst_2(x: Pair):
 ```
 
 For more complicated data structures, we can use `enum` to define a algebraic data types.
+
 ```py
 enum MyTree:
   Node(val, ~left, ~right)
@@ -112,6 +121,7 @@ enum MyTree:
 ```
 
 We can then pattern match on the enum to perform different actions depending on the variant of the value.
+
 ```py
 def Maybe.or_default(x, default):
   match x:
@@ -124,6 +134,7 @@ def Maybe.or_default(x, default):
 
 We use `~` to indicate that a field is recursive.
 This allows us to easily create and consume these recursive data structures with `bend` and `fold`:
+
 ```py
 def MyTree.sum(x):
   // Sum all the values in the tree.
@@ -146,6 +157,7 @@ def main:
 ```
 
 These are equivalent to inline recursive functions that create a tree and consume it.
+
 ```py
 def MyTree.sum(x):
   match x:
@@ -163,10 +175,12 @@ def main_bend(val):
 def main:
   return main_bend(0)
 ```
+
 Making your program around trees is a very good way of making it parallelizable, since each core can be dispatched to work on a different branch of the tree.
 
-*Attention*: Note that despite the ADT syntax sugars, Bend is an *untyped* language and the compiler will not stop you from using values incorrectly, which can lead to very unexpected results.
+_Attention_: Note that despite the ADT syntax sugars, Bend is an _untyped_ language and the compiler will not stop you from using values incorrectly, which can lead to very unexpected results.
 For example, the following program will compile just fine even though `!=` is only defined for native numbers:
+
 ```py
 def main:
   bend val = [0, 1, 2, 3] while val != []:
@@ -179,6 +193,7 @@ def main:
     x = 0
   return x
 ```
+
 Normalizing this program will show `λ* *` and not the expected `6`.
 
 It's also important to note that Bend is linear (technically affine), meaning that every variable is only used once. When a variable is used more than once, the compiler will automatically insert a duplication.
@@ -187,6 +202,7 @@ You can read more about it in [Dups and sups](docs/dups-and-sups.md) and learn h
 
 To use a variable twice without duplicating it, you can use a `use` statement.
 It inlines clones of some value in the statements that follow it.
+
 ```py
 def foo(x):
   use result = bar(1, x)
@@ -196,10 +212,11 @@ def foo(x):
 def foo(x):
   return (bar(1, x), bar(1, x))
 ```
+
 Note that any variable in the `use` will end up being duplicated.
 
-
 Bend supports recursive functions of unrestricted depth:
+
 ```py
 def native_num_to_adt(n):
   if n == 0:
@@ -207,12 +224,13 @@ def native_num_to_adt(n):
   else:
     return Nat.succ(native_num_to_adt(n - 1))
 ```
+
 If your recursive function is not based on pattern matching syntax (like `if`, `match`, `fold`, etc) you have to be careful to avoid an infinite loop.
 Since Bend is eagerly executed, some situations will cause function applications to always be expanded, which can lead to looping situations.
 You can read how to avoid this in [Lazy definitions](docs/lazy-definitions.md).
 
-
 Bend has native numbers and operations.
+
 ```py
 def main:
   a = 1      // A 24 bit unsigned integer.
@@ -224,6 +242,7 @@ def main:
 ```
 
 `switch` pattern matches on unsigned native numbers:
+
 ```py
 switch x = 4:
   // From '0' to n, ending with the default case '_'.
@@ -237,19 +256,22 @@ switch x = 4:
 ```
 
 Bend has Lists and Strings, which support Unicode characters.
+
 ```rs
 def main:
   return ["You: Hello, 🌎", "🌎: Hello, user"]
 ```
+
 A string is desugared to a String data type containing two constructors, `String.cons` and `String.nil`.
 List also becomes a type with two constructors, `List.cons` and `List.nil`.
+
 ```rs
 // These two are equivalent
 def StrEx:
   "Hello"
 
 def ids:
-  [1, 2, 3] 
+  [1, 2, 3]
 
 // These types are builtin.
 enum String:
@@ -265,6 +287,7 @@ def ids:
 ```
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They are encoded as a U24 with the unicode codepoint as their value.
+
 ```
 // These two are equivalent
 def chars:
@@ -274,10 +297,10 @@ def chars2:
   [65, 0x4242, 0x1F30E]
 ```
 
-
 ### More features
 
 Key:
+
 - &#128215;: Basic resources
 - &#128217;: Intermediate resources
 - &#128213;: Advanced resources

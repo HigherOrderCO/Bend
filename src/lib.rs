@@ -144,13 +144,15 @@ pub fn desugar_book(
   if !ctx.info.has_errors() { Ok(ctx.info) } else { Err(ctx.info) }
 }
 
-pub fn run_book(
+pub fn run_book_with_fn(
   mut book: Book,
   run_opts: RunOpts,
   compile_opts: CompileOpts,
   diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
-) -> Result<(Term, String, Diagnostics), Diagnostics> {
+  cmd: &str,
+  arg_io: bool,
+) -> Result<Option<(Term, String, Diagnostics)>, Diagnostics> {
   let CompileResult { core_book, labels, diagnostics } =
     compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args)?;
 
@@ -161,15 +163,26 @@ pub fn run_book(
 
   let out_path = ".out.hvm";
   std::fs::write(out_path, core_book.to_string()).map_err(|x| x.to_string())?;
-  let Output { status, stdout, stderr } = std::process::Command::new("hvm")
-    .arg("run")
-    .arg(out_path)
-    .output()
-    .map_err(|x| format!("While running hvm: {x}"))?;
+  let run_fn = |out_path: &str| {
+    let mut process = std::process::Command::new("hvm");
+    process.arg(cmd).arg(out_path);
+    if arg_io {
+      process.arg("--io");
+      process.stdout(std::process::Stdio::inherit());
+      process.spawn()?.wait_with_output()
+    } else {
+      process.output()
+    }
+  };
+  let Output { status, stdout, stderr } = run_fn(out_path).map_err(|e| format!("While running hvm: {e}"))?;
 
   let out = String::from_utf8_lossy(&stdout);
   let err = String::from_utf8_lossy(&stderr);
   let status = if !status.success() { status.to_string() } else { String::new() };
+
+  if arg_io {
+    return Ok(None);
+  }
 
   let Some((_, result)) = out.split_once("Result: ") else {
     return Err(format!("Error reading result from hvm. Output :\n{}{}{}", err, status, out).into());
@@ -182,7 +195,17 @@ pub fn run_book(
   };
 
   let (term, diags) = readback_hvm_net(&net, &book, &labels, run_opts.linear_readback);
-  Ok((term, stats.to_string(), diags))
+  Ok(Some((term, stats.to_string(), diags)))
+}
+
+pub fn run_book(
+  book: Book,
+  run_opts: RunOpts,
+  compile_opts: CompileOpts,
+  diagnostics_cfg: DiagnosticsConfig,
+  args: Option<Vec<Term>>,
+) -> Result<(Term, String, Diagnostics), Diagnostics> {
+  run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, args, "run", false).map(Option::unwrap)
 }
 
 pub fn readback_hvm_net(net: &Net, book: &Book, labels: &Labels, linear: bool) -> (Term, Diagnostics) {
