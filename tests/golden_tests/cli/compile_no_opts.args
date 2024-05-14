@@ -1,4 +1,4 @@
-compile
+gen-hvm
 tests/golden_tests/cli/compile_no_opts.hvm
 -Ono-all
 -Ono-eta

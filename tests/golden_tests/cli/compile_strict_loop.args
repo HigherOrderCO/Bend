@@ -1,4 +1,4 @@
-compile
+gen-hvm
 tests/golden_tests/cli/compile_strict_loop.hvm
 -Ono-all
 -Arecursion-cycle

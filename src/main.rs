@@ -2,7 +2,7 @@ use bend::{
   check_book, compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   fun::{Book, Name},
-  load_file_to_book, run_book, CompileOpts, OptLevel, RunOpts,
+  load_file_to_book, run_book, run_book_with_fn, CompileOpts, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use std::path::{Path, PathBuf};
@@ -40,7 +40,7 @@ enum Mode {
     path: PathBuf,
   },
   /// Compiles the program to hvmc and prints to stdout.
-  Compile {
+  GenHvm {
     #[arg(
       short = 'O',
       value_delimiter = ' ',
@@ -56,32 +56,12 @@ enum Mode {
     #[arg(help = "Path to the input file")]
     path: PathBuf,
   },
-  /// Compiles the program and runs it with the hvm.
-  Run {
-    #[arg(short = 'p', help = "Debug and normalization pretty printing")]
-    pretty: bool,
-
-    #[command(flatten)]
-    run_opts: RunArgs,
-
-    #[arg(
-      short = 'O',
-      value_delimiter = ' ',
-      action = clap::ArgAction::Append,
-      long_help = r#"Enables or disables the given optimizations
-      float_combinators is enabled by default on strict mode."#,
-    )]
-    comp_opts: Vec<OptArgs>,
-
-    #[command(flatten)]
-    warn_opts: CliWarnOpts,
-
-    #[arg(help = "Path to the input file")]
-    path: PathBuf,
-
-    #[arg(value_parser = |arg: &str| bend::fun::parser::TermParser::new(arg).parse_term())]
-    arguments: Option<Vec<bend::fun::Term>>,
-  },
+  /// Compiles the program and runs it with the Rust HVM implementation.
+  Run(RunArgs2),
+  /// Compiles the program and runs it with the C HVM implementation.
+  RunC(RunArgs2),
+  /// Compiles the program and runs it with the Cuda HVM implementation.
+  RunCu(RunArgs2),
   /// Runs the lambda-term level desugaring passes.
   Desugar {
     #[arg(
@@ -102,6 +82,33 @@ enum Mode {
     #[arg(help = "Path to the input file")]
     path: PathBuf,
   },
+}
+
+#[derive(Args, Clone, Debug)]
+struct RunArgs2 {
+  #[arg(short = 'p', help = "Debug and normalization pretty printing")]
+  pretty: bool,
+
+  #[command(flatten)]
+  run_opts: RunArgs,
+
+  #[arg(
+    short = 'O',
+    value_delimiter = ' ',
+    action = clap::ArgAction::Append,
+    long_help = r#"Enables or disables the given optimizations
+    float_combinators is enabled by default on strict mode."#,
+  )]
+  comp_opts: Vec<OptArgs>,
+
+  #[command(flatten)]
+  warn_opts: CliWarnOpts,
+
+  #[arg(help = "Path to the input file")]
+  path: PathBuf,
+
+  #[arg(value_parser = |arg: &str| bend::fun::parser::TermParser::new(arg).parse_term())]
+  arguments: Option<Vec<bend::fun::Term>>,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -238,7 +245,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       eprintln!("{}", diagnostics);
     }
 
-    Mode::Compile { path, comp_opts, warn_opts } => {
+    Mode::GenHvm { path, comp_opts, warn_opts } => {
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
       let opts = compile_opts_from_cli(&comp_opts);
 
@@ -265,7 +272,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       }
     }
 
-    Mode::Run { run_opts, pretty, comp_opts, warn_opts, arguments, path } => {
+    Mode::Run(RunArgs2 { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
       let RunArgs { linear, print_stats } = run_opts;
 
       let diagnostics_cfg =
@@ -279,6 +286,74 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
       let book = load_book(&path)?;
       let (term, stats, diags) = run_book(book, run_opts, compile_opts, diagnostics_cfg, arguments)?;
+
+      eprint!("{diags}");
+      if pretty {
+        println!("Result:\n{}", term.display_pretty(0));
+      } else {
+        println!("Result: {}", term);
+      }
+      if print_stats {
+        println!("{stats}");
+      }
+    }
+
+    Mode::RunC(RunArgs2 { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
+      let RunArgs { linear, print_stats } = run_opts;
+
+      let diagnostics_cfg =
+        set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
+
+      let compile_opts = compile_opts_from_cli(&comp_opts);
+
+      compile_opts.check_for_strict();
+
+      let run_opts = RunOpts { linear_readback: linear, pretty };
+
+      let book = load_book(&path)?;
+      let run_fn = |out_path: &str| {
+        std::process::Command::new("hvm")
+          .arg("run-c")
+          .arg(out_path)
+          .output()
+          .map_err(|e| format!("While running hvm: {e}"))
+      };
+      let (term, stats, diags) =
+        run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_fn)?;
+
+      eprint!("{diags}");
+      if pretty {
+        println!("Result:\n{}", term.display_pretty(0));
+      } else {
+        println!("Result: {}", term);
+      }
+      if print_stats {
+        println!("{stats}");
+      }
+    }
+
+    Mode::RunCu(RunArgs2 { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
+      let RunArgs { linear, print_stats } = run_opts;
+
+      let diagnostics_cfg =
+        set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
+
+      let compile_opts = compile_opts_from_cli(&comp_opts);
+
+      compile_opts.check_for_strict();
+
+      let run_opts = RunOpts { linear_readback: linear, pretty };
+
+      let book = load_book(&path)?;
+      let run_fn = |out_path: &str| {
+        std::process::Command::new("hvm")
+          .arg("run-cu")
+          .arg(out_path)
+          .output()
+          .map_err(|e| format!("While running hvm: {e}"))
+      };
+      let (term, stats, diags) =
+        run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_fn)?;
 
       eprint!("{diags}");
       if pretty {
