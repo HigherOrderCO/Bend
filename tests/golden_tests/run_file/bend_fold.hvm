@@ -7,9 +7,9 @@ main =
   let b = 2;
   let c = 3;
   let n = 0;
-  let tree = bend n while (< n depth) {
+  let tree = bend n when (< n depth) {
     (Tree/node (go (+ n 1)) (go (+ n 1)))
-  } then {
+  } else {
     (Tree/leaf c)
   }
   fold tree with a {

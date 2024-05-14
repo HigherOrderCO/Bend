@@ -1,4 +1,4 @@
-use super::{AssignPattern, Definition, Expr, MapKey, Stmt};
+use super::{AssignPattern, Definition, Expr, Stmt};
 use crate::fun::{self, Name};
 
 impl Definition {
@@ -144,13 +144,7 @@ impl Expr {
   }
 }
 
-impl MapKey {
-  pub fn to_fun(self) -> fun::Term {
-    fun::Term::Num { val: fun::Num::U24(self.0) }
-  }
-}
-
-fn map_init(entries: Vec<(MapKey, Expr)>) -> fun::Term {
+fn map_init(entries: Vec<(Expr, Expr)>) -> fun::Term {
   let mut map = fun::Term::Ref { nam: fun::Name::new("Map/empty") };
   for (key, value) in entries {
     map =

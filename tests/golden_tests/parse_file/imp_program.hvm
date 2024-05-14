@@ -30,9 +30,9 @@ def lam():
 
 def do_match(b):
   match b:
-    case True:
+    case Bool/True:
       return 1;
-    case False:
+    case Bool/False:
       return 0;
 
 def true():
@@ -59,12 +59,13 @@ def fld(list):
       return 2;
 
 def bnd():
-  bend x = 0 while x < 10:
-    return List/cons(x go(x + 1));
-  then:
-    return List/nil();
+  bend x = 0:
+    when x < 10:
+      return List/cons(x go(x + 1));
+    else:
+      return List/nil();
 
 def main():
-  do IO.bind:
+  do IO:
     x <- IO.read();
     return x;

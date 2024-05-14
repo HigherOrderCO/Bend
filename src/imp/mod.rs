@@ -3,10 +3,8 @@ mod order_kwargs;
 pub mod parser;
 pub mod to_fun;
 
-use indexmap::IndexMap;
-use interner::global::GlobalString;
-
 use crate::fun::{CtrField, Name, Op};
+use interner::global::GlobalString;
 
 #[derive(Clone, Debug)]
 pub enum Expr {
@@ -37,8 +35,8 @@ pub enum Expr {
   // "[" {term} "for" {bind} "in" {iter} ("if" {cond})? "]"
   Comprehension { term: Box<Expr>, bind: Name, iter: Box<Expr>, cond: Option<Box<Expr>> },
   // "{" {entries} "}"
-  MapInit { entries: Vec<(MapKey, Expr)> },
-  // {name} "[" {key} "]"
+  MapInit { entries: Vec<(Expr, Expr)> },
+  // {map} "[" {key} "]"
   MapGet { nam: Name, key: Box<Expr> },
 }
 
@@ -47,9 +45,6 @@ pub struct MatchArm {
   pub lft: Option<Name>,
   pub rgt: Stmt,
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct MapKey(u32);
 
 #[derive(Clone, Debug)]
 pub enum AssignPattern {
@@ -170,7 +165,7 @@ pub struct Definition {
 #[derive(Clone, Debug)]
 pub struct Enum {
   pub name: Name,
-  pub variants: IndexMap<Name, Variant>,
+  pub variants: Vec<Variant>,
 }
 
 impl InPlaceOp {

@@ -1,15 +1,13 @@
 use crate::{
   fun::{
-    display::DisplayFn, Adt, Book, Definition, FanKind, MatchRule, Name, Num, Op, Pattern, Rule, Tag, Term,
-    STRINGS,
+    display::DisplayFn, Adt, Book, CtrField, Definition, FanKind, MatchRule, Name, Num, Op, Pattern, Rule,
+    Tag, Term, STRINGS,
   },
   imp::parser::PyParser,
   maybe_grow,
 };
 use highlight_error::highlight_error;
 use TSPL::Parser;
-
-use super::CtrField;
 
 // Bend grammar description:
 // <Book>       ::= (<Data> | <Rule>)*
@@ -47,6 +45,8 @@ use super::CtrField;
 // <Number>     ::= ([0-9]+ | "0x"[0-9a-fA-F]+ | "0b"[01]+)
 // <Operator>   ::= ( "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<<" | ">>" | "<=" | ">=" | "<" | ">" | "^" )
 
+pub type ParseResult<T> = std::result::Result<T, String>;
+
 pub struct TermParser<'i> {
   input: &'i str,
   index: usize,
@@ -59,43 +59,47 @@ impl<'a> TermParser<'a> {
 
   /* AST parsing functions */
 
-  pub fn parse_book(&mut self, default_book: Book, builtin: bool) -> Result<Book, String> {
+  pub fn parse_book(&mut self, default_book: Book, builtin: bool) -> ParseResult<Book> {
     let mut book = default_book;
-    let mut indent = self.skip_newlines();
+    let mut indent = self.advance_newlines();
     while !self.is_eof() {
       let ini_idx = *self.index();
-      if self.try_consume_keyword("type") {
+      if self.try_parse_keyword("type") {
         // Imp type definition
         let mut prs = PyParser { input: self.input, index: *self.index() };
-        let enum_ = prs.parse_data_type(indent)?;
+        let (enum_, nxt_indent) = prs.parse_data_type(indent)?;
         self.index = prs.index;
         let end_idx = *self.index();
-        prs.add_enum(enum_, &mut book, ini_idx, end_idx, builtin)?;
-      } else if self.try_consume_keyword("def") {
+        prs.add_type(enum_, &mut book, ini_idx, end_idx, builtin)?;
+        indent = nxt_indent;
+      } else if self.try_parse_keyword("def") {
         // Imp function definition
         let mut prs = PyParser { input: self.input, index: *self.index() };
-        let def = prs.parse_def(indent)?;
+        let (def, nxt_indent) = prs.parse_def(indent)?;
         self.index = prs.index;
         let end_idx = *self.index();
         prs.add_def(def, &mut book, ini_idx, end_idx)?;
-      } else if self.try_consume_keyword("data") {
+        indent = nxt_indent;
+      } else if self.try_parse_keyword("data") {
         // Fun type definition
         let (nam, adt) = self.parse_datatype(builtin)?;
         let end_idx = *self.index();
         self.with_ctx(book.add_adt(nam, adt), ini_idx, end_idx)?;
+        indent = self.advance_newlines();
       } else {
         // Fun function definition
         let (name, rule) = self.parse_rule()?;
         book.add_rule(name, rule, builtin);
+        indent = self.advance_newlines();
       }
-      indent = self.skip_newlines();
     }
 
     Ok(book)
   }
 
-  fn parse_datatype(&mut self, builtin: bool) -> Result<(Name, Adt), String> {
+  fn parse_datatype(&mut self, builtin: bool) -> ParseResult<(Name, Adt)> {
     // data name = ctr (| ctr)*
+    self.skip_trivia();
     let name = self.labelled(|p| p.parse_top_level_name(), "datatype name")?;
     self.consume("=")?;
     let mut ctrs = vec![self.parse_datatype_ctr(&name)?];
@@ -107,15 +111,17 @@ impl<'a> TermParser<'a> {
     Ok((name, adt))
   }
 
-  fn parse_datatype_ctr(&mut self, typ_name: &Name) -> Result<(Name, Vec<CtrField>), String> {
+  fn parse_datatype_ctr(&mut self, typ_name: &Name) -> ParseResult<(Name, Vec<CtrField>)> {
     // (name  ('~'? field)*)
     // name
     if self.try_consume("(") {
+      self.skip_trivia();
       let name = self.parse_top_level_name()?;
       let name = Name::new(format!("{typ_name}/{name}"));
 
-      fn parse_field(p: &mut TermParser) -> Result<CtrField, String> {
+      fn parse_field(p: &mut TermParser) -> ParseResult<CtrField> {
         let rec = p.try_consume("~");
+        p.skip_trivia();
         let nam = p.labelled(|p| p.parse_bend_name(), "datatype constructor field")?;
         Ok(CtrField { nam, rec })
       }
@@ -130,23 +136,24 @@ impl<'a> TermParser<'a> {
     }
   }
 
-  fn parse_rule(&mut self) -> Result<(Name, Rule), String> {
+  fn parse_rule(&mut self) -> ParseResult<(Name, Rule)> {
     // (name pat*) = term
     // name pat* = term
-    let (name, pats) = if self.try_consume("(") {
+    let (name, pats) = if self.try_consume_exactly("(") {
+      self.skip_trivia();
       let name = self.labelled(|p| p.parse_top_level_name(), "function name")?;
       let pats = self.list_like(|p| p.parse_pattern(false), "", ")", "", false, 0)?;
+      self.consume("=")?;
       (name, pats)
     } else {
       let name = self.labelled(|p| p.parse_top_level_name(), "top-level definition")?;
       let mut pats = vec![];
-      while !self.skip_starts_with("=") {
+      while !self.try_consume("=") {
         pats.push(self.parse_pattern(false)?);
+        self.skip_trivia();
       }
       (name, pats)
     };
-
-    self.consume("=")?;
 
     let body = self.parse_term()?;
 
@@ -154,20 +161,21 @@ impl<'a> TermParser<'a> {
     Ok((name, rule))
   }
 
-  fn parse_pattern(&mut self, simple: bool) -> Result<Pattern, String> {
+  fn parse_pattern(&mut self, simple: bool) -> ParseResult<Pattern> {
     maybe_grow(|| {
       let (tag, unexpected_tag) = self.parse_tag()?;
       self.skip_trivia();
 
       // Ctr or Tup
       if self.starts_with("(") {
-        self.consume("(")?;
+        self.advance_one();
         let head_ini_idx = *self.index();
         let head = self.parse_pattern(simple)?;
         let head_end_idx = *self.index();
 
         // Tup
-        if simple || self.skip_starts_with(",") {
+        self.skip_trivia();
+        if self.starts_with(",") || simple {
           self.consume(",")?;
           let mut els = self.list_like(|p| p.parse_pattern(simple), "", ")", ",", true, 1)?;
           els.insert(0, head);
@@ -221,6 +229,7 @@ impl<'a> TermParser<'a> {
       if self.starts_with("$") {
         unexpected_tag(self)?;
         self.advance_one();
+        self.skip_trivia();
         let name = self.parse_bend_name()?;
         return Ok(Pattern::Chn(name));
       }
@@ -232,14 +241,14 @@ impl<'a> TermParser<'a> {
     })
   }
 
-  pub fn parse_term(&mut self) -> Result<Term, String> {
+  pub fn parse_term(&mut self) -> ParseResult<Term> {
     maybe_grow(|| {
       let (tag, unexpected_tag) = self.parse_tag()?;
       self.skip_trivia();
 
       // Lambda, unscoped lambda
       if self.starts_with("λ") || self.starts_with("@") {
-        self.advance_one().unwrap();
+        self.advance_one();
         let tag = tag.unwrap_or(Tag::Static);
         let pat = self.parse_pattern(true)?;
         let bod = self.parse_term()?;
@@ -248,15 +257,17 @@ impl<'a> TermParser<'a> {
 
       // App, Tup, Num Op
       if self.starts_with("(") {
-        self.consume("(")?;
+        self.advance_one();
 
         // Opr but maybe a tup
-        let starts_with_oper = self.skip_peek_one().map_or(false, |c| "+-*/%&|<>^=!".contains(c));
+        self.skip_trivia();
+        let starts_with_oper = self.peek_one().map_or(false, |c| "+-*/%&|<>^=!".contains(c));
         if starts_with_oper {
           let opr = self.parse_oper()?;
 
           // jk, actually a tuple
-          if self.skip_starts_with(",") && opr == Op::MUL {
+          self.skip_trivia();
+          if self.starts_with(",") && opr == Op::MUL {
             let mut els = vec![Term::Era];
             while self.try_consume(",") {
               els.push(self.parse_term()?);
@@ -277,7 +288,8 @@ impl<'a> TermParser<'a> {
         let head = self.parse_term()?;
 
         // Tup
-        if self.skip_starts_with(",") {
+        self.skip_trivia();
+        if self.starts_with(",") {
           let mut els = vec![head];
           while self.try_consume(",") {
             els.push(self.parse_term()?);
@@ -311,22 +323,23 @@ impl<'a> TermParser<'a> {
 
       // Unscoped var
       if self.starts_with("$") {
-        self.consume("$")?;
+        self.advance_one();
         unexpected_tag(self)?;
+        self.skip_trivia();
         let nam = self.parse_bend_name()?;
         return Ok(Term::Link { nam });
       }
 
       // Era
       if self.starts_with("*") {
-        self.consume("*")?;
+        self.advance_one();
         unexpected_tag(self)?;
         return Ok(Term::Era);
       }
 
       // Nat
       if self.starts_with("#") {
-        self.consume("#")?;
+        self.advance_one();
         unexpected_tag(self)?;
         let val = self.parse_u32()?;
         return Ok(Term::Nat { val });
@@ -346,63 +359,24 @@ impl<'a> TermParser<'a> {
         return Ok(Term::Num { val: Num::U24(char as u32 & 0x00ff_ffff) });
       }
 
+      // Symbol
+      if self.starts_with("`") {
+        unexpected_tag(self)?;
+        let val = self.parse_quoted_symbol()?;
+        return Ok(Term::Num { val: Num::U24(val) });
+      }
+
       // Native Number
       if self.peek_one().map_or(false, |c| "0123456789+-".contains(c)) {
         unexpected_tag(self)?;
-
-        let ini_idx = *self.index();
-
-        // Parses sign
-        let sgn = if self.try_consume("+") {
-          Some(1)
-        } else if self.try_consume("-") {
-          Some(-1)
-        } else {
-          None
-        };
-
-        // Parses main value
-        let num = self.parse_u32()?;
-
-        // Parses frac value (Float type)
-        // TODO: Will lead to some rounding errors
-        // TODO: Doesn't cover very large/small numbers
-        let fra = if let Some('.') = self.peek_one() {
-          self.consume(".")?;
-          let ini_idx = *self.index();
-          let fra = self.parse_u32()? as f32;
-          let end_idx = *self.index();
-          let fra = fra / 10f32.powi((end_idx - ini_idx) as i32);
-          Some(fra)
-        } else {
-          None
-        };
-
-        // F24
-        if let Some(fra) = fra {
-          let sgn = sgn.unwrap_or(1);
-          return Ok(Term::Num { val: Num::F24(sgn as f32 * (num as f32 + fra)) });
-        }
-
-        // I24
-        if let Some(sgn) = sgn {
-          let num = sgn * num as i32;
-          if !(-0x00800000 ..= 0x007fffff).contains(&num) {
-            return self.num_range_err(ini_idx, "I24");
-          }
-          return Ok(Term::Num { val: Num::I24(num) });
-        }
-
-        // U24
-        if num >= 1 << 24 {
-          return self.num_range_err(ini_idx, "U24");
-        }
-        return Ok(Term::Num { val: Num::U24(num) });
+        let num = self.parse_number()?;
+        return Ok(Term::Num { val: num });
       }
 
       // Use
-      if self.try_consume_keyword("use") {
+      if self.try_parse_keyword("use") {
         unexpected_tag(self)?;
+        self.skip_trivia();
         let nam = self.parse_bend_name()?;
         self.consume("=")?;
         let val = self.parse_term()?;
@@ -412,7 +386,7 @@ impl<'a> TermParser<'a> {
       }
 
       // Let
-      if self.try_consume_keyword("let") {
+      if self.try_parse_keyword("let") {
         unexpected_tag(self)?;
         let pat = self.parse_pattern(true)?;
         self.consume("=")?;
@@ -423,7 +397,7 @@ impl<'a> TermParser<'a> {
       }
 
       // Ask (monadic operation)
-      if self.try_consume_keyword("ask") {
+      if self.try_parse_keyword("ask") {
         unexpected_tag(self)?;
         let pat = self.parse_pattern(true)?;
         self.consume("=")?;
@@ -434,7 +408,7 @@ impl<'a> TermParser<'a> {
       }
 
       // If
-      if self.try_consume_keyword("if") {
+      if self.try_parse_keyword("if") {
         let cnd = self.parse_term()?;
         self.consume("{")?;
         let thn = self.parse_term()?;
@@ -453,7 +427,7 @@ impl<'a> TermParser<'a> {
       }
 
       // Match
-      if self.try_consume_keyword("match") {
+      if self.try_parse_keyword("match") {
         unexpected_tag(self)?;
         let (bnd, arg, with) = self.parse_match_header()?;
         let arms = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
@@ -461,13 +435,13 @@ impl<'a> TermParser<'a> {
       }
 
       // Switch
-      if self.try_consume_keyword("switch") {
+      if self.try_parse_keyword("switch") {
         unexpected_tag(self)?;
         return self.parse_switch();
       }
 
       // Do (monadic block)
-      if self.try_consume_keyword("do") {
+      if self.try_parse_keyword("do") {
         unexpected_tag(self)?;
         let typ = self.parse_name()?;
         self.consume("{")?;
@@ -477,7 +451,7 @@ impl<'a> TermParser<'a> {
       }
 
       // Fold
-      if self.try_consume_keyword("fold") {
+      if self.try_parse_keyword("fold") {
         unexpected_tag(self)?;
         let (bnd, arg, with) = self.parse_match_header()?;
         let arms = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
@@ -485,7 +459,7 @@ impl<'a> TermParser<'a> {
       }
 
       // Bend
-      if self.try_consume_keyword("bend") {
+      if self.try_parse_keyword("bend") {
         unexpected_tag(self)?;
         let args = self.list_like(
           |p| {
@@ -494,7 +468,7 @@ impl<'a> TermParser<'a> {
             Ok((bind, init))
           },
           "",
-          "while",
+          "when",
           ",",
           false,
           0,
@@ -505,7 +479,7 @@ impl<'a> TermParser<'a> {
         self.consume("{")?;
         let step = self.parse_term()?;
         self.consume("}")?;
-        self.consume("then")?;
+        self.consume("else")?;
         self.consume("{")?;
         let base = self.parse_term()?;
         self.consume("}")?;
@@ -525,22 +499,10 @@ impl<'a> TermParser<'a> {
     })
   }
 
-  fn parse_top_level_name(&mut self) -> Result<Name, String> {
-    let ini_idx = *self.index();
-    let nam = self.parse_bend_name()?;
-    let end_idx = *self.index();
-    if nam.contains("__") {
-      let msg = "Top-level names are not allowed to contain \"__\".".to_string();
-      self.with_ctx(Err(msg), ini_idx, end_idx)
-    } else {
-      Ok(nam)
-    }
-  }
-
-  fn parse_name_or_era(&mut self) -> Result<Option<Name>, String> {
+  fn parse_name_or_era(&mut self) -> ParseResult<Option<Name>> {
     self.labelled(
       |p| {
-        if p.try_consume("*") {
+        if p.try_consume_exactly("*") {
           Ok(None)
         } else {
           let nam = p.parse_bend_name()?;
@@ -554,9 +516,10 @@ impl<'a> TermParser<'a> {
   /// Parses a tag where it may or may not be valid.
   ///
   /// If it is not valid, the returned callback can be used to issue an error.
-  fn parse_tag(&mut self) -> Result<(Option<Tag>, impl FnOnce(&mut Self) -> Result<(), String>), String> {
+  fn parse_tag(&mut self) -> ParseResult<(Option<Tag>, impl FnOnce(&mut Self) -> Result<(), String>)> {
     let index = self.index;
-    let tag = if self.skip_peek_one() == Some('#')
+    self.skip_trivia();
+    let tag = if self.peek_one() == Some('#')
       && !self.peek_many(2).is_some_and(|x| x.chars().nth(1).unwrap().is_ascii_digit())
     {
       let msg = "Tagged terms not supported for hvm32.".to_string();
@@ -576,7 +539,7 @@ impl<'a> TermParser<'a> {
     }))
   }
 
-  fn parse_match_arg(&mut self) -> Result<(Option<Name>, Term), String> {
+  fn parse_match_arg(&mut self) -> ParseResult<(Option<Name>, Term)> {
     let ini_idx = *self.index();
     let mut arg = self.parse_term()?;
     let end_idx = *self.index();
@@ -593,13 +556,18 @@ impl<'a> TermParser<'a> {
     }
   }
 
-  fn parse_match_header(&mut self) -> Result<(Option<Name>, Term, Vec<Name>), String> {
+  fn parse_match_header(&mut self) -> ParseResult<(Option<Name>, Term, Vec<Name>)> {
     let (bnd, arg) = self.parse_match_arg()?;
-    let with = if self.try_consume_keyword("with") {
+    self.skip_trivia();
+    let with = if self.try_parse_keyword("with") {
+      self.skip_trivia();
       let mut with = vec![self.parse_bend_name()?];
-      while !self.skip_starts_with("{") {
+      self.skip_trivia();
+      while !self.starts_with("{") {
         self.try_consume(",");
+        self.skip_trivia();
         with.push(self.parse_bend_name()?);
+        self.skip_trivia();
       }
       with
     } else {
@@ -608,23 +576,26 @@ impl<'a> TermParser<'a> {
     Ok((bnd, arg, with))
   }
 
-  fn parse_match_arm(&mut self) -> Result<MatchRule, String> {
+  fn parse_match_arm(&mut self) -> ParseResult<MatchRule> {
     self.try_consume("|");
+    self.skip_trivia();
     let nam = self.parse_name_or_era()?;
     self.consume(":")?;
     let bod = self.parse_term()?;
     Ok((nam, vec![], bod))
   }
 
-  fn parse_switch(&mut self) -> Result<Term, String> {
+  fn parse_switch(&mut self) -> ParseResult<Term> {
     let (bnd, arg, with) = self.parse_match_header()?;
     self.consume("{")?;
     let mut expected_num = 0;
     let mut arms = vec![];
     let mut to_continue = true;
-    while to_continue && !self.skip_starts_with("}") {
+    self.skip_trivia();
+    while to_continue && !self.starts_with("}") {
       self.try_consume("|");
-      let Some(head) = self.skip_peek_one() else { return self.expected("switch pattern") };
+      self.skip_trivia();
+      let Some(head) = self.peek_one() else { return self.expected("switch pattern") };
       match head {
         '_' => {
           if expected_num == 0 {
@@ -651,12 +622,6 @@ impl<'a> TermParser<'a> {
     self.consume("}")?;
     Ok(Term::Swt { arg: Box::new(arg), bnd, with, pred, arms })
   }
-
-  fn num_range_err<T>(&mut self, ini_idx: usize, typ: &str) -> Result<T, String> {
-    let msg = format!("\x1b[1mNumber literal outside of range for {}.\x1b[0m", typ);
-    let end_idx = *self.index();
-    self.with_ctx(Err(msg), ini_idx, end_idx)
-  }
 }
 
 impl<'a> Parser<'a> for TermParser<'a> {
@@ -671,7 +636,7 @@ impl<'a> Parser<'a> for TermParser<'a> {
   /// Generates an error message for parsing failures, including the highlighted context.
   ///
   /// Override to have our own error message.
-  fn expected<T>(&mut self, exp: &str) -> Result<T, String> {
+  fn expected<T>(&mut self, exp: &str) -> ParseResult<T> {
     let ini_idx = *self.index();
     let end_idx = *self.index() + 1;
     self.expected_spanned(exp, ini_idx, end_idx)
@@ -680,7 +645,7 @@ impl<'a> Parser<'a> for TermParser<'a> {
   /// Consumes an instance of the given string, erroring if it is not found.
   ///
   /// Override to have our own error message.
-  fn consume(&mut self, text: &str) -> Result<(), String> {
+  fn consume(&mut self, text: &str) -> ParseResult<()> {
     self.skip_trivia();
     if self.input().get(*self.index() ..).unwrap_or_default().starts_with(text) {
       *self.index() += text.len();
@@ -695,8 +660,32 @@ fn is_name_char(c: char) -> bool {
   c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/'
 }
 
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum Indent {
+  Val(isize),
+  Eof,
+}
+
+impl Indent {
+  pub fn new(val: isize) -> Self {
+    Indent::Val(val)
+  }
+
+  pub fn enter_level(&mut self) {
+    if let Indent::Val(val) = self {
+      *val += 2;
+    }
+  }
+
+  pub fn exit_level(&mut self) {
+    if let Indent::Val(val) = self {
+      *val -= 2;
+    }
+  }
+}
+
 impl Book {
-  fn add_adt(&mut self, nam: Name, adt: Adt) -> Result<(), String> {
+  fn add_adt(&mut self, nam: Name, adt: Adt) -> ParseResult<()> {
     if let Some(adt) = self.adts.get(&nam) {
       if adt.builtin {
         return Err(format!("{} is a built-in datatype and should not be overridden.", nam));
@@ -733,49 +722,71 @@ impl Book {
 impl<'a> ParserCommons<'a> for TermParser<'a> {}
 
 pub trait ParserCommons<'a>: Parser<'a> {
-  fn labelled<T>(
-    &mut self,
-    parser: impl Fn(&mut Self) -> Result<T, String>,
-    label: &str,
-  ) -> Result<T, String> {
+  fn labelled<T>(&mut self, parser: impl Fn(&mut Self) -> ParseResult<T>, label: &str) -> ParseResult<T> {
     match parser(self) {
       Ok(val) => Ok(val),
       Err(_) => self.expected(label),
     }
   }
 
-  fn parse_bend_name(&mut self) -> Result<Name, String> {
-    let nam = self.parse_name()?;
+  fn parse_top_level_name(&mut self) -> ParseResult<Name> {
+    let ini_idx = *self.index();
+    let nam = self.parse_bend_name()?;
+    let end_idx = *self.index();
+    if nam.contains("__") {
+      let msg = "Top-level names are not allowed to contain \"__\".".to_string();
+      self.with_ctx(Err(msg), ini_idx, end_idx)
+    } else {
+      Ok(nam)
+    }
+  }
+
+  fn parse_bend_name(&mut self) -> ParseResult<Name> {
+    let nam = self.parse_exactly_name()?;
     Ok(Name::new(nam))
   }
 
-  fn skip_peek_one(&mut self) -> Option<char> {
-    self.skip_trivia();
-    self.peek_one()
+  fn parse_exactly_name(&mut self) -> ParseResult<String> {
+    let name = self.take_while(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/');
+    if name.is_empty() { self.expected("name") } else { Ok(name.to_owned()) }
   }
 
-  /// Checks if the next characters in the input start with the given string.
-  /// Skips trivia.
-  fn skip_starts_with(&mut self, text: &str) -> bool {
-    self.skip_trivia();
-    self.starts_with(text)
+  /// Consumes exactly the text without skipping.
+  fn consume_exactly(&mut self, text: &str) -> ParseResult<()> {
+    if self.input().get(*self.index() ..).unwrap_or_default().starts_with(text) {
+      *self.index() += text.len();
+      Ok(())
+    } else {
+      self.expected(format!("'{text}'").as_str())
+    }
   }
 
-  fn skip_newlines(&mut self) -> usize {
+  fn consume_new_line(&mut self) -> ParseResult<()> {
+    self.skip_trivia_inline();
+    self.try_consume_exactly("\r");
+    self.consume_exactly("\n")
+  }
+
+  /// Skips trivia, returns the number of trivia characters skipped in the last line.
+  fn advance_newlines(&mut self) -> Indent {
     loop {
-      let num_spaces = self.advance_inline_trivia();
+      let num_spaces = self.advance_trivia_inline();
       if self.peek_one() == Some('\r') {
         self.advance_one();
       }
       if self.peek_one() == Some('\n') {
         self.advance_one();
+      } else if self.is_eof() {
+        return Indent::Eof;
       } else {
-        return num_spaces;
+        return Indent::Val(num_spaces);
       }
     }
   }
 
-  fn advance_inline_trivia(&mut self) -> usize {
+  /// Advances the parser to the next non-trivia character in the same line.
+  /// Returns how many characters were advanced.
+  fn advance_trivia_inline(&mut self) -> isize {
     let mut char_count = 0;
     while let Some(c) = self.peek_one() {
       if " \t".contains(c) {
@@ -799,7 +810,20 @@ pub trait ParserCommons<'a>: Parser<'a> {
     char_count
   }
 
-  fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> Result<T, String> {
+  /// Skips until the next non-trivia character in the same line.
+  fn skip_trivia_inline(&mut self) {
+    self.advance_trivia_inline();
+  }
+
+  fn skip_trivia_maybe_inline(&mut self, inline: bool) {
+    if inline {
+      self.skip_trivia_inline();
+    } else {
+      self.skip_trivia();
+    }
+  }
+
+  fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> ParseResult<T> {
     let is_eof = self.is_eof();
     let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { Ok(()) });
     let msg = format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected);
@@ -811,14 +835,14 @@ pub trait ParserCommons<'a>: Parser<'a> {
     res: Result<T, impl std::fmt::Display>,
     ini_idx: usize,
     end_idx: usize,
-  ) -> Result<T, String> {
+  ) -> ParseResult<T> {
     res.map_err(|msg| {
       let ctx = highlight_error(ini_idx, end_idx, self.input());
       format!("{msg}\n{ctx}")
     })
   }
 
-  /// Consumes text if the input starts with it. Otherwise, do nothing.
+  /// Consumes text if the input starts with it or trivia. Otherwise, do nothing.
   fn try_consume(&mut self, text: &str) -> bool {
     self.skip_trivia();
     if self.starts_with(text) {
@@ -829,23 +853,45 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
   }
 
-  fn try_consume_keyword(&mut self, keyword: &str) -> bool {
-    self.skip_trivia();
-
-    if !self.starts_with(keyword) {
-      return false;
-    }
-    let input = &self.input()[*self.index() + keyword.len() ..];
-    let next_is_name = input.chars().next().map_or(false, is_name_char);
-    if !next_is_name {
-      self.consume(keyword).unwrap();
+  /// Consumes text if the input starts exactly with it. Otherwise, do nothing.
+  fn try_consume_exactly(&mut self, text: &str) -> bool {
+    if self.starts_with(text) {
+      self.consume_exactly(text).unwrap();
       true
     } else {
       false
     }
   }
 
+  fn try_parse_keyword(&mut self, keyword: &str) -> bool {
+    if !self.starts_with(keyword) {
+      return false;
+    }
+    let input = &self.input()[*self.index() + keyword.len() ..];
+    let next_is_name = input.chars().next().map_or(false, is_name_char);
+    if !next_is_name {
+      self.consume_exactly(keyword).unwrap();
+      true
+    } else {
+      false
+    }
+  }
+
+  fn parse_keyword(&mut self, keyword: &str) -> ParseResult<()> {
+    let ini_idx = *self.index();
+    self.consume_exactly(keyword)?;
+    let end_idx = *self.index();
+    let input = &self.input()[*self.index() ..];
+    let next_is_name = input.chars().next().map_or(false, is_name_char);
+    if !next_is_name {
+      Ok(())
+    } else {
+      self.expected_spanned(&format!("keyword '{keyword}'"), ini_idx, end_idx + 1)
+    }
+  }
+
   /// Parses a list-like structure like "[x1, x2, x3,]".
+  /// Since a list is always well terminated, we consume newlines.
   ///
   /// `parser` is a function that parses an element of the list.
   ///
@@ -855,27 +901,33 @@ pub trait ParserCommons<'a>: Parser<'a> {
   /// `min_els` determines how many elements must be parsed at minimum.
   fn list_like<T>(
     &mut self,
-    parser: impl Fn(&mut Self) -> Result<T, String>,
+    parser: impl Fn(&mut Self) -> ParseResult<T>,
     start: &str,
     end: &str,
     sep: &str,
     hard_sep: bool,
     min_els: usize,
-  ) -> Result<Vec<T>, String> {
-    self.consume(start)?;
+  ) -> ParseResult<Vec<T>> {
+    self.consume_exactly(start)?;
+
     let mut els = vec![];
+    // Consume the minimum number of elements
     for i in 0 .. min_els {
+      self.skip_trivia();
       els.push(parser(self)?);
-      if hard_sep && !(i == min_els - 1 && self.skip_starts_with(end)) {
+      self.skip_trivia();
+      if hard_sep && !(i == min_els - 1 && self.starts_with(end)) {
         self.consume(sep)?;
       } else {
         self.try_consume(sep);
       }
     }
 
+    // Consume optional elements
     while !self.try_consume(end) {
       els.push(parser(self)?);
-      if hard_sep && !self.skip_starts_with(end) {
+      self.skip_trivia();
+      if hard_sep && !self.starts_with(end) {
         self.consume(sep)?;
       } else {
         self.try_consume(sep);
@@ -884,30 +936,30 @@ pub trait ParserCommons<'a>: Parser<'a> {
     Ok(els)
   }
 
-  fn parse_oper(&mut self) -> Result<Op, String> {
-    let opr = if self.try_consume("+") {
+  fn parse_oper(&mut self) -> ParseResult<Op> {
+    let opr = if self.try_consume_exactly("+") {
       Op::ADD
-    } else if self.try_consume("-") {
+    } else if self.try_consume_exactly("-") {
       Op::SUB
-    } else if self.try_consume("*") {
+    } else if self.try_consume_exactly("*") {
       Op::MUL
-    } else if self.try_consume("/") {
+    } else if self.try_consume_exactly("/") {
       Op::DIV
-    } else if self.try_consume("%") {
+    } else if self.try_consume_exactly("%") {
       Op::REM
-    } else if self.try_consume("<") {
+    } else if self.try_consume_exactly("<") {
       Op::LTN
-    } else if self.try_consume(">") {
+    } else if self.try_consume_exactly(">") {
       Op::GTN
-    } else if self.try_consume("==") {
+    } else if self.try_consume_exactly("==") {
       Op::EQL
-    } else if self.try_consume("!=") {
+    } else if self.try_consume_exactly("!=") {
       Op::NEQ
-    } else if self.try_consume("&") {
+    } else if self.try_consume_exactly("&") {
       Op::AND
-    } else if self.try_consume("|") {
+    } else if self.try_consume_exactly("|") {
       Op::OR
-    } else if self.try_consume("^") {
+    } else if self.try_consume_exactly("^") {
       Op::XOR
     } else {
       return self.expected("numeric operator");
@@ -915,8 +967,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     Ok(opr)
   }
 
-  fn parse_u32(&mut self) -> Result<u32, String> {
-    self.skip_trivia();
+  fn parse_u32(&mut self) -> ParseResult<u32> {
     let radix = match self.peek_many(2) {
       Some("0x") => {
         self.advance_many(2);
@@ -935,5 +986,89 @@ pub trait ParserCommons<'a>: Parser<'a> {
     } else {
       u32::from_str_radix(&num_str, radix).map_err(|e| e.to_string())
     }
+  }
+
+  fn parse_number(&mut self) -> ParseResult<Num> {
+    let ini_idx = *self.index();
+
+    // Parses sign
+    let sgn = if self.try_consume_exactly("+") {
+      Some(1)
+    } else if self.try_consume_exactly("-") {
+      Some(-1)
+    } else {
+      None
+    };
+
+    // Parses main value
+    let num = self.parse_u32()?;
+
+    // Parses frac value (Float type)
+    // TODO: Will lead to some rounding errors
+    // TODO: Doesn't cover very large/small numbers
+    let fra = if let Some('.') = self.peek_one() {
+      self.advance_one();
+      let ini_idx = *self.index();
+      let fra = self.parse_u32()? as f32;
+      let end_idx = *self.index();
+      let fra = fra / 10f32.powi((end_idx - ini_idx) as i32);
+      Some(fra)
+    } else {
+      None
+    };
+
+    // F24
+    if let Some(fra) = fra {
+      let sgn = sgn.unwrap_or(1);
+      return Ok(Num::F24(sgn as f32 * (num as f32 + fra)));
+    }
+
+    // I24
+    if let Some(sgn) = sgn {
+      let num = sgn * num as i32;
+      if !(-0x00800000 ..= 0x007fffff).contains(&num) {
+        return self.num_range_err(ini_idx, "I24");
+      }
+      return Ok(Num::I24(num));
+    }
+
+    // U24
+    if num >= 1 << 24 {
+      return self.num_range_err(ini_idx, "U24");
+    }
+    Ok(Num::U24(num))
+  }
+
+  fn num_range_err<T>(&mut self, ini_idx: usize, typ: &str) -> ParseResult<T> {
+    let msg = format!("\x1b[1mNumber literal outside of range for {}.\x1b[0m", typ);
+    let end_idx = *self.index();
+    self.with_ctx(Err(msg), ini_idx, end_idx)
+  }
+
+  /// Parses up to 4 base64 characters surrounded by "`".
+  /// Joins the characters into a u24 and returns it.
+  fn parse_quoted_symbol(&mut self) -> ParseResult<u32> {
+    self.consume_exactly("`")?;
+    let mut result = u32::MAX;
+    let mut count = 0;
+    while count < 4 {
+      if self.starts_with("`") {
+        break;
+      }
+      count += 1;
+      let Some(c) = self.advance_one() else { self.expected("base_64 character")? };
+      let c = c as u8;
+      let nxt = match c {
+        b'A' ..= b'Z' => c - b'A',
+        b'a' ..= b'z' => c - b'a' + 26,
+        b'0' ..= b'9' => c - b'0' + 52,
+        b'+' => 62,
+        b'/' => 63,
+        _ => return self.expected("base64 character"),
+      };
+      result = (result << 6) | nxt as u32;
+    }
+    self.consume_exactly("`")?;
+    Ok(result)
   }
 }
