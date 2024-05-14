@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/merge_recursive.bend
+---
+(foo_1) = λa (a foo_2)
+
+(foo_2) = λa λb (a, b)
+
+(bar_1) = λa (a bar_2)
+
+(bar_2) = λa λb (a, b)

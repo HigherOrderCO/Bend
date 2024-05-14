@@ -1,9 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/wrong_nums.hvm
----
-[4m[1m[31mErrors:[0m
-In tests/golden_tests/compile_file/wrong_nums.hvm :
-[1m- expected:[0m ')'
-[1m- detected:[0m
-[0m  1 | main = (+ 0b012345 [4m[31m0[0mFA)[0m

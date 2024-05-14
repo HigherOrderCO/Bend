@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/global_lam.hvm
----
-@main = c
-  & (b (a a)) ~ (b c)

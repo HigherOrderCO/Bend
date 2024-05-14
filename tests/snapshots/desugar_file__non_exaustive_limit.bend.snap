@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/desugar_file/non_exaustive_limit.bend
+---
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mBar[0m[1m':[0m
+  Non-exhaustive pattern matching rule. Constructor 'Foo/B' of type 'Foo' not covered

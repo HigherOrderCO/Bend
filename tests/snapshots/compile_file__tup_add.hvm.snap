@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/tup_add.hvm
----
-@main = b
-  & (1 2) ~ ($(:[+] $(a b)) a)

@@ -1,0 +1,15 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/compile_all.bend
+---
+@Pair.get = (a ((@Pair.get__C0 (a b)) b))
+
+@Pair.get__C0 = (a (b ((a (b c)) c)))
+
+@Pair/Pair = (a (b ((a (b c)) c)))
+
+@main = b
+  & @Pair.get ~ (@main__C0 (a b))
+  & @Pair/Pair ~ (40 (2 a))
+
+@main__C0 = ($(:[+] $(a b)) (a b))

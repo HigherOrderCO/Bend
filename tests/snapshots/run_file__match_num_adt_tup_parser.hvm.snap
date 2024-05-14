@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/match_num_adt_tup_parser.hvm
----
-λ* λa (a {λb λ* (b 40 λc λ* (c 43 String/nil)) *})

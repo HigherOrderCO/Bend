@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/wrong_string.bend
+---
+λa λ* (a λ* 4 λb λ* (b * String/nil))

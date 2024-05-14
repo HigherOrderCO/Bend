@@ -1,7 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/ask_outside_do.hvm
----
-[4m[1m[31mErrors:[0m
-[1mIn definition '[4mmain[0m[1m':[0m
-  Monadic bind operation 'x <- ...' used outside of a `do` block.

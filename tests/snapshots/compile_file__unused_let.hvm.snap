@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/unused_let.hvm
----
-@main = ({$(:[+] $(b *)) {b a}} a)

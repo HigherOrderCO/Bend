@@ -1,0 +1,13 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/fst_snd.bend
+---
+@main = a
+  & @main__C2 ~ (@main__C1 a)
+
+@main__C0 = ((a *) a)
+
+@main__C1 = a
+  & @main__C0 ~ (((1 3) 2) a)
+
+@main__C2 = ((* a) a)

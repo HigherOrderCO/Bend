@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/fst.bend
+---
+@Fst = ((a *) a)
+
+@main = a
+  & @Fst ~ ((4 8) a)

@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/match_num_explicit_bind.bend
+---
+@main = a
+  & @pred ~ (4 a)
+
+@pred = (?((0 (a a)) b) b)

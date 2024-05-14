@@ -1,0 +1,14 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/extracted_match_pred.bend
+---
+@main = a
+  & @val ~ (1 a)
+
+@val = (?((0 @val__C0) a) a)
+
+@valS = a
+  & @val ~ a
+
+@val__C0 = a
+  & @valS ~ a

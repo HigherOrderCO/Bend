@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/match_str.hvm
----
-λa λ* (a 2 λb λ* (b 2 λc λ* (c 1 λd λ* (d 0 λe λ* (e 0 λf λ* (f 0 List/nil))))))

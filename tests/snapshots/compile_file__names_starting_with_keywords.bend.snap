@@ -1,0 +1,15 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/names_starting_with_keywords.bend
+---
+@A = (a a)
+
+@B = (a a)
+
+@C = (a a)
+
+@D = (a a)
+
+@E = (a a)
+
+@main = *

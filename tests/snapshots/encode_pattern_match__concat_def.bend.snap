@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/concat_def.bend
+---
+(concat) = λa (a λb λc λd (String/cons b (concat c d)) λe e)
+
+(main) = (concat (String/cons 97 (String/cons 98 String/nil)) (String/cons 99 (String/cons 100 String/nil)))
+
+(String/cons) = λa λb λc λ* (c a b)
+
+(String/nil) = λ* λb b

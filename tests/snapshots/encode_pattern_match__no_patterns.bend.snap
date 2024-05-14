@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/no_patterns.bend
+---
+(Id) = λa a
+
+(Id2) = λa a
+
+(Pair) = λa λb (a, b)

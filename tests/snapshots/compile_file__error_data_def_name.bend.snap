@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/error_data_def_name.bend
+---
+[4m[1m[31mErrors:[0m
+Function 'A/A' has the same name as a previously defined constructor

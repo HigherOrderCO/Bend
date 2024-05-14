@@ -69,7 +69,7 @@ fn run_golden_test_dir_multiple(test_name: &str, run: &[&RunFn]) {
 
   let walker = WalkDir::new(&root).sort_by_file_name().max_depth(2).into_iter().filter_entry(|e| {
     let path = e.path();
-    path == root || path.is_dir() || (path.is_file() && path.extension().is_some_and(|x| x == "hvm"))
+    path == root || path.is_dir() || (path.is_file() && path.extension().is_some_and(|x| x == "bend"))
   });
 
   for entry in walker {
@@ -407,7 +407,7 @@ fn examples() -> Result<(), Diagnostics> {
     .min_depth(1)
     .into_iter()
     .filter_map(|e| e.ok())
-    .filter(|e| e.path().extension().map_or(false, |ext| ext == "hvm"))
+    .filter(|e| e.path().extension().map_or(false, |ext| ext == "bend"))
   {
     let _guard = RUN_MUTEX.lock().unwrap();
     let path = entry.path();

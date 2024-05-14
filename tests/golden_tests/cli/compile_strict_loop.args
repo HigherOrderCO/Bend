@@ -1,4 +1,4 @@
 gen-hvm
-tests/golden_tests/cli/compile_strict_loop.hvm
+tests/golden_tests/cli/compile_strict_loop.bend
 -Ono-all
 -Arecursion-cycle

@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/wrong_fn_arity.bend
+---
+[4m[1m[31mErrors:[0m
+File has no 'main' definition.
+[1mIn definition '[4mFoo[0m[1m':[0m
+  Incorrect pattern matching rule arity. Expected 3 args, found 0.

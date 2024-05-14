@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: examples/neg_fusion.bend
+---
+λa λ* a

@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared_fn.bend
+---
+(main) = *
+
+(Foo) = λa (a λ* λ* 1 0)
+
+(Bar) = λa (a λ* λ* 0 1)

@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/repeated_bind_rule.bend
+---
+[4m[1m[33mWarnings:[0m
+[1mIn definition '[4mFoo[0m[1m':[0m
+  Repeated bind in pattern matching rule: 'a'.
+
+@Foo = (* (a a))
+
+@main = a
+  & @Foo ~ (1 (2 a))

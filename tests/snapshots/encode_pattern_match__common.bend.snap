@@ -1,0 +1,37 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/common.bend
+---
+(Box/Filled) = λa λb λ* (b a)
+
+(Box/Empty) = λ* λb b
+
+(Option/Some) = λa λb λ* (b a)
+
+(Option/None) = λ* λb b
+
+(Result_/Ok) = λa λb λ* (b a)
+
+(Result_/Err) = λa λ* λc (c a)
+
+(List_/Cons) = λa λb λc λ* (c a b)
+
+(List_/Nil) = λ* λb b
+
+(Bool/True) = λa λ* a
+
+(Bool/False) = λ* λb b
+
+(Light/Red) = λa λ* λ* a
+
+(Light/Yellow) = λ* λb λ* b
+
+(Light/Green) = λ* λ* λc c
+
+(Direction/North) = λa λ* λ* λ* a
+
+(Direction/South) = λ* λb λ* λ* b
+
+(Direction/East) = λ* λ* λc λ* c
+
+(Direction/West) = λ* λ* λ* λd d

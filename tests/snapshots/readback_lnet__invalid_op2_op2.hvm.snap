@@ -1,9 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/readback_lnet/invalid_op2_op2.hvm
----
-[4m[1m[33mWarnings:[0m
-[1mDuring readback:[0m
-  Invalid Numeric Operation. (3 occurrences)
-
-λa <Invalid>

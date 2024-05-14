@@ -1,8 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/io/store.hvm
----
-Lazy mode:
-*
-Strict mode:
-*

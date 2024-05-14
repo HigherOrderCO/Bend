@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/switch_in_switch_arg.bend
+---
+(main) = λa switch switch a { 0: 0; _: λb b; } { 0: 0; _: λc (+ c 1); }

@@ -1,0 +1,29 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/expr.bend
+---
+(Expr/Var) = λa λb λ* λ* λ* λ* λ* λ* λ* λ* (b a)
+
+(Expr/Num) = λa λ* λc λ* λ* λ* λ* λ* λ* λ* (c a)
+
+(Expr/App) = λa λb λ* λ* λe λ* λ* λ* λ* λ* λ* (e a b)
+
+(Expr/Fun) = λa λb λ* λ* λ* λf λ* λ* λ* λ* λ* (f a b)
+
+(Expr/If) = λa λb λc λ* λ* λ* λ* λh λ* λ* λ* λ* (h a b c)
+
+(Expr/Let) = λa λb λc λ* λ* λ* λ* λ* λi λ* λ* λ* (i a b c)
+
+(Expr/Dup) = λa λb λc λd λ* λ* λ* λ* λ* λ* λk λ* λ* (k a b c d)
+
+(Expr/Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
+
+(Expr/Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)
+
+(Op/Add) = λa λ* λ* λ* a
+
+(Op/Sub) = λ* λb λ* λ* b
+
+(Op/Mul) = λ* λ* λc λ* c
+
+(Op/Div) = λ* λ* λ* λd d

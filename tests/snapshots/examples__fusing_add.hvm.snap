@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: examples/fusing_add.hvm
----
-λa λb λ* (b λc λ* (c a))

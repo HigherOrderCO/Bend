@@ -1,0 +1,27 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/linearize_match_all.bend
+---
+(A) = λa switch a { 0: λb λc (b c); _ d: λe λf (d e f); }
+
+(B) = λa λb λc (switch c { 0: λd λe (d e); _ f: λg λh (g h f); } a b)
+
+(C) = λa λb λc switch c { 0: (a b); _ d: (a b d); }
+
+(D) = λa switch a { 0: λb λc c; _ d: λe λf (d f); }
+
+(E) = λa match a { ConsList/Cons b c: λd (match d { ConsList/Cons e f: λg λh (g h e f); ConsList/Nil: λi λj (ConsList/Cons i j ConsList/Nil); } b c); ConsList/Nil: λk (ConsList/Nil k); }
+
+(A2) = λa match a { ConsList/Cons b c: λd λe (b c d e); ConsList/Nil: λf λg (f g); }
+
+(B2) = λa λb λc (match c { ConsList/Cons d e: λf λg (f g d e); ConsList/Nil: λh λi (h i); } a b)
+
+(C2) = λa λb λc match c { ConsList/Cons d e: (a b d e); ConsList/Nil: (a b); }
+
+(D2) = λa match a { ConsList/Cons b c: λd λe (b c d e); ConsList/Nil: λf λg (f g); }
+
+(main) = *
+
+(ConsList/Cons) = λa λb λc λd (c a b)
+
+(ConsList/Nil) = λa λb b

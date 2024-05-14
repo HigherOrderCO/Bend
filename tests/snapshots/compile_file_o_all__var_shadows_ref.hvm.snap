@@ -1,8 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file_o_all/var_shadows_ref.hvm
----
-@a = (a a)
-
-@main = b
-  & @a ~ ((a a) b)

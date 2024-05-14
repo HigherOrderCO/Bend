@@ -1,4 +1,4 @@
 run
-tests/golden_tests/cli/debug_u60_to_nat.hvm
+tests/golden_tests/cli/debug_u60_to_nat.bend
 -d
 4

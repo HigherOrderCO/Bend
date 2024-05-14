@@ -1,9 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/parse_file/scape_chars.hvm
----
-(main) = (String/cons 92 (String/cons 32 (String/cons 10 (String/cons 32 (String/cons 9 (String/cons 32 (String/cons 34 String/nil)))))))
-
-(String/cons) = λhead λtail λString/cons λString/nil (String/cons head tail)
-
-(String/nil) = λString/cons λString/nil String/nil

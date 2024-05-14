@@ -1,7 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/nested_ctr_wrong_arity.hvm
----
-[4m[1m[31mErrors:[0m
-[1mIn definition '[4mfst_fst[0m[1m':[0m
-  Incorrect arity for constructor 'Pair/Pair' of type 'Pair' in pattern matching rule. Expected 2 fields, found 1

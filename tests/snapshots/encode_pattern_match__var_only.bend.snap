@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/var_only.bend
+---
+(Foo) = λa λ* λc (c a)
+
+(main) = λ* Foo
+
+(Bool/False) = λa λ* a
+
+(Bool/True) = λ* λb b

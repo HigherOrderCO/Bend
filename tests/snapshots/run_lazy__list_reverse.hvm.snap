@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_lazy/list_reverse.hvm
----
-(cons 1 (cons 2 (cons 3 nil)))

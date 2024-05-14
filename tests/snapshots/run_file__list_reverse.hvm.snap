@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/list_reverse.hvm
----
-λa λ* (a 1 λb λ* (b 2 λc λ* (c 3 list/nil)))

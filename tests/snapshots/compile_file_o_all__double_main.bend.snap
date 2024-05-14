@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/double_main.bend
+---
+[4m[1m[31mErrors:[0m
+File has both 'main' and 'Main' definitions.

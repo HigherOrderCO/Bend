@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/readback_lnet/fst_snd.hvm
----
-(λa a (λb b {{1 3} 2}))

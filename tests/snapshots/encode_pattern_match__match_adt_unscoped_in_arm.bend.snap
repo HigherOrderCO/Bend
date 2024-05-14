@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_in_arm.bend
+---
+(main) = λ* λ$x $x
+
+(bool/T) = λa λ* a
+
+(bool/F) = λ* λb b

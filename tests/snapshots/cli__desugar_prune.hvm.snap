@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/cli/desugar_prune.hvm
----
-(main) = *

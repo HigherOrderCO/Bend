@@ -1,7 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/simplify_matches/redundant_with_era.hvm
----
-(Fn2) = λa switch a { 0: λb let (c, d) = b; let (e, f) = d; f; _ g: λh let (i, j) = h; let (k, l) = j; l; }
-
-(main) = *

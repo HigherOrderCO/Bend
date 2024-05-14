@@ -1,9 +1,8 @@
 gen-hvm
-tests/golden_tests/cli/compile_no_opts.hvm
+tests/golden_tests/cli/compile_no_opts.bend
 -Ono-all
 -Ono-eta
 -Ono-prune
--Ono-pre-reduce
 -Ono-float-combinators
 -Ono-merge
 -Ono-inline

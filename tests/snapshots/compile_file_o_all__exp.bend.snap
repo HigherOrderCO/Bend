@@ -1,0 +1,10 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/exp.bend
+---
+@main = a
+  & @main__C1 ~ (@main__C0 a)
+
+@main__C0 = ({(b c) (a b)} (a c))
+
+@main__C1 = ({(b c) (a b)} (a c))

@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/bool_tup.bend
+---
+(foo) = λa let (b, c) = a; (b λd d λ* Bool/F c)
+
+(main) = (foo (Bool/F, Bool/T))
+
+(Bool/T) = λa λ* a
+
+(Bool/F) = λ* λb b

@@ -1,7 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/encode_pattern_match/match_bind.hvm
----
-(cheese) = switch (+ 2 3) { 0: 653323; _: λa let {a a_2} = a; (+ (+ a 1) a_2); }
-
-(main) = cheese

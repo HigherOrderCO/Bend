@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/spacing2.bend
+---
+@main = c
+  & (a a) ~ ((b b) c)

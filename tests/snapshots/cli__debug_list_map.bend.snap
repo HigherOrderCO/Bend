@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/debug_list_map.bend
+---
+error: unexpected argument '-d' found
+
+  tip: to pass '-d' as a value, use '-- -d'
+
+Usage: bend run [OPTIONS] <PATH> [ARGUMENTS]...
+
+For more information, try '--help'.

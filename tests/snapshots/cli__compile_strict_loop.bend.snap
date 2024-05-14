@@ -1,0 +1,15 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/compile_strict_loop.bend
+---
+@A = (((* (a b)) (0 c)) c)
+  & @A ~ (a b)
+
+@List/cons = (a (b ((a (b c)) (* c))))
+
+@List/nil = (* (a a))
+
+@main = c
+  & @A ~ (b c)
+  & @List/cons ~ (4 (a b))
+  & @List/cons ~ (4 (@List/nil a))

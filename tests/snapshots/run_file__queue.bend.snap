@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/queue.bend
+---
+λa λ* (a 1 (Cons 2 (Cons 3 Nil)))

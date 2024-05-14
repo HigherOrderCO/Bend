@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/double_unwrap_box.bend
+---
+(DoubleUnbox) = λa match a { Boxed/Box b: match b { Boxed/Box c: λd c; }; }
+
+(Main) = (DoubleUnbox (Boxed/Box (Boxed/Box 0)) 5)
+
+(Boxed/Box) = λa λb (b a)

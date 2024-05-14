@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_lazy/wrong_string.hvm
----
-(String.cons (*, 4) (String.cons * String.nil))

@@ -1,7 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/cyclic_global_lam.hvm
----
-[4m[1m[31mErrors:[0m
-[1mIn compiled inet '[4mmain[0m[1m':[0m
-  Found term that compiles into an inet with a vicious cycle

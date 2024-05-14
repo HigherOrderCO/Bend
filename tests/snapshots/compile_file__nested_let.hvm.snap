@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/nested_let.hvm
----
-@main = a
-  & ((2 4) (3 6)) ~ (* (a *))

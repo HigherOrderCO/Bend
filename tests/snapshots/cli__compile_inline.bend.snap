@@ -1,0 +1,12 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/compile_inline.bend
+---
+@Era = *
+
+@Num = 42
+
+@RefToRef = *
+
+@main = a
+  & * ~ (42 (* a))

@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_lazy/match_num_explicit_bind.hvm
----
-3

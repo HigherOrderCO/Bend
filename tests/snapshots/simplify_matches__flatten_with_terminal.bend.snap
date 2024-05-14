@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/flatten_with_terminal.bend
+---
+(Foo) = λa switch a { 0: λb match b { A_t/A c: match c { B_t/B: B_t/B; }; }; _ d: λe *; }
+
+(main) = (Foo 2 (A_t/A B_t/B))
+
+(A_t/A) = λa λb (b a)
+
+(B_t/B) = λa a

@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/def_bool_num.bend
+---
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mgo[0m[1m':[0m
+  Non-exhaustive pattern matching rule. Default case of number type not covered.

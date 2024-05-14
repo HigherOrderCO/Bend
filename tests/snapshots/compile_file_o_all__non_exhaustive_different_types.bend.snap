@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/non_exhaustive_different_types.bend
+---
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mfoo[0m[1m':[0m
+  Non-exhaustive pattern matching rule. Constructor 'b3/t3' of type 'b3' not covered

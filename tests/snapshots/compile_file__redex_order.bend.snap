@@ -1,0 +1,22 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/redex_order.bend
+---
+@a = (a a)
+
+@b = (a a)
+
+@c = (a a)
+
+@foo = (a d)
+  & @a ~ (c d)
+  & @b ~ (b c)
+  & @c ~ (a b)
+
+@foo2 = c
+  & @a ~ (b c)
+  & @b ~ (a b)
+  & @c ~ (0 a)
+
+@main = a
+  & @foo ~ (@foo2 a)

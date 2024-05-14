@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/desugar_linearize_matches.bend
+---
+(main) = λa λb λc (switch a { 0: λd λ* d; _: λ* λ* λe e; } b c)

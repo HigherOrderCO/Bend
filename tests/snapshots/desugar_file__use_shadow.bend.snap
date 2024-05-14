@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/desugar_file/use_shadow.bend
+---
+(main) = λa let {b c} = a; λd (b c d)

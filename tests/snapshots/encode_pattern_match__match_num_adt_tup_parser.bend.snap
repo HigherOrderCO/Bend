@@ -1,0 +1,15 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/encode_pattern_match/match_num_adt_tup_parser.bend
+---
+(Parse) = λa λb (b λc λd λe (switch (- c 10) { 0: λf λg (Result_/Ok (0, g, f)); _: λh λi λj (switch (- h 29) { 0: λk λl (Result_/Ok (40, l, k)); _: λm λn λo (switch m { 0: λp λq (Result_/Ok (41, q, p)); _: λr λs λt (Result_/Err ((String/cons (+ r 42) t), s)); } n o); } i j); } e d) λu (Result_/Err (String/nil, u)) a)
+
+(main) = (Parse * (String/cons 40 (String/cons 43 String/nil)) λc let (d, e, f) = c; (d, (Parse f e)) λg (Result_/Err g))
+
+(String/cons) = λa λb λc λ* (c a b)
+
+(String/nil) = λ* λb b
+
+(Result_/Ok) = λa λb λ* (b a)
+
+(Result_/Err) = λa λ* λc (c a)

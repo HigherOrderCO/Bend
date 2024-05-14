@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/match_str.bend
+---
+(is_as) = λa match a { String/cons b c: (switch (- b 65) { 0: λd match d { String/cons e f: (switch (- e 115) { 0: λg match g { String/cons h i: 0; String/nil: 2; }; _ j: λk 0; } f); String/nil: 0; }; _ l: λm (switch (- l 31) { 0: λn match n { String/cons o p: (switch (- o 115) { 0: λq match q { String/cons r s: 0; String/nil: 2; }; _ t: λu 0; } p); String/nil: 0; }; _ v: λw 0; } m); } c); String/nil: 1; }
+
+(main) = *

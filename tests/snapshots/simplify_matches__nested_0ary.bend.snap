@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/nested_0ary.bend
+---
+(Unpack) = λa λb (match b { list/Cons c d: λe (match d { list/Cons f g: λh λi (h (list/Cons i (list/Cons f g))); list/Nil: λj λk k; } e c); list/Nil: λl list/Nil; } a)
+
+(list/Cons) = λa λb λc λd (c a b)
+
+(list/Nil) = λa λb b

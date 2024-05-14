@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/list_resugar.hvm
----
-λa λ* (a 42 λb λ* (b λc λ* (c λd d List/nil) List/nil))

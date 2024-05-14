@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/with_clause_parse_err.bend
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/compile_file/with_clause_parse_err.bend :
+[1m- expected:[0m '{'
+[1m- detected:[0m
+[0m  1 | main = @a @b switch b [4m[31mw[0mitha{[0m

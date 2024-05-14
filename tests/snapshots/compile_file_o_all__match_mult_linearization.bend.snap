@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file_o_all/match_mult_linearization.bend
+---
+@main = (?((@main__C0 @main__C1) a) a)
+
+@main__C0 = ($(:[+] $(a $(:[+] $(b c)))) (a (b c)))
+
+@main__C1 = ($(:[+] $(a $(:[+] $(b $(:[+] $(c d)))))) (a (b (c d))))

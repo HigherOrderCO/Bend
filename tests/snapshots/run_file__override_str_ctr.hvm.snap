@@ -1,6 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/run_file/override_str_ctr.hvm
----
-[4m[1m[31mErrors:[0m
-Function 'String/cons' has the same name as a previously defined constructor

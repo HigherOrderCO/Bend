@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/unbound_var_scope.bend
+---
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mmain[0m[1m':[0m
+  Unbound variable 'b'.
