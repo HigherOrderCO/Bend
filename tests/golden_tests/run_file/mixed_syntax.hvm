@@ -17,9 +17,9 @@ def tree_xor(tree):
 
 main =
   let depth = 10
-  let tree = bend n=0 while (< n depth) {
+  let tree = bend n=0 when (< n depth) {
     (Tree/node (go (+ n 1)) (go (+ n 1)))
-  } then {
+  } else {
     if (% n 2) { (Tree/leaf Bool/True) } else { (Tree/leaf Bool/False) }  
   }
   (tree_xor tree)

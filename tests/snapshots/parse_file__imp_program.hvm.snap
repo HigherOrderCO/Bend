@@ -12,7 +12,7 @@ input_file: tests/golden_tests/parse_file/imp_program.hvm
 
 (lam) = λx λy x
 
-(do_match b) = match b = b { True: 1; False: 0; }
+(do_match b) = match b = b { Bool/True: 1; Bool/False: 0; }
 
 (true) = Bool/True
 
@@ -24,7 +24,7 @@ input_file: tests/golden_tests/parse_file/imp_program.hvm
 
 (bnd) = bend x = 0, while (< x 10) { (List/cons x (go (+ x 1))) } then { List/nil }
 
-(main) = do IO.bind { ask x = IO.read; x }
+(main) = do IO { ask x = IO.read; x }
 
 (List/cons) = λhead λtail λList/cons λList/nil (List/cons head tail)
 
