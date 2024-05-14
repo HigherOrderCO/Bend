@@ -29,15 +29,16 @@ If you want to run programs directly from Bend, you also need to have [HVM](http
 
 ## Usage
 
-| Command   | Usage                 | Description                                                                    |
-| --------- | --------------------- | ------------------------------------------------------------------------------ |
-| Check     | `bend check <file>`   | Checks if a program is valid                                                   |
-| GenHvm    | `bend gen-hvm <file>` | Compiles a program to HVM and outputs it to stdout                             |
-| Run       | `bend run <file>`     | Compiles and then runs a program with the Rust HVM implementation              |
-| Run-C     | `bend run-c <file>`   | Compiles and then runs a program with the C HVM implementation                 |
-| Run-Cu    | `bend run-cu <file>`  | Compiles and then runs a program with the Cuda HVM implementation              |
-| Normalize | `bend norm <file>`    | Compiles and then normalizes a program in HVM, outputting the result to stdout |
-| Desugar   | `bend desugar <file>` | Desugars a program to the core syntax and outputs it to stdout                 |
+| Command | Usage                 | Description                                                                                              |
+| ------- | --------------------- | -------------------------------------------------------------------------------------------------------- |
+| Check   | `bend check <file>`   | Checks if a program is valid                                                                             |
+| GenHvm  | `bend gen-hvm <file>` | Compiles a program to HVM and outputs it to stdout                                                       |
+| Run     | `bend run <file>`     | Compiles and then runs a program with the Rust HVM implementation                                        |
+| Run-C   | `bend run-c <file>`   | Compiles and then runs a program with the C HVM implementation                                           |
+| Run-Cu  | `bend run-cu <file>`  | Compiles and then runs a program with the Cuda HVM implementation                                        |
+| Norm    | `bend norm <file>`    | Compiles and then normalizes a program with the C HVM implementation, outputting the result to stdout    |
+| Norm-Cu | `bend norm-cu <file>` | Compiles and then normalizes a program with the Cuda HVM implementation, outputting the result to stdout |
+| Desugar | `bend desugar <file>` | Desugars a program to the core syntax and outputs it to stdout                                           |
 
 If you want to compile a file to a file, just redirect the output with `>`:
 
