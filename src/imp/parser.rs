@@ -34,6 +34,8 @@ impl<'a> PyParser<'a> {
 
 impl<'a> ParserCommons<'a> for PyParser<'a> {}
 
+type ParseResult<T> = std::result::Result<T, String>;
+
 impl<'a> Parser<'a> for PyParser<'a> {
   fn input(&mut self) -> &'a str {
     self.input
@@ -67,9 +69,14 @@ impl<'a> Parser<'a> for PyParser<'a> {
 }
 
 impl<'a> PyParser<'a> {
-  fn parse_expression(&mut self) -> Result<Expr, String> {
+  fn parse_expression(&mut self) -> ParseResult<Expr> {
     let Some(head) = self.skip_peek_one() else { return self.expected("primary term")? };
     let res = match head {
+      '$' => {
+        self.consume("$")?;
+        let nam = self.parse_bend_name()?;
+        Expr::Chn { nam }
+      }
       '(' => {
         self.consume("(")?;
         let head = self.parse_infix_or_lambda()?;
@@ -89,16 +96,6 @@ impl<'a> PyParser<'a> {
         self.consume("{")?;
         let head = self.parse_infix_or_lambda()?;
         if self.skip_starts_with(":") { self.parse_map_init(head)? } else { self.parse_sup(head)? }
-        // let mut entries = Vec::new();
-        // loop {
-        //   entries.push(self.parse_map_entry()?);
-        //   if self.skip_starts_with("}") {
-        //     break;
-        //   }
-        //   self.consume(",")?;
-        // }
-        // self.consume("}")?;
-        // Expr::MapInit { entries }
       }
       '[' => self.list_or_comprehension()?,
       '`' => Expr::Num { val: self.parse_symbol()? },
@@ -128,7 +125,7 @@ impl<'a> PyParser<'a> {
     Ok(res)
   }
 
-  fn parse_map_init(&mut self, head: Expr) -> Result<Expr, String> {
+  fn parse_map_init(&mut self, head: Expr) -> ParseResult<Expr> {
     let mut entries = Vec::new();
     let map_key = match head {
       Expr::Num { val } => MapKey(val),
@@ -155,21 +152,21 @@ impl<'a> PyParser<'a> {
     Ok(Expr::Sup { els })
   }
 
-  fn data_kwarg(&mut self) -> Result<(Name, Expr), String> {
+  fn data_kwarg(&mut self) -> ParseResult<(Name, Expr)> {
     let nam = self.parse_bend_name()?;
     self.consume(":")?;
     let expr = self.parse_infix_or_lambda()?;
     Ok((nam, expr))
   }
 
-  fn parse_map_entry(&mut self) -> Result<(MapKey, Expr), String> {
+  fn parse_map_entry(&mut self) -> ParseResult<(MapKey, Expr)> {
     let key = self.parse_map_key()?;
     self.consume(":")?;
     let val = self.parse_expression()?;
     Ok((key, val))
   }
 
-  fn list_or_comprehension(&mut self) -> Result<Expr, String> {
+  fn list_or_comprehension(&mut self) -> ParseResult<Expr> {
     self.consume("[")?;
     let head = self.parse_infix_or_lambda()?;
     if self.try_consume_keyword("for") {
@@ -191,9 +188,17 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_infix_or_lambda(&mut self) -> Result<Expr, String> {
+  fn parse_infix_or_lambda(&mut self) -> ParseResult<Expr> {
+    fn parse_lam_var(p: &mut PyParser) -> ParseResult<(Name, bool)> {
+      if p.skip_starts_with("$") {
+        p.consume("$")?;
+        Ok((p.parse_bend_name()?, true))
+      } else {
+        Ok((p.parse_bend_name()?, false))
+      }
+    }
     if self.try_consume_keyword("lam") | self.try_consume("λ") {
-      let names = self.list_like(|p| p.parse_bend_name(), "", ":", ",", false, 1)?;
+      let names = self.list_like(parse_lam_var, "", ":", ",", false, 1)?;
       let bod = self.parse_infix_or_lambda()?;
       Ok(Expr::Lam { names, bod: Box::new(bod) })
     } else {
@@ -201,7 +206,7 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_call(&mut self) -> Result<Expr, String> {
+  fn parse_call(&mut self) -> ParseResult<Expr> {
     let mut args = Vec::new();
     let mut kwargs = Vec::new();
     let fun = self.parse_expression()?;
@@ -231,7 +236,7 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_named_arg(&mut self) -> Result<(Option<Name>, Expr), String> {
+  fn parse_named_arg(&mut self) -> ParseResult<(Option<Name>, Expr)> {
     let arg = self.parse_infix_or_lambda()?;
     if self.try_consume("=") {
       if let Expr::Var { nam } = arg {
@@ -248,7 +253,7 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_infix(&mut self, prec: usize) -> Result<Expr, String> {
+  fn parse_infix(&mut self, prec: usize) -> ParseResult<Expr> {
     maybe_grow(|| {
       self.advance_inline_trivia();
       if prec > PREC.len() - 1 {
@@ -294,7 +299,7 @@ impl<'a> PyParser<'a> {
     Some(ret)
   }
 
-  fn skip_exact_indent(&mut self, Indent(mut count): &Indent, block: bool) -> Result<bool, String> {
+  fn skip_exact_indent(&mut self, Indent(mut count): &Indent, block: bool) -> ParseResult<bool> {
     let expected = count;
     let ini_idx = *self.index();
     if count <= 0 {
@@ -329,7 +334,7 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_statement(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_statement(&mut self, indent: &mut Indent) -> ParseResult<Stmt> {
     maybe_grow(|| {
       self.skip_exact_indent(indent, false)?;
       if self.try_consume_keyword("return") {
@@ -352,7 +357,7 @@ impl<'a> PyParser<'a> {
     })
   }
 
-  fn parse_symbol(&mut self) -> Result<u32, String> {
+  fn parse_symbol(&mut self) -> ParseResult<u32> {
     self.consume("`")?;
     let mut result = u32::MAX;
     let mut count = 0;
@@ -377,7 +382,7 @@ impl<'a> PyParser<'a> {
     Ok(result)
   }
 
-  fn parse_map_key(&mut self) -> Result<MapKey, String> {
+  fn parse_map_key(&mut self) -> ParseResult<MapKey> {
     if self.skip_starts_with("`") {
       Ok(MapKey(self.parse_symbol()?))
     } else {
@@ -386,7 +391,7 @@ impl<'a> PyParser<'a> {
   }
 
   /// Assignments, monadic bind operations and in-place operations.
-  fn parse_assign(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_assign(&mut self, indent: &mut Indent) -> ParseResult<Stmt> {
     let ini_idx = *self.index();
     let pat = self.parse_assign_pattern()?;
     let end_idx = *self.index();
@@ -420,7 +425,7 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_in_place_op(&mut self) -> Result<InPlaceOp, String> {
+  fn parse_in_place_op(&mut self) -> ParseResult<InPlaceOp> {
     self.advance_inline_trivia();
     if self.starts_with("+=") {
       self.consume("+=")?;
@@ -448,13 +453,13 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn parse_return(&mut self) -> Result<Stmt, String> {
+  fn parse_return(&mut self) -> ParseResult<Stmt> {
     let term = self.parse_infix_or_lambda()?;
     self.consume(";")?;
     Ok(Stmt::Return { term: Box::new(term) })
   }
 
-  fn parse_if(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_if(&mut self, indent: &mut Indent) -> ParseResult<Stmt> {
     let cond = self.parse_infix_or_lambda()?;
     self.consume(":")?;
     indent.enter_level();
@@ -469,7 +474,7 @@ impl<'a> PyParser<'a> {
     Ok(Stmt::If { cond: Box::new(cond), then: Box::new(then), otherwise: Box::new(otherwise) })
   }
 
-  fn parse_match(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_match(&mut self, indent: &mut Indent) -> ParseResult<Stmt> {
     let (bind, arg) = self.parse_match_arg()?;
     self.consume(":")?;
     let mut arms = Vec::new();
@@ -484,7 +489,7 @@ impl<'a> PyParser<'a> {
     Ok(Stmt::Match { arg: Box::new(arg), bind, arms })
   }
 
-  fn parse_match_arg(&mut self) -> Result<(Option<Name>, Expr), String> {
+  fn parse_match_arg(&mut self) -> ParseResult<(Option<Name>, Expr)> {
     let ini_idx = *self.index();
     let arg = self.parse_infix_or_lambda()?;
     let end_idx = *self.index();
@@ -501,7 +506,7 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn name_or_wildcard(&mut self) -> Result<Option<Name>, String> {
+  fn name_or_wildcard(&mut self) -> ParseResult<Option<Name>> {
     self.labelled(
       |p| {
         if p.try_consume("_") {
@@ -515,7 +520,7 @@ impl<'a> PyParser<'a> {
     )
   }
 
-  fn parse_case(&mut self, indent: &mut Indent) -> Result<MatchArm, String> {
+  fn parse_case(&mut self, indent: &mut Indent) -> ParseResult<MatchArm> {
     self.consume("case")?;
     let pat = self.name_or_wildcard()?;
     self.consume(":")?;
@@ -525,7 +530,7 @@ impl<'a> PyParser<'a> {
     Ok(MatchArm { lft: pat, rgt: body })
   }
 
-  fn parse_switch(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_switch(&mut self, indent: &mut Indent) -> ParseResult<Stmt> {
     let (bind, arg) = self.parse_match_arg()?;
     self.consume(":")?;
     let mut arms = Vec::new();
@@ -567,7 +572,7 @@ impl<'a> PyParser<'a> {
     Ok(Stmt::Switch { arg: Box::new(arg), bind, arms })
   }
 
-  fn parse_fold(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_fold(&mut self, indent: &mut Indent) -> ParseResult<Stmt> {
     let (bind, arg) = self.parse_match_arg()?;
     self.consume(":")?;
     let mut arms = Vec::new();
@@ -582,7 +587,7 @@ impl<'a> PyParser<'a> {
     Ok(Stmt::Fold { arg: Box::new(arg), bind, arms })
   }
 
-  fn parse_bend(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_bend(&mut self, indent: &mut Indent) -> ParseResult<Stmt> {
     let args = self.list_like(|p| p.parse_match_arg(), "", "while", ",", false, 1)?;
     let (bind, init) = args.into_iter().unzip();
     let cond = self.parse_infix_or_lambda()?;
@@ -598,7 +603,7 @@ impl<'a> PyParser<'a> {
     Ok(Stmt::Bend { bind, init, cond: Box::new(cond), step: Box::new(step), base: Box::new(base) })
   }
 
-  fn parse_do(&mut self, indent: &mut Indent) -> Result<Stmt, String> {
+  fn parse_do(&mut self, indent: &mut Indent) -> ParseResult<Stmt> {
     let typ = self.parse_bend_name()?;
     self.consume(":")?;
 
@@ -609,20 +614,27 @@ impl<'a> PyParser<'a> {
     Ok(Stmt::Do { typ, bod: Box::new(bod) })
   }
 
-  fn parse_assign_pattern(&mut self) -> Result<AssignPattern, String> {
+  fn parse_assign_pattern(&mut self) -> ParseResult<AssignPattern> {
     // Tup pattern
     if self.skip_starts_with("(") {
-      let mut binds = self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 1)?;
+      let binds = self.list_like(|p| p.parse_assign_pattern(), "(", ")", ",", true, 1)?;
       if binds.len() == 1 {
-        return Ok(AssignPattern::Var(std::mem::take(&mut binds[0])));
+        return Ok(binds[0].to_owned());
       } else {
         return Ok(AssignPattern::Tup(binds));
       }
     }
     // Dup pattern
     if self.skip_starts_with("{") {
-      let binds = self.list_like(|p| p.parse_bend_name(), "{", "}", "", false, 2)?;
+      let binds = self.list_like(|p| p.parse_assign_pattern(), "{", "}", "", false, 2)?;
       return Ok(AssignPattern::Sup(binds));
+    }
+
+    // Chn pattern
+    if self.skip_starts_with("$") {
+      self.consume("$")?;
+      let nam = self.parse_bend_name()?;
+      return Ok(AssignPattern::Chn(nam));
     }
 
     let var = self.parse_bend_name()?;
@@ -639,7 +651,7 @@ impl<'a> PyParser<'a> {
     Ok(AssignPattern::Var(var))
   }
 
-  pub fn parse_def(&mut self, indent: usize) -> Result<Definition, String> {
+  pub fn parse_def(&mut self, indent: usize) -> ParseResult<Definition> {
     if indent > 0 {
       self.expected("Indentation error")?;
     }
@@ -654,8 +666,8 @@ impl<'a> PyParser<'a> {
     Ok(Definition { name, params, body })
   }
 
-  pub fn parse_data_type(&mut self, indent: usize) -> Result<Enum, String> {
-    fn parse_variant_field(p: &mut PyParser) -> Result<CtrField, String> {
+  pub fn parse_data_type(&mut self, indent: usize) -> ParseResult<Enum> {
+    fn parse_variant_field(p: &mut PyParser) -> ParseResult<CtrField> {
       let rec = p.try_consume("~");
       let nam = p.parse_bend_name()?;
       Ok(CtrField { nam, rec })

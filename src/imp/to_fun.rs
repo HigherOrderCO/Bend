@@ -16,16 +16,13 @@ impl AssignPattern {
   pub fn to_fun(self) -> fun::Pattern {
     match self {
       AssignPattern::Var(name) => fun::Pattern::Var(Some(name)),
-      AssignPattern::Tup(names) => fun::Pattern::Fan(
-        fun::FanKind::Tup,
-        fun::Tag::Static,
-        names.into_iter().map(|name| fun::Pattern::Var(Some(name))).collect(),
-      ),
-      AssignPattern::Sup(names) => fun::Pattern::Fan(
-        fun::FanKind::Dup,
-        fun::Tag::Auto,
-        names.into_iter().map(|name| fun::Pattern::Var(Some(name))).collect(),
-      ),
+      AssignPattern::Chn(name) => fun::Pattern::Chn(name),
+      AssignPattern::Tup(names) => {
+        fun::Pattern::Fan(fun::FanKind::Tup, fun::Tag::Static, names.into_iter().map(Self::to_fun).collect())
+      }
+      AssignPattern::Sup(names) => {
+        fun::Pattern::Fan(fun::FanKind::Dup, fun::Tag::Auto, names.into_iter().map(Self::to_fun).collect())
+      }
       AssignPattern::MapSet(..) => unreachable!(),
     }
   }
@@ -108,15 +105,16 @@ impl Expr {
     match self {
       Expr::None => fun::Term::Era,
       Expr::Var { nam } => fun::Term::Var { nam },
+      Expr::Chn { nam } => fun::Term::Link { nam },
       Expr::Num { val } => fun::Term::Num { val: fun::Num::U24(val) },
       Expr::Call { fun, args, kwargs } => {
         assert!(kwargs.is_empty());
         let args = args.into_iter().map(Self::to_fun);
         fun::Term::call(fun.to_fun(), args)
       }
-      Expr::Lam { names, bod } => names.into_iter().rfold(bod.to_fun(), |acc, nxt| fun::Term::Lam {
+      Expr::Lam { names, bod } => names.into_iter().rfold(bod.to_fun(), |acc, (name, link)| fun::Term::Lam {
         tag: fun::Tag::Static,
-        pat: Box::new(fun::Pattern::Var(Some(nxt))),
+        pat: Box::new(if link { fun::Pattern::Chn(name) } else { fun::Pattern::Var(Some(name)) }),
         bod: Box::new(acc),
       }),
       Expr::Bin { op, lhs, rhs } => {
