@@ -2,13 +2,13 @@
 
 This file provides a reference of each possible syntax of bend programming language.
 
-Click [here](#bend-syntax) to see the bend syntax.
+Click [here](#imp-syntax) to see the syntax for "imp", the variant of bend that looks like an imperative language like python.
 
-Click [here](#core-syntax) to see the core syntax.
+Click [here](#fun-syntax) to see the syntax for "fun", the variant of bend that looks like a functional language like Haskell or ML.
 
-<div id="bend-syntax"></div>
+<div id="imp-syntax"></div>
 
-# Bend Syntax
+# Imp Syntax
 
 ## Top-level definitions
 
@@ -25,9 +25,11 @@ def main:
   return add(40, 2)
 ```
 
-A definition is composed by a name, a sequence of parameters and a body.
+A function definition is composed by a name, a sequence of parameters and a body.
 
 A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names).
+
+The last statement of each branch of the function must be a `return`.
 
 ### Type
 
@@ -59,22 +61,28 @@ Read [defining data types](./defining-data-types.md) to know more.
 ### Assignment
 
 ```python
-value = 2;
-return value;
+value = 2
+return value
 
-(first, second) = (1, 2);
-return second;
+(first, second) = (1, 2)
+return second
 
-{x y} = {2 3};
+{x y} = {2 3}
 ```
 
-Assigns a value to a variable, it's possible to pattern match match tuples and superpositions.
+Assigns a value to a variable.
+
+It's possible to assign to a pattern, like a tuple or superposition, which will destructure the value returned by the expression.
+
+```python
+(first, second) = (1, 2)
+```
 
 ### In-Place Operation
 
 ```python
-x += 1;
-return x;
+x += 1
+return x
 ```
 
 The in-place operation does an infix operation and re-assigns a variable.
@@ -89,23 +97,52 @@ The operations are:
 ### Return
 
 ```python
-return "hello";
+return "hello"
 ```
 
-Returns the following expression. All paths or branches should end with a return.
+Returns the expression that follows. The last statement of each branch of a function must be a `return`.
+
+```py
+// Allowed, all branches return
+def max(a, b):
+  if a > b:
+    return a
+  else:
+    return b
+```
+```py
+// Not allowed, early return
+def Foo(x):
+  if test_condition(x):
+    return "err"
+  else:
+    y = map(x)
+
+  return y
+```
+```py
+// Not allowed, one of the branches doesn't return
+def Foo(a, b):
+  if a < b:
+    return a
+  else:
+    c = a + b
+```
 
 ### If
 
 ```python
 if condition:
-  return 0;
+  return 0
 else:
-  return 1;
+  return 1
 ```
 
 A branching statement where `else` is mandatory.
 
-The condition must return an `u24` and it is equivalent to a switch statement:
+The condition must return a `u24` number, where 0 will run the `else` branch and any other value will return the first one.
+
+It is equivalent to a switch statement:
 
 ```
 switch _ = condition:
@@ -120,25 +157,25 @@ switch _ = condition:
 ```python
 switch x = 4:
   case 0:
-    return "Zero";
+    return 0
   case 1:
-    return "One";
+    return 0
   case _:
-    return "Not zero or one";
+    return x-2
 ```
 
 A switch for native numbers, the pattern matching cases must start from `0` up to `_` sequentially.
 
-It is possible to bind a variable name to the matching value, it allows the access to the predecessor `x-2` (in this case) or `bound_var-next_num` (in the general case).
+In the last arm, the predecessor value is available with the name `x-2` (in this case) or `bound_var-next_num` (in the general case).
 
 ### Match
 
 ```python
 match x = Option/none:
   case Option/some:
-    return x.value;
+    y = x.value
   case Option/none:
-    return 0;
+    y = 0
 ```
 
 A pattern matching statement, the cases must be the constructor names of the matching value.
@@ -150,9 +187,9 @@ It is possible to bind a variable name to the matching value. The fields of the 
 ```python
 fold x = Tree/leaf:
   case Tree/node:
-    return x.value + x.left + x.right;
+    return x.value + x.left + x.right
   case Tree/leaf:
-    return 0;
+    return 0
 ```
 
 A fold statement. Reduces the given value with the given match cases.
@@ -179,22 +216,27 @@ fold(Tree/Leaf)
 Bend can be used to create recursive data structures:
 
 ```rust
-bend x = 0 while x < 10:
-  left = go(x + 1);
-  right = go(x + 1);
-  return Tree/Node(left, right);
-then:
-  return Tree/Leaf(x);
+bend x = 0:
+  when x < 10:
+    left = go(x + 1)
+    right = go(x + 1)
+    y = Tree/Node(left, right)
+  else:
+    y = Tree/Leaf(x)
 ```
 
 Which binds a variable to the return of an inline recursive function.
-The function `go` is available inside the bend body and calls it recursively.
+The function `go` is available inside the `when` arm of the `bend` and calls it recursively. 
 
-It is possible to initialize multiple variables:
+It is possible to pass multiple state variables, which can be initialized:
 
 ```python
-bend x = 1, y = 2 ... while condition(x, y, ...):
+bend x = 1, y = 2 ...:
+  when condition(x, y, ...):
+    ...
 ```
+
+When calling `go`, the function must receive the same number of arguments as the number of state variables.
 
 It is equivalent to this inline recursive function:
 
@@ -210,16 +252,34 @@ def bend(x, y, ...):
 ### Do
 
 ```python
-do Result.bind:
-  x <- safe_div(2, 0);
-  return x;
+do Result:
+  x <- safe_div(2, 0)
+  return x
 ```
 
 A monadic do block.
 
 Where `x <- ...` performs a monadic operation.
 
-Other statements are allowed inside the `do` block.
+Expects `Result` to be a type defined with `type` and a function `Result/bind` to be defined.
+The monadic bind function should be of type `(Result a) -> (a -> Result b) -> Result b`, like this:
+```
+def Result/bind(res, nxt):
+  match res:
+    case Result/ok:
+      return nxt(res.value)
+    case Result/err:
+      return res
+```
+
+Other statements are allowed inside the `do` block and it can both return a value at the end and bind a variable, like branching statements do.
+```
+// Also ok:
+do Result:
+  x <- safe_div(2, 0);
+  y = x
+return y
+```
 
 ## Expressions
 
@@ -236,9 +296,11 @@ A variable can be anything matching the regex `[A-Za-z0-9_.-/]+`.
 A variable is a name for some immutable expression. It is possible to rebind variables with the same name.
 
 ```python
-x = 1;
-x = x + 1;
+x = 1
+x = x + 1
 ```
+
+Note that `-` is also used for negative numbers and as the numeric operator. Bend's grammar is greedily parsed from left to right, meaning that `x-3` always represents a name and not `x - 3` or a sequence of expressions like in `[x -3]`.
 
 ### Lambdas
 
@@ -266,7 +328,7 @@ Like lambdas, with the exception that the variable starts with a `$` sign. Every
 
 Unscoped variables are not transformed and linearized like normal scoped variables.
 
-Read [using scopeless lambdas](/docs/using-scopeless-lambdas.md) to know more about.
+Read [using scopeless lambdas](/docs/using-scopeless-lambdas.md) to know more about their behavior.
 
 ### Function Call
 
@@ -274,11 +336,19 @@ Read [using scopeless lambdas](/docs/using-scopeless-lambdas.md) to know more ab
 callee(arg_1, arg_2, arg_n)
 ```
 
-A call is written with a callee followed by a list of arguments.
+A call is written with a callee followed by a list of arguments. Arguments can be optionally separated by `,`.
 
 The effect of a function call is to substitute the callee with it's body and replace the arguments by the passed variables.
 
-Accepts partial applications.
+The called function can be any expression and it supports partial applications.
+
+Optionally, if you call a function by its name, you can used named arguments:
+
+```python
+callee(expr1, expr2, arg4 = expr3, arg3 = expr4)
+```
+
+In case named arguments are used, they must come after the positional arguments and the function must be called with exactly the number of arguments of its definition.
 
 ### Tuple
 
@@ -294,7 +364,7 @@ A Tuple is surrounded by `(` `)` and should contain 2 or more elements. Elements
 {1 2 3}
 ```
 
-A superposition of values is defined using `{` `}` with at least 2 expressions inside.
+A superposition of values is defined using `{` `}` with at least 2 expressions inside. Elements can be optionally separated by `,`.
 
 Read [sups and dups](./dups-and-sups.md) to know more.
 
@@ -343,6 +413,17 @@ Type/Ctr(4, 8)
 A Character is surrounded with `'`. Accepts unicode characters, unicode escapes in the form '\u{hex value}' and is desugared to the unicode codepoint as an `u24`.
 
 Only supports unicode codepoints up to `0xFFFFFF`.
+
+### Symbol Literal
+
+```python
+// Becomes 2146 (33 << 6 + 34)
+`hi`
+```
+
+A Symbol encodes a up to 4 base64 characters as a `u24` number. It is surrounded by `\``.
+
+Empty characters are interpreted as `A` which has value 0, meaning that `B` is the same as `AAAB`.
 
 ### String Literal
 
@@ -397,7 +478,7 @@ fold list:
 
 <div id="core-syntax"></div>
 
-# Core Syntax
+# Fun Syntax
 
 ## Top-level definitions
 
@@ -410,25 +491,24 @@ Name (Ctr1 sub_arg1 sub_arg2) arg3 = rule0_body
 Name Ctr2 arg3 = rule1_body
 ```
 
-### Definitions
+A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names).
 
-Definitions can have multiple rules pattern matching each defined argument.
+### Function Definitions
+
+A function definition is composed of a sequence of pattern matching equations.
+Each rule is the name of the function, a sequence of patterns and then the body.
 
 ```rust
 identity x = x
 
-Bool.neg True  = False
-Bool.neg False = True
+(Bool.neg True)  = False
+(Bool.neg False) = True
 
 MapMaybe (Some val) f = (Some (f val))
 MapMaybe None f = None
 
 Pair.get (fst, snd) f = (f fst snd)
 ```
-
-A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names).
-
-A function definition is composed of a sequence of rules, where a rule is the name of the function, a sequence of patterns and then the body.
 
 A rule pattern can be:
 
@@ -437,8 +517,19 @@ A rule pattern can be:
 - A constructor.
 - A tuple.
 - A superposition.
+- A wildcard `*`.
 
-The rule body is a `term`, there is no statements in the language.
+And the builtin types that desugar to one of the above:
+
+- A list (becomes a constructor).
+- A string (becomes a constructor).
+- A natural number (becomes a constructor).
+- A character (becomes a number).
+- A symbol (becomes a number);
+
+Unscoped variables can't be defined in a rule pattern.
+
+The rule body is a term, there are no statements in the Fun variant of Bend.
 
 Read [pattern matching](./pattern-matching.md) to learn about what exactly the rules for pattern matching equations are.
 
@@ -456,6 +547,8 @@ data Tree
 `Tree` is the ADT name and it should be unique, except that it can be used once by a constructor name.
 
 Each constructor is defined by a name followed by its fields. The `~` notation describes a recursive field.
+
+The constructors inherit the name of their types and become functions (`Tree/Node` and `Tree/Leaf` in this case).
 
 ## Terms
 
@@ -484,21 +577,24 @@ let x = (+ x 1)
 
 Lambdas represents anonymous inline functions, it can be written with `λ` or `@` followed by a pattern and a term.
 
-A pattern is equivalent to a let:
+A tuple or duplication pattern is equivalent to a lambda followed by a `let`.
 
 ```rust
+λ(fst, snd) snd
 λa let (fst, snd) = a; snd
 
-λa let {x y} = a; x
+λ{x y} (x y)
+λa let {x y} = a; (x y)
 ```
 
-### Unscoped Lambdas and Variables
+### Unscoped Variables
 
 ```
 λ$x $x
 ```
 
-Same as lambdas, with the exception that the variable starts with a `$` sign. Every unscoped variable in a function must have a unique name and must be used exactly once.
+Like a normal scoped variable, but starts with a `$` sign. Every unscoped variable in a function must have a unique name and must be used exactly once.
+They can be defined anywhere a scoped variable would be defined in a term, like in a lambda or a `let`.
 
 Unscoped variables are not transformed and linearized like normal scoped variables.
 
@@ -598,11 +694,11 @@ It is desugared according to the chosen encoding. Read [pattern matching](./patt
 
 Using `;` is optional.
 
-### Monadic bind
+### Monadic bind blocks
 
 ```rust
-Result.bind (Result.ok val) f = (f val)
-Result.bind err _ = err
+Result/bind (Result.ok val) f = (f val)
+Result/bind err _ = err
 
 div a b = switch b {
   0: (Result.err "Div by 0")
@@ -614,18 +710,28 @@ rem a b = switch b {
   _: (Result.ok (% a b))
 }
 
-Main = do Result.bind {
+Main = do Result {
   ask y = (div 3 2);
   ask x = (rem y 0);
   x
 }
 ```
 
-Receives a monadic bind function and then expects a block.
+Receives a type defined with `data` or `type` and expects `Result/bind` to be defined as a monadic bind function.
+It should be of type `(Result a) -> (a -> Result b) -> Result b`, like in the example above.
 
-The block is followed by `ask` binds and ends with a return term.
+Inside a `do` block, you can use `ask`, to access the continuation value of the monadic operation.
 
-The monad bind function should be of type `(Monad a) -> (a -> (Monad b)) -> (Monad b)`.
+```rust
+ask y = (div 3 2)
+ask x = (rem y 0)
+x
+
+// Becomes
+(Result/bind (div 3 2) λy (Result/bind (rem y 0) λx x))
+```
+
+It can be used to force a sequence of operations. Since the continuation receives the result through a lambda, it is only fully evaluated after something is applied to it.
 
 ### Numbers and operations
 
@@ -663,6 +769,17 @@ u24 = 42
 A Character is surrounded with `'`. Accepts unicode characters, unicode escapes in the form '\u{hex value}' and is desugared to the unicode codepoint as an `u24`.
 
 Only supports unicode codepoints up to `0xFFFFFF`.
+
+### Symbol Literal
+
+```python
+// Becomes 2146 (33 << 6 + 34)
+`hi`
+```
+
+A Symbol encodes a up to 4 base64 characters as a `u24` number. It is surrounded by `\``.
+
+Empty characters are interpreted as `A` which has value 0, meaning that `B` is the same as `AAAB`.
 
 ### String Literal
 
