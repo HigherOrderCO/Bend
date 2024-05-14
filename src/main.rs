@@ -39,33 +39,18 @@ enum Mode {
     #[arg(help = "Path to the input file")]
     path: PathBuf,
   },
-  /// Compiles the program to hvmc and prints to stdout.
-  GenHvm {
-    #[arg(
-      short = 'O',
-      value_delimiter = ' ',
-      action = clap::ArgAction::Append,
-      long_help = r#"Enables or disables the given optimizations
-      float_combinators is enabled by default on strict mode."#,
-    )]
-    comp_opts: Vec<OptArgs>,
-
-    #[command(flatten)]
-    warn_opts: CliWarnOpts,
-
-    #[arg(help = "Path to the input file")]
-    path: PathBuf,
-  },
   /// Compiles the program and runs it with the Rust HVM implementation.
   Run(RunArgs),
   /// Compiles the program and runs it with the C HVM implementation.
   RunC(RunArgs),
   /// Compiles the program and runs it with the Cuda HVM implementation.
   RunCu(RunArgs),
-  /// Compiles and then normalizes the program with the C HVM implementation.
-  Norm(RunArgs),
-  /// Compiles and then normalizes the program with the Cuda HVM implementation.
-  NormCu(RunArgs),
+  /// Compiles the program to hvmc and prints to stdout.
+  GenHvm(GenArgs),
+  /// Compiles the program to standalone C and prints to stdout.
+  GenC(GenArgs),
+  /// Compiles the program to standalone Cuda and prints to stdout.
+  GenCu(GenArgs),
   /// Runs the lambda-term level desugaring passes.
   Desugar {
     #[arg(
@@ -93,6 +78,9 @@ struct RunArgs {
   #[arg(short = 'p', help = "Debug and normalization pretty printing")]
   pretty: bool,
 
+  #[arg(long, help = "Run with IO enabled")]
+  io: bool,
+
   #[command(flatten)]
   run_opts: CliRunOpts,
 
@@ -113,6 +101,27 @@ struct RunArgs {
 
   #[arg(value_parser = |arg: &str| bend::fun::parser::TermParser::new(arg).parse_term())]
   arguments: Option<Vec<bend::fun::Term>>,
+}
+
+#[derive(Args, Clone, Debug)]
+struct GenArgs {
+  #[arg(
+    short = 'O',
+    value_delimiter = ' ',
+    action = clap::ArgAction::Append,
+    long_help = r#"Enables or disables the given optimizations
+    float_combinators is enabled by default on strict mode."#,
+  )]
+  comp_opts: Vec<OptArgs>,
+
+  #[arg(long, help = "Generate with IO enabled")]
+  io: bool,
+
+  #[command(flatten)]
+  warn_opts: CliWarnOpts,
+
+  #[arg(help = "Path to the input file")]
+  path: PathBuf,
 }
 
 #[derive(Args, Clone, Debug)]
@@ -239,11 +248,15 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
     Ok(book)
   };
 
-  let (cmd, arg_io) = match &cli.mode {
+  let (gen_cmd, gen_supports_io) = match &cli.mode {
+    Mode::GenC(..) => ("gen-c", true),
+    Mode::GenCu(..) => ("gen-cu", false),
+    _ => ("gen", false),
+  };
+
+  let (run_cmd, run_supports_io) = match &cli.mode {
     Mode::RunC(..) => ("run-c", true),
-    Mode::RunCu(..) => ("run-cu", true),
-    Mode::Norm(..) => ("run-c", false),
-    Mode::NormCu(..) => ("run-cu", false),
+    Mode::RunCu(..) => ("run-cu", false),
     _ => ("run", false),
   };
 
@@ -257,7 +270,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       eprintln!("{}", diagnostics);
     }
 
-    Mode::GenHvm { path, comp_opts, warn_opts } => {
+    Mode::GenHvm(GenArgs { comp_opts, warn_opts, path, .. }) => {
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
       let opts = compile_opts_from_cli(&comp_opts);
 
@@ -266,6 +279,39 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
       eprint!("{}", compile_res.diagnostics);
       println!("{}", compile_res.core_book);
+    }
+
+    Mode::GenC(GenArgs { comp_opts, io, warn_opts, path })
+    | Mode::GenCu(GenArgs { comp_opts, io, warn_opts, path }) => {
+      if io && !gen_supports_io {
+        Err(format!("Selected mode does not support io."))?;
+      }
+      let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
+      let opts = compile_opts_from_cli(&comp_opts);
+
+      let mut book = load_book(&path)?;
+      let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
+
+      let out_path = ".out.hvm";
+      std::fs::write(out_path, compile_res.core_book.to_string()).map_err(|x| x.to_string())?;
+
+      let gen_fn = |out_path: &str| {
+        let mut process = std::process::Command::new("hvm");
+        process.arg(gen_cmd).arg(out_path);
+        if io {
+          process.arg("--io");
+        }
+        process.output().map_err(|e| format!("While running hvm: {e}"))
+      };
+
+      let std::process::Output { stdout, stderr, status } = gen_fn(out_path)?;
+      let out = String::from_utf8_lossy(&stdout);
+      let err = String::from_utf8_lossy(&stderr);
+      let status = if !status.success() { status.to_string() } else { String::new() };
+
+      eprintln!("{err}");
+      println!("{out}");
+      println!("{status}");
     }
 
     Mode::Desugar { path, comp_opts, warn_opts, pretty } => {
@@ -284,12 +330,14 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       }
     }
 
-    Mode::Run(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
-    | Mode::RunC(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
-    | Mode::RunCu(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
-    | Mode::Norm(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
-    | Mode::NormCu(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
+    Mode::Run(RunArgs { pretty, io, run_opts, comp_opts, warn_opts, path, arguments })
+    | Mode::RunC(RunArgs { pretty, io, run_opts, comp_opts, warn_opts, path, arguments })
+    | Mode::RunCu(RunArgs { pretty, io, run_opts, comp_opts, warn_opts, path, arguments }) => {
       let CliRunOpts { linear, print_stats } = run_opts;
+
+      if io && !run_supports_io {
+        Err(format!("Selected mode does not support io."))?;
+      }
 
       let diagnostics_cfg =
         set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
@@ -301,17 +349,18 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let run_opts = RunOpts { linear_readback: linear, pretty };
 
       let book = load_book(&path)?;
-      let (term, stats, diags) =
-        run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, arguments, cmd, arg_io)?;
-
-      eprint!("{diags}");
-      if pretty {
-        println!("Result:\n{}", term.display_pretty(0));
-      } else {
-        println!("Result: {}", term);
-      }
-      if print_stats {
-        println!("{stats}");
+      if let Some((term, stats, diags)) =
+        run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_cmd, io)?
+      {
+        eprint!("{diags}");
+        if pretty {
+          println!("Result:\n{}", term.display_pretty(0));
+        } else {
+          println!("Result: {}", term);
+        }
+        if print_stats {
+          println!("{stats}");
+        }
       }
     }
   };
