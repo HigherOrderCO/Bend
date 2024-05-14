@@ -62,6 +62,10 @@ enum Mode {
   RunC(RunArgs),
   /// Compiles the program and runs it with the Cuda HVM implementation.
   RunCu(RunArgs),
+  /// Compiles and then normalizes the program with the C HVM implementation.
+  Norm(RunArgs),
+  /// Compiles and then normalizes the program with the Cuda HVM implementation.
+  NormCu(RunArgs),
   /// Runs the lambda-term level desugaring passes.
   Desugar {
     #[arg(
@@ -235,10 +239,12 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
     Ok(book)
   };
 
-  let cmd = match &cli.mode {
-    Mode::RunC(..) => "run-c",
-    Mode::RunCu(..) => "run-cu",
-    _ => "run",
+  let (cmd, arg_io) = match &cli.mode {
+    Mode::RunC(..) => ("run-c", true),
+    Mode::RunCu(..) => ("run-cu", true),
+    Mode::Norm(..) => ("run-c", false),
+    Mode::NormCu(..) => ("run-cu", false),
+    _ => ("run", false),
   };
 
   match cli.mode {
@@ -280,7 +286,9 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
     Mode::Run(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
     | Mode::RunC(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
-    | Mode::RunCu(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
+    | Mode::RunCu(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
+    | Mode::Norm(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
+    | Mode::NormCu(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
       let CliRunOpts { linear, print_stats } = run_opts;
 
       let diagnostics_cfg =
@@ -294,7 +302,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
       let book = load_book(&path)?;
       let (term, stats, diags) =
-        run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, arguments, cmd)?;
+        run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, arguments, cmd, arg_io)?;
 
       eprint!("{diags}");
       if pretty {
