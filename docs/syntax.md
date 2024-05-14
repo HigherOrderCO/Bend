@@ -257,7 +257,9 @@ Using `,` is optional.
 ### Unscoped Lambdas and Variables
 
 ```python
-$x => $x
+lam $x: $x
+
+λ$x $y: $x
 ```
 
 Like lambdas, with the exception that the variable starts with a `$` sign. Every unscoped variable in a function must have a unique name and must be used exactly once.
