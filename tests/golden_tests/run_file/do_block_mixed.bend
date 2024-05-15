@@ -1,4 +1,4 @@
-// Mixed contents in a `do` block should still work.
+# Mixed contents in a `do` block should still work.
 
 Result/bind r nxt = match r {
   Result/Ok: (nxt r.val)

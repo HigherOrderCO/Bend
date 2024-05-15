@@ -1,4 +1,4 @@
-// Test that branching statements can end with an assignment
+# Test that branching statements can end with an assignment
 type Tree:
   node { val, ~lft, ~rgt }
   leaf

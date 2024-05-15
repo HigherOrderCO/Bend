@@ -1,7 +1,7 @@
 zero = λs λz z
-succ = λpred λs λz (s pred) // Creates a Scott number out of its predecessor
+succ = λpred λs λz (s pred) # Creates a Scott number out of its predecessor
 
-two = (succ (succ zero)) // λs λz (s λs λz (s λs λz z))
+two = (succ (succ zero)) # λs λz (s λs λz (s λs λz z))
 
 fusing_add = λa
 	let case_succ = λa_pred λb (succ (fusing_add a_pred b))

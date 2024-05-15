@@ -1,4 +1,4 @@
-// Check that the ctr in the middle are interpreted correctly
+# Check that the ctr in the middle are interpreted correctly
 data tup = (pair a b)
 
 main = (List/Cons

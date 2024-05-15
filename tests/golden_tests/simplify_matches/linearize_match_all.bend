@@ -1,31 +1,31 @@
-// Testing linearization in different situations
+# Testing linearization in different situations
 data ConsList = (Cons h t) | Nil
 
-// Auto linearized on strict mode
+# Auto linearized on strict mode
 A = @a @b @c switch a {
   0: (b c)
   _: (a-1 b c)
 }
 
-// Manually linearized
+# Manually linearized
 B = @a @b @c switch c with a b {
   0: (a b)
   _: (a b c-1)
 }
 
-// Not linearized
+# Not linearized
 C = @a @b @c switch c {
   0: (a b)
   _: (a b c-1)
 }
 
-// Auto linearized, one arg not used
+# Auto linearized, one arg not used
 D = @a @b @c switch a {
   0: c
   _: (a-1 c)
 }
 
-// Pattern matching defs linearize all arguments
+# Pattern matching defs linearize all arguments
 E (ConsList/Cons a b) (ConsList/Cons c d) = (a b c d)
 E a b = (a b)
 

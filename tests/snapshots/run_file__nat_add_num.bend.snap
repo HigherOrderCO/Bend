@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nat_add_num.bend
 ---
-λa λ* (a λb λ* (b λc λ* (c λd λ* (d 0))))
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/run_file/nat_add_num.bend :
+[1m- expected:[0m term
+[1m- detected:[0m end of input
+[0m   5 | [4m[31m [0m

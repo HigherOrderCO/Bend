@@ -71,7 +71,7 @@ Bend programs consist of a series of function definitions, always starting with 
 Functions can receive arguments both directly and using a lambda abstraction.
 
 ```py
-// These two are equivalent
+# These two are equivalent
 def add(x, y):
   return x + y
 
@@ -90,22 +90,22 @@ def main:
 You can bundle multiple values into a single value using a tuple or a struct.
 
 ```py
-// With a tuple
+# With a tuple
 def Tuple.fst(x):
-  // This destructures the tuple into the two values it holds.
-  // '*' means that the value is discarded and not bound to any variable.
+  # This destructures the tuple into the two values it holds.
+  # '*' means that the value is discarded and not bound to any variable.
   (fst, *) = x
   return fst
 
-// With a struct
+# With a struct
 struct Pair(fst, snd):
 def Pair.fst(x):
   match x:
     Pair:
       return x.fst
 
-// We can also directly access the fields of a struct.
-// This requires that we tell the compiler the type of the variable where it is defined.
+# We can also directly access the fields of a struct.
+# This requires that we tell the compiler the type of the variable where it is defined.
 def Pair.fst_2(x: Pair):
   return x.fst
 ```
@@ -124,7 +124,7 @@ We can then pattern match on the enum to perform different actions depending on 
 def Maybe.or_default(x, default):
   match x:
     Maybe/some:
-      // We can access the fields of the variant using 'matched.field'
+      # We can access the fields of the variant using 'matched.field'
       return x.val
     Maybe/none:
       return default
@@ -135,9 +135,9 @@ This allows us to easily create and consume these recursive data structures with
 
 ```py
 def MyTree.sum(x):
-  // Sum all the values in the tree.
+  # Sum all the values in the tree.
   fold x:
-    // The fold is implicitly called for fields marked with '~' in their definition.
+    # The fold is implicitly called for fields marked with '~' in their definition.
     Node:
       return val + x.left + x.right
     Leaf:
@@ -145,10 +145,10 @@ def MyTree.sum(x):
 
 def main:
   bend val = 0 while val < 0:
-    // 'go' calls the bend recursively with the provided values.
+    # 'go' calls the bend recursively with the provided values.
     x = Node(val=val, left=go(val + 1), right=go(val + 1))
   then:
-    // 'then' is the base case, when the condition fails.
+    # 'then' is the base case, when the condition fails.
     x = Leaf
 
   return MyTree.sum(x)
@@ -206,7 +206,7 @@ def foo(x):
   use result = bar(1, x)
   return (result, result)
 
-// Is equivalent to
+# Is equivalent to
 def foo(x):
   return (bar(1, x), bar(1, x))
 ```
@@ -231,11 +231,11 @@ Bend has native numbers and operations.
 
 ```py
 def main:
-  a = 1      // A 24 bit unsigned integer.
-  b = +2     // A 24 bit signed integer.
-  c = -3     // Another signed integer, but with negative value.
-  d = 1.0    // A 24 bit floating point number.
-  e = +0.001 // Also a float.
+  a = 1      # A 24 bit unsigned integer.
+  b = +2     # A 24 bit signed integer.
+  c = -3     # Another signed integer, but with negative value.
+  d = 1.0    # A 24 bit floating point number.
+  e = +0.001 # Also a float.
   return (a * 2, b - c, d / e)
 ```
 
@@ -243,13 +243,13 @@ def main:
 
 ```py
 switch x = 4:
-  // From '0' to n, ending with the default case '_'.
+  # From '0' to n, ending with the default case '_'.
   0:  "zero"
   1:  "one"
   2:  "two"
-  // The default case binds the name <arg>-<n>
-  // where 'arg' is the name of the argument and 'n' is the next number.
-  // In this case, it's 'x-3', which will have value (4 - 3) = 1
+  # The default case binds the name <arg>-<n>
+  # where 'arg' is the name of the argument and 'n' is the next number.
+  # In this case, it's 'x-3', which will have value (4 - 3) = 1
   _:  String.concat("other: ", (String.from_num x-3))
 ```
 
@@ -264,14 +264,14 @@ A string is desugared to a String data type containing two constructors, `String
 List also becomes a type with two constructors, `List.cons` and `List.nil`.
 
 ```rs
-// These two are equivalent
+# These two are equivalent
 def StrEx:
   "Hello"
 
 def ids:
   [1, 2, 3]
 
-// These types are builtin.
+# These types are builtin.
 enum String:
   String.cons(head, tail)
   String.nil
@@ -287,7 +287,7 @@ def ids:
 Characters are delimited by `'` `'` and support Unicode escape sequences. They are encoded as a U24 with the unicode codepoint as their value.
 
 ```
-// These two are equivalent
+# These two are equivalent
 def chars:
   ['A', '\u{4242}', '🌎']
 

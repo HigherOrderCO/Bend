@@ -1,4 +1,4 @@
-// We expect the inferred 'λn-1' from the match to be extracted which allows this recursive func
+# We expect the inferred 'λn-1' from the match to be extracted which allows this recursive func
 val = λn (switch n { 0: valZ; _: (valS n-1) })
   valZ = 0
   valS = λp (val p)

@@ -3,7 +3,7 @@ data List   = (Cons head ~tail) | (Nil)
 data Result = (Ok val) | (Err val)
 data Nat    = (Succ ~pred) | (Zero)
 
-// MAP Impl
+# MAP Impl
 
 data Map = (Node value ~left ~right) | (Leaf)
 
@@ -46,7 +46,7 @@ Map/set map key value =
       }
   }
 
-// IO Impl
+# IO Impl
 
 STRING_NIL_TAG  = 0
 STRING_CONS_TAG = 1

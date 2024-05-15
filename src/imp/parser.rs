@@ -58,6 +58,27 @@ impl<'a> Parser<'a> for PyParser<'a> {
       self.expected(format!("'{text}'").as_str())
     }
   }
+
+  fn skip_trivia(&mut self) {
+    while let Some(c) = self.peek_one() {
+      if c.is_ascii_whitespace() {
+        self.advance_one();
+        continue;
+      }
+      if c == '#' {
+        while let Some(c) = self.peek_one() {
+          if c != '\n' {
+            self.advance_one();
+          } else {
+            break;
+          }
+        }
+        self.advance_one(); // Skip the newline character as well
+        continue;
+      }
+      break;
+    }
+  }
 }
 
 impl<'a> PyParser<'a> {

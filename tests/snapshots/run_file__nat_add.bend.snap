@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nat_add.bend
 ---
-λa λ* (a λb λ* (b λc λ* (c λd λ* (d λe λ* (e λf λ* (f λg λ* (g λh λ* (h λi λ* (i λj λ* (j λk λ* (k λl λ* (l λm λ* (m λn λ* (n λo λ* (o λp λ* (p λq λ* (q λr λ* (r λs λ* (s λt λ* (t λu λ* (u λv λ* (v λw λ* (w λx λ* (x λy λ* (y (Nat/Succ (Nat/Succ (Nat/Succ (Nat/Succ (Nat/Succ (Nat/Succ (Nat/Succ (Nat/Succ (Nat/Succ Nat/Zero))))))))))))))))))))))))))))))))))
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/run_file/nat_add.bend :
+[1m- expected:[0m term
+[1m- detected:[0m end of input
+[0m   5 | [4m[31m [0m

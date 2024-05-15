@@ -1,12 +1,12 @@
-// The test below should not trigger this warning:
-//
-// In definition 'f':
-//   Definition is unused.
-// In definition 't':
-//   Definition is unused.
-//
-// This was happening because the prune algorithm was just collecting constructors
-// by searching for tags.
+# The test below should not trigger this warning:
+#
+# In definition 'f':
+#   Definition is unused.
+# In definition 't':
+#   Definition is unused.
+#
+# This was happening because the prune algorithm was just collecting constructors
+# by searching for tags.
 
 data bool = t | f
 

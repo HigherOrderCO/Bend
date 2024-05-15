@@ -1,5 +1,5 @@
-// Given a match/switch term preceded by a sequence of terms with binds (lambda, let, use, etc),
-// by default we linearize all bindings up to the first one that appears in the match "header".
+# Given a match/switch term preceded by a sequence of terms with binds (lambda, let, use, etc),
+# by default we linearize all bindings up to the first one that appears in the match "header".
 
 switch_linearization =
   @a

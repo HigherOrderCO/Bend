@@ -56,6 +56,6 @@ def sort(d, s, t):
       return flow(d, s, sort(d-1, 0, t.a), sort(d-1, 1, t.b))
 
 def main:
-  // Sorts the numbers from 0 to 2^depth.
+  # Sorts the numbers from 0 to 2^depth.
   depth = 14
   return sum(depth, sort(depth, 0, gen(depth, 0)))

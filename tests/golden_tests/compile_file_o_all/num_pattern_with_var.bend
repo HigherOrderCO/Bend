@@ -1,4 +1,4 @@
-// We had a bug where this gave the incorrect error: "Expected a number but found 'a' at definition 'Foo'."
+# We had a bug where this gave the incorrect error: "Expected a number but found 'a' at definition 'Foo'."
 data bool = false | true
 
 (Foo bool/false a) = 0

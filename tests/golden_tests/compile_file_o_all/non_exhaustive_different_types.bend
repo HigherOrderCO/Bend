@@ -1,5 +1,5 @@
-// There was a bug where it would say "Non-exhaustive pattern (foo f1 f2 f3 f3)",
-// repeating the missing constructor for the next args.
+# There was a bug where it would say "Non-exhaustive pattern (foo f1 f2 f3 f3)",
+# repeating the missing constructor for the next args.
 
 data b1 = f1 | t1
 data b2 = f2 | t2

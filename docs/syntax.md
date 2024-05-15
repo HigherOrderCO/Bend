@@ -119,7 +119,7 @@ return "hello"
 Returns the expression that follows. The last statement of each branch of a function must be a `return`.
 
 ```py
-// Allowed, all branches return
+# Allowed, all branches return
 def max(a, b):
   if a > b:
     return a
@@ -128,7 +128,7 @@ def max(a, b):
 ```
 
 ```py
-// Not allowed, early return
+# Not allowed, early return
 def Foo(x):
   if test_condition(x):
     return "err"
@@ -139,7 +139,7 @@ def Foo(x):
 ```
 
 ```py
-// Not allowed, one of the branches doesn't return
+# Not allowed, one of the branches doesn't return
 def Foo(a, b):
   if a < b:
     return a
@@ -283,7 +283,7 @@ It's equivalent to pattern matching on the object, with the restriction that its
 open Point: p
 ...
 
-// Equivalent to:
+# Equivalent to:
 match p:
   Point:
     ...
@@ -316,7 +316,7 @@ def Result/bind(res, nxt):
 Other statements are allowed inside the `do` block and it can both return a value at the end and bind a variable, like branching statements do.
 
 ```
-// Also ok:
+# Also ok:
 do Result:
   x <- safe_div(2, 0);
   y = x
@@ -399,9 +399,9 @@ In case named arguments are used, they must come after the positional arguments 
 
 eraser = *
 
-*(41 + 1)  // applies 41 + 1 to `*` erasing the number and returns `*`
+*(41 + 1)  # applies 41 + 1 to `*` erasing the number and returns `*`
 
-* = 41 + 1 // erases 41 + 1
+* = 41 + 1 # erases 41 + 1
 ```
 
 The effect of an eraser is to free memory. Erasers behave like a `null`.
@@ -482,7 +482,7 @@ Only supports unicode codepoints up to `0xFFFFFF`.
 ### Symbol Literal
 
 ```python
-// Becomes 2146 (33 << 6 + 34)
+# Becomes 2146 (33 << 6 + 34)
 `hi`
 ```
 
@@ -811,7 +811,7 @@ ask y = (div 3 2)
 ask x = (rem y 0)
 x
 
-// Becomes
+# Becomes
 (Result/bind (div 3 2) λy (Result/bind (rem y 0) λx x))
 ```
 
@@ -857,7 +857,7 @@ Only supports unicode codepoints up to `0xFFFFFF`.
 ### Symbol Literal
 
 ```python
-// Becomes 2146 (33 << 6 + 34)
+# Becomes 2146 (33 << 6 + 34)
 `hi`
 ```
 

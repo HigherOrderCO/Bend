@@ -1,4 +1,4 @@
-// Testing various forms of pattern matching
+# Testing various forms of pattern matching
 data Result_ = (Ok val) | (Err err)
 
 Parse state (String/Cons '{' xs) = (Result_/Ok ('{', xs, state))

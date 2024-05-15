@@ -1,4 +1,4 @@
-// The flattened rule should only have 1 arg, for matching 'B'
+# The flattened rule should only have 1 arg, for matching 'B'
 data A_t = (A b)
 data B_t = B
 

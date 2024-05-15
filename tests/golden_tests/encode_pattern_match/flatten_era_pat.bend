@@ -1,4 +1,4 @@
-// To check that flattening works with Era patterns.
+# To check that flattening works with Era patterns.
 (Fn1 (*,(a,*)) *) = a
 
 (Fn2 (*,(*,(a,*)))) = a

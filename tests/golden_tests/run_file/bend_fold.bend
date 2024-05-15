@@ -1,4 +1,4 @@
-// should return (a+b+c) * 2^depth
+# should return (a+b+c) * 2^depth
 data Tree = (node ~lft ~rgt) | (leaf val)
 
 main =

@@ -1,5 +1,5 @@
-//WARNING: unsolved metas.
-//WARNING: unsolved metas.
+#WARNING: unsolved metas.
+#WARNING: unsolved metas.
 _Char = 0
 _List = λ_T 0
 _List.cons = λ_head λ_tail λ_P λ_cons λ_nil ((_cons _head) _tail)

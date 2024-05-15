@@ -1,4 +1,4 @@
-// Vectorizes if the adts are encoded with tagged scott encoding
+# Vectorizes if the adts are encoded with tagged scott encoding
 data Box = (New a)
 data Bool = T | F
 data List_ = (Cons x xs) | Nil

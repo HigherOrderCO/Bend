@@ -4,5 +4,6 @@ input_file: tests/golden_tests/run_file/adt_match_wrong_tag.bend
 ---
 [4m[1m[31mErrors:[0m
 In tests/golden_tests/run_file/adt_match_wrong_tag.bend :
-Tagged terms not supported for hvm32.
-[0m  3 | main = λa[4m[31m [0m#Option (a #wrong_tag λb b *)[0m
+[1m- expected:[0m term
+[1m- detected:[0m end of input
+[0m  4 | [4m[31m [0m

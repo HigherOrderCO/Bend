@@ -682,6 +682,27 @@ impl<'a> Parser<'a> for TermParser<'a> {
       self.expected(format!("'{text}'").as_str())
     }
   }
+
+  fn skip_trivia(&mut self) {
+    while let Some(c) = self.peek_one() {
+      if c.is_ascii_whitespace() {
+        self.advance_one();
+        continue;
+      }
+      if c == '#' {
+        while let Some(c) = self.peek_one() {
+          if c != '\n' {
+            self.advance_one();
+          } else {
+            break;
+          }
+        }
+        self.advance_one(); // Skip the newline character as well
+        continue;
+      }
+      break;
+    }
+  }
 }
 
 pub fn is_name_char(c: char) -> bool {
@@ -826,7 +847,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
         char_count += 1;
         continue;
       }
-      if c == '/' && self.input().get(*self.index() ..).unwrap_or_default().starts_with("//") {
+      if c == '#' {
         while let Some(c) = self.peek_one() {
           if c != '\n' {
             self.advance_one();
