@@ -1,11 +1,11 @@
 String/from_list [] = ""
-String/from_list (List/cons x xs) = (String/cons x (String/from_list xs))
+String/from_list (List/Cons x xs) = (String/Cons x (String/from_list xs))
 
-(Concat String/nil         ys) = ys
-(Concat (String/cons x xs) ys) = (String/cons x (Concat xs ys))
+(Concat String/Nil         ys) = ys
+(Concat (String/Cons x xs) ys) = (String/Cons x (Concat xs ys))
 
-(Join List/nil)         = ""
-(Join (List/cons x xs)) = (Concat x (Join xs))
+(Join List/Nil)         = ""
+(Join (List/Cons x xs)) = (Concat x (Join xs))
 
 main =
   ((String/from_list ['\n', '\r', '\t', '\0', '\"', '\'', '\u{AFE}', '\\'])

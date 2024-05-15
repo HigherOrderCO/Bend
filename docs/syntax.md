@@ -347,9 +347,9 @@ Note that `-` is also used for negative numbers and as the numeric operator. Ben
 ### Lambdas
 
 ```python
-lam x: x
+lambda x: x
 
-lam x, y: y
+lambda x, y: y
 
 λx y: x
 ```
@@ -361,7 +361,7 @@ Using `,` is optional.
 ### Unscoped Lambdas and Variables
 
 ```python
-lam $x: $x
+lambda $x: $x
 
 λ$x $y: $x
 ```

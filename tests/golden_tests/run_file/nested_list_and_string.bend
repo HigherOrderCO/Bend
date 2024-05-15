@@ -1,5 +1,5 @@
 main = @a [
   a,
   (*, 2),
-  (String/cons [7, "1234", 9] (String/cons a (String/cons * (String/cons '4' (String/cons '2' String/nil)))))
+  (String/Cons [7, "1234", 9] (String/Cons a (String/Cons * (String/Cons '4' (String/Cons '2' String/Nil)))))
 ]

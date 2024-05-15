@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/scape_chars.bend
 ---
-(main) = (String/cons 92 (String/cons 32 (String/cons 10 (String/cons 32 (String/cons 9 (String/cons 32 (String/cons 34 String/nil)))))))
+(main) = (String/Cons 92 (String/Cons 32 (String/Cons 10 (String/Cons 32 (String/Cons 9 (String/Cons 32 (String/Cons 34 String/Nil)))))))
 
-(String/cons) = λhead λtail λString/cons λString/nil (String/cons head tail)
+(String/Cons) = λhead λtail λString/Cons λString/Nil (String/Cons head tail)
 
-(String/nil) = λString/cons λString/nil String/nil
+(String/Nil) = λString/Cons λString/Nil String/Nil

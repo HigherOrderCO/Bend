@@ -26,7 +26,7 @@ def inc(n):
 //  return [x+1 for x in list];
 
 def lam():
-  return lam x, y: x;
+  return lambda x, y: x;
 
 def do_match(b):
   match b:

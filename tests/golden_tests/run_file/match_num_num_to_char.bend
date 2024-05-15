@@ -24,10 +24,10 @@ char_to_num '1' = 1
 char_to_num '0' = 0
 char_to_num  _  = (- 0 1)
 
-map f List/nil = List/nil
-map f (List/cons x xs) = (List/cons (f x) (map f xs))
+map f List/Nil = List/Nil
+map f (List/Cons x xs) = (List/Cons (f x) (map f xs))
 
-main = 
+main =
   let nums = [0 1 2 3 4 5 6 7 8 9 10];
   let chars = (map num_to_char nums);
   let nums2 = (map char_to_num chars);

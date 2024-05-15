@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/nested2.bend
 ---
-(Foo) = λa λb (match b { List/cons c d: λe (match d { List/cons f g: λh λi (h i f g); List/nil: λj λk (j (List/cons k List/nil)); } e c); List/nil: λl (l List/nil); } a)
+(Foo) = λa λb (match b { List/Cons c d: λe (match d { List/Cons f g: λh λi (h i f g); List/Nil: λj λk (j (List/Cons k List/Nil)); } e c); List/Nil: λl (l List/Nil); } a)
 
-(List/cons) = λa λb λc λd (c a b)
+(List/Cons) = λa λb λc λd (c a b)
 
-(List/nil) = λa λb b
+(List/Nil) = λa λb b

@@ -1,1 +1,1 @@
-main = λa λb (String/cons a (String/cons 'b' (String/cons 'c' (String/cons b  String/nil))))
+main = λa λb (String/Cons a (String/Cons 'b' (String/Cons 'c' (String/Cons b  String/Nil))))

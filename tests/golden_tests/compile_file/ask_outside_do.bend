@@ -1,6 +1,6 @@
 Result/bind r nxt = match r {
-  Result/ok: (nxt r.val)
-  Result/err: r
+  Result/Ok: (nxt r.val)
+  Result/Err: r
 }
 
-main = ask x = (Result/ok x); x
+main = ask x = (Result/Ok x); x

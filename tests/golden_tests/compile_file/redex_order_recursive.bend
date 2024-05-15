@@ -7,56 +7,56 @@ fold_ = @bm (bm
   @s @z (s @s @z z)
 )
 
-add = @a (a 
+add = @a (a
   @p @b (add p @s @z (s b))
   @b b
 )
 
 List.sum xs acc = match xs {
-  List/nil: acc
-  List/cons: (List.sum xs.tail (+ xs.head acc))
+  List/Nil: acc
+  List/Cons: (List.sum xs.tail (+ xs.head acc))
 }
 
 List.len xs = match xs {
-  List/nil: 0
-  List/cons: (+ 1 (List.len xs.tail))
+  List/Nil: 0
+  List/Cons: (+ 1 (List.len xs.tail))
 }
 
 List.len_tr xs acc = match xs {
-  List/nil: acc
-  List/cons: (List.len_tr xs.tail (+ 1 acc))
+  List/Nil: acc
+  List/Cons: (List.len_tr xs.tail (+ 1 acc))
 }
 
 List.map xs f = match xs {
-  List/nil: List/nil
-  List/cons: (List/cons (f xs.head) (List.map xs.tail f))
+  List/Nil: List/Nil
+  List/Cons: (List/Cons (f xs.head) (List.map xs.tail f))
 }
 
 List.concat xs ys = match xs {
-  List/nil: ys
-  List/cons: (List/cons xs.head (List.concat xs.tail ys))
+  List/Nil: ys
+  List/Cons: (List/Cons xs.head (List.concat xs.tail ys))
 }
 
 List.reverse_bad xs = match xs {
-  List/nil: List/nil
-  List/cons: (List.concat (List.reverse_bad xs.tail) (List/cons xs.head List/nil))
+  List/Nil: List/Nil
+  List/Cons: (List.concat (List.reverse_bad xs.tail) (List/Cons xs.head List/Nil))
 }
 
-List.reverse_tr xs acc = (List.reverse_over xs List/nil)
+List.reverse_tr xs acc = (List.reverse_over xs List/Nil)
 
 List.fold xs c n = match xs {
-  List/nil: n
-  List/cons: (c xs.head (List.fold xs.tail c n))
+  List/Nil: n
+  List/Cons: (c xs.head (List.fold xs.tail c n))
 }
 
 List.reduce xs f acc = match xs {
-  List/nil: acc
-  List/cons: (List.reduce xs.tail f (f acc xs.head))
+  List/Nil: acc
+  List/Cons: (List.reduce xs.tail f (f acc xs.head))
 }
 
 List.reverse_over xs ys = match xs {
-  List/nil: ys
-  List/cons: (List.reverse_over xs.tail (List/cons xs.head ys))
+  List/Nil: ys
+  List/Cons: (List.reverse_over xs.tail (List/Cons xs.head ys))
 }
 
 Tree.leaves tree = match tree {

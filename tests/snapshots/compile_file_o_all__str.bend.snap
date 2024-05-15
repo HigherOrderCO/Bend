@@ -2,14 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/str.bend
 ---
-@String/cons = (a (b ((a (b c)) (* c))))
+@String/Cons = (a (b ((a (b c)) (* c))))
 
-@String/nil = (* (a a))
+@String/Nil = (* (a a))
 
 @main = f
-  & @String/cons ~ (109 (e f))
-  & @String/cons ~ (97 (d e))
-  & @String/cons ~ (105 (c d))
-  & @String/cons ~ (110 (b c))
-  & @String/cons ~ (32 (a b))
-  & @String/cons ~ (61 (@String/nil a))
+  & @String/Cons ~ (109 (e f))
+  & @String/Cons ~ (97 (d e))
+  & @String/Cons ~ (105 (c d))
+  & @String/Cons ~ (110 (b c))
+  & @String/Cons ~ (32 (a b))
+  & @String/Cons ~ (61 (@String/Nil a))

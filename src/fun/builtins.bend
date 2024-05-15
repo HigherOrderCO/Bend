@@ -1,26 +1,26 @@
-data String = (cons head ~tail) | (nil)
-data List   = (cons head ~tail) | (nil)
-data Result = (ok val) | (err val)
-data Nat    = (succ ~pred) | (zero)
+data String = (Cons head ~tail) | (Nil)
+data List   = (Cons head ~tail) | (Nil)
+data Result = (Ok val) | (Err val)
+data Nat    = (Succ ~pred) | (Zero)
 
 // MAP Impl
 
-data Map    = (node value ~left ~right) | (leaf)
+data Map = (Node value ~left ~right) | (Leaf)
 
-Map/empty = Map/leaf
+Map/empty = Map/Leaf
 
 Map/get map key =
   match map {
-    Map/leaf: (*, map)
-    Map/node:
+    Map/Leaf: (*, map)
+    Map/Node:
       switch _ = (== 0 key) {
         0: switch _ = (% key 2) {
           0:
             let (got, rest) = (Map/get map.left (/ key 2))
-            (got, (Map/node map.value rest map.right))
+            (got, (Map/Node map.value rest map.right))
           _:
             let (got, rest) = (Map/get map.right (/ key 2))
-            (got, (Map/node map.value map.left rest))
+            (got, (Map/Node map.value map.left rest))
         }
         _: (map.value, map)
       }
@@ -28,21 +28,21 @@ Map/get map key =
 
 Map/set map key value =
   match map {
-    Map/node:
+    Map/Node:
       switch _ = (== 0 key) {
         0: switch _ = (% key 2) {
-          0: (Map/node map.value (Map/set map.left (/ key 2) value) map.right)
-          _: (Map/node map.value map.left (Map/set map.right (/ key 2) value))
+          0: (Map/Node map.value (Map/set map.left (/ key 2) value) map.right)
+          _: (Map/Node map.value map.left (Map/set map.right (/ key 2) value))
         }
-        _: (Map/node value map.left map.right)
+        _: (Map/Node value map.left map.right)
       }
-    Map/leaf:
+    Map/Leaf:
       switch _ = (== 0 key) {
         0: switch _ = (% key 2) {
-          0: (Map/node * (Map/set Map/leaf (/ key 2) value) Map/leaf)
-          _: (Map/node * Map/leaf (Map/set Map/leaf (/ key 2) value))
+          0: (Map/Node * (Map/set Map/Leaf (/ key 2) value) Map/Leaf)
+          _: (Map/Node * Map/Leaf (Map/set Map/Leaf (/ key 2) value))
         }
-        _: (Map/node value Map/leaf Map/leaf)
+        _: (Map/Node value Map/Leaf Map/Leaf)
       }
   }
 
@@ -70,12 +70,12 @@ data IO
   | (Sleep     time      cont)
   | (DrawImage tree      cont)
 
-MkStr (String/cons x xs) = λt (t STRING_CONS_TAG x (MkStr xs))
-MkStr (String/nil)       = λt (t STRING_NIL_TAG)
+MkStr (String/Cons x xs) = λt (t STRING_CONS_TAG x (MkStr xs))
+MkStr (String/Nil)       = λt (t STRING_NIL_TAG)
 
 ReadStr s = (s λtag switch tag {
-  0: String/nil
-  _: λx λxs (String/cons x (ReadStr xs))
+  0: String/Nil
+  _: λx λxs (String/Cons x (ReadStr xs))
 })
 
 MkIO (IO/Done term)                = λt (t IO_DONE_TAG term)
