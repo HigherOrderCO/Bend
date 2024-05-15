@@ -276,7 +276,7 @@ impl Expr {
       Expr::None => fun::Term::Era,
       Expr::Var { nam } => fun::Term::Var { nam },
       Expr::Chn { nam } => fun::Term::Link { nam },
-      Expr::Num { val } => fun::Term::Num { val: fun::Num::U24(val) },
+      Expr::Num { val } => fun::Term::Num { val },
       Expr::Call { fun, args, kwargs } => {
         assert!(kwargs.is_empty());
         let args = args.into_iter().map(Self::to_fun);

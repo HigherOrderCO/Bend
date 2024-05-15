@@ -6,4 +6,4 @@ Tree.gen n x = switch n {
   _: (Tree.node x (Tree.gen n-1 (+ (* x 2) 1)) (Tree.gen n-1 (+ (* x 2) 2)))
 }
 
-main = (Tree.gen 8 2)
+main = (Tree.gen 4 1)

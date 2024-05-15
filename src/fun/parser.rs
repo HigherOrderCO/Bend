@@ -367,7 +367,7 @@ impl<'a> TermParser<'a> {
       }
 
       // Native Number
-      if self.peek_one().map_or(false, |c| "0123456789+-".contains(c)) {
+      if self.peek_one().map_or(false, is_num_char) {
         unexpected_tag(self)?;
         let num = self.parse_number()?;
         return Ok(Term::Num { val: num });
@@ -658,8 +658,12 @@ impl<'a> Parser<'a> for TermParser<'a> {
   }
 }
 
-fn is_name_char(c: char) -> bool {
+pub fn is_name_char(c: char) -> bool {
   c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/'
+}
+
+pub fn is_num_char(c: char) -> bool {
+  "0123456789+-".contains(c)
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -766,7 +770,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
   fn consume_new_line(&mut self) -> ParseResult<()> {
     self.skip_trivia_inline();
     self.try_consume_exactly("\r");
-    self.consume_exactly("\n")
+    self.labelled(|p| p.consume_exactly("\n"), "newline")
   }
 
   /// Skips trivia, returns the number of trivia characters skipped in the last line.
@@ -967,6 +971,37 @@ pub trait ParserCommons<'a>: Parser<'a> {
       return self.expected("numeric operator");
     };
     Ok(opr)
+  }
+
+  fn peek_oper(&mut self) -> Option<Op> {
+    let opr = if self.starts_with("+") {
+      Op::ADD
+    } else if self.starts_with("-") {
+      Op::SUB
+    } else if self.starts_with("*") {
+      Op::MUL
+    } else if self.starts_with("/") {
+      Op::DIV
+    } else if self.starts_with("%") {
+      Op::REM
+    } else if self.starts_with("<") {
+      Op::LTN
+    } else if self.starts_with(">") {
+      Op::GTN
+    } else if self.starts_with("==") {
+      Op::EQL
+    } else if self.starts_with("!=") {
+      Op::NEQ
+    } else if self.starts_with("&") {
+      Op::AND
+    } else if self.starts_with("|") {
+      Op::OR
+    } else if self.starts_with("^") {
+      Op::XOR
+    } else {
+      return None;
+    };
+    Some(opr)
   }
 
   fn parse_u32(&mut self) -> ParseResult<u32> {

@@ -3,7 +3,7 @@ mod order_kwargs;
 pub mod parser;
 pub mod to_fun;
 
-use crate::fun::{CtrField, Name, Op};
+use crate::fun::{CtrField, Name, Num, Op};
 use interner::global::GlobalString;
 
 #[derive(Clone, Debug)]
@@ -15,7 +15,7 @@ pub enum Expr {
   // "$" [a-zA-Z_]+
   Chn { nam: Name },
   // [0-9_]+
-  Num { val: u32 },
+  Num { val: Num },
   // {fun}({args},{kwargs},)
   Call { fun: Box<Expr>, args: Vec<Expr>, kwargs: Vec<(Name, Expr)> },
   // "lambda" {names}* ":" {bod}
