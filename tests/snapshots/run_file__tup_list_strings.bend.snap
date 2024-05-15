@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/tup_list_strings.bend
 ---
-{λa λ* (a {λb λ* (b 102 λc λ* (c 111 λd λ* (d 111 String/nil))) 0} λe λ* (e {λf λ* (f 102 λg λ* (g 111 λh λ* (h 111 String/nil))) 0} λi λ* (i {λj λ* (j 102 λk λ* (k 111 λl λ* (l 111 String/nil))) 1} List/nil))) 4}
+{λa λ* (a {"foo" 0} λe λ* (e {"foo" 0} λi λ* (i {"foo" 1} List/nil))) 4}

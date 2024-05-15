@@ -98,7 +98,7 @@ impl Term {
             .zip(ctrs.get(ctr).unwrap())
             .filter_map(|(var, field)| if field.rec { Some(var.as_ref().unwrap().clone()) } else { None })
             .collect::<HashSet<_>>();
-          arm.2.call_recursive(&new_nam, &recursive, with, &free_vars);
+          arm.2.call_recursive(&new_nam, &recursive, &free_vars);
         }
 
         // Create the new function
@@ -109,10 +109,10 @@ impl Term {
           with: with.clone(),
           arms: std::mem::take(arms),
         };
-        for nam in free_vars.iter().rev() {
+        for nam in with.iter().rev() {
           body = Term::lam(Pattern::Var(Some(nam.clone())), body);
         }
-        for nam in with.iter().rev() {
+        for nam in free_vars.iter().rev() {
           body = Term::lam(Pattern::Var(Some(nam.clone())), body);
         }
         body = Term::lam(Pattern::Var(Some(x_nam)), body);
@@ -122,24 +122,18 @@ impl Term {
 
         // Call the new function
         let call = Term::call(Term::Ref { nam: new_nam.clone() }, [std::mem::take(arg.as_mut())]);
-        let call = Term::call(call, with.iter().cloned().map(|nam| Term::Var { nam }));
         let call = Term::call(call, free_vars.iter().cloned().map(|nam| Term::Var { nam }));
+        let call = Term::call(call, with.iter().cloned().map(|nam| Term::Var { nam }));
         *self = call;
       }
       Ok(())
     })
   }
 
-  fn call_recursive(
-    &mut self,
-    def_name: &Name,
-    recursive: &HashSet<Name>,
-    with: &[Name],
-    free_vars: &[Name],
-  ) {
+  fn call_recursive(&mut self, def_name: &Name, recursive: &HashSet<Name>, free_vars: &[Name]) {
     maybe_grow(|| {
       for child in self.children_mut() {
-        child.call_recursive(def_name, recursive, with, free_vars);
+        child.call_recursive(def_name, recursive, free_vars);
       }
 
       // If we found a recursive field, replace with a call to the new function.
@@ -147,7 +141,6 @@ impl Term {
         && recursive.contains(nam)
       {
         let call = Term::call(Term::Ref { nam: def_name.clone() }, [std::mem::take(self)]);
-        let call = Term::call(call, with.iter().cloned().map(|nam| Term::Var { nam }));
         let call = Term::call(call, free_vars.iter().cloned().map(|nam| Term::Var { nam }));
         *self = call;
       }

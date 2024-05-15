@@ -139,6 +139,7 @@ pub enum Stmt {
   Fold {
     arg: Box<Expr>,
     bind: Option<Name>,
+    with: Vec<Name>,
     arms: Vec<MatchArm>,
     nxt: Option<Box<Stmt>>,
   },
@@ -159,6 +160,12 @@ pub enum Stmt {
   // "return" {expr} ";"?
   Return {
     term: Box<Expr>,
+  },
+  // "open" {typ} ":" {var} ";"? {nxt}
+  Open {
+    typ: Name,
+    var: Name,
+    nxt: Box<Stmt>,
   },
   #[default]
   Err,

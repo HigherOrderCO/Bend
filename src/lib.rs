@@ -90,6 +90,8 @@ pub fn desugar_book(
 
   ctx.apply_args(args)?;
 
+  ctx.desugar_open()?;
+
   ctx.book.encode_builtins();
 
   ctx.resolve_refs()?;
@@ -213,6 +215,7 @@ pub fn readback_hvm_net(net: &Net, book: &Book, labels: &Labels, linear: bool) -
   let net = hvmc_to_net(net);
   let mut term = net_to_term(&net, book, labels, linear, &mut diags);
   term.expand_generated(book);
+  term.resugar_strings();
   (term, diags)
 }
 

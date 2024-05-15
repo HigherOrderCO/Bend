@@ -156,6 +156,11 @@ pub enum Term {
     step: Box<Term>,
     base: Box<Term>,
   },
+  Open {
+    typ: Name,
+    var: Name,
+    bod: Box<Term>,
+  },
   Ref {
     nam: Name,
   },
@@ -370,6 +375,9 @@ impl Clone for Term {
         step: step.clone(),
         base: base.clone(),
       },
+      Self::Open { typ, var, bod: nxt } => {
+        Self::Open { typ: typ.clone(), var: var.clone(), bod: nxt.clone() }
+      }
       Self::Ref { nam } => Self::Ref { nam: nam.clone() },
       Self::Era => Self::Era,
       Self::Err => Self::Err,
@@ -515,7 +523,9 @@ impl Term {
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
       | Term::Oper { fst, snd, .. } => ChildrenIter::Two([fst.as_ref(), snd.as_ref()]),
-      Term::Lam { bod, .. } | Term::Do { bod, .. } => ChildrenIter::One([bod.as_ref()]),
+      Term::Lam { bod, .. } | Term::Do { bod, .. } | Term::Open { bod, .. } => {
+        ChildrenIter::One([bod.as_ref()])
+      }
       Term::Var { .. }
       | Term::Link { .. }
       | Term::Num { .. }
@@ -548,7 +558,9 @@ impl Term {
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
       | Term::Oper { fst, snd, .. } => ChildrenIter::Two([fst.as_mut(), snd.as_mut()]),
-      Term::Lam { bod, .. } | Term::Do { bod, .. } => ChildrenIter::One([bod.as_mut()]),
+      Term::Lam { bod, .. } | Term::Do { bod, .. } | Term::Open { bod, .. } => {
+        ChildrenIter::One([bod.as_mut()])
+      }
       Term::Var { .. }
       | Term::Link { .. }
       | Term::Num { .. }
@@ -623,6 +635,7 @@ impl Term {
       | Term::Ref { .. }
       | Term::Era
       | Term::Err => ChildrenIter::Zero([]),
+      Term::Open { .. } => unreachable!("Open should be removed in earlier pass"),
     }
   }
 
@@ -682,6 +695,7 @@ impl Term {
       | Term::Ref { .. }
       | Term::Era
       | Term::Err => ChildrenIter::Zero([]),
+      Term::Open { .. } => unreachable!("Open should be removed in earlier pass"),
     }
   }
 
@@ -737,6 +751,7 @@ impl Term {
       | Term::Ref { .. }
       | Term::Era
       | Term::Err => ChildrenIter::Zero([]),
+      Term::Open { .. } => unreachable!("Open should be removed in earlier pass"),
     }
   }
 

@@ -7,13 +7,13 @@ main =
   let b = 2;
   let c = 3;
   let n = 0;
-  let tree = bend n{
+  let tree = bend n {
     when (< n depth):
     (Tree/node (go (+ n 1)) (go (+ n 1)))
   else:
     (Tree/leaf c)
   }
-  fold tree with a {
+  fold tree {
     Tree/node: (+ tree.lft tree.rgt)
     Tree/leaf: (+ tree.val (+ a b))
   }

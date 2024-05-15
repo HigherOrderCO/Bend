@@ -191,7 +191,7 @@ impl Stmt {
         let term = fun::Term::Swt { arg: Box::new(arg), bnd: bind, with: Vec::new(), pred, arms: fun_arms };
         wrap_nxt_assign_stmt(term, nxt, fst_pat)?
       }
-      Stmt::Fold { arg, bind, arms, nxt } => {
+      Stmt::Fold { arg, bind, arms, with, nxt } => {
         let arg = arg.to_fun();
         let mut fun_arms = vec![];
         let mut arms = arms.into_iter();
@@ -220,7 +220,7 @@ impl Stmt {
             (None, None) => fun_arms.push((arm.lft, vec![], arm_rgt)),
           }
         }
-        let term = fun::Term::Fold { arg: Box::new(arg), bnd: bind, with: Vec::new(), arms: fun_arms };
+        let term = fun::Term::Fold { arg: Box::new(arg), bnd: bind, with, arms: fun_arms };
         wrap_nxt_assign_stmt(term, nxt, fst_pat)?
       }
       Stmt::Bend { bind, init, cond, step, base, nxt } => {
@@ -255,13 +255,21 @@ impl Stmt {
         let term = fun::Term::Do { typ, bod: Box::new(bod) };
         wrap_nxt_assign_stmt(term, nxt, pat)?
       }
-      Self::Ask { pat, val, nxt } => {
+      Stmt::Ask { pat, val, nxt } => {
         let (nxt_pat, nxt) = match nxt.into_fun()? {
           StmtToFun::Return(term) => (None, term),
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
         let term =
           fun::Term::Ask { pat: Box::new(pat.into_fun()), val: Box::new(val.to_fun()), nxt: Box::new(nxt) };
+        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+      }
+      Stmt::Open { typ, var, nxt } => {
+        let (nxt_pat, nxt) = match nxt.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        let term = fun::Term::Open { typ, var, bod: Box::new(nxt) };
         if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
       }
       Stmt::Return { term } => StmtToFun::Return(term.to_fun()),

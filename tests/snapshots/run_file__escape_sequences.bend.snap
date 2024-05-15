@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/escape_sequences.bend
 ---
-λa (Join (List/cons (String/cons 10 String/nil) (List/cons (String/cons 13 String/nil) (List/cons (String/cons 9 String/nil) (List/cons (String/cons 0 String/nil) (List/cons (String/cons 34 String/nil) (List/cons (String/cons 39 String/nil) (List/cons (String/cons 2814 String/nil) (List/cons (String/cons 92 String/nil) List/nil)))))))))
+λa (Join (List/cons "\n" (List/cons "\r" (List/cons "\t" (List/cons "\0" (List/cons "\"" (List/cons "'" (List/cons "\u{afe}" (List/cons "\\" List/nil)))))))))

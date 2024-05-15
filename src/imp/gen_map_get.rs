@@ -51,7 +51,7 @@ impl Stmt {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Match { bind: _, arg, arms, nxt } | Stmt::Fold { bind: _, arg, arms, nxt } => {
+      Stmt::Match { bind: _, arg, arms, nxt } | Stmt::Fold { bind: _, arg, arms, with: _, nxt } => {
         for arm in arms.iter_mut() {
           arm.rgt.gen_map_get(id);
         }
@@ -100,6 +100,9 @@ impl Stmt {
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);
         }
+      }
+      Stmt::Open { typ: _, var: _, nxt } => {
+        nxt.gen_map_get(id);
       }
       Stmt::Err => {}
     }
