@@ -237,6 +237,7 @@ fn parse_file() {
     ctx.book.encode_adts();
     ctx.book.encode_builtins();
     ctx.resolve_refs().expect("Resolve refs");
+    ctx.desugar_match_defs().expect("Desugar match defs");
     ctx.prune(false);
     Ok(book.to_string())
   })
