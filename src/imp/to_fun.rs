@@ -191,7 +191,7 @@ impl Stmt {
         let term = fun::Term::Swt { arg: Box::new(arg), bnd: bind, with: Vec::new(), pred, arms: fun_arms };
         wrap_nxt_assign_stmt(term, nxt, fst_pat)?
       }
-      Stmt::Fold { arg, bind, arms, nxt } => {
+      Stmt::Fold { arg, bind, arms, with, nxt } => {
         let arg = arg.to_fun();
         let mut fun_arms = vec![];
         let mut arms = arms.into_iter();
@@ -220,7 +220,7 @@ impl Stmt {
             (None, None) => fun_arms.push((arm.lft, vec![], arm_rgt)),
           }
         }
-        let term = fun::Term::Fold { arg: Box::new(arg), bnd: bind, with: Vec::new(), arms: fun_arms };
+        let term = fun::Term::Fold { arg: Box::new(arg), bnd: bind, with, arms: fun_arms };
         wrap_nxt_assign_stmt(term, nxt, fst_pat)?
       }
       Stmt::Bend { bind, init, cond, step, base, nxt } => {

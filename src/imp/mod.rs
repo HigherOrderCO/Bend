@@ -139,6 +139,7 @@ pub enum Stmt {
   Fold {
     arg: Box<Expr>,
     bind: Option<Name>,
+    with: Vec<Name>,
     arms: Vec<MatchArm>,
     nxt: Option<Box<Stmt>>,
   },
