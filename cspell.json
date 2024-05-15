@@ -9,6 +9,7 @@
     "arity",
     "behaviour",
     "bitand",
+    "Bitonic",
     "builtins",
     "callcc",
     "chumsky",
@@ -24,6 +25,7 @@
     "destructures",
     "desugared",
     "desugars",
+    "devs",
     "dref",
     "dups",
     "effectful",
@@ -58,6 +60,7 @@
     "nullary",
     "numop",
     "nums",
+    "OOM's",
     "oper",
     "opre",
     "oprune",
@@ -67,6 +70,7 @@
     "postcondition",
     "powi",
     "prec",
+    "quadtree",
     "readback",
     "recursively",
     "redex",
@@ -111,6 +115,7 @@
     "/`.`/g",
     "/`..`/g",
     "/`...`/g",
-    "/`....`/g"
+    "/`....`/g",
+    "/```.*\n.*\n```/g"
   ]
 }

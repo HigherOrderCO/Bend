@@ -1,7 +1,7 @@
 use crate::{
   fun::{
-    parser::{Indent, ParseResult, ParserCommons},
-    Adt, Book, CtrField, Name, Op, STRINGS,
+    parser::{is_num_char, Indent, ParseResult, ParserCommons},
+    Adt, Book, CtrField, Name, Num, Op, STRINGS,
   },
   imp::{AssignPattern, Definition, Enum, Expr, InPlaceOp, MatchArm, Stmt, Variant},
   maybe_grow,
@@ -9,7 +9,11 @@ use crate::{
 use TSPL::Parser;
 
 const PREC: &[&[Op]] =
-  &[&[Op::EQL, Op::NEQ], &[Op::LTN], &[Op::GTN], &[Op::ADD, Op::SUB], &[Op::MUL, Op::DIV]];
+  &[&[Op::OR], &[Op::XOR], &[Op::AND], &[Op::EQL, Op::NEQ], &[Op::LTN], &[Op::GTN], &[Op::ADD, Op::SUB], &[
+    Op::MUL,
+    Op::DIV,
+    Op::REM,
+  ]];
 
 pub struct PyParser<'i> {
   pub input: &'i str,
@@ -71,6 +75,7 @@ impl<'a> PyParser<'a> {
         let head = self.parse_expr(false)?;
         self.skip_trivia();
         if self.starts_with(",") {
+          // A Tuple
           let mut els = vec![head];
           while self.try_consume(",") {
             els.push(self.parse_expr(false)?);
@@ -79,6 +84,7 @@ impl<'a> PyParser<'a> {
           Expr::Tup { els }
         } else {
           self.consume(")")?;
+          // A parenthesized expression
           head
         }
       }
@@ -89,7 +95,7 @@ impl<'a> PyParser<'a> {
         if self.starts_with(":") { self.parse_map_init(head)? } else { self.parse_sup(head)? }
       }
       '[' => self.list_or_comprehension()?,
-      '`' => Expr::Num { val: self.parse_quoted_symbol()? },
+      '`' => Expr::Num { val: Num::U24(self.parse_quoted_symbol()?) },
       '\"' => {
         let str = self.parse_quoted_string()?;
         let val = STRINGS.get(str);
@@ -100,8 +106,12 @@ impl<'a> PyParser<'a> {
         let nam = self.parse_bend_name()?;
         Expr::Chn { nam }
       }
-      c if c.is_ascii_digit() => {
-        let val = self.parse_u32()?;
+      '*' => {
+        self.advance_one();
+        Expr::Eraser
+      }
+      c if is_num_char(c) => {
+        let val = self.parse_number()?;
         Expr::Num { val }
       }
       // var or postfix
@@ -284,9 +294,9 @@ impl<'a> PyParser<'a> {
       }
       let mut lhs = self.parse_infix_expr(prec + 1, inline)?;
       self.skip_trivia_maybe_inline(inline);
-      while let Some(op) = self.get_op() {
+      while let Some(op) = self.peek_oper() {
         if PREC[prec].iter().any(|r| *r == op) {
-          let op = self.parse_oper()?;
+          self.parse_oper()?;
           let rhs = self.parse_infix_expr(prec + 1, inline)?;
           lhs = Expr::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
           self.advance_trivia_inline();
@@ -296,31 +306,6 @@ impl<'a> PyParser<'a> {
       }
       Ok(lhs)
     })
-  }
-
-  fn get_op(&mut self) -> Option<Op> {
-    let ret = if self.starts_with("+") {
-      Op::ADD
-    } else if self.starts_with("-") {
-      Op::SUB
-    } else if self.starts_with("*") {
-      Op::MUL
-    } else if self.starts_with("/") {
-      Op::DIV
-    } else if self.starts_with("%") {
-      Op::REM
-    } else if self.starts_with("<") {
-      Op::LTN
-    } else if self.starts_with(">") {
-      Op::GTN
-    } else if self.starts_with("==") {
-      Op::EQL
-    } else if self.starts_with("!=") {
-      Op::NEQ
-    } else {
-      return None;
-    };
-    Some(ret)
   }
 
   fn consume_indent_at_most(&mut self, expected: Indent) -> ParseResult<Indent> {
@@ -390,6 +375,9 @@ impl<'a> PyParser<'a> {
       let val = self.parse_expr(true)?;
       self.skip_trivia_inline();
       self.try_consume_exactly(";");
+      if !self.is_eof() {
+        self.consume_new_line()?;
+      }
       let nxt_indent = self.advance_newlines();
       if nxt_indent == *indent {
         let (nxt, nxt_indent) = self.parse_statement(indent)?;
@@ -460,6 +448,9 @@ impl<'a> PyParser<'a> {
     let term = self.parse_expr(true)?;
     self.skip_trivia_inline();
     self.try_consume_exactly(";");
+    if !self.is_eof() {
+      self.consume_new_line()?;
+    }
     let indent = self.advance_newlines();
     Ok((Stmt::Return { term: Box::new(term) }, indent))
   }
@@ -766,6 +757,11 @@ impl<'a> PyParser<'a> {
   /// | <nam> "[" <expr> "]"
   /// | <nam>
   fn parse_assign_pattern(&mut self) -> ParseResult<AssignPattern> {
+    // Eraser pattern
+    if self.starts_with("*") {
+      self.advance_one();
+      return Ok(AssignPattern::Eraser);
+    }
     // Tup pattern
     if self.starts_with("(") {
       let binds = self.list_like(|p| p.parse_assign_pattern(), "(", ")", ",", true, 1)?;

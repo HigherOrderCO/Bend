@@ -1,7 +1,7 @@
 use super::{parser::TermParser, Book, Name, Num, Pattern, Term};
 use crate::maybe_grow;
 
-const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/fun/builtins.hvm"));
+const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/fun/builtins.bend"));
 
 pub const LIST: &str = "List";
 pub const LCONS: &str = "List/cons";

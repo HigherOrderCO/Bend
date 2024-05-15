@@ -1,6 +1,6 @@
 use crate::{
   diagnostics::Diagnostics,
-  fun::{Ctx, Name, Pattern, Term},
+  fun::{Ctx, Name, Term},
   maybe_grow,
 };
 use std::collections::HashSet;
@@ -41,15 +41,9 @@ impl Term {
           let fun = make_fun_name(typ);
 
           if def_names.contains(&fun) {
-            let mut fvs = nxt.free_vars();
-            pat.binds().flatten().for_each(|bind| _ = fvs.remove(bind));
-            let fvs = fvs.into_keys().collect::<Vec<_>>();
-            let nxt = fvs
-              .iter()
-              .fold(*nxt.clone(), |nxt, nam| Term::lam(Pattern::Var(Some(nam.clone())), nxt.clone()));
-            let nxt = Term::lam(*pat.clone(), nxt);
-            let term = Term::call(Term::Ref { nam: fun.clone() }, [*val.clone(), nxt]);
-            *self = Term::call(term, fvs.into_iter().map(|nam| Term::Var { nam }));
+            // TODO: come up with a strategy for forwarding free vars to prevent infinite recursion.
+            let nxt = Term::lam(*pat.clone(), std::mem::take(nxt));
+            *self = Term::call(Term::Ref { nam: fun.clone() }, [*val.clone(), nxt]);
           } else {
             return Err(format!("Could not find definition {} for type {}.", fun, typ));
           }
