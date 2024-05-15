@@ -210,6 +210,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         | Term::Mat { .. } // Removed in earlier pass
         | Term::Bend { .. } // Removed in desugar_bend
         | Term::Fold { .. } // Removed in desugar_fold
+        | Term::Open { .. } // Removed in desugar_open
         | Term::Nat { .. } // Removed in encode_nat
         | Term::Str { .. } // Removed in encode_str
         | Term::List { .. } // Removed in encode_list

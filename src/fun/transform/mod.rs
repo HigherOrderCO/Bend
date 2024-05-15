@@ -6,6 +6,7 @@ pub mod desugar_bend;
 pub mod desugar_do_blocks;
 pub mod desugar_fold;
 pub mod desugar_match_defs;
+pub mod desugar_open;
 pub mod encode_adts;
 pub mod encode_match_terms;
 pub mod expand_generated;

@@ -56,6 +56,22 @@ The exact function they become depends on the encoding.
 
 Read [defining data types](./defining-data-types.md) to know more.
 
+### Object
+
+Defines a type with a single constructor (like a struct, a record or a class).
+
+```python
+object Pair { fst, snd }
+
+object Function { name, args, body }
+
+object Vec { len, data }
+```
+
+The constructor created from this definition has the same name as the type.
+
+Since it only has one constructor, `fold`ing a recursive `object` requires some additional stop condition apart from pattern matching on the value itself (like an `if` statement).
+
 ## Statements
 
 ### Assignment
@@ -249,6 +265,28 @@ def bend(x, y, ...):
     return ... bend(x, y, ...) ...
   else:
     return ...
+```
+
+### Open
+
+```python
+p = Point { x: 1, y: 2 }
+open Point: p
+return Point { x: p.x * p.x, y: p.y * p.y }
+```
+
+Brings the inner fields of an object into scope. The original variable can still be accessed, but doing so will cause any used fields to be duplicated.
+
+It's equivalent to pattern matching on the object, with the restriction that its type must have only one constructor.
+
+```python
+open Point: p
+...
+
+// Equivalent to:
+match p:
+  Point:
+    ...
 ```
 
 ### Do
@@ -720,6 +758,25 @@ It is possible to use a _wildcard_, a named variable or `*` as default cases.
 It is desugared according to the chosen encoding. Read [pattern matching](./pattern-matching.md) to know more.
 
 Using `;` is optional.
+
+### Open
+
+```rust
+let x = (Pair 1 2);
+open Pair x;
+(+ x.fst x.snd)
+```
+
+Brings the inner fields of an object into scope. The original variable can still be accessed, but doing so will cause any used fields to be duplicated.
+
+It's equivalent to pattern matching on the value, with the restriction that its type must have only one constructor.
+
+```rust
+let x = (Pair 1 2)
+match x {
+  Pair: (+ x.fst x.snd)
+}
+```
 
 ### Monadic bind blocks
 

@@ -2,8 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/exp.bend
 ---
-[4m[1m[33mWarnings:[0m
-[1mDuring readback:[0m
-  Reached Root.
-
-λa λb (<Invalid> λ$c $c $c)
+[4m[1m[31mErrors:[0m
+Error reading result from hvm. Output :
+ERROR: attempt to clone a non-affine global reference.

@@ -146,6 +146,7 @@ impl fmt::Display for Term {
         write!(f, "({} {} {})", opr, fst, snd)
       }
       Term::List { els } => write!(f, "[{}]", DisplayJoin(|| els.iter(), ", "),),
+      Term::Open { typ, var, bod } => write!(f, "open {typ} {var}; {bod}"),
       Term::Err => write!(f, "<Invalid>"),
     })
   }
@@ -414,6 +415,9 @@ impl Term {
           writeln!(f, "{:tab$}}} then {{", "")?;
           writeln!(f, "{:tab$}{}", "", base.display_pretty(tab + 2), tab = tab + 2)?;
           write!(f, "{:tab$}}}", "")
+        }
+        Term::Open { typ, var, bod } => {
+          write!(f, "open {typ} {var};\n{:tab$}{}", "", bod.display_pretty(tab))
         }
         Term::Nat { val } => write!(f, "#{val}"),
         Term::Num { val: Num::U24(val) } => write!(f, "{val}"),

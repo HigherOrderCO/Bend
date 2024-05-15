@@ -255,13 +255,21 @@ impl Stmt {
         let term = fun::Term::Do { typ, bod: Box::new(bod) };
         wrap_nxt_assign_stmt(term, nxt, pat)?
       }
-      Self::Ask { pat, val, nxt } => {
+      Stmt::Ask { pat, val, nxt } => {
         let (nxt_pat, nxt) = match nxt.into_fun()? {
           StmtToFun::Return(term) => (None, term),
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
         let term =
           fun::Term::Ask { pat: Box::new(pat.into_fun()), val: Box::new(val.to_fun()), nxt: Box::new(nxt) };
+        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+      }
+      Stmt::Open { typ, var, nxt } => {
+        let (nxt_pat, nxt) = match nxt.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        let term = fun::Term::Open { typ, var, bod: Box::new(nxt) };
         if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
       }
       Stmt::Return { term } => StmtToFun::Return(term.to_fun()),

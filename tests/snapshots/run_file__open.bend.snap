@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/open.bend
+---
+{λa (a 1 2) 1}

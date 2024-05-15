@@ -64,34 +64,48 @@ impl<'a> TermParser<'a> {
     let mut indent = self.advance_newlines();
     while !self.is_eof() {
       let ini_idx = *self.index();
+      // Imp type definition
       if self.try_parse_keyword("type") {
-        // Imp type definition
         let mut prs = PyParser { input: self.input, index: *self.index() };
-        let (enum_, nxt_indent) = prs.parse_data_type(indent)?;
+        let (enum_, nxt_indent) = prs.parse_type(indent)?;
         self.index = prs.index;
         let end_idx = *self.index();
         prs.add_type(enum_, &mut book, ini_idx, end_idx, builtin)?;
         indent = nxt_indent;
-      } else if self.try_parse_keyword("def") {
-        // Imp function definition
+        continue;
+      }
+      // Imp record type definition
+      if self.try_parse_keyword("object") {
+        let mut prs = PyParser { input: self.input, index: *self.index() };
+        let (obj, nxt_indent) = prs.parse_object(indent)?;
+        self.index = prs.index;
+        let end_idx = *self.index();
+        prs.add_object(obj, &mut book, ini_idx, end_idx, builtin)?;
+        indent = nxt_indent;
+        continue;
+      }
+      // Imp function definition
+      if self.try_parse_keyword("def") {
         let mut prs = PyParser { input: self.input, index: *self.index() };
         let (def, nxt_indent) = prs.parse_def(indent)?;
         self.index = prs.index;
         let end_idx = *self.index();
         prs.add_def(def, &mut book, ini_idx, end_idx)?;
         indent = nxt_indent;
-      } else if self.try_parse_keyword("data") {
-        // Fun type definition
+        continue;
+      }
+      // Fun type definition
+      if self.try_parse_keyword("data") {
         let (nam, adt) = self.parse_datatype(builtin)?;
         let end_idx = *self.index();
         self.with_ctx(book.add_adt(nam, adt), ini_idx, end_idx)?;
         indent = self.advance_newlines();
-      } else {
-        // Fun function definition
-        let (name, rule) = self.parse_rule()?;
-        book.add_rule(name, rule, builtin);
-        indent = self.advance_newlines();
+        continue;
       }
+      // Fun function definition
+      let (name, rule) = self.parse_rule()?;
+      book.add_rule(name, rule, builtin);
+      indent = self.advance_newlines();
     }
 
     Ok(book)
@@ -492,6 +506,18 @@ impl<'a> TermParser<'a> {
           step: Box::new(step),
           base: Box::new(base),
         });
+      }
+
+      // Open
+      if self.try_parse_keyword("open") {
+        unexpected_tag(self)?;
+        self.skip_trivia();
+        let typ = self.parse_top_level_name()?;
+        self.skip_trivia();
+        let var = self.parse_bend_name()?;
+        self.try_consume(";");
+        let bod = self.parse_term()?;
+        return Ok(Term::Open { typ, var, bod: Box::new(bod) });
       }
 
       // Var

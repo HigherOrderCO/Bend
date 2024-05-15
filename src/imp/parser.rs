@@ -245,6 +245,7 @@ impl<'a> PyParser<'a> {
   }
 
   /// "λ" (<name> ","?)+ ":" <expr>
+  /// | "open" <type> ":" <var>
   /// | <infix>
   fn parse_expr(&mut self, inline: bool) -> ParseResult<Expr> {
     fn parse_lam_var(p: &mut PyParser) -> ParseResult<(Name, bool)> {
@@ -257,13 +258,15 @@ impl<'a> PyParser<'a> {
     }
 
     self.skip_trivia_maybe_inline(inline);
+
+    // lambda
     if self.try_parse_keyword("lam") | self.try_consume_exactly("λ") {
       let names = self.list_like(|p| parse_lam_var(p), "", ":", ",", false, 1)?;
       let bod = self.parse_expr(inline)?;
-      Ok(Expr::Lam { names, bod: Box::new(bod) })
-    } else {
-      self.parse_infix_expr(0, inline)
+      return Ok(Expr::Lam { names, bod: Box::new(bod) });
     }
+
+    self.parse_infix_expr(0, inline)
   }
 
   /// Named argument of a function call.
@@ -329,16 +332,6 @@ impl<'a> PyParser<'a> {
   /// Parses a statement and returns the indentation of the next statement.
   fn parse_statement(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
     maybe_grow(|| {
-      /* let got_indent = self.advance_indent(*indent)?;
-      match got_indent {
-        Indent::Eof => {
-          let Indent::Val(expected) = *indent else { unreachable!() };
-          let msg = format!("Indentation error. Expected {} spaces, got end-of-input.", expected);
-          let idx = *self.index();
-          self.with_ctx(Err(msg), idx, idx + 1)
-        }
-        Indent::Val(_) => {}
-      } */
       if self.try_parse_keyword("return") {
         self.parse_return()
       } else if self.try_parse_keyword("if") {
@@ -353,6 +346,8 @@ impl<'a> PyParser<'a> {
         self.parse_bend(indent)
       } else if self.try_parse_keyword("do") {
         self.parse_do(indent)
+      } else if self.try_parse_keyword("open") {
+        self.parse_open(indent)
       } else {
         self.parse_assign(indent)
       }
@@ -799,6 +794,23 @@ impl<'a> PyParser<'a> {
     Ok(AssignPattern::Var(var))
   }
 
+  /// "open" {typ} ":" {var} ";"? {nxt}
+  fn parse_open(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+    self.skip_trivia_inline();
+    let typ = self.labelled(|p| p.parse_bend_name(), "type name")?;
+    self.skip_trivia_inline();
+    self.consume_exactly(":")?;
+    self.skip_trivia_inline();
+    let var = self.labelled(|p| p.parse_bend_name(), "variable name")?;
+    self.skip_trivia_inline();
+    self.try_consume_exactly(";");
+    self.consume_new_line()?;
+    self.consume_indent_exactly(*indent)?;
+    let (nxt, nxt_indent) = self.parse_statement(indent)?;
+    let stmt = Stmt::Open { typ, var, nxt: Box::new(nxt) };
+    Ok((stmt, nxt_indent))
+  }
+
   pub fn parse_def(&mut self, mut indent: Indent) -> ParseResult<(Definition, Indent)> {
     if indent != Indent::Val(0) {
       let msg = "Indentation error. Functions defined with 'def' must be at the start of the line.";
@@ -827,14 +839,7 @@ impl<'a> PyParser<'a> {
     Ok((def, nxt_indent))
   }
 
-  pub fn parse_data_type(&mut self, mut indent: Indent) -> ParseResult<(Enum, Indent)> {
-    fn parse_variant_field(p: &mut PyParser) -> ParseResult<CtrField> {
-      let rec = p.try_consume_exactly("~");
-      p.skip_trivia();
-      let nam = p.parse_bend_name()?;
-      Ok(CtrField { nam, rec })
-    }
-
+  pub fn parse_type(&mut self, mut indent: Indent) -> ParseResult<(Enum, Indent)> {
     if indent != Indent::Val(0) {
       let msg = "Indentation error. Types defined with 'type' must be at the start of the line.";
       let idx = *self.index();
@@ -842,7 +847,7 @@ impl<'a> PyParser<'a> {
     }
 
     self.skip_trivia_inline();
-    let typ_name = self.parse_bend_name()?;
+    let typ_name = self.parse_top_level_name()?;
     self.skip_trivia_inline();
     self.consume_exactly(":")?;
     self.consume_new_line()?;
@@ -852,20 +857,52 @@ impl<'a> PyParser<'a> {
     let mut variants = Vec::new();
     let mut nxt_indent = indent;
     while nxt_indent == indent {
-      let ctr_name = self.parse_bend_name()?;
+      let ctr_name = self.parse_top_level_name()?;
       let ctr_name = Name::new(format!("{typ_name}/{ctr_name}"));
       let mut fields = Vec::new();
       self.skip_trivia_inline();
       if self.starts_with("{") {
-        fields = self.list_like(|p| parse_variant_field(p), "{", "}", ",", false, 0)?;
+        fields = self.list_like(|p| p.parse_variant_field(), "{", "}", ",", false, 0)?;
       }
       variants.push(Variant { name: ctr_name, fields });
+      if !self.is_eof() {
+        self.consume_new_line()?;
+      }
       nxt_indent = self.consume_indent_at_most(indent)?;
     }
     indent.exit_level();
 
     let enum_ = Enum { name: typ_name, variants };
     Ok((enum_, nxt_indent))
+  }
+
+  pub fn parse_object(&mut self, indent: Indent) -> ParseResult<(Variant, Indent)> {
+    if indent != Indent::Val(0) {
+      let msg = "Indentation error. Types defined with 'object' must be at the start of the line.";
+      let idx = *self.index();
+      return self.with_ctx(Err(msg), idx, idx + 1);
+    }
+
+    self.skip_trivia_inline();
+    let name = self.parse_top_level_name()?;
+    self.skip_trivia_inline();
+    let fields = if self.starts_with("{") {
+      self.list_like(|p| p.parse_variant_field(), "{", "}", ",", false, 0)?
+    } else {
+      vec![]
+    };
+    if !self.is_eof() {
+      self.consume_new_line()?;
+    }
+    let nxt_indent = self.advance_newlines();
+    Ok((Variant { name, fields }, nxt_indent))
+  }
+
+  fn parse_variant_field(&mut self) -> ParseResult<CtrField> {
+    let rec = self.try_consume_exactly("~");
+    self.skip_trivia();
+    let nam = self.parse_bend_name()?;
+    Ok(CtrField { nam, rec })
   }
 
   pub fn add_def(
@@ -916,6 +953,33 @@ impl<'a> PyParser<'a> {
       adt.ctrs.insert(variant.name, variant.fields);
     }
     book.adts.insert(r#enum.name.clone(), adt);
+    Ok(())
+  }
+
+  pub fn add_object(
+    &mut self,
+    obj: Variant,
+    book: &mut Book,
+    ini_idx: usize,
+    end_idx: usize,
+    builtin: bool,
+  ) -> ParseResult<()> {
+    if book.adts.contains_key(&obj.name) {
+      let msg = format!("Redefinition of type '{}'.", obj.name);
+      return self.with_ctx(Err(msg), ini_idx, end_idx);
+    }
+    let mut adt = Adt { ctrs: Default::default(), builtin };
+    if book.defs.contains_key(&obj.name) {
+      let msg = format!("Redefinition of function '{}'.", obj.name);
+      return self.with_ctx(Err(msg), ini_idx, end_idx);
+    }
+    if book.ctrs.contains_key(&obj.name) {
+      let msg = format!("Redefinition of constructor '{}'.", obj.name);
+      return self.with_ctx(Err(msg), ini_idx, end_idx);
+    }
+    book.ctrs.insert(obj.name.clone(), obj.name.clone());
+    adt.ctrs.insert(obj.name.clone(), obj.fields);
+    book.adts.insert(obj.name, adt);
     Ok(())
   }
 
