@@ -110,6 +110,7 @@ def max(a, b):
   else:
     return b
 ```
+
 ```py
 // Not allowed, early return
 def Foo(x):
@@ -120,6 +121,7 @@ def Foo(x):
 
   return y
 ```
+
 ```py
 // Not allowed, one of the branches doesn't return
 def Foo(a, b):
@@ -226,7 +228,7 @@ bend x = 0:
 ```
 
 Which binds a variable to the return of an inline recursive function.
-The function `go` is available inside the `when` arm of the `bend` and calls it recursively. 
+The function `go` is available inside the `when` arm of the `bend` and calls it recursively.
 
 It is possible to pass multiple state variables, which can be initialized:
 
@@ -263,6 +265,7 @@ Where `x <- ...` performs a monadic operation.
 
 Expects `Result` to be a type defined with `type` and a function `Result/bind` to be defined.
 The monadic bind function should be of type `(Result a) -> (a -> Result b) -> Result b`, like this:
+
 ```
 def Result/bind(res, nxt):
   match res:
@@ -273,6 +276,7 @@ def Result/bind(res, nxt):
 ```
 
 Other statements are allowed inside the `do` block and it can both return a value at the end and bind a variable, like branching statements do.
+
 ```
 // Also ok:
 do Result:
@@ -349,6 +353,29 @@ callee(expr1, expr2, arg4 = expr3, arg3 = expr4)
 ```
 
 In case named arguments are used, they must come after the positional arguments and the function must be called with exactly the number of arguments of its definition.
+
+### Eraser
+
+```python
+*
+
+eraser = *
+
+*(41 + 1)  // applies 41 + 1 to `*` erasing it and returns `*`
+
+* = 41 + 1 // erases 41 + 1
+```
+
+The effect of an eraser is to free memory. Erasers behave like a `null`.
+
+It's impossible to compare or match eraser values.
+
+It is implicitly inserted for variables that have not been used:
+
+```python
+def constant(x):
+  return 8345
+```
 
 ### Tuple
 
@@ -476,7 +503,7 @@ fold list:
     List/nil
 ```
 
-<div id="core-syntax"></div>
+<div id="fun-syntax"></div>
 
 # Fun Syntax
 

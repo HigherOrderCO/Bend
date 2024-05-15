@@ -150,7 +150,7 @@ impl Expr {
         }
       }
       Expr::MapGet { .. }
-      | Expr::None
+      | Expr::Eraser
       | Expr::Var { .. }
       | Expr::Chn { .. }
       | Expr::Num { .. }

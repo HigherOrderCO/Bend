@@ -24,6 +24,8 @@ input_file: tests/golden_tests/parse_file/imp_program.bend
 
 (bnd) = bend x = 0, while (< x 10) { (List/cons x (go (+ x 1))) } then { List/nil }
 
+(era) = let * = (+ 2 3); let the_expr_killer = *; (the_expr_killer 9)
+
 (main) = do IO { ask x = IO.read; x }
 
 (List/cons) = λhead λtail λList/cons λList/nil (List/cons head tail)
