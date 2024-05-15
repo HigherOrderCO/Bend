@@ -713,11 +713,9 @@ Bend's peak performance is actually achieved on shader-like programs: it gets as
 much as [`74000 MIPS`]. With the addition of immutable textures, we could actually
 use that to build shaders and 3D rendering.
 
-Sadly, time's running out for the release, so, for now, let's leave it like that
-
-this session will be left like
-that, for now. We believe Bend unfolds a whole new world that was not possible
-before. If you want to be part of it, join our
+Sadly, time's running out for the release, so, for now, let's leave it like
+that. We believe Bend unveils a whole new world that was not possible before. If
+you want to be part of it, join our
 [Discord](https://Discord.HigherOrderCO.com/) and let's build that world
 together!
 
