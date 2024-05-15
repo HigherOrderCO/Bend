@@ -54,8 +54,8 @@ def main():
 ```
 
 Wait - there is something strange there. Why `return`, not `print`? Well, *for
-now* (you'll read these words a lot), Bend doesn't have IO yet. We plan to
-introduce it the next weeks! So, *for now*, all you can do is run computations,
+now* (you'll read these words a lot), Bend doesn't have IO yet. We plan on
+introducing it on the following weeks! So, *for now*, all you can do is run computations,
 and see results. To run the program above, enter:
 
 ```
