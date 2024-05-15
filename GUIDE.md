@@ -1,8 +1,6 @@
 Bend in X minutes - the ultimate guide!
 =======================================
 
-**This GUIDE is a WIP.**
-
 Bend is a high-level, massively parallel programming language. That means it
 feels like Python, but scales like CUDA. It runs on CPUs and GPUs, and you don't
 have to do anything to make it parallel: as long as your code isn't "helplessly
