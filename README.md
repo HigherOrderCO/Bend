@@ -1,10 +1,14 @@
 # Bend
 
-Bend is a massively parallel, high-level programming language. Unlike existing
-alternatives like CUDA, OpenCL and Metal, which are low-level and limited, Bend
-has the feel and features of a modern language like Python and Haskell. Yet, it
-runs with 1000's of cores, on CPUs and GPUs, powered by the
-[HVM2](https://github.com/HigherOrderCO/hvm2).
+Bend is a massively parallel, high-level programming language.
+
+Unlike low-level alternatives like CUDA and Metal, Bend has the feeling and
+features of expressive languages like Python and Haskell, including fast object
+allocations, higher-order functions with full closure support, unrestricted
+recursion, even continuations. Yet, it runs on massively parallel hardware like
+GPUs, with near-linear speedup based on core count, and zero explicit parallel
+annotations: no thread spawning, no locks, mutexes, atomics. Bend is powered by
+the [HVM2](https://github.com/HigherOrderCO/hvm2) runtime.
 
 ## Using Bend
 
