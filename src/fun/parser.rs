@@ -994,6 +994,8 @@ pub trait ParserCommons<'a>: Parser<'a> {
       Op::ADD
     } else if self.try_consume_exactly("-") {
       Op::SUB
+    } else if self.try_consume_exactly("**") {
+      Op::POW
     } else if self.try_consume_exactly("*") {
       Op::MUL
     } else if self.try_consume_exactly("/") {
@@ -1025,6 +1027,8 @@ pub trait ParserCommons<'a>: Parser<'a> {
       Op::ADD
     } else if self.starts_with("-") {
       Op::SUB
+    } else if self.starts_with("**") {
+      Op::POW
     } else if self.starts_with("*") {
       Op::MUL
     } else if self.starts_with("/") {
