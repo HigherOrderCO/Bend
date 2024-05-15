@@ -1,6 +1,6 @@
 List/len list = (List/len/go list 0)
 List/len/go [] count = count
-List/len/go (List/cons x xs) count = (List/len/go xs (+ count 1))
+List/len/go (List/Cons x xs) count = (List/len/go xs (+ count 1))
 
 Take/go n list =
   switch _ = (== n 0) {
@@ -8,7 +8,7 @@ Take/go n list =
   | _: []
   }
 Take n [] = []
-Take n (List/cons x xs) = (List/cons x (Take/go (- n 1) xs))
+Take n (List/Cons x xs) = (List/Cons x (Take/go (- n 1) xs))
 
 Drop/go n list =
   switch _ = (== n 0) {
@@ -16,7 +16,7 @@ Drop/go n list =
   | _: list
   }
 Drop n [] = []
-Drop n (List/cons x xs) = (Drop/go (- n 1) xs)
+Drop n (List/Cons x xs) = (Drop/go (- n 1) xs)
 
 List/toTree [] = *
 List/toTree [x] = x

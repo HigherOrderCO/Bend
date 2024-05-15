@@ -1,18 +1,18 @@
 // Mixed contents in a `do` block should still work.
 
 Result/bind r nxt = match r {
-  Result/ok: (nxt r.val)
-  Result/err: r
+  Result/Ok: (nxt r.val)
+  Result/Err: r
 }
 
 main = do Result {
   let x = 1
-  let y = (Result/ok x)
+  let y = (Result/Ok x)
   ask y = y
   if (+ x y) {
-    ask w = (Result/ok x)
-    (Result/ok w)
+    ask w = (Result/Ok x)
+    (Result/Ok w)
   } else {
-    (Result/err 0)
+    (Result/Err 0)
   }
 }

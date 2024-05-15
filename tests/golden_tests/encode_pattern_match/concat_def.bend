@@ -1,4 +1,4 @@
-concat (String/nil) str = str
-concat (String/cons c rest1) str2 = (String/cons c (concat rest1 str2))
+concat (String/Nil) str = str
+concat (String/Cons c rest1) str2 = (String/Cons c (concat rest1 str2))
 
 main = (concat "ab" "cd")

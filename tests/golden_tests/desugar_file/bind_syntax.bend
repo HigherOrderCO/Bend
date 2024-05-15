@@ -1,14 +1,14 @@
-Result/bind (Result/ok val) f = (f val)
+Result/bind (Result/Ok val) f = (f val)
 Result/bind err _ = err
 
 safe_div a b = switch b {
-  0: (Result/err "Div by 0")
-  _: (Result/ok (/ a b))
+  0: (Result/Err "Div by 0")
+  _: (Result/Ok (/ a b))
 }
 
 safe_rem a b = switch b {
-  0: (Result/err "Mod by 0")
-  _: (Result/ok (% a b))
+  0: (Result/Err "Mod by 0")
+  _: (Result/Ok (% a b))
 }
 
 Main = do Result {

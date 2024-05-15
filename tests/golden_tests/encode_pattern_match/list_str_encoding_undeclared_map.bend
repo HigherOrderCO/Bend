@@ -1,10 +1,10 @@
-main = @a @b 
+main = @a @b
   let a = match a {
-    String/cons: 1
-    String/nil : 2
+    String/Cons: 1
+    String/Nil : 2
   };
   let b = match b {
-    List/cons: 1
-    List/nil : 2
+    List/Cons: 1
+    List/Nil : 2
   };
   (a, b)

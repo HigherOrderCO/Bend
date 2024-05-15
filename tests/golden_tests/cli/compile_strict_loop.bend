@@ -1,6 +1,6 @@
 A = @a match a {
-  List/cons: (A a.tail)
-  List/nil: 0
+  List/Cons: (A a.tail)
+  List/Nil: 0
 }
 
 main = (A [4 4])

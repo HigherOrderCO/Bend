@@ -1,9 +1,9 @@
 // Testing various forms of pattern matching
 data Result_ = (Ok val) | (Err err)
 
-Parse state (String/cons '{' xs) = (Result_/Ok ('{', xs, state))
-Parse state (String/cons '}' xs) = (Result_/Ok ('}', xs, state))
-Parse state (String/cons '\n' xs) = (Result_/Ok (0, xs, state))
+Parse state (String/Cons '{' xs) = (Result_/Ok ('{', xs, state))
+Parse state (String/Cons '}' xs) = (Result_/Ok ('}', xs, state))
+Parse state (String/Cons '\n' xs) = (Result_/Ok (0, xs, state))
 Parse state xs = (Result_/Err {xs, state})
 
 main =

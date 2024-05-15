@@ -7,7 +7,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 @List.concat = ((@List.concat__C0 ((a a) b)) b)
 
 @List.concat__C0 = (a (b (c e)))
-  & @List/cons ~ (a (d e))
+  & @List/Cons ~ (a (d e))
   & @List.concat ~ (b (c d))
 
 @List.fold = ((@List.fold__C0 ((a (* a)) (b (c d)))) (c (b d)))
@@ -27,10 +27,10 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
   & @List.len_tr ~ (a (c d))
   & $(b c) ~ [+1]
 
-@List.map = ((@List.map__C0 ((* @List/nil) a)) a)
+@List.map = ((@List.map__C0 ((* @List/Nil) a)) a)
 
 @List.map__C0 = (a (c ({(a b) d} f)))
-  & @List/cons ~ (b (e f))
+  & @List/Cons ~ (b (e f))
   & @List.map ~ (c (d e))
 
 @List.reduce = ((@List.reduce__C0 ((a (* a)) (b (c d)))) (c (b d)))
@@ -38,30 +38,30 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 @List.reduce__C0 = (d (a (c ({b (c (d e))} f))))
   & @List.reduce ~ (a (b (e f)))
 
-@List.reverse_bad = ((@List.reverse_bad__C0 (@List/nil a)) a)
+@List.reverse_bad = ((@List.reverse_bad__C0 (@List/Nil a)) a)
 
 @List.reverse_bad__C0 = (c (a e))
   & @List.concat ~ (b (d e))
   & @List.reverse_bad ~ (a b)
-  & @List/cons ~ (c (@List/nil d))
+  & @List/Cons ~ (c (@List/Nil d))
 
 @List.reverse_over = ((@List.reverse_over__C0 ((a a) b)) b)
 
 @List.reverse_over__C0 = (b (a (c e)))
   & @List.reverse_over ~ (a (d e))
-  & @List/cons ~ (b (c d))
+  & @List/Cons ~ (b (c d))
 
 @List.reverse_tr = (a (* b))
-  & @List.reverse_over ~ (a (@List/nil b))
+  & @List.reverse_over ~ (a (@List/Nil b))
 
 @List.sum = ((@List.sum__C0 ((a a) b)) b)
 
 @List.sum__C0 = ($(:[+] $(b c)) (a (b d)))
   & @List.sum ~ (a (c d))
 
-@List/cons = (a (b ((a (b c)) (* c))))
+@List/Cons = (a (b ((a (b c)) (* c))))
 
-@List/nil = (* (a a))
+@List/Nil = (* (a a))
 
 @Tree.flip = ((@Tree.flip__C1 (@Tree.flip__C0 a)) a)
 

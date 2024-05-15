@@ -16,7 +16,7 @@ input_file: tests/golden_tests/desugar_file/combinators.bend
 
 (tup) = (tup, 1, 0)
 
-(list) = (List/cons 0 list__C0)
+(list) = (List/Cons 0 list__C0)
 
 (A) = λa (A__C0 a)
 
@@ -24,9 +24,9 @@ input_file: tests/golden_tests/desugar_file/combinators.bend
 
 (Main) = list
 
-(List/cons) = λa λb λc λ* (c a b)
+(List/Cons) = λa λb λc λ* (c a b)
 
-(List/nil) = λ* λa a
+(List/Nil) = λ* λa a
 
 (A__C0) = let {a b} = A; λc (a b c)
 
@@ -36,4 +36,4 @@ input_file: tests/golden_tests/desugar_file/combinators.bend
 
 (clax__C0) = λ* λ* λ* λa (clax a)
 
-(list__C0) = (List/cons list List/nil)
+(list__C0) = (List/Cons list List/Nil)

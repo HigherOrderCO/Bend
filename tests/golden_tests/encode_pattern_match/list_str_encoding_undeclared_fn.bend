@@ -1,7 +1,7 @@
 main = *
 
-Foo String/nil = 0
+Foo String/Nil = 0
 Foo *    = 1
 
-Bar (List/cons h t) = 0
+Bar (List/Cons h t) = 0
 Bar * = 1

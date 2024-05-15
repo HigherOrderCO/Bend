@@ -4,23 +4,23 @@ use crate::maybe_grow;
 const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/fun/builtins.bend"));
 
 pub const LIST: &str = "List";
-pub const LCONS: &str = "List/cons";
-pub const LNIL: &str = "List/nil";
+pub const LCONS: &str = "List/Cons";
+pub const LNIL: &str = "List/Nil";
 
 pub const HEAD: &str = "head";
 pub const TAIL: &str = "tail";
 
 pub const STRING: &str = "String";
-pub const SCONS: &str = "String/cons";
-pub const SNIL: &str = "String/nil";
+pub const SCONS: &str = "String/Cons";
+pub const SNIL: &str = "String/Nil";
 
 pub const RESULT: &str = "Result";
-pub const RESULT_OK: &str = "Result/ok";
-pub const RESULT_ERR: &str = "Result/err";
+pub const RESULT_OK: &str = "Result/Ok";
+pub const RESULT_ERR: &str = "Result/Err";
 
 pub const NAT: &str = "Nat";
-pub const NAT_SUCC: &str = "Nat/succ";
-pub const NAT_ZERO: &str = "Nat/zero";
+pub const NAT_SUCC: &str = "Nat/Succ";
+pub const NAT_ZERO: &str = "Nat/Zero";
 
 impl Book {
   pub fn builtins() -> Book {

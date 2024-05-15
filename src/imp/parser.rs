@@ -260,7 +260,7 @@ impl<'a> PyParser<'a> {
     self.skip_trivia_maybe_inline(inline);
 
     // lambda
-    if self.try_parse_keyword("lam") | self.try_consume_exactly("λ") {
+    if self.try_parse_keyword("lambda") | self.try_consume_exactly("λ") {
       let names = self.list_like(|p| parse_lam_var(p), "", ":", ",", false, 1)?;
       let bod = self.parse_expr(inline)?;
       return Ok(Expr::Lam { names, bod: Box::new(bod) });

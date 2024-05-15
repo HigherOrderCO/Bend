@@ -1,1 +1,1 @@
-Main = (String/cons (*, 4) (String/cons * String/nil))
+Main = (String/Cons (*, 4) (String/Cons * String/Nil))

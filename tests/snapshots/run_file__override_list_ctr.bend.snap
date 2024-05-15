@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/override_list_ctr.bend
 ---
 [4m[1m[31mErrors:[0m
-Function 'List/nil' has the same name as a previously defined constructor
+Function 'List/Nil' has the same name as a previously defined constructor

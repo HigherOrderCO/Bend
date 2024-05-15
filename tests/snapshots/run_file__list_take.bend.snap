@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/list_take.bend
 ---
-λa λ* (a 3 λb λ* (b 2 List/nil))
+λa λ* (a 3 λb λ* (b 2 List/Nil))

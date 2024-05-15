@@ -1,5 +1,5 @@
 (Map f []) = []
-(Map f (List/cons head tail)) = (List/cons (f head) (Map f tail))
+(Map f (List/Cons head tail)) = (List/Cons (f head) (Map f tail))
 
 (Inc) = @x (+ x 1)
 

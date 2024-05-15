@@ -1,3 +1,3 @@
-String/cons = *
+String/Cons = *
 
-main = (String/cons "any")
+main = (String/Cons "any")

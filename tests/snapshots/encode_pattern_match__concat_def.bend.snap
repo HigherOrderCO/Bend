@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/concat_def.bend
 ---
-(concat) = λa (a λb λc λd (String/cons b (concat c d)) λe e)
+(concat) = λa (a λb λc λd (String/Cons b (concat c d)) λe e)
 
-(main) = (concat (String/cons 97 (String/cons 98 String/nil)) (String/cons 99 (String/cons 100 String/nil)))
+(main) = (concat (String/Cons 97 (String/Cons 98 String/Nil)) (String/Cons 99 (String/Cons 100 String/Nil)))
 
-(String/cons) = λa λb λc λ* (c a b)
+(String/Cons) = λa λb λc λ* (c a b)
 
-(String/nil) = λ* λb b
+(String/Nil) = λ* λb b
