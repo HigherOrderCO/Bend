@@ -183,7 +183,7 @@ represents a concatenation between an element (`head`) and another list
 
 ```python
 def main:
-  my_list = List/cons { head: 1, tail: List/cons { head: 2, tail: List/cons { head: 3, tail: List/nil }}}
+  my_list = List/Cons { head: 1, tail: List/Cons { head: 2, tail: List/Cons { head: 3, tail: List/Nil }}}
   return my_list
 ```
 
