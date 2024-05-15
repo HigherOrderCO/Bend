@@ -361,7 +361,7 @@ In case named arguments are used, they must come after the positional arguments 
 
 eraser = *
 
-*(41 + 1)  // applies 41 + 1 to `*` erasing it and returns `*`
+*(41 + 1)  // applies 41 + 1 to `*` erasing the number and returns `*`
 
 * = 41 + 1 // erases 41 + 1
 ```
