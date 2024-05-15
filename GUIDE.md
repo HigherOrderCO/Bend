@@ -334,7 +334,7 @@ Here is how you create a perfect binary tree with copies of the number `7`:
 def main():
 
   bend x = 0:
-    while x < 3:
+    when x < 3:
       tree = ![go(x + 1), go(x + 1)]
     else:
       tree = 7
@@ -403,17 +403,13 @@ It could be emulated with a `bend` in the following manner:
 
 ```python
 bend idx = 0:
-  while idx < 10:
+  when idx < 10:
     sum = idx + go(idx + 1)
   else:
     sum = 0
 ```
 
 Of course, if you do it, Bend's devs will be very disappointed with you.
-
-## Example: Parallel Sum
-
-TODO
 
 ## Example: Parallel Bitonic Sort
 

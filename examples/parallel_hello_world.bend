@@ -22,4 +22,4 @@ def gen(depth):
 
 // returns the sum of 0..2^16
 def main:
-  return sum(gen(16))
+  return sum(gen(24))

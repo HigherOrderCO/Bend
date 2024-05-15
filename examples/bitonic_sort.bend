@@ -39,9 +39,7 @@ data Tree = (Leaf val) | (Both lft rgt)
 (Sum (Tree/Leaf x))   = x
 (Sum (Tree/Both a b)) = (+ (Sum a) (Sum b))
 
-(Main) =
-  let n = 10
-  (Sum (Sort 0 (Rev (Gen n 0))))
+(Main) = (Sum (Sort 0 (Rev (Gen 18 0))))
 
 // Use an argument from cli
 // (Main n) = (Sum (Sort 0 (Rev (Gen n 0))))
