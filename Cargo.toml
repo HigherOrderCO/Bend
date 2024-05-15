@@ -1,5 +1,7 @@
 [package]
 name = "bend-lang"
+description = "A high-level, massively parallel programming language"
+license = "MIT"
 version = "0.2.3"
 edition = "2021"
 
