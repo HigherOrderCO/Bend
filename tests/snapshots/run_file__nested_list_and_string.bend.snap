@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nested_list_and_string.bend
 ---
-λa λb λ* (b a λc λ* (c λ* 2 λd λ* (d λe λ* (e λf λ* (f 7 λg λ* (g "1234" λl λ* (l 9 List/Nil))) λm λ* (m a (String/Cons * "42"))) List/Nil)))
+λa [a, λ* 2, λe λ* (e [7, "1234", 9] λm λ* (m a (String/Cons * "42")))]

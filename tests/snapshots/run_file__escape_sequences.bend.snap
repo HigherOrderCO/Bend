@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/escape_sequences.bend
 ---
-λa (Join (List/Cons "\n" (List/Cons "\r" (List/Cons "\t" (List/Cons "\0" (List/Cons "\"" (List/Cons "'" (List/Cons "\u{afe}" (List/Cons "\\" List/Nil)))))))))
+λa (Join ["\n", "\r", "\t", "\0", "\"", "'", "\u{afe}", "\\"])
