@@ -155,7 +155,7 @@ impl Expr {
             go(entry, substitutions, id);
           }
         }
-        Expr::None | Expr::Str { .. } | Expr::Var { .. } | Expr::Chn { .. } | Expr::Num { .. } => {}
+        Expr::Eraser | Expr::Str { .. } | Expr::Var { .. } | Expr::Chn { .. } | Expr::Num { .. } => {}
       }
     }
     let mut substitutions = Substitutions::new();

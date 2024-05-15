@@ -65,6 +65,11 @@ def bnd():
     else:
       return List/nil();
 
+def era():
+  * = (2 + 3)
+  the_expr_killer = *
+  return the_expr_killer(9)
+
 def main():
   do IO:
     x <- IO.read();

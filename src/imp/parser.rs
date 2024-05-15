@@ -106,6 +106,10 @@ impl<'a> PyParser<'a> {
         let nam = self.parse_bend_name()?;
         Expr::Chn { nam }
       }
+      '*' => {
+        self.advance_one();
+        Expr::Eraser
+      }
       c if is_num_char(c) => {
         let val = self.parse_number()?;
         Expr::Num { val }
@@ -753,6 +757,11 @@ impl<'a> PyParser<'a> {
   /// | <nam> "[" <expr> "]"
   /// | <nam>
   fn parse_assign_pattern(&mut self) -> ParseResult<AssignPattern> {
+    // Eraser pattern
+    if self.starts_with("*") {
+      self.advance_one();
+      return Ok(AssignPattern::Eraser);
+    }
     // Tup pattern
     if self.starts_with("(") {
       let binds = self.list_like(|p| p.parse_assign_pattern(), "(", ")", ",", true, 1)?;

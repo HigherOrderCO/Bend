@@ -8,8 +8,8 @@ use interner::global::GlobalString;
 
 #[derive(Clone, Debug)]
 pub enum Expr {
-  // "None"
-  None,
+  // "*"
+  Eraser,
   // [a-zA-Z_]+
   Var { nam: Name },
   // "$" [a-zA-Z_]+
@@ -48,6 +48,8 @@ pub struct MatchArm {
 
 #[derive(Clone, Debug)]
 pub enum AssignPattern {
+  // "*"
+  Eraser,
   // [a-zA-Z_]+
   Var(Name),
   // "$" [a-zA-Z_]+

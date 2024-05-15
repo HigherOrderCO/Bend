@@ -22,6 +22,7 @@ impl Definition {
 impl AssignPattern {
   pub fn into_fun(self) -> fun::Pattern {
     match self {
+      AssignPattern::Eraser => fun::Pattern::Var(None),
       AssignPattern::Var(name) => fun::Pattern::Var(Some(name)),
       AssignPattern::Chn(name) => fun::Pattern::Chn(name),
       AssignPattern::Tup(names) => fun::Pattern::Fan(
@@ -273,7 +274,7 @@ impl Stmt {
 impl Expr {
   pub fn to_fun(self) -> fun::Term {
     match self {
-      Expr::None => fun::Term::Era,
+      Expr::Eraser => fun::Term::Era,
       Expr::Var { nam } => fun::Term::Var { nam },
       Expr::Chn { nam } => fun::Term::Link { nam },
       Expr::Num { val } => fun::Term::Num { val },
