@@ -31,7 +31,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 Then, install Bend itself with:
 
 ```
-cargo install bend-lang
+cargo +nightly install bend-lang
 ```
 
 To test if it worked, type:
