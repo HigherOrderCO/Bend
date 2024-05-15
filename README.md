@@ -9,21 +9,20 @@ Currently Bend only supports strict/eager evaluation. If you need lazy, optimal 
 
 ## Installation
 
-With the nightly version of rust installed, clone the repository:
+With the nightly version of rust installed, install with cargo:
 
 ```bash
-git clone https://github.com/HigherOrderCO/bend.git
-
-cd bend
+cargo install bend-lang
 ```
 
-Install using cargo:
-
+Or install the development version from the github repository:
 ```bash
+git clone https://github.com/HigherOrderCO/bend.git
+cd bend
 cargo install --path . --locked
 ```
 
-If you want to run programs directly from Bend, you also need to have [HVM](https://github.com/HigherOrderCO/hvm2) installed.
+If you want to run programs directly from Bend, you also need to have [HVM](https://github.com/HigherOrderCO/hvm) installed.
 
 ## Usage
 

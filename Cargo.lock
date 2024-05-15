@@ -13,8 +13,9 @@ dependencies = [
 
 [[package]]
 name = "TSPL"
-version = "0.0.9"
-source = "git+https://github.com/developedby/TSPL.git?branch=fix-hvml-bugs#f72a02d79c399c9fcb7ae0a2d4985c0451124afc"
+version = "0.0.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "52dfd6238b1461b99635b26585a85b4e7b9c786cc0481b3c540ae5f590b6dfb6"
 dependencies = [
  "highlight_error",
 ]
@@ -81,10 +82,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c4b4d0bd25bd0b74681c0ad21497610ce1b7c91b1022cd21c80c6fbdd9476b0"
 
 [[package]]
-name = "bend"
+name = "bend-lang"
 version = "0.2.2"
 dependencies = [
- "TSPL 0.0.9 (git+https://github.com/developedby/TSPL.git?branch=fix-hvml-bugs)",
+ "TSPL 0.0.12",
  "clap",
  "highlight_error",
  "hvm-core",
@@ -213,10 +214,10 @@ checksum = "809e18805660d7b6b2e2b9f316a5099521b5998d5cba4dda11b5157a21aaef03"
 
 [[package]]
 name = "hvm-core"
-version = "0.2.24"
-source = "git+https://github.com/HigherOrderCO/hvm-core.git?branch=hvm32-compat#389b3be2d0c0dbe23623adda9175c622dd9ce0b8"
+version = "0.3.0-hvm32.compat"
+source = "git+https://github.com/HigherOrderCO/hvm-core.git?branch=hvm32-compat#f18f2af7d07b365bd241bbdc075e136947783bcf"
 dependencies = [
- "TSPL 0.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "TSPL 0.0.9",
  "arrayvec",
  "clap",
  "nohash-hasher",
