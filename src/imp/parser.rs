@@ -638,6 +638,19 @@ impl<'a> PyParser<'a> {
     // Actually identical to match, except the return
     let (bind, arg) = self.parse_match_arg()?;
     self.skip_trivia_inline();
+    let with = if self.try_parse_keyword("with") {
+      self.skip_trivia_inline();
+      let mut with = vec![];
+      while !self.starts_with(":") {
+        with.push(self.parse_bend_name()?);
+        self.skip_trivia_inline();
+        self.try_consume_exactly(",");
+        self.skip_trivia_inline();
+      }
+      with
+    } else {
+      vec![]
+    };
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -653,10 +666,10 @@ impl<'a> PyParser<'a> {
     indent.exit_level();
     if nxt_indent == *indent {
       let (nxt, nxt_indent) = self.parse_statement(indent)?;
-      let stmt = Stmt::Fold { arg: Box::new(arg), bind, arms, nxt: Some(Box::new(nxt)) };
+      let stmt = Stmt::Fold { arg: Box::new(arg), bind, arms, with, nxt: Some(Box::new(nxt)) };
       Ok((stmt, nxt_indent))
     } else {
-      let stmt = Stmt::Fold { arg: Box::new(arg), bind, arms, nxt: None };
+      let stmt = Stmt::Fold { arg: Box::new(arg), bind, arms, with, nxt: None };
       Ok((stmt, nxt_indent))
     }
   }
