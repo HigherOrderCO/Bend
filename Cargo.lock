@@ -215,7 +215,8 @@ checksum = "809e18805660d7b6b2e2b9f316a5099521b5998d5cba4dda11b5157a21aaef03"
 [[package]]
 name = "hvm-core"
 version = "0.3.0-hvm32.compat"
-source = "git+https://github.com/HigherOrderCO/hvm-core.git?branch=hvm32-compat#f18f2af7d07b365bd241bbdc075e136947783bcf"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "49744e07a05f3fb8f8f3495e1aab1c6a9e7631ce1a6b771ae02b8437c8bfa692"
 dependencies = [
  "TSPL 0.0.9",
  "arrayvec",
