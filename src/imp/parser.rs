@@ -84,7 +84,7 @@ impl<'a> PyParser<'a> {
           Expr::Tup { els }
         } else {
           self.consume(")")?;
-          // A parenthesised expression
+          // A parenthesized expression
           head
         }
       }
