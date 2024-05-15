@@ -325,7 +325,7 @@ be turned into a tree!
 
 The `bend` is the opposite of the `fold`: instead of consuming something, it
 creates something. The way it works is, in some ways, similar to a while loop,
-but, admitedly, a little bit more bureaucratic, in 3 ways:
+but, admittedly, a little bit more bureaucratic, in 3 ways:
 
 1. You must explicit an initial state.
 
@@ -376,7 +376,7 @@ itself, forming a tree of descendants. In the end, you have a complete tree!
 
 The second way to explain is for the devs offended by this ultra simplified
 example: yes, `bend` is just a syntax-sugar for creating a recursive function,
-immediatelly calling it, and assigning the result to a variable. In other words,
+immediately calling it, and assigning the result to a variable. In other words,
 the program above is equivalent to:
 
 ```python
@@ -504,4 +504,4 @@ Benchmarks:
 
 ## ...
 
-TODO: conver IO and so many other aspects :')
+TODO: cover IO and so many other aspects :')
