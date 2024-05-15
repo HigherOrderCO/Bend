@@ -8,10 +8,13 @@ feels like Python, but scales like CUDA. It runs on CPUs and GPUs, and you don't
 have to do anything to make it parallel - as long as your code isn't "helplessly
 sequential", it will use all threads! In a single thread, it is still not so
 fast - our compiler is still on its infancy - but it will only improve, as
-optimizations are added. If you want to be an early adopter of this interesting
-paradigm, this guide will teach you how to apply Bend in practice, simple and
-easy. If you're interested in a more in-depth tech dive, check HVM2's
-[paper](http://paper.HigherOrderCO.com/) instead. Now, let's get started!
+optimizations are added. If you want to be an early adopter of this tech, this
+guide will teach you how to apply Bend in practice, simple and easy. If you're
+interested in a more in-depth tech dive, check HVM2's
+[paper](http://paper.HigherOrderCO.com/) instead. If you'd like an entertaining,
+less deep explanation of how this is possible, check HVM1's classic
+[HOW.md](https://github.com/HigherOrderCO/HVM/blob/master/guide/HOW.md). But if
+you just want to dive straight into action - this guide is for you. Let's go!
 
 Installation
 ------------
@@ -53,6 +56,8 @@ def main():
   with IO:
     print("Hello, world!")
 ```
+
+TODO: IO will not be included this week. Adjust guide for this.
 
 Damn - we wish it was as simple as Python. It isn't. But it isn't too bad
 either, is it? So, why do we need that `with IO` block, there? Well, it is just
@@ -411,11 +416,92 @@ bend idx = 0:
 
 Of course, if you do it, Bend's devs will be very disappointed with you.
 
-## Example: Parallel Bitonic Sort
+## Example: Parallel Tree Sum
 
-TODO
+```python
+def gen(d, x):
+  switch d:
+    case 0:
+      return x
+    case _:
+      return (gen(d-1, x * 2 + 1), gen(d-1, x * 2))
+
+def sum(d, t):
+  switch d:
+    case 0:
+      return t
+    case _:
+      (t.a, t.b) = t
+      return sum(d-1, t.a) + sum(d-1, t.b)
+
+def main:
+  return sum(20, gen(20, 0))
+```
+
+TODO: explain
+
+TODO: use bend/fold syntaxes
+
+Benchmarks:
+- 15.01s / 178 MIPS (Apple M3 Max, 1 thread)
+- 1.35s / 1970 MIPS (Apple M3 Max, 16 threads) - 11x speedup
+- 0.23s /  11823 MIPS (NVIDIA RTX 4090, 16k threads) - 65x speedup
+
+# Example: Parallel Bitonic Sort
+
+```python
+def swap(s, a, b):
+  switch s:
+    case 0:
+      return (a,b)
+    case _:
+      return (b,a)
+
+def warp(d, s, a, b):
+  switch d:
+    case 0:
+      return swap(s + (a > b), a, b)
+    case _:
+      (a.a,a.b) = a
+      (b.a,b.b) = b
+      (A.a,A.b) = warp(d-1, s, a.a, b.a)
+      (B.a,B.b) = warp(d-1, s, a.b, b.b)
+      return ((A.a,B.a),(A.b,B.b))
+
+def flow(d, s, t):
+  switch d:
+    case 0:
+      return t
+    case _:
+      (t.a, t.b) = t
+      return down(d, s, warp(d-1, s, t.a, t.b))
+
+def down(d,s,t):
+  switch d:
+    case 0:
+      return t
+    case _:
+      (t.a, t.b) = t
+      return (flow(d-1, s, t.a), flow(d-1, s, t.b))
+
+def sort(d, s, t):
+  switch d:
+    case 0:
+      return t
+    case _:
+      (t.a, t.b) = t
+      return flow(d, s, sort(d-1, 0, t.a), sort(d-1, 1, t.b))
+```
+
+TODO: explain
+TODO: use fold/bend syntaxes
+TODO: should run with N=20 (2x higher CUDA MIPS), but 1-thread OOM's
+TODO: this requires editing the CUDA file to use 7x7 instead of 8x7
+Benchmarks:
+- 12.33s / 102 MIPS (Apple M3 Max, 1 thread)
+- 0.96s / 1315 MIPS (Apple M3 Max, 16 threads) - 12x speedup
+- 0.24s / 5334 MIPS (NVIDIA RTX 4090, 16k threads) - 51x speedup
 
 ## ...
 
 TODO: conver IO and so many other aspects :')
-

@@ -1,45 +1,59 @@
-data Tree = (Leaf val) | (Both lft rgt)
+def gen(d, x):
+  switch d:
+    case 0:
+      return x
+    case _:
+      return (gen(d-1, x * 2 + 1), gen(d-1, x * 2))
 
-(U60.swap 0 a b) = (Tree/Both a b)
-(U60.swap n a b) = (Tree/Both b a)
+def sum(d, t):
+  switch d:
+    case 0:
+      return t
+    case _:
+      (t.a, t.b) = t
+      return sum(d-1, t.a) + sum(d-1, t.b)
 
-// Swaps distant values in parallel; corresponds to a Red Box
-(Warp s (Tree/Leaf a) (Tree/Leaf b)) = (U60.swap (^ (> a b) s) (Tree/Leaf a) (Tree/Leaf b))
-(Warp s (Tree/Both a b) (Tree/Both c d)) = (Join (Warp s a c) (Warp s b d))
-(Warp s (Tree/Leaf a) (Tree/Both c d)) = (Tree/Both (Warp s (Tree/Leaf a) c) (Warp s (Tree/Leaf a) d))
-(Warp s (Tree/Both a b) (Tree/Leaf c)) = (Tree/Both (Warp s a (Tree/Leaf c)) (Warp s b (Tree/Leaf c)))
+def swap(s, a, b):
+  switch s:
+    case 0:
+      return (a,b)
+    case _:
+      return (b,a)
 
-// Rebuilds the warped tree in the original order
-(Join (Tree/Leaf a) (Tree/Leaf b)) = (Tree/Both a b)
-(Join (Tree/Leaf a) (Tree/Both c d)) = (Tree/Both a (Tree/Both c d))
-(Join (Tree/Both a b) (Tree/Leaf c)) = (Tree/Both (Tree/Both a b) c)
-(Join (Tree/Both a b) (Tree/Both c d)) = (Tree/Both (Tree/Both a c) (Tree/Both b d))
+def warp(d, s, a, b):
+  switch d:
+    case 0:
+      return swap(s + (a > b), a, b)
+    case _:
+      (a.a,a.b) = a
+      (b.a,b.b) = b
+      (A.a,A.b) = warp(d-1, s, a.a, b.a)
+      (B.a,B.b) = warp(d-1, s, a.b, b.b)
+      return ((A.a,B.a),(A.b,B.b))
 
-// Recursively warps each sub-tree; corresponds to a Blue/Green Box
-(Flow s (Tree/Leaf a))   = (Tree/Leaf a)
-(Flow s (Tree/Both a b)) = (Down s (Warp s a b))
+def flow(d, s, t):
+  switch d:
+    case 0:
+      return t
+    case _:
+      (t.a, t.b) = t
+      return down(d, s, warp(d-1, s, t.a, t.b))
 
-// Propagates Flow downwards
-(Down s (Tree/Leaf a))   = (Tree/Leaf a)
-(Down s (Tree/Both a b)) = (Tree/Both (Flow s a) (Flow s b))
+def down(d,s,t):
+  switch d:
+    case 0:
+      return t
+    case _:
+      (t.a, t.b) = t
+      return (flow(d-1, s, t.a), flow(d-1, s, t.b))
 
-// Bitonic Sort
-(Sort s (Tree/Leaf a))   = (Tree/Leaf a)
-(Sort s (Tree/Both a b)) = (Flow s (Tree/Both (Sort 0 a) (Sort 1 b)))
+def sort(d, s, t):
+  switch d:
+    case 0:
+      return t
+    case _:
+      (t.a, t.b) = t
+      return flow(d, s, sort(d-1, 0, t.a), sort(d-1, 1, t.b))
 
-// Generates a tree of depth `n`
-(Gen 0 x) = (Tree/Leaf x)
-(Gen n x) = let m = (- n 1); (Tree/Both (Gen m (* x 2)) (Gen m (+ (* x 2) 1)))
-
-// Reverses a tree
-(Rev (Tree/Leaf x))   = (Tree/Leaf x)
-(Rev (Tree/Both a b)) = (Tree/Both (Rev b) (Rev a))
-
-// Sums a tree
-(Sum (Tree/Leaf x))   = x
-(Sum (Tree/Both a b)) = (+ (Sum a) (Sum b))
-
-(Main) = (Sum (Sort 0 (Rev (Gen 18 0))))
-
-// Use an argument from cli
-// (Main n) = (Sum (Sort 0 (Rev (Gen n 0))))
+def main:
+  return sum(18, sort(18, 0, gen(18, 0)))
