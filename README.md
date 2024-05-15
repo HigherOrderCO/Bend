@@ -11,8 +11,8 @@ runs with 1000's of cores, on CPUs and GPUs, powered by the
 First, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml). Then, install both HVM2 and Bend with:
 
 ```sh
-cargo install hvm
-cargo install bend-lang
+cargo +nightly install hvm
+cargo +nightly install bend-lang
 ```
 
 Then, just write a Bend file, and run it with:

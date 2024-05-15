@@ -22,13 +22,7 @@ you just want to dive straight into action - this guide is for you. Let's go!
 Installation
 ------------
 
-To use Bend, first, install [Rust](https://rust-lang.org/):
-
-```
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-Then, install HVM2 and Bend tself with:
+To use Bend, first, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml). Then, install HVM2 and Bend tself with:
 
 ```
 cargo +nightly install hvm
