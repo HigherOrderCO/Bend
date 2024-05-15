@@ -28,9 +28,10 @@ To use Bend, first, install [Rust](https://rust-lang.org/):
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Then, install Bend itself with:
+Then, install HVM2 and Bend tself with:
 
 ```
+cargo install hvm
 cargo install bend-lang
 ```
 
