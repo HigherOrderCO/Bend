@@ -101,6 +101,9 @@ impl Stmt {
           *self = gen_get(self, substitutions);
         }
       }
+      Stmt::Open { typ: _, var: _, nxt } => {
+        nxt.gen_map_get(id);
+      }
       Stmt::Err => {}
     }
   }

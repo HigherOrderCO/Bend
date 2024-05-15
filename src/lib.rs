@@ -90,6 +90,8 @@ pub fn desugar_book(
 
   ctx.apply_args(args)?;
 
+  ctx.desugar_open()?;
+
   ctx.book.encode_builtins();
 
   ctx.resolve_refs()?;

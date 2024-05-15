@@ -81,6 +81,9 @@ impl Stmt {
           nxt.order_kwargs(book)?;
         }
       }
+      Stmt::Open { typ: _, var: _, nxt } => {
+        nxt.order_kwargs(book)?;
+      }
       Stmt::Return { term } => term.order_kwargs(book)?,
       Stmt::Err => {}
     }
