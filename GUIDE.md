@@ -6,13 +6,19 @@ Bend in X minutes - the ultimate guide!
 Bend is a high-level, massively parallel programming language. That means it
 feels like Python, but scales like CUDA. It runs on CPUs and GPUs, and you don't
 have to do anything to make it parallel - as long as your code isn't "helplessly
-sequential", it will use all threads! In a single thread, it is still not so
-fast - our compiler is still on its infancy - but it will only improve, as
-optimizations are added. If you want to be an early adopter of this tech, this
-guide will teach you how to apply Bend in practice, simple and easy. If you're
-interested in a more in-depth tech dive, check HVM2's
-[paper](http://paper.HigherOrderCO.com/) instead. If you'd like an entertaining,
-less deep explanation of how this is possible, check HVM1's classic
+sequential", it **will** use 1000's of threads! In a single thread, it is still
+not very fast. HVM2's compiler is very, very immature (even against HVM1, let
+alone SOTA compilers) - but it will quickly improve over time.
+
+It is important to keep in mind Bend isn't perfect, and we made an early release
+in order to iteratively evolve the tech with the community (join our
+[Discord](https://Discord.HigherOrderCO.com)!). So, if you understand that, and
+is willing to be an early adopter of this tech - then, this guide will teach you
+how to apply Bend in practice to build parallel programs in a whole new way!
+
+If you'd like to have a more in-depth technical dive, check HVM2's
+[paper](http://paper.HigherOrderCO.com/). If you'd like an entertaining,
+intuitive explanation of how this is possible, check HVM1's classic
 [HOW.md](https://github.com/HigherOrderCO/HVM/blob/master/guide/HOW.md). But if
 you just want to dive straight into action - this guide is for you. Let's go!
 
@@ -43,36 +49,36 @@ Hello, World!
 -------------
 
 As we said, Bend *feels* like Python - in some ways. It is high-level, you can
-easily create and mutate objects, lists and dictionaries, there are loops and
-ifs. In some ways, it is different: there is some Haskell in it, in the sense
-algebraic datatypes, pattern-matching and recursion play an important role. You
-can think of it as the midjourney towards the goal of compiling major languages
-to HVM. And it was made to fully take advantage of it! So, with that said...
-
-Bend's "Hello, World" looks almost like Python's, with one difference:
+easily create objects and lists, there are ifs and loops. In some ways, it is
+different: there is some Haskell in it, in the sense algebraic datatypes,
+pattern-matching and recursion play an important role. You can think of it as
+the midway through the goal of compiling modern languages to HVM. And Bend was
+made from scratch to fully use HVM's potential. Here is the "Hello, world!":
 
 ```python
 def main():
-  with IO:
-    print("Hello, world!")
+  return "Hello, world!"
 ```
 
-TODO: IO will not be included this week. Adjust guide for this.
+Wait - there is something strange there. Why `return`, not `print`? Well, *for
+now* (you'll read these words a lot), Bend doesn't have IO yet. We plan to
+introduce it the upcoming weeks. So, *for now*, all you can do is perform
+computations, and see a result. Run the program above as:
 
-Damn - we wish it was as simple as Python. It isn't. But it isn't too bad
-either, is it? So, why do we need that `with IO` block, there? Well, it is just
-a way to separate parts of the program that can have *side-effects*, like
-creating files or calling APIs, from these that can not, like pure computations.
-That may sound annoying, but, trust me: you really do **not** want to call APIs
-from the middle of a GPU kernel launch. This separation helps us keep Bend lean
-and fast, so, it is one we'll have to live with. Thankfully, Bend is less about
-effects and scripts, and more about writing algorithms. So, let's do that.
+```
+bend run main.bend
+```
+
+If all goes well, you should see "Hello, world!". The `bend run` command uses
+the reference interpreter, which is slow, but reliable. In a few moments, we'll
+teach you how to compile code to run on parallel CPUs and GPUs. For now, let's
+focus in learning some fundamentals!
 
 Basic Functions and Datatypes
 -----------------------------
 
-In Bend, functions are pure: they receive something, they return something else,
-without side-effects. Here is a function that tells you how old you are:
+In Bend, functions are pure: they receive something, and they return something.
+That's all. Here is a function that tells you how old you are:
 
 ```python
 def am_i_old(age):
@@ -80,19 +86,24 @@ def am_i_old(age):
     return "you're a kid"
   else:
     return "you're an adult"
+
+def main():
+  return am_i_old(32)
 ```
 
-That is simple enough, isn't it? Making it more mathematical, this one returns
-the distance between two points:
+That is simple enough, isn't it? Here is one that returns the distance between
+two points:
 
 ```python
 def distance(ax, ay, bx, by):
   dx = bx - ax
   dy = by - ay
   return sqrt(dx ** 2 + dy ** 2)
+
+
 ```
 
-That's a pretty simple function. Can we use tuples? Sure!
+This isn't so pretty. Could we use tuples instead? Yes:
 
 ```python
 def distance(a, b):
