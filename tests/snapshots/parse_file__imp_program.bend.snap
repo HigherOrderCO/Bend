@@ -2,25 +2,31 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/imp_program.bend
 ---
+(Map/empty) = Map/leaf
+
+(Map/get) = λ%arg0 λ%arg1 use key = %arg1; use map = %arg0; match map = map { Map/leaf: (*, map); Map/node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: let (got, rest) = (Map/get map.left (/ key 2)); (got, (Map/node map.value rest map.right)); _ _-1: let (got, rest) = (Map/get map.right (/ key 2)); (got, (Map/node map.value map.left rest)); }; _ _-1: (map.value, map); }; }
+
+(Map/set) = λ%arg0 λ%arg1 λ%arg2 use value = %arg2; use key = %arg1; use map = %arg0; match map = map { Map/node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/node map.value (Map/set map.left (/ key 2) value) map.right); _ _-1: (Map/node map.value map.left (Map/set map.right (/ key 2) value)); }; _ _-1: (Map/node value map.left map.right); }; Map/leaf: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/node * (Map/set Map/leaf (/ key 2) value) Map/leaf); _ _-1: (Map/node * Map/leaf (Map/set Map/leaf (/ key 2) value)); }; _ _-1: (Map/node value Map/leaf Map/leaf); }; }
+
 (symbols) = let x = (Map/set (Map/set Map/empty 49 5) 2 3); let x = (Map/set x 49 2); let x = (Map/set x 2 3); let (map/get%0, x) = (Map/get x 49); (+ map/get%0 8293490)
 
 (mk_point) = (Point/Point 1 2)
 
-(identity x) = x
+(identity) = λ%arg0 use x = %arg0; x
 
-(inc n) = let n = (+ n 1); n
+(inc) = λ%arg0 use n = %arg0; let n = (+ n 1); n
 
 (lam) = λx λy x
 
-(do_match b) = match b = b { Bool/True: 1; Bool/False: 0; }
+(do_match) = λ%arg0 use b = %arg0; match b = b { Bool/True: 1; Bool/False: 0; }
 
 (true) = Bool/True
 
-(fib n) = switch %pred = (< n 2) { 0: (+ (fib (- n 1)) (fib (- n 2))); _ %pred-1: n; }
+(fib) = λ%arg0 use n = %arg0; switch %pred = (< n 2) { 0: (+ (fib (- n 1)) (fib (- n 2))); _ %pred-1: n; }
 
-(swt n) = switch n = n { 0: 42; _ n-1: 1; }
+(swt) = λ%arg0 use n = %arg0; switch n = n { 0: 42; _ n-1: 1; }
 
-(fld list) = fold list = list { List/cons: 1; List/nil: 2; }
+(fld) = λ%arg0 use list = %arg0; fold list = list { List/cons: 1; List/nil: 2; }
 
 (bnd) = bend x = 0, while (< x 10) { (List/cons x (go (+ x 1))) } then { List/nil }
 

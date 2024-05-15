@@ -20,6 +20,9 @@ enum Used {
   /// Should be pruned if `prune_all` or if it's a built-in rule
   /// Otherwise, if the rule has a non-generated name, a warning about the unused def is returned
   Unused,
+
+  /// An unused definition but needed for compilation when `-Oprune` is not active.
+  Needed,
 }
 
 type Definitions = HashMap<Name, Used>;
@@ -34,6 +37,14 @@ impl Ctx<'_> {
       let def = self.book.defs.get(main).unwrap();
       used.insert(main.clone(), Used::Main);
       self.book.find_used_definitions(&def.rule().body, Used::Main, &mut used);
+    }
+
+    if !prune_all {
+      for def in self.book.defs.values() {
+        if !def.builtin && !used.contains_key(&def.name) {
+          self.book.find_used_definitions(&def.rule().body, Used::Needed, &mut used);
+        }
+      }
     }
 
     for (def_name, def) in &self.book.defs {
