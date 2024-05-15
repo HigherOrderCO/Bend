@@ -5,20 +5,19 @@ Bend in X minutes - the ultimate guide!
 
 Bend is a high-level, massively parallel programming language. That means it
 feels like Python, but scales like CUDA. It runs on CPUs and GPUs, and you don't
-have to do anything to make it parallel - as long as your code isn't "helplessly
-sequential", it **will** use 1000's of threads! In a single thread, it is still
-not very fast. HVM2's compiler is very, very immature (even against HVM1, let
-alone SOTA compilers) - but it will quickly improve over time.
+have to do anything to make it parallel: as long as your code isn't "helplessly
+sequential", it **will** use 1000's of threads!
 
-It is important to keep in mind Bend isn't perfect, and we made an early release
-in order to iteratively evolve the tech with the community (join our
-[Discord](https://Discord.HigherOrderCO.com)!). So, if you understand that, and
-is willing to be an early adopter of this tech - then, this guide will teach you
-how to apply Bend in practice to build parallel programs in a whole new way!
+While cool, Bend far from perfect. In absolute terms it is still not so fast.
+Compared to SOTA compilers like GCC or GHC, our codegen is still embarassingly
+bad, and there is a lot to improve. That said, it does what it must - scaling
+high-level code with cores - and that's new. So, if you'd like to be an early
+adopter of this interesting tech, this guide will teach you how to apply Bend to
+build parallel programs in a whole new way!
 
 If you'd like to have a more in-depth technical dive, check HVM2's
-[paper](http://paper.HigherOrderCO.com/). If you'd like an entertaining,
-intuitive explanation of how this is possible, check HVM1's classic
+[paper](http://paper.HigherOrderCO.com/). For an entertaining, intuitive
+explanation instead, check HVM1's classic
 [HOW.md](https://github.com/HigherOrderCO/HVM/blob/master/guide/HOW.md). But if
 you just want to dive straight into action - this guide is for you. Let's go!
 
@@ -34,7 +33,7 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 Then, install Bend itself with:
 
 ```
-cargo install bend
+cargo install bend-lang
 ```
 
 To test if it worked, type:
@@ -43,17 +42,13 @@ To test if it worked, type:
 bend --help
 ```
 
-For any help, reach us in our [Discord](https://discord.HigherOrderCO.com/)!
-
 Hello, World!
 -------------
 
 As we said, Bend *feels* like Python - in some ways. It is high-level, you can
-easily create objects and lists, there are ifs and loops. In some ways, it is
-different: there is some Haskell in it, in the sense algebraic datatypes,
-pattern-matching and recursion play an important role. You can think of it as
-the midway through the goal of compiling modern languages to HVM. And Bend was
-made from scratch to fully use HVM's potential. Here is the "Hello, world!":
+easily create objects and lists, there are ifs and loops. Yet, it is different:
+there is some Haskell in it, in the sense algebraic datatypes, pattern-matching
+and recursion play an important role. Here is the "Hello, world!":
 
 ```python
 def main():
@@ -62,17 +57,17 @@ def main():
 
 Wait - there is something strange there. Why `return`, not `print`? Well, *for
 now* (you'll read these words a lot), Bend doesn't have IO yet. We plan to
-introduce it the upcoming weeks. So, *for now*, all you can do is perform
-computations, and see a result. Run the program above as:
+introduce it the next weeks! So, *for now*, all you can do is run computations,
+and see results. To run the program above, enter:
 
 ```
 bend run main.bend
 ```
 
 If all goes well, you should see "Hello, world!". The `bend run` command uses
-the reference interpreter, which is slow, but reliable. In a few moments, we'll
-teach you how to compile code to run on parallel CPUs and GPUs. For now, let's
-focus in learning some fundamentals!
+the reference interpreter, which is slow. In a few moments, we'll teach you how
+to run your code in parallel, on both CPUs and GPUs. For now, let's focus in
+learning some fundamentals!
 
 Basic Functions and Datatypes
 -----------------------------
@@ -115,12 +110,12 @@ def distance(a, b):
   return (dx * dx + dy * dy) ^ 0.5
 
 def main():
-  return distance(10.0, 10.0, 20.0, 20.0)
+  return distance((10.0, 10.0), (20.0, 20.0))
 ```
 
 So far, this does look like Python, doesn't it? What about objects? Well - here,
-there is ave a difference. In Python, you have classes. In Bend, we just have
-the objects themselves. This is how we create a 2D vector:
+there is a difference. In Python, we have classes. In Bend, we just have the
+objects themselves. This is how we create a 2D vector:
 
 ```python
 object V2 { x, y }
@@ -130,7 +125,7 @@ def distance(a, b):
   open V2: b
   dx = b.x - a.x
   dy = b.y - a.y
-  return sqrt(dx ** 2 + dy ** 2)
+  return (dx * dx + dy * dy) ^ 0.5
 
 def main():
   return distance(V2 { x: 10.0, y: 10.0 }, V2 { x: 20.0, y: 20.0 })
@@ -138,20 +133,19 @@ def main():
 
 This doesn't look too different, does it? What is that `open` thing, though? It
 just tells Bend to *consume* the vector, `a`, "splitting" it into its
-components, `a.x` and `a.y`.
-
-Is that really necessary? Actually, no - not really. But, *for now*, it is. This
-has to do with the fact Bend is an affine language, which... we'll, let's not
-get into that. For now, just remember we need `open` to access fields.
+components, `a.x` and `a.y`. Is that really necessary? Actually, no - not
+really. But, *for now*, it is. This has to do with the fact Bend is an affine
+language, which... we'll, let's not get into that. For now, just remember we
+need `open` to access fields.
 
 Bend comes with 3 built-in numeric types: `u24`, `i24`, `f24`. That's quite
 small, we admit. Soon, we'll have larger types. For now, that's what we got.
 The `u24` type is written like `123` or `0xF`. The `i24` type requires a sign,
 as in, `+7` or `-7`. The `f24` type requires a ??, like `3.14`.
 
-Finally, Bend has a last way to encode data: datatypes! These are just "objects
-with tags". A classic example of this is a "shape", which can be either a circle
-or a rectangle. Here's how you can define it in Bend:
+Other than tuples, Bend has another, very general way to encode data: datatypes!
+These are just "objects with tags". A classic example of this is a "shape",
+which can be either a circle or a rectangle. It is defined like this:
 
 ```python
 type Shape:
@@ -187,7 +181,7 @@ type List:
 
 Here, the `Nil` variant represents an empty list, and the `Cons` variant
 represents a concatenation between an element (`head`) and another list
-(`tail`). That way, the `[1,2,3]` list could be represented as just:
+(`tail`). That way, the `[1,2,3]` list could be written as:
 
 ```python
 def main:
@@ -195,7 +189,7 @@ def main:
   return my_list
 ```
 
-Eh - that's terrible. Let's give it a syntax sugar:
+Obviously - that's terrible. So, you can write just instead:
 
 ```python
 def main:
@@ -203,9 +197,9 @@ def main:
   return my_list
 ```
 
-Ok, now that's decent. But while it is written the same as Python, it is
-important to understand it is just the `List` datatype. Which means we can
-operate on it using the `match` notation. For example:
+Which is decent. But while it is written the same as in Python, it is important
+to understand it is just the `List` datatype, which means we can operate on it
+using the `match` notation. For example:
 
 ```python
 def main:
@@ -222,6 +216,17 @@ Will return `1`, which is the first element.
 We also have a syntax sugar for strings in Bend, which is just a List of `u24`
 characters (UTF-16 encoded). The `"Hello, world!"` type we've seen used it!
 
+Bend also has inline functions, which work just like Python:
+
+```python
+def main:
+  mul_2 = lambda x: x * 2
+  return mul_2(7)
+```
+
+Except without the annoying syntax restrictions. You can also shorten it as `λ`,
+if you can somehow type that.
+
 The Dreaded Immutability
 ------------------------
 
@@ -229,7 +234,7 @@ Finally, let's get straight to the fun part: how do we implement parallel
 algorithms with Bend? Just kidding. Before we get there, let's talk about loops.
 You might have noticed we have avoided them so far. That wasn't by accident.
 There is important aspect on which Bend diverges from Python, and aligns with
-Haskell: variables are immutable. Not "by default". They just **are**. For
+Haskell: **variables are immutable**. Not "by default". They just **are**. For
 example, in Bend, we're not allowed to write:
 
 ```python
@@ -240,7 +245,7 @@ def parity(x):
   return result
 ```
 
-Because that would mutate the `result` variable. Instead, we should write:
+... because that would mutate the `result` variable. Instead, we should write:
 
 ```python
 def is_even(x):
@@ -248,13 +253,16 @@ def is_even(x):
     return "even"
   else:
     return "odd"
+
+def main:
+  return is_even(7)
 ```
 
-If that's sound annoying, that's because **it is**. Don't let anyone tell you
-otherwise. We are aware of that, and we have many ideas on how to ameliorate
-this, making it feel even more Python-like. For now, we have to live with it.
-
-But, wait... if variables are immutable... what loops even do? For example:
+Which is immutable. If that's sound annoying, that's because **it is**. Don't
+let anyone tell you otherwise. We are aware of that, and we have many ideas on
+how to improve this, making Bend feel even more Python-like. For now, we have to
+live with it. But, wait... if variables are immutable... how do we even do
+loops? For example:
 
 ```python
 def sum(x):
@@ -264,17 +272,17 @@ def sum(x):
   return total
 ```
 
-Here, mutating `total` is a fundamental part of how this function works. Without
-mutability, how do we write that loop? The bad news is: we can't. Not like that.
-The good news is Bend has *something else* that is equally as - actually, mode -
-powerful. And learning it is really worth your time. We promise. Let's do it!
+Here, the entire way the algorithm works is by mutating the `total` variable.
+Without mutability, loops don't make sense. The good news is Bend has *something
+else* that is equally as - actually, mode - powerful. And learning it is really
+worth your time. Let's do it!
 
 Folds and Bends
 ---------------
 
 ### Recursive Datatypes
 
-Let's start by defining a recursive datatype in Bend:
+Let's start by implementing a recursive datatype in Bend:
 
 ```python
 type Tree:
@@ -290,7 +298,7 @@ This defines a binary tree, with elements on leaves. For example, the tree:
 1  2   3  4
 ```
 
-Could be represented by:
+Could be represented as:
 
 ```
 tree = Tree/Node {
@@ -299,8 +307,7 @@ tree = Tree/Node {
 }
 ```
 
-Wow, that's quite a mouthful. In an soon update, we'll add a syntax sugar to
-make this shorter:
+That's ugly. Very soon, we'll add a syntax sugar to make this shorter:
 
 ```
 tree = ![![1,2],![3,4]]
@@ -308,23 +315,12 @@ tree = ![![1,2],![3,4]]
 
 As usual, for now, we'll live with the longer version.
 
-Bend also has inline functions, which work just like Python:
-
-```python
-def main:
-  mul_2 = lambda x: x * 2
-  return mul_2(7)
-```
-
-Except without the annoying syntax restrictions. You can also shorten it as `λ`,
-if you can somehow type that.
-
 ### Fold: consuming recursive datatypes
 
-Now, the question is: how do we *add* the elements of a tree? In Python, we
-could just use a loop. In Bend, there is another way. It is called `fold`, and
-it works like a *search and replace* for datatypes. For example, consider the
-code below:
+Now, here's a question: how do we *sum* the elements of a tree? In Python, we
+could just use a loop. In Bend, we don't have loops. Fortunatelly, there is
+another construct we can use: is called `fold`, and it works like a *search and
+replace* for datatypes. For example, consider the code below:
 
 
 ```python
@@ -347,9 +343,9 @@ def main:
   return sum(tree)
 ```
 
-Its effect is that of replacing every `Tree/Node { lft, rgt }` by `lft + rgt`,
-and replacing every `Tree/Leaf` by `val`. As a result, the entire tree of values
-is turned into a tree of additions, and computes as follows:
+It accomplishes the task by replacing every `Tree/Node { lft, rgt }` by `lft +
+rgt`, and replacing every `Tree/Leaf` by `val`. As a result, the entire "tree of
+values" is turned into a "tree of additions", and it evaluates as follows:
 
 ```python
 nums = ((1 + 2) + (3 + 4))
@@ -357,11 +353,11 @@ nums = (3 + 7)
 nums = 10
 ```
 
-That's was not hard, was it? Now, what is the most interesting about folds is
-that they're universal: *any computation that can be implemented with a loop,
-can be implemented with a fold*. For every datatype. So, we can do much more
-than just returning an "aggregated number". Suppose we wanted, for example, to
-transform every element into a tuple of `(index,value)`. We could do it like:
+Now, this may look limiting, but it actually isn't. Folds are known for being
+universal: *any algorithm that can be implemented with a loop, can be
+implemented with a fold*. So, we can do much more than just compute an
+"aggregated value". Suppose we wanted, for example, to transform every element
+into a tuple of `(index,value)`, returning a new tree. Here's how to do it:
 
 ```python
 type Tree:
@@ -369,7 +365,8 @@ type Tree:
   Leaf { val }
 
 def enum(tree):
-  fold tree with idx = 0:
+  idx = 0
+  fold tree with idx:
     case Tree/Node:
       return Tree/Node {
         lft: tree.lft(idx * 2 + 0),
@@ -386,18 +383,21 @@ def main:
   return sum(tree)
 ```
 
-Compared to the `sum` algorithm, 2 important things changed:
+Compared to the `sum` algorithm, 3 important things changed:
 
-1. We initialize a state, `idx`, as `0`
+1. We initialize a state, `idx`, as `0`.
 
-2. We pass new states down the fold by applying `tree.lft` / `tree.rgt` to it
+2. We pass new states down as `tree.xyz(new_idx)`
+
+3. The base case receives the final state: the element index
 
 So, in the end, we'll have computed a copy of the original tree, except that
 every element has now became a tuple of index and value.
 
 Now, please take a moment to think about this fact: **everything can be computed
-with a fold.** It is one that takes a while to get used to, but, once you do. As
-an exercise: use `fold` to implement a "reverse" algorithm for lists:
+with a fold.** This idea often takes some time to get used to, but, once you do,
+it is really liberating, and will let you write better algorithms. As an
+exercise, use `fold` to implement a "reverse" algorithm for lists:
 
 ```python
 def reverse(list):
@@ -429,9 +429,9 @@ def main():
 ```
 
 The program above will initialize a state (`x = 0`), and then, for as long as `x
-< 3`, it will split that state in two, create a `Tree/Node`, and continue (`go`)
-with `x + 1`. When `x >= 3`, it will just return a `Tree/Leaf` with a `7`. When
-all is done, the result will be assigned to the `tree` variable. Like this:
+< 3`, it will split that state in two, creating a `Tree/Node`, and continuing
+(`go`) with `x + 1`. When `x >= 3`, it will just return a `Tree/Leaf` with `7`.
+When all is done, the result will be assigned to the `tree` variable:
 
 ```python
 tree = go(0)
@@ -442,9 +442,8 @@ tree = ![![![7,7], ![7,7]], ![![7,7], ![7,7]]]
 ```
 
 With some imagination, we can easily see that, by recursively unrolling a state
-in this fashion, we can use `bend` to generate any structure we'd like. In fact,
-`bend` is so general we can even use it to emulate a loop. For example, the
-Python program below:
+this way, we can generate any structure we'd like. In fact, `bend` is so general
+we can even use it to emulate a loop. For example, this Python program:
 
 ```python
 sum = 0
@@ -465,12 +464,12 @@ bend idx = 0:
 ```
 
 Of course, if you do it, Bend's devs will be very disappointed with you. Why?
-Because everyone is here for one thing. Let's go!
+Because everyone is here for one thing. Let's do it!
 
 Parallel "Hello, World"
 -----------------------
 
-So, after all this learning, let's now answer the ultimate question:
+So, after all this learning, we're now ready to answer the ultimate question:
 
 **How do we write parallel algorithms in Bend?**
 
@@ -535,10 +534,16 @@ sum = (6 + 22)
 sum = 28
 ```
 
-That's so much better that even the *line count* is shorter! In Bend, we really,
-really want you to be writing programs like that one, and unlike the former one.
-That's why `bend` and `fold` are core features: unlike loops, they make it very
-easy to express parallel computations. For example, a parallel sum is just:
+That's so much better that even the *line count* is shorter!
+
+So, how do you write a parallel program in Bend?
+
+**Just write algorithms that aren't helplessly sequential.**
+
+That's all there is to it. As long as you write programs like that one, and
+unlike the former one, they will run in parallel. And that's why `bend` and
+`fold` are core features: they're, essentially, parallelizable loops. For
+example, to add numbers in parallel, we can write:
 
 ```python
 def main():
@@ -550,10 +555,10 @@ def main():
   return sum
 ```
 
-Bends are just parallelizable loops. And that's the parallel "Hello, world"!
+And that's the parallel "Hello, world"!
 
-So, how do we actually run it in parallel? Just use C or CUDA! Let's do it.
-First, let's see how it performs with the single-thread Rust interpreter:
+So, how do we actually *run* it in parallel? Just use C or CUDA! Let's do it.
+But before, let's see how it performs with the single-threaded interpreter:
 
 ```
 bend run main.bend
@@ -578,34 +583,33 @@ This command converts your `bend` file in a small, dependency-free C file that
 does the same computation much faster. You can compile it to an executable:
 
 ```
-gcc main.c -lm -lpthreads -o main
+gcc main.c main -lm -lpthreads # if you're on Linux
+gcc main.c main                # if you're on OSX
 ./main
 ```
 
 Now, the same program runs in `5.81s`, at `1661.91 MIPS`. That's now **25x
-faster** than the original! 
-
-Regardless -  Let's now enter the unexplored realms of arbitrary high-level
-programs on... GPUs. How hard that could be? Well, for us... it was. A lot. For
-you, all you need to do is call the **CUDA interpreter**:
+faster** than the original! Can we do better? Let's now enter the unexplored
+realms of arbitrary high-level programs on... GPUs. How hard that could be?
+Well, for us... it was. A lot. For you... just call the **CUDA interpreter**:
 
 ```
 bend gen-cu main.bend
 ```
 
 And, simply as that, the same program now runs in `0.82s`, at a blistering
-`11803.24 MIPS`. That's now **181x faster** than the original. Are you proud?
-Well, you should. You did it. Congradulations! You're now *a thread bender*.
+`11803.24 MIPS`. That's **181x faster** than the original. Congradulations!
+You're now a thread bender.
 
 ~
 
 As a last note, you may have noticed that the compiled version isn't much faster
-than the interpreted one. That's because our compiler is still on its infancy,
-and the assembly generated is, honestly, quite abysmal. Most of our effort went
-into setting up a foundation for the parallel evaluator, which was no easy task.
-With that out of our way, improving the compiler has now a higher priority, and
-you can expect huge developments on that front. For now, it is important to
-understand the state of things, and set up reasonable expectations.
+than the interpreted one. Our compiler is still on its infancy, and the assembly
+generated is quite abysmal. Most of our effort went into setting up a foundation
+for the parallel evaluator, which was no easy task. With that out of our way,
+improving the compiler is a higher priority now. You can expect it to improve
+continuously over time. For now, it is important to understand the state of
+things, and set up reasonable expectations.
 
 A Parallel Bitonic Sort
 -----------------------
@@ -615,11 +619,10 @@ them through a "circuit" (sorting network) and swapping as they pass through:
 
 ![bsort](https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/BitonicSort1.svg/1686px-BitonicSort1.svg.png)
 
-It can be implemented in CUDA by using mutable arrays and synchronization
-primitives to ensure safe concurrent access. This is well known. What is less
-known is that it can also be implemented as a series of *immutable tree
-rotations*, with pattern-matching and recursion. Don't bother trying to
-understand it, but, for completion's sake, here's the code:
+In CUDA, this can be implemented by using mutable arrays and synchronization
+primitives. This is well known. What is less known is that it can also be
+implemented as a series of *immutable tree rotations*, with pattern-matching and
+recursion. Don't bother trying to understand it, but, here's the code:
 
 ```python
 def gen(d, x):
@@ -684,7 +687,7 @@ def main:
 ```
 
 As a test of Bend's ability to parallelize the most insanely high-level
-computations imaginable, we ran this algorithm. Here are the results:
+computations possible, let's benchmark this program. Here are the results:
 
 - 12.33s / 102 MIPS (Apple M3 Max, 1 thread)
 
@@ -692,42 +695,37 @@ computations imaginable, we ran this algorithm. Here are the results:
 
 - 0.24s / 5334 MIPS (NVIDIA RTX 4090, 16k threads) - 51x speedup
 
-And, just like magic, it works! Of course, you would absolutely **not** want to
-sort numbers like that, specially when mutable arrays exist. But there are many
-algorithms that *can not* be implemented so easily with flat buffers. Think of
-evolutionary / genetic algorithms, proof checkers, higher-order unifiers. For
-the first time ever, you can implement these algorithms naturally, in a language
-capable of running directly on GPUs. That's the magic of Bend!
+And, just like magic, it works! 51x faster on RTX. How cool is that?
 
-Speaking of which, we have plans to adding mutable buffers to Bend in the
-future. Yes, we can do that! HVM is not a functional runtime anymore - it is
-complete interaction combinator evaluator. More on that later!
+Of course, you would absolutely **not** want to sort numbers like that,
+specially when mutable arrays exist. But there are many algorithms that *can
+not* be implemented easily with buffers. Evolutionary and genetic algorithms,
+proof checkers, compilers, interpreters. For the first time ever, you can
+implement these algorithms as high-level functions, in a language that runs on
+GPUs. That's the magic of Bend!
 
 3D Rendering
 ------------
 
 One of the most interesting applications to Bend, I believe, is that of
-rendering graphics, animations and even 3D games. This is specially compelling
-because Bend's actual peak performance is achieved on shader-like programs,
-i.e., these where you perform a long computation for each of many datapoints.
-It gets to as much as `74000 MIPS`, which is astonishing. And, with the addition
-of immutable textures in the future (for 1-interaction sampling), these would be
-absolutely viable.
+rendering graphics, animations, 3D games. This is specially compelling, because
+Bend's peak performance is actually achieved on shader-like programs: it gets as
+much as [`74000 MIPS`]. With the addition of immutable textures, we could actually
+use that to build shaders and 3D rendering.
 
-Sadly, time's running out for the release, so, this session will be left like
+Sadly, time's running out for the release, so, for now, let's leave it like that
+
+this session will be left like
 that, for now. We believe Bend unfolds a whole new world that was not possible
 before. If you want to be part of it, join our
 [Discord](https://Discord.HigherOrderCO.com/) and let's build that world
 together!
 
-Notes
------
+Note
+----
 
-Since the guide is over for now, 2 important notes:
-
-1. Bend also has a "secret" functional syntax that is compatible with old HVM1.
-  For example, [here](https://gist.github.com/VictorTaelin/9cbb43e2b1f39006bae01238f99ff224)
-  is an implementation of the Bitonic Sort with Haskell-like equations. We'll
-  document this syntax here soon!
-
-2. I forgot what it was. But it was important, so, consider yourself warned. 🥰 
+Bend also has a "secret" functional syntax that is compatible with old HVM1. For
+example,
+[here](https://gist.github.com/VictorTaelin/9cbb43e2b1f39006bae01238f99ff224) is
+an implementation of the Bitonic Sort with Haskell-like equations. We'll
+document this syntax here soon!
