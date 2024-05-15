@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/unaplied_str.bend
 ---
-λa λb λc λ* (c a λd λ* (d 98 λe λ* (e 99 λf λ* (f b String/nil))))
+λa λb λc λ* (c a λd λ* (d 98 λe λ* (e 99 λf λ* (f b ""))))

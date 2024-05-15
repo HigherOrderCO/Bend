@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nested_str.bend
 ---
-λa λb λc λd λ* (d λe λ* (e 97 λf λ* (f 98 String/nil)) λg λ* (g λh λ* (h 99 λi λ* (i 100 String/nil)) String/nil))
+λa λb λc λd λ* (d "ab" λg λ* (g "cd" ""))
