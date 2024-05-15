@@ -2,7 +2,7 @@
 name = "bend-lang"
 description = "A high-level, massively parallel programming language"
 license = "MIT"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 
 [lib]
@@ -25,7 +25,7 @@ cli = ["dep:clap"]
 TSPL = "0.0.12"
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 highlight_error = "0.1.1"
-hvm-core = "=0.3.0-hvm32.compat"
+hvm-core = "=0.3.0-hvm32.compat.2"
 indexmap = "2.2.3"
 interner = "0.2.1"
 itertools = "0.11.0"

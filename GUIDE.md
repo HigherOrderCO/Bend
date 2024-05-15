@@ -31,8 +31,8 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 Then, install HVM2 and Bend tself with:
 
 ```
-cargo install hvm
-cargo install bend-lang
+cargo +nightly install hvm
+cargo +nightly install bend-lang
 ```
 
 To test if it worked, type:
@@ -55,8 +55,8 @@ def main():
 ```
 
 Wait - there is something strange there. Why `return`, not `print`? Well, *for
-now* (you'll read these words a lot), Bend doesn't have IO yet. We plan to
-introduce it the next weeks! So, *for now*, all you can do is run computations,
+now* (you'll read these words a lot), Bend doesn't have IO yet. We plan on
+introducing it on the following weeks! So, *for now*, all you can do is run computations,
 and see results. To run the program above, enter:
 
 ```
@@ -184,7 +184,7 @@ represents a concatenation between an element (`head`) and another list
 
 ```python
 def main:
-  my_list = List/cons { head: 1, tail: List/cons { head: 2, tail: List/cons { head: 3, tail: List/nil }}}
+  my_list = List/Cons { head: 1, tail: List/Cons { head: 2, tail: List/Cons { head: 3, tail: List/Nil }}}
   return my_list
 ```
 
