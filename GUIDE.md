@@ -574,7 +574,7 @@ does the same computation much faster. You can compile it to an executable:
 
 ```
 gcc main.c -o main -O2 -lm -lpthread # if you're on Linux
-gcc main.c -o main                   # if you're on OSX
+gcc main.c -o main -O2               # if you're on OSX
 ./main
 ```
 
