@@ -9,13 +9,13 @@ sequential", it **will** use 1000's of threads!
 While cool, Bend far from perfect. In absolute terms it is still not so fast.
 Compared to SOTA compilers like GCC or GHC, our codegen is still embarassingly
 bad, and there is a lot to improve. That said, it does what it must - scaling
-high-level code with cores - and that's new. So, if you'd like to be an early
-adopter of this interesting tech, this guide will teach you how to apply Bend to
-build parallel programs in a whole new way!
+high-level code with cores - and that's really cool. So, if you'd like to be an
+early adopter of this interesting tech, this guide will teach you how to apply
+Bend to build parallel programs in a whole new way!
 
-If you'd like to have a more in-depth technical dive, check HVM2's
+For a more technical dive, check HVM2's
 [paper](http://paper.HigherOrderCO.com/). For an entertaining, intuitive
-explanation instead, check HVM1's classic
+explanation, see HVM1's classic
 [HOW.md](https://github.com/HigherOrderCO/HVM/blob/master/guide/HOW.md). But if
 you just want to dive straight into action - this guide is for you. Let's go!
 
