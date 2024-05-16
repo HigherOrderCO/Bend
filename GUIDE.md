@@ -547,10 +547,8 @@ def main():
   return sum
 ```
 
-And that's the parallel "Hello, world"!
-
-So, how do we actually *run* it in parallel? Just use C or CUDA! Let's do it.
-But before, let's see how it performs with the single-threaded interpreter:
+And that's the parallel "Hello, world"! Now, let's finally run it. But first,
+let's just check it performs with the single-threaded interpreter:
 
 ```
 bend run main.bend
