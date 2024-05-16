@@ -28,7 +28,7 @@ bend run-cu <file.hvm> # uses the CUDA interpreter (massively parallel)
 ```
 
 You can also compile `Bend` to standalone C/CUDA files with `gen-c` and
-`gen-cu`, for maximum performance. But keep in mind our codegen is still on its
+`gen-cu`, for maximum performance. But keep in mind our code gen is still on its
 infancy, and is nowhere as mature as SOTA compilers like GCC and GHC.
 
 ## Parallel Programming in Bend
@@ -86,7 +86,7 @@ explicit annotations. Long-distance communication is performed by *global
 beta-reduction* (as per the [Interaction
 Calculus](https://github.com/VictorTaelin/Interaction-Calculus)), and
 synchronized correctly and efficiently by
-[HVM2](https://github.com/HigherOrderCO/HVM2)'s *atomic linker*.
+[HVM2](https://github.com/HigherOrderCO/HVM)'s *atomic linker*.
 
 - To jump straight into action, check Bend's [GUIDE.md](https://github.com/HigherOrderCO/bend/blob/main/GUIDE.md).
 
