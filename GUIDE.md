@@ -757,9 +757,8 @@ To be continued...
 ------------------
 
 This guide isn't extensive, and there's a lot uncovered. For example, Bend also
-has an entire "secret" Haskell-like syntax that is compatible with old HVM1. For
-example,
-[here](https://gist.github.com/VictorTaelin/9cbb43e2b1f39006bae01238f99ff224) is
+has an entire "secret" Haskell-like syntax that is compatible with old HVM1.
+[Here](https://gist.github.com/VictorTaelin/9cbb43e2b1f39006bae01238f99ff224) is
 an implementation of the Bitonic Sort with Haskell-like equations. We'll
 document its syntax here soon!
 
