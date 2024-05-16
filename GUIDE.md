@@ -415,22 +415,22 @@ type Tree:
 def main():
   bend x = 0:
     when x < 3:
-      tree = Tree/Node { lft: go(x + 1), rgt: go(x + 1) }
+      tree = Tree/Node { lft: fork(x + 1), rgt: fork(x + 1) }
     else:
       tree = Tree/Leaf { val: 7 }
   return tree
 ```
 
 The program above will initialize a state (`x = 0`), and then, for as long as `x
-< 3`, it will split that state in two, creating a `Tree/Node`, and continuing
-(`go`) with `x + 1`. When `x >= 3`, it will just return a `Tree/Leaf` with `7`.
+< 3`, it will "fork" that state in two, creating a `Tree/Node`, and continuing
+with `x + 1`. When `x >= 3`, it will halt and return a `Tree/Leaf` with `7`.
 When all is done, the result will be assigned to the `tree` variable:
 
 ```python
-tree = go(0)
-tree = ![go(1), go(1)]
-tree = ![![go(2),go(2)], ![go(2),go(2)]]
-tree = ![![![go(3),go(3)], ![go(3),go(3)]], ![![go(3),go(3)], ![go(3),go(3)]]]
+tree = fork(0)
+tree = ![fork(1), fork(1)]
+tree = ![![fork(2),fork(2)], ![fork(2),fork(2)]]
+tree = ![![![fork(3),fork(3)], ![fork(3),fork(3)]], ![![fork(3),fork(3)], ![fork(3),fork(3)]]]
 tree = ![![![7,7], ![7,7]], ![![7,7], ![7,7]]]
 ```
 
@@ -451,7 +451,7 @@ Could be emulated in Bend with a "sequential bend":
 ```python
 bend idx = 0:
   when idx < 10:
-    sum = idx + go(idx + 1)
+    sum = idx + fork(idx + 1)
   else:
     sum = 0
 ```
@@ -541,7 +541,7 @@ example, to add numbers in parallel, we can write:
 def main():
   bend d = 0, i = 0:
     when d < 28:
-      sum = go(d+1, i*2+0) + go(d+1, i*2+1)
+      sum = fork(d+1, i*2+0) + fork(d+1, i*2+1)
     else:
       sum = i
   return sum
@@ -573,8 +573,8 @@ This command converts your `bend` file in a small, dependency-free C file that
 does the same computation much faster. You can compile it to an executable:
 
 ```
-gcc main.c -o main -O2 -lm -lpthread # if you're on Linux
-gcc main.c -o main -O2               # if you're on OSX
+gcc main.c main -O2 -lm -lpthreads # if you're on Linux
+gcc main.c main -O2                # if you're on OSX
 ./main
 ```
 
@@ -694,26 +694,73 @@ proof checkers, compilers, interpreters. For the first time ever, you can
 implement these algorithms as high-level functions, in a language that runs on
 GPUs. That's the magic of Bend!
 
-3D Rendering
-------------
+Graphics Rendering
+------------------
 
-One of the most interesting applications to Bend, I believe, is that of
-rendering graphics, animations, 3D games. This is specially compelling, because
-Bend's peak performance is actually achieved on shader-like programs: it gets as
-much as [`74000 MIPS`]. With the addition of immutable textures, we could actually
-use that to build shaders and 3D rendering.
+While the algorithm above does parallelize well, it is very memory-hungry. It is
+a nice demo of Bend's potential, but isn't a great way to sort lists. Since Bend
+is GC-free, we can express low memory footprint programs using `bend` or tail
+calls. To use Bend's full potential, one should first create enough "parallel
+room" to fill all available cores, and then spend some time doing compute
+expensive, but less memory hungry, computations. For example, consider:
 
-Sadly, time's running out for the release, so, for now, let's leave it like
-that. We believe Bend unveils a whole new world that was not possible before. If
-you want to be part of it, join our
-[Discord](https://Discord.HigherOrderCO.com/) and let's build that world
-together!
+```python
+# given a shader, returns a square image
+def render(depth, shader):
+  bend d = 0, i = 0:
+    when d < depth:
+      color = (go(d+1, i*2+0), go(d+1, i*2+1))
+    else:
+      width = depth / 2
+      color = demo_shader(i % width, i / width)
+  return color
 
-Note
-----
+# given a position, returns a color
+# for this demo, it just busy loops
+def demo_shader(x, y):
+  bend i = 0:
+    when i < 100000:
+      color = go(i + 1)
+    else:
+      color = 0x000001
+  return color
 
-Bend also has a "secret" functional syntax that is compatible with old HVM1. For
+# renders a 256x256 image using demo_shader
+def main:
+  return render(16, demo_shader)
+```
+
+It emulates an OpenGL fragment shader by building an "image" as a perfect binary
+tree, and then calling the `demo_shader` function on each pixel. Since the tree
+has a depth of 16, we have `2^16 = 65536 pixels`, which is enough to fill all
+cores of an RTX 4090. Moreover, since `demo_shader` isn't doing many
+allocations, it can operate entirely inside the GPU's "shared memory" (L1
+cache). Each local GPU thread has a local space of 64 IC nodes. Functions that
+don't need more than that, like `demo_shader`, can run up to 5x faster!
+
+On my GPU, it performs `22,000 MIPS` out of the box, and `40000+ MIPS` with a
+tweak on the generated CUDA file (doubling the `TPC`, which doubles the number
+of threads per block). In the near future, we plan to add immutable textures,
+allowing for single-interaction sampling. With some napkin math, this should be
+enough to render 3D games in real-time. Imagine a future where game engines are
+written in Python-like languages? That's the future we're building, with Bend!
+
+To be continued...
+------------------
+
+This guide isn't extensive, and there's a lot uncovered. For example, Bend also
+has an entire "secret" Haskell-like syntax that is compatible with old HVM1. For
 example,
 [here](https://gist.github.com/VictorTaelin/9cbb43e2b1f39006bae01238f99ff224) is
 an implementation of the Bitonic Sort with Haskell-like equations. We'll
-document this syntax here soon!
+document it syntax here soon!
+
+Community
+---------
+
+Again - this is still very new and experimental. Bugs and imperfections should
+be expected. That said, HOC will be giving long-term support to Bend (and its
+runtime, HVM2). So, if you believe this paradigm will grow, and want to be part
+of it in these early stages, join us on [Discord](https://Discord.HigherOrderCO.com/).
+Report bugs, bring your suggestions, and let's build this together!
+
