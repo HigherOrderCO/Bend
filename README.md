@@ -80,10 +80,39 @@ parallel*, Bend will run it multi-threaded. Some benchmarks:
 
 That's a **111x speedup** by doing nothing. No thread spawning, no explicit
 management of locks, mutexes. We just asked bend to run our program on RTX, and
-it did.  Simple as that. From shaders, to transformers, to Erlang-like
-actor-based systems, every concurrent setup can be implemented on Bend with no
-explicit annotations. Long-distance communication is performed by *global
-beta-reduction* (as per the [Interaction
+it did. Simple as that. Bend isn't limited to a specific paradigm, like tensors
+or actors. Any concurrent system, from shaders to Erlang-like actor models can
+be emulated on Bend. For example, to render images in real time, we could simply
+allocate an immutable tree on each frame:
+
+```python
+# given a shader, returns a square image
+def render(depth, shader):
+  bend d = 0, i = 0:
+    when d < depth:
+      color = (go(d+1, i*2+0), go(d+1, i*2+1))
+    else:
+      width = depth / 2
+      color = demo_shader(i % width, i / width)
+  return color
+
+# given a position, returns a color
+# for this demo, it just busy loops
+def demo_shader(x, y):
+  bend i = 0:
+    when i < 100000:
+      color = go(i + 1)
+    else:
+      color = 0x000001
+  return color
+
+# renders a 256x256 image using demo_shader
+def main:
+  return render(16, demo_shader)
+```
+
+And it would actually work (!!!). Long-distance communication is performed by
+*global beta-reduction* (as per the [Interaction
 Calculus](https://github.com/VictorTaelin/Interaction-Calculus)), and
 synchronized correctly and efficiently by
 [HVM2](https://github.com/HigherOrderCO/HVM)'s *atomic linker*.
