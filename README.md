@@ -111,7 +111,9 @@ def main:
   return render(16, demo_shader)
 ```
 
-And it would actually work (!!!). Long-distance communication is performed by
+And it would actually work (!!!). Even highly involved recursive algorithms,
+such as this [Bitonic Sort based on tree rotations](examples/bitonic_sort.bend),
+parallelizes linearly on Bend. Long-distance communication is performed by
 *global beta-reduction* (as per the [Interaction
 Calculus](https://github.com/VictorTaelin/Interaction-Calculus)), and
 synchronized correctly and efficiently by
@@ -121,4 +123,4 @@ synchronized correctly and efficiently by
 
 - For an extensive list of features, check [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
 
-- For more in-depth information, check HVM's [paper](https://github.com/HigherOrderCO/HVM/raw/main/PAPER.pdf).
+- To understand the tech behind Bend, check HVM2's [paper](https://github.com/HigherOrderCO/HVM/raw/main/PAPER.pdf).
