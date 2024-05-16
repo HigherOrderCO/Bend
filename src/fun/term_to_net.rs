@@ -168,31 +168,45 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         }
         // core: & [opr] ~ $(fst $(snd ret))
         Term::Oper { opr, fst, snd } => {
-          // Partially apply
           match (fst.as_ref(), snd.as_ref()) {
-            // Put oper in fst
+            // Partially apply with fst
             (Term::Num { val }, snd) => {
               let val = val.to_bits();
-              let val = (val & 0xffff_fff0) | opr.to_native_tag();
+              let val = (val & !0x1F) | opr.to_native_tag();
               let fst = Place::Tree(LoanedMut::new(Tree::Num { val }));
               let node = self.new_opr();
               self.link(fst, node.0);
               self.encode_term(snd, node.1);
               self.link(up, node.2);
             }
-            // Put oper in snd
+            // Partially apply with snd, flip
+            // TODO: For now, we use AND OR and XOR for float operations, so don't flip
             (fst, Term::Num { val }) => {
-              let val = val.to_bits();
-              let val = (val & 0xffff_fff0) | opr.to_native_tag();
-              let snd = Place::Tree(LoanedMut::new(Tree::Num { val }));
-              let node = self.new_opr();
-              self.encode_term(fst, node.0);
-              self.link(snd, node.1);
-              self.link(up, node.2);
+              if [Op::AND, Op::OR, Op::XOR].contains(opr) {
+                // no flip and no partial application
+                let opr_val = hvmc::ast::new_sym(opr.to_native_tag());
+                let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
+                let node1 = self.new_opr();
+                self.encode_term(fst, node1.0);
+                self.link(oper, node1.1);
+                let node2 = self.new_opr();
+                self.link(node1.2, node2.0);
+                self.encode_term(snd, node2.1);
+                self.link(up, node2.2);
+              } else {
+                // flip
+                let val = val.to_bits();
+                let val = (val & !0x1F) | hvmc::ast::flip_sym(opr.to_native_tag());
+                let snd = Place::Tree(LoanedMut::new(Tree::Num { val }));
+                let node = self.new_opr();
+                self.encode_term(fst, node.0);
+                self.link(snd, node.1);
+                self.link(up, node.2);
+              }
             }
-            // Put oper as symbol, flip with fst
+            // Don't partially apply
             (fst, snd) => {
-              let opr_val = (opr.to_native_tag() << 4) | 0x1000_0000;
+              let opr_val = hvmc::ast::new_sym(opr.to_native_tag());
               let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
               let node1 = self.new_opr();
               self.encode_term(fst, node1.0);
@@ -409,21 +423,22 @@ fn hole<T: Default>() -> T {
 impl Op {
   fn to_native_tag(self) -> u32 {
     match self {
-      Op::ADD => 0x4,
-      Op::SUB => 0x5,
-      Op::MUL => 0x6,
-      Op::DIV => 0x7,
-      Op::REM => 0x8,
-      Op::EQL => 0x9,
-      Op::NEQ => 0xa,
-      Op::LTN => 0xb,
-      Op::GTN => 0xc,
-      Op::AND => 0xd,
-      Op::OR => 0xe,
-      Op::XOR => 0xf,
-      Op::ATN => 0xd,
-      Op::LOG => 0xe,
-      Op::POW => 0xf,
+      Op::ADD => hvmc::ast::ADD,
+      Op::SUB => hvmc::ast::SUB,
+      Op::MUL => hvmc::ast::MUL,
+      Op::DIV => hvmc::ast::DIV,
+      Op::REM => hvmc::ast::REM,
+      Op::EQ => hvmc::ast::EQ,
+      Op::NEQ => hvmc::ast::NEQ,
+      Op::LT => hvmc::ast::LT,
+      Op::GT => hvmc::ast::GT,
+      Op::AND => hvmc::ast::AND,
+      Op::OR => hvmc::ast::OR,
+      Op::XOR => hvmc::ast::XOR,
+
+      Op::ATN => hvmc::ast::AND,
+      Op::LOG => hvmc::ast::OR,
+      Op::POW => hvmc::ast::XOR,
     }
   }
 }

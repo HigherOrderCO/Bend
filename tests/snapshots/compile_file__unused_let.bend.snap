@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/unused_let.bend
 ---
-@main = ({$(:[+] $(b *)) {b a}} a)
+@main = ({$([+] $(b *)) {b a}} a)

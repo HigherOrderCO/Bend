@@ -4,4 +4,4 @@ input_file: tests/golden_tests/compile_file_o_all/linearize_match.bend
 ---
 @main = (?(((a a) @main__C0) b) b)
 
-@main__C0 = ($(:[+] $(a b)) (a b))
+@main__C0 = ($([+] $(a b)) (a b))

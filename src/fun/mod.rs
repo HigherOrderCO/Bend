@@ -3,6 +3,7 @@ use crate::{
   fun::builtins::*,
   maybe_grow, ENTRY_POINT,
 };
+use hvmc::ast::get_typ;
 use indexmap::{IndexMap, IndexSet};
 use interner::global::{GlobalPool, GlobalString};
 use itertools::Itertools;
@@ -184,10 +185,10 @@ pub enum Op {
   MUL,
   DIV,
   REM,
-  EQL,
+  EQ,
   NEQ,
-  LTN,
-  GTN,
+  LT,
+  GT,
   AND,
   OR,
   XOR,
@@ -898,41 +899,17 @@ impl Num {
 
   pub fn to_bits(&self) -> u32 {
     match self {
-      Num::U24(val) => {
-        assert!(*val <= 0xFFFFFF);
-        ((val & 0xFFFFFF) << 4) | 0x1
-      }
-      Num::I24(val) => (((*val as u32) & 0xFFFFFF) << 4) | 0x2,
-      Num::F24(val) => {
-        let bits = val.to_bits();
-        let sign = (bits >> 31) & 0x1;
-        let expo = (bits >> 23) & 0xFF;
-        let mantissa = bits & 0x7FFFFF;
-        assert!(
-          (expo == 0) || (expo == 255) || (64 ..= 127).contains(&expo) || (128 ..= 190).contains(&expo)
-        );
-        let expo = (expo & 0b0011_1111) | ((expo >> 7) << 6);
-        let mantissa = mantissa >> 7;
-        let bits = (sign << 23) | (expo << 16) | mantissa;
-        (bits << 4) | 0x3
-      }
+      Num::U24(val) => hvmc::ast::new_u24(*val),
+      Num::I24(val) => hvmc::ast::new_i24(*val),
+      Num::F24(val) => hvmc::ast::new_f24(*val),
     }
   }
 
   pub fn from_bits(bits: u32) -> Self {
-    match bits & 0xF {
-      0x1 => Num::U24((bits >> 4) & 0xFFFFFF),
-      0x2 => Num::I24((((bits >> 4) & 0xFFFFFF) as i32) << 8 >> 8),
-      0x3 => {
-        let bits = (bits >> 4) & 0xFFFFFF;
-        let sign = (bits >> 23) & 0x1;
-        let expo = (bits >> 16) & 0x7F;
-        let mantissa = bits & 0xFFFF;
-        let i_exp = (expo as i32) - 63;
-        let bits = (sign << 31) | (((i_exp + 127) as u32) << 23) | (mantissa << 7);
-        let bits = if mantissa == 0 && i_exp == -63 { sign << 31 } else { bits };
-        Num::F24(f32::from_bits(bits))
-      }
+    match get_typ(bits) {
+      hvmc::ast::U24 => Num::U24(hvmc::ast::get_u24(bits)),
+      hvmc::ast::I24 => Num::I24(hvmc::ast::get_i24(bits)),
+      hvmc::ast::F24 => Num::F24(hvmc::ast::get_f24(bits)),
       _ => unreachable!("Invalid Num bits"),
     }
   }
@@ -1121,15 +1098,15 @@ impl Book {
 fn num_to_from_bits() {
   let a = [
     Num::U24(0),
-    Num::I24(0),
-    Num::F24(0.0),
     Num::U24(0xFFFFFF),
-    Num::I24(0xFFFFFF),
-    Num::F24(0xFFFFFF as f32),
     Num::U24(12345),
+    Num::I24(0),
+    Num::I24(0x7FFFFF),
     Num::I24(12345),
     Num::I24(-12345),
+    Num::F24(0.0),
     Num::I24(-0),
+    Num::F24(0xFFFFFF as f32),
     Num::F24(0.0),
     Num::F24(-0.0),
     Num::F24(0.00123),

@@ -3,5 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/f24_oper.bend
 ---
 @main = b
-  & $(1.240 $(:[/] $(a b))) ~ [*4583519]
-  & $(-235.121 a) ~ [+0]
+  & $(1.2399902 $([/] $(a b))) ~ [*4388912]
+  & $(-235.1211 a) ~ [+0]

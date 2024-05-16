@@ -5,13 +5,13 @@ input_file: tests/golden_tests/run_file/lam_op2_nested.bend
 NumScott:
 [4m[1m[33mWarnings:[0m
 [1mDuring readback:[0m
-  Encountered an invalid numeric operation. (2 occurrences)
+  Encountered an invalid numeric operation.
 
-λa (* a (+ a <Invalid>))
+λa <Invalid>
 
 Scott:
 [4m[1m[33mWarnings:[0m
 [1mDuring readback:[0m
-  Encountered an invalid numeric operation. (2 occurrences)
+  Encountered an invalid numeric operation.
 
-λa (* a (+ a <Invalid>))
+λa <Invalid>

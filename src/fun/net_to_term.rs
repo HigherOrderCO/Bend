@@ -1,3 +1,5 @@
+use hvmc::ast::{get_f24, get_i24, get_typ, get_u24};
+
 use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
   fun::{term_to_net::Labels, Book, FanKind, Name, Op, Pattern, Tag, Term},
@@ -211,96 +213,38 @@ impl Reader<'_> {
             _ => unreachable!(),
           }
         }
-        NodeKind::Num { val: _ } => {
-          let (flp, arg) = self.read_opr_arg(next);
-          match arg {
-            NumArg::Sym(opr) => Term::Oper {
-              opr: Op::from_native_tag(opr, NumType::U24),
-              fst: Box::new(Term::Err),
-              snd: Box::new(Term::Err),
-            },
-            NumArg::Num(typ, val) => Term::Num { val: Num::from_bits_and_type(val, typ) },
-            NumArg::Par(opr, val) => {
-              if flp {
-                Term::Oper {
-                  opr: Op::from_native_tag(opr, NumType::U24),
-                  fst: Box::new(Term::Num { val: Num::from_bits_and_type(val, NumType::U24) }),
-                  snd: Box::new(Term::Err),
-                }
-              } else {
-                Term::Oper {
-                  opr: Op::from_native_tag(opr, NumType::U24),
-                  fst: Box::new(Term::Err),
-                  snd: Box::new(Term::Num { val: Num::from_bits_and_type(val, NumType::U24) }),
-                }
-              }
-            }
-            NumArg::Oth(_) => unreachable!(),
-          }
-        }
+        NodeKind::Num { val } => num_from_bits_with_type(*val, *val),
         NodeKind::Opr => match next.slot() {
           2 => {
-            let port0_kind = self.net.node(self.net.enter_port(Port(node, 0)).node()).kind.clone();
+            let port0_node = self.net.enter_port(Port(node, 0)).node();
+            let port0_kind = self.net.node(port0_node).kind.clone();
+            // two oper in a row
             if port0_kind == NodeKind::Opr {
-              // Second half of a numeric operation
-              let fst = self.read_term(self.net.enter_port(Port(node, 0)));
-              if let Term::Oper { opr, fst, snd: _ } = &fst {
-                let (flip, arg) = self.read_opr_arg(self.net.enter_port(Port(node, 1)));
-                let snd = Box::new(match arg {
-                  NumArg::Num(typ, val) => Term::Num { val: Num::from_bits_and_type(val, typ) },
-                  NumArg::Oth(term) => term,
-                  NumArg::Sym(_) | NumArg::Par(_, _) => {
-                    self.error(ReadbackError::InvalidNumericOp);
-                    Term::Err
-                  }
-                });
-                let (fst, snd) = if flip { (snd, fst.clone()) } else { (fst.clone(), snd) };
-                Term::Oper { opr: *opr, fst, snd }
+              // TODO: allow for nested oper
+              let opr_node = self.net.enter_port(Port(port0_node, 0)).node();
+              let opr_kind = self.net.node(opr_node).kind.clone();
+              let opr = if let NodeKind::Num { val } = opr_kind {
+                if get_typ(val) != hvmc::ast::SYM {
+                  self.error(ReadbackError::InvalidNumericOp);
+                  return Term::Err;
+                }
+                if let Some(op) = Op::from_native_tag(val, NumType::U24) {
+                  op
+                } else {
+                  self.error(ReadbackError::InvalidNumericOp);
+                  return Term::Err;
+                }
               } else {
                 self.error(ReadbackError::InvalidNumericOp);
-                Term::Err
-              }
+                return Term::Err;
+              };
+              let fst = self.read_term(self.net.enter_port(Port(port0_node, 1)));
+              let snd = self.read_term(self.net.enter_port(Port(node, 1)));
+              Term::Oper { opr, fst: Box::new(fst), snd: Box::new(snd) }
             } else {
-              // First half of a numeric operation
-              let (flip0, arg0) = self.read_opr_arg(self.net.enter_port(Port(node, 0)));
-              let (flip1, arg1) = self.read_opr_arg(self.net.enter_port(Port(node, 1)));
-              let (arg0, arg1) = if flip0 != flip1 { (arg1, arg0) } else { (arg0, arg1) };
-              match (arg0, arg1) {
-                (NumArg::Sym(opr), NumArg::Num(typ, val)) | (NumArg::Num(typ, val), NumArg::Sym(opr)) => {
-                  Term::Oper {
-                    opr: Op::from_native_tag(opr, typ),
-                    fst: Box::new(Term::Num { val: Num::from_bits_and_type(val, typ) }),
-                    snd: Box::new(Term::Err),
-                  }
-                }
-                (NumArg::Num(typ, num1), NumArg::Par(opr, num2))
-                | (NumArg::Par(opr, num1), NumArg::Num(typ, num2)) => Term::Oper {
-                  opr: Op::from_native_tag(opr, typ),
-                  fst: Box::new(Term::Num { val: Num::from_bits_and_type(num1, typ) }),
-                  snd: Box::new(Term::Num { val: Num::from_bits_and_type(num2, typ) }),
-                },
-                // No type, so assuming u24
-                (NumArg::Sym(opr), NumArg::Oth(term)) | (NumArg::Oth(term), NumArg::Sym(opr)) => Term::Oper {
-                  opr: Op::from_native_tag(opr, NumType::U24),
-                  fst: Box::new(term),
-                  snd: Box::new(Term::Err),
-                },
-
-                (NumArg::Par(opr, num), NumArg::Oth(term)) => Term::Oper {
-                  opr: Op::from_native_tag(opr, NumType::U24),
-                  fst: Box::new(Term::Num { val: Num::from_bits_and_type(num, NumType::U24) }),
-                  snd: Box::new(term),
-                },
-                (NumArg::Oth(term), NumArg::Par(opr, num)) => Term::Oper {
-                  opr: Op::from_native_tag(opr, NumType::U24),
-                  fst: Box::new(term),
-                  snd: Box::new(Term::Num { val: Num::from_bits_and_type(num, NumType::U24) }),
-                },
-                _ => {
-                  self.error(ReadbackError::InvalidNumericOp);
-                  Term::Err
-                }
-              }
+              // TODO: Fix
+              self.error(ReadbackError::InvalidNumericOp);
+              Term::Err
             }
           }
           _ => {
@@ -314,31 +258,6 @@ impl Reader<'_> {
         }
       }
     })
-  }
-
-  fn read_opr_arg(&mut self, next: Port) -> (bool, NumArg) {
-    let node = next.node();
-    match &self.net.node(node).kind {
-      NodeKind::Num { val } => {
-        self.seen.insert(next);
-        let flipped = ((val >> 28) & 0x1) != 0;
-        let typ = val & 0xf;
-        let val = (val >> 4) & 0x00ff_ffff;
-        let arg = match typ {
-          // Sym
-          0x0 => NumArg::Sym(val & 0xf),
-          // Num
-          0x1 ..= 0x3 => NumArg::Num(NumType::from_native_tag(typ), val),
-          // Partial
-          opr => NumArg::Par(opr, val),
-        };
-        (flipped, arg)
-      }
-      _ => {
-        let term = self.read_term(next);
-        (false, NumArg::Oth(term))
-      }
-    }
   }
 
   /// Enters both ports 1 and 2 of a node. Returns a Term if it is
@@ -451,33 +370,25 @@ impl Reader<'_> {
   }
 }
 
-/// Argument for a Opr node
-enum NumArg {
-  Sym(u32),
-  Num(NumType, u32),
-  Par(u32, u32),
-  Oth(Term),
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum NumType {
   U24 = 1,
-  I24 = 2,
+  _I24 = 2,
   F24 = 3,
 }
 
 impl Op {
-  fn from_native_tag(val: u32, typ: NumType) -> Op {
-    match val {
+  fn from_native_tag(val: u32, typ: NumType) -> Option<Op> {
+    let op = match val {
       0x4 => Op::ADD,
       0x5 => Op::SUB,
       0x6 => Op::MUL,
       0x7 => Op::DIV,
       0x8 => Op::REM,
-      0x9 => Op::EQL,
+      0x9 => Op::EQ,
       0xa => Op::NEQ,
-      0xb => Op::LTN,
-      0xc => Op::GTN,
+      0xb => Op::LT,
+      0xc => Op::GT,
       0xd => {
         if typ == NumType::F24 {
           Op::ATN
@@ -499,25 +410,9 @@ impl Op {
           Op::XOR
         }
       }
-      _ => unreachable!(),
-    }
-  }
-}
-
-impl NumType {
-  fn from_native_tag(value: u32) -> Self {
-    match value {
-      x if x == NumType::U24 as u32 => NumType::U24,
-      x if x == NumType::I24 as u32 => NumType::I24,
-      x if x == NumType::F24 as u32 => NumType::F24,
-      _ => unreachable!(),
-    }
-  }
-}
-
-impl Num {
-  fn from_bits_and_type(bits: u32, typ: NumType) -> Self {
-    Num::from_bits((bits & 0x00ff_ffff) << 4 | (typ as u32))
+      _ => return None,
+    };
+    Some(op)
   }
 }
 
@@ -578,6 +473,17 @@ impl Term {
         Some(n)
       }
     })
+  }
+}
+
+fn num_from_bits_with_type(val: u32, typ: u32) -> Term {
+  match get_typ(typ) {
+    // No type information, assume u24 by default
+    hvmc::ast::SYM => Term::Num { val: Num::U24(get_u24(val)) },
+    hvmc::ast::U24 => Term::Num { val: Num::U24(get_u24(val)) },
+    hvmc::ast::I24 => Term::Num { val: Num::I24(get_i24(val)) },
+    hvmc::ast::F24 => Term::Num { val: Num::F24(get_f24(val)) },
+    _ => Term::Err,
   }
 }
 
