@@ -84,8 +84,8 @@ explicit annotations. Long-distance communication is performed by global
 beta-reduction, and handled correctly and efficiently by the
 [HVM2](https://github.com/HigherOrderCO/HVM2) runtime.
 
-- For more in-depth information, check HVM's [paper](https://github.com/HigherOrderCO/HVM/raw/main/PAPER.pdf).
-
 - To jump straight into action, check Bend's [GUIDE.md](https://github.com/HigherOrderCO/bend/blob/main/GUIDE.md).
 
 - For an extensive list of features, check [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
+
+- For more in-depth information, check HVM's [paper](https://github.com/HigherOrderCO/HVM/raw/main/PAPER.pdf).
