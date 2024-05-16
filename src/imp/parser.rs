@@ -8,12 +8,17 @@ use crate::{
 };
 use TSPL::Parser;
 
-const PREC: &[&[Op]] =
-  &[&[Op::OR], &[Op::XOR], &[Op::AND], &[Op::EQL, Op::NEQ], &[Op::LTN], &[Op::GTN], &[Op::ADD, Op::SUB], &[
-    Op::MUL,
-    Op::DIV,
-    Op::REM,
-  ]];
+const PREC: &[&[Op]] = &[
+  &[Op::OR],
+  &[Op::XOR],
+  &[Op::AND],
+  &[Op::EQL, Op::NEQ],
+  &[Op::LTN],
+  &[Op::GTN],
+  &[Op::ADD, Op::SUB],
+  &[Op::MUL, Op::DIV, Op::REM],
+  &[Op::POW],
+];
 
 pub struct PyParser<'i> {
   pub input: &'i str,
