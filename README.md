@@ -81,7 +81,7 @@ parallel*, Bend will run it multi-threaded. Some benchmarks:
 That's a **111x speedup** by doing nothing. No thread spawning, no explicit
 management of locks, mutexes. We just asked bend to run our program on RTX, and
 it did. Simple as that. Bend isn't limited to a specific paradigm, like tensors
-or actors. Any concurrent system, from shaders to Erlang-like actor models can
+or matrices. Any concurrent system, from shaders to Erlang-like actor models can
 be emulated on Bend. For example, to render images in real time, we could simply
 allocate an immutable tree on each frame:
 
