@@ -548,7 +548,7 @@ def main():
 ```
 
 And that's the parallel "Hello, world"! Now, let's finally run it. But first,
-let's just check it performs with the single-threaded interpreter:
+let's measure its single-core performance:
 
 ```
 bend run main.bend
