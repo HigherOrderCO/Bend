@@ -81,9 +81,11 @@ parallel*, the Bend executable will run in many cores. Here are some benchmarks:
 That's a **111x speedup** by doing nothing. No thread spawning, no explicit
 management of locks, mutexes. From shaders, to transformers, to Erlang-like
 actor-based systems, every concurrent setup can be implemented on Bend with no
-explicit annotations. Long-distance communication is performed by global
-beta-reduction, and handled correctly and efficiently by the
-[HVM2](https://github.com/HigherOrderCO/HVM2) runtime.
+explicit annotations. Long-distance communication is performed by *global
+beta-reduction* (as per the [Interaction
+Calculus](https://github.com/HigherOrderCO/Interaction-Calculus)), and
+synchronized correctly and efficiently by
+[HVM2](https://github.com/HigherOrderCO/HVM2)'s *atomic linker*.
 
 - To jump straight into action, check Bend's [GUIDE.md](https://github.com/HigherOrderCO/bend/blob/main/GUIDE.md).
 
