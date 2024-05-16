@@ -451,7 +451,39 @@ impl<'a> TermParser<'a> {
       // Switch
       if self.try_parse_keyword("switch") {
         unexpected_tag(self)?;
-        return self.parse_switch();
+        let (bnd, arg, with) = self.parse_match_header()?;
+
+        self.consume("{")?;
+        self.try_consume("|");
+        self.consume("0")?;
+        self.consume(":")?;
+        let zero = self.parse_term()?;
+        self.try_consume(";");
+
+        let mut arms = vec![zero];
+        let mut expected_num = 1;
+        loop {
+          self.try_consume("|");
+          // case _
+          if self.try_consume("_") {
+            self.consume(":")?;
+            arms.push(self.parse_term()?);
+            self.try_consume(";");
+            self.consume("}")?;
+            break;
+          }
+          // case num
+          let val = self.parse_u32()?;
+          if val != expected_num {
+            return self.expected(&format!("'{}'", &expected_num.to_string()));
+          }
+          expected_num += 1;
+          self.consume(":")?;
+          arms.push(self.parse_term()?);
+          self.try_consume(";");
+        }
+        let pred = Some(Name::new(format!("{}-{}", bnd.as_ref().unwrap(), arms.len() - 1)));
+        return Ok(Term::Swt { arg: Box::new(arg), bnd, with, pred, arms });
       }
 
       // Do (monadic block)
@@ -611,44 +643,6 @@ impl<'a> TermParser<'a> {
     self.consume(":")?;
     let bod = self.parse_term()?;
     Ok((nam, vec![], bod))
-  }
-
-  fn parse_switch(&mut self) -> ParseResult<Term> {
-    let (bnd, arg, with) = self.parse_match_header()?;
-    self.consume("{")?;
-    let mut expected_num = 0;
-    let mut arms = vec![];
-    let mut to_continue = true;
-    self.skip_trivia();
-    while to_continue && !self.starts_with("}") {
-      self.try_consume("|");
-      self.skip_trivia();
-      let Some(head) = self.peek_one() else { return self.expected("switch pattern") };
-      match head {
-        '_' => {
-          if expected_num == 0 {
-            return self.expected("0");
-          } else {
-            self.consume("_")?;
-            to_continue = false;
-          }
-        }
-        c if c.is_ascii_digit() => {
-          let val = self.parse_u32()?;
-          if val != expected_num {
-            return self.expected(&expected_num.to_string());
-          }
-        }
-        _ => return self.expected("switch pattern"),
-      };
-      self.consume(":")?;
-      arms.push(self.parse_term()?);
-      self.try_consume(";");
-      expected_num += 1;
-    }
-    let pred = Some(Name::new(format!("{}-{}", bnd.as_ref().unwrap(), arms.len() - 1)));
-    self.consume("}")?;
-    Ok(Term::Swt { arg: Box::new(arg), bnd, with, pred, arms })
   }
 }
 

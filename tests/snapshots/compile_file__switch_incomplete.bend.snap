@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/switch_incomplete.bend
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/compile_file/switch_incomplete.bend :
+[1m- expected:[0m term
+[1m- detected:[0m
+[0m   2 | main = switch {[4m[31m}[0m

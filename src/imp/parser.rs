@@ -594,9 +594,11 @@ impl<'a> PyParser<'a> {
     indent.enter_level();
 
     self.consume_indent_exactly(*indent)?;
+    let ini_idx = *self.index();
     let (fst_case, fst_stmt, mut nxt_indent) = self.parse_switch_case(indent)?;
+    let end_idx = *self.index();
     if fst_case != Some(0) {
-      return self.expected("case 0");
+      return self.expected_spanned("case 0", ini_idx, end_idx);
     }
     let mut arms = vec![fst_stmt];
     let mut should_continue = fst_case == Some(0);
@@ -640,10 +642,10 @@ impl<'a> PyParser<'a> {
           None
         }
         c if c.is_ascii_digit() => Some(self.parse_u32()?),
-        _ => return self.expected("Number pattern"),
+        _ => return self.expected("number or '_'"),
       }
     } else {
-      return self.expected("Switch pattern")?;
+      return self.expected("number or '_'")?;
     };
 
     self.advance_trivia_inline();
