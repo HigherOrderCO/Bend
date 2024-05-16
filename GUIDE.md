@@ -758,9 +758,10 @@ document it syntax here soon!
 Community
 ---------
 
-Again - this is still very new and experimental. Bugs and imperfections should
-be expected. That said, HOC will be giving long-term support to Bend (and its
-runtime, HVM2). So, if you believe this paradigm will grow, and want to be part
-of it in these early stages, join us on [Discord](https://Discord.HigherOrderCO.com/).
-Report bugs, bring your suggestions, and let's build this together!
+Remember: Bend is very new and experimental. Bugs and imperfections should be
+expected. That said, [HOC](https://HigherOrderCO.com/) will provide long-term
+support to Bend (and its runtime, HVM2). So, if you believe this paradigm will
+be big someday, and want to be part of it in these early stages, join us on
+[Discord](https://Discord.HigherOrderCO.com/) Report bugs, bring your
+suggestions, and let's chat and build this future together!
 
