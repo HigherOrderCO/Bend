@@ -394,6 +394,7 @@ exercise, use `fold` to implement a "reverse" algorithm for lists:
 
 ```python
 def reverse(list):
+  # exercise
   ?
 
 def main:
