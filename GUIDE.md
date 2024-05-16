@@ -709,7 +709,7 @@ compute expensive, but less memory hungry, computations. For example, consider:
 def render(depth, shader):
   bend d = 0, i = 0:
     when d < depth:
-      color = (go(d+1, i*2+0), go(d+1, i*2+1))
+      color = (fork(d+1, i*2+0), fork(d+1, i*2+1))
     else:
       width = depth / 2
       color = demo_shader(i % width, i / width)
@@ -720,7 +720,7 @@ def render(depth, shader):
 def demo_shader(x, y):
   bend i = 0:
     when i < 100000:
-      color = go(i + 1)
+      color = fork(i + 1)
     else:
       color = 0x000001
   return color
