@@ -8,9 +8,8 @@ allocations, higher-order functions with full closure support, unrestricted
 recursion, even continuations. Yet, it runs on massively parallel hardware like
 GPUs, with near-linear speedup based on core count, and zero explicit parallel
 annotations: no thread spawning, no locks, mutexes, atomics. Bend is powered by
-the [HVM2](https://github.com/HigherOrderCO/hvm2) runtime.
-
-![Bend Demo](media/bend_demo.gif)
+the [HVM2](https://github.com/HigherOrderCO/hvm2) runtime. Check the
+[DEMO](media/bend_demo.mp4)!
 
 ## Using Bend
 
