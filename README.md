@@ -111,12 +111,11 @@ def main:
   return render(16, demo_shader)
 ```
 
-And it would actually work (!!!). Even highly involved recursive algorithms,
-such as this [Bitonic Sort based on tree rotations](examples/bitonic_sort.bend),
-parallelizes linearly on Bend. Long-distance communication is performed by
-*global beta-reduction* (as per the [Interaction
-Calculus](https://github.com/VictorTaelin/Interaction-Calculus)), and
-synchronized correctly and efficiently by
+And it would actually work. Even involved algorithms, such as a [Bitonic Sort
+using tree rotations](examples/bitonic_sort.bend), parallelize well on Bend.
+Long-distance communication is performed by *global beta-reduction* (as per the
+[Interaction Calculus](https://github.com/VictorTaelin/Interaction-Calculus)),
+and synchronized correctly and efficiently by
 [HVM2](https://github.com/HigherOrderCO/HVM)'s *atomic linker*.
 
 - To jump straight into action, check Bend's [GUIDE.md](https://github.com/HigherOrderCO/bend/blob/main/GUIDE.md).
