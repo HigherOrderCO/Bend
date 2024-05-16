@@ -157,10 +157,10 @@ def main:
   return area(Shape/Circle { radius: 10.0 })
 ```
 
-In this example, `Shape` is an ADT with two variants: `Circle` and `Rectangle`.
-The `area` function uses pattern matching to handle each variant appropriately.
-Just like objects need `open`, datatypes need `match`, which give us access to
-fields in each respective case.
+In this example, `Shape` is a datatype with two variants: `Circle` and
+`Rectangle`.  The `area` function uses pattern matching to handle each variant
+appropriately.  Just like objects need `open`, datatypes need `match`, which
+give us access to fields in each respective case.
 
 Datatypes are very general. From matrices, to JSON, to quadtrees, every type of
 data can be represented as a datatype (I mean, that's the name!). In fact,
@@ -230,7 +230,7 @@ The Dreaded Immutability
 Finally, let's get straight to the fun part: how do we implement parallel
 algorithms with Bend? Just kidding. Before we get there, let's talk about loops.
 You might have noticed we have avoided them so far. That wasn't by accident.
-There is important aspect on which Bend diverges from Python, and aligns with
+There is an important aspect on which Bend diverges from Python, and aligns with
 Haskell: **variables are immutable**. Not "by default". They just **are**. For
 example, in Bend, we're not allowed to write:
 
