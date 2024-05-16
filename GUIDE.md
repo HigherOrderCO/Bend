@@ -735,8 +735,8 @@ tree, and then calling the `demo_shader` function on each pixel. Since the tree
 has a depth of 16, we have `2^16 = 65536 pixels`, which is enough to fill all
 cores of an RTX 4090. Moreover, since `demo_shader` isn't doing many
 allocations, it can operate entirely inside the GPU's "shared memory" (L1
-cache). Each local GPU thread has a local space of 64 IC nodes. Functions that
-don't need more than that, like `demo_shader`, can run up to 5x faster!
+cache). Each GPU thread has a local space of 64 IC nodes. Functions that don't
+need more than that, like `demo_shader`, can run up to 5x faster!
 
 On my GPU, it performs `22,000 MIPS` out of the box, and `40000+ MIPS` with a
 tweak on the generated CUDA file (doubling the `TPC`, which doubles the number
