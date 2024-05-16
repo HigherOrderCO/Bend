@@ -415,7 +415,7 @@ type Tree:
 def main():
   bend x = 0:
     when x < 3:
-      tree = Tree/Node { lft: go(x + 1), rgt: go(x + 1) }
+      tree = Tree/Node { lft: fork(x + 1), rgt: fork(x + 1) }
     else:
       tree = Tree/Leaf { val: 7 }
   return tree
@@ -423,14 +423,14 @@ def main():
 
 The program above will initialize a state (`x = 0`), and then, for as long as `x
 < 3`, it will split that state in two, creating a `Tree/Node`, and continuing
-(`go`) with `x + 1`. When `x >= 3`, it will just return a `Tree/Leaf` with `7`.
+(`fork`) with `x + 1`. When `x >= 3`, it will just return a `Tree/Leaf` with `7`.
 When all is done, the result will be assigned to the `tree` variable:
 
 ```python
-tree = go(0)
-tree = ![go(1), go(1)]
-tree = ![![go(2),go(2)], ![go(2),go(2)]]
-tree = ![![![go(3),go(3)], ![go(3),go(3)]], ![![go(3),go(3)], ![go(3),go(3)]]]
+tree = fork(0)
+tree = ![fork(1), fork(1)]
+tree = ![![fork(2),fork(2)], ![fork(2),fork(2)]]
+tree = ![![![fork(3),fork(3)], ![fork(3),fork(3)]], ![![fork(3),fork(3)], ![fork(3),fork(3)]]]
 tree = ![![![7,7], ![7,7]], ![![7,7], ![7,7]]]
 ```
 
@@ -451,7 +451,7 @@ Could be emulated in Bend with a "sequential bend":
 ```python
 bend idx = 0:
   when idx < 10:
-    sum = idx + go(idx + 1)
+    sum = idx + fork(idx + 1)
   else:
     sum = 0
 ```
@@ -541,7 +541,7 @@ example, to add numbers in parallel, we can write:
 def main():
   bend d = 0, i = 0:
     when d < 28:
-      sum = go(d+1, i*2+0) + go(d+1, i*2+1)
+      sum = fork(d+1, i*2+0) + fork(d+1, i*2+1)
     else:
       sum = i
   return sum

@@ -61,7 +61,7 @@ def fld(list):
 def bnd():
   bend x = 0:
     when x < 10:
-      return List/cons(x go(x + 1));
+      return List/cons(x fork(x + 1));
     else:
       return List/nil();
 

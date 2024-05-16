@@ -13,7 +13,7 @@ def main:
 
   bend x = 1, h = 0:
     when h < n:
-      y = Tree/node { val: x, lft: go(2 * x, h + 1), rgt: go(2 * x + 1, h + 1) }
+      y = Tree/node { val: x, lft: fork(2 * x, h + 1), rgt: fork(2 * x + 1, h + 1) }
     else:
       y = Tree/leaf
 

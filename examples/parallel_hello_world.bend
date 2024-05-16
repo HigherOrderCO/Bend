@@ -15,7 +15,7 @@ def sum(tree):
 def gen(depth):
   bend val = 0:
     when val < depth:
-      tree = MyTree/Node { val: val, left: go(val+1), right: go(val+1) }
+      tree = MyTree/Node { val: val, left: fork(val+1), right: fork(val+1) }
     else:
       tree = MyTree/Leaf { val: val }
   return tree

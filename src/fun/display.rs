@@ -128,11 +128,7 @@ impl fmt::Display for Term {
           }
           write!(f, "{}, ", init)?;
         }
-        write!(f, "while {cond} {{ ")?;
-        write!(f, "{step} ")?;
-        write!(f, "}} then {{ ")?;
-        write!(f, "{base} ")?;
-        write!(f, "}}")
+        write!(f, "{{ when {cond}: {step}; else: {base} }}")
       }
       Term::Fan { fan: FanKind::Tup, tag, els } => write!(f, "{}({})", tag, DisplayJoin(|| els.iter(), ", ")),
       Term::Fan { fan: FanKind::Dup, tag, els } => write!(f, "{}{{{}}}", tag, DisplayJoin(|| els, " ")),
@@ -410,10 +406,11 @@ impl Term {
             }
             write!(f, "{}, ", init)?;
           }
-          writeln!(f, "while {cond} {{")?;
-          writeln!(f, "{:tab$}{}", "", step.display_pretty(tab + 2), tab = tab + 2)?;
-          writeln!(f, "{:tab$}}} then {{", "")?;
-          writeln!(f, "{:tab$}{}", "", base.display_pretty(tab + 2), tab = tab + 2)?;
+          writeln!(f, "{{")?;
+          writeln!(f, "{:tab$}when {}:", "", cond.display_pretty(tab + 2), tab = tab + 2)?;
+          writeln!(f, "{:tab$}{}", "", step.display_pretty(tab + 4), tab = tab + 4)?;
+          writeln!(f, "{:tab$}else:", "", tab = tab + 2)?;
+          writeln!(f, "{:tab$}{}", "", base.display_pretty(tab + 4), tab = tab + 4)?;
           write!(f, "{:tab$}}}", "")
         }
         Term::Open { typ, var, bod } => {
