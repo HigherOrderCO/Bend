@@ -9,9 +9,9 @@ main =
   let n = 0;
   let tree = bend n {
     when (< n depth):
-    (Tree/node (go (+ n 1)) (go (+ n 1)))
-  else:
-    (Tree/leaf c)
+      (Tree/node (fork (+ n 1)) (fork (+ n 1)))
+    else:
+      (Tree/leaf c)
   }
   fold tree {
     Tree/node: (+ tree.lft tree.rgt)

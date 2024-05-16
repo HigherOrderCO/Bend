@@ -19,7 +19,7 @@ main =
   let depth = 10
   let tree = bend n = 0 {
     when (< n depth):
-      (Tree/node (go (+ n 1)) (go (+ n 1)))
+      (Tree/node (fork (+ n 1)) (fork (+ n 1)))
     else:
       if (% n 2) { (Tree/leaf Bool/True) } else { (Tree/leaf Bool/False) }  
   }

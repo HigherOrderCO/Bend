@@ -236,15 +236,15 @@ Bend can be used to create recursive data structures:
 ```rust
 bend x = 0:
   when x < 10:
-    left = go(x + 1)
-    right = go(x + 1)
+    left = fork(x + 1)
+    right = fork(x + 1)
     y = Tree/Node(left, right)
   else:
     y = Tree/Leaf(x)
 ```
 
 Which binds a variable to the return of an inline recursive function.
-The function `go` is available inside the `when` arm of the `bend` and calls it recursively.
+The function `fork` is available inside the `when` arm of the `bend` and calls it recursively.
 
 It is possible to pass multiple state variables, which can be initialized:
 
@@ -254,7 +254,7 @@ bend x = 1, y = 2 ...:
     ...
 ```
 
-When calling `go`, the function must receive the same number of arguments as the number of state variables.
+When calling `fork`, the function must receive the same number of arguments as the number of state variables.
 
 It is equivalent to this inline recursive function:
 

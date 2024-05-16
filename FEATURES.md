@@ -94,8 +94,8 @@ def MyTree.sum(x):
 
 def main:
   bend val = 0 while val < 0:
-    # 'go' calls the bend recursively with the provided values.
-    x = Node(val=val, left=go(val + 1), right=go(val + 1))
+    # 'fork' calls the bend recursively with the provided values.
+    x = Node(val=val, left=fork(val + 1), right=fork(val + 1))
   then:
     # 'then' is the base case, when the condition fails.
     x = Leaf
@@ -133,7 +133,7 @@ def main:
   bend val = [0, 1, 2, 3] while val != []:
     match val:
       List.cons:
-        x = val.head + go(val.tail)
+        x = val.head + fork(val.tail)
       List.nil:
         x = 0
   then:
