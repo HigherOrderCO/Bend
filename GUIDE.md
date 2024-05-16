@@ -41,7 +41,7 @@ Hello, World!
 As we said, Bend *feels* like Python - in some ways. It is high-level, you can
 easily create objects and lists, there are ifs and loops. Yet, it is different:
 there is some Haskell in it, in the sense algebraic datatypes, pattern-matching
-and recursion play an important role. Here is the "Hello, world!":
+and recursion play an important role. This is how its  "Hello, world!" looks:
 
 ```python
 def main():
@@ -49,9 +49,9 @@ def main():
 ```
 
 Wait - there is something strange there. Why `return`, not `print`? Well, *for
-now* (you'll read these words a lot), Bend doesn't have IO yet. We plan on
-introducing it on the following weeks! So, *for now*, all you can do is run computations,
-and see results. To run the program above, enter:
+now* (you'll read these words a lot), Bend doesn't have IO. We plan on
+introducing it very soon! So, *for now*, all you can do is perform computations,
+and see results. To run the program above, type:
 
 ```
 bend run main.bend
@@ -59,8 +59,8 @@ bend run main.bend
 
 If all goes well, you should see "Hello, world!". The `bend run` command uses
 the reference interpreter, which is slow. In a few moments, we'll teach you how
-to run your code in parallel, on both CPUs and GPUs. For now, let's focus in
-learning some fundamentals!
+to run your code in parallel, on both CPUs and GPUs. For now, let's learn some
+fundamentals!
 
 Basic Functions and Datatypes
 -----------------------------
@@ -128,7 +128,7 @@ This doesn't look too different, does it? What is that `open` thing, though? It
 just tells Bend to *consume* the vector, `a`, "splitting" it into its
 components, `a.x` and `a.y`. Is that really necessary? Actually, no - not
 really. But, *for now*, it is. This has to do with the fact Bend is an affine
-language, which... we'll, let's not get into that. For now, just remember we
+language, which... well, let's not get into that. For now, just remember we
 need `open` to access fields.
 
 Bend comes with 3 built-in numeric types: `u24`, `i24`, `f24`. That's quite
