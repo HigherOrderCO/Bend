@@ -553,7 +553,9 @@ def main():
 ```
 
 And that's the parallel "Hello, world"! Now, let's finally run it. But first,
-let's measure its single-core performance:
+let's measure its single-core performance. Also, remember that, for now, Bend
+only supports 24-bit numbers (`u24`), thus, the results will always be in `mod
+16777216`.
 
 ```
 bend run main.bend

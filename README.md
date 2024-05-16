@@ -80,10 +80,13 @@ parallel*, Bend will run it multi-threaded. Some benchmarks:
 
 That's a **111x speedup** by doing nothing. No thread spawning, no explicit
 management of locks, mutexes. We just asked bend to run our program on RTX, and
-it did. Simple as that. Bend isn't limited to a specific paradigm, like tensors
-or matrices. Any concurrent system, from shaders to Erlang-like actor models can
-be emulated on Bend. For example, to render images in real time, we could simply
-allocate an immutable tree on each frame:
+it did. Simple as that. Note that, for now, Bend only supports 24-bit machine
+ints (`u24`), thus, results are always `mod 2^24`.
+
+Bend isn't limited to a specific paradigm, like tensors or matrices. Any
+concurrent system, from shaders to Erlang-like actor models can be emulated on
+Bend. For example, to render images in real time, we could simply allocate an
+immutable tree on each frame:
 
 ```python
 # given a shader, returns a square image
