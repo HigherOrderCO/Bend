@@ -19,7 +19,7 @@ cargo +nightly install hvm
 cargo +nightly install bend-lang
 ```
 
-Then, just write a Bend file, and run it with:
+Finally, write some Bend file, and run it with one of these commands:
 
 ```sh
 bend run    <file.hvm> # uses the Rust interpreter (sequential)
@@ -28,7 +28,8 @@ bend run-cu <file.hvm> # uses the CUDA interpreter (massively parallel)
 ```
 
 You can also compile `Bend` to standalone C/CUDA files with `gen-c` and
-`gen-cu`, for maximum possible performance.
+`gen-cu`, for maximum performance. But keep in mind our codegen is still on its
+infancy, and is nowhere as mature as SOTA compilers like GCC and GHC.
 
 ## Parallel Programming in Bend
 
@@ -39,14 +40,14 @@ than not making it *inherently sequential*! For example, the expression:
 (((1 + 2) + 3) + 4)
 ```
 
-Can **not** run in parallel, inherently so, because `+4` depends on `+3` which
+Can **not** run in parallel, because `+4` depends on `+3` which
 depends on `(1+2)`. But the following expression:
 
 ```python
 ((1 + 2) + (3 + 4))
 ```
 
-Can run in parallel, and will, due to Bend's fundamental pledge:
+Can run in parallel, and it will, due to Bend's fundamental pledge:
 
 > Everything that **can** run in parallel, **will** run in parallel.
 
