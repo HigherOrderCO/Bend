@@ -79,7 +79,8 @@ parallel*, Bend will run it multi-threaded. Some benchmarks:
 - GPU, NVIDIA RTX 4090, 32k threads: **1.88 seconds**
 
 That's a **111x speedup** by doing nothing. No thread spawning, no explicit
-management of locks, mutexes. From shaders, to transformers, to Erlang-like
+management of locks, mutexes. We just asked bend to run our program on RTX, and
+it did.  Simple as that. From shaders, to transformers, to Erlang-like
 actor-based systems, every concurrent setup can be implemented on Bend with no
 explicit annotations. Long-distance communication is performed by *global
 beta-reduction* (as per the [Interaction
