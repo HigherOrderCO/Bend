@@ -2,8 +2,9 @@
 name = "bend-lang"
 description = "A high-level, massively parallel programming language"
 license = "MIT"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2021"
+exclude = ["media/", "tests/snapshots/"]
 
 [lib]
 name = "bend"

@@ -6,7 +6,7 @@ feels like Python, but scales like CUDA. It runs on CPUs and GPUs, and you don't
 have to do anything to make it parallel: as long as your code isn't "helplessly
 sequential", it **will** use 1000's of threads!
 
-While cool, Bend far from perfect. In absolute terms it is still not so fast.
+While cool, Bend is far from perfect. In absolute terms it is still not so fast.
 Compared to SOTA compilers like GCC or GHC, our code gen is still embarrassingly
 bad, and there is a lot to improve. And, of course, in this beginning, there
 will be tons of instability and bugs. That said, it does what it promises:
@@ -252,7 +252,7 @@ def main:
   return is_even(7)
 ```
 
-Which is immutable. If that's sound annoying, that's because **it is**. Don't
+Which is immutable. If that sounds annoying, that's because **it is**. Don't
 let anyone tell you otherwise. We are aware of that, and we have many ideas on
 how to improve this, making Bend feel even more Python-like. For now, we have to
 live with it. But, wait... if variables are immutable... how do we even do
@@ -268,7 +268,7 @@ def sum(x):
 
 Here, the entire way the algorithm works is by mutating the `total` variable.
 Without mutability, loops don't make sense. The good news is Bend has *something
-else* that is equally as - actually, mode - powerful. And learning it is really
+else* that is equally as - actually, more - powerful. And learning it is really
 worth your time. Let's do it!
 
 Folds and Bends
@@ -313,8 +313,8 @@ As usual, for now, we'll live with the longer version.
 
 Now, here's a question: how do we *sum* the elements of a tree? In Python, we
 could just use a loop. In Bend, we don't have loops. Fortunately, there is
-another construct we can use: is called `fold`, and it works like a *search and
-replace* for datatypes. For example, consider the code below:
+another construct we can use: it's called `fold`, and it works like a *search
+and replace* for datatypes. For example, consider the code below:
 
 
 ```python
@@ -395,6 +395,7 @@ exercise, use `fold` to implement a "reverse" algorithm for lists:
 
 ```python
 def reverse(list):
+  # exercise
   ?
 
 def main:
@@ -491,7 +492,7 @@ for i in range(8):
   sum += i
 ```
 
-Is actually just a short way to write:
+Is actually just a similar way to write:
 
 ```python
 sum = (0 + (1 + (2 + (3 + (4 + (5 + (6 + 7)))))))
@@ -533,7 +534,7 @@ So, how do you write a parallel program in Bend?
 
 **Just write algorithms that aren't helplessly sequential.**
 
-That's all there is to it. As long as you write programs like that one, and
+That's all there is to it. As long as you write programs like that one, then
 unlike the former one, they will run in parallel. And that's why `bend` and
 `fold` are core features: they're, essentially, parallelizable loops. For
 example, to add numbers in parallel, we can write:
@@ -570,8 +571,8 @@ That's **18x faster**! Can we do better? Sure: let's use the **C compiler** now:
 bend gen-c main.bend >> main.c
 ```
 
-This command converts your `bend` file in a small, dependency-free C file that
-does the same computation much faster. You can compile it to an executable:
+This command converts your `bend` file into a small, dependency-free C file
+that does the same computation much faster. You can compile it to an executable:
 
 ```
 gcc main.c -o main -O2 -lm -lpthread # if you're on Linux
@@ -754,7 +755,7 @@ has an entire "secret" Haskell-like syntax that is compatible with old HVM1. For
 example,
 [here](https://gist.github.com/VictorTaelin/9cbb43e2b1f39006bae01238f99ff224) is
 an implementation of the Bitonic Sort with Haskell-like equations. We'll
-document it syntax here soon!
+document its syntax here soon!
 
 Community
 ---------
