@@ -7,7 +7,7 @@ have to do anything to make it parallel: as long as your code isn't "helplessly
 sequential", it **will** use 1000's of threads!
 
 While cool, Bend far from perfect. In absolute terms it is still not so fast.
-Compared to SOTA compilers like GCC or GHC, our codegen is still embarassingly
+Compared to SOTA compilers like GCC or GHC, our code gen is still embarrassingly
 bad, and there is a lot to improve. That said, it does scale horizontally with
 cores - and that's really cool. So, if you'd like to be an early adopter of this
 interesting tech, this guide will teach you how to apply Bend to build parallel
@@ -22,7 +22,7 @@ you just want to dive straight into action - this guide is for you. Let's go!
 Installation
 ------------
 
-To use Bend, first, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml). Then, install HVM2 and Bend tself with:
+To use Bend, first, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml). Then, install HVM2 and Bend itself with:
 
 ```
 cargo +nightly install hvm
@@ -311,7 +311,7 @@ As usual, for now, we'll live with the longer version.
 ### Fold: consuming recursive datatypes
 
 Now, here's a question: how do we *sum* the elements of a tree? In Python, we
-could just use a loop. In Bend, we don't have loops. Fortunatelly, there is
+could just use a loop. In Bend, we don't have loops. Fortunately, there is
 another construct we can use: is called `fold`, and it works like a *search and
 replace* for datatypes. For example, consider the code below:
 
@@ -573,8 +573,8 @@ This command converts your `bend` file in a small, dependency-free C file that
 does the same computation much faster. You can compile it to an executable:
 
 ```
-gcc main.c main -O2 -lm -lpthreads # if you're on Linux
-gcc main.c main -O2                # if you're on OSX
+gcc main.c -o main -O2 -lm -lpthread # if you're on Linux
+gcc main.c -o main -O2               # if you're on OSX
 ./main
 ```
 
@@ -588,7 +588,7 @@ bend gen-cu main.bend
 ```
 
 And, simply as that, the same program now runs in `0.82s`, at a blistering
-`11803.24 MIPS`. That's **181x faster** than the original. Congradulations!
+`11803.24 MIPS`. That's **181x faster** than the original. Congratulations!
 You're now a thread bender.
 
 ~
