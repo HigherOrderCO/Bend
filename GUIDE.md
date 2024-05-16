@@ -703,9 +703,12 @@ Graphics Rendering
 ------------------
 
 While the algorithm above does parallelize well, it is very memory-hungry. It is
-a nice demo of Bend's potential, but isn't a great way to sort lists. Since Bend
-is GC-free, we can express low memory footprint programs using `bend` or tail
-calls. For maximum possible performance, one should first create enough
+a nice demo of Bend's potential, but isn't a great way to sort lists. Currently,
+Bend has a 4GB memory limit (for being a 32-bit architecture). When the memory
+is filled, its performance will degrade considerably. But we can do better.
+
+Since Bend is GC-free, we can express low memory footprint programs using `bend`
+or tail calls. For maximum possible performance, one should first create enough
 "parallel room" to fill all available cores, and then spend some time doing
 compute expensive, but less memory hungry, computations. For example, consider:
 
