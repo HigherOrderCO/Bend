@@ -134,7 +134,7 @@ need `open` to access fields.
 Bend comes with 3 built-in numeric types: `u24`, `i24`, `f24`. That's quite
 small, we admit. Soon, we'll have larger types. For now, that's what we got.
 The `u24` type is written like `123` or `0xF`. The `i24` type requires a sign,
-as in, `+7` or `-7`. The `f24` type requires a `.`, like `3.14`.
+as in, `+7` or `-7`. The `f24` type uses `.`, like `3.14`.
 
 Other than tuples, Bend has another, very general, way to encode data:
 datatypes! These are just "objects with tags". A classic example of this is a
