@@ -164,7 +164,7 @@ fields in each respective case.
 Datatypes are very general. From matrices, to JSON, to quadtrees, every type of
 data can be represented as a datatype (I mean, that's the name!). In fact,
 lists - which, on Python, are actually stored as arrays - are represented using
-datatypes on Bend. Specifically, the following type:
+datatypes on Bend. Specifically, the type:
 
 ```python
 type List:
