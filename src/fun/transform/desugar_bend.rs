@@ -4,7 +4,7 @@ use crate::{
   maybe_grow,
 };
 
-const RECURSIVE_KW: &str = "go";
+const RECURSIVE_KW: &str = "fork";
 const NEW_FN_SEP: &str = "__bend";
 
 impl Ctx<'_> {
