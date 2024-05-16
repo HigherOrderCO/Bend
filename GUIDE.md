@@ -221,6 +221,9 @@ def main:
 Except without the annoying syntax restrictions. You can also shorten it as `λ`,
 if you can somehow type that.
 
+*note - some types, like tuples, aren't being pretty-printed correctly after
+computation. this will be fixed in the next days (TM)*
+
 The Dreaded Immutability
 ------------------------
 
