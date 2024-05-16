@@ -446,7 +446,7 @@ while idx < 10:
   idx = idx + 1
 ```
 
-Could be emulated in Bend like this:
+Could be emulated in Bend with a "sequential bend":
 
 ```python
 bend idx = 0:
@@ -481,9 +481,8 @@ Can NOT be parallelized, because `f` **depends** on the result of `g`. But this:
 H(f(x), g(y))
 ```
 
-Can be parallelized, because `f(x)` and `g(y)` are **independent**. So, why
-`bend/fold`? Honestly - to discourage sequential loops. If you think about it,
-a loopy computation, like:
+Can be parallelized, because `f(x)` and `g(y)` are **independent**. Traditional
+loops, on the other hands, are inherently sequential. A loop like:
 
 ```python
 sum = 0
@@ -498,7 +497,7 @@ sum = (0 + (1 + (2 + (3 + (4 + (5 + (6 + 7)))))))
 ```
 
 Which is *really bad* for parallelism, because the only way to compute this is
-by evaluating the expressions one after the other:
+by evaluating the expressions one after the other, in order:
 
 ```python
 sum = (0 + (1 + (2 + (3 + (4 + (5 + (6 + 7)))))))
@@ -511,8 +510,8 @@ sum = (0 + 28)
 sum = 28
 ```
 
-There is nothing Bend could do to save this program, because sequentialism is
-an inherenty part of its logic. Now, if we had written, instead:
+There is nothing Bend could do to save this program: sequentialism is an
+inherent part of its logic. Now, if we had written, instead:
 
 ```python
 sum = (((0 + 1) + (2 + 3)) + ((4 + 5) + (6 + 7)))
