@@ -41,7 +41,7 @@ Hello, World!
 As we said, Bend *feels* like Python - in some ways. It is high-level, you can
 easily create objects and lists, there are ifs and loops. Yet, it is different:
 there is some Haskell in it, in the sense algebraic datatypes, pattern-matching
-and recursion play an important role. This is how its  "Hello, world!" looks:
+and recursion play an important role. This is how its  `"Hello, world!"` looks:
 
 ```python
 def main():
@@ -57,7 +57,7 @@ and see results. To run the program above, type:
 bend run main.bend
 ```
 
-If all goes well, you should see "Hello, world!". The `bend run` command uses
+If all goes well, you should see `"Hello, world!"`. The `bend run` command uses
 the reference interpreter, which is slow. In a few moments, we'll teach you how
 to run your code in parallel, on both CPUs and GPUs. For now, let's learn some
 fundamentals!
@@ -134,11 +134,11 @@ need `open` to access fields.
 Bend comes with 3 built-in numeric types: `u24`, `i24`, `f24`. That's quite
 small, we admit. Soon, we'll have larger types. For now, that's what we got.
 The `u24` type is written like `123` or `0xF`. The `i24` type requires a sign,
-as in, `+7` or `-7`. The `f24` type requires a ??, like `3.14`.
+as in, `+7` or `-7`. The `f24` type requires a `.`, like `3.14`.
 
-Other than tuples, Bend has another, very general way to encode data: datatypes!
-These are just "objects with tags". A classic example of this is a "shape",
-which can be either a circle or a rectangle. It is defined like this:
+Other than tuples, Bend has another, very general, way to encode data:
+datatypes! These are just "objects with tags". A classic example of this is a
+"shape", which can be either a circle or a rectangle. It is defined like this:
 
 ```python
 type Shape:
