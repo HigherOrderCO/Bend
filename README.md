@@ -70,7 +70,7 @@ def main:
 
 This code adds all numbers from 0 to 2^30, but, instead of a loop, we use a
 recursive divide-and-conquer approach. Since this approach is *inherently
-parallel*, the Bend executable will run in many cores. Here are some benchmarks:
+parallel*, Bend will run it multi-threaded. Some benchmarks:
 
 - CPU, Apple M3 Max, 1 thread: **3.5 minutes**
 
