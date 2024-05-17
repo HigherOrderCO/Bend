@@ -116,6 +116,10 @@ impl<'a> PyParser<'a> {
       }
       '{' => {
         self.advance_one();
+        self.skip_trivia();
+        if self.try_consume_exactly("}") {
+          return Ok(Expr::MapInit { entries: Vec::new() });
+        }
         let head = self.parse_expr(false)?;
         self.skip_trivia();
         if self.starts_with(":") { self.parse_map_init(head)? } else { self.parse_sup(head)? }
@@ -126,6 +130,10 @@ impl<'a> PyParser<'a> {
         let str = self.parse_quoted_string()?;
         let val = STRINGS.get(str);
         Expr::Str { val }
+      }
+      '\'' => {
+        let chr = self.parse_quoted_char()?;
+        Expr::Num { val: Num::U24(chr as u32 & 0x00ff_ffff) }
       }
       '$' => {
         self.advance_one();
