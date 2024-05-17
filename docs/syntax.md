@@ -109,6 +109,19 @@ It's possible to assign to a pattern, like a tuple or superposition, which will 
 (first, second) = (1, 2)
 ```
 
+### Use
+
+```rust
+use x = 2 + 3
+return x + x
+```
+
+Inline copies of the declared bind, it is equivalent to this code:
+
+```rust
+return ((2 + 3) + (2 + 3))
+```
+
 ### In-Place Operation
 
 ```python
@@ -538,6 +551,16 @@ A List literal is surrounded by `[` `]`. The elements must be separated by `,`.
 
 It is desugared to constructor calls of the built-in type List, `List/cons(head, ~tail)` and `List/nil` .
 
+### Map Literals
+
+```python
+{ 0: 4, `hi`: "bye", 'c': 2 + 3 }
+x[0] = 5     # Assigns the key 0 to the value 5
+return x[0]  # Gets the value of the key 0
+```
+
+Bend has a built-in binary tree map data structure where the key is a `u24`, meaning you can use numbers, characters, and symbols as keys.
+
 ### List Comprehension
 
 ```python
@@ -748,6 +771,19 @@ A let term uses a pattern, it can be:
 The let term will expects a binding value followed by a `next` term.
 
 Using `;` is optional.
+
+### Use
+
+```rust
+use x = (+ 2 3)
+(+ x x)
+```
+
+Inline copies of the declared bind, it is equivalent to this code:
+
+```rust
+(+ (+ 2 3) (+ 2 3))
+```
 
 ### Switch
 
