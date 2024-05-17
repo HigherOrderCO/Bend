@@ -88,9 +88,9 @@ def rots(d, s, tree):
 This
 [file](https://gist.github.com/VictorTaelin/face210ca4bc30d96b2d5980278d3921)
 implements a sorting algorithm with just tree rotations. It is not the kind of
-algorithm you'd expect to run on GPUs. Yet, since it uses a divide-and-conquer
-approach, which is *inherently parallel*, Bend will run it multi-threaded. Some
-benchmarks:
+algorithm you'd expect to run fast on GPUs. Yet, since it uses a
+divide-and-conquer approach, which is *inherently parallel*, Bend will run it
+multi-threaded. Some benchmarks:
 
 - CPU, Apple M3 Max, 1 thread: **12.15 seconds**
 
