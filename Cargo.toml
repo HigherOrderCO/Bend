@@ -1,6 +1,6 @@
 [package]
 name = "bend-lang"
-description = "A parallel language"
+description = "A high-level, massively parallel programming language"
 license = "Apache-2.0"
 version = "0.2.7"
 edition = "2021"
