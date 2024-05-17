@@ -127,7 +127,7 @@ and synchronized correctly and efficiently by
 
 - To understand the tech behind Bend, check HVM2's [paper](https://github.com/HigherOrderCO/HVM/raw/main/PAPER.pdf).
 
-- Bend is developed by [HigherOrderCO.com](https://HigherOrderCO.com). Join our [Discord](https://discord.HigherOrderCO.com)!
+- Bend is developed by [HigherOrderCO.com](https://HigherOrderCO.com) - join our [Discord](https://discord.HigherOrderCO.com)!
 
 A Quick Demo
 ------------
