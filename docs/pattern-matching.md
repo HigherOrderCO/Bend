@@ -44,7 +44,7 @@ UnwrapOrZero x = (x λx.val x.val 0)
 
 Currently, if you want to readback the adt constructors and matches after running a program as constructors and matches and not as lambda terms, you have to use `-Oadt-tagged-scott`.
 The tags are used to decode which ADT the lambda term refers to, but having them means that if you want to write your own function to operate on these tagged structures your functions have to either use the `match` syntax or use the tags correctly themselves.
-You can read more about tagged lambdas and applications in [Automatic vectorization with tagged lambdas](docs/automatic-vectorization-with-tagged-lambdas.md).
+You can read more about tagged lambdas and applications in [Automatic vectorization with tagged lambdas](automatic-vectorization-with-tagged-lambdas.md).
 
 
 ### Pattern Matching functions
