@@ -69,6 +69,7 @@ pub struct Reader<'a> {
   dup_paths: Option<HashMap<u16, Vec<SlotId>>>,
   /// Store for floating/unscoped terms, like dups and let tups.
   scope: Scope,
+  // To avoid reinserting things in the scope.
   seen_fans: Scope,
   seen: HashSet<Port>,
   errors: Vec<ReadbackError>,
@@ -79,7 +80,7 @@ impl Reader<'_> {
     use CtrKind::*;
 
     maybe_grow(|| {
-      if self.dup_paths.is_none() && !self.seen.insert(next) {
+      if !self.seen.insert(next) && self.dup_paths.is_none() {
         self.error(ReadbackError::Cyclic);
         return Term::Var { nam: Name::new("...") };
       }
@@ -93,14 +94,22 @@ impl Reader<'_> {
         }
         // If we're visiting a con node...
         NodeKind::Ctr(CtrKind::Con(lab)) => match next.slot() {
-          // If we're visiting a port 0, then it is a lambda.
+          // If we're visiting a port 0, then it is a tuple or a lambda.
           0 => {
-            let nam = self.namegen.decl_name(self.net, Port(node, 1));
-            let bod = self.read_term(self.net.enter_port(Port(node, 2)));
-            Term::Lam {
-              tag: self.labels.con.to_tag(*lab),
-              pat: Box::new(Pattern::Var(nam)),
-              bod: Box::new(bod),
+            if self.is_tup(node) {
+              // A tuple
+              let lft = self.read_term(self.net.enter_port(Port(node, 1)));
+              let rgt = self.read_term(self.net.enter_port(Port(node, 2)));
+              Term::Fan { fan: FanKind::Tup, tag: self.labels.con.to_tag(*lab), els: vec![lft, rgt] }
+            } else {
+              // A lambda
+              let nam = self.namegen.decl_name(self.net, Port(node, 1));
+              let bod = self.read_term(self.net.enter_port(Port(node, 2)));
+              Term::Lam {
+                tag: self.labels.con.to_tag(*lab),
+                pat: Box::new(Pattern::Var(nam)),
+                bod: Box::new(bod),
+              }
             }
           }
           // If we're visiting a port 1, then it is a variable.
@@ -332,8 +341,8 @@ impl Reader<'_> {
     }
   }
 
-  /// Enters both ports 1 and 2 of a node,
-  /// Returning a Term if is possible to simplify the net, or the Terms on the two ports of the node.
+  /// Enters both ports 1 and 2 of a node. Returns a Term if it is
+  /// possible to simplify the net, or the Terms on the two ports of the node.
   /// The two possible outcomes are always equivalent.
   ///
   /// If:
@@ -403,6 +412,42 @@ impl Reader<'_> {
       let msg = format!("{}{}", err, count_msg);
       diagnostics.add_diagnostic(msg.as_str(), Severity::Warning, DiagnosticOrigin::Readback);
     }
+  }
+
+  /// Returns whether the given port represents a tuple or some other
+  /// term (usually a lambda).
+  ///
+  /// Used heuristic: a con node is a tuple if port 1 is a closed net and not an ERA.
+  fn is_tup(&self, node: NodeId) -> bool {
+    if !matches!(self.net.node(node).kind, NodeKind::Ctr(CtrKind::Con(_))) {
+      return false;
+    }
+    if self.net.node(self.net.enter_port(Port(node, 1)).node()).kind == NodeKind::Era {
+      return false;
+    }
+    let mut wires = HashSet::new();
+    let mut to_check = vec![self.net.enter_port(Port(node, 1))];
+    while let Some(port) = to_check.pop() {
+      match port.slot() {
+        0 => {
+          let node = port.node();
+          let lft = self.net.enter_port(Port(node, 1));
+          let rgt = self.net.enter_port(Port(node, 2));
+          to_check.push(lft);
+          to_check.push(rgt);
+        }
+        1 | 2 => {
+          // Mark as a wire. If already present, mark as visited by removing it.
+          if !(wires.insert(port) && wires.insert(self.net.enter_port(port))) {
+            wires.remove(&port);
+            wires.remove(&self.net.enter_port(port));
+          }
+        }
+        _ => unreachable!(),
+      }
+    }
+    // No hanging wires = a combinator = a tuple
+    wires.is_empty()
   }
 }
 

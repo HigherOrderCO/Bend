@@ -7,6 +7,9 @@ String/from_list (List/Cons x xs) = (String/Cons x (String/from_list xs))
 (Join List/Nil)         = ""
 (Join (List/Cons x xs)) = (Concat x (Join xs))
 
+(Expand xs) = fold xs { String/Nil: xs; String/Cons: xs }
+
 main =
-  ((String/from_list ['\n', '\r', '\t', '\0', '\"', '\'', '\u{AFE}', '\\'])
-  , (Join ["\n", "\r", "\t", "\0", "\"", "\'", "\u{AFE}", "\\"]))
+  let a = (String/from_list ['\n', '\r', '\t', '\0', '\"', '\'', '\u{AFE}', '\\'])
+  let b = (Join ["\n", "\r", "\t", "\0", "\"", "\'", "\u{AFE}", "\\"])
+  (Expand (Concat a b))

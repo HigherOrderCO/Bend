@@ -1,0 +1,4 @@
+run
+tests/golden_tests/cli/tuple_readback.bend
+-Ono-float-combinators
+-Aall
