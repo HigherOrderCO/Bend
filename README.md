@@ -17,6 +17,8 @@ A Quick Demo
 
 ## Using Bend
 
+> Currently not working on Windows, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) as a workaround.
+
 First, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml). Then, install both HVM2 and Bend with:
 
 ```sh
@@ -131,6 +133,6 @@ and synchronized correctly and efficiently by
 
 - For an extensive list of features, check [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
 
-- To understand the tech behind Bend, check HVM2's [paper](https://github.com/HigherOrderCO/HVM/raw/main/paper/PAPER.pdf).
+- To understand the tech behind Bend, check HVM2's [paper](https://paper.higherorderco.com).
 
 - Bend is developed by [HigherOrderCO.com](https://HigherOrderCO.com) - join our [Discord](https://discord.HigherOrderCO.com)!

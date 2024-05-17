@@ -33,6 +33,7 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-test-${{ hashFiles('**/Cargo.lock') }}
+      - run: cargo install hvm
       - run: cargo test -- --test-threads=1
   clippy:
     runs-on: ubuntu-latest
