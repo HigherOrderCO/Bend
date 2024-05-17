@@ -70,20 +70,20 @@ def sum(depth, x):
       return fst + snd
     
 def main:
-  return sum(30, 0)
+  return sum(28, 0)
 ```
 
 This code adds all numbers from 0 up to (but not including) 2^30. But, instead
 of a loop, we use a recursive divide-and-conquer approach. Since this approach
 is *inherently parallel*, Bend will run it multi-threaded. Some benchmarks:
 
-- CPU, Apple M3 Max, 1 thread: **3.5 minutes**
+- CPU, Apple M3 Max, 1 thread: **33.39 seconds**
 
-- CPU, Apple M3 Max, 16 threads: **10.26 seconds**
+- CPU, Apple M3 Max, 16 threads: **2.94 seconds**
 
-- GPU, NVIDIA RTX 4090, 32k threads: **1.88 seconds**
+- GPU, NVIDIA RTX 4090, 16k threads: **0.56 seconds**
 
-That's a **111x speedup** by doing nothing. No thread spawning, no explicit
+That's a **59x speedup** by doing nothing. No thread spawning, no explicit
 management of locks, mutexes. We just asked bend to run our program on RTX, and
 it did. Simple as that. (Note that, for now, Bend only supports 24-bit machine
 ints (`u24`), thus, results are always `mod 2^24`. We plan to 64-bit numbers on
