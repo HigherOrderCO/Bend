@@ -89,7 +89,7 @@ two points:
 def distance(ax, ay, bx, by):
   dx = bx - ax
   dy = by - ay
-  return (dx * dx + dy * dy) ^ 0.5
+  return (dx * dx + dy * dy) ** 0.5
 
 def main():
   return distance(10.0, 10.0, 20.0, 20.0)
@@ -103,7 +103,7 @@ def distance(a, b):
   (bx, by) = b
   dx = bx - ax
   dy = by - ay
-  return (dx * dx + dy * dy) ^ 0.5
+  return (dx * dx + dy * dy) ** 0.5
 
 def main():
   return distance((10.0, 10.0), (20.0, 20.0))
@@ -121,7 +121,7 @@ def distance(a, b):
   open V2: b
   dx = b.x - a.x
   dy = b.y - a.y
-  return (dx * dx + dy * dy) ^ 0.5
+  return (dx * dx + dy * dy) ** 0.5
 
 def main():
   return distance(V2 { x: 10.0, y: 10.0 }, V2 { x: 20.0, y: 20.0 })
@@ -151,7 +151,7 @@ type Shape:
 def area(shape):
   match shape:
     case Shape/Circle:
-      return 3.14 * shape.radius ^ 2.0
+      return 3.14 * shape.radius ** 2.0
     case Shape/Rectangle:
       return shape.width * shape.height
 

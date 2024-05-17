@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/imp_use_statement.bend
+---
+λa {{1 a} {1 a}}

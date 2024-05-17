@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/tuple_readback.bend
+---
+Warning: Running in strict mode without enabling the float_combinators pass can lead to some functions expanding infinitely.
+Result: (λa (1, a), ((1, 2), (λ* 2, (λb λc *, (λd (2, λe $f), λg λh λi $j)))))

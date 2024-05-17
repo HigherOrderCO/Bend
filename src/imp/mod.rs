@@ -167,6 +167,12 @@ pub enum Stmt {
     var: Name,
     nxt: Box<Stmt>,
   },
+  // "use" {name} "=" {expr} ";"? {nxt}
+  Use {
+    nam: Name,
+    val: Box<Expr>,
+    nxt: Box<Stmt>,
+  },
   #[default]
   Err,
 }
