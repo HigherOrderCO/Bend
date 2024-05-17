@@ -47,6 +47,6 @@ data Boolean = True | False
 (Option.is_both_some lft rgt) = False
 ```
 
-You can read more about pattern matching rules in [Pattern matching](/pattern-matching.md).
+You can read more about pattern matching rules in [Pattern matching](/docs/pattern-matching.md).
 
 In conclusion, the `data` keyword is very useful as it allows you to easily create data types and deconstruct them.
