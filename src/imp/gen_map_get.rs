@@ -104,6 +104,13 @@ impl Stmt {
       Stmt::Open { typ: _, var: _, nxt } => {
         nxt.gen_map_get(id);
       }
+      Stmt::Use { nam: _, val: bod, nxt } => {
+        nxt.gen_map_get(id);
+        let substitutions = bod.substitute_map_gets(id);
+        if !substitutions.is_empty() {
+          *self = gen_get(self, substitutions);
+        }
+      }
       Stmt::Err => {}
     }
   }

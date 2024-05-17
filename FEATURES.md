@@ -1,9 +1,11 @@
 ## Features
 
-Bend offers two flavors of syntax, a user-friendly python-like syntax (the default) and the core ML/Haskell-like syntax that's used internally by the compiler.
+Bend offers two flavors of syntax, the user-friendly python-like syntax "Imp" (the default) and the core ML/Haskell-like syntax "Fun".
 You can read the full reference for both of them [here](docs/syntax.md), but these examples will use the first one.
 
 To see some more complex examples programs, check out the [examples](examples/) folder.
+
+### Basic features
 
 We can start with a basic program that adds the numbers 3 and 2.
 
@@ -12,8 +14,8 @@ def main:
   return 2 + 3
 ```
 
-Normalizing this program will show the number 5.
-Be careful with `run` and `norm`, since they will not show any warnings by default. Before running a new program it's useful to first `check` it.
+Running this program will show the number 5.
+Be careful with `run` since it will not show any warnings by default. Before running a new program it's useful to first `check` it.
 
 Bend programs consist of a series of function definitions, always starting with a function called `main` or `Main`.
 
@@ -36,69 +38,95 @@ def main:
   return sum
 ```
 
+### Data types
+
 You can bundle multiple values into a single value using a tuple or a struct.
 
 ```py
 # With a tuple
-def Tuple.fst(x):
+def tuple_fst(x):
   # This destructures the tuple into the two values it holds.
   # '*' means that the value is discarded and not bound to any variable.
   (fst, *) = x
   return fst
 
-# With a struct
-struct Pair(fst, snd):
-def Pair.fst(x):
+# With an object (similar to what other languages call a struct, a class or a record)
+object Pair { fst, snd }
+
+def Pair/fst(x):
   match x:
-    Pair:
+    case Pair:
       return x.fst
 
-# We can also directly access the fields of a struct.
-# This requires that we tell the compiler the type of the variable where it is defined.
-def Pair.fst_2(x: Pair):
+# We can also access the fields of an object after we `open` it.
+def Pair/fst_2(x):
+  open Pair: x
   return x.fst
+
+# This is how we can create new objects.
+def Pair/with_one(x):
+  return Pair{ fst: x, snd: 1 }
+
+# The function can be named anything, but by convention we use Type/function_name.
+def Pair/swap(x):
+  open Pair: x
+  # We can also call the constructor like any normal function.
+  return Pair(x.snd, x.fst)
 ```
 
-For more complicated data structures, we can use `enum` to define a algebraic data types.
+For more complicated data structures, we can use `type` to define algebraic data types.
 
 ```py
-enum MyTree:
-  Node(val, ~left, ~right)
+type MyTree:
+  Node { val, ~left, ~right }
   Leaf
 ```
 
-We can then pattern match on the enum to perform different actions depending on the variant of the value.
+This defines a constructor function for each variant of the type, with names `MyTree/Node` and `MyTree/Leaf`.
+
+Like most things in bend (except tuples and numbers), types defined with `type` and `object` become lambda encoded functions.
+You can read how this is done internally by the compiler in [Defining data types](docs/defining-data-types.md) and [Pattern matching](docs/pattern-matching.md).
+
+### Pattern matching
+
+We can pattern match on values of a data type to perform different actions depending on the variant of the value.
 
 ```py
-def Maybe.or_default(x, default):
+def Maybe/or_default(x, default):
   match x:
-    Maybe/some:
+    case Maybe/Some:
       # We can access the fields of the variant using 'matched.field'
       return x.val
-    Maybe/none:
+    case Maybe/None:
       return default
 ```
 
+### Folding
+
 We use `~` to indicate that a field is recursive.
-This allows us to easily create and consume these recursive data structures with `bend` and `fold`:
+This allows us to easily create and consume these recursive data structures with `bend` and `fold`.
+
+`fold` is a recursive `match` that you can use to transform and consume data structures.
+`bend` is a pure recursive loop that is very useful for generating data structures.
 
 ```py
 def MyTree.sum(x):
   # Sum all the values in the tree.
   fold x:
     # The fold is implicitly called for fields marked with '~' in their definition.
-    Node:
-      return val + x.left + x.right
-    Leaf:
+    case MyTree/Node:
+      return x.val + x.left + x.right
+    case MyTree/Leaf:
       return 0
 
 def main:
-  bend val = 0 while val < 0:
-    # 'fork' calls the bend recursively with the provided values.
-    x = Node(val=val, left=fork(val + 1), right=fork(val + 1))
-  then:
-    # 'then' is the base case, when the condition fails.
-    x = Leaf
+  bend val = 0:
+    when val < 10:
+      # 'fork' calls the bend recursively with the provided values.
+      x = MyTree/Node { val:val, left:fork(val + 1), right:fork(val + 1) }
+    else:
+      # 'else' is the base case, when the condition fails.
+      x = MyTree/Leaf
 
   return MyTree.sum(x)
 ```
@@ -108,40 +136,63 @@ These are equivalent to inline recursive functions that create a tree and consum
 ```py
 def MyTree.sum(x):
   match x:
-    Node:
+    case MyTree/Node:
       return x.val + MyTree.sum(x.left) + MyTree.sum(x.right)
-    Leaf:
+    case MyTree/Leaf:
       return 0
 
 def main_bend(val):
-  if val < 0:
-    return Node(val, main_bend(val + 1), main_bend(val + 1))
+  if val < 10:
+    return MyTree/Node(val, main_bend(val + 1), main_bend(val + 1))
   else:
-    return Leaf
+    return MyTree/Leaf
 
 def main:
-  return main_bend(0)
+  x = main_bend(0)
+  return MyTree.sum(x)
 ```
 
 Making your program around trees is a very good way of making it parallelizable, since each core can be dispatched to work on a different branch of the tree.
+
+You can also pass some state variables to `fold` just like the variables used in a `bend`.
+If you give a `fold` some state, then you necessarily need to pass it by calling the folded fields of the matched value, like passing an additional argument to the fold call.
+
+```py
+# This function substitutes each value in the tree with the sum of all the values before it.
+def MyTree.map_sum(x):
+  acc = 0
+  fold x with acc:
+    case MyTree/Node:
+      # `x.left` and `x.right` are called with the new state value.
+      # Note that values are copied if you use them more than once, so you don't want to pass something very large. 
+      return MyTree/Node{ val: x.val + acc, left: x.left(x.val + acc), right: x.right(x.val + acc) }
+    case MyTree/Leaf:
+      return x
+```
+
+This allows `fold` to be a very powerful and generic tool that can be used to implement most pure data transformations.
+
+
+### Some caveats and limitations
 
 _Attention_: Note that despite the ADT syntax sugars, Bend is an _untyped_ language and the compiler will not stop you from using values incorrectly, which can lead to very unexpected results.
 For example, the following program will compile just fine even though `!=` is only defined for native numbers:
 
 ```py
 def main:
-  bend val = [0, 1, 2, 3] while val != []:
-    match val:
-      List.cons:
-        x = val.head + fork(val.tail)
-      List.nil:
-        x = 0
-  then:
-    x = 0
+  bend val = [0, 1, 2, 3]:
+    when val != []:
+      match val:
+        case List/Cons:
+          x = val.head + fork(val.tail)
+        case List/Nil: 
+          x = 0
+    else:
+      x = 0
   return x
 ```
 
-Normalizing this program will show `λ* *` and not the expected `6`.
+Running this program will show `λ* *` and not the expected `6`.
 
 It's also important to note that Bend is linear (technically affine), meaning that every variable is only used once. When a variable is used more than once, the compiler will automatically insert a duplication.
 Duplications efficiently share the same value between two locations, only cloning a value when it's actually needed, but their exact behaviour is slightly more complicated than that and escapes normal lambda-calculus rules.
@@ -167,14 +218,35 @@ Bend supports recursive functions of unrestricted depth:
 ```py
 def native_num_to_adt(n):
   if n == 0:
-    return Nat.zero
+    return Nat/Zero
   else:
-    return Nat.succ(native_num_to_adt(n - 1))
+    return Nat/Succ(native_num_to_adt(n - 1))
 ```
 
 If your recursive function is not based on pattern matching syntax (like `if`, `match`, `fold`, etc) you have to be careful to avoid an infinite loop.
+
+```py
+# A scott-encoded list folding function
+# Writing it like this will cause an infinite loop.
+def scott_list.add(xs, add):
+  xs(
+    λxs.head xs.tail: λc n: (c (xs.head + add) scott_list.sum(xs.tail, add)),
+    λc λn: n
+  )
+
+# Instead we want to write it like this;
+def scott_list.add(xs, add):
+  xs(
+    λxs.head xs.tail: λadd: λc n: (c (xs.head + add) scott_list.sum(xs.tail, add)),
+    λadd: λc λn: n,
+    add
+  )
+```
+
 Since Bend is eagerly executed, some situations will cause function applications to always be expanded, which can lead to looping situations.
 You can read how to avoid this in [Lazy definitions](docs/lazy-definitions.md).
+
+### Numbers
 
 Bend has native numbers and operations.
 
@@ -188,19 +260,30 @@ def main:
   return (a * 2, b - c, d / e)
 ```
 
-`switch` pattern matches on unsigned native numbers:
+Unsigned numbers are written as just the number.
+Signed numbers are written with a `+` or `-` sign.
+Floating point numbers must have the decimal point `.` and can optionally take a sign `+` or `-`.
+
+The three number types are fundamentally different.
+If you mix two numbers of different types HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now.
+
+At the moment Bend doesn't have a way to convert between the different number types, but it will be added in the future.
+
+You can use `switch` to pattern match on unsigned native numbers:
 
 ```py
 switch x = 4:
   # From '0' to n, ending with the default case '_'.
-  0:  "zero"
-  1:  "one"
-  2:  "two"
+  case 0:  "zero"
+  case 1:  "one"
+  case 2:  "two"
   # The default case binds the name <arg>-<n>
   # where 'arg' is the name of the argument and 'n' is the next number.
   # In this case, it's 'x-3', which will have value (4 - 3) = 1
-  _:  String.concat("other: ", (String.from_num x-3))
+  case _:  String.concat("other: ", (String.from_num x-3))
 ```
+
+### Other builtin types
 
 Bend has Lists and Strings, which support Unicode characters.
 
@@ -209,28 +292,29 @@ def main:
   return ["You: Hello, 🌎", "🌎: Hello, user"]
 ```
 
-A string is desugared to a String data type containing two constructors, `String.cons` and `String.nil`.
-List also becomes a type with two constructors, `List.cons` and `List.nil`.
+A string is desugared to a String data type containing two constructors, `String/Cons` and `String/Nil`.
+List also becomes a type with two constructors, `List/Cons` and `List/Nil`.
 
 ```rs
-# These two are equivalent
+# When you write this
 def StrEx:
   "Hello"
-
 def ids:
   [1, 2, 3]
 
-# These types are builtin.
-enum String:
-  String.cons(head, tail)
-  String.nil
-enum List:
-  List.cons(head, tail)
-  List.nil
+# The compiler converts it to this
 def StrEx:
-  String.cons('H', String.cons('e', String.cons('l', String.cons('l', String.cons('o', String.nil)))))
+  String/Cons('H', String/Cons('e', String/Cons('l', String/Cons('l', String/Cons('o', String/Nil)))))
 def ids:
-  List.cons(1, List.cons(2, List.cons(3, List.nil)))
+  List/Cons(1, List/Cons(2, List/Cons(3, List/Nil)))
+
+# These are the definitions of the builtin types.
+type String:
+  Cons { head, ~tail }
+  Nil
+type List:
+  Cons { head, ~tail }
+  Nil
 ```
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They are encoded as a U24 with the unicode codepoint as their value.
@@ -242,6 +326,32 @@ def chars:
 
 def chars2:
   [65, 0x4242, 0x1F30E]
+```
+
+
+### Mixing syntaxes
+
+As was said in the beginning, Bend offers two flavors of syntax.
+You can mix and match them freely in your program, as long as each function uses only one flavor.
+
+```py
+type Bool:
+  True
+  False
+
+def is_odd(x):
+  switch x:
+    case 0:
+      return Bool/False
+    case _:
+      return is_even(x-1)
+
+(is_even n) = switch n {
+  0: return Bool/True
+  _: (is_odd n-1)
+}
+
+main = (is_odd 20)
 ```
 
 ### More features
@@ -258,11 +368,11 @@ Other features are described in the following documentation files:
 - &#128215; Data types: [Defining data types](docs/defining-data-types.md)
 - &#128215; Pattern matching: [Pattern matching](docs/pattern-matching.md)
 - &#128215; Native numbers and operations: [Native numbers](docs/native-numbers.md)
-- &#128215; Builtin definitions: [Builtin definitions](docs/builtin-defs.md)
+- &#128215; Builtin definitions: *Documentation coming soon*
 - &#128215; CLI arguments: [CLI arguments](docs/cli-arguments.md)
 - &#128217; Duplications and superpositions: [Dups and sups](docs/dups-and-sups.md)
 - &#128217; Scopeless lambdas: [Using scopeless lambdas](docs/using-scopeless-lambdas.md)
-- &#128213;: Fusing functions: [Writing fusing functions](docs/writing-fusing-functions.md)
+- &#128213; Fusing functions: [Writing fusing functions](docs/writing-fusing-functions.md)
 
 ## Further reading
 

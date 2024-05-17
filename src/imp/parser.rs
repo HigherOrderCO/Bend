@@ -241,14 +241,16 @@ impl<'a> PyParser<'a> {
   fn list_or_comprehension(&mut self) -> ParseResult<Expr> {
     self.consume_exactly("[")?;
 
+    // Empty list
     self.skip_trivia();
-    if self.starts_with("]") {
+    if self.try_consume_exactly("]") {
       return Ok(Expr::Lst { els: vec![] });
     }
 
     let head = self.parse_expr(false)?;
     self.skip_trivia();
     if self.try_parse_keyword("for") {
+      // Comprehension
       self.skip_trivia();
       let bind = self.parse_bend_name()?;
       self.skip_trivia();
@@ -262,6 +264,7 @@ impl<'a> PyParser<'a> {
       self.consume("]")?;
       Ok(Expr::Comprehension { term: Box::new(head), bind, iter: Box::new(iter), cond })
     } else {
+      // List
       let mut head = vec![head];
       self.try_consume(",");
       let tail = self.list_like(|p| p.parse_expr(false), "", "]", ",", false, 0)?;
@@ -374,6 +377,8 @@ impl<'a> PyParser<'a> {
         self.parse_do(indent)
       } else if self.try_parse_keyword("open") {
         self.parse_open(indent)
+      } else if self.try_parse_keyword("use") {
+        self.parse_use(indent)
       } else {
         self.parse_assign(indent)
       }
@@ -849,6 +854,22 @@ impl<'a> PyParser<'a> {
     self.consume_indent_exactly(*indent)?;
     let (nxt, nxt_indent) = self.parse_statement(indent)?;
     let stmt = Stmt::Open { typ, var, nxt: Box::new(nxt) };
+    Ok((stmt, nxt_indent))
+  }
+
+  fn parse_use(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+    self.skip_trivia_inline();
+    let nam = self.parse_bend_name()?;
+    self.skip_trivia_inline();
+    self.consume_exactly("=")?;
+    self.skip_trivia_inline();
+    let bod = self.parse_expr(true)?;
+    self.skip_trivia_inline();
+    self.try_consume_exactly(";");
+    self.consume_new_line()?;
+    self.consume_indent_exactly(*indent)?;
+    let (nxt, nxt_indent) = self.parse_statement(indent)?;
+    let stmt = Stmt::Use { nam, val: Box::new(bod), nxt: Box::new(nxt) };
     Ok((stmt, nxt_indent))
   }
 

@@ -272,6 +272,14 @@ impl Stmt {
         let term = fun::Term::Open { typ, var, bod: Box::new(nxt) };
         if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
       }
+      Stmt::Use { nam, val, nxt } => {
+        let (nxt_pat, nxt) = match nxt.into_fun()? {
+          StmtToFun::Return(term) => (None, term),
+          StmtToFun::Assign(pat, term) => (Some(pat), term),
+        };
+        let term = fun::Term::Use { nam: Some(nam), val: Box::new(val.to_fun()), nxt: Box::new(nxt) };
+        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+      }
       Stmt::Return { term } => StmtToFun::Return(term.to_fun()),
       Stmt::Err => unreachable!(),
     };
