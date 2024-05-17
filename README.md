@@ -130,4 +130,4 @@ and synchronized correctly and efficiently by
 A Quick Demo
 ------------
 
-![demo](https://i.imgur.com/7X7oHE4.gif)
+![bendlivedemo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)
