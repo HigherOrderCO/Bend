@@ -103,7 +103,7 @@ def render(depth, shader):
 # for this demo, it just busy loops
 def demo_shader(x, y):
   bend i = 0:
-    when i < 100000:
+    when i < 5000:
       color = fork(i + 1)
     else:
       color = 0x000001
