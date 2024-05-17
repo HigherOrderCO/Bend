@@ -17,9 +17,10 @@ A Quick Demo
 
 ## Using Bend
 
+> Currently not working on Windows, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) as a workaround.
+
 First, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml). Then, install both HVM2 and Bend with:
 
-> Currently not working on Windows, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) as a workaround.
 ```sh
 cargo +nightly install hvm
 cargo +nightly install bend-lang
