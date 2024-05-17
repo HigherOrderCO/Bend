@@ -157,7 +157,7 @@ These automatic linearization passes are done before the manual linearization fr
 
 ## float-combinators
 
-Extracts closed terms to new definitions. See [lazy definitions](lazy-definitions#automatic-optimization).
+Extracts closed terms to new definitions. See [lazy definitions](lazy-definitions.md#automatic-optimization).
 Since HVM-Core is an eager runtime, this pass is enabled by default to prevent infinite expansions.
 
 Example:
