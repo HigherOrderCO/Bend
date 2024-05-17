@@ -51,7 +51,7 @@ Map = λf λlist
   (list cons nil f)
 ```
 
-This code will work as expected, since `cons` and `nil` are lambdas without free variables, they will be automatically floated to new definitions if the [float-combinators](compiler-options#float-combinators) option is active, allowing them to be unrolled lazily by hvm.
+This code will work as expected, since `cons` and `nil` are lambdas without free variables, they will be automatically floated to new definitions if the [float-combinators](compiler-options.md#float-combinators) option is active, allowing them to be unrolled lazily by hvm.
 
 It's recommended to use a [supercombinator](https://en.wikipedia.org/wiki/Supercombinator) formulation to make terms be unrolled lazily, preventing infinite expansion in recursive function bodies.
 
@@ -59,7 +59,7 @@ If you have a set of mutually recursive functions, you only need to make one of 
 
 ### Automatic optimization
 
-HVM-lang carries out [match linearization](compiler-options.md#linearize-matches) and [combinator floating](compiler-options#float-combinators) optimizations, enabled through the CLI, which are active by default in strict mode.
+HVM-lang carries out [match linearization](compiler-options.md#linearize-matches) and [combinator floating](compiler-options.md#float-combinators) optimizations, enabled through the CLI, which are active by default in strict mode.
 
 Consider the code below:
 
