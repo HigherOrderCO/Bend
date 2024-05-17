@@ -36,6 +36,8 @@ To test if it worked, type:
 bend --help
 ```
 
+For GPU support, you also need CUDA version `12.X`.
+
 Hello, World!
 -------------
 
@@ -591,7 +593,7 @@ realms of arbitrary high-level programs on... GPUs. How hard that could be?
 Well, for us... it was. A lot. For you... just call the **CUDA interpreter**:
 
 ```
-bend gen-cu main.bend
+bend run-cu main.bend
 ```
 
 And, simply as that, the same program now runs in `0.82s`, at a blistering
