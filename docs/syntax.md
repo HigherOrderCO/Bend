@@ -460,21 +460,23 @@ i24 = -42
 u24 = 42
 ```
 
-| Operation      | Syntax   |
-| -------------- | -------- |
-| Addition       | x + y    |
-| Subtraction    | x - y    |
-| Multiplication | x \* y   |
-| Division       | x / y    |
-| Remainder      | x % y    |
-| Exponentiation | x \*\* y |
-| Equal          | x == y   |
-| Not Equal      | x != y   |
-| Less Than      | x < y    |
-| Greater Than   | x > y    |
-| Bitwise And    | x & y    |
-| Bitwise Or     | x \| y   |
-| Bitwise Xor    | x ^ y    |
+Currently, the 3 number types cannot be mixed.
+
+| Operation      | Syntax   | Supported Types  |
+| -------------- | -------- | ---------------- |
+| Addition       | x + y    | int, float, uint |
+| Subtraction    | x - y    | int, float, uint |
+| Multiplication | x \* y   | int, float, uint |
+| Division       | x / y    | int, float, uint |
+| Remainder      | x % y    | int, float, uint |
+| Exponentiation | x \*\* y | float            |
+| Equal          | x == y   | int, float, uint |
+| Not Equal      | x != y   | int, float, uint |
+| Less Than      | x < y    | int, float, uint |
+| Greater Than   | x > y    | int, float, uint |
+| Bitwise And    | x & y    | int, uint        |
+| Bitwise Or     | x \| y   | int, uint        |
+| Bitwise Xor    | x ^ y    | int, uint        |
 
 ### Constructor Literals
 
@@ -918,21 +920,23 @@ i24 = -42
 u24 = 42
 ```
 
-| Operation      | Syntax     |
-| -------------- | ---------- |
-| Addition       | (+ x y)    |
-| Subtraction    | (- x y)    |
-| Multiplication | (\* x y)   |
-| Division       | (/ x y)    |
-| Remainder      | (% x y)    |
-| Exponentiation | (\*\* x y) |
-| Equal          | (== x y)   |
-| Not Equal      | (!= x y)   |
-| Less Than      | (< x y)    |
-| Greater Than   | (> x y)    |
-| Bitwise And    | (& x y)    |
-| Bitwise Or     | (\| x y)   |
-| Bitwise Xor    | (^ x y)    |
+Currently, the 3 number types cannot be mixed.
+
+| Operation      | Syntax     | Supported Types  |
+| -------------- | ---------- | ---------------- |
+| Addition       | (+ x y)    | int, float, uint |
+| Subtraction    | (- x y)    | int, float, uint |
+| Multiplication | (\* x y)   | int, float, uint |
+| Division       | (/ x y)    | int, float, uint |
+| Remainder      | (% x y)    | int, float, uint |
+| Exponentiation | (\*\* x y) | float            |
+| Equal          | (== x y)   | int, float, uint |
+| Not Equal      | (!= x y)   | int, float, uint |
+| Less Than      | (< x y)    | int, float, uint |
+| Greater Than   | (> x y)    | int, float, uint |
+| Bitwise And    | (& x y)    | int, uint        |
+| Bitwise Or     | (\| x y)   | int, uint        |
+| Bitwise Xor    | (^ x y)    | int, uint        |
 
 ### Character Literal
 
