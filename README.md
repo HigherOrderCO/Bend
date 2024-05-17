@@ -13,7 +13,7 @@ the [HVM2](https://github.com/HigherOrderCO/hvm) runtime.
 A Quick Demo
 ------------
 
-![bendlivedemo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)
+![Bend live demo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)
 
 ## Using Bend
 
