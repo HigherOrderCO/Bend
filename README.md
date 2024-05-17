@@ -62,34 +62,45 @@ per Bend's fundamental pledge:
 For a more complete example, consider:
 
 ```python
-def sum(depth, x):
-  switch depth:
+# Sorting Network = just rotate trees!
+def sort(d, s, tree):
+  switch d:
     case 0:
-      return x
+      return tree
     case _:
-      fst = sum(depth-1, x*2+0) # adds the fst half
-      snd = sum(depth-1, x*2+1) # adds the snd half
-      return fst + snd
-    
-def main:
-  return sum(28, 0)
+      (x,y) = tree
+      lft   = sort(d-1, 0, x)
+      rgt   = sort(d-1, 1, y)
+      return rots(d, s, lft, rgt)
+
+# Rotates sub-trees (Blue/Green Box)
+def rots(d, s, tree):
+  switch d:
+    case 0:
+      return tree
+    case _:
+      (x,y) = tree
+      return down(d, s, warp(d-1, s, x, y))
+
+(...)
 ```
 
-This code adds all numbers from 0 up to (but not including) 2^30. But, instead
-of a loop, we use a recursive divide-and-conquer approach. Since this approach
-is *inherently parallel*, Bend will run it multi-threaded. Some benchmarks:
+This
+[file](https://gist.github.com/VictorTaelin/face210ca4bc30d96b2d5980278d3921)
+implements a sorting algorithm with just tree rotations. It is not the kind of
+algorithm you'd expect to run on GPUs. Yet, since it uses a divide-and-conquer
+approach, which is *inherently parallel*, Bend will run it multi-threaded. Some
+benchmarks:
 
-- CPU, Apple M3 Max, 1 thread: **33.39 seconds**
+- CPU, Apple M3 Max, 1 thread: **12.15 seconds**
 
-- CPU, Apple M3 Max, 16 threads: **2.94 seconds**
+- CPU, Apple M3 Max, 16 threads: **0.96 seconds**
 
-- GPU, NVIDIA RTX 4090, 16k threads: **0.56 seconds**
+- GPU, NVIDIA RTX 4090, 16k threads: **0.21 seconds**
 
-That's a **59x speedup** by doing nothing. No thread spawning, no explicit
+That's a **57x speedup** by doing nothing. No thread spawning, no explicit
 management of locks, mutexes. We just asked bend to run our program on RTX, and
-it did. Simple as that. (Note that, for now, Bend only supports 24-bit machine
-ints (`u24`), thus, results are always `mod 2^24`. We plan to 64-bit numbers on
-the upcoming weeks.)
+it did. Simple as that.
 
 Bend isn't limited to a specific paradigm, like tensors or matrices. Any
 concurrent system, from shaders to Erlang-like actor models can be emulated on
