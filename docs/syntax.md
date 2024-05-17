@@ -6,6 +6,21 @@ Click [here](#imp-syntax) to see the syntax for "imp", the variant of bend that 
 
 Click [here](#fun-syntax) to see the syntax for "fun", the variant of bend that looks like a functional language like Haskell or ML.
 
+Both syntaxes can be mixed in the same file like the example below:
+
+```python
+object Point { x, y }
+
+data Tree = (Node ~left ~right) | (Leaf value)
+
+def identity(x):
+  return x
+
+main =
+  let result = (identity 41)
+  (+ result 1)
+```
+
 <div id="imp-syntax"></div>
 
 # Imp Syntax
@@ -445,28 +460,41 @@ i24 = -42
 u24 = 42
 ```
 
-| Operation      | Syntax |
-| -------------- | ------ |
-| Addition       | x + y  |
-| Subtraction    | x - y  |
-| Multiplication | x \* y |
-| Division       | x / y  |
-| Equal          | x == y |
-| Not Equal      | x != y |
-| Less Than      | x < y  |
-| Greater Than   | x > y  |
-| Bitwise And    | x & y  |
-| Bitwise Or     | x \| y |
-| Bitwise Xor    | x ^ y  |
+Currently, the 3 number types cannot be mixed.
+
+| Operation      | Syntax   | Supported Types  |
+| -------------- | -------- | ---------------- |
+| Addition       | x + y    | int, float, uint |
+| Subtraction    | x - y    | int, float, uint |
+| Multiplication | x \* y   | int, float, uint |
+| Division       | x / y    | int, float, uint |
+| Remainder      | x % y    | int, float, uint |
+| Exponentiation | x \*\* y | float            |
+| Equal          | x == y   | int, float, uint |
+| Not Equal      | x != y   | int, float, uint |
+| Less Than      | x < y    | int, float, uint |
+| Greater Than   | x > y    | int, float, uint |
+| Bitwise And    | x & y    | int, uint        |
+| Bitwise Or     | x \| y   | int, uint        |
+| Bitwise Xor    | x ^ y    | int, uint        |
 
 ### Constructor Literals
 
+Constructors are just functions.
+A Constructor expression is equivalent to calling a Constructor function, they have 2 syntaxes:
+
 ```python
+# Constructor syntax, requires all field names
 Type/Ctr { field1: 4, field2: 8 }
 
+# Function syntax
 Type/Ctr(field1 = 4, field2 = 8)
 
+Type/Ctr(4, field2 = 8)
+
 Type/Ctr(4, 8)
+
+Type/Ctr(4) # Can be partially applied if not using named arguments
 ```
 
 ### Character Literal
@@ -759,6 +787,69 @@ It is desugared according to the chosen encoding. Read [pattern matching](./patt
 
 Using `;` is optional.
 
+### If
+
+```rust
+if condition {
+  ...then
+} else {
+  ...else
+}
+```
+
+A branching expression where `else` is mandatory.
+
+The condition must return a `u24` number, where 0 will run the `else` branch and any other value will return the first one.
+
+It is equivalent to this switch:
+
+```rust
+switch _ = condition {
+  0: else
+  _: then
+}
+```
+
+### Bend
+
+Bend can be used to create recursive data structures:
+
+```rust
+main =
+  bend x = 0 {
+    when (< x 3):
+      (Tree/Node (fork (+ x 1)) (fork (+ x 1)))
+    else:
+      (Tree/Leaf x)
+  }
+```
+
+Which binds a variable to the return of an inline recursive function.
+The function `fork` is available inside the `when` arm of the `bend` and calls it recursively.
+
+It is possible to pass multiple state variables, which can be initialized:
+
+```rust
+bend x = 0, y = 1 ... {
+  when (condition x y ...):
+    ...
+}
+```
+
+When calling `fork`, the function must receive the same number of arguments as the number of state variables.
+
+It is equivalent to this inline recursive function:
+
+```rust
+bend x y ... =
+  if (condition x y ...) {
+    ...
+    ... (bend x y ...) ...
+  } else {
+    ...
+  }
+```
+
 ### Open
 
 ```rust
@@ -829,20 +920,23 @@ i24 = -42
 u24 = 42
 ```
 
-| Operation      | Syntax   |
-| -------------- | -------- |
-| Addition       | (+ x y)  |
-| Subtraction    | (- x y)  |
-| Multiplication | (\* x y) |
-| Division       | (/ x y)  |
-| Remainder      | (% x y)  |
-| Equal          | (== x y) |
-| Not Equal      | (!= x y) |
-| Less Than      | (< x y)  |
-| Greater Than   | (> x y)  |
-| Bitwise And    | (& x y)  |
-| Bitwise Or     | (\| x y) |
-| Bitwise Xor    | (^ x y)  |
+Currently, the 3 number types cannot be mixed.
+
+| Operation      | Syntax     | Supported Types  |
+| -------------- | ---------- | ---------------- |
+| Addition       | (+ x y)    | int, float, uint |
+| Subtraction    | (- x y)    | int, float, uint |
+| Multiplication | (\* x y)   | int, float, uint |
+| Division       | (/ x y)    | int, float, uint |
+| Remainder      | (% x y)    | int, float, uint |
+| Exponentiation | (\*\* x y) | float            |
+| Equal          | (== x y)   | int, float, uint |
+| Not Equal      | (!= x y)   | int, float, uint |
+| Less Than      | (< x y)    | int, float, uint |
+| Greater Than   | (> x y)    | int, float, uint |
+| Bitwise And    | (& x y)    | int, uint        |
+| Bitwise Or     | (\| x y)   | int, uint        |
+| Bitwise Xor    | (^ x y)    | int, uint        |
 
 ### Character Literal
 
