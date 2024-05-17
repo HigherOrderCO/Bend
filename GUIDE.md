@@ -379,7 +379,7 @@ def main:
     lft: Tree/Node { lft: Tree/Leaf { val: 1 }, rgt: Tree/Leaf { val: 2 }, },
     rgt: Tree/Node { lft: Tree/Leaf { val: 3 }, rgt: Tree/Leaf { val: 4 }, }
   }
-  return sum(tree)
+  return enum(tree)
 ```
 
 Compared to the `sum` algorithm, 3 important things changed:
@@ -724,7 +724,7 @@ def render(depth, shader):
       color = (fork(d+1, i*2+0), fork(d+1, i*2+1))
     else:
       width = depth / 2
-      color = demo_shader(i % width, i / width)
+      color = shader(i % width, i / width)
   return color
 
 # given a position, returns a color
