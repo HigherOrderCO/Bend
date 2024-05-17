@@ -10,6 +10,11 @@ GPUs, with near-linear speedup based on core count, and zero explicit parallel
 annotations: no thread spawning, no locks, mutexes, atomics. Bend is powered by
 the [HVM2](https://github.com/HigherOrderCO/hvm) runtime.
 
+A Quick Demo
+------------
+
+![bendlivedemo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)
+
 ## Using Bend
 
 First, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml). Then, install both HVM2 and Bend with:
@@ -128,8 +133,3 @@ and synchronized correctly and efficiently by
 - To understand the tech behind Bend, check HVM2's [paper](https://github.com/HigherOrderCO/HVM/raw/main/PAPER.pdf).
 
 - Bend is developed by [HigherOrderCO.com](https://HigherOrderCO.com) - join our [Discord](https://discord.HigherOrderCO.com)!
-
-A Quick Demo
-------------
-
-![bendlivedemo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)
