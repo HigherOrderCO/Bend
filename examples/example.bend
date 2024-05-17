@@ -18,7 +18,7 @@
 (nums) = λx1 λx2 (* (+ x1 1) (/ (- x2 2) 1))
 
 # You can use numbers on the native match expression
-# The `+` arm binds the `scrutinee`-1 variable to the the value of the number -1
+# The `+` arm binds the `scrutinee`-1 variable to the value of the number -1
 (Num.pred) = λn 
   switch n { 
     0: 0
