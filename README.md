@@ -104,7 +104,7 @@ def render(depth, shader):
       color = (fork(d+1, i*2+0), fork(d+1, i*2+1))
     else:
       width = depth / 2
-      color = demo_shader(i % width, i / width)
+      color = shader(i % width, i / width)
   return color
 
 # given a position, returns a color
