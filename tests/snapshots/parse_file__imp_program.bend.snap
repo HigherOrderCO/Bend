@@ -26,13 +26,17 @@ input_file: tests/golden_tests/parse_file/imp_program.bend
 
 (swt) = λ%arg0 use n = %arg0; switch n = n { 0: 42; _ n-1: 1; }
 
-(fld) = λ%arg0 use list = %arg0; fold list = list { List/cons: 1; List/nil: 2; }
+(fld) = λ%arg0 use list = %arg0; fold list = list { List/Cons: 1; List/Nil: 2; }
 
-(bnd) = bend x = 0, { when (< x 10): (List/cons x (fork (+ x 1))); else: List/nil }
+(bnd) = bend x = 0, { when (< x 10): (List/Cons x (fork (+ x 1))); else: List/Nil }
 
 (era) = let * = (+ 2 3); let the_expr_killer = *; (the_expr_killer 9)
 
 (main) = do IO { ask x = IO.read; x }
+
+(List/Cons) = λhead λtail λList/Cons λList/Nil (List/Cons head tail)
+
+(List/Nil) = λList/Cons λList/Nil List/Nil
 
 (Map/Node) = λvalue λleft λright λMap/Node λMap/Leaf (Map/Node value left right)
 
