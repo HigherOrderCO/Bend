@@ -757,6 +757,15 @@ allowing for single-interaction sampling. With some napkin math, this should be
 enough to render 3D games in real-time. Imagine a future where game engines are
 written in Python-like languages? That's the future we're building, with Bend!
 
+You can see your programs total cost (number of interactions) and performance
+(MIPS) by adding the `-s` flag. This is a good way to check if your algorithm is
+parallelizing. For example, on my Apple M3 Max, sequential algorithms will
+perform about 100 MIPS on interpreted mode, and 130 MIPS on compiled mode
+(remember our compiler is still **very** immature, which is why it isn't much
+faster than the interpreter). A well-parallelizable program, though, will easily
+reach 1000+ MIPS.
+
+
 To be continued...
 ------------------
 
