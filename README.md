@@ -127,6 +127,10 @@ and synchronized correctly and efficiently by
 
 - To understand the tech behind Bend, check HVM2's [paper](https://github.com/HigherOrderCO/HVM/raw/main/PAPER.pdf).
 
+- To learn more about us, visit [HigherOrderCO.com](https://HigherOrderCO.com)
+
+- And join [HOC's Discord Community](https://discord.HigherOrderCO.com)!
+
 A Quick Demo
 ------------
 
