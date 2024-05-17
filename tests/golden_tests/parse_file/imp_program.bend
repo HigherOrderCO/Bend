@@ -53,17 +53,17 @@ def swt(n):
 
 def fld(list):
   fold list:
-    case List/cons:
+    case List/Cons:
       return 1;
-    case List/nil:
+    case List/Nil:
       return 2;
 
 def bnd():
   bend x = 0:
     when x < 10:
-      return List/cons(x fork(x + 1));
+      return List/Cons(x, fork(x + 1));
     else:
-      return List/nil();
+      return List/Nil();
 
 def era():
   * = (2 + 3)
