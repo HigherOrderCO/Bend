@@ -1,0 +1,61 @@
+{
+    "editor.tokenColorCustomizations": {
+        "textMateRules": [
+            {
+                "scope": "keyword.lambda.bend",
+                "settings": {
+                    "foreground": "#84c47f"
+                }
+            },
+            {
+                "scope": "keyword.control.bend",
+                "settings": {
+                    "foreground": "#516fc4"
+                }
+            },
+            {
+                "scope": "keyword.main.bend",
+                "settings": {
+                    "foreground": "#CCCCCC",
+                    "fontStyle": "bold"
+                }
+            },
+            {
+                "scope": "keyword.operator.bend",
+                "settings": {
+                    "foreground": "#ffddaa"
+                }
+            },
+            {
+                "scope": "entity.name.type.bend",
+                "settings": {
+                    "foreground": "#2ca5b8"
+                }
+            },
+            {
+                "scope": "keyword.declaration.bend",
+                "settings": {
+                    "foreground": "#ab5c95"
+                }
+            },
+            {
+                "scope": "string.quoted.double.bend",
+                "settings": {
+                    "foreground": "#FFFFFF"
+                }
+            },
+            {
+                "scope": "entity.name.value.bend",
+                "settings": {
+                    "foreground": "#CCCCCC"
+                }
+            },
+            {
+                "scope": "variable.parameter.bend",
+                "settings": {
+                    "foreground": "#CCCCCC"
+                }
+            }
+        ]
+    }
+}

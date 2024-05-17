@@ -1,0 +1,25 @@
+{
+  "name": "bend",
+  "displayName": "Bend",
+  "description": "Bend Language Syntax Highlighting",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.89.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "bend",
+      "aliases": ["Bend", "bend"],
+      "extensions": [".bend"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "bend",
+      "scopeName": "source.bend",
+      "path": "./syntaxes/bend.tmLanguage.json"
+    }]
+  }
+}

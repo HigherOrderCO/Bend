@@ -1,0 +1,157 @@
+{
+  "scopeName": "source.bend",
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#lambda"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#constants"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#characters"
+    },
+    {
+      "include": "#symbols"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#punctuation"
+    },
+    {
+      "include": "#values"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "match": "#.*$",
+          "name": "comment.line.bend"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "match": "\\b(data|type|object|def)\\b",
+          "name": "keyword.declaration.bend"
+        },
+        {
+          "match": "\\b(return|if|else|switch|match|case|fold|bend|when|open|do|ask|let|in|for|lambda|eraser)\\b",
+          "name": "keyword.control.bend"
+        },
+        {
+          "match": "\\b(main)\\b",
+          "name": "keyword.main.bend"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "match": "\\b([A-Z][A-Za-z0-9_]*(?:\\.[A-Z][A-Za-z0-9_]*)*)\\b",
+          "name": "entity.name.type.bend"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "match": "\\b(True|False)\\b",
+          "name": "constant.language.bend"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.bend",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "match": "\\\\.",
+          "name": "constant.character.escape.bend"
+        }
+      ]
+    },
+    "characters": {
+      "name": "string.quoted.single.bend",
+      "begin": "'",
+      "end": "'",
+      "patterns": [
+        {
+          "match": "\\\\.",
+          "name": "constant.character.escape.bend"
+        }
+      ]
+    },
+    "symbols": {
+      "name": "constant.other.symbol.bend",
+      "begin": "`",
+      "end": "`"
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "match": "\\b\\d+(\\.\\d+)?\\b",
+          "name": "constant.numeric.bend"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "match": "(\\+|\\-|\\*|\\/|%|\\*\\*|==|!=|<|>|&|\\||\\^|\\.)",
+          "name": "keyword.operator.bend"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "match": "(\\(|\\)|\\{|\\}|\\[|\\]|,|;|=|:|\\$)",
+          "name": "punctuation.separator.bend"
+        }
+      ]
+    },
+    "values": {
+      "patterns": [
+        {
+          "match": "\\b(([a-z][A-Za-z0-9_]*)(?:\\.[a-z][A-Za-z0-9_]*)*)\\b",
+          "name": "entity.name.value.bend"
+        }
+      ]
+    },
+    "lambda": {
+      "patterns": [
+        {
+          "match": "(λ|@)([A-Za-z0-9_]*)",
+          "captures": {
+            "1": {
+              "name": "keyword.lambda.bend"
+            },
+            "2": {
+              "name": "variable.parameter.bend"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

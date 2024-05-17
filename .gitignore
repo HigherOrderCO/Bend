@@ -1,3 +1,6 @@
 /target
 *.snap.new
 .out.hvm
+
+# macOS
+.DS_Store
