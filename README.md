@@ -130,6 +130,6 @@ and synchronized correctly and efficiently by
 
 - For an extensive list of features, check [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
 
-- To understand the tech behind Bend, check HVM2's [paper](https://github.com/HigherOrderCO/HVM/raw/main/PAPER.pdf).
+- To understand the tech behind Bend, check HVM2's [paper](https://github.com/HigherOrderCO/HVM/raw/main/paper/PAPER.pdf).
 
 - Bend is developed by [HigherOrderCO.com](https://HigherOrderCO.com) - join our [Discord](https://discord.HigherOrderCO.com)!
