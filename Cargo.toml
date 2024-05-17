@@ -1,7 +1,7 @@
 [package]
 name = "bend-lang"
 description = "A high-level, massively parallel programming language"
-license = "MIT"
+license = "Apache-2.0"
 version = "0.2.6"
 edition = "2021"
 exclude = ["tests/snapshots/"]
