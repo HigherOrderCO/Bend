@@ -16,7 +16,7 @@ def and(a, b):
 def all(tree):
   fold tree:
     case Tree/Node:
-      return and(tree.lft tree.rgt)
+      return and(tree.lft, tree.rgt)
     case Tree/Leaf:
       return tree.val
 

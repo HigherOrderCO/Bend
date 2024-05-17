@@ -13,7 +13,7 @@ the [HVM2](https://github.com/HigherOrderCO/hvm) runtime.
 A Quick Demo
 ------------
 
-![bendlivedemo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)
+![Bend live demo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)
 
 ## Using Bend
 
@@ -131,6 +131,6 @@ and synchronized correctly and efficiently by
 
 - For an extensive list of features, check [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
 
-- To understand the tech behind Bend, check HVM2's [paper](https://github.com/HigherOrderCO/HVM/raw/main/PAPER.pdf).
+- To understand the tech behind Bend, check HVM2's [paper](https://github.com/HigherOrderCO/HVM/raw/main/paper/PAPER.pdf).
 
 - Bend is developed by [HigherOrderCO.com](https://HigherOrderCO.com) - join our [Discord](https://discord.HigherOrderCO.com)!
