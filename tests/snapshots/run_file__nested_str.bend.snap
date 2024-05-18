@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nested_str.bend
 ---
-((String/Cons "a" ""), (λa λ* (a 97 λb λ* (b "bc" "")), (λe λ* (e "ab" "c"), λi λ* (i "ab" λl λ* (l "cd" "")))))
+(λa λ* (a "a" ""), (λc λ* (c 97 λd λ* (d "bc" "")), (λg λ* (g "ab" "c"), λk λ* (k "ab" λn λ* (n "cd" "")))))

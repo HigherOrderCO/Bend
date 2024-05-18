@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/net_size_too_large.bend
+---
+[4m[1m[31mErrors:[0m
+[1mIn definition '[4mRadix[0m[1m':[0m
+  Definition is too large for hvm (size=120, max size=64). Please break it into smaller pieces.
