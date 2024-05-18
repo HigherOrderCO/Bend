@@ -30,5 +30,3 @@
 ### Why am i getting a CUDA not supported error even tho i have it installed?
 - The current iteration of the `hvm.cu` was written with the 4090 in mind, and won't work on older GPUs, since they contain about half of the newer GPUs shared memory, for better understanding please refer to [HVM#283](https://github.com/HigherOrderCO/HVM/issues/283), we are working on the support for other GPUs and will release it soon.
 
-### Why is my program taking so long to run?
-> TODO
