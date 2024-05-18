@@ -65,7 +65,9 @@ pub fn compile_book(
     hvm_book.prune(&prune_entrypoints);
   }
 
-  check_net_sizes(&hvm_book, &mut diagnostics)?;
+  if opts.check_net_size {
+    check_net_sizes(&hvm_book, &mut diagnostics)?;
+  }
 
   add_recursive_priority(&mut hvm_book);
 
@@ -246,7 +248,7 @@ impl OptLevel {
 
 #[derive(Clone, Debug)]
 pub struct CompileOpts {
-  /// Enables [fun::transform::eta_reduction].
+  /// Enables [hvmc::transform::eta_reduce].
   pub eta: bool,
 
   /// Enables [fun::transform::definition_pruning] and [hvmc_net::prune].
@@ -261,12 +263,15 @@ pub struct CompileOpts {
   /// Enables [fun::transform::definition_merge]
   pub merge: bool,
 
-  /// Enables [fun::transform::inline].
+  /// Enables [hvmc::transform::inline].
   pub inline: bool,
+
+  /// Enables [hvm::check_net_size].
+  pub check_net_size: bool,
 }
 
 impl CompileOpts {
-  /// Set all opts as true and keep the current adt encoding.
+  /// Set all optimizing options as true
   #[must_use]
   pub fn set_all(self) -> Self {
     Self {
@@ -276,10 +281,11 @@ impl CompileOpts {
       merge: true,
       inline: true,
       linearize_matches: OptLevel::Enabled,
+      check_net_size: self.check_net_size,
     }
   }
 
-  /// Set all opts as false and keep the current adt encoding.
+  /// Set all optimizing options as false
   #[must_use]
   pub fn set_no_all(self) -> Self {
     Self {
@@ -289,6 +295,7 @@ impl CompileOpts {
       float_combinators: false,
       merge: false,
       inline: false,
+      check_net_size: self.check_net_size,
     }
   }
 
@@ -316,6 +323,7 @@ impl Default for CompileOpts {
       float_combinators: true,
       merge: false,
       inline: false,
+      check_net_size: true,
     }
   }
 }
