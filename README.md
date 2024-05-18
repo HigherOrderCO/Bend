@@ -29,9 +29,9 @@ cargo +nightly install bend-lang
 Finally, write some Bend file, and run it with one of these commands:
 
 ```sh
-bend run    <file.hvm> # uses the Rust interpreter (sequential)
-bend run-c  <file.hvm> # uses the C interpreter (parallel)
-bend run-cu <file.hvm> # uses the CUDA interpreter (massively parallel)
+bend run    <file.bend> # uses the Rust interpreter (sequential)
+bend run-c  <file.bend> # uses the C interpreter (parallel)
+bend run-cu <file.bend> # uses the CUDA interpreter (massively parallel)
 ```
 
 You can also compile `Bend` to standalone C/CUDA files with `gen-c` and
@@ -154,6 +154,6 @@ It is very important to reinforce that, while Bend does that it was built to
 single-core performance is still extremely sub-par. This is the first version of
 the system, and we haven't put much effort into a proper compiler yet. You can
 expect the brute performance to substantially improve every month as we work in
-a proper codegen, and add a constellation of missing optimizations. Meanwhile,
-you can use the interpreters to have a glimpse of what massively parallel
-programming looks like, from the lens of a Pythonish, high-level language.
+proper code generation, and add a constellation of missing optimizations.
+Meanwhile, you can use the interpreters to have a glimpse of what massively
+parallel programming looks like, from the lens of a Python-ish, high-level language.
