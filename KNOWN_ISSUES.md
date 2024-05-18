@@ -3,7 +3,6 @@
 ## Why are my numbers giving me wrong results?
 Either cause overflowing u24 or mixing different number types.
 
-
 ## Can i run this on AMD/METAL GPUs?
 We plan on adding support to many other GPUs as soon as the CUDA version is sufficiently stable.
 
