@@ -91,7 +91,7 @@ and Bend will parallelize it for you!
 
 With 1 CPU core:
 
-```
+```sh
 $ bend run reduce.bend -s
 Result: 5005402
 - ITRS: 738197476
@@ -101,8 +101,8 @@ Result: 5005402
 
 Now, with 16 CPU cores:
 
-```
-bend run-c reduce.bend -s
+```sh
+$ bend run-c reduce.bend -s
 Result: 5005402
 - ITRS: 738197476
 - TIME: 0.79s
@@ -111,8 +111,8 @@ Result: 5005402
 
 Finally, with 16384 GPU cores: (with an RTX 4090)
 
-```
-bend run-cu reduce.bend -s
+```sh
+$ bend run-cu reduce.bend -s
 Result: 5005402
 - ITRS: 738197476
 - LEAK: 44580863
