@@ -265,7 +265,7 @@ loops? For example:
 
 ```python
 def sum(x):
-  total = 0 
+  total = 0
   for i in range(10)
     total += i
   return total
