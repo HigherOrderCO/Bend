@@ -13,7 +13,114 @@ the [HVM2](https://github.com/HigherOrderCO/hvm) runtime.
 A Quick Demo
 ------------
 
-[![Bend live demo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)](https://x.com/i/status/1791213162525524076)
+[Watch the demo as a video](https://x.com/VictorTaelin/status/1791213162525524076)
+
+You don't use 10% of your brain, so why use 1% of your computer?
+
+Bend is a parallel programming language
+- that feels like Python,
+- but scales like CUDA.
+
+Need a sorting network? Just write a function.
+
+```python
+# Sorting Network = just rotate trees!
+def sort(d, s, tree):
+  switch d:
+    case 0:
+      return tree
+    case _:
+      (x,y) = tree
+      lft   = sort(d-1, 0, x)
+      rgt   = sort(d-1, 0, y)
+      return rots(d, s, lft, rgt)
+
+# Rotates sub-trees (Blue/Green Box)
+def rots(d, s, tree):
+  switch d:
+    case 0:
+      return tree
+    case _:
+      (x, y) = tree
+      return down(d, s, warp(d-1, s, x, y)
+```
+
+Need a fragment shader? Just write a function.
+
+```python
+# Image Rendering = create a pixel tree!
+def new_image(depth, shader):
+  bend d = 0, i = 0:
+    when d < depth:
+      color = (go(d+1,i*2+0), go(d+1,i*2+1))
+    else:
+      width = 1 << (depth / 2)
+      color = fragment(i % width, i / width)
+  return color
+
+# Shader: computes the color of a pixel
+def fragment(x, y):
+  color = 0xFF0000
+  # ... any computation here ...
+  return color
+
+def main:
+  return new_image(16, fragment)
+```
+
+Need a fast map reduce? Just write a function.
+
+```python
+# Map-Reduce = simple divide-and-conquer!
+def map_red(d, i, map, red):
+  switch d:
+    case 0:
+      return map(i)
+    case _:
+      lft = map_red(d-1, i*2+0, map, red)
+      rgt = map_red(d-1, i*2+1, map, red)
+      return red(lft, rgt)
+
+def main:
+  map = lambda idx: idx * 777
+  red = lambda x y: x * y + 1
+  return map_red(24, 0, map, red)
+```
+
+and Bend will parallelize it for you!
+
+With 1 CPU core:
+
+```
+$ bend run reduce.bend -s
+Result: 5005402
+- ITRS: 738197476
+- TIME: 12.47s
+- MIPS: 59.22
+```
+
+Now, with 16 CPU cores:
+
+```
+bend run-c reduce.bend -s
+Result: 5005402
+- ITRS: 738197476
+- TIME: 0.79s
+- MIPS: 933.18
+```
+
+Finally, with 16384 GPU cores: (with an RTX 4090)
+
+```
+bend run-cu reduce.bend -s
+Result: 5005402
+- ITRS: 738197476
+- LEAK: 44580863
+- TIME: 0.16s
+- MIPS: 4534.43
+```
+
+That's a 100x speedup by doing nothing, other than using all the cores you already paid for.
 
 ## Using Bend
 
@@ -146,15 +253,3 @@ and synchronized correctly and efficiently by
 - To understand the tech behind Bend, check HVM2's [paper](https://paper.higherorderco.com).
 
 - Bend is developed by [HigherOrderCO.com](https://HigherOrderCO.com) - join our [Discord](https://discord.HigherOrderCO.com)!
-
-## Note
-
-It is very important to reinforce that, while Bend does that it was built to
-(i.e., scale in performance with cores, up to 10000+ concurrent threads), its
-single-core performance is still extremely sub-par. This is the first version of
-the system, and we haven't put much effort into a proper compiler yet. You can
-expect the raw performance to substantially improve on every release, as we work
-to have a proper codegen (and include a constellation of missing optimizations).
-Meanwhile, you can use the interpreters today, to have a glimpse of what
-massively parallel programming looks like, from the lens of a Pythonish,
-high-level language!
