@@ -1,11 +1,7 @@
-add = λa λb (+ a b)
-
-fib = λx switch x {
-  0: 1
-  _: let p = x-1; switch p {
-    0: 1
-    _: (+ (fib p) (fib p-1))
+fib x =
+  bend x a=1 b=1 {
+     when (!= x 0): (fork (- x 1) b (+ a b))
+     else: a
   }
-}
 
 main = (fib 30)
