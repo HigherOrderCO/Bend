@@ -42,7 +42,7 @@ def rots(d, s, tree):
       return tree
     case _:
       (x, y) = tree
-      return down(d, s, warp(d-1, s, x, y)
+      return down(d, s, warp(d-1, s, x, y))
 ```
 
 Need a fragment shader? Just write a function.
