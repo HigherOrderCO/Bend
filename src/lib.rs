@@ -171,7 +171,7 @@ pub fn run_book(
   // cancel the run if a problem is detected.
   eprint!("{diagnostics}");
 
-  let out = run_hvm(&core_book, cmd)?;
+  let out = run_hvm(&core_book, cmd, &run_opts)?;
   let (net, stats) = parse_hvm_output(&out)?;
   let (term, diags) =
     readback_hvm_net(&net, &book, &labels, run_opts.linear_readback, compile_opts.adt_encoding);
@@ -196,7 +196,7 @@ pub fn readback_hvm_net(
 }
 
 /// Runs an HVM book by invoking HVM as a subprocess.
-fn run_hvm(book: &::hvm::ast::Book, cmd: &str) -> Result<String, String> {
+fn run_hvm(book: &::hvm::ast::Book, cmd: &str, run_opts: &RunOpts) -> Result<String, String> {
   fn filter_hvm_output(
     mut stream: impl std::io::Read + Send,
     mut output: impl std::io::Write + Send,
@@ -245,7 +245,7 @@ fn run_hvm(book: &::hvm::ast::Book, cmd: &str) -> Result<String, String> {
 
   let out_path = ".out.hvm";
   std::fs::write(out_path, display_hvm_book(book).to_string()).map_err(|x| x.to_string())?;
-  let mut process = std::process::Command::new("hvm")
+  let mut process = std::process::Command::new(run_opts.hvm_path.clone())
     .arg(cmd)
     .arg(out_path)
     .stdout(std::process::Stdio::piped())
@@ -279,10 +279,21 @@ fn parse_hvm_output(out: &str) -> Result<(::hvm::ast::Net, String), String> {
   Ok((net, stats.to_string()))
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct RunOpts {
   pub linear_readback: bool,
   pub pretty: bool,
+  pub hvm_path: String,
+}
+
+impl Default for RunOpts {
+  fn default() -> Self {
+      RunOpts {
+        linear_readback: false,
+        pretty: false,
+        hvm_path: "hvm".to_string()
+      }
+  }
 }
 
 #[derive(Clone, Copy, Debug, Default)]

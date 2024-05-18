@@ -175,7 +175,7 @@ fn run_file() {
 
       for adt_encoding in [AdtEncoding::NumScott, AdtEncoding::Scott] {
         let compile_opts = CompileOpts { adt_encoding, ..CompileOpts::default() };
-        let (term, _, diags) = run_book_simple(book.clone(), run_opts, compile_opts, diagnostics_cfg, None)?;
+        let (term, _, diags) = run_book_simple(book.clone(), run_opts.clone(), compile_opts, diagnostics_cfg, None)?;
         res.push_str(&format!("{adt_encoding}:\n{diags}{term}\n\n"));
       }
       Ok(res)
