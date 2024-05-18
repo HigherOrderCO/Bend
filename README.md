@@ -133,8 +133,7 @@ def main:
   return render(16, demo_shader)
 ```
 
-And it would actually work. Even involved algorithms, such as a [Bitonic Sort
-using tree rotations](examples/bitonic_sort.bend), parallelize well on Bend.
+And it would actually work. Even involved algorithms,  parallelize well on Bend.
 Long-distance communication is performed by *global beta-reduction* (as per the
 [Interaction Calculus](https://github.com/VictorTaelin/Interaction-Calculus)),
 and synchronized correctly and efficiently by
