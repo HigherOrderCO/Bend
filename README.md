@@ -99,7 +99,7 @@ run fast on GPUs. Yet, since it uses a divide-and-conquer approach, which is
 - GPU, NVIDIA RTX 4090, 16k threads: **0.21 seconds**
 
 That's a **57x speedup** by doing nothing. No thread spawning, no explicit
-management of locks, mutexes. We just asked bend to run our program on RTX, and
+management of locks, mutexes. We just asked Bend to run our program on RTX, and
 it did. Simple as that.
 
 Bend isn't limited to a specific paradigm, like tensors or matrices. Any
