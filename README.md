@@ -120,7 +120,8 @@ Result: 5005402
 - MIPS: 4534.43
 ```
 
-That's a 100x speedup by doing nothing, other than using all the cores you already paid for.
+That's a 100x speedup by doing nothing, other than using all the cores you
+already paid for.
 
 ## Using Bend
 
@@ -256,4 +257,12 @@ and synchronized correctly and efficiently by
 
 ## Note
 
-It is very important to reinforce that, while Bend does that it was built to (i.e., scale in performance with cores, up to 10000+ concurrent threads), its single-core performance is still extremely sub-par. This is the first version of the system, and we haven't put much effort into a proper compiler yet. You can expect the raw performance to substantially improve on every release, as we work to have a proper codegen (and include a constellation of missing optimizations). Meanwhile, you can use the interpreters today, to have a glimpse of what massively parallel programming looks like, from the lens of a Pythonish, high-level language!
+It is very important to reinforce that, while Bend does that it was built to
+(i.e., scale in performance with cores, up to 10000+ concurrent threads), its
+single-core performance is still extremely sub-par. This is the first version of
+the system, and we haven't put much effort into a proper compiler yet. You can
+expect the raw performance to substantially improve on every release, as we work
+to have a proper codegen (and include a constellation of missing optimizations).
+Meanwhile, you can use the interpreters today, to have a glimpse of what
+massively parallel programming looks like, from the lens of a Pythonish,
+high-level language!
