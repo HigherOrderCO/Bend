@@ -108,7 +108,7 @@ The `0` case matches when `n` is 0, and the `_` case matches when `n` is greater
 In the `_` arm, we can access the predecessor of `n` with the `n-1` variable.
 
 We can also match on more than one value at once.
-If we do that, we must necessarily cover the cases in order, starting from 0.
+To do that, we must cover the cases in order, starting from 0.
 
 ```rs
 Number.minus_three = λn λf λx
@@ -121,7 +121,7 @@ Number.minus_three = λn λf λx
 ```
 
 
-Using everything we learned, we can write a program that calculates the n-th Fibonacci number using native numbers
+Using everything we learned, we can write a program that calculates the n-th Fibonacci number using native numbers:
 
 ```rs
 fibonacci = λn // n is the argument
