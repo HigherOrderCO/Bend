@@ -154,7 +154,7 @@ It is very important to reinforce that, while Bend does that it was built to
 single-core performance is still extremely sub-par. This is the first version of
 the system, and we haven't put much effort into a proper compiler yet. You can
 expect the raw performance to substantially improve on every release, as we work
-in a proper codegen (and include a constellation of missing optimizations).
+to have a proper codegen (and include a constellation of missing optimizations).
 Meanwhile, you can use the interpreters today, to have a glimpse of what
 massively parallel programming looks like, from the lens of a Pythonish,
 high-level language!
