@@ -548,7 +548,7 @@ example, to add numbers in parallel, we can write:
 ```python
 def main():
   bend i = 1:
-    when d < 8:
+    when i < 8:
       sum = i + fork(i * 2 + 0) + fork(i * 2 + 1)
     else:
       sum = 0
