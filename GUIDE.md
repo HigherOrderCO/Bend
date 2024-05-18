@@ -172,7 +172,7 @@ datatypes on Bend. Specifically, the type:
 ```python
 type List:
   Nil
-  Cons { head, tail }
+  Cons { head, ~tail }
 ```
 
 Here, the `Nil` variant represents an empty list, and the `Cons` variant
