@@ -209,8 +209,9 @@ def main:
 
 Will return `1`, which is the first element.
 
-We also have a syntax sugar for strings in Bend, which is just a List of `u24`
+We also have a syntax sugar for strings in Bend, which is just a list of `u24`
 characters (UTF-16 encoded). The `"Hello, world!"` type we've seen used it!
+> **_NOTE:_**  The actual type used for strings is `String`, which has `String/Cons` and `String/Nil` just like `List` does.
 
 Bend also has inline functions, which work just like Python:
 
