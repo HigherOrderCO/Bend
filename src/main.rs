@@ -5,7 +5,10 @@ use bend::{
   load_file_to_book, run_book_with_fn, CompileOpts, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
-use std::path::{Path, PathBuf};
+use std::{
+  path::{Path, PathBuf},
+  process::ExitCode,
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -222,15 +225,18 @@ pub enum WarningArgs {
   RecursionCycle,
 }
 
-fn main() {
+fn main() -> ExitCode {
   #[cfg(not(feature = "cli"))]
   compile_error!("The 'cli' feature is needed for the hvm-lang cli");
 
   let cli = Cli::parse();
 
   if let Err(diagnostics) = execute_cli_mode(cli) {
-    eprint!("{diagnostics}")
+    eprint!("{diagnostics}");
+    return ExitCode::FAILURE;
   }
+
+  ExitCode::SUCCESS
 }
 
 fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
