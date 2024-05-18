@@ -146,3 +146,14 @@ and synchronized correctly and efficiently by
 - To understand the tech behind Bend, check HVM2's [paper](https://paper.higherorderco.com).
 
 - Bend is developed by [HigherOrderCO.com](https://HigherOrderCO.com) - join our [Discord](https://discord.HigherOrderCO.com)!
+
+## Note
+
+It is very important to reinforce that, while Bend does that it was built to
+(i.e., scale in performance with cores, up to 10000+ concurrent threads), its
+single-core performance is still extremely sub-par. This is the first version of
+the system, and we haven't put much effort into a proper compiler yet. You can
+expect the brute performance to substantially improve every month as we work in
+a proper codegen, and add a constellation of missing optimizations. Meanwhile,
+you can use the interpreters to have a glimpse of what massively parallel
+programming looks like, from the lens of a Pythonish, high-level language.
