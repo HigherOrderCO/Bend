@@ -86,7 +86,8 @@ main = (id also_id)
 
 ## linearize-matches
 
-Linearizes the variables between match cases, transforming them into combinatopy when possible.
+Linearizes the variables between match cases, transforming them into combinators when possible.
+
 ```py
 # Linearization means going from this
 @a @b switch a {
