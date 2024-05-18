@@ -5,8 +5,10 @@ use bend::{
   load_file_to_book, run_book_with_fn, CompileOpts, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
-use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use std::{
+  path::{Path, PathBuf},
+  process::ExitCode,
+};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
