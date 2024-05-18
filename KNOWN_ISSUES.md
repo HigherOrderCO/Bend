@@ -24,10 +24,10 @@
 
 - If the error contains anything regarding `libc` missing, please refer to [HVM#355](https://github.com/HigherOrderCO/Bend/issues/355)
 
-### I'm getting an error of `failed assertion`
+### I'm getting an error of failed assertion
 - HVM currently has a bug in it's conversion of f32 to f24 and it's unable to read the number 0.0. We already have a fix that we're working on.
 
-### Why am i getting `CUDA not supported` even tho i have it installed?
+### Why am i getting a CUDA not supported error even tho i have it installed?
 - The current iteration of the `hvm.cu` was written with the 4090 in mind, and won't work on older GPUs, since they contain about half of the newer GPUs shared memory, for better understanding please refer to [HVM#283](https://github.com/HigherOrderCO/HVM/issues/283), we are working on the support for other GPUs and will release it soon.
 
 ### Why is my program taking so long to run?
