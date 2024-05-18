@@ -2,14 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/scrutinee_reconstruction.bend
 ---
-@Option/None = (* (a a))
+@Option/None = ((1 a) a)
 
-@Option/Some = (a ((a b) (* b)))
+@Option/Some = (a ((0 (a b)) b))
 
-@Option/or = ((@Option/or__C0 ((a a) b)) b)
+@Option/or = ((@Option/or__C1 a) a)
 
 @Option/or__C0 = (a (* b))
   & @Option/Some ~ (a b)
+
+@Option/or__C1 = (?((@Option/or__C0 (* (a a))) b) b)
 
 @main = b
   & @Option/or ~ (a (@Option/None b))

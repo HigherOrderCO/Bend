@@ -1,6 +1,6 @@
 use crate::{
   diagnostics::Diagnostics,
-  fun::{Ctx, Definition, Name, Pattern, Rule, Term},
+  fun::{Ctx, Definition, Name, Rule, Term},
   maybe_grow,
 };
 
@@ -74,9 +74,8 @@ impl Term {
           pred: Some(Name::new("_-1")),
           arms: vec![std::mem::take(base.as_mut()), std::mem::take(step.as_mut())],
         };
-        let body = free_vars.iter().rfold(body, |acc, bind| Term::lam(Pattern::Var(Some(bind.clone())), acc));
-        let body =
-          bind.iter_mut().rfold(body, |acc, bind| Term::lam(Pattern::Var(std::mem::take(bind)), acc));
+        let body = Term::rfold_lams(body, free_vars.iter().cloned().map(Some));
+        let body = Term::rfold_lams(body, std::mem::take(bind).into_iter());
         let def =
           Definition { name: new_nam.clone(), rules: vec![Rule { pats: vec![], body }], builtin: false };
         new_defs.push(def);

@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/kind_compiled_tree_sum.bend
 ---
+NumScott:
+16678913
+
+Scott:
 16678913

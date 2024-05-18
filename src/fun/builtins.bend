@@ -1,5 +1,5 @@
-data String = (Cons head ~tail) | (Nil)
-data List   = (Cons head ~tail) | (Nil)
+data String = (Nil) | (Cons head ~tail)
+data List   = (Nil) | (Cons head ~tail)
 data Result = (Ok val) | (Err val)
 data Nat    = (Succ ~pred) | (Zero)
 
@@ -69,32 +69,3 @@ data IO
   | (GetTime             cont)
   | (Sleep     time      cont)
   | (DrawImage tree      cont)
-
-MkStr (String/Cons x xs) = λt (t STRING_CONS_TAG x (MkStr xs))
-MkStr (String/Nil)       = λt (t STRING_NIL_TAG)
-
-ReadStr s = (s λtag switch tag {
-  0: String/Nil
-  _: λx λxs (String/Cons x (ReadStr xs))
-})
-
-MkIO (IO/Done term)                = λt (t IO_DONE_TAG term)
-MkIO (IO/PutText text cont)        = λt (t IO_PUT_TEXT_TAG text λx (MkIO (cont x)))
-MkIO (IO/GetText cont)             = λt (t IO_GET_TEXT_TAG λx (MkIO (cont x)))
-MkIO (IO/WriteFile file data cont) = λt (t IO_WRITE_FILE_TAG file data λx (MkIO (cont x)))
-MkIO (IO/ReadFile file cont)       = λt (t IO_READ_FILE_TAG file λx(MkIO (cont x)))
-MkIO (IO/GetTime cont)             = λt (t IO_GET_TIME_TAG λx (MkIO (cont x)))
-MkIO (IO/Sleep time cont)          = λt (t IO_SLEEP_TAG time λx (MkIO (cont x)))
-MkIO (IO/DrawImage tree cont)      = λt (t IO_DRAW_IMAGE_TAG tree λx (MkIO (cont x)))
-
-ReadIO io = (io λtag switch tag {
-  0: λterm (IO/Done term)
-  1: λtext (IO/PutText (ReadStr text) λcont (ReadIO cont))
-  2: (IO/GetText λcont (ReadIO cont))
-  3: λfile λdata (IO/WriteFile file data λcont (ReadIO cont))
-  4: λfile (IO/ReadFile file λcont (ReadIO cont))
-  5: (IO/GetTime λcont (ReadIO cont))
-  6: λtime (IO/Sleep time λcont (ReadIO cont))
-  7: λtree (IO/DrawImage tree λcont (ReadIO cont))
-  _: *
-})

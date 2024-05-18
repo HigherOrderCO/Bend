@@ -2,16 +2,20 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/adt_option_and.bend
 ---
-@Option/None = (* (a a))
+@Option/None = ((1 a) a)
 
-@Option/Some = (a ((a b) (* b)))
+@Option/Some = (a ((0 (a b)) b))
 
-@Option/and = ((@Option/and__C1 ((* @Option/None) a)) a)
+@Option/and = ((@Option/and__C3 a) a)
 
 @Option/and__C0 = (b (a c))
   & @Option/Some ~ ((a b) c)
 
-@Option/and__C1 = (a ((@Option/and__C0 ((* @Option/None) (a b))) b))
+@Option/and__C1 = (?((@Option/and__C0 (* (* @Option/None))) a) a)
+
+@Option/and__C2 = (a ((@Option/and__C1 (a b)) b))
+
+@Option/and__C3 = (?((@Option/and__C2 (* (* @Option/None))) a) a)
 
 @main = c
   & @Option/and ~ (a (b c))

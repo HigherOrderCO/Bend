@@ -2,8 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/adt_tup_era.bend
 ---
+Scott
 (Foo) = λa (a λb λc (b λd λ* λ* d c))
 
 (Main) = (Foo (Tuple/Pair 1 5))
 
 (Tuple/Pair) = λa λb λc (c a b)
+
+NumScott
+(Foo) = λa (a λb switch b { 0: λc λd (c λe switch e { 0: λf λ* λ* f; _: *; } d); _: *; })
+
+(Main) = (Foo (Tuple/Pair 1 5))
+
+(Tuple/Pair) = λa λb λc (c 0 a b)

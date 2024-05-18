@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool.bend
 ---
+Scott
 (not) = λa (a bool/false bool/true)
 
 (and) = λa (a λb (b bool/true bool/false) λc (c bool/false bool/false))
@@ -15,3 +16,18 @@ input_file: tests/golden_tests/encode_pattern_match/bool.bend
 (bool/true) = λa λ* a
 
 (bool/false) = λ* λb b
+
+NumScott
+(not) = λa (a λb switch b { 0: bool/false; _: λ* bool/true; })
+
+(and) = λa (a λb switch b { 0: λc (c λd switch d { 0: bool/true; _: λ* bool/false; }); _: λ* λe (e λf switch f { 0: bool/false; _: λ* bool/false; }); })
+
+(and2) = λa (a λb switch b { 0: λc c; _: λ* λ* bool/false; })
+
+(and3) = λa (a λb switch b { 0: λc (c λd switch d { 0: bool/true; _: λ* bool/false; }); _: λ* λ* bool/false; })
+
+(and4) = λa (a λb switch b { 0: λc (c λd switch d { 0: bool/true; _: λ* bool/false; }); _: λ* λ* bool/false; })
+
+(bool/true) = λa (a 0)
+
+(bool/false) = λa (a 1)

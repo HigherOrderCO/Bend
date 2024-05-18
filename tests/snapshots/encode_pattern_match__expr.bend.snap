@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/expr.bend
 ---
+Scott
 (Expr/Var) = λa λb λ* λ* λ* λ* λ* λ* λ* λ* (b a)
 
 (Expr/Num) = λa λ* λc λ* λ* λ* λ* λ* λ* λ* (c a)
@@ -27,3 +28,30 @@ input_file: tests/golden_tests/encode_pattern_match/expr.bend
 (Op/Mul) = λ* λ* λc λ* c
 
 (Op/Div) = λ* λ* λ* λd d
+
+NumScott
+(Expr/Var) = λa λb (b 0 a)
+
+(Expr/Num) = λa λb (b 1 a)
+
+(Expr/App) = λa λb λc (c 2 a b)
+
+(Expr/Fun) = λa λb λc (c 3 a b)
+
+(Expr/If) = λa λb λc λd (d 4 a b c)
+
+(Expr/Let) = λa λb λc λd (d 5 a b c)
+
+(Expr/Dup) = λa λb λc λd λe (e 6 a b c d)
+
+(Expr/Tup) = λa λb λc (c 7 a b)
+
+(Expr/Op2) = λa λb λc λd (d 8 a b c)
+
+(Op/Add) = λa (a 0)
+
+(Op/Sub) = λa (a 1)
+
+(Op/Mul) = λa (a 2)
+
+(Op/Div) = λa (a 3)

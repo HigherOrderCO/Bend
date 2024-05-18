@@ -14,20 +14,20 @@ input_file: tests/golden_tests/simplify_matches/already_flat.bend
 
 (Rule6) = λa a
 
-(Foo/CtrA) = λa λb a
+(Foo/CtrA) = λa (a 0)
 
-(Foo/CtrB) = λa λb λc (c a)
+(Foo/CtrB) = λa λb (b 1 a)
 
-(Bar/CtrA1) = λa λb λc λd (b a)
+(Bar/CtrA1) = λa λb (b 0 a)
 
-(Bar/CtrA2) = λa λb λc λd λe (d a b)
+(Bar/CtrA2) = λa λb λc (c 1 a b)
 
-(Bar/CtrA3) = λa λb λc λd (d a)
+(Bar/CtrA3) = λa λb (b 2 a)
 
-(Baz/CtrB0) = λa λb λc λd a
+(Baz/CtrB0) = λa (a 0)
 
-(Baz/CtrB1) = λa λb λc λd λe (c a)
+(Baz/CtrB1) = λa λb (b 1 a)
 
-(Baz/CtrB2) = λa λb λc λd λe (d a)
+(Baz/CtrB2) = λa λb (b 2 a)
 
-(Baz/CtrB3) = λa λb λc λd λe (e a)
+(Baz/CtrB3) = λa λb (b 3 a)

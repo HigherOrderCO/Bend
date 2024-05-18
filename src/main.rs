@@ -2,7 +2,7 @@ use bend::{
   check_book, compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   fun::{Book, Name},
-  load_file_to_book, run_book_with_fn, CompileOpts, OptLevel, RunOpts,
+  load_file_to_book, run_book_with_fn, AdtEncoding, CompileOpts, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use std::{
@@ -186,6 +186,8 @@ pub enum OptArgs {
   NoInline,
   CheckNetSize,
   NoCheckNetSize,
+  AdtScott,
+  AdtNumScott,
 }
 
 fn compile_opts_from_cli(args: &Vec<OptArgs>) -> CompileOpts {
@@ -212,6 +214,9 @@ fn compile_opts_from_cli(args: &Vec<OptArgs>) -> CompileOpts {
       LinearizeMatches => opts.linearize_matches = OptLevel::Enabled,
       LinearizeMatchesAlt => opts.linearize_matches = OptLevel::Alt,
       NoLinearizeMatches => opts.linearize_matches = OptLevel::Disabled,
+
+      AdtScott => opts.adt_encoding = AdtEncoding::Scott,
+      AdtNumScott => opts.adt_encoding = AdtEncoding::NumScott,
     }
   }
 
@@ -239,7 +244,6 @@ fn main() -> ExitCode {
     eprint!("{diagnostics}");
     return ExitCode::FAILURE;
   }
-
   ExitCode::SUCCESS
 }
 

@@ -4,76 +4,96 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 ---
 @Foo = (a (b (c ((a (b (c d))) d))))
 
-@List.concat = ((@List.concat__C0 ((a a) b)) b)
+@List.concat = ((@List.concat__C1 a) a)
 
-@List.concat__C0 = (a (b (c e)))
+@List.concat__C0 = (* (a (b (c e))))
   & @List/Cons ~ (a (d e))
   & @List.concat ~ (b (c d))
 
-@List.fold = ((@List.fold__C0 ((a (* a)) (b (c d)))) (c (b d)))
+@List.concat__C1 = (?(((a a) @List.concat__C0) b) b)
 
-@List.fold__C0 = (a (b (d ({(a (e f)) c} f))))
+@List.fold = ((@List.fold__C1 (a (b c))) (b (a c)))
+
+@List.fold__C0 = (* (a (b (d ({(a (e f)) c} f)))))
   & @List.fold ~ (b (c (d e)))
 
-@List.len = ((@List.len__C0 (0 a)) a)
+@List.fold__C1 = (?(((a (* a)) @List.fold__C0) b) b)
 
-@List.len__C0 = (* (a c))
+@List.len = ((@List.len__C1 a) a)
+
+@List.len__C0 = (* (* (a c)))
   & $(b c) ~ [+1]
   & @List.len ~ (a b)
 
-@List.len_tr = ((@List.len_tr__C0 ((a a) b)) b)
+@List.len__C1 = (?((0 @List.len__C0) a) a)
 
-@List.len_tr__C0 = (* (a (b d)))
+@List.len_tr = ((@List.len_tr__C1 a) a)
+
+@List.len_tr__C0 = (* (* (a (b d))))
   & @List.len_tr ~ (a (c d))
   & $(b c) ~ [+1]
 
-@List.map = ((@List.map__C0 ((* @List/Nil) a)) a)
+@List.len_tr__C1 = (?(((a a) @List.len_tr__C0) b) b)
 
-@List.map__C0 = (a (c ({(a b) d} f)))
+@List.map = ((@List.map__C1 a) a)
+
+@List.map__C0 = (* (a (c ({(a b) d} f))))
   & @List/Cons ~ (b (e f))
   & @List.map ~ (c (d e))
 
-@List.reduce = ((@List.reduce__C0 ((a (* a)) (b (c d)))) (c (b d)))
+@List.map__C1 = (?(((* @List/Nil) @List.map__C0) a) a)
 
-@List.reduce__C0 = (d (a (c ({b (c (d e))} f))))
+@List.reduce = ((@List.reduce__C1 (a (b c))) (b (a c)))
+
+@List.reduce__C0 = (* (d (a (c ({b (c (d e))} f)))))
   & @List.reduce ~ (a (b (e f)))
 
-@List.reverse_bad = ((@List.reverse_bad__C0 (@List/Nil a)) a)
+@List.reduce__C1 = (?(((a (* a)) @List.reduce__C0) b) b)
 
-@List.reverse_bad__C0 = (c (a e))
+@List.reverse_bad = ((@List.reverse_bad__C1 a) a)
+
+@List.reverse_bad__C0 = (* (c (a e)))
   & @List.concat ~ (b (d e))
   & @List.reverse_bad ~ (a b)
   & @List/Cons ~ (c (@List/Nil d))
 
-@List.reverse_over = ((@List.reverse_over__C0 ((a a) b)) b)
+@List.reverse_bad__C1 = (?((@List/Nil @List.reverse_bad__C0) a) a)
 
-@List.reverse_over__C0 = (b (a (c e)))
+@List.reverse_over = ((@List.reverse_over__C1 a) a)
+
+@List.reverse_over__C0 = (* (b (a (c e))))
   & @List.reverse_over ~ (a (d e))
   & @List/Cons ~ (b (c d))
+
+@List.reverse_over__C1 = (?(((a a) @List.reverse_over__C0) b) b)
 
 @List.reverse_tr = (a (* b))
   & @List.reverse_over ~ (a (@List/Nil b))
 
-@List.sum = ((@List.sum__C0 ((a a) b)) b)
+@List.sum = ((@List.sum__C1 a) a)
 
-@List.sum__C0 = ($(:[+] $(b c)) (a (b d)))
+@List.sum__C0 = (* ($(:[+] $(b c)) (a (b d))))
   & @List.sum ~ (a (c d))
 
-@List/Cons = (a (b ((a (b c)) (* c))))
+@List.sum__C1 = (?(((a a) @List.sum__C0) b) b)
 
-@List/Nil = (* (a a))
+@List/Cons = (a (b ((1 (a (b c))) c)))
 
-@Tree.flip = ((@Tree.flip__C1 (@Tree.flip__C0 a)) a)
+@List/Nil = ((0 a) a)
 
-@Tree.flip__C0 = a
-  & @Tree/leaf ~ a
+@Tree.flip = ((@Tree.flip__C2 a) a)
 
-@Tree.flip__C1 = (c (a e))
+@Tree.flip__C0 = (c (a e))
   & @Tree/node ~ (b (d e))
   &! @Tree.flip ~ (a b)
   &! @Tree.flip ~ (c d)
 
-@Tree.height = ((@Tree.height__C0 ((* 0) a)) a)
+@Tree.flip__C1 = (* a)
+  & @Tree/leaf ~ a
+
+@Tree.flip__C2 = (?((@Tree.flip__C0 @Tree.flip__C1) a) a)
+
+@Tree.height = ((@Tree.height__C1 a) a)
 
 @Tree.height__C0 = (a (c f))
   & $(e f) ~ [+1]
@@ -81,32 +101,40 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
   &! @Tree.height ~ (a b)
   &! @Tree.height ~ (c d)
 
-@Tree.leaves = ((@Tree.leaves__C0 ((* 1) a)) a)
+@Tree.height__C1 = (?((@Tree.height__C0 (* (* 0))) a) a)
+
+@Tree.leaves = ((@Tree.leaves__C1 a) a)
 
 @Tree.leaves__C0 = (a (b d))
   &! @Tree.leaves ~ (a $(:[+] $(c d)))
   &! @Tree.leaves ~ (b c)
 
-@Tree.map = ((@Tree.map__C1 (@Tree.map__C0 a)) a)
+@Tree.leaves__C1 = (?((@Tree.leaves__C0 (* (* 1))) a) a)
 
-@Tree.map__C0 = (a ((a b) c))
-  & @Tree/leaf ~ (b c)
+@Tree.map = ((@Tree.map__C2 a) a)
 
-@Tree.map__C1 = (a (d ({b e} g)))
+@Tree.map__C0 = (a (d ({b e} g)))
   & @Tree/node ~ (c (f g))
   &! @Tree.map ~ (a (b c))
   &! @Tree.map ~ (d (e f))
 
-@Tree.nodes = ((@Tree.nodes__C0 ((* 0) a)) a)
+@Tree.map__C1 = (* (a ((a b) c)))
+  & @Tree/leaf ~ (b c)
+
+@Tree.map__C2 = (?((@Tree.map__C0 @Tree.map__C1) a) a)
+
+@Tree.nodes = ((@Tree.nodes__C1 a) a)
 
 @Tree.nodes__C0 = (a (b e))
   & $(d e) ~ [+1]
   &! @Tree.nodes ~ (a $(:[+] $(c d)))
   &! @Tree.nodes ~ (b c)
 
-@Tree/leaf = (a (* ((a b) b)))
+@Tree.nodes__C1 = (?((@Tree.nodes__C0 (* (* 0))) a) a)
 
-@Tree/node = (a (b ((a (b c)) (* c))))
+@Tree/leaf = (a ((1 (a b)) b))
+
+@Tree/node = (a (b ((0 (a (b c))) c)))
 
 @add = ((@add__C0 ((a a) b)) b)
 

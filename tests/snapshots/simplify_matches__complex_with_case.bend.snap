@@ -6,6 +6,6 @@ input_file: tests/golden_tests/simplify_matches/complex_with_case.bend
 
 (main) = map
 
-(Tree/Node) = λa λb λc λd λe λf (e a b c d)
+(Tree/Node) = λa λb λc λd λe (e 0 a b c d)
 
-(Tree/Leaf) = λa λb λc (c a)
+(Tree/Leaf) = λa λb (b 1 a)

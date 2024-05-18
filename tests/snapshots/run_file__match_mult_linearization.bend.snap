@@ -2,6 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_mult_linearization.bend
 ---
+NumScott:
+[4m[1m[33mWarnings:[0m
+[1mDuring readback:[0m
+  Invalid Numeric Match.
+
+λa switch a = a { 0: λa λb λc (+ (+ a b) c); _: λa λb λc λd (+ (+ (+ a b) c) d); }
+
+Scott:
 [4m[1m[33mWarnings:[0m
 [1mDuring readback:[0m
   Encountered an invalid 'switch'.

@@ -22,6 +22,6 @@ input_file: tests/golden_tests/simplify_matches/linearize_match_all.bend
 
 (main) = *
 
-(ConsList/Cons) = λa λb λc λd (c a b)
+(ConsList/Cons) = λa λb λc (c 0 a b)
 
-(ConsList/Nil) = λa λb b
+(ConsList/Nil) = λa (a 1)

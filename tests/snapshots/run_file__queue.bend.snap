@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/queue.bend
 ---
+NumScott:
+λa λ* (a 1 (Cons 2 (Cons 3 Nil)))
+
+Scott:
 λa λ* (a 1 (Cons 2 (Cons 3 Nil)))

@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/tuple_rots.bend
 ---
+NumScott:
+λa (a 5 6 7 8 1 2 3 4)
+
+Scott:
 λa (a 5 6 7 8 1 2 3 4)

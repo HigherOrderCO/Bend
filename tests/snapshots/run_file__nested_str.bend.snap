@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nested_str.bend
 ---
-(λa λ* (a "a" ""), (λc λ* (c 97 λd λ* (d "bc" "")), (λg λ* (g "ab" "c"), λk λ* (k "ab" λn λ* (n "cd" "")))))
+NumScott:
+((String/Cons "a" ""), (λa (a 1 97 λb (b 1 "bc" "")), (λe (e 1 "ab" "c"), λi (i 1 "ab" λl (l 1 "cd" "")))))
+
+Scott:
+((String/Cons "a" ""), (λ* λa (a 97 λ* λb (b "bc" "")), (λ* λe (e "ab" "c"), λ* λi (i "ab" λ* λl (l "cd" "")))))

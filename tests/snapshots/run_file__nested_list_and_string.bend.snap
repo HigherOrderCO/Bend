@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nested_list_and_string.bend
 ---
-λa [a, λ* 2, λe λ* (e [7, "1234", 9] λm λ* (m a λn λ* (n * "42")))]
+NumScott:
+λa [a, λ* 2, λe (e 1 [7, "1234", 9] λm (m 1 a (String/Cons * "42")))]
+
+Scott:
+λa [a, λ* 2, λ* λe (e [7, "1234", 9] λ* λm (m a (String/Cons * "42")))]

@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.bend
 ---
+Scott
 (Foo) = λ$x (Maybe/Some 1 $x λa a)
 
 (Bar) = (Maybe/Some 1 $x λa a λ$x *)
@@ -11,3 +12,14 @@ input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.bend
 (Maybe/None) = λa λ* a
 
 (Maybe/Some) = λa λ* λc (c a)
+
+NumScott
+(Foo) = λ$x (Maybe/Some 1 λa switch a { 0: $x; _: λ* λb b; })
+
+(Bar) = (Maybe/Some 1 λa switch a { 0: $x; _: λ* λb b; } λ$x *)
+
+(main) = *
+
+(Maybe/None) = λa (a 0)
+
+(Maybe/Some) = λa λb (b 1 a)

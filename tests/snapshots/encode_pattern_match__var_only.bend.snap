@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/var_only.bend
 ---
+Scott
 (Foo) = λa λ* λc (c a)
 
 (main) = λ* Foo
@@ -9,3 +10,12 @@ input_file: tests/golden_tests/encode_pattern_match/var_only.bend
 (Bool/False) = λa λ* a
 
 (Bool/True) = λ* λb b
+
+NumScott
+(Foo) = λa λ* λc (c a)
+
+(main) = λ* Foo
+
+(Bool/False) = λa (a 0)
+
+(Bool/True) = λa (a 1)

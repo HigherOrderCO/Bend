@@ -6,7 +6,7 @@ input_file: tests/golden_tests/desugar_file/combinators.bend
 
 (bar) = λa λb (a bar b)
 
-(List/ignore) = λa λ* (a List/ignore__C0 0)
+(List/ignore) = λa λ* (a List/ignore__C1)
 
 (baz) = {0 1 2 3 λa a foo}
 
@@ -24,15 +24,17 @@ input_file: tests/golden_tests/desugar_file/combinators.bend
 
 (Main) = list
 
-(List/Cons) = λa λb λc λ* (c a b)
+(List/Nil) = λa (a 0)
 
-(List/Nil) = λ* λa a
+(List/Cons) = λa λb λc (c 1 a b)
 
 (A__C0) = let {a b} = A; λc (a b c)
 
 (B__C0) = let (a, b) = B; λc (a b c)
 
-(List/ignore__C0) = λ* λa (List/ignore a List/ignore)
+(List/ignore__C0) = λ* λ* λa (List/ignore a List/ignore)
+
+(List/ignore__C1) = λa switch a { 0: 0; _: List/ignore__C0; }
 
 (clax__C0) = λ* λ* λ* λa (clax a)
 

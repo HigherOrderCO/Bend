@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_num_explicit_bind.bend
 ---
+NumScott:
+3
+
+Scott:
 3

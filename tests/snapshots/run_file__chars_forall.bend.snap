@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/chars_forall.bend
 ---
+NumScott:
+8704
+
+Scott:
 8704

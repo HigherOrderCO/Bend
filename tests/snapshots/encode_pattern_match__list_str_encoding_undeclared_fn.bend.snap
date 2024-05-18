@@ -2,8 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared_fn.bend
 ---
+Scott
 (main) = *
 
-(Foo) = λa (a λ* λ* 1 0)
+(Foo) = λa (a 0 λ* λ* 1)
 
-(Bar) = λa (a λ* λ* 0 1)
+(Bar) = λa (a 1 λ* λ* 0)
+
+NumScott
+(main) = *
+
+(Foo) = λa (a λb switch b { 0: 0; _: λ* λ* λ* 1; })
+
+(Bar) = λa (a λb switch b { 0: 1; _: λ* λ* λ* 0; })

@@ -1,6 +1,6 @@
 use crate::{
-  fun::{Book, MatchRule, Name, Pattern, Tag, Term},
-  maybe_grow,
+  fun::{Book, MatchRule, Name, Pattern, Term},
+  maybe_grow, AdtEncoding,
 };
 
 impl Book {
@@ -12,27 +12,27 @@ impl Book {
   /// Num matches are encoded as a sequence of native num matches (on 0 and 1+).
   ///
   /// Var and pair matches become a let expression.
-  pub fn encode_matches(&mut self) {
+  pub fn encode_matches(&mut self, adt_encoding: AdtEncoding) {
     for def in self.defs.values_mut() {
       for rule in &mut def.rules {
-        rule.body.encode_matches();
+        rule.body.encode_matches(adt_encoding);
       }
     }
   }
 }
 
 impl Term {
-  pub fn encode_matches(&mut self) {
+  pub fn encode_matches(&mut self, adt_encoding: AdtEncoding) {
     maybe_grow(|| {
       for child in self.children_mut() {
-        child.encode_matches()
+        child.encode_matches(adt_encoding)
       }
 
       if let Term::Mat { arg, bnd: _, with, arms: rules } = self {
         assert!(with.is_empty());
         let arg = std::mem::take(arg.as_mut());
         let rules = std::mem::take(rules);
-        *self = encode_match(arg, rules);
+        *self = encode_match(arg, rules, adt_encoding);
       } else if let Term::Swt { arg, bnd: _, with, pred, arms: rules } = self {
         assert!(with.is_empty());
         let arg = std::mem::take(arg.as_mut());
@@ -44,15 +44,46 @@ impl Term {
   }
 }
 
-fn encode_match(arg: Term, rules: Vec<MatchRule>) -> Term {
-  let tag = Tag::Static;
-  let mut arms = vec![];
-  for rule in rules.into_iter() {
-    let body =
-      rule.1.iter().cloned().rfold(rule.2, |bod, nam| Term::tagged_lam(tag.clone(), Pattern::Var(nam), bod));
-    arms.push(body);
+fn encode_match(arg: Term, rules: Vec<MatchRule>, adt_encoding: AdtEncoding) -> Term {
+  match adt_encoding {
+    AdtEncoding::Scott => {
+      let arms = rules.into_iter().map(|rule| Term::rfold_lams(rule.2, rule.1.into_iter()));
+      Term::call(arg, arms)
+    }
+    AdtEncoding::NumScott => {
+      fn make_switches(arms: &mut [Term]) -> Term {
+        maybe_grow(|| match arms {
+          [] => Term::Err,
+          [arm] => Term::lam(Pattern::Var(None), std::mem::take(arm)),
+          [arm, rest @ ..] => Term::lam(Pattern::Var(Some(Name::new("%tag"))), Term::Swt {
+            arg: Box::new(Term::Var { nam: Name::new("%tag") }),
+            bnd: None,
+            with: vec![],
+            pred: None,
+            arms: vec![std::mem::take(arm), make_switches(rest)],
+          }),
+        })
+      }
+      let mut arms =
+        rules.into_iter().map(|rule| Term::rfold_lams(rule.2, rule.1.into_iter())).collect::<Vec<_>>();
+      let term = if arms.len() == 1 {
+        // λx (x λtag switch tag {0: Ctr0; _: * })
+        let arm = arms.pop().unwrap();
+        let term = Term::Swt {
+          arg: Box::new(Term::Var { nam: Name::new("%tag") }),
+          bnd: None,
+          with: vec![],
+          pred: None,
+          arms: vec![arm, Term::Era],
+        };
+        Term::lam(Pattern::Var(Some(Name::new("%tag"))), term)
+      } else {
+        // λx (x λtag switch tag {0: Ctr0; _: switch tag-1 { ... } })
+        make_switches(arms.as_mut_slice())
+      };
+      Term::call(arg, [term])
+    }
   }
-  Term::tagged_call(tag.clone(), arg, arms)
 }
 
 /// Convert into a sequence of native switches, decrementing by 1 each switch.
