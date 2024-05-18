@@ -223,6 +223,28 @@ def main:
 Except without the annoying syntax restrictions. You can also shorten it as `λ`,
 if you can somehow type that.
 
+You can also match on native numbers (`u24`) using the `switch` statement:
+
+```python
+def slow_mul2(n):
+  switch n:
+    case 0:
+      return 0
+    case _:
+      return 2 * slow_mul2(n-1)
+```
+
+The `if-else` syntax is a third option to branch, other than `match` and
+`switch`. It expects a `u24` (`1` for `true` and `0` for `false`):
+
+```python
+def is_even(n):
+  if n % 2 == 0:
+    return 1
+  else:
+    return 0
+```
+  
 *note - some types, like tuples, aren't being pretty-printed correctly after
 computation. this will be fixed in the next days (TM)*
 
