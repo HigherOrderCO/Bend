@@ -289,7 +289,8 @@ type Tree:
   Leaf { val }
 ```
 
-This defines a binary tree, with elements on leaves. For example, the tree:
+This defines a binary tree, with elements on leaves. Here, `~` flags a field as
+*recursive*. For example, the tree:
 
 ```
   __/\__
