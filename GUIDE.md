@@ -36,7 +36,8 @@ To test if it worked, type:
 bend --help
 ```
 
-For GPU support, you also need CUDA version `12.X`.
+For GPU support, you also need the CUDA toolkit (CUDA and `nvcc`) version `12.X`. **It needs to be installed _before_ you install HVM.**
+At the moment, **only Nvidia GPUs** are supported.
 
 Hello, World!
 -------------
