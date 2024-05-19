@@ -53,9 +53,7 @@ def sort(d, s, t):
       return t
     case _:
       (t.a, t.b) = t
-      return flow(d, s, sort(d-1, 0, t.a), sort(d-1, 1, t.b))
+      return flow(d, s, (sort(d-1, 0, t.a), sort(d-1, 1, t.b)))
 
 def main:
-  # Sorts the numbers from 0 to 2^depth.
-  depth = 14
-  return sum(depth, sort(depth, 0, gen(depth, 0)))
+  return sum(18, sort(18, 0, gen(18, 0)))
