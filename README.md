@@ -35,7 +35,7 @@ bend run-cu <file.hvm> # uses the CUDA interpreter (massively parallel)
 ```
 
 You can also compile `Bend` to standalone C/CUDA files with `gen-c` and
-`gen-cu`, for maximum performance. But keep in mind our code gen is still on its
+`gen-cu`, for maximum performance. But keep in mind our code gen is still in its
 infancy, and is nowhere as mature as SOTA compilers like GCC and GHC.
 
 ## Parallel Programming in Bend
@@ -149,7 +149,7 @@ and synchronized correctly and efficiently by
 
 ## Note
 
-It is very important to reinforce that, while Bend does that it was built to
+It is very important to reinforce that, while Bend does what it was built to
 (i.e., scale in performance with cores, up to 10000+ concurrent threads), its
 single-core performance is still extremely sub-par. This is the first version of
 the system, and we haven't put much effort into a proper compiler yet. You can

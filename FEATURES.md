@@ -15,7 +15,7 @@ def main:
 ```
 
 Running this program will show the number 5.
-Be careful with `run` since it will not show any warnings by default. Before running a new program it's useful to first `check` it.
+Be careful with `run` since it will not show any warnings by default. Before running a new program, it's useful to first `check` it.
 
 Bend programs consist of a series of function definitions, always starting with a function called `main` or `Main`.
 
@@ -164,7 +164,7 @@ def MyTree.map_sum(x):
   fold x with acc:
     case MyTree/Node:
       # `x.left` and `x.right` are called with the new state value.
-      # Note that values are copied if you use them more than once, so you don't want to pass something very large. 
+      # Note that values are copied if you use them more than once, so you don't want to pass something very large.
       return MyTree/Node{ val: x.val + acc, left: x.left(x.val + acc), right: x.right(x.val + acc) }
     case MyTree/Leaf:
       return x
@@ -185,7 +185,7 @@ def main:
       match val:
         case List/Cons:
           x = val.head + fork(val.tail)
-        case List/Nil: 
+        case List/Nil:
           x = 0
     else:
       x = 0
