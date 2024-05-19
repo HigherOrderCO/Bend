@@ -622,7 +622,6 @@ pub enum ReadbackError {
   InvalidNumericOp,
   ReachedRoot,
   Cyclic,
-  InvalidBind,
 }
 
 impl PartialEq for ReadbackError {
@@ -642,11 +641,14 @@ impl std::hash::Hash for ReadbackError {
 impl std::fmt::Display for ReadbackError {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      ReadbackError::InvalidNumericMatch => write!(f, "Invalid Numeric Match."),
-      ReadbackError::InvalidNumericOp => write!(f, "Invalid Numeric Operation."),
-      ReadbackError::ReachedRoot => write!(f, "Reached Root."),
-      ReadbackError::Cyclic => write!(f, "Cyclic Term."),
-      ReadbackError::InvalidBind => write!(f, "Invalid Bind."),
+      ReadbackError::InvalidNumericMatch => write!(f, "Encountered an invalid 'switch'."),
+      ReadbackError::InvalidNumericOp => write!(f, "Encountered an invalid numeric operation."),
+      ReadbackError::ReachedRoot => {
+        write!(f, "Unable to interpret the HVM result as a valid Bend term. (Reached Root)")
+      }
+      ReadbackError::Cyclic => {
+        write!(f, "Unable to interpret the HVM result as a valid Bend term. (Cyclic Term)")
+      }
     }
   }
 }
