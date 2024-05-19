@@ -44,7 +44,8 @@ A function definition is composed by a name, a sequence of parameters and a body
 
 A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names).
 
-The last statement of each branch of the function must be a `return`.
+The last statement of each function must either be a `return` or a selection statement (`if`, `switch`, `match`, `fold`)
+where all branches `return`.
 
 ### Type
 
@@ -188,31 +189,37 @@ A branching statement where `else` is mandatory.
 
 The condition must return a `u24` number, where 0 will run the `else` branch and any other value will return the first one.
 
-It is equivalent to a switch statement:
-
-```
-switch _ = condition:
-  case 0:
-    else
-  case _:
-    then
-```
-
 ### Switch
 
 ```python
 switch x = 4:
   case 0:
-    return 0
+    return 6
   case 1:
-    return 0
+    return 7
   case _:
     return x-2
 ```
 
-A switch for native numbers, the pattern matching cases must start from `0` up to `_` sequentially.
+A switch binds a variable name to the result of a given condition and branches to the case matching its value. Cases
+must be listed from least to greatest, beginning with `0` and incrementing by 1. The last case must be `_`, which
+catches all values not explicitly enumerated. Switches may only be used with native numbers values.
 
-In the last arm, the predecessor value is available with the name `x-2` (in this case) or `bound_var-next_num` (in the general case).
+In the last case, the predecessor value is available with the name `bound_var-next_num`, where `bound_var` is the variable
+set by the condition and `next_num` is the expected value of the next case. For example, the above example code returns
+`5`, since `x-2` is bound to `5` and the value of `x` doesn't match any explicit case.
+
+This switch statement is equivalent to the `if` from the previous section:
+
+```python
+switch _ = condition:
+  case 0:
+    # else branch
+    return 1
+  case _:
+    # then branch
+    return 0
+```
 
 ### Match
 
@@ -250,9 +257,9 @@ It is equivalent to the inline recursive function:
 def fold(x):
   match x:
     case Tree/Node:
-      return x.value + fold(x.left) + fold(x.right);
+      return x.value + fold(x.left) + fold(x.right)
     case Tree/Leaf:
-      return 0;
+      return 0
 ...
 fold(Tree/Leaf)
 ```
@@ -332,7 +339,7 @@ Where `x <- ...` performs a monadic operation.
 Expects `Result` to be a type defined with `type` and a function `Result/bind` to be defined.
 The monadic bind function should be of type `(Result a) -> (a -> Result b) -> Result b`, like this:
 
-```
+```python
 def Result/bind(res, nxt):
   match res:
     case Result/ok:
@@ -343,7 +350,7 @@ def Result/bind(res, nxt):
 
 Other statements are allowed inside the `do` block and it can both return a value at the end and bind a variable, like branching statements do.
 
-```
+```python
 # Also ok:
 do Result:
   x <- safe_div(2, 0);
@@ -705,7 +712,7 @@ A tuple or duplication pattern is equivalent to a lambda followed by a `let`.
 
 ### Unscoped Variables
 
-```
+```rust
 λ$x $x
 ```
 

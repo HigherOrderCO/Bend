@@ -19,7 +19,16 @@ A Quick Demo
 
 > Currently not working on Windows, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) as a workaround.
 
-First, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml). Then, install both HVM2 and Bend with:
+> If you're having issues or have a question about Bend, please first read the [Known Issues](https://github.com/HigherOrderCO/Bend/blob/main/KNOWN_ISSUES.md) page and check if your question has already been addressed.
+
+First, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml).
+
+If you want to use the C runtime, install a C compiler (like GCC or Clang).
+If you want to use the CUDA runtime, install the CUDA toolkit (CUDA and `nvcc`) version 12.x.
+
+> **_Note_: [Only Nvidia GPUs are supported at the moment](https://github.com/HigherOrderCO/Bend/issues/341).**
+
+Then, install both HVM2 and Bend with:
 
 ```sh
 cargo +nightly install hvm
@@ -29,13 +38,13 @@ cargo +nightly install bend-lang
 Finally, write some Bend file, and run it with one of these commands:
 
 ```sh
-bend run    <file.hvm> # uses the Rust interpreter (sequential)
-bend run-c  <file.hvm> # uses the C interpreter (parallel)
-bend run-cu <file.hvm> # uses the CUDA interpreter (massively parallel)
+bend run    <file.bend> # uses the Rust interpreter (sequential)
+bend run-c  <file.bend> # uses the C interpreter (parallel)
+bend run-cu <file.bend> # uses the CUDA interpreter (massively parallel)
 ```
 
 You can also compile `Bend` to standalone C/CUDA files with `gen-c` and
-`gen-cu`, for maximum performance. But keep in mind our code gen is still on its
+`gen-cu`, for maximum performance. But keep in mind our code gen is still in its
 infancy, and is nowhere as mature as SOTA compilers like GCC and GHC.
 
 ## Parallel Programming in Bend
@@ -149,7 +158,7 @@ and synchronized correctly and efficiently by
 
 ## Note
 
-It is very important to reinforce that, while Bend does that it was built to
+It is very important to reinforce that, while Bend does what it was built to
 (i.e., scale in performance with cores, up to 10000+ concurrent threads), its
 single-core performance is still extremely sub-par. This is the first version of
 the system, and we haven't put much effort into a proper compiler yet. You can

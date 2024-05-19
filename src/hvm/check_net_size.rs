@@ -1,7 +1,7 @@
 use crate::{diagnostics::Diagnostics, fun::Name};
 use hvmc::ast::Book;
 
-pub const MAX_NET_SIZE: usize = 32;
+pub const MAX_NET_SIZE: usize = 64;
 
 pub fn check_net_sizes(book: &Book, diagnostics: &mut Diagnostics) -> Result<(), Diagnostics> {
   diagnostics.start_pass();

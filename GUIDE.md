@@ -36,7 +36,8 @@ To test if it worked, type:
 bend --help
 ```
 
-For GPU support, you also need CUDA version `12.X`.
+For GPU support, you also need the CUDA toolkit (CUDA and `nvcc`) version `12.X`. **It needs to be installed _before_ you install HVM.**
+At the moment, **only Nvidia GPUs** are supported.
 
 Hello, World!
 -------------
@@ -209,8 +210,9 @@ def main:
 
 Will return `1`, which is the first element.
 
-We also have a syntax sugar for strings in Bend, which is just a List of `u24`
+We also have a syntax sugar for strings in Bend, which is just a list of `u24`
 characters (UTF-16 encoded). The `"Hello, world!"` type we've seen used it!
+> **_NOTE:_**  The actual type used for strings is `String`, which has `String/Cons` and `String/Nil` just like `List` does.
 
 Bend also has inline functions, which work just like Python:
 
@@ -287,7 +289,7 @@ loops? For example:
 
 ```python
 def sum(x):
-  total = 0 
+  total = 0
   for i in range(10)
     total += i
   return total
