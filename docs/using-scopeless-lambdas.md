@@ -18,7 +18,7 @@ main = (((λ$x 1) 2), $x)
 
 Take some time to think about the program above. It is valid, despite `$x` being used outside the lambda's body.
 
-However, scopeless lambdas don't bind across definitions
+However, scopeless lambdas don't bind across definitions.
 ```rs
 def = $x
 

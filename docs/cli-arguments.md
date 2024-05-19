@@ -8,7 +8,7 @@ bend run <Path to program> [Arguments in expression form]...
 
 It accepts any expression that would also be valid inside a bend function.
 
-Arguments are passed to programs by applying them to the entrypoint function:
+Arguments are passed to programs by applying them to the entry point function:
 
 ```py
 # Imp syntax

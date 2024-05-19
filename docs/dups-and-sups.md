@@ -48,7 +48,7 @@ To avoid label collision, HVM-Lang automatically generates new dup labels for ea
 
 This is not *incorrect* behavior or *undefined* behaviour. It is incorrect only if we treat HVM as a λ-calculus reduction engine, which isn't true. However, there are some cases where HVM diverges from λ-calculus, and this is one of them.
 
-To fix the problem, its necessary to re-create the term so that a new label is assigned, or manually assign one:
+To fix the problem, it's necessary to re-create the term so that a new label is assigned, or manually assign one:
 ```rs
 c2  = λf λx let        {f1 f2} = f; (f1 (f2 x))
 c2_ = λf λx let #label {f1 f2} = f; (f1 (f2 x))

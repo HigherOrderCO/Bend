@@ -53,7 +53,7 @@ minus_zero = -0.0
 ### Mixing number types
 
 The three number types are fundamentally different.
-If you mix two numbers of different types HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now.
+If you mix two numbers of different types, HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now.
 
 At the HVM level, both type and the operation are stored inside the number nodes as tags. One number stores the type, the other the operation.
 That means that we lose the type information of one of the numbers, which causes this behavior.

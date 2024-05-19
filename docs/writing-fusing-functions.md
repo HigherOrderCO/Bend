@@ -17,7 +17,7 @@ main = (if true 42 37)
 // so (true 42 37) will do the same thing.
 ```
 
-This is how a `Not` function that acts on this encoding can be defined
+This is how a `Not` function that acts on this encoding can be defined.
 ```rs
 not = λboolean (boolean false true)
 main = (not true) // Outputs λtλf f.
@@ -114,7 +114,7 @@ fusing_add = λa
 	(a case_succ case_zero)
 ```
 
-This function is fusing on `a`, which means that `λx (fusing_add two x)` will have a small normal form (but `λx (fusing_add x two)` won't)
+This function is fusing on `a`, which means that `λx (fusing_add two x)` will have a small normal form (but `λx (fusing_add x two)` won't).
 
 Broadly speaking, a good rule of thumb in HVM is **push linear lambdas to the top and duplicating lambdas to the bottom**.
 

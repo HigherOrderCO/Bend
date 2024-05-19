@@ -114,7 +114,7 @@ Example:
 λa λb switch b { 0: a; _: a }
 ```
 
-When the `linearize-matches-extra` option is used, it linearizes all vars used in the arms.
+When the `linearize-matches-extra` option is used, it linearizes all variables used in the arms.
 
 example:
 ```py
@@ -160,7 +160,7 @@ fold = λinit λf λxs (xs λh λt (fold (f init h) f t) init)
 
 # Inline
 
-If enabled, inlines terms that compiles to 0 or 1 inet nodes at lambda level, before pre reduction.
+If enabled, inlines terms that compile to 0 or 1 inet nodes at lambda level, before pre-reduction.
 
 Example:
 ```py
