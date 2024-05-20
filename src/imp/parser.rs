@@ -124,7 +124,13 @@ impl<'a> PyParser<'a> {
         }
         let head = self.parse_expr(false)?;
         self.skip_trivia();
-        if self.starts_with(":") { self.parse_map_init(head)? } else { self.parse_sup(head)? }
+        if self.try_consume(",") {
+          self.parse_sup(head)?
+        } else if self.try_consume(":") {
+          self.parse_map_init(head)?
+        } else {
+          self.expected("',' or ':'")?
+        }
       }
       // List or Comprehension
       '[' => self.list_or_comprehension()?,
@@ -226,7 +232,6 @@ impl<'a> PyParser<'a> {
 
   fn parse_map_init(&mut self, head: Expr) -> ParseResult<Expr> {
     let mut entries = Vec::new();
-    self.consume(":")?;
     let val = self.parse_expr(false)?;
     entries.push((head, val));
     self.skip_trivia();
