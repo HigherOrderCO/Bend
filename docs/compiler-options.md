@@ -10,7 +10,7 @@
 | `-Ofloat_combinators` `-Ono-float_combinators` | Enabled  | [float-combinators](#float-combinators) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
 | `-Oinline` `-Ono-inline` | Disabled | [inline](#inline) |
-| `-Ocheck-net-size` `-Ono-check-net-size` | Enabled  | [check-net-size](#check-net-size) |
+| `-Ocheck-net-size` `-Ono-check-net-size` | Disabled | [check-net-size](#check-net-size) |
 | `-Oadt-scott` `-Oadt-num-scott` | adt-num-scott | [adt-encoding](#adt-encoding) | | 
 
 ## Eta-reduction
@@ -185,7 +185,8 @@ main = (id foo)
 
 ## Check-net-size
 
-If enabled, checks that the size of each function after compilation is within the HVM restriction of at most 64 nodes per definition.
+If enabled, checks that the size of each function after compilation has at most 64 HVM nodes.
+This is a memory restriction of the CUDA runtime, if you're not using the `*-cu` you can disable it.
 
 Example:
 ```py

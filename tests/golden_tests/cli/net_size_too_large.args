@@ -1,0 +1,3 @@
+gen-hvm
+tests/golden_tests/cli/net_size_too_large.bend
+-Ocheck-net-size
