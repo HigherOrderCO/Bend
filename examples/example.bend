@@ -1,6 +1,11 @@
 # Write definitions like this
 (Def1) = ((λa a) (λb b))
 
+# or like this
+def def1(a, b):
+  return a, b
+
+
 # You can call a definition by just referencing its name
 # It will be substituted in place of the reference
 (Def2) = ((λa a) Def1)
