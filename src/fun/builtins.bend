@@ -79,4 +79,6 @@ IO/bind (IO/GetTime cont)             f = (IO/GetTime λx (IO/bind (cont x) f))
 IO/bind (IO/Sleep time cont)          f = (IO/Sleep time λx (IO/bind (cont x) f))
 IO/bind (IO/DrawImage tree cont)      f = (IO/DrawImage tree λx (IO/bind (cont x) f))
 
-IO/print s = (IO/PutText s λx (IO/Done x))
+print s = (IO/PutText s λx (IO/Done x))
+get_time = (IO/GetTime @x (IO/Done x))
+sleep hi_lo = (IO/Sleep hi_lo @x (IO/Done x))
