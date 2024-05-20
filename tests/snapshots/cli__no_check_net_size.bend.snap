@@ -2,11 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/no_check_net_size.bend
 ---
-@Arr/Leaf = (a (* ((a b) (* b))))
+@Arr/Leaf = (a ((1 (a b)) b))
 
-@Arr/Node = (a (b (* (* ((a (b c)) c)))))
+@Arr/Node = (a (b ((2 (a (b c))) c)))
 
-@Arr/Null = (a (* (* a)))
+@Arr/Null = ((0 a) a)
 
 @Gen = (a b)
   & @Gen.go ~ (a (0 b))
@@ -30,30 +30,46 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 @Main__C2 = a
   & @Sort ~ (@Main__C1 a)
 
-@Map_/Both = (a (b (* (* ((a (b c)) c)))))
+@Map_/Both = (a (b ((2 (a (b c))) c)))
 
-@Map_/Free = (a (* (* a)))
+@Map_/Free = ((0 a) a)
 
-@Map_/Used = (* (a (* a)))
+@Map_/Used = ((1 a) a)
 
-@Merge = ((@Merge__C5 (@Merge__C4 (@Merge__C3 a))) a)
+@Merge = ((@Merge__C13 a) a)
 
-@Merge__C0 = (b (e (a (d g))))
+@Merge__C0 = (* a)
+  & @Map_/Both ~ a
+
+@Merge__C1 = (?((@Map_/Used @Merge__C0) a) a)
+
+@Merge__C10 = (* (a (b ((@Merge__C8 (a (b c))) c))))
+
+@Merge__C11 = ((@Merge__C2 a) a)
+
+@Merge__C12 = (?((@Merge__C9 @Merge__C10) a) a)
+
+@Merge__C13 = (?((@Merge__C11 @Merge__C12) a) a)
+
+@Merge__C2 = (?((@Map_/Free @Merge__C1) a) a)
+
+@Merge__C3 = (?((@Map_/Used *) a) a)
+
+@Merge__C4 = (?((@Map_/Used @Merge__C3) a) a)
+
+@Merge__C5 = (* (b (e (a (d g)))))
   & @Map_/Both ~ (c (f g))
   &! @Merge ~ (a (b c))
   &! @Merge ~ (d (e f))
 
-@Merge__C1 = a
+@Merge__C6 = a
   & @Map_/Both ~ a
 
-@Merge__C2 = a
-  & @Map_/Both ~ a
+@Merge__C7 = (?((* @Merge__C5) a) a)
 
-@Merge__C3 = (a (b ((@Merge__C1 (* (@Merge__C0 (a (b c))))) c)))
+@Merge__C8 = (?((@Merge__C6 @Merge__C7) a) a)
 
-@Merge__C4 = ((@Map_/Used (@Map_/Used (* a))) a)
-
-@Merge__C5 = ((@Map_/Free (@Map_/Used (@Merge__C2 a))) a)
+@Merge__C9 = ((@Merge__C4 a) a)
 
 @Radix = ({$([&8388608] a) {$([&4194304] b) {$([&2097152] c) {$([&1048576] d) {$([&524288] e) {$([&262144] f) {$([&131072] g) {$([&65536] h) {$([&32768] i) {$([&16384] j) {$([&8192] k) {$([&4096] l) {$([&2048] m) {$([&1024] n) {$([&512] o) {$([&256] p) {$([&128] q) {$([&64] r) {$([&32] s) {$([&16] t) {$([&8] u) {$([&4] v) {$([&2] w) $([&1] x)}}}}}}}}}}}}}}}}}}}}}}} vb)
   & @Swap ~ (a (ub (@Map_/Free vb)))
@@ -81,25 +97,33 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
   & @Swap ~ (w (y (@Map_/Free z)))
   & @Swap ~ (x (@Map_/Used (@Map_/Free y)))
 
-@Reverse = ((@Arr/Null (@Reverse__C1 (@Reverse__C0 a))) a)
+@Reverse = ((@Reverse__C3 a) a)
 
-@Reverse__C0 = (c (a e))
+@Reverse__C0 = a
+  & @Arr/Leaf ~ a
+
+@Reverse__C1 = (* (c (a e)))
   & @Arr/Node ~ (b (d e))
   &! @Reverse ~ (a b)
   &! @Reverse ~ (c d)
 
-@Reverse__C1 = a
-  & @Arr/Leaf ~ a
+@Reverse__C2 = (?((@Reverse__C0 @Reverse__C1) a) a)
+
+@Reverse__C3 = (?((@Arr/Null @Reverse__C2) a) a)
 
 @Sort = (a c)
   & @ToArr ~ (0 (b c))
   & @ToMap ~ (a b)
 
-@Sum = ((0 ((a a) (@Sum__C0 b))) b)
+@Sum = ((@Sum__C2 a) a)
 
-@Sum__C0 = (a (b d))
+@Sum__C0 = (* (a (b d)))
   &! @Sum ~ (a $(:[+] $(c d)))
   &! @Sum ~ (b c)
+
+@Sum__C1 = (?(((a a) @Sum__C0) b) b)
+
+@Sum__C2 = (?((0 @Sum__C1) a) a)
 
 @Swap = (?((@Swap__C0 @Swap__C1) (a (b c))) (b (a c)))
 
@@ -109,25 +133,33 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 @Swap__C1 = (* a)
   & @Map_/Both ~ a
 
-@ToArr = (a (((* @Arr/Null) (@ToArr__C1 (@ToArr__C0 (a b)))) b))
+@ToArr = (a ((@ToArr__C3 (a b)) b))
 
-@ToArr__C0 = (b (e ({$([*2] $([+1] d)) $([*2] $([+0] a))} g)))
+@ToArr__C0 = a
+  & @Arr/Leaf ~ a
+
+@ToArr__C1 = (* (b (e ({$([*2] $([+1] d)) $([*2] $([+0] a))} g))))
   & @Arr/Node ~ (c (f g))
   &! @ToArr ~ (a (b c))
   &! @ToArr ~ (d (e f))
 
-@ToArr__C1 = a
-  & @Arr/Leaf ~ a
+@ToArr__C2 = (?((@ToArr__C0 @ToArr__C1) a) a)
 
-@ToMap = ((@Map_/Free (@ToMap__C1 (@ToMap__C0 a))) a)
+@ToArr__C3 = (?(((* @Arr/Null) @ToArr__C2) a) a)
 
-@ToMap__C0 = (a (c e))
+@ToMap = ((@ToMap__C3 a) a)
+
+@ToMap__C0 = a
+  & @Radix ~ a
+
+@ToMap__C1 = (* (a (c e)))
   & @Merge ~ (b (d e))
   &! @ToMap ~ (a b)
   &! @ToMap ~ (c d)
 
-@ToMap__C1 = a
-  & @Radix ~ a
+@ToMap__C2 = (?((@ToMap__C0 @ToMap__C1) a) a)
+
+@ToMap__C3 = (?((@Map_/Free @ToMap__C2) a) a)
 
 @main = a
   & @Sum ~ (@Main__C2 a)

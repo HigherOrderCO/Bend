@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/imp_empty_literals.bend
 ---
 NumScott:
-λa (a 0)
+[]
 
 Scott:
-λa λ* a
+[]
