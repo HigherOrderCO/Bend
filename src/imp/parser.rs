@@ -129,7 +129,7 @@ impl<'a> PyParser<'a> {
         } else if self.try_consume(":") {
           self.parse_map_init(head)?
         } else {
-          self.expected("Comma or Colon")?
+          self.expected("',' or ':'")?
         }
       }
       // List or Comprehension
