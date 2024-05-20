@@ -53,7 +53,7 @@ minus_zero = -0.0
 ### Mixing number types
 
 The three number types are fundamentally different.
-If you mix two numbers of different types HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now.
+If you mix two numbers of different types, HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now.
 
 At the HVM level, both type and the operation are stored inside the number nodes as tags. One number stores the type, the other the operation.
 That means that we lose the type information of one of the numbers, which causes this behavior.
@@ -123,15 +123,15 @@ Number.minus_three = λn λf λx
 
 Using everything we learned, we can write a program that calculates the n-th Fibonacci number using native numbers:
 
-```rs
-fibonacci = λn // n is the argument
+```py
+fibonacci = λn # n is the argument
   switch n {
-    // If the number is 0, then return 0
+    # If the number is 0, then return 0
     0: 0
-    // If the number is 1, then return 1
+    # If the number is 1, then return 1
     1: 1
-    // Otherwise, return the sum of (fib (n-2 + 1)) and (fib n-2)
-    // The successor pattern provides a `var`-`successor number` bind
+    # Otherwise, return the sum of (fib (n-2 + 1)) and (fib n-2)
+    # The successor pattern provides a `var`-`successor number` bind
     _: (+ (fibonacci (+ n-2 1)) (fibonacci n-2))
   }
 

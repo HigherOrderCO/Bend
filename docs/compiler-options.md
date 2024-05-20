@@ -17,7 +17,7 @@
 
 Enables or disables Eta Reduction for defined functions.
 
-Eta reduction simplifies lambda expressions, removing redundant parameters. [See also](https:#wiki.haskell.org/Eta_conversion).
+Eta reduction simplifies lambda expressions, removing redundant parameters. [See also](https://wiki.haskell.org/Eta_conversion).
 
 Example:
 ```py
@@ -115,7 +115,7 @@ Example:
 λa λb switch b { 0: a; _: a }
 ```
 
-When the `linearize-matches-extra` option is used, it linearizes all vars used in the arms.
+When the `linearize-matches-extra` option is used, it linearizes all variables used in the arms.
 
 example:
 ```py

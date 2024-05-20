@@ -1,8 +1,8 @@
 # Pattern Matching
 
 Switches on many numbers are compiled to sequences of simple switch expressions:
-```rust
-  // These two are equivalent
+```py
+  # These two are equivalent
   switch n {
     0: A
     1: B
@@ -23,7 +23,7 @@ Switches on many numbers are compiled to sequences of simple switch expressions:
 ```
 
 Matches on ADT constructors are compiled to different expressions depending on the chosen encoding:
-```rust
+```py
 data Maybe = (Some val) | None
 
 UnwrapOrZero x = match x {
@@ -31,27 +31,25 @@ UnwrapOrZero x = match x {
   None: 0
 }
 
-// If the current encoding is 'adt-tagged-scott' it becomes:
-Some = λval #Maybe λSome #Maybe λNone #Maybe(Some val)
-None = #Maybe λSome #Maybe λNone None
-UnwrapOrZero x = #Maybe (x #Maybe λx.val x.val 0)
+# If the current encoding is 'adt-num-scott' it becomes:
+Some = λval λx (x 0 val)
+None = λx (x 1)
+UnwrapOrZero x = (x λtag switch tag {
+  0: λx.val x.val
+  _: λ* 0
+})
 
-// Otherwise, if the current encoding is 'adt-scott' it becomes:
+# Otherwise, if the current encoding is 'adt-scott' it becomes:
 Some = λval λSome λNone (Some val)
 None = λSome λNone None
 UnwrapOrZero x = (x λx.val x.val 0)
 ```
 
-Currently, if you want to readback the adt constructors and matches after running a program as constructors and matches and not as lambda terms, you have to use `-Oadt-tagged-scott`.
-The tags are used to decode which ADT the lambda term refers to, but having them means that if you want to write your own function to operate on these tagged structures your functions have to either use the `match` syntax or use the tags correctly themselves.
-You can read more about tagged lambdas and applications in [Automatic vectorization with tagged lambdas](/doc/automatic-vectorization-with-tagged-lambdas.md).
-
-
 ### Pattern Matching functions
 
 Besides `match`and `switch` terms, hvm-lang also supports equational-style pattern matching functions.
 
-```rust
+```py
 And True  b = b
 And False * = False
 ```
@@ -60,8 +58,8 @@ There are advantages and disadvantages to using this syntax.
 They offer more advanced pattern matching capabilities and also take care linearizing variables to make sure that recursive definitions work correctly in strict evaluation mode, but take away your control of how the pattern matching is implemented and can be a bit more resource intensive in some cases.
 
 Pattern matching equations are transformed into a tree of `match` and `switch` terms from left to right.
-```rust
-// These two are equivalent
+```py
+# These two are equivalent
 (Foo 0 false (Cons h1 (Cons h2 t))) = (A h1 h2 t)
 (Foo 0 * *) = B
 (Foo n false *) = n
@@ -87,21 +85,21 @@ Foo = λarg1 λarg2 λarg3 (switch arg1 {
 Besides the compilation of complex pattern matching into simple `match` and `switch` expressions, this example also shows how some arguments are pushed inside the match.
 When compiling for strict evaluation, by default any variables that are used inside a match get linearized by adding a lambda in each arm and an application passing its value inwards.
 To ensure that recursive pattern matching functions don't loop in strict mode, it's necessary to make the match arms combinators, so that they can be converted into separate functions and a lazy reference is used in the match arm.
-```rust
-// This is what the Foo function actually compiles to.
-// With -Olinearize-matches-extra and -Ofloat-combinators (default on strict mode)
+```py
+# This is what the Foo function actually compiles to.
+# With -Olinearize-matches and -Ofloat-combinators (default on strict mode)
 (Foo) = λa λb λc (switch a { 0: Foo$C5; _: Foo$C8 } b c)
 
-(Foo$C5) = λd λe (d Foo$C0 Foo$C4 e) // Foo.case_0
-(Foo$C0) = λ* B                      // Foo.case_0.case_true
-(Foo$C4) = λg (g Foo$C3 B)           // Foo.case_0.case_false
-(Foo$C3) = λh λi (i Foo$C1 Foo$C2 h) // Foo.case_0.case_false.case_cons
-(Foo$C1) = λj λk λl (A l j k)        // Foo.case_0.case_false.case_cons.case_cons
-(Foo$C2) = λ* B                      // Foo.case_0.case_false.case_cons.case_nil
+(Foo$C5) = λd λe (d Foo$C0 Foo$C4 e) # Foo.case_0
+(Foo$C0) = λ* B                      # Foo.case_0.case_true
+(Foo$C4) = λg (g Foo$C3 B)           # Foo.case_0.case_false
+(Foo$C3) = λh λi (i Foo$C1 Foo$C2 h) # Foo.case_0.case_false.case_cons
+(Foo$C1) = λj λk λl (A l j k)        # Foo.case_0.case_false.case_cons.case_cons
+(Foo$C2) = λ* B                      # Foo.case_0.case_false.case_cons.case_nil
 
-(Foo$C8) = λn λo λ* (o Foo$C6 Foo$C7 n) // Foo.case_+
-(Foo$C6) = λ* 0                         // Foo.case_+.case_true
-(Foo$C7) = λr (+ r 1)                   // Foo.case_+.case_false
+(Foo$C8) = λn λo λ* (o Foo$C6 Foo$C7 n) # Foo.case_+
+(Foo$C6) = λ* 0                         # Foo.case_+.case_true
+(Foo$C7) = λr (+ r 1)                   # Foo.case_+.case_false
 ```
 
 Pattern matching equations also support matching on non-consecutive numbers:
@@ -112,10 +110,10 @@ Parse 'λ' = Token.Lambda
 Parse  n  = (Token.Name n)
 ```
 This is compiled to a cascade of `switch` expressions, from smallest value to largest.
-```rust
+```py
 Parse = λarg0 switch matched = (- arg0 '(') {
   0: Token.LParenthesis
-  // ')' + 1 - '(' is resolved during compile time
+  # ')' + 1 - '(' is resolved during compile time
   _: switch matched = (- matched-1 ( ')'-1-'(' ) {
     0: Token.RParenthesis
     _: switch matched = (- matched-1 ( 'λ'-1-')' ) {
@@ -138,7 +136,7 @@ pred_if True  0 *        = 0
 
 Pattern matching on strings and lists desugars to a list of matches on List/String.cons and List/String.nil
 
-```rust
+```py
 Hi "hi" = 1
 Hi _ = 0
 
@@ -146,7 +144,7 @@ Foo [] = 0
 Foo [x] = x
 Foo _ = 3
 
-// Becomes:
+# Becomes:
 Hi (String.cons 'h' (String.cons 'i' String.nil)) = 2
 Hi _ = 0
 
