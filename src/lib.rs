@@ -316,7 +316,8 @@ impl CompileOpts {
 }
 
 impl Default for CompileOpts {
-  /// Enables eta, linearize_matches, float_combinators and reorder_redexes_recursive_last.
+  /// Enables eta, linearize_matches, float_combinators.
+  /// Uses num-scott ADT encoding.
   fn default() -> Self {
     Self {
       eta: true,
@@ -325,7 +326,7 @@ impl Default for CompileOpts {
       float_combinators: true,
       merge: false,
       inline: false,
-      check_net_size: true,
+      check_net_size: false,
       adt_encoding: AdtEncoding::NumScott,
     }
   }
