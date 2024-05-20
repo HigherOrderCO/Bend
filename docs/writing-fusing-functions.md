@@ -1,44 +1,44 @@
 # Writing fusing functions
 ## Church encoding
 Church Encoding is a way to encode common datatypes as λ-calculus terms. For example, here is a [Church-encoded](https://en.wikipedia.org/wiki/Church_encoding) boolean type in HVM
-```rs
+```py
 true = λt λf t
 false = λt λf f
 ```
 Matching on values of this representation is simply calling the boolean value with what the function should return if the boolean is true and if the boolean is false.
-```rs
+```py
 if boolean case_true case_false = (boolean case_true case_false)
 main = (if true 42 37)
-// Outputs 42
+# Outputs 42
 
-// Or alternatively:
-// if boolean = boolean
-// Each boolean is represented by its own matching function
-// so (true 42 37) will do the same thing.
+# Or alternatively:
+# if boolean = boolean
+# Each boolean is represented by its own matching function
+# so (true 42 37) will do the same thing.
 ```
 
 This is how a `Not` function that acts on this encoding can be defined:
-```rs
+```py
 not = λboolean (boolean false true)
-main = (not true) // Outputs λtλf f.
-main = (not false) // Outputs λtλf t.
+main = (not true) # Outputs λtλf f.
+main = (not false) # Outputs λtλf t.
 ```
 If the boolean is `true`, then the function will return `false`. If it is `false`, it will return `true`.
 
 ## Self-application
 
 What happens if we self-compose the `not` function? It is a well known fact that`(not (not x)) == x`, so we should expect something that behaves like the identity function.
-```rs
+```py
 main = λx (not (not x))
-// Output:
-// λa (a λ* λb b λc λ* c λ* λd d λe λ* e)
+# Output:
+# λa (a λ* λb b λc λ* c λ* λd d λe λ* e)
 ```
 The self-application of `not` outputs a large term. Testing will show that the term does indeed behave like an identity function. However, since the self-application of `not` is larger than `not` itself, if we self-compose this function many times, our program will get really slow and eat up a lot of memory, despite all functions being equivalent to the identity function:
-```rs
-main = λx (not (not x)) // Long
-main = λx (not (not (not (not x)))) // Longer
-main = λx (not (not (not (not (not (not (not (not x)))))))) // Longer
-// etc...
+```py
+main = λx (not (not x)) # Long
+main = λx (not (not (not (not x)))) # Longer
+main = λx (not (not (not (not (not (not (not (not x)))))))) # Longer
+# etc...
 ```
 The self-application of not a large number of times, such as 65536 or 4294967296, will be large enough to slow down our computer by a significant amount.
 
@@ -46,19 +46,19 @@ Luckily, there's a trick we can do to make the self-application of `not` much sh
 
 ### Fusing functions
 Let's first take our initial `not` implementation.
-```rs
+```py
 not = λboolean (boolean false true)
 ```
 We begin by replacing `false` and `true` by their values.
-```rs
+```py
 not = λboolean (boolean λtλf(f) λtλf(t))
 ```
 After doing this, it's easy to notice that there's something that both terms have in common. Both of them are lambdas that take in two arguments. We can **lift** the lambda arguments up and make them **shared** between both cases.
-```rs
-not = λbooleanλtλf (boolean f t)
+```py
+not = λboolean λt λf (boolean f t)
 ```
 Let's see how the self-application of `not` gets reduced now. Each line will be a step in the reduction.
-```rs
+```py
 main = λx (not (not x))
 main = λx (not (λbooleanλtλf (boolean f t) x))
 main = λx (not (λtλf (boolean x f t)))
@@ -77,19 +77,19 @@ Something else that is important when writing fusing functions is linearizing va
 
 Consider the [scott-encoded](https://crypto.stanford.edu/~blynn/compiler/scott.html) type `Nat`:
 
-```rs
-zero = λs λz z // 0 as a scott-encoded number
-succ = λpred λs λz (s pred) // Creates a Scott number out of its predecessor
+```py
+zero = λs λz z # 0 as a scott-encoded number
+succ = λpred λs λz (s pred) # Creates a Scott number out of its predecessor
 
-two = (succ (succ zero)) // λs λz (s λs λz (s λs λz z))
+two = (succ (succ zero)) # λs λz (s λs λz (s λs λz z))
 ```
 
 We can write an addition function for this type, that adds two numbers
 
-```rs
+```py
 add = λa λb
-	let case_succ = λa_pred (succ (add a_pred b)) // If a = p+1, then return (p+b)+1
-	let case_zero = b // If the `a = 0`, return `b`
+	let case_succ = λa_pred (succ (add a_pred b)) # If a = p+1, then return (p+b)+1
+	let case_zero = b # If the `a = 0`, return `b`
 	(a case_succ case_zero)
 ```
 
@@ -124,7 +124,7 @@ To show the power of fusing, here is a program that self-composes `fusing_not` 2
 Currently hvm is not able to handle operations between church numbers so we explicitly convert the native number to a church number in this example (which is very slow).
 
 This program uses [native numbers, which are described here](native-numbers.md).
-```rs
+```py
 true = λt λf t
 false = λt λf f
 
@@ -132,14 +132,14 @@ not = λboolean (boolean false true)
 
 fusing_not = λboolean λt λf (boolean f t)
 
-// Creates a Church numeral out of a native number
+# Creates a Church numeral out of a native number
 to_church n = switch n {
 	0: λf λx x
 	_: λf λx (f (to_church n-1 f x))
 }
 
 main =
-	((to_church 0xFFFFFF) fusing_not)  // try replacing this by regular not. Will it still work?
+	((to_church 0xFFFFFF) fusing_not)  # try replacing this by regular not. Will it still work?
 ```
 Here is the program's output:
 ```bash

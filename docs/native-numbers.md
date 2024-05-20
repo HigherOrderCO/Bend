@@ -123,15 +123,15 @@ Number.minus_three = λn λf λx
 
 Using everything we learned, we can write a program that calculates the n-th Fibonacci number using native numbers:
 
-```rs
-fibonacci = λn // n is the argument
+```py
+fibonacci = λn # n is the argument
   switch n {
-    // If the number is 0, then return 0
+    # If the number is 0, then return 0
     0: 0
-    // If the number is 1, then return 1
+    # If the number is 1, then return 1
     1: 1
-    // Otherwise, return the sum of (fib (n-2 + 1)) and (fib n-2)
-    // The successor pattern provides a `var`-`successor number` bind
+    # Otherwise, return the sum of (fib (n-2 + 1)) and (fib n-2)
+    # The successor pattern provides a `var`-`successor number` bind
     _: (+ (fibonacci (+ n-2 1)) (fibonacci n-2))
   }
 
