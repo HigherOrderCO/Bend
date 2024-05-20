@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/imp_empty_literals.bend
 ---
-λ* λa a
+NumScott:
+[]
+
+Scott:
+[]

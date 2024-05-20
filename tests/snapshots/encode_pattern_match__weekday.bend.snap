@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/weekday.bend
 ---
+Scott
 (main) = (λa a Weekday/Saturday)
 
 (Weekday/Monday) = λa λ* λ* λ* λ* λ* λ* a
@@ -17,3 +18,20 @@ input_file: tests/golden_tests/encode_pattern_match/weekday.bend
 (Weekday/Saturday) = λ* λ* λ* λ* λ* λf λ* f
 
 (Weekday/Sunday) = λ* λ* λ* λ* λ* λ* λg g
+
+NumScott
+(main) = (λa a Weekday/Saturday)
+
+(Weekday/Monday) = λa (a 0)
+
+(Weekday/Tuesday) = λa (a 1)
+
+(Weekday/Wednesday) = λa (a 2)
+
+(Weekday/Thursday) = λa (a 3)
+
+(Weekday/Friday) = λa (a 4)
+
+(Weekday/Saturday) = λa (a 5)
+
+(Weekday/Sunday) = λa (a 6)

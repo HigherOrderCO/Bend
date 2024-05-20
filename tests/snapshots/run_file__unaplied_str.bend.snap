@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/unaplied_str.bend
 ---
-λa λb λc λ* (c a λd λ* (d 98 λe λ* (e 99 λf λ* (f b ""))))
+NumScott:
+λa λb λc (c 1 a λd (d 1 98 λe (e 1 99 λf (f 1 b ""))))
+
+Scott:
+λa λb λ* λc (c a λ* λd (d 98 λ* λe (e 99 λ* λf (f b ""))))

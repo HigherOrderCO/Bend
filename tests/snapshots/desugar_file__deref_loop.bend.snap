@@ -2,14 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/deref_loop.bend
 ---
-(foo) = λa (a λb b foo__C0)
+(foo) = λa (a foo__C1)
 
 (bar) = (foo 1)
 
 (main) = (foo 0)
 
-(nat/succ) = λa λb λ* (b a)
+(nat/succ) = λa λb (b 0 a)
 
-(nat/zero) = λ* λa a
+(nat/zero) = λa (a 1)
 
-(foo__C0) = (bar 0)
+(foo__C0) = λ* (bar 0)
+
+(foo__C1) = λa switch a { 0: λb b; _: foo__C0; }

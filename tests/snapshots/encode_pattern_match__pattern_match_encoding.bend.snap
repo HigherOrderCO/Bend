@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.bend
 ---
+Scott
 (Foo) = λa (a λ* 100 λ* 200 λ* 200 λ* λ* 200 λ* λ* 200)
 
 (main) = (Foo MyType/A 2)
@@ -15,3 +16,18 @@ input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.bend
 (MyType/D) = λa λb λ* λ* λ* λf λ* (f a b)
 
 (MyType/E) = λa λb λ* λ* λ* λ* λg (g a b)
+
+NumScott
+(Foo) = λa (a λb switch b { 0: λ* 100; _: λd switch d { 0: λ* 200; _: λf switch f { 0: λ* 200; _: λh switch h { 0: λ* λ* 200; _: λ* λ* λ* 200; }; }; }; })
+
+(main) = (Foo MyType/A 2)
+
+(MyType/A) = λa λb (b 0 a)
+
+(MyType/B) = λa λb (b 1 a)
+
+(MyType/C) = λa λb (b 2 a)
+
+(MyType/D) = λa λb λc (c 3 a b)
+
+(MyType/E) = λa λb λc (c 4 a b)

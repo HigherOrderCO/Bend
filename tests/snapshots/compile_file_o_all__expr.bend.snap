@@ -2,21 +2,21 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/expr.bend
 ---
-@Expr/App = (a (b (* (* ((a (b c)) (* (* (* (* (* (* c)))))))))))
+@Expr/App = (a (b ((2 (a (b c))) c)))
 
-@Expr/Dup = (a (b (c (d (* (* (* (* (* (* ((a (b (c (d e)))) (* (* e)))))))))))))
+@Expr/Dup = (a (b (c (d ((6 (a (b (c (d e))))) e)))))
 
-@Expr/Let = (a (b (c (* (* (* (* (* ((a (b (c d))) (* (* (* d))))))))))))
+@Expr/Let = (a (b (c ((5 (a (b (c d)))) d))))
 
-@Expr/Num = (a (* ((a b) (* (* (* (* (* (* (* b))))))))))
+@Expr/Num = (a ((1 (a b)) b))
 
-@Expr/Op2 = (a (b (c (* (* (* (* (* (* (* (* ((a (b (c d))) d))))))))))))
+@Expr/Op2 = (a (b (c ((8 (a (b (c d)))) d))))
 
-@Expr/Var = (a ((a b) (* (* (* (* (* (* (* (* b))))))))))
+@Expr/Var = (a ((0 (a b)) b))
 
-@Op/Mul = (* (* (a (* a))))
+@Op/Mul = ((2 a) a)
 
-@Op/Sub = (* (a (* (* a))))
+@Op/Sub = ((1 a) a)
 
 @main = n
   & @Expr/Let ~ (a (f (m n)))

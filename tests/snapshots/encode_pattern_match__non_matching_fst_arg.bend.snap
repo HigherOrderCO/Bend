@@ -2,8 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/non_matching_fst_arg.bend
 ---
+Scott
 (Foo) = λa λb (b λc let {c c_2} = c; (Foo c c_2) λd d a)
 
 (bool/true) = λa λ* a
 
 (bool/false) = λ* λb b
+
+NumScott
+(Foo) = λa λb (b λc switch c { 0: λd let {d d_2} = d; (Foo d d_2); _: λ* λe e; } a)
+
+(bool/true) = λa (a 0)
+
+(bool/false) = λa (a 1)

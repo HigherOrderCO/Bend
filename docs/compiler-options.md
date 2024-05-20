@@ -10,7 +10,8 @@
 | `-Ofloat_combinators` `-Ono-float_combinators` | Enabled  | [float-combinators](#float-combinators) |
 | `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
 | `-Oinline` `-Ono-inline` | Disabled | [inline](#inline) |
-| `-Ocheck-net-size` `-Ono-check-net-size` | Enabled  | [check-net-size](#check-net-size) |
+| `-Ocheck-net-size` `-Ono-check-net-size` | Disabled | [check-net-size](#check-net-size) |
+| `-Oadt-scott` `-Oadt-num-scott` | adt-num-scott | [adt-encoding](#adt-encoding) | | 
 
 ## Eta-reduction
 
@@ -130,7 +131,7 @@ These automatic linearization passes are done before the manual linearization fr
 # These variables are only linearized once
 λa λb λc switch a with b c { 0: (b c); _: (a-1 b c) }
 
-# With -Olinearize-matches-extra becomes
+# With -Olinearize-matches becomes
 λa λb λc (switch a { 0: λb λc (b c); _: λb λc (a-1 b c) } b c)
 
 # And not
@@ -160,26 +161,32 @@ fold = λinit λf λxs (xs λh λt (fold (f init h) f t) init)
 
 # Inline
 
-If enabled, inlines terms that compile to 0 or 1 inet nodes at lambda level, before pre-reduction.
+If enabled, inlines terms that compile to nullary inet nodes (refs, numbers, erasures).
 
 Example:
 ```py
-foo = (2, 3)
+# program
+foo = 2
 id = λx x
-
 main = (id foo)
 
-# -Oinline, compilation output
-@foo = [#2 #3]
+# -Ono-inline, compilation output
+@foo = 2
 @id = (a a)
-
 @main = a
-& (b b) ~ ([#2 #3] a)
+& @id ~ (@foo a)
+
+# -Oinline, compilation output
+@foo = 2
+@id = (a a)
+@main = a
+& @id ~ (2 a)
 ```
 
 ## Check-net-size
 
-If enabled, checks that the size of each function after compilation is within the HVM restriction of at most 64 nodes per definition.
+If enabled, checks that the size of each function after compilation has at most 64 HVM nodes.
+This is a memory restriction of the CUDA runtime, if you're not using the `*-cu` you can disable it.
 
 Example:
 ```py
@@ -214,3 +221,29 @@ Example:
   let r = (Swap (& n 8388608) r Map_/Free)
   r
 ```
+
+## ADT Encoding
+
+Selects the lambda encoding for types defined with `data`, `type` and `object`.
+
+`-Oadt-scott` uses Scott encoding.
+`-Oadt-num-scott` uses a variation of Scott encoding where instead of one lambda per constructor, we use a numeric tag to indicate which constructor it is. The numeric tag is assigned to the constructors in the order they are defined.
+
+```py
+# Generates functions Option/Some and Option/None
+type Option:
+  Some { value }
+  None
+
+# With -Oadt-scott they become:
+Option/Some = λvalue λSome λNone (Some value)
+Option/None = λSome λNone (None)
+
+# With -Oadt-num-scott they become:
+Option/Some = λvalue λx (x 0 value)
+Option/None = λx (x 1)
+```
+
+Pattern-matching with `match` and `fold` is generated according to the encoding.
+
+Note: IO is **only** available with `-Oadt-num-scott`.

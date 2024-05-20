@@ -429,12 +429,20 @@ impl From<Option<Name>> for Pattern {
 
 impl Term {
   /* Common construction patterns */
+
+  /// Lambda with a static tag
   pub fn lam(pat: Pattern, bod: Term) -> Self {
     Self::tagged_lam(Tag::Static, pat, bod)
   }
 
+  /// Lambda with any tag
   pub fn tagged_lam(tag: Tag, pat: Pattern, bod: Term) -> Self {
     Term::Lam { tag, pat: Box::new(pat), bod: Box::new(bod) }
+  }
+
+  /// Wraps a term in lambdas, so that the outermost lambda is the first given element.
+  pub fn rfold_lams(term: Term, pats: impl DoubleEndedIterator<Item = Option<Name>>) -> Self {
+    pats.into_iter().rfold(term, |bod, nam| Self::lam(Pattern::Var(nam), bod))
   }
 
   pub fn var_or_era(nam: Option<Name>) -> Self {

@@ -1,9 +1,9 @@
 use bend::{
   compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
-  fun::{load_book::do_parse_book, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Name},
+  fun::{load_book::do_parse_book, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Name, Term},
   net::hvmc_to_net::hvmc_to_net,
-  run_book, CompileOpts, RunOpts,
+  run_book_with_fn, AdtEncoding, CompileOpts, RunOpts,
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -82,6 +82,16 @@ fn run_golden_test_dir_multiple(test_name: &str, run: &[&RunFn]) {
   }
 }
 
+pub fn run_book(
+  book: Book,
+  run_opts: RunOpts,
+  compile_opts: CompileOpts,
+  diagnostics_cfg: DiagnosticsConfig,
+  args: Option<Vec<Term>>,
+) -> Result<(Term, String, Diagnostics), Diagnostics> {
+  run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, args, "run", false).map(Option::unwrap)
+}
+
 /* Snapshot/regression/golden tests
 
  Each tests runs all the files in tests/golden_tests/<test name>.
@@ -153,15 +163,19 @@ fn run_file() {
   run_golden_test_dir_multiple(function_name!(), &[(&|code, path| {
     let _guard = RUN_MUTEX.lock().unwrap();
     let book = do_parse_book(code, path, Book::builtins())?;
-    let compile_opts = CompileOpts::default();
     let diagnostics_cfg = DiagnosticsConfig {
       unused_definition: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
     };
     let run_opts = RunOpts::default();
 
-    let (term, _, diags) = run_book(book, run_opts, compile_opts, diagnostics_cfg, None)?;
-    let res = format!("{diags}{term}");
+    let mut res = String::new();
+
+    for adt_encoding in [AdtEncoding::NumScott, AdtEncoding::Scott] {
+      let compile_opts = CompileOpts { adt_encoding, ..CompileOpts::default() };
+      let (term, _, diags) = run_book(book.clone(), run_opts, compile_opts, diagnostics_cfg, None)?;
+      res.push_str(&format!("{adt_encoding}:\n{diags}{term}\n\n"));
+    }
     Ok(res)
   })])
 }
@@ -208,7 +222,7 @@ fn simplify_matches() {
 
     ctx.check_shared_names();
     ctx.set_entrypoint();
-    ctx.book.encode_adts();
+    ctx.book.encode_adts(AdtEncoding::NumScott);
     ctx.fix_match_defs()?;
     ctx.book.encode_builtins();
     ctx.resolve_refs()?;
@@ -220,7 +234,7 @@ fn simplify_matches() {
     ctx.book.linearize_match_with();
     ctx.check_unbound_vars()?;
     ctx.book.make_var_names_unique();
-    ctx.book.apply_use();
+    ctx.book.desugar_use();
     ctx.book.make_var_names_unique();
     ctx.prune(false);
 
@@ -234,7 +248,7 @@ fn parse_file() {
     let mut book = do_parse_book(code, path, Book::builtins())?;
     let mut ctx = Ctx::new(&mut book, Default::default());
     ctx.set_entrypoint();
-    ctx.book.encode_adts();
+    ctx.book.encode_adts(AdtEncoding::NumScott);
     ctx.book.encode_builtins();
     ctx.resolve_refs().expect("Resolve refs");
     ctx.desugar_match_defs().expect("Desugar match defs");
@@ -247,30 +261,32 @@ fn parse_file() {
 fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut result = String::new();
-    let diagnostics_cfg = DiagnosticsConfig::default();
-    let mut book = do_parse_book(code, path, Book::builtins())?;
-    let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
-    ctx.check_shared_names();
-    ctx.set_entrypoint();
-    ctx.book.encode_adts();
-    ctx.fix_match_defs()?;
-    ctx.book.encode_builtins();
-    ctx.resolve_refs()?;
-    ctx.desugar_match_defs()?;
-    ctx.fix_match_terms()?;
-    ctx.check_unbound_vars()?;
-    ctx.book.make_var_names_unique();
-    ctx.book.linearize_match_binds();
-    ctx.book.linearize_match_with();
-    ctx.book.encode_matches();
-    ctx.check_unbound_vars()?;
-    ctx.book.make_var_names_unique();
-    ctx.book.apply_use();
-    ctx.book.make_var_names_unique();
-    ctx.book.linearize_vars();
-    ctx.prune(false);
+    for adt_encoding in [AdtEncoding::Scott, AdtEncoding::NumScott] {
+      let diagnostics_cfg = DiagnosticsConfig::default();
+      let mut book = do_parse_book(code, path, Book::builtins())?;
+      let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
+      ctx.check_shared_names();
+      ctx.set_entrypoint();
+      ctx.book.encode_adts(adt_encoding);
+      ctx.fix_match_defs()?;
+      ctx.book.encode_builtins();
+      ctx.resolve_refs()?;
+      ctx.desugar_match_defs()?;
+      ctx.fix_match_terms()?;
+      ctx.check_unbound_vars()?;
+      ctx.book.make_var_names_unique();
+      ctx.book.linearize_match_binds();
+      ctx.book.linearize_match_with();
+      ctx.book.encode_matches(adt_encoding);
+      ctx.check_unbound_vars()?;
+      ctx.book.make_var_names_unique();
+      ctx.book.desugar_use();
+      ctx.book.make_var_names_unique();
+      ctx.book.linearize_vars();
+      ctx.prune(false);
 
-    writeln!(result, "{}\n", ctx.book).unwrap();
+      writeln!(result, "{adt_encoding}\n{}\n", ctx.book).unwrap();
+    }
     Ok(result)
   })
 }

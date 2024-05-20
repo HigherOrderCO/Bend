@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/str.bend
 ---
-@String/Cons = (a (b ((a (b c)) (* c))))
+@String/Cons = (a (b ((1 (a (b c))) c)))
 
-@String/Nil = (* (a a))
+@String/Nil = ((0 a) a)
 
 @main = f
   & @String/Cons ~ (109 (e f))

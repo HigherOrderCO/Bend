@@ -3,6 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/compile_pre_reduce.bend
 ---
 error: invalid value 'pre-reduce' for '-O <COMP_OPTS>'
-  [possible values: all, no-all, eta, no-eta, prune, no-prune, linearize-matches, linearize-matches-alt, no-linearize-matches, float-combinators, no-float-combinators, merge, no-merge, inline, no-inline, check-net-size, no-check-net-size]
+  [possible values: all, no-all, eta, no-eta, prune, no-prune, linearize-matches, linearize-matches-alt, no-linearize-matches, float-combinators, no-float-combinators, merge, no-merge, inline, no-inline, check-net-size, no-check-net-size, adt-scott, adt-num-scott]
 
 For more information, try '--help'.

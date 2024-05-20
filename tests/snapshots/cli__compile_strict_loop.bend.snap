@@ -2,12 +2,12 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/compile_strict_loop.bend
 ---
-@A = (((* (a b)) (0 c)) c)
+@A = (((?((0 (* (* (a b)))) c) c) d) d)
   & @A ~ (a b)
 
-@List/Cons = (a (b ((a (b c)) (* c))))
+@List/Cons = (a (b ((1 (a (b c))) c)))
 
-@List/Nil = (* (a a))
+@List/Nil = ((0 a) a)
 
 @main = c
   & @A ~ (b c)

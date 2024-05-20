@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/is_some_some.bend
 ---
+Scott
 (some_some) = λa (a λb (b λ* 1 0) 0)
 
 (main) = (some_some (Option/Some 1))
@@ -9,3 +10,12 @@ input_file: tests/golden_tests/encode_pattern_match/is_some_some.bend
 (Option/Some) = λa λb λ* (b a)
 
 (Option/None) = λ* λb b
+
+NumScott
+(some_some) = λa (a λb switch b { 0: λc (c λd switch d { 0: λ* 1; _: λ* 0; }); _: λ* 0; })
+
+(main) = (some_some (Option/Some 1))
+
+(Option/Some) = λa λb (b 0 a)
+
+(Option/None) = λa (a 1)

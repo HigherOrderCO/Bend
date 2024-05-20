@@ -70,6 +70,10 @@ def era():
   the_expr_killer = *
   return the_expr_killer(9)
 
+def sup():
+  x = {[1, 2], [3, 4, 5, 6]}
+  return x
+
 def main():
   do IO:
     x <- IO.read();

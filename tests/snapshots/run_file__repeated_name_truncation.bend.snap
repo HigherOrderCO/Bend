@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/repeated_name_truncation.bend
 ---
+NumScott:
+λ* long_name_that_truncates2
+
+Scott:
 λ* long_name_that_truncates2

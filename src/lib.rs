@@ -86,7 +86,7 @@ pub fn desugar_book(
 
   ctx.set_entrypoint();
 
-  ctx.book.encode_adts();
+  ctx.book.encode_adts(opts.adt_encoding);
 
   ctx.fix_match_defs()?;
 
@@ -119,13 +119,13 @@ pub fn desugar_book(
   // Manual match linearization
   ctx.book.linearize_match_with();
 
-  ctx.book.encode_matches();
+  ctx.book.encode_matches(opts.adt_encoding);
 
   // sanity check
   ctx.check_unbound_vars()?;
 
   ctx.book.make_var_names_unique();
-  ctx.book.apply_use();
+  ctx.book.desugar_use();
   ctx.book.make_var_names_unique();
   ctx.book.linearize_vars();
 
@@ -198,27 +198,24 @@ pub fn run_book_with_fn(
     return Err(format!("Error reading result from hvm. Output :\n{}{}{}", err, status, out).into());
   };
 
-  let (term, diags) = readback_hvm_net(&net, &book, &labels, run_opts.linear_readback);
+  let (term, diags) =
+    readback_hvm_net(&net, &book, &labels, run_opts.linear_readback, compile_opts.adt_encoding);
   Ok(Some((term, stats.to_string(), diags)))
 }
 
-pub fn run_book(
-  book: Book,
-  run_opts: RunOpts,
-  compile_opts: CompileOpts,
-  diagnostics_cfg: DiagnosticsConfig,
-  args: Option<Vec<Term>>,
-) -> Result<(Term, String, Diagnostics), Diagnostics> {
-  run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, args, "run", false).map(Option::unwrap)
-}
-
-pub fn readback_hvm_net(net: &Net, book: &Book, labels: &Labels, linear: bool) -> (Term, Diagnostics) {
+pub fn readback_hvm_net(
+  net: &Net,
+  book: &Book,
+  labels: &Labels,
+  linear: bool,
+  adt_encoding: AdtEncoding,
+) -> (Term, Diagnostics) {
   let mut diags = Diagnostics::default();
   let net = hvmc_to_net(net);
   let mut term = net_to_term(&net, book, labels, linear, &mut diags);
   term.expand_generated(book);
-  term.resugar_strings();
-  term.resugar_lists();
+  term.resugar_strings(adt_encoding);
+  term.resugar_lists(adt_encoding);
   (term, diags)
 }
 
@@ -268,6 +265,9 @@ pub struct CompileOpts {
 
   /// Enables [hvm::check_net_size].
   pub check_net_size: bool,
+
+  /// Determines the encoding of constructors and matches.
+  pub adt_encoding: AdtEncoding,
 }
 
 impl CompileOpts {
@@ -282,6 +282,7 @@ impl CompileOpts {
       inline: true,
       linearize_matches: OptLevel::Enabled,
       check_net_size: self.check_net_size,
+      adt_encoding: self.adt_encoding,
     }
   }
 
@@ -296,6 +297,7 @@ impl CompileOpts {
       merge: false,
       inline: false,
       check_net_size: self.check_net_size,
+      adt_encoding: self.adt_encoding,
     }
   }
 
@@ -314,7 +316,8 @@ impl CompileOpts {
 }
 
 impl Default for CompileOpts {
-  /// Enables eta, linearize_matches, float_combinators and reorder_redexes_recursive_last.
+  /// Enables eta, linearize_matches, float_combinators.
+  /// Uses num-scott ADT encoding.
   fn default() -> Self {
     Self {
       eta: true,
@@ -323,7 +326,23 @@ impl Default for CompileOpts {
       float_combinators: true,
       merge: false,
       inline: false,
-      check_net_size: true,
+      check_net_size: false,
+      adt_encoding: AdtEncoding::NumScott,
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum AdtEncoding {
+  Scott,
+  NumScott,
+}
+
+impl std::fmt::Display for AdtEncoding {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      AdtEncoding::Scott => write!(f, "Scott"),
+      AdtEncoding::NumScott => write!(f, "NumScott"),
     }
   }
 }

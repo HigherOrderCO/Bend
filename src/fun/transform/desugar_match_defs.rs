@@ -45,7 +45,7 @@ impl Definition {
     let rules = std::mem::take(&mut self.rules);
     match simplify_rule_match(args.clone(), rules, vec![], ctrs, adts) {
       Ok(body) => {
-        let body = args.into_iter().rfold(body, |body, arg| Term::lam(Pattern::Var(Some(arg)), body));
+        let body = Term::rfold_lams(body, args.into_iter().map(Some));
         self.rules = vec![Rule { pats: vec![], body }];
       }
       Err(e) => errs.push(e),

@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: examples/bitonic_sort.bend
 ---
-16760832
+16646144

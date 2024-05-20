@@ -15,14 +15,14 @@ Arguments are passed to programs by applying them to the entry point function:
 def main(x1, x2, x3):
   return MainBody(x1 x2 x3)
 
-// Calling with `bend run <file> arg1 arg2 arg3 argN`, it becomes (in the "fun" syntax):
+# Calling with `bend run <file> arg1 arg2 arg3 argN`, it becomes (in the "fun" syntax):
 main = (x1 λx2 λx3 (MainBody x1 x2 x3) arg1 arg2 arg3 argN)
 ```
 
 There are no restrictions on the number of arguments passed to the program.
 You can even pass more arguments than the function expects, although that can lead to unexpected results.
-```rust
-// Expects 2 CLI arguments
+```py
+# Expects 2 CLI arguments
 def main(x, y):
   return {x - y, y - x}
 ```
