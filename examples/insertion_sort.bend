@@ -1,41 +1,35 @@
-# Sorts a list
-def sort(xs):
+def insertion_sort(xs):
   match xs:
-    case List/Nil: 
+    case List/Nil:
       return List/Nil
-    case List/Cons: 
-      return insert(xs.head, sort(xs.tail))
+    case List/Cons:
+      return insertion_sort.insert(xs.head, insertion_sort(xs.tail))
 
-# Insert : U60 -> List -> List
-def insert(v, xs):
+def insertion_sort.insert(v, xs):
   match xs:
     case List/Nil:
       return List/Cons(v, List/Nil)
     case List/Cons:
-      return swap_gt(v, xs.head, xs.tail)
+      return insert_aux(v > xs.head, v, xs.head, xs.tail)
 
-# SwapGT : U60 -> U60 -> U60 -> List -> List
-def swap_gt(v, x, xs):
-  if x > v:
+def insert_aux(n, v, x, xs):
+  if n == 0:
     return List/Cons(v, List/Cons(x, xs))
   else:
-    return List/Cons(x, insert(v, xs))
+    return List/Cons(x, insertion_sort.insert(v, xs))
 
-# Generates a random list
 def rnd(n):
   if n == 0:
     return List/Nil
   else:
     return List/Cons(random(10000 - n), rnd(n - 1))
 
-# Generates a random number
 def random(n):
   if n == 0:
     return 0
   else:
     return (random(n - 1) * 16 + 101387) % 429453
 
-# Sums a list
 def sum(xs):
   match xs:
     case List/Nil:
@@ -43,6 +37,5 @@ def sum(xs):
     case List/Cons:
       return xs.head + sum(xs.tail)
 
-(Main) =
-  let n = 10
-  (sum (sort (rnd n)))
+def main():
+  return sum(insertion_sort(rnd(1000)))

@@ -1,18 +1,31 @@
-T = λt λf t
-F = λt λf f
-And = λpλq (p q F)
+type Bool: 
+  true
+  false
 
-Z = λs λz (z)
-S = λn λs λz (s n)
+type Tree:
+  Node { ~lft, ~rgt }
+  Leaf { val }
 
-Add = λa λb (a (S b))
-Mul = λa λb λf (a (b f))
-Pow = λa λb (a (Mul b) (S Z))
+def bool_and(p, q):
+  match p:
+    case Bool/true:
+      return q
+    case Bool/false:
+      return Bool/false
 
-Node = λa λb λn λl (n a b)
-Leaf = λn λl l
+def alloc(n):
+  switch n:
+    case 0:
+      return Tree/Leaf { val: 0 }
+    case _:
+      return Tree/Node { lft: alloc(n-1), rgt: alloc(n-1) } 
 
-Alloc = λn (n (λp (Node (Alloc p) (Alloc p))) Leaf)
-Destroy = λt (t (λaλb (And (Destroy a) (Destroy b))) T)
+def destroy(t):
+  match t:
+    case Tree/Leaf:
+      return Bool/true
+    case Tree/Node:
+      return bool_and(destroy(t.lft), destroy(t.rgt))
 
-Main = (Destroy (Alloc (Pow (S (S Z)) (S (S (S (S Z)))))))
+def main():
+  return destroy(alloc(2 ^4))
