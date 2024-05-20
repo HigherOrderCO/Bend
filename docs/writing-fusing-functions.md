@@ -17,7 +17,7 @@ main = (if true 42 37)
 // so (true 42 37) will do the same thing.
 ```
 
-This is how a `Not` function that acts on this encoding can be defined.
+This is how a `Not` function that acts on this encoding can be defined:
 ```rs
 not = λboolean (boolean false true)
 main = (not true) // Outputs λtλf f.
