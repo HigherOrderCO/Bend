@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/id_underscore.bend
 ---
+NumScott:
+{2 3}
+
+Scott:
 {2 3}

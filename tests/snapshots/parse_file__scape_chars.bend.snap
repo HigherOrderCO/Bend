@@ -4,6 +4,6 @@ input_file: tests/golden_tests/parse_file/scape_chars.bend
 ---
 (main) = (String/Cons 92 (String/Cons 32 (String/Cons 10 (String/Cons 32 (String/Cons 9 (String/Cons 32 (String/Cons 34 String/Nil)))))))
 
-(String/Cons) = λhead λtail λString/Cons λString/Nil (String/Cons head tail)
+(String/Nil) = λ%x (%x 0)
 
-(String/Nil) = λString/Cons λString/Nil String/Nil
+(String/Cons) = λhead λtail λ%x (%x 1 head tail)

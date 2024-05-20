@@ -2,6 +2,12 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/box.bend
 ---
+Scott
 (unbox) = λa (a λb b)
 
 (box/new) = λa λb (b a)
+
+NumScott
+(unbox) = λa (a λb switch b { 0: λc c; _: *; })
+
+(box/new) = λa λb (b 0 a)

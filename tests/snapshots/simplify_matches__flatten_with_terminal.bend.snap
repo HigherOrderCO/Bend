@@ -6,6 +6,6 @@ input_file: tests/golden_tests/simplify_matches/flatten_with_terminal.bend
 
 (main) = (Foo 2 (A_t/A B_t/B))
 
-(A_t/A) = λa λb (b a)
+(A_t/A) = λa λb (b 0 a)
 
-(B_t/B) = λa a
+(B_t/B) = λa (a 0)

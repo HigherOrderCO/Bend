@@ -36,16 +36,16 @@ input_file: tests/golden_tests/parse_file/imp_program.bend
 
 (main) = do IO { ask x = IO.read; x }
 
-(List/Cons) = λhead λtail λList/Cons λList/Nil (List/Cons head tail)
+(List/Nil) = λ%x (%x 0)
 
-(List/Nil) = λList/Cons λList/Nil List/Nil
+(List/Cons) = λhead λtail λ%x (%x 1 head tail)
 
-(Map/Node) = λvalue λleft λright λMap/Node λMap/Leaf (Map/Node value left right)
+(Map/Node) = λvalue λleft λright λ%x (%x 0 value left right)
 
-(Map/Leaf) = λMap/Node λMap/Leaf Map/Leaf
+(Map/Leaf) = λ%x (%x 1)
 
-(Point/Point) = λx λy λPoint/Point (Point/Point x y)
+(Point/Point) = λx λy λ%x (%x 0 x y)
 
-(Bool/True) = λBool/True λBool/False Bool/True
+(Bool/True) = λ%x (%x 0)
 
-(Bool/False) = λBool/True λBool/False Bool/False
+(Bool/False) = λ%x (%x 1)

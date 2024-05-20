@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/lam_op2.bend
 ---
+NumScott:
+λa (+ a 2)
+
+Scott:
 λa (+ a 2)

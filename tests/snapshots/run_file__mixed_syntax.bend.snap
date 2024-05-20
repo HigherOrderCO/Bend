@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/mixed_syntax.bend
 ---
+NumScott:
+Bool/False
+
+Scott:
 Bool/False

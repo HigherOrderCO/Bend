@@ -2,6 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/linearize_match.bend
 ---
+NumScott:
+[4m[1m[33mWarnings:[0m
+[1mDuring readback:[0m
+  Encountered an invalid 'switch'.
+
+λa switch a = a { 0: λb b; _: λa λb (+ a b); }
+
+Scott:
 [4m[1m[33mWarnings:[0m
 [1mDuring readback:[0m
   Encountered an invalid 'switch'.

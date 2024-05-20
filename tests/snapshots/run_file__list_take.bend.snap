@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/list_take.bend
 ---
+NumScott:
+[3, 2]
+
+Scott:
 [3, 2]

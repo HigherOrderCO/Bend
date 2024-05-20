@@ -2,11 +2,13 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/and.bend
 ---
-@and = (b (((a a) ((* @bool/false) (b c))) c))
+@and = (a ((@and__C0 (a b)) b))
 
-@bool/false = (* (a a))
+@and__C0 = (?(((a a) (* (* @bool/false))) b) b)
 
-@bool/true = (a (* a))
+@bool/false = ((1 a) a)
+
+@bool/true = ((0 a) a)
 
 @main = a
   & @and ~ (@bool/true (@bool/false a))

@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/bind_syntax.bend
 ---
-(Result/bind) = λa λb (a Result/bind__C1 Result/bind__C0 b)
+(Result/bind) = λa λb (a Result/bind__C2 b)
 
 (safe_div) = λa λb (switch b { 0: λ* (Result/Err (String/Cons 68 (String/Cons 105 (String/Cons 118 (String/Cons 32 (String/Cons 98 (String/Cons 121 (String/Cons 32 (String/Cons 48 String/Nil))))))))); _: safe_div__C0; } a)
 
@@ -10,21 +10,23 @@ input_file: tests/golden_tests/desugar_file/bind_syntax.bend
 
 (Main) = (Result/bind Main__C1 Main__C0)
 
-(String/Cons) = λa λb λc λ* (c a b)
+(String/Nil) = λa (a 0)
 
-(String/Nil) = λ* λa a
+(String/Cons) = λa λb λc (c 1 a b)
 
-(Result/Ok) = λa λb λ* (b a)
+(Result/Ok) = λa λb (b 0 a)
 
-(Result/Err) = λa λ* λb (b a)
+(Result/Err) = λa λb (b 1 a)
 
 (Main__C0) = λa (Result/bind (safe_rem a 0) λb b)
 
 (Main__C1) = (safe_div 3 2)
 
-(Result/bind__C0) = λa λ* (Result/Err a)
+(Result/bind__C0) = λa λb (b a)
 
-(Result/bind__C1) = λa λb (b a)
+(Result/bind__C1) = λ* λa λ* (Result/Err a)
+
+(Result/bind__C2) = λa switch a { 0: Result/bind__C0; _: Result/bind__C1; }
 
 (safe_div__C0) = λa λb (Result/Ok (/ b (+ a 1)))
 

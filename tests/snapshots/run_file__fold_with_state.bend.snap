@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/fold_with_state.bend
 ---
+NumScott:
+[1, 2, 3]
+
+Scott:
 [1, 2, 3]

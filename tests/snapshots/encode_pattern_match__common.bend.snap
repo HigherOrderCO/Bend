@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/common.bend
 ---
+Scott
 (Box/Filled) = λa λb λ* (b a)
 
 (Box/Empty) = λ* λb b
@@ -35,3 +36,38 @@ input_file: tests/golden_tests/encode_pattern_match/common.bend
 (Direction/East) = λ* λ* λc λ* c
 
 (Direction/West) = λ* λ* λ* λd d
+
+NumScott
+(Box/Filled) = λa λb (b 0 a)
+
+(Box/Empty) = λa (a 1)
+
+(Option/Some) = λa λb (b 0 a)
+
+(Option/None) = λa (a 1)
+
+(Result_/Ok) = λa λb (b 0 a)
+
+(Result_/Err) = λa λb (b 1 a)
+
+(List_/Cons) = λa λb λc (c 0 a b)
+
+(List_/Nil) = λa (a 1)
+
+(Bool/True) = λa (a 0)
+
+(Bool/False) = λa (a 1)
+
+(Light/Red) = λa (a 0)
+
+(Light/Yellow) = λa (a 1)
+
+(Light/Green) = λa (a 2)
+
+(Direction/North) = λa (a 0)
+
+(Direction/South) = λa (a 1)
+
+(Direction/East) = λa (a 2)
+
+(Direction/West) = λa (a 3)

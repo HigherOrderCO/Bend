@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/definition_merge.bend
 ---
+Scott
 (Foo) = λa (a λ* λc (c λ* 1 λ* 2) λ* λg (g λ* 3 λ* 3))
 
 (Either/Left) = λa λb λ* (b a)
@@ -11,3 +12,14 @@ input_file: tests/golden_tests/encode_pattern_match/definition_merge.bend
 (Bool/Bool/True) = λa λ* a
 
 (Bool/Bool/False) = λ* λb b
+
+NumScott
+(Foo) = λa (a λb switch b { 0: λ* λd (d λe switch e { 0: λ* 1; _: λ* λ* 2; }); _: λ* λ* λi (i λj switch j { 0: λ* 3; _: λ* λ* 3; }); })
+
+(Either/Left) = λa λb (b 0 a)
+
+(Either/Right) = λa λb (b 1 a)
+
+(Bool/Bool/True) = λa (a 0)
+
+(Bool/Bool/False) = λa (a 1)

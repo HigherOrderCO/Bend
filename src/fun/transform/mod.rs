@@ -1,5 +1,4 @@
 pub mod apply_args;
-pub mod apply_use;
 pub mod definition_merge;
 pub mod definition_pruning;
 pub mod desugar_bend;
@@ -7,6 +6,7 @@ pub mod desugar_do_blocks;
 pub mod desugar_fold;
 pub mod desugar_match_defs;
 pub mod desugar_open;
+pub mod desugar_use;
 pub mod encode_adts;
 pub mod encode_match_terms;
 pub mod expand_generated;

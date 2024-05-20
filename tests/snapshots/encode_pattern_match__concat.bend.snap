@@ -2,10 +2,20 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/concat.bend
 ---
+Scott
 (String/concat) = λ* λb b
 
 (main) = (String/concat (String/Cons 97 (String/Cons 98 String/Nil)) (String/Cons 99 (String/Cons 100 String/Nil)))
 
-(String/Cons) = λa λb λc λ* (c a b)
+(String/Nil) = λa λ* a
 
-(String/Nil) = λ* λb b
+(String/Cons) = λa λb λ* λd (d a b)
+
+NumScott
+(String/concat) = λ* λb b
+
+(main) = (String/concat (String/Cons 97 (String/Cons 98 String/Nil)) (String/Cons 99 (String/Cons 100 String/Nil)))
+
+(String/Nil) = λa (a 0)
+
+(String/Cons) = λa λb λc (c 1 a b)

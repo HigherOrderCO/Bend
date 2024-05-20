@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/bend_fold.bend
 ---
+NumScott:
+24
+
+Scott:
 24

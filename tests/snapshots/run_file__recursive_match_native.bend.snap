@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/recursive_match_native.bend
 ---
+NumScott:
+512
+
+Scott:
 512

@@ -2,15 +2,17 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_reverse.bend
 ---
-@concat = ((@concat__C0 ((a a) b)) b)
+@concat = ((@concat__C1 a) a)
 
 @concat__C0 = (a (b (c e)))
   & @list/cons ~ (a (d e))
   & @concat ~ (b (c d))
 
-@list/cons = (a (b ((a (b c)) (* c))))
+@concat__C1 = (?((@concat__C0 (* (a a))) b) b)
 
-@list/nil = (* (a a))
+@list/cons = (a (b ((0 (a (b c))) c)))
+
+@list/nil = ((1 a) a)
 
 @main = d
   & @reverse ~ (c d)
@@ -18,9 +20,11 @@ input_file: tests/golden_tests/compile_file_o_all/list_reverse.bend
   & @list/cons ~ (2 (a b))
   & @list/cons ~ (1 (@list/nil a))
 
-@reverse = ((@reverse__C0 (@list/nil a)) a)
+@reverse = ((@reverse__C1 a) a)
 
 @reverse__C0 = (c (a e))
   & @concat ~ (b (d e))
   & @reverse ~ (a b)
   & @list/cons ~ (c (@list/nil d))
+
+@reverse__C1 = (?((@reverse__C0 (* @list/nil)) a) a)

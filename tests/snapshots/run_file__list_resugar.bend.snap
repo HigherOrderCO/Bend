@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/list_resugar.bend
 ---
+NumScott:
+[42, [λd d]]
+
+Scott:
 [42, [λd d]]

@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/sum_tree.bend
 ---
+NumScott:
+256
+
+Scott:
 256

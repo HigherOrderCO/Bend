@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/open.bend
 ---
+NumScott:
+{λa (a 0 1 2) 1}
+
+Scott:
 {λa (a 1 2) 1}

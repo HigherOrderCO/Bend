@@ -2,6 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.bend
 ---
+Scott
 (If) = λa (a λb λ* b λ* λe e)
 
 (Pure) = λa (List_/Cons a List_/Nil)
@@ -23,3 +24,26 @@ input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.bend
 (List_/Cons) = λa λb λc λ* (c a b)
 
 (List_/Nil) = λ* λb b
+
+NumScott
+(If) = λa (a λb switch b { 0: λc λ* c; _: λ* λ* λf f; })
+
+(Pure) = λa (List_/Cons a List_/Nil)
+
+(Map) = λa (a λb switch b { 0: λc λd λe let {e e_2} = e; (List_/Cons (e c) (Map d e_2)); _: λ* λ* List_/Nil; })
+
+(MergeSort) = λa λb (Unpack a (Map b Pure))
+
+(Unpack) = λa λb (b λc switch c { 0: λd λe λf (e λg switch g { 0: λh λi λj let {j j_2} = j; λk (Unpack j (MergePair j_2 (List_/Cons k (List_/Cons h i)))); _: λ* λ* λm m; } f d); _: λ* λ* List_/Nil; } a)
+
+(MergePair) = λa λb (b λc switch c { 0: λd λe λf (e λg switch g { 0: λh λi λj let {j j_2} = j; λk (List_/Cons (Merge j k h) (MergePair j_2 i)); _: λ* λ* λm (List_/Cons m List_/Nil); } f d); _: λ* λ* List_/Nil; } a)
+
+(Merge) = λa λb (b λc switch c { 0: λd λe λf λg (g λh switch h { 0: λi let {i i_2 i_3} = i; λj let {j j_2} = j; λk let {k k_2 k_3} = k; λl let {l l_2 l_3} = l; λm let {m m_2} = m; (If (k l i) (List_/Cons l_2 (Merge k_2 m (List_/Cons i_2 j))) (List_/Cons i_3 (Merge k_3 (List_/Cons l_3 m_2) j_2))); _: λ* λ* λq λr (List_/Cons q r); } f d e); _: λ* λ* λt t; } a)
+
+(Bool/True) = λa (a 0)
+
+(Bool/False) = λa (a 1)
+
+(List_/Cons) = λa λb λc (c 0 a b)
+
+(List_/Nil) = λa (a 1)

@@ -2,6 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/let_tup_readback.bend
 ---
+NumScott:
+[4m[1m[33mWarnings:[0m
+[1mDuring readback:[0m
+  Unable to interpret the HVM result as a valid Bend term. (Reached Root)
+
+λa ($b (a λc (<Invalid> λ$b c)))
+
+Scott:
 [4m[1m[33mWarnings:[0m
 [1mDuring readback:[0m
   Unable to interpret the HVM result as a valid Bend term. (Reached Root)

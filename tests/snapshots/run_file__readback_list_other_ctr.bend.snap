@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/readback_list_other_ctr.bend
 ---
-λa λ* (a λb λ* (b 97 λc (c 98 "c")) λe λ* (e 1 λf (f 2 [3, 4])))
+NumScott:
+λa (a 1 λb (b 1 97 λc (c 0 98 "c")) λe (e 1 1 λf (f 0 2 [3, 4])))
+
+Scott:
+λ* λa (a λ* λb (b 97 λc (c 98 "c")) λ* λe (e 1 λf (f 2 [3, 4])))

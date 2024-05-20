@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/chars.bend
 ---
+NumScott:
+"ሴ!7"
+
+Scott:
 "ሴ!7"

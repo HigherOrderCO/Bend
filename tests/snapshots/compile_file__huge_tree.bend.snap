@@ -2,9 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/huge_tree.bend
 ---
-@Tree/Leaf = (a (* ((a b) b)))
+@Tree/Leaf = (a ((1 (a b)) b))
 
-@Tree/Node = (a (b (c (d ((a (b (c (d e)))) (* e))))))
+@Tree/Node = (a (b (c (d ((0 (a (b (c (d e))))) e)))))
 
 @main = e
   & @Tree/Node ~ (a (b (c (d e))))

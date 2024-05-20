@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_builtins.bend
 ---
+NumScott:
+{"ello" "world"}
+
+Scott:
 {"ello" "world"}

@@ -36,7 +36,7 @@ fn add_priority_next_in_cycle(net: &mut Net, nxt: &String) {
     }
   }
 
-  // If there are more than one recursive ref, add a priority to the last (first to execute).
+  // If there are more than one recursive ref, add a priority to them.
   if count > 1 {
     for (pri, a, b) in net.redexes.iter_mut().rev() {
       if let Tree::Ref { nam } = a {

@@ -101,7 +101,7 @@ def Maybe/or_default(x, default):
       return default
 ```
 
-### Folding
+### Folding and bending
 
 We use `~` to indicate that a field is recursive.
 This allows us to easily create and consume these recursive data structures with `bend` and `fold`.
@@ -152,7 +152,7 @@ def main:
   return MyTree.sum(x)
 ```
 
-Making your program around trees is a very good way of making it parallelizable, since each core can be dispatched to work on a different branch of the tree.
+Making your program around folding trees is a very good way of making it parallelizable, since each core can be dispatched to work on a different branch of the tree.
 
 You can also pass some state variables to `fold` just like the variables used in a `bend`.
 If you give a `fold` some state, then you necessarily need to pass it by calling the folded fields of the matched value, like passing an additional argument to the fold call.

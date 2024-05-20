@@ -6,6 +6,7 @@ const BUILTINS: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/fu
 pub const LIST: &str = "List";
 pub const LCONS: &str = "List/Cons";
 pub const LNIL: &str = "List/Nil";
+pub const LCONS_TAG: u32 = 1;
 
 pub const HEAD: &str = "head";
 pub const TAIL: &str = "tail";
@@ -13,14 +14,12 @@ pub const TAIL: &str = "tail";
 pub const STRING: &str = "String";
 pub const SCONS: &str = "String/Cons";
 pub const SNIL: &str = "String/Nil";
-
-pub const RESULT: &str = "Result";
-pub const RESULT_OK: &str = "Result/Ok";
-pub const RESULT_ERR: &str = "Result/Err";
+pub const SCONS_TAG: u32 = 1;
 
 pub const NAT: &str = "Nat";
 pub const NAT_SUCC: &str = "Nat/Succ";
 pub const NAT_ZERO: &str = "Nat/Zero";
+pub const NAT_SUCC_TAG: u32 = 0;
 
 impl Book {
   pub fn builtins() -> Book {
@@ -68,14 +67,6 @@ impl Term {
 
   pub fn encode_nat(val: u32) -> Term {
     (0 .. val).fold(Term::r#ref(NAT_ZERO), |acc, _| Term::app(Term::r#ref(NAT_SUCC), acc))
-  }
-
-  pub fn encode_ok(val: Term) -> Term {
-    Term::call(Term::r#ref(RESULT_OK), [val])
-  }
-
-  pub fn encode_err(val: Term) -> Term {
-    Term::call(Term::r#ref(RESULT_ERR), [val])
   }
 }
 

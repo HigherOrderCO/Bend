@@ -2,8 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_syntax.bend
 ---
+Scott
 (head) = λa (a λb λ* b List_/Nil)
 
 (List_/Cons) = λa λb λc λ* (c a b)
 
 (List_/Nil) = λ* λb b
+
+NumScott
+(head) = λa (a λb switch b { 0: λc λ* c; _: λ* List_/Nil; })
+
+(List_/Cons) = λa λb λc (c 0 a b)
+
+(List_/Nil) = λa (a 1)

@@ -2,13 +2,15 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/num_pattern_with_var.bend
 ---
-@Foo = (((* 0) (@Foo__C1 a)) a)
+@Foo = ((@Foo__C2 a) a)
 
 @Foo__C0 = ($([+1] a) a)
 
-@Foo__C1 = (?((0 @Foo__C0) a) a)
+@Foo__C1 = (* (?((0 @Foo__C0) a) a))
 
-@bool/true = (* (a a))
+@Foo__C2 = (?(((* 0) @Foo__C1) a) a)
+
+@bool/true = ((1 a) a)
 
 @main = a
   & @Foo ~ (@bool/true (3 a))

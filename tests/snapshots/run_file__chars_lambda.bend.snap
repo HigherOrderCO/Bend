@@ -2,4 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/chars_lambda.bend
 ---
+NumScott:
+955
+
+Scott:
 955
