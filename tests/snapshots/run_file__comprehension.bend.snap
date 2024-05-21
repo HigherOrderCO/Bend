@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/comprehension.bend
+---
+NumScott:
+[5, 10, 7, 6]
+
+Scott:
+[5, 10, 7, 6]
