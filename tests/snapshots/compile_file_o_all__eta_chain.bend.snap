@@ -5,7 +5,7 @@ input_file: tests/golden_tests/compile_file_o_all/eta_chain.bend
 @Bar = a
   & @Baz ~ a
 
-@Baz = ($(:[+] $(b c)) ($(:[+] $(a b)) (a c)))
+@Baz = ($([+] $(b c)) ($([+] $(a b)) (a c)))
 
 @Foo = a
   & @Bar ~ a

@@ -72,7 +72,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @List.sum = ((@List.sum__C1 a) a)
 
-@List.sum__C0 = (* ($(:[+] $(b c)) (a (b d))))
+@List.sum__C0 = (* ($([+] $(b c)) (a (b d))))
   & @List.sum ~ (a (c d))
 
 @List.sum__C1 = (?(((a a) @List.sum__C0) b) b)
@@ -106,7 +106,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 @Tree.leaves = ((@Tree.leaves__C1 a) a)
 
 @Tree.leaves__C0 = (a (b d))
-  &! @Tree.leaves ~ (a $(:[+] $(c d)))
+  &! @Tree.leaves ~ (a $([+] $(c d)))
   &! @Tree.leaves ~ (b c)
 
 @Tree.leaves__C1 = (?((@Tree.leaves__C0 (* (* 1))) a) a)
@@ -127,7 +127,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @Tree.nodes__C0 = (a (b e))
   & $(d e) ~ [+1]
-  &! @Tree.nodes ~ (a $(:[+] $(c d)))
+  &! @Tree.nodes ~ (a $([+] $(c d)))
   &! @Tree.nodes ~ (b c)
 
 @Tree.nodes__C1 = (?((@Tree.nodes__C0 (* (* 0))) a) a)
@@ -143,7 +143,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @calc = l
   & @Foo ~ (f (h (k l)))
-  & 1 ~ {$(:[+] $(e f)) {$(:[*] $(a {e {$(:[*] $(b {$(:[+] $(g h)) {$(:[*] $(c {g {$(:[*] $(d {$(:[+] $(j k)) {$(:[*] $(i j)) i}})) d}})) c}})) b}})) a}}
+  & 1 ~ {$([+] $(e f)) {$([*] $(a {e {$([*] $(b {$([+] $(g h)) {$([*] $(c {g {$([*] $(d {$([+] $(j k)) {$([*] $(i j)) i}})) d}})) c}})) b}})) a}}
 
 @fold_ = ((@fold___C1 (@fold___C0 a)) a)
 
@@ -156,7 +156,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @main = *
 
-@max = ({$(:[>] $(a ?(((b (* b)) (* (* (c c)))) (d (e f))))) e} ({a d} f))
+@max = ({$([>] $(a ?(((b (* b)) (* (* (c c)))) (d (e f))))) e} ({a d} f))
 
 @tail_recursive = ((@tail_recursive__C0 ((* 0) a)) a)
 

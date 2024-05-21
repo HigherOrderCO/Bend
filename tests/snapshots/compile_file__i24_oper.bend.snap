@@ -3,5 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/i24_oper.bend
 ---
 @main = b
-  & $(-1 $(:[*] $(a b))) ~ [+1]
-  & $(+14 a) ~ [-16777204]
+  & $(-1 $([*] $(a b))) ~ [+1]
+  & $(+14 a) ~ [-134217716]

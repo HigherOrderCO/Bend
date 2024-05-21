@@ -83,7 +83,7 @@ checksum = "0c4b4d0bd25bd0b74681c0ad21497610ce1b7c91b1022cd21c80c6fbdd9476b0"
 
 [[package]]
 name = "bend-lang"
-version = "0.2.9"
+version = "0.2.10"
 dependencies = [
  "TSPL 0.0.12",
  "clap",
@@ -214,9 +214,9 @@ checksum = "809e18805660d7b6b2e2b9f316a5099521b5998d5cba4dda11b5157a21aaef03"
 
 [[package]]
 name = "hvm-core"
-version = "0.3.0-hvm32.compat.2"
+version = "0.3.0-hvm32.compat.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bd1f250a4a29a9bb2e30fc08a712d7c005df761b84249d7d0ecddf3cc59eb02"
+checksum = "4dc4ab0e7e0a79b299129792012b15085ff1d114bf3756f5e40269cecf2dd97a"
 dependencies = [
  "TSPL 0.0.9",
  "arrayvec",

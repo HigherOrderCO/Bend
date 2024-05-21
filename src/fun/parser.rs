@@ -1007,11 +1007,11 @@ pub trait ParserCommons<'a>: Parser<'a> {
     } else if self.try_consume_exactly("%") {
       Op::REM
     } else if self.try_consume_exactly("<") {
-      Op::LTN
+      Op::LT
     } else if self.try_consume_exactly(">") {
-      Op::GTN
+      Op::GT
     } else if self.try_consume_exactly("==") {
-      Op::EQL
+      Op::EQ
     } else if self.try_consume_exactly("!=") {
       Op::NEQ
     } else if self.try_consume_exactly("&") {
@@ -1040,11 +1040,11 @@ pub trait ParserCommons<'a>: Parser<'a> {
     } else if self.starts_with("%") {
       Op::REM
     } else if self.starts_with("<") {
-      Op::LTN
+      Op::LT
     } else if self.starts_with(">") {
-      Op::GTN
+      Op::GT
     } else if self.starts_with("==") {
-      Op::EQL
+      Op::EQ
     } else if self.starts_with("!=") {
       Op::NEQ
     } else if self.starts_with("&") {

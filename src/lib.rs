@@ -189,13 +189,28 @@ pub fn run_book_with_fn(
   }
 
   let Some((_, result)) = out.split_once("Result: ") else {
-    return Err(format!("Error reading result from hvm. Output :\n{}{}{}", err, status, out).into());
+    return Err(
+      format!("1.Failed to parse result from HVM.\nOutput from HVM was:\n{:?}{:?}{:?}", err, status, out)
+        .into(),
+    );
   };
   let Some((result, stats)) = result.split_once('\n') else {
-    return Err(format!("Error reading result from hvm. Output :\n{}{}{}", err, status, out).into());
+    return Err(
+      format!("2.Failed to parse result from HVM.\nOutput from HVM was:\n{:?}{:?}{:?}", err, status, out)
+        .into(),
+    );
   };
-  let Ok(net) = hvmc::ast::Net::from_str(result) else {
-    return Err(format!("Error reading result from hvm. Output :\n{}{}{}", err, status, out).into());
+  let net = match hvmc::ast::Net::from_str(result) {
+    Ok(net) => net,
+    Err(e) => {
+      return Err(
+        format!(
+          "3.Failed to parse result from HVM with error: '{}'.\nOutput from HVM was:\n{:?}{:?}{:?}",
+          e, err, status, out
+        )
+        .into(),
+      );
+    }
   };
 
   let (term, diags) =

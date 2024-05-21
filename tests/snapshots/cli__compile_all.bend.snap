@@ -14,4 +14,4 @@ input_file: tests/golden_tests/cli/compile_all.bend
   & @Pair.get ~ (@main__C0 (a b))
   & @Pair/Pair ~ (40 (2 a))
 
-@main__C0 = ($(:[+] $(a b)) (a b))
+@main__C0 = ($([+] $(a b)) (a b))
