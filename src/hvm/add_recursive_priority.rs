@@ -1,5 +1,7 @@
-use crate::maybe_grow;
-use hvmc::ast::{Book, Net, Tree};
+use crate::{
+  hvm::ast::{Book, Net, Tree},
+  maybe_grow,
+};
 use std::collections::{HashMap, HashSet};
 
 pub fn add_recursive_priority(book: &mut Book) {

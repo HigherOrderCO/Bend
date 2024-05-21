@@ -4,15 +4,6 @@ version = 3
 
 [[package]]
 name = "TSPL"
-version = "0.0.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a9423b1e6e2d6c0bbc03660f58f9c30f55359e13afea29432e6e767c0f7dc25"
-dependencies = [
- "highlight_error",
-]
-
-[[package]]
-name = "TSPL"
 version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52dfd6238b1461b99635b26585a85b4e7b9c786cc0481b3c540ae5f590b6dfb6"
@@ -85,10 +76,10 @@ checksum = "0c4b4d0bd25bd0b74681c0ad21497610ce1b7c91b1022cd21c80c6fbdd9476b0"
 name = "bend-lang"
 version = "0.2.10"
 dependencies = [
- "TSPL 0.0.12",
+ "TSPL",
+ "arrayvec",
  "clap",
  "highlight_error",
- "hvm-core",
  "indexmap",
  "insta",
  "interner",
@@ -213,21 +204,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "809e18805660d7b6b2e2b9f316a5099521b5998d5cba4dda11b5157a21aaef03"
 
 [[package]]
-name = "hvm-core"
-version = "0.3.0-hvm32.compat.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34f45b2e7a27af7ccecc60ee9c28f8c536c19dac677a0ddd0a19c382eb1367ee"
-dependencies = [
- "TSPL 0.0.9",
- "arrayvec",
- "clap",
- "nohash-hasher",
- "parking_lot",
- "stacker",
- "thiserror",
-]
-
-[[package]]
 name = "indexmap"
 version = "2.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -303,12 +279,6 @@ dependencies = [
  "autocfg",
  "scopeguard",
 ]
-
-[[package]]
-name = "nohash-hasher"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bf50223579dc7cdcfb3bfcacf7069ff68243f8c363f62ffa99cf000a6b9c451"
 
 [[package]]
 name = "parking_lot"
@@ -430,26 +400,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "thiserror"
-version = "1.0.60"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "579e9083ca58dd9dcf91a9923bb9054071b9ebbd800b342194c9feb0ee89fc18"
-dependencies = [
- "thiserror-impl",
-]
-
-[[package]]
-name = "thiserror-impl"
-version = "1.0.60"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e2470041c06ec3ac1ab38d0356a6119054dedaea53e12fbefc0de730a1c08524"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]

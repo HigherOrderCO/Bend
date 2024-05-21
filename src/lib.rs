@@ -1,14 +1,16 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
+#![allow(incomplete_features, clippy::missing_safety_doc, clippy::new_ret_no_self)]
+#![feature(generic_const_exprs)]
 
 use crate::fun::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Term};
 use diagnostics::{Diagnostics, DiagnosticsConfig, ERR_INDENT_SIZE};
 use hvm::{
   add_recursive_priority::add_recursive_priority,
+  ast::Net,
   check_net_size::{check_net_sizes, MAX_NET_SIZE},
   mutual_recursion,
 };
-use hvmc::ast::Net;
 use net::hvmc_to_net::hvmc_to_net;
 use std::{process::Output, str::FromStr};
 
@@ -44,12 +46,12 @@ pub fn compile_book(
   let (mut hvm_book, labels) = book_to_nets(book, &mut diagnostics)?;
 
   if opts.eta {
-    hvm_book.values_mut().for_each(Net::eta_reduce);
+    hvm_book.values_mut().for_each(hvm::ast::Net::eta_reduce);
   }
 
   mutual_recursion::check_cycles(&hvm_book, &mut diagnostics)?;
   if opts.eta {
-    hvm_book.values_mut().for_each(Net::eta_reduce);
+    hvm_book.values_mut().for_each(hvm::ast::Net::eta_reduce);
   }
 
   if opts.inline {
@@ -200,7 +202,7 @@ pub fn run_book_with_fn(
         .into(),
     );
   };
-  let net = match hvmc::ast::Net::from_str(result) {
+  let net = match hvm::ast::Net::from_str(result) {
     Ok(net) => net,
     Err(e) => {
       return Err(
@@ -364,7 +366,7 @@ impl std::fmt::Display for AdtEncoding {
 
 pub struct CompileResult {
   pub diagnostics: Diagnostics,
-  pub core_book: hvmc::ast::Book,
+  pub core_book: hvm::ast::Book,
   pub labels: Labels,
 }
 

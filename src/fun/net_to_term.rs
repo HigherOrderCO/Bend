@@ -1,10 +1,7 @@
-use hvmc::ast::{get_f24, get_i24, get_typ, get_u24};
+use hvm::ast::{get_f24, get_i24, get_typ, get_u24};
 
 use crate::{
-  diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
-  fun::{term_to_net::Labels, Book, FanKind, Name, Op, Pattern, Tag, Term},
-  maybe_grow,
-  net::{CtrKind, INet, NodeId, NodeKind, Port, SlotId, ROOT},
+  diagnostics::{DiagnosticOrigin, Diagnostics, Severity}, fun::{term_to_net::Labels, Book, FanKind, Name, Op, Pattern, Tag, Term}, hvm, maybe_grow, net::{CtrKind, INet, NodeId, NodeKind, Port, SlotId, ROOT}
 };
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -224,7 +221,7 @@ impl Reader<'_> {
               let opr_node = self.net.enter_port(Port(port0_node, 0)).node();
               let opr_kind = self.net.node(opr_node).kind.clone();
               let opr = if let NodeKind::Num { val } = opr_kind {
-                if get_typ(val) != hvmc::ast::TY_SYM {
+                if get_typ(val) != hvm::ast::TY_SYM {
                   self.error(ReadbackError::InvalidNumericOp);
                   return Term::Err;
                 }
@@ -479,10 +476,10 @@ impl Term {
 fn num_from_bits_with_type(val: u32, typ: u32) -> Term {
   match get_typ(typ) {
     // No type information, assume u24 by default
-    hvmc::ast::TY_SYM => Term::Num { val: Num::U24(get_u24(val)) },
-    hvmc::ast::TY_U24 => Term::Num { val: Num::U24(get_u24(val)) },
-    hvmc::ast::TY_I24 => Term::Num { val: Num::I24(get_i24(val)) },
-    hvmc::ast::TY_F24 => Term::Num { val: Num::F24(get_f24(val)) },
+    hvm::ast::TY_SYM => Term::Num { val: Num::U24(get_u24(val)) },
+    hvm::ast::TY_U24 => Term::Num { val: Num::U24(get_u24(val)) },
+    hvm::ast::TY_I24 => Term::Num { val: Num::I24(get_i24(val)) },
+    hvm::ast::TY_F24 => Term::Num { val: Num::F24(get_f24(val)) },
     _ => Term::Err,
   }
 }

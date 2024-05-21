@@ -1,9 +1,7 @@
 use crate::{
-  diagnostics::{Diagnostics, DiagnosticsConfig},
-  fun::builtins::*,
-  maybe_grow, ENTRY_POINT,
+  diagnostics::{Diagnostics, DiagnosticsConfig}, fun::builtins::*, hvm::{self, ast::get_typ}, maybe_grow, ENTRY_POINT
 };
-use hvmc::ast::get_typ;
+// use hvmc::ast::get_typ;
 use indexmap::{IndexMap, IndexSet};
 use interner::global::{GlobalPool, GlobalString};
 use itertools::Itertools;
@@ -901,17 +899,17 @@ impl Num {
 
   pub fn to_bits(&self) -> u32 {
     match self {
-      Num::U24(val) => hvmc::ast::new_u24(*val),
-      Num::I24(val) => hvmc::ast::new_i24(*val),
-      Num::F24(val) => hvmc::ast::new_f24(*val),
+      Num::U24(val) => hvm::ast::new_u24(*val),
+      Num::I24(val) => hvm::ast::new_i24(*val),
+      Num::F24(val) => hvm::ast::new_f24(*val),
     }
   }
 
   pub fn from_bits(bits: u32) -> Self {
     match get_typ(bits) {
-      hvmc::ast::TY_U24 => Num::U24(hvmc::ast::get_u24(bits)),
-      hvmc::ast::TY_I24 => Num::I24(hvmc::ast::get_i24(bits)),
-      hvmc::ast::TY_F24 => Num::F24(hvmc::ast::get_f24(bits)),
+      hvm::ast::TY_U24 => Num::U24(hvm::ast::get_u24(bits)),
+      hvm::ast::TY_I24 => Num::I24(hvm::ast::get_i24(bits)),
+      hvm::ast::TY_F24 => Num::F24(hvm::ast::get_f24(bits)),
       _ => unreachable!("Invalid Num bits"),
     }
   }

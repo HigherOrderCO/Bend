@@ -2,6 +2,7 @@ use bend::{
   compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   fun::{load_book::do_parse_book, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Name, Term},
+  hvm,
   net::hvmc_to_net::hvmc_to_net,
   run_book_with_fn, AdtEncoding, CompileOpts, RunOpts,
 };
@@ -204,7 +205,7 @@ fn run_lazy() {
 #[test]
 fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|code, _| {
-    let net = hvmc::ast::Net::from_str(code)?;
+    let net = hvm::ast::Net::from_str(code)?;
     let book = Book::default();
     let compat_net = hvmc_to_net(&net);
     let mut diags = Diagnostics::default();
