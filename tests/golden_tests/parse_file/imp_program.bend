@@ -22,8 +22,8 @@ def inc(n):
   n += 1;
   return n;
 
-#def inc_list(list):
-#  return [x+1 for x in list];
+def inc_list(list):
+  return [x+1 for x in list];
 
 def lam():
   return lambda x, y: x;

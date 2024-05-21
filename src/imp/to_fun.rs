@@ -1,5 +1,9 @@
 use super::{AssignPattern, Definition, Expr, Stmt};
-use crate::fun::{self, Name};
+use crate::fun::{
+  self,
+  builtins::{LCONS, LNIL},
+  Name,
+};
 
 impl Definition {
   pub fn to_fun(self) -> Result<fun::Definition, String> {
@@ -324,7 +328,40 @@ impl Expr {
         let args = args.into_iter().map(Self::to_fun);
         fun::Term::call(fun::Term::Ref { nam: name }, args)
       }
-      Expr::Comprehension { .. } => todo!(),
+      Expr::Comprehension { term, bind, iter, cond } => {
+        const ITER_TAIL: &str = "%iter.tail";
+        const ITER_HEAD: &str = "%iter.head";
+
+        let cons_branch = fun::Term::call(fun::Term::r#ref(LCONS), [term.to_fun(), fun::Term::Var {
+          nam: Name::new(ITER_TAIL),
+        }]);
+        let cons_branch = if let Some(cond) = cond {
+          fun::Term::Swt {
+            arg: Box::new(cond.to_fun()),
+            bnd: Some(Name::new("%comprehension")),
+            with: vec![],
+            pred: Some(Name::new("%comprehension-1")),
+            arms: vec![fun::Term::Var { nam: Name::new(ITER_TAIL) }, cons_branch],
+          }
+        } else {
+          cons_branch
+        };
+        let cons_branch = fun::Term::Let {
+          pat: Box::new(fun::Pattern::Var(Some(bind))),
+          val: Box::new(fun::Term::Var { nam: Name::new(ITER_HEAD) }),
+          nxt: Box::new(cons_branch),
+        };
+
+        fun::Term::Fold {
+          bnd: Some(Name::new("%iter")),
+          arg: Box::new(iter.to_fun()),
+          with: Vec::new(),
+          arms: vec![
+            (Some(Name::new(LNIL)), vec![], fun::Term::r#ref(LNIL)),
+            (Some(Name::new(LCONS)), vec![], cons_branch),
+          ],
+        }
+      }
       Expr::MapInit { entries } => map_init(entries),
       Expr::MapGet { .. } => unreachable!(),
     }

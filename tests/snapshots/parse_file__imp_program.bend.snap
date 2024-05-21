@@ -16,6 +16,8 @@ input_file: tests/golden_tests/parse_file/imp_program.bend
 
 (inc) = λ%arg0 use n = %arg0; let n = (+ n 1); n
 
+(inc_list) = λ%arg0 use list = %arg0; fold %iter = list { List/Nil: List/Nil; List/Cons: let x = %iter.head; (List/Cons (+ x 1) %iter.tail); }
+
 (lam) = λx λy x
 
 (do_match) = λ%arg0 use b = %arg0; match b = b { Bool/True: 1; Bool/False: 0; }
