@@ -423,22 +423,24 @@ fn hole<T: Default>() -> T {
 impl Op {
   fn to_native_tag(self) -> u32 {
     match self {
-      Op::ADD => hvmc::ast::ADD,
-      Op::SUB => hvmc::ast::SUB,
-      Op::MUL => hvmc::ast::MUL,
-      Op::DIV => hvmc::ast::DIV,
-      Op::REM => hvmc::ast::REM,
-      Op::EQ => hvmc::ast::EQ,
-      Op::NEQ => hvmc::ast::NEQ,
-      Op::LT => hvmc::ast::LT,
-      Op::GT => hvmc::ast::GT,
-      Op::AND => hvmc::ast::AND,
-      Op::OR => hvmc::ast::OR,
-      Op::XOR => hvmc::ast::XOR,
+      Op::ADD => hvmc::ast::OP_ADD,
+      Op::SUB => hvmc::ast::OP_SUB,
+      Op::MUL => hvmc::ast::OP_MUL,
+      Op::DIV => hvmc::ast::OP_DIV,
+      Op::REM => hvmc::ast::OP_REM,
+      Op::EQ => hvmc::ast::OP_EQ,
+      Op::NEQ => hvmc::ast::OP_NEQ,
+      Op::LT => hvmc::ast::OP_LT,
+      Op::GT => hvmc::ast::OP_GT,
+      Op::AND => hvmc::ast::OP_AND,
+      Op::OR => hvmc::ast::OP_OR,
+      Op::XOR => hvmc::ast::OP_XOR,
+      Op::SHL => hvmc::ast::OP_SHL,
+      Op::SHR => hvmc::ast::OP_SHR,
 
-      Op::ATN => hvmc::ast::AND,
-      Op::LOG => hvmc::ast::OR,
-      Op::POW => hvmc::ast::XOR,
+      Op::ATN => hvmc::ast::OP_AND,
+      Op::LOG => hvmc::ast::OP_OR,
+      Op::POW => hvmc::ast::OP_XOR,
     }
   }
 }
