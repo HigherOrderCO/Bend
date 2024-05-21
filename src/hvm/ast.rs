@@ -22,7 +22,7 @@ use super::util::{array_vec, deref};
 /// The top level AST node, representing a collection of named nets.
 ///
 /// This is a newtype wrapper around a `BTreeMap<String, Net>`, and is
-/// dereferencable to such.
+/// dereferenceable to such.
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Default)]
 pub struct Book {
   pub nets: BTreeMap<String, Net>,
