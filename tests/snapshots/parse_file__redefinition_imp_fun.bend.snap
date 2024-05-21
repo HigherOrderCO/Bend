@@ -1,0 +1,8 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/parse_file/redefinition_imp_fun.bend
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/parse_file/redefinition_imp_fun.bend :
+Redefinition of function 'A'
+[0m  5 | [4m[31m(A) = 1[0m
