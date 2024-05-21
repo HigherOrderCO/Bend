@@ -1,7 +1,10 @@
 use hvm::ast::{get_f24, get_i24, get_typ, get_u24};
 
 use crate::{
-  diagnostics::{DiagnosticOrigin, Diagnostics, Severity}, fun::{term_to_net::Labels, Book, FanKind, Name, Op, Pattern, Tag, Term}, hvm, maybe_grow, net::{CtrKind, INet, NodeId, NodeKind, Port, SlotId, ROOT}
+  diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
+  fun::{term_to_net::Labels, Book, FanKind, Name, Op, Pattern, Tag, Term},
+  hvm, maybe_grow,
+  net::{CtrKind, INet, NodeId, NodeKind, Port, SlotId, ROOT},
 };
 use std::collections::{BTreeSet, HashMap, HashSet};
 

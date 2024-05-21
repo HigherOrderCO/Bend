@@ -1,5 +1,8 @@
 use crate::{
-  diagnostics::{Diagnostics, DiagnosticsConfig}, fun::builtins::*, hvm::{self, ast::get_typ}, maybe_grow, ENTRY_POINT
+  diagnostics::{Diagnostics, DiagnosticsConfig},
+  fun::builtins::*,
+  hvm::{self, ast::get_typ},
+  maybe_grow, ENTRY_POINT,
 };
 // use hvmc::ast::get_typ;
 use indexmap::{IndexMap, IndexSet};

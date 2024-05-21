@@ -153,29 +153,29 @@ impl Tree {
   }
 }
 
-pub const TY_SYM : u32 = 0x00;
-pub const TY_U24 : u32 = 0x01;
-pub const TY_I24 : u32 = 0x02;
-pub const TY_F24 : u32 = 0x03;
-pub const OP_ADD : u32 = 0x04;
-pub const OP_SUB : u32 = 0x05;
-pub const FP_SUB : u32 = 0x06;
-pub const OP_MUL : u32 = 0x07;
-pub const OP_DIV : u32 = 0x08;
-pub const FP_DIV : u32 = 0x09;
-pub const OP_REM : u32 = 0x0A;
-pub const FP_REM : u32 = 0x0B;
-pub const OP_EQ  : u32 = 0x0C;
-pub const OP_NEQ : u32 = 0x0D;
-pub const OP_LT  : u32 = 0x0E;
-pub const OP_GT  : u32 = 0x0F;
-pub const OP_AND : u32 = 0x10;
-pub const OP_OR  : u32 = 0x11;
-pub const OP_XOR : u32 = 0x12;
-pub const OP_SHL : u32 = 0x13;
-pub const FP_SHL : u32 = 0x14;
-pub const OP_SHR : u32 = 0x15;
-pub const FP_SHR : u32 = 0x16;
+pub const TY_SYM: u32 = 0x00;
+pub const TY_U24: u32 = 0x01;
+pub const TY_I24: u32 = 0x02;
+pub const TY_F24: u32 = 0x03;
+pub const OP_ADD: u32 = 0x04;
+pub const OP_SUB: u32 = 0x05;
+pub const FP_SUB: u32 = 0x06;
+pub const OP_MUL: u32 = 0x07;
+pub const OP_DIV: u32 = 0x08;
+pub const FP_DIV: u32 = 0x09;
+pub const OP_REM: u32 = 0x0A;
+pub const FP_REM: u32 = 0x0B;
+pub const OP_EQ: u32 = 0x0C;
+pub const OP_NEQ: u32 = 0x0D;
+pub const OP_LT: u32 = 0x0E;
+pub const OP_GT: u32 = 0x0F;
+pub const OP_AND: u32 = 0x10;
+pub const OP_OR: u32 = 0x11;
+pub const OP_XOR: u32 = 0x12;
+pub const OP_SHL: u32 = 0x13;
+pub const FP_SHL: u32 = 0x14;
+pub const OP_SHR: u32 = 0x15;
+pub const FP_SHR: u32 = 0x16;
 
 pub fn flip_sym(val: u32) -> u32 {
   match val {
@@ -240,7 +240,7 @@ pub fn get_f24(val: u32) -> f32 {
 }
 
 pub fn get_typ(val: u32) -> u32 {
-  return (val & 0x1F) as u8 as u32;
+  (val & 0x1F) as u8 as u32
 }
 
 pub fn partial_opr(a: u32, b: u32) -> u32 {
@@ -270,6 +270,7 @@ impl fmt::Display for Net {
 }
 
 impl fmt::Display for Tree {
+  #[allow(illegal_floating_point_literal_pattern)]
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     maybe_grow(move || match self {
       Tree::Era => write!(f, "*"),
@@ -305,11 +306,11 @@ impl fmt::Display for Tree {
             OP_MUL => write!(f, "[*]"),
             OP_DIV => write!(f, "[/]"),
             OP_REM => write!(f, "[%]"),
-            OP_EQ  => write!(f, "[=]"),
-            OP_LT  => write!(f, "[<]"),
-            OP_GT  => write!(f, "[>]"),
+            OP_EQ => write!(f, "[=]"),
+            OP_LT => write!(f, "[<]"),
+            OP_GT => write!(f, "[>]"),
             OP_AND => write!(f, "[&]"),
-            OP_OR  => write!(f, "[|]"),
+            OP_OR => write!(f, "[|]"),
             OP_XOR => write!(f, "[^]"),
             OP_SHL => write!(f, "[<<]"),
             OP_SHR => write!(f, "[>>]"),
@@ -319,7 +320,7 @@ impl fmt::Display for Tree {
             FP_SHL => write!(f, "[:<<]"),
             FP_SHR => write!(f, "[:>>]"),
             _ => write!(f, "[?]"),
-          }
+          },
           TY_U24 => {
             let val = get_u24(numb);
             write!(f, "{}", val)
@@ -334,34 +335,39 @@ impl fmt::Display for Tree {
               f32::INFINITY => write!(f, "+inf"),
               f32::NEG_INFINITY => write!(f, "-inf"),
               x if x.is_nan() => write!(f, "+NaN"),
-              _ => write!(f, "{:?}", val)
+              _ => write!(f, "{:?}", val),
             }
           }
           _ => {
             let typ = get_typ(numb);
             let val = get_u24(numb);
-            write!(f, "[{}{}]", match typ {
-              OP_ADD => "+",
-              OP_SUB => "-", 
-              OP_MUL => "*",
-              OP_DIV => "/",
-              OP_REM => "%",
-              OP_EQ  => "=",
-              OP_NEQ => "!",
-              OP_LT  => "<",
-              OP_GT  => ">",
-              OP_AND => "&",
-              OP_OR  => "|",
-              OP_XOR => "^",
-              OP_SHL => "<<",
-              OP_SHR => ">>",
-              FP_SUB => ":-",
-              FP_DIV => ":/",
-              FP_REM => ":%",
-              FP_SHL => ":<<",
-              FP_SHR => ":>>",
-              _ => "?",
-            }, val)
+            write!(
+              f,
+              "[{}{}]",
+              match typ {
+                OP_ADD => "+",
+                OP_SUB => "-",
+                OP_MUL => "*",
+                OP_DIV => "/",
+                OP_REM => "%",
+                OP_EQ => "=",
+                OP_NEQ => "!",
+                OP_LT => "<",
+                OP_GT => ">",
+                OP_AND => "&",
+                OP_OR => "|",
+                OP_XOR => "^",
+                OP_SHL => "<<",
+                OP_SHR => ">>",
+                FP_SUB => ":-",
+                FP_DIV => ":/",
+                FP_REM => ":%",
+                FP_SHL => ":<<",
+                FP_SHR => ":>>",
+                _ => "?",
+              },
+              val
+            )
           }
         }
       }
@@ -573,7 +579,7 @@ impl<'i> HvmcParser<'i> {
     self.consume("]")?;
 
     // Returns the symbol
-    return Ok(num);
+    Ok(num)
   }
 
   pub fn parse_numb_lit(&mut self) -> Result<u32, String> {
@@ -606,10 +612,10 @@ impl<'i> HvmcParser<'i> {
 
     // Parses symbols (SYM)
     if let Some('[') = self.peek_one() {
-      return self.parse_numb_sym();
+      self.parse_numb_sym()
     // Parses numbers (U24,I24,F24)
     } else {
-      return self.parse_numb_lit();
+      self.parse_numb_lit()
     }
   }
 
@@ -633,7 +639,10 @@ impl<'i> HvmcParser<'i> {
 
 /// Parses the input with the callback, ensuring that the whole input is
 /// consumed.
-fn parse_eof<'i, T>(input: &'i str, parse_fn: impl Fn(&mut HvmcParser<'i>) -> Result<T, String>) -> Result<T, String> {
+fn parse_eof<'i, T>(
+  input: &'i str,
+  parse_fn: impl Fn(&mut HvmcParser<'i>) -> Result<T, String>,
+) -> Result<T, String> {
   let mut parser = HvmcParser::new(input);
   let out = parse_fn(&mut parser)?;
   if parser.index != parser.input.len() {
