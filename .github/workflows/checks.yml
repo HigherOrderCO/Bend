@@ -10,6 +10,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@nightly
@@ -23,6 +24,7 @@ jobs:
       - run: RUSTFLAGS="-D warnings" cargo check --all-targets
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@nightly
@@ -37,6 +39,7 @@ jobs:
       - run: cargo test -- --test-threads=1
   clippy:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@nightly
@@ -52,6 +55,7 @@ jobs:
       - run: RUSTFLAGS="-D warnings" cargo clippy
   fmt:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@nightly
@@ -60,6 +64,7 @@ jobs:
       - run: cargo fmt --check
   cspell:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
       - uses: streetsidesoftware/cspell-action@v5
