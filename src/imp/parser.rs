@@ -90,7 +90,11 @@ impl<'a> PyParser<'a> {
   /// <var> <postfix>?
   ///
   fn parse_simple_expr(&mut self, inline: bool) -> ParseResult<Expr> {
-    self.skip_trivia_maybe_inline(inline);
+    if inline {
+      self.skip_trivia_inline();
+    } else {
+      self.skip_trivia();
+    }
     let Some(head) = self.peek_one() else { return self.expected("expression")? };
 
     let ini_idx = *self.index();
@@ -133,7 +137,7 @@ impl<'a> PyParser<'a> {
         }
       }
       // List or Comprehension
-      '[' => self.list_or_comprehension()?,
+      '[' => self.parse_list_or_comprehension()?,
       // Symbol
       '`' => Expr::Num { val: Num::U24(self.parse_quoted_symbol()?) },
       // String
@@ -173,7 +177,11 @@ impl<'a> PyParser<'a> {
     let end_idx = *self.index();
 
     // postfixes
-    self.skip_trivia_maybe_inline(inline);
+    if inline {
+      self.skip_trivia_inline();
+    } else {
+      self.skip_trivia();
+    }
     // call
     if self.starts_with("(") {
       self.advance_one();
@@ -265,7 +273,7 @@ impl<'a> PyParser<'a> {
     Ok((key, val))
   }
 
-  fn list_or_comprehension(&mut self) -> ParseResult<Expr> {
+  fn parse_list_or_comprehension(&mut self) -> ParseResult<Expr> {
     self.consume_exactly("[")?;
 
     // Empty list
@@ -316,7 +324,11 @@ impl<'a> PyParser<'a> {
       }
     }
 
-    self.skip_trivia_maybe_inline(inline);
+    if inline {
+      self.skip_trivia_inline();
+    } else {
+      self.skip_trivia();
+    }
 
     // lambda
     if self.try_parse_keyword("lambda") | self.try_consume_exactly("λ") {
@@ -350,18 +362,26 @@ impl<'a> PyParser<'a> {
   /// <simple> (<infix_op> <infix>)?
   fn parse_infix_expr(&mut self, prec: usize, inline: bool) -> ParseResult<Expr> {
     maybe_grow(|| {
-      self.skip_trivia_maybe_inline(inline);
+      if inline {
+        self.skip_trivia_inline();
+      } else {
+        self.skip_trivia();
+      }
       if prec > PREC.len() - 1 {
         return self.parse_simple_expr(inline);
       }
       let mut lhs = self.parse_infix_expr(prec + 1, inline)?;
-      self.skip_trivia_maybe_inline(inline);
+      if inline {
+        self.skip_trivia_inline();
+      } else {
+        self.skip_trivia();
+      }
       while let Some(op) = self.peek_oper() {
         if PREC[prec].iter().any(|r| *r == op) {
           self.parse_oper()?;
           let rhs = self.parse_infix_expr(prec + 1, inline)?;
           lhs = Expr::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
-          self.advance_trivia_inline();
+          self.skip_trivia_inline();
         } else {
           break;
         }
@@ -423,7 +443,7 @@ impl<'a> PyParser<'a> {
     let ini_idx = *self.index();
     let pat = self.parse_assign_pattern()?;
     let end_idx = *self.index();
-    self.advance_trivia_inline();
+    self.skip_trivia_inline();
 
     // Assignment
     if self.starts_with("=") {
@@ -472,7 +492,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_in_place_op(&mut self) -> ParseResult<Option<InPlaceOp>> {
-    self.advance_trivia_inline();
+    self.skip_trivia_inline();
     let op = if self.starts_with("+=") {
       self.consume("+=")?;
       Some(InPlaceOp::Add)
@@ -579,7 +599,7 @@ impl<'a> PyParser<'a> {
     let arg = self.parse_expr(true)?;
     let end_idx = *self.index();
 
-    self.advance_trivia_inline();
+    self.skip_trivia_inline();
     match (arg, self.starts_with("=")) {
       (Expr::Var { nam }, true) => {
         self.advance_one();
@@ -591,24 +611,15 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  fn name_or_wildcard(&mut self) -> ParseResult<Option<Name>> {
-    self.labelled(
-      |p| {
-        if p.try_consume_exactly("_") {
-          Ok(None)
-        } else {
-          let nam = p.parse_bend_name()?;
-          Ok(Some(nam))
-        }
-      },
-      "name or '_'",
-    )
-  }
-
   fn parse_match_case(&mut self, indent: &mut Indent) -> ParseResult<(MatchArm, Indent)> {
     self.parse_keyword("case")?;
     self.skip_trivia_inline();
-    let pat = self.name_or_wildcard()?;
+    let pat = if self.try_consume_exactly("_") {
+      None
+    } else {
+      let nam = self.labelled(|p| p.parse_bend_name(), "name or '_'")?;
+      Some(nam)
+    };
     self.skip_trivia_inline();
     self.consume_exactly(":")?;
     self.consume_new_line()?;
@@ -683,7 +694,7 @@ impl<'a> PyParser<'a> {
       return self.expected("number or '_'")?;
     };
 
-    self.advance_trivia_inline();
+    self.skip_trivia_inline();
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -853,7 +864,7 @@ impl<'a> PyParser<'a> {
     // Chn pattern
     if self.starts_with("$") {
       self.advance_one();
-      self.advance_trivia_inline();
+      self.skip_trivia_inline();
       let nam = self.parse_bend_name()?;
       return Ok(AssignPattern::Chn(nam));
     }

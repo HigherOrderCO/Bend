@@ -62,8 +62,10 @@ impl<'a> TermParser<'a> {
   pub fn parse_book(&mut self, default_book: Book, builtin: bool) -> ParseResult<Book> {
     let mut book = default_book;
     let mut indent = self.advance_newlines();
+    let mut last_rule = None;
     while !self.is_eof() {
       let ini_idx = *self.index();
+
       // Imp type definition
       if self.try_parse_keyword("type") {
         let mut prs = PyParser { input: self.input, index: *self.index() };
@@ -72,6 +74,7 @@ impl<'a> TermParser<'a> {
         let end_idx = *self.index();
         prs.add_type(enum_, &mut book, ini_idx, end_idx, builtin)?;
         indent = nxt_indent;
+        last_rule = None;
         continue;
       }
       // Imp record type definition
@@ -82,8 +85,10 @@ impl<'a> TermParser<'a> {
         let end_idx = *self.index();
         prs.add_object(obj, &mut book, ini_idx, end_idx, builtin)?;
         indent = nxt_indent;
+        last_rule = None;
         continue;
       }
+
       // Imp function definition
       if self.try_parse_keyword("def") {
         let mut prs = PyParser { input: self.input, index: *self.index() };
@@ -92,20 +97,46 @@ impl<'a> TermParser<'a> {
         let end_idx = *self.index();
         prs.add_def(def, &mut book, ini_idx, end_idx)?;
         indent = nxt_indent;
+        last_rule = None;
         continue;
       }
+
       // Fun type definition
       if self.try_parse_keyword("data") {
         let (nam, adt) = self.parse_datatype(builtin)?;
         let end_idx = *self.index();
         self.with_ctx(book.add_adt(nam, adt), ini_idx, end_idx)?;
         indent = self.advance_newlines();
+        last_rule = None;
         continue;
       }
+
       // Fun function definition
+      let ini_idx = *self.index();
       let (name, rule) = self.parse_rule()?;
-      book.add_rule(name, rule, builtin);
+      let end_idx = *self.index();
+      // Add to book
+      if let Some(def) = book.defs.get_mut(&name) {
+        if let Some(last_rule) = last_rule {
+          if last_rule == name {
+            // Continuing with a new rule to the current definition
+            def.rules.push(rule);
+          } else {
+            // Trying to add a new rule to a previous definition, coming from a different rule.
+            let msg = format!("Redefinition of function '{name}'");
+            return self.with_ctx(Err(msg), ini_idx, end_idx);
+          }
+        } else {
+          // Trying to add a new rule to a previous definition, coming from another kind of top-level.
+          let msg = format!("Redefinition of function '{name}'");
+          return self.with_ctx(Err(msg), ini_idx, end_idx);
+        }
+      } else {
+        // Adding the first rule of a new definition
+        book.defs.insert(name.clone(), Definition { name: name.clone(), rules: vec![rule], builtin });
+      }
       indent = self.advance_newlines();
+      last_rule = Some(name);
     }
 
     Ok(book)
@@ -756,14 +787,6 @@ impl Book {
     }
     Ok(())
   }
-
-  fn add_rule(&mut self, name: Name, rule: Rule, builtin: bool) {
-    if let Some(def) = self.defs.get_mut(&name) {
-      def.rules.push(rule);
-    } else {
-      self.defs.insert(name.clone(), Definition { name, rules: vec![rule], builtin });
-    }
-  }
 }
 
 impl<'a> ParserCommons<'a> for TermParser<'a> {}
@@ -789,13 +812,8 @@ pub trait ParserCommons<'a>: Parser<'a> {
   }
 
   fn parse_bend_name(&mut self) -> ParseResult<Name> {
-    let nam = self.parse_exactly_name()?;
-    Ok(Name::new(nam))
-  }
-
-  fn parse_exactly_name(&mut self) -> ParseResult<String> {
     let name = self.take_while(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/');
-    if name.is_empty() { self.expected("name") } else { Ok(name.to_owned()) }
+    if name.is_empty() { self.expected("name") } else { Ok(Name::new(name.to_owned())) }
   }
 
   /// Consumes exactly the text without skipping.
@@ -860,14 +878,6 @@ pub trait ParserCommons<'a>: Parser<'a> {
   /// Skips until the next non-trivia character in the same line.
   fn skip_trivia_inline(&mut self) {
     self.advance_trivia_inline();
-  }
-
-  fn skip_trivia_maybe_inline(&mut self, inline: bool) {
-    if inline {
-      self.skip_trivia_inline();
-    } else {
-      self.skip_trivia();
-    }
   }
 
   fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> ParseResult<T> {
