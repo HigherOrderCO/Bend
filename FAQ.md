@@ -43,3 +43,13 @@ Some possibilities:
 
 ### I'm getting an error of failed assertion
 - HVM currently has a bug in its conversion of f32 to f24 and it's unable to read the number 0.0. We already have a fix that we're working on.
+
+### What GPUs are supported?
+GPUs with >=128KB L1 cache per SM *should* work. This includes the following:
+| GPU                         | Tested? |
+|-----------------------------|---------|
+| RTX 4090                    | Yes     |
+| All Other Desktop 40 Series | No      |
+| All Desktop 30 Series       | No      |
+| All Mobile 40 Series        | No      |
+| All Mobile 30 Series        | No      |
