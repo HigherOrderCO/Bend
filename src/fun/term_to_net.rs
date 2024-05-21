@@ -1,7 +1,7 @@
 use crate::{
   diagnostics::Diagnostics,
   fun::{Book, Name, Pattern, Tag, Term},
-  maybe_grow,
+  hvm, maybe_grow,
   net::CtrKind::{self, *},
 };
 use std::{
@@ -9,7 +9,7 @@ use std::{
   ops::{Index, IndexMut},
 };
 
-use hvmc::ast::{Net, Tree};
+use hvm::ast::{Net, Tree};
 use loaned::LoanedMut;
 
 use super::{num_to_name, FanKind, Op};
@@ -17,10 +17,10 @@ use super::{num_to_name, FanKind, Op};
 #[derive(Debug, Clone)]
 pub struct ViciousCycleErr;
 
-pub fn book_to_nets(book: &Book, diags: &mut Diagnostics) -> Result<(hvmc::ast::Book, Labels), Diagnostics> {
+pub fn book_to_nets(book: &Book, diags: &mut Diagnostics) -> Result<(hvm::ast::Book, Labels), Diagnostics> {
   diags.start_pass();
 
-  let mut hvmc = hvmc::ast::Book::default();
+  let mut hvmc = hvm::ast::Book::default();
   let mut labels = Labels::default();
 
   let main = book.entrypoint.as_ref().unwrap();
@@ -158,7 +158,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         }
         Term::Let { pat, val, nxt } => {
           // Dups/tup eliminators are not actually scoped like other terms.
-          // They are depended on 
+          // They are depended on
           self.lets.push((pat, val));
           self.encode_term(nxt, up);
         }
@@ -184,7 +184,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
             (fst, Term::Num { val }) => {
               if [Op::AND, Op::OR, Op::XOR].contains(opr) {
                 // no flip and no partial application
-                let opr_val = hvmc::ast::new_sym(opr.to_native_tag());
+                let opr_val = hvm::ast::new_sym(opr.to_native_tag());
                 let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
                 let node1 = self.new_opr();
                 self.encode_term(fst, node1.0);
@@ -196,7 +196,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
               } else {
                 // flip
                 let val = val.to_bits();
-                let val = (val & !0x1F) | hvmc::ast::flip_sym(opr.to_native_tag());
+                let val = (val & !0x1F) | hvm::ast::flip_sym(opr.to_native_tag());
                 let snd = Place::Tree(LoanedMut::new(Tree::Num { val }));
                 let node = self.new_opr();
                 self.encode_term(fst, node.0);
@@ -206,7 +206,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
             }
             // Don't partially apply
             (fst, snd) => {
-              let opr_val = hvmc::ast::new_sym(opr.to_native_tag());
+              let opr_val = hvm::ast::new_sym(opr.to_native_tag());
               let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
               let node1 = self.new_opr();
               self.encode_term(fst, node1.0);
@@ -423,24 +423,24 @@ fn hole<T: Default>() -> T {
 impl Op {
   fn to_native_tag(self) -> u32 {
     match self {
-      Op::ADD => hvmc::ast::OP_ADD,
-      Op::SUB => hvmc::ast::OP_SUB,
-      Op::MUL => hvmc::ast::OP_MUL,
-      Op::DIV => hvmc::ast::OP_DIV,
-      Op::REM => hvmc::ast::OP_REM,
-      Op::EQ => hvmc::ast::OP_EQ,
-      Op::NEQ => hvmc::ast::OP_NEQ,
-      Op::LT => hvmc::ast::OP_LT,
-      Op::GT => hvmc::ast::OP_GT,
-      Op::AND => hvmc::ast::OP_AND,
-      Op::OR => hvmc::ast::OP_OR,
-      Op::XOR => hvmc::ast::OP_XOR,
-      Op::SHL => hvmc::ast::OP_SHL,
-      Op::SHR => hvmc::ast::OP_SHR,
+      Op::ADD => hvm::ast::OP_ADD,
+      Op::SUB => hvm::ast::OP_SUB,
+      Op::MUL => hvm::ast::OP_MUL,
+      Op::DIV => hvm::ast::OP_DIV,
+      Op::REM => hvm::ast::OP_REM,
+      Op::EQ => hvm::ast::OP_EQ,
+      Op::NEQ => hvm::ast::OP_NEQ,
+      Op::LT => hvm::ast::OP_LT,
+      Op::GT => hvm::ast::OP_GT,
+      Op::AND => hvm::ast::OP_AND,
+      Op::OR => hvm::ast::OP_OR,
+      Op::XOR => hvm::ast::OP_XOR,
+      Op::SHL => hvm::ast::OP_SHL,
+      Op::SHR => hvm::ast::OP_SHR,
 
-      Op::ATN => hvmc::ast::OP_AND,
-      Op::LOG => hvmc::ast::OP_OR,
-      Op::POW => hvmc::ast::OP_XOR,
+      Op::ATN => hvm::ast::OP_AND,
+      Op::LOG => hvm::ast::OP_OR,
+      Op::POW => hvm::ast::OP_XOR,
     }
   }
 }

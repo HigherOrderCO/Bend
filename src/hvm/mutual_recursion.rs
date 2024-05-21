@@ -3,9 +3,10 @@ use crate::{
   fun::transform::definition_merge::MERGE_SEPARATOR,
   maybe_grow,
 };
-use hvmc::ast::{Book, Tree};
 use indexmap::{IndexMap, IndexSet};
 use std::fmt::Debug;
+
+use super::ast::{Book, Tree};
 
 type Ref = String;
 type Stack<T> = Vec<T>;

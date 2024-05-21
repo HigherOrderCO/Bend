@@ -1,5 +1,5 @@
+use super::ast::Book;
 use crate::{diagnostics::Diagnostics, fun::Name};
-use hvmc::ast::Book;
 
 pub const MAX_NET_SIZE: usize = 64;
 
@@ -20,8 +20,8 @@ pub fn check_net_sizes(book: &Book, diagnostics: &mut Diagnostics) -> Result<(),
 }
 
 /// Utility function to count the amount of nodes in an hvm-core AST net
-pub fn count_nodes<'l>(net: &'l hvmc::ast::Net) -> usize {
-  let mut visit: Vec<&'l hvmc::ast::Tree> = vec![&net.root];
+pub fn count_nodes<'l>(net: &'l super::ast::Net) -> usize {
+  let mut visit: Vec<&'l super::ast::Tree> = vec![&net.root];
   let mut count = 0usize;
   for (_, l, r) in &net.redexes {
     visit.push(l);
