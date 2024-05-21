@@ -235,6 +235,8 @@ impl fmt::Display for Op {
       Op::OR => write!(f, "|"),
       Op::XOR => write!(f, "^"),
       Op::POW => write!(f, "**"),
+      Op::SHR => write!(f, ">>"),
+      Op::SHL => write!(f, "<<"),
       Op::LOG => todo!(),
       Op::ATN => todo!(),
     }

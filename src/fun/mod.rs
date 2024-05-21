@@ -192,6 +192,8 @@ pub enum Op {
   AND,
   OR,
   XOR,
+  SHL,
+  SHR,
   /// atan(a, b)
   ATN,
   /// log_a(b)
@@ -907,9 +909,9 @@ impl Num {
 
   pub fn from_bits(bits: u32) -> Self {
     match get_typ(bits) {
-      hvmc::ast::U24 => Num::U24(hvmc::ast::get_u24(bits)),
-      hvmc::ast::I24 => Num::I24(hvmc::ast::get_i24(bits)),
-      hvmc::ast::F24 => Num::F24(hvmc::ast::get_f24(bits)),
+      hvmc::ast::TY_U24 => Num::U24(hvmc::ast::get_u24(bits)),
+      hvmc::ast::TY_I24 => Num::I24(hvmc::ast::get_i24(bits)),
+      hvmc::ast::TY_F24 => Num::F24(hvmc::ast::get_f24(bits)),
       _ => unreachable!("Invalid Num bits"),
     }
   }

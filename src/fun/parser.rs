@@ -1006,6 +1006,10 @@ pub trait ParserCommons<'a>: Parser<'a> {
       Op::DIV
     } else if self.try_consume_exactly("%") {
       Op::REM
+    } else if self.try_consume_exactly("<<") {
+      Op::SHL
+    } else if self.try_consume_exactly(">>") {
+      Op::SHR
     } else if self.try_consume_exactly("<") {
       Op::LT
     } else if self.try_consume_exactly(">") {
@@ -1039,6 +1043,10 @@ pub trait ParserCommons<'a>: Parser<'a> {
       Op::DIV
     } else if self.starts_with("%") {
       Op::REM
+    } else if self.starts_with("<<") {
+      Op::SHL
+    } else if self.starts_with(">>") {
+      Op::SHR
     } else if self.starts_with("<") {
       Op::LT
     } else if self.starts_with(">") {
