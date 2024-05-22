@@ -56,16 +56,14 @@ List/reverse = @l
 # List length:
 # List l -> uint
 # returns the number of elements in list l.
-List/len/aux = @acc @l
-  match l {
-    List/Nil: acc
-    List/Cons: (List/len/aux (+ acc 1) l.tail)
-  }
 List/len = @l
-  (List/len/aux 0 l)
+  match l {
+    List/Nil: 0
+    List/Cons: (+ 1 (List/len l.tail))
+  }
 
 # List count:
-# List l -> Some s -> uint
+# List l -> uint -> uint
 # returns the number of instances of element s in list l.
 List/count/aux = @acc @l @s
   match l {
@@ -164,7 +162,7 @@ List/split = @l @i
 #main = (List/index [1, 2, 3, 4, 5] 4)
 #main = (List/clear [0, 2, 3])
 #main = (List/count [1, 2, 3, 3, 3, 4, 4, 5, 3, 1000] 3)
-#main = (List/len [1, 2, 3, 4, 4, 4])
+main = (List/len [1, 2, 3, 4, 4, 4])
 #main = (List/reverse [1, 2, 3, 4, 5])
 #main = (List/append [1, 2] 3)
 #main = (List/add_front [2, 3] 1)
