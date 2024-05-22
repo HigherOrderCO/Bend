@@ -6,8 +6,8 @@
 # The List type is builtin, so we don't need to declare it.
 # But this is how it's defined in the builtins file.
 # type List:
-#   Cons { head, ~tail }
 #   Nil
+#   Cons { head, ~tail }
 
 ###########################################
 
