@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/guide_enumerate.bend
+---
+NumScott:
+λa (a 0 λb (b 0 λc (c 1 (0, 1)) λd (d 1 (1, 2))) λe (e 0 λf (f 1 (2, 3)) λg (g 1 (3, 4))))
+
+Scott:
+λa λ* (a λb λ* (b λ* λc (c (0, 1)) λ* λd (d (1, 2))) λe λ* (e λ* λf (f (2, 3)) λ* λg (g (3, 4))))

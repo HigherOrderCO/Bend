@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/guide_mul2_inline.bend
+---
+NumScott:
+14
+
+Scott:
+14

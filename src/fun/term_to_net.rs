@@ -180,10 +180,9 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
               self.link(up, node.2);
             }
             // Partially apply with snd, flip
-            // TODO: For now, we use AND OR and XOR for float operations, so don't flip
             (fst, Term::Num { val }) => {
-              if [Op::AND, Op::OR, Op::XOR].contains(opr) {
-                // no flip and no partial application
+              if [Op::POW, Op::ATN, Op::LOG].contains(opr) {
+                // POW, ATN and LOG share tags with AND, OR and XOR, so don't flip or results will be wrong
                 let opr_val = hvm::ast::new_sym(opr.to_native_tag());
                 let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
                 let node1 = self.new_opr();

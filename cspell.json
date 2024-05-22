@@ -43,6 +43,7 @@
     "inets",
     "inlineable",
     "inlineables",
+    "inlinees",
     "inlines",
     "inodes",
     "insta",
@@ -86,10 +87,10 @@
     "recursively",
     "redex",
     "redexes",
+    "repr",
     "resugar",
     "resugared",
     "resugaring",
-    "repr",
     "rfold",
     "rsplit",
     "rwts",
@@ -118,7 +119,10 @@
     "walkdir",
     "wopts"
   ],
-  "files": ["**/*.rs", "**/*.md"],
+  "files": [
+    "**/*.rs",
+    "**/*.md"
+  ],
   "ignoreRegExpList": [
     "HexValues",
     "/λ/g",

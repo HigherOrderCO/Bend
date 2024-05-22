@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/guide_circle_area.bend
+---
+NumScott:
+314.000
+
+Scott:
+314.000

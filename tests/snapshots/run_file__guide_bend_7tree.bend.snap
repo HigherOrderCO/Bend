@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/guide_bend_7tree.bend
+---
+NumScott:
+λa (a 0 λb (b 0 λc (c 0 λd (d 1 7) λe (e 1 7)) λf (f 0 λg (g 1 7) λh (h 1 7))) λi (i 0 λj (j 0 λk (k 1 7) λl (l 1 7)) λm (m 0 λn (n 1 7) λo (o 1 7))))
+
+Scott:
+λa λ* (a λb λ* (b λc λ* (c λ* λd (d 7) λ* λe (e 7)) λf λ* (f λ* λg (g 7) λ* λh (h 7))) λi λ* (i λj λ* (j λ* λk (k 7) λ* λl (l 7)) λm λ* (m λ* λn (n 7) λ* λo (o 7))))

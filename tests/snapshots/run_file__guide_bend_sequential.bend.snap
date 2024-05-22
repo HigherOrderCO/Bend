@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/guide_bend_sequential.bend
+---
+NumScott:
+45
+
+Scott:
+45

@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/guide_bend_sum_tree.bend
+---
+NumScott:
+16760832
+
+Scott:
+16760832

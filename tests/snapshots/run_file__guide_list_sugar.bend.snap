@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/guide_list_sugar.bend
+---
+NumScott:
+[1, 2, 3]
+
+Scott:
+[1, 2, 3]

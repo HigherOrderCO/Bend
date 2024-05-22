@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/guide_bitonic_sort.bend
+---
+NumScott:
+523776
+
+Scott:
+523776
