@@ -22,3 +22,4 @@ main =
   let f2 = @x let (a, b) = x; (min2 a b)
   let a = [f1 f2]
   (map @a (map a vals) a)
+ 

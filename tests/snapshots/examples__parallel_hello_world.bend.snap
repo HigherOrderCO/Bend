@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: examples/parallel_hello_world.bend
 ---
-1966082
+16744448

@@ -15,6 +15,10 @@ A Quick Demo
 
 [![Bend live demo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)](https://x.com/i/status/1791213162525524076)
 
+- For a more in-depth explanation on how to setup and use Bend, check [GUIDE.md](https://github.com/HigherOrderCO/bend/blob/main/GUIDE.md).
+
+- For an extensive list of features, check [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
+
 ## Using Bend
 
 > Currently not working on Windows, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) as a workaround.
@@ -147,10 +151,6 @@ Long-distance communication is performed by *global beta-reduction* (as per the
 [Interaction Calculus](https://github.com/VictorTaelin/Interaction-Calculus)),
 and synchronized correctly and efficiently by
 [HVM2](https://github.com/HigherOrderCO/HVM)'s *atomic linker*.
-
-- To jump straight into action, check Bend's [GUIDE.md](https://github.com/HigherOrderCO/bend/blob/main/GUIDE.md).
-
-- For an extensive list of features, check [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
 
 - To understand the tech behind Bend, check HVM2's [paper](https://paper.higherorderco.com).
 

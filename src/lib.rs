@@ -150,7 +150,7 @@ pub fn desugar_book(
   if !ctx.info.has_errors() { Ok(ctx.info) } else { Err(ctx.info) }
 }
 
-pub fn run_book_with_fn(
+pub fn run_book(
   mut book: Book,
   run_opts: RunOpts,
   compile_opts: CompileOpts,
@@ -185,6 +185,8 @@ pub fn run_book_with_fn(
   let out = String::from_utf8_lossy(&stdout);
   let err = String::from_utf8_lossy(&stderr);
   let status = if !status.success() { status.to_string() } else { String::new() };
+
+  let _ = std::fs::remove_file(out_path);
 
   if arg_io {
     return Ok(None);

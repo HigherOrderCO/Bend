@@ -2,7 +2,7 @@ use bend::{
   check_book, compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   fun::{Book, Name},
-  load_file_to_book, run_book_with_fn, AdtEncoding, CompileOpts, OptLevel, RunOpts,
+  load_file_to_book, run_book, AdtEncoding, CompileOpts, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use std::{
@@ -364,7 +364,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
       let book = load_book(&path)?;
       if let Some((term, stats, diags)) =
-        run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_cmd, io)?
+        run_book(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_cmd, io)?
       {
         eprint!("{diags}");
         if pretty {

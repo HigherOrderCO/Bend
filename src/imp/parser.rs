@@ -8,18 +8,6 @@ use crate::{
 };
 use TSPL::Parser;
 
-const PREC: &[&[Op]] = &[
-  &[Op::OR],
-  &[Op::XOR],
-  &[Op::AND],
-  &[Op::EQ, Op::NEQ],
-  &[Op::LT],
-  &[Op::GT],
-  &[Op::ADD, Op::SUB],
-  &[Op::MUL, Op::DIV, Op::REM],
-  &[Op::POW],
-];
-
 pub struct PyParser<'i> {
   pub input: &'i str,
   pub index: usize,
@@ -367,7 +355,7 @@ impl<'a> PyParser<'a> {
       } else {
         self.skip_trivia();
       }
-      if prec > PREC.len() - 1 {
+      if prec > Op::max_precedence() {
         return self.parse_simple_expr(inline);
       }
       let mut lhs = self.parse_infix_expr(prec + 1, inline)?;
@@ -377,7 +365,7 @@ impl<'a> PyParser<'a> {
         self.skip_trivia();
       }
       while let Some(op) = self.peek_oper() {
-        if PREC[prec].iter().any(|r| *r == op) {
+        if op.precedence() == prec {
           self.parse_oper()?;
           let rhs = self.parse_infix_expr(prec + 1, inline)?;
           lhs = Expr::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
@@ -1115,5 +1103,32 @@ impl<'a> PyParser<'a> {
         }
       }
     }
+  }
+}
+
+impl Op {
+  fn precedence(&self) -> usize {
+    match self {
+      Op::OR => 0,
+      Op::XOR => 1,
+      Op::AND => 2,
+      Op::EQ => 3,
+      Op::NEQ => 3,
+      Op::LT => 4,
+      Op::GT => 4,
+      Op::SHL => 5,
+      Op::SHR => 5,
+      Op::ADD => 6,
+      Op::SUB => 6,
+      Op::MUL => 7,
+      Op::DIV => 7,
+      Op::REM => 7,
+      Op::POW => 8,
+      Op::ATN => todo!(),
+      Op::LOG => todo!(),
+    }
+  }
+  fn max_precedence() -> usize {
+    8
   }
 }

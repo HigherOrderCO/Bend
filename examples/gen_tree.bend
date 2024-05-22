@@ -1,9 +1,17 @@
-Tree/Leaf = λnode λleaf leaf
-Tree/Node = λval λlft λrgt λnode λleaf (node val lft rgt)
+# Generates a tree with numbers in the nodes using 'bend'
+type Tree:
+  Node { val, ~left, ~right }
+  Leaf
 
-Tree/gen n x = switch n {
-  0: Tree/Leaf
-  _: (Tree/Node x (Tree/gen n-1 (+ (* x 2) 1)) (Tree/gen n-1 (+ (* x 2) 2)))
-}
+def tree_gen(n, x):
+  bend n, x:
+    when n != 0:
+      return Tree/Node(x, fork(n - 1, x*2+1), fork(n - 1, x*2+2))
+    else:
+      return Tree/Leaf
 
-main = (Tree/gen 4 1)
+def main:
+  depth = 4
+  first_val = 1
+  return tree_gen(depth, first_val)
+

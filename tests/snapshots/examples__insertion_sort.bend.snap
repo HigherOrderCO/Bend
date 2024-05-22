@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: examples/insertion_sort.bend
+---
+[4780, 11739, 35809, 49583, 154358, 177867, 244878, 289211, 318852, 423850]

@@ -1,4 +1,5 @@
-# A cool trick involving HVM's scopeless lambdas is linear qs:
+# A cool trick involving unscoped lambdas
+# Implements constant-time queues with just lambdas
 
 # Qnew : Queue a
 Qnew = λx x

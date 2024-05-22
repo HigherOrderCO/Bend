@@ -1,6 +1,6 @@
 use crate::{
   diagnostics::Diagnostics,
-  fun::{Ctx, Name, Pattern, Term},
+  fun::{transform::desugar_bend, Ctx, Name, Pattern, Term},
   maybe_grow,
 };
 use std::collections::{hash_map::Entry, HashMap};
@@ -123,7 +123,23 @@ fn pop_scope<'a>(nam: Option<&'a Name>, scope: &mut HashMap<&'a Name, u64>) {
 impl std::fmt::Display for UnboundVarErr {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      UnboundVarErr::Local(var) => write!(f, "Unbound variable '{var}'."),
+      UnboundVarErr::Local(var) => {
+        if var == desugar_bend::RECURSIVE_KW {
+          write!(
+            f,
+            "Unbound variable '{}'.\n    Note: '{}' is only a keyword inside the 'when' arm of a 'bend'.",
+            var,
+            desugar_bend::RECURSIVE_KW
+          )
+        } else if let Some((pre, suf)) = var.rsplit_once('-') {
+          write!(
+            f,
+            "Unbound variable '{var}'. If you wanted to subtract '{pre}' from '{suf}', you must separate it with spaces ('{pre} - {suf}') since '-' is a valid name character."
+          )
+        } else {
+          write!(f, "Unbound variable '{var}'.")
+        }
+      }
       UnboundVarErr::Global { var, declared, used } => match (declared, used) {
         (0, _) => write!(f, "Unbound unscoped variable '${var}'."),
         (_, 0) => write!(f, "Unscoped variable from lambda 'λ${var}' is never used."),
