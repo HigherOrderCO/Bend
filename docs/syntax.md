@@ -11,7 +11,11 @@ Both syntaxes can be mixed in the same file like the example below:
 ```python
 object Point { x, y }
 
-data Tree = (Node ~left ~right) | (Leaf value)
+type Tree = (Node ~left ~right) | (Leaf value)
+
+type Bool:
+  True
+  False
 
 def identity(x):
   return x
@@ -606,7 +610,7 @@ fold list:
 ## Top-level definitions
 
 ```rust
-data Name
+type Name
   = (Ctr1 arg1 arg2)
   | Ctr2
 
@@ -656,12 +660,12 @@ The rule body is a term, there are no statements in the Fun variant of Bend.
 
 Read [pattern matching](./pattern-matching.md) to learn about what exactly the rules for pattern matching equations are.
 
-### Datatype
+### Type
 
 Defines an Algebraic Data Type, it should have at least one constructor.
 
 ```rust
-data Tree
+type Tree
   = (Leaf value)
   | (Node ~left ~right)
   | Nil
@@ -935,7 +939,7 @@ Main = do Result {
 }
 ```
 
-Receives a type defined with `data` or `type` and expects `Result/bind` to be defined as a monadic bind function.
+Receives a type defined with `type` and expects `Result/bind` to be defined as a monadic bind function.
 It should be of type `(Result a) -> (a -> Result b) -> Result b`, like in the example above.
 
 Inside a `do` block, you can use `ask`, to access the continuation value of the monadic operation.

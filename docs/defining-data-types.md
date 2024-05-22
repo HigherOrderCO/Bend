@@ -1,22 +1,22 @@
 # Defining data types
 
-It is possible to easily define complex data types using the `data` keyword.
+It is possible to easily define complex data types using the `type` keyword.
 
 ```py
 # A Boolean is either True or False
-data Bool = True | False
+type Bool = True | False
 ```
 
 If a constructor has any arguments, parentheses are necessary around it:
 ```py
 # An option either contains some value, or None
-data Option = (Some val) | None
+type Option = (Some val) | None
 ```
 
 If the data type has a single constructor, it can be destructured using `let`:
 ```py
 # A Box is a wrapper around a value.
-data Boxed = (Box val)
+type Boxed = (Box val)
 
 let (Box value) = boxed; value
 ```
@@ -49,4 +49,4 @@ data Boolean = True | False
 
 You can read more about pattern matching rules in [Pattern matching](/docs/pattern-matching.md).
 
-In conclusion, the `data` keyword is very useful as it allows you to easily create data types and deconstruct them.
+In conclusion, the `type` keyword is very useful as it allows you to easily create data types and deconstruct them.

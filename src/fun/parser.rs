@@ -11,7 +11,7 @@ use TSPL::Parser;
 
 // Bend grammar description:
 // <Book>       ::= (<Data> | <Rule>)*
-// <Data>       ::= "data" <Name> "=" ( <Name> | "(" <Name> (<Name>)* ")" )+
+// <ADT>        ::= "type" <Name> "=" ( <Name> | "(" <Name> (<Name>)* ")" )+
 // <Rule>       ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) "=" <Term>
 // <Pattern>    ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number> | "(" <Pattern> ("," <Pattern>)+ ")"
 // <Term>       ::=
