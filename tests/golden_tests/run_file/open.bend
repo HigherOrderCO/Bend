@@ -1,4 +1,4 @@
-data Pair = (new a b)
+type Pair = (new a b)
 
 type State:
   new { a, b }

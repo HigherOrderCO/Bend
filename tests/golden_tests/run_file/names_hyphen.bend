@@ -1,6 +1,6 @@
 id cool-var-name = cool-var-name
 
-data Done_ = (Done done-var)
+type Done_ = (Done done-var)
 
 toZero n =
   switch n {

@@ -1,4 +1,4 @@
-data Weekday
+type Weekday
   = Monday
   | Tuesday
   | Wednesday

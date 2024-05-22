@@ -1,4 +1,4 @@
-data Maybe = (Some val) | None
+type Maybe = (Some val) | None
 
 main = @maybe
   match maybe {

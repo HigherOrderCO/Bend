@@ -1,1 +1,1 @@
-data Adt
+type Adt

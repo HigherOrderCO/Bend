@@ -1,4 +1,4 @@
-data Tree = (Leaf x) | (Node x0 x1)
+type Tree = (Leaf x) | (Node x0 x1)
 
 add = λa λb (+ a b)
 

@@ -1,5 +1,5 @@
-data Tree = (Leaf a) | (Both a b)
-data Error = Err
+type Tree = (Leaf a) | (Both a b)
+type Error = Err
 
 # Atomic Swapper
 (Swap n a b) = switch n {

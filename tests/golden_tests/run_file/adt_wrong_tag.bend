@@ -1,3 +1,3 @@
-data Option = (Some val) | None
+type Option = (Some val) | None
 
-main = (@a #Option (a #wrong_tag @x x *)) 
+main = (@a #Option (a #wrong_tag @x x *))

@@ -1,4 +1,4 @@
-data _Box = (Box val)
+type _Box = (Box val)
 
 Box.subst (_Box/Box x) cmp to = switch _ = (cmp x) {
   0: (_Box/Box x)

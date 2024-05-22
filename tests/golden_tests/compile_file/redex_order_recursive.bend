@@ -1,4 +1,4 @@
-data Tree = (node lft rgt) | (leaf val)
+type Tree = (node lft rgt) | (leaf val)
 
 tail_recursive = @x (x @pred @acc (tail_recursive pred (+ 1 acc)) @acc 0)
 

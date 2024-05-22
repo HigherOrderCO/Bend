@@ -1,11 +1,11 @@
-data String = (Nil) | (Cons head ~tail)
-data List   = (Nil) | (Cons head ~tail)
-data Result = (Ok val) | (Err val)
-data Nat    = (Succ ~pred) | (Zero)
+type String = (Nil) | (Cons head ~tail)
+type List   = (Nil) | (Cons head ~tail)
+type Result = (Ok val) | (Err val)
+type Nat    = (Succ ~pred) | (Zero)
 
 # MAP Impl
 
-data Map = (Node value ~left ~right) | (Leaf)
+type Map = (Node value ~left ~right) | (Leaf)
 
 Map/empty = Map/Leaf
 
@@ -60,7 +60,7 @@ IO_GET_TIME_TAG   = 5
 IO_SLEEP_TAG      = 6
 IO_DRAW_IMAGE_TAG = 7
 
-data IO
+type IO
   = (Done term)
   | (PutText   text      cont)
   | (GetText             cont)

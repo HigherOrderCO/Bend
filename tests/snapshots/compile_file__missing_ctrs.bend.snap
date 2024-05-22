@@ -6,4 +6,4 @@ input_file: tests/golden_tests/compile_file/missing_ctrs.bend
 In tests/golden_tests/compile_file/missing_ctrs.bend :
 [1m- expected:[0m datatype constructor name
 [1m- detected:[0m end of input
-[0m  1 | data Adt = [4m[31m [0m
+[0m  1 | type Adt =[4m[31m [0m

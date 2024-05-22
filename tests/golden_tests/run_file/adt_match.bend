@@ -1,4 +1,4 @@
-data Opt = (Some x) | None
+type Opt = (Some x) | None
 
 Opt/map = @opt @f
   match opt {

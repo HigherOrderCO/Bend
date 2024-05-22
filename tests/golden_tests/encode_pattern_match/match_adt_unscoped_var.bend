@@ -1,4 +1,4 @@
-data Maybe = None | (Some val)
+type Maybe = None | (Some val)
 
 Foo = @$x match x = (Maybe/Some 1) {
   Maybe/None: $x

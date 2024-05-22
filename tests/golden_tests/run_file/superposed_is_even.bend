@@ -1,5 +1,5 @@
-data N = (S pred) | Z
-data B = T | F
+type N = (S pred) | Z
+type B = T | F
 
 (Not B/T) = B/F
 (Not B/F) = B/T

@@ -962,14 +962,7 @@ impl<'a> PyParser<'a> {
     let mut variants = Vec::new();
     let mut nxt_indent = indent;
     while nxt_indent == indent {
-      let ctr_name = self.parse_top_level_name()?;
-      let ctr_name = Name::new(format!("{typ_name}/{ctr_name}"));
-      let mut fields = Vec::new();
-      self.skip_trivia_inline();
-      if self.starts_with("{") {
-        fields = self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?;
-      }
-      variants.push(Variant { name: ctr_name, fields });
+      variants.push(self.parse_enum_variant(&typ_name)?);
       if !self.is_eof() {
         self.consume_new_line()?;
       }
@@ -979,6 +972,17 @@ impl<'a> PyParser<'a> {
 
     let enum_ = Enum { name: typ_name, variants };
     Ok((enum_, nxt_indent))
+  }
+
+  pub fn parse_enum_variant(&mut self, typ_name: &Name) -> ParseResult<Variant> {
+    let ctr_name = self.parse_top_level_name()?;
+    let ctr_name = Name::new(format!("{typ_name}/{ctr_name}"));
+    let mut fields = Vec::new();
+    self.skip_trivia_inline();
+    if self.starts_with("{") {
+      fields = self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?;
+    }
+    Ok(Variant { name: ctr_name, fields })
   }
 
   pub fn parse_object(&mut self, indent: Indent) -> ParseResult<(Variant, Indent)> {

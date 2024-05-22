@@ -1,5 +1,5 @@
 # Testing various forms of pattern matching
-data Result_ = (Ok val) | (Err err)
+type Result_ = (Ok val) | (Err err)
 
 Parse state (String/Cons '{' xs) = (Result_/Ok ('{', xs, state))
 Parse state (String/Cons '}' xs) = (Result_/Ok ('}', xs, state))

@@ -1,4 +1,4 @@
-data nat = (succ pred) | zero
+type nat = (succ pred) | zero
 
 foo = @x match x {
   nat/succ: x.pred

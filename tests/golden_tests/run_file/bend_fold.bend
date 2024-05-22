@@ -1,5 +1,5 @@
 # should return (a+b+c) * 2^depth
-data Tree = (node ~lft ~rgt) | (leaf val)
+type Tree = (node ~lft ~rgt) | (leaf val)
 
 main =
   let depth = 2

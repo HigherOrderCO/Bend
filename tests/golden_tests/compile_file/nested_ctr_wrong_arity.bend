@@ -1,4 +1,4 @@
-data Pair = (Pair fst snd)
+type Pair = (Pair fst snd)
 
 fst_fst (Pair/Pair (Pair/Pair fst) *) = fst
 

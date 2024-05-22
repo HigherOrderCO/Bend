@@ -1,3 +1,3 @@
 A = 0
-data B = B
+type B = B
 A = 1

@@ -1,4 +1,4 @@
-data Option = (Some val) | None
+type Option = (Some val) | None
 
 Option/or = @a @b match a {
   Option/Some: a

@@ -1,4 +1,4 @@
-data Expr
+type Expr
   = (Var name)
   | (Num val)
   | (App fun arg)
@@ -9,7 +9,7 @@ data Expr
   | (Tup fst snd)
   | (Op2 op fst snd)
 
-data Op
+type Op
   = Add
   | Sub
   | Mul

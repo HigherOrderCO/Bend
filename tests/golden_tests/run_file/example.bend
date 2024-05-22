@@ -19,15 +19,15 @@
 
 # You can use numbers on the native match expression
 # The `+` arm binds the `scrutinee`-1 variable to the the value of the number -1
-(Num.pred) = λn 
-  switch n { 
+(Num.pred) = λn
+  switch n {
     0: 0
     _: n-1
   }
 
 # Write new data types like this
-data Option = (Some val) | None
-data Bool = True | False
+type Option = (Some val) | None
+type Bool = True | False
 
 # You can have pattern matching on definitions
 # Use `*` to ignore a pattern
@@ -46,7 +46,7 @@ data Bool = True | False
   }
 
 # Data types can store values
-data Boxed = (Box val)
+type Boxed = (Box val)
 
 # Types with only one constructor can be destructured using `let` or a single matching definition
 (Box.map (Boxed/Box val) f) = (Boxed/Box (f val))
@@ -71,7 +71,7 @@ data Boxed = (Box val)
 # You can execute a program in HVM with "cargo run -- run <path to file>"
 # Other options are "check" (the default mode) to just see if the file is well formed
 # and "compile" to output hvm-core code.
-(main) = 
+(main) =
   let tup = (Tuple.new Option/None (Num.pred 5))
 
   let fst = (Tuple.fst tup)

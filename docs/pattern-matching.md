@@ -24,7 +24,7 @@ Switches on many numbers are compiled to sequences of simple switch expressions:
 
 Matches on ADT constructors are compiled to different expressions depending on the chosen encoding:
 ```py
-data Maybe = (Some val) | None
+type Maybe = (Some val) | None
 
 UnwrapOrZero x = match x {
   Some: x.val
@@ -54,7 +54,7 @@ And True  b = b
 And False * = False
 ```
 
-There are advantages and disadvantages to using this syntax. 
+There are advantages and disadvantages to using this syntax.
 They offer more advanced pattern matching capabilities and also take care linearizing variables to make sure that recursive definitions work correctly in strict evaluation mode, but take away your control of how the pattern matching is implemented and can be a bit more resource intensive in some cases.
 
 Pattern matching equations are transformed into a tree of `match` and `switch` terms from left to right.

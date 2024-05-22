@@ -1,4 +1,4 @@
-data Foo = A
-data Foo = B
+type Foo = A
+type Foo = B
 
 main = *

@@ -1,6 +1,6 @@
-data Foo = CtrA | (CtrB x)
-data Bar = (CtrA1 a) | (CtrA2 a1 a2) | (CtrA3 a)
-data Baz = (CtrB0) | (CtrB1 b) | (CtrB2 b) | (CtrB3 b)
+type Foo = CtrA | (CtrB x)
+type Bar = (CtrA1 a) | (CtrA2 a1 a2) | (CtrA3 a)
+type Baz = (CtrB0) | (CtrB1 b) | (CtrB2 b) | (CtrB3 b)
 
 Rule1 = λx x
 
