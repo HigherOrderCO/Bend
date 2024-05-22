@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: examples/parallel_and.bend
+---
+Bool/True

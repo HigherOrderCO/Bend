@@ -21,28 +21,25 @@ def swap_gt(v, x, xs):
   else:
     return List/Cons(x, insert(v, xs))
 
-# Generates a random list
+# Generates a list of 'n' random u24 numbers using xorshift
 def rnd(n):
-  if n == 0:
-    return List/Nil
-  else:
-    return List/Cons(random(10000 - n), rnd(n - 1))
+  bend n, state=1:
+    when n != 0:
+      state = state ^ (state << 13)
+      state = state ^ (state >> 17)
+      state = state ^ (state << 5)
+      return List/Cons(state % 100, fork(n - 1, state))
+    else:
+      return List/Nil
 
-# Generates a random number
-def random(n):
-  if n == 0:
-    return 0
-  else:
-    return (random(n - 1) * 16 + 101387) % 429453
-
-# Sums a list
+# Sums a list of u24 numbers
 def sum(xs):
-  match xs:
+  fold xs:
     case List/Nil:
       return 0
     case List/Cons:
-      return xs.head + sum(xs.tail)
+      return xs.head + xs.tail
 
-(Main) =
-  let n = 10
-  (sum (sort (rnd n)))
+def main:
+  n = 100
+  return sum(sort(rnd(n)))

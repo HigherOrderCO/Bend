@@ -1,3 +1,5 @@
+# Example of some things you can do with the 'fun' syntax
+
 # Write definitions like this
 (Def1) = ((λa a) (λb b))
 
@@ -67,11 +69,11 @@ type Boxed = (Box val)
   let (fst, snd) = pair
   snd
 
-# All files must have a main definition to be run.
-# You can execute a program in HVM with "cargo run -- run <path to file>"
-# Other options are "check" (the default mode) to just see if the file is well formed
-# and "compile" to output hvm-core code.
-(main) =
+# All files must have a main definition to run.
+# You can execute a program in Bend with "bend run <path to file>"
+# Other options are "check" to just see if the file is well formed
+# and "gen-hvm" to output hvm code.
+(main) = 
   let tup = (Tuple.new Option/None (Num.pred 5))
 
   let fst = (Tuple.fst tup)

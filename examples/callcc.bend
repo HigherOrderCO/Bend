@@ -10,6 +10,7 @@ CC.lang = λprogram
   (Seq result garbage)
 
 main = (CC.lang λcallcc 
-  # This code calls `callcc`, then calls `k` to fill the hole with `42`. This means that the call to callcc returns `42`, and the program returns `52`
+  # This code calls `callcc`, then calls `k` to fill the hole with `42`.
+  # This means that the call to callcc returns `42`, and the program returns `52`
   (+ 10 (callcc λk(+ (k 42) 1729)))
 )

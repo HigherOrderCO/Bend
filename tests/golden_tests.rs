@@ -4,7 +4,7 @@ use bend::{
   fun::{load_book::do_parse_book, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Name, Term},
   hvm,
   net::hvmc_to_net::hvmc_to_net,
-  run_book_with_fn, AdtEncoding, CompileOpts, RunOpts,
+  run_book, AdtEncoding, CompileOpts, RunOpts,
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -83,14 +83,14 @@ fn run_golden_test_dir_multiple(test_name: &str, run: &[&RunFn]) {
   }
 }
 
-pub fn run_book(
+pub fn run_book_simple(
   book: Book,
   run_opts: RunOpts,
   compile_opts: CompileOpts,
   diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
 ) -> Result<(Term, String, Diagnostics), Diagnostics> {
-  run_book_with_fn(book, run_opts, compile_opts, diagnostics_cfg, args, "run", false).map(Option::unwrap)
+  run_book(book, run_opts, compile_opts, diagnostics_cfg, args, "run", false).map(Option::unwrap)
 }
 
 /* Snapshot/regression/golden tests
@@ -147,7 +147,7 @@ fn linear_readback() {
     let book = do_parse_book(code, path, Book::builtins())?;
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig::default();
-    let (term, _, diags) = run_book(
+    let (term, _, diags) = run_book_simple(
       book,
       RunOpts { linear_readback: true, ..Default::default() },
       compile_opts,
@@ -174,7 +174,7 @@ fn run_file() {
 
     for adt_encoding in [AdtEncoding::NumScott, AdtEncoding::Scott] {
       let compile_opts = CompileOpts { adt_encoding, ..CompileOpts::default() };
-      let (term, _, diags) = run_book(book.clone(), run_opts, compile_opts, diagnostics_cfg, None)?;
+      let (term, _, diags) = run_book_simple(book.clone(), run_opts, compile_opts, diagnostics_cfg, None)?;
       res.push_str(&format!("{adt_encoding}:\n{diags}{term}\n\n"));
     }
     Ok(res)
@@ -318,7 +318,7 @@ fn hangs() {
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Allow, false);
 
     let thread =
-      std::thread::spawn(move || run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None));
+      std::thread::spawn(move || run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None));
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
 
     if !thread.is_finished() {
@@ -351,7 +351,7 @@ fn run_entrypoint() {
     book.entrypoint = Some(Name::new("foo"));
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
-    let (term, _, diags) = run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let (term, _, diags) = run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
     let res = format!("{diags}{term}");
     Ok(res)
   })
@@ -410,7 +410,7 @@ fn io() {
       let book = do_parse_book(code, path, Book::builtins())?;
       let compile_opts = CompileOpts::default();
       let diagnostics_cfg = DiagnosticsConfig::default();
-      let (term, _, diags) = run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+      let (term, _, diags) = run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
       let res = format!("{diags}{term}");
       Ok(format!("Strict mode:\n{res}"))
     }),
@@ -435,7 +435,7 @@ fn examples() -> Result<(), Diagnostics> {
     let book = do_parse_book(&code, path, Book::builtins()).unwrap();
     let compile_opts = CompileOpts::default();
     let diagnostics_cfg = DiagnosticsConfig::default();
-    let (term, _, diags) = run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let (term, _, diags) = run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
     let res = format!("{diags}{term}");
 
     let mut settings = insta::Settings::clone_current();
