@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/tuple_eta.bend
+---
+NumScott:
+(10.000, 10.000)
+
+Scott:
+(10.000, 10.000)
