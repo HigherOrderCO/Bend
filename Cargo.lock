@@ -68,7 +68,7 @@ checksum = "96d30a06541fbafbc7f82ed10c06164cfbd2c401138f6addd8404629c4b16711"
 
 [[package]]
 name = "bend-lang"
-version = "0.2.13"
+version = "0.2.14"
 dependencies = [
  "TSPL",
  "arrayvec",
