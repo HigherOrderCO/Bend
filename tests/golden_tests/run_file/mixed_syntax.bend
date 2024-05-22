@@ -2,7 +2,7 @@ type Bool:
   True
   False
 
-data Tree = (node ~lft ~rgt) | (leaf val)
+type Tree = (node ~lft ~rgt) | (leaf val)
 
 def tree_xor(tree):
   fold tree:
@@ -21,6 +21,6 @@ main =
     when (< n depth):
       (Tree/node (fork (+ n 1)) (fork (+ n 1)))
     else:
-      if (% n 2) { (Tree/leaf Bool/True) } else { (Tree/leaf Bool/False) }  
+      if (% n 2) { (Tree/leaf Bool/True) } else { (Tree/leaf Bool/False) }
   }
   (tree_xor tree)

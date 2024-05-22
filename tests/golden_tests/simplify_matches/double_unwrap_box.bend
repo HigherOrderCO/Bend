@@ -1,5 +1,5 @@
 # Should notice that the second rule is redundant, not create flattened rule for it and not forward the second argument.
-data Boxed = (Box x)
+type Boxed = (Box x)
 
 (DoubleUnbox (Boxed/Box (Boxed/Box x)) *) = x
 (DoubleUnbox * x) = x

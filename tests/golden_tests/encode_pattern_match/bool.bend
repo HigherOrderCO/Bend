@@ -1,4 +1,4 @@
-data bool = true | false
+type bool = true | false
 
 not bool/false = bool/true
 not bool/true = bool/false

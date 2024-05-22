@@ -1,4 +1,4 @@
-data Nat_ = (Z) | (S nat)
+type Nat_ = (Z) | (S nat)
 
 U60ToNat n = switch n {
   0: Nat_/Z

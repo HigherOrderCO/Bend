@@ -66,17 +66,6 @@ impl<'a> TermParser<'a> {
     while !self.is_eof() {
       let ini_idx = *self.index();
 
-      // Imp type definition
-      if self.try_parse_keyword("type") {
-        let mut prs = PyParser { input: self.input, index: *self.index() };
-        let (enum_, nxt_indent) = prs.parse_type(indent)?;
-        self.index = prs.index;
-        let end_idx = *self.index();
-        prs.add_type(enum_, &mut book, ini_idx, end_idx, builtin)?;
-        indent = nxt_indent;
-        last_rule = None;
-        continue;
-      }
       // Imp record type definition
       if self.try_parse_keyword("object") {
         let mut prs = PyParser { input: self.input, index: *self.index() };
@@ -101,14 +90,31 @@ impl<'a> TermParser<'a> {
         continue;
       }
 
-      // Fun type definition
-      if self.try_parse_keyword("data") {
-        let (nam, adt) = self.parse_datatype(builtin)?;
-        let end_idx = *self.index();
-        self.with_ctx(book.add_adt(nam, adt), ini_idx, end_idx)?;
-        indent = self.advance_newlines();
-        last_rule = None;
-        continue;
+      // Fun/Imp type definition
+      if self.try_parse_keyword("type") {
+        self.skip_trivia();
+        let rewind_index = self.index;
+
+        let _ = self.labelled(|p| p.parse_top_level_name(), "datatype name")?;
+
+        if self.starts_with(":") {
+          let mut prs = PyParser { input: self.input, index: rewind_index };
+          let (r#enum, nxt_indent) = prs.parse_type(indent)?;
+          self.index = prs.index;
+          let end_idx = *self.index();
+          prs.add_type(r#enum, &mut book, ini_idx, end_idx, builtin)?;
+          indent = nxt_indent;
+          last_rule = None;
+          continue;
+        } else {
+          self.index = rewind_index;
+          let (nam, adt) = self.parse_datatype(builtin)?;
+          let end_idx = *self.index();
+          self.with_ctx(book.add_adt(nam, adt), ini_idx, end_idx)?;
+          indent = self.advance_newlines();
+          last_rule = None;
+          continue;
+        }
       }
 
       // Fun function definition

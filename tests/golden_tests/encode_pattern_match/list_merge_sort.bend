@@ -1,5 +1,5 @@
-data Bool = True | False
-data List_ = (Cons head tail) | Nil
+type Bool = True | False
+type List_ = (Cons head tail) | Nil
 
 If Bool/True then else = then
 If Bool/False then else = else

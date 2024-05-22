@@ -1,4 +1,4 @@
-data Tree = Leaf | (Node l m r)
+type Tree = Leaf | (Node l m r)
 
 # Parallel QuickSort
 (Sort List/Nil)         = Tree/Leaf

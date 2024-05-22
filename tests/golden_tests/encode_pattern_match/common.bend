@@ -1,24 +1,24 @@
-data Box
+type Box
   = (Filled value)
   | Empty
 
-data Option
+type Option
   = (Some x)
   | None
 
-data Result_
+type Result_
   = (Ok a)
   | (Err b)
 
-data List_
+type List_
   = (Cons x xs)
   | Nil
 
-data Bool = True | False
+type Bool = True | False
 
-data Light = Red | Yellow | Green
+type Light = Red | Yellow | Green
 
-data Direction
+type Direction
   = North
   | South
   | East

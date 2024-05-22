@@ -1,4 +1,4 @@
-data Bool = T | F
+type Bool = T | F
 
 main = @x match x {
   Bool/T : @$x *

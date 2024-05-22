@@ -1,4 +1,4 @@
-data Type = A | B | C | D
+type Type = A | B | C | D
 
 Foo Type/A Type/B Type/C Type/D = 0
 Foo Type/A Type/B Type/D Type/D = 1

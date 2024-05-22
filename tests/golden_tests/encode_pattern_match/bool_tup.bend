@@ -1,4 +1,4 @@
-data Bool = T | F
+type Bool = T | F
 
 foo (Bool/T, x) = x
 foo * = Bool/F

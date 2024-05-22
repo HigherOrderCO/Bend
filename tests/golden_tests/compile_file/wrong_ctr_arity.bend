@@ -1,4 +1,4 @@
-data Boxed = (Box val)
+type Boxed = (Box val)
 
 Bar (*, (Boxed/Box x y)) = x
 

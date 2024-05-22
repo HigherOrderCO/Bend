@@ -1,4 +1,4 @@
-data Tuple = (Pair a b)
+type Tuple = (Pair a b)
 
 (Foo (Tuple/Pair (Tuple/Pair a b) c)) = a
 (Foo *) = 2

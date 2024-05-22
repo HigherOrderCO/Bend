@@ -1,4 +1,4 @@
-data Bool = T | F
+type Bool = T | F
 
 And (Bool/T, Bool/T, Bool/T) = Bool/T
 And * = Bool/F

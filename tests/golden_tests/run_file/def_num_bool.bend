@@ -1,4 +1,4 @@
-data bool = true | false
+type bool = true | false
 
 go 0 bool/true  = 1
 go 0 bool/false = 0

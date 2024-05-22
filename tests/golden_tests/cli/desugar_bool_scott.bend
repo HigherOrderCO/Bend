@@ -1,3 +1,3 @@
-data Boolean = True | False
+type Boolean = True | False
 
 main = Boolean/True

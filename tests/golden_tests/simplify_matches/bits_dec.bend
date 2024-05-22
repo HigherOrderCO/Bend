@@ -1,4 +1,4 @@
-data Data/Bits = e | (o t) | (i t)
+type Data/Bits = e | (o t) | (i t)
 
 Data.Bits.dec Data/Bits/e = (Data/Bits/e)
 Data.Bits.dec (Data/Bits/o (Data/Bits/e)) = (Data/Bits/e)

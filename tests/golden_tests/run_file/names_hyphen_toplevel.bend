@@ -1,4 +1,4 @@
-data Foo-Bar = (Baz-Qux field-hyph)
+type Foo-Bar = (Baz-Qux field-hyph)
 
 fun-with-hyphen = 1
 

@@ -1,5 +1,5 @@
-data Map_ = Free | Used | (Both a b)
-data Arr = Null | (Leaf x) | (Node a b)
+type Map_ = Free | Used | (Both a b)
+type Arr = Null | (Leaf x) | (Node a b)
 
 (Swap s a b) = switch s {
   0: (Map_/Both a b)

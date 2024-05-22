@@ -1,5 +1,5 @@
 # Testing linearization in different situations
-data ConsList = (Cons h t) | Nil
+type ConsList = (Cons h t) | Nil
 
 # Auto linearized on strict mode
 A = @a @b @c switch a {

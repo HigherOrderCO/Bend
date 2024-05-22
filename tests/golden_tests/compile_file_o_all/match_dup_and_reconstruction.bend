@@ -1,4 +1,4 @@
-data Box = (Boxed val)
+type Box = (Boxed val)
 
 Got = @a match a {
   Box/Boxed: (a, a.val)

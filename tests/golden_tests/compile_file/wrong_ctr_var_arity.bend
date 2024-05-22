@@ -1,4 +1,4 @@
-data Tup = (pair a b)
+type Tup = (pair a b)
 
 (foo Tup/pair) = pair
 

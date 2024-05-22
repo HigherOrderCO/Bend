@@ -1,4 +1,4 @@
-data list = (cons h t) | nil
+type list = (cons h t) | nil
 
 reverse (list/cons h t) = (concat (reverse t) (list/cons h list/nil))
 reverse list/nil = list/nil

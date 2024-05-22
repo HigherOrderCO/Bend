@@ -1,4 +1,4 @@
-data list = (Cons head tail) | Nil
+type list = (Cons head tail) | Nil
 
 Unpack cmp list/Nil = list/Nil
 Unpack cmp (list/Cons h list/Nil) = h
