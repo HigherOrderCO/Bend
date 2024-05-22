@@ -1,0 +1,45 @@
+name: Bug report
+description: Create a report to help us improve.
+body:
+ - type: markdown
+   attributes: 
+     value: |
+      ### Bug Report
+      Note, your issue might have been already reported, please check [issues](https://github.com/HigherOrderCO/Bend/issues). If you find a similar issue, respond with a reaction or any additional information that you feel may be helpful.
+
+      ### For Windows Users
+      There is currently no native way to make Bend work on windows, as a temporary workaround, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).
+  
+ - type: textarea
+   attributes:
+    label: Reproducing the behavior
+    description: A clear and concise description of what the bug is.
+    value: |
+      Example:
+       Running command...
+       With code....
+       Error...
+       Expected behavior....
+   validations:
+    required: true
+ 
+ - type: textarea
+   attributes:
+    label: System Settings
+    description: Your System's settings
+    value: |
+     Example:
+      - HVM: [e.g. HVM 2.0.13]
+      - Bend: [e.g. 0.2.11]
+      - OS: [e.g. Linux (Ubuntu 22.04)]
+      - CPU: [e.g. Intel i9-14900KF]
+      - GPU: [e.g. RTX 4090]
+      - Cuda Version [e.g. release 12.4, V12.4.131]
+   validations:
+     required: true
+
+ - type: textarea
+   attributes:
+    label: Additional context
+    description: Add any other context about the problem here (Optional). 
+   
