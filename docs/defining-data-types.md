@@ -41,7 +41,7 @@ They work like match expressions with explicit bindings:
 However, they also allow matching on multiple values at once, which is something that regular `match` can't do:
 
 ```py
-data Boolean = True | False
+type Boolean = True | False
 
 (Option.is_both_some (Some lft_val) (Some rgt_val)) = True
 (Option.is_both_some lft rgt) = False
