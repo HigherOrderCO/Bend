@@ -21,6 +21,66 @@ export extern "bend check" [
     --verbose(-v)                                   # Be verbose
 ]
 
+# Runs the lambda-term level desugaring passes
+export extern "bend desugar" [
+    -p                                              # Debug and normalization pretty printing
+    -O: string@"nu-complete bend opts"              # Enables or disables the given optimizations
+    --io                                            # Run with IO enabled
+    -l                                              # Linear readback (show explicit dups)
+    --stats(-s)                                     # Show runtime stats and rewrite counts
+    --warn(-W): string@"nu-complete bend warn"      # Show the specified compilation warning
+    --deny(-D): string@"nu-complete bend warn"      # Deny the specified compilation warning
+    --allow(-A): string@"nu-complete bend warn"     # Allow the specified compilation warning
+    --help(-h)                                      # Print help
+    --entrypoint(-e): string                        # Use other entrypoint rather than main or Main
+    --verbose(-v)                                   # Be verbose
+]
+
+# Compiles the program to hvmc and prints to stdout
+export extern "bend gen-hvm" [
+    -p                                              # Debug and normalization pretty printing
+    -O: string@"nu-complete bend opts"              # Enables or disables the given optimizations
+    --io                                            # Run with IO enabled
+    -l                                              # Linear readback (show explicit dups)
+    --stats(-s)                                     # Show runtime stats and rewrite counts
+    --warn(-W): string@"nu-complete bend warn"      # Show the specified compilation warning
+    --deny(-D): string@"nu-complete bend warn"      # Deny the specified compilation warning
+    --allow(-A): string@"nu-complete bend warn"     # Allow the specified compilation warning
+    --help(-h)                                      # Print help
+    --entrypoint(-e): string                        # Use other entrypoint rather than main or Main
+    --verbose(-v)                                   # Be verbose
+]
+
+# Compiles the program to standalone C and prints to stdout
+export extern "bend gen-c" [
+    -p                                              # Debug and normalization pretty printing
+    -O: string@"nu-complete bend opts"              # Enables or disables the given optimizations
+    --io                                            # Run with IO enabled
+    -l                                              # Linear readback (show explicit dups)
+    --stats(-s)                                     # Show runtime stats and rewrite counts
+    --warn(-W): string@"nu-complete bend warn"      # Show the specified compilation warning
+    --deny(-D): string@"nu-complete bend warn"      # Deny the specified compilation warning
+    --allow(-A): string@"nu-complete bend warn"     # Allow the specified compilation warning
+    --help(-h)                                      # Print help
+    --entrypoint(-e): string                        # Use other entrypoint rather than main or Main
+    --verbose(-v)                                   # Be verbose
+]
+
+# Compiles the program to standalone Cuda and prints to stdout
+export extern "bend gen-cu" [
+    -p                                              # Debug and normalization pretty printing
+    -O: string@"nu-complete bend opts"              # Enables or disables the given optimizations
+    --io                                            # Run with IO enabled
+    -l                                              # Linear readback (show explicit dups)
+    --stats(-s)                                     # Show runtime stats and rewrite counts
+    --warn(-W): string@"nu-complete bend warn"      # Show the specified compilation warning
+    --deny(-D): string@"nu-complete bend warn"      # Deny the specified compilation warning
+    --allow(-A): string@"nu-complete bend warn"     # Allow the specified compilation warning
+    --help(-h)                                      # Print help
+    --entrypoint(-e): string                        # Use other entrypoint rather than main or Main
+    --verbose(-v)                                   # Be verbose
+]
+
 # Compiles the program and runs it with the Rust HVM implementation
 export extern "bend run" [
     -p                                              # Debug and normalization pretty printing
