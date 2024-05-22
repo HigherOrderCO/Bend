@@ -91,7 +91,8 @@ impl Term {
         new_defs.push(def);
 
         // Call the new function in the original term.
-        let call = Term::call(Term::Ref { nam: new_nam }, free_vars.iter().map(|v| Term::Var { nam: v.clone() }));
+        let call =
+          Term::call(Term::Ref { nam: new_nam }, free_vars.iter().map(|v| Term::Var { nam: v.clone() }));
         *self = Term::call(call, init.drain(..));
       }
 

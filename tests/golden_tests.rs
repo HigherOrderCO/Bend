@@ -317,8 +317,9 @@ fn hangs() {
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Allow, false);
 
-    let thread =
-      std::thread::spawn(move || run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None));
+    let thread = std::thread::spawn(move || {
+      run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)
+    });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
 
     if !thread.is_finished() {

@@ -131,15 +131,13 @@ impl std::fmt::Display for UnboundVarErr {
             var,
             desugar_bend::RECURSIVE_KW
           )
+        } else if let Some((pre, suf)) = var.rsplit_once('-') {
+          write!(
+            f,
+            "Unbound variable '{var}'. If you wanted to subtract '{pre}' from '{suf}', you must separate it with spaces ('{pre} - {suf}') since '-' is a valid name character."
+          )
         } else {
-          if let Some((pre, suf)) = var.rsplit_once("-") {
-            write!(
-              f,
-              "Unbound variable '{var}'. If you wanted to subtract '{pre}' from '{suf}', you must separate it with spaces ('{pre} - {suf}') since '-' is a valid name character."
-            )
-          } else {
-            write!(f, "Unbound variable '{var}'.")
-          }
+          write!(f, "Unbound variable '{var}'.")
         }
       }
       UnboundVarErr::Global { var, declared, used } => match (declared, used) {
