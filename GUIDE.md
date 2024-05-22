@@ -233,7 +233,7 @@ def slow_mul2(n):
     case 0:
       return 0
     case _:
-      return 2 * slow_mul2(n-1)
+      return 2 + slow_mul2(n-1)
 ```
 
 The `if-else` syntax is a third option to branch, other than `match` and
@@ -397,7 +397,7 @@ def enum(tree):
         rgt: tree.rgt(idx * 2 + 1),
       }
     case Tree/Leaf:
-      return (idx, tree.val)
+      return Tree/Leaf { val: (idx, tree.val) }
 
 def main:
   tree = Tree/Node {

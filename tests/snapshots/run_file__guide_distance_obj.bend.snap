@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/guide_distance_obj.bend
+---
+NumScott:
+14.142
+
+Scott:
+14.142

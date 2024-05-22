@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/guide_is_even_num.bend
+---
+NumScott:
+0
+
+Scott:
+0
