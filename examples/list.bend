@@ -64,18 +64,16 @@ List/len = @l
 
 # List count:
 # List l -> uint -> uint
-# returns the number of instances of element s in list l.
-List/count/aux = @acc @l @s
+# returns the number of instances of uint s in list l.
+List/count = @l @s
   match l {
-    List/Nil: acc
+    List/Nil: 0
     List/Cons: use acc = switch (== l.head s) {
       0: acc;
       _: (+ acc 1);
     }
-    (List/count/aux acc l.tail s)
+    (List/count acc l.tail s)
   }
-List/count = @l @s
-  (List/count/aux 0 l s)
 
 # List index:
 # List l -> Some s
@@ -162,7 +160,7 @@ List/split = @l @i
 #main = (List/index [1, 2, 3, 4, 5] 4)
 #main = (List/clear [0, 2, 3])
 #main = (List/count [1, 2, 3, 3, 3, 4, 4, 5, 3, 1000] 3)
-main = (List/len [1, 2, 3, 4, 4, 4])
+#main = (List/len [1, 2, 3, 4, 4, 4])
 #main = (List/reverse [1, 2, 3, 4, 5])
 #main = (List/append [1, 2] 3)
 #main = (List/add_front [2, 3] 1)
