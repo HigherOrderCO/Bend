@@ -81,9 +81,6 @@ struct RunArgs {
   #[arg(short = 'p', help = "Debug and normalization pretty printing")]
   pretty: bool,
 
-  #[arg(long, help = "Run with IO enabled")]
-  io: bool,
-
   #[command(flatten)]
   run_opts: CliRunOpts,
 
@@ -116,9 +113,6 @@ struct GenArgs {
     float_combinators is enabled by default on strict mode."#,
   )]
   comp_opts: Vec<OptArgs>,
-
-  #[arg(long, help = "Generate with IO enabled")]
-  io: bool,
 
   #[command(flatten)]
   warn_opts: CliWarnOpts,
@@ -262,16 +256,16 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
     Ok(book)
   };
 
-  let (gen_cmd, gen_supports_io) = match &cli.mode {
-    Mode::GenC(..) => ("gen-c", true),
-    Mode::GenCu(..) => ("gen-cu", false),
-    _ => ("gen", false),
+  let gen_cmd = match &cli.mode {
+    Mode::GenC(..) => "gen-c",
+    Mode::GenCu(..) => "gen-cu",
+    _ => "gen",
   };
 
-  let (run_cmd, run_supports_io) = match &cli.mode {
-    Mode::RunC(..) => ("run-c", true),
-    Mode::RunCu(..) => ("run-cu", false),
-    _ => ("run", false),
+  let run_cmd = match &cli.mode {
+    Mode::RunC(..) => "run-c",
+    Mode::RunCu(..) => "run-cu",
+    _ => "run",
   };
 
   match cli.mode {
@@ -295,11 +289,8 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       println!("{}", compile_res.core_book);
     }
 
-    Mode::GenC(GenArgs { comp_opts, io, warn_opts, path })
-    | Mode::GenCu(GenArgs { comp_opts, io, warn_opts, path }) => {
-      if io && !gen_supports_io {
-        Err("Selected mode does not support io.".to_string())?;
-      }
+    Mode::GenC(GenArgs { comp_opts, warn_opts, path })
+    | Mode::GenCu(GenArgs { comp_opts, warn_opts, path }) => {
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
       let opts = compile_opts_from_cli(&comp_opts);
 
@@ -312,9 +303,6 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let gen_fn = |out_path: &str| {
         let mut process = std::process::Command::new("hvm");
         process.arg(gen_cmd).arg(out_path);
-        if io {
-          process.arg("--io");
-        }
         process.output().map_err(|e| format!("While running hvm: {e}"))
       };
 
@@ -344,14 +332,10 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       }
     }
 
-    Mode::Run(RunArgs { pretty, io, run_opts, comp_opts, warn_opts, path, arguments })
-    | Mode::RunC(RunArgs { pretty, io, run_opts, comp_opts, warn_opts, path, arguments })
-    | Mode::RunCu(RunArgs { pretty, io, run_opts, comp_opts, warn_opts, path, arguments }) => {
+    Mode::Run(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
+    | Mode::RunC(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
+    | Mode::RunCu(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
       let CliRunOpts { linear, print_stats } = run_opts;
-
-      if io && !run_supports_io {
-        Err("Selected mode does not support io.".to_string())?;
-      }
 
       let diagnostics_cfg =
         set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
@@ -364,7 +348,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
       let book = load_book(&path)?;
       if let Some((term, stats, diags)) =
-        run_book(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_cmd, io)?
+        run_book(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_cmd)?
       {
         eprint!("{diags}");
         if pretty {

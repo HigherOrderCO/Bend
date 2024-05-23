@@ -11,8 +11,6 @@ Scott
 
 (match_shadowed_field) = λa (a λb λc (List/Cons b c) λd λe λ* λ* (List/Cons d e))
 
-(List/Nil) = λa λ* a
-
 (List/Cons) = λa λb λ* λd (d a b)
 
 NumScott
@@ -23,7 +21,5 @@ NumScott
 (switch_shadowed_field) = λa switch a { 0: λb b; _: λc λ* c; }
 
 (match_shadowed_field) = λa (a λb switch b { 0: λc λd (List/Cons c d); _: λ* λe λf λ* λ* (List/Cons e f); })
-
-(List/Nil) = λa (a 0)
 
 (List/Cons) = λa λb λc (c 1 a b)

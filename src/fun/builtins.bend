@@ -1,6 +1,5 @@
 type String = (Nil) | (Cons head ~tail)
 type List   = (Nil) | (Cons head ~tail)
-type Result = (Ok val) | (Err val)
 type Nat    = (Succ ~pred) | (Zero)
 
 # MAP Impl
@@ -48,37 +47,32 @@ Map/set map key value =
 
 # IO Impl
 
-STRING_NIL_TAG  = 0
-STRING_CONS_TAG = 1
+type IO:
+  Done { magic, expr }
+  Call { magic, func, argm, cont }
 
-IO_DONE_TAG       = 0
-IO_PUT_TEXT_TAG   = 1
-IO_GET_TEXT_TAG   = 2
-IO_WRITE_FILE_TAG = 3
-IO_READ_FILE_TAG  = 4
-IO_GET_TIME_TAG   = 5
-IO_SLEEP_TAG      = 6
-IO_DRAW_IMAGE_TAG = 7
+def IO/MAGIC:
+  return (0xD0CA11, 0xFF1FF1)
 
-type IO
-  = (Done term)
-  | (PutText   text      cont)
-  | (GetText             cont)
-  | (WriteFile file data cont)
-  | (ReadFile  file      cont)
-  | (GetTime             cont)
-  | (Sleep     time      cont)
-  | (DrawImage tree      cont)
+def IO/wrap(x):
+  return IO/Done(IO/MAGIC, x)
 
-IO/bind (IO/Done ret)                 f = (f ret)
-IO/bind (IO/PutText text cont)        f = (IO/PutText text λx (IO/bind (cont x) f))
-IO/bind (IO/GetText cont)             f = (IO/GetText λx (IO/bind (cont x) f))
-IO/bind (IO/WriteFile file data cont) f = (IO/WriteFile file data λx (IO/bind (cont x) f))
-IO/bind (IO/ReadFile file cont)       f = (IO/ReadFile file λx (IO/bind (cont x) f))
-IO/bind (IO/GetTime cont)             f = (IO/GetTime λx (IO/bind (cont x) f))
-IO/bind (IO/Sleep time cont)          f = (IO/Sleep time λx (IO/bind (cont x) f))
-IO/bind (IO/DrawImage tree cont)      f = (IO/DrawImage tree λx (IO/bind (cont x) f))
+def IO/bind(a, b):
+  match a:
+    case IO/Done:
+      return b(a.expr)
+    case IO/Call:
+      return IO/Call(IO/MAGIC, a.func, a.argm, lambda x: IO/bind(a.cont(x), b))
 
-print s = (IO/PutText s λx (IO/Done x))
-get_time = (IO/GetTime @x (IO/Done x))
-sleep hi_lo = (IO/Sleep hi_lo @x (IO/Done x))
+def call(func, argm):
+  return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
+
+
+print text = (IO/Call IO/MAGIC "PUT_TEXT" text @x (IO/Done IO/MAGIC x))
+#input = (IO/Call IO/MAGIC "GET_TEXT" * @x (IO/Done IO/MAGIC x))
+
+#read_file path = (IO/Call IO/MAGIC "GET_FILE" path @x (IO/Done IO/MAGIC x))
+#write_file path text = (IO/Call IO/MAGIC "PUT_FILE" (path, text) @x (IO/Done IO/MAGIC x))
+
+get_time = (IO/Call IO/MAGIC "GET_TIME" * @x (IO/Done IO/MAGIC x))
+sleep hi_lo = (IO/Call IO/MAGIC "PUT_TIME" hi_lo @x (IO/Done IO/MAGIC x))

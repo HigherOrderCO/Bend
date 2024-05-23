@@ -2,13 +2,13 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.bend
 ---
-@Bool/False__M_List_/Nil = ((1 a) a)
-
 @If = ((@If__C0 a) a)
 
 @If__C0 = (?(((a (* a)) (* (* (b b)))) c) c)
 
 @List_/Cons = (a (b ((0 (a (b c))) c)))
+
+@List_/Nil = ((1 a) a)
 
 @Map = ((@Map__C1 a) a)
 
@@ -16,7 +16,7 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.bend
   & @List_/Cons ~ (b (e f))
   & @Map ~ (c (d e))
 
-@Map__C1 = (?((@Map__C0 (* (* @Bool/False__M_List_/Nil))) a) a)
+@Map__C1 = (?((@Map__C0 (* (* @List_/Nil))) a) a)
 
 @Merge = (a ((@Merge__C4 (a b)) b))
 
@@ -28,13 +28,13 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.bend
   & @MergePair ~ (e (f g))
 
 @MergePair__C1 = (* (* (a b)))
-  & @List_/Cons ~ (a (@Bool/False__M_List_/Nil b))
+  & @List_/Cons ~ (a (@List_/Nil b))
 
 @MergePair__C2 = (?((@MergePair__C0 @MergePair__C1) a) a)
 
 @MergePair__C3 = (b ((@MergePair__C2 (a (b c))) (a c)))
 
-@MergePair__C4 = (?((@MergePair__C3 (* (* @Bool/False__M_List_/Nil))) a) a)
+@MergePair__C4 = (?((@MergePair__C3 (* (* @List_/Nil))) a) a)
 
 @MergeSort = (a (b d))
   & @Unpack ~ (a (c d))
@@ -59,7 +59,7 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.bend
 @Merge__C4 = (?((@Merge__C3 (* (* (a a)))) b) b)
 
 @Pure = (a b)
-  & @List_/Cons ~ (a (@Bool/False__M_List_/Nil b))
+  & @List_/Cons ~ (a (@List_/Nil b))
 
 @Unpack = (a ((@Unpack__C3 (a b)) b))
 
@@ -73,6 +73,6 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.bend
 
 @Unpack__C2 = (b ((@Unpack__C1 (a (b c))) (a c)))
 
-@Unpack__C3 = (?((@Unpack__C2 (* (* @Bool/False__M_List_/Nil))) a) a)
+@Unpack__C3 = (?((@Unpack__C2 (* (* @List_/Nil))) a) a)
 
 @main = @MergeSort

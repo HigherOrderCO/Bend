@@ -90,7 +90,7 @@ pub fn run_book_simple(
   diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
 ) -> Result<(Term, String, Diagnostics), Diagnostics> {
-  run_book(book, run_opts, compile_opts, diagnostics_cfg, args, "run", false).map(Option::unwrap)
+  run_book(book, run_opts, compile_opts, diagnostics_cfg, args, "run").map(Option::unwrap)
 }
 
 /* Snapshot/regression/golden tests

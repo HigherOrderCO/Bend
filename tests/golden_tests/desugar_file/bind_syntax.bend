@@ -1,3 +1,5 @@
+type Result = (Ok val) | (Err val)
+
 Result/bind (Result/Ok val) f = (f val)
 Result/bind err _ = err
 
