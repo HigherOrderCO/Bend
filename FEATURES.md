@@ -172,7 +172,6 @@ def MyTree.map_sum(x):
 
 This allows `fold` to be a very powerful and generic tool that can be used to implement most pure data transformations.
 
-
 ### Some caveats and limitations
 
 _Attention_: Note that despite the ADT syntax sugars, Bend is an _untyped_ language and the compiler will not stop you from using values incorrectly, which can lead to very unexpected results.
@@ -287,7 +286,7 @@ switch x = 4:
 
 Bend has Lists and Strings, which support Unicode characters.
 
-```rs
+```py
 def main:
   return ["You: Hello, 🌎", "🌎: Hello, user"]
 ```
@@ -295,12 +294,12 @@ def main:
 A string is desugared to a String data type containing two constructors, `String/Cons` and `String/Nil`.
 List also becomes a type with two constructors, `List/Cons` and `List/Nil`.
 
-```rs
+```py
 # When you write this
 def StrEx:
-  "Hello"
+  return "Hello"
 def ids:
-  [1, 2, 3]
+  return [1, 2, 3]
 
 # The compiler converts it to this
 def StrEx:
@@ -319,15 +318,55 @@ type List:
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They are encoded as a U24 with the unicode codepoint as their value.
 
-```
+```py
 # These two are equivalent
 def chars:
-  ['A', '\u{4242}', '🌎']
+  return ['A', '\u{4242}', '🌎']
 
 def chars2:
-  [65, 0x4242, 0x1F30E]
+  return [65, 0x4242, 0x1F30E]
 ```
 
+Bend has also a binary tree Map data structure that uses a numeric u24 value as key.
+A Map becomes a type with two constructors `Map/Leaf` and `Map/Node`.
+
+Maps are delimited by `{` `}` and support any numeric value as key, it can be a number, characters and symbols.
+
+```py
+# When you write this
+def empty_map:
+  return {}
+
+def init_map:
+  return { 1: "one", 2: "two", `blue`: 0x0000FF }
+
+def main:
+  map = init_map
+  one = map[1]    # map getter syntax
+  map[0] = "zero" # map setter syntax
+  return one
+
+# The compiler converts it to this
+def empty_map():
+  return Map/Leaf
+
+def init_map():
+  map = Map/set(Map/Leaf, 1, "one")
+  map = Map/set(map, 2, "two")
+  map = Map/set(map, `blue`, 0x0000FF)
+  return map
+
+def main():
+  map = init_map
+  (one, map) = Map/get(map, 1)
+  map = Map/set(map, 0, "zero")
+  return one
+
+# The builtin Map type definition
+type Map:
+  Node { value, ~left, ~right }
+  Leaf
+```
 
 ### Mixing syntaxes
 
@@ -368,7 +407,7 @@ Other features are described in the following documentation files:
 - &#128215; Data types: [Defining data types](docs/defining-data-types.md)
 - &#128215; Pattern matching: [Pattern matching](docs/pattern-matching.md)
 - &#128215; Native numbers and operations: [Native numbers](docs/native-numbers.md)
-- &#128215; Builtin definitions: *Documentation coming soon*
+- &#128215; Builtin definitions: _Documentation coming soon_
 - &#128215; CLI arguments: [CLI arguments](docs/cli-arguments.md)
 - &#128217; Duplications and superpositions: [Dups and sups](docs/dups-and-sups.md)
 - &#128217; Scopeless lambdas: [Using scopeless lambdas](docs/using-scopeless-lambdas.md)
