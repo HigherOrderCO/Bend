@@ -196,7 +196,7 @@ The condition must return a `u24` number, where 0 will run the `else` branch and
 ### Switch
 
 ```python
-switch x = 4:
+switch x = 5:
   case 0:
     return 6
   case 1:
@@ -211,7 +211,7 @@ catches all values not explicitly enumerated. Switches may only be used with nat
 
 In the last case, the predecessor value is available with the name `bound_var-next_num`, where `bound_var` is the variable
 set by the condition and `next_num` is the expected value of the next case. For example, the above example code returns
-`5`, since `x-2` is bound to `5` and the value of `x` doesn't match any explicit case.
+`3`, since `x-2` is bound to `5 - 2` and the value of `x` doesn't match any explicit case.
 
 This switch statement is equivalent to the `if` from the previous section:
 
@@ -814,6 +814,10 @@ switch x = (+ 1 1) {
 A switch for native numbers, it can hold a name binding if the matching term is not a variable.
 
 The cases need to be typed from `0` to a wildcard `_` in sequence.
+
+In the last case, the predecessor value is available with the name `bound_var-next_num`, where `bound_var` is the variable
+set by the condition and `next_num` is the expected value of the next case. For example, the above example code returns
+`1`, since `x-1` is bound to `(+ 1 1) - 1` and the value of `x` doesn't match any explicit case.
 
 Using `;` is optional.
 
