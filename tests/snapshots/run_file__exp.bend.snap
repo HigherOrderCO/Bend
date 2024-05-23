@@ -3,6 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/exp.bend
 ---
 [4m[1m[31mErrors:[0m
-1.Failed to parse result from HVM.
-Output from HVM was:
-"""""ERROR: attempt to clone a non-affine global reference.\n\n"
+Failed to parse result from HVM.

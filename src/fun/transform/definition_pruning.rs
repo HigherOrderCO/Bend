@@ -1,28 +1,18 @@
 use crate::{
   diagnostics::WarningType,
-  fun::{Adt, Book, Ctx, Name, Term, LIST, STRING},
+  fun::{Book, Ctx, Name, Term},
   maybe_grow,
 };
-use indexmap::IndexSet;
 use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Used {
-  /// Rule is a constructor for an Adt
-  /// If not `prune_all`, should not be pruned when:
-  /// It or its Adt as a tag name are referenced in the user code at all (I.e. non-built-in code)
-  Adt,
-
-  /// Rule is accessible from the main entry point, should never be pruned
+  /// Definition is accessible from the main entry point, should never be pruned.
   Main,
-
-  /// Rule is not accessible from main nor it's an Adt
-  /// Should be pruned if `prune_all` or if it's a built-in rule
-  /// Otherwise, if the rule has a non-generated name, a warning about the unused def is returned
-  Unused,
-
-  /// An unused definition but needed for compilation when `-Oprune` is not active.
-  Needed,
+  /// Definition is not accessible from main, but is accessible from non-builtin definitions.
+  NonBuiltin,
+  /// Definition is not accessible from main, but is a user-defined constructor.
+  Ctr,
 }
 
 type Definitions = HashMap<Name, Used>;
@@ -33,62 +23,54 @@ impl Ctx<'_> {
   pub fn prune(&mut self, prune_all: bool) {
     let mut used = Definitions::new();
 
+    // Get the functions that are accessible from the main entry point.
     if let Some(main) = &self.book.entrypoint {
       let def = self.book.defs.get(main).unwrap();
       used.insert(main.clone(), Used::Main);
       self.book.find_used_definitions(&def.rule().body, Used::Main, &mut used);
     }
 
-    if !prune_all {
-      for def in self.book.defs.values() {
-        if !def.builtin && !used.contains_key(&def.name) {
-          self.book.find_used_definitions(&def.rule().body, Used::Needed, &mut used);
+    // Get the functions that are accessible from non-builtins.
+    for def in self.book.defs.values() {
+      if !def.builtin && !(used.get(&def.name) == Some(&Used::Main)) {
+        if self.book.ctrs.contains_key(&def.name) {
+          used.insert(def.name.clone(), Used::Ctr);
+        } else {
+          used.insert(def.name.clone(), Used::NonBuiltin);
         }
+        self.book.find_used_definitions(&def.rule().body, Used::NonBuiltin, &mut used);
       }
     }
 
-    for (def_name, def) in &self.book.defs {
-      if !def.builtin && self.book.ctrs.get(def_name).is_some() {
-        used.insert(def_name.clone(), Used::Adt);
-      }
-    }
-
-    // Even if we don't prune all the defs, we need check what built-ins are accessible through user code
-    if !prune_all {
-      for (def_name, def) in &self.book.defs {
-        // This needs to be done for each rule in case the pass it's ran from has not encoded the pattern match
-        // E.g.: the `flatten_rules` golden test
-        if !def.builtin {
-          for rule in &def.rules {
-            match used.entry(def_name.clone()) {
-              Entry::Vacant(e) => _ = e.insert(Used::Unused),
-              Entry::Occupied(e) if *e.get() != Used::Unused => continue,
-              _ => {}
+    // Remove unused definitions.
+    for def in self.book.defs.keys().cloned().collect::<Vec<_>>() {
+      if let Some(use_) = used.get(&def) {
+        match use_ {
+          Used::Main => {
+            // Used by the main entry point, never pruned;
+          }
+          Used::NonBuiltin => {
+            // Used by a non-builtin definition.
+            // Prune if `prune_all`, otherwise show a warning.
+            if prune_all {
+              self.book.defs.shift_remove(&def);
+            } else {
+              self.info.add_rule_warning("Definition is unused.", WarningType::UnusedDefinition, def);
             }
-
-            self.book.find_used_definitions(&rule.body, Used::Unused, &mut used);
+          }
+          Used::Ctr => {
+            // Unused, but a user-defined constructor.
+            // Prune if `prune_all`, otherwise nothing.
+            if prune_all {
+              self.book.defs.shift_remove(&def);
+            } else {
+              // Don't show warning if it's a user-defined constructor.
+            }
           }
         }
-      }
-    }
-
-    // Filter defs from the 'used' hashmap that are not accessible from main
-    let filter = |(name, used)| if used == Used::Unused { None } else { Some(name) };
-    let used: IndexSet<Name> = used.into_iter().filter_map(filter).collect();
-
-    let names = self.book.defs.keys().cloned().collect::<IndexSet<Name>>();
-    let unused = names.difference(&used).cloned();
-
-    self.prune_unused(unused, prune_all);
-  }
-
-  fn prune_unused(&mut self, unused: impl IntoIterator<Item = Name>, prune_all: bool) {
-    for def_name in unused {
-      let def = &self.book.defs[&def_name];
-      if prune_all || def.builtin {
-        self.book.defs.shift_remove(&def_name);
-      } else if !def_name.is_generated() {
-        self.info.add_rule_warning("Definition is unused.", WarningType::UnusedDefinition, def_name);
+      } else {
+        // Unused builtin, can always be pruned.
+        self.book.defs.shift_remove(&def);
       }
     }
   }
@@ -102,15 +84,14 @@ impl Book {
 
       while let Some(term) = to_find.pop() {
         match term {
-          Term::Ref { nam: def_name } => match self.ctrs.get(def_name) {
-            Some(name) => self.insert_ctrs_used(name, uses),
-            None => self.insert_used(def_name, used, uses),
-          },
+          Term::Ref { nam: def_name } => self.insert_used(def_name, used, uses),
           Term::List { .. } => {
-            self.insert_ctrs_used(&Name::new(LIST), uses);
+            self.insert_used(&Name::new(crate::fun::builtins::LCONS), used, uses);
+            self.insert_used(&Name::new(crate::fun::builtins::LNIL), used, uses);
           }
           Term::Str { .. } => {
-            self.insert_ctrs_used(&Name::new(STRING), uses);
+            self.insert_used(&Name::new(crate::fun::builtins::SCONS), used, uses);
+            self.insert_used(&Name::new(crate::fun::builtins::SNIL), used, uses);
           }
           _ => {}
         }
@@ -130,14 +111,6 @@ impl Book {
       // E.g.: the `flatten_rules` golden test
       for rule in &self.defs[def_name].rules {
         self.find_used_definitions(&rule.body, used, uses);
-      }
-    }
-  }
-
-  fn insert_ctrs_used(&self, name: &Name, uses: &mut Definitions) {
-    if let Some(Adt { ctrs, .. }) = self.adts.get(name) {
-      for (ctr, _) in ctrs {
-        self.insert_used(ctr, Used::Adt, uses);
       }
     }
   }

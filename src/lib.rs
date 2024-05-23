@@ -12,7 +12,7 @@ use hvm::{
   mutual_recursion,
 };
 use net::hvmc_to_net::hvmc_to_net;
-use std::{process::Output, str::FromStr};
+use std::str::FromStr;
 
 pub mod diagnostics;
 pub mod fun;
@@ -24,6 +24,8 @@ pub use fun::load_book::load_file_to_book;
 
 pub const ENTRY_POINT: &str = "main";
 pub const HVM1_ENTRY_POINT: &str = "Main";
+
+pub const HVM_OUTPUT_END_MARKER: &str = "Result: ";
 
 pub fn check_book(
   book: &mut Book,
@@ -157,7 +159,6 @@ pub fn run_book(
   diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
   cmd: &str,
-  arg_io: bool,
 ) -> Result<Option<(Term, String, Diagnostics)>, Diagnostics> {
   let CompileResult { core_book, labels, diagnostics } =
     compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args)?;
@@ -167,59 +168,12 @@ pub fn run_book(
   // cancel the run if a problem is detected.
   eprint!("{diagnostics}");
 
-  let out_path = ".out.hvm";
-  std::fs::write(out_path, core_book.to_string()).map_err(|x| x.to_string())?;
-  let run_fn = |out_path: &str| {
-    let mut process = std::process::Command::new("hvm");
-    process.arg(cmd).arg(out_path);
-    if arg_io {
-      process.arg("--io");
-      process.stdout(std::process::Stdio::inherit());
-      process.spawn()?.wait_with_output()
-    } else {
-      process.output()
-    }
-  };
-  let Output { status, stdout, stderr } = run_fn(out_path).map_err(|e| format!("While running hvm: {e}"))?;
-
-  let out = String::from_utf8_lossy(&stdout);
-  let err = String::from_utf8_lossy(&stderr);
-  let status = if !status.success() { status.to_string() } else { String::new() };
-
-  let _ = std::fs::remove_file(out_path);
-
-  if arg_io {
-    return Ok(None);
-  }
-
-  let Some((_, result)) = out.split_once("Result: ") else {
-    return Err(
-      format!("1.Failed to parse result from HVM.\nOutput from HVM was:\n{:?}{:?}{:?}", err, status, out)
-        .into(),
-    );
-  };
-  let Some((result, stats)) = result.split_once('\n') else {
-    return Err(
-      format!("2.Failed to parse result from HVM.\nOutput from HVM was:\n{:?}{:?}{:?}", err, status, out)
-        .into(),
-    );
-  };
-  let net = match hvm::ast::Net::from_str(result) {
-    Ok(net) => net,
-    Err(e) => {
-      return Err(
-        format!(
-          "3.Failed to parse result from HVM with error: '{}'.\nOutput from HVM was:\n{:?}{:?}{:?}",
-          e, err, status, out
-        )
-        .into(),
-      );
-    }
-  };
-
+  let out = run_hvm(&core_book, cmd)?;
+  let (net, stats) = parse_hvm_output(&out)?;
   let (term, diags) =
     readback_hvm_net(&net, &book, &labels, run_opts.linear_readback, compile_opts.adt_encoding);
-  Ok(Some((term, stats.to_string(), diags)))
+
+  Ok(Some((term, stats, diags)))
 }
 
 pub fn readback_hvm_net(
@@ -236,6 +190,85 @@ pub fn readback_hvm_net(
   term.resugar_strings(adt_encoding);
   term.resugar_lists(adt_encoding);
   (term, diags)
+}
+
+/// Runs an HVM book by invoking HVM as a subprocess.
+fn run_hvm(book: &hvm::ast::Book, cmd: &str) -> Result<String, String> {
+  fn filter_hvm_output(
+    mut stream: impl std::io::Read + Send,
+    mut output: impl std::io::Write + Send,
+  ) -> Result<String, String> {
+    let mut capturing = false;
+    let mut result = String::new();
+    let mut buf = [0u8; 1024];
+    loop {
+      let num_read = match stream.read(&mut buf) {
+        Ok(n) => n,
+        Err(e) => {
+          eprintln!("{e}");
+          break;
+        }
+      };
+      if num_read == 0 {
+        break;
+      }
+      let new_buf = &buf[.. num_read];
+      // TODO: Does this lead to broken characters if printing too much at once?
+      let new_str = String::from_utf8_lossy(new_buf);
+      if capturing {
+        // Store the result
+        result.push_str(&new_str);
+      } else if let Some((before, after)) = new_str.split_once(HVM_OUTPUT_END_MARKER) {
+        // If result started in the middle of the buffer, print what came before and start capturing.
+        if let Err(e) = output.write_all(before.as_bytes()) {
+          eprintln!("Error writing HVM output. {e}");
+        };
+        result.push_str(after);
+        capturing = true;
+      } else {
+        // Otherwise, don't capture anything
+        if let Err(e) = output.write_all(new_buf) {
+          eprintln!("Error writing HVM output. {e}");
+        }
+      }
+    }
+
+    if capturing { Ok(result) } else { Err("Failed to parse result from HVM.".into()) }
+  }
+
+  let out_path = ".out.hvm";
+  std::fs::write(out_path, book.to_string()).map_err(|x| x.to_string())?;
+  let mut process = std::process::Command::new("hvm")
+    .arg(cmd)
+    .arg(out_path)
+    .stdout(std::process::Stdio::piped())
+    .spawn()
+    .map_err(|e| format!("Failed to start hvm process.\n{e}"))?;
+
+  let child_out = std::mem::take(&mut process.stdout).expect("Failed to attach to hvm output");
+  let thread_out = std::thread::spawn(move || filter_hvm_output(child_out, std::io::stdout()));
+
+  let _ = process.wait().expect("Failed to wait on hvm subprocess");
+  if let Err(e) = std::fs::remove_file(out_path) {
+    eprintln!("Error removing HVM output file. {e}");
+  }
+
+  let result = thread_out.join().map_err(|_| "HVM output thread panicked.".to_string())??;
+  Ok(result)
+}
+
+/// Reads the final output from HVM and separates the extra information.
+fn parse_hvm_output(out: &str) -> Result<(Net, String), String> {
+  let Some((result, stats)) = out.split_once('\n') else {
+    return Err(format!(
+      "Failed to parse result from HVM (unterminated result).\nOutput from HVM was:\n{:?}",
+      out
+    ));
+  };
+  let Ok(net) = hvm::ast::Net::from_str(result) else {
+    return Err(format!("Failed to parse result from HVM (invalid net).\nOutput from HVM was:\n{:?}", out));
+  };
+  Ok((net, stats.to_string()))
 }
 
 #[derive(Clone, Copy, Debug, Default)]

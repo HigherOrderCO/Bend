@@ -1008,6 +1008,7 @@ impl<'a> PyParser<'a> {
     book: &mut Book,
     ini_idx: usize,
     end_idx: usize,
+    builtin: bool,
   ) -> ParseResult<()> {
     if book.defs.contains_key(&def.name) {
       let msg = format!("Redefinition of function '{}'.", def.name);
@@ -1019,7 +1020,7 @@ impl<'a> PyParser<'a> {
     }
     def.order_kwargs(book)?;
     def.gen_map_get();
-    let def = def.to_fun()?;
+    let def = def.to_fun(builtin)?;
     book.defs.insert(def.name.clone(), def);
     Ok(())
   }

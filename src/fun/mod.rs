@@ -1,6 +1,5 @@
 use crate::{
   diagnostics::{Diagnostics, DiagnosticsConfig},
-  fun::builtins::*,
   hvm::{self, ast::get_typ},
   maybe_grow, ENTRY_POINT,
 };

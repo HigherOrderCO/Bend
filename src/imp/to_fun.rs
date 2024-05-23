@@ -6,7 +6,7 @@ use crate::fun::{
 };
 
 impl Definition {
-  pub fn to_fun(self) -> Result<fun::Definition, String> {
+  pub fn to_fun(self, builtin: bool) -> Result<fun::Definition, String> {
     let body = self.body.into_fun().map_err(|e| format!("In function '{}': {}", self.name, e))?;
     let body = match body {
       StmtToFun::Return(term) => term,
@@ -18,7 +18,7 @@ impl Definition {
     let rule =
       fun::Rule { pats: self.params.into_iter().map(|param| fun::Pattern::Var(Some(param))).collect(), body };
 
-    let def = fun::Definition { name: self.name, rules: vec![rule], builtin: false };
+    let def = fun::Definition { name: self.name, rules: vec![rule], builtin };
     Ok(def)
   }
 }

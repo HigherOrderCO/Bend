@@ -66,7 +66,7 @@ impl<'a> TermParser<'a> {
     while !self.is_eof() {
       let ini_idx = *self.index();
 
-      // Imp record type definition
+      // Record type definition
       if self.try_parse_keyword("object") {
         let mut prs = PyParser { input: self.input, index: *self.index() };
         let (obj, nxt_indent) = prs.parse_object(indent)?;
@@ -84,7 +84,7 @@ impl<'a> TermParser<'a> {
         let (def, nxt_indent) = prs.parse_def(indent)?;
         self.index = prs.index;
         let end_idx = *self.index();
-        prs.add_def(def, &mut book, ini_idx, end_idx)?;
+        prs.add_def(def, &mut book, ini_idx, end_idx, builtin)?;
         indent = nxt_indent;
         last_rule = None;
         continue;
