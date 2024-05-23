@@ -327,10 +327,15 @@ def chars2:
   return [65, 0x4242, 0x1F30E]
 ```
 
-Bend has also a binary tree Map data structure that uses a numeric u24 value as key.
-A Map becomes a type with two constructors `Map/Leaf` and `Map/Node`.
+Bend has a built-in binary tree Map data structure where the key is a `u24` value, meaning you can use numbers, characters, and symbols as keys.
 
-Maps are delimited by `{` `}` and support any numeric value as key, it can be a number, characters and symbols.
+Maps are delimited by `{` `}` and its entries are separated by commas. A key-value entry in a map is denoted using a colon `:`. For example:
+
+```py
+{ 42: [4, 2] } # 42 is the key and [4, 2] is the value
+```
+
+A Map is desugared to a Map data type containing two constructors `Map/Leaf` and `Map/Node`.
 
 ```py
 # When you write this
