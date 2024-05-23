@@ -1,4 +1,4 @@
-# This program allocates a tree with True at the leaves then parallell ANDs them.
+# This program allocates a tree with True at the leaves then parallel ANDs them.
 type Bool:
   True
   False
