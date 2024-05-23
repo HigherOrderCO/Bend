@@ -1090,7 +1090,9 @@ pub trait ParserCommons<'a>: Parser<'a> {
     };
     let num_str = self.take_while(move |c| c.is_digit(radix) || c == '_');
     let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
-    if num_str.is_empty() {
+    if let Some(c) = self.peek_one() && c.is_numeric() {
+      self.expected("valid digit")
+    } else if num_str.is_empty() {
       self.expected("numeric digit")
     } else {
       u32::from_str_radix(&num_str, radix).map_err(|e| e.to_string())
