@@ -912,7 +912,7 @@ impl<'a> PyParser<'a> {
     }
 
     self.skip_trivia_inline();
-    let name = self.parse_bend_name()?;
+    let name = self.parse_top_level_name()?;
     self.skip_trivia_inline();
     let params = if self.starts_with("(") {
       self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 0)?

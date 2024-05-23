@@ -812,6 +812,9 @@ pub trait ParserCommons<'a>: Parser<'a> {
     if nam.contains("__") {
       let msg = "Top-level names are not allowed to contain \"__\".".to_string();
       self.with_ctx(Err(msg), ini_idx, end_idx)
+    } else if nam.starts_with("//") {
+      let msg = "Top-level names are not allowed to start with \"//\".".to_string();
+      self.with_ctx(Err(msg), ini_idx, end_idx)
     } else {
       Ok(nam)
     }
