@@ -80,8 +80,13 @@ Prints text to the console.
 
 ## Map
 
+### Map/empty
+Initializes an empty map.
+```Map/empty = Map/Leaf```
+
+
 ### Map/get
-The `get` function retrieves the value associated with a key from the map. If the key is found, it returns the value and the updated map. If not, it returns a placeholder value and the map.
+Retrieves a `value` from the `map` based on the `key`.
 
 ```Map/get map key =
   match map {
@@ -98,13 +103,12 @@ The `get` function retrieves the value associated with a key from the map. If th
         }
         _: (map.value, map)
       }
-  }```
+  }
+```
 
 
 ### Map/set
-The `set` function replaces the `current value` found in the same `key value` in
-the tree, if it has no value, creates a new branch and sets the value in the
-`node`.
+Sets a `value` in the `map` at the specified `key`.
 
 ```Map/set map key value =
   match map {
@@ -124,11 +128,8 @@ the tree, if it has no value, creates a new branch and sets the value in the
         }
         _: (Map/Node value Map/Leaf Map/Leaf)
       }
-  }```
-
-### Map/empty
-Creates an empty tree, containing only a leaf without any value
-```Map/empty = Map/Leaf```
+  }
+```
 
 
 ## IO
