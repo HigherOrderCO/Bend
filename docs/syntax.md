@@ -46,7 +46,7 @@ def main:
 
 A function definition is composed by a name, a sequence of parameters and a body.
 
-A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names).
+A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names) or start with `//`.
 
 The last statement of each function must either be a `return` or a selection statement (`if`, `switch`, `match`, `fold`)
 where all branches `return`.
@@ -621,7 +621,7 @@ Name (Ctr1 sub_arg1 sub_arg2) arg3 = rule0_body
 Name Ctr2 arg3 = rule1_body
 ```
 
-A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names).
+A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except it can't have `__` (used for generated names) or start with `//`.
 
 ### Function Definitions
 
