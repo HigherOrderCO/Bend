@@ -128,7 +128,7 @@ the tree, if it has no value, creates a new branch and sets the value in the
 
 ### Map/empty
 Creates an empty tree, containing only a leaf without any value
-Map/empty = Map/Leaf
+```Map/empty = Map/Leaf```
 
 
 ## IO
