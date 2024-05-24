@@ -42,6 +42,15 @@ List/add_front = @l @e
 List/append = @l @e
   (List/concat l (List/Cons e List/Nil))
 
+# list sum:
+# List l -> uint
+# returns the sum of all items in the list 
+List/sum = @l
+  match l {
+    List/Cons: (+ l.head (List/sum l.tail))
+    List/Nil: 0
+  }
+
 # List reverse:
 # List l -> List l
 # reverses the order of elements in list l.
@@ -65,15 +74,17 @@ List/len = @l
 # List count:
 # List l -> uint -> uint
 # returns the number of instances of uint s in list l.
-List/count = @l @s
+List/count/aux = @acc @l @s
   match l {
-    List/Nil: 0
+    List/Nil: acc
     List/Cons: use acc = switch (== l.head s) {
       0: acc;
       _: (+ acc 1);
     }
-    (List/count acc l.tail s)
+    (List/count/aux acc l.tail s)
   }
+List/count = @l @s
+  (List/count/aux 0 l s)
 
 # List index:
 # List l -> Some s
@@ -153,6 +164,7 @@ List/split = @l @i
 
 #################################
 
+#main = (List/sum [1, 2, 3])
 #main = (List/split [1, 2, 3, 4, 5, 6, 7] 3)
 #main = (List/remove [1, 2, 1, 3] 1)
 #main = (List/pop_back [])
