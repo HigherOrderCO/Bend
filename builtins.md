@@ -1,5 +1,4 @@
->this is a WIP
->this file is based on [Builtins.bend](https://github.com/HigherOrderCO/Bend/blob/main/src/fun/builtins.bend).
+>this is a WIP based on [Builtins.bend](https://github.com/HigherOrderCO/Bend/blob/main/src/fun/builtins.bend).
 
 # Built-in Types and Functions
 Bend built-in types and functions, this document serves as a reference guide to these built-in features.
