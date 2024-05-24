@@ -155,7 +155,7 @@ and synchronized correctly and efficiently by
 
 - To understand the tech behind Bend, check HVM2's [paper](https://paper.higherorderco.com).
 
-- Learn more about Built-ins check [Builtins.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
+- Learn more about Built-ins check [Builtins.md](https://github.com/HigherOrderCO/bend/blob/main/BUILTINS.md).
 
 - Bend is developed by [HigherOrderCO.com](https://HigherOrderCO.com) - join our [Discord](https://discord.HigherOrderCO.com)!
 
