@@ -45,9 +45,7 @@ data Map = (Node value ~left ~right) | (Leaf)
 - **Node value ~left ~right**: Represents a map node with a `value` and `left` and `right` subtrees.
 - **Leaf**: Represents an empty map.
 
-## Functions
-
-### Map
+## Map Functions
 
 #### Map/empty
 Initializes an empty map.
@@ -56,18 +54,84 @@ Map/empty = Map/Leaf
 ```
 
 #### Map/get
-Retrieves a value from the map based on the key.
+Retrieves a `value` from the `map` based on the `key`.
 ```bend
-Map/get map key = ...
+Map/get map key =
+  match map {
+    Map/Leaf: (*, map)
+    Map/Node:
+      switch _ = (== 0 key) {
+        0: switch _ = (% key 2) {
+          0:
+            let (got, rest) = (Map/get map.left (/ key 2))
+            (got, (Map/Node map.value rest map.right))
+          _:
+            let (got, rest) = (Map/get map.right (/ key 2))
+            (got, (Map/Node map.value map.left rest))
+        }
+        _: (map.value, map)
+      }
+  }
 ```
 
 #### Map/set
-Sets a value in the map at the specified key.
+Sets a `value` in the `map` at the specified `key`.
 ```bend
-Map/set map key value = ...
+Map/set map key value =
+  match map {
+    Map/Node:
+      switch _ = (== 0 key) {
+        0: switch _ = (% key 2) {
+          0: (Map/Node map.value (Map/set map.left (/ key 2) value) map.right)
+          _: (Map/Node map.value map.left (Map/set map.right (/ key 2) value))
+        }
+        _: (Map/Node value map.left map.right)
+      }
+    Map/Leaf:
+      switch _ = (== 0 key) {
+        0: switch _ = (% key 2) {
+          0: (Map/Node * (Map/set Map/Leaf (/ key 2) value) Map/Leaf)
+          _: (Map/Node * Map/Leaf (Map/set Map/Leaf (/ key 2) value))
+        }
+        _: (Map/Node value Map/Leaf Map/Leaf)
+      }
+  }
 ```
 
 ## IO
+IO Functions are in the **next milestone**! 
+
+### IO Implementations
+
+```bend
+STRING_NIL_TAG  = 0
+STRING_CONS_TAG = 1
+```
+
+```bend
+IO_DONE_TAG       = 0
+IO_PUT_TEXT_TAG   = 1
+IO_GET_TEXT_TAG   = 2
+IO_WRITE_FILE_TAG = 3
+IO_READ_FILE_TAG  = 4
+IO_GET_TIME_TAG   = 5
+IO_SLEEP_TAG      = 6
+IO_DRAW_IMAGE_TAG = 7
+```
+
+### Type
+```
+data IO
+  = (Done term)
+  | (PutText   text      cont)
+  | (GetText             cont)
+  | (WriteFile file data cont)
+  | (ReadFile  file      cont)
+  | (GetTime             cont)
+  | (Sleep     time      cont)
+  | (DrawImage tree      cont)
+
+```
 
 ### IO/Done
 Represents a completed IO operation.
@@ -105,62 +169,14 @@ Prints text to the console.
 print text = (IO/Call IO/MAGIC "PUT_TEXT" text @x (IO/Done IO/MAGIC x))
 ```
 
-# Usage Examples
-
-## Map
-
-### Map/empty
-Initializes an empty map.
+### get_time
+`get_time` is an IO action that retrieves the current time.
 ```bend
-Map/empty = Map/Leaf
+get_time = (IO/Call IO/MAGIC "GET_TIME" * @x (IO/Done IO/MAGIC x))
 ```
 
-
-### Map/get
-Retrieves a `value` from the `map` based on the `key`.
-
+### sleep
+`sleep` is an IO action that suspends execution for the specified duration.
 ```bend
-Map/get map key =
-  match map {
-    Map/Leaf: (*, map)
-    Map/Node:
-      switch _ = (== 0 key) {
-        0: switch _ = (% key 2) {
-          0:
-            let (got, rest) = (Map/get map.left (/ key 2))
-            (got, (Map/Node map.value rest map.right))
-          _:
-            let (got, rest) = (Map/get map.right (/ key 2))
-            (got, (Map/Node map.value map.left rest))
-        }
-        _: (map.value, map)
-      }
-  }
+sleep hi_lo = (IO/Call IO/MAGIC "PUT_TIME" hi_lo @x (IO/Done IO/MAGIC x))
 ```
-
-
-### Map/set
-Sets a `value` in the `map` at the specified `key`.
-
-```bend
-Map/set map key value =
-  match map {
-    Map/Node:
-      switch _ = (== 0 key) {
-        0: switch _ = (% key 2) {
-          0: (Map/Node map.value (Map/set map.left (/ key 2) value) map.right)
-          _: (Map/Node map.value map.left (Map/set map.right (/ key 2) value))
-        }
-        _: (Map/Node value map.left map.right)
-      }
-    Map/Leaf:
-      switch _ = (== 0 key) {
-        0: switch _ = (% key 2) {
-          0: (Map/Node * (Map/set Map/Leaf (/ key 2) value) Map/Leaf)
-          _: (Map/Node * Map/Leaf (Map/set Map/Leaf (/ key 2) value))
-        }
-        _: (Map/Node value Map/Leaf Map/Leaf)
-      }
-  }
-```
-
