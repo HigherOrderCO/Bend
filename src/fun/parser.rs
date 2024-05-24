@@ -821,8 +821,17 @@ pub trait ParserCommons<'a>: Parser<'a> {
   }
 
   fn parse_bend_name(&mut self) -> ParseResult<Name> {
+    let ini_idx = *self.index();
     let name = self.take_while(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/');
-    if name.is_empty() { self.expected("name") } else { Ok(Name::new(name.to_owned())) }
+    let end_idx = *self.index();
+    if name.contains("__") {
+      let msg = "Variable names are not allowed to contain \"__\".".to_string();
+      self.with_ctx(Err(msg), ini_idx, end_idx)
+    } else if name.is_empty() {
+      self.expected("name")
+    } else {
+      Ok(Name::new(name.to_owned()))
+    }
   }
 
   /// Consumes exactly the text without skipping.

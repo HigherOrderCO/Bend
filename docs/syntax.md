@@ -372,7 +372,10 @@ some_var
 foo/bar
 ```
 
-A variable can be anything matching the regex `[A-Za-z0-9_.-/]+`.
+A variable can be anything matching the regex `[A-Za-z0-9_.-/]+` but with some restrictions:
+
+- It can not start with `//`
+- It can not contain `__`
 
 A variable is a name for some immutable expression. It is possible to rebind variables with the same name.
 
@@ -681,7 +684,10 @@ The constructors inherit the name of their types and become functions (`Tree/Nod
 
 ### Variables
 
-A variable can be anything matching the regex `[A-Za-z0-9_.-/]+`.
+A variable can be anything matching the regex `[A-Za-z0-9_.-/]+` but with some restrictions:
+
+- It can not start with `//`
+- It can not contain `__`
 
 A variable is a name for some immutable expression. It is possible to rebind variables with the same name.
 
