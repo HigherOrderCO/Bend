@@ -805,24 +805,31 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
   }
 
-  fn parse_top_level_name(&mut self) -> ParseResult<Name> {
+  fn parse_restricted_name(&mut self, kind: &str) -> ParseResult<Name> {
     let ini_idx = *self.index();
-    let nam = self.parse_bend_name()?;
+    let name = self.take_while(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/');
+    if name.is_empty() {
+      self.expected("name")?
+    }
+    let name = Name::new(name.to_owned());
     let end_idx = *self.index();
-    if nam.contains("__") {
-      let msg = "Top-level names are not allowed to contain \"__\".".to_string();
+    if name.contains("__") {
+      let msg = format!("{kind} names are not allowed to contain \"__\".");
       self.with_ctx(Err(msg), ini_idx, end_idx)
-    } else if nam.starts_with("//") {
-      let msg = "Top-level names are not allowed to start with \"//\".".to_string();
+    } else if name.starts_with("//") {
+      let msg = format!("{kind} names are not allowed to start with \"//\".");
       self.with_ctx(Err(msg), ini_idx, end_idx)
     } else {
-      Ok(nam)
+      Ok(name)
     }
   }
 
+  fn parse_top_level_name(&mut self) -> ParseResult<Name> {
+    self.parse_restricted_name("Top-level")
+  }
+
   fn parse_bend_name(&mut self) -> ParseResult<Name> {
-    let name = self.take_while(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/');
-    if name.is_empty() { self.expected("name") } else { Ok(Name::new(name.to_owned())) }
+    self.parse_restricted_name("Variable")
   }
 
   /// Consumes exactly the text without skipping.

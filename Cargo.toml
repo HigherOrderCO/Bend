@@ -2,7 +2,7 @@
 name = "bend-lang"
 description = "A high-level, massively parallel programming language"
 license = "Apache-2.0"
-version = "0.2.18"
+version = "0.2.19"
 edition = "2021"
 exclude = ["tests/snapshots/"]
 
