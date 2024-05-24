@@ -153,6 +153,8 @@ and synchronized correctly and efficiently by
 [HVM2](https://github.com/HigherOrderCO/HVM)'s *atomic linker*.
 
 
+- Learn more about Built-ins check [Builtins.md](https://github.com/HigherOrderCO/bend/blob/main/BUILTINS.md).
+
 - To understand the tech behind Bend, check HVM2's [paper](https://paper.higherorderco.com).
 
 - Learn more about Built-ins check [Builtins.md](https://github.com/HigherOrderCO/bend/blob/main/BUILTINS.md).
