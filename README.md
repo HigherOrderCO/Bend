@@ -152,7 +152,10 @@ Long-distance communication is performed by *global beta-reduction* (as per the
 and synchronized correctly and efficiently by
 [HVM2](https://github.com/HigherOrderCO/HVM)'s *atomic linker*.
 
+
 - To understand the tech behind Bend, check HVM2's [paper](https://paper.higherorderco.com).
+
+- Learn more about Built-ins check [Builtins.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
 
 - Bend is developed by [HigherOrderCO.com](https://HigherOrderCO.com) - join our [Discord](https://discord.HigherOrderCO.com)!
 
