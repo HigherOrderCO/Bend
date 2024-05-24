@@ -133,7 +133,7 @@ and synchronized correctly and efficiently by
 
 - For an extensive list of features, check [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
 
-- Learn more about Built-ins check [Builtins.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
+- Learn more about Built-ins check [Builtins.md](https://github.com/HigherOrderCO/bend/blob/main/BUILTINS.md).
 
 - To understand the tech behind Bend, check HVM2's [paper](https://paper.higherorderco.com).
 
