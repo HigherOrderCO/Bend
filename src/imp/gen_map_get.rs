@@ -15,13 +15,21 @@ impl Definition {
 impl Stmt {
   fn gen_map_get(&mut self, id: &mut usize) {
     match self {
-      Stmt::Assign { pat: _, val, nxt } => {
+      Stmt::Assign { pat, val, nxt } => {
+        let key_substitutions =
+          if let AssignPattern::MapSet(_, key) = pat { key.substitute_map_gets(id) } else { Vec::new() };
+
         if let Some(nxt) = nxt {
           nxt.gen_map_get(id);
         }
+
         let substitutions = val.substitute_map_gets(id);
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);
+        }
+
+        if !key_substitutions.is_empty() {
+          *self = gen_get(self, key_substitutions);
         }
       }
       Stmt::Ask { pat: _, val, nxt } => {
