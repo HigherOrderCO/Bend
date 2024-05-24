@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::fun::Name;
 
 use super::{AssignPattern, Definition, Expr, Stmt};
@@ -116,15 +114,16 @@ impl Stmt {
   }
 }
 
-type Substitutions = HashMap<Name, (Name, Box<Expr>)>;
+type Substitutions = Vec<(Name, Name, Box<Expr>)>;
 
 impl Expr {
   fn substitute_map_gets(&mut self, id: &mut usize) -> Substitutions {
     fn go(e: &mut Expr, substitutions: &mut Substitutions, id: &mut usize) {
       match e {
         Expr::MapGet { nam, key } => {
+          go(key, substitutions, id);
           let new_var = gen_map_var(id);
-          substitutions.insert(new_var.clone(), (nam.clone(), key.clone()));
+          substitutions.push((new_var.clone(), nam.clone(), key.clone()));
           *e = Expr::Var { nam: new_var };
         }
         Expr::Call { fun, args, kwargs } => {
@@ -175,8 +174,8 @@ impl Expr {
 }
 
 fn gen_get(current: &mut Stmt, substitutions: Substitutions) -> Stmt {
-  substitutions.into_iter().fold(std::mem::take(current), |acc, next| {
-    let (var, (map_var, key)) = next;
+  substitutions.into_iter().rfold(std::mem::take(current), |acc, next| {
+    let (var, map_var, key) = next;
     let map_get_call = Expr::Var { nam: Name::new("Map/get") };
     let map_get_call = Expr::Call {
       fun: Box::new(map_get_call),
