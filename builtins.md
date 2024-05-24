@@ -1,38 +1,46 @@
+>this is a WIP
+
 # Built-in Types and Functions
+Bend built-in types and functions, this document serves as a reference guide to these built-in features.
 
 ## Types
 
 ### String
 ```bend
-data String = (Cons head ~tail) | (Nil)```
+data String = (Cons head ~tail) | (Nil)
+```
 
 - **Nil**: Represents an empty string.
 - **Cons head ~tail**: Represents a string with a `head` character and a `tail` string.
 
 ### List
 ```bend
-data List = (Cons head ~tail) | (Nil)```
+data List = (Cons head ~tail) | (Nil)
+```
 
 - **Nil**: Represents an empty list.
 - **Cons head ~tail**: Represents a list with a `head` element and a `tail` list.
 
 ### Nat
 ```bend 
-data Nat = (Succ ~pred) | (Zero)```
+data Nat = (Succ ~pred) | (Zero)
+```
 
 - **Succ ~pred**: Represents a natural number successor.
 - **Zero**: Represents the natural number zero.
 
 ### Result
 ```bend
-data Result = (Ok val) | (Err val)```
+data Result = (Ok val) | (Err val)
+```
 
 - **Ok val**: Represents a successful result with value `val`.
 - **Err val**: Represents an error with value `val`.
 
 ### Map
 ```bend
-data Map = (Node value ~left ~right) | (Leaf)```
+data Map = (Node value ~left ~right) | (Leaf)
+```
 
 - **Node value ~left ~right**: Represents a map node with a `value` and `left` and `right` subtrees.
 - **Leaf**: Represents an empty map.
@@ -44,17 +52,20 @@ data Map = (Node value ~left ~right) | (Leaf)```
 #### Map/empty
 Initializes an empty map.
 ```bend
-Map/empty = Map/Leaf```
+Map/empty = Map/Leaf
+```
 
 #### Map/get
 Retrieves a value from the map based on the key.
 ```bend
-Map/get map key = ...```
+Map/get map key = ...
+```
 
 #### Map/set
 Sets a value in the map at the specified key.
 ```bend
-Map/set map key value = ...```
+Map/set map key value = ...
+```
 
 ## IO
 
@@ -67,27 +78,32 @@ Represents a pending IO operation.
 ### IO/MAGIC
 Returns a magic number used internally.
 ```bend
-def IO/MAGIC: return (0xD0CA11, 0xFF1FF1)```
+def IO/MAGIC: return (0xD0CA11, 0xFF1FF1)
+```
 
 ### IO/wrap
 Wraps a value in an IO/Done.
 ```bend
-def IO/wrap(x): return IO/Done(IO/MAGIC, x)```
+def IO/wrap(x): return IO/Done(IO/MAGIC, x)
+```
 
 ### IO/bind
 Chains IO operations.
 ```bend
-def IO/bind(a, b): match a ...```
+def IO/bind(a, b): match a ...
+```
 
 ### call
 Calls an IO function with an argument.
 ```bend
-def call(func, argm): return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))```
+def call(func, argm): return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
+```
 
 ### print
 Prints text to the console.
 ```bend
-print text = (IO/Call IO/MAGIC "PUT_TEXT" text @x (IO/Done IO/MAGIC x))```
+print text = (IO/Call IO/MAGIC "PUT_TEXT" text @x (IO/Done IO/MAGIC x))
+```
 
 # Usage Examples
 
@@ -96,7 +112,8 @@ print text = (IO/Call IO/MAGIC "PUT_TEXT" text @x (IO/Done IO/MAGIC x))```
 ### Map/empty
 Initializes an empty map.
 ```bend
-Map/empty = Map/Leaf```
+Map/empty = Map/Leaf
+```
 
 
 ### Map/get
