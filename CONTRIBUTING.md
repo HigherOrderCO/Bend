@@ -1,4 +1,4 @@
-# Contributng to Bend 
+# Contributing to Bend 
 Thank you for considering contributing to Bend!
 
 ## How to Contribute
