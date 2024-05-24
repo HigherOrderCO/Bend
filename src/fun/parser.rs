@@ -1090,10 +1090,23 @@ pub trait ParserCommons<'a>: Parser<'a> {
     };
     let num_str = self.take_while(move |c| c.is_digit(radix) || c == '_');
     let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
+    // can't merge the first two blocks because || is invalid in let chains
     if let Some(c) = self.peek_one() && c.is_ascii_alphanumeric() {
-      self.expected("valid digit")
+      let base = match radix {
+        16 => "hexadecimal",
+        10 => "decimal",
+        2 => "binary",
+        _ => unreachable!(),
+      };
+      self.expected(format!("valid {base} digit").as_str())
     } else if num_str.is_empty() {
-      self.expected("numeric digit")
+      let base = match radix {
+        16 => "hexadecimal",
+        10 => "decimal",
+        2 => "binary",
+        _ => unreachable!(),
+      };
+      self.expected(format!("valid {base} digit").as_str())
     } else {
       u32::from_str_radix(&num_str, radix).map_err(|e| e.to_string())
     }
