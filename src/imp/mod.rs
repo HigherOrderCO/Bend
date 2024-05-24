@@ -46,9 +46,10 @@ pub struct MatchArm {
   pub rgt: Stmt,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub enum AssignPattern {
   // "*"
+  #[default]
   Eraser,
   // [a-zA-Z_]+
   Var(Name),
