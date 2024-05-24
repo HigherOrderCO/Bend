@@ -75,3 +75,84 @@ Calls an IO function with an argument.
 ### print
 Prints text to the console.
 ```print text = (IO/Call IO/MAGIC "PUT_TEXT" text @x (IO/Done IO/MAGIC x))```
+
+# Usage Examples
+
+## Map
+
+### Map/get
+The `get` function retrieves the value associated with a key from the map. If the key is found, it returns the value and the updated map. If not, it returns a placeholder value and the map.
+
+```Map/get map key =
+  match map {
+    Map/Leaf: (*, map)
+    Map/Node:
+      switch _ = (== 0 key) {
+        0: switch _ = (% key 2) {
+          0:
+            let (got, rest) = (Map/get map.left (/ key 2))
+            (got, (Map/Node map.value rest map.right))
+          _:
+            let (got, rest) = (Map/get map.right (/ key 2))
+            (got, (Map/Node map.value map.left rest))
+        }
+        _: (map.value, map)
+      }
+  }```
+
+
+### Map/set
+The `set` function replaces the `current value` found in the same `key value` in
+the tree, if it has no value, creates a new branch and sets the value in the
+`node`.
+
+```Map/set map key value =
+  match map {
+    Map/Node:
+      switch _ = (== 0 key) {
+        0: switch _ = (% key 2) {
+          0: (Map/Node map.value (Map/set map.left (/ key 2) value) map.right)
+          _: (Map/Node map.value map.left (Map/set map.right (/ key 2) value))
+        }
+        _: (Map/Node value map.left map.right)
+      }
+    Map/Leaf:
+      switch _ = (== 0 key) {
+        0: switch _ = (% key 2) {
+          0: (Map/Node * (Map/set Map/Leaf (/ key 2) value) Map/Leaf)
+          _: (Map/Node * Map/Leaf (Map/set Map/Leaf (/ key 2) value))
+        }
+        _: (Map/Node value Map/Leaf Map/Leaf)
+      }
+  }```
+
+### Map/empty
+Creates an empty tree, containing only a leaf without any value
+Map/empty = Map/Leaf
+
+
+## IO
+
+#IO Impl
+
+STRING_NIL_TAG  = 0
+STRING_CONS_TAG = 1
+
+IO_DONE_TAG       = 0
+IO_PUT_TEXT_TAG   = 1
+IO_GET_TEXT_TAG   = 2
+IO_WRITE_FILE_TAG = 3
+IO_READ_FILE_TAG  = 4
+IO_GET_TIME_TAG   = 5
+IO_SLEEP_TAG      = 6
+IO_DRAW_IMAGE_TAG = 7
+
+data IO
+  = (Done term)
+  | (PutText   text      cont)
+  | (GetText             cont)
+  | (WriteFile file data cont)
+  | (ReadFile  file      cont)
+  | (GetTime             cont)
+  | (Sleep     time      cont)
+  | (DrawImage tree      cont)
