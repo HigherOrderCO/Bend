@@ -373,6 +373,8 @@ type Map:
   Leaf
 ```
 
+Notice that the getter and setter syntax induces an order on things using the map, since every get or set operation depends on the value of the previous map.
+
 ### Mixing syntaxes
 
 As was said in the beginning, Bend offers two flavors of syntax.
