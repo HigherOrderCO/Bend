@@ -94,7 +94,7 @@ Operation | Description | Accepted types | Return type
 
 ### Pattern matching
 
-HVM-lang also includes a `switch` syntax for pattern-matching U24 numbers.
+Bend also includes a `switch` syntax for pattern-matching U24 numbers.
 
 ```rs
 Number.to_church = λn λf λx

@@ -1,14 +1,11 @@
-use hvm::ast::{get_f24, get_i24, get_typ, get_u24};
-
 use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
-  fun::{term_to_net::Labels, Book, FanKind, Name, Op, Pattern, Tag, Term},
-  hvm, maybe_grow,
+  fun::{term_to_net::Labels, Book, FanKind, Name, Num, Op, Pattern, Tag, Term},
+  maybe_grow,
   net::{CtrKind, INet, NodeId, NodeKind, Port, SlotId, ROOT},
 };
+use hvm::hvm::Numb;
 use std::collections::{BTreeSet, HashMap, HashSet};
-
-use super::Num;
 
 /// Converts an Interaction-INet to a Lambda Calculus term
 pub fn net_to_term(
@@ -224,11 +221,12 @@ impl Reader<'_> {
               let opr_node = self.net.enter_port(Port(port0_node, 0)).node();
               let opr_kind = self.net.node(opr_node).kind.clone();
               let opr = if let NodeKind::Num { val } = opr_kind {
-                if get_typ(val) != hvm::ast::TY_SYM {
+                let typ = hvm::hvm::Numb::get_typ(&Numb(val));
+                if typ != hvm::hvm::TY_SYM {
                   self.error(ReadbackError::InvalidNumericOp);
                   return Term::Err;
                 }
-                if let Some(op) = Op::from_native_tag(val, NumType::U24) {
+                if let Some(op) = Op::from_native_tag(typ, NumType::U24) {
                   op
                 } else {
                   self.error(ReadbackError::InvalidNumericOp);
@@ -378,32 +376,32 @@ enum NumType {
 }
 
 impl Op {
-  fn from_native_tag(val: u32, typ: NumType) -> Option<Op> {
+  fn from_native_tag(val: hvm::hvm::Tag, typ: NumType) -> Option<Op> {
     let op = match val {
-      0x4 => Op::ADD,
-      0x5 => Op::SUB,
-      0x6 => Op::MUL,
-      0x7 => Op::DIV,
-      0x8 => Op::REM,
-      0x9 => Op::EQ,
-      0xa => Op::NEQ,
-      0xb => Op::LT,
-      0xc => Op::GT,
-      0xd => {
+      hvm::hvm::OP_ADD => Op::ADD,
+      hvm::hvm::OP_SUB => Op::SUB,
+      hvm::hvm::OP_MUL => Op::MUL,
+      hvm::hvm::OP_DIV => Op::DIV,
+      hvm::hvm::OP_REM => Op::REM,
+      hvm::hvm::OP_EQ => Op::EQ,
+      hvm::hvm::OP_NEQ => Op::NEQ,
+      hvm::hvm::OP_LT => Op::LT,
+      hvm::hvm::OP_GT => Op::GT,
+      hvm::hvm::OP_AND => {
         if typ == NumType::F24 {
           Op::ATN
         } else {
           Op::AND
         }
       }
-      0xe => {
+      hvm::hvm::OP_OR => {
         if typ == NumType::F24 {
           Op::LOG
         } else {
           Op::OR
         }
       }
-      0xf => {
+      hvm::hvm::OP_XOR => {
         if typ == NumType::F24 {
           Op::POW
         } else {
@@ -477,12 +475,12 @@ impl Term {
 }
 
 fn num_from_bits_with_type(val: u32, typ: u32) -> Term {
-  match get_typ(typ) {
+  match hvm::hvm::Numb::get_typ(&Numb(typ)) {
     // No type information, assume u24 by default
-    hvm::ast::TY_SYM => Term::Num { val: Num::U24(get_u24(val)) },
-    hvm::ast::TY_U24 => Term::Num { val: Num::U24(get_u24(val)) },
-    hvm::ast::TY_I24 => Term::Num { val: Num::I24(get_i24(val)) },
-    hvm::ast::TY_F24 => Term::Num { val: Num::F24(get_f24(val)) },
+    hvm::hvm::TY_SYM => Term::Num { val: Num::U24(Numb::get_u24(&Numb(val))) },
+    hvm::hvm::TY_U24 => Term::Num { val: Num::U24(Numb::get_u24(&Numb(val))) },
+    hvm::hvm::TY_I24 => Term::Num { val: Num::I24(Numb::get_i24(&Numb(val))) },
+    hvm::hvm::TY_F24 => Term::Num { val: Num::F24(Numb::get_f24(&Numb(val))) },
     _ => Term::Err,
   }
 }

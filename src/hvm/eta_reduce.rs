@@ -53,21 +53,22 @@
 //!
 //! The pass also reduces subnets such as `(* *) -> *`
 
-use crate::hvm::ast::{Net, Tree};
+use crate::hvm::net_trees_mut;
+
+use super::{tree_children, tree_children_mut};
 use core::ops::RangeFrom;
+use hvm::ast::{Net, Tree};
 use std::collections::HashMap;
 
-impl Net {
-  /// Carries out simple eta-reduction
-  pub fn eta_reduce(&mut self) {
-    let mut phase1 = Phase1::default();
-    for tree in self.trees() {
-      phase1.walk_tree(tree);
-    }
-    let mut phase2 = Phase2 { nodes: phase1.nodes, index: 0 .. };
-    for tree in self.trees_mut() {
-      phase2.reduce_tree(tree);
-    }
+/// Carries out simple eta-reduction
+pub fn eta_reduce_hvm_net(net: &mut Net) {
+  let mut phase1 = Phase1::default();
+  for tree in net_trees_mut(net) {
+    phase1.walk_tree(tree);
+  }
+  let mut phase2 = Phase2 { nodes: phase1.nodes, index: 0 .. };
+  for tree in net_trees_mut(net) {
+    phase2.reduce_tree(tree);
   }
 }
 
@@ -75,13 +76,12 @@ impl Net {
 enum NodeType {
   Ctr(u16),
   Var(isize),
-  Num(u32),
   Era,
   Other,
   Hole,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 struct Phase1<'a> {
   vars: HashMap<&'a str, usize>,
   nodes: Vec<NodeType>,
@@ -90,14 +90,15 @@ struct Phase1<'a> {
 impl<'a> Phase1<'a> {
   fn walk_tree(&mut self, tree: &'a Tree) {
     match tree {
-      Tree::Ctr { lab, ports } => {
-        let last_port = ports.len() - 1;
-        for (idx, i) in ports.iter().enumerate() {
-          if idx != last_port {
-            self.nodes.push(NodeType::Ctr(*lab));
-          }
-          self.walk_tree(i);
-        }
+      Tree::Con { fst, snd } => {
+        self.nodes.push(NodeType::Ctr(0));
+        self.walk_tree(fst);
+        self.walk_tree(snd);
+      }
+      Tree::Dup { fst, snd } => {
+        self.nodes.push(NodeType::Ctr(1));
+        self.walk_tree(fst);
+        self.walk_tree(snd);
       }
       Tree::Var { nam } => {
         if let Some(i) = self.vars.get(&**nam) {
@@ -110,10 +111,9 @@ impl<'a> Phase1<'a> {
         }
       }
       Tree::Era => self.nodes.push(NodeType::Era),
-      Tree::Num { val } => self.nodes.push(NodeType::Num(*val)),
       _ => {
         self.nodes.push(NodeType::Other);
-        for i in tree.children() {
+        for i in tree_children(tree) {
           self.walk_tree(i);
         }
       }
@@ -127,42 +127,42 @@ struct Phase2 {
 }
 
 impl Phase2 {
-  fn reduce_ctr(&mut self, lab: u16, ports: &mut Vec<Tree>, skip: usize) -> NodeType {
-    if skip == ports.len() {
-      return NodeType::Other;
-    }
-    if skip == ports.len() - 1 {
-      return self.reduce_tree(&mut ports[skip]);
-    }
-    let head_index = self.index.next().unwrap();
-    let a = self.reduce_tree(&mut ports[skip]);
-    let b = self.reduce_ctr(lab, ports, skip + 1);
-    if a == b {
-      let reducible = match a {
-        NodeType::Var(delta) => self.nodes[head_index.wrapping_add_signed(delta)] == NodeType::Ctr(lab),
-        NodeType::Era => true,
-        _ => false,
-      };
-      if reducible {
-        ports.pop();
-        return a;
+  fn reduce_ctr(&mut self, tree: &mut Tree, idx: usize) -> NodeType {
+    if let Tree::Con { fst, snd } | Tree::Dup { fst, snd } = tree {
+      let fst_typ = self.reduce_tree(fst);
+      let snd_typ = self.reduce_tree(snd);
+      // If both children are variables with the same offset, and their parent is a ctr of the same label,
+      // then they are eta-reducible and we replace the current node with the first variable.
+      match (fst_typ, snd_typ) {
+        (NodeType::Var(off_lft), NodeType::Var(off_rgt)) => {
+          if off_lft == off_rgt && self.nodes[idx] == self.nodes[(idx as isize + off_lft) as usize] {
+            let Tree::Var { nam } = fst.as_mut() else { unreachable!() };
+            *tree = Tree::Var { nam: std::mem::take(nam) };
+            return NodeType::Var(off_lft);
+          }
+        }
+        (NodeType::Era, NodeType::Era) => {
+          *tree = Tree::Era;
+          return NodeType::Era;
+        }
+        _ => {}
       }
-    }
-    NodeType::Ctr(lab)
-  }
-  fn reduce_tree(&mut self, tree: &mut Tree) -> NodeType {
-    if let Tree::Ctr { lab, ports } = tree {
-      let ty = self.reduce_ctr(*lab, ports, 0);
-      if ports.len() == 1 {
-        *tree = ports.pop().unwrap();
-      }
-      ty
+      self.nodes[idx]
     } else {
-      let index = self.index.next().unwrap();
-      for i in tree.children_mut() {
-        self.reduce_tree(i);
+      unreachable!()
+    }
+  }
+
+  fn reduce_tree(&mut self, tree: &mut Tree) -> NodeType {
+    let idx = self.index.next().unwrap();
+    match tree {
+      Tree::Con { .. } | Tree::Dup { .. } => self.reduce_ctr(tree, idx),
+      _ => {
+        for child in tree_children_mut(tree) {
+          self.reduce_tree(child);
+        }
+        self.nodes[idx]
       }
-      self.nodes[index]
     }
   }
 }

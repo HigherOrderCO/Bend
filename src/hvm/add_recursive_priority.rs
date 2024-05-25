@@ -1,12 +1,11 @@
-use crate::{
-  hvm::ast::{Book, Net, Tree},
-  maybe_grow,
-};
+use super::tree_children;
+use crate::maybe_grow;
+use hvm::ast::{Book, Net, Tree};
 use std::collections::{HashMap, HashSet};
 
 pub fn add_recursive_priority(book: &mut Book) {
   // Direct dependencies
-  let deps = book.iter().map(|(nam, net)| (nam.clone(), dependencies(net))).collect::<HashMap<_, _>>();
+  let deps = book.defs.iter().map(|(nam, net)| (nam.clone(), dependencies(net))).collect::<HashMap<_, _>>();
   // Recursive cycles
   let cycles = cycles(&deps);
 
@@ -14,7 +13,7 @@ pub fn add_recursive_priority(book: &mut Book) {
     // For each function in the cycle, if there are redexes with the
     // next ref in the cycle, add a priority to one of those redexes.
     for i in 0 .. cycle.len() {
-      let cur = book.get_mut(&cycle[i]).unwrap();
+      let cur = book.defs.get_mut(&cycle[i]).unwrap();
       let nxt = &cycle[(i + 1) % cycle.len()];
       add_priority_next_in_cycle(cur, nxt);
     }
@@ -25,7 +24,7 @@ fn add_priority_next_in_cycle(net: &mut Net, nxt: &String) {
   let mut count = 0;
 
   // Count the number of recursive refs
-  for (_, a, b) in net.redexes.iter() {
+  for (_, a, b) in net.rbag.iter() {
     if let Tree::Ref { nam } = a {
       if nam == nxt {
         count += 1;
@@ -40,7 +39,7 @@ fn add_priority_next_in_cycle(net: &mut Net, nxt: &String) {
 
   // If there are more than one recursive ref, add a priority to them.
   if count > 1 {
-    for (pri, a, b) in net.redexes.iter_mut().rev() {
+    for (pri, a, b) in net.rbag.iter_mut().rev() {
       if let Tree::Ref { nam } = a {
         if nam == nxt {
           *pri = true;
@@ -105,7 +104,7 @@ fn find_cycles(
 fn dependencies(net: &Net) -> HashSet<String> {
   let mut deps = HashSet::new();
   dependencies_tree(&net.root, &mut deps);
-  for (_, a, b) in &net.redexes {
+  for (_, a, b) in &net.rbag {
     dependencies_tree(a, &mut deps);
     dependencies_tree(b, &mut deps);
   }
@@ -116,7 +115,7 @@ fn dependencies_tree(tree: &Tree, deps: &mut HashSet<String>) {
   if let Tree::Ref { nam, .. } = tree {
     deps.insert(nam.clone());
   } else {
-    for subtree in tree.children() {
+    for subtree in tree_children(tree) {
       dependencies_tree(subtree, deps);
     }
   }

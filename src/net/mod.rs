@@ -1,4 +1,4 @@
-pub mod hvmc_to_net;
+pub mod hvm_to_net;
 
 use crate::fun::Name;
 pub type BendLab = u16;
@@ -56,12 +56,6 @@ impl CtrKind {
       CtrKind::Tup(Some(_)) => todo!("Tagged tuples not implemented for hvm32"),
       CtrKind::Dup(0) => 1,
       CtrKind::Dup(_) => todo!("Tagged dups/sups not implemented for hvm32"),
-    }
-  }
-  fn from_lab(lab: u16) -> Self {
-    match lab {
-      0 => CtrKind::Con(None),
-      n => CtrKind::Dup(n - 1),
     }
   }
 }
