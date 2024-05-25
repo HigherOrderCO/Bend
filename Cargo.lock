@@ -62,7 +62,7 @@ dependencies = [
 
 [[package]]
 name = "bend-lang"
-version = "0.2.20"
+version = "0.2.21"
 dependencies = [
  "TSPL",
  "clap",
