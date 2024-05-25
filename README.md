@@ -25,18 +25,32 @@ A Quick Demo
 
 > If you're having issues or have a question about Bend, please first read the [Known Issues](https://github.com/HigherOrderCO/Bend/blob/main/KNOWN_ISSUES.md) page and check if your question has already been addressed.
 
+> **_Note_: [Only Nvidia GPUs are supported at the moment](https://github.com/HigherOrderCO/Bend/issues/341).**
+
+### With Cargo
+
 First, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml).
 
 If you want to use the C runtime, install a C compiler (like GCC or Clang).
 If you want to use the CUDA runtime, install the CUDA toolkit (CUDA and `nvcc`) version 12.x.
-
-> **_Note_: [Only Nvidia GPUs are supported at the moment](https://github.com/HigherOrderCO/Bend/issues/341).**
 
 Then, install both HVM2 and Bend with:
 
 ```sh
 cargo +nightly install hvm
 cargo +nightly install bend-lang
+```
+
+### With Nix
+
+> **_Note_: [You may need to enable the nix unstable channel](https://nixos.wiki/wiki/Nix_channels).**
+
+Bend is also available as a [nix package](https://search.nixos.org/packages?channel=unstable&show=bend&from=0&size=50&sort=relevance&type=packages&query=bend):
+
+You can use it with:
+
+```sh
+nix-shell -p bend
 ```
 
 Finally, write some Bend file, and run it with one of these commands:
