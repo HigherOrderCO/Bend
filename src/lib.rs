@@ -1,30 +1,32 @@
 #![feature(box_patterns)]
 #![feature(let_chains)]
-#![allow(incomplete_features, clippy::missing_safety_doc, clippy::new_ret_no_self)]
-#![feature(generic_const_exprs)]
 
-use crate::fun::{book_to_nets, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Term};
-use diagnostics::{Diagnostics, DiagnosticsConfig, ERR_INDENT_SIZE};
-use hvm::{
-  add_recursive_priority::add_recursive_priority,
-  ast::Net,
-  check_net_size::{check_net_sizes, MAX_NET_SIZE},
-  mutual_recursion,
+use crate::{
+  fun::{book_to_hvm, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Term},
+  hvm::{
+    add_recursive_priority::add_recursive_priority,
+    check_net_size::{check_net_sizes, MAX_NET_SIZE},
+    display_hvm_book,
+    eta_reduce::eta_reduce_hvm_net,
+    inline::inline_hvm_book,
+    mutual_recursion,
+    prune::prune_hvm_book,
+  },
 };
-use net::hvmc_to_net::hvmc_to_net;
-use std::str::FromStr;
+use diagnostics::{Diagnostics, DiagnosticsConfig, ERR_INDENT_SIZE};
+use net::hvm_to_net::hvm_to_net;
 
 pub mod diagnostics;
 pub mod fun;
 pub mod hvm;
 pub mod imp;
 pub mod net;
+mod utils;
 
 pub use fun::load_book::load_file_to_book;
 
 pub const ENTRY_POINT: &str = "main";
 pub const HVM1_ENTRY_POINT: &str = "Main";
-
 pub const HVM_OUTPUT_END_MARKER: &str = "Result: ";
 
 pub fn check_book(
@@ -45,20 +47,21 @@ pub fn compile_book(
 ) -> Result<CompileResult, Diagnostics> {
   let mut diagnostics = desugar_book(book, opts.clone(), diagnostics_cfg, args)?;
 
-  let (mut hvm_book, labels) = book_to_nets(book, &mut diagnostics)?;
+  let (mut hvm_book, labels) = book_to_hvm(book, &mut diagnostics)?;
 
   if opts.eta {
-    hvm_book.values_mut().for_each(hvm::ast::Net::eta_reduce);
+    hvm_book.defs.values_mut().for_each(eta_reduce_hvm_net);
   }
 
   mutual_recursion::check_cycles(&hvm_book, &mut diagnostics)?;
+
   if opts.eta {
-    hvm_book.values_mut().for_each(hvm::ast::Net::eta_reduce);
+    hvm_book.defs.values_mut().for_each(eta_reduce_hvm_net);
   }
 
   if opts.inline {
     diagnostics.start_pass();
-    if let Err(e) = hvm_book.inline() {
+    if let Err(e) = inline_hvm_book(&mut hvm_book) {
       diagnostics.add_book_error(format!("During inlining:\n{:ERR_INDENT_SIZE$}{}", "", e));
     }
     diagnostics.fatal(())?;
@@ -66,7 +69,7 @@ pub fn compile_book(
 
   if opts.prune {
     let prune_entrypoints = vec![book.hvmc_entrypoint().to_string()];
-    hvm_book.prune(&prune_entrypoints);
+    prune_hvm_book(&mut hvm_book, &prune_entrypoints);
   }
 
   if opts.check_net_size {
@@ -75,7 +78,7 @@ pub fn compile_book(
 
   add_recursive_priority(&mut hvm_book);
 
-  Ok(CompileResult { core_book: hvm_book, labels, diagnostics })
+  Ok(CompileResult { hvm_book, labels, diagnostics })
 }
 
 pub fn desugar_book(
@@ -160,7 +163,7 @@ pub fn run_book(
   args: Option<Vec<Term>>,
   cmd: &str,
 ) -> Result<Option<(Term, String, Diagnostics)>, Diagnostics> {
-  let CompileResult { core_book, labels, diagnostics } =
+  let CompileResult { hvm_book: core_book, labels, diagnostics } =
     compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args)?;
 
   // TODO: Printing should be taken care by the cli module, but we'd
@@ -177,14 +180,14 @@ pub fn run_book(
 }
 
 pub fn readback_hvm_net(
-  net: &Net,
+  net: &::hvm::ast::Net,
   book: &Book,
   labels: &Labels,
   linear: bool,
   adt_encoding: AdtEncoding,
 ) -> (Term, Diagnostics) {
   let mut diags = Diagnostics::default();
-  let net = hvmc_to_net(net);
+  let net = hvm_to_net(net);
   let mut term = net_to_term(&net, book, labels, linear, &mut diags);
   term.expand_generated(book);
   term.resugar_strings(adt_encoding);
@@ -193,7 +196,7 @@ pub fn readback_hvm_net(
 }
 
 /// Runs an HVM book by invoking HVM as a subprocess.
-fn run_hvm(book: &hvm::ast::Book, cmd: &str) -> Result<String, String> {
+fn run_hvm(book: &::hvm::ast::Book, cmd: &str) -> Result<String, String> {
   fn filter_hvm_output(
     mut stream: impl std::io::Read + Send,
     mut output: impl std::io::Write + Send,
@@ -237,7 +240,7 @@ fn run_hvm(book: &hvm::ast::Book, cmd: &str) -> Result<String, String> {
   }
 
   let out_path = ".out.hvm";
-  std::fs::write(out_path, book.to_string()).map_err(|x| x.to_string())?;
+  std::fs::write(out_path, display_hvm_book(book).to_string()).map_err(|x| x.to_string())?;
   let mut process = std::process::Command::new("hvm")
     .arg(cmd)
     .arg(out_path)
@@ -258,14 +261,15 @@ fn run_hvm(book: &hvm::ast::Book, cmd: &str) -> Result<String, String> {
 }
 
 /// Reads the final output from HVM and separates the extra information.
-fn parse_hvm_output(out: &str) -> Result<(Net, String), String> {
+fn parse_hvm_output(out: &str) -> Result<(::hvm::ast::Net, String), String> {
   let Some((result, stats)) = out.split_once('\n') else {
     return Err(format!(
       "Failed to parse result from HVM (unterminated result).\nOutput from HVM was:\n{:?}",
       out
     ));
   };
-  let Ok(net) = hvm::ast::Net::from_str(result) else {
+  let mut p = ::hvm::ast::CoreParser::new(result);
+  let Ok(net) = p.parse_net() else {
     return Err(format!("Failed to parse result from HVM (invalid net).\nOutput from HVM was:\n{:?}", out));
   };
   Ok((net, stats.to_string()))
@@ -401,7 +405,7 @@ impl std::fmt::Display for AdtEncoding {
 
 pub struct CompileResult {
   pub diagnostics: Diagnostics,
-  pub core_book: hvm::ast::Book,
+  pub hvm_book: ::hvm::ast::Book,
   pub labels: Labels,
 }
 

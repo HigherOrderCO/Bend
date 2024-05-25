@@ -71,7 +71,7 @@ def radix(n):
   r = swap(n & 512, r, Map_/Free)
   return radix2(n, r)
 
-# At the moment, we need to manually break very large functiions into smaller ones
+# At the moment, we need to manually break very large functions into smaller ones
 # if we want to run this program on the GPU.
 # In a future version of Bend, we will be able to do this automatically.
 def radix2(n, r):

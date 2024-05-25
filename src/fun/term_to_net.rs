@@ -1,39 +1,37 @@
 use crate::{
   diagnostics::Diagnostics,
-  fun::{Book, Name, Pattern, Tag, Term},
-  hvm, maybe_grow,
+  fun::{num_to_name, Book, FanKind, Name, Op, Pattern, Term},
+  hvm::{net_trees, tree_children},
+  maybe_grow,
   net::CtrKind::{self, *},
 };
+use hvm::ast::{Net, Tree};
+use loaned::LoanedMut;
 use std::{
   collections::{hash_map::Entry, HashMap},
   ops::{Index, IndexMut},
 };
 
-use hvm::ast::{Net, Tree};
-use loaned::LoanedMut;
-
-use super::{num_to_name, FanKind, Op};
-
 #[derive(Debug, Clone)]
 pub struct ViciousCycleErr;
 
-pub fn book_to_nets(book: &Book, diags: &mut Diagnostics) -> Result<(hvm::ast::Book, Labels), Diagnostics> {
+pub fn book_to_hvm(book: &Book, diags: &mut Diagnostics) -> Result<(hvm::ast::Book, Labels), Diagnostics> {
   diags.start_pass();
 
-  let mut hvmc = hvm::ast::Book::default();
+  let mut hvm_book = hvm::ast::Book { defs: Default::default() };
   let mut labels = Labels::default();
 
   let main = book.entrypoint.as_ref().unwrap();
 
   for def in book.defs.values() {
     for rule in def.rules.iter() {
-      let net = term_to_net(&rule.body, &mut labels);
+      let net = term_to_hvm(&rule.body, &mut labels);
 
       let name = if def.name == *main { book.hvmc_entrypoint().to_string() } else { def.name.0.to_string() };
 
       match net {
         Ok(net) => {
-          hvmc.insert(name, net);
+          hvm_book.defs.insert(name, net);
         }
         Err(err) => diags.add_inet_error(err, name),
       }
@@ -43,12 +41,12 @@ pub fn book_to_nets(book: &Book, diags: &mut Diagnostics) -> Result<(hvm::ast::B
   labels.con.finish();
   labels.dup.finish();
 
-  diags.fatal((hvmc, labels))
+  diags.fatal((hvm_book, labels))
 }
 
 /// Converts an LC term into an IC net.
-pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, String> {
-  let mut net = Net::default();
+pub fn term_to_hvm(term: &Term, labels: &mut Labels) -> Result<Net, String> {
+  let mut net = Net { root: Tree::Era, rbag: Default::default() };
 
   let mut state = EncodeTermState {
     lets: Default::default(),
@@ -61,11 +59,11 @@ pub fn term_to_net(term: &Term, labels: &mut Labels) -> Result<Net, String> {
   };
 
   state.encode_term(term, Place::Hole(&mut net.root));
-  LoanedMut::from(std::mem::take(&mut state.redexes)).place(&mut net.redexes);
+  LoanedMut::from(std::mem::take(&mut state.redexes)).place(&mut net.rbag);
 
   let EncodeTermState { created_nodes, .. } = { state };
 
-  let found_nodes = net.trees().map(count_nodes).sum::<usize>();
+  let found_nodes = net_trees(&net).map(count_nodes).sum::<usize>();
   if created_nodes != found_nodes {
     return Err("Found term that compiles into an inet with a vicious cycle".into());
   }
@@ -86,7 +84,7 @@ struct EncodeTermState<'t, 'l> {
 
 fn count_nodes(tree: &Tree) -> usize {
   maybe_grow(|| {
-    usize::from(tree.children().next().is_some()) + tree.children().map(count_nodes).sum::<usize>()
+    usize::from(tree_children(tree).next().is_some()) + tree_children(tree).map(count_nodes).sum::<usize>()
   })
 }
 
@@ -111,7 +109,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         Term::Link { nam } => self.link_var(true, nam, up),
         Term::Ref { nam } => self.link(up, Place::Tree(LoanedMut::new(Tree::Ref { nam: nam.to_string() }))),
         Term::Num { val } => {
-          let val = val.to_bits();
+          let val = hvm::ast::Numb(val.to_bits());
           self.link(up, Place::Tree(LoanedMut::new(Tree::Num { val })))
         }
         // A lambda becomes to a con node. Ports:
@@ -144,10 +142,12 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           assert!(with.is_empty());
           assert!(rules.len() == 2);
 
-          self.created_nodes += 1;
+          self.created_nodes += 2;
+          let loaned = Tree::Swi { fst: Box::new(Tree::Con{fst: Box::new(Tree::Era), snd: Box::new(Tree::Era)}), snd: Box::new(Tree::Era)};
           let ((zero, succ, out), node) =
-            LoanedMut::loan_with(Tree::Mat { zero: hole(), succ: hole(), out: hole() }, |t, l| {
-              let Tree::Mat { zero, succ, out, .. } = t else { unreachable!() };
+            LoanedMut::loan_with(loaned, |t, l| {
+              let Tree::Swi { fst, snd: out } = t else { unreachable!() };
+              let Tree::Con { fst:zero, snd: succ } = fst.as_mut() else { unreachable!() };
               (l.loan_mut(zero), l.loan_mut(succ), l.loan_mut(out))
             });
 
@@ -172,7 +172,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
             // Partially apply with fst
             (Term::Num { val }, snd) => {
               let val = val.to_bits();
-              let val = (val & !0x1F) | opr.to_native_tag();
+              let val = hvm::ast::Numb((val & !0x1F) | opr.to_native_tag() as u32);
               let fst = Place::Tree(LoanedMut::new(Tree::Num { val }));
               let node = self.new_opr();
               self.link(fst, node.0);
@@ -183,7 +183,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
             (fst, Term::Num { val }) => {
               if [Op::POW, Op::ATN, Op::LOG].contains(opr) {
                 // POW, ATN and LOG share tags with AND, OR and XOR, so don't flip or results will be wrong
-                let opr_val = hvm::ast::new_sym(opr.to_native_tag());
+                let opr_val = hvm::ast::Numb(hvm::hvm::Numb::new_sym(opr.to_native_tag()).0);
                 let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
                 let node1 = self.new_opr();
                 self.encode_term(fst, node1.0);
@@ -195,7 +195,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
               } else {
                 // flip
                 let val = val.to_bits();
-                let val = (val & !0x1F) | hvm::ast::flip_sym(opr.to_native_tag());
+                let val = hvm::ast::Numb((val & !0x1F) | flip_sym(opr.to_native_tag()) as u32);
                 let snd = Place::Tree(LoanedMut::new(Tree::Num { val }));
                 let node = self.new_opr();
                 self.encode_term(fst, node.0);
@@ -205,7 +205,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
             }
             // Don't partially apply
             (fst, snd) => {
-              let opr_val = hvm::ast::new_sym(opr.to_native_tag());
+              let opr_val = hvm::ast::Numb(hvm::hvm::Numb::new_sym(opr.to_native_tag()).0);
               let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
               let node1 = self.new_opr();
               self.encode_term(fst, node1.0);
@@ -252,10 +252,12 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
 
   fn link(&mut self, a: Place<'t>, b: Place<'t>) {
     match (a, b) {
-      (Place::Tree(a), Place::Tree(b)) => self.redexes.push(LoanedMut::merge(Default::default(), |r, m| {
-        m.place(b, &mut r.1);
-        m.place(a, &mut r.2);
-      })),
+      (Place::Tree(a), Place::Tree(b)) => {
+        self.redexes.push(LoanedMut::merge((false, Tree::Era, Tree::Era), |r, m| {
+          m.place(b, &mut r.1);
+          m.place(a, &mut r.2);
+        }))
+      }
       (Place::Tree(t), Place::Hole(h)) | (Place::Hole(h), Place::Tree(t)) => {
         t.place(h);
       }
@@ -277,20 +279,25 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
 
   fn new_ctr(&mut self, kind: CtrKind) -> (Place<'t>, Place<'t>, Place<'t>) {
     self.created_nodes += 1;
-    let (ports, node) =
-      LoanedMut::loan_with(Tree::Ctr { lab: kind.to_lab(), ports: vec![Tree::Era, Tree::Era] }, |t, l| {
-        let Tree::Ctr { ports, .. } = t else { unreachable!() };
-        l.loan_mut(ports)
-      });
-    let (a, b) = ports.split_at_mut(1);
-    (Place::Tree(node), Place::Hole(&mut a[0]), Place::Hole(&mut b[0]))
+    let node = match kind {
+      CtrKind::Con(None) => Tree::Con { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) },
+      CtrKind::Dup(0) => Tree::Dup { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) },
+      CtrKind::Tup(None) => Tree::Con { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) },
+      _ => unreachable!(),
+    };
+    let ((a, b), node) = LoanedMut::loan_with(node, |t, l| match t {
+      Tree::Con { fst, snd } => (l.loan_mut(fst), l.loan_mut(snd)),
+      Tree::Dup { fst, snd } => (l.loan_mut(fst), l.loan_mut(snd)),
+      _ => unreachable!(),
+    });
+    (Place::Tree(node), Place::Hole(a), Place::Hole(b))
   }
 
   fn new_opr(&mut self) -> (Place<'t>, Place<'t>, Place<'t>) {
     self.created_nodes += 1;
     let ((fst, snd), node) =
-      LoanedMut::loan_with(Tree::Op { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) }, |t, l| {
-        let Tree::Op { fst, snd } = t else { unreachable!() };
+      LoanedMut::loan_with(Tree::Opr { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) }, |t, l| {
+        let Tree::Opr { fst, snd } = t else { unreachable!() };
         (l.loan_mut(fst), l.loan_mut(snd))
       });
     (Place::Tree(node), Place::Hole(fst), Place::Hole(snd))
@@ -319,7 +326,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
     i
   }
 
-  fn fan_kind(&mut self, fan: &FanKind, tag: &Tag) -> CtrKind {
+  fn fan_kind(&mut self, fan: &FanKind, tag: &crate::fun::Tag) -> CtrKind {
     let lab = self.labels[*fan].generate(tag);
     if *fan == FanKind::Tup { Tup(lab) } else { Dup(lab.unwrap()) }
   }
@@ -374,7 +381,8 @@ impl IndexMut<FanKind> for Labels {
 impl LabelGenerator {
   // If some tag and new generate a new label, otherwise return the generated label.
   // If none use the implicit label counter.
-  fn generate(&mut self, tag: &Tag) -> Option<u16> {
+  fn generate(&mut self, tag: &crate::fun::Tag) -> Option<u16> {
+    use crate::fun::Tag;
     match tag {
       Tag::Named(_name) => {
         todo!("Named tags not implemented for hvm32");
@@ -393,7 +401,8 @@ impl LabelGenerator {
     }
   }
 
-  pub fn to_tag(&self, label: Option<u16>) -> Tag {
+  pub fn to_tag(&self, label: Option<u16>) -> crate::fun::Tag {
+    use crate::fun::Tag;
     match label {
       Some(label) => match self.label_to_name.get(&label) {
         Some(name) => Tag::Named(name.clone()),
@@ -415,31 +424,45 @@ impl LabelGenerator {
   }
 }
 
-fn hole<T: Default>() -> T {
-  T::default()
+impl Op {
+  fn to_native_tag(self) -> hvm::hvm::Tag {
+    match self {
+      Op::ADD => hvm::hvm::OP_ADD,
+      Op::SUB => hvm::hvm::OP_SUB,
+      Op::MUL => hvm::hvm::OP_MUL,
+      Op::DIV => hvm::hvm::OP_DIV,
+      Op::REM => hvm::hvm::OP_REM,
+      Op::EQ => hvm::hvm::OP_EQ,
+      Op::NEQ => hvm::hvm::OP_NEQ,
+      Op::LT => hvm::hvm::OP_LT,
+      Op::GT => hvm::hvm::OP_GT,
+      Op::AND => hvm::hvm::OP_AND,
+      Op::OR => hvm::hvm::OP_OR,
+      Op::XOR => hvm::hvm::OP_XOR,
+      Op::SHL => hvm::hvm::OP_SHL,
+      Op::SHR => hvm::hvm::OP_SHR,
+
+      Op::ATN => hvm::hvm::OP_AND,
+      Op::LOG => hvm::hvm::OP_OR,
+      Op::POW => hvm::hvm::OP_XOR,
+    }
+  }
 }
 
-impl Op {
-  fn to_native_tag(self) -> u32 {
-    match self {
-      Op::ADD => hvm::ast::OP_ADD,
-      Op::SUB => hvm::ast::OP_SUB,
-      Op::MUL => hvm::ast::OP_MUL,
-      Op::DIV => hvm::ast::OP_DIV,
-      Op::REM => hvm::ast::OP_REM,
-      Op::EQ => hvm::ast::OP_EQ,
-      Op::NEQ => hvm::ast::OP_NEQ,
-      Op::LT => hvm::ast::OP_LT,
-      Op::GT => hvm::ast::OP_GT,
-      Op::AND => hvm::ast::OP_AND,
-      Op::OR => hvm::ast::OP_OR,
-      Op::XOR => hvm::ast::OP_XOR,
-      Op::SHL => hvm::ast::OP_SHL,
-      Op::SHR => hvm::ast::OP_SHR,
-
-      Op::ATN => hvm::ast::OP_AND,
-      Op::LOG => hvm::ast::OP_OR,
-      Op::POW => hvm::ast::OP_XOR,
-    }
+fn flip_sym(tag: hvm::hvm::Tag) -> hvm::hvm::Tag {
+  match tag {
+    hvm::hvm::OP_SUB => hvm::hvm::FP_SUB,
+    hvm::hvm::FP_SUB => hvm::hvm::OP_SUB,
+    hvm::hvm::OP_DIV => hvm::hvm::FP_DIV,
+    hvm::hvm::FP_DIV => hvm::hvm::OP_DIV,
+    hvm::hvm::OP_REM => hvm::hvm::FP_REM,
+    hvm::hvm::FP_REM => hvm::hvm::OP_REM,
+    hvm::hvm::OP_LT => hvm::hvm::OP_GT,
+    hvm::hvm::OP_GT => hvm::hvm::OP_LT,
+    hvm::hvm::OP_SHL => hvm::hvm::FP_SHL,
+    hvm::hvm::FP_SHL => hvm::hvm::OP_SHL,
+    hvm::hvm::OP_SHR => hvm::hvm::FP_SHR,
+    hvm::hvm::FP_SHR => hvm::hvm::OP_SHR,
+    _ => tag,
   }
 }

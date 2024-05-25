@@ -2,8 +2,8 @@ use bend::{
   compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   fun::{load_book::do_parse_book, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Name, Term},
-  hvm,
-  net::hvmc_to_net::hvmc_to_net,
+  hvm::display_hvm_book,
+  net::hvm_to_net::hvm_to_net,
   run_book, AdtEncoding, CompileOpts, RunOpts,
 };
 use insta::assert_snapshot;
@@ -13,7 +13,6 @@ use std::{
   fmt::Write,
   io::Read,
   path::{Path, PathBuf},
-  str::FromStr,
 };
 use stdext::function_name;
 use walkdir::WalkDir;
@@ -109,7 +108,7 @@ fn compile_file() {
     let diagnostics_cfg = DiagnosticsConfig { unused_definition: Severity::Allow, ..Default::default() };
 
     let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None)?;
-    Ok(format!("{}{}", res.diagnostics, res.core_book))
+    Ok(format!("{}{}", res.diagnostics, display_hvm_book(&res.hvm_book)))
   })
 }
 
@@ -125,7 +124,7 @@ fn compile_file_o_all() {
     };
 
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
-    Ok(format!("{}{}", res.diagnostics, res.core_book))
+    Ok(format!("{}{}", res.diagnostics, display_hvm_book(&res.hvm_book)))
   })
 }
 
@@ -136,7 +135,7 @@ fn compile_file_o_no_all() {
     let compile_opts = CompileOpts::default().set_no_all();
     let diagnostics_cfg = DiagnosticsConfig::default();
     let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None)?;
-    Ok(format!("{}", res.core_book))
+    Ok(format!("{}", display_hvm_book(&res.hvm_book)))
   })
 }
 
@@ -205,9 +204,10 @@ fn run_lazy() {
 #[test]
 fn readback_lnet() {
   run_golden_test_dir(function_name!(), &|code, _| {
-    let net = hvm::ast::Net::from_str(code)?;
+    let mut p = hvm::ast::CoreParser::new(code);
+    let net = p.parse_net()?;
     let book = Book::default();
-    let compat_net = hvmc_to_net(&net);
+    let compat_net = hvm_to_net(&net);
     let mut diags = Diagnostics::default();
     let term = net_to_term(&compat_net, &book, &Labels::default(), false, &mut diags);
     Ok(format!("{}{}", diags, term))
@@ -339,7 +339,7 @@ fn compile_entrypoint() {
     book.entrypoint = Some(Name::new("foo"));
     let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
     let res = compile_book(&mut book, CompileOpts::default(), diagnostics_cfg, None)?;
-    Ok(format!("{}{}", res.diagnostics, res.core_book))
+    Ok(format!("{}{}", res.diagnostics, display_hvm_book(&res.hvm_book)))
   })
 }
 
@@ -386,7 +386,7 @@ fn mutual_recursion() {
     let mut book = do_parse_book(code, path, Book::builtins())?;
     let opts = CompileOpts { merge: true, ..CompileOpts::default() };
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
-    Ok(format!("{}{}", res.diagnostics, res.core_book))
+    Ok(format!("{}{}", res.diagnostics, display_hvm_book(&res.hvm_book)))
   })
 }
 
@@ -460,6 +460,6 @@ fn scott_triggers_unused() {
     let diagnostics_cfg =
       DiagnosticsConfig { unused_definition: Severity::Error, ..DiagnosticsConfig::default() };
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
-    Ok(format!("{}{}", res.diagnostics, res.core_book))
+    Ok(format!("{}{}", res.diagnostics, display_hvm_book(&res.hvm_book)))
   })
 }

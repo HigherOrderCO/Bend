@@ -59,7 +59,7 @@ If you have a set of mutually recursive functions, you only need to make one of 
 
 ### Automatic optimization
 
-HVM-lang carries out [match linearization](compiler-options.md#linearize-matches) and [combinator floating](compiler-options.md#float-combinators) optimizations, enabled through the CLI, which are active by default in strict mode.
+Bend carries out [match linearization](compiler-options.md#linearize-matches) and [combinator floating](compiler-options.md#float-combinators) optimizations, enabled through the CLI, which are active by default in strict mode.
 
 Consider the code below:
 
