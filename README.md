@@ -25,7 +25,7 @@ A Quick Demo
 
 > If you're having issues or have a question about Bend, please first read the [Known Issues](https://github.com/HigherOrderCO/Bend/blob/main/KNOWN_ISSUES.md) page and check if your question has already been addressed.
 
-First, install [Rust nightly](https://www.oreilly.com/library/view/rust-programming-by/9781788390637/e07dc768-de29-482e-804b-0274b4bef418.xhtml).
+First, install [Rust](https://www.rust-lang.org/tools/install).
 
 If you want to use the C runtime, install a C compiler (like GCC or Clang).
 If you want to use the CUDA runtime, install the CUDA toolkit (CUDA and `nvcc`) version 12.x.
@@ -35,8 +35,8 @@ If you want to use the CUDA runtime, install the CUDA toolkit (CUDA and `nvcc`) 
 Then, install both HVM2 and Bend with:
 
 ```sh
-cargo +nightly install hvm
-cargo +nightly install bend-lang
+cargo install hvm
+cargo install bend-lang
 ```
 
 Finally, write some Bend file, and run it with one of these commands:

@@ -12,7 +12,7 @@ pub fn add_recursive_priority(book: &mut Book) {
   for cycle in cycles {
     // For each function in the cycle, if there are redexes with the
     // next ref in the cycle, add a priority to one of those redexes.
-    for i in 0 .. cycle.len() {
+    for i in 0..cycle.len() {
       let cur = book.defs.get_mut(&cycle[i]).unwrap();
       let nxt = &cycle[(i + 1) % cycle.len()];
       add_priority_next_in_cycle(cur, nxt);
@@ -81,7 +81,7 @@ fn find_cycles(
     // Check if the current ref is already in the stack, which indicates a cycle.
     if let Some(cycle_start) = stack.iter().position(|n| n == nam) {
       // If found, add the cycle to the cycles vector.
-      cycles.push(stack[cycle_start ..].to_vec());
+      cycles.push(stack[cycle_start..].to_vec());
       return;
     }
     // If the ref has not been visited yet, mark it as visited.

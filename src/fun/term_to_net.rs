@@ -328,7 +328,11 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
 
   fn fan_kind(&mut self, fan: &FanKind, tag: &crate::fun::Tag) -> CtrKind {
     let lab = self.labels[*fan].generate(tag);
-    if *fan == FanKind::Tup { Tup(lab) } else { Dup(lab.unwrap()) }
+    if *fan == FanKind::Tup {
+      Tup(lab)
+    } else {
+      Dup(lab.unwrap())
+    }
   }
 
   fn link_var(&mut self, global: bool, name: &Name, place: Place<'t>) {

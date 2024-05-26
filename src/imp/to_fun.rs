@@ -59,14 +59,17 @@ impl Stmt {
         };
         let term = fun::Term::Let {
           pat: Box::new(fun::Pattern::Var(Some(map.clone()))),
-          val: Box::new(fun::Term::call(fun::Term::Ref { nam: fun::Name::new("Map/set") }, [
-            fun::Term::Var { nam: map },
-            key.to_fun(),
-            val.to_fun(),
-          ])),
+          val: Box::new(fun::Term::call(
+            fun::Term::Ref { nam: fun::Name::new("Map/set") },
+            [fun::Term::Var { nam: map }, key.to_fun(), val.to_fun()],
+          )),
           nxt: Box::new(nxt),
         };
-        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+        if let Some(pat) = nxt_pat {
+          StmtToFun::Assign(pat, term)
+        } else {
+          StmtToFun::Return(term)
+        }
       }
       Stmt::Assign { pat: AssignPattern::MapSet(..), val: _, nxt: None } => {
         return Err("Branch ends with map assignment.".to_string());
@@ -79,7 +82,11 @@ impl Stmt {
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
         let term = fun::Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) };
-        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+        if let Some(pat) = nxt_pat {
+          StmtToFun::Assign(pat, term)
+        } else {
+          StmtToFun::Return(term)
+        }
       }
       Stmt::Assign { pat, val, nxt: None } => {
         let pat = pat.into_fun();
@@ -100,7 +107,11 @@ impl Stmt {
           }),
           nxt: Box::new(nxt),
         };
-        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+        if let Some(pat) = nxt_pat {
+          StmtToFun::Assign(pat, term)
+        } else {
+          StmtToFun::Return(term)
+        }
       }
       Stmt::If { cond, then, otherwise, nxt } => {
         let (pat, then, else_) = match (then.into_fun()?, otherwise.into_fun()?) {
@@ -266,7 +277,11 @@ impl Stmt {
         };
         let term =
           fun::Term::Ask { pat: Box::new(pat.into_fun()), val: Box::new(val.to_fun()), nxt: Box::new(nxt) };
-        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+        if let Some(pat) = nxt_pat {
+          StmtToFun::Assign(pat, term)
+        } else {
+          StmtToFun::Return(term)
+        }
       }
       Stmt::Open { typ, var, nxt } => {
         let (nxt_pat, nxt) = match nxt.into_fun()? {
@@ -274,7 +289,11 @@ impl Stmt {
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
         let term = fun::Term::Open { typ, var, bod: Box::new(nxt) };
-        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+        if let Some(pat) = nxt_pat {
+          StmtToFun::Assign(pat, term)
+        } else {
+          StmtToFun::Return(term)
+        }
       }
       Stmt::Use { nam, val, nxt } => {
         let (nxt_pat, nxt) = match nxt.into_fun()? {
@@ -282,7 +301,11 @@ impl Stmt {
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
         let term = fun::Term::Use { nam: Some(nam), val: Box::new(val.to_fun()), nxt: Box::new(nxt) };
-        if let Some(pat) = nxt_pat { StmtToFun::Assign(pat, term) } else { StmtToFun::Return(term) }
+        if let Some(pat) = nxt_pat {
+          StmtToFun::Assign(pat, term)
+        } else {
+          StmtToFun::Return(term)
+        }
       }
       Stmt::Return { term } => StmtToFun::Return(term.to_fun()),
       Stmt::Err => unreachable!(),
@@ -332,9 +355,10 @@ impl Expr {
         const ITER_TAIL: &str = "%iter.tail";
         const ITER_HEAD: &str = "%iter.head";
 
-        let cons_branch = fun::Term::call(fun::Term::r#ref(LCONS), [term.to_fun(), fun::Term::Var {
-          nam: Name::new(ITER_TAIL),
-        }]);
+        let cons_branch = fun::Term::call(
+          fun::Term::r#ref(LCONS),
+          [term.to_fun(), fun::Term::Var { nam: Name::new(ITER_TAIL) }],
+        );
         let cons_branch = if let Some(cond) = cond {
           fun::Term::Swt {
             arg: Box::new(cond.to_fun()),
@@ -391,7 +415,11 @@ fn wrap_nxt_assign_stmt(
         StmtToFun::Assign(pat, term) => (Some(pat), term),
       };
       let term = fun::Term::Let { pat: Box::new(pat), val: Box::new(term), nxt: Box::new(nxt) };
-      if let Some(pat) = nxt_pat { Ok(StmtToFun::Assign(pat, term)) } else { Ok(StmtToFun::Return(term)) }
+      if let Some(pat) = nxt_pat {
+        Ok(StmtToFun::Assign(pat, term))
+      } else {
+        Ok(StmtToFun::Return(term))
+      }
     } else {
       Err("Statement ends with return but is not at end of function.".to_string())
     }

@@ -706,7 +706,7 @@ impl<'a> Parser<'a> for TermParser<'a> {
   /// Override to have our own error message.
   fn consume(&mut self, text: &str) -> ParseResult<()> {
     self.skip_trivia();
-    if self.input().get(*self.index() ..).unwrap_or_default().starts_with(text) {
+    if self.input().get(*self.index()..).unwrap_or_default().starts_with(text) {
       *self.index() += text.len();
       Ok(())
     } else {
@@ -834,7 +834,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
 
   /// Consumes exactly the text without skipping.
   fn consume_exactly(&mut self, text: &str) -> ParseResult<()> {
-    if self.input().get(*self.index() ..).unwrap_or_default().starts_with(text) {
+    if self.input().get(*self.index()..).unwrap_or_default().starts_with(text) {
       *self.index() += text.len();
       Ok(())
     } else {
@@ -940,7 +940,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     if !self.starts_with(keyword) {
       return false;
     }
-    let input = &self.input()[*self.index() + keyword.len() ..];
+    let input = &self.input()[*self.index() + keyword.len()..];
     let next_is_name = input.chars().next().map_or(false, is_name_char);
     if !next_is_name {
       self.consume_exactly(keyword).unwrap();
@@ -954,7 +954,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     let ini_idx = *self.index();
     self.consume_exactly(keyword)?;
     let end_idx = *self.index();
-    let input = &self.input()[*self.index() ..];
+    let input = &self.input()[*self.index()..];
     let next_is_name = input.chars().next().map_or(false, is_name_char);
     if !next_is_name {
       Ok(())
@@ -985,7 +985,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
 
     let mut els = vec![];
     // Consume the minimum number of elements
-    for i in 0 .. min_els {
+    for i in 0..min_els {
       self.skip_trivia();
       els.push(parser(self)?);
       self.skip_trivia();
@@ -1097,18 +1097,9 @@ pub trait ParserCommons<'a>: Parser<'a> {
     };
     let num_str = self.take_while(move |c| c.is_digit(radix) || c == '_');
     let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
-    // can't merge the first two blocks because || is invalid in let chains
-    if let Some(c) = self.peek_one()
-      && c.is_ascii_alphanumeric()
-    {
-      let base = match radix {
-        16 => "hexadecimal",
-        10 => "decimal",
-        2 => "binary",
-        _ => unreachable!(),
-      };
-      self.expected(format!("valid {base} digit").as_str())
-    } else if num_str.is_empty() {
+
+    let next_is_hex = self.peek_one().map_or(false, |c| "0123456789abcdefABCDEF".contains(c));
+    if next_is_hex || num_str.is_empty() {
       let base = match radix {
         16 => "hexadecimal",
         10 => "decimal",
@@ -1159,7 +1150,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     // I24
     if let Some(sgn) = sgn {
       let num = sgn * num as i32;
-      if !(-0x00800000 ..= 0x007fffff).contains(&num) {
+      if !(-0x00800000..=0x007fffff).contains(&num) {
         return self.num_range_err(ini_idx, "I24");
       }
       return Ok(Num::I24(num));
@@ -1192,9 +1183,9 @@ pub trait ParserCommons<'a>: Parser<'a> {
       let Some(c) = self.advance_one() else { self.expected("base_64 character")? };
       let c = c as u8;
       let nxt = match c {
-        b'A' ..= b'Z' => c - b'A',
-        b'a' ..= b'z' => c - b'a' + 26,
-        b'0' ..= b'9' => c - b'0' + 52,
+        b'A'..=b'Z' => c - b'A',
+        b'a'..=b'z' => c - b'a' + 26,
+        b'0'..=b'9' => c - b'0' + 52,
         b'+' => 62,
         b'/' => 63,
         _ => return self.expected("base64 character"),

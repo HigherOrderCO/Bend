@@ -66,7 +66,7 @@ pub fn eta_reduce_hvm_net(net: &mut Net) {
   for tree in net_trees_mut(net) {
     phase1.walk_tree(tree);
   }
-  let mut phase2 = Phase2 { nodes: phase1.nodes, index: 0 .. };
+  let mut phase2 = Phase2 { nodes: phase1.nodes, index: 0.. };
   for tree in net_trees_mut(net) {
     phase2.reduce_tree(tree);
   }

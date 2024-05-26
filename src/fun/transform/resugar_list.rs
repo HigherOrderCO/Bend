@@ -19,50 +19,56 @@ impl Term {
       // Search for a List/Cons pattern in the term and try to build a list from that point on.
       // If successful, replace the term with the list.
       // If not, keep as-is.
-      match self {
-        // Nil: List/nil
-        Term::Ref { nam } if nam == builtins::LNIL => *self = Term::List { els: vec![] },
-        // Cons: @x (x CONS_TAG <term> <term>)
-        Term::Lam {
-          tag: Tag::Static,
-          pat: box Pattern::Var(Some(var_lam)),
-          bod:
-            box Term::App {
-              tag: Tag::Static,
-              fun:
-                box Term::App {
-                  tag: Tag::Static,
-                  fun:
-                    box Term::App {
-                      tag: Tag::Static,
-                      fun: box Term::Var { nam: var_app },
-                      arg: box Term::Num { val: Num::U24(LCONS_TAG) },
-                    },
-                  arg: head,
-                },
-              arg: tail,
-            },
-        } if var_lam == var_app => {
-          head.resugar_lists_num_scott();
-          if let Some(els) = build_list_num_scott(tail, vec![head]) {
-            *self = Term::List { els };
-          } else {
-            // Not a list term, keep as-is.
+
+      // Nil: List/nil
+      if let Term::Ref { nam } = self {
+        if nam == builtins::LNIL {
+          *self = Term::List { els: vec![] };
+        }
+      }
+      // Cons: @x (x CONS_TAG <term> <term>)
+      if let Term::Lam { tag: Tag::Static, pat, bod } = self {
+        if let Pattern::Var(Some(var_lam)) = pat.as_mut() {
+          if let Term::App { tag: Tag::Static, fun, arg: tail } = bod.as_mut() {
+            if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_mut() {
+              if let Term::App { tag: Tag::Static, fun, arg } = fun.as_mut() {
+                if let Term::Var { nam: var_app } = fun.as_mut() {
+                  if let Term::Num { val: Num::U24(LCONS_TAG) } = arg.as_mut() {
+                    if var_lam == var_app {
+                      let l = build_list_num_scott(tail.as_mut(), vec![std::mem::take(head)]);
+                      match l {
+                        Ok(l) => *self = Term::List { els: l.into_iter().map(|x| *x).collect() },
+                        // Was not a list term, keep as-is.
+                        Err(mut l) => {
+                          *head = l.pop().unwrap();
+                          assert!(l.is_empty())
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
-        // Cons: (List/Cons <term> <term>)
-        Term::App {
-          tag: Tag::Static,
-          fun: box Term::App { tag: Tag::Static, fun: box Term::Ref { nam }, arg: head },
-          arg: tail,
-        } if nam == builtins::LCONS => {
-          if let Some(els) = build_list_num_scott(tail, vec![head]) {
-            *self = Term::List { els };
-          } else {
-            // Not a list term, keep as-is.
+      }
+      // Cons: (List/Cons <term> <term>)
+      if let Term::App { tag: Tag::Static, fun, arg: tail } = self {
+        if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_mut() {
+          if let Term::Ref { nam } = fun.as_mut() {
+            if nam == builtins::LCONS {
+              let l = build_list_num_scott(tail.as_mut(), vec![std::mem::take(head)]);
+              match l {
+                Ok(l) => *self = Term::List { els: l.into_iter().map(|x| *x).collect() },
+                // Was not a list term, keep as-is.
+                Err(mut l) => {
+                  *head = l.pop().unwrap();
+                  assert!(l.is_empty())
+                }
+              }
+            }
           }
         }
-        _ => (),
       }
 
       for child in self.children_mut() {
@@ -77,45 +83,56 @@ impl Term {
       // Search for a List/Cons pattern in the term and try to build a list from that point on.
       // If successful, replace the term with the list.
       // If not, keep as-is.
-      match self {
-        // Nil: List/nil
-        Term::Ref { nam } if nam == builtins::LNIL => *self = Term::List { els: vec![] },
-        // Cons: @* @c (c <term> <term>)
-        Term::Lam {
-          tag: Tag::Static,
-          pat: box Pattern::Var(None),
-          bod:
-            box Term::Lam {
-              tag: Tag::Static,
-              pat: box Pattern::Var(Some(nam_cons_lam)),
-              bod:
-                box Term::App {
-                  tag: Tag::Static,
-                  fun: box Term::App { tag: Tag::Static, fun: box Term::Var { nam: nam_cons_app }, arg: head },
-                  arg: tail,
-                },
-            },
-        } if nam_cons_lam == nam_cons_app => {
-          head.resugar_lists_scott();
-          if let Some(els) = build_list_scott(tail, vec![head]) {
-            *self = Term::List { els };
-          } else {
-            // Not a list term, keep as-is.
+
+      // Nil: List/nil
+      if let Term::Ref { nam } = self {
+        if nam == builtins::LNIL {
+          *self = Term::List { els: vec![] };
+        }
+      }
+      // Cons: @* @c (c <term> <term>)
+      if let Term::Lam { tag: Tag::Static, pat, bod } = self {
+        if let Pattern::Var(None) = pat.as_mut() {
+          if let Term::Lam { tag: Tag::Static, pat, bod } = bod.as_mut() {
+            if let Pattern::Var(Some(var_lam)) = pat.as_mut() {
+              if let Term::App { tag: Tag::Static, fun, arg: tail } = bod.as_mut() {
+                if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_mut() {
+                  if let Term::Var { nam: var_app } = fun.as_mut() {
+                    if var_lam == var_app {
+                      let l = build_list_scott(tail.as_mut(), vec![std::mem::take(head)]);
+                      match l {
+                        Ok(l) => *self = Term::List { els: l.into_iter().map(|x| *x).collect() },
+                        // Was not a list term, keep as-is.
+                        Err(mut l) => {
+                          *head = l.pop().unwrap();
+                          assert!(l.is_empty())
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
-        // Cons: (List/Cons <term> <term>)
-        Term::App {
-          tag: Tag::Static,
-          fun: box Term::App { tag: Tag::Static, fun: box Term::Ref { nam }, arg: head },
-          arg: tail,
-        } if nam == builtins::LCONS => {
-          if let Some(els) = build_list_scott(tail, vec![head]) {
-            *self = Term::List { els };
-          } else {
-            // Not a list term, keep as-is.
+      }
+      // Cons: (List/Cons <term> <term>)
+      if let Term::App { tag: Tag::Static, fun, arg: tail } = self {
+        if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_mut() {
+          if let Term::Ref { nam } = fun.as_mut() {
+            if nam == builtins::LCONS {
+              let l = build_list_scott(tail.as_mut(), vec![std::mem::take(head)]);
+              match l {
+                Ok(l) => *self = Term::List { els: l.into_iter().map(|x| *x).collect() },
+                // Was not a list term, keep as-is.
+                Err(mut l) => {
+                  *head = l.pop().unwrap();
+                  assert!(l.is_empty())
+                }
+              }
+            }
           }
         }
-        _ => (),
       }
 
       for child in self.children_mut() {
@@ -125,93 +142,128 @@ impl Term {
   }
 }
 
-fn build_list_num_scott(term: &mut Term, mut s: Vec<&mut Term>) -> Option<Vec<Term>> {
+// TODO: We have to do weird manipulations with Box<Term> because of the borrow checker.
+// When we used use box patterns this was a way simpler match statement.
+#[allow(clippy::vec_box)]
+fn build_list_num_scott(term: &mut Term, mut l: Vec<Box<Term>>) -> Result<Vec<Box<Term>>, Vec<Box<Term>>> {
   maybe_grow(|| {
-    match term {
-      // Nil: List/Nil
-      Term::Ref { nam } if nam == builtins::LNIL => Some(s.into_iter().map(std::mem::take).collect()),
-      // Cons: @x (x CONS_TAG <term> <term>)
-      Term::Lam {
-        tag: Tag::Static,
-        pat: box Pattern::Var(Some(var_lam)),
-        bod:
-          box Term::App {
-            tag: Tag::Static,
-            fun:
-              box Term::App {
-                tag: Tag::Static,
-                fun:
-                  box Term::App {
-                    tag: Tag::Static,
-                    fun: box Term::Var { nam: var_app },
-                    arg: box Term::Num { val: Num::U24(LCONS_TAG) },
-                  },
-                arg: head,
-              },
-            arg: tail,
-          },
-      } if var_lam == var_app => {
-        // New list element, append and recurse
-        s.push(head.as_mut());
-        build_list_num_scott(tail, s)
-      }
-      // Cons: (List/cons <term> <term>)
-      Term::App {
-        tag: Tag::Static,
-        fun: box Term::App { tag: Tag::Static, fun: box Term::Ref { nam }, arg: head },
-        arg: tail,
-      } if nam == builtins::LCONS => {
-        // New list element, append and recurse
-        s.push(head.as_mut());
-        build_list_num_scott(tail, s)
-      }
-      _ => {
-        // Not a list term, stop
-        None
+    // Nil: List/nil
+    if let Term::Ref { nam } = term {
+      if nam == builtins::LNIL {
+        return Ok(l);
       }
     }
+    // Cons: @x (x CONS_TAG <term> <term>)
+    if let Term::Lam { tag: Tag::Static, pat, bod } = term {
+      if let Pattern::Var(Some(var_lam)) = pat.as_mut() {
+        if let Term::App { tag: Tag::Static, fun, arg: tail } = bod.as_mut() {
+          if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_mut() {
+            if let Term::App { tag: Tag::Static, fun, arg } = fun.as_mut() {
+              if let Term::Var { nam: var_app } = fun.as_mut() {
+                if let Term::Num { val: Num::U24(LCONS_TAG) } = arg.as_mut() {
+                  if var_lam == var_app {
+                    // New list element, append and recurse
+                    l.push(std::mem::take(head));
+                    let l = build_list_num_scott(tail, l);
+                    match l {
+                      Ok(l) => return Ok(l),
+                      Err(mut l) => {
+                        // If it wasn't a list, we have to put it back.
+                        *head = l.pop().unwrap();
+                        return Err(l);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    // Cons: (List/Cons <term> <term>)
+    if let Term::App { tag: Tag::Static, fun, arg: tail } = term {
+      if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_mut() {
+        if let Term::Ref { nam } = fun.as_mut() {
+          if nam == builtins::LCONS {
+            // New list element, append and recurse
+            l.push(std::mem::take(head));
+            let l = build_list_num_scott(tail, l);
+            match l {
+              Ok(l) => return Ok(l),
+              Err(mut l) => {
+                // If it wasn't a list, we have to put it back.
+                *head = l.pop().unwrap();
+                return Err(l);
+              }
+            }
+          }
+        }
+      }
+    }
+    // Not a list term, stop
+    Err(l)
   })
 }
 
-fn build_list_scott(term: &mut Term, mut s: Vec<&mut Term>) -> Option<Vec<Term>> {
+#[allow(clippy::vec_box)]
+fn build_list_scott(term: &mut Term, mut l: Vec<Box<Term>>) -> Result<Vec<Box<Term>>, Vec<Box<Term>>> {
   maybe_grow(|| {
-    match term {
-      // Nil: List/Nil
-      Term::Ref { nam } if nam == builtins::LNIL => Some(s.into_iter().map(std::mem::take).collect()),
-      // Cons: @* @c (c <term> <term>)
-      Term::Lam {
-        tag: Tag::Static,
-        pat: box Pattern::Var(None),
-        bod:
-          box Term::Lam {
-            tag: Tag::Static,
-            pat: box Pattern::Var(Some(nam_cons_lam)),
-            bod:
-              box Term::App {
-                tag: Tag::Static,
-                fun: box Term::App { tag: Tag::Static, fun: box Term::Var { nam: nam_cons_app }, arg: head },
-                arg: tail,
-              },
-          },
-      } if nam_cons_lam == nam_cons_app => {
-        // New list element, append and recurse
-        s.push(head.as_mut());
-        build_list_scott(tail, s)
-      }
-      // Cons: (List/cons <term> <term>)
-      Term::App {
-        tag: Tag::Static,
-        fun: box Term::App { tag: Tag::Static, fun: box Term::Ref { nam }, arg: head },
-        arg: tail,
-      } if nam == builtins::LCONS => {
-        // New list element, append and recurse
-        s.push(head.as_mut());
-        build_list_scott(tail, s)
-      }
-      _ => {
-        // Not a list term, stop
-        None
+    // Nil: List/nil
+    if let Term::Ref { nam } = term {
+      if nam == builtins::LNIL {
+        return Ok(l);
       }
     }
+    // Cons: @* @c (c <term> <term>)
+    if let Term::Lam { tag: Tag::Static, pat, bod } = term {
+      if let Pattern::Var(None) = pat.as_mut() {
+        if let Term::Lam { tag: Tag::Static, pat, bod } = bod.as_mut() {
+          if let Pattern::Var(Some(var_lam)) = pat.as_mut() {
+            if let Term::App { tag: Tag::Static, fun, arg: tail } = bod.as_mut() {
+              if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_mut() {
+                if let Term::Var { nam: var_app } = fun.as_mut() {
+                  if var_lam == var_app {
+                    // New list element, append and recurse
+                    l.push(std::mem::take(head));
+                    let l = build_list_scott(tail, l);
+                    match l {
+                      Ok(l) => return Ok(l),
+                      Err(mut l) => {
+                        // If it wasn't a list, we have to put it back.
+                        *head = l.pop().unwrap();
+                        return Err(l);
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    // Cons: (List/Cons <term> <term>)
+    if let Term::App { tag: Tag::Static, fun, arg: tail } = term {
+      if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_mut() {
+        if let Term::Ref { nam } = fun.as_mut() {
+          if nam == builtins::LCONS {
+            // New list element, append and recurse
+            l.push(std::mem::take(head));
+            let l = build_list_scott(tail, l);
+            match l {
+              Ok(l) => return Ok(l),
+              Err(mut l) => {
+                // If it wasn't a list, we have to put it back.
+                *head = l.pop().unwrap();
+                return Err(l);
+              }
+            }
+          }
+        }
+      }
+    }
+    // Not a list term, stop
+    Err(l)
   })
 }

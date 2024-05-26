@@ -137,12 +137,12 @@ impl Term {
       }
 
       // If we found a recursive field, replace with a call to the new function.
-      if let Term::Var { nam } = self
-        && recursive.contains(nam)
-      {
-        let call = Term::call(Term::Ref { nam: def_name.clone() }, [std::mem::take(self)]);
-        let call = Term::call(call, free_vars.iter().cloned().map(|nam| Term::Var { nam }));
-        *self = call;
+      if let Term::Var { nam } = self {
+        if recursive.contains(nam) {
+          let call = Term::call(Term::Ref { nam: def_name.clone() }, [std::mem::take(self)]);
+          let call = Term::call(call, free_vars.iter().cloned().map(|nam| Term::Var { nam }));
+          *self = call;
+        }
       }
     })
   }

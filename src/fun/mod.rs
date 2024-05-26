@@ -254,13 +254,17 @@ impl PartialEq<str> for Name {
 
 impl PartialEq<&str> for Name {
   fn eq(&self, other: &&str) -> bool {
-    self == other
+    self == *other
   }
 }
 
 impl PartialEq<Option<Name>> for Name {
   fn eq(&self, other: &Option<Name>) -> bool {
-    if let Some(other) = other.as_ref() { self == other } else { false }
+    if let Some(other) = other.as_ref() {
+      self == other
+    } else {
+      false
+    }
   }
 }
 
@@ -272,7 +276,11 @@ impl PartialEq<Name> for Option<Name> {
 
 impl PartialEq<Option<&Name>> for Name {
   fn eq(&self, other: &Option<&Name>) -> bool {
-    if let Some(other) = other { &self == other } else { false }
+    if let Some(other) = other {
+      &self == other
+    } else {
+      false
+    }
   }
 }
 
@@ -409,7 +417,11 @@ impl Term {
   }
 
   pub fn var_or_era(nam: Option<Name>) -> Self {
-    if let Some(nam) = nam { Term::Var { nam } } else { Term::Era }
+    if let Some(nam) = nam {
+      Term::Var { nam }
+    } else {
+      Term::Era
+    }
   }
 
   pub fn app(fun: Term, arg: Term) -> Self {
@@ -747,10 +759,10 @@ impl Term {
       }
     });
 
-    if let Term::Var { nam } = self
-      && nam == from
-    {
-      *self = to.clone();
+    if let Term::Var { nam } = self {
+      if nam == from {
+        *self = to.clone();
+      }
     }
   }
 
@@ -764,10 +776,10 @@ impl Term {
       }
     });
 
-    if let Term::Link { nam } = self
-      && nam == from
-    {
-      *self = to.clone();
+    if let Term::Link { nam } = self {
+      if nam == from {
+        *self = to.clone();
+      }
     }
   }
 
@@ -1011,7 +1023,11 @@ impl Name {
   }
 
   pub fn def_name_from_generated(&self) -> Name {
-    if let Some((nam, _)) = self.split_once("__") { Name::new(nam) } else { self.clone() }
+    if let Some((nam, _)) = self.split_once("__") {
+      Name::new(nam)
+    } else {
+      self.clone()
+    }
   }
 }
 

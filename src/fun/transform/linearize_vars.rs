@@ -31,52 +31,53 @@ impl Term {
 }
 
 fn term_to_linear(term: &mut Term, var_uses: &mut HashMap<Name, u64>) {
-  maybe_grow(|| match term {
-    Term::Let { pat: box Pattern::Var(Some(nam)), val, nxt } => {
-      // TODO: This is swapping the order of how the bindings are
-      // used, since it's not following the usual AST order (first
-      // val, then nxt). Doesn't change behaviour, but looks strange.
-      term_to_linear(nxt, var_uses);
+  maybe_grow(|| {
+    if let Term::Let { pat, val, nxt } = term {
+      if let Pattern::Var(Some(nam)) = pat.as_ref() {
+        // TODO: This is swapping the order of how the bindings are
+        // used, since it's not following the usual AST order (first
+        // val, then nxt). Doesn't change behaviour, but looks strange.
+        term_to_linear(nxt, var_uses);
 
-      let uses = get_var_uses(Some(nam), var_uses);
-      term_to_linear(val, var_uses);
-      match uses {
-        0 => {
-          let Term::Let { pat, .. } = term else { unreachable!() };
-          **pat = Pattern::Var(None);
+        let uses = get_var_uses(Some(nam), var_uses);
+        term_to_linear(val, var_uses);
+        match uses {
+          0 => {
+            let Term::Let { pat, .. } = term else { unreachable!() };
+            **pat = Pattern::Var(None);
+          }
+          1 => {
+            nxt.subst(nam, val.as_ref());
+            *term = std::mem::take(nxt.as_mut());
+          }
+          _ => {
+            let new_pat = duplicate_pat(nam, uses);
+            let Term::Let { pat, .. } = term else { unreachable!() };
+            *pat = new_pat;
+          }
         }
-        1 => {
-          nxt.subst(nam, val.as_ref());
-          *term = std::mem::take(nxt.as_mut());
-        }
-        _ => {
-          let new_pat = duplicate_pat(nam, uses);
-          let Term::Let { pat, .. } = term else { unreachable!() };
-          *pat = new_pat;
-        }
+        return;
       }
     }
-
-    Term::Var { nam } => {
+    if let Term::Var { nam } = term {
       let instantiated_count = var_uses.entry(nam.clone()).or_default();
       *instantiated_count += 1;
       *nam = dup_name(nam, *instantiated_count);
+      return;
     }
 
-    _ => {
-      for (child, binds) in term.children_mut_with_binds_mut() {
-        term_to_linear(child, var_uses);
+    for (child, binds) in term.children_mut_with_binds_mut() {
+      term_to_linear(child, var_uses);
 
-        for bind in binds {
-          let uses = get_var_uses(bind.as_ref(), var_uses);
-          match uses {
-            // Erase binding
-            0 => *bind = None,
-            // Keep as-is
-            1 => (),
-            // Duplicate binding
-            uses => duplicate_term(bind.as_ref().unwrap(), child, uses, None),
-          }
+      for bind in binds {
+        let uses = get_var_uses(bind.as_ref(), var_uses);
+        match uses {
+          // Erase binding
+          0 => *bind = None,
+          // Keep as-is
+          1 => (),
+          // Duplicate binding
+          uses => duplicate_term(bind.as_ref().unwrap(), child, uses, None),
         }
       }
     }
@@ -108,10 +109,14 @@ fn duplicate_pat(nam: &Name, uses: u64) -> Box<Pattern> {
   Box::new(Pattern::Fan(
     FanKind::Dup,
     Tag::Auto,
-    (1 .. uses + 1).map(|i| Pattern::Var(Some(dup_name(nam, i)))).collect(),
+    (1..uses + 1).map(|i| Pattern::Var(Some(dup_name(nam, i)))).collect(),
   ))
 }
 
 fn dup_name(nam: &Name, uses: u64) -> Name {
-  if uses == 1 { nam.clone() } else { Name::new(format!("{nam}_{uses}")) }
+  if uses == 1 {
+    nam.clone()
+  } else {
+    Name::new(format!("{nam}_{uses}"))
+  }
 }
