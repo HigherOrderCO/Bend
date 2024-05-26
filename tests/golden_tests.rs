@@ -32,7 +32,7 @@ fn run_single_golden_test(path: &Path, run: &[&RunFn]) -> Result<(), String> {
   let file_name = path.to_str().and_then(|path| path.rsplit_once(TESTS_PATH)).unwrap().1;
 
   // unfortunately we need to do this
-  let file_path = format!("{}{}", &TESTS_PATH[1 ..], file_name);
+  let file_path = format!("{}{}", &TESTS_PATH[1..], file_name);
   let file_path = Path::new(&file_path);
 
   let mut results: HashMap<&Path, Vec<String>> = HashMap::new();
@@ -160,24 +160,27 @@ fn linear_readback() {
 
 #[test]
 fn run_file() {
-  run_golden_test_dir_multiple(function_name!(), &[(&|code, path| {
-    let _guard = RUN_MUTEX.lock().unwrap();
-    let book = do_parse_book(code, path, Book::builtins())?;
-    let diagnostics_cfg = DiagnosticsConfig {
-      unused_definition: Severity::Allow,
-      ..DiagnosticsConfig::new(Severity::Error, true)
-    };
-    let run_opts = RunOpts::default();
+  run_golden_test_dir_multiple(
+    function_name!(),
+    &[(&|code, path| {
+      let _guard = RUN_MUTEX.lock().unwrap();
+      let book = do_parse_book(code, path, Book::builtins())?;
+      let diagnostics_cfg = DiagnosticsConfig {
+        unused_definition: Severity::Allow,
+        ..DiagnosticsConfig::new(Severity::Error, true)
+      };
+      let run_opts = RunOpts::default();
 
-    let mut res = String::new();
+      let mut res = String::new();
 
-    for adt_encoding in [AdtEncoding::NumScott, AdtEncoding::Scott] {
-      let compile_opts = CompileOpts { adt_encoding, ..CompileOpts::default() };
-      let (term, _, diags) = run_book_simple(book.clone(), run_opts, compile_opts, diagnostics_cfg, None)?;
-      res.push_str(&format!("{adt_encoding}:\n{diags}{term}\n\n"));
-    }
-    Ok(res)
-  })])
+      for adt_encoding in [AdtEncoding::NumScott, AdtEncoding::Scott] {
+        let compile_opts = CompileOpts { adt_encoding, ..CompileOpts::default() };
+        let (term, _, diags) = run_book_simple(book.clone(), run_opts, compile_opts, diagnostics_cfg, None)?;
+        res.push_str(&format!("{adt_encoding}:\n{diags}{term}\n\n"));
+      }
+      Ok(res)
+    })],
+  )
 }
 
 #[test]
@@ -393,29 +396,33 @@ fn mutual_recursion() {
 #[test]
 #[ignore = "while IO is not implemented for hvm32"]
 fn io() {
-  run_golden_test_dir_multiple(function_name!(), &[
-    /* (&|code, path| {
-      let _guard = RUN_MUTEX.lock().unwrap();
-      let book = do_parse_book(code, path)?;
-      let compile_opts = CompileOpts::default_lazy();
-      let diagnostics_cfg = DiagnosticsConfig::default_lazy();
-      let Output { status, stdout, stderr } =
-        run_book(book, None, RunOpts::lazy(), compile_opts, diagnostics_cfg, None)?;
-      let stderr = String::from_utf8_lossy(&stderr);
-      let status = if !status.success() { format!("\n{status}") } else { String::new() };
-      let stdout = String::from_utf8_lossy(&stdout);
-      Ok(format!("Lazy mode:\n{}{}{}", stderr, status, stdout))
-    }), */
-    (&|code, path| {
-      let _guard = RUN_MUTEX.lock().unwrap();
-      let book = do_parse_book(code, path, Book::builtins())?;
-      let compile_opts = CompileOpts::default();
-      let diagnostics_cfg = DiagnosticsConfig::default();
-      let (term, _, diags) = run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
-      let res = format!("{diags}{term}");
-      Ok(format!("Strict mode:\n{res}"))
-    }),
-  ])
+  run_golden_test_dir_multiple(
+    function_name!(),
+    &[
+      /* (&|code, path| {
+        let _guard = RUN_MUTEX.lock().unwrap();
+        let book = do_parse_book(code, path)?;
+        let compile_opts = CompileOpts::default_lazy();
+        let diagnostics_cfg = DiagnosticsConfig::default_lazy();
+        let Output { status, stdout, stderr } =
+          run_book(book, None, RunOpts::lazy(), compile_opts, diagnostics_cfg, None)?;
+        let stderr = String::from_utf8_lossy(&stderr);
+        let status = if !status.success() { format!("\n{status}") } else { String::new() };
+        let stdout = String::from_utf8_lossy(&stdout);
+        Ok(format!("Lazy mode:\n{}{}{}", stderr, status, stdout))
+      }), */
+      (&|code, path| {
+        let _guard = RUN_MUTEX.lock().unwrap();
+        let book = do_parse_book(code, path, Book::builtins())?;
+        let compile_opts = CompileOpts::default();
+        let diagnostics_cfg = DiagnosticsConfig::default();
+        let (term, _, diags) =
+          run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+        let res = format!("{diags}{term}");
+        Ok(format!("Strict mode:\n{res}"))
+      }),
+    ],
+  )
 }
 
 #[test]

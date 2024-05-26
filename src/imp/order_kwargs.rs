@@ -178,7 +178,7 @@ fn go_order_kwargs(
     );
   }
   let mut kwargs: IndexMap<Name, Expr> = IndexMap::from_iter(kwargs.drain(..));
-  let remaining_names = &names[args.len() ..];
+  let remaining_names = &names[args.len()..];
   for name in remaining_names {
     if let Some(arg) = kwargs.shift_remove(name) {
       args.push(arg);

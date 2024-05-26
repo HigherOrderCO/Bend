@@ -44,7 +44,7 @@ impl<'a> Parser<'a> for PyParser<'a> {
   /// Override to have our own error message.
   fn consume(&mut self, text: &str) -> ParseResult<()> {
     self.skip_trivia();
-    if self.input().get(*self.index() ..).unwrap_or_default().starts_with(text) {
+    if self.input().get(*self.index()..).unwrap_or_default().starts_with(text) {
       *self.index() += text.len();
       Ok(())
     } else {

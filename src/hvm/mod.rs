@@ -87,7 +87,11 @@ pub fn display_hvm_numb(numb: &hvm::ast::Numb) -> impl std::fmt::Display + '_ {
     hvm::hvm::TY_F24 => {
       let val = numb.get_f24();
       if val.is_infinite() {
-        if val.is_sign_positive() { "+inf".to_string() } else { "-inf".to_string() }
+        if val.is_sign_positive() {
+          "+inf".to_string()
+        } else {
+          "-inf".to_string()
+        }
       } else if val.is_nan() {
         "+NaN".to_string()
       } else {

@@ -47,7 +47,11 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
   ) -> String {
     if let Tree::Var { nam } = subtree {
       //
-      if nam == net_root { "_".to_string() } else { nam.clone() }
+      if nam == net_root {
+        "_".to_string()
+      } else {
+        nam.clone()
+      }
     } else {
       let var = new_var(n_vars);
       subtrees.push((var.clone(), subtree));

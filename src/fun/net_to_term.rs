@@ -132,27 +132,34 @@ impl Reader<'_> {
 
             // We expect the pattern matching node to be a CON
             let sel_kind = &self.net.node(sel_node).kind;
-            let (zero, succ) = if *sel_kind == NodeKind::Ctr(Con(None)) {
-              let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
-              let mut succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
+            if sel_kind != &NodeKind::Ctr(CtrKind::Con(None)) {
+              // TODO: Is there any case where we expect a different node type here on readback?
+              self.error(ReadbackError::InvalidNumericMatch);
+              return Term::Err;
+            }
 
-              match &mut succ_term {
-                Term::Lam { pat: box Pattern::Var(nam), bod, .. } => {
+            let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
+            let mut succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
+
+            // Succ term should be a lambda
+            let (zero, succ) = match &mut succ_term {
+              Term::Lam { pat, bod, .. } => {
+                if let Pattern::Var(nam) = pat.as_ref() {
                   let mut bod = std::mem::take(bod.as_mut());
-                  if let Some(nam) = &nam {
+                  if let Some(nam) = nam {
                     bod.subst(nam, &Term::Var { nam: Name::new(format!("{bnd}-1")) });
                   }
                   (zero_term, bod)
-                }
-                _ => {
+                } else {
+                  // Readback should never generate non-var patterns for lambdas.
                   self.error(ReadbackError::InvalidNumericMatch);
                   (zero_term, succ_term)
                 }
               }
-            } else {
-              // TODO: Is there any case where we expect a different node type here on readback?
-              self.error(ReadbackError::InvalidNumericMatch);
-              (Term::Err, Term::Err)
+              _ => {
+                self.error(ReadbackError::InvalidNumericMatch);
+                (zero_term, succ_term)
+              }
             };
             Term::Swt { arg: Box::new(arg), bnd: Some(bnd), with: vec![], pred: None, arms: vec![zero, succ] }
           }
@@ -172,40 +179,58 @@ impl Reader<'_> {
           match next.slot() {
             // If we're visiting a port 0, then it is a pair.
             0 => {
-              if fan == FanKind::Dup
-                && let Some(dup_paths) = &mut self.dup_paths
-                && let stack = dup_paths.entry(lab.unwrap()).or_default()
-                && let Some(slot) = stack.pop()
-              {
-                // Since we had a paired Dup in the path to this Sup,
-                // we "decay" the superposition according to the original direction we came from the Dup.
-                let term = self.read_term(self.net.enter_port(Port(node, slot)));
-                self.dup_paths.as_mut().unwrap().get_mut(&lab.unwrap()).unwrap().push(slot);
-                term
-              } else {
-                // If no Dup with same label in the path, we can't resolve the Sup, so keep it as a term.
-                self.decay_or_get_ports(node).map_or_else(
-                  |(fst, snd)| Term::Fan { fan, tag: self.labels[fan].to_tag(lab), els: vec![fst, snd] },
-                  |term| term,
-                )
+              // If this superposition is in a readback path with a paired Dup,
+              // we resolve it by splitting the two sup values into the two Dup variables.
+              // If we find that it's not paired with a Dup, we just keep the Sup as a term.
+              // The latter are all the early returns.
+
+              if fan != FanKind::Dup {
+                return self.decay_or_get_ports(node).unwrap_or_else(|(fst, snd)| Term::Fan {
+                  fan,
+                  tag: self.labels[fan].to_tag(lab),
+                  els: vec![fst, snd],
+                });
               }
+
+              let Some(dup_paths) = &mut self.dup_paths else {
+                return self.decay_or_get_ports(node).unwrap_or_else(|(fst, snd)| Term::Fan {
+                  fan,
+                  tag: self.labels[fan].to_tag(lab),
+                  els: vec![fst, snd],
+                });
+              };
+
+              let stack = dup_paths.entry(lab.unwrap()).or_default();
+              let Some(slot) = stack.pop() else {
+                return self.decay_or_get_ports(node).unwrap_or_else(|(fst, snd)| Term::Fan {
+                  fan,
+                  tag: self.labels[fan].to_tag(lab),
+                  els: vec![fst, snd],
+                });
+              };
+
+              // Found a paired Dup, so we "decay" the superposition according to the original direction we came from the Dup.
+              let term = self.read_term(self.net.enter_port(Port(node, slot)));
+              self.dup_paths.as_mut().unwrap().get_mut(&lab.unwrap()).unwrap().push(slot);
+              term
             }
             // If we're visiting a port 1 or 2, then it is a variable.
             // Also, that means we found a dup, so we store it to read later.
             1 | 2 => {
-              if fan == FanKind::Dup
-                && let Some(dup_paths) = &mut self.dup_paths
-              {
-                dup_paths.entry(lab.unwrap()).or_default().push(next.slot());
-                let term = self.read_term(self.net.enter_port(Port(node, 0)));
-                self.dup_paths.as_mut().unwrap().entry(lab.unwrap()).or_default().pop().unwrap();
-                term
-              } else {
-                if self.seen_fans.insert(node) {
-                  self.scope.insert(node);
+              // If doing non-linear readback, we also store dup paths to try to resolve them later.
+              if let Some(dup_paths) = &mut self.dup_paths {
+                if fan == FanKind::Dup {
+                  dup_paths.entry(lab.unwrap()).or_default().push(next.slot());
+                  let term = self.read_term(self.net.enter_port(Port(node, 0)));
+                  self.dup_paths.as_mut().unwrap().entry(lab.unwrap()).or_default().pop().unwrap();
+                  return term;
                 }
-                Term::Var { nam: self.namegen.var_name(next) }
               }
+              // Otherwise, just store the new dup/let tup and return the variable.
+              if self.seen_fans.insert(node) {
+                self.scope.insert(node);
+              }
+              Term::Var { nam: self.namegen.var_name(next) }
             }
             _ => unreachable!(),
           }
@@ -589,12 +614,13 @@ impl Term {
     })
   }
 
+  /// Transform the variables that we previously found were unscoped into their unscoped variants.
   pub fn apply_unscoped(&mut self, unscoped: &HashSet<Name>) {
     maybe_grow(|| {
-      if let Term::Var { nam } = self
-        && unscoped.contains(nam)
-      {
-        *self = Term::Link { nam: std::mem::take(nam) }
+      if let Term::Var { nam } = self {
+        if unscoped.contains(nam) {
+          *self = Term::Link { nam: std::mem::take(nam) }
+        }
       }
       if let Some(pat) = self.pattern_mut() {
         pat.apply_unscoped(unscoped);
@@ -609,11 +635,11 @@ impl Term {
 impl Pattern {
   fn apply_unscoped(&mut self, unscoped: &HashSet<Name>) {
     maybe_grow(|| {
-      if let Pattern::Var(Some(nam)) = self
-        && unscoped.contains(nam)
-      {
-        let nam = std::mem::take(nam);
-        *self = Pattern::Chn(nam);
+      if let Pattern::Var(Some(nam)) = self {
+        if unscoped.contains(nam) {
+          let nam = std::mem::take(nam);
+          *self = Pattern::Chn(nam);
+        }
       }
       for child in self.children_mut() {
         child.apply_unscoped(unscoped)

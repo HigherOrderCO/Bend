@@ -2,8 +2,9 @@
 name = "bend-lang"
 description = "A high-level, massively parallel programming language"
 license = "Apache-2.0"
-version = "0.2.21"
+version = "0.2.22"
 edition = "2021"
+rust-version = "1.74"
 exclude = ["tests/snapshots/"]
 
 [lib]
@@ -26,7 +27,7 @@ cli = ["dep:clap"]
 TSPL = "0.0.12"
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 highlight_error = "0.1.1"
-hvm = "2.0.16"
+hvm = "=2.0.17"
 indexmap = "2.2.3"
 interner = "0.2.1"
 itertools = "0.11.0"

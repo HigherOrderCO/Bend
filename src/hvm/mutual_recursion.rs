@@ -83,7 +83,7 @@ impl Graph {
     // Check if the current ref is already in the stack, which indicates a cycle.
     if let Some(cycle_start) = stack.iter().position(|n| n == r#ref) {
       // If found, add the cycle to the cycles vector.
-      cycles.push(stack[cycle_start ..].to_vec());
+      cycles.push(stack[cycle_start..].to_vec());
       return;
     }
 
@@ -167,7 +167,7 @@ fn combinations_from_merges(cycle: Vec<Ref>) -> Vec<Vec<Ref>> {
   for r#ref in cycle {
     if let Some(index) = r#ref.find(MERGE_SEPARATOR) {
       let (left, right) = r#ref.split_at(index);
-      let right = &right[MERGE_SEPARATOR.len() ..]; // skip merge separator
+      let right = &right[MERGE_SEPARATOR.len()..]; // skip merge separator
       let mut new_combinations = Vec::new();
       for combination in &combinations {
         let mut left_comb = combination.clone();

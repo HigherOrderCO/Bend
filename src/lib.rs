@@ -1,6 +1,3 @@
-#![feature(box_patterns)]
-#![feature(let_chains)]
-
 use crate::{
   fun::{book_to_hvm, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Term},
   hvm::{
@@ -152,7 +149,11 @@ pub fn desugar_book(
 
   ctx.book.make_var_names_unique();
 
-  if !ctx.info.has_errors() { Ok(ctx.info) } else { Err(ctx.info) }
+  if !ctx.info.has_errors() {
+    Ok(ctx.info)
+  } else {
+    Err(ctx.info)
+  }
 }
 
 pub fn run_book(
@@ -215,7 +216,7 @@ fn run_hvm(book: &::hvm::ast::Book, cmd: &str) -> Result<String, String> {
       if num_read == 0 {
         break;
       }
-      let new_buf = &buf[.. num_read];
+      let new_buf = &buf[..num_read];
       // TODO: Does this lead to broken characters if printing too much at once?
       let new_str = String::from_utf8_lossy(new_buf);
       if capturing {
@@ -236,7 +237,11 @@ fn run_hvm(book: &::hvm::ast::Book, cmd: &str) -> Result<String, String> {
       }
     }
 
-    if capturing { Ok(result) } else { Err("Failed to parse result from HVM.".into()) }
+    if capturing {
+      Ok(result)
+    } else {
+      Err("Failed to parse result from HVM.".into())
+    }
   }
 
   let out_path = ".out.hvm";
