@@ -16,7 +16,7 @@ def main(x1, x2, x3):
   return MainBody(x1 x2 x3)
 
 # Calling with `bend run <file> arg1 arg2 arg3 argN`, it becomes (in the "fun" syntax):
-main = (x1 λx2 λx3 (MainBody x1 x2 x3) arg1 arg2 arg3 argN)
+main = (λx1 λx2 λx3 (MainBody x1 x2 x3) arg1 arg2 arg3 argN)
 ```
 
 There are no restrictions on the number of arguments passed to the program.
