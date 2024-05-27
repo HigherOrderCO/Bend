@@ -17,11 +17,11 @@ Since Bend depends on HVM, some issues might be related to HVM rather than Bend 
 1. **Fork the repository:** Create your own fork of the repository on GitHub.
 2. **Create a new branch:** Make your changes in a new branch in your forked repository.
 3. **Run formatting and linting checks:** Before submitting your changes, ensure your code is properly formatted and linted:
-  - Run `cargo fmt` to format your code.
-  - Run `cargo clippy` to lint your code.
+   - Run `cargo fmt` to format your code.
+   - Run `cargo clippy` to lint your code.
 4. **Run tests:** Ensure all tests pass and update any test results:
-  - Run `cargo insta test` to run the tests.
-  - Run `cargo insta review` to save any changes to the test results.
+   - Run `cargo insta test` to run the tests.
+   - Run `cargo insta review` to save any changes to the test results.
 5. **Submit a pull request:** Once your changes are ready, submit a pull request from your branch to the `main` branch of the Bend Repository
 
 
