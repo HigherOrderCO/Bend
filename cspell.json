@@ -32,6 +32,7 @@
     "dref",
     "dups",
     "effectful",
+    "elif",
     "elifs",
     "foldl",
     "hasher",
