@@ -1,0 +1,18 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/compile_file/elif.bend
+---
+@main = d
+  & @main__C3 ~ (a (b (c d)))
+  & $(1 a) ~ [<2]
+  & $(2 b) ~ [>3]
+  & $(2 c) ~ [=2]
+
+@main__C0 = (?((0 (* 2)) a) a)
+
+@main__C1 = (a (?((@main__C0 (* (* 3))) (a b)) b))
+
+@main__C2 = (a (b (?((@main__C1 (* (* (* 4)))) (a (b c))) c)))
+
+@main__C3 = a
+  & $(2 ?((@main__C2 (* (* (* (* 1))))) a)) ~ [=1]
