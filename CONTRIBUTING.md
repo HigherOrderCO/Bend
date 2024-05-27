@@ -11,12 +11,12 @@ Thank you for considering contributing to Bend!
 2. **Create a new suggestion:** If you find no similar suggestion, [create a new suggestion issue](https://github.com/HigherOrderCO/Bend/issues/new?template=feature_request.md) and provide detailed information about the enhancement and why it would be useful.
 
 ### Checking HVM Issues
-Since Bend depends on HVM, some issues might be relateds to HVM rather than Bend itself. Please also check the [HVM issues page](https://github.com/HigherOrderCO/HVM/issues) to see if your issue has already been reported there.
+Since Bend depends on HVM, some issues might be related to HVM rather than Bend itself. Please also check the [HVM issues page](https://github.com/HigherOrderCO/HVM/issues) to see if your issue has already been reported there.
 
 ### Submitting Changes
 1. **Fork the repository:** Create your own fork of the repository on GitHub.
 2. **Create a new branch:** Make your changes in a new branch in your forked repository.
-3. **Run formatting and linting checks:** Before submitting your changes, ensure your code is properly formated asnd linted:
+3. **Run formatting and linting checks:** Before submitting your changes, ensure your code is properly formatted and linted:
   - Run `cargo fmt` to format your code.
   - Run `cargo clippy` to lint your code.
 4. **Run tests:** Ensure all tests pass and update any test results:
