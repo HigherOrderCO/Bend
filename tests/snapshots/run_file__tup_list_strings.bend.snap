@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/tup_list_strings.bend
 ---
 NumScott:
-{λa (a List/Cons/tag {λb (b String/Cons/tag 102 λc (c String/Cons/tag 111 λd (d String/Cons/tag 111 ""))) 0} λe (e List/Cons/tag {λf (f String/Cons/tag 102 λg (g String/Cons/tag 111 λh (h String/Cons/tag 111 ""))) 0} λi (i List/Cons/tag {λj (j String/Cons/tag 102 λk (k String/Cons/tag 111 λl (l String/Cons/tag 111 ""))) 1} []))) 4}
+{[{"foo" 0}, {"foo" 0}, {"foo" 1}] 4}
 
 Scott:
 {[{"foo" 0}, {"foo" 0}, {"foo" 1}] 4}

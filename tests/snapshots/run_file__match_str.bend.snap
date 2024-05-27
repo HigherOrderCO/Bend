@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_str.bend
 ---
 NumScott:
-λa (a List/Cons/tag 2 λb (b List/Cons/tag 2 λc (c List/Cons/tag 1 λd (d List/Cons/tag 0 λe (e List/Cons/tag 0 λf (f List/Cons/tag 0 []))))))
+[2, 2, 1, 0, 0, 0]
 
 Scott:
 [2, 2, 1, 0, 0, 0]

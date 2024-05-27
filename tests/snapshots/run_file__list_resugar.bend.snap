@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/list_resugar.bend
 ---
 NumScott:
-λa (a List/Cons/tag 42 λb (b List/Cons/tag λc (c List/Cons/tag λd d []) []))
+[42, [λd d]]
 
 Scott:
 [42, [λd d]]

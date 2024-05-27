@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_builtins.bend
 ---
 NumScott:
-{λa (a String/Cons/tag 101 λb (b String/Cons/tag 108 λc (c String/Cons/tag 108 λd (d String/Cons/tag 111 "")))) λe (e String/Cons/tag 119 λf (f String/Cons/tag 111 λg (g String/Cons/tag 114 λh (h String/Cons/tag 108 λi (i String/Cons/tag 100 "")))))}
+{"ello" "world"}
 
 Scott:
 {"ello" "world"}

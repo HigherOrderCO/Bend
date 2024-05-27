@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/chars.bend
 ---
 NumScott:
-λa (a String/Cons/tag 4660 λb (b String/Cons/tag 33 λc (c String/Cons/tag 55 "")))
+"ሴ!7"
 
 Scott:
 "ሴ!7"

@@ -8,5 +8,5 @@ Result:
       0: "ba";
       _: λ* "ta";
     };
-  _: λ* λb (b String/Cons/tag 97 λc (c String/Cons/tag 116 λd (d String/Cons/tag 97 "")));
+  _: λ* "ata";
 }

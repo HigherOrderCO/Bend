@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/str_concat.bend
 ---
 NumScott:
-λa (a String/Cons/tag 104 λb (b String/Cons/tag 101 λc (c String/Cons/tag 108 λd (d String/Cons/tag 108 λe (e String/Cons/tag 111 λf (f String/Cons/tag 32 λg (g String/Cons/tag 119 λh (h String/Cons/tag 111 λi (i String/Cons/tag 114 λj (j String/Cons/tag 108 λk (k String/Cons/tag 100 "")))))))))))
+"hello world"
 
 Scott:
 "hello world"

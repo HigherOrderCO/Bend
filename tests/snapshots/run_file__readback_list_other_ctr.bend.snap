@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/readback_list_other_ctr.bend
 ---
 NumScott:
-λa (a List/Cons/tag λb (b String/Cons/tag 97 λc (c tup/pair/tag 98 λd (d String/Cons/tag 99 ""))) λe (e List/Cons/tag 1 λf (f tup/pair/tag 2 λg (g List/Cons/tag 3 λh (h List/Cons/tag 4 [])))))
+λa (a List/Cons/tag λb (b String/Cons/tag 97 λc (c tup/pair/tag 98 "c")) λe (e List/Cons/tag 1 λf (f tup/pair/tag 2 [3, 4])))
 
 Scott:
 λ* λa (a λ* λb (b 97 λc (c 98 "c")) λ* λe (e 1 λf (f 2 [3, 4])))

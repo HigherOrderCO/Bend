@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/guide_is_even_str.bend
 ---
 NumScott:
-λa (a String/Cons/tag 111 λb (b String/Cons/tag 100 λc (c String/Cons/tag 100 "")))
+"odd"
 
 Scott:
 "odd"

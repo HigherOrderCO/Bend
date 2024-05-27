@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/list_take.bend
 ---
 NumScott:
-λa (a List/Cons/tag 3 λb (b List/Cons/tag 2 []))
+[3, 2]
 
 Scott:
 [3, 2]
