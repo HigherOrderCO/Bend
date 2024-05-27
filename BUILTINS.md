@@ -1,61 +1,92 @@
 >this is a WIP based on [Builtins.bend](https://github.com/HigherOrderCO/Bend/blob/main/src/fun/builtins.bend).
 
 # Built-in Types and Functions
-Bend built-in types and functions, this document serves as a reference guide to these built-in features.
+**Bend** built-in types and functions, this document serves as a reference guide. Read more at [FEATURES.md](https://github.com/HigherOrderCO/Bend/blob/main/FEATURES.md).
 
-## Types
-
-### String
-```bend
+## String
+```python
 data String = (Cons head ~tail) | (Nil)
 ```
+
 
 - **Nil**: Represents an empty string.
 - **Cons head ~tail**: Represents a string with a `head` character and a `tail` string.
 
-### List
-```bend
+### Syntax
+A String literal is surrounded with `"`. Accepts the same values as characters literals.
+```
+"Hello, World!"
+```
+
+
+
+ 
+## List
+```python
 data List = (Cons head ~tail) | (Nil)
 ```
 
 - **Nil**: Represents an empty list.
 - **Cons head ~tail**: Represents a list with a `head` element and a `tail` list.
 
-### Nat
-```bend 
-data Nat = (Succ ~pred) | (Zero)
+### Syntax
+A List of values can be written using `[ ]`, it can have multiple values inside, using `,` you can divide its value in a list of multiple elements.
+
+```
+["This", "List", "Has", "Multiple", "Values"]
 ```
 
+
+
+ 
+## Nat
+```python
+data Nat = (Succ ~pred) | (Zero)
+```
 - **Succ ~pred**: Represents a natural number successor.
 - **Zero**: Represents the natural number zero.
 
-### Result
-```bend
+### Syntax
+A Natural Number can be written with literals with a `#` before the literal number.
+
+```
+#1337
+```
+
+
+
+## Result
+```python
 data Result = (Ok val) | (Err val)
 ```
 
 - **Ok val**: Represents a successful result with value `val`.
 - **Err val**: Represents an error with value `val`.
 
-### Map
-```bend
+## Map
+```python
 data Map = (Node value ~left ~right) | (Leaf)
 ```
 
 - **Node value ~left ~right**: Represents a map node with a `value` and `left` and `right` subtrees.
 - **Leaf**: Represents an empty map.
 
-## Map Functions
+#### Syntax
+**Bend** has a built-in binary tree map data structure where the key is a `u24`, meaning you can use numbers, characters, and symbols as keys.
+```python
+{ 0: 4, `hi`: "bye", 'c': 2 + 3 }
+```
 
-#### Map/empty
+
+### Map/empty
 Initializes an empty map.
-```bend
+```python
 Map/empty = Map/Leaf
 ```
 
-#### Map/get
+### Map/get
 Retrieves a `value` from the `map` based on the `key`.
-```bend
+```rust
 Map/get map key =
   match map {
     Map/Leaf: (*, map)
@@ -74,9 +105,24 @@ Map/get map key =
   }
 ```
 
-#### Map/set
+
+#### Syntax
+Considering the following tree
+```python
+{ 0: "hello", 1: "bye", 2: "maybe", 3: "yes"}
+```
+The `get` function can be written as
+```
+return x[0]  # Gets the value of the key 0
+```
+And the value resultant from the get function would be:
+```
+"hello"
+```
+
+### Map/set
 Sets a `value` in the `map` at the specified `key`.
-```bend
+```rust
 Map/set map key value =
   match map {
     Map/Node:
@@ -97,86 +143,28 @@ Map/set map key value =
       }
   }
 ```
+#### Syntax
+Considering the following tree
+```python
+{ 0: "hello", 1: "bye", 2: "maybe", 3: "yes"}
+```
+The `set` function can be written as
+```
+x[0] = "swapped"     # Assigns the key 0 to the value "swapped"
+```
+And the value resultant from the get function would be:
+```
+{ 0: "swapped", 1: "bye", 2: "maybe", 3: "yes"}
+```
+If there's no matching `key` in the tree, it would add a new branch to that tree with the value `set`
+
+```
+x[4] = "added"     # Assigns the key 4 to the value "added"
+```
+The new tree
+```
+{ 0: "swapped", 1: "bye", 2: "maybe", 3: "yes", 4: "added"}
+```
 
 ## IO
-IO Functions are in the **next milestone**! 
-
-### IO Implementations
-
-```bend
-STRING_NIL_TAG  = 0
-STRING_CONS_TAG = 1
-```
-
-```bend
-IO_DONE_TAG       = 0
-IO_PUT_TEXT_TAG   = 1
-IO_GET_TEXT_TAG   = 2
-IO_WRITE_FILE_TAG = 3
-IO_READ_FILE_TAG  = 4
-IO_GET_TIME_TAG   = 5
-IO_SLEEP_TAG      = 6
-IO_DRAW_IMAGE_TAG = 7
-```
-
-### Type
-```
-data IO
-  = (Done term)
-  | (PutText   text      cont)
-  | (GetText             cont)
-  | (WriteFile file data cont)
-  | (ReadFile  file      cont)
-  | (GetTime             cont)
-  | (Sleep     time      cont)
-  | (DrawImage tree      cont)
-
-```
-
-### IO/Done
-Represents a completed IO operation.
-
-### IO/Call
-Represents a pending IO operation.
-
-### IO/MAGIC
-Returns a magic number used internally.
-```bend
-def IO/MAGIC: return (0xD0CA11, 0xFF1FF1)
-```
-
-### IO/wrap
-Wraps a value in an IO/Done.
-```bend
-def IO/wrap(x): return IO/Done(IO/MAGIC, x)
-```
-
-### IO/bind
-Chains IO operations.
-```bend
-def IO/bind(a, b): match a ...
-```
-
-### call
-Calls an IO function with an argument.
-```bend
-def call(func, argm): return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
-```
-
-### print
-Prints text to the console.
-```bend
-print text = (IO/Call IO/MAGIC "PUT_TEXT" text @x (IO/Done IO/MAGIC x))
-```
-
-### get_time
-`get_time` is an IO action that retrieves the current time.
-```bend
-get_time = (IO/Call IO/MAGIC "GET_TIME" * @x (IO/Done IO/MAGIC x))
-```
-
-### sleep
-`sleep` is an IO action that suspends execution for the specified duration.
-```bend
-sleep hi_lo = (IO/Call IO/MAGIC "PUT_TIME" hi_lo @x (IO/Done IO/MAGIC x))
-```
+IO Functions are in the **next milestone**!
