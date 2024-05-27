@@ -1,4 +1,6 @@
-# Known Issues
+# Known Issues and Frequently Asked Questions
+
+## Installation and Setup
 
 ### Can I run this on Windows?
 - We're still working on the windows support, for the moment, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).
@@ -9,9 +11,6 @@
 ### I'm getting a `Failed to launch kernels (error code invalid argument)!` error.
 - The current iteration of the `hvm.cu` was written with the RTX 4090 in mind, and won't work on older GPUs, since they contain about half of the newer GPUs shared memory, for better understanding please refer to [HVM#283](https://github.com/HigherOrderCO/HVM/issues/283). We are working on support for older GPUs and will release it soon.
 
-### Can I run this on AMD/Intel/Apple GPUs?
-- We plan on adding support to many other GPUs as soon as the CUDA version is sufficiently stable.
-
 ### I get "Command `bend` not found" after installing, what do I do?
 - If you are on Unix system (or WSL) then most likely bend did not add itself to the PATH variable in your rc file. To remedy this:
   - Determine if you are using bash or zsh (check for presence of `~/.bashrc` or `~/.zshrc`)
@@ -21,9 +20,24 @@
   - Try running `bend` once more - it should work now! 
 
 ### I got an error when installing HVM on Linux
-- If the error contains anything regarding `ccbin`, please refer to [HVM#291](https://github.com/HigherOrderCO/HVM/issues/291)
+- If the error happens when compiling the CUDA runtime or contains anything regarding `ccbin`, please refer to [HVM#291](https://github.com/HigherOrderCO/HVM/issues/291).
 
 - If the error contains anything regarding `libc` missing, please refer to [HVM#355](https://github.com/HigherOrderCO/Bend/issues/355)
+
+### Can I run this on AMD/Intel/Apple GPUs?
+- We plan on adding support to many other GPUs as soon as the CUDA version is sufficiently stable.
+
+### What GPUs are supported?
+GPUs with >=96KB L1 cache per SM *should* work. This includes the following:
+| GPU                         | Tested? |
+|-----------------------------|---------|
+| RTX 4090                    | Yes     |
+| All Other Desktop 40 Series | No      |
+| All Desktop 30 Series       | No      |
+| All Mobile 40 Series        | No      |
+| All Mobile 30 Series        | No      |
+
+## Using Bend
 
 ### How do I use IO?
 - IO is still being developed and is expected to come soon.
@@ -43,13 +57,3 @@ Some possibilities:
 
 ### I'm getting an error of failed assertion
 - HVM currently has a bug in its conversion of f32 to f24 and it's unable to read the number 0.0. We already have a fix that we're working on.
-
-### What GPUs are supported?
-GPUs with >=128KB L1 cache per SM *should* work. This includes the following:
-| GPU                         | Tested? |
-|-----------------------------|---------|
-| RTX 4090                    | Yes     |
-| All Other Desktop 40 Series | No      |
-| All Desktop 30 Series       | No      |
-| All Mobile 40 Series        | No      |
-| All Mobile 30 Series        | No      |
