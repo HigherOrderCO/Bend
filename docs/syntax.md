@@ -205,7 +205,7 @@ elif condition3:
 else:
   return 3
 ```
-The conditions are evaluated in order, one by one, stopping at the first succesful case.
+The conditions are evaluated in order, one by one, stopping at the first successful case.
 
 ### Switch
 
