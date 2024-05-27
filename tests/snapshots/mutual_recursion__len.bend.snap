@@ -10,9 +10,13 @@ input_file: tests/golden_tests/mutual_recursion/len.bend
 
 @Len__C1 = (?((0 @Len__C0) a) a)
 
-@List/Cons = (a (b ((1 (a (b c))) c)))
+@List/Cons = (a (b ((@List/Cons/tag (a (b c))) c)))
 
-@List/Nil = ((0 a) a)
+@List/Cons/tag = 1
+
+@List/Nil = ((@List/Nil/tag a) a)
+
+@List/Nil/tag = 0
 
 @main = g
   & @Len ~ (f g)

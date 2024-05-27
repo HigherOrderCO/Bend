@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/list_reverse.bend
 ---
 NumScott:
-λa (a 0 1 λb (b 0 2 λc (c 0 3 list/nil)))
+λa (a list/cons/tag 1 λb (b list/cons/tag 2 λc (c list/cons/tag 3 list/nil)))
 
 Scott:
 λa λ* (a 1 λb λ* (b 2 λc λ* (c 3 list/nil)))

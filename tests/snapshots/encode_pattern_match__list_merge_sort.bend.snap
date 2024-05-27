@@ -40,10 +40,18 @@ NumScott
 
 (Merge) = λa λb (b λc switch c { 0: λd λe λf λg (g λh switch h { 0: λi let {i i_2 i_3} = i; λj let {j j_2} = j; λk let {k k_2 k_3} = k; λl let {l l_2 l_3} = l; λm let {m m_2} = m; (If (k l i) (List_/Cons l_2 (Merge k_2 m (List_/Cons i_2 j))) (List_/Cons i_3 (Merge k_3 (List_/Cons l_3 m_2) j_2))); _: λ* λ* λq λr (List_/Cons q r); } f d e); _: λ* λ* λt t; } a)
 
-(Bool/True) = λa (a 0)
+(Bool/True) = λa (a Bool/True/tag)
 
-(Bool/False) = λa (a 1)
+(Bool/False) = λa (a Bool/False/tag)
 
-(List_/Cons) = λa λb λc (c 0 a b)
+(List_/Cons) = λa λb λc (c List_/Cons/tag a b)
 
-(List_/Nil) = λa (a 1)
+(List_/Nil) = λa (a List_/Nil/tag)
+
+(Bool/True/tag) = 0
+
+(Bool/False/tag) = 1
+
+(List_/Cons/tag) = 0
+
+(List_/Nil/tag) = 1

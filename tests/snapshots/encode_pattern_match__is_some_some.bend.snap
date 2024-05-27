@@ -16,6 +16,10 @@ NumScott
 
 (main) = (some_some (Option/Some 1))
 
-(Option/Some) = λa λb (b 0 a)
+(Option/Some) = λa λb (b Option/Some/tag a)
 
-(Option/None) = λa (a 1)
+(Option/None) = λa (a Option/None/tag)
+
+(Option/Some/tag) = 0
+
+(Option/None/tag) = 1

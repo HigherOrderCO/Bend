@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_num_succ_complex.bend
 ---
 NumScott:
-[[5, 5, 0, 12, 0, 6], [5, 5, 0, 12, 0, 6]]
+λa (a List/Cons/tag λb (b List/Cons/tag 5 λc (c List/Cons/tag 5 λd (d List/Cons/tag 0 λe (e List/Cons/tag 12 λf (f List/Cons/tag 0 λg (g List/Cons/tag 6 [])))))) λh (h List/Cons/tag λi (i List/Cons/tag 5 λj (j List/Cons/tag 5 λk (k List/Cons/tag 0 λl (l List/Cons/tag 12 λm (m List/Cons/tag 0 λn (n List/Cons/tag 6 [])))))) []))
 
 Scott:
 [[5, 5, 0, 12, 0, 6], [5, 5, 0, 12, 0, 6]]

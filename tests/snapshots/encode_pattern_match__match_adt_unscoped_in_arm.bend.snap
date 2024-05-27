@@ -12,6 +12,10 @@ Scott
 NumScott
 (main) = λ* λ$x $x
 
-(bool/T) = λa (a 0)
+(bool/T) = λa (a bool/T/tag)
 
-(bool/F) = λa (a 1)
+(bool/F) = λa (a bool/F/tag)
+
+(bool/T/tag) = 0
+
+(bool/F/tag) = 1

@@ -16,6 +16,10 @@ NumScott
 
 (main) = λ* Foo
 
-(Bool/False) = λa (a 0)
+(Bool/False) = λa (a Bool/False/tag)
 
-(Bool/True) = λa (a 1)
+(Bool/True) = λa (a Bool/True/tag)
+
+(Bool/False/tag) = 0
+
+(Bool/True/tag) = 1

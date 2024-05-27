@@ -6,4 +6,6 @@ input_file: tests/golden_tests/simplify_matches/double_unwrap_box.bend
 
 (Main) = (DoubleUnbox (Boxed/Box (Boxed/Box 0)) 5)
 
-(Boxed/Box) = λa λb (b 0 a)
+(Boxed/Box) = λa λb (b Boxed/Box/tag a)
+
+(Boxed/Box/tag) = 0

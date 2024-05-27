@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/guide_if_age.bend
 ---
 NumScott:
-"you're an adult"
+λa (a String/Cons/tag 121 λb (b String/Cons/tag 111 λc (c String/Cons/tag 117 λd (d String/Cons/tag 39 λe (e String/Cons/tag 114 λf (f String/Cons/tag 101 λg (g String/Cons/tag 32 λh (h String/Cons/tag 97 λi (i String/Cons/tag 110 λj (j String/Cons/tag 32 λk (k String/Cons/tag 97 λl (l String/Cons/tag 100 λm (m String/Cons/tag 117 λn (n String/Cons/tag 108 λo (o String/Cons/tag 116 "")))))))))))))))
 
 Scott:
 "you're an adult"

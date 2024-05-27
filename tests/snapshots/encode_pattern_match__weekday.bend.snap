@@ -22,16 +22,30 @@ Scott
 NumScott
 (main) = (λa a Weekday/Saturday)
 
-(Weekday/Monday) = λa (a 0)
+(Weekday/Monday) = λa (a Weekday/Monday/tag)
 
-(Weekday/Tuesday) = λa (a 1)
+(Weekday/Tuesday) = λa (a Weekday/Tuesday/tag)
 
-(Weekday/Wednesday) = λa (a 2)
+(Weekday/Wednesday) = λa (a Weekday/Wednesday/tag)
 
-(Weekday/Thursday) = λa (a 3)
+(Weekday/Thursday) = λa (a Weekday/Thursday/tag)
 
-(Weekday/Friday) = λa (a 4)
+(Weekday/Friday) = λa (a Weekday/Friday/tag)
 
-(Weekday/Saturday) = λa (a 5)
+(Weekday/Saturday) = λa (a Weekday/Saturday/tag)
 
-(Weekday/Sunday) = λa (a 6)
+(Weekday/Sunday) = λa (a Weekday/Sunday/tag)
+
+(Weekday/Monday/tag) = 0
+
+(Weekday/Tuesday/tag) = 1
+
+(Weekday/Wednesday/tag) = 2
+
+(Weekday/Thursday/tag) = 3
+
+(Weekday/Friday/tag) = 4
+
+(Weekday/Saturday/tag) = 5
+
+(Weekday/Sunday/tag) = 6

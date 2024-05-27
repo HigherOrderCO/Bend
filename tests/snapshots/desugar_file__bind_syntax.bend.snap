@@ -10,13 +10,21 @@ input_file: tests/golden_tests/desugar_file/bind_syntax.bend
 
 (Main) = (Result/bind Main__C1 Main__C0)
 
-(String/Nil) = λa (a 0)
+(String/Nil) = λa (a String/Nil/tag)
 
-(String/Cons) = λa λb λc (c 1 a b)
+(String/Cons) = λa λb λc (c String/Cons/tag a b)
 
-(Result/Ok) = λa λb (b 0 a)
+(Result/Ok) = λa λb (b Result/Ok/tag a)
 
-(Result/Err) = λa λb (b 1 a)
+(Result/Err) = λa λb (b Result/Err/tag a)
+
+(String/Nil/tag) = 0
+
+(String/Cons/tag) = 1
+
+(Result/Ok/tag) = 0
+
+(Result/Err/tag) = 1
 
 (Main__C0) = λa (Result/bind (safe_rem a 0) λb b)
 

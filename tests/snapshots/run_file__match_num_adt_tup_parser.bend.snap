@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_num_adt_tup_parser.bend
 ---
 NumScott:
-λa (a 1 {"(+" *})
+λa (a Result_/Err/tag {λb (b String/Cons/tag 40 λc (c String/Cons/tag 43 "")) *})
 
 Scott:
 λ* λa (a {"(+" *})

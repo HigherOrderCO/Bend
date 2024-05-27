@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_num_num_to_char.bend
 ---
 NumScott:
-{{[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 16777215]} [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 0]}
+{{λa (a List/Cons/tag 0 λb (b List/Cons/tag 1 λc (c List/Cons/tag 2 λd (d List/Cons/tag 3 λe (e List/Cons/tag 4 λf (f List/Cons/tag 5 λg (g List/Cons/tag 6 λh (h List/Cons/tag 7 λi (i List/Cons/tag 8 λj (j List/Cons/tag 9 λk (k List/Cons/tag 10 []))))))))))) λl (l List/Cons/tag 0 λm (m List/Cons/tag 1 λn (n List/Cons/tag 2 λo (o List/Cons/tag 3 λp (p List/Cons/tag 4 λq (q List/Cons/tag 5 λr (r List/Cons/tag 6 λs (s List/Cons/tag 7 λt (t List/Cons/tag 8 λu (u List/Cons/tag 9 λv (v List/Cons/tag 16777215 [])))))))))))} λw (w List/Cons/tag 48 λx (x List/Cons/tag 49 λy (y List/Cons/tag 50 λz (z List/Cons/tag 51 λab (ab List/Cons/tag 52 λbb (bb List/Cons/tag 53 λcb (cb List/Cons/tag 54 λdb (db List/Cons/tag 55 λeb (eb List/Cons/tag 56 λfb (fb List/Cons/tag 57 λgb (gb List/Cons/tag 0 [])))))))))))}
 
 Scott:
 {{[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10] [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 16777215]} [48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 0]}

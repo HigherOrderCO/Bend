@@ -7,13 +7,31 @@ impl Book {
   /// Defines a function for each constructor in each ADT in the book.
   pub fn encode_adts(&mut self, adt_encoding: AdtEncoding) {
     let mut defs = vec![];
-    for adt in self.adts.values() {
+    let mut tags = vec![];
+
+    for (adt_name, adt) in self.adts.iter() {
       for (ctr_idx, (ctr_name, fields)) in adt.ctrs.iter().enumerate() {
         let ctrs: Vec<_> = adt.ctrs.keys().cloned().collect();
 
         let body = match adt_encoding {
           AdtEncoding::Scott => encode_ctr_scott(fields.iter().map(|f| &f.nam), ctrs, ctr_name),
-          AdtEncoding::NumScott => encode_ctr_num_scott(fields.iter().map(|f| &f.nam), ctr_idx),
+          AdtEncoding::NumScott => {
+            let is_object = adt_name == ctr_name;
+            if is_object {
+              let tag = Name::new(format!("{ctr_name}/tag"));
+              let body = encode_ctr_num_scott(fields.iter().map(|f| &f.nam), &tag);
+              let tag_def = make_tag_def(ctr_idx, &tag, adt);
+              tags.push((tag, tag_def));
+              body
+            } else {
+              let (typ, ctr) = ctr_name.rsplit_once('/').expect("To split at '/'");
+              let tag = Name::new(format!("{typ}/{ctr}/tag"));
+              let body = encode_ctr_num_scott(fields.iter().map(|f| &f.nam), &tag);
+              let tag_def = make_tag_def(ctr_idx, &tag, adt);
+              tags.push((tag, tag_def));
+              body
+            }
+          }
         };
 
         let rules = vec![Rule { pats: vec![], body }];
@@ -22,6 +40,7 @@ impl Book {
       }
     }
     self.defs.extend(defs);
+    self.defs.extend(tags);
   }
 }
 
@@ -36,16 +55,18 @@ fn encode_ctr_scott<'a>(
   ctr_args.cloned().rfold(lam, |acc, arg| Term::lam(Pattern::Var(Some(arg)), acc))
 }
 
-fn encode_ctr_num_scott<'a>(
-  ctr_args: impl DoubleEndedIterator<Item = &'a Name> + Clone,
-  ctr_idx: usize,
-) -> Term {
+fn encode_ctr_num_scott<'a>(ctr_args: impl DoubleEndedIterator<Item = &'a Name> + Clone, tag: &str) -> Term {
   let nam = Name::new("%x");
   // λa1 .. λan λx (x TAG a1 .. an)
   let term = Term::Var { nam: nam.clone() };
-  let tag = Term::Num { val: Num::U24(ctr_idx as u32) };
+  let tag = Term::r#ref(tag);
   let term = Term::app(term, tag);
   let term = Term::call(term, ctr_args.clone().cloned().map(|nam| Term::Var { nam }));
   let term = Term::lam(Pattern::Var(Some(nam)), term);
   Term::rfold_lams(term, ctr_args.cloned().map(Some))
+}
+
+fn make_tag_def(ctr_idx: usize, tag: &Name, adt: &crate::fun::Adt) -> Definition {
+  let tag_rule = vec![Rule { pats: vec![], body: Term::Num { val: Num::U24(ctr_idx as u32) } }];
+  Definition { name: tag.clone(), rules: tag_rule, builtin: adt.builtin }
 }

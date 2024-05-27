@@ -20,6 +20,10 @@ NumScott
 
 (main) = *
 
-(Maybe/None) = λa (a 0)
+(Maybe/None) = λa (a Maybe/None/tag)
 
-(Maybe/Some) = λa λb (b 1 a)
+(Maybe/Some) = λa λb (b Maybe/Some/tag a)
+
+(Maybe/None/tag) = 0
+
+(Maybe/Some/tag) = 1

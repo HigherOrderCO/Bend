@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: examples/insertion_sort.bend
 ---
-[4780, 11739, 35809, 49583, 154358, 177867, 244878, 289211, 318852, 423850]
+λa (a List/Cons/tag 4780 λb (b List/Cons/tag 11739 λc (c List/Cons/tag 35809 λd (d List/Cons/tag 49583 λe (e List/Cons/tag 154358 λf (f List/Cons/tag 177867 λg (g List/Cons/tag 244878 λh (h List/Cons/tag 289211 λi (i List/Cons/tag 318852 λj (j List/Cons/tag 423850 []))))))))))

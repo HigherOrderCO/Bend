@@ -30,28 +30,54 @@ Scott
 (Op/Div) = λ* λ* λ* λd d
 
 NumScott
-(Expr/Var) = λa λb (b 0 a)
+(Expr/Var) = λa λb (b Expr/Var/tag a)
 
-(Expr/Num) = λa λb (b 1 a)
+(Expr/Num) = λa λb (b Expr/Num/tag a)
 
-(Expr/App) = λa λb λc (c 2 a b)
+(Expr/App) = λa λb λc (c Expr/App/tag a b)
 
-(Expr/Fun) = λa λb λc (c 3 a b)
+(Expr/Fun) = λa λb λc (c Expr/Fun/tag a b)
 
-(Expr/If) = λa λb λc λd (d 4 a b c)
+(Expr/If) = λa λb λc λd (d Expr/If/tag a b c)
 
-(Expr/Let) = λa λb λc λd (d 5 a b c)
+(Expr/Let) = λa λb λc λd (d Expr/Let/tag a b c)
 
-(Expr/Dup) = λa λb λc λd λe (e 6 a b c d)
+(Expr/Dup) = λa λb λc λd λe (e Expr/Dup/tag a b c d)
 
-(Expr/Tup) = λa λb λc (c 7 a b)
+(Expr/Tup) = λa λb λc (c Expr/Tup/tag a b)
 
-(Expr/Op2) = λa λb λc λd (d 8 a b c)
+(Expr/Op2) = λa λb λc λd (d Expr/Op2/tag a b c)
 
-(Op/Add) = λa (a 0)
+(Op/Add) = λa (a Op/Add/tag)
 
-(Op/Sub) = λa (a 1)
+(Op/Sub) = λa (a Op/Sub/tag)
 
-(Op/Mul) = λa (a 2)
+(Op/Mul) = λa (a Op/Mul/tag)
 
-(Op/Div) = λa (a 3)
+(Op/Div) = λa (a Op/Div/tag)
+
+(Expr/Var/tag) = 0
+
+(Expr/Num/tag) = 1
+
+(Expr/App/tag) = 2
+
+(Expr/Fun/tag) = 3
+
+(Expr/If/tag) = 4
+
+(Expr/Let/tag) = 5
+
+(Expr/Dup/tag) = 6
+
+(Expr/Tup/tag) = 7
+
+(Expr/Op2/tag) = 8
+
+(Op/Add/tag) = 0
+
+(Op/Sub/tag) = 1
+
+(Op/Mul/tag) = 2
+
+(Op/Div/tag) = 3

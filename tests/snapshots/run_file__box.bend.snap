@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/box.bend
 ---
 NumScott:
-λa (a 0 λb (b 0 10))
+λa (a _Box/Box/tag λb (b _Box/Box/tag 10))
 
 Scott:
 λa (a λb (b 10))

@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/comprehension.bend
 ---
 NumScott:
-[5, 10, 7, 6]
+λa (a List/Cons/tag 5 λb (b List/Cons/tag 10 λc (c List/Cons/tag 7 λd (d List/Cons/tag 6 []))))
 
 Scott:
 [5, 10, 7, 6]

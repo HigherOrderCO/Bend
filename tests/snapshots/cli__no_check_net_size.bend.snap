@@ -2,11 +2,17 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/no_check_net_size.bend
 ---
-@Arr/Leaf = (a ((1 (a b)) b))
+@Arr/Leaf = (a ((@Arr/Leaf/tag (a b)) b))
 
-@Arr/Node = (a (b ((2 (a (b c))) c)))
+@Arr/Leaf/tag = 1
 
-@Arr/Null = ((0 a) a)
+@Arr/Node = (a (b ((@Arr/Node/tag (a (b c))) c)))
+
+@Arr/Node/tag = 2
+
+@Arr/Null = ((@Arr/Null/tag a) a)
+
+@Arr/Null/tag = 0
 
 @Gen = (a b)
   & @Gen.go ~ (a (0 b))
@@ -30,11 +36,17 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 @Main__C2 = a
   & @Sort ~ (@Main__C1 a)
 
-@Map_/Both = (a (b ((2 (a (b c))) c)))
+@Map_/Both = (a (b ((@Map_/Both/tag (a (b c))) c)))
 
-@Map_/Free = ((0 a) a)
+@Map_/Both/tag = 2
 
-@Map_/Used = ((1 a) a)
+@Map_/Free = ((@Map_/Free/tag a) a)
+
+@Map_/Free/tag = 0
+
+@Map_/Used = ((@Map_/Used/tag a) a)
+
+@Map_/Used/tag = 1
 
 @Merge = ((@Merge__C13 a) a)
 

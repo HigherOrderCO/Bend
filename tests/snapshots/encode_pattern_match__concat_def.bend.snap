@@ -16,6 +16,10 @@ NumScott
 
 (main) = (concat (String/Cons 97 (String/Cons 98 String/Nil)) (String/Cons 99 (String/Cons 100 String/Nil)))
 
-(String/Nil) = λa (a 0)
+(String/Nil) = λa (a String/Nil/tag)
 
-(String/Cons) = λa λb λc (c 1 a b)
+(String/Cons) = λa λb λc (c String/Cons/tag a b)
+
+(String/Nil/tag) = 0
+
+(String/Cons/tag) = 1

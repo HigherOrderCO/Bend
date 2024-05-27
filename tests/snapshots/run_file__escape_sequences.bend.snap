@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/escape_sequences.bend
 ---
 NumScott:
-"\n\r\t\0\"'\u{afe}\\\n\r\t\0\"'\u{afe}\\"
+λa (a String/Cons/tag 10 λb (b String/Cons/tag 13 λc (c String/Cons/tag 9 λd (d String/Cons/tag 0 λe (e String/Cons/tag 34 λf (f String/Cons/tag 39 λg (g String/Cons/tag 2814 λh (h String/Cons/tag 92 λi (i String/Cons/tag 10 λj (j String/Cons/tag 13 λk (k String/Cons/tag 9 λl (l String/Cons/tag 0 λm (m String/Cons/tag 34 λn (n String/Cons/tag 39 λo (o String/Cons/tag 2814 λp (p String/Cons/tag 92 ""))))))))))))))))
 
 Scott:
 "\n\r\t\0\"'\u{afe}\\\n\r\t\0\"'\u{afe}\\"

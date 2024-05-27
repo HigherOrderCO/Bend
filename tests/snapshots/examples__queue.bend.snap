@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: examples/queue.bend
 ---
-[1, 2, 3]
+λa (a List/Cons/tag 1 λb (b List/Cons/tag 2 λc (c List/Cons/tag 3 [])))

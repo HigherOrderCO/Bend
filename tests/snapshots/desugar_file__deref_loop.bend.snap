@@ -8,9 +8,13 @@ input_file: tests/golden_tests/desugar_file/deref_loop.bend
 
 (main) = (foo 0)
 
-(nat/succ) = λa λb (b 0 a)
+(nat/succ) = λa λb (b nat/succ/tag a)
 
-(nat/zero) = λa (a 1)
+(nat/zero) = λa (a nat/zero/tag)
+
+(nat/succ/tag) = 0
+
+(nat/zero/tag) = 1
 
 (foo__C0) = λ* (bar 0)
 

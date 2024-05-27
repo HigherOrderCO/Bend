@@ -38,36 +38,70 @@ Scott
 (Direction/West) = λ* λ* λ* λd d
 
 NumScott
-(Box/Filled) = λa λb (b 0 a)
+(Box/Filled) = λa λb (b Box/Filled/tag a)
 
-(Box/Empty) = λa (a 1)
+(Box/Empty) = λa (a Box/Empty/tag)
 
-(Option/Some) = λa λb (b 0 a)
+(Option/Some) = λa λb (b Option/Some/tag a)
 
-(Option/None) = λa (a 1)
+(Option/None) = λa (a Option/None/tag)
 
-(Result_/Ok) = λa λb (b 0 a)
+(Result_/Ok) = λa λb (b Result_/Ok/tag a)
 
-(Result_/Err) = λa λb (b 1 a)
+(Result_/Err) = λa λb (b Result_/Err/tag a)
 
-(List_/Cons) = λa λb λc (c 0 a b)
+(List_/Cons) = λa λb λc (c List_/Cons/tag a b)
 
-(List_/Nil) = λa (a 1)
+(List_/Nil) = λa (a List_/Nil/tag)
 
-(Bool/True) = λa (a 0)
+(Bool/True) = λa (a Bool/True/tag)
 
-(Bool/False) = λa (a 1)
+(Bool/False) = λa (a Bool/False/tag)
 
-(Light/Red) = λa (a 0)
+(Light/Red) = λa (a Light/Red/tag)
 
-(Light/Yellow) = λa (a 1)
+(Light/Yellow) = λa (a Light/Yellow/tag)
 
-(Light/Green) = λa (a 2)
+(Light/Green) = λa (a Light/Green/tag)
 
-(Direction/North) = λa (a 0)
+(Direction/North) = λa (a Direction/North/tag)
 
-(Direction/South) = λa (a 1)
+(Direction/South) = λa (a Direction/South/tag)
 
-(Direction/East) = λa (a 2)
+(Direction/East) = λa (a Direction/East/tag)
 
-(Direction/West) = λa (a 3)
+(Direction/West) = λa (a Direction/West/tag)
+
+(Box/Filled/tag) = 0
+
+(Box/Empty/tag) = 1
+
+(Option/Some/tag) = 0
+
+(Option/None/tag) = 1
+
+(Result_/Ok/tag) = 0
+
+(Result_/Err/tag) = 1
+
+(List_/Cons/tag) = 0
+
+(List_/Nil/tag) = 1
+
+(Bool/True/tag) = 0
+
+(Bool/False/tag) = 1
+
+(Light/Red/tag) = 0
+
+(Light/Yellow/tag) = 1
+
+(Light/Green/tag) = 2
+
+(Direction/North/tag) = 0
+
+(Direction/South/tag) = 1
+
+(Direction/East/tag) = 2
+
+(Direction/West/tag) = 3
