@@ -15,6 +15,7 @@
     "builtins",
     "callcc",
     "chumsky",
+    "clippy",
     "codegen",
     "codepoint",
     "codepoints",
