@@ -193,6 +193,19 @@ A branching statement where `else` is mandatory.
 
 The condition must return a `u24` number, where 0 will run the `else` branch and any other value will return the first one.
 
+It is possible to make if-chains using `elif`:
+
+```python
+if condition1:
+  return 0
+elif condition2:
+  return 1
+elif condition3:
+  return 2
+else:
+  return 3
+```
+
 ### Switch
 
 ```python

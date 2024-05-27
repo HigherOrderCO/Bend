@@ -32,6 +32,7 @@
     "dref",
     "dups",
     "effectful",
+    "elifs",
     "foldl",
     "hasher",
     "hexdigit",
@@ -120,10 +121,7 @@
     "walkdir",
     "wopts"
   ],
-  "files": [
-    "**/*.rs",
-    "**/*.md"
-  ],
+  "files": ["**/*.rs", "**/*.md"],
   "ignoreRegExpList": [
     "HexValues",
     "/λ/g",
