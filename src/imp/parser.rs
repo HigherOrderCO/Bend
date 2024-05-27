@@ -44,7 +44,7 @@ impl<'a> Parser<'a> for PyParser<'a> {
   /// Override to have our own error message.
   fn consume(&mut self, text: &str) -> ParseResult<()> {
     self.skip_trivia();
-    if self.input().get(*self.index() ..).unwrap_or_default().starts_with(text) {
+    if self.input().get(*self.index()..).unwrap_or_default().starts_with(text) {
       *self.index() += text.len();
       Ok(())
     } else {
@@ -532,6 +532,21 @@ impl<'a> PyParser<'a> {
     if nxt_indent != *indent {
       return self.expected_indent(*indent, nxt_indent);
     }
+    let mut elifs = Vec::new();
+    while self.try_parse_keyword("elif") {
+      let cond = self.parse_expr(true)?;
+      self.skip_trivia_inline();
+      self.consume_exactly(":")?;
+      indent.enter_level();
+      self.consume_indent_exactly(*indent)?;
+      let (then, nxt_indent) = self.parse_statement(indent)?;
+      indent.exit_level();
+
+      if nxt_indent != *indent {
+        return self.expected_indent(*indent, nxt_indent);
+      }
+      elifs.push((cond, then));
+    }
     self.parse_keyword("else")?;
     self.skip_trivia_inline();
     self.consume_exactly(":")?;
@@ -539,6 +554,13 @@ impl<'a> PyParser<'a> {
 
     self.consume_indent_exactly(*indent)?;
     let (otherwise, nxt_indent) = self.parse_statement(indent)?;
+    let otherwise = elifs.into_iter().fold(otherwise, |acc, (cond, then)| Stmt::If {
+      cond: Box::new(cond),
+      then: Box::new(then),
+      otherwise: Box::new(acc),
+      nxt: None,
+    });
+
     indent.exit_level();
     if nxt_indent == *indent {
       let (nxt, nxt_indent) = self.parse_statement(indent)?;

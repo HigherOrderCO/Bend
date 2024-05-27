@@ -66,7 +66,7 @@ impl Term {
   }
 
   pub fn encode_nat(val: u32) -> Term {
-    (0 .. val).fold(Term::r#ref(NAT_ZERO), |acc, _| Term::app(Term::r#ref(NAT_SUCC), acc))
+    (0..val).fold(Term::r#ref(NAT_ZERO), |acc, _| Term::app(Term::r#ref(NAT_SUCC), acc))
   }
 }
 

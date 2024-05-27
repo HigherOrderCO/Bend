@@ -46,19 +46,19 @@ impl Term {
     scope: &mut HashMap<&'a Name, usize>,
   ) -> Result<(), String> {
     maybe_grow(move || {
-      if let Term::Var { nam } = self
-        && is_var_in_scope(nam, scope)
-      {
-        // If the variable is actually a reference to main, don't swap and return an error.
-        if let Some(main) = main
-          && nam == main
-        {
-          return Err("Main definition can't be referenced inside the program.".to_string());
-        }
+      if let Term::Var { nam } = self {
+        if is_var_in_scope(nam, scope) {
+          // If the variable is actually a reference to main, don't swap and return an error.
+          if let Some(main) = main {
+            if nam == main {
+              return Err("Main definition can't be referenced inside the program.".to_string());
+            }
+          }
 
-        // If the variable is actually a reference to a function, swap the term.
-        if def_names.contains(nam) {
-          *self = Term::r#ref(nam);
+          // If the variable is actually a reference to a function, swap the term.
+          if def_names.contains(nam) {
+            *self = Term::r#ref(nam);
+          }
         }
       }
 

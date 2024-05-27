@@ -41,7 +41,7 @@ impl Definition {
     let repeated_bind_errs = fix_repeated_binds(&mut self.rules);
     errs.extend(repeated_bind_errs);
 
-    let args = (0 .. self.arity()).map(|i| Name::new(format!("%arg{i}"))).collect::<Vec<_>>();
+    let args = (0..self.arity()).map(|i| Name::new(format!("%arg{i}"))).collect::<Vec<_>>();
     let rules = std::mem::take(&mut self.rules);
     match simplify_rule_match(args.clone(), rules, vec![], ctrs, adts) {
       Ok(body) => {
@@ -198,7 +198,7 @@ fn fan_rule(
 ) -> Result<Term, DesugarMatchDefErr> {
   let arg = args[0].clone();
   let old_args = args.split_off(1);
-  let new_args = (0 .. len).map(|i| Name::new(format!("{arg}.{i}")));
+  let new_args = (0..len).map(|i| Name::new(format!("{arg}.{i}")));
 
   let mut new_rules = vec![];
   for mut rule in rules {
@@ -272,7 +272,7 @@ fn num_rule(
       match &rule.pats[0] {
         Pattern::Num(n) if n == num => {
           let body = rule.body.clone();
-          let rule = Rule { pats: rule.pats[1 ..].to_vec(), body };
+          let rule = Rule { pats: rule.pats[1..].to_vec(), body };
           new_rules.push(rule);
         }
         Pattern::Var(var) => {
@@ -284,7 +284,7 @@ fn num_rule(
               nxt: Box::new(std::mem::take(&mut body)),
             };
           }
-          let rule = Rule { pats: rule.pats[1 ..].to_vec(), body };
+          let rule = Rule { pats: rule.pats[1..].to_vec(), body };
           new_rules.push(rule);
         }
         _ => (),
@@ -304,7 +304,7 @@ fn num_rule(
         let var_recovered = Term::add_num(Term::Var { nam: pred_var.clone() }, Num::U24(1 + last_num));
         body = Term::Use { nam: Some(var.clone()), val: Box::new(var_recovered), nxt: Box::new(body) };
       }
-      let rule = Rule { pats: rule.pats[1 ..].to_vec(), body };
+      let rule = Rule { pats: rule.pats[1..].to_vec(), body };
       new_rules.push(rule);
     }
   }
@@ -405,7 +405,7 @@ fn switch_rule(
 
     let mut new_rules = vec![];
     for rule in &rules {
-      let old_pats = rule.pats[1 ..].to_vec();
+      let old_pats = rule.pats[1..].to_vec();
       match &rule.pats[0] {
         // Same ctr, extract subpatterns.
         // (Ctr pat0_0 ... pat0_m) pat1 ... patN: body

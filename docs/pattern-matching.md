@@ -47,7 +47,7 @@ UnwrapOrZero x = (x λx.val x.val 0)
 
 ### Pattern Matching functions
 
-Besides `match`and `switch` terms, hvm-lang also supports equational-style pattern matching functions.
+Besides `match`and `switch` terms, Bend also supports equational-style pattern matching functions.
 
 ```py
 And True  b = b

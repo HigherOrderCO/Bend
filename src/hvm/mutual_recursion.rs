@@ -1,12 +1,12 @@
+use super::tree_children;
 use crate::{
   diagnostics::{Diagnostics, WarningType, ERR_INDENT_SIZE},
   fun::transform::definition_merge::MERGE_SEPARATOR,
   maybe_grow,
 };
+use hvm::ast::{Book, Tree};
 use indexmap::{IndexMap, IndexSet};
 use std::fmt::Debug;
-
-use super::ast::{Book, Tree};
 
 type Ref = String;
 type Stack<T> = Vec<T>;
@@ -83,7 +83,7 @@ impl Graph {
     // Check if the current ref is already in the stack, which indicates a cycle.
     if let Some(cycle_start) = stack.iter().position(|n| n == r#ref) {
       // If found, add the cycle to the cycles vector.
-      cycles.push(stack[cycle_start ..].to_vec());
+      cycles.push(stack[cycle_start..].to_vec());
       return;
     }
 
@@ -109,13 +109,9 @@ impl Graph {
 fn collect_refs(current: Ref, tree: &Tree, graph: &mut Graph) {
   maybe_grow(|| match tree {
     Tree::Ref { nam, .. } => graph.add(current, nam.clone()),
-    Tree::Ctr { ports, .. } => {
-      if let Some(last) = ports.last() {
-        collect_refs(current, last, graph);
-      }
-    }
+    Tree::Con { fst: _, snd } => collect_refs(current.clone(), snd, graph),
     tree => {
-      for subtree in tree.children() {
+      for subtree in tree_children(tree) {
         collect_refs(current.clone(), subtree, graph);
       }
     }
@@ -126,12 +122,12 @@ impl From<&Book> for Graph {
   fn from(book: &Book) -> Self {
     let mut graph = Self::new();
 
-    for (r#ref, net) in book.iter() {
+    for (r#ref, net) in book.defs.iter() {
       // Collect active refs from the root.
       collect_refs(r#ref.clone(), &net.root, &mut graph);
 
       // Collect active refs from redexes.
-      for (_, left, right) in net.redexes.iter() {
+      for (_, left, right) in net.rbag.iter() {
         if let Tree::Ref { nam, .. } = left {
           graph.add(r#ref.clone(), nam.clone());
         }
@@ -171,7 +167,7 @@ fn combinations_from_merges(cycle: Vec<Ref>) -> Vec<Vec<Ref>> {
   for r#ref in cycle {
     if let Some(index) = r#ref.find(MERGE_SEPARATOR) {
       let (left, right) = r#ref.split_at(index);
-      let right = &right[MERGE_SEPARATOR.len() ..]; // skip merge separator
+      let right = &right[MERGE_SEPARATOR.len()..]; // skip merge separator
       let mut new_combinations = Vec::new();
       for combination in &combinations {
         let mut left_comb = combination.clone();

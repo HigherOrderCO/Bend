@@ -2,6 +2,7 @@ use bend::{
   check_book, compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   fun::{Book, Name},
+  hvm::display_hvm_book,
   load_file_to_book, run_book, AdtEncoding, CompileOpts, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
@@ -230,7 +231,7 @@ pub enum WarningArgs {
 
 fn main() -> ExitCode {
   #[cfg(not(feature = "cli"))]
-  compile_error!("The 'cli' feature is needed for the hvm-lang cli");
+  compile_error!("The 'cli' feature is needed for the Bend cli");
 
   let cli = Cli::parse();
 
@@ -286,7 +287,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
 
       eprint!("{}", compile_res.diagnostics);
-      println!("{}", compile_res.core_book);
+      println!("{}", display_hvm_book(&compile_res.hvm_book));
     }
 
     Mode::GenC(GenArgs { comp_opts, warn_opts, path })
@@ -298,7 +299,8 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
 
       let out_path = ".out.hvm";
-      std::fs::write(out_path, compile_res.core_book.to_string()).map_err(|x| x.to_string())?;
+      std::fs::write(out_path, display_hvm_book(&compile_res.hvm_book).to_string())
+        .map_err(|x| x.to_string())?;
 
       let gen_fn = |out_path: &str| {
         let mut process = std::process::Command::new("hvm");
@@ -310,6 +312,10 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let out = String::from_utf8_lossy(&stdout);
       let err = String::from_utf8_lossy(&stderr);
       let status = if !status.success() { status.to_string() } else { String::new() };
+
+      if let Err(e) = std::fs::remove_file(out_path) {
+        eprintln!("Error removing HVM output file. {e}");
+      }
 
       eprintln!("{err}");
       println!("{out}");

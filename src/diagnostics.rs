@@ -145,7 +145,11 @@ impl Diagnostics {
   /// Returning all the current information as a `Err(Info)`, replacing `&mut self` with an empty one.
   /// Otherwise, returns the given arg as an `Ok(T)`.
   pub fn fatal<T>(&mut self, t: T) -> Result<T, Diagnostics> {
-    if self.err_counter == 0 { Ok(t) } else { Err(std::mem::take(self)) }
+    if self.err_counter == 0 {
+      Ok(t)
+    } else {
+      Err(std::mem::take(self))
+    }
   }
 
   /// Returns a Display that prints the diagnostics with one of the given severities.
@@ -213,10 +217,10 @@ impl Display for Diagnostics {
 impl From<String> for Diagnostics {
   fn from(value: String) -> Self {
     Self {
-      diagnostics: BTreeMap::from_iter([(DiagnosticOrigin::Book, vec![Diagnostic {
-        message: value,
-        severity: Severity::Error,
-      }])]),
+      diagnostics: BTreeMap::from_iter([(
+        DiagnosticOrigin::Book,
+        vec![Diagnostic { message: value, severity: Severity::Error }],
+      )]),
       ..Default::default()
     }
   }

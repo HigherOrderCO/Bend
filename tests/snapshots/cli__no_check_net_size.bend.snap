@@ -18,8 +18,8 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @Gen.go__C1 = ({a d} ({$([*2] $([|1] e)) $([*2] b)} g))
   & @Arr/Node ~ (c (f g))
-  &! @Gen.go ~ (a (b c))
-  &! @Gen.go ~ (d (e f))
+  &!@Gen.go ~ (a (b c))
+  &!@Gen.go ~ (d (e f))
 
 @Main__C0 = a
   & @Gen ~ (4 a)
@@ -59,8 +59,8 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @Merge__C5 = (* (b (e (a (d g)))))
   & @Map_/Both ~ (c (f g))
-  &! @Merge ~ (a (b c))
-  &! @Merge ~ (d (e f))
+  &!@Merge ~ (a (b c))
+  &!@Merge ~ (d (e f))
 
 @Merge__C6 = a
   & @Map_/Both ~ a
@@ -104,8 +104,8 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @Reverse__C1 = (* (c (a e)))
   & @Arr/Node ~ (b (d e))
-  &! @Reverse ~ (a b)
-  &! @Reverse ~ (c d)
+  &!@Reverse ~ (a b)
+  &!@Reverse ~ (c d)
 
 @Reverse__C2 = (?((@Reverse__C0 @Reverse__C1) a) a)
 
@@ -118,8 +118,8 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 @Sum = ((@Sum__C2 a) a)
 
 @Sum__C0 = (* (a (b d)))
-  &! @Sum ~ (a $([+] $(c d)))
-  &! @Sum ~ (b c)
+  &!@Sum ~ (a $([+] $(c d)))
+  &!@Sum ~ (b c)
 
 @Sum__C1 = (?(((a a) @Sum__C0) b) b)
 
@@ -140,8 +140,8 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @ToArr__C1 = (* (b (e ({$([*2] $([+1] d)) $([*2] $([+0] a))} g))))
   & @Arr/Node ~ (c (f g))
-  &! @ToArr ~ (a (b c))
-  &! @ToArr ~ (d (e f))
+  &!@ToArr ~ (a (b c))
+  &!@ToArr ~ (d (e f))
 
 @ToArr__C2 = (?((@ToArr__C0 @ToArr__C1) a) a)
 
@@ -154,8 +154,8 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @ToMap__C1 = (* (a (c e)))
   & @Merge ~ (b (d e))
-  &! @ToMap ~ (a b)
-  &! @ToMap ~ (c d)
+  &!@ToMap ~ (a b)
+  &!@ToMap ~ (c d)
 
 @ToMap__C2 = (?((@ToMap__C0 @ToMap__C1) a) a)
 

@@ -32,6 +32,8 @@
     "dref",
     "dups",
     "effectful",
+    "elif",
+    "elifs",
     "foldl",
     "hasher",
     "hexdigit",
@@ -83,6 +85,7 @@
     "Pythonish",
     "quadtree",
     "quadtrees",
+    "rbag",
     "readback",
     "recursively",
     "redex",
@@ -119,10 +122,7 @@
     "walkdir",
     "wopts"
   ],
-  "files": [
-    "**/*.rs",
-    "**/*.md"
-  ],
+  "files": ["**/*.rs", "**/*.md"],
   "ignoreRegExpList": [
     "HexValues",
     "/λ/g",

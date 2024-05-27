@@ -55,13 +55,16 @@ fn encode_match(arg: Term, rules: Vec<MatchRule>, adt_encoding: AdtEncoding) -> 
         maybe_grow(|| match arms {
           [] => Term::Err,
           [arm] => Term::lam(Pattern::Var(None), std::mem::take(arm)),
-          [arm, rest @ ..] => Term::lam(Pattern::Var(Some(Name::new("%tag"))), Term::Swt {
-            arg: Box::new(Term::Var { nam: Name::new("%tag") }),
-            bnd: None,
-            with: vec![],
-            pred: None,
-            arms: vec![std::mem::take(arm), make_switches(rest)],
-          }),
+          [arm, rest @ ..] => Term::lam(
+            Pattern::Var(Some(Name::new("%tag"))),
+            Term::Swt {
+              arg: Box::new(Term::Var { nam: Name::new("%tag") }),
+              bnd: None,
+              with: vec![],
+              pred: None,
+              arms: vec![std::mem::take(arm), make_switches(rest)],
+            },
+          ),
         })
       }
       let mut arms =

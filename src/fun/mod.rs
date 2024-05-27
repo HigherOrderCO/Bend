@@ -1,7 +1,6 @@
 use crate::{
   diagnostics::{Diagnostics, DiagnosticsConfig},
-  hvm::{self, ast::get_typ},
-  maybe_grow, ENTRY_POINT,
+  maybe_grow, multi_iterator, ENTRY_POINT,
 };
 // use hvmc::ast::get_typ;
 use indexmap::{IndexMap, IndexSet};
@@ -19,7 +18,7 @@ pub mod term_to_net;
 pub mod transform;
 
 pub use net_to_term::{net_to_term, ReadbackError};
-pub use term_to_net::{book_to_nets, term_to_net};
+pub use term_to_net::{book_to_hvm, term_to_hvm};
 
 pub static STRINGS: GlobalPool<String> = GlobalPool::new();
 #[derive(Debug)]
@@ -247,45 +246,6 @@ pub struct Name(GlobalString);
 
 /* Implementations */
 
-/// A macro for creating iterators that can have statically known
-/// different types. Useful for iterating over tree children, where
-/// each tree node variant yields a different iterator type.
-#[macro_export]
-macro_rules! multi_iterator {
-  ($Iter:ident { $($Variant:ident),* $(,)? }) => {
-    #[derive(Debug, Clone)]
-    enum $Iter<$($Variant),*> {
-      $($Variant { iter: $Variant }),*
-    }
-
-    impl<$($Variant),*> $Iter<$($Variant),*> {
-      $(
-        #[allow(non_snake_case)]
-        fn $Variant(iter: impl IntoIterator<IntoIter = $Variant>) -> Self {
-          $Iter::$Variant { iter: iter.into_iter() }
-        }
-      )*
-    }
-
-    impl<T, $($Variant: Iterator<Item = T>),*> Iterator for $Iter<$($Variant),*> {
-      type Item = T;
-      fn next(&mut self) -> Option<T> {
-        match self { $($Iter::$Variant { iter } => iter.next()),* }
-      }
-
-      fn size_hint(&self) -> (usize, Option<usize>) {
-        match self { $($Iter::$Variant { iter } => iter.size_hint()),* }
-      }
-    }
-
-    impl<T, $($Variant: DoubleEndedIterator<Item = T>),*> DoubleEndedIterator for $Iter<$($Variant),*> {
-      fn next_back(&mut self) -> Option<T> {
-        match self { $($Iter::$Variant { iter } => iter.next_back()),* }
-      }
-    }
-  };
-}
-
 impl PartialEq<str> for Name {
   fn eq(&self, other: &str) -> bool {
     &**self == other
@@ -294,13 +254,17 @@ impl PartialEq<str> for Name {
 
 impl PartialEq<&str> for Name {
   fn eq(&self, other: &&str) -> bool {
-    self == other
+    self == *other
   }
 }
 
 impl PartialEq<Option<Name>> for Name {
   fn eq(&self, other: &Option<Name>) -> bool {
-    if let Some(other) = other.as_ref() { self == other } else { false }
+    if let Some(other) = other.as_ref() {
+      self == other
+    } else {
+      false
+    }
   }
 }
 
@@ -312,7 +276,11 @@ impl PartialEq<Name> for Option<Name> {
 
 impl PartialEq<Option<&Name>> for Name {
   fn eq(&self, other: &Option<&Name>) -> bool {
-    if let Some(other) = other { &self == other } else { false }
+    if let Some(other) = other {
+      &self == other
+    } else {
+      false
+    }
   }
 }
 
@@ -449,7 +417,11 @@ impl Term {
   }
 
   pub fn var_or_era(nam: Option<Name>) -> Self {
-    if let Some(nam) = nam { Term::Var { nam } } else { Term::Era }
+    if let Some(nam) = nam {
+      Term::Var { nam }
+    } else {
+      Term::Era
+    }
   }
 
   pub fn app(fun: Term, arg: Term) -> Self {
@@ -787,10 +759,10 @@ impl Term {
       }
     });
 
-    if let Term::Var { nam } = self
-      && nam == from
-    {
-      *self = to.clone();
+    if let Term::Var { nam } = self {
+      if nam == from {
+        *self = to.clone();
+      }
     }
   }
 
@@ -804,10 +776,10 @@ impl Term {
       }
     });
 
-    if let Term::Link { nam } = self
-      && nam == from
-    {
-      *self = to.clone();
+    if let Term::Link { nam } = self {
+      if nam == from {
+        *self = to.clone();
+      }
     }
   }
 
@@ -901,17 +873,17 @@ impl Num {
 
   pub fn to_bits(&self) -> u32 {
     match self {
-      Num::U24(val) => hvm::ast::new_u24(*val),
-      Num::I24(val) => hvm::ast::new_i24(*val),
-      Num::F24(val) => hvm::ast::new_f24(*val),
+      Num::U24(val) => hvm::hvm::Numb::new_u24(*val).0,
+      Num::I24(val) => hvm::hvm::Numb::new_i24(*val).0,
+      Num::F24(val) => hvm::hvm::Numb::new_f24(*val).0,
     }
   }
 
   pub fn from_bits(bits: u32) -> Self {
-    match get_typ(bits) {
-      hvm::ast::TY_U24 => Num::U24(hvm::ast::get_u24(bits)),
-      hvm::ast::TY_I24 => Num::I24(hvm::ast::get_i24(bits)),
-      hvm::ast::TY_F24 => Num::F24(hvm::ast::get_f24(bits)),
+    match hvm::hvm::Numb::get_typ(&hvm::hvm::Numb(bits)) {
+      hvm::hvm::TY_U24 => Num::U24(hvm::hvm::Numb::get_u24(&hvm::hvm::Numb(bits))),
+      hvm::hvm::TY_I24 => Num::I24(hvm::hvm::Numb::get_i24(&hvm::hvm::Numb(bits))),
+      hvm::hvm::TY_F24 => Num::F24(hvm::hvm::Numb::get_f24(&hvm::hvm::Numb(bits))),
       _ => unreachable!("Invalid Num bits"),
     }
   }
@@ -1051,7 +1023,11 @@ impl Name {
   }
 
   pub fn def_name_from_generated(&self) -> Name {
-    if let Some((nam, _)) = self.split_once("__") { Name::new(nam) } else { self.clone() }
+    if let Some((nam, _)) = self.split_once("__") {
+      Name::new(nam)
+    } else {
+      self.clone()
+    }
   }
 }
 

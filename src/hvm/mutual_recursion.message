@@ -13,7 +13,7 @@ It is lazy when it's an argument ('(x Foo)') or when it's used linearly ('let x 
   to:
     'Foo = λa λb (b (λc λa (Foo a c)) (λa a) a)'
   which is lifted to:
-    'Foo = λa λb (b Foo__C1 Foo_C2 a)'
+    'Foo = λa λb (b Foo__C1 Foo__C2 a)'
 - Replace non-linear 'let' expressions with 'use' expressions. For example, change:
     'Foo = λf let x = Foo; (f x x)'
   to:
@@ -22,5 +22,5 @@ It is lazy when it's an argument ('(x Foo)') or when it's used linearly ('let x 
     'Foo = λf (f Foo Foo)'
 - If disabled, re-enable the default 'float-combinators' and 'linearize-matches' compiler options.
 
-For more information, visit: https://github.com/HigherOrderCO/hvm-lang/blob/main/docs/lazy-definitions.md.
+For more information, visit: https://github.com/HigherOrderCO/Bend/blob/main/docs/lazy-definitions.md.
 To disable this check, use the "-Arecursion-cycle" compiler option.

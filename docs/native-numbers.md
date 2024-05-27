@@ -77,24 +77,24 @@ These are the currently available operations:
 
 Operation | Description | Accepted types | Return type
 ----------|-------------|----------------|------------
-+         | Addition    | U24, I24, F24  | Same as arguments
--         | Subtraction | U24, I24, F24  | Same as arguments
-*         | Multiplication | U24, I24, F24  | Same as arguments
-/         | Division | U24, I24, F24  | Same as arguments
-%         | Modulo | U24, I24, F24  | Same as arguments
-==        | Equality | U24, I24, F24  | U24
-!=        | Inequality | U24, I24, F24  | U24
-<         | Less than | U24, I24, F24  | U24
+\+         | Addition    | U24, I24, F24  | Same as arguments
+\-         | Subtraction | U24, I24, F24  | Same as arguments
+\*         | Multiplication | U24, I24, F24  | Same as arguments
+\/         | Division | U24, I24, F24  | Same as arguments
+\%         | Modulo | U24, I24, F24  | Same as arguments
+\==        | Equality | U24, I24, F24  | U24
+\!=        | Inequality | U24, I24, F24  | U24
+\<         | Less than | U24, I24, F24  | U24
 \>        | Greater than | U24, I24, F24  | U24
-&         | Bitwise and | U24, I24  | Same as arguments
-|         | Bitwise or | U24, I24  | Same as arguments
-^         | Bitwise xor | U24, I24  | Same as arguments
-**        | Exponentiation | F24  | F24
+\&         | Bitwise and | U24, I24  | Same as arguments
+\|         | Bitwise or | U24, I24  | Same as arguments
+\^         | Bitwise xor | U24, I24  | Same as arguments
+\**        | Exponentiation | F24  | F24
 
 
 ### Pattern matching
 
-HVM-lang also includes a `switch` syntax for pattern-matching U24 numbers.
+Bend also includes a `switch` syntax for pattern-matching U24 numbers.
 
 ```rs
 Number.to_church = λn λf λx

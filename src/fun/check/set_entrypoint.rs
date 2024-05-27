@@ -52,7 +52,11 @@ impl Ctx<'_> {
 }
 
 fn validate_entry_point(entry: &Definition) -> Result<Name, EntryErr> {
-  if entry.rules.len() > 1 { Err(EntryErr::MultipleRules) } else { Ok(entry.name.clone()) }
+  if entry.rules.len() > 1 {
+    Err(EntryErr::MultipleRules)
+  } else {
+    Ok(entry.name.clone())
+  }
 }
 
 impl Book {
