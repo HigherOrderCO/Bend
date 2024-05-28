@@ -1,7 +1,7 @@
 # Options
 
 | flag                                                                     | Default       | What it does?                             |
-| ------------------------------------------------------------------------ | ------------- | ----------------------------------------- | --- |
+| ------------------------------------------------------------------------ | ------------- | ----------------------------------------- |
 | `-Oall`                                                                  | Disabled      | Enables all compiler passes               |
 | `-Ono-all`                                                               | Disabled      | Disables all compiler passes              |
 | `-Oeta` `-Ono-eta`                                                       | Disabled      | [eta-reduction](#eta-reduction)           |
@@ -11,7 +11,7 @@
 | `-Omerge` `-Ono-merge`                                                   | Disabled      | [definition-merging](#definition-merging) |
 | `-Oinline` `-Ono-inline`                                                 | Disabled      | [inline](#inline)                         |
 | `-Ocheck-net-size` `-Ono-check-net-size`                                 | Disabled      | [check-net-size](#check-net-size)         |
-| `-Oadt-scott` `-Oadt-num-scott`                                          | adt-num-scott | [adt-encoding](#adt-encoding)             |     |
+| `-Oadt-scott` `-Oadt-num-scott`                                          | adt-num-scott | [adt-encoding](#adt-encoding)             |
 
 ## Eta-reduction
 
