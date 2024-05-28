@@ -205,6 +205,7 @@ elif condition3:
 else:
   return 3
 ```
+
 The conditions are evaluated in order, one by one, stopping at the first successful case.
 
 ### Switch
@@ -342,15 +343,15 @@ match p:
     ...
 ```
 
-### Do
+### With block
 
 ```python
-do Result:
+with Result:
   x <- safe_div(2, 0)
   return x
 ```
 
-A monadic do block.
+A monadic with block.
 
 Where `x <- ...` performs a monadic operation.
 
@@ -366,14 +367,27 @@ def Result/bind(res, nxt):
       return res
 ```
 
-Other statements are allowed inside the `do` block and it can both return a value at the end and bind a variable, like branching statements do.
+Other statements are allowed inside the `with` block and it can both return a value at the end and bind a variable, like branching statements do.
 
 ```python
 # Also ok:
-do Result:
+with Result:
   x <- safe_div(2, 0);
   y = x
 return y
+```
+
+The name `wrap` is bound inside a `with` block as a shorthand for `Type/wrap`,
+the equivalent as a `pure` function in other functional languages:
+
+```python
+def Result/wrap(x):
+  return Result/Ok(x)
+
+with Result:
+  x <- some_operation(...)
+  y <- some_operation(...)
+  return wrap(x * y)
 ```
 
 ## Expressions
@@ -940,7 +954,7 @@ match x {
 }
 ```
 
-### Monadic bind blocks
+### With block
 
 ```rust
 Result/bind (Result/Ok val) f = (f val)
@@ -956,7 +970,7 @@ rem a b = switch b {
   _: (Result/Ok (% a b))
 }
 
-Main = do Result {
+Main = with Result {
   ask y = (div 3 2);
   ask x = (rem y 0);
   x
@@ -966,7 +980,7 @@ Main = do Result {
 Receives a type defined with `type` and expects `Result/bind` to be defined as a monadic bind function.
 It should be of type `(Result a) -> (a -> Result b) -> Result b`, like in the example above.
 
-Inside a `do` block, you can use `ask`, to access the continuation value of the monadic operation.
+Inside a `with` block, you can use `ask`, to access the continuation value of the monadic operation.
 
 ```rust
 ask y = (div 3 2)
@@ -978,6 +992,19 @@ x
 ```
 
 It can be used to force a sequence of operations. Since the continuation receives the result through a lambda, it is only fully evaluated after something is applied to it.
+
+The name `wrap` is bound inside a `with` block as a shorthand for `Type/wrap`,
+the equivalent as a `pure` function in other functional languages:
+
+```rust
+Result/wrap x = (Result/Ok x)
+
+with Result {
+  ask x = (some_operation ...)
+  ask y = (some_operation ...)
+  wrap(x * y)
+}
+```
 
 ### Numbers and operations
 

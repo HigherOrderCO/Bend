@@ -262,12 +262,12 @@ impl Stmt {
           fun::Term::Bend { bind, init, cond: Box::new(cond), step: Box::new(step), base: Box::new(base) };
         wrap_nxt_assign_stmt(term, nxt, pat)?
       }
-      Stmt::Do { typ, bod, nxt } => {
+      Stmt::With { typ, bod, nxt } => {
         let (pat, bod) = match bod.into_fun()? {
           StmtToFun::Return(term) => (None, term),
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
-        let term = fun::Term::Do { typ, bod: Box::new(bod) };
+        let term = fun::Term::With { typ, bod: Box::new(bod) };
         wrap_nxt_assign_stmt(term, nxt, pat)?
       }
       Stmt::Ask { pat, val, nxt } => {

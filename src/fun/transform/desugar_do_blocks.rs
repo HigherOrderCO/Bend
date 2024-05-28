@@ -31,21 +31,27 @@ impl Term {
     def_names: &HashSet<Name>,
   ) -> Result<(), String> {
     maybe_grow(|| {
-      if let Term::Do { typ, bod } = self {
+      if let Term::With { typ, bod } = self {
         bod.desugar_do_blocks(Some(typ), def_names)?;
-        *self = std::mem::take(bod);
+        let wrap_ref = Term::r#ref(&format!("{typ}/wrap"));
+        // let wrap_ref = if def_names.contains(&wrap_nam) {
+        //   Term::r#ref(&wrap_nam)
+        // } else {
+        //   return Err(format!("Could not find definition {wrap_nam} for type {typ}"));
+        // };
+        *self = Term::Use { nam: Some(Name::new("wrap")), val: Box::new(wrap_ref), nxt: std::mem::take(bod) };
       }
 
       if let Term::Ask { pat, val, nxt } = self {
         if let Some(typ) = cur_block {
-          let fun = make_fun_name(typ);
+          let bind_nam = Name::new(format!("{typ}/bind"));
 
-          if def_names.contains(&fun) {
+          if def_names.contains(&bind_nam) {
             // TODO: come up with a strategy for forwarding free vars to prevent infinite recursion.
             let nxt = Term::lam(*pat.clone(), std::mem::take(nxt));
-            *self = Term::call(Term::Ref { nam: fun.clone() }, [*val.clone(), nxt]);
+            *self = Term::call(Term::Ref { nam: bind_nam }, [*val.clone(), nxt]);
           } else {
-            return Err(format!("Could not find definition {} for type {}.", fun, typ));
+            return Err(format!("Could not find definition {bind_nam} for type {typ}."));
           }
         } else {
           return Err(format!("Monadic bind operation '{pat} <- ...' used outside of a `do` block."));
@@ -59,8 +65,4 @@ impl Term {
       Ok(())
     })
   }
-}
-
-fn make_fun_name(typ: &Name) -> Name {
-  Name::new(format!("{typ}/bind"))
 }

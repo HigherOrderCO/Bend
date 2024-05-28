@@ -95,7 +95,7 @@ impl Stmt {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Do { typ: _, bod, nxt } => {
+      Stmt::With { typ: _, bod, nxt } => {
         bod.gen_map_get(id);
         if let Some(nxt) = nxt {
           nxt.gen_map_get(id);

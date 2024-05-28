@@ -144,10 +144,10 @@ pub enum Stmt {
     arms: Vec<MatchArm>,
     nxt: Option<Box<Stmt>>,
   },
-  // "do" {fun} ":"
+  // "with" {fun} ":"
   //   {block}
   // <nxt>?
-  Do {
+  With {
     typ: Name,
     bod: Box<Stmt>,
     nxt: Option<Box<Stmt>>,

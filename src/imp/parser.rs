@@ -411,8 +411,8 @@ impl<'a> PyParser<'a> {
         self.parse_fold(indent)
       } else if self.try_parse_keyword("bend") {
         self.parse_bend(indent)
-      } else if self.try_parse_keyword("do") {
-        self.parse_do(indent)
+      } else if self.try_parse_keyword("with") {
+        self.parse_with(indent)
       } else if self.try_parse_keyword("open") {
         self.parse_open(indent)
       } else if self.try_parse_keyword("use") {
@@ -821,10 +821,10 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  /// "do" <typ> ":"
+  /// "with" <typ> ":"
   ///   <bod>
   /// <nxt>?
-  fn parse_do(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+  fn parse_with(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
     self.skip_trivia_inline();
     let typ = self.parse_bend_name()?;
     self.skip_trivia_inline();
@@ -838,10 +838,10 @@ impl<'a> PyParser<'a> {
 
     if nxt_indent == *indent {
       let (nxt, nxt_indent) = self.parse_statement(indent)?;
-      let stmt = Stmt::Do { typ, bod: Box::new(bod), nxt: Some(Box::new(nxt)) };
+      let stmt = Stmt::With { typ, bod: Box::new(bod), nxt: Some(Box::new(nxt)) };
       Ok((stmt, nxt_indent))
     } else {
-      let stmt = Stmt::Do { typ, bod: Box::new(bod), nxt: None };
+      let stmt = Stmt::With { typ, bod: Box::new(bod), nxt: None };
       Ok((stmt, nxt_indent))
     }
   }

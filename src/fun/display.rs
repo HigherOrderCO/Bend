@@ -49,7 +49,7 @@ impl fmt::Display for Term {
       Term::Var { nam } => write!(f, "{nam}"),
       Term::Link { nam } => write!(f, "${nam}"),
       Term::Let { pat, val, nxt } => write!(f, "let {} = {}; {}", pat, val, nxt),
-      Term::Do { typ, bod } => write!(f, "do {typ} {{ {bod} }}"),
+      Term::With { typ, bod } => write!(f, "with {typ} {{ {bod} }}"),
       Term::Ask { pat, val, nxt } => write!(f, "ask {pat} = {val}; {nxt}"),
       Term::Use { nam, val, nxt } => {
         let Some(nam) = nam else { unreachable!() };
@@ -295,8 +295,8 @@ impl Term {
         Term::Let { pat, val, nxt } => {
           write!(f, "let {} = {};\n{:tab$}{}", pat, val.display_pretty(tab), "", nxt.display_pretty(tab))
         }
-        Term::Do { typ, bod } => {
-          writeln!(f, "do {typ} {{")?;
+        Term::With { typ, bod } => {
+          writeln!(f, "with {typ} {{")?;
           writeln!(f, "{:tab$}{}", "", bod.display_pretty(tab + 2), tab = tab + 2)?;
           write!(f, "{:tab$}}}", "")
         }

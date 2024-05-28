@@ -36,7 +36,7 @@ input_file: tests/golden_tests/parse_file/imp_program.bend
 
 (sup) = let x = {(List/Cons 1 (List/Cons 2 List/Nil)) (List/Cons 3 (List/Cons 4 (List/Cons 5 (List/Cons 6 List/Nil))))}; x
 
-(main) = do IO { ask x = IO.read; x }
+(main) = with IO { ask x = IO.read; x }
 
 (List/Nil) = λ%x (%x List/Nil/tag)
 
