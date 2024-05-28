@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: examples/gen_tree.bend
 ---
-λa (a 0 1 λb (b 0 3 λc (c 0 7 λd (d 0 15 Tree/Leaf Tree/Leaf) λe (e 0 16 Tree/Leaf Tree/Leaf)) λf (f 0 8 λg (g 0 17 Tree/Leaf Tree/Leaf) λh (h 0 18 Tree/Leaf Tree/Leaf))) λi (i 0 4 λj (j 0 9 λk (k 0 19 Tree/Leaf Tree/Leaf) λl (l 0 20 Tree/Leaf Tree/Leaf)) λm (m 0 10 λn (n 0 21 Tree/Leaf Tree/Leaf) λo (o 0 22 Tree/Leaf Tree/Leaf))))
+λa (a Tree/Node/tag 1 λb (b Tree/Node/tag 3 λc (c Tree/Node/tag 7 λd (d Tree/Node/tag 15 Tree/Leaf Tree/Leaf) λe (e Tree/Node/tag 16 Tree/Leaf Tree/Leaf)) λf (f Tree/Node/tag 8 λg (g Tree/Node/tag 17 Tree/Leaf Tree/Leaf) λh (h Tree/Node/tag 18 Tree/Leaf Tree/Leaf))) λi (i Tree/Node/tag 4 λj (j Tree/Node/tag 9 λk (k Tree/Node/tag 19 Tree/Leaf Tree/Leaf) λl (l Tree/Node/tag 20 Tree/Leaf Tree/Leaf)) λm (m Tree/Node/tag 10 λn (n Tree/Node/tag 21 Tree/Leaf Tree/Leaf) λo (o Tree/Node/tag 22 Tree/Leaf Tree/Leaf))))

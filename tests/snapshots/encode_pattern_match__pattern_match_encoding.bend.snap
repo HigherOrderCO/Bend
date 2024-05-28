@@ -22,12 +22,22 @@ NumScott
 
 (main) = (Foo MyType/A 2)
 
-(MyType/A) = λa λb (b 0 a)
+(MyType/A) = λa λb (b MyType/A/tag a)
 
-(MyType/B) = λa λb (b 1 a)
+(MyType/B) = λa λb (b MyType/B/tag a)
 
-(MyType/C) = λa λb (b 2 a)
+(MyType/C) = λa λb (b MyType/C/tag a)
 
-(MyType/D) = λa λb λc (c 3 a b)
+(MyType/D) = λa λb λc (c MyType/D/tag a b)
 
-(MyType/E) = λa λb λc (c 4 a b)
+(MyType/E) = λa λb λc (c MyType/E/tag a b)
+
+(MyType/A/tag) = 0
+
+(MyType/B/tag) = 1
+
+(MyType/C/tag) = 2
+
+(MyType/D/tag) = 3
+
+(MyType/E/tag) = 4

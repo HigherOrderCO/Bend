@@ -22,4 +22,6 @@ NumScott
 
 (match_shadowed_field) = λa (a λb switch b { 0: λc λd (List/Cons c d); _: λ* λe λf λ* λ* (List/Cons e f); })
 
-(List/Cons) = λa λb λc (c 1 a b)
+(List/Cons) = λa λb λc (c List/Cons/tag a b)
+
+(List/Cons/tag) = 1

@@ -16,10 +16,18 @@ Scott
 NumScott
 (Foo) = λa (a λb switch b { 0: λ* λd (d λe switch e { 0: λ* 1; _: λ* λ* 2; }); _: λ* λ* λi (i λj switch j { 0: λ* 3; _: λ* λ* 3; }); })
 
-(Either/Left) = λa λb (b 0 a)
+(Either/Left) = λa λb (b Either/Left/tag a)
 
-(Either/Right) = λa λb (b 1 a)
+(Either/Right) = λa λb (b Either/Right/tag a)
 
-(Bool/Bool/True) = λa (a 0)
+(Bool/Bool/True) = λa (a Bool/Bool/True/tag)
 
-(Bool/Bool/False) = λa (a 1)
+(Bool/Bool/False) = λa (a Bool/Bool/False/tag)
+
+(Either/Left/tag) = 0
+
+(Either/Right/tag) = 1
+
+(Bool/Bool/True/tag) = 0
+
+(Bool/Bool/False/tag) = 1

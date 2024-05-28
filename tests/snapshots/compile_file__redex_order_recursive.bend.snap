@@ -77,9 +77,13 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @List.sum__C1 = (?(((a a) @List.sum__C0) b) b)
 
-@List/Cons = (a (b ((1 (a (b c))) c)))
+@List/Cons = (a (b ((@List/Cons/tag (a (b c))) c)))
 
-@List/Nil = ((0 a) a)
+@List/Cons/tag = 1
+
+@List/Nil = ((@List/Nil/tag a) a)
+
+@List/Nil/tag = 0
 
 @Tree.flip = ((@Tree.flip__C2 a) a)
 
@@ -132,9 +136,13 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @Tree.nodes__C1 = (?((@Tree.nodes__C0 (* (* 0))) a) a)
 
-@Tree/leaf = (a ((1 (a b)) b))
+@Tree/leaf = (a ((@Tree/leaf/tag (a b)) b))
 
-@Tree/node = (a (b ((0 (a (b c))) c)))
+@Tree/leaf/tag = 1
+
+@Tree/node = (a (b ((@Tree/node/tag (a (b c))) c)))
+
+@Tree/node/tag = 0
 
 @add = ((@add__C0 ((a a) b)) b)
 

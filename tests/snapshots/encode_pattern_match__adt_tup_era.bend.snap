@@ -14,4 +14,6 @@ NumScott
 
 (Main) = (Foo (Tuple/Pair 1 5))
 
-(Tuple/Pair) = λa λb λc (c 0 a b)
+(Tuple/Pair) = λa λb λc (c Tuple/Pair/tag a b)
+
+(Tuple/Pair/tag) = 0

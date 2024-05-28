@@ -20,10 +20,18 @@ NumScott
 
 (main) = (Parse * (String/Cons 40 (String/Cons 43 String/Nil)) λc switch c { 0: λd let (e, f, g) = d; (e, (Parse g f)); _: λ* λh (Result_/Err h); })
 
-(String/Nil) = λa (a 0)
+(String/Nil) = λa (a String/Nil/tag)
 
-(String/Cons) = λa λb λc (c 1 a b)
+(String/Cons) = λa λb λc (c String/Cons/tag a b)
 
-(Result_/Ok) = λa λb (b 0 a)
+(Result_/Ok) = λa λb (b Result_/Ok/tag a)
 
-(Result_/Err) = λa λb (b 1 a)
+(Result_/Err) = λa λb (b Result_/Err/tag a)
+
+(String/Nil/tag) = 0
+
+(String/Cons/tag) = 1
+
+(Result_/Ok/tag) = 0
+
+(Result_/Err/tag) = 1

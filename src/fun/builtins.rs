@@ -7,6 +7,8 @@ pub const LIST: &str = "List";
 pub const LCONS: &str = "List/Cons";
 pub const LNIL: &str = "List/Nil";
 pub const LCONS_TAG: u32 = 1;
+pub const LNIL_TAG_REF: &str = "List/Nil/tag";
+pub const LCONS_TAG_REF: &str = "List/Cons/tag";
 
 pub const HEAD: &str = "head";
 pub const TAIL: &str = "tail";
@@ -15,6 +17,8 @@ pub const STRING: &str = "String";
 pub const SCONS: &str = "String/Cons";
 pub const SNIL: &str = "String/Nil";
 pub const SCONS_TAG: u32 = 1;
+pub const SNIL_TAG_REF: &str = "String/Nil/tag";
+pub const SCONS_TAG_REF: &str = "String/Cons/tag";
 
 pub const NAT: &str = "Nat";
 pub const NAT_SUCC: &str = "Nat/Succ";

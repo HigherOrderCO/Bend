@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/do_block_mixed.bend
 ---
 NumScott:
-λa (a 0 1)
+λa (a Result/Ok/tag 1)
 
 Scott:
 λa λ* (a 1)

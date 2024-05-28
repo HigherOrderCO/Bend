@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/nested_str.bend
 ---
 NumScott:
-(λa (a 1 "a" ""), (λc (c 1 97 λd (d 1 "bc" "")), (λg (g 1 "ab" "c"), λk (k 1 "ab" λn (n 1 "cd" "")))))
+(λa (a String/Cons/tag "a" ""), (λc (c String/Cons/tag 97 λd (d String/Cons/tag "bc" "")), (λg (g String/Cons/tag "ab" "c"), λk (k String/Cons/tag "ab" λn (n String/Cons/tag "cd" "")))))
 
 Scott:
 (λ* λa (a "a" ""), (λ* λc (c 97 λ* λd (d "bc" "")), (λ* λg (g "ab" "c"), λ* λk (k "ab" λ* λn (n "cd" "")))))

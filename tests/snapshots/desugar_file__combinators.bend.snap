@@ -24,9 +24,13 @@ input_file: tests/golden_tests/desugar_file/combinators.bend
 
 (Main) = list
 
-(List/Nil) = λa (a 0)
+(List/Nil) = λa (a List/Nil/tag)
 
-(List/Cons) = λa λb λc (c 1 a b)
+(List/Cons) = λa λb λc (c List/Cons/tag a b)
+
+(List/Nil/tag) = 0
+
+(List/Cons/tag) = 1
 
 (A__C0) = let {a b} = A; λc (a b c)
 

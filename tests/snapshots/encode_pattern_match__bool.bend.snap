@@ -28,6 +28,10 @@ NumScott
 
 (and4) = λa (a λb switch b { 0: λc (c λd switch d { 0: bool/true; _: λ* bool/false; }); _: λ* λ* bool/false; })
 
-(bool/true) = λa (a 0)
+(bool/true) = λa (a bool/true/tag)
 
-(bool/false) = λa (a 1)
+(bool/false) = λa (a bool/false/tag)
+
+(bool/true/tag) = 0
+
+(bool/false/tag) = 1

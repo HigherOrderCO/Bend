@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/wrong_string.bend
 ---
 NumScott:
-λa (a 1 λ* 4 λb (b 1 * ""))
+λa (a String/Cons/tag λ* 4 λb (b String/Cons/tag * ""))
 
 Scott:
 λ* λa (a λ* 4 λ* λb (b * ""))

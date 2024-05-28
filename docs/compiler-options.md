@@ -1,17 +1,17 @@
 # Options
 
-|  flag          | Default  | What it does? |
-|----------------|----------|---------------|
-| `-Oall`        | Disabled | Enables all compiler passes |
-| `-Ono-all`     | Disabled | Disables all compiler passes |
-| `-Oeta` `-Ono-eta` | Disabled | [eta-reduction](#eta-reduction) |
-| `-Oprune` `-Ono-prune` | Disabled | [definition-pruning](#definition-pruning) |
-| `-Olinearize-matches` `-Olinearize-matches-alt` `-Ono-linearize-matches` | Enabled  | [linearize-matches](#linearize-matches) |
-| `-Ofloat_combinators` `-Ono-float_combinators` | Enabled  | [float-combinators](#float-combinators) |
-| `-Omerge` `-Ono-merge` | Disabled | [definition-merging](#definition-merging) |
-| `-Oinline` `-Ono-inline` | Disabled | [inline](#inline) |
-| `-Ocheck-net-size` `-Ono-check-net-size` | Disabled | [check-net-size](#check-net-size) |
-| `-Oadt-scott` `-Oadt-num-scott` | adt-num-scott | [adt-encoding](#adt-encoding) | | 
+| flag                                                                     | Default       | What it does?                             |
+| ------------------------------------------------------------------------ | ------------- | ----------------------------------------- |
+| `-Oall`                                                                  | Disabled      | Enables all compiler passes               |
+| `-Ono-all`                                                               | Disabled      | Disables all compiler passes              |
+| `-Oeta` `-Ono-eta`                                                       | Disabled      | [eta-reduction](#eta-reduction)           |
+| `-Oprune` `-Ono-prune`                                                   | Disabled      | [definition-pruning](#definition-pruning) |
+| `-Olinearize-matches` `-Olinearize-matches-alt` `-Ono-linearize-matches` | Enabled       | [linearize-matches](#linearize-matches)   |
+| `-Ofloat_combinators` `-Ono-float_combinators`                           | Enabled       | [float-combinators](#float-combinators)   |
+| `-Omerge` `-Ono-merge`                                                   | Disabled      | [definition-merging](#definition-merging) |
+| `-Oinline` `-Ono-inline`                                                 | Disabled      | [inline](#inline)                         |
+| `-Ocheck-net-size` `-Ono-check-net-size`                                 | Disabled      | [check-net-size](#check-net-size)         |
+| `-Oadt-scott` `-Oadt-num-scott`                                          | adt-num-scott | [adt-encoding](#adt-encoding)             |
 
 ## Eta-reduction
 
@@ -20,6 +20,7 @@ Enables or disables Eta Reduction for defined functions.
 Eta reduction simplifies lambda expressions, removing redundant parameters. [See also](https://wiki.haskell.org/Eta_conversion).
 
 Example:
+
 ```py
 # program
 id = λx x
@@ -37,6 +38,7 @@ id_id = λz (id z)
 If enabled, removes all unused definitions.
 
 Example:
+
 ```py
 # program
 Id = λx x
@@ -63,6 +65,7 @@ Main = (Id 42)
 If enabled, merges definitions that are identical at the term level.
 
 Example:
+
 ```py
 # Original program
 id = λx x
@@ -105,6 +108,7 @@ Linearizes the variables between match cases, transforming them into combinators
 When the `linearize-matches` option is used, only linearizes variables that would generate an eta-reducible application.
 
 Example:
+
 ```py
 λa λb switch a { 0: b; _: b }
 
@@ -118,6 +122,7 @@ Example:
 When the `linearize-matches-extra` option is used, it linearizes all variables used in the arms.
 
 example:
+
 ```py
 λa λb λc switch b { 0: a; _: c }
 
@@ -144,6 +149,7 @@ Extracts closed terms to new definitions. See [lazy definitions](lazy-definition
 Since HVM-Core is an eager runtime, this pass is enabled by default to prevent infinite expansions.
 
 Example:
+
 ```py
 True  =    λt λf λm t
 False =    λt λf λm f
@@ -164,6 +170,7 @@ fold = λinit λf λxs (xs λh λt (fold (f init h) f t) init)
 If enabled, inlines terms that compile to nullary inet nodes (refs, numbers, erasures).
 
 Example:
+
 ```py
 # program
 foo = 2
@@ -189,9 +196,10 @@ If enabled, checks that the size of each function after compilation has at most 
 This is a memory restriction of the CUDA runtime, if you're not using the `*-cu` you can disable it.
 
 Example:
+
 ```py
 # Without -Ocheck-net-size compiles normally.
-# But with -Ocheck-net-size it fails with 
+# But with -Ocheck-net-size it fails with
 # `Definition is too large for hvm`
 (Radix n) =
   let r = Map_/Used
@@ -224,10 +232,10 @@ Example:
 
 ## ADT Encoding
 
-Selects the lambda encoding for types defined with `data`, `type` and `object`.
+Selects the lambda encoding for types defined with `type` and `object`.
 
 `-Oadt-scott` uses Scott encoding.
-`-Oadt-num-scott` uses a variation of Scott encoding where instead of one lambda per constructor, we use a numeric tag to indicate which constructor it is. The numeric tag is assigned to the constructors in the order they are defined.
+`-Oadt-num-scott` uses a variation of Scott encoding where instead of one lambda per constructor, we use a numeric tag to indicate which constructor it is. The numeric tag is assigned to the constructors in the order they are defined and each tag is accessible as a definition by `<type>/<ctr>/tag`.
 
 ```py
 # Generates functions Option/Some and Option/None
@@ -240,8 +248,12 @@ Option/Some = λvalue λSome λNone (Some value)
 Option/None = λSome λNone (None)
 
 # With -Oadt-num-scott they become:
-Option/Some = λvalue λx (x 0 value)
-Option/None = λx (x 1)
+Option/Some = λvalue λx (x Option/Some/tag value)
+Option/None = λx (x Option/None/tag)
+
+# Generated -Oadt-num-scott tags:
+Option/Some/tag = 0
+Option/None/tag = 1
 ```
 
 Pattern-matching with `match` and `fold` is generated according to the encoding.
