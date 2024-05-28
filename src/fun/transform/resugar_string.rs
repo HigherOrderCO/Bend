@@ -32,7 +32,6 @@ impl Term {
             if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_mut() {
               if let Term::App { tag: Tag::Static, fun, arg } = fun.as_mut() {
                 if let Term::Var { nam: var_app } = fun.as_mut() {
-                  // if let Term::Num { val: Num::U24(SCONS_TAG) } = arg.as_mut() {
                   if let Term::Ref { nam: Name(nam) } = arg.as_mut() {
                     if let Term::Num { val: Num::U24(head) } = head.as_mut() {
                       if var_lam == var_app && nam == builtins::SCONS_TAG_REF {
@@ -154,7 +153,6 @@ fn build_string_num_scott(term: &Term, mut s: String) -> Option<String> {
             if let Term::App { tag: Tag::Static, fun, arg } = fun.as_ref() {
               if let Term::Var { nam: var_app } = fun.as_ref() {
                 if let Term::Ref { nam } = arg.as_ref() {
-                  // if let Term::Num { val: Num::U24(SCONS_TAG) } = arg.as_ref() {
                   if let Term::Num { val: Num::U24(head) } = head.as_ref() {
                     if var_lam == var_app && nam == builtins::SCONS_TAG_REF {
                       // New string character, append and recurse

@@ -33,7 +33,6 @@ impl Term {
               if let Term::App { tag: Tag::Static, fun, arg } = fun.as_mut() {
                 if let Term::Var { nam: var_app } = fun.as_mut() {
                   if let Term::Ref { nam } = arg.as_mut() {
-                    // if let Term::Num { val: Num::U24(LCONS_TAG) } = arg.as_mut() {
                     if var_lam == var_app && nam == builtins::LCONS_TAG_REF {
                       let l = build_list_num_scott(tail.as_mut(), vec![std::mem::take(head)]);
                       match l {
@@ -161,7 +160,6 @@ fn build_list_num_scott(term: &mut Term, mut l: Vec<Box<Term>>) -> Result<Vec<Bo
             if let Term::App { tag: Tag::Static, fun, arg } = fun.as_mut() {
               if let Term::Var { nam: var_app } = fun.as_mut() {
                 if let Term::Ref { nam } = arg.as_mut() {
-                  // if let Term::Num { val: Num::U24(LCONS_TAG) } = arg.as_mut() {
                   if var_lam == var_app && nam == builtins::LCONS_TAG_REF {
                     // New list element, append and recurse
                     l.push(std::mem::take(head));
