@@ -470,3 +470,20 @@ fn scott_triggers_unused() {
     Ok(format!("{}{}", res.diagnostics, display_hvm_book(&res.hvm_book)))
   })
 }
+
+// TODO: also run the long string file to test the readback
+#[test]
+fn compile_long() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = do_parse_book(code, path, Book::builtins())?;
+    let opts = CompileOpts::default().set_all();
+    let diagnostics_cfg = DiagnosticsConfig {
+      recursion_cycle: Severity::Warning,
+      unused_definition: Severity::Allow,
+      ..Default::default()
+    };
+
+    compile_book(&mut book, opts.clone(), diagnostics_cfg, None)?;
+    Ok("Compiled".to_string())
+  })
+}
