@@ -78,9 +78,7 @@ pub fn check_uses<'a>(
       if let Some(pat) = term.pattern() {
         check_global_binds(pat, globals)
       }
-      //eprintln!("\nterm: {}", term);
       for (child, binds) in term.children_mut_with_binds() {
-        //eprintln!("child: {}\nbinds: {:?}", child, binds.clone().collect::<Vec<_>>());
         for bind in binds.clone() {
           push_scope(bind.as_ref(), scope);
         }

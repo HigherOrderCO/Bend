@@ -16,7 +16,7 @@ use TSPL::Parser;
 // <Pattern>    ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number> | "(" <Pattern> ("," <Pattern>)+ ")"
 // <Term>       ::=
 //   <Number> | <NumOp> | <Tup> | <App> | <Group> | <Nat> | <Lam> | <UnscopedLam> | <Bend> | <Fold> |
-//   <Use> | <Dup> | <LetTup> | <Let> | <Do> | <Match> | <Switch> | <Era> | <UnscopedVar> | <Var>
+//   <Use> | <Dup> | <LetTup> | <Let> | <With> | <Match> | <Switch> | <Era> | <UnscopedVar> | <Var>
 // <Lam>        ::= <Tag>? ("λ"|"@") <NameEra> <Term>
 // <UnscopedLam>::= <Tag>? ("λ"|"@") "$" <Name> <Term>
 // <NumOp>      ::= "(" <Operator> <Term> <Term> ")"
@@ -32,10 +32,14 @@ use TSPL::Parser;
 // <List>       ::= "[" (<Term> ","?)* "]"
 // <String>     ::= "\"" (escape sequence | [^"])* "\""
 // <Char>       ::= "'" (escape sequence | [^']) "'"
-// <Match>      ::= "match" <Name> ("=" <Term>)? ("with" <Var> (","? <Var>)*)? "{" <MatchArm>+ "}"
+// <Match>      ::= "match" <MatchArg> <WithClause>? "{" <MatchArm>+ "}"
+// <Fold>       ::= "fold" <MatchArg> <WithClause>? "{" <MatchArm>+ "}"
+// <MatchArg>   ::= (<Name> "=" <Term>) | <Term>
+// <WithClause> ::= "with" (<Name> ("=" <Term>)? ","?)+
 // <MatchArm>   ::= "|"? <Pattern> ":" <Term> ";"?
-// <Switch>     ::= "switch" <Name> ("=" <Term>)? ("with" <Var> (","? <Var>)*)? "{" <SwitchArm>+ "}"
+// <Switch>     ::= "switch" <MatchArg> <WithClause>? "{" <SwitchArm>+ "}"
 // <SwitchArm>  ::= "|"? (<Num>|"_") ":" <Term> ";"?
+// <Bend>       ::= "bend" (<MatchArg> ","?)+ "{" "when" <Term> ":" <Term> "else" ":" <Term> "}"
 // <Var>        ::= <Name>
 // <UnscopedVar>::= "$" <Name>
 // <NameEra>    ::= <Name> | "*"
@@ -43,7 +47,7 @@ use TSPL::Parser;
 // <Tag>        ::= "#" <Name>
 // <Name>       ::= [_\-./a-zA-Z0-9]+
 // <Number>     ::= ([0-9]+ | "0x"[0-9a-fA-F]+ | "0b"[01]+)
-// <Operator>   ::= ( "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<<" | ">>" | "<=" | ">=" | "<" | ">" | "^" )
+// <Operator>   ::= ( "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<<" | ">>" | "<" | ">" | "&" | "|" | "^" | "**" )
 
 pub type ParseResult<T> = std::result::Result<T, String>;
 
