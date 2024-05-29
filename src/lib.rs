@@ -112,9 +112,8 @@ pub fn desugar_book(
 
   ctx.check_unbound_vars()?;
 
-  ctx.book.make_var_names_unique();
-
   // Auto match linearization
+  ctx.book.make_var_names_unique();
   match opts.linearize_matches {
     OptLevel::Disabled => (),
     OptLevel::Alt => ctx.book.linearize_match_binds(),

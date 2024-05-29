@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/flatten_with_terminal.bend
 ---
-(Foo) = λa switch a { 0: λb match b { A_t/A c: match c { B_t/B: B_t/B; }; }; _ d: λe *; }
+(Foo) = λa switch a { 0: λb let c = b; match c { A_t/A d: match d { B_t/B: B_t/B; }; }; _ e: λf let g = f; *; }
 
 (main) = (Foo 2 (A_t/A B_t/B))
 

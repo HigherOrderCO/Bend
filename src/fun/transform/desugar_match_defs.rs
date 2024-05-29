@@ -313,7 +313,9 @@ fn num_rule(
   let default_body = simplify_rule_match(args.clone(), new_rules, default_with, ctrs, adts)?;
 
   // Linearize previously matched vars and current args.
-  let swt_with = with.into_iter().chain(args).collect::<Vec<_>>();
+  let with = with.into_iter().chain(args).collect::<Vec<_>>();
+  let with_bnd = with.iter().cloned().map(Some).collect::<Vec<_>>();
+  let with_arg = with.iter().cloned().map(|nam| Term::Var { nam }).collect::<Vec<_>>();
 
   let term = num_bodies.into_iter().enumerate().rfold(default_body, |term, (i, body)| {
     let val = if i > 0 {
@@ -328,7 +330,8 @@ fn num_rule(
     Term::Swt {
       arg: Box::new(val),
       bnd: Some(arg.clone()),
-      with: swt_with.clone(),
+      with_bnd: with_bnd.clone(),
+      with_arg: with_arg.clone(),
       pred: Some(pred_var.clone()),
       arms: vec![body, term],
     }
@@ -448,12 +451,15 @@ fn switch_rule(
   }
 
   // Linearize previously matched vars and current args.
-  let mat_with = with.into_iter().chain(old_args).collect::<Vec<_>>();
+  let with = with.into_iter().chain(old_args).collect::<Vec<_>>();
+  let with_bnd = with.iter().cloned().map(Some).collect::<Vec<_>>();
+  let with_arg = with.iter().cloned().map(|nam| Term::Var { nam }).collect::<Vec<_>>();
 
   let term = Term::Mat {
     arg: Box::new(Term::Var { nam: arg.clone() }),
     bnd: Some(arg.clone()),
-    with: mat_with,
+    with_bnd,
+    with_arg,
     arms: new_arms,
   };
   Ok(term)

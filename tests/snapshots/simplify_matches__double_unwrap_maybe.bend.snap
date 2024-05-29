@@ -2,7 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/double_unwrap_maybe.bend
 ---
-(DoubleUnwrap) = λa match a { Maybe/Some b: match b { Maybe/Some c: λd c; Maybe/None: λe e; }; Maybe/None: λf f; }
+(DoubleUnwrap) = λa match a { Maybe/Some b: match b { Maybe/Some c: λd let e = d; let f = e; c; Maybe/None: λg let h = g; let i = h; i; }; Maybe/None: λj let k = j; k; }
 
 (Main) = (DoubleUnwrap (Maybe/Some Maybe/None) 5)
 

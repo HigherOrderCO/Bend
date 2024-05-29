@@ -67,7 +67,7 @@ impl Term {
         if self.has_unscoped_diff() {
           return Err("Can't have non self-contained unscoped variables in a 'fold'".into());
         }
-        let Term::Fold { bnd: _, arg, with, arms } = self else { unreachable!() };
+        let Term::Fold { bnd: _, arg, with_bnd, with_arg, arms } = self else { unreachable!() };
 
         // Gather the free variables
         let mut free_vars = HashSet::new();
@@ -78,7 +78,7 @@ impl Term {
           }
           free_vars.extend(arm_free_vars);
         }
-        for var in with.iter() {
+        for var in with_bnd.iter().flatten() {
           free_vars.remove(var);
         }
         let free_vars = free_vars.into_iter().collect::<Vec<_>>();
@@ -103,19 +103,16 @@ impl Term {
 
         // Create the new function
         let x_nam = Name::new("%x");
-        let mut body = Term::Mat {
+        let body = Term::Mat {
           arg: Box::new(Term::Var { nam: x_nam.clone() }),
           bnd: None,
-          with: with.clone(),
+          with_bnd: with_bnd.clone(),
+          with_arg: with_bnd.iter().map(|nam| Term::var_or_era(nam.clone())).collect(),
           arms: std::mem::take(arms),
         };
-        for nam in with.iter().rev() {
-          body = Term::lam(Pattern::Var(Some(nam.clone())), body);
-        }
-        for nam in free_vars.iter().rev() {
-          body = Term::lam(Pattern::Var(Some(nam.clone())), body);
-        }
-        body = Term::lam(Pattern::Var(Some(x_nam)), body);
+        let body = Term::rfold_lams(body, with_bnd.iter().cloned());
+        let body = Term::rfold_lams(body, free_vars.iter().map(|nam| Some(nam.clone())));
+        let body = Term::lam(Pattern::Var(Some(x_nam)), body);
         let def =
           Definition { name: new_nam.clone(), rules: vec![Rule { pats: vec![], body }], builtin: false };
         new_defs.push(def);
@@ -123,7 +120,7 @@ impl Term {
         // Call the new function
         let call = Term::call(Term::Ref { nam: new_nam.clone() }, [std::mem::take(arg.as_mut())]);
         let call = Term::call(call, free_vars.iter().cloned().map(|nam| Term::Var { nam }));
-        let call = Term::call(call, with.iter().cloned().map(|nam| Term::Var { nam }));
+        let call = Term::call(call, with_arg.iter().cloned());
         *self = call;
       }
       Ok(())

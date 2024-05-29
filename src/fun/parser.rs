@@ -16,7 +16,7 @@ use TSPL::Parser;
 // <Pattern>    ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number> | "(" <Pattern> ("," <Pattern>)+ ")"
 // <Term>       ::=
 //   <Number> | <NumOp> | <Tup> | <App> | <Group> | <Nat> | <Lam> | <UnscopedLam> | <Bend> | <Fold> |
-//   <Use> | <Dup> | <LetTup> | <Let> | <Bind> | <Match> | <Switch> | <Era> | <UnscopedVar> | <Var>
+//   <Use> | <Dup> | <LetTup> | <Let> | <Do> | <Match> | <Switch> | <Era> | <UnscopedVar> | <Var>
 // <Lam>        ::= <Tag>? ("λ"|"@") <NameEra> <Term>
 // <UnscopedLam>::= <Tag>? ("λ"|"@") "$" <Name> <Term>
 // <NumOp>      ::= "(" <Operator> <Term> <Term> ")"
@@ -25,7 +25,7 @@ use TSPL::Parser;
 // <Group>      ::= "(" <Term> ")"
 // <Use>        ::= "use" <Name> "=" <Term> ";"? <Term>
 // <Let>        ::= "let" <NameEra> "=" <Term> ";"? <Term>
-// <Bind>       ::= "with" <Name> "{" <Ask> "}"
+// <With>       ::= "with" <Name> "{" <Ask> "}"
 // <Ask>        ::= "ask" <Pattern> "=" <Term> ";" <Term> | <Term>
 // <LetTup>     ::= "let" "(" <NameEra> ("," <NameEra>)+ ")" "=" <Term> ";"? <Term>
 // <Dup>        ::= "let" <Tag>? "{" <NameEra> (","? <NameEra>)+ "}" "=" <Term> ";"? <Term>
@@ -471,7 +471,8 @@ impl<'a> TermParser<'a> {
         return Ok(Term::Swt {
           arg: Box::new(cnd),
           bnd: Some(Name::new("%cond")),
-          with: Vec::new(),
+          with_bnd: Vec::new(),
+          with_arg: Vec::new(),
           pred: Some(Name::new("%cond-1")),
           arms: vec![els, thn],
         });
@@ -480,17 +481,18 @@ impl<'a> TermParser<'a> {
       // Match
       if self.try_parse_keyword("match") {
         unexpected_tag(self)?;
-        let (bnd, arg, with) = self.parse_match_header()?;
-        let arms = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
-        return Ok(Term::Mat { arg: Box::new(arg), bnd, with, arms });
+        let (bnd, arg) = self.parse_match_arg()?;
+        let (with_bnd, with_arg) = self.parse_with_clause()?;
+        let arms = self.list_like(|p| p.parse_match_arm(), "", "}", ";", false, 1)?;
+        return Ok(Term::Mat { arg: Box::new(arg), bnd, with_bnd, with_arg, arms });
       }
 
       // Switch
       if self.try_parse_keyword("switch") {
         unexpected_tag(self)?;
-        let (bnd, arg, with) = self.parse_match_header()?;
+        let (bnd, arg) = self.parse_match_arg()?;
+        let (with_bnd, with_arg) = self.parse_with_clause()?;
 
-        self.consume("{")?;
         self.try_consume("|");
         self.consume("0")?;
         self.consume(":")?;
@@ -520,7 +522,7 @@ impl<'a> TermParser<'a> {
           self.try_consume(";");
         }
         let pred = Some(Name::new(format!("{}-{}", bnd.as_ref().unwrap(), arms.len() - 1)));
-        return Ok(Term::Swt { arg: Box::new(arg), bnd, with, pred, arms });
+        return Ok(Term::Swt { arg: Box::new(arg), bnd, with_bnd, with_arg, pred, arms });
       }
 
       // With (monadic block)
@@ -536,9 +538,10 @@ impl<'a> TermParser<'a> {
       // Fold
       if self.try_parse_keyword("fold") {
         unexpected_tag(self)?;
-        let (bnd, arg, with) = self.parse_match_header()?;
-        let arms = self.list_like(|p| p.parse_match_arm(), "{", "}", ";", false, 1)?;
-        return Ok(Term::Fold { arg: Box::new(arg), bnd, with, arms });
+        let (bnd, arg) = self.parse_match_arg()?;
+        let (with_bnd, with_arg) = self.parse_with_clause()?;
+        let arms = self.list_like(|p| p.parse_match_arm(), "", "}", ";", false, 1)?;
+        return Ok(Term::Fold { arg: Box::new(arg), bnd, with_bnd, with_arg, arms });
       }
 
       // Bend
@@ -569,8 +572,8 @@ impl<'a> TermParser<'a> {
         let base = self.parse_term()?;
         self.consume("}")?;
         return Ok(Term::Bend {
-          bind,
-          init,
+          bnd: bind,
+          arg: init,
           cond: Box::new(cond),
           step: Box::new(step),
           base: Box::new(base),
@@ -636,6 +639,7 @@ impl<'a> TermParser<'a> {
     }))
   }
 
+  // A named arg with optional name.
   fn parse_match_arg(&mut self) -> ParseResult<(Option<Name>, Term)> {
     let ini_idx = *self.index();
     let mut arg = self.parse_term()?;
@@ -653,24 +657,29 @@ impl<'a> TermParser<'a> {
     }
   }
 
-  fn parse_match_header(&mut self) -> ParseResult<(Option<Name>, Term, Vec<Name>)> {
-    let (bnd, arg) = self.parse_match_arg()?;
+  /// A named arg with non-optional name.
+  fn parse_named_arg(&mut self) -> ParseResult<(Option<Name>, Term)> {
+    let nam = self.parse_bend_name()?;
     self.skip_trivia();
-    let with = if self.try_parse_keyword("with") {
-      self.skip_trivia();
-      let mut with = vec![self.parse_bend_name()?];
-      self.skip_trivia();
-      while !self.starts_with("{") {
-        self.try_consume(",");
-        self.skip_trivia();
-        with.push(self.parse_bend_name()?);
-        self.skip_trivia();
-      }
-      with
+    if self.starts_with("=") {
+      self.advance_one();
+      let arg = self.parse_term()?;
+      Ok((Some(nam), arg))
     } else {
-      vec![]
+      let arg = Term::Var { nam: nam.clone() };
+      Ok((Some(nam), arg))
+    }
+  }
+
+  fn parse_with_clause(&mut self) -> ParseResult<(Vec<Option<Name>>, Vec<Term>)> {
+    self.skip_trivia();
+    let res = if self.try_parse_keyword("with") {
+      self.list_like(|p| p.parse_named_arg(), "", "{", ",", false, 1)?.into_iter().unzip()
+    } else {
+      self.consume_exactly("{")?;
+      (vec![], vec![])
     };
-    Ok((bnd, arg, with))
+    Ok(res)
   }
 
   fn parse_match_arm(&mut self) -> ParseResult<MatchRule> {

@@ -28,16 +28,18 @@ impl Term {
         child.encode_matches(adt_encoding)
       }
 
-      if let Term::Mat { arg, bnd: _, with, arms: rules } = self {
-        assert!(with.is_empty());
+      if let Term::Mat { arg, bnd: _, with_bnd, with_arg, arms } = self {
+        assert!(with_bnd.is_empty());
+        assert!(with_arg.is_empty());
         let arg = std::mem::take(arg.as_mut());
-        let rules = std::mem::take(rules);
+        let rules = std::mem::take(arms);
         *self = encode_match(arg, rules, adt_encoding);
-      } else if let Term::Swt { arg, bnd: _, with, pred, arms: rules } = self {
-        assert!(with.is_empty());
+      } else if let Term::Swt { arg, bnd: _, with_bnd, with_arg, pred, arms } = self {
+        assert!(with_bnd.is_empty());
+        assert!(with_arg.is_empty());
         let arg = std::mem::take(arg.as_mut());
         let pred = std::mem::take(pred);
-        let rules = std::mem::take(rules);
+        let rules = std::mem::take(arms);
         *self = encode_switch(arg, pred, rules);
       }
     })
@@ -60,7 +62,8 @@ fn encode_match(arg: Term, rules: Vec<MatchRule>, adt_encoding: AdtEncoding) -> 
             Term::Swt {
               arg: Box::new(Term::Var { nam: Name::new("%tag") }),
               bnd: None,
-              with: vec![],
+              with_bnd: vec![],
+              with_arg: vec![],
               pred: None,
               arms: vec![std::mem::take(arm), make_switches(rest)],
             },
@@ -75,7 +78,8 @@ fn encode_match(arg: Term, rules: Vec<MatchRule>, adt_encoding: AdtEncoding) -> 
         let term = Term::Swt {
           arg: Box::new(Term::Var { nam: Name::new("%tag") }),
           bnd: None,
-          with: vec![],
+          with_bnd: vec![],
+          with_arg: vec![],
           pred: None,
           arms: vec![arm, Term::Era],
         };
@@ -100,12 +104,20 @@ fn encode_switch(arg: Term, pred: Option<Name>, mut rules: Vec<Term>) -> Term {
   nums.iter_mut().enumerate().rfold(last_arm, |term, (i, rule)| {
     let arms = vec![std::mem::take(rule), term];
     if i == 0 {
-      Term::Swt { arg: Box::new(arg.clone()), bnd: None, with: vec![], pred: None, arms }
+      Term::Swt {
+        arg: Box::new(arg.clone()),
+        bnd: None,
+        with_bnd: vec![],
+        with_arg: vec![],
+        pred: None,
+        arms,
+      }
     } else {
       let swt = Term::Swt {
         arg: Box::new(Term::Var { nam: match_var.clone() }),
         bnd: None,
-        with: vec![],
+        with_bnd: vec![],
+        with_arg: vec![],
         pred: None,
         arms,
       };

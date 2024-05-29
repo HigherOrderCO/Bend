@@ -59,14 +59,17 @@ impl fmt::Display for Term {
       Term::App { tag, fun, arg } => {
         write!(f, "{}({} {})", tag.display_padded(), fun.display_app(tag), arg)
       }
-      Term::Mat { arg, bnd, with, arms } => {
+      Term::Mat { arg, bnd, with_bnd, with_arg, arms } => {
         write!(f, "match ")?;
         if let Some(bnd) = bnd {
           write!(f, "{} = ", bnd)?;
         }
         write!(f, "{} ", arg)?;
-        if !with.is_empty() {
-          write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+        if !with_bnd.is_empty() {
+          write!(f, "with ")?;
+          for (bnd, arg) in with_bnd.iter().zip(with_arg.iter()) {
+            write!(f, "{} = {}, ", var_as_str(bnd), arg)?;
+          }
         }
         write!(f, "{{ ")?;
         for arm in arms {
@@ -78,14 +81,17 @@ impl fmt::Display for Term {
         }
         write!(f, "}}")
       }
-      Term::Swt { arg, bnd, with, pred, arms } => {
+      Term::Swt { arg, bnd, with_bnd, with_arg, pred, arms } => {
         write!(f, "switch ")?;
         if let Some(bnd) = bnd {
           write!(f, "{bnd} = ")?;
         }
         write!(f, "{arg} ")?;
-        if !with.is_empty() {
-          write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+        if !with_bnd.is_empty() {
+          write!(f, "with ")?;
+          for (bnd, arg) in with_bnd.iter().zip(with_arg.iter()) {
+            write!(f, "{} = {}, ", var_as_str(bnd), arg)?;
+          }
         }
         write!(f, "{{ ")?;
         for (i, arm) in arms.iter().enumerate() {
@@ -101,14 +107,17 @@ impl fmt::Display for Term {
         }
         write!(f, "}}")
       }
-      Term::Fold { bnd, arg, with, arms } => {
+      Term::Fold { bnd, arg, with_bnd, with_arg, arms } => {
         write!(f, "fold ")?;
         if let Some(bnd) = bnd {
           write!(f, "{} = ", bnd)?;
         }
         write!(f, "{} ", arg)?;
-        if !with.is_empty() {
-          write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+        if !with_bnd.is_empty() {
+          write!(f, "with ")?;
+          for (bnd, arg) in with_bnd.iter().zip(with_arg.iter()) {
+            write!(f, "{} = {}, ", var_as_str(bnd), arg)?;
+          }
         }
         write!(f, "{{ ")?;
         for arm in arms {
@@ -120,7 +129,7 @@ impl fmt::Display for Term {
         }
         write!(f, "}}")
       }
-      Term::Bend { bind, init, cond, step, base } => {
+      Term::Bend { bnd: bind, arg: init, cond, step, base } => {
         write!(f, "bend ")?;
         for (bind, init) in bind.iter().zip(init) {
           if let Some(bind) = bind {
@@ -339,14 +348,17 @@ impl Term {
         Term::Oper { opr, fst, snd } => {
           write!(f, "({} {} {})", opr, fst.display_pretty(tab), snd.display_pretty(tab))
         }
-        Term::Mat { bnd, arg, with, arms } => {
+        Term::Mat { bnd, arg, with_bnd, with_arg, arms } => {
           write!(f, "match ")?;
           if let Some(bnd) = bnd {
             write!(f, "{} = ", bnd)?;
           }
           write!(f, "{} ", arg.display_pretty(tab))?;
-          if !with.is_empty() {
-            write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+          if !with_bnd.is_empty() {
+            write!(f, "with ")?;
+            for (bnd, arg) in with_bnd.iter().zip(with_arg.iter()) {
+              write!(f, "{} = {}, ", var_as_str(bnd), arg)?;
+            }
           }
           write!(f, "{{ ")?;
           for arm in arms {
@@ -358,14 +370,17 @@ impl Term {
           }
           write!(f, "\n{:tab$}}}", "")
         }
-        Term::Swt { bnd, arg, with, pred, arms } => {
+        Term::Swt { bnd, arg, with_bnd, with_arg, pred, arms } => {
           write!(f, "switch ")?;
           if let Some(bnd) = bnd {
             write!(f, "{bnd} = ")?;
           }
           write!(f, "{} ", arg.display_pretty(tab))?;
-          if !with.is_empty() {
-            write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+          if !with_bnd.is_empty() {
+            write!(f, "with ")?;
+            for (bnd, arg) in with_bnd.iter().zip(with_arg.iter()) {
+              write!(f, "{} = {}, ", var_as_str(bnd), arg)?;
+            }
           }
           writeln!(f, "{{")?;
           for (i, arm) in arms.iter().enumerate() {
@@ -381,14 +396,17 @@ impl Term {
           }
           write!(f, "{:tab$}}}", "")
         }
-        Term::Fold { bnd, arg, with, arms } => {
+        Term::Fold { bnd, arg, with_bnd, with_arg, arms } => {
           write!(f, "fold ")?;
           if let Some(bnd) = bnd {
             write!(f, "{} = ", bnd)?;
           }
           write!(f, "{} ", arg.display_pretty(tab))?;
-          if !with.is_empty() {
-            write!(f, "with {} ", DisplayJoin(|| with, ", "))?;
+          if !with_bnd.is_empty() {
+            write!(f, "with ")?;
+            for (bnd, arg) in with_bnd.iter().zip(with_arg.iter()) {
+              write!(f, "{} = {}, ", var_as_str(bnd), arg)?;
+            }
           }
           write!(f, "{{ ")?;
           for arm in arms {
@@ -400,7 +418,7 @@ impl Term {
           }
           write!(f, "\n{:tab$}}}", "")
         }
-        Term::Bend { bind, init, cond, step, base } => {
+        Term::Bend { bnd: bind, arg: init, cond, step, base } => {
           write!(f, "bend ")?;
           for (bind, init) in bind.iter().zip(init) {
             if let Some(bind) = bind {

@@ -5,13 +5,13 @@ input_file: tests/golden_tests/encode_pattern_match/bool.bend
 Scott
 (not) = λa (a bool/false bool/true)
 
-(and) = λa (a λb (b bool/true bool/false) λc (c bool/false bool/false))
+(and) = λa (a λb (b bool/true bool/false) λd (d bool/false bool/false))
 
-(and2) = λa (a λb b λ* bool/false)
+(and2) = λa (a λb b λd let * = d; bool/false)
 
-(and3) = λa (a λb (b bool/true bool/false) λ* bool/false)
+(and3) = λa (a λb (b bool/true bool/false) λd let * = d; bool/false)
 
-(and4) = λa (a λb (b bool/true bool/false) λ* bool/false)
+(and4) = λa (a λb (b bool/true bool/false) λd let * = d; bool/false)
 
 (bool/true) = λa λ* a
 
@@ -20,13 +20,13 @@ Scott
 NumScott
 (not) = λa (a λb switch b { 0: bool/false; _: λ* bool/true; })
 
-(and) = λa (a λb switch b { 0: λc (c λd switch d { 0: bool/true; _: λ* bool/false; }); _: λ* λe (e λf switch f { 0: bool/false; _: λ* bool/false; }); })
+(and) = λa (a λb switch b { 0: λc (c λe switch e { 0: bool/true; _: λ* bool/false; }); _: λ* λf (f λh switch h { 0: bool/false; _: λ* bool/false; }); })
 
-(and2) = λa (a λb switch b { 0: λc c; _: λ* λ* bool/false; })
+(and2) = λa (a λb switch b { 0: λc c; _: λ* λe let * = e; bool/false; })
 
-(and3) = λa (a λb switch b { 0: λc (c λd switch d { 0: bool/true; _: λ* bool/false; }); _: λ* λ* bool/false; })
+(and3) = λa (a λb switch b { 0: λc (c λe switch e { 0: bool/true; _: λ* bool/false; }); _: λ* λf let * = f; bool/false; })
 
-(and4) = λa (a λb switch b { 0: λc (c λd switch d { 0: bool/true; _: λ* bool/false; }); _: λ* λ* bool/false; })
+(and4) = λa (a λb switch b { 0: λc (c λe switch e { 0: bool/true; _: λ* bool/false; }); _: λ* λf let * = f; bool/false; })
 
 (bool/true) = λa (a bool/true/tag)
 

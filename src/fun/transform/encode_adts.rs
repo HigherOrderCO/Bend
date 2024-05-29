@@ -52,7 +52,7 @@ fn encode_ctr_scott<'a>(
   let ctr = Term::Var { nam: ctr_name.clone() };
   let app = Term::call(ctr, ctr_args.clone().cloned().map(|nam| Term::Var { nam }));
   let lam = Term::rfold_lams(app, ctrs.into_iter().map(Some));
-  ctr_args.cloned().rfold(lam, |acc, arg| Term::lam(Pattern::Var(Some(arg)), acc))
+  Term::rfold_lams(lam, ctr_args.cloned().map(Some))
 }
 
 fn encode_ctr_num_scott<'a>(ctr_args: impl DoubleEndedIterator<Item = &'a Name> + Clone, tag: &str) -> Term {

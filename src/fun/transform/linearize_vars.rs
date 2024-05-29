@@ -1,6 +1,6 @@
 use crate::{
   fun::{Book, FanKind, Name, Pattern, Tag, Term},
-  maybe_grow,
+  maybe_grow, multi_iterator,
 };
 use std::collections::HashMap;
 
@@ -118,5 +118,56 @@ fn dup_name(nam: &Name, uses: u64) -> Name {
     nam.clone()
   } else {
     Name::new(format!("{nam}_{uses}"))
+  }
+}
+
+impl Term {
+  /// Because multiple children can share the same binds, this function is very restricted.
+  /// Should only be called after desugaring bends/folds/matches/switches.
+  pub fn children_mut_with_binds_mut(
+    &mut self,
+  ) -> impl DoubleEndedIterator<Item = (&mut Term, impl DoubleEndedIterator<Item = &mut Option<Name>>)> {
+    multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Swt });
+    multi_iterator!(BindsIter { Zero, One, Pat });
+    match self {
+      Term::Swt { arg, bnd, with_bnd, with_arg, pred, arms } => {
+        debug_assert!(bnd.is_none());
+        debug_assert!(with_bnd.is_empty());
+        debug_assert!(with_arg.is_empty());
+        debug_assert!(pred.is_none());
+        ChildrenIter::Swt(
+          [(arg.as_mut(), BindsIter::Zero([]))]
+            .into_iter()
+            .chain(arms.iter_mut().map(|x| (x, BindsIter::Zero([])))),
+        )
+      }
+      Term::Fan { els, .. } | Term::List { els } => {
+        ChildrenIter::Vec(els.iter_mut().map(|el| (el, BindsIter::Zero([]))))
+      }
+      Term::Use { nam, val, nxt } => {
+        ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([nam]))])
+      }
+      Term::Let { pat, val, nxt, .. } | Term::Ask { pat, val, nxt, .. } => ChildrenIter::Two([
+        (val.as_mut(), BindsIter::Zero([])),
+        (nxt.as_mut(), BindsIter::Pat(pat.binds_mut())),
+      ]),
+      Term::App { fun: fst, arg: snd, .. } | Term::Oper { fst, snd, .. } => {
+        ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
+      }
+      Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds_mut()))]),
+      Term::Do { bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Zero([]))]),
+      Term::Var { .. }
+      | Term::Link { .. }
+      | Term::Num { .. }
+      | Term::Nat { .. }
+      | Term::Str { .. }
+      | Term::Ref { .. }
+      | Term::Era
+      | Term::Err => ChildrenIter::Zero([]),
+      Term::Mat { .. } => unreachable!("'match' should be removed in earlier pass"),
+      Term::Fold { .. } => unreachable!("'fold' should be removed in earlier pass"),
+      Term::Bend { .. } => unreachable!("'bend' should be removed in earlier pass"),
+      Term::Open { .. } => unreachable!("'open' should be removed in earlier pass"),
+    }
   }
 }

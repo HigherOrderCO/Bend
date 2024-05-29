@@ -10,7 +10,7 @@ input_file: tests/golden_tests/simplify_matches/linearize_match_all.bend
 
 (D) = λa switch a { 0: λb λc c; _ d: λe λf (d f); }
 
-(E) = λa match a { ConsList/Cons b c: λd (match d { ConsList/Cons e f: λg λh (g h e f); ConsList/Nil: λi λj (ConsList/Cons i j ConsList/Nil); } b c); ConsList/Nil: λk (ConsList/Nil k); }
+(E) = λa match a { ConsList/Cons b c: λd let e = d; (match e { ConsList/Cons f g: λh λi (h i f g); ConsList/Nil: λj λk (ConsList/Cons j k ConsList/Nil); } b c); ConsList/Nil: λl let m = l; (ConsList/Nil m); }
 
 (A2) = λa match a { ConsList/Cons b c: λd λe (b c d e); ConsList/Nil: λf λg (f g); }
 

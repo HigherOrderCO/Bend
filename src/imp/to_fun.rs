@@ -135,13 +135,14 @@ impl Stmt {
         let term = fun::Term::Swt {
           arg: Box::new(cond.to_fun()),
           bnd: Some(Name::new("%pred")),
-          with: Vec::new(),
+          with_bnd: vec![],
+          with_arg: vec![],
           pred: Some(Name::new("%pred-1")),
           arms,
         };
         wrap_nxt_assign_stmt(term, nxt, pat)?
       }
-      Stmt::Match { arg, bind, arms, nxt } => {
+      Stmt::Match { arg, bnd, with_bnd, with_arg, arms, nxt } => {
         let arg = arg.to_fun();
         let mut fun_arms = vec![];
         let mut arms = arms.into_iter();
@@ -150,6 +151,7 @@ impl Stmt {
           StmtToFun::Return(term) => (None, term),
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
+        let with_arg = with_arg.into_iter().map(Expr::to_fun).collect();
         fun_arms.push((fst.lft, vec![], fst_rgt));
         for arm in arms {
           let (arm_pat, arm_rgt) = match arm.rgt.into_fun()? {
@@ -170,10 +172,10 @@ impl Stmt {
             (None, None) => fun_arms.push((arm.lft, vec![], arm_rgt)),
           }
         }
-        let term = fun::Term::Mat { arg: Box::new(arg), bnd: bind, with: Vec::new(), arms: fun_arms };
+        let term = fun::Term::Mat { arg: Box::new(arg), bnd, with_bnd, with_arg, arms: fun_arms };
         wrap_nxt_assign_stmt(term, nxt, fst_pat)?
       }
-      Stmt::Switch { arg, bind, arms, nxt } => {
+      Stmt::Switch { arg, bnd, with_bnd, with_arg, arms, nxt } => {
         let arg = arg.to_fun();
         let mut fun_arms = vec![];
         let mut arms = arms.into_iter();
@@ -182,6 +184,7 @@ impl Stmt {
           StmtToFun::Return(term) => (None, term),
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
+        let with_arg = with_arg.into_iter().map(Expr::to_fun).collect();
         fun_arms.push(fst);
         for arm in arms {
           let (arm_pat, arm) = match arm.into_fun()? {
@@ -202,11 +205,11 @@ impl Stmt {
             (None, None) => fun_arms.push(arm),
           }
         }
-        let pred = Some(Name::new(format!("{}-{}", bind.clone().unwrap(), fun_arms.len() - 1)));
-        let term = fun::Term::Swt { arg: Box::new(arg), bnd: bind, with: Vec::new(), pred, arms: fun_arms };
+        let pred = Some(Name::new(format!("{}-{}", bnd.clone().unwrap(), fun_arms.len() - 1)));
+        let term = fun::Term::Swt { arg: Box::new(arg), bnd, with_bnd, with_arg, pred, arms: fun_arms };
         wrap_nxt_assign_stmt(term, nxt, fst_pat)?
       }
-      Stmt::Fold { arg, bind, arms, with, nxt } => {
+      Stmt::Fold { arg, bnd, with_bnd, with_arg, arms, nxt } => {
         let arg = arg.to_fun();
         let mut fun_arms = vec![];
         let mut arms = arms.into_iter();
@@ -216,6 +219,7 @@ impl Stmt {
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
         fun_arms.push((fst.lft, vec![], fst_rgt));
+        let with_arg = with_arg.into_iter().map(Expr::to_fun).collect();
         for arm in arms {
           let (arm_pat, arm_rgt) = match arm.rgt.into_fun()? {
             StmtToFun::Return(term) => (None, term),
@@ -235,11 +239,11 @@ impl Stmt {
             (None, None) => fun_arms.push((arm.lft, vec![], arm_rgt)),
           }
         }
-        let term = fun::Term::Fold { arg: Box::new(arg), bnd: bind, with, arms: fun_arms };
+        let term = fun::Term::Fold { arg: Box::new(arg), bnd, with_bnd, with_arg, arms: fun_arms };
         wrap_nxt_assign_stmt(term, nxt, fst_pat)?
       }
-      Stmt::Bend { bind, init, cond, step, base, nxt } => {
-        let init = init.into_iter().map(Expr::to_fun).collect();
+      Stmt::Bend { bnd, arg, cond, step, base, nxt } => {
+        let arg = arg.into_iter().map(Expr::to_fun).collect();
         let cond = cond.to_fun();
         let (pat, step, base) = match (step.into_fun()?, base.into_fun()?) {
           (StmtToFun::Return(s), StmtToFun::Return(b)) => (None, s, b),
@@ -259,7 +263,7 @@ impl Stmt {
           }
         };
         let term =
-          fun::Term::Bend { bind, init, cond: Box::new(cond), step: Box::new(step), base: Box::new(base) };
+          fun::Term::Bend { bnd, arg, cond: Box::new(cond), step: Box::new(step), base: Box::new(base) };
         wrap_nxt_assign_stmt(term, nxt, pat)?
       }
       Stmt::With { typ, bod, nxt } => {
@@ -317,7 +321,7 @@ impl Stmt {
 impl Expr {
   pub fn to_fun(self) -> fun::Term {
     match self {
-      Expr::Eraser => fun::Term::Era,
+      Expr::Era => fun::Term::Era,
       Expr::Var { nam } => fun::Term::Var { nam },
       Expr::Chn { nam } => fun::Term::Link { nam },
       Expr::Num { val } => fun::Term::Num { val },
@@ -331,7 +335,7 @@ impl Expr {
         pat: Box::new(if link { fun::Pattern::Chn(name) } else { fun::Pattern::Var(Some(name)) }),
         bod: Box::new(acc),
       }),
-      Expr::Bin { op, lhs, rhs } => {
+      Expr::Opr { op, lhs, rhs } => {
         fun::Term::Oper { opr: op, fst: Box::new(lhs.to_fun()), snd: Box::new(rhs.to_fun()) }
       }
       Expr::Str { val } => fun::Term::Str { val },
@@ -346,12 +350,12 @@ impl Expr {
         tag: fun::Tag::Auto,
         els: els.into_iter().map(Self::to_fun).collect(),
       },
-      Expr::Constructor { name, args, kwargs } => {
+      Expr::Ctr { name, args, kwargs } => {
         assert!(kwargs.is_empty());
         let args = args.into_iter().map(Self::to_fun);
         fun::Term::call(fun::Term::Ref { nam: name }, args)
       }
-      Expr::Comprehension { term, bind, iter, cond } => {
+      Expr::LstMap { term, bind, iter, cond } => {
         const ITER_TAIL: &str = "%iter.tail";
         const ITER_HEAD: &str = "%iter.head";
 
@@ -363,7 +367,8 @@ impl Expr {
           fun::Term::Swt {
             arg: Box::new(cond.to_fun()),
             bnd: Some(Name::new("%comprehension")),
-            with: vec![],
+            with_bnd: vec![],
+            with_arg: vec![],
             pred: Some(Name::new("%comprehension-1")),
             arms: vec![fun::Term::Var { nam: Name::new(ITER_TAIL) }, cons_branch],
           }
@@ -379,14 +384,15 @@ impl Expr {
         fun::Term::Fold {
           bnd: Some(Name::new("%iter")),
           arg: Box::new(iter.to_fun()),
-          with: Vec::new(),
+          with_bnd: vec![],
+          with_arg: vec![],
           arms: vec![
             (Some(Name::new(LNIL)), vec![], fun::Term::r#ref(LNIL)),
             (Some(Name::new(LCONS)), vec![], cons_branch),
           ],
         }
       }
-      Expr::MapInit { entries } => map_init(entries),
+      Expr::Map { entries } => map_init(entries),
       Expr::MapGet { .. } => unreachable!(),
     }
   }

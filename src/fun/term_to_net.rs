@@ -137,10 +137,13 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           self.link(up, node.2);
         }
         // core: & arg ~ ?<(zero succ) ret>
-        Term::Swt { arg, bnd: _, with, pred: _, arms: rules } => {
+        Term::Swt { arg, bnd, with_bnd, with_arg, pred, arms,  } => {
           // At this point should be only num matches of 0 and succ.
-          assert!(with.is_empty());
-          assert!(rules.len() == 2);
+          assert!(bnd.is_none());
+          assert!(with_bnd.is_empty());
+          assert!(with_arg.is_empty());
+          assert!(pred.is_none());
+          assert!(arms.len() == 2);
 
           self.created_nodes += 2;
           let loaned = Tree::Swi { fst: Box::new(Tree::Con{fst: Box::new(Tree::Era), snd: Box::new(Tree::Era)}), snd: Box::new(Tree::Era)};
@@ -152,8 +155,8 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
             });
 
           self.encode_term(arg, Place::Tree(node));
-          self.encode_term(&rules[0], Place::Hole(zero));
-          self.encode_term(&rules[1], Place::Hole(succ));
+          self.encode_term(&arms[0], Place::Hole(zero));
+          self.encode_term(&arms[1], Place::Hole(succ));
           self.link(up, Place::Hole(out));
         }
         Term::Let { pat, val, nxt } => {

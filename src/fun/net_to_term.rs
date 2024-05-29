@@ -161,7 +161,14 @@ impl Reader<'_> {
                 (zero_term, succ_term)
               }
             };
-            Term::Swt { arg: Box::new(arg), bnd: Some(bnd), with: vec![], pred: None, arms: vec![zero, succ] }
+            Term::Swt {
+              arg: Box::new(arg),
+              bnd: Some(bnd),
+              with_arg: vec![],
+              with_bnd: vec![],
+              pred: None,
+              arms: vec![zero, succ],
+            }
           }
           _ => {
             self.error(ReadbackError::InvalidNumericMatch);
@@ -588,8 +595,11 @@ impl Term {
   pub fn collect_unscoped(&self, unscoped: &mut HashSet<Name>, scope: &mut Vec<Name>) {
     maybe_grow(|| match self {
       Term::Var { nam } if !scope.contains(nam) => _ = unscoped.insert(nam.clone()),
-      Term::Swt { arg, bnd, with: _, pred: _, arms } => {
+      Term::Swt { arg, bnd, with_bnd: _, with_arg, pred: _, arms } => {
         arg.collect_unscoped(unscoped, scope);
+        for arg in with_arg {
+          arg.collect_unscoped(unscoped, scope);
+        }
         arms[0].collect_unscoped(unscoped, scope);
         if let Some(bnd) = bnd {
           scope.push(Name::new(format!("{bnd}-1")));

@@ -9,7 +9,7 @@ use interner::global::GlobalString;
 #[derive(Clone, Debug)]
 pub enum Expr {
   // "*"
-  Eraser,
+  Era,
   // [a-zA-Z_]+
   Var { nam: Name },
   // "$" [a-zA-Z_]+
@@ -21,7 +21,7 @@ pub enum Expr {
   // "lambda" {names}* ":" {bod}
   Lam { names: Vec<(Name, bool)>, bod: Box<Expr> },
   // {lhs} {op} {rhs}
-  Bin { op: Op, lhs: Box<Expr>, rhs: Box<Expr> },
+  Opr { op: Op, lhs: Box<Expr>, rhs: Box<Expr> },
   // "\"" ... "\""
   Str { val: GlobalString },
   // "[" ... "]"
@@ -31,11 +31,11 @@ pub enum Expr {
   // "{" {els} "}"
   Sup { els: Vec<Expr> },
   // {name} "{" {kwargs} "}"
-  Constructor { name: Name, args: Vec<Expr>, kwargs: Vec<(Name, Expr)> },
+  Ctr { name: Name, args: Vec<Expr>, kwargs: Vec<(Name, Expr)> },
   // "[" {term} "for" {bind} "in" {iter} ("if" {cond})? "]"
-  Comprehension { term: Box<Expr>, bind: Name, iter: Box<Expr>, cond: Option<Box<Expr>> },
+  LstMap { term: Box<Expr>, bind: Name, iter: Box<Expr>, cond: Option<Box<Expr>> },
   // "{" {entries} "}"
-  MapInit { entries: Vec<(Expr, Expr)> },
+  Map { entries: Vec<(Expr, Expr)> },
   // {map} "[" {key} "]"
   MapGet { nam: Name, key: Box<Expr> },
 }
@@ -106,7 +106,9 @@ pub enum Stmt {
   // <nxt>?
   Match {
     arg: Box<Expr>,
-    bind: Option<Name>,
+    bnd: Option<Name>,
+    with_bnd: Vec<Option<Name>>,
+    with_arg: Vec<Expr>,
     arms: Vec<MatchArm>,
     nxt: Option<Box<Stmt>>,
   },
@@ -116,7 +118,9 @@ pub enum Stmt {
   // <nxt>?
   Switch {
     arg: Box<Expr>,
-    bind: Option<Name>,
+    bnd: Option<Name>,
+    with_bnd: Vec<Option<Name>>,
+    with_arg: Vec<Expr>,
     arms: Vec<Stmt>,
     nxt: Option<Box<Stmt>>,
   },
@@ -126,8 +130,8 @@ pub enum Stmt {
   //   {base}
   // <nxt>?
   Bend {
-    bind: Vec<Option<Name>>,
-    init: Vec<Expr>,
+    bnd: Vec<Option<Name>>,
+    arg: Vec<Expr>,
     cond: Box<Expr>,
     step: Box<Stmt>,
     base: Box<Stmt>,
@@ -139,8 +143,9 @@ pub enum Stmt {
   // <nxt>?
   Fold {
     arg: Box<Expr>,
-    bind: Option<Name>,
-    with: Vec<Name>,
+    bnd: Option<Name>,
+    with_bnd: Vec<Option<Name>>,
+    with_arg: Vec<Expr>,
     arms: Vec<MatchArm>,
     nxt: Option<Box<Stmt>>,
   },

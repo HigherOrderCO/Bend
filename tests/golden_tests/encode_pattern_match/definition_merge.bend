@@ -1,5 +1,5 @@
 type Either = (Left value) | (Right value)
-type Bool = Bool/True | Bool/False
+type Bool = True | False
 
 Foo (Either/Left  Bool/False) (Either/Left  Bool/False) = 1
 Foo (Either/Left  Bool/False) (Either/Left  Bool/True)  = 1
@@ -20,3 +20,5 @@ Foo (Either/Right Bool/False) (Either/Left Bool/False)  = 3
 Foo (Either/Right Bool/False) (Either/Left Bool/True)   = 3
 Foo (Either/Right Bool/True)  (Either/Left Bool/False)  = 3
 Foo (Either/Right Bool/True)  (Either/Left Bool/True)   = 3
+
+
