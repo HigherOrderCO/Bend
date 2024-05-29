@@ -138,7 +138,7 @@ List/split/aux = @acc @l @i
     List/Cons: 
       switch i {
         0: (acc, l)
-        _: (List/split/aux (List/append acc l.head) l.tail (- i 1))
+        _: (List/split/aux (List/append acc l.head) l.tail i-1)
       }
     List/Nil: *
   }
