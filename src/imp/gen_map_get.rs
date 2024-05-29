@@ -39,11 +39,22 @@ impl Stmt {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::InPlace { op: _, var: _, val, nxt } => {
+      Stmt::InPlace { op: _, pat, val, nxt } => {
+        let key_substitutions = if let AssignPattern::MapSet(_, key) = &mut **pat {
+          key.substitute_map_gets(id)
+        } else {
+          Vec::new()
+        };
+
         nxt.gen_map_get(id);
+
         let substitutions = val.substitute_map_gets(id);
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);
+        }
+
+        if !key_substitutions.is_empty() {
+          *self = gen_get(self, key_substitutions);
         }
       }
       Stmt::If { cond, then, otherwise, nxt } => {

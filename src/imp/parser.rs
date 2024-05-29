@@ -464,16 +464,20 @@ impl<'a> PyParser<'a> {
       return Ok((stmt, nxt_indent));
     }
     // In-place
-    if let AssignPattern::Var(name) = pat {
-      if let Some(op) = self.parse_in_place_op()? {
-        let val = self.parse_expr(true)?;
-        self.skip_trivia_inline();
-        self.try_consume_exactly(";");
-        self.consume_indent_exactly(*indent)?;
-        let (nxt, nxt_indent) = self.parse_statement(indent)?;
-        let stmt = Stmt::InPlace { op, var: name, val: Box::new(val), nxt: Box::new(nxt) };
-        return Ok((stmt, nxt_indent));
-      }
+
+    match &pat {
+      AssignPattern::Var(..) => {}
+      AssignPattern::MapSet(..) => {}
+      _ => self.expected_spanned("Var or Map accessor", ini_idx, end_idx)?,
+    }
+    if let Some(op) = self.parse_in_place_op()? {
+      let val = self.parse_expr(true)?;
+      self.skip_trivia_inline();
+      self.try_consume_exactly(";");
+      self.consume_indent_exactly(*indent)?;
+      let (nxt, nxt_indent) = self.parse_statement(indent)?;
+      let stmt = Stmt::InPlace { op, pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) };
+      return Ok((stmt, nxt_indent));
     }
 
     self.expected_spanned("statement", ini_idx, end_idx)
@@ -502,6 +506,9 @@ impl<'a> PyParser<'a> {
     } else if self.starts_with("^=") {
       self.consume("^=")?;
       Some(InPlaceOp::Xor)
+    } else if self.starts_with("@=") {
+      self.consume("@=")?;
+      Some(InPlaceOp::Map)
     } else {
       None
     };

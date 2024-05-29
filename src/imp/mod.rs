@@ -72,6 +72,7 @@ pub enum InPlaceOp {
   And,
   Or,
   Xor,
+  Map,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -85,7 +86,7 @@ pub enum Stmt {
   // {var} += {val} ";"? {nxt}
   InPlace {
     op: InPlaceOp,
-    var: Name,
+    pat: Box<AssignPattern>,
     val: Box<Expr>,
     nxt: Box<Stmt>,
   },
@@ -215,6 +216,7 @@ impl InPlaceOp {
       InPlaceOp::And => Op::AND,
       InPlaceOp::Or => Op::OR,
       InPlaceOp::Xor => Op::XOR,
+      InPlaceOp::Map => unreachable!(),
     }
   }
 }
