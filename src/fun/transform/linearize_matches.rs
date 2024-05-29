@@ -80,22 +80,32 @@ impl Term {
     })
   }
 
-  fn linearize_binds_single_match(&mut self, bind_terms: Vec<Term>) {
-    let (used_vars, with, arms) = match self {
-      Term::Mat { arg, bnd: _, with, arms } => {
+  fn linearize_binds_single_match(&mut self, mut bind_terms: Vec<Term>) {
+    let (used_vars, with_bnd, with_arg, arms) = match self {
+      Term::Mat { arg, bnd: _, with_bnd, with_arg, arms } => {
         let vars = arg.free_vars().into_keys().collect::<HashSet<_>>();
         let arms = arms.iter_mut().map(|arm| &mut arm.2).collect::<Vec<_>>();
-        (vars, with, arms)
+        (vars, with_bnd, with_arg, arms)
       }
-      Term::Swt { arg, bnd: _, with, pred: _, arms } => {
+      Term::Swt { arg, bnd: _, with_bnd, with_arg, pred: _, arms } => {
         let vars = arg.free_vars().into_keys().collect::<HashSet<_>>();
         let arms = arms.iter_mut().collect();
-        (vars, with, arms)
+        (vars, with_bnd, with_arg, arms)
       }
       _ => unreachable!(),
     };
 
-    let (non_linearized, linearized) = fixed_and_linearized_terms(used_vars, bind_terms);
+    // Add 'with' args as lets that can be moved
+    for (bnd, arg) in with_bnd.iter().zip(with_arg.iter()) {
+      let term = Term::Let {
+        pat: Box::new(Pattern::Var(bnd.clone())),
+        val: Box::new(arg.clone()),
+        nxt: Box::new(Term::Err),
+      };
+      bind_terms.push(term)
+    }
+
+    let (mut non_linearized, linearized) = fixed_and_linearized_terms(used_vars, bind_terms);
 
     // Add the linearized terms to the arms and recurse
     for arm in arms {
@@ -107,18 +117,31 @@ impl Term {
     let linearized_binds = linearized
       .iter()
       .flat_map(|t| match t {
-        Term::Lam { pat, .. } | Term::Let { pat, .. } => pat.binds().flatten().collect::<Vec<_>>(),
+        Term::Lam { pat, .. } | Term::Let { pat, .. } => pat.binds().flatten().cloned().collect::<Vec<_>>(),
         Term::Use { nam, .. } => {
           if let Some(nam) = nam {
-            vec![nam]
+            vec![nam.clone()]
           } else {
             vec![]
           }
         }
         _ => unreachable!(),
       })
-      .collect::<HashSet<_>>();
-    with.retain(|w| !linearized_binds.contains(w));
+      .collect::<BTreeSet<_>>();
+    update_with_clause(with_bnd, with_arg, &linearized_binds);
+
+    // Remove the non-linearized 'with' binds from the terms that need
+    // to be added back (since we didn't move them).
+    non_linearized.retain(|term| {
+      if let Term::Let { pat, .. } = term {
+        if let Pattern::Var(bnd) = pat.as_ref() {
+          if with_bnd.contains(bnd) {
+            return false;
+          }
+        }
+      }
+      true
+    });
 
     // Add the non-linearized terms back to before the match
     self.wrap_with_bind_terms(non_linearized);
@@ -315,6 +338,24 @@ fn binds_fixed_by_dependency(used_in_arg: HashSet<Name>, bind_terms: &[Term]) ->
   fixed_binds
 }
 
+fn update_with_clause(
+  with_bnd: &mut Vec<Option<Name>>,
+  with_arg: &mut Vec<Term>,
+  vars_to_lift: &BTreeSet<Name>,
+) {
+  let mut to_remove = Vec::new();
+  for i in 0..with_bnd.len() {
+    if let Some(with_bnd) = &with_bnd[i] {
+      if vars_to_lift.contains(with_bnd) {
+        to_remove.push(i);
+      }
+    }
+  }
+  for (removed, to_remove) in to_remove.into_iter().enumerate() {
+    with_bnd.remove(to_remove - removed);
+    with_arg.remove(to_remove - removed);
+  }
+}
 /* Linearize all used vars */
 
 impl Book {
@@ -351,15 +392,17 @@ impl Term {
 /// Obs: This does not modify unscoped variables.
 pub fn lift_match_vars(match_term: &mut Term) -> &mut Term {
   // Collect match arms with binds
-  let arms: Vec<_> = match match_term {
-    Term::Mat { arg: _, bnd: _, with: _, arms: rules } => {
-      rules.iter().map(|(_, binds, body)| (binds.iter().flatten().cloned().collect(), body)).collect()
+  let (with_bnd, with_arg, arms) = match match_term {
+    Term::Mat { arg: _, bnd: _, with_bnd, with_arg, arms: rules } => {
+      let args =
+        rules.iter().map(|(_, binds, body)| (binds.iter().flatten().cloned().collect(), body)).collect();
+      (with_bnd.clone(), with_arg.clone(), args)
     }
-    Term::Swt { arg: _, bnd: _, with: _, pred, arms } => {
+    Term::Swt { arg: _, bnd: _, with_bnd, with_arg, pred, arms } => {
       let (succ, nums) = arms.split_last_mut().unwrap();
       let mut arms = nums.iter().map(|body| (vec![], body)).collect::<Vec<_>>();
       arms.push((vec![pred.clone().unwrap()], succ));
-      arms
+      (with_bnd.clone(), with_arg.clone(), arms)
     }
     _ => unreachable!(),
   };
@@ -380,27 +423,36 @@ pub fn lift_match_vars(match_term: &mut Term) -> &mut Term {
 
   // Add lambdas to the arms
   match match_term {
-    Term::Mat { arg: _, bnd: _, with, arms } => {
-      with.retain(|with| !vars_to_lift.contains(with));
+    Term::Mat { arg: _, bnd: _, with_bnd, with_arg, arms } => {
+      update_with_clause(with_bnd, with_arg, &vars_to_lift);
       for arm in arms {
         let old_body = std::mem::take(&mut arm.2);
-        arm.2 =
-          vars_to_lift.iter().cloned().rfold(old_body, |body, nam| Term::lam(Pattern::Var(Some(nam)), body));
+        arm.2 = Term::rfold_lams(old_body, vars_to_lift.iter().cloned().map(Some));
       }
     }
-    Term::Swt { arg: _, bnd: _, with, pred: _, arms } => {
-      with.retain(|with| !vars_to_lift.contains(with));
+    Term::Swt { arg: _, bnd: _, with_bnd, with_arg, pred: _, arms } => {
+      update_with_clause(with_bnd, with_arg, &vars_to_lift);
       for arm in arms {
         let old_body = std::mem::take(arm);
-        *arm =
-          vars_to_lift.iter().cloned().rfold(old_body, |body, nam| Term::lam(Pattern::Var(Some(nam)), body));
+        *arm = Term::rfold_lams(old_body, vars_to_lift.iter().cloned().map(Some));
       }
     }
     _ => unreachable!(),
   }
 
   // Add apps to the match
-  *match_term = vars_to_lift.into_iter().fold(std::mem::take(match_term), Term::arg_call);
+  let args = vars_to_lift
+    .into_iter()
+    .map(|nam| {
+      if let Some(idx) = with_bnd.iter().position(|x| x == &nam) {
+        with_arg[idx].clone()
+      } else {
+        Term::Var { nam }
+      }
+    })
+    .collect::<Vec<_>>();
+  let term = Term::call(std::mem::take(match_term), args);
+  *match_term = term;
 
   get_match_reference(match_term)
 }
@@ -439,38 +491,23 @@ impl Term {
       }
     });
     match self {
-      Term::Mat { arg: _, bnd: _, with, arms: rules } => {
-        // Linearize the vars in the `with` clause, but only the used ones.
-        let with = retain_used_names(std::mem::take(with), rules.iter().map(|r| &r.2));
-        for rule in rules {
-          rule.2 = with
-            .iter()
-            .rfold(std::mem::take(&mut rule.2), |bod, nam| Term::lam(Pattern::Var(Some(nam.clone())), bod));
+      Term::Mat { arg: _, bnd: _, with_bnd, with_arg, arms } => {
+        for rule in arms {
+          rule.2 = Term::rfold_lams(std::mem::take(&mut rule.2), with_bnd.clone().into_iter());
         }
-        *self = Term::call(std::mem::take(self), with.into_iter().map(|nam| Term::Var { nam }));
+        *with_bnd = vec![];
+        let call_args = std::mem::take(with_arg).into_iter();
+        *self = Term::call(std::mem::take(self), call_args);
       }
-      Term::Swt { arg: _, bnd: _, with, pred: _, arms } => {
-        let with = retain_used_names(std::mem::take(with), arms.iter());
-        for arm in arms {
-          *arm = with
-            .iter()
-            .rfold(std::mem::take(arm), |bod, nam| Term::lam(Pattern::Var(Some(nam.clone())), bod));
+      Term::Swt { arg: _, bnd: _, with_bnd, with_arg, pred: _, arms } => {
+        for rule in arms {
+          *rule = Term::rfold_lams(std::mem::take(rule), with_bnd.clone().into_iter());
         }
-        *self = Term::call(std::mem::take(self), with.into_iter().map(|nam| Term::Var { nam }));
+        *with_bnd = vec![];
+        let call_args = std::mem::take(with_arg).into_iter();
+        *self = Term::call(std::mem::take(self), call_args);
       }
       _ => {}
     }
   }
-}
-
-/// From a Vec of variable names, return the ones that are used inside `terms`.
-fn retain_used_names<'a>(mut names: Vec<Name>, terms: impl IntoIterator<Item = &'a Term>) -> Vec<Name> {
-  let mut used_names = HashSet::new();
-  for term in terms.into_iter() {
-    let mut free_vars = term.free_vars();
-    free_vars.retain(|_, uses| *uses > 0);
-    used_names.extend(free_vars.into_keys());
-  }
-  names.retain(|nam| used_names.contains(nam));
-  names
 }

@@ -30,7 +30,8 @@ impl Term {
             *self = Term::Mat {
               arg: Box::new(Term::Var { nam: var.clone() }),
               bnd: Some(std::mem::take(var)),
-              with: vec![],
+              with_bnd: vec![],
+              with_arg: vec![],
               arms: vec![(Some(ctr.clone()), vec![], std::mem::take(bod))],
             }
           } else {

@@ -64,9 +64,9 @@ impl Stmt {
           nxt.order_kwargs(book)?;
         }
       }
-      Stmt::Bend { bind: _, init, cond, step, base, nxt } => {
-        for init in init {
-          init.order_kwargs(book)?;
+      Stmt::Bend { bnd: _, arg, cond, step, base, nxt } => {
+        for arg in arg {
+          arg.order_kwargs(book)?;
         }
         cond.order_kwargs(book)?;
         step.order_kwargs(book)?;
@@ -126,7 +126,7 @@ impl Expr {
         }
       }
       Expr::Lam { bod, .. } => bod.order_kwargs(book)?,
-      Expr::Bin { lhs, rhs, .. } => {
+      Expr::Opr { lhs, rhs, .. } => {
         lhs.order_kwargs(book)?;
         rhs.order_kwargs(book)?;
       }
@@ -135,14 +135,14 @@ impl Expr {
           el.order_kwargs(book)?;
         }
       }
-      Expr::Comprehension { term, iter, cond, .. } => {
+      Expr::LstMap { term, iter, cond, .. } => {
         term.order_kwargs(book)?;
         iter.order_kwargs(book)?;
         if let Some(cond) = cond {
           cond.order_kwargs(book)?;
         }
       }
-      Expr::Constructor { name, args, kwargs } => match get_args_def_or_ctr(name, book) {
+      Expr::Ctr { name, args, kwargs } => match get_args_def_or_ctr(name, book) {
         Some(names) => {
           go_order_kwargs(&names, args, kwargs)?;
           for arg in args {
@@ -151,13 +151,13 @@ impl Expr {
         }
         _ => return Err(format!("Constructor '{name}' not found.")),
       },
-      Expr::MapInit { entries } => {
+      Expr::Map { entries } => {
         for entry in entries {
           entry.1.order_kwargs(book)?;
         }
       }
       Expr::MapGet { .. }
-      | Expr::Eraser
+      | Expr::Era
       | Expr::Var { .. }
       | Expr::Chn { .. }
       | Expr::Num { .. }

@@ -3,31 +3,31 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/definition_merge.bend
 ---
 Scott
-(Foo) = λa (a λ* λc (c λ* 1 λ* 2) λ* λg (g λ* 3 λ* 3))
+(Foo) = λa (a λb (b λc (c λf (f 1 1) λg (g 2 2)) λh (h λk (k 1 1) λl (l 2 2))) λm (m λn (n λq (q 3 3) λr (r 3 3)) λs (s λv (v 3 3) λw (w 3 3))))
 
 (Either/Left) = λa λb λ* (b a)
 
 (Either/Right) = λa λ* λc (c a)
 
-(Bool/Bool/True) = λa λ* a
+(Bool/True) = λa λ* a
 
-(Bool/Bool/False) = λ* λb b
+(Bool/False) = λ* λb b
 
 NumScott
-(Foo) = λa (a λb switch b { 0: λ* λd (d λe switch e { 0: λ* 1; _: λ* λ* 2; }); _: λ* λ* λi (i λj switch j { 0: λ* 3; _: λ* λ* 3; }); })
+(Foo) = λa (a λb switch b { 0: λc (c λd switch d { 0: λe (e λh switch h { 0: λi (i λj switch j { 0: 1; _: λ* 1; }); _: λ* λk (k λl switch l { 0: 2; _: λ* 2; }); }); _: λ* λm (m λp switch p { 0: λq (q λr switch r { 0: 1; _: λ* 1; }); _: λ* λs (s λt switch t { 0: 2; _: λ* 2; }); }); }); _: λ* λu (u λv switch v { 0: λw (w λz switch z { 0: λab (ab λbb switch bb { 0: 3; _: λ* 3; }); _: λ* λcb (cb λdb switch db { 0: 3; _: λ* 3; }); }); _: λ* λeb (eb λhb switch hb { 0: λib (ib λjb switch jb { 0: 3; _: λ* 3; }); _: λ* λkb (kb λlb switch lb { 0: 3; _: λ* 3; }); }); }); })
 
 (Either/Left) = λa λb (b Either/Left/tag a)
 
 (Either/Right) = λa λb (b Either/Right/tag a)
 
-(Bool/Bool/True) = λa (a Bool/Bool/True/tag)
+(Bool/True) = λa (a Bool/True/tag)
 
-(Bool/Bool/False) = λa (a Bool/Bool/False/tag)
+(Bool/False) = λa (a Bool/False/tag)
 
 (Either/Left/tag) = 0
 
 (Either/Right/tag) = 1
 
-(Bool/Bool/True/tag) = 0
+(Bool/True/tag) = 0
 
-(Bool/Bool/False/tag) = 1
+(Bool/False/tag) = 1

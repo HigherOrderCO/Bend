@@ -236,11 +236,11 @@ impl Term {
           }
         }))
       }
-      Term::Mat { arg, bnd: _, with: _, arms } => {
-        FloatIter::Mat([arg.as_mut()].into_iter().chain(arms.iter_mut().map(|r| &mut r.2)))
-      }
-      Term::Swt { arg, bnd: _, with: _, pred: _, arms } => {
-        FloatIter::Swt([arg.as_mut()].into_iter().chain(arms.iter_mut()))
+      Term::Mat { arg, bnd: _, with_bnd: _, with_arg, arms } => FloatIter::Mat(
+        [arg.as_mut()].into_iter().chain(with_arg.iter_mut()).chain(arms.iter_mut().map(|r| &mut r.2)),
+      ),
+      Term::Swt { arg, bnd: _, with_bnd: _, with_arg, pred: _, arms } => {
+        FloatIter::Swt([arg.as_mut()].into_iter().chain(with_arg.iter_mut()).chain(arms.iter_mut()))
       }
       Term::Fan { els, .. } | Term::List { els } => FloatIter::Vec(els),
       Term::Let { val: fst, nxt: snd, .. }

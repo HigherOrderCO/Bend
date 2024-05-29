@@ -57,31 +57,38 @@ impl Stmt {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Match { bind: _, arg, arms, nxt } | Stmt::Fold { bind: _, arg, arms, with: _, nxt } => {
+      Stmt::Match { bnd: _, arg, with_bnd: _, with_arg, arms, nxt }
+      | Stmt::Fold { bnd: _, arg, arms, with_bnd: _, with_arg, nxt } => {
         for arm in arms.iter_mut() {
           arm.rgt.gen_map_get(id);
         }
         if let Some(nxt) = nxt {
           nxt.gen_map_get(id);
         }
-        let substitutions = arg.substitute_map_gets(id);
+        let mut substitutions = arg.substitute_map_gets(id);
+        for arg in with_arg {
+          substitutions.extend(arg.substitute_map_gets(id));
+        }
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Switch { bind: _, arg, arms, nxt } => {
+      Stmt::Switch { bnd: _, arg, with_bnd: _, with_arg, arms, nxt } => {
         for arm in arms.iter_mut() {
           arm.gen_map_get(id);
         }
         if let Some(nxt) = nxt {
           nxt.gen_map_get(id);
         }
-        let substitutions = arg.substitute_map_gets(id);
+        let mut substitutions = arg.substitute_map_gets(id);
+        for arg in with_arg {
+          substitutions.extend(arg.substitute_map_gets(id));
+        }
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);
         }
       }
-      Stmt::Bend { bind: _, init, cond, step, base, nxt } => {
+      Stmt::Bend { bnd: _, arg: init, cond, step, base, nxt } => {
         step.gen_map_get(id);
         base.gen_map_get(id);
         if let Some(nxt) = nxt {
@@ -146,7 +153,7 @@ impl Expr {
         Expr::Lam { bod, .. } => {
           go(bod, substitutions, id);
         }
-        Expr::Bin { lhs, rhs, .. } => {
+        Expr::Opr { lhs, rhs, .. } => {
           go(lhs, substitutions, id);
           go(rhs, substitutions, id);
         }
@@ -155,24 +162,24 @@ impl Expr {
             go(el, substitutions, id);
           }
         }
-        Expr::Constructor { kwargs, .. } => {
+        Expr::Ctr { kwargs, .. } => {
           for (_, arg) in kwargs.iter_mut() {
             go(arg, substitutions, id);
           }
         }
-        Expr::Comprehension { term, iter, cond, .. } => {
+        Expr::LstMap { term, iter, cond, .. } => {
           go(term, substitutions, id);
           go(iter, substitutions, id);
           if let Some(cond) = cond {
             go(cond, substitutions, id);
           }
         }
-        Expr::MapInit { entries } => {
+        Expr::Map { entries } => {
           for (_, entry) in entries {
             go(entry, substitutions, id);
           }
         }
-        Expr::Eraser | Expr::Str { .. } | Expr::Var { .. } | Expr::Chn { .. } | Expr::Num { .. } => {}
+        Expr::Era | Expr::Str { .. } | Expr::Var { .. } | Expr::Chn { .. } | Expr::Num { .. } => {}
       }
     }
     let mut substitutions = Substitutions::new();

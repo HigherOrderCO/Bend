@@ -112,7 +112,7 @@ impl<'a> PyParser<'a> {
         self.advance_one();
         // Empty map
         if self.try_consume("}") {
-          return Ok(Expr::MapInit { entries: vec![] });
+          return Ok(Expr::Map { entries: vec![] });
         }
         let head = self.parse_expr(false)?;
         self.skip_trivia();
@@ -148,7 +148,7 @@ impl<'a> PyParser<'a> {
       // Era
       '*' => {
         self.advance_one();
-        Expr::Eraser
+        Expr::Era
       }
       // Number
       c if is_num_char(c) => {
@@ -216,7 +216,7 @@ impl<'a> PyParser<'a> {
     if self.starts_with("{") {
       if let Expr::Var { nam } = base {
         let kwargs = self.list_like(|p| p.data_kwarg(), "{", "}", ",", true, 0)?;
-        return Ok(Expr::Constructor { name: nam, args: Vec::new(), kwargs });
+        return Ok(Expr::Ctr { name: nam, args: Vec::new(), kwargs });
       } else {
         return self.expected_spanned("Constructor name", ini_idx, end_idx);
       }
@@ -236,7 +236,7 @@ impl<'a> PyParser<'a> {
     }
     let tail = self.list_like(|p| p.parse_map_entry(), "", "}", ",", true, 0)?;
     entries.extend(tail);
-    Ok(Expr::MapInit { entries })
+    Ok(Expr::Map { entries })
   }
 
   fn parse_sup(&mut self, head: Expr) -> ParseResult<Expr> {
@@ -285,7 +285,7 @@ impl<'a> PyParser<'a> {
         cond = Some(Box::new(self.parse_expr(false)?));
       }
       self.consume("]")?;
-      Ok(Expr::Comprehension { term: Box::new(head), bind, iter: Box::new(iter), cond })
+      Ok(Expr::LstMap { term: Box::new(head), bind, iter: Box::new(iter), cond })
     } else {
       // List
       let mut head = vec![head];
@@ -368,7 +368,7 @@ impl<'a> PyParser<'a> {
         if op.precedence() == prec {
           self.parse_oper()?;
           let rhs = self.parse_infix_expr(prec + 1, inline)?;
-          lhs = Expr::Bin { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
+          lhs = Expr::Opr { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
           self.skip_trivia_inline();
         } else {
           break;
@@ -579,9 +579,9 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_match(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
-    let (bind, arg) = self.parse_match_arg()?;
+    let (bnd, arg) = self.parse_match_arg()?;
     self.skip_trivia_inline();
-    self.consume_exactly(":")?;
+    let (with_bnd, with_arg) = self.parse_with_clause()?;
     self.consume_new_line()?;
     indent.enter_level();
 
@@ -596,10 +596,10 @@ impl<'a> PyParser<'a> {
     indent.exit_level();
     if nxt_indent == *indent {
       let (nxt, nxt_indent) = self.parse_statement(indent)?;
-      let stmt = Stmt::Match { arg: Box::new(arg), bind, arms, nxt: Some(Box::new(nxt)) };
+      let stmt = Stmt::Match { arg: Box::new(arg), bnd, with_bnd, with_arg, arms, nxt: Some(Box::new(nxt)) };
       Ok((stmt, nxt_indent))
     } else {
-      let stmt = Stmt::Match { arg: Box::new(arg), bind, arms, nxt: None };
+      let stmt = Stmt::Match { arg: Box::new(arg), bnd, with_bnd, with_arg, arms, nxt: None };
       Ok((stmt, nxt_indent))
     }
   }
@@ -618,6 +618,28 @@ impl<'a> PyParser<'a> {
       (_, true) => self.expected_spanned("argument name", ini_idx, end_idx),
       (Expr::Var { nam }, false) => Ok((Some(nam.clone()), Expr::Var { nam })),
       (arg, false) => Ok((Some(Name::new("%arg")), arg)),
+    }
+  }
+
+  fn parse_with_clause(&mut self) -> ParseResult<(Vec<Option<Name>>, Vec<Expr>)> {
+    self.skip_trivia_inline();
+    let res = if self.try_parse_keyword("with") {
+      self.list_like(|p| p.parse_with_arg(), "", ":", ",", true, 1)?.into_iter().unzip()
+    } else {
+      self.consume_exactly(":")?;
+      (vec![], vec![])
+    };
+    Ok(res)
+  }
+
+  fn parse_with_arg(&mut self) -> ParseResult<(Option<Name>, Expr)> {
+    let bind = self.parse_bend_name()?;
+    self.skip_trivia_inline();
+    if self.try_consume("=") {
+      let arg = self.parse_expr(false)?;
+      Ok((Some(bind), arg))
+    } else {
+      Ok((Some(bind.clone()), Expr::Var { nam: bind }))
     }
   }
 
@@ -644,9 +666,9 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_switch(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
-    let (bind, arg) = self.parse_match_arg()?;
+    let (bnd, arg) = self.parse_match_arg()?;
     self.skip_trivia_inline();
-    self.consume_exactly(":")?;
+    let (with_bnd, with_arg) = self.parse_with_clause()?;
     indent.enter_level();
 
     self.consume_indent_exactly(*indent)?;
@@ -680,10 +702,10 @@ impl<'a> PyParser<'a> {
     indent.exit_level();
     if nxt_indent == *indent {
       let (nxt, nxt_indent) = self.parse_statement(indent)?;
-      let stmt = Stmt::Switch { arg: Box::new(arg), bind, arms, nxt: Some(Box::new(nxt)) };
+      let stmt = Stmt::Switch { arg: Box::new(arg), bnd, with_bnd, with_arg, arms, nxt: Some(Box::new(nxt)) };
       Ok((stmt, nxt_indent))
     } else {
-      let stmt = Stmt::Switch { arg: Box::new(arg), bind, arms, nxt: None };
+      let stmt = Stmt::Switch { arg: Box::new(arg), bnd, with_bnd, with_arg, arms, nxt: None };
       Ok((stmt, nxt_indent))
     }
   }
@@ -722,22 +744,7 @@ impl<'a> PyParser<'a> {
     // Actually identical to match, except the return
     let (bind, arg) = self.parse_match_arg()?;
     self.skip_trivia_inline();
-    let with = if self.try_parse_keyword("with") {
-      self.skip_trivia_inline();
-      let mut with = vec![];
-      while !self.starts_with(":") {
-        with.push(self.parse_bend_name()?);
-        self.skip_trivia_inline();
-        if !self.starts_with(":") {
-          self.consume_exactly(",")?;
-        }
-        self.skip_trivia_inline();
-      }
-      with
-    } else {
-      vec![]
-    };
-    self.consume_exactly(":")?;
+    let (with_bnd, with_arg) = self.parse_with_clause()?;
     self.consume_new_line()?;
     indent.enter_level();
 
@@ -752,10 +759,11 @@ impl<'a> PyParser<'a> {
     indent.exit_level();
     if nxt_indent == *indent {
       let (nxt, nxt_indent) = self.parse_statement(indent)?;
-      let stmt = Stmt::Fold { arg: Box::new(arg), bind, arms, with, nxt: Some(Box::new(nxt)) };
+      let stmt =
+        Stmt::Fold { arg: Box::new(arg), bnd: bind, arms, with_bnd, with_arg, nxt: Some(Box::new(nxt)) };
       Ok((stmt, nxt_indent))
     } else {
-      let stmt = Stmt::Fold { arg: Box::new(arg), bind, arms, with, nxt: None };
+      let stmt = Stmt::Fold { arg: Box::new(arg), bnd: bind, arms, with_bnd, with_arg, nxt: None };
       Ok((stmt, nxt_indent))
     }
   }
@@ -800,8 +808,8 @@ impl<'a> PyParser<'a> {
     if nxt_indent == *indent {
       let (nxt, nxt_indent) = self.parse_statement(indent)?;
       let stmt = Stmt::Bend {
-        bind,
-        init,
+        bnd: bind,
+        arg: init,
         cond: Box::new(cond),
         step: Box::new(step),
         base: Box::new(base),
@@ -810,8 +818,8 @@ impl<'a> PyParser<'a> {
       Ok((stmt, nxt_indent))
     } else {
       let stmt = Stmt::Bend {
-        bind,
-        init,
+        bnd: bind,
+        arg: init,
         cond: Box::new(cond),
         step: Box::new(step),
         base: Box::new(base),

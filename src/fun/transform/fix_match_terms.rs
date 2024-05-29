@@ -86,7 +86,8 @@ impl Term {
       }
       // Add a use term to each arm rebuilding the matched variable
       match self {
-        Term::Mat { arg: _, bnd, with: _, arms } | Term::Fold { bnd, arg: _, with: _, arms } => {
+        Term::Mat { arg: _, bnd, with_bnd: _, with_arg: _, arms }
+        | Term::Fold { bnd, arg: _, with_bnd: _, with_arg: _, arms } => {
           for (ctr, fields, body) in arms {
             if let Some(ctr) = ctr {
               *body = Term::Use {
@@ -100,7 +101,7 @@ impl Term {
             }
           }
         }
-        Term::Swt { arg: _, bnd, with: _, pred, arms } => {
+        Term::Swt { arg: _, bnd, with_bnd: _, with_arg: _, pred, arms } => {
           let n_nums = arms.len() - 1;
           for (i, arm) in arms.iter_mut().enumerate() {
             let orig = if i == n_nums {
@@ -125,7 +126,9 @@ impl Term {
   }
 
   fn fix_match(&mut self, errs: &mut Vec<FixMatchErr>, ctrs: &Constructors, adts: &Adts) {
-    let (Term::Mat { arg: _, bnd, with: _, arms } | Term::Fold { bnd, arg: _, with: _, arms }) = self else {
+    let (Term::Mat { arg: _, bnd, with_bnd: _, with_arg: _, arms }
+    | Term::Fold { bnd, arg: _, with_bnd: _, with_arg: _, arms }) = self
+    else {
       unreachable!()
     };
     let bnd = bnd.clone().unwrap();

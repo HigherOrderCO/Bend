@@ -48,7 +48,7 @@ impl Term {
         if self.has_unscoped_diff() {
           return Err("Can't have non self-contained unscoped variables in a 'bend'".into());
         }
-        let Term::Bend { bind, init, cond, step, base } = self else { unreachable!() };
+        let Term::Bend { bnd, arg, cond, step, base } = self else { unreachable!() };
 
         let new_nam = Name::new(format!("{}{}{}", def_name, NEW_FN_SEP, fresh));
         *fresh += 1;
@@ -59,8 +59,8 @@ impl Term {
         free_vars.remove(&Name::new(RECURSIVE_KW));
         free_vars.extend(base.free_vars());
         free_vars.extend(cond.free_vars());
-        for bind in bind.iter().flatten() {
-          free_vars.remove(bind);
+        for bnd in bnd.iter().flatten() {
+          free_vars.remove(bnd);
         }
         let free_vars = free_vars.into_keys().collect::<Vec<_>>();
 
@@ -78,11 +78,12 @@ impl Term {
         let body = Term::Swt {
           arg: Box::new(std::mem::take(cond)),
           bnd: Some(Name::new("_")),
-          with: vec![],
+          with_bnd: vec![],
+          with_arg: vec![],
           pred: Some(Name::new("_-1")),
           arms: vec![std::mem::take(base.as_mut()), step],
         };
-        let body = Term::rfold_lams(body, std::mem::take(bind).into_iter());
+        let body = Term::rfold_lams(body, std::mem::take(bnd).into_iter());
         let body = Term::rfold_lams(body, free_vars.iter().cloned().map(Some));
 
         // Make a definition from the new function
@@ -93,7 +94,7 @@ impl Term {
         // Call the new function in the original term.
         let call =
           Term::call(Term::Ref { nam: new_nam }, free_vars.iter().map(|v| Term::Var { nam: v.clone() }));
-        *self = Term::call(call, init.drain(..));
+        *self = Term::call(call, arg.drain(..));
       }
 
       Ok(())

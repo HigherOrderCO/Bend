@@ -130,28 +130,31 @@ pub enum Term {
   },
   /// Pattern matching on an ADT.
   Mat {
-    arg: Box<Term>,
     bnd: Option<Name>,
-    with: Vec<Name>,
+    arg: Box<Term>,
+    with_bnd: Vec<Option<Name>>,
+    with_arg: Vec<Term>,
     arms: Vec<MatchRule>,
   },
   /// Native pattern matching on numbers
   Swt {
-    arg: Box<Term>,
     bnd: Option<Name>,
-    with: Vec<Name>,
+    arg: Box<Term>,
+    with_bnd: Vec<Option<Name>>,
+    with_arg: Vec<Term>,
     pred: Option<Name>,
     arms: Vec<Term>,
   },
   Fold {
     bnd: Option<Name>,
     arg: Box<Term>,
-    with: Vec<Name>,
+    with_bnd: Vec<Option<Name>>,
+    with_arg: Vec<Term>,
     arms: Vec<MatchRule>,
   },
   Bend {
-    bind: Vec<Option<Name>>,
-    init: Vec<Term>,
+    bnd: Vec<Option<Name>>,
+    arg: Vec<Term>,
     cond: Box<Term>,
     step: Box<Term>,
     base: Box<Term>,
@@ -326,22 +329,31 @@ impl Clone for Term {
       Self::Str { val } => Self::Str { val: val.clone() },
       Self::List { els } => Self::List { els: els.clone() },
       Self::Oper { opr, fst, snd } => Self::Oper { opr: *opr, fst: fst.clone(), snd: snd.clone() },
-      Self::Mat { arg, bnd, with, arms } => {
-        Self::Mat { arg: arg.clone(), bnd: bnd.clone(), with: with.clone(), arms: arms.clone() }
-      }
-      Self::Swt { arg, bnd, with, pred, arms } => Self::Swt {
+      Self::Mat { arg, bnd, with_bnd, with_arg, arms } => Self::Mat {
         arg: arg.clone(),
         bnd: bnd.clone(),
-        with: with.clone(),
+        with_bnd: with_bnd.clone(),
+        with_arg: with_arg.clone(),
+        arms: arms.clone(),
+      },
+      Self::Swt { arg, bnd, with_bnd, with_arg, pred, arms } => Self::Swt {
+        arg: arg.clone(),
+        bnd: bnd.clone(),
+        with_bnd: with_bnd.clone(),
+        with_arg: with_arg.clone(),
         pred: pred.clone(),
         arms: arms.clone(),
       },
-      Self::Fold { bnd, arg, with, arms } => {
-        Self::Fold { bnd: bnd.clone(), arg: arg.clone(), with: with.clone(), arms: arms.clone() }
-      }
-      Self::Bend { bind, init, cond, step, base } => Self::Bend {
-        bind: bind.clone(),
-        init: init.clone(),
+      Self::Fold { bnd, arg, with_bnd, with_arg, arms } => Self::Fold {
+        bnd: bnd.clone(),
+        arg: arg.clone(),
+        with_bnd: with_bnd.clone(),
+        with_arg: with_arg.clone(),
+        arms: arms.clone(),
+      },
+      Self::Bend { bnd: bind, arg: init, cond, step, base } => Self::Bend {
+        bnd: bind.clone(),
+        arg: init.clone(),
         cond: cond.clone(),
         step: step.clone(),
         base: base.clone(),
@@ -412,6 +424,8 @@ impl Term {
   }
 
   /// Wraps a term in lambdas, so that the outermost lambda is the first given element.
+  ///
+  /// The lambda equivalent of [`Term::call`].
   pub fn rfold_lams(term: Term, pats: impl DoubleEndedIterator<Item = Option<Name>>) -> Self {
     pats.into_iter().rfold(term, |bod, nam| Self::lam(Pattern::Var(nam), bod))
   }
@@ -488,17 +502,17 @@ impl Term {
   pub fn children(&self) -> impl DoubleEndedIterator<Item = &Term> + Clone {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt, Bend, Fold });
     match self {
-      Term::Mat { arg, bnd: _, with: _, arms } => {
-        ChildrenIter::Mat([arg.as_ref()].into_iter().chain(arms.iter().map(|r| &r.2)))
+      Term::Mat { arg, bnd: _, with_bnd: _, with_arg, arms } => {
+        ChildrenIter::Mat([arg.as_ref()].into_iter().chain(with_arg.iter()).chain(arms.iter().map(|r| &r.2)))
       }
-      Term::Swt { arg, bnd: _, with: _, pred: _, arms } => {
-        ChildrenIter::Swt([arg.as_ref()].into_iter().chain(arms))
+      Term::Swt { arg, bnd: _, with_bnd: _, with_arg, pred: _, arms } => {
+        ChildrenIter::Swt([arg.as_ref()].into_iter().chain(with_arg.iter()).chain(arms))
       }
-      Term::Bend { bind: _, init, cond, step, base } => {
+      Term::Bend { bnd: _, arg: init, cond, step, base } => {
         ChildrenIter::Bend(init.iter().chain([cond.as_ref(), step.as_ref(), base.as_ref()]))
       }
-      Term::Fold { bnd: _, arg, with: _, arms } => {
-        ChildrenIter::Fold([arg.as_ref()].into_iter().chain(arms.iter().map(|r| &r.2)))
+      Term::Fold { bnd: _, arg, with_bnd: _, with_arg, arms } => {
+        ChildrenIter::Fold([arg.as_ref()].into_iter().chain(with_arg.iter()).chain(arms.iter().map(|r| &r.2)))
       }
       Term::Fan { els, .. } | Term::List { els } => ChildrenIter::Vec(els),
       Term::Let { val: fst, nxt: snd, .. }
@@ -523,18 +537,18 @@ impl Term {
   pub fn children_mut(&mut self) -> impl DoubleEndedIterator<Item = &mut Term> {
     multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt, Bend, Fold });
     match self {
-      Term::Mat { arg, bnd: _, with: _, arms } => {
-        ChildrenIter::Mat([arg.as_mut()].into_iter().chain(arms.iter_mut().map(|r| &mut r.2)))
+      Term::Mat { arg, bnd: _, with_bnd: _, with_arg, arms } => ChildrenIter::Mat(
+        [arg.as_mut()].into_iter().chain(with_arg.iter_mut()).chain(arms.iter_mut().map(|r| &mut r.2)),
+      ),
+      Term::Swt { arg, bnd: _, with_bnd: _, with_arg, pred: _, arms } => {
+        ChildrenIter::Swt([arg.as_mut()].into_iter().chain(with_arg.iter_mut()).chain(arms))
       }
-      Term::Swt { arg, bnd: _, with: _, pred: _, arms } => {
-        ChildrenIter::Swt([arg.as_mut()].into_iter().chain(arms))
-      }
-      Term::Bend { bind: _, init, cond, step, base } => {
+      Term::Bend { bnd: _, arg: init, cond, step, base } => {
         ChildrenIter::Bend(init.iter_mut().chain([cond.as_mut(), step.as_mut(), base.as_mut()]))
       }
-      Term::Fold { bnd: _, arg, with: _, arms } => {
-        ChildrenIter::Fold([arg.as_mut()].into_iter().chain(arms.iter_mut().map(|r| &mut r.2)))
-      }
+      Term::Fold { bnd: _, arg, with_bnd: _, with_arg, arms } => ChildrenIter::Fold(
+        [arg.as_mut()].into_iter().chain(with_arg.iter_mut()).chain(arms.iter_mut().map(|r| &mut r.2)),
+      ),
       Term::Fan { els, .. } | Term::List { els } => ChildrenIter::Vec(els),
       Term::Let { val: fst, nxt: snd, .. }
       | Term::Ask { val: fst, nxt: snd, .. }
@@ -567,35 +581,36 @@ impl Term {
     &self,
   ) -> impl DoubleEndedIterator<Item = (&Term, impl DoubleEndedIterator<Item = &Option<Name>> + Clone)> + Clone
   {
-    multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt, Bend, Fold });
-    multi_iterator!(BindsIter { Zero, One, Mat, Pat, Bend });
+    multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt, Bend });
+    multi_iterator!(BindsIter { Zero, One, Mat, Pat, SwtNum, SwtSucc, Bend });
     match self {
-      Term::Mat { arg, bnd: _, with: _, arms } => ChildrenIter::Mat(
-        [(arg.as_ref(), BindsIter::Zero([]))]
-          .into_iter()
-          .chain(arms.iter().map(move |r| (&r.2, BindsIter::Mat(r.1.iter())))),
-      ),
-      Term::Swt { arg, bnd: _, with: _, pred, arms } => {
+      Term::Mat { arg, bnd, with_bnd, with_arg, arms }
+      | Term::Fold { bnd, arg, with_bnd, with_arg, arms } => {
+        let arg = [(arg.as_ref(), BindsIter::Zero([]))].into_iter();
+        let with_arg = with_arg.iter().map(|a| (a, BindsIter::Zero([])));
+        let arms = arms
+          .iter()
+          .map(move |r| (&r.2, BindsIter::Mat([bnd].into_iter().chain(r.1.iter()).chain(with_bnd.iter()))));
+        ChildrenIter::Mat(arg.chain(with_arg).chain(arms))
+      }
+      Term::Swt { arg, bnd, with_bnd, with_arg, pred, arms } => {
         let (succ, nums) = arms.split_last().unwrap();
         ChildrenIter::Swt(
           [(arg.as_ref(), BindsIter::Zero([]))]
             .into_iter()
-            .chain(nums.iter().map(move |x| (x, BindsIter::Zero([]))))
-            .chain([(succ, BindsIter::One([pred]))]),
+            .chain(with_arg.iter().map(|a| (a, BindsIter::Zero([]))))
+            .chain(nums.iter().map(move |x| (x, BindsIter::SwtNum([bnd].into_iter().chain(with_bnd.iter())))))
+            .chain([(succ, BindsIter::SwtSucc([bnd, pred].into_iter().chain(with_bnd.iter())))]),
         )
       }
-      Term::Bend { bind, init, cond, step, base } => {
+      Term::Bend { bnd: bind, arg: init, cond, step, base } => {
         ChildrenIter::Bend(init.iter().map(|x| (x, BindsIter::Zero([]))).chain([
           (cond.as_ref(), BindsIter::Bend(bind.iter())),
           (step.as_ref(), BindsIter::Bend(bind.iter())),
           (base.as_ref(), BindsIter::Bend(bind.iter())),
         ]))
       }
-      Term::Fold { bnd: _, arg, with: _, arms } => ChildrenIter::Fold(
-        [(arg.as_ref(), BindsIter::Zero([]))]
-          .into_iter()
-          .chain(arms.iter().map(move |r| (&r.2, BindsIter::Mat(r.1.iter())))),
-      ),
+
       Term::Fan { els, .. } | Term::List { els } => {
         ChildrenIter::Vec(els.iter().map(|el| (el, BindsIter::Zero([]))))
       }
@@ -627,35 +642,38 @@ impl Term {
     &mut self,
   ) -> impl DoubleEndedIterator<Item = (&mut Term, impl DoubleEndedIterator<Item = &Option<Name>> + Clone)>
   {
-    multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt, Bend, Fold });
-    multi_iterator!(BindsIter { Zero, One, Mat, Pat, Bend });
+    multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt, Bend });
+    multi_iterator!(BindsIter { Zero, One, Mat, SwtNum, SwtSucc, Pat, Bend });
     match self {
-      Term::Mat { arg, bnd: _, with: _, arms: rules } => ChildrenIter::Mat(
-        [(arg.as_mut(), BindsIter::Zero([]))]
-          .into_iter()
-          .chain(rules.iter_mut().map(move |r| (&mut r.2, BindsIter::Mat(r.1.iter())))),
-      ),
-      Term::Swt { arg, bnd: _, with: _, pred, arms: rules } => {
-        let (succ, nums) = rules.split_last_mut().unwrap();
+      Term::Mat { arg, bnd, with_bnd, with_arg, arms }
+      | Term::Fold { bnd, arg, with_bnd, with_arg, arms } => {
+        let arg = [(arg.as_mut(), BindsIter::Zero([]))].into_iter();
+        let with_arg = with_arg.iter_mut().map(|a| (a, BindsIter::Zero([])));
+        let arms = arms
+          .iter_mut()
+          .map(|r| (&mut r.2, BindsIter::Mat([&*bnd].into_iter().chain(r.1.iter()).chain(with_bnd.iter()))));
+        ChildrenIter::Mat(arg.chain(with_arg).chain(arms))
+      }
+      Term::Swt { arg, bnd, with_bnd, with_arg, pred, arms } => {
+        let (succ, nums) = arms.split_last_mut().unwrap();
         ChildrenIter::Swt(
           [(arg.as_mut(), BindsIter::Zero([]))]
             .into_iter()
-            .chain(nums.iter_mut().map(move |x| (x, BindsIter::Zero([]))))
-            .chain([(succ, BindsIter::One([&*pred]))]),
+            .chain(with_arg.iter_mut().map(|a| (a, BindsIter::Zero([]))))
+            .chain(
+              nums.iter_mut().map(|x| (x, BindsIter::SwtNum([&*bnd].into_iter().chain(with_bnd.iter())))),
+            )
+            .chain([(succ, BindsIter::SwtSucc([&*bnd, &*pred].into_iter().chain(with_bnd.iter())))]),
         )
       }
-      Term::Bend { bind, init, cond, step, base } => {
-        ChildrenIter::Bend(init.iter_mut().map(|x| (x, BindsIter::Zero([]))).chain([
-          (cond.as_mut(), BindsIter::Bend(bind.iter())),
-          (step.as_mut(), BindsIter::Bend(bind.iter())),
-          (base.as_mut(), BindsIter::Bend(bind.iter())),
+      Term::Bend { bnd, arg, cond, step, base } => {
+        ChildrenIter::Bend(arg.iter_mut().map(|x| (x, BindsIter::Zero([]))).chain([
+          (cond.as_mut(), BindsIter::Bend(bnd.iter())),
+          (step.as_mut(), BindsIter::Bend(bnd.iter())),
+          (base.as_mut(), BindsIter::Bend(bnd.iter())),
         ]))
       }
-      Term::Fold { bnd: _, arg, with: _, arms } => ChildrenIter::Fold(
-        [(arg.as_mut(), BindsIter::Zero([]))]
-          .into_iter()
-          .chain(arms.iter_mut().map(move |r| (&mut r.2, BindsIter::Mat(r.1.iter())))),
-      ),
+
       Term::Fan { els, .. } | Term::List { els } => {
         ChildrenIter::Vec(els.iter_mut().map(|el| (el, BindsIter::Zero([]))))
       }
@@ -681,63 +699,6 @@ impl Term {
       Term::Open { .. } => unreachable!("Open should be removed in earlier pass"),
     }
   }
-
-  /// Must only be called after fix_matches.
-  pub fn children_mut_with_binds_mut(
-    &mut self,
-  ) -> impl DoubleEndedIterator<Item = (&mut Term, impl DoubleEndedIterator<Item = &mut Option<Name>>)> {
-    multi_iterator!(ChildrenIter { Zero, One, Two, Vec, Mat, Swt, Fold });
-    multi_iterator!(BindsIter { Zero, One, Mat, Pat });
-    match self {
-      Term::Mat { arg, bnd: _, with: _, arms: rules } => ChildrenIter::Mat(
-        [(arg.as_mut(), BindsIter::Zero([]))]
-          .into_iter()
-          .chain(rules.iter_mut().map(move |r| (&mut r.2, BindsIter::Mat(r.1.iter_mut())))),
-      ),
-      Term::Swt { arg, bnd: _, with: _, pred, arms: rules } => {
-        let (succ, nums) = rules.split_last_mut().unwrap();
-        ChildrenIter::Swt(
-          [(arg.as_mut(), BindsIter::Zero([]))]
-            .into_iter()
-            .chain(nums.iter_mut().map(move |x| (x, BindsIter::Zero([]))))
-            .chain([(succ, BindsIter::One([pred]))]),
-        )
-      }
-      Term::Bend { .. } => {
-        unreachable!("Term::Bend can't implement children_mut_with_binds_mut")
-      }
-      Term::Fold { bnd: _, arg, with: _, arms } => ChildrenIter::Fold(
-        [(arg.as_mut(), BindsIter::Zero([]))]
-          .into_iter()
-          .chain(arms.iter_mut().map(move |r| (&mut r.2, BindsIter::Mat(r.1.iter_mut())))),
-      ),
-      Term::Fan { els, .. } | Term::List { els } => {
-        ChildrenIter::Vec(els.iter_mut().map(|el| (el, BindsIter::Zero([]))))
-      }
-      Term::Use { nam, val, nxt } => {
-        ChildrenIter::Two([(val.as_mut(), BindsIter::Zero([])), (nxt.as_mut(), BindsIter::One([nam]))])
-      }
-      Term::Let { pat, val, nxt, .. } | Term::Ask { pat, val, nxt, .. } => ChildrenIter::Two([
-        (val.as_mut(), BindsIter::Zero([])),
-        (nxt.as_mut(), BindsIter::Pat(pat.binds_mut())),
-      ]),
-      Term::App { fun: fst, arg: snd, .. } | Term::Oper { fst, snd, .. } => {
-        ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
-      }
-      Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds_mut()))]),
-      Term::With { bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Zero([]))]),
-      Term::Var { .. }
-      | Term::Link { .. }
-      | Term::Num { .. }
-      | Term::Nat { .. }
-      | Term::Str { .. }
-      | Term::Ref { .. }
-      | Term::Era
-      | Term::Err => ChildrenIter::Zero([]),
-      Term::Open { .. } => unreachable!("Open should be removed in earlier pass"),
-    }
-  }
-
   /* Common checks and transformations */
 
   /// Substitute the occurrences of a variable in a term with the given term.

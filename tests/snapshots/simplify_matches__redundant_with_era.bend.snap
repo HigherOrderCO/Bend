@@ -2,6 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/redundant_with_era.bend
 ---
-(Fn2) = λa switch a { 0: λb let (c, d) = b; let (e, f) = d; f; _ g: λh let (i, j) = h; let (k, l) = j; l; }
+(Fn2) = λa switch a { 0: λb let c = b; let (d, e) = c; let (f, g) = e; g; _ h: λi let j = i; let (k, l) = j; let (m, n) = l; n; }
 
 (main) = *
