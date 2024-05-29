@@ -111,27 +111,10 @@ List/pop_front = @l
 
 # List pop_back:
 # List l -> List l
-# removes the first item from the back of list l.
-List/pop_back/aux = @acc @l
-  match l {
-    List/Nil: List/Nil
-    List/Cons: 
-      use x = switch acc {
-        0: *
-        _: l.head
-      }
-      use y = switch acc {
-        0: List/Nil
-        1: List/Nil
-        _: l.tail
-      }
-      (List/Cons x (List/pop_back/aux (- acc 1) y))
-  }
-List/pop_back = @l
-  switch (- (List/len l) 1) {
-    0: []
-    _:  (List/pop_back/aux (- (List/len l) 1) l)
-  }
+# removes and discards the the last item of the list
+List/pop_back (List/Nil) = List/Nil
+List/pop_back (List/Cons x List/Nil) = List/Nil
+List/pop_back (List/Cons head tail) = (List/Cons head (List/pop_back tail))
   
 # List remove:
 # List l -> Some s -> List l 
