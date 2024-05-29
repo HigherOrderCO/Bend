@@ -75,6 +75,6 @@ def sup():
   return x
 
 def main():
-  do IO:
+  with IO:
     x <- IO.read();
     return x;

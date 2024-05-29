@@ -85,7 +85,7 @@ pub enum Term {
     val: Box<Term>,
     nxt: Box<Term>,
   },
-  Do {
+  With {
     typ: Name,
     bod: Box<Term>,
   },
@@ -316,7 +316,7 @@ impl Clone for Term {
       Self::Var { nam } => Self::Var { nam: nam.clone() },
       Self::Link { nam } => Self::Link { nam: nam.clone() },
       Self::Let { pat, val, nxt } => Self::Let { pat: pat.clone(), val: val.clone(), nxt: nxt.clone() },
-      Self::Do { typ, bod } => Self::Do { typ: typ.clone(), bod: bod.clone() },
+      Self::With { typ, bod } => Self::With { typ: typ.clone(), bod: bod.clone() },
       Self::Ask { pat, val, nxt } => Self::Ask { pat: pat.clone(), val: val.clone(), nxt: nxt.clone() },
       Self::Use { nam, val, nxt } => Self::Use { nam: nam.clone(), val: val.clone(), nxt: nxt.clone() },
       Self::App { tag, fun, arg } => Self::App { tag: tag.clone(), fun: fun.clone(), arg: arg.clone() },
@@ -506,7 +506,7 @@ impl Term {
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
       | Term::Oper { fst, snd, .. } => ChildrenIter::Two([fst.as_ref(), snd.as_ref()]),
-      Term::Lam { bod, .. } | Term::Do { bod, .. } | Term::Open { bod, .. } => {
+      Term::Lam { bod, .. } | Term::With { bod, .. } | Term::Open { bod, .. } => {
         ChildrenIter::One([bod.as_ref()])
       }
       Term::Var { .. }
@@ -541,7 +541,7 @@ impl Term {
       | Term::Use { val: fst, nxt: snd, .. }
       | Term::App { fun: fst, arg: snd, .. }
       | Term::Oper { fst, snd, .. } => ChildrenIter::Two([fst.as_mut(), snd.as_mut()]),
-      Term::Lam { bod, .. } | Term::Do { bod, .. } | Term::Open { bod, .. } => {
+      Term::Lam { bod, .. } | Term::With { bod, .. } | Term::Open { bod, .. } => {
         ChildrenIter::One([bod.as_mut()])
       }
       Term::Var { .. }
@@ -609,7 +609,7 @@ impl Term {
         ChildrenIter::Two([(fst.as_ref(), BindsIter::Zero([])), (snd.as_ref(), BindsIter::Zero([]))])
       }
       Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_ref(), BindsIter::Pat(pat.binds()))]),
-      Term::Do { bod, .. } => ChildrenIter::One([(bod.as_ref(), BindsIter::Zero([]))]),
+      Term::With { bod, .. } => ChildrenIter::One([(bod.as_ref(), BindsIter::Zero([]))]),
       Term::Var { .. }
       | Term::Link { .. }
       | Term::Num { .. }
@@ -669,7 +669,7 @@ impl Term {
         ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
       }
       Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds()))]),
-      Term::Do { bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Zero([]))]),
+      Term::With { bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Zero([]))]),
       Term::Var { .. }
       | Term::Link { .. }
       | Term::Num { .. }
@@ -725,7 +725,7 @@ impl Term {
         ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
       }
       Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds_mut()))]),
-      Term::Do { bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Zero([]))]),
+      Term::With { bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Zero([]))]),
       Term::Var { .. }
       | Term::Link { .. }
       | Term::Num { .. }

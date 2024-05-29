@@ -25,7 +25,7 @@ use TSPL::Parser;
 // <Group>      ::= "(" <Term> ")"
 // <Use>        ::= "use" <Name> "=" <Term> ";"? <Term>
 // <Let>        ::= "let" <NameEra> "=" <Term> ";"? <Term>
-// <Bind>       ::= "do" <Name> "{" <Ask> "}"
+// <Bind>       ::= "with" <Name> "{" <Ask> "}"
 // <Ask>        ::= "ask" <Pattern> "=" <Term> ";" <Term> | <Term>
 // <LetTup>     ::= "let" "(" <NameEra> ("," <NameEra>)+ ")" "=" <Term> ";"? <Term>
 // <Dup>        ::= "let" <Tag>? "{" <NameEra> (","? <NameEra>)+ "}" "=" <Term> ";"? <Term>
@@ -523,14 +523,14 @@ impl<'a> TermParser<'a> {
         return Ok(Term::Swt { arg: Box::new(arg), bnd, with, pred, arms });
       }
 
-      // Do (monadic block)
-      if self.try_parse_keyword("do") {
+      // With (monadic block)
+      if self.try_parse_keyword("with") {
         unexpected_tag(self)?;
         let typ = self.parse_name()?;
         self.consume("{")?;
         let bod = self.parse_term()?;
         self.consume("}")?;
-        return Ok(Term::Do { typ: Name::new(typ), bod: Box::new(bod) });
+        return Ok(Term::With { typ: Name::new(typ), bod: Box::new(bod) });
       }
 
       // Fold

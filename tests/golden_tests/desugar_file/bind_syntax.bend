@@ -13,7 +13,7 @@ safe_rem a b = switch b {
   _: (Result/Ok (% a b))
 }
 
-Main = do Result {
+Main = with Result {
   ask y = (safe_div 3 2)
   ask x = (safe_rem y 0);
   x

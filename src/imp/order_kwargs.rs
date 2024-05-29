@@ -75,7 +75,7 @@ impl Stmt {
           nxt.order_kwargs(book)?;
         }
       }
-      Stmt::Do { typ: _, bod, nxt } => {
+      Stmt::With { typ: _, bod, nxt } => {
         bod.order_kwargs(book)?;
         if let Some(nxt) = nxt {
           nxt.order_kwargs(book)?;
