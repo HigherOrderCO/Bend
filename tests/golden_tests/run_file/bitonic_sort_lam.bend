@@ -1,4 +1,4 @@
-# data Tree = (Leaf x) | (Node x0 x1)
+# type Tree = (Leaf x) | (Node x0 x1)
 Leaf = λx      λl λn (l x)
 Node = λx0 λx1 λl λn (n x0 x1)
 

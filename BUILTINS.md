@@ -5,7 +5,7 @@
 
 ## String
 ```python
-data String = (Cons head ~tail) | (Nil)
+type String = (Cons head ~tail) | (Nil)
 ```
 
 
@@ -23,7 +23,7 @@ A String literal is surrounded with `"`. Accepts the same values as characters l
  
 ## List
 ```python
-data List = (Cons head ~tail) | (Nil)
+type List = (Cons head ~tail) | (Nil)
 ```
 
 - **Nil**: Represents an empty list.
@@ -41,7 +41,7 @@ A List of values can be written using `[ ]`, it can have multiple values inside,
  
 ## Nat
 ```python
-data Nat = (Succ ~pred) | (Zero)
+type Nat = (Succ ~pred) | (Zero)
 ```
 - **Succ ~pred**: Represents a natural number successor.
 - **Zero**: Represents the natural number zero.
@@ -57,7 +57,7 @@ A Natural Number can be written with literals with a `#` before the literal numb
 
 ## Result
 ```python
-data Result = (Ok val) | (Err val)
+type Result = (Ok val) | (Err val)
 ```
 
 - **Ok val**: Represents a successful result with value `val`.
@@ -65,7 +65,7 @@ data Result = (Ok val) | (Err val)
 
 ## Map
 ```python
-data Map = (Node value ~left ~right) | (Leaf)
+type Map = (Node value ~left ~right) | (Leaf)
 ```
 
 - **Node value ~left ~right**: Represents a map node with a `value` and `left` and `right` subtrees.

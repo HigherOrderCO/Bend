@@ -153,7 +153,7 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_datatype(&mut self, builtin: bool) -> ParseResult<(Name, Adt)> {
-    // data name = ctr (| ctr)*
+    // type name = ctr (| ctr)*
     self.skip_trivia();
     let name = self.labelled(|p| p.parse_top_level_name(), "datatype name")?;
     self.consume("=")?;
