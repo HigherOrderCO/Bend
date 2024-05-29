@@ -13,8 +13,7 @@
 
 # List clear:
 # List l -> list l
-# clears all elements from list l.
-# (this might be completely useless...)
+# clears all elements from list l. This is equivalent to initializing an empty list.
 List/clear = @l
   []
 
@@ -44,7 +43,7 @@ List/append = @l @e
 
 # list sum:
 # List l -> uint
-# returns the sum of all items in the list 
+# returns the sum of all items in the list. 
 List/sum = @l
   match l {
     List/Cons: (+ l.head (List/sum l.tail))
@@ -73,7 +72,7 @@ List/len = @l
 
 # List count:
 # List l -> uint -> uint
-# returns the number of instances of uint s in list l.
+# returns the number of instances of Some s in list l.
 List/count/aux = @acc @l @s
   match l {
     List/Nil: acc
@@ -94,24 +93,33 @@ List/index = @l @i
     List/Cons: 
       switch i {
         0: l.head
-        _: (List/index l.tail (- i 1))
+        _: (List/index l.tail (i-1))
       }
     List/Nil: *
   }
 
+# List head:
+# List l -> Some s
+# returns the first item in the list, or [] if the list is empty.
+List/head = @l
+  match l {
+    List/Cons: l.head
+    List/Nil: []
+  }
+
 # List pop_front: 
-# List l -> (List l, Some s)
-# removes the first item from the front of list l, or [] if the list is empty.
-# Both the popped element and the new list are returned.
+# List l -> List l
+# removes and discards the first item of list l.
+# The new list is returned, or [] if the list is empty.
 List/pop_front = @l
   match l {
-    List/Cons: (l.head, l.tail) 
+    List/Cons: l.tail
     List/Nil: []
   }
 
 # List pop_back:
 # List l -> List l
-# removes and discards the the last item of the list
+# removes and discards the the last item of list l.
 List/pop_back (List/Nil) = List/Nil
 List/pop_back (List/Cons x List/Nil) = List/Nil
 List/pop_back (List/Cons head tail) = (List/Cons head (List/pop_back tail))
@@ -147,16 +155,18 @@ List/split = @l @i
 
 #################################
 
-#main = (List/sum [1, 2, 3])
-#main = (List/split [1, 2, 3, 4, 5, 6, 7] 3)
-#main = (List/remove [1, 2, 1, 3] 1)
-#main = (List/pop_back [])
-#main = (List/pop_front [1, 2, 3])
-#main = (List/index [1, 2, 3, 4, 5] 4)
-#main = (List/clear [0, 2, 3])
-#main = (List/count [1, 2, 3, 3, 3, 4, 4, 5, 3, 1000] 3)
-#main = (List/len [1, 2, 3, 4, 4, 4])
-#main = (List/reverse [1, 2, 3, 4, 5])
-#main = (List/append [1, 2] 3)
-#main = (List/add_front [2, 3] 1)
-#main = (List/concat [1, 2] [3, 4])
+def main:
+  return List/head([5, 4, 3, 2, 1])
+#  return List/sum([1, 2, 3])
+#  return List/split([1, 2, 3, 4, 5, 6, 7], 3)
+#  return List/remove([1, 2, 1, 3], 1)
+#  return List/pop_back([1, 2, 3, 4])
+#  return List/pop_front([1, 2, 3])
+#  return List/index([5, 3, 6, 8, 2], 0)
+#  return List/clear([0, 2, 3])
+#  return List/count([1, 2, 3, 3, 3, 4, 4, 5, 3, 1000], 4)
+#  return List/len([1, 2, 3, 4, 4, 4])
+#  return List/reverse([1, 2, 3, 4, 5])
+#  return List/append([1, 2], 3)
+#  return List/add_front([2, 3], 1)
+#  return List/concat([1, 2], [3, 4])
