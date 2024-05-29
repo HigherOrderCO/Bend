@@ -151,7 +151,7 @@ impl UniqueNameGenerator {
         self.unique_names_in_term(fst);
         self.unique_names_in_term(snd);
       }
-      Term::Do { typ: _, bod } => {
+      Term::With { typ: _, bod } => {
         self.unique_names_in_term(bod);
       }
       Term::Link { .. }

@@ -155,7 +155,7 @@ impl Term {
         ChildrenIter::Two([(fst.as_mut(), BindsIter::Zero([])), (snd.as_mut(), BindsIter::Zero([]))])
       }
       Term::Lam { pat, bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Pat(pat.binds_mut()))]),
-      Term::Do { bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Zero([]))]),
+      Term::With { bod, .. } => ChildrenIter::One([(bod.as_mut(), BindsIter::Zero([]))]),
       Term::Var { .. }
       | Term::Link { .. }
       | Term::Num { .. }
