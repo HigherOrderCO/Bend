@@ -6,7 +6,7 @@ use crate::{
 use std::collections::HashSet;
 
 impl Ctx<'_> {
-  /// Converts `ask` terms inside `do` blocks into calls to a monadic bind operation.
+  /// Converts `ask` terms inside `with` blocks into calls to a monadic bind operation.
   pub fn desugar_with_blocks(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
