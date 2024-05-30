@@ -147,7 +147,7 @@ The operations are:
 - Bit Xor `^=`
 - Mapper `@=`
 
-The mapper in-place operation applies a function and re-assings the variable:
+The mapper in-place operation applies a function and re-assigns the variable:
 
 ```python
 x = "hello"
