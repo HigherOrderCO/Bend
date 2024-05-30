@@ -205,7 +205,7 @@ fn run_lazy() {
 }
 
 #[test]
-fn readback_lnet() {
+fn readback_hvm() {
   run_golden_test_dir(function_name!(), &|code, _| {
     let mut p = hvm::ast::CoreParser::new(code);
     let net = p.parse_net()?;

@@ -1,9 +1,9 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/readback_lnet/addition.bend
+input_file: tests/golden_tests/readback_hvm/invalid_op2_op2.bend
 ---
 [4m[1m[33mWarnings:[0m
 [1mDuring readback:[0m
   Encountered an invalid numeric operation.
 
-<Invalid>
+λa <Invalid>

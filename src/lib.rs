@@ -65,7 +65,7 @@ pub fn compile_book(
   }
 
   if opts.prune {
-    let prune_entrypoints = vec![book.hvmc_entrypoint().to_string()];
+    let prune_entrypoints = vec![book.hvm_entrypoint().to_string()];
     prune_hvm_book(&mut hvm_book, &prune_entrypoints);
   }
 

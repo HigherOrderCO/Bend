@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: examples/all_tree.bend
----
-Bool/True

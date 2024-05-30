@@ -1,5 +1,0 @@
----
-source: tests/golden_tests.rs
-input_file: tests/golden_tests/readback_lnet/bad_net3.bend
----
-λa λb a

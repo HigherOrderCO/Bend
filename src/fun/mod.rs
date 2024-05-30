@@ -1024,7 +1024,7 @@ impl AsRef<str> for Name {
 }
 
 impl Book {
-  pub fn hvmc_entrypoint(&self) -> &str {
+  pub fn hvm_entrypoint(&self) -> &str {
     match self.entrypoint.as_ref().map(|e| e.as_ref()) {
       Some("main" | "Main") | None => ENTRY_POINT,
       Some(nam) => nam,

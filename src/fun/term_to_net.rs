@@ -27,7 +27,7 @@ pub fn book_to_hvm(book: &Book, diags: &mut Diagnostics) -> Result<(hvm::ast::Bo
     for rule in def.rules.iter() {
       let net = term_to_hvm(&rule.body, &mut labels);
 
-      let name = if def.name == *main { book.hvmc_entrypoint().to_string() } else { def.name.0.to_string() };
+      let name = if def.name == *main { book.hvm_entrypoint().to_string() } else { def.name.0.to_string() };
 
       match net {
         Ok(net) => {
