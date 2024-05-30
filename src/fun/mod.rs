@@ -2,7 +2,6 @@ use crate::{
   diagnostics::{Diagnostics, DiagnosticsConfig},
   maybe_grow, multi_iterator, ENTRY_POINT,
 };
-// use hvmc::ast::get_typ;
 use indexmap::{IndexMap, IndexSet};
 use interner::global::{GlobalPool, GlobalString};
 use itertools::Itertools;

@@ -49,7 +49,7 @@ enum Mode {
   RunC(RunArgs),
   /// Compiles the program and runs it with the Cuda HVM implementation.
   RunCu(RunArgs),
-  /// Compiles the program to hvmc and prints to stdout.
+  /// Compiles the program to hvm and prints to stdout.
   GenHvm(GenArgs),
   /// Compiles the program to standalone C and prints to stdout.
   GenC(GenArgs),

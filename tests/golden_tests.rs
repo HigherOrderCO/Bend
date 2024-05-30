@@ -235,7 +235,7 @@ fn simplify_matches() {
     ctx.fix_match_terms()?;
     ctx.desugar_bend()?;
     ctx.desugar_fold()?;
-    ctx.desugar_do_blocks()?;
+    ctx.desugar_with_blocks()?;
     ctx.check_unbound_vars()?;
     ctx.book.make_var_names_unique();
     ctx.book.linearize_match_binds();
@@ -284,7 +284,7 @@ fn encode_pattern_match() {
       ctx.fix_match_terms()?;
       ctx.desugar_bend()?;
       ctx.desugar_fold()?;
-      ctx.desugar_do_blocks()?;
+      ctx.desugar_with_blocks()?;
       ctx.check_unbound_vars()?;
       ctx.book.make_var_names_unique();
       ctx.book.linearize_match_binds();

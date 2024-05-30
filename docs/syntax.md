@@ -362,20 +362,38 @@ with Result:
   return x
 ```
 
-A monadic with block.
+A monadic `with` block.
 
 Where `x <- ...` performs a monadic operation.
 
-Expects `Result` to be a type defined with `type` and a function `Result/bind` to be defined.
+Expects `Result` to be a type defined with `type` or `object` and the function `Result/bind` to be defined.
 The monadic bind function should be of type `(Result a) -> (a -> Result b) -> Result b`, like this:
 
 ```python
 def Result/bind(res, nxt):
   match res:
     case Result/Ok:
+      nxt = undefer(nxt)
       return nxt(res.value)
     case Result/Err:
       return res
+```
+
+However, the second argument, `nxt`, is actually a deferred call to the continuation, passing any free variables as arguments.
+Therefore, all `bind` functions must call the builtin function `undefer` before using the value of `nxt`, as in the example above.
+This is necessary to ensure that the continuation in recursive monadic functions stays lazy and doesn't expand infinitely.
+
+This is an example of a recursive function that would loop if passing the variable `a` to the recursive call `Result/foo(a, b)` was not deferred:
+```python
+def Result/foo(x, y):
+  with Result:
+    a <- Result/Ok(1)
+    if b:
+      b = Result/Err(x)
+    else:
+      b = Result/Ok(y)
+    b <- b
+    return Result/foo(a, b)
 ```
 
 Other statements are allowed inside the `with` block and it can both return a value at the end and bind a variable, like branching statements do.
@@ -389,7 +407,7 @@ return y
 ```
 
 The name `wrap` is bound inside a `with` block as a shorthand for `Type/wrap`,
-the equivalent as a `pure` function in other functional languages:
+and it calls the unit function of the monad, also called `pure` in some languages:
 
 ```python
 def Result/wrap(x):
@@ -968,8 +986,8 @@ match x {
 ### With block
 
 ```rust
-Result/bind (Result/Ok val) f = (f val)
-Result/bind err _ = err
+Result/bind (Result/Ok val) nxt = (nxt val)
+Result/bind err _nxt = err
 
 div a b = switch b {
   0: (Result/Err "Div by 0")
@@ -990,6 +1008,23 @@ Main = with Result {
 
 Receives a type defined with `type` and expects `Result/bind` to be defined as a monadic bind function.
 It should be of type `(Result a) -> (a -> Result b) -> Result b`, like in the example above.
+
+However, the second argument, `nxt`, is actually a deferred call to the continuation, passing any free variables as arguments.
+Therefore, all `bind` functions must call the builtin function `undefer` before using the value of `nxt`, as in the example above.
+This is necessary to ensure that the continuation in recursive monadic functions stays lazy and doesn't expand infinitely.
+
+This is an example of a recursive function that would loop if passing the variable `a` to the recursive call `Result/foo(a, b)` was not deferred:
+```python
+Result/foo x y = with Result {
+  ask a = (Result/Ok 1)
+  ask b = if b {
+    (Result/Err x)
+  } else {
+    (Result/Ok y)
+  }
+  (Result/foo a b)
+}
+```
 
 Inside a `with` block, you can use `ask`, to access the continuation value of the monadic operation.
 

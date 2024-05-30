@@ -108,7 +108,7 @@ pub fn desugar_book(
 
   ctx.desugar_bend()?;
   ctx.desugar_fold()?;
-  ctx.desugar_do_blocks()?;
+  ctx.desugar_with_blocks()?;
 
   ctx.check_unbound_vars()?;
 
@@ -305,10 +305,10 @@ impl OptLevel {
 
 #[derive(Clone, Debug)]
 pub struct CompileOpts {
-  /// Enables [hvmc::transform::eta_reduce].
+  /// Enables [hvm::eta_reduce].
   pub eta: bool,
 
-  /// Enables [fun::transform::definition_pruning] and [hvmc_net::prune].
+  /// Enables [fun::transform::definition_pruning] and [hvm::prune].
   pub prune: bool,
 
   /// Enables [fun::transform::linearize_matches].
@@ -320,7 +320,7 @@ pub struct CompileOpts {
   /// Enables [fun::transform::definition_merge]
   pub merge: bool,
 
-  /// Enables [hvmc::transform::inline].
+  /// Enables [hvm::inline].
   pub inline: bool,
 
   /// Enables [hvm::check_net_size].
