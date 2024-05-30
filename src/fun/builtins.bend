@@ -45,6 +45,19 @@ Map/set map key value =
       }
   }
 
+Map/map (Map/Leaf)                  key f = Map/Leaf
+Map/map (Map/Node value left right) key f =
+  switch _ = (== 0 key) {
+    0: switch _ = (% key 2) {
+      0:
+        (Map/Node value (Map/map left (/ key 2) f) right)
+      _:
+        (Map/Node value left (Map/map right (/ key 2) f))
+    }
+    _: (Map/Node (f value) left right)
+  }
+
+
 # IO Impl
 
 type IO:

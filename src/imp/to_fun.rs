@@ -1,4 +1,4 @@
-use super::{AssignPattern, Definition, Expr, Stmt};
+use super::{AssignPattern, Definition, Expr, InPlaceOp, Stmt};
 use crate::fun::{
   self,
   builtins::{LCONS, LNIL},
@@ -93,24 +93,78 @@ impl Stmt {
         let val = val.to_fun();
         StmtToFun::Assign(pat, val)
       }
-      Stmt::InPlace { op, var, val, nxt } => {
+      Stmt::InPlace { op, pat, val, nxt } => {
         let (nxt_pat, nxt) = match nxt.into_fun()? {
           StmtToFun::Return(term) => (None, term),
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
-        let term = fun::Term::Let {
-          pat: Box::new(fun::Pattern::Var(Some(var.clone()))),
-          val: Box::new(fun::Term::Oper {
-            opr: op.to_lang_op(),
-            fst: Box::new(fun::Term::Var { nam: var }),
-            snd: Box::new(val.to_fun()),
-          }),
-          nxt: Box::new(nxt),
-        };
-        if let Some(pat) = nxt_pat {
-          StmtToFun::Assign(pat, term)
-        } else {
-          StmtToFun::Return(term)
+
+        // if it is a mapper operation
+        if let InPlaceOp::Map = op {
+          let term = match &*pat {
+            AssignPattern::MapSet(map, key) => {
+              let rhs = fun::Term::call(
+                fun::Term::r#ref("Map/map"),
+                [fun::Term::Var { nam: map.clone() }, key.clone().to_fun(), val.clone().to_fun()],
+              );
+              fun::Term::Let {
+                pat: Box::new(fun::Pattern::Var(Some(map.clone()))),
+                val: Box::new(rhs),
+                nxt: Box::new(nxt),
+              }
+            }
+            _ => {
+              let rhs = fun::Term::call(val.to_fun(), [pat.clone().into_fun().to_term()]);
+              fun::Term::Let { pat: Box::new(pat.into_fun()), val: Box::new(rhs), nxt: Box::new(nxt) }
+            }
+          };
+
+          if let Some(pat) = nxt_pat {
+            return Ok(StmtToFun::Assign(pat, term));
+          } else {
+            return Ok(StmtToFun::Return(term));
+          }
+        }
+
+        // otherwise
+        match *pat {
+          AssignPattern::Var(var) => {
+            let term = fun::Term::Let {
+              pat: Box::new(fun::Pattern::Var(Some(var.clone()))),
+              val: Box::new(fun::Term::Oper {
+                opr: op.to_lang_op(),
+                fst: Box::new(fun::Term::Var { nam: var }),
+                snd: Box::new(val.to_fun()),
+              }),
+              nxt: Box::new(nxt),
+            };
+            if let Some(pat) = nxt_pat {
+              StmtToFun::Assign(pat, term)
+            } else {
+              StmtToFun::Return(term)
+            }
+          }
+          AssignPattern::MapSet(map, key) => {
+            let temp = Name::new("%0");
+            let partial =
+              Expr::Opr { op: op.to_lang_op(), lhs: Box::new(Expr::Var { nam: temp.clone() }), rhs: val };
+            let map_fn = Expr::Lam { names: vec![(temp, false)], bod: Box::new(partial) };
+            let map_term = fun::Term::call(
+              fun::Term::r#ref("Map/map"),
+              [fun::Term::Var { nam: map.clone() }, key.to_fun(), map_fn.to_fun()],
+            );
+            let term = fun::Term::Let {
+              pat: Box::new(fun::Pattern::Var(Some(map))),
+              val: Box::new(map_term),
+              nxt: Box::new(nxt),
+            };
+            if let Some(pat) = nxt_pat {
+              StmtToFun::Assign(pat, term)
+            } else {
+              StmtToFun::Return(term)
+            }
+          }
+          _ => unreachable!(),
         }
       }
       Stmt::If { cond, then, otherwise, nxt } => {
