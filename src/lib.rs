@@ -65,7 +65,7 @@ pub fn compile_book(
   }
 
   if opts.prune {
-    let prune_entrypoints = vec![book.hvmc_entrypoint().to_string()];
+    let prune_entrypoints = vec![book.hvm_entrypoint().to_string()];
     prune_hvm_book(&mut hvm_book, &prune_entrypoints);
   }
 
@@ -108,7 +108,7 @@ pub fn desugar_book(
 
   ctx.desugar_bend()?;
   ctx.desugar_fold()?;
-  ctx.desugar_do_blocks()?;
+  ctx.desugar_with_blocks()?;
 
   ctx.check_unbound_vars()?;
 
@@ -139,6 +139,8 @@ pub fn desugar_book(
   if opts.float_combinators {
     ctx.book.float_combinators(MAX_NET_SIZE);
   }
+
+  ctx.check_unbound_refs()?;
 
   ctx.prune(opts.prune);
 
@@ -305,10 +307,10 @@ impl OptLevel {
 
 #[derive(Clone, Debug)]
 pub struct CompileOpts {
-  /// Enables [hvmc::transform::eta_reduce].
+  /// Enables [hvm::eta_reduce].
   pub eta: bool,
 
-  /// Enables [fun::transform::definition_pruning] and [hvmc_net::prune].
+  /// Enables [fun::transform::definition_pruning] and [hvm::prune].
   pub prune: bool,
 
   /// Enables [fun::transform::linearize_matches].
@@ -320,7 +322,7 @@ pub struct CompileOpts {
   /// Enables [fun::transform::definition_merge]
   pub merge: bool,
 
-  /// Enables [hvmc::transform::inline].
+  /// Enables [hvm::inline].
   pub inline: bool,
 
   /// Enables [hvm::check_net_size].

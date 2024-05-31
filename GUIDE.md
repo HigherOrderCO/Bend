@@ -641,7 +641,7 @@ A Parallel Bitonic Sort
 The bitonic sort is a popular algorithm that sorts a set of numbers by moving
 them through a "circuit" (sorting network) and swapping as they pass through:
 
-![bsort](https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/BitonicSort1.svg/1686px-BitonicSort1.svg.png)
+![bitonic-sort](https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/BitonicSort1.svg/1686px-BitonicSort1.svg.png)
 
 In CUDA, this can be implemented by using mutable arrays and synchronization
 primitives. This is well known. What is less known is that it can also be

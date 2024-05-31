@@ -1,5 +1,5 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/readback_lnet/fst_snd.bend
+input_file: tests/golden_tests/readback_hvm/fst_snd.bend
 ---
 (λa a (λb b {{1 3} 2}))

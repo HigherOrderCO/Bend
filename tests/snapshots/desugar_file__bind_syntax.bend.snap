@@ -2,13 +2,15 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/bind_syntax.bend
 ---
+(undefer) = λa (a λb b)
+
 (Result/bind) = λa λb (a Result/bind__C2 b)
 
 (safe_div) = λa λb (switch b { 0: λ* (Result/Err (String/Cons 68 (String/Cons 105 (String/Cons 118 (String/Cons 32 (String/Cons 98 (String/Cons 121 (String/Cons 32 (String/Cons 48 String/Nil))))))))); _: safe_div__C0; } a)
 
 (safe_rem) = λa λb (switch b { 0: λ* (Result/Err (String/Cons 77 (String/Cons 111 (String/Cons 100 (String/Cons 32 (String/Cons 98 (String/Cons 121 (String/Cons 32 (String/Cons 48 String/Nil))))))))); _: safe_rem__C0; } a)
 
-(Main) = (Result/bind Main__C1 Main__C0)
+(Main) = (Result/bind Main__C3 Main__C2)
 
 (String/Nil) = λa (a String/Nil/tag)
 
@@ -26,11 +28,15 @@ input_file: tests/golden_tests/desugar_file/bind_syntax.bend
 
 (Result/Err/tag) = 1
 
-(Main__C0) = λa (Result/bind (safe_rem a 0) λb b)
+(Main__C0) = λa (a λb b)
 
-(Main__C1) = (safe_div 3 2)
+(Main__C1) = λa (Result/bind (safe_rem a 0) Main__C0)
 
-(Result/bind__C0) = λa λb (b a)
+(Main__C2) = λa (a Main__C1)
+
+(Main__C3) = (safe_div 3 2)
+
+(Result/bind__C0) = λa λb (undefer b a)
 
 (Result/bind__C1) = λ* λa λ* (Result/Err a)
 

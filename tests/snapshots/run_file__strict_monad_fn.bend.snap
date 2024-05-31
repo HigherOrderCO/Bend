@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/strict_monad_fn.bend
+---
+NumScott:
+λa (a Result/Err/tag 1)
+
+Scott:
+λ* λa (a 1)

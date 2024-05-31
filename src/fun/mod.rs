@@ -2,7 +2,6 @@ use crate::{
   diagnostics::{Diagnostics, DiagnosticsConfig},
   maybe_grow, multi_iterator, ENTRY_POINT,
 };
-// use hvmc::ast::get_typ;
 use indexmap::{IndexMap, IndexSet};
 use interner::global::{GlobalPool, GlobalString};
 use itertools::Itertools;
@@ -37,7 +36,7 @@ impl Ctx<'_> {
 #[derive(Debug, Clone, Default)]
 pub struct Book {
   /// The function definitions.
-  pub defs: IndexMap<Name, Definition>,
+  pub defs: Definitions,
 
   /// The algebraic datatypes defined by the program
   pub adts: Adts,
@@ -49,6 +48,7 @@ pub struct Book {
   pub entrypoint: Option<Name>,
 }
 
+pub type Definitions = IndexMap<Name, Definition>;
 pub type Adts = IndexMap<Name, Adt>;
 pub type Constructors = IndexMap<Name, Name>;
 
@@ -1025,7 +1025,7 @@ impl AsRef<str> for Name {
 }
 
 impl Book {
-  pub fn hvmc_entrypoint(&self) -> &str {
+  pub fn hvm_entrypoint(&self) -> &str {
     match self.entrypoint.as_ref().map(|e| e.as_ref()) {
       Some("main" | "Main") | None => ENTRY_POINT,
       Some(nam) => nam,

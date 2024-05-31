@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/readback_hvm/simple_tup.bend
+---
+{0 42}
