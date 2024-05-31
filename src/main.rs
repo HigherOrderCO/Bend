@@ -20,6 +20,9 @@ struct Cli {
   #[arg(short, long, global = true)]
   pub verbose: bool,
 
+  #[arg(long, global = true, default_value = "hvm", help = "Path to hvm binary")]
+  pub hvm_path: String,
+
   #[arg(short = 'e', long, global = true, help = "Use other entrypoint rather than main or Main")]
   pub entrypoint: Option<String>,
 }
@@ -303,7 +306,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
         .map_err(|x| x.to_string())?;
 
       let gen_fn = |out_path: &str| {
-        let mut process = std::process::Command::new("hvm");
+        let mut process = std::process::Command::new(cli.hvm_path);
         process.arg(gen_cmd).arg(out_path);
         process.output().map_err(|e| format!("While running hvm: {e}"))
       };
@@ -350,7 +353,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
       compile_opts.check_for_strict();
 
-      let run_opts = RunOpts { linear_readback: linear, pretty };
+      let run_opts = RunOpts { linear_readback: linear, pretty, hvm_path: cli.hvm_path };
 
       let book = load_book(&path)?;
       if let Some((term, stats, diags)) =
