@@ -288,11 +288,7 @@ pub struct RunOpts {
 
 impl Default for RunOpts {
   fn default() -> Self {
-      RunOpts {
-        linear_readback: false,
-        pretty: false,
-        hvm_path: "hvm".to_string()
-      }
+    RunOpts { linear_readback: false, pretty: false, hvm_path: "hvm".to_string() }
   }
 }
 
