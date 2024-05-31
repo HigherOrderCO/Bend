@@ -140,6 +140,8 @@ pub fn desugar_book(
     ctx.book.float_combinators(MAX_NET_SIZE);
   }
 
+  ctx.check_unbound_refs()?;
+
   ctx.prune(opts.prune);
 
   if opts.merge {

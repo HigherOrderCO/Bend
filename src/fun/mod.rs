@@ -36,7 +36,7 @@ impl Ctx<'_> {
 #[derive(Debug, Clone, Default)]
 pub struct Book {
   /// The function definitions.
-  pub defs: IndexMap<Name, Definition>,
+  pub defs: Definitions,
 
   /// The algebraic datatypes defined by the program
   pub adts: Adts,
@@ -48,6 +48,7 @@ pub struct Book {
   pub entrypoint: Option<Name>,
 }
 
+pub type Definitions = IndexMap<Name, Definition>;
 pub type Adts = IndexMap<Name, Adt>;
 pub type Constructors = IndexMap<Name, Name>;
 
