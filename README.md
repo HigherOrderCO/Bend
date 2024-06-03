@@ -3,53 +3,104 @@
 Bend is a massively parallel, high-level programming language.
 
 Unlike low-level alternatives like CUDA and Metal, Bend has the feeling and
-features of expressive languages like Python and Haskell, including fast object
-allocations, higher-order functions with full closure support, unrestricted
-recursion, even continuations. Yet, it runs on massively parallel hardware like
-GPUs, with near-linear speedup based on core count, and zero explicit parallel
-annotations: no thread spawning, no locks, mutexes, atomics. Bend is powered by
-the [HVM2](https://github.com/HigherOrderCO/hvm) runtime.
+features of expressive languages like Python and Haskell, including:
 
-A Quick Demo
-------------
+- fast object allocations
+- higher-order functions with full closure support
+- unrestricted recursion
+- even continuations
+
+Yet, it runs on massively parallel hardware like GPUs, with near-linear speedup
+based on core count, and zero explicit parallel annotations: no thread spawning,
+no locks, mutexes, atomics.
+
+Bend is powered by the [HVM2] runtime.
+
+[HVM2]: https://github.com/HigherOrderCO/hvm
+
+## A Quick Demo
 
 [![Bend live demo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)](https://x.com/i/status/1791213162525524076)
 
-- For a more in-depth explanation on how to setup and use Bend, check [GUIDE.md](https://github.com/HigherOrderCO/bend/blob/main/GUIDE.md).
+- For a more in-depth explanation on how to setup and use Bend, check
+  [GUIDE.md](https://github.com/HigherOrderCO/bend/blob/main/GUIDE.md).
 
-- For an extensive list of features, check [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
+- For an extensive list of features, check
+  [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
 
-## Using Bend
+## Important Notes
 
-> Currently not working on Windows, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) as a workaround.
+- Bend is designed to excel in scaling performance with cores, supporting over
+  10000 concurrent threads.
+- The current version may have lower single-core performance.
+- You can expect substantial improvements in performance as we advance our code
+  generation and optimization techniques.
+- Windows support is being worked on, for now you can use [WSL2].
+- [We only support NVIDIA Gpus currently][HigherOrderCO/Bend/issues/341].
 
-> If you're having issues or have a question about Bend, please first read the [FAQ](https://github.com/HigherOrderCO/Bend/blob/main/FAQ.md) page and check if your question has already been addressed.
+[WSL2]: https://learn.microsoft.com/en-us/windows/wsl/install
+[HigherOrderCO/Bend/issues/341]: https://github.com/HigherOrderCO/Bend/issues/341
 
-First, install [Rust](https://www.rust-lang.org/tools/install).
+> If you're having issues or questions about Bend, please first read the [FAQ].
 
-If you want to use the C runtime, install a C compiler (like GCC or Clang).
-If you want to use the CUDA runtime, install the CUDA toolkit (CUDA and `nvcc`) version 12.x.
+[FAQ]: https://github.com/HigherOrderCO/Bend/blob/main/FAQ.md 
 
-> **_Note_: [Only Nvidia GPUs are supported at the moment](https://github.com/HigherOrderCO/Bend/issues/341).**
+## Installation
 
-Then, install both HVM2 and Bend with:
+### Dependencies
 
 ```sh
-cargo install hvm
-cargo install bend-lang
+# Install Rust if you haven't it already.
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# For the C runtime, install a C compiler. We recommend GCC 12+.
+sudo apt install gcc
+
+# On macOS
+brew install gcc
 ```
 
-Finally, write some Bend file, and run it with one of these commands:
+For the CUDA runtime install [CUDA tookkit for Linux] version 12.x.
+
+[CUDA tookkit for Linux]: https://developer.nvidia.com/cuda-downloads?target_os=Linux
+
+### Install Bend
+
+1. Install HVM2:
+
+```sh
+# HVM2 is HOC's massively parallel Interaction Combinator evaluator.
+cargo install hvm
+
+# Check if HVM is correctly installed and accessible.
+hvm --version
+```
+2. Install Bend:
+
+```sh
+# This command will install Bend
+cargo install bend-lang
+
+# Check if Bend is correctly installed and accessible.
+bend --version
+```
+
+### Getting Started
+
+#### Running Bend Programs
 
 ```sh
 bend run    <file.bend> # uses the Rust interpreter (sequential)
-bend run-c  <file.bend> # uses the C interpreter (parallel)
+bend run-c  <file.bend> # uses the C interpreter    (parallel)
 bend run-cu <file.bend> # uses the CUDA interpreter (massively parallel)
 ```
 
-You can also compile `Bend` to standalone C/CUDA files with `gen-c` and
+You can also compile Bend to standalone C/CUDA files with `gen-c` and
 `gen-cu`, for maximum performance. But keep in mind our code gen is still in its
 infancy, and is nowhere as mature as SOTA compilers like GCC and GHC.
+
+You can use the -s flag to have more information on, reductions time the code
+took to run Interaction per second (In millions).
 
 ## Parallel Programming in Bend
 
