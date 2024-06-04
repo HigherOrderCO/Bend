@@ -144,7 +144,7 @@ impl Reader<'_> {
             let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
             let mut succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
             // Call expand_generated in case of succ_term be a lifted term
-            succ_term.expand_generated(&self.book, &self.recursive_defs);
+            succ_term.expand_generated(self.book, self.recursive_defs);
 
             // Succ term should be a lambda
             let (zero, succ) = match &mut succ_term {

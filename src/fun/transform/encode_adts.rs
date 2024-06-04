@@ -16,21 +16,11 @@ impl Book {
         let body = match adt_encoding {
           AdtEncoding::Scott => encode_ctr_scott(fields.iter().map(|f| &f.nam), ctrs, ctr_name),
           AdtEncoding::NumScott => {
-            let is_object = adt_name == ctr_name;
-            if is_object {
-              let tag = Name::new(format!("{ctr_name}/tag"));
-              let body = encode_ctr_num_scott(fields.iter().map(|f| &f.nam), &tag);
-              let tag_def = make_tag_def(ctr_idx, &tag, adt);
-              tags.push((tag, tag_def));
-              body
-            } else {
-              let (typ, ctr) = ctr_name.rsplit_once('/').expect("To split at '/'");
-              let tag = Name::new(format!("{typ}/{ctr}/tag"));
-              let body = encode_ctr_num_scott(fields.iter().map(|f| &f.nam), &tag);
-              let tag_def = make_tag_def(ctr_idx, &tag, adt);
-              tags.push((tag, tag_def));
-              body
-            }
+            let tag = make_tag(adt_name == ctr_name, ctr_name);
+            let body = encode_ctr_num_scott(fields.iter().map(|f| &f.nam), &tag);
+            let tag_def = make_tag_def(ctr_idx, &tag, adt);
+            tags.push((tag, tag_def));
+            body
           }
         };
 
@@ -41,6 +31,15 @@ impl Book {
     }
     self.defs.extend(defs);
     self.defs.extend(tags);
+  }
+}
+
+fn make_tag(is_object: bool, ctr_name: &Name) -> Name {
+  if is_object {
+    Name::new(format!("{ctr_name}/tag"))
+  } else {
+    let (typ, ctr) = ctr_name.rsplit_once('/').expect("To split at '/'");
+    Name::new(format!("{typ}/{ctr}/tag"))
   }
 }
 
