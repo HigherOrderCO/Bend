@@ -19,6 +19,7 @@ pub fn net_to_term(
     net,
     labels,
     book,
+    recursive_defs: &book.recursive_defs(),
     dup_paths: if linear { None } else { Some(Default::default()) },
     scope: Default::default(),
     seen_fans: Default::default(),
@@ -72,6 +73,7 @@ pub struct Reader<'a> {
   seen_fans: Scope,
   seen: HashSet<Port>,
   errors: Vec<ReadbackError>,
+  recursive_defs: &'a BTreeSet<Name>,
 }
 
 impl Reader<'_> {
@@ -140,6 +142,8 @@ impl Reader<'_> {
 
             let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
             let mut succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
+            // Call expand_generated in case of succ_term be a lifted term
+            succ_term.expand_generated(self.book, self.recursive_defs);
 
             // Succ term should be a lambda
             let (zero, succ) = match &mut succ_term {
