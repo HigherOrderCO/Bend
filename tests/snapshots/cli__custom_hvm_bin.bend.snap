@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/custom_hvm_bin.bend
+---
+Result: λa a

@@ -20,8 +20,8 @@ struct Cli {
   #[arg(short, long, global = true)]
   pub verbose: bool,
 
-  #[arg(long, global = true, default_value = "hvm", help = "Path to hvm binary")]
-  pub hvm_path: String,
+  #[arg(long, global = true, help = "HVM command or path to HVM binary")]
+  pub hvm_bin: Option<String>,
 
   #[arg(short = 'e', long, global = true, help = "Use other entrypoint rather than main or Main")]
   pub entrypoint: Option<String>,
@@ -260,6 +260,16 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
     Ok(book)
   };
 
+  // Path/command for the HVM binary
+  // CLI option -> Env var -> Default
+  let hvm_bin = if let Some(hvm_bin) = cli.hvm_bin {
+    hvm_bin
+  } else if let Ok(hvm_bin) = std::env::var("HVM_BIN") {
+    hvm_bin
+  } else {
+    "hvm".to_string()
+  };
+
   let gen_cmd = match &cli.mode {
     Mode::GenC(..) => "gen-c",
     Mode::GenCu(..) => "gen-cu",
@@ -293,6 +303,36 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       println!("{}", display_hvm_book(&compile_res.hvm_book));
     }
 
+    Mode::Run(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
+    | Mode::RunC(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
+    | Mode::RunCu(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
+      let CliRunOpts { linear, print_stats } = run_opts;
+
+      let diagnostics_cfg =
+        set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
+
+      let compile_opts = compile_opts_from_cli(&comp_opts);
+
+      compile_opts.check_for_strict();
+
+      let run_opts = RunOpts { linear_readback: linear, pretty, hvm_path: hvm_bin };
+
+      let book = load_book(&path)?;
+      if let Some((term, stats, diags)) =
+        run_book(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_cmd)?
+      {
+        eprint!("{diags}");
+        if pretty {
+          println!("Result:\n{}", term.display_pretty(0));
+        } else {
+          println!("Result: {}", term);
+        }
+        if print_stats {
+          println!("{stats}");
+        }
+      }
+    }
+
     Mode::GenC(GenArgs { comp_opts, warn_opts, path })
     | Mode::GenCu(GenArgs { comp_opts, warn_opts, path }) => {
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
@@ -306,7 +346,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
         .map_err(|x| x.to_string())?;
 
       let gen_fn = |out_path: &str| {
-        let mut process = std::process::Command::new(cli.hvm_path);
+        let mut process = std::process::Command::new(hvm_bin);
         process.arg(gen_cmd).arg(out_path);
         process.output().map_err(|e| format!("While running hvm: {e}"))
       };
@@ -338,36 +378,6 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
         println!("{}", book.display_pretty())
       } else {
         println!("{book}");
-      }
-    }
-
-    Mode::Run(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
-    | Mode::RunC(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
-    | Mode::RunCu(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
-      let CliRunOpts { linear, print_stats } = run_opts;
-
-      let diagnostics_cfg =
-        set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
-
-      let compile_opts = compile_opts_from_cli(&comp_opts);
-
-      compile_opts.check_for_strict();
-
-      let run_opts = RunOpts { linear_readback: linear, pretty, hvm_path: cli.hvm_path };
-
-      let book = load_book(&path)?;
-      if let Some((term, stats, diags)) =
-        run_book(book, run_opts, compile_opts, diagnostics_cfg, arguments, run_cmd)?
-      {
-        eprint!("{diags}");
-        if pretty {
-          println!("Result:\n{}", term.display_pretty(0));
-        } else {
-          println!("Result: {}", term);
-        }
-        if print_stats {
-          println!("{stats}");
-        }
       }
     }
   };
