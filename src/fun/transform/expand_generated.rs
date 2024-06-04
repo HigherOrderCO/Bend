@@ -47,6 +47,7 @@ impl Book {
 fn cycles(deps: &DepGraph) -> Cycles {
   let mut cycles = vec![];
   let mut visited = HashSet::new();
+  // let mut stack = vec![];
   for nam in deps.keys() {
     if !visited.contains(nam) {
       find_cycles(deps, nam, &mut visited, &mut cycles);
@@ -56,34 +57,30 @@ fn cycles(deps: &DepGraph) -> Cycles {
 }
 
 fn find_cycles(deps: &DepGraph, nam: &Name, visited: &mut HashSet<Name>, cycles: &mut Cycles) {
-  maybe_grow(|| {
-    let mut to_search = vec![(nam.clone(), false)];
-    while let Some((current, checked)) = to_search.pop() {
-      if checked {
-        to_search.pop();
-      } else {
-        // Check if the current ref is already in the stack, which indicates a cycle.
-        if let Some(cycle_start) = to_search.iter().position(|(n, _)| n == &current) {
-          // If found, add the cycle to the cycles vector.
-          cycles.push(to_search[cycle_start..].iter().map(|(n, _)| n.clone()).collect::<Vec<_>>());
-          continue;
-        }
-        // If the ref has not been visited yet, mark it as visited.
-        if visited.insert(current.clone()) {
-          // Get the dependencies of the current ref.
-          let deps = deps.get(&current);
-          // Add the current ref to the stack to keep track of the path.
-          to_search.push((current, true));
-          if let Some(deps) = deps {
-            // Search for cycles from each dependency.
-            for dep in deps {
-              to_search.push((dep.clone(), false));
-            }
-          }
-        }
+  let mut stack = vec![(nam.clone(), vec![])];
+  while let Some((current, path)) = stack.pop() {
+    if visited.contains(&current) {
+      // Check if the current ref is already in the stack, which indicates a cycle.
+      if let Some(cycle_start) = path.iter().position(|n| n == &current) {
+        // If found, add the cycle to the cycles vector.
+        cycles.push(path[cycle_start..].to_vec());
+      }
+      continue;
+    }
+
+    // If the ref has not been visited yet, mark it as visited.
+    visited.insert(current.clone());
+    // Add the current ref to the stack to keep track of the path.
+    let mut new_path = path.clone();
+    new_path.push(current.clone());
+
+    // Search for cycles from each dependency.
+    if let Some(deps) = deps.get(&current) {
+      for dep in deps {
+        stack.push((dep.clone(), new_path.clone()));
       }
     }
-  })
+  }
 }
 
 fn book_def_deps(book: &Book) -> DepGraph {
