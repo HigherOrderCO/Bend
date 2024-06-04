@@ -11,7 +11,6 @@ use crate::{
   },
 };
 use diagnostics::{Diagnostics, DiagnosticsConfig, ERR_INDENT_SIZE};
-use fun::transform::expand_generated::find_recursive_defs;
 use net::hvm_to_net::hvm_to_net;
 
 pub mod diagnostics;
@@ -192,7 +191,7 @@ pub fn readback_hvm_net(
   let mut diags = Diagnostics::default();
   let net = hvm_to_net(net);
   let mut term = net_to_term(&net, book, labels, linear, &mut diags);
-  let recursive_cycles = find_recursive_defs(book);
+  let recursive_cycles = book.recursive_defs();
   term.expand_generated(book, &recursive_cycles);
   term.resugar_strings(adt_encoding);
   term.resugar_lists(adt_encoding);
