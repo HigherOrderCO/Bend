@@ -73,7 +73,6 @@ pub struct Reader<'a> {
   seen_fans: Scope,
   seen: HashSet<Port>,
   errors: Vec<ReadbackError>,
-  //
   recursive_defs: &'a BTreeSet<Name>,
 }
 
