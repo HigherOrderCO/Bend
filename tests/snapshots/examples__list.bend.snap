@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: examples/list.bend
+---
+5

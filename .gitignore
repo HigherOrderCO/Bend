@@ -2,3 +2,4 @@
 *.snap.new
 .out.hvm
 .DS_Store
+.vscode
