@@ -111,7 +111,9 @@
     "undefer",
     "vectorize",
     "vectorizes",
-    "walkdir",
+    "tlsv",
+    "proto", 
+    "walkdir"
   ],
   "files": [
     "**/*.rs",

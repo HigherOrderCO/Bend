@@ -1,81 +1,199 @@
-# Bend
+<h1 >Bend</h1>
+<p>A high-level, massively parallel programming language</p>
 
-Bend is a massively parallel, high-level programming language.
+## Index
+1. [Introduction](#introduction)
+2. [Important Notes](#important-notes)
+3. [Install](#install)
+4. [Getting Started](#getting-started)
+5. [Speedup Example](#speedup-example)
+6. [Additional Resources](#additional-resources)
 
-Unlike low-level alternatives like CUDA and Metal, Bend has the feeling and
-features of expressive languages like Python and Haskell, including fast object
-allocations, higher-order functions with full closure support, unrestricted
-recursion, even continuations. Yet, it runs on massively parallel hardware like
-GPUs, with near-linear speedup based on core count, and zero explicit parallel
-annotations: no thread spawning, no locks, mutexes, atomics. Bend is powered by
-the [HVM2](https://github.com/HigherOrderCO/hvm) runtime.
+## Introduction
 
-A Quick Demo
-------------
+Bend offers the feel and features of expressive languages like Python and Haskell. This includes fast object allocations, full support for higher-order functions with closures, unrestricted recursion, and even continuations.                             
+Bend scales like CUDA, it runs on massively parallel hardware like GPUs, with nearly linear acceleration based on core count, and without explicit parallelism annotations: no thread creation, locks, mutexes, or atomics.                     
+Bend is powered by the [HVM2](https://github.com/higherorderco/hvm) runtime.
 
-[![Bend live demo](https://github.com/VictorTaelin/media/blob/main/bend_live_demo.gif?raw=true)](https://x.com/i/status/1791213162525524076)
 
-- For a more in-depth explanation on how to setup and use Bend, check [GUIDE.md](https://github.com/HigherOrderCO/bend/blob/main/GUIDE.md).
+## Important Notes
 
-- For an extensive list of features, check [FEATURES.md](https://github.com/HigherOrderCO/bend/blob/main/FEATURES.md).
+* Bend is designed to excel in scaling performance with cores, supporting over 10000 concurrent threads.
+* The current version may have lower single-core performance.
+* You can expect substantial improvements in performance as we advance our code generation and optimization techniques.
+* We are still working to support Windows. Use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) as an alternative solution.
+* [We only support NVIDIA Gpus currently](https://github.com/HigherOrderCO/Bend/issues/341).
 
-## Using Bend
 
-> Currently not working on Windows, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) as a workaround.
 
-> If you're having issues or have a question about Bend, please first read the [FAQ](https://github.com/HigherOrderCO/Bend/blob/main/FAQ.md) page and check if your question has already been addressed.
 
-First, install [Rust](https://www.rust-lang.org/tools/install).
+## Install
 
-If you want to use the C runtime, install a C compiler (like GCC or Clang).
-If you want to use the CUDA runtime, install the CUDA toolkit (CUDA and `nvcc`) version 12.x.
+### Install dependencies
 
-> **_Note_: [Only Nvidia GPUs are supported at the moment](https://github.com/HigherOrderCO/Bend/issues/341).**
-
-Then, install both HVM2 and Bend with:
-
+#### On Linux
 ```sh
-cargo install hvm
-cargo install bend-lang
+# Install Rust if you haven't it already.
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# For the C version of Bend, use GCC. We recommend a version up to 12.x.
+sudo apt install gcc
+```
+For the CUDA runtime [install the CUDA toolkit for Linux](https://developer.nvidia.com/cuda-downloads?target_os=Linux) version 12.x.
+
+
+#### On Mac
+```sh
+# Install Rust if you haven't it already.
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# For the C version of Bend, use GCC. We recommend a version up to 12.x.
+brew install gcc
 ```
 
-Finally, write some Bend file, and run it with one of these commands:
 
+### Install Bend
+
+1. Install HVM2 by running:
+```sh
+# HVM2 is HOC's massively parallel Interaction Combinator evaluator.
+cargo install hvm
+
+# This ensures HVM is correctly installed and accessible.
+hvm --version
+```
+2. Install Bend by running:
+```sh
+# This command will install Bend
+cargo install bend-lang
+
+# This ensures Bend is correctly installed and accessible.
+bend --version
+```
+
+### Getting Started
+#### Running Bend Programs
 ```sh
 bend run    <file.bend> # uses the Rust interpreter (sequential)
 bend run-c  <file.bend> # uses the C interpreter (parallel)
 bend run-cu <file.bend> # uses the CUDA interpreter (massively parallel)
+
+# Notes
+# You can also compile Bend to standalone C/CUDA files using gen-c and gen-cu for maximum performance.
+# The code generator is still in its early stages and not as mature as compilers like GCC and GHC.
+# You can use the -s flag to have more information on
+  # Reductions
+  # Time the code took to run
+  # Interaction per second (In millions)
 ```
 
-You can also compile `Bend` to standalone C/CUDA files with `gen-c` and
-`gen-cu`, for maximum performance. But keep in mind our code gen is still in its
-infancy, and is nowhere as mature as SOTA compilers like GCC and GHC.
+#### Testing Bend Programs
+The example below sums all the numbers in the range from `start` to `target`. It can be written in two different methods: one that is inherently sequential (and thus cannot be parallelized), and another that is easily parallelizable. (We will be using the `-s`flag in most examples, for the sake of visibility)
 
-## Parallel Programming in Bend
+#### Sequential version:
+First, create a file named `sequential_sum.bend`
+```sh
+# Write this command on your terminal
+touch sequential_sum.bend
+```
+Then with your text editor, open the file `sequential_sum.bend`, copy the code below and paste in the file.
 
-To write parallel programs in Bend, all you have to do is... **nothing**. Other
-than not making it *inherently sequential*! For example, the expression:
+```py
+# Defines the function Sum with two parameters: start and target
+def Sum(start, target):
+    # If the value of start is the same as target, returns start
+  if start == target:
+    return start
+    # If start is not equal to target, recursively call Sum with start incremented by 1, and add the result to start
+  else:
+    return start + Sum(start + 1, target)  
 
-```python
-(((1 + 2) + 3) + 4)
+def main():
+# This translates to (1 + (2 + (3 + (...... + (79999999 + 80000000)))))
+  return Sum(1, 80000000)
 ```
 
-Can **not** run in parallel, because `+4` depends on `+3` which
-depends on `(1+2)`. But the following expression:
-
-```python
-((1 + 2) + (3 + 4))
+##### Running the file
+You can run it using Rust interpreter (Sequential)
+```sh
+bend run sequential_sum.bend -s
 ```
 
-Can run in parallel, because `(1+2)` and `(3+4)` are independent; and it *will*,
-per Bend's fundamental pledge:
+Or you can run it using C interpreter (Sequential)
+```sh
+bend run-c sequential_sum.bend -s
+```
 
-> Everything that **can** run in parallel, **will** run in parallel.
+If you have a NVIDIA GPU, you can also run in CUDA (Sequential)
+```sh
+bend run-cu sequential_sum.bend -s
+```
 
-For a more complete example, consider:
+In this version, the next value to be calculated depends on the previous sum, meaning that it cannot proceed until the current computation is complete. Now, let's look at the easily parallelizable version.
 
-```python
-# Sorting Network = just rotate trees!
+
+#### Parallelizable version:
+First close the old file and then proceed to your terminal to create `parallel_sum.bend`
+```sh
+# Write this command on your terminal
+touch parallel_sum.bend
+```
+Then with your text editor, open the file `parallel_sum.bend`, copy the code below and paste in the file.
+
+```py
+# Defines the function Sum with two parameters: start and target
+def Sum(start, target):
+  # If the value of start is the same as target, returns start
+  if start == target:
+    return start
+  # If start is not equal to target, calculate the midpoint (half), then recursively call Sum on both halves
+  else:
+    half = (start + target) / 2
+    left = Sum(start, half)  # (Start -> Half)
+    right = Sum(half + 1, target)
+    return left + right
+
+# Main function to demonstrate the parallelizable sum from 1 to 80000000
+def main():
+# This translates to ((1 + 2) + (3 + 4)+ ... (79999999 + 80000000)...)
+  return Sum(1, 80000000)
+```
+
+In this example, the (3 + 4) sum does not depend on the (1 + 2), meaning that it can run in parallel because both computations can happen at the same time. 
+
+##### Running the file
+You can run it using Rust interpreter (Sequential)
+```sh
+bend run parallel_sum.bend -s
+```
+
+Or you can run it using C interpreter (Parallel)
+```sh
+bend run-c sequential_sum.bend -s
+```
+
+If you have a NVIDIA GPU, you can also run in CUDA (Massively parallel)
+```sh
+bend run-cu sequential_sum.bend -s
+```
+
+In Bend, it can be parallelized by just changing the run command. If your code **can** run in parallel it **will** run in parallel.
+
+
+### Speedup Examples
+The code snippet below implements a [bitonic sorter](https://en.wikipedia.org/wiki/Bitonic_sorter) with *immutable tree rotations*. It's not the type of algorithm you would expect to run fast on GPUs. However, since it uses a divide and conquer approach, which is inherently parallel, Bend will execute it on multiple threads, no thread creation, no explicit lock management.
+
+#### Bitonic Sorter Benchmark
+
+- `bend run`: CPU, Apple M3 Max: 12.15 seconds
+- `bend run-c`: CPU, Apple M3 Max: 0.96 seconds
+- `bend run-cu`: GPU, NVIDIA RTX 4090: 0.21 seconds
+
+ <details>
+  <summary>Click here for the Bitonic Sorter code </summary> 
+   
+ ```py
+ # Sorting Network = just rotate trees!
 def sort(d, s, tree):
   switch d:
     case 0:
@@ -84,7 +202,7 @@ def sort(d, s, tree):
       (x,y) = tree
       lft   = sort(d-1, 0, x)
       rgt   = sort(d-1, 1, y)
-      return rots(d, s, lft, rgt)
+      return rots(d, s, (lft, rgt))
 
 # Rotates sub-trees (Blue/Green Box)
 def rots(d, s, tree):
@@ -95,76 +213,68 @@ def rots(d, s, tree):
       (x,y) = tree
       return down(d, s, warp(d-1, s, x, y))
 
-(...)
-```
+# Swaps distant values (Red Box)
+def warp(d, s, a, b):
+  switch d:
+    case 0:
+      return swap(s ^ (a > b), a, b)
+    case _:
+      (a.a, a.b) = a
+      (b.a, b.b) = b
+      (A.a, A.b) = warp(d-1, s, a.a, b.a)
+      (B.a, B.b) = warp(d-1, s, a.b, b.b)
+      return ((A.a,B.a),(A.b,B.b))
 
-This
-[file](https://gist.github.com/VictorTaelin/face210ca4bc30d96b2d5980278d3921)
-implements a [bitonic sorter](https://en.wikipedia.org/wiki/Bitonic_sorter) with
-*immutable tree rotations*. It is not the kind of algorithm you'd expect to
-run fast on GPUs. Yet, since it uses a divide-and-conquer approach, which is
-*inherently parallel*, Bend will run it multi-threaded. Some benchmarks:
+# Propagates downwards
+def down(d,s,t):
+  switch d:
+    case 0:
+      return t
+    case _:
+      (t.a, t.b) = t
+      return (rots(d-1, s, t.a), rots(d-1, s, t.b))
 
-- CPU, Apple M3 Max, 1 thread: **12.15 seconds**
+# Swaps a single pair
+def swap(s, a, b):
+  switch s:
+    case 0:
+      return (a,b)
+    case _:
+      return (b,a)
 
-- CPU, Apple M3 Max, 16 threads: **0.96 seconds**
+# Testing
+# -------
 
-- GPU, NVIDIA RTX 4090, 16k threads: **0.21 seconds**
+# Generates a big tree
+def gen(d, x):
+  switch d:
+    case 0:
+      return x
+    case _:
+      return (gen(d-1, x * 2 + 1), gen(d-1, x * 2))
 
-That's a **57x speedup** by doing nothing. No thread spawning, no explicit
-management of locks, mutexes. We just asked Bend to run our program on RTX, and
-it did. Simple as that.
+# Sums a big tree
+def sum(d, t):
+  switch d:
+    case 0:
+      return t
+    case _:
+      (t.a, t.b) = t
+      return sum(d-1, t.a) + sum(d-1, t.b)
 
-Bend isn't limited to a specific paradigm, like tensors or matrices. Any
-concurrent system, from shaders to Erlang-like actor models can be emulated on
-Bend. For example, to render images in real time, we could simply allocate an
-immutable tree on each frame:
-
-```python
-# given a shader, returns a square image
-def render(depth, shader):
-  bend d = 0, i = 0:
-    when d < depth:
-      color = (fork(d+1, i*2+0), fork(d+1, i*2+1))
-    else:
-      width = depth / 2
-      color = shader(i % width, i / width)
-  return color
-
-# given a position, returns a color
-# for this demo, it just busy loops
-def demo_shader(x, y):
-  bend i = 0:
-    when i < 5000:
-      color = fork(i + 1)
-    else:
-      color = 0x000001
-  return color
-
-# renders a 256x256 image using demo_shader
+# Sorts a big tree
 def main:
-  return render(16, demo_shader)
+  return sum(20, sort(20, 0, gen(20, 0)))
 ```
 
-And it would actually work. Even involved algorithms parallelize well on Bend.
-Long-distance communication is performed by *global beta-reduction* (as per the
-[Interaction Calculus](https://github.com/VictorTaelin/Interaction-Calculus)),
-and synchronized correctly and efficiently by
-[HVM2](https://github.com/HigherOrderCO/HVM)'s *atomic linker*.
+</details>
+  
+if you are interested in some other algorithms, you can check our [examples folder](https://github.com/HigherOrderCO/Bend/tree/main/examples)
 
 
-- To understand the tech behind Bend, check HVM2's [paper](https://paper.higherorderco.com).
-
-- Bend is developed by [HigherOrderCO](https://HigherOrderCO.com) - join our [Discord](https://discord.HigherOrderCO.com)!
-
-## Note
-
-It is very important to reinforce that, while Bend does what it was built to
-(i.e., scale in performance with cores, up to 10000+ concurrent threads), its
-single-core performance is still extremely sub-par. This is the first version of
-the system, and we haven't put much effort into a proper compiler yet. You can
-expect the raw performance to substantially improve on every release, as we work
-towards a proper codegen (including a constellation of missing optimizations).
-Meanwhile, you can use the interpreters today, to have a glimpse of what
-massively parallel programming looks like, from the lens of a Pythonish,
-high-level language!
+### Additional Resources
+ - To understand the technology behind Bend, check out the HVM2 [paper](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/PAPER.pdf).
+ - We are working on an official documentation, meanwhile for a more in depth
+     explanation check [GUIDE.md](https://github.com/HigherOrderCO/Bend/blob/main/GUIDE.md)
+ - Read about our features at [FEATURES.md](https://github.com/HigherOrderCO/Bend/blob/main/FEATURES.md)
+ - Bend is developed by [HigherOrderCO](https://higherorderco.com/) - join our [Discord](https://discord.higherorderco.com)!
