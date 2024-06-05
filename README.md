@@ -6,7 +6,7 @@
 2. [Important Notes](#important-notes)
 3. [Install](#install)
 4. [Getting Started](#getting-started)
-5. [Speedup Example](#speedup-example)
+5. [Speedup Example](#speedup-examples)
 6. [Additional Resources](#additional-resources)
 
 ## Introduction
