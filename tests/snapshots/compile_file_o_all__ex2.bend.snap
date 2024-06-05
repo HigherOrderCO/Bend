@@ -29,10 +29,8 @@ input_file: tests/golden_tests/compile_file_o_all/ex2.bend
   & @O ~ (b c)
   & @O ~ (a b)
 
-@main = a
-  & @run ~ (@main__C0 a)
-
-@main__C0 = a
+@main = b
+  & @run ~ (a b)
   & @c2 ~ (@I (@E a))
 
 @run = ((@runO (@runI (@E a))) a)

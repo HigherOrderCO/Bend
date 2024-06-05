@@ -8,4 +8,4 @@ input_file: tests/golden_tests/cli/desugar_merge.bend
 
 (F__M_Z) = λ* λa a
 
-(main) = F__M_Z
+(main) = λ* λa a

@@ -22,7 +22,7 @@ input_file: tests/golden_tests/desugar_file/combinators.bend
 
 (B) = λa (B__C0 a)
 
-(Main) = list
+(Main) = (List/Cons 0 list__C0)
 
 (List/Nil) = λa (a List/Nil/tag)
 

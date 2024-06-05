@@ -148,6 +148,8 @@ pub fn desugar_book(
     ctx.book.merge_definitions();
   }
 
+  ctx.book.expand_main();
+
   ctx.book.make_var_names_unique();
 
   if !ctx.info.has_errors() {

@@ -27,15 +27,6 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
   &!@Gen.go ~ (a (b c))
   &!@Gen.go ~ (d (e f))
 
-@Main__C0 = a
-  & @Gen ~ (4 a)
-
-@Main__C1 = a
-  & @Reverse ~ (@Main__C0 a)
-
-@Main__C2 = a
-  & @Sort ~ (@Main__C1 a)
-
 @Map_/Both = (a (b ((@Map_/Both/tag (a (b c))) c)))
 
 @Map_/Both/tag = 2
@@ -173,5 +164,8 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @ToMap__C3 = (?((@Map_/Free @ToMap__C2) a) a)
 
-@main = a
-  & @Sum ~ (@Main__C2 a)
+@main = d
+  & @Sum ~ (c d)
+  & @Sort ~ (b c)
+  & @Reverse ~ (a b)
+  & @Gen ~ (4 a)

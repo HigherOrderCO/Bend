@@ -10,6 +10,7 @@ pub mod desugar_with_blocks;
 pub mod encode_adts;
 pub mod encode_match_terms;
 pub mod expand_generated;
+pub mod expand_main;
 pub mod fix_match_defs;
 pub mod fix_match_terms;
 pub mod float_combinators;

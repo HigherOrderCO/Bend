@@ -2,5 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/exp.bend
 ---
-[4m[1m[31mErrors:[0m
-Failed to parse result from HVM.
+NumScott:
+[4m[1m[33mWarnings:[0m
+[1mDuring readback:[0m
+  Unable to interpret the HVM result as a valid Bend term. (Reached Root)
+
+λa λb (<Invalid> λ$c $c $c)
+
+Scott:
+[4m[1m[33mWarnings:[0m
+[1mDuring readback:[0m
+  Unable to interpret the HVM result as a valid Bend term. (Reached Root)
+
+λa λb (<Invalid> λ$c $c $c)

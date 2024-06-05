@@ -2,8 +2,6 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/addition.bend
 ---
-@main = a
-  & @main__C0 ~ (8 a)
-
-@main__C0 = (a b)
+@main = c
+  & (a b) ~ (8 c)
   & $(1 $([+] $(a b))) ~ [+1]
