@@ -183,6 +183,12 @@ In Bend, it can be parallelized by just changing the run command. If your code *
 ### Speedup Examples
 The code snippet below implements a [bitonic sorter](https://en.wikipedia.org/wiki/Bitonic_sorter) with *immutable tree rotations*. It's not the type of algorithm you would expect to run fast on GPUs. However, since it uses a divide and conquer approach, which is inherently parallel, Bend will execute it on multiple threads, no thread creation, no explicit lock management.
 
+#### Bitonic Sorter Benchmark
+
+- `bend run`: CPU, Apple M3 Max: 12.15 seconds
+- `bend run-c`: CPU, Apple M3 Max: 0.96 seconds
+- `bend run-cu`: GPU, NVIDIA RTX 4090: 0.21 seconds
+
  <details>
   <summary>Click here for the Bitonic Sorter code </summary> 
    
@@ -260,12 +266,6 @@ def sum(d, t):
 def main:
   return sum(20, sort(20, 0, gen(20, 0)))
 ```
-
-#### Benchmark
-
-- `bend run`: CPU, Apple M3 Max: 12.15 seconds
-- `bend run-c`: CPU, Apple M3 Max: 0.96 seconds
-- `bend run-cu`: GPU, NVIDIA RTX 4090: 0.21 seconds
 
 </details>
   
