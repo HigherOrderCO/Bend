@@ -25,7 +25,7 @@ Installation
 ### Install dependencies
 
 #### On Linux
-```py
+```sh
 # Install Rust if you haven't it already.
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
@@ -36,7 +36,7 @@ For the CUDA runtime [install the CUDA toolkit for Linux](https://developer.nvid
 
 
 #### On Mac
-```py
+```sh
 # Install Rust if you haven't it already.
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
