@@ -248,6 +248,8 @@ impl fmt::Display for Op {
       Op::SHL => write!(f, "<<"),
       Op::LOG => todo!(),
       Op::ATN => todo!(),
+      Op::LE => write!(f, "<="),
+      Op::GE => write!(f, ">="),
     }
   }
 }

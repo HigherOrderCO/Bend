@@ -1176,6 +1176,8 @@ impl Op {
       Op::NEQ => 3,
       Op::LT => 4,
       Op::GT => 4,
+      Op::LE => 4,
+      Op::GE => 4,
       Op::SHL => 5,
       Op::SHR => 5,
       Op::ADD => 6,
