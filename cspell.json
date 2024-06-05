@@ -111,11 +111,9 @@
     "undefer",
     "vectorize",
     "vectorizes",
-    "parallel_sum",
-    "sequential_sum",
     "tlsv",
     "proto",  
-    "walkdir",
+    "walkdir"
   ],
   "files": [
     "**/*.rs",

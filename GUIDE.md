@@ -22,22 +22,47 @@ you just want to dive straight into action - this guide is for you. Let's go!
 
 Installation
 ------------
+### Install dependencies
 
-To use Bend, first, install [Rust](https://www.rust-lang.org/tools/install). Then, install HVM2 and Bend itself with:
+#### On Linux
+```py
+# Install Rust if you haven't it already.
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
+# For the C version of Bend, use GCC. We recommend a version up to 12.x.
+sudo apt install gcc
 ```
+For the CUDA runtime [install the CUDA toolkit for Linux](https://developer.nvidia.com/cuda-downloads?target_os=Linux) version 12.x.
+
+
+#### On Mac
+```py
+# Install Rust if you haven't it already.
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+
+# For the C version of Bend, use GCC. We recommend a version up to 12.x.
+brew install gcc
+```
+
+
+### Install Bend
+
+1. Install HVM2 by running:
+```sh
+# HVM2 is HOC's massively parallel Interaction Combinator evaluator.
 cargo install hvm
+
+# This ensures HVM is correctly installed and accessible.
+hvm --version
+```
+2. Install Bend by running:
+```sh
+# This command will install Bend
 cargo install bend-lang
-```
 
-To test if it worked, type:
-
+# This ensures Bend is correctly installed and accessible.
+bend --version
 ```
-bend --help
-```
-
-For GPU support, you also need the CUDA toolkit (CUDA and `nvcc`) version `12.X`. **It needs to be installed _before_ you install HVM.**
-At the moment, **only Nvidia GPUs** are supported.
 
 Hello, World!
 -------------

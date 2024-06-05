@@ -26,12 +26,13 @@ Bend is powered by the [HVM2](https://github.com/higherorderco/hvm) runtime.
 
 
 
+
 ## Install
 
 ### Install dependencies
 
 #### On Linux
-```py
+```sh
 # Install Rust if you haven't it already.
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
@@ -42,7 +43,7 @@ For the CUDA runtime [install the CUDA toolkit for Linux](https://developer.nvid
 
 
 #### On Mac
-```py
+```sh
 # Install Rust if you haven't it already.
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 
@@ -90,12 +91,12 @@ bend run-cu <file.bend> # uses the CUDA interpreter (massively parallel)
 The example below sums all the numbers in the range from `start` to `target`. It can be written in two different methods: one that is inherently sequential (and thus cannot be parallelized), and another that is easily parallelizable. (We will be using the `-s`flag in most examples, for the sake of visibility)
 
 #### Sequential version:
-First, create a file named `ssum.bend`
+First, create a file named `sequential_sum.bend`
 ```sh
 # Write this command on your terminal
-touch ssum.bend
+touch sequential_sum.bend
 ```
-Then with your text editor, open the file `ssum.bend`, copy the code below and paste in the file.
+Then with your text editor, open the file `sequential_sum.bend`, copy the code below and paste in the file.
 
 ```py
 # Defines the function Sum with two parameters: start and target
@@ -115,29 +116,29 @@ def main():
 ##### Running the file
 You can run it using Rust interpreter (Sequential)
 ```sh
-bend run ssum.bend -s
+bend run sequential_sum.bend -s
 ```
 
 Or you can run it using C interpreter (Sequential)
 ```sh
-bend run-c ssum.bend -s
+bend run-c sequential_sum.bend -s
 ```
 
 If you have a NVIDIA GPU, you can also run in CUDA (Sequential)
 ```sh
-bend run-cu ssum.bend -s
+bend run-cu sequential_sum.bend -s
 ```
 
 In this version, the next value to be calculated depends on the previous sum, meaning that it cannot proceed until the current computation is complete. Now, let's look at the easily parallelizable version.
 
 
 #### Parallelizable version:
-First close the old file and then proceed to your terminal to create `psum.bend`
+First close the old file and then proceed to your terminal to create `parallel_sum.bend`
 ```sh
 # Write this command on your terminal
-touch psum.bend
+touch parallel_sum.bend
 ```
-Then with your text editor, open the file `psum.bend`, copy the code below and paste in the file.
+Then with your text editor, open the file `parallel_sum.bend`, copy the code below and paste in the file.
 
 ```py
 # Defines the function Sum with two parameters: start and target
@@ -163,17 +164,17 @@ In this example, the (3 + 4) sum does not depend on the (1 + 2), meaning that it
 ##### Running the file
 You can run it using Rust interpreter (Sequential)
 ```sh
-bend run psum.bend -s
+bend run parallel_sum.bend -s
 ```
 
 Or you can run it using C interpreter (Parallel)
 ```sh
-bend run-c ssum.bend -s
+bend run-c sequential_sum.bend -s
 ```
 
 If you have a NVIDIA GPU, you can also run in CUDA (Massively parallel)
 ```sh
-bend run-cu ssum.bend -s
+bend run-cu sequential_sum.bend -s
 ```
 
 In Bend, it can be parallelized by just changing the run command. If your code **can** run in parallel it **will** run in parallel.
@@ -272,5 +273,6 @@ if you are interested in some other algorithms, you can check our [examples fold
 
 
 ### Additional Resources
- - To understand the technology behind Bend, check out the HVM2 [paper](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/PAPER.pdf). Bend is developed by [HigherOrderCO](https://higherorderco.com/) - join our [Discord](https://discord.gg/kindelia)!
- - Watch the [live demo video](https://x.com/i/status/1791213162525524076).
+ - To understand the technology behind Bend, check out the HVM2 [paper](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/PAPER.pdf).
+ - We are working  https://github.com/HigherOrderCO/Bend/blob/main/GUIDE.md
+ - Bend is developed by [HigherOrderCO](https://higherorderco.com/) - join our [Discord](https://discord.higherorderco.com)!
