@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/unused_main_var.bend
+---
+NumScott:
+[10, 12, 14, 16]
+
+Scott:
+[10, 12, 14, 16]

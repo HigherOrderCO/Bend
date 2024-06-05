@@ -2,11 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/lets.bend
 ---
-@main = @main__C0
-  & (a a) ~ *
-
-@main__C0 = n
-  & (a a) ~ (f (i (m n)))
-  & (d d) ~ {(e f) e}
-  & (c c) ~ {(g (h i)) {g h}}
-  & (b b) ~ {(j (k (l m))) {j {k l}}}
+@main = o
+  & (a a) ~ (g (j (n o)))
+  & (e e) ~ *
+  & (d d) ~ {(f g) f}
+  & (c c) ~ {(h (i j)) {h i}}
+  & (b b) ~ {(k (l (m n))) {k {l m}}}

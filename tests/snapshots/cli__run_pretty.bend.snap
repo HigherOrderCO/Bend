@@ -4,9 +4,9 @@ input_file: tests/golden_tests/cli/run_pretty.bend
 ---
 Result:
 λa switch a = a {
-  0: λa switch a {
+  0: λb switch b = b {
       0: "ba";
-      _: λ* "ta";
+      _: "ta";
     };
   _: λ* "ata";
 }

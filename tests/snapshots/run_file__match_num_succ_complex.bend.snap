@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_num_succ_complex.bend
 ---
 NumScott:
-[[5, 5, 0, 12, 0, 6], [5, 5, 0, 12, 0, 6]]
+[[5, 5, *, *, *, *], [5, 5, *, *, *, *]]
 
 Scott:
-[[5, 5, 0, 12, 0, 6], [5, 5, 0, 12, 0, 6]]
+[[5, 5, *, *, *, *], [5, 5, *, *, *, *]]

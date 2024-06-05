@@ -36,10 +36,6 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.bend
 
 @MergePair__C4 = (?((@MergePair__C3 (* (* @List_/Nil))) a) a)
 
-@MergeSort = (a (b d))
-  & @Unpack ~ (a (c d))
-  & @Map ~ (b (@Pure c))
-
 @Merge__C0 = ({b {g l}} ({h q} ({(a (b c)) {e m}} ({a {d n}} ({f o} t)))))
   & @If ~ (c (k (s t)))
   & @List_/Cons ~ (d (j k))
@@ -75,4 +71,6 @@ input_file: tests/golden_tests/compile_file_o_all/list_merge_sort.bend
 
 @Unpack__C3 = (?((@Unpack__C2 (* (* @List_/Nil))) a) a)
 
-@main = @MergeSort
+@main = (a (b d))
+  & @Unpack ~ (a (c d))
+  & @Map ~ (b (@Pure c))

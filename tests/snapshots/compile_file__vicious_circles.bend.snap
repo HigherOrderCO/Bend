@@ -7,3 +7,5 @@ input_file: tests/golden_tests/compile_file/vicious_circles.bend
   Found term that compiles into an inet with a vicious cycle
 [1mIn compiled inet '[4mdup_self[0m[1m':[0m
   Found term that compiles into an inet with a vicious cycle
+[1mIn compiled inet '[4mmain[0m[1m':[0m
+  Found term that compiles into an inet with a vicious cycle

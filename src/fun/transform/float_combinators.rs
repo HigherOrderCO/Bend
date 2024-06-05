@@ -33,6 +33,15 @@ impl Book {
     let mut ctx = FloatCombinatorsCtx::new(&book, max_size);
 
     for (def_name, def) in self.defs.iter_mut() {
+      // Don't float combinators in the main entrypoint.
+      // This avoids making programs unexpectedly too lazy,
+      // returning just a reference without executing anything.
+      if let Some(main) = self.entrypoint.as_ref() {
+        if def_name == main {
+          continue;
+        }
+      }
+
       let builtin = def.builtin;
       let body = &mut def.rule_mut().body;
       ctx.reset();

@@ -3,7 +3,15 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/linearize_match.bend
 ---
 NumScott:
-λa switch a = a { 0: λb b; _: λb (+ a-1 b); }
+[4m[1m[33mWarnings:[0m
+[1mDuring readback:[0m
+  Encountered an invalid numeric operation.
+
+λa switch a = a { 0: λb b; _: λd <Invalid>; }
 
 Scott:
-λa switch a = a { 0: λb b; _: λb (+ a-1 b); }
+[4m[1m[33mWarnings:[0m
+[1mDuring readback:[0m
+  Encountered an invalid numeric operation.
+
+λa switch a = a { 0: λb b; _: λd <Invalid>; }

@@ -10,7 +10,7 @@ input_file: tests/golden_tests/desugar_file/mapper_syntax.bend
 
 (Map/map) = λa λb λc (a Map/map__C5 b c)
 
-(main) = let (a, b) = main__C8; let (c, *) = (Map/get b 0); (main__C7, a, c)
+(main) = let (c, d) = (Map/get (Map/map (Map/map (Map/set (Map/set Map/empty 0 3) 1 4) 1 λa (+ a 1)) 1 λb (* b 2)) 1); let (e, *) = (Map/get d 0); ((λf (+ f 1) 1), c, e)
 
 (Map/Node) = λa λb λc λd (d Map/Node/tag a b c)
 
@@ -65,21 +65,3 @@ input_file: tests/golden_tests/desugar_file/mapper_syntax.bend
 (Map/set__C8) = λa λb λc λd λe let {f g} = e; (switch (== 0 f) { 0: Map/set__C2; _: Map/set__C3; } d g a b c)
 
 (Map/set__C9) = λ* λa λb let {c d} = b; (switch (== 0 c) { 0: Map/set__C6; _: Map/set__C7; } a d)
-
-(main__C0) = (Map/set Map/empty 0 3)
-
-(main__C1) = λa (+ a 1)
-
-(main__C2) = (Map/set main__C0 1 4)
-
-(main__C3) = λa (* a 2)
-
-(main__C4) = (Map/map main__C2 1 main__C1)
-
-(main__C5) = (Map/map main__C4 1 main__C3)
-
-(main__C6) = λa (+ a 1)
-
-(main__C7) = (main__C6 1)
-
-(main__C8) = (Map/get main__C5 1)

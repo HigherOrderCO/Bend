@@ -18,4 +18,4 @@ input_file: tests/golden_tests/compile_file/ref_to_ref.bend
 
 @C1 = @B4
 
-@main = ((@A1 @B1) @C1)
+@main = ((1 2) 2)

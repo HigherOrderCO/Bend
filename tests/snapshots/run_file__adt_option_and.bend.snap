@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/adt_option_and.bend
 ---
 NumScott:
-λa (a λa switch a { 0: λa λb (b λa switch a { 0: λa λb (Option/Some (b, a)); _: λ* λ* Option/None; } a); _: λ* λ* Option/None; })
+λa (a λb switch b = b { 0: λc λd (d λe switch e = e { 0: λf λg λh (h Option/Some/tag λi f); _: λ* Option/None; } c); _: λ* Option/None; })
 
 Scott:
-λa (a λa λb (b λa λb (Option/Some (b, a)) λ* Option/None a) λ* Option/None)
+λa (a λb λc (c λd λe λf λ* (f λg d) λ* Option/None b) λ* Option/None)

@@ -10,7 +10,7 @@ input_file: tests/golden_tests/desugar_file/bind_syntax.bend
 
 (safe_rem) = λa λb (switch b { 0: λ* (Result/Err (String/Cons 77 (String/Cons 111 (String/Cons 100 (String/Cons 32 (String/Cons 98 (String/Cons 121 (String/Cons 32 (String/Cons 48 String/Nil))))))))); _: safe_rem__C0; } a)
 
-(Main) = (Result/bind Main__C3 Main__C2)
+(Main) = (Result/bind (safe_div 3 2) λa (a λb (Result/bind (safe_rem b 0) λc (c λd d))))
 
 (String/Nil) = λa (a String/Nil/tag)
 
@@ -27,14 +27,6 @@ input_file: tests/golden_tests/desugar_file/bind_syntax.bend
 (Result/Ok/tag) = 0
 
 (Result/Err/tag) = 1
-
-(Main__C0) = λa (a λb b)
-
-(Main__C1) = λa (Result/bind (safe_rem a 0) Main__C0)
-
-(Main__C2) = λa (a Main__C1)
-
-(Main__C3) = (safe_div 3 2)
 
 (Result/bind__C0) = λa λb (undefer b a)
 

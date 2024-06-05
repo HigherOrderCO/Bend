@@ -10,8 +10,6 @@ input_file: tests/golden_tests/cli/compile_all.bend
 
 @Pair/Pair = (a (b ((0 (a (b c))) c)))
 
-@main = b
-  & @Pair.get ~ (@main__C0 (a b))
-  & @Pair/Pair ~ (40 (2 a))
-
-@main__C0 = ($([+] $(a b)) (a b))
+@main = d
+  & @Pair.get ~ (($([+] $(a b)) (a b)) (c d))
+  & @Pair/Pair ~ (40 (2 c))
