@@ -190,7 +190,7 @@ The code snippet below implements a [bitonic sorter](https://en.wikipedia.org/wi
 - `bend run-cu`: GPU, NVIDIA RTX 4090: 0.21 seconds
 
  <details>
-  <summary>Click here for the Bitonic Sorter code </summary> 
+  <summary><b>Click here for the Bitonic Sorter code</b></summary>
    
  ```py
  # Sorting Network = just rotate trees!
