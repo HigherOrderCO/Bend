@@ -111,8 +111,6 @@
     "undefer",
     "vectorize",
     "vectorizes",
-    "tlsv",
-    "proto",  
     "walkdir"
   ],
   "files": [
