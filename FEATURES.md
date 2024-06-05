@@ -414,7 +414,7 @@ Other features are described in the following documentation files:
 - &#128215; Data types: [Defining data types](docs/defining-data-types.md)
 - &#128215; Pattern matching: [Pattern matching](docs/pattern-matching.md)
 - &#128215; Native numbers and operations: [Native numbers](docs/native-numbers.md)
-- &#128215; Builtin definitions: _Documentation coming soon_
+- &#128215; Builtin definitions: [Builtins](docs/builtins.md)
 - &#128215; CLI arguments: [CLI arguments](docs/cli-arguments.md)
 - &#128217; Duplications and superpositions: [Dups and sups](docs/dups-and-sups.md)
 - &#128217; Scopeless lambdas: [Using scopeless lambdas](docs/using-scopeless-lambdas.md)

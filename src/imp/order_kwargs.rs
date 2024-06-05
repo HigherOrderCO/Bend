@@ -156,12 +156,17 @@ impl Expr {
           entry.1.order_kwargs(book)?;
         }
       }
-      Expr::MapGet { .. }
-      | Expr::Era
-      | Expr::Var { .. }
-      | Expr::Chn { .. }
-      | Expr::Num { .. }
-      | Expr::Str { .. } => {}
+      Expr::MapGet { nam: _, key } => {
+        key.order_kwargs(book)?;
+      }
+      Expr::TreeNode { left, right } => {
+        left.order_kwargs(book)?;
+        right.order_kwargs(book)?;
+      }
+      Expr::TreeLeaf { val } => {
+        val.order_kwargs(book)?;
+      }
+      Expr::Era | Expr::Var { .. } | Expr::Chn { .. } | Expr::Num { .. } | Expr::Str { .. } => {}
     }
     Ok(())
   }

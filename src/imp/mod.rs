@@ -38,6 +38,10 @@ pub enum Expr {
   Map { entries: Vec<(Expr, Expr)> },
   // {map} "[" {key} "]"
   MapGet { nam: Name, key: Box<Expr> },
+  // "![" {left} "," {right} "]"
+  TreeNode { left: Box<Expr>, right: Box<Expr> },
+  // "!" {val}
+  TreeLeaf { val: Box<Expr> },
 }
 
 #[derive(Clone, Debug)]

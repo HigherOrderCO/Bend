@@ -1,0 +1,37 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/desugar_file/tree_syntax.bend
+---
+(fun0) = (Tree/Node (Tree/Leaf 0) (Tree/Node (Tree/Leaf 1) (Tree/Node (Tree/Leaf 2) (Tree/Leaf 3))))
+
+(fun1) = (Tree/Leaf (Tree/Node (Tree/Leaf *) (Tree/Leaf *)))
+
+(fun2) = (Tree/Leaf (Tree/Leaf (Tree/Leaf *)))
+
+(fun3) = (Tree/Leaf 1)
+
+(fun4) = λa switch a { 0: (Tree/Leaf 0); _: fun4__C0; }
+
+(imp0) = (Tree/Node (Tree/Leaf 0) (Tree/Node (Tree/Leaf 1) (Tree/Node (Tree/Leaf 2) (Tree/Leaf 3))))
+
+(imp1) = (Tree/Leaf (Tree/Node (Tree/Leaf *) (Tree/Leaf *)))
+
+(imp2) = (Tree/Leaf (Tree/Leaf (Tree/Leaf *)))
+
+(imp3) = (Tree/Leaf 1)
+
+(imp4) = λa switch a { 0: (Tree/Leaf 0); _: imp4__C0; }
+
+(main) = *
+
+(Tree/Node) = λa λb λc (c Tree/Node/tag a b)
+
+(Tree/Leaf) = λa λb (b Tree/Leaf/tag a)
+
+(Tree/Node/tag) = 0
+
+(Tree/Leaf/tag) = 1
+
+(fun4__C0) = λa let {b c} = a; (Tree/Node (fun4 b) (fun4 c))
+
+(imp4__C0) = λa let {b c} = a; (Tree/Node (imp4 b) (imp4 c))

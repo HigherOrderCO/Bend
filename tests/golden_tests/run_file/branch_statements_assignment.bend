@@ -1,5 +1,5 @@
 # Test that branching statements can end with an assignment
-type Tree:
+type MyTree:
   node { val, ~lft, ~rgt }
   leaf
 
@@ -13,14 +13,14 @@ def main:
 
   bend x = 1, h = 0:
     when h < n:
-      y = Tree/node { val: x, lft: fork(2 * x, h + 1), rgt: fork(2 * x + 1, h + 1) }
+      y = MyTree/node { val: x, lft: fork(2 * x, h + 1), rgt: fork(2 * x + 1, h + 1) }
     else:
-      y = Tree/leaf
+      y = MyTree/leaf
 
   fold y:
-    case Tree/node:
+    case MyTree/node:
       z = y.val + y.lft + y.rgt
-    case Tree/leaf:
+    case MyTree/leaf:
       z = 0
 
   return z

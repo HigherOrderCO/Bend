@@ -1,32 +1,32 @@
-type Tree = Leaf | (Node l m r)
+type MyTree = Leaf | (Node lft val rgt)
 
 # Parallel QuickSort
-(Sort List/Nil)         = Tree/Leaf
-(Sort (List/Cons x xs)) =
-  ((Part x xs) λmin λmax
+(Sort List/Nil)         = MyTree/Leaf
+(Sort (List/Cons head tail)) =
+  ((Part head tail) λmin λmax
     let lft = (Sort min)
     let rgt = (Sort max)
-    (Tree/Node lft x rgt))
+    (MyTree/Node lft head rgt))
 
   # Partitions a list in two halves, less-than-p and greater-than-p
-  (Part p List/Nil)         = λt (t List/Nil List/Nil)
-  (Part p (List/Cons x xs)) = (Push (> x p) x (Part p xs))
+  (Part p List/Nil)              = λt (t List/Nil List/Nil)
+  (Part p (List/Cons head tail)) = (Push (> head p) head (Part p tail))
 
   # Pushes a value to the first or second list of a pair
   (Push 0 x pair) = (pair λmin λmax λp (p (List/Cons x min) max))
   (Push _ x pair) = (pair λmin λmax λp (p min (List/Cons x max)))
 
-# Generates a random list
-(Rnd 0 s) = List/Nil
-(Rnd n s) =
-  let s = (^ s (* s 0b10000000000000))
-  let s = (^ s (/ s 0b100000000000000000))
-  let s = (^ s (* s 0b100000))
-  (List/Cons s (Rnd (- n 1) s))
+# Generates a random list with xorshift
+(Rnd 0 state) = List/Nil
+(Rnd n state) =
+  let state = (^ state (<< state 13))
+  let state = (^ state (>> state 17))
+  let state = (^ state (<< state 5))
+  (List/Cons state (Rnd (- n 1) state))
 
 # Sums all elements in a concatenation tree
-(Sum Tree/Leaf)         = 0
-(Sum (Tree/Node l m r)) = (+ m (+ (Sum l) (Sum r)))
+(Sum MyTree/Leaf)               = 0
+(Sum (MyTree/Node lft val rgt)) = (+ val (+ (Sum lft) (Sum rgt)))
 
 # Sorts and sums n random numbers
 (Main) =

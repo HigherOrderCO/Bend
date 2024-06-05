@@ -448,6 +448,15 @@ impl Expr {
       }
       Expr::Map { entries } => map_init(entries),
       Expr::MapGet { .. } => unreachable!(),
+      Expr::TreeNode { left, right } => {
+        let left = left.to_fun();
+        let right = right.to_fun();
+        fun::Term::call(fun::Term::r#ref("Tree/Node"), [left, right])
+      }
+      Expr::TreeLeaf { val } => {
+        let val = val.to_fun();
+        fun::Term::app(fun::Term::r#ref("Tree/Leaf"), val)
+      }
     }
   }
 }

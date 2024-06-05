@@ -190,6 +190,13 @@ impl Expr {
             go(entry, substitutions, id);
           }
         }
+        Expr::TreeNode { left, right } => {
+          go(left, substitutions, id);
+          go(right, substitutions, id);
+        }
+        Expr::TreeLeaf { val } => {
+          go(val, substitutions, id);
+        }
         Expr::Era | Expr::Str { .. } | Expr::Var { .. } | Expr::Chn { .. } | Expr::Num { .. } => {}
       }
     }

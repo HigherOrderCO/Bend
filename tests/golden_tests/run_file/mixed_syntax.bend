@@ -2,13 +2,13 @@ type Bool:
   True
   False
 
-type Tree = (node ~lft ~rgt) | (leaf val)
+type MyTree = (node ~lft ~rgt) | (leaf val)
 
 def tree_xor(tree):
   fold tree:
-    case Tree/node:
+    case MyTree/node:
       return xor(tree.lft, tree.rgt);
-    case Tree/leaf:
+    case MyTree/leaf:
       return tree.val;
 
 (xor Bool/True Bool/False) = Bool/True
@@ -19,8 +19,8 @@ main =
   let depth = 10
   let tree = bend n = 0 {
     when (< n depth):
-      (Tree/node (fork (+ n 1)) (fork (+ n 1)))
+      (MyTree/node (fork (+ n 1)) (fork (+ n 1)))
     else:
-      if (% n 2) { (Tree/leaf Bool/True) } else { (Tree/leaf Bool/False) }
+      if (% n 2) { (MyTree/leaf Bool/True) } else { (MyTree/leaf Bool/False) }
   }
   (tree_xor tree)

@@ -1,6 +1,4 @@
 # should return (a+b+c) * 2^depth
-type Tree = (node ~lft ~rgt) | (leaf val)
-
 main =
   let depth = 2
   let a = 1;
@@ -9,11 +7,11 @@ main =
   let n = 0;
   let tree = bend n {
     when (< n depth):
-      (Tree/node (fork (+ n 1)) (fork (+ n 1)))
+      ![(fork (+ n 1)) (fork (+ n 1))]
     else:
-      (Tree/leaf c)
+      !c
   }
   fold tree {
-    Tree/node: (+ tree.lft tree.rgt)
-    Tree/leaf: (+ tree.val (+ a b))
+    Tree/Node: (+ tree.left tree.right)
+    Tree/Leaf: (+ tree.value (+ a b))
   }
