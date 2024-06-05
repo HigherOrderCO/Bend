@@ -180,7 +180,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
               let node = self.new_opr();
               self.link(fst, node.0);
               self.encode_term(snd, node.1);
-              self.link(up, node.2);
+              self.encode_le_ge_opers(opr, up, node.2);
             }
             // Partially apply with snd, flip
             (fst, Term::Num { val }) => {
@@ -194,7 +194,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
                 let node2 = self.new_opr();
                 self.link(node1.2, node2.0);
                 self.encode_term(snd, node2.1);
-                self.link(up, node2.2);
+                self.encode_le_ge_opers(opr, up, node2.2);
               } else {
                 // flip
                 let val = val.to_bits();
@@ -203,7 +203,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
                 let node = self.new_opr();
                 self.encode_term(fst, node.0);
                 self.link(snd, node.1);
-                self.link(up, node.2);
+                self.encode_le_ge_opers(opr, up, node.2);
               }
             }
             // Don't partially apply
@@ -216,7 +216,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
               let node2 = self.new_opr();
               self.link(node1.2, node2.0);
               self.encode_term(snd, node2.1);
-              self.link(up, node2.2);
+              self.encode_le_ge_opers(opr, up, node2.2);
             }
           }
         }
@@ -238,6 +238,20 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         self.encode_pat(pat, Place::Wire(wire));
       }
     })
+  }
+
+  fn encode_le_ge_opers(&mut self, opr: &Op, up: Place<'t>, node: Place<'t>) {
+    match opr {
+      Op::LE | Op::GE => {
+        let node_eq = self.new_opr();
+        let eq_val =
+          Place::Tree(LoanedMut::new(Tree::Num { val: hvm::ast::Numb(Op::EQ.to_native_tag() as u32) }));
+        self.link(eq_val, node_eq.0);
+        self.link(node_eq.1, node);
+        self.link(up, node_eq.2);
+      }
+      _ => self.link(up, node),
+    }
   }
 
   fn encode_pat(&mut self, pat: &Pattern, up: Place<'t>) {
@@ -452,6 +466,9 @@ impl Op {
       Op::ATN => hvm::hvm::OP_AND,
       Op::LOG => hvm::hvm::OP_OR,
       Op::POW => hvm::hvm::OP_XOR,
+
+      Op::LE => hvm::hvm::OP_GT,
+      Op::GE => hvm::hvm::OP_LT,
     }
   }
 }

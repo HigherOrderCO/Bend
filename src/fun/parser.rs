@@ -1057,6 +1057,10 @@ pub trait ParserCommons<'a>: Parser<'a> {
       Op::SHL
     } else if self.try_consume_exactly(">>") {
       Op::SHR
+    } else if self.try_consume_exactly("<=") {
+      Op::LE
+    } else if self.try_consume_exactly(">=") {
+      Op::GE
     } else if self.try_consume_exactly("<") {
       Op::LT
     } else if self.try_consume_exactly(">") {
@@ -1094,6 +1098,10 @@ pub trait ParserCommons<'a>: Parser<'a> {
       Op::SHL
     } else if self.starts_with(">>") {
       Op::SHR
+    } else if self.starts_with("<=") {
+      Op::LE
+    } else if self.starts_with(">=") {
+      Op::GE
     } else if self.starts_with("<") {
       Op::LT
     } else if self.starts_with(">") {

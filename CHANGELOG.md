@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.34
+- Added `<=` and `>=` operators. (#451)
+
 ## 0.2.33
 - Added `expand_main`, a compilation pass that expands references in the entry point function. (#424)
 - Changed the `float_combinators` pass to not extract in the entry point function. (#424)

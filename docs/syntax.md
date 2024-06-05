@@ -384,6 +384,7 @@ Therefore, all `bind` functions must call the builtin function `undefer` before 
 This is necessary to ensure that the continuation in recursive monadic functions stays lazy and doesn't expand infinitely.
 
 This is an example of a recursive function that would loop if passing the variable `a` to the recursive call `Result/foo(a, b)` was not deferred:
+
 ```python
 def Result/foo(x, y):
   with Result:
@@ -546,21 +547,23 @@ u24 = 42
 
 Currently, the 3 number types cannot be mixed.
 
-| Operation      | Syntax   | Supported Types  |
-| -------------- | -------- | ---------------- |
-| Addition       | x + y    | int, float, uint |
-| Subtraction    | x - y    | int, float, uint |
-| Multiplication | x \* y   | int, float, uint |
-| Division       | x / y    | int, float, uint |
-| Remainder      | x % y    | int, float, uint |
-| Exponentiation | x \*\* y | float            |
-| Equal          | x == y   | int, float, uint |
-| Not Equal      | x != y   | int, float, uint |
-| Less Than      | x < y    | int, float, uint |
-| Greater Than   | x > y    | int, float, uint |
-| Bitwise And    | x & y    | int, uint        |
-| Bitwise Or     | x \| y   | int, uint        |
-| Bitwise Xor    | x ^ y    | int, uint        |
+| Operation             | Syntax   | Supported Types  |
+| --------------------- | -------- | ---------------- |
+| Addition              | x + y    | int, float, uint |
+| Subtraction           | x - y    | int, float, uint |
+| Multiplication        | x \* y   | int, float, uint |
+| Division              | x / y    | int, float, uint |
+| Remainder             | x % y    | int, float, uint |
+| Exponentiation        | x \*\* y | float            |
+| Equal                 | x == y   | int, float, uint |
+| Not Equal             | x != y   | int, float, uint |
+| Less Than             | x < y    | int, float, uint |
+| Greater Than          | x > y    | int, float, uint |
+| Less Than or Equal    | x <= y   | int, float, uint |
+| Greater Than or Equal | x >= y   | int, float, uint |
+| Bitwise And           | x & y    | int, uint        |
+| Bitwise Or            | x \| y   | int, uint        |
+| Bitwise Xor           | x ^ y    | int, uint        |
 
 ### Constructor Literals
 
@@ -1026,6 +1029,7 @@ Therefore, all `bind` functions must call the builtin function `undefer` before 
 This is necessary to ensure that the continuation in recursive monadic functions stays lazy and doesn't expand infinitely.
 
 This is an example of a recursive function that would loop if passing the variable `a` to the recursive call `Result/foo(a, b)` was not deferred:
+
 ```python
 Result/foo x y = with Result {
   ask a = (Result/Ok 1)
@@ -1078,21 +1082,23 @@ u24 = 42
 
 Currently, the 3 number types cannot be mixed.
 
-| Operation      | Syntax     | Supported Types  |
-| -------------- | ---------- | ---------------- |
-| Addition       | (+ x y)    | int, float, uint |
-| Subtraction    | (- x y)    | int, float, uint |
-| Multiplication | (\* x y)   | int, float, uint |
-| Division       | (/ x y)    | int, float, uint |
-| Remainder      | (% x y)    | int, float, uint |
-| Exponentiation | (\*\* x y) | float            |
-| Equal          | (== x y)   | int, float, uint |
-| Not Equal      | (!= x y)   | int, float, uint |
-| Less Than      | (< x y)    | int, float, uint |
-| Greater Than   | (> x y)    | int, float, uint |
-| Bitwise And    | (& x y)    | int, uint        |
-| Bitwise Or     | (\| x y)   | int, uint        |
-| Bitwise Xor    | (^ x y)    | int, uint        |
+| Operation             | Syntax     | Supported Types  |
+| --------------------- | ---------- | ---------------- |
+| Addition              | (+ x y)    | int, float, uint |
+| Subtraction           | (- x y)    | int, float, uint |
+| Multiplication        | (\* x y)   | int, float, uint |
+| Division              | (/ x y)    | int, float, uint |
+| Remainder             | (% x y)    | int, float, uint |
+| Exponentiation        | (\*\* x y) | float            |
+| Equal                 | (== x y)   | int, float, uint |
+| Not Equal             | (!= x y)   | int, float, uint |
+| Less Than             | (< x y)    | int, float, uint |
+| Greater Than          | (> x y)    | int, float, uint |
+| Less Than or Equal    | (<= x y)   | int, float, uint |
+| Greater Than or Equal | (>= x y)   | int, float, uint |
+| Bitwise And           | (& x y)    | int, uint        |
+| Bitwise Or            | (\| x y)   | int, uint        |
+| Bitwise Xor           | (^ x y)    | int, uint        |
 
 ### Character Literal
 

@@ -202,6 +202,10 @@ pub enum Op {
   LOG,
   // a^b
   POW,
+  /// Less than or equal
+  LE,
+  /// Greater than or equal
+  GE,
 }
 
 #[derive(Debug, Clone, Copy)]
