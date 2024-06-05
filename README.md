@@ -28,7 +28,7 @@ Bend is powered by the [HVM2](https://github.com/higherorderco/hvm) runtime.
 
 ## Install
 
-### Install depedencies
+### Install dependencies
 
 #### On Linux
 ```py
@@ -171,7 +171,7 @@ Or you can run it using C interpreter (Parallel)
 bend run-c ssum.bend -s
 ```
 
-If you have a NVIDIA GPU, you can also run in CUDA (Massivelly parallel)
+If you have a NVIDIA GPU, you can also run in CUDA (Massively parallel)
 ```sh
 bend run-cu ssum.bend -s
 ```
