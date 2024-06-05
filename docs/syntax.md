@@ -622,6 +622,18 @@ A List literal is surrounded by `[` `]`. The elements must be separated by `,`.
 
 It is desugared to constructor calls of the built-in type List, `List/cons(head, ~tail)` and `List/nil` .
 
+### Tree Literals
+
+```python
+![![1, 2], ![3, 4]]
+```
+
+The Tree literals `![]` and `!` are used to create values of the built-in type `Tree`.
+
+`![a b]` is equivalent to `Tree/Node(a, b)`.
+
+`!x` is equivalent to `Tree/Leaf(x)`.
+
 ### Map Literals
 
 ```python
@@ -1130,6 +1142,18 @@ The syntax above is desugared to:
 ```
 
 Using `,` is optional.
+
+### Tree Literals
+
+```python
+![![1, 2], ![3, 4]]
+```
+
+The Tree literals `![]` and `!` are used to create values of the built-in type `Tree`.
+
+`![a b]` is equivalent to `Tree/Node(a, b)`.
+
+`!x` is equivalent to `Tree/Leaf(x)`.
 
 ### Nat Literal
 
