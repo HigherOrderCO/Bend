@@ -180,7 +180,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
               let node = self.new_opr();
               self.link(fst, node.0);
               self.encode_term(snd, node.1);
-              self.encode_le_ge_oprs(opr, up, node.2);
+              self.encode_le_ge_opers(opr, up, node.2);
             }
             // Partially apply with snd, flip
             (fst, Term::Num { val }) => {
@@ -194,7 +194,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
                 let node2 = self.new_opr();
                 self.link(node1.2, node2.0);
                 self.encode_term(snd, node2.1);
-                self.encode_le_ge_oprs(opr, up, node2.2);
+                self.encode_le_ge_opers(opr, up, node2.2);
               } else {
                 // flip
                 let val = val.to_bits();
@@ -203,7 +203,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
                 let node = self.new_opr();
                 self.encode_term(fst, node.0);
                 self.link(snd, node.1);
-                self.encode_le_ge_oprs(opr, up, node.2);
+                self.encode_le_ge_opers(opr, up, node.2);
               }
             }
             // Don't partially apply
@@ -216,7 +216,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
               let node2 = self.new_opr();
               self.link(node1.2, node2.0);
               self.encode_term(snd, node2.1);
-              self.encode_le_ge_oprs(opr, up, node2.2);
+              self.encode_le_ge_opers(opr, up, node2.2);
             }
           }
         }
@@ -240,7 +240,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
     })
   }
 
-  fn encode_le_ge_oprs(&mut self, opr: &Op, up: Place<'t>, node: Place<'t>) {
+  fn encode_le_ge_opers(&mut self, opr: &Op, up: Place<'t>, node: Place<'t>) {
     match opr {
       Op::LE | Op::GE => {
         let node_eq = self.new_opr();
