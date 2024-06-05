@@ -1,5 +1,3 @@
-type Tree = (node lft rgt) | (leaf val)
-
 tail_recursive = @x (x @pred @acc (tail_recursive pred (+ 1 acc)) @acc 0)
 
 fold_ = @bm (bm
@@ -60,23 +58,23 @@ List.reverse_over xs ys = match xs {
 }
 
 Tree.leaves tree = match tree {
-  Tree/leaf: 1
-  Tree/node: (+ (Tree.leaves tree.lft) (Tree.leaves tree.rgt))
+  Tree/Leaf: 1
+  Tree/Node: (+ (Tree.leaves tree.left) (Tree.leaves tree.right))
 }
 
 Tree.nodes tree = match tree {
-  Tree/leaf: 0
-  Tree/node: (+ 1 (+ (Tree.nodes tree.lft) (Tree.nodes tree.rgt)))
+  Tree/Leaf: 0
+  Tree/Node: (+ 1 (+ (Tree.nodes tree.left) (Tree.nodes tree.right)))
 }
 
 Tree.height tree = match tree {
-  Tree/leaf: 0
-  Tree/node: (+ 1 (max (Tree.height tree.lft) (Tree.height tree.rgt)))
+  Tree/Leaf: 0
+  Tree/Node: (+ 1 (max (Tree.height tree.left) (Tree.height tree.right)))
 }
 
 Tree.map tree f = match tree {
-  Tree/leaf: (Tree/leaf (f tree.val))
-  Tree/node: (Tree/node (Tree.map tree.lft f) (Tree.map tree.rgt f))
+  Tree/Leaf: (Tree/Leaf (f tree.value))
+  Tree/Node: (Tree/Node (Tree.map tree.left f) (Tree.map tree.right f))
 }
 
 max a b = switch (> a b) {
@@ -85,8 +83,8 @@ max a b = switch (> a b) {
 }
 
 Tree.flip tree = match tree {
-  Tree/leaf: tree
-  Tree/node: (Tree/node (Tree.flip tree.rgt) (Tree.flip tree.lft))
+  Tree/Leaf: tree
+  Tree/Node: (Tree/Node (Tree.flip tree.right) (Tree.flip tree.left))
 }
 
 calc =

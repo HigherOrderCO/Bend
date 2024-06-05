@@ -11,7 +11,7 @@ Both syntaxes can be mixed in the same file like the example below:
 ```python
 object Point { x, y }
 
-type Tree = (Node ~left ~right) | (Leaf value)
+type MyTree = (Node ~left ~right) | (Leaf value)
 
 type Bool:
   True

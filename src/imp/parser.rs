@@ -83,86 +83,53 @@ impl<'a> PyParser<'a> {
     } else {
       self.skip_trivia();
     }
-    let Some(head) = self.peek_one() else { return self.expected("expression")? };
 
     let ini_idx = *self.index();
 
-    let base = match head {
+    let base = if self.starts_with("(") {
       // Tuple or parenthesized expression
-      '(' => {
-        self.advance_one();
-        let head = self.parse_expr(false)?;
-        self.skip_trivia();
-        if self.starts_with(",") {
-          // A Tuple
-          let mut els = vec![head];
-          while self.try_consume(",") {
-            els.push(self.parse_expr(false)?);
-          }
-          self.consume(")")?;
-          Expr::Tup { els }
-        } else {
-          self.consume(")")?;
-          // A parenthesized expression
-          head
-        }
-      }
+      self.parse_tuple_or_parens()?
+    } else if self.starts_with("{") {
       // Map or Sup
-      '{' => {
-        self.advance_one();
-        // Empty map
-        if self.try_consume("}") {
-          return Ok(Expr::Map { entries: vec![] });
-        }
-        let head = self.parse_expr(false)?;
-        self.skip_trivia();
-        if self.try_consume(",") {
-          self.parse_sup(head)?
-        } else if self.try_consume(":") {
-          self.parse_map_init(head)?
-        } else {
-          self.expected("',' or ':'")?
-        }
-      }
+      self.parse_map_or_sup()?
+    } else if self.starts_with("[") {
       // List or Comprehension
-      '[' => self.parse_list_or_comprehension()?,
+      self.parse_list_or_comprehension()?
+    } else if self.starts_with("![") {
+      // Tree Node
+      self.parse_tree_node()?
+    } else if self.starts_with("!") {
+      // Tree Leaf
+      self.parse_tree_leaf(inline)?
+    } else if self.starts_with("`") {
       // Symbol
-      '`' => Expr::Num { val: Num::U24(self.parse_quoted_symbol()?) },
+      Expr::Num { val: Num::U24(self.parse_quoted_symbol()?) }
+    } else if self.starts_with("\"") {
       // String
-      '\"' => {
-        let str = self.parse_quoted_string()?;
-        let val = STRINGS.get(str);
-        Expr::Str { val }
-      }
+      Expr::Str { val: STRINGS.get(self.parse_quoted_string()?) }
+    } else if self.starts_with("'") {
       // Char
-      '\'' => {
-        let chr = self.parse_quoted_char()?;
-        Expr::Num { val: Num::U24(chr as u32 & 0x00ff_ffff) }
-      }
+      Expr::Num { val: Num::U24(self.parse_quoted_char()? as u32 & 0x00ff_ffff) }
+    } else if self.starts_with("$") {
       // Unscoped var
-      '$' => {
-        self.advance_one();
-        let nam = self.parse_bend_name()?;
-        Expr::Chn { nam }
-      }
+      self.advance_one();
+      Expr::Chn { nam: self.parse_bend_name()? }
+    } else if self.starts_with("*") {
       // Era
-      '*' => {
-        self.advance_one();
-        Expr::Era
-      }
-      // Number
-      c if is_num_char(c) => {
-        let val = self.parse_number()?;
-        Expr::Num { val }
-      }
-      // var
-      _ => {
+      self.advance_one();
+      Expr::Era
+    } else if let Some(c) = self.peek_one() {
+      if is_num_char(c) {
+        // Number
+        Expr::Num { val: self.parse_number()? }
+      } else {
+        // Var
         let nam = self.labelled(|p| p.parse_bend_name(), "expression")?;
         Expr::Var { nam }
       }
+    } else {
+      self.expected("expression")?
     };
-
-    let end_idx = *self.index();
 
     // postfixes
     if inline {
@@ -202,12 +169,13 @@ impl<'a> PyParser<'a> {
 
     // map get
     if self.starts_with("[") {
-      self.advance_one();
       if let Expr::Var { nam } = base {
+        self.advance_one();
         let key = self.parse_expr(false)?;
         self.consume("]")?;
         return Ok(Expr::MapGet { nam, key: Box::new(key) });
       } else {
+        let end_idx = *self.index();
         return self.expected_spanned("Map variable name", ini_idx, end_idx);
       }
     }
@@ -218,12 +186,50 @@ impl<'a> PyParser<'a> {
         let kwargs = self.list_like(|p| p.data_kwarg(), "{", "}", ",", true, 0)?;
         return Ok(Expr::Ctr { name: nam, args: Vec::new(), kwargs });
       } else {
+        let end_idx = *self.index();
         return self.expected_spanned("Constructor name", ini_idx, end_idx);
       }
     }
 
     // no postfix
     Ok(base)
+  }
+
+  fn parse_tuple_or_parens(&mut self) -> ParseResult<Expr> {
+    self.advance_one();
+    let head = self.parse_expr(false)?;
+    self.skip_trivia();
+    let term = if self.starts_with(",") {
+      // A Tuple
+      let mut els = vec![head];
+      while self.try_consume(",") {
+        els.push(self.parse_expr(false)?);
+      }
+      self.consume(")")?;
+      Expr::Tup { els }
+    } else {
+      self.consume(")")?;
+      // A parenthesized expression
+      head
+    };
+    Ok(term)
+  }
+
+  fn parse_map_or_sup(&mut self) -> ParseResult<Expr> {
+    self.advance_one();
+    // Empty map
+    if self.try_consume("}") {
+      return Ok(Expr::Map { entries: vec![] });
+    }
+    let head = self.parse_expr(false)?;
+    self.skip_trivia();
+    if self.try_consume(",") {
+      self.parse_sup(head)
+    } else if self.try_consume(":") {
+      self.parse_map_init(head)
+    } else {
+      self.expected("',' or ':'")
+    }
   }
 
   fn parse_map_init(&mut self, head: Expr) -> ParseResult<Expr> {
@@ -244,6 +250,22 @@ impl<'a> PyParser<'a> {
     let tail = self.list_like(|p| p.parse_expr(false), "", "}", ",", true, 1)?;
     els.extend(tail);
     Ok(Expr::Sup { els })
+  }
+
+  fn parse_tree_node(&mut self) -> ParseResult<Expr> {
+    self.advance_one();
+    self.advance_one();
+    let left = self.parse_expr(false)?;
+    self.consume(",")?;
+    let right = self.parse_expr(false)?;
+    self.consume("]")?;
+    Ok(Expr::TreeNode { left: Box::new(left), right: Box::new(right) })
+  }
+
+  fn parse_tree_leaf(&mut self, inline: bool) -> ParseResult<Expr> {
+    self.advance_one();
+    let val = self.parse_expr(inline)?;
+    Ok(Expr::TreeLeaf { val: Box::new(val) })
   }
 
   fn data_kwarg(&mut self) -> ParseResult<(Name, Expr)> {
@@ -366,7 +388,7 @@ impl<'a> PyParser<'a> {
       }
       while let Some(op) = self.peek_oper() {
         if op.precedence() == prec {
-          self.parse_oper()?;
+          self.try_parse_oper().unwrap();
           let rhs = self.parse_infix_expr(prec + 1, inline)?;
           lhs = Expr::Opr { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
           self.skip_trivia_inline();

@@ -316,12 +316,10 @@ impl<'a> TermParser<'a> {
 
         // Opr but maybe a tup
         self.skip_trivia();
-        let starts_with_oper = self.peek_one().map_or(false, |c| "+-*/%&|<>^=!".contains(c));
-        if starts_with_oper {
-          let opr = self.parse_oper()?;
+        if let Some(opr) = self.try_parse_oper() {
+          self.skip_trivia();
 
           // jk, actually a tuple
-          self.skip_trivia();
           if self.starts_with(",") && opr == Op::MUL {
             let mut els = vec![Term::Era];
             while self.try_consume(",") {
@@ -368,6 +366,26 @@ impl<'a> TermParser<'a> {
         unexpected_tag(self)?;
         let els = self.list_like(|p| p.parse_term(), "[", "]", ",", false, 0)?;
         return Ok(Term::List { els });
+      }
+
+      // Tree Node
+      if self.starts_with("![") {
+        self.advance_one();
+        self.advance_one();
+        unexpected_tag(self)?;
+        let lft = self.parse_term()?;
+        self.try_consume(",");
+        let rgt = self.parse_term()?;
+        self.labelled(|p| p.consume("]"), "Only two children in a Tree/Node")?;
+        return Ok(Term::call(Term::r#ref("Tree/Node"), [lft, rgt]));
+      }
+
+      // Tree Leaf
+      if self.starts_with("!") {
+        self.advance_one();
+        unexpected_tag(self)?;
+        let val = self.parse_term()?;
+        return Ok(Term::app(Term::r#ref("Tree/Leaf"), val));
       }
 
       // Sup
@@ -1022,7 +1040,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     Ok(els)
   }
 
-  fn parse_oper(&mut self) -> ParseResult<Op> {
+  fn try_parse_oper(&mut self) -> Option<Op> {
     let opr = if self.try_consume_exactly("+") {
       Op::ADD
     } else if self.try_consume_exactly("-") {
@@ -1054,9 +1072,9 @@ pub trait ParserCommons<'a>: Parser<'a> {
     } else if self.try_consume_exactly("^") {
       Op::XOR
     } else {
-      return self.expected("numeric operator");
+      return None;
     };
-    Ok(opr)
+    Some(opr)
   }
 
   fn peek_oper(&mut self) -> Option<Op> {

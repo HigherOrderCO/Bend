@@ -88,12 +88,12 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 @Tree.flip = ((@Tree.flip__C2 a) a)
 
 @Tree.flip__C0 = (c (a e))
-  & @Tree/node ~ (b (d e))
+  & @Tree/Node ~ (b (d e))
   &!@Tree.flip ~ (a b)
   &!@Tree.flip ~ (c d)
 
 @Tree.flip__C1 = (* a)
-  & @Tree/leaf ~ a
+  & @Tree/Leaf ~ a
 
 @Tree.flip__C2 = (?((@Tree.flip__C0 @Tree.flip__C1) a) a)
 
@@ -118,12 +118,12 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 @Tree.map = ((@Tree.map__C2 a) a)
 
 @Tree.map__C0 = (a (d ({b e} g)))
-  & @Tree/node ~ (c (f g))
+  & @Tree/Node ~ (c (f g))
   &!@Tree.map ~ (a (b c))
   &!@Tree.map ~ (d (e f))
 
 @Tree.map__C1 = (* (a ((a b) c)))
-  & @Tree/leaf ~ (b c)
+  & @Tree/Leaf ~ (b c)
 
 @Tree.map__C2 = (?((@Tree.map__C0 @Tree.map__C1) a) a)
 
@@ -136,13 +136,13 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @Tree.nodes__C1 = (?((@Tree.nodes__C0 (* (* 0))) a) a)
 
-@Tree/leaf = (a ((@Tree/leaf/tag (a b)) b))
+@Tree/Leaf = (a ((@Tree/Leaf/tag (a b)) b))
 
-@Tree/leaf/tag = 1
+@Tree/Leaf/tag = 1
 
-@Tree/node = (a (b ((@Tree/node/tag (a (b c))) c)))
+@Tree/Node = (a (b ((@Tree/Node/tag (a (b c))) c)))
 
-@Tree/node/tag = 0
+@Tree/Node/tag = 0
 
 @add = ((@add__C0 ((a a) b)) b)
 

@@ -1,6 +1,13 @@
 type String = (Nil) | (Cons head ~tail)
+
 type List   = (Nil) | (Cons head ~tail)
+
 type Nat    = (Succ ~pred) | (Zero)
+
+type Tree:
+  Node { ~left, ~right }
+  Leaf { value }
+
 
 # MAP Impl
 

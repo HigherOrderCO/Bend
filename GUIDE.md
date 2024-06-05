@@ -309,8 +309,8 @@ Let's start by implementing a recursive datatype in Bend:
 
 ```python
 type Tree:
-  Node { ~lft, ~rgt }
-  Leaf { val }
+  Node { ~left, ~right }
+  Leaf { value }
 ```
 
 This defines a binary tree, with elements on leaves. Here, `~` flags a field as
@@ -326,18 +326,18 @@ Could be represented as:
 
 ```
 tree = Tree/Node {
-  lft: Tree/Node { lft: Tree/Leaf { val: 1 }, rgt: Tree/Leaf { val: 2 } },
-  rgt: Tree/Node { lft: Tree/Leaf { val: 3 }, rgt: Tree/Leaf { val: 4 } }
+  lft: Tree/Node { left: Tree/Leaf { val: 1 }, right: Tree/Leaf { val: 2 } },
+  rgt: Tree/Node { left: Tree/Leaf { val: 3 }, right: Tree/Leaf { val: 4 } }
 }
 ```
 
-That's ugly. Very soon, we'll add a syntax sugar to make this shorter:
-
+Binary trees are so useful in Bend that this type is already pre-defined in the
+language and has its own dedicated syntax:
+```py
+# ![a, b] => Equivalent to Tree/Node { left: a, right: b }
+# !x      => Equivalent to Tree/Leaf { value: x }
+tree = ![![!1, !2],![!3, !4]]
 ```
-tree = ![![1,2],![3,4]]
-```
-
-As usual, for now, we'll live with the longer version.
 
 ### Fold: consuming recursive datatypes
 
@@ -348,27 +348,20 @@ and replace* for datatypes. For example, consider the code below:
 
 
 ```python
-type Tree:
-  Node { ~lft, ~rgt }
-  Leaf { val }
-
 def sum(tree):
   fold tree:
     case Tree/Node:
-      return tree.lft + tree.rgt
+      return tree.left + tree.right
     case Tree/Leaf:
-      return tree.val
+      return tree.value
 
 def main:
-  tree = Tree/Node {
-    lft: Tree/Node { lft: Tree/Leaf { val: 1 }, rgt: Tree/Leaf { val: 2 } },
-    rgt: Tree/Node { lft: Tree/Leaf { val: 3 }, rgt: Tree/Leaf { val: 4 } }
-  }
+  tree = ![![!1, !2],![!3, !4]]
   return sum(tree)
 ```
 
-It accomplishes the task by replacing every `Tree/Node { lft, rgt }` by `lft +
-rgt`, and replacing every `Tree/Leaf` by `val`. As a result, the entire "tree of
+It accomplishes the task by replacing every `Tree/Node { left, right }` by `left +
+right`, and replacing every `Tree/Leaf` by `value`. As a result, the entire "tree of
 values" is turned into a "tree of additions", and it evaluates as follows:
 
 ```python
@@ -384,26 +377,16 @@ implemented with a fold*. So, we can do much more than just compute an
 into a tuple of `(index,value)`, returning a new tree. Here's how to do it:
 
 ```python
-type Tree:
-  Node { ~lft, ~rgt }
-  Leaf { val }
-
 def enum(tree):
   idx = 0
   fold tree with idx:
     case Tree/Node:
-      return Tree/Node {
-        lft: tree.lft(idx * 2 + 0),
-        rgt: tree.rgt(idx * 2 + 1),
-      }
+      return ![tree.left(idx * 2 + 0), tree.right(idx * 2 + 1)]
     case Tree/Leaf:
-      return Tree/Leaf { val: (idx, tree.val) }
+      return !(idx, tree.value)
 
 def main:
-  tree = Tree/Node {
-    lft: Tree/Node { lft: Tree/Leaf { val: 1 }, rgt: Tree/Leaf { val: 2 }, },
-    rgt: Tree/Node { lft: Tree/Leaf { val: 3 }, rgt: Tree/Leaf { val: 4 }, }
-  }
+  tree = ![![!1, !2],![!3, !4]]
   return enum(tree)
 ```
 
@@ -440,16 +423,12 @@ can "grow" a recursive structure, layer by layer, until the condition is met.
 For example, consider the code below:
 
 ```python
-type Tree:
-  Node { ~lft, ~rgt }
-  Leaf { val }
-
 def main():
   bend x = 0:
     when x < 3:
-      tree = Tree/Node { lft: fork(x + 1), rgt: fork(x + 1) }
+      tree = ![fork(x + 1), fork(x + 1)]
     else:
-      tree = Tree/Leaf { val: 7 }
+      tree = !7
   return tree
 ```
 
@@ -463,7 +442,7 @@ tree = fork(0)
 tree = ![fork(1), fork(1)]
 tree = ![![fork(2),fork(2)], ![fork(2),fork(2)]]
 tree = ![![![fork(3),fork(3)], ![fork(3),fork(3)]], ![![fork(3),fork(3)], ![fork(3),fork(3)]]]
-tree = ![![![7,7], ![7,7]], ![![7,7], ![7,7]]]
+tree = ![![![!7, !7], ![!7, !7]], ![![!7, !7], ![!7, !7]]]
 ```
 
 With some imagination, we can easily see that, by recursively unrolling a state

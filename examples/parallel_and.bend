@@ -3,10 +3,6 @@ type Bool:
   True
   False
 
-type Tree:
-  Node { ~lft, ~rgt }
-  Leaf { val }
-
 def and(a, b):
   match a:
     case Bool/True:
@@ -17,16 +13,16 @@ def and(a, b):
 def all(tree):
   fold tree:
     case Tree/Node:
-      return and(tree.lft, tree.rgt)
+      return and(tree.left, tree.right)
     case Tree/Leaf:
-      return tree.val
+      return tree.value
 
 def gen(n):
   switch n:
     case 0:
       return Tree/Leaf(Bool/True)
     case _:
-      return Tree/Node { lft: gen(n-1), rgt: gen(n-1) }
+      return Tree/Node { left: gen(n-1), right: gen(n-1) }
 
 def main():
   return all(gen(8))

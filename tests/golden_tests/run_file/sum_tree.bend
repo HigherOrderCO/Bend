@@ -1,5 +1,3 @@
-type Tree = (Leaf x) | (Node x0 x1)
-
 add = λa λb (+ a b)
 
 gen = λn switch n {
@@ -9,8 +7,8 @@ gen = λn switch n {
 
 sum = λt
   match t {
-    Tree/Leaf: t.x
-    Tree/Node: (add (sum t.x0) (sum t.x1))
+    Tree/Leaf: t.value
+    Tree/Node: (add (sum t.left) (sum t.right))
   }
 
 main = (sum (gen 8))
