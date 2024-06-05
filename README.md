@@ -276,4 +276,5 @@ if you are interested in some other algorithms, you can check our [examples fold
  - To understand the technology behind Bend, check out the HVM2 [paper](https://docs.google.com/viewer?url=https://raw.githubusercontent.com/HigherOrderCO/HVM/main/paper/PAPER.pdf).
  - We are working on an official documentation, meanwhile for a more in depth
      explanation check [GUIDE.md](https://github.com/HigherOrderCO/Bend/blob/main/GUIDE.md)
+ - Read about our features at [FEATURES.md](https://github.com/HigherOrderCO/Bend/blob/main/FEATURES.md)
  - Bend is developed by [HigherOrderCO](https://higherorderco.com/) - join our [Discord](https://discord.higherorderco.com)!
