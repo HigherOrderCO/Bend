@@ -1,0 +1,17 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/desugar_pretty.bend
+---
+[4m[1m[33mWarnings:[0m
+[1mIn definition '[4mFoo[0m[1m':[0m
+  Definition is unused.
+
+(Foo) =
+  λa λb let (c, d) = a;
+  let (e, f) = b;
+  (+ (+ c d) (+ e f))
+
+(main) =
+  λpat%a let (a, b) = pat%a;
+  λpat%b let {c d *} = pat%b;
+  (+ (+ a b) (+ c d))
