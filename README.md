@@ -172,12 +172,12 @@ bend run parallel_sum.bend -s
 
 Or you can run it using C interpreter (Parallel)
 ```sh
-bend run-c sequential_sum.bend -s
+bend run-c parallel_sum.bend -s
 ```
 
 If you have a NVIDIA GPU, you can also run in CUDA (Massively parallel)
 ```sh
-bend run-cu sequential_sum.bend -s
+bend run-cu parallel_sum.bend -s
 ```
 
 In Bend, it can be parallelized by just changing the run command. If your code **can** run in parallel it **will** run in parallel.
