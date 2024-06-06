@@ -85,7 +85,9 @@ Operation | Description | Accepted types | Return type
 \==        | Equality | U24, I24, F24  | U24
 \!=        | Inequality | U24, I24, F24  | U24
 \<         | Less than | U24, I24, F24  | U24
+\<=        | Less than or equal to | U24, I24, F24  | U24
 \>        | Greater than | U24, I24, F24  | U24
+\>=        | Greater than or equal to | U24, I24, F24  | U24
 \&         | Bitwise and | U24, I24  | Same as arguments
 \|         | Bitwise or | U24, I24  | Same as arguments
 \^         | Bitwise xor | U24, I24  | Same as arguments
