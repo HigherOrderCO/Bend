@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project does not adhere to a particular versioning scheme at this point.
 
+## Unreleased
+
+### Fixed
+
+- Fixed readback of numeric operations. ([#467][gh-467])
+
 ## [0.2.35] - 2024-06-06
 
 ### Changed
@@ -84,6 +90,7 @@ and this project does not adhere to a particular versioning scheme at this point
 [gh-451]: https://github.com/HigherOrderCO/Bend/issues/451
 [gh-465]: https://github.com/HigherOrderCO/Bend/issues/465
 [gh-466]: https://github.com/HigherOrderCO/Bend/issues/466
+[gh-467]: https://github.com/HigherOrderCO/Bend/issues/467
 [gh-479]: https://github.com/HigherOrderCO/Bend/issues/479
 [gh-502]: https://github.com/HigherOrderCO/Bend/issues/502
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526

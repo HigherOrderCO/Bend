@@ -97,7 +97,7 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
         inodes.push(INode { kind, ports: [subtree_root, fst, snd] });
       }
       Tree::Swi { fst, snd } => {
-        let kind = NodeKind::Mat;
+        let kind = NodeKind::Swi;
         let fst = process_node_subtree(fst, net_root, &mut subtrees, n_vars);
         let snd = process_node_subtree(snd, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, fst, snd] });

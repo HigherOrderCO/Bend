@@ -2,8 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/readback_hvm/addition.bend
 ---
-[4m[1m[33mWarnings:[0m
-[1mDuring readback:[0m
-  Encountered an invalid numeric operation.
-
-<Invalid>
+(+ 2 1)
