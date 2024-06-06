@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.2.35
+- Changed lambda `Term` with bind patterns to display as `let` terms.
+
 ## 0.2.34
 - Added `<=` and `>=` operators. (#451)
 

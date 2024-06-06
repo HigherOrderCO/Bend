@@ -1,6 +1,6 @@
 use super::{Book, Definition, FanKind, Name, Num, Op, Pattern, Rule, Tag, Term};
 use crate::maybe_grow;
-use std::{fmt, ops::Deref};
+use std::{fmt, ops::Deref, sync::atomic::AtomicU64};
 
 /* Some aux structures for things that are not so simple to display */
 
@@ -40,12 +40,27 @@ macro_rules! display {
 
 /* The actual display implementations */
 
+static NAMEGEN: AtomicU64 = AtomicU64::new(0);
+
+fn gen_fan_pat_name() -> Name {
+  let n = NAMEGEN.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+  Name::new(format!("pat%{}", super::num_to_name(n)))
+}
+
+fn namegen_reset() {
+  NAMEGEN.store(0, std::sync::atomic::Ordering::SeqCst);
+}
+
 impl fmt::Display for Term {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     maybe_grow(|| match self {
-      Term::Lam { tag, pat, bod } => {
-        write!(f, "{}λ{} {}", tag.display_padded(), pat, bod)
-      }
+      Term::Lam { tag, pat, bod } => match &**pat {
+        Pattern::Fan(_, _, _) => {
+          let name = gen_fan_pat_name();
+          write!(f, "{}λ{name} let {} = {name}; {}", tag.display_padded(), pat, bod)
+        }
+        _ => write!(f, "{}λ{} {}", tag.display_padded(), pat, bod),
+      },
       Term::Var { nam } => write!(f, "{nam}"),
       Term::Link { nam } => write!(f, "${nam}"),
       Term::Let { pat, val, nxt } => write!(f, "let {} = {}; {}", pat, val, nxt),
@@ -199,6 +214,7 @@ impl Rule {
 
 impl fmt::Display for Definition {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    namegen_reset();
     write!(f, "{}", DisplayJoin(|| self.rules.iter().map(|x| x.display(&self.name)), "\n"))
   }
 }
@@ -279,6 +295,7 @@ impl Book {
 
 impl Definition {
   pub fn display_pretty(&self) -> impl fmt::Display + '_ {
+    namegen_reset();
     display!("{}", DisplayJoin(|| self.rules.iter().map(|x| x.display_pretty(&self.name)), "\n"))
   }
 }
@@ -298,9 +315,20 @@ impl Term {
   pub fn display_pretty(&self, tab: usize) -> impl fmt::Display + '_ {
     maybe_grow(|| {
       DisplayFn(move |f| match self {
-        Term::Lam { tag, pat, bod } => {
-          write!(f, "{}λ{} {}", tag.display_padded(), pat, bod.display_pretty(tab))
-        }
+        Term::Lam { tag, pat, bod } => match &**pat {
+          Pattern::Fan(_, _, _) => {
+            let name = gen_fan_pat_name();
+            write!(
+              f,
+              "{}λ{name} let {} = {name};\n{:tab$}{}",
+              tag.display_padded(),
+              pat,
+              "",
+              bod.display_pretty(tab),
+            )
+          }
+          _ => write!(f, "{}λ{} {}", tag.display_padded(), pat, bod.display_pretty(tab)),
+        },
         Term::Var { nam } => write!(f, "{nam}"),
         Term::Link { nam } => write!(f, "${nam}"),
         Term::Let { pat, val, nxt } => {
