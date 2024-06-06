@@ -101,16 +101,18 @@ Then with your text editor, open the file `sequential_sum.bend`, copy the code b
 ```py
 # Defines the function Sum with two parameters: start and target
 def Sum(start, target):
-    # If the value of start is the same as target, returns start
   if start == target:
+    # If the value of start is the same as target, returns start.
     return start
-    # If start is not equal to target, recursively call Sum with start incremented by 1, and add the result to start
   else:
+    # If start is not equal to target, recursively call Sum with
+    # start incremented by 1, and add the result to start.
     return start + Sum(start + 1, target)  
 
 def main():
-# This translates to (1 + (2 + (3 + (...... + (79999999 + 80000000)))))
-  return Sum(1, 80000000)
+  # This translates to (1 + (2 + (3 + (...... + (999999 + 1000000)))))
+  # Note that this will overflow the maximum value of a number in Bend
+  return Sum(1, 1_000_000)
 ```
 
 ##### Running the file
@@ -143,20 +145,21 @@ Then with your text editor, open the file `parallel_sum.bend`, copy the code bel
 ```py
 # Defines the function Sum with two parameters: start and target
 def Sum(start, target):
-  # If the value of start is the same as target, returns start
   if start == target:
+    # If the value of start is the same as target, returns start.
     return start
-  # If start is not equal to target, calculate the midpoint (half), then recursively call Sum on both halves
   else:
+    # If start is not equal to target, calculate the midpoint (half),
+    # then recursively call Sum on both halves.
     half = (start + target) / 2
     left = Sum(start, half)  # (Start -> Half)
     right = Sum(half + 1, target)
     return left + right
 
-# Main function to demonstrate the parallelizable sum from 1 to 80000000
+# A parallelizable sum of numbers from 1 to 1000000
 def main():
-# This translates to ((1 + 2) + (3 + 4)+ ... (79999999 + 80000000)...)
-  return Sum(1, 80000000)
+  # This translates to (((1 + 2) + (3 + 4)) + ... (999999 + 1000000)...)
+  return Sum(1, 1_000_000)
 ```
 
 In this example, the (3 + 4) sum does not depend on the (1 + 2), meaning that it can run in parallel because both computations can happen at the same time. 
