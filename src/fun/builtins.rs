@@ -25,6 +25,23 @@ pub const NAT_SUCC: &str = "Nat/Succ";
 pub const NAT_ZERO: &str = "Nat/Zero";
 pub const NAT_SUCC_TAG: u32 = 0;
 
+pub const TREE: &str = "Tree";
+pub const TREE_NODE: &str = "Tree/Node";
+pub const TREE_LEAF: &str = "Tree/Leaf";
+
+pub const MAP: &str = "Map";
+pub const MAP_NODE: &str = "Map/Node";
+pub const MAP_LEAF: &str = "Map/Leaf";
+
+pub const IO: &str = "IO";
+pub const IO_DONE: &str = "IO/Done";
+pub const IO_CALL: &str = "IO/Call";
+
+pub const BUILTIN_CTRS: &[&str] =
+  &[LCONS, LNIL, SCONS, SNIL, NAT_SUCC, NAT_ZERO, TREE_NODE, TREE_LEAF, MAP_NODE, MAP_LEAF, IO_DONE, IO_CALL];
+
+pub const BUILTIN_TYPES: &[&str] = &[LIST, STRING, NAT, TREE, MAP, IO];
+
 impl Book {
   pub fn builtins() -> Book {
     TermParser::new(BUILTINS)

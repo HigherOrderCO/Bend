@@ -133,12 +133,12 @@ impl<'a> TermParser<'a> {
             def.rules.push(rule);
           } else {
             // Trying to add a new rule to a previous definition, coming from a different rule.
-            let msg = format!("Redefinition of function '{name}'");
+            let msg = Self::redefinition_of_function_msg(builtin, &name);
             return self.with_ctx(Err(msg), ini_idx, end_idx);
           }
         } else {
           // Trying to add a new rule to a previous definition, coming from another kind of top-level.
-          let msg = format!("Redefinition of function '{name}'");
+          let msg = Self::redefinition_of_function_msg(builtin, &name);
           return self.with_ctx(Err(msg), ini_idx, end_idx);
         }
       } else {
@@ -801,23 +801,13 @@ impl Indent {
 
 impl Book {
   fn add_adt(&mut self, nam: Name, adt: Adt) -> ParseResult<()> {
-    if let Some(adt) = self.adts.get(&nam) {
-      if adt.builtin {
-        return Err(format!("{} is a built-in datatype and should not be overridden.", nam));
-      } else {
-        return Err(format!("Repeated datatype '{}'", nam));
-      }
+    if self.adts.contains_key(&nam) {
+      Err(TermParser::redefinition_of_type_msg(&nam))?
     } else {
       for ctr in adt.ctrs.keys() {
         match self.ctrs.entry(ctr.clone()) {
           indexmap::map::Entry::Vacant(e) => _ = e.insert(nam.clone()),
-          indexmap::map::Entry::Occupied(e) => {
-            if self.adts.get(e.get()).is_some_and(|adt| adt.builtin) {
-              return Err(format!("{} is a built-in constructor and should not be overridden.", e.key()));
-            } else {
-              return Err(format!("Repeated constructor '{}'", e.key()));
-            }
-          }
+          indexmap::map::Entry::Occupied(e) => Err(TermParser::redefinition_of_constructor_msg(e.key()))?,
         }
       }
       self.adts.insert(nam.clone(), adt);
@@ -1233,5 +1223,29 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
     self.consume_exactly("`")?;
     Ok(result)
+  }
+
+  fn redefinition_of_function_msg(builtin: bool, function_name: &str) -> String {
+    if builtin {
+      format!("Redefinition of builtin (function) '{function_name}'.")
+    } else {
+      format!("Redefinition of function '{function_name}'.")
+    }
+  }
+
+  fn redefinition_of_constructor_msg(constructor_name: &str) -> String {
+    if crate::fun::builtins::BUILTIN_CTRS.contains(&constructor_name) {
+      format!("Redefinition of builtin (constructor) '{constructor_name}'.")
+    } else {
+      format!("Redefinition of constructor '{constructor_name}'.")
+    }
+  }
+
+  fn redefinition_of_type_msg(type_name: &str) -> String {
+    if crate::fun::builtins::BUILTIN_TYPES.contains(&type_name) {
+      format!("Redefinition of builtin (type) '{type_name}'.")
+    } else {
+      format!("Redefinition of type '{type_name}'.")
+    }
   }
 }
