@@ -3,9 +3,9 @@
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project does not adhere to a particular versioning scheme at this point.
+and this project does not currently adhere to a particular versioning scheme.
 
-## Unreleased
+## [Unreleased]
 
 ### Fixed
 
@@ -95,3 +95,4 @@ and this project does not adhere to a particular versioning scheme at this point
 [gh-502]: https://github.com/HigherOrderCO/Bend/issues/502
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
+[Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.35...HEAD
