@@ -4,5 +4,5 @@ input_file: tests/golden_tests/parse_file/redefinition_with_def_between.bend
 ---
 [4m[1m[31mErrors:[0m
 In tests/golden_tests/parse_file/redefinition_with_def_between.bend :
-Redefinition of function 'A'
+Redefinition of function 'A'.
 [0m   4 | [4m[31m(A) = @x x[0m

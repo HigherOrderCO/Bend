@@ -133,12 +133,12 @@ impl<'a> TermParser<'a> {
             def.rules.push(rule);
           } else {
             // Trying to add a new rule to a previous definition, coming from a different rule.
-            let msg = format!("Redefinition of function '{name}'");
+            let msg = self.redefinition_of_function_msg(builtin, &name);
             return self.with_ctx(Err(msg), ini_idx, end_idx);
           }
         } else {
           // Trying to add a new rule to a previous definition, coming from another kind of top-level.
-          let msg = format!("Redefinition of function '{name}'");
+          let msg = self.redefinition_of_function_msg(builtin, &name);
           return self.with_ctx(Err(msg), ini_idx, end_idx);
         }
       } else {
@@ -1233,5 +1233,13 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
     self.consume_exactly("`")?;
     Ok(result)
+  }
+
+  fn redefinition_of_function_msg(&self, builtin: bool, function_name: &str) -> String {
+    if builtin {
+      format!("Redefinition of builtin (function) '{function_name}'.")
+    } else {
+      format!("Redefinition of function '{function_name}'.")
+    }
   }
 }

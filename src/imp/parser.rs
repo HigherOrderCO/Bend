@@ -1069,8 +1069,8 @@ impl<'a> PyParser<'a> {
     end_idx: usize,
     builtin: bool,
   ) -> ParseResult<()> {
-    if book.defs.contains_key(&def.name) {
-      let msg = format!("Redefinition of function '{}'.", def.name);
+    if let Some(def) = book.defs.get(&def.name) {
+      let msg = self.redefinition_of_function_msg(def.builtin, &def.name);
       return self.with_ctx(Err(msg), ini_idx, end_idx);
     }
     if book.ctrs.contains_key(&def.name) {

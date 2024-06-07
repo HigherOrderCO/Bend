@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/parse_file/redefinition_builtin.bend
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/parse_file/redefinition_builtin.bend :
+Redefinition of builtin (function) 'Map/get'.
+[0m  1 | [4m[31mdef Map/get(m):
+[0m  2 | [4m[31m  return m
+[0m  3 | [4m[31m
+[0m  4 | [4m[31m[0mdef main:[0m
