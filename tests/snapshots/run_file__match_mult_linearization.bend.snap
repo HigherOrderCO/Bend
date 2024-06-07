@@ -3,15 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/match_mult_linearization.bend
 ---
 NumScott:
-[4m[1m[33mWarnings:[0m
-[1mDuring readback:[0m
-  Encountered an invalid numeric operation. (2 occurrences)
-
-λa switch a = a { 0: λb λc λd <Invalid>; _: λf λg λh <Invalid>; }
+λa switch a = a { 0: λb λc λd (+ (+ b c) d); _: λf λg λh (+ (+ (+ a-1 f) g) h); }
 
 Scott:
-[4m[1m[33mWarnings:[0m
-[1mDuring readback:[0m
-  Encountered an invalid numeric operation. (2 occurrences)
-
-λa switch a = a { 0: λb λc λd <Invalid>; _: λf λg λh <Invalid>; }
+λa switch a = a { 0: λb λc λd (+ (+ b c) d); _: λf λg λh (+ (+ (+ a-1 f) g) h); }

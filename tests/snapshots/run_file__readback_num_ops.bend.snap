@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/readback_num_ops.bend
+---
+NumScott:
+[λb (+ 1 b), λd (+ 1 d), λf λg (+ f g), λi (- i 1), λk (- 1 k), λm λn λo (+ m (- n o)), λq λr λs (+ (- q r) s)]
+
+Scott:
+[λb (+ 1 b), λd (+ 1 d), λf λg (+ f g), λi (- i 1), λk (- 1 k), λm λn λo (+ m (- n o)), λq λr λs (+ (- q r) s)]

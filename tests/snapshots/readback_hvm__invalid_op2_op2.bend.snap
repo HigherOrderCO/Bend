@@ -4,6 +4,6 @@ input_file: tests/golden_tests/readback_hvm/invalid_op2_op2.bend
 ---
 [4m[1m[33mWarnings:[0m
 [1mDuring readback:[0m
-  Encountered an invalid numeric operation.
+  Encountered an invalid numeric operation. (3 occurrences)
 
 λa <Invalid>
