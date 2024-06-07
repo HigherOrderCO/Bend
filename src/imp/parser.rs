@@ -1070,11 +1070,11 @@ impl<'a> PyParser<'a> {
     builtin: bool,
   ) -> ParseResult<()> {
     if let Some(def) = book.defs.get(&def.name) {
-      let msg = self.redefinition_of_function_msg(def.builtin, &def.name);
+      let msg = Self::redefinition_of_function_msg(def.builtin, &def.name);
       return self.with_ctx(Err(msg), ini_idx, end_idx);
     }
     if book.ctrs.contains_key(&def.name) {
-      let msg = format!("Redefinition of constructor '{}'.", def.name);
+      let msg = Self::redefinition_of_constructor_msg(&def.name);
       return self.with_ctx(Err(msg), ini_idx, end_idx);
     }
     def.order_kwargs(book)?;
@@ -1093,17 +1093,17 @@ impl<'a> PyParser<'a> {
     builtin: bool,
   ) -> ParseResult<()> {
     if book.adts.contains_key(&r#enum.name) {
-      let msg = format!("Redefinition of type '{}'.", r#enum.name);
+      let msg = PyParser::redefinition_of_type_msg(&r#enum.name);
       return self.with_ctx(Err(msg), ini_idx, end_idx);
     }
     let mut adt = Adt { ctrs: Default::default(), builtin };
     for variant in r#enum.variants {
-      if book.defs.contains_key(&variant.name) {
-        let msg = format!("Redefinition of function '{}'.", variant.name);
+      if let Some(def) = book.defs.get(&variant.name) {
+        let msg = PyParser::redefinition_of_function_msg(def.builtin, &variant.name);
         return self.with_ctx(Err(msg), ini_idx, end_idx);
       }
       if book.ctrs.contains_key(&variant.name) {
-        let msg = format!("Redefinition of constructor '{}'.", variant.name);
+        let msg = PyParser::redefinition_of_constructor_msg(&variant.name);
         return self.with_ctx(Err(msg), ini_idx, end_idx);
       }
       book.ctrs.insert(variant.name.clone(), r#enum.name.clone());
@@ -1122,16 +1122,16 @@ impl<'a> PyParser<'a> {
     builtin: bool,
   ) -> ParseResult<()> {
     if book.adts.contains_key(&obj.name) {
-      let msg = format!("Redefinition of type '{}'.", obj.name);
+      let msg = PyParser::redefinition_of_type_msg(&obj.name);
       return self.with_ctx(Err(msg), ini_idx, end_idx);
     }
     let mut adt = Adt { ctrs: Default::default(), builtin };
-    if book.defs.contains_key(&obj.name) {
-      let msg = format!("Redefinition of function '{}'.", obj.name);
+    if let Some(def) = book.defs.get(&obj.name) {
+      let msg = PyParser::redefinition_of_function_msg(def.builtin, &obj.name);
       return self.with_ctx(Err(msg), ini_idx, end_idx);
     }
     if book.ctrs.contains_key(&obj.name) {
-      let msg = format!("Redefinition of constructor '{}'.", obj.name);
+      let msg = PyParser::redefinition_of_constructor_msg(&obj.name);
       return self.with_ctx(Err(msg), ini_idx, end_idx);
     }
     book.ctrs.insert(obj.name.clone(), obj.name.clone());

@@ -1,0 +1,10 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/parse_file/redefinition_ctr_with_fun.bend
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/parse_file/redefinition_ctr_with_fun.bend :
+Redefinition of builtin (constructor) 'String/Cons'.
+[0m  1 | [4m[31mdef String/Cons(x):
+[0m  2 | [4m[31m  return x
+[0m
