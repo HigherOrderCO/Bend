@@ -79,7 +79,7 @@ impl<'a> PyParser<'a> {
   ///
   fn parse_simple_expr(&mut self, inline: bool) -> ParseResult<Expr> {
     if inline {
-      self.skip_trivia_inline();
+      self.skip_trivia_inline()?;
     } else {
       self.skip_trivia();
     }
@@ -133,7 +133,7 @@ impl<'a> PyParser<'a> {
 
     // postfixes
     if inline {
-      self.skip_trivia_inline();
+      self.skip_trivia_inline()?;
     } else {
       self.skip_trivia();
     }
@@ -335,7 +335,7 @@ impl<'a> PyParser<'a> {
     }
 
     if inline {
-      self.skip_trivia_inline();
+      self.skip_trivia_inline()?;
     } else {
       self.skip_trivia();
     }
@@ -373,7 +373,7 @@ impl<'a> PyParser<'a> {
   fn parse_infix_expr(&mut self, prec: usize, inline: bool) -> ParseResult<Expr> {
     maybe_grow(|| {
       if inline {
-        self.skip_trivia_inline();
+        self.skip_trivia_inline()?;
       } else {
         self.skip_trivia();
       }
@@ -382,7 +382,7 @@ impl<'a> PyParser<'a> {
       }
       let mut lhs = self.parse_infix_expr(prec + 1, inline)?;
       if inline {
-        self.skip_trivia_inline();
+        self.skip_trivia_inline()?;
       } else {
         self.skip_trivia();
       }
@@ -391,7 +391,7 @@ impl<'a> PyParser<'a> {
           self.try_parse_oper().unwrap();
           let rhs = self.parse_infix_expr(prec + 1, inline)?;
           lhs = Expr::Opr { op, lhs: Box::new(lhs), rhs: Box::new(rhs) };
-          self.skip_trivia_inline();
+          self.skip_trivia_inline()?;
         } else {
           break;
         }
@@ -401,7 +401,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn consume_indent_at_most(&mut self, expected: Indent) -> ParseResult<Indent> {
-    let got = self.advance_newlines();
+    let got = self.advance_newlines()?;
     match (expected, got) {
       (_, Indent::Eof) => Ok(Indent::Eof),
       (Indent::Val(expected), Indent::Val(got)) if got <= expected => Ok(Indent::Val(got)),
@@ -410,7 +410,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn consume_indent_exactly(&mut self, expected: Indent) -> ParseResult<()> {
-    let got = self.advance_newlines();
+    let got = self.advance_newlines()?;
     match (expected, got) {
       (Indent::Eof, Indent::Eof) => Ok(()),
       (Indent::Val(expected), Indent::Val(got)) if got == expected => Ok(()),
@@ -453,18 +453,18 @@ impl<'a> PyParser<'a> {
     let ini_idx = *self.index();
     let pat = self.parse_assign_pattern()?;
     let end_idx = *self.index();
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
 
     // Assignment
     if self.starts_with("=") {
       self.advance_one();
       let val = self.parse_expr(true)?;
-      self.skip_trivia_inline();
+      self.skip_trivia_inline()?;
       self.try_consume_exactly(";");
       if !self.is_eof() {
         self.consume_new_line()?;
       }
-      let nxt_indent = self.advance_newlines();
+      let nxt_indent = self.advance_newlines()?;
       if nxt_indent == *indent {
         let (nxt, nxt_indent) = self.parse_statement(indent)?;
         let stmt = Stmt::Assign { pat, val: Box::new(val), nxt: Some(Box::new(nxt)) };
@@ -478,7 +478,7 @@ impl<'a> PyParser<'a> {
     if self.starts_with("<-") {
       self.consume("<-")?;
       let val = self.parse_expr(true)?;
-      self.skip_trivia_inline();
+      self.skip_trivia_inline()?;
       self.try_consume_exactly(";");
       self.consume_indent_exactly(*indent)?;
       let (nxt, nxt_indent) = self.parse_statement(indent)?;
@@ -494,7 +494,7 @@ impl<'a> PyParser<'a> {
     }
     if let Some(op) = self.parse_in_place_op()? {
       let val = self.parse_expr(true)?;
-      self.skip_trivia_inline();
+      self.skip_trivia_inline()?;
       self.try_consume_exactly(";");
       self.consume_indent_exactly(*indent)?;
       let (nxt, nxt_indent) = self.parse_statement(indent)?;
@@ -506,7 +506,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_in_place_op(&mut self) -> ParseResult<Option<InPlaceOp>> {
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let op = if self.starts_with("+=") {
       self.consume("+=")?;
       Some(InPlaceOp::Add)
@@ -539,18 +539,18 @@ impl<'a> PyParser<'a> {
 
   fn parse_return(&mut self) -> ParseResult<(Stmt, Indent)> {
     let term = self.parse_expr(true)?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.try_consume_exactly(";");
     if !self.is_eof() {
       self.consume_new_line()?;
     }
-    let indent = self.advance_newlines();
+    let indent = self.advance_newlines()?;
     Ok((Stmt::Return { term: Box::new(term) }, indent))
   }
 
   fn parse_if(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
     let cond = self.parse_expr(true)?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
     indent.enter_level();
 
@@ -564,7 +564,7 @@ impl<'a> PyParser<'a> {
     let mut elifs = Vec::new();
     while self.try_parse_keyword("elif") {
       let cond = self.parse_expr(true)?;
-      self.skip_trivia_inline();
+      self.skip_trivia_inline()?;
       self.consume_exactly(":")?;
       indent.enter_level();
       self.consume_indent_exactly(*indent)?;
@@ -577,7 +577,7 @@ impl<'a> PyParser<'a> {
       elifs.push((cond, then));
     }
     self.parse_keyword("else")?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
     indent.enter_level();
 
@@ -609,7 +609,7 @@ impl<'a> PyParser<'a> {
 
   fn parse_match(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
     let (bnd, arg) = self.parse_match_arg()?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let (with_bnd, with_arg) = self.parse_with_clause()?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -638,7 +638,7 @@ impl<'a> PyParser<'a> {
     let arg = self.parse_expr(true)?;
     let end_idx = *self.index();
 
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     match (arg, self.starts_with("=")) {
       (Expr::Var { nam }, true) => {
         self.advance_one();
@@ -651,7 +651,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_with_clause(&mut self) -> ParseResult<(Vec<Option<Name>>, Vec<Expr>)> {
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let res = if self.try_parse_keyword("with") {
       self.list_like(|p| p.parse_with_arg(), "", ":", ",", true, 1)?.into_iter().unzip()
     } else {
@@ -663,7 +663,7 @@ impl<'a> PyParser<'a> {
 
   fn parse_with_arg(&mut self) -> ParseResult<(Option<Name>, Expr)> {
     let bind = self.parse_bend_name()?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     if self.try_consume("=") {
       let arg = self.parse_expr(false)?;
       Ok((Some(bind), arg))
@@ -674,14 +674,14 @@ impl<'a> PyParser<'a> {
 
   fn parse_match_case(&mut self, indent: &mut Indent) -> ParseResult<(MatchArm, Indent)> {
     self.parse_keyword("case")?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let pat = if self.try_consume_exactly("_") {
       None
     } else {
       let nam = self.labelled(|p| p.parse_bend_name(), "name or '_'")?;
       Some(nam)
     };
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -696,7 +696,7 @@ impl<'a> PyParser<'a> {
 
   fn parse_switch(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
     let (bnd, arg) = self.parse_match_arg()?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let (with_bnd, with_arg) = self.parse_with_clause()?;
     indent.enter_level();
 
@@ -741,7 +741,7 @@ impl<'a> PyParser<'a> {
 
   fn parse_switch_case(&mut self, indent: &mut Indent) -> ParseResult<(Option<u32>, Stmt, Indent)> {
     self.parse_keyword("case")?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let case = if let Some(c) = self.peek_one() {
       match c {
         '_' => {
@@ -755,7 +755,7 @@ impl<'a> PyParser<'a> {
       return self.expected("number or '_'")?;
     };
 
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -772,7 +772,7 @@ impl<'a> PyParser<'a> {
   fn parse_fold(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
     // Actually identical to match, except the return
     let (bind, arg) = self.parse_match_arg()?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let (with_bnd, with_arg) = self.parse_with_clause()?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -811,7 +811,7 @@ impl<'a> PyParser<'a> {
     self.consume_indent_exactly(*indent)?;
     self.parse_keyword("when")?;
     let cond = self.parse_expr(true)?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -824,7 +824,7 @@ impl<'a> PyParser<'a> {
       return self.expected_indent(*indent, nxt_indent);
     }
     self.parse_keyword("else")?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -862,9 +862,9 @@ impl<'a> PyParser<'a> {
   ///   <bod>
   /// <nxt>?
   fn parse_with(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let typ = self.parse_bend_name()?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -911,7 +911,7 @@ impl<'a> PyParser<'a> {
     // Chn pattern
     if self.starts_with("$") {
       self.advance_one();
-      self.skip_trivia_inline();
+      self.skip_trivia_inline()?;
       let nam = self.parse_bend_name()?;
       return Ok(AssignPattern::Chn(nam));
     }
@@ -932,13 +932,13 @@ impl<'a> PyParser<'a> {
 
   /// "open" {typ} ":" {var} ";"? {nxt}
   fn parse_open(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let typ = self.labelled(|p| p.parse_bend_name(), "type name")?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let var = self.labelled(|p| p.parse_bend_name(), "variable name")?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.try_consume_exactly(";");
     self.consume_new_line()?;
     self.consume_indent_exactly(*indent)?;
@@ -948,13 +948,13 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_use(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let nam = self.parse_bend_name()?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly("=")?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let bod = self.parse_expr(true)?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.try_consume_exactly(";");
     self.consume_new_line()?;
     self.consume_indent_exactly(*indent)?;
@@ -970,15 +970,15 @@ impl<'a> PyParser<'a> {
       return self.with_ctx(Err(msg), idx, idx + 1);
     }
 
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let name = self.parse_top_level_name()?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let params = if self.starts_with("(") {
       self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 0)?
     } else {
       vec![]
     };
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -998,9 +998,9 @@ impl<'a> PyParser<'a> {
       return self.with_ctx(Err(msg), idx, idx + 1);
     }
 
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let typ_name = self.parse_top_level_name()?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -1025,7 +1025,7 @@ impl<'a> PyParser<'a> {
     let ctr_name = self.parse_top_level_name()?;
     let ctr_name = Name::new(format!("{typ_name}/{ctr_name}"));
     let mut fields = Vec::new();
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     if self.starts_with("{") {
       fields = self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?;
     }
@@ -1039,9 +1039,9 @@ impl<'a> PyParser<'a> {
       return self.with_ctx(Err(msg), idx, idx + 1);
     }
 
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let name = self.parse_top_level_name()?;
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     let fields = if self.starts_with("{") {
       self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?
     } else {
@@ -1050,7 +1050,7 @@ impl<'a> PyParser<'a> {
     if !self.is_eof() {
       self.consume_new_line()?;
     }
-    let nxt_indent = self.advance_newlines();
+    let nxt_indent = self.advance_newlines()?;
     Ok((Variant { name, fields }, nxt_indent))
   }
 
