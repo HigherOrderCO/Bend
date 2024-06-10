@@ -196,7 +196,7 @@ The code snippet below implements a [bitonic sorter](https://en.wikipedia.org/wi
   <summary><b>Click here for the Bitonic Sorter code</b></summary>
    
  ```py
- # Sorting Network = just rotate trees!
+# Sorting Network = just rotate trees!
 def sort(d, s, tree):
   switch d:
     case 0:
