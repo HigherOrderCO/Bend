@@ -1,11 +1,11 @@
 # given a shader, returns a square image
-def render(depth, shader):
+def render(depth):
   bend d = 0, i = 0:
     when d < depth:
       color = (fork(d+1, i*2+0), fork(d+1, i*2+1))
     else:
       width = depth / 2
-      color = shader(i % width, i / width)
+      color = demo_shader(i % width, i / width)
   return color
 
 # given a position, returns a color
@@ -20,4 +20,4 @@ def demo_shader(x, y):
 
 # renders a 256x256 image using demo_shader
 def main:
-  return render(5, demo_shader)
+  return render(5)
