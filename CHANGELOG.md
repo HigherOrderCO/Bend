@@ -7,6 +7,11 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ## [Unreleased]
 
+### Changed
+
+- Improve error messages for redefinition of types and objects. ([#485][gh-485])
+- Don't allow tabs to be used for indentation or spacing. ([#463][gh-463])
+
 ### Fixed
 
 - Fixed readback of numeric operations. ([#467][gh-467])
@@ -88,10 +93,12 @@ and this project does not currently adhere to a particular versioning scheme.
 [0.2.35]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.35
 [gh-424]: https://github.com/HigherOrderCO/Bend/issues/424
 [gh-451]: https://github.com/HigherOrderCO/Bend/issues/451
+[gh-463]: https://github.com/HigherOrderCO/Bend/issues/463
 [gh-465]: https://github.com/HigherOrderCO/Bend/issues/465
 [gh-466]: https://github.com/HigherOrderCO/Bend/issues/466
 [gh-467]: https://github.com/HigherOrderCO/Bend/issues/467
 [gh-479]: https://github.com/HigherOrderCO/Bend/issues/479
+[gh-485]: https://github.com/HigherOrderCO/Bend/issues/485
 [gh-502]: https://github.com/HigherOrderCO/Bend/issues/502
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528

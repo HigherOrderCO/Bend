@@ -65,7 +65,7 @@ impl<'a> TermParser<'a> {
 
   pub fn parse_book(&mut self, default_book: Book, builtin: bool) -> ParseResult<Book> {
     let mut book = default_book;
-    let mut indent = self.advance_newlines();
+    let mut indent = self.advance_newlines()?;
     let mut last_rule = None;
     while !self.is_eof() {
       let ini_idx = *self.index();
@@ -115,7 +115,7 @@ impl<'a> TermParser<'a> {
           let (nam, adt) = self.parse_datatype(builtin)?;
           let end_idx = *self.index();
           self.with_ctx(book.add_adt(nam, adt), ini_idx, end_idx)?;
-          indent = self.advance_newlines();
+          indent = self.advance_newlines()?;
           last_rule = None;
           continue;
         }
@@ -145,7 +145,7 @@ impl<'a> TermParser<'a> {
         // Adding the first rule of a new definition
         book.defs.insert(name.clone(), Definition { name: name.clone(), rules: vec![rule], builtin });
       }
-      indent = self.advance_newlines();
+      indent = self.advance_newlines()?;
       last_rule = Some(name);
     }
 
@@ -864,34 +864,38 @@ pub trait ParserCommons<'a>: Parser<'a> {
   }
 
   fn consume_new_line(&mut self) -> ParseResult<()> {
-    self.skip_trivia_inline();
+    self.skip_trivia_inline()?;
     self.try_consume_exactly("\r");
     self.labelled(|p| p.consume_exactly("\n"), "newline")
   }
 
   /// Skips trivia, returns the number of trivia characters skipped in the last line.
-  fn advance_newlines(&mut self) -> Indent {
+  fn advance_newlines(&mut self) -> ParseResult<Indent> {
     loop {
-      let num_spaces = self.advance_trivia_inline();
+      let num_spaces = self.advance_trivia_inline()?;
       if self.peek_one() == Some('\r') {
         self.advance_one();
       }
       if self.peek_one() == Some('\n') {
         self.advance_one();
       } else if self.is_eof() {
-        return Indent::Eof;
+        return Ok(Indent::Eof);
       } else {
-        return Indent::Val(num_spaces);
+        return Ok(Indent::Val(num_spaces));
       }
     }
   }
 
   /// Advances the parser to the next non-trivia character in the same line.
   /// Returns how many characters were advanced.
-  fn advance_trivia_inline(&mut self) -> isize {
+  fn advance_trivia_inline(&mut self) -> ParseResult<isize> {
     let mut char_count = 0;
     while let Some(c) = self.peek_one() {
-      if " \t".contains(c) {
+      if c == '\t' {
+        let idx = *self.index();
+        return self.with_ctx(Err("Tabs are not accepted for indentation.".to_string()), idx, idx);
+      }
+      if " ".contains(c) {
         self.advance_one();
         char_count += 1;
         continue;
@@ -909,12 +913,13 @@ pub trait ParserCommons<'a>: Parser<'a> {
       }
       break;
     }
-    char_count
+    Ok(char_count)
   }
 
   /// Skips until the next non-trivia character in the same line.
-  fn skip_trivia_inline(&mut self) {
-    self.advance_trivia_inline();
+  fn skip_trivia_inline(&mut self) -> ParseResult<()> {
+    self.advance_trivia_inline()?;
+    Ok(())
   }
 
   fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> ParseResult<T> {
