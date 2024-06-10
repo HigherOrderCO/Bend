@@ -7,6 +7,10 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ## [Unreleased]
 
+### Changed
+
+- Redefinition error messages for types and objects. ([#485][gh-485])
+
 ### Fixed
 
 - Fixed readback of numeric operations. ([#467][gh-467])
@@ -92,6 +96,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-466]: https://github.com/HigherOrderCO/Bend/issues/466
 [gh-467]: https://github.com/HigherOrderCO/Bend/issues/467
 [gh-479]: https://github.com/HigherOrderCO/Bend/issues/479
+[gh-485]: https://github.com/HigherOrderCO/Bend/issues/485
 [gh-502]: https://github.com/HigherOrderCO/Bend/issues/502
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
