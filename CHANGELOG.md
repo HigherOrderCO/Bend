@@ -10,7 +10,7 @@ and this project does not currently adhere to a particular versioning scheme.
 ### Changed
 
 - Improve error messages for redefinition of types and objects. ([#485][gh-485])
-- Don't allow tabs to be used for identation or spacing. ([#463][gh-463])
+- Don't allow tabs to be used for indentation or spacing. ([#463][gh-463])
 
 ### Fixed
 
