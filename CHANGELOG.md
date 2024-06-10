@@ -9,7 +9,8 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ### Changed
 
-- Redefinition error messages for types and objects. ([#485][gh-485])
+- Improve error messages for redefinition of types and objects. ([#485][gh-485])
+- Don't allow tabs to be used for identation or spacing. ([#463][gh-463])
 
 ### Fixed
 
@@ -92,6 +93,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [0.2.35]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.35
 [gh-424]: https://github.com/HigherOrderCO/Bend/issues/424
 [gh-451]: https://github.com/HigherOrderCO/Bend/issues/451
+[gh-463]: https://github.com/HigherOrderCO/Bend/issues/463
 [gh-465]: https://github.com/HigherOrderCO/Bend/issues/465
 [gh-466]: https://github.com/HigherOrderCO/Bend/issues/466
 [gh-467]: https://github.com/HigherOrderCO/Bend/issues/467
