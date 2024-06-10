@@ -5,7 +5,9 @@ body:
    attributes: 
      value: |
       ### Bug Report
-      Note, your issue might have been already reported, please check [issues](https://github.com/HigherOrderCO/Bend/issues). If you find a similar issue, respond with a reaction or any additional information that you feel may be helpful.
+      Your issue might have been already reported. Please check the [frequently asked questions](https://github.com/HigherOrderCO/Bend/blob/main/FAQ.md) first, especially if you're having trouble installing or running the GPU runtime.
+      Then, please check the [existing issues](https://github.com/HigherOrderCO/Bend/issues) to see if someone else already reported it. If you find a similar issue, respond with a reaction or any additional information that you feel may be helpful.
+      Before opening a new issue, make sure that your Bend and HVM versions are up-to-date.
 
       ### For Windows Users
       There is currently no native way to make Bend work on windows, as a temporary workaround, please use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install).
