@@ -195,7 +195,8 @@ The code snippet below implements a [bitonic sorter](https://en.wikipedia.org/wi
  <details>
   <summary><b>Click here for the Bitonic Sorter code</b></summary>
    
- ```py
+
+```py
 # Sorting Network = just rotate trees!
 def sort(d, s, tree):
   switch d:
@@ -268,6 +269,7 @@ def sum(d, t):
 # Sorts a big tree
 def main:
   return sum(20, sort(20, 0, gen(20, 0)))
+
 ```
 
 </details>
