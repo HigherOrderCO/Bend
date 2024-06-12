@@ -57,6 +57,7 @@
     "lnil",
     "lpthread",
     "mant",
+    "miscompilation",
     "mult",
     "namegen",
     "nams",

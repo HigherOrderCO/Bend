@@ -204,6 +204,12 @@ and this project does not currently adhere to a particular versioning scheme.
 - Increase max net size.
 - `check-net-size` to be optional.
 
+## [0.2.7] - 2024-05-17
+
+### Added
+
+- Apache-2.0 License.
+
 ## [0.2.6] - 2024-05-17
 
 ### Added
@@ -273,11 +279,15 @@ and this project does not currently adhere to a particular versioning scheme.
 - Initial public release of Bend.
 
 [0.2.0]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.0
+[0.2.1]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.1
+[0.2.2]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.2
 [0.2.3]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.3
 [0.2.4]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.4
 [0.2.5]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.5
 [0.2.6]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.6
+[0.2.7]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.7
 [0.2.8]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.8
+[0.2.9]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.9
 [0.2.10]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.10
 [0.2.11]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.11
 [0.2.12]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.12
