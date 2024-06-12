@@ -76,29 +76,29 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ### Changed
 
-- Make `with` clauses take a bind and an argument
+- Make `with` clauses take a bind and an argument. ([#516][gh-516])
 
 ## [0.2.26] - 2024-05-28
 
 ### Changed
 
-- `do` keyword to `with`.
+- `do` keyword to `with`. ([#494][gh-494])
 
 ### Added
 
-- `wrap` alias inside `with` blocks.
+- `wrap` alias inside `with` blocks. ([#494][gh-494])
 
 ## [0.2.25] - 2024-05-28
 
 ### Added
 
-- Generated constructor tags.
+- Generated constructor tags. ([#512][gh-512])
 
 ## [0.2.24] - 2024-05-27
 
 ### Added
 
-- `elif` chains.
+- `elif` chains. ([#427][gh-427])
 
 ## [0.2.23] - 2024-05-27
 
@@ -110,37 +110,37 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ### Changed
 
-- Rust channel from `nightly` to `stable`.
+- Rust channel from `nightly` to `stable`. ([#486][gh-486])
 
 ## [0.2.21] - 2024-05-25
 
 ### Changed
 
-- HVM syntax tree for representing inets inside the compiler.
+- HVM syntax tree for representing inets inside the compiler. ([#475][gh-475])
 
 ## [0.2.20] - 2024-05-24
 
 ### Fixed
 
-- Map getters generation inside map setters.
+- Map getters generation inside map setters. ([#489][gh-489])
 
 ## [0.2.19] - 2024-05-24
 
-- Variable names to not allow `__`.
-
 ### Changed
+
+- Variable names to not allow `__`. ([#478][gh-478])
 
 ## [0.2.18] - 2024-05-24
 
 ### Fixed
 
-- Nested map getters generation.
+- Nested map getters generation. ([#483][gh-483])
 
 ## [0.2.17] - 2024-05-23
 
 ### Changed
 
-- Top-level names to not start with `//`.
+- Top-level names to not start with `//`. ([#443][gh-443])
 
 ## [0.2.16] - 2024-05-23
 
@@ -156,7 +156,7 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ### Fixed
 
-- Exponentiation miscompilation.
+- Exponentiation miscompilation. ([#444][gh-444])
 
 ## [0.2.14] - 2024-05-22
 
@@ -191,6 +191,12 @@ and this project does not currently adhere to a particular versioning scheme.
 - Rules definition to be in a single block.
 - Disabled `net-size` check by default.
 
+## [0.2.9] - 2024-05-19
+
+### Changed
+
+- Readback error messages.
+
 ## [0.2.8] - 2024-05-19
 
 ### Changed
@@ -200,15 +206,76 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ## [0.2.6] - 2024-05-17
 
+### Added
+
+- Simple readback of tuples.
+
 ### Changed
 
 - Imperative syntax to require `,` in list-like builtins.
+
+### Fixed
+
+- Empty map parsing.
+
+## [0.2.5] - 2024-05-16
+
+### Added
+
+- Exponentiation `**` operator.
+
+### Changed
+
+- `go` to `fork` inside `bend` statement.
+
+## [0.2.4] -
+
+### Changed
+
+- New version for hvm-core compatibility.
+
+## [0.2.3] -
+
+### Changed
+
+- Rename to `bend-lang`.
+- Use crates.io HVM.
+
+### Added
+
+- List readback.
+
+## [0.2.2] - 2024-05-15
+
+### Changed
+
+- Comments from `//` to `#`.
+- Lambda syntax and built-in constructor names.
+- Fold to require explicit state passing.
+
+### Added
+
+- Record types and destructuring.
+- String readback.
+
+## [0.2.1] - 2024-05-15
+
+### Fixed
+
+- Number parsing in imperative syntax.
+
+### Changed
+
+- Require `\n` after return.
 
 ## [0.2.0] - 2024-05-14
 
 - Initial public release of Bend.
 
 [0.2.0]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.0
+[0.2.3]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.3
+[0.2.4]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.4
+[0.2.5]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.5
 [0.2.6]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.6
 [0.2.8]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.8
 [0.2.10]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.10
@@ -237,14 +304,25 @@ and this project does not currently adhere to a particular versioning scheme.
 [0.2.34]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.34
 [0.2.35]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.35
 [gh-424]: https://github.com/HigherOrderCO/Bend/issues/424
+[gh-427]: https://github.com/HigherOrderCO/Bend/issues/427
+[gh-443]: https://github.com/HigherOrderCO/Bend/issues/443
+[gh-444]: https://github.com/HigherOrderCO/Bend/issues/444
 [gh-451]: https://github.com/HigherOrderCO/Bend/issues/451
 [gh-463]: https://github.com/HigherOrderCO/Bend/issues/463
 [gh-465]: https://github.com/HigherOrderCO/Bend/issues/465
 [gh-466]: https://github.com/HigherOrderCO/Bend/issues/466
 [gh-467]: https://github.com/HigherOrderCO/Bend/issues/467
+[gh-475]: https://github.com/HigherOrderCO/Bend/issues/475
+[gh-478]: https://github.com/HigherOrderCO/Bend/issues/478
 [gh-479]: https://github.com/HigherOrderCO/Bend/issues/479
+[gh-483]: https://github.com/HigherOrderCO/Bend/issues/483
 [gh-485]: https://github.com/HigherOrderCO/Bend/issues/485
+[gh-486]: https://github.com/HigherOrderCO/Bend/issues/486
+[gh-489]: https://github.com/HigherOrderCO/Bend/issues/489
+[gh-494]: https://github.com/HigherOrderCO/Bend/issues/494
 [gh-502]: https://github.com/HigherOrderCO/Bend/issues/502
+[gh-512]: https://github.com/HigherOrderCO/Bend/issues/512
+[gh-516]: https://github.com/HigherOrderCO/Bend/issues/516
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.35...HEAD
