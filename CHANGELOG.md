@@ -78,11 +78,156 @@ and this project does not currently adhere to a particular versioning scheme.
 
 - Make `with` clauses take a bind and an argument
 
+## [0.2.26] - 2024-05-28
+
+### Changed
+
+- `do` keyword to `with`.
+
+### Added
+
+- `wrap` alias inside `with` blocks.
+
+## [0.2.25] - 2024-05-28
+
+### Added
+
+- Generated constructor tags.
+
+## [0.2.24] - 2024-05-27
+
+### Added
+
+- `elif` chains.
+
+## [0.2.23] - 2024-05-27
+
+### Fixed
+
+- `gen-cu` and `gen-c` commands after move to HVM syntax tree.
+
+## [0.2.22] - 2024-05-26
+
+### Changed
+
+- Rust channel from `nightly` to `stable`.
+
+## [0.2.21] - 2024-05-25
+
+### Changed
+
+- HVM syntax tree for representing inets inside the compiler.
+
+## [0.2.20] - 2024-05-24
+
+### Fixed
+
+- Map getters generation inside map setters.
+
+## [0.2.19] - 2024-05-24
+
+- Variable names to not allow `__`.
+
+### Changed
+
+## [0.2.18] - 2024-05-24
+
+### Fixed
+
+- Nested map getters generation.
+
+## [0.2.17] - 2024-05-23
+
+### Changed
+
+- Top-level names to not start with `//`.
+
+## [0.2.16] - 2024-05-23
+
+### Added
+
+- New `IO` builtins.
+
+### Fixed
+
+- Definition pruning transformation.
+
+## [0.2.15] - 2024-05-22
+
+### Fixed
+
+- Exponentiation miscompilation.
+
+## [0.2.14] - 2024-05-22
+
+### Changed
+
+- Inet level eta-reduction pass to not reduce number nodes.
+
+## [0.2.13] - 2024-05-22
+
+### Fixed
+
+- Scope of `fork`.
+
+## [0.2.12] - 2024-05-22
+
+### Changed
+
+- Functional syntax `data` keyword to `type`.
+
+## [0.2.11] - 2024-05-22
+
+### Added
+
+- List comprehension.
+- Bit shift left and Bit shift right.
+
+## [0.2.10] - 2024-05-21
+
+### Changed
+
+- Numbers to new HVM number operation format.
+- Rules definition to be in a single block.
+- Disabled `net-size` check by default.
+
+## [0.2.8] - 2024-05-19
+
+### Changed
+
+- Increase max net size.
+- `check-net-size` to be optional.
+
+## [0.2.6] - 2024-05-17
+
+### Changed
+
+- Imperative syntax to require `,` in list-like builtins.
+
 ## [0.2.0] - 2024-05-14
 
 - Initial public release of Bend.
 
 [0.2.0]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.0
+[0.2.6]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.6
+[0.2.8]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.8
+[0.2.10]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.10
+[0.2.11]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.11
+[0.2.12]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.12
+[0.2.13]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.13
+[0.2.14]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.14
+[0.2.15]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.15
+[0.2.16]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.16
+[0.2.17]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.17
+[0.2.18]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.18
+[0.2.19]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.19
+[0.2.20]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.20
+[0.2.21]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.21
+[0.2.22]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.22
+[0.2.23]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.23
+[0.2.24]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.24
+[0.2.25]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.25
+[0.2.26]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.26
 [0.2.27]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.27
 [0.2.28]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.28
 [0.2.29]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.29
