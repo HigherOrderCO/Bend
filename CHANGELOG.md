@@ -228,13 +228,13 @@ and this project does not currently adhere to a particular versioning scheme.
 
 - `go` to `fork` inside `bend` statement.
 
-## [0.2.4] -
+## [0.2.4] - 2024-05-15
 
 ### Changed
 
 - New version for hvm-core compatibility.
 
-## [0.2.3] -
+## [0.2.3] - 2024-05-15
 
 ### Changed
 
