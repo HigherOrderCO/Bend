@@ -113,4 +113,5 @@ undefer defered = (defered @x x)
 # log :: f24 -> f24 -> f24
 log x base = (| base x)
 # atan2 :: f24 -> f24 -> f24
+# Has the same behaviour as `atan2f` in the C math lib.
 atan2 x y = (& x y)
