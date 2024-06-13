@@ -6,7 +6,6 @@ Currently Bend supports 3 types of native numbers for fast numeric operations (c
 - I24: Signed integers (24 bits, two's complement)
 - F24: Floating point numbers (single precision IEEE-754 floating point with the last bits of the mantissa implicitly set to zero)
 
-
 ### U24
 
 Unsigned numbers are written as just the number and are represented as a 24 bit unsigned integer.
@@ -14,7 +13,6 @@ Unsigned numbers are written as just the number and are represented as a 24 bit 
 ```rs
 two = 2
 ```
-
 
 ### I24
 
@@ -29,7 +27,7 @@ Positive numbers _must_ be written with a `+` sign, otherwise they'll be interpr
 
 Numbers can also be written in binary or hexadecimal form. Underscores can be optionally used as digit separators to make large numbers more readable.
 
-```rs
+````rs
 decimal =     1194684
 binary =      0b100_100_011_101_010_111_100
 hexadecimal = 0x123_abc
@@ -47,8 +45,7 @@ pi = +3.1415926535897932384626433 # Will get rounded to 24bit float
 a_millionth = 0.000001
 zero = 0.0
 minus_zero = -0.0
-```
-
+````
 
 ### Mixing number types
 
@@ -60,7 +57,6 @@ That means that we lose the type information of one of the numbers, which causes
 During runtime, the executed numeric function depends on both the type tag and the operation tag. For example, the same tag is used for unsigned bitwise and floating point atan2, so mixing number types can give you very unexpected results.
 
 At the moment Bend doesn't have a way to convert between the different number types, but it will be added in the future.
-
 
 ### Operations
 
@@ -75,24 +71,30 @@ some_val = (+ (+ 7 4) (* 2 3))
 
 These are the currently available operations:
 
-Operation | Description | Accepted types | Return type
-----------|-------------|----------------|------------
-\+         | Addition    | U24, I24, F24  | Same as arguments
-\-         | Subtraction | U24, I24, F24  | Same as arguments
-\*         | Multiplication | U24, I24, F24  | Same as arguments
-\/         | Division | U24, I24, F24  | Same as arguments
-\%         | Modulo | U24, I24, F24  | Same as arguments
-\==        | Equality | U24, I24, F24  | U24
-\!=        | Inequality | U24, I24, F24  | U24
-\<         | Less than | U24, I24, F24  | U24
-\<=        | Less than or equal to | U24, I24, F24  | U24
-\>        | Greater than | U24, I24, F24  | U24
-\>=        | Greater than or equal to | U24, I24, F24  | U24
-\&         | Bitwise and | U24, I24  | Same as arguments
-\|         | Bitwise or | U24, I24  | Same as arguments
-\^         | Bitwise xor | U24, I24  | Same as arguments
-\**        | Exponentiation | F24  | F24
+| Operation | Description              | Accepted types | Return type       |
+| --------- | ------------------------ | -------------- | ----------------- |
+| \+        | Addition                 | U24, I24, F24  | Same as arguments |
+| \-        | Subtraction              | U24, I24, F24  | Same as arguments |
+| \*        | Multiplication           | U24, I24, F24  | Same as arguments |
+| \/        | Division                 | U24, I24, F24  | Same as arguments |
+| \%        | Modulo                   | U24, I24, F24  | Same as arguments |
+| \==       | Equality                 | U24, I24, F24  | U24               |
+| \!=       | Inequality               | U24, I24, F24  | U24               |
+| \<        | Less than                | U24, I24, F24  | U24               |
+| \<=       | Less than or equal to    | U24, I24, F24  | U24               |
+| \>        | Greater than             | U24, I24, F24  | U24               |
+| \>=       | Greater than or equal to | U24, I24, F24  | U24               |
+| \&        | Bitwise and              | U24, I24       | Same as arguments |
+| \|        | Bitwise or               | U24, I24       | Same as arguments |
+| \^        | Bitwise xor              | U24, I24       | Same as arguments |
+| \*\*      | Exponentiation           | F24            | F24               |
 
+### Functions
+
+| Name           | Description                     | Accepted types | Return type |
+| -------------- | ------------------------------- | -------------- | ----------- |
+| `log(x, base)` | Logarithm                       | F24            | F24         |
+| `atan2(x, y)`  | 2 arguments arctangent (atan2f) | F24            | F24         |
 
 ### Pattern matching
 
@@ -122,7 +124,6 @@ Number.minus_three = λn λf λx
   }
 ```
 
-
 Using everything we learned, we can write a program that calculates the n-th Fibonacci number using native numbers:
 
 ```py
@@ -139,7 +140,6 @@ fibonacci = λn # n is the argument
 
 main = (fibonacci 15)
 ```
-
 
 ### Pattern matching numbers in Fun syntax equations
 
