@@ -109,3 +109,8 @@ sleep hi_lo = (IO/Call IO/MAGIC "PUT_TIME" hi_lo @x (IO/Done IO/MAGIC x))
 defer val = @x (x val)
 defer_arg defered arg = @x (defered x arg)
 undefer defered = (defered @x x)
+
+# log :: f24 -> f24 -> f24
+log x base = (| base x)
+# atan2 :: f24 -> f24 -> f24
+atan2 x y = (& x y)
