@@ -111,7 +111,9 @@ defer_arg defered arg = @x (defered x arg)
 undefer defered = (defered @x x)
 
 # log :: f24 -> f24 -> f24
+# Computes the logarithm of `x` with the specified `base`.
 log x base = (| base x)
 # atan2 :: f24 -> f24 -> f24
 # Has the same behaviour as `atan2f` in the C math lib.
+# Computes the arctangent of the quotient of its two arguments.
 atan2 x y = (& x y)
