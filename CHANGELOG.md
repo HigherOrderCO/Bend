@@ -16,6 +16,10 @@ and this project does not currently adhere to a particular versioning scheme.
 
 - Fixed readback of numeric operations. ([#467][gh-467])
 
+### Added
+
+- `log` and `atan2` builtin functions. ([#583][gh-583])
+
 ## [0.2.35] - 2024-06-06
 
 ### Changed
@@ -335,4 +339,5 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-516]: https://github.com/HigherOrderCO/Bend/issues/516
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
+[gh-583]: https://github.com/HigherOrderCO/Bend/issues/583
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.35...HEAD
