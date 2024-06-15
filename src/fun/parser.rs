@@ -109,7 +109,7 @@ impl<'a> TermParser<'a> {
           let (r#enum, nxt_indent) = prs.parse_type(indent)?;
           self.index = prs.index;
           let end_idx = *self.index();
-          self.add_type(r#enum, &mut book, ini_idx..end_idx, builtin)?;
+          self.add_imp_type(r#enum, &mut book, ini_idx..end_idx, builtin)?;
           indent = nxt_indent;
           last_rule = None;
           continue;
@@ -118,7 +118,7 @@ impl<'a> TermParser<'a> {
           self.index = rewind_index;
           let (nam, adt) = self.parse_datatype(builtin)?;
           let end_idx = *self.index();
-          self.with_ctx(book.add_adt(nam, adt), ini_idx..end_idx)?;
+          self.add_fun_type(&mut book, nam, adt, ini_idx..end_idx)?;
           indent = self.advance_newlines()?;
           last_rule = None;
           continue;
@@ -130,6 +130,9 @@ impl<'a> TermParser<'a> {
         let def = self.parse_hvm(builtin)?;
         let end_idx = *self.index();
         self.add_hvm(def, &mut book, ini_idx..end_idx)?;
+        indent = self.advance_newlines()?;
+        last_rule = None;
+        continue;
       }
 
       // Fun function definition
@@ -774,7 +777,13 @@ impl<'a> TermParser<'a> {
     Ok(())
   }
 
-  fn add_type(&mut self, enum_: Enum, book: &mut Book, span: Range<usize>, builtin: bool) -> ParseResult<()> {
+  fn add_imp_type(
+    &mut self,
+    enum_: Enum,
+    book: &mut Book,
+    span: Range<usize>,
+    builtin: bool,
+  ) -> ParseResult<()> {
     self.check_type_redefinition(&enum_.name, book, span.clone())?;
     let mut adt = Adt { ctrs: Default::default(), builtin };
     for variant in enum_.variants {
@@ -783,6 +792,25 @@ impl<'a> TermParser<'a> {
       adt.ctrs.insert(variant.name, variant.fields);
     }
     book.adts.insert(enum_.name.clone(), adt);
+    Ok(())
+  }
+
+  fn add_fun_type(&mut self, book: &mut Book, nam: Name, adt: Adt, span: Range<usize>) -> ParseResult<()> {
+    if book.adts.contains_key(&nam) {
+      let msg = TermParser::redefinition_of_type_msg(&nam);
+      return self.with_ctx(Err(msg), span);
+    } else {
+      for ctr in adt.ctrs.keys() {
+        match book.ctrs.entry(ctr.clone()) {
+          indexmap::map::Entry::Vacant(e) => _ = e.insert(nam.clone()),
+          indexmap::map::Entry::Occupied(e) => {
+            let msg = TermParser::redefinition_of_constructor_msg(e.key());
+            return self.with_ctx(Err(msg), span);
+          }
+        }
+      }
+      book.adts.insert(nam.clone(), adt);
+    }
     Ok(())
   }
 
@@ -917,22 +945,7 @@ impl Indent {
   }
 }
 
-impl Book {
-  fn add_adt(&mut self, nam: Name, adt: Adt) -> ParseResult<()> {
-    if self.adts.contains_key(&nam) {
-      Err(TermParser::redefinition_of_type_msg(&nam))?
-    } else {
-      for ctr in adt.ctrs.keys() {
-        match self.ctrs.entry(ctr.clone()) {
-          indexmap::map::Entry::Vacant(e) => _ = e.insert(nam.clone()),
-          indexmap::map::Entry::Occupied(e) => Err(TermParser::redefinition_of_constructor_msg(e.key()))?,
-        }
-      }
-      self.adts.insert(nam.clone(), adt);
-    }
-    Ok(())
-  }
-}
+impl Book {}
 
 impl<'a> ParserCommons<'a> for TermParser<'a> {}
 
