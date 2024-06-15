@@ -226,3 +226,19 @@ A Natural Number can be written with literals with a `#` before the literal numb
 
 ## IO
 IO Functions are in the **next milestone**!
+
+## Numeric operations
+
+### log
+```py
+def log(x: f24, base: f24) -> f24
+```
+Computes the logarithm of `x` with the specified `base`.
+
+### atan2
+```py
+def atan2(x: f24, y: f24) -> f24
+```
+Computes the arctangent of `y / x`.
+
+Has the same behaviour as `atan2f` in the C math lib.
