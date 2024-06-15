@@ -22,7 +22,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 @List.len = ((@List.len__C1 a) a)
 
 @List.len__C0 = (* (* (a c)))
-  & $(b c) ~ [+1]
+  & $(b c) ~ [+0x0000001]
   & @List.len ~ (a b)
 
 @List.len__C1 = (?((0 @List.len__C0) a) a)
@@ -31,7 +31,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @List.len_tr__C0 = (* (* (a (b d))))
   & @List.len_tr ~ (a (c d))
-  & $(b c) ~ [+1]
+  & $(b c) ~ [+0x0000001]
 
 @List.len_tr__C1 = (?(((a a) @List.len_tr__C0) b) b)
 
@@ -100,7 +100,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 @Tree.height = ((@Tree.height__C1 a) a)
 
 @Tree.height__C0 = (a (c f))
-  & $(e f) ~ [+1]
+  & $(e f) ~ [+0x0000001]
   & @max ~ (b (d e))
   &!@Tree.height ~ (a b)
   &!@Tree.height ~ (c d)
@@ -130,7 +130,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 @Tree.nodes = ((@Tree.nodes__C1 a) a)
 
 @Tree.nodes__C0 = (a (b e))
-  & $(d e) ~ [+1]
+  & $(d e) ~ [+0x0000001]
   &!@Tree.nodes ~ (a $([+] $(c d)))
   &!@Tree.nodes ~ (b c)
 
@@ -170,4 +170,4 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @tail_recursive__C0 = (a (b d))
   & @tail_recursive ~ (a (c d))
-  & $(b c) ~ [+1]
+  & $(b c) ~ [+0x0000001]

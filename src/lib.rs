@@ -3,8 +3,8 @@ use crate::{
   hvm::{
     add_recursive_priority::add_recursive_priority,
     check_net_size::{check_net_sizes, MAX_NET_SIZE},
-    display_hvm_book,
     eta_reduce::eta_reduce_hvm_net,
+    hvm_book_show_pretty,
     inline::inline_hvm_book,
     mutual_recursion,
     prune::prune_hvm_book,
@@ -249,7 +249,7 @@ fn run_hvm(book: &::hvm::ast::Book, cmd: &str, run_opts: &RunOpts) -> Result<Str
   }
 
   let out_path = ".out.hvm";
-  std::fs::write(out_path, display_hvm_book(book).to_string()).map_err(|x| x.to_string())?;
+  std::fs::write(out_path, hvm_book_show_pretty(book)).map_err(|x| x.to_string())?;
   let mut process = std::process::Command::new(run_opts.hvm_path.clone())
     .arg(cmd)
     .arg(out_path)

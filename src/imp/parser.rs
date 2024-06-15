@@ -1,7 +1,7 @@
 use crate::{
   fun::{
     parser::{is_num_char, Indent, ParseResult, ParserCommons},
-    Adt, Book, CtrField, Name, Num, Op, STRINGS,
+    CtrField, Name, Num, Op, STRINGS,
   },
   imp::{AssignPattern, Definition, Enum, Expr, InPlaceOp, MatchArm, Stmt, Variant},
   maybe_grow,
@@ -36,7 +36,7 @@ impl<'a> Parser<'a> for PyParser<'a> {
   fn expected<T>(&mut self, exp: &str) -> ParseResult<T> {
     let ini_idx = *self.index();
     let end_idx = *self.index() + 1;
-    self.expected_spanned(exp, ini_idx, end_idx)
+    self.expected_spanned(exp, ini_idx..end_idx)
   }
 
   /// Consumes an instance of the given string, erroring if it is not found.
@@ -152,7 +152,7 @@ impl<'a> PyParser<'a> {
           kwargs.push((bnd, arg));
         } else if must_be_named {
           let msg = "Positional arguments are not allowed to go after named arguments.".to_string();
-          return self.with_ctx(Err(msg), ini_idx, end_idx);
+          return self.with_ctx(Err(msg), ini_idx..end_idx);
         } else {
           args.push(arg);
         }
@@ -176,7 +176,7 @@ impl<'a> PyParser<'a> {
         return Ok(Expr::MapGet { nam, key: Box::new(key) });
       } else {
         let end_idx = *self.index();
-        return self.expected_spanned("Map variable name", ini_idx, end_idx);
+        return self.expected_spanned("Map variable name", ini_idx..end_idx);
       }
     }
 
@@ -187,7 +187,7 @@ impl<'a> PyParser<'a> {
         return Ok(Expr::Ctr { name: nam, args: Vec::new(), kwargs });
       } else {
         let end_idx = *self.index();
-        return self.expected_spanned("Constructor name", ini_idx, end_idx);
+        return self.expected_spanned("Constructor name", ini_idx..end_idx);
       }
     }
 
@@ -361,7 +361,7 @@ impl<'a> PyParser<'a> {
       } else {
         let msg = "Unexpected '=' in unnamed argument.".to_string();
         let idx = *self.index();
-        self.with_ctx(Err(msg), idx, idx + 1)
+        self.with_ctx(Err(msg), idx..idx + 1)
       }
     } else {
       Ok((None, arg))
@@ -490,7 +490,7 @@ impl<'a> PyParser<'a> {
     match &pat {
       AssignPattern::Var(..) => {}
       AssignPattern::MapSet(..) => {}
-      _ => self.expected_spanned("Var or Map accessor", ini_idx, end_idx)?,
+      _ => self.expected_spanned("Var or Map accessor", ini_idx..end_idx)?,
     }
     if let Some(op) = self.parse_in_place_op()? {
       let val = self.parse_expr(true)?;
@@ -502,7 +502,7 @@ impl<'a> PyParser<'a> {
       return Ok((stmt, nxt_indent));
     }
 
-    self.expected_spanned("statement", ini_idx, end_idx)
+    self.expected_spanned("statement", ini_idx..end_idx)
   }
 
   fn parse_in_place_op(&mut self) -> ParseResult<Option<InPlaceOp>> {
@@ -644,7 +644,7 @@ impl<'a> PyParser<'a> {
         self.advance_one();
         Ok((Some(nam), self.parse_expr(true)?))
       }
-      (_, true) => self.expected_spanned("argument name", ini_idx, end_idx),
+      (_, true) => self.expected_spanned("argument name", ini_idx..end_idx),
       (Expr::Var { nam }, false) => Ok((Some(nam.clone()), Expr::Var { nam })),
       (arg, false) => Ok((Some(Name::new("%arg")), arg)),
     }
@@ -705,7 +705,7 @@ impl<'a> PyParser<'a> {
     let (fst_case, fst_stmt, mut nxt_indent) = self.parse_switch_case(indent)?;
     let end_idx = *self.index();
     if fst_case != Some(0) {
-      return self.expected_spanned("case 0", ini_idx, end_idx);
+      return self.expected_spanned("case 0", ini_idx..end_idx);
     }
     let mut arms = vec![fst_stmt];
     let mut should_continue = fst_case == Some(0);
@@ -967,7 +967,7 @@ impl<'a> PyParser<'a> {
     if indent != Indent::Val(0) {
       let msg = "Indentation error. Functions defined with 'def' must be at the start of the line.";
       let idx = *self.index();
-      return self.with_ctx(Err(msg), idx, idx + 1);
+      return self.with_ctx(Err(msg), idx..idx + 1);
     }
 
     self.skip_trivia_inline()?;
@@ -995,7 +995,7 @@ impl<'a> PyParser<'a> {
     if indent != Indent::Val(0) {
       let msg = "Indentation error. Types defined with 'type' must be at the start of the line.";
       let idx = *self.index();
-      return self.with_ctx(Err(msg), idx, idx + 1);
+      return self.with_ctx(Err(msg), idx..idx + 1);
     }
 
     self.skip_trivia_inline()?;
@@ -1036,7 +1036,7 @@ impl<'a> PyParser<'a> {
     if indent != Indent::Val(0) {
       let msg = "Indentation error. Types defined with 'object' must be at the start of the line.";
       let idx = *self.index();
-      return self.with_ctx(Err(msg), idx, idx + 1);
+      return self.with_ctx(Err(msg), idx..idx + 1);
     }
 
     self.skip_trivia_inline()?;
@@ -1061,103 +1061,24 @@ impl<'a> PyParser<'a> {
     Ok(CtrField { nam, rec })
   }
 
-  pub fn add_def(
-    &mut self,
-    mut def: Definition,
-    book: &mut Book,
-    ini_idx: usize,
-    end_idx: usize,
-    builtin: bool,
-  ) -> ParseResult<()> {
-    if let Some(def) = book.defs.get(&def.name) {
-      let msg = Self::redefinition_of_function_msg(def.builtin, &def.name);
-      return self.with_ctx(Err(msg), ini_idx, end_idx);
-    }
-    if book.ctrs.contains_key(&def.name) {
-      let msg = Self::redefinition_of_constructor_msg(&def.name);
-      return self.with_ctx(Err(msg), ini_idx, end_idx);
-    }
-    def.order_kwargs(book)?;
-    def.gen_map_get();
-    let def = def.to_fun(builtin)?;
-    book.defs.insert(def.name.clone(), def);
-    Ok(())
-  }
-
-  pub fn add_type(
-    &mut self,
-    r#enum: Enum,
-    book: &mut Book,
-    ini_idx: usize,
-    end_idx: usize,
-    builtin: bool,
-  ) -> ParseResult<()> {
-    if book.adts.contains_key(&r#enum.name) {
-      let msg = PyParser::redefinition_of_type_msg(&r#enum.name);
-      return self.with_ctx(Err(msg), ini_idx, end_idx);
-    }
-    let mut adt = Adt { ctrs: Default::default(), builtin };
-    for variant in r#enum.variants {
-      if let Some(def) = book.defs.get(&variant.name) {
-        let msg = PyParser::redefinition_of_function_msg(def.builtin, &variant.name);
-        return self.with_ctx(Err(msg), ini_idx, end_idx);
-      }
-      if book.ctrs.contains_key(&variant.name) {
-        let msg = PyParser::redefinition_of_constructor_msg(&variant.name);
-        return self.with_ctx(Err(msg), ini_idx, end_idx);
-      }
-      book.ctrs.insert(variant.name.clone(), r#enum.name.clone());
-      adt.ctrs.insert(variant.name, variant.fields);
-    }
-    book.adts.insert(r#enum.name.clone(), adt);
-    Ok(())
-  }
-
-  pub fn add_object(
-    &mut self,
-    obj: Variant,
-    book: &mut Book,
-    ini_idx: usize,
-    end_idx: usize,
-    builtin: bool,
-  ) -> ParseResult<()> {
-    if book.adts.contains_key(&obj.name) {
-      let msg = PyParser::redefinition_of_type_msg(&obj.name);
-      return self.with_ctx(Err(msg), ini_idx, end_idx);
-    }
-    let mut adt = Adt { ctrs: Default::default(), builtin };
-    if let Some(def) = book.defs.get(&obj.name) {
-      let msg = PyParser::redefinition_of_function_msg(def.builtin, &obj.name);
-      return self.with_ctx(Err(msg), ini_idx, end_idx);
-    }
-    if book.ctrs.contains_key(&obj.name) {
-      let msg = PyParser::redefinition_of_constructor_msg(&obj.name);
-      return self.with_ctx(Err(msg), ini_idx, end_idx);
-    }
-    book.ctrs.insert(obj.name.clone(), obj.name.clone());
-    adt.ctrs.insert(obj.name.clone(), obj.fields);
-    book.adts.insert(obj.name, adt);
-    Ok(())
-  }
-
   fn expected_indent<T>(&mut self, expected: Indent, got: Indent) -> ParseResult<T> {
     match (expected, got) {
       (Indent::Eof, Indent::Eof) => unreachable!(),
       (Indent::Eof, Indent::Val(got)) => {
         let msg = format!("Indentation error. Expected end-of-input, got {} spaces.", got);
         let idx = *self.index();
-        self.with_ctx(Err(msg), idx, idx + 1)
+        self.with_ctx(Err(msg), idx..idx + 1)
       }
       (Indent::Val(expected), Indent::Eof) => {
         let msg = format!("Indentation error. Expected {} spaces, got end-of-input.", expected);
         let idx = *self.index();
-        self.with_ctx(Err(msg), idx, idx + 1)
+        self.with_ctx(Err(msg), idx..idx + 1)
       }
       (Indent::Val(expected), Indent::Val(got)) => {
         if got != expected {
           let msg = format!("Indentation error. Expected {} spaces, got {}.", expected, got);
           let idx = *self.index();
-          self.with_ctx(Err(msg), idx, idx + 1)
+          self.with_ctx(Err(msg), idx..idx + 1)
         } else {
           unreachable!()
         }

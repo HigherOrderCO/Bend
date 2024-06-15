@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/hvm_def_cast.bend
+---
+NumScott:
+42.000
+
+Scott:
+42.000

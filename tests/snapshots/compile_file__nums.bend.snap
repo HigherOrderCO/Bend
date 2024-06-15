@@ -3,5 +3,5 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/nums.bend
 ---
 @main = b
-  & $(a b) ~ [+16777215]
-  & $(1000 a) ~ [+5]
+  & $(a b) ~ [+0x0FFFFFF]
+  & $(1000 a) ~ [+0x0000005]

@@ -20,7 +20,8 @@ impl Ctx<'_> {
   pub fn resolve_refs(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
 
-    let def_names = self.book.defs.keys().cloned().collect::<HashSet<_>>();
+    let def_names =
+      self.book.defs.keys().cloned().chain(self.book.hvm_defs.keys().cloned()).collect::<HashSet<_>>();
     for (def_name, def) in &mut self.book.defs {
       for rule in def.rules.iter_mut() {
         let mut scope = HashMap::new();
