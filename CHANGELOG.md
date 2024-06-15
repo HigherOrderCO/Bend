@@ -18,8 +18,9 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ### Added
 
-- Add `log` and `atan2` builtin functions. ([#583][gh-583])
 - Create new type of top-level definition for writing native HVM definitions. ([#586][gh-586])
+- Add `log` and `atan2` builtin functions. ([#583][gh-583])
+- Add `to_f24`, `to_u24` and `to_i24` number casting builtin functions. ([#582][gh-582])
 
 ## [0.2.35] - 2024-06-06
 
@@ -340,6 +341,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-516]: https://github.com/HigherOrderCO/Bend/issues/516
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
+[gh-582]: https://github.com/HigherOrderCO/Bend/issues/582
 [gh-583]: https://github.com/HigherOrderCO/Bend/issues/583
 [gh-586]: https://github.com/HigherOrderCO/Bend/issues/586
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.35...HEAD

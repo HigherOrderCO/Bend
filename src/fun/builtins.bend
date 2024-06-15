@@ -126,3 +126,18 @@ hvm log:
 # Computes the arctangent of the quotient of its two arguments.
 hvm atan2:
   ($([&] $(y ret)) (y ret))
+
+# to_f24(x: native number) -> f24
+# Casts any native number to an f24.
+hvm to_f24:
+  ($([f24] ret) ret)
+
+# to_u24(x: native number) -> u24
+# Casts any native number to a u24.
+hvm to_u24:
+  ($([u24] ret) ret)
+
+# to_i24(x: native number) -> i24
+# Casts any native number to an i24.
+hvm to_i24:
+  ($([i24] ret) ret)

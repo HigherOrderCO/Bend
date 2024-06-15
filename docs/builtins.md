@@ -242,3 +242,21 @@ def atan2(x: f24, y: f24) -> f24
 Computes the arctangent of `y / x`.
 
 Has the same behaviour as `atan2f` in the C math lib.
+
+### to_f24
+```py
+def to_f24(x: any number) -> f24
+```
+Casts any native number to an f24.
+
+### to_u24
+```py
+def to_u24(x: any number) -> u24
+```
+Casts any native number to a u24.
+
+### to_i24
+```py
+def to_i24(x: any number) -> i24
+```
+Casts any native number to an i24.
