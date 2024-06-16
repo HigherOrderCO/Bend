@@ -1187,6 +1187,7 @@ hvm link_ports:
 
 It's also possible to define functions using HVM syntax. This can be
 thought of as a way to write "HVM assembly" directly in a Bend program.
+You can find the reference of this syntax in the [HVM paper](https://github.com/HigherOrderCO/HVM/blob/main/paper/PAPER.pdf).
 
 This is meant for writing things that would otherwise be hard or
 impossible to write in normal Bend syntax.
