@@ -5,7 +5,7 @@ input_file: tests/golden_tests/mutual_recursion/len.bend
 @Len = ((@Len__C1 a) a)
 
 @Len__C0 = (* (* (a c)))
-  & $(b c) ~ [+1]
+  & $(b c) ~ [+0x0000001]
   & @Len ~ (a b)
 
 @Len__C1 = (?((0 @Len__C0) a) a)

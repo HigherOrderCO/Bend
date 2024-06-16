@@ -1172,3 +1172,26 @@ The syntax above is desugared to:
 ```
 (Nat.succ (Nat.succ (Nat.succ List.nil)))
 ```
+
+# Native HVM definitions
+
+```py
+# This function causes two ports to be linked and returns *.
+# This can be used to interpret a lambda as an application and apply something to it for example.
+# It can be used like this: `let * = (link_ports @x x y)`
+hvm link_ports:
+  (a (b *))
+  & (c a) ~ (d e)
+  & (e b) ~ (d c)
+```
+
+It's also possible to define functions using HVM syntax. This can be
+thought of as a way to write "HVM assembly" directly in a Bend program.
+You can find the reference of this syntax in the [HVM paper](https://github.com/HigherOrderCO/HVM/blob/main/paper/PAPER.pdf).
+
+This is meant for writing things that would otherwise be hard or
+impossible to write in normal Bend syntax.
+
+It will also ignore all term-level compiler passes and so can be
+useful for writing programs with exact behaviour that won't ever be
+changed or optimized by the compiler.

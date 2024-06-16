@@ -1,9 +1,11 @@
+use std::ops::Range;
+
 use crate::{
   fun::{
-    display::DisplayFn, Adt, Book, CtrField, Definition, FanKind, MatchRule, Name, Num, Op, Pattern, Rule,
-    Tag, Term, STRINGS,
+    display::DisplayFn, Adt, Book, CtrField, Definition, FanKind, HvmDefinition, MatchRule, Name, Num, Op,
+    Pattern, Rule, Tag, Term, STRINGS,
   },
-  imp::parser::PyParser,
+  imp::{parser::PyParser, Enum, Variant},
   maybe_grow,
 };
 use highlight_error::highlight_error;
@@ -76,7 +78,7 @@ impl<'a> TermParser<'a> {
         let (obj, nxt_indent) = prs.parse_object(indent)?;
         self.index = prs.index;
         let end_idx = *self.index();
-        prs.add_object(obj, &mut book, ini_idx, end_idx, builtin)?;
+        self.add_object(obj, &mut book, ini_idx..end_idx, builtin)?;
         indent = nxt_indent;
         last_rule = None;
         continue;
@@ -88,7 +90,7 @@ impl<'a> TermParser<'a> {
         let (def, nxt_indent) = prs.parse_def(indent)?;
         self.index = prs.index;
         let end_idx = *self.index();
-        prs.add_def(def, &mut book, ini_idx, end_idx, builtin)?;
+        self.add_imp_def(def, &mut book, ini_idx..end_idx, builtin)?;
         indent = nxt_indent;
         last_rule = None;
         continue;
@@ -101,50 +103,43 @@ impl<'a> TermParser<'a> {
 
         let _ = self.labelled(|p| p.parse_top_level_name(), "datatype name")?;
 
+        // Imp type definition
         if self.starts_with(":") {
           let mut prs = PyParser { input: self.input, index: rewind_index };
           let (r#enum, nxt_indent) = prs.parse_type(indent)?;
           self.index = prs.index;
           let end_idx = *self.index();
-          prs.add_type(r#enum, &mut book, ini_idx, end_idx, builtin)?;
+          self.add_imp_type(r#enum, &mut book, ini_idx..end_idx, builtin)?;
           indent = nxt_indent;
           last_rule = None;
           continue;
+        // Fun type definition
         } else {
           self.index = rewind_index;
           let (nam, adt) = self.parse_datatype(builtin)?;
           let end_idx = *self.index();
-          self.with_ctx(book.add_adt(nam, adt), ini_idx, end_idx)?;
+          self.add_fun_type(&mut book, nam, adt, ini_idx..end_idx)?;
           indent = self.advance_newlines()?;
           last_rule = None;
           continue;
         }
       }
 
+      // HVM native function definition
+      if self.try_parse_keyword("hvm") {
+        let def = self.parse_hvm(builtin)?;
+        let end_idx = *self.index();
+        self.add_hvm(def, &mut book, ini_idx..end_idx)?;
+        indent = self.advance_newlines()?;
+        last_rule = None;
+        continue;
+      }
+
       // Fun function definition
       let ini_idx = *self.index();
       let (name, rule) = self.parse_rule()?;
       let end_idx = *self.index();
-      // Add to book
-      if let Some(def) = book.defs.get_mut(&name) {
-        if let Some(last_rule) = last_rule {
-          if last_rule == name {
-            // Continuing with a new rule to the current definition
-            def.rules.push(rule);
-          } else {
-            // Trying to add a new rule to a previous definition, coming from a different rule.
-            let msg = Self::redefinition_of_function_msg(builtin, &name);
-            return self.with_ctx(Err(msg), ini_idx, end_idx);
-          }
-        } else {
-          // Trying to add a new rule to a previous definition, coming from another kind of top-level.
-          let msg = Self::redefinition_of_function_msg(builtin, &name);
-          return self.with_ctx(Err(msg), ini_idx, end_idx);
-        }
-      } else {
-        // Adding the first rule of a new definition
-        book.defs.insert(name.clone(), Definition { name: name.clone(), rules: vec![rule], builtin });
-      }
+      self.add_fun_def(&name, rule, builtin, &last_rule, &mut book, ini_idx..end_idx)?;
       indent = self.advance_newlines()?;
       last_rule = Some(name);
     }
@@ -189,6 +184,21 @@ impl<'a> TermParser<'a> {
       let name = Name::new(format!("{typ_name}/{name}"));
       Ok((name, vec![]))
     }
+  }
+
+  fn parse_hvm(&mut self, builtin: bool) -> ParseResult<HvmDefinition> {
+    self.skip_trivia_inline()?;
+    let name = self.parse_bend_name()?;
+    self.skip_trivia_inline()?;
+    self.consume_exactly(":")?;
+    self.consume_new_line()?;
+    // TODO: This will have the wrong index
+    let ini_idx = *self.index();
+    let mut p = hvm::ast::CoreParser::new(&self.input[*self.index()..]);
+    let body = p.parse_net()?;
+    *self.index() = ini_idx + *p.index();
+    let def = HvmDefinition { name: name.clone(), body, builtin };
+    Ok(def)
   }
 
   fn parse_rule(&mut self) -> ParseResult<(Name, Rule)> {
@@ -240,7 +250,7 @@ impl<'a> TermParser<'a> {
         // Ctr
         unexpected_tag(self)?;
         let Pattern::Var(Some(name)) = head else {
-          return self.expected_spanned("constructor name", head_ini_idx, head_end_idx);
+          return self.expected_spanned("constructor name", head_ini_idx..head_end_idx);
         };
         let els = self.list_like(|p| p.parse_pattern(simple), "", ")", "", false, 0)?;
         return Ok(Pattern::Ctr(name, els));
@@ -645,7 +655,7 @@ impl<'a> TermParser<'a> {
       && !self.peek_many(2).is_some_and(|x| x.chars().nth(1).unwrap().is_ascii_digit())
     {
       let msg = "Tagged terms not supported for hvm32.".to_string();
-      return self.with_ctx(Err(msg), index, index + 1);
+      return self.with_ctx(Err(msg), index..index + 1);
     } else {
       None
     };
@@ -654,7 +664,7 @@ impl<'a> TermParser<'a> {
     Ok((tag, move |slf: &mut Self| {
       if has_tag {
         let msg = "\x1b[1m- unexpected tag:\x1b[0m".to_string();
-        slf.with_ctx(Err(msg), index, end_index)
+        slf.with_ctx(Err(msg), index..end_index)
       } else {
         Ok(())
       }
@@ -674,7 +684,7 @@ impl<'a> TermParser<'a> {
         Ok((Some(std::mem::take(nam)), self.parse_term()?))
       }
       (Term::Var { nam }, false) => Ok((Some(nam.clone()), Term::Var { nam: std::mem::take(nam) })),
-      (_, true) => self.expected_spanned("argument name", ini_idx, end_idx),
+      (_, true) => self.expected_spanned("argument name", ini_idx..end_idx),
       (arg, false) => Ok((Some(Name::new("%arg")), std::mem::take(arg))),
     }
   }
@@ -712,6 +722,142 @@ impl<'a> TermParser<'a> {
     let bod = self.parse_term()?;
     Ok((nam, vec![], bod))
   }
+
+  fn add_fun_def(
+    &mut self,
+    name: &Name,
+    rule: Rule,
+    builtin: bool,
+    last_rule: &Option<Name>,
+    book: &mut Book,
+    span: Range<usize>,
+  ) -> ParseResult<()> {
+    match (book.defs.get_mut(name), last_rule) {
+      // Continuing with a new rule to the current definition
+      (Some(def), Some(last_rule)) if last_rule == name => {
+        def.rules.push(rule);
+      }
+      // Trying to add a new rule to a previous definition, coming from a different rule.
+      (Some(def), Some(_)) => {
+        let msg = Self::redefinition_of_function_msg(def.builtin, name);
+        return self.with_ctx(Err(msg), span);
+      }
+      // Trying to add a new rule to a previous definition, coming from another kind of top-level.
+      (Some(def), None) => {
+        let msg = Self::redefinition_of_function_msg(def.builtin, name);
+        return self.with_ctx(Err(msg), span);
+      }
+      // Adding the first rule of a new definition
+      (None, _) => {
+        self.check_top_level_redefinition(name, book, span)?;
+        book.defs.insert(name.clone(), Definition { name: name.clone(), rules: vec![rule], builtin });
+      }
+    }
+    Ok(())
+  }
+
+  fn add_imp_def(
+    &mut self,
+    mut def: crate::imp::Definition,
+    book: &mut Book,
+    span: Range<usize>,
+    builtin: bool,
+  ) -> ParseResult<()> {
+    self.check_top_level_redefinition(&def.name, book, span)?;
+    def.order_kwargs(book)?;
+    def.gen_map_get();
+    let def = def.to_fun(builtin)?;
+    book.defs.insert(def.name.clone(), def);
+    Ok(())
+  }
+
+  fn add_hvm(&mut self, def: HvmDefinition, book: &mut Book, span: Range<usize>) -> ParseResult<()> {
+    self.check_top_level_redefinition(&def.name, book, span)?;
+    book.hvm_defs.insert(def.name.clone(), def);
+    Ok(())
+  }
+
+  fn add_imp_type(
+    &mut self,
+    enum_: Enum,
+    book: &mut Book,
+    span: Range<usize>,
+    builtin: bool,
+  ) -> ParseResult<()> {
+    self.check_type_redefinition(&enum_.name, book, span.clone())?;
+    let mut adt = Adt { ctrs: Default::default(), builtin };
+    for variant in enum_.variants {
+      self.check_top_level_redefinition(&enum_.name, book, span.clone())?;
+      book.ctrs.insert(variant.name.clone(), enum_.name.clone());
+      adt.ctrs.insert(variant.name, variant.fields);
+    }
+    book.adts.insert(enum_.name.clone(), adt);
+    Ok(())
+  }
+
+  fn add_fun_type(&mut self, book: &mut Book, nam: Name, adt: Adt, span: Range<usize>) -> ParseResult<()> {
+    if book.adts.contains_key(&nam) {
+      let msg = TermParser::redefinition_of_type_msg(&nam);
+      return self.with_ctx(Err(msg), span);
+    } else {
+      for ctr in adt.ctrs.keys() {
+        match book.ctrs.entry(ctr.clone()) {
+          indexmap::map::Entry::Vacant(e) => _ = e.insert(nam.clone()),
+          indexmap::map::Entry::Occupied(e) => {
+            let msg = TermParser::redefinition_of_constructor_msg(e.key());
+            return self.with_ctx(Err(msg), span);
+          }
+        }
+      }
+      book.adts.insert(nam.clone(), adt);
+    }
+    Ok(())
+  }
+
+  fn add_object(
+    &mut self,
+    obj: Variant,
+    book: &mut Book,
+    span: Range<usize>,
+    builtin: bool,
+  ) -> ParseResult<()> {
+    self.check_type_redefinition(&obj.name, book, span.clone())?;
+    self.check_top_level_redefinition(&obj.name, book, span)?;
+    let mut adt = Adt { ctrs: Default::default(), builtin };
+    book.ctrs.insert(obj.name.clone(), obj.name.clone());
+    adt.ctrs.insert(obj.name.clone(), obj.fields);
+    book.adts.insert(obj.name, adt);
+    Ok(())
+  }
+
+  fn check_top_level_redefinition(
+    &mut self,
+    name: &Name,
+    book: &mut Book,
+    span: Range<usize>,
+  ) -> ParseResult<()> {
+    if let Some(def) = book.defs.get(name) {
+      let msg = Self::redefinition_of_function_msg(def.builtin, name);
+      return self.with_ctx(Err(msg), span);
+    }
+    if book.ctrs.contains_key(name) {
+      let msg = Self::redefinition_of_constructor_msg(name);
+      return self.with_ctx(Err(msg), span);
+    }
+    if book.hvm_defs.contains_key(name) {
+      let msg = Self::redefinition_of_hvm_msg(false, name);
+      return self.with_ctx(Err(msg), span);
+    }
+    Ok(())
+  }
+
+  fn check_type_redefinition(&mut self, name: &Name, book: &mut Book, span: Range<usize>) -> ParseResult<()> {
+    if book.adts.contains_key(name) {
+      let msg = Self::redefinition_of_type_msg(name);
+      return self.with_ctx(Err(msg), span);
+    }
+    Ok(())
+  }
 }
 
 impl<'a> Parser<'a> for TermParser<'a> {
@@ -729,7 +875,7 @@ impl<'a> Parser<'a> for TermParser<'a> {
   fn expected<T>(&mut self, exp: &str) -> ParseResult<T> {
     let ini_idx = *self.index();
     let end_idx = *self.index() + 1;
-    self.expected_spanned(exp, ini_idx, end_idx)
+    self.expected_spanned(exp, ini_idx..end_idx)
   }
 
   /// Consumes an instance of the given string, erroring if it is not found.
@@ -799,22 +945,7 @@ impl Indent {
   }
 }
 
-impl Book {
-  fn add_adt(&mut self, nam: Name, adt: Adt) -> ParseResult<()> {
-    if self.adts.contains_key(&nam) {
-      Err(TermParser::redefinition_of_type_msg(&nam))?
-    } else {
-      for ctr in adt.ctrs.keys() {
-        match self.ctrs.entry(ctr.clone()) {
-          indexmap::map::Entry::Vacant(e) => _ = e.insert(nam.clone()),
-          indexmap::map::Entry::Occupied(e) => Err(TermParser::redefinition_of_constructor_msg(e.key()))?,
-        }
-      }
-      self.adts.insert(nam.clone(), adt);
-    }
-    Ok(())
-  }
-}
+impl Book {}
 
 impl<'a> ParserCommons<'a> for TermParser<'a> {}
 
@@ -836,10 +967,10 @@ pub trait ParserCommons<'a>: Parser<'a> {
     let end_idx = *self.index();
     if name.contains("__") {
       let msg = format!("{kind} names are not allowed to contain \"__\".");
-      self.with_ctx(Err(msg), ini_idx, end_idx)
+      self.with_ctx(Err(msg), ini_idx..end_idx)
     } else if name.starts_with("//") {
       let msg = format!("{kind} names are not allowed to start with \"//\".");
-      self.with_ctx(Err(msg), ini_idx, end_idx)
+      self.with_ctx(Err(msg), ini_idx..end_idx)
     } else {
       Ok(name)
     }
@@ -893,7 +1024,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     while let Some(c) = self.peek_one() {
       if c == '\t' {
         let idx = *self.index();
-        return self.with_ctx(Err("Tabs are not accepted for indentation.".to_string()), idx, idx);
+        return self.with_ctx(Err("Tabs are not accepted for indentation.".to_string()), idx..idx);
       }
       if " ".contains(c) {
         self.advance_one();
@@ -922,21 +1053,16 @@ pub trait ParserCommons<'a>: Parser<'a> {
     Ok(())
   }
 
-  fn expected_spanned<T>(&mut self, exp: &str, ini_idx: usize, end_idx: usize) -> ParseResult<T> {
+  fn expected_spanned<T>(&mut self, exp: &str, span: Range<usize>) -> ParseResult<T> {
     let is_eof = self.is_eof();
     let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { Ok(()) });
     let msg = format!("\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}", exp, detected);
-    self.with_ctx(Err(msg), ini_idx, end_idx)
+    self.with_ctx(Err(msg), span)
   }
 
-  fn with_ctx<T>(
-    &mut self,
-    res: Result<T, impl std::fmt::Display>,
-    ini_idx: usize,
-    end_idx: usize,
-  ) -> ParseResult<T> {
+  fn with_ctx<T>(&mut self, res: Result<T, impl std::fmt::Display>, span: Range<usize>) -> ParseResult<T> {
     res.map_err(|msg| {
-      let ctx = highlight_error(ini_idx, end_idx, self.input());
+      let ctx = highlight_error(span.start, span.end, self.input());
       format!("{msg}\n{ctx}")
     })
   }
@@ -985,7 +1111,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     if !next_is_name {
       Ok(())
     } else {
-      self.expected_spanned(&format!("keyword '{keyword}'"), ini_idx, end_idx + 1)
+      self.expected_spanned(&format!("keyword '{keyword}'"), ini_idx..end_idx + 1)
     }
   }
 
@@ -1200,7 +1326,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
   fn num_range_err<T>(&mut self, ini_idx: usize, typ: &str) -> ParseResult<T> {
     let msg = format!("\x1b[1mNumber literal outside of range for {}.\x1b[0m", typ);
     let end_idx = *self.index();
-    self.with_ctx(Err(msg), ini_idx, end_idx)
+    self.with_ctx(Err(msg), ini_idx..end_idx)
   }
 
   /// Parses up to 4 base64 characters surrounded by "`".
@@ -1235,6 +1361,14 @@ pub trait ParserCommons<'a>: Parser<'a> {
       format!("Redefinition of builtin (function) '{function_name}'.")
     } else {
       format!("Redefinition of function '{function_name}'.")
+    }
+  }
+
+  fn redefinition_of_hvm_msg(builtin: bool, function_name: &str) -> String {
+    if builtin {
+      format!("Redefinition of builtin (native HVM function) '{function_name}'.")
+    } else {
+      format!("Redefinition of native HVM function '{function_name}'.")
     }
   }
 

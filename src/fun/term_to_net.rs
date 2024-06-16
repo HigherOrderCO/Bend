@@ -38,6 +38,11 @@ pub fn book_to_hvm(book: &Book, diags: &mut Diagnostics) -> Result<(hvm::ast::Bo
     }
   }
 
+  // TODO: native hvm nets ignore labels
+  for def in book.hvm_defs.values() {
+    hvm_book.defs.insert(def.name.to_string(), def.body.clone());
+  }
+
   labels.con.finish();
   labels.dup.finish();
 

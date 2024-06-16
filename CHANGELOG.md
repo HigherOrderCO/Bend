@@ -14,11 +14,12 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ### Fixed
 
-- Fixed readback of numeric operations. ([#467][gh-467])
+- Fix readback of numeric operations. ([#467][gh-467])
 
 ### Added
 
-- `log` and `atan2` builtin functions. ([#583][gh-583])
+- Add `log` and `atan2` builtin functions. ([#583][gh-583])
+- Create new type of top-level definition for writing native HVM definitions. ([#586][gh-586])
 
 ## [0.2.35] - 2024-06-06
 
@@ -30,7 +31,7 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ### Added
 
-- Create `<=` and `>=` operators. ([#451][gh-451])
+- Add syntax for "less than or equal" `<=` and "greater than or equal" `>=` numeric operators. ([#451][gh-451])
 
 ## [0.2.33] - 2024-06-05
 
@@ -340,4 +341,5 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
 [gh-583]: https://github.com/HigherOrderCO/Bend/issues/583
+[gh-586]: https://github.com/HigherOrderCO/Bend/issues/586
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.35...HEAD

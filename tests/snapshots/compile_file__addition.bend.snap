@@ -4,4 +4,4 @@ input_file: tests/golden_tests/compile_file/addition.bend
 ---
 @main = c
   & (a b) ~ (8 c)
-  & $(1 $([+] $(a b))) ~ [+1]
+  & $(1 $([+] $(a b))) ~ [+0x0000001]

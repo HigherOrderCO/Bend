@@ -221,7 +221,11 @@ impl fmt::Display for Definition {
 
 impl fmt::Display for Book {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "{}", DisplayJoin(|| self.defs.values(), "\n\n"))
+    write!(f, "{}", DisplayJoin(|| self.defs.values(), "\n\n"))?;
+    for def in self.hvm_defs.values() {
+      writeln!(f, "hvm {}:\n{}\n", def.name, def.body.show())?;
+    }
+    Ok(())
   }
 }
 
@@ -289,7 +293,14 @@ fn var_as_str(nam: &Option<Name>) -> &str {
 
 impl Book {
   pub fn display_pretty(&self) -> impl fmt::Display + '_ {
-    display!("{}", DisplayJoin(|| self.defs.values().map(|def| def.display_pretty()), "\n\n"))
+    display!(
+      "{}\n{}",
+      DisplayJoin(|| self.defs.values().map(|def| def.display_pretty()), "\n\n"),
+      DisplayJoin(
+        || self.hvm_defs.values().map(|def| display!("hvm {}:\n{}", def.name, def.body.show())),
+        "\n"
+      )
+    )
   }
 }
 

@@ -35,13 +35,16 @@ impl Ctx<'_> {
 /// The representation of a program.
 #[derive(Debug, Clone, Default)]
 pub struct Book {
-  /// The function definitions.
+  /// Function definitions.
   pub defs: Definitions,
 
-  /// The algebraic datatypes defined by the program
+  /// HVM native function definitions.
+  pub hvm_defs: HvmDefinitions,
+
+  /// Algebraic datatype definitions.
   pub adts: Adts,
 
-  /// To which type does each constructor belong to.
+  /// Map of constructor name to type name.
   pub ctrs: Constructors,
 
   /// A custom or default "main" entrypoint.
@@ -49,6 +52,7 @@ pub struct Book {
 }
 
 pub type Definitions = IndexMap<Name, Definition>;
+pub type HvmDefinitions = IndexMap<Name, HvmDefinition>;
 pub type Adts = IndexMap<Name, Adt>;
 pub type Constructors = IndexMap<Name, Name>;
 
@@ -57,6 +61,14 @@ pub type Constructors = IndexMap<Name, Name>;
 pub struct Definition {
   pub name: Name,
   pub rules: Vec<Rule>,
+  pub builtin: bool,
+}
+
+/// An HVM native definition.
+#[derive(Debug, Clone)]
+pub struct HvmDefinition {
+  pub name: Name,
+  pub body: hvm::ast::Net,
   pub builtin: bool,
 }
 

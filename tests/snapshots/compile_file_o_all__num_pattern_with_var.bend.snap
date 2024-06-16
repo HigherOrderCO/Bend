@@ -4,7 +4,7 @@ input_file: tests/golden_tests/compile_file_o_all/num_pattern_with_var.bend
 ---
 @Foo = ((@Foo__C2 a) a)
 
-@Foo__C0 = ($([+1] a) a)
+@Foo__C0 = ($([+0x0000001] a) a)
 
 @Foo__C1 = (* (?((0 @Foo__C0) a) a))
 

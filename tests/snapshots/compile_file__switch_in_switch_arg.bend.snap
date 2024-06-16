@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/switch_in_switch_arg.bend
 ---
-@main = (?((0 (a a)) ?((0 ($([+1] b) b)) c)) c)
+@main = (?((0 (a a)) ?((0 ($([+0x0000001] b) b)) c)) c)

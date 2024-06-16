@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/match.bend
 ---
 @main = c
-  & $(1 ?(((a (* a)) (* (* (b b)))) c)) ~ [+0]
+  & $(1 ?(((a (* a)) (* (* (b b)))) c)) ~ [+0x0000000]
