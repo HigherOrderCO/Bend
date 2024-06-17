@@ -129,6 +129,7 @@ pub fn desugar_book(
   ctx.check_unbound_vars()?;
 
   ctx.book.make_var_names_unique();
+  ctx.book.desugar_use();
 
   ctx.book.make_var_names_unique();
   ctx.book.linearize_vars();
