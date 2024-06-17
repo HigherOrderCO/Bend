@@ -95,7 +95,10 @@ print text = (IO/Call IO/MAGIC "PUT_TEXT" text @x (IO/Done IO/MAGIC x))
 #read_file path = (IO/Call IO/MAGIC "GET_FILE" path @x (IO/Done IO/MAGIC x))
 #write_file path text = (IO/Call IO/MAGIC "PUT_FILE" (path, text) @x (IO/Done IO/MAGIC x))
 
+# Returns a monotonically increasing nanosecond timestamp as an u48 encoded as a pair of u24s.
 get_time = (IO/Call IO/MAGIC "GET_TIME" * @x (IO/Done IO/MAGIC x))
+
+# Sleeps for the given number of nanoseconds, given by an u48 encoded as a pair of u24s.
 sleep hi_lo = (IO/Call IO/MAGIC "PUT_TIME" hi_lo @x (IO/Done IO/MAGIC x))
 
 
@@ -110,10 +113,31 @@ defer val = @x (x val)
 defer_arg defered arg = @x (defered x arg)
 undefer defered = (defered @x x)
 
-# log :: f24 -> f24 -> f24
+
+# Native numeric operations
+
+# log(x: f24, base: f24) -> f24
 # Computes the logarithm of `x` with the specified `base`.
-log x base = (| base x)
-# atan2 :: f24 -> f24 -> f24
+hvm log:
+  (x ($([|] $(x ret)) ret))
+
+# atan2(x: f24, y: f24) -> f24
 # Has the same behaviour as `atan2f` in the C math lib.
 # Computes the arctangent of the quotient of its two arguments.
-atan2 x y = (& x y)
+hvm atan2:
+  ($([&] $(y ret)) (y ret))
+
+# to_f24(x: native number) -> f24
+# Casts any native number to an f24.
+hvm to_f24:
+  ($([f24] ret) ret)
+
+# to_u24(x: native number) -> u24
+# Casts any native number to a u24.
+hvm to_u24:
+  ($([u24] ret) ret)
+
+# to_i24(x: native number) -> i24
+# Casts any native number to an i24.
+hvm to_i24:
+  ($([i24] ret) ret)

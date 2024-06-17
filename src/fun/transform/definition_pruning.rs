@@ -49,8 +49,19 @@ impl Ctx<'_> {
       }
     }
 
+    fn rm_def(book: &mut Book, def_name: &Name) {
+      if book.defs.contains_key(def_name) {
+        book.defs.shift_remove(def_name);
+      } else if book.hvm_defs.contains_key(def_name) {
+        book.hvm_defs.shift_remove(def_name);
+      } else {
+        unreachable!()
+      }
+    }
+
     // Remove unused definitions.
-    for def in self.book.defs.keys().cloned().collect::<Vec<_>>() {
+    let names = self.book.defs.keys().cloned().chain(self.book.hvm_defs.keys().cloned()).collect::<Vec<_>>();
+    for def in names {
       if let Some(use_) = used.get(&def) {
         match use_ {
           Used::Main => {
@@ -60,7 +71,7 @@ impl Ctx<'_> {
             // Used by a non-builtin definition.
             // Prune if `prune_all`, otherwise show a warning.
             if prune_all {
-              self.book.defs.shift_remove(&def);
+              rm_def(self.book, &def);
             } else {
               self.info.add_rule_warning("Definition is unused.", WarningType::UnusedDefinition, def);
             }
@@ -69,7 +80,7 @@ impl Ctx<'_> {
             // Unused, but a user-defined constructor.
             // Prune if `prune_all`, otherwise nothing.
             if prune_all {
-              self.book.defs.shift_remove(&def);
+              rm_def(self.book, &def);
             } else {
               // Don't show warning if it's a user-defined constructor.
             }
@@ -77,7 +88,7 @@ impl Ctx<'_> {
         }
       } else {
         // Unused builtin, can always be pruned.
-        self.book.defs.shift_remove(&def);
+        rm_def(self.book, &def);
       }
     }
   }
