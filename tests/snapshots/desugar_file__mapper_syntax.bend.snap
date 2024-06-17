@@ -6,7 +6,7 @@ input_file: tests/golden_tests/desugar_file/mapper_syntax.bend
 
 (Map/get) = λa λb (a Map/get__C5 b)
 
-(Map/set) = λa λb λc (a Map/set__C10 c b)
+(Map/set) = λa λb λc (a Map/set__C10 b c)
 
 (Map/map) = λa λb λc (a Map/map__C5 b c)
 
@@ -24,44 +24,44 @@ input_file: tests/golden_tests/desugar_file/mapper_syntax.bend
 
 (Map/get__C1) = λ* λa λb λc λd let (e, f) = (Map/get d (/ a 2)); (e, (Map/Node b c f))
 
-(Map/get__C2) = λa let {b c} = a; λd λe λf λ* (switch (% b 2) { 0: Map/get__C0; _: Map/get__C1; } c d e f)
+(Map/get__C2) = λa let {b c} = a; λd λe λf (switch (% b 2) { 0: Map/get__C0; _: Map/get__C1; } c d e f)
 
-(Map/get__C3) = λ* λ* λa λ* λ* λb (a, b)
+(Map/get__C3) = λ* λ* λa let {b c} = a; λd λe (b, (Map/Node c d e))
 
-(Map/get__C4) = λa let {b c} = a; λd let {e f} = d; λg let {h i} = g; λj let {k l} = j; (switch (== 0 k) { 0: Map/get__C2; _: Map/get__C3; } l b e h (Map/Node c f i))
+(Map/get__C4) = λa λb λc λd let {e f} = d; (switch (== 0 e) { 0: Map/get__C2; _: Map/get__C3; } f a b c)
 
 (Map/get__C5) = λa switch a { 0: Map/get__C4; _: λ* λ* (*, Map/Leaf); }
 
-(Map/map__C0) = λa λb λc λd λe (Map/Node e (Map/map d (/ b 2) a) c)
+(Map/map__C0) = λa λb λc λd λe (Map/Node c (Map/map d (/ a 2) b) e)
 
-(Map/map__C1) = λ* λa λb λc λd λe (Map/Node e d (Map/map c (/ b 2) a))
+(Map/map__C1) = λ* λa λb λc λd λe (Map/Node c d (Map/map e (/ a 2) b))
 
-(Map/map__C2) = λa λb let {c d} = b; λe λf λg (switch (% c 2) { 0: Map/map__C0; _: Map/map__C1; } a d e f g)
+(Map/map__C2) = λa let {b c} = a; λd λe λf λg (switch (% b 2) { 0: Map/map__C0; _: Map/map__C1; } c d e f g)
 
-(Map/map__C3) = λ* λa λ* λb λc λd (Map/Node (a d) c b)
+(Map/map__C3) = λ* λ* λa λb λc λd (Map/Node (a b) c d)
 
-(Map/map__C4) = λa λb λc λd let {e f} = d; λg (switch (== 0 e) { 0: Map/map__C2; _: Map/map__C3; } g f c b a)
+(Map/map__C4) = λa λb λc λd let {e f} = d; λg (switch (== 0 e) { 0: Map/map__C2; _: Map/map__C3; } f g a b c)
 
 (Map/map__C5) = λa switch a { 0: Map/map__C4; _: λ* λ* λ* Map/Leaf; }
 
-(Map/set__C0) = λa λb λc λd λe (Map/Node c (Map/set d (/ b 2) a) e)
+(Map/set__C0) = λa λb λc λd λe (Map/Node c (Map/set d (/ a 2) b) e)
 
-(Map/set__C1) = λ* λa λb λc λd λe (Map/Node c d (Map/set e (/ b 2) a))
+(Map/set__C1) = λ* λa λb λc λd λe (Map/Node c d (Map/set e (/ a 2) b))
 
 (Map/set__C10) = λa switch a { 0: Map/set__C8; _: Map/set__C9; }
 
-(Map/set__C2) = λa λb let {c d} = b; λe λf λg (switch (% c 2) { 0: Map/set__C0; _: Map/set__C1; } a d e f g)
+(Map/set__C2) = λa let {b c} = a; λd λe λf λg (switch (% b 2) { 0: Map/set__C0; _: Map/set__C1; } c d e f g)
 
-(Map/set__C3) = λ* λa λ* λ* λb λc (Map/Node a b c)
+(Map/set__C3) = λ* λ* λa λ* λb λc (Map/Node a b c)
 
-(Map/set__C4) = λa λb (Map/Node * (Map/set Map/Leaf (/ b 2) a) Map/Leaf)
+(Map/set__C4) = λa λb (Map/Node * (Map/set Map/Leaf (/ a 2) b) Map/Leaf)
 
-(Map/set__C5) = λ* λa λb (Map/Node * Map/Leaf (Map/set Map/Leaf (/ b 2) a))
+(Map/set__C5) = λ* λa λb (Map/Node * Map/Leaf (Map/set Map/Leaf (/ a 2) b))
 
-(Map/set__C6) = λa λb let {c d} = b; (switch (% c 2) { 0: Map/set__C4; _: Map/set__C5; } a d)
+(Map/set__C6) = λa let {b c} = a; λd (switch (% b 2) { 0: Map/set__C4; _: Map/set__C5; } c d)
 
-(Map/set__C7) = λ* λa λ* (Map/Node a Map/Leaf Map/Leaf)
+(Map/set__C7) = λ* λ* λa (Map/Node a Map/Leaf Map/Leaf)
 
-(Map/set__C8) = λa λb λc λd λe let {f g} = e; (switch (== 0 f) { 0: Map/set__C2; _: Map/set__C3; } d g a b c)
+(Map/set__C8) = λa λb λc λd let {e f} = d; λg (switch (== 0 e) { 0: Map/set__C2; _: Map/set__C3; } f g a b c)
 
-(Map/set__C9) = λ* λa λb let {c d} = b; (switch (== 0 c) { 0: Map/set__C6; _: Map/set__C7; } a d)
+(Map/set__C9) = λ* λa let {b c} = a; λd (switch (== 0 b) { 0: Map/set__C6; _: Map/set__C7; } c d)
