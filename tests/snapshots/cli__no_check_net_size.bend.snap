@@ -128,13 +128,13 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @Sum__C2 = (?((0 @Sum__C1) a) a)
 
-@Swap = (?((@Swap__C0 @Swap__C1) (a (b c))) (b (a c)))
+@Swap = (?((@Swap__C0 @Swap__C1) a) a)
 
-@Swap__C0 = (b (a c))
-  & @Map_/Both ~ (a (b c))
-
-@Swap__C1 = (* a)
+@Swap__C0 = a
   & @Map_/Both ~ a
+
+@Swap__C1 = (* (b (a c)))
+  & @Map_/Both ~ (a (b c))
 
 @ToArr = (a ((@ToArr__C3 (a b)) b))
 

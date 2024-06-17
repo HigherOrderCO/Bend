@@ -239,6 +239,7 @@ fn simplify_matches() {
     ctx.desugar_with_blocks()?;
     ctx.check_unbound_vars()?;
     ctx.book.make_var_names_unique();
+    ctx.book.desugar_use();
     ctx.book.linearize_match_binds();
     ctx.book.linearize_match_with();
     ctx.check_unbound_vars()?;
@@ -288,6 +289,7 @@ fn encode_pattern_match() {
       ctx.desugar_with_blocks()?;
       ctx.check_unbound_vars()?;
       ctx.book.make_var_names_unique();
+      ctx.book.desugar_use();
       ctx.book.linearize_match_binds();
       ctx.book.linearize_match_with();
       ctx.book.encode_matches(adt_encoding);

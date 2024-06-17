@@ -12,12 +12,12 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @List.concat__C1 = (?(((a a) @List.concat__C0) b) b)
 
-@List.fold = ((@List.fold__C1 (a (b c))) (b (a c)))
+@List.fold = ((@List.fold__C1 a) a)
 
-@List.fold__C0 = (* (a (b (d ({(a (e f)) c} f)))))
+@List.fold__C0 = (* (a (b ({(a (e f)) c} (d f)))))
   & @List.fold ~ (b (c (d e)))
 
-@List.fold__C1 = (?(((a (* a)) @List.fold__C0) b) b)
+@List.fold__C1 = (?(((* (a a)) @List.fold__C0) b) b)
 
 @List.len = ((@List.len__C1 a) a)
 
@@ -43,12 +43,12 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @List.map__C1 = (?(((* @List/Nil) @List.map__C0) a) a)
 
-@List.reduce = ((@List.reduce__C1 (a (b c))) (b (a c)))
+@List.reduce = ((@List.reduce__C1 a) a)
 
-@List.reduce__C0 = (* (d (a (c ({b (c (d e))} f)))))
+@List.reduce__C0 = (* (d (a ({b (c (d e))} (c f)))))
   & @List.reduce ~ (a (b (e f)))
 
-@List.reduce__C1 = (?(((a (* a)) @List.reduce__C0) b) b)
+@List.reduce__C1 = (?(((* (a a)) @List.reduce__C0) b) b)
 
 @List.reverse_bad = ((@List.reverse_bad__C1 a) a)
 
@@ -164,7 +164,7 @@ input_file: tests/golden_tests/compile_file/redex_order_recursive.bend
 
 @main = *
 
-@max = ({$([>] $(a ?(((b (* b)) (* (* (c c)))) (d (e f))))) e} ({a d} f))
+@max = ({$([>] $(a ?(((* (b b)) (* (c (* c)))) (d (e f))))) d} ({a e} f))
 
 @tail_recursive = ((@tail_recursive__C0 ((* 0) a)) a)
 
