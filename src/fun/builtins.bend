@@ -89,18 +89,24 @@ def call(func, argm):
   return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
 
 
-print text = (IO/Call IO/MAGIC "PUT_TEXT" text @x (IO/Done IO/MAGIC x))
+print text = (IO/Call IO/MAGIC "WRITE" (1, text) @x (IO/Done IO/MAGIC x))
 #input = (IO/Call IO/MAGIC "GET_TEXT" * @x (IO/Done IO/MAGIC x))
 
 #read_file path = (IO/Call IO/MAGIC "GET_FILE" path @x (IO/Done IO/MAGIC x))
 #write_file path text = (IO/Call IO/MAGIC "PUT_FILE" (path, text) @x (IO/Done IO/MAGIC x))
 
 # Returns a monotonically increasing nanosecond timestamp as an u48 encoded as a pair of u24s.
-get_time = (IO/Call IO/MAGIC "GET_TIME" * @x (IO/Done IO/MAGIC x))
+IO/get_time = (IO/Call IO/MAGIC "GET_TIME" * @x (IO/Done IO/MAGIC x))
 
 # Sleeps for the given number of nanoseconds, given by an u48 encoded as a pair of u24s.
-sleep hi_lo = (IO/Call IO/MAGIC "PUT_TIME" hi_lo @x (IO/Done IO/MAGIC x))
+IO/nanosleep hi_lo = (IO/Call IO/MAGIC "SLEEP" hi_lo @x (IO/Done IO/MAGIC x))
 
+# Sleeps for a given amount of seconds as a float.
+def IO/sleep(seconds):
+  nanos = seconds * 1_000_000_000.0
+  lo = to_u24(nanos % 0x1_000_000.0)
+  hi = to_u24(nanos / 0x1_000_000.0)
+  return IO/nanosleep((hi, lo))
 
 # Lazy thunks
 # We can defer the evaluation of a function by wrapping it in a thunk
