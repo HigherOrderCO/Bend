@@ -88,13 +88,7 @@ def IO/bind(a, b):
 def call(func, argm):
   return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
 
-
-print text = (IO/Call IO/MAGIC "WRITE" (1, text) @x (IO/Done IO/MAGIC x))
-#input = (IO/Call IO/MAGIC "GET_TEXT" * @x (IO/Done IO/MAGIC x))
-
-#read_file path = (IO/Call IO/MAGIC "GET_FILE" path @x (IO/Done IO/MAGIC x))
-#write_file path text = (IO/Call IO/MAGIC "PUT_FILE" (path, text) @x (IO/Done IO/MAGIC x))
-
+## Time and sleep
 # Returns a monotonically increasing nanosecond timestamp as an u48 encoded as a pair of u24s.
 IO/get_time = (IO/Call IO/MAGIC "GET_TIME" * @x (IO/Done IO/MAGIC x))
 
@@ -107,6 +101,40 @@ def IO/sleep(seconds):
   lo = to_u24(nanos % 0x1_000_000.0)
   hi = to_u24(nanos / 0x1_000_000.0)
   return IO/nanosleep((hi, lo))
+
+## File IO
+
+### File IO primitives
+IO/FS/open path mode = (IO/Call IO/MAGIC "OPEN" (path, mode) @x (IO/Done IO/MAGIC x))
+IO/FS/close file = (IO/Call IO/MAGIC "CLOSE" file @x (IO/Done IO/MAGIC x))
+IO/FS/read file num_bytes = (IO/Call IO/MAGIC "READ" (file, num_bytes) @x (IO/Done IO/MAGIC x))
+IO/FS/write file bytes = (IO/Call IO/MAGIC "WRITE" (file, bytes) @x (IO/Done IO/MAGIC x))
+IO/FS/seek file offset mode = (IO/Call IO/MAGIC "SEEK" (file, (offset, mode)) @x (IO/Done IO/MAGIC x))
+
+### Always available files
+IO/FS/STDIN = 0
+IO/FS/STDOUT = 1
+IO/FS/STDERR = 2
+
+### Seek modes
+# Seek from start of file
+IO/FS/SEEK_SET = +0
+# Seek from current position
+IO/FS/SEEK_CUR = +1
+# Seek from end of file
+IO/FS/SEEK_END = +2
+
+### File utilities
+#read_file path = (IO/Call IO/MAGIC "GET_FILE" path @x (IO/Done IO/MAGIC x))
+#write_file path text = (IO/Call IO/MAGIC "PUT_FILE" (path, text) @x (IO/Done IO/MAGIC x))
+
+### Standard input and output utilities
+
+# TODO: Encode with utf-8
+IO/print text = (IO/FS/write IO/FS/STDOUT text)
+
+# TODO: Should read any length of input
+IO/input = (IO/FS/read IO/FS/STDIN 1024)
 
 # Lazy thunks
 # We can defer the evaluation of a function by wrapping it in a thunk

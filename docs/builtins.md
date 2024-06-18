@@ -225,7 +225,74 @@ A Natural Number can be written with literals with a `#` before the literal numb
 
 
 ## IO
-IO Functions are in the **next milestone**!
+The basic builtin IO functions are under development and will be stable in the next milestone.
+
+Here is the current list of functions, but be aware that they may change in the near future.
+
+### File IO
+
+#### File open
+```python
+def IO/FS/open(path, mode)
+```
+
+Opens a file with with `path` being given as a string and `mode` being a string with the mode to open the file in. The mode should be one of the following:
+- `"r"`: Read mode
+- `"w"`: Write mode (write at the beginning of the file, overwriting any existing content)
+- `"a"`: Append mode (write at the end of the file)
+- `"r+"`: Read and write mode
+- `"w+"`: Read and write mode
+- `"a+"`: Read and append mode
+
+Returns an U24 with the file descriptor. File descriptors are not necessarily the same as the ones assigned by the operating system, but rather unique identifiers internal to Bend's runtime.
+
+#### File descriptors for standard files
+
+The standard input/output files are always open and assigned the following file descriptors:
+- `IO/FS/STDIN = 0`: Standard input
+- `IO/FS/STDOUT = 1`: Standard output
+- `IO/FS/STDERR = 2`: Standard error
+
+#### File close
+```python
+def IO/FS/close(file)
+```
+
+Closes the file with the given `file` descriptor.
+
+#### File read
+```python
+def IO/FS/read(file, num_bytes)
+```
+
+Reads `num_bytes` bytes from the file with the given `file` descriptor.
+
+Returns a list of U24 with each element representing a byte read from the file.
+
+#### File write
+```python
+def IO/FS/write(file, bytes)
+```
+
+Writes `bytes`, a list of U24 with each element representing a byte, to the file with the given `file` descriptor.
+
+Returns nothing (`*`).
+
+Writing discards any preexisting content that came after the current position. For example, if your file contains the text `Hello, world!` and the current position is at the `,`, writing `!` will 
+
+#### File seek
+```python
+def IO/FS/seek(file, offset, mode)
+```
+
+Moves the current position of the file with the given `file` descriptor to the given `offset`, an I24 or U24 number, in bytes.
+
+`mode` can be one of the following:
+- `IO/FS/SEEK_SET = 0`: Seek from start of file
+- `IO/FS/SEEK_CUR = 1`: Seek from current position
+- `IO/FS/SEEK_END = 2`: Seek from end of file
+
+Returns nothing (`*`).
 
 ## Numeric operations
 
