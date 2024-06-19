@@ -178,111 +178,104 @@ hvm to_i24:
 
 # Encoding
 
-Utf8/MAX_RUNE = '\u{0010FFFF}'
-Utf8/RUNE_ERROR = '\u{FFFD}'
-#Utf8/RUNE_SELF = 0x80
-#Utf8/MAX = 4
+Utf8/REPLACEMENT_CHARACTER = '\u{FFFD}'
 
-Utf8/t1 = 0b00000000
-Utf8/tx = 0b10000000
-Utf8/t2 = 0b11000000
-Utf8/t3 = 0b11100000
-Utf8/t4 = 0b11110000
-
-Utf8/maskx = 0b00111111
-Utf8/mask2 = 0b00011111
-Utf8/mask3 = 0b00001111
-Utf8/mask4 = 0b00000111
-
-Utf8/rune1max = (- (<< 1 7) 1)
-Utf8/rune2max = (- (<< 1 11) 1)
-Utf8/rune3max = (- (<< 1 16) 1)
-
-Encoding/List/append x []               = [x]
-Encoding/List/append x (List/Cons y ys) = (List/Cons y (Encoding/List/append x ys))
-
-String/append x ""                 = (String/Cons x String/Nil)
-String/append x (String/Cons y ys) = (String/Cons y (String/append x ys))
-
-Bytes/decode_utf8 bytes acc =
-  let (got, _len, rest) = (Utf8/decode_rune bytes)
+Bytes/decode_utf8 bytes =
+  let (got, rest) = (Utf8/decode_character bytes)
   match rest {
-    List/Nil: (String/append got acc)
-    List/Cons: (Bytes/decode_utf8 rest (String/append got acc))
+    List/Nil: (String/Cons got String/Nil)
+    List/Cons: (String/Cons got (Bytes/decode_utf8 rest))
   }
 
-Utf8/decode_rune [] = (0, 0, [])
-Utf8/decode_rune [a] = if (<= a 0x7F) { (a, 1, []) } else { (Utf8/RUNE_ERROR, 0, []) }
-Utf8/decode_rune [a, b] =
+Utf8/decode_character [] = (0, [])
+Utf8/decode_character [a] = if (<= a 0x7F) { (a, []) } else { (Utf8/REPLACEMENT_CHARACTER, []) }
+Utf8/decode_character [a, b] =
+  use Utf8/maskx = 0b00111111
+  use Utf8/mask2 = 0b00011111
   if (<= a 0x7F) {
-    (a, 1, [b])
+    (a, [b])
   } else {
     if (== (& a 0xE0) 0xC0) {
       let r = (| (<< (& a Utf8/mask2) 6) (& b Utf8/maskx))
-      (r, 2, [])
+      (r, [])
     } else {
-      (Utf8/RUNE_ERROR, 0, [])
+      (Utf8/REPLACEMENT_CHARACTER, [])
     }
   }
-Utf8/decode_rune [a, b, c] =
+Utf8/decode_character [a, b, c] =
+  use Utf8/maskx = 0b00111111
+  use Utf8/mask2 = 0b00011111
+  use Utf8/mask3 = 0b00001111
   if (<= a 0x7F) {
-    (a, 1, [b, c])
+    (a, [b, c])
   } else {
     if (== (& a 0xE0) 0xC0) {
       let r = (| (<< (& a Utf8/mask2) 6) (& b Utf8/maskx))
-      (r, 2, [c])
+      (r, [c])
     } else {
       if (== (& a 0xF0) 0xE0) {
         let r = (| (<< (& a Utf8/mask3) 12) (| (<< (& b Utf8/maskx) 6) (& c Utf8/maskx)))
-        (r, 3, [])
+        (r, [])
       } else {
-        (Utf8/RUNE_ERROR, 0, [])
+        (Utf8/REPLACEMENT_CHARACTER, [])
       }
     }
   }
-Utf8/decode_rune (List/Cons a (List/Cons b (List/Cons c (List/Cons d rest)))) =
+Utf8/decode_character (List/Cons a (List/Cons b (List/Cons c (List/Cons d rest)))) =
+  use Utf8/maskx = 0b00111111
+  use Utf8/mask2 = 0b00011111
+  use Utf8/mask3 = 0b00001111
+  use Utf8/mask4 = 0b00000111
   if (<= a 0x7F) {
-    (a, 1, (List/Cons b (List/Cons c (List/Cons d rest))))
+    (a, (List/Cons b (List/Cons c (List/Cons d rest))))
   } else {
     if (== (& a 0xE0) 0xC0) {
       let r = (| (<< (& a Utf8/mask2) 6) (& b Utf8/maskx))
-      (r, 2, (List/Cons c (List/Cons d rest)))
+      (r, (List/Cons c (List/Cons d rest)))
     } else {
       if (== (& a 0xF0) 0xE0) {
         let r = (| (<< (& a Utf8/mask3) 12) (| (<< (& b Utf8/maskx) 6) (& c Utf8/maskx)))
-        (r, 3, (List/Cons d rest))
+        (r, (List/Cons d rest))
       } else {
         if (== (& a 0xF8) 0xF0) {
           let r = (| (<< (& a Utf8/mask4) 18) (| (<< (& b Utf8/maskx) 12) (| (<< (& c Utf8/maskx) 6) (& d Utf8/maskx))))
-          (r, 4, [])
+          (r, [])
         } else {
-          (Utf8/RUNE_ERROR, 0, rest)
+          (Utf8/REPLACEMENT_CHARACTER, rest)
         }
       }
     }
   }
 
-String/encode_utf8 (String/Nil)       acc = acc
-String/encode_utf8 (String/Cons x xs) acc =
+String/encode_utf8 (String/Nil)       = (List/Nil)
+String/encode_utf8 (String/Cons x xs) =
+  use Utf8/rune1max = (- (<< 1 7) 1)
+  use Utf8/rune2max = (- (<< 1 11) 1)
+  use Utf8/rune3max = (- (<< 1 16) 1)
+  use Utf8/tx       = 0b10000000
+  use Utf8/t2       = 0b11000000
+  use Utf8/t3       = 0b11100000
+  use Utf8/t4       = 0b11110000
+  use Utf8/maskx    = 0b00111111
   if (<= x Utf8/rune1max) {
-    (String/encode_utf8 xs (Encoding/List/append x acc))
+    (List/Cons x (String/encode_utf8 xs))
   } else {
     if (<= x Utf8/rune2max) {
       let b1 = (| Utf8/t2 (>> x 6))
       let b2 = (| Utf8/tx (& x Utf8/maskx))
-      (String/encode_utf8 xs (Encoding/List/append b2 (Encoding/List/append b1 acc)))
+      (List/Cons b1 (List/Cons b2 (String/encode_utf8 xs)))
     } else {
       if (<= x Utf8/rune3max) {
         let b1 = (| Utf8/t3 (>> x 12))
         let b2 = (| Utf8/tx (& (>> x 6) Utf8/maskx))
         let b3 = (| Utf8/tx (& x        Utf8/maskx))
-        (String/encode_utf8 xs (Encoding/List/append b3 (Encoding/List/append b2 (Encoding/List/append b1 acc))))
+        (List/Cons b1 (List/Cons b2 (List/Cons b3 (String/encode_utf8 xs))))
       } else {
         let b1 = (| Utf8/t4 (>> x 18))
         let b2 = (| Utf8/tx (& (>> x 12) Utf8/maskx))
         let b3 = (| Utf8/tx (& (>> x 6)  Utf8/maskx))
         let b4 = (| Utf8/tx (& x         Utf8/maskx))
-        (String/encode_utf8 xs (Encoding/List/append b4 (Encoding/List/append b3 (Encoding/List/append b2 (Encoding/List/append b1 acc)))))
+        (List/Cons b1 (List/Cons b2 (List/Cons b3 (List/Cons b4 (String/encode_utf8 xs)))))
       }
     }
   }

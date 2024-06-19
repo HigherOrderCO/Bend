@@ -387,15 +387,15 @@ Casts any native number to an i24.
 
 ### Bytes/decode_utf8
 
-```python
-def Bytes/decode_utf8(bytes: [u24], out: String) -> String
+```py
+def Bytes/decode_utf8(bytes: [u24]) -> String
 ```
 
 Decodes a sequence of bytes to a String using utf-8 encoding.
 
 ### Bytes/decode_ascii
 
-```python
+```py
 def Bytes/decode_ascii(bytes: [u24]) -> String
 ```
 
@@ -403,25 +403,30 @@ Decodes a sequence of bytes to a String using ascii encoding.
 
 ### String/encode_utf8
 
-```python
-def String/encode_utf8(s: String, out: [u24]) -> [u24]
+```py
+def String/encode_utf8(s: String) -> [u24]
 ```
 
 Encodes a String to a sequence of bytes using utf-8 encoding.
 
 ### String/encode_ascii
 
-```python
+```py
 def String/encode_ascii(s: String) -> [u24]
 ```
 
 Encodes a String to a sequence of bytes using ascii encoding.
 
-### Utf8/decode_rune
+### Utf8/decode_character
 
-```python
-def Utf8/decode_rune(bytes: [u24]) -> (rune: u24, length: u24, rest: [u24])
+```py
+def Utf8/decode_character(bytes: [u24]) -> (rune: u24, rest: [u24])
 ```
 
-Decodes a utf-8 rune, returns a tuple containing the rune, rune length and the rest of the byte
-sequence.
+Decodes a utf-8 character, returns a tuple containing the rune and the rest of the byte sequence.
+
+### Utf8/REPLACEMENT_CHARACTER
+
+```py
+def Utf8/REPLACEMENT_CHARACTER: u24 = '\u{FFFD}'
+```
