@@ -321,8 +321,6 @@ Writes `bytes`, a list of U24 with each element representing a byte, to the file
 
 Returns nothing (`*`).
 
-Writing discards any preexisting content that came after the current position. For example, if your file contains the text `Hello, world!` and the current position is at the `,`, writing `!` will
-
 #### File seek
 
 ```python
