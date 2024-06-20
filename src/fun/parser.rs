@@ -299,7 +299,7 @@ impl<'a> TermParser<'a> {
     }
 
     let (import, alias) = self.parse_name_maybe_alias("Import")?;
-    Ok(Import::new(path, ImportType::Simple(import, alias), relative))
+    Ok(Import::new(path, ImportType::Single(import, alias), relative))
   }
 
   fn parse_import(&mut self) -> Result<Vec<Import>, String> {
@@ -312,7 +312,7 @@ impl<'a> TermParser<'a> {
         None => (Name::default(), import),
       };
 
-      Import::new(path, ImportType::Simple(import, alias), relative)
+      Import::new(path, ImportType::Single(import, alias), relative)
     };
 
     if self.try_consume("(") {
