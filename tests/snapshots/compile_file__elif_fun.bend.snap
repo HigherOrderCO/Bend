@@ -1,6 +1,6 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/compile_file/elif.bend
+input_file: tests/golden_tests/compile_file/elif_fun.bend
 ---
 @main = j
   & $(2 ?(((?(((?(((?((0 (* 4)) a) a) (* (* 3))) b) b) (* (* (* 2)))) d) d) (* (* (* (* 1))))) (g (h (i j))))) ~ [=0x0000001]

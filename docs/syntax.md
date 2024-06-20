@@ -939,6 +939,20 @@ switch _ = condition {
 }
 ```
 
+It is possible to make if-chains using `elif`:
+
+```rust
+if condition1 {
+  0
+} condition2 {
+  1
+} condition3 {
+  2
+} else {
+  3
+}
+```
+
 ### Bend
 
 Bend can be used to create recursive data structures:

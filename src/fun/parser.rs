@@ -492,22 +492,37 @@ impl<'a> TermParser<'a> {
 
       // If
       if self.try_parse_keyword("if") {
+        let mut chain = Vec::new();
         let cnd = self.parse_term()?;
         self.consume("{")?;
         let thn = self.parse_term()?;
         self.consume("}")?;
+
+        chain.push((cnd, thn));
+
+        self.skip_trivia_inline()?;
+        while self.try_parse_keyword("elif") {
+          let cnd = self.parse_term()?;
+          self.consume("{")?;
+          let thn = self.parse_term()?;
+          self.consume("}")?;
+          self.skip_trivia_inline()?;
+          chain.push((cnd, thn));
+        }
+
         self.consume("else")?;
         self.consume("{")?;
         let els = self.parse_term()?;
         self.consume("}")?;
-        return Ok(Term::Swt {
-          arg: Box::new(cnd),
+        let els = chain.into_iter().rfold(els, |acc, (cnd, thn)| Term::Swt {
           bnd: Some(Name::new("%cond")),
+          arg: Box::new(cnd),
           with_bnd: Vec::new(),
           with_arg: Vec::new(),
           pred: Some(Name::new("%cond-1")),
-          arms: vec![els, thn],
+          arms: vec![acc, thn],
         });
+        return Ok(els);
       }
 
       // Match

@@ -25,6 +25,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add `IO/sleep` builtin function to sleep for a given amount of seconds as a float. ([#581][gh-581])
 - Add primitive file IO functions `IO/FS/{read, write, seek, open, close}`. ([#573][gh-573])
 - Add encoding/decoding builtin functions `Bytes/{decode_utf8, decode_ascii} String/{encode_ascii, decode_ascii} Utf8/{decode_character, REPLACEMENT_CHARACTER}`. ([#580][gh-580])
+- Add `elif` chains to functional syntax. ([#596][gh-596])
 
 ## [0.2.35] - 2024-06-06
 
@@ -351,4 +352,5 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-582]: https://github.com/HigherOrderCO/Bend/issues/582
 [gh-583]: https://github.com/HigherOrderCO/Bend/issues/583
 [gh-586]: https://github.com/HigherOrderCO/Bend/issues/586
+[gh-596]: https://github.com/HigherOrderCO/Bend/issues/596
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.35...HEAD
