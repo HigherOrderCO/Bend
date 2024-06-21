@@ -16,6 +16,7 @@ and this project does not currently adhere to a particular versioning scheme.
 ### Fixed
 
 - Fix readback of numeric operations. ([#467][gh-467])
+- Propagate the "builtin" attribute of definitions when extracting functions from `bend` and `fold` syntax.
 
 ### Added
 
