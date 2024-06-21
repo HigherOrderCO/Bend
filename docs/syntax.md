@@ -944,9 +944,9 @@ It is possible to make if-chains using `elif`:
 ```rust
 if condition1 {
   0
-} condition2 {
+} elif condition2 {
   1
-} condition3 {
+} elif condition3 {
   2
 } else {
   3
