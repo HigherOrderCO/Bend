@@ -583,7 +583,7 @@ impl<'a> PyParser<'a> {
 
     self.consume_indent_exactly(*indent)?;
     let (otherwise, nxt_indent) = self.parse_statement(indent)?;
-    let otherwise = elifs.into_iter().fold(otherwise, |acc, (cond, then)| Stmt::If {
+    let otherwise = elifs.into_iter().rfold(otherwise, |acc, (cond, then)| Stmt::If {
       cond: Box::new(cond),
       then: Box::new(then),
       otherwise: Box::new(acc),
