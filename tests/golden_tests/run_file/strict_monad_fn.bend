@@ -1,6 +1,4 @@
 # This will only work if we make the call to `(Result/foo a b)` lazy (by converting it to a combinator).
-type Result = (Ok val) | (Err val)
-
 Result/bind = @val @nxt match val {
   Result/Ok: ((undefer nxt) val.val)
   Result/Err: (Result/Err val.val)
