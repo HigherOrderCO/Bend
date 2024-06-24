@@ -374,6 +374,7 @@ type Map:
 ```
 
 Notice that the getter and setter syntax induces an order on things using the map, since every get or set operation depends on the value of the previous map.
+> **_NOTE:_** Do not get mistaken with lists creation syntax, that also uses `[` `]`.
 
 ### Mixing syntaxes
 

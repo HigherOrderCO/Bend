@@ -234,6 +234,7 @@ def main:
 ```
 
 Will return `1`, which is the first element.
+> **_NOTE:_** Despite creating lists with `[` `]`, the syntax used for accessing values as in `type[key]` is actually related to the `Map` built-in type.
 
 We also have a syntax sugar for strings in Bend, which is just a list of `u24`
 characters (UTF-16 encoded). The `"Hello, world!"` type we've seen used it!
