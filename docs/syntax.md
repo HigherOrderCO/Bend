@@ -1015,7 +1015,7 @@ match x {
 ### With block
 
 ```rust
-Result/bind (Result/Ok val) nxt = (nxt val)
+Result/bind (Result/Ok val) nxt = ((undefer nxt) val)
 Result/bind err _nxt = err
 
 div a b = switch b {
