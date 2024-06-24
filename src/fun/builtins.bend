@@ -2,9 +2,9 @@ type String = (Nil) | (Cons head ~tail)
 
 type List = (Nil) | (Cons head ~tail)
 
-List/length xs = fold xs with len=0, rest=[] {
-  List/Nil: (len, (List/reverse xs))
-  List/Cons: (xs.tail (+ len 1) (List/Cons xs.head rest))
+List/length xs = fold xs with len=0, acc=[] {
+  List/Nil: (len, (List/reverse acc))
+  List/Cons: (xs.tail (+ len 1) (List/Cons xs.head acc))
 }
 
 List/reverse xs = fold xs with acc=[] {

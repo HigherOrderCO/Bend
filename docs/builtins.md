@@ -38,6 +38,52 @@ A List of values can be written using `[ ]`, it can have multiple values inside,
 ["This", "List", "Has", "Multiple", "Values"]
 ```
 
+### Functions
+
+#### List/length
+
+```python
+def List/length(list: [a]) -> (length: u24, list: [a])
+```
+
+Returns a tuple containing the length and the list itself.
+
+#### List/reverse
+
+```python
+def List/reverse(list: [a]) -> [a]
+```
+
+Reverses the elements of a list.
+
+#### List/flatten
+
+```python
+def List/flatten(list: [[a]]) -> [a]
+```
+
+Returns a flattened list from a list of lists. Example:
+
+```python
+List/flatten([[1], [2, 3], [4]])
+
+# Result: [1, 2, 3, 4]
+```
+
+#### List/concat
+
+```python
+def List/concat(xs: [a], ys: [a]) -> [a]
+```
+
+Appends two lists together. Example:
+
+```python
+List/concat([1, 2], [4, 5])
+
+# Result: [1, 2, 4, 5]
+```
+
 ## Tree
 
 ```python

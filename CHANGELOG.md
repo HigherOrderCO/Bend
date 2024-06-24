@@ -29,6 +29,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add `IO/print` function to print to stdout. ([#579][gh-579])
 - Add `IO/input` function to read a line of input from stdin. ([#579][gh-579])
 - Add file IO utilities `IO/FS/{read_file, write_file, read_line, read_to_end}`. ([#578][gh-578])
+- Add list utilities `List/{length, reverse, flatten, concat}`.
 - Add `elif` chains to functional syntax. ([#596][gh-596])
 
 ## [0.2.35] - 2024-06-06
