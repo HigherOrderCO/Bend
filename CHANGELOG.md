@@ -12,6 +12,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Improve error messages for redefinition of types and objects. ([#485][gh-485])
 - Don't allow tabs to be used for indentation or spacing. ([#463][gh-463])
 - Rename builtin function `sleep` to `IO/nanosleep`. ([#581][gh-581])
+- Equational number pattern compilation to use the predecessor variable when possible. ([#470][gh-470])
 
 ### Fixed
 
@@ -333,6 +334,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-465]: https://github.com/HigherOrderCO/Bend/issues/465
 [gh-466]: https://github.com/HigherOrderCO/Bend/issues/466
 [gh-467]: https://github.com/HigherOrderCO/Bend/issues/467
+[gh-470]: https://github.com/HigherOrderCO/Bend/issues/470
 [gh-475]: https://github.com/HigherOrderCO/Bend/issues/475
 [gh-478]: https://github.com/HigherOrderCO/Bend/issues/478
 [gh-479]: https://github.com/HigherOrderCO/Bend/issues/479

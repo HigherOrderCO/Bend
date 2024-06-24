@@ -1,6 +1,7 @@
 use crate::{
   diagnostics::{Diagnostics, WarningType},
   fun::{builtins, Adts, Constructors, Ctx, Definition, FanKind, Name, Num, Pattern, Rule, Tag, Term},
+  maybe_grow,
 };
 use std::collections::{BTreeSet, HashSet};
 
@@ -301,8 +302,10 @@ fn num_rule(
       let mut body = rule.body.clone();
       if let Some(var) = var {
         let last_num = *nums.last().unwrap();
-        let var_recovered = Term::add_num(Term::Var { nam: pred_var.clone() }, Num::U24(1 + last_num));
+        let curr_num = 1 + last_num;
+        let var_recovered = Term::add_num(Term::Var { nam: pred_var.clone() }, Num::U24(curr_num));
         body = Term::Use { nam: Some(var.clone()), val: Box::new(var_recovered), nxt: Box::new(body) };
+        fast_pred_access(&mut body, curr_num, var, &pred_var);
       }
       let rule = Rule { pats: rule.pats[1..].to_vec(), body };
       new_rules.push(rule);
@@ -338,6 +341,25 @@ fn num_rule(
   });
 
   Ok(term)
+}
+
+/// Replaces `body` to `pred_var` if the term is a operation that subtracts the given var by the current
+/// switch number.
+fn fast_pred_access(body: &mut Term, curr_num: u32, var: &Name, pred_var: &Name) {
+  maybe_grow(|| {
+    if let Term::Oper { opr: crate::fun::Op::SUB, fst, snd } = body {
+      if let Term::Num { val: crate::fun::Num::U24(val) } = &**snd {
+        if let Term::Var { nam } = &**fst {
+          if nam == var && *val == curr_num {
+            *body = Term::Var { nam: pred_var.clone() };
+          }
+        }
+      }
+    }
+    for child in body.children_mut() {
+      fast_pred_access(child, curr_num, var, pred_var)
+    }
+  })
 }
 
 /// When the first column has constructors, create a branch on the constructors

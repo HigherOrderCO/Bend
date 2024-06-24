@@ -7,7 +7,7 @@ Scott
 
 (pred2) = λa switch a { 0: 0; _: λb switch b { 0: 0; _: λc c; }; }
 
-(pred3) = λa switch a { 0: 0; _: λb switch b { 0: 0; _: λc switch c { 0: 0; _: λd (- (+ d 3) 3); }; }; }
+(pred3) = λa switch a { 0: 0; _: λb switch b { 0: 0; _: λc switch c { 0: 0; _: λd d; }; }; }
 
 (zero) = λa switch a { 0: 1; _: λb switch b { 0: 0; _: λ* 0; }; }
 
@@ -18,7 +18,7 @@ NumScott
 
 (pred2) = λa switch a { 0: 0; _: λb switch b { 0: 0; _: λc c; }; }
 
-(pred3) = λa switch a { 0: 0; _: λb switch b { 0: 0; _: λc switch c { 0: 0; _: λd (- (+ d 3) 3); }; }; }
+(pred3) = λa switch a { 0: 0; _: λb switch b { 0: 0; _: λc switch c { 0: 0; _: λd d; }; }; }
 
 (zero) = λa switch a { 0: 1; _: λb switch b { 0: 0; _: λ* 0; }; }
 
