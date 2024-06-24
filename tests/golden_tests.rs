@@ -107,7 +107,7 @@ pub fn run_book_simple(
 #[test]
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     let compile_opts = CompileOpts::default();
     let diagnostics_cfg = DiagnosticsConfig { unused_definition: Severity::Allow, ..Default::default() };
 
@@ -119,7 +119,7 @@ fn compile_file() {
 #[test]
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     let opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig {
       recursion_cycle: Severity::Warning,
@@ -135,7 +135,7 @@ fn compile_file_o_all() {
 #[test]
 fn compile_file_o_no_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     let compile_opts = CompileOpts::default().set_no_all();
     let diagnostics_cfg = DiagnosticsConfig::default();
     let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None)?;
@@ -147,7 +147,7 @@ fn compile_file_o_no_all() {
 fn linear_readback() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let _guard = RUN_MUTEX.lock().unwrap();
-    let book = do_parse_book_default(code, path.display())?;
+    let book = do_parse_book_default(code, path)?;
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig::default();
     let (term, _, diags) = run_book_simple(
@@ -168,7 +168,7 @@ fn run_file() {
     function_name!(),
     &[(&|code, path| {
       let _guard = RUN_MUTEX.lock().unwrap();
-      let book = do_parse_book_default(code, path.display())?;
+      let book = do_parse_book_default(code, path)?;
       let diagnostics_cfg = DiagnosticsConfig {
         unused_definition: Severity::Allow,
         ..DiagnosticsConfig::new(Severity::Error, true)
@@ -199,7 +199,7 @@ fn import_system() {
         ..DiagnosticsConfig::new(Severity::Error, true)
       };
 
-      let book = load_to_book(path.display(), code, DefaultLoader::new(path), diagnostics_cfg)?;
+      let book = load_to_book(path, code, DefaultLoader::new(path), diagnostics_cfg)?;
       let run_opts = RunOpts::default();
 
       let mut res = String::new();
@@ -253,7 +253,7 @@ fn simplify_matches() {
       irrefutable_match: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
     };
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
 
     ctx.check_shared_names();
@@ -286,7 +286,7 @@ fn simplify_matches() {
 #[test]
 fn parse_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     let mut ctx = Ctx::new(&mut book, Default::default());
     ctx.set_entrypoint();
     ctx.book.encode_adts(AdtEncoding::NumScott);
@@ -304,7 +304,7 @@ fn encode_pattern_match() {
     let mut result = String::new();
     for adt_encoding in [AdtEncoding::Scott, AdtEncoding::NumScott] {
       let diagnostics_cfg = DiagnosticsConfig::default();
-      let mut book = do_parse_book_default(code, path.display())?;
+      let mut book = do_parse_book_default(code, path)?;
       let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
       ctx.check_shared_names();
       ctx.set_entrypoint();
@@ -345,7 +345,7 @@ fn desugar_file() {
       unused_definition: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
     };
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     desugar_book(&mut book, compile_opts, diagnostics_cfg, None)?;
     Ok(book.to_string())
   })
@@ -358,7 +358,7 @@ fn hangs() {
 
   run_golden_test_dir(function_name!(), &move |code, path| {
     let _guard = RUN_MUTEX.lock().unwrap();
-    let book = do_parse_book_default(code, path.display())?;
+    let book = do_parse_book_default(code, path)?;
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Allow, false);
 
@@ -380,7 +380,7 @@ fn hangs() {
 #[test]
 fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
     let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
     let res = compile_book(&mut book, CompileOpts::default(), diagnostics_cfg, None)?;
@@ -393,7 +393,7 @@ fn compile_entrypoint() {
 fn run_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let _guard = RUN_MUTEX.lock().unwrap();
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
@@ -428,7 +428,7 @@ fn mutual_recursion() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let diagnostics_cfg =
       DiagnosticsConfig { recursion_cycle: Severity::Error, ..DiagnosticsConfig::new(Severity::Allow, true) };
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     let opts = CompileOpts { merge: true, ..CompileOpts::default() };
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, hvm_book_show_pretty(&res.hvm_book)))
@@ -455,7 +455,7 @@ fn io() {
       }), */
       (&|code, path| {
         let _guard = RUN_MUTEX.lock().unwrap();
-        let book = do_parse_book_default(code, path.display())?;
+        let book = do_parse_book_default(code, path)?;
         let compile_opts = CompileOpts::default();
         let diagnostics_cfg = DiagnosticsConfig::default();
         let (term, _, diags) =
@@ -482,7 +482,7 @@ fn examples() -> Result<(), Diagnostics> {
     eprintln!("Testing {}", path.display());
     let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
 
-    let book = do_parse_book_default(&code, path.display()).unwrap();
+    let book = do_parse_book_default(&code, path).unwrap();
     let compile_opts = CompileOpts::default();
     let diagnostics_cfg = DiagnosticsConfig::default();
     let (term, _, diags) = run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
@@ -504,7 +504,7 @@ fn examples() -> Result<(), Diagnostics> {
 #[test]
 fn scott_triggers_unused() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     let opts = CompileOpts::default();
     let diagnostics_cfg =
       DiagnosticsConfig { unused_definition: Severity::Error, ..DiagnosticsConfig::default() };
@@ -517,7 +517,7 @@ fn scott_triggers_unused() {
 #[test]
 fn compile_long() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path.display())?;
+    let mut book = do_parse_book_default(code, path)?;
     let opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig {
       recursion_cycle: Severity::Warning,
