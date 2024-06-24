@@ -353,7 +353,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-581]: https://github.com/HigherOrderCO/Bend/issues/581
 [gh-573]: https://github.com/HigherOrderCO/Bend/issues/573
 [gh-578]: https://github.com/HigherOrderCO/Bend/issues/578
-[gh-578]: https://github.com/HigherOrderCO/Bend/issues/579
+[gh-579]: https://github.com/HigherOrderCO/Bend/issues/579
 [gh-580]: https://github.com/HigherOrderCO/Bend/issues/580
 [gh-582]: https://github.com/HigherOrderCO/Bend/issues/582
 [gh-583]: https://github.com/HigherOrderCO/Bend/issues/583
