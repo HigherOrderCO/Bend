@@ -34,8 +34,14 @@ impl Ctx<'_> {
     for def in self.book.defs.values_mut() {
       let mut fresh = 0;
       for rule in def.rules.iter_mut() {
-        let res =
-          rule.body.desugar_fold(&def.name, &mut fresh, &mut new_defs, &self.book.ctrs, &self.book.adts);
+        let res = rule.body.desugar_fold(
+          &def.name,
+          &mut fresh,
+          &mut new_defs,
+          &self.book.ctrs,
+          &self.book.adts,
+          def.builtin,
+        );
         if let Err(e) = res {
           self.info.add_rule_error(e, def.name.clone());
         }
@@ -56,10 +62,11 @@ impl Term {
     new_defs: &mut Vec<Definition>,
     ctrs: &Constructors,
     adts: &Adts,
+    builtin: bool,
   ) -> Result<(), String> {
     maybe_grow(|| {
       for child in self.children_mut() {
-        child.desugar_fold(def_name, fresh, new_defs, ctrs, adts)?;
+        child.desugar_fold(def_name, fresh, new_defs, ctrs, adts, builtin)?;
       }
 
       if let Term::Fold { .. } = self {
@@ -113,8 +120,7 @@ impl Term {
         let body = Term::rfold_lams(body, with_bnd.iter().cloned());
         let body = Term::rfold_lams(body, free_vars.iter().map(|nam| Some(nam.clone())));
         let body = Term::lam(Pattern::Var(Some(x_nam)), body);
-        let def =
-          Definition { name: new_nam.clone(), rules: vec![Rule { pats: vec![], body }], builtin: false };
+        let def = Definition { name: new_nam.clone(), rules: vec![Rule { pats: vec![], body }], builtin };
         new_defs.push(def);
 
         // Call the new function

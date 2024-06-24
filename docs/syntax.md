@@ -1184,7 +1184,7 @@ The Tree literals `![]` and `!` are used to create values of the built-in type `
 The syntax above is desugared to:
 
 ```
-(Nat.succ (Nat.succ (Nat.succ List.nil)))
+(Nat/succ (Nat/succ (Nat/succ Nat/zero)))
 ```
 
 # Native HVM definitions

@@ -38,6 +38,52 @@ A List of values can be written using `[ ]`, it can have multiple values inside,
 ["This", "List", "Has", "Multiple", "Values"]
 ```
 
+### Functions
+
+#### List/length
+
+```python
+def List/length(list: [a]) -> (length: u24, list: [a])
+```
+
+Returns a tuple containing the length and the list itself.
+
+#### List/reverse
+
+```python
+def List/reverse(list: [a]) -> [a]
+```
+
+Reverses the elements of a list.
+
+#### List/flatten
+
+```python
+def List/flatten(list: [[a]]) -> [a]
+```
+
+Returns a flattened list from a list of lists. Example:
+
+```python
+List/flatten([[1], [2, 3], [4]])
+
+# Result: [1, 2, 3, 4]
+```
+
+#### List/concat
+
+```python
+def List/concat(xs: [a], ys: [a]) -> [a]
+```
+
+Appends two lists together. Example:
+
+```python
+List/concat([1, 2], [4, 5])
+
+# Result: [1, 2, 4, 5]
+```
+
 ## Tree
 
 ```python
@@ -266,6 +312,24 @@ The basic builtin IO functions are under development and will be stable in the n
 
 Here is the current list of functions, but be aware that they may change in the near future.
 
+### Printing
+
+```python
+def IO/print(text)
+```
+
+Prints the string `text` to the standard output, encoded with utf-8.
+
+### Input
+
+```python
+def IO/input() -> String
+```
+
+Reads characters from the standard input until a newline is found.
+
+Returns the read input as a String decoded with utf-8.
+
 ### File IO
 
 #### File open
@@ -311,6 +375,25 @@ Reads `num_bytes` bytes from the file with the given `file` descriptor.
 
 Returns a list of U24 with each element representing a byte read from the file.
 
+```python
+def IO/FS/read_line(file)
+```
+Reads a line from the file with the given `file` descriptor.
+
+Returns a list of U24 with each element representing a byte read from the file.
+
+```python
+def IO/FS/read_until_end(file)
+```
+Reads until the end of the file with the given `file` descriptor.
+
+Returns a list of U24 with each element representing a byte read from the file.
+
+```python
+def IO/FS/read_file(path)
+```
+Reads an entire file with the given `path` and returns a list of U24 with each element representing a byte read from the file.
+
 #### File write
 
 ```python
@@ -320,6 +403,12 @@ def IO/FS/write(file, bytes)
 Writes `bytes`, a list of U24 with each element representing a byte, to the file with the given `file` descriptor.
 
 Returns nothing (`*`).
+
+```python
+def IO/FS/write_file(path, bytes)
+```
+
+Writes `bytes`, a list of U24 with each element representing a byte, as the entire content of the file with the given `path`.
 
 #### File seek
 
@@ -381,7 +470,7 @@ def to_i24(x: any number) -> i24
 
 Casts any native number to an i24.
 
-## Encoding functions
+## String encoding / decoding
 
 ### Bytes/decode_utf8
 

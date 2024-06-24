@@ -1,6 +1,4 @@
 # Mixed contents in a `do` block should still work.
-type Result = (Ok val) | (Err val)
-
 Result/bind r nxt = match r {
   Result/Ok: ((undefer nxt) r.val)
   Result/Err: r

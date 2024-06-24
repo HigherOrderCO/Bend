@@ -17,6 +17,7 @@ and this project does not currently adhere to a particular versioning scheme.
 ### Fixed
 
 - Fix readback of numeric operations. ([#467][gh-467])
+- Propagate the "builtin" attribute of definitions when extracting functions from `bend` and `fold` syntax.
 
 ### Added
 
@@ -26,6 +27,10 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add `IO/sleep` builtin function to sleep for a given amount of seconds as a float. ([#581][gh-581])
 - Add primitive file IO functions `IO/FS/{read, write, seek, open, close}`. ([#573][gh-573])
 - Add encoding/decoding builtin functions `Bytes/{decode_utf8, decode_ascii} String/{encode_ascii, decode_ascii} Utf8/{decode_character, REPLACEMENT_CHARACTER}`. ([#580][gh-580])
+- Add `IO/print` function to print to stdout. ([#579][gh-579])
+- Add `IO/input` function to read a line of input from stdin. ([#579][gh-579])
+- Add file IO utilities `IO/FS/{read_file, write_file, read_line, read_to_end}`. ([#578][gh-578])
+- Add list utilities `List/{length, reverse, flatten, concat}`.
 - Add `elif` chains to functional syntax. ([#596][gh-596])
 
 ## [0.2.35] - 2024-06-06
@@ -350,6 +355,8 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
 [gh-581]: https://github.com/HigherOrderCO/Bend/issues/581
 [gh-573]: https://github.com/HigherOrderCO/Bend/issues/573
+[gh-578]: https://github.com/HigherOrderCO/Bend/issues/578
+[gh-579]: https://github.com/HigherOrderCO/Bend/issues/579
 [gh-580]: https://github.com/HigherOrderCO/Bend/issues/580
 [gh-582]: https://github.com/HigherOrderCO/Bend/issues/582
 [gh-583]: https://github.com/HigherOrderCO/Bend/issues/583

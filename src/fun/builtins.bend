@@ -1,8 +1,26 @@
 type String = (Nil) | (Cons head ~tail)
 
-type List   = (Nil) | (Cons head ~tail)
+type List = (Nil) | (Cons head ~tail)
 
-type Nat    = (Succ ~pred) | (Zero)
+List/length xs = fold xs with len=0, acc=[] {
+  List/Nil: (len, (List/reverse acc))
+  List/Cons: (xs.tail (+ len 1) (List/Cons xs.head acc))
+}
+
+List/reverse xs = fold xs with acc=[] {
+  List/Nil: acc
+  List/Cons: (xs.tail (List/Cons xs.head acc))
+}
+
+List/flatten (List/Cons x xs) = (List/concat x (List/flatten xs))
+List/flatten (List/Nil)       = (List/Nil)
+
+List/concat (List/Cons x xs) ys = (List/Cons x (List/concat xs ys))
+List/concat (List/Nil)       ys = ys
+
+type Nat = (Succ ~pred) | (Zero)
+
+type Result = (Ok val) | (Err val)
 
 type Tree:
   Node { ~left, ~right }
@@ -125,16 +143,96 @@ IO/FS/SEEK_CUR = +1
 IO/FS/SEEK_END = +2
 
 ### File utilities
-#read_file path = (IO/Call IO/MAGIC "GET_FILE" path @x (IO/Done IO/MAGIC x))
-#write_file path text = (IO/Call IO/MAGIC "PUT_FILE" (path, text) @x (IO/Done IO/MAGIC x))
+# Reads an entire file, returning a list of bytes.
+# def IO/FS/read_file(path: String) -> IO [u24]
+def IO/FS/read_file(path):
+  with IO:
+    fd <- IO/FS/open(path, "r")
+    bytes <- IO/FS/read_to_end(fd)
+    * <- IO/FS/close(fd)
+    return wrap(bytes)
+
+# Reads the remaining contents of a file, returning a list of read bytes.
+# def IO/FS/read_to_end(fd: u24) -> IO [u24]
+def IO/FS/read_to_end(fd):
+  return IO/FS/read_to_end.read_chunks(fd, [])
+
+def IO/FS/read_to_end.read_chunks(fd, chunks):
+  with IO:
+    # Read file in 1MB chunks
+    chunk <- IO/FS/read(fd, 1048576)
+    match chunk:
+      case List/Nil:
+        return wrap(List/flatten(chunks))
+      case List/Cons:
+        return IO/FS/read_to_end.read_chunks(fd, List/Cons(chunk, chunks))
+
+# Reads a single line from a file, returning a list of bytes.
+# def IO/FS/read_line(fd: u24) -> IO [u24]
+def IO/FS/read_line(fd):
+  return IO/FS/read_line.read_chunks(fd, [])
+
+def IO/FS/read_line.read_chunks(fd, chunks):
+  with IO:
+    # Read line in 1kB chunks
+    chunk <- IO/FS/read(fd, 1024)
+    match res = Bytes/split_once(chunk, '\n'):
+      case Result/Ok:
+        (line, rest) = res.val
+        (length, *) = List/length(rest)
+        * <- IO/FS/seek(fd, to_i24(length) * -1, IO/FS/SEEK_CUR)
+        chunks = List/Cons(line, chunks)
+        bytes = List/flatten(chunks)
+        return wrap(bytes)
+      case Result/Err:
+        line = res.val
+        chunks = List/Cons(line, chunks)
+        return IO/FS/read_line.read_chunks(fd, chunks)
+
+# Writes a list of bytes to a file given by a path.
+# def IO/FS/write_file(path: String, bytes: [u24]) -> IO *
+def IO/FS/write_file(path, bytes):
+  with IO:
+    f <- IO/FS/open(path, "w")
+    * <- IO/FS/write(f, bytes)
+    * <- IO/FS/close(f)
+    return wrap(bytes)
+
+Bytes/split_once xs cond = (Bytes/split_once.go xs cond @x x)
+  Bytes/split_once.go  List/Nil        cond acc = (Result/Err (acc List/Nil))
+  Bytes/split_once.go (List/Cons x xs) cond acc =
+    if (== cond x) {
+      (Result/Ok ((acc List/Nil), xs))
+    } else {
+      (Bytes/split_once.go xs cond @y (acc (List/Cons x y)))
+    }
 
 ### Standard input and output utilities
 
-# TODO: Encode with utf-8
-IO/print text = (IO/FS/write IO/FS/STDOUT text)
+# Prints a string to stdout, encoding it with utf-8.
+# def IO/print(text: String) -> IO *
+IO/print text = (IO/FS/write IO/FS/STDOUT (String/encode_utf8 text))
 
-# TODO: Should read any length of input
-IO/input = (IO/FS/read IO/FS/STDIN 1024)
+# Read characters from stdin until a newline is found.
+# Returns the read input decoded as utf-8.
+# def IO/input() -> IO String
+IO/input = (IO/input.go @x x)
+def IO/input.go(acc):
+  # TODO: This is slow and inefficient, should be done in hvm using fgets.
+  with IO:
+    byte <- IO/FS/read(IO/FS/STDIN, 1)
+    match byte:
+      case List/Nil:
+        # Nothing read, try again (to simulate blocking a read)
+        return IO/input.go(acc)
+      case List/Cons:
+        if byte.head == '\n':
+          bytes = acc(List/Nil)
+          text = Bytes/decode_utf8(bytes)
+          return wrap(text)
+        else:
+          acc = lambda x: acc(List/Cons(byte.head, x))
+          return IO/input.go(acc)
 
 # Lazy thunks
 # We can defer the evaluation of a function by wrapping it in a thunk
@@ -176,7 +274,7 @@ hvm to_u24:
 hvm to_i24:
   ($([i24] ret) ret)
 
-# Encoding
+# String Encoding and Decoding
 
 Utf8/REPLACEMENT_CHARACTER = '\u{FFFD}'
 
@@ -249,9 +347,9 @@ Utf8/decode_character (List/Cons a (List/Cons b (List/Cons c (List/Cons d rest))
 
 String/encode_utf8 (String/Nil)       = (List/Nil)
 String/encode_utf8 (String/Cons x xs) =
-  use Utf8/rune1max = (- (<< 1 7) 1)
-  use Utf8/rune2max = (- (<< 1 11) 1)
-  use Utf8/rune3max = (- (<< 1 16) 1)
+  use Utf8/rune1max = 0b01111111
+  use Utf8/rune2max = 0b00000111_11111111
+  use Utf8/rune3max = 0b11111111_11111111
   use Utf8/tx       = 0b10000000
   use Utf8/t2       = 0b11000000
   use Utf8/t3       = 0b11100000
