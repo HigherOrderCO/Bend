@@ -127,9 +127,19 @@ fn simplify_rule_match(
 fn irrefutable_fst_row_rule(args: Vec<Name>, rule: Rule) -> Term {
   let mut term = rule.body;
   for (arg, pat) in args.into_iter().zip(rule.pats.into_iter()) {
-    let Pattern::Var(var) = pat else { unreachable!() };
-    if let Some(var) = var {
-      term = Term::Use { nam: Some(var), val: Box::new(Term::Var { nam: arg }), nxt: Box::new(term) };
+    match pat {
+      Pattern::Var(None) => {}
+      Pattern::Var(Some(var)) => {
+        term = Term::Use { nam: Some(var), val: Box::new(Term::Var { nam: arg }), nxt: Box::new(term) };
+      }
+      Pattern::Chn(var) => {
+        term = Term::Let {
+          pat: Box::new(Pattern::Chn(var)),
+          val: Box::new(Term::Var { nam: arg }),
+          nxt: Box::new(term),
+        };
+      }
+      _ => unreachable!(),
     }
   }
   term
