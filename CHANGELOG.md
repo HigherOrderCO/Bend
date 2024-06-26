@@ -18,6 +18,7 @@ and this project does not currently adhere to a particular versioning scheme.
 
 - Fix readback of numeric operations. ([#467][gh-467])
 - Propagate the "builtin" attribute of definitions when extracting functions from `bend` and `fold` syntax.
+- Panic while using unscoped variables on definition patterns. ([#468][gh-468])
 
 ### Added
 
@@ -339,6 +340,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-465]: https://github.com/HigherOrderCO/Bend/issues/465
 [gh-466]: https://github.com/HigherOrderCO/Bend/issues/466
 [gh-467]: https://github.com/HigherOrderCO/Bend/issues/467
+[gh-468]: https://github.com/HigherOrderCO/Bend/issues/468
 [gh-470]: https://github.com/HigherOrderCO/Bend/issues/470
 [gh-475]: https://github.com/HigherOrderCO/Bend/issues/475
 [gh-478]: https://github.com/HigherOrderCO/Bend/issues/478
