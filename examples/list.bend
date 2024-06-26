@@ -125,7 +125,7 @@ pop_back (List/Cons head tail) = (List/Cons head (pop_back tail))
   
 # List remove:
 # List l -> Some s -> List l 
-# removes the first occurence of element e from list l.
+# removes the first occurrence of element e from list l.
 remove = @l @s
   match l {
     List/Cons:
