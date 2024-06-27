@@ -423,6 +423,8 @@ impl<'a> PyParser<'a> {
     maybe_grow(|| {
       if self.try_parse_keyword("return") {
         self.parse_return()
+      } else if self.try_parse_keyword("def") {
+        self.parse_local_def(indent)
       } else if self.try_parse_keyword("if") {
         self.parse_if(indent)
       } else if self.try_parse_keyword("match") {
@@ -963,13 +965,23 @@ impl<'a> PyParser<'a> {
     Ok((stmt, nxt_indent))
   }
 
-  pub fn parse_def(&mut self, mut indent: Indent) -> ParseResult<(Definition, Indent)> {
+  fn parse_local_def(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+    let (def, mut nxt_indent) = self.parse_def_aux(*indent)?;
+    let (nxt, nxt_indent) = self.parse_statement(&mut nxt_indent)?;
+    let stmt = Stmt::LocalDef { def: Box::new(def), nxt: Box::new(nxt) };
+    Ok((stmt, nxt_indent))
+  }
+
+  pub fn parse_def(&mut self, indent: Indent) -> ParseResult<(Definition, Indent)> {
     if indent != Indent::Val(0) {
       let msg = "Indentation error. Functions defined with 'def' must be at the start of the line.";
       let idx = *self.index();
       return self.with_ctx(Err(msg), idx..idx + 1);
     }
+    self.parse_def_aux(indent)
+  }
 
+  fn parse_def_aux(&mut self, mut indent: Indent) -> ParseResult<(Definition, Indent)> {
     self.skip_trivia_inline()?;
     let name = self.parse_top_level_name()?;
     self.skip_trivia_inline()?;

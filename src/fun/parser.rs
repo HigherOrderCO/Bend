@@ -781,7 +781,9 @@ impl<'a> TermParser<'a> {
     self.check_top_level_redefinition(&def.name, book, span)?;
     def.order_kwargs(book)?;
     def.gen_map_get();
+    let locals = def.lift_local_defs(&mut 0)?;
     let def = def.to_fun(builtin)?;
+    book.defs.extend(locals);
     book.defs.insert(def.name.clone(), def);
     Ok(())
   }

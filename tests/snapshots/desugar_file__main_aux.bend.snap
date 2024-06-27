@@ -1,0 +1,11 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/desugar_file/main_aux.bend
+---
+(aux__local_0_aux) = λa λb (+ b a)
+
+(aux__local_1_aux) = λa λb λc (a b c)
+
+(main__local_2_aux) = λa λb λc λd (b a c d)
+
+(main) = (main__local_2_aux aux__local_0_aux aux__local_1_aux 89 2)

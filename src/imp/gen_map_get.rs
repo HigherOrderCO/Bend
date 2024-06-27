@@ -15,6 +15,10 @@ impl Definition {
 impl Stmt {
   fn gen_map_get(&mut self, id: &mut usize) {
     match self {
+      Stmt::LocalDef { def, nxt } => {
+        nxt.gen_map_get(id);
+        def.gen_map_get()
+      }
       Stmt::Assign { pat, val, nxt } => {
         let key_substitutions =
           if let AssignPattern::MapSet(_, key) = pat { key.substitute_map_gets(id) } else { Vec::new() };

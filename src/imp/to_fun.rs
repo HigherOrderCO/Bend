@@ -52,6 +52,7 @@ impl Stmt {
     // TODO: Refactor this to not repeat everything.
     // TODO: When we have an error with an assignment, we should show the offending assignment (eg. "{pat} = ...").
     let stmt_to_fun = match self {
+      Stmt::LocalDef { .. } => todo!(),
       Stmt::Assign { pat: AssignPattern::MapSet(map, key), val, nxt: Some(nxt) } => {
         let (nxt_pat, nxt) = match nxt.into_fun()? {
           StmtToFun::Return(term) => (None, term),

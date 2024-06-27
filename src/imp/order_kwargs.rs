@@ -15,6 +15,10 @@ impl Definition {
 impl Stmt {
   fn order_kwargs(&mut self, book: &Book) -> Result<(), String> {
     match self {
+      Stmt::LocalDef { def, nxt } => {
+        def.order_kwargs(book)?;
+        nxt.order_kwargs(book)?;
+      }
       Stmt::Assign { val, nxt, .. } => {
         val.order_kwargs(book)?;
         if let Some(nxt) = nxt {
