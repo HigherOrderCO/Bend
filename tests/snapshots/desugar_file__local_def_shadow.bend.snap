@@ -6,8 +6,8 @@ input_file: tests/golden_tests/desugar_file/local_def_shadow.bend
 
 (main__local_1_A__local_1_B) = 1
 
-(main__local_1_A) = λa a
+(main__local_1_A) = main__local_1_A__local_1_B
 
-(main__local_0_A) = λa a
+(main__local_0_A) = main__local_0_A__local_0_B
 
-(main) = (main__local_1_A main__local_1_A__local_1_B)
+(main) = 1

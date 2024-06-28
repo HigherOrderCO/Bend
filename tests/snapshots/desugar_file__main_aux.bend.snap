@@ -4,8 +4,8 @@ input_file: tests/golden_tests/desugar_file/main_aux.bend
 ---
 (main__local_0_aux__local_0_aux__local_0_aux) = λa λb (+ b a)
 
-(main__local_0_aux__local_0_aux) = λa λb λc (a b c)
+(main__local_0_aux__local_0_aux) = λa λb (main__local_0_aux__local_0_aux__local_0_aux a b)
 
-(main__local_0_aux) = λa λb λc λd (a b c d)
+(main__local_0_aux) = λa λb (main__local_0_aux__local_0_aux a b)
 
-(main) = (main__local_0_aux main__local_0_aux__local_0_aux main__local_0_aux__local_0_aux__local_0_aux 89 2)
+(main) = (main__local_0_aux 89 2)

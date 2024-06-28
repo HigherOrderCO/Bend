@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use indexmap::IndexMap;
 
@@ -29,7 +29,9 @@ impl Stmt {
         nxt.lift_local_defs(parent, defs, gen)?;
         *gen += 1;
 
-        let (r#use, mut def, fvs) = gen_use(local_name.clone(), *def, nxt)?;
+        let inner_defs =
+          defs.keys().filter(|name| name.starts_with(local_name.as_ref())).cloned().collect::<BTreeSet<_>>();
+        let (r#use, mut def, fvs) = gen_use(local_name.clone(), *def, nxt, inner_defs)?;
         *self = r#use;
         apply_closure(&mut def, fvs);
 
@@ -100,12 +102,14 @@ fn gen_use(
   local_name: Name,
   def: Definition,
   nxt: Box<Stmt>,
+  inner_defs: BTreeSet<Name>,
 ) -> Result<(Stmt, fun::Definition, Vec<Name>), String> {
   let params = def.params.clone();
+  let ignored: BTreeSet<Name> = params.into_iter().chain(inner_defs).collect();
   let mut def = def.to_fun(false)?;
 
   let fvs = BTreeMap::from_iter(def.rules[0].body.free_vars());
-  let fvs = fvs.into_keys().filter(|fv| !params.contains(fv)).collect::<Vec<_>>();
+  let fvs = fvs.into_keys().filter(|fv| !ignored.contains(fv)).collect::<Vec<_>>();
   let val = Expr::Call {
     fun: Box::new(Expr::Var { nam: local_name.clone() }),
     args: fvs.iter().cloned().map(|nam| Expr::Var { nam }).collect(),
