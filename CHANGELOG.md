@@ -33,6 +33,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add file IO utilities `IO/FS/{read_file, write_file, read_line, read_to_end}`. ([#578][gh-578])
 - Add list utilities `List/{length, reverse, flatten, concat}`.
 - Add `elif` chains to functional syntax. ([#596][gh-596])
+- Add local definitions to imperative syntax. ([#562][gh-562])
 
 ## [0.2.35] - 2024-06-06
 
@@ -355,6 +356,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-516]: https://github.com/HigherOrderCO/Bend/issues/516
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
+[gh-562]: https://github.com/HigherOrderCO/Bend/issues/562
 [gh-581]: https://github.com/HigherOrderCO/Bend/issues/581
 [gh-573]: https://github.com/HigherOrderCO/Bend/issues/573
 [gh-578]: https://github.com/HigherOrderCO/Bend/issues/578

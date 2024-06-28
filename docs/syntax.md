@@ -420,6 +420,19 @@ with Result:
   return wrap(x * y)
 ```
 
+### Def
+
+Creates a local function visible in the current block capturing variables:
+
+```python
+def main:
+  y = 41
+  x = 1
+  def aux_add(x):
+    return x + y
+  return aux_add(x)
+```
+
 ## Expressions
 
 ### Variables

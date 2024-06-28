@@ -1,4 +1,5 @@
 pub mod gen_map_get;
+pub mod lift_local_defs;
 mod order_kwargs;
 pub mod parser;
 pub mod to_fun;
@@ -105,7 +106,7 @@ pub enum Stmt {
     otherwise: Box<Stmt>,
     nxt: Option<Box<Stmt>>,
   },
-  // "match" {arg} ":" ("as" {bind})?
+  // "match" ({bind} "=")? {arg} ({with_clause})? ":"
   //   case {lft} ":" {rgt}
   //   ...
   // <nxt>?
@@ -117,7 +118,7 @@ pub enum Stmt {
     arms: Vec<MatchArm>,
     nxt: Option<Box<Stmt>>,
   },
-  // "switch" {arg} ("as" {bind})?
+  // "switch" ({bind} "=")? {arg} ({with_clause})? ":"
   //   case 0..wildcard ":" {rgt}
   //   ...
   // <nxt>?
@@ -129,7 +130,7 @@ pub enum Stmt {
     arms: Vec<Stmt>,
     nxt: Option<Box<Stmt>>,
   },
-  // "bend" ({bind} ("="" {init})?)* "while" {cond} ":"
+  // "bend" ({bind} ("=" {init})?)* "while" {cond} ":"
   //   {step}
   // "then" ":"
   //   {base}
@@ -142,7 +143,7 @@ pub enum Stmt {
     base: Box<Stmt>,
     nxt: Option<Box<Stmt>>,
   },
-  // "fold" {arg} ("as" {bind})? ":" {arms}
+  // "fold" ({bind} "=")? {arg} ({with_clause})? ":" {arms}
   //   case {lft} ":" {rgt}
   //   ...
   // <nxt>?
@@ -184,11 +185,16 @@ pub enum Stmt {
     val: Box<Expr>,
     nxt: Box<Stmt>,
   },
+  // {def} {nxt}
+  LocalDef {
+    def: Box<Definition>,
+    nxt: Box<Stmt>,
+  },
   #[default]
   Err,
 }
 
-// Name "(" {fields}* ")"
+// Name "{" {fields}* "}"
 #[derive(Clone, Debug)]
 pub struct Variant {
   pub name: Name,
