@@ -1,0 +1,10 @@
+def main:
+  def A():
+    def B():
+      return 0
+    return B()
+  def A():
+    def B():
+      return 1
+    return B()
+  return A()

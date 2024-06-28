@@ -24,17 +24,15 @@ impl Stmt {
     match self {
       Stmt::LocalDef { .. } => {
         let Stmt::LocalDef { mut def, mut nxt } = std::mem::take(self) else { unreachable!() };
-        let children = def.lift_local_defs(gen)?;
-        nxt.lift_local_defs(parent, defs, gen)?;
-
         let local_name = Name::new(format!("{}__local_{}_{}", parent, gen, def.name));
+        def.body.lift_local_defs(&local_name, defs, gen)?;
+        nxt.lift_local_defs(parent, defs, gen)?;
         *gen += 1;
 
         let (r#use, mut def, fvs) = gen_use(local_name.clone(), *def, nxt)?;
         *self = r#use;
         apply_closure(&mut def, fvs);
 
-        defs.extend(children);
         defs.insert(def.name.clone(), def);
         Ok(())
       }
@@ -122,8 +120,8 @@ fn gen_use(
 
 fn apply_closure(def: &mut fun::Definition, fvs: Vec<Name>) {
   let rule = &mut def.rules[0];
-  let mut n_pats = fvs.into_iter().map(|x| Pattern::Var(Some(x))).collect::<Vec<_>>();
+  let mut captured = fvs.into_iter().map(|x| Pattern::Var(Some(x))).collect::<Vec<_>>();
   let rule_pats = std::mem::take(&mut rule.pats);
-  n_pats.extend(rule_pats);
-  rule.pats = n_pats;
+  captured.extend(rule_pats);
+  rule.pats = captured;
 }
