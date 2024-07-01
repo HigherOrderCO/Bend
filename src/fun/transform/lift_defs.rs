@@ -58,26 +58,31 @@ fn gen_use(
   local_name: &Name,
   nam: &Name,
   nxt: &mut Box<Term>,
-  rules: Vec<Rule>,
+  mut rules: Vec<Rule>,
 ) -> (Term, BTreeSet<Name>, Vec<Rule>) {
   let mut fvs = BTreeSet::<Name>::new();
   for rule in rules.iter() {
     fvs.extend(rule.body.free_vars().into_keys().collect::<BTreeSet<_>>());
   }
-  // fvs = fvs.into_iter().filter(|fv| !inner_defs.contains(fv)).collect();
   fvs.retain(|fv| !inner_defs.contains(fv));
   for rule in rules.iter() {
     for bind in rule.binds().flatten() {
       fvs.remove(bind);
     }
   }
+  fvs.remove(nam);
 
   let call = Term::call(
     Term::Ref { nam: local_name.clone() },
     fvs.iter().cloned().map(|nam| Term::Var { nam }).collect::<Vec<_>>(),
   );
 
-  let r#use = Term::Use { nam: Some(nam.clone()), val: Box::new(call), nxt: std::mem::take(nxt) };
+  let r#use = Term::Use { nam: Some(nam.clone()), val: Box::new(call.clone()), nxt: std::mem::take(nxt) };
+
+  for rule in rules.iter_mut() {
+    let slf = std::mem::take(&mut rule.body);
+    rule.body = Term::Use { nam: Some(nam.clone()), val: Box::new(call.clone()), nxt: Box::new(slf) };
+  }
 
   (r#use, fvs, rules)
 }
