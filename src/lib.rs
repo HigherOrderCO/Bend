@@ -90,7 +90,7 @@ pub fn desugar_book(
 
   ctx.set_entrypoint();
 
-  ctx.book.lift_defs();
+  ctx.book.lift_local_defs();
 
   ctx.book.encode_adts(opts.adt_encoding);
 

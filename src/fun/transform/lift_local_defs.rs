@@ -5,12 +5,12 @@ use indexmap::IndexMap;
 use crate::fun::{Book, Definition, Name, Pattern, Rule, Term};
 
 impl Book {
-  pub fn lift_defs(&mut self) {
+  pub fn lift_local_defs(&mut self) {
     let mut defs = IndexMap::new();
     for (name, def) in self.defs.iter_mut() {
       let mut gen = 0;
       for rule in def.rules.iter_mut() {
-        rule.body.lift_defs(name, &mut defs, &mut gen);
+        rule.body.lift_local_defs(name, &mut defs, &mut gen);
       }
     }
     self.defs.extend(defs);
@@ -24,14 +24,14 @@ impl Rule {
 }
 
 impl Term {
-  pub fn lift_defs(&mut self, parent: &Name, defs: &mut IndexMap<Name, Definition>, gen: &mut usize) {
+  pub fn lift_local_defs(&mut self, parent: &Name, defs: &mut IndexMap<Name, Definition>, gen: &mut usize) {
     match self {
       Term::Def { nam, rules, nxt } => {
         let local_name = Name::new(format!("{}__local_{}_{}", parent, gen, nam));
         for rule in rules.iter_mut() {
-          rule.body.lift_defs(&local_name, defs, gen);
+          rule.body.lift_local_defs(&local_name, defs, gen);
         }
-        nxt.lift_defs(parent, defs, gen);
+        nxt.lift_local_defs(parent, defs, gen);
         *gen += 1;
 
         let inner_defs =
@@ -46,7 +46,7 @@ impl Term {
       }
       _ => {
         for child in self.children_mut() {
-          child.lift_defs(parent, defs, gen);
+          child.lift_local_defs(parent, defs, gen);
         }
       }
     }

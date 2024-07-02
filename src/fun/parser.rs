@@ -495,18 +495,22 @@ impl<'a> TermParser<'a> {
         self.skip_trivia();
         let (cur_name, rule) = self.parse_rule()?;
         let mut rules = vec![rule];
+        // the current index to backtack in case of fail to parse the next rule.
         let mut nxt_term = *self.index();
         loop {
           self.skip_trivia();
+          // save the start position of the rule that can be a next def term.
           let nxt_def = *self.index();
           match self.parse_rule() {
             Ok((name, rule)) => {
               if name == "def" {
+                // parse the nxt def term.
                 self.index = nxt_def;
                 return Ok(Term::Def { nam: cur_name, rules, nxt: Box::new(self.parse_term()?) });
               }
               if name == cur_name {
                 rules.push(rule);
+                // save the current position.
                 nxt_term = *self.index();
               } else {
                 let cur = *self.index();
@@ -514,6 +518,7 @@ impl<'a> TermParser<'a> {
                 return self.with_ctx(Err(msg), nxt_def..cur);
               }
             }
+            // if failed it is a term.
             Err(_) => break self.index = nxt_term,
           }
         }
