@@ -75,11 +75,11 @@ impl ParseBook {
       // Just serves to pass only the import map of the first call to `apply_imports_go`.
       let main_imports = main_imports.unwrap_or(&self.import_ctx.map);
 
+      package.apply_imports(Some(main_imports), diag, pkgs)?;
+
       // Rename ADTs and defs, applying binds from old names to new names
       package.apply_adts(&src, main_imports);
       package.apply_defs(&src, main_imports);
-
-      package.apply_imports(Some(main_imports), diag, pkgs)?; // TODO: Should this be after the apply_adts/defs functions?
 
       let Book { defs, hvm_defs, adts, .. } = package.to_fun()?;
 
