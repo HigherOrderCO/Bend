@@ -495,27 +495,26 @@ impl<'a> TermParser<'a> {
         self.skip_trivia();
         let (cur_name, rule) = self.parse_rule()?;
         let mut rules = vec![rule];
-        let mut cur_idx = *self.index();
+        let mut nxt_term = *self.index();
         loop {
           self.skip_trivia();
-          let back_term = *self.index();
+          let nxt_def = *self.index();
           match self.parse_rule() {
             Ok((name, rule)) => {
               if name == "def" {
-                self.index = back_term;
+                self.index = nxt_def;
                 return Ok(Term::Def { nam: cur_name, rules, nxt: Box::new(self.parse_term()?) });
               }
               if name == cur_name {
                 rules.push(rule);
-                cur_idx = *self.index();
+                nxt_term = *self.index();
               } else {
-                panic!()
+                let cur = *self.index();
+                let msg = format!("Expected a rule with name '{cur_name}'.");
+                return self.with_ctx(Err(msg), nxt_def..cur);
               }
             }
-            Err(_) => {
-              self.index = cur_idx;
-              break;
-            }
+            Err(_) => break self.index = nxt_term,
           }
         }
         let nxt = self.parse_term()?;
