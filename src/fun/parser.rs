@@ -495,7 +495,7 @@ impl<'a> TermParser<'a> {
         self.skip_trivia();
         let (cur_name, rule) = self.parse_rule()?;
         let mut rules = vec![rule];
-        // the current index to backtack in case of fail to parse the next rule.
+        // the current index to backtrack in case of fail to parse the next rule.
         let mut nxt_term = *self.index();
         loop {
           self.skip_trivia();
