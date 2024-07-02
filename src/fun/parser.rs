@@ -490,6 +490,42 @@ impl<'a> TermParser<'a> {
         return Ok(Term::Ask { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) });
       }
 
+      // Def
+      if self.try_parse_keyword("def") {
+        self.skip_trivia();
+        let (cur_name, rule) = self.parse_rule()?;
+        let mut rules = vec![rule];
+        // the current index to backtrack in case of fail to parse the next rule.
+        let mut nxt_term = *self.index();
+        loop {
+          self.skip_trivia();
+          // save the start position of the rule that can be a next def term.
+          let nxt_def = *self.index();
+          match self.parse_rule() {
+            Ok((name, rule)) => {
+              if name == "def" {
+                // parse the nxt def term.
+                self.index = nxt_def;
+                return Ok(Term::Def { nam: cur_name, rules, nxt: Box::new(self.parse_term()?) });
+              }
+              if name == cur_name {
+                rules.push(rule);
+                // save the current position.
+                nxt_term = *self.index();
+              } else {
+                let cur = *self.index();
+                let msg = format!("Expected a rule with name '{cur_name}'.");
+                return self.with_ctx(Err(msg), nxt_def..cur);
+              }
+            }
+            // if failed it is a term.
+            Err(_) => break self.index = nxt_term,
+          }
+        }
+        let nxt = self.parse_term()?;
+        return Ok(Term::Def { nam: cur_name, rules, nxt: Box::new(nxt) });
+      }
+
       // If
       if self.try_parse_keyword("if") {
         let mut chain = Vec::new();
@@ -781,9 +817,7 @@ impl<'a> TermParser<'a> {
     self.check_top_level_redefinition(&def.name, book, span)?;
     def.order_kwargs(book)?;
     def.gen_map_get();
-    let locals = def.lift_local_defs(&mut 0)?;
     let def = def.to_fun(builtin)?;
-    book.defs.extend(locals);
     book.defs.insert(def.name.clone(), def);
     Ok(())
   }
