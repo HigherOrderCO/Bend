@@ -5,7 +5,7 @@ use crate::{
     display::DisplayFn, Adt, Book, CtrField, Definition, FanKind, HvmDefinition, MatchRule, Name, Num, Op,
     Pattern, Rule, Tag, Term, STRINGS,
   },
-  imp::{parser::PyParser, Enum, Variant},
+  imp::{parser::PyParser, Enum, RepeatedNames, Variant},
   maybe_grow,
 };
 use highlight_error::highlight_error;
@@ -166,8 +166,8 @@ impl<'a> TermParser<'a> {
     // name
     if self.try_consume("(") {
       self.skip_trivia();
-      let name = self.parse_top_level_name()?;
-      let name = Name::new(format!("{typ_name}/{name}"));
+      let ctr_name = self.parse_top_level_name()?;
+      let ctr_name = Name::new(format!("{typ_name}/{ctr_name}"));
 
       fn parse_field(p: &mut TermParser) -> ParseResult<CtrField> {
         let rec = p.try_consume("~");
@@ -177,7 +177,10 @@ impl<'a> TermParser<'a> {
       }
 
       let fields = self.list_like(parse_field, "", ")", "", false, 0)?;
-      Ok((name, fields))
+      if let Some(field) = fields.find_repeated_names().into_iter().next() {
+        return Err(format!("Found a repeated field '{field}' in constructor {ctr_name}."));
+      }
+      Ok((ctr_name, fields))
     } else {
       // name
       let name = self.labelled(|p| p.parse_top_level_name(), "datatype constructor name")?;

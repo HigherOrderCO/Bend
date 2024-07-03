@@ -3,6 +3,8 @@ mod order_kwargs;
 pub mod parser;
 pub mod to_fun;
 
+use std::collections::HashSet;
+
 use crate::fun::{CtrField, Name, Num, Op};
 use interner::global::GlobalString;
 
@@ -207,6 +209,16 @@ pub struct Variant {
   pub fields: Vec<CtrField>,
 }
 
+impl Variant {
+  pub fn repeated_names(&self) -> HashSet<Name> {
+    let mut name_counts = std::collections::HashMap::new();
+    for field in &self.fields {
+      *name_counts.entry(field.nam.clone()).or_insert(0) += 1;
+    }
+    name_counts.into_iter().filter_map(|(name, count)| if count > 1 { Some(name) } else { None }).collect()
+  }
+}
+
 // "def" {name} "(" {params} ")" ":" {body}
 #[derive(Clone, Debug)]
 pub struct Definition {
@@ -234,5 +246,19 @@ impl InPlaceOp {
       InPlaceOp::Xor => Op::XOR,
       InPlaceOp::Map => unreachable!(),
     }
+  }
+}
+
+pub trait RepeatedNames<T> {
+  fn find_repeated_names(&self) -> HashSet<Name>;
+}
+
+impl RepeatedNames<CtrField> for Vec<CtrField> {
+  fn find_repeated_names(&self) -> HashSet<Name> {
+    let mut count = std::collections::HashMap::new();
+    for field in self.iter() {
+      *count.entry(field.nam.clone()).or_insert(0) += 1;
+    }
+    count.into_iter().filter_map(|(name, count)| if count > 1 { Some(name) } else { None }).collect()
   }
 }

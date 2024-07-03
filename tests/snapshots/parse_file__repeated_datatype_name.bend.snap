@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/parse_file/repeated_datatype_name.bend
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/parse_file/repeated_datatype_name.bend :
+Found a repeated field 'Expr' in constructor Expr/Plus.
