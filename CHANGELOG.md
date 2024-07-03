@@ -35,6 +35,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add `elif` chains to functional syntax. ([#596][gh-596])
 - Add local definitions to imperative syntax. ([#562][gh-562])
 - Add local definitions to functional syntax.
+- Add repeated field name error message.
 
 ## [0.2.35] - 2024-06-06
 

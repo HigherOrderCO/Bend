@@ -4,6 +4,7 @@ pub mod parser;
 pub mod to_fun;
 
 use crate::fun::{CtrField, Name, Num, Op};
+use indexmap::{IndexMap, IndexSet};
 use interner::global::GlobalString;
 
 #[derive(Clone, Debug)]
@@ -234,5 +235,25 @@ impl InPlaceOp {
       InPlaceOp::Xor => Op::XOR,
       InPlaceOp::Map => unreachable!(),
     }
+  }
+}
+
+pub trait RepeatedNames {
+  fn find_repeated_names(&self) -> IndexSet<Name>;
+}
+
+impl RepeatedNames for Vec<CtrField> {
+  fn find_repeated_names(&self) -> IndexSet<Name> {
+    let mut count = IndexMap::new();
+    for field in self.iter() {
+      *count.entry(field.nam.clone()).or_insert(0) += 1;
+    }
+    count.into_iter().filter_map(|(name, count)| if count > 1 { Some(name) } else { None }).collect()
+  }
+}
+
+impl RepeatedNames for Variant {
+  fn find_repeated_names(&self) -> IndexSet<Name> {
+    self.fields.find_repeated_names()
   }
 }
