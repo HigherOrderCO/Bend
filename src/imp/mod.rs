@@ -3,9 +3,8 @@ mod order_kwargs;
 pub mod parser;
 pub mod to_fun;
 
-use std::collections::HashSet;
-
 use crate::fun::{CtrField, Name, Num, Op};
+use indexmap::{IndexMap, IndexSet};
 use interner::global::GlobalString;
 
 #[derive(Clone, Debug)]
@@ -240,12 +239,12 @@ impl InPlaceOp {
 }
 
 pub trait RepeatedNames {
-  fn find_repeated_names(&self) -> HashSet<Name>;
+  fn find_repeated_names(&self) -> IndexSet<Name>;
 }
 
 impl RepeatedNames for Vec<CtrField> {
-  fn find_repeated_names(&self) -> HashSet<Name> {
-    let mut count = std::collections::HashMap::new();
+  fn find_repeated_names(&self) -> IndexSet<Name> {
+    let mut count = IndexMap::new();
     for field in self.iter() {
       *count.entry(field.nam.clone()).or_insert(0) += 1;
     }
@@ -254,7 +253,7 @@ impl RepeatedNames for Vec<CtrField> {
 }
 
 impl RepeatedNames for Variant {
-  fn find_repeated_names(&self) -> HashSet<Name> {
+  fn find_repeated_names(&self) -> IndexSet<Name> {
     self.fields.find_repeated_names()
   }
 }
