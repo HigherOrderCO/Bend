@@ -117,35 +117,38 @@ impl ImportsMap {
     }
   }
 
-  fn add_aliased_binds(&mut self, names: &[(Name, Option<Name>)], src: &Name, diag: &mut Diagnostics) {
-    for (sub, alias) in names {
-      self.add_aliased_bind(src, sub, alias.as_ref(), diag);
-    }
-  }
-
   /// Adds all names to the ImportMap in the form `alias/name`.
-  /// If one of the names is equal to the non-aliased name, adds as `alias` instead.
-  fn add_nested_binds(
+  /// If one of the names is equal to the file name, adds as `alias` instead.
+  fn add_file_nested_binds(
     &mut self,
     src: &Name,
-    nam: &Name,
+    file: &Name,
     alias: Option<&Name>,
     names: IndexSet<Name>,
     diag: &mut Diagnostics,
   ) {
-    let aliased = alias.unwrap_or(nam);
+    let aliased = alias.unwrap_or(file);
 
-    for name in &names {
-      if name != nam {
-        let src = format!("{}/{}", src, name);
-        let bind = Name::new(format!("{aliased}/{name}"));
-        self.add_bind(&src, bind, diag);
-      }
-    }
+    self.add_nested_binds(src, aliased, names.iter().filter(|&n| n != file), diag);
 
-    if names.contains(nam) {
-      let src = format!("{}/{}", src, nam);
+    if names.contains(file) {
+      let src = format!("{}/{}", src, file);
       self.add_bind(&src, aliased.clone(), diag);
+    }
+  }
+
+  /// Adds all names to the ImportMap in the form `bind/name`.
+  fn add_nested_binds<'a>(
+    &mut self,
+    src: &Name,
+    bind: &Name,
+    names: impl Iterator<Item = &'a Name>,
+    diag: &mut Diagnostics,
+  ) {
+    for name in names {
+      let src = format!("{}/{}", src, name);
+      let bind = Name::new(format!("{bind}/{name}"));
+      self.add_bind(&src, bind, diag);
     }
   }
 }

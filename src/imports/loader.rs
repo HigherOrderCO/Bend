@@ -94,14 +94,13 @@ impl DefaultLoader {
   ) -> Result<Option<(BoundSource, Sources)>, String> {
     let full_path = base_path.join(path.as_ref());
     let mut src = IndexMap::new();
+    let (mut file, mut dir) = (None, None);
 
-    let file = if full_path.with_extension("bend").is_file() {
-      self.read_file(&full_path, path.as_ref(), &mut src)?
-    } else {
-      None
-    };
+    if full_path.with_extension("bend").is_file() {
+      file = self.read_file(&full_path, path.as_ref(), &mut src)?;
+    }
 
-    let dir = if full_path.is_dir() || path.is_empty() {
+    if full_path.is_dir() || path.is_empty() {
       let mut names = IndexMap::new();
 
       match imp_type {
@@ -131,14 +130,10 @@ impl DefaultLoader {
         }
       }
 
-      if names.is_empty() {
-        None
-      } else {
-        Some(names)
+      if !names.is_empty() {
+        dir = Some(names);
       }
-    } else {
-      None
-    };
+    }
 
     let src = match (file, dir) {
       (Some(f), None) => Some((BoundSource::File(f), src)),

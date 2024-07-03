@@ -119,7 +119,7 @@ impl Packages {
               }
 
               pkgs.insert(name.clone(), src.clone());
-              map.add_aliased_bind(src, name, alias.as_ref(), diag)
+              self.add_aliased_bind(src, name, alias, map, diag);
             }
           }
 
@@ -153,14 +153,14 @@ impl Packages {
           import.src = BoundSource::Dir(std::mem::take(pkgs));
         }
 
-        (BoundSource::File(src), ImportType::Single(nam, alias)) => {
-          if !self.unique_top_level_names(src).contains(nam) {
-            let err = format!("Package '{src}' does not contain the top level name '{nam}'");
+        (BoundSource::File(src), ImportType::Single(name, alias)) => {
+          if !self.unique_top_level_names(src).contains(name) {
+            let err = format!("Package '{src}' does not contain the top level name '{name}'");
             diag.add_book_error(err);
             continue;
           }
 
-          map.add_aliased_bind(src, nam, alias.as_ref(), diag)
+          self.add_aliased_bind(src, name, alias, map, diag);
         }
 
         (BoundSource::File(src), ImportType::List(names)) => {
@@ -179,7 +179,9 @@ impl Packages {
             continue;
           }
 
-          map.add_aliased_binds(names, src, diag);
+          for (name, alias) in names {
+            self.add_aliased_bind(src, name, alias, map, diag);
+          }
         }
 
         (BoundSource::File(src), ImportType::Glob) => {
@@ -206,6 +208,24 @@ impl Packages {
     }
   }
 
+  fn add_aliased_bind(
+    &self,
+    src: &mut Name,
+    name: &Name,
+    alias: &Option<Name>,
+    map: &mut ImportsMap,
+    diag: &mut Diagnostics,
+  ) {
+    let alias = alias.as_ref();
+
+    if let Some(adt) = self.books.get(src).unwrap().borrow().adts.get(name) {
+      let names = adt.ctrs.iter().map(|(n, _)| n);
+      map.add_nested_binds(src, alias.unwrap_or(name), names, diag);
+    }
+
+    map.add_aliased_bind(src, name, alias, diag);
+  }
+
   fn add_file_from_dir(
     &self,
     pkgs: &IndexMap<Name, Name>,
@@ -216,7 +236,7 @@ impl Packages {
   ) -> bool {
     if let Some(src) = pkgs.get(nam) {
       let names = self.unique_top_level_names(src);
-      map.add_nested_binds(src, nam, alias.as_ref(), names, diag);
+      map.add_file_nested_binds(src, nam, alias.as_ref(), names, diag);
       true
     } else {
       false
@@ -226,7 +246,7 @@ impl Packages {
   fn add_glob_from_dir(&self, pkgs: &IndexMap<Name, Name>, map: &mut ImportsMap, diag: &mut Diagnostics) {
     for (nam, src) in pkgs {
       let names = self.unique_top_level_names(src);
-      map.add_nested_binds(src, nam, None, names, diag);
+      map.add_file_nested_binds(src, nam, None, names, diag);
     }
   }
 
