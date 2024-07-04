@@ -383,3 +383,38 @@ Bytes/decode_ascii (List/Nil)       = (String/Nil)
 
 String/encode_ascii (String/Cons x xs) = (List/Cons x (String/encode_ascii xs))
 String/encode_ascii (String/Nil)       = (List/Nil)
+
+# Trigonometry
+
+# The pi number.
+pi = 3.1415926535
+
+# sin(a: f24) -> f24
+# Computes the sine of the given angle in radians.
+hvm sin:
+  ($([<<0x0] a) a)
+
+# cos(a: f24) -> f24
+# Computes the cosine of the given angle in radians.
+cos a = (sin (- (/ pi 2.0) a))
+
+# tan(a: f24) -> f24
+# Computes the tangent of the given angle in radians.
+hvm tan:
+  ($([>>0x0] a) a)
+
+# cot(a: f24) -> f24
+# Computes the cotangent of the given angle in radians.
+cot a = (/ (cos a) (sin a))
+
+# sec(a: f24) -> f24
+# Computes the secant of the given angle in radians.
+sec a = (/ 1.0 (cos a))
+
+# csc(a: f24) -> f24
+# Computes the cosecant of the given angle in radians.
+csc a = (/ 1.0 (sin a))
+
+# radians(a: f24) -> f24
+# Converts degrees to radians.
+radians a = (* a (/ pi 180.0))

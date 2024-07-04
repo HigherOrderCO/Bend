@@ -378,6 +378,7 @@ Returns a list of U24 with each element representing a byte read from the file.
 ```python
 def IO/FS/read_line(file)
 ```
+
 Reads a line from the file with the given `file` descriptor.
 
 Returns a list of U24 with each element representing a byte read from the file.
@@ -385,6 +386,7 @@ Returns a list of U24 with each element representing a byte read from the file.
 ```python
 def IO/FS/read_until_end(file)
 ```
+
 Reads until the end of the file with the given `file` descriptor.
 
 Returns a list of U24 with each element representing a byte read from the file.
@@ -392,6 +394,7 @@ Returns a list of U24 with each element representing a byte read from the file.
 ```python
 def IO/FS/read_file(path)
 ```
+
 Reads an entire file with the given `path` and returns a list of U24 with each element representing a byte read from the file.
 
 #### File write
@@ -516,4 +519,70 @@ Decodes a utf-8 character, returns a tuple containing the rune and the rest of t
 
 ```py
 def Utf8/REPLACEMENT_CHARACTER: u24 = '\u{FFFD}'
+```
+
+## Trigonometry
+
+### pi
+
+Defines the pi constant.
+
+```py
+def pi: f24 = 3.1415926535
+```
+
+### sin
+
+Computes the sine of the given angle in radians.
+
+```py
+def sin(a: f24) -> f24
+```
+
+### cos
+
+Computes the cosine of the given angle in radians.
+
+```py
+def cos(a: f24) -> f24
+```
+
+### tan
+
+Computes the tangent of the given angle in radians.
+
+```py
+def tan(a: f24) -> f24
+```
+
+### cot
+
+Computes the cotangent of the given angle in radians.
+
+```py
+def cot(a: f24) -> f24
+```
+
+### sec
+
+Computes the secant of the given angle in radians.
+
+```py
+def sec(a: f24) -> f24
+```
+
+### csc
+
+Computes the cosecant of the given angle in radians.
+
+```py
+def csc(a: f24) -> f24
+```
+
+### radians
+
+Converts degrees to radians.
+
+```py
+def radians(a: f24) -> f24
 ```
