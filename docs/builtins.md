@@ -579,6 +579,30 @@ Computes the cosecant of the given angle in radians.
 def Math/csc(a: f24) -> f24
 ```
 
+### Math/atan
+
+Computes the arctangent of the given angle.
+
+```py
+def Math/atan(a: f24) -> f24
+```
+
+### Math/asin
+
+Computes the arcsine of the given angle.
+
+```py
+def Math/asin(a: f24) -> f24
+```
+
+### Math/acos
+
+Computes the arccosine of the given angle.
+
+```py
+def Math/acos(a: f24) -> f24
+```
+
 ### Math/radians
 
 Converts degrees to radians.
@@ -609,4 +633,12 @@ Round float down to the nearest integer.
 
 ```py
 def Math/floor(n: f24) -> f24
+```
+
+### Math/round
+
+Round float to the nearest integer.
+
+```py
+def Math/round(n: f24) -> f24
 ```
