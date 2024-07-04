@@ -166,10 +166,12 @@ impl Term {
     let with_bnd = std::mem::take(with_bnd);
     let with_arg = std::mem::take(with_arg);
 
+    // Replaces `self` by its irrefutable arm
+    *self = std::mem::take(&mut arms[0].2);
+
     // `with` clause desugaring
     // Performs the same as `Term::linearize_match_with`.
     // Note that it only wraps the arm with function calls if `with_bnd` and `with_arg` aren't empty.
-    *self = std::mem::take(&mut arms[0].2);
     *self = Term::rfold_lams(std::mem::take(self), with_bnd.into_iter());
     *self = Term::call(std::mem::take(self), with_arg);
 
