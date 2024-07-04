@@ -221,7 +221,7 @@ fn readback_hvm() {
 #[test]
 fn simplify_matches() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let diagnostics_cfg = DiagnosticsConfig { 
+    let diagnostics_cfg = DiagnosticsConfig {
       irrefutable_match: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
     };

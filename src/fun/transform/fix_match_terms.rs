@@ -177,13 +177,11 @@ impl Term {
       *self = Term::Use {
         nam: Some(bnd.clone()),
         val: arg,
-        nxt: Box::new(
-          Term::Use {
-            nam: Some(var),
-            val: Box::new(Term::Var { nam: bnd }),
-            nxt: Box::new(std::mem::take(self)),
-          }
-        )
+        nxt: Box::new(Term::Use {
+          nam: Some(var),
+          val: Box::new(Term::Var { nam: bnd }),
+          nxt: Box::new(std::mem::take(self)),
+        }),
       }
     }
   }
