@@ -113,11 +113,9 @@ from utils/math import (add as addFunc, subtract as subFunc)
 import (utils/math/add as addFunc, utils/math/subtract as subFunc)
 ```
 
-This will bind `calc`, `add` and `subtract` as `calcFunc`, `addFunc` and `subFunc` from their respective files. 
+This will bind `calc`, `add` and `subtract` as `calcFunc`, `addFunc` and `subFunc` from their respective files.
 
-## Files and directories with the same name
-
-### Project Structure
+## Project Structure
 Let's assume we have a bend project with the following structure:
 
 ```
@@ -131,7 +129,34 @@ my_project/
 │       │   └── def concat
 │       └── append.bend
 │           └── def append
+│           └── def helper
 ```
+
+## Importing data types
+
+You can import a data type and its constructors by only importing its name.
+
+### Example:
+```py
+from types/List import List
+# behaves the same as 
+from types/List import (List, List/Nil, List/Cons)
+```
+
+Importing only `List` from `List.bend` will import the type `List` and bind its constructors name `List/Nil` and `List/Cons`. 
+
+## Importing files with a top level name equal to its name
+
+When a file and a top-level name in it share a name, for example, `List.bend`, `concat.bend` and `append.bend`, the bind of that import is simplified to the file name.
+
+### Example:
+```py
+from types/List import append
+```
+
+This will bind `append` and `append/helper` from `append.bend`.
+
+## Files and directories with the same name
 
 When files and directories share a name, both share the import namespace:
 
@@ -139,12 +164,18 @@ When files and directories share a name, both share the import namespace:
 from types/List import (List, concat)
 ```
 
-This will attempt to import from both the `List.bend` file and from the `List` folder, resulting in the binds `List/Nil`, `List/Cons` and `concat`.
+This will attempt to import from both the `List.bend` file and the `List` folder, resulting in the binds `List/Nil`, `List/Cons` and `concat`.
 
 ```py
 from types/List import *
 ```
 
-This will import all the names from `List.bend`, then all the files inside the `List` folder, resulting in the binds `List/Nil`, `List/Cons`, `concat` and `append`.
+This will import all the names from `List.bend`, then all the files inside the `List` folder, resulting in the binds `List/Nil`, `List/Cons`, `concat`, `append` and `append/helper`.
 
-In both cases, if a name is both present as a top-level name on the file, and as a `.bend` file name inside the folder, it will result in an error.
+In both cases, if a name is present as a top-level name on the file, and as a `.bend` file name inside the folder, it will result in an error.
+
+If you only want to import `List.bend` and not search the files in its folder, you can use the `import path` syntax:
+
+```py
+import types/list
+```
