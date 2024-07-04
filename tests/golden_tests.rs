@@ -221,7 +221,10 @@ fn readback_hvm() {
 #[test]
 fn simplify_matches() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
+    let diagnostics_cfg = DiagnosticsConfig { 
+      irrefutable_match: Severity::Allow,
+      ..DiagnosticsConfig::new(Severity::Error, true)
+    };
     let mut book = do_parse_book(code, path, Book::builtins())?;
     let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
 

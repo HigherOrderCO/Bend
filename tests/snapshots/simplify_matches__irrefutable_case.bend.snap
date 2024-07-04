@@ -1,0 +1,17 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/simplify_matches/redundant_cases.bend
+---
+(l) = 1001
+
+(v1) = l
+
+(v2) = l
+
+(v3) = 2002
+
+(v4) = 3003
+
+(v5) = (λa a 5005)
+
+(main) = (v1, v2, v3, v4, v5)

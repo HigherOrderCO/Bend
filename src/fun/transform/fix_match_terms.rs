@@ -126,8 +126,8 @@ impl Term {
   }
 
   fn fix_match(&mut self, errs: &mut Vec<FixMatchErr>, ctrs: &Constructors, adts: &Adts) {
-    let (Term::Mat { arg: _, bnd, with_bnd: _, with_arg: _, arms }
-    | Term::Fold { bnd, arg: _, with_bnd: _, with_arg: _, arms }) = self
+    let (Term::Mat { bnd, arg, with_bnd, with_arg, arms }
+    | Term::Fold { bnd, arg, with_bnd, with_arg, arms }) = self
     else {
       unreachable!()
     };
@@ -162,13 +162,29 @@ impl Term {
     // First arm was not matching a constructor, irrefutable match, convert into a use term.
     errs.push(FixMatchErr::IrrefutableMatch { var: arms[0].0.clone() });
     let match_var = arms[0].0.take();
+    let arg = std::mem::take(arg);
+    let with_bnd = std::mem::take(with_bnd);
+    let with_arg = std::mem::take(with_arg);
+
+    // `with` clause desugaring
+    // Performs the same as `Term::linearize_match_with`.
+    // Note that it only wraps the arm with function calls if `with_bnd` and `with_arg` aren't empty.
     *self = std::mem::take(&mut arms[0].2);
+    *self = Term::rfold_lams(std::mem::take(self), with_bnd.into_iter());
+    *self = Term::call(std::mem::take(self), with_arg);
+
     if let Some(var) = match_var {
       *self = Term::Use {
-        nam: Some(var),
-        val: Box::new(Term::Var { nam: bnd }),
-        nxt: Box::new(std::mem::take(self)),
-      };
+        nam: Some(bnd.clone()),
+        val: arg,
+        nxt: Box::new(
+          Term::Use {
+            nam: Some(var),
+            val: Box::new(Term::Var { nam: bnd }),
+            nxt: Box::new(std::mem::take(self)),
+          }
+        )
+      }
     }
   }
 }
