@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/math.bend
+---
+NumScott:
+[0.500, 0.866, 0.577, 1.732, 1.155, 2.000, 1.176, 3.000, 10.000, 9.000]
+
+Scott:
+[0.500, 0.866, 0.577, 1.732, 1.155, 2.000, 1.176, 3.000, 10.000, 9.000]
