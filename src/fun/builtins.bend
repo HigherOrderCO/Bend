@@ -384,37 +384,62 @@ Bytes/decode_ascii (List/Nil)       = (String/Nil)
 String/encode_ascii (String/Cons x xs) = (List/Cons x (String/encode_ascii xs))
 String/encode_ascii (String/Nil)       = (List/Nil)
 
-# Trigonometry
+# Math
 
-# The pi number.
-pi = 3.1415926535
+# The Pi constant.
+Math/PI = 3.1415926535
 
-# sin(a: f24) -> f24
+# The Euler's number.
+Math/E = 2.717281728
+
+# Math/sin(a: f24) -> f24
 # Computes the sine of the given angle in radians.
-hvm sin:
+hvm Math/sin:
   ($([<<0x0] a) a)
 
-# cos(a: f24) -> f24
+# Math/cos(a: f24) -> f24
 # Computes the cosine of the given angle in radians.
-cos a = (sin (- (/ pi 2.0) a))
+Math/cos a = (Math/sin (- (/ Math/PI 2.0) a))
 
-# tan(a: f24) -> f24
+# Math/tan(a: f24) -> f24
 # Computes the tangent of the given angle in radians.
-hvm tan:
+hvm Math/tan:
   ($([>>0x0] a) a)
 
-# cot(a: f24) -> f24
+# Math/cot(a: f24) -> f24
 # Computes the cotangent of the given angle in radians.
-cot a = (/ (cos a) (sin a))
+Math/cot a = (/ (Math/cos a) (Math/sin a))
 
-# sec(a: f24) -> f24
+# Math/sec(a: f24) -> f24
 # Computes the secant of the given angle in radians.
-sec a = (/ 1.0 (cos a))
+Math/sec a = (/ 1.0 (Math/cos a))
 
-# csc(a: f24) -> f24
+# Math/csc(a: f24) -> f24
 # Computes the cosecant of the given angle in radians.
-csc a = (/ 1.0 (sin a))
+Math/csc a = (/ 1.0 (Math/sin a))
 
-# radians(a: f24) -> f24
+# Math/radians(a: f24) -> f24
 # Converts degrees to radians.
-radians a = (* a (/ pi 180.0))
+Math/radians a = (* a (/ Math/PI 180.0))
+
+# Math/sqrt(x: f24) -> f24
+# Computes the square root  of the given number.
+Math/sqrt n = (** n 0.5)
+
+# Math/ceil(n: f24) -> f24
+# Round float up to the nearest integer.
+def Math/ceil(n):
+  i_n = to_f24(to_i24(n))
+  if n == i_n:
+    return i_n
+  else:
+    return i_n + 1.0
+
+# Math/floor(n: f24) -> f24
+# Round float down to the nearest integer.
+def Math/floor(n):
+  i_n = to_f24(to_i24(n))
+  if n < i_n:
+    return i_n - 1.0
+  else:
+    return i_n

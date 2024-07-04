@@ -521,68 +521,92 @@ Decodes a utf-8 character, returns a tuple containing the rune and the rest of t
 def Utf8/REPLACEMENT_CHARACTER: u24 = '\u{FFFD}'
 ```
 
-## Trigonometry
+## Math
 
-### pi
+### Math/PI
 
-Defines the pi constant.
+Defines the Pi constant.
 
 ```py
-def pi: f24 = 3.1415926535
+def Math/PI: f24 = 3.1415926535
 ```
 
-### sin
+### Math/sin
 
 Computes the sine of the given angle in radians.
 
 ```py
-def sin(a: f24) -> f24
+def Math/sin(a: f24) -> f24
 ```
 
-### cos
+### Math/cos
 
 Computes the cosine of the given angle in radians.
 
 ```py
-def cos(a: f24) -> f24
+def Math/cos(a: f24) -> f24
 ```
 
-### tan
+### Math/tan
 
 Computes the tangent of the given angle in radians.
 
 ```py
-def tan(a: f24) -> f24
+def Math/tan(a: f24) -> f24
 ```
 
-### cot
+### Math/cot
 
 Computes the cotangent of the given angle in radians.
 
 ```py
-def cot(a: f24) -> f24
+def Math/cot(a: f24) -> f24
 ```
 
-### sec
+### Math/sec
 
 Computes the secant of the given angle in radians.
 
 ```py
-def sec(a: f24) -> f24
+def Math/sec(a: f24) -> f24
 ```
 
-### csc
+### Math/csc
 
 Computes the cosecant of the given angle in radians.
 
 ```py
-def csc(a: f24) -> f24
+def Math/csc(a: f24) -> f24
 ```
 
-### radians
+### Math/radians
 
 Converts degrees to radians.
 
 ```py
-def radians(a: f24) -> f24
+def Math/radians(a: f24) -> f24
+```
+
+### Math/sqrt
+
+Computes the square root of the given number.
+
+```py
+def Math/sqrt(n: f24) -> f24
+```
+
+### Math/ceil
+
+Round float up to the nearest integer.
+
+```py
+def Math/ceil(n: f24) -> f24
+```
+
+### Math/floor
+
+Round float down to the nearest integer.
+
+```py
+def Math/floor(n: f24) -> f24
 ```
