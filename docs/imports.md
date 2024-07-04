@@ -177,5 +177,5 @@ In both cases, if a name is present as a top-level name on the file, and as a `.
 If you only want to import `List.bend` and not search the files in its folder, you can use the `import path` syntax:
 
 ```py
-import types/list
+import types/List
 ```
