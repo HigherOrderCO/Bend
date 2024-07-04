@@ -389,9 +389,6 @@ String/encode_ascii (String/Nil)       = (List/Nil)
 # The Pi constant.
 Math/PI = 3.1415926535
 
-# The Euler's number.
-Math/E = 2.717281728
-
 # Math/sin(a: f24) -> f24
 # Computes the sine of the given angle in radians.
 hvm Math/sin:
