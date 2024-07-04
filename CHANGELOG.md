@@ -36,6 +36,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add local definitions to imperative syntax. ([#562][gh-562])
 - Add local definitions to functional syntax.
 - Add repeated field name error message.
+- Add primitive file IO function `IO/FS/flush`. ([#598][gh-598])
 
 ## [0.2.35] - 2024-06-06
 
@@ -369,3 +370,4 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-583]: https://github.com/HigherOrderCO/Bend/issues/583
 [gh-586]: https://github.com/HigherOrderCO/Bend/issues/586
 [gh-596]: https://github.com/HigherOrderCO/Bend/issues/596
+[gh-598]: https://github.com/HigherOrderCO/Bend/issues/598
