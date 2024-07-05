@@ -284,7 +284,7 @@ impl<'a> TermParser<'a> {
     // from path import package
     // from path import (a, b)
     // from path import *
-    let path = self.parse_restricted_name("Path")?;
+    let path = self.parse_restricted_name("Path", true)?;
     self.consume("import")?;
 
     let relative = path.starts_with("./") | path.starts_with("../");
@@ -294,11 +294,11 @@ impl<'a> TermParser<'a> {
     }
 
     if self.try_consume("(") {
-      let sub = self.list_like(|p| p.parse_name_maybe_alias("Name"), "", ")", ",", false, 1)?;
+      let sub = self.list_like(|p| p.parse_name_maybe_alias("Name", false), "", ")", ",", false, 1)?;
       return Ok(Import::new(path, ImportType::List(sub), relative));
     }
 
-    let (import, alias) = self.parse_name_maybe_alias("Import")?;
+    let (import, alias) = self.parse_name_maybe_alias("Import", false)?;
     Ok(Import::new(path, ImportType::Single(import, alias), relative))
   }
 
@@ -316,12 +316,12 @@ impl<'a> TermParser<'a> {
     };
 
     if self.try_consume("(") {
-      let list = self.list_like(|p| p.parse_import_name("Name"), "", ")", ",", false, 1)?;
+      let list = self.list_like(|p| p.parse_import_path(), "", ")", ",", false, 1)?;
       let imports = list.into_iter().map(|(a, b, c)| new_import(a, b, c)).collect_vec();
       return Ok(imports);
     }
 
-    let (import, alias, relative) = self.parse_import_name("Import")?;
+    let (import, alias, relative) = self.parse_import_path()?;
     let import = new_import(import, alias, relative);
     Ok(vec![import])
   }
@@ -1150,9 +1150,9 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
   }
 
-  fn parse_restricted_name(&mut self, kind: &str) -> ParseResult<Name> {
+  fn parse_restricted_name(&mut self, kind: &str, import: bool) -> ParseResult<Name> {
     let ini_idx = *self.index();
-    let name = self.take_while(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/');
+    let name = self.take_while(|c| c.is_ascii_alphanumeric() || "_.-/".contains(c) || import && c == '@');
     if name.is_empty() {
       self.expected("name")?
     }
@@ -1170,27 +1170,27 @@ pub trait ParserCommons<'a>: Parser<'a> {
   }
 
   fn parse_top_level_name(&mut self) -> ParseResult<Name> {
-    self.parse_restricted_name("Top-level")
+    self.parse_restricted_name("Top-level", false)
   }
 
   fn parse_bend_name(&mut self) -> ParseResult<Name> {
-    self.parse_restricted_name("Variable")
+    self.parse_restricted_name("Variable", false)
   }
 
-  fn parse_name_maybe_alias(&mut self, label: &str) -> ParseResult<(Name, Option<Name>)> {
-    let name = self.parse_restricted_name(label)?;
+  fn parse_name_maybe_alias(&mut self, label: &str, import: bool) -> ParseResult<(Name, Option<Name>)> {
+    let name = self.parse_restricted_name(label, import)?;
 
     if self.try_consume("as") {
       self.skip_trivia();
-      let alias = self.parse_restricted_name("Alias")?;
+      let alias = self.parse_restricted_name("Alias", false)?;
       Ok((name, Some(alias)))
     } else {
       Ok((name, None))
     }
   }
 
-  fn parse_import_name(&mut self, label: &str) -> Result<(Name, Option<Name>, bool), String> {
-    let (import, alias) = self.parse_name_maybe_alias(label)?;
+  fn parse_import_path(&mut self) -> Result<(Name, Option<Name>, bool), String> {
+    let (import, alias) = self.parse_name_maybe_alias("Import Path", true)?;
     let relative = import.starts_with("./") | import.starts_with("../");
     Ok((import, alias, relative))
   }

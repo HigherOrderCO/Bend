@@ -7,10 +7,13 @@ use bend::{
   load_file_to_book, run_book, AdtEncoding, CompileOpts, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
+use manager::load_cmd;
 use std::{
   path::{Path, PathBuf},
   process::ExitCode,
 };
+
+mod manager;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -78,6 +81,11 @@ enum Mode {
 
     #[arg(help = "Path to the input file")]
     path: PathBuf,
+  },
+  /// Runs a package manager command
+  Manager {
+    #[command(subcommand)]
+    command: manager::PackageCmd,
   },
 }
 
@@ -253,7 +261,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
   let entrypoint = cli.entrypoint.take();
 
   let load_book = |path: &Path, diag: DiagnosticsConfig| -> Result<Book, Diagnostics> {
-    let package_loader = DefaultLoader::new(path);
+    let package_loader = DefaultLoader::new(path, load_cmd);
     let mut book = load_file_to_book(path, package_loader, diag)?;
     book.entrypoint = entrypoint.map(Name::new);
 
@@ -383,6 +391,8 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
         println!("{book}");
       }
     }
+
+    Mode::Manager { command } => manager::handle_package_cmd(command)?,
   };
   Ok(())
 }

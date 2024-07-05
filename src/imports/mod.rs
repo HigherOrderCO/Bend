@@ -1,6 +1,6 @@
 use crate::{
-  diagnostics::{Diagnostics, WarningType},
-  fun::Name,
+  diagnostics::{Diagnostics, DiagnosticsConfig, Severity, WarningType},
+  fun::{Book, Name},
 };
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
@@ -60,6 +60,12 @@ impl Import {
   }
 }
 
+impl Display for Import {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "from {} import {}", self.path, self.imp_type)
+  }
+}
+
 #[derive(Debug, Clone)]
 pub enum ImportType {
   Single(Name, Option<Name>),
@@ -69,9 +75,14 @@ pub enum ImportType {
 
 impl Display for ImportType {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    let format_alias = |name: &Name, alias: &Option<Name>| match alias {
+      Some(alias) => format!("{name} as {alias}"),
+      None => name.to_string(),
+    };
+
     match self {
-      ImportType::Single(n, _) => write!(f, "{n}"),
-      ImportType::List(l) => write!(f, "({})", l.iter().map(|(n, _)| n).join(", ")),
+      ImportType::Single(n, a) => write!(f, "{}", format_alias(n, a)),
+      ImportType::List(l) => write!(f, "({})", l.iter().map(|(n, a)| format_alias(n, a)).join(", ")),
       ImportType::Glob => write!(f, "*"),
     }
   }
@@ -151,4 +162,16 @@ impl ImportsMap {
       self.add_bind(&src, bind, diag);
     }
   }
+}
+
+#[allow(clippy::field_reassign_with_default)]
+/// Check book without warnings about unused definitions
+pub fn check_book(book: &mut Book) -> Result<Diagnostics, Diagnostics> {
+  let mut diagnostics_cfg = DiagnosticsConfig::default();
+  diagnostics_cfg.unused_definition = Severity::Allow;
+  diagnostics_cfg.missing_main = Severity::Allow;
+
+  let compile_opts = crate::CompileOpts::default();
+
+  crate::check_book(book, diagnostics_cfg, compile_opts)
 }

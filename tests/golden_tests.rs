@@ -199,7 +199,9 @@ fn import_system() {
         ..DiagnosticsConfig::new(Severity::Error, true)
       };
 
-      let book = load_to_book(path, code, DefaultLoader::new(path), diagnostics_cfg)?;
+      let package_loader =
+        DefaultLoader::new(path, |_| Err("Only local dependencies are allowed on tests".to_owned()));
+      let book = load_to_book(path, code, package_loader, diagnostics_cfg)?;
       let run_opts = RunOpts::default();
 
       let mut res = String::new();
