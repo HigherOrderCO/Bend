@@ -83,7 +83,7 @@ pub fn check_uses<'a>(
           push_scope(bind.as_ref(), scope);
         }
         check_uses(child, scope, globals, errs);
-        for bind in binds.rev() {
+        for bind in binds {
           pop_scope(bind.as_ref(), scope);
         }
       }

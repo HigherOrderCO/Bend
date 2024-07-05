@@ -384,3 +384,83 @@ Bytes/decode_ascii (List/Nil)       = (String/Nil)
 
 String/encode_ascii (String/Cons x xs) = (List/Cons x (String/encode_ascii xs))
 String/encode_ascii (String/Nil)       = (List/Nil)
+
+# Math
+
+# The Pi constant.
+Math/PI = 3.1415926535
+
+# Math/sin(a: f24) -> f24
+# Computes the sine of the given angle in radians.
+hvm Math/sin:
+  ($([<<0x0] a) a)
+
+# Math/cos(a: f24) -> f24
+# Computes the cosine of the given angle in radians.
+hvm Math/cos:
+  (a b)
+  & @Math/PI ~ $([:/2.0] $([-] $(a $([<<0x0] b))))
+
+# Math/tan(a: f24) -> f24
+# Computes the tangent of the given angle in radians.
+hvm Math/tan:
+  ($([>>0x0] a) a)
+
+# Math/cot(a: f24) -> f24
+# Computes the cotangent of the given angle in radians.
+Math/cot a = (/ 1.0 (Math/tan a))
+
+# Math/sec(a: f24) -> f24
+# Computes the secant of the given angle in radians.
+Math/sec a = (/ 1.0 (Math/cos a))
+
+# Math/csc(a: f24) -> f24
+# Computes the cosecant of the given angle in radians.
+Math/csc a = (/ 1.0 (Math/sin a))
+
+# Math/atan(a: f24) -> f24
+# Computes the arctangent of the given angle.
+Math/atan a = (atan2 a 1.0)
+
+# Math/asin(a: f24) -> f24
+# Computes the arcsine of the given angle.
+Math/asin a = (atan2 a (Math/sqrt (- 1.0 (* a a))))
+
+# Math/acos(a: f24) -> f24
+# Computes the arccosine of the given angle.
+Math/acos a = (atan2 (Math/sqrt (- 1.0 (* a a))) a)
+
+# Math/radians(a: f24) -> f24
+# Converts degrees to radians.
+Math/radians a = (* a (/ Math/PI 180.0))
+
+# Math/sqrt(x: f24) -> f24
+# Computes the square root  of the given number.
+Math/sqrt n = (** n 0.5)
+
+# Math/ceil(n: f24) -> f24
+# Round float up to the nearest integer.
+def Math/ceil(n):
+  i_n = to_f24(to_i24(n))
+  if n <= i_n:
+    return i_n
+  else:
+    return i_n + 1.0
+
+# Math/floor(n: f24) -> f24
+# Round float down to the nearest integer.
+def Math/floor(n):
+  i_n = to_f24(to_i24(n))
+  if n < i_n:
+    return i_n - 1.0
+  else:
+    return i_n
+
+# Math/round(n: f24) -> f24
+# Round float to the nearest integer.
+def Math/round(n):
+  i_n = to_f24(to_i24(n))
+  if n - i_n < 0.5:
+    return Math/floor(n)
+  else:
+    return Math/ceil(n)

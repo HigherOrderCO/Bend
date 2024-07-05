@@ -1,8 +1,9 @@
 use crate::{
   diagnostics::Diagnostics,
-  fun::{Ctx, Definition, Name, Rule, Term},
+  fun::{Ctx, Definition, Name, Rule, Source, Term},
   maybe_grow,
 };
+use indexmap::IndexMap;
 
 pub const RECURSIVE_KW: &str = "fork";
 const NEW_FN_SEP: &str = "__bend";
@@ -10,20 +11,18 @@ const NEW_FN_SEP: &str = "__bend";
 impl Ctx<'_> {
   pub fn desugar_bend(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
-    let mut new_defs = vec![];
+    let mut new_defs = IndexMap::new();
     for def in self.book.defs.values_mut() {
       let mut fresh = 0;
       for rule in def.rules.iter_mut() {
-        if let Err(err) = rule.body.desugar_bend(&def.name, &mut fresh, &mut new_defs, def.builtin) {
+        if let Err(err) = rule.body.desugar_bend(&def.name, &mut fresh, &mut new_defs, &def.source) {
           self.info.add_rule_error(err, def.name.clone());
           break;
         }
       }
     }
 
-    for def in new_defs {
-      self.book.defs.insert(def.name.clone(), def);
-    }
+    self.book.defs.extend(new_defs);
 
     self.info.fatal(())
   }
@@ -34,13 +33,13 @@ impl Term {
     &mut self,
     def_name: &Name,
     fresh: &mut usize,
-    new_defs: &mut Vec<Definition>,
-    builtin: bool,
+    new_defs: &mut IndexMap<Name, Definition>,
+    source: &Source,
   ) -> Result<(), String> {
     maybe_grow(|| {
       // Recursively encode bends in the children
       for child in self.children_mut() {
-        child.desugar_bend(def_name, fresh, new_defs, builtin)?;
+        child.desugar_bend(def_name, fresh, new_defs, source)?;
       }
 
       // Convert a bend into a new recursive function and call it.
@@ -57,11 +56,11 @@ impl Term {
         // Gather the free variables
         // They will be implicitly captured by the new function
         let mut free_vars = step.free_vars();
-        free_vars.remove(&Name::new(RECURSIVE_KW));
+        free_vars.shift_remove(&Name::new(RECURSIVE_KW));
         free_vars.extend(base.free_vars());
         free_vars.extend(cond.free_vars());
         for bnd in bnd.iter().flatten() {
-          free_vars.remove(bnd);
+          free_vars.shift_remove(bnd);
         }
         let free_vars = free_vars.into_keys().collect::<Vec<_>>();
 
@@ -88,8 +87,8 @@ impl Term {
         let body = Term::rfold_lams(body, free_vars.iter().cloned().map(Some));
 
         // Make a definition from the new function
-        let def = Definition { name: new_nam.clone(), rules: vec![Rule { pats: vec![], body }], builtin };
-        new_defs.push(def);
+        let def = Definition::new(new_nam.clone(), vec![Rule { pats: vec![], body }], source.clone());
+        new_defs.insert(new_nam.clone(), def);
 
         // Call the new function in the original term.
         let call =
