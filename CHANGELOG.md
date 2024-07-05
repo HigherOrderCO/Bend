@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project does not currently adhere to a particular versioning scheme.
 
+## [Unreleased]
+
+### Fixed
+
+- Fix variable binding in pattern matching when the irrefutable pattern optimization occurs. ([#618][gh-618])
+
 ## [0.2.36] - 2024-07-04
 
 ### Changed
@@ -336,6 +342,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [0.2.34]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.34
 [0.2.35]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.35
 [0.2.36]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.36
+[Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
 [gh-424]: https://github.com/HigherOrderCO/Bend/issues/424
 [gh-427]: https://github.com/HigherOrderCO/Bend/issues/427
 [gh-443]: https://github.com/HigherOrderCO/Bend/issues/443
@@ -371,3 +378,4 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-583]: https://github.com/HigherOrderCO/Bend/issues/583
 [gh-586]: https://github.com/HigherOrderCO/Bend/issues/586
 [gh-596]: https://github.com/HigherOrderCO/Bend/issues/596
+[gh-618]: https://github.com/HigherOrderCO/Bend/issues/618
