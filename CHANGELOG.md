@@ -48,6 +48,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add local definitions to functional syntax.
 - Add repeated field name error message.
 - Add `Math` builtin functions. ([#570][gh-570])
+- Add primitive file IO function `IO/FS/flush`. ([#598][gh-598])
 
 ## [0.2.35] - 2024-06-06
 
@@ -387,3 +388,4 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-514]: https://github.com/HigherOrderCO/Bend/issues/514
 [gh-544]: https://github.com/HigherOrderCO/Bend/pull/544
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
+[gh-598]: https://github.com/HigherOrderCO/Bend/issues/598

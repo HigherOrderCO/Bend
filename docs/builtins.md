@@ -429,6 +429,16 @@ Moves the current position of the file with the given `file` descriptor to the g
 
 Returns nothing (`*`).
 
+#### File flush
+
+```python
+def IO/FS/flush(file)
+```
+
+Flushes the file with the given `file` descriptor.
+
+Returns nothing (`*`).
+
 ## Numeric operations
 
 ### log

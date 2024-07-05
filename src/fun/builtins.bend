@@ -128,6 +128,7 @@ IO/FS/close file = (IO/Call IO/MAGIC "CLOSE" file @x (IO/Done IO/MAGIC x))
 IO/FS/read file num_bytes = (IO/Call IO/MAGIC "READ" (file, num_bytes) @x (IO/Done IO/MAGIC x))
 IO/FS/write file bytes = (IO/Call IO/MAGIC "WRITE" (file, bytes) @x (IO/Done IO/MAGIC x))
 IO/FS/seek file offset mode = (IO/Call IO/MAGIC "SEEK" (file, (offset, mode)) @x (IO/Done IO/MAGIC x))
+IO/FS/flush file = (IO/Call IO/MAGIC "FLUSH" file @x (IO/Done IO/MAGIC x))
 
 ### Always available files
 IO/FS/STDIN = 0
