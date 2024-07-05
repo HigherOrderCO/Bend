@@ -36,6 +36,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add local definitions to imperative syntax. ([#562][gh-562])
 - Add local definitions to functional syntax.
 - Add repeated field name error message.
+- Add `Math` builtin functions. ([#570][gh-570])
 
 ## [0.2.35] - 2024-06-06
 
@@ -360,11 +361,12 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
 [gh-562]: https://github.com/HigherOrderCO/Bend/issues/562
-[gh-581]: https://github.com/HigherOrderCO/Bend/issues/581
+[gh-570]: https://github.com/HigherOrderCO/Bend/issues/570
 [gh-573]: https://github.com/HigherOrderCO/Bend/issues/573
 [gh-578]: https://github.com/HigherOrderCO/Bend/issues/578
 [gh-579]: https://github.com/HigherOrderCO/Bend/issues/579
 [gh-580]: https://github.com/HigherOrderCO/Bend/issues/580
+[gh-581]: https://github.com/HigherOrderCO/Bend/issues/581
 [gh-582]: https://github.com/HigherOrderCO/Bend/issues/582
 [gh-583]: https://github.com/HigherOrderCO/Bend/issues/583
 [gh-586]: https://github.com/HigherOrderCO/Bend/issues/586
