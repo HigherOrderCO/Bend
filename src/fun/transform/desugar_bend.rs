@@ -3,6 +3,7 @@ use crate::{
   fun::{Ctx, Definition, Name, Rule, Term},
   maybe_grow,
 };
+use indexmap::IndexMap;
 
 pub const RECURSIVE_KW: &str = "fork";
 const NEW_FN_SEP: &str = "__bend";
@@ -10,7 +11,7 @@ const NEW_FN_SEP: &str = "__bend";
 impl Ctx<'_> {
   pub fn desugar_bend(&mut self) -> Result<(), Diagnostics> {
     self.info.start_pass();
-    let mut new_defs = vec![];
+    let mut new_defs = IndexMap::new();
     for def in self.book.defs.values_mut() {
       let mut fresh = 0;
       for rule in def.rules.iter_mut() {
@@ -21,9 +22,7 @@ impl Ctx<'_> {
       }
     }
 
-    for def in new_defs {
-      self.book.defs.insert(def.name.clone(), def);
-    }
+    self.book.defs.extend(new_defs);
 
     self.info.fatal(())
   }
@@ -34,7 +33,7 @@ impl Term {
     &mut self,
     def_name: &Name,
     fresh: &mut usize,
-    new_defs: &mut Vec<Definition>,
+    new_defs: &mut IndexMap<Name, Definition>,
     builtin: bool,
   ) -> Result<(), String> {
     maybe_grow(|| {
@@ -89,7 +88,7 @@ impl Term {
 
         // Make a definition from the new function
         let def = Definition { name: new_nam.clone(), rules: vec![Rule { pats: vec![], body }], builtin };
-        new_defs.push(def);
+        new_defs.insert(new_nam.clone(), def);
 
         // Call the new function in the original term.
         let call =

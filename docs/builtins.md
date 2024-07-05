@@ -378,6 +378,7 @@ Returns a list of U24 with each element representing a byte read from the file.
 ```python
 def IO/FS/read_line(file)
 ```
+
 Reads a line from the file with the given `file` descriptor.
 
 Returns a list of U24 with each element representing a byte read from the file.
@@ -385,6 +386,7 @@ Returns a list of U24 with each element representing a byte read from the file.
 ```python
 def IO/FS/read_until_end(file)
 ```
+
 Reads until the end of the file with the given `file` descriptor.
 
 Returns a list of U24 with each element representing a byte read from the file.
@@ -392,6 +394,7 @@ Returns a list of U24 with each element representing a byte read from the file.
 ```python
 def IO/FS/read_file(path)
 ```
+
 Reads an entire file with the given `path` and returns a list of U24 with each element representing a byte read from the file.
 
 #### File write
@@ -516,4 +519,126 @@ Decodes a utf-8 character, returns a tuple containing the rune and the rest of t
 
 ```py
 def Utf8/REPLACEMENT_CHARACTER: u24 = '\u{FFFD}'
+```
+
+## Math
+
+### Math/PI
+
+Defines the Pi constant.
+
+```py
+def Math/PI: f24 = 3.1415926535
+```
+
+### Math/sin
+
+Computes the sine of the given angle in radians.
+
+```py
+def Math/sin(a: f24) -> f24
+```
+
+### Math/cos
+
+Computes the cosine of the given angle in radians.
+
+```py
+def Math/cos(a: f24) -> f24
+```
+
+### Math/tan
+
+Computes the tangent of the given angle in radians.
+
+```py
+def Math/tan(a: f24) -> f24
+```
+
+### Math/cot
+
+Computes the cotangent of the given angle in radians.
+
+```py
+def Math/cot(a: f24) -> f24
+```
+
+### Math/sec
+
+Computes the secant of the given angle in radians.
+
+```py
+def Math/sec(a: f24) -> f24
+```
+
+### Math/csc
+
+Computes the cosecant of the given angle in radians.
+
+```py
+def Math/csc(a: f24) -> f24
+```
+
+### Math/atan
+
+Computes the arctangent of the given angle.
+
+```py
+def Math/atan(a: f24) -> f24
+```
+
+### Math/asin
+
+Computes the arcsine of the given angle.
+
+```py
+def Math/asin(a: f24) -> f24
+```
+
+### Math/acos
+
+Computes the arccosine of the given angle.
+
+```py
+def Math/acos(a: f24) -> f24
+```
+
+### Math/radians
+
+Converts degrees to radians.
+
+```py
+def Math/radians(a: f24) -> f24
+```
+
+### Math/sqrt
+
+Computes the square root of the given number.
+
+```py
+def Math/sqrt(n: f24) -> f24
+```
+
+### Math/ceil
+
+Round float up to the nearest integer.
+
+```py
+def Math/ceil(n: f24) -> f24
+```
+
+### Math/floor
+
+Round float down to the nearest integer.
+
+```py
+def Math/floor(n: f24) -> f24
+```
+
+### Math/round
+
+Round float to the nearest integer.
+
+```py
+def Math/round(n: f24) -> f24
 ```
