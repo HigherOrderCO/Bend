@@ -3,7 +3,7 @@ mod order_kwargs;
 pub mod parser;
 pub mod to_fun;
 
-use crate::fun::{CtrField, Name, Num, Op};
+use crate::fun::{CtrField, Name, Num, Op, Source};
 use indexmap::{IndexMap, IndexSet};
 use interner::global::GlobalString;
 
@@ -214,6 +214,7 @@ pub struct Definition {
   pub name: Name,
   pub params: Vec<Name>,
   pub body: Stmt,
+  pub source: Source,
 }
 
 // "type" {name} ":" {variant}*

@@ -41,7 +41,7 @@ impl Term {
 
         apply_closure(&mut rules, &fvs);
 
-        let new_def = Definition { name: local_name.clone(), rules, builtin: false };
+        let new_def = Definition::new_gen(local_name.clone(), rules, false);
         defs.insert(local_name.clone(), new_def);
       }
       _ => {

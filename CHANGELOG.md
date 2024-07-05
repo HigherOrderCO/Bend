@@ -10,6 +10,11 @@ and this project does not currently adhere to a particular versioning scheme.
 ### Fixed
 
 - Fix variable binding in pattern matching when the irrefutable pattern optimization occurs. ([#618][gh-618])
+- Don't warn on unused generated definitions. ([#514][gh-514])
+
+### Added
+
+- Add import system ([#544][gh-544])
 
 ## [0.2.36] - 2024-07-04
 
@@ -379,3 +384,6 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-586]: https://github.com/HigherOrderCO/Bend/issues/586
 [gh-596]: https://github.com/HigherOrderCO/Bend/issues/596
 [gh-618]: https://github.com/HigherOrderCO/Bend/issues/618
+[gh-514]: https://github.com/HigherOrderCO/Bend/issues/514
+[gh-544]: https://github.com/HigherOrderCO/Bend/pull/544
+[Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
