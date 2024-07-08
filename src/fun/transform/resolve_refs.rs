@@ -30,7 +30,8 @@ impl Ctx<'_> {
           push_scope(name.as_ref(), &mut scope);
         }
 
-        let res = rule.body.resolve_refs(&def_names, self.book.entrypoint.as_ref(), &mut scope);
+        let res =
+          rule.body.resolve_refs(&def_names, self.book.entrypoint.as_ref(), &mut scope, &mut self.info);
         self.info.take_rule_err(res, def_name.clone());
       }
     }
@@ -45,31 +46,48 @@ impl Term {
     def_names: &HashSet<Name>,
     main: Option<&Name>,
     scope: &mut HashMap<&'a Name, usize>,
+    info: &mut Diagnostics,
   ) -> Result<(), String> {
     maybe_grow(move || {
-      if let Term::Var { nam } = self {
-        if is_var_in_scope(nam, scope) {
-          // If the variable is actually a reference to main, don't swap and return an error.
-          if let Some(main) = main {
-            if nam == main {
-              return Err("Main definition can't be referenced inside the program.".to_string());
+      match self {
+        Term::Var { nam } => {
+          if is_var_in_scope(nam, scope) {
+            // If the variable is actually a reference to main, don't swap and return an error.
+            if let Some(main) = main {
+              if nam == main {
+                return Err("Main definition can't be referenced inside the program.".to_string());
+              }
+            }
+
+            // If the variable is actually a reference to a function, swap the term.
+            if def_names.contains(nam) {
+              *self = Term::r#ref(nam);
             }
           }
+        }
+        Term::Def { def, nxt } => {
+          for rule in def.rules.iter_mut() {
+            let mut scope = HashMap::new();
 
-          // If the variable is actually a reference to a function, swap the term.
-          if def_names.contains(nam) {
-            *self = Term::r#ref(nam);
+            for name in rule.pats.iter().flat_map(Pattern::binds) {
+              push_scope(name.as_ref(), &mut scope);
+            }
+
+            let res = rule.body.resolve_refs(&def_names, main, &mut scope, info);
+            info.take_rule_err(res, def.name.clone());
           }
+          nxt.resolve_refs(def_names, main, scope, info)?;
         }
-      }
-
-      for (child, binds) in self.children_mut_with_binds() {
-        for bind in binds.clone() {
-          push_scope(bind.as_ref(), scope);
-        }
-        child.resolve_refs(def_names, main, scope)?;
-        for bind in binds.rev() {
-          pop_scope(bind.as_ref(), scope);
+        _ => {
+          for (child, binds) in self.children_mut_with_binds() {
+            for bind in binds.clone() {
+              push_scope(bind.as_ref(), scope);
+            }
+            child.resolve_refs(def_names, main, scope, info)?;
+            for bind in binds.rev() {
+              pop_scope(bind.as_ref(), scope);
+            }
+          }
         }
       }
       Ok(())

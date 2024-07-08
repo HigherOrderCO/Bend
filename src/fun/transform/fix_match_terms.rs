@@ -84,8 +84,14 @@ impl Term {
       if matches!(self, Term::Mat { .. } | Term::Fold { .. }) {
         self.fix_match(&mut errs, ctrs, adts);
       }
-      // Add a use term to each arm rebuilding the matched variable
       match self {
+        Term::Def { def, nxt } => {
+          for rule in def.rules.iter_mut() {
+            errs.extend(rule.body.fix_match_terms(ctrs, adts));
+          }
+          errs.extend(nxt.fix_match_terms(ctrs, adts));
+        }
+        // Add a use term to each arm rebuilding the matched variable
         Term::Mat { arg: _, bnd, with_bnd: _, with_arg: _, arms }
         | Term::Fold { bnd, arg: _, with_bnd: _, with_arg: _, arms } => {
           for (ctr, fields, body) in arms {

@@ -38,7 +38,9 @@ impl Ctx<'_> {
 impl Definition {
   pub fn desugar_match_def(&mut self, ctrs: &Constructors, adts: &Adts) -> Vec<DesugarMatchDefErr> {
     let mut errs = vec![];
-
+    for rule in self.rules.iter_mut() {
+      desugar_inner_match_defs(&mut rule.body, ctrs, adts, &mut errs);
+    }
     let repeated_bind_errs = fix_repeated_binds(&mut self.rules);
     errs.extend(repeated_bind_errs);
 
@@ -53,6 +55,25 @@ impl Definition {
     }
     errs
   }
+}
+
+fn desugar_inner_match_defs(
+  term: &mut Term,
+  ctrs: &Constructors,
+  adts: &Adts,
+  errs: &mut Vec<DesugarMatchDefErr>,
+) {
+  maybe_grow(|| match term {
+    Term::Def { def, nxt } => {
+      errs.extend(def.desugar_match_def(ctrs, adts));
+      desugar_inner_match_defs(nxt, ctrs, adts, errs);
+    }
+    _ => {
+      for child in term.children_mut() {
+        desugar_inner_match_defs(child, ctrs, adts, errs);
+      }
+    }
+  })
 }
 
 /// When a rule has repeated bind, the only one that is actually useful is the last one.

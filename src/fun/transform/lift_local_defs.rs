@@ -2,7 +2,10 @@ use std::collections::BTreeSet;
 
 use indexmap::IndexMap;
 
-use crate::fun::{Book, Definition, Name, Pattern, Rule, Term};
+use crate::{
+  fun::{Book, Definition, Name, Pattern, Rule, Term},
+  maybe_grow,
+};
 
 impl Book {
   pub fn lift_local_defs(&mut self) {
@@ -25,10 +28,10 @@ impl Rule {
 
 impl Term {
   pub fn lift_local_defs(&mut self, parent: &Name, defs: &mut IndexMap<Name, Definition>, gen: &mut usize) {
-    match self {
-      Term::Def { nam, rules, nxt } => {
-        let local_name = Name::new(format!("{}__local_{}_{}", parent, gen, nam));
-        for rule in rules.iter_mut() {
+    maybe_grow(|| match self {
+      Term::Def { def, nxt } => {
+        let local_name = Name::new(format!("{}__local_{}_{}", parent, gen, def.name));
+        for rule in def.rules.iter_mut() {
           rule.body.lift_local_defs(&local_name, defs, gen);
         }
         nxt.lift_local_defs(parent, defs, gen);
@@ -36,7 +39,8 @@ impl Term {
 
         let inner_defs =
           defs.keys().filter(|name| name.starts_with(local_name.as_ref())).cloned().collect::<BTreeSet<_>>();
-        let (r#use, fvs, mut rules) = gen_use(inner_defs, &local_name, nam, nxt, std::mem::take(rules));
+        let (r#use, fvs, mut rules) =
+          gen_use(inner_defs, &local_name, &def.name, nxt, std::mem::take(&mut def.rules));
         *self = r#use;
 
         apply_closure(&mut rules, &fvs);
@@ -49,7 +53,7 @@ impl Term {
           child.lift_local_defs(parent, defs, gen);
         }
       }
-    }
+    })
   }
 }
 
@@ -89,9 +93,7 @@ fn gen_use(
 
 fn apply_closure(rules: &mut [Rule], fvs: &BTreeSet<Name>) {
   for rule in rules.iter_mut() {
-    let pats = std::mem::take(&mut rule.pats);
-    let mut captured = fvs.iter().cloned().map(|nam| Pattern::Var(Some(nam))).collect::<Vec<_>>();
-    captured.extend(pats);
-    rule.pats = captured;
+    let captured = fvs.iter().cloned().map(|nam| Some(nam)).collect::<Vec<_>>();
+    rule.body = Term::rfold_lams(std::mem::take(&mut rule.body), captured.into_iter());
   }
 }

@@ -631,7 +631,8 @@ impl<'a> TermParser<'a> {
               if name == "def" {
                 // parse the nxt def term.
                 self.index = nxt_def;
-                return Ok(Term::Def { nam: cur_name, rules, nxt: Box::new(self.parse_term()?) });
+                let def = FunDefinition::new(name, rules, Source::Local(nxt_def..*self.index()));
+                return Ok(Term::Def { def, nxt: Box::new(self.parse_term()?) });
               }
               if name == cur_name {
                 rules.push(rule);
@@ -648,7 +649,8 @@ impl<'a> TermParser<'a> {
           }
         }
         let nxt = self.parse_term()?;
-        return Ok(Term::Def { nam: cur_name, rules, nxt: Box::new(nxt) });
+        let def = FunDefinition::new(cur_name, rules, Source::Local(nxt_term..*self.index()));
+        return Ok(Term::Def { def, nxt: Box::new(nxt) });
       }
 
       // If

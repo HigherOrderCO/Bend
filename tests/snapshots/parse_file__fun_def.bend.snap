@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/fun_def.bend
 ---
-(main) = let base = 0; def (aux []) = base(aux (List/Cons head tail)) = (+ head (aux tail))(aux [1, 2, 3])
+(main) = let base = 0; def (aux) = λ%arg0 match %arg0 = %arg0 { List/Nil: base; List/Cons %arg0.head %arg0.tail: use tail = %arg0.tail; use head = %arg0.head; (+ head (aux tail)); }(aux (List/Cons 1 (List/Cons 2 (List/Cons 3 List/Nil))))
