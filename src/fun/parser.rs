@@ -1093,14 +1093,31 @@ impl<'a> Parser<'a> for TermParser<'a> {
         continue;
       }
       if c == '#' {
-        while let Some(c) = self.peek_one() {
-          if c != '\n' {
+        self.advance_one();
+        if let Some(c) = self.peek_one() {
+          if c == '{' {
             self.advance_one();
+            while let Some(c) = self.peek_one() {
+              self.advance_one();
+              if c == '}' {
+                if let Some('#') = self.peek_one() {
+                  self.advance_one();
+                  break;
+                } else {
+                  self.advance_one();
+                }
+              }
+            }
           } else {
-            break;
+            while let Some(c) = self.peek_one() {
+              if c != '\n' {
+                self.advance_one();
+              } else {
+                break;
+              }
+            }
           }
         }
-        self.advance_one(); // Skip the newline character as well
         continue;
       }
       break;
@@ -1243,12 +1260,35 @@ pub trait ParserCommons<'a>: Parser<'a> {
         continue;
       }
       if c == '#' {
-        while let Some(c) = self.peek_one() {
-          if c != '\n' {
+        self.advance_one();
+        char_count += 1;
+        if let Some(c) = self.peek_one() {
+          if c == '{' {
             self.advance_one();
             char_count += 1;
+            while let Some(c) = self.peek_one() {
+              self.advance_one();
+              char_count += 1;
+              if c == '}' {
+                if let Some('#') = self.peek_one() {
+                  self.advance_one();
+                  char_count += 1;
+                  break;
+                } else {
+                  self.advance_one();
+                  char_count += 1;
+                }
+              }
+            }
           } else {
-            break;
+            while let Some(c) = self.peek_one() {
+              if c != '\n' {
+                self.advance_one();
+                char_count += 1;
+              } else {
+                break;
+              }
+            }
           }
         }
         continue;
