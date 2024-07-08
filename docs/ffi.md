@@ -7,18 +7,13 @@ We can add new IO functions to Bend during runtime by loading dynamic libraries.
 Here is an example of how we could load a Bend library that contains functions for working with directories.
 
 ```py
-import IO/DyLib
-from List import (Cons, Nil, filter)
-from Result import (Err, Ok)
-import String
-
 def main():
   with IO:
     # Open the dynamic library file
     # The second argument is '0' if we want to load all functions immediately.
     # Otherwise it should be '1' when we want to load functions as we use them.
     # 'dl' is the unique id of the dynamic library.
-    dl <- DyLib/open("./libbend_dirs.so", 0)
+    dl <- IO/DyLib/open("./libbend_dirs.so", 0)
 
     # We can now call functions from the dynamic library.
     # We need to know what functions are available in the dynamic library.
@@ -32,26 +27,26 @@ def main():
 
     # In our example, 'ls' receives a path as a String and
     # returns a String with the result of the 'ls' command.
-    files_bytes <- DyLib/call(dl, "ls", "/home")
+    files_bytes <- IO/DyLib/call(dl, "ls", "/home")
     files_str = String/decode_utf8(files_bytes)
     files = String/split(files_str, '\n')
 
     # We want to create a directory for a new user "my_user" if it doesn't exist.
-    my_dir = filter(files, String/equals("my_user"))
+    my_dir = List/filter(files, String/equals("my_user"))
     match my_dir:
       case Cons:
         # The directory already exists, do nothing.
-        * <- print("Directory already exists.")
+        * <- IO/print("Directory already exists.")
         status = -1
       case Nil:
         # The directory doesn't exist, create it.
-        * <- DyLib/call(dl, "mkdir", "/home/my_user")
-        * <- print("Directory created.")
+        * <- IO/DyLib/call(dl, "mkdir", "/home/my_user")
+        * <- IO/print("Directory created.")
         status = +0
 
     # Here the program ends so we didn't need to close the dynamic library,
     # but it's good practice to do so once we know we won't need it anymore.
-    * <- DyLib/close(dl)
+    * <- IO/DyLib/close(dl)
     return wrap(status)
 ```
 
@@ -87,6 +82,7 @@ We can implement the example library from earlier for the C runtime with the fol
 // The headers we need to open and read directories.
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 
 // IO functions must have this exact signature.
@@ -97,13 +93,13 @@ We can implement the example library from earlier for the C runtime with the fol
 Port ls(Net* net, Book* book, Port arg) {
   // The arguments first need to be converted from HVM to C.
   // For the 'ls' function, this is just a single string.
-  Str ls_path = readback_str(net, book, tup.elem_buf[0]);
+  Str ls_path = readback_str(net, book, arg);
 
   // Now we can do the actual IO operations.
   // In this case, we list the contents of the directory
   // by calling the 'ls' program as a subprocess.
-  char* cmd = malloc(strlen(ls_path) + strlen("ls ") + 1);
-  sprintf(cmd, "ls %s", ls_path);
+  char* cmd = malloc(strlen(ls_path.buf) + strlen("ls ") + 1);
+  sprintf(cmd, "ls %s", ls_path.buf);
   free(ls_path.buf);
 
   FILE* pipe = popen(cmd, "r");
@@ -136,8 +132,8 @@ Port ls(Net* net, Book* book, Port arg) {
   // After we're done with the operation, we convert it to HVM format.
   // In this case, the output is the output of the 'ls' command as a list of bytes.
   // We need to process it in Bend later to convert it to a list of file names.
-  Bytes output_bytes = Bytes { .buf = output, .len = output_len };
-  Port output_port = inject_bytes(net, output_bytes);
+  Bytes output_bytes = { .buf = output, .len = output_len };
+  Port output_port = inject_bytes(net, &output_bytes);
 
   // Remember to free all the allocated memory.
   free(output);
@@ -148,10 +144,10 @@ Port ls(Net* net, Book* book, Port arg) {
 Port mkdir(Net* net, Book* book, Port arg) {
   // We do the same thing here as in the 'ls' function,
   // except we call 'mkdir' which doesn't output anything.
-  Str ls_path = readback_str(net, book, tup.elem_buf[0]);
+  Str ls_path = readback_str(net, book, arg);
 
-  char* cmd = malloc(strlen(ls_path) + strlen("mkdir ") + 1);
-  sprintf(cmd, "mkdir %s", ls_path);
+  char* cmd = malloc(strlen(ls_path.buf) + strlen("mkdir ") + 1);
+  sprintf(cmd, "mkdir %s", ls_path.buf);
   int res = system(cmd);
 
   free(ls_path.buf);
