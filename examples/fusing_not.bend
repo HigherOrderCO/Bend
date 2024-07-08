@@ -12,5 +12,5 @@ to_church n = switch n {
 	_: λf λx (f (to_church n-1 f x))
 }
 main = 
-	# Self-composes `not` 2^24-1 times and prints the result.
-	((to_church 0xFFFFFF) fusing_not)  # try replacing 'fusing_not' by 'not'. Will it still work?
+	# Self-composes `not` 2^23-1 times and prints the result.
+	((to_church 0x7FFFFF) fusing_not)  # try replacing 'fusing_not' by 'not'. Will it still work?

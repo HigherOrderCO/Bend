@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: examples/hello_world.bend
+---
+λa (a IO/Done/tag IO/MAGIC 0)

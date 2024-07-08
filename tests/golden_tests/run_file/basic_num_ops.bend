@@ -140,7 +140,7 @@ main = (List/expand
 
     0xFFFF
 
-    (log 2.0 3.0)
-    (atan2 3.0 4.0)
+    (Math/log 2.0 3.0)
+    (Math/atan2 3.0 4.0)
   ]
 )

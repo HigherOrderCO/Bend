@@ -2,21 +2,56 @@ type String = (Nil) | (Cons head ~tail)
 
 type List = (Nil) | (Cons head ~tail)
 
-List/length xs = fold xs with len=0, acc=[] {
-  List/Nil: (len, (List/reverse acc))
-  List/Cons: (xs.tail (+ len 1) (List/Cons xs.head acc))
+# List/length(xs: List(T)) -> (u24, List(T))
+# Returns the length of a list and the list itself.
+List/length xs = fold xs with len=0, acc=DiffList/new {
+  List/Nil: (len, (DiffList/to_list acc))
+  List/Cons: (xs.tail (+ len 1) (DiffList/append acc xs.head))
 }
 
+# List/reverse(xs: List(T)) -> List(T)
+# Reverses a list.
 List/reverse xs = fold xs with acc=[] {
   List/Nil: acc
   List/Cons: (xs.tail (List/Cons xs.head acc))
 }
 
+# List/flatten(xs: List(List(T))) -> List(T)
+# Flattens a list of lists.
 List/flatten (List/Cons x xs) = (List/concat x (List/flatten xs))
 List/flatten (List/Nil)       = (List/Nil)
 
+# List/concat(xs: List(T), ys: List(T)) -> List(T)
+# Concatenates two lists.
 List/concat (List/Cons x xs) ys = (List/Cons x (List/concat xs ys))
 List/concat (List/Nil)       ys = ys
+
+# List/split_once(xs: List(T), val: T) -> (Result(List(T), List(T)))
+# Splits a list into two lists at the first occurrence of a value.
+List/split_once xs val = (List/split_once.go xs val @x x)
+  List/split_once.go  List/Nil        val acc = (Result/Err (acc List/Nil))
+  List/split_once.go (List/Cons x xs) val acc =
+    if (== val x) {
+      (Result/Ok ((acc List/Nil), xs))
+    } else {
+      (List/split_once.go xs val @y (acc (List/Cons x y)))
+    }
+
+# DiffList/new() -> (List(T) -> List(T))
+# Create a new difference list
+DiffList/new = λx x
+
+# DiffList/append(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T))
+# Append a value to the end of the difference list
+DiffList/append diff val = λx (diff (List/Cons val x))
+
+# DiffList/cons(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T))
+# Append a value to the beginning of the difference list
+DiffList/cons diff val = λx (List/Cons val (diff x))
+
+# DiffList/to_list(diff: List(T) -> List(T)) -> (List(T))
+# Convert a difference list to a list
+DiffList/to_list diff = (diff List/Nil)
 
 type Nat = (Succ ~pred) | (Zero)
 
@@ -123,12 +158,23 @@ def IO/sleep(seconds):
 ## File IO
 
 ### File IO primitives
-IO/FS/open path mode = (IO/Call IO/MAGIC "OPEN" (path, mode) @x (IO/Done IO/MAGIC x))
-IO/FS/close file = (IO/Call IO/MAGIC "CLOSE" file @x (IO/Done IO/MAGIC x))
-IO/FS/read file num_bytes = (IO/Call IO/MAGIC "READ" (file, num_bytes) @x (IO/Done IO/MAGIC x))
-IO/FS/write file bytes = (IO/Call IO/MAGIC "WRITE" (file, bytes) @x (IO/Done IO/MAGIC x))
-IO/FS/seek file offset mode = (IO/Call IO/MAGIC "SEEK" (file, (offset, mode)) @x (IO/Done IO/MAGIC x))
-IO/FS/flush file = (IO/Call IO/MAGIC "FLUSH" file @x (IO/Done IO/MAGIC x))
+# IO/FS/open(path: String, mode: u24) -> (IO u24)
+IO/FS/open path mode = (IO/Call IO/MAGIC "OPEN" (path, mode) IO/wrap)
+
+# IO/FS/close(file: u24) -> (IO None)
+IO/FS/close file = (IO/Call IO/MAGIC "CLOSE" file IO/wrap)
+
+# IO/FS/read(file: u24, num_bytes: u24) -> (IO (List u24))
+IO/FS/read file num_bytes = (IO/Call IO/MAGIC "READ" (file, num_bytes) IO/wrap)
+
+# IO/FS/write(file: u24, bytes: (List u24)) -> (IO None)
+IO/FS/write file bytes = (IO/Call IO/MAGIC "WRITE" (file, bytes) IO/wrap)
+
+# IO/FS/seek(file: u24, offset: i24, mode: u24) -> (IO None)
+IO/FS/seek file offset mode = (IO/Call IO/MAGIC "SEEK" (file, (offset, mode)) IO/wrap)
+
+# IO/FS/flush(file: u24) -> (IO None)
+IO/FS/flush file = (IO/Call IO/MAGIC "FLUSH" file IO/wrap)
 
 ### Always available files
 IO/FS/STDIN = 0
@@ -144,8 +190,9 @@ IO/FS/SEEK_CUR = +1
 IO/FS/SEEK_END = +2
 
 ### File utilities
+
+# IO/FS/read_file(path: String) -> (IO (List u24))
 # Reads an entire file, returning a list of bytes.
-# def IO/FS/read_file(path: String) -> IO [u24]
 def IO/FS/read_file(path):
   with IO:
     fd <- IO/FS/open(path, "r")
@@ -153,8 +200,8 @@ def IO/FS/read_file(path):
     * <- IO/FS/close(fd)
     return wrap(bytes)
 
+# IO/FS/read_to_end(fd: u24) -> (IO (List u24))
 # Reads the remaining contents of a file, returning a list of read bytes.
-# def IO/FS/read_to_end(fd: u24) -> IO [u24]
 def IO/FS/read_to_end(fd):
   return IO/FS/read_to_end.read_chunks(fd, [])
 
@@ -168,8 +215,8 @@ def IO/FS/read_to_end.read_chunks(fd, chunks):
       case List/Cons:
         return IO/FS/read_to_end.read_chunks(fd, List/Cons(chunk, chunks))
 
+# IO/FS/read_line(fd: u24) -> (IO (List u24))
 # Reads a single line from a file, returning a list of bytes.
-# def IO/FS/read_line(fd: u24) -> IO [u24]
 def IO/FS/read_line(fd):
   return IO/FS/read_line.read_chunks(fd, [])
 
@@ -177,7 +224,7 @@ def IO/FS/read_line.read_chunks(fd, chunks):
   with IO:
     # Read line in 1kB chunks
     chunk <- IO/FS/read(fd, 1024)
-    match res = Bytes/split_once(chunk, '\n'):
+    match res = List/split_once(chunk, '\n'):
       case Result/Ok:
         (line, rest) = res.val
         (length, *) = List/length(rest)
@@ -190,8 +237,8 @@ def IO/FS/read_line.read_chunks(fd, chunks):
         chunks = List/Cons(line, chunks)
         return IO/FS/read_line.read_chunks(fd, chunks)
 
+# IO/FS/write_file(path: String, bytes: (List u24)) -> (IO None)
 # Writes a list of bytes to a file given by a path.
-# def IO/FS/write_file(path: String, bytes: [u24]) -> IO *
 def IO/FS/write_file(path, bytes):
   with IO:
     f <- IO/FS/open(path, "w")
@@ -199,25 +246,16 @@ def IO/FS/write_file(path, bytes):
     * <- IO/FS/close(f)
     return wrap(bytes)
 
-Bytes/split_once xs cond = (Bytes/split_once.go xs cond @x x)
-  Bytes/split_once.go  List/Nil        cond acc = (Result/Err (acc List/Nil))
-  Bytes/split_once.go (List/Cons x xs) cond acc =
-    if (== cond x) {
-      (Result/Ok ((acc List/Nil), xs))
-    } else {
-      (Bytes/split_once.go xs cond @y (acc (List/Cons x y)))
-    }
-
 ### Standard input and output utilities
 
+# IO/print(text: String) -> (IO *)
 # Prints a string to stdout, encoding it with utf-8.
-# def IO/print(text: String) -> IO *
 IO/print text = (IO/FS/write IO/FS/STDOUT (String/encode_utf8 text))
 
+# IO/input() -> IO String
 # Read characters from stdin until a newline is found.
 # Returns the read input decoded as utf-8.
-# def IO/input() -> IO String
-IO/input = (IO/input.go @x x)
+IO/input = (IO/input.go DiffList/new)
 def IO/input.go(acc):
   # TODO: This is slow and inefficient, should be done in hvm using fgets.
   with IO:
@@ -228,14 +266,40 @@ def IO/input.go(acc):
         return IO/input.go(acc)
       case List/Cons:
         if byte.head == '\n':
-          bytes = acc(List/Nil)
-          text = Bytes/decode_utf8(bytes)
+          bytes = DiffList/to_list(acc)
+          text = String/decode_utf8(bytes)
           return wrap(text)
         else:
-          acc = lambda x: acc(List/Cons(byte.head, x))
+          acc = DiffList/append(acc, byte.head)
           return IO/input.go(acc)
 
+### Dynamically linked libraries
+
+# IO/DyLib/open(path: String, lazy: u24) -> u24 
+# 'path' is the path to the dl file.
+# 'lazy' is a boolean encoded as a u24 that determines if all functions are loaded lazily or upfront.
+# Returns an unique id to the dl object encoded as a u24
+def IO/DyLib/open(path, lazy):
+  return IO/Call(IO/MAGIC, "DL_OPEN", (path, lazy), IO/wrap)
+
+# IO/DyLib/call(dl: u24, fn: String, args: Any) -> Any
+# Calls a function of a previously opened dylib.
+# 'dl' is the id of the dl object
+# 'fn' is the name of the function in the dylib
+# 'args' are the arguments to the function. The expected values depend on the called function.
+# The returned value is determined by the called function.
+def IO/DyLib/call(dl, fn, args):
+  return IO/Call(IO/MAGIC, "DL_CALL", (dl, fn, args), IO/wrap)
+
+# IO/DyLib/close(dl: u24) -> None
+# Closes a previously open dylib.
+# 'dl' is the id of the dylib.
+# Returns nothing.
+def IO/DyLib/close(dl):
+  return IO/Call(IO/MAGIC, "DL_CLOSE", (dl), IO/wrap)
+
 # Lazy thunks
+# defer(val: T) -> ((T -> T) -> T)  
 # We can defer the evaluation of a function by wrapping it in a thunk
 # Ex: @x (x @arg1 @arg2 @arg3 (f arg1 arg2 arg3) arg1 arg2 arg3)
 # This is only evaluated when we call it with 'undefer' (undefer my_thunk)
@@ -243,22 +307,15 @@ def IO/input.go(acc):
 # The example above can be written as:
 # (defer_arg (defer_arg (defer_arg (defer @arg1 @arg2 @arg3 (f arg1 arg2 arg3)) arg1) arg2) arg3)
 defer val = @x (x val)
+
+# defer_arg(defered: A -> B -> C, arg: B) -> (A -> C)
 defer_arg defered arg = @x (defered x arg)
+
+# undefer(defered: (A -> A) -> B) -> B
 undefer defered = (defered @x x)
 
 
-# Native numeric operations
-
-# log(x: f24, base: f24) -> f24
-# Computes the logarithm of `x` with the specified `base`.
-hvm log:
-  (x ($([|] $(x ret)) ret))
-
-# atan2(x: f24, y: f24) -> f24
-# Has the same behaviour as `atan2f` in the C math lib.
-# Computes the arctangent of the quotient of its two arguments.
-hvm atan2:
-  ($([&] $(y ret)) (y ret))
+# Native number casts
 
 # to_f24(x: native number) -> f24
 # Casts any native number to an f24.
@@ -279,13 +336,18 @@ hvm to_i24:
 
 Utf8/REPLACEMENT_CHARACTER = '\u{FFFD}'
 
-Bytes/decode_utf8 bytes =
+# String/decode_utf8(List u24) -> String
+# Decodes a sequence of bytes to a String using utf-8 encoding.
+String/decode_utf8 bytes =
   let (got, rest) = (Utf8/decode_character bytes)
   match rest {
     List/Nil: (String/Cons got String/Nil)
-    List/Cons: (String/Cons got (Bytes/decode_utf8 rest))
+    List/Cons: (String/Cons got (String/decode_utf8 rest))
   }
 
+# Utf8/decode_character(List u24) -> (u24, List u24)
+# Decodes one utf-8 character from the start of a sequence of bytes.
+# Returns the decoded character and the remaining bytes.
 Utf8/decode_character [] = (0, [])
 Utf8/decode_character [a] = if (<= a 0x7F) { (a, []) } else { (Utf8/REPLACEMENT_CHARACTER, []) }
 Utf8/decode_character [a, b] =
@@ -346,6 +408,8 @@ Utf8/decode_character (List/Cons a (List/Cons b (List/Cons c (List/Cons d rest))
     }
   }
 
+# String/encode_utf8(String) -> (List u24)
+# Encodes a string to a sequence of bytes using utf-8 encoding.
 String/encode_utf8 (String/Nil)       = (List/Nil)
 String/encode_utf8 (String/Cons x xs) =
   use Utf8/rune1max = 0b01111111
@@ -379,16 +443,37 @@ String/encode_utf8 (String/Cons x xs) =
     }
   }
 
-Bytes/decode_ascii (List/Cons x xs) = (String/Cons x (Bytes/decode_ascii xs))
-Bytes/decode_ascii (List/Nil)       = (String/Nil)
+# String/decode_ascii(List u24) -> String
+# Decodes a sequence of bytes to a String using ascii encoding.
+String/decode_ascii (List/Cons x xs) = (String/Cons x (String/decode_ascii xs))
+String/decode_ascii (List/Nil)       = (String/Nil)
 
+# String/encode_ascii(String) -> (List u24)
+# Encodes a string to a sequence of bytes using ascii encoding.
 String/encode_ascii (String/Cons x xs) = (List/Cons x (String/encode_ascii xs))
 String/encode_ascii (String/Nil)       = (List/Nil)
 
 # Math
 
-# The Pi constant.
-Math/PI = 3.1415926535
+# Math/PI() -> f24
+# The Pi (π) constant.
+def Math/PI():
+  return 3.1415926535
+
+def Math/E():
+  return 2.718281828
+
+# Math/log(x: f24, base: f24) -> f24
+# Computes the logarithm of `x` with the specified `base`.
+hvm Math/log:
+  (x ($([|] $(x ret)) ret))
+
+# Math/atan2(x: f24, y: f24) -> f24
+# Has the same behaviour as `atan2f` in the C math lib.
+# Computes the arctangent of the quotient of its two arguments.
+hvm Math/atan2:
+  ($([&] $(y ret)) (y ret))
+
 
 # Math/sin(a: f24) -> f24
 # Computes the sine of the given angle in radians.
@@ -420,15 +505,15 @@ Math/csc a = (/ 1.0 (Math/sin a))
 
 # Math/atan(a: f24) -> f24
 # Computes the arctangent of the given angle.
-Math/atan a = (atan2 a 1.0)
+Math/atan a = (Math/atan2 a 1.0)
 
 # Math/asin(a: f24) -> f24
 # Computes the arcsine of the given angle.
-Math/asin a = (atan2 a (Math/sqrt (- 1.0 (* a a))))
+Math/asin a = (Math/atan2 a (Math/sqrt (- 1.0 (* a a))))
 
 # Math/acos(a: f24) -> f24
 # Computes the arccosine of the given angle.
-Math/acos a = (atan2 (Math/sqrt (- 1.0 (* a a))) a)
+Math/acos a = (Math/atan2 (Math/sqrt (- 1.0 (* a a))) a)
 
 # Math/radians(a: f24) -> f24
 # Converts degrees to radians.
