@@ -73,7 +73,7 @@ impl Term {
               push_scope(name.as_ref(), &mut scope);
             }
 
-            let res = rule.body.resolve_refs(&def_names, main, &mut scope, info);
+            let res = rule.body.resolve_refs(def_names, main, &mut scope, info);
             info.take_rule_err(res, def.name.clone());
           }
           nxt.resolve_refs(def_names, main, scope, info)?;

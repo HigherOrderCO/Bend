@@ -93,7 +93,7 @@ fn gen_use(
 
 fn apply_closure(rules: &mut [Rule], fvs: &BTreeSet<Name>) {
   for rule in rules.iter_mut() {
-    let captured = fvs.iter().cloned().map(|nam| Some(nam)).collect::<Vec<_>>();
+    let captured = fvs.iter().cloned().map(Some).collect::<Vec<_>>();
     rule.body = Term::rfold_lams(std::mem::take(&mut rule.body), captured.into_iter());
   }
 }
