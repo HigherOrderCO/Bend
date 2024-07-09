@@ -201,9 +201,6 @@ pub enum Term {
   Def {
     def: Definition,
     nxt: Box<Term>,
-    // nam: Name,
-    // rules: Vec<Rule>,
-    // nxt: Box<Term>,
   },
   Era,
   #[default]

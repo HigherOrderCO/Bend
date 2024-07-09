@@ -1101,8 +1101,8 @@ impl<'a> Parser<'a> for TermParser<'a> {
             self.advance_one();
             while let Some(c) = self.peek_one() {
               self.advance_one();
-              if c == '}' {
-                if let Some('#') = self.peek_one() {
+              if c == '#' {
+                if let Some('}') = self.peek_one() {
                   self.advance_one();
                   break;
                 } else {
@@ -1271,8 +1271,8 @@ pub trait ParserCommons<'a>: Parser<'a> {
             while let Some(c) = self.peek_one() {
               self.advance_one();
               char_count += 1;
-              if c == '}' {
-                if let Some('#') = self.peek_one() {
+              if c == '#' {
+                if let Some('}') = self.peek_one() {
                   self.advance_one();
                   char_count += 1;
                   break;
