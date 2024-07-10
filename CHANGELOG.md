@@ -11,10 +11,12 @@ and this project does not currently adhere to a particular versioning scheme.
 
 - Fix variable binding in pattern matching when the irrefutable pattern optimization occurs. ([#618][gh-618])
 - Don't warn on unused generated definitions. ([#514][gh-514])
+- Fix local definitions not being desugared properly. ([#623][gh-623])
 
 ### Added
 
-- Add import system ([#544][gh-544])
+- Add import system. ([#544][gh-544])
+- Add multi line comment `#{ ... #}` syntax. ([#595][gh-595])
 
 ## [0.2.36] - 2024-07-04
 
@@ -370,9 +372,11 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-494]: https://github.com/HigherOrderCO/Bend/issues/494
 [gh-502]: https://github.com/HigherOrderCO/Bend/issues/502
 [gh-512]: https://github.com/HigherOrderCO/Bend/issues/512
+[gh-514]: https://github.com/HigherOrderCO/Bend/issues/514
 [gh-516]: https://github.com/HigherOrderCO/Bend/issues/516
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
+[gh-544]: https://github.com/HigherOrderCO/Bend/pull/544
 [gh-562]: https://github.com/HigherOrderCO/Bend/issues/562
 [gh-570]: https://github.com/HigherOrderCO/Bend/issues/570
 [gh-573]: https://github.com/HigherOrderCO/Bend/issues/573
@@ -383,9 +387,9 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-582]: https://github.com/HigherOrderCO/Bend/issues/582
 [gh-583]: https://github.com/HigherOrderCO/Bend/issues/583
 [gh-586]: https://github.com/HigherOrderCO/Bend/issues/586
+[gh-595]: https://github.com/HigherOrderCO/Bend/issues/595
 [gh-596]: https://github.com/HigherOrderCO/Bend/issues/596
-[gh-618]: https://github.com/HigherOrderCO/Bend/issues/618
-[gh-514]: https://github.com/HigherOrderCO/Bend/issues/514
-[gh-544]: https://github.com/HigherOrderCO/Bend/pull/544
-[Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
 [gh-598]: https://github.com/HigherOrderCO/Bend/issues/598
+[gh-618]: https://github.com/HigherOrderCO/Bend/issues/618
+[gh-623]: https://github.com/HigherOrderCO/Bend/issues/623
+[Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD

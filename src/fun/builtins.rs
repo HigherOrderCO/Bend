@@ -70,6 +70,13 @@ impl Term {
       Term::List { els } => *self = Term::encode_list(std::mem::take(els)),
       Term::Str { val } => *self = Term::encode_str(val),
       Term::Nat { val } => *self = Term::encode_nat(*val),
+      Term::Def { def, nxt } => {
+        for rule in def.rules.iter_mut() {
+          rule.pats.iter_mut().for_each(Pattern::encode_builtins);
+          rule.body.encode_builtins();
+        }
+        nxt.encode_builtins();
+      }
       _ => {
         for child in self.children_mut() {
           child.encode_builtins();

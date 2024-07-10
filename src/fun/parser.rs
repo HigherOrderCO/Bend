@@ -631,7 +631,8 @@ impl<'a> TermParser<'a> {
               if name == "def" {
                 // parse the nxt def term.
                 self.index = nxt_def;
-                return Ok(Term::Def { nam: cur_name, rules, nxt: Box::new(self.parse_term()?) });
+                let def = FunDefinition::new(name, rules, Source::Local(nxt_def..*self.index()));
+                return Ok(Term::Def { def, nxt: Box::new(self.parse_term()?) });
               }
               if name == cur_name {
                 rules.push(rule);
@@ -648,7 +649,8 @@ impl<'a> TermParser<'a> {
           }
         }
         let nxt = self.parse_term()?;
-        return Ok(Term::Def { nam: cur_name, rules, nxt: Box::new(nxt) });
+        let def = FunDefinition::new(cur_name, rules, Source::Local(nxt_term..*self.index()));
+        return Ok(Term::Def { def, nxt: Box::new(nxt) });
       }
 
       // If
@@ -1093,14 +1095,31 @@ impl<'a> Parser<'a> for TermParser<'a> {
         continue;
       }
       if c == '#' {
-        while let Some(c) = self.peek_one() {
-          if c != '\n' {
+        self.advance_one();
+        if let Some(c) = self.peek_one() {
+          if c == '{' {
             self.advance_one();
+            while let Some(c) = self.peek_one() {
+              self.advance_one();
+              if c == '#' {
+                if let Some('}') = self.peek_one() {
+                  self.advance_one();
+                  break;
+                } else {
+                  self.advance_one();
+                }
+              }
+            }
           } else {
-            break;
+            while let Some(c) = self.peek_one() {
+              if c != '\n' {
+                self.advance_one();
+              } else {
+                break;
+              }
+            }
           }
         }
-        self.advance_one(); // Skip the newline character as well
         continue;
       }
       break;
@@ -1243,12 +1262,35 @@ pub trait ParserCommons<'a>: Parser<'a> {
         continue;
       }
       if c == '#' {
-        while let Some(c) = self.peek_one() {
-          if c != '\n' {
+        self.advance_one();
+        char_count += 1;
+        if let Some(c) = self.peek_one() {
+          if c == '{' {
             self.advance_one();
             char_count += 1;
+            while let Some(c) = self.peek_one() {
+              self.advance_one();
+              char_count += 1;
+              if c == '#' {
+                if let Some('}') = self.peek_one() {
+                  self.advance_one();
+                  char_count += 1;
+                  break;
+                } else {
+                  self.advance_one();
+                  char_count += 1;
+                }
+              }
+            }
           } else {
-            break;
+            while let Some(c) = self.peek_one() {
+              if c != '\n' {
+                self.advance_one();
+                char_count += 1;
+              } else {
+                break;
+              }
+            }
           }
         }
         continue;

@@ -391,7 +391,7 @@ impl Stmt {
           StmtToFun::Assign(pat, term) => (Some(pat), term),
         };
         let def = def.to_fun()?;
-        let term = fun::Term::Def { nam: def.name, rules: def.rules, nxt: Box::new(nxt) };
+        let term = fun::Term::Def { def, nxt: Box::new(nxt) };
         if let Some(pat) = nxt_pat {
           StmtToFun::Assign(pat, term)
         } else {
