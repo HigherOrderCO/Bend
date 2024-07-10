@@ -21,6 +21,24 @@ A String literal is surrounded with `"`. Accepts the same values as characters l
 "Hello, World!"
 ```
 
+### Functions
+
+#### String/equals
+
+Checks if two strings are equal.
+
+```python
+def String/equals(s1: String, s2: String) -> u24
+```
+
+#### String/split
+
+Splits a string into a list of strings based on the given delimiter.
+
+```python
+def String/split(s: String, delimiter: u24) -> [String]
+```
+
 ## List
 
 ```python
@@ -82,6 +100,14 @@ Appends two lists together. Example:
 List/concat([1, 2], [4, 5])
 
 # Result: [1, 2, 4, 5]
+```
+
+#### List/filter
+
+Filters a list based on a predicate function.
+
+```python
+List/filter(xs: List(T), pred: T -> Bool) -> List(T)
 ```
 
 ## Tree

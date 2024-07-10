@@ -161,12 +161,17 @@ To compile this code into a library, we can use the `gcc` compiler and include t
 Assuming that it's saved in a file called `libbend_dirs.c`, we can compile it with the following command:
 
 ```sh
-gcc -shared -o libbend_dirs.so -I /path/to/hvm/ libbend_dirs.c
+Compile the shared library with unresolved symbols:
+For macOS:
+gcc -shared -o libbend_dirs.so -I /path/to/hvm/ libbend_dirs.c -undefined dynamic_lookup
+
+For Linux:
+gcc -shared -o libbend_dirs.so -I /path/to/hvm/ libbend_dirs.c -Wl,--unresolved-symbols=ignore-all
 ```
 
 Now we can use the dynamic library in our Bend program, we just need to pass the path to the library to `IO/DyLib/open`.
 
-###  Writing libraries for the Cuda runtime
+### Writing libraries for the Cuda runtime
 
 Writing libraries for the Cuda runtime is very similar to writing libraries for the C runtime.
 

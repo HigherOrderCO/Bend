@@ -37,6 +37,41 @@ List/split_once xs val = (List/split_once.go xs val @x x)
       (List/split_once.go xs val @y (acc (List/Cons x y)))
     }
 
+# List/filter(xs: List(T), pred: T -> Bool) -> List(T)
+# Filters a list based on a predicate function.
+List/filter (List/Nil)       _    = List/Nil
+List/filter (List/Cons x xs) pred =
+  if (pred x) {
+    (List/Cons x (List/filter xs pred))
+  } else {
+    (List/filter xs pred)
+  }
+
+# String/equals(s1: String, s2: String) -> u24
+# Checks if two strings are equal.
+String/equals (String/Nil) (String/Nil) = 1
+String/equals (String/Cons x xs) (String/Cons y ys) =
+  if (== x y) {
+    (String/equals xs ys)
+  } else {
+    0
+  }
+String/equals * * = 0
+
+# String/split(s: String, delimiter: u24) -> List(String)
+# Splits a list into two lists at the first occurrence of a value.
+String/split s delim = (String/split.go s delim (List/Cons String/Nil List/Nil))
+  String/split.go (String/Nil) _ acc = (List/reverse acc)
+  String/split.go (String/Cons c cs) delim acc =
+    if (== c delim) {
+      (String/split.go cs delim (List/Cons String/Nil acc))
+    } else {
+      match acc {
+        List/Cons: (String/split.go cs delim (List/Cons (String/Cons c acc.head) acc.tail))
+        List/Nil: []
+      }
+    }
+
 # DiffList/new() -> (List(T) -> List(T))
 # Create a new difference list
 DiffList/new = λx x
@@ -275,7 +310,7 @@ def IO/input.go(acc):
 
 ### Dynamically linked libraries
 
-# IO/DyLib/open(path: String, lazy: u24) -> u24 
+# IO/DyLib/open(path: String, lazy: u24) -> u24
 # 'path' is the path to the dl file.
 # 'lazy' is a boolean encoded as a u24 that determines if all functions are loaded lazily or upfront.
 # Returns an unique id to the dl object encoded as a u24
@@ -299,7 +334,7 @@ def IO/DyLib/close(dl):
   return IO/Call(IO/MAGIC, "DL_CLOSE", (dl), IO/wrap)
 
 # Lazy thunks
-# defer(val: T) -> ((T -> T) -> T)  
+# defer(val: T) -> ((T -> T) -> T)
 # We can defer the evaluation of a function by wrapping it in a thunk
 # Ex: @x (x @arg1 @arg2 @arg3 (f arg1 arg2 arg3) arg1 arg2 arg3)
 # This is only evaluated when we call it with 'undefer' (undefer my_thunk)
