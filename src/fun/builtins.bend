@@ -311,24 +311,24 @@ def IO/input.go(acc):
 ### Dynamically linked libraries
 
 # IO/DyLib/open(path: String, lazy: u24) -> u24
-# 'path' is the path to the dl file.
+# 'path' is the path to the library file.
 # 'lazy' is a boolean encoded as a u24 that determines if all functions are loaded lazily or upfront.
-# Returns an unique id to the dl object encoded as a u24
+# Returns an unique id to the library object encoded as a u24
 def IO/DyLib/open(path, lazy):
   return IO/Call(IO/MAGIC, "DL_OPEN", (path, lazy), IO/wrap)
 
 # IO/DyLib/call(dl: u24, fn: String, args: Any) -> Any
-# Calls a function of a previously opened dylib.
-# 'dl' is the id of the dl object
-# 'fn' is the name of the function in the dylib
+# Calls a function of a previously opened library.
+# 'dl' is the id of the library object.
+# 'fn' is the name of the function in the library.
 # 'args' are the arguments to the function. The expected values depend on the called function.
 # The returned value is determined by the called function.
 def IO/DyLib/call(dl, fn, args):
   return IO/Call(IO/MAGIC, "DL_CALL", (dl, fn, args), IO/wrap)
 
 # IO/DyLib/close(dl: u24) -> None
-# Closes a previously open dylib.
-# 'dl' is the id of the dylib.
+# Closes a previously open library.
+# 'dl' is the id of the library object.
 # Returns nothing.
 def IO/DyLib/close(dl):
   return IO/Call(IO/MAGIC, "DL_CLOSE", (dl), IO/wrap)

@@ -248,7 +248,9 @@ fn run_hvm(book: &::hvm::ast::Book, cmd: &str, run_opts: &RunOpts) -> Result<Str
     if capturing {
       Ok(result)
     } else {
-      Err("Failed to parse result from HVM.".into())
+      output.flush().map_err(|e| format!("Error flushing HVM output. {e}"))?;
+      let msg = "HVM output had no result (An error likely occurred)".to_string();
+      Err(msg)
     }
   }
 
@@ -258,6 +260,7 @@ fn run_hvm(book: &::hvm::ast::Book, cmd: &str, run_opts: &RunOpts) -> Result<Str
     .arg(cmd)
     .arg(out_path)
     .stdout(std::process::Stdio::piped())
+    .stderr(std::process::Stdio::inherit())
     .spawn()
     .map_err(|e| format!("Failed to start hvm process.\n{e}"))?;
 
