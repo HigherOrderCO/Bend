@@ -161,11 +161,11 @@ To compile this code into a library, we can use the `gcc` compiler and include t
 Assuming that it's saved in a file called `libbend_dirs.c`, we can compile it with the following command:
 
 ```sh
-Compile the shared library with unresolved symbols:
-For macOS:
+# Needs to be compiled as a shared library with unresolved symbols.
+# For macOS:
 gcc -shared -o libbend_dirs.so -I /path/to/HVM/src/ libbend_dirs.c -undefined dynamic_lookup -fPIC
 
-For Linux:
+# For Linux:
 gcc -shared -o libbend_dirs.so -I /path/to/HVM/src/ libbend_dirs.c -Wl,--unresolved-symbols=ignore-all -fPIC
 ```
 
