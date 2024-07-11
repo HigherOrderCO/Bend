@@ -17,6 +17,7 @@ and this project does not currently adhere to a particular versioning scheme.
 
 - Add import system. ([#544][gh-544])
 - Add multi line comment `#{ ... #}` syntax. ([#595][gh-595])
+- Add error message when input file is not found. ([#513][gh-513])
 
 ## [0.2.36] - 2024-07-04
 
@@ -372,6 +373,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-494]: https://github.com/HigherOrderCO/Bend/issues/494
 [gh-502]: https://github.com/HigherOrderCO/Bend/issues/502
 [gh-512]: https://github.com/HigherOrderCO/Bend/issues/512
+[gh-513]: https://github.com/HigherOrderCO/Bend/issues/513
 [gh-514]: https://github.com/HigherOrderCO/Bend/issues/514
 [gh-516]: https://github.com/HigherOrderCO/Bend/issues/516
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526

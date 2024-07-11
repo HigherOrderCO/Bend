@@ -16,8 +16,16 @@ pub fn load_file_to_book(
   package_loader: impl PackageLoader,
   diag: DiagnosticsConfig,
 ) -> Result<Book, Diagnostics> {
-  let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
-  load_to_book(path, &code, package_loader, diag)
+  match path.try_exists() {
+    Ok(exists) => {
+      if !exists {
+        return Err(format!("The file '{}' was not found.", path.display()).into());
+      }
+      let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+      load_to_book(path, &code, package_loader, diag)
+    }
+    Err(e) => Err(e.to_string().into()),
+  }
 }
 
 pub fn load_to_book(

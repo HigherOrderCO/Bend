@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/input_file_not_found.bend
+---
+[4m[1m[31mErrors:[0m
+The file 'tests/golden_tests/missing_dir/input_file_not_found.bend' was not found.
