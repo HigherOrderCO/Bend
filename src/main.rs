@@ -12,6 +12,7 @@ use std::{
   process::ExitCode,
 };
 
+#[cfg(feature = "manager")]
 mod manager;
 
 #[derive(Parser, Debug)]
@@ -81,6 +82,7 @@ enum Mode {
     #[arg(help = "Path to the input file")]
     path: PathBuf,
   },
+  #[cfg(feature = "manager")]
   /// Runs a package manager command
   Manager {
     #[command(subcommand)]
@@ -391,6 +393,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       }
     }
 
+    #[cfg(feature = "manager")]
     Mode::Manager { command } => manager::handle_package_cmd(command).map_err(|e| e.to_string())?,
   };
   Ok(())
