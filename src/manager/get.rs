@@ -1,58 +1,11 @@
-use clap::Subcommand;
+use super::*;
 use git2::{FetchOptions, Repository};
 use semver::Version;
-use std::{
-  error::Error,
-  fs::{File, OpenOptions},
-  io::Write,
-  path::Path,
-};
-use toml_edit::{value, DocumentMut, Item, Table, TableLike};
-
-#[derive(Subcommand, Clone, Debug)]
-pub enum PackageCmd {
-  /// Initializes a bend module
-  Init {
-    #[arg(help = "Name of the module to initialize")]
-    name: String,
-  },
-  /// Adds a dependency
-  Get {
-    #[arg(help = "Name of the dependency to add")]
-    name: String,
-    #[arg(help = "Version of the dependency")]
-    version: Option<String>,
-    #[arg(short = 'a', long, help = "Dependency alias")]
-    alias: Option<String>,
-  },
-  /// Removes a dependency
-  Remove {
-    #[arg(help = "Name of the dependency to remove")]
-    name: String,
-  },
-  Tidy,
-}
-
-pub fn handle_package_cmd(command: PackageCmd) -> Result<(), Box<dyn Error>> {
-  match command {
-    PackageCmd::Init { name } => init(&name),
-    PackageCmd::Get { name, version, alias } => get(&name, version, alias),
-    PackageCmd::Remove { name } => remove(&name),
-    PackageCmd::Tidy {} => todo!(),
-  }
-}
-
-/// Initializes a new module configuration file named `mod.toml`
-/// with the given module name.
-fn init(name: &str) -> Result<(), Box<dyn Error>> {
-  let mut config = File::create_new("mod.toml")?;
-  config.write_all(format!("module = \"{name}\"").as_bytes())?;
-  Ok(())
-}
+use std::{error::Error, path::Path};
 
 /// Clones or updates a Git repository, checks out a specific version (if provided),
 /// and updates the module configuration file with the dependency information.
-fn get(name: &str, version: Option<String>, alias: Option<String>) -> Result<(), Box<dyn Error>> {
+pub fn get(name: &str, version: Option<String>, alias: Option<String>) -> Result<(), Box<dyn Error>> {
   let url = format!("https://{name}.git");
 
   let repo_name = alias.as_deref().unwrap_or_else(|| repository_name(name));
@@ -62,13 +15,6 @@ fn get(name: &str, version: Option<String>, alias: Option<String>) -> Result<(),
   let tag = setup_repo(local_path, &url, version)?;
 
   update_mod(name, &tag, alias)
-}
-
-/// Extracts the repository name from a full repository URL.
-/// Assumes the URL is in the format `user/repo`.
-fn repository_name(name: &str) -> &str {
-  let (_user, repo) = name.rsplit_once('/').expect("Invalid repository URL");
-  repo
 }
 
 /// Sets up the repository at the given local path, cloning it if it doesn't exist,
@@ -207,50 +153,4 @@ fn new_dependency(version: &str, alias: Option<String>) -> Item {
   } else {
     value(version)
   }
-}
-
-fn remove(name: &str) -> Result<(), Box<dyn Error>> {
-  remove_dep(name)?;
-  remove_repo(name)
-}
-
-fn remove_dep(name: &str) -> Result<(), Box<dyn Error>> {
-  let mut config = get_config()?;
-  let deps = get_deps(&mut config)?;
-
-  if deps.remove(name).is_none() {
-    return Err(format!("Dependency '{}' not found", name).into());
-  }
-
-  save_config(config)
-}
-
-fn remove_repo(name: &str) -> Result<(), Box<dyn Error>> {
-  let repo_name = repository_name(name);
-  let folder = format!(".bend/{}", repo_name);
-  let local_path = Path::new(&folder);
-
-  if local_path.exists() {
-    std::fs::remove_dir_all(local_path)?;
-  }
-
-  Ok(())
-}
-
-fn get_config() -> Result<DocumentMut, Box<dyn Error>> {
-  let file = std::fs::read_to_string("mod.toml")?;
-  file.parse::<DocumentMut>().map_err(|_| "invalid 'mod.toml' format".into())
-}
-
-fn save_config(config: DocumentMut) -> Result<(), Box<dyn Error>> {
-  let mut f = OpenOptions::new().write(true).truncate(true).open("mod.toml")?;
-  write!(f, "{}", config)?;
-  Ok(())
-}
-
-fn get_deps(config: &mut DocumentMut) -> Result<&mut dyn TableLike, Box<dyn Error>> {
-  config["dependencies"]
-    .or_insert(Item::Table(Table::new()))
-    .as_table_like_mut()
-    .ok_or_else(|| "invalid 'mod.toml' format".into())
 }
