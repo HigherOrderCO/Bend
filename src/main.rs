@@ -50,9 +50,8 @@ enum Mode {
   /// Compiles the program and runs it with the Rust HVM implementation.
   RunRs(RunArgs),
   /// Compiles the program and runs it with the C HVM implementation.
+  #[command(alias = "run")]
   RunC(RunArgs),
-  /// Compiles the program and runs it with the C HVM implementation.
-  Run(RunArgs),
   /// Compiles the program and runs it with the Cuda HVM implementation.
   RunCu(RunArgs),
   /// Compiles the program to hvm and prints to stdout.
@@ -310,8 +309,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       println!("{}", hvm_book_show_pretty(&compile_res.hvm_book));
     }
 
-    Mode::Run(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
-    | Mode::RunC(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
+    Mode::RunC(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
     | Mode::RunCu(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments })
     | Mode::RunRs(RunArgs { pretty, run_opts, comp_opts, warn_opts, path, arguments }) => {
       let CliRunOpts { linear, print_stats } = run_opts;
