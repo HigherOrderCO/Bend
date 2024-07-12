@@ -1,153 +1,192 @@
-use bend::{
-  diagnostics::{Diagnostics, DiagnosticsConfig},
-  fun::load_book::load_to_book,
-  imports::{check_book, DefaultLoader},
-};
-use bpm::*;
+use bend::diagnostics::Diagnostics;
 use clap::Subcommand;
-use std::path::PathBuf;
+use git2::{FetchOptions, Repository};
+use semver::Version;
+use std::{
+  error::Error,
+  fs::{File, OpenOptions},
+  io::Write,
+  path::Path,
+};
+use toml_edit::{value, DocumentMut, Item, Table};
 
 #[derive(Subcommand, Clone, Debug)]
 pub enum PackageCmd {
-  /// Stores a bend file into the package manager
-  Store {
-    #[arg(help = "Path to the input file")]
-    path: PathBuf,
-    #[arg(
-      short = 'n',
-      long = "name",
-      help = "Overwrite the name of the package, otherwise the file name is used"
-    )]
-    name: Option<String>,
-    #[arg(help = "Namespace to store the file")]
-    namespace: String,
-    #[arg(help = "Version of the package", default_value = "v0")]
-    version: String,
-  },
-  /// Loads a package from the package manager
-  Load {
-    #[arg(help = "Name of the package to load")]
+  /// Initializes a bend module
+  Init {
+    #[arg(help = "Name of the module to initialize")]
     name: String,
   },
-  /// Checks fo permissions to create/update the target package
-  CanPost {
-    #[arg(help = "Name of the package to check for permissions")]
+  /// Adds a dependency
+  Get {
+    #[arg(help = "Name of the dependency to load")]
     name: String,
+    #[arg(help = "Version of the dependency")]
+    version: Option<String>,
+    #[arg(short = 'a', long, help = "Dependency alias")]
+    alias: Option<String>,
   },
-  /// Adds permissions to update the target package to the given user name
-  AddPerms {
-    #[arg(help = "Name of the package/namespace to modify the permissions")]
-    name: String,
-    #[arg(help = "Username to add the edit/create permissions to")]
-    user: String,
-  },
-  /// Makes a namespace public, allowing all users to create packages inside
-  MakePub {
-    #[arg(help = "Name of the namespace to make public")]
-    name: String,
-  },
-  /// Register a new Bend Package Manager account
-  Register,
 }
 
 pub fn handle_package_cmd(command: PackageCmd) -> Result<(), Diagnostics> {
   match command {
-    PackageCmd::CanPost { name } => match can_post(&PackageDescriptor::from(name.as_str())) {
-      Ok(true) => println!("The package `{name}` can be uploaded"),
-      Ok(false) => println!("The package `{name}` can NOT be uploaded"),
-      err @ Err(_) => _ = err?,
-    },
+    PackageCmd::Init { name } => init(&name).map_err(|e| e.to_string())?,
+    PackageCmd::Get { name, version, alias} => get(&name, version, alias).map_err(|e| e.to_string())?,
+  }
 
-    PackageCmd::AddPerms { name, user } => add_perms(PackageDescriptor::from(name.as_str()), User(user))?,
+  Ok(())
+}
 
-    PackageCmd::Store { path, name, namespace, version } => store_cmd(path, name, namespace, version)?,
+fn init(name: &str) -> std::io::Result<()> {
+  let mut config = File::create_new("mod.toml")?;
+  config.write_all(format!("module = \"{name}\"").as_bytes())
+}
 
-    PackageCmd::Load { name } => load_cmd(&name).map(|pack| println!("{}", pack))?,
+fn get(name: &str, version: Option<String>, alias: Option<String>) -> Result<(), Box<dyn Error>> {
+  let url = format!("https://{name}.git");
 
-    PackageCmd::MakePub { name } => make_public(name)?,
+  let repo_name =
+    alias.as_deref().unwrap_or_else(|| name.rsplit_once('/').expect("Invalid repository URL").1);
+  let folder = format!(".bend/{}", repo_name);
+  let local_path = Path::new(&folder);
 
-    PackageCmd::Register => register_cmd()?,
+  let tag = setup_repo(local_path, &url, version)?;
+
+  update_mod(name, &tag, alias)
+}
+
+fn setup_repo(local_path: &Path, url: &str, version: Option<String>) -> Result<String, Box<dyn Error>> {
+  // Check if the repository already exists
+  let repo = match Repository::open(local_path) {
+    Ok(repo) => repo,
+    Err(_) => Repository::init(local_path)?,
   };
 
+  {
+    // Add the remote
+    let remote_name = "origin";
+    let mut remote = match repo.find_remote(remote_name) {
+      Ok(remote) => {
+        if remote.url() != Some(url) {
+          repo.remote_set_url(remote_name, url)?;
+          repo.find_remote(remote_name)?
+        } else {
+          remote
+        }
+      }
+      Err(_) => repo.remote(remote_name, url)?,
+    };
+
+    delete_local_tags(&repo)?;
+
+    // Fetch new tags from the remote
+    let mut fetch_opts = FetchOptions::new();
+    remote.fetch(&["refs/tags/*:refs/tags/*"], Some(&mut fetch_opts), None)?;
+  }
+
+  // Determine the tag to checkout
+  let tag = match version {
+    Some(ver) => ver,
+    None => get_latest_tag(&repo)?,
+  };
+
+  // Checkout the specified tag
+  if let Err(err) = checkout_tag(&repo, &tag) {
+    match err.class() {
+      git2::ErrorClass::Reference => return Err(format!("Version '{tag}' not found on '{url}'").into()),
+      _ => return Err(err.message().into()),
+    }
+  }
+
+  Ok(tag)
+}
+
+fn delete_local_tags(repo: &Repository) -> Result<(), git2::Error> {
+  let tags = repo.tag_names(None)?;
+  for tag in tags.iter().flatten() {
+    repo.tag_delete(tag)?;
+  }
   Ok(())
 }
 
-fn store_cmd(
-  path: PathBuf,
-  name: Option<String>,
-  namespace: String,
-  version: String,
-) -> Result<(), Diagnostics> {
-  let name = name.unwrap_or_else(|| {
-    let path = path.clone().with_extension("");
-    let file_name = path.file_name().unwrap();
-    file_name.to_string_lossy().to_string()
-  });
+fn get_latest_tag(repo: &Repository) -> Result<String, Box<dyn Error>> {
+  let refs = repo.references()?;
+  let mut latest_tag: Option<Version> = None;
 
-  let package_name = format!("{}/{}", namespace, name);
+  for reference in refs {
+    let reference = reference?;
+    if reference.is_tag() {
+      if let Some(tag) = reference.shorthand() {
+        if let Ok(version) = Version::parse(tag) {
+          if latest_tag.as_ref().map_or(true, |latest| version > *latest) {
+            latest_tag = Some(version);
+          }
+        }
+      }
+    }
+  }
 
-  let pack = PackageDescriptor::new(Some(&version), &package_name);
-  let package = check(path)?;
-  store(pack, package)?;
+  latest_tag.map(|v| v.to_string()).ok_or_else(|| "No tags found".into())
+}
+
+fn checkout_tag(repo: &Repository, tag: &str) -> Result<(), git2::Error> {
+  // Find the commit corresponding to the tag
+  let (object, reference) = repo.revparse_ext(tag)?;
+  repo.checkout_tree(&object, None)?;
+
+  // Update the HEAD to point to the tag's commit
+  if let Some(ref_) = reference {
+    repo.set_head(ref_.name().unwrap())?;
+  } else {
+    repo.set_head_detached(object.id())?;
+  }
 
   Ok(())
 }
 
-pub fn load_cmd(name: &str) -> Result<String, String> {
-  load(&PackageDescriptor::from(name)).map(|Package(pack)| pack)
+fn update_mod(name: &str, version: &str, alias: Option<String>) -> Result<(), Box<dyn Error>> {
+  let file = std::fs::read_to_string("mod.toml")?;
+  let mut config = file.parse::<DocumentMut>().expect("invalid doc");
+  let deps = config["dependencies"].or_insert(Item::Table(Table::new()));
+
+  if let Some(table) = deps.as_table_like_mut() {
+    // Check if the dependency already exists
+    match table.get_mut(name) {
+      Some(dep_item) => update_existing_dependency(dep_item, version, alias),
+      None => _ = table.insert(name, new_dependency(version, alias)),
+    }
+  } else {
+    panic!("Wrong `mod.toml` format, `dependencies` should be a table");
+  }
+
+  // Write the updated config back to mod.toml
+  let mut f = OpenOptions::new().write(true).truncate(true).open("mod.toml")?;
+  write!(f, "{}", config)?;
+
+  Ok(())
 }
 
-fn check(path: PathBuf) -> Result<Package, Diagnostics> {
-  let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-  let package_loader = DefaultLoader::new_empty(load_cmd);
-  let mut book = load_to_book(&path, &source, package_loader, DiagnosticsConfig::default())?;
-
-  let diagnostics = check_book(&mut book)?;
-  eprint!("{diagnostics}");
-
-  Ok(Package(source))
-}
-
-fn register_cmd() -> Result<(), String> {
-  use std::io::{stdout, Write};
-
-  print!("Please enter your username: ");
-  let _ = stdout().flush();
-
-  let user = get_input();
-
-  loop {
-    print!("Please enter your password:  ");
-    let _ = stdout().flush();
-    let pass = rpassword::read_password().unwrap();
-
-    print!("Please repeat your password: ");
-    let _ = stdout().flush();
-    let pass2 = rpassword::read_password().unwrap();
-
-    if pass != pass2 {
-      println!("Passwords do not match, please try again")
-    } else {
-      register_user(&user, &pass)?;
-      println!("User `{user}` registered");
-      return Ok(());
+fn update_existing_dependency(dep_item: &mut Item, version: &str, alias: Option<String>) {
+  match dep_item.as_table_like_mut() {
+    None => *dep_item = new_dependency(version, alias),
+    Some(table) => {
+      table.insert("version", value(version));
+      if let Some(alias) = alias {
+        table.insert("alias", value(alias));
+      } else {
+        table.remove("alias");
+      }
     }
   }
 }
 
-fn get_input() -> String {
-  use std::io::stdin;
-
-  let mut user = String::new();
-  stdin().read_line(&mut user).expect("Did not enter a correct string");
-
-  if let Some('\n') = user.chars().next_back() {
-    user.pop();
+fn new_dependency(version: &str, alias: Option<String>) -> Item {
+  if let Some(alias) = alias {
+    let mut dep_table = Table::new();
+    dep_table["version"] = value(version);
+    dep_table["alias"] = value(alias);
+    value(dep_table.into_inline_table())
+  } else {
+    value(version)
   }
-
-  if let Some('\r') = user.chars().next_back() {
-    user.pop();
-  }
-
-  user
 }

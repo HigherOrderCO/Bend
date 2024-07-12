@@ -7,7 +7,6 @@ use bend::{
   load_file_to_book, run_book, AdtEncoding, CompileOpts, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
-use manager::load_cmd;
 use std::{
   path::{Path, PathBuf},
   process::ExitCode,
@@ -261,7 +260,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
   let entrypoint = cli.entrypoint.take();
 
   let load_book = |path: &Path, diag: DiagnosticsConfig| -> Result<Book, Diagnostics> {
-    let package_loader = DefaultLoader::new(path, load_cmd);
+    let package_loader = DefaultLoader::new(path);
     let mut book = load_file_to_book(path, package_loader, diag)?;
     book.entrypoint = entrypoint.map(Name::new);
 

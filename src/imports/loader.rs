@@ -37,23 +37,17 @@ pub trait PackageLoader {
 }
 
 /// Default implementation of `PackageLoader` that loads packages from the local directory.
-pub struct DefaultLoader<F: Fn(&str) -> Result<String, String>> {
+pub struct DefaultLoader {
   local_path: PathBuf,
   loaded: HashSet<Name>,
   entrypoint: Name,
-  #[allow(dead_code)] // TODO: call bmp when path contains `version@`
-  non_local_loader: F,
 }
 
-impl<F: Fn(&str) -> Result<String, String>> DefaultLoader<F> {
-  pub fn new(local_path: &Path, non_local_loader: F) -> Self {
+impl DefaultLoader {
+  pub fn new(local_path: &Path) -> Self {
     let entrypoint = Name::new(local_path.file_stem().unwrap().to_string_lossy());
     let local_path = local_path.parent().unwrap().to_path_buf();
-    Self { local_path, loaded: HashSet::new(), entrypoint, non_local_loader }
-  }
-
-  pub fn new_empty(non_local_loader: F) -> Self {
-    Self { local_path: PathBuf::new(), loaded: HashSet::new(), entrypoint: Name::default(), non_local_loader }
+    Self { local_path, loaded: HashSet::new(), entrypoint }
   }
 
   fn read_file(&mut self, path: &Path, file_path: &str, src: &mut Sources) -> Result<Option<Name>, String> {
@@ -158,7 +152,7 @@ impl<F: Fn(&str) -> Result<String, String>> DefaultLoader<F> {
 
 pub const BEND_PATH: &[&str] = &[""];
 
-impl<F: Fn(&str) -> Result<String, String>> PackageLoader for DefaultLoader<F> {
+impl PackageLoader for DefaultLoader {
   fn load(&mut self, import: &mut Import) -> Result<Sources, String> {
     let mut sources = Sources::new();
 
