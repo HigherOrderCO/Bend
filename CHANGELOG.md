@@ -18,6 +18,8 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add import system. ([#544][gh-544])
 - Add multi line comment `#{ ... #}` syntax. ([#595][gh-595])
 - Add error message when input file is not found. ([#513][gh-513])
+- Add DyLib IO functions. ([#621][gh-621])
+- Add `List/filter` and `String/{equals, filter}` builtins.
 
 ## [0.2.36] - 2024-07-04
 
@@ -395,5 +397,6 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-598]: https://github.com/HigherOrderCO/Bend/issues/598
 [gh-618]: https://github.com/HigherOrderCO/Bend/issues/618
 [gh-620]: https://github.com/HigherOrderCO/Bend/issues/620
+[gh-621]: https://github.com/HigherOrderCO/Bend/issues/621
 [gh-623]: https://github.com/HigherOrderCO/Bend/issues/623
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
