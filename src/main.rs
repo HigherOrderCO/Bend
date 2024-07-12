@@ -391,7 +391,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       }
     }
 
-    Mode::Manager { command } => manager::handle_package_cmd(command)?,
+    Mode::Manager { command } => manager::handle_package_cmd(command).map_err(|e| e.to_string())?,
   };
   Ok(())
 }
