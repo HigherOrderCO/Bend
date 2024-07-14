@@ -1,5 +1,5 @@
 use super::{
-  parser::{ParseBook, TermParser},
+  parser::{FunParser, ParseBook},
   Book, Name, Num, Pattern, Term,
 };
 use crate::maybe_grow;
@@ -47,7 +47,7 @@ pub const BUILTIN_TYPES: &[&str] = &[LIST, STRING, NAT, TREE, MAP, IO];
 
 impl ParseBook {
   pub fn builtins() -> Self {
-    let book = TermParser::new(BUILTINS).parse_book(Self::default(), true);
+    let book = FunParser::new(Name::new(""), BUILTINS, true).parse_book(Self::default());
     book.unwrap_or_else(|e| panic!("Error parsing builtin file, this should not happen:\n{e}"))
   }
 }

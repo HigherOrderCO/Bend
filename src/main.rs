@@ -105,7 +105,7 @@ struct RunArgs {
   #[arg(help = "Path to the input file")]
   path: PathBuf,
 
-  #[arg(value_parser = |arg: &str| bend::fun::parser::TermParser::new(arg).parse_term())]
+  #[arg(value_parser = |arg: &str| bend::fun::parser::FunParser::new(Name::new(""), arg, false).parse_term())]
   arguments: Option<Vec<bend::fun::Term>>,
 }
 

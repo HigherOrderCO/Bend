@@ -34,14 +34,17 @@ impl Ctx<'_> {
     for def in self.book.defs.values_mut() {
       let mut fresh = 0;
       for rule in def.rules.iter_mut() {
-        let res = rule.body.desugar_fold(
-          &def.name,
-          &mut fresh,
-          &mut new_defs,
-          &self.book.ctrs,
-          &self.book.adts,
-          &def.source,
-        );
+        let mut ctx = DesugarFoldCtx {
+          def_name: &def.name,
+          fresh: &mut fresh,
+          new_defs: &mut new_defs,
+          ctrs: &self.book.ctrs,
+          adts: &self.book.adts,
+          source: def.source.clone(),
+          check: def.check,
+        };
+
+        let res = rule.body.desugar_fold(&mut ctx);
         if let Err(e) = res {
           self.info.add_function_error(e, def.name.clone(), def.source.clone());
         }
@@ -54,19 +57,21 @@ impl Ctx<'_> {
   }
 }
 
+struct DesugarFoldCtx<'a> {
+  pub def_name: &'a Name,
+  pub fresh: &'a mut usize,
+  pub new_defs: &'a mut Vec<Definition>,
+  pub ctrs: &'a Constructors,
+  pub adts: &'a Adts,
+  pub source: Source,
+  pub check: bool,
+}
+
 impl Term {
-  pub fn desugar_fold(
-    &mut self,
-    def_name: &Name,
-    fresh: &mut usize,
-    new_defs: &mut Vec<Definition>,
-    ctrs: &Constructors,
-    adts: &Adts,
-    source: &Source,
-  ) -> Result<(), String> {
+  fn desugar_fold(&mut self, ctx: &mut DesugarFoldCtx<'_>) -> Result<(), String> {
     maybe_grow(|| {
       for child in self.children_mut() {
-        child.desugar_fold(def_name, fresh, new_defs, ctrs, adts, source)?;
+        child.desugar_fold(ctx)?;
       }
 
       if let Term::Fold { .. } = self {
@@ -90,19 +95,19 @@ impl Term {
         }
         let free_vars = free_vars.into_iter().collect::<Vec<_>>();
 
-        let new_nam = Name::new(format!("{}__fold{}", def_name, fresh));
-        *fresh += 1;
+        let new_nam = Name::new(format!("{}__fold{}", ctx.def_name, ctx.fresh));
+        *ctx.fresh += 1;
 
         // Substitute the implicit recursive calls to call the new function
         let ctr = arms[0].0.as_ref().unwrap();
-        let adt_nam = ctrs.get(ctr).unwrap();
-        let ctrs = &adts.get(adt_nam).unwrap().ctrs;
+        let adt_nam = ctx.ctrs.get(ctr).unwrap();
+        let ctrs = &ctx.adts.get(adt_nam).unwrap().ctrs;
         for arm in arms.iter_mut() {
           let ctr = arm.0.as_ref().unwrap();
           let recursive = arm
             .1
             .iter()
-            .zip(ctrs.get(ctr).unwrap())
+            .zip(&ctrs.get(ctr).unwrap().fields)
             .filter_map(|(var, field)| if field.rec { Some(var.as_ref().unwrap().clone()) } else { None })
             .collect::<HashSet<_>>();
           arm.2.call_recursive(&new_nam, &recursive, &free_vars);
@@ -121,8 +126,13 @@ impl Term {
         let body = Term::rfold_lams(body, free_vars.iter().map(|nam| Some(nam.clone())));
         let body = Term::lam(Pattern::Var(Some(x_nam)), body);
 
-        let def = Definition::new(new_nam.clone(), vec![Rule { pats: vec![], body }], source.clone());
-        new_defs.push(def);
+        let def = Definition::new_gen(
+          new_nam.clone(),
+          vec![Rule { pats: vec![], body }],
+          ctx.source.clone(),
+          ctx.check,
+        );
+        ctx.new_defs.push(def);
 
         // Call the new function
         let call = Term::call(Term::Ref { nam: new_nam.clone() }, [std::mem::take(arg.as_mut())]);

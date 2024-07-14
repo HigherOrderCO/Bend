@@ -6,7 +6,11 @@ use crate::{
 use indexmap::{IndexMap, IndexSet};
 use interner::global::{GlobalPool, GlobalString};
 use itertools::Itertools;
-use std::{borrow::Cow, hash::Hash, ops::Deref};
+use std::{
+  borrow::Cow,
+  hash::Hash,
+  ops::{Deref, Range},
+};
 
 pub mod builtins;
 pub mod check;
@@ -64,6 +68,8 @@ pub type Constructors = IndexMap<Name, Name>;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Definition {
   pub name: Name,
+  pub typ: Type,
+  pub check: bool,
   pub rules: Vec<Rule>,
   pub source: Source,
 }
@@ -93,8 +99,23 @@ pub enum SourceKind {
 #[derive(Debug, Clone)]
 pub struct HvmDefinition {
   pub name: Name,
+  pub typ: Type,
   pub body: hvm::ast::Net,
   pub source: Source,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Type {
+  Any,
+  Hole,
+  Var(Name),
+  All(Name, Box<Type>),
+  Ctr(Name, Vec<Type>),
+  Arr(Box<Type>, Box<Type>),
+  Tup(Vec<Type>),
+  U24,
+  F24,
+  I24,
 }
 
 /// A pattern matching rule of a definition.
@@ -280,15 +301,25 @@ pub enum Tag {
 /// A user defined datatype
 #[derive(Debug, Clone)]
 pub struct Adt {
-  pub ctrs: IndexMap<Name, Vec<CtrField>>,
+  pub name: Name,
+  pub vars: Vec<Name>,
+  pub ctrs: IndexMap<Name, AdtCtr>,
   pub source: Source,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
+pub struct AdtCtr {
+  pub name: Name,
+  pub typ: Type,
+  pub fields: Vec<CtrField>,
+}
+
+#[derive(Debug, Clone)]
 pub struct CtrField {
   pub nam: Name,
   pub rec: bool,
 }
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Name(GlobalString);
 
@@ -1027,14 +1058,10 @@ impl Rule {
 }
 
 impl Definition {
-  pub fn new(name: Name, rules: Vec<Rule>, source: Source) -> Self {
-    Self { name, rules, source }
-  }
-
-  pub fn new_gen(name: Name, rules: Vec<Rule>, source: Source) -> Self {
+  pub fn new_gen(name: Name, rules: Vec<Rule>, source: Source, check: bool) -> Self {
     let kind = if source.is_builtin() { SourceKind::Builtin } else { SourceKind::Generated };
     let source = Source { kind, ..source };
-    Self { name, rules, source }
+    Self { name, typ: Type::Hole, check, rules, source }
   }
 
   pub fn is_builtin(&self) -> bool {
@@ -1133,6 +1160,13 @@ impl Source {
 
   pub fn is_local(&self) -> bool {
     matches!(self.kind, SourceKind::User)
+  }
+
+  pub fn from_file_span(file: &Name, txt: &str, span: Range<usize>, builtin: bool) -> Self {
+    let span = Some(TextSpan::from_byte_span(txt, span));
+    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+    let file = Some(file.to_string());
+    Source { file, span, kind }
   }
 }
 

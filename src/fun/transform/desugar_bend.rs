@@ -15,7 +15,9 @@ impl Ctx<'_> {
     for def in self.book.defs.values_mut() {
       let mut fresh = 0;
       for rule in def.rules.iter_mut() {
-        if let Err(err) = rule.body.desugar_bend(&def.name, &mut fresh, &mut new_defs, &def.source) {
+        if let Err(err) =
+          rule.body.desugar_bend(&def.name, &mut fresh, &mut new_defs, def.source.clone(), def.check)
+        {
           self.info.add_function_error(err, def.name.clone(), def.source.clone());
           break;
         }
@@ -34,12 +36,13 @@ impl Term {
     def_name: &Name,
     fresh: &mut usize,
     new_defs: &mut IndexMap<Name, Definition>,
-    source: &Source,
+    source: Source,
+    check: bool,
   ) -> Result<(), String> {
     maybe_grow(|| {
       // Recursively encode bends in the children
       for child in self.children_mut() {
-        child.desugar_bend(def_name, fresh, new_defs, source)?;
+        child.desugar_bend(def_name, fresh, new_defs, source.clone(), check)?;
       }
 
       // Convert a bend into a new recursive function and call it.
@@ -87,7 +90,7 @@ impl Term {
         let body = Term::rfold_lams(body, free_vars.iter().cloned().map(Some));
 
         // Make a definition from the new function
-        let def = Definition::new(new_nam.clone(), vec![Rule { pats: vec![], body }], source.clone());
+        let def = Definition::new_gen(new_nam.clone(), vec![Rule { pats: vec![], body }], source, check);
         new_defs.insert(new_nam.clone(), def);
 
         // Call the new function in the original term.

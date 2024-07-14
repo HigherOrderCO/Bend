@@ -50,9 +50,15 @@ impl Definition {
     };
 
     let rule =
-      fun::Rule { pats: self.params.into_iter().map(|param| fun::Pattern::Var(Some(param))).collect(), body };
+      fun::Rule { pats: self.args.into_iter().map(|param| fun::Pattern::Var(Some(param))).collect(), body };
 
-    let def = fun::Definition::new(self.name, vec![rule], self.source);
+    let def = fun::Definition {
+      name: self.name,
+      typ: self.typ,
+      check: self.check,
+      rules: vec![rule],
+      source: self.source,
+    };
     Ok(def)
   }
 }

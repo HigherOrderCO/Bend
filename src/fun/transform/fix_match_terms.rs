@@ -159,15 +159,15 @@ impl Term {
 
         // Build the match arms, with all constructors
         let mut new_rules = vec![];
-        for (ctr, fields) in adt_ctrs.iter() {
-          let fields = fields.iter().map(|f| Some(match_field(&bnd, &f.nam))).collect::<Vec<_>>();
-          let body = if let Some(Some(body)) = bodies.remove(ctr) {
+        for (ctr_nam, ctr) in adt_ctrs.iter() {
+          let fields = ctr.fields.iter().map(|f| Some(match_field(&bnd, &f.nam))).collect::<Vec<_>>();
+          let body = if let Some(Some(body)) = bodies.remove(ctr_nam) {
             body
           } else {
-            errs.push(FixMatchErr::NonExhaustiveMatch { typ: adt_nam.clone(), missing: ctr.clone() });
+            errs.push(FixMatchErr::NonExhaustiveMatch { typ: adt_nam.clone(), missing: ctr_nam.clone() });
             Term::Err
           };
-          new_rules.push((Some(ctr.clone()), fields, body));
+          new_rules.push((Some(ctr_nam.clone()), fields, body));
         }
         *arms = new_rules;
         return;
@@ -248,7 +248,7 @@ fn fixed_match_arms<'a>(
         if let Some(var) = &rules[rule_idx].0 {
           new_body = Term::Use {
             nam: Some(var.clone()),
-            val: Box::new(rebuild_ctr(bnd, ctr, &adts[adt_nam].ctrs[&**ctr])),
+            val: Box::new(rebuild_ctr(bnd, ctr, &adts[adt_nam].ctrs[&**ctr].fields)),
             nxt: Box::new(new_body),
           };
         }

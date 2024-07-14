@@ -1,21 +1,17 @@
-use std::ops::Range;
-
 use crate::{
-  diagnostics::{TextLocation, TextSpan},
   fun::{
-    display::DisplayFn, Adt, Adts, Constructors, CtrField, FanKind, HvmDefinition, HvmDefinitions, MatchRule,
-    Name, Num, Op, Pattern, Rule, Source, Tag, Term, STRINGS,
+    display::DisplayFn, Adt, AdtCtr, Adts, Constructors, CtrField, FanKind, HvmDefinition, HvmDefinitions,
+    MatchRule, Name, Num, Op, Pattern, Rule, Source, SourceKind, Tag, Term, Type, STRINGS,
   },
-  imp::{parser::PyParser, Enum, RepeatedNames, Variant},
+  imp::parser::ImpParser,
   imports::{Import, ImportCtx, ImportType},
   maybe_grow,
 };
 use highlight_error::highlight_error;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use std::ops::Range;
 use TSPL::{ParseError, Parser};
-
-use super::SourceKind;
 
 type FunDefinition = super::Definition;
 type ImpDefinition = crate::imp::Definition;
@@ -60,246 +56,320 @@ impl ParseBook {
   }
 }
 
-// Bend grammar description:
-// <Book>       ::= (<Data> | <Rule>)*
-// <ADT>        ::= "type" <Name> "=" ( <Name> | "(" <Name> (<Name>)* ")" )+
-// <Rule>       ::= ("(" <Name> <Pattern>* ")" | <Name> <Pattern>*) "=" <Term>
-// <Pattern>    ::= "(" <Name> <Pattern>* ")" | <NameEra> | <Number> | "(" <Pattern> ("," <Pattern>)+ ")"
-// <Term>       ::=
-//   <Number> | <NumOp> | <Tup> | <App> | <Group> | <Nat> | <Lam> | <UnscopedLam> | <Bend> | <Fold> |
-//   <Use> | <Dup> | <LetTup> | <Let> | <With> | <Match> | <Switch> | <Era> | <UnscopedVar> | <Var>
-// <Lam>        ::= <Tag>? ("λ"|"@") <NameEra> <Term>
-// <UnscopedLam>::= <Tag>? ("λ"|"@") "$" <Name> <Term>
-// <NumOp>      ::= "(" <Operator> <Term> <Term> ")"
-// <Tup>        ::= "(" <Term> ("," <Term>)+ ")"
-// <App>        ::= <Tag>? "(" <Term> (<Term>)+ ")"
-// <Group>      ::= "(" <Term> ")"
-// <Use>        ::= "use" <Name> "=" <Term> ";"? <Term>
-// <Let>        ::= "let" <NameEra> "=" <Term> ";"? <Term>
-// <With>       ::= "with" <Name> "{" <Ask> "}"
-// <Ask>        ::= "ask" <Pattern> "=" <Term> ";" <Term> | <Term>
-// <LetTup>     ::= "let" "(" <NameEra> ("," <NameEra>)+ ")" "=" <Term> ";"? <Term>
-// <Dup>        ::= "let" <Tag>? "{" <NameEra> (","? <NameEra>)+ "}" "=" <Term> ";"? <Term>
-// <List>       ::= "[" (<Term> ","?)* "]"
-// <String>     ::= "\"" (escape sequence | [^"])* "\""
-// <Char>       ::= "'" (escape sequence | [^']) "'"
-// <Match>      ::= "match" <MatchArg> <WithClause>? "{" <MatchArm>+ "}"
-// <Fold>       ::= "fold" <MatchArg> <WithClause>? "{" <MatchArm>+ "}"
-// <MatchArg>   ::= (<Name> "=" <Term>) | <Term>
-// <WithClause> ::= "with" (<Name> ("=" <Term>)? ","?)+
-// <MatchArm>   ::= "|"? <Pattern> ":" <Term> ";"?
-// <Switch>     ::= "switch" <MatchArg> <WithClause>? "{" <SwitchArm>+ "}"
-// <SwitchArm>  ::= "|"? (<Num>|"_") ":" <Term> ";"?
-// <Bend>       ::= "bend" (<MatchArg> ","?)+ "{" "when" <Term> ":" <Term> "else" ":" <Term> "}"
-// <Var>        ::= <Name>
-// <UnscopedVar>::= "$" <Name>
-// <NameEra>    ::= <Name> | "*"
-// <Era>        ::= "*"
-// <Tag>        ::= "#" <Name>
-// <Name>       ::= [_\-./a-zA-Z0-9]+
-// <Number>     ::= ([0-9]+ | "0x"[0-9a-fA-F]+ | "0b"[01]+)
-// <Operator>   ::= ( "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<<" | ">>" | "<" | ">" | "&" | "|" | "^" | "**" )
-
 pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
-pub struct TermParser<'i> {
+pub struct FunParser<'i> {
+  file: Name,
   input: &'i str,
   index: usize,
+  builtin: bool,
 }
 
-impl<'a> TermParser<'a> {
-  pub fn new(input: &'a str) -> Self {
-    Self { input, index: 0 }
+impl<'a> FunParser<'a> {
+  pub fn new(file: Name, input: &'a str, builtin: bool) -> Self {
+    Self { file, input, index: 0, builtin }
   }
 
   /* AST parsing functions */
 
-  pub fn parse_book(&mut self, default_book: ParseBook, builtin: bool) -> ParseResult<ParseBook> {
+  pub fn parse_book(&mut self, default_book: ParseBook) -> ParseResult<ParseBook> {
     let mut book = default_book;
     let mut indent = self.advance_newlines()?;
-    let mut last_rule = None;
     while !self.is_eof() {
-      let ini_idx = *self.index();
-
       // Record type definition
-      if self.try_parse_keyword("object") {
-        let mut prs = PyParser { input: self.input, index: *self.index() };
-        let (obj, nxt_indent) = prs.parse_object(indent)?;
+      if self.starts_with_keyword("object") {
+        let ini_idx = *self.index();
+        let mut prs = ImpParser {
+          file: self.file.clone(),
+          input: self.input,
+          index: *self.index(),
+          builtin: self.builtin,
+        };
+        let (adt, nxt_indent) = prs.parse_object(indent)?;
         self.index = prs.index;
         let end_idx = *self.index();
-        self.add_object(obj, &mut book, ini_idx..end_idx, builtin)?;
+        self.add_type_def(adt, &mut book, ini_idx..end_idx)?;
         indent = nxt_indent;
-        last_rule = None;
         continue;
       }
 
       // Imp function definition
-      if self.try_parse_keyword("def") {
-        let mut prs = PyParser { input: self.input, index: *self.index() };
-        let (def, nxt_indent) = prs.parse_def(indent)?;
+      if self.starts_with_keyword("def") {
+        let ini_idx = *self.index();
+        let mut prs =
+          ImpParser { file: self.file.clone(), input: self.input, index: ini_idx, builtin: self.builtin };
+        let (def, nxt_indent) = prs.parse_function_def(indent)?;
         self.index = prs.index;
         let end_idx = *self.index();
-        self.add_imp_def(def, &mut book, ini_idx..end_idx, builtin)?;
+        self.add_imp_def(def, &mut book, ini_idx..end_idx)?;
         indent = nxt_indent;
-        last_rule = None;
         continue;
       }
 
       // Fun/Imp type definition
-      if self.try_parse_keyword("type") {
-        self.skip_trivia();
-        let rewind_index = self.index;
+      if self.starts_with_keyword("type") {
+        fn starts_with_imp_type(p: &mut FunParser) -> ParseResult<()> {
+          p.parse_keyword("type")?;
+          p.skip_trivia_inline()?;
+          p.parse_top_level_name()?;
+          p.skip_trivia_inline()?;
+          if p.starts_with(":") || p.starts_with("(") {
+            Ok(())
+          } else {
+            Err(ParseError::new((0, 0), ""))
+          }
+        }
 
-        let _ = self.labelled(|p| p.parse_top_level_name(), "datatype name")?;
-
-        // Imp type definition
-        if self.starts_with(":") {
-          let mut prs = PyParser { input: self.input, index: rewind_index };
-          let (r#enum, nxt_indent) = prs.parse_type(indent)?;
+        let ini_idx = *self.index();
+        let is_imp = starts_with_imp_type(self).is_ok();
+        self.index = ini_idx;
+        if is_imp {
+          // Imp type definition
+          let mut prs = ImpParser {
+            file: self.file.clone(),
+            input: self.input,
+            index: *self.index(),
+            builtin: self.builtin,
+          };
+          let (adt, nxt_indent) = prs.parse_type_def(indent)?;
           self.index = prs.index;
           let end_idx = *self.index();
-          self.add_imp_type(r#enum, &mut book, ini_idx..end_idx, builtin)?;
+          self.add_type_def(adt, &mut book, ini_idx..end_idx)?;
           indent = nxt_indent;
-          last_rule = None;
           continue;
-        // Fun type definition
         } else {
-          self.index = rewind_index;
-          let (nam, ctrs) = self.parse_datatype()?;
+          // Fun type definition
+          let adt = self.parse_type_def()?;
           let end_idx = *self.index();
-
-          let span = Some(TextSpan::from_byte_span(self.input(), ini_idx..end_idx));
-          let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
-          let file = Some(book.source.to_string());
-          let source = Source { file, span, kind };
-
-          let adt = Adt { ctrs, source };
-          self.add_fun_type(&mut book, nam, adt, ini_idx..end_idx)?;
+          self.add_type_def(adt, &mut book, ini_idx..end_idx)?;
           indent = self.advance_newlines()?;
-          last_rule = None;
           continue;
         }
       }
 
       // HVM native function definition
-      if self.try_parse_keyword("hvm") {
-        let def = self.parse_hvm(builtin)?;
+      if self.starts_with_keyword("hvm") {
+        let ini_idx = self.index;
+        let mut prs =
+          ImpParser { file: self.file.clone(), input: self.input, index: self.index, builtin: self.builtin };
+        let (def, nxt_indent) = prs.parse_hvm()?;
+        *self.index() = prs.index;
         let end_idx = *self.index();
         self.add_hvm(def, &mut book, ini_idx..end_idx)?;
-        indent = self.advance_newlines()?;
-        last_rule = None;
+        indent = nxt_indent;
         continue;
       }
 
       // Import declaration
-      if self.try_parse_keyword("from") {
-        self.skip_trivia();
+      if self.starts_with_keyword("from") {
         let import = self.parse_from_import()?;
         book.import_ctx.add_import(import);
         indent = self.advance_newlines()?;
-        last_rule = None;
         continue;
       }
 
-      if self.try_parse_keyword("import") {
-        self.skip_trivia();
+      if self.starts_with_keyword("import") {
         let imports = self.parse_import()?;
         for imp in imports {
           book.import_ctx.add_import(imp);
         }
         indent = self.advance_newlines()?;
-        last_rule = None;
         continue;
       }
 
       // Fun function definition
       let ini_idx = *self.index();
-      let (name, rule) = self.parse_rule()?;
+      let def = self.parse_fun_def()?;
       let end_idx = *self.index();
 
-      if let Some(def) = book.imp_defs.get(&name) {
-        let msg = Self::redefinition_of_function_msg(def.source.is_builtin(), &name);
-        return self.with_ctx(Err(msg), ini_idx..end_idx);
-      }
-
-      self.add_fun_def(&name, rule, builtin, &last_rule, &mut book, ini_idx..end_idx)?;
+      self.add_fun_def(def, &mut book, ini_idx..end_idx)?;
       indent = self.advance_newlines()?;
-      last_rule = Some(name);
     }
 
     Ok(book)
   }
 
-  fn parse_datatype(&mut self) -> ParseResult<(Name, IndexMap<Name, Vec<CtrField>>)> {
-    // type name = ctr (| ctr)*
+  fn parse_type_def(&mut self) -> ParseResult<Adt> {
+    // type (name var1 ... varN) = ctr (| ctr)*
+    let ini_idx = self.index;
+    self.parse_keyword("type")?;
     self.skip_trivia();
-    let name = self.labelled(|p| p.parse_top_level_name(), "datatype name")?;
-    self.consume("=")?;
-    let mut ctrs = vec![self.parse_datatype_ctr(&name)?];
-    while self.try_consume("|") {
-      ctrs.push(self.parse_datatype_ctr(&name)?);
+
+    let name;
+    let vars;
+    if self.try_consume("(") {
+      // parens around name and vars
+      self.skip_trivia();
+      name = self.parse_top_level_name()?;
+      vars = self.list_like(|p| p.parse_var_name(), "", ")", "", false, 0)?;
+      self.consume("=")?;
+    } else {
+      // no parens
+      name = self.parse_top_level_name()?;
+      vars = self.list_like(|p| p.parse_var_name(), "", "=", "", false, 0)?;
     }
-    let ctrs = ctrs.into_iter().collect();
-    Ok((name, ctrs))
+
+    let mut ctrs = vec![self.parse_type_ctr(&name, &vars)?];
+    while self.try_consume("|") {
+      ctrs.push(self.parse_type_ctr(&name, &vars)?);
+    }
+    let ctrs = ctrs.into_iter().map(|ctr| (ctr.name.clone(), ctr)).collect::<IndexMap<_, _>>();
+
+    let end_idx = *self.index();
+    let source = Source::from_file_span(&self.file, self.input, ini_idx..end_idx, self.builtin);
+    let adt = Adt { name, vars, ctrs, source };
+    Ok(adt)
   }
 
-  fn parse_datatype_ctr(&mut self, typ_name: &Name) -> ParseResult<(Name, Vec<CtrField>)> {
-    // (name  ('~'? field)*)
+  fn parse_type_ctr(&mut self, typ_name: &Name, typ_vars: &[Name]) -> ParseResult<AdtCtr> {
+    // '(' name (( '~'? field) | ('~'? '('field (':' type)? ')') )* ')'
     // name
+    self.skip_trivia();
+    let ini_idx = *self.index();
     if self.try_consume("(") {
+      // name and optionally fields
+
       self.skip_trivia();
       let ctr_name = self.parse_top_level_name()?;
       let ctr_name = Name::new(format!("{typ_name}/{ctr_name}"));
 
-      fn parse_field(p: &mut TermParser) -> ParseResult<CtrField> {
-        let rec = p.try_consume("~");
-        p.skip_trivia();
-        let nam = p.labelled(|p| p.parse_bend_name(), "datatype constructor field")?;
-        Ok(CtrField { nam, rec })
-      }
+      let fields = self.list_like(|p| p.parse_type_ctr_field(), "", ")", "", false, 0)?;
+      let (fields, field_types): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
+      let end_idx = *self.index();
+      self.check_repeated_ctr_fields(&fields, &ctr_name, ini_idx..end_idx)?;
 
-      let fields = self.list_like(parse_field, "", ")", "", false, 0)?;
-      if let Some(field) = fields.find_repeated_names().into_iter().next() {
-        let msg = format!("Found a repeated field '{field}' in constructor {ctr_name}.");
-        return self.expected_message(&msg)?;
-      }
-      Ok((ctr_name, fields))
+      let typ = Type::Ctr(typ_name.clone(), typ_vars.iter().cloned().map(Type::Var).collect());
+      let typ = field_types.into_iter().rfold(typ, |acc, typ| Type::Arr(Box::new(acc), Box::new(typ)));
+      let typ = typ_vars.iter().cloned().rfold(typ, |acc, nam| Type::All(nam, Box::new(acc)));
+      let ctr = AdtCtr { name: ctr_name, typ, fields };
+      Ok(ctr)
     } else {
-      // name
+      // just name
       let name = self.labelled(|p| p.parse_top_level_name(), "datatype constructor name")?;
       let name = Name::new(format!("{typ_name}/{name}"));
-      Ok((name, vec![]))
+      let typ = Type::Ctr(typ_name.clone(), typ_vars.iter().cloned().map(Type::Var).collect());
+      let typ = typ_vars.iter().cloned().rfold(typ, |acc, nam| Type::All(nam, Box::new(acc)));
+      let ctr = AdtCtr { name, typ, fields: vec![] };
+      Ok(ctr)
     }
   }
 
-  fn parse_hvm(&mut self, builtin: bool) -> ParseResult<HvmDefinition> {
-    self.skip_trivia_inline()?;
-    let name = self.parse_bend_name()?;
-    self.skip_trivia_inline()?;
-    self.consume_exactly(":")?;
-    self.consume_new_line()?;
-    // TODO: This will have the wrong index
+  fn parse_type_ctr_field(&mut self) -> ParseResult<(CtrField, Type)> {
+    let rec = self.try_consume("~");
+
+    let nam;
+    let typ;
+    if self.try_consume("(") {
+      nam = self.parse_var_name()?;
+      if self.try_consume(":") {
+        typ = self.parse_type_term(&mut Default::default())?;
+      } else {
+        typ = Type::Any;
+      }
+      self.consume(")")?;
+    } else {
+      nam = self.parse_var_name()?;
+      typ = Type::Any;
+    }
+    Ok((CtrField { nam, rec }, typ))
+  }
+
+  fn parse_fun_def(&mut self) -> ParseResult<FunDefinition> {
     let ini_idx = *self.index();
-    let mut p = hvm::ast::CoreParser::new(&self.input[*self.index()..]);
-    let body = p.parse_net()?;
-    *self.index() = ini_idx + *p.index();
-    let end_idx = *self.index();
 
-    let span = Some(TextSpan::from_byte_span(self.input(), ini_idx..end_idx));
-    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
-    let file = None; // should we pass the book's source here?
-    let source = Source { file, span, kind };
+    // Try to parse signature
+    if let Ok((name, args, typ)) = self.parse_def_sig() {
+      if self.try_consume("=") {
+        // Single rule with signature
+        let body = self.parse_term()?;
+        let pats = args.into_iter().map(|nam| Pattern::Var(Some(nam))).collect();
+        let rules = vec![Rule { pats, body }];
+        let end_idx = *self.index();
+        let source = Source::from_file_span(&self.file, self.input, ini_idx..end_idx, self.builtin);
+        let def = FunDefinition { name, typ, check: true, rules, source };
+        Ok(def)
+      } else {
+        // Multiple rules with signature
+        let mut rules = vec![];
+        let (_, rule) = self.parse_rule()?;
+        rules.push(rule);
+        while self.starts_with_rule(&name) {
+          let (_, rule) = self.parse_rule()?;
+          rules.push(rule);
+        }
+        let end_idx = *self.index();
+        let source = Source::from_file_span(&self.file, self.input, ini_idx..end_idx, self.builtin);
+        let def = FunDefinition { name, typ, check: true, rules, source };
+        Ok(def)
+      }
+    } else {
+      // Was not a signature, backtrack and read the name from the first rule
+      self.index = ini_idx;
+      let mut rules = vec![];
+      let (name, rule) = self.parse_rule()?;
+      rules.push(rule);
+      while self.starts_with_rule(&name) {
+        let (_, rule) = self.parse_rule()?;
+        rules.push(rule);
+      }
+      let end_idx = *self.index();
+      let source = Source::from_file_span(&self.file, self.input, ini_idx..end_idx, self.builtin);
+      let def = FunDefinition { name, typ: Type::Any, check: true, rules, source };
+      Ok(def)
+    }
+  }
 
-    let def = HvmDefinition { name: name.clone(), body, source };
-    Ok(def)
+  /// Parses a function definition signature.
+  /// Returns the name, name of the arguments and the type of the function.
+  fn parse_def_sig(&mut self) -> ParseResult<(Name, Vec<Name>, Type)> {
+    // '(' name ((arg | '(' arg (':' type)? ')'))* ')' ':' type
+    //     name ((arg | '(' arg (':' type)? ')'))*     ':' type
+    let mut type_vars = IndexSet::new();
+    let (name, args, typ) = if self.try_consume("(") {
+      let name = self.parse_top_level_name()?;
+      let args = self.list_like(|p| p.parse_def_sig_arg(&mut type_vars), "", ")", "", false, 0)?;
+      self.consume(":")?;
+      let typ = self.parse_type_term(&mut type_vars)?;
+      (name, args, typ)
+    } else {
+      let name = self.parse_top_level_name()?;
+      let args = self.list_like(|p| p.parse_def_sig_arg(&mut type_vars), "", ":", "", false, 0)?;
+      let typ = self.parse_type_term(&mut type_vars)?;
+      (name, args, typ)
+    };
+    let (args, arg_types): (Vec<_>, Vec<_>) = args.into_iter().unzip();
+    let typ = arg_types.into_iter().rfold(typ, |acc, typ| Type::Arr(Box::new(acc), Box::new(typ)));
+    let typ = type_vars.into_iter().rfold(typ, |acc, typ| Type::All(typ, Box::new(acc)));
+    Ok((name, args, typ))
+  }
+
+  fn parse_def_sig_arg(&mut self, type_vars: &mut IndexSet<Name>) -> ParseResult<(Name, Type)> {
+    // name
+    // '(' name ')'
+    // '(' name ':' type ')'
+    if self.try_consume("(") {
+      let name = self.parse_var_name()?;
+      let typ = if self.try_consume(":") { self.parse_type_term(type_vars)? } else { Type::Any };
+      self.consume(")")?;
+      Ok((name, typ))
+    } else {
+      let name = self.parse_var_name()?;
+      Ok((name, Type::Any))
+    }
   }
 
   fn parse_from_import(&mut self) -> ParseResult<Import> {
     // from path import package
     // from path import (a, b)
     // from path import *
+    self.parse_keyword("from")?;
+    self.skip_trivia_inline()?;
+
     let path = self.parse_restricted_name("Path")?;
+    self.skip_trivia_inline()?;
+
     self.consume("import")?;
+    self.skip_trivia_inline()?;
 
     let relative = path.starts_with("./") | path.starts_with("../");
 
@@ -347,6 +417,9 @@ impl<'a> TermParser<'a> {
       let pats = self.list_like(|p| p.parse_pattern(false), "", ")", "", false, 0)?;
       Ok((name, pats))
     } else {
+      // Rule without parens
+      // Here we use a different label for the error because this is
+      // the last alternative case for top-level definitions.
       let name = self.labelled(|p| p.parse_top_level_name(), "top-level definition")?;
       let mut pats = vec![];
       self.skip_trivia();
@@ -367,6 +440,24 @@ impl<'a> TermParser<'a> {
 
     let rule = Rule { pats, body };
     Ok((name, rule))
+  }
+
+  fn starts_with_rule(&mut self, expected_name: &Name) -> bool {
+    let ini_idx = *self.index();
+    let res = self.parse_rule_lhs();
+    self.index = ini_idx;
+    if let Ok((name, _)) = res {
+      if &name == expected_name {
+        // Found rule with the expected name
+        true
+      } else {
+        // Found rule with a different name
+        false
+      }
+    } else {
+      // Not a rule
+      false
+    }
   }
 
   fn parse_pattern(&mut self, simple: bool) -> ParseResult<Pattern> {
@@ -438,7 +529,7 @@ impl<'a> TermParser<'a> {
         unexpected_tag(self)?;
         self.advance_one();
         self.skip_trivia();
-        let name = self.parse_bend_name()?;
+        let name = self.parse_var_name()?;
         return Ok(Pattern::Chn(name));
       }
 
@@ -488,11 +579,9 @@ impl<'a> TermParser<'a> {
 
           // jk, actually a tuple
           if self.starts_with(",") && opr == Op::MUL {
-            let mut els = vec![Term::Era];
-            while self.try_consume(",") {
-              els.push(self.parse_term()?);
-            }
-            self.consume(")")?;
+            self.consume_exactly(",")?;
+            let tail = self.list_like(|p| p.parse_term(), "", ")", ",", true, 1)?;
+            let els = [Term::Era].into_iter().chain(tail).collect();
             return Ok(Term::Fan { fan: FanKind::Tup, tag: tag.unwrap_or(Tag::Static), els });
           }
 
@@ -570,7 +659,7 @@ impl<'a> TermParser<'a> {
         self.advance_one();
         unexpected_tag(self)?;
         self.skip_trivia();
-        let nam = self.parse_bend_name()?;
+        let nam = self.parse_var_name()?;
         return Ok(Term::Link { nam });
       }
 
@@ -621,7 +710,7 @@ impl<'a> TermParser<'a> {
       if self.try_parse_keyword("use") {
         unexpected_tag(self)?;
         self.skip_trivia();
-        let nam = self.parse_bend_name()?;
+        let nam = self.parse_var_name()?;
         self.consume("=")?;
         let val = self.parse_term()?;
         self.try_consume(";");
@@ -654,41 +743,9 @@ impl<'a> TermParser<'a> {
       // Def
       if self.try_parse_keyword("def") {
         self.skip_trivia();
-        let (cur_name, rule) = self.parse_rule()?;
-        let mut rules = vec![rule];
-        // the current index to backtrack in case of fail to parse the next rule.
-        let mut nxt_term = *self.index();
-        loop {
-          self.skip_trivia();
-          // save the start position of the rule that can be a next def term.
-          let nxt_def = *self.index();
-          match self.parse_rule() {
-            Ok((name, rule)) => {
-              if name == "def" {
-                // parse the nxt def term.
-                self.index = nxt_def;
-                let span = Some(TextSpan::from_byte_span(self.input(), nxt_def..*self.index()));
-                let source = Source { span, file: None, kind: SourceKind::User };
-                let def = FunDefinition::new(name, rules, source);
-                return Ok(Term::Def { def, nxt: Box::new(self.parse_term()?) });
-              }
-              if name == cur_name {
-                rules.push(rule);
-                // save the current position.
-                nxt_term = *self.index();
-              } else {
-                let cur = *self.index();
-                let msg = format!("Expected a rule with name '{cur_name}'.");
-                return self.with_ctx(Err(msg), nxt_def..cur);
-              }
-            }
-            // if failed it is a term.
-            Err(_) => break self.index = nxt_term,
-          }
-        }
+        let mut def = self.parse_fun_def()?;
+        def.source.kind = SourceKind::Generated;
         let nxt = self.parse_term()?;
-        let span = Some(TextSpan::from_byte_span(self.input(), nxt_term..*self.index()));
-        let def = FunDefinition::new(cur_name, rules, Source { span, file: None, kind: SourceKind::User });
         return Ok(Term::Def { def, nxt: Box::new(nxt) });
       }
 
@@ -798,7 +855,7 @@ impl<'a> TermParser<'a> {
         unexpected_tag(self)?;
         let args = self.list_like(
           |p| {
-            let bind = p.parse_bend_name()?;
+            let bind = p.parse_var_name()?;
             let init = if p.try_consume("=") { p.parse_term()? } else { Term::Var { nam: bind.clone() } };
             Ok((bind, init))
           },
@@ -835,7 +892,7 @@ impl<'a> TermParser<'a> {
         self.skip_trivia();
         let typ = self.parse_top_level_name()?;
         self.skip_trivia();
-        let var = self.parse_bend_name()?;
+        let var = self.parse_var_name()?;
         self.try_consume(";");
         let bod = self.parse_term()?;
         return Ok(Term::Open { typ, var, bod: Box::new(bod) });
@@ -843,7 +900,7 @@ impl<'a> TermParser<'a> {
 
       // Var
       unexpected_tag(self)?;
-      let nam = self.labelled(|p| p.parse_bend_name(), "term")?;
+      let nam = self.labelled(|p| p.parse_var_name(), "term")?;
       Ok(Term::Var { nam })
     })
   }
@@ -854,7 +911,7 @@ impl<'a> TermParser<'a> {
         if p.try_consume_exactly("*") {
           Ok(None)
         } else {
-          let nam = p.parse_bend_name()?;
+          let nam = p.parse_var_name()?;
           Ok(Some(nam))
         }
       },
@@ -908,7 +965,7 @@ impl<'a> TermParser<'a> {
 
   /// A named arg with non-optional name.
   fn parse_named_arg(&mut self) -> ParseResult<(Option<Name>, Term)> {
-    let nam = self.parse_bend_name()?;
+    let nam = self.parse_var_name()?;
     self.skip_trivia();
     if self.starts_with("=") {
       self.advance_one();
@@ -940,59 +997,84 @@ impl<'a> TermParser<'a> {
     Ok((nam, vec![], bod))
   }
 
-  fn add_fun_def(
-    &mut self,
-    name: &Name,
-    rule: Rule,
-    builtin: bool,
-    last_rule: &Option<Name>,
-    book: &mut ParseBook,
-    span: Range<usize>,
-  ) -> ParseResult<()> {
-    match (book.fun_defs.get_mut(name), last_rule) {
-      // Continuing with a new rule to the current definition
-      (Some(def), Some(last_rule)) if last_rule == name => {
-        def.rules.push(rule);
-        if let Some(s) = &mut def.source.span {
-          s.end = TextLocation::from_byte_loc(self.input(), span.end);
-        }
-      }
-      // Trying to add a new rule to a previous definition, coming from a different rule.
-      (Some(def), Some(_)) => {
-        let msg = Self::redefinition_of_function_msg(def.is_builtin(), name);
-        return self.with_ctx(Err(msg), span);
-      }
-      // Trying to add a new rule to a previous definition, coming from another kind of top-level.
-      (Some(def), None) => {
-        let msg = Self::redefinition_of_function_msg(def.is_builtin(), name);
-        return self.with_ctx(Err(msg), span);
-      }
-      // Adding the first rule of a new definition
-      (None, _) => {
-        self.check_top_level_redefinition(name, book, span.clone())?;
-        let span = Some(TextSpan::from_byte_span(self.input(), span.start..span.end));
-        let file = Some(book.source.to_string());
-        let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
-        let source = Source { file, span, kind };
-        book.fun_defs.insert(name.clone(), FunDefinition::new(name.clone(), vec![rule], source));
-      }
+  fn parse_type_term(&mut self, vars: &mut IndexSet<Name>) -> ParseResult<Type> {
+    let mut left = self.parse_type_atom(vars)?;
+    self.skip_trivia();
+    while self.try_consume_exactly("->") {
+      let right = self.parse_type_term(vars)?;
+      left = Type::Arr(Box::new(left), Box::new(right));
     }
+    Ok(left)
+  }
+
+  /// Parses a type without an ending arrow.
+  /// Either an atom, a tuple, a ctr or a parenthesized type.
+  fn parse_type_atom(&mut self, vars: &mut IndexSet<Name>) -> ParseResult<Type> {
+    self.skip_trivia();
+    if self.try_parse_keyword("Any") {
+      Ok(Type::Any)
+    } else if self.try_parse_keyword("U24") {
+      Ok(Type::U24)
+    } else if self.try_parse_keyword("I24") {
+      Ok(Type::I24)
+    } else if self.try_parse_keyword("F24") {
+      Ok(Type::F24)
+    } else if self.try_consume_exactly("(") {
+      // Tuple, constructor or parenthesized expression
+      let ini_idx = *self.index();
+      let head = self.parse_type_term(vars)?;
+      self.skip_trivia();
+      if self.try_consume_exactly(")") {
+        // Parens
+        Ok(head)
+      } else if self.try_consume_exactly(",") {
+        // Tuple
+        let mut types = vec![head];
+        loop {
+          types.push(self.parse_type_term(vars)?);
+          self.skip_trivia();
+          if !self.try_consume_exactly(",") {
+            break;
+          }
+        }
+        self.consume(")")?;
+        Ok(Type::Tup(types))
+      } else {
+        // Constructor
+        let Type::Var(nam) = head else {
+          let end_idx = *self.index();
+          // TODO: This is not a good error message
+          return self.expected_spanned("type constructor", ini_idx..end_idx);
+        };
+        let mut args = vec![];
+        // We know there's at least one argument, otherwise it would go in the parens case.
+        while !self.try_consume(")") {
+          args.push(self.parse_type_term(vars)?);
+          self.skip_trivia();
+        }
+        Ok(Type::Ctr(nam, args))
+      }
+    } else {
+      // Variable
+      // TODO: This will show "expected Name" instead of "expected type"
+      let nam = self.parse_var_name()?;
+      Ok(Type::Var(nam))
+    }
+  }
+
+  fn add_fun_def(&mut self, def: FunDefinition, book: &mut ParseBook, span: Range<usize>) -> ParseResult<()> {
+    self.check_top_level_redefinition(&def.name, book, span)?;
+    book.fun_defs.insert(def.name.clone(), def);
     Ok(())
   }
 
   fn add_imp_def(
     &mut self,
-    mut def: crate::imp::Definition,
+    def: crate::imp::Definition,
     book: &mut ParseBook,
     span: Range<usize>,
-    builtin: bool,
   ) -> ParseResult<()> {
-    self.check_top_level_redefinition(&def.name, book, span.clone())?;
-    let span = Some(TextSpan::from_byte_span(self.input(), span.start..span.end));
-    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
-    let file = Some(book.source.to_string());
-    let source = Source { file, span, kind };
-    def.source = source;
+    self.check_top_level_redefinition(&def.name, book, span)?;
     book.imp_defs.insert(def.name.clone(), def);
     Ok(())
   }
@@ -1003,78 +1085,22 @@ impl<'a> TermParser<'a> {
     Ok(())
   }
 
-  fn add_imp_type(
-    &mut self,
-    enum_: Enum,
-    book: &mut ParseBook,
-    range: Range<usize>,
-    builtin: bool,
-  ) -> ParseResult<()> {
-    self.check_type_redefinition(&enum_.name, book, range.clone())?;
-
-    let span = Some(TextSpan::from_byte_span(self.input(), range.start..range.end));
-    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
-    let file = Some(book.source.to_string());
-    let source = Source { file, span, kind };
-
-    let mut adt = Adt { ctrs: Default::default(), source };
-    for variant in enum_.variants {
-      self.check_top_level_redefinition(&enum_.name, book, range.clone())?;
-      book.ctrs.insert(variant.name.clone(), enum_.name.clone());
-      adt.ctrs.insert(variant.name, variant.fields);
-    }
-    book.adts.insert(enum_.name.clone(), adt);
-    Ok(())
-  }
-
-  fn add_fun_type(
-    &mut self,
-    book: &mut ParseBook,
-    nam: Name,
-    adt: Adt,
-    span: Range<usize>,
-  ) -> ParseResult<()> {
-    if book.adts.contains_key(&nam) {
-      let msg = TermParser::redefinition_of_type_msg(&nam);
-      return self.with_ctx(Err(msg), span);
-    } else {
-      for ctr in adt.ctrs.keys() {
-        if let Some(builtin) = book.contains_builtin_def(ctr) {
-          let msg = TermParser::redefinition_of_function_msg(builtin, ctr);
-          return self.expected_and("function", &msg);
-        }
-        match book.ctrs.entry(ctr.clone()) {
-          indexmap::map::Entry::Vacant(e) => _ = e.insert(nam.clone()),
-          indexmap::map::Entry::Occupied(e) => {
-            let msg = TermParser::redefinition_of_constructor_msg(e.key());
-            return self.with_ctx(Err(msg), span);
-          }
+  fn add_type_def(&mut self, adt: Adt, book: &mut ParseBook, span: Range<usize>) -> ParseResult<()> {
+    self.check_type_redefinition(&adt.name, book, span.clone())?;
+    for ctr in adt.ctrs.keys() {
+      if let Some(builtin) = book.contains_builtin_def(ctr) {
+        let msg = FunParser::redefinition_of_function_msg(builtin, ctr);
+        return self.with_ctx(Err(msg), span);
+      }
+      match book.ctrs.entry(ctr.clone()) {
+        indexmap::map::Entry::Vacant(e) => _ = e.insert(adt.name.clone()),
+        indexmap::map::Entry::Occupied(e) => {
+          let msg = FunParser::redefinition_of_constructor_msg(e.key());
+          return self.with_ctx(Err(msg), span);
         }
       }
-      book.adts.insert(nam.clone(), adt);
     }
-    Ok(())
-  }
-
-  fn add_object(
-    &mut self,
-    obj: Variant,
-    book: &mut ParseBook,
-    span: Range<usize>,
-    builtin: bool,
-  ) -> ParseResult<()> {
-    self.check_type_redefinition(&obj.name, book, span.clone())?;
-    self.check_top_level_redefinition(&obj.name, book, span.clone())?;
-
-    let span = Some(TextSpan::from_byte_span(self.input(), span.start..span.end));
-    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
-    let file = Some(book.source.to_string());
-    let source = Source { file, span, kind };
-
-    let mut adt = Adt { ctrs: Default::default(), source };
-    book.ctrs.insert(obj.name.clone(), obj.name.clone());
-    adt.ctrs.insert(obj.name.clone(), obj.fields);
-    book.adts.insert(obj.name, adt);
+    book.adts.insert(adt.name.clone(), adt);
     Ok(())
   }
 
@@ -1113,7 +1139,7 @@ impl<'a> TermParser<'a> {
   }
 }
 
-impl<'a> Parser<'a> for TermParser<'a> {
+impl<'a> Parser<'a> for FunParser<'a> {
   fn input(&mut self) -> &'a str {
     self.input
   }
@@ -1224,7 +1250,7 @@ impl Indent {
   }
 }
 
-impl<'a> ParserCommons<'a> for TermParser<'a> {}
+impl<'a> ParserCommons<'a> for FunParser<'a> {}
 
 pub trait ParserCommons<'a>: Parser<'a> {
   /// Generates an error message that does not print expected terms.
@@ -1247,9 +1273,9 @@ pub trait ParserCommons<'a>: Parser<'a> {
 
   fn parse_restricted_name(&mut self, kind: &str) -> ParseResult<Name> {
     let ini_idx = *self.index();
-    let name = self.take_while(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/');
+    let name = self.take_while(is_name_char);
     if name.is_empty() {
-      self.expected("name")?
+      self.expected(&format!("{kind} name"))?
     }
     let name = Name::new(name.to_owned());
     let end_idx = *self.index();
@@ -1268,7 +1294,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     self.parse_restricted_name("Top-level")
   }
 
-  fn parse_bend_name(&mut self) -> ParseResult<Name> {
+  fn parse_var_name(&mut self) -> ParseResult<Name> {
     self.parse_restricted_name("Variable")
   }
 
@@ -1389,6 +1415,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     self.with_ctx(Err(msg), span)
   }
 
+  /// Same as `expected_spanned` but adds an information message before the expected message.
   fn expected_spanned_and<T>(&mut self, exp: &str, msg: &str, span: Range<usize>) -> ParseResult<T> {
     let is_eof = self.is_eof();
     let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { Ok(()) });
@@ -1429,12 +1456,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
   }
 
   fn try_parse_keyword(&mut self, keyword: &str) -> bool {
-    if !self.starts_with(keyword) {
-      return false;
-    }
-    let input = &self.input()[*self.index() + keyword.len()..];
-    let next_is_name = input.chars().next().map_or(false, is_name_char);
-    if !next_is_name {
+    if self.starts_with_keyword(keyword) {
       self.consume_exactly(keyword).unwrap();
       true
     } else {
@@ -1455,6 +1477,16 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
   }
 
+  fn starts_with_keyword(&mut self, keyword: &str) -> bool {
+    if self.starts_with(keyword) {
+      let input = &self.input()[*self.index() + keyword.len()..];
+      let next_is_name = input.chars().next().map_or(false, is_name_char);
+      !next_is_name
+    } else {
+      false
+    }
+  }
+
   /// Parses a list-like structure like "[x1, x2, x3,]".
   /// Since a list is always well terminated, we consume newlines.
   ///
@@ -1466,7 +1498,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
   /// `min_els` determines how many elements must be parsed at minimum.
   fn list_like<T>(
     &mut self,
-    parser: impl Fn(&mut Self) -> ParseResult<T>,
+    mut parser: impl FnMut(&mut Self) -> ParseResult<T>,
     start: &str,
     end: &str,
     sep: &str,
@@ -1702,6 +1734,22 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
     self.consume_exactly("`")?;
     Ok(result)
+  }
+
+  fn check_repeated_ctr_fields(
+    &mut self,
+    fields: &[CtrField],
+    ctr_name: &Name,
+    span: Range<usize>,
+  ) -> ParseResult<()> {
+    for i in 0..fields.len() {
+      let field = &fields[i];
+      if fields.iter().skip(i + 1).any(|a: &CtrField| a.nam == field.nam) {
+        let msg = format!("Found a repeated field '{}' in constructor {}.", field.nam, ctr_name);
+        return self.with_ctx(Err(msg), span);
+      }
+    }
+    Ok(())
   }
 
   fn redefinition_of_function_msg(builtin: bool, function_name: &str) -> String {
