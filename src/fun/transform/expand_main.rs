@@ -65,7 +65,7 @@ impl Term {
               // If the argument is a 0-ary constructor, we don't need to expand it.
               if let Term::Ref { nam } = arg {
                 if let Some(adt_nam) = book.ctrs.get(nam) {
-                  if book.adts.get(adt_nam).unwrap().ctrs.get(nam).unwrap().is_empty() {
+                  if book.adts.get(adt_nam).unwrap().ctrs.get(nam).unwrap().fields.is_empty() {
                     continue;
                   }
                 }

@@ -1,5 +1,5 @@
 use super::{
-  parser::{ParseBook, TermParser},
+  parser::{FunParser, ParseBook},
   Book, Name,
 };
 use crate::{
@@ -41,7 +41,7 @@ pub fn load_to_book(
 
 pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<ParseBook, String> {
   book.source = Name::new(origin.to_string_lossy());
-  TermParser::new(code).parse_book(book, false).map_err(|e| format!("In {} :\n{}", origin.display(), e))
+  FunParser::new(code, false).parse_book(book).map_err(|e| format!("In {} :\n{}", origin.display(), e))
 }
 
 pub fn do_parse_book_default(code: &str, origin: &Path) -> Result<Book, String> {

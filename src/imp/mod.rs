@@ -3,8 +3,7 @@ mod order_kwargs;
 pub mod parser;
 pub mod to_fun;
 
-use crate::fun::{CtrField, Name, Num, Op, Source};
-use indexmap::{IndexMap, IndexSet};
+use crate::fun::{Name, Num, Op, Source, Type};
 use interner::global::GlobalString;
 
 #[derive(Clone, Debug)]
@@ -201,27 +200,15 @@ pub enum Stmt {
   Err,
 }
 
-// {name} "{" {field}* "}"
-#[derive(Clone, Debug)]
-pub struct Variant {
-  pub name: Name,
-  pub fields: Vec<CtrField>,
-}
-
 // "def" {name} "(" {params} ")" ":" {body}
 #[derive(Clone, Debug)]
 pub struct Definition {
   pub name: Name,
-  pub params: Vec<Name>,
+  pub typ: Type,
+  pub check: bool,
+  pub args: Vec<Name>,
   pub body: Stmt,
   pub source: Source,
-}
-
-// "type" {name} ":" {variant}*
-#[derive(Clone, Debug)]
-pub struct Enum {
-  pub name: Name,
-  pub variants: Vec<Variant>,
 }
 
 impl InPlaceOp {
@@ -236,25 +223,5 @@ impl InPlaceOp {
       InPlaceOp::Xor => Op::XOR,
       InPlaceOp::Map => unreachable!(),
     }
-  }
-}
-
-pub trait RepeatedNames {
-  fn find_repeated_names(&self) -> IndexSet<Name>;
-}
-
-impl RepeatedNames for Vec<CtrField> {
-  fn find_repeated_names(&self) -> IndexSet<Name> {
-    let mut count = IndexMap::new();
-    for field in self.iter() {
-      *count.entry(field.nam.clone()).or_insert(0) += 1;
-    }
-    count.into_iter().filter_map(|(name, count)| if count > 1 { Some(name) } else { None }).collect()
-  }
-}
-
-impl RepeatedNames for Variant {
-  fn find_repeated_names(&self) -> IndexSet<Name> {
-    self.fields.find_repeated_names()
   }
 }
