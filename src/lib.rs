@@ -104,6 +104,7 @@ pub fn desugar_book(
   ctx.book.encode_builtins();
 
   ctx.resolve_refs()?;
+  ctx.resolve_type_ctrs()?;
 
   ctx.desugar_match_defs()?;
 

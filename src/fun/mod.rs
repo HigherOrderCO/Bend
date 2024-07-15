@@ -106,6 +106,7 @@ pub enum Type {
   U24,
   F24,
   I24,
+  None,
 }
 
 /// A pattern matching rule of a definition.
