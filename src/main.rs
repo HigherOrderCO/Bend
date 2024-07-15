@@ -83,7 +83,7 @@ enum Mode {
     path: PathBuf,
   },
   #[cfg(feature = "manager")]
-  /// Runs a package manager command
+  /// Runs a package manager command.
   Manager {
     #[command(subcommand)]
     command: manager::PackageCmd,
