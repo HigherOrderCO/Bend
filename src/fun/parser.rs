@@ -8,7 +8,7 @@ use crate::{
   maybe_grow,
 };
 use highlight_error::highlight_error;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use std::ops::Range;
 use TSPL::{ParseError, Parser};
@@ -221,7 +221,7 @@ impl<'a> FunParser<'a> {
     Ok(adt)
   }
 
-  fn parse_type_ctr(&mut self, typ_name: &Name, typ_vars: &[Name]) -> ParseResult<AdtCtr> {
+  fn parse_type_ctr(&mut self, type_name: &Name, type_vars: &[Name]) -> ParseResult<AdtCtr> {
     // '(' name (( '~'? field) | ('~'? '('field (':' type)? ')') )* ')'
     // name
     self.skip_trivia();
@@ -231,24 +231,21 @@ impl<'a> FunParser<'a> {
 
       self.skip_trivia();
       let ctr_name = self.parse_top_level_name()?;
-      let ctr_name = Name::new(format!("{typ_name}/{ctr_name}"));
+      let ctr_name = Name::new(format!("{type_name}/{ctr_name}"));
 
       let fields = self.list_like(|p| p.parse_type_ctr_field(), "", ")", "", false, 0)?;
       let (fields, field_types): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
       let end_idx = *self.index();
       self.check_repeated_ctr_fields(&fields, &ctr_name, ini_idx..end_idx)?;
 
-      let typ = Type::Ctr(typ_name.clone(), typ_vars.iter().cloned().map(Type::Var).collect());
-      let typ = field_types.into_iter().rfold(typ, |acc, typ| Type::Arr(Box::new(acc), Box::new(typ)));
-      let typ = typ_vars.iter().cloned().rfold(typ, |acc, nam| Type::All(nam, Box::new(acc)));
+      let typ = make_ctr_type(type_name.clone(), &field_types, type_vars);
       let ctr = AdtCtr { name: ctr_name, typ, fields };
       Ok(ctr)
     } else {
       // just name
       let name = self.labelled(|p| p.parse_top_level_name(), "datatype constructor name")?;
-      let name = Name::new(format!("{typ_name}/{name}"));
-      let typ = Type::Ctr(typ_name.clone(), typ_vars.iter().cloned().map(Type::Var).collect());
-      let typ = typ_vars.iter().cloned().rfold(typ, |acc, nam| Type::All(nam, Box::new(acc)));
+      let name = Name::new(format!("{type_name}/{name}"));
+      let typ = make_ctr_type(type_name.clone(), &[], type_vars);
       let ctr = AdtCtr { name, typ, fields: vec![] };
       Ok(ctr)
     }
@@ -262,7 +259,7 @@ impl<'a> FunParser<'a> {
     if self.try_consume("(") {
       nam = self.parse_var_name()?;
       if self.try_consume(":") {
-        typ = self.parse_type_term(&mut Default::default())?;
+        typ = self.parse_type_term()?;
       } else {
         typ = Type::Any;
       }
@@ -324,32 +321,30 @@ impl<'a> FunParser<'a> {
   fn parse_def_sig(&mut self) -> ParseResult<(Name, Vec<Name>, Type)> {
     // '(' name ((arg | '(' arg (':' type)? ')'))* ')' ':' type
     //     name ((arg | '(' arg (':' type)? ')'))*     ':' type
-    let mut type_vars = IndexSet::new();
     let (name, args, typ) = if self.try_consume("(") {
       let name = self.parse_top_level_name()?;
-      let args = self.list_like(|p| p.parse_def_sig_arg(&mut type_vars), "", ")", "", false, 0)?;
+      let args = self.list_like(|p| p.parse_def_sig_arg(), "", ")", "", false, 0)?;
       self.consume(":")?;
-      let typ = self.parse_type_term(&mut type_vars)?;
+      let typ = self.parse_type_term()?;
       (name, args, typ)
     } else {
       let name = self.parse_top_level_name()?;
-      let args = self.list_like(|p| p.parse_def_sig_arg(&mut type_vars), "", ":", "", false, 0)?;
-      let typ = self.parse_type_term(&mut type_vars)?;
+      let args = self.list_like(|p| p.parse_def_sig_arg(), "", ":", "", false, 0)?;
+      let typ = self.parse_type_term()?;
       (name, args, typ)
     };
     let (args, arg_types): (Vec<_>, Vec<_>) = args.into_iter().unzip();
-    let typ = arg_types.into_iter().rfold(typ, |acc, typ| Type::Arr(Box::new(acc), Box::new(typ)));
-    let typ = type_vars.into_iter().rfold(typ, |acc, typ| Type::All(typ, Box::new(acc)));
+    let typ = make_fn_type(&arg_types, typ);
     Ok((name, args, typ))
   }
 
-  fn parse_def_sig_arg(&mut self, type_vars: &mut IndexSet<Name>) -> ParseResult<(Name, Type)> {
+  fn parse_def_sig_arg(&mut self) -> ParseResult<(Name, Type)> {
     // name
     // '(' name ')'
     // '(' name ':' type ')'
     if self.try_consume("(") {
       let name = self.parse_var_name()?;
-      let typ = if self.try_consume(":") { self.parse_type_term(type_vars)? } else { Type::Any };
+      let typ = if self.try_consume(":") { self.parse_type_term()? } else { Type::Any };
       self.consume(")")?;
       Ok((name, typ))
     } else {
@@ -997,11 +992,11 @@ impl<'a> FunParser<'a> {
     Ok((nam, vec![], bod))
   }
 
-  fn parse_type_term(&mut self, vars: &mut IndexSet<Name>) -> ParseResult<Type> {
-    let mut left = self.parse_type_atom(vars)?;
+  fn parse_type_term(&mut self) -> ParseResult<Type> {
+    let mut left = self.parse_type_atom()?;
     self.skip_trivia();
     while self.try_consume_exactly("->") {
-      let right = self.parse_type_term(vars)?;
+      let right = self.parse_type_term()?;
       left = Type::Arr(Box::new(left), Box::new(right));
     }
     Ok(left)
@@ -1009,20 +1004,22 @@ impl<'a> FunParser<'a> {
 
   /// Parses a type without an ending arrow.
   /// Either an atom, a tuple, a ctr or a parenthesized type.
-  fn parse_type_atom(&mut self, vars: &mut IndexSet<Name>) -> ParseResult<Type> {
+  fn parse_type_atom(&mut self) -> ParseResult<Type> {
     self.skip_trivia();
     if self.try_parse_keyword("Any") {
       Ok(Type::Any)
-    } else if self.try_parse_keyword("U24") {
+    } else if self.try_parse_keyword("None") {
+      Ok(Type::None)
+    } else if self.try_parse_keyword("u24") {
       Ok(Type::U24)
-    } else if self.try_parse_keyword("I24") {
+    } else if self.try_parse_keyword("i24") {
       Ok(Type::I24)
-    } else if self.try_parse_keyword("F24") {
+    } else if self.try_parse_keyword("f24") {
       Ok(Type::F24)
     } else if self.try_consume_exactly("(") {
       // Tuple, constructor or parenthesized expression
       let ini_idx = *self.index();
-      let head = self.parse_type_term(vars)?;
+      let head = self.parse_type_term()?;
       self.skip_trivia();
       if self.try_consume_exactly(")") {
         // Parens
@@ -1031,7 +1028,7 @@ impl<'a> FunParser<'a> {
         // Tuple
         let mut types = vec![head];
         loop {
-          types.push(self.parse_type_term(vars)?);
+          types.push(self.parse_type_term()?);
           self.skip_trivia();
           if !self.try_consume_exactly(",") {
             break;
@@ -1049,7 +1046,7 @@ impl<'a> FunParser<'a> {
         let mut args = vec![];
         // We know there's at least one argument, otherwise it would go in the parens case.
         while !self.try_consume(")") {
-          args.push(self.parse_type_term(vars)?);
+          args.push(self.parse_type_term()?);
           self.skip_trivia();
         }
         Ok(Type::Ctr(nam, args))
@@ -1224,6 +1221,19 @@ pub fn is_name_char(c: char) -> bool {
 
 pub fn is_num_char(c: char) -> bool {
   "0123456789+-".contains(c)
+}
+
+pub fn make_fn_type(args: &[Type], ret: Type) -> Type {
+  let typ = ret;
+  let typ = args.iter().rfold(typ, |acc, typ| Type::Arr(Box::new(typ.clone()), Box::new(acc)));
+  typ
+}
+
+pub fn make_ctr_type(type_name: Name, fields: &[Type], vars: &[Name]) -> Type {
+  let typ = Type::Ctr(type_name, vars.iter().cloned().map(Type::Var).collect());
+  let typ = fields.iter().rfold(typ, |acc, typ| Type::Arr(Box::new(typ.clone()), Box::new(acc)));
+  let typ = vars.iter().rfold(typ, |acc, typ| Type::All(typ.clone(), Box::new(acc)));
+  typ
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

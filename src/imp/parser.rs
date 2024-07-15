@@ -1,12 +1,11 @@
 use crate::{
   fun::{
-    parser::{is_num_char, Indent, ParseResult, ParserCommons},
+    parser::{is_num_char, make_ctr_type, make_fn_type, Indent, ParseResult, ParserCommons},
     Adt, AdtCtr, CtrField, HvmDefinition, Name, Num, Op, Source, SourceKind, Type, STRINGS,
   },
   imp::{AssignPattern, Definition, Expr, InPlaceOp, MatchArm, Stmt},
   maybe_grow,
 };
-use indexmap::IndexSet;
 use TSPL::Parser;
 
 pub struct ImpParser<'i> {
@@ -97,7 +96,7 @@ impl<'a> ImpParser<'a> {
     self.skip_trivia_inline()?;
 
     let (fields, field_types): (Vec<_>, Vec<_>) = if self.starts_with("{") {
-      self.list_like(|p| p.parse_variant_field(&mut Default::default()), "{", "}", ",", true, 0)?
+      self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?
     } else {
       vec![]
     }
@@ -112,9 +111,7 @@ impl<'a> ImpParser<'a> {
     }
     let nxt_indent = self.advance_newlines()?;
 
-    let typ = Type::Ctr(name.clone(), type_vars.iter().cloned().map(Type::Var).collect());
-    let typ = field_types.into_iter().rfold(typ, |acc, typ| Type::Arr(Box::new(typ), Box::new(acc)));
-    let typ = type_vars.iter().cloned().rfold(typ, |acc, typ| Type::All(typ, Box::new(acc)));
+    let typ = make_ctr_type(name.clone(), &field_types, &type_vars);
     let ctr = AdtCtr { name: name.clone(), typ, fields };
 
     let ctrs = [(name.clone(), ctr)].into_iter().collect();
@@ -132,9 +129,8 @@ impl<'a> ImpParser<'a> {
     let name = self.parse_var_name()?;
     self.skip_trivia_inline()?;
 
-    let mut type_vars = IndexSet::new();
-    let typ = self.parse_return_type(&mut type_vars)?;
-    let typ = type_vars.into_iter().rfold(typ, |acc, typ| Type::All(typ, Box::new(acc)));
+    let typ = self.parse_return_type()?;
+    let typ = make_fn_type(&[], typ);
     self.skip_trivia_inline()?;
 
     self.consume_exactly(":")?;
@@ -159,7 +155,7 @@ impl<'a> ImpParser<'a> {
     self.skip_trivia_inline()?;
 
     let fields = if self.try_consume_exactly("{") {
-      self.list_like(|p| p.parse_variant_field(&mut Default::default()), "", "}", ",", true, 0)?
+      self.list_like(|p| p.parse_variant_field(), "", "}", ",", true, 0)?
     } else {
       vec![]
     };
@@ -167,22 +163,18 @@ impl<'a> ImpParser<'a> {
     let end_idx = *self.index();
     self.check_repeated_ctr_fields(&fields, &name, ini_idx..end_idx)?;
 
-    // Type is forall type vars, arrows of the fields, returns the type of the constructor
-    let typ = Type::Ctr(type_name.clone(), type_vars.iter().cloned().map(Type::Var).collect());
-    let typ = field_types.into_iter().rfold(typ, |acc, typ| Type::Arr(Box::new(typ), Box::new(acc)));
-    let typ = type_vars.iter().cloned().rfold(typ, |acc, nam| Type::All(nam, Box::new(acc)));
-
+    let typ = make_ctr_type(type_name.clone(), &field_types, type_vars);
     Ok(AdtCtr { name, typ, fields })
   }
 
-  fn parse_variant_field(&mut self, vars: &mut IndexSet<Name>) -> ParseResult<(CtrField, Type)> {
+  fn parse_variant_field(&mut self) -> ParseResult<(CtrField, Type)> {
     let rec = self.try_consume_exactly("~");
     self.skip_trivia_inline()?;
 
     let nam = self.parse_var_name()?;
     self.skip_trivia_inline()?;
 
-    let typ = if self.try_consume_exactly(":") { self.parse_type_expr(vars)? } else { Type::Any };
+    let typ = if self.try_consume_exactly(":") { self.parse_type_expr()? } else { Type::Any };
 
     Ok((CtrField { nam, rec }, typ))
   }
@@ -1162,7 +1154,7 @@ impl<'a> ImpParser<'a> {
   }
 
   /// Parses a type expression, returning the type and the type variables.
-  fn parse_type_expr(&mut self, vars: &mut IndexSet<Name>) -> ParseResult<Type> {
+  fn parse_type_expr(&mut self) -> ParseResult<Type> {
     // TODO: We should probably not have it all be inline or not inline.
     // For example, in tuple types or constructors, we could have line breaks.
     maybe_grow(|| {
@@ -1170,16 +1162,18 @@ impl<'a> ImpParser<'a> {
       let ini_idx = *self.index();
       let lft = if self.try_parse_keyword("Any") {
         Type::Any
-      } else if self.try_parse_keyword("U24") {
+      } else if self.try_parse_keyword("None") {
+        Type::None
+      } else if self.try_parse_keyword("u24") {
         Type::U24
-      } else if self.try_parse_keyword("I24") {
+      } else if self.try_parse_keyword("i24") {
         Type::I24
-      } else if self.try_parse_keyword("F24") {
+      } else if self.try_parse_keyword("f24") {
         Type::F24
       } else if self.try_consume_exactly("(") {
         // Tuple or parenthesized expression
         self.skip_trivia();
-        let head = self.parse_type_expr(vars)?;
+        let head = self.parse_type_expr()?;
         self.skip_trivia();
         if self.try_consume_exactly(")") {
           // Parens
@@ -1189,7 +1183,7 @@ impl<'a> ImpParser<'a> {
           let mut types = vec![head];
           loop {
             self.consume_exactly(",")?;
-            types.push(self.parse_type_expr(vars)?);
+            types.push(self.parse_type_expr()?);
             if self.try_consume_exactly(")") {
               break;
             }
@@ -1211,11 +1205,10 @@ impl<'a> ImpParser<'a> {
           // Constructor with arguments
           // name "(" (type ("," type)* ","?)? ")"
 
-          let args = self.list_like(|p| p.parse_type_expr(vars), "", ")", ",", true, 0)?;
+          let args = self.list_like(|p| p.parse_type_expr(), "", ")", ",", true, 0)?;
           Type::Ctr(name, args)
         } else {
           // Variable
-          vars.insert(name.clone());
           Type::Var(name)
         }
       };
@@ -1223,7 +1216,7 @@ impl<'a> ImpParser<'a> {
       // Handle arrow types
       self.skip_trivia_inline()?;
       if self.try_consume_exactly("->") {
-        let rgt = self.parse_type_expr(vars)?;
+        let rgt = self.parse_type_expr()?;
         Ok(Type::Arr(Box::new(lft), Box::new(rgt)))
       } else {
         Ok(lft)
@@ -1239,20 +1232,16 @@ impl<'a> ImpParser<'a> {
     let name = self.parse_top_level_name()?;
     self.skip_trivia_inline()?;
 
-    let mut type_vars = IndexSet::new();
     let args = if self.try_consume_exactly("(") {
-      self.list_like(|p| p.parse_def_arg(&mut type_vars), "", ")", ",", true, 0)?
+      self.list_like(|p| p.parse_def_arg(), "", ")", ",", true, 0)?
     } else {
       vec![]
     };
     self.skip_trivia_inline()?;
     let (args, arg_types): (Vec<_>, Vec<_>) = args.into_iter().unzip();
 
-    let ret_type = self.parse_return_type(&mut type_vars)?;
+    let ret_type = self.parse_return_type()?;
     self.skip_trivia_inline()?;
-
-    let typ = arg_types.into_iter().rfold(ret_type, |acc, typ| Type::Arr(Box::new(typ), Box::new(acc)));
-    let typ = type_vars.into_iter().rfold(typ, |acc, typ| Type::All(typ, Box::new(acc)));
 
     self.consume_exactly(":")?;
     self.consume_new_line()?;
@@ -1264,24 +1253,25 @@ impl<'a> ImpParser<'a> {
 
     // Note: The source kind gets replaced later (generated if a local def, user otherwise)
     let source = Source::from_file_span(&self.file, self.input, ini_idx..self.index, self.builtin);
+    let typ = make_fn_type(&arg_types, ret_type);
     let def = Definition { name, args, typ, check, body, source };
     Ok((def, nxt_indent))
   }
 
-  fn parse_def_arg(&mut self, vars: &mut IndexSet<Name>) -> ParseResult<(Name, Type)> {
+  fn parse_def_arg(&mut self) -> ParseResult<(Name, Type)> {
     let name = self.parse_var_name()?;
     self.skip_trivia_inline()?;
     if self.try_consume_exactly(":") {
-      let typ = self.parse_type_expr(vars)?;
+      let typ = self.parse_type_expr()?;
       Ok((name, typ))
     } else {
       Ok((name, Type::Any))
     }
   }
 
-  fn parse_return_type(&mut self, vars: &mut IndexSet<Name>) -> ParseResult<Type> {
+  fn parse_return_type(&mut self) -> ParseResult<Type> {
     if self.try_consume_exactly("->") {
-      self.parse_type_expr(vars)
+      self.parse_type_expr()
     } else {
       Ok(Type::Any)
     }
