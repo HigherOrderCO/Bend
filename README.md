@@ -74,7 +74,8 @@ bend --version
 ### Getting Started
 #### Running Bend Programs
 ```sh
-bend run    <file.bend> # uses the Rust interpreter (sequential)
+bend run    <file.bend> # uses the C interpreter by default (parallel)
+bend run-rs <file.bend> # uses the Rust interpreter (sequential)
 bend run-c  <file.bend> # uses the C interpreter (parallel)
 bend run-cu <file.bend> # uses the CUDA interpreter (massively parallel)
 

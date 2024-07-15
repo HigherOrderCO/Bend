@@ -52,6 +52,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add repeated field name error message.
 - Add `Math` builtin functions. ([#570][gh-570])
 - Add primitive file IO function `IO/FS/flush`. ([#598][gh-598])
+- Changed `bend run` to `bend run-rs` and `bend run` defaults to the C implementation. ([#620][gh-620])
 
 ## [0.2.35] - 2024-06-06
 
@@ -393,5 +394,6 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-596]: https://github.com/HigherOrderCO/Bend/issues/596
 [gh-598]: https://github.com/HigherOrderCO/Bend/issues/598
 [gh-618]: https://github.com/HigherOrderCO/Bend/issues/618
+[gh-620]: https://github.com/HigherOrderCO/Bend/issues/620
 [gh-623]: https://github.com/HigherOrderCO/Bend/issues/623
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
