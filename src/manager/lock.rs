@@ -1,4 +1,6 @@
-use std::error::Error;
+use super::save_config;
+use semver::Version;
+use std::{collections::HashMap, error::Error};
 use toml_edit::{value, ArrayOfTables, DocumentMut, Table};
 
 pub const LOCK_FILE: &str = "mod.lock";
@@ -6,38 +8,24 @@ pub const LOCK_FILE: &str = "mod.lock";
 const ARRAY_NAME: &str = "package";
 pub const NAM_FIELD: &str = "name";
 pub const VER_FIELD: &str = "version";
-pub const SRC_FIELD: &str = "source";
 
 pub fn resolve() -> Result<(), Box<dyn Error>> {
   todo!() // Todo: resolve the versions of the mod.toml and all dependencies, adding to the lockfile
 }
 
-pub fn insert_table(
-  config: &mut DocumentMut,
-  name: &str,
-  version: &str,
-  source: &str,
-) -> Result<(), Box<dyn Error>> {
-  let packages = get_packages(config)?;
+pub fn update_lock_file(resolved: HashMap<String, Version>) -> Result<(), Box<dyn Error>> {
+  let mut packages = ArrayOfTables::new();
 
-  let dep = packages.iter_mut().find(|dep| dep[NAM_FIELD].as_str() == Some(name));
+  for (name, version) in resolved {
+    let mut table = Table::new();
+    table[NAM_FIELD] = value(name);
+    table[VER_FIELD] = value(version.to_string());
+    packages.push(table);
+  }
 
-  let dep = match dep {
-    Some(dep) => dep,
-    None => {
-      let mut new_dep = Table::new();
-      new_dep[NAM_FIELD] = value(name);
-
-      let index = packages.len();
-      packages.push(new_dep);
-      packages.get_mut(index).unwrap()
-    }
-  };
-
-  dep[VER_FIELD] = value(version);
-  dep[SRC_FIELD] = value(source);
-
-  Ok(())
+  let mut lock = DocumentMut::new();
+  lock[ARRAY_NAME] = toml_edit::Item::ArrayOfTables(packages);
+  save_config(lock, LOCK_FILE)
 }
 
 pub fn get_packages(config: &mut DocumentMut) -> Result<&mut ArrayOfTables, String> {

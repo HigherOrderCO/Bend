@@ -20,7 +20,7 @@ fn clone_locked() -> Result<(), Box<dyn Error>> {
     let ver = pkg[VER_FIELD].as_str().unwrap();
     let alias = deps.get(nam).and_then(|dep| dep.get("alias")).and_then(|alias| alias.as_str());
 
-    repo::clone(nam, ver, alias)?;
+    let _ = repo::clone(nam, ver, alias)?;
   }
 
   Ok(())
