@@ -39,7 +39,7 @@ pub fn handle_package_cmd(command: PackageCmd) -> Result<(), Box<dyn Error>> {
     PackageCmd::Init { name } => config::init(&name),
     PackageCmd::Add { name, version, alias } => dep::add(&name, version, alias.as_deref()),
     PackageCmd::Remove { name } => dep::remove(&name),
-    PackageCmd::Tidy {} => tidy::tidy(),
+    PackageCmd::Tidy => tidy::tidy(),
   }
 }
 

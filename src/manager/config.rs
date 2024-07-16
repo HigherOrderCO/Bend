@@ -19,7 +19,7 @@ pub fn get_deps(config: &mut DocumentMut) -> Result<&mut dyn TableLike, Box<dyn 
 }
 
 /// Updates the module configuration file with the dependency information.
-pub fn update_config(name: &str, version: &str, alias: Option<&str>) -> Result<(), Box<dyn Error>> {
+pub fn insert(name: &str, version: &str, alias: Option<&str>) -> Result<(), Box<dyn Error>> {
   let mut config = get_config(CONFIG_FILE)?;
   let deps = get_deps(&mut config)?;
 
@@ -32,7 +32,7 @@ pub fn update_config(name: &str, version: &str, alias: Option<&str>) -> Result<(
 }
 
 /// Updates an existing dependency with the new version and alias (if provided).
-pub fn update_existing_dependency(dep_item: &mut Item, version: &str, alias: Option<&str>) {
+fn update_existing_dependency(dep_item: &mut Item, version: &str, alias: Option<&str>) {
   match dep_item.as_table_like_mut() {
     None => *dep_item = new_dependency(version, alias),
     Some(table) => {
@@ -47,7 +47,7 @@ pub fn update_existing_dependency(dep_item: &mut Item, version: &str, alias: Opt
 }
 
 /// Creates a new dependency with the given version and alias (if provided).
-pub fn new_dependency(version: &str, alias: Option<&str>) -> Item {
+fn new_dependency(version: &str, alias: Option<&str>) -> Item {
   if let Some(alias) = alias {
     let mut dep_table = Table::new();
     dep_table["version"] = value(version);

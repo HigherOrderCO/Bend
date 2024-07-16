@@ -1,4 +1,4 @@
-use super::config::{get_deps, update_config, CONFIG_FILE};
+use super::config::{get_deps, insert, CONFIG_FILE};
 use super::{get_config, repo, save_config};
 use git2::Repository;
 use semver::VersionReq;
@@ -21,7 +21,7 @@ pub fn add(name: &str, version: Option<VersionReq>, alias: Option<&str>) -> Resu
     }
   };
 
-  update_config(name, &tag, alias)
+  insert(name, &tag, alias)
 }
 
 /// Removes the dependency information from the module configuration file.
