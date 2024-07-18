@@ -352,6 +352,8 @@ impl<'a> TermParser<'a> {
   }
 
   fn parse_pattern(&mut self, simple: bool) -> ParseResult<Pattern> {
+    const PATTERNS: &[&str] =
+      &["Constructor", "Tuple", "Dup", "List", "String", "Char", "Number", "Unscoped Var", "Var"];
     maybe_grow(|| {
       let (tag, unexpected_tag) = self.parse_tag()?;
       self.skip_trivia();
@@ -426,7 +428,7 @@ impl<'a> TermParser<'a> {
 
       // Var
       unexpected_tag(self)?;
-      let nam = self.labelled(|p| p.parse_name_or_era(), "pattern-matching pattern")?;
+      let nam = self.alternative_fn(Self::parse_name_or_era, PATTERNS, Some("Pattern"))?;
       Ok(Pattern::Var(nam))
     })
   }
@@ -1638,6 +1640,26 @@ pub trait ParserCommons<'a>: Parser<'a> {
       format!("Redefinition of builtin (type) '{type_name}'.")
     } else {
       format!("Redefinition of type '{type_name}'.")
+    }
+  }
+
+  fn alternative<T>(&mut self, alternatives: &[&str], label: Option<&str>) -> ParseResult<T> {
+    let ini_idx = *self.index();
+    let end_idx = *self.index() + 1;
+    let exp = alternatives.into_iter().join(" or ");
+    let exp = if let Some(label) = label { format!("{label} - {exp}") } else { exp };
+    self.expected_spanned(&exp, ini_idx..end_idx)
+  }
+
+  fn alternative_fn<T>(
+    &mut self,
+    parser: impl Fn(&mut Self) -> ParseResult<T>,
+    alternatives: &[&str],
+    label: Option<&str>,
+  ) -> ParseResult<T> {
+    match parser(self) {
+      Ok(val) => Ok(val),
+      Err(_) => self.alternative(alternatives, label),
     }
   }
 }

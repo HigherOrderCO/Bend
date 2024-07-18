@@ -80,6 +80,21 @@ impl<'a> PyParser<'a> {
   /// <var> <postfix>?
   ///
   fn parse_simple_expr(&mut self, inline: bool) -> ParseResult<Expr> {
+    const EXPRESSIONS: &[&str] = &[
+      "Tuple",
+      "Map",
+      "Superposition",
+      "List",
+      "Tree",
+      "Symbol",
+      "String",
+      "Char",
+      "Number",
+      "Unscoped Var",
+      "Eraser",
+      "Var",
+    ];
+
     if inline {
       self.skip_trivia_inline()?;
     } else {
@@ -126,11 +141,11 @@ impl<'a> PyParser<'a> {
         Expr::Num { val: self.parse_number()? }
       } else {
         // Var
-        let nam = self.labelled(|p| p.parse_bend_name(), "expression")?;
+        let nam = self.alternative_fn(|p| p.parse_bend_name(), EXPRESSIONS, Some("Expression"))?;
         Expr::Var { nam }
       }
     } else {
-      self.expected("expression")?
+      self.alternative(EXPRESSIONS, Some("Expression"))?
     };
 
     // postfixes
