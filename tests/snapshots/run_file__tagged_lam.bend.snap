@@ -4,6 +4,6 @@ input_file: tests/golden_tests/run_file/tagged_lam.bend
 ---
 [4m[1m[31mErrors:[0m
 In tests/golden_tests/run_file/tagged_lam.bend :
-[1m- expected:[0m term
+[1m- expected:[0m Term - Lambda or Application or Tuple or Operation or List or Tree or Sup or Unscoped Var or Eraser or String or Char or Symbol or Number or Use or Let or Def or If or Match or Switch or With or Fold or Bend or Open or Var
 [1m- detected:[0m end of input
 [0m  2 | [4m[31m [0m

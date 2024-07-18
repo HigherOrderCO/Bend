@@ -434,6 +434,32 @@ impl<'a> TermParser<'a> {
   }
 
   pub fn parse_term(&mut self) -> ParseResult<Term> {
+    const TERMS: &[&str] = &[
+      "Lambda",
+      "Application",
+      "Tuple",
+      "Operation",
+      "List",
+      "Tree",
+      "Sup",
+      "Unscoped Var",
+      "Eraser",
+      "String",
+      "Char",
+      "Symbol",
+      "Number",
+      "Use",
+      "Let",
+      "Def",
+      "If",
+      "Match",
+      "Switch",
+      "With",
+      "Fold",
+      "Bend",
+      "Open",
+      "Var",
+    ];
     maybe_grow(|| {
       let (tag, unexpected_tag) = self.parse_tag()?;
       self.skip_trivia();
@@ -806,7 +832,7 @@ impl<'a> TermParser<'a> {
 
       // Var
       unexpected_tag(self)?;
-      let nam = self.labelled(|p| p.parse_bend_name(), "term")?;
+      let nam = self.alternative_fn(|p| p.parse_bend_name(), TERMS, Some("Term"))?;
       Ok(Term::Var { nam })
     })
   }
@@ -1646,7 +1672,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
   fn alternative<T>(&mut self, alternatives: &[&str], label: Option<&str>) -> ParseResult<T> {
     let ini_idx = *self.index();
     let end_idx = *self.index() + 1;
-    let exp = alternatives.into_iter().join(" or ");
+    let exp = alternatives.iter().join(" or ");
     let exp = if let Some(label) = label { format!("{label} - {exp}") } else { exp };
     self.expected_spanned(&exp, ini_idx..end_idx)
   }
