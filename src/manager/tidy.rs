@@ -1,5 +1,6 @@
 use super::config::{get_deps, CONFIG_FILE};
-use super::lock::{get_packages, resolve, LOCK_FILE, NAM_FIELD, VER_FIELD};
+use super::lock::{get_packages, LOCK_FILE, NAM_FIELD, VER_FIELD};
+use super::resolver::resolve;
 use super::{get_config, repo, Error};
 
 /// Ensures that downloaded packages matches the `mod.lock` file.

@@ -7,6 +7,7 @@ mod config;
 mod dep;
 mod lock;
 mod repo;
+mod resolver;
 mod tidy;
 
 #[derive(Subcommand, Clone, Debug)]

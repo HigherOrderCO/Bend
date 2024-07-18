@@ -57,3 +57,13 @@ fn new_dependency(version: &str, alias: Option<&str>) -> Item {
     value(version)
   }
 }
+
+pub fn get_version(item: &Item) -> Option<&str> {
+  if let Some(v) = item.as_str() {
+    Some(v)
+  } else {
+    let tab = item.as_table_like()?;
+    let ver = tab.get("version")?;
+    ver.as_str()
+  }
+}

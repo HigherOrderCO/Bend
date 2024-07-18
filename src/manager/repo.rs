@@ -1,5 +1,5 @@
-use git2::{AutotagOption, Remote, RemoteCallbacks};
-use git2::{FetchOptions, Repository};
+use git2::Repository;
+use git2::{Direction, FetchOptions, Reference, ReferenceFormat, Remote, RemoteCallbacks};
 use semver::{Version, VersionReq};
 use std::error::Error;
 use std::path::Path;
@@ -18,7 +18,8 @@ pub fn clone(name: &str, tag: &str, alias: Option<&str>) -> Result<PathBuf, Box<
     Err(_) => Repository::init(&local_path)?,
   };
 
-  setup_remote(&repo, name, "origin")?;
+  let mut remote = setup_remote(&repo, name, "origin")?;
+  fetch_tag(&mut remote, tag)?;
 
   // Checkout the specified tag
   if let Err(err) = checkout_tag(&repo, tag) {
@@ -64,45 +65,52 @@ fn repository_name(name: &str) -> &str {
   repo
 }
 
-/// Sets up the remote URL for the repository, updating it if necessary,
-/// and fetches all tags.
-pub fn setup_remote(repo: &Repository, url: &str, remote_name: &str) -> Result<(), Box<dyn Error>> {
+/// Sets up the remote URL for the repository, updating it if necessary.
+pub fn setup_remote<'r>(repo: &'r Repository, url: &str, name: &str) -> Result<Remote<'r>, Box<dyn Error>> {
   let url = &format!("https://{url}.git");
 
-  let mut remote = match repo.find_remote(remote_name) {
+  let remote = match repo.find_remote(name) {
     Ok(remote) if remote.url() != Some(url) => {
-      repo.remote_set_url(remote_name, url)?;
-      repo.find_remote(remote_name)?
+      repo.remote_set_url(name, url)?;
+      repo.find_remote(name)?
     }
     Ok(remote) => remote,
-    Err(_) => repo.remote(remote_name, url)?,
+    Err(_) => repo.remote(name, url)?,
   };
 
-  fetch_tags(&mut remote)?;
-  Ok(())
+  Ok(remote)
 }
 
 pub fn get_remote_tags(url: &str) -> Result<Vec<String>, Box<dyn Error>> {
   let url = &format!("https://{url}.git");
 
-  let temp_dir = tempfile::tempdir()?;
-  let repo_path = temp_dir.path();
+  let temp_dir = std::env::temp_dir().join("bend");
+  std::fs::create_dir(&temp_dir)?;
 
-  let repo = Repository::init(repo_path)?;
-  let mut remote = repo.remote("origin", url)?;
-  fetch_tags(&mut remote)?;
+  let repo = Repository::init_bare(&temp_dir)?;
+  let mut remote = repo.remote_anonymous(url)?;
 
-  let tags: Vec<String> = repo.tag_names(None)?.iter().filter_map(|t| t.map(String::from)).collect();
+  let connection = remote.connect_auth(Direction::Fetch, None, None)?;
+
+  let mut tags = Vec::new();
+
+  for reference in connection.list()? {
+    if let Ok(name) = Reference::normalize_name(reference.name(), ReferenceFormat::NORMAL) {
+      if let Some(name) = name.strip_prefix("refs/tags/") {
+        tags.push(name.to_string());
+      }
+    }
+  }
 
   Ok(tags)
 }
 
-fn fetch_tags(remote: &mut Remote) -> Result<(), git2::Error> {
+fn fetch_tag(remote: &mut Remote, tag: &str) -> Result<(), git2::Error> {
   let callbacks = RemoteCallbacks::new();
   let mut fo = FetchOptions::new();
   fo.remote_callbacks(callbacks);
-  fo.download_tags(AutotagOption::All);
-  remote.fetch(&[] as &[&str], Some(&mut fo), None)
+  let refspecs = vec![format!("+refs/tags/{}:refs/tags/{}", tag, tag)];
+  remote.fetch(&refspecs, Some(&mut fo), None)
 }
 
 /// Retrieves the latest tag from the repository by parsing the tag names as versions
@@ -113,10 +121,7 @@ pub fn get_latest_tag(name: &str, constraint: Option<VersionReq>) -> Result<Vers
 
   for tag in tags {
     if let Ok(version) = Version::parse(&tag) {
-      let is_within_constraint = match &constraint {
-        Some(req) => req.matches(&version),
-        None => true,
-      };
+      let is_within_constraint = constraint.as_ref().map_or(true, |req| req.matches(&version));
 
       if is_within_constraint && highest_version.as_ref().map_or(true, |latest| version > *latest) {
         highest_version = Some(version);

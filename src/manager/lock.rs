@@ -1,6 +1,6 @@
 use super::save_config;
 use semver::Version;
-use std::{collections::HashMap, error::Error};
+use std::{collections::BTreeMap, error::Error};
 use toml_edit::{value, ArrayOfTables, DocumentMut, Table};
 
 pub const LOCK_FILE: &str = "mod.lock";
@@ -9,11 +9,7 @@ const ARRAY_NAME: &str = "package";
 pub const NAM_FIELD: &str = "name";
 pub const VER_FIELD: &str = "version";
 
-pub fn resolve() -> Result<(), Box<dyn Error>> {
-  todo!() // Todo: resolve the versions of the mod.toml and all dependencies, adding to the lockfile
-}
-
-pub fn update_lock_file(resolved: HashMap<String, Version>) -> Result<(), Box<dyn Error>> {
+pub fn update_lock_file(resolved: BTreeMap<String, Version>) -> Result<(), Box<dyn Error>> {
   let mut packages = ArrayOfTables::new();
 
   for (name, version) in resolved {
