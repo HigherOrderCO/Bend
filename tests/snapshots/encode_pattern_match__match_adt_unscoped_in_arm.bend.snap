@@ -3,19 +3,27 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_in_arm.bend
 ---
 Scott
+main: Any
 (main) = λ* λ$x $x
 
+bool/T: bool
 (bool/T) = λa λ* a
 
+bool/F: bool
 (bool/F) = λ* λb b
 
 NumScott
+main: Any
 (main) = λ* λ$x $x
 
+bool/T: bool
 (bool/T) = λa (a bool/T/tag)
 
+bool/F: bool
 (bool/F) = λa (a bool/F/tag)
 
+bool/T/tag: u24
 (bool/T/tag) = 0
 
+bool/F/tag: u24
 (bool/F/tag) = 1

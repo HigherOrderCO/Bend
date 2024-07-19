@@ -3,19 +3,27 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_lambda.bend
 ---
 Scott
+main: Any
 (main) = (Maybe/Some 1 λ$x * λa a $x)
 
+Maybe/None: Maybe
 (Maybe/None) = λa λ* a
 
+Maybe/Some: (Any -> Maybe)
 (Maybe/Some) = λa λ* λc (c a)
 
 NumScott
+main: Any
 (main) = (Maybe/Some 1 λa switch a { 0: λ$x *; _: λ* λb b; } $x)
 
+Maybe/None: Maybe
 (Maybe/None) = λa (a Maybe/None/tag)
 
+Maybe/Some: (Any -> Maybe)
 (Maybe/Some) = λa λb (b Maybe/Some/tag a)
 
+Maybe/None/tag: u24
 (Maybe/None/tag) = 0
 
+Maybe/Some/tag: u24
 (Maybe/Some/tag) = 1

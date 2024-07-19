@@ -8,8 +8,6 @@ impl Ctx<'_> {
   ///
   /// Does not check exhaustiveness of rules and type mismatches. (Inter-ctr/type proprieties)
   pub fn fix_match_defs(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     for def in self.book.defs.values_mut() {
       let mut errs = vec![];
 
@@ -82,7 +80,7 @@ impl Pattern {
   fn check_good_ctr(&self, ctrs: &Constructors, adts: &Adts, errs: &mut Vec<String>) {
     if let Pattern::Ctr(nam, args) = self {
       if let Some(adt) = ctrs.get(nam) {
-        let expected_arity = adts[adt].ctrs[nam].len();
+        let expected_arity = adts[adt].ctrs[nam].fields.len();
         let found_arity = args.len();
         if expected_arity != found_arity {
           errs.push(format!(

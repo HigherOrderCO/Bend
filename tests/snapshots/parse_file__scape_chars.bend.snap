@@ -2,12 +2,17 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/scape_chars.bend
 ---
+main: Any
 (main) = (String/Cons 92 (String/Cons 32 (String/Cons 10 (String/Cons 32 (String/Cons 9 (String/Cons 32 (String/Cons 34 String/Nil)))))))
 
+String/Nil: String
 (String/Nil) = λ%x (%x String/Nil/tag)
 
+String/Cons: (u24 -> (String -> String))
 (String/Cons) = λhead λtail λ%x (%x String/Cons/tag head tail)
 
+String/Nil/tag: u24
 (String/Nil/tag) = 0
 
+String/Cons/tag: u24
 (String/Cons/tag) = 1

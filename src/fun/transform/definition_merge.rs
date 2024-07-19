@@ -40,7 +40,10 @@ impl Book {
       if equal_defs.len() > 1 {
         // Merging some defs
         // Add the merged def
-        let new_def = Definition::new_gen(new_name.clone(), vec![Rule { pats: vec![], body: term }], builtin);
+        let rules = vec![Rule { pats: vec![], body: term }];
+        // TODO: We should either carry the types and type-checking from the functions
+        // or check that types were already erased by this point.
+        let new_def = Definition::new_gen(new_name.clone(), rules, builtin, true);
         self.defs.insert(new_name.clone(), new_def);
         // Remove the old ones and write the map of old names to new ones.
         for name in equal_defs {

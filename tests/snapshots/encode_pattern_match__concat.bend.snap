@@ -3,23 +3,33 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/concat.bend
 ---
 Scott
+String/concat: Any
 (String/concat) = λ* λb b
 
+main: Any
 (main) = (String/concat (String/Cons 97 (String/Cons 98 String/Nil)) (String/Cons 99 (String/Cons 100 String/Nil)))
 
+String/Nil: String
 (String/Nil) = λa λ* a
 
+String/Cons: (u24 -> (String -> String))
 (String/Cons) = λa λb λ* λd (d a b)
 
 NumScott
+String/concat: Any
 (String/concat) = λ* λb b
 
+main: Any
 (main) = (String/concat (String/Cons 97 (String/Cons 98 String/Nil)) (String/Cons 99 (String/Cons 100 String/Nil)))
 
+String/Nil: String
 (String/Nil) = λa (a String/Nil/tag)
 
+String/Cons: (u24 -> (String -> String))
 (String/Cons) = λa λb λc (c String/Cons/tag a b)
 
+String/Nil/tag: u24
 (String/Nil/tag) = 0
 
+String/Cons/tag: u24
 (String/Cons/tag) = 1

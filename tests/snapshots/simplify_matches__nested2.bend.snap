@@ -2,12 +2,17 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/nested2.bend
 ---
+Foo: Any
 (Foo) = λa λb (match b { List/Nil: λc (c List/Nil); List/Cons d e: λf (match e { List/Nil: λg λh (g (List/Cons h List/Nil)); List/Cons i j: λk λl (k l i j); } f d); } a)
 
+List/Nil: ∀t (List t)
 (List/Nil) = λa (a List/Nil/tag)
 
+List/Cons: ∀t (u24 -> ((List t) -> (List t)))
 (List/Cons) = λa λb λc (c List/Cons/tag a b)
 
+List/Nil/tag: u24
 (List/Nil/tag) = 0
 
+List/Cons/tag: u24
 (List/Cons/tag) = 1
