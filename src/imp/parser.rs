@@ -887,51 +887,61 @@ impl<'a> PyParser<'a> {
     }
   }
 
-  /// "("<nam> ("," <nam>)* ")"
-  /// | "{"<nam> (","? <nam>)+  "}"
+  /// <pat1>
   /// | <nam> "[" <expr> "]"
-  /// | <nam>
+  /// | <pat1> ("," <pat1>)*
   fn parse_assign_pattern(&mut self) -> ParseResult<AssignPattern> {
-    // Eraser pattern
-    if self.starts_with("*") {
-      self.advance_one();
-      return Ok(AssignPattern::Eraser);
-    }
-    // Tup pattern
-    if self.starts_with("(") {
-      let binds = self.list_like(|p| p.parse_assign_pattern(), "(", ")", ",", true, 1)?;
-      if binds.len() == 1 {
-        return Ok(binds[0].to_owned());
-      } else {
-        return Ok(AssignPattern::Tup(binds));
-      }
-    }
-    // Dup pattern
-    if self.starts_with("{") {
-      let binds = self.list_like(|p| p.parse_assign_pattern(), "{", "}", ",", true, 2)?;
-      return Ok(AssignPattern::Sup(binds));
-    }
-
-    // Chn pattern
-    if self.starts_with("$") {
-      self.advance_one();
-      self.skip_trivia_inline()?;
-      let nam = self.parse_bend_name()?;
-      return Ok(AssignPattern::Chn(nam));
-    }
-
-    let var = self.parse_bend_name()?;
-
-    // Map get pattern
+    let head_ini = *self.index();
+    let head = self.parse_primary_assign_pattern()?;
+    let head_end = *self.index();
+    self.skip_trivia_inline()?;
     if self.starts_with("[") {
+      // TODO: allow patterns like `x[a][b]`
       self.advance_one();
       let key = self.parse_expr(false)?;
       self.consume("]")?;
-      return Ok(AssignPattern::MapSet(var, key));
+      if let AssignPattern::Var(var) = head {
+        Ok(AssignPattern::MapSet(var, key))
+      } else {
+        self.with_ctx(Err("Expected a variable pattern"), head_ini..head_end)
+      }
+    } else if self.starts_with(",") {
+      let mut els = vec![head];
+      while self.try_consume(",") {
+        self.skip_trivia_inline()?;
+        els.push(self.parse_primary_assign_pattern()?);
+      }
+      Ok(AssignPattern::Tup(els))
+    } else {
+      Ok(head)
     }
+  }
 
-    // Var pattern
-    Ok(AssignPattern::Var(var))
+  /// "*"
+  /// | "{"<pat1> ("," <pat1>)+ "}"
+  /// | "$" <nam>
+  /// | "(" <pat0> ")"
+  /// | <nam>
+  fn parse_primary_assign_pattern(&mut self) -> ParseResult<AssignPattern> {
+    if self.starts_with("*") {
+      self.advance_one();
+      Ok(AssignPattern::Eraser)
+    } else if self.starts_with("{") {
+      let binds = self.list_like(|p| p.parse_primary_assign_pattern(), "{", "}", ",", true, 2)?;
+      Ok(AssignPattern::Sup(binds))
+    } else if self.starts_with("$") {
+      self.advance_one();
+      self.skip_trivia_inline()?;
+      let nam = self.parse_bend_name()?;
+      Ok(AssignPattern::Chn(nam))
+    } else if self.starts_with("(") {
+      self.advance_one();
+      let assign = self.parse_assign_pattern()?;
+      self.consume(")")?;
+      Ok(assign)
+    } else {
+      Ok(AssignPattern::Var(self.parse_bend_name()?))
+    }
   }
 
   /// "open" {typ} ":" {var} ";"? {nxt}
