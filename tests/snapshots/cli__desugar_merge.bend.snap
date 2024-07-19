@@ -7,6 +7,8 @@ input_file: tests/golden_tests/cli/desugar_merge.bend
 [1mIn definition '[4mZ[0m[1m':[0m
   Definition is unused.
 
+F__M_Z: _
 (F__M_Z) = λ* λa a
 
+main: Any
 (main) = λ* λa a

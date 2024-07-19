@@ -2,4 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/desugar_linearize_matches_alt.bend
 ---
+main: Any
 (main) = λa switch a { 0: λb b; _: λ* λc c; }

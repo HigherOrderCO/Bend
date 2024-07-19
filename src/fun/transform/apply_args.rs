@@ -15,8 +15,6 @@ impl Ctx<'_> {
   /// main = (λx1 λx2 λx3 (MainBody x1 x2 x3) arg1 arg2 arg3)
   /// ```
   pub fn apply_args(&mut self, args: Option<Vec<Term>>) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     if let Some(entrypoint) = &self.book.entrypoint {
       let main_def = &mut self.book.defs[entrypoint];
 

@@ -2,66 +2,98 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/imp_program.bend
 ---
+Map/empty: (Map T)
 (Map/empty) = Map/Leaf
 
-(Map/get) = λ%arg0 λ%arg1 use key = %arg1; use map = %arg0; match map = map { Map/Leaf: (*, map); Map/Node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: let (got, rest) = (Map/get map.left (/ key 2)); (got, (Map/Node map.value rest map.right)); _ _-1: let (got, rest) = (Map/get map.right (/ key 2)); (got, (Map/Node map.value map.left rest)); }; _ _-1: (map.value, map); }; }
+Map/get: ((Map T) -> (u24 -> ((Map T), T)))
+(Map/get map key) = match map = map { Map/Leaf: (*, map); Map/Node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: let (got, rest) = (Map/get map.left (/ key 2)); (got, (Map/Node map.value rest map.right)); _ _-1: let (got, rest) = (Map/get map.right (/ key 2)); (got, (Map/Node map.value map.left rest)); }; _ _-1: (map.value, map); }; }
 
-(Map/set) = λ%arg0 λ%arg1 λ%arg2 use value = %arg2; use key = %arg1; use map = %arg0; match map = map { Map/Node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/Node map.value (Map/set map.left (/ key 2) value) map.right); _ _-1: (Map/Node map.value map.left (Map/set map.right (/ key 2) value)); }; _ _-1: (Map/Node value map.left map.right); }; Map/Leaf: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/Node * (Map/set Map/Leaf (/ key 2) value) Map/Leaf); _ _-1: (Map/Node * Map/Leaf (Map/set Map/Leaf (/ key 2) value)); }; _ _-1: (Map/Node value Map/Leaf Map/Leaf); }; }
+Map/set: ((Map T) -> (u24 -> (T -> (Map T))))
+(Map/set map key value) = match map = map { Map/Node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/Node map.value (Map/set map.left (/ key 2) value) map.right); _ _-1: (Map/Node map.value map.left (Map/set map.right (/ key 2) value)); }; _ _-1: (Map/Node value map.left map.right); }; Map/Leaf: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/Node * (Map/set Map/Leaf (/ key 2) value) Map/Leaf); _ _-1: (Map/Node * Map/Leaf (Map/set Map/Leaf (/ key 2) value)); }; _ _-1: (Map/Node value Map/Leaf Map/Leaf); }; }
 
+symbols: Any
 (symbols) = let x = (Map/set (Map/set Map/empty 49 5) 2 3); let x = (Map/set x 49 2); let x = (Map/set x 2 3); let (map/get%0, x) = (Map/get x 49); (+ map/get%0 8293490)
 
+mk_point: Any
 (mk_point) = (Point/Point 1 2)
 
-(identity) = λ%arg0 use x = %arg0; x
+identity: (Any -> Any)
+(identity x) = x
 
-(inc) = λ%arg0 use n = %arg0; let n = (+ n 1); n
+inc: (Any -> Any)
+(inc n) = let n = (+ n 1); n
 
-(inc_list) = λ%arg0 use list = %arg0; fold %iter = list { List/Nil: List/Nil; List/Cons: let x = %iter.head; (List/Cons (+ x 1) %iter.tail); }
+inc_list: (Any -> Any)
+(inc_list list) = fold %iter = list { List/Nil: List/Nil; List/Cons: let x = %iter.head; (List/Cons (+ x 1) %iter.tail); }
 
+lam: Any
 (lam) = λx λy x
 
-(do_match) = λ%arg0 use b = %arg0; match b = b { Bool/True: 1; Bool/False: 0; }
+do_match: (Any -> Any)
+(do_match b) = match b = b { Bool/True: 1; Bool/False: 0; }
 
+true: Any
 (true) = Bool/True
 
-(fib) = λ%arg0 use n = %arg0; switch %pred = (< n 2) { 0: (+ (fib (- n 1)) (fib (- n 2))); _ %pred-1: n; }
+fib: (Any -> Any)
+(fib n) = switch %pred = (< n 2) { 0: (+ (fib (- n 1)) (fib (- n 2))); _ %pred-1: n; }
 
-(swt) = λ%arg0 use n = %arg0; switch n = n { 0: 42; _ n-1: 1; }
+swt: (Any -> Any)
+(swt n) = switch n = n { 0: 42; _ n-1: 1; }
 
-(fld) = λ%arg0 use list = %arg0; fold list = list { List/Cons: 1; List/Nil: 2; }
+fld: (Any -> Any)
+(fld list) = fold list = list { List/Cons: 1; List/Nil: 2; }
 
+bnd: Any
 (bnd) = bend x = 0, { when (< x 10): (List/Cons x (fork (+ x 1))); else: List/Nil }
 
+era: Any
 (era) = let * = (+ 2 3); let the_expr_killer = *; (the_expr_killer 9)
 
+sup: Any
 (sup) = let x = {(List/Cons 1 (List/Cons 2 List/Nil)) (List/Cons 3 (List/Cons 4 (List/Cons 5 (List/Cons 6 List/Nil))))}; x
 
+main: Any
 (main) = with IO { ask x = IO.read; x }
 
+List/Nil: ∀t (List t)
 (List/Nil) = λ%x (%x List/Nil/tag)
 
+List/Cons: ∀t (u24 -> ((List t) -> (List t)))
 (List/Cons) = λhead λtail λ%x (%x List/Cons/tag head tail)
 
+Map/Node: ∀T (T -> ((Map T) -> ((Map T) -> (Map T))))
 (Map/Node) = λvalue λleft λright λ%x (%x Map/Node/tag value left right)
 
+Map/Leaf: ∀T (Map T)
 (Map/Leaf) = λ%x (%x Map/Leaf/tag)
 
+Point/Point: (Any -> (Any -> Point))
 (Point/Point) = λx λy λ%x (%x Point/Point/tag x y)
 
+Bool/True: Bool
 (Bool/True) = λ%x (%x Bool/True/tag)
 
+Bool/False: Bool
 (Bool/False) = λ%x (%x Bool/False/tag)
 
+List/Nil/tag: u24
 (List/Nil/tag) = 0
 
+List/Cons/tag: u24
 (List/Cons/tag) = 1
 
+Map/Node/tag: u24
 (Map/Node/tag) = 0
 
+Map/Leaf/tag: u24
 (Map/Leaf/tag) = 1
 
+Point/Point/tag: u24
 (Point/Point/tag) = 0
 
+Bool/True/tag: u24
 (Bool/True/tag) = 0
 
+Bool/False/tag: u24
 (Bool/False/tag) = 1

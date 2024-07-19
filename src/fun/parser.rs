@@ -37,7 +37,7 @@ pub struct ParseBook {
   /// Imported packages to be loaded in the program
   pub import_ctx: ImportCtx,
 
-  /// Source of the book
+  /// File path that the book was loaded from.
   pub source: Name,
 }
 
@@ -384,6 +384,8 @@ impl<'a> FunParser<'a> {
   fn parse_import(&mut self) -> ParseResult<Vec<Import>> {
     // import path
     // import (path/a, path/b)
+    self.parse_keyword("import")?;
+    self.skip_trivia_inline()?;
 
     let new_import = |import: Name, alias: Option<Name>, relative: bool| -> Import {
       let (path, import) = match import.rsplit_once('/') {

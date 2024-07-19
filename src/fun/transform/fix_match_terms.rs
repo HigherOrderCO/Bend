@@ -42,8 +42,6 @@ impl Ctx<'_> {
   /// }
   /// ```
   pub fn fix_match_terms(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     for def in self.book.defs.values_mut() {
       for rule in def.rules.iter_mut() {
         let errs = rule.body.fix_match_terms(&self.book.ctrs, &self.book.adts);

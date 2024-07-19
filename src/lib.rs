@@ -60,7 +60,6 @@ pub fn compile_book(
   }
 
   if opts.inline {
-    diagnostics.start_pass();
     if let Err(e) = inline_hvm_book(&mut hvm_book) {
       diagnostics.add_book_error(format!("During inlining:\n{:ERR_INDENT_SIZE$}{}", "", e));
     }

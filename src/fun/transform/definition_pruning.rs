@@ -30,7 +30,9 @@ impl Ctx<'_> {
     if let Some(main) = &self.book.entrypoint {
       let def = self.book.defs.get(main).unwrap();
       used.insert(main.clone(), Used::Main);
-      self.book.find_used_definitions_from_term(&def.rule().body, Used::Main, &mut used);
+      for rule in def.rules.iter() {
+        self.book.find_used_definitions_from_term(&rule.body, Used::Main, &mut used);
+      }
     }
 
     // Get the functions that are accessible from non-builtins.
@@ -41,7 +43,9 @@ impl Ctx<'_> {
         } else {
           used.insert(def.name.clone(), Used::NonBuiltin);
         }
-        self.book.find_used_definitions_from_term(&def.rule().body, Used::NonBuiltin, &mut used);
+        for rule in def.rules.iter() {
+          self.book.find_used_definitions_from_term(&rule.body, Used::NonBuiltin, &mut used);
+        }
       }
     }
     for def in self.book.hvm_defs.values() {

@@ -28,8 +28,6 @@ impl Ctx<'_> {
   /// }
   /// ```
   pub fn desugar_fold(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     let mut new_defs = vec![];
     for def in self.book.defs.values_mut() {
       let mut fresh = 0;

@@ -836,6 +836,26 @@ impl Term {
     }
   }
 
+  /// Substitutes the occurrences of a type constructor in the term with the given name.
+  pub fn subst_type_ctrs(&mut self, from: &Name, to: &Name) {
+    maybe_grow(|| {
+      match self {
+        Term::Def { def, nxt: _ } => {
+          def.typ.subst_ctr(from, to);
+        }
+        Term::With { typ, bod: _ } => {
+          if typ == from {
+            *typ = to.clone();
+          }
+        }
+        _ => (),
+      }
+      for child in self.children_mut() {
+        child.subst_type_ctrs(from, to);
+      }
+    });
+  }
+
   /// Substitute the occurrence of an unscoped variable with the given term.
   pub fn subst_unscoped(&mut self, from: &Name, to: &Term) {
     maybe_grow(|| {
@@ -1089,6 +1109,48 @@ impl Definition {
   pub fn rule_mut(&mut self) -> &mut Rule {
     self.assert_no_pattern_matching_rules();
     &mut self.rules[0]
+  }
+}
+
+impl Type {
+  /// Substitutes the occurrences of a type constructor with the given name.
+  /// Substitutes both `Var` and `Ctr` types since `Var` could be referring to
+  /// an unresolved type constructor.
+  pub fn subst_ctr(&mut self, from: &Name, to: &Name) {
+    maybe_grow(|| {
+      match self {
+        Type::Var(nam) => {
+          if nam == from {
+            *nam = to.clone();
+          }
+        }
+        Type::Ctr(nam, _) => {
+          if nam == from {
+            *nam = to.clone();
+          }
+        }
+        Type::All(nam, _) if nam == from => {
+          // This forall is shadowing the subst variable, so stop here.
+          return;
+        }
+        _ => (),
+      };
+      for child in self.children_mut() {
+        child.subst_ctr(from, to);
+      }
+    })
+  }
+
+  pub fn children_mut(&mut self) -> impl Iterator<Item = &mut Type> {
+    multi_iterator!(ChildrenIter { Zero, One, Two, Vec });
+    match self {
+      Type::Any | Type::None | Type::Hole | Type::I24 | Type::F24 | Type::U24 | Type::Var(_) => {
+        ChildrenIter::Zero([])
+      }
+      Type::Arr(lft, rgt) => ChildrenIter::Two([lft.as_mut(), rgt.as_mut()]),
+      Type::Tup(els) | Type::Ctr(_, els) => ChildrenIter::Vec(els),
+      Type::All(_, body) => ChildrenIter::One([body.as_mut()]),
+    }
   }
 }
 

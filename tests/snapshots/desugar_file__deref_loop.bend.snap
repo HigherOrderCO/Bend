@@ -2,20 +2,29 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/deref_loop.bend
 ---
+foo: Any
 (foo) = λa (a foo__C1)
 
+bar: Any
 (bar) = (foo 1)
 
+main: Any
 (main) = (foo 0)
 
+nat/succ: (Any -> nat)
 (nat/succ) = λa λb (b nat/succ/tag a)
 
+nat/zero: nat
 (nat/zero) = λa (a nat/zero/tag)
 
+nat/succ/tag: u24
 (nat/succ/tag) = 0
 
+nat/zero/tag: u24
 (nat/zero/tag) = 1
 
+foo__C0: _
 (foo__C0) = λ* (bar 0)
 
+foo__C1: _
 (foo__C1) = λa switch a { 0: λb b; _: foo__C0; }

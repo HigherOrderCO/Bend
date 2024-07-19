@@ -88,11 +88,16 @@ impl<'a> ImpParser<'a> {
     let ini_idx = *self.index();
 
     self.parse_keyword("object")?;
-
-    let type_vars = self.list_like(|p| p.parse_var_name(), "(", ")", ",", true, 0)?;
     self.skip_trivia_inline()?;
 
     let name = self.parse_top_level_name()?;
+    self.skip_trivia_inline()?;
+
+    let type_vars = if self.starts_with("(") {
+      self.list_like(|p| p.parse_var_name(), "(", ")", ",", true, 0)?
+    } else {
+      vec![]
+    };
     self.skip_trivia_inline()?;
 
     let (fields, field_types): (Vec<_>, Vec<_>) = if self.starts_with("{") {

@@ -3,25 +3,36 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_auto_linearization.bend
 ---
 Scott
+switch_linearization: Any
 (switch_linearization) = λa let {a a_2 a_3 a_4} = a; λb let {b b_2 b_3 b_4 b_5} = b; let (c, d) = (a, b); let {d d_2} = d; let {c c_2} = c; switch a_2 { 0: let {e e_2} = 2; let {f g} = e; (b_2 e_2 f g (a_3, b_3) c d); _: λh let {i i_2} = 2; let {j k} = i; (h b_4 i_2 j k (a_4, b_5) c_2 d_2); }
 
+match_linearization: Any
 (match_linearization) = λa let {a a_2 a_3 a_4} = a; λb let {b b_2 b_3 b_4 b_5} = b; let (c, d) = (a, b); let {d d_2} = d; let {c c_2} = c; (a_2 λe let {f f_2} = 2; let {g h} = f; (e b_2 f_2 g h (a_3, b_3) c d) let {i i_2} = 2; let {j k} = i; (b_4 i_2 j k (a_4, b_5) c_2 d_2))
 
+switch_shadowed_field: Any
 (switch_shadowed_field) = λa switch a { 0: λb b; _: λc λ* c; }
 
+match_shadowed_field: Any
 (match_shadowed_field) = λa (a λb λc (List/Cons b c) λd λe λ* λ* (List/Cons d e))
 
+List/Cons: ∀t (u24 -> ((List t) -> (List t)))
 (List/Cons) = λa λb λ* λd (d a b)
 
 NumScott
+switch_linearization: Any
 (switch_linearization) = λa let {a a_2 a_3 a_4} = a; λb let {b b_2 b_3 b_4 b_5} = b; let (c, d) = (a, b); let {d d_2} = d; let {c c_2} = c; switch a_2 { 0: let {e e_2} = 2; let {f g} = e; (b_2 e_2 f g (a_3, b_3) c d); _: λh let {i i_2} = 2; let {j k} = i; (h b_4 i_2 j k (a_4, b_5) c_2 d_2); }
 
+match_linearization: Any
 (match_linearization) = λa let {a a_2 a_3 a_4} = a; λb let {b b_2 b_3 b_4 b_5} = b; let (c, d) = (a, b); let {d d_2} = d; let {c c_2} = c; (a_2 λe switch e { 0: λf let {g g_2} = 2; let {h i} = g; (f b_2 g_2 h i (a_3, b_3) c d); _: λ* let {j j_2} = 2; let {k l} = j; (b_4 j_2 k l (a_4, b_5) c_2 d_2); })
 
+switch_shadowed_field: Any
 (switch_shadowed_field) = λa switch a { 0: λb b; _: λc λ* c; }
 
+match_shadowed_field: Any
 (match_shadowed_field) = λa (a λb switch b { 0: λc λd (List/Cons c d); _: λ* λe λf λ* λ* (List/Cons e f); })
 
+List/Cons: ∀t (u24 -> ((List t) -> (List t)))
 (List/Cons) = λa λb λc (c List/Cons/tag a b)
 
+List/Cons/tag: u24
 (List/Cons/tag) = 1

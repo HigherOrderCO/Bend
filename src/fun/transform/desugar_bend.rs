@@ -10,7 +10,6 @@ const NEW_FN_SEP: &str = "__bend";
 
 impl Ctx<'_> {
   pub fn desugar_bend(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
     let mut new_defs = IndexMap::new();
     for def in self.book.defs.values_mut() {
       let mut fresh = 0;

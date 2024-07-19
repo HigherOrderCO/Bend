@@ -14,9 +14,6 @@ pub fn check_net_sizes(
     CompilerTarget::Cuda => (MAX_NET_SIZE_CUDA, "Cuda"),
     _ => (MAX_NET_SIZE_C, "C"),
   };
-
-  diagnostics.start_pass();
-
   for (name, net) in &book.defs {
     let nodes = count_nodes(net);
     if nodes > net_size_bound {

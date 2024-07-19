@@ -50,7 +50,3 @@ pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<P
     diagnostics
   })
 }
-
-pub fn do_parse_book_default(code: &str, origin: &Path) -> Result<Book, Diagnostics> {
-  do_parse_book(code, origin, ParseBook::builtins())?.to_fun()
-}

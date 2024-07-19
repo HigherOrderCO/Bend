@@ -16,8 +16,6 @@ use std::{
 pub struct ViciousCycleErr;
 
 pub fn book_to_hvm(book: &Book, diags: &mut Diagnostics) -> Result<(hvm::ast::Book, Labels), Diagnostics> {
-  diags.start_pass();
-
   let mut hvm_book = hvm::ast::Book { defs: Default::default() };
   let mut labels = Labels::default();
 

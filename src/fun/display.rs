@@ -300,11 +300,13 @@ impl fmt::Display for Type {
       Type::Var(nam) => write!(f, "{nam}"),
       Type::All(nam, bod) => write!(f, "∀{nam} {bod}"),
       Type::Arr(lft, rgt) => write!(f, "({lft} -> {rgt})"),
-      Type::Ctr(nam, args) => if args.is_empty() {
-        write!(f, "{nam}")
-      } else {
-        write!(f, "({nam} {})", DisplayJoin(|| args.iter(), ", "))
-      },
+      Type::Ctr(nam, args) => {
+        if args.is_empty() {
+          write!(f, "{nam}")
+        } else {
+          write!(f, "({nam} {})", DisplayJoin(|| args.iter(), " "))
+        }
+      }
       Type::U24 => write!(f, "u24"),
       Type::I24 => write!(f, "i24"),
       Type::F24 => write!(f, "f24"),

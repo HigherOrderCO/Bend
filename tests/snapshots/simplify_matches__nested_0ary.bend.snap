@@ -2,12 +2,17 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/nested_0ary.bend
 ---
+Unpack: Any
 (Unpack) = λa λb (match b { list/Cons c d: λe (match d { list/Cons f g: λh λi (h (list/Cons i (list/Cons f g))); list/Nil: λj λk k; } e c); list/Nil: λl list/Nil; } a)
 
+list/Cons: (Any -> (Any -> list))
 (list/Cons) = λa λb λc (c list/Cons/tag a b)
 
+list/Nil: list
 (list/Nil) = λa (a list/Nil/tag)
 
+list/Cons/tag: u24
 (list/Cons/tag) = 0
 
+list/Nil/tag: u24
 (list/Nil/tag) = 1

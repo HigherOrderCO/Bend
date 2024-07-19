@@ -2,10 +2,14 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/adt_tup_era.bend
 ---
+Foo: Any
 (Foo) = λa match a { Tuple/Pair b c: (match b { Tuple/Pair d e: λf d; } c); }
 
+Main: Any
 (Main) = (Foo (Tuple/Pair 1 5))
 
+Tuple/Pair: (Any -> (Any -> Tuple))
 (Tuple/Pair) = λa λb λc (c Tuple/Pair/tag a b)
 
+Tuple/Pair/tag: u24
 (Tuple/Pair/tag) = 0

@@ -15,8 +15,6 @@ pub enum DesugarMatchDefErr {
 impl Ctx<'_> {
   /// Converts equational-style pattern matching function definitions into trees of match terms.
   pub fn desugar_match_defs(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     for (def_name, def) in self.book.defs.iter_mut() {
       let errs = def.desugar_match_def(&self.book.ctrs, &self.book.adts);
       for err in errs {
@@ -566,7 +564,7 @@ impl Pattern {
     match self {
       Pattern::Var(_) | Pattern::Chn(_) => Type::Any,
       Pattern::Ctr(ctr_nam, _) => {
-        let adt_nam = ctrs.get(ctr_nam).expect("Unknown constructor '{ctr_nam}'");
+        let adt_nam = ctrs.get(ctr_nam).unwrap_or_else(|| panic!("Unknown constructor '{ctr_nam}'"));
         Type::Adt(adt_nam.clone())
       }
       Pattern::Fan(is_tup, tag, args) => Type::Fan(*is_tup, tag.clone(), args.len()),

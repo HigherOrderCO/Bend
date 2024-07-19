@@ -2,4 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/use_id.bend
 ---
+Main: Any
 (Main) = (λa a 2 3 (λb b 2 3) (λc c 2 3 (λd d 2 3)))
