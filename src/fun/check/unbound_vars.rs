@@ -14,8 +14,6 @@ pub enum UnboundVarErr {
 impl Ctx<'_> {
   /// Checks that there are no unbound variables in all definitions.
   pub fn check_unbound_vars(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     for (def_name, def) in self.book.defs.iter_mut() {
       let mut errs = Vec::new();
       for rule in &mut def.rules {

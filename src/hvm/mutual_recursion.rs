@@ -16,8 +16,6 @@ type RefSet = IndexSet<Ref>;
 pub struct Graph(IndexMap<Ref, RefSet>);
 
 pub fn check_cycles(book: &Book, diagnostics: &mut Diagnostics) -> Result<(), Diagnostics> {
-  diagnostics.start_pass();
-
   let graph = Graph::from(book);
   let cycles = graph.cycles();
 

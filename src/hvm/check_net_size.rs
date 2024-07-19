@@ -5,8 +5,6 @@ use hvm::ast::{Book, Net, Tree};
 pub const MAX_NET_SIZE: usize = 64;
 
 pub fn check_net_sizes(book: &Book, diagnostics: &mut Diagnostics) -> Result<(), Diagnostics> {
-  diagnostics.start_pass();
-
   for (name, net) in &book.defs {
     let nodes = count_nodes(net);
     if nodes > MAX_NET_SIZE {

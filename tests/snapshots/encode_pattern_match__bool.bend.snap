@@ -3,35 +3,51 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool.bend
 ---
 Scott
+not: Any
 (not) = λa (a bool/false bool/true)
 
+and: Any
 (and) = λa (a λb (b bool/true bool/false) λd (d bool/false bool/false))
 
+and2: Any
 (and2) = λa (a λb b λd let * = d; bool/false)
 
+and3: Any
 (and3) = λa (a λb (b bool/true bool/false) λd let * = d; bool/false)
 
+and4: Any
 (and4) = λa (a λb (b bool/true bool/false) λd let * = d; bool/false)
 
+bool/true: bool
 (bool/true) = λa λ* a
 
+bool/false: bool
 (bool/false) = λ* λb b
 
 NumScott
+not: Any
 (not) = λa (a λb switch b { 0: bool/false; _: λ* bool/true; })
 
+and: Any
 (and) = λa (a λb switch b { 0: λc (c λe switch e { 0: bool/true; _: λ* bool/false; }); _: λ* λf (f λh switch h { 0: bool/false; _: λ* bool/false; }); })
 
+and2: Any
 (and2) = λa (a λb switch b { 0: λc c; _: λ* λe let * = e; bool/false; })
 
+and3: Any
 (and3) = λa (a λb switch b { 0: λc (c λe switch e { 0: bool/true; _: λ* bool/false; }); _: λ* λf let * = f; bool/false; })
 
+and4: Any
 (and4) = λa (a λb switch b { 0: λc (c λe switch e { 0: bool/true; _: λ* bool/false; }); _: λ* λf let * = f; bool/false; })
 
+bool/true: bool
 (bool/true) = λa (a bool/true/tag)
 
+bool/false: bool
 (bool/false) = λa (a bool/false/tag)
 
+bool/true/tag: u24
 (bool/true/tag) = 0
 
+bool/false/tag: u24
 (bool/false/tag) = 1

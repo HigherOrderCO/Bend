@@ -9,8 +9,6 @@ use crate::{
 impl Ctx<'_> {
   /// Resolves type constructors in the book and adds for alls for the free type vars.
   pub fn resolve_type_ctrs(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     for def in self.book.defs.values_mut() {
       let mut free_vars = Default::default();
       match def.typ.resolve_type_ctrs(&mut vec![], &mut free_vars, &self.book.adts) {

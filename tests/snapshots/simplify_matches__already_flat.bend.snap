@@ -2,50 +2,74 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/already_flat.bend
 ---
+Rule1: Any
 (Rule1) = λa a
 
+Rule2: Any
 (Rule2) = λa λb b
 
+Rule3: Any
 (Rule3) = λa λb λc λd (a b c d)
 
+Rule4: Any
 (Rule4) = λa match a { Foo/CtrA: λb b; Foo/CtrB c: c; }
 
+Rule5: Any
 (Rule5) = λa match a { Bar/CtrA1 b: λc let d = c; (b d); Bar/CtrA2 e f: λg let h = g; (e f h); Bar/CtrA3 i: λj let k = j; (match k { Baz/CtrB0: λl (Bar/CtrA3 l); Baz/CtrB1 m: λn (Bar/CtrA3 n m); Baz/CtrB2 o: λp (Bar/CtrA3 p (Baz/CtrB2 o)); Baz/CtrB3 q: λr (r q); } i); }
 
+Rule6: Any
 (Rule6) = λa a
 
+Foo/CtrA: Foo
 (Foo/CtrA) = λa (a Foo/CtrA/tag)
 
+Foo/CtrB: (Any -> Foo)
 (Foo/CtrB) = λa λb (b Foo/CtrB/tag a)
 
+Bar/CtrA1: (Any -> Bar)
 (Bar/CtrA1) = λa λb (b Bar/CtrA1/tag a)
 
+Bar/CtrA2: (Any -> (Any -> Bar))
 (Bar/CtrA2) = λa λb λc (c Bar/CtrA2/tag a b)
 
+Bar/CtrA3: (Any -> Bar)
 (Bar/CtrA3) = λa λb (b Bar/CtrA3/tag a)
 
+Baz/CtrB0: Baz
 (Baz/CtrB0) = λa (a Baz/CtrB0/tag)
 
+Baz/CtrB1: (Any -> Baz)
 (Baz/CtrB1) = λa λb (b Baz/CtrB1/tag a)
 
+Baz/CtrB2: (Any -> Baz)
 (Baz/CtrB2) = λa λb (b Baz/CtrB2/tag a)
 
+Baz/CtrB3: (Any -> Baz)
 (Baz/CtrB3) = λa λb (b Baz/CtrB3/tag a)
 
+Foo/CtrA/tag: u24
 (Foo/CtrA/tag) = 0
 
+Foo/CtrB/tag: u24
 (Foo/CtrB/tag) = 1
 
+Bar/CtrA1/tag: u24
 (Bar/CtrA1/tag) = 0
 
+Bar/CtrA2/tag: u24
 (Bar/CtrA2/tag) = 1
 
+Bar/CtrA3/tag: u24
 (Bar/CtrA3/tag) = 2
 
+Baz/CtrB0/tag: u24
 (Baz/CtrB0/tag) = 0
 
+Baz/CtrB1/tag: u24
 (Baz/CtrB1/tag) = 1
 
+Baz/CtrB2/tag: u24
 (Baz/CtrB2/tag) = 2
 
+Baz/CtrB3/tag: u24
 (Baz/CtrB3/tag) = 3

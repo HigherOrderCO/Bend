@@ -3,15 +3,21 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_str_encoding_undeclared_fn.bend
 ---
 Scott
+main: Any
 (main) = *
 
+Foo: Any
 (Foo) = λa (a 0 λ* λ* 1)
 
+Bar: Any
 (Bar) = λa (a 1 λ* λ* 0)
 
 NumScott
+main: Any
 (main) = *
 
+Foo: Any
 (Foo) = λa (a λb switch b { 0: 0; _: λ* λ* λ* 1; })
 
+Bar: Any
 (Bar) = λa (a λb switch b { 0: 1; _: λ* λ* λ* 0; })

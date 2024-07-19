@@ -43,7 +43,3 @@ pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<P
   book.source = Name::new(origin.to_string_lossy());
   FunParser::new(code, false).parse_book(book).map_err(|e| format!("In {} :\n{}", origin.display(), e))
 }
-
-pub fn do_parse_book_default(code: &str, origin: &Path) -> Result<Book, String> {
-  do_parse_book(code, origin, ParseBook::builtins())?.to_fun()
-}

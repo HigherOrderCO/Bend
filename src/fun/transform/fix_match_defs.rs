@@ -8,8 +8,6 @@ impl Ctx<'_> {
   ///
   /// Does not check exhaustiveness of rules and type mismatches. (Inter-ctr/type proprieties)
   pub fn fix_match_defs(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     for def in self.book.defs.values_mut() {
       let mut errs = vec![];
 

@@ -8,7 +8,6 @@ pub const ERR_INDENT_SIZE: usize = 2;
 
 #[derive(Debug, Clone, Default)]
 pub struct Diagnostics {
-  err_counter: usize,
   pub diagnostics: BTreeMap<DiagnosticOrigin, Vec<Diagnostic>>,
   pub config: DiagnosticsConfig,
 }
@@ -65,37 +64,28 @@ pub enum WarningType {
 
 impl Diagnostics {
   pub fn new(config: DiagnosticsConfig) -> Self {
-    Self { err_counter: 0, diagnostics: Default::default(), config }
+    Self { diagnostics: Default::default(), config }
   }
 
   pub fn add_book_error(&mut self, err: impl std::fmt::Display) {
-    self.err_counter += 1;
     self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Book);
   }
 
   pub fn add_rule_error(&mut self, err: impl std::fmt::Display, def_name: Name) {
-    self.err_counter += 1;
     self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Rule(def_name.def_name_from_generated()));
   }
 
   pub fn add_inet_error(&mut self, err: impl std::fmt::Display, def_name: String) {
-    self.err_counter += 1;
     self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Inet(def_name));
   }
 
   pub fn add_rule_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType, def_name: Name) {
     let severity = self.config.warning_severity(warn_type);
-    if severity == Severity::Error {
-      self.err_counter += 1;
-    }
     self.add_diagnostic(warn, severity, DiagnosticOrigin::Rule(def_name.def_name_from_generated()));
   }
 
   pub fn add_book_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType) {
     let severity = self.config.warning_severity(warn_type);
-    if severity == Severity::Error {
-      self.err_counter += 1;
-    }
     self.add_diagnostic(warn, severity, DiagnosticOrigin::Book);
   }
 
@@ -140,16 +130,11 @@ impl Diagnostics {
     self.has_severity(Severity::Error)
   }
 
-  /// Resets the internal counter
-  pub fn start_pass(&mut self) {
-    self.err_counter = 0;
-  }
-
   /// Checks if any error was emitted since the start of the pass,
   /// Returning all the current information as a `Err(Info)`, replacing `&mut self` with an empty one.
   /// Otherwise, returns the given arg as an `Ok(T)`.
   pub fn fatal<T>(&mut self, t: T) -> Result<T, Diagnostics> {
-    if self.err_counter == 0 {
+    if !self.has_errors() {
       Ok(t)
     } else {
       Err(std::mem::take(self))
