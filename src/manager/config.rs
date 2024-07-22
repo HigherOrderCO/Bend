@@ -6,6 +6,7 @@ pub const CONFIG_FILE: &str = "mod.toml";
 
 /// Initializes a new module configuration file with the given module name.
 pub fn init(name: &str) -> Result<(), Box<dyn Error>> {
+  // TODO: initialize a git repo?
   let mut config = DocumentMut::new();
   config["module"] = value(name);
   save_config(config, CONFIG_FILE)

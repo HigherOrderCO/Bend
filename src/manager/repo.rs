@@ -84,8 +84,11 @@ pub fn setup_remote<'r>(repo: &'r Repository, url: &str, name: &str) -> Result<R
 pub fn get_remote_tags(url: &str) -> Result<Vec<String>, Box<dyn Error>> {
   let url = &format!("https://{url}.git");
 
-  let temp_dir = std::env::temp_dir().join("bend");
-  std::fs::create_dir(&temp_dir)?;
+  let temp_dir = std::env::temp_dir().join(".bend");
+
+  if !temp_dir.exists() {
+    std::fs::create_dir(&temp_dir)?;
+  }
 
   let repo = Repository::init_bare(&temp_dir)?;
   let mut remote = repo.remote_anonymous(url)?;
