@@ -21,6 +21,10 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add `List/filter` and `String/{equals, filter}` builtins.
 - Add IO functions for loading dynamically linked libraries (`IO/DyLib/open`, `IO/DyLib/call`, `IO/DyLib/close`). ([#621][gh-621])
 
+### Changed
+
+- Change tuple syntax to not require parentheses in some cases. ([#554][gh-554])
+
 ## [0.2.36] - 2024-07-04
 
 ### Changed
@@ -384,6 +388,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-526]: https://github.com/HigherOrderCO/Bend/issues/526
 [gh-528]: https://github.com/HigherOrderCO/Bend/issues/528
 [gh-544]: https://github.com/HigherOrderCO/Bend/pull/544
+[gh-554]: https://github.com/HigherOrderCO/Bend/issues/554
 [gh-562]: https://github.com/HigherOrderCO/Bend/issues/562
 [gh-570]: https://github.com/HigherOrderCO/Bend/issues/570
 [gh-573]: https://github.com/HigherOrderCO/Bend/issues/573

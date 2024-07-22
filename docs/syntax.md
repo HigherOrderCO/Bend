@@ -112,6 +112,8 @@ It's possible to assign to a pattern, like a tuple or superposition, which will 
 
 ```python
 (first, second) = (1, 2)
+
+first, second = 1, 2
 ```
 
 ### Use
