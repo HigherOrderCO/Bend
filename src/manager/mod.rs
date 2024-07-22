@@ -3,7 +3,7 @@ use semver::VersionReq;
 use std::{error::Error, fs::OpenOptions, io::Write};
 use toml_edit::DocumentMut;
 
-mod config;
+pub mod config;
 mod dep;
 mod lock;
 mod repo;

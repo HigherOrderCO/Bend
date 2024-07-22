@@ -48,7 +48,7 @@ enum Mode {
     warn_opts: CliWarnOpts,
 
     #[arg(help = "Path to the input file")]
-    path: PathBuf,
+    path: Option<PathBuf>,
   },
   /// Compiles the program and runs it with the Rust HVM implementation.
   Run(RunArgs),
@@ -111,7 +111,7 @@ struct RunArgs {
   warn_opts: CliWarnOpts,
 
   #[arg(help = "Path to the input file")]
-  path: PathBuf,
+  path: Option<PathBuf>,
 
   #[arg(value_parser = |arg: &str| bend::fun::parser::TermParser::new(arg).parse_term())]
   arguments: Option<Vec<bend::fun::Term>>,
@@ -300,6 +300,11 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
       let compile_opts = compile_opts_from_cli(&comp_opts);
 
+      let path = match path {
+        Some(path) => path,
+        None => manager::config::get_project_path()?,
+      };
+
       let mut book = load_book(&path, diagnostics_cfg)?;
       let diagnostics = check_book(&mut book, diagnostics_cfg, compile_opts)?;
       eprintln!("{}", diagnostics);
@@ -329,6 +334,11 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       compile_opts.check_for_strict();
 
       let run_opts = RunOpts { linear_readback: linear, pretty, hvm_path: hvm_bin };
+
+      let path = match path {
+        Some(path) => path,
+        None => manager::config::get_project_path()?,
+      };
 
       let book = load_book(&path, diagnostics_cfg)?;
       if let Some((term, stats, diags)) =

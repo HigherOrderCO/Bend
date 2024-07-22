@@ -1,14 +1,28 @@
 use super::{get_config, save_config};
-use std::error::Error;
-use toml_edit::{value, DocumentMut, Item, Table, TableLike};
+use std::{error::Error, fs::OpenOptions, io::Write, path::PathBuf};
+use toml_edit::{table, value, DocumentMut, Item, Table, TableLike};
 
 pub const CONFIG_FILE: &str = "mod.toml";
 
 /// Initializes a new module configuration file with the given module name.
 pub fn init(name: &str) -> Result<(), Box<dyn Error>> {
-  // TODO: initialize a git repo?
+  // TODO: initialize a git repo? or just add a .gitignote?
+  let main_file = "src/main.bend";
+  let path = PathBuf::from(main_file);
+
+  if !path.exists() {
+    std::fs::create_dir("src")?;
+    let mut f = OpenOptions::new().create_new(true).write(true).open(path)?;
+    write!(f, "def main():\n  return \"Hello World!\"\n")?;
+  }
+
   let mut config = DocumentMut::new();
   config["module"] = value(name);
+
+  let mut table = table();
+  table["path"] = value(main_file);
+
+  config.insert("lib", table);
   save_config(config, CONFIG_FILE)
 }
 
@@ -67,4 +81,24 @@ pub fn get_version(item: &Item) -> Option<&str> {
     let ver = tab.get("version")?;
     ver.as_str()
   }
+}
+
+/// Gets the main path from a bend project config file,
+/// used when a path is not provided when invoking the CLI.
+pub fn get_project_path() -> Result<PathBuf, String> {
+  let config = get_config(CONFIG_FILE).map_err(|_| {
+    format!(
+      "failed to read a valid '{CONFIG_FILE}', \
+        pass the file path as an argument, \
+        or make sure you are in a valid bend project"
+    )
+  })?;
+
+  let path = config
+    .get("lib")
+    .and_then(|lib| lib.get("path"))
+    .and_then(|path| path.as_str())
+    .ok_or_else(|| format!("invalid '{CONFIG_FILE}' format"))?;
+
+  Ok(PathBuf::from(path))
 }
