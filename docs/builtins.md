@@ -21,6 +21,24 @@ A String literal is surrounded with `"`. Accepts the same values as characters l
 "Hello, World!"
 ```
 
+### Functions
+
+#### String/equals
+
+Checks if two strings are equal.
+
+```python
+def String/equals(s1: String, s2: String) -> u24
+```
+
+#### String/split
+
+Splits a string into a list of strings based on the given delimiter.
+
+```python
+def String/split(s: String, delimiter: u24) -> [String]
+```
+
 ## List
 
 ```python
@@ -82,6 +100,22 @@ Appends two lists together. Example:
 List/concat([1, 2], [4, 5])
 
 # Result: [1, 2, 4, 5]
+```
+
+#### List/filter
+
+Filters a list based on a predicate function.
+
+```python
+List/filter(xs: List(T), pred: T -> Bool) -> List(T)
+```
+
+#### List/split_once
+
+Splits a list into two lists at the first occurrence of a value.
+
+```python
+List/split_once(xs: List(T), val: T) -> (Result(List(T), List(T)))
 ```
 
 ## Tree
@@ -306,6 +340,48 @@ A Natural Number can be written with literals with a `#` before the literal numb
 #1337
 ```
 
+## DiffList
+
+DiffList is a list that has constant time prepends (cons), appends and concatenation, but can't be pattern matched.
+
+It is implemented as a function that receives a list to be appended to the last element of the DiffList.
+
+For example, the list `List/Cons(1, List/Cons(2, List/Nil))` can be written as the difference list `lambda x: List/Cons(1, List/Cons(2, x))`.
+
+### Functions
+
+#### DiffList/new
+
+Creates a new difference list.
+
+```python
+def DiffList/new() -> (List(T) -> List(T))
+```
+
+#### DiffList/append
+
+Appends a value to the end of the difference list.
+
+```python
+def DiffList/append(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T))
+```
+
+#### DiffList/cons
+
+Appends a value to the beginning of the difference list.
+
+```python
+def DiffList/cons(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T))
+```
+
+#### DiffList/to_list
+
+Converts a difference list to a regular cons list.
+
+```python
+def DiffList/to_list(diff: List(T) -> List(T)) -> (List(T))
+```
+
 ## IO
 
 The basic builtin IO functions are under development and will be stable in the next milestone.
@@ -439,25 +515,45 @@ Flushes the file with the given `file` descriptor.
 
 Returns nothing (`*`).
 
-## Numeric operations
+### Dinamically linked libraries
 
-### log
+It's possible to dynamically load shared objects (libraries) with functions that implement the Bend IO interface.
+You can read more on how to implement these libraries in the [Dynamically linked libraries and foreign functions](docs/ffi.md) documentation.
 
-```py
-def log(x: f24, base: f24) -> f24
-```
-
-Computes the logarithm of `x` with the specified `base`.
-
-### atan2
+#### IO/DyLib/open
 
 ```py
-def atan2(x: f24, y: f24) -> f24
+def IO/DyLib/open(path: String, lazy: u24) -> u24
 ```
 
-Computes the arctangent of `y / x`.
+Loads a dynamic library file.
+* `path` is the path to the library file.
+* `lazy` is a boolean encoded as a `u24` that determines if all functions are loaded lazily (`1`) or upfront (`0`).
+* Returns an unique id to the library object encoded as a `u24`.
 
-Has the same behaviour as `atan2f` in the C math lib.
+#### IO/DyLib/call
+
+``` py
+def IO/DyLib/call(dl: u24, fn: String, args: Any) -> Any
+```
+
+Calls a function of a previously opened library.
+* `dl` is the id of the library object.
+* `fn` is the name of the function in the library.
+* `args` are the arguments to the function. The expected values depend on the called function.
+* The returned value is determined by the called function.
+
+#### IO/DyLib/close
+
+```py
+def IO/DyLib/close(dl: u24) -> None
+```
+
+Closes a previously open library.
+* `dl` is the id of the library object.
+* Returns nothing (`*`).  
+
+## Native number casting
 
 ### to_f24
 
@@ -485,18 +581,18 @@ Casts any native number to an i24.
 
 ## String encoding / decoding
 
-### Bytes/decode_utf8
+### String/decode_utf8
 
 ```py
-def Bytes/decode_utf8(bytes: [u24]) -> String
-```
+def String/decode_utf8(bytes: [u24]) -> String
+``` 
 
 Decodes a sequence of bytes to a String using utf-8 encoding.
 
-### Bytes/decode_ascii
+### String/decode_ascii
 
 ```py
-def Bytes/decode_ascii(bytes: [u24]) -> String
+def String/decode_ascii(bytes: [u24]) -> String
 ```
 
 Decodes a sequence of bytes to a String using ascii encoding.
@@ -533,12 +629,39 @@ def Utf8/REPLACEMENT_CHARACTER: u24 = '\u{FFFD}'
 
 ## Math
 
+### Math/log
+
+```py
+def Math/log(x: f24, base: f24) -> f24
+```
+
+Computes the logarithm of `x` with the specified `base`.
+
+### Math/atan2
+
+```py
+def Math/atan2(x: f24, y: f24) -> f24
+```
+
+Computes the arctangent of `y / x`.
+
+Has the same behaviour as `atan2f` in the C math lib.
+
+
 ### Math/PI
 
 Defines the Pi constant.
 
 ```py
 def Math/PI: f24 = 3.1415926535
+```
+
+### Math/E
+
+Euler's number
+
+```py
+def Math/E: f24 = 2.718281828
 ```
 
 ### Math/sin
@@ -652,3 +775,10 @@ Round float to the nearest integer.
 ```py
 def Math/round(n: f24) -> f24
 ```
+
+## Lazy thunks
+
+You can force a function call to be evaluated lazily by wrapping it in a lazy thunk.
+In Bend, this can be expressed as `lambda x: x(my_function, arg1, arg2, ...)`.
+
+To evaluate the thunk, you can use the `undefer` function or apply `lambda x: x` to it.

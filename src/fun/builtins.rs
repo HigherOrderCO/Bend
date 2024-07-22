@@ -47,9 +47,8 @@ pub const BUILTIN_TYPES: &[&str] = &[LIST, STRING, NAT, TREE, MAP, IO];
 
 impl ParseBook {
   pub fn builtins() -> Self {
-    TermParser::new(BUILTINS)
-      .parse_book(Self::default(), true)
-      .expect("Error parsing builtin file, this should not happen")
+    let book = TermParser::new(BUILTINS).parse_book(Self::default(), true);
+    book.unwrap_or_else(|e| panic!("Error parsing builtin file, this should not happen:\n{e}"))
   }
 }
 

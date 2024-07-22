@@ -1,9 +1,7 @@
 use bend::{
   compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
-  fun::{
-    load_book::do_parse_book_default, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Name, Term,
-  },
+  fun::{load_book::do_parse_book_default, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Name},
   hvm::hvm_book_show_pretty,
   imports::DefaultLoader,
   load_to_book,
@@ -86,16 +84,6 @@ fn run_golden_test_dir_multiple(test_name: &str, run: &[&RunFn]) {
   }
 }
 
-pub fn run_book_simple(
-  book: Book,
-  run_opts: RunOpts,
-  compile_opts: CompileOpts,
-  diagnostics_cfg: DiagnosticsConfig,
-  args: Option<Vec<Term>>,
-) -> Result<(Term, String, Diagnostics), Diagnostics> {
-  run_book(book, run_opts, compile_opts, diagnostics_cfg, args, "run").map(Option::unwrap)
-}
-
 /* Snapshot/regression/golden tests
 
  Each tests runs all the files in tests/golden_tests/<test name>.
@@ -150,13 +138,15 @@ fn linear_readback() {
     let book = do_parse_book_default(code, path)?;
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig::default();
-    let (term, _, diags) = run_book_simple(
+    let (term, _, diags) = run_book(
       book,
       RunOpts { linear_readback: true, ..Default::default() },
       compile_opts,
       diagnostics_cfg,
       None,
-    )?;
+      "run",
+    )?
+    .unwrap();
     let res = format!("{diags}{term}");
     Ok(res)
   });
@@ -180,7 +170,7 @@ fn run_file() {
       for adt_encoding in [AdtEncoding::NumScott, AdtEncoding::Scott] {
         let compile_opts = CompileOpts { adt_encoding, ..CompileOpts::default() };
         let (term, _, diags) =
-          run_book_simple(book.clone(), run_opts.clone(), compile_opts, diagnostics_cfg, None)?;
+          run_book(book.clone(), run_opts.clone(), compile_opts, diagnostics_cfg, None, "run")?.unwrap();
         res.push_str(&format!("{adt_encoding}:\n{diags}{term}\n\n"));
       }
       Ok(res)
@@ -205,7 +195,7 @@ fn import_system() {
       let mut res = String::new();
 
       let compile_opts = CompileOpts::default();
-      let (term, _, diags) = run_book_simple(book, run_opts, compile_opts, diagnostics_cfg, None)?;
+      let (term, _, diags) = run_book(book, run_opts, compile_opts, diagnostics_cfg, None, "run")?.unwrap();
       res.push_str(&format!("{diags}{term}\n\n"));
       Ok(res)
     })],
@@ -363,7 +353,7 @@ fn hangs() {
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Allow, false);
 
     let thread = std::thread::spawn(move || {
-      run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)
+      run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run")
     });
     std::thread::sleep(std::time::Duration::from_secs(expected_normalization_time));
 
@@ -397,7 +387,8 @@ fn run_entrypoint() {
     book.entrypoint = Some(Name::new("foo"));
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
-    let (term, _, diags) = run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let (term, _, diags) =
+      run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run")?.unwrap();
     let res = format!("{diags}{term}");
     Ok(res)
   })
@@ -459,7 +450,7 @@ fn io() {
         let compile_opts = CompileOpts::default();
         let diagnostics_cfg = DiagnosticsConfig::default();
         let (term, _, diags) =
-          run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+          run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
         let res = format!("{diags}{term}");
         Ok(format!("Strict mode:\n{res}"))
       }),
@@ -485,7 +476,8 @@ fn examples() -> Result<(), Diagnostics> {
     let book = do_parse_book_default(&code, path).unwrap();
     let compile_opts = CompileOpts::default();
     let diagnostics_cfg = DiagnosticsConfig::default();
-    let (term, _, diags) = run_book_simple(book, RunOpts::default(), compile_opts, diagnostics_cfg, None)?;
+    let (term, _, diags) =
+      run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
     let res = format!("{diags}{term}");
 
     let mut settings = insta::Settings::clone_current();

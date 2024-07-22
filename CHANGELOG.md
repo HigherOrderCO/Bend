@@ -18,6 +18,8 @@ and this project does not currently adhere to a particular versioning scheme.
 - Add import system. ([#544][gh-544])
 - Add multi line comment `#{ ... #}` syntax. ([#595][gh-595])
 - Add error message when input file is not found. ([#513][gh-513])
+- Add `List/filter` and `String/{equals, filter}` builtins.
+- Add IO functions for loading dynamically linked libraries (`IO/DyLib/open`, `IO/DyLib/call`, `IO/DyLib/close`). ([#621][gh-621])
 
 ## [0.2.36] - 2024-07-04
 
@@ -27,6 +29,8 @@ and this project does not currently adhere to a particular versioning scheme.
 - Don't allow tabs to be used for indentation or spacing. ([#463][gh-463])
 - Rename builtin function `sleep` to `IO/nanosleep`. ([#581][gh-581])
 - Equational number pattern compilation to use the predecessor variable when possible. ([#470][gh-470])
+- Rename `Bytes/decode_utf8` to `String/decode_utf8` and `Bytes/decode_ascii` to `String/decode_ascii`.
+- Rename `log` to `Math/log` and `atan2` to `Math/atan2`.
 
 ### Fixed
 
@@ -395,5 +399,6 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-598]: https://github.com/HigherOrderCO/Bend/issues/598
 [gh-618]: https://github.com/HigherOrderCO/Bend/issues/618
 [gh-620]: https://github.com/HigherOrderCO/Bend/issues/620
+[gh-621]: https://github.com/HigherOrderCO/Bend/issues/621
 [gh-623]: https://github.com/HigherOrderCO/Bend/issues/623
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
