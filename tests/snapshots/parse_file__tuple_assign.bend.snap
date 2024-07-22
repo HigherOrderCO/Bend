@@ -1,0 +1,5 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/parse_file/tuple_assign.bend
+---
+(main) = let (first, second) = (1, (2, 3)); second
