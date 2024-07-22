@@ -24,7 +24,7 @@ pub fn clone(name: &str, tag: &str, alias: Option<&str>) -> Result<PathBuf, Box<
   // Checkout the specified tag
   if let Err(err) = checkout_tag(&repo, tag) {
     match err.class() {
-      git2::ErrorClass::Reference => return Err(format!("Version '{tag}' not found on '{name}'").into()),
+      git2::ErrorClass::Reference => return Err(format!("version '{tag}' not found on '{name}'").into()),
       _ => return Err(err.message().into()),
     }
   }
@@ -61,7 +61,7 @@ pub fn remove(name: &str) -> Result<(), Box<dyn Error>> {
 /// Extracts the repository name from a full repository URL.
 /// Assumes the URL is in the format `user/repo`.
 fn repository_name(name: &str) -> &str {
-  let (_user, repo) = name.rsplit_once('/').expect("Invalid repository URL");
+  let (_user, repo) = name.rsplit_once('/').expect("invalid repository URL");
   repo
 }
 

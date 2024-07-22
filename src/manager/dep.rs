@@ -19,7 +19,7 @@ pub fn remove(name: &str) -> Result<(), Box<dyn Error>> {
   let deps = get_deps(&mut config)?;
 
   if deps.remove(name).is_none() {
-    return Err(format!("Dependency '{}' not found", name).into());
+    return Err(format!("dependency '{}' not found", name).into());
   }
 
   save_config(config, CONFIG_FILE)?;

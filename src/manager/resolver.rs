@@ -39,7 +39,7 @@ fn build_dependency_graph(deps: &dyn TableLike) -> Result<DependencyGraph, Box<d
   let mut graph = DependencyGraph { packages: BTreeMap::new() };
 
   for (name, dep) in deps.iter() {
-    let ver = get_version(dep).ok_or_else(|| format!("Invalid version format '{}'", dep))?;
+    let ver = get_version(dep).ok_or_else(|| format!("invalid version format '{}'", dep))?;
     let version_req = VersionReq::parse(ver)?;
 
     let versions = get_all_versions(name)?;
@@ -47,7 +47,7 @@ fn build_dependency_graph(deps: &dyn TableLike) -> Result<DependencyGraph, Box<d
     // Find the latest version that matches the version requirement
     let latest_version =
       versions.iter().filter(|version| version_req.matches(version)).max().ok_or_else(|| {
-        format!("No matching versions found for '{}' with requirement {}", name, version_req)
+        format!("no matching versions found for '{}' with requirement {}", name, version_req)
       })?;
 
     let package = Package {
@@ -89,7 +89,7 @@ fn resolve_package(
 
   visited.insert(name.to_string());
 
-  let versions = graph.packages.get(name).ok_or_else(|| format!("Package '{}' not found", name))?;
+  let versions = graph.packages.get(name).ok_or_else(|| format!("package '{}' not found", name))?;
 
   // MVS: Select the minimum version that satisfies all constraints
   let mut selected_version = None;
@@ -117,7 +117,7 @@ fn resolve_package(
       }
       Ok(())
     }
-    None => Err(format!("Unable to find a compatible version for '{}'", name).into()),
+    None => Err(format!("unable to find a compatible version for '{}'", name).into()),
   }
 }
 
@@ -149,7 +149,7 @@ fn get_dependencies(name: &str, version: &Version) -> Result<Vec<Dependency>, Bo
   let mut deps = Vec::new();
 
   for (name, item) in get_deps(&mut config)?.iter() {
-    let ver = get_version(item).ok_or_else(|| format!("Invalid version format '{}'", item))?;
+    let ver = get_version(item).ok_or_else(|| format!("invalid version format '{}'", item))?;
     let version_req = VersionReq::parse(ver)?;
 
     deps.push(Dependency { name: name.to_string(), version_req });
