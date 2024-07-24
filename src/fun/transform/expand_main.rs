@@ -18,6 +18,9 @@ impl Book {
     let mut seen = vec![self.entrypoint.as_ref().unwrap().clone()];
     main_bod.expand_ref_return(self, &mut seen, &mut 0);
 
+    // Undo the `float_combinators` pass for main, to recover the strictness of the main function.
+    main_bod.expand_floated_combinators(self);
+
     let main = self.defs.get_mut(self.entrypoint.as_ref().unwrap()).unwrap();
     main.rule_mut().body = main_bod;
   }
@@ -71,6 +74,19 @@ impl Term {
       | Term::Def { .. }
       | Term::Era
       | Term::Err => {}
+    })
+  }
+
+  pub fn expand_floated_combinators(&mut self, book: &Book) {
+    maybe_grow(|| {
+      if let Term::Ref { nam } = self {
+        if nam.contains(super::float_combinators::NAME_SEP) {
+          *self = book.defs.get(nam).unwrap().rule().body.clone();
+        }
+      }
+      for child in self.children_mut() {
+        child.expand_floated_combinators(book);
+      }
     })
   }
 }

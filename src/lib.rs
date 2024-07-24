@@ -206,54 +206,6 @@ pub fn readback_hvm_net(
 
 /// Runs an HVM book by invoking HVM as a subprocess.
 fn run_hvm(book: &::hvm::ast::Book, cmd: &str, run_opts: &RunOpts) -> Result<String, String> {
-  fn filter_hvm_output(
-    mut stream: impl std::io::Read + Send,
-    mut output: impl std::io::Write + Send,
-  ) -> Result<String, String> {
-    let mut capturing = false;
-    let mut result = String::new();
-    let mut buf = [0u8; 1024];
-    loop {
-      let num_read = match stream.read(&mut buf) {
-        Ok(n) => n,
-        Err(e) => {
-          eprintln!("{e}");
-          break;
-        }
-      };
-      if num_read == 0 {
-        break;
-      }
-      let new_buf = &buf[..num_read];
-      // TODO: Does this lead to broken characters if printing too much at once?
-      let new_str = String::from_utf8_lossy(new_buf);
-      if capturing {
-        // Store the result
-        result.push_str(&new_str);
-      } else if let Some((before, after)) = new_str.split_once(HVM_OUTPUT_END_MARKER) {
-        // If result started in the middle of the buffer, print what came before and start capturing.
-        if let Err(e) = output.write_all(before.as_bytes()) {
-          eprintln!("Error writing HVM output. {e}");
-        };
-        result.push_str(after);
-        capturing = true;
-      } else {
-        // Otherwise, don't capture anything
-        if let Err(e) = output.write_all(new_buf) {
-          eprintln!("Error writing HVM output. {e}");
-        }
-      }
-    }
-
-    if capturing {
-      Ok(result)
-    } else {
-      output.flush().map_err(|e| format!("Error flushing HVM output. {e}"))?;
-      let msg = "HVM output had no result (An error likely occurred)".to_string();
-      Err(msg)
-    }
-  }
-
   let out_path = ".out.hvm";
   std::fs::write(out_path, hvm_book_show_pretty(book)).map_err(|x| x.to_string())?;
   let mut process = std::process::Command::new(run_opts.hvm_path.clone())
@@ -289,6 +241,58 @@ fn parse_hvm_output(out: &str) -> Result<(::hvm::ast::Net, String), String> {
     return Err(format!("Failed to parse result from HVM (invalid net).\nOutput from HVM was:\n{:?}", out));
   };
   Ok((net, stats.to_string()))
+}
+
+/// Filters the output from HVM, separating user output from the
+/// result, used for readback and displaying stats.
+///
+/// Buffers the output from HVM to try to parse it.
+fn filter_hvm_output(
+  mut stream: impl std::io::Read + Send,
+  mut output: impl std::io::Write + Send,
+) -> Result<String, String> {
+  let mut capturing = false;
+  let mut result = String::new();
+  let mut buf = [0u8; 1024];
+  loop {
+    let num_read = match stream.read(&mut buf) {
+      Ok(n) => n,
+      Err(e) => {
+        eprintln!("{e}");
+        break;
+      }
+    };
+    if num_read == 0 {
+      break;
+    }
+    let new_buf = &buf[..num_read];
+    // TODO: Does this lead to broken characters if printing too much at once?
+    let new_str = String::from_utf8_lossy(new_buf);
+    if capturing {
+      // Store the result
+      result.push_str(&new_str);
+    } else if let Some((before, after)) = new_str.split_once(HVM_OUTPUT_END_MARKER) {
+      // If result started in the middle of the buffer, print what came before and start capturing.
+      if let Err(e) = output.write_all(before.as_bytes()) {
+        eprintln!("Error writing HVM output. {e}");
+      };
+      result.push_str(after);
+      capturing = true;
+    } else {
+      // Otherwise, don't capture anything
+      if let Err(e) = output.write_all(new_buf) {
+        eprintln!("Error writing HVM output. {e}");
+      }
+    }
+  }
+
+  if capturing {
+    Ok(result)
+  } else {
+    output.flush().map_err(|e| format!("Error flushing HVM output. {e}"))?;
+    let msg = "HVM output had no result (An error likely occurred)".to_string();
+    Err(msg)
+  }
 }
 
 #[derive(Clone, Debug)]
