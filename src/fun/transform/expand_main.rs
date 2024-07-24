@@ -35,7 +35,7 @@ impl Term {
   /// - When main returns a pair or superposition and one of its elements is a reference.
   ///
   /// Only expand recursive functions once.
-  pub fn expand_ref_return(&mut self, book: &Book, seen: &mut Vec<Name>, globals_count: &mut usize) {
+  fn expand_ref_return(&mut self, book: &Book, seen: &mut Vec<Name>, globals_count: &mut usize) {
     maybe_grow(|| match self {
       Term::Ref { nam } => {
         if seen.contains(nam) {
@@ -54,6 +54,28 @@ impl Term {
           el.expand_ref_return(book, seen, globals_count);
         }
       }
+      // If an application is just a constructor, we expand the arguments.
+      // That way we can write programs like
+      // `main = [do_thing1, do_thing2, do_thing3]`
+      Term::App { .. } => {
+        let (fun, args) = self.multi_arg_app();
+        if let Term::Ref { nam } = fun {
+          if book.ctrs.contains_key(nam) {
+            for arg in args {
+              // If the argument is a 0-ary constructor, we don't need to expand it.
+              if let Term::Ref { nam } = arg {
+                if let Some(adt_nam) = book.ctrs.get(nam) {
+                  if book.adts.get(adt_nam).unwrap().ctrs.get(nam).unwrap().is_empty() {
+                    continue;
+                  }
+                }
+              }
+              // Otherwise, we expand the argument.
+              arg.expand_ref_return(book, seen, globals_count);
+            }
+          }
+        }
+      }
       Term::Lam { bod: nxt, .. }
       | Term::With { bod: nxt, .. }
       | Term::Open { bod: nxt, .. }
@@ -62,7 +84,6 @@ impl Term {
       | Term::Use { nxt, .. } => nxt.expand_ref_return(book, seen, globals_count),
       Term::Var { .. }
       | Term::Link { .. }
-      | Term::App { .. }
       | Term::Num { .. }
       | Term::Nat { .. }
       | Term::Str { .. }
@@ -77,7 +98,7 @@ impl Term {
     })
   }
 
-  pub fn expand_floated_combinators(&mut self, book: &Book) {
+  fn expand_floated_combinators(&mut self, book: &Book) {
     maybe_grow(|| {
       if let Term::Ref { nam } = self {
         if nam.contains(super::float_combinators::NAME_SEP) {
@@ -88,6 +109,22 @@ impl Term {
         child.expand_floated_combinators(book);
       }
     })
+  }
+
+  /// Read the term as an n-ary application.
+  fn multi_arg_app(&mut self) -> (&mut Term, Vec<&mut Term>) {
+    fn go<'a>(term: &'a mut Term, args: &mut Vec<&'a mut Term>) -> &'a mut Term {
+      match term {
+        Term::App { fun, arg, .. } => {
+          args.push(arg);
+          go(fun, args)
+        }
+        _ => term,
+      }
+    }
+    let mut args = vec![];
+    let fun = go(self, &mut args);
+    (fun, args)
   }
 }
 
