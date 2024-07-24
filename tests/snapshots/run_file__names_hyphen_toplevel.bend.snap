@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/names_hyphen_toplevel.bend
 ---
 NumScott:
-λa (a Foo-Bar/Baz-Qux/tag fun-with-hyphen)
+λa (a λb (b Foo-Bar/Baz-Qux/tag 1) fun-with-hyphen)
 
 Scott:
-λa (a fun-with-hyphen)
+λa (a λb (b 1) fun-with-hyphen)

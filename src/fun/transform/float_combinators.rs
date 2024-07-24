@@ -4,6 +4,8 @@ use crate::{
 };
 use std::collections::{BTreeMap, HashSet};
 
+pub const NAME_SEP: &str = "__C";
+
 impl Book {
   /// Extracts combinator terms into new definitions.
   ///
@@ -110,7 +112,7 @@ impl Term {
 
   /// Inserts a new definition for the given term in the combinators map.
   fn float(&mut self, ctx: &mut FloatCombinatorsCtx, def_name: &Name, builtin: bool, is_safe: bool) {
-    let comb_name = Name::new(format!("{}__C{}", def_name, ctx.name_gen));
+    let comb_name = Name::new(format!("{}{}{}", def_name, NAME_SEP, ctx.name_gen));
     ctx.name_gen += 1;
 
     let comb_ref = Term::Ref { nam: comb_name.clone() };

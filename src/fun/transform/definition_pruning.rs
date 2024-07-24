@@ -20,7 +20,9 @@ type Definitions = HashMap<Name, Used>;
 
 impl Ctx<'_> {
   /// If `prune_all`, removes all unused definitions and adts starting from Main.
-  /// Otherwise, prunes only the builtins not accessible from any non-built-in definition
+  /// Otherwise, prunes only the builtins not accessible from any non-built-in definition.
+  ///
+  /// Emits unused definition warnings.
   pub fn prune(&mut self, prune_all: bool) {
     let mut used = Definitions::new();
 
