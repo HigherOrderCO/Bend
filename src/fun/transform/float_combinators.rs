@@ -131,6 +131,7 @@ impl Term {
   /// - An application or numeric operation where all arguments are safe.
   /// - A safe Lambda, e.g. a nullary constructor or a lambda with safe body.
   /// - A Reference with a safe body.
+  ///
   /// A reference to a recursive definition (or mutually recursive) is not safe.
   fn is_safe(&self, ctx: &mut FloatCombinatorsCtx) -> bool {
     maybe_grow(|| match self {

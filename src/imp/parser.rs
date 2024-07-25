@@ -575,7 +575,9 @@ impl<'a> PyParser<'a> {
     indent.exit_level();
 
     if nxt_indent != *indent {
-      return self.expected_indent(*indent, nxt_indent);
+      return self
+        .expected_indent(*indent, nxt_indent)
+        .or(self.expected_spanned("'else' or 'elif'", self.index..self.index + 1));
     }
     let mut elifs = Vec::new();
     while self.try_parse_keyword("elif") {
@@ -588,7 +590,9 @@ impl<'a> PyParser<'a> {
       indent.exit_level();
 
       if nxt_indent != *indent {
-        return self.expected_indent(*indent, nxt_indent);
+        return self
+          .expected_indent(*indent, nxt_indent)
+          .or(self.expected_spanned("'else' or 'elif'", self.index..self.index + 1));
       }
       elifs.push((cond, then));
     }
@@ -630,7 +634,7 @@ impl<'a> PyParser<'a> {
     self.consume_new_line()?;
     indent.enter_level();
 
-    self.consume_indent_exactly(*indent)?;
+    self.consume_indent_exactly(*indent).or(self.expected_spanned("'case'", self.index..self.index + 1))?;
     let (case, mut nxt_indent) = self.parse_match_case(indent)?;
     let mut arms = vec![case];
     while nxt_indent == *indent {
@@ -728,7 +732,9 @@ impl<'a> PyParser<'a> {
     let mut expected_num = 1;
     while should_continue {
       if nxt_indent != *indent {
-        return self.expected_indent(*indent, nxt_indent);
+        return self
+          .expected_indent(*indent, nxt_indent)
+          .or(self.expected_spanned("'case'", self.index..self.index + 1));
       }
       let (case, stmt, nxt_indent_) = self.parse_switch_case(indent)?;
       nxt_indent = nxt_indent_;
@@ -793,7 +799,7 @@ impl<'a> PyParser<'a> {
     self.consume_new_line()?;
     indent.enter_level();
 
-    self.consume_indent_exactly(*indent)?;
+    self.consume_indent_exactly(*indent).or(self.expected_spanned("'case'", self.index..self.index + 1))?;
     let (case, mut nxt_indent) = self.parse_match_case(indent)?;
     let mut arms = vec![case];
     while nxt_indent == *indent {
@@ -824,7 +830,7 @@ impl<'a> PyParser<'a> {
     self.consume_new_line()?;
     indent.enter_level();
 
-    self.consume_indent_exactly(*indent)?;
+    self.consume_indent_exactly(*indent).or(self.expected_spanned("'when'", self.index..self.index + 1))?;
     self.parse_keyword("when")?;
     let cond = self.parse_expr(true, false)?;
     self.skip_trivia_inline()?;
@@ -837,7 +843,9 @@ impl<'a> PyParser<'a> {
     indent.exit_level();
 
     if nxt_indent != *indent {
-      return self.expected_indent(*indent, nxt_indent);
+      return self
+        .expected_indent(*indent, nxt_indent)
+        .or(self.expected_spanned("'else'", self.index..self.index + 1));
     }
     self.parse_keyword("else")?;
     self.skip_trivia_inline()?;
