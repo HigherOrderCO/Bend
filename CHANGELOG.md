@@ -26,6 +26,7 @@ and this project does not currently adhere to a particular versioning scheme.
 ### Changed
 
 - Change tuple syntax to not require parentheses in some cases. ([#554][gh-554])
+- Improve error messages in branching statements. ([#464][gh-464])
 
 ## [0.2.36] - 2024-07-04
 
@@ -369,6 +370,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-444]: https://github.com/HigherOrderCO/Bend/issues/444
 [gh-451]: https://github.com/HigherOrderCO/Bend/issues/451
 [gh-463]: https://github.com/HigherOrderCO/Bend/issues/463
+[gh-464]: https://github.com/HigherOrderCO/Bend/issues/464
 [gh-465]: https://github.com/HigherOrderCO/Bend/issues/465
 [gh-466]: https://github.com/HigherOrderCO/Bend/issues/466
 [gh-467]: https://github.com/HigherOrderCO/Bend/issues/467
