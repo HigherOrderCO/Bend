@@ -14,6 +14,7 @@ use diagnostics::{Diagnostics, DiagnosticsConfig, ERR_INDENT_SIZE};
 use net::hvm_to_net::hvm_to_net;
 
 pub mod diagnostics;
+// `Name` triggers this warning, but it's safe because we're not using its internal mutability.
 #[allow(clippy::mutable_key_type)]
 pub mod fun;
 pub mod hvm;
@@ -198,7 +199,7 @@ pub fn readback_hvm_net(
   let mut diags = Diagnostics::default();
   let net = hvm_to_net(net);
   let mut term = net_to_term(&net, book, labels, linear, &mut diags);
-  #[allow(clippy::mutable_key_type)]
+  #[allow(clippy::mutable_key_type)] // Safe to allow, we know how `Name` works.
   let recursive_defs = book.recursive_defs();
   term.expand_generated(book, &recursive_defs);
   term.resugar_strings(adt_encoding);
