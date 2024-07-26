@@ -326,24 +326,28 @@ impl<'a> TermParser<'a> {
     Ok(vec![import])
   }
 
-  fn parse_rule(&mut self) -> ParseResult<(Name, Rule)> {
-    // (name pat*) = term
-    // name pat* = term
-    let (name, pats) = if self.try_consume_exactly("(") {
+  fn parse_rule_lhs(&mut self) -> ParseResult<(Name, Vec<Pattern>)> {
+    if self.try_consume_exactly("(") {
       self.skip_trivia();
       let name = self.labelled(|p| p.parse_top_level_name(), "function name")?;
       let pats = self.list_like(|p| p.parse_pattern(false), "", ")", "", false, 0)?;
-      self.consume("=")?;
-      (name, pats)
+      Ok((name, pats))
     } else {
       let name = self.labelled(|p| p.parse_top_level_name(), "top-level definition")?;
       let mut pats = vec![];
-      while !self.try_consume("=") {
+      self.skip_trivia();
+      while !self.starts_with("=") {
         pats.push(self.parse_pattern(false)?);
         self.skip_trivia();
       }
-      (name, pats)
-    };
+      Ok((name, pats))
+    }
+  }
+
+  fn parse_rule(&mut self) -> ParseResult<(Name, Rule)> {
+    let (name, pats) = self.parse_rule_lhs()?;
+
+    self.consume("=")?;
 
     let body = self.parse_term()?;
 
@@ -425,9 +429,23 @@ impl<'a> TermParser<'a> {
       }
 
       // Var
-      unexpected_tag(self)?;
-      let nam = self.labelled(|p| p.parse_name_or_era(), "pattern-matching pattern")?;
-      Ok(Pattern::Var(nam))
+      if self.starts_with("*")
+        || self
+          .peek_one()
+          .is_some_and(|c| c.is_ascii_alphanumeric() || c == '_' || c == '.' || c == '-' || c == '/')
+      {
+        unexpected_tag(self)?;
+        let nam = self.parse_name_or_era()?;
+        return Ok(Pattern::Var(nam));
+      }
+
+      let ini_idx = *self.index();
+      while !(self.is_eof() || self.starts_with("=")) {
+        self.advance_one();
+      }
+      let cur_idx = *self.index();
+
+      self.expected_spanned("pattern or '='", ini_idx..cur_idx)
     })
   }
 
