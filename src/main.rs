@@ -303,7 +303,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let opts = compile_opts_from_cli(&comp_opts);
 
       let mut book = load_book(&path, diagnostics_cfg)?;
-      let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
+      let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None, Some("gen-hvm"))?;
 
       eprint!("{}", compile_res.diagnostics);
       println!("{}", hvm_book_show_pretty(&compile_res.hvm_book));
@@ -345,7 +345,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let opts = compile_opts_from_cli(&comp_opts);
 
       let mut book = load_book(&path, diagnostics_cfg)?;
-      let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
+      let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None, Some(gen_cmd))?;
 
       let out_path = ".out.hvm";
       std::fs::write(out_path, hvm_book_show_pretty(&compile_res.hvm_book)).map_err(|x| x.to_string())?;

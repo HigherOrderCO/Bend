@@ -2,16 +2,22 @@ use super::tree_children;
 use crate::{diagnostics::Diagnostics, fun::Name};
 use hvm::ast::{Book, Net, Tree};
 
-pub const MAX_NET_SIZE: usize = 64;
+pub const MAX_NET_SIZE_C: usize = 4095;
+pub const MAX_NET_SIZE_CUDA: usize = 64;
 
-pub fn check_net_sizes(book: &Book, diagnostics: &mut Diagnostics) -> Result<(), Diagnostics> {
+pub fn check_net_sizes(book: &Book, diagnostics: &mut Diagnostics, cmd: &str) -> Result<(), Diagnostics> {
+  let net_size_bound = match cmd {
+    "run-cu" | "gen-cu" | "gen-hvm" => MAX_NET_SIZE_CUDA,
+    _ => MAX_NET_SIZE_C,
+  };
+
   diagnostics.start_pass();
 
   for (name, net) in &book.defs {
     let nodes = count_nodes(net);
-    if nodes > MAX_NET_SIZE {
+    if nodes > net_size_bound {
       diagnostics.add_rule_error(
-        format!("Definition is too large for hvm (size={nodes}, max size={MAX_NET_SIZE}). Please break it into smaller pieces."),
+        format!("Definition is too large for hvm (size={nodes}, max size={net_size_bound}). Please break it into smaller pieces."),
         Name::new(name),
       );
     }

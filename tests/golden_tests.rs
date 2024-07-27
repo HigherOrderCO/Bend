@@ -99,7 +99,7 @@ fn compile_file() {
     let compile_opts = CompileOpts::default();
     let diagnostics_cfg = DiagnosticsConfig { unused_definition: Severity::Allow, ..Default::default() };
 
-    let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None)?;
+    let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None, None)?;
     Ok(format!("{}{}", res.diagnostics, hvm_book_show_pretty(&res.hvm_book)))
   })
 }
@@ -115,7 +115,7 @@ fn compile_file_o_all() {
       ..Default::default()
     };
 
-    let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
+    let res = compile_book(&mut book, opts, diagnostics_cfg, None, None)?;
     Ok(format!("{}{}", res.diagnostics, hvm_book_show_pretty(&res.hvm_book)))
   })
 }
@@ -126,7 +126,7 @@ fn compile_file_o_no_all() {
     let mut book = do_parse_book_default(code, path)?;
     let compile_opts = CompileOpts::default().set_no_all();
     let diagnostics_cfg = DiagnosticsConfig::default();
-    let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None)?;
+    let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None, None)?;
     Ok(hvm_book_show_pretty(&res.hvm_book).to_string())
   })
 }
@@ -373,7 +373,7 @@ fn compile_entrypoint() {
     let mut book = do_parse_book_default(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
     let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
-    let res = compile_book(&mut book, CompileOpts::default(), diagnostics_cfg, None)?;
+    let res = compile_book(&mut book, CompileOpts::default(), diagnostics_cfg, None, None)?;
     Ok(format!("{}{}", res.diagnostics, hvm_book_show_pretty(&res.hvm_book)))
   })
 }
@@ -421,7 +421,7 @@ fn mutual_recursion() {
       DiagnosticsConfig { recursion_cycle: Severity::Error, ..DiagnosticsConfig::new(Severity::Allow, true) };
     let mut book = do_parse_book_default(code, path)?;
     let opts = CompileOpts { merge: true, ..CompileOpts::default() };
-    let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
+    let res = compile_book(&mut book, opts, diagnostics_cfg, None, None)?;
     Ok(format!("{}{}", res.diagnostics, hvm_book_show_pretty(&res.hvm_book)))
   })
 }
@@ -500,7 +500,7 @@ fn scott_triggers_unused() {
     let opts = CompileOpts::default();
     let diagnostics_cfg =
       DiagnosticsConfig { unused_definition: Severity::Error, ..DiagnosticsConfig::default() };
-    let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
+    let res = compile_book(&mut book, opts, diagnostics_cfg, None, None)?;
     Ok(format!("{}{}", res.diagnostics, hvm_book_show_pretty(&res.hvm_book)))
   })
 }
@@ -517,7 +517,7 @@ fn compile_long() {
       ..Default::default()
     };
 
-    compile_book(&mut book, opts.clone(), diagnostics_cfg, None)?;
+    compile_book(&mut book, opts.clone(), diagnostics_cfg, None, None)?;
     Ok("Compiled".to_string())
   })
 }

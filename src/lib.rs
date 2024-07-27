@@ -2,7 +2,7 @@ use crate::{
   fun::{book_to_hvm, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Term},
   hvm::{
     add_recursive_priority::add_recursive_priority,
-    check_net_size::{check_net_sizes, MAX_NET_SIZE},
+    check_net_size::{check_net_sizes, MAX_NET_SIZE_CUDA},
     eta_reduce::eta_reduce_hvm_net,
     hvm_book_show_pretty,
     inline::inline_hvm_book,
@@ -35,7 +35,7 @@ pub fn check_book(
   compile_opts: CompileOpts,
 ) -> Result<Diagnostics, Diagnostics> {
   // TODO: Do the checks without having to do full compilation
-  let res = compile_book(book, compile_opts, diagnostics_cfg, None)?;
+  let res = compile_book(book, compile_opts, diagnostics_cfg, None, None)?;
   Ok(res.diagnostics)
 }
 
@@ -44,6 +44,7 @@ pub fn compile_book(
   opts: CompileOpts,
   diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
+  cmd: Option<&str>,
 ) -> Result<CompileResult, Diagnostics> {
   let mut diagnostics = desugar_book(book, opts.clone(), diagnostics_cfg, args)?;
 
@@ -72,8 +73,8 @@ pub fn compile_book(
     prune_hvm_book(&mut hvm_book, &prune_entrypoints);
   }
 
-  if opts.check_net_size {
-    check_net_sizes(&hvm_book, &mut diagnostics)?;
+  if opts.check_net_size && cmd.is_some() {
+    check_net_sizes(&hvm_book, &mut diagnostics, cmd.unwrap())?;
   }
 
   add_recursive_priority(&mut hvm_book);
@@ -143,7 +144,7 @@ pub fn desugar_book(
   ctx.check_unbound_vars()?;
 
   if opts.float_combinators {
-    ctx.book.float_combinators(MAX_NET_SIZE);
+    ctx.book.float_combinators(MAX_NET_SIZE_CUDA);
   }
   // sanity check
   ctx.check_unbound_refs()?;
@@ -174,7 +175,7 @@ pub fn run_book(
   cmd: &str,
 ) -> Result<Option<(Term, String, Diagnostics)>, Diagnostics> {
   let CompileResult { hvm_book: core_book, labels, diagnostics } =
-    compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args)?;
+    compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args, Some(cmd))?;
 
   // TODO: Printing should be taken care by the cli module, but we'd
   // like to print any warnings before running so that the user can
@@ -412,7 +413,7 @@ impl Default for CompileOpts {
       float_combinators: true,
       merge: false,
       inline: false,
-      check_net_size: false,
+      check_net_size: true,
       adt_encoding: AdtEncoding::NumScott,
     }
   }
