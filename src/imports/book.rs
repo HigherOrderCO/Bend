@@ -338,18 +338,18 @@ impl Def for Definition {
   }
 
   fn apply_types(&mut self, types: &BindMap) {
-    fn apply_type(bod: &mut Term, types: &BindMap) {
+    fn rename_with_type(bod: &mut Term, types: &BindMap) {
       if let Term::With { typ, .. } = bod {
         if let Some(alias) = types.get(typ).cloned() {
           *typ = alias;
         }
       }
       for child in bod.children_mut() {
-        apply_type(child, types);
+        rename_with_type(child, types);
       }
     }
     for rule in self.rules.iter_mut() {
-      apply_type(&mut rule.body, types);
+      rename_with_type(&mut rule.body, types);
     }
   }
 
@@ -373,81 +373,81 @@ impl Def for imp::Definition {
   }
 
   fn apply_types(&mut self, types: &BindMap) {
-    fn rename_with_types(bod: &mut Stmt, types: &BindMap) {
+    fn rename_with_type(bod: &mut Stmt, types: &BindMap) {
       match bod {
         Stmt::With { typ, bod, nxt } => {
           if let Some(alias) = types.get(typ).cloned() {
             *typ = alias
           }
-          rename_with_types(bod, types);
+          rename_with_type(bod, types);
           if let Some(nxt) = nxt {
-            rename_with_types(nxt, types);
+            rename_with_type(nxt, types);
           }
         }
         Stmt::Assign { nxt, .. } => {
           if let Some(nxt) = nxt {
-            rename_with_types(nxt, types);
+            rename_with_type(nxt, types);
           }
         }
         Stmt::InPlace { nxt, .. } => {
-          rename_with_types(nxt, types);
+          rename_with_type(nxt, types);
         }
         Stmt::If { then, otherwise, nxt, .. } => {
-          rename_with_types(then, types);
-          rename_with_types(otherwise, types);
+          rename_with_type(then, types);
+          rename_with_type(otherwise, types);
           if let Some(nxt) = nxt {
-            rename_with_types(nxt, types);
+            rename_with_type(nxt, types);
           }
         }
         Stmt::Match { arms, nxt, .. } => {
           for arm in arms {
-            rename_with_types(&mut arm.rgt, types);
+            rename_with_type(&mut arm.rgt, types);
           }
           if let Some(nxt) = nxt {
-            rename_with_types(nxt, types);
+            rename_with_type(nxt, types);
           }
         }
         Stmt::Switch { arms, nxt, .. } => {
           for arm in arms {
-            rename_with_types(arm, types);
+            rename_with_type(arm, types);
           }
           if let Some(nxt) = nxt {
-            rename_with_types(nxt, types);
+            rename_with_type(nxt, types);
           }
         }
         Stmt::Bend { step, base, nxt, .. } => {
-          rename_with_types(step, types);
-          rename_with_types(base, types);
+          rename_with_type(step, types);
+          rename_with_type(base, types);
           if let Some(nxt) = nxt {
-            rename_with_types(nxt, types);
+            rename_with_type(nxt, types);
           }
         }
         Stmt::Fold { arms, nxt, .. } => {
           for arm in arms {
-            rename_with_types(&mut arm.rgt, types);
+            rename_with_type(&mut arm.rgt, types);
           }
           if let Some(nxt) = nxt {
-            rename_with_types(nxt, types);
+            rename_with_type(nxt, types);
           }
         }
         Stmt::Ask { nxt, .. } => {
-          rename_with_types(nxt, types);
+          rename_with_type(nxt, types);
         }
         Stmt::Return { .. } => {}
         Stmt::Open { nxt, .. } => {
-          rename_with_types(nxt, types);
+          rename_with_type(nxt, types);
         }
         Stmt::Use { nxt, .. } => {
-          rename_with_types(nxt, types);
+          rename_with_type(nxt, types);
         }
         Stmt::LocalDef { def, nxt } => {
           def.apply_types(types);
-          rename_with_types(nxt, types);
+          rename_with_type(nxt, types);
         }
         Stmt::Err => {}
       }
     }
-    rename_with_types(&mut self.body, types);
+    rename_with_type(&mut self.body, types);
   }
 
   fn source(&self) -> &Source {
