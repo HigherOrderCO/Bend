@@ -505,9 +505,6 @@ impl<'a> PyParser<'a> {
         let stmt = Stmt::Ask { pat, val: Box::new(val), nxt: None };
         return Ok((stmt, nxt_indent));
       }
-      // let (nxt, nxt_indent) = self.parse_statement(indent)?;
-      // let stmt = Stmt::Ask { pat, val: Box::new(val), nxt: Box::new(nxt) };
-      // return Ok((stmt, nxt_indent));
     }
     // In-place
 
