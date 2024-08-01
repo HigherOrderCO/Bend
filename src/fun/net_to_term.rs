@@ -550,7 +550,7 @@ impl Reader<'_> {
     for (err, count) in err_counts {
       let count_msg = if count > 1 { format!(" ({count} occurrences)") } else { "".to_string() };
       let msg = format!("{}{}", err, count_msg);
-      diagnostics.add_diagnostic(msg.as_str(), Severity::Warning, DiagnosticOrigin::Readback);
+      diagnostics.add_diagnostic(msg.as_str(), Severity::Warning, DiagnosticOrigin::Readback, None);
     }
   }
 

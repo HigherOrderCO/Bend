@@ -26,14 +26,30 @@ pub struct DiagnosticsConfig {
   pub import_shadow: Severity,
 }
 
+#[derive(Debug, Copy, Clone, Hash)]
+pub struct TextRange {
+  pub line: usize,
+  pub char: usize,
+}
+
+#[derive(Debug, Clone, Hash)]
+pub struct FileRange {
+  pub range: TextRange,
+  // Storing files as Strings, could be done as file IDs in the future
+  pub file: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct Diagnostic {
-  message: String,
-  severity: Severity,
+  pub message: String,
+  pub severity: Severity,
+  pub range: Option<FileRange>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum DiagnosticOrigin {
+  /// An error when parsing source code.
+  Parsing,
   /// An error from the relationship between multiple top-level definitions.
   Book,
   /// An error in a pattern-matching function definition rule.
@@ -68,19 +84,29 @@ impl Diagnostics {
     Self { err_counter: 0, diagnostics: Default::default(), config }
   }
 
+  pub fn add_parsing_error(&mut self, err: impl std::fmt::Display, range: Option<FileRange>) {
+    self.err_counter += 1;
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Parsing, range);
+  }
+
   pub fn add_book_error(&mut self, err: impl std::fmt::Display) {
     self.err_counter += 1;
-    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Book);
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Book, None);
   }
 
   pub fn add_rule_error(&mut self, err: impl std::fmt::Display, def_name: Name) {
     self.err_counter += 1;
-    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Rule(def_name.def_name_from_generated()));
+    self.add_diagnostic(
+      err,
+      Severity::Error,
+      DiagnosticOrigin::Rule(def_name.def_name_from_generated()),
+      None,
+    );
   }
 
   pub fn add_inet_error(&mut self, err: impl std::fmt::Display, def_name: String) {
     self.err_counter += 1;
-    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Inet(def_name));
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Inet(def_name), None);
   }
 
   pub fn add_rule_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType, def_name: Name) {
@@ -88,7 +114,7 @@ impl Diagnostics {
     if severity == Severity::Error {
       self.err_counter += 1;
     }
-    self.add_diagnostic(warn, severity, DiagnosticOrigin::Rule(def_name.def_name_from_generated()));
+    self.add_diagnostic(warn, severity, DiagnosticOrigin::Rule(def_name.def_name_from_generated()), None);
   }
 
   pub fn add_book_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType) {
@@ -96,11 +122,17 @@ impl Diagnostics {
     if severity == Severity::Error {
       self.err_counter += 1;
     }
-    self.add_diagnostic(warn, severity, DiagnosticOrigin::Book);
+    self.add_diagnostic(warn, severity, DiagnosticOrigin::Book, None);
   }
 
-  pub fn add_diagnostic(&mut self, msg: impl ToString, severity: Severity, orig: DiagnosticOrigin) {
-    let diag = Diagnostic { message: msg.to_string(), severity };
+  pub fn add_diagnostic(
+    &mut self,
+    msg: impl ToString,
+    severity: Severity,
+    orig: DiagnosticOrigin,
+    range: Option<FileRange>,
+  ) {
+    let diag = Diagnostic { message: msg.to_string(), severity, range };
     self.diagnostics.entry(orig).or_default().push(diag)
   }
 
@@ -171,6 +203,11 @@ impl Diagnostics {
         let mut errs = filter(errs, severity).peekable();
         if errs.peek().is_some() {
           match orig {
+            DiagnosticOrigin::Parsing => {
+              for err in errs {
+                writeln!(f, "{err}")?;
+              }
+            }
             DiagnosticOrigin::Book => {
               for err in errs {
                 writeln!(f, "{err}")?;
@@ -223,7 +260,7 @@ impl From<String> for Diagnostics {
     Self {
       diagnostics: BTreeMap::from_iter([(
         DiagnosticOrigin::Book,
-        vec![Diagnostic { message: value, severity: Severity::Error }],
+        vec![Diagnostic { message: value, severity: Severity::Error, range: None }],
       )]),
       ..Default::default()
     }
