@@ -1,0 +1,35 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/desugar_file/ask_branch.bend
+---
+(undefer) = λa (a λb b)
+
+(IO/MAGIC) = (13683217, 16719857)
+
+(IO/wrap) = λa (IO/Done IO/MAGIC a)
+
+(IO/bind) = λa λb (a IO/bind__C2 b)
+
+(main) = (IO/bind (Bool/T λa switch a { 0: (IO/wrap 0); _: λ* (IO/wrap 0); }) λb (b λc λd (c d) IO/wrap))
+
+(IO/Done) = λa λb λc (c IO/Done/tag a b)
+
+(IO/Call) = λa λb λc λd λe (e IO/Call/tag a b c d)
+
+(Bool/T) = λa (a Bool/T/tag)
+
+(Bool/F) = λa (a Bool/F/tag)
+
+(IO/Done/tag) = 0
+
+(IO/Call/tag) = 1
+
+(Bool/T/tag) = 0
+
+(Bool/F/tag) = 1
+
+(IO/bind__C0) = λ* λa λb (undefer b a)
+
+(IO/bind__C1) = λ* λ* λa λb λc λd (IO/Call IO/MAGIC a b λe (IO/bind (c e) d))
+
+(IO/bind__C2) = λa switch a { 0: IO/bind__C0; _: IO/bind__C1; }
