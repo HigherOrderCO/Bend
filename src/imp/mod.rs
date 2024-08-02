@@ -174,7 +174,7 @@ pub enum Stmt {
   Ask {
     pat: AssignPattern,
     val: Box<Expr>,
-    nxt: Box<Stmt>,
+    nxt: Option<Box<Stmt>>,
   },
   // "return" {expr} ";"?
   Return {

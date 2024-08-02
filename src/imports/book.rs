@@ -431,7 +431,9 @@ impl Def for imp::Definition {
           }
         }
         Stmt::Ask { nxt, .. } => {
-          rename_with_type(nxt, types);
+          if let Some(nxt) = nxt {
+            rename_with_type(nxt, types);
+          }
         }
         Stmt::Return { .. } => {}
         Stmt::Open { nxt, .. } => {

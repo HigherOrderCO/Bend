@@ -28,7 +28,9 @@ impl Stmt {
       }
       Stmt::Ask { val, nxt, .. } => {
         val.order_kwargs(book, use_map)?;
-        nxt.order_kwargs(book, use_map)?;
+        if let Some(nxt) = nxt {
+          nxt.order_kwargs(book, use_map)?;
+        }
       }
       Stmt::InPlace { val, nxt, .. } => {
         val.order_kwargs(book, use_map)?;

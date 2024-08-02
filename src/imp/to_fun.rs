@@ -61,9 +61,25 @@ impl AssignPattern {
   }
 }
 
+#[derive(Debug)]
 enum StmtToFun {
   Return(fun::Term),
-  Assign(fun::Pattern, fun::Term),
+  Assign(bool, fun::Pattern, fun::Term),
+}
+
+fn take(t: Stmt) -> Result<(bool, Option<fun::Pattern>, fun::Term), String> {
+  match t.into_fun()? {
+    StmtToFun::Return(ret) => Ok((false, None, ret)),
+    StmtToFun::Assign(x, pat, val) => Ok((x, Some(pat), val)),
+  }
+}
+
+fn wrap(nxt: Option<fun::Pattern>, term: fun::Term, ask: bool) -> StmtToFun {
+  if let Some(pat) = nxt {
+    StmtToFun::Assign(ask, pat, term)
+  } else {
+    StmtToFun::Return(term)
+  }
 }
 
 impl Stmt {
@@ -72,10 +88,7 @@ impl Stmt {
     // TODO: When we have an error with an assignment, we should show the offending assignment (eg. "{pat} = ...").
     let stmt_to_fun = match self {
       Stmt::Assign { pat: AssignPattern::MapSet(map, key), val, nxt: Some(nxt) } => {
-        let (nxt_pat, nxt) = match nxt.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
+        let (ask, nxt_pat, nxt) = take(*nxt)?;
         let term = fun::Term::Let {
           pat: Box::new(fun::Pattern::Var(Some(map.clone()))),
           val: Box::new(fun::Term::call(
@@ -84,11 +97,7 @@ impl Stmt {
           )),
           nxt: Box::new(nxt),
         };
-        if let Some(pat) = nxt_pat {
-          StmtToFun::Assign(pat, term)
-        } else {
-          StmtToFun::Return(term)
-        }
+        wrap(nxt_pat, term, ask)
       }
       Stmt::Assign { pat: AssignPattern::MapSet(..), val: _, nxt: None } => {
         return Err("Branch ends with map assignment.".to_string());
@@ -96,28 +105,17 @@ impl Stmt {
       Stmt::Assign { pat, val, nxt: Some(nxt) } => {
         let pat = pat.into_fun();
         let val = val.to_fun();
-        let (nxt_pat, nxt) = match nxt.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
+        let (ask, nxt_pat, nxt) = take(*nxt)?;
         let term = fun::Term::Let { pat: Box::new(pat), val: Box::new(val), nxt: Box::new(nxt) };
-        if let Some(pat) = nxt_pat {
-          StmtToFun::Assign(pat, term)
-        } else {
-          StmtToFun::Return(term)
-        }
+        wrap(nxt_pat, term, ask)
       }
       Stmt::Assign { pat, val, nxt: None } => {
         let pat = pat.into_fun();
         let val = val.to_fun();
-        StmtToFun::Assign(pat, val)
+        StmtToFun::Assign(false, pat, val)
       }
       Stmt::InPlace { op, pat, val, nxt } => {
-        let (nxt_pat, nxt) = match nxt.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
-
+        let (ask, nxt_pat, nxt) = take(*nxt)?;
         // if it is a mapper operation
         if let InPlaceOp::Map = op {
           let term = match &*pat {
@@ -138,11 +136,7 @@ impl Stmt {
             }
           };
 
-          if let Some(pat) = nxt_pat {
-            return Ok(StmtToFun::Assign(pat, term));
-          } else {
-            return Ok(StmtToFun::Return(term));
-          }
+          return Ok(wrap(nxt_pat, term, ask));
         }
 
         // otherwise
@@ -157,11 +151,7 @@ impl Stmt {
               }),
               nxt: Box::new(nxt),
             };
-            if let Some(pat) = nxt_pat {
-              StmtToFun::Assign(pat, term)
-            } else {
-              StmtToFun::Return(term)
-            }
+            wrap(nxt_pat, term, ask)
           }
           AssignPattern::MapSet(map, key) => {
             let temp = Name::new("%0");
@@ -177,19 +167,17 @@ impl Stmt {
               val: Box::new(map_term),
               nxt: Box::new(nxt),
             };
-            if let Some(pat) = nxt_pat {
-              StmtToFun::Assign(pat, term)
-            } else {
-              StmtToFun::Return(term)
-            }
+            wrap(nxt_pat, term, ask)
           }
           _ => unreachable!(),
         }
       }
       Stmt::If { cond, then, otherwise, nxt } => {
-        let (pat, then, else_) = match (then.into_fun()?, otherwise.into_fun()?) {
-          (StmtToFun::Return(t), StmtToFun::Return(e)) => (None, t, e),
-          (StmtToFun::Assign(tp, t), StmtToFun::Assign(ep, e)) if tp == ep => (Some(tp), t, e),
+        let (ask, pat, then, else_) = match (then.into_fun()?, otherwise.into_fun()?) {
+          (StmtToFun::Return(t), StmtToFun::Return(e)) => (false, None, t, e),
+          (StmtToFun::Assign(ask, tp, t), StmtToFun::Assign(ask_, ep, e)) if tp == ep => {
+            (ask && ask_, Some(tp), t, e)
+          }
           (StmtToFun::Assign(..), StmtToFun::Assign(..)) => {
             return Err("'if' branches end with different assignments.".to_string());
           }
@@ -213,26 +201,20 @@ impl Stmt {
           pred: Some(Name::new("%pred-1")),
           arms,
         };
-        wrap_nxt_assign_stmt(term, nxt, pat)?
+        wrap_nxt_assign_stmt(term, nxt, pat, ask)?
       }
       Stmt::Match { arg, bnd, with_bnd, with_arg, arms, nxt } => {
         let arg = arg.to_fun();
         let mut fun_arms = vec![];
         let mut arms = arms.into_iter();
         let fst = arms.next().unwrap();
-        let (fst_pat, fst_rgt) = match fst.rgt.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
+        let (fst_ask, fst_pat, fst_rgt) = take(fst.rgt)?;
         let with_arg = with_arg.into_iter().map(Expr::to_fun).collect();
         fun_arms.push((fst.lft, vec![], fst_rgt));
         for arm in arms {
-          let (arm_pat, arm_rgt) = match arm.rgt.into_fun()? {
-            StmtToFun::Return(term) => (None, term),
-            StmtToFun::Assign(pat, term) => (Some(pat), term),
-          };
+          let (arm_ask, arm_pat, arm_rgt) = take(arm.rgt)?;
           match (&arm_pat, &fst_pat) {
-            (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat => {
+            (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat || arm_ask != fst_ask => {
               return Err("'match' arms end with different assignments.".to_string());
             }
             (Some(_), None) => {
@@ -246,26 +228,20 @@ impl Stmt {
           }
         }
         let term = fun::Term::Mat { arg: Box::new(arg), bnd, with_bnd, with_arg, arms: fun_arms };
-        wrap_nxt_assign_stmt(term, nxt, fst_pat)?
+        wrap_nxt_assign_stmt(term, nxt, fst_pat, fst_ask)?
       }
       Stmt::Switch { arg, bnd, with_bnd, with_arg, arms, nxt } => {
         let arg = arg.to_fun();
         let mut fun_arms = vec![];
         let mut arms = arms.into_iter();
         let fst = arms.next().unwrap();
-        let (fst_pat, fst) = match fst.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
+        let (fst_ask, fst_pat, fst) = take(fst)?;
         let with_arg = with_arg.into_iter().map(Expr::to_fun).collect();
         fun_arms.push(fst);
         for arm in arms {
-          let (arm_pat, arm) = match arm.into_fun()? {
-            StmtToFun::Return(term) => (None, term),
-            StmtToFun::Assign(pat, term) => (Some(pat), term),
-          };
+          let (arm_ask, arm_pat, arm) = take(arm)?;
           match (&arm_pat, &fst_pat) {
-            (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat => {
+            (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat || arm_ask != fst_ask => {
               return Err("'switch' arms end with different assignments.".to_string());
             }
             (Some(_), None) => {
@@ -280,26 +256,20 @@ impl Stmt {
         }
         let pred = Some(Name::new(format!("{}-{}", bnd.clone().unwrap(), fun_arms.len() - 1)));
         let term = fun::Term::Swt { arg: Box::new(arg), bnd, with_bnd, with_arg, pred, arms: fun_arms };
-        wrap_nxt_assign_stmt(term, nxt, fst_pat)?
+        wrap_nxt_assign_stmt(term, nxt, fst_pat, fst_ask)?
       }
       Stmt::Fold { arg, bnd, with_bnd, with_arg, arms, nxt } => {
         let arg = arg.to_fun();
         let mut fun_arms = vec![];
         let mut arms = arms.into_iter();
         let fst = arms.next().unwrap();
-        let (fst_pat, fst_rgt) = match fst.rgt.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
+        let (fst_ask, fst_pat, fst_rgt) = take(fst.rgt)?;
         fun_arms.push((fst.lft, vec![], fst_rgt));
         let with_arg = with_arg.into_iter().map(Expr::to_fun).collect();
         for arm in arms {
-          let (arm_pat, arm_rgt) = match arm.rgt.into_fun()? {
-            StmtToFun::Return(term) => (None, term),
-            StmtToFun::Assign(pat, term) => (Some(pat), term),
-          };
+          let (arm_ask, arm_pat, arm_rgt) = take(arm.rgt)?;
           match (&arm_pat, &fst_pat) {
-            (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat => {
+            (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat || arm_ask != fst_ask => {
               return Err("'fold' arms end with different assignments.".to_string());
             }
             (Some(_), None) => {
@@ -313,14 +283,16 @@ impl Stmt {
           }
         }
         let term = fun::Term::Fold { arg: Box::new(arg), bnd, with_bnd, with_arg, arms: fun_arms };
-        wrap_nxt_assign_stmt(term, nxt, fst_pat)?
+        wrap_nxt_assign_stmt(term, nxt, fst_pat, fst_ask)?
       }
       Stmt::Bend { bnd, arg, cond, step, base, nxt } => {
         let arg = arg.into_iter().map(Expr::to_fun).collect();
         let cond = cond.to_fun();
-        let (pat, step, base) = match (step.into_fun()?, base.into_fun()?) {
-          (StmtToFun::Return(s), StmtToFun::Return(b)) => (None, s, b),
-          (StmtToFun::Assign(sp, s), StmtToFun::Assign(bp, b)) if sp == bp => (Some(sp), s, b),
+        let (ask, pat, step, base) = match (step.into_fun()?, base.into_fun()?) {
+          (StmtToFun::Return(s), StmtToFun::Return(b)) => (false, None, s, b),
+          (StmtToFun::Assign(aa, sp, s), StmtToFun::Assign(ba, bp, b)) if sp == bp => {
+            (aa && ba, Some(sp), s, b)
+          }
           (StmtToFun::Assign(..), StmtToFun::Assign(..)) => {
             return Err("'bend' branches end with different assignments.".to_string());
           }
@@ -337,66 +309,40 @@ impl Stmt {
         };
         let term =
           fun::Term::Bend { bnd, arg, cond: Box::new(cond), step: Box::new(step), base: Box::new(base) };
-        wrap_nxt_assign_stmt(term, nxt, pat)?
+        wrap_nxt_assign_stmt(term, nxt, pat, ask)?
       }
       Stmt::With { typ, bod, nxt } => {
-        let (pat, bod) = match bod.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
+        let (ask, pat, bod) = take(*bod)?;
         let term = fun::Term::With { typ, bod: Box::new(bod) };
-        wrap_nxt_assign_stmt(term, nxt, pat)?
+        wrap_nxt_assign_stmt(term, nxt, pat, ask)?
       }
-      Stmt::Ask { pat, val, nxt } => {
-        let (nxt_pat, nxt) = match nxt.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
+      Stmt::Ask { pat, val, nxt: Some(nxt) } => {
+        let (ask, nxt_pat, nxt) = take(*nxt)?;
         let term =
           fun::Term::Ask { pat: Box::new(pat.into_fun()), val: Box::new(val.to_fun()), nxt: Box::new(nxt) };
-        if let Some(pat) = nxt_pat {
-          StmtToFun::Assign(pat, term)
-        } else {
-          StmtToFun::Return(term)
-        }
+        wrap(nxt_pat, term, ask)
+      }
+      Stmt::Ask { pat, val, nxt: None } => {
+        let pat = pat.into_fun();
+        let val = val.to_fun();
+        StmtToFun::Assign(true, pat, val)
       }
       Stmt::Open { typ, var, nxt } => {
-        let (nxt_pat, nxt) = match nxt.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
+        let (ask, nxt_pat, nxt) = take(*nxt)?;
         let term = fun::Term::Open { typ, var, bod: Box::new(nxt) };
-        if let Some(pat) = nxt_pat {
-          StmtToFun::Assign(pat, term)
-        } else {
-          StmtToFun::Return(term)
-        }
+        wrap(nxt_pat, term, ask)
       }
       Stmt::Use { nam, val, nxt } => {
-        let (nxt_pat, nxt) = match nxt.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
+        let (ask, nxt_pat, nxt) = take(*nxt)?;
         let term = fun::Term::Use { nam: Some(nam), val: Box::new(val.to_fun()), nxt: Box::new(nxt) };
-        if let Some(pat) = nxt_pat {
-          StmtToFun::Assign(pat, term)
-        } else {
-          StmtToFun::Return(term)
-        }
+        wrap(nxt_pat, term, ask)
       }
       Stmt::Return { term } => StmtToFun::Return(term.to_fun()),
       Stmt::LocalDef { def, nxt } => {
-        let (nxt_pat, nxt) = match nxt.into_fun()? {
-          StmtToFun::Return(term) => (None, term),
-          StmtToFun::Assign(pat, term) => (Some(pat), term),
-        };
+        let (ask, nxt_pat, nxt) = take(*nxt)?;
         let def = def.to_fun()?;
         let term = fun::Term::Def { def, nxt: Box::new(nxt) };
-        if let Some(pat) = nxt_pat {
-          StmtToFun::Assign(pat, term)
-        } else {
-          StmtToFun::Return(term)
-        }
+        wrap(nxt_pat, term, ask)
       }
       Stmt::Err => unreachable!(),
     };
@@ -508,24 +454,22 @@ fn wrap_nxt_assign_stmt(
   term: fun::Term,
   nxt: Option<Box<Stmt>>,
   pat: Option<fun::Pattern>,
+  ask: bool,
 ) -> Result<StmtToFun, String> {
   if let Some(nxt) = nxt {
     if let Some(pat) = pat {
-      let (nxt_pat, nxt) = match nxt.into_fun()? {
-        StmtToFun::Return(term) => (None, term),
-        StmtToFun::Assign(pat, term) => (Some(pat), term),
-      };
-      let term = fun::Term::Let { pat: Box::new(pat), val: Box::new(term), nxt: Box::new(nxt) };
-      if let Some(pat) = nxt_pat {
-        Ok(StmtToFun::Assign(pat, term))
+      let (ask_nxt, nxt_pat, nxt) = take(*nxt)?;
+      let term = if ask {
+        fun::Term::Ask { pat: Box::new(pat), val: Box::new(term), nxt: Box::new(nxt) }
       } else {
-        Ok(StmtToFun::Return(term))
-      }
+        fun::Term::Let { pat: Box::new(pat), val: Box::new(term), nxt: Box::new(nxt) }
+      };
+      Ok(wrap(nxt_pat, term, ask_nxt))
     } else {
       Err("Statement ends with return but is not at end of function.".to_string())
     }
   } else if let Some(pat) = pat {
-    Ok(StmtToFun::Assign(pat, term))
+    Ok(StmtToFun::Assign(ask, pat, term))
   } else {
     Ok(StmtToFun::Return(term))
   }
