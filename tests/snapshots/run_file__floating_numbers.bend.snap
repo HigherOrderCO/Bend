@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/floating_numbers.bend
+---
+NumScott:
+[18.072, 0.125, 5.625, 2863333376.000]
+
+Scott:
+[18.072, 0.125, 5.625, 2863333376.000]

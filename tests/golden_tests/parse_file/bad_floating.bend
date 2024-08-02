@@ -1,0 +1,2 @@
+def main:
+  return 0xA.0xA
