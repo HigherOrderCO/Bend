@@ -1531,7 +1531,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
 
     let next_is_hex = self.peek_one().map_or(false, |c| "0123456789abcdefABCDEF".contains(c));
     if next_is_hex || num_str.is_empty() {
-      self.expected(format!("valid {} digit", radix.to_string()).as_str())
+      self.expected(format!("valid {radix} digit").as_str())
     } else {
       u32::from_str_radix(&num_str, radix as u32).map_err(|e| e.to_string())
     }
@@ -1542,7 +1542,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
     let next_is_hex = self.peek_one().map_or(false, |c| "0123456789abcdefABCDEF".contains(c));
     if next_is_hex || num_str.is_empty() {
-      self.expected(format!("valid {} digit", radix.to_string()).as_str())
+      self.expected(format!("valid {radix} digit").as_str())
     } else {
       u32::from_str_radix(&num_str, radix as u32).map_err(|e| e.to_string())
     }
@@ -1586,11 +1586,11 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
 
     if let Some(sign) = sign {
-      let num = sign as i32 * num as i32;
+      let num = sign * num as i32;
       if !(-0x00800000..=0x007fffff).contains(&num) {
         return self.num_range_err(ini_idx, "I24");
       }
-      return Ok(Num::I24(num));
+      Ok(Num::I24(num))
     } else {
       if num >= 1 << 24 {
         return self.num_range_err(ini_idx, "U24");
@@ -1673,7 +1673,7 @@ pub enum Radix {
 }
 
 impl Radix {
-  fn to_f32(&self) -> f32 {
+  fn to_f32(self) -> f32 {
     match self {
       Radix::Bin => 2.,
       Radix::Dec => 10.,
@@ -1682,12 +1682,12 @@ impl Radix {
   }
 }
 
-impl ToString for Radix {
-  fn to_string(&self) -> String {
+impl std::fmt::Display for Radix {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match self {
-      Radix::Bin => "binary".to_string(),
-      Radix::Dec => "decimal".to_string(),
-      Radix::Hex => "hexadecimal".to_string(),
+      Radix::Bin => write!(f, "binary"),
+      Radix::Dec => write!(f, "decimal"),
+      Radix::Hex => write!(f, "hexadecimal"),
     }
   }
 }
