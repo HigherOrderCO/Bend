@@ -1093,7 +1093,7 @@ Result/wrap x = (Result/Ok x)
 with Result {
   ask x = (some_operation ...)
   ask y = (some_operation ...)
-  (wrap (* x y)
+  (wrap (* x y))
 }
 ```
 
