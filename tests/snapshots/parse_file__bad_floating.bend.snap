@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/parse_file/bad_floating.bend
+---
+[4m[1m[31mErrors:[0m
+In tests/golden_tests/parse_file/bad_floating.bend :
+[1m- expected:[0m newline
+[1m- detected:[0m
+[0m  2 |   return 0xA.0[4m[31mx[0mA[0m

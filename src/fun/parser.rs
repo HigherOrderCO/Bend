@@ -1518,80 +1518,85 @@ pub trait ParserCommons<'a>: Parser<'a> {
     let radix = match self.peek_many(2) {
       Some("0x") => {
         self.advance_many(2);
-        16
+        Radix::Hex
       }
       Some("0b") => {
         self.advance_many(2);
-        2
+        Radix::Bin
       }
-      _ => 10,
+      _ => Radix::Dec,
     };
-    let num_str = self.take_while(move |c| c.is_digit(radix) || c == '_');
+    let num_str = self.take_while(move |c| c.is_digit(radix as u32) || c == '_');
     let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
 
     let next_is_hex = self.peek_one().map_or(false, |c| "0123456789abcdefABCDEF".contains(c));
     if next_is_hex || num_str.is_empty() {
-      let base = match radix {
-        16 => "hexadecimal",
-        10 => "decimal",
-        2 => "binary",
-        _ => unreachable!(),
-      };
-      self.expected(format!("valid {base} digit").as_str())
+      self.expected(format!("valid {radix} digit").as_str())
     } else {
-      u32::from_str_radix(&num_str, radix).map_err(|e| e.to_string())
+      u32::from_str_radix(&num_str, radix as u32).map_err(|e| e.to_string())
+    }
+  }
+
+  fn u32_with_radix(&mut self, radix: Radix) -> ParseResult<u32> {
+    let num_str = self.take_while(move |c| c.is_digit(radix as u32) || c == '_');
+    let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
+    let next_is_hex = self.peek_one().map_or(false, |c| "0123456789abcdefABCDEF".contains(c));
+    if next_is_hex || num_str.is_empty() {
+      self.expected(format!("valid {radix} digit").as_str())
+    } else {
+      u32::from_str_radix(&num_str, radix as u32).map_err(|e| e.to_string())
     }
   }
 
   fn parse_number(&mut self) -> ParseResult<Num> {
     let ini_idx = *self.index();
-
-    // Parses sign
-    let sgn = if self.try_consume_exactly("+") {
+    let sign = if self.try_consume_exactly("+") {
       Some(1)
     } else if self.try_consume_exactly("-") {
       Some(-1)
     } else {
       None
     };
-
-    // Parses main value
-    let num = self.parse_u32()?;
-
-    // Parses frac value (Float type)
-    // TODO: Will lead to some rounding errors
-    // TODO: Doesn't cover very large/small numbers
-    let fra = if let Some('.') = self.peek_one() {
+    let radix = match self.peek_many(2) {
+      Some("0x") => {
+        self.advance_many(2);
+        Radix::Hex
+      }
+      Some("0b") => {
+        self.advance_many(2);
+        Radix::Bin
+      }
+      _ => Radix::Dec,
+    };
+    let num = self.u32_with_radix(radix)?;
+    let frac = if let Some('.') = self.peek_one() {
       self.advance_one();
-      let ini_idx = *self.index();
-      let fra = self.parse_u32()? as f32;
-      let end_idx = *self.index();
-      let fra = fra / 10f32.powi((end_idx - ini_idx) as i32);
+      let fra_str = self.take_while(|c| c.is_digit(radix as u32) || c == '_');
+      let fra_str = fra_str.chars().filter(|c| *c != '_').collect::<String>();
+      let fra = u32::from_str_radix(&fra_str, radix as u32).map_err(|e| e.to_string())?;
+      let fra = fra as f32 / (radix.to_f32()).powi(fra_str.len() as i32);
       Some(fra)
     } else {
       None
     };
 
-    // F24
-    if let Some(fra) = fra {
-      let sgn = sgn.unwrap_or(1);
-      return Ok(Num::F24(sgn as f32 * (num as f32 + fra)));
+    if let Some(frac) = frac {
+      let sign = sign.unwrap_or(1);
+      return Ok(Num::F24(sign as f32 * (num as f32 + frac)));
     }
 
-    // I24
-    if let Some(sgn) = sgn {
-      let num = sgn * num as i32;
+    if let Some(sign) = sign {
+      let num = sign * num as i32;
       if !(-0x00800000..=0x007fffff).contains(&num) {
         return self.num_range_err(ini_idx, "I24");
       }
-      return Ok(Num::I24(num));
+      Ok(Num::I24(num))
+    } else {
+      if num >= 1 << 24 {
+        return self.num_range_err(ini_idx, "U24");
+      }
+      Ok(Num::U24(num))
     }
-
-    // U24
-    if num >= 1 << 24 {
-      return self.num_range_err(ini_idx, "U24");
-    }
-    Ok(Num::U24(num))
   }
 
   fn num_range_err<T>(&mut self, ini_idx: usize, typ: &str) -> ParseResult<T> {
@@ -1656,6 +1661,33 @@ pub trait ParserCommons<'a>: Parser<'a> {
       format!("Redefinition of builtin (type) '{type_name}'.")
     } else {
       format!("Redefinition of type '{type_name}'.")
+    }
+  }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Radix {
+  Bin = 2,
+  Dec = 10,
+  Hex = 16,
+}
+
+impl Radix {
+  fn to_f32(self) -> f32 {
+    match self {
+      Radix::Bin => 2.,
+      Radix::Dec => 10.,
+      Radix::Hex => 16.,
+    }
+  }
+}
+
+impl std::fmt::Display for Radix {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Radix::Bin => write!(f, "binary"),
+      Radix::Dec => write!(f, "decimal"),
+      Radix::Hex => write!(f, "hexadecimal"),
     }
   }
 }
