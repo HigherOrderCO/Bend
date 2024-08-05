@@ -1572,8 +1572,10 @@ pub trait ParserCommons<'a>: Parser<'a> {
     let frac = if let Some('.') = self.peek_one() {
       self.advance_one();
       let ini_idx = *self.index();
-      let fra = self.u32_with_radix(radix)?;
-      let end_idx = *self.index();
+      let fra_str = self.take_while(|c| c.is_digit(radix as u32) || c == '_');
+      let fra_str = fra_str.chars().filter(|c| *c != '_').collect::<String>();
+      let end_idx = ini_idx + fra_str.len();
+      let fra = u32::from_str_radix(&fra_str, radix as u32).map_err(|e| e.to_string())?;
       let fra = fra as f32 / (radix.to_f32()).powi((end_idx - ini_idx) as i32);
       Some(fra)
     } else {
