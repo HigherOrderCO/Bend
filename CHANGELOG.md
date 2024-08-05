@@ -28,6 +28,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Change tuple syntax to not require parentheses in some cases. ([#554][gh-554])
 - Improve error messages in branching statements. ([#464][gh-464])
 - Change branches to support ending with ask statements. ([#629][gh-629])
+- Improve hexadecimal and binary floating numbers. ([#648][gh-648])
 
 ## [0.2.36] - 2024-07-04
 
@@ -414,4 +415,5 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-629]: https://github.com/HigherOrderCO/Bend/issues/629
 [gh-642]: https://github.com/HigherOrderCO/Bend/issues/642
 [gh-643]: https://github.com/HigherOrderCO/Bend/issues/643
+[gh-648]: https://github.com/HigherOrderCO/Bend/issues/648
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
