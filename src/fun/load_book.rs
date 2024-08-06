@@ -1,5 +1,5 @@
 use super::{
-  parser::{ParseBook, ParseResult, TermParser},
+  parser::{ParseBook, TermParser},
   Book, Name,
 };
 use crate::{

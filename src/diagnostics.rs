@@ -47,7 +47,7 @@ pub struct FileSpan {
 pub struct Diagnostic {
   pub message: String,
   pub severity: Severity,
-  pub range: Option<FileSpan>,
+  pub span: Option<FileSpan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -136,7 +136,7 @@ impl Diagnostics {
     orig: DiagnosticOrigin,
     range: Option<FileSpan>,
   ) {
-    let diag = Diagnostic { message: msg.to_string(), severity, range };
+    let diag = Diagnostic { message: msg.to_string(), severity, span: range };
     self.diagnostics.entry(orig).or_default().push(diag)
   }
 
@@ -264,7 +264,7 @@ impl From<String> for Diagnostics {
     Self {
       diagnostics: BTreeMap::from_iter([(
         DiagnosticOrigin::Book,
-        vec![Diagnostic { message: value, severity: Severity::Error, range: None }],
+        vec![Diagnostic { message: value, severity: Severity::Error, span: None }],
       )]),
       ..Default::default()
     }
@@ -277,7 +277,7 @@ impl From<ParseError> for Diagnostics {
       diagnostics: BTreeMap::from_iter([(
         DiagnosticOrigin::Parsing,
         // TODO: range is not because we're missing the origin file, can we fix this?
-        vec![Diagnostic { message: value.into(), severity: Severity::Error, range: None }],
+        vec![Diagnostic { message: value.into(), severity: Severity::Error, span: None }],
       )]),
       ..Default::default()
     }
@@ -324,7 +324,7 @@ impl Default for DiagnosticsConfig {
 
 impl Display for Diagnostic {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    match &self.range {
+    match &self.span {
       Some(FileSpan { file, .. }) => write!(f, "In {}: \n{}", file, self.message),
       None => write!(f, "{}", self.message),
     }

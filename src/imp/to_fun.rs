@@ -1,10 +1,13 @@
 use super::{AssignPattern, Definition, Expr, InPlaceOp, Stmt};
-use crate::{diagnostics::Diagnostics, fun::{
-  self,
-  builtins::{LCONS, LNIL},
-  parser::ParseBook,
-  Book, Name,
-}};
+use crate::{
+  diagnostics::Diagnostics,
+  fun::{
+    self,
+    builtins::{LCONS, LNIL},
+    parser::ParseBook,
+    Book, Name,
+  },
+};
 
 impl ParseBook {
   // TODO: Change all functions to return diagnostics
