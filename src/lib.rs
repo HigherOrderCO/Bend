@@ -128,6 +128,8 @@ pub fn desugar_book(
   // Manual match linearization
   ctx.book.linearize_match_with();
 
+  type_check_book(&mut ctx)?;
+
   ctx.book.encode_matches(opts.adt_encoding);
 
   // sanity check
@@ -163,6 +165,17 @@ pub fn desugar_book(
   } else {
     Err(ctx.info)
   }
+}
+
+pub fn type_check_book(ctx: &mut Ctx) -> Result<(), Diagnostics> {
+  // TODO: Check unbound type variables and constructors
+  let old_book = std::mem::replace(ctx.book, ctx.book.clone());
+  ctx.make_native_defs();
+  ctx.book.encode_adts(AdtEncoding::Scott);
+  let res = ctx.type_check();
+  *ctx.book = old_book;
+  res?;
+  Ok(())
 }
 
 pub fn run_book(

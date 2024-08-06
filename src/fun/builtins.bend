@@ -1,10 +1,10 @@
 type String:
   Nil
-  Cons { head: u24,  ~tail: String }
+  Cons { head: u24, ~tail: String }
 
 type List(T):
   Nil
-  Cons { head: T,  ~tail: List(T) }
+  Cons { head: T, ~tail: List(T) }
 
 # Returns the length of a list and the list itself.
 def List/length(xs: List(T)) -> (u24, List(T)):
@@ -109,7 +109,7 @@ type Map T = (Node (value: T) ~(left: (Map T)) ~(right: (Map T))) | (Leaf)
 
 Map/empty : (Map T) = Map/Leaf
 
-Map/get (map: (Map T)) (key: u24) : ((Map T), T) =
+Map/get (map: (Map T)) (key: u24) : (T, (Map T)) =
   match map {
     Map/Leaf: (*, map)
     Map/Node:
@@ -180,7 +180,7 @@ def IO/bind(a: IO(A), b: A -> IO(B)) -> IO(B):
     case IO/Call:
       return IO/Call(IO/MAGIC, a.func, a.argm, lambda x: IO/bind(a.cont(x), b))
 
-def IO/call(func: String, argm: Any) -> IO(T):
+def IO/call(func: String, argm: Any) -> IO(Any):
   return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
 
 ## Time and sleep
@@ -286,23 +286,6 @@ def IO/FS/write_file(path: String, bytes: List(u24)) -> IO(None):
     * <- IO/FS/close(f)
     return wrap(*)
 
-def Bytes/split_once(xs: List(u24), cond: u24) -> Result((List(u24), List(u24)), List(u24)):
-  return Bytes/split_once.go(xs, cond, DiffList/new)
-
-def Bytes/split_once.go(
-  xs: List(u24),
-  cond: u24,
-  acc: List(u24) -> List(u24)
-) -> Result((List(u24), List(u24)), List(u24)):
-  match xs:
-    case List/Nil:
-      return Result/Err(DiffList/to_list(acc))
-    case List/Cons:
-      if xs.head == cond:
-        return Result/Ok((DiffList/to_list(acc), xs.tail))
-      else:
-        return Bytes/split_once.go(xs.tail, cond, DiffList/append(acc, xs.head))
-
 ### Standard input and output utilities
 
 # Prints a string to stdout, encoding it with utf-8.
@@ -334,25 +317,24 @@ def IO/input.go(acc: List(u24) -> List(u24)) -> IO(String):
 
 ### Dynamically linked libraries
 
+# Returns an unique id to the library object encoded as a u24
 # 'path' is the path to the library file.
 # 'lazy' is a boolean encoded as a u24 that determines if all functions are loaded lazily or upfront.
-# Returns an unique id to the library object encoded as a u24
 def IO/DyLib/open(path: String, lazy: u24) -> IO(u24):
   return IO/call("DL_OPEN", (path, lazy))
 
 # Calls a function of a previously opened library.
+# The returned value is determined by the called function.
 # 'dl' is the id of the library object.
 # 'fn' is the name of the function in the library.
 # 'args' are the arguments to the function. The expected values depend on the called function.
-# The returned value is determined by the called function.
 def IO/DyLib/call(dl: u24, fn: String, args: Any) -> IO(Any):
   return IO/call("DL_CALL", (dl, (fn, args)))
 
-# IO/DyLib/close(dl: u24) -> None
 # Closes a previously open library.
-# 'dl' is the id of the library object.
 # Returns nothing.
-def IO/DyLib/close(dl):
+# 'dl' is the id of the library object.
+def IO/DyLib/close(dl: u24) -> IO(None):
   return IO/Call(IO/MAGIC, "DL_CLOSE", (dl), IO/wrap)
 
 # Lazy thunks
@@ -363,16 +345,47 @@ def IO/DyLib/close(dl):
 # We can build a defered call directly or by by using defer and defer_arg
 # The example above can be written as:
 # (defer_arg (defer_arg (defer_arg (defer @arg1 @arg2 @arg3 (f arg1 arg2 arg3)) arg1) arg2) arg3)
-defer val =
+defer (val: a) : (a -> b) -> b =
   @x (x val)
 
-# defer_arg(defered: A -> B -> C, arg: B) -> (A -> C)
-defer_arg defered arg =
+defer_arg (defered: a -> b -> c) (arg: b) : (a -> c) -> c =
   @x (defered x arg)
 
-# undefer(defered: (A -> A) -> B) -> B
-undefer defered =
+undefer (defered: (a -> a) -> b) : b =
   (defered @x x)
+
+
+# Native number casts
+
+# f24_to_u24(x: f24) -> u24
+# Casts a f24 number to a u24.
+hvm f24_to_u24 -> (f24 -> u24):
+  ($([u24] ret) ret)
+
+# i24_to_u24(x: i24) -> u24
+# Casts an i24 number to a u24.
+hvm i24_to_u24 -> (i24 -> u24):
+  ($([u24] ret) ret)
+
+# u24_to_i24(x: u24) -> i24
+# Casts a u24 number to an i24.
+hvm u24_to_i24 -> (u24 -> i24):
+  ($([i24] ret) ret)
+
+# f24_to_i24(x: f24) -> i24
+# Casts a f24 number to an i24.
+hvm f24_to_i24 -> (f24 -> i24):
+  ($([i24] ret) ret)
+
+# u24_to_f24(x: u24) -> f24
+# Casts a u24 number to a f24.
+hvm u24_to_f24 -> (u24 -> f24):
+  ($([f24] ret) ret)
+
+# i24_to_f24(x: i24) -> f24
+# Casts an i24 number to a f24.
+hvm i24_to_f24 -> (i24 -> f24):
+  ($([f24] ret) ret)
 
 
 # String Encoding and Decoding

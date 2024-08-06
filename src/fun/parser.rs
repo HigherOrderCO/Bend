@@ -221,7 +221,7 @@ impl<'a> FunParser<'a> {
       let ctr_name = Name::new(format!("{type_name}/{ctr_name}"));
 
       let fields = self.list_like(|p| p.parse_type_ctr_field(), "", ")", "", false, 0)?;
-      let (fields, field_types): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
+      let field_types = fields.iter().map(|f| f.typ.clone()).collect::<Vec<_>>();
       let end_idx = *self.index();
       self.check_repeated_ctr_fields(&fields, &ctr_name, ini_idx..end_idx)?;
 
@@ -238,7 +238,7 @@ impl<'a> FunParser<'a> {
     }
   }
 
-  fn parse_type_ctr_field(&mut self) -> ParseResult<(CtrField, Type)> {
+  fn parse_type_ctr_field(&mut self) -> ParseResult<CtrField> {
     let rec = self.try_consume("~");
 
     let nam;
@@ -255,7 +255,7 @@ impl<'a> FunParser<'a> {
       nam = self.parse_var_name()?;
       typ = Type::Any;
     }
-    Ok((CtrField { nam, rec }, typ))
+    Ok(CtrField { nam, typ, rec })
   }
 
   fn parse_fun_def(&mut self) -> ParseResult<FunDefinition> {
