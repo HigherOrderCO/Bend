@@ -29,14 +29,16 @@ pub struct DiagnosticsConfig {
 }
 
 #[derive(Debug, Copy, Clone, Hash)]
-pub struct TextRange {
+pub struct TextLocation {
   pub line: usize,
   pub char: usize,
 }
 
+pub type TextSpan = (TextLocation, TextLocation);
+
 #[derive(Debug, Clone, Hash)]
-pub struct FileRange {
-  pub range: TextRange,
+pub struct FileSpan {
+  pub span: TextSpan,
   // Storing files as Strings, could be done as file IDs in the future
   pub file: String,
 }
@@ -45,7 +47,7 @@ pub struct FileRange {
 pub struct Diagnostic {
   pub message: String,
   pub severity: Severity,
-  pub range: Option<FileRange>,
+  pub range: Option<FileSpan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -86,9 +88,9 @@ impl Diagnostics {
     Self { err_counter: 0, diagnostics: Default::default(), config }
   }
 
-  pub fn add_parsing_error(&mut self, err: impl std::fmt::Display, range: Option<FileRange>) {
+  pub fn add_parsing_error(&mut self, err: impl std::fmt::Display, span: FileSpan) {
     self.err_counter += 1;
-    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Parsing, range);
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Parsing, Some(span));
   }
 
   pub fn add_book_error(&mut self, err: impl std::fmt::Display) {
@@ -132,7 +134,7 @@ impl Diagnostics {
     msg: impl ToString,
     severity: Severity,
     orig: DiagnosticOrigin,
-    range: Option<FileRange>,
+    range: Option<FileSpan>,
   ) {
     let diag = Diagnostic { message: msg.to_string(), severity, range };
     self.diagnostics.entry(orig).or_default().push(diag)
@@ -274,6 +276,7 @@ impl From<ParseError> for Diagnostics {
     Self {
       diagnostics: BTreeMap::from_iter([(
         DiagnosticOrigin::Parsing,
+        // TODO: range is not because we're missing the origin file, can we fix this?
         vec![Diagnostic { message: value.into(), severity: Severity::Error, range: None }],
       )]),
       ..Default::default()
@@ -321,6 +324,9 @@ impl Default for DiagnosticsConfig {
 
 impl Display for Diagnostic {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    write!(f, "{}", self.message)
+    match &self.range {
+      Some(FileSpan { file, .. }) => write!(f, "In {}: \n{}", file, self.message),
+      None => write!(f, "{}", self.message),
+    }
   }
 }

@@ -1,13 +1,14 @@
 use super::{AssignPattern, Definition, Expr, InPlaceOp, Stmt};
-use crate::fun::{
+use crate::{diagnostics::Diagnostics, fun::{
   self,
   builtins::{LCONS, LNIL},
   parser::ParseBook,
   Book, Name,
-};
+}};
 
 impl ParseBook {
-  pub fn to_fun(mut self) -> Result<Book, String> {
+  // TODO: Change all functions to return diagnostics
+  pub fn to_fun(mut self) -> Result<Book, Diagnostics> {
     for (name, mut def) in std::mem::take(&mut self.imp_defs) {
       def.order_kwargs(&self)?;
       def.gen_map_get();

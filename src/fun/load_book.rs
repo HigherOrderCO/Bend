@@ -1,9 +1,9 @@
 use super::{
-  parser::{ParseBook, TermParser},
+  parser::{ParseBook, ParseResult, TermParser},
   Book, Name,
 };
 use crate::{
-  diagnostics::{Diagnostics, DiagnosticsConfig},
+  diagnostics::{Diagnostics, DiagnosticsConfig, FileSpan, TextLocation, TextSpan},
   imports::PackageLoader,
 };
 use std::path::Path;
@@ -39,11 +39,50 @@ pub fn load_to_book(
   book.load_imports(package_loader, diag)
 }
 
-pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<ParseBook, String> {
+pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<ParseBook, Diagnostics> {
   book.source = Name::new(origin.to_string_lossy());
-  TermParser::new(code).parse_book(book, false).map_err(|e| format!("In {} :\n{}", origin.display(), e))
+  TermParser::new(code).parse_book(book, false).map_err(|err| {
+    let mut diagnostics = Diagnostics::default();
+    let span = byte_span_to_line(code, err.span);
+    diagnostics.add_parsing_error(err, FileSpan { span, file: origin.to_string_lossy().into() });
+    diagnostics
+  })
 }
 
-pub fn do_parse_book_default(code: &str, origin: &Path) -> Result<Book, String> {
+pub fn do_parse_book_default(code: &str, origin: &Path) -> Result<Book, Diagnostics> {
   do_parse_book(code, origin, ParseBook::builtins())?.to_fun()
+}
+
+fn byte_span_to_line(code: &str, span: (usize, usize)) -> TextSpan {
+  // Will loop for way too long otherwise
+  assert!(span.0 <= span.1);
+
+  let mut start_line = 0;
+  let mut start_char = 0;
+  let mut end_line = 0;
+  let mut end_char = 0;
+
+  let mut curr_idx = 0;
+  while curr_idx <= span.0 {
+    if code.as_bytes()[curr_idx] == b'\n' {
+      start_line += 1;
+      end_line += 1;
+      start_char = 0;
+    } else {
+      start_char += 1;
+    }
+    curr_idx += 1;
+  }
+
+  while curr_idx <= span.1 {
+    if code.as_bytes()[curr_idx] == b'\n' {
+      end_line += 1;
+      end_char = 0;
+    } else {
+      end_char += 1;
+    }
+    curr_idx += 1;
+  }
+
+  (TextLocation { line: start_line, char: start_char }, TextLocation { line: end_line, char: end_char })
 }
