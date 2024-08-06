@@ -63,7 +63,7 @@ fn byte_span_to_line(code: &str, span: (usize, usize)) -> TextSpan {
   let mut end_char = 0;
 
   let mut curr_idx = 0;
-  while curr_idx <= span.0 {
+  while curr_idx <= span.0 && curr_idx < code.len() {
     if code.as_bytes()[curr_idx] == b'\n' {
       start_line += 1;
       end_line += 1;
@@ -74,7 +74,7 @@ fn byte_span_to_line(code: &str, span: (usize, usize)) -> TextSpan {
     curr_idx += 1;
   }
 
-  while curr_idx <= span.1 {
+  while curr_idx <= span.1 && curr_idx < code.len() {
     if code.as_bytes()[curr_idx] == b'\n' {
       end_line += 1;
       end_char = 0;

@@ -325,7 +325,7 @@ impl Default for DiagnosticsConfig {
 impl Display for Diagnostic {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match &self.span {
-      Some(FileSpan { file, .. }) => write!(f, "In {}: \n{}", file, self.message),
+      Some(FileSpan { file, .. }) => write!(f, "In {} :\n{}", file, self.message),
       None => write!(f, "{}", self.message),
     }
   }
