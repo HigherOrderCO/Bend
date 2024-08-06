@@ -12,7 +12,7 @@ use crate::{
 use highlight_error::highlight_error;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use TSPL::Parser;
+use TSPL::{ParseError, Parser};
 
 type FunDefinition = super::Definition;
 type ImpDefinition = crate::imp::Definition;
@@ -97,7 +97,7 @@ impl ParseBook {
 // <Number>     ::= ([0-9]+ | "0x"[0-9a-fA-F]+ | "0b"[01]+)
 // <Operator>   ::= ( "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<<" | ">>" | "<" | ">" | "&" | "|" | "^" | "**" )
 
-pub type ParseResult<T> = std::result::Result<T, String>;
+pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
 pub struct TermParser<'i> {
   input: &'i str,
@@ -252,7 +252,8 @@ impl<'a> TermParser<'a> {
 
       let fields = self.list_like(parse_field, "", ")", "", false, 0)?;
       if let Some(field) = fields.find_repeated_names().into_iter().next() {
-        return Err(format!("Found a repeated field '{field}' in constructor {ctr_name}."));
+        let msg = format!("Found a repeated field '{field}' in constructor {ctr_name}.");
+        return self.expected_and("field", &msg)?;
       }
       Ok((ctr_name, fields))
     } else {
@@ -280,7 +281,7 @@ impl<'a> TermParser<'a> {
     Ok(def)
   }
 
-  fn parse_from_import(&mut self) -> Result<Import, String> {
+  fn parse_from_import(&mut self) -> ParseResult<Import> {
     // from path import package
     // from path import (a, b)
     // from path import *
@@ -302,7 +303,7 @@ impl<'a> TermParser<'a> {
     Ok(Import::new(path, ImportType::Single(import, alias), relative))
   }
 
-  fn parse_import(&mut self) -> Result<Vec<Import>, String> {
+  fn parse_import(&mut self) -> ParseResult<Vec<Import>> {
     // import path
     // import (path/a, path/b)
 
@@ -844,7 +845,7 @@ impl<'a> TermParser<'a> {
   /// Parses a tag where it may or may not be valid.
   ///
   /// If it is not valid, the returned callback can be used to issue an error.
-  fn parse_tag(&mut self) -> ParseResult<(Option<Tag>, impl FnOnce(&mut Self) -> Result<(), String>)> {
+  fn parse_tag(&mut self) -> ParseResult<(Option<Tag>, impl FnOnce(&mut Self) -> Result<(), ParseError>)> {
     let index = self.index;
     self.skip_trivia();
     let tag = if self.peek_one() == Some('#')
@@ -1008,7 +1009,8 @@ impl<'a> TermParser<'a> {
     } else {
       for ctr in adt.ctrs.keys() {
         if let Some(builtin) = book.contains_builtin_def(ctr) {
-          return Err(TermParser::redefinition_of_function_msg(builtin, ctr));
+          let msg = TermParser::redefinition_of_function_msg(builtin, ctr);
+          return self.expected_and("function", &msg);
         }
         match book.ctrs.entry(ctr.clone()) {
           indexmap::map::Entry::Vacant(e) => _ = e.insert(nam.clone()),
@@ -1091,6 +1093,15 @@ impl<'a> Parser<'a> for TermParser<'a> {
     let ini_idx = *self.index();
     let end_idx = *self.index() + 1;
     self.expected_spanned(exp, ini_idx..end_idx)
+  }
+
+  /// Generates an error message with an additional custom message.
+  ///
+  /// Override to have our own error message.
+  fn expected_and<T>(&mut self, exp: &str, msg: &str) -> ParseResult<T> {
+    let ini_idx = *self.index();
+    let end_idx = *self.index() + 1;
+    self.expected_spanned_and(exp, msg, ini_idx..end_idx)
   }
 
   /// Consumes an instance of the given string, erroring if it is not found.
@@ -1226,7 +1237,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
   }
 
-  fn parse_import_name(&mut self, label: &str) -> Result<(Name, Option<Name>, bool), String> {
+  fn parse_import_name(&mut self, label: &str) -> ParseResult<(Name, Option<Name>, bool)> {
     let (import, alias) = self.parse_name_maybe_alias(label)?;
     let relative = import.starts_with("./") | import.starts_with("../");
     Ok((import, alias, relative))
@@ -1331,10 +1342,21 @@ pub trait ParserCommons<'a>: Parser<'a> {
     self.with_ctx(Err(msg), span)
   }
 
+  fn expected_spanned_and<T>(&mut self, exp: &str, msg: &str, span: Range<usize>) -> ParseResult<T> {
+    let is_eof = self.is_eof();
+    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { Ok(()) });
+    let msg = format!(
+      "\x1b[1m- information:\x1b[0m {}\n\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}",
+      msg, exp, detected,
+    );
+    self.with_ctx(Err(msg), span)
+  }
+
   fn with_ctx<T>(&mut self, res: Result<T, impl std::fmt::Display>, span: Range<usize>) -> ParseResult<T> {
     res.map_err(|msg| {
       let ctx = highlight_error(span.start, span.end, self.input());
-      format!("{msg}\n{ctx}")
+      let msg = format!("{msg}\n{ctx}");
+      ParseError::new((span.start, span.end), msg)
     })
   }
 
@@ -1533,7 +1555,8 @@ pub trait ParserCommons<'a>: Parser<'a> {
     if next_is_hex || num_str.is_empty() {
       self.expected(format!("valid {radix} digit").as_str())
     } else {
-      u32::from_str_radix(&num_str, radix as u32).map_err(|e| e.to_string())
+      u32::from_str_radix(&num_str, radix as u32)
+        .map_err(|e| self.expected_and::<u64>("integer", &e.to_string()).unwrap_err())
     }
   }
 
@@ -1544,7 +1567,8 @@ pub trait ParserCommons<'a>: Parser<'a> {
     if next_is_hex || num_str.is_empty() {
       self.expected(format!("valid {radix} digit").as_str())
     } else {
-      u32::from_str_radix(&num_str, radix as u32).map_err(|e| e.to_string())
+      u32::from_str_radix(&num_str, radix as u32)
+        .map_err(|e| self.expected_and::<u64>("integer", &e.to_string()).unwrap_err())
     }
   }
 
@@ -1573,7 +1597,8 @@ pub trait ParserCommons<'a>: Parser<'a> {
       self.advance_one();
       let fra_str = self.take_while(|c| c.is_digit(radix as u32) || c == '_');
       let fra_str = fra_str.chars().filter(|c| *c != '_').collect::<String>();
-      let fra = u32::from_str_radix(&fra_str, radix as u32).map_err(|e| e.to_string())?;
+      let fra = u32::from_str_radix(&fra_str, radix as u32)
+        .map_err(|e| self.expected_and::<u64>("integer", &e.to_string()).unwrap_err())?;
       let fra = fra as f32 / (radix.to_f32()).powi(fra_str.len() as i32);
       Some(fra)
     } else {

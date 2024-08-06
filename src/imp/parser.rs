@@ -1080,7 +1080,8 @@ impl<'a> PyParser<'a> {
       fields = self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?;
     }
     if let Some(field) = fields.find_repeated_names().into_iter().next() {
-      return Err(format!("Found a repeated field '{field}' in constructor {ctr_name}."));
+      let msg = format!("Found a repeated field '{field}' in constructor {ctr_name}.");
+      return self.expected_and("field", &msg);
     }
     Ok(Variant { name: ctr_name, fields })
   }
@@ -1101,7 +1102,8 @@ impl<'a> PyParser<'a> {
       vec![]
     };
     if let Some(field) = fields.find_repeated_names().into_iter().next() {
-      return Err(format!("Found a repeated field '{field}' in object {name}."));
+      let msg = format!("Found a repeated field '{field}' in object {name}.");
+      return self.expected_and("field", &msg);
     }
     if !self.is_eof() {
       self.consume_new_line()?;

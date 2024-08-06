@@ -5,8 +5,7 @@ version = 3
 [[package]]
 name = "TSPL"
 version = "0.0.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52dfd6238b1461b99635b26585a85b4e7b9c786cc0481b3c540ae5f590b6dfb6"
+source = "git+https://github.com/HigherOrderCO/TSPL.git?branch=range-info#ae25a5f5e3a805e4ae8854b34b6f29954ec2b68f"
 dependencies = [
  "highlight_error",
 ]
@@ -192,9 +191,8 @@ checksum = "809e18805660d7b6b2e2b9f316a5099521b5998d5cba4dda11b5157a21aaef03"
 
 [[package]]
 name = "hvm"
-version = "2.0.19"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "281675413d2dd76cb1c53ec0d318bb672f5d70fb825929af6bcadd9b7f78c11b"
+version = "2.0.21"
+source = "git+https://github.com/higherorderco/hvm.git?branch=parser-update#01b795d8718cae14c7809316ac7b2acf459b0dba"
 dependencies = [
  "TSPL",
  "cc",

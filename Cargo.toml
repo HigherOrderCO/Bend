@@ -27,7 +27,7 @@ cli = ["dep:clap"]
 TSPL = "0.0.12"
 clap = { version = "4.4.1", features = ["derive"], optional = true }
 highlight_error = "0.1.1"
-hvm = "=2.0.19"
+hvm = "2.0.21"
 indexmap = "2.2.3"
 interner = "0.2.1"
 itertools = "0.11.0"
@@ -41,3 +41,7 @@ walkdir = "2.3.3"
 
 [profile.test]
 opt-level = 2
+
+[patch.crates-io]
+TSPL = { git = "https://github.com/HigherOrderCO/TSPL.git", branch = "range-info" }
+hvm = { git = "https://github.com/higherorderco/hvm.git", branch = "parser-update" }

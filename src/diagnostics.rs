@@ -1,3 +1,5 @@
+use TSPL::ParseError;
+
 use crate::fun::{display::DisplayFn, Name};
 use std::{
   collections::BTreeMap,
@@ -261,6 +263,18 @@ impl From<String> for Diagnostics {
       diagnostics: BTreeMap::from_iter([(
         DiagnosticOrigin::Book,
         vec![Diagnostic { message: value, severity: Severity::Error, range: None }],
+      )]),
+      ..Default::default()
+    }
+  }
+}
+
+impl From<ParseError> for Diagnostics {
+  fn from(value: ParseError) -> Self {
+    Self {
+      diagnostics: BTreeMap::from_iter([(
+        DiagnosticOrigin::Parsing,
+        vec![Diagnostic { message: value.into(), severity: Severity::Error, range: None }],
       )]),
       ..Default::default()
     }
