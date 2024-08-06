@@ -302,14 +302,14 @@ impl Reader<'_> {
         hvm::hvm::OP_GT => Op::GT,
         hvm::hvm::OP_AND => {
           if typ == hvm::hvm::TY_F24 {
-            Op::ATN
+            todo!("Implement readback of atan2")
           } else {
             Op::AND
           }
         }
         hvm::hvm::OP_OR => {
           if typ == hvm::hvm::TY_F24 {
-            Op::LOG
+            todo!("Implement readback of log")
           } else {
             Op::OR
           }
