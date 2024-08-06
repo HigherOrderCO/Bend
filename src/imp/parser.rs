@@ -1383,8 +1383,6 @@ impl Op {
       Op::DIV => 7,
       Op::REM => 7,
       Op::POW => 8,
-      Op::ATN => todo!(),
-      Op::LOG => todo!(),
     }
   }
 

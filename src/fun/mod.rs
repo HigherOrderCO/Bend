@@ -259,10 +259,6 @@ pub enum Op {
   XOR,
   SHL,
   SHR,
-  /// atan(a, b)
-  ATN,
-  /// log_a(b)
-  LOG,
   // a^b
   POW,
   /// Less than or equal
