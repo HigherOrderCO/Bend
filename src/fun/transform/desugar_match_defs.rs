@@ -25,7 +25,7 @@ impl Ctx<'_> {
           | DesugarMatchDefErr::NumMissingDefault
           | DesugarMatchDefErr::TypeMismatch { .. } => self.info.add_rule_error(err, def_name.clone()),
           DesugarMatchDefErr::RepeatedBind { .. } => {
-            self.info.add_rule_warning(err, WarningType::RepeatedBind, def_name.clone())
+            self.info.add_rule_warning(err, WarningType::RepeatedBind, def_name.clone(), None)
           }
         }
       }

@@ -1,5 +1,5 @@
 use crate::{
-  diagnostics::WarningType,
+  diagnostics::{FileSpan, WarningType},
   fun::{Book, Ctx, Name, Source, Term},
   maybe_grow,
 };
@@ -78,7 +78,11 @@ impl Ctx<'_> {
             if prune_all {
               rm_def(self.book, &def);
             } else if !def.is_generated() && !matches!(src, Source::Generated) {
-              self.info.add_rule_warning("Definition is unused.", WarningType::UnusedDefinition, def);
+              let span = match src {
+                Source::Local(span) => Some(FileSpan::new(span, "TODO")),
+                _ => None,
+              };
+              self.info.add_rule_warning("Definition is unused.", WarningType::UnusedDefinition, def, span);
             }
           }
           Used::Ctr => {

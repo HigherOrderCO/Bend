@@ -3,7 +3,7 @@ use super::{
   Book, Name,
 };
 use crate::{
-  diagnostics::{Diagnostics, DiagnosticsConfig, FileSpan, TextLocation, TextSpan},
+  diagnostics::{Diagnostics, DiagnosticsConfig, FileSpan, TextSpan},
   imports::PackageLoader,
 };
 use std::path::Path;
@@ -43,7 +43,7 @@ pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<P
   book.source = Name::new(origin.to_string_lossy());
   TermParser::new(code).parse_book(book, false).map_err(|err| {
     let mut diagnostics = Diagnostics::default();
-    let span = byte_span_to_line(code, err.span);
+    let span = TextSpan::from_byte_span(code, err.span);
     diagnostics.add_parsing_error(err, FileSpan { span, file: origin.to_string_lossy().into() });
     diagnostics
   })
@@ -51,40 +51,4 @@ pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<P
 
 pub fn do_parse_book_default(code: &str, origin: &Path) -> Result<Book, Diagnostics> {
   do_parse_book(code, origin, ParseBook::builtins())?.to_fun()
-}
-
-fn byte_span_to_line(code: &str, span: (usize, usize)) -> TextSpan {
-  // Will loop for way too long otherwise
-  assert!(span.0 <= span.1);
-
-  let code = code.as_bytes();
-  let mut start_line = 0;
-  let mut start_char = 0;
-  let mut end_line;
-  let mut end_char;
-
-  let mut curr_idx = 0;
-  while curr_idx < span.0 && curr_idx < code.len() {
-    if code[curr_idx] == b'\n' {
-      start_line += 1;
-      start_char = 0;
-    } else {
-      start_char += 1;
-    }
-    curr_idx += 1;
-  }
-
-  end_line = start_line;
-  end_char = start_char;
-  while curr_idx < span.1 && curr_idx < code.len() {
-    if code[curr_idx] == b'\n' {
-      end_line += 1;
-      end_char = 0;
-    } else {
-      end_char += 1;
-    }
-    curr_idx += 1;
-  }
-
-  (TextLocation { line: start_line, char: start_char }, TextLocation { line: end_line, char: end_char })
 }

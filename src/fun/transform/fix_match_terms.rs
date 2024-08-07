@@ -54,13 +54,13 @@ impl Ctx<'_> {
               self.info.add_rule_error(err, def.name.clone())
             }
             FixMatchErr::IrrefutableMatch { .. } => {
-              self.info.add_rule_warning(err, WarningType::IrrefutableMatch, def.name.clone())
+              self.info.add_rule_warning(err, WarningType::IrrefutableMatch, def.name.clone(), None)
             }
             FixMatchErr::UnreachableMatchArms { .. } => {
-              self.info.add_rule_warning(err, WarningType::UnreachableMatch, def.name.clone())
+              self.info.add_rule_warning(err, WarningType::UnreachableMatch, def.name.clone(), None)
             }
             FixMatchErr::RedundantArm { .. } => {
-              self.info.add_rule_warning(err, WarningType::RedundantMatch, def.name.clone())
+              self.info.add_rule_warning(err, WarningType::RedundantMatch, def.name.clone(), None)
             }
           }
         }

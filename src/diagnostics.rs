@@ -28,21 +28,6 @@ pub struct DiagnosticsConfig {
   pub import_shadow: Severity,
 }
 
-#[derive(Debug, Copy, Clone, Hash)]
-pub struct TextLocation {
-  pub line: usize,
-  pub char: usize,
-}
-
-pub type TextSpan = (TextLocation, TextLocation);
-
-#[derive(Debug, Clone, Hash)]
-pub struct FileSpan {
-  pub span: TextSpan,
-  // Storing files as Strings, could be done as file IDs in the future
-  pub file: String,
-}
-
 #[derive(Debug, Clone)]
 pub struct Diagnostic {
   pub message: String,
@@ -113,12 +98,18 @@ impl Diagnostics {
     self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Inet(def_name), None);
   }
 
-  pub fn add_rule_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType, def_name: Name) {
+  pub fn add_rule_warning(
+    &mut self,
+    warn: impl std::fmt::Display,
+    warn_type: WarningType,
+    def_name: Name,
+    span: Option<FileSpan>,
+  ) {
     let severity = self.config.warning_severity(warn_type);
     if severity == Severity::Error {
       self.err_counter += 1;
     }
-    self.add_diagnostic(warn, severity, DiagnosticOrigin::Rule(def_name.def_name_from_generated()), None);
+    self.add_diagnostic(warn, severity, DiagnosticOrigin::Rule(def_name.def_name_from_generated()), span);
   }
 
   pub fn add_book_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType) {
@@ -328,5 +319,96 @@ impl Display for Diagnostic {
       Some(FileSpan { file, .. }) => write!(f, "In {} :\n{}", file, self.message),
       None => write!(f, "{}", self.message),
     }
+  }
+}
+
+#[derive(Debug, Copy, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
+pub struct TextLocation {
+  pub line: usize,
+  pub char: usize,
+}
+
+impl TextLocation {
+  pub fn new(line: usize, char: usize) -> Self {
+    TextLocation { line, char }
+  }
+
+  pub fn from_byte_loc(code: &str, loc: usize) -> Self {
+    let code = code.as_bytes();
+    let mut line = 0;
+    let mut char = 0;
+    let mut curr_idx = 0;
+    while curr_idx < loc && curr_idx < code.len() {
+      if code[curr_idx] == b'\n' {
+        line += 1;
+        char = 0;
+      } else {
+        char += 1;
+      }
+      curr_idx += 1;
+    }
+
+    TextLocation { line, char }
+  }
+}
+
+#[derive(Debug, Copy, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
+pub struct TextSpan {
+  pub start: TextLocation,
+  pub end: TextLocation,
+}
+
+impl TextSpan {
+  pub fn new(start: TextLocation, end: TextLocation) -> Self {
+    TextSpan { start, end }
+  }
+
+  pub fn from_byte_span(code: &str, span: (usize, usize)) -> Self {
+    // Will loop for way too long otherwise
+    assert!(span.0 <= span.1);
+
+    let code = code.as_bytes();
+    let mut start_line = 0;
+    let mut start_char = 0;
+    let mut end_line;
+    let mut end_char;
+
+    let mut curr_idx = 0;
+    while curr_idx < span.0 && curr_idx < code.len() {
+      if code[curr_idx] == b'\n' {
+        start_line += 1;
+        start_char = 0;
+      } else {
+        start_char += 1;
+      }
+      curr_idx += 1;
+    }
+
+    end_line = start_line;
+    end_char = start_char;
+    while curr_idx < span.1 && curr_idx < code.len() {
+      if code[curr_idx] == b'\n' {
+        end_line += 1;
+        end_char = 0;
+      } else {
+        end_char += 1;
+      }
+      curr_idx += 1;
+    }
+
+    TextSpan::new(TextLocation::new(start_line, start_char), TextLocation::new(end_line, end_char))
+  }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
+pub struct FileSpan {
+  pub span: TextSpan,
+  // Storing files as Strings, could be done as file IDs in the future
+  pub file: String,
+}
+
+impl FileSpan {
+  pub fn new(span: TextSpan, origin: &str) -> Self {
+    FileSpan { span, file: origin.into() }
   }
 }
