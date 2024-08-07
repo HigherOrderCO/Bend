@@ -76,9 +76,19 @@ String/split s delim = (String/split.go s delim (List/Cons String/Nil List/Nil))
 # Create a new difference list
 DiffList/new = λx x
 
+# DiffList/wrap(head: T) -> (List(T) -> List(T)
+# Creates a new difference list with just the given value.
+def DiffList/wrap(head):
+  return lambda tail: List/Cons(head, tail)
+
 # DiffList/append(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T))
 # Append a value to the end of the difference list
 DiffList/append diff val = λx (diff (List/Cons val x))
+
+# DiffList/append(left: List(T) -> List(T), right: List(T) -> List(T)) -> (List(T) -> List(T))
+# Concatenates two difference lists.
+def DiffList/concat(left, right):
+  return lambda x: left(right(x))
 
 # DiffList/cons(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T))
 # Append a value to the beginning of the difference list
@@ -96,7 +106,22 @@ type Tree:
   Node { ~left, ~right }
   Leaf { value }
 
+# Returns a List converted from a Tree.
+def Tree/to_list(tree):
+  fold tree:
+    case Tree/Leaf:
+      list = DiffList/wrap(tree.value)
+    case Tree/Node:
+      list = DiffList/concat(tree.left, tree.right)
+  return DiffList/to_list(list)
 
+# Reverses a tree swapping right and left leaves.
+def Tree/reverse(tree):
+  fold tree:
+    case Tree/Leaf:
+      return !tree.value
+    case Tree/Node:
+      return ![tree.right, tree.left]
 # MAP Impl
 
 type Map = (Node value ~left ~right) | (Leaf)
@@ -217,11 +242,11 @@ IO/FS/STDOUT = 1
 IO/FS/STDERR = 2
 
 ### Seek modes
-# Seek from start of file
+# Seek from start of file.
 IO/FS/SEEK_SET = +0
-# Seek from current position
+# Seek from current position.
 IO/FS/SEEK_CUR = +1
-# Seek from end of file
+# Seek from end of file.
 IO/FS/SEEK_END = +2
 
 ### File utilities
