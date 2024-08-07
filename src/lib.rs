@@ -73,7 +73,7 @@ pub fn compile_book(
   }
 
   if opts.check_net_size {
-    check_net_sizes(&hvm_book, &mut diagnostics, &opts)?;
+    check_net_sizes(&hvm_book, &mut diagnostics, &opts.target_architecture)?;
   }
 
   add_recursive_priority(&mut hvm_book);
@@ -330,9 +330,16 @@ impl OptLevel {
 }
 
 #[derive(Clone, Debug)]
+pub enum CompilerTarget {
+  C,
+  Cuda,
+  Unknown,
+}
+
+#[derive(Clone, Debug)]
 pub struct CompileOpts {
-  /// The Bend command
-  pub command: String,
+  /// The Compiler target architecture
+  pub target_architecture: CompilerTarget,
 
   /// Enables [hvm::eta_reduce].
   pub eta: bool,
@@ -364,7 +371,7 @@ impl CompileOpts {
   #[must_use]
   pub fn set_all(self) -> Self {
     Self {
-      command: self.command,
+      target_architecture: self.target_architecture,
       eta: true,
       prune: true,
       float_combinators: true,
@@ -380,7 +387,7 @@ impl CompileOpts {
   #[must_use]
   pub fn set_no_all(self) -> Self {
     Self {
-      command: self.command,
+      target_architecture: self.target_architecture,
       eta: false,
       prune: false,
       linearize_matches: OptLevel::Disabled,
@@ -411,7 +418,7 @@ impl Default for CompileOpts {
   /// Uses num-scott ADT encoding.
   fn default() -> Self {
     Self {
-      command: String::from("run"),
+      target_architecture: CompilerTarget::Cuda,
       eta: true,
       prune: false,
       linearize_matches: OptLevel::Enabled,

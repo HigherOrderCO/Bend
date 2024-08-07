@@ -4,7 +4,7 @@ use bend::{
   fun::{Book, Name},
   hvm::hvm_book_show_pretty,
   imports::DefaultLoader,
-  load_file_to_book, run_book, AdtEncoding, CompileOpts, OptLevel, RunOpts,
+  load_file_to_book, run_book, AdtEncoding, CompileOpts, CompilerTarget, OptLevel, RunOpts,
 };
 use clap::{Args, CommandFactory, Parser, Subcommand};
 use std::{
@@ -190,13 +190,10 @@ pub enum OptArgs {
   AdtNumScott,
 }
 
-fn compile_opts_from_cli(args: &Vec<OptArgs>, cmd: Option<&str>) -> CompileOpts {
+fn compile_opts_from_cli(args: &Vec<OptArgs>, compiler_target: CompilerTarget) -> CompileOpts {
   use OptArgs::*;
   let mut opts = CompileOpts::default();
-
-  if let Some(cmd) = cmd {
-    opts.command = cmd.to_string();
-  }
+  opts.target_architecture = compiler_target;
 
   for arg in args {
     match arg {
@@ -292,10 +289,18 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
     _ => "run-c",
   };
 
+  let compiler_target = match &cli.mode {
+    Mode::RunC(..) => CompilerTarget::C,
+    Mode::GenC(..) => CompilerTarget::C,
+    Mode::RunCu(..) => CompilerTarget::Cuda,
+    Mode::GenCu(..) => CompilerTarget::Cuda,
+    _ => CompilerTarget::Unknown,
+  };
+
   match cli.mode {
     Mode::Check { comp_opts, warn_opts, path } => {
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
-      let compile_opts = compile_opts_from_cli(&comp_opts, None);
+      let compile_opts = compile_opts_from_cli(&comp_opts, compiler_target);
 
       let mut book = load_book(&path, diagnostics_cfg)?;
       let diagnostics = check_book(&mut book, diagnostics_cfg, compile_opts)?;
@@ -304,7 +309,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
 
     Mode::GenHvm(GenArgs { comp_opts, warn_opts, path, .. }) => {
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
-      let opts = compile_opts_from_cli(&comp_opts, Some("gen-hvm"));
+      let opts = compile_opts_from_cli(&comp_opts, compiler_target);
 
       let mut book = load_book(&path, diagnostics_cfg)?;
       let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
@@ -321,7 +326,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
       let diagnostics_cfg =
         set_warning_cfg_from_cli(DiagnosticsConfig::new(Severity::Allow, arg_verbose), warn_opts);
 
-      let compile_opts = compile_opts_from_cli(&comp_opts, Some(run_cmd));
+      let compile_opts = compile_opts_from_cli(&comp_opts, compiler_target);
 
       compile_opts.check_for_strict();
 
@@ -346,7 +351,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
     Mode::GenC(GenArgs { comp_opts, warn_opts, path })
     | Mode::GenCu(GenArgs { comp_opts, warn_opts, path }) => {
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
-      let opts = compile_opts_from_cli(&comp_opts, Some(gen_cmd));
+      let opts = compile_opts_from_cli(&comp_opts, compiler_target);
 
       let mut book = load_book(&path, diagnostics_cfg)?;
       let compile_res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
@@ -377,7 +382,7 @@ fn execute_cli_mode(mut cli: Cli) -> Result<(), Diagnostics> {
     Mode::Desugar { path, comp_opts, warn_opts, pretty } => {
       let diagnostics_cfg = set_warning_cfg_from_cli(DiagnosticsConfig::default(), warn_opts);
 
-      let opts = compile_opts_from_cli(&comp_opts, None);
+      let opts = compile_opts_from_cli(&comp_opts, compiler_target);
 
       let mut book = load_book(&path, diagnostics_cfg)?;
       let diagnostics = desugar_book(&mut book, opts, diagnostics_cfg, None)?;
