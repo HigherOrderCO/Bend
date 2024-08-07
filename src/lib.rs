@@ -35,7 +35,7 @@ pub fn check_book(
   compile_opts: CompileOpts,
 ) -> Result<Diagnostics, Diagnostics> {
   // TODO: Do the checks without having to do full compilation
-  let res = compile_book(book, compile_opts, diagnostics_cfg, None, None)?;
+  let res = compile_book(book, compile_opts, diagnostics_cfg, None)?;
   Ok(res.diagnostics)
 }
 
@@ -44,7 +44,6 @@ pub fn compile_book(
   opts: CompileOpts,
   diagnostics_cfg: DiagnosticsConfig,
   args: Option<Vec<Term>>,
-  cmd: Option<&str>,
 ) -> Result<CompileResult, Diagnostics> {
   let mut diagnostics = desugar_book(book, opts.clone(), diagnostics_cfg, args)?;
 
@@ -73,8 +72,8 @@ pub fn compile_book(
     prune_hvm_book(&mut hvm_book, &prune_entrypoints);
   }
 
-  if opts.check_net_size && cmd.is_some() {
-    check_net_sizes(&hvm_book, &mut diagnostics, cmd.unwrap())?;
+  if opts.check_net_size {
+    check_net_sizes(&hvm_book, &mut diagnostics, &opts)?;
   }
 
   add_recursive_priority(&mut hvm_book);
@@ -175,7 +174,7 @@ pub fn run_book(
   cmd: &str,
 ) -> Result<Option<(Term, String, Diagnostics)>, Diagnostics> {
   let CompileResult { hvm_book: core_book, labels, diagnostics } =
-    compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args, Some(cmd))?;
+    compile_book(&mut book, compile_opts.clone(), diagnostics_cfg, args)?;
 
   // TODO: Printing should be taken care by the cli module, but we'd
   // like to print any warnings before running so that the user can
@@ -332,6 +331,9 @@ impl OptLevel {
 
 #[derive(Clone, Debug)]
 pub struct CompileOpts {
+  /// The Bend command
+  pub command: String,
+
   /// Enables [hvm::eta_reduce].
   pub eta: bool,
 
@@ -362,6 +364,7 @@ impl CompileOpts {
   #[must_use]
   pub fn set_all(self) -> Self {
     Self {
+      command: self.command,
       eta: true,
       prune: true,
       float_combinators: true,
@@ -377,6 +380,7 @@ impl CompileOpts {
   #[must_use]
   pub fn set_no_all(self) -> Self {
     Self {
+      command: self.command,
       eta: false,
       prune: false,
       linearize_matches: OptLevel::Disabled,
@@ -407,6 +411,7 @@ impl Default for CompileOpts {
   /// Uses num-scott ADT encoding.
   fn default() -> Self {
     Self {
+      command: String::from("run"),
       eta: true,
       prune: false,
       linearize_matches: OptLevel::Enabled,

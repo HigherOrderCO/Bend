@@ -1,12 +1,16 @@
 use super::tree_children;
-use crate::{diagnostics::Diagnostics, fun::Name};
+use crate::{diagnostics::Diagnostics, fun::Name, CompileOpts};
 use hvm::ast::{Book, Net, Tree};
 
 pub const MAX_NET_SIZE_C: usize = 4095;
 pub const MAX_NET_SIZE_CUDA: usize = 64;
 
-pub fn check_net_sizes(book: &Book, diagnostics: &mut Diagnostics, cmd: &str) -> Result<(), Diagnostics> {
-  let net_size_bound = match cmd {
+pub fn check_net_sizes(
+  book: &Book,
+  diagnostics: &mut Diagnostics,
+  opts: &CompileOpts,
+) -> Result<(), Diagnostics> {
+  let net_size_bound = match opts.command.as_str() {
     "run-cu" | "gen-cu" | "gen-hvm" => MAX_NET_SIZE_CUDA,
     _ => MAX_NET_SIZE_C,
   };
