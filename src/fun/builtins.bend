@@ -92,6 +92,11 @@ type Nat = (Succ ~pred) | (Zero)
 
 type Result = (Ok val) | (Err val)
 
+Result/unwrap res = match res {
+  Result/Ok: res.val;
+  Result/Err: res.val;
+}
+
 type Tree:
   Node { ~left, ~right }
   Leaf { value }
@@ -189,7 +194,10 @@ IO/done_on_err done = done
 
 ## Time and sleep
 # Returns a monotonically increasing nanosecond timestamp as an u48 encoded as a pair of u24s.
-IO/get_time = (IO/Call IO/MAGIC "GET_TIME" * @x (IO/Done IO/MAGIC x))
+IO/get_time = with IO {
+    ask res = (IO/Call IO/MAGIC "GET_TIME" * @x (IO/Done IO/MAGIC x))
+    (wrap (Result/unwrap res))
+  }
 
 # Sleeps for the given number of nanoseconds, given by an u48 encoded as a pair of u24s.
 IO/nanosleep hi_lo = (IO/Call IO/MAGIC "SLEEP" hi_lo @x (IO/Done IO/MAGIC x))
@@ -199,7 +207,9 @@ def IO/sleep(seconds):
   nanos = seconds * 1_000_000_000.0
   lo = to_u24(nanos % 0x1_000_000.0)
   hi = to_u24(nanos / 0x1_000_000.0)
-  return IO/nanosleep((hi, lo))
+  with IO:
+    res <- IO/nanosleep((hi, lo))
+    return wrap(Result/unwrap(res))
 
 ## File IO
 
@@ -296,7 +306,10 @@ def IO/FS/write_file(path, bytes):
 
 # IO/print(text: String) -> (IO *)
 # Prints a string to stdout, encoding it with utf-8.
-IO/print text = (IO/FS/write IO/FS/STDOUT (String/encode_utf8 text))
+IO/print text = with IO {
+    ask res = (IO/FS/write IO/FS/STDOUT (String/encode_utf8 text))
+    (wrap (Result/unwrap res))
+  }
 
 # IO/input() -> IO String
 # Read characters from stdin until a newline is found.
