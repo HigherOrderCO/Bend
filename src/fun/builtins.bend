@@ -159,6 +159,11 @@ type IO:
   Done { magic, expr }
   Call { magic, func, argm, cont }
 
+type IOError:
+  Type
+  Name
+  Inner { value }
+
 def IO/MAGIC:
   return (0xD0CA11, 0xFF1FF1)
 
@@ -175,6 +180,12 @@ def IO/bind(a, b):
 
 def call(func, argm):
   return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
+
+IO/done_on_err (IO/Call magic func argm cont) = (IO/Call magic func argm @res match res {
+  Result/Ok: (cont res.val)
+  Result/Err: (IO/Done IO/MAGIC (Result/Err res.val))
+})
+IO/done_on_err done = done
 
 ## Time and sleep
 # Returns a monotonically increasing nanosecond timestamp as an u48 encoded as a pair of u24s.
@@ -230,9 +241,9 @@ IO/FS/SEEK_END = +2
 # Reads an entire file, returning a list of bytes.
 def IO/FS/read_file(path):
   with IO:
-    fd <- IO/FS/open(path, "r")
+    fd <- IO/done_on_err(IO/FS/open(path, "r"))
     bytes <- IO/FS/read_to_end(fd)
-    * <- IO/FS/close(fd)
+    * <- IO/done_on_err(IO/FS/close(fd))
     return wrap(bytes)
 
 # IO/FS/read_to_end(fd: u24) -> (IO (List u24))
@@ -243,7 +254,7 @@ def IO/FS/read_to_end(fd):
 def IO/FS/read_to_end.read_chunks(fd, chunks):
   with IO:
     # Read file in 1MB chunks
-    chunk <- IO/FS/read(fd, 1048576)
+    chunk <- IO/done_on_err(IO/FS/read(fd, 1048576))
     match chunk:
       case List/Nil:
         return wrap(List/flatten(chunks))
@@ -258,7 +269,7 @@ def IO/FS/read_line(fd):
 def IO/FS/read_line.read_chunks(fd, chunks):
   with IO:
     # Read line in 1kB chunks
-    chunk <- IO/FS/read(fd, 1024)
+    chunk <- IO/done_on_err(IO/FS/read(fd, 1024))
     match res = List/split_once(chunk, '\n'):
       case Result/Ok:
         (line, rest) = res.val
@@ -276,9 +287,9 @@ def IO/FS/read_line.read_chunks(fd, chunks):
 # Writes a list of bytes to a file given by a path.
 def IO/FS/write_file(path, bytes):
   with IO:
-    f <- IO/FS/open(path, "w")
-    * <- IO/FS/write(f, bytes)
-    * <- IO/FS/close(f)
+    f <- IO/done_on_err(IO/FS/open(path, "w"))
+    * <- IO/done_on_err(IO/FS/write(f, bytes))
+    * <- IO/done_on_err(IO/FS/close(f))
     return wrap(bytes)
 
 ### Standard input and output utilities
@@ -294,7 +305,7 @@ IO/input = (IO/input.go DiffList/new)
 def IO/input.go(acc):
   # TODO: This is slow and inefficient, should be done in hvm using fgets.
   with IO:
-    byte <- IO/FS/read(IO/FS/STDIN, 1)
+    byte <- IO/done_on_err(IO/FS/read(IO/FS/STDIN, 1))
     match byte:
       case List/Nil:
         # Nothing read, try again (to simulate blocking a read)
