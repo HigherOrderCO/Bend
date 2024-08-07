@@ -130,6 +130,8 @@ type Result<A, B>:
 
 Returns the inner value of `Result/Ok` or `Result/Err`.
 
+If the types `A` and `B` are different, should only be used in type unsafe programs or when only one variant is guaranteed to happen.
+
 ```python
 def Result/unwrap(result: Result<A, B>): A || B
 ```
