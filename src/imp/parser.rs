@@ -496,10 +496,15 @@ impl<'a> PyParser<'a> {
       let val = self.parse_expr(true, true)?;
       self.skip_trivia_inline()?;
       self.try_consume_exactly(";");
-      self.consume_indent_exactly(*indent)?;
-      let (nxt, nxt_indent) = self.parse_statement(indent)?;
-      let stmt = Stmt::Ask { pat, val: Box::new(val), nxt: Box::new(nxt) };
-      return Ok((stmt, nxt_indent));
+      let nxt_indent = self.advance_newlines()?;
+      if nxt_indent == *indent {
+        let (nxt, nxt_indent) = self.parse_statement(indent)?;
+        let stmt = Stmt::Ask { pat, val: Box::new(val), nxt: Some(Box::new(nxt)) };
+        return Ok((stmt, nxt_indent));
+      } else {
+        let stmt = Stmt::Ask { pat, val: Box::new(val), nxt: None };
+        return Ok((stmt, nxt_indent));
+      }
     }
     // In-place
 

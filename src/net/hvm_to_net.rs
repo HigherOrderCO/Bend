@@ -23,7 +23,8 @@ fn hvm_to_inodes(net: &Net) -> INodes {
 
   // Convert all the trees forming active pairs.
   for (i, (_, tree1, tree2)) in net.rbag.iter().enumerate() {
-    let tree_root = format!("a{i}");
+    // This name cannot appear anywhere in the original net
+    let tree_root = format!("%a{i}");
     let mut tree1 = tree_to_inodes(tree1, tree_root.clone(), net_root, &mut n_vars);
     inodes.append(&mut tree1);
     let mut tree2 = tree_to_inodes(tree2, tree_root, net_root, &mut n_vars);
@@ -33,7 +34,8 @@ fn hvm_to_inodes(net: &Net) -> INodes {
 }
 
 fn new_var(n_vars: &mut NodeId) -> String {
-  let new_var = format!("x{n_vars}");
+  // This name cannot appear anywhere in the original net
+  let new_var = format!("%x{n_vars}");
   *n_vars += 1;
   new_var
 }
@@ -46,7 +48,6 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
     n_vars: &mut NodeId,
   ) -> String {
     if let Tree::Var { nam } = subtree {
-      //
       if nam == net_root {
         "_".to_string()
       } else {

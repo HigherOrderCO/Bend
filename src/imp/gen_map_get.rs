@@ -37,7 +37,9 @@ impl Stmt {
         }
       }
       Stmt::Ask { pat: _, val, nxt } => {
-        nxt.gen_map_get(id);
+        if let Some(nxt) = nxt {
+          nxt.gen_map_get(id);
+        }
         let substitutions = val.substitute_map_gets(id);
         if !substitutions.is_empty() {
           *self = gen_get(self, substitutions);

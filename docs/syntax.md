@@ -580,6 +580,18 @@ Currently, the 3 number types cannot be mixed.
 | Bitwise Or            | x \| y   | int, uint        |
 | Bitwise Xor           | x ^ y    | int, uint        |
 
+Hexadecimal and binary floating-point literals are also supported.
+
+In these representations, each digit after the point is divided according to the base’s power of the digit's position.
+Specifically, for hexadecimal floating-point numbers, each place after the dot represents a fraction of 16 to the power of the digit's depth.
+Similarly, for binary floating-point numbers, each place after the dot represents a fraction of 2 to the power of the digit's depth.
+
+```python
+0xA.A == 10.625
+
+0b111.111 == 7.875
+```
+
 ### Constructor Literals
 
 Constructors are just functions.
@@ -1093,7 +1105,7 @@ Result/wrap x = (Result/Ok x)
 with Result {
   ask x = (some_operation ...)
   ask y = (some_operation ...)
-  wrap(x * y)
+  (wrap (* x y))
 }
 ```
 
@@ -1140,6 +1152,18 @@ Currently, the 3 number types cannot be mixed.
 | Bitwise And           | (& x y)    | int, uint        |
 | Bitwise Or            | (\| x y)   | int, uint        |
 | Bitwise Xor           | (^ x y)    | int, uint        |
+
+Hexadecimal and binary floating-point literals are also supported.
+
+In these representations, each digit after the point is divided according to the base’s power of the digit's position.
+Specifically, for hexadecimal floating-point numbers, each place after the dot represents a fraction of 16 to the negative power of the digit's depth.
+Similarly, for binary floating-point numbers, each place after the dot represents a fraction of 2 to the negative power of the digit's depth.
+
+```python
+(== 0xA.A 10.625)
+
+(== 0b111.111 7.875)
+```
 
 ### Character Literal
 
@@ -1240,14 +1264,17 @@ changed or optimized by the compiler.
 # Import Syntax
 
 ### Import Relative to the File
+
 Paths starting with `./` or `../` are imported relative to the file.
 
 ### Import Relative to the Main Folder
+
 Paths that do not start with `./` or `../` are relative to the folder of the main file.
 
 ## Syntax
 
 ### Import Specific Names from a File, or Files from a Folder
+
 ```py
 from path import name
 from path import (name1, name2)
@@ -1255,11 +1282,13 @@ import (path/name1, path/name2)
 ```
 
 ### Import All Names from a File, or All Files from a Folder
+
 ```py
 from path import *
 ```
 
 ### Aliasing Imports
+
 ```py
 from path import name as alias
 from path import (name1 as Alias1, name2 as Alias2)
