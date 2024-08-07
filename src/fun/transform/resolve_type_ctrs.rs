@@ -7,7 +7,7 @@ use crate::{
 };
 
 impl Ctx<'_> {
-  /// Resolves type constructors in the book and adds for alls for the free type vars.
+  /// Resolves type constructors in the book and adds for-alls for the free type vars.
   pub fn resolve_type_ctrs(&mut self) -> Result<(), Diagnostics> {
     for def in self.book.defs.values_mut() {
       let mut free_vars = Default::default();

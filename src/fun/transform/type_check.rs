@@ -374,7 +374,7 @@ fn ctr_to_kindc(ctr_nam: &Name, adt: &Adt, counter: &mut u64, book: &mut KindCBo
     typ: Box::new(KT::Set),
     bod: Box::new(typ),
   });
-  let term = KT::Ann { chk: true, bod: Box::new(term), typ: Box::new(typ) };
+  let term = KT::Ann { chk: false, bod: Box::new(term), typ: Box::new(typ) };
   book.insert(src, (ctr_nam.to_string(), term));
 }
 
@@ -425,7 +425,7 @@ fn adt_to_kindc(adt: &Adt, counter: &mut u64, book: &mut KindCBook) {
     bod: Box::new(typ),
   });
 
-  let term = KT::Ann { chk: true, bod: Box::new(term), typ: Box::new(typ) };
+  let term = KT::Ann { chk: false, bod: Box::new(term), typ: Box::new(typ) };
   book.insert(src, (adt.name.to_string(), term));
 }
 
@@ -695,7 +695,7 @@ impl Type {
       Type::Tup(els) => els.iter().fold(KT::Ref { nam: format!("kindc__tup{}", els.len()) }, |typ, el| {
         KT::App { fun: Box::new(typ), arg: Box::new(el.to_kindc(counter, src)) }
       }),
-      Type::None => KT::Ref { nam: "None".to_string() },
+      Type::None => KT::Ref { nam: "kindc__none".to_string() },
     });
     KT::Src { src, bod: Box::new(kt) }
   }

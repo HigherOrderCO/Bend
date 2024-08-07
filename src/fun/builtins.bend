@@ -180,7 +180,7 @@ def IO/MAGIC -> (u24, u24):
 def IO/wrap(x: T) -> IO(T):
   return IO/Done(IO/MAGIC, x)
 
-def IO/bind(a: IO(A), b: A -> IO(B)) -> IO(B):
+def IO/bind(a: IO(A), b: (id -> id) -> A -> IO(B)) -> IO(B):
   match a:
     case IO/Done:
       b = undefer(b)
