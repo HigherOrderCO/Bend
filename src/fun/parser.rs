@@ -759,6 +759,11 @@ impl<'a> TermParser<'a> {
         let typ = self.parse_name()?;
         self.consume("{")?;
         let bod = self.parse_term()?;
+        let bod = Term::Use {
+          nam: Some(Name::new("wrap")),
+          val: Box::new(Term::Var { nam: Name::new(format!("{typ}/wrap")) }),
+          nxt: Box::new(bod),
+        };
         self.consume("}")?;
         return Ok(Term::With { typ: Name::new(typ), bod: Box::new(bod) });
       }

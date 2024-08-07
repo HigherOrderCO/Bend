@@ -10,7 +10,7 @@ input_file: tests/golden_tests/desugar_file/ask_branch.bend
 
 (IO/bind) = λa λb (a IO/bind__C2 b)
 
-(main) = (IO/bind (Bool/T λa switch a { 0: (IO/wrap 0); _: λ* (IO/wrap 0); }) λb (b λc λd (c d) IO/wrap))
+(main) = (IO/bind (Bool/T λa switch a { 0: (IO/wrap 0); _: λ* (IO/wrap 0); }) λb (b λc (IO/wrap c)))
 
 (IO/Done) = λa λb λc (c IO/Done/tag a b)
 

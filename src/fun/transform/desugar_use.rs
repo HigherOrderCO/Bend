@@ -13,6 +13,8 @@ impl Book {
   ///
   /// // Transforms to:
   /// (λx x λx x λx x)
+  ///
+  /// Should only be used after `make_var_names_unique`.
   /// ```
   pub fn desugar_use(&mut self) {
     for def in self.defs.values_mut() {
