@@ -236,6 +236,77 @@ impl Diagnostics {
       Ok(())
     })
   }
+
+  //   pub fn display_with_severity<'a>(
+  //     &'a self,
+  //     severity: Severity,
+  //     origin: &'a DiagnosticOrigin,
+  //   ) -> impl std::fmt::Display + '_ {
+  //     DisplayFn(move |f| {
+  //       fn filter<'a>(
+  //         errs: impl IntoIterator<Item = &'a Diagnostic>,
+  //         severity: Severity,
+  //       ) -> impl Iterator<Item = &'a Diagnostic> {
+  //         errs.into_iter().filter(move |err| err.severity == severity)
+  //       }
+
+  //       let mut has_msg = false;
+  //       if let Some(errs) = self.diagnostics.get(&origin) {
+  //         let mut errs = filter(errs, severity).peekable();
+  //         if errs.peek().is_some() {
+  //           match &origin {
+  //             DiagnosticOrigin::Parsing => {
+  //               for err in errs {
+  //                 writeln!(f, "{err}")?;
+  //               }
+  //             }
+  //             DiagnosticOrigin::Book => {
+  //               for err in errs {
+  //                 writeln!(f, "{err}")?;
+  //               }
+  //             }
+  //             DiagnosticOrigin::Rule(nam) => {
+  //               writeln!(f, "\x1b[1mIn definition '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
+  //               for err in errs {
+  //                 writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
+  //               }
+  //             }
+  //             DiagnosticOrigin::Inet(nam) => {
+  //               writeln!(f, "\x1b[1mIn compiled inet '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
+  //               for err in errs {
+  //                 writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
+  //               }
+  //             }
+  //             DiagnosticOrigin::Readback => {
+  //               writeln!(f, "\x1b[1mDuring readback:\x1b[0m")?;
+  //               for err in errs {
+  //                 writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
+  //               }
+  //             }
+  //           }
+  //           has_msg = true;
+  //         }
+  //       }
+  //       if has_msg {
+  //         writeln!(f)?;
+  //       }
+  //       Ok(())
+  //     })
+  //   }
+
+  //   /// Returns a Display that prints the diagnostics with one of the given severities.
+  //   pub fn display_all_with_severity(&self, severity: Severity) -> impl std::fmt::Display + '_ {
+  //     DisplayFn(move |f| {
+  //       let mut has_msg = false;
+  //       for orig in self.diagnostics.keys() {
+  //         write!(f, "{}", self.display_with_severity(severity, orig))?;
+  //       }
+  //       if has_msg {
+  //         writeln!(f)?;
+  //       }
+  //       Ok(())
+  //     })
+  //   }
 }
 
 impl Display for Diagnostics {
@@ -319,6 +390,30 @@ impl Display for Diagnostic {
       Some(FileSpan { file: Some(file), .. }) => write!(f, "In {} :\n{}", file, self.message),
       _ => write!(f, "{}", self.message),
     }
+  }
+}
+
+impl Diagnostic {
+  pub fn display_with_origin<'a>(&'a self, origin: &'a DiagnosticOrigin) -> impl std::fmt::Display + '_ {
+    DisplayFn(move |f| {
+      match origin {
+        DiagnosticOrigin::Parsing => writeln!(f, "{self}")?,
+        DiagnosticOrigin::Book => writeln!(f, "{self}")?,
+        DiagnosticOrigin::Rule(nam) => {
+          writeln!(f, "\x1b[1mIn definition '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
+          writeln!(f, "{:ERR_INDENT_SIZE$}{self}", "")?;
+        }
+        DiagnosticOrigin::Inet(nam) => {
+          writeln!(f, "\x1b[1mIn compiled inet '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
+          writeln!(f, "{:ERR_INDENT_SIZE$}{self}", "")?;
+        }
+        DiagnosticOrigin::Readback => {
+          writeln!(f, "\x1b[1mDuring readback:\x1b[0m")?;
+          writeln!(f, "{:ERR_INDENT_SIZE$}{self}", "")?;
+        }
+      };
+      Ok(())
+    })
   }
 }
 
