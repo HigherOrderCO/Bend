@@ -1,6 +1,6 @@
 (Main) =
   use path = "tests/golden_tests/io/missing_dir/store_fail.txt"
-  (HVM.store path "(Main) = 0" @result match result {
-    Result/ok: result.val;
-    Result/err: result.val;
-  })
+  with IO {
+    ask res = (IO/FS/write_file path (String/encode_utf8 "(Main) = 0"))
+    res
+  }

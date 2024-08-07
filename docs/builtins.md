@@ -118,6 +118,24 @@ Splits a list into two lists at the first occurrence of a value.
 List/split_once(xs: List(T), val: T) -> (Result(List(T), List(T)))
 ```
 
+## Result
+
+```python
+type Result<A, B>:
+  Ok { val: A }
+  Err { val: B }
+```
+
+### Result/unwrap
+
+Returns the inner value of `Result/Ok` or `Result/Err`.
+
+If the types `A` and `B` are different, should only be used in type unsafe programs or when only one variant is guaranteed to happen.
+
+```python
+def Result/unwrap(result: Result<A, B>): A || B
+```
+
 ## Tree
 
 ```python
@@ -527,21 +545,23 @@ def IO/DyLib/open(path: String, lazy: u24) -> u24
 ```
 
 Loads a dynamic library file.
-* `path` is the path to the library file.
-* `lazy` is a boolean encoded as a `u24` that determines if all functions are loaded lazily (`1`) or upfront (`0`).
-* Returns an unique id to the library object encoded as a `u24`.
+
+- `path` is the path to the library file.
+- `lazy` is a boolean encoded as a `u24` that determines if all functions are loaded lazily (`1`) or upfront (`0`).
+- Returns an unique id to the library object encoded as a `u24`.
 
 #### IO/DyLib/call
 
-``` py
+```py
 def IO/DyLib/call(dl: u24, fn: String, args: Any) -> Any
 ```
 
 Calls a function of a previously opened library.
-* `dl` is the id of the library object.
-* `fn` is the name of the function in the library.
-* `args` are the arguments to the function. The expected values depend on the called function.
-* The returned value is determined by the called function.
+
+- `dl` is the id of the library object.
+- `fn` is the name of the function in the library.
+- `args` are the arguments to the function. The expected values depend on the called function.
+- The returned value is determined by the called function.
 
 #### IO/DyLib/close
 
@@ -550,8 +570,9 @@ def IO/DyLib/close(dl: u24) -> None
 ```
 
 Closes a previously open library.
-* `dl` is the id of the library object.
-* Returns nothing (`*`).  
+
+- `dl` is the id of the library object.
+- Returns nothing (`*`).
 
 ## Native number casting
 
@@ -585,7 +606,7 @@ Casts any native number to an i24.
 
 ```py
 def String/decode_utf8(bytes: [u24]) -> String
-``` 
+```
 
 Decodes a sequence of bytes to a String using utf-8 encoding.
 
@@ -646,7 +667,6 @@ def Math/atan2(x: f24, y: f24) -> f24
 Computes the arctangent of `y / x`.
 
 Has the same behaviour as `atan2f` in the C math lib.
-
 
 ### Math/PI
 
