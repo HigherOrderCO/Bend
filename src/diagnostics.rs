@@ -316,8 +316,8 @@ impl Default for DiagnosticsConfig {
 impl Display for Diagnostic {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
     match &self.span {
-      Some(FileSpan { file, .. }) => write!(f, "In {} :\n{}", file, self.message),
-      None => write!(f, "{}", self.message),
+      Some(FileSpan { file: Some(file), .. }) => write!(f, "In {} :\n{}", file, self.message),
+      _ => write!(f, "{}", self.message),
     }
   }
 }
@@ -404,11 +404,12 @@ impl TextSpan {
 pub struct FileSpan {
   pub span: TextSpan,
   // Storing files as Strings, could be done as file IDs in the future
-  pub file: String,
+  // This is currently optional, we might want to change it later
+  pub file: Option<String>,
 }
 
 impl FileSpan {
-  pub fn new(span: TextSpan, origin: &str) -> Self {
-    FileSpan { span, file: origin.into() }
+  pub fn new(span: TextSpan, origin: Option<&str>) -> Self {
+    FileSpan { span, file: origin.map(|s| s.into()) }
   }
 }

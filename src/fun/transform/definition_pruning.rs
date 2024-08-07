@@ -79,7 +79,7 @@ impl Ctx<'_> {
               rm_def(self.book, &def);
             } else if !def.is_generated() && !matches!(src, Source::Generated) {
               let span = match src {
-                Source::Local(span) => Some(FileSpan::new(span, "TODO")),
+                Source::Local(span) => Some(FileSpan::new(span, None)),
                 _ => None,
               };
               self.info.add_rule_warning("Definition is unused.", WarningType::UnusedDefinition, def, span);
