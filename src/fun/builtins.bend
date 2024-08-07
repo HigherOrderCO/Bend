@@ -122,6 +122,7 @@ def Tree/reverse(tree):
       return !tree.value
     case Tree/Node:
       return ![tree.right, tree.left]
+
 # MAP Impl
 
 type Map = (Node value ~left ~right) | (Leaf)
