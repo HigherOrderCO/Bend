@@ -427,6 +427,7 @@ impl<'a> FunParser<'a> {
   }
 
   fn starts_with_rule(&mut self, expected_name: &Name) -> bool {
+    self.skip_trivia();
     let ini_idx = *self.index();
     let res = self.parse_rule_lhs();
     self.index = ini_idx;

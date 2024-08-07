@@ -33,15 +33,23 @@ List/concat (List/Cons x xs) ys = (List/Cons x (List/concat xs ys))
 List/concat (List/Nil)       ys = ys
 
 # Splits a list into two lists at the first occurrence of a value.
-List/split_once (xs: (List T)) (val: T) -> (Result(List(T), List(T)))
-List/split_once xs val = (List/split_once.go xs val @x x)
-  List/split_once.go  List/Nil        val acc = (Result/Err (acc List/Nil))
-  List/split_once.go (List/Cons x xs) val acc =
-    if (== val x) {
-      (Result/Ok ((acc List/Nil), xs))
-    } else {
-      (List/split_once.go xs val @y (acc (List/Cons x y)))
-    }
+# Returns the original list if the value is not found
+def List/split_once(xs: List(T), val: T) -> (Result((List(T), List(T)), List(T))):
+  return List/split_once.go(xs, val, DiffList/new)
+
+def List/split_once.go(
+  xs: List(T),
+  val: T,
+  acc: List(T) -> List(T)
+) -> Result((List(T), List(T)), List(T)):
+  match xs:
+    case List/Nil:
+      return Result/Err(DiffList/to_list(acc))
+    case List/Cons:
+      if val == xs.head:
+        return Result/Ok((DiffList/to_list(acc), xs.tail))
+      else:
+        return List/split_once.go(xs.tail, val, DiffList/append(acc, xs.head))
 
 # Filters a list based on a predicate function.
 List/filter (xs: (List T)) (pred: T -> Bool) : (List T)
@@ -54,7 +62,7 @@ List/filter (List/Cons x xs) pred =
   }
 
 # Checks if two strings are equal.
-String/equals (s1: String) (s2: String) -> u24
+String/equals (s1: String) (s2: String) : u24
 String/equals (String/Nil) (String/Nil) = 1
 String/equals (String/Cons x xs) (String/Cons y ys) =
   if (== x y) {
@@ -195,8 +203,8 @@ def IO/nanosleep(hi_lo: (u24, u24)) -> IO(None):
 # Sleeps for a given amount of seconds as a float.
 def IO/sleep(seconds: f24) -> IO(None):
   nanos = seconds * 1_000_000_000.0
-  lo = to_u24(nanos % 0x1_000_000.0)
-  hi = to_u24(nanos / 0x1_000_000.0)
+  lo = f24_to_u24(nanos % 0x1_000_000.0)
+  hi = f24_to_u24(nanos / 0x1_000_000.0)
   return IO/nanosleep((hi, lo))
 
 ## File IO
@@ -269,7 +277,7 @@ def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(List(u24
       case Result/Ok:
         (line, rest) = res.val
         (length, *) = List/length(rest)
-        * <- IO/FS/seek(fd, to_i24(length) * -1, IO/FS/SEEK_CUR)
+        * <- IO/FS/seek(fd, u24_to_i24(length) * -1, IO/FS/SEEK_CUR)
         chunks = List/Cons(line, chunks)
         bytes = List/flatten(chunks)
         return wrap(bytes)
@@ -581,7 +589,7 @@ Math/sqrt (n: f24) : f24 =
 
 # Round float up to the nearest integer.
 def Math/ceil(n: f24) -> f24:
-  i_n = to_f24(to_i24(n))
+  i_n = i24_to_f24(f24_to_i24(n))
   if n <= i_n:
     return i_n
   else:
@@ -589,7 +597,7 @@ def Math/ceil(n: f24) -> f24:
 
 # Round float down to the nearest integer.
 def Math/floor(n: f24) -> f24:
-  i_n = to_f24(to_i24(n))
+  i_n = i24_to_f24(f24_to_i24(n))
   if n < i_n:
     return i_n - 1.0
   else:
@@ -597,8 +605,8 @@ def Math/floor(n: f24) -> f24:
 
 # Round float to the nearest integer.
 def Math/round(n: f24) -> f24:
-  i_n = to_f24(to_i24(n))
-  if n - i_n < 0.5:
+  i_n = i24_to_f24(f24_to_i24(n))
+  if (n - i_n) < 0.5:
     return Math/floor(n)
   else:
     return Math/ceil(n)
