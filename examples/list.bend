@@ -106,6 +106,35 @@ head = @l
     List/Nil: []
   }
 
+# List tail:
+# List l -> List
+# returns the list except for the first item in it, or [] if the list is empty.
+def tail(l):
+  match l:
+    case List/Cons:
+      return l.tail
+    case List/Nil:
+      return []
+
+# List equals:
+# List xs, List ys, function cmp -> 1|0
+# Compares the elements in two lists and returns 1 if they're equal, and 0 otherwise.
+# The function cmp compares two values and returns 1 if they're equal, and 0 otherwise. 
+equals xs ys cmp = match xs {
+  List/Cons: match ys {
+    List/Cons: if (cmp xs.head ys.head) {
+      (equals xs.tail ys.tail cmp)
+    } else {
+      0
+    }
+    List/Nil: 0
+  }
+  List/Nil: match ys {
+    List/Cons: 0
+    List/Nil: 1
+  }
+}
+
 # List pop_front: 
 # List l -> List l
 # removes and discards the first item of list l.
