@@ -418,7 +418,7 @@ impl Default for CompileOpts {
   /// Uses num-scott ADT encoding.
   fn default() -> Self {
     Self {
-      target_architecture: CompilerTarget::Cuda,
+      target_architecture: CompilerTarget::Unknown,
       eta: true,
       prune: false,
       linearize_matches: OptLevel::Enabled,

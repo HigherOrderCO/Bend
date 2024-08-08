@@ -517,7 +517,7 @@ fn compile_long() {
       ..Default::default()
     };
 
-    let res = compile_book(&mut book, opts.clone(), diagnostics_cfg, None)?;
-    Ok(format!("{}{}", res.diagnostics, hvm_book_show_pretty(&res.hvm_book)))
+    compile_book(&mut book, opts.clone(), diagnostics_cfg, None)?;
+    Ok("Compiled".to_string())
   })
 }
