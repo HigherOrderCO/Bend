@@ -100,13 +100,12 @@ impl<'a> ImpParser<'a> {
     };
     self.skip_trivia_inline()?;
 
-    let (fields, field_types): (Vec<_>, Vec<_>) = if self.starts_with("{") {
+    let fields = if self.starts_with("{") {
       self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?
     } else {
       vec![]
-    }
-    .into_iter()
-    .unzip();
+    };
+    let field_types = fields.iter().map(|f| f.typ.clone()).collect::<Vec<_>>();
 
     let end_idx = *self.index();
     self.check_repeated_ctr_fields(&fields, &name, ini_idx..end_idx)?;
@@ -164,7 +163,7 @@ impl<'a> ImpParser<'a> {
     } else {
       vec![]
     };
-    let (fields, field_types): (Vec<_>, Vec<_>) = fields.into_iter().unzip();
+    let field_types = fields.iter().map(|f| f.typ.clone()).collect::<Vec<_>>();
     let end_idx = *self.index();
     self.check_repeated_ctr_fields(&fields, &name, ini_idx..end_idx)?;
 
@@ -172,7 +171,7 @@ impl<'a> ImpParser<'a> {
     Ok(AdtCtr { name, typ, fields })
   }
 
-  fn parse_variant_field(&mut self) -> ParseResult<(CtrField, Type)> {
+  fn parse_variant_field(&mut self) -> ParseResult<CtrField> {
     let rec = self.try_consume_exactly("~");
     self.skip_trivia_inline()?;
 
@@ -181,7 +180,7 @@ impl<'a> ImpParser<'a> {
 
     let typ = if self.try_consume_exactly(":") { self.parse_type_expr()? } else { Type::Any };
 
-    Ok((CtrField { nam, rec }, typ))
+    Ok(CtrField { nam, typ, rec })
   }
 
   fn parse_primary_expr(&mut self, inline: bool) -> ParseResult<Expr> {

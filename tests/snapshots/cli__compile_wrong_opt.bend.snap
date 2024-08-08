@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/compile_wrong_opt.bend
 ---
 error: invalid value 'foo' for '-O <COMP_OPTS>'
-  [possible values: all, no-all, eta, no-eta, prune, no-prune, linearize-matches, linearize-matches-alt, no-linearize-matches, float-combinators, no-float-combinators, merge, no-merge, inline, no-inline, check-net-size, no-check-net-size, adt-scott, adt-num-scott]
+  [possible values: all, no-all, eta, no-eta, prune, no-prune, linearize-matches, linearize-matches-alt, no-linearize-matches, float-combinators, no-float-combinators, merge, no-merge, inline, no-inline, check-net-size, no-check-net-size, adt-scott, adt-num-scott, type-check, no-type-check]
 
   tip: a similar value exists: 'float-combinators'
 

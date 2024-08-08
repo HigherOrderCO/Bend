@@ -49,6 +49,7 @@
     "ints",
     "itertools",
     "ITRS",
+    "kindc",
     "kwarg",
     "kwargs",
     "lcons",

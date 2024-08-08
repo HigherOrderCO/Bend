@@ -315,6 +315,7 @@ pub struct AdtCtr {
 pub struct CtrField {
   pub nam: Name,
   pub rec: bool,
+  pub typ: Type,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

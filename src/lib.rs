@@ -103,7 +103,6 @@ pub fn desugar_book(
   ctx.book.encode_builtins();
 
   ctx.resolve_refs()?;
-  ctx.resolve_type_ctrs()?;
 
   ctx.desugar_match_defs()?;
 
@@ -127,6 +126,10 @@ pub fn desugar_book(
   }
   // Manual match linearization
   ctx.book.linearize_match_with();
+
+  if opts.type_check {
+    type_check_book(&mut ctx)?;
+  }
 
   ctx.book.encode_matches(opts.adt_encoding);
 
@@ -163,6 +166,17 @@ pub fn desugar_book(
   } else {
     Err(ctx.info)
   }
+}
+
+pub fn type_check_book(ctx: &mut Ctx) -> Result<(), Diagnostics> {
+  let old_book = std::mem::replace(ctx.book, ctx.book.clone());
+  ctx.make_native_defs();
+  ctx.book.encode_adts(AdtEncoding::Scott);
+  ctx.resolve_type_ctrs()?;
+  let res = ctx.type_check();
+  *ctx.book = old_book;
+  res?;
+  Ok(())
 }
 
 pub fn run_book(
@@ -362,6 +376,9 @@ pub struct CompileOpts {
   /// Enables [hvm::check_net_size].
   pub check_net_size: bool,
 
+  /// Enables [type_check_book].
+  pub type_check: bool,
+
   /// Determines the encoding of constructors and matches.
   pub adt_encoding: AdtEncoding,
 }
@@ -376,8 +393,9 @@ impl CompileOpts {
       prune: true,
       float_combinators: true,
       merge: true,
-      inline: true,
       linearize_matches: OptLevel::Enabled,
+      type_check: true,
+      inline: self.inline,
       check_net_size: self.check_net_size,
       adt_encoding: self.adt_encoding,
     }
@@ -394,6 +412,7 @@ impl CompileOpts {
       float_combinators: false,
       merge: false,
       inline: false,
+      type_check: self.type_check,
       check_net_size: self.check_net_size,
       adt_encoding: self.adt_encoding,
     }
@@ -426,6 +445,7 @@ impl Default for CompileOpts {
       merge: false,
       inline: false,
       check_net_size: true,
+      type_check: true,
       adt_encoding: AdtEncoding::NumScott,
     }
   }

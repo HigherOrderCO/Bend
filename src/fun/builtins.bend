@@ -1,10 +1,10 @@
 type String:
   Nil
-  Cons { head: u24,  ~tail: String }
+  Cons { head: u24, ~tail: String }
 
 type List(T):
   Nil
-  Cons { head: T,  ~tail: List(T) }
+  Cons { head: T, ~tail: List(T) }
 
 # Returns the length of a list and the list itself.
 def List/length(xs: List(T)) -> (u24, List(T)):
@@ -33,15 +33,23 @@ List/concat (List/Cons x xs) ys = (List/Cons x (List/concat xs ys))
 List/concat (List/Nil)       ys = ys
 
 # Splits a list into two lists at the first occurrence of a value.
-List/split_once (xs: (List T)) (val: T) -> (Result(List(T), List(T)))
-List/split_once xs val = (List/split_once.go xs val @x x)
-  List/split_once.go  List/Nil        val acc = (Result/Err (acc List/Nil))
-  List/split_once.go (List/Cons x xs) val acc =
-    if (== val x) {
-      (Result/Ok ((acc List/Nil), xs))
-    } else {
-      (List/split_once.go xs val @y (acc (List/Cons x y)))
-    }
+# Returns the original list if the value is not found
+def List/split_once(xs: List(T), val: T) -> (Result((List(T), List(T)), List(T))):
+  return List/split_once.go(xs, val, DiffList/new)
+
+def List/split_once.go(
+  xs: List(T),
+  val: T,
+  acc: List(T) -> List(T)
+) -> Result((List(T), List(T)), List(T)):
+  match xs:
+    case List/Nil:
+      return Result/Err(DiffList/to_list(acc))
+    case List/Cons:
+      if val == xs.head:
+        return Result/Ok((DiffList/to_list(acc), xs.tail))
+      else:
+        return List/split_once.go(xs.tail, val, DiffList/append(acc, xs.head))
 
 # Filters a list based on a predicate function.
 List/filter (xs: (List T)) (pred: T -> Bool) : (List T)
@@ -54,7 +62,7 @@ List/filter (List/Cons x xs) pred =
   }
 
 # Checks if two strings are equal.
-String/equals (s1: String) (s2: String) -> u24
+String/equals (s1: String) (s2: String) : u24
 String/equals (String/Nil) (String/Nil) = 1
 String/equals (String/Cons x xs) (String/Cons y ys) =
   if (== x y) {
@@ -143,7 +151,7 @@ type Map T = (Node (value: T) ~(left: (Map T)) ~(right: (Map T))) | (Leaf)
 
 Map/empty : (Map T) = Map/Leaf
 
-Map/get (map: (Map T)) (key: u24) : ((Map T), T) =
+Map/get (map: (Map T)) (key: u24) : (T, (Map T)) =
   match map {
     Map/Leaf: (*, map)
     Map/Node:
@@ -198,7 +206,7 @@ Map/map (Map/Node value left right) key f =
 
 type IO(T):
   Done { magic: (u24, u24), expr: T }
-  Call { magic: (u24, u24), func: String, argm: Any, cont: T -> IO(T) }
+  Call { magic: (u24, u24), func: String, argm: Any, cont: Any -> IO(T) }
 
 type IOError(T):
   Type
@@ -211,13 +219,13 @@ def IO/MAGIC() -> (u24, u24):
 def IO/wrap(x: T) -> IO(T):
   return IO/Done(IO/MAGIC, x)
 
-def IO/bind(a: IO(A), b: A -> IO(B)) -> IO(B):
+def IO/bind(a: IO(A), b: ((A -> IO(B)) -> (A -> IO(B))) -> (A -> IO(B))) -> IO(B):
   match a:
     case IO/Done:
       b = undefer(b)
       return b(a.expr)
     case IO/Call:
-      return IO/Call(IO/MAGIC, a.func, a.argm, lambda x: IO/bind(a.cont(x), b))
+      return IO/Call(a.magic, a.func, a.argm, lambda x: IO/bind(a.cont(x), b))
 
 def IO/call(func: String, argm: Any) -> IO(Result(Any, Any)):
   return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
@@ -242,8 +250,8 @@ def IO/nanosleep(hi_lo: (u24, u24)) -> IO(None):
 # Sleeps for a given amount of seconds as a float.
 def IO/sleep(seconds: f24) -> IO(None):
   nanos = seconds * 1_000_000_000.0
-  lo = to_u24(nanos % 0x1_000_000.0)
-  hi = to_u24(nanos / 0x1_000_000.0)
+  lo = f24_to_u24(nanos % 0x1_000_000.0)
+  hi = f24_to_u24(nanos / 0x1_000_000.0)
   with IO:
     res <- IO/nanosleep((hi, lo))
     return wrap(Result/unwrap(res))
@@ -319,7 +327,7 @@ def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(List(u24
       case Result/Ok:
         (line, rest) = res.val
         (length, *) = List/length(rest)
-        * <- IO/FS/seek(fd, to_i24(length) * -1, IO/FS/SEEK_CUR)
+        * <- IO/FS/seek(fd, u24_to_i24(length) * -1, IO/FS/SEEK_CUR)
         chunks = List/Cons(line, chunks)
         bytes = List/flatten(chunks)
         return wrap(bytes)
@@ -381,45 +389,74 @@ def IO/input.go(acc: List(u24) -> List(u24)) -> IO(String):
 
 ### Dynamically linked libraries
 
+# Returns an unique id to the library object encoded as a u24
 # 'path' is the path to the library file.
 # 'lazy' is a boolean encoded as a u24 that determines if all functions are loaded lazily or upfront.
-# Returns an unique id to the library object encoded as a u24
 def IO/DyLib/open(path: String, lazy: u24) -> IO(u24):
   return IO/call("DL_OPEN", (path, lazy))
 
 # Calls a function of a previously opened library.
+# The returned value is determined by the called function.
 # 'dl' is the id of the library object.
 # 'fn' is the name of the function in the library.
 # 'args' are the arguments to the function. The expected values depend on the called function.
-# The returned value is determined by the called function.
 def IO/DyLib/call(dl: u24, fn: String, args: Any) -> IO(Any):
   return IO/call("DL_CALL", (dl, (fn, args)))
 
-# IO/DyLib/close(dl: u24) -> None
 # Closes a previously open library.
-# 'dl' is the id of the library object.
 # Returns nothing.
-def IO/DyLib/close(dl):
+# 'dl' is the id of the library object.
+def IO/DyLib/close(dl: u24) -> IO(None):
   return IO/Call(IO/MAGIC, "DL_CLOSE", (dl), IO/wrap)
 
 # Lazy thunks
-# defer(val: T) -> ((T -> T) -> T)
 # We can defer the evaluation of a function by wrapping it in a thunk
 # Ex: @x (x @arg1 @arg2 @arg3 (f arg1 arg2 arg3) arg1 arg2 arg3)
-# This is only evaluated when we call it with 'undefer' (undefer my_thunk)
+# This is only evaluated when we call it with ' ' (undefer my_thunk)
 # We can build a defered call directly or by by using defer and defer_arg
 # The example above can be written as:
 # (defer_arg (defer_arg (defer_arg (defer @arg1 @arg2 @arg3 (f arg1 arg2 arg3)) arg1) arg2) arg3)
-defer val =
-  @x (x val)
+def defer(val: T) -> (T -> T) -> T:
+  return lambda x: x(val)
 
-# defer_arg(defered: A -> B -> C, arg: B) -> (A -> C)
-defer_arg defered arg =
-  @x (defered x arg)
+def defer_arg(defered: ((A -> B) -> (A -> B)) -> (A -> B), arg: B) -> ((A -> A) -> A):
+  return lambda x: defered(x, arg)
 
-# undefer(defered: (A -> A) -> B) -> B
-undefer defered =
-  (defered @x x)
+def undefer(defered: ((A -> A) -> A)) -> A:
+  return defered(lambda x: x)
+
+
+# Native number casts
+
+# f24_to_u24(x: f24) -> u24
+# Casts a f24 number to a u24.
+hvm f24_to_u24 -> (f24 -> u24):
+  ($([u24] ret) ret)
+
+# i24_to_u24(x: i24) -> u24
+# Casts an i24 number to a u24.
+hvm i24_to_u24 -> (i24 -> u24):
+  ($([u24] ret) ret)
+
+# u24_to_i24(x: u24) -> i24
+# Casts a u24 number to an i24.
+hvm u24_to_i24 -> (u24 -> i24):
+  ($([i24] ret) ret)
+
+# f24_to_i24(x: f24) -> i24
+# Casts a f24 number to an i24.
+hvm f24_to_i24 -> (f24 -> i24):
+  ($([i24] ret) ret)
+
+# u24_to_f24(x: u24) -> f24
+# Casts a u24 number to a f24.
+hvm u24_to_f24 -> (u24 -> f24):
+  ($([f24] ret) ret)
+
+# i24_to_f24(x: i24) -> f24
+# Casts an i24 number to a f24.
+hvm i24_to_f24 -> (i24 -> f24):
+  ($([f24] ret) ret)
 
 
 # String Encoding and Decoding
@@ -615,7 +652,7 @@ Math/sqrt (n: f24) : f24 =
 
 # Round float up to the nearest integer.
 def Math/ceil(n: f24) -> f24:
-  i_n = to_f24(to_i24(n))
+  i_n = i24_to_f24(f24_to_i24(n))
   if n <= i_n:
     return i_n
   else:
@@ -623,7 +660,7 @@ def Math/ceil(n: f24) -> f24:
 
 # Round float down to the nearest integer.
 def Math/floor(n: f24) -> f24:
-  i_n = to_f24(to_i24(n))
+  i_n = i24_to_f24(f24_to_i24(n))
   if n < i_n:
     return i_n - 1.0
   else:
@@ -631,8 +668,8 @@ def Math/floor(n: f24) -> f24:
 
 # Round float to the nearest integer.
 def Math/round(n: f24) -> f24:
-  i_n = to_f24(to_i24(n))
-  if n - i_n < 0.5:
+  i_n = i24_to_f24(f24_to_i24(n))
+  if (n - i_n) < 0.5:
     return Math/floor(n)
   else:
     return Math/ceil(n)

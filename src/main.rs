@@ -188,6 +188,8 @@ pub enum OptArgs {
   NoCheckNetSize,
   AdtScott,
   AdtNumScott,
+  TypeCheck,
+  NoTypeCheck,
 }
 
 fn compile_opts_from_cli(args: &Vec<OptArgs>, compiler_target: CompilerTarget) -> CompileOpts {
@@ -210,6 +212,8 @@ fn compile_opts_from_cli(args: &Vec<OptArgs>, compiler_target: CompilerTarget) -
       NoInline => opts.inline = false,
       CheckNetSize => opts.check_net_size = true,
       NoCheckNetSize => opts.check_net_size = false,
+      TypeCheck => opts.type_check = true,
+      NoTypeCheck => opts.type_check = false,
 
       LinearizeMatches => opts.linearize_matches = OptLevel::Enabled,
       LinearizeMatchesAlt => opts.linearize_matches = OptLevel::Alt,
