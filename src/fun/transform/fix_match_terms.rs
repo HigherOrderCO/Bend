@@ -22,7 +22,7 @@ impl Ctx<'_> {
   ///
   /// Example:
   /// For the program
-  /// ```hvm
+  /// ```bend
   /// data MyList = (Cons h t) | Nil
   /// match x {
   ///   Cons: (A x.h x.t)
@@ -35,9 +35,9 @@ impl Ctx<'_> {
   /// * The bind `%matched-2` will be generated and stored in the switch term.
   /// * If either was missing one of the match cases (a number or a constructor), we'd get an error.
   /// * If either included one of the cases more than once (including wildcard patterns), we'd get a warning.
-  /// ```hvm
+  /// ```bend
   /// match x {
-  ///   Cons: (A x.h x.t)
+  ///   Cons x.h x.t: (A x.h x.t)
   ///   Nil: let %matched = (Foo y); switch %matched { 0: B; 1: C; _: D }
   /// }
   /// ```

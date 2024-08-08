@@ -1,6 +1,8 @@
 Result/bind (Result/Ok val) f = ((undefer f) val)
 Result/bind err _ = err
 
+Result/wrap x = (Result/Ok x)
+
 safe_div a b = switch b {
   0: (Result/Err "Div by 0")
   _: (Result/Ok (/ a b))

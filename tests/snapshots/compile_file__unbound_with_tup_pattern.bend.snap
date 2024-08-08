@@ -4,4 +4,4 @@ input_file: tests/golden_tests/compile_file/unbound_with_tup_pattern.bend
 ---
 [4m[1m[31mErrors:[0m
 [1mIn definition '[4mFoo[0m[1m':[0m
-  Unbound variable 'a'.
+  Unbound name 'a'.

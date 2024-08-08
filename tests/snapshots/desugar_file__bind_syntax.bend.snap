@@ -6,6 +6,8 @@ input_file: tests/golden_tests/desugar_file/bind_syntax.bend
 
 (Result/bind) = λa λb (a Result/bind__C2 b)
 
+(Result/wrap) = λa (Result/Ok a)
+
 (safe_div) = λa λb (switch b { 0: λ* (Result/Err (String/Cons 68 (String/Cons 105 (String/Cons 118 (String/Cons 32 (String/Cons 98 (String/Cons 121 (String/Cons 32 (String/Cons 48 String/Nil))))))))); _: safe_div__C0; } a)
 
 (safe_rem) = λa λb (switch b { 0: λ* (Result/Err (String/Cons 77 (String/Cons 111 (String/Cons 100 (String/Cons 32 (String/Cons 98 (String/Cons 121 (String/Cons 32 (String/Cons 48 String/Nil))))))))); _: safe_rem__C0; } a)

@@ -9,6 +9,7 @@ use std::collections::HashMap;
 impl Book {
   /// Makes all variables in each definition have a new unique name.
   /// Skips unbound variables.
+  ///
   /// Precondition: Definition references have been resolved.
   pub fn make_var_names_unique(&mut self) {
     for def in self.defs.values_mut() {
@@ -32,7 +33,7 @@ pub struct UniqueNameGenerator {
 }
 
 impl UniqueNameGenerator {
-  // Recursively assign an id to each variable in the term, then convert each id into a unique name.
+  /// Recursively assign an id to each variable in the term, then convert each id into a unique name.
   pub fn unique_names_in_term(&mut self, term: &mut Term) {
     // Note: we can't use the children iterators here because we mutate the binds,
     // which are shared across multiple children.
@@ -189,14 +190,16 @@ impl UniqueNameGenerator {
     }
   }
 
-  fn use_var(&self, nam: &Name) -> Name {
+  fn use_var(&mut self, nam: &Name) -> Name {
     if let Some(vars) = self.name_map.get(nam) {
       let var_id = *vars.last().unwrap();
       Name::from(var_id)
     } else {
       // Skip unbound variables.
       // With this, we can use this function before checking for unbound vars.
-      nam.clone()
+      let nam = Name::from(self.name_count);
+      self.name_count += 1;
+      nam
     }
   }
 }

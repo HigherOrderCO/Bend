@@ -8,6 +8,10 @@ input_file: tests/golden_tests/parse_file/imp_program.bend
 
 (Map/set) = λ%arg0 λ%arg1 λ%arg2 use value = %arg2; use key = %arg1; use map = %arg0; match map = map { Map/Node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/Node map.value (Map/set map.left (/ key 2) value) map.right); _ _-1: (Map/Node map.value map.left (Map/set map.right (/ key 2) value)); }; _ _-1: (Map/Node value map.left map.right); }; Map/Leaf: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/Node * (Map/set Map/Leaf (/ key 2) value) Map/Leaf); _ _-1: (Map/Node * Map/Leaf (Map/set Map/Leaf (/ key 2) value)); }; _ _-1: (Map/Node value Map/Leaf Map/Leaf); }; }
 
+(IO/MAGIC) = (13683217, 16719857)
+
+(IO/wrap) = λ%arg0 use x = %arg0; (IO/Done IO/MAGIC x)
+
 (symbols) = let x = (Map/set (Map/set Map/empty 49 5) 2 3); let x = (Map/set x 49 2); let x = (Map/set x 2 3); let (map/get%0, x) = (Map/get x 49); (+ map/get%0 8293490)
 
 (mk_point) = (Point/Point 1 2)
@@ -36,7 +40,7 @@ input_file: tests/golden_tests/parse_file/imp_program.bend
 
 (sup) = let x = {(List/Cons 1 (List/Cons 2 List/Nil)) (List/Cons 3 (List/Cons 4 (List/Cons 5 (List/Cons 6 List/Nil))))}; x
 
-(main) = with IO { ask x = IO.read; x }
+(main) = with IO { use wrap = IO/wrap; ask x = IO.read; x }
 
 (List/Nil) = λ%x (%x List/Nil/tag)
 
@@ -45,6 +49,8 @@ input_file: tests/golden_tests/parse_file/imp_program.bend
 (Map/Node) = λvalue λleft λright λ%x (%x Map/Node/tag value left right)
 
 (Map/Leaf) = λ%x (%x Map/Leaf/tag)
+
+(IO/Done) = λmagic λexpr λ%x (%x IO/Done/tag magic expr)
 
 (Point/Point) = λx λy λ%x (%x Point/Point/tag x y)
 
@@ -59,6 +65,8 @@ input_file: tests/golden_tests/parse_file/imp_program.bend
 (Map/Node/tag) = 0
 
 (Map/Leaf/tag) = 1
+
+(IO/Done/tag) = 0
 
 (Point/Point/tag) = 0
 
