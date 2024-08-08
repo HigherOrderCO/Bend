@@ -2,6 +2,170 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/net_size_too_large.bend
 ---
-[4m[1m[31mErrors:[0m
-[1mIn definition '[4mRadix[0m[1m':[0m
-  Definition is too large for hvm (size=120, max size=64). Please break it into smaller pieces.
+@Arr/Leaf = (a ((@Arr/Leaf/tag (a b)) b))
+
+@Arr/Leaf/tag = 1
+
+@Arr/Node = (a (b ((@Arr/Node/tag (a (b c))) c)))
+
+@Arr/Node/tag = 2
+
+@Arr/Null = ((@Arr/Null/tag a) a)
+
+@Arr/Null/tag = 0
+
+@Gen = (a b)
+  & @Gen.go ~ (a (0 b))
+
+@Gen.go = (?((@Gen.go__C0 @Gen.go__C1) a) a)
+
+@Gen.go__C0 = a
+  & @Arr/Leaf ~ a
+
+@Gen.go__C1 = ({a d} ({$([*0x0000002] $([|0x0000001] e)) $([*0x0000002] b)} g))
+  & @Arr/Node ~ (c (f g))
+  &!@Gen.go ~ (a (b c))
+  &!@Gen.go ~ (d (e f))
+
+@Map_/Both = (a (b ((@Map_/Both/tag (a (b c))) c)))
+
+@Map_/Both/tag = 2
+
+@Map_/Free = ((@Map_/Free/tag a) a)
+
+@Map_/Free/tag = 0
+
+@Map_/Used = ((@Map_/Used/tag a) a)
+
+@Map_/Used/tag = 1
+
+@Merge = ((@Merge__C13 a) a)
+
+@Merge__C0 = (* a)
+  & @Map_/Both ~ a
+
+@Merge__C1 = (?((@Map_/Used @Merge__C0) a) a)
+
+@Merge__C10 = (* (a (b ((@Merge__C8 (a (b c))) c))))
+
+@Merge__C11 = ((@Merge__C2 a) a)
+
+@Merge__C12 = (?((@Merge__C9 @Merge__C10) a) a)
+
+@Merge__C13 = (?((@Merge__C11 @Merge__C12) a) a)
+
+@Merge__C2 = (?((@Map_/Free @Merge__C1) a) a)
+
+@Merge__C3 = (?((@Map_/Used *) a) a)
+
+@Merge__C4 = (?((@Map_/Used @Merge__C3) a) a)
+
+@Merge__C5 = (* (b (e (a (d g)))))
+  & @Map_/Both ~ (c (f g))
+  &!@Merge ~ (a (b c))
+  &!@Merge ~ (d (e f))
+
+@Merge__C6 = a
+  & @Map_/Both ~ a
+
+@Merge__C7 = (?((* @Merge__C5) a) a)
+
+@Merge__C8 = (?((@Merge__C6 @Merge__C7) a) a)
+
+@Merge__C9 = ((@Merge__C4 a) a)
+
+@Radix = ({$([&0x0800000] a) {$([&0x0400000] b) {$([&0x0200000] c) {$([&0x0100000] d) {$([&0x0080000] e) {$([&0x0040000] f) {$([&0x0020000] g) {$([&0x0010000] h) {$([&0x0008000] i) {$([&0x0004000] j) {$([&0x0002000] k) {$([&0x0001000] l) {$([&0x0000800] m) {$([&0x0000400] n) {$([&0x0000200] o) {$([&0x0000100] p) {$([&0x0000080] q) {$([&0x0000040] r) {$([&0x0000020] s) {$([&0x0000010] t) {$([&0x0000008] u) {$([&0x0000004] v) {$([&0x0000002] w) $([&0x0000001] x)}}}}}}}}}}}}}}}}}}}}}}} vb)
+  & @Swap ~ (a (ub (@Map_/Free vb)))
+  & @Swap ~ (b (tb (@Map_/Free ub)))
+  & @Swap ~ (c (sb (@Map_/Free tb)))
+  & @Swap ~ (d (rb (@Map_/Free sb)))
+  & @Swap ~ (e (qb (@Map_/Free rb)))
+  & @Swap ~ (f (pb (@Map_/Free qb)))
+  & @Swap ~ (g (ob (@Map_/Free pb)))
+  & @Swap ~ (h (nb (@Map_/Free ob)))
+  & @Swap ~ (i (mb (@Map_/Free nb)))
+  & @Swap ~ (j (lb (@Map_/Free mb)))
+  & @Swap ~ (k (kb (@Map_/Free lb)))
+  & @Swap ~ (l (jb (@Map_/Free kb)))
+  & @Swap ~ (m (ib (@Map_/Free jb)))
+  & @Swap ~ (n (hb (@Map_/Free ib)))
+  & @Swap ~ (o (gb (@Map_/Free hb)))
+  & @Swap ~ (p (fb (@Map_/Free gb)))
+  & @Swap ~ (q (eb (@Map_/Free fb)))
+  & @Swap ~ (r (db (@Map_/Free eb)))
+  & @Swap ~ (s (cb (@Map_/Free db)))
+  & @Swap ~ (t (bb (@Map_/Free cb)))
+  & @Swap ~ (u (ab (@Map_/Free bb)))
+  & @Swap ~ (v (z (@Map_/Free ab)))
+  & @Swap ~ (w (y (@Map_/Free z)))
+  & @Swap ~ (x (@Map_/Used (@Map_/Free y)))
+
+@Reverse = ((@Reverse__C3 a) a)
+
+@Reverse__C0 = a
+  & @Arr/Leaf ~ a
+
+@Reverse__C1 = (* (c (a e)))
+  & @Arr/Node ~ (b (d e))
+  &!@Reverse ~ (a b)
+  &!@Reverse ~ (c d)
+
+@Reverse__C2 = (?((@Reverse__C0 @Reverse__C1) a) a)
+
+@Reverse__C3 = (?((@Arr/Null @Reverse__C2) a) a)
+
+@Sort = (a c)
+  & @ToArr ~ (0 (b c))
+  & @ToMap ~ (a b)
+
+@Sum = ((@Sum__C2 a) a)
+
+@Sum__C0 = (* (a (b d)))
+  &!@Sum ~ (a $([+] $(c d)))
+  &!@Sum ~ (b c)
+
+@Sum__C1 = (?(((a a) @Sum__C0) b) b)
+
+@Sum__C2 = (?((0 @Sum__C1) a) a)
+
+@Swap = (?((@Swap__C0 @Swap__C1) a) a)
+
+@Swap__C0 = a
+  & @Map_/Both ~ a
+
+@Swap__C1 = (* (b (a c)))
+  & @Map_/Both ~ (a (b c))
+
+@ToArr = (a ((@ToArr__C3 (a b)) b))
+
+@ToArr__C0 = a
+  & @Arr/Leaf ~ a
+
+@ToArr__C1 = (* (b (e ({$([*0x0000002] $([+0x0000001] d)) $([*0x0000002] $([+0x0000000] a))} g))))
+  & @Arr/Node ~ (c (f g))
+  &!@ToArr ~ (a (b c))
+  &!@ToArr ~ (d (e f))
+
+@ToArr__C2 = (?((@ToArr__C0 @ToArr__C1) a) a)
+
+@ToArr__C3 = (?(((* @Arr/Null) @ToArr__C2) a) a)
+
+@ToMap = ((@ToMap__C3 a) a)
+
+@ToMap__C0 = a
+  & @Radix ~ a
+
+@ToMap__C1 = (* (a (c e)))
+  & @Merge ~ (b (d e))
+  &!@ToMap ~ (a b)
+  &!@ToMap ~ (c d)
+
+@ToMap__C2 = (?((@ToMap__C0 @ToMap__C1) a) a)
+
+@ToMap__C3 = (?((@Map_/Free @ToMap__C2) a) a)
+
+@main = d
+  & @Sum ~ (c d)
+  & @Sort ~ (b c)
+  & @Reverse ~ (a b)
+  & @Gen ~ (4 a)
