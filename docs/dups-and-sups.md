@@ -31,7 +31,7 @@ let {x1 x2} = {1 2}
 ```
 
 Due to how duplications are compiled, when two dups interact, they destructively interfere with each other.
-In this case the result doesn't follow the expected behavior (it's well defined at the HVM level, but doesn't is incorrect at a lambda-calculus level).
+In this case the result doesn't follow the expected behavior (it's well defined at the HVM level, but is incorrect at a lambda-calculus level).
 
 That imposes a strong restriction on correct Bend programs: a variable should not duplicate another variable that itself duplicates some variables.
 
