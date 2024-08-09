@@ -323,10 +323,14 @@ def IO/FS/read_line.read_chunks(fd, chunks):
 # Writes a list of bytes to a file given by a path.
 def IO/FS/write_file(path, bytes):
   with IO:
-    f <- IO/done_on_err(IO/FS/open(path, "w"))
-    * <- IO/done_on_err(IO/FS/write(f, bytes))
-    * <- IO/done_on_err(IO/FS/close(f))
-    return wrap(bytes)
+    f <- IO/FS/open(path, "w")
+    match f:
+      case Result/Err:
+        return wrap(Result/Err(f.val))
+      case Result/Ok:
+        * <- IO/done_on_err(IO/FS/write(f.val, bytes))
+        * <- IO/done_on_err(IO/FS/close(f.val))
+        return wrap(Result/Ok(bytes))
 
 ### Standard input and output utilities
 

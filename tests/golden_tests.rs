@@ -427,7 +427,6 @@ fn mutual_recursion() {
 }
 
 #[test]
-#[ignore = "while IO is not implemented for hvm32"]
 fn io() {
   run_golden_test_dir_multiple(
     function_name!(),
