@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/io/store_fail.bend
+---
+Strict mode:
+λa (a Result/Err/tag λb (b 2 +2))
