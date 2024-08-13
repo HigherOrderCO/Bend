@@ -5,7 +5,6 @@ use toml_edit::DocumentMut;
 
 pub mod config;
 mod dep;
-mod lock;
 mod repo;
 mod resolver;
 mod tidy;

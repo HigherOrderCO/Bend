@@ -1,4 +1,4 @@
-use super::config::{get_deps, insert, CONFIG_FILE};
+use super::config::{get_deps, get_version, insert, CONFIG_FILE};
 use super::{get_config, repo, save_config};
 use semver::VersionReq;
 use std::error::Error;
@@ -18,10 +18,12 @@ pub fn remove(name: &str) -> Result<(), Box<dyn Error>> {
   let mut config = get_config(CONFIG_FILE)?;
   let deps = get_deps(&mut config)?;
 
-  if deps.remove(name).is_none() {
+  let Some(dep) = deps.remove(name) else {
     return Err(format!("dependency '{}' not found", name).into());
-  }
+  };
+
+  let version = get_version(&dep).ok_or_else(|| format!("invalid version format '{}'", dep))?;
 
   save_config(config, CONFIG_FILE)?;
-  repo::remove(name)
+  repo::remove(name, version)
 }

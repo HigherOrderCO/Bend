@@ -8,9 +8,8 @@ use std::path::PathBuf;
 const DEPS_FOLDER: &str = ".bend";
 
 // Clones or updates a dep Git repository, checks out a specific version (if provided)
-pub fn clone(name: &str, tag: &str, alias: Option<&str>) -> Result<PathBuf, Box<dyn Error>> {
-  let repo_name = alias.unwrap_or_else(|| repository_name(name));
-  let folder = format!("{DEPS_FOLDER}/{repo_name}");
+pub fn clone(name: &str, tag: &str) -> Result<PathBuf, Box<dyn Error>> {
+  let folder = format!("{DEPS_FOLDER}/{name}/{tag}");
   let local_path = PathBuf::from(folder);
 
   let repo = match Repository::open(&local_path) {
@@ -46,9 +45,8 @@ fn checkout_tag(repo: &Repository, tag: &str) -> Result<(), git2::Error> {
 }
 
 /// Removes the local repository of the given package
-pub fn remove(name: &str) -> Result<(), Box<dyn Error>> {
-  let repo_name = repository_name(name);
-  let folder = format!("{DEPS_FOLDER}/{repo_name}");
+pub fn remove(name: &str, version: &str) -> Result<(), Box<dyn Error>> {
+  let folder = format!("{DEPS_FOLDER}/{name}/{version}");
   let local_path = Path::new(&folder);
 
   if local_path.exists() {
@@ -56,13 +54,6 @@ pub fn remove(name: &str) -> Result<(), Box<dyn Error>> {
   }
 
   Ok(())
-}
-
-/// Extracts the repository name from a full repository URL.
-/// Assumes the URL is in the format `user/repo`.
-fn repository_name(name: &str) -> &str {
-  let (_user, repo) = name.rsplit_once('/').expect("invalid repository URL");
-  repo
 }
 
 /// Sets up the remote URL for the repository, updating it if necessary.

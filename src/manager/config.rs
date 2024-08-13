@@ -1,19 +1,25 @@
 use super::{get_config, save_config};
-use std::{error::Error, fs::OpenOptions, io::Write, path::PathBuf};
+use std::{error::Error, path::PathBuf};
 use toml_edit::{table, value, DocumentMut, Item, Table, TableLike};
 
 pub const CONFIG_FILE: &str = "mod.toml";
 
 /// Initializes a new module configuration file with the given module name.
 pub fn init(name: &str) -> Result<(), Box<dyn Error>> {
-  // TODO: initialize a git repo? or just add a .gitignote?
   let main_file = "src/main.bend";
   let path = PathBuf::from(main_file);
 
   if !path.exists() {
     std::fs::create_dir("src")?;
-    let mut f = OpenOptions::new().create_new(true).write(true).open(path)?;
-    write!(f, "def main():\n  return \"Hello World!\"\n")?;
+    let data = "def main():\n  return \"Hello World!\"\n";
+    std::fs::write(path, data)?;
+  }
+
+  let git_ignore = PathBuf::from(".gitignore");
+
+  if !git_ignore.exists() {
+    let data = ".bend/\n";
+    std::fs::write(git_ignore, data)?;
   }
 
   let mut config = DocumentMut::new();

@@ -1,37 +1,37 @@
 use super::config::{get_deps, get_version, CONFIG_FILE};
 use super::repo;
-use super::{get_config, lock::update_lock_file};
+use super::get_config;
 use semver::{Version, VersionReq};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, HashMap};
 use std::error::Error;
 use toml_edit::TableLike;
 
-struct Dependency {
-  name: String,
-  version_req: VersionReq,
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PackageInfo {
+  pub name: String,
+  pub version: Version,
 }
 
+#[derive(Debug, Clone)]
 struct Package {
-  #[allow(dead_code)]
-  name: String,
-  version: Version,
-  dependencies: Vec<Dependency>,
+  info: PackageInfo,
+  dependencies: Vec<PackageInfo>,
 }
 
+#[derive(Debug)]
 struct DependencyGraph {
   packages: BTreeMap<String, Vec<Package>>,
 }
 
-pub fn resolve() -> Result<(), Box<dyn Error>> {
+pub type Resolved = BTreeMap<String, Vec<Version>>;
+pub type Dependencies = HashMap<PackageInfo, Vec<PackageInfo>>;
+
+pub fn resolve() -> Result<(Resolved, Dependencies), Box<dyn Error>> {
   let mut config = get_config(CONFIG_FILE)?;
   let deps = get_deps(&mut config)?;
 
   let graph = build_dependency_graph(deps)?;
-  let resolved = resolve_dependencies(&graph)?;
-
-  update_lock_file(resolved)?;
-
-  Ok(())
+  resolve_dependencies(&graph)
 }
 
 /// Builds the dependency graph from the given dependencies
@@ -39,86 +39,75 @@ fn build_dependency_graph(deps: &dyn TableLike) -> Result<DependencyGraph, Box<d
   let mut graph = DependencyGraph { packages: BTreeMap::new() };
 
   for (name, dep) in deps.iter() {
-    let ver = get_version(dep).ok_or_else(|| format!("invalid version format '{}'", dep))?;
-    let version_req = VersionReq::parse(ver)?;
+    let version = get_version(dep).ok_or_else(|| format!("invalid version format '{}'", dep))?;
+    let version = fun_name(version);
 
-    let versions = get_all_versions(name)?;
-
-    // Find the latest version that matches the version requirement
-    let latest_version =
-      versions.iter().filter(|version| version_req.matches(version)).max().ok_or_else(|| {
-        format!("no matching versions found for '{}' with requirement {}", name, version_req)
-      })?;
-
-    let package = Package {
-      name: name.to_string(),
-      version: latest_version.clone(),
-      dependencies: get_dependencies(name, latest_version)?,
-    };
-
-    graph.packages.entry(name.to_string()).or_default().push(package);
+    populate_package_versions(&mut graph, name, &version)?;
   }
 
   Ok(graph)
 }
 
-/// Resolves dependencies using Minimal Version Selection
-fn resolve_dependencies(graph: &DependencyGraph) -> Result<BTreeMap<String, Version>, Box<dyn Error>> {
-  let mut resolved = BTreeMap::new();
-  let mut visited = BTreeSet::new();
+fn populate_package_versions(
+  graph: &mut DependencyGraph,
+  name: &str,
+  version_req: &Version,
+) -> Result<(), Box<dyn Error>> {
+  let versions = get_all_versions(name)?;
 
-  for name in graph.packages.keys() {
-    if !visited.contains(name) {
-      resolve_package(name, graph, &mut resolved, &mut visited)?;
+  println!("Available versions for {}[{}]: {:?}", name, version_req, versions);
+
+  for version in versions {
+    if version_req == &version {
+      let dependencies = get_dependencies(name, &version)?;
+      let info = PackageInfo { name: name.to_owned(), version: version.clone() };
+      let package = Package { info, dependencies: dependencies.clone() };
+
+      println!("Matching version for {}: {} with dependencies: {:?}", name, version, dependencies);
+
+      // Recursively populate dependencies
+      for dep in &package.dependencies {
+        populate_package_versions(graph, &dep.name, &dep.version)?;
+      }
+
+      graph.packages.entry(name.to_string()).or_default().push(package);
+      break;
     }
   }
 
-  Ok(resolved)
+  Ok(())
 }
 
-/// Recursively resolves a single package and its dependencies using MVS
+fn resolve_dependencies(graph: &DependencyGraph) -> Result<(Resolved, Dependencies), Box<dyn Error>> {
+  let mut resolved = Resolved::new();
+  let mut resolved_deps = Dependencies::new();
+
+  for (name, pkgs) in &graph.packages {
+    for pkg in pkgs {
+      let pkg = PackageInfo { name: name.clone(), version: pkg.info.version.clone() };
+      resolve_package(pkg, graph, &mut resolved, &mut resolved_deps)?;
+    }
+  }
+
+  Ok((resolved, resolved_deps))
+}
+
+// TODO: MVS
 fn resolve_package(
-  name: &str,
+  pkg: PackageInfo,
   graph: &DependencyGraph,
-  resolved: &mut BTreeMap<String, Version>,
-  visited: &mut BTreeSet<String>,
+  resolved: &mut Resolved,
+  resolved_deps: &mut Dependencies,
 ) -> Result<(), Box<dyn Error>> {
-  if visited.contains(name) {
-    return Ok(());
-  }
+  println!("resolve_package for {}[{}]", pkg.name, pkg.version);
 
-  visited.insert(name.to_string());
+  let versions = graph.packages.get(&pkg.name).ok_or_else(|| format!("package '{}' not found", pkg.name))?;
+  let selected = versions.iter().find(|package| pkg.version == package.info.version).unwrap().clone();
 
-  let versions = graph.packages.get(name).ok_or_else(|| format!("package '{}' not found", name))?;
+  resolved.entry(pkg.name.to_owned()).or_default().push(selected.info.version.clone());
+  resolved_deps.insert(pkg, selected.dependencies);
 
-  // MVS: Select the minimum version that satisfies all constraints
-  let mut selected_version = None;
-  for package in versions {
-    if selected_version.as_ref().map_or(true, |v| package.version < *v) {
-      let is_compatible = package
-        .dependencies
-        .iter()
-        .all(|dep| resolved.get(&dep.name).map_or(true, |v| dep.version_req.matches(v)));
-
-      if is_compatible {
-        selected_version = Some(package.version.clone());
-      }
-    }
-  }
-
-  match selected_version {
-    Some(version) => {
-      resolved.insert(name.to_string(), version.clone());
-
-      // Resolve dependencies of the selected version
-      let selected_package = versions.iter().find(|p| p.version == version).unwrap();
-      for dep in &selected_package.dependencies {
-        resolve_package(&dep.name, graph, resolved, visited)?;
-      }
-      Ok(())
-    }
-    None => Err(format!("unable to find a compatible version for '{}'", name).into()),
-  }
+  Ok(())
 }
 
 /// Retrieves all versions for a given package
@@ -137,8 +126,8 @@ fn get_all_versions(name: &str) -> Result<Vec<Version>, Box<dyn Error>> {
 }
 
 /// Retrieves dependencies for a specific version of a package
-fn get_dependencies(name: &str, version: &Version) -> Result<Vec<Dependency>, Box<dyn Error>> {
-  let local_path = repo::clone(name, &version.to_string(), None)?;
+fn get_dependencies(name: &str, version: &Version) -> Result<Vec<PackageInfo>, Box<dyn Error>> {
+  let local_path = repo::clone(name, &version.to_string())?;
 
   let Ok(mut config) = get_config(&local_path.join(CONFIG_FILE).to_string_lossy()) else {
     // TODO: if config is not present, it's not a bend project, should return an error
@@ -149,11 +138,17 @@ fn get_dependencies(name: &str, version: &Version) -> Result<Vec<Dependency>, Bo
   let mut deps = Vec::new();
 
   for (name, item) in get_deps(&mut config)?.iter() {
-    let ver = get_version(item).ok_or_else(|| format!("invalid version format '{}'", item))?;
-    let version_req = VersionReq::parse(ver)?;
+    let version = get_version(item).ok_or_else(|| format!("invalid version format '{}'", item))?;
+    let version = fun_name(version);
 
-    deps.push(Dependency { name: name.to_string(), version_req });
+    deps.push(PackageInfo { name: name.to_owned(), version });
   }
 
   Ok(deps)
+}
+
+// TEMPORARY: Remove when mod.toml only has the fully resolved version
+fn fun_name(ver: &str) -> Version {
+  let a = VersionReq::parse(ver).unwrap().comparators.remove(0);
+  Version::new(a.major, a.minor.unwrap_or_default(), a.patch.unwrap_or_default())
 }
