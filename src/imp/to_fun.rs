@@ -32,7 +32,7 @@ impl Definition {
   pub fn to_fun(self) -> Result<fun::Definition, Diagnostics> {
     let body = self.body.into_fun().map_err(|e| {
       let mut diags = Diagnostics::default();
-      diags.add_function_error(e.display_only_messages(), self.name.clone(), Some(&self.source));
+      diags.add_function_error(e, self.name.clone(), Some(&self.source));
       diags
     })?;
 
@@ -82,7 +82,7 @@ enum StmtToFun {
   Assign(bool, fun::Pattern, fun::Term),
 }
 
-fn take(t: Stmt) -> Result<(bool, Option<fun::Pattern>, fun::Term), Diagnostics> {
+fn take(t: Stmt) -> Result<(bool, Option<fun::Pattern>, fun::Term), String> {
   match t.into_fun()? {
     StmtToFun::Return(ret) => Ok((false, None, ret)),
     StmtToFun::Assign(x, pat, val) => Ok((x, Some(pat), val)),
@@ -98,7 +98,7 @@ fn wrap(nxt: Option<fun::Pattern>, term: fun::Term, ask: bool) -> StmtToFun {
 }
 
 impl Stmt {
-  fn into_fun(self) -> Result<StmtToFun, Diagnostics> {
+  fn into_fun(self) -> Result<StmtToFun, String> {
     // TODO: Refactor this to not repeat everything.
     // TODO: When we have an error with an assignment, we should show the offending assignment (eg. "{pat} = ...").
     let stmt_to_fun = match self {
@@ -355,7 +355,7 @@ impl Stmt {
       Stmt::Return { term } => StmtToFun::Return(term.to_fun()),
       Stmt::LocalDef { def, nxt } => {
         let (ask, nxt_pat, nxt) = take(*nxt)?;
-        let def = def.to_fun()?;
+        let def = def.to_fun().map_err(|e| e.display_only_messages().to_string())?;
         let term = fun::Term::Def { def, nxt: Box::new(nxt) };
         wrap(nxt_pat, term, ask)
       }
@@ -470,7 +470,7 @@ fn wrap_nxt_assign_stmt(
   nxt: Option<Box<Stmt>>,
   pat: Option<fun::Pattern>,
   ask: bool,
-) -> Result<StmtToFun, Diagnostics> {
+) -> Result<StmtToFun, String> {
   if let Some(nxt) = nxt {
     if let Some(pat) = pat {
       let (ask_nxt, nxt_pat, nxt) = take(*nxt)?;
