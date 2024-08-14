@@ -1,17 +1,27 @@
 use super::tree_children;
-use crate::{diagnostics::Diagnostics, fun::Name};
+use crate::{diagnostics::Diagnostics, fun::Name, CompilerTarget};
 use hvm::ast::{Book, Net, Tree};
 
-pub const MAX_NET_SIZE: usize = 64;
+pub const MAX_NET_SIZE_C: usize = 4095;
+pub const MAX_NET_SIZE_CUDA: usize = 64;
 
-pub fn check_net_sizes(book: &Book, diagnostics: &mut Diagnostics) -> Result<(), Diagnostics> {
+pub fn check_net_sizes(
+  book: &Book,
+  diagnostics: &mut Diagnostics,
+  target: &CompilerTarget,
+) -> Result<(), Diagnostics> {
+  let (net_size_bound, target_lang) = match target {
+    CompilerTarget::Cuda => (MAX_NET_SIZE_CUDA, "Cuda"),
+    _ => (MAX_NET_SIZE_C, "C"),
+  };
+
   diagnostics.start_pass();
 
   for (name, net) in &book.defs {
     let nodes = count_nodes(net);
-    if nodes > MAX_NET_SIZE {
+    if nodes > net_size_bound {
       diagnostics.add_function_error(
-        format!("Definition is too large for hvm (size={nodes}, max size={MAX_NET_SIZE}). Please break it into smaller pieces."),
+        format!("Definition is too large for HVM {target_lang} (size={nodes}, max size={net_size_bound}). Please break it into smaller pieces."),
         Name::new(name),
         None
       );

@@ -30,6 +30,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Improve error messages in branching statements. ([#464][gh-464])
 - Change branches to support ending with ask statements. ([#629][gh-629])
 - Improve hexadecimal and binary floating numbers. ([#648][gh-648])
+- Change IO functions to return Result. ([#657][gh-657])
 
 ## [0.2.36] - 2024-07-04
 
@@ -417,5 +418,6 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-642]: https://github.com/HigherOrderCO/Bend/issues/642
 [gh-643]: https://github.com/HigherOrderCO/Bend/issues/643
 [gh-648]: https://github.com/HigherOrderCO/Bend/issues/648
+[gh-657]: https://github.com/HigherOrderCO/Bend/issues/657
 [gh-659]: https://github.com/HigherOrderCO/Bend/pull/659
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD

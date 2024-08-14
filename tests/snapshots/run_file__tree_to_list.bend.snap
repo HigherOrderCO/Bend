@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/tree_to_list.bend
+---
+NumScott:
+[4, 3, 2, 1]
+
+Scott:
+[4, 3, 2, 1]

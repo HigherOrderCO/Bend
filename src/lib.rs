@@ -2,7 +2,7 @@ use crate::{
   fun::{book_to_hvm, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Term},
   hvm::{
     add_recursive_priority::add_recursive_priority,
-    check_net_size::{check_net_sizes, MAX_NET_SIZE},
+    check_net_size::{check_net_sizes, MAX_NET_SIZE_CUDA},
     eta_reduce::eta_reduce_hvm_net,
     hvm_book_show_pretty,
     inline::inline_hvm_book,
@@ -73,7 +73,7 @@ pub fn compile_book(
   }
 
   if opts.check_net_size {
-    check_net_sizes(&hvm_book, &mut diagnostics)?;
+    check_net_sizes(&hvm_book, &mut diagnostics, &opts.target_architecture)?;
   }
 
   add_recursive_priority(&mut hvm_book);
@@ -143,7 +143,7 @@ pub fn desugar_book(
   ctx.check_unbound_vars()?;
 
   if opts.float_combinators {
-    ctx.book.float_combinators(MAX_NET_SIZE);
+    ctx.book.float_combinators(MAX_NET_SIZE_CUDA);
   }
   // sanity check
   ctx.check_unbound_refs()?;
@@ -330,7 +330,17 @@ impl OptLevel {
 }
 
 #[derive(Clone, Debug)]
+pub enum CompilerTarget {
+  C,
+  Cuda,
+  Unknown,
+}
+
+#[derive(Clone, Debug)]
 pub struct CompileOpts {
+  /// The Compiler target architecture
+  pub target_architecture: CompilerTarget,
+
   /// Enables [hvm::eta_reduce].
   pub eta: bool,
 
@@ -361,6 +371,7 @@ impl CompileOpts {
   #[must_use]
   pub fn set_all(self) -> Self {
     Self {
+      target_architecture: self.target_architecture,
       eta: true,
       prune: true,
       float_combinators: true,
@@ -376,6 +387,7 @@ impl CompileOpts {
   #[must_use]
   pub fn set_no_all(self) -> Self {
     Self {
+      target_architecture: self.target_architecture,
       eta: false,
       prune: false,
       linearize_matches: OptLevel::Disabled,
@@ -406,13 +418,14 @@ impl Default for CompileOpts {
   /// Uses num-scott ADT encoding.
   fn default() -> Self {
     Self {
+      target_architecture: CompilerTarget::Unknown,
       eta: true,
       prune: false,
       linearize_matches: OptLevel::Enabled,
       float_combinators: true,
       merge: false,
       inline: false,
-      check_net_size: false,
+      check_net_size: true,
       adt_encoding: AdtEncoding::NumScott,
     }
   }
