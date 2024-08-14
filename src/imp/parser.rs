@@ -1081,7 +1081,7 @@ impl<'a> PyParser<'a> {
     }
     if let Some(field) = fields.find_repeated_names().into_iter().next() {
       let msg = format!("Found a repeated field '{field}' in constructor {ctr_name}.");
-      return self.expected_and("field", &msg);
+      return self.expected_message(&msg);
     }
     Ok(Variant { name: ctr_name, fields })
   }
@@ -1103,7 +1103,7 @@ impl<'a> PyParser<'a> {
     };
     if let Some(field) = fields.find_repeated_names().into_iter().next() {
       let msg = format!("Found a repeated field '{field}' in object {name}.");
-      return self.expected_and("field", &msg);
+      return self.expected_message(&msg);
     }
     if !self.is_eof() {
       self.consume_new_line()?;

@@ -255,7 +255,7 @@ impl<'a> TermParser<'a> {
       let fields = self.list_like(parse_field, "", ")", "", false, 0)?;
       if let Some(field) = fields.find_repeated_names().into_iter().next() {
         let msg = format!("Found a repeated field '{field}' in constructor {ctr_name}.");
-        return self.expected_and("field", &msg)?;
+        return self.expected_message(&msg)?;
       }
       Ok((ctr_name, fields))
     } else {
@@ -1200,6 +1200,17 @@ impl Indent {
 impl<'a> ParserCommons<'a> for TermParser<'a> {}
 
 pub trait ParserCommons<'a>: Parser<'a> {
+  /// Generates an error message that does not print expected terms.
+  fn expected_message<T>(&mut self, msg: &str) -> ParseResult<T> {
+    let ini_idx = *self.index();
+    let end_idx = *self.index() + 1;
+
+    let is_eof = self.is_eof();
+    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { Ok(()) });
+    let msg = format!("\x1b[1m- information:\x1b[0m {}\n\x1b[1m- location:\x1b[0m{}", msg, detected);
+    self.with_ctx(Err(msg), ini_idx..end_idx)
+  }
+
   fn labelled<T>(&mut self, parser: impl Fn(&mut Self) -> ParseResult<T>, label: &str) -> ParseResult<T> {
     match parser(self) {
       Ok(val) => Ok(val),
