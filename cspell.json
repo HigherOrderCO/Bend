@@ -21,6 +21,7 @@
     "concat",
     "ctrs",
     "cuda",
+    "curr",
     "datatypes",
     "Deque",
     "destructures",
