@@ -1,11 +1,11 @@
 use super::{AssignPattern, Definition, Expr, InPlaceOp, Stmt};
 use crate::{
-  diagnostics::Diagnostics,
+  diagnostics::{Diagnostics, FileSpan},
   fun::{
     self,
     builtins::{LCONS, LNIL},
     parser::ParseBook,
-    Book, Name,
+    Book, Name, Source,
   },
 };
 
@@ -29,12 +29,24 @@ impl ParseBook {
 }
 
 impl Definition {
-  pub fn to_fun(self) -> Result<fun::Definition, String> {
-    let body = self.body.into_fun().map_err(|e| format!("In function '{}': {}", self.name, e))?;
+  pub fn to_fun(self) -> Result<fun::Definition, Diagnostics> {
+    let span = match self.source {
+      Source::Local(span) => Some(FileSpan::new(span, None)),
+      _ => None,
+    };
+
+    let body = self.body.into_fun().map_err(|e| {
+      let mut diags = Diagnostics::default();
+      diags.add_function_error(e.display_only_messages(), self.name.clone(), span.clone());
+      diags
+    })?;
+
     let body = match body {
       StmtToFun::Return(term) => term,
       StmtToFun::Assign(..) => {
-        return Err(format!("Function '{}' doesn't end with a return statement", self.name));
+        let mut diags = Diagnostics::default();
+        diags.add_function_error("Function doesn't end with a return statement", self.name, span);
+        return Err(diags);
       }
     };
 
@@ -71,7 +83,7 @@ enum StmtToFun {
   Assign(bool, fun::Pattern, fun::Term),
 }
 
-fn take(t: Stmt) -> Result<(bool, Option<fun::Pattern>, fun::Term), String> {
+fn take(t: Stmt) -> Result<(bool, Option<fun::Pattern>, fun::Term), Diagnostics> {
   match t.into_fun()? {
     StmtToFun::Return(ret) => Ok((false, None, ret)),
     StmtToFun::Assign(x, pat, val) => Ok((x, Some(pat), val)),
@@ -87,7 +99,7 @@ fn wrap(nxt: Option<fun::Pattern>, term: fun::Term, ask: bool) -> StmtToFun {
 }
 
 impl Stmt {
-  fn into_fun(self) -> Result<StmtToFun, String> {
+  fn into_fun(self) -> Result<StmtToFun, Diagnostics> {
     // TODO: Refactor this to not repeat everything.
     // TODO: When we have an error with an assignment, we should show the offending assignment (eg. "{pat} = ...").
     let stmt_to_fun = match self {
@@ -104,7 +116,7 @@ impl Stmt {
         wrap(nxt_pat, term, ask)
       }
       Stmt::Assign { pat: AssignPattern::MapSet(..), val: _, nxt: None } => {
-        return Err("Branch ends with map assignment.".to_string());
+        return Err("Branch ends with map assignment.".to_string())?;
       }
       Stmt::Assign { pat, val, nxt: Some(nxt) } => {
         let pat = pat.into_fun();
@@ -183,17 +195,17 @@ impl Stmt {
             (ask && ask_, Some(tp), t, e)
           }
           (StmtToFun::Assign(..), StmtToFun::Assign(..)) => {
-            return Err("'if' branches end with different assignments.".to_string());
+            return Err("'if' branches end with different assignments.".to_string())?;
           }
           (StmtToFun::Return(..), StmtToFun::Assign(..)) => {
             return Err(
               "Expected 'else' branch from 'if' to return, but it ends with assignment.".to_string(),
-            );
+            )?;
           }
           (StmtToFun::Assign(..), StmtToFun::Return(..)) => {
             return Err(
               "Expected 'else' branch from 'if' to end with assignment, but it returns.".to_string(),
-            );
+            )?;
           }
         };
         let arms = vec![else_, then];
@@ -219,13 +231,13 @@ impl Stmt {
           let (arm_ask, arm_pat, arm_rgt) = take(arm.rgt)?;
           match (&arm_pat, &fst_pat) {
             (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat || arm_ask != fst_ask => {
-              return Err("'match' arms end with different assignments.".to_string());
+              return Err("'match' arms end with different assignments.".to_string())?;
             }
             (Some(_), None) => {
-              return Err("Expected 'match' arms to end with assignment, but it returns.".to_string());
+              return Err("Expected 'match' arms to end with assignment, but it returns.".to_string())?;
             }
             (None, Some(_)) => {
-              return Err("Expected 'match' arms to return, but it ends with assignment.".to_string());
+              return Err("Expected 'match' arms to return, but it ends with assignment.".to_string())?;
             }
             (Some(_), Some(_)) => fun_arms.push((arm.lft, vec![], arm_rgt)),
             (None, None) => fun_arms.push((arm.lft, vec![], arm_rgt)),
@@ -246,13 +258,13 @@ impl Stmt {
           let (arm_ask, arm_pat, arm) = take(arm)?;
           match (&arm_pat, &fst_pat) {
             (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat || arm_ask != fst_ask => {
-              return Err("'switch' arms end with different assignments.".to_string());
+              return Err("'switch' arms end with different assignments.".to_string())?;
             }
             (Some(_), None) => {
-              return Err("Expected 'switch' arms to end with assignment, but it returns.".to_string());
+              return Err("Expected 'switch' arms to end with assignment, but it returns.".to_string())?;
             }
             (None, Some(_)) => {
-              return Err("Expected 'switch' arms to return, but it ends with assignment.".to_string());
+              return Err("Expected 'switch' arms to return, but it ends with assignment.".to_string())?;
             }
             (Some(_), Some(_)) => fun_arms.push(arm),
             (None, None) => fun_arms.push(arm),
@@ -274,13 +286,13 @@ impl Stmt {
           let (arm_ask, arm_pat, arm_rgt) = take(arm.rgt)?;
           match (&arm_pat, &fst_pat) {
             (Some(arm_pat), Some(fst_pat)) if arm_pat != fst_pat || arm_ask != fst_ask => {
-              return Err("'fold' arms end with different assignments.".to_string());
+              return Err("'fold' arms end with different assignments.".to_string())?;
             }
             (Some(_), None) => {
-              return Err("Expected 'fold' arms to end with assignment, but it returns.".to_string());
+              return Err("Expected 'fold' arms to end with assignment, but it returns.".to_string())?;
             }
             (None, Some(_)) => {
-              return Err("Expected 'fold' arms to return, but it ends with assignment.".to_string());
+              return Err("Expected 'fold' arms to return, but it ends with assignment.".to_string())?;
             }
             (Some(_), Some(_)) => fun_arms.push((arm.lft, vec![], arm_rgt)),
             (None, None) => fun_arms.push((arm.lft, vec![], arm_rgt)),
@@ -298,17 +310,17 @@ impl Stmt {
             (aa && ba, Some(sp), s, b)
           }
           (StmtToFun::Assign(..), StmtToFun::Assign(..)) => {
-            return Err("'bend' branches end with different assignments.".to_string());
+            return Err("'bend' branches end with different assignments.".to_string())?;
           }
           (StmtToFun::Return(..), StmtToFun::Assign(..)) => {
             return Err(
               "Expected 'else' branch from 'bend' to return, but it ends with assignment.".to_string(),
-            );
+            )?;
           }
           (StmtToFun::Assign(..), StmtToFun::Return(..)) => {
             return Err(
               "Expected 'else' branch from 'bend' to end with assignment, but it returns.".to_string(),
-            );
+            )?;
           }
         };
         let term =
@@ -459,7 +471,7 @@ fn wrap_nxt_assign_stmt(
   nxt: Option<Box<Stmt>>,
   pat: Option<fun::Pattern>,
   ask: bool,
-) -> Result<StmtToFun, String> {
+) -> Result<StmtToFun, Diagnostics> {
   if let Some(nxt) = nxt {
     if let Some(pat) = pat {
       let (ask_nxt, nxt_pat, nxt) = take(*nxt)?;
@@ -470,7 +482,7 @@ fn wrap_nxt_assign_stmt(
       };
       Ok(wrap(nxt_pat, term, ask_nxt))
     } else {
-      Err("Statement ends with return but is not at end of function.".to_string())
+      Err("Statement ends with return but is not at end of function.".to_string())?
     }
   } else if let Some(pat) = pat {
     Ok(StmtToFun::Assign(ask, pat, term))

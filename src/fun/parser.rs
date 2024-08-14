@@ -165,7 +165,7 @@ impl<'a> TermParser<'a> {
           self.index = rewind_index;
           let (nam, ctrs) = self.parse_datatype()?;
           let end_idx = *self.index();
-          let span = TextSpan::from_byte_span(self.input(), (ini_idx, end_idx));
+          let span = TextSpan::from_byte_span(self.input(), ini_idx..end_idx);
           let source = if builtin { Source::Builtin } else { Source::Local(span) };
           let adt = Adt { ctrs, source };
           self.add_fun_type(&mut book, nam, adt, ini_idx..end_idx)?;
@@ -278,7 +278,7 @@ impl<'a> TermParser<'a> {
     let body = p.parse_net()?;
     *self.index() = ini_idx + *p.index();
     let end_idx = *self.index();
-    let span = TextSpan::from_byte_span(self.input(), (ini_idx, end_idx));
+    let span = TextSpan::from_byte_span(self.input(), ini_idx..end_idx);
     let source = if builtin { Source::Builtin } else { Source::Local(span) };
     let def = HvmDefinition { name: name.clone(), body, source };
     Ok(def)
@@ -653,7 +653,7 @@ impl<'a> TermParser<'a> {
               if name == "def" {
                 // parse the nxt def term.
                 self.index = nxt_def;
-                let span = TextSpan::from_byte_span(self.input(), (nxt_def, *self.index()));
+                let span = TextSpan::from_byte_span(self.input(), nxt_def..*self.index());
                 let def = FunDefinition::new(name, rules, Source::Local(span));
                 return Ok(Term::Def { def, nxt: Box::new(self.parse_term()?) });
               }
@@ -672,7 +672,7 @@ impl<'a> TermParser<'a> {
           }
         }
         let nxt = self.parse_term()?;
-        let span = TextSpan::from_byte_span(self.input(), (nxt_term, *self.index()));
+        let span = TextSpan::from_byte_span(self.input(), nxt_term..*self.index());
         let def = FunDefinition::new(cur_name, rules, Source::Local(span));
         return Ok(Term::Def { def, nxt: Box::new(nxt) });
       }
@@ -955,7 +955,7 @@ impl<'a> TermParser<'a> {
       // Adding the first rule of a new definition
       (None, _) => {
         self.check_top_level_redefinition(name, book, span.clone())?;
-        let span = TextSpan::from_byte_span(self.input(), (span.start, span.end));
+        let span = TextSpan::from_byte_span(self.input(), span.start..span.end);
         let source = if builtin { Source::Builtin } else { Source::Local(span) };
         book.fun_defs.insert(name.clone(), FunDefinition::new(name.clone(), vec![rule], source));
       }
@@ -971,7 +971,7 @@ impl<'a> TermParser<'a> {
     builtin: bool,
   ) -> ParseResult<()> {
     self.check_top_level_redefinition(&def.name, book, span.clone())?;
-    let span = TextSpan::from_byte_span(self.input(), (span.start, span.end));
+    let span = TextSpan::from_byte_span(self.input(), span.start..span.end);
     let source = if builtin { Source::Builtin } else { Source::Local(span) };
     def.source = source;
     book.imp_defs.insert(def.name.clone(), def);
@@ -992,7 +992,7 @@ impl<'a> TermParser<'a> {
     builtin: bool,
   ) -> ParseResult<()> {
     self.check_type_redefinition(&enum_.name, book, span.clone())?;
-    let text_span = TextSpan::from_byte_span(self.input(), (span.start, span.end));
+    let text_span = TextSpan::from_byte_span(self.input(), span.start..span.end);
     let source = if builtin { Source::Builtin } else { Source::Local(text_span) };
     let mut adt = Adt { ctrs: Default::default(), source };
     for variant in enum_.variants {
@@ -1042,7 +1042,7 @@ impl<'a> TermParser<'a> {
   ) -> ParseResult<()> {
     self.check_type_redefinition(&obj.name, book, span.clone())?;
     self.check_top_level_redefinition(&obj.name, book, span.clone())?;
-    let span = TextSpan::from_byte_span(self.input(), (span.start, span.end));
+    let span = TextSpan::from_byte_span(self.input(), span.start..span.end);
     let source = if builtin { Source::Builtin } else { Source::Local(span) };
     let mut adt = Adt { ctrs: Default::default(), source };
     book.ctrs.insert(obj.name.clone(), obj.name.clone());

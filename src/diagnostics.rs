@@ -4,6 +4,7 @@ use crate::fun::{display::DisplayFn, Name};
 use std::{
   collections::BTreeMap,
   fmt::{Display, Formatter},
+  ops::Range,
 };
 
 pub const ERR_INDENT_SIZE: usize = 2;
@@ -43,6 +44,8 @@ pub enum DiagnosticOrigin {
   Book,
   /// An error in a pattern-matching function definition rule.
   Rule(Name),
+  /// An error when transforming `imp` syntax into `fun`.
+  Function(Name),
   /// An error in a compiled inet.
   Inet(String),
   /// An error during readback of hvm-core run results.
@@ -83,13 +86,18 @@ impl Diagnostics {
     self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Book, None);
   }
 
-  pub fn add_rule_error(&mut self, err: impl std::fmt::Display, def_name: Name) {
+  pub fn add_rule_error(&mut self, err: impl std::fmt::Display, name: Name) {
+    self.err_counter += 1;
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Rule(name.def_name_from_generated()), None);
+  }
+
+  pub fn add_function_error(&mut self, err: impl std::fmt::Display, name: Name, span: Option<FileSpan>) {
     self.err_counter += 1;
     self.add_diagnostic(
       err,
       Severity::Error,
-      DiagnosticOrigin::Rule(def_name.def_name_from_generated()),
-      None,
+      DiagnosticOrigin::Function(name.def_name_from_generated()),
+      span,
     );
   }
 
@@ -122,7 +130,7 @@ impl Diagnostics {
 
   pub fn add_diagnostic(
     &mut self,
-    msg: impl ToString,
+    msg: impl std::fmt::Display,
     severity: Severity,
     orig: DiagnosticOrigin,
     range: Option<FileSpan>,
@@ -214,6 +222,12 @@ impl Diagnostics {
                 writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
               }
             }
+            DiagnosticOrigin::Function(nam) => {
+              writeln!(f, "\x1b[1mIn function '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
+              for err in errs {
+                writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
+              }
+            }
             DiagnosticOrigin::Inet(nam) => {
               writeln!(f, "\x1b[1mIn compiled inet '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
               for err in errs {
@@ -232,6 +246,15 @@ impl Diagnostics {
       }
       if has_msg {
         writeln!(f)?;
+      }
+      Ok(())
+    })
+  }
+
+  pub fn display_only_messages(&self) -> impl std::fmt::Display + '_ {
+    DisplayFn(move |f| {
+      for err in self.diagnostics.values().flatten() {
+        writeln!(f, "{err}")?;
       }
       Ok(())
     })
@@ -263,11 +286,15 @@ impl From<String> for Diagnostics {
 }
 
 impl From<ParseError> for Diagnostics {
+  /// Transforms a parse error into `Diagnostics`.
+  ///
+  /// NOTE: Since `ParseError` does not include the source code, we can't get the `TextLocation` of the error,
+  /// so it is not included in the diagnostic.
+  /// range is set as None.
   fn from(value: ParseError) -> Self {
     Self {
       diagnostics: BTreeMap::from_iter([(
         DiagnosticOrigin::Parsing,
-        // TODO: range is not because we're missing the origin file, can we fix this?
         vec![Diagnostic { message: value.into(), severity: Severity::Error, span: None }],
       )]),
       ..Default::default()
@@ -315,6 +342,8 @@ impl Default for DiagnosticsConfig {
 
 impl Display for Diagnostic {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    // TODO: this could be problematic when printing multiple errors from the same file
+    // currently, there shouldn't be any `Diagnostics` with multiple problems `FileSpan`s
     match &self.span {
       Some(FileSpan { file: Some(file), .. }) => write!(f, "In {} :\n{}", file, self.message),
       _ => write!(f, "{}", self.message),
@@ -330,6 +359,10 @@ impl Diagnostic {
         DiagnosticOrigin::Book => writeln!(f, "{self}")?,
         DiagnosticOrigin::Rule(nam) => {
           writeln!(f, "\x1b[1mIn definition '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
+          writeln!(f, "{:ERR_INDENT_SIZE$}{self}", "")?;
+        }
+        DiagnosticOrigin::Function(nam) => {
+          writeln!(f, "\x1b[1mIn function '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
           writeln!(f, "{:ERR_INDENT_SIZE$}{self}", "")?;
         }
         DiagnosticOrigin::Inet(nam) => {
@@ -357,6 +390,7 @@ impl TextLocation {
     TextLocation { line, char }
   }
 
+  /// Transforms a `usize` byte index on `code` into a `TextLocation`.
   pub fn from_byte_loc(code: &str, loc: usize) -> Self {
     let code = code.as_bytes();
     let mut line = 0;
@@ -387,9 +421,10 @@ impl TextSpan {
     TextSpan { start, end }
   }
 
-  pub fn from_byte_span(code: &str, span: (usize, usize)) -> Self {
+  /// Transforms a `usize` byte range on `code` into a `TextLocation`.
+  pub fn from_byte_span(code: &str, span: Range<usize>) -> Self {
     // Will loop for way too long otherwise
-    assert!(span.0 <= span.1);
+    assert!(span.start <= span.end);
 
     let code = code.as_bytes();
     let mut start_line = 0;
@@ -398,7 +433,7 @@ impl TextSpan {
     let mut end_char;
 
     let mut curr_idx = 0;
-    while curr_idx < span.0 && curr_idx < code.len() {
+    while curr_idx < span.start && curr_idx < code.len() {
       if code[curr_idx] == b'\n' {
         start_line += 1;
         start_char = 0;
@@ -410,7 +445,7 @@ impl TextSpan {
 
     end_line = start_line;
     end_char = start_char;
-    while curr_idx < span.1 && curr_idx < code.len() {
+    while curr_idx < span.end && curr_idx < code.len() {
       if code[curr_idx] == b'\n' {
         end_line += 1;
         end_char = 0;

@@ -43,7 +43,7 @@ pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<P
   book.source = Name::new(origin.to_string_lossy());
   TermParser::new(code).parse_book(book, false).map_err(|err| {
     let mut diagnostics = Diagnostics::default();
-    let span = TextSpan::from_byte_span(code, err.span);
+    let span = TextSpan::from_byte_span(code, err.span.0..err.span.1);
     diagnostics.add_parsing_error(err, FileSpan { span, file: Some(origin.to_string_lossy().into()) });
     diagnostics
   })
