@@ -1,11 +1,11 @@
 use super::{AssignPattern, Definition, Expr, InPlaceOp, Stmt};
 use crate::{
-  diagnostics::{Diagnostics, FileSpan},
+  diagnostics::Diagnostics,
   fun::{
     self,
     builtins::{LCONS, LNIL},
     parser::ParseBook,
-    Book, Name, Source,
+    Book, Name,
   },
 };
 
@@ -30,14 +30,9 @@ impl ParseBook {
 
 impl Definition {
   pub fn to_fun(self) -> Result<fun::Definition, Diagnostics> {
-    let span = match self.source {
-      Source::Local(span) => Some(FileSpan::new(span, None)),
-      _ => None,
-    };
-
     let body = self.body.into_fun().map_err(|e| {
       let mut diags = Diagnostics::default();
-      diags.add_function_error(e.display_only_messages(), self.name.clone(), span.clone());
+      diags.add_function_error(e.display_only_messages(), self.name.clone(), Some(&self.source));
       diags
     })?;
 
@@ -45,7 +40,11 @@ impl Definition {
       StmtToFun::Return(term) => term,
       StmtToFun::Assign(..) => {
         let mut diags = Diagnostics::default();
-        diags.add_function_error("Function doesn't end with a return statement", self.name, span);
+        diags.add_function_error(
+          "Function doesn't end with a return statement",
+          self.name,
+          Some(&self.source),
+        );
         return Err(diags);
       }
     };

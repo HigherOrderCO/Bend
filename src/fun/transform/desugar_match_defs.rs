@@ -23,10 +23,15 @@ impl Ctx<'_> {
         match err {
           DesugarMatchDefErr::AdtNotExhaustive { .. }
           | DesugarMatchDefErr::NumMissingDefault
-          | DesugarMatchDefErr::TypeMismatch { .. } => self.info.add_rule_error(err, def_name.clone()),
-          DesugarMatchDefErr::RepeatedBind { .. } => {
-            self.info.add_rule_warning(err, WarningType::RepeatedBind, def_name.clone(), None)
+          | DesugarMatchDefErr::TypeMismatch { .. } => {
+            self.info.add_function_error(err, def_name.clone(), Some(&def.source))
           }
+          DesugarMatchDefErr::RepeatedBind { .. } => self.info.add_function_warning(
+            err,
+            WarningType::RepeatedBind,
+            def_name.clone(),
+            Some(&def.source),
+          ),
         }
       }
     }

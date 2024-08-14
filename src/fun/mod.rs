@@ -1123,6 +1123,13 @@ impl Source {
   pub fn is_local(&self) -> bool {
     matches!(self, Source::Local(..))
   }
+
+  pub fn span(&self) -> Option<TextSpan> {
+    match self {
+      Source::Local(span) => Some(*span),
+      _ => None,
+    }
+  }
 }
 
 #[test]

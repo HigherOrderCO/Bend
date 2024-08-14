@@ -16,7 +16,7 @@ impl Ctx<'_> {
       let mut fresh = 0;
       for rule in def.rules.iter_mut() {
         if let Err(err) = rule.body.desugar_bend(&def.name, &mut fresh, &mut new_defs, &def.source) {
-          self.info.add_rule_error(err, def.name.clone());
+          self.info.add_function_error(err, def.name.clone(), Some(&def.source));
           break;
         }
       }

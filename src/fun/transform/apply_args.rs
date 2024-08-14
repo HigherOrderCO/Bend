@@ -23,9 +23,10 @@ impl Ctx<'_> {
       // Since we fatal error, no need to exit early
       let n_rules = main_def.rules.len();
       if n_rules != 1 {
-        self.info.add_rule_error(
+        self.info.add_function_error(
           format!("Expected the entrypoint function to have only one rule, found {n_rules}."),
           entrypoint.clone(),
+          None,
         );
       }
 
@@ -35,9 +36,10 @@ impl Ctx<'_> {
         if let Pattern::Var(var) = pat {
           main_body = Term::lam(Pattern::Var(var.clone()), main_body);
         } else {
-          self.info.add_rule_error(
+          self.info.add_function_error(
             format!("Expected the entrypoint function to only have variable patterns, found '{pat}'."),
             entrypoint.clone(),
+            None,
           );
         }
       }

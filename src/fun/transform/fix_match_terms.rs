@@ -51,17 +51,26 @@ impl Ctx<'_> {
         for err in errs {
           match err {
             FixMatchErr::AdtMismatch { .. } | FixMatchErr::NonExhaustiveMatch { .. } => {
-              self.info.add_rule_error(err, def.name.clone())
+              self.info.add_function_error(err, def.name.clone(), Some(&def.source))
             }
-            FixMatchErr::IrrefutableMatch { .. } => {
-              self.info.add_rule_warning(err, WarningType::IrrefutableMatch, def.name.clone(), None)
-            }
-            FixMatchErr::UnreachableMatchArms { .. } => {
-              self.info.add_rule_warning(err, WarningType::UnreachableMatch, def.name.clone(), None)
-            }
-            FixMatchErr::RedundantArm { .. } => {
-              self.info.add_rule_warning(err, WarningType::RedundantMatch, def.name.clone(), None)
-            }
+            FixMatchErr::IrrefutableMatch { .. } => self.info.add_function_warning(
+              err,
+              WarningType::IrrefutableMatch,
+              def.name.clone(),
+              Some(&def.source),
+            ),
+            FixMatchErr::UnreachableMatchArms { .. } => self.info.add_function_warning(
+              err,
+              WarningType::UnreachableMatch,
+              def.name.clone(),
+              Some(&def.source),
+            ),
+            FixMatchErr::RedundantArm { .. } => self.info.add_function_warning(
+              err,
+              WarningType::RedundantMatch,
+              def.name.clone(),
+              Some(&def.source),
+            ),
           }
         }
       }

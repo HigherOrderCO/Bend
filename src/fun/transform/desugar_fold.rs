@@ -43,7 +43,7 @@ impl Ctx<'_> {
           &def.source,
         );
         if let Err(e) = res {
-          self.info.add_rule_error(e, def.name.clone());
+          self.info.add_function_error(e, def.name.clone(), Some(&def.source));
         }
       }
     }

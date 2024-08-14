@@ -10,9 +10,10 @@ pub fn check_net_sizes(book: &Book, diagnostics: &mut Diagnostics) -> Result<(),
   for (name, net) in &book.defs {
     let nodes = count_nodes(net);
     if nodes > MAX_NET_SIZE {
-      diagnostics.add_rule_error(
+      diagnostics.add_function_error(
         format!("Definition is too large for hvm (size={nodes}, max size={MAX_NET_SIZE}). Please break it into smaller pieces."),
         Name::new(name),
+        None
       );
     }
   }

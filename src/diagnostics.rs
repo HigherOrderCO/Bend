@@ -1,6 +1,6 @@
 use TSPL::ParseError;
 
-use crate::fun::{display::DisplayFn, Name};
+use crate::fun::{display::DisplayFn, Name, Source};
 use std::{
   collections::BTreeMap,
   fmt::{Display, Formatter},
@@ -42,9 +42,7 @@ pub enum DiagnosticOrigin {
   Parsing,
   /// An error from the relationship between multiple top-level definitions.
   Book,
-  /// An error in a pattern-matching function definition rule.
-  Rule(Name),
-  /// An error when transforming `imp` syntax into `fun`.
+  /// An error in a function definition.
   Function(Name),
   /// An error in a compiled inet.
   Inet(String),
@@ -86,13 +84,9 @@ impl Diagnostics {
     self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Book, None);
   }
 
-  pub fn add_rule_error(&mut self, err: impl std::fmt::Display, name: Name) {
+  pub fn add_function_error(&mut self, err: impl std::fmt::Display, name: Name, source: Option<&Source>) {
     self.err_counter += 1;
-    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Rule(name.def_name_from_generated()), None);
-  }
-
-  pub fn add_function_error(&mut self, err: impl std::fmt::Display, name: Name, span: Option<FileSpan>) {
-    self.err_counter += 1;
+    let span = source.and_then(|src| src.span()).map(|s| FileSpan::new(s, None));
     self.add_diagnostic(
       err,
       Severity::Error,
@@ -106,18 +100,19 @@ impl Diagnostics {
     self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Inet(def_name), None);
   }
 
-  pub fn add_rule_warning(
+  pub fn add_function_warning(
     &mut self,
     warn: impl std::fmt::Display,
     warn_type: WarningType,
     def_name: Name,
-    span: Option<FileSpan>,
+    source: Option<&Source>,
   ) {
     let severity = self.config.warning_severity(warn_type);
     if severity == Severity::Error {
       self.err_counter += 1;
     }
-    self.add_diagnostic(warn, severity, DiagnosticOrigin::Rule(def_name.def_name_from_generated()), span);
+    let span = source.and_then(|src| src.span()).map(|s| FileSpan::new(s, None));
+    self.add_diagnostic(warn, severity, DiagnosticOrigin::Function(def_name.def_name_from_generated()), span);
   }
 
   pub fn add_book_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType) {
@@ -147,7 +142,7 @@ impl Diagnostics {
     match result {
       Ok(t) => Some(t),
       Err(e) => {
-        self.add_rule_error(e, def_name);
+        self.add_function_error(e, def_name, None);
         None
       }
     }
@@ -216,14 +211,8 @@ impl Diagnostics {
                 writeln!(f, "{err}")?;
               }
             }
-            DiagnosticOrigin::Rule(nam) => {
-              writeln!(f, "\x1b[1mIn definition '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
-              for err in errs {
-                writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
-              }
-            }
             DiagnosticOrigin::Function(nam) => {
-              writeln!(f, "\x1b[1mIn function '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
+              writeln!(f, "\x1b[1mIn definition '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
               for err in errs {
                 writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
               }
@@ -357,12 +346,8 @@ impl Diagnostic {
       match origin {
         DiagnosticOrigin::Parsing => writeln!(f, "{self}")?,
         DiagnosticOrigin::Book => writeln!(f, "{self}")?,
-        DiagnosticOrigin::Rule(nam) => {
-          writeln!(f, "\x1b[1mIn definition '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
-          writeln!(f, "{:ERR_INDENT_SIZE$}{self}", "")?;
-        }
         DiagnosticOrigin::Function(nam) => {
-          writeln!(f, "\x1b[1mIn function '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
+          writeln!(f, "\x1b[1mIn definition '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
           writeln!(f, "{:ERR_INDENT_SIZE$}{self}", "")?;
         }
         DiagnosticOrigin::Inet(nam) => {
@@ -395,15 +380,15 @@ impl TextLocation {
     let code = code.as_bytes();
     let mut line = 0;
     let mut char = 0;
-    let mut curr_idx = 0;
-    while curr_idx < loc && curr_idx < code.len() {
-      if code[curr_idx] == b'\n' {
+    let mut cur_idx = 0;
+    while cur_idx < loc && cur_idx < code.len() {
+      if code[cur_idx] == b'\n' {
         line += 1;
         char = 0;
       } else {
         char += 1;
       }
-      curr_idx += 1;
+      cur_idx += 1;
     }
 
     TextLocation { line, char }
@@ -432,27 +417,27 @@ impl TextSpan {
     let mut end_line;
     let mut end_char;
 
-    let mut curr_idx = 0;
-    while curr_idx < span.start && curr_idx < code.len() {
-      if code[curr_idx] == b'\n' {
+    let mut cur_idx = 0;
+    while cur_idx < span.start && cur_idx < code.len() {
+      if code[cur_idx] == b'\n' {
         start_line += 1;
         start_char = 0;
       } else {
         start_char += 1;
       }
-      curr_idx += 1;
+      cur_idx += 1;
     }
 
     end_line = start_line;
     end_char = start_char;
-    while curr_idx < span.end && curr_idx < code.len() {
-      if code[curr_idx] == b'\n' {
+    while cur_idx < span.end && cur_idx < code.len() {
+      if code[cur_idx] == b'\n' {
         end_line += 1;
         end_char = 0;
       } else {
         end_char += 1;
       }
-      curr_idx += 1;
+      cur_idx += 1;
     }
 
     TextSpan::new(TextLocation::new(start_line, start_char), TextLocation::new(end_line, end_char))

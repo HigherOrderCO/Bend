@@ -14,7 +14,11 @@ impl Ctx<'_> {
         rule.body.check_unbound_refs(self.book, &mut unbounds);
       }
       for unbound in unbounds {
-        self.info.add_rule_error(format!("Reference to undefined function '{unbound}'"), def.name.clone());
+        self.info.add_function_error(
+          format!("Reference to undefined function '{unbound}'"),
+          def.name.clone(),
+          Some(&def.source),
+        );
       }
     }
     self.info.fatal(())

@@ -19,7 +19,7 @@ impl Ctx<'_> {
       }
 
       for err in errs {
-        self.info.add_rule_error(err, def.name.clone());
+        self.info.add_function_error(err, def.name.clone(), Some(&def.source));
       }
     }
 
