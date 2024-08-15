@@ -38,8 +38,12 @@ impl Ctx<'_> {
 
 impl Term {
   /// Checks that all variables are bound.
-  /// Precondition: References have been resolved, implicit binds have been solved.
-
+  ///
+  /// Precondition: References have been resolved, implicit binds
+  /// have been solved.
+  ///
+  /// `check_unbound_vars` should be called once before this, since
+  /// the original names will be lost after.
   pub fn check_unbound_vars<'a>(
     &'a mut self,
     scope: &mut HashMap<&'a Name, u64>,
@@ -127,17 +131,17 @@ impl std::fmt::Display for UnboundVarErr {
         if var == desugar_bend::RECURSIVE_KW {
           write!(
             f,
-            "Unbound variable '{}'.\n    Note: '{}' is only a keyword inside the 'when' arm of a 'bend'.",
+            "Unbound name '{}'.\n    Note: '{}' is only a keyword inside the 'when' arm of a 'bend'.",
             var,
             desugar_bend::RECURSIVE_KW
           )
         } else if let Some((pre, suf)) = var.rsplit_once('-') {
           write!(
             f,
-            "Unbound variable '{var}'. If you wanted to subtract '{pre}' from '{suf}', you must separate it with spaces ('{pre} - {suf}') since '-' is a valid name character."
+            "Unbound name '{var}'. If you wanted to subtract '{pre}' from '{suf}', you must separate it with spaces ('{pre} - {suf}') since '-' is a valid name character."
           )
         } else {
-          write!(f, "Unbound variable '{var}'.")
+          write!(f, "Unbound name '{var}'.")
         }
       }
       UnboundVarErr::Global { var, declared, used } => match (declared, used) {

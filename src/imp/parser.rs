@@ -900,6 +900,11 @@ impl<'a> PyParser<'a> {
 
     self.consume_indent_exactly(*indent)?;
     let (bod, nxt_indent) = self.parse_statement(indent)?;
+    let bod = Stmt::Use {
+      nam: Name::new("wrap"),
+      val: Box::new(Expr::Var { nam: Name::new(format!("{typ}/wrap")) }),
+      nxt: Box::new(bod),
+    };
     indent.exit_level();
 
     if nxt_indent == *indent {

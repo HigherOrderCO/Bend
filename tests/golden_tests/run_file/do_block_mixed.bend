@@ -4,6 +4,8 @@ Result/bind r nxt = match r {
   Result/Err: r
 }
 
+Result/wrap x = (Result/Ok x)
+
 main = with Result {
   let x = 1
   let y = (Result/Ok x)
