@@ -26,7 +26,7 @@ impl Ctx<'_> {
         self.info.add_function_error(
           format!("Expected the entrypoint function to have only one rule, found {n_rules}."),
           entrypoint.clone(),
-          None,
+          main_def.source.clone(),
         );
       }
 
@@ -39,7 +39,7 @@ impl Ctx<'_> {
           self.info.add_function_error(
             format!("Expected the entrypoint function to only have variable patterns, found '{pat}'."),
             entrypoint.clone(),
-            None,
+            main_def.source.clone(),
           );
         }
       }

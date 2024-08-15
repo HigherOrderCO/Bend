@@ -1,3 +1,4 @@
+use itertools::Itertools;
 use TSPL::ParseError;
 
 use crate::fun::{display::DisplayFn, Name, Source};
@@ -33,7 +34,7 @@ pub struct DiagnosticsConfig {
 pub struct Diagnostic {
   pub message: String,
   pub severity: Severity,
-  pub span: Option<FileSpan>,
+  pub source: Source,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -74,30 +75,29 @@ impl Diagnostics {
     Self { err_counter: 0, diagnostics: Default::default(), config }
   }
 
-  pub fn add_parsing_error(&mut self, err: impl std::fmt::Display, span: FileSpan) {
+  pub fn add_parsing_error(&mut self, err: impl std::fmt::Display, source: Source) {
     self.err_counter += 1;
-    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Parsing, Some(span));
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Parsing, source);
   }
 
   pub fn add_book_error(&mut self, err: impl std::fmt::Display) {
     self.err_counter += 1;
-    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Book, None);
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Book, Default::default());
   }
 
-  pub fn add_function_error(&mut self, err: impl std::fmt::Display, name: Name, source: Option<&Source>) {
+  pub fn add_function_error(&mut self, err: impl std::fmt::Display, name: Name, source: Source) {
     self.err_counter += 1;
-    let span = source.and_then(|src| src.span()).map(|s| FileSpan::new(s, None));
     self.add_diagnostic(
       err,
       Severity::Error,
       DiagnosticOrigin::Function(name.def_name_from_generated()),
-      span,
+      source,
     );
   }
 
   pub fn add_inet_error(&mut self, err: impl std::fmt::Display, def_name: String) {
     self.err_counter += 1;
-    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Inet(def_name), None);
+    self.add_diagnostic(err, Severity::Error, DiagnosticOrigin::Inet(def_name), Default::default());
   }
 
   pub fn add_function_warning(
@@ -105,14 +105,18 @@ impl Diagnostics {
     warn: impl std::fmt::Display,
     warn_type: WarningType,
     def_name: Name,
-    source: Option<&Source>,
+    source: Source,
   ) {
     let severity = self.config.warning_severity(warn_type);
     if severity == Severity::Error {
       self.err_counter += 1;
     }
-    let span = source.and_then(|src| src.span()).map(|s| FileSpan::new(s, None));
-    self.add_diagnostic(warn, severity, DiagnosticOrigin::Function(def_name.def_name_from_generated()), span);
+    self.add_diagnostic(
+      warn,
+      severity,
+      DiagnosticOrigin::Function(def_name.def_name_from_generated()),
+      source,
+    );
   }
 
   pub fn add_book_warning(&mut self, warn: impl std::fmt::Display, warn_type: WarningType) {
@@ -120,7 +124,7 @@ impl Diagnostics {
     if severity == Severity::Error {
       self.err_counter += 1;
     }
-    self.add_diagnostic(warn, severity, DiagnosticOrigin::Book, None);
+    self.add_diagnostic(warn, severity, DiagnosticOrigin::Book, Default::default());
   }
 
   pub fn add_diagnostic(
@@ -128,9 +132,9 @@ impl Diagnostics {
     msg: impl std::fmt::Display,
     severity: Severity,
     orig: DiagnosticOrigin,
-    range: Option<FileSpan>,
+    source: Source,
   ) {
-    let diag = Diagnostic { message: msg.to_string(), severity, span: range };
+    let diag = Diagnostic { message: msg.to_string(), severity, source };
     self.diagnostics.entry(orig).or_default().push(diag)
   }
 
@@ -142,7 +146,7 @@ impl Diagnostics {
     match result {
       Ok(t) => Some(t),
       Err(e) => {
-        self.add_function_error(e, def_name, None);
+        self.add_function_error(e, def_name, Default::default());
         None
       }
     }
@@ -189,52 +193,90 @@ impl Diagnostics {
   /// Returns a Display that prints the diagnostics with one of the given severities.
   pub fn display_with_severity(&self, severity: Severity) -> impl std::fmt::Display + '_ {
     DisplayFn(move |f| {
-      fn filter<'a>(
-        errs: impl IntoIterator<Item = &'a Diagnostic>,
-        severity: Severity,
-      ) -> impl Iterator<Item = &'a Diagnostic> {
-        errs.into_iter().filter(move |err| err.severity == severity)
-      }
+      // We want to print diagnostics information somewhat like this:
+      // ```
+      // In file A :
+      // In definition X :
+      //   {error}
+      // In definition Y :
+      //   {error}
+      //
+      // In file B :
+      // In compiled Inet Z :
+      //   {error}
+      // {...}
+      // ```
+      // The problem is, diagnostics data is currently structured as a mapping from something like
+      // DiagnosticOrigin to (DiagnosticMessage, DiagnosticFile), and we would need something
+      // like a mapping from DiagnosticFile to DiagnosticOrigin to DiagnosticMessage in order
+      // to print it cleanly. We might want to change it later to have this structure,
+      // but meanwhile, we do the transformations below to make the goal possible.
 
-      let mut has_msg = false;
-      for (orig, errs) in &self.diagnostics {
-        let mut errs = filter(errs, severity).peekable();
-        if errs.peek().is_some() {
-          match orig {
-            DiagnosticOrigin::Parsing => {
-              for err in errs {
-                writeln!(f, "{err}")?;
+      // Flatten Iter<(Origin, Vec<Diagnostic>)> into Iter<(Origin, Diagnostic)>
+      let diagnostics = self
+        .diagnostics
+        .iter()
+        .flat_map(|(origin, diagnostics)| diagnostics.iter().map(move |diagnostic| (origin, diagnostic)));
+      // Remove diagnostics with unwanted Severity
+      let diagnostics = diagnostics.filter(|(_, diag)| diag.severity == severity);
+      // Group diagnostics by their file names
+      let file_groups = diagnostics.group_by(|diag| diag.1.source.file.as_ref());
+
+      // Now, we have a mapping from DiagnosticFile to (DiagnosticOrigin, DiagnosticMessage).
+      for (file, origins_and_diagnostics) in &file_groups {
+        // We don't have to check if the amount of diagnostics in this file is greater than 0,
+        // since we will only get a file if it was included in a diagnostic.
+        match &file {
+          Some(name) => writeln!(f, "\x1b[1mIn \x1b[4m{}\x1b[0m\x1b[1m :\x1b[0m", name)?,
+          None => writeln!(f, "\x1b[1mDuring execution :\x1b[0m")?,
+        };
+
+        // Group errors by their origin
+        let origin_groups = origins_and_diagnostics.group_by(|(origin, _)| *origin);
+
+        let mut has_msg = false;
+        // Finally, we have our mapping of DiagnosticOrigin to DiagnosticMessage back.
+        for (origin, origins_and_diagnostics) in &origin_groups {
+          // We don't care about DiagnosticOrigins here, so remove them.
+          let mut diagnostics = origins_and_diagnostics.map(|(_, diag)| diag).peekable();
+
+          if diagnostics.peek().is_some() {
+            match origin {
+              DiagnosticOrigin::Parsing => {
+                for err in diagnostics {
+                  writeln!(f, "{err}")?;
+                }
+              }
+              DiagnosticOrigin::Book => {
+                for err in diagnostics {
+                  writeln!(f, "{err}")?;
+                }
+              }
+              DiagnosticOrigin::Function(nam) => {
+                writeln!(f, "\x1b[1mIn definition '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
+                for err in diagnostics {
+                  writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
+                }
+              }
+              DiagnosticOrigin::Inet(nam) => {
+                writeln!(f, "\x1b[1mIn compiled inet '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
+                for err in diagnostics {
+                  writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
+                }
+              }
+              DiagnosticOrigin::Readback => {
+                writeln!(f, "\x1b[1mDuring readback:\x1b[0m")?;
+                for err in diagnostics {
+                  writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
+                }
               }
             }
-            DiagnosticOrigin::Book => {
-              for err in errs {
-                writeln!(f, "{err}")?;
-              }
-            }
-            DiagnosticOrigin::Function(nam) => {
-              writeln!(f, "\x1b[1mIn definition '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
-              for err in errs {
-                writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
-              }
-            }
-            DiagnosticOrigin::Inet(nam) => {
-              writeln!(f, "\x1b[1mIn compiled inet '\x1b[4m{}\x1b[0m\x1b[1m':\x1b[0m", nam)?;
-              for err in errs {
-                writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
-              }
-            }
-            DiagnosticOrigin::Readback => {
-              writeln!(f, "\x1b[1mDuring readback:\x1b[0m")?;
-              for err in errs {
-                writeln!(f, "{:ERR_INDENT_SIZE$}{err}", "")?;
-              }
-            }
+            has_msg = true;
           }
-          has_msg = true;
         }
-      }
-      if has_msg {
-        writeln!(f)?;
+        if has_msg {
+          writeln!(f)?;
+        }
       }
       Ok(())
     })
@@ -267,7 +309,7 @@ impl From<String> for Diagnostics {
     Self {
       diagnostics: BTreeMap::from_iter([(
         DiagnosticOrigin::Book,
-        vec![Diagnostic { message: value, severity: Severity::Error, span: None }],
+        vec![Diagnostic { message: value, severity: Severity::Error, source: Default::default() }],
       )]),
       ..Default::default()
     }
@@ -284,7 +326,7 @@ impl From<ParseError> for Diagnostics {
     Self {
       diagnostics: BTreeMap::from_iter([(
         DiagnosticOrigin::Parsing,
-        vec![Diagnostic { message: value.into(), severity: Severity::Error, span: None }],
+        vec![Diagnostic { message: value.into(), severity: Severity::Error, source: Default::default() }],
       )]),
       ..Default::default()
     }
@@ -331,12 +373,7 @@ impl Default for DiagnosticsConfig {
 
 impl Display for Diagnostic {
   fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-    // TODO: this could be problematic when printing multiple errors from the same file
-    // currently, there shouldn't be any `Diagnostics` with multiple problems `FileSpan`s
-    match &self.span {
-      Some(FileSpan { file: Some(file), .. }) => write!(f, "In {} :\n{}", file, self.message),
-      _ => write!(f, "{}", self.message),
-    }
+    write!(f, "{}", self.message)
   }
 }
 
@@ -441,19 +478,5 @@ impl TextSpan {
     }
 
     TextSpan::new(TextLocation::new(start_line, start_char), TextLocation::new(end_line, end_char))
-  }
-}
-
-#[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
-pub struct FileSpan {
-  pub span: TextSpan,
-  // Storing files as Strings, could be done as file IDs in the future
-  // This is currently optional, we might want to change it later
-  pub file: Option<String>,
-}
-
-impl FileSpan {
-  pub fn new(span: TextSpan, origin: Option<&str>) -> Self {
-    FileSpan { span, file: origin.map(|s| s.into()) }
   }
 }

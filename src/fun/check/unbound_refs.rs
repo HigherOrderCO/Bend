@@ -17,7 +17,7 @@ impl Ctx<'_> {
         self.info.add_function_error(
           format!("Reference to undefined function '{unbound}'"),
           def.name.clone(),
-          Some(&def.source),
+          def.source.clone(),
         );
       }
     }

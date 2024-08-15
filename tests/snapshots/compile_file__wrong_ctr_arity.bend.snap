@@ -3,5 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/wrong_ctr_arity.bend
 ---
 [4m[1m[31mErrors:[0m
+[1mIn [4mtests/golden_tests/compile_file/wrong_ctr_arity.bend[0m[1m :[0m
 [1mIn definition '[4mBar[0m[1m':[0m
   Incorrect arity for constructor 'Boxed/Box' of type 'Boxed' in pattern matching rule. Expected 1 fields, found 2

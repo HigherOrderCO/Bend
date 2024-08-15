@@ -15,7 +15,7 @@ impl Ctx<'_> {
     for def in self.book.defs.values_mut() {
       for rule in def.rules.iter_mut() {
         if let Err(e) = rule.body.desugar_with_blocks(None, &def_names) {
-          self.info.add_function_error(e, def.name.clone(), Some(&def.source));
+          self.info.add_function_error(e, def.name.clone(), def.source.clone());
         }
       }
     }

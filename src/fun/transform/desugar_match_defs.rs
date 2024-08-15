@@ -24,13 +24,13 @@ impl Ctx<'_> {
           DesugarMatchDefErr::AdtNotExhaustive { .. }
           | DesugarMatchDefErr::NumMissingDefault
           | DesugarMatchDefErr::TypeMismatch { .. } => {
-            self.info.add_function_error(err, def_name.clone(), Some(&def.source))
+            self.info.add_function_error(err, def_name.clone(), def.source.clone())
           }
           DesugarMatchDefErr::RepeatedBind { .. } => self.info.add_function_warning(
             err,
             WarningType::RepeatedBind,
             def_name.clone(),
-            Some(&def.source),
+            def.source.clone(),
           ),
         }
       }

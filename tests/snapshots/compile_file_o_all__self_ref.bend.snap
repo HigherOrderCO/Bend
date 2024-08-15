@@ -3,6 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/self_ref.bend
 ---
 [4m[1m[33mWarnings:[0m
+[1mDuring execution :[0m
 [1mThe following functions contain recursive cycles incompatible with HVM's strict evaluation:[0m
   * Foo -> Foo
 
@@ -32,5 +33,6 @@ To disable this check, use the "-Arecursion-cycle" compiler option.
 
 
 [4m[1m[31mErrors:[0m
+[1mDuring execution :[0m
 During inlining:
   infinite reference cycle in `@Foo`

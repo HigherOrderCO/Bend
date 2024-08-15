@@ -3,5 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_long/huge_tree.bend
 ---
 [4m[1m[31mErrors:[0m
+[1mDuring execution :[0m
 [1mIn definition '[4mmain[0m[1m':[0m
   Definition is too large for HVM C (size=120002, max size=4095). Please break it into smaller pieces.

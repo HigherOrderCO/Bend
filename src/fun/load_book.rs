@@ -1,9 +1,9 @@
 use super::{
   parser::{ParseBook, TermParser},
-  Book, Name,
+  Book, Name, Source, SourceKind,
 };
 use crate::{
-  diagnostics::{Diagnostics, DiagnosticsConfig, FileSpan, TextSpan},
+  diagnostics::{Diagnostics, DiagnosticsConfig, TextSpan},
   imports::PackageLoader,
 };
 use std::path::Path;
@@ -44,7 +44,9 @@ pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<P
   TermParser::new(code).parse_book(book, false).map_err(|err| {
     let mut diagnostics = Diagnostics::default();
     let span = TextSpan::from_byte_span(code, err.span.0..err.span.1);
-    diagnostics.add_parsing_error(err, FileSpan { span, file: Some(origin.to_string_lossy().into()) });
+    let source =
+      Source { file: Some(origin.to_string_lossy().into()), span: Some(span), kind: SourceKind::User };
+    diagnostics.add_parsing_error(err, source);
     diagnostics
   })
 }

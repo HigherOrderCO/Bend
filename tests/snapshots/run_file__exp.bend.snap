@@ -4,6 +4,7 @@ input_file: tests/golden_tests/run_file/exp.bend
 ---
 NumScott:
 [4m[1m[33mWarnings:[0m
+[1mDuring execution :[0m
 [1mDuring readback:[0m
   Unable to interpret the HVM result as a valid Bend term. (Reached Root)
 
@@ -11,6 +12,7 @@ NumScott:
 
 Scott:
 [4m[1m[33mWarnings:[0m
+[1mDuring execution :[0m
 [1mDuring readback:[0m
   Unable to interpret the HVM result as a valid Bend term. (Reached Root)
 

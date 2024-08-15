@@ -32,7 +32,7 @@ impl Definition {
   pub fn to_fun(self) -> Result<fun::Definition, Diagnostics> {
     let body = self.body.into_fun().map_err(|e| {
       let mut diags = Diagnostics::default();
-      diags.add_function_error(e, self.name.clone(), Some(&self.source));
+      diags.add_function_error(e, self.name.clone(), self.source.clone());
       diags
     })?;
 
@@ -43,7 +43,7 @@ impl Definition {
         diags.add_function_error(
           "Function doesn't end with a return statement",
           self.name,
-          Some(&self.source),
+          self.source.clone(),
         );
         return Err(diags);
       }

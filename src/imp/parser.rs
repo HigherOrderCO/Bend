@@ -1,7 +1,7 @@
 use crate::{
   fun::{
     parser::{is_num_char, Indent, ParseResult, ParserCommons},
-    CtrField, Name, Num, Op, STRINGS,
+    CtrField, Name, Num, Op, Source, SourceKind, STRINGS,
   },
   imp::{AssignPattern, Definition, Enum, Expr, InPlaceOp, MatchArm, Stmt, Variant},
   maybe_grow,
@@ -1037,7 +1037,8 @@ impl<'a> PyParser<'a> {
     indent.exit_level();
 
     // Temporary source, should be overwritten later
-    let def = Definition { name, params, body, source: crate::fun::Source::Generated };
+    let source = Source { file: None, span: None, kind: SourceKind::Generated };
+    let def = Definition { name, params, body, source };
     Ok((def, nxt_indent))
   }
 

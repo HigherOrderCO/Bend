@@ -3,6 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/tab.bend
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/parse_file/tab.bend :
+[1mIn [4mtests/golden_tests/parse_file/tab.bend[0m[1m :[0m
 Tabs are not accepted for indentation.
 [0m  2 | [4m[31m[0m	x = 2[0m

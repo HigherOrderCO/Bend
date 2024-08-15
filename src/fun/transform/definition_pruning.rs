@@ -1,6 +1,6 @@
 use crate::{
   diagnostics::WarningType,
-  fun::{Book, Ctx, Name, Source, Term},
+  fun::{Book, Ctx, Name, SourceKind, Term},
   maybe_grow,
 };
 use hvm::ast::{Net, Tree};
@@ -77,12 +77,12 @@ impl Ctx<'_> {
             // Prune if `prune_all`, otherwise show a warning.
             if prune_all {
               rm_def(self.book, &def);
-            } else if !def.is_generated() && !matches!(src, Source::Generated) {
+            } else if !def.is_generated() && !matches!(src.kind, SourceKind::Generated) {
               self.info.add_function_warning(
                 "Definition is unused.",
                 WarningType::UnusedDefinition,
                 def,
-                Some(&src),
+                src,
               );
             }
           }

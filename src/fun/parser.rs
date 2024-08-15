@@ -15,6 +15,8 @@ use indexmap::IndexMap;
 use itertools::Itertools;
 use TSPL::{ParseError, Parser};
 
+use super::SourceKind;
+
 type FunDefinition = super::Definition;
 type ImpDefinition = crate::imp::Definition;
 
@@ -165,8 +167,12 @@ impl<'a> TermParser<'a> {
           self.index = rewind_index;
           let (nam, ctrs) = self.parse_datatype()?;
           let end_idx = *self.index();
-          let span = TextSpan::from_byte_span(self.input(), ini_idx..end_idx);
-          let source = if builtin { Source::Builtin } else { Source::Local(span) };
+
+          let span = Some(TextSpan::from_byte_span(self.input(), ini_idx..end_idx));
+          let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+          let file = Some(book.source.to_string());
+          let source = Source { file, span, kind };
+
           let adt = Adt { ctrs, source };
           self.add_fun_type(&mut book, nam, adt, ini_idx..end_idx)?;
           indent = self.advance_newlines()?;
@@ -278,8 +284,12 @@ impl<'a> TermParser<'a> {
     let body = p.parse_net()?;
     *self.index() = ini_idx + *p.index();
     let end_idx = *self.index();
-    let span = TextSpan::from_byte_span(self.input(), ini_idx..end_idx);
-    let source = if builtin { Source::Builtin } else { Source::Local(span) };
+
+    let span = Some(TextSpan::from_byte_span(self.input(), ini_idx..end_idx));
+    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+    let file = None; // should we pass the book's source here?
+    let source = Source { file, span, kind };
+
     let def = HvmDefinition { name: name.clone(), body, source };
     Ok(def)
   }
@@ -653,8 +663,9 @@ impl<'a> TermParser<'a> {
               if name == "def" {
                 // parse the nxt def term.
                 self.index = nxt_def;
-                let span = TextSpan::from_byte_span(self.input(), nxt_def..*self.index());
-                let def = FunDefinition::new(name, rules, Source::Local(span));
+                let span = Some(TextSpan::from_byte_span(self.input(), nxt_def..*self.index()));
+                let source = Source { span, file: None, kind: SourceKind::User };
+                let def = FunDefinition::new(name, rules, source);
                 return Ok(Term::Def { def, nxt: Box::new(self.parse_term()?) });
               }
               if name == cur_name {
@@ -672,8 +683,8 @@ impl<'a> TermParser<'a> {
           }
         }
         let nxt = self.parse_term()?;
-        let span = TextSpan::from_byte_span(self.input(), nxt_term..*self.index());
-        let def = FunDefinition::new(cur_name, rules, Source::Local(span));
+        let span = Some(TextSpan::from_byte_span(self.input(), nxt_term..*self.index()));
+        let def = FunDefinition::new(cur_name, rules, Source { span, file: None, kind: SourceKind::User });
         return Ok(Term::Def { def, nxt: Box::new(nxt) });
       }
 
@@ -938,7 +949,7 @@ impl<'a> TermParser<'a> {
       // Continuing with a new rule to the current definition
       (Some(def), Some(last_rule)) if last_rule == name => {
         def.rules.push(rule);
-        if let Source::Local(s) = &mut def.source {
+        if let Some(s) = &mut def.source.span {
           s.end = TextLocation::from_byte_loc(self.input(), span.end);
         }
       }
@@ -955,8 +966,10 @@ impl<'a> TermParser<'a> {
       // Adding the first rule of a new definition
       (None, _) => {
         self.check_top_level_redefinition(name, book, span.clone())?;
-        let span = TextSpan::from_byte_span(self.input(), span.start..span.end);
-        let source = if builtin { Source::Builtin } else { Source::Local(span) };
+        let span = Some(TextSpan::from_byte_span(self.input(), span.start..span.end));
+        let file = Some(book.source.to_string());
+        let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+        let source = Source { file, span, kind };
         book.fun_defs.insert(name.clone(), FunDefinition::new(name.clone(), vec![rule], source));
       }
     }
@@ -971,8 +984,10 @@ impl<'a> TermParser<'a> {
     builtin: bool,
   ) -> ParseResult<()> {
     self.check_top_level_redefinition(&def.name, book, span.clone())?;
-    let span = TextSpan::from_byte_span(self.input(), span.start..span.end);
-    let source = if builtin { Source::Builtin } else { Source::Local(span) };
+    let span = Some(TextSpan::from_byte_span(self.input(), span.start..span.end));
+    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+    let file = Some(book.source.to_string());
+    let source = Source { file, span, kind };
     def.source = source;
     book.imp_defs.insert(def.name.clone(), def);
     Ok(())
@@ -988,15 +1003,19 @@ impl<'a> TermParser<'a> {
     &mut self,
     enum_: Enum,
     book: &mut ParseBook,
-    span: Range<usize>,
+    range: Range<usize>,
     builtin: bool,
   ) -> ParseResult<()> {
-    self.check_type_redefinition(&enum_.name, book, span.clone())?;
-    let text_span = TextSpan::from_byte_span(self.input(), span.start..span.end);
-    let source = if builtin { Source::Builtin } else { Source::Local(text_span) };
+    self.check_type_redefinition(&enum_.name, book, range.clone())?;
+
+    let span = Some(TextSpan::from_byte_span(self.input(), range.start..range.end));
+    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+    let file = Some(book.source.to_string());
+    let source = Source { file, span, kind };
+
     let mut adt = Adt { ctrs: Default::default(), source };
     for variant in enum_.variants {
-      self.check_top_level_redefinition(&enum_.name, book, span.clone())?;
+      self.check_top_level_redefinition(&enum_.name, book, range.clone())?;
       book.ctrs.insert(variant.name.clone(), enum_.name.clone());
       adt.ctrs.insert(variant.name, variant.fields);
     }
@@ -1042,8 +1061,12 @@ impl<'a> TermParser<'a> {
   ) -> ParseResult<()> {
     self.check_type_redefinition(&obj.name, book, span.clone())?;
     self.check_top_level_redefinition(&obj.name, book, span.clone())?;
-    let span = TextSpan::from_byte_span(self.input(), span.start..span.end);
-    let source = if builtin { Source::Builtin } else { Source::Local(span) };
+
+    let span = Some(TextSpan::from_byte_span(self.input(), span.start..span.end));
+    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+    let file = Some(book.source.to_string());
+    let source = Source { file, span, kind };
+
     let mut adt = Adt { ctrs: Default::default(), source };
     book.ctrs.insert(obj.name.clone(), obj.name.clone());
     adt.ctrs.insert(obj.name.clone(), obj.fields);

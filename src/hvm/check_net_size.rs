@@ -23,7 +23,7 @@ pub fn check_net_sizes(
       diagnostics.add_function_error(
         format!("Definition is too large for HVM {target_lang} (size={nodes}, max size={net_size_bound}). Please break it into smaller pieces."),
         Name::new(name),
-        None
+        Default::default()
       );
     }
   }

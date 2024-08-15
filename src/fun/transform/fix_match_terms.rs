@@ -51,25 +51,25 @@ impl Ctx<'_> {
         for err in errs {
           match err {
             FixMatchErr::AdtMismatch { .. } | FixMatchErr::NonExhaustiveMatch { .. } => {
-              self.info.add_function_error(err, def.name.clone(), Some(&def.source))
+              self.info.add_function_error(err, def.name.clone(), def.source.clone())
             }
             FixMatchErr::IrrefutableMatch { .. } => self.info.add_function_warning(
               err,
               WarningType::IrrefutableMatch,
               def.name.clone(),
-              Some(&def.source),
+              def.source.clone(),
             ),
             FixMatchErr::UnreachableMatchArms { .. } => self.info.add_function_warning(
               err,
               WarningType::UnreachableMatch,
               def.name.clone(),
-              Some(&def.source),
+              def.source.clone(),
             ),
             FixMatchErr::RedundantArm { .. } => self.info.add_function_warning(
               err,
               WarningType::RedundantMatch,
               def.name.clone(),
-              Some(&def.source),
+              def.source.clone(),
             ),
           }
         }
