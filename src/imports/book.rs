@@ -161,6 +161,7 @@ impl ParseBook {
     let adts = std::mem::take(&mut self.adts);
     let mut new_adts = IndexMap::new();
     let mut ctrs_map = IndexMap::new();
+    let mut new_ctrs = IndexMap::new();
 
     // Rename the ADTs and constructors to their canonical name,
     // starting with `__` if not imported by the main book.
@@ -182,6 +183,7 @@ impl ParseBook {
             ctr_name = Name::new(format!("__{}", ctr_name));
           }
 
+          new_ctrs.insert(ctr_name.clone(), name.clone());
           ctrs_map.insert(ctr, ctr_name.clone());
           adt.ctrs.insert(ctr_name, f);
         }
@@ -201,6 +203,7 @@ impl ParseBook {
     }
 
     self.adts = new_adts;
+    self.ctrs = new_ctrs;
   }
 
   /// Apply the necessary naming transformations to the book definitions,
