@@ -467,17 +467,21 @@ fn examples() -> Result<(), Diagnostics> {
     .filter_map(|e| e.ok())
     .filter(|e| e.path().extension().map_or(false, |ext| ext == "bend"))
   {
-    let _guard = RUN_MUTEX.lock().unwrap();
+    let _guard = RUN_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
     let path = entry.path();
     eprintln!("Testing {}", path.display());
     let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
 
-    let book = do_parse_book_default(&code, path).unwrap();
-    let compile_opts = CompileOpts::default();
-    let diagnostics_cfg = DiagnosticsConfig::default();
-    let (term, _, diags) =
-      run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
-    let res = format!("{diags}{term}");
+    let res = match do_parse_book_default(&code, path) {
+      Ok(book) => {
+        let compile_opts = CompileOpts::default();
+        let diagnostics_cfg = DiagnosticsConfig::default();
+        let (term, _, diags) =
+          run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
+        format!("{diags}{term}")
+      }
+      Err(e) => e,
+    };
 
     let mut settings = insta::Settings::clone_current();
     settings.set_prepend_module_to_snapshot(false);
