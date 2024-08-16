@@ -480,7 +480,7 @@ fn examples() -> Result<(), Diagnostics> {
           run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
         format!("{diags}{term}")
       }
-      Err(e) => e,
+      Err(e) => e.to_string(),
     };
 
     let mut settings = insta::Settings::clone_current();
