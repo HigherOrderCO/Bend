@@ -1031,9 +1031,9 @@ impl Definition {
     Self { name, rules, source }
   }
 
-  pub fn new_gen(name: Name, rules: Vec<Rule>, builtin: bool) -> Self {
-    let kind = if builtin { SourceKind::Builtin } else { SourceKind::Generated };
-    let source = Source { file: None, span: None, kind };
+  pub fn new_gen(name: Name, rules: Vec<Rule>, source: Source) -> Self {
+    let kind = if source.is_builtin() { SourceKind::Builtin } else { SourceKind::Generated };
+    let source = Source { kind, ..source };
     Self { name, rules, source }
   }
 
