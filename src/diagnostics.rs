@@ -220,19 +220,23 @@ impl Diagnostics {
         .map(|(origin, diags)| (origin, diags.iter().filter(|diag| diag.severity == severity)));
 
       // Produce the structure described above.
-      let groups = diagnostics.fold(BTreeMap::new(), |mut file_tree, (origin, diags)| {
-        for diag in diags {
-          let file_group_entry = file_tree.entry(&diag.source.file).or_insert_with(|| BTreeMap::new());
-          let origin_group_entry = file_group_entry.entry(origin).or_insert_with(|| Vec::new());
-          origin_group_entry.push(diag);
-        }
-        file_tree
-      });
+      let groups: BTreeMap<&Option<String>, BTreeMap<&DiagnosticOrigin, Vec<&Diagnostic>>> = diagnostics
+        .fold(BTreeMap::new(), |mut file_tree, (origin, diags)| {
+          for diag in diags {
+            // We need to allow this Clippy warning due to `Name` in `DiagnosticOrigin::Function`.
+            // We know how it works, so it shouldn't be a problem.
+            #[allow(clippy::mutable_key_type)]
+            let file_group_entry = file_tree.entry(&diag.source.file).or_default();
+            let origin_group_entry = file_group_entry.entry(origin).or_default();
+            origin_group_entry.push(diag);
+          }
+          file_tree
+        });
       // Now, we have a mapping from DiagnosticFile to DiagnosticOrigin to Vec<DiagnosticMessage>.
 
       // If the last file is `None`, it means we only have diagnostics with unknown source file.
       // In this case, we won't print a special message for them.
-      let only_unknown_file_diagnostics = groups.keys().rev().next() == Some(&&None);
+      let only_unknown_file_diagnostics = groups.keys().next_back() == Some(&&None);
 
       // Reverse the group iterator so `None` files go last.
       for (file, origin_to_diagnostics) in groups.iter().rev() {
