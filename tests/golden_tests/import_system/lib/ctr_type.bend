@@ -1,3 +1,4 @@
+# Test issue #674
 type Ctr:
   Foo { x, y }
 
