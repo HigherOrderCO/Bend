@@ -1,4 +1,3 @@
-use itertools::Itertools;
 use TSPL::ParseError;
 
 use crate::fun::{display::DisplayFn, Name, Source};
@@ -37,7 +36,7 @@ pub struct Diagnostic {
   pub source: Source,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum DiagnosticOrigin {
   /// An error when parsing source code.
   Parsing,
@@ -204,42 +203,49 @@ impl Diagnostics {
       // In file B :
       // In compiled Inet Z :
       //   {error}
-      // {...}
+      //
+      // Other diagnostics:
+      // In {...}
       // ```
       // The problem is, diagnostics data is currently structured as a mapping from something like
-      // DiagnosticOrigin to (DiagnosticMessage, DiagnosticFile), and we would need something
-      // like a mapping from DiagnosticFile to DiagnosticOrigin to DiagnosticMessage in order
+      // DiagnosticOrigin to Vec<(DiagnosticMessage, DiagnosticFile)>, and we would need something
+      // like a mapping from DiagnosticFile to DiagnosticOrigin to Vec<DiagnosticMessage> in order
       // to print it cleanly. We might want to change it later to have this structure,
       // but meanwhile, we do the transformations below to make the goal possible.
 
-      // Flatten Iter<(Origin, Vec<Diagnostic>)> into Iter<(Origin, Diagnostic)>
+      // Ignore diagnostics without the desired severity.
       let diagnostics = self
         .diagnostics
         .iter()
-        .flat_map(|(origin, diagnostics)| diagnostics.iter().map(move |diagnostic| (origin, diagnostic)));
-      // Remove diagnostics with unwanted Severity
-      let diagnostics = diagnostics.filter(|(_, diag)| diag.severity == severity);
-      // Group diagnostics by their file names
-      let file_groups = diagnostics.group_by(|diag| diag.1.source.file.as_ref());
+        .map(|(origin, diags)| (origin, diags.iter().filter(|diag| diag.severity == severity)));
 
-      // Now, we have a mapping from DiagnosticFile to (DiagnosticOrigin, DiagnosticMessage).
-      for (file, origins_and_diagnostics) in &file_groups {
-        // We don't have to check if the amount of diagnostics in this file is greater than 0,
-        // since we will only get a file if it was included in a diagnostic.
-        match &file {
-          Some(name) => writeln!(f, "\x1b[1mIn \x1b[4m{}\x1b[0m\x1b[1m :\x1b[0m", name)?,
-          None => writeln!(f, "\x1b[1mDuring execution :\x1b[0m")?,
-        };
+      // Produce the structure described above.
+      let groups = diagnostics.fold(BTreeMap::new(), |mut file_tree, (origin, diags)| {
+        for diag in diags {
+          let file_group_entry = file_tree.entry(&diag.source.file).or_insert_with(|| BTreeMap::new());
+          let origin_group_entry = file_group_entry.entry(origin).or_insert_with(|| Vec::new());
+          origin_group_entry.push(diag);
+        }
+        file_tree
+      });
+      // Now, we have a mapping from DiagnosticFile to DiagnosticOrigin to Vec<DiagnosticMessage>.
 
-        // Group errors by their origin
-        let origin_groups = origins_and_diagnostics.group_by(|(origin, _)| *origin);
+      // If the last file is `None`, it means we only have diagnostics with unknown source file.
+      // In this case, we won't print a special message for them.
+      let only_unknown_file_diagnostics = groups.keys().rev().next() == Some(&&None);
+
+      // Reverse the group iterator so `None` files go last.
+      for (file, origin_to_diagnostics) in groups.iter().rev() {
+        if !only_unknown_file_diagnostics {
+          match &file {
+            Some(name) => writeln!(f, "\x1b[1mIn \x1b[4m{}\x1b[0m\x1b[1m :\x1b[0m", name)?,
+            None => writeln!(f, "\x1b[1mOther diagnostics:\x1b[0m")?,
+          };
+        }
 
         let mut has_msg = false;
-        // Finally, we have our mapping of DiagnosticOrigin to DiagnosticMessage back.
-        for (origin, origins_and_diagnostics) in &origin_groups {
-          // We don't care about DiagnosticOrigins here, so remove them.
-          let mut diagnostics = origins_and_diagnostics.map(|(_, diag)| diag).peekable();
-
+        for (origin, diagnostics) in origin_to_diagnostics {
+          let mut diagnostics = diagnostics.iter().peekable();
           if diagnostics.peek().is_some() {
             match origin {
               DiagnosticOrigin::Parsing => {

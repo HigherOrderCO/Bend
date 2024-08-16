@@ -3,7 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_no_all/list_reverse.bend
 ---
 [4m[1m[31mErrors:[0m
-[1mDuring execution :[0m
 [1mThe following functions contain recursive cycles incompatible with HVM's strict evaluation:[0m
   * concat -> concat
   * reverse -> reverse
