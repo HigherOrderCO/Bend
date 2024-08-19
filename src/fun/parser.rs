@@ -496,6 +496,10 @@ impl<'a> TermParser<'a> {
             return Ok(Term::Fan { fan: FanKind::Tup, tag: tag.unwrap_or(Tag::Static), els });
           }
 
+          if opr == Op::MUL && self.try_consume(")") {
+            return Ok(Term::Era);
+          }
+
           // Opr
           unexpected_tag(self)?;
           let fst = self.parse_term()?;
