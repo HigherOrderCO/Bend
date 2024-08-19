@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/missing_ctrs.bend
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/compile_file/missing_ctrs.bend :
+[1mIn [4mtests/golden_tests/compile_file/missing_ctrs.bend[0m[1m :[0m
 [1m- expected:[0m datatype constructor name
 [1m- detected:[0m end of input
 [0m  1 | type Adt =[4m[31m [0m

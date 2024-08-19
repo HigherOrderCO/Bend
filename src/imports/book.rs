@@ -1,7 +1,7 @@
 use super::{BindMap, ImportsMap, PackageLoader};
 use crate::{
   diagnostics::{Diagnostics, DiagnosticsConfig},
-  fun::{parser::ParseBook, Adt, Book, Definition, HvmDefinition, Name, Rule, Source, Term},
+  fun::{parser::ParseBook, Adt, Book, Definition, HvmDefinition, Name, Rule, Source, SourceKind, Term},
   imp::{self, Expr, Stmt},
   imports::packages::Packages,
 };
@@ -167,7 +167,7 @@ impl ParseBook {
     // starting with `__` if not imported by the main book.
     for (mut name, mut adt) in adts {
       if adt.source.is_local() {
-        adt.source = Source::Imported;
+        adt.source.kind = SourceKind::Imported;
         name = Name::new(format!("{}/{}", src, name));
 
         let mangle_name = !main_imports.contains_source(&name);
@@ -220,7 +220,7 @@ impl ParseBook {
     // Applies the binds for the new names for every definition
     for (_, def) in self.local_defs_mut() {
       def.apply_binds(false, &canonical_map);
-      *def.source_mut() = Source::Imported;
+      def.source_mut().kind = SourceKind::Imported;
     }
   }
 }

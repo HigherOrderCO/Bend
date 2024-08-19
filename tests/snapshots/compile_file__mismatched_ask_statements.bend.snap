@@ -3,4 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/mismatched_ask_statements.bend
 ---
 [4m[1m[31mErrors:[0m
-In function 'main': 'match' arms end with different assignments.
+[1mIn [4mtests/golden_tests/compile_file/mismatched_ask_statements.bend[0m[1m :[0m
+[1mIn definition '[4mmain[0m[1m':[0m
+  'match' arms end with different assignments.

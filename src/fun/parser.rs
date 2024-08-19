@@ -1,6 +1,7 @@
 use std::ops::Range;
 
 use crate::{
+  diagnostics::{TextLocation, TextSpan},
   fun::{
     display::DisplayFn, Adt, Adts, Constructors, CtrField, FanKind, HvmDefinition, HvmDefinitions, MatchRule,
     Name, Num, Op, Pattern, Rule, Source, Tag, Term, STRINGS,
@@ -12,7 +13,9 @@ use crate::{
 use highlight_error::highlight_error;
 use indexmap::IndexMap;
 use itertools::Itertools;
-use TSPL::Parser;
+use TSPL::{ParseError, Parser};
+
+use super::SourceKind;
 
 type FunDefinition = super::Definition;
 type ImpDefinition = crate::imp::Definition;
@@ -97,7 +100,7 @@ impl ParseBook {
 // <Number>     ::= ([0-9]+ | "0x"[0-9a-fA-F]+ | "0b"[01]+)
 // <Operator>   ::= ( "+" | "-" | "*" | "/" | "%" | "==" | "!=" | "<<" | ">>" | "<" | ">" | "&" | "|" | "^" | "**" )
 
-pub type ParseResult<T> = std::result::Result<T, String>;
+pub type ParseResult<T> = std::result::Result<T, ParseError>;
 
 pub struct TermParser<'i> {
   input: &'i str,
@@ -164,7 +167,12 @@ impl<'a> TermParser<'a> {
           self.index = rewind_index;
           let (nam, ctrs) = self.parse_datatype()?;
           let end_idx = *self.index();
-          let source = if builtin { Source::Builtin } else { Source::Local(ini_idx..end_idx) };
+
+          let span = Some(TextSpan::from_byte_span(self.input(), ini_idx..end_idx));
+          let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+          let file = Some(book.source.to_string());
+          let source = Source { file, span, kind };
+
           let adt = Adt { ctrs, source };
           self.add_fun_type(&mut book, nam, adt, ini_idx..end_idx)?;
           indent = self.advance_newlines()?;
@@ -252,7 +260,8 @@ impl<'a> TermParser<'a> {
 
       let fields = self.list_like(parse_field, "", ")", "", false, 0)?;
       if let Some(field) = fields.find_repeated_names().into_iter().next() {
-        return Err(format!("Found a repeated field '{field}' in constructor {ctr_name}."));
+        let msg = format!("Found a repeated field '{field}' in constructor {ctr_name}.");
+        return self.expected_message(&msg)?;
       }
       Ok((ctr_name, fields))
     } else {
@@ -275,12 +284,17 @@ impl<'a> TermParser<'a> {
     let body = p.parse_net()?;
     *self.index() = ini_idx + *p.index();
     let end_idx = *self.index();
-    let source = if builtin { Source::Builtin } else { Source::Local(ini_idx..end_idx) };
+
+    let span = Some(TextSpan::from_byte_span(self.input(), ini_idx..end_idx));
+    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+    let file = None; // should we pass the book's source here?
+    let source = Source { file, span, kind };
+
     let def = HvmDefinition { name: name.clone(), body, source };
     Ok(def)
   }
 
-  fn parse_from_import(&mut self) -> Result<Import, String> {
+  fn parse_from_import(&mut self) -> ParseResult<Import> {
     // from path import package
     // from path import (a, b)
     // from path import *
@@ -302,7 +316,7 @@ impl<'a> TermParser<'a> {
     Ok(Import::new(path, ImportType::Single(import, alias), relative))
   }
 
-  fn parse_import(&mut self) -> Result<Vec<Import>, String> {
+  fn parse_import(&mut self) -> ParseResult<Vec<Import>> {
     // import path
     // import (path/a, path/b)
 
@@ -653,7 +667,9 @@ impl<'a> TermParser<'a> {
               if name == "def" {
                 // parse the nxt def term.
                 self.index = nxt_def;
-                let def = FunDefinition::new(name, rules, Source::Local(nxt_def..*self.index()));
+                let span = Some(TextSpan::from_byte_span(self.input(), nxt_def..*self.index()));
+                let source = Source { span, file: None, kind: SourceKind::User };
+                let def = FunDefinition::new(name, rules, source);
                 return Ok(Term::Def { def, nxt: Box::new(self.parse_term()?) });
               }
               if name == cur_name {
@@ -671,7 +687,8 @@ impl<'a> TermParser<'a> {
           }
         }
         let nxt = self.parse_term()?;
-        let def = FunDefinition::new(cur_name, rules, Source::Local(nxt_term..*self.index()));
+        let span = Some(TextSpan::from_byte_span(self.input(), nxt_term..*self.index()));
+        let def = FunDefinition::new(cur_name, rules, Source { span, file: None, kind: SourceKind::User });
         return Ok(Term::Def { def, nxt: Box::new(nxt) });
       }
 
@@ -848,7 +865,7 @@ impl<'a> TermParser<'a> {
   /// Parses a tag where it may or may not be valid.
   ///
   /// If it is not valid, the returned callback can be used to issue an error.
-  fn parse_tag(&mut self) -> ParseResult<(Option<Tag>, impl FnOnce(&mut Self) -> Result<(), String>)> {
+  fn parse_tag(&mut self) -> ParseResult<(Option<Tag>, impl FnOnce(&mut Self) -> Result<(), ParseError>)> {
     let index = self.index;
     self.skip_trivia();
     let tag = if self.peek_one() == Some('#')
@@ -936,8 +953,8 @@ impl<'a> TermParser<'a> {
       // Continuing with a new rule to the current definition
       (Some(def), Some(last_rule)) if last_rule == name => {
         def.rules.push(rule);
-        if let Source::Local(s) = &mut def.source {
-          s.end = span.end;
+        if let Some(s) = &mut def.source.span {
+          s.end = TextLocation::from_byte_loc(self.input(), span.end);
         }
       }
       // Trying to add a new rule to a previous definition, coming from a different rule.
@@ -953,7 +970,10 @@ impl<'a> TermParser<'a> {
       // Adding the first rule of a new definition
       (None, _) => {
         self.check_top_level_redefinition(name, book, span.clone())?;
-        let source = if builtin { Source::Builtin } else { Source::Local(span) };
+        let span = Some(TextSpan::from_byte_span(self.input(), span.start..span.end));
+        let file = Some(book.source.to_string());
+        let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+        let source = Source { file, span, kind };
         book.fun_defs.insert(name.clone(), FunDefinition::new(name.clone(), vec![rule], source));
       }
     }
@@ -968,7 +988,10 @@ impl<'a> TermParser<'a> {
     builtin: bool,
   ) -> ParseResult<()> {
     self.check_top_level_redefinition(&def.name, book, span.clone())?;
-    let source = if builtin { Source::Builtin } else { Source::Local(span) };
+    let span = Some(TextSpan::from_byte_span(self.input(), span.start..span.end));
+    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+    let file = Some(book.source.to_string());
+    let source = Source { file, span, kind };
     def.source = source;
     book.imp_defs.insert(def.name.clone(), def);
     Ok(())
@@ -984,14 +1007,19 @@ impl<'a> TermParser<'a> {
     &mut self,
     enum_: Enum,
     book: &mut ParseBook,
-    span: Range<usize>,
+    range: Range<usize>,
     builtin: bool,
   ) -> ParseResult<()> {
-    self.check_type_redefinition(&enum_.name, book, span.clone())?;
-    let source = if builtin { Source::Builtin } else { Source::Local(span.clone()) };
+    self.check_type_redefinition(&enum_.name, book, range.clone())?;
+
+    let span = Some(TextSpan::from_byte_span(self.input(), range.start..range.end));
+    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+    let file = Some(book.source.to_string());
+    let source = Source { file, span, kind };
+
     let mut adt = Adt { ctrs: Default::default(), source };
     for variant in enum_.variants {
-      self.check_top_level_redefinition(&enum_.name, book, span.clone())?;
+      self.check_top_level_redefinition(&enum_.name, book, range.clone())?;
       book.ctrs.insert(variant.name.clone(), enum_.name.clone());
       adt.ctrs.insert(variant.name, variant.fields);
     }
@@ -1012,7 +1040,8 @@ impl<'a> TermParser<'a> {
     } else {
       for ctr in adt.ctrs.keys() {
         if let Some(builtin) = book.contains_builtin_def(ctr) {
-          return Err(TermParser::redefinition_of_function_msg(builtin, ctr));
+          let msg = TermParser::redefinition_of_function_msg(builtin, ctr);
+          return self.expected_and("function", &msg);
         }
         match book.ctrs.entry(ctr.clone()) {
           indexmap::map::Entry::Vacant(e) => _ = e.insert(nam.clone()),
@@ -1036,7 +1065,12 @@ impl<'a> TermParser<'a> {
   ) -> ParseResult<()> {
     self.check_type_redefinition(&obj.name, book, span.clone())?;
     self.check_top_level_redefinition(&obj.name, book, span.clone())?;
-    let source = if builtin { Source::Builtin } else { Source::Local(span) };
+
+    let span = Some(TextSpan::from_byte_span(self.input(), span.start..span.end));
+    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+    let file = Some(book.source.to_string());
+    let source = Source { file, span, kind };
+
     let mut adt = Adt { ctrs: Default::default(), source };
     book.ctrs.insert(obj.name.clone(), obj.name.clone());
     adt.ctrs.insert(obj.name.clone(), obj.fields);
@@ -1095,6 +1129,15 @@ impl<'a> Parser<'a> for TermParser<'a> {
     let ini_idx = *self.index();
     let end_idx = *self.index() + 1;
     self.expected_spanned(exp, ini_idx..end_idx)
+  }
+
+  /// Generates an error message with an additional custom message.
+  ///
+  /// Override to have our own error message.
+  fn expected_and<T>(&mut self, exp: &str, msg: &str) -> ParseResult<T> {
+    let ini_idx = *self.index();
+    let end_idx = *self.index() + 1;
+    self.expected_spanned_and(exp, msg, ini_idx..end_idx)
   }
 
   /// Consumes an instance of the given string, erroring if it is not found.
@@ -1184,6 +1227,17 @@ impl Indent {
 impl<'a> ParserCommons<'a> for TermParser<'a> {}
 
 pub trait ParserCommons<'a>: Parser<'a> {
+  /// Generates an error message that does not print expected terms.
+  fn expected_message<T>(&mut self, msg: &str) -> ParseResult<T> {
+    let ini_idx = *self.index();
+    let end_idx = *self.index() + 1;
+
+    let is_eof = self.is_eof();
+    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { Ok(()) });
+    let msg = format!("\x1b[1m- information:\x1b[0m {}\n\x1b[1m- location:\x1b[0m{}", msg, detected);
+    self.with_ctx(Err(msg), ini_idx..end_idx)
+  }
+
   fn labelled<T>(&mut self, parser: impl Fn(&mut Self) -> ParseResult<T>, label: &str) -> ParseResult<T> {
     match parser(self) {
       Ok(val) => Ok(val),
@@ -1230,7 +1284,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     }
   }
 
-  fn parse_import_name(&mut self, label: &str) -> Result<(Name, Option<Name>, bool), String> {
+  fn parse_import_name(&mut self, label: &str) -> ParseResult<(Name, Option<Name>, bool)> {
     let (import, alias) = self.parse_name_maybe_alias(label)?;
     let relative = import.starts_with("./") | import.starts_with("../");
     Ok((import, alias, relative))
@@ -1335,10 +1389,21 @@ pub trait ParserCommons<'a>: Parser<'a> {
     self.with_ctx(Err(msg), span)
   }
 
+  fn expected_spanned_and<T>(&mut self, exp: &str, msg: &str, span: Range<usize>) -> ParseResult<T> {
+    let is_eof = self.is_eof();
+    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { Ok(()) });
+    let msg = format!(
+      "\x1b[1m- information:\x1b[0m {}\n\x1b[1m- expected:\x1b[0m {}\n\x1b[1m- detected:\x1b[0m{}",
+      msg, exp, detected,
+    );
+    self.with_ctx(Err(msg), span)
+  }
+
   fn with_ctx<T>(&mut self, res: Result<T, impl std::fmt::Display>, span: Range<usize>) -> ParseResult<T> {
     res.map_err(|msg| {
       let ctx = highlight_error(span.start, span.end, self.input());
-      format!("{msg}\n{ctx}")
+      let msg = format!("{msg}\n{ctx}");
+      ParseError::new((span.start, span.end), msg)
     })
   }
 
@@ -1537,7 +1602,8 @@ pub trait ParserCommons<'a>: Parser<'a> {
     if next_is_hex || num_str.is_empty() {
       self.expected(format!("valid {radix} digit").as_str())
     } else {
-      u32::from_str_radix(&num_str, radix as u32).map_err(|e| e.to_string())
+      u32::from_str_radix(&num_str, radix as u32)
+        .map_err(|e| self.expected_and::<u64>("integer", &e.to_string()).unwrap_err())
     }
   }
 
@@ -1548,7 +1614,8 @@ pub trait ParserCommons<'a>: Parser<'a> {
     if next_is_hex || num_str.is_empty() {
       self.expected(format!("valid {radix} digit").as_str())
     } else {
-      u32::from_str_radix(&num_str, radix as u32).map_err(|e| e.to_string())
+      u32::from_str_radix(&num_str, radix as u32)
+        .map_err(|e| self.expected_and::<u64>("integer", &e.to_string()).unwrap_err())
     }
   }
 
@@ -1577,7 +1644,8 @@ pub trait ParserCommons<'a>: Parser<'a> {
       self.advance_one();
       let fra_str = self.take_while(|c| c.is_digit(radix as u32) || c == '_');
       let fra_str = fra_str.chars().filter(|c| *c != '_').collect::<String>();
-      let fra = u32::from_str_radix(&fra_str, radix as u32).map_err(|e| e.to_string())?;
+      let fra = u32::from_str_radix(&fra_str, radix as u32)
+        .map_err(|e| self.expected_and::<u64>("integer", &e.to_string()).unwrap_err())?;
       let fra = fra as f32 / (radix.to_f32()).powi(fra_str.len() as i32);
       Some(fra)
     } else {

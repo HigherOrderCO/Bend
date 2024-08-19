@@ -1,5 +1,5 @@
 use crate::{
-  fun::{Book, Definition, Name, Pattern, Rule, Term},
+  fun::{Book, Definition, Name, Pattern, Rule, Source, Term},
   maybe_grow, multi_iterator,
 };
 use std::collections::{BTreeMap, HashSet};
@@ -44,11 +44,11 @@ impl Book {
         }
       }
 
-      let builtin = def.is_builtin();
+      let source = def.source.clone();
       let body = &mut def.rule_mut().body;
       ctx.reset();
       ctx.def_size = body.size();
-      body.float_combinators(&mut ctx, def_name, builtin);
+      body.float_combinators(&mut ctx, def_name, source.clone());
     }
 
     self.defs.extend(ctx.combinators.into_iter().map(|(nam, (_, def))| (nam, def)));
@@ -84,11 +84,11 @@ impl<'b> FloatCombinatorsCtx<'b> {
 }
 
 impl Term {
-  fn float_combinators(&mut self, ctx: &mut FloatCombinatorsCtx, def_name: &Name, builtin: bool) {
+  fn float_combinators(&mut self, ctx: &mut FloatCombinatorsCtx, def_name: &Name, source: Source) {
     maybe_grow(|| {
       // Recursively float the grandchildren terms.
       for child in self.float_children_mut() {
-        child.float_combinators(ctx, def_name, builtin);
+        child.float_combinators(ctx, def_name, source.clone());
       }
 
       let mut size = self.size();
@@ -104,14 +104,14 @@ impl Term {
         if child.is_combinator() && child_size > 0 && (!child_is_safe || extract_for_size) {
           ctx.def_size -= child_size;
           size -= child_size;
-          child.float(ctx, def_name, builtin, child_is_safe);
+          child.float(ctx, def_name, source.clone(), child_is_safe);
         }
       }
     })
   }
 
   /// Inserts a new definition for the given term in the combinators map.
-  fn float(&mut self, ctx: &mut FloatCombinatorsCtx, def_name: &Name, builtin: bool, is_safe: bool) {
+  fn float(&mut self, ctx: &mut FloatCombinatorsCtx, def_name: &Name, source: Source, is_safe: bool) {
     let comb_name = Name::new(format!("{}{}{}", def_name, NAME_SEP, ctx.name_gen));
     ctx.name_gen += 1;
 
@@ -119,7 +119,7 @@ impl Term {
     let extracted_term = std::mem::replace(self, comb_ref);
 
     let rules = vec![Rule { body: extracted_term, pats: Vec::new() }];
-    let rule = Definition::new_gen(comb_name.clone(), rules, builtin);
+    let rule = Definition::new_gen(comb_name.clone(), rules, source);
     ctx.combinators.insert(comb_name, (is_safe, rule));
   }
 }

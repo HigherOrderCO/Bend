@@ -3,6 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/number_too_large.bend
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/compile_file/number_too_large.bend :
+[1mIn [4mtests/golden_tests/compile_file/number_too_large.bend[0m[1m :[0m
 [1mNumber literal outside of range for U24.[0m
 [0m  1 | main = [4m[31m0x10000000[0m

@@ -20,9 +20,10 @@ pub fn check_net_sizes(
   for (name, net) in &book.defs {
     let nodes = count_nodes(net);
     if nodes > net_size_bound {
-      diagnostics.add_rule_error(
+      diagnostics.add_function_error(
         format!("Definition is too large for HVM {target_lang} (size={nodes}, max size={net_size_bound}). Please break it into smaller pieces."),
         Name::new(name),
+        Default::default()
       );
     }
   }

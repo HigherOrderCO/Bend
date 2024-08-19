@@ -1,5 +1,5 @@
 use crate::{
-  fun::{Book, Definition, Name, Num, Pattern, Rule, Term},
+  fun::{Book, Definition, Name, Num, Pattern, Rule, Source, Term},
   AdtEncoding,
 };
 
@@ -18,7 +18,7 @@ impl Book {
           AdtEncoding::NumScott => {
             let tag = make_tag(adt_name == ctr_name, ctr_name);
             let body = encode_ctr_num_scott(fields.iter().map(|f| &f.nam), &tag);
-            let tag_def = make_tag_def(ctr_idx, &tag, adt.source.is_builtin());
+            let tag_def = make_tag_def(ctr_idx, &tag, adt.source.clone());
             tags.push((tag, tag_def));
             body
           }
@@ -65,7 +65,7 @@ fn encode_ctr_num_scott<'a>(ctr_args: impl DoubleEndedIterator<Item = &'a Name> 
   Term::rfold_lams(term, ctr_args.cloned().map(Some))
 }
 
-fn make_tag_def(ctr_idx: usize, tag: &Name, builtin: bool) -> Definition {
+fn make_tag_def(ctr_idx: usize, tag: &Name, source: Source) -> Definition {
   let tag_rule = vec![Rule { pats: vec![], body: Term::Num { val: Num::U24(ctr_idx as u32) } }];
-  Definition::new_gen(tag.clone(), tag_rule, builtin)
+  Definition::new_gen(tag.clone(), tag_rule, source)
 }

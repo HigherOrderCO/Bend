@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/str_inc_eta.bend
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/run_file/str_inc_eta.bend :
+[1mIn [4mtests/golden_tests/run_file/str_inc_eta.bend[0m[1m :[0m
 [1m- expected:[0m ')'
 [1m- detected:[0m
 [0m   3 | (StrGo 0  (head, tail)) [4m[31m=[0m (head, tail)[0m

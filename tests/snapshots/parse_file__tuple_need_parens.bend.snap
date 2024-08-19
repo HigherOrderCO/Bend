@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/tuple_need_parens.bend
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/parse_file/tuple_need_parens.bend :
+[1mIn [4mtests/golden_tests/parse_file/tuple_need_parens.bend[0m[1m :[0m
 [1m- expected:[0m ':'
 [1m- detected:[0m
 [0m  2 |   if 1[4m[31m,[0m 2:[0m

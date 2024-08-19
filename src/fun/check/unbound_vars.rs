@@ -28,7 +28,7 @@ impl Ctx<'_> {
       }
 
       for err in errs {
-        self.info.add_rule_error(err, def_name.clone());
+        self.info.add_function_error(err, def_name.clone(), def.source.clone());
       }
     }
 

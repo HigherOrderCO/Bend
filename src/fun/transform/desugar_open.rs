@@ -11,7 +11,7 @@ impl Ctx<'_> {
     for def in self.book.defs.values_mut() {
       for rule in def.rules.iter_mut() {
         if let Err(err) = rule.body.desugar_open(&self.book.adts) {
-          self.info.add_rule_error(err, def.name.clone());
+          self.info.add_function_error(err, def.name.clone(), def.source.clone());
         }
       }
     }

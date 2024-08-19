@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file/variable_name_double_underscore.bend
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/compile_file/variable_name_double_underscore.bend :
+[1mIn [4mtests/golden_tests/compile_file/variable_name_double_underscore.bend[0m[1m :[0m
 [1m- expected:[0m expression
 [1m- detected:[0m
 [0m  2 |   return __this_should_fail__[4m[31m([0m*)[0m

@@ -12,7 +12,7 @@ impl Book {
   /// Merges definitions that have the same structure into one definition.
   /// Expects variables to be linear.
   ///
-  /// Ignores origin of the rules when merging,
+  /// Some of the origins of the rules will be lost in this stage,
   /// Should not be preceded by passes that cares about the origins.
   pub fn merge_definitions(&mut self) {
     let defs: Vec<_> = self.defs.keys().cloned().collect();
@@ -34,13 +34,18 @@ impl Book {
       // def1_$_def2_$_def3
       let new_name = Name::new(equal_defs.iter().join(MERGE_SEPARATOR));
 
-      // Builtin origin takes precedence
-      let builtin = equal_defs.iter().any(|nam| self.defs[nam].is_builtin());
-
       if equal_defs.len() > 1 {
         // Merging some defs
+
+        // The source of the generated definition will be based on the first one we get from `equal_defs`.
+        // In the future, we might want to change this to point to every source of every definition
+        // it's based on.
+        // This could be done by having SourceKind::Generated contain a Vec<Source> or Vec<Definition>.
+        let any_def_name = equal_defs.iter().next().unwrap(); // we know we can unwrap since equal_defs.len() > 1
+        let source = self.defs[any_def_name].source.clone();
+
         // Add the merged def
-        let new_def = Definition::new_gen(new_name.clone(), vec![Rule { pats: vec![], body: term }], builtin);
+        let new_def = Definition::new_gen(new_name.clone(), vec![Rule { pats: vec![], body: term }], source);
         self.defs.insert(new_name.clone(), new_def);
         // Remove the old ones and write the map of old names to new ones.
         for name in equal_defs {

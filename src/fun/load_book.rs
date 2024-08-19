@@ -1,9 +1,9 @@
 use super::{
   parser::{ParseBook, TermParser},
-  Book, Name,
+  Book, Name, Source, SourceKind,
 };
 use crate::{
-  diagnostics::{Diagnostics, DiagnosticsConfig},
+  diagnostics::{Diagnostics, DiagnosticsConfig, TextSpan},
   imports::PackageLoader,
 };
 use std::path::Path;
@@ -39,11 +39,18 @@ pub fn load_to_book(
   book.load_imports(package_loader, diag)
 }
 
-pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<ParseBook, String> {
+pub fn do_parse_book(code: &str, origin: &Path, mut book: ParseBook) -> Result<ParseBook, Diagnostics> {
   book.source = Name::new(origin.to_string_lossy());
-  TermParser::new(code).parse_book(book, false).map_err(|e| format!("In {} :\n{}", origin.display(), e))
+  TermParser::new(code).parse_book(book, false).map_err(|err| {
+    let mut diagnostics = Diagnostics::default();
+    let span = TextSpan::from_byte_span(code, err.span.0..err.span.1);
+    let source =
+      Source { file: Some(origin.to_string_lossy().into()), span: Some(span), kind: SourceKind::User };
+    diagnostics.add_parsing_error(err, source);
+    diagnostics
+  })
 }
 
-pub fn do_parse_book_default(code: &str, origin: &Path) -> Result<Book, String> {
+pub fn do_parse_book_default(code: &str, origin: &Path) -> Result<Book, Diagnostics> {
   do_parse_book(code, origin, ParseBook::builtins())?.to_fun()
 }

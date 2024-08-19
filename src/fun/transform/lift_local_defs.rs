@@ -41,11 +41,12 @@ impl Term {
           defs.keys().filter(|name| name.starts_with(local_name.as_ref())).cloned().collect::<BTreeSet<_>>();
         let (r#use, fvs, mut rules) =
           gen_use(inner_defs, &local_name, &def.name, nxt, std::mem::take(&mut def.rules));
+        let source = std::mem::take(&mut def.source);
         *self = r#use;
 
         apply_closure(&mut rules, &fvs);
 
-        let new_def = Definition::new_gen(local_name.clone(), rules, false);
+        let new_def = Definition::new_gen(local_name.clone(), rules, source);
         defs.insert(local_name.clone(), new_def);
       }
       _ => {

@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/redefinition_type_with_object.bend
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/parse_file/redefinition_type_with_object.bend :
+[1mIn [4mtests/golden_tests/parse_file/redefinition_type_with_object.bend[0m[1m :[0m
 Redefinition of builtin (type) 'IO'.
 [0m  1 | [4m[31mobject IO { run }
 [0m

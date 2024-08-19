@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/compile_file_o_all/tagged_dup.bend
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/compile_file_o_all/tagged_dup.bend :
+[1mIn [4mtests/golden_tests/compile_file_o_all/tagged_dup.bend[0m[1m :[0m
 [1m- expected:[0m '='
 [1m- detected:[0m
 [0m  4 |   [4m[31ml[0met #i {e f} = @x x;[0m

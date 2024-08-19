@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/bend_missing_else.bend
 ---
 [4m[1m[31mErrors:[0m
-In tests/golden_tests/parse_file/bend_missing_else.bend :
+[1mIn [4mtests/golden_tests/parse_file/bend_missing_else.bend[0m[1m :[0m
 [1m- expected:[0m 'else'
 [1m- detected:[0m
 [0m  14 | [4m[31md[0mef main():[0m

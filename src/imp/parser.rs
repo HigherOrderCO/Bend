@@ -1,7 +1,7 @@
 use crate::{
   fun::{
     parser::{is_num_char, Indent, ParseResult, ParserCommons},
-    CtrField, Name, Num, Op, STRINGS,
+    CtrField, Name, Num, Op, Source, SourceKind, STRINGS,
   },
   imp::{AssignPattern, Definition, Enum, Expr, InPlaceOp, MatchArm, Stmt, Variant},
   maybe_grow,
@@ -1037,7 +1037,8 @@ impl<'a> PyParser<'a> {
     indent.exit_level();
 
     // Temporary source, should be overwritten later
-    let def = Definition { name, params, body, source: crate::fun::Source::Generated };
+    let source = Source { file: None, span: None, kind: SourceKind::Generated };
+    let def = Definition { name, params, body, source };
     Ok((def, nxt_indent))
   }
 
@@ -1080,7 +1081,8 @@ impl<'a> PyParser<'a> {
       fields = self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?;
     }
     if let Some(field) = fields.find_repeated_names().into_iter().next() {
-      return Err(format!("Found a repeated field '{field}' in constructor {ctr_name}."));
+      let msg = format!("Found a repeated field '{field}' in constructor {ctr_name}.");
+      return self.expected_message(&msg);
     }
     Ok(Variant { name: ctr_name, fields })
   }
@@ -1101,7 +1103,8 @@ impl<'a> PyParser<'a> {
       vec![]
     };
     if let Some(field) = fields.find_repeated_names().into_iter().next() {
-      return Err(format!("Found a repeated field '{field}' in object {name}."));
+      let msg = format!("Found a repeated field '{field}' in object {name}.");
+      return self.expected_message(&msg);
     }
     if !self.is_eof() {
       self.consume_new_line()?;

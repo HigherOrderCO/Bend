@@ -3,5 +3,6 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/unbound_wrap.bend
 ---
 [4m[1m[31mErrors:[0m
+[1mIn [4mtests/golden_tests/run_file/unbound_wrap.bend[0m[1m :[0m
 [1mIn definition '[4mmain[0m[1m':[0m
   Reference to undefined function 'Maybe/wrap'
