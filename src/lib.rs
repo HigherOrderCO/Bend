@@ -119,6 +119,7 @@ pub fn desugar_book(
   // Auto match linearization
   ctx.book.make_var_names_unique();
   ctx.book.desugar_use();
+
   match opts.linearize_matches {
     OptLevel::Disabled => (),
     OptLevel::Alt => ctx.book.linearize_match_binds(),
@@ -170,8 +171,7 @@ pub fn desugar_book(
 
 pub fn type_check_book(ctx: &mut Ctx) -> Result<(), Diagnostics> {
   let old_book = std::mem::replace(ctx.book, ctx.book.clone());
-  ctx.make_native_defs();
-  ctx.book.encode_adts(AdtEncoding::Scott);
+  //ctx.make_native_defs();
   ctx.resolve_type_ctrs()?;
   let res = ctx.type_check();
   *ctx.book = old_book;

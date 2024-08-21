@@ -37,7 +37,7 @@ impl Ctx<'_> {
   /// * If either included one of the cases more than once (including wildcard patterns), we'd get a warning.
   /// ```hvm
   /// match x {
-  ///   Cons: (A x.h x.t)
+  ///   Cons x.h x.t: (A x.h x.t)
   ///   Nil: let %matched = (Foo y); switch %matched { 0: B; 1: C; _: D }
   /// }
   /// ```

@@ -296,7 +296,6 @@ impl fmt::Display for Type {
     match self {
       Type::Hole => write!(f, "_"),
       Type::Var(nam) => write!(f, "{nam}"),
-      Type::All(nam, bod) => write!(f, "∀{nam} {bod}"),
       Type::Arr(lft, rgt) => write!(f, "({lft} -> {rgt})"),
       Type::Ctr(nam, args) => {
         if args.is_empty() {

@@ -109,7 +109,6 @@ pub enum Type {
   Any,
   Hole,
   Var(Name),
-  All(Name, Box<Type>),
   Ctr(Name, Vec<Type>),
   Arr(Box<Type>, Box<Type>),
   Tup(Vec<Type>),
@@ -1126,10 +1125,6 @@ impl Type {
             *nam = to.clone();
           }
         }
-        Type::All(nam, _) if nam == from => {
-          // This forall is shadowing the subst variable, so stop here.
-          return;
-        }
         _ => (),
       };
       for child in self.children_mut() {
@@ -1139,14 +1134,13 @@ impl Type {
   }
 
   pub fn children_mut(&mut self) -> impl Iterator<Item = &mut Type> {
-    multi_iterator!(ChildrenIter { Zero, One, Two, Vec });
+    multi_iterator!(ChildrenIter { Zero, Two, Vec });
     match self {
       Type::Any | Type::None | Type::Hole | Type::I24 | Type::F24 | Type::U24 | Type::Var(_) => {
         ChildrenIter::Zero([])
       }
       Type::Arr(lft, rgt) => ChildrenIter::Two([lft.as_mut(), rgt.as_mut()]),
       Type::Tup(els) | Type::Ctr(_, els) => ChildrenIter::Vec(els),
-      Type::All(_, body) => ChildrenIter::One([body.as_mut()]),
     }
   }
 }

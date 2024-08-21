@@ -21,5 +21,4 @@ pub mod resolve_refs;
 pub mod resolve_type_ctrs;
 pub mod resugar_list;
 pub mod resugar_string;
-pub mod type_check;
 pub mod unique_names;

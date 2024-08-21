@@ -1235,7 +1235,6 @@ pub fn make_fn_type(args: &[Type], ret: Type) -> Type {
 pub fn make_ctr_type(type_name: Name, fields: &[Type], vars: &[Name]) -> Type {
   let typ = Type::Ctr(type_name, vars.iter().cloned().map(Type::Var).collect());
   let typ = fields.iter().rfold(typ, |acc, typ| Type::Arr(Box::new(typ.clone()), Box::new(acc)));
-  let typ = vars.iter().rfold(typ, |acc, typ| Type::All(typ.clone(), Box::new(acc)));
   typ
 }
 
