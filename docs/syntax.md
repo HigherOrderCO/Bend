@@ -6,6 +6,10 @@ Click [here](#imp-syntax) to see the syntax for "imp", the variant of bend that 
 
 Click [here](#fun-syntax) to see the syntax for "fun", the variant of bend that looks like a functional language like Haskell or ML.
 
+Click [here](#import-syntax) to see the import syntax.
+
+Click [here](#comments) to see the syntax for commenting code.
+
 Both syntaxes can be mixed in the same file like the example below:
 
 ```python
@@ -17,6 +21,10 @@ type Bool:
   True
   False
 
+#{
+  The identity function is a function that always returns the value that
+  was used as its argument.
+#}
 def identity(x):
   return x
 
@@ -1261,6 +1269,8 @@ It will also ignore all term-level compiler passes and so can be
 useful for writing programs with exact behaviour that won't ever be
 changed or optimized by the compiler.
 
+<div id="import-syntax"></div>
+
 # Import Syntax
 
 ### Import Relative to the File
@@ -1294,4 +1304,37 @@ from path import name as alias
 from path import (name1 as Alias1, name2 as Alias2)
 import path as alias
 import (path/name1 as Alias1, path/name2 as Alias2)
+```
+
+<div id="comments"></div>
+
+# Comments
+
+## Syntax
+
+### Single Line Comment
+
+Use `#` to indicate a single line comment.
+
+```py
+# Single line comment
+
+def main():
+  # return 0
+```
+
+### Multi Line Comment
+
+Use `#{ ... #}` to indicate a multi-line comment.
+
+Multi-line commenting should also be used to document code.
+
+```py
+#{
+  Expects two arguments to be passed.
+
+  This function always returns the second value that was used as argument.
+#}
+def second(x, y):
+  return y
 ```
