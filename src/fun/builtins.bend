@@ -124,6 +124,23 @@ def Result/unwrap(res: Result(T, E)) -> Any:
     case Result/Err:
       return res.val
 
+# Returns the second result if the first one is `Ok`.
+# Otherwise, returns the `Err` of the first result.
+def Result/and(fst: Result(T, E), snd: Result(T, E)) -> Result(T, E):
+  match fst:
+    case Result/Ok:
+      return snd
+    case Result/Err:
+      return fst
+
+# Maps the error value of a result.
+def Result/map_err(res: Result(T, E), f: E -> F) -> Result(T, F):
+  match res:
+    case Result/Ok:
+      return Result/Ok(res.val)
+    case Result/Err:
+      return Result/Err(f(res.val))
+
 type Tree(T):
   Node { ~left: Tree(T), ~right: Tree(T) }
   Leaf { value: T }
@@ -213,6 +230,15 @@ type IOError(T):
   Name
   Inner { value: T }
 
+def IOError/unwrap_inner(err: IOError(T)) -> T:
+  match err:
+    case IOError/Type:
+      return unreachable()
+    case IOError/Name:
+      return unreachable()
+    case IOError/Inner:
+      return err.value
+
 def IO/MAGIC() -> (u24, u24):
   return (0xD0CA11, 0xFF1FF1)
 
@@ -222,22 +248,49 @@ def IO/wrap(x: T) -> IO(T):
 def IO/bind(a: IO(A), b: ((A -> IO(B)) -> (A -> IO(B))) -> (A -> IO(B))) -> IO(B):
   match a:
     case IO/Done:
-      b = undefer(b)
-      return b(a.expr)
+      return undefer(b, a.expr)
     case IO/Call:
       return IO/Call(a.magic, a.func, a.argm, lambda x: IO/bind(a.cont(x), b))
 
-def IO/call(func: String, argm: Any) -> IO(Result(Any, Any)):
+# Calls an IO by its name with the given arguments.
+#
+# The arguments are untyped and not checked for type correctness.
+# If type safety is desired, this function should be wrapped with 
+# another that checks the types of the arguments and of the return.
+#
+# Always returns a `Result` where the error is an `IOError`, a type
+# that either contains an internal error of the IO function, like an
+# `errno` in the case of FS functions, or a general Bend IO error,
+# like a type error if the arguments are invalid or a name error if
+# the called IO is not found.
+def IO/call(func: String, argm: Any) -> IO(Result(Any, IOError(Any))):
   return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
 
-IO/done_on_err (IO/Call magic func argm cont) = (IO/Call magic func argm @res match res {
-  Result/Ok: (cont res.val)
-  Result/Err: (IO/Done IO/MAGIC (Result/Err res.val))
-})
+# If the IO result is an error, returns it without calling the continuation.
+# Otherwise, calls the continuation with the unwrapped result.
+IO/done_on_err (io: (IO (Result A B))) : (IO (Result A B))
+IO/done_on_err (IO/Call magic func argm cont) =
+  let cont = @res match res {
+    Result/Ok: (cont res.val)
+    Result/Err: (IO/Done IO/MAGIC (Result/Err res.val))
+  }
+  (IO/Call magic func argm cont)
 IO/done_on_err done = done
 
+# Maps the result of an IO.
+def IO/map(io: IO(A), f: A -> B) -> IO(B):
+  return IO/bind(io, lambda x: x(lambda f, y: IO/Done(IO/MAGIC, f(y)), f))
+
+# Unwraps the `IOError` of the result of an IO, returning the `Inner` variant.
+#
+# Should only be called if the other `IOError` variants are unreachable.
+def IO/unwrap_inner(io: IO(Result(A, IOError(B)))) -> IO(Result(A, B)):
+  return IO/map(io, lambda x: Result/map_err(x, IOError/unwrap_inner))
+
 ## Time and sleep
-# Returns a monotonically increasing nanosecond timestamp as an u48 encoded as a pair of u24s.
+
+  # Returns a monotonically increasing nanosecond timestamp as an u48
+# encoded as a pair of u24s.
 def IO/get_time() -> IO((u24, u24)):
   with IO:
     res <- IO/call("GET_TIME", *)
@@ -245,37 +298,37 @@ def IO/get_time() -> IO((u24, u24)):
 
 # Sleeps for the given number of nanoseconds, given by an u48 encoded as a pair of u24s.
 def IO/nanosleep(hi_lo: (u24, u24)) -> IO(None):
-  return IO/call("SLEEP", hi_lo)
+  with IO:
+    res <- IO/call("SLEEP", hi_lo)
+    return wrap(Result/unwrap(res))
 
 # Sleeps for a given amount of seconds as a float.
 def IO/sleep(seconds: f24) -> IO(None):
   nanos = seconds * 1_000_000_000.0
   lo = f24_to_u24(nanos % 0x1_000_000.0)
   hi = f24_to_u24(nanos / 0x1_000_000.0)
-  with IO:
-    res <- IO/nanosleep((hi, lo))
-    return wrap(Result/unwrap(res))
+  return IO/nanosleep((hi, lo))
 
 ## File IO
 
 ### File IO primitives
-def IO/FS/open(path: String, mode: String) -> IO(u24):
-  return IO/call("OPEN", (path, mode))
+def IO/FS/open(path: String, mode: String) -> IO(Result(u24, u24)):
+  return IO/unwrap_inner(IO/call("OPEN", (path, mode)))
 
-def IO/FS/close(file: u24) -> IO(None):
-  return IO/call("CLOSE", file)
+def IO/FS/close(file: u24) -> IO(Result(None, u24)):
+  return IO/unwrap_inner(IO/call("CLOSE", file))
 
-def IO/FS/read(file: u24, num_bytes: u24) -> IO(List(u24)):
-  return IO/call("READ", (file, num_bytes))
+def IO/FS/read(file: u24, num_bytes: u24) -> IO(Result(List(u24), u24)):
+  return IO/unwrap_inner(IO/call("READ", (file, num_bytes)))
 
-def IO/FS/write(file: u24, bytes: List(u24)) -> IO(None):
-  return IO/call("WRITE", (file, bytes))
+def IO/FS/write(file: u24, bytes: List(u24)) -> IO(Result(None, u24)):
+  return IO/unwrap_inner(IO/call("WRITE", (file, bytes)))
 
-def IO/FS/seek(file: u24, offset: i24, mode: u24) -> IO(None):
-  return IO/call("SEEK", (file, (offset, mode)))
+def IO/FS/seek(file: u24, offset: i24, mode: u24) -> IO(Result(None, u24)):
+  return IO/unwrap_inner(IO/call("SEEK", (file, (offset, mode))))
 
-def IO/FS/flush(file: u24) -> IO(None):
-  return IO/call("FLUSH", file)
+def IO/FS/flush(file: u24) -> IO(Result(None, u24)):
+  return IO/unwrap_inner(IO/call("FLUSH", file))
 
 ### Always available files
 IO/FS/STDIN : u24 = 0
@@ -293,18 +346,18 @@ IO/FS/SEEK_END : i24 = +2
 ### File utilities
 
 # Reads an entire file, returning a list of bytes.
-def IO/FS/read_file(path: String) -> IO(List(u24)):
+def IO/FS/read_file(path: String) -> IO(Result(List(u24), u24)):
   with IO:
     fd <- IO/done_on_err(IO/FS/open(path, "r"))
-    bytes <- IO/FS/read_to_end(fd)
+    bytes <- IO/done_on_err(IO/FS/read_to_end(fd))
     * <- IO/done_on_err(IO/FS/close(fd))
     return wrap(bytes)
 
 # Reads the remaining contents of a file, returning a list of read bytes.
-def IO/FS/read_to_end(fd: u24) -> IO(List(u24)):
+def IO/FS/read_to_end(fd: u24) -> IO(Result(List(u24), u24)):
   return IO/FS/read_to_end.read_chunks(fd, [])
 
-def IO/FS/read_to_end.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(List(u24)):
+def IO/FS/read_to_end.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result(List(u24), u24)):
   with IO:
     # Read file in 1MB chunks
     chunk <- IO/done_on_err(IO/FS/read(fd, 1048576))
@@ -315,24 +368,27 @@ def IO/FS/read_to_end.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(List(u
         return IO/FS/read_to_end.read_chunks(fd, List/Cons(chunk, chunks))
 
 # Reads a single line from a file, returning a list of bytes.
-def IO/FS/read_line(fd: u24) -> IO(List(u24)):
+def IO/FS/read_line(fd: u24) -> IO(Result(List(u24), u24)):
   return IO/FS/read_line.read_chunks(fd, [])
 
-def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(List(u24)):
+def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result(List(u24), u24)):
   with IO:
     # Read line in 1kB chunks
     chunk <- IO/done_on_err(IO/FS/read(fd, 1024))
     match res = List/split_once(chunk, '\n'):
       # Found a newline, backtrack and join chunks
       case Result/Ok:
+        # Found line end, backtrack on the file to the start of the next line
+        # and return the found line.
         (line, rest) = res.val
         (length, *) = List/length(rest)
-        * <- IO/FS/seek(fd, u24_to_i24(length) * -1, IO/FS/SEEK_CUR)
+        * <- IO/done_on_err(IO/FS/seek(fd, u24_to_i24(length) * -1, IO/FS/SEEK_CUR))
         chunks = List/Cons(line, chunks)
         bytes = List/flatten(chunks)
-        return wrap(bytes)
+        return wrap(Result/Ok(bytes))
       # Newline not found
       case Result/Err:
+        # No line end found, continue reading.
         line = res.val
         (length, line) = List/length(line)
         # If length is 0, the end of the file was reached, return as if it was a newline
@@ -345,7 +401,7 @@ def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(List(u24
           return IO/FS/read_line.read_chunks(fd, chunks)
 
 # Writes a list of bytes to a file given by a path.
-def IO/FS/write_file(path: String, bytes: List(u24)) -> IO(None):
+def IO/FS/write_file(path: String, bytes: List(u24)) -> IO(Result(None, u24)):
   with IO:
     f <- IO/FS/open(path, "w")
     match f:
@@ -367,10 +423,10 @@ def IO/print(text: String) -> IO(None):
 # IO/input() -> IO String
 # Read characters from stdin until a newline is found.
 # Returns the read input decoded as utf-8.
-def IO/input() -> IO(String):
+def IO/input() -> IO(Result(String, u24)):
   return IO/input.go(DiffList/new)
 
-def IO/input.go(acc: List(u24) -> List(u24)) -> IO(String):
+def IO/input.go(acc: List(u24) -> List(u24)) -> IO(Result(String, u24)):
   # TODO: This is slow and inefficient, should be done in hvm using fgets.
   with IO:
     byte <- IO/done_on_err(IO/FS/read(IO/FS/STDIN, 1))
@@ -382,7 +438,7 @@ def IO/input.go(acc: List(u24) -> List(u24)) -> IO(String):
         if byte.head == '\n':
           bytes = DiffList/to_list(acc)
           text = String/decode_utf8(bytes)
-          return wrap(text)
+          return wrap(Result/Ok(text))
         else:
           acc = DiffList/append(acc, byte.head)
           return IO/input.go(acc)
@@ -392,8 +448,8 @@ def IO/input.go(acc: List(u24) -> List(u24)) -> IO(String):
 # Returns an unique id to the library object encoded as a u24
 # 'path' is the path to the library file.
 # 'lazy' is a boolean encoded as a u24 that determines if all functions are loaded lazily or upfront.
-def IO/DyLib/open(path: String, lazy: u24) -> IO(u24):
-  return IO/call("DL_OPEN", (path, lazy))
+def IO/DyLib/open(path: String, lazy: u24) -> IO(Result(u24, String)):
+  return IO/unwrap_inner(IO/call("DL_OPEN", (path, lazy)))
 
 # Calls a function of a previously opened library.
 # The returned value is determined by the called function.
@@ -401,20 +457,24 @@ def IO/DyLib/open(path: String, lazy: u24) -> IO(u24):
 # 'fn' is the name of the function in the library.
 # 'args' are the arguments to the function. The expected values depend on the called function.
 def IO/DyLib/call(dl: u24, fn: String, args: Any) -> IO(Any):
-  return IO/call("DL_CALL", (dl, (fn, args)))
+  return IO/unwrap_inner(IO/call("DL_CALL", (dl, (fn, args))))
 
 # Closes a previously open library.
 # Returns nothing.
 # 'dl' is the id of the library object.
 def IO/DyLib/close(dl: u24) -> IO(None):
-  return IO/Call(IO/MAGIC, "DL_CLOSE", (dl), IO/wrap)
+  return IO/unwrap_inner(IO/call("DL_CLOSE", dl))
 
 # Lazy thunks
-# We can defer the evaluation of a function by wrapping it in a thunk
+
+# We can defer the evaluation of a function by wrapping it in a thunk.
 # Ex: @x (x @arg1 @arg2 @arg3 (f arg1 arg2 arg3) arg1 arg2 arg3)
-# This is only evaluated when we call it with ' ' (undefer my_thunk)
-# We can build a defered call directly or by by using defer and defer_arg
+#
+# This is only evaluated when we call it with `(undefer my_thunk)`.
+# We can build a defered call directly or by by using `defer` and `defer_arg`.
+#
 # The example above can be written as:
+#
 # (defer_arg (defer_arg (defer_arg (defer @arg1 @arg2 @arg3 (f arg1 arg2 arg3)) arg1) arg2) arg3)
 def defer(val: T) -> (T -> T) -> T:
   return lambda x: x(val)
@@ -422,9 +482,14 @@ def defer(val: T) -> (T -> T) -> T:
 def defer_arg(defered: ((A -> B) -> (A -> B)) -> (A -> B), arg: B) -> ((A -> A) -> A):
   return lambda x: defered(x, arg)
 
-def undefer(defered: ((A -> A) -> A)) -> A:
+def undefer(defered: (A -> A) -> A) -> A:
   return defered(lambda x: x)
 
+# A function that can be used in unreachable code.
+#
+# Is not type safe and if used in code that is actually reachable, will corrupt the program.
+def unreachable() -> Any:
+  return *
 
 # Native number casts
 
@@ -463,8 +528,8 @@ hvm i24_to_f24 -> (i24 -> f24):
 
 Utf8/REPLACEMENT_CHARACTER : u24 = '\u{FFFD}'
 
-# String/decode_utf8(List u24) -> String
 # Decodes a sequence of bytes to a String using utf-8 encoding.
+# Invalid utf-8 sequences are replaced with Utf8/REPLACEMENT_CHARACTER.
 String/decode_utf8 (bytes: (List u24)) : String =
   let (got, rest) = (Utf8/decode_character bytes)
   match rest {
