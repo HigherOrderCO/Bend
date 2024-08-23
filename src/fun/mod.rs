@@ -116,6 +116,8 @@ pub enum Type {
   F24,
   I24,
   None,
+  Number(Box<Type>),
+  Integer(Box<Type>),
 }
 
 /// A pattern matching rule of a definition.
@@ -1133,12 +1135,25 @@ impl Type {
     })
   }
 
-  pub fn children_mut(&mut self) -> impl Iterator<Item = &mut Type> {
-    multi_iterator!(ChildrenIter { Zero, Two, Vec });
+  pub fn children(&self) -> impl Iterator<Item = &Type> {
+    multi_iterator!(ChildrenIter { Zero, One, Two, Vec });
     match self {
       Type::Any | Type::None | Type::Hole | Type::I24 | Type::F24 | Type::U24 | Type::Var(_) => {
         ChildrenIter::Zero([])
       }
+      Type::Number(t) | Type::Integer(t) => ChildrenIter::One([t.as_ref()]),
+      Type::Arr(lft, rgt) => ChildrenIter::Two([lft.as_ref(), rgt.as_ref()]),
+      Type::Tup(els) | Type::Ctr(_, els) => ChildrenIter::Vec(els),
+    }
+  }
+
+  pub fn children_mut(&mut self) -> impl Iterator<Item = &mut Type> {
+    multi_iterator!(ChildrenIter { Zero, One, Two, Vec });
+    match self {
+      Type::Any | Type::None | Type::Hole | Type::I24 | Type::F24 | Type::U24 | Type::Var(_) => {
+        ChildrenIter::Zero([])
+      }
+      Type::Number(t) | Type::Integer(t) => ChildrenIter::One([t.as_mut()]),
       Type::Arr(lft, rgt) => ChildrenIter::Two([lft.as_mut(), rgt.as_mut()]),
       Type::Tup(els) | Type::Ctr(_, els) => ChildrenIter::Vec(els),
     }

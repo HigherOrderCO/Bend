@@ -44,15 +44,16 @@ impl Type {
             arg.resolve_type_ctrs(adts)?;
           }
         }
-        Type::Arr(lft, rgt) => {
-          lft.resolve_type_ctrs(adts)?;
-          rgt.resolve_type_ctrs(adts)?;
-        }
         Type::Tup(els) => {
           for el in els {
             el.resolve_type_ctrs(adts)?;
           }
         }
+        Type::Arr(lft, rgt) => {
+          lft.resolve_type_ctrs(adts)?;
+          rgt.resolve_type_ctrs(adts)?;
+        }
+        Type::Number(t) | Type::Integer(t) => t.resolve_type_ctrs(adts)?,
         Type::Any | Type::Hole | Type::None | Type::U24 | Type::I24 | Type::F24 => {}
       }
       Ok(())

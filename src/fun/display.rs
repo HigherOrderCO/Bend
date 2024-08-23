@@ -293,7 +293,7 @@ impl Tag {
 
 impl fmt::Display for Type {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
+    maybe_grow(|| match self {
       Type::Hole => write!(f, "_"),
       Type::Var(nam) => write!(f, "{nam}"),
       Type::Arr(lft, rgt) => write!(f, "({lft} -> {rgt})"),
@@ -304,13 +304,15 @@ impl fmt::Display for Type {
           write!(f, "({nam} {})", DisplayJoin(|| args.iter(), " "))
         }
       }
+      Type::Number(t) => write!(f, "(Number {t})"),
+      Type::Integer(t) => write!(f, "(Integer {t})"),
       Type::U24 => write!(f, "u24"),
       Type::I24 => write!(f, "i24"),
       Type::F24 => write!(f, "f24"),
       Type::Any => write!(f, "Any"),
       Type::None => write!(f, "None"),
       Type::Tup(els) => write!(f, "({})", DisplayJoin(|| els.iter(), ", ")),
-    }
+    })
   }
 }
 
