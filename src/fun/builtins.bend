@@ -53,9 +53,9 @@ List/filter (List/Cons x xs) pred =
 List/sum (List/Nil) = 0
 List/sum (List/Cons x xs) = (+ x (List/sum xs))
 
-# Generates a list of natural numbers starting from `start` and ending at `end` (inclusive).
+# Generates a list of unsigned numbers starting from `start` and ending at `end` (inclusive).
 # If the start value is greater than the end value, returns an empty list.
-# List/range (start: n24, end: n24) -> (List n24)
+# List/range (start: u24, end: u24) -> (List u24)
 List/range start end =
   if (> start end) {
     (List/Nil)
