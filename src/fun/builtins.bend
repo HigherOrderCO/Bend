@@ -47,9 +47,9 @@ List/filter (List/Cons x xs) pred =
     (List/filter xs pred)
   }
 
-## Recursively sums all elements in a list of natural numbers.
+## Recursively sums all elements in a list of native numbers.
 # If the list is empty, returns 0.
-# List/sum (xs: List(n24)) -> n24
+# List/sum (xs: List(Number(a))) -> Number(a)
 List/sum (List/Nil) = 0
 List/sum (List/Cons x xs) = (+ x (List/sum xs))
 
