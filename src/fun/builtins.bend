@@ -223,7 +223,7 @@ Map/map (Map/Node value left right) key f =
 
 type IO(T):
   Done { magic: (u24, u24), expr: T }
-  Call { magic: (u24, u24), func: String, argm: Any, cont: Any -> IO(T) }
+  Call { magic: (u24, u24), func: String, argm: Any, cont: Result(Any, IOError(Any)) -> IO(T) }
 
 type IOError(T):
   Type
@@ -245,7 +245,7 @@ def IO/MAGIC() -> (u24, u24):
 def IO/wrap(x: T) -> IO(T):
   return IO/Done(IO/MAGIC, x)
 
-def IO/bind(a: IO(A), b: ((A -> IO(B)) -> (A -> IO(B))) -> (A -> IO(B))) -> IO(B):
+def IO/bind(a: IO(A), b: ((id -> id) -> A -> IO(B))) -> IO(B):
   match a:
     case IO/Done:
       return undefer(b, a.expr)
@@ -279,7 +279,9 @@ IO/done_on_err done = done
 
 # Maps the result of an IO.
 def IO/map(io: IO(A), f: A -> B) -> IO(B):
-  return IO/bind(io, lambda x: x(lambda f, y: IO/Done(IO/MAGIC, f(y)), f))
+  with IO:
+    a <- io
+    return wrap(f(a))
 
 # Unwraps the `IOError` of the result of an IO, returning the `Inner` variant.
 #
@@ -479,10 +481,10 @@ def IO/DyLib/close(dl: u24) -> IO(None):
 def defer(val: T) -> (T -> T) -> T:
   return lambda x: x(val)
 
-def defer_arg(defered: ((A -> B) -> (A -> B)) -> (A -> B), arg: B) -> ((A -> A) -> A):
+def defer_arg(defered: (Id -> Id) -> A -> B, arg: B) -> ((Id -> Id) -> A):
   return lambda x: defered(x, arg)
 
-def undefer(defered: (A -> A) -> A) -> A:
+def undefer(defered: (Id -> Id) -> T) -> T:
   return defered(lambda x: x)
 
 # A function that can be used in unreachable code.

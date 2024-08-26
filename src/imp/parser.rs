@@ -1168,6 +1168,8 @@ impl<'a> ImpParser<'a> {
         Type::Any
       } else if self.try_parse_keyword("None") {
         Type::None
+      } else if self.try_parse_keyword("_") {
+        Type::Hole
       } else if self.try_parse_keyword("u24") {
         Type::U24
       } else if self.try_parse_keyword("i24") {

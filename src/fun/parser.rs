@@ -1013,6 +1013,8 @@ impl<'a> FunParser<'a> {
       Ok(Type::Any)
     } else if self.try_parse_keyword("None") {
       Ok(Type::None)
+    } else if self.try_parse_keyword("_") {
+      Ok(Type::Hole)
     } else if self.try_parse_keyword("u24") {
       Ok(Type::U24)
     } else if self.try_parse_keyword("i24") {
