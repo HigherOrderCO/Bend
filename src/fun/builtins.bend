@@ -74,17 +74,22 @@ String/equals * * = 0
 
 # Splits a list into two lists at the first occurrence of a value.
 String/split (s: String) (delimiter: u24) : (List String)
-String/split s delim = (String/split.go s delim (List/Cons String/Nil List/Nil))
-  String/split.go (String/Nil) _ acc = (List/reverse acc)
-  String/split.go (String/Cons c cs) delim acc =
-    if (== c delim) {
-      (String/split.go cs delim (List/Cons String/Nil acc))
-    } else {
-      match acc {
-        List/Cons: (String/split.go cs delim (List/Cons (String/Cons c acc.head) acc.tail))
-        List/Nil: []
-      }
+String/split s delim = (String/split.go s delim [""])
+
+String/split.go (cs: String) (delim: u24) (acc: (List String)) : (List String)
+String/split.go (String/Nil) _ acc = (List/reverse acc)
+String/split.go (String/Cons c cs) delim acc =
+  if (== c delim) {
+    # Start a new split string
+    (String/split.go cs delim (List/Cons String/Nil acc))
+  } else {
+    match acc {
+      # Add the current character to the current split string
+      List/Cons: (String/split.go cs delim (List/Cons (String/Cons c acc.head) acc.tail))
+      # Should be unreachable
+      List/Nil: []
     }
+  }
 
 # Create a new difference list
 def DiffList/new() -> (List(T) -> List(T)):
@@ -126,7 +131,7 @@ def Result/unwrap(res: Result(T, E)) -> Any:
 
 # Returns the second result if the first one is `Ok`.
 # Otherwise, returns the `Err` of the first result.
-def Result/and(fst: Result(T, E), snd: Result(T, E)) -> Result(T, E):
+def Result/and(fst: Result(A, E), snd: Result(B, E)) -> Result(B, E):
   match fst:
     case Result/Ok:
       return snd
@@ -146,7 +151,7 @@ type Tree(T):
   Leaf { value: T }
 
 # Returns a List converted from a Tree.
-def Tree/to_list(tree):
+def Tree/to_list(tree: Tree(T)) -> List(T):
   fold tree:
     case Tree/Leaf:
       list = DiffList/wrap(tree.value)
@@ -155,7 +160,7 @@ def Tree/to_list(tree):
   return DiffList/to_list(list)
 
 # Reverses a tree swapping right and left leaves.
-def Tree/reverse(tree):
+def Tree/reverse(tree: Tree(T)) -> Tree(T):
   fold tree:
     case Tree/Leaf:
       return !tree.value
@@ -245,7 +250,7 @@ def IO/MAGIC() -> (u24, u24):
 def IO/wrap(x: T) -> IO(T):
   return IO/Done(IO/MAGIC, x)
 
-def IO/bind(a: IO(A), b: ((id -> id) -> A -> IO(B))) -> IO(B):
+def IO/bind(a: IO(A), b: ((Id -> Id) -> A -> IO(B))) -> IO(B):
   match a:
     case IO/Done:
       return undefer(b, a.expr)
@@ -265,17 +270,6 @@ def IO/bind(a: IO(A), b: ((id -> id) -> A -> IO(B))) -> IO(B):
 # the called IO is not found.
 def IO/call(func: String, argm: Any) -> IO(Result(Any, IOError(Any))):
   return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
-
-# If the IO result is an error, returns it without calling the continuation.
-# Otherwise, calls the continuation with the unwrapped result.
-IO/done_on_err (io: (IO (Result A B))) : (IO (Result A B))
-IO/done_on_err (IO/Call magic func argm cont) =
-  let cont = @res match res {
-    Result/Ok: (cont res.val)
-    Result/Err: (IO/Done IO/MAGIC (Result/Err res.val))
-  }
-  (IO/Call magic func argm cont)
-IO/done_on_err done = done
 
 # Maps the result of an IO.
 def IO/map(io: IO(A), f: A -> B) -> IO(B):
@@ -326,7 +320,7 @@ def IO/FS/read(file: u24, num_bytes: u24) -> IO(Result(List(u24), u24)):
 def IO/FS/write(file: u24, bytes: List(u24)) -> IO(Result(None, u24)):
   return IO/unwrap_inner(IO/call("WRITE", (file, bytes)))
 
-def IO/FS/seek(file: u24, offset: i24, mode: u24) -> IO(Result(None, u24)):
+def IO/FS/seek(file: u24, offset: i24, mode: i24) -> IO(Result(None, u24)):
   return IO/unwrap_inner(IO/call("SEEK", (file, (offset, mode))))
 
 def IO/FS/flush(file: u24) -> IO(Result(None, u24)):
@@ -350,10 +344,15 @@ IO/FS/SEEK_END : i24 = +2
 # Reads an entire file, returning a list of bytes.
 def IO/FS/read_file(path: String) -> IO(Result(List(u24), u24)):
   with IO:
-    fd <- IO/done_on_err(IO/FS/open(path, "r"))
-    bytes <- IO/done_on_err(IO/FS/read_to_end(fd))
-    * <- IO/done_on_err(IO/FS/close(fd))
-    return wrap(bytes)
+    res_fd <- IO/FS/open(path, "r")
+    match res_fd:
+      case Result/Ok:
+        fd = res_fd.val
+        res1 <- IO/FS/read_to_end(fd)
+        res2 <- IO/FS/close(fd)
+        return wrap(Result/and(res2, res1))
+      case Result/Err:
+        return wrap(Result/Err(res_fd.val))
 
 # Reads the remaining contents of a file, returning a list of read bytes.
 def IO/FS/read_to_end(fd: u24) -> IO(Result(List(u24), u24)):
@@ -362,12 +361,17 @@ def IO/FS/read_to_end(fd: u24) -> IO(Result(List(u24), u24)):
 def IO/FS/read_to_end.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result(List(u24), u24)):
   with IO:
     # Read file in 1MB chunks
-    chunk <- IO/done_on_err(IO/FS/read(fd, 1048576))
-    match chunk:
-      case List/Nil:
-        return wrap(List/flatten(chunks))
-      case List/Cons:
-        return IO/FS/read_to_end.read_chunks(fd, List/Cons(chunk, chunks))
+    res_chunk <- IO/FS/read(fd, 1048576)
+    match res_chunk:
+      case Result/Ok:
+        chunk = res_chunk.val
+        match chunk:
+          case List/Nil:
+            return wrap(Result/Ok(List/flatten(chunks)))
+          case List/Cons:
+            return IO/FS/read_to_end.read_chunks(fd, List/Cons(chunk, chunks))
+      case Result/Err:
+        return wrap(Result/Err(res_chunk.val))
 
 # Reads a single line from a file, returning a list of bytes.
 def IO/FS/read_line(fd: u24) -> IO(Result(List(u24), u24)):
@@ -376,43 +380,52 @@ def IO/FS/read_line(fd: u24) -> IO(Result(List(u24), u24)):
 def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result(List(u24), u24)):
   with IO:
     # Read line in 1kB chunks
-    chunk <- IO/done_on_err(IO/FS/read(fd, 1024))
-    match res = List/split_once(chunk, '\n'):
-      # Found a newline, backtrack and join chunks
+    res_chunk <- IO/FS/read(fd, 1024)
+    match res_chunk:
       case Result/Ok:
-        # Found line end, backtrack on the file to the start of the next line
-        # and return the found line.
-        (line, rest) = res.val
-        (length, *) = List/length(rest)
-        * <- IO/done_on_err(IO/FS/seek(fd, u24_to_i24(length) * -1, IO/FS/SEEK_CUR))
-        chunks = List/Cons(line, chunks)
-        bytes = List/flatten(chunks)
-        return wrap(Result/Ok(bytes))
-      # Newline not found
+        chunk = res_chunk.val
+        match res = List/split_once(chunk, '\n'):
+          # Found a newline, backtrack and join chunks
+          case Result/Ok:
+            # Found line end, backtrack on the file to the start of the next line
+            # and return the found line.
+            (line, rest) = res.val
+            (length, *) = List/length(rest)
+            res_seek <- IO/FS/seek(fd, u24_to_i24(length) * -1, IO/FS/SEEK_CUR)
+            match res_seek:
+              case Result/Ok:
+                chunks = List/Cons(line, chunks)
+                bytes = List/flatten(chunks)
+                return wrap(Result/Ok(bytes))
+              case Result/Err:
+                return wrap(Result/Err(res_seek.val))
+          # Newline not found
+          case Result/Err:
+            line = res.val
+            (length, line) = List/length(line)
+            # If length is 0, the end of the file was reached, return as if it was a newline
+            if length == 0:
+              bytes = List/flatten(chunks)
+              return wrap(bytes)
+            # Otherwise, the line is still ongoing, read more chunks
+            else:
+              chunks = List/Cons(line, chunks)
+              return IO/FS/read_line.read_chunks(fd, chunks)
       case Result/Err:
-        # No line end found, continue reading.
-        line = res.val
-        (length, line) = List/length(line)
-        # If length is 0, the end of the file was reached, return as if it was a newline
-        if length == 0:
-          bytes = List/flatten(chunks)
-          return wrap(bytes)
-        # Otherwise, the line is still ongoing, read more chunks
-        else:
-          chunks = List/Cons(line, chunks)
-          return IO/FS/read_line.read_chunks(fd, chunks)
+        return wrap(Result/Err(res_chunk.val))
 
 # Writes a list of bytes to a file given by a path.
 def IO/FS/write_file(path: String, bytes: List(u24)) -> IO(Result(None, u24)):
   with IO:
-    f <- IO/FS/open(path, "w")
-    match f:
-      case Result/Err:
-        return wrap(Result/Err(f.val))
+    res_f <- IO/FS/open(path, "w")
+    match res_f:
       case Result/Ok:
-        * <- IO/done_on_err(IO/FS/write(f.val, bytes))
-        * <- IO/done_on_err(IO/FS/close(f.val))
-        return wrap(Result/Ok(bytes))
+        f = res_f.val 
+        res1 <- IO/FS/write(f, bytes)
+        res2 <- IO/FS/close(f)
+        return wrap(Result/and(res2, res1))
+      case Result/Err:
+        return wrap(Result/Err(res_f.val))
 
 ### Standard input and output utilities
 
@@ -431,19 +444,24 @@ def IO/input() -> IO(Result(String, u24)):
 def IO/input.go(acc: List(u24) -> List(u24)) -> IO(Result(String, u24)):
   # TODO: This is slow and inefficient, should be done in hvm using fgets.
   with IO:
-    byte <- IO/done_on_err(IO/FS/read(IO/FS/STDIN, 1))
-    match byte:
-      case List/Nil:
-        # Nothing read, try again (to simulate blocking a read)
-        return IO/input.go(acc)
-      case List/Cons:
-        if byte.head == '\n':
-          bytes = DiffList/to_list(acc)
-          text = String/decode_utf8(bytes)
-          return wrap(Result/Ok(text))
-        else:
-          acc = DiffList/append(acc, byte.head)
-          return IO/input.go(acc)
+    res_byte <- IO/FS/read(IO/FS/STDIN, 1)
+    match res_byte:
+      case Result/Ok:
+        byte = res_byte.val
+        match byte:
+          case List/Nil:
+            # Nothing read, try again (to simulate blocking a read)
+            return IO/input.go(acc)
+          case List/Cons:
+            if byte.head == '\n':
+              bytes = DiffList/to_list(acc)
+              text = String/decode_utf8(bytes)
+              return wrap(Result/Ok(text))
+            else:
+              acc = DiffList/append(acc, byte.head)
+              return IO/input.go(acc)
+      case Result/Err:
+        return wrap(Result/Err(res_byte.val))
 
 ### Dynamically linked libraries
 
@@ -458,13 +476,13 @@ def IO/DyLib/open(path: String, lazy: u24) -> IO(Result(u24, String)):
 # 'dl' is the id of the library object.
 # 'fn' is the name of the function in the library.
 # 'args' are the arguments to the function. The expected values depend on the called function.
-def IO/DyLib/call(dl: u24, fn: String, args: Any) -> IO(Any):
+def IO/DyLib/call(dl: u24, fn: String, args: Any) -> IO(Result(Any, String)):
   return IO/unwrap_inner(IO/call("DL_CALL", (dl, (fn, args))))
 
 # Closes a previously open library.
 # Returns nothing.
 # 'dl' is the id of the library object.
-def IO/DyLib/close(dl: u24) -> IO(None):
+def IO/DyLib/close(dl: u24) -> IO(Result(None, String)):
   return IO/unwrap_inner(IO/call("DL_CLOSE", dl))
 
 # Lazy thunks
@@ -495,32 +513,26 @@ def unreachable() -> Any:
 
 # Native number casts
 
-# f24_to_u24(x: f24) -> u24
 # Casts a f24 number to a u24.
 hvm f24_to_u24 -> (f24 -> u24):
   ($([u24] ret) ret)
 
-# i24_to_u24(x: i24) -> u24
 # Casts an i24 number to a u24.
 hvm i24_to_u24 -> (i24 -> u24):
   ($([u24] ret) ret)
 
-# u24_to_i24(x: u24) -> i24
 # Casts a u24 number to an i24.
 hvm u24_to_i24 -> (u24 -> i24):
   ($([i24] ret) ret)
 
-# f24_to_i24(x: f24) -> i24
 # Casts a f24 number to an i24.
 hvm f24_to_i24 -> (f24 -> i24):
   ($([i24] ret) ret)
 
-# u24_to_f24(x: u24) -> f24
 # Casts a u24 number to a f24.
 hvm u24_to_f24 -> (u24 -> f24):
   ($([f24] ret) ret)
 
-# i24_to_f24(x: i24) -> f24
 # Casts an i24 number to a f24.
 hvm i24_to_f24 -> (i24 -> f24):
   ($([f24] ret) ret)

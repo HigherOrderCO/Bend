@@ -159,7 +159,6 @@ impl TypeEnv {
   }
 
   fn insert(&mut self, name: Name, scheme: Scheme) {
-    eprintln!("inserting {name}: {} to env", scheme.1);
     self.0.insert(name, scheme);
   }
 }
@@ -167,7 +166,6 @@ impl TypeEnv {
 impl VarGen {
   fn fresh(&mut self) -> Type {
     let x = self.fresh_name();
-    eprintln!("fresh var: {x}");
     Type::Var(x)
   }
 
@@ -305,10 +303,7 @@ fn infer_book(book: &Book) -> Result<ProgramTypes, String> {
 
   // Infer the types of regular functions.
   for group in &groups.0 {
-    if let Err(e) = infer_group(&mut env, book, group, &mut types) {
-      eprintln!("Error while inferring types for group '{group:?}'");
-      return Err(e);
-    }
+    infer_group(&mut env, book, group, &mut types)?;
   }
   Ok(types)
 }
@@ -320,7 +315,6 @@ fn infer_group(
   types: &mut ProgramTypes,
 ) -> Result<(), String> {
   let var_gen = &mut VarGen::default();
-  eprintln!();
   // Generate fresh type variables for each function in the group.
   let tvs = group.iter().map(|_| var_gen.fresh()).collect::<Vec<_>>();
   for (name, tv) in group.iter().zip(tvs.iter()) {
@@ -332,10 +326,9 @@ fn infer_group(
   let mut inf_ts = vec![];
   let mut exp_ts = vec![];
   for name in group {
-    eprintln!("inferring fn: {name} = {}", book.defs[name].rule().body);
     let def = &book.defs[name];
     let (s, t) = infer(env, book, &def.rule().body, var_gen)?;
-    eprintln!("inferred fn {name} : {t}");
+    let t = t.subst(&s);
     ss.push(s);
     inf_ts.push(t);
     exp_ts.push(&def.typ);
@@ -373,7 +366,6 @@ fn infer_group(
 /// The returned substitution records the type constraints imposed on type variables by the term.
 /// The returned type is the type of the term.
 fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Result<(Subst, Type), String> {
-  eprintln!("infer: {term}");
   let res = maybe_grow(|| match term {
     Term::Var { nam } | Term::Ref { nam } => match env.0.get(nam) {
       Some(scheme) => Ok::<_, String>((Subst::default(), scheme.instantiate(var_gen))),
@@ -497,8 +489,12 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
       let tv = var_gen.fresh();
       let (t_opr, s_opr) = match opr {
         // Any numeric type
-        Op::ADD | Op::SUB | Op::MUL | Op::DIV | Op::EQ | Op::NEQ | Op::LT | Op::GT | Op::GE | Op::LE => {
+        Op::ADD | Op::SUB | Op::MUL | Op::DIV  => {
           unify(&t_args, &Type::Number(Box::new(tv.clone())), term)?
+        }
+        Op::EQ | Op::NEQ | Op::LT | Op::GT | Op::GE | Op::LE => {
+          let (_, s) = unify(&t_args, &Type::Number(Box::new(tv.clone())), term)?;
+          (Type::U24, s)
         }
         // Integers
         Op::REM | Op::AND | Op::OR | Op::XOR | Op::SHL | Op::SHR => {
@@ -550,7 +546,6 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
     | Term::Def { .. }
     | Term::Err => unreachable!("'{term}' while type checking. Should have been removed in earlier pass"),
   })?;
-  eprintln!("inferred: {term} : {}\n{}", res.1, res.0);
   Ok(res)
 }
 
@@ -614,7 +609,6 @@ fn unify_fields<'a>(ts: impl Iterator<Item = (&'a Type, &'a Type)>, ctx: &Term) 
 }
 
 fn unify(t1: &Type, t2: &Type, ctx: &Term) -> Result<(Type, Subst), String> {
-  eprintln!("\t{t1} ~ {t2}");
   maybe_grow(|| match (t1, t2) {
     (t, Type::Hole) | (Type::Hole, t) => Ok((t.clone(), Subst::default())),
     (t, Type::Var(x)) | (Type::Var(x), t) => {
@@ -700,13 +694,17 @@ fn unify(t1: &Type, t2: &Type, ctx: &Term) -> Result<(Type, Subst), String> {
 fn specialize(gen: &Type, spe: &Type, ctx: &Term) -> Result<Type, String> {
   fn merge_specialization(inf: &Type, exp: &Type, s: &mut Subst, ctx: &Term) -> Result<Type, String> {
     maybe_grow(|| match (inf, exp) {
+      // These rules have to come before
       (t, Type::Hole) => Ok(t.clone()),
+      (_inf, Type::Any) => Ok(Type::Any),
+      (Type::Any, exp) => Ok(exp.clone()),
+
       (inf, Type::Var(x)) => {
         if let Some(exp) = s.0.get(x) {
           if inf == exp {
             Ok(inf.clone())
           } else {
-            Err(format!("Cannot substitute type '{inf}' with type '{exp}'"))
+            Err(format!("In {ctx}: Cannot substitute type '{inf}' with type '{exp}'"))
           }
         } else {
           s.0.insert(x.clone(), inf.clone());
@@ -740,22 +738,19 @@ fn specialize(gen: &Type, spe: &Type, ctx: &Term) -> Result<Type, String> {
       (Type::Integer(t1), Type::Integer(t2)) => {
         Ok(Type::Integer(Box::new(merge_specialization(t1, t2, s, ctx)?)))
       }
-      (Type::Any, Type::Any)
-      | (Type::U24, Type::U24)
-      | (Type::F24, Type::F24)
-      | (Type::I24, Type::I24)
-      | (Type::None, Type::None) => Ok(inf.clone()),
-      (_inf, Type::Any) => Ok(Type::Any),
-      (Type::Any, exp) => Ok(exp.clone()),
-      _ => Err(format!("Cannot specialize type '{inf}' with type '{exp}'")),
+      (Type::U24, Type::U24) | (Type::F24, Type::F24) | (Type::I24, Type::I24) | (Type::None, Type::None) => {
+        Ok(inf.clone())
+      }
+      _ => Err(format!("In {ctx}: Cannot specialize type '{inf}' with type '{exp}'")),
     })
   }
 
   let (t, s) = unify(gen, spe, ctx)?;
   // Merge the inferred specialization with the expected type.
   // This is done to cast to/from `Any` types.
-  eprintln!("specialize: {t} ~ {spe}");
-  merge_specialization(&t.subst(&s), spe, &mut Subst::default(), ctx)
+  let mut merge_s = Subst::default();
+  let t =   merge_specialization(&t.subst(&s), spe, &mut merge_s, ctx)?;
+  Ok(t.subst(&merge_s))
 }
 
 impl std::fmt::Display for Subst {

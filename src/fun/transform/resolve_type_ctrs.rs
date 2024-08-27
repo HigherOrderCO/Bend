@@ -32,7 +32,6 @@ impl Type {
         Type::Var(nam) => {
           // If the variable actually refers to a type, we change the type to a constructor.
           if adts.contains_key(nam) {
-            eprintln!("found adt: {nam}");
             *self = Type::Ctr(nam.clone(), vec![]);
           }
         }
