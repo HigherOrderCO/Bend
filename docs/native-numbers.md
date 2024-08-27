@@ -27,12 +27,12 @@ Positive numbers _must_ be written with a `+` sign, otherwise they'll be interpr
 
 Numbers can also be written in binary or hexadecimal form. Underscores can be optionally used as digit separators to make large numbers more readable.
 
-````rs
+```rs
 decimal =     1194684
 binary =      0b100_100_011_101_010_111_100
 hexadecimal = 0x123_abc
 hex_signed = -0xbeef
-
+```
 
 ### F24
 
