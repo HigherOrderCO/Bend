@@ -45,7 +45,7 @@ pi = +3.1415926535897932384626433 # Will get rounded to 24bit float
 a_millionth = 0.000001
 zero = 0.0
 minus_zero = -0.0
-````
+```
 
 ### Mixing number types
 
