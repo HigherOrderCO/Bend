@@ -26,7 +26,7 @@ pub type ProgramTypes = BTreeMap<Name, Type>;
 struct Scheme(Vec<Name>, Type);
 
 /// A finite mapping from type variables to types.
-#[derive(Clone, Default, Debug)]
+#[derive(Clone, Default)]
 struct Subst(BTreeMap<Name, Type>);
 
 /// A mapping from term variables to type schemes.
@@ -77,23 +77,6 @@ impl Type {
     let vars = vars_t.difference(&vars_env).cloned().collect();
     Scheme(vars, self.clone())
   }
-
-  fn refresh_vars(&mut self, s: &mut Subst, var_gen: &mut VarGen) {
-    maybe_grow(|| {
-      if let Type::Var(x) = self {
-        if let Some(y) = s.0.get(x) {
-          *self = y.clone();
-        } else {
-          let y = var_gen.fresh();
-          s.0.insert(x.clone(), y.clone());
-          *self = y;
-        }
-      }
-      for child in self.children_mut() {
-        child.refresh_vars(s, var_gen);
-      }
-    })
-  }
 }
 
 impl Scheme {
@@ -118,17 +101,6 @@ impl Scheme {
     let new_vars = self.0.iter().map(|_| var_gen.fresh());
     let subst = Subst(self.0.iter().cloned().zip(new_vars).collect());
     self.1.subst(&subst)
-  }
-
-  fn refresh_vars(&mut self) {
-    let mut s = Subst::default();
-    let mut var_gen = VarGen::default();
-    for x in self.0.iter_mut() {
-      let y = var_gen.fresh_name();
-      s.0.insert(x.clone(), Type::Var(y.clone()));
-      *x = y;
-    }
-    self.1.refresh_vars(&mut s, &mut var_gen);
   }
 }
 
@@ -344,18 +316,15 @@ fn infer_group(
   }
   let ts = ts.into_iter().map(|t| t.subst(&s)).collect::<Vec<_>>();
 
-  // Specialize against the expected type
+  // Specialize against the expected type, then generalize and store.
   for ((name, exp_t), inf_t) in group.iter().zip(exp_ts.iter()).zip(ts.iter()) {
-    types.insert(name.clone(), specialize(inf_t, exp_t, &book.defs[name].rule().body)?);
+    let t = specialize(inf_t, exp_t, &book.defs[name].rule().body)?;
+    let scheme = t.generalize(&TypeEnv::default());
+    let t = scheme.instantiate(&mut VarGen::default());
+    env.insert(name.clone(), scheme);
+    types.insert(name.clone(), t);
   }
 
-  // Generalize the function types
-  *env = env.subst(&s);
-  for name in group {
-    let mut scheme = types[name].generalize(&TypeEnv::default());
-    scheme.refresh_vars();
-    env.insert(name.clone(), scheme);
-  }
   Ok(())
 }
 
@@ -382,7 +351,7 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
         let var_t = tv.subst(&s);
         Ok((s, Type::Arr(Box::new(var_t), Box::new(bod_t))))
       }
-      _ => unreachable!(),
+      _ => unreachable!("{}", term),
     },
     Term::App { tag: Tag::Static, fun, arg } => {
       let (s1, fun_t) = infer(env, book, fun, var_gen)?;
@@ -698,7 +667,6 @@ fn specialize(gen: &Type, spe: &Type, ctx: &Term) -> Result<Type, String> {
       (t, Type::Hole) => Ok(t.clone()),
       (_inf, Type::Any) => Ok(Type::Any),
       (Type::Any, exp) => Ok(exp.clone()),
-
       (inf, Type::Var(x)) => {
         if let Some(exp) = s.0.get(x) {
           if inf == exp {
@@ -711,6 +679,7 @@ fn specialize(gen: &Type, spe: &Type, ctx: &Term) -> Result<Type, String> {
           Ok(inf.clone())
         }
       }
+
       (Type::Arr(l1, r1), Type::Arr(l2, r2)) => {
         let l = merge_specialization(l1, l2, s, ctx)?;
         let r = merge_specialization(r1, r2, s, ctx)?;

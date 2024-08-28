@@ -106,7 +106,7 @@ def DiffList/append(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T)):
 # Concatenates two difference lists.
 def DiffList/concat(
   left: List(T) -> List(T),
-  right: List(T) -> List(T)
+  right: List(T) -> List(T) 
 ) -> (List(T) -> List(T)):
   return lambda x: left(right(x))
 

@@ -296,7 +296,7 @@ impl fmt::Display for Type {
     maybe_grow(|| match self {
       Type::Hole => write!(f, "_"),
       Type::Var(nam) => write!(f, "{nam}"),
-      Type::Arr(lft, rgt) => write!(f, "({lft} -> {rgt})"),
+      Type::Arr(lft, rgt) => write!(f, "({} -> {})", lft, rgt.display_arrow()),
       Type::Ctr(nam, args) => {
         if args.is_empty() {
           write!(f, "{nam}")
@@ -312,6 +312,19 @@ impl fmt::Display for Type {
       Type::Any => write!(f, "Any"),
       Type::None => write!(f, "None"),
       Type::Tup(els) => write!(f, "({})", DisplayJoin(|| els.iter(), ", ")),
+    })
+  }
+}
+
+impl Type {
+  pub fn display_arrow(&self) -> impl fmt::Display + '_ {
+    maybe_grow(|| {
+      DisplayFn(move |f| match self {
+        Type::Arr(lft, rgt) => {
+          write!(f, "{} -> {}", lft, rgt.display_arrow())
+        }
+        _ => write!(f, "{}", self),
+      })
     })
   }
 }

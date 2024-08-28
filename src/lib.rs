@@ -170,12 +170,9 @@ pub fn desugar_book(
 }
 
 pub fn type_check_book(ctx: &mut Ctx) -> Result<(), Diagnostics> {
-  let old_book = std::mem::replace(ctx.book, ctx.book.clone());
-  //ctx.make_native_defs();
+  ctx.check_untyped_terms()?;
   ctx.resolve_type_ctrs()?;
-  let res = ctx.type_check();
-  *ctx.book = old_book;
-  res?;
+  ctx.type_check()?;
   Ok(())
 }
 
