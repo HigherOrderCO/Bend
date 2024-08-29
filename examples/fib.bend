@@ -3,7 +3,7 @@
 # Calculates fibonacci numbers recursively.
 # Although branching recursion is usually a good idea to parallelize,
 # it makes this code run in exponential time.
-def fib_recursive(n):
+def fib_recursive(n: u24) -> u24:
   switch n:
     case 0:
       return 0
@@ -14,14 +14,14 @@ def fib_recursive(n):
 
 # Calculates fibonacci numbers iteratively (tail-recursively).
 # This function is inherently sequential, but runs in linear time.
-def fib_iterative(n):
+def fib_iterative(n: u24) -> u24:
   bend a=0, b=1, n:
     when n != 0:
       return fork(b, a + b, n - 1)
     else:
       return a
 
-def main():
+def main() -> u24:
   # With the iterative version, we can calculate large fibonacci numbers
   # While with the recursive version, we will quickly run out of memory.
   # Note that for numbers larger than 36 the result will overflow the space of the 24-bit integer.

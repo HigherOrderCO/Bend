@@ -8,7 +8,7 @@ Qnew = λx x
 Qadd = λx λq λk (q λc (c x k))
 
 # Qrem : Queue a -> Pair a (Queue a)
-Qrem = λq (q $k λx λxs λp(p x λ$k xs))
+unchecked Qrem = λq (q $k λx λxs λp(p x λ$k xs))
 
 # Output: [1, 2, 3]
 main =

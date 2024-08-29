@@ -32,27 +32,30 @@ List/concat(xs: (List T)) (ys: (List T)) : (List T)
 List/concat (List/Cons x xs) ys = (List/Cons x (List/concat xs ys))
 List/concat (List/Nil)       ys = ys
 
-# Splits a list into two lists at the first occurrence of a value.
+# Splits a list into two lists at the first value that passes a condition.
 # Returns the original list if the value is not found
-def List/split_once(xs: List(T), val: T) -> (Result((List(T), List(T)), List(T))):
-  return List/split_once.go(xs, val, DiffList/new)
+def List/split_once(
+  xs: List(T),
+  cond: T -> u24
+) -> (Result((List(T), List(T)), List(T))):
+  return List/split_once.go(xs, cond, DiffList/new)
 
 def List/split_once.go(
   xs: List(T),
-  val: T,
+  cond: T -> u24,
   acc: List(T) -> List(T)
 ) -> Result((List(T), List(T)), List(T)):
   match xs:
     case List/Nil:
       return Result/Err(DiffList/to_list(acc))
     case List/Cons:
-      if val == xs.head:
+      if cond(xs.head):
         return Result/Ok((DiffList/to_list(acc), xs.tail))
       else:
-        return List/split_once.go(xs.tail, val, DiffList/append(acc, xs.head))
+        return List/split_once.go(xs.tail, cond, DiffList/append(acc, xs.head))
 
 # Filters a list based on a predicate function.
-List/filter (xs: (List T)) (pred: T -> Bool) : (List T)
+List/filter (xs: (List T)) (pred: T -> u24) : (List T)
 List/filter (List/Nil)       _    = List/Nil
 List/filter (List/Cons x xs) pred =
   if (pred x) {
@@ -175,7 +178,7 @@ Map/empty : (Map T) = Map/Leaf
 
 Map/get (map: (Map T)) (key: u24) : (T, (Map T)) =
   match map {
-    Map/Leaf: (*, map)
+    Map/Leaf: (unreachable, map)
     Map/Node:
       switch _ = (== 0 key) {
         0: switch _ = (% key 2) {
@@ -203,8 +206,8 @@ Map/set (map: (Map T)) (key: u24) (value: T) : (Map T) =
     Map/Leaf:
       switch _ = (== 0 key) {
         0: switch _ = (% key 2) {
-          0: (Map/Node * (Map/set Map/Leaf (/ key 2) value) Map/Leaf)
-          _: (Map/Node * Map/Leaf (Map/set Map/Leaf (/ key 2) value))
+          0: (Map/Node unreachable (Map/set Map/Leaf (/ key 2) value) Map/Leaf)
+          _: (Map/Node unreachable Map/Leaf (Map/set Map/Leaf (/ key 2) value))
         }
         _: (Map/Node value Map/Leaf Map/Leaf)
       }
@@ -384,11 +387,9 @@ def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result(L
     match res_chunk:
       case Result/Ok:
         chunk = res_chunk.val
-        match res = List/split_once(chunk, '\n'):
+        match res = List/split_once(chunk, lambda x: x == '\n'):
           # Found a newline, backtrack and join chunks
           case Result/Ok:
-            # Found line end, backtrack on the file to the start of the next line
-            # and return the found line.
             (line, rest) = res.val
             (length, *) = List/length(rest)
             res_seek <- IO/FS/seek(fd, u24_to_i24(length) * -1, IO/FS/SEEK_CUR)
@@ -499,7 +500,7 @@ def IO/DyLib/close(dl: u24) -> IO(Result(None, String)):
 def defer(val: T) -> (T -> T) -> T:
   return lambda x: x(val)
 
-def defer_arg(defered: (Id -> Id) -> A -> B, arg: B) -> ((Id -> Id) -> A):
+def defer_arg(defered: (Id -> Id) -> A -> B, arg: A) -> ((Id -> Id) -> B):
   return lambda x: defered(x, arg)
 
 def undefer(defered: (Id -> Id) -> T) -> T:
