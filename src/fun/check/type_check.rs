@@ -483,21 +483,35 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
       Ok((s_opr.compose(&s_args), t_opr.subst(&s_opr)))
     }
     Term::Swt { bnd: _, arg, with_bnd: _, with_arg: _, pred, arms } => {
-      debug_assert!(arms.len() == 2);
       let (s1, t1) = infer(env, book, arg, var_gen)?;
       let (_, s2) = unify_term(&t1, &Type::U24, arg)?;
       let s_arg = s2.compose(&s1);
       let mut env = env.subst(&s_arg);
 
-      let (s_zero, t_zero) = infer(&env, book, &arms[0], var_gen)?;
+      let mut ss_nums = vec![];
+      let mut ts_nums = vec![];
+      for arm in arms.iter().rev().skip(1) {
+        let (s, t) = infer(&env, book, arm, var_gen)?;
+        ss_nums.push(s);
+        ts_nums.push(t);
+      }
       if let Some(pred) = pred {
         env.insert(pred.clone(), Scheme(vec![], Type::U24));
       }
       let (s_succ, t_succ) = infer(&env, book, &arms[1], var_gen)?;
-      let s_arms = s_succ.compose(&s_zero);
-      let (t_swt, s_swt) = unify_term(&t_zero.subst(&s_arms), &t_succ.subst(&s_arms), term)?;
 
-      Ok((s_swt.compose(&s_arms).compose(&s_arg), t_swt.subst(&s_swt)))
+      let s_arms = ss_nums.into_iter().fold(s_succ, |acc, s| acc.compose(&s));
+      let mut t_swt = t_succ;
+      let mut s_swt = Subst::default();
+      for t_num in ts_nums {
+        let (t, s) = unify_term(&t_swt, &t_num, term)?;
+        t_swt = t;
+        s_swt = s.compose(&s_swt);
+      }
+
+      let s = s_swt.compose(&s_arms).compose(&s_arg);
+      let t = t_swt.subst(&s);
+      Ok((s, t))
     }
 
     Term::Fan { fan: FanKind::Tup, tag: Tag::Static, els } => {
@@ -670,6 +684,10 @@ fn unify(t1: &Type, t2: &Type) -> Result<(Type, Subst), String> {
 }
 
 /// Specializes the inferred type against the type annotation.
+/// This way, the annotation can be less general than the inferred type.
+///
+/// It also forces inferred 'Any' to the annotated, inferred types to
+/// annotated 'Any' and fills 'Hole' with the inferred type.
 ///
 /// Errors if the first type is not a superset of the second type.
 fn specialize(inf: &Type, ann: &Type) -> Result<Type, String> {
@@ -677,18 +695,21 @@ fn specialize(inf: &Type, ann: &Type) -> Result<Type, String> {
     maybe_grow(|| match (inf, exp) {
       // These rules have to come before
       (t, Type::Hole) => Ok(t.clone()),
+      (Type::Hole, _) => unreachable!("Hole should never appear in the inferred type"),
+
       (_inf, Type::Any) => Ok(Type::Any),
       (Type::Any, exp) => Ok(exp.clone()),
-      (inf, Type::Var(x)) => {
-        if let Some(exp) = s.0.get(x) {
-          if inf == exp {
-            Ok(inf.clone())
+
+      (Type::Var(x), new) => {
+        if let Some(old) = s.0.get(x) {
+          if old == new {
+            Ok(new.clone())
           } else {
-            Err(format!(" Cannot substitute type '{inf}' with type '{exp}'"))
+            Err(format!(" Inferred type variable '{x}' must be both '{old}' and '{new}'"))
           }
         } else {
-          s.0.insert(x.clone(), inf.clone());
-          Ok(inf.clone())
+          s.0.insert(x.clone(), new.clone());
+          Ok(new.clone())
         }
       }
 
@@ -718,17 +739,28 @@ fn specialize(inf: &Type, ann: &Type) -> Result<Type, String> {
       (Type::U24, Type::U24) | (Type::F24, Type::F24) | (Type::I24, Type::I24) | (Type::None, Type::None) => {
         Ok(inf.clone())
       }
-      _ => Err(format!(" Cannot specialize type '{inf}' with type '{exp}'")),
+      _ => Err(String::new()),
     })
   }
 
-  let (t, s) = unify(inf, ann)
+  // Refresh the variable names to avoid conflicts when unifying
+  // Names of type vars in the annotation have nothing to do with names in the inferred type.
+  let var_gen = &mut VarGen::default();
+  let inf2 = inf.generalize(&TypeEnv::default()).instantiate(var_gen);
+  let ann2 = ann.generalize(&TypeEnv::default()).instantiate(var_gen);
+
+  let (t, s) = unify(&inf2, &ann2)
     .map_err(|e| format!("Type Error: Expected function type '{ann}' but found '{inf}'.{e}"))?;
+  let t = t.subst(&s);
+
   // Merge the inferred specialization with the expected type.
-  // This is done to cast to/from `Any` types.
+  // This is done to cast to/from `Any` and `_` types.
   let mut merge_s = Subst::default();
-  let t = merge_specialization(&t.subst(&s), ann, &mut merge_s)?;
-  Ok(t.subst(&merge_s))
+  let t2 = merge_specialization(&t, ann, &mut merge_s).map_err(|e| {
+    format!("Type Error: Annotated type '{ann}' is not a subtype of inferred type '{inf2}'.{e}")
+  })?;
+
+  Ok(t2.subst(&merge_s))
 }
 
 impl std::fmt::Display for Subst {
