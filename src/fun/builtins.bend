@@ -316,8 +316,13 @@ def IO/FS/read_line.read_chunks(fd, chunks):
         return wrap(bytes)
       case Result/Err:
         line = res.val
-        chunks = List/Cons(line, chunks)
-        return IO/FS/read_line.read_chunks(fd, chunks)
+        (length, line) = List/length(line)
+        if length == 0:
+          bytes = List/flatten(chunks)
+          return wrap(bytes)
+        else:
+          chunks = List/Cons(line, chunks)
+          return IO/FS/read_line.read_chunks(fd, chunks)
 
 # IO/FS/write_file(path: String, bytes: (List u24)) -> (IO None)
 # Writes a list of bytes to a file given by a path.
