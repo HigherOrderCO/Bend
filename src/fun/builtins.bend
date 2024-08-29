@@ -307,6 +307,7 @@ def IO/FS/read_line.read_chunks(fd, chunks):
     # Read line in 1kB chunks
     chunk <- IO/done_on_err(IO/FS/read(fd, 1024))
     match res = List/split_once(chunk, '\n'):
+      # Found a newline, backtrack and join chunks
       case Result/Ok:
         (line, rest) = res.val
         (length, *) = List/length(rest)
@@ -314,10 +315,18 @@ def IO/FS/read_line.read_chunks(fd, chunks):
         chunks = List/Cons(line, chunks)
         bytes = List/flatten(chunks)
         return wrap(bytes)
+      # Newline not found
       case Result/Err:
         line = res.val
-        chunks = List/Cons(line, chunks)
-        return IO/FS/read_line.read_chunks(fd, chunks)
+        (length, line) = List/length(line)
+        # If length is 0, the end of the file was reached, return as if it was a newline
+        if length == 0:
+          bytes = List/flatten(chunks)
+          return wrap(bytes)
+        # Otherwise, the line is still ongoing, read more chunks
+        else:
+          chunks = List/Cons(line, chunks)
+          return IO/FS/read_line.read_chunks(fd, chunks)
 
 # IO/FS/write_file(path: String, bytes: (List u24)) -> (IO None)
 # Writes a list of bytes to a file given by a path.

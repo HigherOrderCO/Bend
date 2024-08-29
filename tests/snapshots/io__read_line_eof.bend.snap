@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/io/read_line_eof.bend
+---
+Strict mode:
+λa (a IO/Done/tag IO/MAGIC "text")
