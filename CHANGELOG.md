@@ -17,6 +17,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Fix readback when hvm net has `a{n}` or `x{n}` vars. ([#659][gh-659])
 - Fix imported constructors not being updated to Constructor expression. ([#674][gh-674])
 - Fix parse error on parenthesized eraser. ([#675][gh-675])
+- Fix IO/FS/read_line when the line ends with a EOF. ([#638][gh-638])
 
 ### Added
 
@@ -426,4 +427,5 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-673]: https://github.com/HigherOrderCO/Bend/pull/673
 [gh-674]: https://github.com/HigherOrderCO/Bend/issues/674
 [gh-675]: https://github.com/HigherOrderCO/Bend/issues/675
+[gh-638]: https://github.com/HigherOrderCO/Bend/issues/638
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
