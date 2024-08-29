@@ -307,7 +307,7 @@ def IO/FS/read_line.read_chunks(fd, chunks):
     # Read line in 1kB chunks
     chunk <- IO/done_on_err(IO/FS/read(fd, 1024))
     match res = List/split_once(chunk, '\n'):
-      # Found a newline, backtract and join chunks
+      # Found a newline, backtrack and join chunks
       case Result/Ok:
         (line, rest) = res.val
         (length, *) = List/length(rest)
@@ -319,7 +319,7 @@ def IO/FS/read_line.read_chunks(fd, chunks):
       case Result/Err:
         line = res.val
         (length, line) = List/length(line)
-        # If lenght is 0, the end of the file was reached, return as if it was a newline
+        # If length is 0, the end of the file was reached, return as if it was a newline
         if length == 0:
           bytes = List/flatten(chunks)
           return wrap(bytes)
