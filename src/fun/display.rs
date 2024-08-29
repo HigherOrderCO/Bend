@@ -222,7 +222,7 @@ impl Rule {
 impl fmt::Display for Definition {
   fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
     namegen_reset();
-    writeln!(f, "{}: {}", self.name, self.typ)?;
+    writeln!(f, "{}{}: {}", if !self.check { "unchecked " } else { "" }, self.name, self.typ)?;
     write!(f, "{}", DisplayJoin(|| self.rules.iter().map(|x| x.display(&self.name)), "\n"))
   }
 }

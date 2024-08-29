@@ -3,14 +3,15 @@
 //! Based on https://github.com/developedby/algorithm-w-rs
 //! and https://github.com/mgrabmueller/AlgorithmW.
 use crate::{
+  diagnostics::Diagnostics,
   fun::{num_to_name, Adt, Book, Ctx, FanKind, MatchRule, Name, Num, Op, Pattern, Tag, Term, Type},
   maybe_grow,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
 impl Ctx<'_> {
-  pub fn type_check(&mut self) -> Result<(), String> {
-    let types = infer_book(self.book)?;
+  pub fn type_check(&mut self) -> Result<(), Diagnostics> {
+    let types = infer_book(self.book, &mut self.info)?;
 
     for (nam, typ) in types {
       eprintln!("{nam}: {typ}");
@@ -220,8 +221,8 @@ impl RecGroups {
     // Build the dependency graph
     let mut deps = DependencyGraph::default();
     for (name, def) in &book.defs {
-      if book.ctrs.contains_key(name) {
-        // Don't infer types for constructors
+      if book.ctrs.contains_key(name) || !def.check {
+        // Don't infer types for constructors or unchecked functions
         continue;
       }
       let mut fn_deps = Default::default();
@@ -246,7 +247,7 @@ impl RecGroups {
 }
 
 /* Inference, unification and type checking */
-fn infer_book(book: &Book) -> Result<ProgramTypes, String> {
+fn infer_book(book: &Book, diags: &mut Diagnostics) -> Result<ProgramTypes, Diagnostics> {
   let groups = RecGroups::from_book(book);
   let mut env = TypeEnv::default();
   let mut types = BTreeMap::new();
@@ -275,7 +276,7 @@ fn infer_book(book: &Book) -> Result<ProgramTypes, String> {
 
   // Infer the types of regular functions.
   for group in &groups.0 {
-    infer_group(&mut env, book, group, &mut types)?;
+    infer_group(&mut env, book, group, &mut types, diags)?;
   }
   Ok(types)
 }
@@ -285,7 +286,8 @@ fn infer_group(
   book: &Book,
   group: &[Name],
   types: &mut ProgramTypes,
-) -> Result<(), String> {
+  diags: &mut Diagnostics,
+) -> Result<(), Diagnostics> {
   let var_gen = &mut VarGen::default();
   // Generate fresh type variables for each function in the group.
   let tvs = group.iter().map(|_| var_gen.fresh()).collect::<Vec<_>>();
@@ -299,7 +301,10 @@ fn infer_group(
   let mut exp_ts = vec![];
   for name in group {
     let def = &book.defs[name];
-    let (s, t) = infer(env, book, &def.rule().body, var_gen)?;
+    let (s, t) = infer(env, book, &def.rule().body, var_gen).map_err(|e| {
+      diags.add_rule_error(e, name.clone());
+      std::mem::take(diags)
+    })?;
     let t = t.subst(&s);
     ss.push(s);
     inf_ts.push(t);
@@ -310,7 +315,7 @@ fn infer_group(
   let mut s = ss.iter().fold(Subst::default(), |s, s2| s.compose(s2));
   let mut ts = vec![];
   for ((bod_t, tv), nam) in inf_ts.into_iter().zip(tvs.iter()).zip(group.iter()) {
-    let (t, s2) = unify(&tv.subst(&s), &bod_t, &book.defs[nam].rule().body)?;
+    let (t, s2) = unify_term(&tv.subst(&s), &bod_t, &book.defs[nam].rule().body)?;
     ts.push(t);
     s = s.compose(&s2);
   }
@@ -318,14 +323,18 @@ fn infer_group(
 
   // Specialize against the expected type, then generalize and store.
   for ((name, exp_t), inf_t) in group.iter().zip(exp_ts.iter()).zip(ts.iter()) {
-    let t = specialize(inf_t, exp_t, &book.defs[name].rule().body)?;
+    let t = specialize(inf_t, exp_t).map_err(|e| {
+      diags.add_rule_error(e, name.clone());
+      std::mem::take(diags)
+    })?;
     let scheme = t.generalize(&TypeEnv::default());
     let t = scheme.instantiate(&mut VarGen::default());
     env.insert(name.clone(), scheme);
+    eprintln!("{name}: {t}");
     types.insert(name.clone(), t);
   }
 
-  Ok(())
+  diags.fatal(())
 }
 
 /// Infer the type of a term in the given environment.
@@ -357,7 +366,8 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
       let (s1, fun_t) = infer(env, book, fun, var_gen)?;
       let (s2, arg_t) = infer(&env.subst(&s1), book, arg, var_gen)?;
       let app_t = var_gen.fresh();
-      let (_, s3) = unify(&fun_t.subst(&s2), &Type::Arr(Box::new(arg_t), Box::new(app_t.clone())), term)?;
+      let (_, s3) =
+        unify_term(&fun_t.subst(&s2), &Type::Arr(Box::new(arg_t), Box::new(app_t.clone())), fun)?;
       Ok((s3.compose(&s2).compose(&s1), app_t.subst(&s3)))
     }
     Term::Let { pat, val, nxt } => match pat.as_ref() {
@@ -390,7 +400,7 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
         }
         let (s2, nxt_t) = infer(&env.subst(&s1), book, nxt, var_gen)?;
         let tvs = tvs.into_iter().map(|tv| tv.subst(&s2)).collect::<Vec<_>>();
-        let (_, s3) = unify(&val_t, &Type::Tup(tvs), val)?;
+        let (_, s3) = unify_term(&val_t, &Type::Tup(tvs), val)?;
         Ok((s3.compose(&s2).compose(&s1), nxt_t))
       }
       Pattern::Fan(FanKind::Dup, Tag::Auto, els) => {
@@ -412,7 +422,7 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
         }
         let (mut s2, nxt_t) = infer(&env.subst(&s1), book, nxt, var_gen)?;
         for tv in tvs {
-          let (val_t_, s) = unify(&val_t, &tv.subst(&s2), val)?;
+          let (val_t_, s) = unify_term(&val_t, &tv.subst(&s2), val)?;
           val_t = val_t_;
           s2 = s2.compose(&s);
         }
@@ -436,7 +446,7 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
       let (s2, nxt_t) = infer_match_cases(&env.subst(&s1), book, adt, arms, &adt_s, var_gen)?;
 
       // Unify the inferred type with the expected type
-      let (_, s3) = unify(&t1, &adt_t.subst(&s2), arg)?;
+      let (_, s3) = unify_term(&t1, &adt_t.subst(&s2), arg)?;
       Ok((s3.compose(&s2).compose(&s1), nxt_t))
     }
 
@@ -451,33 +461,33 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
     Term::Oper { opr, fst, snd } => {
       let (s1, t1) = infer(env, book, fst, var_gen)?;
       let (s2, t2) = infer(&env.subst(&s1), book, snd, var_gen)?;
-      let (t2, s3) = unify(&t2.subst(&s1), &t1.subst(&s2), term)?;
+      let (t2, s3) = unify_term(&t2.subst(&s1), &t1.subst(&s2), term)?;
       let s_args = s3.compose(&s2).compose(&s1);
       let t_args = t2.subst(&s_args);
       // Check numeric type matches the operation
       let tv = var_gen.fresh();
       let (t_opr, s_opr) = match opr {
         // Any numeric type
-        Op::ADD | Op::SUB | Op::MUL | Op::DIV  => {
-          unify(&t_args, &Type::Number(Box::new(tv.clone())), term)?
+        Op::ADD | Op::SUB | Op::MUL | Op::DIV => {
+          unify_term(&t_args, &Type::Number(Box::new(tv.clone())), term)?
         }
         Op::EQ | Op::NEQ | Op::LT | Op::GT | Op::GE | Op::LE => {
-          let (_, s) = unify(&t_args, &Type::Number(Box::new(tv.clone())), term)?;
+          let (_, s) = unify_term(&t_args, &Type::Number(Box::new(tv.clone())), term)?;
           (Type::U24, s)
         }
         // Integers
         Op::REM | Op::AND | Op::OR | Op::XOR | Op::SHL | Op::SHR => {
-          unify(&t_args, &Type::Integer(Box::new(tv.clone())), term)?
+          unify_term(&t_args, &Type::Integer(Box::new(tv.clone())), term)?
         }
         // Floating
-        Op::POW => unify(&t_args, &Type::F24, term)?,
+        Op::POW => unify_term(&t_args, &Type::F24, term)?,
       };
       Ok((s_opr.compose(&s_args), t_opr.subst(&s_opr)))
     }
     Term::Swt { bnd: _, arg, with_bnd: _, with_arg: _, pred, arms } => {
       debug_assert!(arms.len() == 2);
       let (s1, t1) = infer(env, book, arg, var_gen)?;
-      let (_, s2) = unify(&t1, &Type::U24, arg)?;
+      let (_, s2) = unify_term(&t1, &Type::U24, arg)?;
       let s_arg = s2.compose(&s1);
       let mut env = env.subst(&s_arg);
 
@@ -487,7 +497,7 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
       }
       let (s_succ, t_succ) = infer(&env, book, &arms[1], var_gen)?;
       let s_arms = s_succ.compose(&s_zero);
-      let (t_swt, s_swt) = unify(&t_zero.subst(&s_arms), &t_succ.subst(&s_arms), term)?;
+      let (t_swt, s_swt) = unify_term(&t_zero.subst(&s_arms), &t_succ.subst(&s_arms), term)?;
 
       Ok((s_swt.compose(&s_arms).compose(&s_arg), t_swt.subst(&s_swt)))
     }
@@ -559,7 +569,7 @@ fn infer_match_cases(
 
       // Recurse and unify with the other arms.
       let (s_rest, t_rest) = infer_match_cases(env, book, adt, rest, adt_s, var_gen)?;
-      let (t_final, s_final) = unify(&t1, &t_rest, bod)?;
+      let (t_final, s_final) = unify_term(&t1, &t_rest, bod)?;
 
       Ok((s_final.compose(&s_rest).compose(&s2).compose(&s1), t_final))
     } else {
@@ -569,7 +579,7 @@ fn infer_match_cases(
 }
 
 fn unify_fields<'a>(ts: impl Iterator<Item = (&'a Type, &'a Type)>, ctx: &Term) -> Result<Subst, String> {
-  let ss = ts.map(|(inf, exp)| unify(inf, exp, ctx)).collect::<Result<Vec<_>, _>>()?;
+  let ss = ts.map(|(inf, exp)| unify_term(inf, exp, ctx)).collect::<Result<Vec<_>, _>>()?;
   let mut s = Subst::default();
   for (_, s2) in ss.into_iter().rev() {
     s = s.compose(&s2);
@@ -577,7 +587,14 @@ fn unify_fields<'a>(ts: impl Iterator<Item = (&'a Type, &'a Type)>, ctx: &Term) 
   Ok(s)
 }
 
-fn unify(t1: &Type, t2: &Type, ctx: &Term) -> Result<(Type, Subst), String> {
+fn unify_term(t1: &Type, t2: &Type, ctx: &Term) -> Result<(Type, Subst), String> {
+  match unify(t1, t2) {
+    Ok((t, s)) => Ok((t, s)),
+    Err(msg) => Err(format!("In {ctx}: Can't unify '{t1}' and '{t2}'.{msg}")),
+  }
+}
+
+fn unify(t1: &Type, t2: &Type) -> Result<(Type, Subst), String> {
   maybe_grow(|| match (t1, t2) {
     (t, Type::Hole) | (Type::Hole, t) => Ok((t.clone(), Subst::default())),
     (t, Type::Var(x)) | (Type::Var(x), t) => {
@@ -590,22 +607,20 @@ fn unify(t1: &Type, t2: &Type, ctx: &Term) -> Result<(Type, Subst), String> {
       }
       // Occurs check
       if t.free_type_vars().contains(x) {
-        return Err(format!(
-          "In {ctx}: Cannot unify variable '{x}' with type '{t}' because it occurs as a free variable"
-        ));
+        return Err(format!(" Variable '{x}' occurs in '{t}'"));
       }
       Ok((t.clone(), Subst(BTreeMap::from([(x.clone(), t.clone())]))))
     }
     (Type::Arr(l1, r1), Type::Arr(l2, r2)) => {
-      let (t1, s1) = unify(l1, l2, ctx)?;
-      let (t2, s2) = unify(&r1.subst(&s1), &r2.subst(&s1), ctx)?;
+      let (t1, s1) = unify(l1, l2)?;
+      let (t2, s2) = unify(&r1.subst(&s1), &r2.subst(&s1))?;
       Ok((Type::Arr(Box::new(t1), Box::new(t2)), s2.compose(&s1)))
     }
     (Type::Ctr(name1, ts1), Type::Ctr(name2, ts2)) if name1 == name2 && ts1.len() == ts2.len() => {
       let mut s = Subst::default();
       let mut ts = vec![];
       for (t1, t2) in ts1.iter().zip(ts2.iter()) {
-        let (t, s2) = unify(t1, t2, ctx)?;
+        let (t, s2) = unify(t1, t2)?;
         ts.push(t);
         s = s.compose(&s2);
       }
@@ -615,7 +630,7 @@ fn unify(t1: &Type, t2: &Type, ctx: &Term) -> Result<(Type, Subst), String> {
       let mut s = Subst::default();
       let mut ts = vec![];
       for (t1, t2) in els1.iter().zip(els2.iter()) {
-        let (t, s2) = unify(t1, t2, ctx)?;
+        let (t, s2) = unify(t1, t2)?;
         ts.push(t);
         s = s.compose(&s2);
       }
@@ -626,20 +641,20 @@ fn unify(t1: &Type, t2: &Type, ctx: &Term) -> Result<(Type, Subst), String> {
     | (Type::I24, Type::I24)
     | (Type::None, Type::None)) => Ok((t.0.clone(), Subst::default())),
     (Type::Number(t1), Type::Number(t2)) => {
-      let (t, s) = unify(t1, t2, ctx)?;
+      let (t, s) = unify(t1, t2)?;
       Ok((Type::Number(Box::new(t)), s))
     }
     (Type::Number(tn), Type::Integer(ti)) | (Type::Integer(ti), Type::Number(tn)) => {
-      let (t, s) = unify(ti, tn, ctx)?;
+      let (t, s) = unify(ti, tn)?;
       Ok((Type::Integer(Box::new(t)), s))
     }
     (Type::Integer(t1), Type::Integer(t2)) => {
-      let (t, s) = unify(t1, t2, ctx)?;
+      let (t, s) = unify(t1, t2)?;
       Ok((Type::Integer(Box::new(t)), s))
     }
     (Type::Number(t1) | Type::Integer(t1), t2 @ (Type::U24 | Type::I24 | Type::F24))
     | (t2 @ (Type::U24 | Type::I24 | Type::F24), Type::Number(t1) | Type::Integer(t1)) => {
-      let (t, s) = unify(t1, t2, ctx)?;
+      let (t, s) = unify(t1, t2)?;
       Ok((t, s))
     }
 
@@ -647,21 +662,21 @@ fn unify(t1: &Type, t2: &Type, ctx: &Term) -> Result<(Type, Subst), String> {
       let mut s = Subst::default();
       // Recurse to assign variables to `Any` as well
       for child in t.children() {
-        let (_, s2) = unify(&Type::Any, child, ctx)?;
+        let (_, s2) = unify(&Type::Any, child)?;
         s = s2.compose(&s);
       }
       Ok((Type::Any, s))
     }
 
-    _ => Err(format!("In {ctx}: Types do not unify: '{t1}' and '{t2}'")),
+    _ => Err(String::new()),
   })
 }
 
-/// Specializes a type against another type.
+/// Specializes the inferred type against the type annotation.
 ///
 /// Errors if the first type is not a superset of the second type.
-fn specialize(gen: &Type, spe: &Type, ctx: &Term) -> Result<Type, String> {
-  fn merge_specialization(inf: &Type, exp: &Type, s: &mut Subst, ctx: &Term) -> Result<Type, String> {
+fn specialize(inf: &Type, ann: &Type) -> Result<Type, String> {
+  fn merge_specialization(inf: &Type, exp: &Type, s: &mut Subst) -> Result<Type, String> {
     maybe_grow(|| match (inf, exp) {
       // These rules have to come before
       (t, Type::Hole) => Ok(t.clone()),
@@ -672,7 +687,7 @@ fn specialize(gen: &Type, spe: &Type, ctx: &Term) -> Result<Type, String> {
           if inf == exp {
             Ok(inf.clone())
           } else {
-            Err(format!("In {ctx}: Cannot substitute type '{inf}' with type '{exp}'"))
+            Err(format!(" Cannot substitute type '{inf}' with type '{exp}'"))
           }
         } else {
           s.0.insert(x.clone(), inf.clone());
@@ -681,14 +696,14 @@ fn specialize(gen: &Type, spe: &Type, ctx: &Term) -> Result<Type, String> {
       }
 
       (Type::Arr(l1, r1), Type::Arr(l2, r2)) => {
-        let l = merge_specialization(l1, l2, s, ctx)?;
-        let r = merge_specialization(r1, r2, s, ctx)?;
+        let l = merge_specialization(l1, l2, s)?;
+        let r = merge_specialization(r1, r2, s)?;
         Ok(Type::Arr(Box::new(l), Box::new(r)))
       }
       (Type::Ctr(name1, ts1), Type::Ctr(name2, ts2)) if name1 == name2 && ts1.len() == ts2.len() => {
         let mut ts = vec![];
         for (t1, t2) in ts1.iter().zip(ts2.iter()) {
-          let t = merge_specialization(t1, t2, s, ctx)?;
+          let t = merge_specialization(t1, t2, s)?;
           ts.push(t);
         }
         Ok(Type::Ctr(name1.clone(), ts))
@@ -696,29 +711,26 @@ fn specialize(gen: &Type, spe: &Type, ctx: &Term) -> Result<Type, String> {
       (Type::Tup(ts1), Type::Tup(ts2)) if ts1.len() == ts2.len() => {
         let mut ts = vec![];
         for (t1, t2) in ts1.iter().zip(ts2.iter()) {
-          let t = merge_specialization(t1, t2, s, ctx)?;
+          let t = merge_specialization(t1, t2, s)?;
           ts.push(t);
         }
         Ok(Type::Tup(ts))
       }
-      (Type::Number(t1), Type::Number(t2)) => {
-        Ok(Type::Number(Box::new(merge_specialization(t1, t2, s, ctx)?)))
-      }
-      (Type::Integer(t1), Type::Integer(t2)) => {
-        Ok(Type::Integer(Box::new(merge_specialization(t1, t2, s, ctx)?)))
-      }
+      (Type::Number(t1), Type::Number(t2)) => Ok(Type::Number(Box::new(merge_specialization(t1, t2, s)?))),
+      (Type::Integer(t1), Type::Integer(t2)) => Ok(Type::Integer(Box::new(merge_specialization(t1, t2, s)?))),
       (Type::U24, Type::U24) | (Type::F24, Type::F24) | (Type::I24, Type::I24) | (Type::None, Type::None) => {
         Ok(inf.clone())
       }
-      _ => Err(format!("In {ctx}: Cannot specialize type '{inf}' with type '{exp}'")),
+      _ => Err(format!(" Cannot specialize type '{inf}' with type '{exp}'")),
     })
   }
 
-  let (t, s) = unify(gen, spe, ctx)?;
+  let (t, s) = unify(inf, ann)
+    .map_err(|e| format!("Type Error: Expected function type '{ann}' but found '{inf}'.{e}"))?;
   // Merge the inferred specialization with the expected type.
   // This is done to cast to/from `Any` types.
   let mut merge_s = Subst::default();
-  let t =   merge_specialization(&t.subst(&s), spe, &mut merge_s, ctx)?;
+  let t = merge_specialization(&t.subst(&s), ann, &mut merge_s)?;
   Ok(t.subst(&merge_s))
 }
 

@@ -275,7 +275,7 @@ impl<'a> FunParser<'a> {
     let ini_idx = *self.index();
 
     // Try to parse signature
-    if let Ok((name, args, typ)) = self.parse_def_sig() {
+    if let Ok((name, args, check, typ)) = self.parse_def_sig() {
       if self.try_consume("=") {
         // Single rule with signature
         let body = self.parse_term()?;
@@ -283,7 +283,7 @@ impl<'a> FunParser<'a> {
         let rules = vec![Rule { pats, body }];
         let end_idx = *self.index();
         let source = Source::from_file_span(&self.file, self.input, ini_idx..end_idx, self.builtin);
-        let def = FunDefinition { name, typ, check: true, rules, source };
+        let def = FunDefinition { name, typ, check, rules, source };
         Ok(def)
       } else {
         // Multiple rules with signature
@@ -296,12 +296,12 @@ impl<'a> FunParser<'a> {
         }
         let end_idx = *self.index();
         let source = Source::from_file_span(&self.file, self.input, ini_idx..end_idx, self.builtin);
-        let def = FunDefinition { name, typ, check: true, rules, source };
+        let def = FunDefinition { name, typ, check, rules, source };
         Ok(def)
       }
     } else {
       // Was not a signature, backtrack and read the name from the first rule
-      self.index = ini_idx;
+      self.index = ini_idx; 
       let mut rules = vec![];
       let (name, rule) = self.parse_rule()?;
       rules.push(rule);
@@ -318,9 +318,10 @@ impl<'a> FunParser<'a> {
 
   /// Parses a function definition signature.
   /// Returns the name, name of the arguments and the type of the function.
-  fn parse_def_sig(&mut self) -> ParseResult<(Name, Vec<Name>, Type)> {
+  fn parse_def_sig(&mut self) -> ParseResult<(Name, Vec<Name>, bool, Type)> {
     // '(' name ((arg | '(' arg (':' type)? ')'))* ')' ':' type
     //     name ((arg | '(' arg (':' type)? ')'))*     ':' type
+    let check = !self.try_parse_keyword("unchecked");
     let (name, args, typ) = if self.try_consume("(") {
       let name = self.parse_top_level_name()?;
       let args = self.list_like(|p| p.parse_def_sig_arg(), "", ")", "", false, 0)?;
@@ -335,7 +336,7 @@ impl<'a> FunParser<'a> {
     };
     let (args, arg_types): (Vec<_>, Vec<_>) = args.into_iter().unzip();
     let typ = make_fn_type(&arg_types, typ);
-    Ok((name, args, typ))
+    Ok((name, args, check, typ))
   }
 
   fn parse_def_sig_arg(&mut self) -> ParseResult<(Name, Type)> {

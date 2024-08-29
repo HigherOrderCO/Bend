@@ -29,7 +29,7 @@ impl<'a> ImpParser<'a> {
       return self.with_ctx(Err(msg), idx..idx + 1);
     }
     // TODO: checked vs unchecked functions
-    let (mut def, nxt_indent) = self.parse_def_aux(indent, true)?;
+    let (mut def, nxt_indent) = self.parse_def_aux(indent)?;
     def.source.kind = if self.builtin { SourceKind::Builtin } else { SourceKind::User };
     Ok((def, nxt_indent))
   }
@@ -1150,7 +1150,7 @@ impl<'a> ImpParser<'a> {
 
   fn parse_local_def(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
     // TODO: checked vs unchecked functions
-    let (mut def, mut nxt_indent) = self.parse_def_aux(*indent, true)?;
+    let (mut def, mut nxt_indent) = self.parse_def_aux(*indent)?;
     def.source.kind = if self.builtin { SourceKind::Builtin } else { SourceKind::Generated };
     let (nxt, nxt_indent) = self.parse_statement(&mut nxt_indent)?;
     let stmt = Stmt::LocalDef { def: Box::new(def), nxt: Box::new(nxt) };
@@ -1230,10 +1230,12 @@ impl<'a> ImpParser<'a> {
     })
   }
 
-  fn parse_def_aux(&mut self, mut indent: Indent, check: bool) -> ParseResult<(Definition, Indent)> {
+  fn parse_def_aux(&mut self, mut indent: Indent) -> ParseResult<(Definition, Indent)> {
     let ini_idx = *self.index();
     self.parse_keyword("def")?;
     self.skip_trivia_inline()?;
+
+    let check = !self.try_parse_keyword("unchecked");
 
     let name = self.parse_top_level_name()?;
     self.skip_trivia_inline()?;
