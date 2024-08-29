@@ -301,7 +301,9 @@ impl<'a> FunParser<'a> {
       }
     } else {
       // Was not a signature, backtrack and read the name from the first rule
-      self.index = ini_idx; 
+      self.index = ini_idx;
+      let check = !self.try_parse_keyword("unchecked");
+      self.skip_trivia();
       let mut rules = vec![];
       let (name, rule) = self.parse_rule()?;
       rules.push(rule);
@@ -311,7 +313,7 @@ impl<'a> FunParser<'a> {
       }
       let end_idx = *self.index();
       let source = Source::from_file_span(&self.file, self.input, ini_idx..end_idx, self.builtin);
-      let def = FunDefinition { name, typ: Type::Any, check: true, rules, source };
+      let def = FunDefinition { name, typ: Type::Any, check, rules, source };
       Ok(def)
     }
   }

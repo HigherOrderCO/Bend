@@ -330,7 +330,6 @@ fn infer_group(
     let scheme = t.generalize(&TypeEnv::default());
     let t = scheme.instantiate(&mut VarGen::default());
     env.insert(name.clone(), scheme);
-    eprintln!("{name}: {t}");
     types.insert(name.clone(), t);
   }
 
@@ -366,8 +365,7 @@ fn infer(env: &TypeEnv, book: &Book, term: &Term, var_gen: &mut VarGen) -> Resul
       let (s1, fun_t) = infer(env, book, fun, var_gen)?;
       let (s2, arg_t) = infer(&env.subst(&s1), book, arg, var_gen)?;
       let app_t = var_gen.fresh();
-      let (_, s3) =
-        unify_term(&fun_t.subst(&s2), &Type::Arr(Box::new(arg_t), Box::new(app_t.clone())), fun)?;
+      let (_, s3) = unify_term(&fun_t.subst(&s2), &Type::Arr(Box::new(arg_t), Box::new(app_t.clone())), fun)?;
       Ok((s3.compose(&s2).compose(&s1), app_t.subst(&s3)))
     }
     Term::Let { pat, val, nxt } => match pat.as_ref() {
@@ -560,7 +558,6 @@ fn infer_match_cases(
           case_env.insert(var.clone(), Scheme(vec![], tv.clone()));
         }
       }
-
       // Infer the body and unify the inferred field types with the expected.
       let (s1, t1) = infer(&case_env, book, bod, var_gen)?;
       let inf_ts = tvs.into_iter().map(|tv| tv.subst(&s1)).collect::<Vec<_>>();
