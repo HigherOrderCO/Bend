@@ -41,7 +41,7 @@ const TESTS_PATH: &str = "/tests/golden_tests/";
 
 type RunFn = dyn Fn(&str, &Path) -> Result<String, Diagnostics>;
 
-pub fn parse_book_single_file(code: &str, origin: &Path) -> Result<Book, String> {
+pub fn parse_book_single_file(code: &str, origin: &Path) -> Result<Book, Diagnostics> {
   do_parse_book(code, origin, ParseBook::builtins())?.to_fun()
 }
 
@@ -441,19 +441,16 @@ fn mutual_recursion() {
 /// Runs a file that uses IO.
 #[test]
 fn io() {
-  run_golden_test_dir(
-    function_name!(),
-    (&|code, path| {
-      let _guard = RUN_MUTEX.lock().unwrap();
-      let book = parse_book_single_file(code, path)?;
-      let compile_opts = CompileOpts::default();
-      let diagnostics_cfg = DiagnosticsConfig::default();
-      let (term, _, diags) =
-        run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
-      let res = format!("{diags}{term}");
-      Ok(format!("Strict mode:\n{res}"))
-    }),
-  )
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let _guard = RUN_MUTEX.lock().unwrap();
+    let book = parse_book_single_file(code, path)?;
+    let compile_opts = CompileOpts::default();
+    let diagnostics_cfg = DiagnosticsConfig::default();
+    let (term, _, diags) =
+      run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
+    let res = format!("{diags}{term}");
+    Ok(format!("Strict mode:\n{res}"))
+  })
 }
 
 /// Runs all examples in the examples folder.

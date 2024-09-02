@@ -11,7 +11,7 @@ impl Ctx<'_> {
       if def.check {
         for rule in def.rules.iter() {
           if let Err(e) = rule.body.check_untyped_terms() {
-            self.info.add_rule_error(e, def.name.clone());
+            self.info.add_function_error(e, def.name.clone(), def.source.clone());
           }
         }
       }

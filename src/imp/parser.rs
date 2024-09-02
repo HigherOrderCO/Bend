@@ -45,7 +45,7 @@ impl<'a> ImpParser<'a> {
     self.parse_keyword("type")?;
     self.skip_trivia_inline()?;
 
-    let type_name = self.parse_top_level_name()?;
+    let type_name = self.parse_restricted_name("datatype")?;
     self.skip_trivia_inline()?;
 
     let type_vars = if self.try_consume_exactly("(") {
@@ -133,8 +133,8 @@ impl<'a> ImpParser<'a> {
     let name = self.parse_var_name()?;
     self.skip_trivia_inline()?;
 
-    let typ = self.parse_return_type()?;
-    let typ = make_fn_type(&[], typ);
+    let typ = self.parse_return_type()?.unwrap_or(Type::Any);
+    let typ = make_fn_type(vec![], typ);
     self.skip_trivia_inline()?;
 
     self.consume_exactly(":")?;
@@ -1235,7 +1235,13 @@ impl<'a> ImpParser<'a> {
     self.parse_keyword("def")?;
     self.skip_trivia_inline()?;
 
-    let check = !self.try_parse_keyword("unchecked");
+    let check = if self.try_parse_keyword("unchecked") {
+      (false, true)
+    } else if self.try_parse_keyword("checked") {
+      (true, false)
+    } else {
+      (false, false)
+    };
 
     let name = self.parse_top_level_name()?;
     self.skip_trivia_inline()?;
@@ -1259,29 +1265,39 @@ impl<'a> ImpParser<'a> {
     let (body, nxt_indent) = self.parse_statement(&mut indent)?;
     indent.exit_level();
 
+    // If any annotation, check by default, otherwise unchecked by default
+    let check = if check.0 {
+      true
+    } else if check.1 {
+      false
+    } else {
+      ret_type.is_some() || arg_types.iter().any(|t| t.is_some())
+    };
+    let arg_types = arg_types.into_iter().map(|t| t.unwrap_or(Type::Any)).collect::<Vec<_>>();
+    let typ = make_fn_type(arg_types, ret_type.unwrap_or(Type::Any));
+
     // Note: The source kind gets replaced later (generated if a local def, user otherwise)
     let source = Source::from_file_span(&self.file, self.input, ini_idx..self.index, self.builtin);
-    let typ = make_fn_type(&arg_types, ret_type);
     let def = Definition { name, args, typ, check, body, source };
     Ok((def, nxt_indent))
   }
 
-  fn parse_def_arg(&mut self) -> ParseResult<(Name, Type)> {
+  fn parse_def_arg(&mut self) -> ParseResult<(Name, Option<Type>)> {
     let name = self.parse_var_name()?;
     self.skip_trivia_inline()?;
     if self.try_consume_exactly(":") {
       let typ = self.parse_type_expr()?;
-      Ok((name, typ))
+      Ok((name, Some(typ)))
     } else {
-      Ok((name, Type::Any))
+      Ok((name, None))
     }
   }
 
-  fn parse_return_type(&mut self) -> ParseResult<Type> {
+  fn parse_return_type(&mut self) -> ParseResult<Option<Type>> {
     if self.try_consume_exactly("->") {
-      self.parse_type_expr()
+      Ok(Some(self.parse_type_expr()?))
     } else {
-      Ok(Type::Any)
+      Ok(None)
     }
   }
 

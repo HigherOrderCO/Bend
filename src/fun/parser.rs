@@ -200,13 +200,15 @@ impl<'a> FunParser<'a> {
     if self.try_consume("(") {
       // parens around name and vars
       self.skip_trivia();
-      name = self.parse_top_level_name()?;
-      vars = self.list_like(|p| p.parse_var_name(), "", ")", "", false, 0)?;
+      name = self.parse_restricted_name("Datatype")?;
+      vars = self
+        .labelled(|p| p.list_like(|p| p.parse_var_name(), "", ")", "", false, 0), "Type variable or ')'")?;
       self.consume("=")?;
     } else {
       // no parens
-      name = self.parse_top_level_name()?;
-      vars = self.list_like(|p| p.parse_var_name(), "", "=", "", false, 0)?;
+      name = self.parse_restricted_name("Datatype")?;
+      vars = self
+        .labelled(|p| p.list_like(|p| p.parse_var_name(), "", "=", "", false, 0), "Type variable or '='")?;
     }
 
     let mut ctrs = vec![self.parse_type_ctr(&name, &vars)?];
@@ -243,7 +245,7 @@ impl<'a> FunParser<'a> {
       Ok(ctr)
     } else {
       // just name
-      let name = self.labelled(|p| p.parse_top_level_name(), "datatype constructor name")?;
+      let name = self.parse_restricted_name("Datatype constructor")?;
       let name = Name::new(format!("{type_name}/{name}"));
       let typ = make_ctr_type(type_name.clone(), &[], type_vars);
       let ctr = AdtCtr { name, typ, fields: vec![] };
@@ -302,8 +304,8 @@ impl<'a> FunParser<'a> {
     } else {
       // Was not a signature, backtrack and read the name from the first rule
       self.index = ini_idx;
-      let check = !self.try_parse_keyword("unchecked");
-      self.skip_trivia();
+      // No signature, don't check by default
+      let check = self.parse_checked(false);
       let mut rules = vec![];
       let (name, rule) = self.parse_rule()?;
       rules.push(rule);
@@ -323,7 +325,8 @@ impl<'a> FunParser<'a> {
   fn parse_def_sig(&mut self) -> ParseResult<(Name, Vec<Name>, bool, Type)> {
     // '(' name ((arg | '(' arg (':' type)? ')'))* ')' ':' type
     //     name ((arg | '(' arg (':' type)? ')'))*     ':' type
-    let check = !self.try_parse_keyword("unchecked");
+    // Signature, check by default
+    let check = self.parse_checked(true);
     let (name, args, typ) = if self.try_consume("(") {
       let name = self.parse_top_level_name()?;
       let args = self.list_like(|p| p.parse_def_sig_arg(), "", ")", "", false, 0)?;
@@ -337,7 +340,7 @@ impl<'a> FunParser<'a> {
       (name, args, typ)
     };
     let (args, arg_types): (Vec<_>, Vec<_>) = args.into_iter().unzip();
-    let typ = make_fn_type(&arg_types, typ);
+    let typ = make_fn_type(arg_types, typ);
     Ok((name, args, check, typ))
   }
 
@@ -353,6 +356,16 @@ impl<'a> FunParser<'a> {
     } else {
       let name = self.parse_var_name()?;
       Ok((name, Type::Any))
+    }
+  }
+
+  fn parse_checked(&mut self, default: bool) -> bool {
+    if self.try_parse_keyword("checked") {
+      true
+    } else if self.try_parse_keyword("unchecked") {
+      false
+    } else {
+      default
     }
   }
 
@@ -413,7 +426,7 @@ impl<'a> FunParser<'a> {
   fn parse_rule_lhs(&mut self) -> ParseResult<(Name, Vec<Pattern>)> {
     if self.try_consume_exactly("(") {
       self.skip_trivia();
-      let name = self.labelled(|p| p.parse_top_level_name(), "function name")?;
+      let name = self.parse_restricted_name("Function")?;
       let pats = self.list_like(|p| p.parse_pattern(false), "", ")", "", false, 0)?;
       Ok((name, pats))
     } else {
@@ -432,6 +445,7 @@ impl<'a> FunParser<'a> {
   }
 
   fn parse_rule(&mut self) -> ParseResult<(Name, Rule)> {
+    self.skip_trivia();
     let (name, pats) = self.parse_rule_lhs()?;
 
     self.consume("=")?;
@@ -443,8 +457,8 @@ impl<'a> FunParser<'a> {
   }
 
   fn starts_with_rule(&mut self, expected_name: &Name) -> bool {
-    self.skip_trivia();
     let ini_idx = *self.index();
+    self.skip_trivia();
     let res = self.parse_rule_lhs();
     self.index = ini_idx;
     if let Ok((name, _)) = res {
@@ -1231,9 +1245,9 @@ pub fn is_num_char(c: char) -> bool {
   "0123456789+-".contains(c)
 }
 
-pub fn make_fn_type(args: &[Type], ret: Type) -> Type {
+pub fn make_fn_type(args: Vec<Type>, ret: Type) -> Type {
   let typ = ret;
-  let typ = args.iter().rfold(typ, |acc, typ| Type::Arr(Box::new(typ.clone()), Box::new(acc)));
+  let typ = args.into_iter().rfold(typ, |acc, typ| Type::Arr(Box::new(typ), Box::new(acc)));
   typ
 }
 

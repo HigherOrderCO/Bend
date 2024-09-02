@@ -1068,6 +1068,15 @@ impl Pattern {
       Pattern::Ctr(_, x) | Pattern::Fan(_, _, x) | Pattern::Lst(x) => x.iter().any(|x| x.has_unscoped()),
     }
   }
+
+  pub fn has_nested(&self) -> bool {
+    for child in self.children() {
+      if matches!(child, Pattern::Ctr(_, _) | Pattern::Fan(_, _, _) | Pattern::Lst(_)) {
+        return true;
+      }
+    }
+    false
+  }
 }
 
 impl Rule {

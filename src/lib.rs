@@ -392,7 +392,7 @@ impl CompileOpts {
       merge: true,
       linearize_matches: OptLevel::Enabled,
       type_check: true,
-      inline: self.inline,
+      inline: true,
       check_net_size: self.check_net_size,
       adt_encoding: self.adt_encoding,
     }
