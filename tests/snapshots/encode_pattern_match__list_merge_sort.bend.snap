@@ -3,25 +3,25 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/list_merge_sort.bend
 ---
 Scott
-If: Any
+unchecked If: Any
 (If) = λa (a λb λc let * = c; b λf λg let * = f; g)
 
-Pure: Any
+unchecked Pure: Any
 (Pure) = λa (List_/Cons a List_/Nil)
 
-Map: Any
+unchecked Map: Any
 (Map) = λa (a λb λc λd let {e e_2} = d; (List_/Cons (e b) (Map c e_2)) λf let * = f; List_/Nil)
 
-MergeSort: Any
+unchecked MergeSort: Any
 (MergeSort) = λa λb (Unpack a (Map b Pure))
 
-Unpack: Any
+unchecked Unpack: Any
 (Unpack) = λa λb (b λc λd λe (d λf λg λh let {h h_2} = h; λi (Unpack h (MergePair h_2 (List_/Cons i (List_/Cons f g)))) λ* λk k e c) λ* List_/Nil a)
 
-MergePair: Any
+unchecked MergePair: Any
 (MergePair) = λa λb (b λc λd λe (d λf λg λh let {h h_2} = h; λi (List_/Cons (Merge h i f) (MergePair h_2 g)) λ* λk (List_/Cons k List_/Nil) e c) λ* List_/Nil a)
 
-Merge: Any
+unchecked Merge: Any
 (Merge) = λa λb (b λc λd λe λf (f λh let {h h_2 h_3} = h; λi let {i i_2} = i; λj let {j j_2 j_3} = j; λk let {k k_2 k_3} = k; λl let {l l_2} = l; (If (j k h) (List_/Cons k_2 (Merge j_2 l (List_/Cons h_2 i))) (List_/Cons h_3 (Merge j_3 (List_/Cons k_3 l_2) i_2))) λ* λp λq (List_/Cons p q) e c d) λ* λs s a)
 
 Bool/True: Bool
@@ -30,32 +30,32 @@ Bool/True: Bool
 Bool/False: Bool
 (Bool/False) = λ* λb b
 
-List_/Cons: (Any -> (Any -> List_))
+List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc λ* (c a b)
 
 List_/Nil: List_
 (List_/Nil) = λ* λb b
 
 NumScott
-If: Any
+unchecked If: Any
 (If) = λa (a λb switch b { 0: λc λd let * = d; c; _: λ* λg λh let * = g; h; })
 
-Pure: Any
+unchecked Pure: Any
 (Pure) = λa (List_/Cons a List_/Nil)
 
-Map: Any
+unchecked Map: Any
 (Map) = λa (a λb switch b { 0: λc λd λe let {f f_2} = e; (List_/Cons (f c) (Map d f_2)); _: λ* λg let * = g; List_/Nil; })
 
-MergeSort: Any
+unchecked MergeSort: Any
 (MergeSort) = λa λb (Unpack a (Map b Pure))
 
-Unpack: Any
+unchecked Unpack: Any
 (Unpack) = λa λb (b λc switch c { 0: λd λe λf (e λg switch g { 0: λh λi λj let {j j_2} = j; λk (Unpack j (MergePair j_2 (List_/Cons k (List_/Cons h i)))); _: λ* λ* λm m; } f d); _: λ* λ* List_/Nil; } a)
 
-MergePair: Any
+unchecked MergePair: Any
 (MergePair) = λa λb (b λc switch c { 0: λd λe λf (e λg switch g { 0: λh λi λj let {j j_2} = j; λk (List_/Cons (Merge j k h) (MergePair j_2 i)); _: λ* λ* λm (List_/Cons m List_/Nil); } f d); _: λ* λ* List_/Nil; } a)
 
-Merge: Any
+unchecked Merge: Any
 (Merge) = λa λb (b λc switch c { 0: λd λe λf λg (g λi switch i { 0: λj let {j j_2 j_3} = j; λk let {k k_2} = k; λl let {l l_2 l_3} = l; λm let {m m_2 m_3} = m; λn let {n n_2} = n; (If (l m j) (List_/Cons m_2 (Merge l_2 n (List_/Cons j_2 k))) (List_/Cons j_3 (Merge l_3 (List_/Cons m_3 n_2) k_2))); _: λ* λ* λr λs (List_/Cons r s); } f d e); _: λ* λ* λu u; } a)
 
 Bool/True: Bool
@@ -64,7 +64,7 @@ Bool/True: Bool
 Bool/False: Bool
 (Bool/False) = λa (a Bool/False/tag)
 
-List_/Cons: (Any -> (Any -> List_))
+List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc (c List_/Cons/tag a b)
 
 List_/Nil: List_

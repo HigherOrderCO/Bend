@@ -2,4 +2,4 @@
 source: tests/golden_tests.rs
 input_file: examples/list.bend
 ---
-5
+λa (a Result/Ok/tag 5)

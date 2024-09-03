@@ -3,20 +3,20 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_syntax.bend
 ---
 Scott
-head: Any
+unchecked head: Any
 (head) = λa (a λb λ* b List_/Nil)
 
-List_/Cons: (Any -> (Any -> List_))
+List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc λ* (c a b)
 
 List_/Nil: List_
 (List_/Nil) = λ* λb b
 
 NumScott
-head: Any
+unchecked head: Any
 (head) = λa (a λb switch b { 0: λc λ* c; _: λ* List_/Nil; })
 
-List_/Cons: (Any -> (Any -> List_))
+List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc (c List_/Cons/tag a b)
 
 List_/Nil: List_

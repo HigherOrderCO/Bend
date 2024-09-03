@@ -3,10 +3,10 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool_tup.bend
 ---
 Scott
-foo: Any
+unchecked foo: Any
 (foo) = λa let (b, c) = a; (b λd d λ* Bool/F c)
 
-main: Any
+unchecked main: Any
 (main) = (foo (Bool/F, Bool/T))
 
 Bool/T: Bool
@@ -16,10 +16,10 @@ Bool/F: Bool
 (Bool/F) = λ* λb b
 
 NumScott
-foo: Any
+unchecked foo: Any
 (foo) = λa let (b, c) = a; (b λd switch d { 0: λe e; _: λ* λ* Bool/F; } c)
 
-main: Any
+unchecked main: Any
 (main) = (foo (Bool/F, Bool/T))
 
 Bool/T: Bool

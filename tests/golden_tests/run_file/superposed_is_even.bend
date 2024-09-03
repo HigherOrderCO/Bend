@@ -1,18 +1,18 @@
-type N = (S pred) | Z
-type B = T | F
+type MyNat = (S pred) | Z
+type MyBool = T | F
 
-(Not B/T) = B/F
-(Not B/F) = B/T
+(Not MyBool/T) = MyBool/F
+(Not MyBool/F) = MyBool/T
 
 (IsEven n) =
   match n {
-    N/S: (Not (IsEven n.pred))
-    N/Z: B/T
+    MyNat/S: (Not (IsEven n.pred))
+    MyNat/Z: MyBool/T
   }
 
-N0 = N/Z
-N1 = (N/S N0)
-N2 = (N/S N1)
-N3 = (N/S N2)
+N0 = MyNat/Z
+N1 = (MyNat/S N0)
+N2 = (MyNat/S N1)
+N3 = (MyNat/S N2)
 
 Main = (IsEven {{N0 N1} {N2 N3}})

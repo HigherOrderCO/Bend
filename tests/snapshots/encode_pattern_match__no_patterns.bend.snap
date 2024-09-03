@@ -3,21 +3,21 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/no_patterns.bend
 ---
 Scott
-Id: Any
+unchecked Id: Any
 (Id) = λa a
 
-Id2: Any
+unchecked Id2: Any
 (Id2) = λa a
 
-Pair: Any
+unchecked Pair: Any
 (Pair) = λa λb (a, b)
 
 NumScott
-Id: Any
+unchecked Id: Any
 (Id) = λa a
 
-Id2: Any
+unchecked Id2: Any
 (Id2) = λa a
 
-Pair: Any
+unchecked Pair: Any
 (Pair) = λa λb (a, b)

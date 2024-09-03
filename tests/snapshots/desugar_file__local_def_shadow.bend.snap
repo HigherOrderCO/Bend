@@ -2,17 +2,17 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/local_def_shadow.bend
 ---
-main: Any
+unchecked main: Any
 (main) = 1
 
-main__local_0_A__local_0_B: _
+unchecked main__local_0_A__local_0_B: _
 (main__local_0_A__local_0_B) = 0
 
-main__local_1_A__local_1_B: _
+unchecked main__local_1_A__local_1_B: _
 (main__local_1_A__local_1_B) = 1
 
-main__local_1_A: _
+unchecked main__local_1_A: _
 (main__local_1_A) = main__local_1_A__local_1_B
 
-main__local_0_A: _
+unchecked main__local_0_A: _
 (main__local_0_A) = main__local_0_A__local_0_B

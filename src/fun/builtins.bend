@@ -284,11 +284,17 @@ def IO/map(io: IO(A), f: A -> B) -> IO(B):
 #
 # Should only be called if the other `IOError` variants are unreachable.
 def IO/unwrap_inner(io: IO(Result(A, IOError(B)))) -> IO(Result(A, B)):
-  return IO/map(io, lambda x: Result/map_err(x, IOError/unwrap_inner))
+  with IO:
+    res <- io
+    match res:
+      case Result/Ok:
+        return wrap(Result/Ok(res.val))
+      case Result/Err:
+        return wrap(Result/Err(IOError/unwrap_inner(res.val)))
 
 ## Time and sleep
 
-  # Returns a monotonically increasing nanosecond timestamp as an u48
+# Returns a monotonically increasing nanosecond timestamp as an u48
 # encoded as a pair of u24s.
 def IO/get_time() -> IO((u24, u24)):
   with IO:
@@ -407,7 +413,7 @@ def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result(L
             # If length is 0, the end of the file was reached, return as if it was a newline
             if length == 0:
               bytes = List/flatten(chunks)
-              return wrap(bytes)
+              return wrap(Result/Ok(bytes))
             # Otherwise, the line is still ongoing, read more chunks
             else:
               chunks = List/Cons(line, chunks)

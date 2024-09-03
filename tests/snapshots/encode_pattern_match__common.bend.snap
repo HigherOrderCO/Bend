@@ -21,7 +21,7 @@ Result_/Ok: (Any -> Result_)
 Result_/Err: (Any -> Result_)
 (Result_/Err) = λa λ* λc (c a)
 
-List_/Cons: (Any -> (Any -> List_))
+List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc λ* (c a b)
 
 List_/Nil: List_
@@ -73,7 +73,7 @@ Result_/Ok: (Any -> Result_)
 Result_/Err: (Any -> Result_)
 (Result_/Err) = λa λb (b Result_/Err/tag a)
 
-List_/Cons: (Any -> (Any -> List_))
+List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc (c List_/Cons/tag a b)
 
 List_/Nil: List_

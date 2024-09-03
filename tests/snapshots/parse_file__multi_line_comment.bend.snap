@@ -2,16 +2,16 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/multi_line_comment.bend
 ---
-X: Any
+unchecked X: Any
 (X x x x) = x
 
-String/is_empty: Any
+unchecked String/is_empty: Any
 (String/is_empty s) = match s = s { String/Nil: 1; String/Cons: 0; }
 
-main: Any
+unchecked main: Any
 (main) = 0
 
-String/not_empty: (Any -> Any)
+unchecked String/not_empty: (Any -> Any)
 (String/not_empty s) = match s = s { String/Nil: 0; String/Cons: 1; }
 
 Foo/Foo: (Any -> Foo)

@@ -3,13 +3,13 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.bend
 ---
 Scott
-Foo: Any
+unchecked Foo: Any
 (Foo) = λ$x (Maybe/Some 1 $x λa a)
 
-Bar: Any
+unchecked Bar: Any
 (Bar) = (Maybe/Some 1 $x λa a λ$x *)
 
-main: Any
+unchecked main: Any
 (main) = *
 
 Maybe/None: Maybe
@@ -19,13 +19,13 @@ Maybe/Some: (Any -> Maybe)
 (Maybe/Some) = λa λ* λc (c a)
 
 NumScott
-Foo: Any
+unchecked Foo: Any
 (Foo) = λ$x (Maybe/Some 1 λa switch a { 0: $x; _: λ* λb b; })
 
-Bar: Any
+unchecked Bar: Any
 (Bar) = (Maybe/Some 1 λa switch a { 0: $x; _: λ* λb b; } λ$x *)
 
-main: Any
+unchecked main: Any
 (main) = *
 
 Maybe/None: Maybe

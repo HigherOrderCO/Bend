@@ -3,10 +3,10 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/and3.bend
 ---
 Scott
-And: Any
+unchecked And: Any
 (And) = λa let (b, c, d) = a; (b λe λf (e λg (g Bool/T Bool/F) λ* Bool/F f) λ* λ* Bool/F c d)
 
-main: Any
+unchecked main: Any
 (main) = (And (Bool/F, Bool/T, Bool/F))
 
 Bool/T: Bool
@@ -16,10 +16,10 @@ Bool/F: Bool
 (Bool/F) = λ* λb b
 
 NumScott
-And: Any
+unchecked And: Any
 (And) = λa let (b, c, d) = a; (b λe switch e { 0: λf λg (f λh switch h { 0: λi (i λj switch j { 0: Bool/T; _: λ* Bool/F; }); _: λ* λ* Bool/F; } g); _: λ* λ* λ* Bool/F; } c d)
 
-main: Any
+unchecked main: Any
 (main) = (And (Bool/F, Bool/T, Bool/F))
 
 Bool/T: Bool

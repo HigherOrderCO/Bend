@@ -8,9 +8,7 @@ input_file: tests/golden_tests/cli/compile_all.bend
 
 @Pair.get__C1 = (?((@Pair.get__C0 *) a) a)
 
-@Pair/Pair = (a (b ((@Pair/Pair/tag (a (b c))) c)))
-
-@Pair/Pair/tag = 0
+@Pair/Pair = (a (b ((0 (a (b c))) c)))
 
 @main = d
   & @Pair.get ~ (($([+] $(a b)) (a b)) (c d))

@@ -3,33 +3,33 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_num_pred.bend
 ---
 Scott
-pred: Any
+unchecked pred: Any
 (pred) = λa switch a { 0: 0; _: λb b; }
 
-pred2: Any
+unchecked pred2: Any
 (pred2) = λa switch a { 0: 0; _: λb switch b { 0: 0; _: λc c; }; }
 
-pred3: Any
+unchecked pred3: Any
 (pred3) = λa switch a { 0: 0; _: λb switch b { 0: 0; _: λc switch c { 0: 0; _: λd d; }; }; }
 
-zero: Any
+unchecked zero: Any
 (zero) = λa switch a { 0: 1; _: λb switch b { 0: 0; _: λ* 0; }; }
 
-main: Any
+unchecked main: Any
 (main) = *
 
 NumScott
-pred: Any
+unchecked pred: Any
 (pred) = λa switch a { 0: 0; _: λb b; }
 
-pred2: Any
+unchecked pred2: Any
 (pred2) = λa switch a { 0: 0; _: λb switch b { 0: 0; _: λc c; }; }
 
-pred3: Any
+unchecked pred3: Any
 (pred3) = λa switch a { 0: 0; _: λb switch b { 0: 0; _: λc switch c { 0: 0; _: λd d; }; }; }
 
-zero: Any
+unchecked zero: Any
 (zero) = λa switch a { 0: 1; _: λb switch b { 0: 0; _: λ* 0; }; }
 
-main: Any
+unchecked main: Any
 (main) = *

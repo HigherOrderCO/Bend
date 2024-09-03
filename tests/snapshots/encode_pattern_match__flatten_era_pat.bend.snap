@@ -3,27 +3,27 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/flatten_era_pat.bend
 ---
 Scott
-Fn1: Any
+unchecked Fn1: Any
 (Fn1) = λa λ* let (*, d) = a; let (e, *) = d; e
 
-Fn2: Any
+unchecked Fn2: Any
 (Fn2) = λa let (*, c) = a; let (*, e) = c; let (f, *) = e; f
 
-Fn3: Any
+unchecked Fn3: Any
 (Fn3) = λa let (b, c) = a; (switch b { 0: λ* λe let * = e; 0; _: λg λ* λi let * = i; (+ g 1); } c)
 
-main: Any
+unchecked main: Any
 (main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)
 
 NumScott
-Fn1: Any
+unchecked Fn1: Any
 (Fn1) = λa λ* let (*, d) = a; let (e, *) = d; e
 
-Fn2: Any
+unchecked Fn2: Any
 (Fn2) = λa let (*, c) = a; let (*, e) = c; let (f, *) = e; f
 
-Fn3: Any
+unchecked Fn3: Any
 (Fn3) = λa let (b, c) = a; (switch b { 0: λ* λe let * = e; 0; _: λg λ* λi let * = i; (+ g 1); } c)
 
-main: Any
+unchecked main: Any
 (main) = (Fn2 ((1, 2), (3, (4, (5, 6)))) 0)

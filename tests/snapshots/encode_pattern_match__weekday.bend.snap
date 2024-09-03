@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/weekday.bend
 ---
 Scott
-main: Any
+unchecked main: Any
 (main) = (λa a Weekday/Saturday)
 
 Weekday/Monday: Weekday
@@ -28,7 +28,7 @@ Weekday/Sunday: Weekday
 (Weekday/Sunday) = λ* λ* λ* λ* λ* λ* λg g
 
 NumScott
-main: Any
+unchecked main: Any
 (main) = (λa a Weekday/Saturday)
 
 Weekday/Monday: Weekday

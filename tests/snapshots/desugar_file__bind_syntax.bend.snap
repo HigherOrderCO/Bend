@@ -2,31 +2,31 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/bind_syntax.bend
 ---
-undefer: Any
-(undefer) = λa (a λb b)
-
-Result/bind: Any
+unchecked Result/bind: Any
 (Result/bind) = λa λb (a Result/bind__C2 b)
 
-safe_div: Any
+unchecked safe_div: Any
 (safe_div) = λa λb (switch b { 0: λ* (Result/Err (String/Cons 68 (String/Cons 105 (String/Cons 118 (String/Cons 32 (String/Cons 98 (String/Cons 121 (String/Cons 32 (String/Cons 48 String/Nil))))))))); _: safe_div__C0; } a)
 
-safe_rem: Any
+unchecked safe_rem: Any
 (safe_rem) = λa λb (switch b { 0: λ* (Result/Err (String/Cons 77 (String/Cons 111 (String/Cons 100 (String/Cons 32 (String/Cons 98 (String/Cons 121 (String/Cons 32 (String/Cons 48 String/Nil))))))))); _: safe_rem__C0; } a)
 
-Main: Any
+unchecked Main: Any
 (Main) = (Result/bind (safe_div 3 2) λa (a λb (Result/bind (safe_rem b 0) λc (c λd d))))
+
+undefer: (((a -> a) -> b) -> b)
+(undefer) = λa (a λb b)
 
 String/Nil: String
 (String/Nil) = λa (a String/Nil/tag)
 
-String/Cons: (u24 -> (String -> String))
+String/Cons: (u24 -> String -> String)
 (String/Cons) = λa λb λc (c String/Cons/tag a b)
 
-Result/Ok: ∀o ∀e (o -> (Result o e))
+Result/Ok: (b -> (Result b a))
 (Result/Ok) = λa λb (b Result/Ok/tag a)
 
-Result/Err: ∀o ∀e (e -> (Result o e))
+Result/Err: (a -> (Result b a))
 (Result/Err) = λa λb (b Result/Err/tag a)
 
 String/Nil/tag: u24
@@ -41,17 +41,17 @@ Result/Ok/tag: u24
 Result/Err/tag: u24
 (Result/Err/tag) = 1
 
-Result/bind__C0: _
+unchecked Result/bind__C0: _
 (Result/bind__C0) = λa λb (undefer b a)
 
-Result/bind__C1: _
+unchecked Result/bind__C1: _
 (Result/bind__C1) = λ* λa λ* (Result/Err a)
 
-Result/bind__C2: _
+unchecked Result/bind__C2: _
 (Result/bind__C2) = λa switch a { 0: Result/bind__C0; _: Result/bind__C1; }
 
-safe_div__C0: _
+unchecked safe_div__C0: _
 (safe_div__C0) = λa λb (Result/Ok (/ b (+ a 1)))
 
-safe_rem__C0: _
+unchecked safe_rem__C0: _
 (safe_rem__C0) = λa λb (Result/Ok (% b (+ a 1)))

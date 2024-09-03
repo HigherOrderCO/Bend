@@ -3,16 +3,16 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_num_adt_tup_parser.bend
 ---
 Scott
-Parse: Any
+unchecked Parse: Any
 (Parse) = λa λb (b λc (Result_/Err (String/Nil, c)) λd λe λf (switch (- d 10) { 0: λg λh (Result_/Ok (0, h, g)); _: λi λj λk (switch (- i 29) { 0: λl λm (Result_/Ok (40, m, l)); _: λn λo λp (switch n { 0: λq λr (Result_/Ok (41, r, q)); _: λs λt λu (Result_/Err ((String/Cons (+ s 42) u), t)); } o p); } j k); } f e) a)
 
-main: Any
+unchecked main: Any
 (main) = (Parse * (String/Cons 40 (String/Cons 43 String/Nil)) λc let (d, e, f) = c; (d, (Parse f e)) λg (Result_/Err g))
 
 String/Nil: String
 (String/Nil) = λa λ* a
 
-String/Cons: (u24 -> (String -> String))
+String/Cons: (u24 -> String -> String)
 (String/Cons) = λa λb λ* λd (d a b)
 
 Result_/Ok: (Any -> Result_)
@@ -22,16 +22,16 @@ Result_/Err: (Any -> Result_)
 (Result_/Err) = λa λ* λc (c a)
 
 NumScott
-Parse: Any
+unchecked Parse: Any
 (Parse) = λa λb (b λc switch c { 0: λd (Result_/Err (String/Nil, d)); _: λ* λe λf λg (switch (- e 10) { 0: λh λi (Result_/Ok (0, i, h)); _: λj λk λl (switch (- j 29) { 0: λm λn (Result_/Ok (40, n, m)); _: λo λp λq (switch o { 0: λr λs (Result_/Ok (41, s, r)); _: λt λu λv (Result_/Err ((String/Cons (+ t 42) v), u)); } p q); } k l); } g f); } a)
 
-main: Any
+unchecked main: Any
 (main) = (Parse * (String/Cons 40 (String/Cons 43 String/Nil)) λc switch c { 0: λd let (e, f, g) = d; (e, (Parse g f)); _: λ* λh (Result_/Err h); })
 
 String/Nil: String
 (String/Nil) = λa (a String/Nil/tag)
 
-String/Cons: (u24 -> (String -> String))
+String/Cons: (u24 -> String -> String)
 (String/Cons) = λa λb λc (c String/Cons/tag a b)
 
 Result_/Ok: (Any -> Result_)

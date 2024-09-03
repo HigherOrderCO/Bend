@@ -9,25 +9,25 @@ Expr/Var: (Any -> Expr)
 Expr/Num: (Any -> Expr)
 (Expr/Num) = λa λ* λc λ* λ* λ* λ* λ* λ* λ* (c a)
 
-Expr/App: (Any -> (Any -> Expr))
+Expr/App: (Any -> Any -> Expr)
 (Expr/App) = λa λb λ* λ* λe λ* λ* λ* λ* λ* λ* (e a b)
 
-Expr/Fun: (Any -> (Any -> Expr))
+Expr/Fun: (Any -> Any -> Expr)
 (Expr/Fun) = λa λb λ* λ* λ* λf λ* λ* λ* λ* λ* (f a b)
 
-Expr/If: (Any -> (Any -> (Any -> Expr)))
+Expr/If: (Any -> Any -> Any -> Expr)
 (Expr/If) = λa λb λc λ* λ* λ* λ* λh λ* λ* λ* λ* (h a b c)
 
-Expr/Let: (Any -> (Any -> (Any -> Expr)))
+Expr/Let: (Any -> Any -> Any -> Expr)
 (Expr/Let) = λa λb λc λ* λ* λ* λ* λ* λi λ* λ* λ* (i a b c)
 
-Expr/Dup: (Any -> (Any -> (Any -> (Any -> Expr))))
+Expr/Dup: (Any -> Any -> Any -> Any -> Expr)
 (Expr/Dup) = λa λb λc λd λ* λ* λ* λ* λ* λ* λk λ* λ* (k a b c d)
 
-Expr/Tup: (Any -> (Any -> Expr))
+Expr/Tup: (Any -> Any -> Expr)
 (Expr/Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
 
-Expr/Op2: (Any -> (Any -> (Any -> Expr)))
+Expr/Op2: (Any -> Any -> Any -> Expr)
 (Expr/Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)
 
 Op/Add: Op
@@ -49,25 +49,25 @@ Expr/Var: (Any -> Expr)
 Expr/Num: (Any -> Expr)
 (Expr/Num) = λa λb (b Expr/Num/tag a)
 
-Expr/App: (Any -> (Any -> Expr))
+Expr/App: (Any -> Any -> Expr)
 (Expr/App) = λa λb λc (c Expr/App/tag a b)
 
-Expr/Fun: (Any -> (Any -> Expr))
+Expr/Fun: (Any -> Any -> Expr)
 (Expr/Fun) = λa λb λc (c Expr/Fun/tag a b)
 
-Expr/If: (Any -> (Any -> (Any -> Expr)))
+Expr/If: (Any -> Any -> Any -> Expr)
 (Expr/If) = λa λb λc λd (d Expr/If/tag a b c)
 
-Expr/Let: (Any -> (Any -> (Any -> Expr)))
+Expr/Let: (Any -> Any -> Any -> Expr)
 (Expr/Let) = λa λb λc λd (d Expr/Let/tag a b c)
 
-Expr/Dup: (Any -> (Any -> (Any -> (Any -> Expr))))
+Expr/Dup: (Any -> Any -> Any -> Any -> Expr)
 (Expr/Dup) = λa λb λc λd λe (e Expr/Dup/tag a b c d)
 
-Expr/Tup: (Any -> (Any -> Expr))
+Expr/Tup: (Any -> Any -> Expr)
 (Expr/Tup) = λa λb λc (c Expr/Tup/tag a b)
 
-Expr/Op2: (Any -> (Any -> (Any -> Expr)))
+Expr/Op2: (Any -> Any -> Any -> Expr)
 (Expr/Op2) = λa λb λc λd (d Expr/Op2/tag a b c)
 
 Op/Add: Op

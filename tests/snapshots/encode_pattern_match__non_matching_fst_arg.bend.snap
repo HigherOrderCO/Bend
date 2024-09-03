@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/non_matching_fst_arg.bend
 ---
 Scott
-Foo: Any
+unchecked Foo: Any
 (Foo) = λa λb (b λc let {c c_2} = c; (Foo c c_2) λd d a)
 
 bool/true: bool
@@ -13,7 +13,7 @@ bool/false: bool
 (bool/false) = λ* λb b
 
 NumScott
-Foo: Any
+unchecked Foo: Any
 (Foo) = λa λb (b λc switch c { 0: λd let {d d_2} = d; (Foo d d_2); _: λ* λe e; } a)
 
 bool/true: bool

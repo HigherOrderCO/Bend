@@ -117,7 +117,6 @@ new_list = bend x = 0 {
 # To make programs that are more parallelizable, you generally want to
 # avoid lists and use tree-like structures with multiple recursion instead.
 sum_nums from to =
-  # 
   if (< from to) {
     (+ 
       (sum_nums from (/ 2 (+ from to)))
@@ -126,10 +125,12 @@ sum_nums from to =
     from
   }
 
-# Internally, each variable is only used once.
-# If you use a variable is used more than once, the compiler will insert duplications for you.
-# You can also write them manually with 'let {a b} = ...',
-# but then you have to mark the function as unchecked.
+# Internally, each variable is only used once. If you use a variable
+# is used more than once, the compiler will insert duplications for you.
+#
+# You can also write them manually with 'let {a b} = ...', but then
+# your function needs to be unchecked, either by not annotating it 
+# with types or by marking it as unchecked.
 unchecked (def4) = λz let {z1 z2} = z; (z1 ((λx (x x x x x)) z2))
 
 # Duplicating a term that duplicates a variable is not allowed and will break the program.

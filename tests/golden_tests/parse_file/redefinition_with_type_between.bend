@@ -1,3 +1,3 @@
 A = 0
-type B = B
+type MyType = MyType
 A = 1

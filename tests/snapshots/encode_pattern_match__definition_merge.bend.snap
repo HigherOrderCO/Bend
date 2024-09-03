@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/definition_merge.bend
 ---
 Scott
-Foo: Any
+unchecked Foo: Any
 (Foo) = λa (a λb (b λc (c λf (f 1 1) λg (g 2 2)) λh (h λk (k 1 1) λl (l 2 2))) λm (m λn (n λq (q 3 3) λr (r 3 3)) λs (s λv (v 3 3) λw (w 3 3))))
 
 Either/Left: (Any -> Either)
@@ -19,7 +19,7 @@ Bool/False: Bool
 (Bool/False) = λ* λb b
 
 NumScott
-Foo: Any
+unchecked Foo: Any
 (Foo) = λa (a λb switch b { 0: λc (c λd switch d { 0: λe (e λh switch h { 0: λi (i λj switch j { 0: 1; _: λ* 1; }); _: λ* λk (k λl switch l { 0: 2; _: λ* 2; }); }); _: λ* λm (m λp switch p { 0: λq (q λr switch r { 0: 1; _: λ* 1; }); _: λ* λs (s λt switch t { 0: 2; _: λ* 2; }); }); }); _: λ* λu (u λv switch v { 0: λw (w λz switch z { 0: λab (ab λbb switch bb { 0: 3; _: λ* 3; }); _: λ* λcb (cb λdb switch db { 0: 3; _: λ* 3; }); }); _: λ* λeb (eb λhb switch hb { 0: λib (ib λjb switch jb { 0: 3; _: λ* 3; }); _: λ* λkb (kb λlb switch lb { 0: 3; _: λ* 3; }); }); }); })
 
 Either/Left: (Any -> Either)

@@ -2,5 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/dup_linearization.bend
 ---
-main: Any
+unchecked main: Any
 (main) = let {a b c d e} = *; (a, e, d, c, b)

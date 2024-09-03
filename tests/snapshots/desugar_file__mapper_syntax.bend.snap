@@ -2,25 +2,28 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/mapper_syntax.bend
 ---
-Map/empty: ∀T (Map T)
+Map/empty: (Map a)
 (Map/empty) = Map/Leaf
 
-Map/get: ∀T ((Map T) -> (u24 -> ((Map T), T)))
+Map/get: ((Map a) -> u24 -> (a, (Map a)))
 (Map/get) = λa λb (a Map/get__C5 b)
 
-Map/set: ∀T ((Map T) -> (u24 -> (T -> (Map T))))
+Map/set: ((Map a) -> u24 -> a -> (Map a))
 (Map/set) = λa λb λc (a Map/set__C10 b c)
 
-Map/map: ∀T ((Map T) -> (u24 -> ((T -> T) -> (Map T))))
+Map/map: ((Map a) -> u24 -> (a -> a) -> (Map a))
 (Map/map) = λa λb λc (a Map/map__C5 b c)
 
-main: Any
+unreachable: Any
+(unreachable) = *
+
+unchecked main: Any
 (main) = let (c, d) = (Map/get (Map/map (Map/map (Map/set (Map/set Map/empty 0 3) 1 4) 1 λa (+ a 1)) 1 λb (* b 2)) 1); let (e, *) = (Map/get d 0); ((λf (+ f 1) 1), c, e)
 
-Map/Node: ∀T (T -> ((Map T) -> ((Map T) -> (Map T))))
+Map/Node: (a -> (Map a) -> (Map a) -> (Map a))
 (Map/Node) = λa λb λc λd (d Map/Node/tag a b c)
 
-Map/Leaf: ∀T (Map T)
+Map/Leaf: (Map a)
 (Map/Leaf) = λa (a Map/Leaf/tag)
 
 Map/Node/tag: u24
@@ -45,7 +48,7 @@ Map/get__C4: _
 (Map/get__C4) = λa λb λc λd let {e f} = d; (switch (== 0 e) { 0: Map/get__C2; _: Map/get__C3; } f a b c)
 
 Map/get__C5: _
-(Map/get__C5) = λa switch a { 0: Map/get__C4; _: λ* λ* (*, Map/Leaf); }
+(Map/get__C5) = λa switch a { 0: Map/get__C4; _: λ* λ* (unreachable, Map/Leaf); }
 
 Map/map__C0: _
 (Map/map__C0) = λa λb λc λd λe (Map/Node c (Map/map d (/ a 2) b) e)
@@ -81,10 +84,10 @@ Map/set__C3: _
 (Map/set__C3) = λ* λ* λa λ* λb λc (Map/Node a b c)
 
 Map/set__C4: _
-(Map/set__C4) = λa λb (Map/Node * (Map/set Map/Leaf (/ a 2) b) Map/Leaf)
+(Map/set__C4) = λa λb (Map/Node unreachable (Map/set Map/Leaf (/ a 2) b) Map/Leaf)
 
 Map/set__C5: _
-(Map/set__C5) = λ* λa λb (Map/Node * Map/Leaf (Map/set Map/Leaf (/ a 2) b))
+(Map/set__C5) = λ* λa λb (Map/Node unreachable Map/Leaf (Map/set Map/Leaf (/ a 2) b))
 
 Map/set__C6: _
 (Map/set__C6) = λa let {b c} = a; λd (switch (% b 2) { 0: Map/set__C4; _: Map/set__C5; } c d)

@@ -3,23 +3,23 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/adt_tup_era.bend
 ---
 Scott
-Foo: Any
+unchecked Foo: Any
 (Foo) = λa (a λb λc (b λd λ* λ* d c))
 
-Main: Any
+unchecked Main: Any
 (Main) = (Foo (Tuple/Pair 1 5))
 
-Tuple/Pair: (Any -> (Any -> Tuple))
+Tuple/Pair: (Any -> Any -> Tuple)
 (Tuple/Pair) = λa λb λc (c a b)
 
 NumScott
-Foo: Any
+unchecked Foo: Any
 (Foo) = λa (a λb switch b { 0: λc λd (c λe switch e { 0: λf λ* λ* f; _: *; } d); _: *; })
 
-Main: Any
+unchecked Main: Any
 (Main) = (Foo (Tuple/Pair 1 5))
 
-Tuple/Pair: (Any -> (Any -> Tuple))
+Tuple/Pair: (Any -> Any -> Tuple)
 (Tuple/Pair) = λa λb λc (c Tuple/Pair/tag a b)
 
 Tuple/Pair/tag: u24

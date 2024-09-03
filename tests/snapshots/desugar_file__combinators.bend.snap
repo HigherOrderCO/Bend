@@ -2,43 +2,43 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/combinators.bend
 ---
-foo: Any
+unchecked foo: Any
 (foo) = λa λ* λ* (foo a)
 
-bar: Any
+unchecked bar: Any
 (bar) = λa λb (a bar b)
 
-List/ignore: Any
+unchecked List/ignore: Any
 (List/ignore) = λa λ* (a List/ignore__C1)
 
-baz: Any
+unchecked baz: Any
 (baz) = {0 1 2 3 λa a foo}
 
-qux: Any
+unchecked qux: Any
 (qux) = {0 qux}
 
-clax: Any
+unchecked clax: Any
 (clax) = (λa a clax__C0)
 
-tup: Any
+unchecked tup: Any
 (tup) = (tup, 1, 0)
 
-list: Any
+unchecked list: Any
 (list) = (List/Cons 0 list__C0)
 
-A: Any
+unchecked A: Any
 (A) = λa (A__C0 a)
 
-B: Any
+unchecked B: Any
 (B) = λa (B__C0 a)
 
-Main: Any
-(Main) = (List/Cons 0 list__C0)
+unchecked Main: Any
+(Main) = (List/Cons 0 (List/Cons list List/Nil))
 
-List/Nil: ∀t (List t)
+List/Nil: (List a)
 (List/Nil) = λa (a List/Nil/tag)
 
-List/Cons: ∀t (u24 -> ((List t) -> (List t)))
+List/Cons: (a -> (List a) -> (List a))
 (List/Cons) = λa λb λc (c List/Cons/tag a b)
 
 List/Nil/tag: u24
@@ -47,20 +47,20 @@ List/Nil/tag: u24
 List/Cons/tag: u24
 (List/Cons/tag) = 1
 
-A__C0: _
+unchecked A__C0: _
 (A__C0) = let {a b} = A; λc (a b c)
 
-B__C0: _
+unchecked B__C0: _
 (B__C0) = let (a, b) = B; λc (a b c)
 
-List/ignore__C0: _
+unchecked List/ignore__C0: _
 (List/ignore__C0) = λ* λ* λa (List/ignore a List/ignore)
 
-List/ignore__C1: _
+unchecked List/ignore__C1: _
 (List/ignore__C1) = λa switch a { 0: 0; _: List/ignore__C0; }
 
-clax__C0: _
+unchecked clax__C0: _
 (clax__C0) = λ* λ* λ* λa (clax a)
 
-list__C0: _
+unchecked list__C0: _
 (list__C0) = (List/Cons list List/Nil)

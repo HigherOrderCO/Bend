@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_lambda.bend
 ---
 Scott
-main: Any
+unchecked main: Any
 (main) = (Maybe/Some 1 λ$x * λa a $x)
 
 Maybe/None: Maybe
@@ -13,7 +13,7 @@ Maybe/Some: (Any -> Maybe)
 (Maybe/Some) = λa λ* λc (c a)
 
 NumScott
-main: Any
+unchecked main: Any
 (main) = (Maybe/Some 1 λa switch a { 0: λ$x *; _: λ* λb b; } $x)
 
 Maybe/None: Maybe
