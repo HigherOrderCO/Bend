@@ -35,7 +35,11 @@ impl Term {
   /// Checks that all variables are bound.
   /// Precondition: References have been resolved, implicit binds have been solved.
 
-  pub fn check_unbound_vars<'a>(&'a mut self, scope: &mut Vec<Option<&'a Name>>, errs: &mut Vec<UnboundVarErr>) {
+  pub fn check_unbound_vars<'a>(
+    &'a mut self,
+    scope: &mut Vec<Option<&'a Name>>,
+    errs: &mut Vec<UnboundVarErr>,
+  ) {
     let mut globals = HashMap::new();
     check_uses(self, scope, &mut globals, errs);
 

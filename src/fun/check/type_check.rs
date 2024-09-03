@@ -280,21 +280,18 @@ fn infer_book(book: &Book, diags: &mut Diagnostics) -> Result<ProgramTypes, Diag
   // Add the constructors to the environment.
   for adt in book.adts.values() {
     for ctr in adt.ctrs.values() {
-      let scheme = ctr.typ.generalize(&TypeEnv::default());
-      types.insert(ctr.name.clone(), scheme);
+      types.insert(ctr.name.clone(), ctr.typ.generalize(&TypeEnv::default()));
     }
   }
   // Add the types of unchecked functions to the environment.
   for def in book.defs.values() {
     if !def.check {
-      let scheme = def.typ.generalize(&TypeEnv::default());
-      types.insert(def.name.clone(), scheme);
+      types.insert(def.name.clone(), def.typ.generalize(&TypeEnv::default()));
     }
   }
   // Add the types of hvm functions to the environment.
   for def in book.hvm_defs.values() {
-    let scheme = def.typ.generalize(&TypeEnv::default());
-    types.insert(def.name.clone(), scheme);
+    types.insert(def.name.clone(), def.typ.generalize(&TypeEnv::default()));
   }
 
   // Infer the types of regular functions.
@@ -356,8 +353,7 @@ fn infer_group(
       diags.add_function_error(e, name.clone(), book.defs[name].source.clone());
       std::mem::take(diags)
     })?;
-    let scheme = t.generalize(&TypeEnv::default());
-    types.insert(name.clone(), scheme);
+    types.insert(name.clone(), t.generalize(&TypeEnv::default()));
   }
 
   diags.fatal(())

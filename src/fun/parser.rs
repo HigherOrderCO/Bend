@@ -460,6 +460,10 @@ impl<'a> FunParser<'a> {
     let ini_idx = *self.index();
     self.skip_trivia();
     let res = self.parse_rule_lhs();
+    if !self.try_consume("=") {
+      self.index = ini_idx;
+      return false;
+    }
     self.index = ini_idx;
     if let Ok((name, _)) = res {
       if &name == expected_name {
@@ -1246,9 +1250,7 @@ pub fn is_num_char(c: char) -> bool {
 }
 
 pub fn make_fn_type(args: Vec<Type>, ret: Type) -> Type {
-  let typ = ret;
-  let typ = args.into_iter().rfold(typ, |acc, typ| Type::Arr(Box::new(typ), Box::new(acc)));
-  typ
+  args.into_iter().rfold(ret, |acc, typ| Type::Arr(Box::new(typ), Box::new(acc)))
 }
 
 pub fn make_ctr_type(type_name: Name, fields: &[Type], vars: &[Name]) -> Type {
@@ -1284,17 +1286,6 @@ impl Indent {
 impl<'a> ParserCommons<'a> for FunParser<'a> {}
 
 pub trait ParserCommons<'a>: Parser<'a> {
-  /// Generates an error message that does not print expected terms.
-  fn expected_message<T>(&mut self, msg: &str) -> ParseResult<T> {
-    let ini_idx = *self.index();
-    let end_idx = *self.index() + 1;
-
-    let is_eof = self.is_eof();
-    let detected = DisplayFn(|f| if is_eof { write!(f, " end of input") } else { Ok(()) });
-    let msg = format!("\x1b[1m- information:\x1b[0m {}\n\x1b[1m- location:\x1b[0m{}", msg, detected);
-    self.with_ctx(Err(msg), ini_idx..end_idx)
-  }
-
   fn labelled<T>(&mut self, parser: impl Fn(&mut Self) -> ParseResult<T>, label: &str) -> ParseResult<T> {
     match parser(self) {
       Ok(val) => Ok(val),
@@ -1457,10 +1448,13 @@ pub trait ParserCommons<'a>: Parser<'a> {
     self.with_ctx(Err(msg), span)
   }
 
+  /// If the parser result is an error, adds code location information to the error message.
   fn with_ctx<T>(&mut self, res: Result<T, impl std::fmt::Display>, span: Range<usize>) -> ParseResult<T> {
     res.map_err(|msg| {
       let ctx = highlight_error(span.start, span.end, self.input());
-      let msg = format!("{msg}\n{ctx}");
+      let is_eof = self.is_eof();
+      let eof_msg = if is_eof { " end of input" } else { "" };
+      let msg = format!("{msg}\nLocation:{eof_msg}\n{ctx}");
       ParseError::new((span.start, span.end), msg)
     })
   }
