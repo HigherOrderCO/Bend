@@ -329,7 +329,7 @@ impl OptLevel {
   }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CompilerTarget {
   C,
   Cuda,
