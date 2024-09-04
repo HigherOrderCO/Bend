@@ -1242,6 +1242,7 @@ impl<'a> ImpParser<'a> {
     } else {
       (false, false)
     };
+    self.skip_trivia_inline()?;
 
     let name = self.parse_top_level_name()?;
     self.skip_trivia_inline()?;
