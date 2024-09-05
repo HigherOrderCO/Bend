@@ -199,7 +199,7 @@ impl<'a> ImpParser<'a> {
         }
       }
       let names = self.list_like(|p| parse_lam_var(p), "", ":", ",", false, 1)?;
-      let bod = self.parse_expr(inline, true)?;
+      let bod = self.parse_expr(inline, false)?;
       Ok(Expr::Lam { names, bod: Box::new(bod) })
     } else if self.starts_with("(") {
       self.advance_one();

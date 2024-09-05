@@ -1,0 +1,2 @@
+gen-hvm
+tests/golden_tests/cli/gen_hvm_no_eta_by_default.bend

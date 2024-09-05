@@ -1,0 +1,14 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/cli/gen_hvm_no_eta_by_default.bend
+---
+@main = a
+  & @make_10 ~ (1 a)
+
+@make_10 = (a b)
+  & @make_list ~ (10 (a b))
+
+@make_list = (?(((* (a a)) @make_list__C0) (b c)) (b c))
+
+@make_list__C0 = (b ({a c} ((a (d e)) e)))
+  & @make_list ~ (b (c d))

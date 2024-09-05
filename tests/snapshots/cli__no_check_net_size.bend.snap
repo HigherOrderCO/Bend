@@ -17,10 +17,10 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 @Gen = (a b)
   & @Gen.go ~ (a (0 b))
 
-@Gen.go = (?((@Gen.go__C0 @Gen.go__C1) a) a)
+@Gen.go = (?((@Gen.go__C0 @Gen.go__C1) (a b)) (a b))
 
-@Gen.go__C0 = a
-  & @Arr/Leaf ~ a
+@Gen.go__C0 = (a b)
+  & @Arr/Leaf ~ (a b)
 
 @Gen.go__C1 = ({a d} ({$([*0x0000002] $([|0x0000001] e)) $([*0x0000002] b)} g))
   & @Arr/Node ~ (c (f g))
@@ -39,10 +39,10 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @Map_/Used/tag = 1
 
-@Merge = ((@Merge__C13 a) a)
+@Merge = ((@Merge__C13 (a b)) (a b))
 
-@Merge__C0 = (* a)
-  & @Map_/Both ~ a
+@Merge__C0 = (* (a (b c)))
+  & @Map_/Both ~ (a (b c))
 
 @Merge__C1 = (?((@Map_/Used @Merge__C0) a) a)
 
@@ -56,7 +56,7 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @Merge__C2 = (?((@Map_/Free @Merge__C1) a) a)
 
-@Merge__C3 = (?((@Map_/Used *) a) a)
+@Merge__C3 = (?((@Map_/Used (* (* (* *)))) a) a)
 
 @Merge__C4 = (?((@Map_/Used @Merge__C3) a) a)
 
@@ -65,10 +65,10 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
   &!@Merge ~ (a (b c))
   &!@Merge ~ (d (e f))
 
-@Merge__C6 = a
-  & @Map_/Both ~ a
+@Merge__C6 = (a (b c))
+  & @Map_/Both ~ (a (b c))
 
-@Merge__C7 = (?((* @Merge__C5) a) a)
+@Merge__C7 = (?(((* (* *)) @Merge__C5) a) a)
 
 @Merge__C8 = (?((@Merge__C6 @Merge__C7) a) a)
 
@@ -102,8 +102,8 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @Reverse = ((@Reverse__C3 a) a)
 
-@Reverse__C0 = a
-  & @Arr/Leaf ~ a
+@Reverse__C0 = (a b)
+  & @Arr/Leaf ~ (a b)
 
 @Reverse__C1 = (* (c (a e)))
   & @Arr/Node ~ (b (d e))
@@ -128,18 +128,18 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @Sum__C2 = (?((0 @Sum__C1) a) a)
 
-@Swap = (?((@Swap__C0 @Swap__C1) a) a)
+@Swap = (?((@Swap__C0 @Swap__C1) (a (b c))) (a (b c)))
 
-@Swap__C0 = a
-  & @Map_/Both ~ a
+@Swap__C0 = (a (b c))
+  & @Map_/Both ~ (a (b c))
 
 @Swap__C1 = (* (b (a c)))
   & @Map_/Both ~ (a (b c))
 
 @ToArr = (a ((@ToArr__C3 (a b)) b))
 
-@ToArr__C0 = a
-  & @Arr/Leaf ~ a
+@ToArr__C0 = (a b)
+  & @Arr/Leaf ~ (a b)
 
 @ToArr__C1 = (* (b (e ({$([*0x0000002] $([+0x0000001] d)) $([*0x0000002] $([+0x0000000] a))} g))))
   & @Arr/Node ~ (c (f g))
@@ -152,8 +152,8 @@ input_file: tests/golden_tests/cli/no_check_net_size.bend
 
 @ToMap = ((@ToMap__C3 a) a)
 
-@ToMap__C0 = a
-  & @Radix ~ a
+@ToMap__C0 = (a b)
+  & @Radix ~ (a b)
 
 @ToMap__C1 = (* (a (c e)))
   & @Merge ~ (b (d e))

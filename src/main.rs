@@ -195,6 +195,9 @@ pub enum OptArgs {
 fn compile_opts_from_cli(args: &Vec<OptArgs>, compiler_target: CompilerTarget) -> CompileOpts {
   use OptArgs::*;
   let mut opts = CompileOpts { target_architecture: compiler_target, ..CompileOpts::default() };
+  if opts.target_architecture != CompilerTarget::C {
+    opts.eta = false;
+  }
 
   for arg in args {
     match arg {

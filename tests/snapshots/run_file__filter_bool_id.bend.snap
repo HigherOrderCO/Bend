@@ -1,0 +1,9 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/filter_bool_id.bend
+---
+NumScott:
+[Bool/T]
+
+Scott:
+[Bool/T]
