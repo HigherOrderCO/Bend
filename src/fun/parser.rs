@@ -1377,7 +1377,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     while let Some(c) = self.peek_one() {
       if c == '\t' {
         let idx = *self.index();
-        return self.err_msg_spanned("Tabs are not accepted for indentation.", idx..idx+1);
+        return self.err_msg_spanned("Tabs are not accepted for indentation.", idx..idx + 1);
       }
       if " ".contains(c) {
         self.advance_one();

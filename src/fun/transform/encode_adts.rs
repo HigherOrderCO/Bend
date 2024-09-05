@@ -73,6 +73,7 @@ fn encode_ctr_num_scott<'a>(ctr_args: impl DoubleEndedIterator<Item = &'a Name> 
 
 fn make_tag_def(ctr_idx: usize, tag: &Name, source: Source) -> Definition {
   let rules = vec![Rule { pats: vec![], body: Term::Num { val: Num::U24(ctr_idx as u32) } }];
-  let source = Source { kind: SourceKind::Generated, ..source };
+  let kind = if source.is_builtin() { SourceKind::Builtin } else { SourceKind::Generated };
+  let source = Source { kind, ..source };
   Definition { name: tag.clone(), typ: Type::U24, check: true, rules, source }
 }

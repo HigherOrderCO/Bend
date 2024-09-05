@@ -32,11 +32,6 @@ impl Term {
       if let Term::With { typ, bod } = self {
         bod.desugar_with_blocks(Some(typ), def_names)?;
         let wrap_ref = Term::r#ref(&format!("{typ}/wrap"));
-        // let wrap_ref = if def_names.contains(&wrap_nam) {
-        //   Term::r#ref(&wrap_nam)
-        // } else {
-        //   return Err(format!("Could not find definition {wrap_nam} for type {typ}"));
-        // };
         *self = Term::Use { nam: Some(Name::new("wrap")), val: Box::new(wrap_ref), nxt: std::mem::take(bod) };
       }
 

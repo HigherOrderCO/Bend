@@ -1,7 +1,9 @@
 use super::{BindMap, ImportsMap, PackageLoader};
 use crate::{
   diagnostics::{Diagnostics, DiagnosticsConfig},
-  fun::{parser::ParseBook, Adt, Book, Definition, HvmDefinition, Name, Rule, Source, SourceKind, Term},
+  fun::{
+    parser::ParseBook, Adt, AdtCtr, Book, Definition, HvmDefinition, Name, Rule, Source, SourceKind, Term,
+  },
   imp::{self, Expr, MatchArm, Stmt},
   imports::packages::Packages,
   maybe_grow,
@@ -115,7 +117,7 @@ impl ParseBook {
     // Can not be done outside the function because of the borrow checker.
     // Just serves to pass only the import map of the first call to `apply_imports_go`.
     let main_imports = main_imports.unwrap_or(&self.import_ctx.map);
-
+    Debug
     let mut local_imports = BindMap::new();
     let mut adt_imports = BindMap::new();
 
@@ -154,7 +156,7 @@ impl ParseBook {
 
     for (_, def) in self.local_defs_mut() {
       def.apply_binds(true, &local_imports);
-      def.apply_type_binds(&local_imports);
+      def.apply_type_binds(&adt_imports);
     }
   }
 
@@ -179,8 +181,8 @@ impl ParseBook {
         let mangle_name = !main_imports.contains_source(&name);
         let mut mangle_adt_name = mangle_name;
 
-        for (ctr, f) in std::mem::take(&mut adt.ctrs) {
-          let mut ctr_name = Name::new(format!("{}/{}", src, ctr));
+        for (old_nam, ctr) in std::mem::take(&mut adt.ctrs) {
+          let mut ctr_name = Name::new(format!("{}/{}", src, old_nam));
 
           let mangle_ctr = mangle_name && !main_imports.contains_source(&ctr_name);
 
@@ -189,9 +191,10 @@ impl ParseBook {
             ctr_name = Name::new(format!("__{}", ctr_name));
           }
 
+          let ctr = AdtCtr { name: ctr_name.clone(), ..ctr };
           new_ctrs.insert(ctr_name.clone(), name.clone());
-          ctrs_map.insert(ctr, ctr_name.clone());
-          adt.ctrs.insert(ctr_name, f);
+          ctrs_map.insert(old_nam, ctr_name.clone());
+          adt.ctrs.insert(ctr_name, ctr);
         }
 
         if mangle_adt_name {
@@ -213,12 +216,13 @@ impl ParseBook {
       }
     }
 
+    let adts_map = adts_map.into_iter().collect::<IndexMap<_, _>>();
     for (_, def) in self.local_defs_mut() {
       // Applies the binds for the new constructor names for every definition.
       def.apply_binds(true, &ctrs_map);
 
       // Apply the binds for the type constructors in the def types and in the `def` terms.
-      def.apply_type_binds(&ctrs_map);
+      def.apply_type_binds(&adts_map);
     }
 
     self.adts = new_adts;
@@ -257,7 +261,6 @@ impl ParseBook {
   }
 
   fn add_imported_adt(&mut self, nam: Name, adt: Adt, diag: &mut Diagnostics) {
-    eprintln!("Adding imported adt {}", nam);
     if self.adts.get(&nam).is_some() {
       let err = format!("The imported datatype '{nam}' conflicts with the datatype '{nam}'.");
       diag.add_book_error(err);
