@@ -310,8 +310,8 @@ def IO/nanosleep(hi_lo: (u24, u24)) -> IO(None):
 # Sleeps for a given amount of seconds as a float.
 def IO/sleep(seconds: f24) -> IO(None):
   nanos = seconds * 1_000_000_000.0
-  lo = f24_to_u24(nanos % 0x1_000_000.0)
-  hi = f24_to_u24(nanos / 0x1_000_000.0)
+  lo = f24/to_u24(nanos % 0x1_000_000.0)
+  hi = f24/to_u24(nanos / 0x1_000_000.0)
   return IO/nanosleep((hi, lo))
 
 ## File IO
@@ -398,7 +398,7 @@ def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result(L
           case Result/Ok:
             (line, rest) = res.val
             (length, *) = List/length(rest)
-            res_seek <- IO/FS/seek(fd, u24_to_i24(length) * -1, IO/FS/SEEK_CUR)
+            res_seek <- IO/FS/seek(fd, u24/to_i24(length) * -1, IO/FS/SEEK_CUR)
             match res_seek:
               case Result/Ok:
                 chunks = List/Cons(line, chunks)
@@ -521,29 +521,39 @@ def unreachable() -> Any:
 # Native number casts
 
 # Casts a f24 number to a u24.
-hvm f24_to_u24 -> (f24 -> u24):
+hvm f24/to_u24 -> (f24 -> u24):
   ($([u24] ret) ret)
 
 # Casts an i24 number to a u24.
-hvm i24_to_u24 -> (i24 -> u24):
+hvm i24/to_u24 -> (i24 -> u24):
   ($([u24] ret) ret)
 
 # Casts a u24 number to an i24.
-hvm u24_to_i24 -> (u24 -> i24):
+hvm u24/to_i24 -> (u24 -> i24):
   ($([i24] ret) ret)
 
 # Casts a f24 number to an i24.
-hvm f24_to_i24 -> (f24 -> i24):
+hvm f24/to_i24 -> (f24 -> i24):
   ($([i24] ret) ret)
 
 # Casts a u24 number to a f24.
-hvm u24_to_f24 -> (u24 -> f24):
+hvm u24/to_f24 -> (u24 -> f24):
   ($([f24] ret) ret)
 
 # Casts an i24 number to a f24.
-hvm i24_to_f24 -> (i24 -> f24):
+hvm i24/to_f24 -> (i24 -> f24):
   ($([f24] ret) ret)
 
+def u24/to_string(n: u24) -> String:
+  def go(n: u24) -> String -> String:
+    r = n % 10
+    d = n / 10
+    c = '0' + r
+    if d == 0:
+      return lambda t: String/Cons(c, t)
+    else:
+      return lambda t: go(d, String/Cons(c, t))
+  return go(n, String/Nil)
 
 # String Encoding and Decoding
 
@@ -738,7 +748,7 @@ Math/sqrt (n: f24) : f24 =
 
 # Round float up to the nearest integer.
 def Math/ceil(n: f24) -> f24:
-  i_n = i24_to_f24(f24_to_i24(n))
+  i_n = i24/to_f24(f24/to_i24(n))
   if n <= i_n:
     return i_n
   else:
@@ -746,7 +756,7 @@ def Math/ceil(n: f24) -> f24:
 
 # Round float down to the nearest integer.
 def Math/floor(n: f24) -> f24:
-  i_n = i24_to_f24(f24_to_i24(n))
+  i_n = i24/to_f24(f24/to_i24(n))
   if n < i_n:
     return i_n - 1.0
   else:
@@ -754,7 +764,7 @@ def Math/floor(n: f24) -> f24:
 
 # Round float to the nearest integer.
 def Math/round(n: f24) -> f24:
-  i_n = i24_to_f24(f24_to_i24(n))
+  i_n = i24/to_f24(f24/to_i24(n))
   if (n - i_n) < 0.5:
     return Math/floor(n)
   else:
