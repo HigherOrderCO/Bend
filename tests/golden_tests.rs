@@ -260,6 +260,7 @@ fn simplify_matches() {
     ctx.resolve_type_ctrs()?;
     ctx.desugar_match_defs()?;
     ctx.fix_match_terms()?;
+    ctx.book.lift_local_defs();
     ctx.desugar_bend()?;
     ctx.desugar_fold()?;
     ctx.desugar_with_blocks()?;
@@ -293,9 +294,9 @@ fn encode_pattern_match() {
       ctx.desugar_open()?;
       ctx.book.encode_builtins();
       ctx.resolve_refs()?;
-      ctx.resolve_type_ctrs()?;
       ctx.desugar_match_defs()?;
       ctx.fix_match_terms()?;
+      ctx.book.lift_local_defs();
       ctx.desugar_bend()?;
       ctx.desugar_fold()?;
       ctx.desugar_with_blocks()?;
