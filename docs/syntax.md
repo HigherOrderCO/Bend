@@ -10,6 +10,10 @@ Click [here](#import-syntax) to see the import syntax.
 
 Click [here](#comments) to see the syntax for commenting code.
 
+Click [here](#imp-type-syntax) to see the imperative type syntax.
+
+Click [here](#fun-type-syntax) to see the functional type syntax.
+
 Both syntaxes can be mixed in the same file like the example below:
 
 ```python
@@ -1337,4 +1341,239 @@ Multi-line commenting should also be used to document code.
 #}
 def second(x, y):
   return y
+```
+
+<div id="imp-type-syntax"></div>
+
+# Imp Type Syntax
+
+## Variable
+
+Any name represents a type variable.
+
+Used in generic or polymorphic type definitions.
+
+```python
+# T is a type variable
+type Option(T):
+  Some { value: T }
+  None
+
+# A is a type variable
+def id(x: A) -> A:
+  return x
+```
+
+## Constructor
+
+`Ctr(...)` represents a constructor type.
+
+Used for defining custom data types or algebraic data types.
+Can contain other types as parameters.
+
+```python
+def head(list: List(T)) -> Option(T)
+  match list:
+    case List/Nil:
+      return Option/None
+    case List/Cons:
+      return Option/Some(list.head)
+```
+
+## Any
+
+`Any` represents any type.
+
+Can be used when the specific type is unknown or doesn't matter.
+
+```python
+def main -> Any:
+  return lambda x: x
+```
+
+## None
+
+`None` represents an eraser or absence of a value.
+
+Often used to indicate that a function doesn't return anything.
+
+```python
+def none -> None:
+  return *
+```
+
+## Hole
+
+`_` represents a hole type.
+
+Can be used to represent/infer any type in the current context.
+
+```python
+def increment(x: _) -> _:
+  return x + 1
+```
+
+## u24
+
+`u24` represents an unsigned 24-bit integer.
+
+```python
+def zero -> u24:
+  return 0
+```
+
+## i24
+
+`i24` represents a signed 24-bit integer.
+
+```python
+def random_integer -> i24:
+  return -42
+```
+
+## f24
+
+`f24` represents a 24-bit floating-point number.
+
+```python
+def PI -> f24:
+  return 3.14
+```
+
+## Tuple
+
+`(_, _, ...)` represents a tuple type.
+
+Can contain two or more types separated by commas.
+
+```python
+def make_tuple(fst: A, snd: B) -> (A, B):
+  return (fst, snd)
+```
+
+## Function
+
+`a -> b` represents a function type.
+
+`a` is the input type, and `b` is the output type.
+
+```python
+def apply(f: A -> B, arg: A) -> B:
+  return f(arg)
+```
+
+<div id="fun-type-syntax"></div>
+
+# Fun Type Syntax
+
+## Variable
+
+Any name represents a type variable.
+
+Used in generic or polymorphic type definitions.
+
+```python
+# T is a type variable
+type (Option T)
+  = (Some T)
+  | None
+
+# A is a type variable
+id : A -> A
+id x = x
+```
+
+## Constructor
+
+`(Ctr ...)` represents a constructor type.
+
+Used for defining custom data types or algebraic data types.
+Can contain other types as parameters.
+
+```python
+head : (List T) -> (Option T)
+head [] = Option/None
+head (List/Cons head _) = (Option/Some head)
+```
+
+## Any
+
+`Any` represents any type.
+
+Can be used when the specific type is unknown or doesn't matter.
+
+```python
+main : Any
+main = @x x
+```
+
+## None
+
+`None` represents an eraser or absence of a value.
+
+Often used to indicate that a function doesn't return anything.
+
+```python
+none : None
+none = *
+```
+
+## Hole
+
+`_` represents a hole type.
+
+Can be used to represent/infer any type in the current context.
+
+```python
+increment : _ -> _
+increment x = (+ x 1)
+```
+
+## u24
+
+`u24` represents an unsigned 24-bit integer.
+
+```python
+zero : u24
+zero = 0
+```
+
+## i24
+
+`i24` represents a signed 24-bit integer.
+
+```python
+random_integer : i24
+random_integer = -24
+```
+
+## f24
+
+`f24` represents a 24-bit floating-point number.
+
+```python
+PI : f24
+PI = 3.14
+```
+
+## Tuple
+
+`(_, _, ...)` represents a tuple type.
+
+Can contain two or more types separated by commas.
+
+```python
+make_tuple : A -> B -> (A, B)
+make_tuple fst snd = (fst, snd)
+```
+
+## Function
+
+`a -> b` represents a function type.
+
+`a` is the input type, and `b` is the output type.
+
+```python
+apply : (A -> B) -> A -> B
+apply f arg = (f arg)
 ```
