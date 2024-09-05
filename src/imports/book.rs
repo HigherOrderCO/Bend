@@ -117,7 +117,6 @@ impl ParseBook {
     // Can not be done outside the function because of the borrow checker.
     // Just serves to pass only the import map of the first call to `apply_imports_go`.
     let main_imports = main_imports.unwrap_or(&self.import_ctx.map);
-    Debug
     let mut local_imports = BindMap::new();
     let mut adt_imports = BindMap::new();
 
