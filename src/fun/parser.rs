@@ -948,16 +948,15 @@ impl<'a> FunParser<'a> {
       && !self.peek_many(2).is_some_and(|x| x.chars().nth(1).unwrap().is_ascii_digit())
     {
       let msg = "Tagged terms not supported for hvm32.".to_string();
-      return self.with_ctx(Err(msg), index..index + 1);
+      return self.err_msg_spanned(&msg, index..index + 1);
     } else {
       None
     };
     let end_index = self.index;
-    let has_tag = tag.is_some();
-    Ok((tag, move |slf: &mut Self| {
-      if has_tag {
-        let msg = "\x1b[1m- unexpected tag:\x1b[0m".to_string();
-        slf.with_ctx(Err(msg), index..end_index)
+    Ok((tag.clone(), move |slf: &mut Self| {
+      if let Some(tag) = tag {
+        let msg = format!("Unexpected tag '{tag}'");
+        slf.err_msg_spanned(&msg, index..end_index)
       } else {
         Ok(())
       }
@@ -1113,13 +1112,13 @@ impl<'a> FunParser<'a> {
     for ctr in adt.ctrs.keys() {
       if let Some(builtin) = book.contains_builtin_def(ctr) {
         let msg = FunParser::redefinition_of_function_msg(builtin, ctr);
-        return self.with_ctx(Err(msg), span);
+        return self.err_msg_spanned(&msg, span);
       }
       match book.ctrs.entry(ctr.clone()) {
         indexmap::map::Entry::Vacant(e) => _ = e.insert(adt.name.clone()),
         indexmap::map::Entry::Occupied(e) => {
           let msg = FunParser::redefinition_of_constructor_msg(e.key());
-          return self.with_ctx(Err(msg), span);
+          return self.err_msg_spanned(&msg, span);
         }
       }
     }
@@ -1135,15 +1134,15 @@ impl<'a> FunParser<'a> {
   ) -> ParseResult<()> {
     if let Some(builtin) = book.contains_builtin_def(name) {
       let msg = Self::redefinition_of_function_msg(builtin, name);
-      return self.with_ctx(Err(msg), span);
+      return self.err_msg_spanned(&msg, span);
     }
     if book.ctrs.contains_key(name) {
       let msg = Self::redefinition_of_constructor_msg(name);
-      return self.with_ctx(Err(msg), span);
+      return self.err_msg_spanned(&msg, span);
     }
     if book.hvm_defs.contains_key(name) {
       let msg = Self::redefinition_of_hvm_msg(false, name);
-      return self.with_ctx(Err(msg), span);
+      return self.err_msg_spanned(&msg, span);
     }
     Ok(())
   }
@@ -1156,7 +1155,7 @@ impl<'a> FunParser<'a> {
   ) -> ParseResult<()> {
     if book.adts.contains_key(name) {
       let msg = Self::redefinition_of_type_msg(name);
-      return self.with_ctx(Err(msg), span);
+      return self.err_msg_spanned(&msg, span);
     }
     Ok(())
   }
@@ -1303,10 +1302,10 @@ pub trait ParserCommons<'a>: Parser<'a> {
     let end_idx = *self.index();
     if name.contains("__") {
       let msg = format!("{kind} names are not allowed to contain \"__\".");
-      self.with_ctx(Err(msg), ini_idx..end_idx)
+      self.err_msg_spanned(&msg, ini_idx..end_idx)
     } else if name.starts_with("//") {
       let msg = format!("{kind} names are not allowed to start with \"//\".");
-      self.with_ctx(Err(msg), ini_idx..end_idx)
+      self.err_msg_spanned(&msg, ini_idx..end_idx)
     } else {
       Ok(name)
     }
@@ -1378,7 +1377,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     while let Some(c) = self.peek_one() {
       if c == '\t' {
         let idx = *self.index();
-        return self.with_ctx(Err("Tabs are not accepted for indentation.".to_string()), idx..idx);
+        return self.err_msg_spanned("Tabs are not accepted for indentation.", idx..idx+1);
       }
       if " ".contains(c) {
         self.advance_one();
@@ -1449,12 +1448,18 @@ pub trait ParserCommons<'a>: Parser<'a> {
   }
 
   /// If the parser result is an error, adds code location information to the error message.
+  fn err_msg_spanned<T>(&mut self, msg: &str, span: Range<usize>) -> ParseResult<T> {
+    let is_eof = self.is_eof();
+    let eof_msg = if is_eof { " end of input" } else { "" };
+    let msg = format!("{msg}\nLocation:{eof_msg}");
+    self.with_ctx(Err(msg), span)
+  }
+
+  /// If the parser result is an error, adds highlighted code context to the message.
   fn with_ctx<T>(&mut self, res: Result<T, impl std::fmt::Display>, span: Range<usize>) -> ParseResult<T> {
     res.map_err(|msg| {
       let ctx = highlight_error(span.start, span.end, self.input());
-      let is_eof = self.is_eof();
-      let eof_msg = if is_eof { " end of input" } else { "" };
-      let msg = format!("{msg}\nLocation:{eof_msg}\n{ctx}");
+      let msg = format!("{msg}\n{ctx}");
       ParseError::new((span.start, span.end), msg)
     })
   }
@@ -1731,7 +1736,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
   fn num_range_err<T>(&mut self, ini_idx: usize, typ: &str) -> ParseResult<T> {
     let msg = format!("\x1b[1mNumber literal outside of range for {}.\x1b[0m", typ);
     let end_idx = *self.index();
-    self.with_ctx(Err(msg), ini_idx..end_idx)
+    self.err_msg_spanned(&msg, ini_idx..end_idx)
   }
 
   /// Parses up to 4 base64 characters surrounded by "`".
@@ -1771,7 +1776,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
       let field = &fields[i];
       if fields.iter().skip(i + 1).any(|a: &CtrField| a.nam == field.nam) {
         let msg = format!("Found a repeated field '{}' in constructor {}.", field.nam, ctr_name);
-        return self.with_ctx(Err(msg), span);
+        return self.err_msg_spanned(&msg, span);
       }
     }
     Ok(())
