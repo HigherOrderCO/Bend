@@ -18,6 +18,7 @@ and this project does not currently adhere to a particular versioning scheme.
 - Fix imported constructors not being updated to Constructor expression. ([#674][gh-674])
 - Fix parse error on parenthesized eraser. ([#675][gh-675])
 - Fix IO/FS/read_line when the line ends with a EOF. ([#638][gh-638])
+- Fix lambda body being parsed as tuple in imp syntax. ([#706][gh-706])
 
 ### Added
 
@@ -419,6 +420,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-621]: https://github.com/HigherOrderCO/Bend/issues/621
 [gh-623]: https://github.com/HigherOrderCO/Bend/issues/623
 [gh-629]: https://github.com/HigherOrderCO/Bend/issues/629
+[gh-638]: https://github.com/HigherOrderCO/Bend/issues/638
 [gh-642]: https://github.com/HigherOrderCO/Bend/issues/642
 [gh-643]: https://github.com/HigherOrderCO/Bend/issues/643
 [gh-648]: https://github.com/HigherOrderCO/Bend/issues/648
@@ -427,5 +429,5 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-673]: https://github.com/HigherOrderCO/Bend/pull/673
 [gh-674]: https://github.com/HigherOrderCO/Bend/issues/674
 [gh-675]: https://github.com/HigherOrderCO/Bend/issues/675
-[gh-638]: https://github.com/HigherOrderCO/Bend/issues/638
+[gh-706]: https://github.com/HigherOrderCO/Bend/issues/706
 [Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
