@@ -5,4 +5,5 @@ input_file: tests/golden_tests/compile_file/top_level_name_slashslash.bend
 [4m[1m[31mErrors:[0m
 [1mIn [4mtests/golden_tests/compile_file/top_level_name_slashslash.bend[0m[1m :[0m
 Top-level names are not allowed to start with "//".
+Location:
 [0m  4 | def [4m[31m//thisshouldfail[0m():[0m

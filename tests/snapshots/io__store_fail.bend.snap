@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/io/store_fail.bend
 ---
 Strict mode:
-λa (a Result/Err/tag λb (b 2 +2))
+λa (a IO/Done/tag IO/MAGIC λb (b Result/Err/tag +2))

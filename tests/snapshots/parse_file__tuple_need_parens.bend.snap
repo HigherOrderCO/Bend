@@ -2,8 +2,17 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/tuple_need_parens.bend
 ---
-[4m[1m[31mErrors:[0m
-[1mIn [4mtests/golden_tests/parse_file/tuple_need_parens.bend[0m[1m :[0m
-[1m- expected:[0m ':'
-[1m- detected:[0m
-[0m  2 |   if 1[4m[31m,[0m 2:[0m
+unchecked main: Any
+(main) = switch %pred = (1, 2) { 0: (String/Cons 104 (String/Cons 109 (String/Cons 109 (String/Cons 109 String/Nil)))); _ %pred-1: (String/Cons 110 (String/Cons 111 (String/Cons 116 String/Nil))); }
+
+String/Nil: String
+(String/Nil) = λ%x (%x String/Nil/tag)
+
+String/Cons: (u24 -> String -> String)
+(String/Cons) = λhead λtail λ%x (%x String/Cons/tag head tail)
+
+String/Nil/tag: u24
+(String/Nil/tag) = 0
+
+String/Cons/tag: u24
+(String/Cons/tag) = 1

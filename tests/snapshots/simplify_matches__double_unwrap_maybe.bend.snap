@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/double_unwrap_maybe.bend
 ---
-DoubleUnwrap: Any
+unchecked DoubleUnwrap: Any
 (DoubleUnwrap) = λa match a { Maybe/Some b: match b { Maybe/Some c: λd let e = d; let f = e; c; Maybe/None: λg let h = g; let i = h; i; }; Maybe/None: λj let k = j; k; }
 
-Main: Any
+unchecked Main: Any
 (Main) = (DoubleUnwrap (Maybe/Some Maybe/None) 5)
 
 Maybe/Some: (Any -> Maybe)

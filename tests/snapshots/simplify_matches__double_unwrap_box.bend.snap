@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/double_unwrap_box.bend
 ---
-DoubleUnbox: Any
+unchecked DoubleUnbox: Any
 (DoubleUnbox) = λa match a { Boxed/Box b: match b { Boxed/Box c: λd let e = d; let f = e; c; }; }
 
-Main: Any
+unchecked Main: Any
 (Main) = (DoubleUnbox (Boxed/Box (Boxed/Box 0)) 5)
 
 Boxed/Box: (Any -> Boxed)

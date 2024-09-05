@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/io/store.bend
 ---
 Strict mode:
-λa (a Result/Ok/tag [40, 77, 97, 105, 110, 41, 32, 61, 32, 48])
+λa (a IO/Done/tag IO/MAGIC λb (b Result/Ok/tag *))

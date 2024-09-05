@@ -4,7 +4,6 @@ input_file: tests/golden_tests/parse_file/repeated_datatype_name.bend
 ---
 [4m[1m[31mErrors:[0m
 [1mIn [4mtests/golden_tests/parse_file/repeated_datatype_name.bend[0m[1m :[0m
-[1m- information:[0m Found a repeated field 'Expr' in constructor Expr/Plus.
-[1m- location:[0m
-[0m  3 |   | (Plus Expr Expr)[4m[31m 
-[0m
+Found a repeated field 'Expr' in constructor Expr/Plus.
+Location:
+[0m  3 |   | [4m[31m(Plus Expr Expr)[0m

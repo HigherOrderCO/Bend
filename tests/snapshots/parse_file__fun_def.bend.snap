@@ -2,5 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/fun_def.bend
 ---
-main: Any
+unchecked main: Any
 (main) = let base = 0; def (aux (List/Nil)) = base(aux (List/Cons head tail)) = (+ head (aux tail))(aux (List/Cons 1 (List/Cons 2 (List/Cons 3 List/Nil))))

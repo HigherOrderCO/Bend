@@ -2,10 +2,10 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/nested.bend
 ---
-Rule: Any
+unchecked Rule: Any
 (Rule) = λa match a { Foo/CtrA b c: (match c { Bar/CtrB1 d: λe (e d); Bar/CtrB2 f g: λh (match f { Baz/CtrC: λi λj (i j); } h g); } b); Foo/CtrB k: k; }
 
-Foo/CtrA: (Any -> (Any -> Foo))
+Foo/CtrA: (Any -> Any -> Foo)
 (Foo/CtrA) = λa λb λc (c Foo/CtrA/tag a b)
 
 Foo/CtrB: (Any -> Foo)
@@ -14,7 +14,7 @@ Foo/CtrB: (Any -> Foo)
 Bar/CtrB1: (Any -> Bar)
 (Bar/CtrB1) = λa λb (b Bar/CtrB1/tag a)
 
-Bar/CtrB2: (Any -> (Any -> Bar))
+Bar/CtrB2: (Any -> Any -> Bar)
 (Bar/CtrB2) = λa λb λc (c Bar/CtrB2/tag a b)
 
 Baz/CtrC: Baz

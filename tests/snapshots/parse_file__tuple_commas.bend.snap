@@ -2,6 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/tuple_commas.bend
 ---
+unchecked main: Any
 (main) = let tup = ((fst 1 λx x), 2); (tup, 3, (4, 5))
 
-(fst) = λ%arg0 λ%arg1 use y = %arg1; use x = %arg0; x
+unchecked fst: (Any -> Any -> Any)
+(fst x y) = x

@@ -2,17 +2,17 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/desugar_float_combinators.bend
 ---
-Z: Any
+unchecked Z: Any
 (Z) = λ* λa a
 
-S: Any
+unchecked S: Any
 (S) = λa λb let {c d} = b; λe (c (a d e))
 
-get: Any
+unchecked get: Any
 (get) = λa (a get__C0 0)
 
-main: Any
+unchecked main: Any
 (main) = (get (S (S Z)))
 
-get__C0: _
+unchecked get__C0: _
 (get__C0) = λa (+ a 1)

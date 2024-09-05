@@ -2,22 +2,22 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/already_flat.bend
 ---
-Rule1: Any
+unchecked Rule1: Any
 (Rule1) = λa a
 
-Rule2: Any
+unchecked Rule2: Any
 (Rule2) = λa λb b
 
-Rule3: Any
+unchecked Rule3: Any
 (Rule3) = λa λb λc λd (a b c d)
 
-Rule4: Any
+unchecked Rule4: Any
 (Rule4) = λa match a { Foo/CtrA: λb b; Foo/CtrB c: c; }
 
-Rule5: Any
+unchecked Rule5: Any
 (Rule5) = λa match a { Bar/CtrA1 b: λc let d = c; (b d); Bar/CtrA2 e f: λg let h = g; (e f h); Bar/CtrA3 i: λj let k = j; (match k { Baz/CtrB0: λl (Bar/CtrA3 l); Baz/CtrB1 m: λn (Bar/CtrA3 n m); Baz/CtrB2 o: λp (Bar/CtrA3 p (Baz/CtrB2 o)); Baz/CtrB3 q: λr (r q); } i); }
 
-Rule6: Any
+unchecked Rule6: Any
 (Rule6) = λa a
 
 Foo/CtrA: Foo
@@ -29,7 +29,7 @@ Foo/CtrB: (Any -> Foo)
 Bar/CtrA1: (Any -> Bar)
 (Bar/CtrA1) = λa λb (b Bar/CtrA1/tag a)
 
-Bar/CtrA2: (Any -> (Any -> Bar))
+Bar/CtrA2: (Any -> Any -> Bar)
 (Bar/CtrA2) = λa λb λc (c Bar/CtrA2/tag a b)
 
 Bar/CtrA3: (Any -> Bar)

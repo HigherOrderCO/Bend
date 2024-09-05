@@ -2,37 +2,37 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/linearize_match_all.bend
 ---
-A: Any
+unchecked A: Any
 (A) = λa switch a { 0: λb λc (b c); _ d: λe λf (d e f); }
 
-B: Any
+unchecked B: Any
 (B) = λa λb λc (switch c { 0: λd λe (d e); _ f: λg λh (g h f); } a b)
 
-C: Any
+unchecked C: Any
 (C) = λa λb λc switch c { 0: (a b); _ d: (a b d); }
 
-D: Any
+unchecked D: Any
 (D) = λa switch a { 0: λb λc c; _ d: λe λf (d f); }
 
-E: Any
+unchecked E: Any
 (E) = λa match a { ConsList/Cons b c: λd let e = d; (match e { ConsList/Cons f g: λh λi (h i f g); ConsList/Nil: λj λk (ConsList/Cons j k ConsList/Nil); } b c); ConsList/Nil: λl let m = l; (ConsList/Nil m); }
 
-A2: Any
+unchecked A2: Any
 (A2) = λa match a { ConsList/Cons b c: λd λe (b c d e); ConsList/Nil: λf λg (f g); }
 
-B2: Any
+unchecked B2: Any
 (B2) = λa λb λc (match c { ConsList/Cons d e: λf λg (f g d e); ConsList/Nil: λh λi (h i); } a b)
 
-C2: Any
+unchecked C2: Any
 (C2) = λa λb λc match c { ConsList/Cons d e: (a b d e); ConsList/Nil: (a b); }
 
-D2: Any
+unchecked D2: Any
 (D2) = λa match a { ConsList/Cons b c: λd λe (b c d e); ConsList/Nil: λf λg (f g); }
 
-main: Any
+unchecked main: Any
 (main) = *
 
-ConsList/Cons: (Any -> (Any -> ConsList))
+ConsList/Cons: (Any -> Any -> ConsList)
 (ConsList/Cons) = λa λb λc (c ConsList/Cons/tag a b)
 
 ConsList/Nil: ConsList

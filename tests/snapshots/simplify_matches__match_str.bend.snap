@@ -2,8 +2,8 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/match_str.bend
 ---
-is_as: Any
+unchecked is_as: Any
 (is_as) = λa match a { String/Nil: 1; String/Cons b c: (switch (- b 65) { 0: λd match d { String/Nil: 0; String/Cons e f: (switch (- e 115) { 0: λg match g { String/Nil: 2; String/Cons h i: 0; }; _ j: λk 0; } f); }; _ l: λm (switch (- l 31) { 0: λn match n { String/Nil: 0; String/Cons o p: (switch (- o 115) { 0: λq match q { String/Nil: 2; String/Cons r s: 0; }; _ t: λu 0; } p); }; _ v: λw 0; } m); } c); }
 
-main: Any
+unchecked main: Any
 (main) = *
