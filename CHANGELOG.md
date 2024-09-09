@@ -22,6 +22,7 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ### Added
 
+- Add type system for Bend. ([#615][gh-615], [#679][gh-679], see [Type Checking](docs/type-checking.md))
 - Add import system. ([#544][gh-544])
 - Add multi line comment `#{ ... #}` syntax. ([#595][gh-595])
 - Add error message when input file is not found. ([#513][gh-513])
