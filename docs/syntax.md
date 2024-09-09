@@ -48,12 +48,15 @@ main =
 Defines a top level function.
 
 ```python
-def add(x, y):
+def add(x: u24, y: u24) -> u24:
   result = x + y
   return result
 
+def unchecked two() -> u24:
+  return 2
+
 def main:
-  return add(40, 2)
+  return add(40, two)
 ```
 
 A function definition is composed by a name, a sequence of parameters and a body.
@@ -62,6 +65,10 @@ A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except i
 
 The last statement of each function must either be a `return` or a selection statement (`if`, `switch`, `match`, `fold`)
 where all branches `return`.
+
+Each parameter of the function can receive a type annotation with `param_name: type` and the return value of the function can also be annotated with `def fn_name(args) -> return_type:`.
+
+We can force the type-checker to run or not on a specific function by adding `checked` or `unchecked` between `def` and the function name.
 
 ### Type
 
@@ -72,14 +79,16 @@ type Option:
   Some { value }
   None
 
-type Tree:
-  Node { value, ~left, ~right }
+type Tree(T):
+  Node { value: T, ~left: Tree(T), ~right: Tree(T) }
   Leaf
 ```
 
 Type names must be unique, and should have at least one constructor.
 
-Each constructor is defined by a name followed by its fields.
+For a generic or polymorphic type, all type variables used in the constructors must be declared first in the type definition with `type Name(type_var1, ...):`
+
+Each constructor is defined by a name followed by its fields. The fields can be annotated with types that will be checked when creating values of that type.
 
 The `~` notation indicates a recursive field. To use `fold` statements with a type its recursive fields must be correctly marked with `~`.
 
@@ -93,9 +102,9 @@ Read [defining data types](./defining-data-types.md) to know more.
 Defines a type with a single constructor (like a struct, a record or a class).
 
 ```python
-object Pair { fst, snd }
+object Pair(A, B) { fst: A, snd: B }
 
-object Function { name, args, body }
+object Function(T) { name: String, args, body: T }
 
 object Vec { len, data }
 ```
@@ -1260,6 +1269,11 @@ hvm link_ports:
   (a (b *))
   & (c a) ~ (d e)
   & (e b) ~ (d c)
+
+# Casts a `u24` to itself.
+# We can give type annotations to HVM definitions.
+hvm u24_to_u24 -> (u24 -> u24):
+  ($([u24] ret) ret)
 ```
 
 It's also possible to define functions using HVM syntax. This can be
@@ -1382,18 +1396,23 @@ def head(list: List(T)) -> Option(T)
 
 ## Any
 
-`Any` represents any type.
+`Any` represents the untyped type.
 
-Can be used when the specific type is unknown or doesn't matter.
+It accepts values of alls type and will forcefully cast any type to `Any`.
+
+Can be used for values that can't be statically typed, either because
+they are unknown (like in raw IO calls), because they contain untypable
+expressions (like unscoped variables), or because the expression cannot
+be typed with the current type system (like the self application `lambda x: x(x)`).
 
 ```python
 def main -> Any:
-  return lambda x: x
+  return 24
 ```
 
 ## None
 
-`None` represents an eraser or absence of a value.
+`None` represents the eraser `*` or absence of a value.
 
 Often used to indicate that a function doesn't return anything.
 
@@ -1406,7 +1425,7 @@ def none -> None:
 
 `_` represents a hole type.
 
-Can be used to represent/infer any type in the current context.
+This will let the type checker infer the most general type for an argument or return value.
 
 ```python
 def increment(x: _) -> _:
@@ -1498,9 +1517,14 @@ head (List/Cons head _) = (Option/Some head)
 
 ## Any
 
-`Any` represents any type.
+`Any` represents the untyped type.
 
-Can be used when the specific type is unknown or doesn't matter.
+It accepts values of alls type and will forcefully cast any type to `Any`.
+
+Can be used for values that can't be statically typed, either because
+they are unknown (like in raw IO calls), because they contain untypable
+expressions (like unscoped variables), or because the expression cannot
+be typed with the current type system (like the self application `λx (x x)`).
 
 ```python
 main : Any
@@ -1509,7 +1533,7 @@ main = @x x
 
 ## None
 
-`None` represents an eraser or absence of a value.
+`None` represents the eraser `*` or absence of a value.
 
 Often used to indicate that a function doesn't return anything.
 
@@ -1522,7 +1546,7 @@ none = *
 
 `_` represents a hole type.
 
-Can be used to represent/infer any type in the current context.
+This will let the type checker infer the most general type for an argument or return value.
 
 ```python
 increment : _ -> _

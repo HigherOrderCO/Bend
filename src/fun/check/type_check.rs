@@ -1,4 +1,4 @@
-//! Gradual Hindley-Milner-like type system.
+//! Optional Hindley-Milner-like type system.
 //!
 //! Based on https://github.com/developedby/algorithm-w-rs
 //! and https://github.com/mgrabmueller/AlgorithmW.
@@ -196,6 +196,7 @@ impl RecGroups {
       }
     }
 
+    /// Tarjan's algorithm for finding strongly connected components.
     fn strong_connect<'a>(
       v: &'a Name,
       deps: &DependencyGraph<'a>,
@@ -253,7 +254,6 @@ impl RecGroups {
       deps.insert(name, fn_deps);
     }
 
-    // Run Tarjan's algorithm
     let mut index = 0;
     let mut stack = Vec::new();
     let mut index_map = BTreeMap::new();
@@ -612,7 +612,7 @@ fn unify_fields<'a>(ts: impl Iterator<Item = (&'a Type, &'a Type)>, ctx: &Term) 
 fn unify_term(t1: &Type, t2: &Type, ctx: &Term) -> Result<(Type, Subst), String> {
   match unify(t1, t2) {
     Ok((t, s)) => Ok((t, s)),
-    Err(msg) => Err(format!("In {ctx}: Can't unify '{t1}' and '{t2}'.{msg}")),
+    Err(msg) => Err(format!("In {ctx}:\n  Can't unify '{t1}' and '{t2}'.{msg}")),
   }
 }
 
