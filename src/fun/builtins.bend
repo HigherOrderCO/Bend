@@ -498,7 +498,7 @@ Utf8/decode_character (List/Cons a (List/Cons b (List/Cons c (List/Cons d rest))
       } else {
         if (== (& a 0xF8) 0xF0) {
           let r = (| (<< (& a Utf8/mask4) 18) (| (<< (& b Utf8/maskx) 12) (| (<< (& c Utf8/maskx) 6) (& d Utf8/maskx))))
-          (r, [])
+          (r, rest)
         } else {
           (Utf8/REPLACEMENT_CHARACTER, rest)
         }
