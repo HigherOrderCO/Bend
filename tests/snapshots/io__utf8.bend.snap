@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/io/utf8.bend
+---
+Strict mode:
+["hi", "(λf ((λx (f (x x))) (λx (f (x x)))))", "🌟", "Hello 🌎!", "𓆈 𓆉 𓆊 𓆋 𓅯"]
