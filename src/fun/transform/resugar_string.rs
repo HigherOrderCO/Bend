@@ -1,5 +1,5 @@
 use crate::{
-  fun::{builtins, Num, Pattern, Tag, Term},
+  fun::{builtins, Name, Num, Pattern, Tag, Term},
   maybe_grow, AdtEncoding,
 };
 
@@ -97,7 +97,7 @@ impl Term {
   }
 
   /// common string building function that uses custom and default cons handlers.
-  /// pattern keep if tree mimics the shape of the AST visualize the structure
+  /// pattern keep if tree mimics the shape of the AST visualize the structure #713
   fn build_string<F>(term: &Term, mut s: String, cons_handler: F) -> Option<String>
   where
     F: Fn(&Term) -> Option<(char, &Term)>,
@@ -105,35 +105,62 @@ impl Term {
     maybe_grow(|| {
       let mut current = term;
       loop {
-        match current {
-          Term::Ref { nam } if nam == builtins::SNIL => return Some(s),
-          _ => {
-            if let Some((head, tail)) = cons_handler(current) {
-              s.push(head);
-              current = tail;
-            } else if let Term::App { tag: Tag::Static, fun, arg: tail } = current {
+        // Nil: String/nil
+        if let Term::Ref { nam } = current {
+          if nam == builtins::SNIL {
+            return Some(s);
+          }
+        }
+
+        // Try custom cons handler
+        if let Some((head, tail)) = cons_handler(current) {
+          s.push(head);
+          current = tail;
+          continue;
+        }
+
+        // Cons: @x (x CONS_TAG <num> <str>)
+        if let Term::Lam { tag: Tag::Static, pat, bod } = current {
+          if let Pattern::Var(Some(var_lam)) = pat.as_ref() {
+            if let Term::App { tag: Tag::Static, fun, arg: tail } = bod.as_ref() {
               if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_ref() {
-                if let (Term::Ref { nam }, Term::Num { val: Num::U24(head_val) }) =
-                  (fun.as_ref(), head.as_ref())
-                {
-                  if nam == builtins::SCONS {
-                    let head_char = char::from_u32(*head_val).unwrap_or(char::REPLACEMENT_CHARACTER);
-                    s.push(head_char);
-                    current = tail;
-                  } else {
-                    return None;
+                if let Term::App { tag: Tag::Static, fun, arg } = fun.as_ref() {
+                  if let Term::Var { nam: var_app } = fun.as_ref() {
+                    if let Term::Ref { nam } = arg.as_ref() {
+                      if let Term::Num { val: Num::U24(head_val) } = head.as_ref() {
+                        if var_lam == var_app && nam == builtins::SCONS_TAG_REF {
+                          let head_char = char::from_u32(*head_val).unwrap_or(char::REPLACEMENT_CHARACTER);
+                          s.push(head_char);
+                          current = tail;
+                          continue;
+                        }
+                      }
+                    }
                   }
-                } else {
-                  return None;
                 }
-              } else {
-                return None;
               }
-            } else {
-              return None;
             }
           }
         }
+
+        // Cons: (String/cons <num> <str>)
+        if let Term::App { tag: Tag::Static, fun, arg: tail } = current {
+          if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_ref() {
+            if let Term::Ref { nam } = fun.as_ref() {
+              if let Term::Num { val: Num::U24(head_val) } = head.as_ref() {
+                if nam == builtins::SCONS {
+                  let head_char = char::from_u32(*head_val).unwrap_or(char::REPLACEMENT_CHARACTER);
+                  s.push(head_char);
+                  current = tail;
+                  continue;
+                }
+              }
+            }
+          }
+        }
+
+        // Not a string term, stop
+        return None;
       }
     })
   }
