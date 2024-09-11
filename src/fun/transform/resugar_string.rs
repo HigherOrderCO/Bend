@@ -1,45 +1,7 @@
 use crate::{
-  fun::{builtins, Name, Num, Pattern, Tag, Term},
+  fun::{builtins, Num, Pattern, Tag, Term},
   maybe_grow, AdtEncoding,
 };
-
-/// Trait for visiting Term structures and extracting character and tail information.
-trait TermVisitor {
-  fn visit<'a>(&self, term: &'a Term) -> Result<(char, &'a Term), ()>;
-}
-
-/// Wrapper for custom cons handler functions.
-struct ConsHandler<F>(F);
-
-impl<F> TermVisitor for ConsHandler<F>
-where
-  F: for<'a> Fn(&'a Term) -> Option<(char, &'a Term)>,
-{
-  fn visit<'a>(&self, term: &'a Term) -> Result<(char, &'a Term), ()> {
-    self.0(term).ok_or(())
-  }
-}
-/// Default handler for cons operations.
-struct DefaultConsHandler;
-
-impl TermVisitor for DefaultConsHandler {
-  fn visit<'a>(&self, term: &'a Term) -> Result<(char, &'a Term), ()> {
-    match term {
-      Term::App { tag: Tag::Static, fun, arg: tail } => {
-        let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_ref() else { return Err(()) };
-        let (Term::Ref { nam }, Term::Num { val: Num::U24(head_val) }) = (fun.as_ref(), head.as_ref()) else {
-          return Err(());
-        };
-        if nam != builtins::SCONS {
-          return Err(());
-        };
-        let head_char = char::try_from(*head_val).unwrap_or(char::REPLACEMENT_CHARACTER);
-        Ok((head_char, tail))
-      }
-      _ => Err(()),
-    }
-  }
-}
 
 impl Term {
   /// Converts lambda-encoded strings ending with String/nil to a string literals.
@@ -86,9 +48,11 @@ impl Term {
     else {
       return false;
     };
+
     if var_lam != var_app {
       return false;
     };
+
     let head_char = char::from_u32(*head_val).unwrap_or(char::REPLACEMENT_CHARACTER);
     Self::build_string_scott(tail, head_char.to_string()).map(|str| *term = Term::str(&str)).is_some()
   }
@@ -123,6 +87,7 @@ impl Term {
     else {
       return false;
     };
+
     if nam != builtins::SCONS {
       return false;
     };
@@ -131,28 +96,41 @@ impl Term {
     build_string_fn(tail, head_char.to_string()).map(|str| *self = Term::str(&str)).is_some()
   }
 
-  /// Generic string building function that uses custom and default cons handlers.
-  fn build_string_generic<F>(term: &Term, mut s: String, cons_handler: F) -> Option<String>
+  /// common string building function that uses custom and default cons handlers.
+  /// pattern keep if tree mimics the shape of the AST visualize the structure
+  fn build_string<F>(term: &Term, mut s: String, cons_handler: F) -> Option<String>
   where
-    F: for<'a> Fn(&'a Term) -> Option<(char, &'a Term)>,
+    F: Fn(&Term) -> Option<(char, &Term)>,
   {
     maybe_grow(|| {
-      let custom_handler = ConsHandler(cons_handler);
-      let default_handler = DefaultConsHandler;
       let mut current = term;
       loop {
         match current {
-          // If we've reached the end of the string (nil), return the built string
           Term::Ref { nam } if nam == builtins::SNIL => return Some(s),
           _ => {
-            // Try custom handler first, then fall back to default handler
-            let result = custom_handler.visit(current).or_else(|_| default_handler.visit(current));
-            match result {
-              Ok((head, tail)) => {
-                s.push(head);
-                current = tail;
+            if let Some((head, tail)) = cons_handler(current) {
+              s.push(head);
+              current = tail;
+            } else if let Term::App { tag: Tag::Static, fun, arg: tail } = current {
+              if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_ref() {
+                if let (Term::Ref { nam }, Term::Num { val: Num::U24(head_val) }) =
+                  (fun.as_ref(), head.as_ref())
+                {
+                  if nam == builtins::SCONS {
+                    let head_char = char::from_u32(*head_val).unwrap_or(char::REPLACEMENT_CHARACTER);
+                    s.push(head_char);
+                    current = tail;
+                  } else {
+                    return None;
+                  }
+                } else {
+                  return None;
+                }
+              } else {
+                return None;
               }
-              Err(_) => return None, // If both handlers fail, the term is not a valid string
+            } else {
+              return None;
             }
           }
         }
@@ -162,22 +140,19 @@ impl Term {
 
   /// Builds a string from a NumScott-encoded term.
   fn build_string_num_scott(term: &Term, s: String) -> Option<String> {
-    Self::build_string_generic(term, s, |term| {
+    Self::build_string(term, s, |term| {
       let Term::Lam { tag: Tag::Static, pat, bod } = term else { return None };
       let Pattern::Var(Some(var_lam)) = pat.as_ref() else { return None };
       let Term::App { tag: Tag::Static, fun, arg: tail } = bod.as_ref() else { return None };
       let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_ref() else { return None };
       let Term::App { tag: Tag::Static, fun, arg } = fun.as_ref() else { return None };
-      let (
-        Term::Var { nam: var_app },
-        Term::Ref { nam: Name(ref_nam) },
-        Term::Num { val: Num::U24(head_val) },
-      ) = (fun.as_ref(), arg.as_ref(), head.as_ref())
+      let (Term::Var { nam: var_app }, Term::Ref { nam }, Term::Num { val: Num::U24(head_val) }) =
+        (fun.as_ref(), arg.as_ref(), head.as_ref())
       else {
         return None;
       };
 
-      if var_lam == var_app && ref_nam == builtins::SCONS_TAG_REF {
+      if var_lam == var_app && nam == builtins::SCONS_TAG_REF {
         let head_char = char::from_u32(*head_val).unwrap_or(char::REPLACEMENT_CHARACTER);
         Some((head_char, tail))
       } else {
@@ -188,7 +163,7 @@ impl Term {
 
   /// Builds a string from a Scott-encoded term.
   fn build_string_scott(term: &Term, s: String) -> Option<String> {
-    Self::build_string_generic(term, s, |term| {
+    Self::build_string(term, s, |term| {
       let Term::Lam { tag: Tag::Static, pat, bod } = term else { return None };
       let Pattern::Var(None) = pat.as_ref() else { return None };
       let Term::Lam { tag: Tag::Static, pat, bod } = bod.as_ref() else { return None };
@@ -199,6 +174,7 @@ impl Term {
       else {
         return None;
       };
+
       if var_lam == var_app {
         let head_char = char::from_u32(*head_val).unwrap_or(char::REPLACEMENT_CHARACTER);
         Some((head_char, tail))
@@ -208,3 +184,4 @@ impl Term {
     })
   }
 }
+
