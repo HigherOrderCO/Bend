@@ -79,7 +79,7 @@ impl Term {
   /// Converts scott-encoded lists ending with List/Nil to list literals.
   fn resugar_lists_scott(&mut self) {
     maybe_grow(|| {
-      // Search for a List/Cons pattern in the term and try to build a list from that point on.
+      // Searc                  h for a List/Cons pattern in the term and try to build a list from that point on.
       // If successful, replace the term with the list.
       // If not, keep as-is.
 
@@ -124,7 +124,7 @@ impl Term {
               match l {
                 Ok(l) => *self = Term::List { els: l.into_iter().map(|x| *x).collect() },
                 // Was not a list term, keep as-is.
-                Err(mut l) => {
+                                  Err(mut l) => {
                   *head = l.pop().unwrap();
                   assert!(l.is_empty())
                 }
@@ -241,7 +241,7 @@ fn build_list_scott(term: &mut Term, mut l: Vec<Box<Term>>) -> Result<Vec<Box<Te
           }
         }
       }
-    }
+                      }
     // Cons: (List/Cons <term> <term>)
     if let Term::App { tag: Tag::Static, fun, arg: tail } = term {
       if let Term::App { tag: Tag::Static, fun, arg: head } = fun.as_mut() {
@@ -266,3 +266,4 @@ fn build_list_scott(term: &mut Term, mut l: Vec<Box<Term>>) -> Result<Vec<Box<Te
     Err(l)
   })
 }
+
