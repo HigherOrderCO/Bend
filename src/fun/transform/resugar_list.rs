@@ -79,7 +79,7 @@ impl Term {
   /// Converts scott-encoded lists ending with List/Nil to list literals.
   fn resugar_lists_scott(&mut self) {
     maybe_grow(|| {
-      // Searc      h for a List/Cons pattern in the term and try to build a list from that point on.
+      // Search for a List/Cons pattern in the term and try to build a list from that point on.
       // If successful, replace the term with the list.
       // If not, keep as-is.
 
