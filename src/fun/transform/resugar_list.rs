@@ -266,4 +266,3 @@ fn build_list_scott(term: &mut Term, mut l: Vec<Box<Term>>) -> Result<Vec<Box<Te
     Err(l)
   })
 }
-
