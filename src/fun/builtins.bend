@@ -47,6 +47,24 @@ List/filter (List/Cons x xs) pred =
     (List/filter xs pred)
   }
 
+## Recursively sums all elements in a list of native numbers.
+# If the list is empty, returns 0.
+# List/sum (xs: List(Number(a))) -> Number(a)
+List/sum (List/Nil) = 0
+List/sum (List/Cons x xs) = (+ x (List/sum xs))
+
+# Generates a list of unsigned numbers starting from `start` and ending at `end` (inclusive).
+# If the start value is greater than the end value, returns an empty list.
+# List/range (start: u24, end: u24) -> (List u24)
+List/range start end =
+  if (> start end) {
+    (List/Nil)
+  } else {
+    (List/Cons start (List/range (+ start 1) end))
+  }
+
+
+
 # String/equals(s1: String, s2: String) -> u24
 # Checks if two strings are equal.
 String/equals (String/Nil) (String/Nil) = 1
