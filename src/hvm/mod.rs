@@ -1,5 +1,6 @@
 use crate::multi_iterator;
 use hvm::ast::{Net, Tree};
+use std::fmt::Write;
 
 pub mod add_recursive_priority;
 pub mod check_net_size;
@@ -37,20 +38,17 @@ pub fn net_trees_mut(net: &mut Net) -> impl DoubleEndedIterator<Item = &mut Tree
 }
 
 pub fn hvm_book_show_pretty(book: &hvm::ast::Book) -> String {
-  let mut s = String::new();
+  let mut s = String::with_capacity(book.defs.len());
   for (nam, def) in book.defs.iter() {
-    s.push_str(&format!("@{} = {}\n", nam, def.root.show()));
+    let _ = writeln!(&mut s, "@{} = {}", nam, def.root.show());
     for (pri, a, b) in def.rbag.iter() {
-      s.push_str("  &");
+      let _ = write!(&mut s, "  &");
       if *pri {
         s.push('!');
       } else {
         s.push(' ');
       }
-      s.push_str(&a.show());
-      s.push_str(" ~ ");
-      s.push_str(&b.show());
-      s.push('\n');
+      let _ = writeln!(&mut s, "{} ~ {}", a.show(), b.show());
     }
     s.push('\n');
   }

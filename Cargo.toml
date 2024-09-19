@@ -22,6 +22,8 @@ lto = true
 [features]
 default = ["cli"]
 cli = ["dep:clap"]
+bench = []
+
 
 [dependencies]
 TSPL = "0.0.13"
@@ -41,3 +43,7 @@ walkdir = "2.3.3"
 
 [profile.test]
 opt-level = 2
+
+[[bench]]
+name = "hvm_common"
+harness = true

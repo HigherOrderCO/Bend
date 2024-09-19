@@ -388,7 +388,7 @@ impl Display for Diagnostic {
 }
 
 impl Diagnostic {
-  pub fn display_with_origin<'a>(&'a self, origin: &'a DiagnosticOrigin) -> impl std::fmt::Display + '_ {
+  pub fn display_with_origin<'a>(&'a self, origin: &'a DiagnosticOrigin) -> impl std::fmt::Display + 'a {
     DisplayFn(move |f| {
       match origin {
         DiagnosticOrigin::Parsing => writeln!(f, "{self}")?,
