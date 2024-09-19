@@ -1,25 +1,12 @@
 #![feature(test)]
 extern crate test;
+mod hvm_common;
+
 use bend::hvm::prune::prune_hvm_book;
 use hvm::ast::{Book, Net, Tree};
+use hvm_common::SimpleRng;
 use std::collections::BTreeMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 use test::Bencher;
-
-// Simple random number generator
-struct SimpleRng(u64);
-
-impl SimpleRng {
-  fn new() -> Self {
-    let seed = SystemTime::now().duration_since(UNIX_EPOCH).expect("Time went backwards").as_secs();
-    SimpleRng(seed)
-  }
-
-  fn gen_range(&mut self, low: u64, high: u64) -> u64 {
-    self.0 = self.0.wrapping_mul(6364136223846793005).wrapping_add(1);
-    low + (self.0 >> 32) % (high - low)
-  }
-}
 
 fn create_test_book(rng: &mut SimpleRng, num_defs: usize, max_depth: u32, max_rbag: usize) -> Book {
   let mut defs = BTreeMap::new();
