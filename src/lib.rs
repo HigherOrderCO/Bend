@@ -60,7 +60,6 @@ pub fn compile_book(
   }
 
   if opts.inline {
-    diagnostics.start_pass();
     if let Err(e) = inline_hvm_book(&mut hvm_book) {
       diagnostics.add_book_error(format!("During inlining:\n{:ERR_INDENT_SIZE$}{}", "", e));
     }
@@ -120,6 +119,7 @@ pub fn desugar_book(
   // Auto match linearization
   ctx.book.make_var_names_unique();
   ctx.book.desugar_use();
+
   match opts.linearize_matches {
     OptLevel::Disabled => (),
     OptLevel::Alt => ctx.book.linearize_match_binds(),
@@ -127,6 +127,10 @@ pub fn desugar_book(
   }
   // Manual match linearization
   ctx.book.linearize_match_with();
+
+  if opts.type_check {
+    type_check_book(&mut ctx)?;
+  }
 
   ctx.book.encode_matches(opts.adt_encoding);
 
@@ -163,6 +167,13 @@ pub fn desugar_book(
   } else {
     Err(ctx.info)
   }
+}
+
+pub fn type_check_book(ctx: &mut Ctx) -> Result<(), Diagnostics> {
+  ctx.check_untyped_terms()?;
+  ctx.resolve_type_ctrs()?;
+  ctx.type_check()?;
+  Ok(())
 }
 
 pub fn run_book(
@@ -362,6 +373,9 @@ pub struct CompileOpts {
   /// Enables [hvm::check_net_size].
   pub check_net_size: bool,
 
+  /// Enables [type_check_book].
+  pub type_check: bool,
+
   /// Determines the encoding of constructors and matches.
   pub adt_encoding: AdtEncoding,
 }
@@ -376,8 +390,9 @@ impl CompileOpts {
       prune: true,
       float_combinators: true,
       merge: true,
-      inline: true,
       linearize_matches: OptLevel::Enabled,
+      type_check: true,
+      inline: true,
       check_net_size: self.check_net_size,
       adt_encoding: self.adt_encoding,
     }
@@ -394,6 +409,7 @@ impl CompileOpts {
       float_combinators: false,
       merge: false,
       inline: false,
+      type_check: self.type_check,
       check_net_size: self.check_net_size,
       adt_encoding: self.adt_encoding,
     }
@@ -426,6 +442,7 @@ impl Default for CompileOpts {
       merge: false,
       inline: false,
       check_net_size: true,
+      type_check: true,
       adt_encoding: AdtEncoding::NumScott,
     }
   }

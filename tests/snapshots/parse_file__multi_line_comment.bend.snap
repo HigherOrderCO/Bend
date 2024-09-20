@@ -2,22 +2,32 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/multi_line_comment.bend
 ---
-(X) = λ%arg0 λ%arg1 λ%arg2 use x = %arg2; x
+unchecked X: Any
+(X x x x) = x
 
-(String/is_empty) = λ%arg0 use s = %arg0; match s = s { String/Nil: 1; String/Cons: 0; }
+unchecked String/is_empty: Any
+(String/is_empty s) = match s = s { String/Nil: 1; String/Cons: 0; }
 
+unchecked main: Any
 (main) = 0
 
-(String/not_empty) = λ%arg0 use s = %arg0; match s = s { String/Nil: 0; String/Cons: 1; }
+unchecked String/not_empty: (Any -> Any)
+(String/not_empty s) = match s = s { String/Nil: 0; String/Cons: 1; }
 
+Foo/Foo: (Any -> Foo)
 (Foo/Foo) = λfoo λ%x (%x Foo/Foo/tag foo)
 
+Bar: (Any -> Bar)
 (Bar) = λbar λ%x (%x Bar/tag bar)
 
+V/V: V
 (V/V) = λ%x (%x V/V/tag)
 
+Foo/Foo/tag: u24
 (Foo/Foo/tag) = 0
 
+Bar/tag: u24
 (Bar/tag) = 0
 
+V/V/tag: u24
 (V/V/tag) = 0

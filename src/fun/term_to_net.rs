@@ -16,8 +16,6 @@ use std::{
 pub struct ViciousCycleErr;
 
 pub fn book_to_hvm(book: &Book, diags: &mut Diagnostics) -> Result<(hvm::ast::Book, Labels), Diagnostics> {
-  diags.start_pass();
-
   let mut hvm_book = hvm::ast::Book { defs: Default::default() };
   let mut labels = Labels::default();
 
@@ -193,8 +191,8 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
             }
             // Partially apply with snd, flip
             (fst, Term::Num { val }) => {
-              if [Op::POW, Op::ATN, Op::LOG].contains(opr) {
-                // POW, ATN and LOG share tags with AND, OR and XOR, so don't flip or results will be wrong
+              if let Op::POW = opr {
+                // POW shares tags with AND, so don't flip or results will be wrong
                 let opr_val = hvm::ast::Numb(hvm::hvm::Numb::new_sym(opr.to_native_tag()).0);
                 let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
                 let node1 = self.new_opr();
@@ -473,8 +471,6 @@ impl Op {
       Op::SHL => hvm::hvm::OP_SHL,
       Op::SHR => hvm::hvm::OP_SHR,
 
-      Op::ATN => hvm::hvm::OP_AND,
-      Op::LOG => hvm::hvm::OP_OR,
       Op::POW => hvm::hvm::OP_XOR,
 
       Op::LE => hvm::hvm::OP_GT,

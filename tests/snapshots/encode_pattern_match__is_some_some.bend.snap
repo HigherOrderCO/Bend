@@ -3,23 +3,33 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/is_some_some.bend
 ---
 Scott
+unchecked some_some: Any
 (some_some) = λa (a λb (b λ* 1 0) 0)
 
+unchecked main: Any
 (main) = (some_some (Option/Some 1))
 
+Option/Some: (Any -> Option)
 (Option/Some) = λa λb λ* (b a)
 
+Option/None: Option
 (Option/None) = λ* λb b
 
 NumScott
+unchecked some_some: Any
 (some_some) = λa (a λb switch b { 0: λc (c λd switch d { 0: λ* 1; _: λ* 0; }); _: λ* 0; })
 
+unchecked main: Any
 (main) = (some_some (Option/Some 1))
 
+Option/Some: (Any -> Option)
 (Option/Some) = λa λb (b Option/Some/tag a)
 
+Option/None: Option
 (Option/None) = λa (a Option/None/tag)
 
+Option/Some/tag: u24
 (Option/Some/tag) = 0
 
+Option/None/tag: u24
 (Option/None/tag) = 1

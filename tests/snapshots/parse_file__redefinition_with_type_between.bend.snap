@@ -5,4 +5,5 @@ input_file: tests/golden_tests/parse_file/redefinition_with_type_between.bend
 [4m[1m[31mErrors:[0m
 [1mIn [4mtests/golden_tests/parse_file/redefinition_with_type_between.bend[0m[1m :[0m
 Redefinition of function 'A'.
+Location:
 [0m  3 | [4m[31mA = 1[0m

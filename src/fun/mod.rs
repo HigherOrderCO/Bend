@@ -6,7 +6,11 @@ use crate::{
 use indexmap::{IndexMap, IndexSet};
 use interner::global::{GlobalPool, GlobalString};
 use itertools::Itertools;
-use std::{borrow::Cow, hash::Hash, ops::Deref};
+use std::{
+  borrow::Cow,
+  hash::Hash,
+  ops::{Deref, Range},
+};
 
 pub mod builtins;
 pub mod check;
@@ -64,6 +68,8 @@ pub type Constructors = IndexMap<Name, Name>;
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Definition {
   pub name: Name,
+  pub typ: Type,
+  pub check: bool,
   pub rules: Vec<Rule>,
   pub source: Source,
 }
@@ -93,8 +99,25 @@ pub enum SourceKind {
 #[derive(Debug, Clone)]
 pub struct HvmDefinition {
   pub name: Name,
+  pub typ: Type,
   pub body: hvm::ast::Net,
   pub source: Source,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum Type {
+  Any,
+  Hole,
+  Var(Name),
+  Ctr(Name, Vec<Type>),
+  Arr(Box<Type>, Box<Type>),
+  Tup(Vec<Type>),
+  U24,
+  F24,
+  I24,
+  None,
+  Number(Box<Type>),
+  Integer(Box<Type>),
 }
 
 /// A pattern matching rule of a definition.
@@ -237,10 +260,6 @@ pub enum Op {
   XOR,
   SHL,
   SHR,
-  /// atan(a, b)
-  ATN,
-  /// log_a(b)
-  LOG,
   // a^b
   POW,
   /// Less than or equal
@@ -280,15 +299,26 @@ pub enum Tag {
 /// A user defined datatype
 #[derive(Debug, Clone)]
 pub struct Adt {
-  pub ctrs: IndexMap<Name, Vec<CtrField>>,
+  pub name: Name,
+  pub vars: Vec<Name>,
+  pub ctrs: IndexMap<Name, AdtCtr>,
   pub source: Source,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
+pub struct AdtCtr {
+  pub name: Name,
+  pub typ: Type,
+  pub fields: Vec<CtrField>,
+}
+
+#[derive(Debug, Clone)]
 pub struct CtrField {
   pub nam: Name,
   pub rec: bool,
+  pub typ: Type,
 }
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct Name(GlobalString);
 
@@ -804,6 +834,26 @@ impl Term {
     }
   }
 
+  /// Substitutes the occurrences of a type constructor in the term with the given name.
+  pub fn subst_type_ctrs(&mut self, from: &Name, to: &Name) {
+    maybe_grow(|| {
+      match self {
+        Term::Def { def, nxt: _ } => {
+          def.typ.subst_ctr(from, to);
+        }
+        Term::With { typ, bod: _ } => {
+          if typ == from {
+            *typ = to.clone();
+          }
+        }
+        _ => (),
+      }
+      for child in self.children_mut() {
+        child.subst_type_ctrs(from, to);
+      }
+    });
+  }
+
   /// Substitute the occurrence of an unscoped variable with the given term.
   pub fn subst_unscoped(&mut self, from: &Name, to: &Term) {
     maybe_grow(|| {
@@ -1018,6 +1068,15 @@ impl Pattern {
       Pattern::Ctr(_, x) | Pattern::Fan(_, _, x) | Pattern::Lst(x) => x.iter().any(|x| x.has_unscoped()),
     }
   }
+
+  pub fn has_nested(&self) -> bool {
+    for child in self.children() {
+      if matches!(child, Pattern::Ctr(_, _) | Pattern::Fan(_, _, _) | Pattern::Lst(_)) {
+        return true;
+      }
+    }
+    false
+  }
 }
 
 impl Rule {
@@ -1027,14 +1086,10 @@ impl Rule {
 }
 
 impl Definition {
-  pub fn new(name: Name, rules: Vec<Rule>, source: Source) -> Self {
-    Self { name, rules, source }
-  }
-
-  pub fn new_gen(name: Name, rules: Vec<Rule>, source: Source) -> Self {
+  pub fn new_gen(name: Name, rules: Vec<Rule>, source: Source, check: bool) -> Self {
     let kind = if source.is_builtin() { SourceKind::Builtin } else { SourceKind::Generated };
     let source = Source { kind, ..source };
-    Self { name, rules, source }
+    Self { name, typ: Type::Hole, check, rules, source }
   }
 
   pub fn is_builtin(&self) -> bool {
@@ -1061,6 +1116,56 @@ impl Definition {
   pub fn rule_mut(&mut self) -> &mut Rule {
     self.assert_no_pattern_matching_rules();
     &mut self.rules[0]
+  }
+}
+
+impl Type {
+  /// Substitutes the occurrences of a type constructor with the given name.
+  /// Substitutes both `Var` and `Ctr` types since `Var` could be referring to
+  /// an unresolved type constructor.
+  pub fn subst_ctr(&mut self, from: &Name, to: &Name) {
+    maybe_grow(|| {
+      match self {
+        Type::Var(nam) => {
+          if nam == from {
+            *nam = to.clone();
+          }
+        }
+        Type::Ctr(nam, _) => {
+          if nam == from {
+            *nam = to.clone();
+          }
+        }
+        _ => (),
+      };
+      for child in self.children_mut() {
+        child.subst_ctr(from, to);
+      }
+    })
+  }
+
+  pub fn children(&self) -> impl Iterator<Item = &Type> {
+    multi_iterator!(ChildrenIter { Zero, One, Two, Vec });
+    match self {
+      Type::Any | Type::None | Type::Hole | Type::I24 | Type::F24 | Type::U24 | Type::Var(_) => {
+        ChildrenIter::Zero([])
+      }
+      Type::Number(t) | Type::Integer(t) => ChildrenIter::One([t.as_ref()]),
+      Type::Arr(lft, rgt) => ChildrenIter::Two([lft.as_ref(), rgt.as_ref()]),
+      Type::Tup(els) | Type::Ctr(_, els) => ChildrenIter::Vec(els),
+    }
+  }
+
+  pub fn children_mut(&mut self) -> impl Iterator<Item = &mut Type> {
+    multi_iterator!(ChildrenIter { Zero, One, Two, Vec });
+    match self {
+      Type::Any | Type::None | Type::Hole | Type::I24 | Type::F24 | Type::U24 | Type::Var(_) => {
+        ChildrenIter::Zero([])
+      }
+      Type::Number(t) | Type::Integer(t) => ChildrenIter::One([t.as_mut()]),
+      Type::Arr(lft, rgt) => ChildrenIter::Two([lft.as_mut(), rgt.as_mut()]),
+      Type::Tup(els) | Type::Ctr(_, els) => ChildrenIter::Vec(els),
+    }
   }
 }
 
@@ -1133,6 +1238,13 @@ impl Source {
 
   pub fn is_local(&self) -> bool {
     matches!(self.kind, SourceKind::User)
+  }
+
+  pub fn from_file_span(file: &Name, txt: &str, span: Range<usize>, builtin: bool) -> Self {
+    let span = Some(TextSpan::from_byte_span(txt, span));
+    let kind = if builtin { SourceKind::Builtin } else { SourceKind::User };
+    let file = Some(file.to_string());
+    Source { file, span, kind }
   }
 }
 

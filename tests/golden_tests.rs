@@ -1,7 +1,20 @@
+//! This module runs snapshot tests for compiling and running Bend programs.
+//!
+//! The result of each test is saved as a snapshot and used as golden output
+//! for future tests. This allows us to test regressions in compilation and
+//! have a history of how certain programs compiled and ran.
+//!
+//! These tests use `cargo-insta`. To run the tests, run `cargo insta test`.
+//! If there are any changes to the snapshots, they'll be highlighted by the
+//! CLI tool. Then, run `cargo insta review` to review these changes.
+
 use bend::{
   compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
-  fun::{load_book::do_parse_book_default, net_to_term::net_to_term, term_to_net::Labels, Book, Ctx, Name},
+  fun::{
+    load_book::do_parse_book, net_to_term::net_to_term, parser::ParseBook, term_to_net::Labels, Book, Ctx,
+    Name,
+  },
   hvm::hvm_book_show_pretty,
   imports::DefaultLoader,
   load_to_book,
@@ -27,6 +40,10 @@ static RUN_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 const TESTS_PATH: &str = "/tests/golden_tests/";
 
 type RunFn = dyn Fn(&str, &Path) -> Result<String, Diagnostics>;
+
+pub fn parse_book_single_file(code: &str, origin: &Path) -> Result<Book, Diagnostics> {
+  do_parse_book(code, origin, ParseBook::builtins())?.to_fun()
+}
 
 fn run_single_golden_test(path: &Path, run: &[&RunFn]) -> Result<(), String> {
   println!("{}", path.display());
@@ -92,10 +109,11 @@ fn run_golden_test_dir_multiple(test_name: &str, run: &[&RunFn]) {
  and what to save as a snapshot.
 */
 
+/// Compiles a file with regular compilation options.
 #[test]
 fn compile_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path)?;
+    let mut book = parse_book_single_file(code, path)?;
     let compile_opts = CompileOpts::default();
     let diagnostics_cfg = DiagnosticsConfig { unused_definition: Severity::Allow, ..Default::default() };
 
@@ -104,10 +122,11 @@ fn compile_file() {
   })
 }
 
+/// Compiles a file with `-Oall` option.
 #[test]
 fn compile_file_o_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path)?;
+    let mut book = parse_book_single_file(code, path)?;
     let opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig {
       recursion_cycle: Severity::Warning,
@@ -120,10 +139,11 @@ fn compile_file_o_all() {
   })
 }
 
+/// Compiles a file with `-Ono-all` option.
 #[test]
 fn compile_file_o_no_all() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path)?;
+    let mut book = parse_book_single_file(code, path)?;
     let compile_opts = CompileOpts::default().set_no_all();
     let diagnostics_cfg = DiagnosticsConfig::default();
     let res = compile_book(&mut book, compile_opts, diagnostics_cfg, None)?;
@@ -131,11 +151,12 @@ fn compile_file_o_no_all() {
   })
 }
 
+/// Runs a file, but with linear readback enabled.
 #[test]
 fn linear_readback() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let _guard = RUN_MUTEX.lock().unwrap();
-    let book = do_parse_book_default(code, path)?;
+    let book = parse_book_single_file(code, path)?;
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig::default();
     let (term, _, diags) = run_book(
@@ -152,13 +173,15 @@ fn linear_readback() {
   });
 }
 
+/// Runs a file with regular compilation options, but rejecting all warnings.
+/// Runs once for each ADT encoding.
 #[test]
 fn run_file() {
   run_golden_test_dir_multiple(
     function_name!(),
     &[(&|code, path| {
       let _guard = RUN_MUTEX.lock().unwrap();
-      let book = do_parse_book_default(code, path)?;
+      let book = parse_book_single_file(code, path)?;
       let diagnostics_cfg = DiagnosticsConfig {
         unused_definition: Severity::Allow,
         ..DiagnosticsConfig::new(Severity::Error, true)
@@ -178,6 +201,7 @@ fn run_file() {
   )
 }
 
+/// Runs bend programs, all sharing a common lib to test the import system.
 #[test]
 fn import_system() {
   run_golden_test_dir_multiple(
@@ -202,27 +226,7 @@ fn import_system() {
   )
 }
 
-#[test]
-#[ignore = "while lazy execution is not implemented for hvm32"]
-fn run_lazy() {
-  run_golden_test_dir(function_name!(), &|_code, _path| {
-    todo!()
-    /* let _guard = RUN_MUTEX.lock().unwrap();
-    let book = do_parse_book_default(code, path)?;
-    let compile_opts = CompileOpts::default_lazy();
-    let diagnostics_cfg = DiagnosticsConfig {
-      recursion_cycle: Severity::Allow,
-      unused_definition: Severity::Allow,
-      ..DiagnosticsConfig::new(Severity::Error, true)
-    };
-    let run_opts = RunOpts::lazy();
-
-    let (term, _, diags) = run_book(book, run_opts, compile_opts, diagnostics_cfg, None)?;
-    let res = format!("{diags}{term}");
-    Ok(res) */
-  })
-}
-
+/// Reads back an HVM net.
 #[test]
 fn readback_hvm() {
   run_golden_test_dir(function_name!(), &|code, _| {
@@ -236,6 +240,7 @@ fn readback_hvm() {
   })
 }
 
+/// Runs compilation up to fixing, simplifying and linearizing matches.
 #[test]
 fn simplify_matches() {
   run_golden_test_dir(function_name!(), &|code, path| {
@@ -243,18 +248,19 @@ fn simplify_matches() {
       irrefutable_match: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
     };
-    let mut book = do_parse_book_default(code, path)?;
+    let mut book = parse_book_single_file(code, path)?;
     let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
 
     ctx.check_shared_names();
-    ctx.set_entrypoint();
     ctx.book.encode_adts(AdtEncoding::NumScott);
     ctx.fix_match_defs()?;
     ctx.desugar_open()?;
     ctx.book.encode_builtins();
     ctx.resolve_refs()?;
+    ctx.resolve_type_ctrs()?;
     ctx.desugar_match_defs()?;
     ctx.fix_match_terms()?;
+    ctx.book.lift_local_defs();
     ctx.desugar_bend()?;
     ctx.desugar_fold()?;
     ctx.desugar_with_blocks()?;
@@ -273,31 +279,16 @@ fn simplify_matches() {
   })
 }
 
-#[test]
-fn parse_file() {
-  run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path)?;
-    let mut ctx = Ctx::new(&mut book, Default::default());
-    ctx.set_entrypoint();
-    ctx.book.encode_adts(AdtEncoding::NumScott);
-    ctx.book.encode_builtins();
-    ctx.resolve_refs().expect("Resolve refs");
-    ctx.desugar_match_defs().expect("Desugar match defs");
-    ctx.prune(false);
-    Ok(book.to_string())
-  })
-}
-
+/// Runs compilation up to encoding `match` terms as lambdas.
 #[test]
 fn encode_pattern_match() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let mut result = String::new();
     for adt_encoding in [AdtEncoding::Scott, AdtEncoding::NumScott] {
       let diagnostics_cfg = DiagnosticsConfig::default();
-      let mut book = do_parse_book_default(code, path)?;
+      let mut book = parse_book_single_file(code, path)?;
       let mut ctx = Ctx::new(&mut book, diagnostics_cfg);
       ctx.check_shared_names();
-      ctx.set_entrypoint();
       ctx.book.encode_adts(adt_encoding);
       ctx.fix_match_defs()?;
       ctx.desugar_open()?;
@@ -305,6 +296,7 @@ fn encode_pattern_match() {
       ctx.resolve_refs()?;
       ctx.desugar_match_defs()?;
       ctx.fix_match_terms()?;
+      ctx.book.lift_local_defs();
       ctx.desugar_bend()?;
       ctx.desugar_fold()?;
       ctx.desugar_with_blocks()?;
@@ -327,6 +319,22 @@ fn encode_pattern_match() {
   })
 }
 
+/// Parses a file, but does not desugar or compile it.
+#[test]
+fn parse_file() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let mut book = parse_book_single_file(code, path)?;
+    let mut ctx = Ctx::new(&mut book, Default::default());
+    ctx.set_entrypoint();
+    ctx.book.encode_adts(AdtEncoding::NumScott);
+    ctx.book.encode_builtins();
+    ctx.resolve_refs().expect("Resolve refs");
+    ctx.prune(false);
+    Ok(book.to_string())
+  })
+}
+
+/// Runs compilation up to the last term-level pass (`bend desugar` command).
 #[test]
 fn desugar_file() {
   run_golden_test_dir(function_name!(), &|code, path| {
@@ -335,12 +343,13 @@ fn desugar_file() {
       unused_definition: Severity::Allow,
       ..DiagnosticsConfig::new(Severity::Error, true)
     };
-    let mut book = do_parse_book_default(code, path)?;
+    let mut book = parse_book_single_file(code, path)?;
     desugar_book(&mut book, compile_opts, diagnostics_cfg, None)?;
     Ok(book.to_string())
   })
 }
 
+/// Runs a file that is expected to hang.
 #[test]
 #[ignore = "bug - the subprocess created by run_book leaks"]
 fn hangs() {
@@ -348,7 +357,7 @@ fn hangs() {
 
   run_golden_test_dir(function_name!(), &move |code, path| {
     let _guard = RUN_MUTEX.lock().unwrap();
-    let book = do_parse_book_default(code, path)?;
+    let book = parse_book_single_file(code, path)?;
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig::new(Severity::Allow, false);
 
@@ -367,10 +376,11 @@ fn hangs() {
   })
 }
 
+/// Compiles a file with a custom entrypoint.
 #[test]
 fn compile_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path)?;
+    let mut book = parse_book_single_file(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
     let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
     let res = compile_book(&mut book, CompileOpts::default(), diagnostics_cfg, None)?;
@@ -378,12 +388,13 @@ fn compile_entrypoint() {
   })
 }
 
+/// Runs a file with a custom entrypoint.
 #[test]
 #[ignore = "while execution with different entrypoints is not implemented for hvm32"]
 fn run_entrypoint() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let _guard = RUN_MUTEX.lock().unwrap();
-    let mut book = do_parse_book_default(code, path)?;
+    let mut book = parse_book_single_file(code, path)?;
     book.entrypoint = Some(Name::new("foo"));
     let compile_opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig { ..DiagnosticsConfig::new(Severity::Error, true) };
@@ -394,6 +405,7 @@ fn run_entrypoint() {
   })
 }
 
+/// Runs a Bend CLI command.
 #[test]
 fn cli() {
   run_golden_test_dir(function_name!(), &|_code, path| {
@@ -414,49 +426,35 @@ fn cli() {
   })
 }
 
+/// Compiles a file to check for mutual recursion.
 #[test]
 fn mutual_recursion() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let diagnostics_cfg =
       DiagnosticsConfig { recursion_cycle: Severity::Error, ..DiagnosticsConfig::new(Severity::Allow, true) };
-    let mut book = do_parse_book_default(code, path)?;
+    let mut book = parse_book_single_file(code, path)?;
     let opts = CompileOpts { merge: true, ..CompileOpts::default() };
     let res = compile_book(&mut book, opts, diagnostics_cfg, None)?;
     Ok(format!("{}{}", res.diagnostics, hvm_book_show_pretty(&res.hvm_book)))
   })
 }
 
+/// Runs a file that uses IO.
 #[test]
 fn io() {
-  run_golden_test_dir_multiple(
-    function_name!(),
-    &[
-      /* (&|code, path| {
-        let _guard = RUN_MUTEX.lock().unwrap();
-        let book = do_parse_book_default(code, path)?;
-        let compile_opts = CompileOpts::default_lazy();
-        let diagnostics_cfg = DiagnosticsConfig::default_lazy();
-        let Output { status, stdout, stderr } =
-          run_book(book, None, RunOpts::lazy(), compile_opts, diagnostics_cfg, None)?;
-        let stderr = String::from_utf8_lossy(&stderr);
-        let status = if !status.success() { format!("\n{status}") } else { String::new() };
-        let stdout = String::from_utf8_lossy(&stdout);
-        Ok(format!("Lazy mode:\n{}{}{}", stderr, status, stdout))
-      }), */
-      (&|code, path| {
-        let _guard = RUN_MUTEX.lock().unwrap();
-        let book = do_parse_book_default(code, path)?;
-        let compile_opts = CompileOpts::default();
-        let diagnostics_cfg = DiagnosticsConfig::default();
-        let (term, _, diags) =
-          run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
-        let res = format!("{diags}{term}");
-        Ok(format!("Strict mode:\n{res}"))
-      }),
-    ],
-  )
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let _guard = RUN_MUTEX.lock().unwrap();
+    let book = parse_book_single_file(code, path)?;
+    let compile_opts = CompileOpts::default();
+    let diagnostics_cfg = DiagnosticsConfig::default();
+    let (term, _, diags) =
+      run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
+    let res = format!("{diags}{term}");
+    Ok(format!("Strict mode:\n{res}"))
+  })
 }
 
+/// Runs all examples in the examples folder.
 #[test]
 fn examples() -> Result<(), Diagnostics> {
   let examples_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("examples");
@@ -472,16 +470,12 @@ fn examples() -> Result<(), Diagnostics> {
     eprintln!("Testing {}", path.display());
     let code = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
 
-    let res = match do_parse_book_default(&code, path) {
-      Ok(book) => {
-        let compile_opts = CompileOpts::default();
-        let diagnostics_cfg = DiagnosticsConfig::default();
-        let (term, _, diags) =
-          run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
-        format!("{diags}{term}")
-      }
-      Err(e) => e.to_string(),
-    };
+    let book = parse_book_single_file(&code, path).unwrap();
+    let compile_opts = CompileOpts::default();
+    let diagnostics_cfg = DiagnosticsConfig::default();
+    let (term, _, diags) =
+      run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
+    let res = format!("{diags}{term}");
 
     let mut settings = insta::Settings::clone_current();
     settings.set_prepend_module_to_snapshot(false);
@@ -496,10 +490,11 @@ fn examples() -> Result<(), Diagnostics> {
   Ok(())
 }
 
+/// Test that the Scott encoding correctly triggers unused definition warnings.
 #[test]
 fn scott_triggers_unused() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path)?;
+    let mut book = parse_book_single_file(code, path)?;
     let opts = CompileOpts::default();
     let diagnostics_cfg =
       DiagnosticsConfig { unused_definition: Severity::Error, ..DiagnosticsConfig::default() };
@@ -509,10 +504,12 @@ fn scott_triggers_unused() {
 }
 
 // TODO: also run the long string file to test the readback
+/// Compiles a file that is very large and takes a long time to compile.
+/// Only outputs if compilation worked without errors.
 #[test]
 fn compile_long() {
   run_golden_test_dir(function_name!(), &|code, path| {
-    let mut book = do_parse_book_default(code, path)?;
+    let mut book = parse_book_single_file(code, path)?;
     let opts = CompileOpts::default().set_all();
     let diagnostics_cfg = DiagnosticsConfig {
       recursion_cycle: Severity::Warning,

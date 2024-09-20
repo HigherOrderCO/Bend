@@ -3,81 +3,120 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/expr.bend
 ---
 Scott
+Expr/Var: (Any -> Expr)
 (Expr/Var) = λa λb λ* λ* λ* λ* λ* λ* λ* λ* (b a)
 
+Expr/Num: (Any -> Expr)
 (Expr/Num) = λa λ* λc λ* λ* λ* λ* λ* λ* λ* (c a)
 
+Expr/App: (Any -> Any -> Expr)
 (Expr/App) = λa λb λ* λ* λe λ* λ* λ* λ* λ* λ* (e a b)
 
+Expr/Fun: (Any -> Any -> Expr)
 (Expr/Fun) = λa λb λ* λ* λ* λf λ* λ* λ* λ* λ* (f a b)
 
+Expr/If: (Any -> Any -> Any -> Expr)
 (Expr/If) = λa λb λc λ* λ* λ* λ* λh λ* λ* λ* λ* (h a b c)
 
+Expr/Let: (Any -> Any -> Any -> Expr)
 (Expr/Let) = λa λb λc λ* λ* λ* λ* λ* λi λ* λ* λ* (i a b c)
 
+Expr/Dup: (Any -> Any -> Any -> Any -> Expr)
 (Expr/Dup) = λa λb λc λd λ* λ* λ* λ* λ* λ* λk λ* λ* (k a b c d)
 
+Expr/Tup: (Any -> Any -> Expr)
 (Expr/Tup) = λa λb λ* λ* λ* λ* λ* λ* λ* λj λ* (j a b)
 
+Expr/Op2: (Any -> Any -> Any -> Expr)
 (Expr/Op2) = λa λb λc λ* λ* λ* λ* λ* λ* λ* λ* λl (l a b c)
 
+Op/Add: Op
 (Op/Add) = λa λ* λ* λ* a
 
+Op/Sub: Op
 (Op/Sub) = λ* λb λ* λ* b
 
+Op/Mul: Op
 (Op/Mul) = λ* λ* λc λ* c
 
+Op/Div: Op
 (Op/Div) = λ* λ* λ* λd d
 
 NumScott
+Expr/Var: (Any -> Expr)
 (Expr/Var) = λa λb (b Expr/Var/tag a)
 
+Expr/Num: (Any -> Expr)
 (Expr/Num) = λa λb (b Expr/Num/tag a)
 
+Expr/App: (Any -> Any -> Expr)
 (Expr/App) = λa λb λc (c Expr/App/tag a b)
 
+Expr/Fun: (Any -> Any -> Expr)
 (Expr/Fun) = λa λb λc (c Expr/Fun/tag a b)
 
+Expr/If: (Any -> Any -> Any -> Expr)
 (Expr/If) = λa λb λc λd (d Expr/If/tag a b c)
 
+Expr/Let: (Any -> Any -> Any -> Expr)
 (Expr/Let) = λa λb λc λd (d Expr/Let/tag a b c)
 
+Expr/Dup: (Any -> Any -> Any -> Any -> Expr)
 (Expr/Dup) = λa λb λc λd λe (e Expr/Dup/tag a b c d)
 
+Expr/Tup: (Any -> Any -> Expr)
 (Expr/Tup) = λa λb λc (c Expr/Tup/tag a b)
 
+Expr/Op2: (Any -> Any -> Any -> Expr)
 (Expr/Op2) = λa λb λc λd (d Expr/Op2/tag a b c)
 
+Op/Add: Op
 (Op/Add) = λa (a Op/Add/tag)
 
+Op/Sub: Op
 (Op/Sub) = λa (a Op/Sub/tag)
 
+Op/Mul: Op
 (Op/Mul) = λa (a Op/Mul/tag)
 
+Op/Div: Op
 (Op/Div) = λa (a Op/Div/tag)
 
+Expr/Var/tag: u24
 (Expr/Var/tag) = 0
 
+Expr/Num/tag: u24
 (Expr/Num/tag) = 1
 
+Expr/App/tag: u24
 (Expr/App/tag) = 2
 
+Expr/Fun/tag: u24
 (Expr/Fun/tag) = 3
 
+Expr/If/tag: u24
 (Expr/If/tag) = 4
 
+Expr/Let/tag: u24
 (Expr/Let/tag) = 5
 
+Expr/Dup/tag: u24
 (Expr/Dup/tag) = 6
 
+Expr/Tup/tag: u24
 (Expr/Tup/tag) = 7
 
+Expr/Op2/tag: u24
 (Expr/Op2/tag) = 8
 
+Op/Add/tag: u24
 (Op/Add/tag) = 0
 
+Op/Sub/tag: u24
 (Op/Sub/tag) = 1
 
+Op/Mul/tag: u24
 (Op/Mul/tag) = 2
 
+Op/Div/tag: u24
 (Op/Div/tag) = 3

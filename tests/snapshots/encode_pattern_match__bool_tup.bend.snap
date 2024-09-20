@@ -3,23 +3,33 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/bool_tup.bend
 ---
 Scott
+unchecked foo: Any
 (foo) = λa let (b, c) = a; (b λd d λ* Bool/F c)
 
+unchecked main: Any
 (main) = (foo (Bool/F, Bool/T))
 
+Bool/T: Bool
 (Bool/T) = λa λ* a
 
+Bool/F: Bool
 (Bool/F) = λ* λb b
 
 NumScott
+unchecked foo: Any
 (foo) = λa let (b, c) = a; (b λd switch d { 0: λe e; _: λ* λ* Bool/F; } c)
 
+unchecked main: Any
 (main) = (foo (Bool/F, Bool/T))
 
+Bool/T: Bool
 (Bool/T) = λa (a Bool/T/tag)
 
+Bool/F: Bool
 (Bool/F) = λa (a Bool/F/tag)
 
+Bool/T/tag: u24
 (Bool/T/tag) = 0
 
+Bool/F/tag: u24
 (Bool/F/tag) = 1

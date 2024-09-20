@@ -1,9 +1,12 @@
 use super::{BindMap, ImportsMap, PackageLoader};
 use crate::{
   diagnostics::{Diagnostics, DiagnosticsConfig},
-  fun::{parser::ParseBook, Adt, Book, Definition, HvmDefinition, Name, Rule, Source, SourceKind, Term},
-  imp::{self, Expr, Stmt},
+  fun::{
+    parser::ParseBook, Adt, AdtCtr, Book, Definition, HvmDefinition, Name, Rule, Source, SourceKind, Term,
+  },
+  imp::{self, Expr, MatchArm, Stmt},
   imports::packages::Packages,
+  maybe_grow,
 };
 use indexmap::{map::Entry, IndexMap};
 use itertools::Itertools;
@@ -29,11 +32,16 @@ impl ParseBook {
   ) -> Result<Book, Diagnostics> {
     let diag = &mut Diagnostics::new(diag_config);
     let pkgs = &mut Packages::new(self);
+    // Load all the imports recursively, saving them in `pkgs`.
+    // `book` is the root book with the entry point.
     let mut book = pkgs.load_imports(&mut loader, diag)?;
 
+    // Apply the imports to the book
     book.apply_imports(None, diag, pkgs)?;
+    diag.fatal(())?;
     eprint!("{}", diag);
 
+    // Convert the parse-level AST into the internal functional representation.
     let mut book = book.to_fun()?;
 
     // Process terms that contains constructors names and can't be updated by `desugar_use`.
@@ -63,8 +71,6 @@ impl ParseBook {
     diag: &mut Diagnostics,
     pkgs: &mut Packages,
   ) -> Result<(), Diagnostics> {
-    diag.start_pass();
-
     let sources = self.import_ctx.sources().into_iter().cloned().collect_vec();
 
     for src in sources {
@@ -101,8 +107,7 @@ impl ParseBook {
         self.add_imported_hvm_def(def, diag);
       }
     }
-
-    diag.fatal(())
+    Ok(())
   }
 
   /// Applies a chain of `use bind = src` to every local definition.
@@ -112,7 +117,6 @@ impl ParseBook {
     // Can not be done outside the function because of the borrow checker.
     // Just serves to pass only the import map of the first call to `apply_imports_go`.
     let main_imports = main_imports.unwrap_or(&self.import_ctx.map);
-
     let mut local_imports = BindMap::new();
     let mut adt_imports = BindMap::new();
 
@@ -151,15 +155,17 @@ impl ParseBook {
 
     for (_, def) in self.local_defs_mut() {
       def.apply_binds(true, &local_imports);
-      def.apply_types(&adt_imports);
+      def.apply_type_binds(&adt_imports);
     }
   }
 
   /// Applying the necessary naming transformations to the book ADTs,
-  /// adding `use ctr = ctr_src` chains to every local definition.
+  /// adding `use ctr = ctr_src` chains to every local definition and
+  /// substituting the name of type ctrs for the canonical ones.
   fn apply_adts(&mut self, src: &Name, main_imports: &ImportsMap) {
     let adts = std::mem::take(&mut self.adts);
     let mut new_adts = IndexMap::new();
+    let mut adts_map = vec![];
     let mut ctrs_map = IndexMap::new();
     let mut new_ctrs = IndexMap::new();
 
@@ -168,13 +174,14 @@ impl ParseBook {
     for (mut name, mut adt) in adts {
       if adt.source.is_local() {
         adt.source.kind = SourceKind::Imported;
+        let old_name = name.clone();
         name = Name::new(format!("{}/{}", src, name));
 
         let mangle_name = !main_imports.contains_source(&name);
         let mut mangle_adt_name = mangle_name;
 
-        for (ctr, f) in std::mem::take(&mut adt.ctrs) {
-          let mut ctr_name = Name::new(format!("{}/{}", src, ctr));
+        for (old_nam, ctr) in std::mem::take(&mut adt.ctrs) {
+          let mut ctr_name = Name::new(format!("{}/{}", src, old_nam));
 
           let mangle_ctr = mangle_name && !main_imports.contains_source(&ctr_name);
 
@@ -183,23 +190,38 @@ impl ParseBook {
             ctr_name = Name::new(format!("__{}", ctr_name));
           }
 
+          let ctr = AdtCtr { name: ctr_name.clone(), ..ctr };
           new_ctrs.insert(ctr_name.clone(), name.clone());
-          ctrs_map.insert(ctr, ctr_name.clone());
-          adt.ctrs.insert(ctr_name, f);
+          ctrs_map.insert(old_nam, ctr_name.clone());
+          adt.ctrs.insert(ctr_name, ctr);
         }
 
         if mangle_adt_name {
           name = Name::new(format!("__{}", name));
         }
+
+        adts_map.push((old_name, name.clone()));
       }
 
       new_adts.insert(name.clone(), adt);
     }
 
-    // Applies the binds for the new constructor names for every definition.
-    // As ADTs names are not used in the syntax, we don't bind their new names.
+    // Apply the binds for the type constructors in the constructor types
+    for (_, adt) in &mut new_adts {
+      for (_, ctr) in &mut adt.ctrs {
+        for (from, to) in &adts_map {
+          ctr.typ.subst_ctr(from, to);
+        }
+      }
+    }
+
+    let adts_map = adts_map.into_iter().collect::<IndexMap<_, _>>();
     for (_, def) in self.local_defs_mut() {
+      // Applies the binds for the new constructor names for every definition.
       def.apply_binds(true, &ctrs_map);
+
+      // Apply the binds for the type constructors in the def types and in the `def` terms.
+      def.apply_type_binds(&adts_map);
     }
 
     self.adts = new_adts;
@@ -308,11 +330,13 @@ trait Def {
     *def_name = new_name;
   }
 
-  /// Should apply the binds to the definition,
-  /// and if there are possible constructor names on it, rename rule patterns.
+  /// Applies the binds for definition names by placing `use` terms.
+  ///
+  /// If we know that the bind map doesn't contain any constructor names,
+  /// we skip renaming rule patterns.
   fn apply_binds(&mut self, maybe_constructor: bool, binds: &BindMap);
 
-  fn apply_types(&mut self, types: &BindMap);
+  fn apply_type_binds(&mut self, binds: &BindMap);
 
   fn source(&self) -> &Source;
   fn source_mut(&mut self) -> &mut Source;
@@ -340,19 +364,12 @@ impl Def for Definition {
     }
   }
 
-  fn apply_types(&mut self, types: &BindMap) {
-    fn rename_with_type(bod: &mut Term, types: &BindMap) {
-      if let Term::With { typ, .. } = bod {
-        if let Some(alias) = types.get(typ).cloned() {
-          *typ = alias;
-        }
+  fn apply_type_binds(&mut self, binds: &BindMap) {
+    for (from, to) in binds.iter().rev() {
+      self.typ.subst_ctr(from, to);
+      for rule in &mut self.rules {
+        rule.body.subst_type_ctrs(from, to);
       }
-      for child in bod.children_mut() {
-        rename_with_type(child, types);
-      }
-    }
-    for rule in self.rules.iter_mut() {
-      rename_with_type(&mut rule.body, types);
     }
   }
 
@@ -375,84 +392,90 @@ impl Def for imp::Definition {
     self.body = bod.fold_uses(binds.iter().rev());
   }
 
-  fn apply_types(&mut self, types: &BindMap) {
-    fn rename_with_type(bod: &mut Stmt, types: &BindMap) {
-      match bod {
-        Stmt::With { typ, bod, nxt } => {
-          if let Some(alias) = types.get(typ).cloned() {
-            *typ = alias
-          }
-          rename_with_type(bod, types);
-          if let Some(nxt) = nxt {
-            rename_with_type(nxt, types);
-          }
-        }
+  fn apply_type_binds(&mut self, binds: &BindMap) {
+    fn subst_type_ctrs_stmt(stmt: &mut Stmt, from: &Name, to: &Name) {
+      maybe_grow(|| match stmt {
         Stmt::Assign { nxt, .. } => {
           if let Some(nxt) = nxt {
-            rename_with_type(nxt, types);
+            subst_type_ctrs_stmt(nxt, from, to);
           }
         }
         Stmt::InPlace { nxt, .. } => {
-          rename_with_type(nxt, types);
+          subst_type_ctrs_stmt(nxt, from, to);
         }
         Stmt::If { then, otherwise, nxt, .. } => {
-          rename_with_type(then, types);
-          rename_with_type(otherwise, types);
+          subst_type_ctrs_stmt(then, from, to);
+          subst_type_ctrs_stmt(otherwise, from, to);
           if let Some(nxt) = nxt {
-            rename_with_type(nxt, types);
+            subst_type_ctrs_stmt(nxt, from, to);
           }
         }
         Stmt::Match { arms, nxt, .. } => {
-          for arm in arms {
-            rename_with_type(&mut arm.rgt, types);
+          for MatchArm { lft: _, rgt } in arms {
+            subst_type_ctrs_stmt(rgt, from, to);
           }
           if let Some(nxt) = nxt {
-            rename_with_type(nxt, types);
+            subst_type_ctrs_stmt(nxt, from, to);
           }
         }
         Stmt::Switch { arms, nxt, .. } => {
           for arm in arms {
-            rename_with_type(arm, types);
+            subst_type_ctrs_stmt(arm, from, to);
           }
           if let Some(nxt) = nxt {
-            rename_with_type(nxt, types);
+            subst_type_ctrs_stmt(nxt, from, to);
           }
         }
         Stmt::Bend { step, base, nxt, .. } => {
-          rename_with_type(step, types);
-          rename_with_type(base, types);
+          subst_type_ctrs_stmt(step, from, to);
+          subst_type_ctrs_stmt(base, from, to);
           if let Some(nxt) = nxt {
-            rename_with_type(nxt, types);
+            subst_type_ctrs_stmt(nxt, from, to);
           }
         }
         Stmt::Fold { arms, nxt, .. } => {
-          for arm in arms {
-            rename_with_type(&mut arm.rgt, types);
+          for MatchArm { lft: _, rgt } in arms {
+            subst_type_ctrs_stmt(rgt, from, to);
           }
           if let Some(nxt) = nxt {
-            rename_with_type(nxt, types);
+            subst_type_ctrs_stmt(nxt, from, to);
+          }
+        }
+        Stmt::With { typ, bod, nxt } => {
+          if typ == from {
+            *typ = to.clone();
+          }
+          subst_type_ctrs_stmt(bod, from, to);
+          if let Some(nxt) = nxt {
+            subst_type_ctrs_stmt(nxt, from, to);
           }
         }
         Stmt::Ask { nxt, .. } => {
           if let Some(nxt) = nxt {
-            rename_with_type(nxt, types);
+            subst_type_ctrs_stmt(nxt, from, to);
           }
         }
         Stmt::Return { .. } => {}
-        Stmt::Open { nxt, .. } => {
-          rename_with_type(nxt, types);
+        Stmt::Open { typ, nxt, .. } => {
+          if typ == from {
+            *typ = to.clone();
+          }
+          subst_type_ctrs_stmt(nxt, from, to);
         }
         Stmt::Use { nxt, .. } => {
-          rename_with_type(nxt, types);
+          subst_type_ctrs_stmt(nxt, from, to);
         }
         Stmt::LocalDef { def, nxt } => {
-          def.apply_types(types);
-          rename_with_type(nxt, types);
+          def.apply_type_binds(&[(from.clone(), to.clone())].into_iter().collect());
+          subst_type_ctrs_stmt(nxt, from, to);
         }
         Stmt::Err => {}
-      }
+      })
     }
-    rename_with_type(&mut self.body, types);
+    for (from, to) in binds.iter().rev() {
+      self.typ.subst_ctr(from, to);
+      subst_type_ctrs_stmt(&mut self.body, from, to);
+    }
   }
 
   fn source(&self) -> &Source {
@@ -472,7 +495,11 @@ impl Def for HvmDefinition {
   /// Do nothing, can not apply binds to a HvmDefinition.
   fn apply_binds(&mut self, _maybe_constructor: bool, _binds: &BindMap) {}
 
-  fn apply_types(&mut self, _types: &BindMap) {}
+  fn apply_type_binds(&mut self, binds: &BindMap) {
+    for (from, to) in binds.iter().rev() {
+      self.typ.subst_ctr(from, to);
+    }
+  }
 
   fn source(&self) -> &Source {
     &self.source

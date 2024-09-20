@@ -1,17 +1,24 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/simplify_matches/redundant_cases.bend
+input_file: tests/golden_tests/simplify_matches/irrefutable_case.bend
 ---
+unchecked l: Any
 (l) = 1001
 
+unchecked v1: Any
 (v1) = l
 
+unchecked v2: Any
 (v2) = l
 
+unchecked v3: Any
 (v3) = 2002
 
+unchecked v4: Any
 (v4) = 3003
 
+unchecked v5: Any
 (v5) = (λa a 5005)
 
+unchecked main: Any
 (main) = (v1, v2, v3, v4, v5)

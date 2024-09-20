@@ -12,173 +12,159 @@
 ###########################################
 
 # List clear:
-# List l -> list l
 # clears all elements from list l. This is equivalent to initializing an empty list.
-clear = @l []
+clear : (List t) -> (List t) = @l []
 
 # List concat:
-# List l -> List l
 # combines two lists (l1, l2) from left to right.
-concat = @l1 @l2
+concat : (List t) -> (List t) -> (List t) = 
+  @l1 @l2
   match l1 {
     List/Cons: (List/Cons l1.head (concat l1.tail l2))
     List/Nil: l2
   }
 
 # List add_front:
-# List l -> List l
-# adds a non-List element e to the front of list l.
-add_front = @l @e
+# adds an element e to the front of list l.
+add_front : (List t) -> t -> (List t) = 
+  @l @e
   match l {
     List/Cons: (List/Cons e l)
     List/Nil: (List/Cons e List/Nil)
   }
 
 # List append (add_back):
-# List l -> List l
-# adds a non-list element e to the back of list l.
-append = @l @e
-  (concat l (List/Cons e List/Nil))
+# adds an element e to the back of list l.
+append : (List t) -> t -> (List t) = 
+  @l @e (concat l (List/Cons e List/Nil))
 
 # list sum:
-# List l -> uint
 # returns the sum of all items in the list. 
-sum = @l
+sum : (List u24) -> u24 = @l
   match l {
     List/Cons: (+ l.head (sum l.tail))
     List/Nil: 0
   }
 
 # List reverse:
-# List l -> List l
 # reverses the order of elements in list l.
-reverse.aux = @acc @l
+reverse.aux : (List t) -> (List t) -> (List t) = 
+  @acc @l 
   match l {
     List/Nil: acc
     List/Cons: (reverse.aux (List/Cons l.head acc) l.tail)
   }
-reverse = @l
-  (reverse.aux [] l)
+reverse : (List t) -> (List t) = 
+  @l (reverse.aux [] l)
 
 # List length:
-# List l -> uint
 # returns the number of elements in list l.
-len = @l
+len : (List t) -> u24 = 
+  @l 
   match l {
     List/Nil: 0
     List/Cons: (+ 1 (len l.tail))
   }
 
 # List count:
-# List l -> uint -> uint
-# returns the number of instances of Some s in list l.
-count.aux = @acc @l @s
+# returns the number of instances of some number n in list l.
+count.aux : u24 -> (List u24) -> u24 -> u24 =
+  @acc @l @n
   match l {
     List/Nil: acc
-    List/Cons: use acc = switch (== l.head s) {
-      0: acc;
-      _: (+ acc 1);
-    }
-    (count.aux acc l.tail s)
+    List/Cons: 
+      let acc = if (== l.head n) { (+ acc 1) } else { acc }
+      (count.aux acc l.tail n)
   }
-count = @l @s
-  (count.aux 0 l s)
+count = @l @n
+  (count.aux 0 l n)
 
 # List index:
-# List l -> Some s
 # returns the value of a specific list index i, or * if the index doesn't exist.
-index = @l @i
+index : (List t) -> u24 -> (Result t None) = 
+  @l @i
   match l {
     List/Cons: 
       switch i {
-        0: l.head
+        0: (Result/Ok l.head)
         _: (index l.tail (i-1))
       }
-    List/Nil: *
+    List/Nil: (Result/Err *)
   }
 
 # List head:
-# List l -> Some s
 # returns the first item in the list, or [] if the list is empty.
-head = @l
+head : (List t) -> (Result t None) = 
+  @l
   match l {
-    List/Cons: l.head
-    List/Nil: []
+    List/Cons: (Result/Ok l.head)
+    List/Nil : (Result/Err *)
   }
 
 # List tail:
-# List l -> List
-# returns the list except for the first item in it, or [] if the list is empty.
-def tail(l):
-  match l:
-    case List/Cons:
-      return l.tail
-    case List/Nil:
-      return []
+# returns the list whithout the first item, or [] if the list is empty.
+tail : (List t) -> (List t) = 
+  @l
+  match l {
+    List/Cons: l.tail
+    List/Nil: []
+  }
 
 # List equals:
-# List xs, List ys, function cmp -> 1|0
 # Compares the elements in two lists and returns 1 if they're equal, and 0 otherwise.
 # The function cmp compares two values and returns 1 if they're equal, and 0 otherwise. 
-equals xs ys cmp = match xs {
-  List/Cons: match ys {
-    List/Cons: if (cmp xs.head ys.head) {
-      (equals xs.tail ys.tail cmp)
-    } else {
-      0
-    }
-    List/Nil: 0
-  }
-  List/Nil: match ys {
-    List/Cons: 0
-    List/Nil: 1
-  }
-}
+equals (xs: (List a)) (ys: (List b)) (cmp: a -> b -> u24) : u24
+equals (List/Cons x xs) (List/Cons y ys) cmp = if (cmp x y) { (equals xs ys cmp) } else { 0 }
+equals (List/Cons x xs)  List/Nil        cmp = 0
+equals  List/Nil        (List/Cons y ys) cmp = 0
+equals  List/Nil         List/Nil        cmp = 1
 
 # List pop_front: 
-# List l -> List l
 # removes and discards the first item of list l.
 # The new list is returned, or [] if the list is empty.
-pop_front = @l
+pop_front : (List t) -> (List t) =
+  @l
   match l {
     List/Cons: l.tail
     List/Nil: []
   }
 
 # List pop_back:
-# List l -> List l
 # removes and discards the the last item of list l.
+pop_back : (List t) -> (List t)
 pop_back (List/Nil) = List/Nil
 pop_back (List/Cons x List/Nil) = List/Nil
 pop_back (List/Cons head tail) = (List/Cons head (pop_back tail))
   
 # List remove:
-# List l -> Some s -> List l 
 # removes the first occurrence of element e from list l.
-remove = @l @s
+remove : (List u24) -> u24 -> (List u24) =
+  @l @s
   match l {
     List/Cons:
-      switch (== l.head s) {
-        0: (List/Cons l.head (remove l.tail s))
-        _: l.tail
+      if (== l.head s) {
+        l.tail
+      } else {
+        (List/Cons l.head (remove l.tail s))
       }
     List/Nil: List/Nil
   }
 
 # List split:
-# list l -> uint i -> (List l, list l)
 # splits list l into two lists (l1, l2) at index i.
 # the second list takes the element at index i during the split.
-split = @l @i (split.aux [] l i)
+split : (List t) -> u24 -> ((List t), (List t)) =
+  @l @i (split.aux [] l i)
 
-split.aux = @acc @l @i
+split.aux : (List t) -> (List t) -> u24 -> ((List t), (List t)) =
+  @acc @l @i
   match l {
     List/Cons: 
       switch i {
         0: (acc, l)
         _: (split.aux (append acc l.head) l.tail i-1)
       }
-    List/Nil: *
+    List/Nil: (acc, [])
   }
 
 

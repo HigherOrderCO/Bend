@@ -7,7 +7,6 @@ use std::collections::HashSet;
 
 impl Ctx<'_> {
   pub fn check_unbound_refs(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
     for def in self.book.defs.values() {
       let mut unbounds = HashSet::new();
       for rule in def.rules.iter() {

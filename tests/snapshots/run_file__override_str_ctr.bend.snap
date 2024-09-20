@@ -5,4 +5,5 @@ input_file: tests/golden_tests/run_file/override_str_ctr.bend
 [4m[1m[31mErrors:[0m
 [1mIn [4mtests/golden_tests/run_file/override_str_ctr.bend[0m[1m :[0m
 Redefinition of builtin (constructor) 'String/Cons'.
+Location:
 [0m  1 | [4m[31mString/Cons = *[0m

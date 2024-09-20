@@ -105,7 +105,7 @@ struct RunArgs {
   #[arg(help = "Path to the input file")]
   path: PathBuf,
 
-  #[arg(value_parser = |arg: &str| bend::fun::parser::TermParser::new(arg).parse_term())]
+  #[arg(value_parser = |arg: &str| bend::fun::parser::FunParser::new(Name::new(""), arg, false).parse_term())]
   arguments: Option<Vec<bend::fun::Term>>,
 }
 
@@ -188,6 +188,8 @@ pub enum OptArgs {
   NoCheckNetSize,
   AdtScott,
   AdtNumScott,
+  TypeCheck,
+  NoTypeCheck,
 }
 
 fn compile_opts_from_cli(args: &Vec<OptArgs>, compiler_target: CompilerTarget) -> CompileOpts {
@@ -213,6 +215,8 @@ fn compile_opts_from_cli(args: &Vec<OptArgs>, compiler_target: CompilerTarget) -
       NoInline => opts.inline = false,
       CheckNetSize => opts.check_net_size = true,
       NoCheckNetSize => opts.check_net_size = false,
+      TypeCheck => opts.type_check = true,
+      NoTypeCheck => opts.type_check = false,
 
       LinearizeMatches => opts.linearize_matches = OptLevel::Enabled,
       LinearizeMatchesAlt => opts.linearize_matches = OptLevel::Alt,

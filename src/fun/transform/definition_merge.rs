@@ -42,10 +42,12 @@ impl Book {
         // it's based on.
         // This could be done by having SourceKind::Generated contain a Vec<Source> or Vec<Definition>.
         let any_def_name = equal_defs.iter().next().unwrap(); // we know we can unwrap since equal_defs.len() > 1
-        let source = self.defs[any_def_name].source.clone();
 
         // Add the merged def
-        let new_def = Definition::new_gen(new_name.clone(), vec![Rule { pats: vec![], body: term }], source);
+        let source = self.defs[any_def_name].source.clone();
+        let rules = vec![Rule { pats: vec![], body: term }];
+        // Note: This will erase types, so type checking needs to come before this.
+        let new_def = Definition::new_gen(new_name.clone(), rules, source, false);
         self.defs.insert(new_name.clone(), new_def);
         // Remove the old ones and write the map of old names to new ones.
         for name in equal_defs {

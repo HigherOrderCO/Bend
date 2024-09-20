@@ -10,6 +10,10 @@ Click [here](#import-syntax) to see the import syntax.
 
 Click [here](#comments) to see the syntax for commenting code.
 
+Click [here](#imp-type-syntax) to see the imperative type syntax.
+
+Click [here](#fun-type-syntax) to see the functional type syntax.
+
 Both syntaxes can be mixed in the same file like the example below:
 
 ```python
@@ -44,12 +48,15 @@ main =
 Defines a top level function.
 
 ```python
-def add(x, y):
+def add(x: u24, y: u24) -> u24:
   result = x + y
   return result
 
+def unchecked two() -> u24:
+  return 2
+
 def main:
-  return add(40, 2)
+  return add(40, two)
 ```
 
 A function definition is composed by a name, a sequence of parameters and a body.
@@ -58,6 +65,10 @@ A top-level name can be anything matching the regex `[A-Za-z0-9_.-/]+`, except i
 
 The last statement of each function must either be a `return` or a selection statement (`if`, `switch`, `match`, `fold`)
 where all branches `return`.
+
+Each parameter of the function can receive a type annotation with `param_name: type` and the return value of the function can also be annotated with `def fn_name(args) -> return_type:`.
+
+We can force the type-checker to run or not on a specific function by adding `checked` or `unchecked` between `def` and the function name.
 
 ### Type
 
@@ -68,14 +79,16 @@ type Option:
   Some { value }
   None
 
-type Tree:
-  Node { value, ~left, ~right }
+type Tree(T):
+  Node { value: T, ~left: Tree(T), ~right: Tree(T) }
   Leaf
 ```
 
 Type names must be unique, and should have at least one constructor.
 
-Each constructor is defined by a name followed by its fields.
+For a generic or polymorphic type, all type variables used in the constructors must be declared first in the type definition with `type Name(type_var1, ...):`
+
+Each constructor is defined by a name followed by its fields. The fields can be annotated with types that will be checked when creating values of that type.
 
 The `~` notation indicates a recursive field. To use `fold` statements with a type its recursive fields must be correctly marked with `~`.
 
@@ -89,9 +102,9 @@ Read [defining data types](./defining-data-types.md) to know more.
 Defines a type with a single constructor (like a struct, a record or a class).
 
 ```python
-object Pair { fst, snd }
+object Pair(A, B) { fst: A, snd: B }
 
-object Function { name, args, body }
+object Function(T) { name: String, args, body: T }
 
 object Vec { len, data }
 ```
@@ -1256,6 +1269,11 @@ hvm link_ports:
   (a (b *))
   & (c a) ~ (d e)
   & (e b) ~ (d c)
+
+# Casts a `u24` to itself.
+# We can give type annotations to HVM definitions.
+hvm u24_to_u24 -> (u24 -> u24):
+  ($([u24] ret) ret)
 ```
 
 It's also possible to define functions using HVM syntax. This can be
@@ -1337,4 +1355,249 @@ Multi-line commenting should also be used to document code.
 #}
 def second(x, y):
   return y
+```
+
+<div id="imp-type-syntax"></div>
+
+# Imp Type Syntax
+
+## Variable
+
+Any name represents a type variable.
+
+Used in generic or polymorphic type definitions.
+
+```python
+# T is a type variable
+type Option(T):
+  Some { value: T }
+  None
+
+# A is a type variable
+def id(x: A) -> A:
+  return x
+```
+
+## Constructor
+
+`Ctr(...)` represents a constructor type.
+
+Used for defining custom data types or algebraic data types.
+Can contain other types as parameters.
+
+```python
+def head(list: List(T)) -> Option(T)
+  match list:
+    case List/Nil:
+      return Option/None
+    case List/Cons:
+      return Option/Some(list.head)
+```
+
+## Any
+
+`Any` represents the untyped type.
+
+It accepts values of alls type and will forcefully cast any type to `Any`.
+
+Can be used for values that can't be statically typed, either because
+they are unknown (like in raw IO calls), because they contain untypable
+expressions (like unscoped variables), or because the expression cannot
+be typed with the current type system (like the self application `lambda x: x(x)`).
+
+```python
+def main -> Any:
+  return 24
+```
+
+## None
+
+`None` represents the eraser `*` or absence of a value.
+
+Often used to indicate that a function doesn't return anything.
+
+```python
+def none -> None:
+  return *
+```
+
+## Hole
+
+`_` represents a hole type.
+
+This will let the type checker infer the most general type for an argument or return value.
+
+```python
+def increment(x: _) -> _:
+  return x + 1
+```
+
+## u24
+
+`u24` represents an unsigned 24-bit integer.
+
+```python
+def zero -> u24:
+  return 0
+```
+
+## i24
+
+`i24` represents a signed 24-bit integer.
+
+```python
+def random_integer -> i24:
+  return -42
+```
+
+## f24
+
+`f24` represents a 24-bit floating-point number.
+
+```python
+def PI -> f24:
+  return 3.14
+```
+
+## Tuple
+
+`(_, _, ...)` represents a tuple type.
+
+Can contain two or more types separated by commas.
+
+```python
+def make_tuple(fst: A, snd: B) -> (A, B):
+  return (fst, snd)
+```
+
+## Function
+
+`a -> b` represents a function type.
+
+`a` is the input type, and `b` is the output type.
+
+```python
+def apply(f: A -> B, arg: A) -> B:
+  return f(arg)
+```
+
+<div id="fun-type-syntax"></div>
+
+# Fun Type Syntax
+
+## Variable
+
+Any name represents a type variable.
+
+Used in generic or polymorphic type definitions.
+
+```python
+# T is a type variable
+type (Option T)
+  = (Some T)
+  | None
+
+# A is a type variable
+id : A -> A
+id x = x
+```
+
+## Constructor
+
+`(Ctr ...)` represents a constructor type.
+
+Used for defining custom data types or algebraic data types.
+Can contain other types as parameters.
+
+```python
+head : (List T) -> (Option T)
+head [] = Option/None
+head (List/Cons head _) = (Option/Some head)
+```
+
+## Any
+
+`Any` represents the untyped type.
+
+It accepts values of alls type and will forcefully cast any type to `Any`.
+
+Can be used for values that can't be statically typed, either because
+they are unknown (like in raw IO calls), because they contain untypable
+expressions (like unscoped variables), or because the expression cannot
+be typed with the current type system (like the self application `λx (x x)`).
+
+```python
+main : Any
+main = @x x
+```
+
+## None
+
+`None` represents the eraser `*` or absence of a value.
+
+Often used to indicate that a function doesn't return anything.
+
+```python
+none : None
+none = *
+```
+
+## Hole
+
+`_` represents a hole type.
+
+This will let the type checker infer the most general type for an argument or return value.
+
+```python
+increment : _ -> _
+increment x = (+ x 1)
+```
+
+## u24
+
+`u24` represents an unsigned 24-bit integer.
+
+```python
+zero : u24
+zero = 0
+```
+
+## i24
+
+`i24` represents a signed 24-bit integer.
+
+```python
+random_integer : i24
+random_integer = -24
+```
+
+## f24
+
+`f24` represents a 24-bit floating-point number.
+
+```python
+PI : f24
+PI = 3.14
+```
+
+## Tuple
+
+`(_, _, ...)` represents a tuple type.
+
+Can contain two or more types separated by commas.
+
+```python
+make_tuple : A -> B -> (A, B)
+make_tuple fst snd = (fst, snd)
+```
+
+## Function
+
+`a -> b` represents a function type.
+
+`a` is the input type, and `b` is the output type.
+
+```python
+apply : (A -> B) -> A -> B
+apply f arg = (f arg)
 ```

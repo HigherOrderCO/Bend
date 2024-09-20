@@ -2,4 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/switch_with_use.bend
 ---
+unchecked main: Any
 (main) = λa λb λc λ* λ* (switch c { 0: λd d; _: λe λf (e f); } (a b))

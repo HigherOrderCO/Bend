@@ -2,34 +2,50 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/ask_branch.bend
 ---
-(undefer) = λa (a λb b)
-
+IO/MAGIC: (u24, u24)
 (IO/MAGIC) = (13683217, 16719857)
 
+IO/wrap: (a -> (IO a))
 (IO/wrap) = λa (IO/Done IO/MAGIC a)
 
+IO/bind: ((IO a) -> ((c -> c) -> a -> (IO b)) -> (IO b))
 (IO/bind) = λa λb (a IO/bind__C2 b)
 
+undefer: (((a -> a) -> b) -> b)
+(undefer) = λa (a λb b)
+
+unchecked main: Any
 (main) = (IO/bind (Bool/T λa switch a { 0: (IO/wrap 0); _: λ* (IO/wrap 0); }) λb (b λc λd (c d) IO/wrap))
 
+IO/Done: ((u24, u24) -> a -> (IO a))
 (IO/Done) = λa λb λc (c IO/Done/tag a b)
 
+IO/Call: ((u24, u24) -> String -> Any -> ((Result Any (IOError Any)) -> (IO a)) -> (IO a))
 (IO/Call) = λa λb λc λd λe (e IO/Call/tag a b c d)
 
+Bool/T: Bool
 (Bool/T) = λa (a Bool/T/tag)
 
+Bool/F: Bool
 (Bool/F) = λa (a Bool/F/tag)
 
+IO/Done/tag: u24
 (IO/Done/tag) = 0
 
+IO/Call/tag: u24
 (IO/Call/tag) = 1
 
+Bool/T/tag: u24
 (Bool/T/tag) = 0
 
+Bool/F/tag: u24
 (Bool/F/tag) = 1
 
+IO/bind__C0: _
 (IO/bind__C0) = λ* λa λb (undefer b a)
 
-(IO/bind__C1) = λ* λ* λa λb λc λd (IO/Call IO/MAGIC a b λe (IO/bind (c e) d))
+IO/bind__C1: _
+(IO/bind__C1) = λ* λa λb λc λd λe (IO/Call a b c λf (IO/bind (d f) e))
 
+IO/bind__C2: _
 (IO/bind__C2) = λa switch a { 0: IO/bind__C0; _: IO/bind__C1; }

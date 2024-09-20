@@ -15,8 +15,6 @@ pub enum DesugarMatchDefErr {
 impl Ctx<'_> {
   /// Converts equational-style pattern matching function definitions into trees of match terms.
   pub fn desugar_match_defs(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     for (def_name, def) in self.book.defs.iter_mut() {
       let errs = def.desugar_match_def(&self.book.ctrs, &self.book.adts);
       for err in errs {
@@ -460,8 +458,8 @@ fn switch_rule(
   let old_args = args.split_off(1);
 
   let mut new_arms = vec![];
-  for (ctr, fields) in &adts[&adt_name].ctrs {
-    let new_args = fields.iter().map(|f| Name::new(format!("{}.{}", arg, f.nam)));
+  for (ctr_nam, ctr) in &adts[&adt_name].ctrs {
+    let new_args = ctr.fields.iter().map(|f| Name::new(format!("{}.{}", arg, f.nam)));
     let args = new_args.clone().chain(old_args.clone()).collect();
 
     let mut new_rules = vec![];
@@ -472,7 +470,7 @@ fn switch_rule(
         // (Ctr pat0_0 ... pat0_m) pat1 ... patN: body
         // becomes
         // pat0_0 ... pat0_m pat1 ... patN: body
-        Pattern::Ctr(found_ctr, new_pats) if ctr == found_ctr => {
+        Pattern::Ctr(found_ctr, new_pats) if ctr_nam == found_ctr => {
           let pats = new_pats.iter().cloned().chain(old_pats).collect();
           let body = rule.body.clone();
           let rule = Rule { pats, body };
@@ -488,7 +486,7 @@ fn switch_rule(
           let pats = new_pats.chain(old_pats.clone()).collect();
           let mut body = rule.body.clone();
           let reconstructed_var =
-            Term::call(Term::Ref { nam: ctr.clone() }, new_args.clone().map(|nam| Term::Var { nam }));
+            Term::call(Term::Ref { nam: ctr_nam.clone() }, new_args.clone().map(|nam| Term::Var { nam }));
           if let Some(var) = var {
             body =
               Term::Use { nam: Some(var.clone()), val: Box::new(reconstructed_var), nxt: Box::new(body) };
@@ -501,11 +499,11 @@ fn switch_rule(
     }
 
     if new_rules.is_empty() {
-      return Err(DesugarMatchDefErr::AdtNotExhaustive { adt: adt_name, ctr: ctr.clone() });
+      return Err(DesugarMatchDefErr::AdtNotExhaustive { adt: adt_name, ctr: ctr_nam.clone() });
     }
 
     let body = simplify_rule_match(args, new_rules, with.clone(), ctrs, adts)?;
-    new_arms.push((Some(ctr.clone()), new_args.map(Some).collect(), body));
+    new_arms.push((Some(ctr_nam.clone()), new_args.map(Some).collect(), body));
   }
 
   // Linearize previously matched vars and current args.
@@ -566,7 +564,7 @@ impl Pattern {
     match self {
       Pattern::Var(_) | Pattern::Chn(_) => Type::Any,
       Pattern::Ctr(ctr_nam, _) => {
-        let adt_nam = ctrs.get(ctr_nam).expect("Unknown constructor '{ctr_nam}'");
+        let adt_nam = ctrs.get(ctr_nam).unwrap_or_else(|| panic!("Unknown constructor '{ctr_nam}'"));
         Type::Adt(adt_nam.clone())
       }
       Pattern::Fan(is_tup, tag, args) => Type::Fan(*is_tup, tag.clone(), args.len()),

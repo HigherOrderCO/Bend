@@ -37,13 +37,11 @@ impl Ctx<'_> {
   /// * If either included one of the cases more than once (including wildcard patterns), we'd get a warning.
   /// ```hvm
   /// match x {
-  ///   Cons: (A x.h x.t)
+  ///   Cons x.h x.t: (A x.h x.t)
   ///   Nil: let %matched = (Foo y); switch %matched { 0: B; 1: C; _: D }
   /// }
   /// ```
   pub fn fix_match_terms(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     for def in self.book.defs.values_mut() {
       for rule in def.rules.iter_mut() {
         let errs = rule.body.fix_match_terms(&self.book.ctrs, &self.book.adts);
@@ -159,15 +157,15 @@ impl Term {
 
         // Build the match arms, with all constructors
         let mut new_rules = vec![];
-        for (ctr, fields) in adt_ctrs.iter() {
-          let fields = fields.iter().map(|f| Some(match_field(&bnd, &f.nam))).collect::<Vec<_>>();
-          let body = if let Some(Some(body)) = bodies.remove(ctr) {
+        for (ctr_nam, ctr) in adt_ctrs.iter() {
+          let fields = ctr.fields.iter().map(|f| Some(match_field(&bnd, &f.nam))).collect::<Vec<_>>();
+          let body = if let Some(Some(body)) = bodies.remove(ctr_nam) {
             body
           } else {
-            errs.push(FixMatchErr::NonExhaustiveMatch { typ: adt_nam.clone(), missing: ctr.clone() });
+            errs.push(FixMatchErr::NonExhaustiveMatch { typ: adt_nam.clone(), missing: ctr_nam.clone() });
             Term::Err
           };
-          new_rules.push((Some(ctr.clone()), fields, body));
+          new_rules.push((Some(ctr_nam.clone()), fields, body));
         }
         *arms = new_rules;
         return;
@@ -248,7 +246,7 @@ fn fixed_match_arms<'a>(
         if let Some(var) = &rules[rule_idx].0 {
           new_body = Term::Use {
             nam: Some(var.clone()),
-            val: Box::new(rebuild_ctr(bnd, ctr, &adts[adt_nam].ctrs[&**ctr])),
+            val: Box::new(rebuild_ctr(bnd, ctr, &adts[adt_nam].ctrs[&**ctr].fields)),
             nxt: Box::new(new_body),
           };
         }

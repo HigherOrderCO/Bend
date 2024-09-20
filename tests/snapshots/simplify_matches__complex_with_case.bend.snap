@@ -2,14 +2,20 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/complex_with_case.bend
 ---
+unchecked map: Any
 (map) = λa λb (match b { Tree_/Node c d e f: λg (Tree_/Node (map g c) (map g d) (map g e) (map g f)); Tree_/Leaf h: λi (Tree_/Leaf (i h)); } a)
 
+unchecked main: Any
 (main) = map
 
+Tree_/Node: (Any -> Any -> Any -> Any -> Tree_)
 (Tree_/Node) = λa λb λc λd λe (e Tree_/Node/tag a b c d)
 
+Tree_/Leaf: (Any -> Tree_)
 (Tree_/Leaf) = λa λb (b Tree_/Leaf/tag a)
 
+Tree_/Node/tag: u24
 (Tree_/Node/tag) = 0
 
+Tree_/Leaf/tag: u24
 (Tree_/Leaf/tag) = 1

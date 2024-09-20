@@ -3,7 +3,7 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/run_file/superposed_is_even.bend
 ---
 NumScott:
-{{B/T B/F} {B/T B/F}}
+{{MyBool/T MyBool/F} {MyBool/T MyBool/F}}
 
 Scott:
-{{B/T B/F} {B/T B/F}}
+{{MyBool/T MyBool/F} {MyBool/T MyBool/F}}

@@ -3,19 +3,27 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/merge_recursive.bend
 ---
 Scott
+unchecked foo_1: Any
 (foo_1) = λa (a foo_2)
 
+unchecked foo_2: Any
 (foo_2) = λa λb (a, b)
 
+unchecked bar_1: Any
 (bar_1) = λa (a bar_2)
 
+unchecked bar_2: Any
 (bar_2) = λa λb (a, b)
 
 NumScott
+unchecked foo_1: Any
 (foo_1) = λa (a foo_2)
 
+unchecked foo_2: Any
 (foo_2) = λa λb (a, b)
 
+unchecked bar_1: Any
 (bar_1) = λa (a bar_2)
 
+unchecked bar_2: Any
 (bar_2) = λa λb (a, b)

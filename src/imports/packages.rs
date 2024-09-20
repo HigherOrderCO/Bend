@@ -11,6 +11,7 @@ pub struct Packages {
   /// Map from source name to parsed book.
   pub books: IndexMap<Name, RefCell<ParseBook>>,
   /// Already loaded ADTs information to be used when applying ADT binds.
+  /// Source path -> ADT names -> constructor names.
   pub loaded_adts: IndexMap<Name, IndexMap<Name, Vec<Name>>>,
   /// Queue of books indexes that still needs to load its imports.
   load_queue: VecDeque<usize>,
@@ -32,10 +33,7 @@ impl Packages {
     loader: &mut impl PackageLoader,
     diag: &mut Diagnostics,
   ) -> Result<ParseBook, Diagnostics> {
-    diag.start_pass();
-
     self.load_imports_go(0, None, loader)?;
-
     while let Some(idx) = self.load_queue.pop_front() {
       let parent_dir = {
         let book = self.books[idx].borrow();

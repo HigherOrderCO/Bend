@@ -2,4 +2,5 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/era.bend
 ---
+unchecked Main: Any
 (Main) = *

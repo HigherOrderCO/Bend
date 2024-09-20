@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/io/load.bend
 ---
 Strict mode:
-"Contents\n"
+λa (a IO/Done/tag IO/MAGIC λb (b Result/Ok/tag "Contents\n"))

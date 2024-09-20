@@ -215,7 +215,7 @@ fn get_args_def_or_ctr(name: &Name, book: &ParseBook, use_map: &IndexMap<Name, N
 
   #[allow(clippy::manual_map)]
   if let Some(adt_nam) = book.ctrs.get(name) {
-    Some(book.adts[adt_nam].ctrs[name].iter().map(|f| f.nam.clone()).collect())
+    Some(book.adts[adt_nam].ctrs[name].fields.iter().map(|f| f.nam.clone()).collect())
   } else if let Some(def) = book.fun_defs.get(name) {
     Some(def.rules[0].pats.iter().flat_map(|p| p.binds().flatten().cloned()).collect())
   } else {

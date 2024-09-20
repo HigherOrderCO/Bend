@@ -1,84 +1,188 @@
 use crate::{
   fun::{
-    parser::{is_num_char, Indent, ParseResult, ParserCommons},
-    CtrField, Name, Num, Op, Source, SourceKind, STRINGS,
+    parser::{is_num_char, make_ctr_type, make_fn_type, Indent, ParseResult, ParserCommons},
+    Adt, AdtCtr, CtrField, HvmDefinition, Name, Num, Op, Source, SourceKind, Type, STRINGS,
   },
-  imp::{AssignPattern, Definition, Enum, Expr, InPlaceOp, MatchArm, Stmt, Variant},
+  imp::{AssignPattern, Definition, Expr, InPlaceOp, MatchArm, Stmt},
   maybe_grow,
 };
 use TSPL::Parser;
 
-use super::RepeatedNames;
-
-pub struct PyParser<'i> {
+pub struct ImpParser<'i> {
+  pub file: Name,
   pub input: &'i str,
   pub index: usize,
+  pub builtin: bool,
 }
 
-impl<'a> PyParser<'a> {
-  pub fn new(input: &'a str) -> Self {
-    Self { input, index: 0 }
-  }
-}
-
-impl<'a> ParserCommons<'a> for PyParser<'a> {}
-
-impl<'a> Parser<'a> for PyParser<'a> {
-  fn input(&mut self) -> &'a str {
-    self.input
+impl<'a> ImpParser<'a> {
+  pub fn new(file: Name, input: &'a str, builtin: bool) -> Self {
+    Self { file, input, index: 0, builtin }
   }
 
-  fn index(&mut self) -> &mut usize {
-    &mut self.index
+  pub fn parse_function_def(&mut self, indent: Indent) -> ParseResult<(Definition, Indent)> {
+    // def name(arg1: type1, arg2: type2, ...) -> type:
+    //   body
+    if indent != Indent::Val(0) {
+      let msg = "Indentation error. Functions defined with 'def' must be at the start of the line.";
+      let idx = *self.index();
+      return self.with_ctx(Err(msg), idx..idx + 1);
+    }
+    // TODO: checked vs unchecked functions
+    let (mut def, nxt_indent) = self.parse_def_aux(indent)?;
+    def.source.kind = if self.builtin { SourceKind::Builtin } else { SourceKind::User };
+    Ok((def, nxt_indent))
   }
 
-  /// Generates an error message for parsing failures, including the highlighted context.
-  ///
-  /// Override to have our own error message.
-  fn expected<T>(&mut self, exp: &str) -> ParseResult<T> {
+  pub fn parse_type_def(&mut self, mut indent: Indent) -> ParseResult<(Adt, Indent)> {
+    if indent != Indent::Val(0) {
+      let msg = "Indentation error. Types defined with 'type' must be at the start of the line.";
+      let idx = *self.index();
+      return self.with_ctx(Err(msg), idx..idx + 1);
+    }
     let ini_idx = *self.index();
-    let end_idx = *self.index() + 1;
-    self.expected_spanned(exp, ini_idx..end_idx)
-  }
 
-  /// Consumes an instance of the given string, erroring if it is not found.
-  ///
-  /// Override to have our own error message.
-  fn consume(&mut self, text: &str) -> ParseResult<()> {
-    self.skip_trivia();
-    if self.input().get(*self.index()..).unwrap_or_default().starts_with(text) {
-      *self.index() += text.len();
-      Ok(())
+    self.parse_keyword("type")?;
+    self.skip_trivia_inline()?;
+
+    let type_name = self.parse_restricted_name("datatype")?;
+    self.skip_trivia_inline()?;
+
+    let type_vars = if self.try_consume_exactly("(") {
+      self.list_like(|p| p.parse_var_name(), "", ")", ",", true, 0)?
     } else {
-      self.expected(format!("'{text}'").as_str())
+      vec![]
+    };
+    self.skip_trivia_inline()?;
+
+    self.consume_exactly(":")?;
+    self.consume_new_line()?;
+    indent.enter_level();
+    self.consume_indent_exactly(indent)?;
+
+    let mut ctrs = Vec::new();
+    let mut nxt_indent = indent;
+    while nxt_indent == indent {
+      ctrs.push(self.parse_type_def_variant(&type_name, &type_vars)?);
+      if !self.is_eof() {
+        self.consume_new_line()?;
+      }
+      nxt_indent = self.consume_indent_at_most(indent)?;
     }
+    indent.exit_level();
+
+    let ctrs = ctrs.into_iter().map(|ctr| (ctr.name.clone(), ctr)).collect();
+    let source = Source::from_file_span(&self.file, self.input, ini_idx..self.index, self.builtin);
+    let adt = Adt { name: type_name, vars: type_vars, ctrs, source };
+
+    Ok((adt, nxt_indent))
   }
 
-  fn skip_trivia(&mut self) {
-    while let Some(c) = self.peek_one() {
-      if c.is_ascii_whitespace() {
-        self.advance_one();
-        continue;
-      }
-      if c == '#' {
-        while let Some(c) = self.peek_one() {
-          if c != '\n' {
-            self.advance_one();
-          } else {
-            break;
-          }
-        }
-        self.advance_one(); // Skip the newline character as well
-        continue;
-      }
-      break;
+  pub fn parse_object(&mut self, indent: Indent) -> ParseResult<(Adt, Indent)> {
+    // object Pair(a, b) { fst: a, snd: b }
+    if indent != Indent::Val(0) {
+      let msg = "Indentation error. Types defined with 'object' must be at the start of the line.";
+      let idx = *self.index();
+      return self.with_ctx(Err(msg), idx..idx + 1);
     }
-  }
-}
+    let ini_idx = *self.index();
 
-impl<'a> PyParser<'a> {
-  /// <var> <postfix>?
-  ///
+    self.parse_keyword("object")?;
+    self.skip_trivia_inline()?;
+
+    let name = self.parse_top_level_name()?;
+    self.skip_trivia_inline()?;
+
+    let type_vars = if self.starts_with("(") {
+      self.list_like(|p| p.parse_var_name(), "(", ")", ",", true, 0)?
+    } else {
+      vec![]
+    };
+    self.skip_trivia_inline()?;
+
+    let fields = if self.starts_with("{") {
+      self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?
+    } else {
+      vec![]
+    };
+    let field_types = fields.iter().map(|f| f.typ.clone()).collect::<Vec<_>>();
+
+    let end_idx = *self.index();
+    self.check_repeated_ctr_fields(&fields, &name, ini_idx..end_idx)?;
+
+    if !self.is_eof() {
+      self.consume_new_line()?;
+    }
+    let nxt_indent = self.advance_newlines()?;
+
+    let typ = make_ctr_type(name.clone(), &field_types, &type_vars);
+    let ctr = AdtCtr { name: name.clone(), typ, fields };
+
+    let ctrs = [(name.clone(), ctr)].into_iter().collect();
+    let source = Source::from_file_span(&self.file, self.input, ini_idx..end_idx, self.builtin);
+    let adt = Adt { name, vars: type_vars, ctrs, source };
+    Ok((adt, nxt_indent))
+  }
+
+  pub fn parse_hvm(&mut self) -> ParseResult<(HvmDefinition, Indent)> {
+    let ini_idx = *self.index();
+
+    self.parse_keyword("hvm")?;
+    self.skip_trivia_inline()?;
+
+    let name = self.parse_var_name()?;
+    self.skip_trivia_inline()?;
+
+    let typ = self.parse_return_type()?.unwrap_or(Type::Any);
+    let typ = make_fn_type(vec![], typ);
+    self.skip_trivia_inline()?;
+
+    self.consume_exactly(":")?;
+    self.consume_new_line()?;
+
+    // TODO: This will have the wrong index
+    let net_idx = *self.index();
+    let mut p = hvm::ast::CoreParser::new(&self.input[net_idx..]);
+    let body = p.parse_net()?;
+    *self.index() = net_idx + *p.index();
+
+    let source = Source::from_file_span(&self.file, self.input, ini_idx..self.index, self.builtin);
+    let def = HvmDefinition { name: name.clone(), typ, body, source };
+    let nxt_indent = self.advance_newlines()?;
+    Ok((def, nxt_indent))
+  }
+
+  fn parse_type_def_variant(&mut self, type_name: &Name, type_vars: &[Name]) -> ParseResult<AdtCtr> {
+    let ini_idx = *self.index();
+    let name = self.parse_top_level_name()?;
+    let name = Name::new(format!("{type_name}/{name}"));
+    self.skip_trivia_inline()?;
+
+    let fields = if self.try_consume_exactly("{") {
+      self.list_like(|p| p.parse_variant_field(), "", "}", ",", true, 0)?
+    } else {
+      vec![]
+    };
+    let field_types = fields.iter().map(|f| f.typ.clone()).collect::<Vec<_>>();
+    let end_idx = *self.index();
+    self.check_repeated_ctr_fields(&fields, &name, ini_idx..end_idx)?;
+
+    let typ = make_ctr_type(type_name.clone(), &field_types, type_vars);
+    Ok(AdtCtr { name, typ, fields })
+  }
+
+  fn parse_variant_field(&mut self) -> ParseResult<CtrField> {
+    let rec = self.try_consume_exactly("~");
+    self.skip_trivia_inline()?;
+
+    let nam = self.parse_var_name()?;
+    self.skip_trivia_inline()?;
+
+    let typ = if self.try_consume_exactly(":") { self.parse_type_expr()? } else { Type::Any };
+
+    Ok(CtrField { nam, typ, rec })
+  }
+
   fn parse_primary_expr(&mut self, inline: bool) -> ParseResult<Expr> {
     if inline {
       self.skip_trivia_inline()?;
@@ -86,12 +190,12 @@ impl<'a> PyParser<'a> {
       self.skip_trivia();
     }
     if self.try_parse_keyword("lambda") | self.try_consume_exactly("λ") {
-      fn parse_lam_var(p: &mut PyParser) -> ParseResult<(Name, bool)> {
+      fn parse_lam_var(p: &mut ImpParser) -> ParseResult<(Name, bool)> {
         if p.starts_with("$") {
           p.advance_one();
-          Ok((p.parse_bend_name()?, true))
+          Ok((p.parse_var_name()?, true))
         } else {
-          Ok((p.parse_bend_name()?, false))
+          Ok((p.parse_var_name()?, false))
         }
       }
       let names = self.list_like(|p| parse_lam_var(p), "", ":", ",", false, 1)?;
@@ -126,7 +230,7 @@ impl<'a> PyParser<'a> {
     } else if self.starts_with("$") {
       // Unscoped var
       self.advance_one();
-      Ok(Expr::Chn { nam: self.parse_bend_name()? })
+      Ok(Expr::Chn { nam: self.parse_var_name()? })
     } else if self.starts_with("*") {
       // Era
       self.advance_one();
@@ -137,7 +241,7 @@ impl<'a> PyParser<'a> {
         Ok(Expr::Num { val: self.parse_number()? })
       } else {
         // Var
-        let nam = self.labelled(|p| p.parse_bend_name(), "expression")?;
+        let nam = self.labelled(|p| p.parse_var_name(), "expression")?;
         Ok(Expr::Var { nam })
       }
     } else {
@@ -270,7 +374,7 @@ impl<'a> PyParser<'a> {
 
   fn data_kwarg(&mut self) -> ParseResult<(Name, Expr)> {
     self.skip_trivia();
-    let nam = self.parse_bend_name()?;
+    let nam = self.parse_var_name()?;
     self.consume(":")?;
     let expr = self.parse_expr(false, false)?;
     Ok((nam, expr))
@@ -297,7 +401,7 @@ impl<'a> PyParser<'a> {
     if self.try_parse_keyword("for") {
       // Comprehension
       self.skip_trivia();
-      let bind = self.parse_bend_name()?;
+      let bind = self.parse_var_name()?;
       self.skip_trivia();
       self.parse_keyword("in")?;
       let iter = self.parse_expr(false, false)?;
@@ -435,25 +539,25 @@ impl<'a> PyParser<'a> {
   /// Parses a statement and returns the indentation of the next statement.
   fn parse_statement(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
     maybe_grow(|| {
-      if self.try_parse_keyword("return") {
+      if self.starts_with_keyword("return") {
         self.parse_return()
-      } else if self.try_parse_keyword("def") {
+      } else if self.starts_with_keyword("def") {
         self.parse_local_def(indent)
-      } else if self.try_parse_keyword("if") {
+      } else if self.starts_with_keyword("if") {
         self.parse_if(indent)
-      } else if self.try_parse_keyword("match") {
+      } else if self.starts_with_keyword("match") {
         self.parse_match(indent)
-      } else if self.try_parse_keyword("switch") {
+      } else if self.starts_with_keyword("switch") {
         self.parse_switch(indent)
-      } else if self.try_parse_keyword("fold") {
+      } else if self.starts_with_keyword("fold") {
         self.parse_fold(indent)
-      } else if self.try_parse_keyword("bend") {
+      } else if self.starts_with_keyword("bend") {
         self.parse_bend(indent)
-      } else if self.try_parse_keyword("with") {
+      } else if self.starts_with_keyword("with") {
         self.parse_with(indent)
-      } else if self.try_parse_keyword("open") {
+      } else if self.starts_with_keyword("open") {
         self.parse_open(indent)
-      } else if self.try_parse_keyword("use") {
+      } else if self.starts_with_keyword("use") {
         self.parse_use(indent)
       } else {
         self.parse_assign(indent)
@@ -559,18 +663,25 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_return(&mut self) -> ParseResult<(Stmt, Indent)> {
+    self.parse_keyword("return")?;
+
     let term = self.parse_expr(true, true)?;
     self.skip_trivia_inline()?;
+
     self.try_consume_exactly(";");
     if !self.is_eof() {
       self.consume_new_line()?;
     }
     let indent = self.advance_newlines()?;
+
     Ok((Stmt::Return { term: Box::new(term) }, indent))
   }
 
   fn parse_if(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
-    let cond = self.parse_expr(true, false)?;
+    self.parse_keyword("if")?;
+    self.skip_trivia_inline()?;
+
+    let cond = self.parse_expr(true, true)?;
     self.skip_trivia_inline()?;
     self.consume_exactly(":")?;
     indent.enter_level();
@@ -633,8 +744,12 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_match(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+    self.parse_keyword("match")?;
+    self.skip_trivia_inline()?;
+
     let (bnd, arg) = self.parse_match_arg()?;
     self.skip_trivia_inline()?;
+
     let (with_bnd, with_arg) = self.parse_with_clause()?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -687,7 +802,7 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_with_arg(&mut self) -> ParseResult<(Option<Name>, Expr)> {
-    let bind = self.parse_bend_name()?;
+    let bind = self.parse_var_name()?;
     self.skip_trivia_inline()?;
     if self.try_consume("=") {
       let arg = self.parse_expr(false, false)?;
@@ -703,7 +818,7 @@ impl<'a> PyParser<'a> {
     let pat = if self.try_consume_exactly("_") {
       None
     } else {
-      let nam = self.labelled(|p| p.parse_bend_name(), "name or '_'")?;
+      let nam = self.labelled(|p| p.parse_var_name(), "name or '_'")?;
       Some(nam)
     };
     self.skip_trivia_inline()?;
@@ -720,8 +835,12 @@ impl<'a> PyParser<'a> {
   }
 
   fn parse_switch(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+    self.parse_keyword("switch")?;
+    self.skip_trivia_inline()?;
+
     let (bnd, arg) = self.parse_match_arg()?;
     self.skip_trivia_inline()?;
+
     let (with_bnd, with_arg) = self.parse_with_clause()?;
     indent.enter_level();
 
@@ -797,9 +916,13 @@ impl<'a> PyParser<'a> {
   ///     <case>
   ///   ...
   fn parse_fold(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+    self.parse_keyword("fold")?;
+    self.skip_trivia_inline()?;
+
     // Actually identical to match, except the return
     let (bind, arg) = self.parse_match_arg()?;
     self.skip_trivia_inline()?;
+
     let (with_bnd, with_arg) = self.parse_with_clause()?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -830,6 +953,9 @@ impl<'a> PyParser<'a> {
   ///   "else" ":"
   ///     <base>
   fn parse_bend(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+    self.parse_keyword("bend")?;
+    self.skip_trivia_inline()?;
+
     let args = self.list_like(|p| p.parse_match_arg(), "", ":", ",", true, 1)?;
     let (bind, init) = args.into_iter().unzip();
     self.consume_new_line()?;
@@ -837,8 +963,11 @@ impl<'a> PyParser<'a> {
 
     self.consume_indent_exactly(*indent).or(self.expected_spanned("'when'", self.index..self.index + 1))?;
     self.parse_keyword("when")?;
-    let cond = self.parse_expr(true, false)?;
     self.skip_trivia_inline()?;
+
+    let cond = self.parse_expr(true, true)?;
+    self.skip_trivia_inline()?;
+
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -891,9 +1020,12 @@ impl<'a> PyParser<'a> {
   ///   <bod>
   /// <nxt>?
   fn parse_with(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+    self.parse_keyword("with")?;
     self.skip_trivia_inline()?;
-    let typ = self.parse_bend_name()?;
+
+    let typ = self.parse_var_name()?;
     self.skip_trivia_inline()?;
+
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
@@ -957,7 +1089,7 @@ impl<'a> PyParser<'a> {
     } else if self.starts_with("$") {
       self.advance_one();
       self.skip_trivia_inline()?;
-      let nam = self.parse_bend_name()?;
+      let nam = self.parse_var_name()?;
       Ok(AssignPattern::Chn(nam))
     } else if self.starts_with("(") {
       self.advance_one();
@@ -965,159 +1097,209 @@ impl<'a> PyParser<'a> {
       self.consume(")")?;
       Ok(assign)
     } else {
-      Ok(AssignPattern::Var(self.parse_bend_name()?))
+      Ok(AssignPattern::Var(self.parse_var_name()?))
     }
   }
 
   /// "open" {typ} ":" {var} ";"? {nxt}
   fn parse_open(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+    self.parse_keyword("open")?;
     self.skip_trivia_inline()?;
-    let typ = self.labelled(|p| p.parse_bend_name(), "type name")?;
+
+    let typ = self.labelled(|p| p.parse_var_name(), "type name")?;
     self.skip_trivia_inline()?;
+
     self.consume_exactly(":")?;
     self.skip_trivia_inline()?;
-    let var = self.labelled(|p| p.parse_bend_name(), "variable name")?;
+
+    let var = self.labelled(|p| p.parse_var_name(), "variable name")?;
     self.skip_trivia_inline()?;
+
     self.try_consume_exactly(";");
     self.consume_new_line()?;
     self.consume_indent_exactly(*indent)?;
+
     let (nxt, nxt_indent) = self.parse_statement(indent)?;
+
     let stmt = Stmt::Open { typ, var, nxt: Box::new(nxt) };
     Ok((stmt, nxt_indent))
   }
 
   fn parse_use(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
+    self.parse_keyword("use")?;
     self.skip_trivia_inline()?;
-    let nam = self.parse_bend_name()?;
+
+    let nam = self.parse_var_name()?;
     self.skip_trivia_inline()?;
+
     self.consume_exactly("=")?;
     self.skip_trivia_inline()?;
+
     let bod = self.parse_expr(true, true)?;
     self.skip_trivia_inline()?;
+
     self.try_consume_exactly(";");
     self.consume_new_line()?;
     self.consume_indent_exactly(*indent)?;
+
     let (nxt, nxt_indent) = self.parse_statement(indent)?;
+
     let stmt = Stmt::Use { nam, val: Box::new(bod), nxt: Box::new(nxt) };
     Ok((stmt, nxt_indent))
   }
 
   fn parse_local_def(&mut self, indent: &mut Indent) -> ParseResult<(Stmt, Indent)> {
-    let (def, mut nxt_indent) = self.parse_def_aux(*indent)?;
+    // TODO: checked vs unchecked functions
+    let (mut def, mut nxt_indent) = self.parse_def_aux(*indent)?;
+    def.source.kind = if self.builtin { SourceKind::Builtin } else { SourceKind::Generated };
     let (nxt, nxt_indent) = self.parse_statement(&mut nxt_indent)?;
     let stmt = Stmt::LocalDef { def: Box::new(def), nxt: Box::new(nxt) };
     Ok((stmt, nxt_indent))
   }
 
-  pub fn parse_def(&mut self, indent: Indent) -> ParseResult<(Definition, Indent)> {
-    if indent != Indent::Val(0) {
-      let msg = "Indentation error. Functions defined with 'def' must be at the start of the line.";
-      let idx = *self.index();
-      return self.with_ctx(Err(msg), idx..idx + 1);
-    }
-    self.parse_def_aux(indent)
+  /// Parses a type expression, returning the type and the type variables.
+  fn parse_type_expr(&mut self) -> ParseResult<Type> {
+    // TODO: We should probably not have it all be inline or not inline.
+    // For example, in tuple types or constructors, we could have line breaks.
+    maybe_grow(|| {
+      self.skip_trivia_inline()?;
+      let ini_idx = *self.index();
+      let lft = if self.try_parse_keyword("Any") {
+        Type::Any
+      } else if self.try_parse_keyword("None") {
+        Type::None
+      } else if self.try_parse_keyword("_") {
+        Type::Hole
+      } else if self.try_parse_keyword("u24") {
+        Type::U24
+      } else if self.try_parse_keyword("i24") {
+        Type::I24
+      } else if self.try_parse_keyword("f24") {
+        Type::F24
+      } else if self.try_consume_exactly("(") {
+        // Tuple or parenthesized expression
+        self.skip_trivia();
+        let head = self.parse_type_expr()?;
+        self.skip_trivia();
+        if self.try_consume_exactly(")") {
+          // Parens
+          head
+        } else if self.starts_with(",") {
+          // Tuple
+          let mut types = vec![head];
+          loop {
+            self.consume_exactly(",")?;
+            types.push(self.parse_type_expr()?);
+            if self.try_consume_exactly(")") {
+              break;
+            }
+            if !self.starts_with(",") {
+              return self.expected("',' or ')'");
+            }
+          }
+          Type::Tup(types)
+        } else {
+          let end_idx = *self.index();
+          return self.expected_spanned("tuple type or parenthesized type", ini_idx..end_idx);
+        }
+      } else {
+        // Variable or Constructor
+        // TODO: This will show "expected Name" instead of "expected type"
+        let name = self.parse_var_name()?;
+        self.skip_trivia_inline()?;
+        if self.try_consume_exactly("(") {
+          // Constructor with arguments
+          // name "(" (type ("," type)* ","?)? ")"
+
+          let args = self.list_like(|p| p.parse_type_expr(), "", ")", ",", true, 0)?;
+          Type::Ctr(name, args)
+        } else {
+          // Variable
+          Type::Var(name)
+        }
+      };
+
+      // Handle arrow types
+      self.skip_trivia_inline()?;
+      if self.try_consume_exactly("->") {
+        let rgt = self.parse_type_expr()?;
+        Ok(Type::Arr(Box::new(lft), Box::new(rgt)))
+      } else {
+        Ok(lft)
+      }
+    })
   }
 
   fn parse_def_aux(&mut self, mut indent: Indent) -> ParseResult<(Definition, Indent)> {
+    let ini_idx = *self.index();
+    self.parse_keyword("def")?;
     self.skip_trivia_inline()?;
+
+    let check = if self.try_parse_keyword("unchecked") {
+      (false, true)
+    } else if self.try_parse_keyword("checked") {
+      (true, false)
+    } else {
+      (false, false)
+    };
+    self.skip_trivia_inline()?;
+
     let name = self.parse_top_level_name()?;
     self.skip_trivia_inline()?;
-    let params = if self.starts_with("(") {
-      self.list_like(|p| p.parse_bend_name(), "(", ")", ",", true, 0)?
+
+    let args = if self.try_consume_exactly("(") {
+      self.list_like(|p| p.parse_def_arg(), "", ")", ",", true, 0)?
     } else {
       vec![]
     };
     self.skip_trivia_inline()?;
+    let (args, arg_types): (Vec<_>, Vec<_>) = args.into_iter().unzip();
+
+    let ret_type = self.parse_return_type()?;
+    self.skip_trivia_inline()?;
+
     self.consume_exactly(":")?;
     self.consume_new_line()?;
     indent.enter_level();
-
     self.consume_indent_exactly(indent)?;
+
     let (body, nxt_indent) = self.parse_statement(&mut indent)?;
     indent.exit_level();
 
-    // Temporary source, should be overwritten later
-    let source = Source { file: None, span: None, kind: SourceKind::Generated };
-    let def = Definition { name, params, body, source };
+    // If any annotation, check by default, otherwise unchecked by default
+    let check = if check.0 {
+      true
+    } else if check.1 {
+      false
+    } else {
+      ret_type.is_some() || arg_types.iter().any(|t| t.is_some())
+    };
+    let arg_types = arg_types.into_iter().map(|t| t.unwrap_or(Type::Any)).collect::<Vec<_>>();
+    let typ = make_fn_type(arg_types, ret_type.unwrap_or(Type::Any));
+
+    // Note: The source kind gets replaced later (generated if a local def, user otherwise)
+    let source = Source::from_file_span(&self.file, self.input, ini_idx..self.index, self.builtin);
+    let def = Definition { name, args, typ, check, body, source };
     Ok((def, nxt_indent))
   }
 
-  pub fn parse_type(&mut self, mut indent: Indent) -> ParseResult<(Enum, Indent)> {
-    if indent != Indent::Val(0) {
-      let msg = "Indentation error. Types defined with 'type' must be at the start of the line.";
-      let idx = *self.index();
-      return self.with_ctx(Err(msg), idx..idx + 1);
-    }
-
+  fn parse_def_arg(&mut self) -> ParseResult<(Name, Option<Type>)> {
+    let name = self.parse_var_name()?;
     self.skip_trivia_inline()?;
-    let typ_name = self.parse_top_level_name()?;
-    self.skip_trivia_inline()?;
-    self.consume_exactly(":")?;
-    self.consume_new_line()?;
-    indent.enter_level();
-
-    self.consume_indent_exactly(indent)?;
-    let mut variants = Vec::new();
-    let mut nxt_indent = indent;
-    while nxt_indent == indent {
-      variants.push(self.parse_enum_variant(&typ_name)?);
-      if !self.is_eof() {
-        self.consume_new_line()?;
-      }
-      nxt_indent = self.consume_indent_at_most(indent)?;
-    }
-    indent.exit_level();
-
-    let enum_ = Enum { name: typ_name, variants };
-    Ok((enum_, nxt_indent))
-  }
-
-  pub fn parse_enum_variant(&mut self, typ_name: &Name) -> ParseResult<Variant> {
-    let ctr_name = self.parse_top_level_name()?;
-    let ctr_name = Name::new(format!("{typ_name}/{ctr_name}"));
-    let mut fields = Vec::new();
-    self.skip_trivia_inline()?;
-    if self.starts_with("{") {
-      fields = self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?;
-    }
-    if let Some(field) = fields.find_repeated_names().into_iter().next() {
-      let msg = format!("Found a repeated field '{field}' in constructor {ctr_name}.");
-      return self.expected_message(&msg);
-    }
-    Ok(Variant { name: ctr_name, fields })
-  }
-
-  pub fn parse_object(&mut self, indent: Indent) -> ParseResult<(Variant, Indent)> {
-    if indent != Indent::Val(0) {
-      let msg = "Indentation error. Types defined with 'object' must be at the start of the line.";
-      let idx = *self.index();
-      return self.with_ctx(Err(msg), idx..idx + 1);
-    }
-
-    self.skip_trivia_inline()?;
-    let name = self.parse_top_level_name()?;
-    self.skip_trivia_inline()?;
-    let fields = if self.starts_with("{") {
-      self.list_like(|p| p.parse_variant_field(), "{", "}", ",", true, 0)?
+    if self.try_consume_exactly(":") {
+      let typ = self.parse_type_expr()?;
+      Ok((name, Some(typ)))
     } else {
-      vec![]
-    };
-    if let Some(field) = fields.find_repeated_names().into_iter().next() {
-      let msg = format!("Found a repeated field '{field}' in object {name}.");
-      return self.expected_message(&msg);
+      Ok((name, None))
     }
-    if !self.is_eof() {
-      self.consume_new_line()?;
-    }
-    let nxt_indent = self.advance_newlines()?;
-    Ok((Variant { name, fields }, nxt_indent))
   }
 
-  fn parse_variant_field(&mut self) -> ParseResult<CtrField> {
-    let rec = self.try_consume_exactly("~");
-    self.skip_trivia();
-    let nam = self.parse_bend_name()?;
-    Ok(CtrField { nam, rec })
+  fn parse_return_type(&mut self) -> ParseResult<Option<Type>> {
+    if self.try_consume_exactly("->") {
+      Ok(Some(self.parse_type_expr()?))
+    } else {
+      Ok(None)
+    }
   }
 
   fn expected_indent<T>(&mut self, expected: Indent, got: Indent) -> ParseResult<T> {
@@ -1146,6 +1328,61 @@ impl<'a> PyParser<'a> {
   }
 }
 
+impl<'a> ParserCommons<'a> for ImpParser<'a> {}
+
+impl<'a> Parser<'a> for ImpParser<'a> {
+  fn input(&mut self) -> &'a str {
+    self.input
+  }
+
+  fn index(&mut self) -> &mut usize {
+    &mut self.index
+  }
+
+  /// Generates an error message for parsing failures, including the highlighted context.
+  ///
+  /// Override to have our own error message.
+  fn expected<T>(&mut self, exp: &str) -> ParseResult<T> {
+    let ini_idx = *self.index();
+    let end_idx = *self.index() + 1;
+    self.expected_spanned(exp, ini_idx..end_idx)
+  }
+
+  /// Consumes an instance of the given string, erroring if it is not found.
+  ///
+  /// Override to have our own error message.
+  fn consume(&mut self, text: &str) -> ParseResult<()> {
+    self.skip_trivia();
+    if self.input().get(*self.index()..).unwrap_or_default().starts_with(text) {
+      *self.index() += text.len();
+      Ok(())
+    } else {
+      self.expected(format!("'{text}'").as_str())
+    }
+  }
+
+  fn skip_trivia(&mut self) {
+    while let Some(c) = self.peek_one() {
+      if c.is_ascii_whitespace() {
+        self.advance_one();
+        continue;
+      }
+      if c == '#' {
+        while let Some(c) = self.peek_one() {
+          if c != '\n' {
+            self.advance_one();
+          } else {
+            break;
+          }
+        }
+        self.advance_one(); // Skip the newline character as well
+        continue;
+      }
+      break;
+    }
+  }
+}
+
 impl Op {
   fn precedence(&self) -> usize {
     match self {
@@ -1166,10 +1403,9 @@ impl Op {
       Op::DIV => 7,
       Op::REM => 7,
       Op::POW => 8,
-      Op::ATN => todo!(),
-      Op::LOG => todo!(),
     }
   }
+
   fn max_precedence() -> usize {
     8
   }

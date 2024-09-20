@@ -2,14 +2,20 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/flatten_with_terminal.bend
 ---
+unchecked Foo: Any
 (Foo) = λa switch a { 0: λb let c = b; match c { A_t/A d: match d { B_t/B: B_t/B; }; }; _ e: λf let g = f; *; }
 
+unchecked main: Any
 (main) = (Foo 2 (A_t/A B_t/B))
 
+A_t/A: (Any -> A_t)
 (A_t/A) = λa λb (b A_t/A/tag a)
 
+B_t/B: B_t
 (B_t/B) = λa (a B_t/B/tag)
 
+A_t/A/tag: u24
 (A_t/A/tag) = 0
 
+B_t/B/tag: u24
 (B_t/B/tag) = 0

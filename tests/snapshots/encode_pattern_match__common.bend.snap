@@ -3,105 +3,156 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/common.bend
 ---
 Scott
+Box/Filled: (Any -> Box)
 (Box/Filled) = λa λb λ* (b a)
 
+Box/Empty: Box
 (Box/Empty) = λ* λb b
 
+Option/Some: (Any -> Option)
 (Option/Some) = λa λb λ* (b a)
 
+Option/None: Option
 (Option/None) = λ* λb b
 
+Result_/Ok: (Any -> Result_)
 (Result_/Ok) = λa λb λ* (b a)
 
+Result_/Err: (Any -> Result_)
 (Result_/Err) = λa λ* λc (c a)
 
+List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc λ* (c a b)
 
+List_/Nil: List_
 (List_/Nil) = λ* λb b
 
+Bool/True: Bool
 (Bool/True) = λa λ* a
 
+Bool/False: Bool
 (Bool/False) = λ* λb b
 
+Light/Red: Light
 (Light/Red) = λa λ* λ* a
 
+Light/Yellow: Light
 (Light/Yellow) = λ* λb λ* b
 
+Light/Green: Light
 (Light/Green) = λ* λ* λc c
 
+Direction/North: Direction
 (Direction/North) = λa λ* λ* λ* a
 
+Direction/South: Direction
 (Direction/South) = λ* λb λ* λ* b
 
+Direction/East: Direction
 (Direction/East) = λ* λ* λc λ* c
 
+Direction/West: Direction
 (Direction/West) = λ* λ* λ* λd d
 
 NumScott
+Box/Filled: (Any -> Box)
 (Box/Filled) = λa λb (b Box/Filled/tag a)
 
+Box/Empty: Box
 (Box/Empty) = λa (a Box/Empty/tag)
 
+Option/Some: (Any -> Option)
 (Option/Some) = λa λb (b Option/Some/tag a)
 
+Option/None: Option
 (Option/None) = λa (a Option/None/tag)
 
+Result_/Ok: (Any -> Result_)
 (Result_/Ok) = λa λb (b Result_/Ok/tag a)
 
+Result_/Err: (Any -> Result_)
 (Result_/Err) = λa λb (b Result_/Err/tag a)
 
+List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc (c List_/Cons/tag a b)
 
+List_/Nil: List_
 (List_/Nil) = λa (a List_/Nil/tag)
 
+Bool/True: Bool
 (Bool/True) = λa (a Bool/True/tag)
 
+Bool/False: Bool
 (Bool/False) = λa (a Bool/False/tag)
 
+Light/Red: Light
 (Light/Red) = λa (a Light/Red/tag)
 
+Light/Yellow: Light
 (Light/Yellow) = λa (a Light/Yellow/tag)
 
+Light/Green: Light
 (Light/Green) = λa (a Light/Green/tag)
 
+Direction/North: Direction
 (Direction/North) = λa (a Direction/North/tag)
 
+Direction/South: Direction
 (Direction/South) = λa (a Direction/South/tag)
 
+Direction/East: Direction
 (Direction/East) = λa (a Direction/East/tag)
 
+Direction/West: Direction
 (Direction/West) = λa (a Direction/West/tag)
 
+Box/Filled/tag: u24
 (Box/Filled/tag) = 0
 
+Box/Empty/tag: u24
 (Box/Empty/tag) = 1
 
+Option/Some/tag: u24
 (Option/Some/tag) = 0
 
+Option/None/tag: u24
 (Option/None/tag) = 1
 
+Result_/Ok/tag: u24
 (Result_/Ok/tag) = 0
 
+Result_/Err/tag: u24
 (Result_/Err/tag) = 1
 
+List_/Cons/tag: u24
 (List_/Cons/tag) = 0
 
+List_/Nil/tag: u24
 (List_/Nil/tag) = 1
 
+Bool/True/tag: u24
 (Bool/True/tag) = 0
 
+Bool/False/tag: u24
 (Bool/False/tag) = 1
 
+Light/Red/tag: u24
 (Light/Red/tag) = 0
 
+Light/Yellow/tag: u24
 (Light/Yellow/tag) = 1
 
+Light/Green/tag: u24
 (Light/Green/tag) = 2
 
+Direction/North/tag: u24
 (Direction/North/tag) = 0
 
+Direction/South/tag: u24
 (Direction/South/tag) = 1
 
+Direction/East/tag: u24
 (Direction/East/tag) = 2
 
+Direction/West/tag: u24
 (Direction/West/tag) = 3

@@ -13,7 +13,7 @@ impl Book {
     for (name, def) in self.defs.iter_mut() {
       let mut gen = 0;
       for rule in def.rules.iter_mut() {
-        rule.body.lift_local_defs(name, &mut defs, &mut gen);
+        rule.body.lift_local_defs(name, def.check, &mut defs, &mut gen);
       }
     }
     self.defs.extend(defs);
@@ -27,14 +27,20 @@ impl Rule {
 }
 
 impl Term {
-  pub fn lift_local_defs(&mut self, parent: &Name, defs: &mut IndexMap<Name, Definition>, gen: &mut usize) {
+  pub fn lift_local_defs(
+    &mut self,
+    parent: &Name,
+    check: bool,
+    defs: &mut IndexMap<Name, Definition>,
+    gen: &mut usize,
+  ) {
     maybe_grow(|| match self {
       Term::Def { def, nxt } => {
         let local_name = Name::new(format!("{}__local_{}_{}", parent, gen, def.name));
         for rule in def.rules.iter_mut() {
-          rule.body.lift_local_defs(&local_name, defs, gen);
+          rule.body.lift_local_defs(&local_name, check, defs, gen);
         }
-        nxt.lift_local_defs(parent, defs, gen);
+        nxt.lift_local_defs(parent, check, defs, gen);
         *gen += 1;
 
         let inner_defs =
@@ -46,12 +52,12 @@ impl Term {
 
         apply_closure(&mut rules, &fvs);
 
-        let new_def = Definition::new_gen(local_name.clone(), rules, source);
+        let new_def = Definition::new_gen(local_name.clone(), rules, source, check);
         defs.insert(local_name.clone(), new_def);
       }
       _ => {
         for child in self.children_mut() {
-          child.lift_local_defs(parent, defs, gen);
+          child.lift_local_defs(parent, check, defs, gen);
         }
       }
     })

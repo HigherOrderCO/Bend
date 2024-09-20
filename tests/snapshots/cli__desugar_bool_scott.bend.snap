@@ -2,8 +2,11 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/cli/desugar_bool_scott.bend
 ---
+unchecked main: Any
 (main) = λa λ* a
 
+Boolean/True: Boolean
 (Boolean/True) = λa λ* a
 
+Boolean/False: Boolean
 (Boolean/False) = λ* λa a

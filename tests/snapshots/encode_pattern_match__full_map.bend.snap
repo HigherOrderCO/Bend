@@ -3,43 +3,69 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/full_map.bend
 ---
 Scott
-(Map/get) = λa (a λb let {b b_2 b_3 b_4} = b; λc let {c c_2 c_3} = c; λd let {d d_2 d_3} = d; λe let {e e_2 e_3 e_4} = e; switch (== 0 e) { 0: switch (% e_2 2) { 0: let (f, g) = (Map/get c (/ e_3 2)); (f, (Map/Node b g d)); _: λ* let (i, j) = (Map/get d_2 (/ e_4 2)); (i, (Map/Node b_2 c_2 j)); }; _: λ* (b_3, (Map/Node b_4 c_3 d_3)); } λ* (*, Map/Leaf))
+Map/get: ((Map T) -> u24 -> (T, (Map T)))
+(Map/get) = λa (a λb let {b b_2 b_3 b_4} = b; λc let {c c_2 c_3} = c; λd let {d d_2 d_3} = d; λe let {e e_2 e_3 e_4} = e; switch (== 0 e) { 0: switch (% e_2 2) { 0: let (f, g) = (Map/get c (/ e_3 2)); (f, (Map/Node b g d)); _: λ* let (i, j) = (Map/get d_2 (/ e_4 2)); (i, (Map/Node b_2 c_2 j)); }; _: λ* (b_3, (Map/Node b_4 c_3 d_3)); } λ* (unreachable, Map/Leaf))
 
+unreachable: Any
+(unreachable) = *
+
+unchecked prng: (Any -> Any)
 (prng) = λa let {a a_2} = a; let {b b_2} = (^ a (<< a_2 13)); let {c c_2} = (^ b (>> b_2 17)); (^ c (<< c_2 5))
 
+unchecked fullMap: Any
 (fullMap) = (fullMap__bend0 14)
 
+unchecked test: (Any -> Any)
 (test) = λa (test__bend0 0 a)
 
+unchecked main: Any
 (main) = (test fullMap)
 
+Map/Node: (T -> (Map T) -> (Map T) -> (Map T))
 (Map/Node) = λa λb λc λd λ* (d a b c)
 
+Map/Leaf: (Map T)
 (Map/Leaf) = λ* λb b
 
+unchecked fullMap__bend0: _
 (fullMap__bend0) = λa let {a a_2 a_3} = a; switch (> a 0) { 0: Map/Leaf; _: λ* (Map/Node 1 (fullMap__bend0 (- a_2 1)) (fullMap__bend0 (- a_3 1))); }
 
+unchecked test__bend0: _
 (test__bend0) = λa let {a a_2 a_3} = a; switch (< a 1000) { 0: λ* 0; _: λ* λd let (e, f) = (Map/get d (% (prng a_2) 4096)); (+ e (test__bend0 (+ a_3 1) f)); }
 
 NumScott
-(Map/get) = λa (a λb switch b { 0: λc let {c c_2 c_3 c_4} = c; λd let {d d_2 d_3} = d; λe let {e e_2 e_3} = e; λf let {f f_2 f_3 f_4} = f; switch (== 0 f) { 0: switch (% f_2 2) { 0: let (g, h) = (Map/get d (/ f_3 2)); (g, (Map/Node c h e)); _: λ* let (j, k) = (Map/get e_2 (/ f_4 2)); (j, (Map/Node c_2 d_2 k)); }; _: λ* (c_3, (Map/Node c_4 d_3 e_3)); }; _: λ* λ* (*, Map/Leaf); })
+Map/get: ((Map T) -> u24 -> (T, (Map T)))
+(Map/get) = λa (a λb switch b { 0: λc let {c c_2 c_3 c_4} = c; λd let {d d_2 d_3} = d; λe let {e e_2 e_3} = e; λf let {f f_2 f_3 f_4} = f; switch (== 0 f) { 0: switch (% f_2 2) { 0: let (g, h) = (Map/get d (/ f_3 2)); (g, (Map/Node c h e)); _: λ* let (j, k) = (Map/get e_2 (/ f_4 2)); (j, (Map/Node c_2 d_2 k)); }; _: λ* (c_3, (Map/Node c_4 d_3 e_3)); }; _: λ* λ* (unreachable, Map/Leaf); })
 
+unreachable: Any
+(unreachable) = *
+
+unchecked prng: (Any -> Any)
 (prng) = λa let {a a_2} = a; let {b b_2} = (^ a (<< a_2 13)); let {c c_2} = (^ b (>> b_2 17)); (^ c (<< c_2 5))
 
+unchecked fullMap: Any
 (fullMap) = (fullMap__bend0 14)
 
+unchecked test: (Any -> Any)
 (test) = λa (test__bend0 0 a)
 
+unchecked main: Any
 (main) = (test fullMap)
 
+Map/Node: (T -> (Map T) -> (Map T) -> (Map T))
 (Map/Node) = λa λb λc λd (d Map/Node/tag a b c)
 
+Map/Leaf: (Map T)
 (Map/Leaf) = λa (a Map/Leaf/tag)
 
+Map/Node/tag: u24
 (Map/Node/tag) = 0
 
+Map/Leaf/tag: u24
 (Map/Leaf/tag) = 1
 
+unchecked fullMap__bend0: _
 (fullMap__bend0) = λa let {a a_2 a_3} = a; switch (> a 0) { 0: Map/Leaf; _: λ* (Map/Node 1 (fullMap__bend0 (- a_2 1)) (fullMap__bend0 (- a_3 1))); }
 
+unchecked test__bend0: _
 (test__bend0) = λa let {a a_2 a_3} = a; switch (< a 1000) { 0: λ* 0; _: λ* λd let (e, f) = (Map/get d (% (prng a_2) 4096)); (+ e (test__bend0 (+ a_3 1) f)); }

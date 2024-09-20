@@ -3,41 +3,60 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/pattern_match_encoding.bend
 ---
 Scott
+unchecked Foo: Any
 (Foo) = λa (a λ* 100 λ* 200 λ* 200 λ* λ* 200 λ* λ* 200)
 
+unchecked main: Any
 (main) = (Foo MyType/A 2)
 
+MyType/A: (Any -> MyType)
 (MyType/A) = λa λb λ* λ* λ* λ* (b a)
 
+MyType/B: (Any -> MyType)
 (MyType/B) = λa λ* λc λ* λ* λ* (c a)
 
+MyType/C: (Any -> MyType)
 (MyType/C) = λa λ* λ* λd λ* λ* (d a)
 
+MyType/D: (Any -> Any -> MyType)
 (MyType/D) = λa λb λ* λ* λ* λf λ* (f a b)
 
+MyType/E: (Any -> Any -> MyType)
 (MyType/E) = λa λb λ* λ* λ* λ* λg (g a b)
 
 NumScott
+unchecked Foo: Any
 (Foo) = λa (a λb switch b { 0: λ* 100; _: λd switch d { 0: λ* 200; _: λf switch f { 0: λ* 200; _: λh switch h { 0: λ* λ* 200; _: λ* λ* λ* 200; }; }; }; })
 
+unchecked main: Any
 (main) = (Foo MyType/A 2)
 
+MyType/A: (Any -> MyType)
 (MyType/A) = λa λb (b MyType/A/tag a)
 
+MyType/B: (Any -> MyType)
 (MyType/B) = λa λb (b MyType/B/tag a)
 
+MyType/C: (Any -> MyType)
 (MyType/C) = λa λb (b MyType/C/tag a)
 
+MyType/D: (Any -> Any -> MyType)
 (MyType/D) = λa λb λc (c MyType/D/tag a b)
 
+MyType/E: (Any -> Any -> MyType)
 (MyType/E) = λa λb λc (c MyType/E/tag a b)
 
+MyType/A/tag: u24
 (MyType/A/tag) = 0
 
+MyType/B/tag: u24
 (MyType/B/tag) = 1
 
+MyType/C/tag: u24
 (MyType/C/tag) = 2
 
+MyType/D/tag: u24
 (MyType/D/tag) = 3
 
+MyType/E/tag: u24
 (MyType/E/tag) = 4

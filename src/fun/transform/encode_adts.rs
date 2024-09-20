@@ -1,5 +1,5 @@
 use crate::{
-  fun::{Book, Definition, Name, Num, Pattern, Rule, Source, Term},
+  fun::{Book, Definition, Name, Num, Pattern, Rule, Source, SourceKind, Term, Type},
   AdtEncoding,
 };
 
@@ -10,14 +10,14 @@ impl Book {
     let mut tags = vec![];
 
     for (adt_name, adt) in self.adts.iter() {
-      for (ctr_idx, (ctr_name, fields)) in adt.ctrs.iter().enumerate() {
+      for (ctr_idx, (ctr_name, ctr)) in adt.ctrs.iter().enumerate() {
         let ctrs: Vec<_> = adt.ctrs.keys().cloned().collect();
 
         let body = match adt_encoding {
-          AdtEncoding::Scott => encode_ctr_scott(fields.iter().map(|f| &f.nam), ctrs, ctr_name),
+          AdtEncoding::Scott => encode_ctr_scott(ctr.fields.iter().map(|f| &f.nam), ctrs, ctr_name),
           AdtEncoding::NumScott => {
             let tag = make_tag(adt_name == ctr_name, ctr_name);
-            let body = encode_ctr_num_scott(fields.iter().map(|f| &f.nam), &tag);
+            let body = encode_ctr_num_scott(ctr.fields.iter().map(|f| &f.nam), &tag);
             let tag_def = make_tag_def(ctr_idx, &tag, adt.source.clone());
             tags.push((tag, tag_def));
             body
@@ -25,7 +25,13 @@ impl Book {
         };
 
         let rules = vec![Rule { pats: vec![], body }];
-        let def = Definition::new(ctr_name.clone(), rules, adt.source.clone());
+        let def = Definition {
+          name: ctr_name.clone(),
+          typ: ctr.typ.clone(),
+          check: true,
+          rules,
+          source: adt.source.clone(),
+        };
         defs.push((ctr_name.clone(), def));
       }
     }
@@ -66,6 +72,8 @@ fn encode_ctr_num_scott<'a>(ctr_args: impl DoubleEndedIterator<Item = &'a Name> 
 }
 
 fn make_tag_def(ctr_idx: usize, tag: &Name, source: Source) -> Definition {
-  let tag_rule = vec![Rule { pats: vec![], body: Term::Num { val: Num::U24(ctr_idx as u32) } }];
-  Definition::new_gen(tag.clone(), tag_rule, source)
+  let rules = vec![Rule { pats: vec![], body: Term::Num { val: Num::U24(ctr_idx as u32) } }];
+  let kind = if source.is_builtin() { SourceKind::Builtin } else { SourceKind::Generated };
+  let source = Source { kind, ..source };
+  Definition { name: tag.clone(), typ: Type::U24, check: true, rules, source }
 }

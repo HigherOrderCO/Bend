@@ -1,0 +1,7 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/run_file/checked_scott_encoding.bend
+---
+[4m[1m[31mErrors:[0m
+In λa λb (a λe λf λg λh (g e (scott_concat f b)) b):
+  Can't unify '(e -> c -> j)' and '(((d -> e -> (d -> j -> k) -> g -> k) -> c -> m) -> c -> m)'. Variable 'e' occurs in '((d -> e -> (d -> j -> k) -> g -> k) -> c -> m)'

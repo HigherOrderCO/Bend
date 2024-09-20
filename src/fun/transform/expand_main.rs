@@ -40,13 +40,16 @@ impl Term {
       Term::Ref { nam } => {
         if seen.contains(nam) {
           // Don't expand recursive references
-        } else {
+        } else if let Some(def) = book.defs.get(nam) {
+          // Regular function, expand
           seen.push(nam.clone());
-          let mut body = book.defs.get(nam).unwrap().rule().body.clone();
+          let mut body = def.rule().body.clone();
           body.rename_unscoped(globals_count, &mut HashMap::new());
           *self = body;
           self.expand_ref_return(book, seen, globals_count);
           seen.pop().unwrap();
+        } else {
+          // Not a regular function, don't expand
         }
       }
       Term::Fan { els, .. } | Term::List { els } => {
@@ -65,7 +68,7 @@ impl Term {
               // If the argument is a 0-ary constructor, we don't need to expand it.
               if let Term::Ref { nam } = arg {
                 if let Some(adt_nam) = book.ctrs.get(nam) {
-                  if book.adts.get(adt_nam).unwrap().ctrs.get(nam).unwrap().is_empty() {
+                  if book.adts.get(adt_nam).unwrap().ctrs.get(nam).unwrap().fields.is_empty() {
                     continue;
                   }
                 }

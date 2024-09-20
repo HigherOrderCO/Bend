@@ -5,4 +5,5 @@ input_file: tests/golden_tests/compile_file/error_data_def_name.bend
 [4m[1m[31mErrors:[0m
 [1mIn [4mtests/golden_tests/compile_file/error_data_def_name.bend[0m[1m :[0m
 Redefinition of constructor 'A/A'.
+Location:
 [0m  2 | [4m[31mA/A = 0[0m

@@ -6,8 +6,6 @@ use crate::{
 
 impl Ctx<'_> {
   pub fn desugar_open(&mut self) -> Result<(), Diagnostics> {
-    self.info.start_pass();
-
     for def in self.book.defs.values_mut() {
       for rule in def.rules.iter_mut() {
         if let Err(err) = rule.body.desugar_open(&self.book.adts) {
