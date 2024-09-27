@@ -77,7 +77,15 @@ fn term_to_linear(term: &mut Term, var_uses: &mut HashMap<Name, u64>) {
           // Keep as-is
           1 => (),
           // Duplicate binding
-          uses => duplicate_term(bind.as_ref().unwrap(), child, uses, None),
+          uses => {
+            debug_assert!(uses > 1);
+            let nam = bind.as_ref().unwrap();
+            *child = Term::Let {
+              pat: duplicate_pat(nam, uses),
+              val: Box::new(Term::Var { nam: nam.clone() }),
+              nxt: Box::new(std::mem::take(child)),
+            }
+          }
         }
       }
     }
@@ -86,23 +94,6 @@ fn term_to_linear(term: &mut Term, var_uses: &mut HashMap<Name, u64>) {
 
 fn get_var_uses(nam: Option<&Name>, var_uses: &HashMap<Name, u64>) -> u64 {
   nam.and_then(|nam| var_uses.get(nam).copied()).unwrap_or_default()
-}
-
-/// Creates the duplication bindings for variables used multiple times.
-///
-/// Example:
-///
-/// `@x (x x x x)` becomes `@x let {x0 x1 x2 x3} = x; (x0 x1 x2 x3)`.
-///
-/// `let x = @y y; (x x x)` becomes `let {x0 x1 x2} = @y y; (x0 x1 x2)`.
-fn duplicate_term(nam: &Name, nxt: &mut Term, uses: u64, dup_body: Option<&mut Term>) {
-  debug_assert!(uses > 1);
-
-  *nxt = Term::Let {
-    pat: duplicate_pat(nam, uses),
-    val: Box::new(dup_body.map_or_else(|| Term::Var { nam: nam.clone() }, std::mem::take)),
-    nxt: Box::new(std::mem::take(nxt)),
-  }
 }
 
 fn duplicate_pat(nam: &Name, uses: u64) -> Box<Pattern> {
