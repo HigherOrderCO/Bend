@@ -43,80 +43,80 @@ Op/Div: Op
 (Op/Div) = λ* λ* λ* λd d
 
 NumScott
+Expr/Var/tag: _
+(Expr/Var/tag) = 0
+
 Expr/Var: (Any -> Expr)
 (Expr/Var) = λa λb (b Expr/Var/tag a)
+
+Expr/Num/tag: _
+(Expr/Num/tag) = 1
 
 Expr/Num: (Any -> Expr)
 (Expr/Num) = λa λb (b Expr/Num/tag a)
 
+Expr/App/tag: _
+(Expr/App/tag) = 2
+
 Expr/App: (Any -> Any -> Expr)
 (Expr/App) = λa λb λc (c Expr/App/tag a b)
+
+Expr/Fun/tag: _
+(Expr/Fun/tag) = 3
 
 Expr/Fun: (Any -> Any -> Expr)
 (Expr/Fun) = λa λb λc (c Expr/Fun/tag a b)
 
+Expr/If/tag: _
+(Expr/If/tag) = 4
+
 Expr/If: (Any -> Any -> Any -> Expr)
 (Expr/If) = λa λb λc λd (d Expr/If/tag a b c)
+
+Expr/Let/tag: _
+(Expr/Let/tag) = 5
 
 Expr/Let: (Any -> Any -> Any -> Expr)
 (Expr/Let) = λa λb λc λd (d Expr/Let/tag a b c)
 
+Expr/Dup/tag: _
+(Expr/Dup/tag) = 6
+
 Expr/Dup: (Any -> Any -> Any -> Any -> Expr)
 (Expr/Dup) = λa λb λc λd λe (e Expr/Dup/tag a b c d)
+
+Expr/Tup/tag: _
+(Expr/Tup/tag) = 7
 
 Expr/Tup: (Any -> Any -> Expr)
 (Expr/Tup) = λa λb λc (c Expr/Tup/tag a b)
 
+Expr/Op2/tag: _
+(Expr/Op2/tag) = 8
+
 Expr/Op2: (Any -> Any -> Any -> Expr)
 (Expr/Op2) = λa λb λc λd (d Expr/Op2/tag a b c)
+
+Op/Add/tag: _
+(Op/Add/tag) = 0
 
 Op/Add: Op
 (Op/Add) = λa (a Op/Add/tag)
 
+Op/Sub/tag: _
+(Op/Sub/tag) = 1
+
 Op/Sub: Op
 (Op/Sub) = λa (a Op/Sub/tag)
+
+Op/Mul/tag: _
+(Op/Mul/tag) = 2
 
 Op/Mul: Op
 (Op/Mul) = λa (a Op/Mul/tag)
 
+Op/Div/tag: _
+(Op/Div/tag) = 3
+
 Op/Div: Op
 (Op/Div) = λa (a Op/Div/tag)
-
-Expr/Var/tag: u24
-(Expr/Var/tag) = 0
-
-Expr/Num/tag: u24
-(Expr/Num/tag) = 1
-
-Expr/App/tag: u24
-(Expr/App/tag) = 2
-
-Expr/Fun/tag: u24
-(Expr/Fun/tag) = 3
-
-Expr/If/tag: u24
-(Expr/If/tag) = 4
-
-Expr/Let/tag: u24
-(Expr/Let/tag) = 5
-
-Expr/Dup/tag: u24
-(Expr/Dup/tag) = 6
-
-Expr/Tup/tag: u24
-(Expr/Tup/tag) = 7
-
-Expr/Op2/tag: u24
-(Expr/Op2/tag) = 8
-
-Op/Add/tag: u24
-(Op/Add/tag) = 0
-
-Op/Sub/tag: u24
-(Op/Sub/tag) = 1
-
-Op/Mul/tag: u24
-(Op/Mul/tag) = 2
-
-Op/Div/tag: u24
-(Op/Div/tag) = 3

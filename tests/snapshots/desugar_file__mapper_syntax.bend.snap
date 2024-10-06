@@ -20,17 +20,17 @@ unreachable: Any
 unchecked main: Any
 (main) = let (c, d) = (Map/get (Map/map (Map/map (Map/set (Map/set Map/empty 0 3) 1 4) 1 λa (+ a 1)) 1 λb (* b 2)) 1); let (e, *) = (Map/get d 0); ((λf (+ f 1) 1), c, e)
 
-Map/Node: (a -> (Map a) -> (Map a) -> (Map a))
-(Map/Node) = λa λb λc λd (d Map/Node/tag a b c)
-
-Map/Leaf: (Map a)
-(Map/Leaf) = λa (a Map/Leaf/tag)
-
 Map/Node/tag: u24
 (Map/Node/tag) = 0
 
+Map/Node: (a -> (Map a) -> (Map a) -> (Map a))
+(Map/Node) = λa λb λc λd (d Map/Node/tag a b c)
+
 Map/Leaf/tag: u24
 (Map/Leaf/tag) = 1
+
+Map/Leaf: (Map a)
+(Map/Leaf) = λa (a Map/Leaf/tag)
 
 Map/get__C0: _
 (Map/get__C0) = λa λb λc λd let (e, f) = (Map/get c (/ a 2)); (e, (Map/Node b f d))

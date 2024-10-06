@@ -8,14 +8,14 @@ unchecked Foo: Any
 unchecked main: Any
 (main) = (Foo 2 (A_t/A B_t/B))
 
+A_t/A/tag: _
+(A_t/A/tag) = 0
+
 A_t/A: (Any -> A_t)
 (A_t/A) = λa λb (b A_t/A/tag a)
 
+B_t/B/tag: _
+(B_t/B/tag) = 0
+
 B_t/B: B_t
 (B_t/B) = λa (a B_t/B/tag)
-
-A_t/A/tag: u24
-(A_t/A/tag) = 0
-
-B_t/B/tag: u24
-(B_t/B/tag) = 0

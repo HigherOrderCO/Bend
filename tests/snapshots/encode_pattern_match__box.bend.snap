@@ -13,8 +13,8 @@ NumScott
 unchecked unbox: Any
 (unbox) = λa (a λb switch b { 0: λc c; _: *; })
 
+box/new/tag: _
+(box/new/tag) = 0
+
 box/new: (Any -> box)
 (box/new) = λa λb (b box/new/tag a)
-
-box/new/tag: u24
-(box/new/tag) = 0

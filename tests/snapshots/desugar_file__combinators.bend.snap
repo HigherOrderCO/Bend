@@ -35,17 +35,17 @@ unchecked B: Any
 unchecked Main: Any
 (Main) = (List/Cons 0 (List/Cons list List/Nil))
 
-List/Nil: (List a)
-(List/Nil) = λa (a List/Nil/tag)
-
-List/Cons: (a -> (List a) -> (List a))
-(List/Cons) = λa λb λc (c List/Cons/tag a b)
-
 List/Nil/tag: u24
 (List/Nil/tag) = 0
 
+List/Nil: (List a)
+(List/Nil) = λa (a List/Nil/tag)
+
 List/Cons/tag: u24
 (List/Cons/tag) = 1
+
+List/Cons: (a -> (List a) -> (List a))
+(List/Cons) = λa λb λc (c List/Cons/tag a b)
 
 unchecked A__C0: _
 (A__C0) = let {a b} = A; λc (a b c)

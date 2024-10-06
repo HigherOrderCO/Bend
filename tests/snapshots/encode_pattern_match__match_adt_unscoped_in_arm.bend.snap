@@ -16,14 +16,14 @@ NumScott
 unchecked main: Any
 (main) = λ* λ$x $x
 
+bool/T/tag: _
+(bool/T/tag) = 0
+
 bool/T: bool
 (bool/T) = λa (a bool/T/tag)
 
+bool/F/tag: _
+(bool/F/tag) = 1
+
 bool/F: bool
 (bool/F) = λa (a bool/F/tag)
-
-bool/T/tag: u24
-(bool/T/tag) = 0
-
-bool/F/tag: u24
-(bool/F/tag) = 1

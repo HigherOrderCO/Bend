@@ -28,26 +28,26 @@ unchecked Parse: Any
 unchecked main: Any
 (main) = (Parse * (String/Cons 40 (String/Cons 43 String/Nil)) λc switch c { 0: λd let (e, f, g) = d; (e, (Parse g f)); _: λ* λh (Result_/Err h); })
 
+String/Nil/tag: _
+(String/Nil/tag) = 0
+
 String/Nil: String
 (String/Nil) = λa (a String/Nil/tag)
+
+String/Cons/tag: _
+(String/Cons/tag) = 1
 
 String/Cons: (u24 -> String -> String)
 (String/Cons) = λa λb λc (c String/Cons/tag a b)
 
+Result_/Ok/tag: _
+(Result_/Ok/tag) = 0
+
 Result_/Ok: (Any -> Result_)
 (Result_/Ok) = λa λb (b Result_/Ok/tag a)
 
+Result_/Err/tag: _
+(Result_/Err/tag) = 1
+
 Result_/Err: (Any -> Result_)
 (Result_/Err) = λa λb (b Result_/Err/tag a)
-
-String/Nil/tag: u24
-(String/Nil/tag) = 0
-
-String/Cons/tag: u24
-(String/Cons/tag) = 1
-
-Result_/Ok/tag: u24
-(Result_/Ok/tag) = 0
-
-Result_/Err/tag: u24
-(Result_/Err/tag) = 1

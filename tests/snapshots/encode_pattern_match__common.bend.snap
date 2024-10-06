@@ -55,104 +55,104 @@ Direction/West: Direction
 (Direction/West) = λ* λ* λ* λd d
 
 NumScott
+Box/Filled/tag: _
+(Box/Filled/tag) = 0
+
 Box/Filled: (Any -> Box)
 (Box/Filled) = λa λb (b Box/Filled/tag a)
+
+Box/Empty/tag: _
+(Box/Empty/tag) = 1
 
 Box/Empty: Box
 (Box/Empty) = λa (a Box/Empty/tag)
 
+Option/Some/tag: _
+(Option/Some/tag) = 0
+
 Option/Some: (Any -> Option)
 (Option/Some) = λa λb (b Option/Some/tag a)
+
+Option/None/tag: _
+(Option/None/tag) = 1
 
 Option/None: Option
 (Option/None) = λa (a Option/None/tag)
 
+Result_/Ok/tag: _
+(Result_/Ok/tag) = 0
+
 Result_/Ok: (Any -> Result_)
 (Result_/Ok) = λa λb (b Result_/Ok/tag a)
+
+Result_/Err/tag: _
+(Result_/Err/tag) = 1
 
 Result_/Err: (Any -> Result_)
 (Result_/Err) = λa λb (b Result_/Err/tag a)
 
+List_/Cons/tag: _
+(List_/Cons/tag) = 0
+
 List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc (c List_/Cons/tag a b)
+
+List_/Nil/tag: _
+(List_/Nil/tag) = 1
 
 List_/Nil: List_
 (List_/Nil) = λa (a List_/Nil/tag)
 
+Bool/True/tag: _
+(Bool/True/tag) = 0
+
 Bool/True: Bool
 (Bool/True) = λa (a Bool/True/tag)
+
+Bool/False/tag: _
+(Bool/False/tag) = 1
 
 Bool/False: Bool
 (Bool/False) = λa (a Bool/False/tag)
 
+Light/Red/tag: _
+(Light/Red/tag) = 0
+
 Light/Red: Light
 (Light/Red) = λa (a Light/Red/tag)
+
+Light/Yellow/tag: _
+(Light/Yellow/tag) = 1
 
 Light/Yellow: Light
 (Light/Yellow) = λa (a Light/Yellow/tag)
 
+Light/Green/tag: _
+(Light/Green/tag) = 2
+
 Light/Green: Light
 (Light/Green) = λa (a Light/Green/tag)
+
+Direction/North/tag: _
+(Direction/North/tag) = 0
 
 Direction/North: Direction
 (Direction/North) = λa (a Direction/North/tag)
 
+Direction/South/tag: _
+(Direction/South/tag) = 1
+
 Direction/South: Direction
 (Direction/South) = λa (a Direction/South/tag)
+
+Direction/East/tag: _
+(Direction/East/tag) = 2
 
 Direction/East: Direction
 (Direction/East) = λa (a Direction/East/tag)
 
+Direction/West/tag: _
+(Direction/West/tag) = 3
+
 Direction/West: Direction
 (Direction/West) = λa (a Direction/West/tag)
-
-Box/Filled/tag: u24
-(Box/Filled/tag) = 0
-
-Box/Empty/tag: u24
-(Box/Empty/tag) = 1
-
-Option/Some/tag: u24
-(Option/Some/tag) = 0
-
-Option/None/tag: u24
-(Option/None/tag) = 1
-
-Result_/Ok/tag: u24
-(Result_/Ok/tag) = 0
-
-Result_/Err/tag: u24
-(Result_/Err/tag) = 1
-
-List_/Cons/tag: u24
-(List_/Cons/tag) = 0
-
-List_/Nil/tag: u24
-(List_/Nil/tag) = 1
-
-Bool/True/tag: u24
-(Bool/True/tag) = 0
-
-Bool/False/tag: u24
-(Bool/False/tag) = 1
-
-Light/Red/tag: u24
-(Light/Red/tag) = 0
-
-Light/Yellow/tag: u24
-(Light/Yellow/tag) = 1
-
-Light/Green/tag: u24
-(Light/Green/tag) = 2
-
-Direction/North/tag: u24
-(Direction/North/tag) = 0
-
-Direction/South/tag: u24
-(Direction/South/tag) = 1
-
-Direction/East/tag: u24
-(Direction/East/tag) = 2
-
-Direction/West/tag: u24
-(Direction/West/tag) = 3

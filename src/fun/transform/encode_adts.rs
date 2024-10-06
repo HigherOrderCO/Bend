@@ -1,5 +1,5 @@
 use crate::{
-  fun::{Book, Definition, Name, Num, Pattern, Rule, Source, SourceKind, Term, Type},
+  fun::{Book, Definition, Name, Num, Pattern, Rule, Source, Term},
   AdtEncoding,
 };
 
@@ -7,20 +7,17 @@ impl Book {
   /// Defines a function for each constructor in each ADT in the book.
   pub fn encode_adts(&mut self, adt_encoding: AdtEncoding) {
     let mut defs = vec![];
-    let mut tags = vec![];
 
-    for (adt_name, adt) in self.adts.iter() {
+    for (_, adt) in self.adts.iter() {
       for (ctr_idx, (ctr_name, ctr)) in adt.ctrs.iter().enumerate() {
         let ctrs: Vec<_> = adt.ctrs.keys().cloned().collect();
 
         let body = match adt_encoding {
           AdtEncoding::Scott => encode_ctr_scott(ctr.fields.iter().map(|f| &f.nam), ctrs, ctr_name),
           AdtEncoding::NumScott => {
-            let tag = make_tag(adt_name == ctr_name, ctr_name);
-            let body = encode_ctr_num_scott(ctr.fields.iter().map(|f| &f.nam), &tag);
-            let tag_def = make_tag_def(ctr_idx, &tag, adt.source.clone());
-            tags.push((tag, tag_def));
-            body
+            let tag = encode_num_scott_tag(ctr_idx as u32, ctr_name, adt.source.clone());
+            defs.push((tag.name.clone(), tag.clone()));
+            encode_ctr_num_scott(ctr.fields.iter().map(|f| &f.nam), &tag.name)
           }
         };
 
@@ -36,16 +33,6 @@ impl Book {
       }
     }
     self.defs.extend(defs);
-    self.defs.extend(tags);
-  }
-}
-
-fn make_tag(is_object: bool, ctr_name: &Name) -> Name {
-  if is_object {
-    Name::new(format!("{ctr_name}/tag"))
-  } else {
-    let (typ, ctr) = ctr_name.rsplit_once('/').expect("To split at '/'");
-    Name::new(format!("{typ}/{ctr}/tag"))
   }
 }
 
@@ -71,9 +58,8 @@ fn encode_ctr_num_scott<'a>(ctr_args: impl DoubleEndedIterator<Item = &'a Name> 
   Term::rfold_lams(term, ctr_args.cloned().map(Some))
 }
 
-fn make_tag_def(ctr_idx: usize, tag: &Name, source: Source) -> Definition {
-  let rules = vec![Rule { pats: vec![], body: Term::Num { val: Num::U24(ctr_idx as u32) } }];
-  let kind = if source.is_builtin() { SourceKind::Builtin } else { SourceKind::Generated };
-  let source = Source { kind, ..source };
-  Definition { name: tag.clone(), typ: Type::U24, check: true, rules, source }
+fn encode_num_scott_tag(tag : u32, ctr_name: &Name, source: Source) -> Definition {
+  let tag_nam = Name::new(format!("{ctr_name}/tag"));
+  let rules = vec![Rule { pats: vec![], body: Term::Num { val: Num::U24(tag) } }];
+  Definition::new_gen(tag_nam.clone(), rules, source, true)
 }

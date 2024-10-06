@@ -170,8 +170,7 @@ impl Term {
 
         // Check if the function it's referring to is safe
         let safe = if let Some(def) = ctx.book.defs.get(nam) {
-          let ref_safe = def.rule().body.is_safe(ctx);
-          ref_safe
+          def.rule().body.is_safe(ctx)
         } else if let Some((safe, _)) = ctx.combinators.get(nam) {
           *safe
         } else {
@@ -187,13 +186,15 @@ impl Term {
     })
   }
 
-  /// Checks if the term is a lambda sequence with the body being a variable in the scope or a reference.
+  /// Checks if the term is a lambda sequence with a safe body.
+  /// If the body is a variable bound in the lambdas, it's a nullary constructor.
+  /// If the body is a reference, it's in inactive position, so always safe.
   fn is_safe_lambda(&self, ctx: &mut FloatCombinatorsCtx) -> bool {
     let mut current = self;
     let mut scope = Vec::new();
 
-    while let Term::Lam { bod, .. } = current {
-      scope.extend(current.pattern().unwrap().binds().filter_map(|x| x.as_ref()));
+    while let Term::Lam { pat, bod, .. } = current {
+      scope.extend(pat.binds().filter_map(|x| x.as_ref()));
       current = bod;
     }
 

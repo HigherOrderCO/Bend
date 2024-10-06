@@ -5,13 +5,11 @@ use crate::{
 
 impl Book {
   /// Encodes pattern matching expressions in the book into their
-  /// native/core form. Must be run after [`Ctr::fix_match_terms`].
+  /// core form. Must be run after [`Ctr::fix_match_terms`].
   ///
   /// ADT matches are encoded based on `adt_encoding`.
   ///
   /// Num matches are encoded as a sequence of native num matches (on 0 and 1+).
-  ///
-  /// Var and pair matches become a let expression.
   pub fn encode_matches(&mut self, adt_encoding: AdtEncoding) {
     for def in self.defs.values_mut() {
       for rule in &mut def.rules {

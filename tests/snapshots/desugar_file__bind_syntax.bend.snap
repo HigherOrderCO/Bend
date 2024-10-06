@@ -17,29 +17,29 @@ unchecked Main: Any
 undefer: (((a -> a) -> b) -> b)
 (undefer) = λa (a λb b)
 
-String/Nil: String
-(String/Nil) = λa (a String/Nil/tag)
-
-String/Cons: (u24 -> String -> String)
-(String/Cons) = λa λb λc (c String/Cons/tag a b)
-
-Result/Ok: (b -> (Result b a))
-(Result/Ok) = λa λb (b Result/Ok/tag a)
-
-Result/Err: (a -> (Result b a))
-(Result/Err) = λa λb (b Result/Err/tag a)
-
 String/Nil/tag: u24
 (String/Nil/tag) = 0
+
+String/Nil: String
+(String/Nil) = λa (a String/Nil/tag)
 
 String/Cons/tag: u24
 (String/Cons/tag) = 1
 
+String/Cons: (u24 -> String -> String)
+(String/Cons) = λa λb λc (c String/Cons/tag a b)
+
 Result/Ok/tag: u24
 (Result/Ok/tag) = 0
 
+Result/Ok: (b -> (Result b a))
+(Result/Ok) = λa λb (b Result/Ok/tag a)
+
 Result/Err/tag: u24
 (Result/Err/tag) = 1
+
+Result/Err: (a -> (Result b a))
+(Result/Err) = λa λb (b Result/Err/tag a)
 
 unchecked Result/bind__C0: _
 (Result/bind__C0) = λa λb (undefer b a)

@@ -31,32 +31,32 @@ unchecked Foo: Any
 unchecked main: Any
 (main) = (Foo MyType/A 2)
 
+MyType/A/tag: _
+(MyType/A/tag) = 0
+
 MyType/A: (Any -> MyType)
 (MyType/A) = λa λb (b MyType/A/tag a)
+
+MyType/B/tag: _
+(MyType/B/tag) = 1
 
 MyType/B: (Any -> MyType)
 (MyType/B) = λa λb (b MyType/B/tag a)
 
+MyType/C/tag: _
+(MyType/C/tag) = 2
+
 MyType/C: (Any -> MyType)
 (MyType/C) = λa λb (b MyType/C/tag a)
+
+MyType/D/tag: _
+(MyType/D/tag) = 3
 
 MyType/D: (Any -> Any -> MyType)
 (MyType/D) = λa λb λc (c MyType/D/tag a b)
 
+MyType/E/tag: _
+(MyType/E/tag) = 4
+
 MyType/E: (Any -> Any -> MyType)
 (MyType/E) = λa λb λc (c MyType/E/tag a b)
-
-MyType/A/tag: u24
-(MyType/A/tag) = 0
-
-MyType/B/tag: u24
-(MyType/B/tag) = 1
-
-MyType/C/tag: u24
-(MyType/C/tag) = 2
-
-MyType/D/tag: u24
-(MyType/D/tag) = 3
-
-MyType/E/tag: u24
-(MyType/E/tag) = 4

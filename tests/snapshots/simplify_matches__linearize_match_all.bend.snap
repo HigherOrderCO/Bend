@@ -32,14 +32,14 @@ unchecked D2: Any
 unchecked main: Any
 (main) = *
 
+ConsList/Cons/tag: _
+(ConsList/Cons/tag) = 0
+
 ConsList/Cons: (Any -> Any -> ConsList)
 (ConsList/Cons) = λa λb λc (c ConsList/Cons/tag a b)
 
+ConsList/Nil/tag: _
+(ConsList/Nil/tag) = 1
+
 ConsList/Nil: ConsList
 (ConsList/Nil) = λa (a ConsList/Nil/tag)
-
-ConsList/Cons/tag: u24
-(ConsList/Cons/tag) = 0
-
-ConsList/Nil/tag: u24
-(ConsList/Nil/tag) = 1

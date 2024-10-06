@@ -59,44 +59,44 @@ unchecked sup: Any
 unchecked main: Any
 (main) = with IO { ask x = IO.read; x }
 
+List/Nil/tag: _
+(List/Nil/tag) = 0
+
 List/Nil: (List T)
 (List/Nil) = λ%x (%x List/Nil/tag)
+
+List/Cons/tag: _
+(List/Cons/tag) = 1
 
 List/Cons: (T -> (List T) -> (List T))
 (List/Cons) = λhead λtail λ%x (%x List/Cons/tag head tail)
 
+Map/Node/tag: _
+(Map/Node/tag) = 0
+
 Map/Node: (T -> (Map T) -> (Map T) -> (Map T))
 (Map/Node) = λvalue λleft λright λ%x (%x Map/Node/tag value left right)
+
+Map/Leaf/tag: _
+(Map/Leaf/tag) = 1
 
 Map/Leaf: (Map T)
 (Map/Leaf) = λ%x (%x Map/Leaf/tag)
 
+Point/Point/tag: _
+(Point/Point/tag) = 0
+
 Point/Point: (Any -> Any -> Point)
 (Point/Point) = λx λy λ%x (%x Point/Point/tag x y)
+
+Bool/True/tag: _
+(Bool/True/tag) = 0
 
 Bool/True: Bool
 (Bool/True) = λ%x (%x Bool/True/tag)
 
+Bool/False/tag: _
+(Bool/False/tag) = 1
+
 Bool/False: Bool
 (Bool/False) = λ%x (%x Bool/False/tag)
-
-List/Nil/tag: u24
-(List/Nil/tag) = 0
-
-List/Cons/tag: u24
-(List/Cons/tag) = 1
-
-Map/Node/tag: u24
-(Map/Node/tag) = 0
-
-Map/Leaf/tag: u24
-(Map/Leaf/tag) = 1
-
-Point/Point/tag: u24
-(Point/Point/tag) = 0
-
-Bool/True/tag: u24
-(Bool/True/tag) = 0
-
-Bool/False/tag: u24
-(Bool/False/tag) = 1

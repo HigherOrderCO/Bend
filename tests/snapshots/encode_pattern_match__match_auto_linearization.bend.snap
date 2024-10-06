@@ -31,8 +31,8 @@ unchecked switch_shadowed_field: Any
 unchecked match_shadowed_field: Any
 (match_shadowed_field) = λa (a λb switch b { 0: λc λd (List/Cons c d); _: λ* λe λf λ* λ* (List/Cons e f); })
 
+List/Cons/tag: _
+(List/Cons/tag) = 1
+
 List/Cons: (T -> (List T) -> (List T))
 (List/Cons) = λa λb λc (c List/Cons/tag a b)
-
-List/Cons/tag: u24
-(List/Cons/tag) = 1

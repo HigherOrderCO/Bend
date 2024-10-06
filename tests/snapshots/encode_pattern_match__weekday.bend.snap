@@ -31,44 +31,44 @@ NumScott
 unchecked main: Any
 (main) = (λa a Weekday/Saturday)
 
+Weekday/Monday/tag: _
+(Weekday/Monday/tag) = 0
+
 Weekday/Monday: Weekday
 (Weekday/Monday) = λa (a Weekday/Monday/tag)
+
+Weekday/Tuesday/tag: _
+(Weekday/Tuesday/tag) = 1
 
 Weekday/Tuesday: Weekday
 (Weekday/Tuesday) = λa (a Weekday/Tuesday/tag)
 
+Weekday/Wednesday/tag: _
+(Weekday/Wednesday/tag) = 2
+
 Weekday/Wednesday: Weekday
 (Weekday/Wednesday) = λa (a Weekday/Wednesday/tag)
+
+Weekday/Thursday/tag: _
+(Weekday/Thursday/tag) = 3
 
 Weekday/Thursday: Weekday
 (Weekday/Thursday) = λa (a Weekday/Thursday/tag)
 
+Weekday/Friday/tag: _
+(Weekday/Friday/tag) = 4
+
 Weekday/Friday: Weekday
 (Weekday/Friday) = λa (a Weekday/Friday/tag)
+
+Weekday/Saturday/tag: _
+(Weekday/Saturday/tag) = 5
 
 Weekday/Saturday: Weekday
 (Weekday/Saturday) = λa (a Weekday/Saturday/tag)
 
+Weekday/Sunday/tag: _
+(Weekday/Sunday/tag) = 6
+
 Weekday/Sunday: Weekday
 (Weekday/Sunday) = λa (a Weekday/Sunday/tag)
-
-Weekday/Monday/tag: u24
-(Weekday/Monday/tag) = 0
-
-Weekday/Tuesday/tag: u24
-(Weekday/Tuesday/tag) = 1
-
-Weekday/Wednesday/tag: u24
-(Weekday/Wednesday/tag) = 2
-
-Weekday/Thursday/tag: u24
-(Weekday/Thursday/tag) = 3
-
-Weekday/Friday/tag: u24
-(Weekday/Friday/tag) = 4
-
-Weekday/Saturday/tag: u24
-(Weekday/Saturday/tag) = 5
-
-Weekday/Sunday/tag: u24
-(Weekday/Sunday/tag) = 6

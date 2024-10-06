@@ -17,29 +17,29 @@ undefer: (((a -> a) -> b) -> b)
 unchecked main: Any
 (main) = (IO/bind (Bool/T λa switch a { 0: (IO/wrap 0); _: λ* (IO/wrap 0); }) λb (b λc λd (c d) IO/wrap))
 
-IO/Done: ((u24, u24) -> a -> (IO a))
-(IO/Done) = λa λb λc (c IO/Done/tag a b)
-
-IO/Call: ((u24, u24) -> String -> Any -> ((Result Any (IOError Any)) -> (IO a)) -> (IO a))
-(IO/Call) = λa λb λc λd λe (e IO/Call/tag a b c d)
-
-Bool/T: Bool
-(Bool/T) = λa (a Bool/T/tag)
-
-Bool/F: Bool
-(Bool/F) = λa (a Bool/F/tag)
-
 IO/Done/tag: u24
 (IO/Done/tag) = 0
+
+IO/Done: ((u24, u24) -> a -> (IO a))
+(IO/Done) = λa λb λc (c IO/Done/tag a b)
 
 IO/Call/tag: u24
 (IO/Call/tag) = 1
 
+IO/Call: ((u24, u24) -> String -> Any -> ((Result Any (IOError Any)) -> (IO a)) -> (IO a))
+(IO/Call) = λa λb λc λd λe (e IO/Call/tag a b c d)
+
 Bool/T/tag: u24
 (Bool/T/tag) = 0
 
+Bool/T: Bool
+(Bool/T) = λa (a Bool/T/tag)
+
 Bool/F/tag: u24
 (Bool/F/tag) = 1
+
+Bool/F: Bool
+(Bool/F) = λa (a Bool/F/tag)
 
 IO/bind__C0: _
 (IO/bind__C0) = λ* λa λb (undefer b a)

@@ -8,8 +8,8 @@ unchecked DoubleUnbox: Any
 unchecked Main: Any
 (Main) = (DoubleUnbox (Boxed/Box (Boxed/Box 0)) 5)
 
+Boxed/Box/tag: _
+(Boxed/Box/tag) = 0
+
 Boxed/Box: (Any -> Boxed)
 (Boxed/Box) = λa λb (b Boxed/Box/tag a)
-
-Boxed/Box/tag: u24
-(Boxed/Box/tag) = 0

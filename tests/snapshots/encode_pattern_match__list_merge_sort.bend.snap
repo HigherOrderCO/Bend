@@ -58,26 +58,26 @@ unchecked MergePair: Any
 unchecked Merge: Any
 (Merge) = λa λb (b λc switch c { 0: λd λe λf λg (g λi switch i { 0: λj let {j j_2 j_3} = j; λk let {k k_2} = k; λl let {l l_2 l_3} = l; λm let {m m_2 m_3} = m; λn let {n n_2} = n; (If (l m j) (List_/Cons m_2 (Merge l_2 n (List_/Cons j_2 k))) (List_/Cons j_3 (Merge l_3 (List_/Cons m_3 n_2) k_2))); _: λ* λ* λr λs (List_/Cons r s); } f d e); _: λ* λ* λu u; } a)
 
+Bool/True/tag: _
+(Bool/True/tag) = 0
+
 Bool/True: Bool
 (Bool/True) = λa (a Bool/True/tag)
+
+Bool/False/tag: _
+(Bool/False/tag) = 1
 
 Bool/False: Bool
 (Bool/False) = λa (a Bool/False/tag)
 
+List_/Cons/tag: _
+(List_/Cons/tag) = 0
+
 List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc (c List_/Cons/tag a b)
 
+List_/Nil/tag: _
+(List_/Nil/tag) = 1
+
 List_/Nil: List_
 (List_/Nil) = λa (a List_/Nil/tag)
-
-Bool/True/tag: u24
-(Bool/True/tag) = 0
-
-Bool/False/tag: u24
-(Bool/False/tag) = 1
-
-List_/Cons/tag: u24
-(List_/Cons/tag) = 0
-
-List_/Nil/tag: u24
-(List_/Nil/tag) = 1

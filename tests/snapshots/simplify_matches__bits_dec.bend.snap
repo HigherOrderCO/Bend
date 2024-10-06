@@ -5,20 +5,20 @@ input_file: tests/golden_tests/simplify_matches/bits_dec.bend
 unchecked Data.Bits.dec: Any
 (Data.Bits.dec) = λa match a { Data/Bits/e: Data/Bits/e; Data/Bits/o b: match b { Data/Bits/e: Data/Bits/e; Data/Bits/o c: (Data/Bits/i (Data.Bits.dec c)); Data/Bits/i d: (Data/Bits/i (Data.Bits.dec d)); }; Data/Bits/i e: match e { Data/Bits/e: (Data/Bits/o Data/Bits/e); Data/Bits/o f: (Data/Bits/o f); Data/Bits/i g: (Data/Bits/o g); }; }
 
+Data/Bits/e/tag: _
+(Data/Bits/e/tag) = 0
+
 Data/Bits/e: Data/Bits
 (Data/Bits/e) = λa (a Data/Bits/e/tag)
+
+Data/Bits/o/tag: _
+(Data/Bits/o/tag) = 1
 
 Data/Bits/o: (Any -> Data/Bits)
 (Data/Bits/o) = λa λb (b Data/Bits/o/tag a)
 
+Data/Bits/i/tag: _
+(Data/Bits/i/tag) = 2
+
 Data/Bits/i: (Any -> Data/Bits)
 (Data/Bits/i) = λa λb (b Data/Bits/i/tag a)
-
-Data/Bits/e/tag: u24
-(Data/Bits/e/tag) = 0
-
-Data/Bits/o/tag: u24
-(Data/Bits/o/tag) = 1
-
-Data/Bits/i/tag: u24
-(Data/Bits/i/tag) = 2

@@ -22,14 +22,14 @@ unchecked And: Any
 unchecked main: Any
 (main) = (And (Bool/F, Bool/T, Bool/F))
 
+Bool/T/tag: _
+(Bool/T/tag) = 0
+
 Bool/T: Bool
 (Bool/T) = λa (a Bool/T/tag)
 
+Bool/F/tag: _
+(Bool/F/tag) = 1
+
 Bool/F: Bool
 (Bool/F) = λa (a Bool/F/tag)
-
-Bool/T/tag: u24
-(Bool/T/tag) = 0
-
-Bool/F/tag: u24
-(Bool/F/tag) = 1

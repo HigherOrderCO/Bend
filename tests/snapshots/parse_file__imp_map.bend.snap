@@ -17,14 +17,14 @@ unreachable: Any
 unchecked main: Any
 (main) = let x = (Map/set (Map/set Map/empty 2 1) 3 2); let (map/get%1, x) = (Map/get x 2); let y = (id map/get%1); let z = 4; let x = (Map/set x z 4); let (map/get%0, x) = (Map/get x z); (+ y map/get%0)
 
+Map/Node/tag: _
+(Map/Node/tag) = 0
+
 Map/Node: (T -> (Map T) -> (Map T) -> (Map T))
 (Map/Node) = λvalue λleft λright λ%x (%x Map/Node/tag value left right)
 
+Map/Leaf/tag: _
+(Map/Leaf/tag) = 1
+
 Map/Leaf: (Map T)
 (Map/Leaf) = λ%x (%x Map/Leaf/tag)
-
-Map/Node/tag: u24
-(Map/Node/tag) = 0
-
-Map/Leaf/tag: u24
-(Map/Leaf/tag) = 1

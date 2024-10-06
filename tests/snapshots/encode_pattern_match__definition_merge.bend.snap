@@ -22,26 +22,26 @@ NumScott
 unchecked Foo: Any
 (Foo) = λa (a λb switch b { 0: λc (c λd switch d { 0: λe (e λh switch h { 0: λi (i λj switch j { 0: 1; _: λ* 1; }); _: λ* λk (k λl switch l { 0: 2; _: λ* 2; }); }); _: λ* λm (m λp switch p { 0: λq (q λr switch r { 0: 1; _: λ* 1; }); _: λ* λs (s λt switch t { 0: 2; _: λ* 2; }); }); }); _: λ* λu (u λv switch v { 0: λw (w λz switch z { 0: λab (ab λbb switch bb { 0: 3; _: λ* 3; }); _: λ* λcb (cb λdb switch db { 0: 3; _: λ* 3; }); }); _: λ* λeb (eb λhb switch hb { 0: λib (ib λjb switch jb { 0: 3; _: λ* 3; }); _: λ* λkb (kb λlb switch lb { 0: 3; _: λ* 3; }); }); }); })
 
+Either/Left/tag: _
+(Either/Left/tag) = 0
+
 Either/Left: (Any -> Either)
 (Either/Left) = λa λb (b Either/Left/tag a)
+
+Either/Right/tag: _
+(Either/Right/tag) = 1
 
 Either/Right: (Any -> Either)
 (Either/Right) = λa λb (b Either/Right/tag a)
 
+Bool/True/tag: _
+(Bool/True/tag) = 0
+
 Bool/True: Bool
 (Bool/True) = λa (a Bool/True/tag)
 
+Bool/False/tag: _
+(Bool/False/tag) = 1
+
 Bool/False: Bool
 (Bool/False) = λa (a Bool/False/tag)
-
-Either/Left/tag: u24
-(Either/Left/tag) = 0
-
-Either/Right/tag: u24
-(Either/Right/tag) = 1
-
-Bool/True/tag: u24
-(Bool/True/tag) = 0
-
-Bool/False/tag: u24
-(Bool/False/tag) = 1

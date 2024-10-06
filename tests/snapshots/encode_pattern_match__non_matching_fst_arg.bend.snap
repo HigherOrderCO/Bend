@@ -16,14 +16,14 @@ NumScott
 unchecked Foo: Any
 (Foo) = λa λb (b λc switch c { 0: λd let {d d_2} = d; (Foo d d_2); _: λ* λe e; } a)
 
+bool/true/tag: _
+(bool/true/tag) = 0
+
 bool/true: bool
 (bool/true) = λa (a bool/true/tag)
 
+bool/false/tag: _
+(bool/false/tag) = 1
+
 bool/false: bool
 (bool/false) = λa (a bool/false/tag)
-
-bool/true/tag: u24
-(bool/true/tag) = 0
-
-bool/false/tag: u24
-(bool/false/tag) = 1

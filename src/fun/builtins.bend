@@ -109,7 +109,7 @@ def DiffList/append(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T)):
 # Concatenates two difference lists.
 def DiffList/concat(
   left: List(T) -> List(T),
-  right: List(T) -> List(T) 
+  right: List(T) -> List(T)
 ) -> (List(T) -> List(T)):
   return lambda x: left(right(x))
 
@@ -263,7 +263,7 @@ def IO/bind(a: IO(A), b: ((Id -> Id) -> A -> IO(B))) -> IO(B):
 # Calls an IO by its name with the given arguments.
 #
 # The arguments are untyped and not checked for type correctness.
-# If type safety is desired, this function should be wrapped with 
+# If type safety is desired, this function should be wrapped with
 # another that checks the types of the arguments and of the return.
 #
 # Always returns a `Result` where the error is an `IOError`, a type
@@ -427,7 +427,7 @@ def IO/FS/write_file(path: String, bytes: List(u24)) -> IO(Result(None, u24)):
     res_f <- IO/FS/open(path, "w")
     match res_f:
       case Result/Ok:
-        f = res_f.val 
+        f = res_f.val
         res1 <- IO/FS/write(f, bytes)
         res2 <- IO/FS/close(f)
         return wrap(Result/and(res2, res1))

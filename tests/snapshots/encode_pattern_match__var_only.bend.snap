@@ -22,14 +22,14 @@ unchecked Foo: Any
 unchecked main: Any
 (main) = λ* Foo
 
+Bool/False/tag: _
+(Bool/False/tag) = 0
+
 Bool/False: Bool
 (Bool/False) = λa (a Bool/False/tag)
 
+Bool/True/tag: _
+(Bool/True/tag) = 1
+
 Bool/True: Bool
 (Bool/True) = λa (a Bool/True/tag)
-
-Bool/False/tag: u24
-(Bool/False/tag) = 0
-
-Bool/True/tag: u24
-(Bool/True/tag) = 1

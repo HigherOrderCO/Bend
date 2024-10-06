@@ -8,8 +8,8 @@ unchecked Foo: Any
 unchecked Main: Any
 (Main) = (Foo (Tuple/Pair 1 5))
 
+Tuple/Pair/tag: _
+(Tuple/Pair/tag) = 0
+
 Tuple/Pair: (Any -> Any -> Tuple)
 (Tuple/Pair) = λa λb λc (c Tuple/Pair/tag a b)
-
-Tuple/Pair/tag: u24
-(Tuple/Pair/tag) = 0

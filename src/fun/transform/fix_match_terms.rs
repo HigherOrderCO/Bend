@@ -16,9 +16,10 @@ enum FixMatchErr {
 impl Ctx<'_> {
   /// Convert all match and switch expressions to a normalized form.
   /// * For matches, resolve the constructors and create the name of the field variables.
-  /// * For switches, resolve the succ case ("_") and create the name of the pred variable.
-  /// * If the match arg is not a variable, it is separated into a let expression and bound to "%matched"
+  /// * For switches, the resolution and name bind is already done during parsing.
   /// * Check for redundant arms and non-exhaustive matches.
+  /// * Converts the initial bind to an alias on every arm, rebuilding the eliminated constructor
+  /// * Since the bind is not needed anywhere else, it's erased from the term.
   ///
   /// Example:
   /// For the program
@@ -26,19 +27,22 @@ impl Ctx<'_> {
   /// data MyList = (Cons h t) | Nil
   /// match x {
   ///   Cons: (A x.h x.t)
-  ///   Nil: switch (Foo y) { 0: B; 1: C; _: D }
+  ///   Nil: switch %arg = (Foo y) { 0: B; 1: C; _ %arg-2: D }
   /// }
   /// ```
   /// The following AST transformations will be made:
   /// * The binds `x.h` and `x.t` will be generated and stored in the match term.
-  /// * `(Foo y)`` will be put in a let expression, bound to the variable `%matched`;
-  /// * The bind `%matched-2` will be generated and stored in the switch term.
-  /// * If either was missing one of the match cases (a number or a constructor), we'd get an error.
-  /// * If either included one of the cases more than once (including wildcard patterns), we'd get a warning.
+  /// * If it was missing one of the match cases, we'd get an error.
+  /// * If it included one of the cases more than once (including wildcard patterns), we'd get a warning.
   /// ```hvm
-  /// match x {
-  ///   Cons x.h x.t: (A x.h x.t)
-  ///   Nil: let %matched = (Foo y); switch %matched { 0: B; 1: C; _: D }
+  /// match * = x {
+  ///   Cons x.h x.t: use x = (Cons x.h x.t); (A x.h x.t)
+  ///   Nil: use x = Nil;
+  ///     switch * = (Foo y) {
+  ///       0: use %arg = 0; B;
+  ///       1: use %arg = 1; C;
+  ///       _: use %arg = (+ %arg-2 2); D
+  ///       }
   /// }
   /// ```
   pub fn fix_match_terms(&mut self) -> Result<(), Diagnostics> {

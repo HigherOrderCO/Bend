@@ -52,17 +52,17 @@ unchecked test: (Any -> Any)
 unchecked main: Any
 (main) = (test fullMap)
 
+Map/Node/tag: _
+(Map/Node/tag) = 0
+
 Map/Node: (T -> (Map T) -> (Map T) -> (Map T))
 (Map/Node) = λa λb λc λd (d Map/Node/tag a b c)
 
+Map/Leaf/tag: _
+(Map/Leaf/tag) = 1
+
 Map/Leaf: (Map T)
 (Map/Leaf) = λa (a Map/Leaf/tag)
-
-Map/Node/tag: u24
-(Map/Node/tag) = 0
-
-Map/Leaf/tag: u24
-(Map/Leaf/tag) = 1
 
 unchecked fullMap__bend0: _
 (fullMap__bend0) = λa let {a a_2 a_3} = a; switch (> a 0) { 0: Map/Leaf; _: λ* (Map/Node 1 (fullMap__bend0 (- a_2 1)) (fullMap__bend0 (- a_3 1))); }

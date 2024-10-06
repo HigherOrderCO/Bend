@@ -14,20 +14,20 @@ unchecked main: Any
 unchecked String/not_empty: (Any -> Any)
 (String/not_empty s) = match s = s { String/Nil: 0; String/Cons: 1; }
 
+Foo/Foo/tag: _
+(Foo/Foo/tag) = 0
+
 Foo/Foo: (Any -> Foo)
 (Foo/Foo) = λfoo λ%x (%x Foo/Foo/tag foo)
+
+Bar/tag: _
+(Bar/tag) = 0
 
 Bar: (Any -> Bar)
 (Bar) = λbar λ%x (%x Bar/tag bar)
 
+V/V/tag: _
+(V/V/tag) = 0
+
 V/V: V
 (V/V) = λ%x (%x V/V/tag)
-
-Foo/Foo/tag: u24
-(Foo/Foo/tag) = 0
-
-Bar/tag: u24
-(Bar/tag) = 0
-
-V/V/tag: u24
-(V/V/tag) = 0

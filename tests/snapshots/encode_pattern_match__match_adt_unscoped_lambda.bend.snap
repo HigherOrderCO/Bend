@@ -16,14 +16,14 @@ NumScott
 unchecked main: Any
 (main) = (Maybe/Some 1 λa switch a { 0: λ$x *; _: λ* λb b; } $x)
 
+Maybe/None/tag: _
+(Maybe/None/tag) = 0
+
 Maybe/None: Maybe
 (Maybe/None) = λa (a Maybe/None/tag)
 
+Maybe/Some/tag: _
+(Maybe/Some/tag) = 1
+
 Maybe/Some: (Any -> Maybe)
 (Maybe/Some) = λa λb (b Maybe/Some/tag a)
-
-Maybe/None/tag: u24
-(Maybe/None/tag) = 0
-
-Maybe/Some/tag: u24
-(Maybe/Some/tag) = 1

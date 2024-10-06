@@ -35,17 +35,17 @@ unchecked imp3: Any
 unchecked imp4: (Any -> Any)
 (imp4) = λa switch a { 0: (Tree/Leaf 0); _: imp4__C0; }
 
-Tree/Node: ((Tree a) -> (Tree a) -> (Tree a))
-(Tree/Node) = λa λb λc (c Tree/Node/tag a b)
-
-Tree/Leaf: (a -> (Tree a))
-(Tree/Leaf) = λa λb (b Tree/Leaf/tag a)
-
 Tree/Node/tag: u24
 (Tree/Node/tag) = 0
 
+Tree/Node: ((Tree a) -> (Tree a) -> (Tree a))
+(Tree/Node) = λa λb λc (c Tree/Node/tag a b)
+
 Tree/Leaf/tag: u24
 (Tree/Leaf/tag) = 1
+
+Tree/Leaf: (a -> (Tree a))
+(Tree/Leaf) = λa λb (b Tree/Leaf/tag a)
 
 unchecked fun4__C0: _
 (fun4__C0) = λa let {b c} = a; (Tree/Node (fun4 b) (fun4 c))

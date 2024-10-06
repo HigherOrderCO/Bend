@@ -40,14 +40,14 @@ unchecked and3: Any
 unchecked and4: Any
 (and4) = λa (a λb switch b { 0: λc (c λe switch e { 0: bool/true; _: λ* bool/false; }); _: λ* λf let * = f; bool/false; })
 
+bool/true/tag: _
+(bool/true/tag) = 0
+
 bool/true: bool
 (bool/true) = λa (a bool/true/tag)
 
+bool/false/tag: _
+(bool/false/tag) = 1
+
 bool/false: bool
 (bool/false) = λa (a bool/false/tag)
-
-bool/true/tag: u24
-(bool/true/tag) = 0
-
-bool/false/tag: u24
-(bool/false/tag) = 1
