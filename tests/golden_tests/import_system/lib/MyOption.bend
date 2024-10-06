@@ -1,6 +1,8 @@
-type MyOption = (Some val) | (None)
+type MyOption(A):
+  Some { val: A }
+  None
 
-def MyOption/bind(val, nxt):
+def MyOption/bind(val: MyOption(A), nxt: (Id -> Id) -> A -> MyOption(B)) -> MyOption(B):
   match val:
     case MyOption/Some:
       nxt = undefer(nxt)
@@ -8,5 +10,5 @@ def MyOption/bind(val, nxt):
     case MyOption/None:
       return MyOption/None
 
-def MyOption/wrap(val):
+def MyOption/wrap(val: A) -> MyOption(A):
   return MyOption/Some(val)
