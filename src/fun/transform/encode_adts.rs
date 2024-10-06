@@ -58,7 +58,7 @@ fn encode_ctr_num_scott<'a>(ctr_args: impl DoubleEndedIterator<Item = &'a Name> 
   Term::rfold_lams(term, ctr_args.cloned().map(Some))
 }
 
-fn encode_num_scott_tag(tag : u32, ctr_name: &Name, source: Source) -> Definition {
+fn encode_num_scott_tag(tag: u32, ctr_name: &Name, source: Source) -> Definition {
   let tag_nam = Name::new(format!("{ctr_name}/tag"));
   let rules = vec![Rule { pats: vec![], body: Term::Num { val: Num::U24(tag) } }];
   Definition::new_gen(tag_nam.clone(), rules, source, true)

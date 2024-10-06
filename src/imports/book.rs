@@ -200,6 +200,7 @@ impl ParseBook {
           name = Name::new(format!("__{}", name));
         }
 
+        adt.name = name.clone();
         adts_map.push((old_name, name.clone()));
       }
 
