@@ -2,7 +2,7 @@ use super::{BindMap, ImportsMap, PackageLoader};
 use crate::{
   diagnostics::{Diagnostics, DiagnosticsConfig},
   fun::{
-    parser::ParseBook, Adt, AdtCtr, Book, Definition, HvmDefinition, Name, Rule, Source, SourceKind, Term,
+    parser::ParseBook, Adt, AdtCtr, Book, Definition, HvmDefinition, Name, Pattern, Source, SourceKind, Term,
   },
   imp::{self, Expr, MatchArm, Stmt},
   imports::packages::Packages,
@@ -346,19 +346,30 @@ trait Def {
 
 impl Def for Definition {
   fn apply_binds(&mut self, maybe_constructor: bool, binds: &BindMap) {
-    fn rename_ctr_patterns(rule: &mut Rule, binds: &BindMap) {
-      for pat in &mut rule.pats {
-        for bind in pat.binds_mut().flatten() {
-          if let Some(alias) = binds.get(bind) {
-            *bind = alias.clone();
+    fn rename_ctr_pattern(pat: &mut Pattern, binds: &BindMap) {
+      for pat in pat.children_mut() {
+        rename_ctr_pattern(pat, binds);
+      }
+      match pat {
+        Pattern::Ctr(nam, _) => {
+          if let Some(alias) = binds.get(nam) {
+            *nam = alias.clone();
           }
         }
+        Pattern::Var(Some(nam)) => {
+          if let Some(alias) = binds.get(nam) {
+            *nam = alias.clone();
+          }
+        }
+        _ => {}
       }
     }
 
     for rule in &mut self.rules {
       if maybe_constructor {
-        rename_ctr_patterns(rule, binds);
+        for pat in &mut rule.pats {
+          rename_ctr_pattern(pat, binds);
+        }
       }
       let bod = std::mem::take(&mut rule.body);
       rule.body = bod.fold_uses(binds.iter().rev());
