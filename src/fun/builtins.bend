@@ -561,7 +561,9 @@ Utf8/REPLACEMENT_CHARACTER : u24 = '\u{FFFD}'
 
 # Decodes a sequence of bytes to a String using utf-8 encoding.
 # Invalid utf-8 sequences are replaced with Utf8/REPLACEMENT_CHARACTER.
-String/decode_utf8 (bytes: (List u24)) : String =
+String/decode_utf8 (bytes: (List u24)) : String
+String/decode_utf8 [] = String/Nil
+String/decode_utf8 bytes =
   let (got, rest) = (Utf8/decode_character bytes)
   match rest {
     List/Nil: (String/Cons got String/Nil)
