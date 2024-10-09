@@ -440,29 +440,29 @@ impl Reader<'_> {
           return Term::Err;
         }
 
-        let zero_term = self.read_term(self.net.enter_port(Port(sel_node, 1)));
-        let mut succ_term = self.read_term(self.net.enter_port(Port(sel_node, 2)));
+        let zero = self.read_term(self.net.enter_port(Port(sel_node, 1)));
+        let mut succ = self.read_term(self.net.enter_port(Port(sel_node, 2)));
         // Call expand_generated in case of succ_term be a lifted term
-        succ_term.expand_generated(self.book, self.recursive_defs);
+        succ.expand_generated(self.book, self.recursive_defs);
 
         // Succ term should be a lambda
-        let (zero, succ) = match &mut succ_term {
+        let succ = match &mut succ {
           Term::Lam { pat, bod, .. } => {
             if let Pattern::Var(nam) = pat.as_ref() {
               let mut bod = std::mem::take(bod.as_mut());
               if let Some(nam) = nam {
                 bod.subst(nam, &Term::Var { nam: Name::new(format!("{bnd}-1")) });
               }
-              (zero_term, bod)
+              bod
             } else {
               // Readback should never generate non-var patterns for lambdas.
               self.error(ReadbackError::InvalidNumericMatch);
-              (zero_term, succ_term)
+              succ
             }
           }
           _ => {
             self.error(ReadbackError::InvalidNumericMatch);
-            (zero_term, succ_term)
+            succ
           }
         };
         Term::Swt {
@@ -562,7 +562,7 @@ impl Reader<'_> {
   /// Returns whether the given port represents a tuple or some other
   /// term (usually a lambda).
   ///
-  /// Used heuristic: a con node is a tuple if port 1 is a closed net and not an ERA.
+  /// Used heuristic: a con node is a tuple if port 1 is a closed tree and not an ERA.
   fn is_tup(&self, node: NodeId) -> bool {
     if !matches!(self.net.node(node).kind, NodeKind::Ctr(CtrKind::Con(_))) {
       return false;
