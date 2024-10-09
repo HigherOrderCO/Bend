@@ -24,15 +24,15 @@ impl Ctx<'_> {
 type ProgramTypes = HashMap<Name, Scheme>;
 
 /// A type scheme, aka a polymorphic type.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Scheme(Vec<Name>, Type);
 
 /// A finite mapping from type variables to types.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 struct Subst(BTreeMap<Name, Type>);
 
 /// A mapping from term variables to type schemes.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 struct TypeEnv(BTreeMap<Name, Scheme>);
 
 /// Variable generator for type variables.

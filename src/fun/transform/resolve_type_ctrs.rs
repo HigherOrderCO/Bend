@@ -17,6 +17,10 @@ impl Ctx<'_> {
       for ctr in adt.ctrs.values_mut() {
         let res = ctr.typ.resolve_type_ctrs(&adts);
         self.info.take_rule_err(res, ctr.name.clone());
+        for field in ctr.fields.iter_mut() {
+          let res = field.typ.resolve_type_ctrs(&adts);
+          self.info.take_rule_err(res, ctr.name.clone());
+        }
       }
     }
 
