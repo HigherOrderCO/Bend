@@ -1,6 +1,6 @@
 use super::tree_children;
+use crate::hvm::ast::{Book, Net, Tree};
 use crate::{diagnostics::Diagnostics, fun::Name, CompilerTarget};
-use hvm::ast::{Book, Net, Tree};
 
 pub const MAX_NET_SIZE_C: usize = 4095;
 pub const MAX_NET_SIZE_CUDA: usize = 64;

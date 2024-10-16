@@ -1,12 +1,13 @@
-use crate::multi_iterator;
-use hvm::ast::{Net, Tree};
-
 pub mod add_recursive_priority;
+pub mod ast;
 pub mod check_net_size;
 pub mod eta_reduce;
 pub mod inline;
 pub mod mutual_recursion;
 pub mod prune;
+
+use crate::hvm::ast::{Net, Tree};
+use crate::multi_iterator;
 
 pub fn tree_children(tree: &Tree) -> impl DoubleEndedIterator<Item = &Tree> + Clone {
   multi_iterator!(ChildrenIter { Zero, Two });
@@ -36,7 +37,7 @@ pub fn net_trees_mut(net: &mut Net) -> impl DoubleEndedIterator<Item = &mut Tree
   [&mut net.root].into_iter().chain(net.rbag.iter_mut().flat_map(|(_, fst, snd)| [fst, snd]))
 }
 
-pub fn hvm_book_show_pretty(book: &hvm::ast::Book) -> String {
+pub fn hvm_book_show_pretty(book: &crate::hvm::ast::Book) -> String {
   let mut s = String::new();
   for (nam, def) in book.defs.iter() {
     s.push_str(&format!("@{} = {}\n", nam, def.root.show()));

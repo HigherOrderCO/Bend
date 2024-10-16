@@ -1,10 +1,10 @@
+use crate::hvm::ast::Numb;
 use crate::{
   diagnostics::{DiagnosticOrigin, Diagnostics, Severity},
   fun::{term_to_net::Labels, Book, FanKind, Name, Num, Op, Pattern, Tag, Term},
   maybe_grow,
   net::{BendLab, CtrKind, INet, NodeId, NodeKind, Port, SlotId, ROOT},
 };
-use hvm::hvm::Numb;
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 /// Converts an Interaction-INet to a Lambda Calculus term
@@ -213,23 +213,23 @@ impl Reader<'_> {
     fn add_arg(
       reader: &mut Reader,
       port: Port,
-      args: &mut Vec<Result<hvm::hvm::Val, Term>>,
-      types: &mut Vec<hvm::hvm::Tag>,
-      ops: &mut Vec<hvm::hvm::Tag>,
+      args: &mut Vec<Result<crate::hvm::ast::Val, Term>>,
+      types: &mut Vec<crate::hvm::ast::Tag>,
+      ops: &mut Vec<crate::hvm::ast::Tag>,
     ) {
       if let NodeKind::Num { val } = reader.net.node(port.node_id()).kind {
-        match hvm::hvm::Numb::get_typ(&Numb(val)) {
+        match crate::hvm::ast::Numb::get_typ(&Numb(val)) {
           // Contains an operation
-          hvm::hvm::TY_SYM => {
-            ops.push(hvm::hvm::Numb(val).get_sym());
+          crate::hvm::ast::TY_SYM => {
+            ops.push(crate::hvm::ast::Numb(val).get_sym());
           }
           // Contains a number with a type
-          typ @ hvm::hvm::TY_U24..=hvm::hvm::TY_F24 => {
+          typ @ crate::hvm::ast::TY_U24..=crate::hvm::ast::TY_F24 => {
             types.push(typ);
             args.push(Ok(val));
           }
           // Contains a partially applied number with operation and no type
-          op @ hvm::hvm::OP_ADD.. => {
+          op @ crate::hvm::ast::OP_ADD.. => {
             ops.push(op);
             args.push(Ok(val));
           }
@@ -243,15 +243,15 @@ impl Reader<'_> {
 
     /// Creates an Opr term from the arguments of the subnet of an OPR node.
     fn opr_term_from_hvm_args(
-      args: &mut Vec<Result<hvm::hvm::Val, Term>>,
-      types: &mut Vec<hvm::hvm::Tag>,
-      ops: &mut Vec<hvm::hvm::Tag>,
+      args: &mut Vec<Result<crate::hvm::ast::Val, Term>>,
+      types: &mut Vec<crate::hvm::ast::Tag>,
+      ops: &mut Vec<crate::hvm::ast::Tag>,
       is_flipped: bool,
     ) -> Term {
       let typ = match types.as_slice() {
         [typ] => *typ,
         // Use U24 as default number type
-        [] => hvm::hvm::TY_U24,
+        [] => crate::hvm::ast::TY_U24,
         _ => {
           // Too many types
           return Term::Err;
@@ -282,49 +282,56 @@ impl Reader<'_> {
       }
     }
 
-    fn op_is_flipped(op: hvm::hvm::Tag) -> bool {
-      [hvm::hvm::FP_DIV, hvm::hvm::FP_REM, hvm::hvm::FP_SHL, hvm::hvm::FP_SHR, hvm::hvm::FP_SUB].contains(&op)
+    fn op_is_flipped(op: crate::hvm::ast::Tag) -> bool {
+      [
+        crate::hvm::ast::FP_DIV,
+        crate::hvm::ast::FP_REM,
+        crate::hvm::ast::FP_SHL,
+        crate::hvm::ast::FP_SHR,
+        crate::hvm::ast::FP_SUB,
+      ]
+      .contains(&op)
     }
 
-    fn op_from_native_tag(val: hvm::hvm::Tag, typ: hvm::hvm::Tag) -> Option<Op> {
+    fn op_from_native_tag(val: crate::hvm::ast::Tag, typ: crate::hvm::ast::Tag) -> Option<Op> {
       let op = match val {
-        hvm::hvm::OP_ADD => Op::ADD,
-        hvm::hvm::OP_SUB => Op::SUB,
-        hvm::hvm::FP_SUB => Op::SUB,
-        hvm::hvm::OP_MUL => Op::MUL,
-        hvm::hvm::OP_DIV => Op::DIV,
-        hvm::hvm::FP_DIV => Op::DIV,
-        hvm::hvm::OP_REM => Op::REM,
-        hvm::hvm::FP_REM => Op::REM,
-        hvm::hvm::OP_EQ => Op::EQ,
-        hvm::hvm::OP_NEQ => Op::NEQ,
-        hvm::hvm::OP_LT => Op::LT,
-        hvm::hvm::OP_GT => Op::GT,
-        hvm::hvm::OP_AND => {
-          if typ == hvm::hvm::TY_F24 {
+        crate::hvm::ast::OP_ADD => Op::ADD,
+        crate::hvm::ast::OP_SUB => Op::SUB,
+        crate::hvm::ast::FP_SUB => Op::SUB,
+        crate::hvm::ast::OP_MUL => Op::MUL,
+        crate::hvm::ast::OP_DIV => Op::DIV,
+        crate::hvm::ast::FP_DIV => Op::DIV,
+        crate::hvm::ast::OP_REM => Op::REM,
+        crate::hvm::ast::FP_REM => Op::REM,
+        crate::hvm::ast::OP_EQ => Op::EQ,
+        crate::hvm::ast::OP_NEQ => Op::NEQ,
+        crate::hvm::ast::OP_LT => Op::LT,
+        crate::hvm::ast::OP_GT => Op::GT,
+        crate::hvm::ast::OP_AND => {
+          if typ == crate::hvm::ast::TY_F24 {
             todo!("Implement readback of atan2")
           } else {
             Op::AND
           }
         }
-        hvm::hvm::OP_OR => {
-          if typ == hvm::hvm::TY_F24 {
+        crate::hvm::ast::OP_OR => {
+          if typ == crate::hvm::ast::TY_F24 {
             todo!("Implement readback of log")
           } else {
             Op::OR
           }
         }
-        hvm::hvm::OP_XOR => {
-          if typ == hvm::hvm::TY_F24 {
+        crate::hvm::ast::OP_XOR => {
+          if typ == crate::hvm::ast::TY_F24 {
             Op::POW
           } else {
             Op::XOR
           }
         }
-        hvm::hvm::OP_SHL => Op::SHL,
-        hvm::hvm::FP_SHL => Op::SHL,
-        hvm::hvm::OP_SHR => Op::SHR,
-        hvm::hvm::FP_SHR => Op::SHR,
+        crate::hvm::ast::OP_SHL => Op::SHL,
+        crate::hvm::ast::FP_SHL => Op::SHL,
+        crate::hvm::ast::OP_SHR => Op::SHR,
+        crate::hvm::ast::FP_SHR => Op::SHR,
         _ => return None,
       };
       Some(op)
@@ -338,8 +345,8 @@ impl Reader<'_> {
         // The operation is interpreted as being pre-flipped (if its a FP_, they cancel and don't flip).
         let port1_kind = self.net.node(self.net.enter_port(Port(node, 1)).node_id()).kind.clone();
         if let NodeKind::Num { val } = port1_kind {
-          match hvm::hvm::Numb::get_typ(&Numb(val)) {
-            hvm::hvm::OP_ADD.. => {
+          match crate::hvm::ast::Numb::get_typ(&Numb(val)) {
+            crate::hvm::ast::OP_ADD.. => {
               let x1_port = self.net.enter_port(Port(node, 0));
               let x2_port = self.net.enter_port(Port(node, 1));
               let mut args = vec![];
@@ -364,8 +371,8 @@ impl Reader<'_> {
         // The operation is interpreted as not pre-flipped.
         let port0_kind = self.net.node(self.net.enter_port(Port(node, 0)).node_id()).kind.clone();
         if let NodeKind::Num { val } = port0_kind {
-          match hvm::hvm::Numb::get_typ(&Numb(val)) {
-            hvm::hvm::OP_ADD.. => {
+          match crate::hvm::ast::Numb::get_typ(&Numb(val)) {
+            crate::hvm::ast::OP_ADD.. => {
               let x1_port = self.net.enter_port(Port(node, 0));
               let x2_port = self.net.enter_port(Port(node, 1));
               let mut args = vec![];
@@ -600,12 +607,12 @@ impl Reader<'_> {
 
 /// From an hvm number carrying the value and another carrying the type, return a Num term.
 fn num_from_bits_with_type(val: u32, typ: u32) -> Term {
-  match hvm::hvm::Numb::get_typ(&Numb(typ)) {
+  match crate::hvm::ast::Numb::get_typ(&Numb(typ)) {
     // No type information, assume u24 by default
-    hvm::hvm::TY_SYM => Term::Num { val: Num::U24(Numb::get_u24(&Numb(val))) },
-    hvm::hvm::TY_U24 => Term::Num { val: Num::U24(Numb::get_u24(&Numb(val))) },
-    hvm::hvm::TY_I24 => Term::Num { val: Num::I24(Numb::get_i24(&Numb(val))) },
-    hvm::hvm::TY_F24 => Term::Num { val: Num::F24(Numb::get_f24(&Numb(val))) },
+    crate::hvm::ast::TY_SYM => Term::Num { val: Num::U24(Numb::get_u24(&Numb(val))) },
+    crate::hvm::ast::TY_U24 => Term::Num { val: Num::U24(Numb::get_u24(&Numb(val))) },
+    crate::hvm::ast::TY_I24 => Term::Num { val: Num::I24(Numb::get_i24(&Numb(val))) },
+    crate::hvm::ast::TY_F24 => Term::Num { val: Num::F24(Numb::get_f24(&Numb(val))) },
     _ => Term::Err,
   }
 }

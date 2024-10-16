@@ -142,7 +142,7 @@ impl<'a> ImpParser<'a> {
 
     // TODO: This will have the wrong index
     let net_idx = *self.index();
-    let mut p = hvm::ast::CoreParser::new(&self.input[net_idx..]);
+    let mut p = crate::hvm::ast::CoreParser::new(&self.input[net_idx..]);
     let body = p.parse_net()?;
     *self.index() = net_idx + *p.index();
 

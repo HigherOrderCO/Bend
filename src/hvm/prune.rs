@@ -1,6 +1,6 @@
 use super::{net_trees, tree_children};
+use crate::hvm::ast::{Book, Tree};
 use crate::maybe_grow;
-use hvm::ast::{Book, Tree};
 use std::collections::HashSet;
 
 pub fn prune_hvm_book(book: &mut Book, entrypoints: &[String]) {

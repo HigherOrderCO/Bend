@@ -1,9 +1,9 @@
+use crate::hvm::ast::{Net, Tree};
 use crate::{
   diagnostics::WarningType,
   fun::{Book, Ctx, Name, SourceKind, Term},
   maybe_grow,
 };
-use hvm::ast::{Net, Tree};
 use std::collections::{hash_map::Entry, HashMap};
 
 #[derive(Clone, Copy, Debug, PartialEq)]

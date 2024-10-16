@@ -230,7 +230,7 @@ fn import_system() {
 #[test]
 fn readback_hvm() {
   run_golden_test_dir(function_name!(), &|code, _| {
-    let mut p = hvm::ast::CoreParser::new(code);
+    let mut p = bend::hvm::ast::CoreParser::new(code);
     let net = p.parse_net()?;
     let book = Book::default();
     let compat_net = hvm_to_net(&net);

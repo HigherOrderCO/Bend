@@ -1,3 +1,4 @@
+use crate::hvm::ast::{Net, Tree};
 use crate::{
   diagnostics::Diagnostics,
   fun::{num_to_name, Book, FanKind, Name, Op, Pattern, Term},
@@ -5,7 +6,6 @@ use crate::{
   maybe_grow,
   net::CtrKind::{self, *},
 };
-use hvm::ast::{Net, Tree};
 use loaned::LoanedMut;
 use std::{
   collections::{hash_map::Entry, HashMap},
@@ -15,8 +15,11 @@ use std::{
 #[derive(Debug, Clone)]
 pub struct ViciousCycleErr;
 
-pub fn book_to_hvm(book: &Book, diags: &mut Diagnostics) -> Result<(hvm::ast::Book, Labels), Diagnostics> {
-  let mut hvm_book = hvm::ast::Book { defs: Default::default() };
+pub fn book_to_hvm(
+  book: &Book,
+  diags: &mut Diagnostics,
+) -> Result<(crate::hvm::ast::Book, Labels), Diagnostics> {
+  let mut hvm_book = crate::hvm::ast::Book { defs: Default::default() };
   let mut labels = Labels::default();
 
   let main = book.entrypoint.as_ref();
@@ -116,7 +119,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         Term::Link { nam } => self.link_var(true, nam, up),
         Term::Ref { nam } => self.link(up, Place::Tree(LoanedMut::new(Tree::Ref { nam: nam.to_string() }))),
         Term::Num { val } => {
-          let val = hvm::ast::Numb(val.to_bits());
+          let val = crate::hvm::ast::Numb(val.to_bits());
           self.link(up, Place::Tree(LoanedMut::new(Tree::Num { val })))
         }
         // A lambda becomes to a con node. Ports:
@@ -182,7 +185,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
             // Partially apply with fst
             (Term::Num { val }, snd) => {
               let val = val.to_bits();
-              let val = hvm::ast::Numb((val & !0x1F) | opr.to_native_tag() as u32);
+              let val = crate::hvm::ast::Numb((val & !0x1F) | opr.to_native_tag() as u32);
               let fst = Place::Tree(LoanedMut::new(Tree::Num { val }));
               let node = self.new_opr();
               self.link(fst, node.0);
@@ -193,7 +196,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
             (fst, Term::Num { val }) => {
               if let Op::POW = opr {
                 // POW shares tags with AND, so don't flip or results will be wrong
-                let opr_val = hvm::ast::Numb(hvm::hvm::Numb::new_sym(opr.to_native_tag()).0);
+                let opr_val = crate::hvm::ast::Numb::new_sym(opr.to_native_tag());
                 let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
                 let node1 = self.new_opr();
                 self.encode_term(fst, node1.0);
@@ -205,7 +208,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
               } else {
                 // flip
                 let val = val.to_bits();
-                let val = hvm::ast::Numb((val & !0x1F) | flip_sym(opr.to_native_tag()) as u32);
+                let val = crate::hvm::ast::Numb((val & !0x1F) | flip_sym(opr.to_native_tag()) as u32);
                 let snd = Place::Tree(LoanedMut::new(Tree::Num { val }));
                 let node = self.new_opr();
                 self.encode_term(fst, node.0);
@@ -215,7 +218,7 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
             }
             // Don't partially apply
             (fst, snd) => {
-              let opr_val = hvm::ast::Numb(hvm::hvm::Numb::new_sym(opr.to_native_tag()).0);
+              let opr_val = crate::hvm::ast::Numb::new_sym(opr.to_native_tag());
               let oper = Place::Tree(LoanedMut::new(Tree::Num { val: opr_val }));
               let node1 = self.new_opr();
               self.encode_term(fst, node1.0);
@@ -252,8 +255,9 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
     match opr {
       Op::LE | Op::GE => {
         let node_eq = self.new_opr();
-        let eq_val =
-          Place::Tree(LoanedMut::new(Tree::Num { val: hvm::ast::Numb(Op::EQ.to_native_tag() as u32) }));
+        let eq_val = Place::Tree(LoanedMut::new(Tree::Num {
+          val: crate::hvm::ast::Numb(Op::EQ.to_native_tag() as u32),
+        }));
         self.link(eq_val, node_eq.0);
         self.link(node_eq.1, node);
         self.link(up, node_eq.2);
@@ -454,45 +458,45 @@ impl LabelGenerator {
 }
 
 impl Op {
-  fn to_native_tag(self) -> hvm::hvm::Tag {
+  fn to_native_tag(self) -> crate::hvm::ast::Tag {
     match self {
-      Op::ADD => hvm::hvm::OP_ADD,
-      Op::SUB => hvm::hvm::OP_SUB,
-      Op::MUL => hvm::hvm::OP_MUL,
-      Op::DIV => hvm::hvm::OP_DIV,
-      Op::REM => hvm::hvm::OP_REM,
-      Op::EQ => hvm::hvm::OP_EQ,
-      Op::NEQ => hvm::hvm::OP_NEQ,
-      Op::LT => hvm::hvm::OP_LT,
-      Op::GT => hvm::hvm::OP_GT,
-      Op::AND => hvm::hvm::OP_AND,
-      Op::OR => hvm::hvm::OP_OR,
-      Op::XOR => hvm::hvm::OP_XOR,
-      Op::SHL => hvm::hvm::OP_SHL,
-      Op::SHR => hvm::hvm::OP_SHR,
+      Op::ADD => crate::hvm::ast::OP_ADD,
+      Op::SUB => crate::hvm::ast::OP_SUB,
+      Op::MUL => crate::hvm::ast::OP_MUL,
+      Op::DIV => crate::hvm::ast::OP_DIV,
+      Op::REM => crate::hvm::ast::OP_REM,
+      Op::EQ => crate::hvm::ast::OP_EQ,
+      Op::NEQ => crate::hvm::ast::OP_NEQ,
+      Op::LT => crate::hvm::ast::OP_LT,
+      Op::GT => crate::hvm::ast::OP_GT,
+      Op::AND => crate::hvm::ast::OP_AND,
+      Op::OR => crate::hvm::ast::OP_OR,
+      Op::XOR => crate::hvm::ast::OP_XOR,
+      Op::SHL => crate::hvm::ast::OP_SHL,
+      Op::SHR => crate::hvm::ast::OP_SHR,
 
-      Op::POW => hvm::hvm::OP_XOR,
+      Op::POW => crate::hvm::ast::OP_XOR,
 
-      Op::LE => hvm::hvm::OP_GT,
-      Op::GE => hvm::hvm::OP_LT,
+      Op::LE => crate::hvm::ast::OP_GT,
+      Op::GE => crate::hvm::ast::OP_LT,
     }
   }
 }
 
-fn flip_sym(tag: hvm::hvm::Tag) -> hvm::hvm::Tag {
+fn flip_sym(tag: crate::hvm::ast::Tag) -> crate::hvm::ast::Tag {
   match tag {
-    hvm::hvm::OP_SUB => hvm::hvm::FP_SUB,
-    hvm::hvm::FP_SUB => hvm::hvm::OP_SUB,
-    hvm::hvm::OP_DIV => hvm::hvm::FP_DIV,
-    hvm::hvm::FP_DIV => hvm::hvm::OP_DIV,
-    hvm::hvm::OP_REM => hvm::hvm::FP_REM,
-    hvm::hvm::FP_REM => hvm::hvm::OP_REM,
-    hvm::hvm::OP_LT => hvm::hvm::OP_GT,
-    hvm::hvm::OP_GT => hvm::hvm::OP_LT,
-    hvm::hvm::OP_SHL => hvm::hvm::FP_SHL,
-    hvm::hvm::FP_SHL => hvm::hvm::OP_SHL,
-    hvm::hvm::OP_SHR => hvm::hvm::FP_SHR,
-    hvm::hvm::FP_SHR => hvm::hvm::OP_SHR,
+    crate::hvm::ast::OP_SUB => crate::hvm::ast::FP_SUB,
+    crate::hvm::ast::FP_SUB => crate::hvm::ast::OP_SUB,
+    crate::hvm::ast::OP_DIV => crate::hvm::ast::FP_DIV,
+    crate::hvm::ast::FP_DIV => crate::hvm::ast::OP_DIV,
+    crate::hvm::ast::OP_REM => crate::hvm::ast::FP_REM,
+    crate::hvm::ast::FP_REM => crate::hvm::ast::OP_REM,
+    crate::hvm::ast::OP_LT => crate::hvm::ast::OP_GT,
+    crate::hvm::ast::OP_GT => crate::hvm::ast::OP_LT,
+    crate::hvm::ast::OP_SHL => crate::hvm::ast::FP_SHL,
+    crate::hvm::ast::FP_SHL => crate::hvm::ast::OP_SHL,
+    crate::hvm::ast::OP_SHR => crate::hvm::ast::FP_SHR,
+    crate::hvm::ast::FP_SHR => crate::hvm::ast::OP_SHR,
     _ => tag,
   }
 }

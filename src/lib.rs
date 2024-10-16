@@ -201,7 +201,7 @@ pub fn run_book(
 }
 
 pub fn readback_hvm_net(
-  net: &::hvm::ast::Net,
+  net: &crate::hvm::ast::Net,
   book: &Book,
   labels: &Labels,
   linear: bool,
@@ -219,7 +219,7 @@ pub fn readback_hvm_net(
 }
 
 /// Runs an HVM book by invoking HVM as a subprocess.
-fn run_hvm(book: &::hvm::ast::Book, cmd: &str, run_opts: &RunOpts) -> Result<String, String> {
+fn run_hvm(book: &crate::hvm::ast::Book, cmd: &str, run_opts: &RunOpts) -> Result<String, String> {
   let out_path = ".out.hvm";
   std::fs::write(out_path, hvm_book_show_pretty(book)).map_err(|x| x.to_string())?;
   let mut process = std::process::Command::new(run_opts.hvm_path.clone())
@@ -243,14 +243,14 @@ fn run_hvm(book: &::hvm::ast::Book, cmd: &str, run_opts: &RunOpts) -> Result<Str
 }
 
 /// Reads the final output from HVM and separates the extra information.
-fn parse_hvm_output(out: &str) -> Result<(::hvm::ast::Net, String), String> {
+fn parse_hvm_output(out: &str) -> Result<(crate::hvm::ast::Net, String), String> {
   let Some((result, stats)) = out.split_once('\n') else {
     return Err(format!(
       "Failed to parse result from HVM (unterminated result).\nOutput from HVM was:\n{:?}",
       out
     ));
   };
-  let mut p = ::hvm::ast::CoreParser::new(result);
+  let mut p = crate::hvm::ast::CoreParser::new(result);
   let Ok(net) = p.parse_net() else {
     return Err(format!("Failed to parse result from HVM (invalid net).\nOutput from HVM was:\n{:?}", out));
   };
@@ -465,7 +465,7 @@ impl std::fmt::Display for AdtEncoding {
 
 pub struct CompileResult {
   pub diagnostics: Diagnostics,
-  pub hvm_book: ::hvm::ast::Book,
+  pub hvm_book: crate::hvm::ast::Book,
   pub labels: Labels,
 }
 

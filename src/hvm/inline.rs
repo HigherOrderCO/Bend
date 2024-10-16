@@ -1,7 +1,7 @@
 use super::{net_trees_mut, tree_children, tree_children_mut};
+use crate::hvm::ast::{Book, Net, Tree};
 use crate::maybe_grow;
 use core::ops::BitOr;
-use hvm::ast::{Book, Net, Tree};
 use std::collections::{HashMap, HashSet};
 
 pub fn inline_hvm_book(book: &mut Book) -> Result<HashSet<String>, String> {

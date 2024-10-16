@@ -56,8 +56,8 @@
 use crate::hvm::net_trees_mut;
 
 use super::{tree_children, tree_children_mut};
+use crate::hvm::ast::{Net, Tree};
 use core::ops::RangeFrom;
-use hvm::ast::{Net, Tree};
 use std::collections::HashMap;
 
 /// Carries out simple eta-reduction

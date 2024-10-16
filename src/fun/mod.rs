@@ -100,7 +100,7 @@ pub enum SourceKind {
 pub struct HvmDefinition {
   pub name: Name,
   pub typ: Type,
-  pub body: hvm::ast::Net,
+  pub body: crate::hvm::ast::Net,
   pub source: Source,
 }
 
@@ -961,17 +961,17 @@ impl Num {
 
   pub fn to_bits(&self) -> u32 {
     match self {
-      Num::U24(val) => hvm::hvm::Numb::new_u24(*val).0,
-      Num::I24(val) => hvm::hvm::Numb::new_i24(*val).0,
-      Num::F24(val) => hvm::hvm::Numb::new_f24(*val).0,
+      Num::U24(val) => crate::hvm::ast::Numb::new_u24(*val).0,
+      Num::I24(val) => crate::hvm::ast::Numb::new_i24(*val).0,
+      Num::F24(val) => crate::hvm::ast::Numb::new_f24(*val).0,
     }
   }
 
   pub fn from_bits(bits: u32) -> Self {
-    match hvm::hvm::Numb::get_typ(&hvm::hvm::Numb(bits)) {
-      hvm::hvm::TY_U24 => Num::U24(hvm::hvm::Numb::get_u24(&hvm::hvm::Numb(bits))),
-      hvm::hvm::TY_I24 => Num::I24(hvm::hvm::Numb::get_i24(&hvm::hvm::Numb(bits))),
-      hvm::hvm::TY_F24 => Num::F24(hvm::hvm::Numb::get_f24(&hvm::hvm::Numb(bits))),
+    match crate::hvm::ast::Numb::get_typ(&crate::hvm::ast::Numb(bits)) {
+      crate::hvm::ast::TY_U24 => Num::U24(crate::hvm::ast::Numb::get_u24(&crate::hvm::ast::Numb(bits))),
+      crate::hvm::ast::TY_I24 => Num::I24(crate::hvm::ast::Numb::get_i24(&crate::hvm::ast::Numb(bits))),
+      crate::hvm::ast::TY_F24 => Num::F24(crate::hvm::ast::Numb::get_f24(&crate::hvm::ast::Numb(bits))),
       _ => unreachable!("Invalid Num bits"),
     }
   }
