@@ -1,3 +1,4 @@
+#{
 type String:
   Nil
   Cons { head: u24, ~tail: String }
@@ -771,3 +772,4 @@ def Math/round(n: f24) -> f24:
     return Math/floor(n)
   else:
     return Math/ceil(n)
+#}

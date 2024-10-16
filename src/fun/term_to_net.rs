@@ -1,7 +1,7 @@
 use crate::hvm::ast::{Net, Tree};
 use crate::{
   diagnostics::Diagnostics,
-  fun::{num_to_name, Book, FanKind, Name, Op, Pattern, Term},
+  fun::{num_to_name, Book, FanKind, Name, Pattern, Term},
   hvm::{net_trees, tree_children},
   maybe_grow,
   net::CtrKind::{self, *},
@@ -55,7 +55,7 @@ pub fn book_to_hvm(
 }
 
 /// Converts an LC term into an IC net.
-pub fn term_to_hvm(term: &Term, labels: &mut Labels) -> Result<Net, String> {
+pub fn term_to_hvm(term: &Term, _labels: &mut Labels) -> Result<Net, String> {
   let mut net = Net { root: Tree::Era, rbag: Default::default() };
 
   let mut state = EncodeTermState {
@@ -65,7 +65,7 @@ pub fn term_to_hvm(term: &Term, labels: &mut Labels) -> Result<Net, String> {
     redexes: Default::default(),
     name_idx: 0,
     created_nodes: 0,
-    labels,
+    // labels,
   };
 
   state.encode_term(term, Place::Hole(&mut net.root));
@@ -82,14 +82,14 @@ pub fn term_to_hvm(term: &Term, labels: &mut Labels) -> Result<Net, String> {
 }
 
 #[derive(Debug)]
-struct EncodeTermState<'t, 'l> {
+struct EncodeTermState<'t> {
   lets: Vec<(&'t Pattern, &'t Term)>,
   vars: HashMap<(bool, Name), Place<'t>>,
   wires: Vec<Option<Place<'t>>>,
   redexes: Vec<LoanedMut<'t, (bool, Tree, Tree)>>,
   name_idx: u64,
   created_nodes: usize,
-  labels: &'l mut Labels,
+  // labels: &'l mut Labels,
 }
 
 fn count_nodes(tree: &Tree) -> usize {
@@ -105,7 +105,7 @@ enum Place<'t> {
   Wire(usize),
 }
 
-impl<'t, 'l> EncodeTermState<'t, 'l> {
+impl<'t> EncodeTermState<'t> {
   /// Adds a subterm connected to `up` to the `inet`.
   /// `scope` has the current variable scope.
   /// `vars` has the information of which ports the variables are declared and used in.
@@ -118,18 +118,13 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         Term::Var { nam } => self.link_var(false, nam, up),
         Term::Link { nam } => self.link_var(true, nam, up),
         Term::Ref { nam } => self.link(up, Place::Tree(LoanedMut::new(Tree::Ref { nam: nam.to_string() }))),
-        Term::Num { val } => {
-          let val = crate::hvm::ast::Numb(val.to_bits());
-          self.link(up, Place::Tree(LoanedMut::new(Tree::Num { val })))
-        }
         // A lambda becomes to a con node. Ports:
         // - 0: points to where the lambda occurs.
         // - 1: points to the lambda variable.
         // - 2: points to the lambda body.
         // core: (var_use bod)
-        Term::Lam { tag, pat, bod } => {
-          let kind = Con(self.labels.con.generate(tag));
-          let node = self.new_ctr(kind);
+        Term::Lam { tag: _, pat, bod } => {
+          let node = self.new_ctr(Lam);
           self.link(up, node.0);
           self.encode_pat(pat, node.1);
           self.encode_term(bod, node.2);
@@ -139,12 +134,25 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         // - 1: points to the function's argument.
         // - 2: points to where the application occurs.
         // core: & fun ~ (arg ret) (fun not necessarily main port)
-        Term::App { tag, fun, arg } => {
-          let kind = Con(self.labels.con.generate(tag));
-          let node = self.new_ctr(kind);
+        Term::App { tag: _, fun, arg } => {
+          let node = self.new_ctr(App);
           self.encode_term(fun, node.0);
           self.encode_term(arg, node.1);
           self.link(up, node.2);
+        }
+        Term::Let { pat, val, nxt } => {
+          // Dups/tup eliminators are not actually scoped like other terms.
+          // They are depended on
+          self.lets.push((pat, val));
+          self.encode_term(nxt, up);
+        }
+        Term::Fan { fan, tag: _, els } => {
+          let kind = self.fan_kind(fan, true);
+          self.make_node_list(kind, up, els.iter().map(|el| |slf: &mut Self, up| slf.encode_term(el, up)), true);
+        }
+        /* Term::Num { val } => {
+          let val = crate::hvm::ast::Numb(val.to_bits());
+          self.link(up, Place::Tree(LoanedMut::new(Tree::Num { val })))
         }
         // core: & arg ~ ?<(zero succ) ret>
         Term::Swt { arg, bnd, with_bnd, with_arg, pred, arms,  } => {
@@ -168,16 +176,6 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
           self.encode_term(&arms[0], Place::Hole(zero));
           self.encode_term(&arms[1], Place::Hole(succ));
           self.link(up, Place::Hole(out));
-        }
-        Term::Let { pat, val, nxt } => {
-          // Dups/tup eliminators are not actually scoped like other terms.
-          // They are depended on
-          self.lets.push((pat, val));
-          self.encode_term(nxt, up);
-        }
-        Term::Fan { fan, tag, els } => {
-          let kind = self.fan_kind(fan, tag);
-          self.make_node_list(kind, up, els.iter().map(|el| |slf: &mut Self, up| slf.encode_term(el, up)));
         }
         // core: & [opr] ~ $(fst $(snd ret))
         Term::Oper { opr, fst, snd } => {
@@ -229,7 +227,8 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
               self.encode_le_ge_opers(opr, up, node2.2);
             }
           }
-        }
+        } */
+        Term::Num { .. } | Term::Swt { .. } | Term::Oper { .. } => panic!("Numbers not supported in this branch of Bend. Found '{}'", term),
         Term::Use { .. }  // Removed in earlier pass
         | Term::With { .. } // Removed in earlier pass
         | Term::Ask { .. } // Removed in earlier pass
@@ -245,13 +244,14 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
       }
       while let Some((pat, val)) = self.lets.pop() {
         let wire = self.new_wire();
-        self.encode_term(val, Place::Wire(wire));
+        // encode_pat comes before to ensure positive polarity are on the left of redexes
         self.encode_pat(pat, Place::Wire(wire));
+        self.encode_term(val, Place::Wire(wire));
       }
     })
   }
 
-  fn encode_le_ge_opers(&mut self, opr: &Op, up: Place<'t>, node: Place<'t>) {
+  /*   fn encode_le_ge_opers(&mut self, opr: &Op, up: Place<'t>, node: Place<'t>) {
     match opr {
       Op::LE | Op::GE => {
         let node_eq = self.new_opr();
@@ -264,43 +264,49 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
       }
       _ => self.link(up, node),
     }
-  }
+  } */
 
   fn encode_pat(&mut self, pat: &Pattern, up: Place<'t>) {
     maybe_grow(|| match pat {
-      Pattern::Var(None) => self.link(up, Place::Tree(LoanedMut::new(Tree::Era))),
+      Pattern::Var(None) => self.link(up, Place::Tree(LoanedMut::new(Tree::Del))),
       Pattern::Var(Some(name)) => self.link_var(false, name, up),
       Pattern::Chn(name) => self.link_var(true, name, up),
-      Pattern::Fan(fan, tag, els) => {
-        let kind = self.fan_kind(fan, tag);
-        self.make_node_list(kind, up, els.iter().map(|el| |slf: &mut Self, up| slf.encode_pat(el, up)));
+      Pattern::Fan(fan, _tag, els) => {
+        let kind = self.fan_kind(fan, false);
+        self.make_node_list(kind, up, els.iter().map(|el| |slf: &mut Self, up| slf.encode_pat(el, up)), false);
       }
       Pattern::Ctr(_, _) | Pattern::Num(_) | Pattern::Lst(_) | Pattern::Str(_) => unreachable!(),
     })
   }
 
-  fn link(&mut self, a: Place<'t>, b: Place<'t>) {
-    match (a, b) {
-      (Place::Tree(a), Place::Tree(b)) => {
+  fn link(&mut self, pos: Place<'t>, neg: Place<'t>) {
+    match (pos, neg) {
+      (Place::Tree(pos), Place::Tree(neg)) => {
         self.redexes.push(LoanedMut::merge((false, Tree::Era, Tree::Era), |r, m| {
-          m.place(b, &mut r.1);
-          m.place(a, &mut r.2);
+          m.place(neg, &mut r.1);
+          m.place(pos, &mut r.2);
         }))
       }
       (Place::Tree(t), Place::Hole(h)) | (Place::Hole(h), Place::Tree(t)) => {
         t.place(h);
       }
-      (Place::Hole(a), Place::Hole(b)) => {
-        let var = Tree::Var { nam: num_to_name(self.name_idx) };
+      (Place::Hole(pos), Place::Hole(neg)) => {
+        *pos = Tree::Var { nam: num_to_name(self.name_idx) };
+        *neg = Tree::Sub { nam: num_to_name(self.name_idx) };
         self.name_idx += 1;
-        *a = var.clone();
-        *b = var;
       }
-      (Place::Wire(v), p) | (p, Place::Wire(v)) => {
-        let v = &mut self.wires[v];
-        match v.take() {
-          Some(q) => self.link(p, q),
-          None => *v = Some(p),
+      (Place::Wire(pos), neg) => {
+        let pos = &mut self.wires[pos];
+        match pos.take() {
+          Some(pos) => self.link(pos, neg),
+          None => *pos = Some(neg),
+        }
+      }
+      (pos, Place::Wire(neg)) => {
+        let neg = &mut self.wires[neg];
+        match neg.take() {
+          Some(neg) => self.link(pos, neg),
+          None => *neg = Some(pos),
         }
       }
     }
@@ -309,20 +315,24 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
   fn new_ctr(&mut self, kind: CtrKind) -> (Place<'t>, Place<'t>, Place<'t>) {
     self.created_nodes += 1;
     let node = match kind {
-      CtrKind::Con(None) => Tree::Con { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) },
-      CtrKind::Dup(0) => Tree::Dup { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) },
-      CtrKind::Tup(None) => Tree::Con { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) },
-      _ => unreachable!(),
+      CtrKind::Lam => Tree::Lam { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) },
+      CtrKind::App => Tree::App { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) },
+      CtrKind::Tup => panic!("Tuples not supported in this branch of Bend."),
+      CtrKind::Ltp => panic!("Tuples not supported in this branch of Bend."),
+      CtrKind::Dup => Tree::Dup { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) },
+      CtrKind::Sup => Tree::Sup { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) },
     };
     let ((a, b), node) = LoanedMut::loan_with(node, |t, l| match t {
-      Tree::Con { fst, snd } => (l.loan_mut(fst), l.loan_mut(snd)),
+      Tree::Lam { fst, snd } => (l.loan_mut(fst), l.loan_mut(snd)),
+      Tree::App { fst, snd } => (l.loan_mut(fst), l.loan_mut(snd)),
       Tree::Dup { fst, snd } => (l.loan_mut(fst), l.loan_mut(snd)),
+      Tree::Sup { fst, snd } => (l.loan_mut(fst), l.loan_mut(snd)),
       _ => unreachable!(),
     });
     (Place::Tree(node), Place::Hole(a), Place::Hole(b))
   }
 
-  fn new_opr(&mut self) -> (Place<'t>, Place<'t>, Place<'t>) {
+  /*   fn new_opr(&mut self) -> (Place<'t>, Place<'t>, Place<'t>) {
     self.created_nodes += 1;
     let ((fst, snd), node) =
       LoanedMut::loan_with(Tree::Opr { fst: Box::new(Tree::Era), snd: Box::new(Tree::Era) }, |t, l| {
@@ -330,19 +340,26 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
         (l.loan_mut(fst), l.loan_mut(snd))
       });
     (Place::Tree(node), Place::Hole(fst), Place::Hole(snd))
-  }
+  } */
 
   /// Adds a list-like tree of nodes of the same kind to the inet.
+  ///
+  /// If making positive polarity nodes, `positive` should be true and vice versa.
   fn make_node_list(
     &mut self,
     kind: CtrKind,
     mut up: Place<'t>,
     mut els: impl DoubleEndedIterator<Item = impl FnOnce(&mut Self, Place<'t>)>,
+    positive: bool,
   ) {
     let last = els.next_back().unwrap();
     for item in els {
       let node = self.new_ctr(kind);
-      self.link(up, node.0);
+      if positive {
+        self.link(node.0, up);
+      } else {
+        self.link(up, node.0);
+      }
       item(self, node.1);
       up = node.2;
     }
@@ -355,12 +372,12 @@ impl<'t, 'l> EncodeTermState<'t, 'l> {
     i
   }
 
-  fn fan_kind(&mut self, fan: &FanKind, tag: &crate::fun::Tag) -> CtrKind {
-    let lab = self.labels[*fan].generate(tag);
-    if *fan == FanKind::Tup {
-      Tup(lab)
-    } else {
-      Dup(lab.unwrap())
+  fn fan_kind(&mut self, fan: &FanKind, positive: bool) -> CtrKind {
+    match (fan, positive) {
+      (FanKind::Tup, false) => CtrKind::Ltp,
+      (FanKind::Tup, true) => CtrKind::Tup,
+      (FanKind::Dup, false) => CtrKind::Dup,
+      (FanKind::Dup, true) => CtrKind::Sup,
     }
   }
 
@@ -412,7 +429,7 @@ impl IndexMut<FanKind> for Labels {
 }
 
 impl LabelGenerator {
-  // If some tag and new generate a new label, otherwise return the generated label.
+  /*   // If some tag and new generate a new label, otherwise return the generated label.
   // If none use the implicit label counter.
   fn generate(&mut self, tag: &crate::fun::Tag) -> Option<u16> {
     use crate::fun::Tag;
@@ -432,7 +449,7 @@ impl LabelGenerator {
       Tag::Auto => Some(0),
       Tag::Static => None,
     }
-  }
+  } */
 
   pub fn to_tag(&self, label: Option<u16>) -> crate::fun::Tag {
     use crate::fun::Tag;
@@ -456,7 +473,7 @@ impl LabelGenerator {
     self.name_to_label.clear();
   }
 }
-
+/*
 impl Op {
   fn to_native_tag(self) -> crate::hvm::ast::Tag {
     match self {
@@ -500,3 +517,4 @@ fn flip_sym(tag: crate::hvm::ast::Tag) -> crate::hvm::ast::Tag {
     _ => tag,
   }
 }
+ */

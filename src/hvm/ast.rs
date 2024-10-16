@@ -15,13 +15,17 @@ pub struct Numb(pub u32);
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub enum Tree {
   Var { nam: String },
-  Ref { nam: String },
+  Sub { nam: String },
   Era,
-  Num { val: Numb },
-  Con { fst: Box<Tree>, snd: Box<Tree> },
+  Del,
+  Lam { fst: Box<Tree>, snd: Box<Tree> },
+  App { fst: Box<Tree>, snd: Box<Tree> },
   Dup { fst: Box<Tree>, snd: Box<Tree> },
-  Opr { fst: Box<Tree>, snd: Box<Tree> },
-  Swi { fst: Box<Tree>, snd: Box<Tree> },
+  Sup { fst: Box<Tree>, snd: Box<Tree> },
+  Ref { nam: String },
+  // Num { val: Numb },
+  // Opr { fst: Box<Tree>, snd: Box<Tree> },
+  // Swi { fst: Box<Tree>, snd: Box<Tree> },
 }
 
 pub type Redex = (bool, Tree, Tree);
@@ -136,59 +140,54 @@ impl<'i> CoreParser<'i> {
   pub fn parse_tree(&mut self) -> ParseResult<Tree> {
     self.skip_trivia();
     //println!("aaa ||{}", &self.input[self.index..]);
-    match self.peek_one() {
-      Some('(') => {
-        self.advance_one();
-        let fst = Box::new(self.parse_tree()?);
-        self.skip_trivia();
-        let snd = Box::new(self.parse_tree()?);
-        self.consume(")")?;
-        Ok(Tree::Con { fst, snd })
-      }
-      Some('{') => {
-        self.advance_one();
-        let fst = Box::new(self.parse_tree()?);
-        self.skip_trivia();
-        let snd = Box::new(self.parse_tree()?);
-        self.consume("}")?;
-        Ok(Tree::Dup { fst, snd })
-      }
-      Some('$') => {
-        self.advance_one();
-        self.consume("(")?;
-        let fst = Box::new(self.parse_tree()?);
-        self.skip_trivia();
-        let snd = Box::new(self.parse_tree()?);
-        self.consume(")")?;
-        Ok(Tree::Opr { fst, snd })
-      }
-      Some('?') => {
-        self.advance_one();
-        self.consume("(")?;
-        let fst = Box::new(self.parse_tree()?);
-        self.skip_trivia();
-        let snd = Box::new(self.parse_tree()?);
-        self.consume(")")?;
-        Ok(Tree::Swi { fst, snd })
-      }
-      Some('@') => {
-        self.advance_one();
-        let nam = self.parse_name()?;
-        Ok(Tree::Ref { nam })
-      }
-      Some('*') => {
-        self.advance_one();
-        Ok(Tree::Era)
-      }
-      _ => {
-        if let Some(c) = self.peek_one() {
-          if "0123456789+-[".contains(c) {
-            return Ok(Tree::Num { val: self.parse_numb()? });
-          }
-        }
-        let nam = self.parse_name()?;
-        Ok(Tree::Var { nam })
-      }
+    if self.starts_with("+(") {
+      self.advance_many(2);
+      let fst = Box::new(self.parse_tree()?);
+      self.skip_trivia();
+      let snd = Box::new(self.parse_tree()?);
+      self.consume(")")?;
+      Ok(Tree::Lam { fst, snd })
+    } else if self.starts_with("-(") {
+      self.advance_many(2);
+      let fst = Box::new(self.parse_tree()?);
+      self.skip_trivia();
+      let snd = Box::new(self.parse_tree()?);
+      self.consume(")")?;
+      Ok(Tree::App { fst, snd })
+    } else if self.starts_with("+{") {
+      self.advance_many(2);
+      let fst = Box::new(self.parse_tree()?);
+      self.skip_trivia();
+      let snd = Box::new(self.parse_tree()?);
+      self.consume("}")?;
+      Ok(Tree::Sup { fst, snd })
+    } else if self.starts_with("-{") {
+      self.advance_many(2);
+      let fst = Box::new(self.parse_tree()?);
+      self.skip_trivia();
+      let snd = Box::new(self.parse_tree()?);
+      self.consume("}")?;
+      Ok(Tree::Dup { fst, snd })
+    } else if self.starts_with("@") {
+      self.advance_one();
+      let nam = self.parse_name()?;
+      Ok(Tree::Ref { nam })
+    } else if self.starts_with("+*") {
+      self.advance_many(2);
+      Ok(Tree::Era)
+    } else if self.starts_with("-*") {
+      self.advance_many(2);
+      Ok(Tree::Del)
+    } else if self.starts_with("+") {
+      self.advance_one();
+      let nam = self.parse_name()?;
+      Ok(Tree::Var { nam })
+    } else if self.starts_with("-") {
+      self.advance_one();
+      let nam = self.parse_name()?;
+      Ok(Tree::Sub { nam })
+    } else {
+      self.expected("tree")
     }
   }
 
@@ -327,14 +326,18 @@ impl Numb {
 impl Tree {
   pub fn show(&self) -> String {
     match self {
-      Tree::Var { nam } => nam.to_string(),
+      Tree::Var { nam } => format!("+{}", nam),
+      Tree::Sub { nam } => format!("-{}", nam),
+      Tree::Lam { fst, snd } => format!("+({} {})", fst.show(), snd.show()),
+      Tree::App { fst, snd } => format!("-({} {})", fst.show(), snd.show()),
+      Tree::Sup { fst, snd } => format!("+{{{} {}}}", fst.show(), snd.show()),
+      Tree::Dup { fst, snd } => format!("-{{{} {}}}", fst.show(), snd.show()),
+      Tree::Era => "+*".to_string(),
+      Tree::Del => "-*".to_string(),
       Tree::Ref { nam } => format!("@{}", nam),
-      Tree::Era => "*".to_string(),
-      Tree::Num { val } => val.show().to_string(),
-      Tree::Con { fst, snd } => format!("({} {})", fst.show(), snd.show()),
-      Tree::Dup { fst, snd } => format!("{{{} {}}}", fst.show(), snd.show()),
-      Tree::Opr { fst, snd } => format!("$({} {})", fst.show(), snd.show()),
-      Tree::Swi { fst, snd } => format!("?({} {})", fst.show(), snd.show()),
+      //Tree::Num { val } => val.show().to_string(),
+      //Tree::Opr { fst, snd } => format!("$({} {})", fst.show(), snd.show()),
+      //Tree::Swi { fst, snd } => format!("?({} {})", fst.show(), snd.show()),
     }
   }
 }

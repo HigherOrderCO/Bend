@@ -107,7 +107,7 @@ impl Graph {
 fn collect_refs(current: Ref, tree: &Tree, graph: &mut Graph) {
   maybe_grow(|| match tree {
     Tree::Ref { nam, .. } => graph.add(current, nam.clone()),
-    Tree::Con { fst: _, snd } => collect_refs(current.clone(), snd, graph),
+    Tree::Lam { fst: _, snd } | Tree::App { fst: _, snd } => collect_refs(current.clone(), snd, graph),
     tree => {
       for subtree in tree_children(tree) {
         collect_refs(current.clone(), subtree, graph);

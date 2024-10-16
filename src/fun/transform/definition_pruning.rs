@@ -145,14 +145,14 @@ impl Book {
       while let Some(term) = to_find.pop() {
         match term {
           Tree::Ref { nam } => self.insert_used(&Name::new(nam), used, uses),
-          Tree::Con { fst, snd }
-          | Tree::Dup { fst, snd }
-          | Tree::Opr { fst, snd }
-          | Tree::Swi { fst, snd } => {
+          Tree::Lam { fst, snd }
+          | Tree::App { fst, snd }
+          | Tree::Sup { fst, snd }
+          | Tree::Dup { fst, snd } => {
             to_find.push(fst);
             to_find.push(snd);
           }
-          Tree::Era | Tree::Var { .. } | Tree::Num { .. } => {}
+          Tree::Era | Tree::Del | Tree::Var { .. } | Tree::Sub { .. } => {}
         }
       }
     })

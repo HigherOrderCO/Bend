@@ -27,12 +27,22 @@ pub enum NodeKind {
   Rot,
   /// Erasure nodes
   Era,
+  Del,
   /// Binary combinators
-  Ctr(CtrKind),
+  Lam,
+  App,
+  Tup,
+  Ltp,
+  Dup,
+  Sup,
   /// Reference to function definitions
-  Ref { def_name: Name },
+  Ref {
+    def_name: Name,
+  },
   /// Numbers
-  Num { val: u32 },
+  Num {
+    val: u32,
+  },
   /// Numeric operations
   Opr,
   /// Pattern matching on numbers
@@ -41,23 +51,12 @@ pub enum NodeKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CtrKind {
-  Con(Option<BendLab>),
-  Tup(Option<BendLab>),
-  Dup(BendLab),
-}
-
-impl CtrKind {
-  pub fn to_lab(self) -> BendLab {
-    #[allow(clippy::identity_op)]
-    match self {
-      CtrKind::Con(None) => 0,
-      CtrKind::Con(Some(_)) => todo!("Tagged lambdas/applications not implemented for hvm32"),
-      CtrKind::Tup(None) => 0,
-      CtrKind::Tup(Some(_)) => todo!("Tagged tuples not implemented for hvm32"),
-      CtrKind::Dup(0) => 1,
-      CtrKind::Dup(_) => todo!("Tagged dups/sups not implemented for hvm32"),
-    }
-  }
+  Lam,
+  App,
+  Tup,
+  Ltp,
+  Dup,
+  Sup,
 }
 
 pub type NodeId = u64;

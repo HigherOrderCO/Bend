@@ -36,8 +36,8 @@ pub fn net_to_term(
     let snd = reader.namegen.decl_name(net, Port(node, 2));
 
     let (fan, tag) = match reader.net.node(node).kind {
-      NodeKind::Ctr(CtrKind::Tup(lab)) => (FanKind::Tup, reader.labels.tup.to_tag(lab)),
-      NodeKind::Ctr(CtrKind::Dup(lab)) => (FanKind::Dup, reader.labels.dup.to_tag(Some(lab))),
+      //NodeKind::Ctr(CtrKind::Tup(lab)) => (FanKind::Tup, reader.labels.tup.to_tag(lab)),
+      NodeKind::Dup => (FanKind::Dup, reader.labels.dup.to_tag(Some(0))),
       _ => unreachable!(),
     };
 
@@ -78,8 +78,6 @@ pub struct Reader<'a> {
 
 impl Reader<'_> {
   fn read_term(&mut self, next: Port) -> Term {
-    use CtrKind::*;
-
     maybe_grow(|| {
       if !self.seen.insert(next) && self.dup_paths.is_none() {
         self.error(ReadbackError::Cyclic);
@@ -89,10 +87,15 @@ impl Reader<'_> {
       let node = next.node_id();
       match &self.net.node(node).kind {
         NodeKind::Era => Term::Era,
-        NodeKind::Ctr(CtrKind::Con(lab)) => self.read_con(next, *lab),
+        NodeKind::Del => panic!("Tried to read a negative erasure node as a term."),
+        NodeKind::Lam => self.read_con(next, None),
+        NodeKind::App => self.read_con(next, None),
+        NodeKind::Tup => self.read_con(next, None),
+        NodeKind::Ltp => self.read_con(next, None),
         NodeKind::Swi => self.read_swi(next),
         NodeKind::Ref { def_name } => Term::Ref { nam: def_name.clone() },
-        NodeKind::Ctr(kind @ (Dup(_) | Tup(_))) => self.read_fan(next, *kind),
+        NodeKind::Dup => self.read_fan(next, CtrKind::Dup),
+        NodeKind::Sup => self.read_fan(next, CtrKind::Sup),
         NodeKind::Num { val } => num_from_bits_with_type(*val, *val),
         NodeKind::Opr => self.read_opr(next),
         NodeKind::Rot => {
@@ -143,8 +146,10 @@ impl Reader<'_> {
   fn read_fan(&mut self, next: Port, kind: CtrKind) -> Term {
     let node = next.node_id();
     let (fan, lab) = match kind {
-      CtrKind::Tup(lab) => (FanKind::Tup, lab),
-      CtrKind::Dup(lab) => (FanKind::Dup, Some(lab)),
+      CtrKind::Tup => (FanKind::Tup, None),
+      CtrKind::Ltp => (FanKind::Tup, None),
+      CtrKind::Dup => (FanKind::Dup, Some(0)),
+      CtrKind::Sup => (FanKind::Dup, Some(0)),
       _ => unreachable!(),
     };
     match next.slot() {
@@ -441,7 +446,7 @@ impl Reader<'_> {
 
         // We expect the pattern matching node to be a CON
         let sel_kind = &self.net.node(sel_node).kind;
-        if sel_kind != &NodeKind::Ctr(CtrKind::Con(None)) {
+        if sel_kind != &NodeKind::Lam && sel_kind != &NodeKind::Tup {
           // TODO: Is there any case where we expect a different node type here on readback?
           self.error(ReadbackError::InvalidNumericMatch);
           return Term::Err;
@@ -524,7 +529,10 @@ impl Reader<'_> {
 
     // Eta-reduce the readback inet.
     // This is not valid for all kinds of nodes, only CON/TUP/DUP, due to their interaction rules.
-    if matches!(node_kind, NodeKind::Ctr(_)) {
+    if matches!(
+      node_kind,
+      NodeKind::Lam | NodeKind::App | NodeKind::Tup | NodeKind::Ltp | NodeKind::Dup | NodeKind::Sup
+    ) {
       match (fst_port, snd_port) {
         (Port(fst_node, 1), Port(snd_node, 2)) if fst_node == snd_node => {
           if self.net.node(fst_node).kind == *node_kind {
@@ -571,7 +579,7 @@ impl Reader<'_> {
   ///
   /// Used heuristic: a con node is a tuple if port 1 is a closed tree and not an ERA.
   fn is_tup(&self, node: NodeId) -> bool {
-    if !matches!(self.net.node(node).kind, NodeKind::Ctr(CtrKind::Con(_))) {
+    if !matches!(self.net.node(node).kind, NodeKind::Lam | NodeKind::App | NodeKind::Tup | NodeKind::Ltp) {
       return false;
     }
     if self.net.node(self.net.enter_port(Port(node, 1)).node_id()).kind == NodeKind::Era {

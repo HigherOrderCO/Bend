@@ -90,12 +90,12 @@ struct Phase1<'a> {
 impl<'a> Phase1<'a> {
   fn walk_tree(&mut self, tree: &'a Tree) {
     match tree {
-      Tree::Con { fst, snd } => {
+      Tree::Lam { fst, snd } | Tree::App { fst, snd } => {
         self.nodes.push(NodeType::Ctr(0));
         self.walk_tree(fst);
         self.walk_tree(snd);
       }
-      Tree::Dup { fst, snd } => {
+      Tree::Dup { fst, snd } | Tree::Sup { fst, snd } => {
         self.nodes.push(NodeType::Ctr(1));
         self.walk_tree(fst);
         self.walk_tree(snd);
@@ -128,7 +128,9 @@ struct Phase2 {
 
 impl Phase2 {
   fn reduce_ctr(&mut self, tree: &mut Tree, idx: usize) -> NodeType {
-    if let Tree::Con { fst, snd } | Tree::Dup { fst, snd } = tree {
+    if let Tree::Lam { fst, snd } | Tree::App { fst, snd } | Tree::Dup { fst, snd } | Tree::Sup { fst, snd } =
+      tree
+    {
       let fst_typ = self.reduce_tree(fst);
       let snd_typ = self.reduce_tree(snd);
       // If both children are variables with the same offset, and their parent is a ctr of the same label,
@@ -156,7 +158,7 @@ impl Phase2 {
   fn reduce_tree(&mut self, tree: &mut Tree) -> NodeType {
     let idx = self.index.next().unwrap();
     match tree {
-      Tree::Con { .. } | Tree::Dup { .. } => self.reduce_ctr(tree, idx),
+      Tree::Lam { .. } | Tree::App { .. } | Tree::Dup { .. } | Tree::Sup { .. } => self.reduce_ctr(tree, idx),
       _ => {
         for child in tree_children_mut(tree) {
           self.reduce_tree(child);

@@ -1,9 +1,6 @@
 use super::{INet, INode, INodes, NodeId, NodeKind::*, Port, SlotId, ROOT};
 use crate::hvm::ast::{Net, Tree};
-use crate::{
-  fun::Name,
-  net::{CtrKind, NodeKind},
-};
+use crate::{fun::Name, net::NodeKind};
 
 pub fn hvm_to_net(net: &Net) -> INet {
   let inodes = hvm_to_inodes(net);
@@ -47,7 +44,7 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
     subtrees: &mut Vec<(String, &'a Tree)>,
     n_vars: &mut NodeId,
   ) -> String {
-    if let Tree::Var { nam } = subtree {
+    if let Tree::Var { nam } | Tree::Sub { nam } = subtree {
       if nam == net_root {
         "_".to_string()
       } else {
@@ -68,41 +65,57 @@ fn tree_to_inodes(tree: &Tree, tree_root: String, net_root: &str, n_vars: &mut N
         let var = new_var(n_vars);
         inodes.push(INode { kind: Era, ports: [subtree_root, var.clone(), var] });
       }
-      Tree::Con { fst, snd } => {
-        let kind = NodeKind::Ctr(CtrKind::Con(None));
+      Tree::Del => {
+        let var = new_var(n_vars);
+        inodes.push(INode { kind: Del, ports: [subtree_root, var.clone(), var] });
+      }
+      Tree::Lam { fst, snd } => {
+        let kind = NodeKind::Lam;
+        let fst = process_node_subtree(fst, net_root, &mut subtrees, n_vars);
+        let snd = process_node_subtree(snd, net_root, &mut subtrees, n_vars);
+        inodes.push(INode { kind, ports: [subtree_root, fst, snd] });
+      }
+      Tree::App { fst, snd } => {
+        let kind = NodeKind::App;
+        let fst = process_node_subtree(fst, net_root, &mut subtrees, n_vars);
+        let snd = process_node_subtree(snd, net_root, &mut subtrees, n_vars);
+        inodes.push(INode { kind, ports: [subtree_root, fst, snd] });
+      }
+      Tree::Sup { fst, snd } => {
+        let kind = NodeKind::Sup;
         let fst = process_node_subtree(fst, net_root, &mut subtrees, n_vars);
         let snd = process_node_subtree(snd, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, fst, snd] });
       }
       Tree::Dup { fst, snd } => {
-        let kind = NodeKind::Ctr(CtrKind::Dup(0));
+        let kind = NodeKind::Dup;
         let fst = process_node_subtree(fst, net_root, &mut subtrees, n_vars);
         let snd = process_node_subtree(snd, net_root, &mut subtrees, n_vars);
         inodes.push(INode { kind, ports: [subtree_root, fst, snd] });
       }
       Tree::Var { .. } => unreachable!(),
+      Tree::Sub { .. } => unreachable!(),
       Tree::Ref { nam } => {
         let kind = Ref { def_name: Name::new(nam) };
         let var = new_var(n_vars);
         inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
-      }
-      Tree::Num { val } => {
-        let kind = Num { val: val.0 };
-        let var = new_var(n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
-      }
-      Tree::Opr { fst, snd } => {
-        let kind = NodeKind::Opr;
-        let fst = process_node_subtree(fst, net_root, &mut subtrees, n_vars);
-        let snd = process_node_subtree(snd, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, fst, snd] });
-      }
-      Tree::Swi { fst, snd } => {
-        let kind = NodeKind::Swi;
-        let fst = process_node_subtree(fst, net_root, &mut subtrees, n_vars);
-        let snd = process_node_subtree(snd, net_root, &mut subtrees, n_vars);
-        inodes.push(INode { kind, ports: [subtree_root, fst, snd] });
-      }
+      } /* Tree::Num { val } => {
+          let kind = Num { val: val.0 };
+          let var = new_var(n_vars);
+          inodes.push(INode { kind, ports: [subtree_root, var.clone(), var] });
+        }
+        Tree::Opr { fst, snd } => {
+          let kind = NodeKind::Opr;
+          let fst = process_node_subtree(fst, net_root, &mut subtrees, n_vars);
+          let snd = process_node_subtree(snd, net_root, &mut subtrees, n_vars);
+          inodes.push(INode { kind, ports: [subtree_root, fst, snd] });
+        }
+        Tree::Swi { fst, snd } => {
+          let kind = NodeKind::Swi;
+          let fst = process_node_subtree(fst, net_root, &mut subtrees, n_vars);
+          let snd = process_node_subtree(snd, net_root, &mut subtrees, n_vars);
+          inodes.push(INode { kind, ports: [subtree_root, fst, snd] });
+        } */
     }
   }
   inodes

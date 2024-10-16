@@ -12,8 +12,8 @@ use crate::multi_iterator;
 pub fn tree_children(tree: &Tree) -> impl DoubleEndedIterator<Item = &Tree> + Clone {
   multi_iterator!(ChildrenIter { Zero, Two });
   match tree {
-    Tree::Var { .. } | Tree::Ref { .. } | Tree::Era | Tree::Num { .. } => ChildrenIter::Zero([]),
-    Tree::Con { fst, snd } | Tree::Dup { fst, snd } | Tree::Opr { fst, snd } | Tree::Swi { fst, snd } => {
+    Tree::Var { .. } | Tree::Sub { .. } | Tree::Ref { .. } | Tree::Era | Tree::Del => ChildrenIter::Zero([]),
+    Tree::Lam { fst, snd } | Tree::App { fst, snd } | Tree::Dup { fst, snd } | Tree::Sup { fst, snd } => {
       ChildrenIter::Two([fst.as_ref(), snd.as_ref()])
     }
   }
@@ -22,8 +22,8 @@ pub fn tree_children(tree: &Tree) -> impl DoubleEndedIterator<Item = &Tree> + Cl
 pub fn tree_children_mut(tree: &mut Tree) -> impl DoubleEndedIterator<Item = &mut Tree> {
   multi_iterator!(ChildrenIter { Zero, Two });
   match tree {
-    Tree::Var { .. } | Tree::Ref { .. } | Tree::Era | Tree::Num { .. } => ChildrenIter::Zero([]),
-    Tree::Con { fst, snd } | Tree::Dup { fst, snd } | Tree::Opr { fst, snd } | Tree::Swi { fst, snd } => {
+    Tree::Var { .. } | Tree::Sub { .. } | Tree::Ref { .. } | Tree::Era | Tree::Del => ChildrenIter::Zero([]),
+    Tree::Lam { fst, snd } | Tree::App { fst, snd } | Tree::Dup { fst, snd } | Tree::Sup { fst, snd } => {
       ChildrenIter::Two([fst.as_mut(), snd.as_mut()])
     }
   }
