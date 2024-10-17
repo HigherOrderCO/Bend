@@ -291,10 +291,10 @@ It is possible to bind a variable name to the matching value. The fields of the 
 ### Fold
 
 ```python
-fold x = Tree/leaf:
-  case Tree/node:
+fold x = Tree/Leaf:
+  case Tree/Node:
     return x.value + x.left + x.right
-  case Tree/leaf:
+  case Tree/Leaf:
     return 0
 ```
 
