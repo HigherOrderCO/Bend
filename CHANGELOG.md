@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project does not currently adhere to a particular versioning scheme.
 
-## [Unreleased]
+## [0.2.37] - 2024-10-18
 
 ### Fixed
 
@@ -373,7 +373,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [0.2.34]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.34
 [0.2.35]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.35
 [0.2.36]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.36
-[Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
+[0.2.37]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.37
 [gh-424]: https://github.com/HigherOrderCO/Bend/issues/424
 [gh-427]: https://github.com/HigherOrderCO/Bend/issues/427
 [gh-443]: https://github.com/HigherOrderCO/Bend/issues/443
@@ -431,4 +431,3 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-674]: https://github.com/HigherOrderCO/Bend/issues/674
 [gh-675]: https://github.com/HigherOrderCO/Bend/issues/675
 [gh-706]: https://github.com/HigherOrderCO/Bend/issues/706
-[Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.36...HEAD
