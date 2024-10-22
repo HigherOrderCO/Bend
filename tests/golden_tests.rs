@@ -245,7 +245,9 @@ fn readback_hvm() {
 fn simplify_matches() {
   run_golden_test_dir(function_name!(), &|code, path| {
     let diagnostics_cfg = DiagnosticsConfig {
-      irrefutable_match: Severity::Allow,
+      unused_definition: Severity::Allow,
+      irrefutable_match: Severity::Warning,
+      unreachable_match: Severity::Warning,
       ..DiagnosticsConfig::new(Severity::Error, true)
     };
     let mut book = parse_book_single_file(code, path)?;
@@ -275,7 +277,7 @@ fn simplify_matches() {
     ctx.book.make_var_names_unique();
     ctx.prune(false);
 
-    Ok(ctx.book.to_string())
+    Ok(format!("{}\n{}", ctx.book, ctx.info))
   })
 }
 

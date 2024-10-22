@@ -7,8 +7,12 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ## [Unreleased]
 
+### Added
+
+- Emit a warning when a rule in a pattern matching function is unreachable. ([#736][gh-736])
+
 ### Fixed
-- Fix type checker not properly unifying all the arms of a match expression.
+- Fix type checker not properly unifying all the arms of a match expression. ([#734][gh-734])
 
 ## [0.2.37] - 2024-10-18
 
@@ -379,6 +383,7 @@ and this project does not currently adhere to a particular versioning scheme.
 [0.2.35]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.35
 [0.2.36]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.36
 [0.2.37]: https://github.com/HigherOrderCO/Bend/releases/tag/0.2.37
+[Unreleased]: https://github.com/HigherOrderCO/Bend/compare/0.2.37...HEAD
 [gh-424]: https://github.com/HigherOrderCO/Bend/issues/424
 [gh-427]: https://github.com/HigherOrderCO/Bend/issues/427
 [gh-443]: https://github.com/HigherOrderCO/Bend/issues/443
@@ -436,3 +441,5 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-674]: https://github.com/HigherOrderCO/Bend/issues/674
 [gh-675]: https://github.com/HigherOrderCO/Bend/issues/675
 [gh-706]: https://github.com/HigherOrderCO/Bend/issues/706
+[gh-734]: https://github.com/HigherOrderCO/Bend/issues/734
+[gh-736]: https://github.com/HigherOrderCO/Bend/issues/736

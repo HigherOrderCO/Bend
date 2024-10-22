@@ -7,3 +7,8 @@ unchecked Fn2: Any
 
 unchecked main: Any
 (main) = *
+[4m[1m[33mWarnings:[0m
+[1mIn [4mtests/golden_tests/simplify_matches/redundant_with_era.bend[0m[1m :[0m
+[1mIn definition '[4mFn2[0m[1m':[0m
+  Unreachable pattern matching rule '(Fn2 0 *)' (rule index 1).
+  Unreachable pattern matching rule '(Fn2 a *)' (rule index 2).

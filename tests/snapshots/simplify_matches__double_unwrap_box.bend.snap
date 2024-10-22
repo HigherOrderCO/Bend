@@ -13,3 +13,7 @@ Boxed/Box/tag: _
 
 Boxed/Box: (Any -> Boxed)
 (Boxed/Box) = λa λb (b Boxed/Box/tag a)
+[4m[1m[33mWarnings:[0m
+[1mIn [4mtests/golden_tests/simplify_matches/double_unwrap_box.bend[0m[1m :[0m
+[1mIn definition '[4mDoubleUnbox[0m[1m':[0m
+  Unreachable pattern matching rule '(DoubleUnbox * x)' (rule index 1).
