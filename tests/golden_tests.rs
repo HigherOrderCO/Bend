@@ -9,17 +9,10 @@
 //! CLI tool. Then, run `cargo insta review` to review these changes.
 
 use bend::{
-  compile_book, desugar_book,
-  diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
-  fun::{
+  check_book, compile_book, desugar_book, diagnostics::{Diagnostics, DiagnosticsConfig, Severity}, fun::{
     load_book::do_parse_book, net_to_term::net_to_term, parser::ParseBook, term_to_net::Labels, Book, Ctx,
     Name,
-  },
-  hvm::hvm_book_show_pretty,
-  imports::DefaultLoader,
-  load_to_book,
-  net::hvm_to_net::hvm_to_net,
-  run_book, AdtEncoding, CompileOpts, RunOpts,
+  }, hvm::hvm_book_show_pretty, imports::DefaultLoader, load_to_book, net::hvm_to_net::hvm_to_net, run_book, AdtEncoding, CompileOpts, RunOpts
 };
 use insta::assert_snapshot;
 use itertools::Itertools;
@@ -333,6 +326,22 @@ fn parse_file() {
     Ok(book.to_string())
   })
 }
+
+/// Runs the check command on a file.
+#[test]
+fn check_file() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let compile_opts = CompileOpts::default();
+    let diagnostics_cfg = DiagnosticsConfig {
+      unused_definition: Severity::Allow,
+      ..DiagnosticsConfig::new(Severity::Error, true)
+    };
+    let mut book = parse_book_single_file(code, path)?;
+    check_book(&mut book, diagnostics_cfg, compile_opts)?;
+    Ok(book.to_string())
+  })
+}
+
 
 /// Runs compilation up to the last term-level pass (`bend desugar` command).
 #[test]

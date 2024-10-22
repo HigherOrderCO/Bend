@@ -1,6 +1,6 @@
 ---
 source: tests/golden_tests.rs
-input_file: tests/golden_tests/desugar_file/fail_type_bad_rec_fn_adt.bend
+input_file: tests/golden_tests/check_file/fail_type_bad_rec_fn_adt.bend
 ---
 [4m[1m[31mErrors:[0m
 In λa match a { Box/Box b: (Erase b); }:
