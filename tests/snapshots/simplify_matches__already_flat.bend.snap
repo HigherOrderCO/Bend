@@ -73,3 +73,9 @@ Baz/CtrB3/tag: _
 
 Baz/CtrB3: (Any -> Baz)
 (Baz/CtrB3) = λa λb (b Baz/CtrB3/tag a)
+[4m[1m[33mWarnings:[0m
+[1mIn [4mtests/golden_tests/simplify_matches/already_flat.bend[0m[1m :[0m
+[1mIn definition '[4mRule4[0m[1m':[0m
+  Unreachable pattern matching rule '(Rule4 x)' (rule index 2).
+[1mIn definition '[4mRule6[0m[1m':[0m
+  Unreachable pattern matching rule '(Rule6 b)' (rule index 1).

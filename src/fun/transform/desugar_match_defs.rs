@@ -3,6 +3,7 @@ use crate::{
   fun::{builtins, Adts, Constructors, Ctx, Definition, FanKind, Name, Num, Pattern, Rule, Tag, Term},
   maybe_grow,
 };
+use itertools::Itertools;
 use std::collections::{BTreeSet, HashSet};
 
 pub enum DesugarMatchDefErr {
@@ -10,6 +11,7 @@ pub enum DesugarMatchDefErr {
   NumMissingDefault,
   TypeMismatch { expected: Type, found: Type, pat: Pattern },
   RepeatedBind { bind: Name },
+  UnreachableRule { idx: usize, nam: Name, pats: Vec<Pattern> },
 }
 
 impl Ctx<'_> {
@@ -27,6 +29,12 @@ impl Ctx<'_> {
           DesugarMatchDefErr::RepeatedBind { .. } => self.info.add_function_warning(
             err,
             WarningType::RepeatedBind,
+            def_name.clone(),
+            def.source.clone(),
+          ),
+          DesugarMatchDefErr::UnreachableRule { .. } => self.info.add_function_warning(
+            err,
+            WarningType::UnreachableMatch,
             def_name.clone(),
             def.source.clone(),
           ),
@@ -49,10 +57,22 @@ impl Definition {
 
     let args = (0..self.arity()).map(|i| Name::new(format!("%arg{i}"))).collect::<Vec<_>>();
     let rules = std::mem::take(&mut self.rules);
-    match simplify_rule_match(args.clone(), rules, vec![], ctrs, adts) {
+    let idx = (0..rules.len()).collect::<Vec<_>>();
+    let mut used = BTreeSet::new();
+    match simplify_rule_match(args.clone(), rules.clone(), idx.clone(), vec![], &mut used, ctrs, adts) {
       Ok(body) => {
         let body = Term::rfold_lams(body, args.into_iter().map(Some));
         self.rules = vec![Rule { pats: vec![], body }];
+        for i in idx {
+          if !used.contains(&i) {
+            let e = DesugarMatchDefErr::UnreachableRule {
+              idx: i,
+              nam: self.name.clone(),
+              pats: rules[i].pats.clone(),
+            };
+            errs.push(e);
+          }
+        }
       }
       Err(e) => errs.push(e),
     }
@@ -123,24 +143,32 @@ fn fix_repeated_binds(rules: &mut [Rule]) -> Vec<DesugarMatchDefErr> {
 /// expression, together with the remaining match arguments.
 ///
 /// Linearizes all the arguments that are used in at least one of the bodies.
+///
+/// `args`: Name of the generated argument variables that sill have to be processed.
+/// `rules`: The rules to simplify.
+/// `idx`: The original index of the rules, to check for unreachable rules.
+/// `with`: Name of the variables to be inserted in the `with` clauses.
 fn simplify_rule_match(
   args: Vec<Name>,
   rules: Vec<Rule>,
+  idx: Vec<usize>,
   with: Vec<Name>,
+  used: &mut BTreeSet<usize>,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, DesugarMatchDefErr> {
   if args.is_empty() {
+    used.insert(idx[0]);
     Ok(rules.into_iter().next().unwrap().body)
   } else if rules[0].pats.iter().all(|p| p.is_wildcard()) {
-    Ok(irrefutable_fst_row_rule(args, rules.into_iter().next().unwrap()))
+    Ok(irrefutable_fst_row_rule(args, rules.into_iter().next().unwrap(), idx[0], used))
   } else {
     let typ = Type::infer_from_def_arg(&rules, 0, ctrs)?;
     match typ {
-      Type::Any => var_rule(args, rules, with, ctrs, adts),
-      Type::Fan(fan, tag, tup_len) => fan_rule(args, rules, with, fan, tag, tup_len, ctrs, adts),
-      Type::Num => num_rule(args, rules, with, ctrs, adts),
-      Type::Adt(adt_name) => switch_rule(args, rules, with, adt_name, ctrs, adts),
+      Type::Any => var_rule(args, rules, idx, with, used, ctrs, adts),
+      Type::Fan(fan, tag, tup_len) => fan_rule(args, rules, idx, with, used, fan, tag, tup_len, ctrs, adts),
+      Type::Num => num_rule(args, rules, idx, with, used, ctrs, adts),
+      Type::Adt(adt_name) => switch_rule(args, rules, idx, with, adt_name, used, ctrs, adts),
     }
   }
 }
@@ -148,7 +176,7 @@ fn simplify_rule_match(
 /// Irrefutable first row rule.
 /// Short-circuits the encoding in case the first rule always matches.
 /// This is useful to avoid unnecessary pattern matching.
-fn irrefutable_fst_row_rule(args: Vec<Name>, rule: Rule) -> Term {
+fn irrefutable_fst_row_rule(args: Vec<Name>, rule: Rule, idx: usize, used: &mut BTreeSet<usize>) -> Term {
   let mut term = rule.body;
   for (arg, pat) in args.into_iter().zip(rule.pats.into_iter()) {
     match pat {
@@ -166,6 +194,7 @@ fn irrefutable_fst_row_rule(args: Vec<Name>, rule: Rule) -> Term {
       _ => unreachable!(),
     }
   }
+  used.insert(idx);
   term
 }
 
@@ -176,7 +205,9 @@ fn irrefutable_fst_row_rule(args: Vec<Name>, rule: Rule) -> Term {
 fn var_rule(
   mut args: Vec<Name>,
   rules: Vec<Rule>,
+  idx: Vec<usize>,
   mut with: Vec<Name>,
+  used: &mut BTreeSet<usize>,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, DesugarMatchDefErr> {
@@ -202,7 +233,7 @@ fn var_rule(
 
   with.push(arg);
 
-  simplify_rule_match(new_args, new_rules, with, ctrs, adts)
+  simplify_rule_match(new_args, new_rules, idx, with, used, ctrs, adts)
 }
 
 /// Tuple rule.
@@ -224,7 +255,9 @@ fn var_rule(
 fn fan_rule(
   mut args: Vec<Name>,
   rules: Vec<Rule>,
+  idx: Vec<usize>,
   with: Vec<Name>,
+  used: &mut BTreeSet<usize>,
   fan: FanKind,
   tag: Tag,
   len: usize,
@@ -263,7 +296,7 @@ fn fan_rule(
 
   let bnd = new_args.clone().map(|x| Pattern::Var(Some(x))).collect();
   let args = new_args.chain(old_args).collect();
-  let nxt = simplify_rule_match(args, new_rules, with, ctrs, adts)?;
+  let nxt = simplify_rule_match(args, new_rules, idx, with, used, ctrs, adts)?;
   let term = Term::Let {
     pat: Box::new(Pattern::Fan(fan, tag.clone(), bnd)),
     val: Box::new(Term::Var { nam: arg }),
@@ -276,7 +309,9 @@ fn fan_rule(
 fn num_rule(
   mut args: Vec<Name>,
   rules: Vec<Rule>,
+  idx: Vec<usize>,
   with: Vec<Name>,
+  used: &mut BTreeSet<usize>,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, DesugarMatchDefErr> {
@@ -303,12 +338,14 @@ fn num_rule(
   let mut num_bodies = vec![];
   for num in nums.iter() {
     let mut new_rules = vec![];
-    for rule in rules.iter() {
+    let mut new_idx = vec![];
+    for (rule, &idx) in rules.iter().zip(&idx) {
       match &rule.pats[0] {
         Pattern::Num(n) if n == num => {
           let body = rule.body.clone();
           let rule = Rule { pats: rule.pats[1..].to_vec(), body };
           new_rules.push(rule);
+          new_idx.push(idx);
         }
         Pattern::Var(var) => {
           let mut body = rule.body.clone();
@@ -321,17 +358,19 @@ fn num_rule(
           }
           let rule = Rule { pats: rule.pats[1..].to_vec(), body };
           new_rules.push(rule);
+          new_idx.push(idx);
         }
         _ => (),
       }
     }
-    let body = simplify_rule_match(args.clone(), new_rules, with.clone(), ctrs, adts)?;
+    let body = simplify_rule_match(args.clone(), new_rules, new_idx, with.clone(), used, ctrs, adts)?;
     num_bodies.push(body);
   }
 
   // Default case
   let mut new_rules = vec![];
-  for rule in rules {
+  let mut new_idx = vec![];
+  for (rule, &idx) in rules.into_iter().zip(&idx) {
     if let Pattern::Var(var) = &rule.pats[0] {
       let mut body = rule.body.clone();
       if let Some(var) = var {
@@ -343,11 +382,12 @@ fn num_rule(
       }
       let rule = Rule { pats: rule.pats[1..].to_vec(), body };
       new_rules.push(rule);
+      new_idx.push(idx);
     }
   }
   let mut default_with = with.clone();
   default_with.push(pred_var.clone());
-  let default_body = simplify_rule_match(args.clone(), new_rules, default_with, ctrs, adts)?;
+  let default_body = simplify_rule_match(args.clone(), new_rules, new_idx, default_with, used, ctrs, adts)?;
 
   // Linearize previously matched vars and current args.
   let with = with.into_iter().chain(args).collect::<Vec<_>>();
@@ -446,11 +486,14 @@ fn fast_pred_access(body: &mut Term, cur_num: u32, var: &Name, pred_var: &Name) 
 /// }
 /// ```
 /// Where `case` represents a call of the [`simplify_rule_match`] function.
+#[allow(clippy::too_many_arguments)]
 fn switch_rule(
   mut args: Vec<Name>,
   rules: Vec<Rule>,
+  idx: Vec<usize>,
   with: Vec<Name>,
   adt_name: Name,
+  used: &mut BTreeSet<usize>,
   ctrs: &Constructors,
   adts: &Adts,
 ) -> Result<Term, DesugarMatchDefErr> {
@@ -463,7 +506,8 @@ fn switch_rule(
     let args = new_args.clone().chain(old_args.clone()).collect();
 
     let mut new_rules = vec![];
-    for rule in &rules {
+    let mut new_idx = vec![];
+    for (rule, &idx) in rules.iter().zip(&idx) {
       let old_pats = rule.pats[1..].to_vec();
       match &rule.pats[0] {
         // Same ctr, extract subpatterns.
@@ -475,6 +519,7 @@ fn switch_rule(
           let body = rule.body.clone();
           let rule = Rule { pats, body };
           new_rules.push(rule);
+          new_idx.push(idx);
         }
         // Var, match and rebuild the constructor.
         // var pat1 ... patN: body
@@ -493,6 +538,7 @@ fn switch_rule(
           }
           let rule = Rule { pats, body };
           new_rules.push(rule);
+          new_idx.push(idx);
         }
         _ => (),
       }
@@ -502,7 +548,7 @@ fn switch_rule(
       return Err(DesugarMatchDefErr::AdtNotExhaustive { adt: adt_name, ctr: ctr_nam.clone() });
     }
 
-    let body = simplify_rule_match(args, new_rules, with.clone(), ctrs, adts)?;
+    let body = simplify_rule_match(args, new_rules, new_idx, with.clone(), used, ctrs, adts)?;
     new_arms.push((Some(ctr_nam.clone()), new_args.map(Some).collect(), body));
   }
 
@@ -605,6 +651,14 @@ impl std::fmt::Display for DesugarMatchDefErr {
       }
       DesugarMatchDefErr::RepeatedBind { bind } => {
         write!(f, "Repeated bind in pattern matching rule: '{bind}'.")
+      }
+      DesugarMatchDefErr::UnreachableRule { idx, nam, pats } => {
+        write!(
+          f,
+          "Unreachable pattern matching rule '({}{})' (rule index {idx}).",
+          nam,
+          pats.iter().map(|p| format!(" {p}")).join("")
+        )
       }
     }
   }

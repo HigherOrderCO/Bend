@@ -22,3 +22,25 @@ unchecked v5: Any
 
 unchecked main: Any
 (main) = (v1, v2, v3, v4, v5)
+[4m[1m[33mWarnings:[0m
+[1mIn [4mtests/golden_tests/simplify_matches/irrefutable_case.bend[0m[1m :[0m
+[1mIn definition '[4mv1[0m[1m':[0m
+  Irrefutable 'match' expression. All cases after variable pattern 'x' will be ignored.
+  Note that to use a 'match' expression, the matched constructors need to be defined in a 'data' definition.
+  If this is not a mistake, consider using a 'let' expression instead.
+[1mIn definition '[4mv2[0m[1m':[0m
+  Irrefutable 'match' expression. All cases after variable pattern 'x' will be ignored.
+  Note that to use a 'match' expression, the matched constructors need to be defined in a 'data' definition.
+  If this is not a mistake, consider using a 'let' expression instead.
+[1mIn definition '[4mv3[0m[1m':[0m
+  Irrefutable 'match' expression. All cases after variable pattern 'x' will be ignored.
+  Note that to use a 'match' expression, the matched constructors need to be defined in a 'data' definition.
+  If this is not a mistake, consider using a 'let' expression instead.
+[1mIn definition '[4mv4[0m[1m':[0m
+  Irrefutable 'match' expression. All cases after variable pattern 'x' will be ignored.
+  Note that to use a 'match' expression, the matched constructors need to be defined in a 'data' definition.
+  If this is not a mistake, consider using a 'let' expression instead.
+[1mIn definition '[4mv5[0m[1m':[0m
+  Irrefutable 'match' expression. All cases after variable pattern 'x' will be ignored.
+  Note that to use a 'match' expression, the matched constructors need to be defined in a 'data' definition.
+  If this is not a mistake, consider using a 'let' expression instead.

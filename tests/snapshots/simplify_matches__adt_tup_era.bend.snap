@@ -13,3 +13,7 @@ Tuple/Pair/tag: _
 
 Tuple/Pair: (Any -> Any -> Tuple)
 (Tuple/Pair) = λa λb λc (c Tuple/Pair/tag a b)
+[4m[1m[33mWarnings:[0m
+[1mIn [4mtests/golden_tests/simplify_matches/adt_tup_era.bend[0m[1m :[0m
+[1mIn definition '[4mFoo[0m[1m':[0m
+  Unreachable pattern matching rule '(Foo *)' (rule index 1).

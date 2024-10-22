@@ -34,3 +34,8 @@ Baz/CtrC/tag: _
 
 Baz/CtrC: Baz
 (Baz/CtrC) = λa (a Baz/CtrC/tag)
+[4m[1m[33mWarnings:[0m
+[1mIn [4mtests/golden_tests/simplify_matches/nested.bend[0m[1m :[0m
+[1mIn definition '[4mRule[0m[1m':[0m
+  Unreachable pattern matching rule '(Rule (Foo/CtrA a b))' (rule index 2).
+  Unreachable pattern matching rule '(Rule x)' (rule index 4).
