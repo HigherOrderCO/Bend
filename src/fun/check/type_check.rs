@@ -591,7 +591,7 @@ fn infer_match_cases(
       // Recurse and unify with the other arms.
       let s = s2.compose(s1);
       let (s_rest, t_rest) = infer_match_cases(env.subst(&s), book, types, adt, rest, adt_s, var_gen)?;
-      let (t_final, s_final) = unify_term(&t1, &t_rest, bod)?;
+      let (t_final, s_final) = unify_term(&t1.subst(&s), &t_rest, bod)?;
 
       Ok((s_final.compose(s_rest).compose(s), t_final))
     } else {

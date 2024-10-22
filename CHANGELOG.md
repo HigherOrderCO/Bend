@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project does not currently adhere to a particular versioning scheme.
 
+## [Unreleased]
+
+### Fixed
+- Fix type checker not properly unifying all the arms of a match expression.
+
 ## [0.2.37] - 2024-10-18
 
 ### Fixed

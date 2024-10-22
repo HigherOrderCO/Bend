@@ -9,7 +9,7 @@
 //! CLI tool. Then, run `cargo insta review` to review these changes.
 
 use bend::{
-  compile_book, desugar_book,
+  check_book, compile_book, desugar_book,
   diagnostics::{Diagnostics, DiagnosticsConfig, Severity},
   fun::{
     load_book::do_parse_book, net_to_term::net_to_term, parser::ParseBook, term_to_net::Labels, Book, Ctx,
@@ -330,6 +330,21 @@ fn parse_file() {
     ctx.book.encode_builtins();
     ctx.resolve_refs().expect("Resolve refs");
     ctx.prune(false);
+    Ok(book.to_string())
+  })
+}
+
+/// Runs the check command on a file.
+#[test]
+fn check_file() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let compile_opts = CompileOpts::default();
+    let diagnostics_cfg = DiagnosticsConfig {
+      unused_definition: Severity::Allow,
+      ..DiagnosticsConfig::new(Severity::Error, true)
+    };
+    let mut book = parse_book_single_file(code, path)?;
+    check_book(&mut book, diagnostics_cfg, compile_opts)?;
     Ok(book.to_string())
   })
 }
