@@ -600,6 +600,8 @@ Currently, the 3 number types cannot be mixed.
 | Bitwise And           | x & y    | int, uint        |
 | Bitwise Or            | x \| y   | int, uint        |
 | Bitwise Xor           | x ^ y    | int, uint        |
+| Bitwise Right Shift   | x >> y   | uint             |
+| Bitwise Left Shift    | x << y   | uint             |
 
 Hexadecimal and binary floating-point literals are also supported.
 
@@ -1173,6 +1175,8 @@ Currently, the 3 number types cannot be mixed.
 | Bitwise And           | (& x y)    | int, uint        |
 | Bitwise Or            | (\| x y)   | int, uint        |
 | Bitwise Xor           | (^ x y)    | int, uint        |
+| Bitwise Right Shift   | (>> x y)   | uint             |
+| Bitwise Left Shift    | (<< x y)   | uint             |
 
 Hexadecimal and binary floating-point literals are also supported.
 
