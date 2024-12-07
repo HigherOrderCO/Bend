@@ -3,19 +3,19 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/simplify_matches/double_unwrap_maybe.bend
 ---
 unchecked DoubleUnwrap: Any
-(DoubleUnwrap) = λa match a { Maybe/Some b: match b { Maybe/Some c: λd let e = d; let f = e; c; Maybe/None: λg let h = g; let i = h; i; }; Maybe/None: λj let k = j; k; }
+(DoubleUnwrap) = λa match a { Maybe_/Some b: match b { Maybe_/Some c: λd let e = d; let f = e; c; Maybe_/None: λg let h = g; let i = h; i; }; Maybe_/None: λj let k = j; k; }
 
 unchecked Main: Any
-(Main) = (DoubleUnwrap (Maybe/Some Maybe/None) 5)
+(Main) = (DoubleUnwrap (Maybe_/Some Maybe_/None) 5)
 
-Maybe/Some/tag: _
-(Maybe/Some/tag) = 0
+Maybe_/Some/tag: _
+(Maybe_/Some/tag) = 0
 
-Maybe/Some: (Any -> Maybe)
-(Maybe/Some) = λa λb (b Maybe/Some/tag a)
+Maybe_/Some: (Any -> Maybe_)
+(Maybe_/Some) = λa λb (b Maybe_/Some/tag a)
 
-Maybe/None/tag: _
-(Maybe/None/tag) = 1
+Maybe_/None/tag: _
+(Maybe_/None/tag) = 1
 
-Maybe/None: Maybe
-(Maybe/None) = λa (a Maybe/None/tag)
+Maybe_/None: Maybe_
+(Maybe_/None) = λa (a Maybe_/None/tag)
