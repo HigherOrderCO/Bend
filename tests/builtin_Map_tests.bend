@@ -1,7 +1,3 @@
-type Bool:
-  True
-  False
-
 # Returns values from a map
 def test1() -> (u24, u24):
   m = {1: 1, 2: 2, 3: 3}

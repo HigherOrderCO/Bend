@@ -2,28 +2,7 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_lambda.bend
 ---
-Scott
-unchecked main: Any
-(main) = (Maybe/Some 1 λ$x * λa a $x)
-
-Maybe/None: Maybe
-(Maybe/None) = λa λ* a
-
-Maybe/Some: (Any -> Maybe)
-(Maybe/Some) = λa λ* λc (c a)
-
-NumScott
-unchecked main: Any
-(main) = (Maybe/Some 1 λa switch a { 0: λ$x *; _: λ* λb b; } $x)
-
-Maybe/None/tag: _
-(Maybe/None/tag) = 0
-
-Maybe/None: Maybe
-(Maybe/None) = λa (a Maybe/None/tag)
-
-Maybe/Some/tag: _
-(Maybe/Some/tag) = 1
-
-Maybe/Some: (Any -> Maybe)
-(Maybe/Some) = λa λb (b Maybe/Some/tag a)
+[4m[1m[31mErrors:[0m
+[1mIn [4mtests/golden_tests/encode_pattern_match/match_adt_unscoped_lambda.bend[0m[1m :[0m
+[1mIn definition '[4mmain[0m[1m':[0m
+  Unbound variable 'x.value'.
