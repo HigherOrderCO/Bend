@@ -4,38 +4,29 @@ input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_var.bend
 ---
 Scott
 unchecked Foo: Any
-(Foo) = λ$x (Maybe/Some 1 $x λa a)
+(Foo) = λ$x (Maybe/Some 1 λa a $x)
 
 unchecked Bar: Any
-(Bar) = (Maybe/Some 1 $x λa a λ$x *)
+(Bar) = (Maybe/Some 1 λa a $x λ$x *)
 
 unchecked main: Any
 (main) = *
 
-Maybe/None: Maybe
-(Maybe/None) = λa λ* a
-
-Maybe/Some: (Any -> Maybe)
-(Maybe/Some) = λa λ* λc (c a)
+Maybe/Some: (T -> (Maybe T))
+(Maybe/Some) = λa λb λ* (b a)
 
 NumScott
 unchecked Foo: Any
-(Foo) = λ$x (Maybe/Some 1 λa switch a { 0: $x; _: λ* λb b; })
+(Foo) = λ$x (Maybe/Some 1 λa switch a { 0: λb b; _: λ* $x; })
 
 unchecked Bar: Any
-(Bar) = (Maybe/Some 1 λa switch a { 0: $x; _: λ* λb b; } λ$x *)
+(Bar) = (Maybe/Some 1 λa switch a { 0: λb b; _: λ* $x; } λ$x *)
 
 unchecked main: Any
 (main) = *
 
-Maybe/None/tag: _
-(Maybe/None/tag) = 0
-
-Maybe/None: Maybe
-(Maybe/None) = λa (a Maybe/None/tag)
-
 Maybe/Some/tag: _
-(Maybe/Some/tag) = 1
+(Maybe/Some/tag) = 0
 
-Maybe/Some: (Any -> Maybe)
+Maybe/Some: (T -> (Maybe T))
 (Maybe/Some) = λa λb (b Maybe/Some/tag a)

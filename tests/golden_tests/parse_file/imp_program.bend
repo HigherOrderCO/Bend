@@ -1,10 +1,6 @@
 type Point:
   Point { x, y }
 
-type Bool:
-  True
-  False
-
 
 def symbols():
   x = { `x`: 5, 2: 3 };

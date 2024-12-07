@@ -11,11 +11,11 @@ unchecked Main: Any
 Maybe/Some/tag: _
 (Maybe/Some/tag) = 0
 
-Maybe/Some: (Any -> Maybe)
+Maybe/Some: (T -> (Maybe T))
 (Maybe/Some) = λa λb (b Maybe/Some/tag a)
 
 Maybe/None/tag: _
 (Maybe/None/tag) = 1
 
-Maybe/None: Maybe
+Maybe/None: (Maybe T)
 (Maybe/None) = λa (a Maybe/None/tag)

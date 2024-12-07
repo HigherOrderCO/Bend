@@ -4,5 +4,5 @@ input_file: tests/golden_tests/run_file/unbound_wrap.bend
 ---
 [4m[1m[31mErrors:[0m
 [1mIn [4mtests/golden_tests/run_file/unbound_wrap.bend[0m[1m :[0m
-[1mIn definition '[4mmain[0m[1m':[0m
-  Reference to undefined function 'Maybe/wrap'
+[1mIn definition '[4mMaybe/bind[0m[1m':[0m
+  Unbound variable 'val.x'.

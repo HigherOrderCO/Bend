@@ -27,12 +27,6 @@ List_/Cons: (Any -> Any -> List_)
 List_/Nil: List_
 (List_/Nil) = λ* λb b
 
-Bool/True: Bool
-(Bool/True) = λa λ* a
-
-Bool/False: Bool
-(Bool/False) = λ* λb b
-
 Light/Red: Light
 (Light/Red) = λa λ* λ* a
 
@@ -102,18 +96,6 @@ List_/Nil/tag: _
 
 List_/Nil: List_
 (List_/Nil) = λa (a List_/Nil/tag)
-
-Bool/True/tag: _
-(Bool/True/tag) = 0
-
-Bool/True: Bool
-(Bool/True) = λa (a Bool/True/tag)
-
-Bool/False/tag: _
-(Bool/False/tag) = 1
-
-Bool/False: Bool
-(Bool/False) = λa (a Bool/False/tag)
 
 Light/Red/tag: _
 (Light/Red/tag) = 0
