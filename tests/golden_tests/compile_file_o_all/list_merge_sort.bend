@@ -1,5 +1,7 @@
 type List_ = (Cons head tail) | Nil
 
+type Bool = True | False
+
 If Bool/True then else = then
 If Bool/False then else = else
 

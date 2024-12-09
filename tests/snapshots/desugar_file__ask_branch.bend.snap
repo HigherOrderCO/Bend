@@ -17,12 +17,6 @@ undefer: (((a -> a) -> b) -> b)
 unchecked main: Any
 (main) = (IO/bind (Bool/True λa switch a { 0: (IO/wrap 0); _: λ* (IO/wrap 0); }) λb (b λc λd (c d) IO/wrap))
 
-Bool/True/tag: u24
-(Bool/True/tag) = 0
-
-Bool/True: Bool
-(Bool/True) = λa (a Bool/True/tag)
-
 IO/Done/tag: u24
 (IO/Done/tag) = 0
 
@@ -34,6 +28,18 @@ IO/Call/tag: u24
 
 IO/Call: ((u24, u24) -> String -> Any -> ((Result Any (IOError Any)) -> (IO a)) -> (IO a))
 (IO/Call) = λa λb λc λd λe (e IO/Call/tag a b c d)
+
+Bool/True/tag: u24
+(Bool/True/tag) = 0
+
+Bool/True: Bool
+(Bool/True) = λa (a Bool/True/tag)
+
+Bool/False/tag: u24
+(Bool/False/tag) = 1
+
+Bool/False: Bool
+(Bool/False) = λa (a Bool/False/tag)
 
 IO/bind__C0: _
 (IO/bind__C0) = λ* λa λb (undefer b a)

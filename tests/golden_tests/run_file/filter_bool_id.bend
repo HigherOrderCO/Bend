@@ -1,3 +1,5 @@
+type Bool = True | False
+
 def filter(f, ls):
   match ls:
     case List/Nil:

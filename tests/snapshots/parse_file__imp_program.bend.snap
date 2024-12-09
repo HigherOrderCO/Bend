@@ -103,3 +103,15 @@ Point/Point/tag: _
 
 Point/Point: (Any -> Any -> Point)
 (Point/Point) = λx λy λ%x (%x Point/Point/tag x y)
+
+Bool/True/tag: _
+(Bool/True/tag) = 0
+
+Bool/True: Bool
+(Bool/True) = λ%x (%x Bool/True/tag)
+
+Bool/False/tag: _
+(Bool/False/tag) = 1
+
+Bool/False: Bool
+(Bool/False) = λ%x (%x Bool/False/tag)

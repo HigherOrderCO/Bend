@@ -1,3 +1,4 @@
+type Bool = True | False
 def main:
   with IO:
     match _ = Bool/True:

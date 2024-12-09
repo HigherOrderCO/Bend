@@ -169,13 +169,7 @@ def Tree/reverse(tree: Tree(T)) -> Tree(T):
       return !tree.value
     case Tree/Node:
       return ![tree.right, tree.left]
-
-# BOOL Impl
-type Bool:
-  True
-  False
-
-
+      
 # MAYBE Impl
 
 type Maybe(T):

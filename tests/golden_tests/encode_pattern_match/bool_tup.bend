@@ -1,3 +1,4 @@
+type Bool = True | False
 foo (Bool/True, x) = x
 foo * = Bool/False
 

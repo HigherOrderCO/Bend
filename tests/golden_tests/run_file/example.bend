@@ -27,6 +27,7 @@
 
 # Write new data types like this
 type Option = (Some val) | None
+type Bool = True | False
 
 # You can have pattern matching on definitions
 # Use `*` to ignore a pattern

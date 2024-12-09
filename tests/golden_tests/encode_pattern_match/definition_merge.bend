@@ -1,3 +1,4 @@
+type Bool = True | False
 type Either = (Left value) | (Right value)
 
 Foo (Either/Left  Bool/False) (Either/Left  Bool/False) = 1
