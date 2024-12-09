@@ -242,17 +242,17 @@ def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
         return Map/Node(Maybe/None, Map/Leaf, Map/set(Map/Leaf, (key / 2),value))
 
 # Checks if a Map contains a given key
-def Map/contains (map: Map(T), key: u24) -> Bool:
+def Map/contains (map: Map(T), key: u24) -> u24:
   match map:
     case Map/Leaf:
-      return Bool/False
+      return 0
     case Map/Node:
       if (0 == key):
         match map.value:
           case Maybe/Some:
-            return Bool/True
+            return 1
           case Maybe/None:
-            return Bool/False
+            return 0
       elif ((key % 2) == 0):
         return Map/contains(map.left, (key / 2))
       else:

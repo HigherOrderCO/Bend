@@ -1,6 +1,8 @@
+#This test aims to see if every builtin Map function behaves correctly and returns the expected result
+
 type Bool:
   True
-  False
+  False 
 
 # Returns values from a map
 def test1() -> (u24, u24):
@@ -30,10 +32,10 @@ def test3(m: Map(T), x: u24, v: T) -> Map(T):
 # Checks if a map contains a given key, and if it does, returns the assigned to the key, otherwise it returns the given value
 def test4(m: Map(T), x: u24, v: T) -> T:
   match Map/contains(m, x):
-    case Bool/True:
+    case 1:
       (value, map) = Map/get(m, x)
       return value
-    case Bool/False:
+    case 0:
       return v
 
 #Checks if a generic map contains a given key, and if it does, applies a function to the value, otherwise it returns the map
@@ -41,19 +43,19 @@ def test5(m: Map(T), key: u24) -> Map(T):
   def self (x: T) -> T:
     return x
   match Map/contains(m, key):
-    case Bool/True:
+    case 1:
       return Map/map(m, key, self())
-    case Bool/False:
+    case 0:
       return m
 
 #Checks if a u24 map contains a given key, and if it does, applies a function to the value, otherwise it returns the map
 def test6(m: Map(u24), key: u24) -> Map(u24):
   def addtwo (x: u24) -> u24:
-    return x + 2
+    return (x + 2)
   match Map/contains(m, key):
-    case Bool/True:
+    case 1:
       return Map/map(m, key, addtwo())
-    case Bool/False:
+    case 0:
       return m
 
 
