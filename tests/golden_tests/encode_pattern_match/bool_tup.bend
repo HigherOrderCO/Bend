@@ -1,6 +1,5 @@
-type Bool = T | F
+type Bool = True | False
+foo (Bool/True, x) = x
+foo * = Bool/False
 
-foo (Bool/T, x) = x
-foo * = Bool/F
-
-main = (foo (Bool/F, Bool/T))
+main = (foo (Bool/False, Bool/True))

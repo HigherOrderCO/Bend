@@ -1,8 +1,6 @@
-# This program allocates a tree with True at the leaves then parallel ANDs them.
-type Bool:
-  True
-  False
+type Bool = True | False
 
+# This program allocates a tree with True at the leaves then parallel ANDs them.
 def and(a: Bool, b: Bool) -> Bool:
   match a:
     case Bool/True:

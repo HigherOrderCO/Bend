@@ -24,17 +24,17 @@ unchecked MergePair: Any
 unchecked Merge: Any
 (Merge) = λa λb (b λc λd λe λf (f λh let {h h_2 h_3} = h; λi let {i i_2} = i; λj let {j j_2 j_3} = j; λk let {k k_2 k_3} = k; λl let {l l_2} = l; (If (j k h) (List_/Cons k_2 (Merge j_2 l (List_/Cons h_2 i))) (List_/Cons h_3 (Merge j_3 (List_/Cons k_3 l_2) i_2))) λ* λp λq (List_/Cons p q) e c d) λ* λs s a)
 
-Bool/True: Bool
-(Bool/True) = λa λ* a
-
-Bool/False: Bool
-(Bool/False) = λ* λb b
-
 List_/Cons: (Any -> Any -> List_)
 (List_/Cons) = λa λb λc λ* (c a b)
 
 List_/Nil: List_
 (List_/Nil) = λ* λb b
+
+Bool/True: Bool
+(Bool/True) = λa λ* a
+
+Bool/False: Bool
+(Bool/False) = λ* λb b
 
 NumScott
 unchecked If: Any
@@ -58,18 +58,6 @@ unchecked MergePair: Any
 unchecked Merge: Any
 (Merge) = λa λb (b λc switch c { 0: λd λe λf λg (g λi switch i { 0: λj let {j j_2 j_3} = j; λk let {k k_2} = k; λl let {l l_2 l_3} = l; λm let {m m_2 m_3} = m; λn let {n n_2} = n; (If (l m j) (List_/Cons m_2 (Merge l_2 n (List_/Cons j_2 k))) (List_/Cons j_3 (Merge l_3 (List_/Cons m_3 n_2) k_2))); _: λ* λ* λr λs (List_/Cons r s); } f d e); _: λ* λ* λu u; } a)
 
-Bool/True/tag: _
-(Bool/True/tag) = 0
-
-Bool/True: Bool
-(Bool/True) = λa (a Bool/True/tag)
-
-Bool/False/tag: _
-(Bool/False/tag) = 1
-
-Bool/False: Bool
-(Bool/False) = λa (a Bool/False/tag)
-
 List_/Cons/tag: _
 (List_/Cons/tag) = 0
 
@@ -81,3 +69,15 @@ List_/Nil/tag: _
 
 List_/Nil: List_
 (List_/Nil) = λa (a List_/Nil/tag)
+
+Bool/True/tag: _
+(Bool/True/tag) = 0
+
+Bool/True: Bool
+(Bool/True) = λa (a Bool/True/tag)
+
+Bool/False/tag: _
+(Bool/False/tag) = 1
+
+Bool/False: Bool
+(Bool/False) = λa (a Bool/False/tag)
