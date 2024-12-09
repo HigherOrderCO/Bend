@@ -23,7 +23,8 @@ def test2(m: Map(T), xs: List(u24), ys: List(T)) -> Map(T):
 
 # Sets a value if the given node is empty, otherwise returns the map
 def test3(m: Map(T), x: u24, v: T) -> Map(T):
-  match Map/get_check(m, x):
+  (map, val) = Map/get_check(m, x)
+  match val:
     case Maybe/Some:
       return m
     case Maybe/None:
