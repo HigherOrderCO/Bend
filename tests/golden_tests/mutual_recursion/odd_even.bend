@@ -1,5 +1,3 @@
-type Bool = True | False
-
 (if_ 0 then else) = else
 (if_ _ then else) = then
 

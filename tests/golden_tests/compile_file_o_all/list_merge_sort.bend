@@ -1,4 +1,3 @@
-type Bool = True | False
 type List_ = (Cons head tail) | Nil
 
 If Bool/True then else = then
