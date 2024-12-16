@@ -4,26 +4,26 @@ input_file: tests/golden_tests/encode_pattern_match/match_adt_unscoped_lambda.be
 ---
 Scott
 unchecked main: Any
-(main) = (Maybe/Some 1 λ$x * λa a $x)
+(main) = (Maybe_/Some 1 λ$x * λa a $x)
 
-Maybe/None: Maybe
-(Maybe/None) = λa λ* a
+Maybe_/None: Maybe_
+(Maybe_/None) = λa λ* a
 
-Maybe/Some: (Any -> Maybe)
-(Maybe/Some) = λa λ* λc (c a)
+Maybe_/Some: (Any -> Maybe_)
+(Maybe_/Some) = λa λ* λc (c a)
 
 NumScott
 unchecked main: Any
-(main) = (Maybe/Some 1 λa switch a { 0: λ$x *; _: λ* λb b; } $x)
+(main) = (Maybe_/Some 1 λa switch a { 0: λ$x *; _: λ* λb b; } $x)
 
-Maybe/None/tag: _
-(Maybe/None/tag) = 0
+Maybe_/None/tag: _
+(Maybe_/None/tag) = 0
 
-Maybe/None: Maybe
-(Maybe/None) = λa (a Maybe/None/tag)
+Maybe_/None: Maybe_
+(Maybe_/None) = λa (a Maybe_/None/tag)
 
-Maybe/Some/tag: _
-(Maybe/Some/tag) = 1
+Maybe_/Some/tag: _
+(Maybe_/Some/tag) = 1
 
-Maybe/Some: (Any -> Maybe)
-(Maybe/Some) = λa λb (b Maybe/Some/tag a)
+Maybe_/Some: (Any -> Maybe_)
+(Maybe_/Some) = λa λb (b Maybe_/Some/tag a)
