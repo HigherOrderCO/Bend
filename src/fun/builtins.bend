@@ -210,7 +210,7 @@ def Map/get (map: Map(T), key: u24) -> (T, Map(T)):
       return (unreachable(), map)
 
 # Checks if a node has a value on a given key, returning Maybe/Some if it does, Maybe/None otherwise
-def Map/get_check (map: Map(T), key: u24) -> (Map(T),Maybe(T)):
+def Map/get_check (map: Map(T), key: u24) -> (Map(T), Maybe(T)):
   match map:
     case Map/Leaf:
       return (map, Maybe/None)
@@ -218,11 +218,11 @@ def Map/get_check (map: Map(T), key: u24) -> (Map(T),Maybe(T)):
       if (0 == key):
         return (map, map.value)
       elif (key % 2 == 0):
-        (rest, got) = Map/get(map.left, (key / 2))
-        return (Map/Node(map.value, got, map.right), map.value)
+        (new_map, new_value) = Map/get_check(map.left, (key / 2))
+        return (Map/Node(map.value, new_map, map.right), new_value)
       else:
-        (rest, got) = Map/get(map.right, (key / 2))
-        return (Map/Node(map.value, map.left, got), map.value)
+        (new_map, new_value) = Map/get_check(map.right, (key / 2))
+        return (Map/Node(map.value, map.left, new_map), new_value)
 
 # Sets a value on a Map
 def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
@@ -242,24 +242,25 @@ def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
       else:
         return Map/Node(Maybe/None, Map/Leaf, Map/set(Map/Leaf, (key / 2),value))
 
+
 # Checks if a Map contains a given key
-def Map/contains (map: Map(T), key: u24) -> u24:
+def Map/contains (map: Map(T), key: u24) -> (Map(T), u24):
   match map:
     case Map/Leaf:
-      return 0
+      return (map, 0)
     case Map/Node:
       if (0 == key):
         match map.value:
           case Maybe/Some:
-            return 1
+            return (map, 1)
           case Maybe/None:
-            return 0
+            return (map, 0)
       elif ((key % 2) == 0):
-        (value, got) = Map/get(map.left, (key / 2))
-        return Map/contains(got, (key / 2))
+        (new_map, new_value) = Map/contains(map.left, (key / 2))
+        return (Map/Node(map.value, new_map, map.right), new_value)
       else:
-        (value, got) = Map/get(map.right, (key / 2))
-        return Map/contains(got, (key / 2))
+        (new_map, new_value) = Map/contains(map.right, (key / 2))
+        return (Map/Node(map.value, map.left, new_map), new_value)
 
 # Applies a funtion to a value on a Map
 def Map/map (map: Map(T), key: u24, f: T -> T) -> Map(T):

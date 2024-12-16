@@ -81,7 +81,7 @@ Map/map__C4: _
 (Map/map__C4) = λa λb λc λd let {e f} = d; λg (switch (== 0 e) { 0: Map/map__C2; _: Map/map__C3; } f g a b c)
 
 Map/map__C5: _
-(Map/map__C5) = λa switch a { 0: Map/map__C4; _: λ* λ* λ* unreachable; }
+(Map/map__C5) = λa switch a { 0: Map/map__C4; _: λ* λ* λ* Map/Leaf; }
 
 Map/set__C0: _
 (Map/set__C0) = λa λb λc λd λe (Map/Node c d (Map/set e (/ a 2) b))
