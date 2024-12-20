@@ -3,4 +3,4 @@ source: tests/golden_tests.rs
 input_file: tests/golden_tests/prelude/applies_function_to_map.bend
 ---
 Strict mode:
-λa (a Map/Node/tag Maybe/None Map/Leaf λb (b Map/Node/tag Maybe/None Map/Leaf λc (c Map/Node/tag λd (d Maybe/Some/tag 257) Map/Leaf Map/Leaf)))
+257

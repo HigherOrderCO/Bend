@@ -187,7 +187,7 @@ def Maybe/unwrap(m: Maybe(T)) -> T:
 # MAP Impl
 
 type Map(T):
-  Node { value: Maybe(T), ~left: Map(T), ~right: Map(T)}
+  Node { value: Maybe(T), ~left: Map(T), ~right: Map(T) }
   Leaf  
 
 # Creates an empty Map
