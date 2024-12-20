@@ -1,6 +1,6 @@
-type Bool = True | False
+type Bool = T | F
 
-And (Bool/True, Bool/True, Bool/True) = Bool/True
-And * = Bool/False
+And (Bool/T, Bool/T, Bool/T) = Bool/T
+And * = Bool/F
 
-main = (And (Bool/False, Bool/True, Bool/False))
+main = (And (Bool/F, Bool/T, Bool/F))

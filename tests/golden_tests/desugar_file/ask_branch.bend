@@ -1,9 +1,12 @@
-type Bool = True | False
+type Bool:
+  T
+  F
+
 def main:
   with IO:
-    match _ = Bool/True:
-      case Bool/True:
+    match _ = Bool/T:
+      case Bool/T:
         x <- wrap(0)
-      case Bool/False:
+      case Bool/F:
         x <- wrap(0)
     return wrap(x)

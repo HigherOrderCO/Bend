@@ -14,6 +14,8 @@ type List_
   = (Cons x xs)
   | Nil
 
+type Bool = True | False
+
 type Light = Red | Yellow | Green
 
 type Direction

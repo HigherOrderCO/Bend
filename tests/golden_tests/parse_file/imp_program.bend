@@ -1,6 +1,9 @@
 type Point:
   Point { x, y }
-type Bool = True | False
+
+type Bool:
+  True
+  False
 
 
 def symbols():

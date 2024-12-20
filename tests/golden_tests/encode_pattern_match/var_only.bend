@@ -1,3 +1,5 @@
+type Bool = False | True
+
 (Foo a b) = λf (f a)
 (Foo a b) = b
 

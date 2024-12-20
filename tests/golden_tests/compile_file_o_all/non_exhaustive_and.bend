@@ -1,5 +1,6 @@
-type Bool = True | False
-Bool.and Bool/True Bool/True = Bool/True
-Bool.and Bool/False Bool/False = Bool/False
+type Bool = T | F
+
+Bool.and Bool/T Bool/T = Bool/T
+Bool.and Bool/F Bool/F = Bool/F
 
 Main = *

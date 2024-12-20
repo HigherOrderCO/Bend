@@ -1,5 +1,6 @@
-type Bool = True | False
+type Bool = T | F
+
 main = @x match x {
-  Bool/True : @$x *
-  Bool/False : @x *
+  Bool/T : @$x *
+  Bool/F : @x *
 }

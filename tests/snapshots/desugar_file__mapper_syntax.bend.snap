@@ -48,7 +48,7 @@ Map/Leaf: (Map a)
 (Map/Leaf) = λa (a Map/Leaf/tag)
 
 Map/get__C0: _
-(Map/get__C0) = λa λb λc λd let (e, f) = (Map/get d (/ a 2)); (e, (Map/Node b f c))
+(Map/get__C0) = λa λb λc λd let (e, f) = (Map/get d (/ a 2)); (e, (Map/Node b c f))
 
 Map/get__C1: _
 (Map/get__C1) = λ* λa λb λc λd let (e, f) = (Map/get c (/ a 2)); (e, (Map/Node b f d))

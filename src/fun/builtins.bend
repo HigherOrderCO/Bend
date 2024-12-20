@@ -173,21 +173,21 @@ def Tree/reverse(tree: Tree(T)) -> Tree(T):
 # MAYBE Impl
 
 type Maybe(T):
-  Some{val: T}
+  Some { value: T }
   None 
 
 # Removes the value on a Maybe
 def Maybe/unwrap(m: Maybe(T)) -> T:
   match m:
     case Maybe/Some:
-      return m.val
+      return m.value
     case Maybe/None:
       return unreachable()
 
 # MAP Impl
 
 type Map(T):
-  Node {value: Maybe(T), ~left: Map(T), ~right: Map(T)}
+  Node { value: Maybe(T), ~left: Map(T), ~right: Map(T)}
   Leaf  
 
 # Creates an empty Map
@@ -197,6 +197,8 @@ def Map/empty() -> Map(T):
 # Gets a value on a Map
 def Map/get (map: Map(T), key: u24) -> (T, Map(T)):
   match map:
+    case Map/Leaf:
+      return (unreachable(), map)
     case Map/Node:
       if (0 == key):
         return (Maybe/unwrap(map.value), map)
@@ -205,24 +207,23 @@ def Map/get (map: Map(T), key: u24) -> (T, Map(T)):
         return(got, Map/Node(map.value, rest, map.right))
       else:
         (got, rest) = Map/get(map.right, (key / 2))
-        return(got, Map/Node(map.value, rest, map.left))
-    case Map/Leaf:
-      return (unreachable(), map)
+        return(got, Map/Node(map.value, map.left, rest))
+
 
 # Checks if a node has a value on a given key, returning Maybe/Some if it does, Maybe/None otherwise
-def Map/get_check (map: Map(T), key: u24) -> (Map(T), Maybe(T)):
+def Map/get_check (map: Map(T), key: u24) -> (Maybe(T), Map(T)):
   match map:
     case Map/Leaf:
-      return (map, Maybe/None)
+      return (Maybe/None, map)
     case Map/Node:
       if (0 == key):
-        return (map, map.value)
+        return (map.value, map)
       elif (key % 2 == 0):
-        (new_map, new_value) = Map/get_check(map.left, (key / 2))
-        return (Map/Node(map.value, new_map, map.right), new_value)
+        (new_value, new_map) = Map/get_check(map.left, (key / 2))
+        return (new_value, Map/Node(map.value, new_map, map.right))
       else:
-        (new_map, new_value) = Map/get_check(map.right, (key / 2))
-        return (Map/Node(map.value, map.left, new_map), new_value)
+        (new_value, new_map) = Map/get_check(map.right, (key / 2))
+        return (new_value, Map/Node(map.value, map.left, new_map))
 
 # Sets a value on a Map
 def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
@@ -244,23 +245,23 @@ def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
 
 
 # Checks if a Map contains a given key
-def Map/contains (map: Map(T), key: u24) -> (Map(T), u24):
+def Map/contains (map: Map(T), key: u24) -> (u24, Map(T)):
   match map:
     case Map/Leaf:
-      return (map, 0)
+      return (0, map)
     case Map/Node:
       if (0 == key):
         match map.value:
           case Maybe/Some:
-            return (map, 1)
+            return (1, map)
           case Maybe/None:
-            return (map, 0)
+            return (0, map)
       elif ((key % 2) == 0):
-        (new_map, new_value) = Map/contains(map.left, (key / 2))
-        return (Map/Node(map.value, new_map, map.right), new_value)
+        (new_value, new_map) = Map/contains(map.left, (key / 2))
+        return (new_value, Map/Node(map.value, new_map, map.right))
       else:
-        (new_map, new_value) = Map/contains(map.right, (key / 2))
-        return (Map/Node(map.value, map.left, new_map), new_value)
+        (new_value, new_map) = Map/contains(map.right, (key / 2))
+        return (new_value, Map/Node(map.value, map.left, new_map))
 
 # Applies a funtion to a value on a Map
 def Map/map (map: Map(T), key: u24, f: T -> T) -> Map(T):

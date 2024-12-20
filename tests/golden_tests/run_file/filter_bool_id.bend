@@ -1,4 +1,6 @@
-type Bool = True | False
+type Bool:
+  T
+  F
 
 def filter(f, ls):
   match ls:
@@ -6,10 +8,10 @@ def filter(f, ls):
       return List/Nil
     case List/Cons:
       match f(ls.head):
-        case Bool/True:
+        case Bool/T:
           return List/Cons(ls.head, filter(f, ls.tail))
-        case Bool/False:
+        case Bool/F:
           return filter(f, ls.tail)
 
 def main:
-  return filter(lambda x: x, [Bool/True])
+  return filter(lambda x: x, [Bool/T])

@@ -161,7 +161,32 @@ tree = ![![!1, !2],![!3, !4]]
 ```
 
 Technically your trees don't need to end with leaves, but if you don't, your program will be very hard to reason about.
+## Maybe
 
+```python
+type Maybe(T):
+  Some{ value }
+  None 
+```
+**`Maybe`** is a structure that may or not contain a value. It is meant to be used as a return type for functions that can fail. This way you don't need to resort to unreachable() in order to handle errors.
+
+#### Syntax
+Here's how you create a new `Maybe` containing the Nat value of 1:
+```python
+maybe = Maybe/Some(Nat/Succ(Nat/Zero))
+```
+## Maybe functions
+
+### Maybe/unwrap
+Maybe has a builtin function that returns the value inside the `Maybe` if it is `Some`, and returns `unreachable()` if it is `None`.
+```python
+def Maybe/unwrap(m: Maybe(T)) -> T:
+  match m:
+    case Maybe/Some:
+      return m.val
+    case Maybe/None:
+      return unreachable()
+```
 ## Map
 
 ```python
@@ -173,7 +198,7 @@ type Map:
 **`Map`** represents a tree with values stored in the branches.
 It is meant to be used as an efficient map data structure with integer keys and O(log n) read and write operations.
 
-- **Node { value ~left ~right }**: Represents a map node with a `value` and `left` and `right` subtrees. Empty nodes have `*` stored in the `value` field.
+- **Node { value ~left ~right }**: Represents a map node with a `Maybe` and `left` and `right` subtrees. Empty nodes have `Maybe/None` stored in the `value` field, whislt non-empty nodes have `Maybe/Some` stored in the `value` field.
 - **Leaf**: Represents an unwritten, empty portion of the map.
 
 #### Syntax

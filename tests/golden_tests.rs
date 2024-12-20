@@ -478,7 +478,7 @@ fn prelude() {
     let _guard = RUN_MUTEX.lock().unwrap();
     let book = parse_book_single_file(code, path)?;
     let compile_opts = CompileOpts::default();
-    let diagnostics_cfg = DiagnosticsConfig::default();
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
     let (term, _, diags) =
       run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
     let res = format!("{diags}{term}");

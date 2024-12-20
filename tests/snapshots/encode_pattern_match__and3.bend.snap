@@ -4,32 +4,32 @@ input_file: tests/golden_tests/encode_pattern_match/and3.bend
 ---
 Scott
 unchecked And: Any
-(And) = λa let (b, c, d) = a; (b λe λf (e λg (g Bool/True Bool/False) λ* Bool/False f) λ* λ* Bool/False c d)
+(And) = λa let (b, c, d) = a; (b λe λf (e λg (g Bool/T Bool/F) λ* Bool/F f) λ* λ* Bool/F c d)
 
 unchecked main: Any
-(main) = (And (Bool/False, Bool/True, Bool/False))
+(main) = (And (Bool/F, Bool/T, Bool/F))
 
-Bool/True: Bool
-(Bool/True) = λa λ* a
+Bool/T: Bool
+(Bool/T) = λa λ* a
 
-Bool/False: Bool
-(Bool/False) = λ* λb b
+Bool/F: Bool
+(Bool/F) = λ* λb b
 
 NumScott
 unchecked And: Any
-(And) = λa let (b, c, d) = a; (b λe switch e { 0: λf λg (f λh switch h { 0: λi (i λj switch j { 0: Bool/True; _: λ* Bool/False; }); _: λ* λ* Bool/False; } g); _: λ* λ* λ* Bool/False; } c d)
+(And) = λa let (b, c, d) = a; (b λe switch e { 0: λf λg (f λh switch h { 0: λi (i λj switch j { 0: Bool/T; _: λ* Bool/F; }); _: λ* λ* Bool/F; } g); _: λ* λ* λ* Bool/F; } c d)
 
 unchecked main: Any
-(main) = (And (Bool/False, Bool/True, Bool/False))
+(main) = (And (Bool/F, Bool/T, Bool/F))
 
-Bool/True/tag: _
-(Bool/True/tag) = 0
+Bool/T/tag: _
+(Bool/T/tag) = 0
 
-Bool/True: Bool
-(Bool/True) = λa (a Bool/True/tag)
+Bool/T: Bool
+(Bool/T) = λa (a Bool/T/tag)
 
-Bool/False/tag: _
-(Bool/False/tag) = 1
+Bool/F/tag: _
+(Bool/F/tag) = 1
 
-Bool/False: Bool
-(Bool/False) = λa (a Bool/False/tag)
+Bool/F: Bool
+(Bool/F) = λa (a Bool/F/tag)

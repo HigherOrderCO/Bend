@@ -4,32 +4,32 @@ input_file: tests/golden_tests/encode_pattern_match/bool_tup.bend
 ---
 Scott
 unchecked foo: Any
-(foo) = λa let (b, c) = a; (b λd d λ* Bool/False c)
+(foo) = λa let (b, c) = a; (b λd d λ* Bool/F c)
 
 unchecked main: Any
-(main) = (foo (Bool/False, Bool/True))
+(main) = (foo (Bool/F, Bool/T))
 
-Bool/True: Bool
-(Bool/True) = λa λ* a
+Bool/T: Bool
+(Bool/T) = λa λ* a
 
-Bool/False: Bool
-(Bool/False) = λ* λb b
+Bool/F: Bool
+(Bool/F) = λ* λb b
 
 NumScott
 unchecked foo: Any
-(foo) = λa let (b, c) = a; (b λd switch d { 0: λe e; _: λ* λ* Bool/False; } c)
+(foo) = λa let (b, c) = a; (b λd switch d { 0: λe e; _: λ* λ* Bool/F; } c)
 
 unchecked main: Any
-(main) = (foo (Bool/False, Bool/True))
+(main) = (foo (Bool/F, Bool/T))
 
-Bool/True/tag: _
-(Bool/True/tag) = 0
+Bool/T/tag: _
+(Bool/T/tag) = 0
 
-Bool/True: Bool
-(Bool/True) = λa (a Bool/True/tag)
+Bool/T: Bool
+(Bool/T) = λa (a Bool/T/tag)
 
-Bool/False/tag: _
-(Bool/False/tag) = 1
+Bool/F/tag: _
+(Bool/F/tag) = 1
 
-Bool/False: Bool
-(Bool/False) = λa (a Bool/False/tag)
+Bool/F: Bool
+(Bool/F) = λa (a Bool/F/tag)
