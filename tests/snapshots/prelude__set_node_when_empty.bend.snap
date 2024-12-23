@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/prelude/set_node_when_empty.bend
+---
+Strict mode:
+λa (a Map/Node/tag λb (b Maybe/Some/tag 42) Map/Leaf λc (c Map/Node/tag λd (d Maybe/Some/tag 23) Map/Leaf λe (e Map/Node/tag λf (f Maybe/Some/tag 4) Map/Leaf Map/Leaf)))

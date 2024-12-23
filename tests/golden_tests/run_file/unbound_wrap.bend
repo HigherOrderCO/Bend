@@ -1,10 +1,10 @@
-type Maybe = (Some x) | None
+type Maybe_ = (Some x) | None
 
-Maybe/bind val nxt = match val {
-  Maybe/Some: (nxt val.x)
-  Maybe/None: Maybe/None
+Maybe_/bind val nxt = match val {
+  Maybe_/Some: (nxt val.x)
+  Maybe_/None: Maybe_/None
 }
 
-main = with Maybe {
+main = with Maybe_ {
   (wrap 1)
 }

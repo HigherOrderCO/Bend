@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/prelude/map_checked_test.bend
+---
+Strict mode:
+(λa (a Maybe/Some/tag 2), λb (b Map/Node/tag λc (c Maybe/Some/tag 1) Map/Leaf λd (d Map/Node/tag Maybe/None Map/Leaf λe (e Map/Node/tag λf (f Maybe/Some/tag 2) Map/Leaf Map/Leaf))))

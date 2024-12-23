@@ -2,6 +2,9 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/desugar_file/mapper_syntax.bend
 ---
+Maybe/unwrap: ((Maybe a) -> a)
+(Maybe/unwrap) = λa (a Maybe/unwrap__C0)
+
 Map/empty: (Map a)
 (Map/empty) = Map/Leaf
 
@@ -20,10 +23,22 @@ unreachable: Any
 unchecked main: Any
 (main) = let (c, d) = (Map/get (Map/map (Map/map (Map/set (Map/set Map/empty 0 3) 1 4) 1 λa (+ a 1)) 1 λb (* b 2)) 1); let (e, *) = (Map/get d 0); ((λf (+ f 1) 1), c, e)
 
+Maybe/Some/tag: u24
+(Maybe/Some/tag) = 0
+
+Maybe/Some: (a -> (Maybe a))
+(Maybe/Some) = λa λb (b Maybe/Some/tag a)
+
+Maybe/None/tag: u24
+(Maybe/None/tag) = 1
+
+Maybe/None: (Maybe a)
+(Maybe/None) = λa (a Maybe/None/tag)
+
 Map/Node/tag: u24
 (Map/Node/tag) = 0
 
-Map/Node: (a -> (Map a) -> (Map a) -> (Map a))
+Map/Node: ((Maybe a) -> (Map a) -> (Map a) -> (Map a))
 (Map/Node) = λa λb λc λd (d Map/Node/tag a b c)
 
 Map/Leaf/tag: u24
@@ -33,16 +48,16 @@ Map/Leaf: (Map a)
 (Map/Leaf) = λa (a Map/Leaf/tag)
 
 Map/get__C0: _
-(Map/get__C0) = λa λb λc λd let (e, f) = (Map/get c (/ a 2)); (e, (Map/Node b f d))
+(Map/get__C0) = λa λb λc λd let (e, f) = (Map/get d (/ a 2)); (e, (Map/Node b c f))
 
 Map/get__C1: _
-(Map/get__C1) = λ* λa λb λc λd let (e, f) = (Map/get d (/ a 2)); (e, (Map/Node b c f))
+(Map/get__C1) = λ* λa λb λc λd let (e, f) = (Map/get c (/ a 2)); (e, (Map/Node b f d))
 
 Map/get__C2: _
-(Map/get__C2) = λa let {b c} = a; λd λe λf (switch (% b 2) { 0: Map/get__C0; _: Map/get__C1; } c d e f)
+(Map/get__C2) = λa let {b c} = a; λd λe λf (switch (== (% b 2) 0) { 0: Map/get__C0; _: Map/get__C1; } c d e f)
 
 Map/get__C3: _
-(Map/get__C3) = λ* λ* λa let {b c} = a; λd λe (b, (Map/Node c d e))
+(Map/get__C3) = λ* λ* λa let {b c} = a; λd λe ((Maybe/unwrap b), (Map/Node c d e))
 
 Map/get__C4: _
 (Map/get__C4) = λa λb λc λd let {e f} = d; (switch (== 0 e) { 0: Map/get__C2; _: Map/get__C3; } f a b c)
@@ -51,16 +66,16 @@ Map/get__C5: _
 (Map/get__C5) = λa switch a { 0: Map/get__C4; _: λ* λ* (unreachable, Map/Leaf); }
 
 Map/map__C0: _
-(Map/map__C0) = λa λb λc λd λe (Map/Node c (Map/map d (/ a 2) b) e)
+(Map/map__C0) = λa λb λc λd λe (Map/Node c d (Map/map e (/ a 2) b))
 
 Map/map__C1: _
-(Map/map__C1) = λ* λa λb λc λd λe (Map/Node c d (Map/map e (/ a 2) b))
+(Map/map__C1) = λ* λa λb λc λd λe (Map/Node c (Map/map d (/ a 2) b) e)
 
 Map/map__C2: _
-(Map/map__C2) = λa let {b c} = a; λd λe λf λg (switch (% b 2) { 0: Map/map__C0; _: Map/map__C1; } c d e f g)
+(Map/map__C2) = λa let {b c} = a; λd λe λf λg (switch (== (% b 2) 0) { 0: Map/map__C0; _: Map/map__C1; } c d e f g)
 
 Map/map__C3: _
-(Map/map__C3) = λ* λ* λa λb λc λd (Map/Node (a b) c d)
+(Map/map__C3) = λ* λ* λa λb λc λd (Map/Node (Maybe/Some (a (Maybe/unwrap b))) c d)
 
 Map/map__C4: _
 (Map/map__C4) = λa λb λc λd let {e f} = d; λg (switch (== 0 e) { 0: Map/map__C2; _: Map/map__C3; } f g a b c)
@@ -69,34 +84,37 @@ Map/map__C5: _
 (Map/map__C5) = λa switch a { 0: Map/map__C4; _: λ* λ* λ* Map/Leaf; }
 
 Map/set__C0: _
-(Map/set__C0) = λa λb λc λd λe (Map/Node c (Map/set d (/ a 2) b) e)
+(Map/set__C0) = λa λb λc λd λe (Map/Node c d (Map/set e (/ a 2) b))
 
 Map/set__C1: _
-(Map/set__C1) = λ* λa λb λc λd λe (Map/Node c d (Map/set e (/ a 2) b))
+(Map/set__C1) = λ* λa λb λc λd λe (Map/Node c (Map/set d (/ a 2) b) e)
 
 Map/set__C10: _
 (Map/set__C10) = λa switch a { 0: Map/set__C8; _: Map/set__C9; }
 
 Map/set__C2: _
-(Map/set__C2) = λa let {b c} = a; λd λe λf λg (switch (% b 2) { 0: Map/set__C0; _: Map/set__C1; } c d e f g)
+(Map/set__C2) = λa let {b c} = a; λd λe λf λg (switch (== (% b 2) 0) { 0: Map/set__C0; _: Map/set__C1; } c d e f g)
 
 Map/set__C3: _
-(Map/set__C3) = λ* λ* λa λ* λb λc (Map/Node a b c)
+(Map/set__C3) = λ* λ* λa λ* λb λc (Map/Node (Maybe/Some a) b c)
 
 Map/set__C4: _
-(Map/set__C4) = λa λb (Map/Node unreachable (Map/set Map/Leaf (/ a 2) b) Map/Leaf)
+(Map/set__C4) = λa λb (Map/Node Maybe/None Map/Leaf (Map/set Map/Leaf (/ a 2) b))
 
 Map/set__C5: _
-(Map/set__C5) = λ* λa λb (Map/Node unreachable Map/Leaf (Map/set Map/Leaf (/ a 2) b))
+(Map/set__C5) = λ* λa λb (Map/Node Maybe/None (Map/set Map/Leaf (/ a 2) b) Map/Leaf)
 
 Map/set__C6: _
-(Map/set__C6) = λa let {b c} = a; λd (switch (% b 2) { 0: Map/set__C4; _: Map/set__C5; } c d)
+(Map/set__C6) = λa let {b c} = a; λd (switch (== (% b 2) 0) { 0: Map/set__C4; _: Map/set__C5; } c d)
 
 Map/set__C7: _
-(Map/set__C7) = λ* λ* λa (Map/Node a Map/Leaf Map/Leaf)
+(Map/set__C7) = λ* λ* λa (Map/Node (Maybe/Some a) Map/Leaf Map/Leaf)
 
 Map/set__C8: _
 (Map/set__C8) = λa λb λc λd let {e f} = d; λg (switch (== 0 e) { 0: Map/set__C2; _: Map/set__C3; } f g a b c)
 
 Map/set__C9: _
 (Map/set__C9) = λ* λa let {b c} = a; λd (switch (== 0 b) { 0: Map/set__C6; _: Map/set__C7; } c d)
+
+Maybe/unwrap__C0: _
+(Maybe/unwrap__C0) = λa switch a { 0: λb b; _: λ* unreachable; }

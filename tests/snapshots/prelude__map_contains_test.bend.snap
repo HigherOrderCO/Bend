@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/prelude/map_contains_test.bend
+---
+Strict mode:
+(0, λa (a Map/Node/tag λb (b Maybe/Some/tag 23) Map/Leaf Map/Leaf))

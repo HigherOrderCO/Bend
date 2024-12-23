@@ -2,14 +2,17 @@
 source: tests/golden_tests.rs
 input_file: tests/golden_tests/parse_file/imp_program.bend
 ---
+Maybe/unwrap: ((Maybe T) -> T)
+(Maybe/unwrap m) = match m = m { Maybe/Some: m.value; Maybe/None: unreachable; }
+
 Map/empty: (Map T)
 (Map/empty) = Map/Leaf
 
 Map/get: ((Map T) -> u24 -> (T, (Map T)))
-(Map/get map key) = match map = map { Map/Leaf: (unreachable, map); Map/Node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: let (got, rest) = (Map/get map.left (/ key 2)); (got, (Map/Node map.value rest map.right)); _ _-1: let (got, rest) = (Map/get map.right (/ key 2)); (got, (Map/Node map.value map.left rest)); }; _ _-1: (map.value, map); }; }
+(Map/get map key) = match map = map { Map/Leaf: (unreachable, map); Map/Node: switch %pred = (== 0 key) { 0: switch %pred = (== (% key 2) 0) { 0: let (got, rest) = (Map/get map.right (/ key 2)); (got, (Map/Node map.value map.left rest)); _ %pred-1: let (got, rest) = (Map/get map.left (/ key 2)); (got, (Map/Node map.value rest map.right)); }; _ %pred-1: ((Maybe/unwrap map.value), map); }; }
 
 Map/set: ((Map T) -> u24 -> T -> (Map T))
-(Map/set map key value) = match map = map { Map/Node: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/Node map.value (Map/set map.left (/ key 2) value) map.right); _ _-1: (Map/Node map.value map.left (Map/set map.right (/ key 2) value)); }; _ _-1: (Map/Node value map.left map.right); }; Map/Leaf: switch _ = (== 0 key) { 0: switch _ = (% key 2) { 0: (Map/Node unreachable (Map/set Map/Leaf (/ key 2) value) Map/Leaf); _ _-1: (Map/Node unreachable Map/Leaf (Map/set Map/Leaf (/ key 2) value)); }; _ _-1: (Map/Node value Map/Leaf Map/Leaf); }; }
+(Map/set map key value) = match map = map { Map/Node: switch %pred = (== 0 key) { 0: switch %pred = (== (% key 2) 0) { 0: (Map/Node map.value map.left (Map/set map.right (/ key 2) value)); _ %pred-1: (Map/Node map.value (Map/set map.left (/ key 2) value) map.right); }; _ %pred-1: (Map/Node (Maybe/Some value) map.left map.right); }; Map/Leaf: switch %pred = (== 0 key) { 0: switch %pred = (== (% key 2) 0) { 0: (Map/Node Maybe/None Map/Leaf (Map/set Map/Leaf (/ key 2) value)); _ %pred-1: (Map/Node Maybe/None (Map/set Map/Leaf (/ key 2) value) Map/Leaf); }; _ %pred-1: (Map/Node (Maybe/Some value) Map/Leaf Map/Leaf); }; }
 
 unreachable: Any
 (unreachable) = *
@@ -71,10 +74,22 @@ List/Cons/tag: _
 List/Cons: (T -> (List T) -> (List T))
 (List/Cons) = λhead λtail λ%x (%x List/Cons/tag head tail)
 
+Maybe/Some/tag: _
+(Maybe/Some/tag) = 0
+
+Maybe/Some: (T -> (Maybe T))
+(Maybe/Some) = λvalue λ%x (%x Maybe/Some/tag value)
+
+Maybe/None/tag: _
+(Maybe/None/tag) = 1
+
+Maybe/None: (Maybe T)
+(Maybe/None) = λ%x (%x Maybe/None/tag)
+
 Map/Node/tag: _
 (Map/Node/tag) = 0
 
-Map/Node: (T -> (Map T) -> (Map T) -> (Map T))
+Map/Node: ((Maybe T) -> (Map T) -> (Map T) -> (Map T))
 (Map/Node) = λvalue λleft λright λ%x (%x Map/Node/tag value left right)
 
 Map/Leaf/tag: _

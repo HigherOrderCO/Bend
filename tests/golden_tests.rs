@@ -471,6 +471,21 @@ fn io() {
   })
 }
 
+/// Runs a file that uses the prelude.
+#[test]
+fn prelude() {
+  run_golden_test_dir(function_name!(), &|code, path| {
+    let _guard = RUN_MUTEX.lock().unwrap();
+    let book = parse_book_single_file(code, path)?;
+    let compile_opts = CompileOpts::default();
+    let diagnostics_cfg = DiagnosticsConfig::new(Severity::Error, true);
+    let (term, _, diags) =
+      run_book(book, RunOpts::default(), compile_opts, diagnostics_cfg, None, "run-c")?.unwrap();
+    let res = format!("{diags}{term}");
+    Ok(format!("Strict mode:\n{res}"))
+  })
+}
+
 /// Runs all examples in the examples folder.
 #[test]
 fn examples() -> Result<(), Diagnostics> {

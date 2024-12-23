@@ -161,19 +161,44 @@ tree = ![![!1, !2],![!3, !4]]
 ```
 
 Technically your trees don't need to end with leaves, but if you don't, your program will be very hard to reason about.
+## Maybe
 
+```python
+type Maybe(T):
+  Some{ value }
+  None 
+```
+**`Maybe`** is a structure that may or not contain a value. It is meant to be used as a return type for functions that can fail. This way you don't need to resort to unreachable() in order to handle errors.
+
+#### Syntax
+Here's how you create a new `Maybe` containing the Nat value of 1:
+```python
+maybe = Maybe/Some(Nat/Succ(Nat/Zero))
+```
+## Maybe functions
+
+### Maybe/unwrap
+Maybe has a builtin function that returns the value inside the `Maybe` if it is `Some`, and returns `unreachable()` if it is `None`.
+```python
+def Maybe/unwrap(m: Maybe(T)) -> T:
+  match m:
+    case Maybe/Some:
+      return m.val
+    case Maybe/None:
+      return unreachable()
+```
 ## Map
 
 ```python
-type Map:
-  Node { value ~left ~right }
-  Leaf
+type Map(T):
+  Node { value: Maybe(T), ~left: Map(T), ~right: Map(T) }
+  Leaf  
 ```
 
 **`Map`** represents a tree with values stored in the branches.
 It is meant to be used as an efficient map data structure with integer keys and O(log n) read and write operations.
 
-- **Node { value ~left ~right }**: Represents a map node with a `value` and `left` and `right` subtrees. Empty nodes have `*` stored in the `value` field.
+- **Node { value: Maybe(T), ~left: Map(T), ~right: Map(T) }**: Represents a map node with a `Maybe` and `left` and `right` subtrees. Empty nodes have `Maybe/None` stored in the `value` field, whilst non-empty nodes have `Maybe/Some` stored in the `value` field.
 - **Leaf**: Represents an unwritten, empty portion of the map.
 
 #### Syntax
@@ -216,22 +241,19 @@ Retrieves a `value` from the `map` based on the `key`.
 Returns a tuple with the value and the `map` unchanged.
 
 ```rust
-Map/get map key =
-  match map {
-    Map/Leaf: (*, map)
-    Map/Node:
-      switch _ = (== 0 key) {
-        0: switch _ = (% key 2) {
-          0:
-            let (got, rest) = (Map/get map.left (/ key 2))
-            (got, (Map/Node map.value rest map.right))
-          _:
-            let (got, rest) = (Map/get map.right (/ key 2))
-            (got, (Map/Node map.value map.left rest))
-        }
-        _: (map.value, map)
-      }
-  }
+def Map/get (map: Map(T), key: u24) -> (T, Map(T)):
+  match map:
+    case Map/Leaf:
+      return (unreachable(), map)
+    case Map/Node:
+      if (0 == key):
+        return (Maybe/unwrap(map.value), map)
+      elif (key % 2 == 0):
+        (got, rest) = Map/get(map.left, (key / 2))
+        return(got, Map/Node(map.value, rest, map.right))
+      else:
+        (got, rest) = Map/get(map.right, (key / 2))
+        return(got, Map/Node(map.value, map.left, rest))
 ```
 
 #### Syntax
@@ -256,29 +278,23 @@ And the value resultant from the get function would be:
 
 ### Map/set
 
-Sets a `value` in the `map` at the specified `key`.
-Returns the map with the new value.
-
 ```rust
-Map/set map key value =
-  match map {
-    Map/Node:
-      switch _ = (== 0 key) {
-        0: switch _ = (% key 2) {
-          0: (Map/Node map.value (Map/set map.left (/ key 2) value) map.right)
-          _: (Map/Node map.value map.left (Map/set map.right (/ key 2) value))
-        }
-        _: (Map/Node value map.left map.right)
-      }
-    Map/Leaf:
-      switch _ = (== 0 key) {
-        0: switch _ = (% key 2) {
-          0: (Map/Node * (Map/set Map/Leaf (/ key 2) value) Map/Leaf)
-          _: (Map/Node * Map/Leaf (Map/set Map/Leaf (/ key 2) value))
-        }
-        _: (Map/Node value Map/Leaf Map/Leaf)
-      }
-  }
+def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
+  match map:
+    case Map/Node:
+      if (0 == key):
+        return Map/Node(Maybe/Some(value), map.left, map.right)
+      elif ((key % 2) == 0):
+        return Map/Node(map.value, Map/set(map.left, (key / 2), value), map.right)
+      else:
+        return Map/Node(map.value, map.left, Map/set(map.right, (key / 2), value))
+    case Map/Leaf:
+      if (0 == key):
+        return Map/Node(Maybe/Some(value), Map/Leaf, Map/Leaf)
+      elif ((key % 2) == 0):
+        return Map/Node(Maybe/None, Map/set(Map/Leaf, (key / 2), value), Map/Leaf)
+      else:
+        return Map/Node(Maybe/None, Map/Leaf, Map/set(Map/Leaf, (key / 2),value))
 ```
 
 #### Syntax
@@ -319,17 +335,17 @@ Applies a function to a value in the map.
 Returns the map with the value mapped.
 
 ```rust
-Map/map (Map/Leaf)                  key f = Map/Leaf
-Map/map (Map/Node value left right) key f =
-  switch _ = (== 0 key) {
-    0: switch _ = (% key 2) {
-      0:
-        (Map/Node value (Map/map left (/ key 2) f) right)
-      _:
-        (Map/Node value left (Map/map right (/ key 2) f))
-    }
-    _: (Map/Node (f value) left right)
-  }
+def Map/map (map: Map(T), key: u24, f: T -> T) -> Map(T):
+  match map:
+    case Map/Leaf:
+      return Map/Leaf
+    case Map/Node:
+      if (0 == key):
+        return Map/Node(Maybe/Some(f(Maybe/unwrap(map.value))), map.left, map.right)
+      elif ((key % 2) == 0):
+        return Map/Node(map.value, Map/map(map.left, (key / 2), f), map.right)
+      else:
+        return Map/Node(map.value, map.left, Map/map(map.right, (key / 2), f))
 ```
 
 #### Syntax
@@ -340,6 +356,40 @@ With the same map that we `set` in the previous section, we can map it's values 
 x[0] @= lambda y: String/concat(y, " and mapped")
 # x[0] now contains "swapped and mapped"
 ```
+
+
+### Map/contains
+Checks if a `map` contains a given `key` and returns 0 or 1 as a `u24` number and the `map` unchanged.
+```python
+def Map/contains (map: Map(T), key: u24) -> (u24, Map(T)):
+  match map:
+    case Map/Leaf:
+      return (0, map)
+    case Map/Node:
+      if (0 == key):
+        match map.value:
+          case Maybe/Some:
+            return (1, map)
+          case Maybe/None:
+            return (0, map)
+      elif ((key % 2) == 0):
+        (new_value, new_map) = Map/contains(map.left, (key / 2))
+        return (new_value, Map/Node(map.value, new_map, map.right))
+      else:
+        (new_value, new_map) = Map/contains(map.right, (key / 2))
+        return (new_value, Map/Node(map.value, map.left, new_map))
+```
+
+#### Syntax
+
+With the same map that we `set` in the previous section, we can call the function `Map/contains` explicitly:
+
+```python
+(num, map) = Map/contains(m, key)
+return num
+```
+Whilst the `num` variable will contain 0 or 1 depending on if the key is in the map or not.
+
 
 ## Nat
 
