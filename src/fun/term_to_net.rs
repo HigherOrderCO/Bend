@@ -102,7 +102,7 @@ enum Place<'t> {
   Wire(usize),
 }
 
-impl<'t, 'l> EncodeTermState<'t, 'l> {
+impl<'t> EncodeTermState<'t, '_> {
   /// Adds a subterm connected to `up` to the `inet`.
   /// `scope` has the current variable scope.
   /// `vars` has the information of which ports the variables are declared and used in.
