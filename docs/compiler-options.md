@@ -7,7 +7,7 @@
 | `-Oeta` `-Ono-eta`                                                       | Disabled      | [eta-reduction](#eta-reduction)           |
 | `-Oprune` `-Ono-prune`                                                   | Disabled      | [definition-pruning](#definition-pruning) |
 | `-Olinearize-matches` `-Olinearize-matches-alt` `-Ono-linearize-matches` | Enabled       | [linearize-matches](#linearize-matches)   |
-| `-Ofloat_combinators` `-Ono-float_combinators`                           | Enabled       | [float-combinators](#float-combinators)   |
+| `-Ofloat-combinators` `-Ono-float-combinators`                           | Enabled       | [float-combinators](#float-combinators)   |
 | `-Omerge` `-Ono-merge`                                                   | Disabled      | [definition-merging](#definition-merging) |
 | `-Oinline` `-Ono-inline`                                                 | Disabled      | [inline](#inline)                         |
 | `-Ocheck-net-size` `-Ono-check-net-size`                                 | Disabled      | [check-net-size](#check-net-size)         |

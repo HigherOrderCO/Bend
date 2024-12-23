@@ -941,7 +941,7 @@ impl<'a> FunParser<'a> {
   /// Parses a tag where it may or may not be valid.
   ///
   /// If it is not valid, the returned callback can be used to issue an error.
-  fn parse_tag(&mut self) -> ParseResult<(Option<Tag>, impl FnOnce(&mut Self) -> Result<(), ParseError>)> {
+  fn parse_tag(&mut self) -> ParseResult<(Option<Tag>, impl FnOnce(&mut Self) -> ParseResult<()>)> {
     let index = self.index;
     self.skip_trivia();
     let tag = if self.peek_one() == Some('#')

@@ -19,7 +19,7 @@ struct PruneState<'a> {
   unvisited: HashSet<String>,
 }
 
-impl<'a> PruneState<'a> {
+impl PruneState<'_> {
   fn visit_def(&mut self, name: &str) {
     if self.unvisited.remove(name) {
       for tree in net_trees(&self.book.defs[name]) {
