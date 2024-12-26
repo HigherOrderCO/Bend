@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/prelude/applies_function_to_map.bend
+---
+Strict mode:
+257
