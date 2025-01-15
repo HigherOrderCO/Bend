@@ -55,7 +55,7 @@ def add(x: u24, y: u24) -> u24:
 def unchecked two() -> u24:
   return 2
 
-def main:
+def main() -> u24:
   return add(40, two)
 ```
 
@@ -187,7 +187,7 @@ Returns the expression that follows. The last statement of each branch of a func
 
 ```py
 # Allowed, all branches return
-def max(a, b):
+def max(a: T, b: T) -> T:
   if a > b:
     return a
   else:
@@ -207,7 +207,7 @@ def Foo(x):
 
 ```py
 # Not allowed, one of the branches doesn't return
-def Foo(a, b):
+def Foo(a: T, b: T) -> T:
   if a < b:
     return a
   else:
@@ -307,7 +307,7 @@ For fields notated with `~` in the type definition, the fold function is called 
 It is equivalent to the inline recursive function:
 
 ```python
-def fold(x):
+def fold(x: Tree) -> u24:
   match x:
     case Tree/Node:
       return x.value + fold(x.left) + fold(x.right)
@@ -448,7 +448,7 @@ with Result:
 Creates a local function visible in the current block capturing variables:
 
 ```python
-def main:
+def main() -> _:
   y = 41
   x = 1
   def aux_add(x):
@@ -581,7 +581,7 @@ i24 = -42
 u24 = 42
 ```
 
-Currently, the 3 number types cannot be mixed.
+Currently, the 3 number types cannot be mixed, but can be converted in order to correspond to each other.
 
 | Operation             | Syntax   | Supported Types  |
 | --------------------- | -------- | ---------------- |
@@ -1350,14 +1350,14 @@ def main():
 Use `#{ ... #}` to indicate a multi-line comment.
 
 Multi-line commenting should also be used to document code.
-
+Documentation for functions is meant to be written as a multiline comment right above the function.
 ```py
 #{
   Expects two arguments to be passed.
 
   This function always returns the second value that was used as argument.
 #}
-def second(x, y):
+def second(x: T, y: T) -> T:
   return y
 ```
 

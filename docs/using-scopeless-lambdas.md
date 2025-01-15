@@ -15,6 +15,14 @@ main = (((λ$x 1) 2), $x)
 # $x gets replaced by 2 and the application ((λ$x 1) 2) gets replaced by 1
 # Outputs (1, 2)
 ```
+In the imp syntax, scopeless lambdas can be written in the following way:
+```py
+def main() -> _:
+  # This is the equivalent code to the above example
+  # Notice that in the imp syntax, you scopeless lambdas are written as `lambda $x: 1` instead of `λ$x 1`.
+  f = lambda $x: 1
+  return (f(2), $x)
+```
 
 Take some time to think about the program above. It is valid, despite `$x` being used outside the lambda's body.
 
@@ -52,13 +60,14 @@ main =
 	let f = λ$x 1 # Assign the lambda to a variable
 	((f 2), ((f 3), $x)) # Return a tuple of (f 2) and another tuple.
 
-# Outputs (1, (1, {#0 3 2}))
+# Outputs (1, (1, {2 3}))
 ```
 
 What? This is even more confusing. The first two values are `1`, as expected. But what about the last term?
 
 The last term in the tuple is a **superposition** of two values. A [superposition](dups-and-sups.md) is the "other side" of a duplication. It is created here because we implicitly duplicated `f` when we used it twice, and duplicating lambdas creates superpositions.
 
+When implicitly duplicating a lambda, the order of the arguments is left to the compiler's discretion. So it's possible that depending on the context of your program, the order of the arguments on the superposition might be different than expected. If you want to make sure that your duplications come out in a specific order, you need to explicitly duplicate the lambda.
 ## Usage
 
 Now that we know how scopeless lambdas work, we can make programs using them. An example of a function that is usually thought as "primitive", but can be implemented using scopeless lambdas is [call/cc](http://www.madore.org/~david/computers/callcc.html)

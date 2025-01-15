@@ -7,7 +7,9 @@
 ## String
 
 ```python
-type String = (Cons head ~tail) | (Nil)
+type String:
+  Nil
+  Cons { head: u24, ~tail: String }
 ```
 
 - **Nil**: Represents an empty string.
@@ -25,28 +27,33 @@ A String literal is surrounded with `"`. Accepts the same values as characters l
 
 #### String/equals
 
-Checks if two strings are equal.
-
 ```python
-def String/equals(s1: String, s2: String) -> u24
+#{
+  Checks if two strings are equal.
+#}
+def String/equals (s1: String) (s2: String) : u24
 ```
 
 #### String/split
 
-Splits a string into a list of strings based on the given delimiter.
-
 ```python
-def String/split(s: String, delimiter: u24) -> [String]
+#{
+  Splits a string into a list of strings based on the given delimiter.
+#}
+String/split (s: String) (delimiter: u24) : (List String)
 ```
 
 ## List
 
 ```python
-type List = (Cons head ~tail) | (Nil)
+type List(T):
+  Nil
+  Cons { head: T, ~tail: List(T) }
 ```
 
 - **Nil**: Represents an empty list.
 - **Cons head ~tail**: Represents a list with a `head` element and a `tail` list.
+- **T**: Represents the type of the elements in the list.
 
 ### Syntax
 
@@ -61,27 +68,32 @@ A List of values can be written using `[ ]`, it can have multiple values inside,
 #### List/length
 
 ```python
-def List/length(list: [a]) -> (length: u24, list: [a])
+#{
+  Returns a tuple containing the length and the list itself.
+#}
+def List/length(xs: List(T)) -> (u24, List(T)):
 ```
 
-Returns a tuple containing the length and the list itself.
+
 
 #### List/reverse
 
 ```python
-def List/reverse(list: [a]) -> [a]
+#{
+  Reverses the elements of a list.
+#}
+def List/reverse(xs: List(T)) -> List(T):
 ```
-
-Reverses the elements of a list.
 
 #### List/flatten
 
 ```python
-def List/flatten(list: [[a]]) -> [a]
+#{
+  Returns a flattened list from a list of lists.
+#}
+List/flatten (xs: (List (List T))) : (List T)
 ```
-
-Returns a flattened list from a list of lists. Example:
-
+Example:
 ```python
 List/flatten([[1], [2, 3], [4]])
 
@@ -91,11 +103,12 @@ List/flatten([[1], [2, 3], [4]])
 #### List/concat
 
 ```python
-def List/concat(xs: [a], ys: [a]) -> [a]
+#{
+  Appends two lists together. 
+#}
+def List/concat(xs: (List T)) (ys: (List T)) : (List T)
 ```
-
-Appends two lists together. Example:
-
+Example:
 ```python
 List/concat([1, 2], [4, 5])
 
@@ -104,26 +117,34 @@ List/concat([1, 2], [4, 5])
 
 #### List/filter
 
-Filters a list based on a predicate function.
-
 ```python
+#{
+  Filters a list based on a predicate function.
+#}
 List/filter(xs: List(T), pred: T -> Bool) -> List(T)
 ```
 
 #### List/split_once
 
-Splits a list into two lists at the first occurrence of a value.
-
 ```python
-List/split_once(xs: List(T), val: T) -> (Result(List(T), List(T)))
+#{
+Splits a list into two lists at the first occurrence of a value.
+#}
+def List/split_once(xs: List(T), cond: T -> u24)
+```
+Example:
+```python
+  # Split list at first even number
+  list = [1,3,4,5,6]
+  result = List/split_once(list, λx: x % 2 == 0)
+  return result
+  # Result: ([1,3], [5,6]) 
 ```
 
 ## Result
 
 ```python
-type Result<A, B>:
-  Ok { val: A }
-  Err { val: B }
+type (Result o e) = (Ok (val: o)) | (Err (val: e))
 ```
 
 ### Result/unwrap
@@ -133,15 +154,20 @@ Returns the inner value of `Result/Ok` or `Result/Err`.
 If the types `A` and `B` are different, should only be used in type unsafe programs or when only one variant is guaranteed to happen.
 
 ```python
-def Result/unwrap(result: Result<A, B>): A || B
+#{
+Returns the inner value of `Result/Ok` or `Result/Err`.
+
+If the types `A` and `B` are different, should only be used in type unsafe programs or when only one variant is guaranteed to happen.
+#}
+def Result/unwrap(res: Result(T, E)) -> Any:
 ```
 
 ## Tree
 
 ```python
-type Tree:
-  Node { ~left, ~right }
-  Leaf { value }
+type Tree(T):
+  Node { ~left: Tree(T), ~right: Tree(T) }
+  Leaf { value: T }
 ```
 
 **`Tree`** represents a tree with values stored in the leaves.
@@ -149,6 +175,7 @@ Trees are a structure that naturally lends itself to parallel recursion, so writ
 
 - **Node { ~left ~right }**: Represents a tree node with `left` and `right` subtrees.
 - **Leaf { value }**: Represents one of the ends of the tree, storing `value`.
+- **T**: Represents the type of the elements in the tree.
 
 #### Syntax
 
@@ -178,14 +205,12 @@ maybe = Maybe/Some(Nat/Succ(Nat/Zero))
 ## Maybe functions
 
 ### Maybe/unwrap
-Maybe has a builtin function that returns the value inside the `Maybe` if it is `Some`, and returns `unreachable()` if it is `None`.
+Returns the value inside the `Maybe` if it is `Some`, and returns `unreachable()` if it is `None`.
 ```python
-def Maybe/unwrap(m: Maybe(T)) -> T:
-  match m:
-    case Maybe/Some:
-      return m.val
-    case Maybe/None:
-      return unreachable()
+#{
+Returns the value inside the `Maybe` if it is `Some`, and returns `unreachable()` if it is `None`.
+#}  
+def Maybe/unwrap(m: Maybe(T)) -> T
 ```
 ## Map
 
@@ -206,12 +231,13 @@ It is meant to be used as an efficient map data structure with integer keys and 
 Here's how you create a new `Map` with some initial values.:
 
 ```python
-{ 0: 4, `hi`: "bye", 'c': 2 + 3 }
+def main():
+  return { 0: 4, `hi`: "bye", 'c': 2 + 3 }
 ```
 
 The keys must be `U24` numbers, and can be given as literals or any other expression that evaluates to a `U24`.
 
-The values can be anything, but storing data of different types in a `Map` will make it harder for you to reason about it.
+As long as your function isn't typed, like the one in the example, the values can be anything. But storing data of different types in a `Map` will make it harder for you to reason about it.
 
 You can read and write a value of a map with the `[]` operator:
 
@@ -229,31 +255,22 @@ Here, `map` must be the name of the `Map` variable, and the keys inside `[]` can
 
 ### Map/empty
 
-Initializes an empty map.
-
 ```python
+#{
+  Initializes an empty map.
+#} 
 Map/empty = Map/Leaf
 ```
 
 ### Map/get
 
-Retrieves a `value` from the `map` based on the `key`.
-Returns a tuple with the value and the `map` unchanged.
+
 
 ```rust
-def Map/get (map: Map(T), key: u24) -> (T, Map(T)):
-  match map:
-    case Map/Leaf:
-      return (unreachable(), map)
-    case Map/Node:
-      if (0 == key):
-        return (Maybe/unwrap(map.value), map)
-      elif (key % 2 == 0):
-        (got, rest) = Map/get(map.left, (key / 2))
-        return(got, Map/Node(map.value, rest, map.right))
-      else:
-        (got, rest) = Map/get(map.right, (key / 2))
-        return(got, Map/Node(map.value, map.left, rest))
+#{
+  Retrieves a `value` from the `map` based on the `key` and returns a tuple with the value and the `map` unchanged.
+#}
+def Map/get (map: Map(T), key: u24) -> (T, Map(T))
 ```
 
 #### Syntax
@@ -279,22 +296,10 @@ And the value resultant from the get function would be:
 ### Map/set
 
 ```rust
-def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
-  match map:
-    case Map/Node:
-      if (0 == key):
-        return Map/Node(Maybe/Some(value), map.left, map.right)
-      elif ((key % 2) == 0):
-        return Map/Node(map.value, Map/set(map.left, (key / 2), value), map.right)
-      else:
-        return Map/Node(map.value, map.left, Map/set(map.right, (key / 2), value))
-    case Map/Leaf:
-      if (0 == key):
-        return Map/Node(Maybe/Some(value), Map/Leaf, Map/Leaf)
-      elif ((key % 2) == 0):
-        return Map/Node(Maybe/None, Map/set(Map/Leaf, (key / 2), value), Map/Leaf)
-      else:
-        return Map/Node(Maybe/None, Map/Leaf, Map/set(Map/Leaf, (key / 2),value))
+#{
+  Sets a value on a Map, returning the map with the value mapped.
+#}
+def Map/set (map: Map(T), key: u24, value: T) -> Map(T)
 ```
 
 #### Syntax
@@ -331,21 +336,12 @@ The new tree
 
 ### Map/map
 
-Applies a function to a value in the map.
-Returns the map with the value mapped.
 
 ```rust
-def Map/map (map: Map(T), key: u24, f: T -> T) -> Map(T):
-  match map:
-    case Map/Leaf:
-      return Map/Leaf
-    case Map/Node:
-      if (0 == key):
-        return Map/Node(Maybe/Some(f(Maybe/unwrap(map.value))), map.left, map.right)
-      elif ((key % 2) == 0):
-        return Map/Node(map.value, Map/map(map.left, (key / 2), f), map.right)
-      else:
-        return Map/Node(map.value, map.left, Map/map(map.right, (key / 2), f))
+#{
+  Applies a function to a value in the map and returns the map with the value mapped.
+#}
+def Map/map (map: Map(T), key: u24, f: T -> T) -> Map(T)
 ```
 
 #### Syntax
@@ -359,26 +355,12 @@ x[0] @= lambda y: String/concat(y, " and mapped")
 
 
 ### Map/contains
-Checks if a `map` contains a given `key` and returns 0 or 1 as a `u24` number and the `map` unchanged.
+
 ```python
-def Map/contains (map: Map(T), key: u24) -> (u24, Map(T)):
-  match map:
-    case Map/Leaf:
-      return (0, map)
-    case Map/Node:
-      if (0 == key):
-        match map.value:
-          case Maybe/Some:
-            return (1, map)
-          case Maybe/None:
-            return (0, map)
-      elif ((key % 2) == 0):
-        (new_value, new_map) = Map/contains(map.left, (key / 2))
-        return (new_value, Map/Node(map.value, new_map, map.right))
-      else:
-        (new_value, new_map) = Map/contains(map.right, (key / 2))
-        return (new_value, Map/Node(map.value, map.left, new_map))
-```
+#{
+  Checks if a `map` contains a given `key` and returns 0 or 1 as a `u24` number and the `map` unchanged.
+#}
+def Map/contains (map: Map(T), key: u24) -> (u24, Map(T))
 
 #### Syntax
 
@@ -394,19 +376,11 @@ Whilst the `num` variable will contain 0 or 1 depending on if the key is in the 
 ## Nat
 
 ```python
-type Nat = (Succ ~pred) | (Zero)
+type Nat = (Succ ~(pred: Nat)) | (Zero)
 ```
 
 - **Succ ~pred**: Represents a natural number successor.
 - **Zero**: Represents the natural number zero.
-
-### Syntax
-
-A Natural Number can be written with literals with a `#` before the literal number.
-
-```
-#1337
-```
 
 ## DiffList
 
@@ -420,33 +394,40 @@ For example, the list `List/Cons(1, List/Cons(2, List/Nil))` can be written as t
 
 #### DiffList/new
 
-Creates a new difference list.
 
 ```python
+#{
+Creates a new difference list.
+#}
 def DiffList/new() -> (List(T) -> List(T))
 ```
 
 #### DiffList/append
 
-Appends a value to the end of the difference list.
 
 ```python
+#{
+  Appends a value to the end of the difference list.
+#}
 def DiffList/append(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T))
 ```
 
 #### DiffList/cons
 
-Appends a value to the beginning of the difference list.
-
 ```python
+#{
+  Appends a value to the beginning of the difference list.
+#}
 def DiffList/cons(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T))
 ```
 
 #### DiffList/to_list
 
-Converts a difference list to a regular cons list.
 
 ```python
+#{
+  Converts a difference list to a regular cons list.
+#}
 def DiffList/to_list(diff: List(T) -> List(T)) -> (List(T))
 ```
 
@@ -459,30 +440,36 @@ Here is the current list of functions, but be aware that they may change in the 
 ### Printing
 
 ```python
-def IO/print(text)
+#{
+  Prints the string `text` to the standard output, encoded with utf-8.
+#}
+def IO/print(text: String) -> IO(None)
 ```
 
-Prints the string `text` to the standard output, encoded with utf-8.
 
 ### Input
 
 ```python
-def IO/input() -> String
+#{
+  Reads characters from the standard input until a newline is found.
+  Returns the read input as a String decoded with utf-8.
+#}
+def IO/input() -> IO(Result(String, u24))
 ```
 
-Reads characters from the standard input until a newline is found.
 
-Returns the read input as a String decoded with utf-8.
 
 ### File IO
 
 #### File open
 
 ```python
-def IO/FS/open(path, mode)
+#{
+  Opens a file with with `path` being given as a string and `mode` being a string with the mode to open the file in. The mode should be one of the following:
+#}
+def IO/FS/open(path: String, mode: String) -> IO(Result(u24, u24))
 ```
 
-Opens a file with with `path` being given as a string and `mode` being a string with the mode to open the file in. The mode should be one of the following:
 
 - `"r"`: Read mode
 - `"w"`: Write mode (write at the beginning of the file, overwriting any existing content)
@@ -504,66 +491,78 @@ The standard input/output files are always open and assigned the following file 
 #### File close
 
 ```python
-def IO/FS/close(file)
+#{
+  Closes the file with the given `file` descriptor.
+#}
+def IO/FS/close(file: u24) -> IO(Result(None, u24))
 ```
 
-Closes the file with the given `file` descriptor.
 
 #### File read
 
 ```python
-def IO/FS/read(file, num_bytes)
-```
-
+#{
 Reads `num_bytes` bytes from the file with the given `file` descriptor.
-
 Returns a list of U24 with each element representing a byte read from the file.
-
-```python
-def IO/FS/read_line(file)
+#}
+def IO/FS/read(file: u24, num_bytes: u24) -> IO(Result(List(u24), u24))
 ```
 
-Reads a line from the file with the given `file` descriptor.
 
-Returns a list of U24 with each element representing a byte read from the file.
 
 ```python
-def IO/FS/read_until_end(file)
+#{
+  Reads a line from the file with the given `file` descriptor.
+  Returns a list of U24 with each element representing a byte read from the file.
+#}
+def IO/FS/read_line(fd: u24) -> IO(Result(List(u24), u24))
 ```
 
-Reads until the end of the file with the given `file` descriptor.
 
-Returns a list of U24 with each element representing a byte read from the file.
 
 ```python
-def IO/FS/read_file(path)
+#{
+  Reads until the end of the file with the given `file` descriptor.
+  Returns a list of U24 with each element representing a byte read from the file.
+#}
+def IO/FS/read_to_end(fd: u24) -> IO(Result(List(u24), u24))
 ```
 
-Reads an entire file with the given `path` and returns a list of U24 with each element representing a byte read from the file.
+
+
+```python
+#{
+  Reads an entire file with the given `path` and returns a list of U24 with each element representing a byte read from the file.
+#}
+def IO/FS/read_file(path: String) -> IO(Result(List(u24), u24))
+```
+
 
 #### File write
 
 ```python
-def IO/FS/write(file, bytes)
+#{
+  Writes `bytes`, a list of U24 with each element representing a byte, to the file with the given `file` descriptor.
+  Returns nothing (`*`).
+#}
+def IO/FS/write(file: u24, bytes: List(u24)) -> IO(Result(None, u24))
 ```
-
-Writes `bytes`, a list of U24 with each element representing a byte, to the file with the given `file` descriptor.
-
-Returns nothing (`*`).
 
 ```python
-def IO/FS/write_file(path, bytes)
+#{
+  Writes `bytes`, a list of U24 with each element representing a byte, as the entire content of the file with the given `path`.
+#}
+def IO/FS/write_file(path: String, bytes: List(u24)) -> IO(Result(None, u24))
 ```
-
-Writes `bytes`, a list of U24 with each element representing a byte, as the entire content of the file with the given `path`.
 
 #### File seek
 
 ```python
-def IO/FS/seek(file, offset, mode)
+#{
+  Moves the current position of the file with the given `file` descriptor to the given `offset`, an I24 or U24 number, in bytes.
+#}
+def IO/FS/seek(file: u24, offset: i24, mode: i24) -> IO(Result(None, u24)) 
 ```
-
-Moves the current position of the file with the given `file` descriptor to the given `offset`, an I24 or U24 number, in bytes.
 
 `mode` can be one of the following:
 
@@ -576,12 +575,12 @@ Returns nothing (`*`).
 #### File flush
 
 ```python
-def IO/FS/flush(file)
+#{
+  Flushes the file with the given `file` descriptor.
+  Returns nothing (`*`).
+#}
+def IO/FS/flush(file: u24) -> IO(Result(None, u24))
 ```
-
-Flushes the file with the given `file` descriptor.
-
-Returns nothing (`*`).
 
 ### Dinamically linked libraries
 
@@ -591,11 +590,11 @@ You can read more on how to implement these libraries in the [Dynamically linked
 #### IO/DyLib/open
 
 ```py
-def IO/DyLib/open(path: String, lazy: u24) -> u24
+#{
+  Loads a dynamic library file.
+#}
+def IO/DyLib/open(path: String, lazy: u24) -> IO(Result(u24, String))
 ```
-
-Loads a dynamic library file.
-
 - `path` is the path to the library file.
 - `lazy` is a boolean encoded as a `u24` that determines if all functions are loaded lazily (`1`) or upfront (`0`).
 - Returns an unique id to the library object encoded as a `u24`.
@@ -603,11 +602,11 @@ Loads a dynamic library file.
 #### IO/DyLib/call
 
 ```py
-def IO/DyLib/call(dl: u24, fn: String, args: Any) -> Any
+#{
+  Calls a function of a previously opened library.
+#}
+def IO/DyLib/call(dl: u24, fn: String, args: Any) -> IO(Result(Any, String))
 ```
-
-Calls a function of a previously opened library.
-
 - `dl` is the id of the library object.
 - `fn` is the name of the function in the library.
 - `args` are the arguments to the function. The expected values depend on the called function.
@@ -616,11 +615,11 @@ Calls a function of a previously opened library.
 #### IO/DyLib/close
 
 ```py
-def IO/DyLib/close(dl: u24) -> None
+#{
+  Closes a previously open library.
+#}
+def IO/DyLib/close(dl: u24) -> IO(Result(None, String))
 ```
-
-Closes a previously open library.
-
 - `dl` is the id of the library object.
 - Returns nothing (`*`).
 
@@ -629,73 +628,107 @@ Closes a previously open library.
 ### to_f24
 
 ```py
-def to_f24(x: any number) -> f24
+#{
+  Casts an u24 number to an f24.
+#}
+hvm u24/to_f24 -> (u24 -> f24)
+
+#{
+  Casts an i24 number to an f24.
+#}
+hvm i24/to_f24 -> (i24 -> f24)
 ```
-
-Casts any native number to an f24.
-
 ### to_u24
 
 ```py
-def to_u24(x: any number) -> u24
+#{
+  Casts a f24 number to an u24.
+#}
+hvm f24/to_u24 -> (f24 -> u24)
+
+#{
+  Casts an i24 number to an u24.
+#}
+hvm i24/to_u24 -> (i24 -> u24)
 ```
-
-Casts any native number to a u24.
-
 ### to_i24
 
 ```py
-def to_i24(x: any number) -> i24
+#{
+  Casts an u24 number to an i24.
+#}
+hvm u24/to_i24 -> (u24 -> i24):
+#{
+  Casts a f24 number to an i24.
+#}
+hvm f24/to_i24 -> (f24 -> i24):
 ```
 
-Casts any native number to an i24.
+### to_string
+
+```py
+#{
+  Casts an u24 native number to a string.
+#}
+def u24/to_string(n: u24) -> String:
+```
 
 ## String encoding / decoding
 
 ### String/decode_utf8
 
 ```py
-def String/decode_utf8(bytes: [u24]) -> String
+#{
+  Decodes a sequence of bytes to a String using utf-8 encoding.
+#}
+String/decode_utf8 (bytes: (List u24)) : String
 ```
 
-Decodes a sequence of bytes to a String using utf-8 encoding.
 
 ### String/decode_ascii
 
 ```py
-def String/decode_ascii(bytes: [u24]) -> String
+#{
+  Decodes a sequence of bytes to a String using ascii encoding.
+#}
+String/decode_ascii (bytes: (List u24)) : String
 ```
 
-Decodes a sequence of bytes to a String using ascii encoding.
 
 ### String/encode_utf8
 
 ```py
-def String/encode_utf8(s: String) -> [u24]
+#{
+  Encodes a String to a sequence of bytes using utf-8 encoding.
+#}
+String/encode_utf8 (str: String) : (List u24)
 ```
 
-Encodes a String to a sequence of bytes using utf-8 encoding.
 
 ### String/encode_ascii
 
 ```py
-def String/encode_ascii(s: String) -> [u24]
+#{
+  Encodes a String to a sequence of bytes using ascii encoding.
+#}
+String/encode_ascii (str: String) : (List u24)
 ```
 
-Encodes a String to a sequence of bytes using ascii encoding.
 
 ### Utf8/decode_character
 
 ```py
-def Utf8/decode_character(bytes: [u24]) -> (rune: u24, rest: [u24])
+#{
+  Decodes a utf-8 character, returns a tuple containing the rune and the rest of the byte sequence.
+#}
+Utf8/decode_character (bytes: (List u24)) : (u24, (List u24))
 ```
 
-Decodes a utf-8 character, returns a tuple containing the rune and the rest of the byte sequence.
 
 ### Utf8/REPLACEMENT_CHARACTER
 
 ```py
-def Utf8/REPLACEMENT_CHARACTER: u24 = '\u{FFFD}'
+Utf8/REPLACEMENT_CHARACTER : u24 = '\u{FFFD}'
 ```
 
 ## Math
@@ -703,146 +736,185 @@ def Utf8/REPLACEMENT_CHARACTER: u24 = '\u{FFFD}'
 ### Math/log
 
 ```py
-def Math/log(x: f24, base: f24) -> f24
+#{
+  Computes the logarithm of `x` with the specified `base`.
+#}
+hvm Math/log -> (f24 -> f24 -> f24):
+  (x ($([|] $(x ret)) ret))
 ```
 
-Computes the logarithm of `x` with the specified `base`.
 
 ### Math/atan2
 
 ```py
-def Math/atan2(x: f24, y: f24) -> f24
+#{
+  Computes the arctangent of `y / x`.
+  Has the same behaviour as `atan2f` in the C math lib.
+#}
+hvm Math/atan2 -> (f24 -> f24 -> f24):
+  ($([&] $(y ret)) (y ret))
 ```
 
-Computes the arctangent of `y / x`.
-
-Has the same behaviour as `atan2f` in the C math lib.
 
 ### Math/PI
 
-Defines the Pi constant.
 
 ```py
-def Math/PI: f24 = 3.1415926535
+#{
+  Defines the Pi constant.
+#}
+def Math/PI() -> f24:
+  return 3.1415926535
 ```
 
 ### Math/E
 
-Euler's number
 
 ```py
-def Math/E: f24 = 2.718281828
+#{
+Euler's number
+#}
+def Math/E() -> f24:
+  return 2.718281828
 ```
 
 ### Math/sin
 
-Computes the sine of the given angle in radians.
 
 ```py
-def Math/sin(a: f24) -> f24
+#{
+  Computes the sine of the given angle in radians.
+#}
+hvm Math/sin -> (f24 -> f24)
 ```
 
 ### Math/cos
 
-Computes the cosine of the given angle in radians.
 
 ```py
-def Math/cos(a: f24) -> f24
+#{
+  Computes the cosine of the given angle in radians.
+#}
+hvm Math/cos -> (f24 -> f24)
 ```
 
 ### Math/tan
 
-Computes the tangent of the given angle in radians.
 
 ```py
-def Math/tan(a: f24) -> f24
+#{
+  Computes the tangent of the given angle in radians.
+#}
+hvm Math/tan -> (f24 -> f24)
 ```
 
 ### Math/cot
 
-Computes the cotangent of the given angle in radians.
 
 ```py
-def Math/cot(a: f24) -> f24
+#{
+  Computes the cotangent of the given angle in radians.
+#}
+Math/cot (a: f24) : f24 
 ```
 
 ### Math/sec
 
-Computes the secant of the given angle in radians.
 
 ```py
-def Math/sec(a: f24) -> f24
+#{
+  Computes the secant of the given angle in radians.
+#}
+Math/sec (a: f24) : f24 
 ```
 
 ### Math/csc
 
-Computes the cosecant of the given angle in radians.
 
 ```py
-def Math/csc(a: f24) -> f24
+#{
+  Computes the cosecant of the given angle in radians.
+#}
+Math/csc (a: f24) : f24 
 ```
 
 ### Math/atan
 
-Computes the arctangent of the given angle.
+
 
 ```py
-def Math/atan(a: f24) -> f24
+#{
+  Computes the arctangent of the given angle.
+#}
+Math/atan (a: f24) : f24 
 ```
 
 ### Math/asin
 
-Computes the arcsine of the given angle.
 
 ```py
-def Math/asin(a: f24) -> f24
+#{
+  Computes the arcsine of the given angle.
+#}
+Math/asin (a: f24) : f24 
 ```
 
 ### Math/acos
 
-Computes the arccosine of the given angle.
 
 ```py
-def Math/acos(a: f24) -> f24
-```
+#{
+  Computes the arccosine of the given angle.
+#}
+Math/acos (a: f24) : f24
 
 ### Math/radians
 
-Converts degrees to radians.
 
 ```py
-def Math/radians(a: f24) -> f24
+#{
+  Converts degrees to radians.
+#}
+Math/radians (a: f24) : f24 
 ```
 
 ### Math/sqrt
 
-Computes the square root of the given number.
 
 ```py
-def Math/sqrt(n: f24) -> f24
+#{
+  Computes the square root of the given number.
+#}
+Math/sqrt (n: f24) : f24 
 ```
 
 ### Math/ceil
 
-Round float up to the nearest integer.
 
 ```py
+#{
+  Round float up to the nearest integer.
+#}
 def Math/ceil(n: f24) -> f24
 ```
 
 ### Math/floor
 
-Round float down to the nearest integer.
 
 ```py
+#{
+  Round float down to the nearest integer.
+#}
 def Math/floor(n: f24) -> f24
 ```
 
 ### Math/round
 
-Round float to the nearest integer.
 
 ```py
+#{
+  Round float to the nearest integer.
+#}
 def Math/round(n: f24) -> f24
 ```
 

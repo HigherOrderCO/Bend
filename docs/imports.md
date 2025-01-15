@@ -11,6 +11,8 @@ from path import name
 # or
 import path/name
 ```
+## Placement
+Imports should be placed at the top of a file.
 
 ## Project Structure
 Let's assume we have a bend project with the following structure:

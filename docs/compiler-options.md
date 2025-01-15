@@ -12,6 +12,7 @@
 | `-Oinline` `-Ono-inline`                                                 | Disabled      | [inline](#inline)                         |
 | `-Ocheck-net-size` `-Ono-check-net-size`                                 | Disabled      | [check-net-size](#check-net-size)         |
 | `-Oadt-scott` `-Oadt-num-scott`                                          | adt-num-scott | [adt-encoding](#adt-encoding)             |
+| `-Otype-check` `-Ono-type-check`                                          | type-check | Checks if the types are coherent to bend's type system          |
 
 ## Eta-reduction
 
@@ -259,3 +260,13 @@ Option/None/tag = 1
 Pattern-matching with `match` and `fold` is generated according to the encoding.
 
 Note: IO is **only** available with `-Oadt-num-scott`.
+
+## Type Checking
+
+Type checking is enabled by default and verifies that the types are all declared correctly.
+
+```py
+  def main() -> Bool: 
+    return 3
+```
+If type checking is enabled, The following program will throw a type error `Expected function type 'Bool' but found 'u24'`, whereas if it is disabled, it will compile successfully and return `3`.

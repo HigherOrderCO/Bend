@@ -88,28 +88,37 @@ To ensure that recursive pattern matching functions don't loop in strict mode, i
 ```py
 # This is what the Foo function actually compiles to.
 # With -Olinearize-matches and -Ofloat-combinators (default on strict mode)
-(Foo) = λa λb λc (switch a { 0: Foo$C5; _: Foo$C8 } b c)
 
-(Foo$C5) = λd λe (d Foo$C0 Foo$C4 e) # Foo.case_0
-(Foo$C0) = λ* B                      # Foo.case_0.case_true
-(Foo$C4) = λg (g Foo$C3 B)           # Foo.case_0.case_false
-(Foo$C3) = λh λi (i Foo$C1 Foo$C2 h) # Foo.case_0.case_false.case_cons
-(Foo$C1) = λj λk λl (A l j k)        # Foo.case_0.case_false.case_cons.case_cons
-(Foo$C2) = λ* B                      # Foo.case_0.case_false.case_cons.case_nil
-
-(Foo$C8) = λn λo λ* (o Foo$C6 Foo$C7 n) # Foo.case_+
-(Foo$C6) = λ* 0                         # Foo.case_+.case_true
-(Foo$C7) = λr (+ r 1)                   # Foo.case_+.case_false
+unchecked Foo__C0: _
+(Foo__C0) = λ* λa λb λc (A c a b)        # Foo.case_0.case_false.case_cons.case_cons
+unchecked Foo__C1: _
+(Foo__C1) = λa switch a { 0: λ* B; _: Foo__C0; }  # Part of cons pattern matching
+unchecked Foo__C2: _
+(Foo__C2) = λ* λa λb (b Foo__C1 a)       # Foo.case_0.case_false.case_cons
+unchecked Foo__C3: _
+(Foo__C3) = λa switch a { 0: B; _: Foo__C2; }  # Part of cons pattern matching
+unchecked Foo__C4: _
+(Foo__C4) = λ* λa (a Foo__C3)            # Foo.case_0.case_false
+unchecked Foo__C5: _
+(Foo__C5) = λa switch a { 0: λ* B; _: Foo__C4; }  # Foo.case_0
+unchecked Foo__C6: _
+(Foo__C6) = λ* λa (+ a 0)                # Foo.case_+.case_false
+unchecked Foo__C7: _
+(Foo__C7) = λa switch a { 0: λ* 0; _: Foo__C6; }  # Part of bool pattern matching
+unchecked Foo__C8: _
+(Foo__C8) = λa λ* (a Foo__C5)            # Part of main pattern matching
+unchecked Foo__C9: _
+(Foo__C9) = λa λb λ* (b Foo__C7 a)       # Foo.case_+
 ```
 
-Pattern matching equations also support matching on non-consecutive numbers:
+Pattern matching equations support non-consecutive numeric or character values. For example, this parser matches specific characters with corresponding tokens, with a catch-all case for any other character: 
 ```rust
 Parse '(' = Token.LParenthesis
 Parse ')' = Token.RParenthesis
 Parse 'λ' = Token.Lambda
 Parse  n  = (Token.Name n)
 ```
-This is compiled to a cascade of `switch` expressions, from smallest value to largest.
+The compiler transforms this into an optimized cascade of switch expressions. Each switch computes the distance from the smallest character to efficiently test each case:
 ```py
 Parse = λarg0 switch matched = (- arg0 '(') {
   0: Token.LParenthesis
@@ -123,18 +132,19 @@ Parse = λarg0 switch matched = (- arg0 '(') {
   }
 }
 ```
-Unlike with `switch`, with pattern matching equations you can't access the value of the predecessor of the matched value directly, but instead you can match on a variable.
+A key difference from direct switch expressions is how variable binding works. In pattern matching equations, you can't directly access predecessor values. Instead, variables (like n above) are bound to computed expressions based on the matched value.
 Notice how in the example above, `n` is bound to `(+ 1 matched-1)`.
 
 Notice that this definition is valid, since `*` will cover both `p` and `0` cases when the first argument is `False`.
 
+This example shows how pattern order matters, with wildcards covering multiple specific cases:
 ```rust
 pred_if False * if_false = if_false
 pred_if True  p *        = (- p 1)
 pred_if True  0 *        = 0
 ```
 
-Pattern matching on strings and lists desugars to a list of matches on List/String.cons and List/String.nil
+Pattern matching on strings and lists desugars to a list of matches on List||String/cons and List||String/nil
 
 ```py
 Hi "hi" = 1
@@ -145,7 +155,7 @@ Foo [x] = x
 Foo _ = 3
 
 # Becomes:
-Hi (String.cons 'h' (String.cons 'i' String.nil)) = 2
+Hi (String/Cons 'h' (String/Cons 'i' String/Nil)) = 2
 Hi _ = 0
 
 Foo List.nil = 0
