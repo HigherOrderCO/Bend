@@ -44,31 +44,31 @@ You can bundle multiple values into a single value using a tuple or a struct.
 
 ```py
 # With a tuple
-def tuple_fst(x: Any) -> Any:
+def tuple_fst(x: (a, b)) -> a:
   # This destructures the tuple into the two values it holds.
   # '*' means that the value is discarded and not bound to any variable.
   (fst, *) = x
   return fst
 
 # With an object (similar to what other languages call a struct, a class or a record)
-object Pair { fst, snd }
+object Pair(a, b) { fst: a, snd: b }
 
-def Pair/fst(x: Pair) -> Any:
+def Pair/fst(x: Pair(a, b)) -> a:
   match x:
     case Pair:
       return x.fst
 
 # We can also access the fields of an object after we `open` it.
-def Pair/fst_2(x: Paul) -> Any:
+def Pair/fst_2(x: Pair(a, b)) -> a:
   open Pair: x
   return x.fst
 
 # This is how we can create new objects.
-def Pair/with_one(x: Pair) -> Pair:
+def Pair/with_one(x: a) -> Pair(a, u24):
   return Pair{ fst: x, snd: 1 }
 
 # The function can be named anything, but by convention we use Type/function_name.
-def Pair/swap(x: Pair) -> Pair:
+def Pair/swap(x: Pair(a, b)) -> Pair(b, a):
   open Pair: x
   # We can also call the constructor like any normal function.
   return Pair(x.snd, x.fst)

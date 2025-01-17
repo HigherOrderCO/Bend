@@ -307,7 +307,7 @@ For fields notated with `~` in the type definition, the fold function is called 
 It is equivalent to the inline recursive function:
 
 ```python
-def fold(x: Tree) -> u24:
+def fold(x: Tree(u24)) -> u24:
   match x:
     case Tree/Node:
       return x.value + fold(x.left) + fold(x.right)
@@ -1357,7 +1357,7 @@ Documentation for functions is meant to be written as a multiline comment right 
 
   This function always returns the second value that was used as argument.
 #}
-def second(x: T, y: T) -> T:
+def second(x: A, y: B) -> B:
   return y
 ```
 
