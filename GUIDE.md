@@ -450,11 +450,11 @@ it is really liberating, and will let you write better algorithms. As an
 exercise, use `fold` to implement a "reverse" algorithm for lists:
 
 ```python
-def reverse(list: List) -> List:
+def reverse(list: List(T)) -> List(T):
   # exercise
   ?
 
-def main() -> List:
+def main() -> List(u24):
   return reverse([1,2,3])
 ```
 
@@ -679,7 +679,7 @@ def gen(d: u24, x: u24) -> Any:
     case _:
       return (gen(d-1, x * 2 + 1), gen(d-1, x * 2))
 ```
-> Note: Bend's type system does not support functions such as the one, but you can still write it.
+> Note: The type of this function can't be expressed with Bend's type system, but we can still write it using `Any`.
 
 ```python
 def sum(d: u24, t: u24) -> u24:
