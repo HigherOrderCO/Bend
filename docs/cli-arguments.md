@@ -33,15 +33,14 @@ def main(x, y):
 
 # Calling with two argument
 > bend run <path> +5 +3
-{+2 -2}
-
-#{
-  Calling with three argument
-  In this case, the third argument doesn't change anything
-  due to the underlying interaction rules.
-  If this were a variant of simply-typed lambda-calculus
-  it wouldn't be well-typed.
-}#
+{+2 -2}#
+# Calling with three arguments
+# In this case, the third argument doesn't change anything
+# due to the underlying interaction rules.
+# If this were a variant of simply-typed lambda-calculus
+# it wouldn't be well-typed.
 > bend run <path> +5 +3 +1
 {+2 -2}
 ```
+
+

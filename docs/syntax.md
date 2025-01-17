@@ -187,7 +187,7 @@ Returns the expression that follows. The last statement of each branch of a func
 
 ```py
 # Allowed, all branches return
-def max(a: T, b: T) -> T:
+def max(a, b):
   if a > b:
     return a
   else:
@@ -207,7 +207,7 @@ def Foo(x):
 
 ```py
 # Not allowed, one of the branches doesn't return
-def Foo(a: T, b: T) -> T:
+def Foo(a, b):
   if a < b:
     return a
   else:
@@ -581,7 +581,7 @@ i24 = -42
 u24 = 42
 ```
 
-Currently, the 3 number types cannot be mixed, but can be converted in order to correspond to each other.
+Currently, We can't write operations that mix two types of number but we can explicitly convert between them.
 
 | Operation             | Syntax   | Supported Types  |
 | --------------------- | -------- | ---------------- |

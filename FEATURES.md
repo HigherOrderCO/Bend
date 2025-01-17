@@ -6,8 +6,7 @@ You can read the full reference for both of them [here](docs/syntax.md), but the
 To see some more complex examples programs, check out the [examples](examples/) folder.
 
 ### Basic features
-
-We can start with a basic program that adds the numbers 3 and 2.
+Types in Bend are completely optional - you can write programs without any type annotations, but we'll be typing every function for clarity. We can start with a basic program that adds the numbers 3 and 2. Though 
 
 ```py
 def main() -> u24:
@@ -110,8 +109,10 @@ This allows us to easily create and consume these recursive data structures with
 `bend` is a pure recursive loop that is very useful for generating data structures.
 
 ```py
+#{
+  Sum all the values in the tree.
+#}
 def MyTree.sum(x: MyTree) -> u24:
-  # Sum all the values in the tree.
   fold x:
     # The fold is implicitly called for fields marked with '~' in their definition.
     case MyTree/Node:
@@ -130,6 +131,8 @@ def main() -> u24:
 
   return MyTree.sum(x)
 ```
+It should be noted that in this case, since MyTree has no type annotations, its fields will be considered of type Any, which partially disables the type checker for these values. Thus the fact that `x` is holding a tree of u24 and not a tree of anything else won't be checked and it's up to the user to make sure it's correct.
+
 
 These are equivalent to inline recursive functions that create a tree and consume it.
 
@@ -201,12 +204,12 @@ To use a variable twice without duplicating it, you can use a `use` statement.
 It inlines clones of some value in the statements that follow it.
 
 ```py
-def foo(x: Any) -> (Any, Any):
+def foo(x):
   use result = (1, x)
   return (result, result)
 
 # Is equivalent to
-def foo(x: Any) -> (Any, Any):
+def foo(x):
   return ((1, x), (1, x))
 ```
 
@@ -225,18 +228,19 @@ def native_num_to_adt(n: u24) -> Nat:
 If your recursive function is not based on pattern matching syntax (like `if`, `match`, `fold`, etc) you have to be careful to avoid an infinite loop.
 
 ```py
-# A scott-encoded list folding function
+# A scott-encoded list folding function.
 # Writing it like this will cause an infinite loop.
-def scott_list.add(xs: List, add: u24) -> List:
+def scott_list.add(xs, add):
   return xs( λxs.head xs.tail: λc n: (c (xs.head + add), scott_list.add(xs.tail, add)))
 
 # Instead we want to write it like this;
-def scott_list.add(xs: List, add: u24) -> List:
+def scott_list.add(xs, add):
   return xs(
     λxs.head xs.tail: λadd: λc n: (c (xs.head + add) scott_list.sum(xs.tail, add)),
     λadd: λc λn: n,
     add
   )
+# These functions can't be typed with bend's type system.
 ```
 
 Since Bend is eagerly executed, some situations will cause function applications to always be expanded, which can lead to looping situations.
@@ -282,11 +286,11 @@ Bend has Lists and Strings, which support Unicode characters.
 # These are the definitions of the builtin types.
 ```py
 type String:
-  Cons { head, ~tail }
   Nil
-type List:
-  Cons { head, ~tail }
+  Cons { head: u24, ~tail: String }
+type List(T):
   Nil
+  Cons { head: T, ~tail: List(T) }
 ```
 
 ```py
@@ -388,7 +392,7 @@ def is_odd(x: u24) -> Bool:
     case _:
       return is_even(x-1)
 
-(is_even n) = switch n {
+is_even(n: u24): u24 = switch n {
   0: Bool/True
   _: (is_odd n-1)
 }

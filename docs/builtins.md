@@ -130,7 +130,7 @@ List/filter(xs: List(T), pred: T -> Bool) -> List(T)
 #{
 Splits a list into two lists at the first occurrence of a value.
 #}
-def List/split_once(xs: List(T), cond: T -> u24)
+def List/split_once(xs: List(T), cond: T -> u24) -> (Result((List(T), List(T)), List(T))): 
 ```
 Example:
 ```python
@@ -138,7 +138,7 @@ Example:
   list = [1,3,4,5,6]
   result = List/split_once(list, λx: x % 2 == 0)
   return result
-  # Result: ([1,3], [5,6]) 
+  # Result: Result/Ok/tag ([1, 3], [5, 6])
 ```
 
 ## Result
@@ -205,7 +205,6 @@ maybe = Maybe/Some(Nat/Succ(Nat/Zero))
 ## Maybe functions
 
 ### Maybe/unwrap
-Returns the value inside the `Maybe` if it is `Some`, and returns `unreachable()` if it is `None`.
 ```python
 #{
 Returns the value inside the `Maybe` if it is `Some`, and returns `unreachable()` if it is `None`.
@@ -268,8 +267,7 @@ Map/empty = Map/Leaf
 
 ```rust
 #{
-  Retrieves a `value` from the `map` based on the `key` and returns a tuple with the value and the `map` unchanged.
-#}
+  Retrieves a `value` from the `map` based on the `key` and returns a tuple with the value and the `map` unchanged. The logic for checking whether a value is or not contained in a `map` is not done in the `get` function, so if we try to get a key that is not in the map, the program will return `unreachable`. 
 def Map/get (map: Map(T), key: u24) -> (T, Map(T))
 ```
 
@@ -358,7 +356,7 @@ x[0] @= lambda y: String/concat(y, " and mapped")
 
 ```python
 #{
-  Checks if a `map` contains a given `key` and returns 0 or 1 as a `u24` number and the `map` unchanged.
+  Checks if a `map` contains a given `key` and returns 0 or 1 along with and  `map` unchanged.
 #}
 def Map/contains (map: Map(T), key: u24) -> (u24, Map(T))
 
@@ -604,24 +602,26 @@ def IO/DyLib/open(path: String, lazy: u24) -> IO(Result(u24, String))
 ```py
 #{
   Calls a function of a previously opened library.
+  - `dl` is the id of the library object.
+  - `fn` is the name of the function in the library.
+  - `args` are the arguments to the function. The expected values depend on the called function.
+  - The returned value is determined by the called function.
 #}
 def IO/DyLib/call(dl: u24, fn: String, args: Any) -> IO(Result(Any, String))
 ```
-- `dl` is the id of the library object.
-- `fn` is the name of the function in the library.
-- `args` are the arguments to the function. The expected values depend on the called function.
-- The returned value is determined by the called function.
+
 
 #### IO/DyLib/close
 
 ```py
 #{
   Closes a previously open library.
+  - `dl` is the id of the library object.
+  - Returns nothing (`*`).
 #}
 def IO/DyLib/close(dl: u24) -> IO(Result(None, String))
 ```
-- `dl` is the id of the library object.
-- Returns nothing (`*`).
+
 
 ## Native number casting
 
@@ -631,12 +631,12 @@ def IO/DyLib/close(dl: u24) -> IO(Result(None, String))
 #{
   Casts an u24 number to an f24.
 #}
-hvm u24/to_f24 -> (u24 -> f24)
+def u24/to_f24 -> (u24 -> f24)
 
 #{
   Casts an i24 number to an f24.
 #}
-hvm i24/to_f24 -> (i24 -> f24)
+def i24/to_f24 -> (i24 -> f24)
 ```
 ### to_u24
 
@@ -644,12 +644,12 @@ hvm i24/to_f24 -> (i24 -> f24)
 #{
   Casts a f24 number to an u24.
 #}
-hvm f24/to_u24 -> (f24 -> u24)
+def f24/to_u24 -> (f24 -> u24)
 
 #{
   Casts an i24 number to an u24.
 #}
-hvm i24/to_u24 -> (i24 -> u24)
+def i24/to_u24 -> (i24 -> u24)
 ```
 ### to_i24
 
@@ -657,11 +657,11 @@ hvm i24/to_u24 -> (i24 -> u24)
 #{
   Casts an u24 number to an i24.
 #}
-hvm u24/to_i24 -> (u24 -> i24):
+def u24/to_i24 -> (u24 -> i24):
 #{
   Casts a f24 number to an i24.
 #}
-hvm f24/to_i24 -> (f24 -> i24):
+def f24/to_i24 -> (f24 -> i24):
 ```
 
 ### to_string
@@ -739,8 +739,7 @@ Utf8/REPLACEMENT_CHARACTER : u24 = '\u{FFFD}'
 #{
   Computes the logarithm of `x` with the specified `base`.
 #}
-hvm Math/log -> (f24 -> f24 -> f24):
-  (x ($([|] $(x ret)) ret))
+def Math/log -> (f24 -> f24 -> f24)
 ```
 
 
@@ -751,8 +750,7 @@ hvm Math/log -> (f24 -> f24 -> f24):
   Computes the arctangent of `y / x`.
   Has the same behaviour as `atan2f` in the C math lib.
 #}
-hvm Math/atan2 -> (f24 -> f24 -> f24):
-  ($([&] $(y ret)) (y ret))
+def Math/atan2 -> (f24 -> f24 -> f24)
 ```
 
 
@@ -763,8 +761,7 @@ hvm Math/atan2 -> (f24 -> f24 -> f24):
 #{
   Defines the Pi constant.
 #}
-def Math/PI() -> f24:
-  return 3.1415926535
+def Math/PI() -> f24
 ```
 
 ### Math/E
@@ -774,8 +771,7 @@ def Math/PI() -> f24:
 #{
 Euler's number
 #}
-def Math/E() -> f24:
-  return 2.718281828
+def Math/E() -> f24
 ```
 
 ### Math/sin
@@ -785,7 +781,7 @@ def Math/E() -> f24:
 #{
   Computes the sine of the given angle in radians.
 #}
-hvm Math/sin -> (f24 -> f24)
+def Math/sin -> (f24 -> f24)
 ```
 
 ### Math/cos
@@ -795,7 +791,7 @@ hvm Math/sin -> (f24 -> f24)
 #{
   Computes the cosine of the given angle in radians.
 #}
-hvm Math/cos -> (f24 -> f24)
+def Math/cos -> (f24 -> f24)
 ```
 
 ### Math/tan
@@ -805,7 +801,7 @@ hvm Math/cos -> (f24 -> f24)
 #{
   Computes the tangent of the given angle in radians.
 #}
-hvm Math/tan -> (f24 -> f24)
+def Math/tan -> (f24 -> f24)
 ```
 
 ### Math/cot

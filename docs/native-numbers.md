@@ -50,7 +50,11 @@ minus_zero = -0.0
 ### Mixing number types
 
 The three number types are fundamentally different.
-If you mix two numbers of different types, HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now. Instead, you should make sure that all numbers are of the same type. We recently introduced a way to convert between the different number types, and using it is very easy, here's an example:
+If you mix two numbers of different types, HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now. Instead, you should make sure that all numbers are of the same type. 
+
+#### Casting numbers
+
+We introduced a way to convert between the different number types, and using it is very easy, here's an example:
 
 ```py
 def main() -> _:

@@ -95,11 +95,11 @@ def main() -> IO(u24):
 To run the program above, type:
 
 ```
-bend run main.bend
+bend run-c main.bend
 ```
 
 If all goes well, you should see `"Hello, world!"` in both cases. The `bend run-rs` command uses
-the reference interpreter, which is slow, whereas the `bend run` command uses the much faster C interpreter, but bend can run even faster! In a few moments, we'll teach you how to run your code in parallel, on both CPUs and GPUs. For now, let's learn some
+the reference interpreter, which is slow, whereas the `bend run-c` command uses the much faster C interpreter, but bend can run even faster! In a few moments, we'll teach you how to run your code in parallel, on both CPUs and GPUs. For now, let's learn some
 fundamentals!
 
 ## Basic Functions and Datatypes
@@ -311,7 +311,7 @@ def parity(x: u24) -> String:
   return result
 ```
 
-... because that would mutate the `result` variable. Instead, we should write:
+... because that would require mutating the `result` variable. Instead, we should write:
 
 ```python
 def is_even(x: u24) -> String:
@@ -426,9 +426,8 @@ def enum(tree):
       return ![tree.left(idx * 2 + 0), tree.right(idx * 2 + 1)]
     case Tree/Leaf:
       return !(idx, tree.value)
-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@VER PRA TIPAR ESSA FUNÇÃO QUE NÃO TA FUNCIONANDO@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
 
-def main() -> Tree:
+def main() -> Tree(u24):
   tree = ![![!1, !2],![!3, !4]]
   return enum(tree)
 ```
@@ -598,8 +597,7 @@ def main() -> u24:
     else:
       sum = i
   return sum
-``` @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
-@@@@@@@@@@@@@@@@@@@@@@@@@ VER DEPOIS PORQUE ISSO ENTRA NUM LOOP INFINITO@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```
 
 And that's the parallel "Hello, world"! Now, let's finally run it. But first,
 let's measure its single-core performance. Also, remember that, for now, Bend

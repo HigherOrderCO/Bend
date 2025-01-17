@@ -12,7 +12,7 @@
 | `-Oinline` `-Ono-inline`                                                 | Disabled      | [inline](#inline)                         |
 | `-Ocheck-net-size` `-Ono-check-net-size`                                 | Disabled      | [check-net-size](#check-net-size)         |
 | `-Oadt-scott` `-Oadt-num-scott`                                          | adt-num-scott | [adt-encoding](#adt-encoding)             |
-| `-Otype-check` `-Ono-type-check`                                          | type-check | Checks if the types are coherent to bend's type system          |
+| `-Otype-check` `-Ono-type-check`                                         | type-check    |  Checks the type compatibility            |
 
 ## Eta-reduction
 
@@ -263,7 +263,7 @@ Note: IO is **only** available with `-Oadt-num-scott`.
 
 ## Type Checking
 
-Type checking is enabled by default and verifies that the types are all declared correctly.
+Type checking is enabled by default and verifies and enforces the constraints of types. 
 
 ```py
   def main() -> Bool: 

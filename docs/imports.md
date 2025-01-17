@@ -10,9 +10,8 @@ Imports can be declared two ways:
 from path import name
 # or
 import path/name
+# We recommend always placing the imports at the top of the file.
 ```
-## Placement
-Imports should be placed at the top of a file.
 
 ## Project Structure
 Let's assume we have a bend project with the following structure:

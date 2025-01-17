@@ -16,7 +16,7 @@ Map = λf λlist
 Main = (Map λx (+ x 1) (Cons 1 Nil))
 ```
 
-The recursive `Map`  creates an infinite reduction sequence because each recursive call expands into another call to Map, never reaching a base case. Which means that functionally, it never gets reduced. 
+The recursive `Map`  creates an infinite reduction sequence because each recursive call expands into another call to Map, never reaching a base case. Which means that functionally, it will reduce it infinitely, never reaching a normal form. 
 
 For similar reasons, if we try using Y combinator it also won't work.
 
@@ -40,7 +40,7 @@ Map = λf λlist
 
 This code will work as expected, since `cons` and `nil` are lambdas without free variables, they will be automatically floated to new definitions if the [float-combinators](compiler-options.md#float-combinators) option is active, allowing them to be unrolled lazily by hvm.
 
-To handle recursion properly, recursive calls should be wrapped in top-level combinators. This ensures lazy unrolling of recursive terms, preventing infinite expansion during reduction. While [supercombinators](https://en.wikipedia.org/wiki/Supercombinator) are commonly used for this purpose, other combinator patterns can work as well, as long as they're lifted to the top level.
+The recursive part of the function should be part of a combinator that is not in an active position. That way it can be lifted into a top-level function which is compiled into a lazy reference thus preventing the infinite expansion. [Supercombinators](https://en.wikipedia.org/wiki/Supercombinator) can be used in order to ensure said lazy unrolling of recursive terms. Other combinator patterns can work as well, as long as they're lifted to the top level.
 
 If you have a set of mutually recursive functions, you only need to make one of the steps lazy. This might be useful when doing micro-optimizations, since it's possible to avoid part of the small performance cost of linearizing lambdas.
 
