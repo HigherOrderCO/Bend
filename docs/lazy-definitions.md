@@ -2,7 +2,7 @@
 
 In strict-mode, some types of recursive terms will unroll indefinitely.
 
-This is a simple piece of code that works on many other functional programming languages and hangs on strict-mode:
+This is a simple piece of code that works on many other functional programming languages but hangs on Bend due to the strict evaluation of HVM2.
 
 ```rust
 Cons = λx λxs λcons λnil (cons x xs)
