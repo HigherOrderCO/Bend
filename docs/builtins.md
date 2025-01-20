@@ -128,7 +128,7 @@ List/filter(xs: List(T), pred: T -> Bool) -> List(T)
 
 ```python
 #{
-Splits a list into two lists at the first occurrence of a value.
+  Splits a list into two lists at the first occurrence of a value.
 #}
 def List/split_once(xs: List(T), cond: T -> u24) -> (Result((List(T), List(T)), List(T))): 
 ```
@@ -268,6 +268,7 @@ Map/empty = Map/Leaf
 ```rust
 #{
   Retrieves a `value` from the `map` based on the `key` and returns a tuple with the value and the `map` unchanged. The logic for checking whether a value is or not contained in a `map` is not done in the `get` function, so if we try to get a key that is not in the map, the program will return `unreachable`. 
+#}
 def Map/get (map: Map(T), key: u24) -> (T, Map(T))
 ```
 

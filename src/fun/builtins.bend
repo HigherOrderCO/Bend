@@ -6,7 +6,7 @@ type List(T):
   Nil
   Cons { head: T, ~tail: List(T) }
 
-#{ Returns the length of a list and the list itself. #}
+#{ Returns a tuple containing the length and the list itself. #}
 def List/length(xs: List(T)) -> (u24, List(T)):
   fold xs with len=0, acc=DiffList/new:
     case List/Nil:
@@ -14,7 +14,7 @@ def List/length(xs: List(T)) -> (u24, List(T)):
     case List/Cons:
       return xs.tail(len + 1, DiffList/append(acc, xs.head))
 
-#{ Reverses a list. #}
+#{ Reverses the elements of a list. #}
 def List/reverse(xs: List(T)) -> List(T):
   fold xs with acc=[]:
     case List/Nil:
@@ -22,19 +22,18 @@ def List/reverse(xs: List(T)) -> List(T):
     case List/Cons:
       return xs.tail(List/Cons(xs.head, acc))
 
-#{ Flattens a list of lists. #}
+#{ Returns a flattened list from a list of lists. #}
 List/flatten (xs: (List (List T))) : (List T)
 List/flatten (List/Cons x xs) = (List/concat x (List/flatten xs))
 List/flatten (List/Nil)       = (List/Nil)
 
-#{ Concatenates two lists. #}
+#{ Appends two lists together. #}
 List/concat(xs: (List T)) (ys: (List T)) : (List T)
 List/concat (List/Cons x xs) ys = (List/Cons x (List/concat xs ys))
 List/concat (List/Nil)       ys = ys
 
 #{
-  Splits a list into two lists at the first value that passes a condition.
-  Returns the original list if the value is not found
+  Splits a list into two lists at the first occurrence of a value.
 #}
 def List/split_once(
   xs: List(T),
@@ -77,7 +76,7 @@ String/equals (String/Cons x xs) (String/Cons y ys) =
   }
 String/equals * * = 0
 
-#{ Splits a list into two lists at the first occurrence of a value. #}
+#{ Splits a string into a list of strings based on the given delimiter. #}
 String/split (s: String) (delimiter: u24) : (List String)
 String/split s delim = (String/split.go s delim [""])
 
@@ -119,7 +118,7 @@ def DiffList/concat(
 def DiffList/cons(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T)):
   return lambda x: List/Cons(val, diff(x))
 
-#{ Convert a difference list to a list #}
+#{ Converts a difference list to a regular cons list. #}
 def DiffList/to_list(diff: List(T) -> List(T)) -> (List(T)):
   return diff(List/Nil)
 
@@ -127,6 +126,11 @@ type Nat = (Succ ~(pred: Nat)) | (Zero)
 
 type (Result o e) = (Ok (val: o)) | (Err (val: e))
 
+#{
+Returns the inner value of `Result/Ok` or `Result/Err`.
+
+If the types `A` and `B` are different, should only be used in type unsafe programs or when only one variant is guaranteed to happen.
+#}
 def Result/unwrap(res: Result(T, E)) -> Any:
   match res:
     case Result/Ok:
@@ -180,7 +184,7 @@ type Maybe(T):
   Some { value: T }
   None 
 
-#{ Removes the value on a Maybe #}
+#{ Returns the value inside the `Maybe` if it is `Some`, and returns `unreachable()` if it is `None`. #}  
 def Maybe/unwrap(m: Maybe(T)) -> T:
   match m:
     case Maybe/Some:
@@ -194,11 +198,15 @@ type Map(T):
   Node { value: Maybe(T), ~left: Map(T), ~right: Map(T) }
   Leaf  
 
-#{ Creates an empty Map #}
+#{ Initializes an empty map. #}
 def Map/empty() -> Map(T):
   return Map/Leaf
 
-#{ Gets a value on a Map #}
+#{
+  Retrieves a `value` from the `map` based on the `key` and returns a tuple with the value and the `map` unchanged. 
+  The logic for checking whether a value is or not contained in a `map` is not done in the `get` function, so if 
+  we try to get a key that is not in the map, the program will return `unreachable`. 
+#}
 def Map/get (map: Map(T), key: u24) -> (T, Map(T)):
   match map:
     case Map/Leaf:
@@ -229,7 +237,7 @@ def Map/get_check (map: Map(T), key: u24) -> (Maybe(T), Map(T)):
         (new_value, new_map) = Map/get_check(map.right, (key / 2))
         return (new_value, Map/Node(map.value, map.left, new_map))
 
-#{ Sets a value on a Map #}
+#{ Sets a value on a Map, returning the map with the value mapped. #}
 def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
   match map:
     case Map/Node:
@@ -248,7 +256,7 @@ def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
         return Map/Node(Maybe/None, Map/Leaf, Map/set(Map/Leaf, (key / 2),value))
 
 
-#{ Checks if a Map contains a given key #}
+#{ Checks if a `map` contains a given `key` and returns 0 or 1 along with and  `map` unchanged. #}
 def Map/contains (map: Map(T), key: u24) -> (u24, Map(T)):
   match map:
     case Map/Leaf:
@@ -267,7 +275,7 @@ def Map/contains (map: Map(T), key: u24) -> (u24, Map(T)):
         (new_value, new_map) = Map/contains(map.right, (key / 2))
         return (new_value, Map/Node(map.value, map.left, new_map))
 
-#{ Applies a funtion to a value on a Map #}
+#{ Applies a function to a value in the map and returns the map with the value mapped. #}
 def Map/map (map: Map(T), key: u24, f: T -> T) -> Map(T):
   match map:
     case Map/Leaf:
@@ -376,21 +384,37 @@ def IO/sleep(seconds: f24) -> IO(None):
 ## File IO
 
 ### File IO primitives
+
+#{ Opens a file with with `path` being given as a string and `mode` being a string with the mode to open the file in. The mode should be one of the following: #}
 def IO/FS/open(path: String, mode: String) -> IO(Result(u24, u24)):
   return IO/unwrap_inner(IO/call("OPEN", (path, mode)))
 
+#{ Closes the file with the given `file` descriptor. #}
 def IO/FS/close(file: u24) -> IO(Result(None, u24)):
   return IO/unwrap_inner(IO/call("CLOSE", file))
 
+#{
+Reads `num_bytes` bytes from the file with the given `file` descriptor.
+Returns a list of U24 with each element representing a byte read from the file.
+#}
 def IO/FS/read(file: u24, num_bytes: u24) -> IO(Result(List(u24), u24)):
   return IO/unwrap_inner(IO/call("READ", (file, num_bytes)))
 
+#{
+  Writes `bytes`, a list of U24 with each element representing a byte, to the file with the given `file` descriptor.
+  Returns nothing (`*`).
+#}
 def IO/FS/write(file: u24, bytes: List(u24)) -> IO(Result(None, u24)):
   return IO/unwrap_inner(IO/call("WRITE", (file, bytes)))
 
+#{ Moves the current position of the file with the given `file` descriptor to the given `offset`, an I24 or U24 number, in bytes. #}
 def IO/FS/seek(file: u24, offset: i24, mode: i24) -> IO(Result(None, u24)):
   return IO/unwrap_inner(IO/call("SEEK", (file, (offset, mode))))
 
+#{
+  Flushes the file with the given `file` descriptor.
+  Returns nothing (`*`).
+#}
 def IO/FS/flush(file: u24) -> IO(Result(None, u24)):
   return IO/unwrap_inner(IO/call("FLUSH", file))
 
@@ -409,7 +433,10 @@ IO/FS/SEEK_END : i24 = +2
 
 ### File utilities
 
-#{ Reads an entire file, returning a list of bytes. #}
+#{
+  Reads an entire file with the given `path` and returns a list of U24 with each 
+  element representing a byte read from the file.
+#}
 def IO/FS/read_file(path: String) -> IO(Result(List(u24), u24)):
   with IO:
     res_fd <- IO/FS/open(path, "r")
@@ -422,7 +449,10 @@ def IO/FS/read_file(path: String) -> IO(Result(List(u24), u24)):
       case Result/Err:
         return wrap(Result/Err(res_fd.val))
 
-#{ Reads the remaining contents of a file, returning a list of read bytes. #}
+#{
+  Reads until the end of the file with the given `file` descriptor.
+  Returns a list of U24 with each element representing a byte read from the file.
+#}
 def IO/FS/read_to_end(fd: u24) -> IO(Result(List(u24), u24)):
   return IO/FS/read_to_end.read_chunks(fd, [])
 
@@ -441,7 +471,10 @@ def IO/FS/read_to_end.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result
       case Result/Err:
         return wrap(Result/Err(res_chunk.val))
 
-#{ Reads a single line from a file, returning a list of bytes. #}
+#{
+  Reads a line from the file with the given `file` descriptor.
+  Returns a list of U24 with each element representing a byte read from the file.
+#}
 def IO/FS/read_line(fd: u24) -> IO(Result(List(u24), u24)):
   return IO/FS/read_line.read_chunks(fd, [])
 
@@ -480,7 +513,7 @@ def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result(L
       case Result/Err:
         return wrap(Result/Err(res_chunk.val))
 
-#{ Writes a list of bytes to a file given by a path. #}
+#{ Writes `bytes`, a list of U24 with each element representing a byte, as the entire content of the file with the given `path`. #}
 def IO/FS/write_file(path: String, bytes: List(u24)) -> IO(Result(None, u24)):
   with IO:
     res_f <- IO/FS/open(path, "w")
@@ -495,7 +528,7 @@ def IO/FS/write_file(path: String, bytes: List(u24)) -> IO(Result(None, u24)):
 
 ### Standard input and output utilities
 
-#{ Prints a string to stdout, encoding it with utf-8. #}
+#{ Prints the string `text` to the standard output, encoded with utf-8. #}
 def IO/print(text: String) -> IO(None):
   with IO:
     res <- IO/FS/write(IO/FS/STDOUT, String/encode_utf8(text))
@@ -503,8 +536,8 @@ def IO/print(text: String) -> IO(None):
 
 #{
   IO/input() -> IO String
-  Read characters from stdin until a newline is found.
-  Returns the read input decoded as utf-8.
+  Reads characters from the standard input until a newline is found.
+  Returns the read input as a String decoded with utf-8.
 #}
 def IO/input() -> IO(Result(String, u24)):
   return IO/input.go(DiffList/new)
@@ -534,27 +567,30 @@ def IO/input.go(acc: List(u24) -> List(u24)) -> IO(Result(String, u24)):
 ### Dynamically linked libraries
 
 #{
-  Returns an unique id to the library object encoded as a u24
-  'path' is the path to the library file.
-  'lazy' is a boolean encoded as a u24 that determines if all functions are loaded lazily or upfront.
+  Loads a dynamic library file.
 #}
 def IO/DyLib/open(path: String, lazy: u24) -> IO(Result(u24, String)):
   return IO/unwrap_inner(IO/call("DL_OPEN", (path, lazy)))
+#{
+  - `path` is the path to the library file.
+  - `lazy` is a boolean encoded as a `u24` that determines if all functions are loaded lazily (`1`) or upfront (`0`).
+  - Returns an unique id to the library object encoded as a `u24`.
+#}
 
 #{
   Calls a function of a previously opened library.
-  The returned value is determined by the called function.
-  'dl' is the id of the library object.
-  'fn' is the name of the function in the library.
-  'args' are the arguments to the function. The expected values depend on the called function.
+  - `dl` is the id of the library object.
+  - `fn` is the name of the function in the library.
+  - `args` are the arguments to the function. The expected values depend on the called function.
+  - The returned value is determined by the called function.
 #}
 def IO/DyLib/call(dl: u24, fn: String, args: Any) -> IO(Result(Any, String)):
   return IO/unwrap_inner(IO/call("DL_CALL", (dl, (fn, args))))
 
 #{
   Closes a previously open library.
-  Returns nothing.
-  'dl' is the id of the library object.
+  - `dl` is the id of the library object.
+  - Returns nothing (`*`).
 #}
 def IO/DyLib/close(dl: u24) -> IO(Result(None, String)):
   return IO/unwrap_inner(IO/call("DL_CLOSE", dl))
@@ -615,6 +651,7 @@ hvm u24/to_f24 -> (u24 -> f24):
 hvm i24/to_f24 -> (i24 -> f24):
   ($([f24] ret) ret)
 
+#{ Casts an u24 native number to a string. #}
 def u24/to_string(n: u24) -> String:
   def go(n: u24) -> String -> String:
     r = n % 10
@@ -630,10 +667,7 @@ def u24/to_string(n: u24) -> String:
 
 Utf8/REPLACEMENT_CHARACTER : u24 = '\u{FFFD}'
 
-#{
-  Decodes a sequence of bytes to a String using utf-8 encoding.
-  Invalid utf-8 sequences are replaced with Utf8/REPLACEMENT_CHARACTER.
-#}
+#{ Decodes a sequence of bytes to a String using utf-8 encoding. #}
 String/decode_utf8 (bytes: (List u24)) : String
 String/decode_utf8 [] = String/Nil
 String/decode_utf8 bytes =
@@ -643,10 +677,7 @@ String/decode_utf8 bytes =
     List/Cons: (String/Cons got (String/decode_utf8 rest))
   }
 
-#{
-  Decodes one utf-8 character from the start of a sequence of bytes.
-  Returns the decoded character and the remaining bytes.
-#}
+#{ Decodes a utf-8 character, returns a tuple containing the rune and the rest of the byte sequence. #}
 Utf8/decode_character (bytes: (List u24)) : (u24, (List u24))
 Utf8/decode_character [] = (0, [])
 Utf8/decode_character [a] = if (<= a 0x7F) { (a, []) } else { (Utf8/REPLACEMENT_CHARACTER, []) }
@@ -774,8 +805,8 @@ hvm Math/log -> (f24 -> f24 -> f24):
 
 #{
   Math/atan2(x: f24, y: f24) -> f24
+  Computes the arctangent of `y / x`.
   Has the same behaviour as `atan2f` in the C math lib.
-  Computes the arctangent of the quotient of its two arguments.
 #}
 hvm Math/atan2 -> (f24 -> f24 -> f24):
   ($([&] $(y ret)) (y ret))
