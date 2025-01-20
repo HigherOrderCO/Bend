@@ -6,7 +6,7 @@ type List(T):
   Nil
   Cons { head: T, ~tail: List(T) }
 
-# Returns the length of a list and the list itself.
+#{ Returns the length of a list and the list itself. #}
 def List/length(xs: List(T)) -> (u24, List(T)):
   fold xs with len=0, acc=DiffList/new:
     case List/Nil:
@@ -14,7 +14,7 @@ def List/length(xs: List(T)) -> (u24, List(T)):
     case List/Cons:
       return xs.tail(len + 1, DiffList/append(acc, xs.head))
 
-# Reverses a list.
+#{ Reverses a list. #}
 def List/reverse(xs: List(T)) -> List(T):
   fold xs with acc=[]:
     case List/Nil:
@@ -22,18 +22,20 @@ def List/reverse(xs: List(T)) -> List(T):
     case List/Cons:
       return xs.tail(List/Cons(xs.head, acc))
 
-# Flattens a list of lists.
+#{ Flattens a list of lists. #}
 List/flatten (xs: (List (List T))) : (List T)
 List/flatten (List/Cons x xs) = (List/concat x (List/flatten xs))
 List/flatten (List/Nil)       = (List/Nil)
 
-# Concatenates two lists.
+#{ Concatenates two lists. #}
 List/concat(xs: (List T)) (ys: (List T)) : (List T)
 List/concat (List/Cons x xs) ys = (List/Cons x (List/concat xs ys))
 List/concat (List/Nil)       ys = ys
 
-# Splits a list into two lists at the first value that passes a condition.
-# Returns the original list if the value is not found
+#{
+  Splits a list into two lists at the first value that passes a condition.
+  Returns the original list if the value is not found
+#}
 def List/split_once(
   xs: List(T),
   cond: T -> u24
@@ -54,7 +56,7 @@ def List/split_once.go(
       else:
         return List/split_once.go(xs.tail, cond, DiffList/append(acc, xs.head))
 
-# Filters a list based on a predicate function.
+#{ Filters a list based on a predicate function. #}
 List/filter (xs: (List T)) (pred: T -> u24) : (List T)
 List/filter (List/Nil)       _    = List/Nil
 List/filter (List/Cons x xs) pred =
@@ -64,7 +66,7 @@ List/filter (List/Cons x xs) pred =
     (List/filter xs pred)
   }
 
-# Checks if two strings are equal.
+#{ Checks if two strings are equal. #}
 String/equals (s1: String) (s2: String) : u24
 String/equals (String/Nil) (String/Nil) = 1
 String/equals (String/Cons x xs) (String/Cons y ys) =
@@ -75,7 +77,7 @@ String/equals (String/Cons x xs) (String/Cons y ys) =
   }
 String/equals * * = 0
 
-# Splits a list into two lists at the first occurrence of a value.
+#{ Splits a list into two lists at the first occurrence of a value. #}
 String/split (s: String) (delimiter: u24) : (List String)
 String/split s delim = (String/split.go s delim [""])
 
@@ -83,41 +85,41 @@ String/split.go (cs: String) (delim: u24) (acc: (List String)) : (List String)
 String/split.go (String/Nil) _ acc = (List/reverse acc)
 String/split.go (String/Cons c cs) delim acc =
   if (== c delim) {
-    # Start a new split string
+#{ Start a new split string #}
     (String/split.go cs delim (List/Cons String/Nil acc))
   } else {
     match acc {
-      # Add the current character to the current split string
+#{ Add the current character to the current split string #}
       List/Cons: (String/split.go cs delim (List/Cons (String/Cons c acc.head) acc.tail))
-      # Should be unreachable
+#{ Should be unreachable #}
       List/Nil: []
     }
   }
 
-# Create a new difference list
+#{ Create a new difference list #}
 def DiffList/new() -> (List(T) -> List(T)):
   return lambda x: x
 
-# Creates a new difference list with just the given value.
+#{ Creates a new difference list with just the given value. #}
 def DiffList/wrap(head: T) -> (List(T) -> List(T)):
   return lambda tail: List/Cons(head, tail)
 
-# Append a value to the end of the difference list
+#{ Append a value to the end of the difference list #}
 def DiffList/append(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T)):
   return lambda x: diff(List/Cons(val, x))
 
-# Concatenates two difference lists.
+#{ Concatenates two difference lists. #}
 def DiffList/concat(
   left: List(T) -> List(T),
   right: List(T) -> List(T)
 ) -> (List(T) -> List(T)):
   return lambda x: left(right(x))
 
-# Append a value to the beginning of the difference list
+#{ Append a value to the beginning of the difference list #}
 def DiffList/cons(diff: List(T) -> List(T), val: T) -> (List(T) -> List(T)):
   return lambda x: List/Cons(val, diff(x))
 
-# Convert a difference list to a list
+#{ Convert a difference list to a list #}
 def DiffList/to_list(diff: List(T) -> List(T)) -> (List(T)):
   return diff(List/Nil)
 
@@ -132,8 +134,10 @@ def Result/unwrap(res: Result(T, E)) -> Any:
     case Result/Err:
       return res.val
 
-# Returns the second result if the first one is `Ok`.
-# Otherwise, returns the `Err` of the first result.
+#{
+  Returns the second result if the first one is `Ok`.
+  Otherwise, returns the `Err` of the first result.
+#}
 def Result/and(fst: Result(A, E), snd: Result(B, E)) -> Result(B, E):
   match fst:
     case Result/Ok:
@@ -141,7 +145,7 @@ def Result/and(fst: Result(A, E), snd: Result(B, E)) -> Result(B, E):
     case Result/Err:
       return fst
 
-# Maps the error value of a result.
+#{ Maps the error value of a result. #}
 def Result/map_err(res: Result(T, E), f: E -> F) -> Result(T, F):
   match res:
     case Result/Ok:
@@ -153,7 +157,7 @@ type Tree(T):
   Node { ~left: Tree(T), ~right: Tree(T) }
   Leaf { value: T }
 
-# Returns a List converted from a Tree.
+#{ Returns a List converted from a Tree. #}
 def Tree/to_list(tree: Tree(T)) -> List(T):
   fold tree:
     case Tree/Leaf:
@@ -162,7 +166,7 @@ def Tree/to_list(tree: Tree(T)) -> List(T):
       list = DiffList/concat(tree.left, tree.right)
   return DiffList/to_list(list)
 
-# Reverses a tree swapping right and left leaves.
+#{ Reverses a tree swapping right and left leaves. #}
 def Tree/reverse(tree: Tree(T)) -> Tree(T):
   fold tree:
     case Tree/Leaf:
@@ -170,13 +174,13 @@ def Tree/reverse(tree: Tree(T)) -> Tree(T):
     case Tree/Node:
       return ![tree.right, tree.left]
 
-# MAYBE Impl
+#{ MAYBE Impl #}
 
 type Maybe(T):
   Some { value: T }
   None 
 
-# Removes the value on a Maybe
+#{ Removes the value on a Maybe #}
 def Maybe/unwrap(m: Maybe(T)) -> T:
   match m:
     case Maybe/Some:
@@ -184,17 +188,17 @@ def Maybe/unwrap(m: Maybe(T)) -> T:
     case Maybe/None:
       return unreachable()
 
-# MAP Impl
+#{ MAP Impl #}
 
 type Map(T):
   Node { value: Maybe(T), ~left: Map(T), ~right: Map(T) }
   Leaf  
 
-# Creates an empty Map
+#{ Creates an empty Map #}
 def Map/empty() -> Map(T):
   return Map/Leaf
 
-# Gets a value on a Map
+#{ Gets a value on a Map #}
 def Map/get (map: Map(T), key: u24) -> (T, Map(T)):
   match map:
     case Map/Leaf:
@@ -210,7 +214,7 @@ def Map/get (map: Map(T), key: u24) -> (T, Map(T)):
         return(got, Map/Node(map.value, map.left, rest))
 
 
-# Checks if a node has a value on a given key, returning Maybe/Some if it does, Maybe/None otherwise
+#{ Checks if a node has a value on a given key, returning Maybe/Some if it does, Maybe/None otherwise #}
 def Map/get_check (map: Map(T), key: u24) -> (Maybe(T), Map(T)):
   match map:
     case Map/Leaf:
@@ -225,7 +229,7 @@ def Map/get_check (map: Map(T), key: u24) -> (Maybe(T), Map(T)):
         (new_value, new_map) = Map/get_check(map.right, (key / 2))
         return (new_value, Map/Node(map.value, map.left, new_map))
 
-# Sets a value on a Map
+#{ Sets a value on a Map #}
 def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
   match map:
     case Map/Node:
@@ -244,7 +248,7 @@ def Map/set (map: Map(T), key: u24, value: T) -> Map(T):
         return Map/Node(Maybe/None, Map/Leaf, Map/set(Map/Leaf, (key / 2),value))
 
 
-# Checks if a Map contains a given key
+#{ Checks if a Map contains a given key #}
 def Map/contains (map: Map(T), key: u24) -> (u24, Map(T)):
   match map:
     case Map/Leaf:
@@ -263,7 +267,7 @@ def Map/contains (map: Map(T), key: u24) -> (u24, Map(T)):
         (new_value, new_map) = Map/contains(map.right, (key / 2))
         return (new_value, Map/Node(map.value, map.left, new_map))
 
-# Applies a funtion to a value on a Map
+#{ Applies a funtion to a value on a Map #}
 def Map/map (map: Map(T), key: u24, f: T -> T) -> Map(T):
   match map:
     case Map/Leaf:
@@ -276,7 +280,7 @@ def Map/map (map: Map(T), key: u24, f: T -> T) -> Map(T):
       else:
         return Map/Node(map.value, map.left, Map/map(map.right, (key / 2), f))
 
-# IO Impl
+#{ IO Impl #}
 
 type IO(T):
   Done { magic: (u24, u24), expr: T }
@@ -309,29 +313,33 @@ def IO/bind(a: IO(A), b: ((Id -> Id) -> A -> IO(B))) -> IO(B):
     case IO/Call:
       return IO/Call(a.magic, a.func, a.argm, lambda x: IO/bind(a.cont(x), b))
 
-# Calls an IO by its name with the given arguments.
-#
-# The arguments are untyped and not checked for type correctness.
-# If type safety is desired, this function should be wrapped with
-# another that checks the types of the arguments and of the return.
-#
-# Always returns a `Result` where the error is an `IOError`, a type
-# that either contains an internal error of the IO function, like an
-# `errno` in the case of FS functions, or a general Bend IO error,
-# like a type error if the arguments are invalid or a name error if
-# the called IO is not found.
+#{
+  Calls an IO by its name with the given arguments.
+  
+  The arguments are untyped and not checked for type correctness.
+  If type safety is desired, this function should be wrapped with
+  another that checks the types of the arguments and of the return.
+  
+  Always returns a `Result` where the error is an `IOError`, a type
+  that either contains an internal error of the IO function, like an
+  `errno` in the case of FS functions, or a general Bend IO error,
+  like a type error if the arguments are invalid or a name error if
+  the called IO is not found.
+#}
 def IO/call(func: String, argm: Any) -> IO(Result(Any, IOError(Any))):
   return IO/Call(IO/MAGIC, func, argm, lambda x: IO/Done(IO/MAGIC, x))
 
-# Maps the result of an IO.
+#{ Maps the result of an IO. #}
 def IO/map(io: IO(A), f: A -> B) -> IO(B):
   with IO:
     a <- io
     return wrap(f(a))
 
-# Unwraps the `IOError` of the result of an IO, returning the `Inner` variant.
-#
-# Should only be called if the other `IOError` variants are unreachable.
+#{
+  Unwraps the `IOError` of the result of an IO, returning the `Inner` variant.
+  
+  Should only be called if the other `IOError` variants are unreachable.
+#}
 def IO/unwrap_inner(io: IO(Result(A, IOError(B)))) -> IO(Result(A, B)):
   with IO:
     res <- io
@@ -343,20 +351,22 @@ def IO/unwrap_inner(io: IO(Result(A, IOError(B)))) -> IO(Result(A, B)):
 
 ## Time and sleep
 
-# Returns a monotonically increasing nanosecond timestamp as an u48
-# encoded as a pair of u24s.
+#{
+  Returns a monotonically increasing nanosecond timestamp as an u48
+  encoded as a pair of u24s.
+#}
 def IO/get_time() -> IO((u24, u24)):
   with IO:
     res <- IO/call("GET_TIME", *)
     return wrap(Result/unwrap(res))
 
-# Sleeps for the given number of nanoseconds, given by an u48 encoded as a pair of u24s.
+#{ Sleeps for the given number of nanoseconds, given by an u48 encoded as a pair of u24s. #}
 def IO/nanosleep(hi_lo: (u24, u24)) -> IO(None):
   with IO:
     res <- IO/call("SLEEP", hi_lo)
     return wrap(Result/unwrap(res))
 
-# Sleeps for a given amount of seconds as a float.
+#{ Sleeps for a given amount of seconds as a float. #}
 def IO/sleep(seconds: f24) -> IO(None):
   nanos = seconds * 1_000_000_000.0
   lo = f24/to_u24(nanos % 0x1_000_000.0)
@@ -390,16 +400,16 @@ IO/FS/STDOUT : u24 = 1
 IO/FS/STDERR : u24 = 2
 
 ### Seek modes
-# Seek from start of file.
+#{ Seek from start of file. #}
 IO/FS/SEEK_SET : i24 = +0
-# Seek from current position.
+#{ Seek from current position. #}
 IO/FS/SEEK_CUR : i24 = +1
-# Seek from end of file.
+#{ Seek from end of file. #}
 IO/FS/SEEK_END : i24 = +2
 
 ### File utilities
 
-# Reads an entire file, returning a list of bytes.
+#{ Reads an entire file, returning a list of bytes. #}
 def IO/FS/read_file(path: String) -> IO(Result(List(u24), u24)):
   with IO:
     res_fd <- IO/FS/open(path, "r")
@@ -412,7 +422,7 @@ def IO/FS/read_file(path: String) -> IO(Result(List(u24), u24)):
       case Result/Err:
         return wrap(Result/Err(res_fd.val))
 
-# Reads the remaining contents of a file, returning a list of read bytes.
+#{ Reads the remaining contents of a file, returning a list of read bytes. #}
 def IO/FS/read_to_end(fd: u24) -> IO(Result(List(u24), u24)):
   return IO/FS/read_to_end.read_chunks(fd, [])
 
@@ -431,7 +441,7 @@ def IO/FS/read_to_end.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result
       case Result/Err:
         return wrap(Result/Err(res_chunk.val))
 
-# Reads a single line from a file, returning a list of bytes.
+#{ Reads a single line from a file, returning a list of bytes. #}
 def IO/FS/read_line(fd: u24) -> IO(Result(List(u24), u24)):
   return IO/FS/read_line.read_chunks(fd, [])
 
@@ -470,7 +480,7 @@ def IO/FS/read_line.read_chunks(fd: u24, chunks: List(List(u24))) -> IO(Result(L
       case Result/Err:
         return wrap(Result/Err(res_chunk.val))
 
-# Writes a list of bytes to a file given by a path.
+#{ Writes a list of bytes to a file given by a path. #}
 def IO/FS/write_file(path: String, bytes: List(u24)) -> IO(Result(None, u24)):
   with IO:
     res_f <- IO/FS/open(path, "w")
@@ -485,15 +495,17 @@ def IO/FS/write_file(path: String, bytes: List(u24)) -> IO(Result(None, u24)):
 
 ### Standard input and output utilities
 
-# Prints a string to stdout, encoding it with utf-8.
+#{ Prints a string to stdout, encoding it with utf-8. #}
 def IO/print(text: String) -> IO(None):
   with IO:
     res <- IO/FS/write(IO/FS/STDOUT, String/encode_utf8(text))
     return wrap(Result/unwrap(res))
 
-# IO/input() -> IO String
-# Read characters from stdin until a newline is found.
-# Returns the read input decoded as utf-8.
+#{
+  IO/input() -> IO String
+  Read characters from stdin until a newline is found.
+  Returns the read input decoded as utf-8.
+#}
 def IO/input() -> IO(Result(String, u24)):
   return IO/input.go(DiffList/new)
 
@@ -521,37 +533,45 @@ def IO/input.go(acc: List(u24) -> List(u24)) -> IO(Result(String, u24)):
 
 ### Dynamically linked libraries
 
-# Returns an unique id to the library object encoded as a u24
-# 'path' is the path to the library file.
-# 'lazy' is a boolean encoded as a u24 that determines if all functions are loaded lazily or upfront.
+#{
+  Returns an unique id to the library object encoded as a u24
+  'path' is the path to the library file.
+  'lazy' is a boolean encoded as a u24 that determines if all functions are loaded lazily or upfront.
+#}
 def IO/DyLib/open(path: String, lazy: u24) -> IO(Result(u24, String)):
   return IO/unwrap_inner(IO/call("DL_OPEN", (path, lazy)))
 
-# Calls a function of a previously opened library.
-# The returned value is determined by the called function.
-# 'dl' is the id of the library object.
-# 'fn' is the name of the function in the library.
-# 'args' are the arguments to the function. The expected values depend on the called function.
+#{
+  Calls a function of a previously opened library.
+  The returned value is determined by the called function.
+  'dl' is the id of the library object.
+  'fn' is the name of the function in the library.
+  'args' are the arguments to the function. The expected values depend on the called function.
+#}
 def IO/DyLib/call(dl: u24, fn: String, args: Any) -> IO(Result(Any, String)):
   return IO/unwrap_inner(IO/call("DL_CALL", (dl, (fn, args))))
 
-# Closes a previously open library.
-# Returns nothing.
-# 'dl' is the id of the library object.
+#{
+  Closes a previously open library.
+  Returns nothing.
+  'dl' is the id of the library object.
+#}
 def IO/DyLib/close(dl: u24) -> IO(Result(None, String)):
   return IO/unwrap_inner(IO/call("DL_CLOSE", dl))
 
-# Lazy thunks
+#{ Lazy thunks #}
 
-# We can defer the evaluation of a function by wrapping it in a thunk.
-# Ex: @x (x @arg1 @arg2 @arg3 (f arg1 arg2 arg3) arg1 arg2 arg3)
-#
-# This is only evaluated when we call it with `(undefer my_thunk)`.
-# We can build a defered call directly or by by using `defer` and `defer_arg`.
-#
-# The example above can be written as:
-#
-# (defer_arg (defer_arg (defer_arg (defer @arg1 @arg2 @arg3 (f arg1 arg2 arg3)) arg1) arg2) arg3)
+#{
+  We can defer the evaluation of a function by wrapping it in a thunk.
+  Ex: @x (x @arg1 @arg2 @arg3 (f arg1 arg2 arg3) arg1 arg2 arg3)
+  
+  This is only evaluated when we call it with `(undefer my_thunk)`.
+  We can build a defered call directly or by by using `defer` and `defer_arg`.
+  
+  The example above can be written as:
+  
+  (defer_arg (defer_arg (defer_arg (defer @arg1 @arg2 @arg3 (f arg1 arg2 arg3)) arg1) arg2) arg3)
+#}
 def defer(val: T) -> (T -> T) -> T:
   return lambda x: x(val)
 
@@ -561,35 +581,37 @@ def defer_arg(defered: (Id -> Id) -> A -> B, arg: A) -> ((Id -> Id) -> B):
 def undefer(defered: (Id -> Id) -> T) -> T:
   return defered(lambda x: x)
 
-# A function that can be used in unreachable code.
-#
-# Is not type safe and if used in code that is actually reachable, will corrupt the program.
+#{
+  A function that can be used in unreachable code.
+  
+  Is not type safe and if used in code that is actually reachable, will corrupt the program.
+#}
 def unreachable() -> Any:
   return *
 
-# Native number casts
+#{ Native number casts #}
 
-# Casts a f24 number to a u24.
+#{ Casts a f24 number to a u24. #}
 hvm f24/to_u24 -> (f24 -> u24):
   ($([u24] ret) ret)
 
-# Casts an i24 number to a u24.
+#{ Casts an i24 number to a u24. #}
 hvm i24/to_u24 -> (i24 -> u24):
   ($([u24] ret) ret)
 
-# Casts a u24 number to an i24.
+#{ Casts a u24 number to an i24. #}
 hvm u24/to_i24 -> (u24 -> i24):
   ($([i24] ret) ret)
 
-# Casts a f24 number to an i24.
+#{ Casts a f24 number to an i24. #}
 hvm f24/to_i24 -> (f24 -> i24):
   ($([i24] ret) ret)
 
-# Casts a u24 number to a f24.
+#{ Casts a u24 number to a f24. #}
 hvm u24/to_f24 -> (u24 -> f24):
   ($([f24] ret) ret)
 
-# Casts an i24 number to a f24.
+#{ Casts an i24 number to a f24. #}
 hvm i24/to_f24 -> (i24 -> f24):
   ($([f24] ret) ret)
 
@@ -604,12 +626,14 @@ def u24/to_string(n: u24) -> String:
       return lambda t: go(d, String/Cons(c, t))
   return go(n, String/Nil)
 
-# String Encoding and Decoding
+#{ String Encoding and Decoding #}
 
 Utf8/REPLACEMENT_CHARACTER : u24 = '\u{FFFD}'
 
-# Decodes a sequence of bytes to a String using utf-8 encoding.
-# Invalid utf-8 sequences are replaced with Utf8/REPLACEMENT_CHARACTER.
+#{
+  Decodes a sequence of bytes to a String using utf-8 encoding.
+  Invalid utf-8 sequences are replaced with Utf8/REPLACEMENT_CHARACTER.
+#}
 String/decode_utf8 (bytes: (List u24)) : String
 String/decode_utf8 [] = String/Nil
 String/decode_utf8 bytes =
@@ -619,8 +643,10 @@ String/decode_utf8 bytes =
     List/Cons: (String/Cons got (String/decode_utf8 rest))
   }
 
-# Decodes one utf-8 character from the start of a sequence of bytes.
-# Returns the decoded character and the remaining bytes.
+#{
+  Decodes one utf-8 character from the start of a sequence of bytes.
+  Returns the decoded character and the remaining bytes.
+#}
 Utf8/decode_character (bytes: (List u24)) : (u24, (List u24))
 Utf8/decode_character [] = (0, [])
 Utf8/decode_character [a] = if (<= a 0x7F) { (a, []) } else { (Utf8/REPLACEMENT_CHARACTER, []) }
@@ -682,7 +708,7 @@ Utf8/decode_character (List/Cons a (List/Cons b (List/Cons c (List/Cons d rest))
     }
   }
 
-# Encodes a string to a sequence of bytes using utf-8 encoding.
+#{ Encodes a string to a sequence of bytes using utf-8 encoding. #}
 String/encode_utf8 (str: String) : (List u24)
 String/encode_utf8 (String/Nil)       = (List/Nil)
 String/encode_utf8 (String/Cons x xs) =
@@ -717,95 +743,107 @@ String/encode_utf8 (String/Cons x xs) =
     }
   }
 
-# Decodes a sequence of bytes to a String using ascii encoding.
+#{ Decodes a sequence of bytes to a String using ascii encoding. #}
 String/decode_ascii (bytes: (List u24)) : String
 String/decode_ascii (List/Cons x xs) = (String/Cons x (String/decode_ascii xs))
 String/decode_ascii (List/Nil)       = (String/Nil)
 
-# Encodes a string to a sequence of bytes using ascii encoding.
+#{ Encodes a string to a sequence of bytes using ascii encoding. #}
 String/encode_ascii (str: String) : (List u24)
 String/encode_ascii (String/Cons x xs) = (List/Cons x (String/encode_ascii xs))
 String/encode_ascii (String/Nil)       = (List/Nil)
 
-# Math
+#{ Math #}
 
-# Math/PI() -> f24
-# The Pi (π) constant.
+#{
+  Math/PI() -> f24
+  The Pi (π) constant.
+#}
 def Math/PI() -> f24:
   return 3.1415926535
 
 def Math/E() -> f24:
   return 2.718281828
 
-# Math/log(x: f24, base: f24) -> f24
-# Computes the logarithm of `x` with the specified `base`.
+#{
+  Math/log(x: f24, base: f24) -> f24
+  Computes the logarithm of `x` with the specified `base`.
+#}
 hvm Math/log -> (f24 -> f24 -> f24):
   (x ($([|] $(x ret)) ret))
 
-# Math/atan2(x: f24, y: f24) -> f24
-# Has the same behaviour as `atan2f` in the C math lib.
-# Computes the arctangent of the quotient of its two arguments.
+#{
+  Math/atan2(x: f24, y: f24) -> f24
+  Has the same behaviour as `atan2f` in the C math lib.
+  Computes the arctangent of the quotient of its two arguments.
+#}
 hvm Math/atan2 -> (f24 -> f24 -> f24):
   ($([&] $(y ret)) (y ret))
 
 
-# Math/sin(a: f24) -> f24
-# Computes the sine of the given angle in radians.
+#{
+  Math/sin(a: f24) -> f24
+  Computes the sine of the given angle in radians.
+#}
 hvm Math/sin -> (f24 -> f24):
   ($([<<0x0] a) a)
 
-# Math/cos(a: f24) -> f24
-# Computes the cosine of the given angle in radians.
+#{
+  Math/cos(a: f24) -> f24
+  Computes the cosine of the given angle in radians.
+#}
 hvm Math/cos -> (f24 -> f24):
   (a b)
   & @Math/PI ~ $([:/2.0] $([-] $(a $([<<0x0] b))))
 
-# Math/tan(a: f24) -> f24
-# Computes the tangent of the given angle in radians.
+#{
+  Math/tan(a: f24) -> f24
+  Computes the tangent of the given angle in radians.
+#}
 hvm Math/tan -> (f24 -> f24):
   ($([>>0x0] a) a)
 
-# Computes the cotangent of the given angle in radians.
+#{ Computes the cotangent of the given angle in radians. #}
 Math/cot (a: f24) : f24 =
   (/ 1.0 (Math/tan a))
 
-# Computes the secant of the given angle in radians.
+#{ Computes the secant of the given angle in radians. #}
 Math/sec (a: f24) : f24 =
   (/ 1.0 (Math/cos a))
 
-# Computes the cosecant of the given angle in radians.
+#{ Computes the cosecant of the given angle in radians. #}
 Math/csc (a: f24) : f24 =
   (/ 1.0 (Math/sin a))
 
-# Computes the arctangent of the given angle.
+#{ Computes the arctangent of the given angle. #}
 Math/atan (a: f24) : f24 =
   (Math/atan2 a 1.0)
 
-# Computes the arcsine of the given angle.
+#{ Computes the arcsine of the given angle. #}
 Math/asin (a: f24) : f24 =
   (Math/atan2 a (Math/sqrt (- 1.0 (* a a))))
 
-# Computes the arccosine of the given angle.
+#{ Computes the arccosine of the given angle. #}
 Math/acos (a: f24) : f24 =
   (Math/atan2 (Math/sqrt (- 1.0 (* a a))) a)
 
-# Converts degrees to radians.
+#{ Converts degrees to radians. #}
 Math/radians (a: f24) : f24 =
   (* a (/ Math/PI 180.0))
 
-# Computes the square root  of the given number.
+#{ Computes the square root  of the given number. #}
 Math/sqrt (n: f24) : f24 =
   (** n 0.5)
 
-# Round float up to the nearest integer.
+#{ Round float up to the nearest integer. #}
 def Math/ceil(n: f24) -> f24:
   i_n = i24/to_f24(f24/to_i24(n))
   if n <= i_n:
     return i_n
   else:
     return i_n + 1.0
-
-# Round float down to the nearest integer.
+ 
+#{ Round float down to the nearest integer. #}
 def Math/floor(n: f24) -> f24:
   i_n = i24/to_f24(f24/to_i24(n))
   if n < i_n:
@@ -813,7 +851,7 @@ def Math/floor(n: f24) -> f24:
   else:
     return i_n
 
-# Round float to the nearest integer.
+#{ Round float to the nearest integer. #}
 def Math/round(n: f24) -> f24:
   i_n = i24/to_f24(f24/to_i24(n))
   if (n - i_n) < 0.5:

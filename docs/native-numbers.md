@@ -54,7 +54,7 @@ If you mix two numbers of different types, HVM will interpret the binary represe
 
 #### Casting numbers
 
-We introduced a way to convert between the different number types, and using it is very easy, here's an example:
+There is a way to convert between the different number types, and using it is very easy, here's an example:
 
 ```py
 def main() -> _:

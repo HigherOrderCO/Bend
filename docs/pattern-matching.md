@@ -60,20 +60,20 @@ They offer more advanced pattern matching capabilities and also take care linear
 Pattern matching equations are transformed into a tree of `match` and `switch` terms from left to right.
 ```py
 # These two are equivalent
-(Foo 0 false (Cons h1 (Cons h2 t))) = (A h1 h2 t)
-(Foo 0 * *) = B
+(Foo 0 false (Cons h1 (Cons h2 t))) = (Bar h1 h2 t)
+(Foo 0 * *) = Baz
 (Foo n false *) = n
 (Foo * true *) = 0
 
 Foo = λarg1 λarg2 λarg3 (switch arg1 {
   0: λarg2 λarg3 match arg2 {
-    true: λarg3 B
+    true: λarg3 Baz
     false: λarg3 match arg3 {
       Cons: (match arg3.tail {
         Cons: λarg3.head (A arg3.head arg3.tail.head arg3.tail.tail)
-        Nil: λarg3.head B
+        Nil: λarg3.head Baz
       } arg3.head)
-      Nil: B
+      Nil: Baz
     }
   }
   _: λarg2 λarg3 (match arg2 {
@@ -88,13 +88,14 @@ To ensure that recursive pattern matching functions don't loop in strict mode, i
 ```py
 # This is what the Foo function actually compiles to.
 # With -Olinearize-matches and -Ofloat-combinators (default on strict mode)
+(Foo__C0) = λ* λa λb λc (Bar c a b)
 
-(Foo__C5) = λa switch a { 0: λ* B; _: Foo__C4; }   # Foo.case_0
+(Foo__C5) = λa switch a { 0: λ* Baz; _: Foo__C4; }   # Foo.case_0
 (Foo__C4) = λ* λa (a Foo__C3)                      # Foo.case_0.case_false
-(Foo__C3) = λa switch a { 0: B; _: Foo__C2; }      # Part of cons pattern matching
+(Foo__C3) = λa switch a { 0: Bar; _: Foo__C2; }      # Part of cons pattern matching
 (Foo__C2) = λ* λa λb (b Foo__C1 a)                 # Foo.case_0.case_false.case_cons
-(Foo__C1) = λa switch a { 0: λ* B; _: Foo__C0; }   # Part of cons pattern matching
-(Foo__C0) = λ* λa λb λc (A c a b)                  # Foo.case_0.case_false.case_cons.case_cons
+(Foo__C1) = λa switch a { 0: λ* Baz; _: Foo__C0; }   # Part of cons pattern matching
+(Foo__C0) = λ* λa λb λc (Bar c a b)                  # Foo.case_0.case_false.case_cons.case_cons
 
 (Foo__C6) = λ* λa (+ a 0)                          # Foo.case_+.case_false
 (Foo__C7) = λa switch a { 0: λ* 0; _: Foo__C6; }   # Part of bool pattern matching

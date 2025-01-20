@@ -6,8 +6,8 @@ You can read the full reference for both of them [here](docs/syntax.md), but the
 To see some more complex examples programs, check out the [examples](examples/) folder.
 
 ### Basic features
-Types in Bend are completely optional - you can write programs without any type annotations, but we'll be typing every function for clarity. We can start with a basic program that adds the numbers 3 and 2. Though 
 
+We can start with a basic program that adds the numbers 3 and 2.
 ```py
 def main() -> u24:
   return 2 + 3
@@ -85,6 +85,16 @@ This defines a constructor function for each variant of the type, with names `My
 
 Like most things in bend (except tuples and numbers), types defined with `type` and `object` become lambda encoded functions.
 You can read how this is done internally by the compiler in [Defining data types](docs/defining-data-types.md) and [Pattern matching](docs/pattern-matching.md).
+
+### Optional typing
+
+Types in Bend are completely optional - you can write programs without any type annotations, but we'll be typing every function for clarity. For instace:
+```py
+def main():
+  sum = add(2, 3)
+  return sum
+```
+Here, this program will run just fine and return the exact same result as the example shown in [Basic features](#basic-features)
 
 ### Pattern matching
 
@@ -267,7 +277,21 @@ Floating point numbers must have the decimal point `.` and can optionally take a
 The three number types are fundamentally different.
 If you mix two numbers of different types HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now.
 
-Bend now has a way to convert between the different number types!
+You can use `switch` to pattern match on unsigned native numbers:
+
+```py
+switch x = 4:
+  # From '0' to n, ending with the default case '_'.
+  case 0:  "zero"
+  case 1:  "one"
+  case 2:  "two"
+  # The default case binds the name <arg>-<n>
+  # where 'arg' is the name of the argument and 'n' is the next number.
+  # In this case, it's 'x-3', which will have value (4 - 3) = 1
+  case _:  String.concat("other: ", (String.from_num x-3))
+```
+
+You can also convert between the number types using the builtin casting functions.
 Here's some of the builtin functions you can use to cast any native number into the corresponding type:
 
 ```py
@@ -282,8 +306,7 @@ You can find the other casting functions and their declarations at [builtins.md]
 ### Other builtin types
 
 Bend has Lists and Strings, which support Unicode characters.
-
-# These are the definitions of the builtin types.
+This is how they are defined:
 ```py
 type String:
   Nil
@@ -343,7 +366,7 @@ def empty_map() -> Map(T):
   return {}
 
 def init_map() -> Map(String):
-  return { 1: "one", 2: "two"}
+  return { 1: "one", 2: "two", `blue`: "0x0000FF" }
 
 def main() -> String:
   map = init_map
