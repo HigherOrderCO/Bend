@@ -368,7 +368,7 @@ Could be represented as:
 
 ```
 tree = Tree/Node{
-  left: Tree/Node{left: Tree/Leaf {value: 1}, right: Tree/Leaf {value: 2}},
+  left:  Tree/Node{left: Tree/Leaf {value: 1}, right: Tree/Leaf {value: 2}},
   right: Tree/Node{left: Tree/Leaf {value: 3}, right: Tree/Leaf {value: 4}},
 }
 ```
