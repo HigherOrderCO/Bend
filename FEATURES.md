@@ -141,7 +141,7 @@ def main() -> u24:
 
   return MyTree.sum(x)
 ```
-It should be noted that in this case, since MyTree has no type annotations, its fields will be considered of type Any, which partially disables the type checker for these values. Thus the fact that `x` is holding a tree of u24 and not a tree of anything else won't be checked and it's up to the user to make sure it's correct.
+> Note: since MyTree has no type annotations, its fields will be considered of type `Any`, which partially disables the type checker for these values. Thus the fact that `x` is holding a tree of u24 and not a tree of anything else won't be checked and it's up to the user to make sure it's correct.
 
 
 These are equivalent to inline recursive functions that create a tree and consume it.

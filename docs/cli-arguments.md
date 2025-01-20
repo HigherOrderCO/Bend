@@ -33,7 +33,7 @@ def main(x, y):
 
 # Calling with two argument
 > bend run <path> +5 +3
-{+2 -2}#
+{+2 -2}
 # Calling with three arguments
 # In this case, the third argument doesn't change anything
 # due to the underlying interaction rules.
