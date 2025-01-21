@@ -267,7 +267,9 @@ def Map/empty() -> Map(T)
 
 ```rust
 #{
-  Retrieves a `value` from the `map` based on the `key` and returns a tuple with the value and the `map` unchanged. The logic for checking whether a value is or not contained in a `map` is not done in the `get` function, so if we try to get a key that is not in the map, the program will return `unreachable`. 
+  Retrieves a `value` from the `map` based on the `key` and returns a tuple with the value and the `map` unchanged.
+  
+  The logic for checking whether a value is or not contained in a `map` is not done in the `get` function, so if we try to get a key that is not in the map, the program will return `unreachable`. 
 #}
 def Map/get (map: Map(T), key: u24) -> (T, Map(T))
 ```
