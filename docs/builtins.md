@@ -258,7 +258,7 @@ Here, `map` must be the name of the `Map` variable, and the keys inside `[]` can
 #{
   Initializes an empty map.
 #} 
-Map/empty = Map/Leaf
+def Map/empty() -> Map(T)
 ```
 
 ### Map/get

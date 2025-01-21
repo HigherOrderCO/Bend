@@ -12,8 +12,7 @@
 | `-Oinline` `-Ono-inline`                                                 | Disabled      | [inline](#inline)                         |
 | `-Ocheck-net-size` `-Ono-check-net-size`                                 | Disabled      | [check-net-size](#check-net-size)         |
 | `-Oadt-scott` `-Oadt-num-scott`                                          | adt-num-scott | [adt-encoding](#adt-encoding)             |
-| `-Otype-check` `-Ono-type-check`                                         | type-check    |  Checks the type compatibility            |
-
+| `-Otype-check` `-Ono-type-check`                                         | type-check    | [type-checking](#type-checking)            |
 ## Eta-reduction
 
 Enables or disables Eta Reduction for defined functions.
@@ -263,10 +262,10 @@ Note: IO is **only** available with `-Oadt-num-scott`.
 
 ## Type Checking
 
-Type checking is enabled by default and verifies and enforces the constraints of types. 
+Type checking is enabled by default and verifies and enforces the constraints of types. When enabled, verifies the type safety of the program based on the source code. If it passes the check, then the program is guaranteed to satisfy type constraints for all possible inputs.
 
 ```py
   def main() -> Bool: 
     return 3
 ```
-If type checking is enabled, The following program will throw a type error `Expected function type 'Bool' but found 'u24'`, whereas if it is disabled, it will compile successfully and return `3`.
+With type checking enabled, The following program will throw a type error `Expected function type 'Bool' but found 'u24'`, whereas if it is disabled, it will compile successfully and return `3`.

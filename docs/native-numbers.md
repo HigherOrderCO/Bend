@@ -49,8 +49,9 @@ minus_zero = -0.0
 
 ### Mixing number types
 
-The three number types are fundamentally different.
-If you mix two numbers of different types, HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now. Instead, you should make sure that all numbers are of the same type. 
+The three number types are fundamentally different. At the HVM level, both type and the operation are stored inside the number nodes as tags. One number stores the type, the other the operation.
+That means that we lose the type information of one of the numbers, which causes this behavior.
+During runtime, the executed numeric function depends on both the type tag and the operation tag. For example, the same tag is used for unsigned bitwise and floating point atan2, so if you mix two numbers of different types, HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now. Instead, you should make sure that all numbers are of the same type. 
 
 #### Casting numbers
 
@@ -65,10 +66,6 @@ def main() -> _:
   return (x, y, z)
 ```
 You can find more number casting functions and their declarations at [builtins.md](docs/builtins.md).
-
-At the HVM level, both type and the operation are stored inside the number nodes as tags. One number stores the type, the other the operation.
-That means that we lose the type information of one of the numbers, which causes this behavior.
-During runtime, the executed numeric function depends on both the type tag and the operation tag. For example, the same tag is used for unsigned bitwise and floating point atan2, so mixing number types can give you very unexpected results.
 
 
 ### Operations

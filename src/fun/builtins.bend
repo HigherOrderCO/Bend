@@ -178,7 +178,7 @@ def Tree/reverse(tree: Tree(T)) -> Tree(T):
     case Tree/Node:
       return ![tree.right, tree.left]
 
-#{ MAYBE Impl #}
+# MAYBE Impl 
 
 type Maybe(T):
   Some { value: T }
@@ -192,7 +192,7 @@ def Maybe/unwrap(m: Maybe(T)) -> T:
     case Maybe/None:
       return unreachable()
 
-#{ MAP Impl #}
+# MAP Impl
 
 type Map(T):
   Node { value: Maybe(T), ~left: Map(T), ~right: Map(T) }
@@ -288,7 +288,7 @@ def Map/map (map: Map(T), key: u24, f: T -> T) -> Map(T):
       else:
         return Map/Node(map.value, map.left, Map/map(map.right, (key / 2), f))
 
-#{ IO Impl #}
+# IO Impl
 
 type IO(T):
   Done { magic: (u24, u24), expr: T }
@@ -595,7 +595,7 @@ def IO/DyLib/call(dl: u24, fn: String, args: Any) -> IO(Result(Any, String)):
 def IO/DyLib/close(dl: u24) -> IO(Result(None, String)):
   return IO/unwrap_inner(IO/call("DL_CLOSE", dl))
 
-#{ Lazy thunks #}
+# Lazy thunks
 
 #{
   We can defer the evaluation of a function by wrapping it in a thunk.
@@ -625,7 +625,7 @@ def undefer(defered: (Id -> Id) -> T) -> T:
 def unreachable() -> Any:
   return *
 
-#{ Native number casts #}
+# Native number casts
 
 #{ Casts a f24 number to a u24. #}
 hvm f24/to_u24 -> (f24 -> u24):
@@ -784,7 +784,7 @@ String/encode_ascii (str: String) : (List u24)
 String/encode_ascii (String/Cons x xs) = (List/Cons x (String/encode_ascii xs))
 String/encode_ascii (String/Nil)       = (List/Nil)
 
-#{ Math #}
+# Math
 
 #{
   Math/PI() -> f24

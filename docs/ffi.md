@@ -13,7 +13,7 @@ def main():
     # The second argument is '0' if we want to load all functions immediately.
     # Otherwise it should be '1' when we want to load functions as we use them.
     # 'dl' is the unique id of the dynamic library.
-    dl <- Result/unwrap(IO/DyLib/open("./libbend_dirs.so", 0)) 
+    dl <- IO/DyLib/open("./libbend_dirs.so", 0)
 
     # We can now call functions from the dynamic library.
     # We need to know what functions are available in the dynamic library.
@@ -27,7 +27,8 @@ def main():
 
     # In our example, 'ls' receives a path as a String and
     # returns a String with the result of the 'ls' command.
-    files_bytes <- IO/DyLib/call(dl, "ls", "./") 
+    unwrapped_dl = Result/unwrap(dl)
+    files_bytes <- IO/DyLib/call(unwrapped_dl, "ls", "./") 
     files_str = String/decode_utf8(Result/unwrap(files_bytes)) 
     files = String/split(files_str, '\n')
 
@@ -40,14 +41,14 @@ def main():
         status = wrap(-1)
       case List/Nil:
         # The directory doesn't exist, create it.
-        * <- IO/DyLib/call(dl, "mkdir", "./my_dir")
+        * <- IO/DyLib/call(unwrapped_dl, "mkdir", "./my_dir")
         * <- IO/print("Directory created.\n")
         status = wrap(+0)
     status <- status
 
     # Here the program ends so we didn't need to close the dynamic library,
     # but it's good practice to do so once we know we won't need it anymore.
-    * <- IO/DyLib/close(dl)
+    * <- IO/DyLib/close(unwrapped_dl)
     return wrap(status)
 ```
 
