@@ -84,13 +84,13 @@ String/split.go (cs: String) (delim: u24) (acc: (List String)) : (List String)
 String/split.go (String/Nil) _ acc = (List/reverse acc)
 String/split.go (String/Cons c cs) delim acc =
   if (== c delim) {
-#{ Start a new split string #}
+  # Start a new split string.
     (String/split.go cs delim (List/Cons String/Nil acc))
   } else {
     match acc {
-#{ Add the current character to the current split string #}
+  # Add the current character to the current split string.
       List/Cons: (String/split.go cs delim (List/Cons (String/Cons c acc.head) acc.tail))
-#{ Should be unreachable #}
+  # Should be unreachable.
       List/Nil: []
     }
   }
@@ -385,7 +385,16 @@ def IO/sleep(seconds: f24) -> IO(None):
 
 ### File IO primitives
 
-#{ Opens a file with with `path` being given as a string and `mode` being a string with the mode to open the file in. The mode should be one of the following: #}
+#{ 
+  Opens a file with with `path` being given as a string and `mode` being a string with the mode to open the file in. 
+  The mode should be one of the following: 
+  "r": Read mode
+  "w": Write mode (write at the beginning of the file, overwriting any existing content)
+  "a": Append mode (write at the end of the file)
+  "r+": Read and write mode
+  "w+": Read and write mode
+  "a+": Read and append mode
+#}
 def IO/FS/open(path: String, mode: String) -> IO(Result(u24, u24)):
   return IO/unwrap_inner(IO/call("OPEN", (path, mode)))
 
@@ -786,13 +795,11 @@ String/encode_ascii (String/Nil)       = (List/Nil)
 
 # Math
 
-#{
-  Math/PI() -> f24
-  The Pi (π) constant.
-#}
+#{ The Pi (π) constant.#}
 def Math/PI() -> f24:
   return 3.1415926535
 
+#{ Euler's number #}
 def Math/E() -> f24:
   return 2.718281828
 
