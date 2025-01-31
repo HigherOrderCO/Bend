@@ -41,7 +41,7 @@ UnwrapOrZero x = (x λtag switch tag {
 
 # Otherwise, if the current encoding is 'adt-scott' it becomes:
 Maybe/Some = λval λMaybe/Some λMaybe/None (Maybe/Some val)
-Maybe/None = λMaybe/Some λMaybe/None None
+Maybe/None = λMaybe/Some λMaybe/None Maybe/None
 UnwrapOrZero x = (x λx.val x.val 0)
 ```
 
