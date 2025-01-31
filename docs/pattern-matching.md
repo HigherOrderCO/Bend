@@ -153,7 +153,7 @@ Foo _ = 3
 Hi (String/Cons 'h' (String/Cons 'i' String/Nil)) = 2
 Hi _ = 0
 
-Foo List/nil = 0
-Foo (List/cons x List/nil) = x
+Foo List/Nil = 0
+Foo (List/Cons x List/Nil) = x
 Foo _ = 3
 ```
