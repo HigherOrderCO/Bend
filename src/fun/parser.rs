@@ -537,7 +537,7 @@ impl<'a> FunParser<'a> {
       }
 
       // Number
-      if self.peek_one().map_or(false, |c| c.is_ascii_digit()) {
+      if self.peek_one().is_some_and(|c| c.is_ascii_digit()) {
         unexpected_tag(self)?;
         let num = self.parse_u32()?;
         return Ok(Pattern::Num(num));
@@ -719,7 +719,7 @@ impl<'a> FunParser<'a> {
       }
 
       // Native Number
-      if self.peek_one().map_or(false, is_num_char) {
+      if self.peek_one().is_some_and(is_num_char) {
         unexpected_tag(self)?;
         let num = self.parse_number()?;
         return Ok(Term::Num { val: num });
@@ -1499,7 +1499,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     self.consume_exactly(keyword)?;
     let end_idx = *self.index();
     let input = &self.input()[*self.index()..];
-    let next_is_name = input.chars().next().map_or(false, is_name_char);
+    let next_is_name = input.chars().next().is_some_and(is_name_char);
     if !next_is_name {
       Ok(())
     } else {
@@ -1510,7 +1510,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
   fn starts_with_keyword(&mut self, keyword: &str) -> bool {
     if self.starts_with(keyword) {
       let input = &self.input()[*self.index() + keyword.len()..];
-      let next_is_name = input.chars().next().map_or(false, is_name_char);
+      let next_is_name = input.chars().next().is_some_and(is_name_char);
       !next_is_name
     } else {
       false
@@ -1660,7 +1660,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
     let num_str = self.take_while(move |c| c.is_digit(radix as u32) || c == '_');
     let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
 
-    let next_is_hex = self.peek_one().map_or(false, |c| "0123456789abcdefABCDEF".contains(c));
+    let next_is_hex = self.peek_one().is_some_and(|c| "0123456789abcdefABCDEF".contains(c));
     if next_is_hex || num_str.is_empty() {
       self.expected(format!("valid {radix} digit").as_str())
     } else {
@@ -1672,7 +1672,7 @@ pub trait ParserCommons<'a>: Parser<'a> {
   fn u32_with_radix(&mut self, radix: Radix) -> ParseResult<u32> {
     let num_str = self.take_while(move |c| c.is_digit(radix as u32) || c == '_');
     let num_str = num_str.chars().filter(|c| *c != '_').collect::<String>();
-    let next_is_hex = self.peek_one().map_or(false, |c| "0123456789abcdefABCDEF".contains(c));
+    let next_is_hex = self.peek_one().is_some_and(|c| "0123456789abcdefABCDEF".contains(c));
     if next_is_hex || num_str.is_empty() {
       self.expected(format!("valid {radix} digit").as_str())
     } else {

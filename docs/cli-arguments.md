@@ -34,8 +34,7 @@ def main(x, y):
 # Calling with two argument
 > bend run <path> +5 +3
 {+2 -2}
-
-# Calling with three argument
+# Calling with three arguments
 # In this case, the third argument doesn't change anything
 # due to the underlying interaction rules.
 # If this were a variant of simply-typed lambda-calculus
@@ -43,3 +42,5 @@ def main(x, y):
 > bend run <path> +5 +3 +1
 {+2 -2}
 ```
+
+

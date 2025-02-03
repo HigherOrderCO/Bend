@@ -37,7 +37,7 @@ That imposes a strong restriction on correct Bend programs: a variable should no
 
 The program below is an example where this can go wrong when using higher-order functions.
 ```py
-def List/map(xs, f):
+def List/map(xs: List(A), f: A -> B) -> List(B):
   fold xs:
     case List/Nil:
       return List/Nil
@@ -48,7 +48,7 @@ def List/map(xs, f):
       # {f1 f2} = f
       # return List/Cons(f1(xs.head), List/map(xs.tail, f2))
 
-def main:
+def main() -> _:
   # This lambda duplicates `x` and is itself duplicated by the map function.
   # This will result in wrong behavior.
   # In this specific case, the runtime will catch it and generate an error,

@@ -8,9 +8,8 @@ To see some more complex examples programs, check out the [examples](examples/) 
 ### Basic features
 
 We can start with a basic program that adds the numbers 3 and 2.
-
 ```py
-def main:
+def main() -> u24:
   return 2 + 3
 ```
 
@@ -23,17 +22,17 @@ Functions can receive arguments both directly and using a lambda abstraction.
 
 ```py
 # These two are equivalent
-def add(x, y):
+def add(x: u24, y: u24) -> u24:
   return x + y
 
-def add2:
+def add2() -> (u24 -> u24 -> u24): 
   return lambda x, y: x + y
 ```
 
 You can then call this function like this:
 
 ```py
-def main:
+def main() -> u24:
   sum = add(2, 3)
   return sum
 ```
@@ -44,31 +43,31 @@ You can bundle multiple values into a single value using a tuple or a struct.
 
 ```py
 # With a tuple
-def tuple_fst(x):
+def tuple_fst(x: (a, b)) -> a:
   # This destructures the tuple into the two values it holds.
   # '*' means that the value is discarded and not bound to any variable.
   (fst, *) = x
   return fst
 
 # With an object (similar to what other languages call a struct, a class or a record)
-object Pair { fst, snd }
+object Pair(a, b) { fst: a, snd: b }
 
-def Pair/fst(x):
+def Pair/fst(x: Pair(a, b)) -> a:
   match x:
     case Pair:
       return x.fst
 
 # We can also access the fields of an object after we `open` it.
-def Pair/fst_2(x):
+def Pair/fst_2(x: Pair(a, b)) -> a:
   open Pair: x
   return x.fst
 
 # This is how we can create new objects.
-def Pair/with_one(x):
+def Pair/with_one(x: a) -> Pair(a, u24):
   return Pair{ fst: x, snd: 1 }
 
 # The function can be named anything, but by convention we use Type/function_name.
-def Pair/swap(x):
+def Pair/swap(x: Pair(a, b)) -> Pair(b, a):
   open Pair: x
   # We can also call the constructor like any normal function.
   return Pair(x.snd, x.fst)
@@ -87,16 +86,26 @@ This defines a constructor function for each variant of the type, with names `My
 Like most things in bend (except tuples and numbers), types defined with `type` and `object` become lambda encoded functions.
 You can read how this is done internally by the compiler in [Defining data types](docs/defining-data-types.md) and [Pattern matching](docs/pattern-matching.md).
 
+### Optional typing
+
+Types in Bend are completely optional - you can write programs without any type annotations, but we'll be typing every function for clarity. For instace:
+```py
+def main():
+  sum = add(2, 3)
+  return sum
+```
+Here, this program will run just fine and return the exact same result as the example shown in [Basic features](#basic-features)
+
 ### Pattern matching
 
 We can pattern match on values of a data type to perform different actions depending on the variant of the value.
 
 ```py
-def Maybe/or_default(x, default):
+def Maybe/or_default(x: Maybe(T), default: T) -> T:
   match x:
     case Maybe/Some:
       # We can access the fields of the variant using 'matched.field'
-      return x.val
+      return x.value
     case Maybe/None:
       return default
 ```
@@ -110,8 +119,10 @@ This allows us to easily create and consume these recursive data structures with
 `bend` is a pure recursive loop that is very useful for generating data structures.
 
 ```py
-def MyTree.sum(x):
-  # Sum all the values in the tree.
+#{
+  Sum all the values in the tree.
+#}
+def MyTree.sum(x: MyTree) -> u24:
   fold x:
     # The fold is implicitly called for fields marked with '~' in their definition.
     case MyTree/Node:
@@ -119,7 +130,7 @@ def MyTree.sum(x):
     case MyTree/Leaf:
       return 0
 
-def main:
+def main() -> u24:
   bend val = 0:
     when val < 10:
       # 'fork' calls the bend recursively with the provided values.
@@ -130,24 +141,26 @@ def main:
 
   return MyTree.sum(x)
 ```
+> Note: since MyTree has no type annotations, its fields will be considered of type `Any`, which partially disables the type checker for these values. Thus the fact that `x` is holding a tree of u24 and not a tree of anything else won't be checked and it's up to the user to make sure it's correct.
+
 
 These are equivalent to inline recursive functions that create a tree and consume it.
 
 ```py
-def MyTree.sum(x):
+def MyTree.sum(x: MyTree) -> u24:
   match x:
     case MyTree/Node:
       return x.val + MyTree.sum(x.left) + MyTree.sum(x.right)
     case MyTree/Leaf:
       return 0
 
-def main_bend(val):
+def main_bend(val: u24) -> MyTree:
   if val < 10:
     return MyTree/Node(val, main_bend(val + 1), main_bend(val + 1))
   else:
     return MyTree/Leaf
 
-def main:
+def main() -> u24:
   x = main_bend(0)
   return MyTree.sum(x)
 ```
@@ -159,7 +172,7 @@ If you give a `fold` some state, then you necessarily need to pass it by calling
 
 ```py
 # This function substitutes each value in the tree with the sum of all the values before it.
-def MyTree.map_sum(x):
+def MyTree.map_sum(x: MyTree) -> MyTree:
   acc = 0
   fold x with acc:
     case MyTree/Node:
@@ -178,7 +191,7 @@ _Attention_: Note that despite the ADT syntax sugars, Bend is an _untyped_ langu
 For example, the following program will compile just fine even though `!=` is only defined for native numbers:
 
 ```py
-def main:
+def main():
   bend val = [0, 1, 2, 3]:
     when val != []:
       match val:
@@ -202,12 +215,12 @@ It inlines clones of some value in the statements that follow it.
 
 ```py
 def foo(x):
-  use result = bar(1, x)
+  use result = (1, x)
   return (result, result)
 
 # Is equivalent to
 def foo(x):
-  return (bar(1, x), bar(1, x))
+  return ((1, x), (1, x))
 ```
 
 Note that any variable in the `use` will end up being duplicated.
@@ -215,7 +228,7 @@ Note that any variable in the `use` will end up being duplicated.
 Bend supports recursive functions of unrestricted depth:
 
 ```py
-def native_num_to_adt(n):
+def native_num_to_adt(n: u24) -> Nat:
   if n == 0:
     return Nat/Zero
   else:
@@ -225,21 +238,19 @@ def native_num_to_adt(n):
 If your recursive function is not based on pattern matching syntax (like `if`, `match`, `fold`, etc) you have to be careful to avoid an infinite loop.
 
 ```py
-# A scott-encoded list folding function
+# A scott-encoded list folding function.
 # Writing it like this will cause an infinite loop.
 def scott_list.add(xs, add):
-  xs(
-    λxs.head xs.tail: λc n: (c (xs.head + add) scott_list.sum(xs.tail, add)),
-    λc λn: n
-  )
+  return xs( λxs.head xs.tail: λc n: (c (xs.head + add), scott_list.add(xs.tail, add)))
 
 # Instead we want to write it like this;
 def scott_list.add(xs, add):
-  xs(
+  return xs(
     λxs.head xs.tail: λadd: λc n: (c (xs.head + add) scott_list.sum(xs.tail, add)),
     λadd: λc λn: n,
     add
   )
+# These functions can't be typed with bend's type system.
 ```
 
 Since Bend is eagerly executed, some situations will cause function applications to always be expanded, which can lead to looping situations.
@@ -250,7 +261,7 @@ You can read how to avoid this in [Lazy definitions](docs/lazy-definitions.md).
 Bend has native numbers and operations.
 
 ```py
-def main:
+def main() -> (u24, i24, f24):
   a = 1      # A 24 bit unsigned integer.
   b = +2     # A 24 bit signed integer.
   c = -3     # Another signed integer, but with negative value.
@@ -266,8 +277,6 @@ Floating point numbers must have the decimal point `.` and can optionally take a
 The three number types are fundamentally different.
 If you mix two numbers of different types HVM will interpret the binary representation of one of them incorrectly, leading to incorrect results. Which number is interpreted incorrectly depends on the situation and shouldn't be relied on for now.
 
-At the moment Bend doesn't have a way to convert between the different number types, but it will be added in the future.
-
 You can use `switch` to pattern match on unsigned native numbers:
 
 ```py
@@ -282,12 +291,34 @@ switch x = 4:
   case _:  String.concat("other: ", (String.from_num x-3))
 ```
 
+You can also convert between the number types using the builtin casting functions.
+Here's some of the builtin functions you can use to cast any native number into the corresponding type:
+
+```py
+def main() -> _:
+  x = f24/to_i24(1.0)
+  y = u24/to_f24(2)
+  z = i24/to_u24(-3)
+
+  return (x, y, z)
+```
+You can find the other casting functions and their declarations at [builtins.md](docs/builtins.md).
 ### Other builtin types
 
 Bend has Lists and Strings, which support Unicode characters.
+This is how they are defined:
+```py
+type String:
+  Nil
+  Cons { head: u24, ~tail: String }
+type List(T):
+  Nil
+  Cons { head: T, ~tail: List(T) }
+```
 
 ```py
-def main:
+# Here's an example of a List of Strings
+def main() -> List(String):
   return ["You: Hello, 🌎", "🌎: Hello, user"]
 ```
 
@@ -296,34 +327,26 @@ List also becomes a type with two constructors, `List/Cons` and `List/Nil`.
 
 ```py
 # When you write this
-def StrEx:
+def StrEx() -> String:
   return "Hello"
-def ids:
+def ids() -> List(u24):
   return [1, 2, 3]
 
 # The compiler converts it to this
-def StrEx:
-  String/Cons('H', String/Cons('e', String/Cons('l', String/Cons('l', String/Cons('o', String/Nil)))))
-def ids:
-  List/Cons(1, List/Cons(2, List/Cons(3, List/Nil)))
-
-# These are the definitions of the builtin types.
-type String:
-  Cons { head, ~tail }
-  Nil
-type List:
-  Cons { head, ~tail }
-  Nil
+def StrEx() -> String:
+  return String/Cons('H', String/Cons('e', String/Cons('l', String/Cons('l', String/Cons('o', String/Nil)))))
+def ids() -> List(u24):
+  return List/Cons(1, List/Cons(2, List/Cons(3, List/Nil)))
 ```
 
 Characters are delimited by `'` `'` and support Unicode escape sequences. They are encoded as a U24 with the unicode codepoint as their value.
 
 ```py
 # These two are equivalent
-def chars:
+def chars() -> List(u24):
   return ['A', '\u{4242}', '🌎']
 
-def chars2:
+def chars2()  -> List(u24):
   return [65, 0x4242, 0x1F30E]
 ```
 
@@ -339,38 +362,37 @@ A Map is desugared to a Map data type containing two constructors `Map/Leaf` and
 
 ```py
 # When you write this
-def empty_map:
+def empty_map() -> Map(T):
   return {}
 
-def init_map:
-  return { 1: "one", 2: "two", `blue`: 0x0000FF }
+def init_map() -> Map(String):
+  return { 1: "one", 2: "two", `blue`: "0x0000FF" }
 
-def main:
+def main() -> String:
   map = init_map
   one = map[1]    # map getter syntax
   map[0] = "zero" # map setter syntax
   return one
 
 # The compiler converts it to this
-def empty_map():
+def empty_map() -> Map(T):
   return Map/Leaf
 
-def init_map():
+def init_map() -> Map(String): 
   map = Map/set(Map/Leaf, 1, "one")
   map = Map/set(map, 2, "two")
-  map = Map/set(map, `blue`, 0x0000FF)
   return map
 
-def main():
+def main() -> String:
   map = init_map
   (one, map) = Map/get(map, 1)
   map = Map/set(map, 0, "zero")
   return one
 
 # The builtin Map type definition
-type Map:
-  Node { value, ~left, ~right }
-  Leaf
+type Map(T):
+  Node { value: Maybe(T), ~left: Map(T), ~right: Map(T) }
+  Leaf 
 ```
 
 Notice that the getter and setter syntax induces an order on things using the map, since every get or set operation depends on the value of the previous map.
@@ -386,15 +408,15 @@ type Bool:
   True
   False
 
-def is_odd(x):
+def is_odd(x: u24) -> Bool:
   switch x:
     case 0:
       return Bool/False
     case _:
       return is_even(x-1)
 
-(is_even n) = switch n {
-  0: return Bool/True
+is_even(n: u24): u24 = switch n {
+  0: Bool/True
   _: (is_odd n-1)
 }
 

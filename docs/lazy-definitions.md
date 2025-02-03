@@ -2,7 +2,7 @@
 
 In strict-mode, some types of recursive terms will unroll indefinitely.
 
-This is a simple piece of code that works on many other functional programming languages, including hvm's lazy-mode, but hangs on strict-mode:
+This is a simple piece of code that works on many other functional programming languages but hangs on Bend due to the strict evaluation of HVM2.
 
 ```rust
 Cons = λx λxs λcons λnil (cons x xs)
@@ -16,20 +16,7 @@ Map = λf λlist
 Main = (Map λx (+ x 1) (Cons 1 Nil))
 ```
 
-The recursive `Map` definition never gets reduced.
-Using the debug mode `-d` we can see the steps:
-
-```
-(Map λa (+ a 1) (Cons 1 Nil))
----------------------------------------
-(Map λa (+ a 1) λb λ* (b 1 Nil))
----------------------------------------
-(Cons (λa (+ a 1) 1) (Map λa (+ a 1) Nil))
----------------------------------------
-(Cons (λa (+ a 1) 1) (Nil λb λc (Cons (λa (+ a 1) b) (Map λa (+ a 1) c)) Nil))
----------------------------------------
-...
-```
+The recursive `Map`  creates an infinite reduction sequence because each recursive call expands into another call to Map, never reaching a base case. Which means that functionally, it will reduce it infinitely, never reaching a normal form. 
 
 For similar reasons, if we try using Y combinator it also won't work.
 
@@ -42,7 +29,7 @@ Map = (Y λrec λf λlist
   (list cons nil f))
 ```
 
-By linearizing `f`, the `Map` function "fully reduces" first and then applies `f`.
+By linearizing `f`, the `Map` function only expands after applying the argument `f`, because the `cons` function will be lifted to a separate top-level function by the compiler (when this option is enabled).
 
 ```rust
 Map = λf λlist
@@ -53,7 +40,7 @@ Map = λf λlist
 
 This code will work as expected, since `cons` and `nil` are lambdas without free variables, they will be automatically floated to new definitions if the [float-combinators](compiler-options.md#float-combinators) option is active, allowing them to be unrolled lazily by hvm.
 
-It's recommended to use a [supercombinator](https://en.wikipedia.org/wiki/Supercombinator) formulation to make terms be unrolled lazily, preventing infinite expansion in recursive function bodies.
+The recursive part of the function should be part of a combinator that is not in an active position. That way it can be lifted into a top-level function which is compiled into a lazy reference thus preventing the infinite expansion. [Supercombinators](https://en.wikipedia.org/wiki/Supercombinator) can be used in order to ensure said lazy unrolling of recursive terms. Other combinator patterns can work as well, as long as they're lifted to the top level.
 
 If you have a set of mutually recursive functions, you only need to make one of the steps lazy. This might be useful when doing micro-optimizations, since it's possible to avoid part of the small performance cost of linearizing lambdas.
 

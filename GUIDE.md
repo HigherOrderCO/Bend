@@ -78,19 +78,28 @@ and recursion play an important role. This is how its `"Hello, world!"` looks:
 def main():
   return "Hello, world!"
 ```
-
-Wait - there is something strange there. Why `return`, not `print`? Well, _for
-now_ (you'll read these words a lot), Bend doesn't have IO. We plan on
-introducing it very soon! So, _for now_, all you can do is perform computations,
-and see results. To run the program above, type:
-
+To run the program above, type:
 ```
 bend run-rs main.bend
 ```
+Wait - there is something strange there. Why `return`, not `print`? Well, _for
+now_ (you'll read these words a lot), Bend's IO is in an experimental stage. We plan on
+fully introducing it very soon! Nevertheless, here's an example on how you can use IO on bend to print `"Hello, world!"`:
 
-If all goes well, you should see `"Hello, world!"`. The `bend run-rs` command uses
-the reference interpreter, which is slow. In a few moments, we'll teach you how
-to run your code in parallel, on both CPUs and GPUs. For now, let's learn some
+```python
+def main() -> IO(u24):
+  with IO:
+    * <- IO/print("Hello, world!\n")
+    return wrap(0)
+```
+To run the program above, type:
+
+```
+bend run-c main.bend
+```
+
+If all goes well, you should see `"Hello, world!"` in both cases. The `bend run-rs` command uses
+the reference interpreter, which is slow, whereas the `bend run-c` command uses the much faster C interpreter, but bend can run even faster! In a few moments, we'll teach you how to run your code in parallel, on both CPUs and GPUs. For now, let's learn some
 fundamentals!
 
 ## Basic Functions and Datatypes
@@ -99,40 +108,40 @@ In Bend, functions are pure: they receive something, and they return something.
 That's all. Here is a function that tells you how old you are:
 
 ```python
-def am_i_old(age):
+def am_i_old(age: u24) -> String:
   if age < 18:
     return "you're a kid"
   else:
     return "you're an adult"
 
-def main():
+def main() -> String:
   return am_i_old(32)
 ```
 
-That is simple enough, isn't it? Here is one that returns the distance between
+That is simple enough, isn't it? Here is one that returns the euclidean distance between
 two points:
 
 ```python
-def distance(ax, ay, bx, by):
+def distance(ax: f24, ay: f24, bx: f24, by: f24) -> f24:
   dx = bx - ax
   dy = by - ay
   return (dx * dx + dy * dy) ** 0.5
 
-def main():
+def main() -> f24:
   return distance(10.0, 10.0, 20.0, 20.0)
 ```
 
 This isn't so pretty. Could we use tuples instead? Yes:
 
 ```python
-def distance(a, b):
+def distance(a: (f24, f24), b: (f24, f24)) -> f24:
   (ax, ay) = a
   (bx, by) = b
   dx = bx - ax
   dy = by - ay
   return (dx * dx + dy * dy) ** 0.5
 
-def main():
+def main() -> f24:
   return distance((10.0, 10.0), (20.0, 20.0))
 ```
 
@@ -143,14 +152,14 @@ objects themselves. This is how we create a 2D vector:
 ```python
 object V2 { x, y }
 
-def distance(a, b):
+def distance(a: V2, b: V2) -> f24:
   open V2: a
   open V2: b
   dx = b.x - a.x
   dy = b.y - a.y
   return (dx * dx + dy * dy) ** 0.5
 
-def main():
+def main() -> f24:
   return distance(V2 { x: 10.0, y: 10.0 }, V2 { x: 20.0, y: 20.0 })
 ```
 
@@ -175,14 +184,14 @@ type Shape:
   Circle { radius }
   Rectangle { width, height }
 
-def area(shape):
+def area(shape: Shape) -> f24:
   match shape:
     case Shape/Circle:
       return 3.14 * shape.radius ** 2.0
     case Shape/Rectangle:
       return shape.width * shape.height
 
-def main:
+def main() -> f24:
   return area(Shape/Circle { radius: 10.0 })
 ```
 
@@ -207,15 +216,15 @@ represents a concatenation between an element (`head`) and another list
 (`tail`). That way, the `[1,2,3]` list could be written as:
 
 ```python
-def main:
-  my_list = List/Cons { head: 1, tail: List/Cons { head: 2, tail: List/Cons { head: 3, tail: List/Nil }}}
+def main() -> List(u24):
+  my_list = List/Cons{head: 1, tail: List/Cons{head: 2, tail: List/Cons{head: 3, tail: List/Nil}}}
   return my_list
 ```
 
 Obviously - that's terrible. So, you can write just instead:
 
 ```python
-def main:
+def main() -> List(u24):
   my_list = [1, 2, 3]
   return my_list
 ```
@@ -225,7 +234,7 @@ to understand it is just the `List` datatype, which means we can operate on it
 using the `match` notation. For example:
 
 ```python
-def main:
+def main() -> u24:
   my_list = [1, 2, 3]
   match my_list:
     case List/Cons:
@@ -246,7 +255,7 @@ characters (UTF-16 encoded). The `"Hello, world!"` type we've seen used it!
 Bend also has inline functions, which work just like Python:
 
 ```python
-def main:
+def main() -> u24:
   mul_2 = lambda x: x * 2
   return mul_2(7)
 ```
@@ -257,27 +266,33 @@ if you can somehow type that.
 You can also match on native numbers (`u24`) using the `switch` statement:
 
 ```python
-def slow_mul2(n):
+def slow_mul2(n: u24) -> u24:
   switch n:
     case 0:
       return 0
     case _:
       return 2 + slow_mul2(n-1)
+
+def main() -> u24:
+  return slow_mul2(7)
 ```
 
 The `if-else` syntax is a third option to branch, other than `match` and
 `switch`. It expects a `u24` (`1` for `true` and `0` for `false`):
 
 ```python
-def is_even(n):
+def is_even(n: u24) -> u24:
   if n % 2 == 0:
     return 1
   else:
     return 0
+
+def main() -> u24:
+  return is_even(7)
 ```
 
 _note - some types, like tuples, aren't being pretty-printed correctly after
-computation. this will be fixed in the next days (TM)_
+computation. This will be fixed in the future (TM)_
 
 ## The Dreaded Immutability
 
@@ -289,23 +304,23 @@ Haskell: **variables are immutable**. Not "by default". They just **are**. For
 example, in Bend, we're not allowed to write:
 
 ```python
-def parity(x):
+def parity(x: u24) -> String:
   result = "odd"
   if x % 2 == 0:
     result = "even"
   return result
 ```
 
-... because that would mutate the `result` variable. Instead, we should write:
+... because that would require mutating the `result` variable. Instead, we should write:
 
 ```python
-def is_even(x):
+def is_even(x: u24) -> String:
   if x % 2 == 0:
     return "even"
   else:
     return "odd"
 
-def main:
+def main() -> String:
   return is_even(7)
 ```
 
@@ -316,7 +331,7 @@ live with it. But, wait... if variables are immutable... how do we even do
 loops? For example:
 
 ```python
-def sum(x):
+def sum(x: u24) -> u24:
   total = 0
   for i in range(10)
     total += i
@@ -352,9 +367,9 @@ _recursive_. For example, the tree:
 Could be represented as:
 
 ```
-tree = Tree/Node {
-  lft: Tree/Node { left: Tree/Leaf { val: 1 }, right: Tree/Leaf { val: 2 } },
-  rgt: Tree/Node { left: Tree/Leaf { val: 3 }, right: Tree/Leaf { val: 4 } }
+tree = Tree/Node{
+  left:  Tree/Node{left: Tree/Leaf {value: 1}, right: Tree/Leaf {value: 2}},
+  right: Tree/Node{left: Tree/Leaf {value: 3}, right: Tree/Leaf {value: 4}},
 }
 ```
 
@@ -375,14 +390,14 @@ another construct we can use: it's called `fold`, and it works like a _search
 and replace_ for datatypes. For example, consider the code below:
 
 ```python
-def sum(tree):
+def sum(tree: Tree(u24)) -> u24:
   fold tree:
     case Tree/Node:
       return tree.left + tree.right
     case Tree/Leaf:
       return tree.value
 
-def main:
+def main() -> u24:
   tree = ![![!1, !2],![!3, !4]]
   return sum(tree)
 ```
@@ -412,7 +427,7 @@ def enum(tree):
     case Tree/Leaf:
       return !(idx, tree.value)
 
-def main:
+def main() -> Tree(u24):
   tree = ![![!1, !2],![!3, !4]]
   return enum(tree)
 ```
@@ -434,11 +449,11 @@ it is really liberating, and will let you write better algorithms. As an
 exercise, use `fold` to implement a "reverse" algorithm for lists:
 
 ```python
-def reverse(list):
+def reverse(list: List(T)) -> List(T):
   # exercise
   ?
 
-def main:
+def main() -> List(u24):
   return reverse([1,2,3])
 ```
 
@@ -450,7 +465,7 @@ can "grow" a recursive structure, layer by layer, until the condition is met.
 For example, consider the code below:
 
 ```python
-def main():
+def main() -> Tree(u24):
   bend x = 0:
     when x < 3:
       tree = ![fork(x + 1), fork(x + 1)]
@@ -575,7 +590,7 @@ unlike the former one, they will run in parallel. And that's why `bend` and
 example, to add numbers in parallel, we can write:
 
 ```python
-def main():
+def main() -> u24:
   bend d = 0, i = 0:
     when d < 28:
       sum = fork(d+1, i*2+0) + fork(d+1, i*2+1)
@@ -655,14 +670,17 @@ implemented as a series of _immutable tree rotations_, with pattern-matching and
 recursion. Don't bother trying to understand it, but, here's the code:
 
 ```python
-def gen(d, x):
+def gen(d: u24, x: u24) -> Any:
   switch d:
     case 0:
       return x
     case _:
       return (gen(d-1, x * 2 + 1), gen(d-1, x * 2))
+```
+> Note: The type of this function can't be expressed with Bend's type system, but we can still write it using `Any`.
 
-def sum(d, t):
+```python
+def sum(d: u24, t: u24) -> u24:
   switch d:
     case 0:
       return t
@@ -670,14 +688,14 @@ def sum(d, t):
       (t.a, t.b) = t
       return sum(d-1, t.a) + sum(d-1, t.b)
 
-def swap(s, a, b):
+def swap(s: u24, a: Any, b: Any) -> (Any, Any):
   switch s:
     case 0:
       return (a,b)
     case _:
       return (b,a)
 
-def warp(d, s, a, b):
+def warp(d: u24, s: u24, a: Any, b: Any) -> (Any, Any):
   switch d:
     case 0:
       return swap(s ^ (a > b), a, b)
@@ -688,7 +706,7 @@ def warp(d, s, a, b):
       (B.a,B.b) = warp(d-1, s, a.b, b.b)
       return ((A.a,B.a),(A.b,B.b))
 
-def flow(d, s, t):
+def flow(d: u24, s: u24, t: Any) -> Any:
   switch d:
     case 0:
       return t
@@ -696,7 +714,7 @@ def flow(d, s, t):
       (t.a, t.b) = t
       return down(d, s, warp(d-1, s, t.a, t.b))
 
-def down(d,s,t):
+def down(d: u24, s: u24, t: Any) -> Any:
   switch d:
     case 0:
       return t
@@ -704,7 +722,7 @@ def down(d,s,t):
       (t.a, t.b) = t
       return (flow(d-1, s, t.a), flow(d-1, s, t.b))
 
-def sort(d, s, t):
+def sort(d: u24, s: u24, t: Any) -> Any:
   switch d:
     case 0:
       return t
@@ -712,7 +730,7 @@ def sort(d, s, t):
       (t.a, t.b) = t
       return flow(d, s, (sort(d-1, 0, t.a), sort(d-1, 1, t.b)))
 
-def main:
+def main() -> u24:
   return sum(18, sort(18, 0, gen(18, 0)))
 ```
 
@@ -748,7 +766,7 @@ compute-heavy, but less memory-hungry, computations. For example, consider:
 
 ```python
 # given a shader, returns a square image
-def render(depth):
+def render(depth: u24) -> Any:
   bend d = 0, i = 0:
     when d < depth:
       color = (fork(d+1, i*2+0), fork(d+1, i*2+1))
@@ -759,7 +777,7 @@ def render(depth):
 
 # given a position, returns a color
 # for this demo, it just busy loops
-def demo_shader(x, y):
+def demo_shader(x: Any, y: Any) -> Any:
   bend i = 0:
     when i < 100000:
       color = fork(i + 1)
@@ -768,7 +786,7 @@ def demo_shader(x, y):
   return color
 
 # renders a 256x256 image using demo_shader
-def main:
+def main() -> Any:
   return render(16, demo_shader)
 ```
 
@@ -798,10 +816,7 @@ reach 1000+ MIPS.
 ## To be continued...
 
 This guide isn't extensive, and there's a lot uncovered. For example, Bend also
-has an entire "secret" Haskell-like syntax that is compatible with old HVM1.
-[Here](https://gist.github.com/VictorTaelin/9cbb43e2b1f39006bae01238f99ff224) is
-an implementation of the Bitonic Sort with Haskell-like equations. We'll
-document its syntax here soon!
+has an entire Haskell-like functional syntax that is compatible with old HVM1, you can find it documented [here](https://github.com/HigherOrderCO/Bend/blob/main/docs/syntax.md#fun-syntax). You can also check [this](https://gist.github.com/VictorTaelin/9cbb43e2b1f39006bae01238f99ff224) out, it's an implementation of the Bitonic Sort with Haskell-like equations. 
 
 ## Community
 

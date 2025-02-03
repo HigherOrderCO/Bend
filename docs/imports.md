@@ -10,6 +10,7 @@ Imports can be declared two ways:
 from path import name
 # or
 import path/name
+# We recommend always placing the imports at the top of the file.
 ```
 
 ## Project Structure

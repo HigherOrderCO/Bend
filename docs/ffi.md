@@ -27,8 +27,9 @@ def main():
 
     # In our example, 'ls' receives a path as a String and
     # returns a String with the result of the 'ls' command.
-    files_bytes <- IO/DyLib/call(dl, "ls", "./")
-    files_str = String/decode_utf8(files_bytes)
+    unwrapped_dl = Result/unwrap(dl)
+    files_bytes <- IO/DyLib/call(unwrapped_dl, "ls", "./") 
+    files_str = String/decode_utf8(Result/unwrap(files_bytes)) 
     files = String/split(files_str, '\n')
 
     # We want to create a directory for a new user "my_user" if it doesn't exist.
@@ -40,14 +41,14 @@ def main():
         status = wrap(-1)
       case List/Nil:
         # The directory doesn't exist, create it.
-        * <- IO/DyLib/call(dl, "mkdir", "./my_dir")
+        * <- IO/DyLib/call(unwrapped_dl, "mkdir", "./my_dir")
         * <- IO/print("Directory created.\n")
         status = wrap(+0)
     status <- status
 
     # Here the program ends so we didn't need to close the dynamic library,
     # but it's good practice to do so once we know we won't need it anymore.
-    * <- IO/DyLib/close(dl)
+    * <- IO/DyLib/close(unwrapped_dl)
     return wrap(status)
 ```
 
