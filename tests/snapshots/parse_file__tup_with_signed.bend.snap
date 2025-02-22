@@ -1,0 +1,6 @@
+---
+source: tests/golden_tests.rs
+input_file: tests/golden_tests/parse_file/tup_with_signed.bend
+---
+unchecked main: Any
+(main) = let a = (+1, +1); let b = 1.132; let c = (-6.234, -1); let d = -1; let e = (+6 * λx x); let f = (* λx x); (+ a (+ b (+ c (+ d (- e f)))))

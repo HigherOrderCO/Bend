@@ -590,21 +590,56 @@ impl<'a> FunParser<'a> {
       // App, Tup, Num Op
       if self.starts_with("(") {
         self.advance_one();
-
-        // Opr but maybe a tup
         self.skip_trivia();
+
+        // Opr but maybe something else
+        // ( +/-n ,    -> Tup with Int/Float
+        // ( +/-n )    -> Int/Float
+        // ( +/-n term -> App with Int/Float
+        // ( * ,       -> Tup with Era
+        // ( * )       -> Era
+        // ( opr       -> Num Op
         if let Some(opr) = self.try_parse_oper() {
+          if (opr == Op::ADD || opr == Op::SUB) && self.peek_one().map_or(false, |c| "0123456789".contains(c))
+          {
+            unexpected_tag(self)?;
+            *self.index() -= 1;
+            let num = self.parse_number()?;
+            let head = Term::Num { val: num };
+            self.skip_trivia();
+
+            if self.starts_with(",") {
+              self.consume_exactly(",")?;
+              let tail = self.list_like(|p| p.parse_term(), "", ")", ",", true, 1)?;
+              let els = [head].into_iter().chain(tail).collect();
+              return Ok(Term::Fan { fan: FanKind::Tup, tag: tag.unwrap_or(Tag::Static), els });
+            }
+
+            if self.starts_with(")") {
+              self.consume_exactly(")")?;
+              return Ok(head);
+            }
+
+            let els = self.list_like(|p| p.parse_term(), "", ")", "", false, 0)?;
+            let term = els.into_iter().fold(head, |fun, arg| Term::App {
+              tag: tag.clone().unwrap_or(Tag::Static),
+              fun: Box::new(fun),
+              arg: Box::new(arg),
+            });
+            return Ok(term);
+          }
+
           self.skip_trivia();
 
-          // jk, actually a tuple
-          if self.starts_with(",") && opr == Op::MUL {
+          if opr == Op::MUL && self.starts_with(",") {
             self.consume_exactly(",")?;
             let tail = self.list_like(|p| p.parse_term(), "", ")", ",", true, 1)?;
             let els = [Term::Era].into_iter().chain(tail).collect();
             return Ok(Term::Fan { fan: FanKind::Tup, tag: tag.unwrap_or(Tag::Static), els });
           }
 
-          if opr == Op::MUL && self.try_consume(")") {
+          if opr == Op::MUL && self.starts_with(")") {
+            self.consume_exactly(")")?;
             return Ok(Term::Era);
           }
 
