@@ -13,6 +13,7 @@ and this project does not currently adhere to a particular versioning scheme.
 
 ### Fixed
 - Fix type checker not properly unifying all the arms of a match expression. ([#734][gh-734])
+- Fix signed numbers (i24 and f24) not being parsed after parenthesis `(`. ([#748][gh-748])
 
 ## [0.2.37] - 2024-10-18
 
@@ -443,3 +444,4 @@ and this project does not currently adhere to a particular versioning scheme.
 [gh-706]: https://github.com/HigherOrderCO/Bend/issues/706
 [gh-734]: https://github.com/HigherOrderCO/Bend/issues/734
 [gh-736]: https://github.com/HigherOrderCO/Bend/issues/736
+[gh-748]: https://github.com/HigherOrderCO/Bend/issues/748
