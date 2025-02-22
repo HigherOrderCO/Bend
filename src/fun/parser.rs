@@ -600,8 +600,7 @@ impl<'a> FunParser<'a> {
         // ( * )       -> Era
         // ( opr       -> Num Op
         if let Some(opr) = self.try_parse_oper() {
-          if (opr == Op::ADD || opr == Op::SUB) && self.peek_one().map_or(false, |c| "0123456789".contains(c))
-          {
+          if (opr == Op::ADD || opr == Op::SUB) && self.peek_one().is_some_and(|c| "0123456789".contains(c)) {
             unexpected_tag(self)?;
             *self.index() -= 1;
             let num = self.parse_number()?;
