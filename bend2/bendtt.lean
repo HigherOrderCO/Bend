@@ -1284,58 +1284,54 @@ def Term.uses : Term → Nat → Nat
     a + b
   | _, _ => 0
 
--- A column's pattern: what the def's case tree learned about the value
--- in it. A piece it split is a pair of the pieces' patterns, a label a
--- match hit is that label, and a piece it did not look into is a hole.
+-- A column's pattern: the pieces the def's case tree split open, each a
+-- pair of its parts, and holes for the rest
 inductive Pat where
   | hole
-  | lab (k : String)
   | pair (a b : Pat)
 
--- p, with the piece at path π (outermost step first) split open, and the
--- label k there if a match hit one
-def Pat.ins (k : Option String) : List Bool → Pat → Pat
-  | [], .hole => k.elim .hole .lab
+-- p, split open down to the piece at π (outermost step first)
+def Pat.ins : List Bool → Pat → Pat
   | [], p => p
   | b :: π, p =>
-    let (x, y) := match p with | .pair x y => (x, y) | _ => (.hole, .hole)
-    if b then .pair x (Pat.ins k π y) else .pair (Pat.ins k π x) y
+    let (x, y) := match p with | .pair x y => (x, y) | .hole => (.hole, .hole)
+    if b then .pair x (Pat.ins π y) else .pair (Pat.ins π x) y
 
--- column j's pattern, from the paths of the guard's tags and hits
+-- column j's pattern: split down to every variable the case tree bound in
+-- it and every label a match hit
 def Guard.pat (g : Guard) (j : Nat) : Pat :=
-  let vs := g.tags.filterMap (·.bind fun (c, π) => if c == j then some (none, π) else none)
-  let ls := g.hits.filterMap fun ((c, π), k) => if c == j then some (some k, π) else none
-  (vs ++ ls).foldl (fun p (e : Option String × List Bool) => Pat.ins e.1 e.2.reverse p) .hole
+  let ps := (g.tags.filterMap id ++ g.hits.map (·.1)).filterMap fun (c, π) =>
+    if c == j then some π else none
+  ps.foldl (fun p π => Pat.ins π.reverse p) .hole
 
--- x is the variable the case tree bound to the piece at π of column j
-def Guard.var (g : Guard) (j : Nat) (π : List Bool) : Term → Bool
+-- x is the piece at π of column j as the case tree saw it: the variable it
+-- bound there, or the label a match hit there
+def Guard.at (g : Guard) (j : Nat) (π : List Bool) : Term → Bool
   | Var v => g.tags[v]? == some (some (j, π))
+  | Lab k => g.hits.contains ((j, π), k)
   | _ => false
-
--- the piece at ρ is the one at τ, or inside it (paths are innermost first)
-def Path.under (ρ τ : List Bool) : Bool :=
-  τ.length ≤ ρ.length && ρ.drop (ρ.length - τ.length) == τ
 
 mutual
 -- how x compares to the piece at π of column j, whose pattern is p, as
--- bend2's term_descend: the variable bound there, or the label hit there,
--- is eq; a constructor compares its fields in turn, and when one may be
--- bigger, x is lt if it is no bigger than another piece of the pattern
+-- bend2's term_descend: the piece itself is eq; a constructor compares
+-- its fields in turn, and when one may be bigger, x is lt if it is no
+-- bigger than another piece of the pattern
 def Pat.cmp (g : Guard) (j : Nat) (p : Pat) (π : List Bool) (x : Term) : Ordering :=
-  if g.var j π x then .eq else
-  match p, x with
-  | .lab k, Lab l => if k == l then .eq else .gt
-  | .pair a b, x =>
+  if g.at j π x then .eq else
+  match p with
+  | .pair a b =>
     match Pat.fields g j a b π x with
     | .ok o => o
-    | .error bad => if Pat.search g j bad a b π x then .lt else .gt
-  | _, _ => .gt
+    | .error bad =>
+      if Pat.visit g j bad a (false :: π) x || Pat.visit g j bad b (true :: π) x then .lt else .gt
+  | .hole => .gt
 termination_by 3 * sizeOf p
 
 -- x's fields against the constructor pattern a, b at π, down its right
 -- spine: how they compare, or the path of the first that may be bigger
 -- (none when x is no constructor)
-def Pat.fields (g : Guard) (j : Nat) (a b : Pat) (π : List Bool) : Term → Except (Option (List Bool)) Ordering
+def Pat.fields (g : Guard) (j : Nat) (a b : Pat) (π : List Bool) :
+    Term → Except (Option (List Bool)) Ordering
   | Tup q x y =>
     if !Quan.live q then .error none else
     match Pat.cmp g j a (false :: π) x, b with
@@ -1345,25 +1341,18 @@ def Pat.fields (g : Guard) (j : Nat) (a b : Pat) (π : List Bool) : Term → Exc
   | _ => .error none
 termination_by 3 * (sizeOf a + sizeOf b) + 2
 
--- x is no bigger than a piece of the constructor pattern a, b at π other
--- than the field at bad
-def Pat.search (g : Guard) (j : Nat) (bad : Option (List Bool)) (a b : Pat) (π : List Bool)
-    (x : Term) : Bool :=
-  Pat.visit g j bad a (false :: π) x || Pat.visit g j bad b (true :: π) x
-termination_by 3 * (sizeOf a + sizeOf b) + 2
-
--- the search at the piece at ρ, of pattern q: the failed field and what is
--- in it are skipped, a piece that holds it is looked into, and any other
--- piece is compared with x
+-- x is no bigger than the piece at ρ, of pattern q, or than one inside it,
+-- away from the field that failed: that field and what is in it are
+-- skipped, and a piece that holds it is looked into (paths are innermost
+-- first, so a piece's path ends with those of the pieces holding it)
 def Pat.visit (g : Guard) (j : Nat) (bad : Option (List Bool)) (q : Pat) (ρ : List Bool)
     (x : Term) : Bool :=
-  match bad, q with
-  | some e, q =>
-    if Path.under ρ e then false
-    else if Path.under e ρ then
-      match q with | .pair a b => Pat.search g j bad a b ρ x | _ => false
-    else Pat.cmp g j q ρ x != .gt
-  | none, q => Pat.cmp g j q ρ x != .gt
+  if bad.any (·.isSuffixOf ρ) then false
+  else if bad.any ρ.isSuffixOf then
+    match q with
+    | .pair a b => Pat.visit g j bad a (false :: ρ) x || Pat.visit g j bad b (true :: ρ) x
+    | .hole => false
+  else Pat.cmp g j q ρ x != .gt
 termination_by 3 * sizeOf q + 1
 end
 
@@ -3541,38 +3530,6 @@ def Frame.hc (F : Frame) (σ : Subst) (t : Term) (es : List Arg) : Prop :=
 theorem values_mem (h : Values bk xs) (m : a ∈ xs) (hl : a.1.live = true) : Value bk a.2 := by
   induction xs <;> cases h <;> cases m; exact ‹_ → _› hl; exact ‹Values bk _ → _ ∈ _ → _› ‹_› ‹_›
 
--- p is a pattern of the piece at π of column c: every label in it is one
--- a match hit there
-def Pat.ok (hs : List ((Nat × List Bool) × String)) (c : Nat) : Pat → List Bool → Prop
-  | .lab k, π => ((c, π), k) ∈ hs
-  | .pair a b, π => Pat.ok hs c a (false :: π) ∧ Pat.ok hs c b (true :: π)
-  | .hole, _ => True
-
-theorem ins_ok (h : Pat.ok hs c p τ) (hk : ∀ l, k = some l → ((c, ρ.reverse ++ τ), l) ∈ hs) :
-    Pat.ok hs c (Pat.ins k ρ p) τ := by
-  induction ρ generalizing p τ with
-  | nil => cases p <;> cases k <;> simp_all [Pat.ins, Pat.ok]
-  | cons b ρ ih =>
-    have hc {q} (hq : Pat.ok hs c q (b :: τ)) : Pat.ok hs c (Pat.ins k ρ q) (b :: τ) :=
-      ih hq fun l e => by simpa using hk l e
-    cases p <;> cases b <;> simp only [Pat.ins, Pat.ok] at h ⊢
-    all_goals first | exact ⟨hc h.1, h.2⟩ | exact ⟨h.1, hc h.2⟩ | exact ⟨hc trivial, trivial⟩ | exact ⟨trivial, hc trivial⟩
-
-theorem pat_ok (g : Guard) (c : Nat) : Pat.ok g.hits c (g.pat c) [] := by
-  have (es : List (Option String × List Bool)) (p) (h : Pat.ok g.hits c p [])
-      (he : ∀ e ∈ es, ∀ l, e.1 = some l → ((c, e.2), l) ∈ g.hits) :
-      Pat.ok g.hits c (es.foldl (fun p (e : Option String × List Bool) => Pat.ins e.1 e.2.reverse p) p) [] := by
-    induction es generalizing p with
-    | nil => exact h
-    | cons e es ih =>
-      exact ih _ (ins_ok h fun l k => by simpa using he e (.head _) l k) fun e m => he e (.tail _ m)
-  refine this _ _ trivial fun e m l k => ?_
-  simp only [List.mem_append, List.mem_filterMap] at m
-  rcases m with ⟨t, -, m⟩ | ⟨⟨⟨c', π⟩, k'⟩, hm, m⟩
-  · obtain ⟨⟨c', π⟩, -, m⟩ := Option.bind_eq_some_iff.1 m
-    split at m <;> cases m; cases k
-  · split at m <;> cases m; cases k; simp_all
-
 -- under σ, x is a closed value k or more smaller than the piece at π of X
 def Below (bk : Book) (σ : Subst) (X : Term) (π : List Bool) (x : Term) (k : Nat) : Prop :=
   ∃ y, Term.get π X = some y ∧ Value bk (Term.sub σ x) ∧ Term.Closed (Term.sub σ x) ∧
@@ -3596,39 +3553,37 @@ theorem below_tup (l : q.live = true) (h0 : Below bk σ X (false :: π) x k0)
 -- piece of column c of value X it is compared to: a result other than gt
 -- makes x a closed value no bigger than that piece, and lt makes it smaller
 theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : Value F.bk X) (n : Nat) :
-    (∀ p π x, 3 * sizeOf p ≤ n → Pat.ok F.hs c p π → F.tags ts σ x → Pat.cmp (F.g ts) c p π x ≠ .gt →
+    (∀ p π x, 3 * sizeOf p ≤ n → F.tags ts σ x → Pat.cmp (F.g ts) c p π x ≠ .gt →
       Below F.bk σ X π x (if Pat.cmp (F.g ts) c p π x = .lt then 1 else 0)) ∧
-    (∀ a b π x o, 3 * (sizeOf a + sizeOf b) + 2 ≤ n → Pat.ok F.hs c a (false :: π) → Pat.ok F.hs c b (true :: π) →
-      F.tags ts σ x → Pat.fields (F.g ts) c a b π x = .ok o → Below F.bk σ X π x (if o = .lt then 1 else 0)) ∧
-    (∀ bad a b π x, 3 * (sizeOf a + sizeOf b) + 2 ≤ n → Pat.ok F.hs c a (false :: π) → Pat.ok F.hs c b (true :: π) →
-      F.tags ts σ x → Pat.search (F.g ts) c bad a b π x = true → Below F.bk σ X π x 1) ∧
-    (∀ bad q ρ x, 3 * sizeOf q + 1 ≤ n → Pat.ok F.hs c q ρ → F.tags ts σ x →
+    (∀ a b π x o, 3 * (sizeOf a + sizeOf b) + 2 ≤ n → F.tags ts σ x →
+      Pat.fields (F.g ts) c a b π x = .ok o → Below F.bk σ X π x (if o = .lt then 1 else 0)) ∧
+    (∀ bad q ρ x, 3 * sizeOf q + 1 ≤ n → F.tags ts σ x →
       Pat.visit (F.g ts) c bad q ρ x = true → Below F.bk σ X ρ x 0) := by
   have hX := (ho.2.2.1 _ (List.mem_of_getElem? ha)).1
   have A : ∀ {π}, Arg.at F.xs c π = Term.get π X := by simp [Arg.at, ha]
   induction n using Nat.strongRecOn with | _ n ih =>
   have I {m} (h : m < n) := ih m h
-  refine ⟨fun p π x hn hp ht hg => ?_, fun a b π x o hn ha' hb ht h => ?_, fun bad a b π x hn ha' hb ht h => ?_,
-    fun bad q ρ x hn hq ht h => ?_⟩
+  refine ⟨fun p π x hn ht hg => ?_, fun a b π x o hn ht h => ?_, fun bad q ρ x hn ht h => ?_⟩
   · generalize e : Pat.cmp (F.g ts) c p π x = o at hg ⊢
     unfold Pat.cmp at e
     split at e
     · rename_i hx; subst e; simp only [reduceCtorEq, ite_false]
-      unfold Guard.var at hx; split at hx
+      unfold Guard.at at hx; split at hx
       · have h := A ▸ ht _ _ _ (by simpa using hx) (by simp [Term.uses])
         have ⟨c, v, _⟩ := get_val (bk := F.bk) hX h
         exact ⟨_, h, v hv, c, by simp [Term.sub]⟩
+      · rename_i k
+        exact ⟨_, A ▸ ho.2.2.2.2.2 c π k (by simpa using hx), .lab, fun _ => rfl, by simp [Term.sub]⟩
       · cases hx
     split at e
-    · split at e
-      · subst e; rename_i hk; simp at hk; subst hk
-        exact ⟨_, A ▸ ho.2.2.2.2.2 c π _ hp, .lab, fun _ => rfl, by simp [Term.sub]⟩
-      · subst e; exact absurd rfl hg
-    · rename_i a b; simp only [Pat.pair.sizeOf_spec, Pat.ok] at hn hp
+    · rename_i a b; simp only [Pat.pair.sizeOf_spec] at hn
       split at e
-      · subst e; exact (I (m := 3 * (sizeOf a + sizeOf b) + 2) (by omega)).2.1 _ _ _ _ _ (Nat.le_refl _) hp.1 hp.2 ht ‹_›
+      · subst e; exact (I (m := 3 * (sizeOf a + sizeOf b) + 2) (by omega)).2.1 _ _ _ _ _ (Nat.le_refl _) ht ‹_›
       · split at e
-        · subst e; simpa using (I (m := 3 * (sizeOf a + sizeOf b) + 2) (by omega)).2.2.1 _ _ _ _ _ (Nat.le_refl _) hp.1 hp.2 ht ‹_›
+        · subst e; simp only [Bool.or_eq_true] at *; rename_i h; simp only [ite_true]
+          rcases h with h | h
+          · exact below_up ((I (m := 3 * sizeOf a + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h)
+          · exact below_up ((I (m := 3 * sizeOf b + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h)
         · subst e; exact absurd rfl hg
     · subst e; exact absurd rfl hg
   · unfold Pat.fields at h
@@ -3639,41 +3594,38 @@ theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : V
       have t0 : F.tags ts σ x0 := tags_mono ht
       have t1 : F.tags ts σ x1 := tags_mono ht
       have C0 (e : Pat.cmp (F.g ts) c a (false :: π) x0 ≠ .gt) :=
-        (I (m := 3 * sizeOf a) (by omega)).1 _ _ _ (Nat.le_refl _) ha' t0 e
+        (I (m := 3 * sizeOf a) (by omega)).1 _ _ _ (Nat.le_refl _) t0 e
       split at h
       · cases h
       · rename_i a' b' hc0
         cases hf : Pat.fields (F.g ts) c a' b' (true :: π) x1 <;> simp [hf, Except.map] at h
-        simp only [Pat.pair.sizeOf_spec, Pat.ok] at hn hb
-        have h1 := (I (m := 3 * (sizeOf a' + sizeOf b') + 2) (by omega)).2.1 _ _ _ _ _ (Nat.le_refl _) hb.1 hb.2 t1 hf
+        simp only [Pat.pair.sizeOf_spec] at hn
+        have h1 := (I (m := 3 * (sizeOf a' + sizeOf b') + 2) (by omega)).2.1 _ _ _ _ _ (Nat.le_refl _) t1 hf
         refine below_le (below_tup hl (C0 hc0) h1) ?_
         subst h; revert hc0; cases Pat.cmp (F.g ts) c a (false :: π) x0 <;> rename_i o2 <;> cases o2 <;>
           simp [Ordering.then]
-      · rename_i hc0
+      · rename_i hc0; rename_i bt _ _ _
         split at h
         · rename_i hbeq; cases h
-          have h1 := (I (m := n - 1) (by omega)).1 _ _ _ (by omega) hb t1 (by simp at hbeq; simp [hbeq])
-          simp at hbeq; simp only [hbeq] at h1
+          simp at hbeq
+          have h1 := (I (m := 3 * sizeOf bt) (by omega)).1 bt (true :: π) x1 (Nat.le_refl _) t1 (by simp [hbeq])
+          simp only [hbeq] at h1
           refine below_le (below_tup hl (C0 hc0) h1) ?_; simp
         · cases h
     · cases h
-  · unfold Pat.search at h; simp only [Bool.or_eq_true] at h
-    rcases h with h | h
-    · simpa using below_up ((I (m := 3 * sizeOf a + 1) (by omega)).2.2.2 _ _ _ _ (Nat.le_refl _) ha' ht h)
-    · simpa using below_up ((I (m := 3 * sizeOf b + 1) (by omega)).2.2.2 _ _ _ _ (Nat.le_refl _) hb ht h)
   · unfold Pat.visit at h
-    have C (h : (Pat.cmp (F.g ts) c q ρ x != .gt) = true) :=
-      below_le ((I (m := 3 * sizeOf q) (by omega)).1 _ _ _ (Nat.le_refl _) hq ht (by simpa using h)) (Nat.zero_le _)
+    split at h; · cases h
     split at h
-    · split at h; · cases h
-      split at h
-      · split at h
-        · rename_i a b; simp only [Pat.pair.sizeOf_spec, Pat.ok] at hn hq
-          exact below_le ((I (m := 3 * (sizeOf a + sizeOf b) + 2) (by omega)).2.2.1 _ _ _ _ _ (Nat.le_refl _) hq.1 hq.2 ht h)
+    · split at h
+      · rename_i a b; simp only [Pat.pair.sizeOf_spec] at hn; simp only [Bool.or_eq_true] at h
+        rcases h with h | h
+        · exact below_le (below_up ((I (m := 3 * sizeOf a + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h))
             (Nat.zero_le _)
-        · cases h
-      · exact C h
-    · exact C h
+        · exact below_le (below_up ((I (m := 3 * sizeOf b + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h))
+            (Nat.zero_le _)
+      · cases h
+    · exact below_le ((I (m := 3 * sizeOf q) (by omega)).1 _ _ _ (Nat.le_refl _) ht (by simpa using h))
+        (Nat.zero_le _)
 
 -- a descent from column j on: column by column, the call's sizes are
 -- no bigger than B's until one is smaller
@@ -3700,7 +3652,7 @@ theorem desc_lex {F : Frame} (ho : F.ok) (ys : List Arg) :
       have ⟨c2, v2⟩ := ho.2.2.1 _ (List.mem_of_getElem? ha)
       have v2 := (v2 (hl.trans hq)).1
       simp only [ite_true, Arg.size, hl, hq, v2, c2, and_self]
-      have B := (pat_below ho ha v2 _).1 _ _ _ (Nat.le_refl _) (pat_ok (F.g ts) j) (hu _ (.head _) hq)
+      have B := (pat_below ho ha v2 (3 * sizeOf ((F.g ts).pat j))).1 _ [] _ (Nat.le_refl _) (hu _ (.head _) hq)
       constructor <;> intro h <;> obtain ⟨_, g, v, c, s⟩ := B (by simp [h]) <;> cases g <;>
         simp [h, v, c, Size.le, Size.lt] at s ⊢ <;> omega
     cases n; have := (List.getElem?_eq_some_iff.1 e).1; omega
