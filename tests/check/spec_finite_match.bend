@@ -23,14 +23,6 @@ law same:
 def same(b):
   {==}
 
-law both:
-  for ~a: Bool
-  for ~b: Bool
-  {a == a : Bool} & {b == b : Bool}
-
-def both(a, b):
-  (same(~a), same(~b))
-
 def grade(b: Bool) -> Quant:
   match b:
     case False{}:

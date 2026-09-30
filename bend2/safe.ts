@@ -305,7 +305,6 @@ function root_emit(e: Safe, k: Name, r: Root): string {
   const s = scope_nil();
   const inline = tld.$ === "Def" && tld.e !== undefined && tld.u !== true;
   const efq: O = { $: "Efq" };
-  const unit = (h: O): O => ({ $: "Mat", k: "()", h, m: efq });
   // a λ-match on A, the arm hs[i] at its i-th value (Quant's in order)
   const mat = (A: HTerm, hs: O[]): O => {
     if (A.$ !== "ADT") {
@@ -701,7 +700,7 @@ function unapply(t: HTerm): [HTerm, HTerm[]] {
 function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
   const top = fs[fs.length - 1];
   if (top !== undefined && top.n === 0) {
-    return { $: "Mat", k: "()", h: convoy_bind(e, s, top.cv, t, fs.slice(0, -1)), m: { $: "Efq" } };
+    return unit(convoy_bind(e, s, top.cv, t, fs.slice(0, -1)));
   }
   const [x, T] = open(t);
   const all = all_of(e, T);
@@ -1214,7 +1213,6 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
   };
   // the selector's match: a member's arm past its tag (and a helper's (.k, ()))
   const efq: O = { $: "Efq" };
-  const unit = (h: O): O => ({ $: "Mat", k: "()", h, m: efq });
   const sel = (f: (m: Name) => O): O => ({ $: "Prj", h: g.ms.reduceRight<O>((m, k, i) => ({ $: "Mat", k: name_tt(k), m,
     h: i === 0 ? unit(f(k)) : { $: "Prj", h: { $: "Mat", k: name_tt(g.k), h: unit(f(k)), m: efq } } }), efq) });
   const l0 = s.D;
@@ -1431,6 +1429,11 @@ function is_o(v: unknown): v is O {
 // ∀s (or Σs) over b, at the binders ps
 function alls(ps: Binder[], b: O, $: "All" | "Sig" = "All"): O {
   return ps.reduceRight<O>((B, [q, l, A]) => ({ $, q, l, A, B }), b);
+}
+
+// the match that splits a Σ chain's unit, then h
+function unit(h: O): O {
+  return { $: "Mat", k: "()", h, m: { $: "Efq" } };
 }
 
 // λs over b, at the binders ps; one that uses its variable twice copies it
