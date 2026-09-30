@@ -90,6 +90,12 @@ type Bind = { o: O; T: HTerm | null; v?: HTerm };
 // tree, that is specialized; null at the rest
 type Cols = Array<HTerm | null>;
 
+// a root's instances: the columns of one, or a match on a specialized
+// parameter of a finite type A, with a root for each of its values
+type Root =
+  | { $: "Cols"; cols: Cols }
+  | { $: "Mat"; A: HTerm; arms: Root[] };
+
 // an argument: its binder's quantity, the argument, the binder's type,
 // and its value when the binder is specialized
 type Arg = [Q, HTerm, HTerm, HTerm | null];
@@ -206,7 +212,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
   const roots: Array<[Name, string]> = [];
   for (const k of [...new Set([...book.order].reverse())].reverse().filter((k) => book.tlds[k].b !== true)) {
     try {
-      roots.push([k, root_emit(e, k, root_cols(e, k, book.tlds[k].T, []))]);
+      roots.push([k, root_emit(e, k, root_of(e, k, book.tlds[k].T, []))]);
     } catch (x) {
       if (!(x instanceof Scope_Error)) {
         throw x;
@@ -239,22 +245,20 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
   return { text: book_show(e), oos };
 }
 
-// the columns root k checks at, after the columns cs of its telescope T,
-// as a tree: a specialized parameter of a finite type A (Quant, or a
-// datatype whose constructors have no fields) branches at each value,
-// any other takes an opaque constant of its type, one per place for all
-// roots, which models read at its model (as bend2 checks a template: its
-// body holds at every argument)
-type Roots = { cols: Cols } | { A: HTerm; arms: Roots[] };
-
-function root_cols(e: Safe, k: Name, T: HTerm, cs: Cols): Roots {
+// root k after the columns cs of its telescope T: a specialized
+// parameter of a finite type (Quant, or a datatype whose constructors
+// have no fields) matched, at each value; any other at an opaque
+// constant of its type, one per place for all roots, which models read
+// at its model (as bend2 checks a template: its body holds at every
+// argument)
+function root_of(e: Safe, k: Name, T: HTerm, cs: Cols): Root {
   const tld = e.book.tlds[k];
   const j = cs.length;
   const F = j === tld.n ? null : B.term_wnf(e.book, T);
   if (F?.$ !== "All") {
-    return { cols: cs };
+    return { $: "Cols", cols: cs };
   }
-  const at = (v: HTerm | null): Roots => root_cols(e, k, F.B(v ?? B.Var(F.k, j)), [...cs, v]);
+  const at = (v: HTerm | null): Root => root_of(e, k, F.B(v ?? B.Var(F.k, j)), [...cs, v]);
   if (tld.$ !== "Def" || j >= tld.x) {
     return at(null);
   }
@@ -263,7 +267,7 @@ function root_cols(e: Safe, k: Name, T: HTerm, cs: Cols): Roots {
   const vs: HTerm[] | null = A.$ === "Qnt" ? [B.None(), B.Lone(), B.Many()].map((q) => B.Qua(q))
     : adt !== null && adt.c.every((c) => B.term_wnf(e.book, c.T).$ !== "All") ? adt.c.map((c) => B.Ctr(c.k, [])) : null;
   if (vs !== null) {
-    return { A, arms: vs.map((v) => at(v)) };
+    return { $: "Mat", A, arms: vs.map(at) };
   }
   if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
     oos("a specialized parameter whose type names a parameter");
@@ -287,33 +291,48 @@ function root_cols(e: Safe, k: Name, T: HTerm, cs: Cols): Roots {
   return at(B.Ref(c));
 }
 
-// root k at its tree r: at a leaf, k at its columns; else one def, a
-// λ-match on each finite parameter, whose type is ∀x:A -> ({λ-match} x)
-// (at *1: a *2 fits), and at each leaf k's type and its tree there (or
-// k there, for a datatype, a def with no body or an @unsafe one), so the
-// kernel checks that the values cover k (at an empty datatype, none: λ{})
-function root_emit(e: Safe, k: Name, r: Roots): string {
-  if ("cols" in r) {
+// root k at r: at its columns, that item; else one def, a λ-match on
+// each finite parameter whose arms are k's tree at each value (or k
+// there, for a datatype, a def with no body or an @unsafe one), at a
+// type that is a λ-match on it too (at *1, which a *2 fits), so the
+// kernel checks that the values cover k (at an empty type, none: λ{})
+function root_emit(e: Safe, k: Name, r: Root): string {
+  if (r.$ === "Cols") {
     return item_try(e, k, r.cols);
   }
   const tld = e.book.tlds[k] as Def;
   const n = fresh(e, name_tt(k));
   const s = scope_nil();
+  const inline = tld.$ === "Def" && tld.e !== undefined && tld.u !== true;
   const efq: O = { $: "Efq" };
+  const unit = (h: O): O => ({ $: "Mat", k: "()", h, m: efq });
   // a λ-match on A, the arm hs[i] at its i-th value (Quant's in order)
-  const mat = (A: HTerm, hs: O[]): O => A.$ !== "ADT" ? hs.reduceRight<O>((m, h, i) => ({ $: "Mat", k: "Q" + String(i), h, m }), efq)
-    : { $: "Prj", h: (e.book.tlds[A.k] as ADT).c.reduceRight<O>((m, c, i) => ({ $: "Mat", k: name_tt(c.k), h: { $: "Mat", k: "()", h: hs[i], m: efq }, m }), efq) };
-  const type = (s: Scope, r: Roots): O => {
-    if ("cols" in r) {
-      return term(e, s, B.tele_fill(e.book, tld.T, r.cols.slice(0, tld.x) as HTerm[], B.ctx_nil()), false);
+  const mat = (A: HTerm, hs: O[]): O => {
+    if (A.$ !== "ADT") {
+      return hs.reduceRight<O>((m, h, i) => ({ $: "Mat", k: "Q" + String(i), h, m }), efq);
     }
-    const [l, A] = [s.D, term(e, s, r.A, false)];
-    const M = mat(r.A, r.arms.map((a) => type(scope_hide(s), a)));
-    return { $: "All", q: 1, l, A, B: { $: "App", q: 1, f: { $: "Ann", x: M, T: { $: "All", q: 1, l: l + 1, A, B: { $: "Typ", q: { $: "Lab", k: "Q1" } } } }, x: { $: "Var", l } } };
+    const cs = (e.book.tlds[A.k] as ADT).c;
+    return { $: "Prj", h: cs.reduceRight<O>((m, c, i) => ({ $: "Mat", k: name_tt(c.k), h: unit(hs[i]), m }), efq) };
   };
-  const body = (r: Roots): O => !("cols" in r) ? mat(r.A, r.arms.map(body))
-    : tld.$ === "Def" && tld.e !== undefined && tld.u !== true ? arm(e, s, k, r.cols, []) : { $: "Ref", k: item_ref(e, k, r.cols, true) };
-  e.out.push([n, type(s, r), body(r), false]);
+  const ty = (s: Scope, r: Root): O => {
+    if (r.$ === "Cols") {
+      const X = r.cols.slice(0, tld.x) as HTerm[];
+      return term(e, s, B.tele_fill(e.book, tld.T, X, B.ctx_nil()), false);
+    }
+    const l = s.D;
+    const A = term(e, s, r.A, false);
+    const M = mat(r.A, r.arms.map((a) => ty(scope_hide(s), a)));
+    const T: O = { $: "Typ", q: { $: "Lab", k: "Q1" } };
+    const K: O = { $: "All", q: 1, l: l + 1, A, B: T };
+    return { $: "All", q: 1, l, A, B: { $: "App", q: 1, f: { $: "Ann", x: M, T: K }, x: { $: "Var", l } } };
+  };
+  const body = (r: Root): O => {
+    if (r.$ === "Mat") {
+      return mat(r.A, r.arms.map(body));
+    }
+    return inline ? arm(e, s, k, r.cols, []) : { $: "Ref", k: item_ref(e, k, r.cols, true) };
+  };
+  e.out.push([n, ty(s, r), body(r), false]);
   return n;
 }
 
