@@ -1,9 +1,9 @@
 # a def specialized at a finite parameter went to --verdict once per
 # value, and --verdict trusted that those instances cover the law: at
-# Void, with none, skip went out zero times and passed unchecked. Now it
-# goes out once, a λ-match on the parameter whose arms are its instances'
-# bodies, and its type a λ-match on it too, so the kernel checks the
-# cover: skip's is λ{(,): λ{}}, and same's has an arm per Bool (#1186)
+# Void, with none, skip went out zero times and passed unchecked. Now a
+# def goes out too, a λ-match on the parameter whose arms name the
+# instances, at a type that is a λ-match on it too, so the kernel checks
+# the cover: skip's is λ{(,): λ{}}, and same's has an arm per Bool (#1186)
 import Base
 
 type Void is Data:
