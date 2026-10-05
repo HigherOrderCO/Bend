@@ -158,8 +158,6 @@ const WORDS: Record<string, Lay> = Object.setPrototypeOf(
 
 const WIDE = 247;
 
-const CB = {} as Bend.Span;
-
 const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
   + " --gpu 8GB|a function the device does not hold|a Nat past the"
   + " largest immediate 2^48-1|*|memory fault (machine stack overflow?)|an"
@@ -525,6 +523,8 @@ function char_new(code) {
 export const PROBES: Of<"Var">[] = [];
 
 const DUMMY = probe("~");
+
+const CB = {} as Bend.Span;
 
 let FUEL = 0;
 
