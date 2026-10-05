@@ -75,6 +75,7 @@ type File = {
   srcs: Map<Name, Set<Name> | null>;
   loops: Map<Name, Name[]>;
   flats: Map<Name, boolean>;
+  cbs: Map<string, Name>;
   funs: Map<Name, Fun>;
   brws: Map<Name, boolean[]>;
   nodes: Map<Name, Lay>;
@@ -156,6 +157,8 @@ const WORDS: Record<string, Lay> = Object.setPrototypeOf(
   { U32: W32, F32: W32, Nat: W64 }, null);
 
 const WIDE = 247;
+
+const CB = {} as Bend.Span;
 
 const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
   + " --gpu 8GB|a function the device does not hold|a Nat past the"
@@ -684,13 +687,81 @@ function term_spine(tm: HTerm): Spine {
     const a = apps[live.lastIndexOf(true)];
     const m = { h, t: c, all, args, tld, k: null, xs: args };
     if (def !== null && args.length === need) {
-      return { ...m, k: def, b: (c as Of<"Ref">).b };
+      return cb_spine({ ...m, k: def, b: (c as Of<"Ref">).b });
     }
-    if (args.length > need && (def !== null || c.$ !== "Ref")) {
+    if (args.length > need && (def !== null || c.$ !== "Ref"
+      && (FL.js || c.$ !== "Lam"))) {
       return { ...m, k: CLO_APPLY, xs: [a.f, a.x] };
     }
     return m;
   });
+}
+
+function cb_spine(m: Spine): Spine {
+  const c = m.k!;
+  const tld = m.tld as Bend.Def;
+  const l = m.args.find((a) => term_strip(a).$ === "Lam")!;
+  const j = m.all.indexOf(l);
+  const ds = l && tele_unbind(ty_ann(l)!).doms;
+  if (!l || j >= tld.n || FL.js || m.b || def_foreign(tld)
+    || def_raise(l, 0) < ds.length) {
+    return m;
+  }
+  const lo = Bend.term_lower({ ...term_strip(l), s: undefined }, 1e9);
+  const vs = new Map<number, Of<"Var">>();
+  const ts: Bend.LTerm[] = [];
+  let ps: Of<"Var">[] = [];
+  let ok = FL.segs.length === 0;
+  const key = () => c + j + JSON.stringify([ds.map((d) => lay_of(d[2])), lo],
+    (k, v) => {
+    ok &&= v !== CB;
+    if (v?.$ === "Ann" && v.x.$ === "Var") {
+      ts[v.x.i] ??= v.T;
+    }
+    if (v?.$ !== "Var" || v.i < 0 || v.i >= 1e9) {
+      return k === "s" || k === "T" ? undefined : v;
+    }
+    vs.set(v.i, v);
+    return ps.includes(PROBES[v.i]) ? ps.indexOf(PROBES[v.i]) : v;
+  });
+  key();
+  ps = [...vs.keys()].map((i) => PROBES[i]).filter((p) =>
+    p?.k === vs.get(p.i)!.k && term_use(term_uses(l), p) > 0);
+  const at = key();
+  if (ok && !FL.cbs.has(at) && ps.every((p) => ts[p.i])) {
+    const K = c + "$cb" + FL.cbs.size;
+    const abs = (lam: boolean, t: HTerm, xs: HTerm[] = []): HTerm => {
+      let env: Bend.Env = null;
+      vs.forEach((v, i) => env = Bend.list_set(env, i,
+        xs[ps.indexOf(PROBES[i])] ?? v));
+      const p = ps[xs.length];
+      const B = (x: HTerm) => abs(lam, t, [...xs, x]);
+      return !p ? def_inst(t, j, { ...Bend.term_higher(lo, env), s: CB })
+        : lam ? Bend.Lam(p.k, 0, B) as HTerm : Bend.All(Bend.Lone(), p.k, 0,
+          Bend.term_higher(ts[p.i], env), B) as HTerm;
+    };
+    FL.cbs.set(at, K);
+    FL.book.tlds[K] = { ...tld, n: ps.length + tld.n - 1, e: undefined,
+      v: abs(true, fun_of(c).h!), T: abs(false, tld.T) };
+  }
+  const k = FL.cbs.get(at);
+  const t = Bend.Ref(k!) as HTerm;
+  const args = [...ps, ...m.args.filter((x) => x !== l)];
+  return k === undefined ? m : { ...m, t, all: [...ps,
+    ...m.all.filter((x) => x !== l)], args, xs: args, k };
+}
+
+function def_inst(t: HTerm, j: number, v: HTerm): HTerm {
+  const s = term_force(t);
+  if (s.$ === "Lam") {
+    return j ? { ...s, f: (x: HTerm) => def_inst(s.f(x), j - 1, v) } : s.f(v);
+  }
+  if (s.$ === "All") {
+    return j ? { ...s, B: (x: HTerm) => def_inst(s.B(x), j - 1, v) } : s.B(v);
+  }
+  return s.$ === "Mat" ? { ...s, h: def_inst(s.h, j - 1 + FL.book.ctrs[s.k].n,
+    v), m: def_inst(s.m, j, v) } : s.$ === "Ann" ? { ...s,
+    x: def_inst(s.x, j, v) } : s;
 }
 
 function term_eta(t: HTerm, T: HTerm, n: number): HTerm {
@@ -1188,7 +1259,7 @@ function fun_of(k: Name): Fun {
       return { n: 0, h: null, live: [], lays: [BOX, BOX], ret: BOX };
     }
     const doms = tele_unbind(tld.T).doms;
-    const h = tld.e ? Bend.term_higher(tld.e) : null;
+    const h = tld.e ? Bend.term_higher(tld.e) : tld.v;
     const n = tld.n + (h === null ? 0
       : Math.min(def_raise(h, tld.n), doms.length - tld.n));
     const live = doms.slice(0, n).filter(dom_live);
@@ -1343,6 +1414,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     srcs: new Map(),
     loops: new Map(),
     flats: new Map(),
+    cbs: new Map(),
     funs: new Map(),
     brws: new Map(),
     nodes: new Map(),
@@ -1415,6 +1487,9 @@ function file_book(roots: Name[]): void {
       const ck = term_spine(s);
       if (ck.k !== null && ck.k !== d) {
         deps.add(ck.k);
+      }
+      if (ck.k !== null && FL.book.tlds[ck.k]) {
+        refs.add(ck.k);
       }
       flat &&= !((s.$ === "Let" && s.k.length >= 2)
         || (ck.k !== null && (ck.b || (ck.k === d && !tail))));
@@ -1980,6 +2055,22 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
       case "Ref":
       case "App": {
         const m = term_spine(s);
+        const beta = (v: HTerm): HTerm => {
+          const f = term_force(v);
+          if (f.$ !== "App") {
+            return f.$ === "Ann" ? { ...f, x: beta(f.x) } : f;
+          }
+          const g = term_strip(f.f);
+          if (g.$ !== "Lam") {
+            return { ...f, f: beta(f.f) };
+          }
+          const p = probe("a");
+          binds.push([p, go(f.x, true, null)]);
+          return g.f(p);
+        };
+        if (m.t.$ === "Lam") {
+          return go(beta(s), top, T);
+        }
         const spine = (v: HTerm): HTerm => {
           const f = term_force(v);
           if (f.$ === "Ann") {
