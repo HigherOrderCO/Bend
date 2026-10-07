@@ -131,6 +131,9 @@ const IO_EMIT = "IO~emit";
 const ATOM   = /^(?:[A-Za-z_$][A-Za-z0-9_$]*|\d+|\d+\.\d+)$/;
 const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
 
+// A JS local, as name_local writes it: its base and its count.
+const LOCAL  = /(?<![\w$])_(\w*)_(\d+)\b/g;
+
 // The field a JS match opens from a named U32, F32 or Char (its word, its
 // code): a binder takes it as written, so a rebuild folds back to the name.
 const VIEW = /^(?:u32_to_word\((\w+|f32_bits\(\w+\))\)|(\w+)\.codePointAt\(0\))$/;
@@ -2905,7 +2908,8 @@ export function compile_book(book: Bend.Book): string {
 // may return one: a marker per call resolves once every def is out.
 
 function js_sat(k: Name): string {
-  return name_id("$", k);
+  return `$${k.replace(/\W/g, (c) => c === "." ? "$"
+    : "$" + String(c.charCodeAt(0)).padStart(3, "0"))}$`;
 }
 
 function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
@@ -2997,17 +3001,20 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
         return js_expr(sc, (x as Of<"Lam">).f(Bend.Var("null", 0)),
           ty_all(ty).B(DUMMY));
       }
-      // include VIEW operands
-      const caps: string[] = [];
-      term_any(x, (v) => (v.$ === "Var" && v.i === 0
-        && caps.push(...v.k.match(/\b_\w*_\d+\b/g) ?? []), false));
+      const old = new Map(sc.fresh);
       const arg = name_local(sc, "x");
-      const ps = [...new Set(caps), arg].join();
       const cl = { ...sc, seg: seg_new("", BOX, []) };
-      const name = js_sat("$" + FL.spins.push(cl.seg));
-      block(cl, `function ${name}(${ps}) {`,
-        () => js_func(cl, x, ty, [arg]));
-      return `run_clo((${arg}) => ${name}(${ps}))`;
+      const name = "$0c" + FL.spins.push(cl.seg);
+      block(cl, "", () => block(cl, `return (${arg}) => {`, () =>
+        js_func(cl, x, ty, [arg])));
+      // its captures: the locals its text names that were made before it
+      const body = cl.seg.lines.join("\n")
+        .replace(/"(?:[^"\\]|\\.)*"|\x01[^\x02]*\x02/g, "");
+      const ps = [...new Set([...body.matchAll(LOCAL)]
+        .filter((m) => +m[2] < (old.get(m[1]) ?? 0)).map((m) => m[0]))]
+        .join(", ");
+      cl.seg.lines[0] = `function ${name}(${ps}) {`;
+      return `run_clo(${name}(${ps}))`;
     }
     default: {
       return "null";
