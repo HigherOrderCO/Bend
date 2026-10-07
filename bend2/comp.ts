@@ -2905,8 +2905,7 @@ export function compile_book(book: Bend.Book): string {
 // may return one: a marker per call resolves once every def is out.
 
 function js_sat(k: Name): string {
-  return `$${k.replace(/\W/g, (c) => c === "." ? "$"
-    : "$" + String(c.charCodeAt(0)).padStart(3, "0"))}$`;
+  return name_id("$", k);
 }
 
 function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
@@ -2998,11 +2997,17 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
         return js_expr(sc, (x as Of<"Lam">).f(Bend.Var("null", 0)),
           ty_all(ty).B(DUMMY));
       }
+      // include VIEW operands
+      const caps: string[] = [];
+      term_any(x, (v) => (v.$ === "Var" && v.i === 0
+        && caps.push(...v.k.match(/\b_\w*_\d+\b/g) ?? []), false));
       const arg = name_local(sc, "x");
+      const ps = [...new Set(caps), arg].join();
       const cl = { ...sc, seg: seg_new("", BOX, []) };
-      js_func(cl, x, ty, [arg]);
-      return `run_clo((${arg}) => {\n${seg_text(cl.seg.lines, 1)
-        .join("\n")}\n})`;
+      const name = js_sat("$" + FL.spins.push(cl.seg));
+      block(cl, `function ${name}(${ps}) {`,
+        () => js_func(cl, x, ty, [arg]));
+      return `run_clo((${arg}) => ${name}(${ps}))`;
     }
     default: {
       return "null";
