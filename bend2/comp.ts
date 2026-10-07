@@ -115,6 +115,8 @@ type Dom = [Bend.Quant, Name, HTerm];
 
 type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 
+type Trace = { miss: (() => boolean)[]; asks: Name[]; lends: Set<string> };
+
 // Constants
 // =========
 
@@ -558,6 +560,9 @@ const DUMMY = probe("~");
 let FUEL = 0;
 
 let FL: File;
+
+// What the def being emitted missed, asked and lent (compile_book).
+let TRACE: Trace | null = null;
 
 // Name
 // ====
@@ -1301,12 +1306,15 @@ function fun_at(ck: Spine): Fun {
 }
 
 function brw_of(k: Name): boolean[] {
-  return memo(FL.brws, k, () => {
+  const row = memo(FL.brws, k, () => {
     const { live, lays } = fun_of(k);
     return lays.map((l, i) => done_live(FL.book.tlds[k])
       && l.ks.includes("box") && ty_adt(live[i][2])?.k !== "Array"
       && !FL.own.has(k + "~" + i));
   });
+  TRACE?.asks.push(k);
+  row.forEach((b, i) => b && TRACE?.miss.push(() => FL.own.has(k + "~" + i)));
+  return row;
 }
 
 function def_raise(t: HTerm, left: number): number {
@@ -1412,7 +1420,17 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // asked by a holder or passed on from a lent root (k~i<j~q). A shared value
 // heats its type (hot); a family stuck on an open index heats its arms'
 // types once, its arguments at every instantiation. compile_book emits until
-// a pass changes no fact.
+// a pass changes no fact. A def reads facts through hot, stat and its rows.
+
+class Facts extends Set<string> {
+  has(k: string): boolean {
+    const got = super.has(k);
+    if (!got) {
+      TRACE?.miss.push(() => super.has(k));
+    }
+    return got;
+  }
+}
 
 function file_new(book: Bend.Book, js: boolean): File {
   PROBES.length = 1;
@@ -1421,8 +1439,8 @@ function file_new(book: Bend.Book, js: boolean): File {
     js,
     bangs: new Set(),
     sites: new Map(),
-    hot: new Set(),
-    stat: new Set(),
+    hot: new Facts(),
+    stat: new Facts(),
     own: new Set(),
     lend: new Set(),
     segs: [],
@@ -2873,9 +2891,14 @@ export function compile_book(book: Bend.Book): string {
   file_book(["main", ...RUNTIME_ADTS,
     ...names.map((c) => Bend.book_fam(FL.book, c))]);
   const facts = () => FL.own.size + FL.hot.size + FL.stat.size;
+  // a def none of whose missed facts was added is replayed, not emitted;
+  // after a pass that adds no fact, one more emits every def
+  const traces = new Map<Name, Trace>();
   let was: number;
+  let full: boolean;
   do {
     was = facts();
+    full = traces.size === 0;
     [FL.lend, FL.spun, FL.clos, FL.tabs, FL.lits, FL.consts, FL.brws]
       .forEach((m) => m.clear());
     FL.segs = [];
@@ -2883,6 +2906,12 @@ export function compile_book(book: Bend.Book): string {
     FL.img = [];
     for (const [k, tld] of [...done_defs().reverse(),
       ...done_defs(def_foreign)]) {
+      const t = traces.get(k);
+      if (t && !t.miss.some((f) => f())) {
+        t.asks.forEach(brw_of);
+        continue;
+      }
+      traces.set(k, TRACE = { miss: [], asks: [], lends: FL.lend = new Set() });
       memo_gc();
       PROBES.length = 1;
       const [dl, vals] = emit_open(scope_new(), k);
@@ -2892,7 +2921,9 @@ export function compile_book(book: Bend.Book): string {
       } else {
         emit_body(dl, fun_of(k).h!, tld.T, [], vals, null);
       }
+      TRACE = null;
     }
+    FL.lend = new Set([...traces.values()].flatMap((t) => [...t.lends]));
     graph_close(FL.lend, [...FL.lend].map((l) => l.split("<").reverse())
       .filter((e) => e.length > 1));
     FL.brws.forEach((bs, k) => bs.forEach((b, i) => {
@@ -2900,7 +2931,10 @@ export function compile_book(book: Bend.Book): string {
         FL.own.add(k + "~" + i);
       }
     }));
-  } while (was !== facts());
+    if (was === facts()) {
+      traces.clear();
+    }
+  } while (was !== facts() || !full);
   const edges = [...FL.segs, ...FL.spins].flatMap((s) =>
     [...s.refs].map((r) => [s.fid, r]));
   const reach = (from: string[]) => graph_close(new Set(from), edges);
