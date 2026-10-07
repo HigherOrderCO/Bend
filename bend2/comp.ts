@@ -131,9 +131,6 @@ const IO_EMIT = "IO~emit";
 const ATOM   = /^(?:[A-Za-z_$][A-Za-z0-9_$]*|\d+|\d+\.\d+)$/;
 const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
 
-// A JS local, as name_local writes it: its base and its count.
-const LOCAL  = /(?<![\w$])_(\w*)_(\d+)\b/g;
-
 // The field a JS match opens from a named U32, F32 or Char (its word, its
 // code): a binder takes it as written, so a rebuild folds back to the name.
 const VIEW = /^(?:u32_to_word\((\w+|f32_bits\(\w+\))\)|(\w+)\.codePointAt\(0\))$/;
@@ -2897,8 +2894,6 @@ export function compile_book(book: Bend.Book): string {
 // JS
 // --
 
-// A def's JS name is its key between $s: each . a $, and any other
-// non-word char a $ and its three-digit code, so no two keys share one.
 // Each effect source runs once in a closure of its own and registers
 // its effects with io_eff(CID(k), run), as a C source does. A
 // def on a tail cycle is one loop over the cycle's bodies ($pc picks
@@ -2908,8 +2903,7 @@ export function compile_book(book: Bend.Book): string {
 // may return one: a marker per call resolves once every def is out.
 
 function js_sat(k: Name): string {
-  return `$${k.replace(/\W/g, (c) => c === "." ? "$"
-    : "$" + String(c.charCodeAt(0)).padStart(3, "0"))}$`;
+  return name_id("$", k);
 }
 
 function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
@@ -3005,16 +2999,15 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
       const arg = name_local(sc, "x");
       const cl = { ...sc, seg: seg_new("", BOX, []) };
       const name = "$0c" + FL.spins.push(cl.seg);
-      block(cl, "", () => block(cl, `return (${arg}) => {`, () =>
-        js_func(cl, x, ty, [arg])));
-      // its captures: the locals its text names that were made before it
-      const body = cl.seg.lines.join("\n")
-        .replace(/"(?:[^"\\]|\\.)*"|\x01[^\x02]*\x02/g, "");
-      const ps = [...new Set([...body.matchAll(LOCAL)]
-        .filter((m) => +m[2] < (old.get(m[1]) ?? 0)).map((m) => m[0]))]
-        .join(", ");
-      cl.seg.lines[0] = `function ${name}(${ps}) {`;
-      return `run_clo(${name}(${ps}))`;
+      js_func(cl, x, ty, [arg]);
+      const ps = new Set<string>();
+      for (const [w, b, n] of cl.seg.lines.join().matchAll(
+        /"(?:\\.|[^"])*"|\x01[^\x02]*\x02|(?<![\w$])_(\w*)_(\d+)\b/g)) {
+        if (+n < (old.get(b) ?? 0)) ps.add(w);
+      }
+      cl.seg.lines = [`function ${name}(${[...ps]}) { return (${arg}) => {`,
+        ...cl.seg.lines, "}}"];
+      return `run_clo(${name}(${[...ps]}))`;
     }
     default: {
       return "null";
@@ -5994,13 +5987,12 @@ function array_rmw(a, i, f) {
 // ===
 
 function run_tail(f, x) {
-  return {$: "$JMP", f: f.j?.f === f ? f.j : f, x};
+  return {$: "$JMP", f: f.j ?? f, x};
 }
 
 function run_clo(j) {
   const f = (x) => run_loop(j(x));
   f.j = j;
-  j.f = f;
   return f;
 }
 
