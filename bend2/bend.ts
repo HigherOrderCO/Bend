@@ -250,96 +250,84 @@ import * as url from "node:url";
 export type Space = "def" | "ctr";
 export type Name = string & { readonly identity: unique symbol };
 export type Label = string;
-export type FileId = string & { readonly file: unique symbol };
-const SOURCE_NAME = /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/;
-export function file_key(raw: string): FileId { return atom(raw) as FileId; }
-export const BASE_ID = file_key("Base");
-type Identity = { owner: string; role?: string; space?: Space; part: string };
+export type FileId = string;
+export const BASE_ID: FileId = "Base";
+export const SOURCE_NAME = /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/;
 
-// Selectors consume canonical keys; raw labels never enter this representation.
-function name_view(k: Name): Identity {
+// Global slots contain canonical keys made here, never raw source labels.
+// Their primitive value preserves identity when a term or a book is copied.
+export function name_source(file: FileId, text: string, space: Space = "def"): Name {
+  if (!file || !text) throw Error("empty file or declaration name");
+  return (name_part(file) + (space === "ctr" ? ":#" : ":") + name_part(text)) as Name;
+}
+
+export function name_internal(text: string): Name { return ("!" + name_part(text)) as Name; }
+
+let next_name = 0n;
+export function name_gen(owner: Name, role: string, index?: number | bigint): Name {
+  const n = index === undefined ? "@" + next_name++ : String(BigInt(index));
+  if (n[0] === "-") throw Error("negative member position");
+  return (owner + "~" + name_part(role) + ":" + n) as Name;
+}
+
+function name_part(text: string): string {
+  return text.replace(/[^A-Za-z0-9_./-]/g,
+    c => "%" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+}
+
+function name_unpart(text: string): string {
+  return text.replace(/%([0-9a-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+}
+
+export function name_file(k: Name): FileId {
+  return k[0] === "!" ? "" : name_unpart(k.slice(0, k.indexOf(":")));
+}
+
+export function name_text(k: Name): string {
+  return k.split("~").map((part, i) => {
+    const at = part.indexOf(":");
+    if (i === 0) return name_unpart(part.slice(part[0] === "!" ? 1 : at + (part[at + 1] === "#" ? 2 : 1)));
+    return "~" + name_unpart(part.slice(0, at)) + (part[at + 1] === "@" ? "" : part.slice(at + 1));
+  }).join("");
+}
+
+export function name_parent(k: Name): Name | null {
   const at = k.lastIndexOf("~");
-  if (at >= 0) {
-    const end = k.indexOf(":", at);
-    return { owner: k.slice(0, at), role: unatom(k.slice(at + 1, end)), part: k.slice(end + 1) };
-  }
-  if (k[0] === "!") return { owner: "", part: unatom(k.slice(1)) };
-  const end = k.indexOf(":"), ctr = k[end + 1] === "#";
-  return { owner: k.slice(0, end), space: ctr ? "ctr" : "def", part: unatom(k.slice(end + (ctr ? 2 : 1))) };
+  return at < 0 ? null : k.slice(0, at) as Name;
 }
-export function name_keys(table: Record<string, unknown>): Name[] { return Object.keys(table) as Name[]; }
-export function name_parent(k: Name): Name | null { const at = k.lastIndexOf("~"); return at < 0 ? null : k.slice(0, at) as Name; }
-export function name_role(k: Name): string | null { return name_view(k).role ?? null; }
-function unatom(s: string): string { return s.replace(/%([0-9a-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16))); }
 
-function hex4(c: string): string { return c.charCodeAt(0).toString(16).padStart(4, "0"); }
-
-export function atom(s: string): string {
-  return s.replace(/[^A-Za-z0-9_./-]/g, c => "%" + hex4(c));
-}
 export function file_id(real: string, base: string, store: string | null): FileId {
   if (real === base) return BASE_ID;
   const tail = store === null ? "" : path.relative(store, real).split(path.sep).join("/");
   const pkg = /^0x([0-9a-f]+)\/(.*)/.exec(tail);
   if (pkg && pkg[1].length !== 32) throw Error("expected a 32-digit package hash");
-  return file_key(pkg?.[2] ? tail : real);
+  return pkg?.[2] ? tail : real;
 }
-export function name_source(file: FileId, text: string, space: Space = "def"): Name {
-  if (!file || !text) throw Error("empty file or declaration name");
-  return (file + (space === "ctr" ? ":#" : ":") + atom(text)) as Name;
-}
-export function name_internal(text: string): Name { return ("!" + atom(text)) as Name; }
-export function name_origin(k: Name): { file: FileId; text: string; space: Space } | null {
-  const end = k.indexOf("~"), n = name_view(end < 0 ? k : k.slice(0, end) as Name);
-  return n.space ? { file: n.owner as FileId, text: n.part, space: n.space } : null;
-}
-export function name_at(owner: Name, role: string, index: number | bigint): Name {
-  index = BigInt(index);
-  if (index < 0n) throw Error("negative member position");
-  return (owner + "~" + atom(role) + ":" + index) as Name;
-}
-let next_name = 0n;
-export function name_fresh(owner: Name, role: string): Name { return (owner + "~" + atom(role) + ":@" + next_name++) as Name; }
-export function name_member(k: Name, member: string): Name {
-  if (name_view(k).space !== "def") throw Error("member requires a source declaration");
-  return (k + "." + atom(member)) as Name;
-}
-export function js_field(k: Label): string { return k.startsWith("$") ? "$" + k : k; }
-export const fixed = Object.fromEntries(["Clo.apply", "IO.emit", "JMP", "IO.default", "default", "dummy", "marshal", "table", "gpu.bend", "gpu.window", "Q0", "Q1", "Q2", "unit"].map(s => [s, name_internal(s)]));
-export function name_entry(which: "bend" | "window"): string { return name_emit(fixed["gpu." + which]); }
-const kernel = new Map([[fixed.Q0, "Q0"], [fixed.Q1, "Q1"], [fixed.Q2, "Q2"], [fixed.unit, "()"]]);
-export function name_kernel(k: Name): string { return kernel.get(k) ?? name_emit(k); }
-export type Symbols = { names: Map<Name, string>; next: number };
-export function name_local(hint: string, index: number): string { return `b0_n${index}v${hint.replace(/[^A-Za-z0-9]+/g, "_")}`; }
-export function name_emit(k: Name, symbols?: Symbols): string {
-  const old = symbols?.names.get(k);
-  if (old !== undefined) return old;
-  const out = symbols ? name_local(name_origin(k)?.text ?? name_view(k).role ?? name_view(k).part, symbols.next++)
-    : "b0" + k.replace(/[^A-Za-z0-9]/g, c => "_u" + hex4(c));
-  symbols?.names.set(k, out);
-  return out;
-}
-export function name_is_local(s: string): boolean { return /^b0_n(0|[1-9][0-9]*)v[A-Za-z0-9_]*$/.test(s); }
-export function name_exports(k: Name, entry: FileId): string[] {
-  const n = name_view(k);
-  if (n.space !== "def") throw Error("not a source export");
-  return n.owner === entry && SOURCE_NAME.test(n.part) ? [k, n.part] : [k];
-}
+
 export function display_text(text: string): string {
-  return text.replace(/[\x00-\x1f\x7f-\x9f\ud800-\udfff]/gu, c => "\\u" + hex4(c));
+  return text.replace(/[\x00-\x1f\x7f-\x9f\ud800-\udfff]/gu,
+    c => "\\u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
 }
-export function c_text(text: string): string { return JSON.stringify(display_text(text)).replaceAll("?", "\\?"); }
+
+export function name_emit(k: Name): string {
+  return "b0" + k.replace(/[^A-Za-z0-9]/g,
+    c => "_u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+}
+
 export function name_display(book: Book | undefined, k: Name, file?: File): string {
-  const n = name_view(k);
-  if (n.owner === "") return "!" + display_text(n.part);
-  if (n.role !== undefined) return name_display(book, n.owner as Name, file) + "~" + display_text(n.role) + (n.part[0] === "@" ? "" : n.part);
-  let prefix = n.owner === file?.ns ? "" : Object.entries(file?.al ?? {}).find(([, target]) => target === n.owner)?.[0] ?? (n.owner === BASE_ID || n.owner === book?.entry ? "" : undefined);
+  const owner = name_file(k), text = name_text(k);
+  if (owner === "") return "!" + display_text(text);
+  let prefix: string | undefined;
+  if (owner === file?.ns) prefix = "";
+  else prefix = Object.entries(file?.al ?? {}).find(([, target]) => target === owner)?.[0];
+  if (prefix === undefined && (owner === BASE_ID || owner === book?.entry)) prefix = "";
   if (prefix === undefined) {
-    const entry = book?.files.get(book.entry), own = book?.files.get(n.owner as FileId);
-    prefix = entry?.path && own?.path && !/^0x[0-9a-f]{32}\//.test(n.owner) ? path.relative(path.dirname(entry.path), own.path).split(path.sep).join("/") : unatom(n.owner);
+    const entry = book?.files.get(book.entry), own = book?.files.get(owner);
+    prefix = entry?.path && own?.path && !/^0x[0-9a-f]{32}\//.test(owner)
+      ? path.relative(path.dirname(entry.path), own.path).split(path.sep).join("/") : owner;
     prefix = prefix.replace(/\.bend$/, "");
   }
-  return display_text((prefix ? prefix + "." : "") + n.part);
+  return display_text((prefix ? prefix + "." : "") + text);
 }
 
 // Core
@@ -1005,7 +993,7 @@ export function ctx_scope(ctx: Ctx): Label[] {
 // for a package's <name>@<version>.
 
 export function book_nil(): Book {
-  return { entry: file_key(""), base: null, files: new Map(), tlds: Object.create(null), ctrs: Object.create(null), order: [], hols: 0, tmps: new Map() };
+  return { entry: "", base: null, files: new Map(), tlds: Object.create(null), ctrs: Object.create(null), order: [], hols: 0, tmps: new Map() };
 }
 
 export function book_ctr(book: Book, k: Name): Ctr | null {
@@ -2364,7 +2352,7 @@ export function parse_term_ns(p: Parse, tm: LTerm, T: LTerm): void {
       throw Err(p.book, ctx_nil(), "a type name after : (the operators' namespace)", undefined, h.s);
     }
     const head = parse_head(h);
-    Object.assign(f, Ref(typeof head === "string" ? parse_reso(p, head + op) : name_member(head.k, op.slice(1)), f.s));
+    Object.assign(f, Ref(typeof head === "string" ? parse_reso(p, head + op) : name_source(name_file(head.k), name_text(head.k) + op), f.s));
   } else if (f.$ !== "Ref" || !["Bool.and", "Bool.or", "String.append"].some(k => f.k === book_name(p.book, k))) {
     return;
   }
@@ -3781,9 +3769,11 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       const t_wnf = term_wnf(book, ty);
       if (t_wnf.$ !== "ADT") {
         const fam = book_ctr(book, tm.k) === null ? null : book_fam(book, tm.k);
-        const origin = name_origin(tm.k);
-        const type = origin && (book.tlds[name_source(origin.file, origin.text)]
-          ?? (origin.file === tm.s?.file.ns ? book.tlds[book_name(book, origin.text)] : undefined));
+        let origin = tm.k;
+        for (let parent = name_parent(origin); parent !== null; parent = name_parent(origin)) origin = parent;
+        const file = name_file(origin), text = name_text(origin);
+        const type = file === "" ? undefined : (book.tlds[name_source(file, text)]
+          ?? (file === tm.s?.file.ns ? book.tlds[book_name(book, text)] : undefined));
         const nte = fam === null && type?.$ === "ADT" ? "Note: " + name_display(book, tm.k) + " is a datatype: write its arguments as <>" : undefined;
         throw Err(book, ctx, ty, fam === null ? "non-inferrable term" : Ref(fam, tm.s), tm.s, lhs.def, nte);
       }
@@ -3950,7 +3940,7 @@ export function def_check(book: Book, k: Name, def: Def, z?: number): LTerm {
   let [t, v, T]: HTerm[] = [Ref(k), def.v as HTerm, def.T];
   for (let j = 0; j < def.x; j++) {
     const h = tele_head(gen, T, ctx_nil(), k);
-    const o = name_at(k, "param", j);
+    const o = name_gen(k, "param", j);
     gen.tlds[o] = { $: "Def", n: 0, x: 0, T: h.A, v: null, b: true };
     t = App(t, Ref(o));
     v = term_apply(v, Ref(o));
@@ -3991,7 +3981,7 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
     if (z > 64) {
       throw Err(book, ctx, "a template that stops instantiating itself (64 levels at most)", tm, tm.s, lhs.def);
     }
-    o = name_fresh(tm.k, "inst");
+    o = name_gen(tm.k, "inst");
     book.tmps.set(key, o);
     try {
       const values = args.map(a => term_higher(a));
@@ -4051,7 +4041,7 @@ export function book_valid(book: Book, done: number = 0): void {
     last.set(book.order[i], i);
   }
   book.tlds = Object.create(null);
-  for (const k of name_keys(tlds)) {
+  for (const k of Object.keys(tlds) as Name[]) {
     const t = tlds[k];
     book.tlds[k] = last.has(k) && t.$ === "Def" ? { ...t, v: null } : t;
   }

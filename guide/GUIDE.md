@@ -405,8 +405,8 @@ for it. Underneath are `IO.spawn`, `Chan.new`, `Chan.send`, `Chan.recv` and
 every computation is done, or reports a deadlock when the remaining ones all
 wait.
 
-Every Base effect is a def importing `.js` and `.c` implementations. Each file
-declares Bend names in a `bend-ids 1` header and registers a handler with
+Base effects import `.js` and `.c` implementations. These declare names in
+a `bend-ids 1` header and register handlers with
 `io_eff`; see [Effects](EFFECTS.md). Define your own effects the same way.
 Only the event loop runs
 them, so proofs, termination and the GPU never touch host code. In the other
