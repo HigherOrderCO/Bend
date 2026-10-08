@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Flood.tick BEND_CID_Flood_tick
+// bend-ids end
 // Flood
 // =====
 
@@ -15,5 +18,5 @@ Term flood_tick_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) flood_tick_use(void) {
-  io_eff(CID(Flood.tick), flood_tick_run);
+  io_eff(BEND_CID_Flood_tick, flood_tick_run);
 }

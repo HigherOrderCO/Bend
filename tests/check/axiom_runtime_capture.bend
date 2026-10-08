@@ -29,7 +29,7 @@ def main():
 #|- observed : magic
 #|Context:
 #|- x : U32
-#|Location: tpl~0
+#|Location: tpl~inst
 #|23 | def main():
 #|24>|   tpl(y => (y + magic : U32), 1)
 #|   |                 ^^^^^

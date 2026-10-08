@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :UDP.bind BEND_CID_UDP_bind
+// bend-ids end
 // UDP
 // ===
 
@@ -20,4 +23,4 @@ function udp_bind(host, port) {
   return io_done(fd);
 }
 
-io_eff(CID(UDP.bind), udp_bind);
+io_eff(BEND_CID_UDP_bind, udp_bind);

@@ -1,3 +1,11 @@
+// bend-ids 1
+// CID #Wait BEND_CID_Wait
+// CID #Unit BEND_CID_Unit
+// CID :TCP.send BEND_CID_TCP_send
+// CID :TCP.send_bytes BEND_CID_TCP_send_bytes
+// CID :TCP.try_send BEND_CID_TCP_try_send
+// CID :TCP.try_send_bytes BEND_CID_TCP_try_send_bytes
+// bend-ids end
 // TCP
 // ===
 
@@ -19,14 +27,14 @@ function tcp_send_with(socket, b, k, make, at) {
         }
         if (io_late(at)) {
           const rest = make(part, part.length);
-          return io_tup(socket, { $: CID(Wait), rest: rest });
+          return io_tup(socket, { $: BEND_CID_Wait, rest: rest });
         }
         io_park_on(fd, true, k, () => go(off), at);
         return undefined;
       }
       off += n;
     }
-    return io_tup(socket, io_ready(at, io_done({ $: CID(Unit) })));
+    return io_tup(socket, io_ready(at, io_done({ $: BEND_CID_Unit })));
   };
   return go(0);
 }
@@ -57,7 +65,7 @@ function tcp_try_send_bytes(socket, data, ms, k) {
   return tcp_send_bytes_with(socket, data, k, io_until(ms));
 }
 
-io_eff(CID(TCP.send), tcp_send);
-io_eff(CID(TCP.send_bytes), tcp_send_bytes);
-io_eff(CID(TCP.try_send), tcp_try_send);
-io_eff(CID(TCP.try_send_bytes), tcp_try_send_bytes);
+io_eff(BEND_CID_TCP_send, tcp_send);
+io_eff(BEND_CID_TCP_send_bytes, tcp_send_bytes);
+io_eff(BEND_CID_TCP_try_send, tcp_try_send);
+io_eff(BEND_CID_TCP_try_send_bytes, tcp_try_send_bytes);

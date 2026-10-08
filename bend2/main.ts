@@ -4,8 +4,8 @@
 // it under [serve.static] plugins, or hand it to Bun.build) and a node hook
 // (node --import). A .bend module exports every filled, non-base, non-IO
 // def, wrapped so a JS caller passes the live arguments, in one call or
-// curried, and gets a plain value back: a constructor is {$: "Name", field:
-// value, ...}, a closure is a function, Nat is a number, Bool, String and U32
+// curried, and gets a plain value back: a constructor is {$: canonical_key,
+// field: value, ...}, a closure is a function, Nat is a number, Bool, String and U32
 // are native. A page bundles through Bun.build with the loader on, since
 // the bun build CLI takes no plugins.
 
@@ -302,7 +302,7 @@ async function cli_file(args: string[]): Promise<void> {
     if (checkup) {
       return await cli_checkup(file);
     }
-    const seen = new Map<string, string | null>();
+    const seen = new Map<string, Bend.FileId | null>();
     const book = await book_read(file, undefined, seen);
     if (only || verdict) {
       process.exitCode = cli_verdict(book, verdict);
@@ -586,7 +586,7 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
 // left) to the hub with its proof of work, and prints the import line.
 // First it prints the terms and the license the hub will show.
 async function cli_publish(file: string, named?: string): Promise<void> {
-  const seen = new Map<string, string | null>();
+  const seen = new Map<string, Bend.FileId | null>();
   const book = await book_read(file, undefined, seen);
   const files = pkg_files(file, book, seen);
   const entry = Object.keys(files)[0];
@@ -752,17 +752,18 @@ async function cli_login(): Promise<string> {
 // never match its hash.
 function pkg_files(file: string, book: Bend.Book,
   seen: Map<string, string | null>): Record<string, string> {
-  const dir  = fs.realpathSync(path.dirname(file)) + "/";
+  const entry = fs.realpathSync(file);
+  const dir = path.dirname(entry) + "/";
   const raws = [...[...seen].flatMap(([real, ns]): [string, string][] =>
     real === BASE || ns === null || ns.startsWith("0x") ? []
-      : [[ns === "" ? path.basename(file) : ns + ".bend", real]]),
+      : [[real === entry ? path.basename(file) : path.posix.relative(dir, real), real]]),
   ...Object.entries(book.tlds).flatMap(([k, tld]): [string, string][] =>
     tld.$ !== "Def" || tld.i === undefined || tld.b === true
       || k.startsWith("0x") ? [] : tld.i.map((f) =>
       [f.startsWith(dir) ? f.slice(dir.length) : f, f]))];
   const ups = raws.map(([p]) => path.posix.normalize(p).split("/")
     .filter((s) => s === "..").length);
-  const anc = fs.realpathSync(path.dirname(file)).split("/")
+  const anc = path.dirname(entry).split("/")
     .slice(-Math.max(0, ...ups) || Infinity);
   const files: Record<string, string> = {};
   for (const [raw, real] of raws) {
@@ -813,7 +814,7 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
   if (bad.length !== 0) {
     cli_say(2, FAIL + "\nError: " + String(bad.length) + " def" + (bad.length === 1
       ? " relies" : "s rely") + " on unsafe or foreign code:\n"
-      + bad.map((k) => "- " + Bend.name_key(k) + "\n").join(""));
+      + bad.map((k) => "- " + Bend.name_display(book, k) + "\n").join(""));
     return 1;
   }
   const why = kernel ? Safe.safe_check(book) : null;
@@ -831,8 +832,7 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
 // promise like @unsafe is: the checker reads its type, never its code.
 // If the book holds a promise, a walk from the defs outside Base collects
 // who names whom, then the promises flood back along those edges.
-function book_promises(book: Bend.Book): string[] {
-  const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
+function book_promises(book: Bend.Book): Bend.Name[] {
   const bad  = new Set(Object.keys(book.tlds).filter((k) => {
     const t = book.tlds[k] as Bend.Def;
     return t.u === true || (t.i !== undefined && t.b !== true);
@@ -840,17 +840,18 @@ function book_promises(book: Bend.Book): string[] {
   if (bad.size === 0) {
     return [];
   }
-  const uses: Record<string, string[]> = Object.create(null);
+  const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
+  const uses: Record<string, Bend.Name[]> = Object.create(null);
   const reach = new Set(own);
   for (const k of reach) {
     const t = book.tlds[k];
     if (t !== undefined) {
-      const rs = new Set<string>();
+      const rs = new Set<Bend.Name>();
       for (const c of t.$ === "ADT" ? [t, ...t.c] : [t]) {
         term_refs(Bend.term_lower(c.T), rs);
       }
       if (t.$ === "Def" && t.e !== undefined) {
-        term_refs(t.e, rs);
+        term_refs(Bend.term_lower(Bend.checked_higher(t.e)), rs);
       }
       for (const r of rs) {
         (uses[r] ??= []).push(k);
@@ -865,18 +866,15 @@ function book_promises(book: Bend.Book): string[] {
 }
 
 // term_refs adds to out the names a term (a span skipped) refers to.
-function term_refs(t: object, out: Set<string>): void {
+function term_refs(t: Bend.LTerm, out: Set<Bend.Name>): void {
   const seen = new Set([t]);
   for (const todo = [t]; todo.length > 0;) {
-    const x = todo.pop() as Record<string, unknown>;
-    if ((x.$ === "Ref" || x.$ === "ADT") && typeof x.k === "string") {
-      out.add(x.k);
-    }
-    for (const f in x) {
-      const v = x[f];
-      if (f !== "s" && typeof v === "object" && v !== null && !seen.has(v)) {
-        seen.add(v);
-        todo.push(v);
+    const x = todo.pop() as Bend.LTerm;
+    if (x.$ === "Ref" || x.$ === "ADT") out.add(x.k);
+    for (const key of Bend.term_children[x.$]) {
+      const v = (x as unknown as Record<string, unknown>)[key];
+      for (const child of Array.isArray(v) ? v : v === undefined ? [] : [v]) {
+        if (!seen.has(child)) { seen.add(child); todo.push(child); }
       }
     }
   }
@@ -902,21 +900,20 @@ function cli_fail(msg: string): never {
 // ====
 
 async function book_read(file: string, base?: Bend.Book,
-  seen = new Map<string, string | null>()): Promise<Bend.Book> {
+  seen = new Map<string, Bend.FileId | null>()): Promise<Bend.Book> {
   const book = base === undefined ? Bend.book_nil() : book_seed(base);
-  if (base !== undefined) {
-    seen.set(BASE, "");
-  }
   try {
-    await Bend.book_load(book, file, "", seen);
+    await Bend.book_load(book, file, seen);
     const laws = path.join(path.dirname(file), "LAWS.bend");
     if (path.basename(file) === "PROOF.bend" && fs.existsSync(laws)
       && !seen.has(fs.realpathSync(laws))) {
       throw "Error: PROOF.bend must import ./LAWS.bend";
     }
     Bend.book_valid(book, base?.order.length ?? 0);
-    if (book.hols > 0) {
-      throw "Error: " + String(book.hols) + " TODO" + (book.hols === 1 ? "" : "s")
+    const holes = book.hols + Object.values(book.tlds)
+      .filter(t => t.$ === "Def" && t.v === null && t.b !== true && !t.i).length;
+    if (holes > 0) {
+      throw "Error: " + String(holes) + " TODO" + (holes === 1 ? "" : "s")
         + " found.\nThe code is incomplete, and not a valid proof yet.";
     }
   } catch (e) {
@@ -936,15 +933,15 @@ function book_seed(base: Bend.Book): Bend.Book {
     book.tlds[k] = { ...base.tlds[k] };
   }
   Object.assign(book.ctrs, base.ctrs);
-  for (const k of Object.keys(base.tmps)) {
-    book.tmps[k] = new Map(base.tmps[k]);
-  }
+  book.base = base.base;
+  book.files = new Map(base.files);
+  book.tmps = new Map(base.tmps);
   book.order.push(...base.order);
   return book;
 }
 
 function book_main(book: Bend.Book): Bend.Def | null {
-  const main = book.tlds["main"];
+  const main = book.tlds[Bend.name_source(book.entry, "main")];
   return main === undefined || main.$ !== "Def"
     || (main.v === null && main.i === undefined) ? null : main;
 }
@@ -958,7 +955,7 @@ function book_run(book: Bend.Book, argv: string[]): number {
     return Comp.io_run(book, argv);
   }
   const snf = Bend.term_snf(book, main.v as Bend.HTerm);
-  cli_say(1, Bend.term_show(Bend.term_lower(snf)) + "\n");
+  cli_say(1, Bend.term_show(Bend.term_lower(snf), -1, [], undefined, book) + "\n");
   return 0;
 }
 

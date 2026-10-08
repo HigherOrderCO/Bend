@@ -1,3 +1,7 @@
+// bend-ids 1
+// CID #Con BEND_CID_Con
+// CID :Process.run BEND_CID_Process_run
+// bend-ids end
 // Process
 // =======
 
@@ -62,7 +66,7 @@ let process_worker = null;
 
 function process_run(program, args, input, maxOutput, timeoutMs) {
   const argv = [str_out(program)];
-  for (let xs = args; xs.$ === CID(Con); xs = xs.tail) {
+  for (let xs = args; xs.$ === BEND_CID_Con; xs = xs.tail) {
     argv.push(str_out(xs.head));
   }
   if (maxOutput === 0 || timeoutMs === 0
@@ -92,4 +96,4 @@ function process_run(program, args, input, maxOutput, timeoutMs) {
     : io_done(io_tup(got.code, got.out, got.err));
 }
 
-io_eff(CID(Process.run), process_run);
+io_eff(BEND_CID_Process_run, process_run);

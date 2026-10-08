@@ -12,8 +12,8 @@ def main() -> {Nat.add(3n, 0n) == 3n : Nat}:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : Nat.add(add0~n, 0n)
-#|- observed : add0~n
+#|- expected : Nat.add(add0~param0, 0n)
+#|- observed : add0~param0
 #|Location: add0
 #|7 | def add0(~n: Nat) -> {Nat.add(n, 0n) == n : Nat}:
 #|8>|   {==}

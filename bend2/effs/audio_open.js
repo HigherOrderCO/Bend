@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Audio.open BEND_CID_Audio_open
+// bend-ids end
 // Audio
 // =====
 
@@ -9,4 +12,4 @@ function audio_open(rate) {
   return io_done({ rate, queued: 0, at: Date.now() });
 }
 
-io_eff(CID(Audio.open), audio_open);
+io_eff(BEND_CID_Audio_open, audio_open);

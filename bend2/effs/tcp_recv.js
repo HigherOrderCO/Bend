@@ -1,3 +1,13 @@
+// bend-ids 1
+// CID #Wait BEND_CID_Wait
+// CID #Unit BEND_CID_Unit
+// CID #None BEND_CID_None
+// CID #Some BEND_CID_Some
+// CID :TCP.recv BEND_CID_TCP_recv
+// CID :TCP.recv_bytes BEND_CID_TCP_recv_bytes
+// CID :TCP.try_recv BEND_CID_TCP_try_recv
+// CID :TCP.try_recv_bytes BEND_CID_TCP_try_recv_bytes
+// bend-ids end
 // TCP
 // ===
 
@@ -20,13 +30,13 @@ function tcp_recv_with(socket, max, k, read, at) {
         return io_tup(socket, io_ready(at, io_fail(code)));
       }
       if (io_late(at)) {
-        return io_tup(socket, { $: CID(Wait), rest: { $: CID(Unit) } });
+        return io_tup(socket, { $: BEND_CID_Wait, rest: { $: BEND_CID_Unit } });
       }
       io_park_on(fd, false, k, go, at);
       return undefined;
     }
-    const got = n === 0 ? { $: CID(None) }
-      : { $: CID(Some), value: read(b, n) };
+    const got = n === 0 ? { $: BEND_CID_None }
+      : { $: BEND_CID_Some, value: read(b, n) };
     return io_tup(socket, io_ready(at, io_done(got)));
   };
   return go();
@@ -49,7 +59,7 @@ function tcp_try_recv_bytes(socket, max, ms, k) {
   return tcp_recv_with(socket, max, k, io_list, io_until(ms));
 }
 
-io_eff(CID(TCP.recv), tcp_recv);
-io_eff(CID(TCP.recv_bytes), tcp_recv_bytes);
-io_eff(CID(TCP.try_recv), tcp_try_recv);
-io_eff(CID(TCP.try_recv_bytes), tcp_try_recv_bytes);
+io_eff(BEND_CID_TCP_recv, tcp_recv);
+io_eff(BEND_CID_TCP_recv_bytes, tcp_recv_bytes);
+io_eff(BEND_CID_TCP_try_recv, tcp_try_recv);
+io_eff(BEND_CID_TCP_try_recv_bytes, tcp_try_recv_bytes);

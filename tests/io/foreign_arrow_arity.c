@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :twice BEND_CID_twice
+// bend-ids end
 // IO
 // ==
 
@@ -6,5 +9,5 @@ Term twice_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) twice_use(void) {
-  io_eff(CID(twice), twice_run);
+  io_eff(BEND_CID_twice, twice_run);
 }

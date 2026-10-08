@@ -1,8 +1,12 @@
+// bend-ids 1
+// CID #Unit BEND_CID_Unit
+// CID :Window.close BEND_CID_Window_close
+// bend-ids end
 // Window
 // ======
 
 function window_close(window) {
-  return { $: CID(Unit) };
+  return { $: BEND_CID_Unit };
 }
 
-io_eff(CID(Window.close), window_close);
+io_eff(BEND_CID_Window_close, window_close);

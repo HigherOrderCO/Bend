@@ -1,7 +1,7 @@
-# two ~ binders of one name once collided in the generic check: each
-# became the opaque constant cast~T, so the second overwrote the first
-# and a body typed at the first checked at the second, which admitted
-# a closed Empty (#905); the second name is now refused where it binds
+# Repeated ~ binder labels once collided as the opaque constant cast~T.
+# Parameters now have distinct positional identities, so shadowing is
+# harmless but x still has the first T: returning it at the second T
+# is rejected by ordinary type comparison (#905).
 type Unit is Data:
   Unit{}
 
@@ -13,11 +13,11 @@ def main() -> Unit:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a fresh ~ binder name
-#|- observed : T
-#|Location:
-#|7 | 
-#|8>| def cast(~T: Type, ~x: T, ~T: Type) -> T:
-#|  |                            ^
-#|9 |   x
+#|- expected : cast~param2
+#|- observed : cast~param0
+#|Location: cast
+#| 8 | def cast(~T: Type, ~x: T, ~T: Type) -> T:
+#| 9>|   x
+#|   |   ^
+#|10 |
 #|exit 1

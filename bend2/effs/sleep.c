@@ -1,8 +1,12 @@
+// bend-ids 1
+// CID #Unit BEND_CID_Unit
+// CID :IO.sleep BEND_CID_IO_sleep
+// bend-ids end
 // IO
 // ==
 
 static Term io_sleep_more(Env e, IoWork* w) {
-  return term_pak(CID(Unit), 0);
+  return term_pak(BEND_CID_Unit, 0);
 }
 
 // Parks until f[0] milliseconds from now.
@@ -12,5 +16,5 @@ Term io_sleep_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) io_sleep_use(void) {
-  io_eff(CID(IO.sleep), io_sleep_run);
+  io_eff(BEND_CID_IO_sleep, io_sleep_run);
 }

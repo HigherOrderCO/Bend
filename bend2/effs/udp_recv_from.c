@@ -1,3 +1,11 @@
+// bend-ids 1
+// CID #Unit BEND_CID_Unit
+// CID #Con BEND_CID_Con
+// CID :UDP.recv_from BEND_CID_UDP_recv_from
+// CID :UDP.try_recv_from BEND_CID_UDP_try_recv_from
+// CID :UDP.recv_bytes_from BEND_CID_UDP_recv_bytes_from
+// CID :UDP.try_recv_bytes_from BEND_CID_UDP_try_recv_bytes_from
+// bend-ids end
 // UDP
 // ===
 
@@ -17,7 +25,7 @@ static Term udp_recv_from_with(Env e, IoWork* w, IoPack more,
     return io_wait_on(w, fd, POLLIN, w->time, more);
   }
   inet_ntop(AF_INET, &at.sin_addr, host, 16);
-  Term r = io_poll_end(e, w, term_pak(CID(Unit), 0), io_res(e, w,
+  Term r = io_poll_end(e, w, term_pak(BEND_CID_Unit, 0), io_res(e, w,
     io_tup(e, io_str(e, host, strlen(host)),
       io_tup(e, ntohs(at.sin_port), read(e, w->data, w->size)))));
   free(w->data);
@@ -31,7 +39,7 @@ static Term udp_recv_from_start(Env e, Term* f, IoWork* w, IoPack more, u64 at) 
   if (f[1] == 0) {
     w->code = EINVAL;
     return io_tup(e, io_hand(w->hand), io_poll_end(e, w,
-      term_pak(CID(Unit), 0), io_fail(e, EINVAL, NULL)));
+      term_pak(BEND_CID_Unit, 0), io_fail(e, EINVAL, NULL)));
   }
   w->made = f[1] < INT32_MAX ? (intptr_t)f[1] : INT32_MAX;
   w->data = io_mem(malloc((size_t)w->made + 1));
@@ -42,7 +50,7 @@ static Term udp_recv_from_more(Env e, IoWork* w) {
   return udp_recv_from_with(e, w, udp_recv_from_more, io_str);
 }
 
-#ifdef CID(Con)
+#ifdef BEND_CID_Con
 
 static Term udp_recv_bytes_from_more(Env e, IoWork* w) {
   return udp_recv_from_with(e, w, udp_recv_bytes_from_more, io_list);
@@ -50,43 +58,43 @@ static Term udp_recv_bytes_from_more(Env e, IoWork* w) {
 
 #endif
 
-#ifdef CID(UDP.recv_from)
+#ifdef BEND_CID_UDP_recv_from
 
 Term udp_recv_from_run(Env e, Term* f, IoWork* w) {
   return udp_recv_from_start(e, f, w, udp_recv_from_more, 0);
 }
 
 static void __attribute__((constructor)) udp_recv_from_use(void) {
-  io_eff(CID(UDP.recv_from), udp_recv_from_run);
+  io_eff(BEND_CID_UDP_recv_from, udp_recv_from_run);
 }
 
 #endif
 
-#ifdef CID(UDP.try_recv_from)
+#ifdef BEND_CID_UDP_try_recv_from
 
 Term udp_try_recv_from_run(Env e, Term* f, IoWork* w) {
   return udp_recv_from_start(e, f, w, udp_recv_from_more, io_until(f[2]));
 }
 
 static void __attribute__((constructor)) udp_try_recv_from_use(void) {
-  io_eff(CID(UDP.try_recv_from), udp_try_recv_from_run);
+  io_eff(BEND_CID_UDP_try_recv_from, udp_try_recv_from_run);
 }
 
 #endif
 
-#ifdef CID(UDP.recv_bytes_from)
+#ifdef BEND_CID_UDP_recv_bytes_from
 
 Term udp_recv_bytes_from_run(Env e, Term* f, IoWork* w) {
   return udp_recv_from_start(e, f, w, udp_recv_bytes_from_more, 0);
 }
 
 static void __attribute__((constructor)) udp_recv_bytes_from_use(void) {
-  io_eff(CID(UDP.recv_bytes_from), udp_recv_bytes_from_run);
+  io_eff(BEND_CID_UDP_recv_bytes_from, udp_recv_bytes_from_run);
 }
 
 #endif
 
-#ifdef CID(UDP.try_recv_bytes_from)
+#ifdef BEND_CID_UDP_try_recv_bytes_from
 
 Term udp_try_recv_bytes_from_run(Env e, Term* f, IoWork* w) {
   return udp_recv_from_start(e, f, w, udp_recv_bytes_from_more,
@@ -94,7 +102,7 @@ Term udp_try_recv_bytes_from_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) udp_try_recv_bytes_from_use(void) {
-  io_eff(CID(UDP.try_recv_bytes_from), udp_try_recv_bytes_from_run);
+  io_eff(BEND_CID_UDP_try_recv_bytes_from, udp_try_recv_bytes_from_run);
 }
 
 #endif

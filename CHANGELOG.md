@@ -3,6 +3,20 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
+## Unreleased
+
+- Names retain their resolved file, declaration category and generated owner
+  through checking, compilation and `--verdict`. Separately compiled JS modules
+  agree on constructor tags; imported exports cannot overwrite a literally dotted
+  name in the entry file. Entry definitions keep their short JS export aliases.
+- Template parameters use their positions, so repeated binder labels cannot
+  identify different parameters as one. Template arguments must also be closed
+  in retained dead match fallbacks before entering the instance cache.
+- **Foreign interface change:** C and JS files declare their Bend references in
+  a `// bend-ids 1` header. Replace body `CID(...)`/`FID(...)` uses with the
+  declared host aliases; the compiler now copies the host body unchanged.
+  See [Effects](guide/EFFECTS.md) for the format and examples.
+
 ## 2.0.37 (2026-10-13)
 
 - **A Nat crosses to a JS host as a plain number** (PR #1506 by

@@ -33,7 +33,7 @@ def false_theorem() -> {False{} == True{} : Bit}:
 #|- observed : loop
 #|Context:
 #|- u : Unit
-#|Location: bounce~0
+#|Location: bounce~inst
 #|18 | def loop(~k: Key, u: Unit) -> Empty:
 #|19>|   bounce(~loop(~k), u)
 #|   |           ^^^^

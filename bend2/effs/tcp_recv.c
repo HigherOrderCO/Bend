@@ -1,3 +1,13 @@
+// bend-ids 1
+// CID #Unit BEND_CID_Unit
+// CID #None BEND_CID_None
+// CID #Some BEND_CID_Some
+// CID #Con BEND_CID_Con
+// CID :TCP.recv BEND_CID_TCP_recv
+// CID :TCP.recv_bytes BEND_CID_TCP_recv_bytes
+// CID :TCP.try_recv BEND_CID_TCP_try_recv
+// CID :TCP.try_recv_bytes BEND_CID_TCP_try_recv_bytes
+// bend-ids end
 // TCP
 // ===
 
@@ -11,9 +21,9 @@ static Term tcp_recv_with(Env e, IoWork* w, IoPack more,
   if (io_again(w)) {
     return io_wait_on(w, fd, POLLIN, w->time, more);
   }
-  Term r = io_poll_end(e, w, term_pak(CID(Unit), 0), io_res(e, w,
-    w->size == 0 ? term_pak(CID(None), 0)
-      : io_box(e, CID(Some), read(e, w->data, w->size))));
+  Term r = io_poll_end(e, w, term_pak(BEND_CID_Unit, 0), io_res(e, w,
+    w->size == 0 ? term_pak(BEND_CID_None, 0)
+      : io_box(e, BEND_CID_Some, read(e, w->data, w->size))));
   free(w->data);
   return io_tup(e, io_hand(w->hand), r);
 }
@@ -25,7 +35,7 @@ static Term tcp_recv_start(Env e, Term* f, IoWork* w, IoPack more, u64 at) {
   if (f[1] == 0) {
     w->code = EINVAL;
     return io_tup(e, io_hand(w->hand), io_poll_end(e, w,
-      term_pak(CID(Unit), 0), io_fail(e, EINVAL, NULL)));
+      term_pak(BEND_CID_Unit, 0), io_fail(e, EINVAL, NULL)));
   }
   w->made = f[1] < INT32_MAX ? (intptr_t)f[1] : INT32_MAX;
   w->data = io_mem(malloc((size_t)w->made));
@@ -36,7 +46,7 @@ static Term tcp_recv_more(Env e, IoWork* w) {
   return tcp_recv_with(e, w, tcp_recv_more, io_str);
 }
 
-#ifdef CID(Con)
+#ifdef BEND_CID_Con
 
 static Term tcp_recv_bytes_more(Env e, IoWork* w) {
   return tcp_recv_with(e, w, tcp_recv_bytes_more, io_list);
@@ -44,50 +54,50 @@ static Term tcp_recv_bytes_more(Env e, IoWork* w) {
 
 #endif
 
-#ifdef CID(TCP.recv)
+#ifdef BEND_CID_TCP_recv
 
 Term tcp_recv_run(Env e, Term* f, IoWork* w) {
   return tcp_recv_start(e, f, w, tcp_recv_more, 0);
 }
 
 static void __attribute__((constructor)) tcp_recv_use(void) {
-  io_eff(CID(TCP.recv), tcp_recv_run);
+  io_eff(BEND_CID_TCP_recv, tcp_recv_run);
 }
 
 #endif
 
-#ifdef CID(TCP.recv_bytes)
+#ifdef BEND_CID_TCP_recv_bytes
 
 Term tcp_recv_bytes_run(Env e, Term* f, IoWork* w) {
   return tcp_recv_start(e, f, w, tcp_recv_bytes_more, 0);
 }
 
 static void __attribute__((constructor)) tcp_recv_bytes_use(void) {
-  io_eff(CID(TCP.recv_bytes), tcp_recv_bytes_run);
+  io_eff(BEND_CID_TCP_recv_bytes, tcp_recv_bytes_run);
 }
 
 #endif
 
-#ifdef CID(TCP.try_recv)
+#ifdef BEND_CID_TCP_try_recv
 
 Term tcp_try_recv_run(Env e, Term* f, IoWork* w) {
   return tcp_recv_start(e, f, w, tcp_recv_more, io_until(f[2]));
 }
 
 static void __attribute__((constructor)) tcp_try_recv_use(void) {
-  io_eff(CID(TCP.try_recv), tcp_try_recv_run);
+  io_eff(BEND_CID_TCP_try_recv, tcp_try_recv_run);
 }
 
 #endif
 
-#ifdef CID(TCP.try_recv_bytes)
+#ifdef BEND_CID_TCP_try_recv_bytes
 
 Term tcp_try_recv_bytes_run(Env e, Term* f, IoWork* w) {
   return tcp_recv_start(e, f, w, tcp_recv_bytes_more, io_until(f[2]));
 }
 
 static void __attribute__((constructor)) tcp_try_recv_bytes_use(void) {
-  io_eff(CID(TCP.try_recv_bytes), tcp_try_recv_bytes_run);
+  io_eff(BEND_CID_TCP_try_recv_bytes, tcp_try_recv_bytes_run);
 }
 
 #endif
