@@ -811,7 +811,7 @@ function pkg_files(file: string, book: Bend.Book,
       : [[real === entry ? path.basename(file) : path.posix.relative(dir, real), real]]),
   ...Object.entries(book.tlds).flatMap(([k, tld]): [string, string][] =>
     tld.$ !== "Def" || tld.i === undefined || tld.b === true
-      || k.startsWith("0x") ? [] : tld.i.map((f) =>
+      || Bend.name_file(k as Bend.Name).startsWith("0x") ? [] : tld.i.map((f) =>
       [f.startsWith(dir) ? f.slice(dir.length) : f, f]))];
   const ups = raws.map(([p]) => path.posix.normalize(p).split("/")
     .filter((s) => s === "..").length);
@@ -887,7 +887,7 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
 // If the book holds a promise, a walk from the defs outside Base collects
 // who names whom, then the promises flood back along those edges.
 function book_promises(book: Bend.Book): Bend.Name[] {
-  const bad  = new Set(Object.keys(book.tlds).filter((k) => {
+  const bad  = new Set((Object.keys(book.tlds) as Bend.Name[]).filter((k) => {
     const t = book.tlds[k] as Bend.Def;
     return t.u === true || (t.i !== undefined && t.b !== true);
   }));
@@ -998,9 +998,7 @@ class Check_Fail {
 
 function book_seed(base: Bend.Book): Bend.Book {
   const book = Bend.book_nil();
-  for (const k of Object.keys(base.tlds)) {
-    book.tlds[k] = { ...base.tlds[k] };
-  }
+  for (const [k, t] of Object.entries(base.tlds)) book.tlds[k] = { ...t };
   Object.assign(book.ctrs, base.ctrs);
   book.base = base.base;
   book.files = new Map(base.files);
