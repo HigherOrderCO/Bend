@@ -1,3 +1,8 @@
+// bend-ids 1
+// CID #Unit BEND_CID_Unit
+// CID :TCP.accept BEND_CID_TCP_accept
+// CID :TCP.try_accept BEND_CID_TCP_try_accept
+// bend-ids end
 // TCP
 // ===
 
@@ -16,11 +21,11 @@ static Term tcp_accept_more(Env e, IoWork* w) {
   if (io_again(w)) {
     return io_wait_on(w, fd, POLLIN, w->time, tcp_accept_more);
   }
-  return io_tup(e, io_hand(fd), io_poll_end(e, w, term_pak(CID(Unit), 0),
+  return io_tup(e, io_hand(fd), io_poll_end(e, w, term_pak(BEND_CID_Unit, 0),
     io_res(e, w, io_hand(got))));
 }
 
-#ifdef CID(TCP.accept)
+#ifdef BEND_CID_TCP_accept
 
 Term tcp_accept_run(Env e, Term* f, IoWork* w) {
   w->hand = (intptr_t)io_hand_v(f[0]);
@@ -28,12 +33,12 @@ Term tcp_accept_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tcp_accept_use(void) {
-  io_eff(CID(TCP.accept), tcp_accept_run);
+  io_eff(BEND_CID_TCP_accept, tcp_accept_run);
 }
 
 #endif
 
-#ifdef CID(TCP.try_accept)
+#ifdef BEND_CID_TCP_try_accept
 
 // w->time is the deadline, past which tcp_accept_more answers Wait{}.
 Term tcp_try_accept_run(Env e, Term* f, IoWork* w) {
@@ -43,7 +48,7 @@ Term tcp_try_accept_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tcp_try_accept_use(void) {
-  io_eff(CID(TCP.try_accept), tcp_try_accept_run);
+  io_eff(BEND_CID_TCP_try_accept, tcp_try_accept_run);
 }
 
 #endif

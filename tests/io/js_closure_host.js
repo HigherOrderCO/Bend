@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Clo.host_tail BEND_CID_Clo_host_tail
+// bend-ids end
 function clo_host_tail() {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -45,4 +48,4 @@ def ap(f: U32 -> U32, x: U32) -> U32:
   }
 }
 
-io_eff(CID(Clo.host_tail), clo_host_tail);
+io_eff(BEND_CID_Clo_host_tail, clo_host_tail);

@@ -1,3 +1,8 @@
+// bend-ids 1
+// CID #Unit BEND_CID_Unit
+// CID :ffi_absent BEND_CID_ffi_absent
+// CID :ffi_back BEND_CID_ffi_back
+// bend-ids end
 // Takes the FFI table away until ffi_back puts it back, so File.size runs
 // as on a host without bun:ffi and nothing after it in the process does.
 let ffi_real = undefined;
@@ -9,13 +14,13 @@ function ffi_absent_run() {
       throw new Error("no ffi table on this host");
     },
   });
-  return { $: CID(Unit) };
+  return { $: BEND_CID_Unit };
 }
 
 function ffi_back_run() {
   globalThis.BEND_SYS = ffi_real;
-  return { $: CID(Unit) };
+  return { $: BEND_CID_Unit };
 }
 
-io_eff(CID(ffi_absent), ffi_absent_run);
-io_eff(CID(ffi_back), ffi_back_run);
+io_eff(BEND_CID_ffi_absent, ffi_absent_run);
+io_eff(BEND_CID_ffi_back, ffi_back_run);

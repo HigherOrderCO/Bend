@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Nat.host_export BEND_CID_Nat_host_export
+// bend-ids end
 function nat_host_export() {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -41,4 +44,4 @@ def add(a: Nat, b: Nat) -> Nat:
   }
 }
 
-io_eff(CID(Nat.host_export), nat_host_export);
+io_eff(BEND_CID_Nat_host_export, nat_host_export);

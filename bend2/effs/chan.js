@@ -1,3 +1,18 @@
+// bend-ids 1
+// CID #Done BEND_CID_Done
+// CID #Unit BEND_CID_Unit
+// CID #Wait BEND_CID_Wait
+// CID #Ready BEND_CID_Ready
+// CID #None BEND_CID_None
+// CID #Fail BEND_CID_Fail
+// CID #Some BEND_CID_Some
+// CID :Chan.new BEND_CID_Chan_new
+// CID :Chan.send BEND_CID_Chan_send
+// CID :Chan.recv BEND_CID_Chan_recv
+// CID :Chan.try_send BEND_CID_Chan_try_send
+// CID :Chan.try_recv BEND_CID_Chan_try_recv
+// CID :Chan.close BEND_CID_Chan_close
+// bend-ids end
 // Chan
 // ====
 
@@ -8,11 +23,11 @@
 const CHAN_RECV = Symbol();
 
 function chan_done() {
-  return { $: CID(Done), value: { $: CID(Unit) } };
+  return { $: BEND_CID_Done, value: { $: BEND_CID_Unit } };
 }
 
 function chan_wait(item) {
-  return { $: CID(Wait), rest: item === CHAN_RECV ? { $: CID(Unit) } : item };
+  return { $: BEND_CID_Wait, rest: item === CHAN_RECV ? { $: BEND_CID_Unit } : item };
 }
 
 // The first waiter, past those whose IO has returned (a nested io_run): their
@@ -34,7 +49,7 @@ function chan_wake(row, x) {
     const ws = w.io.waits;
     const at = ws.findIndex((t) => t.more === w.late);
     if (at >= 0) ws.splice(at, 1);
-    x = { $: CID(Ready), value: x };
+    x = { $: BEND_CID_Ready, value: x };
   }
   io_push(w.cont, x, false, w.io);
   return w.item;
@@ -53,8 +68,8 @@ function chan_shut(row) {
   row.shut = true;
   while (chan_head(row) !== undefined) {
     const item = row.wait[0].item;
-    chan_wake(row, item === CHAN_RECV ? { $: CID(None) }
-      : { $: CID(Fail), error: item });
+    chan_wake(row, item === CHAN_RECV ? { $: BEND_CID_None }
+      : { $: BEND_CID_Fail, error: item });
   }
 }
 
@@ -79,10 +94,10 @@ function chan_park(row, k, item, ms) {
 // Sends without waiting: Done{}, Fail{v} if closed, undefined if it would.
 function chan_put(row, value) {
   if (row.shut) {
-    return { $: CID(Fail), error: value };
+    return { $: BEND_CID_Fail, error: value };
   }
   if (chan_head(row)?.item === CHAN_RECV) {
-    chan_wake(row, { $: CID(Some), value: value });
+    chan_wake(row, { $: BEND_CID_Some, value: value });
     return chan_done();
   }
   if (row.ring.length < row.room) {
@@ -95,14 +110,14 @@ function chan_put(row, value) {
 // Receives without waiting: Some{v}, None{} at the end, undefined if not.
 function chan_get(row) {
   if (row.ring.length > 0) {
-    return { $: CID(Some), value: chan_take(row) };
+    return { $: BEND_CID_Some, value: chan_take(row) };
   }
   const w = chan_head(row);
   if (w !== undefined && w.item !== CHAN_RECV) {
-    return { $: CID(Some), value: chan_wake(row, chan_done()) };
+    return { $: BEND_CID_Some, value: chan_wake(row, chan_done()) };
   }
   if (row.shut) {
-    return { $: CID(None) };
+    return { $: BEND_CID_None };
   }
   return undefined;
 }
@@ -110,7 +125,7 @@ function chan_get(row) {
 // Ready{x} now, Wait{rest} now if ms is 0, else parks until a wake or ms.
 function chan_try(row, x, item, ms, k) {
   if (x !== undefined) {
-    return { $: CID(Ready), value: x };
+    return { $: BEND_CID_Ready, value: x };
   }
   if (Number(ms) === 0) {
     return chan_wait(item);
@@ -144,12 +159,12 @@ function chan_close(row) {
   if (!row.shut) {
     chan_shut(row);
   }
-  return { $: CID(Unit) };
+  return { $: BEND_CID_Unit };
 }
 
-io_eff(CID(Chan.new), chan_new);
-io_eff(CID(Chan.send), chan_send);
-io_eff(CID(Chan.recv), chan_recv);
-io_eff(CID(Chan.try_send), chan_try_send);
-io_eff(CID(Chan.try_recv), chan_try_recv);
-io_eff(CID(Chan.close), chan_close);
+io_eff(BEND_CID_Chan_new, chan_new);
+io_eff(BEND_CID_Chan_send, chan_send);
+io_eff(BEND_CID_Chan_recv, chan_recv);
+io_eff(BEND_CID_Chan_try_send, chan_try_send);
+io_eff(BEND_CID_Chan_try_recv, chan_try_recv);
+io_eff(BEND_CID_Chan_close, chan_close);

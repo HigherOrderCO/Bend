@@ -1,5 +1,5 @@
-# a foreign def and a constructor share the C constructor ids, so they may
-# not share a name (Tick's arity and its effect's were one table cell)
+# A constructor and foreign request keep distinct identities. The foreign
+# header selects :Tick explicitly because bare Tick would be ambiguous.
 import Base
 
 type T is Data:
@@ -14,5 +14,4 @@ def main() -> IO(Unit):
     n : U32 <- Tick()
     IO.print(U32.show(n))
 
-#|Error: Tick names both a constructor and a foreign def: name one apart
-#|exit 1
+#|7

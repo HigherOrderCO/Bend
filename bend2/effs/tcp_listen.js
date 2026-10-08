@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :TCP.listen BEND_CID_TCP_listen
+// bend-ids end
 // TCP
 // ===
 
@@ -23,4 +26,4 @@ function tcp_listen(host, port) {
   return io_done(fd);
 }
 
-io_eff(CID(TCP.listen), tcp_listen);
+io_eff(BEND_CID_TCP_listen, tcp_listen);

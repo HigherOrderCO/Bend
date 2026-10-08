@@ -24,11 +24,13 @@ for (let y = 0; y < H; y++) {
 
 // Bend bridge
 // ===========
-// The conventions: a constructor is {$: "Name", field: value, ...} (live
+// Constructor tags retain their module: {$: "Base:#Con", head, tail} (live
 // fields only), Nat is a number, Bool is a plain boolean. Stepping onto the
 // flag's cell is the win: the game sets `won` itself.
 
-const one  = (act) => ({ $: "Con", head: { $: act }, tail: { $: "Nil" } });
+const KEY = { Up: 119, Down: 115, Left: 97, Right: 100 };
+const one = (act) => ({ $: "Base:#Con", head: Game.key(KEY[act]).value,
+  tail: { $: "Base:#Nil" } });
 const send = (act, g) => Game.replay(g, one(act));
 
 let st    = Game.start();

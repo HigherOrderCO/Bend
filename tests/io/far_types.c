@@ -1,3 +1,8 @@
+// bend-ids 1
+// CID #Near BEND_CID_Near
+// CID #Deep BEND_CID_Deep
+// CID :far.make BEND_CID_far_make
+// bend-ids end
 // Far
 // ===
 
@@ -6,11 +11,11 @@
 static Term far_make_at(Env e, u32 depth, u32* next) {
   if (depth == 0) {
     *next += 1;
-    return term_pak(CID(Near), *next);
+    return term_pak(BEND_CID_Near, *next);
   }
   Term l = far_make_at(e, depth - 1, next);
   Term r = far_make_at(e, depth - 1, next);
-  return io_node(e, CID(Deep), l, r);
+  return io_node(e, BEND_CID_Deep, l, r);
 }
 
 Term far_make_run(Env e, Term* f, IoWork* w) {
@@ -19,5 +24,5 @@ Term far_make_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) far_make_use(void) {
-  io_eff(CID(far.make), far_make_run);
+  io_eff(BEND_CID_far_make, far_make_run);
 }

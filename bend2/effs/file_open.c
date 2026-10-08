@@ -1,3 +1,9 @@
+// bend-ids 1
+// CID #SCon BEND_CID_SCon
+// CID #Con BEND_CID_Con
+// CID :File.open BEND_CID_File_open
+// CID :File.open_bytes BEND_CID_File_open_bytes
+// bend-ids end
 // File
 // ====
 
@@ -40,26 +46,26 @@ static Term file_open_start(Env e, Term* f, IoWork* w, u64 cons) {
   return io_work(w, file_open_call, file_open_pack);
 }
 
-#ifdef CID(File.open)
+#ifdef BEND_CID_File_open
 
 Term file_open_run(Env e, Term* f, IoWork* w) {
-  return file_open_start(e, f, w, CID(SCon));
+  return file_open_start(e, f, w, BEND_CID_SCon);
 }
 
 static void __attribute__((constructor)) file_open_use(void) {
-  io_eff(CID(File.open), file_open_run);
+  io_eff(BEND_CID_File_open, file_open_run);
 }
 
 #endif
 
-#ifdef CID(File.open_bytes)
+#ifdef BEND_CID_File_open_bytes
 
 Term file_open_bytes_run(Env e, Term* f, IoWork* w) {
-  return file_open_start(e, f, w, CID(Con));
+  return file_open_start(e, f, w, BEND_CID_Con);
 }
 
 static void __attribute__((constructor)) file_open_bytes_use(void) {
-  io_eff(CID(File.open_bytes), file_open_bytes_run);
+  io_eff(BEND_CID_File_open_bytes, file_open_bytes_run);
 }
 
 #endif

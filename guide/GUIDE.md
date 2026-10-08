@@ -405,14 +405,16 @@ for it. Underneath are `IO.spawn`, `Chan.new`, `Chan.send`, `Chan.recv` and
 every computation is done, or reports a deadlock when the remaining ones all
 wait.
 
-Every effect in Base is a def whose body is `import "./x.js"` plus a `.c` twin,
-implemented by a host function named after the def, lowercased, dots to
-underscores. You can add your own effects the same way. Only the event loop runs
+Every Base effect is a def importing `.js` and `.c` implementations. Each file
+declares Bend names in a `bend-ids 1` header and registers a handler with
+`io_eff`; see [Effects](EFFECTS.md). Define your own effects the same way.
+Only the event loop runs
 them, so proofs, termination and the GPU never touch host code. In the other
 direction, a JS file may `import Game from "./game.bend"` (with `bend2/main.ts`
 preloaded), or from the `./game.mjs` that `-o game.mjs` writes, and call every
-non-IO def, with constructors as `{$: "Name", field: value}` and `Nat` as a
-number. A value crosses without a copy: an `Array`
+non-IO def. Entry exports keep short names; others use canonical keys.
+Constructors use canonical tags: `{$: "Base:#Some", value: x}`; `Nat` is
+a number. A value crosses without a copy: an `Array`
 argument is the caller's own array, updated in place, so copy it first if you
 keep it.
 

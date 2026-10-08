@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :IO.get_env BEND_CID_IO_get_env
+// bend-ids end
 // IO
 // ==
 
@@ -10,4 +13,4 @@ function io_get_env(name) {
   return value === undefined ? io_fail(2) : io_done(value);
 }
 
-io_eff(CID(IO.get_env), io_get_env);
+io_eff(BEND_CID_IO_get_env, io_get_env);

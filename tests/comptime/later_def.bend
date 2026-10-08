@@ -18,7 +18,7 @@ def later(n: Nat) -> Nat:
 #|- observed : later
 #|Context:
 #|- x : Nat
-#|Location: app~0
+#|Location: app~inst
 #| 9 | def main() -> Nat:
 #|10>|   app(~later, 3n)
 #|   |        ^^^^^

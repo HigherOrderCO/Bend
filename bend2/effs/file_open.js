@@ -1,3 +1,7 @@
+// bend-ids 1
+// CID :File.open BEND_CID_File_open
+// CID :File.open_bytes BEND_CID_File_open_bytes
+// bend-ids end
 // File
 // ====
 
@@ -29,5 +33,5 @@ function file_open_bytes(path, mode) {
   return file_open_with(io_unlist(path), mode);
 }
 
-io_eff(CID(File.open), file_open);
-io_eff(CID(File.open_bytes), file_open_bytes);
+io_eff(BEND_CID_File_open, file_open);
+io_eff(BEND_CID_File_open_bytes, file_open_bytes);

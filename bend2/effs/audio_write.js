@@ -1,3 +1,7 @@
+// bend-ids 1
+// CID #Con BEND_CID_Con
+// CID :Audio.write BEND_CID_Audio_write
+// bend-ids end
 // Audio
 // =====
 
@@ -5,7 +9,7 @@ const AUDIO_RING = 4096; // Frames; matches IO_RING in audio.c.
 
 function audio_write(audio, samples) {
   let n = 0;
-  for (let xs = samples; xs.$ === CID(Con); xs = xs.tail) {
+  for (let xs = samples; xs.$ === BEND_CID_Con; xs = xs.tail) {
     n += 1;
   }
   const frames = Math.floor(n / 2);
@@ -22,4 +26,4 @@ function audio_write(audio, samples) {
   return io_tup(audio, audio.queued);
 }
 
-io_eff(CID(Audio.write), audio_write);
+io_eff(BEND_CID_Audio_write, audio_write);
