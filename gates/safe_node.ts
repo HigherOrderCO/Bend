@@ -17,7 +17,8 @@ export function judge(g: Got): [string, string] {
   const out = g.out.trim();
   if (g.timeout) return ["t", "timeout"];
   if (g.error || g.code === null || g.code < 0) {
-    return ["e", "infrastructure: " + (g.error ?? out)];
+    const why = (g.error ?? out).replace(/\s+/g, " ").slice(0, 300);
+    return ["e", "infrastructure: " + why];
   }
   if (g.code === 0 && out === "ALL PROOFS CHECK") return [" ", "agree"];
   if (/^Error: \d+ defs? rel(y|ies) on unsafe or foreign code/m.test(out)) {
@@ -30,7 +31,8 @@ export function judge(g: Got): [string, string] {
   if (tt.startsWith("out of scope")) {
     return ["-", "out of scope: " + [...tt.matchAll(/^- \S+: (.*)$/gm)].map((m) => m[1]).slice(0, 2).join(" | ").slice(0, 160)];
   }
-  return ["!", tt.split("\n").slice(0, 3).join(" | ").slice(0, 300)];
+  // the kernel's first line is SOME PROOFS FAIL; why starts at In <def>:
+  return ["!", tt.split("\n").slice(1, 3).join(" | ").slice(0, 300)];
 }
 
 async function run(bin: string, args: string[], cap: number): Promise<Omit<Got, "f">> {
