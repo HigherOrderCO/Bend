@@ -1,3 +1,11 @@
+// bend-ids 1
+// CID #Wait BEND_CID_Wait
+// CID #Unit BEND_CID_Unit
+// CID :UDP.recv_from BEND_CID_UDP_recv_from
+// CID :UDP.recv_bytes_from BEND_CID_UDP_recv_bytes_from
+// CID :UDP.try_recv_from BEND_CID_UDP_try_recv_from
+// CID :UDP.try_recv_bytes_from BEND_CID_UDP_try_recv_bytes_from
+// bend-ids end
 // UDP
 // ===
 
@@ -24,7 +32,7 @@ function udp_recv_from_with(socket, max, k, read, at) {
         return io_tup(socket, io_ready(at, io_fail(code)));
       }
       if (io_late(at)) {
-        return io_tup(socket, { $: CID(Wait), rest: { $: CID(Unit) } });
+        return io_tup(socket, { $: BEND_CID_Wait, rest: { $: BEND_CID_Unit } });
       }
       io_park_on(fd, false, k, go, at);
       return undefined;
@@ -56,7 +64,7 @@ function udp_try_recv_bytes_from(socket, max, ms, k) {
   return udp_recv_from_with(socket, max, k, io_list, io_until(ms));
 }
 
-io_eff(CID(UDP.recv_from), udp_recv_from);
-io_eff(CID(UDP.recv_bytes_from), udp_recv_bytes_from);
-io_eff(CID(UDP.try_recv_from), udp_try_recv_from);
-io_eff(CID(UDP.try_recv_bytes_from), udp_try_recv_bytes_from);
+io_eff(BEND_CID_UDP_recv_from, udp_recv_from);
+io_eff(BEND_CID_UDP_recv_bytes_from, udp_recv_bytes_from);
+io_eff(BEND_CID_UDP_try_recv_from, udp_try_recv_from);
+io_eff(BEND_CID_UDP_try_recv_bytes_from, udp_try_recv_bytes_from);

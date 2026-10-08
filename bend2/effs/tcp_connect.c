@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :TCP.connect BEND_CID_TCP_connect
+// bend-ids end
 // TCP
 // ===
 
@@ -37,5 +40,5 @@ Term tcp_connect_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tcp_connect_use(void) {
-  io_eff(CID(TCP.connect), tcp_connect_run);
+  io_eff(BEND_CID_TCP_connect, tcp_connect_run);
 }

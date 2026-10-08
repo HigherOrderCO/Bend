@@ -1,3 +1,20 @@
+// bend-ids 1
+// CID :Window.open BEND_CID_Window_open
+// CID #Key BEND_CID_Key
+// CID #Mouse BEND_CID_Mouse
+// CID #Look BEND_CID_Look
+// CID #Move BEND_CID_Move
+// CID #Scroll BEND_CID_Scroll
+// CID #Close BEND_CID_Close
+// CID :Window.frame BEND_CID_Window_frame
+// CID #Nil BEND_CID_Nil
+// CID #Con BEND_CID_Con
+// CID :Window.set_title BEND_CID_Window_set_title
+// CID :Window.grab BEND_CID_Window_grab
+// CID #True BEND_CID_True
+// CID :Window.close BEND_CID_Window_close
+// CID #Unit BEND_CID_Unit
+// bend-ids end
 // Window
 // ======
 
@@ -42,7 +59,7 @@ typedef struct {
 
 #endif
 
-#ifdef CID(Window.open)
+#ifdef BEND_CID_Window_open
 
 #if defined(__OBJC__) || defined(__linux__)
 
@@ -122,7 +139,7 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
 - (void)key:(NSEvent*)ev down:(BOOL)down {
   NSString* s = [ev.charactersIgnoringModifiers lowercaseString];
   u32 code = s.length > 0 ? [s characterAtIndex:0] : 65536 + ev.keyCode;
-  [self push:CID(Key) a:code b:down c:0 d:0];
+  [self push:BEND_CID_Key a:code b:down c:0 d:0];
 }
 
 - (void)keyDown:(NSEvent*)ev {
@@ -223,7 +240,7 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
 
 - (void)flagsChanged:(NSEvent*)ev {
   u64 now = ev.modifierFlags;
-  [self push:CID(Key) a:65536 + ev.keyCode b:(now & ~flags) != 0 c:0
+  [self push:BEND_CID_Key a:65536 + ev.keyCode b:(now & ~flags) != 0 c:0
     d:0];
   flags = now;
 }
@@ -237,22 +254,22 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
 
 - (void)mouse:(NSEvent*)ev down:(BOOL)down {
   NSPoint p = [self at:ev];
-  [self push:CID(Mouse) a:p.x b:p.y c:(u32)ev.buttonNumber d:down];
+  [self push:BEND_CID_Mouse a:p.x b:p.y c:(u32)ev.buttonNumber d:down];
 }
 
 - (void)move:(NSEvent*)ev {
   NSPoint p = [self at:ev];
   if (grab) {
-    [self push:CID(Look) a:f32_rewrap(ev.deltaX) b:f32_rewrap(ev.deltaY)
+    [self push:BEND_CID_Look a:f32_rewrap(ev.deltaX) b:f32_rewrap(ev.deltaY)
       c:0 d:0];
   } else {
-    [self push:CID(Move) a:p.x b:p.y c:0 d:0];
+    [self push:BEND_CID_Move a:p.x b:p.y c:0 d:0];
   }
 }
 
 - (void)scrollWheel:(NSEvent*)ev {
   NSPoint p = [self at:ev];
-  [self push:CID(Scroll) a:p.x b:p.y c:f32_rewrap(ev.scrollingDeltaX)
+  [self push:BEND_CID_Scroll a:p.x b:p.y c:f32_rewrap(ev.scrollingDeltaX)
     d:f32_rewrap(ev.scrollingDeltaY)];
 }
 
@@ -319,7 +336,7 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
 }
 
 - (BOOL)windowShouldClose:(NSWindow*)sender {
-  [self push:CID(Close) a:0 b:0 c:0 d:0];
+  [self push:BEND_CID_Close a:0 b:0 c:0 d:0];
   return NO;
 }
 
@@ -505,12 +522,12 @@ Term window_open_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) window_open_use(void) {
-  io_eff(CID(Window.open), window_open_run);
+  io_eff(BEND_CID_Window_open, window_open_run);
 }
 
 #endif
 
-#ifdef CID(Window.frame)
+#ifdef BEND_CID_Window_frame
 
 // An event is five words: its constructor's id and its fields; a frame
 // answers the events pumped since the last one.
@@ -537,9 +554,9 @@ static u32 window_depth(u32 n) {
 }
 
 static Term window_list(Env e, const u32* p, u64 n) {
-  Term list = term_pak(CID(Nil), 0);
+  Term list = term_pak(BEND_CID_Nil, 0);
   for (u64 i = n; i > 0; i -= 1) {
-    list = io_node(e, CID(Con), window_node(e, p + 5 * (i - 1)), list);
+    list = io_node(e, BEND_CID_Con, window_node(e, p + 5 * (i - 1)), list);
   }
   return list;
 }
@@ -574,7 +591,7 @@ static const char* window_msl =
   "ulong node(device const ulong* mem, ulong t) {\n"
   "  return t & RFC_BIT ? mem[t & LOC_MASK] >> 24 : t & LOC_MASK;\n"
   "}\n"
-  "kernel void window_dev(device const ulong* mem [[buffer(0)]],\n"
+  "kernel void " BEND_GPU_WINDOW "(device const ulong* mem [[buffer(0)]],\n"
   "  constant Args& a [[buffer(1)]],\n"
   "  texture2d<float, access::write> out [[texture(0)]],\n"
   "  uint2 p [[thread_position_in_grid]]) {\n"
@@ -604,7 +621,7 @@ static void window_pipe(id<MTLDevice> dev) {
     err_fail(err.localizedDescription.UTF8String);
   }
   window_pso = [dev newComputePipelineStateWithFunction:
-    [lib newFunctionWithName:@"window_dev"] error:&err];
+    [lib newFunctionWithName:@BEND_GPU_WINDOW] error:&err];
   if (window_pso == nil) {
     err_fail(err.localizedDescription.UTF8String);
   }
@@ -803,21 +820,8 @@ static void window_pump(BendWin* win) {
     XKeyEvent key  = ev.xkey;
     bool      took = XFilterEvent(&ev, None);
     if (ev.type == KeyPress || ev.type == KeyRelease) {
-      // Each key is a Key, even one the input method took (the event as
-      // it came: Xlib's own method rewrites it). A method may hand a key
-      // back at its time, the same Key, or bring text on key code 0.
-      u32 code = key.keycode << 1 | (ev.type == KeyPress);
-      if (key.keycode != 0
-        && (took || key.time != win->kt || code != win->kc)) {
-        window_push(win, CID(Key), window_key(&key), ev.type == KeyPress, 0,
-          0);
-      }
-      if (took) {
-        win->kt = key.time;
-        win->kc = code;
-      } else if (ev.type == KeyPress) {
-        window_text(win, &ev.xkey);
-      }
+      window_push(win, BEND_CID_Key, window_key(&ev.xkey), ev.type == KeyPress,
+        0, 0);
     } else if (ev.type == ButtonPress || ev.type == ButtonRelease) {
       // the wheel: 4 up, 5 down, 6 left, 7 right
       u32 b  = ev.xbutton.button;
@@ -825,17 +829,17 @@ static void window_pump(BendWin* win) {
       u32 by = window_clip(ev.xbutton.y, h);
       f32 s  = b % 2 ? -1 : 1;
       if (b <= 3) {
-        window_push(win, CID(Mouse), bx, by, b == 1 ? 0 : 4 - b,
+        window_push(win, BEND_CID_Mouse, bx, by, b == 1 ? 0 : 4 - b,
           ev.type == ButtonPress);
       } else if (b <= 7 && ev.type == ButtonPress) {
-        window_push(win, CID(Scroll), bx, by, f32_rewrap(b > 5 ? s : 0),
+        window_push(win, BEND_CID_Scroll, bx, by, f32_rewrap(b > 5 ? s : 0),
           f32_rewrap(b > 5 ? 0 : s));
       }
     } else if (ev.type == MotionNotify) {
       x = ev.xmotion.x;
       y = ev.xmotion.y;
       if (!win->grab) {
-        window_push(win, CID(Move), window_clip(x, w), window_clip(y, h), 0,
+        window_push(win, BEND_CID_Move, window_clip(x, w), window_clip(y, h), 0,
           0);
       }
     } else if (ev.type == FocusIn && win->ic != NULL) {
@@ -848,12 +852,12 @@ static void window_pump(BendWin* win) {
       win->grab = 0;
     } else if (ev.type == ClientMessage
       && (Atom)ev.xclient.data.l[0] == win->del) {
-      window_push(win, CID(Close), 0, 0, 0, 0);
+      window_push(win, BEND_CID_Close, 0, 0, 0, 0);
     }
   }
   // grabbed, the frame's motion is one look from the centre
   if (win->grab && (x != cx || y != cy)) {
-    window_push(win, CID(Look), f32_rewrap(x - cx), f32_rewrap(y - cy), 0,
+    window_push(win, BEND_CID_Look, f32_rewrap(x - cx), f32_rewrap(y - cy), 0,
       0);
     XWarpPointer(win->dpy, None, win->win, 0, 0, 0, 0, cx, cy);
   }
@@ -897,7 +901,7 @@ static void window_fill(Env e, u32* pix, u32 w, u32 h, Term image, u32 k) {
     u64    len  = (u64)w * h * 4;
     void*  args[] = { &H, &image, &w, &h, &k, &window_buf };
     if (window_pso == NULL && cuModuleGetFunction(&window_pso, gpu_lib,
-      "window_dev") != CUDA_SUCCESS) {
+      BEND_GPU_WINDOW) != CUDA_SUCCESS) {
       err_fail("cannot load the window kernel");
     }
     if (len > window_len) {
@@ -955,7 +959,7 @@ static Term window_frame(Env e, intptr_t at, Term image) {
 #else
 
 static Term window_frame(Env e, intptr_t at, Term image) {
-  return term_pak(CID(Nil), 0);
+  return term_pak(BEND_CID_Nil, 0);
 }
 
 #endif
@@ -966,12 +970,12 @@ Term window_frame_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) window_frame_use(void) {
-  io_eff(CID(Window.frame), window_frame_run);
+  io_eff(BEND_CID_Window_frame, window_frame_run);
 }
 
 #endif
 
-#ifdef CID(Window.set_title)
+#ifdef BEND_CID_Window_set_title
 
 #ifdef __OBJC__
 
@@ -1005,12 +1009,12 @@ Term window_set_title_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) window_set_title_use(void) {
-  io_eff(CID(Window.set_title), window_set_title_run);
+  io_eff(BEND_CID_Window_set_title, window_set_title_run);
 }
 
 #endif
 
-#ifdef CID(Window.grab)
+#ifdef BEND_CID_Window_grab
 
 #ifdef __OBJC__
 
@@ -1058,17 +1062,17 @@ static void window_grab(intptr_t at, bool on) {
 #endif
 
 Term window_grab_run(Env e, Term* f, IoWork* w) {
-  window_grab((intptr_t)io_hand_v(f[0]), term_aux(f[1]) == CID(True));
+  window_grab((intptr_t)io_hand_v(f[0]), term_aux(f[1]) == BEND_CID_True);
   return f[0];
 }
 
 static void __attribute__((constructor)) window_grab_use(void) {
-  io_eff(CID(Window.grab), window_grab_run);
+  io_eff(BEND_CID_Window_grab, window_grab_run);
 }
 
 #endif
 
-#ifdef CID(Window.close)
+#ifdef BEND_CID_Window_close
 
 #ifdef __OBJC__
 
@@ -1101,11 +1105,11 @@ static void window_close(intptr_t at) {
 
 Term window_close_run(Env e, Term* f, IoWork* w) {
   window_close((intptr_t)io_hand_v(f[0]));
-  return term_pak(CID(Unit), 0);
+  return term_pak(BEND_CID_Unit, 0);
 }
 
 static void __attribute__((constructor)) window_close_use(void) {
-  io_eff(CID(Window.close), window_close_run);
+  io_eff(BEND_CID_Window_close, window_close_run);
 }
 
 #endif

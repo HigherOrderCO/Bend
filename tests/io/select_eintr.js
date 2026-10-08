@@ -1,3 +1,7 @@
+// bend-ids 1
+// CID #Unit BEND_CID_Unit
+// CID :Idle.park BEND_CID_Idle_park
+// bend-ids end
 // A listener makes Bun install a handler for SIGALRM (ignored by
 // default, so a run that never got the handler is not killed); an
 // interval timer has the kernel send it ms later, whatever the loop is
@@ -21,8 +25,8 @@ function idle_park(ms, k) {
   const p = new Int32Array(2);
   lib.pipe(sys.ptr(p));
   sys.fcntl(p[0], 4, sys.fcntl(p[0], 3, 0) | (sys.mac ? 4 : 0x800));
-  io_park_on(p[0], false, k, () => ({ $: CID(Unit) }));
+  io_park_on(p[0], false, k, () => ({ $: BEND_CID_Unit }));
   return undefined;
 }
 
-io_eff(CID(Idle.park), idle_park);
+io_eff(BEND_CID_Idle_park, idle_park);

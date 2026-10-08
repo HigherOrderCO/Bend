@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :fifo.drain BEND_CID_fifo_drain
+// bend-ids end
 #include <fcntl.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
@@ -64,5 +67,5 @@ Term fifo_drain_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) fifo_drain_use(void) {
-  io_eff(CID(fifo.drain), fifo_drain_run);
+  io_eff(BEND_CID_fifo_drain, fifo_drain_run);
 }

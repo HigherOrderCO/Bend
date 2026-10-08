@@ -1,3 +1,9 @@
+// bend-ids 1
+// CID #Wait BEND_CID_Wait
+// CID #Unit BEND_CID_Unit
+// CID :TCP.accept BEND_CID_TCP_accept
+// CID :TCP.try_accept BEND_CID_TCP_try_accept
+// bend-ids end
 // TCP
 // ===
 
@@ -16,7 +22,7 @@ function tcp_accept_with(listener, k, at) {
         return io_tup(listener, io_ready(at, io_fail(code)));
       }
       if (io_late(at)) {
-        return io_tup(listener, { $: CID(Wait), rest: { $: CID(Unit) } });
+        return io_tup(listener, { $: BEND_CID_Wait, rest: { $: BEND_CID_Unit } });
       }
       io_park_on(lfd, false, k, go, at);
       return undefined;
@@ -41,5 +47,5 @@ function tcp_try_accept(listener, ms, k) {
   return tcp_accept_with(listener, k, io_until(ms));
 }
 
-io_eff(CID(TCP.accept), tcp_accept);
-io_eff(CID(TCP.try_accept), tcp_try_accept);
+io_eff(BEND_CID_TCP_accept, tcp_accept);
+io_eff(BEND_CID_TCP_try_accept, tcp_try_accept);

@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :A.run BEND_CID_A_run
+// bend-ids end
 let asked = false;
 
 function a_run(ms) {
@@ -11,4 +14,4 @@ function a_run_helper() {
   asked = true;
 }
 
-io_eff(CID(A.run), a_run);
+io_eff(BEND_CID_A_run, a_run);

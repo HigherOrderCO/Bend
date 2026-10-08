@@ -1,3 +1,11 @@
+// bend-ids 1
+// CID #Wait BEND_CID_Wait
+// CID #Unit BEND_CID_Unit
+// CID :UDP.send_to BEND_CID_UDP_send_to
+// CID :UDP.send_bytes_to BEND_CID_UDP_send_bytes_to
+// CID :UDP.try_send_to BEND_CID_UDP_try_send_to
+// CID :UDP.try_send_bytes_to BEND_CID_UDP_try_send_bytes_to
+// bend-ids end
 // UDP
 // ===
 
@@ -20,12 +28,12 @@ function udp_send_to_with(socket, host, port, data, b, k, at) {
         return fail(code);
       }
       if (io_late(at)) {
-        return io_tup(socket, { $: CID(Wait), rest: data });
+        return io_tup(socket, { $: BEND_CID_Wait, rest: data });
       }
       io_park_on(fd, true, k, go, at);
       return undefined;
     }
-    return io_tup(socket, io_ready(at, io_done({ $: CID(Unit) })));
+    return io_tup(socket, io_ready(at, io_done({ $: BEND_CID_Unit })));
   };
   return go();
 }
@@ -58,7 +66,7 @@ function udp_try_send_bytes_to(socket, host, port, data, ms, k) {
   return udp_send_bytes_to_with(socket, host, port, data, k, io_until(ms));
 }
 
-io_eff(CID(UDP.send_to), udp_send_to);
-io_eff(CID(UDP.send_bytes_to), udp_send_bytes_to);
-io_eff(CID(UDP.try_send_to), udp_try_send_to);
-io_eff(CID(UDP.try_send_bytes_to), udp_try_send_bytes_to);
+io_eff(BEND_CID_UDP_send_to, udp_send_to);
+io_eff(BEND_CID_UDP_send_bytes_to, udp_send_bytes_to);
+io_eff(BEND_CID_UDP_try_send_to, udp_try_send_to);
+io_eff(BEND_CID_UDP_try_send_bytes_to, udp_try_send_bytes_to);

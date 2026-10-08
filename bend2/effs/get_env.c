@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :IO.get_env BEND_CID_IO_get_env
+// bend-ids end
 // IO
 // ==
 
@@ -11,5 +14,5 @@ Term io_get_env_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) io_get_env_use(void) {
-  io_eff(CID(IO.get_env), io_get_env_run);
+  io_eff(BEND_CID_IO_get_env, io_get_env_run);
 }

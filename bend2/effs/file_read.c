@@ -1,3 +1,8 @@
+// bend-ids 1
+// CID :File.read BEND_CID_File_read
+// CID :File.read_bytes BEND_CID_File_read_bytes
+// CID :File.read_at BEND_CID_File_read_at
+// bend-ids end
 // File
 // ====
 
@@ -14,7 +19,7 @@ static Term file_read_start(Term file, u64 max, IoWork* w,
   return io_work(w, call, pack);
 }
 
-#ifdef CID(File.read)
+#ifdef BEND_CID_File_read
 
 static Term file_read_pack(Env e, IoWork* w) {
   Term r = io_res(e, w, io_str(e, w->data, w->size));
@@ -27,12 +32,12 @@ Term file_read_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) file_read_use(void) {
-  io_eff(CID(File.read), file_read_run);
+  io_eff(BEND_CID_File_read, file_read_run);
 }
 
 #endif
 
-#if defined(CID(File.read_bytes)) || defined(CID(File.read_at))
+#if defined(BEND_CID_File_read_bytes) || defined(BEND_CID_File_read_at)
 
 static Term file_read_bytes_pack(Env e, IoWork* w) {
   Term r = io_res(e, w, io_list(e, w->data, w->size));
@@ -42,19 +47,19 @@ static Term file_read_bytes_pack(Env e, IoWork* w) {
 
 #endif
 
-#ifdef CID(File.read_bytes)
+#ifdef BEND_CID_File_read_bytes
 
 Term file_read_bytes_run(Env e, Term* f, IoWork* w) {
   return file_read_start(f[0], f[1], w, file_read_call, file_read_bytes_pack);
 }
 
 static void __attribute__((constructor)) file_read_bytes_use(void) {
-  io_eff(CID(File.read_bytes), file_read_bytes_run);
+  io_eff(BEND_CID_File_read_bytes, file_read_bytes_run);
 }
 
 #endif
 
-#ifdef CID(File.read_at)
+#ifdef BEND_CID_File_read_at
 
 // The bytes at an offset, as file_read_bytes gives them; the position of
 // the file does not move.
@@ -69,7 +74,7 @@ Term file_read_at_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) file_read_at_use(void) {
-  io_eff(CID(File.read_at), file_read_at_run);
+  io_eff(BEND_CID_File_read_at, file_read_at_run);
 }
 
 #endif
