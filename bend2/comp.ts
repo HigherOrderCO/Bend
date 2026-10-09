@@ -2873,12 +2873,21 @@ export function compile_book(book: Bend.Book): string {
     "#endif"];
   const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [""]),
     seg_new(CLO_APPLY, BOX, ["", ""])];
-  const cids = new Map<Name, number>();
-  const cid = (k: Name, n: number) =>
-    cids.set(k, n > WIDE ? 240 + Math.log2(n) : n);
+  const cids = new Map<Name, number[]>();
+  const cid = (k: Name, n: number, tail = 255) => cids.set(k, n > WIDE
+    ? [240 + Math.log2(n), Number(FL.hot.has(k)), 255]
+    : [n, Number(FL.hot.has(k)), tail]);
   for (const k of FL.srcs.keys()) {
     for (const c of (FL.book.tlds[k] as Bend.ADT).c ?? []) {
-      cid(c.k, lay_node(c.k).ks.length);
+      let at = 0;
+      let tail = 255;
+      for (const F of ctr_doms(c)) {
+        if (ty_holds(F, (u) => u?.$ === "ADT" && u.k === k)) {
+          tail = at;
+        }
+        at += lay_of(F).ks.length;
+      }
+      cid(c.k, lay_node(c.k).ks.length, tail);
     }
   }
   done_defs(def_foreign).forEach(([k]) => cid(k, fun_of(k).lays.length));
@@ -2886,7 +2895,7 @@ export function compile_book(book: Bend.Book): string {
     .map((s) => s.fid)), [...FL.segs, { fid: seg_fid(CLO_APPLY),
     refs: FL.clos }].flatMap((s) => [...s.refs].map((r) => [r, s.fid])));
   if (entries.some((s) => s.params.length > WIDE)
-    || [...cids.values()].some((n) => n > 255)) {
+    || [...cids.values()].some(([n]) => n > 255)) {
     die("an arity over " + WIDE);
   }
   const defs = [[...cids.keys()].map(cid_mac),
@@ -2902,8 +2911,8 @@ export function compile_book(book: Bend.Book): string {
     `{ ${s.params.length}, ${s.frame === null ? 0
       : s.params.length - s.frame.at.length}, ${Number(FL.bangs.has(s.def))
       | Number(!forky.has(s.fid)) << 1} }`).join(", ")} };`,
-  `CONSTV u8 CID_T[][2] = { ${[...cids].map(([k, n]) =>
-    `{ ${n}, ${Number(FL.hot.has(k))} }`).join(", ")} };`,
+  `CONSTV u8 CID_T[][3] = { ${[...cids.values()].map((r) =>
+    `{ ${r.join(", ")} }`).join(", ")} };`,
   `#define STAT_LEN ${FL.img.length}`, "",
   `#define WL_RESW ${resw}`, `#define BANGS   ${FL.bangs.size}`, "",
   `#define WL_BANK Term ${ws.join(", ")};`, "",
@@ -3990,6 +3999,12 @@ FAR void term_drop(Env e, Term t) {
         u32 cls = tag == TAG_ARR ? 64 | blk_cls(t)
           : n > ${WIDE} ? 64 | (n - 240)
           : cls_fit(tag == TAG_TSK ? n + 2 : n);
+        u32 s = tag == TAG_CTR ? CID_T[aux][2] : n;
+        if (s + 1 < n) {
+          Term f = H[loc + s];
+          H[loc + s] = H[loc + n - 1];
+          H[loc + n - 1] = f;
+        }
         c0 = H[loc];
         H[loc] = cur;
         cur = loc | ((u64)n << 48) | ((u64)cls << 56);
@@ -4012,27 +4027,21 @@ FAR void term_drop(Env e, Term t) {
           j = (u32)H[loc + 1];
         }
       }
-      if (j < n) {
-        Term c = j == 0 ? c0 : H[loc + j];
+      Term c = j >= n ? 0 : j == 0 ? c0 : H[loc + j];
+      if (j + 1 >= n) {
+        cur = H[loc];
+        heap_free(e, cls, loc);
+      } else {
         if (arr && j > 0) {
           H[loc + 1] = j + 1;
         }
         if (!arr || i < 2) {
           cur += 1ull << 40;
         }
-        if (!term_triv(c)) {
-          // The last child is held in c; its frame can be freed now.
-          if (j + 1 == n) {
-            cur = H[loc];
-            heap_free(e, cls, loc);
-          }
-          t = c;
-          break;
-        }
-      } else {
-        u64 up = H[loc];
-        heap_free(e, cls, loc);
-        cur = up;
+      }
+      if (!term_triv(c)) {
+        t = c;
+        break;
       }
     }
   }
