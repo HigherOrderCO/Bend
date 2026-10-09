@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-import type { Book, LTerm, Span as BendSpan } from "bend2/bend.ts";
+import type { Book, FileId, Name, LTerm, Span as BendSpan } from "bend2/bend.ts";
 import type * as BendModule from "bend2/bend.ts";
 import { BEND2, applyFixes, bendRule, findConfig, lint, readConfig, render } from "./lint.ts";
 import type { Diag, Edit, Fact, LintRule, Node, RuleContext, Source } from "./lint.ts";
@@ -21,9 +21,10 @@ import {
   resolve,
   seeCheck,
   seeInfer,
+  select,
   walk,
 } from "./seam.ts";
-import type { Raw } from "./seam.ts";
+import type { Loaded, Raw } from "./seam.ts";
 
 // Types
 // =====
@@ -327,7 +328,7 @@ const identity: LintRule = {
     const raw = loose(cx, body);
     const ann = cx.unstable.Bend.pmap_get(raw.ctx, raw.tm.x!.i!)!;
     expect(ann.k).toBe("x");
-    expect((cx.unstable.Bend.term_wnf(raw.bok, raw.ty) as { k?: string }).k).toBe("N");
+    expect(cx.show(body, cx.normal(body, cx.type(body)))).toBe("N");
     expect(cx.same(body, cx.type(body), cx.binder(body)!)).toBe(true);
     return [
       cx.diag({
@@ -553,8 +554,8 @@ function drifts(f: () => unknown): boolean {
   return false;
 }
 
-function file2(p: string, ns: string): { str: string; ns: string; al: {}; path: string } {
-  return { str: "x\n", ns, al: {}, path: p };
+function file2(p: string, ns: string): BendModule.File & { path: string } {
+  return { str: "x\n", ns: Bend.file_name(ns), al: {}, base: null, path: p };
 }
 
 function fixture(name: string, text: string): string {
@@ -584,7 +585,7 @@ function bodies(book: Book): Record<string, string> {
     book.order.flatMap((name) => {
       const tld = book.tlds[name];
       return tld.$ === "Def" && tld.e !== undefined && !tld.b
-        ? [[name, Bend.term_show(tld.e)]]
+        ? [[Bend.name_display(book, name), Bend.term_show(tld.e, -1, [], book.files.get(book.entry), book)]]
         : [];
     }),
   );
@@ -666,8 +667,8 @@ describe("patch", () => {
     expect(out).toMatch(/^import \{ path \} from "file:.*seam\.ts";/m);
   });
 
-  test("comp.ts: exports RUNTIME_MAIN and name_id", () => {
-    expect(patch("comp.ts", comp)).toContain("export { RUNTIME_MAIN, name_id };");
+  test("comp.ts: exports RUNTIME_MAIN and name_global", () => {
+    expect(patch("comp.ts", comp)).toContain("export { RUNTIME_MAIN, name_global };");
   });
 
   test("main.ts: exports how bend reads a book and words a failure, with the same fs and path", () => {
@@ -695,8 +696,8 @@ describe("patch", () => {
     expect(() => patch("bend.ts", src + "\nexport function term_check(\n")).toThrow(
       /found 2 of "export function term_check\("/,
     );
-    expect(() => patch("comp.ts", comp.replace("function name_id(", "function js_name("))).toThrow(
-      /comp\.ts: found 0 of a declaration of name_id/,
+    expect(() => patch("comp.ts", comp.replace("function name_global(", "function js_name("))).toThrow(
+      /comp\.ts: found 0 of a declaration of name_global/,
     );
     expect(() =>
       patch("comp.ts", comp.replace("function io_run(m) {", "function run(m) {")),
@@ -918,8 +919,9 @@ def main() -> IO(Unit):
 describe("spans", () => {
   const source = (p: string, text: string) => ({
     str: text,
-    ns: "",
-    al: {} as Record<string, string>,
+    ns: Bend.file_name(""),
+    base: null,
+    al: {} as Record<string, FileId>,
     path: p,
   });
 
@@ -934,13 +936,13 @@ describe("spans", () => {
         const src = source("/p/m.bend", text);
         const beg = masked.indexOf("x");
         const got = mapper([src])({
-          file: { str: masked, ns: "", dir: "/p/", al: { A: "a" } },
+          file: { str: masked, ns: Bend.file_name(""), base: null, dir: "/p/", al: { A: Bend.file_name("a") } },
           beg,
           end: beg + 1,
         } as BendSpan)!;
         expect(got.file).toBe(src);
         expect(text.slice(got.beg, got.end)).toBe("x");
-        expect(src.al.A).toBe("a");
+        expect(src.al.A).toBe(Bend.file_name("a"));
       });
     }
   }
@@ -952,11 +954,11 @@ describe("spans", () => {
     expect(map(spn)).toBe(spn);
     expect(
       drifts(() =>
-        map({ file: { str: "\ndef g() -> N:\n  x\n", ns: "", al: {} }, beg: 0, end: 0 }),
+        map({ file: { str: "\ndef g() -> N:\n  x\n", ns: Bend.file_name(""), base: null, al: {} }, beg: 0, end: 0 }),
       ),
     ).toBe(true);
     expect(
-      drifts(() => map({ file: { str: "def f() -> N:\n  x\n", ns: "", al: {} }, beg: 0, end: 0 })),
+      drifts(() => map({ file: { str: "def f() -> N:\n  x\n", ns: Bend.file_name(""), base: null, al: {} }, beg: 0, end: 0 })),
     ).toBe(true);
   });
 
@@ -965,7 +967,7 @@ describe("spans", () => {
     const b = source("/b/m.bend", "import Base\nx\n");
     const map = mapper([a, b]);
     expect(
-      map({ file: { str: "\nx\n", ns: "", dir: "/b/", al: {} }, beg: 1, end: 2 } as BendSpan)!.file,
+      map({ file: { str: "\nx\n", ns: Bend.file_name(""), base: null, dir: "/b/", al: {} }, beg: 1, end: 2 } as BendSpan)!.file,
     ).toBe(b);
   });
 });
@@ -1039,9 +1041,13 @@ describe("lint", () => {
             return x?.$ === kind && (name === "" || x.k === name);
           })!;
         const generic = named("generic", "Var", "x");
-        expect(loose(cx, generic).bok.tlds["generic~T"]).toBeDefined();
+        const rawGeneric = loose(cx, generic);
+        expect(rawGeneric.bok.tlds[Bend.name_gen(rawGeneric.def, "param", 0)]).toBeDefined();
         expect(cx.view(generic).inst).toBe(false);
-        const inst = named("generic~0", "Var", "x");
+        const inst = cx.facts!.find((f) => {
+          const v = cx.view(f);
+          return v.inst && v.kind === "Var" && v.name === "x";
+        })!;
         expect(cx.view(inst).inst).toBe(true);
         expect(cx.view(inst).span).toEqual(cx.view(generic).span);
         expect(["erased", "once", "many"]).toContain(cx.view(generic).quantity);
@@ -1067,6 +1073,43 @@ describe("lint", () => {
     expect((await lint(userland, [probe])).ok).toBe(true);
   });
 
+  test("instance owners select their exact bodies without losing template filters", async () => {
+    const file = fixture("instances.bend", `type N is Data:
+  Z{}
+
+type M is Data:
+  K{}
+
+def generic(~T: Type, x: T) -> T:
+  x
+
+def main() -> N:
+  _ = generic(~M, K{})
+  generic(~N, Z{})
+`);
+    const result = await lint(file, [{
+      id: "test/instances",
+      facts: true,
+      run: (cx) => {
+        const owners = [...new Set(cx.facts!.filter((f) => cx.view(f).inst).map((f) => cx.view(f).owner))];
+        expect(owners.length).toBe(2);
+        expect(cx.body(owners[0])).not.toBe(cx.body(owners[1]));
+        for (const owner of owners) {
+          expect(cx.body(owner)).toBeDefined();
+          const run = { book: cx.unstable.book, sources: cx.sources, facts: cx.facts, map: (s: BendSpan | undefined) => s };
+          const selected = select({ Bend } as Loaded, run, { defs: [owner] }, false)!;
+          expect(selected.length).toBeGreaterThan(0);
+          expect(selected.every((f) => cx.view(f).owner === owner)).toBe(true);
+        }
+        expect(cx.body("generic")).toBeDefined();
+        expect(cx.body("")).toBeUndefined();
+        return [];
+      },
+    }]);
+    expect(result.ok).toBe(true);
+    expect((await seen(file, { defs: ["generic"] })).length).toBeGreaterThan(0);
+  });
+
   test("walk reaches every kind in checked bodies; an unknown kind fails", async () => {
     const res = await lint(userland, []);
     const { book } = res.unstable;
@@ -1083,8 +1126,8 @@ describe("lint", () => {
 
   test("walk preserves constructor and type argument order across traversals", () => {
     const children: LTerm[] = [
-      { $: "Ref", k: "first" },
-      { $: "Ref", k: "second" },
+      { $: "Ref", k: Bend.name_source(Bend.file_name("test"), "first") },
+      { $: "Ref", k: Bend.name_source(Bend.file_name("test"), "second") },
     ];
     for (const $ of ["Ctr", "ADT"] as const) {
       const term = { $, k: "Pair", x: children } as LTerm;
@@ -1321,7 +1364,10 @@ describe("lint", () => {
         expect(cx.sources.some((s) => s.base)).toBe(true);
         const owners = cx.facts!.map((f) => cx.view(f).owner);
         expect(owners.some((def) => def === "main")).toBe(true);
-        expect(owners.every((def) => cx.unstable.book.tlds[def]?.b !== true)).toBe(true);
+        expect(cx.facts!.every((f) => {
+          const r = cx.unstable.raw(f);
+          return r.bok.tlds[r.def]?.b !== true;
+        })).toBe(true);
         return [];
       },
     };
@@ -1388,10 +1434,10 @@ describe("lint", () => {
       run: async (cx, signal) => {
         const fact = loose(cx, cx.fact(cx.body("id")!)!);
         const type = cx.unstable.Bend.term_wnf(fact.bok, fact.ty) as { A: typeof fact.ty };
-        const arg = cx.unstable.Bend.term_wnf(fact.bok, type.A) as { k?: string };
+        const arg = cx.unstable.Bend.term_lower(cx.unstable.Bend.term_wnf(fact.bok, type.A));
         const res = await fetch(server.url, {
           method: "POST",
-          body: JSON.stringify({ type: arg.k }),
+          body: JSON.stringify({ type: Bend.term_show(arg, -1, [], fact.spn?.file, fact.bok) }),
           signal,
         });
         return [cx.diag({ message: await res.text(), severity: "hint" })];
@@ -1615,7 +1661,7 @@ describe("review fixes", () => {
       b = file2("/p/b.bend", "b");
     expect(
       mapper([a, b])({
-        file: { str: "x\n", ns: "b", dir: "/p/", al: {} },
+        file: { str: "x\n", ns: Bend.file_name("b"), base: null, dir: "/p/", al: {} },
         beg: 0,
         end: 1,
       } as BendSpan)!.file,
@@ -1633,7 +1679,7 @@ describe("review fixes", () => {
     const res = await lint(file, []);
     expect(res.diags.map(render)).toEqual([]);
     const t = performance.now();
-    const count = [...walk((res.unstable.book.tlds.xs as { e: LTerm }).e)].length;
+    const count = [...walk((res.unstable.book.tlds[Bend.name_source(res.unstable.book.entry, "xs")] as { e: LTerm }).e)].length;
     expect(count).toBeGreaterThan(n);
     expect(performance.now() - t).toBeLessThan(100);
   });
@@ -1691,10 +1737,10 @@ describe("review fixes", () => {
     ).toEqual({ text: "abC", skipped: 0, elsewhere: 1 });
   });
 
-  test("comp.ts that already exports name_id still loads", () => {
+  test("comp.ts that already exports name_global still loads", () => {
     const comp = fs
       .readFileSync(path.join(BEND2, "comp.ts"), "utf8")
-      .replace("\nfunction name_id(", "\nexport function name_id(");
+      .replace("\nfunction name_global(", "\nexport function name_global(");
     const out = patch("comp.ts", comp);
     expect(out).toContain("export { RUNTIME_MAIN };");
     expect(() => new Bun.Transpiler({ loader: "ts" }).transformSync(out)).not.toThrow();
@@ -1817,15 +1863,24 @@ describe("fact filters", () => {
   test("kinds, defs and names narrow the facts; an empty or absent list matches all", async () => {
     const all = await seen(userland, true);
     const only = async (want: LintRule["facts"], keep: (f: Seen) => boolean) => {
-      const got = await seen(userland, want);
+      let complete: Seen[] = [], got: Seen[] = [];
+      const read = (cx: RuleContext): Seen[] => cx.facts!.map((f) => {
+        const v = cx.view(f);
+        return { kind: v.kind, def: v.owner, name: v.name, path: v.span!.file.path };
+      });
+      // Generated identities are fresh per check: compare filters on one book.
+      await lint(userland, [
+        { id: "test/all", facts: true, run: (cx) => { complete = read(cx); return []; } },
+        { id: "test/filtered", facts: want, run: (cx) => { got = read(cx); return []; } },
+      ]);
       expect(got.length).toBeGreaterThan(0);
-      expect(got).toEqual(all.filter(keep));
+      expect(got).toEqual(complete.filter(keep));
     };
     await only({ kinds: ["Var"] }, (f) => f.kind === "Var");
-    await only({ defs: ["generic"] }, (f) => f.def === "generic" || f.def.startsWith("generic~"));
+    await only({ defs: ["generic"] }, (f) => f.def === "generic" || Bend.name_parent(f.def as Name) !== null);
     await only({ kinds: ["Ref"], names: ["id"] }, (f) => f.kind === "Ref" && f.name === "id");
     await only({ kinds: [], defs: [], names: [] }, () => true);
-    expect(all.some((f) => f.def.startsWith("generic~"))).toBe(true);
+    expect(all.some((f) => Bend.name_parent(f.def as Name) !== null)).toBe(true);
   });
 
   test("each rule gets its own facts; bend-lint keeps only what some rule asked for", async () => {
