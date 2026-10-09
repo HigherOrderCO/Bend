@@ -3,14 +3,6 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
-## Unreleased
-
-- Native windows emit `Text{text: String}` after key-down when the OS
-  supplies characters, preserving Shift, Caps Lock and the keyboard
-  layout without changing `Key` codes (#1019). Linux uses an X11 UTF-8
-  input context; macOS uses `NSEvent.characters`.
-  A missing Linux UTF-8 input context is reported as `ENOTSUP`.
-
 ## 2.0.36 (2026-10-07)
 
 - **HOC's proving agent is now named BendAI**: `bend login` logs in to
