@@ -5710,9 +5710,11 @@ static void io_wait(Env e, bool block) {
   u64 ms = soon > tick && block ? (soon - tick) / 1000000 + 1 : 0;
   struct timeval tv = { ms / 1000, ms % 1000 * 1000 };
   io_sync();
+  bool bad = false;
   if (select(top + 1, (fd_set*)set[0], (fd_set*)set[1], NULL,
     soon == 0 && block ? NULL : &tv) < 0) {
-    if (errno != EINTR) {
+    bad = errno == EBADF;
+    if (!bad && errno != EINTR) {
       err_fail("the poller failed");
     }
     memset(set[0], 0, 2 * len);
@@ -5726,7 +5728,8 @@ static void io_wait(Env e, bool block) {
   while (todo != NULL) {
     IoWork* a   = io_pop(&todo);
     bool    due = (a->evts != 0
-        && io_bit(set[a->evts == POLLOUT], (int)a->word, false))
+        && (bad ? fcntl((int)a->word, F_GETFD) < 0
+          : io_bit(set[a->evts == POLLOUT], (int)a->word, false)))
       || (a->time != 0 && a->time <= now);
     if (!due) {
       io_park_add(a);
@@ -6326,19 +6329,26 @@ function io_wait(io, block) {
   const tv = new BigInt64Array([BigInt(ms / 1000 | 0),
     BigInt(ms % 1000 * 1000)]);
   const sys = io_sys();
+  let code = 0;
   if (sys.select(top + 1, sys.ptr(set), sys.ptr(set, len), null,
     ms < 0 ? null : sys.ptr(tv)) < 0) {
-    if (sys.errno() !== 4) {
+    code = sys.errno();
+    if (code !== 4 && code !== 9) {
       throw "bend: the poller failed";
     }
     set.fill(0);
   }
   const now = performance.now();
   const due = (w) => w.at <= now || w.fd !== undefined
-    && set[at(w)] & 1 << (w.fd & 7);
-  const todo = io.waits;
-  io.waits = todo.filter((w) => !due(w));
-  for (const w of todo.filter(due)) {
+    && (code === 9 ? sys.fcntl(w.fd, 1, 0) < 0
+      : set[at(w)] & 1 << (w.fd & 7));
+  const todo = [];
+  io.waits = io.waits.filter((w) => {
+    if (!due(w)) return true;
+    todo.push(w);
+    return false;
+  });
+  for (const w of todo) {
     const x = w.more();
     if (x !== undefined) {
       io_push(w.k, x, false);

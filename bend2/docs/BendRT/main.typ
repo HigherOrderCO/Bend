@@ -519,6 +519,13 @@ no IO. A fallible operation answers a `Result` carrying errno, and a
 handle threads back outside the `Result`, so even a failure cannot
 lose it.
 
+On C and Bun, an interrupted readiness wait wakes no descriptors. If
+`select` answers `EBADF`, the loop probes parked descriptors with
+`F_GETFD` and resumes only the invalid ones; their effect handlers
+produce the ordinary fallible answers. Valid descriptors remain
+parked, deadlines still run, and other wait errors remain fatal. The
+probes run only on the error path.
+
 = The JavaScript Backend <sec:js>
 
 The same rewritten definitions (@sec:compile) print as plain
