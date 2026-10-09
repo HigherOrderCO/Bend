@@ -9,7 +9,7 @@ import * as os from "node:os";
 import * as nodePath from "node:path";
 import * as url from "node:url";
 
-import type { Book, Ctx, Err, HTerm, LTerm, Name, Quant, Uses } from "bend2/bend.ts";
+import type { Book, Ctx, Err, HTerm, LTerm, Name, FileId, Quant, Uses } from "bend2/bend.ts";
 import type { Span as BendSpan } from "bend2/bend.ts";
 import type * as BendModule from "bend2/bend.ts";
 import type * as CompModule from "bend2/comp.ts";
@@ -48,12 +48,12 @@ export type FindOptions = {
 };
 
 // comp.ts as the patch exports it.
-type Comp = typeof CompModule & { RUNTIME_MAIN: string; name_id(pre: string, k: string): string };
+type Comp = typeof CompModule & { RUNTIME_MAIN: string; name_global(k: Name): string };
 
 // What bend-lint uses of main.ts, as the patch exports it: book_read throws
 // a Check_Fail holding why the check failed.
 type Main = {
-  book_read(file: string, base?: Book, seen?: Map<string, string | null>): Promise<Book>;
+  book_read(file: string, base?: Book, seen?: Map<string, FileId | null>): Promise<Book>;
   book_err(e: unknown): string;
   Check_Fail: new (why: unknown) => { why: unknown };
 };
@@ -62,7 +62,7 @@ type Main = {
 export type Loaded = { Bend: typeof BendModule; Comp: Comp; Main: Main; BEND2: string };
 
 // A source as bend.ts spans point at it.
-type File = { str: string; ns: string; al: Record<Name, Name>; path: string };
+type File = BendModule.File & { path: string };
 
 type Mapper = (s: BendSpan | undefined) => BendSpan | undefined;
 
@@ -155,7 +155,7 @@ const PATCHES: Record<string, Patch> = {
     edits: [],
     needs: ["let cli_args = [];", "function io_run(m) {"],
     tail: "",
-    exports: ["RUNTIME_MAIN", "name_id"],
+    exports: ["RUNTIME_MAIN", "name_global"],
   },
   "main.ts": { edits: SHIMMED, tail: "", exports: ["book_read", "book_err", "Check_Fail"] },
 };
@@ -215,6 +215,7 @@ const CHILDREN: { [K in LTerm["$"]]: (tm: Extract<LTerm, { $: K }>) => LTerm[] }
   Efq: () => [],
   Rfl: () => [],
   Hol: () => [],
+  Op: () => [],
 };
 
 // Functions
@@ -599,21 +600,28 @@ const demand = (checks: Array<[string, boolean]>, say: (wrong: string) => string
 const isErr = (e: unknown): e is Err =>
   typeof e === "object" && e !== null && (e as { $?: unknown }).$ === "Err";
 
+// Display is a public lookup name only when it resolves back to this identity.
+// Generated and otherwise unaddressable globals retain their opaque keys.
+const sourceName = (m: Loaded, book: Book, k: Name): string => {
+  const scope = book.files.get(book.entry);
+  const text = m.Bend.name_display(book, k, scope);
+  const found = scope && m.Bend.name_resolve(book, scope, text);
+  return m.Bend.name_parent(k) === null && found?.k === k && !found.issue ? text : k;
+};
+
 // A term's kind, and the name a Var or Ref points to.
-const kindOf = (t: LTerm): { kind: string; name: Name } => ({
+const kindOf = (m: Loaded, book: Book, t: LTerm): { kind: string; name: string } => ({
   kind: t.$,
-  name: t.$ === "Var" || t.$ === "Ref" ? t.k : "",
+  name: t.$ === "Var" ? t.k : t.$ === "Ref" ? sourceName(m, book, t.k) : "",
 });
 
 // Whether a fact passes a filter, its scope aside.
-const matches = (f: FactFilter, kind: string, def: Name, name: Name): boolean => {
+const matches = (m: Loaded, book: Book, f: FactFilter, kind: string, def: Name, name: string): boolean => {
   const all = (xs: string[] | undefined, x: string): boolean =>
     xs === undefined || xs.length === 0 || xs.includes(x);
-  return (
-    all(f.kinds, kind) &&
-    (all(f.defs, def) || all(f.defs, def.replace(/~\d+$/, ""))) &&
-    all(f.names, name)
-  );
+  let owner: Name | null = def;
+  while (owner !== null && !all(f.defs, sourceName(m, book, owner))) owner = m.Bend.name_parent(owner);
+  return owner !== null && all(f.kinds, kind) && all(f.names, name);
 };
 
 // bend's words for a failed check, its location aside (a finding has its
@@ -641,10 +649,9 @@ const checked = async (
   signal: AbortSignal,
 ): Promise<Checked> => {
   const { Bend, Main } = m;
-  const seen = new Map<string, string | null>();
+  const seen = new Map<string, FileId | null>();
   const found: Report[] = [];
   const real = fs.existsSync(file) ? fs.realpathSync(file) : "";
-  const home = real.slice(0, real.lastIndexOf("/") + 1);
   const far = filters.filter((f) => f.scope === "program");
   const program = far.length > 0;
   const texts = new Map<string, string>();
@@ -655,11 +662,10 @@ const checked = async (
     BASE = { key, book: Main.book_read(Bend.BASE_BEND) };
   }
   const see = (report: Report): void => {
-    const at = report.spn?.file as { dir?: string; ns?: string } | undefined;
-    const near = at?.dir === home && at.ns === "" ? filters : far;
+    const near = report.spn?.file.path === real ? filters : far;
     const { kind, name } =
-      near.length > 0 ? kindOf(Bend.term_strip(report.tm)) : { kind: "", name: "" };
-    if (near.some((f) => matches(f, kind, report.def, name))) {
+      near.length > 0 ? kindOf(m, report.bok, Bend.term_strip(report.tm)) : { kind: "", name: "" };
+    if (near.some((f) => matches(m, report.bok, f, kind, report.def, name))) {
       found.push(report);
     }
   };
@@ -680,7 +686,9 @@ const checked = async (
     .map((real): Source => {
       const text = texts.get(real) ?? fs.readFileSync(real, "utf8");
       const source = { path: real, text, root: real === root, base: real === Bend.BASE_BEND };
-      const file = { str: text, ns: seen.get(real) ?? "", al: {}, path: real };
+      const ns = seen.get(real) ?? Bend.file_name(real);
+      const scope = "book" in read ? read.book.files.get(ns) : undefined;
+      const file: File = { str: text, ns, al: scope?.al ?? {}, base: scope?.base ?? null, path: real };
       FILES.set(source, file);
       SOURCES.set(file, source);
       return source;
@@ -688,7 +696,7 @@ const checked = async (
   const map = mapper(sources.map((s) => FILES.get(s)!));
   if ("book" in read) {
     const { book } = read;
-    const insts = new Set(Object.values(book.tmps).flatMap((t) => [...t.values()]));
+    const insts = new Set(book.tmps.values());
     const own = new Set<unknown>(
       sources.filter((s) => (program ? !s.base : s.root)).map((s) => FILES.get(s)),
     );
@@ -721,7 +729,7 @@ const checked = async (
       severity: "error",
       message: failure(m, read.e),
       span,
-      def: err?.def,
+      def: err?.def && sourceName(m, err.bok, err.def),
       fixes: [],
       core: read.e,
     },
@@ -770,9 +778,9 @@ export const select = (
     ? facts
     : facts.filter((fact) => {
         const r = raw(fact);
-        const { kind, name } = kindOf(m.Bend.term_strip(r.tm));
+        const { kind, name } = kindOf(m, r.bok, m.Bend.term_strip(r.tm));
         return (
-          (want.scope === "program" || r.spn?.file === root) && matches(want, kind, r.def, name)
+          (want.scope === "program" || r.spn?.file === root) && matches(m, r.bok, want, kind, r.def, name)
         );
       });
 };
@@ -786,52 +794,21 @@ export const select = (
 const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): boolean => {
   const { Bend } = m;
   const root = sources.find((s) => s.root)!;
-  const ns = FILES.get(root)!.ns;
-  const dir = root.path.slice(0, root.path.lastIndexOf("/") + 1);
-  const header = (s: string) => {
+  const file = book.files.get(FILES.get(root)!.ns)!;
+  const body = (s: string) => {
     const lines = s.split("\n");
-    const imports: [string, string][] = [];
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (line === "" || line.startsWith("#")) continue;
       const m = /^import\s+(\S+)(?:\s+as\s+([A-Za-z_]\w*))?\s*(?:#.*)?$/.exec(line);
       if (m === null || (m[2] === undefined && m[1] !== "Base")) break;
-      if (m[2] !== undefined) imports.push([m[1], m[2]]);
       lines[i] = "";
     }
-    return { body: lines.join("\n"), imports };
-  };
-  const original = header(root.text);
-  const spanned = (): Record<Name, Name> => {
-    for (const tld of Object.values(book.tlds)) {
-      for (const t of [tld.T, ...(tld.$ === "Def" && tld.v ? [tld.v] : [])]) {
-        for (const tm of walk(Bend.term_lower(t))) {
-          if (tm.s?.file.str === original.body) {
-            return tm.s.file.al;
-          }
-        }
-      }
-    }
-    return {};
-  };
-  const aliases = original.imports.reduce<Record<Name, Name>>(
-    (known, [at, alias]) => {
-      const imported = sources.find((s) => s.path === resolve(root.path, "..", at));
-      return known[alias] !== undefined || imported === undefined
-        ? known
-        : { ...known, [alias]: FILES.get(imported)!.ns };
-    },
-    original.imports.length ? spanned() : {},
-  );
-  const qualify = (name: string) => {
-    const dot = name.indexOf(".");
-    return dot >= 0 && aliases[name.slice(0, dot)] !== undefined
-      ? aliases[name.slice(0, dot)] + ":" + name.slice(dot + 1)
-      : (ns ? ns + ":" : "") + name;
+    return lines.join("\n");
   };
   const own = new Set(
     [...root.text.matchAll(/^(?:@unsafe\s+)?(?:def|type|law)\s+([\w.]+)/gm)].map((match) =>
-      qualify(match[1]),
+      Bend.name_resolve(book, file, match[1]).k,
     ),
   );
   const seed = (): Book => {
@@ -840,7 +817,7 @@ const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): 
     fresh.ctrs = { ...book.ctrs };
     for (const k of own) {
       const tld = fresh.tlds[k];
-      if (k.includes(":") && !k.startsWith(ns + ":") && tld?.$ === "Def") {
+      if (Bend.name_file(k) !== file.ns && tld?.$ === "Def") {
         fresh.tlds[k] = { ...tld, v: null, i: undefined, u: false };
       } else {
         if (tld?.$ === "ADT") for (const c of tld.c) delete fresh.ctrs[c.k];
@@ -851,7 +828,7 @@ const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): 
   };
   const snapshot = (s: string) => {
     const parsed = seed();
-    Bend.parse_book(parsed, dir, header(s).body, ns, aliases);
+    Bend.parse_book(parsed, file, body(s));
     const lower = (t: HTerm | null) => (t === null ? null : Bend.term_lower(t));
     return JSON.stringify(
       parsed.order.map((k) => {
@@ -878,9 +855,9 @@ export const operations = (m: Loaded, run: Checked): Operations => {
     view: (fact): View => {
       const r = raw(fact);
       return {
-        owner: r.def,
+        owner: sourceName(m, r.bok, r.def),
         inst: r.inst,
-        ...kindOf(Bend.term_strip(r.tm)),
+        ...kindOf(m, r.bok, Bend.term_strip(r.tm)),
         quantity: QUANTITY[r.qt.$],
         span: toSpan(r.spn),
         inner: toSpan(run.map(Bend.term_strip(r.tm).s)),
@@ -894,7 +871,8 @@ export const operations = (m: Loaded, run: Checked): Operations => {
       return ann === null ? undefined : typed(ann.T);
     },
     same: (fact, a, b) => Bend.term_compare("EQ", raw(fact).bok, term(a), term(b), raw(fact).dep),
-    show: (fact, t) => Bend.term_show(Bend.term_lower(term(t), raw(fact).dep)),
+    show: (fact, t) => Bend.term_show(Bend.term_lower(term(t), raw(fact).dep), -1,
+      Bend.ctx_scope(raw(fact).ctx), raw(fact).spn?.file, raw(fact).bok),
     normal: (fact, t) => typed(Bend.term_snf(raw(fact).bok, term(t))),
     uses: (fact) => {
       const r = raw(fact);
@@ -904,13 +882,16 @@ export const operations = (m: Loaded, run: Checked): Operations => {
     },
     sameDeclarations: (text) => sameDeclarations(m, run, text),
     body: (name) => {
-      const tld = run.book.tlds[name];
+      const scope = run.book.files.get(run.book.entry)!;
+      if (!Object.hasOwn(run.book.tlds, name) && !Bend.SOURCE_NAME.test(name)) return undefined;
+      const k = Object.hasOwn(run.book.tlds, name) ? name : Bend.name_resolve(run.book, scope, name).k;
+      const tld = run.book.tlds[k];
       return tld?.$ === "Def" && tld.e !== undefined ? node(tld.e) : undefined;
     },
     node: (fact) => node(raw(fact).tm),
     shape: (n): Shape => {
       const t = tree(n);
-      return { ...kindOf(t), span: toSpan(run.map(t.s)), children: children(t).map(node) };
+      return { ...kindOf(m, run.book, t), span: toSpan(run.map(t.s)), children: children(t).map(node) };
     },
     fact: (n) => {
       byTerm ??= new Map((run.facts ?? []).map((f) => [raw(f).tm, f]));
@@ -924,7 +905,7 @@ export const operations = (m: Loaded, run: Checked): Operations => {
 // context and location.
 export const layout = (m: Loaded, d: Diag, head: string): string => {
   const r = d.fact && raw(d.fact);
-  return m.Bend.err_show(
+  let out = m.Bend.err_show(
     isErr(d.core)
       ? d.core
       : m.Bend.Err(
@@ -933,25 +914,33 @@ export const layout = (m: Loaded, d: Diag, head: string): string => {
           d.message,
           undefined,
           fromSpan(d.span),
-          d.def,
         ),
   ).replace(/^Error:/, head);
+  if (!isErr(d.core) && d.def !== undefined) {
+    const location = "\nLocation: " + m.Bend.display_text(d.def);
+    out = out.includes("\nLocation:") ? out.replace("\nLocation:", location) : out + location;
+  }
+  return out;
 };
 
 // A Bend rule's id(), facts() and main(), compiled as comp.ts io_run does.
 // facts(), checked: NoFacts{} gives null, Want{...} a filter.
 export const compile = (m: Loaded, { book }: Checked, file: string): Compiled => {
   const { Bend, Comp } = m;
-  const value = (k: Name): LTerm | undefined => {
-    const tld = book.tlds[k];
+  const value = (text: string): LTerm | undefined => {
+    const tld = book.tlds[Bend.name_source(book.entry, text)];
     return tld?.$ === "Def" && tld.n === 0 && tld.v !== null
       ? Bend.term_lower(Bend.term_snf(book, tld.v))
       : undefined;
   };
   const shown = value("id");
-  const id = shown === undefined ? undefined : Bend.term_show(shown).match(/^"([^"\\]*)"$/)?.[1];
-  const args = (t: LTerm | undefined, ctr: string): LTerm[] | undefined =>
-    t?.$ === "Ctr" && (t.k === ctr || t.k.endsWith(":" + ctr)) ? t.x : undefined;
+  const id = shown === undefined ? undefined : Bend.term_show(shown, -1, [], book.files.get(book.entry), book).match(/^"([^"\\]*)"$/)?.[1];
+  const lintPath = fs.realpathSync(path.join(HERE, "bend", "lint.bend"));
+  const api = [...book.files.values()].find((f) => f.path === lintPath);
+  const args = (t: LTerm | undefined, ctr: string): LTerm[] | undefined => {
+    const owner = ctr === "Con" || ctr === "Nil" ? Bend.BASE_ID : api?.ns;
+    return owner !== undefined && t?.$ === "Ctr" && t.k === Bend.name_source(owner, ctr, "ctr") ? t.x : undefined;
+  };
   const texts = (t: LTerm | undefined): string[] | undefined => {
     const [head, tail] = args(t, "Con") ?? [];
     const rest = tail && texts(tail);
@@ -985,7 +974,7 @@ export const compile = (m: Loaded, { book }: Checked, file: string): Compiled =>
   }
   const main = new Function(
     "require",
-    `${Comp.js_lib(book)}\n${Comp.RUNTIME_MAIN}\nreturn (args) => { cli_args = args; return io_run(${Comp.name_id("$", "main")}); };`,
+    `${Comp.js_lib(book)}\n${Comp.RUNTIME_MAIN}\nreturn (args) => { cli_args = args; return io_run(${Comp.name_global(Bend.name_source(book.entry, "main"))}); };`,
   )(import.meta.require) as (args: string[]) => number;
   return { id, want: want as FactFilter | null, main };
 };

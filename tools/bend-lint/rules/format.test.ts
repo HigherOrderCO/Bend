@@ -38,7 +38,7 @@ async function fixed(text: string, options: FormatOptions = opts) {
       book.order.flatMap((name) => {
         const tld = book.tlds[name];
         return tld.$ === "Def" && tld.e !== undefined && !tld.b
-          ? [[name, Bend.term_show(tld.e)]]
+          ? [[Bend.name_display(book, name), Bend.term_show(tld.e, -1, [], book.files.get(book.entry), book)]]
           : [];
       }),
     ),
