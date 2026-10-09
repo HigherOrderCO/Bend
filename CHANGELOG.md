@@ -14,6 +14,11 @@ latest one; the GitHub release carries the same notes.
   arguments for elaboration instead of recovering them from serialized cache keys.
 - Bare names in patterns bind variables, including names also used by
   constructors. Constructor patterns use braces in every file.
+- Compiled names follow declaration identities, owning functions and helper
+  inputs, so unrelated edits no longer renumber unchanged code. Numeric runtime
+  dispatch tables remain local to each build.
+- Publication preserves source imports and rejects archives that would lose
+  their targets, split module identity or change proof-sibling obligations.
 - **Foreign interface change:** C and JS files declare their Bend references in
   a `// bend-ids 1` header. Replace body `CID(...)`/`FID(...)` uses with the
   declared host aliases; the compiler now copies the host body unchanged.

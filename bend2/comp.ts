@@ -9,6 +9,7 @@
 // the device, or to JS. The C and JS runtimes close the file.
 
 import * as fs from "node:fs";
+import { createHash } from "node:crypto";
 
 import * as Bend from "./bend.ts";
 import {
@@ -77,7 +78,7 @@ type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 // CLO_APPLY and IO_EMIT are the runtime's own internal names, so no file
 // declares them. FOLD_FUEL caps the nodes that unfolds
 // add to a segment, so a literal-bounded loop does not unroll into its
-// caller. A spin of SPIN_FAR characters of C is a call on the device
+// caller. A spin of SPIN_FAR characters of C (names cost seven) calls on the device
 // (DFAR). WIDE is the widest flat layout or segment; a node past
 // it pads to its size class and keeps 240 plus log2 of it in CID_T. An
 // argument nested past TPL_DEEP brackets goes to a local (clang allows 256).
@@ -510,11 +511,42 @@ function entry(book = FL.book): Name {
 }
 
 function name_global(k: Name): string {
-  return memo(FL.symbols, k, () => name_local(name_text(k)));
+  return memo(FL.symbols, k, () => {
+    const parent = name_parent(k), args = FL.instances.get(k);
+    if (args !== undefined) return name_global(name_content(parent!, "inst", name_key(args)[0]));
+    return parent === null ? Bend.name_emit(k)
+      : name_global(parent) + Bend.name_emit(k.slice(parent.length) as Name).slice(2);
+  });
 }
 
-function name_local(k: Label): string {
-  return `b0_n${FL.next++}v${k.replace(/[^A-Za-z0-9]+/g, "_")}`;
+function name_local(sc: Scope, k: Label): string {
+  return `b0_n${sc.names.next++}v${k.replace(/[^A-Za-z0-9]+/g, "_")}`;
+}
+
+function name_member(sc: Scope, role: string): Name {
+  return name_gen(sc.names.owner, role, sc.names.next++);
+}
+
+// Digests bound symbol length; exact keys detect collisions instead of aliasing code.
+function name_content(owner: Name, role: string, key: string): Name {
+  const text = JSON.stringify([name_global(owner), role, key]);
+  const hash = createHash("sha256").update(text, "utf16le").digest("hex");
+  if (FL.hashes.has(hash) && FL.hashes.get(hash) !== text) die("generated name hash collision");
+  FL.hashes.set(hash, text);
+  const k = name_gen(owner, role + ".key", BigInt("0x" + hash));
+  FL.symbols.set(k, "b0_h" + hash);
+  return k;
+}
+
+// Rewrite only identities in serialized syntax, never labels or string literals.
+function name_key(key: string): [string, boolean] {
+  let open = false;
+  const text = JSON.stringify(JSON.parse(key), (_, v) => {
+    if (v?.$ === "Var" && v.binding !== undefined) open = true;
+    return ["Ref", "Ctr", "ADT", "Mat"].includes(v?.$)
+      ? { ...v, k: name_global(v.k), ...v.r ? { r: v.r.map(name_global) } : {} } : v;
+  });
+  return [text, open];
 }
 
 function cid_mac(k: Name): string {
@@ -1309,7 +1341,8 @@ function file_new(book: Bend.Book, js: boolean) {
     brws: new Map<Name, boolean[]>(),
     nodes: new Map<Name, Lay>(),
     bindings: new Map<Of<"Var">, HTerm>(),
-    symbols: new Map<Name, string>(), next: 0,
+    symbols: new Map<Name, string>(), hashes: new Map<string, string>(),
+    instances: new Map([...book.tmps].map(([key, k]) => [k, key])),
     lays: new Map<string, Lay>(),
     memo: {
       opens: new Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
@@ -1321,6 +1354,7 @@ function file_new(book: Bend.Book, js: boolean) {
   };
 }
 
+// Copied scopes share one naming counter; each emitted function starts its own.
 // A scope is where the emitter writes: its segment, its locals' names, the
 // bindings and spare nodes it holds, the def it is in. A nested arm, closure
 // or fork copies its scope; the book's facts and output live in FL.
@@ -1332,6 +1366,7 @@ function scope_new() {
     uses: new Map<Of<"Var">, Bind>(),
     rest: [] as HTerm[],
     def: INTERNAL.dummy,
+    names: { owner: INTERNAL.dummy, next: 0 },
   };
 }
 
@@ -1503,7 +1538,7 @@ function seg_clo(sc: Scope, key: Name, words: string[]): string {
 function seg_open(sc: Scope, name: Name, ret: Lay, frame: Seg["frame"],
   live: [Of<"Var">, Bind][], res: Val, rest: HTerm[]): Scope {
   const vals = live.map(([p, b]) => val_new(b.val.ws.map((w) => {
-    const nw = name_local(p.k);
+    const nw = name_local(sc, p.k);
     if (sc.brwl.has(w)) {
       sc.brwl.set(nw, sc.brwl.get(w)!);
     }
@@ -1523,7 +1558,7 @@ function seg_open(sc: Scope, name: Name, ret: Lay, frame: Seg["frame"],
 
 function node_fill(sc: Scope, k: string, alloc: string,
   exprs: string[], shr = false): string {
-  const nd = name_local(k);
+  const nd = name_local(sc, k);
   file_push(sc, `u64 ${nd} = ${alloc};`);
   exprs.forEach((w, j) => file_push(sc,
     `e.mem[${nd} + ${j}] = ${shr ? `rfc_seal(e, ${w})` : w};`));
@@ -1538,8 +1573,8 @@ function node_fields(sc: Scope, t: string, k: Name, tail = false): Val[] {
   }
   const r = sc.brwl.get(t);
   const z = r === undefined && (FL.hot.has(k) || FL.stat.has(k));
-  const sp = name_local("sp");
-  const fb = z ? name_local("fb") : "";
+  const sp = name_local(sc, "sp");
+  const fb = z ? name_local(sc, "fb") : "";
   if (z) {
     file_push(sc, `Term ${fb}[${n}];`);
   }
@@ -1685,7 +1720,7 @@ function arr_cells(sc: Scope, l: string, at: string, el: Lay,
 function arr_new(sc: Scope, d: string, v: Val, el: Lay): string {
   const { arr, lgs } = lay_arr(el);
   const ws = val_own(sc, val_to(sc, v, el));
-  const fv = name_local("fv");
+  const fv = name_local(sc, "fv");
   file_push(sc, `Term ${fv}[${Math.max(1, ws.length)}];`);
   ws.forEach((w, j) => file_push(sc, `${fv}[${j}] = ${w};`));
   return `blk_new(e, ${Number(arr)}, ${d}, ${lgs}, ${ws.length}, ${fv})`;
@@ -1990,7 +2025,7 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
 function emit_hold(sc: Scope, exprs: string[], k: Label,
   ks?: Kind[]): string[] {
   return exprs.map((ex, i) => {
-    const al = name_local(k);
+    const al = name_local(sc, k);
     const ty = FL.js ? "const" : lay_c(ks?.[i] ?? "w64");
     file_push(sc, `${ty} ${al} = ${ex};`);
     return al;
@@ -2094,7 +2129,7 @@ function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
       lays.map((lay) => val_new(ws.splice(0, lay.ks.length), lay)), dst);
   }
   const name = emit_native(sc, k, ers);
-  const o = name_local("o");
+  const o = name_local(sc, "o");
   const out = val_new(ret.ks.map((k, j) =>
     `${k === "w32" ? "(u32)" : ""}${o}[${j}]`), ret);
   file_push(sc, `Term ${o}[${out.ws.length}];`);
@@ -2112,10 +2147,11 @@ function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
 function emit_open(k: Name): [Scope, Val[]] {
   FUEL = FOLD_FUEL;
   const sc = scope_new();
+  sc.names.owner = k;
   const { live, lays, ret } = fun_of(k);
   const brw = brw_of(k);
   const vals = lays.map((l, i) => val_new(l.ks.map((kd) => {
-    const w = name_local(live[i]?.[1] ?? "k");
+    const w = name_local(sc, live[i]?.[1] ?? "k");
     if (brw[i] && kd === "box") {
       sc.brwl.set(w, arg_name(k, i, true));
     }
@@ -2136,12 +2172,15 @@ function scoped_key(t: HTerm): string {
 function emit_native(sc: Scope, k: Name, ers: HTerm[]): string {
   // k fixes erased positions, layouts and memoized borrowing for this pass.
   // Array sharing can grow mid-pass; any fact growth discards the whole output.
-  const key = JSON.stringify([k, ers.map(scoped_key), arr_q("box")]);
+  const raw = JSON.stringify([Bend.Ref(k), ers.map(t => JSON.parse(scoped_key(t))), arr_q("box")]);
+  const [stable, open] = name_key(raw);
+  const key = open ? JSON.stringify([sc.names.owner, raw]) : raw;
   return seg_ref(sc, memo(FL.spun, key, () => {
-    const code = name_gen(k, "native");
+    const code = open ? name_member(sc, "native") : name_content(k, "native", stable);
     FL.spun.set(key, code);
     const fuel = FUEL;
     const [sl, vals] = emit_open(k);
+    sl.names.owner = code;
     const seg = sl.seg;
     seg.key = code;
     seg.native = true;
@@ -2153,7 +2192,7 @@ function emit_native(sc: Scope, k: Name, ers: HTerm[]): string {
     ...seg_take(seg), "WL_SPIN"], 1),
     ...seg_text(seg.lines, 2), "  break;", "  }",
     "  return 1;", "}"];
-    const far = body.reduce((n, l) => n + l.length + 1, 0) >= SPIN_FAR;
+    const far = body.reduce((n, l) => n + l.replace(/\b(?:CID_)?b0\w+/g, "b0_name").length + 1, 0) >= SPIN_FAR;
     FL.spins.push({ ...seg, lines: [`${far ? "DFAR" : "INLINE"} Term ${
       name_global(code)}(Env e, THR Term* o${
       seg.ks.map((k, i) => `, ${lay_c(k)} r${i}${arr_q(k)
@@ -2196,9 +2235,9 @@ function emit_clo(sc: Scope, x: HTerm, ty: HTerm | null): Val {
       return [p, { ...b, val: bind_pop(sc, p) }];
     });
   const words = live.flatMap(([, b]) => val_own(sc, b.val));
-  const name = name_gen(sc.seg.key, "clo");
+  const name = name_member(sc, "clo");
   const clo = seg_clo(sc, name, words);
-  const arg = val_new([name_local("x")], BOX);
+  const arg = val_new([name_local(sc, "x")], BOX);
   emit_body(seg_open(sc, name, BOX, null, live, arg, [x]), x, ty, [], [arg],
     null);
   return val_new([clo], BOX);
@@ -2476,7 +2515,7 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   const o = term_open(x);
   const calls = x.v.map(term_spine);
   const fork = calls.length > 1;
-  const name = name_gen(sc.seg.key, "join");
+  const name = name_member(sc, "join");
   let hold: Of<"Var">[] = [];
   if (fork) {
     spare_flush(sc);
@@ -2511,7 +2550,7 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   calls.forEach((c, i) => {
     const cargs = emit_args({ ...sc, rest: [chain[i]] }, c);
     const vs = [...sc.uses].filter(([p]) => i === 0 || p === o.ps[i - 1]);
-    const kn = name_gen(sc.seg.key, "cont");
+    const kn = name_member(sc, "cont");
     spare_flush(sc);
     const ws = vs.flatMap(([p, b]) =>
       (pos.set(p, depth), depth += b.val.ws.length, b.val.ws));
@@ -2532,7 +2571,7 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
       pos.get(p)! + j - (last ? 0 : depth)));
     const ret = fun_of(c.k!).ret;
     const rest = [...hold, chain[i]];
-    const rs = val_new(ret.ks.map(() => name_local(o.ps[i].k)), ret);
+    const rs = val_new(ret.ks.map(() => name_local(sc, o.ps[i].k)), ret);
     sc = seg_open(sc, kn, sc.seg.ret, { pop: last ? depth : 0, at }, held, rs,
       rest);
     bind_uses(sc, o.ps[i], rs, rest, ty_ann(x.v[i])!);
@@ -2582,7 +2621,7 @@ function emit_tab(sc: Scope, cells: HTerm[] | null, ty: HTerm,
   const key = (FL.js ? ls : Function("f32_bits", `return [${ls}]`)(
     Bend.f32_to_bits).map((v: number) => BigInt(v) + "ull")).join(", ");
   const tab = name_global(memo(FL.tabs, key, () =>
-    name_gen(INTERNAL.table, "tab")));
+    name_content(INTERNAL.table, "tab", key)));
   return FL.js ? `${tab}[Math.min(${s}, ${ls.length - 1})]`
     : `TAB_AT(${tab}, ${s}, ${ls.length - 1})`;
 }
@@ -2737,7 +2776,6 @@ export function compile_book(book: Bend.Book): string {
     [FL.lend, FL.spun, FL.clos, FL.tabs, FL.lits, FL.consts, FL.brws]
       .forEach((m) => m.clear());
     FL.symbols.clear();
-    FL.next = 0;
     FL.lends = [];
     FL.segs = [];
     FL.spins = [];
@@ -2891,7 +2929,7 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
     die("a live call into the law " + name_display(FL.book, k));
   }
   const v = def_foreign(tld) && exprs.length === fun_of(k).lays.length - 1
-    ? name_local("x") : "";
+    ? name_local(sc, "x") : "";
   if (v) {
     exprs.push(v);
   }
@@ -2962,12 +3000,12 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
         return js_expr(sc, (x as Of<"Lam">).f(probe((x as Of<"Lam">).k, "null")),
           ty_all(ty).B(DUMMY));
       }
-      const arg = name_local("x");
+      const arg = name_local(sc, "x");
       const vs = new Map<HTerm, string>();
       const cl = { ...sc, seg: seg_new(INTERNAL.dummy, BOX, []),
         caps: { d: (sc.caps?.d ?? 0) + 1, vs } };
       FL.spins.push(cl.seg);
-      const name = name_global(name_gen(sc.def, "closure"));
+      const name = name_global(name_member(sc, "closure"));
       js_func(cl, x, ty, [arg]);
       const ps = [...new Set(vs.values())];
       vs.forEach((_, p) => js_expr(sc, p, null));
@@ -2991,7 +3029,7 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
     const all = ty_all(ty);
     const [e, ...rest] = quant_live(all.q) ? args : ["null", ...args];
     const k = LOCAL.test(e) || e === "null" || VIEW.test(e) ? e
-      : name_local(x.k);
+      : name_local(sc, x.k);
     const at = sc.seg.lines.length;
     const p = js_var(sc, x.k, k);
     js_func(sc, x.f(p), all.B(p), rest);
@@ -3063,13 +3101,14 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   FUEL = FOLD_FUEL;
   sc = { ...sc, def: k };
   sc.seg.def = k;
+  sc.names = { owner: k, next: 0 };
   const { live, h } = fun_of(k);
   const loop = loop_of(k);
   const params = loop.length > 0 ? [...Array(Math.max(...loop.map((d) =>
     fun_of(d).live.length))).keys()].map((i) => "$" + i)
-    : live.map(([, x]) => name_local(x));
+    : live.map(([, x]) => name_local(sc, x));
   if (def_foreign(def)) {
-    params.push(name_local("k"));
+    params.push(name_local(sc, "k"));
   }
   block(sc, `function ${name_global(k)}(${params.join(", ")}) {`, () => {
     if (def_foreign(def)) {
@@ -3090,11 +3129,10 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
       loop.forEach((d, i) => {
         memo_gc();
         FUEL = FOLD_FUEL;
-        const fx = { ...sc, def: d };
-        const ps = fun_of(d).live.map(([, x]) => name_local(x));
-        block(fx, pc ? `case ${i}: {` : "{", () => {
-          ps.forEach((p, j) => file_push(fx, `const ${p} = $${j};`));
-          js_func(fx, fun_of(d).h!, FL.book.tlds[d].T, ps);
+        const ps = fun_of(d).live.map(([, x]) => name_local(sc, x));
+        block(sc, pc ? `case ${i}: {` : "{", () => {
+          ps.forEach((p, j) => file_push(sc, `const ${p} = $${j};`));
+          js_func(sc, fun_of(d).h!, FL.book.tlds[d].T, ps);
         });
       }));
   });
