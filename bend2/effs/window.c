@@ -11,18 +11,20 @@
 
 #elif defined(__linux__)
 
-// The X11 window: its own connection (so its queue holds only its
-// events), the frame's image, the events pumped since the last frame,
-// five words each (cid, a, b, c, d) as on the Mac, whether it holds the
-// pointer, and the display's refresh period in ns.
+// The X11 window: its own connection and UTF-8 input context, the
+// frame's image, the queued event words, whether it holds the pointer,
+// and the display's refresh period in ns.
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <dlfcn.h>
+#include <limits.h>
 
 typedef struct {
   Display* dpy;
   Window   win;
+  XIM      im;
+  XIC      ic;
   Atom     del;
   XImage*  img;
   u32      n;
@@ -77,6 +79,16 @@ typedef struct {
 
 - (void)keyDown:(NSEvent*)ev {
   [self key:ev down:YES];
+  NSString* s = ev.characters;
+  NSUInteger n = [s lengthOfBytesUsingEncoding:NSUTF8StringEncoding];
+  if (n > UINT32_MAX) err_fail("Window: text event too large");
+  if (n > 0) {
+    u32 head[2] = { CID(Text), (u32)n };
+    u32 zero = 0;
+    [evs appendBytes:head length:sizeof head];
+    [evs appendBytes:s.UTF8String length:n];
+    [evs appendBytes:&zero length:(4 - n % 4) % 4];
+  }
 }
 
 - (void)keyUp:(NSEvent*)ev {
@@ -290,6 +302,20 @@ static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
   win->period = window_period(dpy);
   win->win = XCreateSimpleWindow(dpy, RootWindow(dpy, scr), 0, 0, w, h, 0, 0,
     BlackPixel(dpy, scr));
+  win->im = XOpenIM(dpy, NULL, NULL, NULL);
+  win->ic = win->im == NULL ? NULL : XCreateIC(win->im,
+    XNInputStyle, XIMPreeditNothing | XIMStatusNothing,
+    XNClientWindow, win->win, XNFocusWindow, win->win, NULL);
+  if (win->ic == NULL) {
+    *why = "Window.open: X11 UTF-8 input context unavailable";
+    if (win->im != NULL) {
+      XCloseIM(win->im);
+    }
+    XDestroyWindow(dpy, win->win);
+    XCloseDisplay(dpy);
+    free(win);
+    return ENOTSUP;
+  }
   win->del = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
   win->img = XCreateImage(dpy, DefaultVisual(dpy, scr), DefaultDepth(dpy, scr),
     ZPixmap, 0, io_mem(calloc(w * h, 4)), w, h, 32, w * 4);
@@ -339,11 +365,14 @@ static void __attribute__((constructor)) window_open_use(void) {
 
 #ifdef CID(Window.frame)
 
-// An event is five words: its constructor's id and its fields; a frame
-// answers the events pumped since the last one.
+// Ordinary events take five words (cid and four fields). Text takes
+// (cid, byte length, padded UTF-8 bytes), copied before the OS releases it.
 #if defined(__OBJC__) || defined(__linux__)
 
 static Term window_node(Env e, const u32* ev) {
+  if (ev[0] == CID(Text)) {
+    return io_box(e, CID(Text), io_str(e, (const char*)(ev + 2), ev[1]));
+  }
   u32 n = cid_arity(ev[0]);
   if (n == 0) {
     return term_pak(ev[0], 0);
@@ -361,8 +390,14 @@ static u32 window_depth(u32 n) {
 
 static Term window_list(Env e, const u32* p, u64 n) {
   Term list = term_pak(CID(Nil), 0);
-  for (u64 i = n; i > 0; i -= 1) {
-    list = io_node(e, CID(Con), window_node(e, p + 5 * (i - 1)), list);
+  Term* hole = &list;
+  for (u64 i = 0; i < n;) {
+    const u32* ev = p + i;
+    Term node = io_node(e, CID(Con), window_node(e, ev),
+      term_pak(CID(Nil), 0));
+    *hole = hole == &list ? node : io_seal(e, node, CID(Con));
+    hole = &e.mem[term_peek(e.mem, node) + 1];
+    i += ev[0] == CID(Text) ? 2 + ((u64)ev[1] + 3) / 4 : 5;
   }
   return list;
 }
@@ -522,7 +557,7 @@ static Term window_frame(Env e, intptr_t at, Term image) {
   NSMutableData* evs  = [view valueForKey:@"evs"];
   io_sync();
   window_show(e, (CAMetalLayer*)view.layer, image);
-  Term list = window_list(e, evs.bytes, evs.length / 20);
+  Term list = window_list(e, evs.bytes, evs.length / 4);
   evs.length = 0;
   return list;
 }
@@ -561,14 +596,47 @@ static u32 window_key(XKeyEvent* ev) {
   return 65536 + ev->keycode;
 }
 
-static void window_push(BendWin* win, u32 cid, u32 a, u32 b, u32 c, u32 d) {
-  if (win->n == win->cap) {
-    win->cap = win->cap == 0 ? 64 : win->cap * 2;
-    win->evs = io_mem(realloc(win->evs, win->cap * 20));
+static void window_room(BendWin* win, u32 words) {
+  u64 need = (u64)win->n + words;
+  if (need > UINT32_MAX) {
+    err_fail("Window: event queue too large");
   }
+  if (need > win->cap) {
+    u64 cap = win->cap == 0 ? 320 : win->cap;
+    while (cap < need) {
+      cap = cap > UINT32_MAX / 2 ? need : cap * 2;
+    }
+    win->cap = (u32)cap;
+    win->evs = io_mem(realloc(win->evs, cap * sizeof *win->evs));
+  }
+}
+
+static void window_push(BendWin* win, u32 cid, u32 a, u32 b, u32 c, u32 d) {
+  window_room(win, 5);
   u32 ev[5] = { cid, a, b, c, d };
-  memcpy(win->evs + win->n * 5, ev, sizeof ev);
-  win->n += 1;
+  memcpy(win->evs + win->n, ev, sizeof ev);
+  win->n += 5;
+}
+
+static void window_text(BendWin* win, XKeyEvent* key) {
+  window_room(win, 18);
+  KeySym symbol;
+  Status status;
+  int n;
+  for (;;) {
+    u64 bytes = (u64)(win->cap - win->n - 2) * 4;
+    n = Xutf8LookupString(win->ic, key, (char*)(win->evs + win->n + 2),
+      bytes > INT_MAX ? INT_MAX : (int)bytes, &symbol, &status);
+    if (status != XBufferOverflow) {
+      break;
+    }
+    window_room(win, 2 + ((u32)n + 3) / 4);
+  }
+  if (n > 0 && (status == XLookupChars || status == XLookupBoth)) {
+    win->evs[win->n] = CID(Text);
+    win->evs[win->n + 1] = (u32)n;
+    win->n += 2 + ((u32)n + 3) / 4;
+  }
 }
 
 static u32 window_clip(int v, u32 most) {
@@ -585,9 +653,13 @@ static void window_pump(BendWin* win) {
   while (XPending(win->dpy) > 0) {
     XEvent ev;
     XNextEvent(win->dpy, &ev);
+    bool filtered = XFilterEvent(&ev, win->win);
     if (ev.type == KeyPress || ev.type == KeyRelease) {
-      window_push(win, CID(Key), window_key(&ev.xkey), ev.type == KeyPress,
-        0, 0);
+      XKeyEvent key = ev.xkey; // window_key folds only its private copy.
+      window_push(win, CID(Key), window_key(&key), ev.type == KeyPress, 0, 0);
+      if (ev.type == KeyPress && !filtered) {
+        window_text(win, &ev.xkey);
+      }
     } else if (ev.type == ButtonPress || ev.type == ButtonRelease) {
       // the wheel: 4 up, 5 down, 6 left, 7 right
       u32 b  = ev.xbutton.button;
@@ -608,7 +680,10 @@ static void window_pump(BendWin* win) {
         window_push(win, CID(Move), window_clip(x, w), window_clip(y, h), 0,
           0);
       }
+    } else if (ev.type == FocusIn) {
+      XSetICFocus(win->ic);
     } else if (ev.type == FocusOut) {
+      XUnsetICFocus(win->ic);
       XUngrabPointer(win->dpy, CurrentTime);
       win->grab = 0;
     } else if (ev.type == ClientMessage
@@ -847,6 +922,8 @@ static void window_close(intptr_t at) {
 
 static void window_close(intptr_t at) {
   BendWin* win = (BendWin*)at;
+  XDestroyIC(win->ic);
+  XCloseIM(win->im);
   XDestroyImage(win->img);
   XCloseDisplay(win->dpy);
   free(win->evs);

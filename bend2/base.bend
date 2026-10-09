@@ -82,8 +82,12 @@ type Image is Data:
   Pix{color: U32}
   Qua{tl: Image, tr: Image, bl: Image, br: Image}
 
+# Key keeps its existing canonical code. Text follows a native key-down
+# with the OS's characters, retaining Shift, Caps Lock and the layout.
+# It is text, not a key identity; full input-method editing is separate.
 type Event is Data:
   Key{code: U32, down: Bool}
+  Text{text: String}
   Mouse{x: U32, y: U32, button: U32, down: Bool}
   Move{x: U32, y: U32}
   Look{dx: F32, dy: F32}
