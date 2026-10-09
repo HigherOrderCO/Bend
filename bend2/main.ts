@@ -313,7 +313,7 @@ async function cli_file(args: string[]): Promise<void> {
       return;
     }
     const ins = new Set([...seen.keys(), ...Object.values(book.tlds).flatMap((t) =>
-      t.$ === "Def" && t.i !== undefined ? t.i.map(path_real) : [])]);
+      t.$ === "Def" && t.i !== undefined ? t.i.paths.map(path_real) : [])]);
     for (const out of outs) {
       const at = path_real(out);
       if (ins.has(at) || (fs.existsSync(at) && fs.statSync(at).isDirectory())) {
@@ -757,9 +757,9 @@ function pkg_files(file: string, book: Bend.Book,
   const raws = [...[...seen].flatMap(([real, ns]): [string, string][] =>
     real === BASE || ns === null || ns.startsWith("0x") ? []
       : [[real === entry ? path.basename(file) : path.posix.relative(dir, real), real]]),
-  ...Object.entries(book.tlds).flatMap(([k, tld]): [string, string][] =>
+  ...Object.values(book.tlds).flatMap((tld): [string, string][] =>
     tld.$ !== "Def" || tld.i === undefined || tld.b === true
-      || Bend.name_file(k as Bend.Name).startsWith("0x") ? [] : tld.i.map((f) =>
+      || tld.i.file.startsWith("0x") ? [] : tld.i.paths.map((f) =>
       [f.startsWith(dir) ? f.slice(dir.length) : f, f]))];
   const ups = raws.map(([p]) => path.posix.normalize(p).split("/")
     .filter((s) => s === "..").length);
