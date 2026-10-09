@@ -4021,6 +4021,11 @@ FAR void term_drop(Env e, Term t) {
           cur += 1ull << 40;
         }
         if (!term_triv(c)) {
+          // The last child is held in c; its frame can be freed now.
+          if (j + 1 == n) {
+            cur = H[loc];
+            heap_free(e, cls, loc);
+          }
           t = c;
           break;
         }
