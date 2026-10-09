@@ -405,18 +405,17 @@ for it. Underneath are `IO.spawn`, `Chan.new`, `Chan.send`, `Chan.recv` and
 every computation is done, or reports a deadlock when the remaining ones all
 wait.
 
-Base effects import `.js` and `.c` implementations. These declare names in
-a `bend-ids 1` header and register handlers with
-`io_eff`; see [Effects](EFFECTS.md). Define your own effects the same way.
-Only the event loop runs
-them, so proofs, termination and the GPU never touch host code. In the other
-direction, a JS file may `import Game from "./game.bend"` (with `bend2/main.ts`
-preloaded), or from the `./game.mjs` that `-o game.mjs` writes, and call every
-non-IO def. Entry exports keep short names; others use canonical keys.
-Constructors use canonical tags: `{$: "Base:#Some", value: x}`; `Nat` is
-a number. A value crosses without a copy: an `Array`
-argument is the caller's own array, updated in place, so copy it first if you
-keep it.
+Base effects import `.js` and `.c` implementations with `bend-ids 1` headers
+and register handlers with `io_eff`; see [Effects](EFFECTS.md). Define your own
+effects the same way. Only the event loop runs host code; proofs, termination
+and the GPU never touch it.
+
+A JS file can `import Game from "./game.bend"` with `bend2/main.ts` preloaded,
+or import the `game.mjs` produced by `-o game.mjs`, and call every non-IO def.
+Exports use canonical keys, with short aliases for entry definitions.
+Constructors use canonical tags, e.g. `{$: "Base:#Some", value: x}`, and `Nat`
+is a number. Arrays cross without copying and are updated in place; copy
+an argument first if you need its original contents.
 
 ### Monads
 
