@@ -4273,10 +4273,6 @@ INLINE u32 ring_flip(u32 i) {
   return (i % CUBE_T << CUBE_LOG) + i / CUBE_T;
 }
 
-// A turn's passes (at: the grows in one group and in all, the runs of pass
-// 1 and 3, the pack) and the groups each runs on a frontier of f tasks: 0
-// when it has no work. turn_set writes f and, for Metal's indirect
-// dispatch, each pass's groups after it.
 INLINE u32 turn_groups(u64 f, u32 at) {
   bool run = f != 0 && (at == 2 ? f >= CUBE_T : at == 1 ? f < LANES
     : at == 4 || f < CUBE_T);
@@ -4549,8 +4545,6 @@ INLINE u32 monk_step(Env e, DEV Term* stk, u32 rg, u32 put0, u32 base, u32 strid
 // so a spine of forks unrolls whole. TG_HOLD words of threadgroup memory
 // hold one group per Apple core (bitonic 1.35x without). Pass 3 is pass 1
 // after a grow from under CUBE_T roots, on the lane's own ring to ring_held.
-// The pack also takes the next frontier, whose size tells each pass of the
-// turn if it runs (as the host did), so one submission chains turns.
 
 #if DEVICE
 
