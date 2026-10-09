@@ -10,11 +10,15 @@ latest one; the GitHub release carries the same notes.
   agree on constructor tags; imported exports cannot overwrite a literally dotted
   name in the entry file. Entry definitions keep their short JS export aliases.
 - Template parameters use their positions, so repeated binder labels cannot
-  identify different parameters as one. Template arguments must also be closed
-  in retained dead match fallbacks before entering the instance cache.
+  identify different parameters as one. Template instances retain their checked
+  arguments for elaboration instead of recovering them from serialized cache keys.
+- Bare names in patterns bind variables, including names also used by
+  constructors. Constructor patterns use braces in every file.
 - **Foreign interface change:** C and JS files declare their Bend references in
   a `// bend-ids 1` header. Replace body `CID(...)`/`FID(...)` uses with the
   declared host aliases; the compiler now copies the host body unchanged.
+  Header names use the imports of the Bend file supplying the implementation,
+  including when that implementation fills a law declared elsewhere.
   See [Effects](guide/EFFECTS.md) for the format and examples.
 
 ## 2.0.38 (2026-10-20)

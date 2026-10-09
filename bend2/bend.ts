@@ -412,7 +412,7 @@ export type Env = List<HTerm | ((s?: Span) => HTerm)>;
 export type Ctr  = { k: Name; n: number; T: HTerm }
 export type Ctrs = Array<Ctr>;
 export type ADT  = { $: "ADT"; n: number; g: number; T: HTerm; c: Ctrs; b?: Bool; };
-export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: string[]; args?: HTerm[]; };
+export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: { file: FileId; paths: string[] }; args?: HTerm[]; };
 export type TLD  = ADT | Def;
 export type Book = {
   entry: FileId; base: FileId | null; files: Map<FileId, File>;
@@ -948,15 +948,6 @@ export function scope_mapper(free: (v: Variable) => HTerm, refs?: ReadonlyMap<Na
     return go;
   }
   return context();
-}
-
-
-// With no source bindings allowed, forcing the complete reification establishes
-// closure, including retained annotations and otherwise skipped match branches.
-export function closed_argument(term: HTerm): LTerm {
-  return term_lower(scope_mapper(v => {
-    throw Error("open template argument: " + display_text(v.k) + "@" + v.i);
-  })(term));
 }
 
 
@@ -1939,9 +1930,6 @@ export function parse_patt(p: Parse, t: LTerm): Patt {
   const book = p.book;
   switch (t.$) {
     case "Var": {
-      if (book_ctr(book, parse_reso(p, parse_head(t), "ctr")) !== null) {
-        throw Err(book, ctx_nil(), "a braced constructor pattern (" + display_text(t.k) + " is a constructor: write " + display_text(t.k) + "{}, or rename the binder)", undefined, t.s);
-      }
       return parse_bind(p, t);
     }
     case "Ctr": {
@@ -2698,7 +2686,7 @@ export function parse_def(p: Parse, u: Bool): void {
     if (def.x > 0) {
       parse_fail(p, "a body (a template is not foreign)");
     }
-    def.i = [];
+    def.i = { file: p.ns, paths: [] };
     while (parse_word(p, "import")) {
       parse_eat(p, "\"");
       let eff = "";
@@ -2709,7 +2697,7 @@ export function parse_def(p: Parse, u: Bool): void {
       if (!/\.(c|js)$/.test(eff)) {
         parse_fail(p, "a .c or .js path");
       }
-      def.i.push(path.dirname(p.path ?? "") + "/" + eff);
+      def.i.paths.push(path.dirname(p.path ?? "") + "/" + eff);
     }
   } else {
     const vars = tele.map((cell): PVar => ({ $: "PVar", k: cell[1], i: cell[2], q: Lone(), s: cell[4] }));
@@ -3967,20 +3955,17 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
   if (xs.length < def.x) {
     throw Err(book, ctx, "a template applied to closed ~ arguments (a def parameter is not comptime)", tm, tm.s, lhs.def);
   }
-  let args: LTerm[];
+  let checked: ReturnType<typeof tele_check>;
   try {
-    tele_check(book, lhs, def.T, xs, None(), ctx_nil(), d, tm.s);
-    args = xs.map(closed_argument);
+    checked = tele_check(book, lhs, def.T, xs, None(), ctx_nil(), d, tm.s);
   } catch (e) {
-    if (e instanceof Error && e.message.startsWith("open template argument")) {
-      throw Err(book, ctx, "a template applied to closed ~ arguments (including retained match fallbacks)", tm, tm.s, lhs.def);
-    }
     const v = (e as Err)?.obs;
     if (typeof v === "object" && v.$ === "Var" && v.i >= 0 && v.i < d) {
       throw Err(book, ctx, "a template applied to closed ~ arguments (" + display_text(v.k) + " is a variable here, not comptime: pass it at run time)", tm, tm.s, lhs.def);
     }
     throw e;
   }
+  const args = xs.map(a => term_lower(a));
   if (args.reduce((n, a) => n + term_size(a) + 1, -1) > 32768) {
     throw Err(book, ctx, "a ~ argument that stops growing", tm, tm.s, lhs.def);
   }
@@ -3994,12 +3979,12 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
     o = name_gen(tm.k, "inst");
     book.tmps.set(key, o);
     try {
-      const values = args.map(a => term_higher(a));
-      // Source definitions are closed. Substituting closed arguments preserves
-      // closure in both stored fields without traversing the whole body again.
-      const T = tele_fill(book, def.T, values, ctx_nil(), lhs.def, tm.s);
-      const v = values.reduce((v, a) => term_apply(v, a), def.v as HTerm);
-      const inst: Def = { $: "Def", n: def.n - def.x, x: 0, T, v, u: def.u, args: values };
+      const v = xs.reduce((v, a) => term_apply(v, a), def.v as HTerm);
+      // Elaboration consumes checked arguments; instantiation substitutes the originals.
+      const env = pmap_to_array(ctx).reduce<Env>((env, [i, a]) => list_set(env, i, Var(a.k, i)), null);
+      const cells = {};
+      const inst: Def = { $: "Def", n: def.n - def.x, x: 0, T: checked.tel, v, u: def.u,
+        args: checked.xs.map(a => term_higher(a, env, cells)) };
       book.tlds[o] = { ...inst, v: null };
       inst.e = def_check(book, o, inst, z);
       book.tlds[o] = inst;

@@ -1272,7 +1272,7 @@ function def_raise(t: HTerm, left: number): number {
 }
 
 function def_foreign(tld: Bend.TLD | undefined):
-  tld is Bend.Def & { i: string[] } {
+  tld is Bend.Def & { i: NonNullable<Bend.Def["i"]> } {
   return tld?.$ === "Def" && tld.i !== undefined;
 }
 
@@ -2789,12 +2789,12 @@ function foreign_src(src: string, scopes: Bend.File[], use?: (macro: string, key
     + (FL.js ? "" : "\n\n" + [...names].map((k) => "#undef " + k).join("\n") + "\n");
 }
 
-function effect_src(k: Name, tld: Bend.Def & { i: string[] }): void {
+function effect_src(k: Name, tld: Bend.Def & { i: NonNullable<Bend.Def["i"]> }): void {
   const ext = FL.js ? ".js" : ".c";
-  const path = fs.realpathSync(tld.i.find((x) => x.endsWith(ext))
+  const path = fs.realpathSync(tld.i.paths.find((x) => x.endsWith(ext))
     ?? die("no " + ext + " import: " + name_display(FL.book, k)));
-  const scope = FL.book.files.get(name_file(k))
-    ?? die("foreign definition has no declaring file: " + name_display(FL.book, k));
+  const scope = FL.book.files.get(tld.i.file)
+    ?? die("foreign implementation has no source file: " + name_display(FL.book, k));
   const [scopes, src] = memo(FL.effs, path, () => [[], fs.readFileSync(path, "utf8")]);
   if (!scopes.includes(scope)) {
     scopes.push(scope);

@@ -43,10 +43,10 @@ binds a host alias to a Bend identity: `CID #K BEND_K` selects a constructor,
 id. Scoped source names always start with `#` or `:` to select their category;
 exact canonical identities, such as `Base:#Unit`, are also accepted. The runtime
 function ids are `FID !Clo.apply` and `FID !IO.emit`.
-Names resolve in the file declaring the Bend def, including its import aliases
-and Base. A law filled from another file keeps the declaring file's scope.
+Names resolve in the Bend file containing the foreign import, using its aliases
+and Base, just as names in a Bend body do. The law keeps its declaration identity.
 One physical foreign file emitted for several definitions must resolve its
-header identically in each declaring scope. Unused definitions do not add scopes.
+header identically in each importing scope. Unused definitions do not add scopes.
 
 Host aliases start with `BEND_`, followed by letters or digits, with optional
 single underscores between nonempty groups. They must be distinct within the
