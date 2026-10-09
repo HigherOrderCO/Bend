@@ -741,12 +741,13 @@ async function cli_login(): Promise<string> {
 }
 
 // pkg_files is the package the loader read for this file, the entry first:
-// every .bend file at its namespace (the entry at its name), every foreign
-// .c or .js file at its path from the entry's directory; base and the
-// store's packages stay out. A path that climbs above the entry's directory
+// every local .bend and foreign .c or .js file, relative to the entry's
+// directory (the entry at its name); Base and stored packages stay out.
+// A path that climbs above the entry's directory
 // takes the entry's ancestor directories along, as many as the deepest climb.
 // A LICENSE beside a published file goes along; a license/ directory, in
 // any case, is refused (it clashes with LICENSE on a case-blind disk).
+// Imports must still select the same files without rewriting the source.
 // A leading byte order mark is dropped: the hub stores the text as sent,
 // and an importer's fetch drops the mark, so a file sent with one would
 // never match its hash.
@@ -759,15 +760,32 @@ function pkg_files(file: string, book: Bend.Book,
       : [[real === entry ? path.basename(file) : path.posix.relative(dir, real), real]]),
   ...Object.values(book.tlds).flatMap((tld): [string, string][] =>
     tld.$ !== "Def" || tld.i === undefined || tld.b === true
-      || tld.i.file.startsWith("0x") ? [] : tld.i.paths.map((f) =>
-      [f.startsWith(dir) ? f.slice(dir.length) : f, f]))];
+      || tld.i.file.startsWith("0x") ? [] : tld.i.paths.map((f) => {
+        const real = fs.realpathSync(f);
+        return [path.posix.relative(dir, real), real];
+      }))];
   const ups = raws.map(([p]) => path.posix.normalize(p).split("/")
     .filter((s) => s === "..").length);
   const anc = path.dirname(entry).split("/")
     .slice(-Math.max(0, ...ups) || Infinity);
+  const names = new Map(raws.map(([raw, real]) => [real, path.posix.join(...anc, raw)]));
+  const owners = new Map<string, string>();
   const files: Record<string, string> = {};
-  for (const [raw, real] of raws) {
-    const p = path.posix.join(...anc, raw);
+  const disk_key = (p: string): string => p.toLowerCase().normalize("NFC");
+  const add = (p: string, real: string): void => {
+    // Manifest paths are whitespace-separated and fetched as URL paths.
+    if (/[\s#?%\\]/.test(p)) {
+      throw "Error: " + real + " cannot be published: package paths cannot contain"
+        + " whitespace, #, ?, %, or backslash";
+    }
+    const old = owners.get(disk_key(p));
+    if (old !== undefined && old !== real) {
+      throw "Error: " + real + " cannot be published: " + p + " clashes with " + old;
+    }
+    owners.set(disk_key(p), real);
+    files[p] = fs.readFileSync(real, "utf8").replace(/^\uFEFF/, "");
+  };
+  for (const [real, p] of names) {
     if (p.startsWith("/") || p.startsWith("..")) {
       throw "Error: " + real + " cannot be published (an absolute import,"
         + " or a climb above the file system)";
@@ -776,11 +794,68 @@ function pkg_files(file: string, book: Bend.Book,
       throw "Error: " + real + " cannot be published: it is in a directory"
         + " named license, which clashes with a LICENSE file; rename it";
     }
-    files[p] = fs.readFileSync(real, "utf8").replace(/^\uFEFF/, "");
+    if (p.endsWith(".bend") && !/^(?:[A-Za-z_][\w-]*\/)*[A-Za-z_][\w-]*\.bend$/.test(p)) {
+      throw "Error: " + real + " cannot be published: " + p + " is not a Bend import path";
+    }
+    add(p, real);
     if (fs.readdirSync(path.dirname(real)).includes("LICENSE")) {
-      files[path.posix.join(path.posix.dirname(p), "LICENSE")] =
-        fs.readFileSync(path.join(path.dirname(real), "LICENSE"), "utf8")
-          .replace(/^\uFEFF/, "");
+      add(path.posix.join(path.posix.dirname(p), "LICENSE"), path.join(path.dirname(real), "LICENSE"));
+    }
+  }
+  const dirs = new Set(["."]);
+  for (const p of Object.keys(files)) {
+    for (let dir = path.posix.dirname(p); dir !== "."; dir = path.posix.dirname(dir)) {
+      if (owners.has(disk_key(dir))) {
+        throw "Error: " + dir + " cannot be both a package file and a directory";
+      }
+      dirs.add(dir);
+    }
+  }
+  const check = (from: string, target: string, use: string): void => {
+    const p = path.posix.join(path.posix.dirname(names.get(from)!), use);
+    if (path.posix.isAbsolute(use) || names.get(target) !== p) {
+      throw "Error: " + from + ": import " + JSON.stringify(use)
+        + " cannot be published unchanged; use a relative path to the file"
+        + " itself, without symlink aliases";
+    }
+  };
+  for (const scope of book.files.values()) {
+    const from = scope.path, p = from && names.get(from);
+    if (!from || !p) continue;
+    // The loader already validated this header and resolved its aliases.
+    for (const line of files[p].split("\n")) {
+      const text = line.trim();
+      if (!text || text.startsWith("#")) continue;
+      const [word, use, , alias] = text.split(/\s+/);
+      if (word !== "import") break;
+      if (use === "Base" || /^(0x[0-9a-f]+|[^/]*@[^/]*)\//.test(use)) continue;
+      check(from, book.files.get(scope.al[alias])?.path ?? "", use);
+    }
+  }
+  for (const tld of Object.values(book.tlds)) {
+    if (tld.$ !== "Def" || !tld.i) continue;
+    const from = book.files.get(tld.i.file)?.path;
+    if (from && names.has(from)) for (const imported of tld.i.paths) {
+      const use = imported.slice(path.dirname(from).length + 1);
+      check(from, fs.realpathSync(imported), use);
+      let at = path.posix.dirname(names.get(from)!);
+      // Foreign imports reach the filesystem without the Bend loader's normalization.
+      for (const part of use.split("/").slice(0, -1)) {
+        at = path.posix.join(at, part);
+        if (!dirs.has(at)) {
+          throw "Error: " + from + ": import " + JSON.stringify(use)
+            + " cannot be published unchanged: directory " + at + " is not in the package";
+        }
+      }
+    }
+  }
+  for (const [real, p] of names) if (path.posix.basename(p) === "PROOF.bend") {
+    const from = real === entry ? file : real;
+    const laws = path.join(path.dirname(from), "LAWS.bend");
+    const original = fs.existsSync(laws) ? fs.realpathSync(laws) : undefined;
+    const archived = owners.get(disk_key(path.posix.join(path.posix.dirname(p), "LAWS.bend")));
+    if (original !== archived) {
+      throw "Error: " + from + " cannot be published: its LAWS.bend sibling would change";
     }
   }
   return files;
