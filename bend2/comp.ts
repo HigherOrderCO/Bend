@@ -4647,9 +4647,20 @@ extern "C" __global__ void window_dev(DEV u64* H, Term root, u32 w, u32 h,
 // Row
 // ===
 
-static u32 row_grow(Env e, DEV Term* stk, u32 base, u32 stride, u32 want) {
+static u64 io_tick(void) {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return (u64)ts.tv_sec * 1000000000ull + (u64)ts.tv_nsec;
+}
+
+// A row runs what precedes its forks on one thread: in a turn with fewer
+// rows than threads, a grow past 1 ms (a bench's: under 0.3) deals its
+// forks over the rows, for idle threads to grow (#1475: 3.2 s -> 1.1 s).
+static u32 row_grow(Env e, DEV Term* stk, u32 base, u32 stride, u32 want,
+  u32 rows) {
   u64* H = e.mem;
   u32 cur = 0;
+  u64 end = rows < pool_size ? io_tick() + 1000000 : ~0ull;
   for (;;) {
     u32 put0[CUBE_T];
     u32 has = 0;
@@ -4660,14 +4671,15 @@ static u32 row_grow(Env e, DEV Term* stk, u32 base, u32 stride, u32 want) {
     if (root_done(H) || has >= want) {
       return cur;
     }
+    bool slow = io_tick() > end;
     u32 grew = 0;
     u32 ran  = 0;
     for (u32 i = 0; i < CUBE_T && ran != 2; i += 1) {
-      ran   = monk_step(e, stk, base + i * stride, put0[i], base, stride,
-        &cur);
+      ran   = monk_step(e, stk, base + i * stride, put0[i], slow ? 0 : base,
+        slow ? CUBE_G : stride, slow ? a32_at(H, H_CURSOR) : &cur);
       grew += ran == 1;
     }
-    if (grew == 0) {
+    if (grew == 0 || slow) {
       return cur;
     }
   }
@@ -4738,7 +4750,7 @@ static u32 pool_rows(Env e, DEV Term* stk) {
     }
     a32_acq(&pool_row);
     if (c >> 23 & 1) {
-      row_grow(e, stk, r * CUBE_T, 1, CUBE_T);
+      row_grow(e, stk, r * CUBE_T, 1, CUBE_T, rows);
     } else {
       u32 row = r / step * CUBE_T;
       for (u32 rg = row + r % step; rg < row + CUBE_T; rg += step) {
@@ -5141,7 +5153,8 @@ static void gpu_pass(u32 f) {
 // splits the few rows finely instead. A turn visits only the rows below
 // its bound: a drain deals task g to ring_flip(g), whose row is at most g,
 // a row grows into itself, and a column grow's cur tasks land in rows 0
-// to cur - 1, so those rows hold every task.
+// to cur - 1, so those rows hold every task. A slow grow deals task g to
+// row g % CUBE_T, and the grows repeat over g rows until none deals.
 
 // Between turns, each ring's pending tasks move back to slot 0.
 
@@ -5181,14 +5194,15 @@ static void cube_run(u64* H, bool gpu) {
       u32 rows = f;
       u32 want = (pool_size - 1) / (CUBE_T / LINE) + 1;
       if (f < want) {
-        u32 cur = row_grow((Env){ H, ALC[0] }, io_stk, 0, CUBE_G, want);
+        u32 cur = row_grow((Env){ H, ALC[0] }, io_stk, 0, CUBE_G, want, f);
         rows = cur > f ? cur : f;
       }
-      if (f < CUBE) {
+      for (u32 g = f; g != 0 && f < CUBE;
+        g = a32_exch(a32_at(H, H_CURSOR), 0)) {
+        rows = g > rows ? g : rows;
         pool_turn(true, rows);
       }
-      f = a32_load(a32_at(H, H_CURSOR));
-      pool_turn(false, f > rows ? f : rows);
+      pool_turn(false, rows);
       f = a32_load(a32_at(H, H_CURSOR));
       ring_rewind(H, f > rows ? f : rows);
     }
@@ -5361,12 +5375,6 @@ typedef Term (*Effect)(Env e, Term* f, IoWork* w);
 
 Effect io_eff_rows[sizeof CID_T / sizeof *CID_T];
 static u32    io_live;
-
-static u64 io_tick(void) {
-  struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC, &ts);
-  return (u64)ts.tv_sec * 1000000000ull + (u64)ts.tv_nsec;
-}
 
 OUTLINE void* io_mem(void* mem) {
   if (mem == NULL) {
