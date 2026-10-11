@@ -23,18 +23,7 @@ type Val = { ws: string[]; lay: Lay; stat: boolean };
 
 type Bind = { val: Val; n: number; A: HTerm };
 
-type Seg = {
-  fid: string;
-  def: Name;
-  ret: Lay;
-  lines: string[];
-  params: string[];
-  ks: Kind[];
-  frame: { pop: number; at: number[] } | null;
-  refs: Set<string>;
-  spin?: boolean;
-  fork?: boolean;
-};
+type Seg = ReturnType<typeof seg_new>;
 
 type Spine = {
   h: HTerm;
@@ -627,7 +616,7 @@ function term_spine(tm: HTerm): Spine {
       }
       c = term_force(c.$ === "App" ? c.f : c.x);
     }
-    const tld = c.$ === "Ref" ? FL.book.tlds[c.k] : undefined;
+    const tld = c.$ === "Ref" ? FL.tlds[c.k] : undefined;
     const T = tld?.$ === "Def" ? tld.T : ty_ann(h);
     const qs = T === null || apps.length === 0 ? [] : tele_unbind(T).doms;
     const live = apps.map((_, i) => i >= qs.length || dom_live(qs[i]));
@@ -759,7 +748,7 @@ function quant_live(q: Bend.Quant): boolean {
 // ====
 
 function intr_of(k: Name, js = false): Intr | undefined {
-  const tld = FL.book.tlds[k];
+  const tld = FL.tlds[k];
   const it = tld?.$ === "Def" && tld.i === undefined && tld.b
     ? OPERATIONS[op_name(k)] : undefined;
   return it && (js || it.C !== undefined) ? it : undefined;
@@ -773,11 +762,11 @@ function op_name(k: Name): string {
 // ====
 
 function tele_unbind(T: HTerm): { doms: Dom[]; ret: HTerm } {
-  return memo(FL.teles, T, () => Bend.tele_unbind(FL.book, T));
+  return memo(FL.teles, T, () => Bend.tele_unbind(FL, T));
 }
 
 function tele_fill(T: HTerm, xs: HTerm[]): HTerm {
-  return Bend.tele_fill(FL.book, T, xs, Bend.ctx_nil());
+  return Bend.tele_fill(FL, T, xs, Bend.ctx_nil());
 }
 
 // Ty
@@ -789,12 +778,12 @@ function ty_ann(t: HTerm): HTerm | null {
 }
 
 function ty_wnf(ty: HTerm | null): HTerm | null {
-  const t = ty && Bend.term_wnf(FL.book, ty);
+  const t = ty && Bend.term_wnf(FL, ty);
   return t?.$ === "Rwt" ? ty_wnf(t.f) : t;
 }
 
 function ty_all(ty: HTerm | null): Of<"All"> {
-  return Bend.tele_open(FL.book, ty!)!;
+  return Bend.tele_open(FL, ty!)!;
 }
 
 function ty_peel(tm: HTerm, ty: HTerm | null): [HTerm, HTerm | null] {
@@ -833,7 +822,7 @@ function ty_holds(A: HTerm | null,
   if (t?.$ !== "ADT" || WORDS[t.k]) {
     return false;
   }
-  const tld = FL.book.tlds[t.k];
+  const tld = FL.tlds[t.k];
   const ks = tld?.$ === "ADT" ? tele_unbind(tld.T).doms : [];
   if (t.x.some((x, i) => !ty_value(ks[i]?.[2] ?? null)
     && ty_holds(x, p, seen))) {
@@ -894,7 +883,7 @@ function lay_of(A: HTerm | null): Lay {
   const t = ty_adt(A);
   return t === null ? BOX : WORDS[t.k] ?? memo(FL.lays,
     Bend.term_key(Bend.term_lower(t)), (key) => {
-    const tld = FL.book.tlds[t.k];
+    const tld = FL.tlds[t.k];
     if (t.k === "Array" || t.k === "IO.OP" || tld?.$ !== "ADT"
       || tld.c.some((c) => ctr_doms(c).some((F) => ty_holds(F,
         (u) => u?.$ === "ADT" && u.k === t.k)))) {
@@ -915,7 +904,7 @@ function lay_el(A: HTerm | null): Lay {
     }
     return BOX;
   }
-  const tld = FL.book.tlds[t.k];
+  const tld = FL.tlds[t.k];
   return lay_of(tld?.$ === "ADT" && tld.c[0]
     ? tele_unbind(tld.c[0].T).ret : A);
 }
@@ -935,7 +924,7 @@ function lay_pack(arms: [Name, Lay[]][]): Lay {
 
 function lay_node(k: Name): Lay {
   return memo(FL.nodes, k, () => {
-    const lay = lay_pack([[k, (FL.book.ctrs[k] ? ctr_doms(FL.book.ctrs[k])
+    const lay = lay_pack([[k, (FL.ctrs[k] ? ctr_doms(FL.ctrs[k])
       : []).map(lay_of)]]);
     while (lay.ks.length > WIDE && lay.ks.length & (lay.ks.length - 1)) {
       lay.ks.push("w32");
@@ -966,7 +955,7 @@ function lay_arr(lay: Lay) {
 
 function ctr_adt(x: Of<"Ctr">,
   ty: HTerm | null): [Of<"ADT">, number | null] {
-  const ctr = FL.book.ctrs[x.k];
+  const ctr = FL.ctrs[x.k];
   const adt = adt_of(ty ?? (ctr ? tele_unbind(ctr.T).ret
     : null));
   if (ty === null && adt.x.length > 0) {
@@ -977,7 +966,7 @@ function ctr_adt(x: Of<"Ctr">,
 }
 
 function ctr_tail(ctr: Bend.Ctr, xs?: HTerm[]): Dom[] {
-  const doms = (xs ? Bend.tele_unbind(FL.book, tele_fill(ctr.T, xs))
+  const doms = (xs ? Bend.tele_unbind(FL, tele_fill(ctr.T, xs))
     : tele_unbind(ctr.T)).doms;
   return doms.slice(doms.length - ctr.n);
 }
@@ -991,7 +980,7 @@ function ctr_doms(ctr: Bend.Ctr, xs?: HTerm[]): HTerm[] {
 }
 
 function ctr_flds(k: Name, xs: HTerm[]): HTerm[] {
-  const ds = FL.book.ctrs[k] ? ctr_tail(FL.book.ctrs[k]) : [];
+  const ds = FL.ctrs[k] ? ctr_tail(FL.ctrs[k]) : [];
   return xs.filter((_, j) => !ds[j] || dom_live(ds[j]));
 }
 
@@ -1000,8 +989,8 @@ function src_add(k: Name): void {
 }
 
 function ctr_build(sc: Scope, k: Name, exprs: string[], stat = false): string {
-  if (FL.book.ctrs[k]) {
-    src_add(Bend.book_fam(FL.book, k));
+  if (FL.ctrs[k]) {
+    src_add(Bend.book_fam(FL, k));
   }
   const cid = cid_mac(k);
   if (lay_node(k).ks.join() === "w32" || exprs.length === 0) {
@@ -1120,7 +1109,7 @@ function mat_ctrs(x: HTerm, adt: Of<"ADT">): [Name, HTerm][] {
   const io = adt.k === "IO.OP";
   return io && term_strip(end).$ !== "Efq"
     ? [...arms, ["_", end], ["", Bend.Efq()]]
-    : io || arms.length < Bend.book_adt(FL.book, adt, Bend.Emp()).c.length
+    : io || arms.length < Bend.book_adt(FL, adt, Bend.Emp()).c.length
     ? [...arms, ["", end]] : arms;
 }
 
@@ -1138,7 +1127,7 @@ function mat_ops(eq: (k: Name) => string): string {
 
 function fun_of(k: Name): Fun {
   return memo(FL.funs, k, () => {
-    const tld = FL.book.tlds[k];
+    const tld = FL.tlds[k];
     if (tld?.$ !== "Def") {
       return { n: 0, h: null, live: [], lays: [BOX, BOX], ret: BOX };
     }
@@ -1161,7 +1150,7 @@ function fun_of(k: Name): Fun {
 function brw_of(k: Name): boolean[] {
   return memo(FL.brws, k, () => {
     const { live, lays } = fun_of(k);
-    return lays.map((l, i) => done_live(FL.book.tlds[k])
+    return lays.map((l, i) => done_live(FL.tlds[k])
       && l.ks.includes("box") && ty_adt(live[i][2])?.k !== "Array"
       && !FL.own.has(k + "~" + i));
   });
@@ -1174,7 +1163,7 @@ function def_raise(t: HTerm, left: number): number {
     return left > 0 ? def_raise(b, left - 1) : 1 + def_raise(b, 0);
   }
   if (s.$ === "Mat") {
-    return Math.min(def_raise(s.h, left - 1 + FL.book.ctrs[s.k].n),
+    return Math.min(def_raise(s.h, left - 1 + FL.ctrs[s.k].n),
       def_raise(s.m, left));
   }
   return s.$ === "Efq" ? 99 : 0;
@@ -1195,7 +1184,7 @@ function fun_runs(tld: Bend.TLD | undefined): tld is Bend.Def {
 
 function done_defs(live = done_live): [Name, Bend.Def][] {
   return [...FL.srcs.keys()].map((k) =>
-    [k, FL.book.tlds[k]] as [Name, Bend.Def]).filter(([, d]) => live(d));
+    [k, FL.tlds[k]] as [Name, Bend.Def]).filter(([, d]) => live(d));
 }
 
 function loop_of(k: Name): Name[] {
@@ -1204,10 +1193,10 @@ function loop_of(k: Name): Name[] {
     const id = stack.push(k) - 1;
     let low = id;
     let self = false;
-    if (done_live(FL.book.tlds[k])) {
+    if (done_live(FL.tlds[k])) {
       term_any(fun_of(k).h!, (s, tail) => {
         const d = tail ? term_spine(s).k : null;
-        if (d !== null && done_live(FL.book.tlds[d])) {
+        if (d !== null && done_live(FL.tlds[d])) {
           const at = stack.indexOf(d);
           self ||= d === k;
           low = Math.min(low, at >= 0 ? at : FL.loops.has(d) ? low : visit(d));
@@ -1275,7 +1264,7 @@ export function io_run(book: Bend.Book, args: string[]): number {
 function file_new(book: Bend.Book, js: boolean) {
   PROBES.length = 1;
   return {
-    book,
+    ...book,
     js,
     bangs: new Set<Name>(),
     sites: new Map<Name, number>(),
@@ -1331,13 +1320,13 @@ function scope_new() {
 
 function file_book(roots: Name[]): void {
   for (const k of OWNED) {
-    if (FL.book.tlds[k] && !FL.book.tlds[k].b) {
+    if (FL.tlds[k] && !FL.tlds[k].b) {
       die(Bend.name_key(k)
         + " is a name the compiler encodes itself: name yours apart");
     }
   }
-  for (const [k, tld] of Object.entries(FL.book.tlds)) {
-    if (def_foreign(tld) && k in FL.book.ctrs) {
+  for (const [k, tld] of Object.entries(FL.tlds)) {
+    if (def_foreign(tld) && k in FL.ctrs) {
       die(Bend.name_key(k)
         + " names both a constructor and a foreign def: name one apart");
     }
@@ -1345,7 +1334,7 @@ function file_book(roots: Name[]): void {
   roots.forEach(src_add);
   for (const d of FL.srcs.keys()) {
     memo_gc();
-    const tld = FL.book.tlds[d];
+    const tld = FL.tlds[d];
     for (const x of tld?.$ === "ADT" ? tld.c : tld ? [tld] : []) {
       type_adts(x.T).forEach(src_add);
     }
@@ -1407,7 +1396,7 @@ function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
       return term_kids(w).forEach((h) => facts_hot(sc, h, true, local));
     }
     const dom = w?.$ === "Var" && !local
-      && tele_unbind(FL.book.tlds[sc.def].T).doms[w.i];
+      && tele_unbind(FL.tlds[sc.def].T).doms[w.i];
     if (dom && dom[1] === w.k && !dom_live(dom)) {
       FL.hot.add(sc.def + "~" + w.i);
     } else if ("All Var App".includes(w?.$!)) {
@@ -1425,7 +1414,7 @@ function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
     return;
   }
   FL.hot.add(tk);
-  const tld = FL.book.tlds[w.k];
+  const tld = FL.tlds[w.k];
   if (tld?.$ === "ADT") {
     for (const c of tld.c) {
       FL.hot.add(c.k);
@@ -1476,9 +1465,10 @@ function spare_flush(sc: Scope): void {
 // parameters from the frame slots, then from the bank (r0..).
 
 function seg_new(name: string, ret: Lay, params: string[],
-  ks: Kind[] = params.map(() => "w64"), frame: Seg["frame"] = null): Seg {
-  return { fid: name && seg_fid(name), def: name, ret, lines: [], params, ks,
-    frame, refs: new Set() };
+  ks: Kind[] = params.map(() => "w64"),
+  frame: { pop: number; at: number[] } | null = null) {
+  return { fid: name && seg_fid(name), def: name, ret, lines: [] as string[],
+    params, ks, frame, refs: new Set<string>(), spin: false, fork: false };
 }
 
 function seg_fid(k: Name): string {
@@ -1832,14 +1822,14 @@ function memo_gc(): void {
 // function, a Type, an erased or dependent field) refuses the build.
 
 function show_main(): (number | Name)[] | null {
-  const main = FL.book.tlds.main;
-  if (!FL.book.tlds.IO) {
+  const main = FL.tlds.main;
+  if (!FL.tlds.IO) {
     die("a build needs import Base");
   }
   if (!fun_runs(main)) {
     die("no main to run");
   }
-  if (io_type(FL.book) !== null) {
+  if (io_type(FL) !== null) {
     return null;
   }
   const show: (number | Name)[] = [];
@@ -1857,7 +1847,7 @@ function show_main(): (number | Name)[] | null {
     }
     const box = lay === BOX;
     const adt = ty_adt(t);
-    const tld = adt && FL.book.tlds[adt.k];
+    const tld = adt && FL.tlds[adt.k];
     const kind = t.$ === "Eql" ? 5 : "U32 F32 Nat Char String . Array"
       .split(" ").indexOf(adt?.k ?? "") & 7;
     if (kind !== 5 && (tld?.$ !== "ADT" || adt?.k === "IO.OP")) {
@@ -1967,7 +1957,7 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
         return go(o.b, top, T);
       }
       case "Lam": {
-        const all = T && Bend.tele_open(FL.book, T);
+        const all = T && Bend.tele_open(FL, T);
         return all === null || quant_live(all.q) ? s
           : Bend.Ann(go(s.f(DUMMY), top, all.B(DUMMY)), all.B(DUMMY));
       }
@@ -2032,7 +2022,7 @@ function emit_task(sc: Scope, fid: string, rem: number, words: string[],
     `task_node(e, ${seg_ref(sc, fid)}, ${cont}, ${idx}, ${rem})`, words);
 }
 
-function emit_jump(sc: Scope, args: string[], k: Name, bang?: boolean): void {
+function emit_jump(sc: Scope, args: string[], k: Name, bang = false): void {
   const fid = seg_fid(k);
   sc.seg.fork ||= bang;
   if (bang || sc.seg.def !== k) {
@@ -2110,7 +2100,7 @@ function emit_put(sc: Scope, dst: Val | null, v: Val): void {
 
 function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
   const k = ck.k!;
-  const T = FL.book.tlds[k].T;
+  const T = FL.tlds[k].T;
   const doms = tele_unbind(T).doms;
   const { n, h, lays, ret } = fun_of(k);
   const ers = ck.all.filter((_, i) => i < n && !dom_live(doms[i]));
@@ -2163,7 +2153,7 @@ function emit_native(sc: Scope, k: Name, ers: HTerm[]): string {
     const seg = sl.seg;
     seg.fid = name;
     const dst = val_new(seg.ret.ks.map((_, j) => `o[${j}]`), seg.ret);
-    emit_body(sl, fun_of(k).h!, FL.book.tlds[k].T, ers, vals, dst);
+    emit_body(sl, fun_of(k).h!, FL.tlds[k].T, ers, vals, dst);
     FUEL = fuel;
     const body = [...seg_text(["u32 wpoll = 0;", ...seg.ks.flatMap((k, i) =>
       arr_q(k) ? [`Term h${i} = r${i};`] : []),
@@ -2231,7 +2221,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     return val_new([`${u}ull`], W32, true);
   }
   const flds = ctr_flds(x.k, x.x);
-  const ctr = FL.book.ctrs[x.k];
+  const ctr = FL.ctrs[x.k];
   const tys = () => ctr_doms(ctr, adt.x);
   const word = WORDS[adt.k];
   if (word !== undefined) {
@@ -2481,7 +2471,7 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
       }
       const ret = fun_of(ck.k).ret;
       const once = FL.sites.get(ck.k) === 1 && !ck.b
-        && !def_foreign(FL.book.tlds[ck.k])
+        && !def_foreign(FL.tlds[ck.k])
         && (ret !== BOX || sc.seg.ret === BOX);
       if (sc.seg.def !== ck.k && (flat_call(x) || (dst === null && once))) {
         return emit_fuse(sc, ck, dst, true);
@@ -2698,8 +2688,8 @@ function c_ids(src: string, m = ""): string {
     if (!p) {
       return t;
     }
-    const q = [m === "" ? k : m + ":" + k, k].find((q) => q in FL.book.ctrs
-      || q in FL.book.tlds || FL.ids.has(p + "_" + q))
+    const q = [m === "" ? k : m + ":" + k, k].find((q) => q in FL.ctrs
+      || q in FL.tlds || FL.ids.has(p + "_" + q))
       ?? die(`${p}(${k}) names no constructor or def`);
     return FL.js ? JSON.stringify(Bend.name_key(q)) : name_id(p + "_", q);
   });
@@ -2736,7 +2726,7 @@ export function compile_book(book: Bend.Book): string {
   const show = show_main();
   const names = (show ?? []).filter((c) => typeof c === "string");
   file_book(["main", ...RUNTIME_ADTS,
-    ...names.map((c) => Bend.book_fam(FL.book, c))]);
+    ...names.map((c) => Bend.book_fam(FL, c))]);
   const facts = () => FL.own.size + FL.hot.size + FL.stat.size;
   let was: number;
   do {
@@ -2789,7 +2779,7 @@ export function compile_book(book: Bend.Book): string {
   const cid = (k: Name, n: number) =>
     cids.set(k, n > WIDE ? 240 + Math.log2(n) : n);
   for (const k of FL.srcs.keys()) {
-    for (const c of (FL.book.tlds[k] as Bend.ADT).c ?? []) {
+    for (const c of (FL.tlds[k] as Bend.ADT).c ?? []) {
       cid(c.k, lay_node(c.k).ks.length);
     }
   }
@@ -2880,7 +2870,7 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
     const [f, x] = exprs;
     return tail ? `run_tail(${f}, ${x})` : `${f}(${x})`;
   }
-  const tld = FL.book.tlds[k];
+  const tld = FL.tlds[k];
   if (tld.$ === "ADT") {
     return "null";
   }
@@ -2946,7 +2936,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
       if (native !== undefined) {
         return tpl(native[x.k].intr, exprs);
       }
-      const fs = ctr_live(FL.book.ctrs[x.k]);
+      const fs = ctr_live(FL.ctrs[x.k]);
       return `{$: "${Bend.name_key(x.k)}"${exprs.map((z, j) =>
         ", " + js_key(fs[j][1]) + z).join("")}}`;
     }
@@ -3036,7 +3026,7 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
     const is = (c: Name) => `${s}.$ === "${Bend.name_key(c)}"`;
     lv = mat_ctrs(x, adt).map(([k, h]): [string, HTerm, string[]] =>
       k === "" || k === "_" ? [k && mat_ops(is), h, [s]] : native === undefined
-      ? [is(k), h, ctr_live(FL.book.ctrs[k]).map(([, f]) => `${s}["${f}"]`)]
+      ? [is(k), h, ctr_live(FL.ctrs[k]).map(([, f]) => `${s}["${f}"]`)]
       : [tpl(native[k].cond ?? "", [s]), h,
         (native[k].elim ?? []).map((e) => tpl(e, [s]))]);
   }
@@ -3082,7 +3072,7 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
         const ps = fun_of(d).live.map(([, x]) => name_local(fx, x));
         block(fx, pc ? `case ${i}: {` : "{", () => {
           ps.forEach((p, j) => file_push(fx, `const ${p} = $${j};`));
-          js_func(fx, fun_of(d).h!, FL.book.tlds[d].T, ps);
+          js_func(fx, fun_of(d).h!, FL.tlds[d].T, ps);
         });
       }));
   });
@@ -3124,7 +3114,7 @@ function js_marshal(A: HTerm | null, out: boolean): string {
       if (f === "") return "";
       body.push(`r = v; v.forEach((x, i) => { ${put(f, "v", "i")} });`);
     } else {
-      const cs = (FL.book.tlds[t.k] as Bend.ADT).c;
+      const cs = (FL.tlds[t.k] as Bend.ADT).c;
       const arms = cs.map((c) => {
         const fs = ctr_live(c, t.x).flatMap(([, n, B]) => {
           const f = js_marshal(B, out);
@@ -3136,8 +3126,6 @@ function js_marshal(A: HTerm | null, out: boolean): string {
       const tk = Bend.name_key(t.k);
       const tags = cs.map((c) => Bend.name_key(c.k)).join(", ");
       body.push("switch (v.$) {", ...arms,
-        // TODO(#1105): a tag is the key the loading book gives its constructor,
-        // so it depends on the root file; make tags the same in every book
         `default: throw "bend: ${tk} has no tag " + v?.$ + " (its tags: ${
           tags}); a tag names its constructor as the"
         + " loading file sees it, which a later version will make the same"
@@ -3156,7 +3144,7 @@ function js_host(k: Name): string {
   const { n, live } = fun_of(k);
   const ps = live.map((_, i) => "a" + i);
   const xs = live.map(([, , A], i) => `${js_marshal(A, false)}(${ps[i]})`);
-  const ret = tele_fill(FL.book.tlds[k].T, Array(n).fill(DUMMY));
+  const ret = tele_fill(FL.tlds[k].T, Array(n).fill(DUMMY));
   const back = live.map(([, , A], i) =>
     `${js_marshal(A, true)}(${ps[i]});`);
   return `(${ps.join(", ")}) => { const r = ${js_marshal(ret, true)
@@ -3167,10 +3155,10 @@ function js_host(k: Name): string {
 // def a host can call.
 export function js_lib(book: Bend.Book, mod = false): string {
   FL = file_new(book, true);
-  const outs = !mod ? null : [...new Set(FL.book.order)].filter((k) => {
-    const t = FL.book.tlds[k];
+  const outs = !mod ? null : [...new Set(FL.order)].filter((k) => {
+    const t = FL.tlds[k];
     return done_live(t) && t.b !== true && t.x === 0
-      && io_base(FL.book, t.T) === null;
+      && io_base(FL, t.T) === null;
   });
   file_book(outs ?? ["main"]);
   const sc = scope_new();
@@ -3893,10 +3881,7 @@ INLINE Term term_keep(Env e, Term t, u32 k) {
 // two halves, both holding the same loc. A shared node's fields never change
 // either, so ctr_take copies them before it acquires.
 INLINE u64 term_peek(DEV u64* H, Term t) {
-  if (term_rfc(t)) {
-    return w64_load(&H[term_loc(t)]) >> 24;
-  }
-  return term_loc(t);
+  return term_rfc(t) ? w64_load(&H[term_loc(t)]) >> 24 : term_loc(t);
 }
 
 #define blk_shr(t) (BLK_SHR && term_rfc(t))
@@ -4007,15 +3992,12 @@ OUTLINE void span_fade(Env e, Term t, u64 src, u32 n) {
 
 INLINE u64 ctr_take(Env e, Term t, u32 n, THR Term* out) {
   DEV u64* H = e.mem;
-  if (!term_rfc(t)) {
-    for (u32 j = 0; j < n; j += 1) {
-      out[j] = H[term_loc(t) + j];
-    }
-    return term_loc(t);
-  }
   u64 src = term_peek(H, t);
   for (u32 j = 0; j < n; j += 1) {
     out[j] = H[src + j];
+  }
+  if (!term_rfc(t)) {
+    return src;
   }
   DEV u32* c = a32_at(H, term_loc(t));
   if ((a32_load(c) & RFC_CNT) == 1) {
@@ -4057,10 +4039,7 @@ INLINE DEV u32a* blk_ptr(DEV u64* H, u64 loc, u32 i) {
 }
 
 INLINE Term blk_read(DEV u64* H, bool arr, u64 loc, u32 i) {
-  if (arr) {
-    return H[loc + i];
-  }
-  return (u64)*blk_ptr(H, loc, i);
+  return arr ? H[loc + i] : (u64)*blk_ptr(H, loc, i);
 }
 
 INLINE void blk_write(DEV u64* H, bool arr, u64 loc, u32 i, Term v) {
