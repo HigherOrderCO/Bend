@@ -34,6 +34,8 @@ def intercept.at(op):
       do IO<U32>:
         u : Unit <- IO.print(m)
         return c
+    case Exit{c}:
+      IO.pure(U32, c)
 
 law intercept:
   IO(U32)
@@ -49,6 +51,7 @@ def decode(op):
   match op:
     case Emit{v}: U32.show(v)
     case Halt{c, m}: m
+    case Exit{c}: U32.show(c)
 
 law main:
   IO(U32)
