@@ -19,6 +19,12 @@ Each file registers the effect under its def with `io_eff(CID(Clock.now),
 serves `bend x.bend -o x.js` and `bend x.bend`. Every effect in Base is
 built this way: `bend2/effs/*.c` and `*.js` are the reference.
 
+On Linux, the audio pump retains partial device writes and retries recoverable
+errors. A zero write, failed recovery, or one second without progress stops
+the pump. The next `Audio.write` or `Audio.close` prints the stored error and
+exits with status 1. Both calls join the pump and release the device before they
+report that error. A full ring still drops the new producer chunk.
+
 ## The C side
 
 The compiler splices your `.c` into the program's C source after the
