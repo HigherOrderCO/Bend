@@ -6342,13 +6342,9 @@ function io_wait(io, block) {
   const due = (w) => w.at <= now || w.fd !== undefined
     && (code === 9 ? sys.fcntl(w.fd, 1, 0) < 0
       : set[at(w)] & 1 << (w.fd & 7));
-  const todo = [];
-  io.waits = io.waits.filter((w) => {
-    if (!due(w)) return true;
-    todo.push(w);
-    return false;
-  });
-  for (const w of todo) {
+  const todo = io.waits;
+  io.waits = todo.filter((w) => !due(w));
+  for (const w of todo.filter(due)) {
     const x = w.more();
     if (x !== undefined) {
       io_push(w.k, x, false);
