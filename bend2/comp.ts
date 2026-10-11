@@ -51,54 +51,9 @@ type HTerm = Bend.HTerm;
 
 type Name = Bend.Name;
 
-type File = {
-  book: Bend.Book;
-  js: boolean;
-  bangs: Set<Name>;
-  sites: Map<Name, number>;
-  hot: Set<Name>;
-  stat: Set<Name>;
-  own: Set<string>;
-  lend: Set<string>;
-  segs: Seg[];
-  spins: Seg[];
-  spun: Map<string, string>;
-  marsh: Map<string, string>;
-  clos: Set<string>;
-  tabs: Map<string, number>;
-  tails: Map<Name, Set<Name>>;
-  img: string[];
-  lits: Map<string, number>;
-  consts: Map<Lay, Map<HTerm, Val>>;
-  ids: Map<string, string>;
-  taken: Set<string>;
-  teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
-  srcs: Map<Name, Set<Name> | null>;
-  loops: Map<Name, Name[]>;
-  flats: Map<Name, boolean>;
-  funs: Map<Name, Fun>;
-  brws: Map<Name, boolean[]>;
-  nodes: Map<Name, Lay>;
-  lays: Map<string, Lay>;
-  lay_ids: Map<Lay, number>;
-  memo: {
-    opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
-    uses: Map<HTerm, Bend.PMap<number>>;
-    folds: Map<HTerm, HTerm | null>;
-    spines: Map<HTerm, Spine>;
-    steps: Map<HTerm, HTerm>;
-  };
-};
+type File = ReturnType<typeof file_new>;
 
-type Scope = {
-  seg: Seg;
-  fresh: Map<string, number>;
-  brwl: Map<string, string>;
-  spares: { words: number; name: string; z: boolean }[];
-  uses: Map<Of<"Var">, Bind>;
-  rest: HTerm[];
-  def: Name;
-};
+type Scope = ReturnType<typeof scope_new>;
 
 type Tpl = string | ((xs: string[]) => string);
 
@@ -226,8 +181,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     JS: "($0 >= 1 && $0 < 4294967296 ? Math.floor($0) : 0)",
   },
   f32_bits: { C: "$0", JS: "f32_bits($0)" },
-  f32_show: { C: "f32_show(e, $0)", JS: "f32_show($0)" },
-  f32_read: { C: "f32_read(e, $0)", JS: "f32_read($0)" },
+  ...tpl_ops("f32_", "show read", "f32_$o(e, $0)", "f32_$o($0)"),
   nat_add: { C: "nat_chk(e, $0 + $1)", JS: "nat_chk($0 + $1)" },
   nat_mul: { C: "nat_mul(e, $0, $1)", JS: "nat_chk($0 * $1)" },
   nat_double: { C: "nat_chk(e, $0 + $0)", JS: "nat_chk($0 + $0)" },
@@ -1042,9 +996,7 @@ function ctr_flds(k: Name, xs: HTerm[]): HTerm[] {
 }
 
 function src_add(k: Name): void {
-  if (!FL.srcs.has(k)) {
-    FL.srcs.set(k, null);
-  }
+  memo(FL.srcs, k, () => null);
 }
 
 function ctr_build(sc: Scope, k: Name, exprs: string[], stat = false): string {
@@ -1320,44 +1272,44 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // types once, its arguments at every instantiation. compile_book emits until
 // a pass changes no fact.
 
-function file_new(book: Bend.Book, js: boolean): File {
+function file_new(book: Bend.Book, js: boolean) {
   PROBES.length = 1;
   return {
     book,
     js,
-    bangs: new Set(),
-    sites: new Map(),
-    hot: new Set(),
-    stat: new Set(),
-    own: new Set(),
-    lend: new Set(),
-    segs: [],
-    spins: [],
-    spun: new Map(),
-    marsh: new Map(),
-    clos: new Set(),
-    tabs: new Map(),
-    tails: new Map(),
-    img: [],
-    lits: new Map(),
-    consts: new Map(),
-    ids: new Map(),
+    bangs: new Set<Name>(),
+    sites: new Map<Name, number>(),
+    hot: new Set<Name>(),
+    stat: new Set<Name>(),
+    own: new Set<string>(),
+    lend: new Set<string>(),
+    segs: [] as Seg[],
+    spins: [] as Seg[],
+    spun: new Map<string, string>(),
+    marsh: new Map<string, string>(),
+    clos: new Set<string>(),
+    tabs: new Map<string, number>(),
+    tails: new Map<Name, Set<Name>>(),
+    img: [] as string[],
+    lits: new Map<string, number>(),
+    consts: new Map<Lay, Map<HTerm, Val>>(),
+    ids: new Map<string, string>(),
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T".split(" ")),
-    teles: new Map(),
-    srcs: new Map(),
-    loops: new Map(),
-    flats: new Map(),
-    funs: new Map(),
-    brws: new Map(),
-    nodes: new Map(),
-    lays: new Map(),
-    lay_ids: new Map(),
+    teles: new Map<HTerm, { doms: Dom[]; ret: HTerm }>(),
+    srcs: new Map<Name, Set<Name> | null>(),
+    loops: new Map<Name, Name[]>(),
+    flats: new Map<Name, boolean>(),
+    funs: new Map<Name, Fun>(),
+    brws: new Map<Name, boolean[]>(),
+    nodes: new Map<Name, Lay>(),
+    lays: new Map<string, Lay>(),
+    lay_ids: new Map<Lay, number>(),
     memo: {
-      opens: new Map(),
-      uses: new Map(),
-      folds: new Map(),
-      spines: new Map(),
-      steps: new Map(),
+      opens: new Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
+      uses: new Map<HTerm, Bend.PMap<number>>(),
+      folds: new Map<HTerm, HTerm | null>(),
+      spines: new Map<HTerm, Spine>(),
+      steps: new Map<HTerm, HTerm>(),
     },
   };
 }
@@ -1365,15 +1317,15 @@ function file_new(book: Bend.Book, js: boolean): File {
 // A scope is where the emitter writes: its segment, its locals' names, the
 // bindings and spare nodes it holds, the def it is in. A nested arm, closure
 // or fork copies its scope; the book's facts and output live in FL.
-function scope_new(): Scope {
+function scope_new() {
   return {
     seg: seg_new("", BOX, []),
-    fresh: new Map(),
-    brwl: new Map(),
-    spares: [],
-    uses: new Map(),
-    rest: [],
-    def: "",
+    fresh: new Map<string, number>(),
+    brwl: new Map<string, string>(),
+    spares: [] as { words: number; name: string; z: boolean }[],
+    uses: new Map<Of<"Var">, Bind>(),
+    rest: [] as HTerm[],
+    def: "" as Name,
   };
 }
 
@@ -4286,11 +4238,8 @@ INLINE Term task_deliver(DEV u64* H, Term cont, u32 idx, THR Term* v, u32 n) {
 INLINE void task_deal(DEV u64* H, Term join, u32 base, u32 stride, TG u32* cur) {
   u64 loc = term_loc(join);
   u32 ar  = fid_arity((u32)term_aux(join));
-  u32 g   = 0;
-  if (stride == 0) {
-    u32 rem = (u32)H[loc + ar + 1];
-    g = a32_add(a32_at(H, H_CURSOR), rem);
-  }
+  u32 g   = stride != 0 ? 0
+    : a32_add(a32_at(H, H_CURSOR), (u32)H[loc + ar + 1]);
   for (u32 i = 0; i < ar; i += 1) {
     Term k = H[loc + i];
     if (term_tag(k) == TAG_TSK) {
@@ -4752,7 +4701,7 @@ static u32 pool_rows(Env e, DEV Term* stk) {
       u32 row = r / step * CUBE_T;
       for (u32 rg = row + r % step; rg < row + CUBE_T; rg += step) {
         u32 put0 = a32_load(ring_put(e.mem, rg));
-        while (*ring_get(e.mem, rg) != put0 && !err_seen(e.mem)) {
+        while (*ring_get(e.mem, rg) != put0) {
           monk_step(e, stk, rg, put0, rg, 0, NULL);
         }
       }
