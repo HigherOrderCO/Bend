@@ -282,7 +282,8 @@ try {
     && fs.statSync(BIN).ino === was);
   const upd = await bend(["update"]);
   check("bend update runs the installer again: " + upd.err, upd.code === 0
-    && upd.err.startsWith("curl -fsSL " + ORIGIN + "/install.sh | sh\n")
+    && upd.err.startsWith("s=$(curl -fsSL " + ORIGIN
+      + "/install.sh) && printf '%s\\n' \"$s\" | sh\n")
     && plain(upd.out).includes("Bend \u2588  " + ver) && fs.statSync(BIN).ino !== was);
   const guide = await bend(["guide"]);
   const base  = await bend(["base", "Map"]);

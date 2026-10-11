@@ -169,25 +169,11 @@ function cli_guide(name: string): void {
 // cli_update runs the installer again: the one way bend changes. The
 // command prints first, so the user can run it alone.
 function cli_update(): void {
-  const cmd = "curl -fsSL " + ORIGIN + "/install.sh | sh";
+  const cmd = "s=$(curl -fsSL " + ORIGIN
+    + "/install.sh) && printf '%s\\n' \"$s\" | sh";
   cli_say(2, cmd + "\n");
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bend-update-"));
-  const file = path.join(dir, "install.sh");
-  try {
-    process.exitCode = child.spawnSync("curl", ["-fsSL", ORIGIN + "/install.sh",
-      "-o", file], { stdio: "inherit" }).status ?? 1;
-    if (process.exitCode === 0) {
-      const fd = fs.openSync(file, "r");
-      try {
-        process.exitCode = child.spawnSync("sh", [],
-          { stdio: [fd, "inherit", "inherit"] }).status ?? 1;
-      } finally {
-        fs.closeSync(fd);
-      }
-    }
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
-  }
+  process.exitCode = child.spawnSync("sh", ["-c", cmd],
+    { stdio: "inherit" }).status ?? 1;
 }
 
 // check is the whole telemetry: once a day, a GET of /check?v=&os=&arch=
