@@ -3,12 +3,6 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
-## Unreleased
-
-- `IO.exit(code)` exits quietly with a code in 0..255. `IO.die` keeps its
-  message and newline; out-of-range codes now fail instead of wrapping (#1465).
-  An `IO(U32)` main's result is still ignored.
-
 ## 2.0.36 (2026-10-07)
 
 - **HOC's proving agent is now named BendAI**: `bend login` logs in to
