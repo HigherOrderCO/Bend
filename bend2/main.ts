@@ -484,6 +484,15 @@ function cli_base(what?: string): void {
 // cli_bundle builds a page. Bun skips inline module scripts (#1400), so the
 // inline plugin moves each to a virtual file beside its page, padded so an
 // error points at the page's own line and column.
+function is_inline_module(el: {
+  getAttribute(name: string): string | null;
+  hasAttribute(name: string): boolean;
+  canHaveContent: boolean;
+}): boolean {
+  return el.canHaveContent && !el.hasAttribute("src")
+    && el.getAttribute("type")?.trim().toLowerCase() === "module";
+}
+
 async function cli_bundle(page: string, dir: string): Promise<void> {
   const code = new Map<string, string>();
   const inline: BunPlugin = {
@@ -500,10 +509,11 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
         const marks: string[] = [];
         const marked = new HTMLRewriter().on("script", {
           element(el) {
-            const type = el.getAttribute("type")?.trim().toLowerCase();
-            if (type === "module" && !el.hasAttribute("src")) {
+            if (is_inline_module(el)) {
               let mark = "BEND_INLINE_START_" + marks.length + "_";
-              while (src.includes(mark)) mark += "_";
+              while (src.includes(mark)) {
+                mark += "_";
+              }
               marks.push(mark);
               el.prepend(mark);
             }
@@ -513,9 +523,8 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
         let mod: { id: string; text: string } | null = null;
         const html = new HTMLRewriter().on("script", {
           element(el) {
-            const type = el.getAttribute("type")?.trim().toLowerCase();
             mod = null;
-            if (type === "module" && !el.hasAttribute("src")) {
+            if (is_inline_module(el)) {
               const name = "." + path.basename(a.path) + ".bend-inline-"
                 + mods.length + ".js";
               mod = { id: path.join(path.dirname(a.path), name), text: "" };
