@@ -481,6 +481,12 @@ function cli_base(what?: string): void {
   cli_say(1, want.join("\n\n") + "\n");
 }
 
+// An inline module script; an empty svg <script/> can't have content.
+function is_inline_module(el: HTMLRewriterTypes.Element): boolean {
+  return el.canHaveContent && !el.hasAttribute("src")
+    && el.getAttribute("type")?.trim().toLowerCase() === "module";
+}
+
 // cli_bundle builds a page. Bun skips inline module scripts (#1400), so the
 // inline plugin moves each to a virtual file beside its page, padded so an
 // error points at the page's own line and column.
@@ -497,13 +503,25 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
         ({ contents: code.get(a.path)!, loader: "js" }));
       build.onLoad({ filter: /\.html$/ }, async (a) => {
         const src = await Bun.file(a.path).text();
+        // HTMLRewriter gives no offsets, so a first pass marks where each
+        // script's text starts, with a mark the page doesn't hold.
+        let mark = "BEND_INLINE_";
+        while (src.includes(mark)) {
+          mark += "_";
+        }
+        const marked = new HTMLRewriter().on("script", {
+          element(el) {
+            if (is_inline_module(el)) {
+              el.prepend(mark);
+            }
+          },
+        }).transform(src);
         const mods: { id: string; text: string }[] = [];
         let mod: { id: string; text: string } | null = null;
         const html = new HTMLRewriter().on("script", {
           element(el) {
-            const type = el.getAttribute("type")?.trim().toLowerCase();
             mod = null;
-            if (type === "module" && !el.hasAttribute("src")) {
+            if (is_inline_module(el)) {
               const name = "." + path.basename(a.path) + ".bend-inline-"
                 + mods.length + ".js";
               mod = { id: path.join(path.dirname(a.path), name), text: "" };
@@ -520,13 +538,13 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
         }).transform(src);
         let end = 0;
         let line = 0;
-        for (const m of mods) {
-          const at = src.indexOf(m.text, end);
+        for (const [i, m] of mods.entries()) {
+          const skip = i * mark.length;
+          const at = marked.indexOf(mark, end + skip) - skip;
           line += src.slice(end, at).split("\n").length - 1;
           const col = at - src.lastIndexOf("\n", at - 1) - 1;
           code.set(m.id, "\n".repeat(line) + " ".repeat(col) + m.text);
-          line += m.text.split("\n").length - 1;
-          end = at + m.text.length;
+          end = at;
         }
         return { contents: html, loader: "html" };
       });
