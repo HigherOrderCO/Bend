@@ -3,11 +3,6 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
-## Unreleased
-
-- Restore list-map conversion regression coverage: a closed template callback
-  reduces inside equality types, and the runtime consumes mapped values (#1490).
-
 ## 2.0.36 (2026-10-07)
 
 - **HOC's proving agent is now named BendAI**: `bend login` logs in to
