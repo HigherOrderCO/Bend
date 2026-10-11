@@ -1162,8 +1162,7 @@ function lits_cond(w: string, j: number, n: number): string {
   return j >= 32 ? `${w} == ${n}` : `(${w} & ${2 ** j - 1}) == ${n}`;
 }
 
-// An IO.OP match keeps its default arm: a request is none of its arms, so
-// it fail-stops, and a user's default arm ("_") takes only Emit and Halt.
+// An IO.OP default accepts its constructors, never a foreign request.
 function mat_ctrs(x: HTerm, adt: Of<"ADT">): [Name, HTerm][] {
   const { arms, end } = mat_arms(x);
   const io = adt.k === "IO.OP";
@@ -1174,7 +1173,7 @@ function mat_ctrs(x: HTerm, adt: Of<"ADT">): [Name, HTerm][] {
 }
 
 function mat_ops(eq: (k: Name) => string): string {
-  return ["Emit", "Halt"].map(eq).join(" || ");
+  return ["Emit", "Halt", "Exit"].map(eq).join(" || ");
 }
 
 // Fun
@@ -5889,9 +5888,11 @@ static void io_step(Env e, IoWork* a) {
     }
     Term fs[256];
     u32  n = cid_arity(c);
-    spare_free(e, cls_fit(n), ctr_take(e, req, n, fs));
-    if (c == CID(Halt)) {
-      io_errs(e, fs[1]);
+    if (term_tag(req) == TAG_PAK) fs[0] = term_loc(req);
+    else spare_free(e, cls_fit(n), ctr_take(e, req, n, fs));
+    if (c == CID(Halt) || c == CID(Exit)) {
+      if (c == CID(Halt)) io_errs(e, fs[1]);
+      if ((u32)fs[0] > 255) err_fail("exit code must be in 0..255");
       exit((int)(u32)fs[0]);
     }
     if (io_eff_rows[c] == NULL) {
@@ -6383,8 +6384,12 @@ function io_run(m) {
           io.live -= 1;
           break;
         }
-        if (op.$ === "Halt") {
-          io_errs(op.message);
+        if (op.$ === "Halt" || op.$ === "Exit") {
+          if (op.$ === "Halt") io_errs(op.message);
+          if (op.code > 255) {
+            io_errs("bend: exit code must be in 0..255");
+            return 1;
+          }
           return op.code;
         }
         const run = $0eff[op.$];
