@@ -112,6 +112,16 @@ F32 NaN payload bits are not preserved on the JS lane (#797, #872)
   dependent tag takes the two lanes down two arms, and the arm JS takes may
   duplicate an affine value (#872). The C lane is the reference there too.
 
+The BendTT kernel may exhaust a conversion's fuel (#1193, #1322)
+  Its evaluator unfolds Nat literals in unary and does not share repeated
+  subterms as bend2's checker does. A comparison around 3,000,000 or a
+  deeply shared graph can run out of fuel; combining computations in one
+  equality spends one conversion budget. This is a resource limit, not
+  evidence that the theory disagrees with bend2. --verdict reports the
+  kernel's reason and exits nonzero: the book has not been validated.
+  Keep large constants abstract, or prove smaller computations as separate
+  equality obligations and combine their results with a generic law.
+
 RUNTIME (the theory allows it, the runtime does not run it yet; we remove
 these over time; do not open an issue)
 

@@ -1538,14 +1538,19 @@ export function run_read(bin: string, args: string[],
 // the kernel's verdict on a book's text: ok on exit 0 with its exact
 // success line. It checks a copy in a fresh private dir, which no one
 // else can swap, and a kernel reading /dev/stdin got EBADF (1 in 1486)
-function kernel_check(text: string): boolean {
+function kernel_check(text: string): string | null {
   const env = { ...process.env, LEAN_STACK_SIZE_KB: "4194304" };
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bendtt-"));
   try {
     const inp = path.join(dir, "in.bendtt");
     fs.writeFileSync(inp, text, { flag: "wx" });
     const [got, out] = run_read(kernel_bin(), [inp], { env });
-    return got.status === 0 && out.trim() === "ALL PROOFS CHECK";
+    const why = out.trim();
+    if (got.status === 0 && why === "ALL PROOFS CHECK") {
+      return null;
+    }
+    return why.replace(/^SOME PROOFS FAIL\n?/, "") || got.error?.message
+      || "kernel ended with " + (got.signal ?? "exit " + got.status);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -1559,9 +1564,12 @@ export function safe_emit(book: Book, out: string): string[] {
   return got.oos.map(([k, why]) => "- " + B.name_key(k) + ": " + why + "\n");
 }
 
-// --verdict: whether every def of a book bend2 checked is in the kernel's
-// scope, and the kernel checks them all
-export function safe_check(book: Book): boolean {
+// --verdict: null only when every def is in scope and the kernel checks
+// them all; otherwise the elaborator's or kernel's reason, not a verdict
+// that mistakes exhausted conversion fuel for a theory disagreement
+export function safe_check(book: Book): string | null {
   const got = safe_book(book);
-  return got.oos.length === 0 && kernel_check(got.text);
+  return got.oos.length === 0 ? kernel_check(got.text)
+    : "out of scope:\n" + got.oos.map(([k, why]) =>
+      "- " + B.name_key(k) + ": " + why).join("\n");
 }

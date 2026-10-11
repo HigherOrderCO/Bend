@@ -84,11 +84,6 @@ const FAIL = "SOME PROOFS FAIL";
 
 const HINT = "Use --verdict for mathematical validity.";
 
-const MISMATCH = "Sorry - this is a mismatch between the TypeScript implementation,"
-  + " and the formalized BendTT kernel. Your proofs may or may not be correct, and"
-  + " we cannot validate them yet. This will be addressed in a future update."
-  + " Meanwhile, feel free to open an issue to report this bug.";
-
 // BendHub's terms; s18.4 makes MIT-0 the default license
 const TERMS = "https://bend-lang.com/bendai/terms#s18";
 
@@ -775,8 +770,8 @@ async function pow_mine(hash: string, bytes: number): Promise<number> {
 
 // cli_verdict prints the verdict on a book bend2 checked: PASS when no
 // def outside Base relies on unsafe or foreign code and, with the kernel,
-// when BendTT checks every def too; else FAIL and why. A kernel failure is
-// a mismatch: bend2 accepted what the kernel rejects.
+// when BendTT checks every def too; else FAIL and why. Kernel resource
+// limits and out-of-scope elaboration do not establish a theory mismatch.
 function cli_verdict(book: Bend.Book, kernel: boolean): number {
   const bad = book_promises(book);
   if (bad.length !== 0) {
@@ -785,8 +780,9 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
       + bad.map((k) => "- " + Bend.name_key(k) + "\n").join(""));
     return 1;
   }
-  if (kernel && !Safe.safe_check(book)) {
-    cli_say(2, FAIL + "\n" + MISMATCH + "\n");
+  const why = kernel ? Safe.safe_check(book) : null;
+  if (why !== null) {
+    cli_say(2, FAIL + "\nBendTT could not validate this book:\n" + why + "\n");
     return 1;
   }
   cli_say(1, PASS + "\n" + (kernel ? "" : HINT + "\n"));
