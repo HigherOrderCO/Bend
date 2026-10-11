@@ -325,6 +325,13 @@ try {
     const got = await bend_closed(args);
     check("a closed reader keeps success: " + args.join(" "), got.code === 0);
   }
+  fs.writeFileSync(checkup, "import ./bad.bend as Bad # must still fail\n");
+  fs.writeFileSync(good_checkup, "import ./sum.bend as Good # must still run\n");
+  const comment_bad = await bend([checkup, "--checkup"]);
+  const comment_good = await bend([good_checkup, "--checkup"]);
+  check("import comments preserve checkup rejection and execution",
+    comment_bad.code === 1 && comment_good.code === 0
+    && comment_good.out.endsWith("5n\n"));
   const two  = "import Base\ndef two() -> Nat:\n  2n\n";
   const use  = (at: string) => "import Base\nimport ./" + at
     + " as T\ndef main() -> Nat:\n  T.two\n";

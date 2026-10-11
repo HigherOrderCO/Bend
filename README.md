@@ -205,6 +205,8 @@ def add_zero(x):
 - Paper: [BendRT: A Parallel Runtime for CPUs and GPUs](paper/BendRT.pdf).
 - Formalization: [bendtt.lean](bend2/bendtt.lean), the kernel of `--verdict` and its proofs, in Lean.
 - Benches: [bench/](bench), every bench used to make the charts above.
+- Module smoke checks: `bend aggregation.bend --checkup` checks and runs
+  each aliased import independently, including lines with trailing `#` comments.
 - Formatter: [bend-fmt-lsp](tools/bend-fmt-lsp), a formatting-only Bend 2 language server.
 - Community language server: [bend2-lsp](https://github.com/don2e4/bend2-lsp), with formatting, diagnostics, and hover.
 - Community workshop: [Bend 2 pocket workshop](https://np.github.io/bend-workshop/), the checker and JS compiler in one HTML page, with goals and proof tools, phone first.
