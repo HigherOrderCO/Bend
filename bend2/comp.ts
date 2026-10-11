@@ -2788,6 +2788,7 @@ export function compile_book(book: Bend.Book): string {
     ...names.map((c) => Bend.book_fam(FL.book, c))]);
   const facts = () => FL.own.size + FL.hot.size + FL.stat.size;
   let was: number;
+  let pressure = 2 ** 31, emitted = 0;
   do {
     was = facts();
     [FL.lend, FL.spun, FL.clos, FL.tabs, FL.lits, FL.consts, FL.brws]
@@ -2798,6 +2799,12 @@ export function compile_book(book: Bend.Book): string {
     for (const [k, tld] of [...done_defs().reverse(),
       ...done_defs(def_foreign)]) {
       memo_gc();
+      // Collect on heap growth, not the host's total RAM budget.
+      if ((++emitted & 63) === 0 && typeof Bun !== "undefined" &&
+          process.memoryUsage().heapUsed > pressure) {
+        Bun.gc(true);
+        pressure = process.memoryUsage().heapUsed + 2 ** 31;
+      }
       const [dl, vals] = emit_open(scope_new(), k);
       FL.segs.push(dl.seg);
       if (def_foreign(tld)) {

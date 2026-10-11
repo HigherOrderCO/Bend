@@ -142,6 +142,9 @@ Hints:
 
 Bend works best on the back-end, on Linux or macOS.
 
+Bun's native code emitter samples heap use every 64 definitions and collects
+at 2 GiB, then after each 2 GiB of growth. Live compiler state is not capped.
+
 # Examples
 
 ### Syntax == Python + dependent types
