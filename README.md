@@ -20,6 +20,10 @@ Thanks to strong types, purity and linearity, Bend compiles to fast executables
 as fast as hand-written C (single-core), and even faster (on 10000s cores). The
 entire language runs on the GPU, with full memory unification.
 
+The C evaluator's shared call bank stays at 247 words. Wider segment
+arguments spill to its stack, so closure captures and fork joins can keep
+larger live sets without enlarging that bank.
+
 ## Bend checks FAST
 
 **Target:** outperform every proof assistant by several OOMs. **Status:**

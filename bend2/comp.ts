@@ -34,6 +34,7 @@ type Seg = {
   refs: Set<string>;
   spin?: boolean;
   fork?: boolean;
+  native?: boolean;
 };
 
 type Spine = {
@@ -117,13 +118,10 @@ type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 // Constants
 // =========
 
-// CLO_APPLY and IO_EMIT are the runtime's own segments, named with a ~
-// so that no file declares them. FOLD_FUEL caps the nodes that unfolds
-// add to a segment, so a literal-bounded loop does not unroll into its
-// caller. A spin of SPIN_FAR characters of C is a call on the device
-// (DFAR). WIDE is the widest flat layout or segment; a node past
-// it pads to its size class and keeps 240 plus log2 of it in CID_T. An
-// argument nested past TPL_DEEP brackets goes to a local (clang allows 256).
+// ~ reserves runtime segment names. FOLD_FUEL bounds unfolded nodes.
+// SPIN_FAR bounds inline C characters on device. WIDE caps layouts/bank;
+// excess live words spill. Wide CID_T entries encode 240+log2(size).
+// TPL_DEEP avoids clang's 256-bracket limit.
 
 const CLO_APPLY = "Clo~apply";
 
@@ -1520,11 +1518,10 @@ function spare_flush(sc: Scope): void {
 // Seg
 // ===
 
-// A segment enters by popping its frame and reading its
-// parameters from the frame slots, then from the bank (r0..).
+// Pop the frame and register spill before opening the parameters.
 
 function seg_new(name: string, ret: Lay, params: string[],
-  ks: Kind[] = params.map(() => "w64"), frame: Seg["frame"] = null): Seg {
+  ks: Kind[] = [], frame: Seg["frame"] = null): Seg {
   return { fid: name && seg_fid(name), def: name, ret, lines: [], params, ks,
     frame, refs: new Set() };
 }
@@ -1533,11 +1530,17 @@ function seg_fid(k: Name): string {
   return name_id("FID_", k);
 }
 
+function seg_reg(seg: Seg, i: number, offset = 0): string {
+  return !seg.native && i >= WIDE ? `STK(${offset + i - WIDE})` : `r${i}`;
+}
+
 function seg_take(seg: Seg): string[] {
   const { pop, at } = seg.frame ?? { pop: 0, at: [] };
-  return [...pop > 0 ? [`WL_POPN(${pop});`] : [], ...seg.params.map((p, i) =>
+  const drop = pop + (seg.native ? 0
+    : Math.max(0, seg.params.length - at.length - WIDE));
+  return [...drop > 0 ? [`WL_POPN(${drop});`] : [], ...seg.params.map((p, i) =>
     `${lay_c(seg.ks[i])} ${p} = ${i < at.length ? `STK(${at[i]})`
-      : `r${i - at.length}`};`)];
+      : seg_reg(seg, i - at.length, pop)};`)];
 }
 
 function seg_text(lines: string[], tab: number): string[] {
@@ -1572,9 +1575,9 @@ function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
     }
     return nw;
   }), b.val.lay));
-  const all = [...vals, res];
-  const seg = seg_new(name, ret, all.flatMap((v) => v.ws),
-    all.flatMap((v) => v.lay.ks), frame);
+  vals.push(res);
+  const seg = seg_new(name, ret, vals.flatMap((v) => v.ws),
+    vals.flatMap((v) => v.lay.ks), frame);
   FL.segs.push(seg);
   sc = { ...sc, seg, spares: [], uses: new Map() };
   live.forEach(([p, b], i) => bind_uses(sc, p, vals[i], rest, b.A, false));
@@ -2089,12 +2092,15 @@ function emit_jump(sc: Scope, args: string[], k: Name, bang?: boolean): void {
       file_push(sc, `return term_tsk(${fid}, ${
         emit_task(sc, fid, 0, args)});`));
   }
-  args.forEach((a, i) => file_push(sc, `r${i} = ${a};`));
+  const spill = sc.seg.native ? 0 : Math.max(0, args.length - WIDE);
+  if (spill) file_push(sc, `WL_ROOM(${spill})`);
+  args.forEach((a, i) => file_push(sc, `${seg_reg(sc.seg, i)} = ${a};`));
   if (sc.seg.def !== k) {
+    if (spill) file_push(sc, `WL_PUSHN(${spill});`);
     return file_push(sc, `WL_JMP(${seg_ref(sc, fid)});`);
   }
   sc.seg.spin = true;
-  sc.seg.params.forEach((p, i) => file_push(sc, `${p} = r${i};`));
+  sc.seg.params.forEach((p, i) => file_push(sc, `${p} = ${seg_reg(sc.seg, i)};`));
   file_push(sc, `WL_AGAIN(${sc.seg.fid});`);
 }
 
@@ -2210,6 +2216,7 @@ function emit_native(sc: Scope, k: Name, ers: HTerm[]): string {
     const [sl, vals] = emit_open(sc, k);
     const seg = sl.seg;
     seg.fid = name;
+    seg.native = true;
     const dst = val_new(seg.ret.ks.map((_, j) => `o[${j}]`), seg.ret);
     emit_body(sl, fun_of(k).h!, FL.book.tlds[k].T, ers, vals, dst);
     FUEL = fuel;
@@ -2771,11 +2778,9 @@ function effect_srcs(ext: string, miss: string): string[] {
 // C
 // -
 
-// A segment may fork if one it reaches does; Clo~apply reaches every
-// closure. The device holds what the bangs reach, and every closure when a
-// bang's parameter may hold one. One bank serves both lanes: rp pads the
-// host's twelfth slot, which keeps rax free for the tail call. WL_LOAD is a
-// ladder, as clang builds the phi cascade of a fallthrough switch in O(n^2).
+// The device holds bang-reachable segments and closure-taking bangs' closures.
+// rp frees rax for host musttail. WL_LOAD's ladder avoids clang's quadratic
+// phi cascade for a fallthrough switch.
 
 export function compile_book(book: Bend.Book): string {
   FL = file_new(book, false);
@@ -2845,7 +2850,8 @@ export function compile_book(book: Bend.Book): string {
   const forky = graph_close(new Set(FL.segs.filter((s) => s.fork)
     .map((s) => s.fid)), [...FL.segs, { fid: seg_fid(CLO_APPLY),
     refs: FL.clos }].flatMap((s) => [...s.refs].map((r) => [r, s.fid])));
-  if (entries.some((s) => s.params.length > WIDE)
+  if (entries.some((s) => s.params.length > WIDE &&
+      def_foreign(FL.book.tlds[s.def]))
     || [...cids.values()].some((n) => n > 255)) {
     die("an arity over " + WIDE);
   }
@@ -2856,9 +2862,9 @@ export function compile_book(book: Bend.Book): string {
   const resw = Math.max(...entries.map((s) => s.ret.ks.length));
   const n = Math.max(resw, ...entries.filter((s) => s.frame === null)
     .map((s) => s.params.length));
-  const rs = [...Array(n).keys()].map((i) => "r" + i);
+  const rs = [...Array(Math.min(n, WIDE)).keys()].map((i) => "r" + i);
   const ws = n > 6 ? [...rs.slice(0, 6), "rp", ...rs.slice(6)] : rs;
-  defs.push(`CONSTV u8 FID_T[][3] = { ${entries.map((s) =>
+  defs.push(`CONSTV struct { u32 arity; u8 resw, flags; } FID_T[] = { ${entries.map((s) =>
     `{ ${s.params.length}, ${s.frame === null ? 0
       : s.params.length - s.frame.at.length}, ${Number(FL.bangs.has(s.def))
       | Number(!forky.has(s.fid)) << 1} }`).join(", ")} };`,
@@ -2869,9 +2875,10 @@ export function compile_book(book: Bend.Book): string {
   `#define WL_BANK Term ${ws.join(", ")};`, "",
   `#define WL_LOAD(A, N) \\\n  do { \\\n${rs.map((r, i) =>
     `    if ((N) <= ${i}) break; ${r} = e.mem[(A) + ${i}]; \\\n`).join("")
-    }  } while (0);`, "",
+    }  } while (0);${n > WIDE ? ` \\\n  if ((N) > ${WIDE}) { \\\n    WL_ROOM((N) - ${WIDE}) \\\n    WL_ARGS((A) + ${WIDE}, (N) - ${WIDE} + 1) \\\n  }` : ""}`, "",
   `#define WL_LAST(X) \\\n  switch (war) { \\\n${rs.map((r, i) =>
-    `    case ${i}: ${r} = (X); \\\n      break; \\\n`).join("")}  }`, "",
+    `    case ${i}: ${r} = (X); \\\n      break; \\\n`).join("")}${n > WIDE
+    ? "    default: WL_ROOM(1) STK(0) = (X); WL_PUSHN(1); \\\n" : ""}  }`, "",
   `#define WL_SAVE(V) ${rs.slice(0, resw).map((r, j) =>
     `(V)[${j}] = ${r};`).join(" ")}`, "",
   `#define WL_TAKE(V) ${rs.slice(0, resw).map((r, j) =>
@@ -3588,10 +3595,10 @@ ${tabs}
 
 #define TAB_AT(T, S, I) T[S < I ? S : I]
 
-#define fid_arity(x) ((u32)FID_T[x][0])
-#define fid_resw(x)  ((u32)FID_T[x][1])
-#define fid_bangs(x) ((bool)(FID_T[x][2] & 1))
-#define fid_nofk(x)  ((bool)(FID_T[x][2] & 2))
+#define fid_arity(x) (FID_T[x].arity)
+#define fid_resw(x)  (FID_T[x].resw)
+#define fid_bangs(x) ((bool)(FID_T[x].flags & 1))
+#define fid_nofk(x)  ((bool)(FID_T[x].flags & 2))
 #define cid_arity(x) ((u32)CID_T[x][0])
 #define cid_hot(x)   ((bool)CID_T[x][1])
 
@@ -4365,8 +4372,7 @@ static Term work_loop(Env e, DEV Term* sp, Term t, u32 seq) {
 // Segments
 // ========
 
-// A task enters through its words: a continuation's results ride r0..
-// and its parameters the stack; any other segment's parameters ride r0..
+// Parameters: continuation frames, otherwise the bank plus its spill tail.
 
 ${segs}
 
