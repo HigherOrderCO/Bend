@@ -51,7 +51,7 @@ type HTerm = Bend.HTerm;
 
 type Name = Bend.Name;
 
-type File = {
+type File = ReturnType<typeof file_pass> & {
   book: Bend.Book;
   js: boolean;
   bangs: Set<Name>;
@@ -59,17 +59,8 @@ type File = {
   hot: Set<Name>;
   stat: Set<Name>;
   own: Set<string>;
-  lend: Set<string>;
-  segs: Seg[];
-  spins: Seg[];
-  spun: Map<string, string>;
   marsh: Map<string, string>;
-  clos: Set<string>;
-  tabs: Map<string, number>;
   tails: Map<Name, Set<Name>>;
-  img: string[];
-  lits: Map<string, number>;
-  consts: Map<Lay, Map<HTerm, Val>>;
   ids: Map<string, string>;
   taken: Set<string>;
   teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
@@ -77,7 +68,6 @@ type File = {
   loops: Map<Name, Name[]>;
   flats: Map<Name, boolean>;
   funs: Map<Name, Fun>;
-  brws: Map<Name, boolean[]>;
   nodes: Map<Name, Lay>;
   lays: Map<string, Lay>;
   lay_ids: Map<Lay, number>;
@@ -1320,6 +1310,15 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // types once, its arguments at every instantiation. compile_book emits until
 // a pass changes no fact.
 
+// What one emitting pass writes, cleared before the next one.
+function file_pass() {
+  return { lend: new Set<string>(), segs: [] as Seg[], spins: [] as Seg[],
+    spun: new Map<string, string>(), clos: new Set<string>(),
+    tabs: new Map<string, number>(), img: [] as string[],
+    lits: new Map<string, number>(), consts: new Map<Lay, Map<HTerm, Val>>(),
+    brws: new Map<Name, boolean[]>() };
+}
+
 function file_new(book: Bend.Book, js: boolean): File {
   PROBES.length = 1;
   return {
@@ -1330,17 +1329,9 @@ function file_new(book: Bend.Book, js: boolean): File {
     hot: new Set(),
     stat: new Set(),
     own: new Set(),
-    lend: new Set(),
-    segs: [],
-    spins: [],
-    spun: new Map(),
+    ...file_pass(),
     marsh: new Map(),
-    clos: new Set(),
-    tabs: new Map(),
     tails: new Map(),
-    img: [],
-    lits: new Map(),
-    consts: new Map(),
     ids: new Map(),
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T".split(" ")),
     teles: new Map(),
@@ -1348,7 +1339,6 @@ function file_new(book: Bend.Book, js: boolean): File {
     loops: new Map(),
     flats: new Map(),
     funs: new Map(),
-    brws: new Map(),
     nodes: new Map(),
     lays: new Map(),
     lay_ids: new Map(),
@@ -2789,11 +2779,7 @@ export function compile_book(book: Bend.Book): string {
   let was: number;
   do {
     was = facts();
-    [FL.lend, FL.spun, FL.clos, FL.tabs, FL.lits, FL.consts, FL.brws]
-      .forEach((m) => m.clear());
-    FL.segs = [];
-    FL.spins = [];
-    FL.img = [];
+    Object.assign(FL, file_pass());
     for (const [k, tld] of [...done_defs().reverse(),
       ...done_defs(def_foreign)]) {
       memo_gc();
