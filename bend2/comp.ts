@@ -1294,8 +1294,8 @@ function io_base(book: Bend.Book, t: HTerm): HTerm[] | null {
   return h.$ === "Ref" && h.k === "IO" ? xs : null;
 }
 
-export function io_type(book: Bend.Book): HTerm | null {
-  const main = book.tlds["main"];
+export function io_type(book: Bend.Book, entry = "main"): HTerm | null {
+  const main = book.tlds[entry];
   const xs = main?.$ === "Def" ? io_base(book, main.T) : null;
   if (xs && def_foreign(main)) {
     die("main must be a filled def: a foreign main cannot anchor IO");
@@ -1303,9 +1303,9 @@ export function io_type(book: Bend.Book): HTerm | null {
   return xs?.length === 1 ? xs[0] : null;
 }
 
-export function io_run(book: Bend.Book, args: string[]): number {
-  const src = `${js_lib(book)}\n${RUNTIME_MAIN}\ncli_args = ${
-    JSON.stringify(args)};\nreturn io_run(${js_sat("main")});`;
+export function io_run(book: Bend.Book, args: string[], entry = "main"): number {
+  const src = `${js_lib(book, false, entry)}\n${RUNTIME_MAIN}\ncli_args = ${
+    JSON.stringify(args)};\nreturn io_run(${js_sat(entry)});`;
   return new Function("require", src)(import.meta.require);
 }
 
@@ -3213,14 +3213,14 @@ function js_host(k: Name): string {
 
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
 // def a host can call.
-export function js_lib(book: Bend.Book, mod = false): string {
+export function js_lib(book: Bend.Book, mod = false, entry = "main"): string {
   FL = file_new(book, true);
   const outs = !mod ? null : [...new Set(FL.book.order)].filter((k) => {
     const t = FL.book.tlds[k];
     return done_live(t) && t.b !== true && t.x === 0
       && io_base(FL.book, t.T) === null;
   });
-  file_book(outs ?? ["main"]);
+  file_book(outs ?? [entry]);
   const sc = scope_new();
   for (const [k, def] of done_defs(fun_runs)) {
     memo_gc();

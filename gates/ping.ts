@@ -325,6 +325,26 @@ try {
     const got = await bend_closed(args);
     check("a closed reader keeps success: " + args.join(" "), got.code === 0);
   }
+  const checkup_files = {
+    "pure.bend": "import Base\ndef main() -> Nat:\n  5n\n",
+    "io.bend": "import Base\ndef main() -> IO(Unit):\n  IO.print(\"hub-io\")\n",
+  };
+  const checkup_pkg = pkg_hash(checkup_files);
+  const checkup_cache = path.join(TMP, "checkup-lib");
+  fs.mkdirSync(path.join(checkup_cache, checkup_pkg), { recursive: true });
+  fs.mkdirSync(path.join(checkup_cache, "names"));
+  for (const [name, text] of Object.entries(checkup_files)) {
+    fs.writeFileSync(path.join(checkup_cache, checkup_pkg, name), text);
+  }
+  fs.writeFileSync(path.join(checkup_cache, "names", "checkup@1.0.0.0"), checkup_pkg);
+  const checkup_hub = path.join(TMP, "checkup-hub.bend");
+  fs.writeFileSync(checkup_hub, "import " + checkup_pkg
+    + "/pure.bend as Pure\nimport checkup@1.0.0.0/io.bend as Effect\n");
+  const checkup_result = await bend([checkup_hub, "--checkup"],
+    { BEND_LIB: checkup_cache, BEND_NO_TELEMETRY: "1" });
+  check("hash and named hub checkups execute pure and effectful entries",
+    checkup_result.code === 0 && checkup_result.out.includes("\n5n\n")
+    && checkup_result.out.endsWith("hub-io\n"));
   const two  = "import Base\ndef two() -> Nat:\n  2n\n";
   const use  = (at: string) => "import Base\nimport ./" + at
     + " as T\ndef main() -> Nat:\n  T.two\n";

@@ -325,10 +325,15 @@ async function cli_file(args: string[]): Promise<void> {
   }
 }
 
-// cli_checkup checks and runs each import of the file alone (Base read
-// once, seeded into every module that imports it); one that fails fails it.
+// cli_checkup checks and runs imports independently, reusing checked Base
+// when the source is already available; one failure fails the command.
 async function cli_checkup(file: string): Promise<void> {
   const base = await book_read(BASE);
+  const lib = path.resolve(process.env.BEND_LIB
+    ?? path.join(os.homedir(), ".bend", "lib"));
+  const hub = /^0x[0-9a-f]+\//;
+  const plain = /^(\/|(\.\.\/)*)([A-Za-z_][\w-]*\/)*[A-Za-z_][\w-]*$/;
+  const hash = /^0x[0-9a-f]{32}$/;
   let bad = false;
   for (const raw of fs.readFileSync(file, "utf8").split("\n")) {
     const m = /^import\s+(\S+)\s+as\s+[A-Za-z_][A-Za-z0-9_]*\s*$/
@@ -336,13 +341,55 @@ async function cli_checkup(file: string): Promise<void> {
     if (m === null) {
       continue;
     }
-    const at = m[1].startsWith("/") ? m[1]
-      : path.join(path.dirname(file), m[1]);
     cli_say(1, "--- " + m[1] + " ---\n");
     let code = 1;
     try {
-      const own = /^import Base$/m.test(fs.readFileSync(at, "utf8"));
-      code = book_run(await book_read(at, own ? base : undefined), [at]);
+      let at = m[1];
+      const nv = /^([^/]*@[^/]*)\//.exec(at);
+      if (nv !== null) {
+        if (!Bend.NAMED.test(nv[1])) {
+          throw "Error: a package named <name>@<version>";
+        }
+        const cache = path.join(lib, "names", nv[1]);
+        let got = fs.existsSync(cache) ? fs.readFileSync(cache, "utf8").trim() : "";
+        if (!hash.test(got)) {
+          const res = await fetch(Bend.BEND_HUB + "/name/" + nv[1],
+            { signal: AbortSignal.timeout(30000) }).catch(() => null);
+          got = res?.ok ? (await res.text().catch(() => "")).trim() : "";
+          if (!hash.test(got)) {
+            throw "Error: no package named " + nv[1] + " on " + Bend.BEND_HUB;
+          }
+          fs.mkdirSync(path.dirname(cache), { recursive: true });
+          fs.writeFileSync(cache, got + "\n");
+        }
+        at = got + at.slice(nv[1].length);
+      }
+      let ns = "";
+      if (hub.test(at)) {
+        const rel = path.posix.normalize(at);
+        if (!at.endsWith(".bend") || !plain.test(at.replace(hub, "").slice(0, -5))
+          || !hub.test(rel) || !plain.test(rel.replace(hub, "").slice(0, -5))) {
+          throw "Error: a hub import of a .bend file in its package";
+        }
+        at = path.join(lib, rel);
+        ns = rel.slice(0, -5);
+        if (fs.existsSync(at)) {
+          at = fs.realpathSync(at);
+          ns = path.posix.relative(fs.realpathSync(lib), at).slice(0, -5);
+          if (!hub.test(ns) || !plain.test(ns.replace(hub, ""))) {
+            throw "Error: a hub file inside the library cache";
+          }
+        }
+      } else {
+        at = path.resolve(path.dirname(file), at);
+      }
+      const own = fs.existsSync(at) && /^import Base$/m.test(fs.readFileSync(at, "utf8"));
+      const book = await book_read(at, own ? base : undefined, new Map(), ns);
+      if (ns && path.posix.relative(fs.realpathSync(lib),
+        fs.realpathSync(at)).slice(0, -5) !== ns) {
+        throw "Error: a hub file inside the library cache";
+      }
+      code = book_run(book, [at], ns ? ns + ":main" : "main");
     } catch (e) {
       cli_say(2, book_err(e) + "\n");
     }
@@ -888,13 +935,13 @@ function cli_fail(msg: string): never {
 // ====
 
 async function book_read(file: string, base?: Bend.Book,
-  seen = new Map<string, string | null>()): Promise<Bend.Book> {
+  seen = new Map<string, string | null>(), ns = ""): Promise<Bend.Book> {
   const book = base === undefined ? Bend.book_nil() : book_seed(base);
   if (base !== undefined) {
     seen.set(BASE, "");
   }
   try {
-    await Bend.book_load(book, file, "", seen);
+    await Bend.book_load(book, file, ns, seen);
     const laws = path.join(path.dirname(file), "LAWS.bend");
     if (path.basename(file) === "PROOF.bend" && fs.existsSync(laws)
       && !seen.has(fs.realpathSync(laws))) {
@@ -929,19 +976,19 @@ function book_seed(base: Bend.Book): Bend.Book {
   return book;
 }
 
-function book_main(book: Bend.Book): Bend.Def | null {
-  const main = book.tlds["main"];
+function book_main(book: Bend.Book, entry = "main"): Bend.Def | null {
+  const main = book.tlds[entry];
   return main === undefined || main.$ !== "Def"
     || (main.v === null && main.i === undefined) ? null : main;
 }
 
-function book_run(book: Bend.Book, argv: string[]): number {
-  const main = book_main(book);
+function book_run(book: Bend.Book, argv: string[], entry = "main"): number {
+  const main = book_main(book, entry);
   if (main === null) {
     return cli_verdict(book, false);
   }
-  if (Comp.io_type(book) !== null) {
-    return Comp.io_run(book, argv);
+  if (Comp.io_type(book, entry) !== null) {
+    return Comp.io_run(book, argv, entry);
   }
   const snf = Bend.term_snf(book, main.v as Bend.HTerm);
   cli_say(1, Bend.term_show(Bend.term_lower(snf)) + "\n");
