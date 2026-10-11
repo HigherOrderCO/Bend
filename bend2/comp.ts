@@ -63,7 +63,6 @@ type File = {
   segs: Seg[];
   spins: Seg[];
   spun: Map<string, string>;
-  marsh: Map<string, string>;
   clos: Set<string>;
   tabs: Map<string, number>;
   tails: Map<Name, Set<Name>>;
@@ -470,14 +469,6 @@ function nat_chk(n) {
     throw "bend: ${ERRS[5]}";
   }
   return n;
-}
-
-function nat_host(n) {
-  const int = typeof n === "bigint" || Number.isInteger(n);
-  if (int && n >= 0 && n <= 2 ** 53) {
-    return Number(n);
-  }
-  return { [Symbol.toPrimitive]() { throw "bend: ${ERRS[5]}"; } };
 }
 
 function f32_show(x) {
@@ -1330,7 +1321,6 @@ function file_new(book: Bend.Book, js: boolean): File {
     segs: [],
     spins: [],
     spun: new Map(),
-    marsh: new Map(),
     clos: new Set(),
     tabs: new Map(),
     tails: new Map(),
@@ -3105,11 +3095,8 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   }
   block(sc, `function ${js_sat(k)}(${params.join(", ")}) {`, () => {
     if (def_foreign(def)) {
-      const doms = [...live, tele_unbind(def.T).doms.at(-1)!];
-      const xs = params.map((p, i) =>
-        `${js_marshal(doms[i][2], true)}(${p})`);
       return file_push(sc, `return { $: ${JSON.stringify(Bend.name_key(k))
-        }, args: [${xs.slice(0, -1).join(", ")}], kont: ${xs.at(-1)} };`);
+        }, args: [${params.slice(0, -1).join(", ")}], kont: ${params.at(-1)} };`);
     }
     if (loop.length === 0) {
       return js_func(sc, h!, def.T, params);
@@ -3133,78 +3120,6 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
-// A part with a converter of its own waits on one work stack, so no depth
-// grows the JS call stack; a Nat or function part converts on the spot.
-// Arrays stay in-place; ADT nodes are copied.
-function js_marshal(A: HTerm | null, out: boolean): string {
-  const t = ty_wnf(A);
-  if (t?.$ === "All") {
-    const y = js_marshal(t.B(DUMMY), out);
-    if (!quant_live(t.q)) {
-      return y;
-    }
-    const x = js_marshal(t.A, !out);
-    return x + y === "" ? y : `((f) => (x) => ${y}(f(${x}(x))))`;
-  }
-  const seen = new Set<Name>();
-  const nat = (u: HTerm | null): boolean => u?.$ === "All"
-    ? [u.A, u.B(DUMMY)].some((v) => ty_holds(v, nat, seen))
-    : u?.$ === "ADT" && u.k === "Nat";
-  if (t?.$ !== "ADT" || !ty_holds(t, nat, seen)) {
-    return "";
-  }
-  if (t.k === "Nat") {
-    return out ? "BigInt" : "nat_host";
-  }
-  const key = (out ? "out " : "in ") + Bend.term_key(Bend.term_lower(t));
-  return memo(FL.marsh, key, () => {
-    const name = "$0m" + FL.marsh.size;
-    FL.marsh.set(key, name);
-    const put = (f: string, a: string, i: string): string => f[0] === "$"
-      ? `q.push(${f}, ${a}, ${i});` : `${a}[${i}] = ${f}(${a}[${i}]);`;
-    const body: string[] = [];
-    if (t.k === "Array") {
-      const f = js_marshal(t.x[0], out);
-      if (f === "") return "";
-      body.push(`r = v; v.forEach((x, i) => { ${put(f, "v", "i")} });`);
-    } else {
-      const cs = (FL.book.tlds[t.k] as Bend.ADT).c;
-      const arms = cs.map((c) => {
-        const fs = ctr_live(c, t.x).flatMap(([, n, B]) => {
-          const f = js_marshal(B, out);
-          return f === "" ? [] : [put(f, "r", `"${n}"`)];
-        });
-        return [`case "${Bend.name_key(c.k)}": r = ${fs.length ? "{...v}"
-          : "v"};`, ...fs, "break;"].join(" ");
-      });
-      const tk = Bend.name_key(t.k);
-      const tags = cs.map((c) => Bend.name_key(c.k)).join(", ");
-      body.push("switch (v.$) {", ...arms,
-        `default: throw "bend: ${tk} has no tag " + v?.$ + " (its tags: ${
-          tags}); a tag names its constructor as the"
-        + " loading file sees it, which a later version will make the same"
-        + " everywhere (#1105)";`, "}");
-    }
-    FL.spins.push({ ...seg_new("", BOX, ["v"]), lines: [`function ${name}(v, q) {`,
-      "const own = q === undefined;", "if (own) q = [];", "let r;", ...body,
-      "if (own) while (q.length) {",
-      "const i = q.pop(), a = q.pop(); a[i] = q.pop()(a[i], q);",
-      "}", "return r;", "}", ""] });
-    return name;
-  });
-}
-
-function js_host(k: Name): string {
-  const { n, live } = fun_of(k);
-  const ps = live.map((_, i) => "a" + i);
-  const xs = live.map(([, , A], i) => `${js_marshal(A, false)}(${ps[i]})`);
-  const ret = tele_fill(FL.book.tlds[k].T, Array(n).fill(DUMMY));
-  const back = live.map(([, , A], i) =>
-    `${js_marshal(A, true)}(${ps[i]});`);
-  return `(${ps.join(", ")}) => { const r = ${js_marshal(ret, true)
-    }(run_loop(${js_sat(k)}(${xs.join(", ")}))); ${back.join(" ")} return r; }`;
-}
-
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
 // def a host can call.
 export function js_lib(book: Bend.Book, mod = false): string {
@@ -3223,7 +3138,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const effs = effect_srcs(".js", "a foreign def without a .js import: ")
     .map((t) => `(() => {\n${t}\n})();\n\n`).join("");
   const lib = outs === null ? "" : `export default {\n${outs.map((k) =>
-    `  ${js_key(Bend.name_key(k))}run_lib(${js_host(k)}, ${
+    `  ${js_key(Bend.name_key(k))}run_lib(${js_sat(k)}, ${
       fun_of(k).lays.length}),`).join("\n")}\n};\n`;
   const jmps = new Map<Name, boolean>();
   const jmp = (k: Name): boolean => k === CLO_APPLY || memo(jmps, k, () =>
@@ -6061,7 +5976,7 @@ function run_loop(r) {
 
 function run_lib(f, n) {
   return (...a) => a.length < n ? run_lib((...b) => f(...a, ...b), n - a.length)
-    : f(...a);
+    : run_loop(f(...a));
 }
 
 // Effect

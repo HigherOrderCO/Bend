@@ -80,7 +80,7 @@ allocate it in the run function and free it in `pack`. In `bend2/effs/`,
 The `.js` file is a plain script, run once in a closure of its own, that
 registers the effect: `io_eff(CID(Clock.now), clock_now)`. The effect
 takes the def's arguments as JS values: a `U32` is a number, a `Nat` a
-`BigInt`, a `String` a string, a constructor
+number, a `String` a string, a constructor
 `{$: CID(Name), field: value}`, a handle its host value (a descriptor).
 `CID(Name)` is the constructor's tag, read as on the C side. It returns
 the answer the same way: `io_done(v)`, `io_fail(code)`,

@@ -1,11 +1,11 @@
 function zero() {
-  return 0n;
+  return 0;
 }
 function five() {
-  return 5n;
+  return 5;
 }
 function neg() {
-  return -3n;
+  return -3;
 }
 
 io_eff(CID(zero), zero);
