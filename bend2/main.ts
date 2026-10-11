@@ -331,8 +331,15 @@ async function cli_checkup(file: string): Promise<void> {
   const base = await book_read(BASE);
   let bad = false;
   for (const raw of fs.readFileSync(file, "utf8").split("\n")) {
+    const line = raw.trim();
+    if (line === "" || line.startsWith("#")) {
+      continue;
+    }
+    if (!/^import(\s|$)/.test(line)) {
+      break;
+    }
     const m = /^import\s+(\S+)\s+as\s+[A-Za-z_][A-Za-z0-9_]*\s*$/
-      .exec(raw.trim());
+      .exec(line);
     if (m === null) {
       continue;
     }
