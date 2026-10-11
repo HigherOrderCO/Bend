@@ -283,7 +283,7 @@ async function cli_file(args: string[]): Promise<void> {
   if ((only || verdict) && (outs.length !== 0 || checkup || (only && verdict))) {
     cli_fail((verdict ? "--verdict" : "--check-only") + " takes no other option");
   }
-  if (argv.length !== 0 && (outs.length !== 0 || only || checkup || publish)) {
+  if (argv.length !== 0 && (outs.length !== 0 || only || verdict || checkup || publish)) {
     cli_fail("arguments go to a run: bend <file.bend> [args]");
   }
   if (checkup && outs.length !== 0) {

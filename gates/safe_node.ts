@@ -8,7 +8,8 @@ import * as fs from "node:fs";
 
 const files = fs.readFileSync(0, "utf8").split("\n").filter((l) => l !== "");
 const CAP = Number(process.env.CAP ?? 30) * 1000;
-const res: unknown[] = [];
+type Got = { f: string; code: number | null; ms: number; out: string };
+const res: Got[] = [];
 
 function one(f: string): Promise<void> {
   return new Promise((done) => {
@@ -44,4 +45,13 @@ await Promise.all(Array.from({ length: Number(process.env.PAR ?? 8) }, async () 
     await one(files[next++]);
   }
 }));
+const ok = res.find((g) => g.code === 0);
+if (ok !== undefined) {
+  const extra = child.spawnSync(process.execPath,
+    ["bend2/main.ts", ok.f, "--verdict", "argument"],
+    { env: process.env, encoding: "utf8", timeout: CAP });
+  if (extra.status !== 1) {
+    throw new Error("--verdict accepted program arguments: " + extra.stdout + extra.stderr);
+  }
+}
 process.stdout.write(JSON.stringify(res));

@@ -60,12 +60,12 @@ await node_pool(live, shards.map((fs_) => async (node: number) => {
   const script = "cd " + tag + " && BEND_LIB=" + tag + "/lib BENDTT=" + tag + "/bendtt PAR=" + PAR
     + " /usr/local/bun/bin/bun gates/safe_node.ts <<'EOF'\n" + fs_.join("\n") + "\nEOF\n";
   const got = await ssh(node, script, undefined, 120000);
+  if (got.code !== 0) {
+    throw new Error("node", { cause: got.err });
+  }
   try {
     gots.push(...JSON.parse(got.out));
   } catch {
-    if (got.code === 255) {
-      throw new Error("node", { cause: got.err });
-    }
     for (const f of fs_) {
       gots.push({ f, code: -1, ms: 0, out: "shard failed on " + node + ": " + got.err.slice(-300) });
     }
