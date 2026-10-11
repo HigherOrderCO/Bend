@@ -19,6 +19,7 @@ function bundle_inline() {
     put("repeated.html", '<!--\n<script type="module">\nconst x = ;\n'
       + '</script>\n-->\n<script type="module">\nconst x = ;\n</script>\n');
     put("multi.html", '<svg><script type="module"/></svg>\n'
+      + '<svg><script type="module"><![CDATA[\n]]></script></svg>\n'
       + '<!-- BEND_INLINE_START_0_ -->\n'
       + '<script type="module">\nconsole.log(1);\n</script>\n'
       + '<!--\nconst x = ;\n-->\n'
@@ -41,7 +42,7 @@ function bundle_inline() {
       return 4;
     }
     const multi = build("multi.html");
-    return multi.status === 1 && multi.stderr.includes("multi.html:10:11")
+    return multi.status === 1 && multi.stderr.includes("multi.html:12:11")
       ? 0 : 5;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
