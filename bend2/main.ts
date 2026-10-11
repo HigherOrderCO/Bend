@@ -312,9 +312,25 @@ async function cli_file(args: string[]): Promise<void> {
     }
     const ins = new Set([...seen.keys(), ...Object.values(book.tlds).flatMap((t) =>
       t.$ === "Def" && t.i !== undefined ? t.i.map(path_real) : [])]);
+    let ids: Set<string> | undefined;
     for (const out of outs) {
       const at = path_real(out);
-      if (ins.has(at) || (fs.existsSync(at) && fs.statSync(at).isDirectory())) {
+      const stat = fs.statSync(at, { bigint: true, throwIfNoEntry: false });
+      const dir = stat?.isDirectory();
+      let reads = ins.has(at);
+      if (stat !== undefined && !reads && !dir) {
+        if (ids === undefined) {
+          ids = new Set();
+          for (const input of ins) {
+            const file = fs.statSync(input, { bigint: true, throwIfNoEntry: false });
+            if (file !== undefined) {
+              ids.add(`${file.dev}:${file.ino}`);
+            }
+          }
+        }
+        reads = ids.has(`${stat.dev}:${stat.ino}`);
+      }
+      if (reads || dir) {
         cli_fail("-o " + out + " is a file the program reads, or a directory");
       }
       cli_emit(book, out);
