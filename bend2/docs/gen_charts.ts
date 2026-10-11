@@ -14,9 +14,12 @@
 // the same way (render the film after) and its comment names the
 // stamps. A checker timeout (>=300 s) is quoted as 300 and flagged
 // over. gen_gifs.ts imports the pin readers below: they are the one
-// source of every bar and figure.
+// source of every bar and figure. It also shares the GIF writer used
+// by gen_anim.ts and gen_gifs.ts.
 
+import * as child from "node:child_process";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 
 // Constants
@@ -176,6 +179,44 @@ function quote_film(runs: RunRow[], checks: CheckRow[]): void {
       .join(", ") + "];")
     .replace(/\(\d{4}-\d\d-\d\d, [0-9a-f]+\)/g, () => stamps.shift() ?? ""));
   say("wrote " + file);
+}
+
+// Gif
+// ===
+
+// the frames go to ffmpeg through a concat list, which keeps every
+// duration, so a frame that holds is one frame with a long delay
+export function gif_write<T>(name: string, cv: { width: number; height: number;
+  toBuffer: (t: "image/png") => Buffer }, draw: (t: T) => void,
+  shots: [T, number][]): { out: string; frames: number; bytes: number } {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), name + "-"));
+  const file = (i: number): string =>
+    path.join(dir, "f" + String(i).padStart(4, "0") + ".png");
+  let list = "ffconcat version 1.0\n";
+  shots.forEach(([t, d], i): void => {
+    draw(t);
+    fs.writeFileSync(file(i), cv.toBuffer("image/png"));
+    list += "file '" + file(i) + "'\nduration " + String(d) + "\n";
+  });
+  list += "file '" + file(shots.length - 1) + "'\n";
+  fs.writeFileSync(path.join(dir, "list.txt"), list);
+  const out = path.join(ROOT, "media", name + ".gif");
+  // one palette of 63 colours plus the transparent slot, no dither.
+  // A smaller palette makes a smaller file, but it drops the green of
+  // the speedups. A gif has 1-bit alpha: a pixel is opaque (alpha >= 128)
+  // or clear. Because every frame keeps clear pixels, ffmpeg disposes
+  // each one to the background, so the previous frame does not show
+  // through
+  const got = child.spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f",
+    "concat", "-safe", "0", "-i", path.join(dir, "list.txt"), "-vf",
+    "split[a][b];[a]palettegen=max_colors=63:reserve_transparent=1[p];"
+    + "[b][p]paletteuse=dither=none:alpha_threshold=128",
+    "-fps_mode", "vfr", "-loop", "0", out], { stdio: "inherit" });
+  if (got.status !== 0) {
+    throw new Error("ffmpeg failed on " + name);
+  }
+  fs.rmSync(dir, { recursive: true });
+  return { out, frames: shots.length, bytes: fs.statSync(out).size };
 }
 
 // Main

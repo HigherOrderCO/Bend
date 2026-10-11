@@ -32,7 +32,7 @@ def main(x, y):
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : a match on a parameter or field (this name is a def or a consumed binder: give the value its own def)
+#|- message  : 'x' can't be matched in this position (it is matched after a local statement or after a match on a later binder, it was already matched, or it is a def)
 #|Location:
 #|24 |     case T{}:
 #|25>|       match x:

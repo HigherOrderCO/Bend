@@ -7,10 +7,10 @@ import ./main.bend as Echo
 law echoes_data:
   for +c: Char
   for +t: String
-  {Echo.echo_step(Done{SCon{c, t}}) == Some{SCon{c, t}} : Maybe<String>}
+  {Echo.echo_step(Done{Some{SCon{c, t}}}) == Some{SCon{c, t}} : Maybe<String>}
 
-# LAW: a closed peer (an empty recv) or a failed recv ends the
-# connection: nothing is sent.
+# LAW: a closed peer (None) or a failed recv ends the connection:
+# nothing is sent.
 law closes_on_end:
   for e: U32 & String
-  {Echo.echo_step(Done{""}) == None{} : Maybe<String>} & {Echo.echo_step(Fail{e}) == None{} : Maybe<String>}
+  {Echo.echo_step(Done{None{}}) == None{} : Maybe<String>} & {Echo.echo_step(Fail{e}) == None{} : Maybe<String>}

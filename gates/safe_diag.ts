@@ -11,7 +11,7 @@ type T =
   | { $: "Lam"; q: Q; f: T; n: string } | { $: "App"; q: Q; f: T; x: T } | { $: "Sig"; q: Q; A: T; B: T }
   | { $: "Tup"; q: Q; a: T; b: T } | { $: "Prj"; h: T } | { $: "Enu" } | { $: "Lab"; k: string }
   | { $: "Mat"; k: string; h: T; m: T } | { $: "Efq" } | { $: "Eql"; a: T; b: T; T: T } | { $: "Rfl" }
-  | { $: "Rwt"; e: T; P: T; f: T };
+  | { $: "Rwt"; e: T; P: T; f: T } | { $: "Min"; a: T; b: T };
 
 let src = "";
 let pos = 0;
@@ -36,7 +36,7 @@ function term(vs: string[]): T {
     if (take("==")) { const b = term(vs); eat(":"); const T = term(vs); eat("}"); return { $: "Eql", a, b, T }; }
     eat(":"); const T = term(vs); eat("}"); return { $: "Ann", x: a, T };
   }
-  if (c === "*") { eat("*"); pos++; return { $: "Typ" }; }
+  if (c === "*") { eat("*"); if (src[pos] === "(") term(vs); else pos++; return { $: "Typ" }; }
   if (c === "!") { eat("!"); const q = quan(); const n = name(); eat("="); const v = term(vs); eat(";"); return { $: "Let", q, v, f: term([n, ...vs]), n }; }
   if (c === "∀" || c === "Σ") { pos++; const q = quan(); const n = name(); eat(":"); const A = term(vs); eat("->"); const B = term([n, ...vs]); return c === "∀" ? { $: "All", q, A, B } : { $: "Sig", q, A, B }; }
   if (c === "λ") {
@@ -54,6 +54,7 @@ function term(vs: string[]): T {
     if (take(")")) return { $: "Lab", k: "()" };
     const q = quan(); const a = term(vs);
     if (take(",")) return tup(vs, q, a);
+    if (take("<&>")) { const b = term(vs); eat(")"); return { $: "Min", a, b }; }
     let f = a;
     while (!take(")")) { const p = quan(); f = { $: "App", q: p, f, x: term(vs) }; }
     return f;
@@ -87,6 +88,7 @@ function uses(t: T, i: number): number {
     case "Prj": return uses(t.h, i);
     case "Mat": return uses(t.h, i) + uses(t.m, i);
     case "Rwt": return uses(t.e, i) + uses(t.f, i);
+    case "Min": return uses(t.a, i) + uses(t.b, i);
     default: return 0;
   }
 }
@@ -140,6 +142,7 @@ function lv(g: G, top: boolean, t: T): boolean {
     case "Prj": return lv(g, true, t.h);
     case "Mat": { const h = lv(g, true, t.h); const m = lv(g, true, t.m); return h && m; }
     case "Rwt": { const e = lv(g, true, t.e); const f = lv(g, true, t.f); return e && f; }
+    case "Min": { const a = lv(g, true, t.a); const b = lv(g, true, t.b); return a && b; }
     default: return true;
   }
 }

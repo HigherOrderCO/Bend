@@ -37,5 +37,5 @@ Term tcp_connect_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tcp_connect_use(void) {
-  io_eff(CID(TCP.connect), tcp_connect_run, 0);
+  io_eff(CID(TCP.connect), tcp_connect_run);
 }

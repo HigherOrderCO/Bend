@@ -3,6 +3,145 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
+## 2.0.36 (2026-10-07)
+
+- **HOC's proving agent is now named BendAI**: `bend login` logs in to
+  BendAI at bend-lang.com/bendai and writes its key to
+  `~/.bend/bendai.json`; a key an older bend wrote moves there at the next
+  `--publish <name>@…`, so it keeps working. The publish notice links
+  https://bend-lang.com/bendai/terms#s18, and the installer's card ends
+  "You're now a Bend developer." The old addresses redirect.
+- **Every channel and socket wait has a `try_` twin** with a limit in ms
+  that answers `Poll` (PR #1259 by nicolas-abril), and UDP gets the byte
+  twins TCP and File already have: `send_bytes_to`, `recv_bytes_from` and
+  their `try_` twins (PR #1359 by kbrianps).
+- **BendTT's kinds are quantity terms**, with meets, Σ at any kind and
+  subsumption under ∀, and `--verdict` emits a generic def once (PR #1203
+  by nicolas-abril); a λ+ converts as a λ (#1189, PR #1224 by
+  nicolas-abril).
+- **Faster checks**: a name lookup is one map read, not a scan of the book
+  (PR #1372); types never read, or already reduced, are not reduced again
+  (PR #1362); roots share their `~` constants, so a template goes to the
+  kernel once (PR #1358 by chelokot); n instances of a def take O(n log n)
+  characters of names, not O(n²) (PR #1350 by chelokot); a graph closure
+  is linear in the graph (PR #1298 by moorbrook).
+- **Fixes**:
+  - A value past 2^24-1 live copies fail-stops with its own message, and
+    WONTFIX names the cap (PR #1366 by nicolas-abril).
+  - A type under a rewrite stuck on an open proof is read as its body, and
+    a type the C facts can't read is a compile error (#1273, PR #1276 by
+    nicolas-abril).
+  - A constructor's fields compile with their declared types, so a Word
+    folded out of a U32 literal emits (#1100, PR #1361 by nicolas-abril);
+    datatypes of boxed constructors are registered (PR #1351 by
+    vicmcorrea); spare nodes stay apart across sum arms (PR #1279 by
+    jasisz); C emits right when a native effect calls back into Bend (PR
+    #1286 by mizchi).
+  - The work pass after a grow runs each lane's own ring (#925, PR #1132),
+    and on MSL 3.2+ `heap_free` reads the error flag with a coherent
+    volatile load (#1143, PR #1299 by nicolas-abril).
+  - `--verdict` checks what bend checks for a match carrying a later
+    variable (#1292, PR #1293 by aaaxn), respects Unit provenance and word
+    constructor families (PR #1338 by oxura), verifies the Lean version and
+    drops unversioned kernel caches (PR #1339 by oxura), and cleans up its
+    temporary input when the kernel build fails (PR #1327 by Osraka).
+  - Unsafe dependencies are tracked in datatype kinds (#1205, PR #1220 by
+    oxura).
+  - A nested match on a split value is refused with its name and where to
+    match it (#1125, PR #1290 by nicolas-abril); only a statement
+    `a[i] <- v` is the write let, so `Array.set(..);` in an inline match
+    keeps the next row (#1126, PR #1289 by nicolas-abril).
+  - `F32.read` skips leading whitespace (PR #1335 by vicmcorrea); the
+    formatter keeps unsafe declaration suffixes (PR #1296 by vicmcorrea).
+  - A CUDA probe failure names its stage and the Driver API error (PR
+    #1341 by oxura).
+
+## 2.0.35 (2026-10-03)
+
+- **M1 and M2 run the GPU again** (#1154, PR #1274 by nicolas-abril): since
+  2.0.29 Apple's compiler died building the GPU program of any program with
+  a `!` on M1 and M2 chips; M3 and M4 were never affected.
+- **A library's names stay its own** (#1045, #1124, #1184, PR #1156 by
+  nicolas-abril): a name the entry file declares as `lib.None` no longer
+  takes the key of `lib.bend`'s own `None`, so its foreign `CID(None)`
+  means the constructor its Bend code means, and C no longer takes the
+  wrong arm or frees into the wrong size class.
+- **Less memory on the CPU** (PRs #1171, #1269 by nicolas-abril): the host
+  grows fewer tasks up front and splits a drain into finer units, so
+  parallel tree-matmul peaks at 14.5 MB instead of 68.5 MB and kmeans at
+  10.8 MB instead of 22.9 MB, with every bench as fast or faster. A spin
+  called in a jump's argument frees the variable it was lent, so a loop
+  over a list no longer keeps the old list's cells (81.6 MB to 1.6 MB, PR
+  #1243 by mizchi). U32 `/` and `%` divide directly on the host and CUDA;
+  only Metal keeps its workaround (PR #1277 by nicolas-abril).
+- **Arrays of equality proofs** build in JS and C (#1130, PR #1219 by oxura).
+- **A deadline or a timer fires while computations keep the loop busy**
+  (#1122, PR #1245 by nicolas-abril): `IO.within` and `IO.sleep` no longer
+  wait for a channel pipeline to end.
+- **Fixes**:
+  - A chain of more than about 86 U32 or 130 F32 operators builds in C
+    (#1123, PR #1239 by nicolas-abril).
+  - `bend f.bend -o f.c` builds at `-O0` with clang 19 and later, for a
+    debug build (PR #1074 by aldeni).
+  - A type with deeply nested sums compiles without hundreds of MB (#1270,
+    PRs #1196 and #1244 by vicmcorrea).
+  - A template with many instances names them in linear time, not
+    quadratic (#1271, PR #1275 by nicolas-abril).
+  - `IO.random_u32` answers `Fail` on the JS lane, as on C, instead of
+    ending the run (#1146, PR #1198 by Yi-111-a).
+  - A match on a binder a constructor column closed says so and lists the
+    causes (#1134, PR #1226 by nicolas-abril).
+  - `bend ... | head` keeps the command's exit status when the reader
+    closes early (#1211, PR #1214 by oxura).
+  - `--verdict --publish` is refused instead of publishing unchecked
+    (#1191, PR #1199 by vicmcorrea).
+  - `--publish` drops a leading byte order mark, so a package whose LICENSE
+    was saved with one imports (PR #1188).
+  - `--verdict`: model search is bounded (#1181, PR #1218 by oxura);
+    recursive groups follow live references only (#1212, PR #1215 by
+    oxura); a dead fallback past the last constructor checks (#1204); an
+    empty datatype goes out with `D.efq : D -> <>` (#1183); a specialized
+    argument is elaborated at each use (#1168, #1178); a match inside a type
+    goes at the goals bend2 checked it at (#1157).
+
+## 2.0.34 (2026-09-28)
+
+- **A shared graph is compared once** (#1071, PR #1151 by Giulio2002):
+  when conversion proves two share cells equal, the second points at the
+  first, so a value used twice on each side is compared once, not walked
+  as a tree. Two Merkle roots of depth 32 over a symbolic leaf, proven
+  equal by `{==}`, check in 0.07 s (they took 2^32 steps). `--verdict`'s
+  kernel does not share yet and runs out of fuel on such a proof.
+
+## 2.0.33 (2026-09-28)
+
+- **Two copies of one term are equal before either unfolds** (#1071, PR
+  #1151 by Giulio2002): a conversion first compares both sides with no def
+  unfolded, then as before. A law proven by induction and used at a fixed
+  size, like `agree(32n, x)` against its written type, checks at once
+  instead of walking a shared chain as a tree of 2^32 steps.
+- **Base opens a value before it copies it**: `U32.min`/`max`, the `F32`
+  helpers, `Char.to_upper`/`to_lower`, `U32.div`/`mod` and `List.sort` match
+  their argument first, so a stuck argument stays one call (#1075).
+- **Base is smaller** (PR #1153 by nicolas-abril, from #1059 by
+  jnadeau207-collab), and `U32.log2` takes five native shifts instead of
+  thirty-two.
+- **Fixes**:
+  - `U32.to_nat` widens to u64 in C, so Nat arithmetic on a u32 local no
+    longer wraps at 2^32 (PR #1142 by Giulio2002).
+  - A shared Array's redirect is read without a race and without a device
+    atomic (PR #1155 by nicolas-abril).
+  - `TCP.recv`, `TCP.recv_bytes` and `TCP.poll` with a max of 0 fail with
+    EINVAL, not a closed peer's `""` (#1121, by aldeni).
+  - Emission does less work per word type and nullary constructor (#1056,
+    by jnadeau207-collab).
+  - `--verdict`: the kernel puts a λ argument into a type annotated with
+    its domain, so a `+` let of `Equal.cong` over a function checks (#1158).
+  - A pure main shows an Array element and a flat value of one type each
+    by its own layout (#1166).
+  - A `CID(k)` in an effect source's comment or string is left alone
+    (#1161, by aldeni).
+
 ## 2.0.32 (2026-09-27)
 
 - **One verdict: `ALL PROOFS CHECK` or `SOME PROOFS FAIL`**: `bend f.bend`
@@ -149,7 +288,7 @@ latest one; the GitHub release carries the same notes.
   (#1018): the executable was a Bun program built with Bun's defaults, so a
   project it checked could preload its own code before bend's (and print a
   forged `All terms check.`), or set `BEND_HUB`, `BEND_ORIGIN` or `BEND_LIB`
-  for you: your Bender key went to its server on `--publish <name>@…` and
+  for you: your BendAI key went to its server on `--publish <name>@…` and
   `bend link`, `bend update` ran its script, and its own copies of hub
   packages, named ones included, were checked in place of the real ones. The
   release is now built with that loading off (`package.json` and
@@ -160,7 +299,7 @@ latest one; the GitHub release carries the same notes.
   named exactly `LICENSE` beside a published file, at the same path, and the
   hash covers it. A package without one is MIT-0 under BendHub's terms, and
   the publish warns so. Every publish first prints, on stderr, that the hub is
-  public and permanent under https://bend-lang.com/bender/terms#s18, and the
+  public and permanent under https://bend-lang.com/bendai/terms#s18, and the
   license the hub will show: the `SPDX-License-Identifier` of the shallowest
   `LICENSE`, else `see <path>`. A directory named `license` in any case is
   refused before mining, since it clashes with a `LICENSE` on a disk that
@@ -188,7 +327,7 @@ latest one; the GitHub release carries the same notes.
   <file> --publish <name>@<version>` publishes and names in one run, after
   the hub confirms the name is yours or free and the version goes up; `bend
   link <name>@<version> 0x<hash>` names a package already published; `bend
-  login` logs in to Bender for both. A name is a-z, 0-9 and -, 12 to 64
+  login` logs in to BendAI for both. A name is a-z, 0-9 and -, 12 to 64
   characters; a version is four numbers like 1.0.0.0. The first:
   `import bend-tensors@0.0.0.1/bend_tensors.bend as T`.
 - **The effects guide calls `io_node` and `io_wait_on` as the runtime

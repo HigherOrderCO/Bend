@@ -28,7 +28,7 @@ def main():
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : a match on a parameter or field (this name is a def or a consumed binder: give the value its own def)
+#|- message  : 'a' can't be matched in this position (it is matched after a local statement or after a match on a later binder, it was already matched, or it is a def)
 #|Location:
 #|17 | def frame(b):
 #|18>|   match a : Bool = b, c : Bool = a:

@@ -11,5 +11,5 @@ Term io_print_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) io_print_use(void) {
-  io_eff(CID(IO.print), io_print_run, 0);
+  io_eff(CID(IO.print), io_print_run);
 }

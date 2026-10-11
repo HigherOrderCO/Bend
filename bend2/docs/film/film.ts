@@ -10,12 +10,10 @@ const TMP  = process.env.NERV_TMP ?? path.join(DIR, "../../../.tmp/film");
 const SONG = process.env.NERV_SONG ?? path.join(TMP, "song.m4a");
 const OUT  = process.env.NERV_OUT ?? path.join(TMP, "bend.mp4");
 const S    = Number(process.env.NERV_SCALE ?? 1);
-const W    = Math.round(1920 * S);
+const W    = Math.round(1440 * S);
 const H    = Math.round(1080 * S);
 const FPS  = 24;
 const END  = 89.6;
-// The 4:3 picture sits in the middle of the 16:9 frame, OX from its left.
-const OX = 240;
 const PARTS = Number(process.env.NERV_PARTS ?? 64);
 
 // Math
@@ -119,16 +117,13 @@ function paint(i: number, c: Col, a: number): void {
   buf[k + 2] += (c[2] - buf[k + 2]) * a;
 }
 
-// Fills the 4:3 picture.
+// Fills the picture.
 function fill(c: Col, a = 1): void {
-  const x0 = Math.round(OX * S), x1 = W - x0;
-  for (let y = 0; y < H; ++y) {
-    for (let x = x0; x < x1; ++x) paint(y * W + x, c, a);
-  }
+  for (let i = 0; i < W * H; ++i) paint(i, c, a);
 }
 
 function rect(x: number, y: number, w: number, h: number, c: Col, a = 1): void {
-  const x0 = Math.max(0, Math.round((x + OX) * S)), x1 = Math.min(W, Math.round((x + w + OX) * S));
+  const x0 = Math.max(0, Math.round(x * S)), x1 = Math.min(W, Math.round((x + w) * S));
   const y0 = Math.max(0, Math.round(y * S)), y1 = Math.min(H, Math.round((y + h) * S));
   for (let py = y0; py < y1; ++py) {
     for (let px = x0; px < x1; ++px) paint(py * W + px, c, a);
@@ -138,7 +133,7 @@ function rect(x: number, y: number, w: number, h: number, c: Col, a = 1): void {
 // A segment of width w, antialiased by its distance to each pixel.
 function line(x0: number, y0: number, x1: number, y1: number, w: number, c: Col, a = 1): void {
   if (a <= 0) return;
-  x0 = (x0 + OX) * S; y0 *= S; x1 = (x1 + OX) * S; y1 *= S; w *= S;
+  x0 *= S; y0 *= S; x1 *= S; y1 *= S; w *= S;
   const r  = w / 2 + 1;
   const bx = Math.max(0, Math.floor(Math.min(x0, x1) - r)), ex = Math.min(W - 1, Math.ceil(Math.max(x0, x1) + r));
   const by = Math.max(0, Math.floor(Math.min(y0, y1) - r)), ey = Math.min(H - 1, Math.ceil(Math.max(y0, y1) + r));
@@ -158,7 +153,7 @@ function line(x0: number, y0: number, x1: number, y1: number, w: number, c: Col,
 // the fraction f of a turn.
 function ring(cx: number, cy: number, r: number, w: number, c: Col, a = 1, f = 1): void {
   if (a <= 0 || f <= 0) return;
-  cx = (cx + OX) * S; cy *= S; r *= S; w *= S;
+  cx *= S; cy *= S; r *= S; w *= S;
   const e  = r + w / 2 + 1;
   const bx = Math.max(CLIP0, Math.floor(cx - e)), ex = Math.min(W - 1, CLIP1 - 1, Math.ceil(cx + e));
   const by = Math.max(0, Math.floor(cy - e)), ey = Math.min(H - 1, Math.ceil(cy + e));
@@ -175,7 +170,7 @@ function ring(cx: number, cy: number, r: number, w: number, c: Col, a = 1, f = 1
 
 function disc(cx: number, cy: number, r: number, c: Col, a = 1): void {
   if (a <= 0) return;
-  cx = (cx + OX) * S; cy *= S; r *= S;
+  cx *= S; cy *= S; r *= S;
   const bx = Math.max(CLIP0, Math.floor(cx - r - 1)), ex = Math.min(W - 1, CLIP1 - 1, Math.ceil(cx + r + 1));
   const by = Math.max(0, Math.floor(cy - r - 1)), ey = Math.min(H - 1, Math.ceil(cy + r + 1));
   for (let py = by; py <= ey; ++py) {
@@ -189,7 +184,7 @@ function disc(cx: number, cy: number, r: number, c: Col, a = 1): void {
 
 // A filled triangle, by the sign of its three edges.
 function tri(ax: number, ay: number, bx: number, by: number, cx: number, cy: number, c: Col, a = 1): void {
-  const xs = [ax, bx, cx].map(v => (v + OX) * S), ys = [ay, by, cy].map(v => v * S);
+  const xs = [ax, bx, cx].map(v => v * S), ys = [ay, by, cy].map(v => v * S);
   const x0 = Math.max(0, Math.floor(Math.min(...xs))), x1 = Math.min(W - 1, Math.ceil(Math.max(...xs)));
   const y0 = Math.max(0, Math.floor(Math.min(...ys))), y1 = Math.min(H - 1, Math.ceil(Math.max(...ys)));
   const side = (i: number, j: number, px: number, py: number) =>
@@ -255,10 +250,9 @@ function clouds(t: number, c0: Col, c1: Col, a: number, zoom: number, seed: numb
       g[y * gw + x] = smooth(fbm(u + t * 0.9, v + t * 0.25, seed) * 1.3 - 0.15);
     }
   }
-  const bx = Math.round(OX * S);
   for (let py = 0; py < H; ++py) {
     const gy = py / 8, y0 = Math.floor(gy), fy = gy - y0;
-    for (let px = bx; px < W - bx; ++px) {
+    for (let px = 0; px < W; ++px) {
       const gx = px / 8, x0 = Math.floor(gx), fx = gx - x0, k = y0 * gw + x0;
       const m  = lerp(lerp(g[k], g[k + 1], fx), lerp(g[k + gw], g[k + gw + 1], fx), fy);
       const i  = (py * W + px) * 3;
@@ -335,7 +329,7 @@ function blit(id: number, x: number, y: number, o: Blit = {}): void {
   const sp = SPRITES[id], c = o.c ?? CREAM, al = o.a ?? 1, z = o.z ?? 1;
   if (al <= 0) return;
   const w  = sp.w * z, h = sp.h * z;
-  const x0 = (x + OX) * S - (o.ax ?? 0) * w, y0 = y * S - (o.ay ?? 0) * h;
+  const x0 = x * S - (o.ax ?? 0) * w, y0 = y * S - (o.ay ?? 0) * h;
   const cut = x0 + w * clamp(o.show ?? 1);
   const bx = Math.max(0, Math.floor(x0)), ex = Math.min(W, Math.ceil(Math.min(x0 + w, cut)));
   const by = Math.max(0, Math.floor(y0)), ey = Math.min(H, Math.ceil(y0 + h));
@@ -642,14 +636,14 @@ type MandOpt = { k?: number; rows?: number; beam?: number; z?: number; a?: numbe
 
 function mandel(o: MandOpt): void {
   const al = o.a ?? 1, z = o.z ?? 1, k = o.k ?? 1, T = 1080 / k, cut = (o.rows ?? 1) * T;
-  const x0 = Math.round((MX + OX) * S), x1 = Math.round((1440 + OX) * S);
+  const x0 = Math.round(MX * S), x1 = Math.round(1440 * S);
   const glow = clamp(Math.log2(z) / 3), max = Math.round(200 + 150 * Math.log2(z)), size = 3 / (1080 * z);
   for (let py = 0; py < H; ++py) {
     const Y = (py + 0.5) / S;
     if (Y % T >= cut) continue;
     const ci = ((SEA[1] + (Y - SEA[1]) / z) / 1080 - 0.5) * 3;
     for (let px = x0; px < x1; ++px) {
-      const X = (px + 0.5) / S - OX, cr = -0.65 + ((SEA[0] + (X - SEA[0]) / z - MX) / 1080 - 0.5) * 3;
+      const X = (px + 0.5) / S, cr = -0.65 + ((SEA[0] + (X - SEA[0]) / z - MX) / 1080 - 0.5) * 3;
       let x = 0, y = 0, dx = 0, dy = 0, n = 0, r = 0;
       for (; n < max; ++n) {
         const t = 2 * (x * dx - y * dy) + 1;
@@ -801,7 +795,7 @@ function lwire(s: string | (Pt | string)[], v: Pt[][]): Pt[] {
 const L_FIELD = new Float32Array(W * H);
 function lstroke(pts: Pt[], w: number, c: Col, a: number, gr = 0, tw?: number[]): void {
   if (a <= 0 || pts.length < 2) return;
-  const q = pts.map(([x, y]) => [(x + OX) * S, y * S]), hw = w * S / 2, g = gr * S, e = hw + 1 + 2 * g;
+  const q = pts.map(([x, y]) => [x * S, y * S]), hw = w * S / 2, g = gr * S, e = hw + 1 + 2 * g;
   let x0 = W, y0 = H, x1 = 0, y1 = 0;
   for (const [x, y] of q) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
   x0 = Math.max(CLIP0, Math.floor(x0 - e)); x1 = Math.min(W - 1, CLIP1 - 1, Math.ceil(x1 + e));
@@ -921,7 +915,7 @@ const L_BURST: [number, Pt, number][] = [[0.19, L_C, 1], [0.4, L_D, 0.6], [0.4, 
 // A soft disc of light at (x, y): alpha a at the center, none at r.
 function lglow(x: number, y: number, r: number, c: Col, a: number): void {
   if (a <= 0 || r <= 0) return;
-  const cx = (x + OX) * S, cy = y * S, rr = r * S;
+  const cx = x * S, cy = y * S, rr = r * S;
   const x0 = Math.max(CLIP0, Math.floor(cx - rr)), x1 = Math.min(W - 1, CLIP1 - 1, Math.ceil(cx + rr));
   const y0 = Math.max(0, Math.floor(cy - rr)), y1 = Math.min(H - 1, Math.ceil(cy + rr));
   for (let py = y0; py <= y1; ++py) {
@@ -1088,7 +1082,7 @@ function game(o: GameOpt): void {
     if (fl > 0) line(cx - 14, cy + 30, cx - 14, lerp(cy + 30, cy - 32, smooth(fl / 0.6)), 3, CREAM, a);
     if (fl > 0.6) tri(cx - 14, cy - 32, cx + 26, cy - 20, cx - 14, cy - 8, RED, a * prog(fl, 0.6, 1));
   };
-  if (wr > 0) for (const dy of [-D, 0, D]) for (const dx of [-R, 0, R]) if (dx || dy) board(dx, dy, 0.28 * wr, 9);
+  if (wr > 0) for (const dy of [-D, 0, D]) for (const dx of [-R, 0, R]) if (dx || dy) board(dx, dy, 0.16 * wr, 9);
   board(0, 0, 1, o.b ?? 9);
   // The far walls are conjured: each flashes white and flares.
   FIXES.forEach(([x, y], i) => {
@@ -1096,8 +1090,7 @@ function game(o: GameOpt): void {
     if (dt > 0) rect(cx - h, cy - h, 2 * h, 2 * h, WHITE, 0.7 * (1 - prog(dt, 0.1, 0.35)));
     flare(dt, cx, cy, YEL, 50);
   });
-  // The open edges: thin chevrons, out at one side, in at the other; the
-  // torus named under the board.
+  // The open edges: thin chevrons, out at one side, in at the other.
   if (wr > 0) {
     for (let j = 0; j < 8; ++j) {
       const y = GY + (j + 0.5) * CELL;
@@ -1107,10 +1100,9 @@ function game(o: GameOpt): void {
       const x = GX + (i + 0.5) * CELL;
       for (const y of [GY + D + 5, GY - 15]) poly([[x - 9, y], [x, y + 10], [x + 9, y]], 1.5, ALARM, 0.6 * wr);
     }
-    label(T_TORUS, GX, GY + D + 34, TXT, 0.8 * wr);
   }
   // The flag, reached: its cell burns, rings flare on the beat, a red
-  // flash; the stamp YOU WON!? slams onto the board and throbs on each beat;
+  // flash; the stamp EXPLOIT slams onto the board and throbs on each beat;
   // the walk is named: a counterexample.
   const won = o.won ?? -1;
   if (won >= 0) {
@@ -1130,7 +1122,7 @@ function game(o: GameOpt): void {
     for (let i = 0; i + 1 < path.length; ++i) {
       const q = smooth(prog(k, i + 0.2, i + 0.6)), [cx, cy] = cell(path[i][0], path[i][1]);
       if (q > 0) for (const dy of wr > 0 ? [-D, 0, D] : [0]) for (const dx of wr > 0 ? [-R, 0, R] : [0]) {
-        disc(cx + dx, cy + dy, 2, WHITE, 0.55 * q * (dx || dy ? 0.28 * wr : 1));
+        disc(cx + dx, cy + dy, 3.2, WHITE, 0.7 * q * (dx || dy ? 0.16 * wr : 1));
       }
     }
   }
@@ -1142,7 +1134,7 @@ function game(o: GameOpt): void {
     for (const k of wr > 0 ? [-1, 0, 1] : [0]) {
       clip_x(GX + k * R, GX + (k + 1) * R, () => {
         for (const m of [-1, 0, 1]) for (const n of wr > 0 ? [-1, 0, 1] : [0]) {
-          ball(GX + (x + 0.5 + 12 * (k + m)) * CELL, y + n * D, 9, k === 0 && n === 0 ? 1 : 0.28 * wr);
+          ball(GX + (x + 0.5 + 12 * (k + m)) * CELL, y + n * D, 9, k === 0 && n === 0 ? 1 : 0.16 * wr);
         }
       });
     }
@@ -1273,7 +1265,7 @@ function gdot(x: number, y: number, r: number, c: Col, a = 1): void {
 
 // A soft round light: its alpha falls off as a bell of radius r.
 function sdot(x: number, y: number, r: number, c: Col, a = 1): void {
-  const e = 2.5 * r, cx = (x + OX) * S, cy = y * S, rs = r * S;
+  const e = 2.5 * r, cx = x * S, cy = y * S, rs = r * S;
   const bx = Math.max(0, Math.floor(cx - e * S)), ex = Math.min(W - 1, Math.ceil(cx + e * S));
   const by = Math.max(0, Math.floor(cy - e * S)), ey = Math.min(H - 1, Math.ceil(cy + e * S));
   for (let py = by; py <= ey; ++py) {
@@ -1492,6 +1484,21 @@ function split3d(q: number, lit: number, join: number, cam: number): void {
 }
 
 // logo figures
+
+// The eyes open on the red sea (o from 0 to 1): the light comes up in the
+// middle first and reaches the top and the bottom last, the lids curved,
+// so the frame dims by its distance d from the middle line.
+function lids(o: number): void {
+  if (o >= 1) return;
+  for (let py = 0; py < H; ++py) {
+    const dy = Math.abs(py / S - 540) / 540;
+    for (let px = 0; px < W; ++px) {
+      const dx = (px / S - 720) / 720, d = dy + 0.15 * dx * dx;
+      const b = smooth(clamp((1.8 * o - d) / 0.8)), k = (py * W + px) * 3;
+      buf[k] *= b; buf[k + 1] *= b; buf[k + 2] *= b;
+    }
+  }
+}
 
 // board figures
 
@@ -1739,29 +1746,35 @@ function refl(u: number): void {
   }
 }
 
-// Absurd, u seconds in, on the song's four hits (h: the frames at or just
-// before its onsets 50.34, 50.80, 51.27, 51.74, from a cut at 50.125): P
-// and ¬P slide together and collide on the first, and collapse into ⊥; on
-// each of the next three ⊥ pulses and a wave of absurd goals bursts out of
-// it: four with arrows, four more with arrows, eight at the rim.
-const ABS_H = [0.208, 0.667, 1.125, 1.583];
-const ABS_W: [number, number, number][][] = [
-  [-90, 0, 90, 180].map((d): [number, number, number] => [d, 480, 300]),
-  [-135, -45, 45, 135].map((d): [number, number, number] => [d, 480, 300]),
-  [-157.5, -112.5, -67.5, -22.5, 22.5, 67.5, 112.5, 157.5].map((d): [number, number, number] => [d, 600, 370]),
-];
+// Rewrite, u seconds in: by the equation e : a = b, the goal P(a) becomes
+// P(b): an arrow falls from e toward the a, the a lifts out, the b drops
+// in.
+function rewrite(u: number): void {
+  const w = (id: number) => SPRITES[id].w / S, sw = smooth(prog(u, 0.08, 0.24)), y = 560;
+  const x0 = 720 - (w(M_RW[1]) + w(M_RW[2]) + w(M_RW[4])) / 2, xa = x0 + w(M_RW[1]);
+  blit(M_RW[0], 720, 260, { c: GRNL, ax: 0.5, ay: 0.5 });
+  const top: Pt = [720, 320], end: Pt = [xa + w(M_RW[2]) / 2, 430], f = prog(u, 0, 0.1);
+  poly([top, end], 2.5, GRNL, 0.8 * (1 - prog(u, 0.22, 0.32)), f);
+  if (f > 0 && f < 1) spark(...along([top, end], f));
+  blit(M_RW[1], x0, y, { c: CREAM, ay: 0.5 });
+  blit(M_RW[2], xa, y - 70 * sw, { c: CREAM, ay: 0.5, a: 1 - sw });
+  blit(M_RW[3], xa, y + 70 * (1 - sw), { c: GRNL, ay: 0.5, a: sw });
+  blit(M_RW[4], xa + lerp(w(M_RW[2]), w(M_RW[3]), sw), y, { c: CREAM, ay: 0.5 });
+  aura(xa + w(M_RW[3]) / 2, y, 110, GRNL, 0.6 * prog(u, 0.2, 0.26) * (1 - prog(u, 0.26, 0.45)));
+  flares(u - 0.22, xa + w(M_RW[3]) / 2, y, GRNL, 120);
+}
+
+// Absurd, u seconds in, from its hit: P and ¬P slam together in a red
+// flash and burst; the contradiction collapses into ⊥.
 function absurd(u: number): void {
-  const cx = 720, cy = 450, red = hex(0xff453a), [h0] = ABS_H;
-  if (u < h0) {
-    const s = prog(u, 0, h0) ** 2;
-    blit(M_ABS[0], cx - 60 - 380 * (1 - s), cy, { c: CREAM, ax: 0.5, ay: 0.5 });
-    blit(M_ABS[1], cx + 60 + 380 * (1 - s), cy, { c: CREAM, ax: 0.5, ay: 0.5 });
+  const cx = 720, cy = 450, red = hex(0xff453a), p = clamp(u / 0.45);
+  if (u < 3 / 24) {
+    const s = u / (3 / 24);
+    blit(M_ABS[0], cx - 60 - 160 * (1 - s), cy, { c: CREAM, ax: 0.5, ay: 0.5, a: 1 - s });
+    blit(M_ABS[1], cx + 60 + 160 * (1 - s), cy, { c: CREAM, ax: 0.5, ay: 0.5, a: 1 - s });
   }
-  // The collision: a red flash, a burst, rays.
-  const dt = u - h0;
-  if (dt >= 0 && dt < 0.45) {
-    const p = dt / 0.45;
-    if (dt < 2 / 24) fill(red, 0.3);
+  if (u < 2 / 24) fill(red, 0.3);
+  if (p < 1) {
     aura(cx, cy, 80 + 200 * p, red, 0.9 * (1 - p));
     for (let k = 0; k < 12; ++k) {
       const a = (k + 0.5) * Math.PI / 6, r0 = 30 + 200 * p, r1 = 60 + 330 * (1 - (1 - p) ** 3);
@@ -1769,28 +1782,9 @@ function absurd(u: number): void {
     }
   }
   // ⊥, in two strokes.
-  poly([[cx, cy - 85], [cx, cy + 85]], 8, YEL, 1, prog(u, h0 + 0.05, h0 + 0.17));
-  poly([[cx - 110, cy + 85], [cx + 110, cy + 85]], 8, YEL, 1, prog(u, h0 + 0.13, h0 + 0.25));
-  aura(cx, cy, 160, YEL, 0.35 * prog(u, h0 + 0.1, h0 + 0.3));
-  // Each wave: ⊥ pulses on its hit, and its goals burst out; the inner
-  // ones ride arrows, the rim ones land with a spark.
-  ABS_W.forEach((wave, w) => {
-    const h = ABS_H[w + 1], d = u - h;
-    if (d < 0) return;
-    aura(cx, cy, 220, WHITE, 0.6 * (1 - prog(d, 0, 0.3)));
-    flares(d, cx, cy, YEL, 200);
-    wave.forEach(([deg, rx, ry], i) => {
-      const a = deg * Math.PI / 180, ux = Math.cos(a), uy = Math.sin(a), ex = cx + rx * ux, ey = cy + ry * uy;
-      const p = 1 - (1 - prog(d, 0, 0.16)) ** 3, o = prog(d, 0.08, 0.18);
-      if (w < 2) {
-        const sx = cx + 150 * ux, sy = cy + 130 * uy, tx = lerp(sx, ex, 0.55 * p), ty = lerp(sy, ey, 0.55 * p);
-        line(sx, sy, tx, ty, 2.5, CREAM, 0.8);
-        for (const sg of [1, -1]) line(tx, ty, tx - 22 * ux + sg * 12 * uy, ty - 22 * uy - sg * 12 * ux, 2.5, CREAM, 0.8);
-      }
-      blit(M_ABSW[w][i], ex, ey, { c: YEL, ax: 0.5, ay: 0.5, a: (w < 2 ? 1 : 0.8) * o });
-      if (o < 1) spark(lerp(cx, ex, p), lerp(cy, ey, p), 1 - o);
-    });
-  });
+  poly([[cx, cy - 85], [cx, cy + 85]], 8, YEL, 1, prog(u, 0.05, 0.15));
+  poly([[cx - 110, cy + 85], [cx + 110, cy + 85]], 8, YEL, 1, prog(u, 0.12, 0.22));
+  aura(cx, cy, 160, YEL, 0.35 * prog(u, 0.1, 0.3));
 }
 
 // par figures
@@ -1807,7 +1801,7 @@ function hexagon(x: number, y: number, r: number, w: number, c: Col, a = 1, f = 
 // A filled pointy-top hexagon, antialiased by its distance to each pixel.
 function hexfill(x: number, y: number, r: number, c: Col, a = 1): void {
   if (a <= 0) return;
-  x = (x + OX) * S; y *= S; r *= S;
+  x *= S; y *= S; r *= S;
   const ap = r * Math.sqrt(3) / 2;
   const bx = Math.max(0, Math.floor(x - ap - 1)), ex = Math.min(W - 1, Math.ceil(x + ap + 1));
   const by = Math.max(0, Math.floor(y - r - 1)), ey = Math.min(H - 1, Math.ceil(y + r + 1));
@@ -1904,7 +1898,7 @@ function splits(f: number, a: number): void {
 // The menu's readout (the clock, the zoom): s glyph by glyph on a fixed
 // pitch, its baseline at y.
 function readout(s: string, y: number, c: Col): void {
-  [...s].forEach((g, k) => { if (g !== " ") blit(T_DIG["0123456789.s×".indexOf(g)], 50 + k * 40 + 20, y, { c, ax: 0.5, ay: 1 }); });
+  [...s].forEach((g, k) => { if (g !== " ") blit(T_DIG["0123456789.s".indexOf(g)], 50 + k * 40 + 20, y, { c, ax: 0.5, ay: 1 }); });
 }
 
 // net figures
@@ -2150,30 +2144,27 @@ const T_POW2    = mono("pow2!(20n)", 40, 0.1);
 // board sprites
 const T_LAW     = mono("LAW: the flag is unreachable", 54, 0.06);
 const T_LAWW    = mono("LAW:", 54, 0.06);
-const T_TORUS   = mono("12×8 torus", 36, 0.1);
 const T_MOVES   = mono("∀ moves. ¬won", 40, 0.06);
 const T_CEX     = mono("counterexample", 36, 0.1);
 // A red rubber stamp, askew.
-const C_STAMP   = sprite(`#rotate(-12deg, reflow: true, box(stroke: 8pt + white, radius: 8pt, inset: (x: 30pt, y: 18pt), text(font: "Superclarendon", weight: "bold", size: 96pt, "YOU WON!?")))`);
+const C_STAMP   = sprite(`#rotate(-12deg, reflow: true, box(stroke: 8pt + white, radius: 8pt, inset: (x: 30pt, y: 18pt), text(font: "Superclarendon", weight: "bold", size: 96pt, "EXPLOIT")))`);
 
 // proof sprites
-const T_ASK     = [mono("Which laws must hold", 64), mono("for every input", 64), mono("in order to trust", 64), mono("code no one reads?", 64)];
-const T_NAME    = ["induction", "case analysis", "reflexivity", "absurd"].map(w => mono(w, 72, 0.25));
+const T_ASK     = [mono("Which laws must", 64), mono("always hold", 64), mono("in order to trust", 64), mono("code no one reads?", 64)];
+const T_NAME    = ["induction", "case analysis", "reflexivity", "rewrite", "absurd"].map(w => mono(w, 72, 0.25));
 const T_CASE    = [mono("case 0n", 50, 0.1), mono("case 1n+p", 50, 0.1)];
 const T_REFL    = mono("{==}", 84, 0.1);
 const M_NUM     = ["0", "1", "2", "3", "4", "5", "⋯", "∞"].map(s => math(s, s === "⋯" ? 90 : 52));
 const M_GOAL    = math("n", 150);
 const M_CASE    = [math("0", 130), math("1 + n", 130)];
 const M_ABS     = [math("P", 130), math("¬P", 130)];
-const M_ABSW    = [["0 = 1", "A → B", "x < x", "∀n. P(n)"], ["Q", "¬Q", "1 = 2", "n < 0"],
-  ["2 + 2 = 5", "x ≠ x", "P ∧ ¬P", "1 > 2", "¬A", "B", "0 = 2", "n ≠ n"]].map((w, i) => w.map(s => math(s, i < 2 ? 64 : 52)));
+const M_RW      = [math("e : a = b", 100), math("P(", 180), math("a", 180), math("b", 180), math(")", 180)];
 
 // par sprites
 const T_BADGE   = ["1", "2", "3", "4"].map(d => clar(d, 150));
 const T_BWORD   = ["affine", "dependent", "total", "parallel"].map(w => mono(w, 84, 0.3));
-const T_WHO     = ["C", "1 thread", "Bend", "GPU"].map(w => mono(w, 44, 0.2));
-const T_DIG     = [..."0123456789.s×"].map(g => mono(g, 56, 0));
-const T_JAR     = ["row by row", "fork-join", "every pixel", "zoom"].map(w => mono(w, 32, 0.12));
+const T_LANG    = ["C", "Bend"].map(w => mono(w, 120, 0));
+const T_DIG     = [..."0123456789.s"].map(g => mono(g, 56, 0));
 const C_66      = flash("66×", 420, "", 900);
 const C_PAR     = flash("PARALLEL", 300);
 const C_EVERY   = flash("EVERY CORE", 300);
@@ -2237,15 +2228,19 @@ const CUTS: Cut[] = [
     logo({ z, c: GOLD, fc: hex(0xff9030), fill: 0.3 * pen, w, glow: 3 * w, a: al, nodes: pen, pen, loop: Math.max(0, u - 1.2) / 3.2 });
     blit(S_KIKAKU, 720, 420, { c: WHITE, ax: 0.5, a: at(u, 0.6, 0.9) * (1 - at(u, 4.0, 4.5)) });
     blit(S_HOC, 720, 500, { c: WHITE, ax: 0.5, a: at(u, 0.6, 0.9) * (1 - at(u, 4.0, 4.5)) });
+    lids(prog(u, 0, 1.2));
   } },
   // ==== net 6.5-13.68: the blue sea, the net of 2 2 ====
-  // Red turns blue under the rays; the net of 2 2 opens like a tree.
+  // Red turns blue under the rays; the net of 2 2 opens like a tree. The
+  // red sea goes on where it left off (T, its clock) as the blue comes in.
   { t: 6.5, draw: u => {
-    const b = at(u, 0, 1.0);
-    clouds(u * 0.3, hex(0x2a0402), hex(0xff2a0a), 1 - b, 340, 21);
+    const b = at(u, 0, 1.2), T = u + 4.66;
+    clouds(T * 0.3, hex(0x2a0402), hex(0xff2a0a), 1 - b, 340, 21);
+    clouds(T * 0.2, hex(0x100000), hex(0xa01006), 0.35 * (1 - b), 110, 23);
+    stars(T, 120, 30, 0.5 * (1 - b));
     clouds(u * 0.2, hex(0x020a30), hex(0x2a60e0), b, 300, 25);
     streaks(u, 170, b);
-    rays(720, -300, 260, 200, 1400, hex(0xc8d8ff), 0.35 * (1 - at(u, 3.0, 3.5)), 100, 0.3, Math.PI - 0.3);
+    rays(720, -300, 260, 200, 1400, hex(0xc8d8ff), 0.35 * b * (1 - at(u, 3.0, 3.5)), 100, 0.3, Math.PI - 0.3);
     // Five parallel rounds, two beats apart: each round's pairs flare
     // together on a beat (7.371 + 0.935 r, the verse grid run backward).
     const k = clamp((u - 1.432) / 0.935, 0, 5), sky = hex(0xe0ecff), blob = at(u, 4.3, 4.9);
@@ -2280,7 +2275,7 @@ const CUTS: Cut[] = [
         tri(v[0][0], v[0][1], v[1][0], v[1][1], v[2][0], v[2][1], BLACK, 0.9);
       }
     }
-    blit(S_BEND, 720, 540, { c: hex(0x303030), ax: 0.5, ay: 0.5, a: at(u, 1.0, 1.5) });
+    blit(S_BEND, 720, 470, { c: hex(0x303030), ax: 0.5, ay: 0.5, a: at(u, 1.0, 1.5) });
   } },
   // The title in three parts: the name; the katakana, blue then burning
   // orange through white heat; the kanji over it; a ring; a cross of light.
@@ -2341,7 +2336,7 @@ const CUTS: Cut[] = [
   { t: 28.404, card: true, draw: u => hit(C_LAW, u) },
   // The law, typed; the board wraps (its copies tile around it); the player
   // leaves by the east edge, comes in by the west, reaches the flag: the
-  // law broken, stamped YOU WON!?.
+  // law broken, stamped EXPLOIT.
   { t: 28.872, draw: (u, t) => {
     const k = (t - gbeat(-17.5)) / HB;
     game({ me: walk(P_WRAP, k), wrap: at(u, 0.1, 0.35), won: t - gbeat(-13), trail: [P_WRAP, k] });
@@ -2371,18 +2366,18 @@ const CUTS: Cut[] = [
       for (const [px, py] of v) line(px, py, px + (px - x) * 0.45, py + (py - y) * 0.45, 4, WHITE, 1);
     }
   } },
-  // Induction: the chain draws, the base lights on a beat, the light runs
-  // to the end; the word comes on the beat after, when the chain is done.
+  // Induction, at half speed: the chain draws, the base lights on a beat,
+  // the light runs a node per beat to ∞; the word comes on the beat after.
   { t: 43.829, draw: u => {
-    induct(u);
-    tac_name(T_NAME[0], u - 2.804, YEL);
+    induct(u / 2);
+    tac_name(T_NAME[0], u - 5.608, YEL);
   } },
-  // The tactics, a hard cut on a beat each, their names at once.
-  { t: 47.569, draw: u => { cases(u); tac_name(T_NAME[1], u, CYAN); } },
-  { t: 48.971, draw: u => { refl(u); tac_name(T_NAME[2], u, LAV); } },
-  // Absurd comes half a beat early, calm and dark (no flash), so that P and
-  // ¬P slide in and collide on the song's hit.
-  { t: 50.125, draw: u => { absurd(u); tac_name(T_NAME[3], u, ORANGE, false); } },
+  // The tactics, one per hit of the song (the frames at or just before its
+  // onsets 50.34, 50.80, 51.27, 51.74), each caught near its end.
+  { t: 50.333, draw: u => { cases(0.6 + 1.3 * u); tac_name(T_NAME[1], u, CYAN); } },
+  { t: 50.791, draw: u => { refl(0.5 + 1.5 * u); tac_name(T_NAME[2], u, LAV); } },
+  { t: 51.25, draw: u => { rewrite(u); tac_name(T_NAME[3], u, GRNL); } },
+  { t: 51.708, draw: u => { absurd(u); tac_name(T_NAME[4], u, ORANGE, false); } },
   // ==== gpu 52.09-57.76: the bitonic sort ====
   // The sort: the fork tree grows over the wires (ochre); the stages fire
   // (blue).
@@ -2420,9 +2415,8 @@ const CUTS: Cut[] = [
   { t: 63.5, draw: u => {
     const s = u * 0.815;
     mandel({ rows: s / 3.75, beam: (u * 7.3) % 1 });
-    caps(T_WHO.slice(0, 2), 50, 70, 64, [0, 0], u);
+    blit(T_LANG[0], 50, 60, { c: TXT });
     readout(s.toFixed(3) + " s", 306, TXT);
-    blit(T_JAR[0], 50, 360, { c: TXT });
   } },
   // The chorus. The GPU, in frames: the square forks into 64 tasks, and
   // each draws its own rows, all at once (0-7); the clock stops at 0.057 s,
@@ -2437,10 +2431,8 @@ const CUTS: Cut[] = [
     // The menu column, over the shock.
     rect(0, 0, MX, 1080, BG, 0.94);
     line(MX, 0, MX, 1080, 2, LINE, 0.22);
-    caps(T_WHO.slice(2), 50, 70, 64, [0, 0], u);
+    blit(T_LANG[1], 50, 60, { c: TXT });
     readout((0.057 * prog(F, 0.5, 7)).toFixed(3) + " s", 306, F < 7 ? TXT : GRNL);
-    blit(T_JAR[F < 7 ? 1 : 2], 50, 360, { c: TXT });
-    if (z > 1.05) { blit(T_JAR[3], 50, 440, { c: TXT }); readout("×" + Math.floor(z), 540, GRNL); }
   } },
   // ==== chorus: one slot per beat group, b(k) = 66.03 + 0.4674 k ====
   // k2 par PARALLEL: the card cuts the dive
@@ -2523,8 +2515,8 @@ const CUTS: Cut[] = [
 let CLIP0 = 0, CLIP1 = 1e9;
 
 function clip_x(x0: number, x1: number, f: () => void): void {
-  CLIP0 = Math.max(0, Math.round((x0 + OX) * S));
-  CLIP1 = Math.round((x1 + OX) * S);
+  CLIP0 = Math.max(0, Math.round(x0 * S));
+  CLIP1 = Math.round(x1 * S);
   f();
   CLIP0 = 0;
   CLIP1 = 1e9;
@@ -2557,17 +2549,12 @@ function run(cmd: string[]): Buffer {
   return got.stdout as Buffer;
 }
 
-// The tube: a soft vignette on the 4:3 picture (a quarter darker at the
-// rim), black bars beside it.
+// The tube: a soft vignette on the picture (a quarter darker at the rim).
 const VIG = new Float32Array(W * H);
-const BAR = new Uint8Array(W * H);
-const PW  = W - 2 * Math.round(OX * S);
 for (let y = 0; y < H; ++y) {
   for (let x = 0; x < W; ++x) {
-    const u = (x - Math.round(OX * S)) / PW;
-    const d = Math.hypot((u - 0.5) * 2, (y / H - 0.5) * 2) / Math.SQRT2;
-    BAR[y * W + x] = u < 0 || u >= 1 ? 0 : 1;
-    VIG[y * W + x] = BAR[y * W + x] * (1 - 0.3 * Math.pow(clamp((d - 0.35) / 0.65), 1.4));
+    const d = Math.hypot((x / W - 0.5) * 2, (y / H - 0.5) * 2) / Math.SQRT2;
+    VIG[y * W + x] = 1 - 0.3 * Math.pow(clamp((d - 0.35) / 0.65), 1.4);
   }
 }
 
@@ -2667,8 +2654,8 @@ async function frames_pipe(fs_: number[], args: string[]): Promise<void> {
     const clean = frame(f);
     if (clean) {
       for (let i = 0; i < W * H; ++i) {
-        const v = BAR[i], k = i * 3;
-        out[k] = clamp(buf[k]) * 255 * v; out[k + 1] = clamp(buf[k + 1]) * 255 * v; out[k + 2] = clamp(buf[k + 2]) * 255 * v;
+        const k = i * 3;
+        out[k] = clamp(buf[k]) * 255; out[k + 1] = clamp(buf[k + 1]) * 255; out[k + 2] = clamp(buf[k + 2]) * 255;
       }
     } else {
       phosphor();

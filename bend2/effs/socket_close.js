@@ -2,8 +2,7 @@
 // ======
 
 function socket_close(socket) {
-  const sys = io_sys();
-  sys.close(socket);
+  io_sys().close(socket);
   return { $: CID(Unit) };
 }
 

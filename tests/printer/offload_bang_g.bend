@@ -3,8 +3,13 @@
 # the bang did not survive a print-parse round trip
 import Base
 
+# f matches, so f!(n) on a variable is stuck and the snf keeps the mark
 def f(n: Nat) -> Nat:
-  n
+  match n:
+    case 0n:
+      0n
+    case 1n+p:
+      p
 
 def main(n: Nat) -> Nat:
   f!(n)
@@ -13,4 +18,4 @@ def h(+n: Nat) -> Nat:
   a b = f!(n) f(n)
   Nat.add(a, b)
 
-#|n => n
+#|n => f!(n)

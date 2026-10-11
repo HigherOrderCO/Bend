@@ -2,7 +2,7 @@
 // ==
 
 function io_print_err(text) {
-  io_out(2, io_bytes(text + "\n"));
+  io_errs(text);
   return { $: CID(Unit) };
 }
 

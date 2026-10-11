@@ -27,39 +27,17 @@ const KEYWORDS = new Set(["return", "match", "case", "do", "for", "exs", "where"
 
 function splitLine(text: string): Line {
   const indent = text.match(/^[\t ]*/)?.[0] ?? "";
-  const source = text.slice(indent.length);
-  let quote = "";
-  let escaped = false;
-  let commentAt = -1;
-  for (let i = 0; i < source.length; i++) {
-    const char = source[i];
-    if (quote !== "") {
-      if (escaped) escaped = false;
-      else if (char === "\\") escaped = true;
-      else if (char === quote) quote = "";
-    } else if (char === "\"" || char === "'") {
-      quote = char;
-    } else if (char === "#") {
-      commentAt = i;
-      break;
-    }
-  }
-  if (quote !== "") throw new Error("unterminated literal");
-  const code = (commentAt < 0 ? source : source.slice(0, commentAt)).trim();
-  const comment = commentAt < 0 ? "" : source.slice(commentAt);
-  return { indent, code, comment, tokens: lex(code) };
-}
-
-function lex(code: string): Token[] {
+  const code = text.slice(indent.length);
   const tokens: Token[] = [];
   let i = 0;
   let hadGap = false;
   while (i < code.length) {
     if (/\s/.test(code[i])) {
-      hadGap = true;
+      hadGap = tokens.length > 0;
       i++;
       continue;
     }
+    if (code[i] === "#") break;
     const start = i;
     const char = code[i];
     let kind: Token["kind"] = "symbol";
@@ -68,13 +46,20 @@ function lex(code: string): Token[] {
       const quote = char;
       i++;
       let escaped = false;
+      let closed = false;
       while (i < code.length) {
         const next = code[i++];
         if (escaped) escaped = false;
         else if (next === "\\") escaped = true;
-        else if (next === quote) break;
+        else if (next === quote) {
+          closed = true;
+          break;
+        }
       }
-      if (code[i - 1] !== quote || escaped) throw new Error("unterminated literal");
+      if (!closed) throw new Error("unterminated literal");
+    } else if (tokens.length === 1 && tokens[0].text === "import" && hadGap) {
+      kind = "word";
+      while (i < code.length && !/\s/.test(code[i]) && code[i] !== "#") i++;
     } else if (HEAD.test(char)) {
       kind = "word";
       i++;
@@ -100,7 +85,7 @@ function lex(code: string): Token[] {
     tokens.push({ text: code.slice(start, i), kind, gap: hadGap });
     hadGap = false;
   }
-  return tokens;
+  return { indent, code: code.slice(0, i).trim(), comment: code.slice(i), tokens };
 }
 
 function unary(tokens: Token[], index: number): boolean {
@@ -130,6 +115,8 @@ function needsSpace(tokens: Token[], index: number): boolean {
   if (left.text === ",") return true;
   if (right.text === "!" && (left.kind === "word" || [")", "]", "}"].includes(left.text))) return false;
   if (left.text === "!" && right.text === "(") return false;
+  if (right.text === "?" && left.kind === "word" && (!tokens[index + 1] || tokens[index + 1].text === "(")) return right.gap;
+  if (left.text === "?" && right.text === "(" && tokens[index - 2]?.kind === "word") return false;
   if (right.text === "(" || right.text === "[") {
     const suffix = (left.kind === "word" && !KEYWORDS.has(left.text)) || left.kind === "number" || left.kind === "literal" || [")", "]", "}", ">", ">>"].includes(left.text);
     return !suffix;

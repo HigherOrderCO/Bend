@@ -27,15 +27,6 @@ def timeout(r: Result<&1, &1, U32 & String, U32 & (String & String)>) ->
     case Fail{(+code, message)}:
       Bool.show(Bool.or(U32.is_eq(code, 110), U32.is_eq(code, 60)))
 
-def contains_answer(r: Result<&1, &1, U32 & String, U32 & (String & String)>,
-  want: U32, needle: String) -> String:
-  match r:
-    case Done{(code, (stdout, stderr))}:
-      Bool.show(Bool.and(U32.is_eq(code, want),
-        Bool.and(String.contains(stdout, needle), String.eq(stderr, ""))))
-    case Fail{error}:
-      "unexpected failure"
-
 def main() -> IO(Unit):
   do IO<Unit>:
     a : Result<&1, &1, U32 & String, U32 & (String & String)> <-
@@ -85,11 +76,21 @@ def main() -> IO(Unit):
         "", 128, 2000)
     o : Unit <- IO.print("sigpipe default: " ++ answer(n, 0, "default", ""))
     p : Result<&1, &1, U32 & String, U32 & (String & String)> <-
-      Process.run("/bin/sh", ["-c", "sleep 3 & echo hi"], "", 128, 1500)
-    IO.print("inherited pipe: " ++ answer(p, 0, "hi\n", ""))
+      Process.run("/bin/sh", ["-c", "sleep 3 & echo hi"], "", 128, 300)
+    IO.print("inherited pipe: " ++ timeout(p))
     q : Result<&1, &1, U32 & String, U32 & (String & String)> <-
-      Process.run("/bin/sh", ["-c", "yes & echo hi"], "", 1048576, 1500)
-    IO.print("descendant output: " ++ contains_answer(q, 0, "hi"))
+      Process.run("/bin/sh", ["-c", "printf A; (sleep 0.2; printf B) & exit 0"],
+        "", 128, 2000)
+    IO.print("descendant output: " ++ answer(q, 0, "AB", ""))
+    r : Result<&1, &1, U32 & String, U32 & (String & String)> <-
+      Process.run("/bin/sh", ["-c", "yes & echo hi"], "", 4096, 2000)
+    IO.print("runaway descendant: " ++ failure(r, 27))
+    r0 : Result<&1, &1, U32 & String, U32 & (String & String)> <-
+      Process.run("/bin/sh", ["-c", "exec >&- 2>&-; sleep 3"], "", 128, 300)
+    IO.print("closed stdio: " ++ timeout(r0))
+    r1 : Result<&1, &1, U32 & String, U32 & (String & String)> <-
+      Process.run("/bin/echo", ["hi"], "", 128, 4294967295)
+    IO.print("largest timeout: " ++ answer(r1, 0, "hi\n", ""))
 
 #|stdin: True
 #|literal argv: True
@@ -107,3 +108,6 @@ def main() -> IO(Unit):
 #|sigpipe default: True
 #|inherited pipe: True
 #|descendant output: True
+#|runaway descendant: True
+#|closed stdio: True
+#|largest timeout: True

@@ -49,12 +49,12 @@ def pick01(z):
       0
 
 law agree:
-  for x0: U32
+  for x: U32
+  for v: U32
   U32
 
-def agree(x0):
-  +x = {x0 : U32}
-  pick01(U32.is_eq(g(x), g(x)))
+def agree(x, v):
+  pick01(U32.is_eq(g(x), v))
 
 law nest:
   for a: Bool
@@ -76,7 +76,7 @@ law main.out:
   U32
 
 def main.out():
-  (agree(0) + agree(2) + agree(3) + agree(5) + agree(6) + agree(9) + 10 * (nest(True{}, True{}) + nest(True{}, False{}) + nest(False{}, True{})) : U32)
+  (agree(0, 10) + agree(2, 10) + agree(3, 20) + agree(5, 20) + agree(6, 30) + agree(9, 30) + 10 * (nest(True{}, True{}) + nest(True{}, False{}) + nest(False{}, True{})) : U32)
 
 law main:
   IO(Unit)

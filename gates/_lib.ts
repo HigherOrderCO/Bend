@@ -1,8 +1,15 @@
 // Shared by the gates: local and cluster exec (ssh through the bastion's
 // mux), a slot of 48 minis (the live ones), a pool that hands jobs to free
 // nodes, and the verdict line.
+//
+// $BEND_HOC, a bastion user (or user@host), is the way in for a machine
+// without the `cluster` aliases or a key the minis trust: each session goes
+// to the bastion and on through its own wrapper, `sudo hoc-ssh <index>`,
+// which holds the fleet key, so no personal key lives on the Macs. Only
+// the hop differs: the slots, the pool and the scripts are the same.
 
 import * as child from "node:child_process";
+import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
@@ -26,6 +33,8 @@ export const SITE = process.env.SITE_REPO ?? path.join(ROOT, "..", "bend-lang.co
 
 export const BUN = "/usr/local/bun/bin/bun";
 
+const HOC = process.env.BEND_HOC ?? "";
+
 const SLOTS = { dir: "/tmp/bend-cluster-slots", count: 4, size: 48, base: 2 };
 
 const STALE = 20 * 60 * 1000;
@@ -37,10 +46,17 @@ const MUX = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=8",
 const SSH = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=8",
   "-o", "ProxyCommand=ssh " + MUX.join(" ") + " -W %h:%p cluster"];
 
+const HOC_HUB = ["-p", "22022", HOC.includes("@") ? HOC : HOC
+  + "@52.67.125.18"];
+
 const DROP = new RegExp("Connection reset|closed by remote host"
   + "|Broken pipe|kex_exchange_identification|mux_client|timed out");
 
 let held = "";
+
+const staged = new Map<string, Promise<Exec>>();
+
+const opened = new Map<number, Promise<Exec>>();
 
 // Exec
 // ====
@@ -79,13 +95,68 @@ export function node_name(node: number): string {
 export async function ssh(node: number, script: string,
   input?: Buffer | string, timeout?: number): Promise<Exec> {
   for (let hop = 0; ; hop += 1) {
-    const got = await exec("ssh", [...SSH, node_name(node), script], input,
-      timeout);
+    const got = HOC === ""
+      ? await exec("ssh", [...SSH, node_name(node), script], input, timeout)
+      : await hoc_ssh(node, script, input, timeout);
     if (hop >= 2 || got.code !== 255 || !DROP.test(got.err)) {
       return got;
     }
     await sleep(500 + Math.random() * 1500);
   }
+}
+
+// The hoc way sends each input up to the bastion once, and every session
+// reads it there: 48 shards of one pack cost one upload, not 48.
+async function hoc_ssh(node: number, script: string,
+  input?: Buffer | string, timeout?: number): Promise<Exec> {
+  const open = await hoc_open(node);
+  if (open.code !== 0) {
+    return open;
+  }
+  let from = "";
+  if (input !== undefined) {
+    const sum = crypto.createHash("sha1").update(input).digest("hex");
+    const up = staged.get(sum) ?? exec("ssh", [...hoc_mux(node), ...HOC_HUB,
+      "d=$HOME/.bend-gate; mkdir -p $d && { find $d -type f -mmin +60"
+      + " -delete 2>/dev/null; cat > $d/" + sum + ".$$; } && mv $d/" + sum
+      + ".$$ $d/" + sum], input);
+    staged.set(sum, up);
+    const got = await up;
+    if (got.code !== 0) {
+      if (staged.get(sum) === up) {
+        staged.delete(sum);
+      }
+      return got;
+    }
+    from = " < $HOME/.bend-gate/" + sum;
+  }
+  return exec("ssh", [...hoc_mux(node), ...HOC_HUB, "sudo -n"
+    + " /usr/local/bin/hoc-ssh " + String(node) + " '"
+    + script.replaceAll("'", "'\\''") + "'" + from], undefined, timeout);
+}
+
+// The bastion opens at most 10 sessions on one connection, so the hoc way
+// gives each 10 nodes in a row their own mux: a node runs one session at a
+// time, so no mux carries more than 10, whatever gates run side by side.
+function hoc_mux(node: number): string[] {
+  return MUX.map((o) => o.startsWith("ControlPath=") ? "ControlPath=/tmp/"
+    + "bend-hoc-nodes-" + String(Math.floor(node / 10)) : o);
+}
+
+// One session opens a node's mux before the rest use it: sessions that
+// start together on a closed mux would each dial the bastion on its own,
+// and past its startup limit it drops them.
+function hoc_open(node: number): Promise<Exec> {
+  const mux = Math.floor(node / 10);
+  const got: Promise<Exec> = opened.get(mux) ?? exec("ssh",
+    [...hoc_mux(node), ...HOC_HUB, "true"]).then((g) => {
+    if (g.code !== 0 && opened.get(mux) === got) {
+      opened.delete(mux);
+    }
+    return g;
+  });
+  opened.set(mux, got);
+  return got;
 }
 
 function sleep(ms: number): Promise<void> {
@@ -104,8 +175,11 @@ function sleep(ms: number): Promise<void> {
 // probe.
 export async function node_lock(): Promise<number[]> {
   const nodes = slot_lock();
-  const got = await exec("ssh", [...MUX, "cluster", "true"]);
-  if (got.code !== 0) {
+  const gots = await Promise.all(HOC === ""
+    ? [exec("ssh", [...MUX, "cluster", "true"])]
+    : nodes.map(hoc_open));
+  const got = gots.find((g) => g.code !== 0);
+  if (got !== undefined) {
     throw new Error("the bastion refused the mux session (is id_rsa in the"
       + " agent? ssh-add ~/.ssh/id_rsa): "
       + (got.err.trim().split("\n").pop() ?? ""));

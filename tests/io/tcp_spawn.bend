@@ -9,7 +9,7 @@
 import Base
 
 law handle.sent:
-  for m: Socket & Result<&1, &1, (U32 & String), Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
   IO(Unit)
 
 def handle.sent(m):
@@ -17,15 +17,15 @@ def handle.sent(m):
   Socket.close(s)
 
 law handle.read:
-  for m: Socket & Result<&1, &1, (U32 & String), String>
+  for m: Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>>
   IO(Unit)
 
 def handle.read(m):
   (s, r) = m
   do IO<Unit>:
-    data : String <- IO.pass(String, r)
-    sent : Socket & Result<&1, &1, (U32 & String), Unit> <-
-      TCP.send(s, String.append("echo:", data))
+    data : Maybe<&1, String> <- IO.pass(Maybe<&1, String>, r)
+    sent : Socket & Result<&1, &1, (U32 & String) & String, Unit> <-
+      TCP.send(s, String.append("echo:", Maybe.default(&1, String, data, "")))
     handle.sent(sent)
 
 law handle:
@@ -34,7 +34,7 @@ law handle:
 
 def handle(s):
   do IO<Unit>:
-    m : Socket & Result<&1, &1, (U32 & String), String> <- TCP.recv(s, 8)
+    m : Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>> <- TCP.recv(s, 8)
     handle.read(m)
 
 law serve.got:
@@ -63,26 +63,30 @@ def serve(n, l):
         TCP.accept(l), serve.got(l2 => serve(p, l2)))
 
 law client.read:
-  for m: Socket & Result<&1, &1, (U32 & String), String>
+  for m: Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>>
   IO(String)
 
 def client.read(m):
   (s, r) = m
   do IO<String>:
-    reply : String <- IO.pass(String, r)
+    reply : Maybe<&1, String> <- IO.pass(Maybe<&1, String>, r)
     Unit <- Socket.close(s)
-    return reply
+    return Maybe.default(&1, String, reply, "ended")
 
 law client.sent:
-  for m: Socket & Result<&1, &1, (U32 & String), Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
   IO(String)
 
 def client.sent(m):
   (s, r) = m
-  do IO<String>:
-    Unit <- IO.pass(Unit, r)
-    got : Socket & Result<&1, &1, (U32 & String), String> <- TCP.recv(s, 64)
-    client.read(got)
+  match r:
+    case Done{u}:
+      IO.bind(Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>>, String,
+        TCP.recv(s, 64), client.read)
+    case Fail{((code, message), rest)}:
+      do IO<String>:
+        Unit <- Socket.close(s)
+        IO.die(String, code, message)
 
 law client:
   for port: U32
@@ -92,7 +96,7 @@ law client:
 def client(port, tag):
   do IO<String>:
     s : Socket <- IO.try(Socket, TCP.connect("127.0.0.1", port))
-    m : Socket & Result<&1, &1, (U32 & String), Unit> <- TCP.send(s, tag)
+    m : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(s, tag)
     client.sent(m)
 
 law main.go:

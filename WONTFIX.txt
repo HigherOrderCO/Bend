@@ -126,6 +126,12 @@ A Nat past 2^48-1, or an array past block class 31, fail-stops (#779)
   Immediates hold 48 bits; blocks have 32 classes. The theory has no such
   bound.
 
+A value with more than 2^24-1 live copies fail-stops on the C lane (#1267)
+  Copies of a `+` value share it through one 24-bit count; JS keeps no
+  count and runs on. `Array.new(T, d, x)` makes 2^d copies of x, so a
+  computed x stops it at depth 24 there. For more copies, build x again for
+  each group: e.g. an `Array.new` at depth 23 per build, joined by `ANode`.
+
 SOON (we will add it; do not open an issue)
 
 U64 (#1027)

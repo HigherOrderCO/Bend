@@ -25,7 +25,7 @@ Term file_write_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) file_write_use(void) {
-  io_eff(CID(File.write), file_write_run, 0);
+  io_eff(CID(File.write), file_write_run);
 }
 
 #endif
@@ -42,7 +42,7 @@ Term file_write_bytes_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) file_write_bytes_use(void) {
-  io_eff(CID(File.write_bytes), file_write_bytes_run, 0);
+  io_eff(CID(File.write_bytes), file_write_bytes_run);
 }
 
 #endif

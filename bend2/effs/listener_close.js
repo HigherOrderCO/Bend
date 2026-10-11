@@ -2,8 +2,7 @@
 // ========
 
 function listener_close(listener) {
-  const sys = io_sys();
-  sys.close(listener);
+  io_sys().close(listener);
   return { $: CID(Unit) };
 }
 

@@ -23,10 +23,6 @@
 //     PATH=/usr/local/node/bin:$PATH:$HOME/film node bend2/docs/gen_gifs.ts'
 //   scp -o ProxyJump=cluster 'cluster-9d:film/media/*.gif' media/
 
-import * as child from "node:child_process";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 import { createCanvas } from "canvas";
 
 import * as charts from "./gen_charts.ts";
@@ -215,41 +211,21 @@ function frame(a: Page, b: Page, t: number, at: number, n: number): void {
 // ===
 
 // every turn is GLIDE seconds of frames at FPS; the last frame of each
-// turn is the page itself, and lasts HOLD seconds more. The frames go
-// to ffmpeg through a concat list, which keeps every duration, so each
-// hold is one frame with a long delay; one palette of 63 colours plus
-// the transparent slot, no dither. A smaller palette makes a smaller
-// file, but it drops the green of the speedups. A gif has 1-bit alpha:
-// a pixel is opaque (alpha >= 128) or clear. Because every frame keeps
-// clear pixels, ffmpeg disposes each one to the background, so no bar
-// of the page before shows through
+// turn is the page itself, and lasts HOLD seconds more
 function gif(name: string, pages: Page[]): void {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), name + "-"));
   const steps = Math.round(GLIDE * FPS);
-  let list = "ffconcat version 1.0\n";
-  let n = 0;
+  const shots: [[Page, Page, number, number], number][] = [];
   pages.forEach((page, at): void => {
     const prev = pages[(at + pages.length - 1) % pages.length];
     for (let k = 1; k <= steps; k++) {
-      frame(prev, page, k / FPS, at, pages.length);
-      const file = path.join(dir, "f" + String(n++).padStart(4, "0") + ".png");
-      fs.writeFileSync(file, cv.toBuffer("image/png"));
-      list += "file '" + file + "'\nduration " + String(1 / FPS + (k === steps ? HOLD : 0)) + "\n";
+      shots.push([[prev, page, k / FPS, at], 1 / FPS + (k === steps ? HOLD : 0)]);
     }
   });
-  list += "file '" + path.join(dir, "f" + String(n - 1).padStart(4, "0") + ".png") + "'\n";
-  fs.writeFileSync(path.join(dir, "list.txt"), list);
-  const out = path.join(charts.ROOT, "media", name + ".gif");
-  const got = child.spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f", "concat",
-    "-safe", "0", "-i", path.join(dir, "list.txt"), "-vf",
-    "split[a][b];[a]palettegen=max_colors=63:reserve_transparent=1[p];[b][p]paletteuse=dither=none:alpha_threshold=128",
-    "-fps_mode", "vfr", "-loop", "0", out], { stdio: "inherit" });
-  if (got.status !== 0) {
-    throw new Error("ffmpeg failed on " + name);
-  }
-  fs.rmSync(dir, { recursive: true });
-  process.stdout.write("wrote " + out + ": " + String(pages.length) + " pages, "
-    + String(n) + " frames, " + String(fs.statSync(out).size) + " bytes\n");
+  const got = charts.gif_write(name, cv,
+    ([a, b, t, at]) => frame(a, b, t, at, pages.length), shots);
+  process.stdout.write("wrote " + got.out + ": " + String(pages.length)
+    + " pages, " + String(got.frames) + " frames, "
+    + String(got.bytes) + " bytes\n");
 }
 
 // Main

@@ -2,9 +2,9 @@
 # A six-byte send read at max 3 answers "abc" and KEEPS the
 # remainder in the stream, so the next recv answers "def" -- the
 # datagram contrast of io_udp_truncate: a stream discards nothing.
-# After the peer's orderly close a recv answers Done with the empty
-# payload ("end:" prints bare), the law's own words, never a Fail:
-# a kit turning the zero-byte read into an error reds the last row.
+# After the peer's orderly close a recv answers Done{None{}} ("ended"
+# prints), the law's own words, never a Fail: a kit turning the
+# zero-byte read into an error reds the last row.
 # Handles thread back OUTSIDE the Result, tuples destructure in
 # their own helpers, and the listener retries upward from a base
 # port (+port licenses the port's reuse). The recv buffer allocates
@@ -13,25 +13,29 @@
 import Base
 
 law send_go:
-  for m: Socket & Result<&1, &1, (U32 & String), Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
   IO(Socket)
 
 def send_go(m):
   (s, r) = m
-  do IO<Socket>:
-    u : Unit <- IO.pass(Unit, r)
-    return s
+  match r:
+    case Done{u}:
+      IO.pure(Socket, s)
+    case Fail{((code, message), rest)}:
+      do IO<Socket>:
+        u : Unit <- IO.die(Unit, code, message)
+        return s
 
 law step_four:
   for l: Listener
-  for m: Socket & Result<&1, &1, (U32 & String), String>
+  for m: Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>>
   IO(U32)
 
 def step_four(l, m):
   (a, r) = m
   do IO<U32>:
-    d3 : String <- IO.pass(String, r)
-    w  : Unit <- IO.print(String.append("end:", d3))
+    d3 : Maybe<&1, String> <- IO.pass(Maybe<&1, String>, r)
+    w  : Unit <- IO.print(Maybe.default(&1, String, d3, "ended"))
     y  : Unit <- Socket.close(a)
     z  : Unit <- Listener.close(l)
     return 0
@@ -39,30 +43,30 @@ def step_four(l, m):
 law step_three:
   for l: Listener
   for c: Socket
-  for m: Socket & Result<&1, &1, (U32 & String), String>
+  for m: Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>>
   IO(U32)
 
 def step_three(l, c, m):
   (a, r) = m
   do IO<U32>:
-    d2 : String <- IO.pass(String, r)
-    w  : Unit <- IO.print(d2)
+    d2 : Maybe<&1, String> <- IO.pass(Maybe<&1, String>, r)
+    w  : Unit <- IO.print(Maybe.default(&1, String, d2, "ended"))
     x  : Unit <- Socket.close(c)
-    rm : Socket & Result<&1, &1, (U32 & String), String> <- TCP.recv(a, 64)
+    rm : Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>> <- TCP.recv(a, 64)
     step_four(l, rm)
 
 law step_two:
   for l: Listener
   for c: Socket
-  for m: Socket & Result<&1, &1, (U32 & String), String>
+  for m: Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>>
   IO(U32)
 
 def step_two(l, c, m):
   (a, r) = m
   do IO<U32>:
-    d1 : String <- IO.pass(String, r)
-    w  : Unit <- IO.print(d1)
-    rm : Socket & Result<&1, &1, (U32 & String), String> <- TCP.recv(a, 64)
+    d1 : Maybe<&1, String> <- IO.pass(Maybe<&1, String>, r)
+    w  : Unit <- IO.print(Maybe.default(&1, String, d1, "ended"))
+    rm : Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>> <- TCP.recv(a, 64)
     step_three(l, c, rm)
 
 law step_accept:
@@ -74,9 +78,9 @@ def step_accept(c, p):
   (l, ar) = p
   do IO<U32>:
     a  : Socket <- IO.pass(Socket, ar)
-    sm : Socket & Result<&1, &1, (U32 & String), Unit> <- TCP.send(c, "abcdef")
+    sm : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(c, "abcdef")
     c2 : Socket <- send_go(sm)
-    rm : Socket & Result<&1, &1, (U32 & String), String> <- TCP.recv(a, 3)
+    rm : Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>> <- TCP.recv(a, 3)
     step_two(l, c2, rm)
 
 law main_go:
@@ -128,4 +132,4 @@ def main():
 
 #|abc
 #|def
-#|end:
+#|ended

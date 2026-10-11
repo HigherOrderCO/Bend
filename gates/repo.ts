@@ -35,6 +35,7 @@ function allow(at: string | RegExp, cap = Infinity): void {
 }
 
 allow(/^\.github\/ISSUE_TEMPLATE\/(bug|feature|config)\.yml$/);
+allow(".github/workflows/repo-gate.yml");
 allow(".gitattributes");
 allow(".gitignore");
 allow("AGENTS.md");
@@ -78,18 +79,26 @@ allow(/^media\/logo_(bend|hoc)\.png$/);
 allow(/^media\/game_[a-z_]+\.gif$/);
 allow(/^media\/slash_boss_3d\/[a-z_]+\.wav$/);
 allow(/^gates\/(_lib|_run|perf|ping|repo|test|safe|safe_node|safe_diag)\.ts$/);
-allow(/^tests\/[a-z]+\/([a-z0-9-]+\/)?[a-z0-9_]+\.bend$/);
+allow(/^tests\/[a-z]+\/([a-z0-9-]+\/)?[A-Za-z0-9_]+\.bend$/);
 allow(/^tests\/[a-z]+\/[a-z0-9_]+\.(c|js)$/);
 allow(/^tools\/bend-fmt-lsp\/(\.gitignore|README\.md|package\.json|package-lock\.json|tsconfig\.json)$/);
 allow(/^tools\/bend-fmt-lsp\/src\/(formatter|server)\.ts$/);
 allow(/^tools\/bend-fmt-lsp\/src\/test\/[a-z_]+\.test\.ts$/);
+allow(/^tools\/bend-lint\/(README\.md|package\.json|tsconfig\.json)$/);
+allow(/^tools\/bend-lint\/src\/(lint\.ts|seam\.ts|lint\.test\.ts)$/);
+allow(/^tools\/bend-lint\/src\/bend\/(lint\.bend|effects\.js|sample\.bend)$/);
+allow(/^tools\/bend-lint\/rules\/[a-z_]+(\.test)?\.(ts|bend)$/);
 
 // Gate
 // ====
 
 function ttok(file: string): number {
   const got = child.spawnSync("ttok", [], { input: fs.readFileSync(file) });
-  return Number(got.stdout.toString().trim());
+  const n = Number(got.stdout?.toString().trim() || NaN);
+  if (got.status !== 0 || !(n > 0)) {
+    throw new Error("ttok counted nothing for " + file + " (pipx install ttok)");
+  }
+  return n;
 }
 
 function gate(): string[] {

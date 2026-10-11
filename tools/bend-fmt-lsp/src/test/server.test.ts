@@ -69,8 +69,30 @@ test("serves formatting over an LSP stdio session", async (context) => {
     newText: "def main() -> U32:\n  0",
   }]);
 
-  const shutdown = waitFor(3);
-  send(child, { jsonrpc: "2.0", id: 3, method: "shutdown" });
+  send(child, {
+    jsonrpc: "2.0",
+    method: "textDocument/didOpen",
+    params: { textDocument: {
+      uri: "file:///imports.bend",
+      languageId: "bend",
+      version: 1,
+      text: "import   lib/dep.bend   as   Dep # dependency\n\ndef main()->U32:\n    Dep.answer()",
+    } },
+  });
+  const imports = waitFor(3);
+  send(child, {
+    jsonrpc: "2.0",
+    id: 3,
+    method: "textDocument/formatting",
+    params: { textDocument: { uri: "file:///imports.bend" }, options: { tabSize: 2, insertSpaces: true } },
+  });
+  assert.deepEqual((await imports).result, [{
+    range: { start: { line: 0, character: 0 }, end: { line: 3, character: 16 } },
+    newText: "import lib/dep.bend as Dep  # dependency\n\ndef main() -> U32:\n  Dep.answer()",
+  }]);
+
+  const shutdown = waitFor(4);
+  send(child, { jsonrpc: "2.0", id: 4, method: "shutdown" });
   assert.equal((await shutdown).result, null);
   send(child, { jsonrpc: "2.0", method: "exit" });
 });

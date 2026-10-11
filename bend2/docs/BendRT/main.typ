@@ -158,7 +158,7 @@ def build(+d: Nat, +i: U32) -> Tree:
     case 0n:
       Leaf{i}
     case 1n+p:
-      l r = build(p, i * 2) build(p, i * 2 + 1)
+      l r = build(p, (i * 2 : U32)) build(p, (i * 2 + 1 : U32))
       Node{l, r}
 
 def sum(t: Tree) -> U32:
@@ -167,7 +167,7 @@ def sum(t: Tree) -> U32:
       x
     case Node{l, r}:
       a b = sum(l) sum(r)
-      a + b
+      (a + b : U32)
 
 def main() -> IO(Unit):
   t = build(20n, 0)
@@ -446,7 +446,11 @@ The host pool is up to 128 threads, which claim rows by one fetch-add
 and meet at one barrier per turn; it opens at a program's first fork.
 The GPU runs a grow as a dispatch of 128 groups (seeded by one group
 while $f < 128$) and a work as one thread per lane; between dispatches
-the host only reads $f$.
+the host only reads $f$. After a grow from $f < 128$, a lane drains its
+row ring, not its column, down to the put the grow left: a SIMD group
+then runs one root's cousins, and a late group leaves new deals to the
+next round. From more roots a row holds unrelated deals, and the column
+keeps a fork's kids together.
 
 == Why Nothing Contends
 

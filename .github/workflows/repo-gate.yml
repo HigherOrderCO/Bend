@@ -1,0 +1,37 @@
+name: repo-gate
+
+# The repo gate (gates/repo.ts: the allow list and the ttok caps) on every PR,
+# and again in the merge queue, on main plus the PRs queued ahead plus this
+# one: a PR's own branch is checked against a stale main, and #1269 passed at
+# 63,821 tokens there, then landed comp.ts at 64,250 after five other merges.
+# The gate is main's, run over the PR's tree, so a PR cannot pass by editing
+# the gate that checks it. It needs only git, bun and ttok, and runs on
+# GitHub's machines with no secrets, so a PR from a fork is safe to run.
+on:
+  pull_request:
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repo-gate-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  repo-gate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.0
+      - run: pipx install ttok==0.3
+      - name: main's gate files over this tree
+        run: |
+          git fetch --no-tags --depth=1 origin main
+          git checkout FETCH_HEAD -- gates/
+      - run: bun gates/repo.ts

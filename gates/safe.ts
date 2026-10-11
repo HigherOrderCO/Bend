@@ -23,7 +23,7 @@ const HUB = process.env.SAFE_HUB ?? "";
 const corpus = process.argv[2];
 const bin = path.resolve(process.argv[3] ?? path.join(ROOT, ".tmp", "bendtt"));
 const OUT = path.join(ROOT, ".tmp", "safe", process.env.GATE_OUT ?? "");
-const DIR = "/tmp/bend-safe-gate";
+const DIR = "$HOME/bend-safe-gate";
 const PAR = 8;
 const find = (dir: string, cwd: string) => child.spawnSync("find", [dir, "-name", "*.bend"], { cwd, encoding: "utf8" })
   .stdout.split("\n").filter((l) => l !== "").sort();

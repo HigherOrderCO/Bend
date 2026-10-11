@@ -117,7 +117,9 @@ function shard_split(tests: Test[], count: number): Test[][] {
 // The shard's aggregator and build list ride in the script, over the pack
 // every shard shares. A build that fails leaves its message in
 // <name>.left: the test's lanes then read it as their answer, so a
-// program the compiler cannot build fails the gate.
+// program the compiler cannot build fails the gate. The io tests write
+// fixed names in /tmp, which every Mac user shares: the shard removes its
+// own before and after, so a user's leftovers never fail another's run.
 function shard_script(shard: Test[], tag: number): string {
   const runs = test_runs(shard);
   const bangs = runs.filter((t) => /!\(/.test(t.src)).map((t) => t.name);
@@ -128,11 +130,14 @@ function shard_script(shard: Test[], tag: number): string {
     .join(" ") + "\n").join("");
   const file = (name: string, text: string): string =>
     `cat > ${name} <<'${MARK}'\n${text}${MARK}\n`;
+  const tmp = `find /tmp/ -maxdepth 1 -user $(id -u) \\( -name 'bend_io_*'`
+    + ` -o -name 'bend_gfx_*' \\) -delete 2>/dev/null;`;
   const probe = (kind: string, cmd: string): string =>
     `echo "${MARK} ${kind} $m"; perl -e 'alarm 5; exec @ARGV' ${cmd} 2>&1;`
     + ` echo "${MARK} exit $?";`;
   return `export BUN_JSC_maxPerThreadStackUsage=33554432;`
-    + ` d=$HOME/bend-test/${tag}; rm -rf $d; mkdir -p $d; cd $d; tar -xzf -;\n`
+    + ` d=$HOME/bend-test/${tag}; rm -rf $d; mkdir -p $d; cd $d; tar -xzf -;`
+    + ` ${tmp}\n`
     + file("main.bend", main) + file("build.txt", build)
     + ` echo "${MARK} checkup"; ${BUN} bend2/main.ts main.bend --checkup 2>&1;`
     + ` xargs -P 10 -L 1 sh -c 'm=$1; shift; ${BUN} bend2/main.ts "$@"`
@@ -141,7 +146,7 @@ function shard_script(shard: Test[], tag: number): string {
     + ` >/dev/null 2>&1; done; for m in ${runs.map((t) => t.name).join(" ")};`
     + ` do if [ -f $m.left ]; then echo "${MARK} left $m"; cat $m.left;`
     + ` else ${probe("c", "./$m")} ${probe("js", BUN + " $m.js")} fi; done;`
-    + ` cd; rm -rf $d`;
+    + ` cd; rm -rf $d; ${tmp}`;
 }
 
 function shard_parse(shard: Test[], out: string): Map<string, Got> {
@@ -153,7 +158,7 @@ function shard_parse(shard: Test[], out: string): Map<string, Got> {
     const head = part.slice(0, nl).trim().split(" ");
     const body = part.slice(nl + 1);
     if (head[0] === "checkup") {
-      const secs = body.split(/^--- \.\/tests\/([a-z0-9_/]+)\.bend ---\n/m);
+      const secs = body.split(/^--- \.\/tests\/([A-Za-z0-9_/]+)\.bend ---\n/m);
       for (let i = 1; i + 1 < secs.length; i += 2) {
         const got = gots.get(secs[i].replace("/", "_"));
         if (got !== undefined) {

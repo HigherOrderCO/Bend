@@ -2,7 +2,6 @@
 // =======
 
 #include <spawn.h>
-#include <sys/ioctl.h>
 #include <sys/wait.h>
 #ifdef __APPLE__
 #include <sys/event.h>
@@ -40,11 +39,11 @@ static void process_free(ProcessCall* p) {
   free(p);
 }
 
-static bool process_append(ProcessCall* p, bool error, const char* data,
+static void process_append(ProcessCall* p, bool error, const char* data,
   u64 size) {
   if (size > (u64)p->max - p->out_len - p->err_len) {
     p->code = EFBIG;
-    return false;
+    return;
   }
   char** buf = error ? &p->err : &p->out;
   u64* len  = error ? &p->err_len : &p->out_len;
@@ -63,24 +62,6 @@ static bool process_append(ProcessCall* p, bool error, const char* data,
   }
   memcpy(*buf + *len, data, size);
   *len = need;
-  return true;
-}
-
-static void process_drain(ProcessCall* p, int fd, bool error) {
-  int left = 0;
-  if (ioctl(fd, FIONREAD, &left) != 0) {
-    p->code = errno;
-  }
-  while (left > 0 && p->code == 0) {
-    char buf[8192];
-    ssize_t n = read(fd, buf, left < 8192 ? (size_t)left : 8192);
-    if (n <= 0) {
-      p->code = n < 0 ? errno : 0;
-      break;
-    }
-    process_append(p, error, buf, (u64)n);
-    left -= (int)n;
-  }
 }
 
 // A descriptor that polls readable once the child exits.
@@ -202,14 +183,10 @@ static void process_call(IoWork* w) {
   u64 deadline = io_tick() + (u64)p->timeout * 1000000ull;
   u64 written  = 0;
   while (p->code == 0) {
-    pid_t got = waitpid(child, &status, WNOHANG);
+    bool reading = pipes[1][0] >= 0 || pipes[2][0] >= 0;
+    pid_t got = reading ? 0 : waitpid(child, &status, WNOHANG);
     if (got == child) {
       child = -1;
-      for (int i = 1; i < 3; i += 1) {
-        if (pipes[i][0] >= 0) {
-          process_drain(p, pipes[i][0], i == 2);
-        }
-      }
       break;
     }
     if (got < 0 && errno != EINTR) {
@@ -221,22 +198,15 @@ static void process_call(IoWork* w) {
       p->code = ETIMEDOUT;
       break;
     }
-    struct pollfd fds[4];
-    int roles[3];
-    nfds_t count = 0;
-    for (int i = 0; i < 3; i += 1) {
-      int fd = i == 0 ? pipes[0][1] : pipes[i][0];
-      if (fd >= 0) {
-        fds[count] = (struct pollfd){fd, i == 0 ? POLLOUT : POLLIN, 0};
-        roles[count++] = i;
-      }
-    }
-    if (exitfd >= 0) {
-      fds[count++] = (struct pollfd){exitfd, POLLIN, 0};
-    }
+    struct pollfd fds[4] = {
+      {pipes[0][1], POLLOUT, 0},
+      {pipes[1][0], POLLIN, 0},
+      {pipes[2][0], POLLIN, 0},
+      {reading ? -1 : exitfd, POLLIN, 0}
+    };
     u64 left = (deadline - now + 999999ull) / 1000000ull;
-    u64 most = exitfd >= 0 ? 1000000 : 50;
-    int ready = poll(fds, count, (int)(left > most ? most : left));
+    u64 most = reading || exitfd >= 0 ? 1000000 : 50;
+    int ready = poll(fds, 4, (int)(left > most ? most : left));
     if (ready < 0) {
       if (errno == EINTR) {
         continue;
@@ -244,14 +214,10 @@ static void process_call(IoWork* w) {
       p->code = errno;
       break;
     }
-    if (exitfd >= 0 && fds[count - 1].revents != 0) {
-      continue;
-    }
-    for (nfds_t k = 0; k < count && p->code == 0; k += 1) {
-      if (fds[k].revents == 0) {
+    for (int i = 0; i < 3 && p->code == 0; i += 1) {
+      if (fds[i].revents == 0) {
         continue;
       }
-      int i = roles[k];
       if (i == 0) {
         u64 remain = p->input_len - written;
         size_t size = remain < 8192 ? (size_t)remain : 8192;
@@ -352,5 +318,5 @@ Term process_run_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) process_run_use(void) {
-  io_eff(CID(Process.run), process_run_run, 0);
+  io_eff(CID(Process.run), process_run_run);
 }

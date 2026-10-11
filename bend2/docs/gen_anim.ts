@@ -17,21 +17,19 @@
 // It needs node >= 22.18, the canvas package, ffmpeg and Menlo, which
 // this Mac lacks: render on cluster-9d, where ~/film has all four.
 //
-//   tar cf - bend2/docs/gen_anim.ts | ssh -J cluster cluster-9d 'cd film && tar xf -'
+//   tar cf - bend2/docs/gen_anim.ts bend2/docs/gen_charts.ts \
+//     | ssh -J cluster cluster-9d 'cd film && tar xf -'
 //   ssh -J cluster cluster-9d 'cd film && \
 //     PATH=/usr/local/node/bin:$PATH:$HOME/film node bend2/docs/gen_anim.ts'
 //   scp -o ProxyJump=cluster 'cluster-9d:film/media/{hero,parallel}.gif' media/
 
-import * as child from "node:child_process";
-import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 import { createCanvas } from "canvas";
+
+import { gif_write } from "./gen_charts.ts";
 
 // Constants
 // =========
 
-const ROOT = path.join(import.meta.dirname, "..", "..");
 const MONO = "Menlo, monospace";
 const PURPLE = "#8b83b5";
 const BG = "#f2eee7";
@@ -62,34 +60,9 @@ function mix(a: string, b: string, f: number): string {
   return "rgb(" + one(0) + "," + one(1) + "," + one(2) + ")";
 }
 
-// the frames go to ffmpeg through a concat list, which keeps every
-// duration, so a frame that holds is one frame with a long delay
-function gif(name: string, cv: { width: number; height: number;
-  toBuffer: (t: "image/png") => Buffer }, draw: (t: number) => void,
-  shots: [number, number][]): void {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), name + "-"));
-  const file = (i: number): string =>
-    path.join(dir, "f" + String(i).padStart(4, "0") + ".png");
-  let list = "ffconcat version 1.0\n";
-  shots.forEach(([t, d], i): void => {
-    draw(t);
-    fs.writeFileSync(file(i), cv.toBuffer("image/png"));
-    list += "file '" + file(i) + "'\nduration " + String(d) + "\n";
-  });
-  list += "file '" + file(shots.length - 1) + "'\n";
-  fs.writeFileSync(path.join(dir, "list.txt"), list);
-  const out = path.join(ROOT, "media", name + ".gif");
-  const got = child.spawnSync("ffmpeg", ["-y", "-loglevel", "error", "-f",
-    "concat", "-safe", "0", "-i", path.join(dir, "list.txt"), "-vf",
-    "split[a][b];[a]palettegen=max_colors=63:reserve_transparent=1[p];"
-    + "[b][p]paletteuse=dither=none:alpha_threshold=128",
-    "-fps_mode", "vfr", "-loop", "0", out], { stdio: "inherit" });
-  if (got.status !== 0) {
-    throw new Error("ffmpeg failed on " + name);
-  }
-  fs.rmSync(dir, { recursive: true });
-  process.stdout.write("wrote " + out + ": " + String(shots.length)
-    + " frames, " + String(fs.statSync(out).size) + " bytes\n");
+function gif_report(got: { out: string; frames: number; bytes: number }): void {
+  process.stdout.write("wrote " + got.out + ": " + String(got.frames)
+    + " frames, " + String(got.bytes) + " bytes\n");
 }
 
 // Hero
@@ -150,7 +123,7 @@ function hero(name: string, ink: string, dim: string): void {
     run(PITCH, TITLE * 0.36, ty + TITLE * 0.89);
     run(CLAIMS, TITLE * 0.264, ty + TITLE * 1.39);
   }
-  gif(name, cv, draw, [[0, 0.55], [0.6, 0.55]]);
+  gif_report(gif_write(name, cv, draw, [[0, 0.55], [0.6, 0.55]]));
 }
 
 // Parallel
@@ -360,7 +333,7 @@ function parallel(): void {
     shots.push([i / FPS, 1 / FPS]);
   }
   shots[shots.length - 1][1] = 1.8;
-  gif("parallel", cv, draw, shots);
+  gif_report(gif_write("parallel", cv, draw, shots));
 }
 
 // Game
@@ -550,15 +523,17 @@ function game(act: Act): void {
     shots.push([i / FPS, 1 / FPS]);
   }
   shots.push([still, HOLD]);
-  gif(act.name, cv, draw, shots);
+  gif_report(gif_write(act.name, cv, draw, shots));
 }
 
 // Main
 // ====
 
-hero("hero", "#1f2328", "#656d76");
-hero("hero_dark", "#ffffff", "#8b949e");
-parallel();
-for (const act of ACTS) {
-  game(act);
+if (import.meta.main) {
+  hero("hero", "#1f2328", "#656d76");
+  hero("hero_dark", "#ffffff", "#8b949e");
+  parallel();
+  for (const act of ACTS) {
+    game(act);
+  }
 }

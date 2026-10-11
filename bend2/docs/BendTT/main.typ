@@ -95,6 +95,7 @@
 #let Da = $sans("Data")$
 #let rfl = $sans("rfl")$
 #let kind = $sans("kind")$
+#let Qs = $sans("Q")$
 #let fld = $sans("fld")$
 #let live = $sans("live")$
 #let emp = $chevron.l chevron.r$
@@ -285,7 +286,8 @@ copyable fields.
 
 == Kinds
 
-Every type has a _kind_, #Ty or #Da. A copyable binder needs a type of
+Every type has a _kind_ `Kind(q)`, for a quantity `q`: #Ty is
+`Kind(&1)` and #Da is `Kind(&2)`. A copyable binder needs a type of
 kind #Da. A datatype declares its kind, and the checker verifies the
 kind at each field. A #Da type may only have #Da fields. `Nat` is #Da.
 A function type is always #Ty, so a function cannot be copyable:
@@ -448,7 +450,10 @@ names of definitions.
 @fig:terms lists the terms. We use two notations for them. The kernel
 reads a text syntax, which we use in examples. The rules use math
 notation. Every binder, application and pair carries a quantity 0, 1
-or 2, which the text writes as `-`, nothing, or `+`. A _book_ is an
+or 2, which the text writes as `-`, nothing, or `+`. These quantities
+are fixed. A kind carries a quantity too, but there it is a term: a
+label of the enumeration $Qs = chevron.l Q_0, Q_1, Q_2 chevron.r$, or a
+variable, a call or a meet that computes one. A _book_ is an
 ordered list of definitions `k : T = t`, where `t` is closed. A name
 `k` in a term refers to a definition of the book.
 
@@ -468,7 +473,9 @@ is 0 (erased), 1 (affine) or 2 (copyable).], {
     [`x`, `k`], [$x$, $k$], [variable, name],
     [`{t : T}`], [$(t : T)$], [annotation],
     [`!q x = v; t`], [$sans("let")^q x = v; t$], [let],
-    [`*1`, `*2`], [#Ty, #Da], [kinds],
+    [`*(g)`], [$star(g)$], [kind of quantity $g$],
+    [`*1`, `*2`], [#Ty, #Da], [$star(Q_1)$, $star(Q_2)$],
+    [`(g <&> h)`], [$g ⊓ h$], [meet of quantities],
     [`∀q x : A -> B`], [$forall^q (x : A). B$], [function type],
     [`λq x => t`], [$lambda^q x. t$], [function],
     [`(f q a)`], [$f ∘^q a$], [application],
@@ -511,17 +518,29 @@ check ignores them, so they need no order and no positivity condition.
 
 == Kinds
 
-The kind of a type says whether its values may be copied. Function
-types have kind #Ty. Enumerations and equality types have kind #Da. A
-pair type $Sigma^q (x : A). B$ has the kind $K$ of $B$, and $A$ must
-have the kind $kind(q, K)$:
+The kind of a type says whether its values may be copied. A kind is
+$star(g)$ for a quantity $g : Qs$, and a type of kind $star(g)$ is #Da
+exactly where $g$ reduces to $Q_2$. Function types have kind #Ty.
+Enumerations and equality types have kind #Da. A pair type
+$Sigma^q (x : A). B$ has any kind $K = star(g)$ that $B$ has, and $A$
+must have the kind $kind(q, K)$:
 $ kind(0, K) = #Ty, quad kind(1, K) = K, quad kind(2, K) = #Da. $
 An erased field may have any type, since it is gone at run time. An
 affine field of a #Da pair must be #Da, and a copyable field is always
 #Da. So the live part of a value of a #Da type holds only labels,
 pairs and #rfl. In the
-same way, the domain of a function type of quantity 2 must be #Da. A
-#Da type may be used where a #Ty is expected.
+same way, the domain of a function type of quantity 2 must be #Da.
+
+A kind $star(g)$ may be used where $star(h)$ is expected when $g$ is
+$Q_2$ wherever $h$ is. So #Da fits every kind, and every kind fits #Ty
+and $star(Q_0)$. The meet $g ⊓ h$ is the least of two quantities. It
+reduces as Bend's `<&>` does: $Q_2$ is its identity and $Q_0$ absorbs
+it, on either side, even when the other side is stuck. So Bend's
+`Either<a, b, A, B>` has the kind $star(a ⊓ b)$, and it is #Da where
+both sides are. Function types fit by their parts, as in Bend:
+$forall^q (x : A). B$ fits $forall^q (x : C). D$ when $C$ fits $A$ and
+$B$ fits $D$. So a `Nat -> Data` fits where a `Nat -> Type` is
+expected, and a `Type -> Nat` where a `Data -> Nat` is.
 
 == Matches and Case Trees
 
@@ -593,8 +612,14 @@ change the type of live code, and evaluation could get stuck.
 
 #figure(kind: image, supplement: [Figure], placement: top,
 scope: "parent", caption: [Selected typing rules. $U <= T$ holds when
-$U$ and $T$ are convertible, when $U = #Da$ and $T$ is a kind, or when
-both are enumerations and each label of $U$ is in $T$. The rules for
+$U$ and $T$ are convertible, when they are kinds $star(g)$ and
+$star(h)$ and $g$ is $Q_2$ wherever $h$ is, under every substitution,
+when both are enumerations and each label of $U$ is in $T$, when they
+are $forall^q (x : A). B$ and $forall^q (x : C). D$ with $C <= A$ and
+$B <= D$, or through a type between them. The checker decides
+the kind case by rules: $Q_2$ is the top, $Q_0$ and $Q_1$ the bottom, a
+meet on the left needs both sides, and a meet on the right needs
+either. The rules for
 variables, names, annotations, pairs, labels and the types of pairs
 and equalities are standard.],
 {
@@ -602,7 +627,8 @@ and equalities are standard.],
   let row(..xs) = align(center, xs.pos().join(h(1.6em)))
   stack(dir: ttb, spacing: 0.9em,
     row(
-      rule[sort][$Gamma tack K : #Ty$],
+      rule[sort][$Gamma tack star(g) : #Ty$][$Gamma tack g : Qs$],
+      rule[meet][$Gamma tack g ⊓ h : Qs$][$Gamma tack g : Qs$][$Gamma tack h : Qs$],
       rule[enum][$Gamma tack chevron.l k_1, ..., k_n chevron.r : #Da$],
       rule[conv][$Gamma tack t : T$][$Gamma tack t : U$][$U <= T$],
       rule[refl][$Gamma tack rfl : a scripts(=)_A b$][$a equiv b$],
@@ -631,17 +657,18 @@ and equalities are standard.],
   )
 }) <fig:typing>
 
-@fig:typing gives the typing rules. Here $K$ is #Ty or #Da, and
+@fig:typing gives the typing rules. Here $K$ is a kind $star(g)$, and
 $live(q)$ holds when $q$ is 1 or 2. Most rules are standard. We explain
 the unusual ones.
 
-The rule #smallcaps[sort] gives #Ty : #Ty and #Da : #Ty. There is one
-level, as in the `idid` example of @sec:bend.
+The rule #smallcaps[sort] gives every kind the kind #Ty, so #Ty : #Ty
+and #Da : #Ty. There is one level, as in the `idid` example of
+@sec:bend.
 
 The rules #smallcaps[pi] and #smallcaps[sigma] assign kinds. A function
 type always has kind #Ty. No rule gives it kind #Da, and confluence
-(@sec:meta) shows that #Ty and #Da are not convertible. So no function
-is ever bound at quantity 2.
+(@sec:meta) shows that #Ty and #Da are not convertible, since $Q_1$ and
+$Q_2$ are distinct labels. So no function is ever bound at quantity 2.
 
 In the rule #smallcaps[lam], a lambda may bind its variable at
 quantity 2 under a function type of quantity 1, if the domain is #Da.
@@ -690,7 +717,8 @@ at most one live use. A variable of quantity 2 may have any number of
 live uses. The uses in the two arms of a match add up. Until the match
 fires, both arms are part of the term. If a variable were substituted
 into both, its value would be copied, and the value may hold calls.
-This is why the compiler binds `b` inside each arm of `add`.
+This is why the compiler binds `b` inside each arm of `add`. A meet is
+live code: its two sides are live, and their uses add up.
 
 The quantity is written on the binder. The kind of its type only
 confirms that the quantity is allowed. That way the live check needs
@@ -744,8 +772,10 @@ the theory, with three relations:
 - _Parallel reduction_ $t => u$ reduces any set of redexes in $t$, in
   live and dead positions. It includes the rules of @fig:eval with any
   terms in place of the values, and the unfolding of a name to its
-  body. _Conversion_ $a equiv b$ holds when $a$ and $b$ have a common
-  reduct.
+  body. It also steps $lambda^2 x. t$ to $lambda^1 x. t$, and never
+  back: the quantity of a lambda says how it runs, so two lambdas of one
+  liveness are convertible when their bodies are. _Conversion_
+  $a equiv b$ holds when $a$ and $b$ have a common reduct.
 - _Typing_ $Gamma tack t : T$ has the rules of @fig:typing.
 - _Evaluation_ $t |-> u$ is call-by-value evaluation of live code
   (@fig:eval). Its values are lambdas, matches, labels, #rfl, types,
@@ -764,6 +794,7 @@ leaf $t$. Evaluation does not enter dead positions.], {
     $lambda{k : h; m} ∘^q j$, $|->$, $m ∘^q j quad (j != k)$,
     $sans("let")^q x = v; t$, $|->$, $t[v slash x]$,
     $(t : T)$, $|->$, $t$,
+    $Q_i ⊓ Q_j$, $|->$, $Q_(min(i, j))$,
     $rfl ▹_(x,h. P) f$, $|->$, $f$,
     $k space v_1 ... v_n$, $|->$, $t[v_1 ... v_n]$,
   )
@@ -782,16 +813,18 @@ $t scripts(=>)^* u_2$, then $u_1 scripts(=>)^* v$ and
 $u_2 scripts(=>)^* v$ for some $v$.]
 
 We follow Takahashi @takahashi1995. The complete development $t^*$
-reduces every redex of $t$ at once. If $t => u$, then $u => t^*$, and
-confluence follows. The proof does not use types, so #Ty : #Ty plays no
-part in it.
+reduces every redex of $t$ at once, and steps every $lambda^2$ to
+$lambda^1$. If $t => u$, then $u => t^*$, and confluence follows. The
+proof does not use types, so #Ty : #Ty plays no part in it.
 
 Confluence gives the two facts about conversion that the rest of the
 proof needs. First, type formers are injective. If
 $forall^p (x : A). B equiv forall^q (x : A'). B'$, then $p = q$,
-$A equiv A'$ and $B equiv B'$, and the same holds for $Sigma$. Second,
-terms with different head formers are not convertible. So #Ty is not
-#Da, and a function type is not an enumeration. Many type theories get
+$A equiv A'$ and $B equiv B'$, the same holds for $Sigma$, and
+$star(g) equiv star(h)$ only when $g equiv h$. Second, terms with
+different head formers are not convertible. So #Ty is not #Da, since
+$Q_1$ and $Q_2$ are distinct labels, and a function type is not an
+enumeration. Many type theories get
 these facts from the normalization of types. BendTT gets them from
 confluence alone.
 
@@ -801,11 +834,19 @@ confluence alone.
 $Gamma tack t : T$ and $t => u$, then $Gamma tack u : T$.]
 
 The proof is by induction on the typing derivation, with a
-substitution lemma and inversion through injectivity. It holds for
+substitution lemma and inversion through injectivity. A fit is read the
+same way: where $U <= T$ and $T$ converts to a type former, $U$
+converts to the same former, and their parts fit. So a $beta$ step
+casts the argument along the fit of the domains, and the result along
+the fit of the codomains. It holds for
 reduction anywhere, dead positions included, and it does not need the
 live check.
 
-Reduction of open terms does not preserve the live check. Take
+Parallel reduction does not preserve the live check. On a closed
+term, the step from $lambda^2 x. (x, x)$ to $lambda^1 x. (x, x)$ leaves
+a quantity-1 variable used twice. This is harmless, since the live
+claims are about evaluation, and $|->$ never takes that step. Reduction
+of open terms loses the live check in a second way. Take
 $(lambda^2 x. (x, x)) space y$, where $y$ is an affine variable of type
 `Nat`. It passes the live check, since it uses $y$ once. One step later
 it is $(y, y)$, which uses $y$ twice. Quantitative type theory
@@ -849,8 +890,8 @@ a column is the size of the live part of its argument when that
 argument is a closed value. It is 0 when the column is erased, and
 $omega$ when the argument is not yet a value. Labels are ordered by
 index first, and then by sizes, from left to right, with every number
-below $omega$. Each lambda, match, let, annotation and rewrite in a live
-position gets the least label. The _measure_ of a term is the multiset
+below $omega$. Each lambda, match, let, annotation, rewrite and meet in
+a live position gets the least label. The _measure_ of a term is the multiset
 of the labels of its live calls and nodes. Multisets are ordered as
 Dershowitz and Manna define @dershowitzmanna1979: one element may be
 replaced by any finite number of smaller ones. This order is well
@@ -974,10 +1015,11 @@ type List<a, -A: Kind(a)> is Kind(a):
   Con{head: A, tail: List<a, A>}
 ```
 
-Here `Kind(1)` is #Ty and `Kind(2)` is #Da. So `List<2, Nat>`, written
-`+List<Nat>`, is #Da, and a list of functions is #Ty. BendTT has no
-quantity variables. The compiler emits a copy of each generic
-definition for each quantity that the program uses.
+Here `Kind(&1)` is #Ty and `Kind(&2)` is #Da. So `List<&2, Nat>`,
+written `+List<Nat>`, is #Da, and a list of functions is #Ty. In
+BendTT, `a` is a variable of type $Qs$, and `List` has the kind
+$star(a)$. So each generic definition goes to the kernel once, as
+written. A kind may depend on any value, even one computed at run time.
 
 Negative datatypes are fine, and so is an evaluator that applies each
 closure once:
@@ -1006,7 +1048,7 @@ counter.
 = Mechanization <sec:mech>
 
 The kernel of BendTT, the statements of the theorems and their proofs
-are one Lean 4 file @demoura2021, `bendtt.lean`, of 4,247 lines. Every
+are one Lean 4 file @demoura2021, `bendtt.lean`, of about 4,000 lines. Every
 proof is complete, and the file declares no axioms of its own, so the
 proofs rest only on Lean's standard axioms. The file has three parts.
 Part 1 is the kernel: terms, evaluation, conversion, the checker, the

@@ -7,5 +7,5 @@ Term socket_close_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) socket_close_use(void) {
-  io_eff(CID(Socket.close), socket_close_run, 0);
+  io_eff(CID(Socket.close), socket_close_run);
 }

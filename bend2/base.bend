@@ -37,6 +37,13 @@ type Result<a, b, -E: Kind(a), -A: Kind(b)> is Kind(a <&> b):
   Fail{error: E}
   Done{value: A}
 
+# What a try_ operation answers: Ready{x}, x what its blocking twin answers,
+# or Wait{rest} once ms milliseconds pass first (0: at once), rest what did
+# not happen (the value or the bytes not sent).
+type Poll<a, b, -A: Kind(a), -R: Kind(b)> is Kind(a <&> b):
+  Ready{value: A}
+  Wait{rest: R}
+
 type List<a, -A: Kind(a)> is Kind(a):
   Nil{}
   Con{head: A, tail: List<a, A>}
@@ -222,11 +229,23 @@ def Chan.new(-A: Type, room: U32) -> IO(Chan(A)):
   import "./effs/chan.c"
   import "./effs/chan.js"
 
-def Chan.send(-A: Type, chan: Chan(A), value: A) -> IO(Bool):
+# Done{} once the channel takes the value, Fail{value} if it is closed.
+def Chan.send(-A: Type, chan: Chan(A), value: A) -> IO(Result<&1, &1, A, Unit>):
   import "./effs/chan.c"
   import "./effs/chan.js"
 
+# Some{value}, or None{} once the channel is closed and drained.
 def Chan.recv(-A: Type, chan: Chan(A)) -> IO(Maybe<&1, A>):
+  import "./effs/chan.c"
+  import "./effs/chan.js"
+
+def Chan.try_send(-A: Type, chan: Chan(A), value: A, ms: U32) ->
+  IO(Poll<&1, &1, Result<&1, &1, A, Unit>, A>):
+  import "./effs/chan.c"
+  import "./effs/chan.js"
+
+def Chan.try_recv(-A: Type, chan: Chan(A), ms: U32) ->
+  IO(Poll<&1, &1, Maybe<&1, A>, Unit>):
   import "./effs/chan.c"
   import "./effs/chan.js"
 
@@ -236,8 +255,9 @@ def Chan.close(-A: Type, chan: Chan(A)) -> IO(Unit):
 
 def IO.fork.go(-A: Type, act: IO(A), chan: Chan(A)) -> IO(Chan(A)):
   +c = chan
-  sent = IO.bind(A, Bool, act, x => Chan.send(A, c, x))
-  IO.bind(Unit, Chan(A), IO.spawn(Bool, sent), u => IO.pure(Chan(A), c))
+  sent = IO.bind(A, Result<&1, &1, A, Unit>, act, x => Chan.send(A, c, x))
+  IO.bind(Unit, Chan(A), IO.spawn(Result<&1, &1, A, Unit>, sent),
+    u => IO.pure(Chan(A), c))
 
 def IO.fork(-A: Type, act: IO(A)) -> IO(Chan(A)):
   IO.bind(Chan(A), Chan(A), Chan.new(A, 1), IO.fork.go(A, act))
@@ -309,19 +329,37 @@ def TCP.accept(listener: Listener) ->
   import "./effs/tcp_accept.c"
   import "./effs/tcp_accept.js"
 
+def TCP.try_accept(listener: Listener, ms: U32) ->
+  IO(Listener & Poll<&1, &1, Result<&1, &1, U32 & String, Socket>, Unit>):
+  import "./effs/tcp_accept.c"
+  import "./effs/tcp_accept.js"
+
 def TCP.connect(host: String, port: U32) ->
   IO(Result<&1, &1, U32 & String, Socket>):
   import "./effs/tcp_connect.c"
   import "./effs/tcp_connect.js"
 
+# A failed send hands back what the kernel did not take. Sent means taken
+# by the kernel, not yet read by the peer.
 def TCP.send(sock: Socket, data: String) ->
-  IO(Socket & Result<&1, &1, U32 & String, Unit>):
+  IO(Socket & Result<&1, &1, (U32 & String) & String, Unit>):
   import "./effs/tcp_send.c"
   import "./effs/tcp_send.js"
 
-# A max of 0 fails with EINVAL, as do TCP.recv_bytes and TCP.poll.
+def TCP.try_send(sock: Socket, data: String, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & String, Unit>, String>):
+  import "./effs/tcp_send.c"
+  import "./effs/tcp_send.js"
+
+# Some{data}, or None{} once the peer has sent everything (it may still
+# read). A max of 0 fails with EINVAL, as in every receive below.
 def TCP.recv(sock: Socket, max: U32) ->
-  IO(Socket & Result<&1, &1, U32 & String, String>):
+  IO(Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>):
+  import "./effs/tcp_recv.c"
+  import "./effs/tcp_recv.js"
+
+def TCP.try_recv(sock: Socket, max: U32, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, U32 & String, Maybe<&1, String>>, Unit>):
   import "./effs/tcp_recv.c"
   import "./effs/tcp_recv.js"
 
@@ -329,38 +367,80 @@ def TCP.recv(sock: Socket, max: U32) ->
 # binary data and a character split between two reads survive. A value past
 # 255 fails with EINVAL before any byte is sent.
 def TCP.send_bytes(sock: Socket, data: List<&2, U32>) ->
-  IO(Socket & Result<&1, &1, U32 & String, Unit>):
+  IO(Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>):
+  import "./effs/tcp_send.c"
+  import "./effs/tcp_send.js"
+
+def TCP.try_send_bytes(sock: Socket, data: List<&2, U32>, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>,
+    List<&2, U32>>):
   import "./effs/tcp_send.c"
   import "./effs/tcp_send.js"
 
 def TCP.recv_bytes(sock: Socket, max: U32) ->
-  IO(Socket & Result<&1, &1, U32 & String, List<&2, U32>>):
+  IO(Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>>):
   import "./effs/tcp_recv.c"
   import "./effs/tcp_recv.js"
 
-def TCP.poll(sock: Socket, max: U32, ms: U32) ->
-  IO(Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>):
-  import "./effs/tcp_poll.c"
-  import "./effs/tcp_poll.js"
+def TCP.try_recv_bytes(sock: Socket, max: U32, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>>,
+    Unit>):
+  import "./effs/tcp_recv.c"
+  import "./effs/tcp_recv.js"
 
 def UDP.bind(host: String, port: U32) -> IO(Result<&1, &1, U32 & String, Socket>):
   import "./effs/udp_bind.c"
   import "./effs/udp_bind.js"
 
+# A datagram goes whole or not at all: a failed send hands it back.
 def UDP.send_to(sock: Socket, host: String, port: U32, data: String) ->
-  IO(Socket & Result<&1, &1, U32 & String, Unit>):
+  IO(Socket & Result<&1, &1, (U32 & String) & String, Unit>):
   import "./effs/udp_send_to.c"
   import "./effs/udp_send_to.js"
 
+def UDP.try_send_to(sock: Socket, host: String, port: U32, data: String, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & String, Unit>, String>):
+  import "./effs/udp_send_to.c"
+  import "./effs/udp_send_to.js"
+
+# The datagram's bytes as they are (0..255), one List cell each: no UTF-8
+# encoding, so a binary protocol's datagram goes out as written. A value
+# past 255 fails with EINVAL before anything is sent.
+def UDP.send_bytes_to(sock: Socket, host: String, port: U32, data: List<&2, U32>) ->
+  IO(Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>):
+  import "./effs/udp_send_to.c"
+  import "./effs/udp_send_to.js"
+
+def UDP.try_send_bytes_to(sock: Socket, host: String, port: U32, data: List<&2, U32>,
+  ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>,
+    List<&2, U32>>):
+  import "./effs/udp_send_to.c"
+  import "./effs/udp_send_to.js"
+
+# A datagram may be empty: UDP has no end, so no None{}.
 def UDP.recv_from(sock: Socket, max: U32) ->
   IO(Socket & Result<&1, &1, U32 & String, String & U32 & String>):
   import "./effs/udp_recv_from.c"
   import "./effs/udp_recv_from.js"
 
-def UDP.poll(sock: Socket, max: U32) ->
-  IO(Socket & Result<&1, &1, U32 & String, Maybe<&1, String & U32 & String>>):
-  import "./effs/udp_poll.c"
-  import "./effs/udp_poll.js"
+def UDP.try_recv_from(sock: Socket, max: U32, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, U32 & String, String & U32 & String>, Unit>):
+  import "./effs/udp_recv_from.c"
+  import "./effs/udp_recv_from.js"
+
+# The datagram's bytes as they are: no UTF-8 decoding, so every byte of a
+# binary datagram survives.
+def UDP.recv_bytes_from(sock: Socket, max: U32) ->
+  IO(Socket & Result<&1, &1, U32 & String, String & U32 & List<&2, U32>>):
+  import "./effs/udp_recv_from.c"
+  import "./effs/udp_recv_from.js"
+
+def UDP.try_recv_bytes_from(sock: Socket, max: U32, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, U32 & String,
+    String & U32 & List<&2, U32>>, Unit>):
+  import "./effs/udp_recv_from.c"
+  import "./effs/udp_recv_from.js"
 
 def Socket.close(socket: Socket) -> IO(Unit):
   import "./effs/socket_close.c"

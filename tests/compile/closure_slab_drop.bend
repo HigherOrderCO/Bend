@@ -1,7 +1,6 @@
-# a dropped closure whose capture is an array: the drop must collect the
-# captured tree (bend3 pinned its slab drop walk; the capture-drop is
-# the dialect-neutral part)
-# ported from bend3: the 2^17-slot slab becomes a 16-leaf Base Array
+# The foreign sink keeps a closure with a runtime array capture live, then
+# drops it without calling it. Native arena growth stays within one
+# allocation quantum after warm-up, including retained free lists.
 import Base
 
 law foo.go:
@@ -21,17 +20,28 @@ law foo:
 def foo(a, x):
   foo.go(x, Array.get(U32, a, 12))
 
-law main.out:
-  U32
+def dispose(f: U32 -> U32) -> IO(U32):
+  import "./closure_slab_drop.c"
+  import "./closure_slab_drop.js"
 
-def main.out():
-  g = foo([7 : U32*16n])
-  5
+def loop(n: Nat, +x: U32, last: U32) -> IO(U32):
+  match n:
+    case 0n:
+      IO.pure(U32, last)
+    case 1n+more:
+      do IO<U32>:
+        a : Array<U32> = [x : U32*16n]
+        value : U32 <- dispose(foo(a))
+        loop(more, x, value)
 
 law main:
   IO(Unit)
 
 def main():
-  IO.print(U32.show(main.out()))
+  do IO<Unit>:
+    xs : List<String> <- IO.args()
+    x : U32 = U32.from_nat(List.length(&1, String, xs))
+    value : U32 <- loop(20000n, x, 0)
+    IO.print(U32.show(value))
 
 #|5

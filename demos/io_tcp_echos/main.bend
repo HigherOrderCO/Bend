@@ -8,17 +8,15 @@
 import Base
 
 # the move on a recv: the data sent back, or nothing: the connection
-# closes on a closed peer (an empty recv) or a failed one
-def echo_step(r: Result<&1, &1, U32 & String, String>) -> Maybe<String>:
+# closes at the peer's end (None{}) or on a failed recv
+def echo_step(r: Result<&1, &1, U32 & String, Maybe<&1, String>>) -> Maybe<String>:
   match r:
-    case Done{SCon{h, t}}:
-      Some{SCon{h, t}}
-    case Done{SNil{}}:
-      None{}
+    case Done{m}:
+      m
     case Fail{e}:
       None{}
 
-def echo_sent(m: Socket & Result<&1, &1, U32 & String, Unit>, next: Socket -> IO(Unit)) -> IO(Unit):
+def echo_sent(m: Socket & Result<&1, &1, (U32 & String) & String, Unit>, next: Socket -> IO(Unit)) -> IO(Unit):
   (s, r) = m
   match r:
     case Done{u}:
@@ -33,17 +31,17 @@ def echo_move(s: Socket, m: Maybe<String>, next: Socket -> IO(Unit)) -> IO(Unit)
       Socket.close(s)
     case Some{d}:
       do IO<Unit>:
-        sm : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(s, d)
+        sm : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(s, d)
         echo_sent(sm, next)
 
-def echo_back(m: Socket & Result<&1, &1, U32 & String, String>, next: Socket -> IO(Unit)) -> IO(Unit):
+def echo_back(m: Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>, next: Socket -> IO(Unit)) -> IO(Unit):
   (s, r) = m
   echo_move(s, echo_step(r), next)
 
 @unsafe
 def echo_conn(s: Socket) -> IO(Unit):
   do IO<Unit>:
-    rm : Socket & Result<&1, &1, U32 & String, String> <- TCP.recv(s, 4096)
+    rm : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(s, 4096)
     echo_back(rm, s2 => echo_conn(s2))
 
 def serve_next(m: Listener & Result<&1, &1, U32 & String, Socket>) -> IO(Listener):

@@ -13,11 +13,12 @@
 
 // The X11 window: its own connection (so its queue holds only its
 // events), the frame's image, the events pumped since the last frame,
-// five words each (cid, a, b, c, d) as on the Mac, and whether it
-// holds the pointer.
+// five words each (cid, a, b, c, d) as on the Mac, whether it holds the
+// pointer, and the display's refresh period in ns.
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
+#include <dlfcn.h>
 
 typedef struct {
   Display* dpy;
@@ -28,6 +29,7 @@ typedef struct {
   u32      cap;
   u32*     evs;
   u32      grab;
+  u64      period;
 } BendWin;
 
 #endif
@@ -243,6 +245,30 @@ static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
 
 #elif defined(__linux__)
 
+// The display's refresh period in ns: the rate RandR reports, through a
+// libXrandr loaded at run time (a build needs no libxrandr-dev), else
+// 60 Hz, as under a display that reports none or has no RandR (asked
+// first: libXrandr faults on a server without it). The library stays
+// loaded: it hooks the connection's close.
+static u64 window_period(Display* dpy) {
+  int op, ev, er;
+  void* xrr = XQueryExtension(dpy, "RANDR", &op, &ev, &er)
+    ? dlopen("libXrandr.so.2", RTLD_LAZY | RTLD_LOCAL) : NULL;
+  if (xrr == NULL) {
+    return 16666667;
+  }
+  void* (*info)(Display*, Window) =
+    (void* (*)(Display*, Window))dlsym(xrr, "XRRGetScreenInfo");
+  short (*rate)(void*) = (short (*)(void*))dlsym(xrr, "XRRConfigCurrentRate");
+  void (*done)(void*) = (void (*)(void*))dlsym(xrr, "XRRFreeScreenConfigInfo");
+  void* cfg = info && rate && done ? info(dpy, DefaultRootWindow(dpy)) : NULL;
+  short hz  = cfg != NULL ? rate(cfg) : 0;
+  if (cfg != NULL) {
+    done(cfg);
+  }
+  return hz >= 24 && hz <= 1000 ? 1000000000 / (u64)hz : 16666667;
+}
+
 static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
   const char** why) {
   if (w < 1 || h < 1 || w > 16384 || h > 16384) {
@@ -261,6 +287,7 @@ static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
   }
   BendWin* win = io_mem(calloc(1, sizeof *win));
   win->dpy = dpy;
+  win->period = window_period(dpy);
   win->win = XCreateSimpleWindow(dpy, RootWindow(dpy, scr), 0, 0, w, h, 0, 0,
     BlackPixel(dpy, scr));
   win->del = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
@@ -305,7 +332,7 @@ Term window_open_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) window_open_use(void) {
-  io_eff(CID(Window.open), window_open_run, 0);
+  io_eff(CID(Window.open), window_open_run);
 }
 
 #endif
@@ -326,6 +353,10 @@ static Term window_node(Env e, const u32* ev) {
     e.mem[l + j] = ev[1 + j];
   }
   return term_ctr(ev[0], l);
+}
+
+static u32 window_depth(u32 n) {
+  return n > 1 ? 32 - CLZ(n - 1) : 0;
 }
 
 static Term window_list(Env e, const u32* p, u64 n) {
@@ -452,9 +483,7 @@ static void window_show(Env e, CAMetalLayer* layer, Term image) {
   id<MTLBuffer> buf = window_corpus(e, dev);
   WinArgs args = { image, layer.drawableSize.width, layer.drawableSize.height,
     0 };
-  while ((1u << args.k) < args.w || (1u << args.k) < args.h) {
-    args.k += 1;
-  }
+  args.k = window_depth(args.w > args.h ? args.w : args.h);
   __block bool done = false;
   id<MTLCommandBuffer> cb = [window_que commandBuffer];
   // nextDrawable blocks until the display frees one: on a helper thread
@@ -656,26 +685,23 @@ static void window_fill(Env e, u32* pix, u32 w, u32 h, Term image, u32 k) {
   window_sq(e.mem, pix, w, h, image, 1u << k, 0, 0);
 }
 
-// A frame waits for the next 60 Hz tick, as the Mac's display sync.
-static void window_pace(void) {
+// A frame waits for the display's next tick, as the Mac's display sync.
+static void window_pace(u64 period) {
   static u64 due;
   u64 now = io_tick();
   if (due > now) {
     struct timespec ts = { 0, (long)(due - now) };
     nanosleep(&ts, NULL);
   }
-  due = (due > now ? due : now) + 16666667;
+  due = (due > now ? due : now) + period;
 }
 
 static void window_show(Env e, BendWin* win, Term image) {
   u32 w = win->img->width;
   u32 h = win->img->height;
-  u32 k = 0;
-  while ((1u << k) < w || (1u << k) < h) {
-    k += 1;
-  }
+  u32 k = window_depth(w > h ? w : h);
   window_fill(e, (u32*)win->img->data, w, h, image, k);
-  window_pace();
+  window_pace(win->period);
   XPutImage(win->dpy, win->win, DefaultGC(win->dpy, DefaultScreen(win->dpy)),
     win->img, 0, 0, 0, 0, w, h);
   XFlush(win->dpy);
@@ -705,7 +731,7 @@ Term window_frame_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) window_frame_use(void) {
-  io_eff(CID(Window.frame), window_frame_run, 0);
+  io_eff(CID(Window.frame), window_frame_run);
 }
 
 #endif
@@ -744,7 +770,7 @@ Term window_set_title_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) window_set_title_use(void) {
-  io_eff(CID(Window.set_title), window_set_title_run, 0);
+  io_eff(CID(Window.set_title), window_set_title_run);
 }
 
 #endif
@@ -802,7 +828,7 @@ Term window_grab_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) window_grab_use(void) {
-  io_eff(CID(Window.grab), window_grab_run, 0);
+  io_eff(CID(Window.grab), window_grab_run);
 }
 
 #endif
@@ -840,7 +866,7 @@ Term window_close_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) window_close_use(void) {
-  io_eff(CID(Window.close), window_close_run, 0);
+  io_eff(CID(Window.close), window_close_run);
 }
 
 #endif

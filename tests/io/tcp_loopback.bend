@@ -14,28 +14,32 @@ import Base
 law step_finish:
   for l: Listener
   for c: Socket
-  for m: Socket & Result<&1, &1, (U32 & String), String>
+  for m: Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>>
   IO(U32)
 
 def step_finish(l, c, m):
   (a, r) = m
   do IO<U32>:
-    data : String <- IO.pass(String, r)
-    w    : Unit <- IO.print(data)
+    data : Maybe<&1, String> <- IO.pass(Maybe<&1, String>, r)
+    w    : Unit <- IO.print(Maybe.default(&1, String, data, "ended"))
     x    : Unit <- Socket.close(a)
     y    : Unit <- Socket.close(c)
     z    : Unit <- Listener.close(l)
     return 0
 
 law send_go:
-  for m: Socket & Result<&1, &1, (U32 & String), Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
   IO(Socket)
 
 def send_go(m):
   (s, r) = m
-  do IO<Socket>:
-    u : Unit <- IO.pass(Unit, r)
-    return s
+  match r:
+    case Done{u}:
+      IO.pure(Socket, s)
+    case Fail{((code, message), rest)}:
+      do IO<Socket>:
+        u : Unit <- IO.die(Unit, code, message)
+        return s
 
 law step_accept:
   for c: Socket
@@ -46,9 +50,9 @@ def step_accept(c, p):
   (l, ar) = p
   do IO<U32>:
     a  : Socket <- IO.pass(Socket, ar)
-    sm : Socket & Result<&1, &1, (U32 & String), Unit> <- TCP.send(c, "bend-tcp")
+    sm : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(c, "bend-tcp")
     c2 : Socket <- send_go(sm)
-    rm : Socket & Result<&1, &1, (U32 & String), String> <- TCP.recv(a, 64)
+    rm : Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>> <- TCP.recv(a, 64)
     step_finish(l, c2, rm)
 
 law main_go:

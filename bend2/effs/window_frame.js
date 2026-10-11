@@ -2,8 +2,7 @@
 // ======
 
 function window_frame(window, image) {
-  return { $: CID(Tuple), fst: window,
-    snd: { $: CID(Tuple), fst: image, snd: { $: CID(Nil) } } };
+  return io_tup(window, image, { $: CID(Nil) });
 }
 
 io_eff(CID(Window.frame), window_frame);

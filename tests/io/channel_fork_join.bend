@@ -12,8 +12,8 @@ law producer:
 
 def producer(c):
   do IO<Unit>:
-    a : Bool <- Chan.send(U32, c, 11)
-    b : Bool <- Chan.send(U32, c, 22)
+    a : Result<&1, &1, U32, Unit> <- Chan.send(U32, c, 11)
+    b : Result<&1, &1, U32, Unit> <- Chan.send(U32, c, 22)
     Chan.close(U32, c)
 
 law got:

@@ -3,11 +3,10 @@
 
 function file_write_buffer(file, b) {
   const fs = require("fs");
-  const fd = file;
   let at = 0;
   try {
     while (at < b.length) {
-      at += fs.writeSync(fd, b, at, b.length - at, null);
+      at += fs.writeSync(file, b, at, b.length - at, null);
     }
     return io_tup(file, io_done({ $: CID(Unit) }));
   } catch (e) {
