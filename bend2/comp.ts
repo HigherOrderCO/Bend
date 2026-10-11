@@ -1518,8 +1518,6 @@ function spare_flush(sc: Scope): void {
 // Seg
 // ===
 
-// Pop the frame and register spill before opening the parameters.
-
 function seg_new(name: string, ret: Lay, params: string[],
   ks: Kind[] = [], frame: Seg["frame"] = null): Seg {
   return { fid: name && seg_fid(name), def: name, ret, lines: [], params, ks,
@@ -1538,7 +1536,7 @@ function seg_take(seg: Seg): string[] {
   const { pop, at } = seg.frame ?? { pop: 0, at: [] };
   const drop = pop + (seg.native ? 0
     : Math.max(0, seg.params.length - at.length - WIDE));
-  return [...drop > 0 ? [`WL_POPN(${drop});`] : [], ...seg.params.map((p, i) =>
+  return [...drop ? [`WL_POPN(${drop});`] : [], ...seg.params.map((p, i) =>
     `${lay_c(seg.ks[i])} ${p} = ${i < at.length ? `STK(${at[i]})`
       : seg_reg(seg, i - at.length, pop)};`)];
 }
@@ -2778,9 +2776,7 @@ function effect_srcs(ext: string, miss: string): string[] {
 // C
 // -
 
-// The device holds bang-reachable segments and closure-taking bangs' closures.
-// rp frees rax for host musttail. WL_LOAD's ladder avoids clang's quadratic
-// phi cascade for a fallthrough switch.
+// Bounded bank/ladder avoids quadratic clang phis; rp frees rax for musttail.
 
 export function compile_book(book: Bend.Book): string {
   FL = file_new(book, false);
@@ -4371,8 +4367,6 @@ static Term work_loop(Env e, DEV Term* sp, Term t, u32 seq) {
 
 // Segments
 // ========
-
-// Parameters: continuation frames, otherwise the bank plus its spill tail.
 
 ${segs}
 
