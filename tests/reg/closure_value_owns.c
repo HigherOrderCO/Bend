@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :heap.check BEND_CID_heap_check
+// bend-ids end
 static Term closure_heap_run(Env e, Term* f, IoWork* w) {
   if (f[0] != f[1]) {
     err_fail("closure_value_owns: incorrect sum");
@@ -10,5 +13,5 @@ static Term closure_heap_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) closure_heap_use(void) {
-  io_eff(CID(heap.check), closure_heap_run);
+  io_eff(BEND_CID_heap_check, closure_heap_run);
 }

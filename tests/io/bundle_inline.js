@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Bundle.inline BEND_CID_Bundle_inline
+// bend-ids end
 function bundle_inline() {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -49,4 +52,4 @@ function bundle_inline() {
   }
 }
 
-io_eff(CID(Bundle.inline), bundle_inline);
+io_eff(BEND_CID_Bundle_inline, bundle_inline);
