@@ -336,6 +336,16 @@ try {
       && got.out === "" && got.err === "bend: arguments go to a run:"
       + " bend <file.bend> [args] (see bend --help)\n");
   }
+  fs.writeFileSync(path.join(TMP, "noted.bend"),
+    "import Base # base\ndef main() -> Nat:\n  (2n + 3n : Nat)\n");
+  const noted = path.join(TMP, "noted_checkup.bend");
+  fs.writeFileSync(noted, "import ./noted.bend as N # noted\n"
+    + "import ./bad.bend as B # bad\n");
+  const got_noted = await bend([noted, "--checkup"]);
+  check("--checkup reads imports with a # comment: " + got_noted.out,
+    got_noted.code === 1
+    && got_noted.out.includes("--- ./noted.bend ---\n5n\n")
+    && got_noted.out.includes("--- ./bad.bend ---\n"));
   const argn = path.join(TMP, "argn.bend");
   fs.writeFileSync(argn, "import Base\nlaw main:\n  IO(Unit)\ndef main():\n"
     + "  do IO<Unit>:\n    xs : List<String> <- IO.args()\n"
