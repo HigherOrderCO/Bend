@@ -860,6 +860,7 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
 // but for the words.
+// seen tracks the active datatype path, not sibling instances of a family.
 function ty_holds(A: HTerm | null,
   p: (t: HTerm | null) => boolean, seen = new Set<Name>()): boolean {
   const t = ty_wnf(A);
@@ -882,8 +883,10 @@ function ty_holds(A: HTerm | null,
     return false;
   }
   seen.add(t.k);
-  return tld.c.some((c) =>
+  const holds = tld.c.some((c) =>
     ctr_doms(c, t.x).some((f) => ty_holds(f, p, seen)));
+  seen.delete(t.k);
+  return holds;
 }
 
 function ty_value(K: HTerm | null): boolean {
