@@ -4,18 +4,16 @@ import Base
 def Host.nested(mode: U32) -> IO(Unit):
   import "./reenter_scheduler.js"
 
-def child(text: String) -> IO(Unit):
-  IO.print(text)
-
 def main() -> IO(Unit):
   do IO<Unit>:
+    Unit <- IO.sleep(1)
     Unit <- Host.nested(0)
-    Unit <- IO.spawn(Unit, child("child"))
+    a : Chan(U32) <- IO.fork(U32, IO.pure(U32, 10))
+    x : U32 <- IO.join(U32, a)
     Unit <- Host.nested(1)
-    Unit <- IO.spawn(Unit, child("after-error"))
-    IO.print("outer-complete")
+    b : Chan(U32) <- IO.fork(U32, IO.pure(U32, 20))
+    y : U32 <- IO.join(U32, b)
+    IO.print(U32.show((x + y : U32)))
 
 #|inner
-#|outer-complete
-#|child
-#|after-error
+#|30

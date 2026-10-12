@@ -309,7 +309,7 @@ async function cli_file(args: string[]): Promise<void> {
       return;
     }
     if (outs.length === 0) {
-      process.exitCode = book_run(book, [file, ...argv]);
+      process.exitCode = await book_run(book, [file, ...argv]);
       return;
     }
     const ins = new Set([...seen.keys(), ...Object.values(book.tlds).flatMap((t) =>
@@ -352,7 +352,7 @@ async function cli_checkup(file: string): Promise<void> {
     try {
       const own = /^(?:[\t\r ]*(?:(?:#|import )[^\n]*)?\n)*[\t ]*import Base\s/
         .test(fs.readFileSync(at, "utf8"));
-      code = book_run(await book_read(at, own ? base : undefined), [at]);
+      code = await book_run(await book_read(at, own ? base : undefined), [at]);
     } catch (e) {
       cli_say(2, book_err(e) + "\n");
     }
@@ -945,7 +945,7 @@ function book_main(book: Bend.Book): Bend.Def | null {
     || (main.v === null && main.i === undefined) ? null : main;
 }
 
-function book_run(book: Bend.Book, argv: string[]): number {
+function book_run(book: Bend.Book, argv: string[]): number | Promise<number> {
   const main = book_main(book);
   if (main === null) {
     return cli_verdict(book, false);

@@ -1294,7 +1294,7 @@ export function io_type(book: Bend.Book): HTerm | null {
   return xs?.length === 1 ? xs[0] : null;
 }
 
-export function io_run(book: Bend.Book, args: string[]): number {
+export function io_run(book: Bend.Book, args: string[]): Promise<number> {
   const src = `${js_lib(book)}\n${RUNTIME_MAIN}\ncli_args = ${
     JSON.stringify(args)};\nreturn io_run(${js_sat("main")});`;
   return new Function("require", src)(import.meta.require);
@@ -6093,13 +6093,13 @@ function show_val(D, d, v, chain) {
 // undefined parks it again. The waits stay in deadline order, as io_park
 // does in C.
 
-function io_exit(main, show) {
+async function io_exit(main, show) {
   try {
     if (show !== null) {
       io_out(1, io_bytes(show_val(show, 0, run_loop(main()), 0) + "\n"));
       process.exit(0);
     }
-    process.exit(io_run(main));
+    process.exit(await io_run(main));
   } catch (e) {
     io_errs(String(e));
     process.exit(1);
@@ -6243,38 +6243,30 @@ function io_push(fun, arg, fresh) {
   io.live += fresh ? 1 : 0;
 }
 
-function io_wait(io, block) {
-  const soon = io.waits[0]?.at ?? Infinity;
-  const ms = !block ? 0 : soon === Infinity ? -1
-    : Math.max(0, Math.ceil(soon - performance.now()));
+function io_wait(io) {
   const fds = io.waits.filter((w) => w.fd !== undefined);
   const top = fds.reduce((m, w) => Math.max(m, w.fd), 0);
   const len = (top >> 6 << 3) + 8;
-  const set = new Uint8Array(2 * len);
+  const set = fds.length ? new Uint8Array(2 * len) : null;
   const at = (w) => (w.out ? len : 0) + (w.fd >> 3);
-  for (const w of fds) {
-    set[at(w)] |= 1 << (w.fd & 7);
-  }
-  const tv = new BigInt64Array([BigInt(ms / 1000 | 0),
-    BigInt(ms % 1000 * 1000)]);
-  const sys = io_sys();
-  if (sys.select(top + 1, sys.ptr(set), sys.ptr(set, len), null,
-    ms < 0 ? null : sys.ptr(tv)) < 0) {
-    if (sys.errno() !== 4) {
-      throw "bend: the poller failed";
+  if (set !== null) {
+    for (const w of fds) set[at(w)] |= 1 << (w.fd & 7);
+    const tv = new BigInt64Array([0n, 0n]);
+    const sys = io_sys();
+    if (sys.select(top + 1, sys.ptr(set), sys.ptr(set, len), null,
+      sys.ptr(tv)) < 0) {
+      if (sys.errno() !== 4) throw "bend: the poller failed";
+      set.fill(0);
     }
-    set.fill(0);
   }
   const now = performance.now();
   const due = (w) => w.at <= now || w.fd !== undefined
-    && set[at(w)] & 1 << (w.fd & 7);
+    && set !== null && set[at(w)] & 1 << (w.fd & 7);
   const todo = io.waits;
   io.waits = todo.filter((w) => !due(w));
   for (const w of todo.filter(due)) {
     const x = w.more();
-    if (x !== undefined) {
-      io_push(w.k, x, false);
-    }
+    if (x !== undefined) io_push(w.k, x, false);
   }
 }
 
@@ -6284,35 +6276,73 @@ function io_park_on(fd, out, k, more, at) {
   ws.splice(i + 1, 0, { fd, out, k, more, at });
 }
 
-function io_run(m) {
-  const io = { runs: [], live: 0, waits: [] };
+function io_park_promise(promise, k, done, fail) {
+  const io = io_active;
+  io.pending += 1;
+  const finish = (map, value) => {
+    io.pending -= 1;
+    if (io.closed) return;
+    try {
+      io.runs.push({ fun: k, arg: map(value) });
+    } catch (error) {
+      io.error = { value: error };
+    }
+    io.wake?.();
+  };
+  Promise.resolve(promise).then((value) => finish(done, value),
+    (error) => finish(fail, error));
+}
+
+function io_pause(io) {
+  const soon = io.waits[0]?.at ?? Infinity;
+  const ms = Math.max(0, Math.min(2147483647, soon - performance.now(),
+    io.waits.some((w) => w.fd !== undefined) ? 1 : Infinity));
+  const { promise, resolve } = Promise.withResolvers();
+  const done = () => {
+    clearTimeout(timer);
+    io.wake = undefined;
+    resolve();
+  };
+  const timer = setTimeout(done, ms);
+  io.wake = done;
+  return promise;
+}
+
+async function io_run(m) {
+  const io = { runs: [], live: 0, waits: [], pending: 0, closed: false };
   const parent = io_active;
   io_active = io;
   try {
     io_push(run_loop(m()), (x) => ({ $: "Emit", value: x }), true);
-    let look = 0;
-    for (let n = 0;; n += 1) {
+    let ticks = 0;
+    for (;;) {
+      if (io.error !== undefined) throw io.error.value;
       if (io.runs.length === 0) {
         if (io.live === 0) {
           return 0;
         }
-        if (io.waits.length === 0) {
+        if (io.waits.length === 0 && io.pending === 0) {
           io_errs("bend: deadlock: every computation waits on a channel");
           return 1;
         }
-        io_wait(io, true);
+        io_active = parent;
+        await io_pause(io);
+        io_active = io;
+        io_wait(io);
         continue;
-      }
-      if ((n & 63) === 0 && io.waits.length > 0) {
-        const now = performance.now();
-        if (now >= look || io.waits[0].at <= now) {
-          look = now + 10;
-          io_wait(io, false);
-        }
       }
       const s = io.runs.shift();
       let op = s.fun(s.arg);
       while (op !== undefined) {
+        if ((++ticks & 63) === 0) {
+          io_active = parent;
+          const { promise, resolve } = Promise.withResolvers();
+          setImmediate(resolve);
+          await promise;
+          io_active = io;
+          if (io.error !== undefined) throw io.error.value;
+          if (io.waits.length > 0) io_wait(io);
+        }
         if (op.$ === "Emit") {
           io.live -= 1;
           break;
@@ -6339,6 +6369,7 @@ function io_run(m) {
   } catch (e) {
     throw e instanceof RangeError ? "bend: ${ERRS[7]}" : e;
   } finally {
+    io.closed = true;
     io_active = parent;
   }
 }

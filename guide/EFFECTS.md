@@ -88,9 +88,13 @@ the answer the same way: `io_done(v)`, `io_fail(code)`,
 whole number from 0 to 2^53 stops the run; a `Nat` inside an answer goes
 unchecked, so the host keeps it in that range.
 
-Each generated JS program owns its IO scheduler. A nested `io_run` restores
-the outer scheduler when it completes or throws, so an effect may enter a
-nested run without losing the outer run's spawned work or parked operations.
+Each generated JS program owns its IO scheduler. `io_run` returns a
+Promise of the exit code; callers must await it. A nested run restores
+the outer scheduler before yielding or finishing, including on errors.
+The IO loop yields to host callbacks every 64 effects and waits with host
+timers rather than blocking `select`, so microtasks, timers and signal
+handlers can run. Descriptor waits still use `bun:ffi`, with nonblocking
+readiness polls at a 1 ms interval while parked.
 
 A blocking effect takes one more argument, `k`, and parks with
 `io_park_on(fd, out, k, more)`: it returns `undefined`, and the loop calls
@@ -101,6 +105,24 @@ argument to also wake on time; with no fd
 alone, as `sleep.js` does. An effect that can meet a steady backlog
 parks before its first try, as on the C side. `io_sys()` is `libc` through `bun:ffi`
 (`read`, `recv`, `select`, `errno`); `tcp_accept.js` shows the full shape.
+
+A host Promise parks with `io_park_promise(promise, k, done, fail)` and
+returns `undefined`. `done(value)` and `fail(error)` synchronously map the
+settlement to the Bend answer, for example `io_done(value)` or
+`io_fail(code)`. Throwing in either mapper fails the owning run. The helper
+captures that run, so simultaneous or nested runs cannot resume each
+other's continuations. Settlements after the run exits are ignored; this
+does not cancel the underlying host operation.
+
+```js
+function host_digest(k) {
+  const bytes = new TextEncoder().encode("abc");
+  return io_park_promise(
+    require("node:crypto").webcrypto.subtle.digest("SHA-256", bytes), k,
+    (result) => new Uint8Array(result)[0],
+    (error) => { throw error; });
+}
+```
 
 ## A complete example
 
