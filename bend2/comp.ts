@@ -1051,6 +1051,21 @@ function ctr_doms(ctr: Bend.Ctr, xs?: HTerm[]): HTerm[] {
   return ctr_live(ctr, xs).map(([, , A]) => A);
 }
 
+// The slot term_drop moves last, so a node frees before its spine: the
+// last box of the last field that holds the node's own datatype.
+function ctr_spine(k: Name, n: number): number {
+  const ctr = FL.book.ctrs[k];
+  if (!ctr || n > WIDE) {
+    return 255;
+  }
+  const fam = Bend.book_fam(FL.book, k);
+  const lays = lay_node(k).arms![k];
+  const i = ctr_doms(ctr).findLastIndex((F) =>
+    ty_holds(F, (u) => u?.$ === "ADT" && u.k === fam));
+  return i < 0 ? 255 : lays.slice(0, i).reduce((at, lay) =>
+    at + lay.ks.length, lays[i].ks.lastIndexOf("box"));
+}
+
 function ctr_flds(k: Name, xs: HTerm[]): HTerm[] {
   const ds = FL.book.ctrs[k] ? ctr_tail(FL.book.ctrs[k]) : [];
   return xs.filter((_, j) => !ds[j] || dom_live(ds[j]));
@@ -2873,21 +2888,12 @@ export function compile_book(book: Bend.Book): string {
     "#endif"];
   const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [""]),
     seg_new(CLO_APPLY, BOX, ["", ""])];
-  const cids = new Map<Name, number[]>();
-  const cid = (k: Name, n: number, tail = 255) => cids.set(k, n > WIDE
-    ? [240 + Math.log2(n), Number(FL.hot.has(k)), 255]
-    : [n, Number(FL.hot.has(k)), tail]);
+  const cids = new Map<Name, number>();
+  const cid = (k: Name, n: number) =>
+    cids.set(k, n > WIDE ? 240 + Math.log2(n) : n);
   for (const k of FL.srcs.keys()) {
     for (const c of (FL.book.tlds[k] as Bend.ADT).c ?? []) {
-      let at = 0;
-      let tail = 255;
-      for (const F of ctr_doms(c)) {
-        if (ty_holds(F, (u) => u?.$ === "ADT" && u.k === k)) {
-          tail = at;
-        }
-        at += lay_of(F).ks.length;
-      }
-      cid(c.k, lay_node(c.k).ks.length, tail);
+      cid(c.k, lay_node(c.k).ks.length);
     }
   }
   done_defs(def_foreign).forEach(([k]) => cid(k, fun_of(k).lays.length));
@@ -2895,7 +2901,7 @@ export function compile_book(book: Bend.Book): string {
     .map((s) => s.fid)), [...FL.segs, { fid: seg_fid(CLO_APPLY),
     refs: FL.clos }].flatMap((s) => [...s.refs].map((r) => [r, s.fid])));
   if (entries.some((s) => s.params.length > WIDE)
-    || [...cids.values()].some(([n]) => n > 255)) {
+    || [...cids.values()].some((n) => n > 255)) {
     die("an arity over " + WIDE);
   }
   const defs = [[...cids.keys()].map(cid_mac),
@@ -2911,8 +2917,8 @@ export function compile_book(book: Bend.Book): string {
     `{ ${s.params.length}, ${s.frame === null ? 0
       : s.params.length - s.frame.at.length}, ${Number(FL.bangs.has(s.def))
       | Number(!forky.has(s.fid)) << 1} }`).join(", ")} };`,
-  `CONSTV u8 CID_T[][3] = { ${[...cids.values()].map((r) =>
-    `{ ${r.join(", ")} }`).join(", ")} };`,
+  `CONSTV u8 CID_T[][3] = { ${[...cids].map(([k, n]) =>
+    `{ ${n}, ${Number(FL.hot.has(k))}, ${ctr_spine(k, n)} }`).join(", ")} };`,
   `#define STAT_LEN ${FL.img.length}`, "",
   `#define WL_RESW ${resw}`, `#define BANGS   ${FL.bangs.size}`, "",
   `#define WL_BANK Term ${ws.join(", ")};`, "",
@@ -4004,6 +4010,20 @@ FAR void term_drop(Env e, Term t) {
           Term f = H[loc + s];
           H[loc + s] = H[loc + n - 1];
           H[loc + n - 1] = f;
+        }
+        if (cls < 64) {
+          while (n > 1 && term_triv(H[loc + n - 1])) {
+            n -= 1;
+          }
+        } else {
+          u32 m = 1u << (cls & 63);
+          while (m > 1 && term_triv(H[loc + m - 1])) {
+            m -= 1;
+          }
+          if (m < 256) {
+            n   = m;
+            cls &= 63;
+          }
         }
         c0 = H[loc];
         H[loc] = cur;
