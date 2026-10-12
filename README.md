@@ -208,8 +208,6 @@ def add_zero(x):
 - Formatter: [bend-fmt-lsp](tools/bend-fmt-lsp), a formatting-only Bend 2 language server.
 - Community language server: [bend2-lsp](https://github.com/don2e4/bend2-lsp), with formatting, diagnostics, and hover.
 - Community workshop: [Bend 2 pocket workshop](https://np.github.io/bend-workshop/), the checker and JS compiler in one HTML page, with goals and proof tools, phone first.
-- `--checkup` checks and runs the initial import header independently;
-  definitions and multiline string bodies do not add imports.
 
 # Community
 
