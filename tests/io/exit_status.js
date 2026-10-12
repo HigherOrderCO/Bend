@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Host.exit_status BEND_CID_Host_exit_status
+// bend-ids end
 function exit_status() {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -46,4 +49,4 @@ def main() -> IO(Unit):
   }
 }
 
-io_eff(CID(Host.exit_status), exit_status);
+io_eff(BEND_CID_Host_exit_status, exit_status);

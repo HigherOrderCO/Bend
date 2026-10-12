@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Module.export_keys BEND_CID_Module_export_keys
+// bend-ids end
 function module_export_keys() {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -33,18 +36,22 @@ def ordinary(x: U32) -> U32:
     if (keys.some((k) => !Object.hasOwn(lib, k))) {
       return 2;
     }
-    if (Object.keys(lib).join(",") !== keys.join(",")) {
+    const names = Object.keys(lib);
+    if (names.length !== keys.length * 2 || keys.some((k, i) =>
+      names[i * 2] !== k || !names[i * 2 + 1].endsWith(":" + k)
+      || lib[names[i * 2 + 1]] !== lib[k])) {
       return 3;
     }
-    if (Object.getPrototypeOf(lib) !== Object.prototype) {
+    if (Object.getPrototypeOf(lib) !== null) {
       return 4;
     }
     const copy = { ...lib };
-    return keys.every((k, i) => Object.hasOwn(copy, k)
-      && lib[k](5) === i + 6 && copy[k](5) === i + 6) ? 0 : 5;
+    return Object.getPrototypeOf(copy) === Object.prototype
+      && names.every((k, i) => Object.hasOwn(copy, k)
+        && lib[k](5) === (i >> 1) + 6 && copy[k](5) === (i >> 1) + 6) ? 0 : 5;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
 
-io_eff(CID(Module.export_keys), module_export_keys);
+io_eff(BEND_CID_Module_export_keys, module_export_keys);
