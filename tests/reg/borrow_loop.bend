@@ -3,9 +3,10 @@
 # compilation in one process read the first book's stale rows and the
 # minted continuation died 'unbound binder: t' on THIS shape: a
 # let-bound t with two owners (lend and eat both take it; nothing
-# borrows) across spin's cut. gates/test.ts recompiles this checked book
-# in-process around JS emission, normalization and a different book,
-# compares fresh C/JS bytes and retained probe counts, and runs both outputs.
+# borrows) across spin's cut. gates/test.ts's state_run compiles a
+# second checked copy of this book in one process, C and JS over and
+# over, around normalization and the next fixture: each must give the
+# first copy's bytes and probe count.
 import Base
 
 type Bt is Data:

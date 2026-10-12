@@ -1,6 +1,6 @@
-# gates/test.ts interleaves this independently checked program with a
-# different book (A -> B -> A). Both programs' C/JS bytes and values must
-# match fresh baselines, without retaining previous compilations' probes.
+# gates/test.ts's state_run compiles a second checked copy of this book
+# in one process, C and JS over and over, around normalization and the
+# next fixture: each must give the first copy's bytes and probe count.
 import Base
 
 law grow:

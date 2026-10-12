@@ -1,6 +1,6 @@
-# gates/test.ts compares repeated C/JS emissions and actual values with
-# fresh baselines, before and after normalization. The retained compiler
-# probe count must match the fresh baseline too, even if bytes agree.
+# gates/test.ts's state_run compiles a second checked copy of this book
+# in one process, C and JS over and over, around normalization and the
+# next fixture: each must give the first copy's bytes and probe count.
 import Base
 
 law flip:
