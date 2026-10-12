@@ -6235,8 +6235,10 @@ function io_addr(host, port) {
   return b;
 }
 
+let io_active;
+
 function io_push(fun, arg, fresh) {
-  const io = globalThis.BEND_IO;
+  const io = io_active;
   io.runs.push({ fun, arg });
   io.live += fresh ? 1 : 0;
 }
@@ -6277,14 +6279,15 @@ function io_wait(io, block) {
 }
 
 function io_park_on(fd, out, k, more, at) {
-  const ws = globalThis.BEND_IO.waits;
+  const ws = io_active.waits;
   const i = ws.findLastIndex((w) => (w.at ?? Infinity) <= (at ?? Infinity));
   ws.splice(i + 1, 0, { fd, out, k, more, at });
 }
 
 function io_run(m) {
   const io = { runs: [], live: 0, waits: [] };
-  globalThis.BEND_IO = io;
+  const parent = io_active;
+  io_active = io;
   try {
     io_push(run_loop(m()), (x) => ({ $: "Emit", value: x }), true);
     let look = 0;
@@ -6335,6 +6338,8 @@ function io_run(m) {
     }
   } catch (e) {
     throw e instanceof RangeError ? "bend: ${ERRS[7]}" : e;
+  } finally {
+    io_active = parent;
   }
 }
 `.slice(1);

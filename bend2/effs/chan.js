@@ -19,7 +19,7 @@ function chan_wait(item) {
 function chan_wake(row, x) {
   const w = row.wait.shift();
   if (w.late !== undefined) {
-    const ws = globalThis.BEND_IO.waits;
+    const ws = io_active.waits;
     ws.splice(ws.findIndex((t) => t.more === w.late), 1);
     x = { $: CID(Ready), value: x };
   }
