@@ -70,8 +70,8 @@ export const BUILD = [CC + " main.c -lpthread", CC + " main.c -lpthread",
 const THREADS = "nt=1; while [ $nt -lt $(getconf _NPROCESSORS_ONLN) ] &&"
   + " [ $nt -lt 256 ]; do nt=$((nt*2)); done;";
 
-export const FLAGS = ["--threads 1 --gpu off", "--threads $nt --gpu off",
-  "--gpu $gm"];
+export const FLAGS = ["+RTS --threads 1 --gpu off",
+  "+RTS --threads $nt --gpu off", "+RTS --gpu $gm"];
 
 export const MEMORY: Record<string, string> = {
   "tree-bitonic": "768MB", gameoflife: "512MB", kmeans: "768MB",

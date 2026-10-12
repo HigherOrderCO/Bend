@@ -3539,13 +3539,15 @@ static bool io_gpu;
 static DEV Term*  io_stk;
 
 static const char* CLI_HELP =
-  "usage: %s [options] [arguments]\n"
+  "usage: %s [arguments] [+RTS options -RTS] [arguments]\n"
+  "options, from $BENDRTS, then between +RTS and -RTS (or the end):\n"
   "  --threads N       worker threads, 1 to 128 (default: the CPU count)\n"
   "  --gpu on|off|4GB  run ! calls on the GPU, over this much of its memory\n"
   "                    (default: on if present, over 2GB on Metal)\n"
   "  --gpu-build       write the GPU program and exit\n"
   "  --bend-help       show this text\n"
-  "  --                the rest are the program's arguments (IO.args)\n";
+  "the rest are the program's arguments (IO.args); -- (kept) or --RTS\n"
+  "(dropped) makes every argument after it the program's\n";
 
 #endif
 
@@ -5920,21 +5922,42 @@ ${reqs}
 // Main
 // ====
 
+// The runtime's options are $BENDRTS's words, then the command line's
+// between +RTS and -RTS (or its end), as GHC's RTS reads them. Every other
+// argument is the program's (IO.args), and -- (kept) or --RTS (dropped)
+// hands it the rest.
 int main(int argc, char** argv) {
-  long thr = cpu_count();
-  int  gpu = -1;
-  u64  mem = 0;
+  long   thr = cpu_count();
+  int    gpu = -1;
+  u64    mem = 0;
+  char*  env = strdup(getenv("BENDRTS") != NULL ? getenv("BENDRTS") : "");
+  char** rts = malloc((argc + strlen(env)) * sizeof(char*));
+  int    n   = 0;
+  bool   in  = false;
+  for (char* w = strtok(env, " \t\n"); w != NULL; w = strtok(NULL, " \t\n")) {
+    rts[n++] = w;
+  }
   io_argv = argv;
   io_argc = 1;
   for (int i = 1; i < argc; i += 1) {
-    const char* a = argv[i];
-    const char* v = i + 1 < argc ? argv[i + 1] : "";
-    char*       end;
-    if (!strcmp(a, "--")) {
-      while (i + 1 < argc) {
-        io_argv[io_argc++] = argv[++i];
+    char* a = argv[i];
+    if (!strcmp(a, "--") || !strcmp(a, "--RTS")) {
+      for (i += a[2] == 'R'; i < argc; i += 1) {
+        io_argv[io_argc++] = argv[i];
       }
-    } else if (!strcmp(a, "--bend-help")) {
+    } else if (!strcmp(a, "+RTS") || !strcmp(a, "-RTS")) {
+      in = a[0] == '+';
+    } else if (in) {
+      rts[n++] = a;
+    } else {
+      io_argv[io_argc++] = a;
+    }
+  }
+  for (int i = 0; i < n; i += 1) {
+    const char* a = rts[i];
+    const char* v = i + 1 < n ? rts[i + 1] : "";
+    char*       end;
+    if (!strcmp(a, "--bend-help")) {
       printf(CLI_HELP, argv[0]);
       return 0;
     } else if (!strcmp(a, "--gpu-build")) {
@@ -5963,7 +5986,10 @@ int main(int argc, char** argv) {
       }
       i += 1;
     } else {
-      io_argv[io_argc++] = argv[i];
+      char msg[256];
+      snprintf(msg, sizeof msg, "unknown runtime option %s (see +RTS"
+        " --bend-help)", a);
+      err_fail(msg);
     }
   }
   const char* why = gpu != 0 && BANGS != 0 ? gpu_probe() : "";
@@ -6056,19 +6082,20 @@ const RUNTIME_MAIN: string = String.raw`
 let cli_args = [];
 
 function cli(argv) {
+  let rts = false;
   cli_args.push(argv[0]);
   for (let i = 1; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === "--") {
-      cli_args.push(...argv.slice(i + 1));
+    if (a === "--" || a === "--RTS") {
+      cli_args.push(...argv.slice(a === "--" ? i : i + 1));
       break;
+    } else if (a === "+RTS" || a === "-RTS") {
+      rts = a === "+RTS";
+    } else if (!rts) {
+      cli_args.push(a);
     } else if (a === "--bend-help") {
       io_out(1, io_bytes("usage: " + argv[0] + "\n"));
       process.exit(0);
-    } else if (a === "--threads" || a === "--gpu") {
-      i += 1;
-    } else {
-      cli_args.push(a);
     }
   }
 }
