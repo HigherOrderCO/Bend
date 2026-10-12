@@ -901,10 +901,10 @@ export const BEND_HUB   = process.env.BEND_HUB ?? "https://hub.bend-lang.com";
 export const NAMED = /^([a-z][a-z0-9-]{0,63})@((?:0|[1-9][0-9]*)(?:\.(?:0|[1-9][0-9]*)){3})$/;
 
 async function hub_get(book: Book, sub: string, hash: string, spn?: Span): Promise<string> {
-  const res = await fetch(BEND_HUB + "/" + sub);
-  const src = res.ok ? await res.text() : "";
+  const res = await fetch(BEND_HUB + "/" + sub, { signal: AbortSignal.timeout(30000) }).catch(() => null);
+  const src = res?.ok ? await res.text().catch(() => "") : "";
   const sum = Buffer.from(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(src))).toString("hex");
-  if (!res.ok || hash.length < 32 || sum.slice(0, hash.length) !== hash || path.posix.normalize("/" + sub) !== "/" + sub) {
+  if (!res?.ok || hash.length < 32 || sum.slice(0, hash.length) !== hash || path.posix.normalize("/" + sub) !== "/" + sub) {
     throw Err(book, ctx_nil(), "a file at " + BEND_HUB + "/" + sub + " hashing to " + hash, undefined, spn);
   }
   return src;
@@ -919,8 +919,8 @@ async function name_hash(book: Book, nv: string, spn?: Span): Promise<string> {
   if (/^0x[0-9a-f]{32}$/.test(old)) {
     return old;
   }
-  const res = await fetch(BEND_HUB + "/name/" + nv).catch(() => null);
-  const got = res?.ok ? (await res.text()).trim() : "";
+  const res = await fetch(BEND_HUB + "/name/" + nv, { signal: AbortSignal.timeout(30000) }).catch(() => null);
+  const got = res?.ok ? (await res.text().catch(() => "")).trim() : "";
   if (!/^0x[0-9a-f]{32}$/.test(got)) {
     throw Err(book, ctx_nil(), "a package named " + nv + " on " + BEND_HUB
       + (res?.status === 410 ? " (it was taken down)" : ""), undefined, spn);
