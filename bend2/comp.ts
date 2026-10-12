@@ -23,7 +23,18 @@ type Val = { ws: string[]; lay: Lay; stat: boolean };
 
 type Bind = { val: Val; n: number; A: HTerm };
 
-type Seg = ReturnType<typeof seg_new>;
+type Seg = {
+  fid: string;
+  def: Name;
+  ret: Lay;
+  lines: string[];
+  params: string[];
+  ks: Kind[];
+  frame: { pop: number; at: number[] } | null;
+  refs: Set<string>;
+  spin: boolean;
+  fork: boolean;
+};
 
 type Spine = {
   h: HTerm;
@@ -40,9 +51,53 @@ type HTerm = Bend.HTerm;
 
 type Name = Bend.Name;
 
-type File = ReturnType<typeof file_new>;
+type File = Bend.Book & {
+  js: boolean;
+  bangs: Set<Name>;
+  sites: Map<Name, number>;
+  hot: Set<Name>;
+  stat: Set<Name>;
+  own: Set<string>;
+  lend: Set<string>;
+  segs: Seg[];
+  spins: Seg[];
+  spun: Map<string, string>;
+  marsh: Map<string, string>;
+  clos: Set<string>;
+  tabs: Map<string, number>;
+  tails: Map<Name, Set<Name>>;
+  img: string[];
+  lits: Map<string, number>;
+  consts: Map<Lay, Map<HTerm, Val>>;
+  ids: Map<string, string>;
+  taken: Set<string>;
+  teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
+  srcs: Map<Name, Set<Name> | null>;
+  loops: Map<Name, Name[]>;
+  flats: Map<Name, boolean>;
+  funs: Map<Name, Fun>;
+  brws: Map<Name, boolean[]>;
+  nodes: Map<Name, Lay>;
+  lays: Map<string, Lay>;
+  lay_ids: Map<Lay, number>;
+  memo: {
+    opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
+    uses: Map<HTerm, Bend.PMap<number>>;
+    folds: Map<HTerm, HTerm | null>;
+    spines: Map<HTerm, Spine>;
+    steps: Map<HTerm, HTerm>;
+  };
+};
 
-type Scope = ReturnType<typeof scope_new>;
+type Scope = {
+  seg: Seg;
+  fresh: Map<string, number>;
+  brwl: Map<string, string>;
+  spares: { words: number; name: string; z: boolean }[];
+  uses: Map<Of<"Var">, Bind>;
+  rest: HTerm[];
+  def: Name;
+};
 
 type Tpl = string | ((xs: string[]) => string);
 
@@ -1260,44 +1315,44 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // types once, its arguments at every instantiation. compile_book emits until
 // a pass changes no fact.
 
-function file_new(book: Bend.Book, js: boolean) {
+function file_new(book: Bend.Book, js: boolean): File {
   PROBES.length = 1;
   return {
     ...book,
     js,
-    bangs: new Set<Name>(),
-    sites: new Map<Name, number>(),
-    hot: new Set<Name>(),
-    stat: new Set<Name>(),
-    own: new Set<string>(),
-    lend: new Set<string>(),
-    segs: [] as Seg[],
-    spins: [] as Seg[],
-    spun: new Map<string, string>(),
-    marsh: new Map<string, string>(),
-    clos: new Set<string>(),
-    tabs: new Map<string, number>(),
-    tails: new Map<Name, Set<Name>>(),
-    img: [] as string[],
-    lits: new Map<string, number>(),
-    consts: new Map<Lay, Map<HTerm, Val>>(),
-    ids: new Map<string, string>(),
+    bangs: new Set(),
+    sites: new Map(),
+    hot: new Set(),
+    stat: new Set(),
+    own: new Set(),
+    lend: new Set(),
+    segs: [],
+    spins: [],
+    spun: new Map(),
+    marsh: new Map(),
+    clos: new Set(),
+    tabs: new Map(),
+    tails: new Map(),
+    img: [],
+    lits: new Map(),
+    consts: new Map(),
+    ids: new Map(),
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T".split(" ")),
-    teles: new Map<HTerm, { doms: Dom[]; ret: HTerm }>(),
-    srcs: new Map<Name, Set<Name> | null>(),
-    loops: new Map<Name, Name[]>(),
-    flats: new Map<Name, boolean>(),
-    funs: new Map<Name, Fun>(),
-    brws: new Map<Name, boolean[]>(),
-    nodes: new Map<Name, Lay>(),
-    lays: new Map<string, Lay>(),
-    lay_ids: new Map<Lay, number>(),
+    teles: new Map(),
+    srcs: new Map(),
+    loops: new Map(),
+    flats: new Map(),
+    funs: new Map(),
+    brws: new Map(),
+    nodes: new Map(),
+    lays: new Map(),
+    lay_ids: new Map(),
     memo: {
-      opens: new Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
-      uses: new Map<HTerm, Bend.PMap<number>>(),
-      folds: new Map<HTerm, HTerm | null>(),
-      spines: new Map<HTerm, Spine>(),
-      steps: new Map<HTerm, HTerm>(),
+      opens: new Map(),
+      uses: new Map(),
+      folds: new Map(),
+      spines: new Map(),
+      steps: new Map(),
     },
   };
 }
@@ -1305,15 +1360,15 @@ function file_new(book: Bend.Book, js: boolean) {
 // A scope is where the emitter writes: its segment, its locals' names, the
 // bindings and spare nodes it holds, the def it is in. A nested arm, closure
 // or fork copies its scope; the book's facts and output live in FL.
-function scope_new() {
+function scope_new(): Scope {
   return {
     seg: seg_new("", BOX, []),
-    fresh: new Map<string, number>(),
-    brwl: new Map<string, string>(),
-    spares: [] as { words: number; name: string; z: boolean }[],
-    uses: new Map<Of<"Var">, Bind>(),
-    rest: [] as HTerm[],
-    def: "" as Name,
+    fresh: new Map(),
+    brwl: new Map(),
+    spares: [],
+    uses: new Map(),
+    rest: [],
+    def: "",
   };
 }
 
@@ -1464,10 +1519,9 @@ function spare_flush(sc: Scope): void {
 // parameters from the frame slots, then from the bank (r0..).
 
 function seg_new(name: string, ret: Lay, params: string[],
-  ks: Kind[] = params.map(() => "w64"),
-  frame: { pop: number; at: number[] } | null = null) {
-  return { fid: name && seg_fid(name), def: name, ret, lines: [] as string[],
-    params, ks, frame, refs: new Set<string>(), spin: false, fork: false };
+  ks: Kind[] = params.map(() => "w64"), frame: Seg["frame"] = null): Seg {
+  return { fid: name && seg_fid(name), def: name, ret, lines: [], params, ks,
+    frame, refs: new Set(), spin: false, fork: false };
 }
 
 function seg_fid(k: Name): string {
