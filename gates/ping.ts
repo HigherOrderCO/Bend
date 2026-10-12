@@ -329,6 +329,20 @@ try {
     const got = await bend_closed(args);
     check("a closed reader keeps success: " + args.join(" "), got.code === 0);
   }
+  for (const args of [[sum_file, "--verdict", bad_file],
+    [sum_file, "extra", "--verdict"], [sum_file, "--check-only", "extra"]]) {
+    const got = await bend(args, { BEND_NO_TELEMETRY: "1" });
+    check("only a plain run takes arguments: " + args.join(" "), got.code === 1
+      && got.out === "" && got.err === "bend: arguments go to a run:"
+      + " bend <file.bend> [args] (see bend --help)\n");
+  }
+  const argn = path.join(TMP, "argn.bend");
+  fs.writeFileSync(argn, "import Base\nlaw main:\n  IO(Unit)\ndef main():\n"
+    + "  do IO<Unit>:\n    xs : List<String> <- IO.args()\n"
+    + "    IO.print(Nat.show(List.length(&1, String, xs)))\n");
+  const argv = await bend([argn, "x", "--", "--verdict"]);
+  check("a plain run gets its arguments: " + argv.err, argv.code === 0
+    && argv.out === "3\n");
   const two  = "import Base\ndef two() -> Nat:\n  2n\n";
   const use  = (at: string) => "import Base\nimport ./" + at
     + " as T\ndef main() -> Nat:\n  T.two\n";
