@@ -32,8 +32,8 @@ type Seg = {
   ks: Kind[];
   frame: { pop: number; at: number[] } | null;
   refs: Set<string>;
-  spin?: boolean;
-  fork?: boolean;
+  spin: boolean;
+  fork: boolean;
 };
 
 type Spine = {
@@ -226,8 +226,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     JS: "($0 >= 1 && $0 < 4294967296 ? Math.floor($0) : 0)",
   },
   f32_bits: { C: "$0", JS: "f32_bits($0)" },
-  f32_show: { C: "f32_show(e, $0)", JS: "f32_show($0)" },
-  f32_read: { C: "f32_read(e, $0)", JS: "f32_read($0)" },
+  ...tpl_ops("f32_", "show read", "f32_$o(e, $0)", "f32_$o($0)"),
   nat_add: { C: "nat_chk(e, $0 + $1)", JS: "nat_chk($0 + $1)" },
   nat_mul: { C: "nat_mul(e, $0, $1)", JS: "nat_chk($0 * $1)" },
   nat_double: { C: "nat_chk(e, $0 + $0)", JS: "nat_chk($0 + $0)" },
@@ -530,7 +529,6 @@ const DUMMY = probe("~");
 
 let FUEL = 0;
 
-// The book being compiled and all that is memoized about it.
 let FL: File;
 
 // Name
@@ -1042,9 +1040,7 @@ function ctr_flds(k: Name, xs: HTerm[]): HTerm[] {
 }
 
 function src_add(k: Name): void {
-  if (!FL.srcs.has(k)) {
-    FL.srcs.set(k, null);
-  }
+  memo(FL.srcs, k, () => null);
 }
 
 function ctr_build(sc: Scope, k: Name, exprs: string[], stat = false): string {
@@ -1526,7 +1522,7 @@ function spare_flush(sc: Scope): void {
 function seg_new(name: string, ret: Lay, params: string[],
   ks: Kind[] = params.map(() => "w64"), frame: Seg["frame"] = null): Seg {
   return { fid: name && seg_fid(name), def: name, ret, lines: [], params, ks,
-    frame, refs: new Set() };
+    frame, refs: new Set(), spin: false, fork: false };
 }
 
 function seg_fid(k: Name): string {
@@ -1874,10 +1870,10 @@ function memo_gc(): void {
 // ====
 
 // A pure main prints through a descriptor of its type, a node per (type,
-// layout): 0 U32, 1 F32, 2 Nat, 3 Char, 4 String, 5 Eql, 6 Array (element,
-// lgs), 7 Data (boxed?, arms; per arm name, cid, fields, bracket, then an
-// (offset, node) per field). An IO main has none; an unprintable type (a
-// function, a Type, an erased or dependent field) refuses the build.
+// layout): 0 U32, 1 F32, 2 Nat, 3 Char (boxed?), 4 String, 5 Eql, 6 Array
+// (element, lgs), 7 Data (boxed?, arms; per arm name, cid, fields, bracket,
+// then an (offset, node) per field). An IO main has none; an unprintable
+// type (a function, a Type, an erased or dependent field) refuses the build.
 
 function show_main(): (number | Name)[] | null {
   const main = FL.book.tlds.main;
@@ -2080,7 +2076,7 @@ function emit_task(sc: Scope, fid: string, rem: number, words: string[],
     `task_node(e, ${seg_ref(sc, fid)}, ${cont}, ${idx}, ${rem})`, words);
 }
 
-function emit_jump(sc: Scope, args: string[], k: Name, bang?: boolean): void {
+function emit_jump(sc: Scope, args: string[], k: Name, bang = false): void {
   const fid = seg_fid(k);
   sc.seg.fork ||= bang;
   if (bang || sc.seg.def !== k) {
@@ -3184,8 +3180,6 @@ function js_marshal(A: HTerm | null, out: boolean): string {
       const tk = Bend.name_key(t.k);
       const tags = cs.map((c) => Bend.name_key(c.k)).join(", ");
       body.push("switch (v.$) {", ...arms,
-        // TODO(#1105): a tag is the key the loading book gives its constructor,
-        // so it depends on the root file; make tags the same in every book
         `default: throw "bend: ${tk} has no tag " + v?.$ + " (its tags: ${
           tags}); a tag names its constructor as the"
         + " loading file sees it, which a later version will make the same"
@@ -4055,15 +4049,12 @@ OUTLINE void span_fade(Env e, Term t, u64 src, u32 n) {
 
 INLINE u64 ctr_take(Env e, Term t, u32 n, THR Term* out) {
   DEV u64* H = e.mem;
-  if (!term_rfc(t)) {
-    for (u32 j = 0; j < n; j += 1) {
-      out[j] = H[term_loc(t) + j];
-    }
-    return term_loc(t);
-  }
   u64 src = term_peek(H, t);
   for (u32 j = 0; j < n; j += 1) {
     out[j] = H[src + j];
+  }
+  if (!term_rfc(t)) {
+    return src;
   }
   DEV u32* c = a32_at(H, term_loc(t));
   if ((a32_load(c) & RFC_CNT) == 1) {
@@ -4752,7 +4743,7 @@ static u32 pool_rows(Env e, DEV Term* stk) {
       u32 row = r / step * CUBE_T;
       for (u32 rg = row + r % step; rg < row + CUBE_T; rg += step) {
         u32 put0 = a32_load(ring_put(e.mem, rg));
-        while (*ring_get(e.mem, rg) != put0 && !err_seen(e.mem)) {
+        while (*ring_get(e.mem, rg) != put0) {
           monk_step(e, stk, rg, put0, rg, 0, NULL);
         }
       }
@@ -5471,7 +5462,6 @@ static Term io_wait_on(IoWork* w, int fd, short evts, u64 time, IoPack more) {
   return IO_PARK;
 }
 
-// EPIPE ends the program by SIGPIPE.
 static void io_lost(void) {
   if (errno == EPIPE) {
     signal(SIGPIPE, SIG_DFL);
@@ -5750,8 +5740,8 @@ ${NATIVE.IO}
 // is a SHOW_DESC node (see show_main), w its words, and chain the
 // bracket of the [a, b] or (a, b) the value continues, or 0. Con
 // or Nil spell a list, Tuple a tuple, and their tails continue
-// it. show_chr escapes as char_show does; show_f32 prints the
-// shortest text that reads back, with a point before an e.
+// it. show_f32 prints the shortest text that reads back, with a
+// point before an e.
 
 #if MAIN_PURE
 
@@ -6117,7 +6107,7 @@ function cli(argv) {
 // ====
 
 // show_val prints a pure main's value as term_show does (see show_main);
-// chain is the bracket it continues, or 0. show_chr escapes as char_show.
+// chain is the bracket it continues, or 0.
 
 function show_chr(s, q) {
   const c = s.codePointAt(0);
