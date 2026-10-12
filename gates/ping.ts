@@ -295,7 +295,7 @@ try {
     && sum5.code === 0 && sum5.out === "5n\n");
   const header_source = path.join(TMP, "literal-checkup.bend");
   fs.writeFileSync(header_source,
-    "import Base\nimport ./sum.bend as Sum\n"
+    "# a header\nimport Base\n\nimport ./sum.bend as Sum\n"
     + "def text() -> String:\n  \"body text\n"
     + "import ./absent.bend as Hidden\nmore text\"\n");
   const header_check = await bend([header_source, "--check-only"],
