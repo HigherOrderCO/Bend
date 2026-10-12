@@ -20,9 +20,10 @@ iteration. A def is flat when it has no parallel let, no bang, no closure apply,
 no non-flat call and no non-tail self call: it compiles to one native tail loop
 (`spin_N` in the C). A non-tail self call becomes a segmented continuation: a
 frame per call. Memory is one heap shared by the CPU and the GPU: unified on
-Apple; managed on CUDA, where each page faults across PCIe on the first touch by
-the other side. A machine with no GPU, or `--gpu off`, runs bangs on the CPU
-pool. Divergent per-lane work (a search, a tree walk per ray) is faster there
+Apple; managed on CUDA, where each page faults across PCIe on first touch by
+the other side. A machine with no GPU, or `BEND_GPU=off`, runs bangs on the CPU
+pool.
+Divergent per-lane work (a search, a tree walk per ray) is faster there
 than on the GPU. Aim for 4^7 leaves per bang, one per lane, and sweep one fork
 level either side on the device: the CPU pool is flat across that sweep, so it
 cannot tune it. Fewer leaves leave lanes idle (256 of 16384 busy: 234 ms for a

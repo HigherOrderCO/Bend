@@ -371,10 +371,9 @@ def main() -> IO(Unit):
 Every bind is annotated, and `x : T = v` binds a pure value in the middle of a
 block. A fallible effect answers `Result<&1, &1, U32 & String, A>`: `IO.try`
 unwraps it or exits with the error, and `IO.die` exits with your own. `IO.args`
-answers the program's arguments without its name, unchanged (including `--`).
-Runtime settings use the environment. Handles (`File`, `Socket`, `Window`)
-are affine and opaque: effects return them beside results; no program can
-forge or reuse one.
+answers the program's arguments, after its name. A handle (`File`, `Socket`,
+`Window`) is an affine, opaque value, so every effect on one hands it back
+beside its result, and no program can forge or reuse one.
 
 `TCP.listen(host, port)` and `UDP.bind(host, port)` bind the IPv4 literal
 `host`: `"127.0.0.1"` serves this machine only, `"0.0.0.0"` every interface.
@@ -556,7 +555,6 @@ bend page.html -o dist    # bundle a web page that imports .bend files
 BEND_THREADS=8 ./file     # run a native binary on 8 CPU threads
 BEND_GPU=off ./file       # run ! calls on the CPU (GPU on by default)
 BEND_GPU=4GB ./file       # cap the GPU's heap at 4GB
-BEND_GPU_BUILD=1 ./file   # write the native GPU program and exit
 ```
 
 A `main` that returns `IO` runs compiled; one that returns a value is normalized

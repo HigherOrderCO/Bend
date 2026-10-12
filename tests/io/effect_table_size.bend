@@ -1,5 +1,5 @@
 # #1163: the effect table is sized by CID_T, so a small program stays under
-# 256 KiB. The harness builds this test as ./effect_table_size, beside its
+# 256 KiB. The harness builds this test as ./io_effect_table_size, beside its
 # .js, in the directory both run in; the checkup runs before the build, so
 # a missing binary passes.
 import Base
@@ -21,6 +21,6 @@ def inspect(r: Result<&1, &1, U32 & String, File>) -> IO(Unit):
 
 def main() -> IO(Unit):
   IO.bind(Result<&1, &1, U32 & String, File>, Unit,
-    File.open("effect_table_size", "r"), inspect)
+    File.open("io_effect_table_size", "r"), inspect)
 
 #|True

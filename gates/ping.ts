@@ -289,6 +289,27 @@ try {
   check("guide, base and a program run through the executable",
     guide.out.startsWith("# Bend") && base.out.startsWith("type Map")
     && sum5.code === 0 && sum5.out === "5n\n");
+  const args_file = path.join(TMP, "args.bend");
+  const args_bin  = path.join(TMP, "args");
+  const args_js   = path.join(TMP, "args.js");
+  fs.writeFileSync(args_file,
+    fs.readFileSync(path.join(lib.ROOT, "tests/io/args.bend"), "utf8"));
+  const args_build = await bend([args_file, "-o", args_bin, "-o", args_js]);
+  const argv = ["grep", "-e", "--threads", "--", "--gpu", "off", "",
+    "space value", "🙂"];
+  const want_args = "[<grep>, <-e>, <--threads>, <-->, <--gpu>, <off>, <>,"
+    + " <space value>, <🙂>]\n";
+  const native_args = args_build.code === 0
+    ? await run(args_bin, argv) : args_build;
+  check("native IO.args preserves flags, --, empty and Unicode arguments",
+    native_args.code === 0 && native_args.out === want_args);
+  const js_args = args_build.code === 0
+    ? await run(lib.BUN, [args_js, ...argv], { BEND_THREADS: "auto" }) : args_build;
+  check("JS IO.args preserves arguments and ignores native thread settings",
+    js_args.code === 0 && js_args.out === want_args);
+  const interp_args = await bend([args_file, "--", ...argv], { BEND_GPU: "auto" });
+  check("interpreted IO.args preserves arguments and ignores native GPU settings",
+    interp_args.code === 0 && interp_args.out === want_args);
   fs.writeFileSync(path.join(TMP, "page.html"),
     "<script type=\"module\" src=\"./page.ts\"></script>\n");
   fs.writeFileSync(path.join(TMP, "page.ts"), "import \"./none.ts\";\n");
