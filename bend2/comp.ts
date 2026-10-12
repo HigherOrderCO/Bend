@@ -3133,15 +3133,19 @@ function host_nat(A: HTerm | null): boolean {
   return t?.$ === "ADT" && t.k === "Nat";
 }
 
+export function js_exports(book: Bend.Book): Name[] {
+  return [...new Set(book.order)].filter((k) => {
+    const t = book.tlds[k];
+    return done_live(t) && t.b !== true && t.x === 0
+      && io_base(book, t.T) === null;
+  });
+}
+
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
 // def a host can call.
 export function js_lib(book: Bend.Book, mod = false): string {
   FL = file_new(book, true);
-  const outs = !mod ? null : [...new Set(FL.book.order)].filter((k) => {
-    const t = FL.book.tlds[k];
-    return done_live(t) && t.b !== true && t.x === 0
-      && io_base(FL.book, t.T) === null;
-  });
+  const outs = mod ? js_exports(FL.book) : null;
   file_book(outs ?? ["main"]);
   const sc = scope_new();
   for (const [k, def] of done_defs(fun_runs)) {

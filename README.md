@@ -142,6 +142,14 @@ Hints:
 
 Bend works best on the back-end, on Linux or macOS.
 
+For a JS/TypeScript host, `bend core.bend -o core.mjs` also writes
+`core.d.mts`. Import the default object for functions and named type-only
+exports for their values; `Nat` crosses as a number. Declarations describe
+tagged constructors, recursive types and partial calls from the checked book.
+Erased/template, kind-returning and open type-family signatures are omitted,
+not widened to `any`; an unmapped concrete type fails with the def's name.
+Both output paths are checked against program inputs before either is written.
+
 # Examples
 
 ### Syntax == Python + dependent types

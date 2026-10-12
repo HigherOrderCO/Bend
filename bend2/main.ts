@@ -315,11 +315,15 @@ async function cli_file(args: string[]): Promise<void> {
     const ins = new Set([...seen.keys(), ...Object.values(book.tlds).flatMap((t) =>
       t.$ === "Def" && t.i !== undefined ? t.i.map(path_real) : [])]);
     for (const out of outs) {
-      const at = path_real(out);
-      if (ins.has(at) || (fs.existsSync(at) && fs.statSync(at).isDirectory())) {
-        cli_fail("-o " + out + " is a file the program reads, or a directory");
+      const declaration = out.endsWith(".mjs") ? out.slice(0, -4) + ".d.mts" : null;
+      for (let j = 0, n = declaration === null ? 1 : 2; j < n; j += 1) {
+        const file = j === 0 ? out : declaration!;
+        const at = path_real(file);
+        if (ins.has(at) || (fs.existsSync(at) && fs.statSync(at).isDirectory())) {
+          cli_fail("-o " + file + " is a file the program reads, or a directory");
+        }
       }
-      cli_emit(book, out);
+      cli_emit(book, out, declaration);
     }
   } catch (e) {
     cli_say(2, book_err(e) + "\n");
@@ -370,9 +374,109 @@ function path_real(p: string): string {
   return fs.existsSync(p) ? fs.realpathSync(p) : path.resolve(p);
 }
 
-function cli_emit(book: Bend.Book, out: string): void {
+// Declarations use checked telescopes and constructor fields, not source text.
+function js_declarations(book: Bend.Book): string {
+  const types = new Map<string, string>();
+  const native: Record<string, string> = {
+    Nat: "number", U32: "number", F32: "number", Bool: "boolean",
+    Char: "string", String: "string",
+  };
+  const id = (k: string) => k.replace(/[^A-Za-z0-9_]/g,
+    (c) => "$" + c.charCodeAt(0).toString(16) + "$");
+  let owner = "";
+  const fail = (A: Bend.HTerm): never => {
+    throw "Error: cannot declare JS type " + Bend.term_show(Bend.term_lower(A))
+      + " in " + Bend.name_key(owner);
+  };
+  function type(A: Bend.HTerm, vars?: ReadonlyMap<number, string>): string {
+    const t = Bend.term_wnf(book, A);
+    if (t.$ === "Var") {
+      return vars?.get(t.i) ?? fail(A);
+    }
+    if (t.$ === "All" && t.q.$ !== "None") {
+      const tel = Bend.tele_unbind(book, t);
+      if (tel.doms.some(([q]) => q.$ === "None")) {
+        return fail(A);
+      }
+      return tel.doms.reduceRight((tail, [, , T]) =>
+        `(arg: ${type(T, vars)}) => ${tail}`, type(tel.ret, vars));
+    }
+    if (t.$ !== "ADT") {
+      return fail(A);
+    }
+    const key = Bend.name_key(t.k);
+    const name = "$T" + id(key);
+    const alias = key === "default" ? ""
+      : `\nexport type { ${name} as ${JSON.stringify(key)} };`;
+    if (Object.hasOwn(native, t.k)) {
+      types.set(t.k, `type ${name} = ${native[t.k]};${alias}`);
+      return name;
+    }
+    if (t.k === "Array") {
+      types.set(t.k, `type ${name}<$A> = $A[];${alias}`);
+      return `${name}<${type(t.x[0], vars)}>`;
+    }
+    const adt = book.tlds[t.k];
+    if (adt?.$ !== "ADT") {
+      return fail(A);
+    }
+    const params = Bend.tele_unbind(book, adt.T).doms;
+    const kinds = params.map(([, , T]) => Bend.term_wnf(book, T).$);
+    if (kinds.some((k) => k !== "Typ" && k !== "Qnt")) {
+      return fail(A);
+    }
+    const names = params.flatMap(([, k], i) =>
+      kinds[i] === "Typ" ? ["$P" + id(k)] : []);
+    const args = t.x.flatMap((x, i) => kinds[i] === "Typ" ? [type(x, vars)] : []);
+    if (!types.has(t.k)) {
+      types.set(t.k, "");
+      const env = new Map(params.flatMap(([, k], i): [number, string][] =>
+        kinds[i] === "Typ" ? [[i, "$P" + id(k)]] : []));
+      const arms = adt.c.map((c) => {
+        const fields = Bend.tele_unbind(book, c.T).doms.slice(-c.n)
+          .filter(([q]) => q.$ !== "None")
+          .map(([, k, T]) => `${JSON.stringify(k)}: ${type(T, env)}`);
+        return `{ $: ${JSON.stringify(Bend.name_key(c.k))}${
+          fields.length ? "; " + fields.join("; ") : ""} }`;
+      });
+      types.set(t.k, `type ${name}${names.length
+        ? "<" + names.join(", ") + ">" : ""} = ${arms.join(" | ") || "never"};${alias}`);
+    }
+    return name + (args.length ? "<" + args.join(", ") + ">" : "");
+  }
+  const members: string[] = [];
+  for (const k of Comp.js_exports(book)) {
+    const def = book.tlds[k] as Bend.Def;
+    const tel = Bend.tele_unbind(book, def.T);
+    const ret = Bend.term_wnf(book, tel.ret);
+    // Erased/template, kind-returning and open type-family signatures have no
+    // faithful JS declaration. Their runtime exports stay unchanged.
+    if (tel.doms.some(([q]) => q.$ === "None") || ret.$ === "Typ"
+      || ret.$ === "Qnt" || ret.$ === "App" || ret.$ === "Ref"
+      || ret.$ === "Var" || ret.$ === "Eql") {
+      continue;
+    }
+    owner = k;
+    const args = tel.doms.map(([, , A], i) => `a${i}: ${type(A)}`);
+    members.push(`  ${JSON.stringify(Bend.name_key(k))}: $BendFn<[${
+      args.join(", ")}], ${type(ret)}>;`);
+  }
+  return [
+    "type $BendFn<A extends unknown[], R> = ((...args: A) => R) & $BendPartial<A, R>;",
+    "type $BendPartial<A extends unknown[], R, P extends unknown[] = []> =",
+    "  A extends [infer H, ...infer T] ? ((...args: P) => $BendFn<A, R>)",
+    "    & $BendPartial<T, R, [...P, H]> : unknown;",
+    ...types.values(), "declare const mod: {", ...members, "};",
+    "export default mod;", "",
+  ].join("\n");
+}
+
+function cli_emit(book: Bend.Book, out: string, declaration: string | null): void {
   if (out.endsWith(".mjs")) {
-    fs.writeFileSync(out, Comp.js_lib(book, true));
+    const declarations = js_declarations(book);
+    const module = Comp.js_lib(book, true);
+    fs.writeFileSync(out, module);
+    fs.writeFileSync(declaration!, declarations);
   } else if (/\.c?js$/.test(out)) {
     fs.writeFileSync(out, Comp.js_book(book));
   } else if (out.endsWith(".c")) {
