@@ -5923,7 +5923,7 @@ ${reqs}
 // ====
 
 // The runtime's options are $BENDRTS's words, then those between +RTS and
-// -RTS (or the end), as GHC's RTS reads them; "" closes each span, so an
+// -RTS (or the end), as GHC's RTS reads them; NULL closes each span, so an
 // option's value is in its own. The rest are the program's (IO.args), and
 // -- (kept) or --RTS (dropped) hands it every argument after it.
 int main(int argc, char** argv) {
@@ -5937,7 +5937,7 @@ int main(int argc, char** argv) {
   for (char* w = strtok(env, " \t\n"); w != NULL; w = strtok(NULL, " \t\n")) {
     rts[nr++] = w;
   }
-  rts[nr++] = "";
+  rts[nr++] = NULL;
   io_argv = argv;
   io_argc = 1;
   for (int i = 1; i < argc; i += 1) {
@@ -5948,7 +5948,7 @@ int main(int argc, char** argv) {
       }
     } else if (!strcmp(a, "+RTS") || !strcmp(a, "-RTS")) {
       in        = a[0] == '+';
-      rts[nr++] = "";
+      rts[nr++] = NULL;
     } else if (in) {
       rts[nr++] = a;
     } else {
@@ -5957,9 +5957,11 @@ int main(int argc, char** argv) {
   }
   for (int i = 0; i < nr; i += 1) {
     const char* a = rts[i];
-    const char* v = i + 1 < nr ? rts[i + 1] : "";
+    const char* v = i + 1 < nr && rts[i + 1] != NULL ? rts[i + 1] : "";
     char*       end;
-    if (!strcmp(a, "--bend-help")) {
+    if (a == NULL) {
+      continue;
+    } else if (!strcmp(a, "--bend-help")) {
       printf(CLI_HELP, argv[0]);
       return 0;
     } else if (!strcmp(a, "--gpu-build")) {
@@ -5969,8 +5971,8 @@ int main(int argc, char** argv) {
       }
       return 0;
     } else if (!strcmp(a, "--threads")) {
-      thr = strtol(v, &end, 10);
-      if (thr < 1 || *end != 0) {
+      thr = strtol(v, NULL, 10);
+      if (thr < 1 || v[strspn(v, "0123456789")] != 0) {
         err_fail("expected a thread count of 1 or more after --threads");
       }
       i += 1;
@@ -5980,14 +5982,15 @@ int main(int argc, char** argv) {
         : !strcmp(end, "MB") ? 1ull << 20 : 0;
       if (!strcmp(v, "off")) {
         gpu = 0;
-      } else if (!strcmp(v, "on") || (mul != 0 && n > 0)) {
+      } else if (!strcmp(v, "on")
+        || (mul != 0 && n > 0 && end == v + strspn(v, "0123456789."))) {
         gpu = 1;
         mem = (u64)(n * (double)mul);
       } else {
         err_fail("expected on, off or a size like 4GB after --gpu");
       }
       i += 1;
-    } else if (*a != 0) {
+    } else {
       char msg[256];
       snprintf(msg, sizeof msg, "unknown runtime option %s", a);
       err_fail(msg);
@@ -6098,9 +6101,9 @@ function cli(argv) {
     } else if (a === "--bend-help" || a === "--gpu-build") {
       io_out(1, io_bytes(a === "--bend-help" ? "usage: " + argv[0] + "\n" : ""));
       process.exit(0);
-    } else if (a !== "") {
-      const re = { "--threads": /^\s*\+?0*[1-9]\d*$/,
-        "--gpu": /^(on|off|(?=.*[1-9])\d*\.?\d+[GM]B)$/ }[a];
+    } else {
+      const re = a === "--threads" ? /^0*[1-9]\d*$/ : a === "--gpu"
+        ? /^(on|off|(?=.*[1-9])(\d+\.?\d*|\.\d+)[GM]B)$/ : undefined;
       if (!re?.test(argv[++i])) {
         io_errs("bend: " + (re === undefined ? "unknown runtime option " + a
           : a === "--gpu" ? "expected on, off or a size like 4GB after --gpu"

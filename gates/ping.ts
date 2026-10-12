@@ -418,6 +418,7 @@ try {
     ends.code === 0 && ends.out.endsWith(", <a>, <+RTS>, <b>]\n")
     && zero.code === 1 && span.code === 1);
   for (const bad of [["+RTS", "--thread", "2"], ["+RTS", "--gpu", "of"],
+    ["+RTS", "--gpu", "1e2GB"], ["+RTS", "", "-RTS"],
     ["+RTS", "--threads", "-RTS", "x", "+RTS", "2"]]) {
     const c  = await run(argo, bad);
     const js = await run(process.execPath, [argo + ".js", ...bad]);
