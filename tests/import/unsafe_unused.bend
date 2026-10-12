@@ -8,5 +8,5 @@ def keep(n: Nat) -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error: 1 def relies on unsafe or foreign code:
-#|- unsafe_lib.boom
+#|- unsafe_lib.boom: @unsafe
 #|exit 1

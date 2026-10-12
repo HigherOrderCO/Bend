@@ -7,5 +7,5 @@ def Laws.false_law?():
 
 #|SOME PROOFS FAIL
 #|Error: 1 def relies on unsafe or foreign code:
-#|- unsafe-law/laws.false_law
+#|- unsafe-law/laws.false_law: @unsafe
 #|exit 1

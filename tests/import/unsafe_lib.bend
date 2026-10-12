@@ -11,5 +11,5 @@ def safe(n: Nat) -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error: 1 def relies on unsafe or foreign code:
-#|- boom
+#|- boom: @unsafe
 #|exit 1

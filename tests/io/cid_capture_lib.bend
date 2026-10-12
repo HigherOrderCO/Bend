@@ -10,6 +10,6 @@ def list() -> IO(List<U32>):
 
 #|SOME PROOFS FAIL
 #|Error: 2 defs rely on unsafe or foreign code:
-#|- peek
-#|- list
+#|- peek: foreign
+#|- list: foreign
 #|exit 1

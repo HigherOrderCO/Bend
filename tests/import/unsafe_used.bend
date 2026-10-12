@@ -11,6 +11,6 @@ def keep(n: Nat) -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error: 2 defs rely on unsafe or foreign code:
-#|- unsafe_lib.boom
-#|- innocent
+#|- unsafe_lib.boom: @unsafe
+#|- innocent: through unsafe_lib.boom
 #|exit 1

@@ -16,5 +16,5 @@ def far.make(depth):
 
 #|SOME PROOFS FAIL
 #|Error: 1 def relies on unsafe or foreign code:
-#|- far.make
+#|- far.make: foreign
 #|exit 1

@@ -37,6 +37,6 @@ def tag.on():
 
 #|SOME PROOFS FAIL
 #|Error: 2 defs rely on unsafe or foreign code:
-#|- tag.off
-#|- tag.on
+#|- tag.off: foreign
+#|- tag.on: foreign
 #|exit 1

@@ -20,8 +20,8 @@ type P<-A: Kind(qsize(Array.join(Nat, ALeaf{0n}, ALeaf{0n})))> is Type:
 
 #|SOME PROOFS FAIL
 #|Error: 4 defs rely on unsafe or foreign code:
-#|- D
-#|- use
-#|- Zero
-#|- P
+#|- D: through Array.join
+#|- use: through Array.join
+#|- Zero: through Array.join
+#|- P: through Array.join
 #|exit 1
