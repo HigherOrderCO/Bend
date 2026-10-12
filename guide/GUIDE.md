@@ -462,10 +462,8 @@ def main() -> IO(Unit):
 
 An `Image` is a quadtree: `Pix{color}` paints a square, and `Qua{tl, tr, bl,
 br}` splits it in four, so a frame is drawn by recursion like everything else,
-in parallel if you want. Events are `Key`, `Text`, `Mouse`, `Move`, `Look`,
-`Scroll` and `Close`. `Text{text}` is what a key press typed, an input method's
-included: text fields read it, games read `Key`.
-`Scroll{x, y, dx, dy}` is a wheel or trackpad under the pointer;
+in parallel if you want. Events are `Key`, `Mouse`, `Move`, `Look`, `Scroll`
+and `Close`. `Scroll{x, y, dx, dy}` is a wheel or trackpad under the pointer;
 its signed `F32` deltas scroll toward a page's top and left (a notch is 1 on
 X11). For a first-person camera, `Window.grab(window, True{})` hides and holds
 the cursor, and the mouse's motion comes as `Look{dx, dy}` (signed `F32`, in
