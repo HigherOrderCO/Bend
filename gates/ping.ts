@@ -38,6 +38,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import * as lib from "./_lib";
+import { judge, type Got } from "./safe_node.ts";
 
 // Constants
 // =========
@@ -334,6 +335,24 @@ try {
   check("a failed kernel build leaves no private BendTT input",
     no_lean.code === 1 && no_lean.err.includes("--verdict needs Lean")
     && fs.readdirSync(verdict_tmp).every((name) => !name.startsWith("bendtt-")));
+  const recursive_file = path.join(TMP, "recursive_type.bend");
+  fs.writeFileSync(recursive_file, "import Base\n\ndef G() -> Type:\n"
+    + "  (G -> U32) -> U32\n\ndef run(g: G, k: G -> U32) -> U32:\n  g(k)\n");
+  const recursive_check = await bend([recursive_file, "--check-only"]);
+  const recursive_verdict = await bend([recursive_file, "--verdict"]);
+  check("the frontend accepts a recursive type",
+    recursive_check.code === 0 && recursive_check.out.startsWith("ALL PROOFS CHECK"));
+  check("a translator stack overflow has an infrastructure error marker",
+    !/stack|RangeError/i.test(recursive_verdict.err)
+    || recursive_verdict.err.includes("BendTT infrastructure: elaboration failed:"));
+  const surveyed = await lib.exec(process.execPath,
+    [path.join(lib.ROOT, "gates", "safe_node.ts")], recursive_file + "\n",
+    25_000, { BEND_NO_TELEMETRY: "1" });
+  const recursive_row = (JSON.parse(surveyed.out) as Got[])[0];
+  const [recursive_class, recursive_reason] = judge(recursive_row);
+  check("the survey keeps translator failures separate from frontend rejections",
+    surveyed.code === 0 && !recursive_row.timeout
+    && (recursive_class !== " " || recursive_reason === "agree"));
   fs.writeFileSync(unsafe_file,
     "import Base\n@unsafe\ndef main() -> Nat:\n  0n\n");
   fs.writeFileSync(checkup,
