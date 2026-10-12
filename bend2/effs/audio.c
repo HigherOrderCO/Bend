@@ -22,19 +22,9 @@ typedef struct {
 #elif defined(__linux__)
   snd_pcm_t*   unit;
   pthread_t    pump;
-  _Atomic(u32) done, failed;
+  _Atomic(u32) done;
 #endif
 } IoRing;
-
-#if defined(__linux__) && !defined(__OBJC__)
-static void io_ring_error(u32 code) {
-  if (code != 0) {
-    char text[160];
-    snprintf(text, sizeof text, "Audio: %s", snd_strerror(-(int)code));
-    err_fail(text);
-  }
-}
-#endif
 
 // n frames queued after the write; a write past the ring's room is
 // dropped and the queue answered as it is.
@@ -116,14 +106,15 @@ static void io_ring_free(IoRing* p) {
 
 #elif defined(__linux__)
 
-// Keep each chunk until ALSA accepts all frames. Nonblocking writes
-// and bounded waits let close join a suspended pump. Stop after one
-// second without progress; write or close reports the stored error.
+// A thread feeds the default ALSA device 256 frames at a time (a
+// write blocks until the device has room, so the ring drains at the
+// device's clock). A chunk stays until the device has taken all of it;
+// an error ALSA can't recover stops the thread, and the ring fills as
+// with a stalled device.
 static void* io_ring_pump(void* ctx) {
-  IoRing* p = ctx;
+  IoRing* p  = ctx;
   float   out[256 * 2];
   u32     at = 256;
-  u64     stalled = 0;
   while (atomic_load_explicit(&p->done, memory_order_relaxed) == 0) {
     if (at == 256) {
       io_ring_pull(p, out, 256);
@@ -132,31 +123,9 @@ static void* io_ring_pump(void* ctx) {
     snd_pcm_sframes_t n = snd_pcm_writei(p->unit, out + at * 2, 256 - at);
     if (n > 0) {
       at += (u32)n;
-      stalled = 0;
-      continue;
-    }
-    int code = n == 0 ? -EIO : (int)n;
-    if (code == -EAGAIN) {
-      code = snd_pcm_wait(p->unit, 20);
-      if (code >= 0) code = 0;
-    }
-    if (code == -ESTRPIPE) {
-      code = snd_pcm_resume(p->unit);
-      if (code == -EAGAIN) code = 0;
-      else if (code < 0) code = snd_pcm_prepare(p->unit);
-    } else if (code < 0) {
-      code = snd_pcm_recover(p->unit, code, 1);
-    }
-    if (atomic_load_explicit(&p->done, memory_order_relaxed) != 0) break;
-    u64 now = io_tick();
-    if (stalled == 0) stalled = now;
-    if (code == 0 && now - stalled >= 1000000000ull) code = -ETIMEDOUT;
-    if (code < 0) {
-      atomic_store_explicit(&p->failed, (u32)-code, memory_order_release);
+    } else if (n == 0 || snd_pcm_recover(p->unit, (int)n, 1) < 0) {
       break;
     }
-    struct timespec pause = { 0, 1000000 };
-    nanosleep(&pause, NULL);
   }
   return NULL;
 }
@@ -167,8 +136,7 @@ static void io_ring_hush(const char* file, int line, const char* fn, int err,
 
 static u32 io_ring_start(IoRing* p, u32 rate) {
   snd_lib_error_set_handler(io_ring_hush);
-  if (snd_pcm_open(&p->unit, "default", SND_PCM_STREAM_PLAYBACK,
-    SND_PCM_NONBLOCK) < 0) {
+  if (snd_pcm_open(&p->unit, "default", SND_PCM_STREAM_PLAYBACK, 0) < 0) {
     return ENODEV;
   }
   if (snd_pcm_set_params(p->unit, SND_PCM_FORMAT_FLOAT_LE,
@@ -180,17 +148,14 @@ static u32 io_ring_start(IoRing* p, u32 rate) {
 }
 
 static void io_ring_free(IoRing* p) {
-  u32 code = 0;
   if (p->unit != NULL) {
     atomic_store_explicit(&p->done, 1, memory_order_relaxed);
     if (p->pump != 0) {
       pthread_join(p->pump, NULL);
     }
-    code = atomic_load_explicit(&p->failed, memory_order_acquire);
     snd_pcm_close(p->unit);
   }
   free(p);
-  io_ring_error(code);
 }
 
 #else
@@ -241,11 +206,6 @@ Term audio_write_run(Env e, Term* f, IoWork* w) {
     n += 1;
     s  = fb[1];
   }
-#if defined(__linux__) && !defined(__OBJC__)
-  if (atomic_load_explicit(&p->failed, memory_order_acquire) != 0) {
-    io_ring_free(p);
-  }
-#endif
   u64 q = io_ring_write(p, pcm, n > IO_RING * 2 ? 0 : n / 2);
   return io_tup(e, f[0], q);
 }
