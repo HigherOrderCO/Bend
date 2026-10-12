@@ -5,6 +5,7 @@
 // on the translation, with the failing call if live. ms times the verdict
 // only; a failed diagnostic never changes it, and an infrastructure error
 // is never a proof rejection.
+// From the repo root, --test runs the translator classification regression.
 import * as child from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -116,7 +117,53 @@ async function one(f: string, cap: number): Promise<Got> {
   return g;
 }
 
-if (import.meta.main) {
+async function regression(): Promise<void> {
+  let passed = 0;
+  const check = (what: string, ok: boolean): void => {
+    if (!ok) {
+      throw new Error(what);
+    }
+    passed += 1;
+  };
+  const accepts = (g: Got): boolean => {
+    if (g.timeout || g.signal || g.diagnostic_error) {
+      return false;
+    }
+    const [c, why] = judge(g);
+    const out = g.out.trim();
+    return g.code === 0 && !g.error && out === "ALL PROOFS CHECK"
+      && c === " " && why === "agree"
+      || g.code === 1 && g.error === out && c === "e"
+        && /^Error: BendTT infrastructure: elaboration failed: RangeError: .*stack/i.test(out);
+  };
+  const f = "tests/check/verdict_recursive_type.bend";
+  const frontend = await run(process.execPath, ["bend2/main.ts", f, "--check-only"], 30000);
+  check("the frontend must accept the recursive type",
+    frontend.code === 0 && !frontend.timeout && !frontend.error
+    && frontend.out.trim() === "ALL PROOFS CHECK\nUse --verdict for mathematical validity.");
+  const surveyed = await one(f, 30000);
+  check("the survey must report the translator overflow or successful verification: "
+    + JSON.stringify(surveyed), accepts(surveyed));
+  const success: Got = { f, code: 0, ms: 1, timeout: false, out: "ALL PROOFS CHECK\n" };
+  check("successful verification is allowed", accepts(success));
+  const missing = "Error: BendTT infrastructure: ENOENT: missing kernel";
+  const overflow = "Error: BendTT infrastructure: elaboration failed: RangeError: Maximum call stack size exceeded.";
+  for (const [what, row] of [
+    ["missing kernel", { ...success, code: 1, out: missing, error: missing }],
+    ["frontend rejection", { ...success, code: 1, out: "SOME PROOFS FAIL\nError: wrong type" }],
+    ["kernel rejection", { ...success, code: 1, out: "SOME PROOFS FAIL\nSorry - mismatch" }],
+    ["other translator error", { ...success, code: 1, out: "Error: BendTT infrastructure: elaboration failed: Error: unknown name" }],
+    ["timeout", { ...success, code: null, timeout: true, out: overflow, error: overflow }],
+    ["failed success status", { ...success, code: 1 }],
+  ] as Array<[string, Got]>) {
+    check(what + " must fail the regression", !accepts(row));
+  }
+  console.log("PASS: " + passed + " / " + passed);
+}
+
+if (import.meta.main && process.argv[2] === "--test") {
+  await regression();
+} else if (import.meta.main) {
   const files = fs.readFileSync(0, "utf8").split("\n").filter((l) => l !== "");
   const cap = Number(process.env.CAP ?? 30) * 1000;
   const res: Got[] = [];

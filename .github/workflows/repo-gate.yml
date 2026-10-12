@@ -30,6 +30,10 @@ jobs:
         with:
           bun-version: 1.4.0
       - run: pipx install ttok==0.3
+      - name: survey translator regression
+        env:
+          BEND_NO_TELEMETRY: '1'
+        run: bun gates/safe_node.ts --test
       - name: main's gate files over this tree
         run: |
           git fetch --no-tags --depth=1 origin main
