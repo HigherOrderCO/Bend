@@ -9,7 +9,7 @@ import Game from "../main.bend";
 // Map
 // ===
 
-const ROWS  = Game.grid(Game.map_h() - 1n).split("\n");
+const ROWS  = Game.grid(Game.map_h() - 1).split("\n");
 const H     = ROWS.length;
 const W     = ROWS[0].length;
 const WALLS = new Set();
@@ -25,7 +25,7 @@ for (let y = 0; y < H; y++) {
 // Bend bridge
 // ===========
 // The conventions: a constructor is {$: "Name", field: value, ...} (live
-// fields only), Nat is BigInt, Bool is a plain boolean. Stepping onto the
+// fields only), Nat is a number, Bool is a plain boolean. Stepping onto the
 // flag's cell is the win: the game sets `won` itself.
 
 const one  = (act) => ({ $: "Con", head: { $: act }, tail: { $: "Nil" } });

@@ -5,7 +5,7 @@
 // (node --import). A .bend module exports every filled, non-base, non-IO
 // def, wrapped so a JS caller passes the live arguments, in one call or
 // curried, and gets a plain value back: a constructor is {$: "Name", field:
-// value, ...}, a closure is a function, Nat is BigInt, Bool, String and U32
+// value, ...}, a closure is a function, Nat is a number, Bool, String and U32
 // are native. A page bundles through Bun.build with the loader on, since
 // the bun build CLI takes no plugins.
 
