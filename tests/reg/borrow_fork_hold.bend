@@ -1,9 +1,6 @@
-# regression witness: two forked readers of one list whose join does not
-# mention it. The join now holds the list (a captured variable that dies
-# at the fork) and sinks it after both tasks, so the readers borrow it.
-# Before, each reader owned its copy: a term_keep before the fork, the
-# type hot, and each match a ctr_take. In the C, WL_CASE(FID_TWICE) has
-# no term_keep and WL_CASE(FID_XS_LEN) reads through term_peek.
+# Two different last fork readers of one list must both observe every
+# element while safely releasing their references. The join has no later
+# use of the list; neither reader may free beneath its sibling.
 import Base
 
 type Xs is Data:

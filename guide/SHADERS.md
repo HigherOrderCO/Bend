@@ -192,6 +192,12 @@ borrows: `Blk.go` only matches, `Tile.fin` consumes last. So the scene is
 host-owned, borrowed by the bang, and returned (`Frame.show`). Read through
 counts, the frame costs 8.0 -> 16.5 ms (draw 6.0 -> 14.1).
 
+When a fork is the last use of a locally owned box, its readers take counted
+ownership together, so recursive readers free nodes as they walk rather than
+leaving one whole-value sink at the join. All sibling readers must own a
+reference before that handoff; giving ownership to only one could invalidate
+another's borrow. A value needed after the fork retains its original owner.
+
 - Two consumers of one list share it: 45 ms frames and a 448 s Metal compile. A
   `+` where one use would do heats its type (symreg 2.83 -> 3.30 s).
 - A def that returns its argument shares it: `Bool.pick(Cloth, c, a, b)` on a

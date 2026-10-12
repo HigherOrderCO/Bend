@@ -2088,7 +2088,7 @@ function emit_jump(sc: Scope, args: string[], k: Name, bang = false): void {
   file_push(sc, `WL_AGAIN(${sc.seg.fid});`);
 }
 
-function emit_args(sc: Scope, ck: Spine, jump = false, fork = false): string[] {
+function emit_args(sc: Scope, ck: Spine, jump = false): string[] {
   const k = ck.k!;
   const brw = brw_of(k);
   ck.all.forEach((a, q) => {
@@ -2118,7 +2118,7 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false): string[] {
       }
       if (dead && !twin && val_brw(sc, bd.val)) {
         sc.uses.delete(p);
-      } else if (!fork) {
+      } else {
         sc.uses.set(p, { ...bd, n: Math.max(bd.n - 1, 1) });
       }
       b = bd.val;
@@ -2543,12 +2543,18 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   const name = seg_name(sc, "j");
   let hold: Of<"Var">[] = [];
   if (fork) {
+    for (const c of calls) c.xs.forEach((a, i) => {
+      const x = term_strip(a);
+      if (x.$ !== "Var") return;
+      const p = probe_of(x), b = sc.uses.get(p);
+      if (b && rest_use([o.b], p) === 0) val_own(sc, b.val, c.k! + "~" + i);
+    });
     spare_flush(sc);
     sc.seg.fork = true;
     const pl = { ...sc, uses: new Map(sc.uses) };
     block(pl, "if (!seq) {", () => {
       const margs = calls.map((c, j) => emit_args({ ...pl,
-        rest: [...x.v.filter((_, i) => i !== j), o.b] }, c, false, true));
+        rest: [...x.v.slice(j + 1), o.b] }, c));
       const live = [...pl.uses].filter(([p, b]) =>
         !val_brw(pl, b.val) || rest_use([o.b], p) > 0);
       hold = live.map(([p]) => p);

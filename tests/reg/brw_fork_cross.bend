@@ -1,8 +1,6 @@
-# borrow witness: a fork whose kids read (cnt~0 borrowed) and consume
-# (tail~0 owned: it returns a field) one list. The reader's use still
-# counts when the consumer pops, so tail gets a kept copy (a term_keep on
-# each path, parallel and sequential; Xs hot), both tasks see a live list,
-# and the join holds it and sinks it after both. Correct at 8 threads.
+# A forked reader and a tail consumer must share a live list safely.
+# Returning a field from one task must not invalidate the other task's
+# traversal; the returned tail is still readable after the join.
 import Base
 
 type Xs is Data:

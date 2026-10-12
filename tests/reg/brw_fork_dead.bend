@@ -1,8 +1,6 @@
-# borrow witness: a fork with a dead parameter. Xs.seven ignores its list,
-# so seven~0 is borrowed (an unused rooted word is let go, never sunk);
-# cnt~0 is borrowed (its sibling holds the list). In the C, FID_TWICE and
-# FID_THRICE have no term_keep, the join holds xs and the joiner sinks it
-# once, and cnt reads through term_peek.
+# A fork with an unused list argument must release that task's reference
+# without invalidating its sibling. Thrice also retains the list for a
+# later traversal, so that original owner must survive the join.
 import Base
 
 type Xs is Data:
