@@ -350,7 +350,8 @@ async function cli_checkup(file: string): Promise<void> {
     cli_say(1, "--- " + m[1] + " ---\n");
     let code = 1;
     try {
-      const own = /^import Base\s*(?:#.*)?$/m.test(fs.readFileSync(at, "utf8"));
+      const own = /^(?:[\t\r ]*(?:(?:#|import )[^\n]*)?\n)*[\t ]*import Base\s/
+        .test(fs.readFileSync(at, "utf8"));
       code = book_run(await book_read(at, own ? base : undefined), [at]);
     } catch (e) {
       cli_say(2, book_err(e) + "\n");

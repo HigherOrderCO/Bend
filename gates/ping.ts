@@ -305,6 +305,14 @@ try {
   check("valid body literal text does not add an independent import",
     header_check.code === 0 && header_run.code === 0
     && header_run.out.endsWith("5n\n"));
+  const no_base = path.join(TMP, "no-base.bend");
+  fs.writeFileSync(no_base,
+    "def main() -> String:\n  \"body\nimport Base\n\"\n");
+  fs.writeFileSync(header_source, "import ./no-base.bend as NoBase\n");
+  const base_run = await bend([header_source, "--checkup"],
+    { BEND_NO_TELEMETRY: "1" });
+  check("--checkup gives Base only to a module that imports it",
+    base_run.code === 1);
   fs.writeFileSync(path.join(TMP, "page.html"),
     "<script type=\"module\" src=\"./page.ts\"></script>\n");
   fs.writeFileSync(path.join(TMP, "page.ts"), "import \"./none.ts\";\n");
