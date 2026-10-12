@@ -6,8 +6,8 @@
 // on @unsafe or foreign code: the goal allows it), bend2 rejects (--verdict
 // stops there, so the kernel never accepts more), - out of scope (the
 // kernel cannot express a def), ! false reject (bend2 checks, the kernel
-// rejects), t timeout. A live check failure goes through safe_diag.ts,
-// which names the failing call.
+// rejects), t deadline timeout, e infrastructure error. Optional diagnostics
+// cannot change the verdict class; their failures are reported separately.
 // The table lands in .tmp/safe/<corpus>.txt; the hub corpus is a pulled
 // BendHub store ($SAFE_HUB), sent as BEND_LIB. The kernel binary is built
 // on a Lean node (bendtt.lean's CLI). Each worktree stages in its own
@@ -18,6 +18,7 @@ import * as child from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { ROOT, node_pool, ssh } from "./_lib.ts";
+import { judge, type Got } from "./safe_node.ts";
 
 const HUB = process.env.SAFE_HUB ?? "";
 const corpus = process.argv[2];
@@ -53,7 +54,6 @@ const shards: string[][] = [];
 for (let i = 0; i < all.length; i += PAR) {
   shards.push(all.slice(i, i + PAR));
 }
-type Got = { f: string; code: number; ms: number; out: string };
 const gots: Got[] = [];
 const t0 = Date.now();
 await node_pool(live, shards.map((fs_) => async (node: number) => {
@@ -63,37 +63,23 @@ await node_pool(live, shards.map((fs_) => async (node: number) => {
   try {
     gots.push(...JSON.parse(got.out));
   } catch {
+    // a dead node (ssh exits 255) hands its shard back to node_pool
     if (got.code === 255) {
       throw new Error("node", { cause: got.err });
     }
     for (const f of fs_) {
-      gots.push({ f, code: -1, ms: 0, out: "shard failed on " + node + ": " + got.err.slice(-300) });
+      gots.push({ f, code: -1, ms: 0, timeout: false,
+        out: "shard failed on " + node + ": " + got.err });
     }
   }
 }));
 gots.sort((a, b) => a.f < b.f ? -1 : 1);
-// a verdict's class and its reason (the kernel's or elaborator's first words)
-function judge(g: Got): [string, string] {
-  const out = g.out.trim();
-  if (g.code === null || (g.code as unknown) === null || g.ms >= 29000) {
-    return ["t", "timeout"];
-  }
-  if (g.code === 0 && out === "ALL PROOFS CHECK") {
-    return [" ", "agree"];
-  }
-  if (/^Error: \d+ defs? rel(y|ies) on unsafe or foreign code/m.test(out)) {
-    return ["u", "unsafe: " + [...out.matchAll(/^- (\S+)$/gm)].map((m) => m[1]).slice(0, 3).join(" ")];
-  }
-  if (!out.includes("Sorry - ")) {
-    return [" ", "bend2 rejects: " + out.split("\n").slice(1, 3).join(" ").slice(0, 80)];
-  }
-  const tt = out.slice(out.indexOf("BendTT: ") + 8);
-  if (tt.startsWith("out of scope")) {
-    return ["-", "out of scope: " + [...tt.matchAll(/^- \S+: (.*)$/gm)].map((m) => m[1]).slice(0, 2).join(" | ").slice(0, 160)];
-  }
-  return ["!", tt.split("\n").slice(1, 3).join(" | ").slice(0, 300)];
-}
-const rows = gots.map((g) => [...judge(g), g.f, g.out] as const);
+const rows = gots.map((g) => {
+  const [c, reason] = judge(g);
+  const r = reason + (g.diagnostic_error
+    ? " [diagnostic failed: " + g.diagnostic_error.replace(/\s+/g, " ").slice(0, 300) + "]" : "");
+  return [c, r, g.f, g.out] as const;
+});
 fs.mkdirSync(OUT, { recursive: true });
 fs.writeFileSync(path.join(OUT, corpus + ".json"), JSON.stringify(gots));
 fs.writeFileSync(path.join(OUT, corpus + ".txt"), rows.map(([c, r, f]) => c + " " + f + "  " + r).join("\n") + "\n");
@@ -105,7 +91,8 @@ const agree = rows.filter(([c, r]) => c === " " && r === "agree").length;
 const b2rej = rows.filter(([c, r]) => c === " " && r !== "agree").length;
 console.log(corpus + ": " + rows.length + " files on " + live.length + " nodes in " + (Date.now() - t0) + " ms");
 console.log("agree (both check): " + agree + ", u unsafe: " + (tally.get("u") ?? 0) + ", bend2 rejects: " + b2rej
-  + ", - out of scope: " + (tally.get("-") ?? 0) + ", ! false reject: " + (tally.get("!") ?? 0) + ", t timeout: " + (tally.get("t") ?? 0));
+  + ", - out of scope: " + (tally.get("-") ?? 0) + ", ! false reject: " + (tally.get("!") ?? 0)
+  + ", t timeout: " + (tally.get("t") ?? 0) + ", e infrastructure: " + (tally.get("e") ?? 0));
 // the false rejects by failing def, most files first
 const why = new Map<string, number>();
 for (const [c, r] of rows) {

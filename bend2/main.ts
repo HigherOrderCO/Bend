@@ -169,7 +169,8 @@ function cli_guide(name: string): void {
 // cli_update runs the installer again: the one way bend changes. The
 // command prints first, so the user can run it alone.
 function cli_update(): void {
-  const cmd = "curl -fsSL " + ORIGIN + "/install.sh | sh";
+  const cmd = "s=$(curl -fsSL " + ORIGIN
+    + "/install.sh) && printf '%s\\n' \"$s\" | sh";
   cli_say(2, cmd + "\n");
   process.exitCode = child.spawnSync("sh", ["-c", cmd],
     { stdio: "inherit" }).status ?? 1;
@@ -481,16 +482,88 @@ function cli_base(what?: string): void {
   cli_say(1, want.join("\n\n") + "\n");
 }
 
+// An inline module script; an empty svg <script/> can't have content.
+function is_inline_module(el: HTMLRewriterTypes.Element): boolean {
+  return el.canHaveContent && !el.hasAttribute("src")
+    && el.getAttribute("type")?.trim().toLowerCase() === "module";
+}
+
+// cli_bundle builds a page. Bun skips inline module scripts (#1400), so the
+// inline plugin moves each to a virtual file beside its page, padded so an
+// error points at the page's own line and column.
 async function cli_bundle(page: string, dir: string): Promise<void> {
-  const out = await Bun.build({
-    entrypoints: [page],
-    outdir: dir,
-    target: "browser",
-    minify: true,
-    plugins: [PLUGIN],
-  });
-  for (const a of out.outputs) {
-    cli_say(1, a.path + " (" + (a.size / 1024).toFixed(1) + "kb)\n");
+  const code = new Map<string, string>();
+  const inline: BunPlugin = {
+    name: "bend inline",
+    setup(build) {
+      build.onResolve({ filter: /\.bend-inline-\d+\.js$/ }, (a) => {
+        const id = path.resolve(a.resolveDir, a.path);
+        return code.has(id) ? { path: id, namespace: "inline" } : undefined;
+      });
+      build.onLoad({ filter: /.*/, namespace: "inline" }, (a) =>
+        ({ contents: code.get(a.path)!, loader: "js" }));
+      build.onLoad({ filter: /\.html$/ }, async (a) => {
+        const src = await Bun.file(a.path).text();
+        // HTMLRewriter gives no offsets, so a first pass marks where each
+        // script's text starts, with a mark the page doesn't hold.
+        let mark = "BEND_INLINE_";
+        while (src.includes(mark)) {
+          mark += "_";
+        }
+        const marked = new HTMLRewriter().on("script", {
+          element(el) {
+            if (is_inline_module(el)) {
+              el.prepend(mark);
+            }
+          },
+        }).transform(src);
+        const mods: { id: string; text: string }[] = [];
+        let mod: { id: string; text: string } | null = null;
+        const html = new HTMLRewriter().on("script", {
+          element(el) {
+            mod = null;
+            if (is_inline_module(el)) {
+              const name = "." + path.basename(a.path) + ".bend-inline-"
+                + mods.length + ".js";
+              mod = { id: path.join(path.dirname(a.path), name), text: "" };
+              mods.push(mod);
+              el.setAttribute("src", "./" + name);
+            }
+          },
+          text(t) {
+            if (mod) {
+              mod.text += t.text;
+              t.remove();
+            }
+          },
+        }).transform(src);
+        let end = 0;
+        let line = 0;
+        for (const [i, m] of mods.entries()) {
+          const skip = i * mark.length;
+          const at = marked.indexOf(mark, end + skip) - skip;
+          line += src.slice(end, at).split("\n").length - 1;
+          const col = at - src.lastIndexOf("\n", at - 1) - 1;
+          code.set(m.id, "\n".repeat(line) + " ".repeat(col) + m.text);
+          end = at;
+        }
+        return { contents: html, loader: "html" };
+      });
+    },
+  };
+  try {
+    const out = await Bun.build({
+      entrypoints: [page],
+      outdir: dir,
+      target: "browser",
+      minify: true,
+      plugins: [inline, PLUGIN],
+    });
+    for (const a of out.outputs) {
+      cli_say(1, a.path + " (" + (a.size / 1024).toFixed(1) + "kb)\n");
+    }
+  } catch (e) {
+    throw book_err(e).replace(/\.([^/\\]+)\.bend-inline-\d+\.js/g, "$1");
   }
 }
 

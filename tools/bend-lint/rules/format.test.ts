@@ -232,6 +232,44 @@ def main() -> String:
     await fixed("import Base\nimport ./LAWS.bend as Laws\ndef Laws.same(x):\n  {==}\n", opts);
   });
 
+  test("indented header imports allow safe formatting across comments and blank lines", async () => {
+    const source = "# header\n\n\timport Base # base\n\n# body\ndef main()->U32: 7\n";
+    const expected = "# header\n\n  import Base  # base\n\n# body\ndef main() -> U32:\n  7\n";
+    for (const endOfLine of ["lf", "crlf"] as const) {
+      const newline = endOfLine === "crlf" ? "\r\n" : "\n";
+      expect(await fixed(source.replaceAll("\n", newline), { ...opts, endOfLine })).toBe(
+        expected.replaceAll("\n", newline),
+      );
+    }
+  });
+
+  test("indented module aliases allow safe formatting", async () => {
+    fixture("import Base\ndef value() -> U32:\n  7\n", "HEADER_VALUE.bend");
+    expect(
+      await fixed("import Base\n  import ./HEADER_VALUE.bend as D\ndef main()->U32: D.value()\n"),
+    ).toBe(
+      "import Base\n  import ./HEADER_VALUE.bend as D\n\ndef main() -> U32:\n  D.value()\n",
+    );
+  });
+
+  test("indented aliases preserve imported law fills without body spans", async () => {
+    fixture("import Base\nlaw same:\n  for x: U32\n  {x == x : U32}\n", "HEADER_LAWS.bend");
+    expect(
+      await fixed("import Base\n  import ./HEADER_LAWS.bend as Laws\ndef Laws.same(x):\n  {==}\n"),
+    ).toBe(
+      "import Base\n  import ./HEADER_LAWS.bend as Laws\n\ndef Laws.same(x):\n  {==}\n",
+    );
+  });
+
+  test("column-zero foreign body imports survive the guard", async () => {
+    fixture("io_eff(CID(read), (n) => n);\n", "header-foreign.js");
+    const source =
+      'import Base\nlaw read:\n  U32 -> IO(U32)\ndef read(n):\nimport "./header-foreign.js"\ndef main() -> IO(Unit):\n  do IO<Unit>:\n    n : U32 <- read(7)\n    IO.print(U32.show(n))\n';
+    expect(await fixed(source)).toBe(
+      'import Base\n\nlaw read:\n  U32 -> IO(U32)\n\ndef read(n):\nimport "./header-foreign.js"\n\ndef main() -> IO(Unit):\n  do IO<Unit>:\n    n: U32 <- read(7)\n    IO.print(U32.show(n))\n',
+    );
+  });
+
   for (const [name, comment] of [
     ["foreign#probe.js", " #outside"],
     ["foreign  as  probe.js", ""],
@@ -273,6 +311,47 @@ def main() -> String:
       },
     };
     expect((await lint(fixture("import Base\ndef main() -> U32:\n  1\n"), [guard])).ok).toBe(true);
+  });
+
+  test("the guard compares import-looking multiline literal contents", async () => {
+    const source = 'import Base\ndef main() -> String:\n  "first\nimport Base\nlast"\n';
+    const guard: LintRule = {
+      id: "test/literal-guard",
+      run: (cx) => {
+        expect(cx.sameDeclarations(cx.root.text)).toBe(true);
+        expect(
+          cx.sameDeclarations(cx.root.text.replace("\nimport Base\nlast", "\nimport Different\nlast")),
+        ).toBe(false);
+        return [];
+      },
+    };
+    expect((await lint(fixture(source), [guard])).ok).toBe(true);
+  });
+
+  test("the guard does not mask imports after a declaration", async () => {
+    const guard: LintRule = {
+      id: "test/late-import",
+      run: (cx) => {
+        expect(cx.sameDeclarations(cx.root.text)).toBe(true);
+        expect(cx.sameDeclarations(cx.root.text + "import ./missing.bend as Missing\n")).toBe(false);
+        return [];
+      },
+    };
+    expect((await lint(fixture("import Base\ndef main() -> U32:\n  7\n"), [guard])).ok).toBe(true);
+  });
+
+  test("the guard stops the module header at an unsafe annotation", async () => {
+    const guard: LintRule = {
+      id: "test/unsafe-header",
+      run: (cx) => {
+        expect(cx.sameDeclarations(cx.root.text)).toBe(true);
+        expect(
+          cx.sameDeclarations(cx.root.text.replace("@unsafe\n", "@unsafe\nimport Base\n")),
+        ).toBe(false);
+        return [];
+      },
+    };
+    expect((await lint(fixture("import Base\n@unsafe\ndef main() -> U32:\n  7\n"), [guard])).ok).toBe(true);
   });
 
   test("configuration passes the union through the unchanged engine", async () => {
