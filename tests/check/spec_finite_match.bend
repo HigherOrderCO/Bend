@@ -5,9 +5,9 @@
 # names that value's instance at the law's type and returns the value,
 # so the kernel checks that every value has an instance that fits the
 # law: skip's is λ{(,): λ{}}, and same's has an arm per Bool (#1186).
-# main prints 3n either way; --verdict fails a def that reaches no
-# kernel def (- skip: no kernel def), so it fails here if that def stops
-# going out.
+# main prints 3n either way, and no gate runs --verdict to failure: by
+# hand, --verdict fails here if skip's def stops going out (- skip: no
+# kernel def), though not if same's does, as its instances still go out.
 import Base
 
 type Void is Data:
