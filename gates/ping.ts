@@ -345,6 +345,22 @@ try {
   check("hash and named hub checkups execute pure and effectful entries",
     checkup_result.code === 0 && checkup_result.out.includes("\n5n\n")
     && checkup_result.out.endsWith("hub-io\n"));
+  const checkup_outside = path.join(TMP, "checkup-outside.bend");
+  fs.writeFileSync(checkup_outside, "import Base\ndef main() -> Nat:\n  99n\n");
+  fs.writeFileSync(checkup_hub, "import " + checkup_pkg
+    + "/../../checkup-outside.bend as Outside\nimport checkup@1.0.0.0/io.bend as Effect\n");
+  const checkup_escape = await bend([checkup_hub, "--checkup"],
+    { BEND_LIB: checkup_cache, BEND_NO_TELEMETRY: "1" });
+  check("a hub traversal fails without running the outside file; later imports run",
+    checkup_escape.code === 1 && !checkup_escape.out.includes("\n99n\n")
+    && checkup_escape.out.endsWith("hub-io\n"));
+  fs.unlinkSync(path.join(checkup_cache, checkup_pkg, "pure.bend"));
+  fs.symlinkSync(checkup_outside, path.join(checkup_cache, checkup_pkg, "pure.bend"));
+  fs.writeFileSync(checkup_hub, "import checkup@1.0.0.0/pure.bend as Outside\n");
+  const checkup_link = await bend([checkup_hub, "--checkup"],
+    { BEND_LIB: checkup_cache, BEND_NO_TELEMETRY: "1" });
+  check("a named hub entry cannot run through a symlink outside its cache",
+    checkup_link.code === 1 && !checkup_link.out.includes("\n99n\n"));
   const two  = "import Base\ndef two() -> Nat:\n  2n\n";
   const use  = (at: string) => "import Base\nimport ./" + at
     + " as T\ndef main() -> Nat:\n  T.two\n";
