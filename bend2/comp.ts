@@ -471,6 +471,10 @@ function nat_chk(n) {
   return n;
 }
 
+function nat_in(n) {
+  return Number.isInteger(n) && n >= 0 && n <= 2 ** 53 ? n : nat_chk(1 / 0);
+}
+
 function f32_show(x) {
   if (x !== x) {
     return "nan";
@@ -3095,8 +3099,11 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   }
   block(sc, `function ${js_sat(k)}(${params.join(", ")}) {`, () => {
     if (def_foreign(def)) {
+      const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
+      const f = params.at(-1);
       return file_push(sc, `return { $: ${JSON.stringify(Bend.name_key(k))
-        }, args: [${params.slice(0, -1).join(", ")}], kont: ${params.at(-1)} };`);
+        }, args: [${params.slice(0, -1).join(", ")}], kont: ${K?.$ === "All"
+        && host_nat(K.A) ? `(x) => ${f}(nat_in(x))` : f} };`);
     }
     if (loop.length === 0) {
       return js_func(sc, h!, def.T, params);
@@ -3120,6 +3127,12 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
+// A host hands a Nat in as a number, which nat_in checks.
+function host_nat(A: HTerm | null): boolean {
+  const t = ty_wnf(A);
+  return t?.$ === "ADT" && t.k === "Nat";
+}
+
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
 // def a host can call.
 export function js_lib(book: Bend.Book, mod = false): string {
@@ -3137,9 +3150,13 @@ export function js_lib(book: Bend.Book, mod = false): string {
   }
   const effs = effect_srcs(".js", "a foreign def without a .js import: ")
     .map((t) => `(() => {\n${t}\n})();\n\n`).join("");
-  const lib = outs === null ? "" : `export default {\n${outs.map((k) =>
-    `  ${js_key(Bend.name_key(k))}run_lib(${js_sat(k)}, ${
-      fun_of(k).lays.length}),`).join("\n")}\n};\n`;
+  const lib = outs === null ? "" : `export default {\n${outs.map((k) => {
+    const { live, lays } = fun_of(k);
+    const ps = live.map((_, i) => "a" + i);
+    const xs = live.map(([, , A], i) => host_nat(A) ? `nat_in(a${i})` : ps[i]);
+    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${js_sat(k)}(${
+      xs}), ${lays.length}),`;
+  }).join("\n")}\n};\n`;
   const jmps = new Map<Name, boolean>();
   const jmp = (k: Name): boolean => k === CLO_APPLY || memo(jmps, k, () =>
     (jmps.set(k, true), [...FL.tails.get(k) ?? []].some(jmp)));

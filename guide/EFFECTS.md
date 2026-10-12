@@ -84,7 +84,9 @@ number, a `String` a string, a constructor
 `{$: CID(Name), field: value}`, a handle its host value (a descriptor).
 `CID(Name)` is the constructor's tag, read as on the C side. It returns
 the answer the same way: `io_done(v)`, `io_fail(code)`,
-`io_tup(handle, result)`, `{$: CID(Unit)}`.
+`io_tup(handle, result)`, `{$: CID(Unit)}`. A `Nat` answer that is not a
+whole number from 0 to 2^53 stops the run; a `Nat` inside an answer goes
+unchecked, so the host keeps it in that range.
 
 A blocking effect takes one more argument, `k`, and parks with
 `io_park_on(fd, out, k, more)`: it returns `undefined`, and the loop calls
