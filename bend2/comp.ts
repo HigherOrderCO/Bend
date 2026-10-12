@@ -584,6 +584,11 @@ function view_of(e: string): string | undefined {
   return m?.[1] ?? m?.[3];
 }
 
+function view_root(e: string): string | undefined {
+  const m = e.match(VIEW);
+  return m?.[2] ?? m?.[3] ?? m?.[1];
+}
+
 function tpl_nat(u: string, f: string): Tpl {
   return ([p]) => /^\d/.test(p) ? BigInt(parseInt(p)) + 1n + u
     : /^nat_chk\(.* \+ \d+\)$/.test(p)
@@ -2918,14 +2923,14 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
   if (tail) {
     memo(FL.tails, sc.seg.def, () => new Set()).add(k);
   }
+  const tld = FL.book.tlds[k];
+  if (tld?.$ === "ADT") {
+    return "null";
+  }
   const exprs = args.map((x) => js_expr(sc, x, null));
   if (k === CLO_APPLY) {
     const [f, x] = exprs;
     return tail ? `run_tail(${f}, ${x})` : `${f}(${x})`;
-  }
-  const tld = FL.book.tlds[k];
-  if (tld.$ === "ADT") {
-    return "null";
   }
   const intr = intr_of(k, true);
   if (intr !== undefined) {
@@ -2961,9 +2966,8 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
     case "Var": {
       const c = sc.caps;
       const p = PROBES[x.i];
-      if (c && (JS_DEPTH.get(p) ?? c.d) < c.d) {
-        const m = x.k.match(VIEW);
-        c.vs.set(p, m?.[2] ?? m?.[3] ?? m?.[1] ?? x.k);
+      if (c && !c.vs.has(p) && (JS_DEPTH.get(p) ?? c.d) < c.d) {
+        c.vs.set(p, view_root(x.k) ?? x.k);
       }
       return x.k;
     }
@@ -3135,7 +3139,7 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
       loop.forEach((d, i) => {
         memo_gc();
         FUEL = FOLD_FUEL;
-        const fx = { ...sc, fresh: new Map() };
+        const fx = { ...sc, fresh: new Map(), def: d };
         const ps = fun_of(d).live.map(([, x]) => name_local(fx, x));
         block(fx, pc ? `case ${i}: {` : "{", () => {
           ps.forEach((p, j) => file_push(fx, `const ${p} = $${j};`));
@@ -3182,6 +3186,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const funs = [sc.seg, ...FL.spins].flatMap((f) => seg_text(f.lines, 0))
     .join("\n").replace(/\x01([^\x02]*)\x02/g, (_, k) => jmp(k) ? "run_loop"
       : "");
+  PROBES.length = 1;
   return RUNTIME + effs + "// Program\n// =======\n\n" + [funs, ...[...FL.tabs]
     .map(([r, i]) => `const TAB_${i} = [${r}];`)].join("\n") + lib;
 }

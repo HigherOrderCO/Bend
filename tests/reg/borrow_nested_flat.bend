@@ -4,7 +4,7 @@
 # (a term_keep) and the type went hot. Now a Var argument's later uses are
 # the continuation, and the emitter evaluates nested arguments before the
 # Var pops. In the C, the program has no term_keep outside the runtime
-# and no rfc_seal in WL_CASE(FID_XS_BUILD_K*).
+# and no rfc_seal in WL_CASE(FID_Xs_build_k*).
 import Base
 
 type Xs is Data:

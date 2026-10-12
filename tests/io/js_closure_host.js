@@ -2,7 +2,8 @@ function clo_host_tail() {
   const fs = require("node:fs");
   const path = require("node:path");
   const child = require("node:child_process");
-  const dir = fs.mkdtempSync(path.join(process.cwd(), ".bend-clo-host-"));
+  const os = require("node:os");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bend-clo-host-"));
   try {
     const input = path.join(dir, "lib.bend");
     const output = path.join(dir, "lib.mjs");
