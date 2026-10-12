@@ -21,6 +21,7 @@
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <dlfcn.h>
+#include <langinfo.h>
 #include <locale.h>
 
 typedef struct {
@@ -379,12 +380,17 @@ static u64 window_period(Display* dpy) {
 }
 
 // The input method XMODIFIERS names (as ibus or fcitx), else Xlib's own
-// (dead keys and Compose), under the user's character set, which Xlib
-// takes here and the program's locale keeps out. With neither, Text
-// comes from the key's symbol.
+// (dead keys and Compose), under the user's locale, or C.UTF-8 if its
+// characters are not UTF-8 (Xlib mangles composed text there). Xlib
+// takes the locale here; the program's stays as it was. With no method,
+// Text comes from the key's symbol.
 static void window_ime(BendWin* win) {
   char* was = io_mem(strdup(setlocale(LC_CTYPE, NULL)));
-  if (setlocale(LC_CTYPE, "") != NULL && XSupportsLocale()) {
+  setlocale(LC_CTYPE, "");
+  if (strcmp(nl_langinfo(CODESET), "UTF-8") != 0) {
+    setlocale(LC_CTYPE, "C.UTF-8");
+  }
+  if (XSupportsLocale()) {
     XSetLocaleModifiers("");
     win->im = XOpenIM(win->dpy, NULL, NULL, NULL);
     if (win->im == NULL) {
@@ -766,18 +772,20 @@ static void window_pump(BendWin* win) {
   while (XPending(win->dpy) > 0) {
     XEvent ev;
     XNextEvent(win->dpy, &ev);
-    bool took = XFilterEvent(&ev, None);
+    XKeyEvent key  = ev.xkey;
+    bool      took = XFilterEvent(&ev, None);
     if (ev.type == KeyPress || ev.type == KeyRelease) {
-      // Each key is a Key, even one the input method took; a method may
-      // hand a key back later, at its time: it is that same Key.
-      XKeyEvent key  = ev.xkey;
-      u32       code = key.keycode << 1 | (ev.type == KeyPress);
-      if (took || key.time != win->kt || code != win->kc) {
+      // Each key is a Key, even one the input method took (the event as
+      // it came: Xlib's own method rewrites it). A method may hand a key
+      // back at its time, the same Key, or bring text on key code 0.
+      u32 code = key.keycode << 1 | (ev.type == KeyPress);
+      if (key.keycode != 0
+        && (took || key.time != win->kt || code != win->kc)) {
         window_push(win, CID(Key), window_key(&key), ev.type == KeyPress, 0,
           0);
       }
       if (took) {
-        win->kt = ev.xkey.time;
+        win->kt = key.time;
         win->kc = code;
       } else if (ev.type == KeyPress) {
         window_text(win, &ev.xkey);
