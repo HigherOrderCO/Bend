@@ -97,6 +97,7 @@ type Scope = {
   uses: Map<Of<"Var">, Bind>;
   rest: HTerm[];
   def: Name;
+  caps?: { d: number; vs: Map<HTerm, string> };
 };
 
 type Tpl = string | ((xs: string[]) => string);
@@ -133,7 +134,7 @@ const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
 
 // The field a JS match opens from a named U32, F32 or Char (its word, its
 // code): a binder takes it as written, so a rebuild folds back to the name.
-const VIEW = /^(?:u32_to_word\((\w+|f32_bits\(\w+\))\)|(\w+)\.codePointAt\(0\))$/;
+const VIEW = /^(?:u32_to_word\((\w+|f32_bits\((\w+)\))\)|(\w+)\.codePointAt\(0\))$/;
 
 const TAB_BAD = /\b(?!(?:fround|imul)\()\w+\(/;
 
@@ -542,7 +543,7 @@ function name_local(sc: Scope, k: Name): string {
 
 function name_id(pre: string, k: string): string {
   return memo(FL.ids, pre + k, () => {
-    const base = pre + name_clean(k).toUpperCase();
+    const base = pre + name_clean(k);
     let id = base;
     for (let n = 1; FL.taken.has(id); n += 1) {
       id = base + "_" + n;
@@ -580,7 +581,7 @@ function tpl(t: Tpl, xs: string[]): string {
 
 function view_of(e: string): string | undefined {
   const m = e.match(VIEW);
-  return m?.[1] ?? m?.[2];
+  return m?.[1] ?? m?.[3];
 }
 
 function tpl_nat(u: string, f: string): Tpl {
@@ -1296,7 +1297,7 @@ export function io_type(book: Bend.Book): HTerm | null {
 
 export function io_run(book: Bend.Book, args: string[]): number {
   const src = `${js_lib(book)}\n${RUNTIME_MAIN}\ncli_args = ${
-    JSON.stringify(args)};\nreturn io_run(${js_sat("main")});`;
+    JSON.stringify(args)};\nreturn io_run(${name_id("$", "main")});`;
   return new Function("require", src)(import.meta.require);
 }
 
@@ -1332,7 +1333,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     lits: new Map(),
     consts: new Map(),
     ids: new Map(),
-    taken: new Set("FID_EXIT FID_ENTER FID_T CID_T".split(" ")),
+    taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
     teles: new Map(),
     srcs: new Map(),
     loops: new Map(),
@@ -2902,8 +2903,15 @@ export function compile_book(book: Bend.Book): string {
 // (run_tail), so a call passes through run_loop only when its callee
 // may return one: a marker per call resolves once every def is out.
 
-function js_sat(k: Name): string {
-  return name_id("$", k);
+const JS_DEPTH = new WeakMap<HTerm, number>();
+
+function js_var(sc: Scope, k: string): HTerm {
+  if (k === "null") {
+    return Bend.Var(k, 0);
+  }
+  const p = probe(k);
+  JS_DEPTH.set(p, sc.caps?.d ?? 0);
+  return p;
 }
 
 function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
@@ -2932,7 +2940,7 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
   if (v) {
     exprs.push(v);
   }
-  const call = `${js_sat(k)}(${exprs.join(", ")})`;
+  const call = `${name_id("$", k)}(${exprs.join(", ")})`;
   return v ? `(${v}) => ${call}`
     : def_foreign(tld) || tail ? call : `\x01${k}\x02(${call})`;
 }
@@ -2940,7 +2948,7 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
 function js_open(sc: Scope, x: Of<"Let">): HTerm {
   const on = let_live(x);
   return x.f(x.v.map((v, j): HTerm => !on[j] ? v
-    : Bend.Var(emit_hold(sc, [js_expr(sc, v, null)], x.k[j])[0], 0)));
+    : js_var(sc, emit_hold(sc, [js_expr(sc, v, null)], x.k[j])[0])));
 }
 
 function js_key(n: Name): string {
@@ -2951,6 +2959,12 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
   const [x, ty] = ty_peel(tm, ty0);
   switch (x.$) {
     case "Var": {
+      const c = sc.caps;
+      const p = PROBES[x.i];
+      if (c && (JS_DEPTH.get(p) ?? c.d) < c.d) {
+        const m = x.k.match(VIEW);
+        c.vs.set(p, m?.[2] ?? m?.[3] ?? m?.[1] ?? x.k);
+      }
       return x.k;
     }
     case "Ref":
@@ -2995,19 +3009,18 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
         return js_expr(sc, (x as Of<"Lam">).f(Bend.Var("null", 0)),
           ty_all(ty).B(DUMMY));
       }
-      const old = new Map(sc.fresh);
       const arg = name_local(sc, "x");
-      const cl = { ...sc, seg: seg_new("", BOX, []) };
-      const name = "$0c" + FL.spins.push(cl.seg);
+      const vs = new Map<HTerm, string>();
+      const cl = { ...sc, seg: seg_new("", BOX, []),
+        caps: { d: (sc.caps?.d ?? 0) + 1, vs } };
+      FL.spins.push(cl.seg);
+      const name = name_id("$", sc.def + "$c" + FL.spins.length);
       js_func(cl, x, ty, [arg]);
-      const ps = new Set<string>();
-      for (const [w, b, n] of cl.seg.lines.join().matchAll(
-        /"(?:\\.|[^"])*"|\x01[^\x02]*\x02|(?<![\w$])_(\w*)_(\d+)\b/g)) {
-        if (+n < (old.get(b) ?? 0)) ps.add(w);
-      }
-      cl.seg.lines = [`function ${name}(${[...ps]}) { return (${arg}) => {`,
-        ...cl.seg.lines, "}}"];
-      return `run_clo(${name}(${[...ps]}))`;
+      const ps = [...new Set(vs.values())];
+      vs.forEach((_, p) => js_expr(sc, p, null));
+      cl.seg.lines = [`function ${name}(${ps}) {`, `return (${arg}) => {`,
+        ...cl.seg.lines, "}", "}"];
+      return `run_clo(${name}(${ps}))`;
     }
     default: {
       return "null";
@@ -3027,7 +3040,8 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
     const k = /^(\w*_\d+|null)$/.test(e) || VIEW.test(e) ? e
       : name_local(sc, x.k);
     const at = sc.seg.lines.length;
-    js_func(sc, x.f(Bend.Var(k, 0)), all.B(Bend.Var(k, 0)), rest);
+    const v = js_var(sc, k);
+    js_func(sc, x.f(v), all.B(v), rest);
     if (k !== e && sc.seg.lines.slice(at).some((l) => l.includes(k))) {
       sc.seg.lines.splice(at, 0, `const ${k} = ${e};`);
     }
@@ -3092,7 +3106,7 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
     return;
   }
   FUEL = FOLD_FUEL;
-  sc = { ...sc, fresh: new Map() };
+  sc = { ...sc, fresh: new Map(), def: k };
   sc.seg.def = k;
   const { live, h } = fun_of(k);
   const loop = loop_of(k);
@@ -3102,7 +3116,7 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   if (def_foreign(def)) {
     params.push(name_local(sc, "k"));
   }
-  block(sc, `function ${js_sat(k)}(${params.join(", ")}) {`, () => {
+  block(sc, `function ${name_id("$", k)}(${params.join(", ")}) {`, () => {
     if (def_foreign(def)) {
       const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
       const f = params.at(-1);
@@ -3159,8 +3173,8 @@ export function js_lib(book: Bend.Book, mod = false): string {
     const { live, lays } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
     const xs = live.map(([, , A], i) => host_nat(A) ? `nat_in(a${i})` : ps[i]);
-    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${js_sat(k)}(${
-      xs}), ${lays.length}),`;
+    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${
+      name_id("$", k)}(${xs}), ${lays.length}),`;
   }).join("\n")}\n};\n`;
   const jmps = new Map<Name, boolean>();
   const jmp = (k: Name): boolean => k === CLO_APPLY || memo(jmps, k, () =>
@@ -3176,7 +3190,7 @@ export function js_book(book: Bend.Book): string {
   const lib = js_lib(book);
   const show = show_main();
   return `${lib}\n${RUNTIME_MAIN}\ncli(process.argv.slice(1));\nio_exit(${
-    js_sat("main")}, ${JSON.stringify(show && show.map((c) =>
+    name_id("$", "main")}, ${JSON.stringify(show && show.map((c) =>
       typeof c === "string" ? Bend.name_key(c) : c))});`;
 }
 
@@ -5987,12 +6001,13 @@ function array_rmw(a, i, f) {
 // ===
 
 function run_tail(f, x) {
-  return {$: "$JMP", f: f.j ?? f, x};
+  return {$: "$JMP", f: f.j?.f === f ? f.j : f, x};
 }
 
 function run_clo(j) {
   const f = (x) => run_loop(j(x));
   f.j = j;
+  j.f = f;
   return f;
 }
 
