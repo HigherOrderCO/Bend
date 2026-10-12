@@ -1813,10 +1813,31 @@ def F32.square(a: F32) -> F32:
     case F32{+x}:
       F32.mul(F32{x}, F32{x})
 
+# Scale before squaring to retain large and small finite lengths.
+def F32.hypot.scale(+hi: F32, lo: F32, edge: Bool) -> F32:
+  match edge:
+    case True{}:
+      F32.add(hi, lo)
+    case False{}:
+      +r = F32.div(lo, hi)
+      F32.mul(hi, F32.sqrt(F32.add(1.0, F32.mul(r, r))))
+
+def F32.hypot.norm(+hi: F32, lo: F32) -> F32:
+  # Positive infinity has F32 bits 0x7f800000.
+  F32.hypot.scale(hi, lo,
+    Bool.or(F32.is_eq(hi, 0.0), U32.is_eq(F32.bits(hi), 2139095040)))
+
+def F32.hypot.order(+x: F32, +y: F32, less: Bool) -> F32:
+  match less:
+    case True{}:
+      F32.hypot.norm(y, x)
+    case False{}:
+      F32.hypot.norm(x, y)
+
 def F32.hypot(a: F32, b: F32) -> F32:
-  match a b:
-    case F32{+x} F32{+y}:
-      F32.sqrt(F32.add(F32.mul(F32{x}, F32{x}), F32.mul(F32{y}, F32{y})))
+  +x = F32.abs(a)
+  +y = F32.abs(b)
+  F32.hypot.order(x, y, F32.is_lt(x, y))
 
 def F32.round(a: F32) -> F32:
   F32.floor(F32.add(a, 0.5))
