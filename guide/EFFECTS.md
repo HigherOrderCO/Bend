@@ -40,7 +40,7 @@ def's body would. A constructor the program does not use has no id, so
 `#ifdef CID(Name)` tests for it. `FID(name)` is a def's function id the
 same way. `f` holds the def's arguments in order: a `U32` is the word
 (`(u32)f[0]`), a `String` is taken with `io_cstr(e, f[0], &len)` (a
-`malloc`ed copy you free), a handle with `io_hand_v(f[0])`. The loop
+`malloc`ed copy you free), a packed handle with `io_hand_v(f[0])`. The loop
 calls the effect at once; an effect that waits (for a handle, or for time)
 parks itself, as below.
 
@@ -50,11 +50,20 @@ constructor is `io_node(e, CID(K), a, b)`. A `Result` is `io_done(e, v)`
 or `io_fail(e, code, text)` (`text` NULL prints `strerror(code)`).
 `io_sys_end(w, n)` stores `errno` in `w->code` when a call fails.
 
-A handle is a descriptor or pointer packed in one word by `io_hand(v)`. Its
+Descriptor and window handles pack one word with `io_hand(v)`. Their
 type must be one of Base's handle laws (`File`, `Socket`, ...): a user
 handle type is a WONTFIX entry for now, see `WONTFIX.txt`. An effect on a
 handle hands it back beside its result: `io_tup(e, io_hand(h), r)`, also
 on failure.
+
+`Chan` instead owns a native heap block containing its row and buffered
+Terms. Handle copies use the ordinary native reference count. Close wakes
+waiters but preserves buffered values for copied handles; dropping the
+last handle releases the block and unread values. A parked channel
+operation retains its input handle until it wakes or times out. The C
+effect consumes that handle, rather than returning it beside the result.
+Channels share the native heap's reference-counting lifetime model, not
+a tracing garbage collector.
 
 Blocking work leaves the loop in two ways. `io_work(w, call, pack)` runs
 `call(w)` on a helper thread, then `pack(e, w)` on the loop; `pack`'s value
