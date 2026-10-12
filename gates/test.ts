@@ -10,14 +10,14 @@
 // run, its JS run and its C run all print its `#|` lines; a test whose main
 // the compiler refuses to print (a function, a Type, an erased or dependent
 // field) is checked and interpreted only; a foreign def with no twin for a
-// lane drops that lane; any other build failure fails its lanes.
+// lane drops that lane; any other build failure fails its lanes. Meanwhile,
+// here, one process compiles four of them over and over (state_run).
 
 import * as fs from "node:fs";
 import * as path from "node:path";
-import * as os from "node:os";
+
 import * as Bend from "../bend2/bend.ts";
 import * as Comp from "../bend2/comp.ts";
-
 import * as lib from "./_lib";
 
 // Types
@@ -198,75 +198,55 @@ async function shard_run(shard: Test[], pack: Buffer, tag: number,
   }
 }
 
-// Compiler state lives for a process, not a CLI run. Compare independently
-// checked baselines with repeated/interleaved emissions, then execute both.
-export async function compiler_purity(): Promise<Fail[]> {
+// State
+// =====
+
+// A process may compile many books (the bun loader, io_run), and none may
+// leave state for the next: #976 kept every book's probes, with the same
+// bytes. Each fixture loads and checks twice. Its first copy's C and JS
+// are the baseline (compiled after the earlier fixtures' baselines, not in
+// a fresh process); its second copy must match them, bytes and probes left,
+// at every step: C, C, JS, C, normalization, JS, C, the next fixture (+),
+// C, JS. It builds and runs nothing: the shards run these programs.
+async function state_run(): Promise<Fail[]> {
   const files = ["reg/borrow_loop", "run/harness_cache_compile",
     "run/harness_cache_purity", "run/harness_cache_stats"];
+  const books: Bend.Book[][] = [];
+  for (const file of files) {
+    const copies = [Bend.book_nil(), Bend.book_nil()];
+    for (const book of copies) {
+      await Bend.book_load(book, path.join(TESTS, file + ".bend"), "",
+        new Map());
+      Bend.book_valid(book);
+    }
+    books.push(copies);
+  }
+  const emit = (book: Bend.Book, lane: string): string =>
+    Bun.hash(lane === "c" ? Comp.compile_book(book) : Comp.js_book(book))
+    + " bytes, " + String(Comp.PROBES.length) + " probes";
+  const base = books.map(([book]): Record<string, string> =>
+    ({ c: emit(book, "c"), js: emit(book, "js") }));
   const fails: Fail[] = [];
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bend-compiler-state-"));
-  const load = async (file: string): Promise<Bend.Book> => {
-    const book = Bend.book_nil();
-    await Bend.book_load(book, path.join(TESTS, file + ".bend"), "", new Map());
-    Bend.book_valid(book);
-    if (book.hols !== 0) throw new Error(file + ": incomplete book");
-    return book;
-  };
-  type Emission = { text: string; probes: number };
-  const emit = (book: Bend.Book, lane: "c" | "js"): Emission => {
-    const text = lane === "c" ? Comp.compile_book(book) : Comp.js_book(book);
-    return { text, probes: Comp.retained_probes() };
-  };
-  try {
-    const baselines: { c: Emission; js: Emission }[] = [];
-    const books: Bend.Book[] = [];
-    for (const file of files) {
-      const fresh = await load(file);
-      baselines.push({ c: emit(fresh, "c"), js: emit(fresh, "js") });
-      books.push(await load(file));
-    }
-    for (const [i, file] of files.entries()) {
-      const name = file.replace("/", "_");
-      const expected = test_read(path.dirname(file), path.basename(file) + ".bend").want;
-      const check = (probe: string, want: string, got: string): void => {
-        if (want !== got) fails.push({ name, probe, want, got });
-      };
-      const compare = (at: number, lane: "c" | "js") => {
-        const got = emit(books[at], lane);
-        const fresh = baselines[at][lane];
-        check(files[at] + " " + lane + " bytes", "identical", fresh.text === got.text ? "identical" : "different");
-        check(files[at] + " " + lane + " retained probes", String(fresh.probes), String(got.probes));
-        return got;
-      };
-      // C -> C, C -> JS -> C, normalization -> JS -> C, then A -> B -> A.
-      compare(i, "c"); compare(i, "c"); compare(i, "js"); compare(i, "c");
-      for (const def of Object.values(books[i].tlds)) {
-        if (def.$ === "Def" && !def.b && def.v !== null) Bend.term_snf(books[i], def.v);
-      }
-      compare(i, "js"); compare(i, "c");
-      compare((i + 1) % books.length, "c");
-      compare((i + 1) % books.length, "js");
-      const repeated = { c: compare(i, "c"), js: compare(i, "js") };
-      for (const [phase, emissions] of [["fresh", baselines[i]], ["repeated", repeated]] as const) {
-        const stem = path.join(dir, name + "-" + phase);
-        fs.writeFileSync(stem + ".c", emissions.c.text);
-        fs.writeFileSync(stem + ".js", emissions.js.text);
-        const built = await lib.exec(process.env.CC ?? "clang",
-          ["-std=c11", "-O3", stem + ".c", "-lpthread", "-lm", "-o", stem], undefined, 20000);
-        check(phase + " native build", "0", String(built.code));
-        if (built.code !== 0) check(phase + " compiler error", "", built.err);
-        const js = await lib.exec(process.execPath, [stem + ".js"], undefined, 5000);
-        check(phase + " js exit", "0", String(js.code));
-        check(phase + " js value", expected, tidy(js.out));
-        if (built.code === 0) {
-          const c = await lib.exec(stem, [], undefined, 5000);
-          check(phase + " c exit", "0", String(c.code));
-          check(phase + " c value", expected, tidy(c.out));
+  for (const [i, file] of files.entries()) {
+    const book = books[i][1];
+    // the steps on this fixture's second copy; + is the next fixture's
+    for (const step of "c c js c snf js c +c +js c js".split(" ")) {
+      if (step === "snf") {
+        for (const def of Object.values(book.tlds)) {
+          if (def.$ === "Def" && def.v !== null) {
+            Bend.term_snf(book, def.v);
+          }
         }
+        continue;
+      }
+      const at = step[0] === "+" ? (i + 1) % files.length : i;
+      const lane = step[0] === "+" ? step.slice(1) : step;
+      const got = emit(books[at][1], lane);
+      if (got !== base[at][lane]) {
+        fails.push({ name: files[at].replace("/", "_"),
+          probe: "state " + file + " " + step, want: base[at][lane], got });
       }
     }
-  } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
   }
   return fails;
 }
@@ -278,7 +258,7 @@ if (import.meta.main) {
   const tests = fs.readdirSync(TESTS).sort().flatMap((dir) =>
     fs.readdirSync(path.join(TESTS, dir)).filter((f) => f.endsWith(".bend"))
       .sort().map((f) => test_read(dir, f)));
-  const purity = compiler_purity();
+  const state = state_run();
   const nodes = await lib.node_lock();
   // Every test's source goes to every shard: a test may import another,
   // or a module from a subdirectory.
@@ -287,7 +267,7 @@ if (import.meta.main) {
   const fails: Fail[] = [];
   await lib.node_pool(nodes, shards.map((shard, tag) => (node: number) =>
     shard_run(shard, pack, tag, node, fails)));
-  fails.push(...await purity);
+  fails.push(...await state);
   fails.sort((a, b) => a.name < b.name ? -1 : 1);
   if (!lib.GATE) {
     for (const f of fails) {

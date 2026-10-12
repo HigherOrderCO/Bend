@@ -524,14 +524,9 @@ function char_new(code) {
 // Caches
 // ------
 
-const PROBES: Of<"Var">[] = [];
+export const PROBES: Of<"Var">[] = [];
 
 const DUMMY = probe("~");
-
-// Deterministic retained-state observable for the in-process compiler gate.
-export function retained_probes(): number {
-  return PROBES.length;
-}
 
 let FUEL = 0;
 
