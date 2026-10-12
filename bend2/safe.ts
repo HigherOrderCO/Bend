@@ -1608,5 +1608,5 @@ export function safe_emit(book: Book, out: string): string[] {
 export function safe_check(book: Book): string | null {
   const got = safe_book(book);
   return got.oos.length === 0 ? kernel_check(got.text) : "BendTT: out of scope:\n"
-    + got.oos.map(([k, why]) => "- " + B.name_key(k) + ": " + why).join("\n");
+    + got.oos.map(([k, why]) => "- " + B.name_display(book, k) + ": " + why).join("\n");
 }

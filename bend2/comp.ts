@@ -3010,10 +3010,6 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail = false): string {
     const [f, x] = exprs;
     return tail ? `run_tail(${f}, ${x})` : `${f}(${x})`;
   }
-  const tld = FL.book.tlds[k];
-  if (tld.$ === "ADT") {
-    return "null";
-  }
   const intr = intr_of(k, true);
   if (intr) {
     return tpl(intr.JS!, exprs.map((e) => ATOM.test(e) || STRLIT.test(e) ? e
