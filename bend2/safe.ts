@@ -39,8 +39,9 @@
 // once per tuple of closed arguments at its template (~) parameters, with
 // those parameters gone; a def checked on its own also goes out as a
 // λ-match on its finite ones, to its instances, so the kernel checks
-// that they cover it. Every def goes out after the defs its live code
-// names; a name in a type may come later. A def with no body (a
+// that they cover those parameters' values, each instance at its own
+// type (not at the def's). Every def goes out after the defs its live
+// code names; a name in a type may come later. A def with no body (a
 // law, a native, a foreign fill) goes out opaque at a model: the kernel
 // checks the model, then never unfolds the def. What the kernel cannot
 // express is out of scope: it goes, with every def that names it, and
@@ -92,10 +93,10 @@ type Bind = { o: O; T: HTerm | null; v?: HTerm };
 type Cols = Array<HTerm | null>;
 
 // a root's instances: the columns of one, or a match on a specialized
-// parameter of a finite type A, with a root for each of its values
+// parameter of a finite type A, with a root for each of its values vs
 type Root =
   | { $: "Cols"; cols: Cols }
-  | { $: "Mat"; A: HTerm; arms: Root[] };
+  | { $: "Mat"; A: HTerm; vs: HTerm[]; arms: Root[] };
 
 // an argument: its binder's quantity, the argument, the binder's type,
 // and its value when the binder is specialized
@@ -268,7 +269,7 @@ function root_of(e: Safe, k: Name, T: HTerm, cs: Cols): Root {
   const vs: HTerm[] | null = A.$ === "Qnt" ? [B.None(), B.Lone(), B.Many()].map((q) => B.Qua(q))
     : adt !== null && adt.c.every((c) => B.term_wnf(e.book, c.T).$ !== "All") ? adt.c.map((c) => B.Ctr(c.k, [])) : null;
   if (vs !== null) {
-    return { $: "Mat", A, arms: vs.map(at) };
+    return { $: "Mat", A, vs, arms: vs.map(at) };
   }
   if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
     oos("a specialized parameter whose type names a parameter");
@@ -294,23 +295,24 @@ function root_of(e: Safe, k: Name, T: HTerm, cs: Cols): Root {
 
 // root k at r: at its columns, that item; else k's instances, and a def
 // that is a λ-match on each finite parameter whose arms name them, at a
-// type that is a λ-match on it too (at *1, which a *2 fits), so the
-// kernel checks that the instances cover k (at an empty type, that
-// there are none: λ{})
+// type that is a λ-match on it too, whose arm at a value is that
+// instance's own type (at *1, which a *2 fits). So the kernel checks
+// that the instances cover the parameter's values (at an empty type,
+// that there are none: λ{}), not that they fit k's declared type. An
+// instance out of scope keeps its reason, and the def goes with it.
 function root_emit(e: Safe, k: Name, r: Root): string {
   if (r.$ === "Cols") {
     return item_try(e, k, r.cols);
   }
   const tld = e.book.tlds[k] as Def;
-  const n = fresh(e, name_tt(k));
-  const efq: O = { $: "Efq" };
-  // a λ-match on A, the arm hs[i] at its i-th value (Quant's in order)
-  const mat = (A: HTerm, hs: O[]): O => {
-    if (A.$ !== "ADT") {
-      return hs.reduceRight<O>((m, h, i) => ({ $: "Mat", k: "Q" + String(i), h, m }), efq);
+  // a λ-match on r's parameter, the arm hs[i] at its value r.vs[i]
+  const mat = (r: Root & { $: "Mat" }, hs: O[]): O => {
+    if (r.A.$ !== "ADT") {
+      const qs = r.vs.map((v) => quant((v as { q: Quant }).q));
+      return mats(qs.map((q) => "Q" + String(q)), (i) => hs[i]);
     }
-    const cs = (e.book.tlds[A.k] as ADT).c;
-    return { $: "Prj", h: cs.reduceRight<O>((m, c, i) => ({ $: "Mat", k: name_tt(c.k), h: unit(hs[i]), m }), efq) };
+    const ks = r.vs.map((v) => name_tt((v as { k: Name }).k));
+    return { $: "Prj", h: mats(ks, (i) => unit(hs[i])) };
   };
   const ty = (s: Scope, r: Root): O => {
     if (r.$ === "Cols") {
@@ -319,13 +321,21 @@ function root_emit(e: Safe, k: Name, r: Root): string {
     }
     const l = s.D;
     const A = term(e, s, r.A, false);
-    const M = mat(r.A, r.arms.map((a) => ty(scope_hide(s), a)));
+    const M = mat(r, r.arms.map((a) => ty(scope_hide(s), a)));
     const T: O = { $: "Typ", q: { $: "Lab", k: "Q1" } };
     const K: O = { $: "All", q: 1, l: l + 1, A, B: T };
     return { $: "All", q: 1, l, A, B: { $: "App", q: 1, f: { $: "Ann", x: M, T: K }, x: { $: "Var", l } } };
   };
-  const body = (r: Root): O => r.$ === "Mat" ? mat(r.A, r.arms.map(body)) : { $: "Ref", k: item_ref(e, k, r.cols, true) };
-  e.out.push([n, ty(scope_nil(), r), body(r), false]);
+  const body = (r: Root): O => {
+    if (r.$ === "Mat") {
+      return mat(r, r.arms.map(body));
+    }
+    return { $: "Ref", k: item_try(e, k, r.cols) };
+  };
+  const T = ty(scope_nil(), r);
+  const v = body(r);
+  const n = fresh(e, name_tt(k));
+  e.out.push([n, T, v, false]);
   return n;
 }
 
@@ -435,8 +445,9 @@ function adt_emit(e: Safe, cols: Cols, n: string, tld: ADT): void {
   const t = s.D;
   // a constructor's fields as a Σ chain ending in <()>
   const fs = (c: B.Ctr): O => alls(tele_open(e, s, B.tele_fill(e.book, c.T, xs, B.ctx_nil()), [], Infinity).ps, { $: "Enu", ks: ["()"] }, "Sig");
-  const arms = tld.c.reduceRight<O>((m, c) => ({ $: "Mat", k: name_tt(c.k), h: fs(c), m }), { $: "Efq" });
-  const Enu: O = { $: "Enu", ks: tld.c.map((c) => name_tt(c.k)) };
+  const ks = tld.c.map((c) => name_tt(c.k));
+  const arms = mats(ks, (i) => fs(tld.c[i]));
+  const Enu: O = { $: "Enu", ks };
   e.out.push([am, alls(ps, { $: "All", q: 1, l: t, A: Enu, B: G }), lams(e, ps, arms), false]);
   const at = (k: string): O => ps.reduce<O>((f, [q, l]) => ({ $: "App", q, f, x: { $: "Var", l } }), { $: "Ref", k });
   e.out.push([n, alls(ps, G), lams(e, ps, { $: "Sig", q: 1, l: t, A: Enu, B: { $: "App", q: 1, f: at(am), x: { $: "Var", l: t } } }), false]);
@@ -1206,19 +1217,19 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
     return { ...r, vs: r.xs.flatMap((x, j): Array<[Q, O]> => j < nx ? [] : [[qs[j], term(e, r.s, x, false)]]), cs: r.xs.map((x, j) => j < nx ? x : null) };
   };
   // the selector's match: a member's arm past its tag (and a helper's ((.k, ()), ()))
-  const efq: O = { $: "Efq" };
-  const sel = (f: (m: Name) => O): O => ({ $: "Prj", h: g.ms.reduceRight<O>((m, k, i) => ({ $: "Mat", k: name_tt(k), m,
-    h: i === 0 ? unit(f(k)) : { $: "Prj", h: { $: "Prj", h: { $: "Mat", k: name_tt(g.k), h: unit(unit(f(k))), m: efq } } } }), efq) });
+  const tags = g.ms.map(name_tt);
+  const sel = (f: (m: Name) => O): O => ({ $: "Prj", h: mats(tags, (i) => i === 0 ? unit(f(g.ms[i]))
+    : { $: "Prj", h: { $: "Prj", h: mats([name_tt(g.k)], () => unit(unit(f(g.ms[i])))) } }) });
   const l0 = s.D;
   const s0 = scope_kq(scope_hide(s), l0, 1);
   const mode = sel((m) => {
     const r = rest(s0, m);
     return alls(r.ps, term(e, r.s, r.T, false));
   });
-  const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: g.ms.map(name_tt) }, B: { $: "App", q: 1, x: { $: "Var", l: l0 },
-    f: g.ms.reduceRight<O>((m, k, i) => ({ $: "Mat", k: name_tt(k), m, h: i === 0 ? { $: "Enu", ks: ["()"] }
+  const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: tags }, B: { $: "App", q: 1, x: { $: "Var", l: l0 },
+    f: mats(tags, (i) => i === 0 ? { $: "Enu", ks: ["()"] }
       : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [name_tt(g.k)] }, B: { $: "Enu", ks: ["()"] } },
-        B: { $: "Enu", ks: ["()"] } } }), efq) } };
+        B: { $: "Enu", ks: ["()"] } }) } };
   const To = alls(ls, { $: "All", q: 1, l: l0, A: Sel, B: { $: "App", q: 1, f: mode, x: { $: "Var", l: l0 } } });
   const ks = ls.filter(([q]) => q === 1).map(([, l]) => l);
   const body = sel((m) => convoy_bind(e, s0, ks, (s2) => {
@@ -1424,6 +1435,12 @@ function is_o(v: unknown): v is O {
 // ∀s (or Σs) over b, at the binders ps
 function alls(ps: Binder[], b: O, $: "All" | "Sig" = "All"): O {
   return ps.reduceRight<O>((B, [q, l, A]) => ({ $, q, l, A, B }), b);
+}
+
+// a λ-match whose arm at the label ks[i] is h(i), made last to first
+function mats(ks: string[], h: (i: number) => O): O {
+  const efq: O = { $: "Efq" };
+  return ks.reduceRight<O>((m, k, i) => ({ $: "Mat", k, h: h(i), m }), efq);
 }
 
 // the match that splits a Σ chain's unit, then h
