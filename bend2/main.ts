@@ -327,8 +327,13 @@ async function cli_file(args: string[]): Promise<void> {
 
 // cli_checkup checks and runs each import of the file alone (Base read
 // once, seeded into every module that imports it); one that fails fails it.
+// A hub import loads from a root that imports only it, so it resolves as any
+// import does and keeps its namespace; a first parse (Base skipped) finds its
+// file, to see if it imports Base, and its main is the root's main.
 async function cli_checkup(file: string): Promise<void> {
   const base = await book_read(BASE);
+  const tmp  = fs.mkdtempSync(path.join(os.tmpdir(), "bend-"));
+  const hub  = path.join(tmp, "hub.bend");
   let bad = false;
   for (const raw of fs.readFileSync(file, "utf8").split("\n")) {
     const m = /^import\s+(\S+)\s+as\s+[A-Za-z_][A-Za-z0-9_]*\s*$/
@@ -336,13 +341,29 @@ async function cli_checkup(file: string): Promise<void> {
     if (m === null) {
       continue;
     }
-    const at = m[1].startsWith("/") ? m[1]
-      : path.join(path.dirname(file), m[1]);
+    const at = /^(0x[0-9a-f]+|[^/]*@[^/]*)\//.test(m[1]) ? hub
+      : path.resolve(path.dirname(file), m[1]);
+    // A hub-owned root makes the loader confine every import to its cache.
+    const ns = at === hub ? "0x0/checkup" : "";
     cli_say(1, "--- " + m[1] + " ---\n");
     let code = 1;
     try {
-      const own = /^import Base$/m.test(fs.readFileSync(at, "utf8"));
-      code = book_run(await book_read(at, own ? base : undefined), [at]);
+      fs.writeFileSync(hub, "import " + m[1] + " as Hub\n");
+      let seen = new Map<string, string | null>([[BASE, ""]]);
+      if (at === hub) {
+        await Bend.book_load(Bend.book_nil(), hub, ns, seen).catch((e) => {
+          throw new Check_Fail(e);
+        });
+      }
+      const [, , got = at] = seen.keys();
+      const own = /^import Base$/m.test(fs.readFileSync(got, "utf8"));
+      seen = new Map();
+      const book = await book_read(at, own ? base : undefined, seen, ns);
+      const main = book.tlds[seen.get(got) + ":main"];
+      if (at === hub && main !== undefined) {
+        book.tlds["main"] = main;
+      }
+      code = book_run(book, [at]);
     } catch (e) {
       cli_say(2, book_err(e) + "\n");
     }
@@ -351,6 +372,7 @@ async function cli_checkup(file: string): Promise<void> {
       bad = true;
     }
   }
+  fs.rmSync(tmp, { recursive: true });
   if (bad) {
     process.exit(1);
   }
@@ -888,13 +910,13 @@ function cli_fail(msg: string): never {
 // ====
 
 async function book_read(file: string, base?: Bend.Book,
-  seen = new Map<string, string | null>()): Promise<Bend.Book> {
+  seen = new Map<string, string | null>(), ns = ""): Promise<Bend.Book> {
   const book = base === undefined ? Bend.book_nil() : book_seed(base);
   if (base !== undefined) {
     seen.set(BASE, "");
   }
   try {
-    await Bend.book_load(book, file, "", seen);
+    await Bend.book_load(book, file, ns, seen);
     const laws = path.join(path.dirname(file), "LAWS.bend");
     if (path.basename(file) === "PROOF.bend" && fs.existsSync(laws)
       && !seen.has(fs.realpathSync(laws))) {

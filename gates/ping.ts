@@ -325,6 +325,42 @@ try {
     const got = await bend_closed(args);
     check("a closed reader keeps success: " + args.join(" "), got.code === 0);
   }
+  const checkup_files = {
+    "pure.bend": "import Base\ndef main() -> Nat:\n  5n\n",
+    "io.bend": "import Base\ndef main() -> IO(Unit):\n  IO.print(\"hub-io\")\n",
+  };
+  const checkup_pkg = pkg_hash(checkup_files);
+  const checkup_cache = path.join(TMP, "checkup-lib");
+  fs.mkdirSync(path.join(checkup_cache, checkup_pkg), { recursive: true });
+  fs.mkdirSync(path.join(checkup_cache, "names"));
+  for (const [name, text] of Object.entries(checkup_files)) {
+    fs.writeFileSync(path.join(checkup_cache, checkup_pkg, name), text);
+  }
+  fs.writeFileSync(path.join(checkup_cache, "names", "checkup@1.0.0.0"), checkup_pkg);
+  const checkup_hub = path.join(TMP, "checkup-hub.bend");
+  fs.writeFileSync(checkup_hub, "import " + checkup_pkg
+    + "/pure.bend as Pure\nimport checkup@1.0.0.0/io.bend as Effect\n");
+  const checkup_result = await bend([checkup_hub, "--checkup"],
+    { BEND_LIB: checkup_cache, BEND_NO_TELEMETRY: "1" });
+  check("hash and named hub checkups execute pure and effectful entries",
+    checkup_result.code === 0 && checkup_result.out.includes("\n5n\n")
+    && checkup_result.out.endsWith("hub-io\n"));
+  const checkup_outside = path.join(TMP, "checkup-outside.bend");
+  fs.writeFileSync(checkup_outside, "import Base\ndef main() -> Nat:\n  99n\n");
+  fs.writeFileSync(checkup_hub, "import " + checkup_pkg
+    + "/../../checkup-outside.bend as Outside\nimport checkup@1.0.0.0/io.bend as Effect\n");
+  const checkup_escape = await bend([checkup_hub, "--checkup"],
+    { BEND_LIB: checkup_cache, BEND_NO_TELEMETRY: "1" });
+  check("a hub traversal fails without running the outside file; later imports run",
+    checkup_escape.code === 1 && !checkup_escape.out.includes("\n99n\n")
+    && checkup_escape.out.endsWith("hub-io\n"));
+  fs.unlinkSync(path.join(checkup_cache, checkup_pkg, "pure.bend"));
+  fs.symlinkSync(checkup_outside, path.join(checkup_cache, checkup_pkg, "pure.bend"));
+  fs.writeFileSync(checkup_hub, "import checkup@1.0.0.0/pure.bend as Outside\n");
+  const checkup_link = await bend([checkup_hub, "--checkup"],
+    { BEND_LIB: checkup_cache, BEND_NO_TELEMETRY: "1" });
+  check("a named hub entry cannot run through a symlink outside its cache",
+    checkup_link.code === 1 && !checkup_link.out.includes("\n99n\n"));
   const two  = "import Base\ndef two() -> Nat:\n  2n\n";
   const use  = (at: string) => "import Base\nimport ./" + at
     + " as T\ndef main() -> Nat:\n  T.two\n";
