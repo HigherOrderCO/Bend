@@ -293,6 +293,20 @@ try {
   check("guide, base and a program run through the executable",
     guide.out.startsWith("# Bend") && base.out.startsWith("type Map")
     && sum5.code === 0 && sum5.out === "5n\n");
+  const base_file = path.join(BEND, "bend2", "base.bend");
+  const base_src = fs.readFileSync(base_file, "utf8");
+  const gap = " \t# comment\n".repeat(500);
+  try {
+    fs.writeFileSync(base_file, base_src.replace("@unsafe\ndef Array.fork",
+      "@unsafe\n" + gap + "def Array.fork"));
+    const fork = await bend(["base", "Array.fork"]);
+    check("base keeps @unsafe and comments with only the selected definition",
+      fork.code === 0 && fork.out === "@unsafe\n" + gap
+      + "def Array.fork(-T: Type, +a: Array<T>) -> Array<T> & Array<T>:\n"
+      + "  (a, a)\n");
+  } finally {
+    fs.writeFileSync(base_file, base_src);
+  }
   const header_source = path.join(TMP, "literal-checkup.bend");
   fs.writeFileSync(header_source,
     "# a header\nimport Base\n\nimport ./sum.bend as Sum\n"
