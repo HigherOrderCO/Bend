@@ -3423,6 +3423,7 @@ using namespace metal;
 #define WL_ROOM(N, D) \
   if (DEVICE && sp + (N) * CUBE >= e.mem + STAT_OFF + CUBE \
     && !(sp = lane_spill(e, sp, N, D))) { \
+    err_post(e.mem, ERR_DEEP); \
     return 0; \
   }
 
@@ -4345,28 +4346,25 @@ static const WlFn wl_tab[] = { WL_TABLE };
 #undef WL_X
 #endif
 
-// A full device lane moves all but its def's top D words to the heap,
-// under a frame whose return (FID_EXIT) moves them back (#1393).
-OUTLINE DEV Term* lane_spill(Env e, DEV Term* sp, u32 n, u32 d) {
-  DEV Term* lo = e.mem + STAK_OFF + (e.alc - e.mem - ALC_OFF);
+// A full lane moves the words below its def's to the heap, under an exit
+// frame that moves them back (#1393).
+FAR DEV Term* lane_spill(Env e, DEV Term* sp, u32 n, u32 d) {
+  DEV Term* lo = e.alc + (STAK_OFF - ALC_OFF);
   u64 k = (sp - lo) / CUBE - d;
-  u64 b = heap_alloc(e, cls_fit(STAK_LEN));
-  if (k < 4 || d + n + 3 >= STAK_LEN) {
-    err_post(e.mem, ERR_DEEP);
-  }
-  if (err_seen(e.mem)) {
+  if (d + n + 3 > STAK_LEN) {
     return 0;
   }
+  u64 b = heap_alloc(e, cls_fit(STAK_LEN));
   for (u64 i = 0; i < k + d; i += 1) {
     e.mem[b + i] = lo[i * CUBE];
   }
-  for (u64 i = 0; i < d; i += 1) {
-    lo[(i + 3) * CUBE] = e.mem[b + k + i];
-  }
-  lo[0]        = term_tsk(FID_EXIT, b);
-  lo[CUBE]     = k;
-  lo[2 * CUBE] = FID_EXIT;
-  return lo + (d + 3) * CUBE;
+  sp = lo;
+  STK(0) = term_tsk(FID_EXIT, b);
+  STK(1) = k;
+  STK(2) = FID_EXIT;
+  WL_PUSHN(3);
+  WL_ARGS(b + k, d + 1)
+  return sp;
 }
 
 static Term work_loop(Env e, DEV Term* sp, Term t, u32 seq) {
@@ -4451,7 +4449,7 @@ ${segs}
     Term cont = STK(0);
     u32  idx  = (u32)STK(1);
     u32  wf   = (u32)term_aux(cont);
-    if (cont != TERM_HOLE && wf == FID_EXIT) {
+    if (wf == FID_EXIT) {
       WL_ARGS(term_loc(cont), idx + 1)
       heap_free(e, cls_fit(STAK_LEN), term_loc(cont));
       WL_TAKE(rv)
