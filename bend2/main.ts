@@ -436,6 +436,7 @@ function cc_find(gpu: boolean): string {
 // lib; else the ! runs on the cores). On macOS a program with a framework
 // (#import: a window, audio) builds as Objective-C; on Linux it links the X11
 // (plus libdl, for dlopen before glibc 2.34) and ALSA libraries it includes.
+// The GPU program's build runs without the user's $BENDRTS.
 function cli_build(bin: string, file: string): void {
   const c     = fs.readFileSync(file, "utf8");
   const mac   = process.platform === "darwin";
@@ -456,7 +457,8 @@ function cli_build(bin: string, file: string): void {
   const steps: [string, string[]][] = bangs
     ? [[cc, gpu], [path.resolve(bin), ["+RTS", "--gpu-build"]]] : [[cc, cpu]];
   for (const [cmd, args] of steps) {
-    if (child.spawnSync(cmd, args, { stdio: "inherit" }).status !== 0) {
+    if (child.spawnSync(cmd, args, { stdio: "inherit",
+      env: { ...process.env, BENDRTS: "" } }).status !== 0) {
       throw "Error: " + path.basename(cmd) + " failed to build " + bin;
     }
   }

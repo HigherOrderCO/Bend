@@ -412,9 +412,19 @@ try {
   const ends = await run(argo, ["a", "--RTS", "+RTS", "b"],
     { BENDRTS: "--threads 2" });
   const zero = await run(argo, ["a"], { BENDRTS: "--threads 0" });
-  check("--RTS ends the runtime's options, which BENDRTS holds too: "
-    + ends.out + ends.err + zero.err, ends.code === 0
-    && ends.out.endsWith(", <a>, <+RTS>, <b>]\n") && zero.code === 1);
+  const span = await run(argo, ["+RTS", "2"], { BENDRTS: "--threads" });
+  check("--RTS ends the runtime's options; BENDRTS holds some, each value in"
+    + " its own span: " + ends.out + ends.err + zero.err + span.err,
+    ends.code === 0 && ends.out.endsWith(", <a>, <+RTS>, <b>]\n")
+    && zero.code === 1 && span.code === 1);
+  for (const bad of [["+RTS", "--thread", "2"], ["+RTS", "--gpu", "of"],
+    ["+RTS", "--threads", "-RTS", "x", "+RTS", "2"]]) {
+    const c  = await run(argo, bad);
+    const js = await run(process.execPath, [argo + ".js", ...bad]);
+    check("a malformed runtime option fails alike on C and JS: "
+      + bad.join(" ") + ": " + c.err + js.err,
+      c.code === 1 && js.code === 1 && c.err === js.err);
+  }
   const two  = "import Base\ndef two() -> Nat:\n  2n\n";
   const use  = (at: string) => "import Base\nimport ./" + at
     + " as T\ndef main() -> Nat:\n  T.two\n";
