@@ -55,10 +55,9 @@ const HELP = `Bend ${VERSION}: check, run, build and publish Bend programs.
 usage:
 ${USAGE.map(([use, say]) => `  ${use.padEnd(USE_W)}  ${say}`).join("\n")}
 
-Runtime settings: BEND_THREADS=N (native, positive, clamped to 128; default: CPU count),
-BEND_GPU=on|off|4GB (native; default: GPU if present), BEND_GPU_BUILD=1
-(write the native GPU program and exit). IO.args excludes the program name;
-compiled binaries reserve no arguments. JavaScript stays single-threaded.
+A binary reads BEND_THREADS=N (worker threads, 1 to 128; default: the CPU
+count) and BEND_GPU=on|off|4GB (run ! calls on the GPU, over this much of
+its memory; default: on if present, over 2GB on Metal).
 
 Read the guide (\`bend guide\`) before writing Bend code.
 `;

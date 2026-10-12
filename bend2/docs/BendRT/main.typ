@@ -278,8 +278,8 @@ first call in place; each step pushes the next frame, and the last
 jumps into the joiner with both results in the bank.
 
 The emitted file is the runtime template, the program's tables and
-segments, and the C source of every effect it imports; `--threads`
-and `--gpu` pick the executor at run time.
+segments, and the C source of every effect it imports; `BEND_THREADS`
+and `BEND_GPU` pick the executor at run time.
 
 = Memory <sec:memory>
 
@@ -480,7 +480,7 @@ behind a hash of the text), and a launch loads it, or compiles it once
 when the file is missing or stale, so host and device run the same
 functions by construction.
 
-The span is decided once, before the first dispatch: `--gpu <size>`,
+The span is decided once, before the first dispatch: `BEND_GPU=<size>`,
 else 2 GB on Metal, where a buffer cannot grow under a running kernel,
 and the whole card on CUDA, whose managed pages fault in on demand.
 Metal wraps the host mapping in one zero-copy buffer at the same

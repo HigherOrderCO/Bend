@@ -1,7 +1,7 @@
 // IO
 // ==
 
-// The host pool's size, set before the loop runs: --threads, else the CPUs
+// The host pool's size, set before the loop runs: BEND_THREADS, else the CPUs
 // this process may use, clamped to 1..CUBE_T.
 Term io_thread_count_run(Env e, Term* f, IoWork* w) {
   return (Term)pool_size;

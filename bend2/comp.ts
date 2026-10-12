@@ -1305,8 +1305,8 @@ export function io_type(book: Bend.Book): HTerm | null {
 }
 
 export function io_run(book: Bend.Book, args: string[]): number {
-  const src = `${js_lib(book)}\n${RUNTIME_MAIN}\ncli(${
-    JSON.stringify(args)});\nreturn io_run(${js_sat("main")});`;
+  const src = `${js_lib(book)}\n${RUNTIME_MAIN}\ncli_args = ${
+    JSON.stringify(args)};\nreturn io_run(${js_sat("main")});`;
   return new Function("require", src)(import.meta.require);
 }
 
@@ -5983,9 +5983,7 @@ int main(int argc, char** argv) {
   v = getenv("BEND_GPU_BUILD");
   if (v != NULL) {
     if (strcmp(v, "1") == 0) {
-      const char* why = gpu_probe();
-      if (why != NULL) err_fail(why);
-      if (!gpu_make(gpu_path())) {
+      if (gpu_probe() == NULL && !gpu_make(gpu_path())) {
         fprintf(stderr, "bend: cannot write %s\n", gpu_path());
         return 1;
       }
@@ -6082,30 +6080,7 @@ const RUNTIME_MAIN: string = String.raw`
 // Cli
 // ===
 
-let cli_args;
-
-function cli(argv) {
-  cli_args = argv;
-  const threads = process.env.BEND_THREADS;
-  if (threads !== undefined
-    && (!/^[ \t\n\r\f\v]*\+?\d+$/.test(threads) || !(Number(threads) > 0))) {
-    throw "bend: expected a thread count of 1 or more in BEND_THREADS";
-  }
-  const gpu = process.env.BEND_GPU;
-  const size = gpu?.match(/^[ \t\n\r\f\v]*\+?((?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)(GB|MB)$/);
-  const bytes = size ? Number(size[1]) * (size[2] === "GB" ? 2 ** 30 : 2 ** 20) : 0;
-  if (gpu !== undefined && gpu !== "on" && gpu !== "off"
-    && !(bytes > 0 && bytes < 2 ** 64)) {
-    throw "bend: expected on, off or a size like 4GB in BEND_GPU";
-  }
-  const build = process.env.BEND_GPU_BUILD;
-  if (build === "1") {
-    throw "bend: GPU builds require a native binary";
-  }
-  if (build !== undefined && build !== "0") {
-    throw "bend: expected 0 or 1 in BEND_GPU_BUILD";
-  }
-}
+let cli_args = [];
 
 // Show
 // ====
@@ -6159,7 +6134,7 @@ function show_val(D, d, v, chain) {
 
 function io_exit(main, show) {
   try {
-    cli(process.argv.slice(2));
+    cli_args = process.argv.slice(2);
     if (show !== null) {
       io_out(1, io_bytes(show_val(show, 0, run_loop(main()), 0) + "\n"));
       process.exit(0);
