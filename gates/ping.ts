@@ -277,9 +277,13 @@ try {
   check("a dead origin costs one run under four seconds", dead.code === 0
     && dead.out.includes("usage:") && Date.now() - t0 < 4000);
   const was = fs.statSync(BIN).ino;
+  const no_upd = await bend(["update"], { BEND_ORIGIN: "http://127.0.0.1:1" });
+  check("bend update fails when the installer download fails", no_upd.code !== 0
+    && fs.statSync(BIN).ino === was);
   const upd = await bend(["update"]);
   check("bend update runs the installer again: " + upd.err, upd.code === 0
-    && upd.err.startsWith("curl -fsSL " + ORIGIN + "/install.sh | sh\n")
+    && upd.err.startsWith("s=$(curl -fsSL " + ORIGIN
+      + "/install.sh) && printf '%s\\n' \"$s\" | sh\n")
     && plain(upd.out).includes("Bend \u2588  " + ver) && fs.statSync(BIN).ino !== was);
   const guide = await bend(["guide"]);
   const base  = await bend(["base", "Map"]);

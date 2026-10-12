@@ -169,7 +169,8 @@ function cli_guide(name: string): void {
 // cli_update runs the installer again: the one way bend changes. The
 // command prints first, so the user can run it alone.
 function cli_update(): void {
-  const cmd = "curl -fsSL " + ORIGIN + "/install.sh | sh";
+  const cmd = "s=$(curl -fsSL " + ORIGIN
+    + "/install.sh) && printf '%s\\n' \"$s\" | sh";
   cli_say(2, cmd + "\n");
   process.exitCode = child.spawnSync("sh", ["-c", cmd],
     { stdio: "inherit" }).status ?? 1;
