@@ -4378,11 +4378,8 @@ ${segs}
 
 // One turn on a ring: its head task below put0 runs (a growing
 // lane skips a fork-free one). The host grows a row ring by
-// ring and drains a ring; a device lane does both. A grow pushes
-// a fork-free task back for the drain, but on the host it runs
-// one in place when its continuation is a frame (resw != 0; a
-// join has none) that can fork, so the grow reaches that fork,
-// as it does in inlined code.
+// ring and drains a ring; a device lane does both. A host grow
+// runs a fork-free task in place if a forking frame follows it.
 INLINE u32 monk_step(Env e, DEV Term* stk, u32 rg, u32 put0, u32 base, u32 stride,
   TG u32* cur) {
   DEV u64* H   = e.mem;
