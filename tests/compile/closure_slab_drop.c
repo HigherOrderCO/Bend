@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :dispose BEND_CID_dispose
+// bend-ids end
 static u32 slab_seen;
 static u32 slab_pages;
 
@@ -24,5 +27,5 @@ static Term slab_dispose_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) slab_dispose_use(void) {
-  io_eff(CID(dispose), slab_dispose_run);
+  io_eff(BEND_CID_dispose, slab_dispose_run);
 }

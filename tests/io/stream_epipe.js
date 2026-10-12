@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Epipe.write BEND_CID_Epipe_write
+// bend-ids end
 // A child bun gets a pipe whose read end is closed as fd and writes a
 // line there with the runtime's own io_out, as IO.print does. The
 // answer is the child's status as a shell shows it: 128 plus the signal
@@ -20,4 +23,4 @@ function epipe_write(fd, resume, k) {
   return r.exitCode ?? 128 + require("os").constants.signals[r.signalCode];
 }
 
-io_eff(CID(Epipe.write), epipe_write);
+io_eff(BEND_CID_Epipe_write, epipe_write);

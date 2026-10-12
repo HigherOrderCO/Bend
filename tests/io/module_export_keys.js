@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Module.export_keys BEND_CID_Module_export_keys
+// bend-ids end
 function module_export_keys() {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -37,24 +40,31 @@ def dep.value(x: U32) -> U32:
       return 1;
     }
     const lib = require(output).default;
-    const values = { "dep:value": 15, ["__proto__"]: 6, constructor: 7,
-      toString: 8, ordinary: 9, "dep.value": 25 };
-    const keys = Object.keys(values);
-    if (keys.some((k) => !Object.hasOwn(lib, k))) {
+    const Bend = require(path.resolve("bend2/bend.ts"));
+    const file = Bend.file_name(fs.realpathSync(input));
+    const dep = Bend.file_name(fs.realpathSync(path.join(dir, "dep.bend")));
+    const values = { ["__proto__"]: 6, constructor: 7, toString: 8, ordinary: 9, "dep.value": 25 };
+    const keys = Object.keys(values), imported = Bend.name_source(dep, "value");
+    if (keys.some((k) => !Object.hasOwn(lib, k)) || !Object.hasOwn(lib, imported)) {
       return 2;
     }
-    if (Object.keys(lib).join(",") !== keys.join(",")) {
+    const names = Object.keys(lib);
+    if (names.length !== keys.length * 2 + 1 || keys.some((k) =>
+      !Object.hasOwn(lib, Bend.name_source(file, k))
+      || lib[Bend.name_source(file, k)] !== lib[k])) {
       return 3;
     }
-    if (Object.getPrototypeOf(lib) !== Object.prototype) {
+    if (Object.getPrototypeOf(lib) !== null) {
       return 4;
     }
     const copy = { ...lib };
-    return keys.every((k) => Object.hasOwn(copy, k)
-      && lib[k](5) === values[k] && copy[k](5) === values[k]) ? 0 : 5;
+    return Object.getPrototypeOf(copy) === Object.prototype
+      && names.every((k) => Object.hasOwn(copy, k) && copy[k] === lib[k])
+      && lib[imported](5) === 15 && copy[imported](5) === 15
+      && keys.every((k) => lib[k](5) === values[k] && copy[k](5) === values[k]) ? 0 : 5;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
 }
 
-io_eff(CID(Module.export_keys), module_export_keys);
+io_eff(BEND_CID_Module_export_keys, module_export_keys);
