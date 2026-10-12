@@ -77,7 +77,7 @@ gots.sort((a, b) => a.f < b.f ? -1 : 1);
 const rows = gots.map((g) => {
   const [c, reason] = judge(g);
   const r = reason + (g.diagnostic_error
-    ? " [diagnostic failed: " + g.diagnostic_error.replace(/\s+/g, " ") + "]" : "");
+    ? " [diagnostic failed: " + g.diagnostic_error.replace(/\s+/g, " ").slice(0, 300) + "]" : "");
   return [c, r, g.f, g.out] as const;
 });
 fs.mkdirSync(OUT, { recursive: true });

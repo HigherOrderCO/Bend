@@ -1,6 +1,10 @@
-// safe.ts's node side: each verdict child has its own CAP-second deadline.
-// ms measures only that child. Diagnostic failures and duration are separate;
-// neither replaces its verdict. Infrastructure errors are not proof rejections.
+// safe.ts's node side: runs `bend <f> --verdict` on each file named on
+// stdin, PAR at a time, each capped at CAP s, and prints one JSON array
+// of Got. On a mismatch (bend2 checks, the kernel does not), diagnostic
+// says why: the defs `-o` leaves out of scope, or else the kernel's error
+// on the translation, with the failing call if live. ms times the verdict
+// only; a failed diagnostic never changes it, and an infrastructure error
+// is never a proof rejection.
 import * as child from "node:child_process";
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -15,12 +19,16 @@ export type Got = {
 // Classification consumes explicit process outcomes, never elapsed diagnostics.
 export function judge(g: Got): [string, string] {
   const out = g.out.trim();
-  if (g.timeout) return ["t", "timeout"];
+  if (g.timeout) {
+    return ["t", "timeout"];
+  }
   if (g.error || g.code === null || g.code < 0) {
     const why = (g.error ?? out).replace(/\s+/g, " ").slice(0, 300);
     return ["e", "infrastructure: " + why];
   }
-  if (g.code === 0 && out === "ALL PROOFS CHECK") return [" ", "agree"];
+  if (g.code === 0 && out === "ALL PROOFS CHECK") {
+    return [" ", "agree"];
+  }
   if (/^Error: \d+ defs? rel(y|ies) on unsafe or foreign code/m.test(out)) {
     return ["u", "unsafe: " + [...out.matchAll(/^- (\S+)$/gm)].map((m) => m[1]).slice(0, 3).join(" ")];
   }
@@ -50,7 +58,9 @@ async function run(bin: string, args: string[], cap: number): Promise<Omit<Got, 
       g.ms = Date.now() - t0;
       if (signal) {
         g.signal = signal;
-        if (!g.timeout) g.error = "child terminated by " + signal;
+        if (!g.timeout) {
+          g.error = "child terminated by " + signal;
+        }
       }
       done();
     });
@@ -60,7 +70,9 @@ async function run(bin: string, args: string[], cap: number): Promise<Omit<Got, 
 
 async function one(f: string, cap: number): Promise<Got> {
   const g: Got = { f, ...await run(process.execPath, ["bend2/main.ts", f, "--verdict"], cap) };
-  if (g.out.includes("Error: BendTT infrastructure:")) g.error = g.out.trim();
+  if (g.out.includes("Error: BendTT infrastructure:")) {
+    g.error = g.out.trim();
+  }
   if (!g.timeout && !g.error && g.out.includes("Sorry - ")) {
     const t1 = Date.now();
     let dir: string | undefined;
@@ -95,7 +107,9 @@ async function one(f: string, cap: number): Promise<Got> {
     } catch (e) {
       g.diagnostic_error = String(e);
     } finally {
-      if (dir !== undefined) fs.rmSync(dir, { recursive: true, force: true });
+      if (dir !== undefined) {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
       g.diagnostic_ms = Date.now() - t1;
     }
   }
@@ -108,7 +122,9 @@ if (import.meta.main) {
   const res: Got[] = [];
   let next = 0;
   await Promise.all(Array.from({ length: Number(process.env.PAR ?? 8) }, async () => {
-    while (next < files.length) res.push(await one(files[next++], cap));
+    while (next < files.length) {
+      res.push(await one(files[next++], cap));
+    }
   }));
   process.stdout.write(JSON.stringify(res));
 }
