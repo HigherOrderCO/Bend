@@ -39,13 +39,13 @@
 // once per tuple of closed arguments at its template (~) parameters, with
 // those parameters gone; a def checked on its own also goes out as a
 // λ-match on its finite ones, to its instances, so the kernel checks
-// that they cover those parameters' values, each instance at its own
-// type (not at the def's). Every def goes out after the defs its live
-// code names; a name in a type may come later. A def with no body (a
-// law, a native, a foreign fill) goes out opaque at a model: the kernel
-// checks the model, then never unfolds the def. What the kernel cannot
-// express is out of scope: it goes, with every def that names it, and
-// --verdict fails.
+// that they cover those parameters' values and fit the def's type.
+// Every def goes out after the defs its live code names; a name in a
+// type may come later. A def with no body (a law, a native, a foreign
+// fill) goes out opaque at a model: the kernel checks the model, then
+// never unfolds the def. What the kernel cannot express is out of
+// scope: it goes, with every def that names it, and --verdict fails, as
+// it does for a def that reaches no kernel def.
 
 import * as child from "node:child_process";
 import * as crypto from "node:crypto";
@@ -93,10 +93,11 @@ type Bind = { o: O; T: HTerm | null; v?: HTerm };
 type Cols = Array<HTerm | null>;
 
 // a root's instances: the columns of one, or a match on a specialized
-// parameter of a finite type A, with a root for each of its values vs
+// parameter of a finite type A (a datatype, when adt), with a root for
+// each of its values, whose kernel labels are ks
 type Root =
   | { $: "Cols"; cols: Cols }
-  | { $: "Mat"; A: HTerm; vs: HTerm[]; arms: Root[] };
+  | { $: "Mat"; A: HTerm; ks: string[]; adt: boolean; arms: Root[] };
 
 // an argument: its binder's quantity, the argument, the binder's type,
 // and its value when the binder is specialized
@@ -165,6 +166,9 @@ const MODEL_DEPTH = 8;
 // only this compiler release may build a cached kernel
 const LEAN_VERSION = "4.34.0";
 
+// Quant's kernel labels, by quant
+const QS = ["Q0", "Q1", "Q2"];
+
 // Errors
 // ======
 
@@ -211,7 +215,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
   const g0 = groups.size;
   const e: Safe = { book, mb: { ...book, tlds: Object.create(book.tlds) as Book["tlds"] }, out: [], names: new Map(), seen: new Set(),
     todo: [], taken: new Set(), fail: new Map(), groups, inst, stack: [], going: new Set(), grew: false, consts: new Map(), uses: new WeakMap() };
-  const roots: Array<[Name, string]> = [];
+  const roots: Array<[Name, string[]]> = [];
   for (const k of [...new Set([...book.order].reverse())].reverse().filter((k) => book.tlds[k].b !== true)) {
     try {
       roots.push([k, root_emit(e, k, root_of(e, k, book.tlds[k].T, []))]);
@@ -221,7 +225,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
       }
       const n = fresh(e, name_tt(k));
       e.fail.set(n, x.message);
-      roots.push([k, n]);
+      roots.push([k, [n]]);
     }
   }
   for (let it = e.todo.pop(); it !== undefined; it = e.todo.pop()) {
@@ -243,7 +247,13 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
     }
   }
   e.out = e.out.filter(([k]) => !bad.has(k));
-  const oos = roots.filter(([, n]) => bad.has(n)).map(([k, n]): [Name, string] => [k, bad.get(n) as string]);
+  // a def is out at its first name out (an instance's before its
+  // match's), or when none of its names went out
+  const out = new Set(e.out.map(([k]) => k));
+  const oos = roots.flatMap(([k, ns]): Array<[Name, string]> => {
+    const n = ns.find((n) => bad.has(n));
+    return n !== undefined ? [[k, bad.get(n) as string]] : ns.some((n) => out.has(n)) ? [] : [[k, "no kernel def"]];
+  });
   return { text: book_show(e), oos };
 }
 
@@ -265,11 +275,12 @@ function root_of(e: Safe, k: Name, T: HTerm, cs: Cols): Root {
     return at(null);
   }
   const A = B.term_wnf(e.book, F.A);
+  if (A.$ === "Qnt") {
+    return { $: "Mat", A, ks: QS, adt: false, arms: [B.None(), B.Lone(), B.Many()].map((q) => at(B.Qua(q))) };
+  }
   const adt = A.$ === "ADT" && A.x.length === 0 ? e.book.tlds[A.k] as ADT : null;
-  const vs: HTerm[] | null = A.$ === "Qnt" ? [B.None(), B.Lone(), B.Many()].map((q) => B.Qua(q))
-    : adt !== null && adt.c.every((c) => B.term_wnf(e.book, c.T).$ !== "All") ? adt.c.map((c) => B.Ctr(c.k, [])) : null;
-  if (vs !== null) {
-    return { $: "Mat", A, vs, arms: vs.map(at) };
+  if (adt !== null && adt.c.every((c) => B.term_wnf(e.book, c.T).$ !== "All")) {
+    return { $: "Mat", A, ks: adt.c.map((c) => name_tt(c.k)), adt: true, arms: adt.c.map((c) => at(B.Ctr(c.k, []))) };
   }
   if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
     oos("a specialized parameter whose type names a parameter");
@@ -295,48 +306,52 @@ function root_of(e: Safe, k: Name, T: HTerm, cs: Cols): Root {
 
 // root k at r: at its columns, that item; else k's instances, and a def
 // that is a λ-match on each finite parameter whose arms name them, at a
-// type that is a λ-match on it too, whose arm at a value is that
-// instance's own type (at *1, which a *2 fits). So the kernel checks
-// that the instances cover the parameter's values (at an empty type,
-// that there are none: λ{}), not that they fit k's declared type. An
-// instance out of scope keeps its reason, and the def goes with it.
-function root_emit(e: Safe, k: Name, r: Root): string {
+// type that is a λ-match on it too, whose arm at a value is k's type, a
+// λ G on its ~ parameters, at that instance's arguments (where k's type
+// needs them closed, as at a template call, the instance's own type).
+// So the kernel checks that the instances cover the parameter's values
+// (at an empty type, that there are none: λ{}) and fit k's type. Its
+// names, the instances first
+function root_emit(e: Safe, k: Name, r: Root): string[] {
   if (r.$ === "Cols") {
-    return item_try(e, k, r.cols);
+    return [item_try(e, k, r.cols)];
   }
   const tld = e.book.tlds[k] as Def;
-  // a λ-match on r's parameter, the arm hs[i] at its value r.vs[i]
-  const mat = (r: Root & { $: "Mat" }, hs: O[]): O => {
-    if (r.A.$ !== "ADT") {
-      const qs = r.vs.map((v) => quant((v as { q: Quant }).q));
-      return mats(qs.map((q) => "Q" + String(q)), (i) => hs[i]);
-    }
-    const ks = r.vs.map((v) => name_tt((v as { k: Name }).k));
-    return { $: "Prj", h: mats(ks, (i) => unit(hs[i])) };
-  };
-  const ty = (s: Scope, r: Root): O => {
-    if (r.$ === "Cols") {
-      const X = r.cols.slice(0, tld.x) as HTerm[];
-      return term(e, s, B.tele_fill(e.book, tld.T, X, B.ctx_nil()), false);
-    }
-    const l = s.D;
-    const A = term(e, s, r.A, false);
-    const M = mat(r, r.arms.map((a) => ty(scope_hide(s), a)));
-    const T: O = { $: "Typ", q: { $: "Lab", k: "Q1" } };
-    const K: O = { $: "All", q: 1, l: l + 1, A, B: T };
-    return { $: "All", q: 1, l, A, B: { $: "App", q: 1, f: { $: "Ann", x: M, T: K }, x: { $: "Var", l } } };
-  };
+  const ns: string[] = [];
+  // a λ-match on r's parameter, the arm hs[i] at its label r.ks[i]
+  const mat = (r: Root & { $: "Mat" }, hs: O[]): O => r.adt
+    ? { $: "Prj", h: mats(r.ks, (i) => unit(hs[i])) } : mats(r.ks, (i) => hs[i]);
   const body = (r: Root): O => {
     if (r.$ === "Mat") {
       return mat(r, r.arms.map(body));
     }
-    return { $: "Ref", k: item_try(e, k, r.cols) };
+    ns.push(item_try(e, k, r.cols));
+    return { $: "Ref", k: ns[ns.length - 1] };
   };
-  const T = ty(scope_nil(), r);
   const v = body(r);
+  const K: O = { $: "Typ", q: { $: "Lab", k: "Q1" } };
+  let G: [O, Binder[]] | null = null;
+  try {
+    const t = tele_open(e, scope_nil(), tld.T, [], tld.x);
+    G = [{ $: "Ann", x: t.ps.reduceRight<O>((f, [q, l]) => ({ $: "Lam", q, l, f }), term(e, t.s, t.T, false)), T: alls(t.ps, K) }, t.ps];
+  } catch (x) {
+    if (!(x instanceof Scope_Error)) {
+      throw x;
+    }
+  }
+  const ty = (s: Scope, r: Root): O => {
+    if (r.$ === "Cols") {
+      return G === null ? term(e, s, B.tele_fill(e.book, tld.T, r.cols.slice(0, tld.x) as HTerm[], B.ctx_nil()), false)
+        : G[1].reduce<O>((f, [q], j) => ({ $: "App", q, f, x: term(e, s, r.cols[j] as HTerm, false) }), G[0]);
+    }
+    const l = s.D;
+    const A = term(e, s, r.A, false);
+    const M = mat(r, r.arms.map((a) => ty(scope_hide(s), a)));
+    return { $: "All", q: 1, l, A, B: { $: "App", q: 1, f: { $: "Ann", x: M, T: { $: "All", q: 1, l: l + 1, A, B: K } }, x: { $: "Var", l } } };
+  };
   const n = fresh(e, name_tt(k));
-  e.out.push([n, T, v, false]);
-  return n;
+  e.out.push([n, ty(scope_nil(), r), v, false]);
+  return [...ns, n];
 }
 
 // item_ref, with a failure kept as the item's reason
@@ -1015,10 +1030,10 @@ function term(e: Safe, s0: Scope, t: HTerm, live: boolean): O {
       return rwt_term(e, s, x, live);
     }
     case "Qnt": {
-      return { $: "Enu", ks: ["Q0", "Q1", "Q2"] };
+      return { $: "Enu", ks: QS };
     }
     case "Qua": {
-      return { $: "Lab", k: "Q" + String(quant(x.q)) };
+      return { $: "Lab", k: QS[quant(x.q)] };
     }
     case "Min": {
       return { $: "Min", a: term(e, s, x.a, live), b: term(e, s, x.b, live) };
