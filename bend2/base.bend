@@ -82,9 +82,10 @@ type Image is Data:
   Pix{color: U32}
   Qua{tl: Image, tr: Image, bl: Image, br: Image}
 
-# Key keeps its existing canonical code. Text follows a native key-down
-# with the OS's characters, retaining Shift, Caps Lock and the layout.
-# It is text, not a key identity; full input-method editing is separate.
+# Key is a key, pressed or let go. Text is what the keys typed, after
+# Shift, Caps Lock, the layout and any input method: never a control
+# character, so Enter or Backspace come only as Keys. A long input method
+# commit can come as several Texts.
 type Event is Data:
   Key{code: U32, down: Bool}
   Text{text: String}
