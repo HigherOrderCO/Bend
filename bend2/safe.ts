@@ -162,6 +162,10 @@ const LEAN_VERSION = "4.34.0";
 // Quant's kernel labels, by quant
 const QS = ["Q0", "Q1", "Q2"];
 
+// the unit type and value
+const UT: O = { $: "Enu", ks: ["()"] };
+const UV: O = { $: "Lab", k: "()" };
+
 // Errors
 // ======
 
@@ -240,11 +244,12 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
     }
   }
   e.out = e.out.filter(([k]) => !bad.has(k));
-  // a def is out at its first name not out, or with no name
+  // a def is out at each reason of its names not out (its last name's,
+  // which names the others, only when alone), or with no name
   const out = new Set(e.out.map(([k]) => k));
-  const oos = roots.flatMap(([k, ns]): Array<[Name, string]> => {
-    const n = ns.find((n) => !out.has(n));
-    return n === undefined && ns.length > 0 ? [] : [[k, bad.get(n as string) ?? "no kernel def"]];
+  const oos = roots.flatMap(([k, ns]) => {
+    const ws = ns.length > 0 ? ns.filter((n) => !out.has(n)).map((n) => bad.get(n) ?? "no kernel def") : ["no kernel def"];
+    return [...new Set(ws.length > 1 ? ws.slice(0, -1) : ws)].map((w): [Name, string] => [k, w]);
   });
   return { text: book_show(e), oos };
 }
@@ -263,8 +268,6 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
 function root_emit(e: Safe, k: Name): string[] {
   const tld = e.book.tlds[k];
   const ns: string[] = [];
-  const U: O = { $: "Enu", ks: ["()"] };
-  const one: O = { $: "Lab", k: "()" };
   let G: O | null | undefined;
   let ps: Binder[] = [];
   // the check of k's instances after the columns cs of T, at depth d
@@ -287,6 +290,7 @@ function root_emit(e: Safe, k: Name): string[] {
     if (vs !== null) {
       if (G === undefined) {
         G = null;
+        const m = trail(e);
         try {
           const t = tele_open(e, scope_nil(), tld.T, [], tld.x);
           G = { $: "Ann", x: t.ps.reduceRight<O>((f, [q, l]) => ({ $: "Lam", q, l, f }), term(e, t.s, t.T, false)), T: alls(t.ps, { $: "Typ", q: { $: "Lab", k: "Q1" } }) };
@@ -295,6 +299,7 @@ function root_emit(e: Safe, k: Name): string[] {
           if (!(x instanceof Scope_Error)) {
             throw x;
           }
+          undo(e, m);
         }
       }
       const hs = vs.map((v): O => ({ $: "Let", q: 0, l: d, v: at(v, d + 1), f: { $: "Tup", q: 1, a: term(e, scope_nil(), v, false), b: { $: "Rfl" } } }));
@@ -323,12 +328,12 @@ function root_emit(e: Safe, k: Name): string[] {
     e.consts.set(key, c);
     return at(B.Ref(c));
   };
-  const v: O = { $: "Let", q: 0, l: 1, v: go(tld.T, [], 2), f: one };
+  const v: O = { $: "Let", q: 0, l: 1, v: go(tld.T, [], 2), f: UV };
   if (G === undefined) {
     return ns;
   }
   const n = fresh(e, name_tt(k));
-  e.out.push([n, U, G === null ? v : { $: "Let", q: 0, l: 0, v: G, f: v }, false]);
+  e.out.push([n, UT, G === null ? v : { $: "Let", q: 0, l: 0, v: G, f: v }, false]);
   return [...ns, n];
 }
 
@@ -437,7 +442,7 @@ function adt_emit(e: Safe, cols: Cols, n: string, tld: ADT): void {
   const am = fresh(e, n + ".arms");
   const t = s.D;
   // a constructor's fields as a Σ chain ending in <()>
-  const fs = (c: B.Ctr): O => alls(tele_open(e, s, B.tele_fill(e.book, c.T, xs, B.ctx_nil()), [], Infinity).ps, { $: "Enu", ks: ["()"] }, "Sig");
+  const fs = (c: B.Ctr): O => alls(tele_open(e, s, B.tele_fill(e.book, c.T, xs, B.ctx_nil()), [], Infinity).ps, UT, "Sig");
   const ks = tld.c.map((c) => name_tt(c.k));
   const arms = mats(ks, (i) => fs(tld.c[i]));
   const Enu: O = { $: "Enu", ks };
@@ -1189,8 +1194,8 @@ function group_call(e: Safe, s: Scope, g: Group, m: Name, ps: Arg[], R: HTerm, l
   const a = { ...s, sub: live && k === s.self };
   const args = (xs: Arg[], qs: Q[]): Array<[Q, O]> => xs.flatMap(([q, x, A, v], j): Array<[Q, O]> =>
     v !== null ? [] : [[qs[j] ?? q, arg_term(e, a, x, A, live && (qs[j] ?? q) > 0)]]);
-  const sel: O = { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(g.k) }, b: { $: "Lab", k: "()" } };
-  const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(m) }, b: { $: "Tup", q: 1, a: sel, b: { $: "Lab", k: "()" } } }] as [Q, O],
+  const sel: O = { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(g.k) }, b: UV };
+  const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(m) }, b: { $: "Tup", q: 1, a: sel, b: UV } }] as [Q, O],
     ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), { $: "Ref", k });
   return { $: "Ann", x, T: term(e, s, R, false) };
 }
@@ -1220,9 +1225,8 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
     return alls(r.ps, term(e, r.s, r.T, false));
   });
   const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: tags }, B: { $: "App", q: 1, x: { $: "Var", l: l0 },
-    f: mats(tags, (i) => i === 0 ? { $: "Enu", ks: ["()"] }
-      : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [name_tt(g.k)] }, B: { $: "Enu", ks: ["()"] } },
-        B: { $: "Enu", ks: ["()"] } }) } };
+    f: mats(tags, (i) => i === 0 ? UT
+      : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [name_tt(g.k)] }, B: UT }, B: UT }) } };
   const To = alls(ls, { $: "All", q: 1, l: l0, A: Sel, B: { $: "App", q: 1, f: mode, x: { $: "Var", l: l0 } } });
   const ks = ls.filter(([q]) => q === 1).map(([, l]) => l);
   const body = sel((m) => convoy_bind(e, s0, ks, (s2) => {
@@ -1318,7 +1322,7 @@ function ctr_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Ctr" }>, T: HTerm |
     F = A.B(a);
   }
   const k = name_tt(x.k);
-  const tail = fs.reduceRight<O>((b, [q, a]) => ({ $: "Tup", q, a, b }), { $: "Lab", k: "()" });
+  const tail = fs.reduceRight<O>((b, [q, a]) => ({ $: "Tup", q, a, b }), UV);
   return { $: "Tup", q: 1, a: { $: "Lab", k }, b: tail };
 }
 
