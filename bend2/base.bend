@@ -123,6 +123,7 @@ law Chan:
 type IO.OP<-R: Type> is Type:
   Emit{value: R}
   Halt{code: U32, message: String}
+  Exit{code: U32}
 
 type App<-S: Type> is Type:
   App{view: S -> Pair(S, Image), tick: List<Event> -> S -> IO(Maybe<S>)}
@@ -194,6 +195,9 @@ def Process.run(program: String, args: List<String>, input: String,
 
 def IO.die(-A: Type, code: U32, msg: String) -> IO(A):
   R => k => Halt{code, msg}
+
+def IO.exit(code: U32) -> IO(Unit):
+  R => k => Exit{code}
 
 def IO.pass(-A: Type, r: Result<&1, &1, U32 & String, A>) -> IO(A):
   match r:

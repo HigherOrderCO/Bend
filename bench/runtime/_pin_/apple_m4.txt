@@ -1,20 +1,20 @@
-# 2026-09-11 b20509fd bun gates/perf.ts (the COMPILER column: medians of three runs, by hand)
+# 2026-10-08 the SEQ-CPU, PAR-CPU and PAR-GPU times are the medians of 5 gate runs (each cell timed by tm, the median of three runs under 2 s) at the commit each was pinned at: 35dbdb75; 386b7fc1 for bitonic, kmeans and nbody SEQ and PAR; d04cf05e for histogram. COMPILER and the spaces as 2026-09-11 b20509fd bun gates/perf.ts (the COMPILER column: medians of three runs, by hand)
 | bench        | COMPILER | SEQ-CPU          | PAR-CPU          | PAR-GPU          | OUTPUT     |
 |--------------|----------|------------------|------------------|------------------|------------|
-| bfs          |   0.578s |   3.508s    1.9M |   0.507s    2.6M |   0.956s   13.9M | 651176970  |
-| editdist     |   0.562s |   1.926s    2.0M |   0.397s    3.0M |   0.481s   13.8M | 2229810577 |
-| gameoflife   |   0.553s |   6.927s    2.0M |   1.154s    2.6M |   0.100s   13.9M | 2016151040 |
-| hashmap      |   0.661s |   3.293s    2.3M |   0.517s    9.0M |   1.548s   14.0M | 1307803744 |
-| histogram    |   1.033s |   1.717s   67.7M |   0.367s   74.8M |   1.481s   80.0M | 122845198  |
-| kmeans       |   1.094s |   3.969s   23.5M |   0.835s   21.0M |   0.700s   15.8M | 1616398086 |
-| lexer        |   0.646s |   2.323s    1.9M |   0.429s    2.9M |   3.891s   14.1M | 2401049475 |
-| mandelbrot   |   0.637s |   4.451s    2.2M |   0.685s    2.8M |   0.068s   13.6M | 3101455856 |
-| merkle       |   0.597s |   4.171s    130M |   0.777s    131M |   0.081s   13.9M | 3104235417 |
-| nbody        |   0.671s |   5.899s    2.1M |   0.850s    2.6M |   0.065s   14.2M | 3516450380 |
-| queens       |   0.602s |   4.768s    2.0M |   0.762s    2.5M |   2.683s   13.9M | 2063750025 |
-| raytrace     |   0.652s |   4.353s    2.0M |   0.734s    2.6M |   0.395s   14.0M | 1924309504 |
-| symreg       |   0.686s |   2.750s    2.0M |   0.473s    3.0M |   0.814s   14.3M | 2383953211 |
-| terrain      |   0.622s |   2.150s    2.0M |   0.364s    3.3M |   0.291s   13.9M | 2572468224 |
-| tree-bitonic |   0.666s |   5.847s    146M |   1.246s    159M |   1.987s   14.3M | 3787129428 |
-| tree-matmul  |   1.473s |   1.855s    2.8M |   0.377s   15.3M |   0.999s   16.8M | 3797651056 |
-| tree-radix   |   0.668s |   3.785s    651M |   0.759s    615M |   1.028s   14.5M | 1998173798 |
+| bfs          |   0.578s |   3.501s    1.9M |   0.500s    2.6M |   0.894s   13.9M | 651176970  |
+| editdist     |   0.562s |   1.916s    2.0M |   0.393s    3.0M |   0.476s   13.8M | 2229810577 |
+| gameoflife   |   0.553s |   6.919s    2.0M |   1.151s    2.6M |   0.085s   13.9M | 2016151040 |
+| hashmap      |   0.661s |   3.281s    2.3M |   0.509s    9.0M |   1.543s   14.0M | 1307803744 |
+| histogram    |   1.033s |   1.466s   67.7M |   0.312s   74.8M |   1.477s   80.0M | 122845198  |
+| kmeans       |   1.094s |   3.772s   23.5M |   0.826s   21.0M |   0.684s   15.8M | 1616398086 |
+| lexer        |   0.646s |   2.292s    1.9M |   0.427s    2.9M |   3.923s   14.1M | 2401049475 |
+| mandelbrot   |   0.637s |   4.444s    2.2M |   0.677s    2.8M |   0.067s   13.6M | 3101455856 |
+| merkle       |   0.597s |   4.166s    130M |   0.771s    131M |   0.080s   13.9M | 3104235417 |
+| nbody        |   0.671s |   5.894s    2.1M |   0.842s    2.6M |   0.061s   14.2M | 3516450380 |
+| queens       |   0.602s |   4.745s    2.0M |   0.770s    2.5M |   2.701s   13.9M | 2063750025 |
+| raytrace     |   0.652s |   4.346s    2.0M |   0.730s    2.6M |   0.391s   14.0M | 1924309504 |
+| symreg       |   0.686s |   2.744s    2.0M |   0.466s    3.0M |   0.807s   14.3M | 2383953211 |
+| terrain      |   0.622s |   2.139s    2.0M |   0.360s    3.3M |   0.313s   13.9M | 2572468224 |
+| tree-bitonic |   0.666s |   5.490s    146M |   1.185s    159M |   1.966s   14.3M | 3787129428 |
+| tree-matmul  |   1.473s |   1.861s    2.8M |   0.371s   15.3M |   1.013s   16.8M | 3797651056 |
+| tree-radix   |   0.668s |   3.780s    651M |   0.738s    615M |   1.025s   14.5M | 1998173798 |

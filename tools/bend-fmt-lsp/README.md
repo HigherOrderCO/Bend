@@ -6,13 +6,24 @@ completion, hover, range-formatting, or on-type-formatting features.
 
 ## Install and run
 
-Node.js 22 or newer is required.
+Node.js 22 or newer is required. From the repository root:
 
 ```sh
-npm install
+cd tools/bend-fmt-lsp
+npm ci
 npm run build
-node dist/server.js --stdio
 ```
+
+To run the server directly from this checkout, use `node dist/server.js --stdio`.
+To use the editor configurations below, install the built package as a command:
+
+```sh
+npm install -g .
+```
+
+Run this from `tools/bend-fmt-lsp` after building. Without the global install,
+configure your editor to run `node` with the absolute path to `dist/server.js`
+and `--stdio` instead.
 
 The server handles documents whose language ID is `bend` or `bend2`. It
 preserves line breaks, blank lines, comments, literal spelling, line endings,

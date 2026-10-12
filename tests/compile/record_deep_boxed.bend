@@ -92,6 +92,45 @@ law one4:
 def one4():
   BoxK{one3(), one3(), one3(), one3(), one3(), one3(), one3(), one3()}
 
+law one5:
+  BoxK<BoxK<BoxK<BoxK<BoxK<U32>>>>>
+
+def one5():
+  BoxK{one4(), one4(), one4(), one4(), one4(), one4(), one4(), one4()}
+
+law one6:
+  BoxK<BoxK<BoxK<BoxK<BoxK<BoxK<U32>>>>>>
+
+def one6():
+  BoxK{one5(), one5(), one5(), one5(), one5(), one5(), one5(), one5()}
+
+law one7:
+  BoxK<BoxK<BoxK<BoxK<BoxK<BoxK<BoxK<U32>>>>>>>
+
+def one7():
+  BoxK{one6(), one6(), one6(), one6(), one6(), one6(), one6(), one6()}
+
+law dig7:
+  for b: BoxK<BoxK<BoxK<BoxK<BoxK<BoxK<BoxK<U32>>>>>>>
+  U32
+
+def dig7(b):
+  match b:
+    case BoxK{x0_0, x0_1, x0_2, x0_3, x0_4, x0_5, x0_6, x0_7}:
+      match x0_3:
+        case BoxK{x1_0, x1_1, x1_2, x1_3, x1_4, x1_5, x1_6, x1_7}:
+          match x1_3:
+            case BoxK{x2_0, x2_1, x2_2, x2_3, x2_4, x2_5, x2_6, x2_7}:
+              match x2_3:
+                case BoxK{x3_0, x3_1, x3_2, x3_3, x3_4, x3_5, x3_6, x3_7}:
+                  match x3_3:
+                    case BoxK{x4_0, x4_1, x4_2, x4_3, x4_4, x4_5, x4_6, x4_7}:
+                      match x4_3:
+                        case BoxK{x5_0, x5_1, x5_2, x5_3, x5_4, x5_5, x5_6, x5_7}:
+                          match x5_3:
+                            case BoxK{x6_0, x6_1, x6_2, x6_3, x6_4, x6_5, x6_6, x6_7}:
+                              x6_3
+
 law dig:
   for b: BoxK<BoxK<BoxK<BoxK<U32>>>>
   U32
@@ -111,7 +150,7 @@ law main.out:
   U32
 
 def main.out():
-  (dig(mk4(0)) + dig(one4()) : U32)
+  ((dig(mk4(0)) + dig(one4()) : U32) + dig7(one7()) : U32)
 
 law main:
   IO(Unit)
@@ -119,4 +158,4 @@ law main:
 def main():
   IO.print(U32.show(main.out()))
 
-#|2748
+#|2749

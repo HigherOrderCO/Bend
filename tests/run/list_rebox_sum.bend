@@ -1,11 +1,6 @@
-# Smoke test for #970: a List built at runtime (the sum comes from the
-# argument count, IO.args past the program) keeps the val_box-over-sum shape in the emitted C,
-# the one place main's two lines differ from this branch's: main splices
-# the parked Cons cell into the Pair node (_nd_2 = _sp_0) and heap_allocs
-# the rebuild, so the Scalar path orphans it, while here the Pair is
-# allocated and the rebuild keeps _sp_0. A leak is not visible in the
-# output, so this only holds the shape compiling and running; a literal
-# list folds away on both.
+# #970: runtime Scalar and Pair lists exercise boxing across a sum. After
+# warm-up, native arena growth is bounded by one allocation quantum,
+# including retained free lists. JS checks the values without a heap pin.
 import Base
 
 type Value is Data:
@@ -48,12 +43,29 @@ def head_nat(values: List<&2, Value>) -> Nat:
         case Pair{+left, right}:
           left
 
+def cycle(n: Nat, +seed: Nat, acc: U32) -> U32:
+  match n:
+    case 0n:
+      acc
+    case 1n+more:
+      cycle(more, seed, U32.add(acc,
+        U32.add(head_u32(rebox(wrap(seed) <> Nil{})),
+          U32.from_nat(head_nat(rebox(wrap(Nat.add(seed, 4n)) <> Nil{}))))))
+
+def heap.check(value: U32, expected: U32, before: U32) -> IO(U32):
+  import "./list_rebox_sum.c"
+  import "./list_rebox_sum.js"
+
 def main() -> IO(Unit):
   do IO<Unit>:
     xs : List<String> <- IO.args()
     +n : Nat = Nat.sub(List.length(&1, String, xs), 1n)
     Unit <- IO.print(U32.show(head_u32(rebox(wrap(n) <> Nil{}))))
-    IO.print(Nat.show(head_nat(rebox(wrap(Nat.add(n, 4n)) <> Nil{}))))
+    Unit <- IO.print(Nat.show(head_nat(rebox(wrap(Nat.add(n, 4n)) <> Nil{}))))
+    before : U32 <- heap.check(cycle(10000n, n, 0), 100000, 0)
+    after : U32 <- heap.check(cycle(200000n, n, 0), 2000000, before)
+    IO.print("bounded")
 
 #|7
 #|3
+#|bounded

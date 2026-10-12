@@ -277,9 +277,13 @@ try {
   check("a dead origin costs one run under four seconds", dead.code === 0
     && dead.out.includes("usage:") && Date.now() - t0 < 4000);
   const was = fs.statSync(BIN).ino;
+  const no_upd = await bend(["update"], { BEND_ORIGIN: "http://127.0.0.1:1" });
+  check("bend update fails when the installer download fails", no_upd.code !== 0
+    && fs.statSync(BIN).ino === was);
   const upd = await bend(["update"]);
   check("bend update runs the installer again: " + upd.err, upd.code === 0
-    && upd.err.startsWith("curl -fsSL " + ORIGIN + "/install.sh | sh\n")
+    && upd.err.startsWith("s=$(curl -fsSL " + ORIGIN
+      + "/install.sh) && printf '%s\\n' \"$s\" | sh\n")
     && plain(upd.out).includes("Bend \u2588  " + ver) && fs.statSync(BIN).ino !== was);
   const guide = await bend(["guide"]);
   const base  = await bend(["base", "Map"]);
@@ -289,6 +293,15 @@ try {
   check("guide, base and a program run through the executable",
     guide.out.startsWith("# Bend") && base.out.startsWith("type Map")
     && sum5.code === 0 && sum5.out === "5n\n");
+  fs.writeFileSync(path.join(TMP, "page.html"),
+    "<script type=\"module\" src=\"./page.ts\"></script>\n");
+  fs.writeFileSync(path.join(TMP, "page.ts"), "import \"./none.ts\";\n");
+  const page = await bend([path.join(TMP, "page.html"), "-o",
+    path.join(TMP, "dist")]);
+  check("a page that fails to bundle names the import and where, and exits 1"
+    + " with no crash banner: " + page.err, page.code === 1
+    && page.err.includes("Could not resolve: \"./none.ts\"")
+    && page.err.includes("page.ts:1:") && !page.err.includes("Bun v"));
   const bad_file = path.join(TMP, "bad.bend");
   const sum_file = path.join(TMP, "sum.bend");
   const unsafe_file = path.join(TMP, "unsafe.bend");

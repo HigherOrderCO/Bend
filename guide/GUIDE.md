@@ -386,22 +386,24 @@ the current directory and environment, writes UTF-8 `input` to its stdin, and
 answers `Done{(status, (stdout, stderr))}` even when the exit status is not
 zero. Both limits must be positive; failure to start, a timeout, or stdout
 and stderr exceeding `max_output` bytes together answer `Fail`. The call
-waits for the direct child and drains ready output; a descendant holding an
-inherited pipe open does not extend the wait. Timeouts do not kill descendants.
+returns once the child exits and stdout and stderr close, so a descendant
+holding a pipe open delays it, up to the timeout. Timeouts do not kill
+descendants.
 A native build runs the child on an IO helper thread; the JavaScript lane
 blocks while the child runs. On Linux, native builds need glibc 2.34 or newer
 to close inherited descriptors. It does not sandbox the child: callers must
 whether a command is trusted before executing it.
 
 A Bend program is a set of computations interleaved by one event loop, as in
-Node.js: each runs its pure code (in parallel, on every core) up to its next
-effect, and one that waits on a socket, a sleep or a channel steps aside for the
-others. `IO.fork` starts a computation and returns the channel its result will
-arrive on; `IO.join` waits for it. Underneath are `IO.spawn`, `Chan.new`,
-`Chan.send`, `Chan.recv` and `Chan.close`. `IO.within(A, ms, act)` races `act`
-against a deadline and answers `None{}` if the deadline wins; the loser is not
-cancelled. The program ends when every computation is done, or reports a
-deadlock when the remaining ones all wait.
+Node.js: one at a time, each runs its pure code, on every core through its
+[parallel calls](#parallelism), up to its next effect, and one that waits on a
+socket, a sleep or a channel steps aside for the others. `IO.fork` starts a
+computation and returns the channel its result will arrive on; `IO.join` waits
+for it. Underneath are `IO.spawn`, `Chan.new`, `Chan.send`, `Chan.recv` and
+`Chan.close`. `IO.within(A, ms, act)` races `act` against a deadline and answers
+`None{}` if the deadline wins; the loser is not cancelled. The program ends when
+every computation is done, or reports a deadlock when the remaining ones all
+wait.
 
 Every effect in Base is a def whose body is `import "./x.js"` plus a `.c` twin,
 implemented by a host function named after the def, lowercased, dots to

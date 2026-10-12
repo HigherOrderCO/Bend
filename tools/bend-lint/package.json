@@ -1,0 +1,22 @@
+{
+  "name": "bend-lint",
+  "version": "0.1.0",
+  "description": "Diagnostics for Bend 2 from rules outside the language: source text, and the checker's types",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "bend-lint": "src/lint.ts"
+  },
+  "exports": "./src/lint.ts",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.0"
+  },
+  "engines": {
+    "bun": ">=1.2"
+  },
+  "license": "Apache-2.0"
+}
