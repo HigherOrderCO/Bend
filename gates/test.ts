@@ -215,15 +215,13 @@ async function state_run(): Promise<Fail[]> {
   for (const file of files) {
     const copies = [Bend.book_nil(), Bend.book_nil()];
     for (const book of copies) {
-      await Bend.book_load(book, path.join(TESTS, file + ".bend"), "",
-        new Map());
+      await Bend.book_load(book, path.join(TESTS, file + ".bend"), new Map());
       Bend.book_valid(book);
     }
     books.push(copies);
   }
   const emit = (book: Bend.Book, lane: string): string =>
-    Bun.hash(lane === "c" ? Comp.compile_book(book) : Comp.js_book(book))
-    + " bytes, " + String(Comp.PROBES.length) + " probes";
+    String(Bun.hash(lane === "c" ? Comp.compile_book(book) : Comp.js_book(book)));
   const base = books.map(([book]): Record<string, string> =>
     ({ c: emit(book, "c"), js: emit(book, "js") }));
   const fails: Fail[] = [];
