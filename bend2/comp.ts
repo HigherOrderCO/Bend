@@ -524,7 +524,7 @@ function char_new(code) {
 // Caches
 // ------
 
-const PROBES: Of<"Var">[] = [];
+export const PROBES: Of<"Var">[] = [];
 
 const DUMMY = probe("~");
 
