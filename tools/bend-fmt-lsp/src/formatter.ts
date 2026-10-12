@@ -121,7 +121,8 @@ function needsSpace(tokens: Token[], index: number): boolean {
     const suffix = (left.kind === "word" && !KEYWORDS.has(left.text)) || left.kind === "number" || left.kind === "literal" || [")", "]", "}", ">", ">>"].includes(left.text);
     return !suffix;
   }
-  if (right.text === "{" && ((left.kind === "word" && !["return", "case"].includes(left.text)) || [">", ">>", "}"].includes(left.text))) return false;
+  // A separated brace can start the next annotated argument, rather than a constructor.
+  if (right.text === "{" && ((left.kind === "word" && !["return", "case"].includes(left.text)) || [">", ">>", "}"].includes(left.text))) return left.kind === "word" && right.gap;
   if (left.text === "\\" && right.text === "{") return false;
   if (left.text === "." || right.text === ".") return false;
   if (left.kind === "number" && left.text.endsWith("n") && (right.text === "+" || right.text === "++")) return right.gap;

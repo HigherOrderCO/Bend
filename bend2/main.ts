@@ -169,7 +169,8 @@ function cli_guide(name: string): void {
 // cli_update runs the installer again: the one way bend changes. The
 // command prints first, so the user can run it alone.
 function cli_update(): void {
-  const cmd = "curl -fsSL " + ORIGIN + "/install.sh | sh";
+  const cmd = "s=$(curl -fsSL " + ORIGIN
+    + "/install.sh) && printf '%s\\n' \"$s\" | sh";
   cli_say(2, cmd + "\n");
   process.exitCode = child.spawnSync("sh", ["-c", cmd],
     { stdio: "inherit" }).status ?? 1;
@@ -283,7 +284,8 @@ async function cli_file(args: string[]): Promise<void> {
   if ((only || verdict) && (outs.length !== 0 || checkup || (only && verdict))) {
     cli_fail((verdict ? "--verdict" : "--check-only") + " takes no other option");
   }
-  if (argv.length !== 0 && (outs.length !== 0 || only || checkup || publish)) {
+  // args go to a plain run only: any option (all start with -) refuses them
+  if (argv.length !== 0 && args.some((a) => a.startsWith("-") && a !== "--")) {
     cli_fail("arguments go to a run: bend <file.bend> [args]");
   }
   if (checkup && outs.length !== 0) {
@@ -331,8 +333,15 @@ async function cli_checkup(file: string): Promise<void> {
   const base = await book_read(BASE);
   let bad = false;
   for (const raw of fs.readFileSync(file, "utf8").split("\n")) {
-    const m = /^import\s+(\S+)\s+as\s+[A-Za-z_][A-Za-z0-9_]*\s*$/
-      .exec(raw.trim());
+    const line = raw.trim();
+    if (line === "" || line.startsWith("#")) {
+      continue;
+    }
+    if (!/^import(\s|$)/.test(line)) {
+      break;
+    }
+    const m = /^import\s+(\S+)\s+as\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:#.*)?$/
+      .exec(line);
     if (m === null) {
       continue;
     }
@@ -341,7 +350,8 @@ async function cli_checkup(file: string): Promise<void> {
     cli_say(1, "--- " + m[1] + " ---\n");
     let code = 1;
     try {
-      const own = /^import Base$/m.test(fs.readFileSync(at, "utf8"));
+      const own = /^(?:[\t\r ]*(?:(?:#|import )[^\n]*)?\n)*[\t ]*import Base\s/
+        .test(fs.readFileSync(at, "utf8"));
       code = book_run(await book_read(at, own ? base : undefined), [at]);
     } catch (e) {
       cli_say(2, book_err(e) + "\n");
