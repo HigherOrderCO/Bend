@@ -5330,8 +5330,8 @@ OUTLINE Term corpus_eval(u64* H, Term t) {
 // resumes, IO_PARK parks again. The edge is UTF-8, decoded as WHATWG does: a
 // broken sequence yields one U+FFFD and its breaking byte is read again as a
 // lead. inet_aton reads a leading zero as octal, so io_sys_addr refuses it.
-// macOS poll misses FIFO EOF, so io_wait selects, its sets sized to the
-// highest fd (_DARWIN_UNLIMITED_SELECT allows fds past FD_SETSIZE).
+// macOS poll misses FIFO EOF; select sets fit the highest fd.
+// _DARWIN_UNLIMITED_SELECT permits fds past FD_SETSIZE.
 
 #include <arpa/inet.h>
 #include <errno.h>
