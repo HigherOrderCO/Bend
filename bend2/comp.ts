@@ -473,7 +473,6 @@ const DUMMY = probe("~");
 
 let FUEL = 0;
 
-// The book being compiled and all that is memoized about it.
 let FL: File;
 
 // Name
@@ -1816,10 +1815,10 @@ function memo_gc(): void {
 // ====
 
 // A pure main prints through a descriptor of its type, a node per (type,
-// layout): 0 U32, 1 F32, 2 Nat, 3 Char, 4 String, 5 Eql, 6 Array (element,
-// lgs), 7 Data (boxed?, arms; per arm name, cid, fields, bracket, then an
-// (offset, node) per field). An IO main has none; an unprintable type (a
-// function, a Type, an erased or dependent field) refuses the build.
+// layout): 0 U32, 1 F32, 2 Nat, 3 Char (boxed?), 4 String, 5 Eql, 6 Array
+// (element, lgs), 7 Data (boxed?, arms; per arm name, cid, fields, bracket,
+// then an (offset, node) per field). An IO main has none; an unprintable
+// type (a function, a Type, an erased or dependent field) refuses the build.
 
 function show_main(): (number | Name)[] | null {
   const main = FL.tlds.main;
@@ -5399,7 +5398,6 @@ static Term io_wait_on(IoWork* w, int fd, short evts, u64 time, IoPack more) {
   return IO_PARK;
 }
 
-// EPIPE ends the program by SIGPIPE.
 static void io_lost(void) {
   if (errno == EPIPE) {
     signal(SIGPIPE, SIG_DFL);
@@ -5678,8 +5676,8 @@ ${NATIVE.IO}
 // is a SHOW_DESC node (see show_main), w its words, and chain the
 // bracket of the [a, b] or (a, b) the value continues, or 0. Con
 // or Nil spell a list, Tuple a tuple, and their tails continue
-// it. show_chr escapes as char_show does; show_f32 prints the
-// shortest text that reads back, with a point before an e.
+// it. show_f32 prints the shortest text that reads back, with a
+// point before an e.
 
 #if MAIN_PURE
 
@@ -6045,7 +6043,7 @@ function cli(argv) {
 // ====
 
 // show_val prints a pure main's value as term_show does (see show_main);
-// chain is the bracket it continues, or 0. show_chr escapes as char_show.
+// chain is the bracket it continues, or 0.
 
 function show_chr(s, q) {
   const c = s.codePointAt(0);
