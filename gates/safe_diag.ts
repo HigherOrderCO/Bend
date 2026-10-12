@@ -1,6 +1,6 @@
 // why the kernel's live check fails on a .bendtt def: a port of
-// bendtt.lean's Term.tree / Term.live (affinity, call order, descent)
-// that names the failing binder or call. A diagnosis, not a verdict.
+// bendtt.lean's Term.tree / Term.live / Term.pos (affinity, call order,
+// descent) that names the failing binder or call. A diagnosis, not a verdict.
 //   bun gates/safe_diag.ts <file.bendtt> [def]
 import * as fs from "node:fs";
 
@@ -61,7 +61,11 @@ function term(vs: string[]): T {
   }
   if (c === "<") { eat("<"); while (!take(">")) { label(); take(","); } return { $: "Enu" }; }
   if (c === ".") { eat("."); return { $: "Lab", k: name() }; }
-  if (c === "%") { eat("%"); const e = term(vs); eat(":"); const n = name(); eat("=>"); const P = term([n, ...vs]); eat(";"); return { $: "Rwt", e, P, f: term(vs) }; }
+  if (c === "%") {
+    eat("%"); const e = term(vs); eat(":"); const n = name(); eat(",");
+    const h = name(); eat("=>"); const P = term([h, n, ...vs]); eat(";");
+    return { $: "Rwt", e, P, f: term(vs) };
+  }
   const k = name();
   const i = vs.indexOf(k);
   return i >= 0 ? { $: "Var", i } : { $: "Ref", k };
@@ -72,8 +76,10 @@ function tup(vs: string[], q: Q, a: T): T {
   eat(")"); return { $: "Tup", q, a, b };
 }
 
-type Tag = [number, "eq" | "lt"] | null;
-type G = { ks: string[]; i: number; cs: boolean[]; ts: Tag[]; ns: string[] };
+// a tag is a var's path into column j, as "<path>@j": each step,
+// innermost first, takes a pair's first (0) or second (1) field
+type Tag = string | null;
+type G = { ks: string[]; i: number; cs: boolean[]; ts: Tag[]; ns: string[]; hs: [string, string][] };
 const why: string[] = [];
 const live = (q: Q): boolean => q !== 0;
 const allows = (q: Q, n: number): boolean => q === 0 ? n === 0 : q === 1 ? n <= 1 : true;
@@ -100,7 +106,16 @@ function unspine(t: T): [T, Array<[Q, T]>] {
 const takes = (t: T): boolean => ["Lam", "Prj", "Mat", "Efq"].includes(t.$);
 function bind(g: G, o: Tag, n: string): G { return { ...g, ts: [o, ...g.ts], ns: [n, ...g.ns] }; }
 function next(g: G, ps: Tag[], l: boolean): [Tag, G, Tag[]] {
-  return ps.length > 0 ? [ps[0], g, ps.slice(1)] : [[g.cs.length, "eq"], { ...g, cs: [...g.cs, l] }, []];
+  return ps.length > 0 ? [ps[0], g, ps.slice(1)] : ["@" + g.cs.length, { ...g, cs: [...g.cs, l] }, []];
+}
+// the tags of the pieces x rebuilds: a tagged var, a hit label, or a
+// live pair of the two pieces of one split
+function cells(g: G, x: T): string[] {
+  if (x.$ === "Var") return g.ts[x.i] ? [g.ts[x.i]!] : [];
+  if (x.$ === "Lab") return g.hs.filter(([, k]) => k === x.k).map(([p]) => p);
+  if (x.$ !== "Tup" || !live(x.q)) return [];
+  const a = cells(g, x.a);
+  return cells(g, x.b).filter((p) => p[0] === "1" && a.includes("0" + p.slice(1))).map((p) => p.slice(1));
 }
 function show(t: T, ns: string[]): string {
   switch (t.$) {
@@ -123,9 +138,7 @@ function called(g: G, t: T): boolean {
   for (let c = 0; c < xs.length && o === "eq"; c++) {
     const [q, x] = xs[c];
     if (g.cs[c] !== live(q)) o = "gt";
-    else if (!live(q)) o = "eq";
-    else if (x.$ === "Var") { const tg = g.ts[x.i]; o = tg && tg[0] === c ? tg[1] : "gt"; }
-    else o = "gt";
+    else if (live(q)) { const ps = cells(g, x).filter((p) => p.endsWith("@" + c)); o = ps.includes("@" + c) ? "eq" : ps.length ? "lt" : "gt"; }
     if (o === "gt") why.push("no descent at column " + c + " in " + show(t, g.ns));
   }
   if (o === "eq") why.push("no column shrinks in " + show(t, g.ns));
@@ -149,8 +162,8 @@ function lv(g: G, top: boolean, t: T): boolean {
 function tree(g: G, ps: Tag[], t: T): boolean {
   switch (t.$) {
     case "Lam": { const [p, g2, ps2] = next(g, ps, live(t.q)); const a = allows(t.q, uses(t.f, 0)); if (!a) why.push("tree λ " + t.n + " used " + uses(t.f, 0) + " at q" + t.q); return tree(bind(g2, p, t.n), ps2, t.f) && a; }
-    case "Prj": { const [p, g2, ps2] = next(g, ps, true); const pp: Tag = p === null ? null : [p[0], "lt"]; return tree(g2, [pp, pp, ...ps2], t.h); }
-    case "Mat": { const [p, g2, ps2] = next(g, ps, true); const h = tree(g2, ps2, t.h); const m = tree(g2, [p, ...ps2], t.m); return h && m; }
+    case "Prj": { const [p, g2, ps2] = next(g, ps, true); return tree(g2, [p && "0" + p, p && "1" + p, ...ps2], t.h); }
+    case "Mat": { const [p, g2, ps2] = next(g, ps, true); const h = tree(p ? { ...g2, hs: [[p, t.k], ...g2.hs] } : g2, ps2, t.h); const m = tree(g2, [p, ...ps2], t.m); return h && m; }
     case "Efq": return true;
     case "App": {
       if (t.x.$ === "Var" && takes(unspine(t.f)[0])) return tree(g, [g.ts[t.x.i] ?? null, ...ps], t.f);
@@ -171,5 +184,5 @@ const ks = defs.map(([k]) => k);
 for (const [i, [k, v]] of defs.entries()) {
   if (process.argv[3] !== undefined && process.argv[3] !== k) continue;
   why.length = 0;
-  if (!tree({ ks, i, cs: [], ts: [], ns: [] }, [], v)) console.log(k + ": " + [...new Set(why)].join("; "));
+  if (!tree({ ks, i, cs: [], ts: [], ns: [], hs: [] }, [], v)) console.log(k + ": " + [...new Set(why)].join("; "));
 }
