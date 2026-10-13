@@ -35,6 +35,10 @@ def main() -> IO(Unit):
     IO.print(fu(F32.hypot(3.0, 4.0)))
     IO.print(fu(F32.round(2.5)))
     IO.print(fu(F32.round(2.4)))
+    IO.print(fu(F32.round(0.4999999701976776)))
+    IO.print(U32.show(F32.to_u32(F32.round(8388609.0))))
+    IO.print(Bool.show(F32.is_eq(F32.round(F32.neg(8388609.0)), F32.neg(8388609.0))))
+    IO.print(Bool.show(F32.is_eq(F32.round(F32.neg(2.5)), F32.neg(2.0))))
     IO.print(fu(F32.pi()))
     IO.print(Nat.show(F32.to_nat(F32.from_nat(42n))))
     IO.print(U32.show(Bool.pick(U32, True{}, 1, 2)))
@@ -67,6 +71,10 @@ def main() -> IO(Unit):
 #|500
 #|300
 #|200
+#|0
+#|8388609
+#|True
+#|True
 #|314
 #|42
 #|1
