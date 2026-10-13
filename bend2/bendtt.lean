@@ -1329,12 +1329,14 @@ termination_by 3 * sizeOf p
 
 -- x's fields against the constructor pattern a, b at π, down its right
 -- spine: how they compare, or the path of the first that may be bigger
--- (none when x is no constructor)
+-- (none when x is no constructor). A dead field is eq when it is the
+-- variable the case tree bound there, as bend2 compares it
 def Pat.fields (g : Guard) (j : Nat) (a b : Pat) (π : List Bool) :
     Term → Except (Option (List Bool)) Ordering
   | Tup q x y =>
-    if !Quan.live q then .error none else
-    match Pat.cmp g j a (false :: π) x, b with
+    let o := if Quan.live q then Pat.cmp g j a (false :: π) x
+      else if g.at j (false :: π) x then .eq else .gt
+    match o, b with
     | .gt, _ => .error (false :: π)
     | o, .pair a' b' => (Pat.fields g j a' b' (true :: π) y).map o.then
     | o, b => if Pat.cmp g j b (true :: π) y == .eq then .ok o else .error (true :: π)
@@ -3480,41 +3482,25 @@ def Frame.ok (F : Frame) : Prop :=
   Book.index F.bk F.k = some F.i ∧ Book.get F.bk F.k = some F.d ∧ AOK F.bk F.xs ∧
   F.cs.length ≤ Term.size F.d.v ∧ CS F.xs F.cs ∧ Hits F.xs F.hs
 
--- a live use of a tagged variable holds the piece its tag names
+-- a tagged variable is closed, and a live use of it holds the piece its
+-- tag names
 def Frame.tags (F : Frame) (ts : List Tag) (σ : Subst) (t : Term) : Prop :=
-  ∀ v c π, ts[v]? = some (some (c, π)) → Term.uses t v ≠ 0 → Arg.at F.xs c π = some (σ v)
+  ∀ v c π, ts[v]? = some (some (c, π)) → Term.Closed (σ v) ∧
+    (Term.uses t v ≠ 0 → Arg.at F.xs c π = some (σ v))
 
 theorem tags_mono {F : Frame} (h : F.tags ts σ t)
     (hu : ∀ v, Term.uses t' v ≠ 0 → Term.uses t v ≠ 0 := by intro v n; simp_all [Term.uses]) :
-    F.tags ts σ t' := fun v c o e n => h v c o e (hu v n)
+    F.tags ts σ t' := fun v c o e => (h v c o e).imp_right (· ∘ hu v)
 
--- the piece n steps above the one at π is bigger by n
-theorem get_drop (h : Term.get π X = some Y) (hn : n ≤ π.length) :
-    ∃ Z, Term.get (π.drop n) X = some Z ∧ Term.size Y + n ≤ Term.size Z := by
-  induction π generalizing n Y with
-  | nil => cases n <;> simp_all
-  | cons b π ih =>
-    cases n with
-    | zero => exact ⟨Y, h, by simp⟩
-    | succ n =>
-      simp only [Term.get] at h; split at h
-      next r x y e =>
-        have ⟨Z, g, s⟩ := ih (n := n) e (by simpa using hn)
-        refine ⟨Z, g, ?_⟩; split at h <;> (try split at h) <;> cases h <;> simp_all [Term.size] <;> omega
-      next => cases h
-
-theorem get_val (hc : Term.Closed X) (h : Term.get π X = some Y) :
-    Term.Closed Y ∧ (Value bk X → Value bk Y) ∧ Term.size Y + π.length ≤ Term.size X := by
+theorem get_val (h : Term.get π X = some Y) (v : Value bk X) : Value bk Y := by
   induction π generalizing Y with
-  | nil => cases h; exact ⟨hc, id, by simp⟩
+  | nil => cases h; exact v
   | cons b π ih =>
     simp only [Term.get] at h; split at h <;> try cases h
-    rename_i x y e; have ⟨c, v, s⟩ := ih e
-    have ⟨ca, cb⟩ : Term.Closed x ∧ Term.Closed y := by cl c
-    simp only [Term.size] at s
+    rename_i e; have := value_tup (ih e)
     split at h <;> (try split at h) <;> cases h
-    · exact ⟨cb, fun h => (value_tup (v h)).2, by simp_all <;> omega⟩
-    · exact ⟨ca, fun h => (value_tup (v h)).1 ‹_›, by simp_all <;> omega⟩
+    · exact this.2
+    · exact this.1 ‹_›
 
 theorem at_cons (h : Arg.at xs c π = some (Tup r x y)) :
     Arg.at xs c (true :: π) = some y ∧ (r.live = true → Arg.at xs c (false :: π) = some x) := by
@@ -3535,19 +3521,27 @@ def Below (bk : Book) (σ : Subst) (X : Term) (π : List Bool) (x : Term) (k : N
   ∃ y, Term.get π X = some y ∧ Value bk (Term.sub σ x) ∧ Term.Closed (Term.sub σ x) ∧
     Term.size (Term.sub σ x) + k ≤ Term.size y
 
-theorem below_up (h : Below bk σ X (b :: π) x k) : Below bk σ X π x (k + 1) :=
-  let ⟨_, g, v, c, s⟩ := h; let ⟨Z, g', s'⟩ := get_drop g (n := 1) (by simp); ⟨Z, g', v, c, by omega⟩
+-- a piece's parent is bigger by one
+theorem below_up (h : Below bk σ X (b :: π) x k) : Below bk σ X π x (k + 1) := by
+  obtain ⟨_, g, v, c, s⟩ := h; simp only [Term.get] at g; split at g <;> try cases g
+  refine ⟨_, ‹_›, v, c, ?_⟩
+  split at g <;> (try split at g) <;> cases g <;> simp only [Term.size] <;> split <;> omega
 
 theorem below_le (h : Below bk σ X π x k) (e : k' ≤ k) : Below bk σ X π x k' :=
   let ⟨y, g, v, c, s⟩ := h; ⟨y, g, v, c, by omega⟩
 
-theorem below_tup (l : q.live = true) (h0 : Below bk σ X (false :: π) x k0)
+-- a pair's first part is below its piece, or dead and closed under σ
+theorem below_tup (h0 : Below bk σ X (false :: π) x k0 ∨ q.live = false ∧ Term.Closed (Term.sub σ x) ∧ k0 = 0)
     (h1 : Below bk σ X (true :: π) y k1) : Below bk σ X π (Tup q x y) (k0 + k1) := by
-  obtain ⟨ya, ga, va, ca, sa⟩ := h0; obtain ⟨yb, gb, vb, cb, sb⟩ := h1
-  simp only [Term.get] at gb ga; split at gb <;> simp at gb
-  rename_i r u w e; rw [e] at ga; simp at ga; obtain ⟨lr, rfl⟩ := ga; subst gb
-  refine ⟨_, e, .tup (fun _ => va) vb, by simp only [Term.sub]; cl And.intro ca cb, ?_⟩
-  simp [Term.sub, Term.size, l, lr]; omega
+  obtain ⟨yb, gb, vb, cb, sb⟩ := h1
+  simp only [Term.get] at gb; split at gb <;> simp at gb
+  rename_i r u w e; subst gb
+  rcases h0 with ⟨ya, ga, va, ca, sa⟩ | ⟨l, ca, rfl⟩
+  · simp only [Term.get, e] at ga; simp at ga; obtain ⟨lr, rfl⟩ := ga
+    refine ⟨_, e, .tup (fun _ => va) vb, by simp only [Term.sub]; cl And.intro ca cb, ?_⟩
+    simp [Term.sub, Term.size, lr]; split <;> omega
+  · refine ⟨_, e, .tup (by simp [l]) vb, by simp only [Term.sub]; cl And.intro ca cb, ?_⟩
+    simp [Term.sub, Term.size, l]; omega
 
 -- what each step of the comparison shows, under σ, of x against the
 -- piece of column c of value X it is compared to: a result other than gt
@@ -3559,7 +3553,6 @@ theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : V
       Pat.fields (F.g ts) c a b π x = .ok o → Below F.bk σ X π x (if o = .lt then 1 else 0)) ∧
     (∀ bad q ρ x, 3 * sizeOf q + 1 ≤ n → F.tags ts σ x →
       Pat.visit (F.g ts) c bad q ρ x = true → Below F.bk σ X ρ x 0) := by
-  have hX := (ho.2.2.1 _ (List.mem_of_getElem? ha)).1
   have A : ∀ {π}, Arg.at F.xs c π = Term.get π X := by simp [Arg.at, ha]
   induction n using Nat.strongRecOn with | _ n ih =>
   have I {m} (h : m < n) := ih m h
@@ -3569,9 +3562,9 @@ theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : V
     split at e
     · rename_i hx; subst e; simp only [reduceCtorEq, ite_false]
       unfold Guard.at at hx; split at hx
-      · have h := A ▸ ht _ _ _ (by simpa using hx) (by simp [Term.uses])
-        have ⟨c, v, _⟩ := get_val (bk := F.bk) hX h
-        exact ⟨_, h, v hv, c, by simp [Term.sub]⟩
+      · rename_i v; have ⟨hc, h⟩ := ht v c π (by simpa using hx)
+        have h := A ▸ h (by simp [Term.uses])
+        exact ⟨_, h, get_val h hv, hc, by simp [Term.sub]⟩
       · rename_i k
         exact ⟨_, A ▸ ho.2.2.2.2.2 c π k (by simpa using hx), .lab, fun _ => rfl, by simp [Term.sub]⟩
       · cases hx
@@ -3589,28 +3582,34 @@ theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : V
   · unfold Pat.fields at h
     split at h
     · rename_i q x0 x1
-      split at h; · cases h
-      rename_i hl; simp at hl
-      have t0 : F.tags ts σ x0 := tags_mono ht
+      generalize eo : (if q.live then Pat.cmp (F.g ts) c a (false :: π) x0
+        else if (F.g ts).at c (false :: π) x0 then Ordering.eq else .gt) = o0 at h
       have t1 : F.tags ts σ x1 := tags_mono ht
-      have C0 (e : Pat.cmp (F.g ts) c a (false :: π) x0 ≠ .gt) :=
-        (I (m := 3 * sizeOf a) (by omega)).1 _ _ _ (Nat.le_refl _) t0 e
-      split at h
+      have C0 (g : o0 ≠ .gt) : Below F.bk σ X (false :: π) x0 (if o0 = .lt then 1 else 0) ∨
+          q.live = false ∧ Term.Closed (Term.sub σ x0) ∧ (if o0 = .lt then 1 else 0) = 0 := by
+        split at eo
+        · subst eo; exact .inl ((I (m := 3 * sizeOf a) (by omega)).1 _ _ _ (Nat.le_refl _) (tags_mono ht) g)
+        rename_i hl; split at eo <;> subst eo
+        · rename_i hx; refine .inr ⟨by simpa using hl, ?_, rfl⟩
+          unfold Guard.at at hx; split at hx
+          · simpa [Term.sub] using (ht _ _ _ (by simpa using hx)).1
+          · exact fun _ => rfl
+          · cases hx
+        · exact absurd rfl g
+      simp only at h; split at h
       · cases h
       · rename_i a' b' hc0
         cases hf : Pat.fields (F.g ts) c a' b' (true :: π) x1 <;> simp [hf, Except.map] at h
         simp only [Pat.pair.sizeOf_spec] at hn
         have h1 := (I (m := 3 * (sizeOf a' + sizeOf b') + 2) (by omega)).2.1 _ _ _ _ _ (Nat.le_refl _) t1 hf
-        refine below_le (below_tup hl (C0 hc0) h1) ?_
-        subst h; revert hc0; cases Pat.cmp (F.g ts) c a (false :: π) x0 <;> rename_i o2 <;> cases o2 <;>
-          simp [Ordering.then]
-      · rename_i hc0; rename_i bt _ _ _
-        split at h
+        refine below_le (below_tup (C0 hc0) h1) ?_
+        subst h; revert hc0; cases o0 <;> rename_i o2 <;> cases o2 <;> simp [Ordering.then]
+      · split at h
         · rename_i hbeq; cases h
           simp at hbeq
-          have h1 := (I (m := 3 * sizeOf bt) (by omega)).1 bt (true :: π) x1 (Nat.le_refl _) t1 (by simp [hbeq])
+          have h1 := (I (m := 3 * sizeOf b) (by omega)).1 b (true :: π) x1 (Nat.le_refl _) t1 (by simp [hbeq])
           simp only [hbeq] at h1
-          refine below_le (below_tup hl (C0 hc0) h1) ?_; simp
+          refine below_le (below_tup (C0 ‹_›) h1) ?_; simp
         · cases h
     · cases h
   · unfold Pat.visit at h
@@ -3700,13 +3699,12 @@ theorem vm_up (h : VM σ) : VM (Subst.up σ) ∧
   refine ⟨?_, funext ?_⟩ <;> rintro (_ | v) <;> first | exact .inl ⟨0, rfl⟩ | rfl |
     rcases h v with ⟨w, e⟩ | hc <;> simp [Subst.up, Term.ren, Term.labels, Bud.up, closed_ren, *]
 
-theorem tags_up {F : Frame} (ho : F.ok) (h : F.tags ts σ t)
+theorem tags_up {F : Frame} (h : F.tags ts σ t)
     (hu : ∀ v, Term.uses f (v + 1) ≠ 0 → Term.uses t v ≠ 0 := by intro v n; simp_all [Term.uses]) :
     F.tags (none :: ts) (Subst.up σ) f := by
-  rintro (_ | v) c π e n; cases e
-  have r := h v c π e (hu v n)
-  obtain ⟨a, ha, g⟩ := Option.bind_eq_some_iff.1 r
-  rwa [Subst.up, closed_ren (get_val (bk := F.bk) (ho.2.2.1 a (List.mem_of_getElem? ha)).1 g).1]
+  rintro (_ | v) c π e; cases e
+  have ⟨hc, r⟩ := h v c π e
+  rw [Subst.up, closed_ren hc]; exact ⟨hc, r ∘ hu v⟩
 
 theorem good_if {q : Quan} (h : q.live = true → Good L P A B C) :
     Good L P (if q.live then A else []) (if q.live then B else []) (if q.live then C else []) := by
@@ -3753,7 +3751,7 @@ theorem gsl (F : Frame) (t : Term) : ∀ {ts : List Tag} {σ : Subst} {es es₀ 
     first
       | refine good_cons hL (good_mono this ?_)
       | refine good_cons hL (good_app (good_if fun hq => good_ch (ihv hv .nil)) (good_mono this ?_))
-    exact fun ⟨o, l, tg, _⟩ => by lv at l; exact ⟨o, live_mono l.2, tags_up o tg, hcl o l.2 (tags_up o tg)⟩
+    exact fun ⟨o, l, tg, _⟩ => by lv at l; exact ⟨o, live_mono l.2, tags_up tg, hcl o l.2 (tags_up tg)⟩
   case Tup iha ihb => exact good_app (good_if fun hq => good_ch (iha hv .nil)) (good_ch (ihb hv .nil))
   case Mat iha ihb | Rwt iha _ ihb | Min iha ihb =>
     exact good_cons hL (good_app (good_ch (iha hv .nil)) (good_ch (ihb hv .nil)))
@@ -3843,7 +3841,7 @@ theorem tp (hk : Book.index bk k = some i) (hd : Book.get bk k = some d) (hx : A
     have lq : Term.uses f 0 ≠ 0 → q.live = true := (pl ▸ allows_live ht.1 ·)
     refine ih _ cs' _ _ _ rfl ⟨ht.2, (Lam.inj hr).2,
       fun | 0, _ => (ha _ (.head _)).imp_right (· ∘ lq) | v + 1, hv => hE v (by simpa using hv),
-      fun | 0 => fun c o e' h => hx' c o (Option.some.inj e') (lq h) | v + 1 => htg v,
+      fun | 0 => fun c o e' => ⟨(ha _ (.head _)).1, hx' c o (Option.some.inj e') ∘ lq⟩ | v + 1 => htg v,
       ⟨pend', hpe', hp'⟩, by omega, hcs', fun a h => ha a (.tail _ h),
       le_le (le_app (le_le (bud_once (i := 0) f fun h => data_labels (dx (allows_two ht.1 h)))
         (le_app (.inl (.of_eq (congrArg (Term.bud · f) (funext fun v => by cases v <;> rfl))))
@@ -3877,7 +3875,7 @@ theorem tp (hk : Book.index bk k = some i) (hd : Book.get bk k = some d) (hx : A
     simp only [Term.tree, show Term.takes _ = true from hn] at ht; simp [Term.ren] at hr
     have huv : q.live = true → Term.uses (App q f (Var v)) v ≠ 0 := by simp +contextual [Term.uses]
     exact ih _ _ _ _ _ rfl ⟨ht, hr.1, eok_mono hE, tags_mono htg,
-      ⟨(q, _) :: pend, by simp [hpe], .cons (fun c o e l => htg v c o (Option.join_eq_some_iff.1 e) (huv l)) hp⟩,
+      ⟨(q, _) :: pend, by simp [hpe], .cons (fun c o e l => (htg v c o (Option.join_eq_some_iff.1 e)).2 (huv l)) hp⟩,
       by omega, hcs, fun | _, .head _ => (hE v (lift_fix hr.2)).imp_right (· ∘ huv) | _, .tail _ hy => ha _ hy,
       List.append_assoc .. ▸ hbud, hh⟩
   case done t e xs' hn =>
