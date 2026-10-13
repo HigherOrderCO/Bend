@@ -30,7 +30,7 @@ import * as Safe from "./safe.ts";
 // Constants
 // =========
 
-const VERSION = "2.0.36";
+const VERSION = "2.0.37";
 
 // the commands, one row each: [usage, what it does]; bend guide stays last
 const USAGE = [
@@ -471,7 +471,10 @@ function cli_base(what?: string): void {
     return cli_say(1, src);
   }
   const want: string[] = [];
-  for (const text of src.split(/(?=\n(?:type |law |def |@))(?<!^@[^\n]*(?:\n[ \t\r]*(?:#[^\n]*)?)*)\n/m)) {
+  let tag = "";
+  for (const part of src.split(/\n(?=type |law |def |@)/)) {
+    const text = tag + part;
+    tag = part.startsWith("@") ? text + "\n" : "";
     const m = /^(type|law|def) ([^\s(<:?]+)/m.exec(text);
     if (m === null) {
       continue;
