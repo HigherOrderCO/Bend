@@ -865,14 +865,13 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 }
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
-// but for the words. Its type arguments are walked themselves, so a
-// datatype is opened once per value its value arguments take (a
-// family's siblings differ); one nested 1000 deep is taken to hold it.
-function ty_holds(A: HTerm | null,
-  p: (t: HTerm | null) => boolean, seen = new Set<string>(), d = 0): boolean {
+// but for the words. Each datatype is opened once; met again with other
+// arguments, it answers rep, so ty_clo says a closure may be there.
+function ty_holds(A: HTerm | null, p: (t: HTerm | null) => boolean,
+  rep = false, seen = new Map<Name, string>()): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
-    return ty_holds(t.f(DUMMY), p, seen, d);
+    return ty_holds(t.f(DUMMY), p, rep, seen);
   }
   if (p(t)) {
     return true;
@@ -882,18 +881,20 @@ function ty_holds(A: HTerm | null,
   }
   const tld = FL.book.tlds[t.k];
   const ks = tld?.$ === "ADT" ? tele_unbind(tld.T).doms : [];
-  const vs = t.x.map((_, i) => ty_value(ks[i]?.[2] ?? null));
-  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, seen, d))) {
+  if (t.x.some((x, i) => !ty_value(ks[i]?.[2] ?? null)
+    && ty_holds(x, p, rep, seen))) {
     return true;
   }
-  const key = Bend.term_key(Bend.term_lower({ ...t,
-    x: t.x.filter((_, i) => vs[i]) }));
-  if (tld?.$ !== "ADT" || seen.has(key)) {
+  if (tld?.$ !== "ADT") {
     return false;
   }
-  seen.add(key);
-  return d > 999 || tld.c.some((c) =>
-    ctr_doms(c, t.x).some((f) => ty_holds(f, p, seen, d + 1)));
+  const key = rep ? Bend.term_key(Bend.term_lower(t)) : "";
+  if (seen.has(t.k)) {
+    return rep && seen.get(t.k) !== key;
+  }
+  seen.set(t.k, key);
+  return tld.c.some((c) =>
+    ctr_doms(c, t.x).some((f) => ty_holds(f, p, rep, seen)));
 }
 
 function ty_value(K: HTerm | null): boolean {
@@ -904,7 +905,7 @@ function ty_value(K: HTerm | null): boolean {
 
 function ty_clo(A: HTerm | null): boolean {
   return ty_holds(A, (t) =>
-    !["ADT", "Typ", "Qua", "Min", "Eql"].includes(t?.$ ?? ""));
+    !["ADT", "Typ", "Qua", "Min", "Eql"].includes(t?.$ ?? ""), true);
 }
 
 function type_adts(T: HTerm): Name[] {
