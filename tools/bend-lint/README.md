@@ -383,7 +383,7 @@ renamed and wrapped to record what they return to `hook.see` in seam.ts. The
 wrappers pass every argument on. The hook is global, so checks run one at a
 time. The `fs` and `path` adapters, in `bend.ts` and `main.ts`, turn real paths
 into `/` paths so imports resolve on Windows. `comp.ts` also exports
-`RUNTIME_MAIN` and `js_sat`, which compiling Bend rules needs. `main.ts` exports
+`RUNTIME_MAIN` and `name_id`, which compiling Bend rules needs. `main.ts` exports
 `book_read`, `book_err` and `Check_Fail`: a file is read and checked by the same
 code as `bend <file>`, never a copy of it. Imported, `main.ts` also registers
 Bend's loader for `import "x.bend"`.

@@ -70,6 +70,21 @@ test("keeps separated import path parts separated", () => {
   assert.equal(formatBend("import lib /dep.bend as Dep"), "import lib / dep.bend as Dep");
 });
 
+test("preserves separated annotated arguments and adjacent constructors", () => {
+  for (const [source, expected] of [
+    ["choose(id   {42:U32})", "choose(id {42: U32})"],
+    ["choose(Fns.id {42:U32})", "choose(Fns.id {42: U32})"],
+    ["use(Nat {1n==1n:Nat})", "use(Nat {1n == 1n: Nat})"],
+    ["use(P {==})", "use(P {==})"],
+    ["choose(id,{42:U32})", "choose(id, {42: U32})"],
+    ["Wrap{Inner{1}}", "Wrap{Inner{1}}"],
+    ["\\ { Case:handler }", "\\{Case: handler}"],
+  ]) {
+    assert.equal(formatBend(source), expected);
+    assert.equal(formatBend(expected), expected);
+  }
+});
+
 test("formats Base and quoted foreign imports without changing comments or arithmetic", () => {
   const source = "import   Base # base\n# import lib/dep.bend as Dep\n\ndef read()->IO(U32):\n    import   \"./lib/foreign-dep.js\" # foreign\n\ndef main()->U32:\n    (6/3-1:U32)\n";
   const expected = "import Base  # base\n# import lib/dep.bend as Dep\n\ndef read() -> IO(U32):\n  import \"./lib/foreign-dep.js\"  # foreign\n\ndef main() -> U32:\n  (6 / 3 - 1: U32)\n";

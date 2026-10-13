@@ -1,5 +1,5 @@
 # borrow witness: a sibling dropping an unused parameter. Pick never uses
-# ys, and F holds ys across the call: Pick~1 is borrowed, so FID_PICK has
+# ys, and F holds ys across the call: Pick~1 is borrowed, so FID_Pick has
 # no term_sink and F has no term_keep; the list dies in F.
 import Base
 

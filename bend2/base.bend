@@ -123,6 +123,7 @@ law Chan:
 type IO.OP<-R: Type> is Type:
   Emit{value: R}
   Halt{code: U32, message: String}
+  Exit{code: U32}
 
 type App<-S: Type> is Type:
   App{view: S -> Pair(S, Image), tick: List<Event> -> S -> IO(Maybe<S>)}
@@ -194,6 +195,9 @@ def Process.run(program: String, args: List<String>, input: String,
 
 def IO.die(-A: Type, code: U32, msg: String) -> IO(A):
   R => k => Halt{code, msg}
+
+def IO.exit(code: U32) -> IO(Unit):
+  R => k => Exit{code}
 
 def IO.pass(-A: Type, r: Result<&1, &1, U32 & String, A>) -> IO(A):
   match r:
@@ -1775,7 +1779,7 @@ law F32.is_ge:
   Bool
 
 law F32.show:
-  for +a: F32
+  for a: F32
   String
 
 law F32.bits:
@@ -1809,10 +1813,21 @@ def F32.square(a: F32) -> F32:
     case F32{+x}:
       F32.mul(F32{x}, F32{x})
 
+# Outside [2^-60, 2^60] the squares would overflow or underflow, so scale
+# both sides by a power of two first; inside, the scale is 1 and exact.
 def F32.hypot(a: F32, b: F32) -> F32:
-  match a b:
-    case F32{+x} F32{+y}:
-      F32.sqrt(F32.add(F32.mul(F32{x}, F32{x}), F32.mul(F32{y}, F32{y})))
+  +x = F32.abs(a)
+  +y = F32.abs(b)
+  +m = F32.max(x, y)
+  +hi = F32.is_gt(m, 1.152921504606847e18)
+  +lo = F32.is_lt(m, 8.673617379884035e-19)
+  +s = Bool.pick(F32, hi, 8.470329472543003e-22,
+    Bool.pick(F32, lo, 1.2676506002282294e30, 1.0))
+  +u = Bool.pick(F32, hi, 1.1805916207174113e21,
+    Bool.pick(F32, lo, 7.888609052210118e-31, 1.0))
+  +p = F32.mul(x, s)
+  +q = F32.mul(y, s)
+  F32.mul(F32.sqrt(F32.add(F32.mul(p, p), F32.mul(q, q))), u)
 
 def F32.round(a: F32) -> F32:
   F32.floor(F32.add(a, 0.5))

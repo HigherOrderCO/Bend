@@ -1497,7 +1497,7 @@ function kernel_bin(): string {
   const tool = (t: string): string => fs.existsSync(path.join(home, t)) ? path.join(home, t) : t;
   fs.mkdirSync(dir, { recursive: true });
   const fail = (why: string): never => {
-    throw new Error("the kernel did not build (" + why
+    throw new Error("BendTT infrastructure: the kernel did not build (" + why
       + "); --verdict needs Lean v" + LEAN_VERSION + " (elan toolchain leanprover/lean4:v" + LEAN_VERSION + "), or $BENDTT set to a built kernel");
   };
   const run = (bin: string, args: string[]): string => {
@@ -1535,17 +1535,26 @@ export function run_read(bin: string, args: string[],
   }
 }
 
-// the kernel's verdict on a book's text: ok on exit 0 with its exact
-// success line. It checks a copy in a fresh private dir, which no one
-// else can swap, and a kernel reading /dev/stdin got EBADF (1 in 1486)
-function kernel_check(text: string): boolean {
+// the kernel's verdict on a book's text: null on exit 0 with its exact
+// success line, else the lines under its failure line, or how it exited
+// if none. It checks a copy in a fresh private dir, which no one else
+// can swap, and a kernel reading /dev/stdin got EBADF (1 in 1486)
+function kernel_check(text: string): string | null {
   const env = { ...process.env, LEAN_STACK_SIZE_KB: "4194304" };
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bendtt-"));
   try {
     const inp = path.join(dir, "in.bendtt");
     fs.writeFileSync(inp, text, { flag: "wx" });
     const [got, out] = run_read(kernel_bin(), [inp], { env });
-    return got.status === 0 && out.trim() === "ALL PROOFS CHECK";
+    if (got.error || got.signal || got.status === null
+      || (out.trim() !== "ALL PROOFS CHECK" && !out.startsWith("SOME PROOFS FAIL"))) {
+      throw new Error("BendTT infrastructure: " + (got.error?.message
+        ?? (got.signal ? "kernel terminated by " + got.signal : out.trim()
+          || "kernel exited " + got.status + " without a verdict")));
+    }
+    const why = out.trim().split("\n").slice(1).join("\n");
+    return got.status === 0 && out.trim() === "ALL PROOFS CHECK" ? null
+      : why || "kernel exited " + got.status + " after " + out.trim();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -1559,9 +1568,11 @@ export function safe_emit(book: Book, out: string): string[] {
   return got.oos.map(([k, why]) => "- " + B.name_key(k) + ": " + why + "\n");
 }
 
-// --verdict: whether every def of a book bend2 checked, but those in skip,
-// is in the kernel's scope, and the kernel checks them all
-export function safe_check(book: Book, skip: Name[] = []): boolean {
+// --verdict: null when every def of a book bend2 checked, but those in
+// skip, is in the kernel's scope and the kernel checks them all, else why not
+export function safe_check(book: Book, skip: Name[] = []): string | null {
   const got = safe_book(book);
-  return got.oos.every(([k]) => skip.includes(k)) && kernel_check(got.text);
+  const oos = got.oos.filter(([k]) => !skip.includes(k));
+  return oos.length === 0 ? kernel_check(got.text) : "BendTT: out of scope:\n"
+    + oos.map(([k, why]) => "- " + B.name_key(k) + ": " + why).join("\n");
 }

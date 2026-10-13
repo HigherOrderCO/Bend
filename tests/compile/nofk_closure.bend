@@ -1,16 +1,13 @@
-# compile (compile_nofk_closure): SPEC 2.4's NOFK law -- a segment is
-# no-fork only when its body holds no fork and every definition it
-# calls is no-fork too, read off the BOOK and closed under references;
-# the scheduler skips no-fork tasks during growth. The closure half
-# rode on nothing: gutting the reference fixpoint in gen_defs kept the
-# whole suite green while every fork hidden behind a wrapper call was
-# marked no-fork, so growth would skip the very tasks that must split.
-# Here main holds no fork of its own and reaches one only through
-# main.out (wrap and fork_pair, each called once, are fused into it):
-# main's 0 mark is the closure's work, main.out's 0 is the direct
-# half, and leap -- recursive, fork-free -- keeps the honest 1 beside
-# them, as do U32.show's own segments, the fork's joiner and its
-# sequential chain steps (each holds one call).
+# NOFK is transitive: a retained function that reaches a fork through
+# another definition must not be marked no-fork. A recursive function
+# with no reachable fork must keep its no-fork mark.
+# The opaque C/JS effect keeps both function values in the emitted
+# program. Native code asserts their actual descriptor marks and drops
+# both values; JS checks that both retained values are functions.
+# Removing transitive propagation while keeping direct fork detection
+# makes the native assertion fail, although the old numeric-only test
+# still prints 22. This checks metadata, not scheduler growth or speed,
+# and does not independently cover the synthetic Clo~apply graph edge.
 import Base
 
 law leap:
@@ -45,10 +42,16 @@ law main.out:
 def main.out():
   wrap(10n)
 
+def flags(par: Nat -> U32, seq: Nat -> U32) -> IO(Unit):
+  import "./nofk_closure.c"
+  import "./nofk_closure.js"
+
 law main:
   IO(Unit)
 
 def main():
-  IO.print(U32.show(main.out()))
+  do IO<Unit>:
+    Unit <- flags(n => wrap(n), n => leap(n))
+    IO.print(U32.show(main.out()))
 
 #|22

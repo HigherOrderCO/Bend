@@ -1,5 +1,5 @@
 # io (io_request_wildcard): an IO.OP match's own default arm takes only
-# what an IO.OP is (Emit, Halt), never a request. decode's case _ takes a
+# what an IO.OP is (Emit, Halt, Exit), never a request. decode's case _ takes a
 # purely built Halt and prints "other"; intercept's case _ meets the
 # request IO.print("SECRET") applies to its continuation, and every lane
 # refuses it instead of running the user's arm on it (which printed

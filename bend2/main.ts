@@ -5,7 +5,7 @@
 // (node --import). A .bend module exports every filled, non-base, non-IO
 // def, wrapped so a JS caller passes the live arguments, in one call or
 // curried, and gets a plain value back: a constructor is {$: "Name", field:
-// value, ...}, a closure is a function, Nat is BigInt, Bool, String and U32
+// value, ...}, a closure is a function, Nat is a number, Bool, String and U32
 // are native. A page bundles through Bun.build with the loader on, since
 // the bun build CLI takes no plugins.
 
@@ -30,7 +30,7 @@ import * as Safe from "./safe.ts";
 // Constants
 // =========
 
-const VERSION = "2.0.36";
+const VERSION = "2.0.37";
 
 // the commands, one row each: [usage, what it does]; bend guide stays last
 const USAGE = [
@@ -169,7 +169,8 @@ function cli_guide(name: string): void {
 // cli_update runs the installer again: the one way bend changes. The
 // command prints first, so the user can run it alone.
 function cli_update(): void {
-  const cmd = "curl -fsSL " + ORIGIN + "/install.sh | sh";
+  const cmd = "s=$(curl -fsSL " + ORIGIN
+    + "/install.sh) && printf '%s\\n' \"$s\" | sh";
   cli_say(2, cmd + "\n");
   process.exitCode = child.spawnSync("sh", ["-c", cmd],
     { stdio: "inherit" }).status ?? 1;
@@ -283,7 +284,8 @@ async function cli_file(args: string[]): Promise<void> {
   if ((only || verdict) && (outs.length !== 0 || checkup || (only && verdict))) {
     cli_fail((verdict ? "--verdict" : "--check-only") + " takes no other option");
   }
-  if (argv.length !== 0 && (outs.length !== 0 || only || checkup || publish)) {
+  // args go to a plain run only: any option (all start with -) refuses them
+  if (argv.length !== 0 && args.some((a) => a.startsWith("-") && a !== "--")) {
     cli_fail("arguments go to a run: bend <file.bend> [args]");
   }
   if (checkup && outs.length !== 0) {
@@ -331,8 +333,15 @@ async function cli_checkup(file: string): Promise<void> {
   const base = await book_read(BASE);
   let bad = false;
   for (const raw of fs.readFileSync(file, "utf8").split("\n")) {
-    const m = /^import\s+(\S+)\s+as\s+[A-Za-z_][A-Za-z0-9_]*\s*$/
-      .exec(raw.trim());
+    const line = raw.trim();
+    if (line === "" || line.startsWith("#")) {
+      continue;
+    }
+    if (!/^import(\s|$)/.test(line)) {
+      break;
+    }
+    const m = /^import\s+(\S+)\s+as\s+[A-Za-z_][A-Za-z0-9_]*\s*(?:#.*)?$/
+      .exec(line);
     if (m === null) {
       continue;
     }
@@ -341,7 +350,8 @@ async function cli_checkup(file: string): Promise<void> {
     cli_say(1, "--- " + m[1] + " ---\n");
     let code = 1;
     try {
-      const own = /^import Base$/m.test(fs.readFileSync(at, "utf8"));
+      const own = /^(?:[\t\r ]*(?:(?:#|import )[^\n]*)?\n)*[\t ]*import Base\s/
+        .test(fs.readFileSync(at, "utf8"));
       code = book_run(await book_read(at, own ? base : undefined), [at]);
     } catch (e) {
       cli_say(2, book_err(e) + "\n");
@@ -461,7 +471,10 @@ function cli_base(what?: string): void {
     return cli_say(1, src);
   }
   const want: string[] = [];
-  for (const text of src.split(/\n(?=type |law |def |@)/)) {
+  let tag = "";
+  for (const part of src.split(/\n(?=type |law |def |@)/)) {
+    const text = tag + part;
+    tag = part.startsWith("@") ? text + "\n" : "";
     const m = /^(type|law|def) ([^\s(<:?]+)/m.exec(text);
     if (m === null) {
       continue;
@@ -481,6 +494,12 @@ function cli_base(what?: string): void {
   cli_say(1, want.join("\n\n") + "\n");
 }
 
+// An inline module script; an empty svg <script/> can't have content.
+function is_inline_module(el: HTMLRewriterTypes.Element): boolean {
+  return el.canHaveContent && !el.hasAttribute("src")
+    && el.getAttribute("type")?.trim().toLowerCase() === "module";
+}
+
 // cli_bundle builds a page. Bun skips inline module scripts (#1400), so the
 // inline plugin moves each to a virtual file beside its page, padded so an
 // error points at the page's own line and column.
@@ -497,13 +516,25 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
         ({ contents: code.get(a.path)!, loader: "js" }));
       build.onLoad({ filter: /\.html$/ }, async (a) => {
         const src = await Bun.file(a.path).text();
+        // HTMLRewriter gives no offsets, so a first pass marks where each
+        // script's text starts, with a mark the page doesn't hold.
+        let mark = "BEND_INLINE_";
+        while (src.includes(mark)) {
+          mark += "_";
+        }
+        const marked = new HTMLRewriter().on("script", {
+          element(el) {
+            if (is_inline_module(el)) {
+              el.prepend(mark);
+            }
+          },
+        }).transform(src);
         const mods: { id: string; text: string }[] = [];
         let mod: { id: string; text: string } | null = null;
         const html = new HTMLRewriter().on("script", {
           element(el) {
-            const type = el.getAttribute("type")?.trim().toLowerCase();
             mod = null;
-            if (type === "module" && !el.hasAttribute("src")) {
+            if (is_inline_module(el)) {
               const name = "." + path.basename(a.path) + ".bend-inline-"
                 + mods.length + ".js";
               mod = { id: path.join(path.dirname(a.path), name), text: "" };
@@ -520,13 +551,13 @@ async function cli_bundle(page: string, dir: string): Promise<void> {
         }).transform(src);
         let end = 0;
         let line = 0;
-        for (const m of mods) {
-          const at = src.indexOf(m.text, end);
+        for (const [i, m] of mods.entries()) {
+          const skip = i * mark.length;
+          const at = marked.indexOf(mark, end + skip) - skip;
           line += src.slice(end, at).split("\n").length - 1;
           const col = at - src.lastIndexOf("\n", at - 1) - 1;
           code.set(m.id, "\n".repeat(line) + " ".repeat(col) + m.text);
-          line += m.text.split("\n").length - 1;
-          end = at + m.text.length;
+          end = at;
         }
         return { contents: html, loader: "html" };
       });
@@ -779,7 +810,7 @@ async function pow_mine(hash: string, bytes: number): Promise<number> {
 // scope; else FAIL and why. The claims are the defs outside Base, but a
 // PROOF.bend's are its own and its LAWS.bend's: another def that relies
 // on a promise is noted (#1463). A kernel failure is a mismatch: bend2
-// accepted what the kernel rejects.
+// accepted what the kernel rejects; it shows the why.
 function cli_verdict(book: Bend.Book, file: string, kernel: boolean): number {
   const proof = path.basename(file) === "PROOF.bend";
   const bad = book_promises(book);
@@ -789,8 +820,9 @@ function cli_verdict(book: Bend.Book, file: string, kernel: boolean): number {
     cli_say(2, FAIL + "\nError: " + relies(fail, ":"));
     return 1;
   }
-  if (kernel && !Safe.safe_check(book, note)) {
-    cli_say(2, FAIL + "\n" + MISMATCH + "\n");
+  const why = kernel ? Safe.safe_check(book, note) : null;
+  if (why !== null) {
+    cli_say(2, FAIL + "\n" + why + "\n" + MISMATCH + "\n");
     return 1;
   }
   cli_say(1, PASS + "\n" + (note.length === 0 ? "" : "Note: "

@@ -48,7 +48,7 @@ export type FindOptions = {
 };
 
 // comp.ts as the patch exports it.
-type Comp = typeof CompModule & { RUNTIME_MAIN: string; js_sat(k: Name): string };
+type Comp = typeof CompModule & { RUNTIME_MAIN: string; name_id(pre: string, k: string): string };
 
 // What bend-lint uses of main.ts, as the patch exports it: book_read throws
 // a Check_Fail holding why the check failed.
@@ -155,7 +155,7 @@ const PATCHES: Record<string, Patch> = {
     edits: [],
     needs: ["let cli_args = [];", "function io_run(m) {"],
     tail: "",
-    exports: ["RUNTIME_MAIN", "js_sat"],
+    exports: ["RUNTIME_MAIN", "name_id"],
   },
   "main.ts": { edits: SHIMMED, tail: "", exports: ["book_read", "book_err", "Check_Fail"] },
 };
@@ -788,13 +788,25 @@ const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): 
   const root = sources.find((s) => s.root)!;
   const ns = FILES.get(root)!.ns;
   const dir = root.path.slice(0, root.path.lastIndexOf("/") + 1);
-  const body = (s: string) => s.replace(/^import[^\S\n].*$/gm, "");
+  const header = (s: string) => {
+    const lines = s.split("\n");
+    const imports: [string, string][] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === "" || line.startsWith("#")) continue;
+      const m = /^import\s+(\S+)(?:\s+as\s+([A-Za-z_]\w*))?\s*(?:#.*)?$/.exec(line);
+      if (m === null || (m[2] === undefined && m[1] !== "Base")) break;
+      if (m[2] !== undefined) imports.push([m[1], m[2]]);
+      lines[i] = "";
+    }
+    return { body: lines.join("\n"), imports };
+  };
+  const original = header(root.text);
   const spanned = (): Record<Name, Name> => {
-    const original = body(root.text);
     for (const tld of Object.values(book.tlds)) {
       for (const t of [tld.T, ...(tld.$ === "Def" && tld.v ? [tld.v] : [])]) {
         for (const tm of walk(Bend.term_lower(t))) {
-          if (tm.s?.file.str === original) {
+          if (tm.s?.file.str === original.body) {
             return tm.s.file.al;
           }
         }
@@ -802,16 +814,14 @@ const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): 
     }
     return {};
   };
-  const aliases = [...root.text.matchAll(/^import\s+(\S+)\s+as\s+(\w+)/gm)].reduce<
-    Record<Name, Name>
-  >(
-    (known, [, at, alias]) => {
+  const aliases = original.imports.reduce<Record<Name, Name>>(
+    (known, [at, alias]) => {
       const imported = sources.find((s) => s.path === resolve(root.path, "..", at));
       return known[alias] !== undefined || imported === undefined
         ? known
         : { ...known, [alias]: FILES.get(imported)!.ns };
     },
-    /^import\s+\S+\s+as\s+/m.test(root.text) ? spanned() : {},
+    original.imports.length ? spanned() : {},
   );
   const qualify = (name: string) => {
     const dot = name.indexOf(".");
@@ -841,7 +851,7 @@ const sameDeclarations = (m: Loaded, { book, sources }: Checked, text: string): 
   };
   const snapshot = (s: string) => {
     const parsed = seed();
-    Bend.parse_book(parsed, dir, body(s), ns, aliases);
+    Bend.parse_book(parsed, dir, header(s).body, ns, aliases);
     const lower = (t: HTerm | null) => (t === null ? null : Bend.term_lower(t));
     return JSON.stringify(
       parsed.order.map((k) => {
@@ -975,7 +985,7 @@ export const compile = (m: Loaded, { book }: Checked, file: string): Compiled =>
   }
   const main = new Function(
     "require",
-    `${Comp.js_lib(book)}\n${Comp.RUNTIME_MAIN}\nreturn (args) => { cli_args = args; return io_run(${Comp.js_sat("main")}); };`,
+    `${Comp.js_lib(book)}\n${Comp.RUNTIME_MAIN}\nreturn (args) => { cli_args = args; return io_run(${Comp.name_id("$", "main")}); };`,
   )(import.meta.require) as (args: string[]) => number;
   return { id, want: want as FactFilter | null, main };
 };

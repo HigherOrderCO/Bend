@@ -1,5 +1,5 @@
 function exchange(tree) {
-  const input = 123456789n;
+  const input = 123456789;
   let node = tree;
   let depth = 0;
   while (node.$ === CID(Node)) {
@@ -12,7 +12,7 @@ function exchange(tree) {
   if (node.$ !== CID(Leaf) || node.n !== input || depth !== 20000) {
     throw new Error("invalid Leaf at depth " + depth);
   }
-  node.n = 987654321n;
+  node.n = 987654321;
   return tree;
 }
 

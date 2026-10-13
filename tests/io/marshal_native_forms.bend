@@ -1,5 +1,5 @@
 # io (io_marshal_native_forms): the native forms cross the effect
-# seam canonically, both ways -- a Nat as a BigInt, a Bool as a
+# seam canonically, both ways -- a Nat as a number, a Bool as a
 # boolean, a Cmp by its tag through the generic ctor lane. The legs
 # escalate as io_marshal_char_type does: direct answers, an answer
 # inside a Maybe field, a round trip through an argument -- and both

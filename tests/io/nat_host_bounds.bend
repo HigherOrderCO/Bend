@@ -1,6 +1,6 @@
 # io (io_nat_host_bounds): a foreign effect answers Nats at and past the
 # immediate cap: 2^48-1, 2^48 and 2^53. The C lane takes each word as it
-# is; the JS lane takes each exactly, so the unchecked operations (a
+# is; the JS lane takes each number exactly, so the unchecked operations (a
 # word, a quotient, a remainder) print the same on both lanes.
 import Base
 
