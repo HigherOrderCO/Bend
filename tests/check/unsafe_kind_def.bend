@@ -19,7 +19,5 @@ def use(d: D) -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error: 3 defs rely on unsafe or foreign code:
-#|- qv: through Array.join
-#|- D: through Array.join
-#|- use: through Array.join
+#|defs that depend on @unsafe: qv, D, use
 #|exit 1

@@ -5,5 +5,5 @@ import ./unsafe-law/safe.bend as S
 
 #|SOME PROOFS FAIL
 #|Error: 1 def relies on unsafe or foreign code:
-#|- unsafe-law/safe.spin: @unsafe
+#|defs that depend on @unsafe: unsafe-law/safe.spin
 #|exit 1

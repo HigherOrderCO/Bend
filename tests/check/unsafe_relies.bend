@@ -19,7 +19,5 @@ def sound(n: Nat) -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error: 3 defs rely on unsafe or foreign code:
-#|- boom: @unsafe
-#|- innocent: through boom
-#|- by_type: through boom
+#|defs that depend on @unsafe: boom, innocent, by_type
 #|exit 1

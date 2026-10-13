@@ -810,11 +810,12 @@ async function pow_mine(hash: string, bytes: number): Promise<number> {
 // a mismatch: bend2 accepted what the kernel rejects; it shows the why.
 function cli_verdict(book: Bend.Book, kernel: boolean): number {
   const bad = book_promises(book);
-  if (bad.length !== 0) {
-    cli_say(2, FAIL + "\nError: " + String(bad.length) + " def" + (bad.length === 1
-      ? " relies" : "s rely") + " on unsafe or foreign code:\n"
-      + bad.map(([k, why]) => "- " + Bend.name_key(k) + ": " + why + "\n")
-        .join(""));
+  const n   = new Set(bad.flatMap(([, ks]) => ks)).size;
+  if (n !== 0) {
+    cli_say(2, FAIL + "\nError: " + String(n) + " def" + (n === 1 ? " relies"
+      : "s rely") + " on unsafe or foreign code:\n"
+      + bad.map(([on, ks]) => "defs that depend on " + on + ": "
+        + ks.map(Bend.name_key).join(", ") + "\n").join(""));
     return 1;
   }
   const why = kernel ? Safe.safe_check(book) : null;
@@ -826,26 +827,27 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
   return 0;
 }
 
-// book_promises lists the defs outside Base (laws and types too) that are
-// @unsafe or foreign, or whose type, body, datatype kind, parameters or
-// constructor fields name a def that relies on one, each with why: the
-// promise it is, or those it relies on, nearest first. A foreign def is a
-// promise like @unsafe is: the checker reads its type, never its code.
-// If the book holds a promise, a walk from the defs outside Base collects
-// who names whom, then the promises flood back along those edges.
-function book_promises(book: Bend.Book): Array<[string, string]> {
+// book_promises lists, per promise (@unsafe, foreign effects), the defs
+// outside Base (laws and types too) that are one, or whose type, body,
+// datatype kind, parameters or constructor fields name a def that relies
+// on one. A foreign def is a promise like @unsafe is: the checker reads
+// its type, never its code. If the book holds a promise, a walk from the
+// defs outside Base collects who names whom, then each promise floods
+// back along those edges.
+function book_promises(book: Bend.Book): Array<[string, string[]]> {
   const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
-  const kind = new Map(Object.keys(book.tlds).flatMap<[string, string]>((k) => {
-    const t = book.tlds[k] as Bend.Def;
-    return t.u === true ? [[k, "@unsafe"]]
-      : t.i !== undefined && t.b !== true ? [[k, "foreign"]] : [];
-  }));
-  if (kind.size === 0) {
+  const keys = Object.keys(book.tlds);
+  const roots: Array<[string, string[]]> = [
+    ["@unsafe", keys.filter((k) => (book.tlds[k] as Bend.Def).u === true)],
+    ["foreign effects", keys.filter((k) => {
+      const t = book.tlds[k] as Bend.Def;
+      return t.u !== true && t.i !== undefined && t.b !== true;
+    })],
+  ];
+  if (roots.every(([, ks]) => ks.length === 0)) {
     return [];
   }
-  const bad  = new Set(kind.keys());
   const uses: Record<string, string[]> = Object.create(null);
-  const refs: Record<string, Set<string>> = Object.create(null);
   const reach = new Set(own);
   for (const k of reach) {
     const t = book.tlds[k];
@@ -857,27 +859,19 @@ function book_promises(book: Bend.Book): Array<[string, string]> {
       if (t.$ === "Def" && t.e !== undefined) {
         term_refs(t.e, rs);
       }
-      refs[k] = rs;
       for (const r of rs) {
         (uses[r] ??= []).push(k);
         reach.add(r);
       }
     }
   }
-  for (const k of bad) {
-    uses[k]?.forEach((j) => bad.add(j));
-  }
-  return own.filter((k) => bad.has(k)).map((k) => {
-    const near = new Set([k]);
-    for (const j of near) {
-      for (const r of refs[j] ?? []) {
-        if (bad.has(r)) {
-          near.add(r);
-        }
-      }
+  return roots.flatMap(([on, ks]) => {
+    const bad = new Set(ks);
+    for (const k of bad) {
+      uses[k]?.forEach((j) => bad.add(j));
     }
-    return [k, kind.get(k) ?? "through " + [...near].filter((r) => kind.has(r))
-      .map(Bend.name_key).join(", ")];
+    const out = own.filter((k) => bad.has(k));
+    return out.length === 0 ? [] : [[on, out]];
   });
 }
 
