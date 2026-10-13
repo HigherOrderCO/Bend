@@ -514,12 +514,11 @@ function char_new(c) {
 }
 
 function char_len(s) {
-  const u = s.charCodeAt(0);
-  return u < 0xD800 || u >= 0xE000 ? 1 : u < 0xDC00 ? 2 : 4;
+  return s[0] === "\uDC00" ? 4 : s.codePointAt(0) > 0xFFFF ? 2 : 1;
 }
 
 function char_code(s) {
-  return char_len(s) < 4 ? s.codePointAt(0)
+  return s.length < 4 ? s.codePointAt(0)
     : (s.charCodeAt(1) << 22 | s.charCodeAt(2) << 11 | s.charCodeAt(3)) >>> 0;
 }
 
@@ -3143,8 +3142,7 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
       const f = params.at(-1);
       return file_push(sc, `return { $: ${JSON.stringify(Bend.name_key(k))
         }, args: [${live.map(([, , A], i) => host(A, params[i], 1))
-        }], kont: ${K?.$ === "All" && host(K.A, "") ? `(x) => ${f}(${
-          host(K.A, "x")})` : f} };`);
+        }], kont: (x) => ${f}(${host(K?.$ === "All" ? K.A : null, "x")}) };`);
     }
     if (loop.length === 0) {
       return js_func(sc, h!, def.T, params);
@@ -3171,7 +3169,8 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
 // What crosses to or from a host: a Nat comes in as a number, which nat_in
 // checks; text gets U+FFFD for what is no Unicode scalar.
 function host(A: HTerm | null, x: string, out = 0): string {
-  const k = (t => t?.$ === "ADT" ? t.k : "")(ty_wnf(A));
+  const t = ty_wnf(A);
+  const k = t?.$ === "ADT" ? t.k : "";
   return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
     : k === "Nat" && !out ? `nat_in(${x})` : x;
 }
@@ -6105,8 +6104,7 @@ function show_chr(s, q) {
   const k = { 10: "n", 9: "t", 13: "r", 0: "0", 92: "\\" }[c]
     ?? (s === q ? q : null);
   return k !== null ? "\\" + k : c < 32 || c === 127
-    || (c >= 0xD800 && c <= 0xDFFF) || c > 0x10FFFF
-    ? "\\u{" + c.toString(16) + "}" : s;
+    || s.length > 2 ? "\\u{" + c.toString(16) + "}" : s;
 }
 
 function show_val(D, d, v, chain) {
@@ -6129,8 +6127,8 @@ function show_val(D, d, v, chain) {
     : D[d] === 1 ? f32_show(v).replace(/^-?\d+(?=e|$)/, "$&.0")
     : D[d] === 2 ? v + "n"
     : D[d] === 3 ? "'" + show_chr(v, "'") + "'"
-    : D[d] === 4 ? "\"" + (v.match(/\uDC00[^]{3}|[^]/gu) ?? [])
-      .map((c) => show_chr(c, "\"")).join("") + "\""
+    : D[d] === 4 ? "\"" + v.replace(/\uDC00[^]{3}|[^]/gu,
+      (c) => show_chr(c, "\"")) + "\""
     : D[d] === 5 ? "{==}"
     : "[" + v.map((x) => show_val(D, D[d + 1], x, 0)).join(", ") + "]";
 }
