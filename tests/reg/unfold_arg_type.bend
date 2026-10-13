@@ -2,7 +2,7 @@
 # as a bare value, and a Let carries no type, so the value reached
 # emit_open untyped; an intrinsic emitted with no expected type took
 # the BOX layout, and the fused Bool match then read a raw 0/1 word
-# through the boxed protocol, term_aux against CID_FALSE, matching no
+# through the boxed protocol, term_aux against CID_False, matching no
 # arm: C fail-stopped with error 3 where the interpreter and JS print
 # 0. The unfold now annotates the let with the callee's parameter type.
 import Base

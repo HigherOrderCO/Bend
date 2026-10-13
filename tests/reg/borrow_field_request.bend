@@ -5,7 +5,7 @@
 # box word). Now Probe's site asks Sum to own and View's asks it to lend
 # (the record is View's borrow): Sum lends, Probe's continuation sinks
 # the field, View borrows, and Loop shares nothing. In the C,
-# WL_CASE(FID_LOOP) and WL_CASE(FID_VIEW) have no term_keep.
+# WL_CASE(FID_Loop) and WL_CASE(FID_View) have no term_keep.
 import Base
 
 type Xs is Data:

@@ -48,7 +48,7 @@ export type FindOptions = {
 };
 
 // comp.ts as the patch exports it.
-type Comp = typeof CompModule & { RUNTIME_MAIN: string; js_sat(k: Name): string };
+type Comp = typeof CompModule & { RUNTIME_MAIN: string; name_id(pre: string, k: string): string };
 
 // What bend-lint uses of main.ts, as the patch exports it: book_read throws
 // a Check_Fail holding why the check failed.
@@ -155,7 +155,7 @@ const PATCHES: Record<string, Patch> = {
     edits: [],
     needs: ["let cli_args = [];", "function io_run(m) {"],
     tail: "",
-    exports: ["RUNTIME_MAIN", "js_sat"],
+    exports: ["RUNTIME_MAIN", "name_id"],
   },
   "main.ts": { edits: SHIMMED, tail: "", exports: ["book_read", "book_err", "Check_Fail"] },
 };
@@ -985,7 +985,7 @@ export const compile = (m: Loaded, { book }: Checked, file: string): Compiled =>
   }
   const main = new Function(
     "require",
-    `${Comp.js_lib(book)}\n${Comp.RUNTIME_MAIN}\nreturn (args) => { cli_args = args; return io_run(${Comp.js_sat("main")}); };`,
+    `${Comp.js_lib(book)}\n${Comp.RUNTIME_MAIN}\nreturn (args) => { cli_args = args; return io_run(${Comp.name_id("$", "main")}); };`,
   )(import.meta.require) as (args: string[]) => number;
   return { id, want: want as FactFilter | null, main };
 };
