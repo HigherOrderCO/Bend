@@ -5847,6 +5847,7 @@ static void io_step(Env e, IoWork* a) {
     if (c == CID(Halt) || c == CID(Exit)) {
       if (c == CID(Halt)) io_errs(e, fs[1]);
       if ((u32)fs[0] > 255) err_fail("exit code must be in 0..255");
+      io_sync();
       exit((int)(u32)fs[0]);
     }
     if (io_eff_rows[c] == NULL) {
