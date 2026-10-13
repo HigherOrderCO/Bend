@@ -334,6 +334,14 @@ try {
   check("a failed kernel build leaves no private BendTT input",
     no_lean.code === 1 && no_lean.err.includes("--verdict needs Lean")
     && fs.readdirSync(verdict_tmp).every((name) => !name.startsWith("bendtt-")));
+  const fuel_kernel = path.join(TMP, "fuel_kernel.sh");
+  fs.writeFileSync(fuel_kernel, "#!/bin/sh\necho 'SOME PROOFS FAIL'\n"
+    + "echo 'In Sum.f:'\necho 'out of fuel'\nexit 1\n", { mode: 0o755 });
+  const fuel = await bend([sum_file, "--verdict"],
+    { BENDTT: fuel_kernel, BEND_NO_TELEMETRY: "1" });
+  check("a kernel failure shows the kernel's why above the mismatch notice",
+    fuel.code === 1 && fuel.out === "" && fuel.err.startsWith("SOME PROOFS FAIL\n"
+      + "In Sum.f:\nout of fuel\nSorry - this is a mismatch"));
   fs.writeFileSync(unsafe_file,
     "import Base\n@unsafe\ndef main() -> Nat:\n  0n\n");
   fs.writeFileSync(checkup,
