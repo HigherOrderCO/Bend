@@ -293,6 +293,10 @@ try {
   check("guide, base and a program run through the executable",
     guide.out.startsWith("# Bend") && base.out.startsWith("type Map")
     && sum5.code === 0 && sum5.out === "5n\n");
+  const fork = await bend(["base", "Array.fork"]);
+  check("base keeps the @unsafe line above the selected def",
+    fork.code === 0 && fork.out === "@unsafe\ndef Array.fork(-T: Type,"
+    + " +a: Array<T>) -> Array<T> & Array<T>:\n  (a, a)\n");
   const header_source = path.join(TMP, "literal-checkup.bend");
   fs.writeFileSync(header_source,
     "# a header\nimport Base\n\nimport ./sum.bend as Sum\n"
@@ -334,6 +338,14 @@ try {
   check("a failed kernel build leaves no private BendTT input",
     no_lean.code === 1 && no_lean.err.includes("--verdict needs Lean")
     && fs.readdirSync(verdict_tmp).every((name) => !name.startsWith("bendtt-")));
+  const fuel_kernel = path.join(TMP, "fuel_kernel.sh");
+  fs.writeFileSync(fuel_kernel, "#!/bin/sh\necho 'SOME PROOFS FAIL'\n"
+    + "echo 'In Sum.f:'\necho 'out of fuel'\nexit 1\n", { mode: 0o755 });
+  const fuel = await bend([sum_file, "--verdict"],
+    { BENDTT: fuel_kernel, BEND_NO_TELEMETRY: "1" });
+  check("a kernel failure shows the kernel's why above the mismatch notice",
+    fuel.code === 1 && fuel.out === "" && fuel.err.startsWith("SOME PROOFS FAIL\n"
+      + "In Sum.f:\nout of fuel\nSorry - this is a mismatch"));
   fs.writeFileSync(unsafe_file,
     "import Base\n@unsafe\ndef main() -> Nat:\n  0n\n");
   fs.writeFileSync(checkup,
