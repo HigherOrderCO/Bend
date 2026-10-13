@@ -30,7 +30,7 @@ import * as Safe from "./safe.ts";
 // Constants
 // =========
 
-const VERSION = "2.0.36";
+const VERSION = "2.0.37";
 
 // the commands, one row each: [usage, what it does]; bend guide stays last
 const USAGE = [
