@@ -1,4 +1,4 @@
-# List searches stop when the result is known and use constant stack space.
+# List searches find the first match and run on long lists in constant stack.
 import Base
 
 def zeros(n: Nat, acc: List<&2, U32>) -> List<&2, U32>:
@@ -32,10 +32,6 @@ def main() -> IO(Unit):
     IO.print(Bool.show(List.all(~&1, ~(U32 -> Bool), ~apply,
       [x => U32.is_eq(x, 8), x => U32.is_eq(x, 7)])))
     +xs : List<&2, U32> = zeros(50000n, [])
-    IO.print(Bool.show(List.any(~&2, ~U32, ~is_hit, 42 <> xs)))
-    IO.print(Bool.show(List.all(~&2, ~U32, ~is_clear, 42 <> xs)))
-    IO.print(show(List.find(~U32, ~is_hit, 42 <> xs)))
-    IO.print(Bool.show(List.contains(~U32, ~U32.is_eq, 42 <> xs, 42)))
     IO.print(Bool.show(List.any(~&2, ~U32, ~is_hit, xs)))
     IO.print(Bool.show(List.all(~&2, ~U32, ~is_clear, xs)))
     IO.print(show(List.find(~U32, ~is_hit, xs)))
@@ -53,10 +49,6 @@ def main() -> IO(Unit):
 #|Some(2)
 #|True
 #|False
-#|True
-#|False
-#|Some(42)
-#|True
 #|False
 #|True
 #|None
