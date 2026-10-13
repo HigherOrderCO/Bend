@@ -5015,10 +5015,7 @@ static void gpu_load(u64 bytes) {
 }
 
 static void gpu_kernel(u32 pass, u32 at) {
-  [gpu_enc setComputePipelineState:gpu_pso];
-  [gpu_enc setBuffer:gpu_buf offset:0 atIndex:0];
   [gpu_enc setBytes:&pass length:sizeof pass atIndex:1];
-  [gpu_enc setThreadgroupMemoryLength:TG_HOLD * 8 atIndex:0];
   [gpu_enc dispatchThreadgroupsWithIndirectBuffer:gpu_buf
     indirectBufferOffset:(H_CURSOR + 2) * 8 + at * 12
     threadsPerThreadgroup:MTLSizeMake(CUBE_T, 1, 1)];
@@ -5029,6 +5026,9 @@ static void gpu_pass(u32 n) {
   @autoreleasepool {
     id<MTLCommandBuffer> cb = [gpu_que commandBuffer];
     gpu_enc = [cb computeCommandEncoder];
+    [gpu_enc setComputePipelineState:gpu_pso];
+    [gpu_enc setBuffer:gpu_buf offset:0 atIndex:0];
+    [gpu_enc setThreadgroupMemoryLength:TG_HOLD * 8 atIndex:0];
     gpu_run(n);
     [gpu_enc endEncoding];
     [cb commit];
@@ -5232,18 +5232,24 @@ static void ring_rewind(u64* H, u32 rows) {
   }
 }
 
+// A GPU bang submits n rounds at once: n doubles, up to 64, while a
+// submission takes under 250 ms, and halves when one takes more, so a
+// submission stays far from the GPU's timeout.
+
 static void cube_run(u64* H, bool gpu) {
-  for (u32 n = 1;; n += n < 64 ? n : 0) {
-    u32 f = a32_exch(a32_at(H, H_CURSOR), 0) + (u32)H[H_CURSOR + 1];
-    if (root_done(H)) {
-      return;
-    }
+  u32 f = a32_exch(a32_at(H, H_CURSOR), 0);
+  if (gpu) {
+    turn_set(H, f);
+  }
+  for (u32 n = 1; !root_done(H);) {
     if (f == 0) {
       err_fail("frontier drained without a result");
     }
     if (gpu) {
-      turn_set(H, f);
+      u64 t = io_tick();
       gpu_pass(n);
+      f = (u32)H[H_CURSOR + 1];
+      n = io_tick() - t > 250000000 ? (n + 1) / 2 : n < 64 ? 2 * n : n;
     } else {
       u32 rows = f;
       u32 want = (pool_size - 1) / (CUBE_T / LINE) + 1;
@@ -5257,7 +5263,7 @@ static void cube_run(u64* H, bool gpu) {
         pool_turn(true, rows);
       }
       pool_turn(false, rows);
-      f = a32_load(a32_at(H, H_CURSOR));
+      f = a32_exch(a32_at(H, H_CURSOR), 0);
       ring_rewind(H, f > rows ? f : rows);
     }
     u32 ec = a32_load(a32_at(H, H_ERROR_CODE));
@@ -5265,6 +5271,7 @@ static void cube_run(u64* H, bool gpu) {
       err_post(H, ec);
     }
   }
+  a32_store(a32_at(H, H_CURSOR), 0);
 }
 
 // Corpus
