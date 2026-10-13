@@ -1,6 +1,6 @@
-# a bang over a chain whose index grows with each link: every link is a
-# new instance, so the walk stops 1000 deep and takes it to hold a
-# closure; the value is the plain call's
+# a bang over a chain whose index grows with each link: the walk meets
+# the family again with another index and stops there, taking it to hold
+# a closure; the value is the plain call's
 import Base
 
 type Ch<-n: Nat> is Type:

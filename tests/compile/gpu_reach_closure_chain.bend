@@ -1,7 +1,7 @@
 # a bang over a chain whose later links are another instance of its own
 # value-indexed family: the first link holds a word, the next a closure.
-# The walk opens each instance, so the lambda minted on the host is on
-# the device
+# The walk meets the family again with another index and takes it to
+# hold a closure, so the lambda minted on the host is on the device
 import Base
 
 type Tag is Data:

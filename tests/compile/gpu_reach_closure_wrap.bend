@@ -1,6 +1,6 @@
 # a bang over a chain whose growing index sits under twelve type
-# arguments: the cap counts every step of the walk, the arguments too,
-# so the walk stops 1000 steps deep, not 13000 calls deep on the stack
+# arguments: the walk opens the chain once and stops at the next link,
+# not 13000 calls deep on the stack
 import Base
 
 type Bx<A: Type> is Type:

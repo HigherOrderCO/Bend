@@ -1,7 +1,6 @@
-# a bang over a nested datatype whose index grows with each link: every
-# link is a new instance, and its type argument doubles. The walk meets
-# the shared halves of P<A, A> once, so it reaches the cap 1000 deep
-# in time linear in the depth, not after 2^depth pairs
+# a bang over a nested datatype whose index grows with each link and
+# whose type argument doubles: the walk opens the datatype once and stops
+# at the next link, not after 2^depth pairs
 import Base
 
 type P<A: Type, B: Type> is Type:

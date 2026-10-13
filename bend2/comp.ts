@@ -866,7 +866,8 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
 // but for the words. Each datatype is opened once; met again with other
-// arguments, it answers rep, so ty_clo says a closure may be there.
+// value arguments, it answers rep, so ty_clo says a closure may be there
+// (its type arguments are looked into apart, on every visit).
 function ty_holds(A: HTerm | null, p: (t: HTerm | null) => boolean,
   rep = false, seen = new Map<Name, string>()): boolean {
   const t = ty_wnf(A);
@@ -881,14 +882,15 @@ function ty_holds(A: HTerm | null, p: (t: HTerm | null) => boolean,
   }
   const tld = FL.book.tlds[t.k];
   const ks = tld?.$ === "ADT" ? tele_unbind(tld.T).doms : [];
-  if (t.x.some((x, i) => !ty_value(ks[i]?.[2] ?? null)
-    && ty_holds(x, p, rep, seen))) {
+  const vs = t.x.map((x, i) => ty_value(ks[i]?.[2] ?? null));
+  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, rep, seen))) {
     return true;
   }
   if (tld?.$ !== "ADT") {
     return false;
   }
-  const key = rep ? Bend.term_key(Bend.term_lower(t)) : "";
+  const key = rep ? t.x.map((x, i) => vs[i]
+    ? Bend.term_key(Bend.term_lower(x)) : "").join("\n") : "";
   if (seen.has(t.k)) {
     return rep && seen.get(t.k) !== key;
   }
