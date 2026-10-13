@@ -20,8 +20,8 @@ import Std.Data.HashMap
 -- no types. The typing checker (Checker) ignores usage; the live check
 -- (Termination) ignores types. The live part of a def must be affine (a
 -- q=1 variable is used at most once, a q=0 one never), may call only
--- earlier defs, and may call its own def only on parameters it rebuilt,
--- then a piece of one.
+-- earlier defs, and may call its own def only on arguments no bigger
+-- than its parameters, then a smaller one, as bend2's term_descend.
 -- A q=2 binder needs a Data domain, and Data holds no λ and no call.
 -- A kind is *(q), for a quantity q : <Q0, Q1, Q2>: *1 is *(.Q1), Type,
 -- and *2 is *(.Q2), Data. A meet (a <&> b) runs on two of those labels.
@@ -1329,8 +1329,8 @@ termination_by 3 * sizeOf p
 
 -- x's fields against the constructor pattern a, b at π, down its right
 -- spine: how they compare, or the path of the first that may be bigger
--- (none when x is no constructor). A dead field is eq when it is the
--- variable the case tree bound there, as bend2 compares it
+-- (none when x is no constructor). A dead field, or a tail, is eq when
+-- it is the variable the case tree bound there, as bend2 compares it
 def Pat.fields (g : Guard) (j : Nat) (a b : Pat) (π : List Bool) :
     Term → Except (Option (List Bool)) Ordering
   | Tup q x y =>
@@ -1338,7 +1338,8 @@ def Pat.fields (g : Guard) (j : Nat) (a b : Pat) (π : List Bool) :
       else if g.at j (false :: π) x then .eq else .gt
     match o, b with
     | .gt, _ => .error (false :: π)
-    | o, .pair a' b' => (Pat.fields g j a' b' (true :: π) y).map o.then
+    | o, .pair a' b' =>
+      if g.at j (true :: π) y then .ok o else (Pat.fields g j a' b' (true :: π) y).map o.then
     | o, b => if Pat.cmp g j b (true :: π) y == .eq then .ok o else .error (true :: π)
   | _ => .error none
 termination_by 3 * (sizeOf a + sizeOf b) + 2
@@ -3599,6 +3600,12 @@ theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : V
       simp only at h; split at h
       · cases h
       · rename_i a' b' hc0
+        split at h
+        · cases h; simp only [Pat.pair.sizeOf_spec] at hn
+          have h1 := (I (m := 3 * sizeOf (Pat.pair a' b')) (by simp; omega)).1 _ (true :: π) x1 (Nat.le_refl _) t1
+            (by unfold Pat.cmp; simp [*])
+          rw [show Pat.cmp (F.g ts) c (.pair a' b') (true :: π) x1 = .eq by unfold Pat.cmp; simp [*]] at h1
+          exact below_le (below_tup (C0 hc0) h1) (by simp)
         cases hf : Pat.fields (F.g ts) c a' b' (true :: π) x1 <;> simp [hf, Except.map] at h
         simp only [Pat.pair.sizeOf_spec] at hn
         have h1 := (I (m := 3 * (sizeOf a' + sizeOf b') + 2) (by omega)).2.1 _ _ _ _ _ (Nat.le_refl _) t1 hf
