@@ -3105,16 +3105,19 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
   file_push(sc, `return ${ck.k === null ? js_expr(sc, x, ty)
     : js_call(sc, ck.k, ck.xs, true)};`);
 }
+
 // JSON escapes this private field-read marker.
 function js_hold_view(sc: Scope, e: string, at: number): void {
   if (!e.startsWith("char_code(")) return;
   const mark = e + "\x03", ls = sc.seg.lines;
-  if (!ls.slice(at).some(s => s.includes(mark))) return;
-  const k = name_local(sc, "code");
-  for (let i = at; i < ls.length; ++i) ls[i] = ls[i].replaceAll(mark, k);
-  ls.splice(at, 0, `const ${k} = ${e};`);
+  let k = "";
+  for (let i = at; i < ls.length; ++i) {
+    if (!ls[i].includes(mark)) continue;
+    k ||= name_local(sc, "code");
+    ls[i] = ls[i].replaceAll(mark, k);
+  }
+  if (k) ls.splice(at, 0, `const ${k} = ${e};`);
 }
-
 
 function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
   if (x.$ === "Efq") {
