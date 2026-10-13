@@ -134,7 +134,7 @@ const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
 
 // The field a JS match opens from a named U32, F32 or Char (its word, its
 // code): a binder takes it as written, so a rebuild folds back to the name.
-const VIEW = /^(?:u32_to_word\((\w+|f32_bits\((\w+)\))\)|(\w+)\.codePointAt\(0\))$/;
+const VIEW = /^(?:u32_to_word\((\w+|f32_bits\((\w+)\))\)|char_code\((\w+)\))$/;
 
 const TAB_BAD = /\b(?!(?:fround|imul)\()\w+\(/;
 
@@ -240,7 +240,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   },
   ...tpl_ops("bool_", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
   string_append: { JS: "($0 + $1)" },
-  string_length: { JS: "[...$0].length" },
+  string_length: { JS: "[...str_out($0)].length" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -292,7 +292,7 @@ const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
           ? JSON.stringify(String.fromCodePoint(n))
           : `char_new(${c})`);
       },
-      elim: ["$0.codePointAt(0)"],
+      elim: ["char_code($0)"],
     },
   },
   Array: {
@@ -309,8 +309,7 @@ const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
       intr: ([h, t]) => STRLIT.test(h) && STRLIT.test(t)
         ? JSON.stringify(JSON.parse(h) + JSON.parse(t))
         : `(${h} + ${t})`,
-      elim: ["($0.codePointAt(0) > 0xFFFF ? $0.slice(0, 2) : $0[0])",
-        "($0.codePointAt(0) > 0xFFFF ? $0.slice(2) : $0.slice(1))"],
+      elim: ["$0.slice(0, char_len($0))", "$0.slice(char_len($0))"],
       cond: "$0 !== \"\"",
     },
   },
@@ -507,11 +506,29 @@ function f32_read(s) {
 
 const f32_round = ${Bend.f32_round};
 
-function char_new(code) {
-  if (code > 0x10FFFF || (code >= 0xD800 && code <= 0xDFFF)) {
-    throw "bend: " + code + " is not a Unicode scalar value";
-  }
-  return String.fromCodePoint(code);
+// A Char past the Unicode scalars keeps its code as 0xDC00 and three 11-bit
+// pieces; str_out writes it as U+FFFD, as str_in does a host's surrogate.
+function char_new(c) {
+  return c < 0xD800 || c >= 0xE000 && c <= 0x10FFFF ? String.fromCodePoint(c)
+    : String.fromCharCode(0xDC00, c >>> 22, c >>> 11 & 0x7FF, c & 0x7FF);
+}
+
+function char_len(s) {
+  const u = s.charCodeAt(0);
+  return u < 0xD800 || u >= 0xE000 ? 1 : u < 0xDC00 ? 2 : 4;
+}
+
+function char_code(s) {
+  return char_len(s) < 4 ? s.codePointAt(0)
+    : (s.charCodeAt(1) << 22 | s.charCodeAt(2) << 11 | s.charCodeAt(3)) >>> 0;
+}
+
+function str_out(s) {
+  return s.replace(/\uDC00[^]{3}/gu, "\uFFFD");
+}
+
+function str_in(s) {
+  return s.replace(/\p{Cs}/gu, "\uFFFD");
 }
 `.slice(1),
 };
@@ -3125,8 +3142,9 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
       const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
       const f = params.at(-1);
       return file_push(sc, `return { $: ${JSON.stringify(Bend.name_key(k))
-        }, args: [${params.slice(0, -1).join(", ")}], kont: ${K?.$ === "All"
-        && host_nat(K.A) ? `(x) => ${f}(nat_in(x))` : f} };`);
+        }, args: [${live.map(([, , A], i) => host(A, params[i], 1))
+        }], kont: ${K?.$ === "All" && host(K.A, "") ? `(x) => ${f}(${
+          host(K.A, "x")})` : f} };`);
     }
     if (loop.length === 0) {
       return js_func(sc, h!, def.T, params);
@@ -3150,10 +3168,12 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
-// A host hands a Nat in as a number, which nat_in checks.
-function host_nat(A: HTerm | null): boolean {
-  const t = ty_wnf(A);
-  return t?.$ === "ADT" && t.k === "Nat";
+// What crosses to or from a host: a Nat comes in as a number, which nat_in
+// checks; text gets U+FFFD for what is no Unicode scalar.
+function host(A: HTerm | null, x: string, out = 0): string {
+  const k = (t => t?.$ === "ADT" ? t.k : "")(ty_wnf(A));
+  return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
+    : k === "Nat" && !out ? `nat_in(${x})` : x;
 }
 
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
@@ -3176,9 +3196,10 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const lib = outs === null ? "" : `export default {\n${outs.map((k) => {
     const { live, lays } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
-    const xs = live.map(([, , A], i) => host_nat(A) ? `nat_in(a${i})` : ps[i]);
-    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${
-      name_id("$", k)}(${xs}), ${lays.length}),`;
+    const xs = live.map(([, , A], i) => host(A, ps[i]));
+    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${host(tele_unbind(
+      FL.book.tlds[k].T).ret, `run_loop(${name_id("$", k)}(${xs}))`, 1)
+    }, ${lays.length}),`;
   }).join("\n")}\n};\n`;
   const jmps = new Map<Name, boolean>();
   const jmp = (k: Name): boolean => k === CLO_APPLY || memo(jmps, k, () =>
@@ -5451,6 +5472,7 @@ OUTLINE void io_sync(void) {
 }
 
 static u64 io_utf8(char* buf, u64 c) {
+  c = c > 0x10FFFF || (c >= 0xD800 && c <= 0xDFFF) ? 0xFFFD : c;
   u64 k = c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : 4;
   for (u64 i = k; i > 1; i -= 1) {
     buf[i - 1] = (char)(0x80 | (c & 0x3F));
@@ -6079,11 +6101,12 @@ function cli(argv) {
 // chain is the bracket it continues, or 0.
 
 function show_chr(s, q) {
-  const c = s.codePointAt(0);
+  const c = char_code(s);
   const k = { 10: "n", 9: "t", 13: "r", 0: "0", 92: "\\" }[c]
     ?? (s === q ? q : null);
   return k !== null ? "\\" + k : c < 32 || c === 127
-    || (c >= 0xD800 && c <= 0xDFFF) ? "\\u{" + c.toString(16) + "}" : s;
+    || (c >= 0xD800 && c <= 0xDFFF) || c > 0x10FFFF
+    ? "\\u{" + c.toString(16) + "}" : s;
 }
 
 function show_val(D, d, v, chain) {
@@ -6106,7 +6129,8 @@ function show_val(D, d, v, chain) {
     : D[d] === 1 ? f32_show(v).replace(/^-?\d+(?=e|$)/, "$&.0")
     : D[d] === 2 ? v + "n"
     : D[d] === 3 ? "'" + show_chr(v, "'") + "'"
-    : D[d] === 4 ? "\"" + [...v].map((c) => show_chr(c, "\"")).join("") + "\""
+    : D[d] === 4 ? "\"" + (v.match(/\uDC00[^]{3}|[^]/gu) ?? [])
+      .map((c) => show_chr(c, "\"")).join("") + "\""
     : D[d] === 5 ? "{==}"
     : "[" + v.map((x) => show_val(D, D[d + 1], x, 0)).join(", ") + "]";
 }
@@ -6227,7 +6251,7 @@ function io_tup(...xs) {
 }
 
 function io_bytes(text) {
-  return new TextEncoder().encode(text);
+  return new TextEncoder().encode(str_out(text));
 }
 
 function io_text(b, n) {
