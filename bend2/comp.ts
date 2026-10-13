@@ -132,8 +132,9 @@ const IO_EMIT = "IO~emit";
 const ATOM   = /^(?:[A-Za-z_$][A-Za-z0-9_$]*|\d+|\d+\.\d+)$/;
 const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
 
-// Native view rebuilds keep the original value.
-const VIEW = /^(?:u32_to_word\((\w+|f32_bits\((\w+)\))\)|char_code\((\w+)\)\x03?)$/;
+// The field a JS match opens from a named U32, F32 or Char (its word, its
+// code): a binder takes it as written, so a rebuild folds back to the name.
+const VIEW = /^(?:u32_to_word\((\w+|f32_bits\((\w+)\))\)|char_code\((\w+)\))$/;
 
 const TAB_BAD = /\b(?!(?:fround|imul)\()\w+\(/;
 
@@ -505,7 +506,9 @@ function f32_read(s) {
 
 const f32_round = ${Bend.f32_round};
 
-// Non-scalars: 2+3x10 bits in four low-surrogate units.
+// A Char past the Unicode scalars keeps its code in four low surrogates
+// (2+10+10+10 bits); str_out writes it as U+FFFD, as str_in does a host's
+// surrogate.
 function char_new(c) {
   return c < 0xD800 || c >= 0xE000 && c <= 0x10FFFF ? String.fromCodePoint(c)
     : String.fromCharCode(0xDC00 | c >>> 30, 0xDC00 | c >>> 20 & 1023,
@@ -2935,8 +2938,13 @@ export function compile_book(book: Bend.Book): string {
 // JS
 // --
 
-// Effects register once; tail cycles loop with fresh bindings.
-// Other call markers resolve after emission.
+// Each effect source runs once in a closure of its own and registers
+// its effects with io_eff(CID(k), run), as a C source does. A
+// def on a tail cycle is one loop over the cycle's bodies ($pc picks
+// one), each turn binding its parameters afresh, so a closure keeps its
+// own; any other call is direct. Only a closure's tail call bounces
+// (run_tail), so a call passes through run_loop only when its callee
+// may return one: a marker per call resolves once every def is out.
 
 const JS_DEPTH = new WeakMap<HTerm, number>();
 
@@ -2999,7 +3007,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
       if (c && !c.vs.has(p) && (JS_DEPTH.get(p) ?? c.d) < c.d) {
         c.vs.set(p, view_root(x.k) ?? x.k);
       }
-      return x.k.startsWith("char_code(") ? x.k + "\x03" : x.k;
+      return x.k;
     }
     case "Ref":
     case "App": {
@@ -3051,10 +3059,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
       const name = name_id("$", sc.def + "$c" + FL.spins.length);
       js_func(cl, x, ty, [arg]);
       const ps = [...new Set(vs.values())];
-      vs.forEach((_, p) => {
-        js_expr(sc, p, null);
-        js_hold_view(cl, (p as Of<"Var">).k, 0);
-      });
+      vs.forEach((_, p) => js_expr(sc, p, null));
       cl.seg.lines = [`function ${name}(${ps}) {`, `return (${arg}) => {`,
         ...cl.seg.lines, "}", "}"];
       return `run_clo(${name}(${ps}))`;
@@ -3082,7 +3087,6 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
     if (k !== e && sc.seg.lines.slice(at).some((l) => l.includes(k))) {
       sc.seg.lines.splice(at, 0, `const ${k} = ${e};`);
     }
-    js_hold_view(sc, k, at);
     return;
   }
   if (mat_head(x)) {
@@ -3104,19 +3108,6 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
   }
   file_push(sc, `return ${ck.k === null ? js_expr(sc, x, ty)
     : js_call(sc, ck.k, ck.xs, true)};`);
-}
-
-// JSON escapes this private field-read marker.
-function js_hold_view(sc: Scope, e: string, at: number): void {
-  if (!e.startsWith("char_code(")) return;
-  const mark = e + "\x03", ls = sc.seg.lines;
-  let k = "";
-  for (let i = at; i < ls.length; ++i) {
-    if (!ls[i].includes(mark)) continue;
-    k ||= name_local(sc, "code");
-    ls[i] = ls[i].replaceAll(mark, k);
-  }
-  if (k) ls.splice(at, 0, `const ${k} = ${e};`);
 }
 
 function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
@@ -3198,14 +3189,16 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
-// Converter names for values crossing the host seam.
+// The converter for what crosses to or from a host: a Nat comes in as a
+// number, which nat_in checks; text gets U+FFFD for what is no scalar.
 function host(A: HTerm | null, out = 0): string {
   const t = ty_wnf(A), k = t?.$ === "ADT" ? t.k : "";
   return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}`
     : k === "Nat" && !out ? "nat_in" : "";
 }
 
-// Export the host-callable defs.
+// A module (for the .bend loader and -o <out>.mjs) roots and exports each
+// def a host can call.
 export function js_lib(book: Bend.Book, mod = false): string {
   FL = file_new(book, true);
   const outs = !mod ? null : [...new Set(FL.book.order)].filter((k) => {
@@ -3234,7 +3227,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
     (jmps.set(k, true), [...FL.tails.get(k) ?? []].some(jmp)));
   const funs = [sc.seg, ...FL.spins].flatMap((f) => seg_text(f.lines, 0))
     .join("\n").replace(/\x01([^\x02]*)\x02/g, (_, k) => jmp(k) ? "run_loop"
-      : "").replaceAll("\x03", "");
+      : "");
   PROBES.length = 1;
   return RUNTIME + effs + "// Program\n// =======\n\n" + [funs, ...[...FL.tabs]
     .map(([r, i]) => `const TAB_${i} = [${r}];`)].join("\n") + lib;

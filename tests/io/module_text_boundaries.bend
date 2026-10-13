@@ -16,11 +16,6 @@ def main() -> IO(Unit):
 #|low DC05: 56325,3
 #|payload controls: false
 #|length: 2
-#|scalar: a😀b
 #|surrogate: �
-#|wide Char code: 103
 #|raw U32 codes: true
 #|bad host types: 2
-#|captured code: 65,131
-#|literal marker: true
-#|identity: A

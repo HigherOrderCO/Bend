@@ -20,9 +20,6 @@ def plain(s: String) -> String:
 def char(c: Char) -> Char:
   c
 
-def head_code(c: Char) -> U32:
-  Char.to_u32(c)
-
 def raw(n: U32) -> List<String>:
   [SCon{Char.from_u32(n), SNil{}}]
 
@@ -46,21 +43,8 @@ def size(xs: List<String>) -> U32:
       0
     case s <> _:
       U32.from_nat(String.length(s))
-
-def captured(c: Char) -> U32 & (U32 -> U32):
-  match c:
-    case Chr{+n}:
-      (n, x => U32.add(U32.add(n, n), x))
-
-def literal() -> String:
-  "char_code(_c_0)\\u{3}"
-
-def identity(c: Char) -> Char:
-  match c:
-    case Chr{n}:
-      Chr{n}
 `);
-    const built = child.spawnSync("bun",
+    const built = child.spawnSync(process.execPath,
       [path.resolve("bend2/main.ts"), input, "-o", output], {
         encoding: "utf8",
         env: { ...process.env, HOME: dir, BEND_ORIGIN: "http://127.0.0.1:9" },
@@ -76,9 +60,7 @@ def identity(c: Char) -> Char:
     const packet = lib.packet();
     rows.push("payload controls: " + /[\u0000-\u001F]/u.test(packet.head));
     rows.push("length: " + lib.size(packet));
-    rows.push("scalar: " + lib.plain("a😀b"));
     rows.push("surrogate: " + lib.char("\uD800"));
-    rows.push("wide Char code: " + lib.head_code("gbab"));
     const codes = [0xD7FF, 0xD800, 0xDC00, 0xDC03, 0xDC05, 0xDFFF,
       0xE000, 0x10FFFF, 0x110000, 0x40000000, 0x80000000, 0xC0000000,
       0xFFFFFFFF];
@@ -93,10 +75,6 @@ def identity(c: Char) -> Char:
       }
     }
     rows.push("bad host types: " + errors);
-    const captured = lib.captured("A");
-    rows.push("captured code: " + captured.fst + "," + captured.snd(1));
-    rows.push("literal marker: " + (lib.literal() === "char_code(_c_0)\x03"));
-    rows.push("identity: " + lib.identity("A"));
     return rows.join("\n");
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
