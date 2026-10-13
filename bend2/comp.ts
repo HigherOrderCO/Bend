@@ -98,6 +98,8 @@ type Scope = {
   rest: HTerm[];
   def: Name;
   caps?: { d: number; vs: Map<HTerm, string> };
+  js_aliases?: Map<string, string>;
+  js_records?: { k: Name; root: HTerm; fields: string[] }[];
 };
 
 type Tpl = string | ((xs: string[]) => string);
@@ -2916,13 +2918,10 @@ export function compile_book(book: Bend.Book): string {
 // JS
 // --
 
-// Each effect source runs once in a closure of its own and registers
-// its effects with io_eff(CID(k), run), as a C source does. A
-// def on a tail cycle is one loop over the cycle's bodies ($pc picks
-// one), each turn binding its parameters afresh, so a closure keeps its
-// own; any other call is direct. Only a closure's tail call bounces
-// (run_tail), so a call passes through run_loop only when its callee
-// may return one: a marker per call resolves once every def is out.
+// Effect sources register handlers in separate closures. Tail cycles use
+// one loop; each turn binds fresh parameters for captured values.
+// Only closure tail calls use run_tail. Call markers add run_loop where
+// needed after all definitions are emitted.
 
 const JS_DEPTH = new WeakMap<HTerm, number>();
 
@@ -2976,8 +2975,28 @@ function js_key(n: Name): string {
   return (n === "__proto__" ? `["${n}"]` : `"${n}"`) + ": ";
 }
 
+function js_bind(sc: Scope, k: string, e: string): Scope {
+  return k === e ? sc : { ...sc,
+    js_aliases: new Map(sc.js_aliases).set(k, sc.js_aliases?.get(e) ?? e) };
+}
+
+// Find unchanged records before emitting fields or collecting captures.
+function js_origin(sc: Scope, x: HTerm): HTerm {
+  const rs = x.$ === "Ctr" && sc.js_records?.filter((r) => r.k === x.k);
+  if (!rs || !rs.length) {
+    return x;
+  }
+  const fs = ctr_flds(x.k, x.x).map((f) => {
+    const v = js_origin(sc, ty_peel(f, null)[0]);
+    return v.$ === "Var" ? sc.js_aliases?.get(v.k) ?? v.k : "";
+  });
+  return rs.find((r) => r.fields.length === fs.length
+    && r.fields.every((f, i) => f === fs[i]))?.root ?? x;
+}
+
 function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
-  const [x, ty] = ty_peel(tm, ty0);
+  const [t, ty] = ty_peel(tm, ty0);
+  const x = js_origin(sc, t);
   switch (x.$) {
     case "Var": {
       const c = sc.caps;
@@ -3061,7 +3080,7 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
       : name_local(sc, x.k);
     const at = sc.seg.lines.length;
     const v = js_var(sc, k);
-    js_func(sc, x.f(v), all.B(v), rest);
+    js_func(js_bind(sc, k, e), x.f(v), all.B(v), rest);
     if (k !== e && sc.seg.lines.slice(at).some((l) => l.includes(k))) {
       sc.seg.lines.splice(at, 0, `const ${k} = ${e};`);
     }
@@ -3094,11 +3113,12 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
   }
   const { adt, ret, rows, cells } = mat_rows(sc, x, ty);
   const s = emit_alias(sc, args[0], "$t");
+  sc = js_bind(sc, s, args[0]);
   const tab = emit_tab(sc, cells, ret, s);
   if (tab !== null) {
     return file_push(sc, `return ${tab};`);
   }
-  let lv: [string, HTerm, string[]][];
+  let lv: [string, HTerm, string[], Name?][];
   if (adt.k === "Nat") {
     lv = rows!.map(([h, , n, e]) => [`${s} === ${n}`, h,
       [`(${s} - ${n})`].slice(0, e)]);
@@ -3111,14 +3131,16 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
   } else {
     const native = OPTIMIZED[adt.k];
     const is = (c: Name) => `${s}.$ === "${Bend.name_key(c)}"`;
-    lv = mat_ctrs(x, adt).map(([k, h]): [string, HTerm, string[]] =>
+    lv = mat_ctrs(x, adt).map(([k, h]): [string, HTerm, string[], Name?] =>
       k === "" || k === "_" ? [k && mat_ops(is), h, [s]] : native === undefined
-      ? [is(k), h, ctr_live(FL.book.ctrs[k]).map(([, f]) => `${s}["${f}"]`)]
+      ? [is(k), h, ctr_live(FL.book.ctrs[k]).map(([, f]) => `${s}["${f}"]`), k]
       : [tpl(native[k].cond ?? "", [s]), h,
         (native[k].elim ?? []).map((e) => tpl(e, [s]))]);
   }
-  emit_chain(sc, (i) => lv[i][0], lv.map(([, h, fs]) => () =>
-    js_func(sc, h, null, [...fs, ...args.slice(1)])));
+  emit_chain(sc, (i) => lv[i][0], lv.map(([, h, fs, k]) => () =>
+    js_func(k === undefined ? sc : { ...sc, js_records: [
+      { k, root: js_var(sc, s), fields: fs }, ...sc.js_records ?? []] },
+    h, null, [...fs, ...args.slice(1)])));
 }
 
 function js_def(sc: Scope, k: Name, def: Bend.Def): void {
