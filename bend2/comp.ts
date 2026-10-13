@@ -1484,8 +1484,8 @@ function facts_ctr(sc: Scope, c: Bend.Ctr, xs: HTerm[]): void {
   ds.filter(dom_live).forEach(([, , A]) => facts_hot(sc, A, true, own));
 }
 
-function file_push(sc: Scope, line: string): void {
-  sc.seg.lines.push(line);
+function file_push(sc: Scope, ...lines: string[]): void {
+  sc.seg.lines.push(...lines);
 }
 
 function block(sc: Scope, open: string, go: () => void): void {
@@ -1583,8 +1583,7 @@ function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
 function node_fill(sc: Scope, k: string, alloc: string,
   exprs: string[], shr = false): string {
   const nd = name_local(sc, k);
-  file_push(sc, `u64 ${nd} = ${alloc};`);
-  exprs.forEach((w, j) => file_push(sc,
+  file_push(sc, `u64 ${nd} = ${alloc};`, ...exprs.map((w, j) =>
     `e.mem[${nd} + ${j}] = ${shr ? `rfc_seal(e, ${w})` : w};`));
   return nd;
 }
@@ -1745,8 +1744,8 @@ function arr_new(sc: Scope, d: string, v: Val, el: Lay): string {
   const { arr, lgs } = lay_arr(el);
   const ws = val_own(sc, val_to(sc, v, el));
   const fv = name_local(sc, "fv");
-  file_push(sc, `Term ${fv}[${Math.max(1, ws.length)}];`);
-  ws.forEach((w, j) => file_push(sc, `${fv}[${j}] = ${w};`));
+  file_push(sc, `Term ${fv}[${Math.max(1, ws.length)}];`,
+    ...ws.map((w, j) => `${fv}[${j}] = ${w};`));
   return `blk_new(e, ${Number(arr)}, ${d}, ${lgs}, ${ws.length}, ${fv})`;
 }
 
@@ -2090,8 +2089,8 @@ function emit_jump(sc: Scope, args: string[], k: Name, bang = false): void {
     return file_push(sc, `WL_JMP(${seg_ref(sc, fid)});`);
   }
   sc.seg.spin = true;
-  sc.seg.params.forEach((p, i) => file_push(sc, `${p} = r${i};`));
-  file_push(sc, `WL_AGAIN(${sc.seg.fid});`);
+  file_push(sc, ...sc.seg.params.map((p, i) => `${p} = r${i};`),
+    `WL_AGAIN(${sc.seg.fid});`);
 }
 
 function emit_args(sc: Scope, ck: Spine, jump = false, fork = false): string[] {
@@ -2146,10 +2145,8 @@ function emit_put(sc: Scope, dst: Val | null, v: Val): void {
     spare_flush(sc);
   }
   const ws = val_own(sc, val_to(sc, v, dst?.lay ?? sc.seg.ret));
-  ws.forEach((w, j) => file_push(sc, `${dst?.ws[j] ?? "r" + j} = ${w};`));
-  if (dst === null) {
-    file_push(sc, `WL_RETN(${ws.length});`);
-  }
+  file_push(sc, ...ws.map((w, j) => `${dst?.ws[j] ?? "r" + j} = ${w};`),
+    ...dst === null ? [`WL_RETN(${ws.length});`] : []);
 }
 
 function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
@@ -2587,13 +2584,11 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
       (pos.set(p, depth), depth += b.val.ws.length, b.val.ws));
     emit_chain(sc, () => "seq", [() => {
       const fr = [...ws, seg_ref(sc, seg_fid(kn))];
-      file_push(sc, `WL_ROOM(${fr.length});`);
-      fr.forEach((w, j) => file_push(sc, `STK(${j}) = ${w};`));
-      file_push(sc, `WL_PUSHN(${fr.length});`);
+      file_push(sc, `WL_ROOM(${fr.length});`,
+        ...fr.map((w, j) => `STK(${j}) = ${w};`), `WL_PUSHN(${fr.length});`);
     }, ...fork ? [] : [() => {
       file_push(sc, `WL_CONT = term_tsk(${seg_fid(kn)}, ${
-        emit_task(sc, seg_fid(kn), 1, ws)});`);
-      file_push(sc, `WL_IDX = ${ws.length};`);
+        emit_task(sc, seg_fid(kn), 1, ws)});`, `WL_IDX = ${ws.length};`);
     }]]);
     emit_jump(sc, cargs, c.k!, !fork && c.b);
     const last = i === calls.length - 1;
@@ -2659,8 +2654,7 @@ function emit_tab(sc: Scope, cells: HTerm[] | null, ty: HTerm,
 function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
   ty: HTerm | null, ers: HTerm[], args: Val[], dst: Val | null): void {
   if (x.$ === "Efq") {
-    file_push(sc, "err_post(e.mem, ERR_TAGS);");
-    return file_push(sc, "return 0;");
+    return file_push(sc, "err_post(e.mem, ERR_TAGS);", "return 0;");
   }
   const { adt, ret, rows, cells } = mat_rows(sc, x, ty);
   const word = WORDS[adt.k] === W32;
@@ -3064,9 +3058,9 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
   const loop = loop_of(sc.seg.def);
   const at = loop.indexOf(ck.k ?? "");
   if (at >= 0) {
-    ck.xs.map((a) => js_expr(sc, a, null)).forEach((e, i) =>
-      file_push(sc, `$${i} = ${e};`));
-    return file_push(sc, `${loop.length > 1 ? `$pc = ${at}; ` : ""}continue;`);
+    return file_push(sc, ...ck.xs.map((a, i) =>
+      `$${i} = ${js_expr(sc, a, null)};`),
+      `${loop.length > 1 ? `$pc = ${at}; ` : ""}continue;`);
   }
   file_push(sc, `return ${ck.k === null ? js_expr(sc, x, ty)
     : js_call(sc, ck.k, ck.xs, true)};`);
