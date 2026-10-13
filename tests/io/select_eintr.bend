@@ -1,12 +1,9 @@
-# io (io_select_eintr): a signal that lands while the loop waits in
-# select wakes nothing. Idle.park installs a no-op handler, has the
-# signal arrive a few ms later, and parks on a pipe nobody writes, so any
-# wake of it is spurious; main sleeps 30 ms and ends the process itself
-# (the park is still live). An interrupted select fails with EINTR and
-# leaves its sets as they were; the JS loop read them anyway and woke
-# every parked fd, so a TCP.connect still in progress answered Done
-# (SO_ERROR reads 0 then). It now retries the select, as the native
-# loop does.
+# io (io_select_eintr): a signal during the kernel wait wakes no idle fd.
+# Idle.park installs a no-op handler and parks on an unwritten pipe;
+# main sleeps 30 ms and exits while that park is still live.
+# The original JS select bug treated unchanged fd sets after EINTR as
+# readiness, so an unfinished TCP.connect falsely answered Done.
+# An interrupted poller reports no fd readiness; due timers still run.
 import Base
 
 def Idle.park(ms: U32) -> IO(Unit):

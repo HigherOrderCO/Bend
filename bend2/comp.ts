@@ -3202,9 +3202,7 @@ const runtime_c = (tabs: string, spins: string, segs: string,
 #include <metal_stdlib>
 using namespace metal;
 #elif !defined(BEND_RTC)
-#ifdef __APPLE__
-#define _DARWIN_UNLIMITED_SELECT
-#else
+#ifndef __APPLE__
 #define _GNU_SOURCE
 #endif
 #include <stdint.h>
@@ -3221,7 +3219,11 @@ using namespace metal;
 #include <sys/mman.h>
 #include <time.h>
 #include <poll.h>
-#include <sys/select.h>
+#ifdef __linux__
+#include <sys/epoll.h>
+#else
+#include <sys/event.h>
+#endif
 #ifdef __APPLE__
 #include <mach-o/dyld.h>
 #endif
@@ -5298,6 +5300,9 @@ typedef struct IoWork {
   Term           cont;
   Term           item;
   u64            time;
+  u64            order;
+  u32            heap;
+  bool           ready;
   short          evts;
   struct IoWork* next;
   struct IoWork* prev;
@@ -5344,9 +5349,26 @@ static u64 io_sys_end(IoWork* w, ssize_t n) {
   return n < 0 ? 0 : (u64)n;
 }
 
+typedef struct IoHeap {
+  IoWork** rows;
+  u32 size;
+  u32 room;
+} IoHeap;
+
+typedef struct IoFd {
+  u32 key;
+  IoWork* wait[2];
+} IoFd;
+
 static IoWork* io_runs;
-static IoWork* io_park;
 static IoWork* io_jobs;
+static IoHeap io_park;
+static IoHeap io_ready;
+static u64 io_order;
+static IoFd* io_fds;
+static u32 io_fd_room, io_fd_size, io_fd_used;
+static int io_poll_fd = -1;
+static int io_wake_fd[2];
 
 static void io_push(IoWork** q, IoWork* a) {
   IoWork* l = *q != NULL ? *q : a;
@@ -5370,27 +5392,200 @@ static void io_spawn(Term m) {
   io_live += 1;
 }
 
-// io_park stays in deadline order (time 0, none, sorts last; ties keep
-// their park order), so io_wait wakes due timers in the order they expire.
-// It links both ways, so io_park_cut drops a waiter in O(1).
-static void io_park_add(IoWork* w) {
-  IoWork* p = io_park;
-  if (p == NULL || p->time - 1 <= w->time - 1) {
-    io_push(&io_park, w);
-  } else {
-    while (p->next->time - 1 <= w->time - 1) {
-      p = p->next;
-    }
-    io_push(&p, w);
+// Deadline heaps retain park order on ties. A waiter records its slot,
+// so readiness and channel cancellation remove it without a full scan.
+static bool io_before(IoWork* a, IoWork* b) {
+  return a->time != b->time ? a->time - 1 < b->time - 1
+    : a->order < b->order;
+}
+
+static void io_heap_add(IoHeap* h, IoWork* w) {
+  if (h->size == h->room) {
+    if (h->room > UINT32_MAX / 2) err_fail("too many IO waiters");
+    h->room = h->room == 0 ? 64 : h->room * 2;
+    h->rows = io_mem(realloc(h->rows, (u64)h->room * sizeof *h->rows));
   }
-  w->prev       = w->next == w ? w : w->next->prev;
+  u32 at = h->size++;
+  while (at != 0) {
+    u32 up = (at - 1) / 2;
+    if (!io_before(w, h->rows[up])) break;
+    h->rows[at] = h->rows[up];
+    h->rows[at]->heap = at + 1;
+    at = up;
+  }
+  h->rows[at] = w;
+  w->heap = at + 1;
+}
+
+static void io_heap_cut(IoHeap* h, IoWork* w) {
+  u32 at = w->heap - 1;
+  w->heap = 0;
+  IoWork* last = h->rows[--h->size];
+  if (at == h->size) return;
+  if (at != 0 && io_before(last, h->rows[(at - 1) / 2])) {
+    while (at != 0) {
+      u32 up = (at - 1) / 2;
+      if (!io_before(last, h->rows[up])) break;
+      h->rows[at] = h->rows[up];
+      h->rows[at]->heap = at + 1;
+      at = up;
+    }
+  } else {
+    while ((u64)at * 2 + 1 < h->size) {
+      u32 down = at * 2 + 1;
+      if (down + 1 < h->size && io_before(h->rows[down + 1], h->rows[down]))
+        down++;
+      if (!io_before(h->rows[down], last)) break;
+      h->rows[at] = h->rows[down];
+      h->rows[at]->heap = at + 1;
+      at = down;
+    }
+  }
+  h->rows[at] = last;
+  last->heap = at + 1;
+}
+
+static void io_fd_grow(u32 room) {
+  IoFd* rows = io_mem(calloc(room, sizeof *rows));
+  for (u32 i = 0; i < io_fd_room; i++) {
+    if (io_fds[i].key == 0 || io_fds[i].key == UINT32_MAX) continue;
+    u32 at = io_fds[i].key * 2654435761u & (room - 1);
+    while (rows[at].key != 0) at = (at + 1) & (room - 1);
+    rows[at] = io_fds[i];
+  }
+  free(io_fds);
+  io_fds = rows;
+  io_fd_room = room;
+  io_fd_used = io_fd_size;
+}
+
+static IoFd* io_fd_get(int fd, bool make) {
+  if (io_fd_room == 0) {
+    if (!make) return NULL;
+    io_fd_grow(64);
+  }
+  u32 key = (u32)fd + 1;
+  for (;;) {
+    u32 at = key * 2654435761u & (io_fd_room - 1);
+    u32 gap = UINT32_MAX;
+    while (io_fds[at].key != 0) {
+      if (io_fds[at].key == key) return &io_fds[at];
+      if (io_fds[at].key == UINT32_MAX && gap == UINT32_MAX) gap = at;
+      at = (at + 1) & (io_fd_room - 1);
+    }
+    if (!make) return NULL;
+    if (gap != UINT32_MAX || (u64)(io_fd_used + 1) * 2 < io_fd_room) {
+      if (gap != UINT32_MAX) at = gap;
+      else io_fd_used++;
+      io_fds[at].key = key;
+      io_fd_size++;
+      return &io_fds[at];
+    }
+    u32 room = io_fd_room;
+    if ((u64)io_fd_size * 4 >= room) {
+      if (room > UINT32_MAX / 2) err_fail("too many IO descriptors");
+      room *= 2;
+    }
+    io_fd_grow(room);
+  }
+}
+
+static void io_poll_open(void) {
+  if (io_poll_fd >= 0) return;
+#ifdef __linux__
+  io_poll_fd = epoll_create1(EPOLL_CLOEXEC);
+  struct epoll_event event = { .events = EPOLLIN,
+    .data = { .fd = io_wake_fd[0] } };
+  if (io_poll_fd < 0 || epoll_ctl(io_poll_fd, EPOLL_CTL_ADD,
+    io_wake_fd[0], &event) < 0) err_fail("the poller failed");
+#else
+  io_poll_fd = kqueue();
+  struct kevent event;
+  EV_SET(&event, io_wake_fd[0], EVFILT_READ, EV_ADD, 0, 0, NULL);
+  if (io_poll_fd < 0 || fcntl(io_poll_fd, F_SETFD, FD_CLOEXEC) < 0
+    || kevent(io_poll_fd, &event, 1, NULL, 0, NULL) < 0)
+    err_fail("the poller failed");
+#endif
+}
+
+static u32 io_fd_mask(IoFd* row) {
+  return (row->wait[0] != NULL ? POLLIN : 0)
+    | (row->wait[1] != NULL ? POLLOUT : 0);
+}
+
+static void io_fd_change(int fd, u32 old, u32 mask) {
+  if (old == mask) return;
+  io_poll_open();
+#ifdef __linux__
+  struct epoll_event event = { .events = mask, .data = { .fd = fd } };
+  int op = mask == 0 ? EPOLL_CTL_DEL : old == 0 ? EPOLL_CTL_ADD : EPOLL_CTL_MOD;
+  if (epoll_ctl(io_poll_fd, op, fd, &event) < 0) err_fail("the poller failed");
+#else
+  struct kevent events[2];
+  u32 n = 0;
+  for (u32 side = 0; side < 2; side++) {
+    u32 bit = side == 0 ? POLLIN : POLLOUT;
+    if ((old & bit) == (mask & bit)) continue;
+    EV_SET(&events[n++], fd, side == 0 ? EVFILT_READ : EVFILT_WRITE,
+      mask & bit ? EV_ADD : EV_DELETE, 0, 0, NULL);
+  }
+  if (kevent(io_poll_fd, events, n, NULL, 0, NULL) < 0)
+    err_fail("the poller failed");
+#endif
+}
+
+static void io_fd_add(IoWork* w) {
+  IoFd* row = io_fd_get((int)w->word, true);
+  u32 old = io_fd_mask(row);
+  u32 side = w->evts == POLLOUT;
+  io_push(&row->wait[side], w);
+  w->prev = w->next == w ? w : w->next->prev;
   w->next->prev = w;
+  io_fd_change((int)w->word, old, io_fd_mask(row));
+}
+
+static void io_fd_cut(IoWork* w) {
+  IoFd* row = io_fd_get((int)w->word, false);
+  u32 old = io_fd_mask(row);
+  u32 side = w->evts == POLLOUT;
+  w->prev->next = w->next;
+  w->next->prev = w->prev;
+  row->wait[side] = w->next == w ? NULL
+    : row->wait[side] == w ? w->prev : row->wait[side];
+  u32 mask = io_fd_mask(row);
+  io_fd_change((int)w->word, old, mask);
+  if (mask == 0) {
+    row->key = UINT32_MAX;
+    io_fd_size--;
+  }
+}
+
+static void io_park_add(IoWork* w) {
+  w->order = ++io_order;
+  w->ready = false;
+  io_heap_add(&io_park, w);
+  if (w->evts != 0) io_fd_add(w);
 }
 
 static void io_park_cut(IoWork* w) {
-  w->prev->next = w->next;
-  w->next->prev = w->prev;
-  io_park = w->next == w ? NULL : io_park == w ? w->prev : io_park;
+  io_heap_cut(w->ready ? &io_ready : &io_park, w);
+  if (!w->ready && w->evts != 0) io_fd_cut(w);
+  w->ready = false;
+}
+
+static void io_mark_ready(IoWork* w) {
+  io_park_cut(w);
+  w->ready = true;
+  io_heap_add(&io_ready, w);
+}
+
+static void io_fd_ready(int fd, u32 mask) {
+  for (u32 side = 0; side < 2; side++) {
+    if (!(mask & (side == 0 ? POLLIN : POLLOUT))) continue;
+    IoFd* row;
+    while ((row = io_fd_get(fd, false)) != NULL && row->wait[side] != NULL)
+      io_mark_ready(row->wait[side]->next);
+  }
 }
 
 static Term io_wait_on(IoWork* w, int fd, short evts, u64 time, IoPack more) {
@@ -5563,7 +5758,6 @@ static pthread_mutex_t io_gate = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  io_bell = PTHREAD_COND_INITIALIZER;
 static u32             io_busy;
 static u32             io_size;
-static int             io_wake_fd[2];
 
 static void io_take(Env e) {
   IoWork* acts[64];
@@ -5611,64 +5805,55 @@ static Term io_work(IoWork* w, IoCall call, IoPack pack) {
   return IO_PARK;
 }
 
-static bool io_bit(u8* set, int fd, bool put) {
-  u8* at = set + fd / 8;
-  *at |= put << fd % 8;
-  return *at >> fd % 8 & 1;
-}
-
 static void io_wait(Env e, bool block) {
-  int top  = io_wake_fd[0];
-  u64 soon = io_park != NULL ? io_park->next->time : 0;
-  for (IoWork* a = io_park; a != NULL;
-    a = a->next != io_park ? a->next : NULL) {
-    if (a->evts != 0 && (int)a->word > top) {
-      top = (int)a->word;
-    }
-  }
-  u64 len = (u64)top / 64 * 8 + 8;
-  u8* set[2] = { io_mem(calloc(2, len)), NULL };
-  set[1] = set[0] + len;
-  io_bit(set[0], io_wake_fd[0], true);
-  for (IoWork* a = io_park; a != NULL;
-    a = a->next != io_park ? a->next : NULL) {
-    if (a->evts != 0) {
-      io_bit(set[a->evts == POLLOUT], (int)a->word, true);
-    }
-  }
+  u64 soon = io_park.size != 0 ? io_park.rows[0]->time : 0;
   u64 tick = io_tick();
   u64 ms = soon > tick && block ? (soon - tick) / 1000000 + 1 : 0;
-  struct timeval tv = { ms / 1000, ms % 1000 * 1000 };
+  io_poll_open();
   io_sync();
-  if (select(top + 1, (fd_set*)set[0], (fd_set*)set[1], NULL,
-    soon == 0 && block ? NULL : &tv) < 0) {
-    if (errno != EINTR) {
-      err_fail("the poller failed");
+  for (;;) {
+#ifdef __linux__
+    struct epoll_event events[64];
+    int span = !block ? 0 : soon == 0 ? -1 : ms > INT32_MAX ? INT32_MAX : (int)ms;
+    int n = epoll_wait(io_poll_fd, events, 64, span);
+#else
+    struct kevent events[64];
+    struct timespec tv = { ms / 1000, ms % 1000 * 1000000 };
+    int n = kevent(io_poll_fd, NULL, 0, events, 64, soon == 0 && block ? NULL : &tv);
+#endif
+    if (n < 0) {
+      if (errno != EINTR) err_fail("the poller failed");
+      break;
     }
-    memset(set[0], 0, 2 * len);
-  }
-  if (io_bit(set[0], io_wake_fd[0], false)) {
-    io_take(e);
-  }
-  u64     now  = io_tick();
-  IoWork* todo = io_park;
-  io_park = NULL;
-  while (todo != NULL) {
-    IoWork* a   = io_pop(&todo);
-    bool    due = (a->evts != 0
-        && io_bit(set[a->evts == POLLOUT], (int)a->word, false))
-      || (a->time != 0 && a->time <= now);
-    if (!due) {
-      io_park_add(a);
-      continue;
+    for (int i = 0; i < n; i++) {
+#ifdef __linux__
+      int fd = events[i].data.fd;
+      u32 mask = events[i].events & (EPOLLERR | EPOLLHUP)
+        ? POLLIN | POLLOUT : events[i].events;
+#else
+      int fd = (int)events[i].ident;
+      if (events[i].flags & EV_ERROR) err_fail("the poller failed");
+      u32 mask = events[i].filter == EVFILT_READ ? POLLIN : POLLOUT;
+#endif
+      if (fd == io_wake_fd[0]) io_take(e);
+      else io_fd_ready(fd, mask);
     }
+    if (n < 64) break;
+    block = false;
+    ms = 0;
+  }
+  u64 now = io_tick();
+  while (io_park.size != 0 && io_park.rows[0]->time != 0
+    && io_park.rows[0]->time <= now) io_mark_ready(io_park.rows[0]);
+  while (io_ready.size != 0) {
+    IoWork* a = io_ready.rows[0];
+    io_park_cut(a);
     Term x = a->pack(e, a);
     if (x != IO_PARK) {
       a->item = x;
       io_push(&io_runs, a);
     }
   }
-  free(set[0]);
 }
 
 ${NATIVE.IO}
@@ -5858,7 +6043,7 @@ OUTLINE void io_loop(u64* H) {
       if (io_live == 0) {
         return;
       }
-      if (io_park == NULL && io_busy == 0) {
+      if (io_park.size == 0 && io_busy == 0) {
         io_sync();
         err_fail("deadlock: every computation waits on a channel");
       }
@@ -5870,9 +6055,9 @@ OUTLINE void io_loop(u64* H) {
       if (io_busy != 0) {
         io_take(e);
       }
-      if (io_park != NULL) {
+      if (io_park.size != 0) {
         u64 now = io_tick();
-        if (now >= look || io_park->next->time - 1 < now) {
+        if (now >= look || io_park.rows[0]->time - 1 < now) {
           look = now + 10000000;
           io_wait(e, false);
         }
@@ -6139,7 +6324,6 @@ function io_sys() {
     const ffi = require("bun:ffi");
     const mac = process.platform === "darwin";
     const err = mac ? "__error" : "__errno_location";
-    const sel = mac ? "select$DARWIN_EXTSN" : "select";
     const T = { i: "i32", u: "u32", U: "u64", I: "i64", p: "ptr",
       c: "cstring" };
     const vari = mac && process.arch === "arm64";
@@ -6147,7 +6331,8 @@ function io_sys() {
       Object.fromEntries(("socket:iii>i bind:ipu>i listen:ii>i connect:ipu>i"
         + " accept:ipp>i send:ipUi>I recv:ipUi>I read:ipU>I pread:ipUI>I"
         + " sendto:ipUipu>I recvfrom:ipUipp>I close:i>i setsockopt:iiipu>i"
-        + " " + sel + ":ipppp>i"
+        + (mac ? " kqueue:>i kevent64:ipipiup>i"
+          : " epoll_create1:i>i epoll_ctl:iiip>i epoll_wait:ipii>i")
         + (vari ? " fcntl:iiiiiiiii>i" : " fcntl:iii>i") + " getsockopt:iiipp>i"
         + " strerror:i>c " + err + ":>p").split(" ").map((s) => {
         const [name, args, ret] = s.split(/[:>]/);
@@ -6156,7 +6341,7 @@ function io_sys() {
     const fcntl = (fd, cmd, arg) => vari
       ? lib.fcntl(fd, cmd, 0, 0, 0, 0, 0, 0, arg)
       : lib.fcntl(fd, cmd, arg);
-    globalThis.BEND_SYS = { ...lib, fcntl, select: lib[sel],
+    globalThis.BEND_SYS = { ...lib, fcntl,
       ptr: ffi.ptr, mac,
       errno: () => ffi.read.i32(lib[err](), 0) };
   }
@@ -6241,49 +6426,193 @@ function io_push(fun, arg, fresh) {
   io.live += fresh ? 1 : 0;
 }
 
+function io_before(a, b) {
+  const at = a.at ?? Infinity;
+  const bt = b.at ?? Infinity;
+  return at !== bt ? at < bt : a.order < b.order;
+}
+
+function io_heap_add(h, w) {
+  let at = h.length;
+  h.push(w);
+  while (at > 0) {
+    const up = (at - 1) >> 1;
+    if (!io_before(w, h[up])) break;
+    h[at] = h[up];
+    h[at].heap = at + 1;
+    at = up;
+  }
+  h[at] = w;
+  w.heap = at + 1;
+}
+
+function io_heap_cut(h, w) {
+  let at = w.heap - 1;
+  w.heap = 0;
+  const last = h.pop();
+  if (at === h.length) return;
+  if (at > 0 && io_before(last, h[(at - 1) >> 1])) {
+    while (at > 0) {
+      const up = (at - 1) >> 1;
+      if (!io_before(last, h[up])) break;
+      h[at] = h[up];
+      h[at].heap = at + 1;
+      at = up;
+    }
+  } else {
+    while (at * 2 + 1 < h.length) {
+      let down = at * 2 + 1;
+      if (down + 1 < h.length && io_before(h[down + 1], h[down])) down++;
+      if (!io_before(h[down], last)) break;
+      h[at] = h[down];
+      h[at].heap = at + 1;
+      at = down;
+    }
+  }
+  h[at] = last;
+  last.heap = at + 1;
+}
+
+function io_poll_open(io) {
+  if (io.poll !== undefined) return io.poll;
+  const sys = io_sys();
+  const fd = sys.mac ? sys.kqueue() : sys.epoll_create1(0x80000);
+  if (fd < 0 || sys.mac && sys.fcntl(fd, 2, 1) < 0)
+    throw "bend: the poller failed";
+  const stride = sys.mac ? 48 : process.arch === "x64" ? 12 : 16;
+  const events = new Uint8Array(stride * 64);
+  const change = new Uint8Array(sys.mac ? 96 : stride);
+  return io.poll = { sys, fd, stride, events, change,
+    event_view: new DataView(events.buffer),
+    change_view: new DataView(change.buffer),
+    time: new BigInt64Array(2) };
+}
+
+function io_fd_mask(row) {
+  return (row.read.size > 0 ? 1 : 0) | (row.write.size > 0 ? 4 : 0);
+}
+
+function io_fd_change(io, fd, old, mask) {
+  if (old === mask) return;
+  const poll = io_poll_open(io);
+  const { sys, change, change_view: view } = poll;
+  let n;
+  if (sys.mac) {
+    n = 0;
+    for (let bit = 1; bit <= 4; bit *= 4) {
+      if ((old & bit) === (mask & bit)) continue;
+      const at = n++ * 48;
+      view.setBigUint64(at, BigInt(fd), true);
+      view.setInt16(at + 8, bit === 1 ? -1 : -2, true);
+      view.setUint16(at + 10, mask & bit ? 1 : 2, true);
+    }
+    n = sys.kevent64(poll.fd, sys.ptr(change), n, null, 0, 0, null);
+  } else {
+    view.setUint32(0, mask, true);
+    view.setInt32(poll.stride === 12 ? 4 : 8, fd, true);
+    n = sys.epoll_ctl(poll.fd, mask === 0 ? 2 : old === 0 ? 1 : 3,
+      fd, sys.ptr(change));
+  }
+  if (n < 0) throw "bend: the poller failed";
+}
+
+function io_park_cut(w) {
+  const io = globalThis.BEND_IO;
+  io_heap_cut(w.ready ? io.ready : io.waits, w);
+  if (!w.ready && w.fd !== undefined) {
+    const row = io.fds.get(w.fd);
+    const old = io_fd_mask(row);
+    (w.out ? row.write : row.read).delete(w);
+    const mask = io_fd_mask(row);
+    io_fd_change(io, w.fd, old, mask);
+    if (mask === 0) io.fds.delete(w.fd);
+  }
+  w.ready = false;
+}
+
+function io_mark_ready(io, w) {
+  io_park_cut(w);
+  w.ready = true;
+  io_heap_add(io.ready, w);
+}
+
+function io_fd_ready(io, fd, mask) {
+  const row = io.fds.get(fd);
+  if (row === undefined) return;
+  for (let bit = 1; bit <= 4; bit *= 4) {
+    if (!(mask & bit)) continue;
+    for (const w of bit === 1 ? row.read : row.write) io_mark_ready(io, w);
+  }
+}
+
 function io_wait(io, block) {
   const soon = io.waits[0]?.at ?? Infinity;
-  const ms = !block ? 0 : soon === Infinity ? -1
+  let ms = !block ? 0 : soon === Infinity ? -1
     : Math.max(0, Math.ceil(soon - performance.now()));
-  const fds = io.waits.filter((w) => w.fd !== undefined);
-  const top = fds.reduce((m, w) => Math.max(m, w.fd), 0);
-  const len = (top >> 6 << 3) + 8;
-  const set = new Uint8Array(2 * len);
-  const at = (w) => (w.out ? len : 0) + (w.fd >> 3);
-  for (const w of fds) {
-    set[at(w)] |= 1 << (w.fd & 7);
-  }
-  const tv = new BigInt64Array([BigInt(ms / 1000 | 0),
-    BigInt(ms % 1000 * 1000)]);
-  const sys = io_sys();
-  if (sys.select(top + 1, sys.ptr(set), sys.ptr(set, len), null,
-    ms < 0 ? null : sys.ptr(tv)) < 0) {
-    if (sys.errno() !== 4) {
-      throw "bend: the poller failed";
+  const poll = io_poll_open(io);
+  const { sys, events, stride, time, event_view: view } = poll;
+  for (;;) {
+    let n;
+    if (sys.mac) {
+      time[0] = BigInt(Math.trunc(ms / 1000));
+      time[1] = BigInt(ms % 1000 * 1000000);
+      n = sys.kevent64(poll.fd, null, 0, sys.ptr(events), 64, 0,
+        ms < 0 ? null : sys.ptr(time));
+    } else {
+      n = sys.epoll_wait(poll.fd, sys.ptr(events), 64, Math.min(ms, 0x7fffffff));
     }
-    set.fill(0);
+    if (n < 0) {
+      if (sys.errno() !== 4) throw "bend: the poller failed";
+      break;
+    }
+    for (let i = 0; i < n; i++) {
+      const at = i * stride;
+      let fd, mask;
+      if (sys.mac) {
+        if (view.getUint16(at + 10, true) & 0x4000)
+          throw "bend: the poller failed";
+        fd = Number(view.getBigUint64(at, true));
+        mask = view.getInt16(at + 8, true) === -1 ? 1 : 4;
+      } else {
+        fd = view.getInt32(at + (stride === 12 ? 4 : 8), true);
+        const flags = view.getUint32(at, true);
+        mask = flags & 24 ? 5 : flags;
+      }
+      io_fd_ready(io, fd, mask);
+    }
+    if (n < 64) break;
+    ms = 0;
   }
   const now = performance.now();
-  const due = (w) => w.at <= now || w.fd !== undefined
-    && set[at(w)] & 1 << (w.fd & 7);
-  const todo = io.waits;
-  io.waits = todo.filter((w) => !due(w));
-  for (const w of todo.filter(due)) {
+  while (io.waits.length > 0 && io.waits[0].at <= now)
+    io_mark_ready(io, io.waits[0]);
+  while (io.ready.length > 0) {
+    const w = io.ready[0];
+    io_park_cut(w);
     const x = w.more();
-    if (x !== undefined) {
-      io_push(w.k, x, false);
-    }
+    if (x !== undefined) io_push(w.k, x, false);
   }
 }
 
 function io_park_on(fd, out, k, more, at) {
-  const ws = globalThis.BEND_IO.waits;
-  const i = ws.findLastIndex((w) => (w.at ?? Infinity) <= (at ?? Infinity));
-  ws.splice(i + 1, 0, { fd, out, k, more, at });
+  const io = globalThis.BEND_IO;
+  const w = { fd, out, k, more, at, order: ++io.order, ready: false };
+  io_heap_add(io.waits, w);
+  if (fd !== undefined) {
+    let row = io.fds.get(fd);
+    if (row === undefined) {
+      row = { read: new Set(), write: new Set() };
+      io.fds.set(fd, row);
+    }
+    const old = io_fd_mask(row);
+    (out ? row.write : row.read).add(w);
+    io_fd_change(io, fd, old, io_fd_mask(row));
+  }
+  return w;
 }
 
 function io_run(m) {
-  const io = { runs: [], live: 0, waits: [] };
+  const io = { runs: [], live: 0, waits: [], ready: [], fds: new Map(), order: 0 };
   globalThis.BEND_IO = io;
   try {
     io_push(run_loop(m()), (x) => ({ $: "Emit", value: x }), true);
@@ -6335,6 +6664,8 @@ function io_run(m) {
     }
   } catch (e) {
     throw e instanceof RangeError ? "bend: ${ERRS[7]}" : e;
+  } finally {
+    if (io.poll !== undefined) io.poll.sys.close(io.poll.fd);
   }
 }
 `.slice(1);

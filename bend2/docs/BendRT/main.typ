@@ -519,6 +519,14 @@ no IO. A fallible operation answers a `Result` carrying errno, and a
 handle threads back outside the `Result`, so even a failure cannot
 lose it.
 
+The native and Bun loops index parked requests by descriptor and deadline.
+Level-triggered `epoll` on Linux and `kqueue` on macOS maintain the watched
+descriptor masks, including multiple waiters on one descriptor. Deadline
+and ready heaps preserve deadline and park order; each waiter records its
+heap slot, so cancellation also works after a timer becomes ready in the
+same pass. Readiness touches the relevant waiters with logarithmic heap
+updates instead of walking the whole parked set on every arrival.
+
 = The JavaScript Backend <sec:js>
 
 The same rewritten definitions (@sec:compile) print as plain

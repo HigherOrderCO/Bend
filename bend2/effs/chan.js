@@ -18,9 +18,8 @@ function chan_wait(item) {
 // Wakes the first waiter with x, as Ready{x} if try_ (cutting its timer).
 function chan_wake(row, x) {
   const w = row.wait.shift();
-  if (w.late !== undefined) {
-    const ws = globalThis.BEND_IO.waits;
-    ws.splice(ws.findIndex((t) => t.more === w.late), 1);
+  if (w.timer !== undefined) {
+    io_park_cut(w.timer);
     x = { $: CID(Ready), value: x };
   }
   io_push(w.cont, x, false);
@@ -50,11 +49,10 @@ function chan_shut(row) {
 function chan_park(row, k, item, ms) {
   const w = { cont: k, item: item };
   if (ms !== undefined) {
-    w.late = () => {
+    w.timer = io_park_on(undefined, false, k, () => {
       row.wait.splice(row.wait.indexOf(w), 1);
       return chan_wait(item);
-    };
-    io_park_on(undefined, false, k, w.late, io_until(ms));
+    }, io_until(ms));
   }
   row.wait.push(w);
   return undefined;

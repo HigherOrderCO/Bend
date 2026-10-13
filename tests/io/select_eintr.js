@@ -3,7 +3,7 @@
 // interval timer has the kernel send it ms later, whatever the loop is
 // doing then. A child process cannot promise that: a kill spawned here
 // lands in about half a millisecond on Linux, most often before the
-// loop reaches select, and the test then exercises nothing. Then the
+// loop enters the kernel wait, and the test then exercises nothing. Then the
 // computation parks on the read end of a pipe whose write end stays
 // open and unwritten: its fd never becomes ready, so a wake is
 // spurious.
