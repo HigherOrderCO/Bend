@@ -865,8 +865,9 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 }
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
-// but for the words. Each instance is opened once (a family's siblings
-// differ); one nested 1000 datatypes deep is taken to hold it.
+// but for the words. Its type arguments are walked themselves, so a
+// datatype is opened once per value its value arguments take (a
+// family's siblings differ); one nested 1000 deep is taken to hold it.
 function ty_holds(A: HTerm | null,
   p: (t: HTerm | null) => boolean, seen = new Set<string>(), d = 0): boolean {
   const t = ty_wnf(A);
@@ -881,11 +882,12 @@ function ty_holds(A: HTerm | null,
   }
   const tld = FL.book.tlds[t.k];
   const ks = tld?.$ === "ADT" ? tele_unbind(tld.T).doms : [];
-  if (t.x.some((x, i) => !ty_value(ks[i]?.[2] ?? null)
-    && ty_holds(x, p, seen, d))) {
+  const vs = t.x.map((_, i) => ty_value(ks[i]?.[2] ?? null));
+  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, seen, d))) {
     return true;
   }
-  const key = Bend.term_key(Bend.term_lower(t));
+  const key = Bend.term_key(Bend.term_lower({ ...t,
+    x: t.x.filter((_, i) => vs[i]) }));
   if (tld?.$ !== "ADT" || seen.has(key)) {
     return false;
   }
