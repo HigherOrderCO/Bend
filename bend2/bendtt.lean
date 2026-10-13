@@ -1315,7 +1315,7 @@ mutual
 -- how x compares to the piece at π of column j, whose pattern is p, as
 -- bend2's term_descend: the piece itself is eq; a constructor compares
 -- its fields in turn, and when one may be bigger, x is lt if it is no
--- bigger than another piece of the pattern
+-- bigger than another of those fields
 def Pat.cmp (g : Guard) (j : Nat) (p : Pat) (π : List Bool) (x : Term) : Ordering :=
   if g.at j π x then .eq else
   match p with
@@ -1323,7 +1323,7 @@ def Pat.cmp (g : Guard) (j : Nat) (p : Pat) (π : List Bool) (x : Term) : Orderi
     match Pat.fields g j a b π x with
     | .ok o => o
     | .error bad =>
-      if Pat.visit g j bad a (false :: π) x || Pat.visit g j bad b (true :: π) x then .lt else .gt
+      if Pat.visit g j bad b (true :: π) x then .lt else .gt
   | .hole => .gt
 termination_by 3 * sizeOf p
 
@@ -1344,18 +1344,15 @@ def Pat.fields (g : Guard) (j : Nat) (a b : Pat) (π : List Bool) :
   | _ => .error none
 termination_by 3 * (sizeOf a + sizeOf b) + 2
 
--- x is no bigger than the piece at ρ, of pattern q, or than one inside it,
--- away from the field that failed: that field and what is in it are
--- skipped, and a piece that holds it is looked into (paths are innermost
--- first, so a piece's path ends with those of the pieces holding it)
+-- x is no bigger than a field on the chain q at ρ, other than the one
+-- that failed: as bend2, only the constructor's fields are tried, not its
+-- tag or the pairs that chain them
 def Pat.visit (g : Guard) (j : Nat) (bad : Option (List Bool)) (q : Pat) (ρ : List Bool)
     (x : Term) : Bool :=
-  if bad.any (·.isSuffixOf ρ) then false
-  else if bad.any ρ.isSuffixOf then
-    match q with
-    | .pair a b => Pat.visit g j bad a (false :: ρ) x || Pat.visit g j bad b (true :: ρ) x
-    | .hole => false
-  else Pat.cmp g j q ρ x != .gt
+  match q with
+  | .pair a b =>
+    (bad != some (false :: ρ) && Pat.cmp g j a (false :: ρ) x != .gt) || Pat.visit g j bad b (true :: ρ) x
+  | .hole => false
 termination_by 3 * sizeOf q + 1
 end
 
@@ -3574,10 +3571,8 @@ theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : V
       split at e
       · subst e; exact (I (m := 3 * (sizeOf a + sizeOf b) + 2) (by omega)).2.1 _ _ _ _ _ (Nat.le_refl _) ht ‹_›
       · split at e
-        · subst e; simp only [Bool.or_eq_true] at *; rename_i h; simp only [ite_true]
-          rcases h with h | h
-          · exact below_up ((I (m := 3 * sizeOf a + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h)
-          · exact below_up ((I (m := 3 * sizeOf b + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h)
+        · subst e; rename_i h; simp only [ite_true]
+          exact below_up ((I (m := 3 * sizeOf b + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h)
         · subst e; exact absurd rfl hg
     · subst e; exact absurd rfl hg
   · unfold Pat.fields at h
@@ -3620,18 +3615,14 @@ theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : V
         · cases h
     · cases h
   · unfold Pat.visit at h
-    split at h; · cases h
     split at h
-    · split at h
-      · rename_i a b; simp only [Pat.pair.sizeOf_spec] at hn; simp only [Bool.or_eq_true] at h
-        rcases h with h | h
-        · exact below_le (below_up ((I (m := 3 * sizeOf a + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h))
-            (Nat.zero_le _)
-        · exact below_le (below_up ((I (m := 3 * sizeOf b + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h))
-            (Nat.zero_le _)
-      · cases h
-    · exact below_le ((I (m := 3 * sizeOf q) (by omega)).1 _ _ _ (Nat.le_refl _) ht (by simpa using h))
-        (Nat.zero_le _)
+    · rename_i a b; simp only [Pat.pair.sizeOf_spec] at hn
+      simp only [Bool.or_eq_true, Bool.and_eq_true, bne_iff_ne] at h
+      rcases h with ⟨-, h⟩ | h
+      · exact below_le (below_up ((I (m := 3 * sizeOf a) (by omega)).1 _ _ _ (Nat.le_refl _) ht h)) (Nat.zero_le _)
+      · exact below_le (below_up ((I (m := 3 * sizeOf b + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h))
+          (Nat.zero_le _)
+    · cases h
 
 -- a descent from column j on: column by column, the call's sizes are
 -- no bigger than B's until one is smaller

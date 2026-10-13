@@ -756,7 +756,8 @@ at the piece, or the label a match hit there, is equal to it. A pair
 against a piece that was split compares field by field: each field no
 bigger, and one smaller, makes it smaller; all equal makes it equal.
 Otherwise the argument is smaller when it is no bigger than another
-piece inside, away from the field that failed. So `height(Node{rest})`
+field of the piece. A constructor $(k, (a, (b, ())))$ has the fields
+$a$ and $b$; its tag and the pairs that chain the fields are not tried. So `height(Node{rest})`
 descends under `Node{Cons{x, rest}}`: `rest` is smaller than the field
 `Cons{x, rest}`.
 
