@@ -1,8 +1,8 @@
 // Chan
 // ====
 
-// Chan.new, send, recv, close and the try_ twins share this file: the rows
-// live here, and each effect registers when the program uses it.
+// Chan.new, send, recv, close and the try_ twins share this file: their
+// rows live in the native heap, and each used effect registers itself.
 
 typedef struct {
   u64 room;
@@ -29,7 +29,7 @@ static Term chan_open(Env e, u32 room) {
   memset(e.mem + loc, 0, (1ull << cls) * sizeof(Term));
   ChanRow* row = (ChanRow*)(e.mem + loc);
   row->room = room;
-  return term_blk(true, cls, loc);
+  return rfc_wrap(e, term_blk(true, cls, loc), 1);
 }
 
 static ChanRow* chan_at(Env e, Term t) {
@@ -125,7 +125,9 @@ static Term chan_take(Env e, ChanRow* row) {
   Term v = e.mem[loc];
   row->items = e.mem[loc + 1];
   row->size -= 1;
-  if (row->size == 0) row->tail = 0;
+  if (row->size == 0) {
+    row->tail = 0;
+  }
   if (row->wait != 0) {
     e.mem[loc] = chan_wake(e, row, chan_done(e));
     e.mem[loc + 1] = 0;
@@ -211,7 +213,9 @@ static void __attribute__((constructor)) chan_new_use(void) {
 Term chan_send_run(Env e, Term* f, IoWork* w) {
   ChanRow* row = chan_at(e, f[0]);
   Term     x   = chan_put(e, row, f[1]);
-  if (x == IO_PARK) return chan_park(row, w, f[0], f[1], 0);
+  if (x == IO_PARK) {
+    return chan_park(row, w, f[0], f[1], 0);
+  }
   term_drop(e, f[0]);
   return x;
 }
@@ -227,7 +231,9 @@ static void __attribute__((constructor)) chan_send_use(void) {
 Term chan_recv_run(Env e, Term* f, IoWork* w) {
   ChanRow* row = chan_at(e, f[0]);
   Term     x   = chan_get(e, row);
-  if (x == IO_PARK) return chan_park(row, w, f[0], TERM_HOLE, 0);
+  if (x == IO_PARK) {
+    return chan_park(row, w, f[0], TERM_HOLE, 0);
+  }
   term_drop(e, f[0]);
   return x;
 }

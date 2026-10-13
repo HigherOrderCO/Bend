@@ -57,7 +57,8 @@ handle hands it back beside its result: `io_tup(e, io_hand(h), r)`, also
 on failure.
 
 `Chan` instead owns a native heap block containing its row and buffered
-Terms. Handle copies use the ordinary native reference count. Close wakes
+Terms, wrapped in a reference count at birth so a shared Data cell may
+hold it. Handle copies use the ordinary native reference count. Close wakes
 waiters but preserves buffered values for copied handles; dropping the
 last handle releases the block and unread values. A parked channel
 operation retains its input handle until it wakes or times out. The C
