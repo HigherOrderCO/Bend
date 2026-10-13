@@ -1313,47 +1313,44 @@ def Guard.at (g : Guard) (j : Nat) (π : List Bool) : Term → Bool
 
 mutual
 -- how x compares to the piece at π of column j, whose pattern is p, as
--- bend2's term_descend: the piece itself is eq; a constructor compares
--- its fields in turn, and when one may be bigger, x is lt if it is no
--- bigger than another of those fields
+-- bend2's term_descend: field by field (Pat.fields), and when one may be
+-- bigger, x is lt if it is no bigger than another of those fields
 def Pat.cmp (g : Guard) (j : Nat) (p : Pat) (π : List Bool) (x : Term) : Ordering :=
-  if g.at j π x then .eq else
-  match p with
-  | .pair a b =>
-    match Pat.fields g j a b π x with
-    | .ok o => o
-    | .error bad =>
-      if Pat.visit g j bad b (true :: π) x then .lt else .gt
-  | .hole => .gt
-termination_by 3 * sizeOf p
+  match Pat.fields g j p π x with
+  | .ok o => o
+  | .error bad => match p with
+    | .pair _ b => if Pat.visit g j bad b (true :: π) x then .lt else .gt
+    | .hole => .gt
+termination_by 2 * sizeOf p + 1
 
--- x's fields against the constructor pattern a, b at π, down its right
--- spine: how they compare, or the path of the first that may be bigger
--- (none when x is no constructor). A dead field, or a tail, is eq when
--- it is the variable the case tree bound there, as bend2 compares it
-def Pat.fields (g : Guard) (j : Nat) (a b : Pat) (π : List Bool) :
-    Term → Except (Option (List Bool)) Ordering
-  | Tup q x y =>
+-- x against the piece at π, whose pattern is p: eq when it is the
+-- variable the case tree bound there, or the label a match hit there;
+-- else a constructor's fields in turn, down its right spine (a dead one
+-- must be such a variable): how they compare, or the path of the first
+-- that may be bigger, or x's when it is no constructor
+def Pat.fields (g : Guard) (j : Nat) (p : Pat) (π : List Bool) (x : Term) :
+    Except (List Bool) Ordering :=
+  if g.at j π x then .ok .eq else
+  match p, x with
+  | .pair a b, Tup q x y =>
     let o := if Quan.live q then Pat.cmp g j a (false :: π) x
       else if g.at j (false :: π) x then .eq else .gt
-    match o, b with
-    | .gt, _ => .error (false :: π)
-    | o, .pair a' b' =>
-      if g.at j (true :: π) y then .ok o else (Pat.fields g j a' b' (true :: π) y).map o.then
-    | o, b => if Pat.cmp g j b (true :: π) y == .eq then .ok o else .error (true :: π)
-  | _ => .error none
-termination_by 3 * (sizeOf a + sizeOf b) + 2
+    match o with
+    | .gt => .error (false :: π)
+    | o => (Pat.fields g j b (true :: π) y).map o.then
+  | _, _ => .error π
+termination_by 2 * sizeOf p
 
 -- x is no bigger than a field on the chain q at ρ, other than the one
 -- that failed: as bend2, only the constructor's fields are tried, not its
 -- tag or the pairs that chain them
-def Pat.visit (g : Guard) (j : Nat) (bad : Option (List Bool)) (q : Pat) (ρ : List Bool)
+def Pat.visit (g : Guard) (j : Nat) (bad : List Bool) (q : Pat) (ρ : List Bool)
     (x : Term) : Bool :=
   match q with
   | .pair a b =>
-    (bad != some (false :: ρ) && Pat.cmp g j a (false :: ρ) x != .gt) || Pat.visit g j bad b (true :: ρ) x
+    (bad != false :: ρ && Pat.cmp g j a (false :: ρ) x != .gt) || Pat.visit g j bad b (true :: ρ) x
   | .hole => false
-termination_by 3 * sizeOf q + 1
+termination_by 2 * sizeOf q
 end
 
 def Arg.cmp (g : Guard) (j : Nat) : Arg → Ordering
@@ -3545,46 +3542,43 @@ theorem below_tup (h0 : Below bk σ X (false :: π) x k0 ∨ q.live = false ∧ 
 -- piece of column c of value X it is compared to: a result other than gt
 -- makes x a closed value no bigger than that piece, and lt makes it smaller
 theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : Value F.bk X) (n : Nat) :
-    (∀ p π x, 3 * sizeOf p ≤ n → F.tags ts σ x → Pat.cmp (F.g ts) c p π x ≠ .gt →
+    (∀ p π x, 2 * sizeOf p + 1 ≤ n → F.tags ts σ x → Pat.cmp (F.g ts) c p π x ≠ .gt →
       Below F.bk σ X π x (if Pat.cmp (F.g ts) c p π x = .lt then 1 else 0)) ∧
-    (∀ a b π x o, 3 * (sizeOf a + sizeOf b) + 2 ≤ n → F.tags ts σ x →
-      Pat.fields (F.g ts) c a b π x = .ok o → Below F.bk σ X π x (if o = .lt then 1 else 0)) ∧
-    (∀ bad q ρ x, 3 * sizeOf q + 1 ≤ n → F.tags ts σ x →
+    (∀ p π x o, 2 * sizeOf p ≤ n → F.tags ts σ x →
+      Pat.fields (F.g ts) c p π x = .ok o → Below F.bk σ X π x (if o = .lt then 1 else 0)) ∧
+    (∀ bad q ρ x, 2 * sizeOf q ≤ n → F.tags ts σ x →
       Pat.visit (F.g ts) c bad q ρ x = true → Below F.bk σ X ρ x 0) := by
   have A : ∀ {π}, Arg.at F.xs c π = Term.get π X := by simp [Arg.at, ha]
   induction n using Nat.strongRecOn with | _ n ih =>
   have I {m} (h : m < n) := ih m h
-  refine ⟨fun p π x hn ht hg => ?_, fun a b π x o hn ht h => ?_, fun bad q ρ x hn ht h => ?_⟩
+  refine ⟨fun p π x hn ht hg => ?_, fun p π x o hn ht h => ?_, fun bad q ρ x hn ht h => ?_⟩
   · generalize e : Pat.cmp (F.g ts) c p π x = o at hg ⊢
     unfold Pat.cmp at e
     split at e
-    · rename_i hx; subst e; simp only [reduceCtorEq, ite_false]
+    · subst e; exact (I (m := 2 * sizeOf p) (by omega)).2.1 _ _ _ _ (Nat.le_refl _) ht ‹_›
+    split at e
+    · rename_i b _; simp only [Pat.pair.sizeOf_spec] at hn
+      split at e <;> subst e
+      · exact below_up ((I (m := 2 * sizeOf b) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht ‹_›)
+      · exact absurd rfl hg
+    · subst e; exact absurd rfl hg
+  · unfold Pat.fields at h
+    split at h
+    · rename_i hx; cases h; simp only [reduceCtorEq, ite_false]
       unfold Guard.at at hx; split at hx
       · rename_i v; have ⟨hc, h⟩ := ht v c π (by simpa using hx)
         have h := A ▸ h (by simp [Term.uses])
         exact ⟨_, h, get_val h hv, hc, by simp [Term.sub]⟩
-      · rename_i k
-        exact ⟨_, A ▸ ho.2.2.2.2.2 c π k (by simpa using hx), .lab, fun _ => rfl, by simp [Term.sub]⟩
+      · rename_i k; exact ⟨_, A ▸ ho.2.2.2.2.2 c π k (by simpa using hx), .lab, fun _ => rfl, by simp [Term.sub]⟩
       · cases hx
-    split at e
-    · rename_i a b; simp only [Pat.pair.sizeOf_spec] at hn
-      split at e
-      · subst e; exact (I (m := 3 * (sizeOf a + sizeOf b) + 2) (by omega)).2.1 _ _ _ _ _ (Nat.le_refl _) ht ‹_›
-      · split at e
-        · subst e; rename_i h; simp only [ite_true]
-          exact below_up ((I (m := 3 * sizeOf b + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h)
-        · subst e; exact absurd rfl hg
-    · subst e; exact absurd rfl hg
-  · unfold Pat.fields at h
     split at h
-    · rename_i q x0 x1
+    · rename_i a b q x0 x1 _; simp only [Pat.pair.sizeOf_spec] at hn
       generalize eo : (if q.live then Pat.cmp (F.g ts) c a (false :: π) x0
         else if (F.g ts).at c (false :: π) x0 then Ordering.eq else .gt) = o0 at h
-      have t1 : F.tags ts σ x1 := tags_mono ht
       have C0 (g : o0 ≠ .gt) : Below F.bk σ X (false :: π) x0 (if o0 = .lt then 1 else 0) ∨
           q.live = false ∧ Term.Closed (Term.sub σ x0) ∧ (if o0 = .lt then 1 else 0) = 0 := by
         split at eo
-        · subst eo; exact .inl ((I (m := 3 * sizeOf a) (by omega)).1 _ _ _ (Nat.le_refl _) (tags_mono ht) g)
+        · subst eo; exact .inl ((I (m := 2 * sizeOf a + 1) (by omega)).1 _ _ _ (Nat.le_refl _) (tags_mono ht) g)
         rename_i hl; split at eo <;> subst eo
         · rename_i hx; refine .inr ⟨by simpa using hl, ?_, rfl⟩
           unfold Guard.at at hx; split at hx
@@ -3594,33 +3588,19 @@ theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : V
         · exact absurd rfl g
       simp only at h; split at h
       · cases h
-      · rename_i a' b' hc0
-        split at h
-        · cases h; simp only [Pat.pair.sizeOf_spec] at hn
-          have h1 := (I (m := 3 * sizeOf (Pat.pair a' b')) (by simp; omega)).1 _ (true :: π) x1 (Nat.le_refl _) t1
-            (by unfold Pat.cmp; simp [*])
-          rw [show Pat.cmp (F.g ts) c (.pair a' b') (true :: π) x1 = .eq by unfold Pat.cmp; simp [*]] at h1
-          exact below_le (below_tup (C0 hc0) h1) (by simp)
-        cases hf : Pat.fields (F.g ts) c a' b' (true :: π) x1 <;> simp [hf, Except.map] at h
-        simp only [Pat.pair.sizeOf_spec] at hn
-        have h1 := (I (m := 3 * (sizeOf a' + sizeOf b') + 2) (by omega)).2.1 _ _ _ _ _ (Nat.le_refl _) t1 hf
-        refine below_le (below_tup (C0 hc0) h1) ?_
-        subst h; revert hc0; cases o0 <;> rename_i o2 <;> cases o2 <;> simp [Ordering.then]
-      · split at h
-        · rename_i hbeq; cases h
-          simp at hbeq
-          have h1 := (I (m := 3 * sizeOf b) (by omega)).1 b (true :: π) x1 (Nat.le_refl _) t1 (by simp [hbeq])
-          simp only [hbeq] at h1
-          refine below_le (below_tup (C0 ‹_›) h1) ?_; simp
-        · cases h
+      rename_i hc0
+      cases hf : Pat.fields (F.g ts) c b (true :: π) x1 <;> simp [hf, Except.map] at h
+      have h1 := (I (m := 2 * sizeOf b) (by omega)).2.1 _ _ _ _ (Nat.le_refl _) (tags_mono ht) hf
+      refine below_le (below_tup (C0 hc0) h1) ?_
+      subst h; revert hc0; cases o0 <;> rename_i o2 <;> cases o2 <;> simp [Ordering.then]
     · cases h
   · unfold Pat.visit at h
     split at h
     · rename_i a b; simp only [Pat.pair.sizeOf_spec] at hn
       simp only [Bool.or_eq_true, Bool.and_eq_true, bne_iff_ne] at h
       rcases h with ⟨-, h⟩ | h
-      · exact below_le (below_up ((I (m := 3 * sizeOf a) (by omega)).1 _ _ _ (Nat.le_refl _) ht h)) (Nat.zero_le _)
-      · exact below_le (below_up ((I (m := 3 * sizeOf b + 1) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h))
+      · exact below_le (below_up ((I (m := 2 * sizeOf a + 1) (by omega)).1 _ _ _ (Nat.le_refl _) ht h)) (Nat.zero_le _)
+      · exact below_le (below_up ((I (m := 2 * sizeOf b) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h))
           (Nat.zero_le _)
     · cases h
 
@@ -3649,7 +3629,7 @@ theorem desc_lex {F : Frame} (ho : F.ok) (ys : List Arg) :
       have ⟨c2, v2⟩ := ho.2.2.1 _ (List.mem_of_getElem? ha)
       have v2 := (v2 (hl.trans hq)).1
       simp only [ite_true, Arg.size, hl, hq, v2, c2, and_self]
-      have B := (pat_below ho ha v2 (3 * sizeOf ((F.g ts).pat j))).1 _ [] _ (Nat.le_refl _) (hu _ (.head _) hq)
+      have B := (pat_below ho ha v2 (2 * sizeOf ((F.g ts).pat j) + 1)).1 _ [] _ (Nat.le_refl _) (hu _ (.head _) hq)
       constructor <;> intro h <;> obtain ⟨_, g, v, c, s⟩ := B (by simp [h]) <;> cases g <;>
         simp [h, v, c, Size.le, Size.lt] at s ⊢ <;> omega
     cases n; have := (List.getElem?_eq_some_iff.1 e).1; omega
