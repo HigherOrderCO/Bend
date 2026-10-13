@@ -88,10 +88,6 @@ the answer the same way: `io_done(v)`, `io_fail(code)`,
 whole number from 0 to 2^53 stops the run; a `Nat` inside an answer goes
 unchecked, so the host keeps it in that range.
 
-Each generated JS program owns its IO scheduler. A nested `io_run` restores
-the outer scheduler when it completes or throws, so an effect may enter a
-nested run without losing the outer run's spawned work or parked operations.
-
 A blocking effect takes one more argument, `k`, and parks with
 `io_park_on(fd, out, k, more)`: it returns `undefined`, and the loop calls
 `more()` when `fd` is ready; `more` answers the value, or `undefined` to
