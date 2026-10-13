@@ -698,57 +698,53 @@ function term_spine(tm: HTerm): Spine {
 }
 
 function cb_spine(m: Spine): Spine {
-  const c = m.k!;
   const tld = m.tld as Bend.Def;
-  const l = m.args.find((a) => term_strip(a).$ === "Lam")!;
-  const j = m.all.indexOf(l);
-  const ds = l && tele_unbind(ty_ann(l)!).doms;
-  if (!l || j >= tld.n || FL.js || m.b || def_foreign(tld)
-    || def_raise(l, 0) < ds.length) {
+  const l = m.args.find((a) => term_strip(a).$ === "Lam");
+  if (l === undefined || FL.js || m.b || def_foreign(tld)
+    || m.all.indexOf(l) >= tld.n
+    || def_raise(l, 0) < tele_unbind(ty_ann(l)!).doms.length) {
     return m;
   }
-  const lo = Bend.term_lower({ ...term_strip(l), s: undefined }, 1e9);
-  const vs = new Map<number, Of<"Var">>();
+  const j = m.all.indexOf(l);
+  const ps: Of<"Var">[] = [];
   const ts: Bend.LTerm[] = [];
-  let ps: Of<"Var">[] = [];
   let ok = FL.segs.length === 0;
-  const key = () => c + j + JSON.stringify([ds.map((d) => lay_of(d[2])), lo],
-    (k, v) => {
+  const lo = Bend.term_lower({ ...term_strip(l), s: undefined }, 1e9);
+  const at = m.k! + j + JSON.stringify(lo, (k, v) => {
     ok &&= v !== CB;
     if (v?.$ === "Ann" && v.x.$ === "Var") {
       ts[v.x.i] ??= v.T;
     }
     if (v?.$ !== "Var" || v.i < 0 || v.i >= 1e9) {
-      return k === "s" || k === "T" ? undefined : v;
+      return k === "s" ? undefined : v;
     }
-    vs.set(v.i, v);
-    return ps.includes(PROBES[v.i]) ? ps.indexOf(PROBES[v.i]) : v;
+    const n = ps.findIndex((p) => p.i === v.i);
+    return n < 0 ? ps.push(v) - 1 : n;
   });
-  key();
-  ps = [...vs.keys()].map((i) => PROBES[i]).filter((p) =>
-    p?.k === vs.get(p.i)!.k && term_use(term_uses(l), p) > 0);
-  const at = key();
-  if (ok && !FL.cbs.has(at) && ps.every((p) => ts[p.i])) {
-    const K = c + "$cb" + FL.cbs.size;
-    const abs = (lam: boolean, t: HTerm, xs: HTerm[] = []): HTerm => {
-      let env: Bend.Env = null;
-      vs.forEach((v, i) => env = Bend.list_set(env, i,
-        xs[ps.indexOf(PROBES[i])] ?? v));
-      const p = ps[xs.length];
-      const B = (x: HTerm) => abs(lam, t, [...xs, x]);
-      return !p ? def_inst(t, j, { ...Bend.term_higher(lo, env), s: CB })
-        : lam ? Bend.Lam(p.k, 0, B) as HTerm : Bend.All(Bend.Lone(), p.k, 0,
-          Bend.term_higher(ts[p.i], env), B) as HTerm;
-    };
+  const u = term_uses(l);
+  const abs = (t: HTerm, lam: boolean, xs: HTerm[]): HTerm => {
+    const env = ps.reduce<Bend.Env>((e, p, n) =>
+      Bend.list_set(e, p.i, xs[n] ?? p), null);
+    const p = ps[xs.length];
+    const B = (x: HTerm) => abs(t, lam, [...xs, x]);
+    if (p === undefined) {
+      return def_inst(t, j, { ...Bend.term_higher(lo, env), s: CB });
+    }
+    return lam ? Bend.Lam(p.k, 0, B)
+      : Bend.All(Bend.Lone(), p.k, 0, Bend.term_higher(ts[p.i], env), B);
+  };
+  if (ok && !FL.cbs.has(at)
+    && ps.every((p) => ts[p.i] && term_use(u, p) > 0)) {
+    const K = m.k + "$cb" + FL.cbs.size;
     FL.cbs.set(at, K);
+    src_add(K);
     FL.book.tlds[K] = { ...tld, n: ps.length + tld.n - 1, e: undefined,
-      v: abs(true, fun_of(c).h!), T: abs(false, tld.T) };
+      v: abs(fun_of(m.k!).h!, true, []), T: abs(tld.T, false, []) };
   }
   const k = FL.cbs.get(at);
-  const t = Bend.Ref(k!) as HTerm;
+  const all = [...ps, ...m.all.filter((x) => x !== l)];
   const args = [...ps, ...m.args.filter((x) => x !== l)];
-  return k === undefined ? m : { ...m, t, all: [...ps,
-    ...m.all.filter((x) => x !== l)], args, xs: args, k };
+  return k === undefined ? m : { ...m, t: Bend.Ref(k), all, args, xs: args, k };
 }
 
 function def_inst(t: HTerm, j: number, v: HTerm): HTerm {
@@ -759,9 +755,11 @@ function def_inst(t: HTerm, j: number, v: HTerm): HTerm {
   if (s.$ === "All") {
     return j ? { ...s, B: (x: HTerm) => def_inst(s.B(x), j - 1, v) } : s.B(v);
   }
-  return s.$ === "Mat" ? { ...s, h: def_inst(s.h, j - 1 + FL.book.ctrs[s.k].n,
-    v), m: def_inst(s.m, j, v) } : s.$ === "Ann" ? { ...s,
-    x: def_inst(s.x, j, v) } : s;
+  if (s.$ === "Mat") {
+    return { ...s, h: def_inst(s.h, j - 1 + FL.book.ctrs[s.k].n, v),
+      m: def_inst(s.m, j, v) };
+  }
+  return s.$ === "Ann" ? { ...s, x: def_inst(s.x, j, v) } : s;
 }
 
 function term_eta(t: HTerm, T: HTerm, n: number): HTerm {
@@ -1488,9 +1486,6 @@ function file_book(roots: Name[]): void {
       if (ck.k !== null && ck.k !== d) {
         deps.add(ck.k);
       }
-      if (ck.k !== null && FL.book.tlds[ck.k]) {
-        refs.add(ck.k);
-      }
       flat &&= !((s.$ === "Let" && s.k.length >= 2)
         || (ck.k !== null && (ck.b || (ck.k === d && !tail))));
       return false;
@@ -2056,9 +2051,9 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
       case "App": {
         const m = term_spine(s);
         const beta = (v: HTerm): HTerm => {
-          const f = term_force(v);
-          if (f.$ !== "App") {
-            return f.$ === "Ann" ? { ...f, x: beta(f.x) } : f;
+          const f = term_force(v) as Of<"App"> | Of<"Ann">;
+          if (f.$ === "Ann") {
+            return { ...f, x: beta(f.x) };
           }
           const g = term_strip(f.f);
           if (g.$ !== "Lam") {
