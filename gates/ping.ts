@@ -293,6 +293,10 @@ try {
   check("guide, base and a program run through the executable",
     guide.out.startsWith("# Bend") && base.out.startsWith("type Map")
     && sum5.code === 0 && sum5.out === "5n\n");
+  const fork = await bend(["base", "Array.fork"]);
+  check("base keeps the @unsafe line above the selected def",
+    fork.code === 0 && fork.out === "@unsafe\ndef Array.fork(-T: Type,"
+    + " +a: Array<T>) -> Array<T> & Array<T>:\n  (a, a)\n");
   const header_source = path.join(TMP, "literal-checkup.bend");
   fs.writeFileSync(header_source,
     "# a header\nimport Base\n\nimport ./sum.bend as Sum\n"

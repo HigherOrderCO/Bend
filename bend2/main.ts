@@ -471,7 +471,10 @@ function cli_base(what?: string): void {
     return cli_say(1, src);
   }
   const want: string[] = [];
-  for (const text of src.split(/\n(?=type |law |def |@)/)) {
+  let tag = "";
+  for (const part of src.split(/\n(?=type |law |def |@)/)) {
+    const text = tag + part;
+    tag = part.startsWith("@") ? text + "\n" : "";
     const m = /^(type|law|def) ([^\s(<:?]+)/m.exec(text);
     if (m === null) {
       continue;
