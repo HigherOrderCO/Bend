@@ -1389,7 +1389,7 @@ export function io_run(book: Bend.Book, args: string[]): number {
 function file_new(book: Bend.Book, js: boolean): File {
   PROBES.length = 1;
   return {
-    book,
+    book: { ...book, tlds: { ...book.tlds } },
     js,
     bangs: new Set(),
     sites: new Map(),
