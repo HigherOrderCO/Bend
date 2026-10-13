@@ -132,9 +132,8 @@ const IO_EMIT = "IO~emit";
 const ATOM   = /^(?:[A-Za-z_$][A-Za-z0-9_$]*|\d+|\d+\.\d+)$/;
 const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
 
-// The field a JS match opens from a named U32, F32 or Char (its word, its
-// code): a binder takes it as written, so a rebuild folds back to the name.
-const VIEW = /^(?:u32_to_word\((\w+|f32_bits\((\w+)\))\)|char_code\((\w+)\))$/;
+// Native view rebuilds keep the original value.
+const VIEW = /^(?:u32_to_word\((\w+|f32_bits\((\w+)\))\)|char_code\((\w+)\)\x03?)$/;
 
 const TAB_BAD = /\b(?!(?:fround|imul)\()\w+\(/;
 
@@ -240,7 +239,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   },
   ...tpl_ops("bool_", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
   string_append: { JS: "($0 + $1)" },
-  string_length: { JS: "[...str_out($0)].length" },
+  string_length: { JS: "str_len($0)" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -506,27 +505,47 @@ function f32_read(s) {
 
 const f32_round = ${Bend.f32_round};
 
-// A Char past the Unicode scalars keeps its code as 0xDC00 and three 11-bit
-// pieces; str_out writes it as U+FFFD, as str_in does a host's surrogate.
+// Non-scalars: 2+3x10 bits in four low-surrogate units.
 function char_new(c) {
   return c < 0xD800 || c >= 0xE000 && c <= 0x10FFFF ? String.fromCodePoint(c)
-    : String.fromCharCode(0xDC00, c >>> 22, c >>> 11 & 0x7FF, c & 0x7FF);
+    : String.fromCharCode(0xDC00 | c >>> 30, 0xDC00 | c >>> 20 & 1023,
+      0xDC00 | c >>> 10 & 1023, 0xDC00 | c & 1023);
 }
 
-function char_len(s) {
-  return s[0] === "\uDC00" ? 4 : s.codePointAt(0) > 0xFFFF ? 2 : 1;
+function char_len(s, i = 0) {
+  const u = s.codePointAt(i);
+  if (u < 0xDC00 || u > 0xDC03) return u > 0xFFFF ? 2 : 1;
+  for (let j = 1; j <= 3; ++j) {
+    if ((s.charCodeAt(i + j) & 0xFC00) !== 0xDC00) return 1;
+  }
+  return 4;
 }
 
 function char_code(s) {
-  return s.length < 4 ? s.codePointAt(0)
-    : (s.charCodeAt(1) << 22 | s.charCodeAt(2) << 11 | s.charCodeAt(3)) >>> 0;
+  const u = s.codePointAt(0);
+  if (u < 0xDC00 || u > 0xDC03) return u;
+  let c = u & 3;
+  for (let i = 1; i <= 3; ++i) {
+    const b = s.charCodeAt(i);
+    if ((b & 0xFC00) !== 0xDC00) return u;
+    c = c << 10 | b & 1023;
+  }
+  return c >>> 0;
+}
+
+function str_len(s) {
+  let n = 0;
+  for (let i = 0; i < s.length; i += char_len(s, i)) ++n;
+  return n;
 }
 
 function str_out(s) {
-  return s.replace(/\uDC00[^]{3}/gu, "\uFFFD");
+  if (typeof s !== "string") throw "bend: expected a JS string";
+  return s.replace(/[\uDC00-\uDC03][\uDC00-\uDFFF]{3}|\p{Cs}/gu, "\uFFFD");
 }
 
 function str_in(s) {
+  if (typeof s !== "string") throw "bend: expected a JS string";
   return s.replace(/\p{Cs}/gu, "\uFFFD");
 }
 `.slice(1),
@@ -2916,13 +2935,8 @@ export function compile_book(book: Bend.Book): string {
 // JS
 // --
 
-// Each effect source runs once in a closure of its own and registers
-// its effects with io_eff(CID(k), run), as a C source does. A
-// def on a tail cycle is one loop over the cycle's bodies ($pc picks
-// one), each turn binding its parameters afresh, so a closure keeps its
-// own; any other call is direct. Only a closure's tail call bounces
-// (run_tail), so a call passes through run_loop only when its callee
-// may return one: a marker per call resolves once every def is out.
+// Effects register once; tail cycles loop with fresh bindings.
+// Other call markers resolve after emission.
 
 const JS_DEPTH = new WeakMap<HTerm, number>();
 
@@ -2985,7 +2999,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
       if (c && !c.vs.has(p) && (JS_DEPTH.get(p) ?? c.d) < c.d) {
         c.vs.set(p, view_root(x.k) ?? x.k);
       }
-      return x.k;
+      return x.k.startsWith("char_code(") ? x.k + "\x03" : x.k;
     }
     case "Ref":
     case "App": {
@@ -3037,7 +3051,10 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
       const name = name_id("$", sc.def + "$c" + FL.spins.length);
       js_func(cl, x, ty, [arg]);
       const ps = [...new Set(vs.values())];
-      vs.forEach((_, p) => js_expr(sc, p, null));
+      vs.forEach((_, p) => {
+        js_expr(sc, p, null);
+        js_hold_view(cl, (p as Of<"Var">).k, 0);
+      });
       cl.seg.lines = [`function ${name}(${ps}) {`, `return (${arg}) => {`,
         ...cl.seg.lines, "}", "}"];
       return `run_clo(${name}(${ps}))`;
@@ -3065,6 +3082,7 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
     if (k !== e && sc.seg.lines.slice(at).some((l) => l.includes(k))) {
       sc.seg.lines.splice(at, 0, `const ${k} = ${e};`);
     }
+    js_hold_view(sc, k, at);
     return;
   }
   if (mat_head(x)) {
@@ -3087,6 +3105,16 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
   file_push(sc, `return ${ck.k === null ? js_expr(sc, x, ty)
     : js_call(sc, ck.k, ck.xs, true)};`);
 }
+// JSON escapes this private field-read marker.
+function js_hold_view(sc: Scope, e: string, at: number): void {
+  if (!e.startsWith("char_code(")) return;
+  const mark = e + "\x03", ls = sc.seg.lines;
+  if (!ls.slice(at).some(s => s.includes(mark))) return;
+  const k = name_local(sc, "code");
+  for (let i = at; i < ls.length; ++i) ls[i] = ls[i].replaceAll(mark, k);
+  ls.splice(at, 0, `const ${k} = ${e};`);
+}
+
 
 function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
   if (x.$ === "Efq") {
@@ -3140,9 +3168,10 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
     if (def_foreign(def)) {
       const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
       const f = params.at(-1);
+      const c = K?.$ === "All" ? host(K.A) : "";
       return file_push(sc, `return { $: ${JSON.stringify(Bend.name_key(k))
-        }, args: [${live.map(([, , A], i) => host(A, params[i], 1))
-        }], kont: (x) => ${f}(${host(K?.$ === "All" ? K.A : null, "x")}) };`);
+        }, args: [${live.map(([, , A], i) => `${host(A, 1)}(${params[i]})`)
+        }], kont: ${c ? `(x) => ${f}(${c}(x))` : f} };`);
     }
     if (loop.length === 0) {
       return js_func(sc, h!, def.T, params);
@@ -3166,17 +3195,14 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
-// What crosses to or from a host: a Nat comes in as a number, which nat_in
-// checks; text gets U+FFFD for what is no Unicode scalar.
-function host(A: HTerm | null, x: string, out = 0): string {
-  const t = ty_wnf(A);
-  const k = t?.$ === "ADT" ? t.k : "";
-  return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
-    : k === "Nat" && !out ? `nat_in(${x})` : x;
+// Converter names for values crossing the host seam.
+function host(A: HTerm | null, out = 0): string {
+  const t = ty_wnf(A), k = t?.$ === "ADT" ? t.k : "";
+  return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}`
+    : k === "Nat" && !out ? "nat_in" : "";
 }
 
-// A module (for the .bend loader and -o <out>.mjs) roots and exports each
-// def a host can call.
+// Export the host-callable defs.
 export function js_lib(book: Bend.Book, mod = false): string {
   FL = file_new(book, true);
   const outs = !mod ? null : [...new Set(FL.book.order)].filter((k) => {
@@ -3193,19 +3219,19 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const effs = effect_srcs(".js", "a foreign def without a .js import: ")
     .map((t) => `(() => {\n${t}\n})();\n\n`).join("");
   const lib = outs === null ? "" : `export default {\n${outs.map((k) => {
-    const { live, lays } = fun_of(k);
+    const { live, n } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
-    const xs = live.map(([, , A], i) => host(A, ps[i]));
-    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${host(tele_unbind(
-      FL.book.tlds[k].T).ret, `run_loop(${name_id("$", k)}(${xs}))`, 1)
-    }, ${lays.length}),`;
+    const xs = live.map(([, , A], i) => `${host(A)}(${ps[i]})`);
+    const out = host(tele_fill(FL.book.tlds[k].T, Array(n).fill(DUMMY)), 1);
+    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${
+      name_id("$", k)}(${xs}), ${ps.length}, ${out || "null"}),`;
   }).join("\n")}\n};\n`;
   const jmps = new Map<Name, boolean>();
   const jmp = (k: Name): boolean => k === CLO_APPLY || memo(jmps, k, () =>
     (jmps.set(k, true), [...FL.tails.get(k) ?? []].some(jmp)));
   const funs = [sc.seg, ...FL.spins].flatMap((f) => seg_text(f.lines, 0))
     .join("\n").replace(/\x01([^\x02]*)\x02/g, (_, k) => jmp(k) ? "run_loop"
-      : "");
+      : "").replaceAll("\x03", "");
   PROBES.length = 1;
   return RUNTIME + effs + "// Program\n// =======\n\n" + [funs, ...[...FL.tabs]
     .map(([r, i]) => `const TAB_${i} = [${r}];`)].join("\n") + lib;
@@ -6049,9 +6075,12 @@ function run_loop(r) {
   return r;
 }
 
-function run_lib(f, n) {
-  return (...a) => a.length < n ? run_lib((...b) => f(...a, ...b), n - a.length)
-    : run_loop(f(...a));
+function run_lib(f, n, out) {
+  return (...a) => {
+    if (a.length < n) return run_lib((...b) => f(...a, ...b), n - a.length, out);
+    const r = run_loop(f(...a));
+    return out === null ? r : out(r);
+  };
 }
 
 // Effect
@@ -6104,7 +6133,8 @@ function show_chr(s, q) {
   const k = { 10: "n", 9: "t", 13: "r", 0: "0", 92: "\\" }[c]
     ?? (s === q ? q : null);
   return k !== null ? "\\" + k : c < 32 || c === 127
-    || s.length > 2 ? "\\u{" + c.toString(16) + "}" : s;
+    || c >= 0xD800 && c < 0xE000 || c > 0x10FFFF
+    ? "\\u{" + c.toString(16) + "}" : s;
 }
 
 function show_val(D, d, v, chain) {
@@ -6127,7 +6157,7 @@ function show_val(D, d, v, chain) {
     : D[d] === 1 ? f32_show(v).replace(/^-?\d+(?=e|$)/, "$&.0")
     : D[d] === 2 ? v + "n"
     : D[d] === 3 ? "'" + show_chr(v, "'") + "'"
-    : D[d] === 4 ? "\"" + v.replace(/\uDC00[^]{3}|[^]/gu,
+    : D[d] === 4 ? "\"" + v.replace(/[\uDC00-\uDC03][\uDC00-\uDFFF]{3}|[^]/gu,
       (c) => show_chr(c, "\"")) + "\""
     : D[d] === 5 ? "{==}"
     : "[" + v.map((x) => show_val(D, D[d + 1], x, 0)).join(", ") + "]";
@@ -6182,7 +6212,7 @@ function io_out(fd, data) {
 }
 
 function io_errs(message) {
-  io_out(2, io_bytes(message + "\n"));
+  io_out(2, io_bytes(str_out(message) + "\n"));
 }
 
 function io_sys() {
@@ -6249,7 +6279,7 @@ function io_tup(...xs) {
 }
 
 function io_bytes(text) {
-  return new TextEncoder().encode(str_out(text));
+  return new TextEncoder().encode(text);
 }
 
 function io_text(b, n) {
