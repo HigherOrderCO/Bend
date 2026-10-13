@@ -79,6 +79,7 @@ type File = {
   brws: Map<Name, boolean[]>;
   nodes: Map<Name, Lay>;
   lays: Map<string, Lay>;
+  vals: Map<Name, boolean[]>;
   lay_ids: Map<Lay, number>;
   memo: {
     opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
@@ -865,14 +866,14 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 }
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
-// but for the words. Each datatype is opened once; met again with other
-// value arguments, it answers rep, so ty_clo says a closure may be there
-// (its type arguments are looked into apart, on every visit).
-function ty_holds(A: HTerm | null, p: (t: HTerm | null) => boolean,
-  rep = false, seen = new Map<Name, string>()): boolean {
+// but for the words. Its type arguments are looked into on every visit,
+// its fields once, with DUMMY for its value arguments: the answer then
+// covers every index it is met with (#1513).
+function ty_holds(A: HTerm | null,
+  p: (t: HTerm | null) => boolean, seen = new Set<Name>()): boolean {
   const t = ty_wnf(A);
   if (t?.$ === "Lam") {
-    return ty_holds(t.f(DUMMY), p, rep, seen);
+    return ty_holds(t.f(DUMMY), p, seen);
   }
   if (p(t)) {
     return true;
@@ -881,22 +882,18 @@ function ty_holds(A: HTerm | null, p: (t: HTerm | null) => boolean,
     return false;
   }
   const tld = FL.book.tlds[t.k];
-  const ks = tld?.$ === "ADT" ? tele_unbind(tld.T).doms : [];
-  const vs = t.x.map((x, i) => ty_value(ks[i]?.[2] ?? null));
-  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, rep, seen))) {
+  const vs = tld?.$ === "ADT" ? memo(FL.vals, t.k, () =>
+    tele_unbind(tld.T).doms.map(([, , K]) => ty_value(K))) : [];
+  if (t.x.some((x, i) => !vs[i] && ty_holds(x, p, seen))) {
     return true;
   }
-  if (tld?.$ !== "ADT") {
+  if (tld?.$ !== "ADT" || seen.has(t.k)) {
     return false;
   }
-  const key = rep ? t.x.map((x, i) => vs[i]
-    ? Bend.term_key(Bend.term_lower(x)) : "").join("\n") : "";
-  if (seen.has(t.k)) {
-    return rep && seen.get(t.k) !== key;
-  }
-  seen.set(t.k, key);
+  seen.add(t.k);
+  const xs = t.x.map((x, i) => vs[i] ? DUMMY : x);
   return tld.c.some((c) =>
-    ctr_doms(c, t.x).some((f) => ty_holds(f, p, rep, seen)));
+    ctr_doms(c, xs).some((f) => ty_holds(f, p, seen)));
 }
 
 function ty_value(K: HTerm | null): boolean {
@@ -907,7 +904,7 @@ function ty_value(K: HTerm | null): boolean {
 
 function ty_clo(A: HTerm | null): boolean {
   return ty_holds(A, (t) =>
-    !["ADT", "Typ", "Qua", "Min", "Eql"].includes(t?.$ ?? ""), true);
+    !["ADT", "Typ", "Qua", "Min", "Eql"].includes(t?.$ ?? ""));
 }
 
 function type_adts(T: HTerm): Name[] {
@@ -1354,6 +1351,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     brws: new Map(),
     nodes: new Map(),
     lays: new Map(),
+    vals: new Map(),
     lay_ids: new Map(),
     memo: {
       opens: new Map(),
