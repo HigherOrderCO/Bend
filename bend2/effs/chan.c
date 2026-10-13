@@ -29,7 +29,8 @@ static Term chan_open(Env e, u32 room) {
   memset(e.mem + loc, 0, (1ull << cls) * sizeof(Term));
   ChanRow* row = (ChanRow*)(e.mem + loc);
   row->room = room;
-  return term_blk(true, cls, loc);
+  // Data: born shared, so a node that holds a copy may itself be shared.
+  return rfc_wrap(e, term_blk(true, cls, loc), 1);
 }
 
 static ChanRow* chan_at(Env e, Term t) {
