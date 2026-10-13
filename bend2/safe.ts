@@ -212,17 +212,19 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
   const g0 = groups.size;
   const e: Safe = { book, mb: { ...book, tlds: Object.create(book.tlds) as Book["tlds"] }, out: [], names: new Map(), seen: new Set(),
     todo: [], taken: new Set(), fail: new Map(), groups, inst, stack: [], going: new Set(), grew: false, consts: new Map(), uses: new WeakMap() };
-  const roots: Array<[Name, string[]]> = [];
+  const roots: Array<[Name, string[], string | null]> = [];
   for (const k of [...new Set([...book.order].reverse())].reverse().filter((k) => book.tlds[k].b !== true)) {
+    const m = trail(e);
     try {
-      roots.push([k, root_emit(e, k)]);
+      roots.push([k, ...root_emit(e, k)]);
     } catch (x) {
       if (!(x instanceof Scope_Error)) {
         throw x;
       }
+      undo(e, m);
       const n = fresh(e, name_tt(k));
       e.fail.set(n, x.message);
-      roots.push([k, [n]]);
+      roots.push([k, [n], null]);
     }
   }
   for (let it = e.todo.pop(); it !== undefined; it = e.todo.pop()) {
@@ -244,12 +246,15 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
     }
   }
   e.out = e.out.filter(([k]) => !bad.has(k));
-  // a def is out at each reason of its names not out (its last name's,
-  // which names the others, only when alone), or with no name
+  // a def is out at each reason its instances are out for, or else at
+  // its check's (which names them)
   const out = new Set(e.out.map(([k]) => k));
-  const oos = roots.flatMap(([k, ns]) => {
-    const ws = ns.length > 0 ? ns.filter((n) => !out.has(n)).map((n) => bad.get(n) ?? "no kernel def") : ["no kernel def"];
-    return [...new Set(ws.length > 1 ? ws.slice(0, -1) : ws)].map((w): [Name, string] => [k, w]);
+  const why = (n: string): string[] =>
+    out.has(n) ? [] : [bad.get(n) ?? "no kernel def"];
+  const oos = roots.flatMap(([k, ns, top]) => {
+    const ws = ns.flatMap(why);
+    const all = ws.length > 0 || top === null ? ws : why(top);
+    return [...new Set(all)].map((w): [Name, string] => [k, w]);
   });
   return { text: book_show(e), oos };
 }
@@ -263,12 +268,14 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
 // λ-match on each, at ∀y:A -> Σz:A -> {z == y : A}, whose arm at a value
 // names its instance at k's type G, a λ on its ~ parameters (unless G
 // needs them closed), and returns that value. So the kernel checks that
-// each value has an instance that fits k's type. Its names, that def's
-// last
-function root_emit(e: Safe, k: Name): string[] {
+// each value has an instance that fits k's type. Its instances' names,
+// and that def's (null with no finite one)
+function root_emit(e: Safe, k: Name): [string[], string | null] {
   const tld = e.book.tlds[k];
   const ns: string[] = [];
-  let G: O | null | undefined;
+  // fin: k has a finite parameter; G: k's type, if it can go out
+  let fin = false;
+  let G: O | null = null;
   let ps: Binder[] = [];
   // the check of k's instances after the columns cs of T, at depth d
   const go = (T: HTerm, cs: Cols, d: number): O => {
@@ -277,9 +284,12 @@ function root_emit(e: Safe, k: Name): string[] {
     if (F?.$ !== "All") {
       ns.push(item_try(e, k, cs));
       const x: O = { $: "Ref", k: ns[ns.length - 1] };
-      return G == null ? x : { $: "Ann", x, T: ps.reduce<O>((f, [q], j) => ({ $: "App", q, f, x: term(e, scope_nil(), cs[j] as HTerm, false) }), { $: "Var", l: 0 }) };
+      return G === null ? x : { $: "Ann", x, T: ps.reduce<O>((f, [q], j) =>
+        ({ $: "App", q, f, x: term(e, scope_nil(), cs[j] as HTerm, false) }),
+        { $: "Var", l: 0 }) };
     }
-    const at = (v: HTerm | null, d1 = d): O => go(F.B(v ?? B.Var(F.k, j)), [...cs, v], d1);
+    const at = (v: HTerm | null, d1 = d): O =>
+      go(F.B(v ?? B.Var(F.k, j)), [...cs, v], d1);
     if (tld.$ !== "Def" || j >= tld.x) {
       return at(null);
     }
@@ -288,12 +298,14 @@ function root_emit(e: Safe, k: Name): string[] {
     const vs: HTerm[] | null = A.$ === "Qnt" ? [B.None(), B.Lone(), B.Many()].map((q) => B.Qua(q))
       : adt !== null && adt.c.every((c) => B.term_wnf(e.book, c.T).$ !== "All") ? adt.c.map((c) => B.Ctr(c.k, [])) : null;
     if (vs !== null) {
-      if (G === undefined) {
-        G = null;
+      if (!fin) {
+        fin = true;
         const m = trail(e);
         try {
           const t = tele_open(e, scope_nil(), tld.T, [], tld.x);
-          G = { $: "Ann", x: t.ps.reduceRight<O>((f, [q, l]) => ({ $: "Lam", q, l, f }), term(e, t.s, t.T, false)), T: alls(t.ps, { $: "Typ", q: { $: "Lab", k: "Q1" } }) };
+          const b = term(e, t.s, t.T, false);
+          G = { $: "Ann", x: t.ps.reduceRight<O>((f, [q, l]) => ({ $: "Lam", q, l, f }), b),
+            T: alls(t.ps, { $: "Typ", q: { $: "Lab", k: "Q1" } }) };
           ps = t.ps;
         } catch (x) {
           if (!(x instanceof Scope_Error)) {
@@ -302,10 +314,14 @@ function root_emit(e: Safe, k: Name): string[] {
           undo(e, m);
         }
       }
-      const hs = vs.map((v): O => ({ $: "Let", q: 0, l: d, v: at(v, d + 1), f: { $: "Tup", q: 1, a: term(e, scope_nil(), v, false), b: { $: "Rfl" } } }));
-      const M: O = adt === null ? mats(QS, (i) => hs[i]) : { $: "Prj", h: mats(adt.c.map((c) => name_tt(c.k)), (i) => unit(hs[i])) };
+      const hs = vs.map((v): O => ({ $: "Let", q: 0, l: d, v: at(v, d + 1),
+        f: { $: "Tup", q: 1, a: term(e, scope_nil(), v, false), b: { $: "Rfl" } } }));
+      const M: O = adt === null ? mats(QS, (i) => hs[i])
+        : { $: "Prj", h: mats(adt.c.map((c) => name_tt(c.k)), (i) => unit(hs[i])) };
       const Ao = term(e, scope_nil(), A, false);
-      return { $: "Ann", x: M, T: { $: "All", q: 1, l: d, A: Ao, B: { $: "Sig", q: 1, l: d + 1, A: Ao, B: { $: "Eql", a: { $: "Var", l: d + 1 }, b: { $: "Var", l: d }, T: Ao } } } };
+      const eq: O = { $: "Eql", a: { $: "Var", l: d + 1 }, b: { $: "Var", l: d }, T: Ao };
+      return { $: "Ann", x: M,
+        T: { $: "All", q: 1, l: d, A: Ao, B: { $: "Sig", q: 1, l: d + 1, A: Ao, B: eq } } };
     }
     if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
       oos("a specialized parameter whose type names a parameter");
@@ -329,12 +345,12 @@ function root_emit(e: Safe, k: Name): string[] {
     return at(B.Ref(c));
   };
   const v: O = { $: "Let", q: 0, l: 1, v: go(tld.T, [], 2), f: UV };
-  if (G === undefined) {
-    return ns;
+  if (!fin) {
+    return [ns, null];
   }
   const n = fresh(e, name_tt(k));
   e.out.push([n, UT, G === null ? v : { $: "Let", q: 0, l: 0, v: G, f: v }, false]);
-  return [...ns, n];
+  return [ns, n];
 }
 
 // item_ref, with a failure kept as the item's reason
@@ -1436,13 +1452,12 @@ function alls(ps: Binder[], b: O, $: "All" | "Sig" = "All"): O {
 
 // a λ-match whose arm at the label ks[i] is h(i), made last to first
 function mats(ks: string[], h: (i: number) => O): O {
-  const efq: O = { $: "Efq" };
-  return ks.reduceRight<O>((m, k, i) => ({ $: "Mat", k, h: h(i), m }), efq);
+  return ks.reduceRight<O>((m, k, i) => ({ $: "Mat", k, h: h(i), m }), { $: "Efq" });
 }
 
 // the match that splits a Σ chain's unit, then h
 function unit(h: O): O {
-  return { $: "Mat", k: "()", h, m: { $: "Efq" } };
+  return mats(["()"], () => h);
 }
 
 // λs over b, at the binders ps; one that uses its variable twice copies it
