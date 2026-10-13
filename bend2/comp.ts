@@ -2738,9 +2738,12 @@ function emit_chain(sc: Scope, cond: (i: number) => string,
 // namespace, else as is. An effect source is read once, in one namespace.
 
 function c_ids(src: string, m = ""): string {
-  return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
+  return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CFH]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
     if (!p) {
       return t;
+    }
+    if (p === "HID") {
+      return name_id("HID_", m + ":" + k);
     }
     const q = [m === "" ? k : m + ":" + k, k].find((q) => q in FL.book.ctrs
       || q in FL.book.tlds || FL.ids.has(p + "_" + q))
