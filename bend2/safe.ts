@@ -1536,9 +1536,9 @@ export function run_read(bin: string, args: string[],
 }
 
 // the kernel's verdict on a book's text: null on exit 0 with its exact
-// success line, else the lines under its failure line. It checks a copy
-// in a fresh private dir, which no one else can swap, and a kernel
-// reading /dev/stdin got EBADF (1 in 1486)
+// success line, else the lines under its failure line, or how it exited
+// if none. It checks a copy in a fresh private dir, which no one else
+// can swap, and a kernel reading /dev/stdin got EBADF (1 in 1486)
 function kernel_check(text: string): string | null {
   const env = { ...process.env, LEAN_STACK_SIZE_KB: "4194304" };
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bendtt-"));
@@ -1552,8 +1552,9 @@ function kernel_check(text: string): string | null {
         ?? (got.signal ? "kernel terminated by " + got.signal : out.trim()
           || "kernel exited " + got.status + " without a verdict")));
     }
+    const why = out.trim().split("\n").slice(1).join("\n");
     return got.status === 0 && out.trim() === "ALL PROOFS CHECK" ? null
-      : out.trim().split("\n").slice(1).join("\n");
+      : why || "kernel exited " + got.status + " after " + out.trim();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
