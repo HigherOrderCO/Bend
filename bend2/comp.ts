@@ -867,8 +867,9 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
 
 // Whether A holds a type p seeks: a datatype p rejects is looked into,
 // but for the words. Its type arguments are looked into on every visit,
-// its fields once, with DUMMY for its value arguments: the answer then
-// covers every index it is met with (#1513).
+// its fields once. When p takes an unknown type as a hit, they are opened
+// with DUMMY for its value arguments, so the answer covers every index it
+// is met with (#1513); else with the arguments first met.
 function ty_holds(A: HTerm | null,
   p: (t: HTerm | null) => boolean, seen = new Set<Name>()): boolean {
   const t = ty_wnf(A);
@@ -891,7 +892,7 @@ function ty_holds(A: HTerm | null,
     return false;
   }
   seen.add(t.k);
-  const xs = t.x.map((x, i) => vs[i] ? DUMMY : x);
+  const xs = p(DUMMY) ? t.x.map((x, i) => vs[i] ? DUMMY : x) : t.x;
   return tld.c.some((c) =>
     ctr_doms(c, xs).some((f) => ty_holds(f, p, seen)));
 }
