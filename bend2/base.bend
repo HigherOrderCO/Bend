@@ -1830,7 +1830,10 @@ def F32.hypot(a: F32, b: F32) -> F32:
   F32.mul(F32.sqrt(F32.add(F32.mul(p, p), F32.mul(q, q))), u)
 
 def F32.round(a: F32) -> F32:
-  F32.floor(F32.add(a, 0.5))
+  match a:
+    case F32{+x}:
+      +f = F32.floor(F32{x})
+      F32.add(f, Bool.pick(F32, F32.is_ge(F32.sub(F32{x}, f), 0.5), 1.0, 0.0))
 
 def F32.pi() -> F32:
   3.14159265
