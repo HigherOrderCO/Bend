@@ -1535,10 +1535,11 @@ export function run_read(bin: string, args: string[],
   }
 }
 
-// the kernel's verdict on a book's text: ok on exit 0 with its exact
-// success line. It checks a copy in a fresh private dir, which no one
-// else can swap, and a kernel reading /dev/stdin got EBADF (1 in 1486)
-function kernel_check(text: string): boolean {
+// the kernel's verdict on a book's text: null on exit 0 with its exact
+// success line, else the lines under its failure line, or how it exited
+// if none. It checks a copy in a fresh private dir, which no one else
+// can swap, and a kernel reading /dev/stdin got EBADF (1 in 1486)
+function kernel_check(text: string): string | null {
   const env = { ...process.env, LEAN_STACK_SIZE_KB: "4194304" };
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bendtt-"));
   try {
@@ -1551,7 +1552,9 @@ function kernel_check(text: string): boolean {
         ?? (got.signal ? "kernel terminated by " + got.signal : out.trim()
           || "kernel exited " + got.status + " without a verdict")));
     }
-    return got.status === 0 && out.trim() === "ALL PROOFS CHECK";
+    const why = out.trim().split("\n").slice(1).join("\n");
+    return got.status === 0 && out.trim() === "ALL PROOFS CHECK" ? null
+      : why || "kernel exited " + got.status + " after " + out.trim();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -1565,9 +1568,10 @@ export function safe_emit(book: Book, out: string): string[] {
   return got.oos.map(([k, why]) => "- " + B.name_key(k) + ": " + why + "\n");
 }
 
-// --verdict: whether every def of a book bend2 checked is in the kernel's
-// scope, and the kernel checks them all
-export function safe_check(book: Book): boolean {
+// --verdict: null when every def of a book bend2 checked is in the
+// kernel's scope and the kernel checks them all, else why not
+export function safe_check(book: Book): string | null {
   const got = safe_book(book);
-  return got.oos.length === 0 && kernel_check(got.text);
+  return got.oos.length === 0 ? kernel_check(got.text) : "BendTT: out of scope:\n"
+    + got.oos.map(([k, why]) => "- " + B.name_key(k) + ": " + why).join("\n");
 }
