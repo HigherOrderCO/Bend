@@ -2728,11 +2728,12 @@ function emit_chain(sc: Scope, cond: (i: number) => string,
 // Compile
 // =======
 
-// Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
-// namespace, else as is. An effect source is read once, in one namespace.
+// Foreign ids resolve in the module, then by bare name.
+
+const foreign_tokens = /\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g;
 
 function c_ids(src: string, m = ""): string {
-  return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
+  return src.replace(foreign_tokens, (t, p, k) => {
     if (!p) {
       return t;
     }
@@ -2741,6 +2742,75 @@ function c_ids(src: string, m = ""): string {
       ?? die(`${p}(${k}) names no constructor or def`);
     return FL.js ? JSON.stringify(Bend.name_key(q)) : name_id(p + "_", q);
   });
+}
+
+function c_namespace(src: string, m: string): string {
+  if (!m) return src;
+  const atom = new RegExp(foreign_tokens.source + String.raw`|\w+|->|[^\s]`, "g");
+  const lex = new RegExp(String.raw`^[ \t]*#(?:\\\n|[^\n])*|` + atom.source, "gm");
+  const ts = [...src.matchAll(lex)].map((t) => t[0])
+    .filter((t) => t[0] !== "/");
+  const names = new Set<string>();
+  const macros = new Set<string>();
+  const fields = new Set<number>();
+  const stack: string[] = [];
+  let par = 0, last = "", fn = "", record = false, init = false;
+  const ident = /^[A-Za-z_]\w*$/;
+  ts.forEach((t, i) => {
+    const p = ts[i - 1], n = ts[i + 1];
+    if (/^\s*#/.test(t)) {
+      const k = t.match(/^\s*#\s*define\s+(\w+)/)?.[1];
+      if (k) macros.add(k);
+      return;
+    }
+    if (t === "struct" || t === "union") record = true;
+    if (!stack.length) {
+      if (t === "(" && !par && !init && p !== "__attribute__") fn = last;
+      if (t === "(" || t === "[") par++;
+      if (t === ")" || t === "]") par--;
+      if (!par && ["=", ",", ";"].includes(t)) {
+        last = fn = ""; record = false;
+        init = t === "=";
+      }
+      if (!par && !init && ident.test(t) && t !== "__attribute__") last = t;
+    }
+    if (t === "{") {
+      const kind = p === ")" && fn && !stack.length && !init
+        ? "function" : record ? "record" : "";
+      if (kind === "function") names.add(fn);
+      record = false;
+      stack.push(kind);
+    } else if (t === "}") {
+      if (stack.pop() === "function" && !stack.length) last = fn = "";
+    } else if (stack.at(-1) === "record"
+      && (/^[;,\[=:]$/.test(n)
+        || (/^(\*|const|volatile|restrict|_Atomic)$/.test(p) && n === ")"))) {
+      fields.add(i);
+    }
+    if (t === ";") record = false;
+  });
+  const pre = name_id("EFFECT_", m) + "_";
+  const emit = (s: string, re: RegExp, xs: string[], keep?: Set<number>,
+    bound?: string[] | null): string => {
+    let i = 0;
+    return s.replace(re, (t) => {
+      if (t[0] === "/") return t;
+      const at = i++;
+      if (re === lex && /^\s*#(?!\s*(include|import|pragma|line)\b)/.test(t)) {
+        const args = t.match(/^\s*#\s*define\s+\w+\(([^)]*)\)/)?.[1];
+        return emit(t, atom, [...t.matchAll(atom)].map((v) => v[0])
+          .filter((v) => v[0] !== "/"), undefined, args?.match(/\w+/g));
+      }
+      return names.has(t) && !bound?.includes(t) && !keep?.has(at)
+        && ![".", "->", "struct", "union", "enum"].includes(xs[at - 1])
+        && !(xs[at - 1] === "," && /^(offsetof|__builtin_offsetof)$/
+          .test(xs[at - (xs[at - 3] === "(" ? 4 : 5)])) ? pre + t : t;
+    });
+  };
+  const ms = [...macros].map((k) => names.has(k) ? pre + k : k);
+  return ms.map((k) => `#pragma push_macro("${k}")\n`).join("")
+    + emit(src, lex, ts, fields) + "\n"
+    + ms.map((k) => `#pragma pop_macro("${k}")\n`).join("");
 }
 
 function effect_srcs(ext: string, miss: string): string[] {
@@ -2755,7 +2825,10 @@ function effect_srcs(ext: string, miss: string): string[] {
     }
     seen.set(path, m);
   }
-  return [...seen].map(([p, m]) => c_ids(fs.readFileSync(p, "utf8"), m));
+  return [...seen].map(([p, m]) => {
+    const src = c_ids(fs.readFileSync(p, "utf8"), m);
+    return ext === ".c" ? c_namespace(src, m) : src;
+  });
 }
 
 // C

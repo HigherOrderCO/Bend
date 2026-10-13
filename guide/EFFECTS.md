@@ -33,6 +33,13 @@ static void __attribute__((constructor)) clock_now_use(void) {
 }
 ```
 
+Functions defined directly in an imported C twin, including its helpers
+and registration constructor, get module-qualified host symbols. Headers,
+record members and literals keep their spelling. Source-defined macros
+are saved and restored around each twin, so a shared include guard
+does not suppress another version's helper. Other C names retain their
+normal C scope; function-local state belongs to each qualified function.
+
 `CID(Name)` is the C id of a constructor or of an effect def: the compiler
 replaces it with the name's own id, reading `Name` in the effect's
 namespace first (the file that declares the def), then in Base's, as the
