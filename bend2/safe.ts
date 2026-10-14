@@ -131,6 +131,7 @@ type Safe = {
   todo: Array<[Name, Cols]>;
   taken: Set<string>;
   fail: Map<string, string>;
+  log: Array<[Map<string, string> | Set<string>, string]>;
   groups: Map<Name, Group>;
   inst: Map<Name, [Name, HTerm[]]>;
   stack: string[];
@@ -172,6 +173,10 @@ const UV: O = { $: "Lab", k: "()" };
 // a book the kernel cannot express
 class Scope_Error extends Error {}
 
+// a template argument that depends on a run-time value, which a closed
+// argument there would not
+class Open_Error extends Scope_Error {}
+
 // a live cycle found below the item at key, now a group: the emission
 // since key began is undone, and its caller retries (Reroute)
 class Regroup extends Error {
@@ -181,8 +186,8 @@ class Regroup extends Error {
 }
 class Reroute extends Error {}
 
-function oos(why: string): never {
-  throw new Scope_Error(why);
+function oos(why: string, E = Scope_Error): never {
+  throw new E(why);
 }
 
 // Book
@@ -211,7 +216,7 @@ function safe_book(book: Book): { text: string; oos: Array<[Name, string]> } {
 function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { text: string; oos: Array<[Name, string]> } | null {
   const g0 = groups.size;
   const e: Safe = { book, mb: { ...book, tlds: Object.create(book.tlds) as Book["tlds"] }, out: [], names: new Map(), seen: new Set(),
-    todo: [], taken: new Set(), fail: new Map(), groups, inst, stack: [], going: new Set(), grew: false, consts: new Map(), uses: new WeakMap() };
+    todo: [], taken: new Set(), fail: new Map(), log: [], groups, inst, stack: [], going: new Set(), grew: false, consts: new Map(), uses: new WeakMap() };
   const roots: Array<[Name, string[], string | null]> = [];
   for (const k of [...new Set([...book.order].reverse())].reverse().filter((k) => book.tlds[k].b !== true)) {
     const m = trail(e);
@@ -223,7 +228,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
       }
       undo(e, m);
       const n = fresh(e, name_tt(k));
-      e.fail.set(n, x.message);
+      put(e, e.fail, n, x.message);
       roots.push([k, [n], null]);
     }
   }
@@ -251,8 +256,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
   const why = (n: string): string[] => bad.has(n) ? [bad.get(n) as string] : [];
   const oos = roots.flatMap(([k, ns, top]) => {
     const ws = ns.flatMap(why);
-    const t = top ?? ns[0];
-    const all = ws.length > 0 ? ws : t === undefined ? ["no kernel def"] : why(t);
+    const all = ws.length > 0 ? ws : top !== null ? why(top) : ns.length === 0 ? ["no kernel def"] : [];
     return [...new Set(all)].map((w): [Name, string] => [k, w]);
   });
   return { text: book_show(e), oos };
@@ -263,19 +267,22 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
 // have no fields) at each value, any other at an opaque constant of its
 // type, one per place for all roots, which models read at its model (as
 // bend2 checks a template: its body holds at every argument). With a
-// finite one, k also goes out as a λ-match on each, at
-// ∀y:A -> Σz:A -> {z == y : A}, whose arm names an instance at k's type
-// G at its own arguments. So the kernel checks that every value has an
-// arm and each instance fits G, not which arm names which. If G cannot
-// go out, the arms name the instances bare. Returns the instances'
-// names, and the λ-match's (null without one)
+// finite one, k also goes out as a λ-match on each, at ∀y:A -> <()>,
+// whose arm names an instance at k's type G at its own arguments. So the
+// kernel checks that every value has an arm and each instance fits G,
+// not which arm names which. If G calls a template at one of k's ~
+// parameters (bound in it), the arms name the instances bare; any other
+// reason G cannot go out is k's. Returns the instances' names, and the
+// λ-match's (null without one)
 function root_emit(e: Safe, k: Name): [string[], string | null] {
   const tld = e.book.tlds[k];
   const ns: string[] = [];
-  // fin: k has a finite parameter; G: k's type, null if it cannot go out
-  let fin = false;
-  let G: O | null = null;
+  // k's type G: undefined until a finite parameter, null if it cannot go out
+  let G: O | null | undefined;
   let ps: Binder[] = [];
+  // a column's kernel term, made once for every leaf below it
+  const kc = new Map<HTerm, O>();
+  const col = (v: HTerm): O => kc.get(v) ?? kc.set(v, term(e, scope_nil(), v, false)).get(v) as O;
   // the check of k's instances after the columns cs of T, at depth d
   const go = (T: HTerm, cs: Cols, d: number): O => {
     const j = cs.length;
@@ -283,9 +290,8 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     if (F?.$ !== "All") {
       ns.push(item_try(e, k, cs));
       const x: O = { $: "Ref", k: ns[ns.length - 1] };
-      return G === null ? x : { $: "Ann", x, T: ps.reduce<O>((f, [q], j) =>
-        ({ $: "App", q, f, x: term(e, scope_nil(), cs[j] as HTerm, false) }),
-        { $: "Var", l: 0 }) };
+      return G == null ? x : { $: "Ann", x, T: ps.reduce<O>((f, [q], j) =>
+        ({ $: "App", q, f, x: col(cs[j] as HTerm) }), { $: "Var", l: 0 }) };
     }
     const at = (v: HTerm | null, d1 = d): O =>
       go(F.B(v ?? B.Var(F.k, j)), [...cs, v], d1);
@@ -297,30 +303,25 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     const vs: HTerm[] | null = A.$ === "Qnt" ? [B.None(), B.Lone(), B.Many()].map((q) => B.Qua(q))
       : adt !== null && adt.c.every((c) => B.term_wnf(e.book, c.T).$ !== "All") ? adt.c.map((c) => B.Ctr(c.k, [])) : null;
     if (vs !== null) {
-      if (!fin) {
-        fin = true;
+      if (G === undefined) {
+        G = null;
         const m = trail(e);
         try {
           const t = tele_open(e, scope_nil(), tld.T, [], tld.x);
           const b = term(e, t.s, t.T, false);
-          G = { $: "Ann", x: t.ps.reduceRight<O>((f, [q, l]) => ({ $: "Lam", q, l, f }), b),
-            T: alls(t.ps, { $: "Typ", q: { $: "Lab", k: "Q1" } }) };
+          G = { $: "Ann", x: lams(e, t.ps, b), T: alls(t.ps, { $: "Typ", q: { $: "Lab", k: "Q1" } }) };
           ps = t.ps;
         } catch (x) {
-          if (!(x instanceof Scope_Error)) {
+          if (!(x instanceof Open_Error)) {
             throw x;
           }
           undo(e, m);
         }
       }
-      const hs = vs.map((v): O => ({ $: "Let", q: 0, l: d, v: at(v, d + 1),
-        f: { $: "Tup", q: 1, a: term(e, scope_nil(), v, false), b: { $: "Rfl" } } }));
+      const hs = vs.map((v): O => ({ $: "Let", q: 0, l: d, v: at(v, d + 1), f: UV }));
       const M: O = adt === null ? mats(QS, (i) => hs[i])
         : { $: "Prj", h: mats(adt.c.map((c) => name_tt(c.k)), (i) => unit(hs[i])) };
-      const Ao = term(e, scope_nil(), A, false);
-      const eq: O = { $: "Eql", a: { $: "Var", l: d + 1 }, b: { $: "Var", l: d }, T: Ao };
-      return { $: "Ann", x: M,
-        T: { $: "All", q: 1, l: d, A: Ao, B: { $: "Sig", q: 1, l: d + 1, A: Ao, B: eq } } };
+      return { $: "Ann", x: M, T: { $: "All", q: 1, l: d, A: term(e, scope_nil(), A, false), B: UT } };
     }
     if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
       oos("a specialized parameter whose type names a parameter");
@@ -343,10 +344,11 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     e.consts.set(key, c);
     return at(B.Ref(c));
   };
-  const v: O = { $: "Let", q: 0, l: 1, v: go(tld.T, [], 2), f: UV };
-  if (!fin) {
+  const h = go(tld.T, [], 2);
+  if (G === undefined) {
     return [ns, null];
   }
+  const v: O = { $: "Let", q: 0, l: 1, v: h, f: UV };
   const n = fresh(e, name_tt(k));
   e.out.push([n, UT, G === null ? v : { $: "Let", q: 0, l: 0, v: G, f: v }, false]);
   return [ns, n];
@@ -386,7 +388,7 @@ function item_ref(e: Safe, k: Name, cols: Cols, live: boolean): string {
   if (n === undefined) {
     const tag = cols.flatMap((v) => v === null ? [] : [v.$ === "Qua" ? String(quant(v.q)) : "v"]).join("");
     n = fresh(e, name_tt(k[0] === "\t" ? k.slice(1) + ".group" : k) + (tag !== "" ? ".q" + tag : ""));
-    e.names.set(key, n);
+    put(e, e.names, key, n);
     e.todo.push([k, cols]);
   }
   const why = e.fail.get(n);
@@ -394,14 +396,14 @@ function item_ref(e: Safe, k: Name, cols: Cols, live: boolean): string {
     oos(why);
   }
   if (m !== null) {
-    e.seen.add(key);
+    put(e, e.seen, key);
     e.stack.push(key);
     e.going.add(key);
     try {
       item_emit(e, k, cols, n);
     } catch (x) {
       if (x instanceof Scope_Error) {
-        e.fail.set(n, x.message);
+        put(e, e.fail, n, x.message);
       }
       if (x instanceof Regroup && x.key === key) {
         undo(e, m);
@@ -495,7 +497,7 @@ function tele_open(e: Safe, s: Scope, T: HTerm, cols: Cols, n: number): { s: Sco
 
 // a specialized argument: closed, in normal form
 function spec_val(e: Safe, s: Scope, x: HTerm): HTerm {
-  return closed_val(e, s, x) ?? oos("a template argument that depends on a run-time value");
+  return closed_val(e, s, x) ?? oos("a template argument that depends on a run-time value", Open_Error);
 }
 
 // x's normal form, when it is closed; null when it depends on a run-time value
@@ -617,7 +619,7 @@ function fresh(e: Safe, n: string): string {
   for (let i = 1; e.taken.has(k); i++) {
     k = n + "_" + String(i);
   }
-  e.taken.add(k);
+  put(e, e.taken, k);
   return k;
 }
 
@@ -1182,19 +1184,33 @@ function back(t: unknown, k: Name): B.LTerm[][] {
 }
 
 // what an emission has added, which a Regroup below it undoes. Emission
-// only appends to these six, so their sizes mark it; other state an
-// emission changes would outlive the undo
-type Trail = [number, number, number, number, number, number];
+// only appends to out and todo, and adds keys to names, seen, taken and
+// fail through put, which logs each new one, so their lengths mark it and
+// an undo costs what it removes; other state an emission changes would
+// outlive the undo
+type Trail = [number, number, number];
 
 function trail(e: Safe): Trail {
-  return [e.out.length, e.names.size, e.seen.size, e.todo.length, e.taken.size, e.fail.size];
+  return [e.out.length, e.todo.length, e.log.length];
 }
 
 function undo(e: Safe, m: Trail): void {
   e.out.length = m[0];
-  e.todo.length = m[3];
-  for (const [x, n] of [[e.names, m[1]], [e.seen, m[2]], [e.taken, m[4]], [e.fail, m[5]]] as Array<[Map<string, string> | Set<string>, number]>) {
-    [...x.keys()].slice(n).forEach((k) => x.delete(k));
+  e.todo.length = m[1];
+  for (const [x, k] of e.log.splice(m[2])) {
+    x.delete(k);
+  }
+}
+
+// x gains the key k (at v, in a map); a new one is logged for undo
+function put(e: Safe, x: Map<string, string> | Set<string>, k: string, v = ""): void {
+  if (!x.has(k)) {
+    e.log.push([x, k]);
+  }
+  if (x instanceof Map) {
+    x.set(k, v);
+  } else {
+    x.add(k);
   }
 }
 
@@ -1347,7 +1363,7 @@ function word_ref(e: Safe, T: Name, fam: Name, n: number): O {
   let k = e.names.get(key);
   if (k === undefined) {
     k = fresh(e, T + ".lit" + String(n));
-    e.names.set(key, k);
+    put(e, e.names, key, k);
     const v = term(e, { ...scope_nil(), sub: true }, B.Ctr(T, [B.word_to_term(n)]), true);
     e.out.push([k, { $: "Ref", k: item_ref(e, fam, [], false) }, v, false]);
   }

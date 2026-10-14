@@ -94,6 +94,29 @@ law wrap:
 def wrap(b, x):
   {==}
 
+def Sz(~n: Nat) -> Type:
+  Nat
+
+# the fallback at a parameter that isn't finite: n goes out at an opaque
+# constant, so Sz(~n) has an instance at it, but G binds n
+law size:
+  for ~n: Nat
+  for ~b: Bool
+  for x: Sz(~n)
+  {x == x : Nat}
+
+def size(n, b, x):
+  {==}
+
+# two Quant parameters: each of the outer arms holds a λ-match on q
+law both:
+  for ~p: Quant
+  for ~q: Quant
+  {p == p : Quant}
+
+def both(p, q):
+  {==}
+
 def main() -> Nat:
   3n
 
