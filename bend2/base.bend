@@ -1996,9 +1996,8 @@ def String.reverse.go(s: String, acc: String) -> String:
 def String.reverse(s: String) -> String:
   String.reverse.go(s, SNil{})
 
-# The last chars' comparison rides a column after the strings, so the
-# walk is one tail call per char and hands nothing back (String.cmp
-# rebuilds both strings for the callers that keep them).
+# c is the order of the chars so far: the walk is one tail call per char
+# and builds nothing (String.cmp rebuilds both strings for its callers).
 def String.order.go(a: String, b: String, c: Cmp) -> Cmp:
   match a b c:
     case SNil{} SCon{h, t} EQ{}:

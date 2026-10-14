@@ -2,8 +2,8 @@
 # order of two equal 50000-char strings is one tail call per char (a
 # non-tail walk overflows the JS lane's stack near 50000), and the
 # order is decided by the first differing char, or by length when one
-# string is the other's prefix; String.eq, is_lt, is_le, is_gt and
-# is_ge read the same walk
+# string is the other's prefix, whatever the later chars or lengths;
+# String.eq, is_lt, is_le, is_gt and is_ge read the same walk
 import Base
 
 def rep(n: Nat, +c: Char, acc: String) -> String:
@@ -35,6 +35,8 @@ def main() -> IO(Unit):
     IO.print(ord("abd", "abc"))
     IO.print(ord("ab", "abc"))
     IO.print(ord("abc", "ab"))
+    IO.print(ord("ab", "ba"))
+    IO.print(ord("b", "ab"))
     IO.print(ord("B", "a"))
     IO.print(ord("é", "z"))
     IO.print(Bool.show(String.eq("abc", "abc")))
@@ -50,6 +52,8 @@ def main() -> IO(Unit):
 #|LT
 #|GT
 #|EQ
+#|LT
+#|GT
 #|LT
 #|GT
 #|LT
