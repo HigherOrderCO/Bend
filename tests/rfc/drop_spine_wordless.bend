@@ -1,6 +1,6 @@
 # drop order: a field can hold the node's own datatype with no box for it
 # (here a phantom Ph<PL>, as Nat's Succ holds a Nat word). Such a node has
-# no spine slot, and its CID_T entry stays 255: a -1 there is a narrowing
+# no spine slot, and its CID_T entry stays 0: a -1 there was a narrowing
 # error in the Metal build of a program with a `!` call.
 import Base
 

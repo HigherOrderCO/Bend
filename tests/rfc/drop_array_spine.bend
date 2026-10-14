@@ -3,9 +3,11 @@
 # each Array before it drops the next link. ACon moves its kids behind its
 # item. A 4-cell Array with the child in cell 1 becomes a plain frame of 2;
 # a 512-cell one stays an Array frame, with the child last (512) and in
-# cell 255 (live end 256, one past a plain frame). Each round drops fresh
-# chains whole, then sums fresh ones; a cell freed early would read back
-# wrong from reused memory in a later round. Expect 3 rounds of 3 * 5050.
+# cell 255 (live end 256, one past a plain frame, kept in the Array's last
+# cell). Each round drops fresh chains whole, then sums fresh ones; a cell
+# freed early would read back wrong from reused memory in a later round.
+# Build with CCC_OVERRIDE_OPTIONS=+-DBEND_POISON to also fail a read of a
+# freed block within one drop. Expect 3 rounds of 3 * 5050.
 import Base
 
 type AT is Type:
