@@ -12,6 +12,13 @@ def at(r: Array<U32> & U32) -> U32:
 def flag() -> Bool -> U32:
   \{True(): 1; False(): 0}
 
+# Type arguments retain the written namespace, even for a Base datatype.
+def Maybe.add(a: Maybe<Unit>, b: Maybe<Unit>) -> Maybe<Unit>:
+  None{}
+
+def family() -> {(None{} + None{} : Maybe<Unit>) == None{} : Maybe<Unit>}:
+  {==}
+
 def main() -> U32:
   xs = [1 + 2 : U32*4n]
   a  = (1 + (2 * 3) - 1 : U32)

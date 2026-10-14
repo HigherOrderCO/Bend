@@ -760,7 +760,7 @@ function pkg_files(file: string, book: Bend.Book,
       : [[real === entry ? path.basename(file) : path.posix.relative(dir, real), real]]),
   ...Object.values(book.tlds).flatMap((tld): [string, string][] =>
     tld.$ !== "Def" || tld.i === undefined || tld.b === true
-      || tld.i.file.startsWith("0x") ? [] : tld.i.paths.map((f) => {
+      || tld.i.file.ns.startsWith("0x") ? [] : tld.i.paths.map((f) => {
         const real = fs.realpathSync(f);
         return [path.posix.relative(dir, real), real];
       }))];
@@ -834,7 +834,7 @@ function pkg_files(file: string, book: Bend.Book,
   }
   for (const tld of Object.values(book.tlds)) {
     if (tld.$ !== "Def" || !tld.i) continue;
-    const from = book.files.get(tld.i.file)?.path;
+    const from = tld.i.file.path;
     if (from && names.has(from)) for (const imported of tld.i.paths) {
       const use = imported.slice(path.dirname(from).length + 1);
       check(from, fs.realpathSync(imported), use);

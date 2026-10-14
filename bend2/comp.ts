@@ -15,7 +15,7 @@ import * as Bend from "./bend.ts";
 import {
   type HTerm, type Name, type Label,
   name_gen, name_display, name_internal, name_resolve, name_source,
-  name_file, name_text, name_parent
+  name_file, name_text, name_parent, name_emit
 } from "./bend.ts";
 
 // Types
@@ -66,7 +66,7 @@ type Of<K> = Extract<HTerm, { $: K }>;
 
 type Row = [HTerm, number, number, number];
 
-type Intr = { C?: string | string[] | null; JS: string };
+type Intr = [C: string | string[] | null | undefined, JS: string];
 
 type Dom = [Bend.Quant, Label, HTerm];
 
@@ -94,7 +94,7 @@ const DEFAULT = name_internal("default");
 const IO_DEFAULT = name_internal("IO.default");
 
 const INTERNAL = { dummy: name_internal("dummy"), table: name_internal("table"),
-  marshal: name_internal("marshal"), jump: name_internal("JMP") };
+  jump: name_internal("JMP") };
 const GPU_BEND = "bend_dev";
 const GPU_WINDOW = "window_dev";
 const LOCAL = /^b0_n(0|[1-9][0-9]*)v[A-Za-z0-9_]*$/;
@@ -141,95 +141,74 @@ const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
 
 const CMPS = "is_eq:==:=== is_ne:!=:!== is_lt:< is_le:<= is_gt:> is_ge:>=";
 
-const OPERATIONS: Map<Name, Intr> = new Map(Object.entries({
-  ...tpl_ops("U32.", "add:+ sub:- and:& or:| xor:^",
-    "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
-  ...tpl_ops("U32.", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
-  "U32.mul": { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
-  "U32.div": {
-    C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
-    JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)",
+const OPERATIONS = new Map(Object.entries({
+  U32: {
+    ...tpl_ops("add:+ sub:- and:& or:| xor:^", "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
+    ...tpl_ops(CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
+    mul: ["U32_BIN($0, *, $1)", "(Math.imul($0, $1) >>> 0)"],
+    div: ["((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
+      "($1 === 0 ? 0 : ($0 / $1) >>> 0)"],
+    mod: ["((u32)($1) == 0 ? $0 : U32_BIN($0, -, U32_QUO((u32)($0), (u32)($1)) * $1))",
+      "($1 === 0 ? $0 : $0 % $1)"],
+    ...tpl_ops("inc:+ shl:<< shr:>>:>>>", "U32_BIN($0, $o, 1)", "(($0 $o 1) >>> 0)"),
+    ...tpl_ops("shln:<< shrn:>>:>>>", "($1 >= 32 ? 0 : U32_BIN($0, $o, $1))",
+      "($1 >= 32 ? 0 : ($0 $o $1) >>> 0)"),
+    not: ["((u64)~(u32)($0))", "(~$0 >>> 0)"],
+    is_zero: ["U32_BIN($0, ==, 0)", "($0 === 0)"],
+    cmp: ["(U32_BIN($0, >, $1) + U32_BIN($0, >=, $1))", "cmp_new($0, $1)"],
+    to_f32: ["f32_rewrap((f32)(u32)($0))", "Math.fround($0)"],
+    to_nat: ["((u64)$0)", "$0"],
+    from_nat: ["((u64)(u32)($0))", "($0 >>> 0)"],
   },
-  "U32.mod": {
-    C:  "((u32)($1) == 0 ? $0 : U32_BIN($0, -,"
-      + " U32_QUO((u32)($0), (u32)($1)) * $1))",
-    JS: "($1 === 0 ? $0 : $0 % $1)",
+  F32: {
+    ...tpl_ops("add:+ sub:- mul:* div:/", "f32_rewrap(f32_unbox($0) $o f32_unbox($1))",
+      "Math.fround($0 $o $1)"),
+    neg: ["f32_rewrap(-f32_unbox($0))", "(-$0)"],
+    ...tpl_ops(CMPS, "((u64)(f32_unbox($0) $o f32_unbox($1)))", "($0 $o $1)"),
+    ...tpl_ops("sqrt exp log log2 log10 sin cos tan asin acos atan sinh cosh tanh floor ceil trunc abs:fabs:abs",
+      "f32_rewrap((f32)$o(f32_unbox($0)))", "Math.fround(Math.$o($0))"),
+    ...tpl_ops("atan2", "f32_rewrap((f32)$o(f32_unbox($0), f32_unbox($1)))",
+      "Math.fround(Math.$o($0, $1))"),
+    // IEEE's pow(1, y) and pow(-1, inf) are 1; JS's Math.pow says NaN
+    pow: ["f32_rewrap((f32)pow(f32_unbox($0), f32_unbox($1)))",
+      "($0 === 1 || $0 === -1 && Math.abs($1) === Infinity ? 1 : Math.fround(Math.pow($0, $1)))"],
+    mod: ["f32_rewrap((f32)fmod(f32_unbox($0), f32_unbox($1)))", "Math.fround($0 % $1)"],
+    to_u32: ["f32_to_u32($0)", "($0 >= 1 && $0 < 4294967296 ? Math.floor($0) : 0)"],
+    bits: ["$0", "f32_bits($0)"],
+    show: ["f32_show(e, $0)", "f32_show($0)"],
+    read: ["f32_read(e, $0)", "f32_read($0)"],
   },
-  ...tpl_ops("U32.", "inc:+ shl:<< shr:>>:>>>", "U32_BIN($0, $o, 1)",
-    "(($0 $o 1) >>> 0)"),
-  ...tpl_ops("U32.", "shln:<< shrn:>>:>>>",
-    "($1 >= 32 ? 0 : U32_BIN($0, $o, $1))",
-    "($1 >= 32 ? 0 : ($0 $o $1) >>> 0)"),
-  "U32.not": { C: "((u64)~(u32)($0))", JS: "(~$0 >>> 0)" },
-  "U32.is_zero": { C: "U32_BIN($0, ==, 0)", JS: "($0 === 0)" },
-  "U32.cmp": {
-    C:  "(U32_BIN($0, >, $1) + U32_BIN($0, >=, $1))",
-    JS: "cmp_new($0, $1)",
+  Nat: {
+    add: ["nat_chk(e, $0 + $1)", "nat_chk($0 + $1)"],
+    mul: ["nat_mul(e, $0, $1)", "nat_chk($0 * $1)"],
+    double: ["nat_chk(e, $0 + $0)", "nat_chk($0 + $0)"],
+    cmp: ["(($0 > $1) + ($0 >= $1))", "cmp_new($0, $1)"],
+    ...tpl_ops("sub", "($0 < $1 ? 0 : $0 - $1)"),
+    ...tpl_ops("is_lt:<", "($0 $o $1)"),
+    ...tpl_ops("min:< max:>", "($0 $o $1 ? $0 : $1)"),
+    divmod: [["($1 == 0 ? 0 : $0 / $1)", "($1 == 0 ? $0 : $0 % $1)"], "nat_divmod($0, $1)"],
   },
-  "U32.to_f32": { C: "f32_rewrap((f32)(u32)($0))", JS: "Math.fround($0)" },
-  "U32.to_nat": { C: "((u64)$0)", JS: "$0" },
-  "U32.from_nat": { C: "((u64)(u32)($0))", JS: "($0 >>> 0)" },
-  ...tpl_ops("F32.", "add:+ sub:- mul:* div:/",
-    "f32_rewrap(f32_unbox($0) $o f32_unbox($1))", "Math.fround($0 $o $1)"),
-  "F32.neg": { C: "f32_rewrap(-f32_unbox($0))", JS: "(-$0)" },
-  ...tpl_ops("F32.", CMPS, "((u64)(f32_unbox($0) $o f32_unbox($1)))",
-    "($0 $o $1)"),
-  ...tpl_ops("F32.", "sqrt exp log log2 log10 sin cos tan asin acos atan"
-    + " sinh cosh tanh floor ceil trunc abs:fabs:abs",
-    "f32_rewrap((f32)$o(f32_unbox($0)))", "Math.fround(Math.$o($0))"),
-  ...tpl_ops("F32.", "atan2",
-    "f32_rewrap((f32)$o(f32_unbox($0), f32_unbox($1)))",
-    "Math.fround(Math.$o($0, $1))"),
-  // IEEE's pow(1, y) and pow(-1, inf) are 1; JS's Math.pow says NaN
-  "F32.pow": {
-    C:  "f32_rewrap((f32)pow(f32_unbox($0), f32_unbox($1)))",
-    JS: "($0 === 1 || $0 === -1 && Math.abs($1) === Infinity ? 1"
-      + " : Math.fround(Math.pow($0, $1)))",
+  Bool: tpl_ops("or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
+  String: { append: [undefined, "($0 + $1)"], length: [undefined, "[...str_out($0)].length"] },
+  Array: {
+    ...Object.fromEntries(Object.entries({
+      new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
+      get: `{$: ${js_tag("Tuple")}, fst: $0, snd: $0[$1 % $0.length]}`,
+      swap: "array_rmw($0, $1, () => $2)",
+      size: `{$: ${js_tag("Tuple")}, fst: $0, snd: $0.length}`,
+    }).map(([k, JS]): [string, Intr] => [k, [null, JS]])),
+    clone: [["$0", "blk_copy(e, $0)"], `{$: ${js_tag("Tuple")}, fst: $0, snd: $0.slice()}`],
   },
-  "F32.mod": {
-    C:  "f32_rewrap((f32)fmod(f32_unbox($0), f32_unbox($1)))",
-    JS: "Math.fround($0 % $1)",
-  },
-  "F32.to_u32": {
-    C:  "f32_to_u32($0)",
-    JS: "($0 >= 1 && $0 < 4294967296 ? Math.floor($0) : 0)",
-  },
-  "F32.bits": { C: "$0", JS: "f32_bits($0)" },
-  ...tpl_ops("F32.", "show read", "f32_$o(e, $0)", "f32_$o($0)"),
-  "Nat.add": { C: "nat_chk(e, $0 + $1)", JS: "nat_chk($0 + $1)" },
-  "Nat.mul": { C: "nat_mul(e, $0, $1)", JS: "nat_chk($0 * $1)" },
-  "Nat.double": { C: "nat_chk(e, $0 + $0)", JS: "nat_chk($0 + $0)" },
-  "Nat.cmp": { C: "(($0 > $1) + ($0 >= $1))", JS: "cmp_new($0, $1)" },
-  ...tpl_ops("Nat.", "sub", "($0 < $1 ? 0 : $0 - $1)"),
-  ...tpl_ops("Nat.", "is_lt:<", "($0 $o $1)"),
-  ...tpl_ops("Nat.", "min:< max:>", "($0 $o $1 ? $0 : $1)"),
-  "Nat.divmod": {
-    C:  ["($1 == 0 ? 0 : $0 / $1)", "($1 == 0 ? $0 : $0 % $1)"],
-    JS: "nat_divmod($0, $1)",
-  },
-  ...tpl_ops("Bool.", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
-  "String.append": { JS: "($0 + $1)" },
-  "String.length": { JS: "[...str_out($0)].length" },
-  ...Object.fromEntries(Object.entries({
-    new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
-    get: `{$: ${js_tag("Tuple")}, fst: $0, snd: $0[$1 % $0.length]}`,
-    swap: "array_rmw($0, $1, () => $2)",
-    size: `{$: ${js_tag("Tuple")}, fst: $0, snd: $0.length}`,
-  }).map(([k, JS]) => ["Array." + k, { C: null, JS }])),
-  "Array.clone": {
-    C:  ["$0", "blk_copy(e, $0)"],
-    JS: `{$: ${js_tag("Tuple")}, fst: $0, snd: $0.slice()}`,
-  },
-  ...Object.fromEntries(Object.entries({
+  "Array.atomic": Object.fromEntries(Object.entries({
     add: "(o + $2) >>> 0", min: "Math.min(o, $2)", max: "Math.max(o, $2)",
     and: "(o & $2) >>> 0", or: "(o | $2) >>> 0", xor: "(o ^ $2) >>> 0",
     exch: "$2", cmpx: "o === $2 ? $3 : o", fadd: "Math.fround(o + $2)",
-  }).map(([k, js]) => ["Array.atomic." + k.replace("cmpx", "cas"), {
-    C:  ["$0", "a32_" + k + "(blk_ptr(e.mem, blk_loc(e.mem, $0),"
-      + " blk_at($0, $1, 0)), (u32)$2" + (k === "cmpx" ? ", (u32)$3)" : ")")],
-    JS: `array_rmw($0, $1, (o) => ${js})`,
-  }])),
-}).map(([op, intr]) => [base(op), intr]));
+  }).map(([k, js]): [string, Intr] => [k.replace("cmpx", "cas"), [
+    ["$0", "a32_" + k + "(blk_ptr(e.mem, blk_loc(e.mem, $0), blk_at($0, $1, 0)), (u32)$2"
+      + (k === "cmpx" ? ", (u32)$3)" : ")")], `array_rmw($0, $1, (o) => ${js})`,
+  ]])),
+} satisfies Record<string, Record<string, Intr>>).flatMap(([family, ops]) =>
+  Object.entries(ops).map(([k, intr]): [Name, Intr] => [base(family + "." + k), intr])));
 
 // Optimized
 // ---------
@@ -491,7 +470,8 @@ function str_in(s) {
 // Caches
 // ------
 
-let PROBES = new Map<symbol, Probe>();
+const BINDING = Symbol();
+let PROBES = 0;
 
 const DUMMY = probe("dummy");
 
@@ -510,15 +490,6 @@ function entry(book = FL.book): Name {
   return name_source(book.entry, "main");
 }
 
-function name_global(k: Name): string {
-  return memo(FL.symbols, k, () => {
-    const parent = name_parent(k), args = FL.instances.get(k);
-    if (args !== undefined) return name_global(name_content(parent!, "inst", name_key(args)[0]));
-    return parent === null ? Bend.name_emit(k)
-      : name_global(parent) + Bend.name_emit(k.slice(parent.length) as Name).slice(2);
-  });
-}
-
 function name_local(sc: Scope, k: Label): string {
   return `b0_n${sc.names.next++}v${k.replace(/[^A-Za-z0-9]+/g, "_")}`;
 }
@@ -527,26 +498,12 @@ function name_member(sc: Scope, role: string): Name {
   return name_gen(sc.names.owner, role, sc.names.next++);
 }
 
-// Digests bound symbol length; exact keys detect collisions instead of aliasing code.
-function name_content(owner: Name, role: string, key: string): Name {
-  const text = JSON.stringify([name_global(owner), role, key]);
-  const hash = createHash("sha256").update(text, "utf16le").digest("hex");
-  if (FL.hashes.has(hash) && FL.hashes.get(hash) !== text) die("generated name hash collision");
-  FL.hashes.set(hash, text);
-  const k = name_gen(owner, role + ".key", BigInt("0x" + hash));
-  FL.symbols.set(k, "b0_h" + hash);
-  return k;
-}
-
-// Rewrite only identities in serialized syntax, never labels or string literals.
-function name_key(key: string): [string, boolean] {
-  let open = false;
-  const text = JSON.stringify(JSON.parse(key), (_, v) => {
-    if (v?.$ === "Var" && v.binding !== undefined) open = true;
-    return ["Ref", "Ctr", "ADT", "Mat"].includes(v?.$)
-      ? { ...v, k: name_global(v.k), ...v.r ? { r: v.r.map(name_global) } : {} } : v;
-  });
-  return [text, open];
+// Hash generated identities only at emission; exact identities reject collisions.
+function name_global(k: Name): string {
+  if (name_parent(k) === null) return name_emit(k);
+  const symbol = "b0_h" + createHash("sha256").update(k, "utf16le").digest("hex");
+  if (memo(FL.symbols, symbol, () => k) !== k) die("generated name hash collision");
+  return symbol;
 }
 
 function cid_mac(k: Name): string {
@@ -569,11 +526,11 @@ function arg_name(k: Name, i: number, live = false): Name {
 // Tpl
 // ===
 
-function tpl_ops(pre: string, names: string, C: string, JS = C):
+function tpl_ops(names: string, C: string, JS = C):
   Record<string, Intr> {
   return Object.fromEntries(names.split(" ").map((p) => {
     const [k, o = k, jo = o] = p.split(":");
-    return [pre + k, { C: C.replaceAll("$o", o), JS: JS.replaceAll("$o", jo) }];
+    return [k, [C.replaceAll("$o", o), JS.replaceAll("$o", jo)]];
   }));
 }
 
@@ -607,19 +564,18 @@ function tpl_nat(u: string, f: string): Tpl {
 // Probe
 // =====
 
-type Probe = Of<"Var"> & { probe: symbol; expr?: string };
+type Probe = Of<"Var"> & { [BINDING]: Probe; expr?: string };
 
 function probe(k: Label, expr?: string): Probe {
-  const p: Probe = { $: "Var", k, i: PROBES.size, probe: Symbol(), expr };
-  PROBES.set(p.probe, p);
+  const p = { $: "Var", k, i: PROBES++, expr } as Probe;
+  p[BINDING] = p;
   return p;
 }
 
 function probe_of(t: HTerm, required = true): Of<"Var"> {
-  const v = term_force(t) as Of<"Var"> & { probe?: symbol };
-  return PROBES.get(v.probe!) ?? (required ? die("a variable outside compiler bindings") : v);
+  const v = term_force(t) as Probe;
+  return v[BINDING] ?? (required ? die("a variable outside compiler bindings") : v);
 }
-
 
 // Graph
 // =====
@@ -821,7 +777,7 @@ function intr_of(k: Name, js = false): Intr | undefined {
   const tld = FL.book.tlds[k];
   const it = tld?.$ === "Def" && tld.i === undefined && tld.b
     ? OPERATIONS.get(k) : undefined;
-  return it && (js || it.C !== undefined) ? it : undefined;
+  return it && (js || it[0] !== undefined) ? it : undefined;
 }
 
 // Tele
@@ -1312,7 +1268,7 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // use argument keys.
 
 function file_new(book: Bend.Book, js: boolean) {
-  PROBES = new Map([[DUMMY.probe, DUMMY]]);
+  PROBES = 1;
   return {
     book,
     js,
@@ -1341,8 +1297,7 @@ function file_new(book: Bend.Book, js: boolean) {
     brws: new Map<Name, boolean[]>(),
     nodes: new Map<Name, Lay>(),
     bindings: new Map<Of<"Var">, HTerm>(),
-    symbols: new Map<Name, string>(), hashes: new Map<string, string>(),
-    instances: new Map([...book.tmps].map(([key, k]) => [k, key])),
+    symbols: new Map<string, Name>(),
     lays: new Map<string, Lay>(),
     memo: {
       opens: new Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
@@ -2163,20 +2118,22 @@ function emit_open(k: Name): [Scope, Val[]] {
 }
 
 // Cache-local free bindings carry an ordinal; reified bound Vars have no binding field.
-function scoped_key(t: HTerm): string {
-  const scoped = Bend.scope_mapper(v => memo(FL.bindings, probe_of(v, false),
-    () => ({ $: "Var", k: "", i: 0, binding: FL.bindings.size })))(t);
-  return Bend.term_key(Bend.term_lower(scoped));
+function scoped_key(...terms: HTerm[]): string {
+  return Bend.term_key(terms.map(t => {
+    const copy = Bend.scope_mapper(v => memo(FL.bindings, probe_of(v, false),
+      () => ({ $: "Var", k: "", i: 0, binding: FL.bindings.size })));
+    return Bend.term_lower(copy(t));
+  }));
 }
 
 function emit_native(sc: Scope, k: Name, ers: HTerm[]): string {
   // k fixes erased positions, layouts and memoized borrowing for this pass.
   // Array sharing can grow mid-pass; any fact growth discards the whole output.
-  const raw = JSON.stringify([Bend.Ref(k), ers.map(t => JSON.parse(scoped_key(t))), arr_q("box")]);
-  const [stable, open] = name_key(raw);
+  const raw = Number(arr_q("box")) + scoped_key(Bend.Ref(k), ...ers);
+  const open = raw.includes('"binding":');
   const key = open ? JSON.stringify([sc.names.owner, raw]) : raw;
   return seg_ref(sc, memo(FL.spun, key, () => {
-    const code = open ? name_member(sc, "native") : name_content(k, "native", stable);
+    const code = open ? name_member(sc, "native") : name_gen(k, "native", raw);
     FL.spun.set(key, code);
     const fuel = FUEL;
     const [sl, vals] = emit_open(k);
@@ -2208,7 +2165,7 @@ function emit_dst(sc: Scope, lay: Lay, k = "v"): Val {
 function emit_intr(sc: Scope, it: Intr, m: Spine, ty: HTerm | null): Val {
   const k = (m.t as Of<"Ref">).k;
   const args = emit_each(sc, m.args);
-  const C = it.C!;
+  const C = it[0]!;
   if (["Array.get", "Array.new", "Array.clone"].some((op) => k === base(op))
     && lay_el(m.all[0]).ks.includes("box")
     && !(k === base("Array.new") && facts_packed(m.all[2]))) {
@@ -2601,14 +2558,14 @@ function emit_row(sc: Scope, t: HTerm, ty: HTerm | null): string | null {
   }
   const m = term_spine(s);
   const it = m.t.$ === "Ref" ? intr_of(m.t.k) : undefined;
-  if (it === undefined || TAB_BAD.test(it.JS)) {
+  if (it === undefined || TAB_BAD.test(it[1])) {
     return null;
   }
   const xs = m.args.map((a) => emit_row(sc, a, null));
   if (xs.includes(null)) {
     return null;
   }
-  const r = tpl(it.JS, xs as string[]);
+  const r = tpl(it[1], xs as string[]);
   return bits ? `f32_bits(${r})` : r;
 }
 
@@ -2621,7 +2578,7 @@ function emit_tab(sc: Scope, cells: HTerm[] | null, ty: HTerm,
   const key = (FL.js ? ls : Function("f32_bits", `return [${ls}]`)(
     Bend.f32_to_bits).map((v: number) => BigInt(v) + "ull")).join(", ");
   const tab = name_global(memo(FL.tabs, key, () =>
-    name_content(INTERNAL.table, "tab", key)));
+    name_gen(INTERNAL.table, "tab", key)));
   return FL.js ? `${tab}[Math.min(${s}, ${ls.length - 1})]`
     : `TAB_AT(${tab}, ${s}, ${ls.length - 1})`;
 }
@@ -2745,8 +2702,7 @@ function effect_srcs(): string[] {
     const path = fs.realpathSync(tld.i!.paths.find((x) => x.endsWith(ext))
       ?? die("no " + ext + " import: " + name_display(FL.book, k)));
     const scopes = memo(files, path, () => []);
-    const scope = FL.book.files.get(tld.i!.file)
-      ?? die("foreign implementation has no source file: " + name_display(FL.book, k));
+    const scope = tld.i!.file;
     if (!scopes.includes(scope)) scopes.push(scope);
   }
   return [...files].map(([path, scopes]) => foreign_src(fs.readFileSync(path, "utf8"), scopes));
@@ -2775,7 +2731,6 @@ export function compile_book(book: Bend.Book): string {
     was = facts();
     [FL.lend, FL.spun, FL.clos, FL.tabs, FL.lits, FL.consts, FL.brws]
       .forEach((m) => m.clear());
-    FL.symbols.clear();
     FL.lends = [];
     FL.segs = [];
     FL.spins = [];
@@ -2918,7 +2873,7 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
   }
   const intr = intr_of(k, true);
   if (intr !== undefined) {
-    return tpl(intr.JS, exprs.map((e) => ATOM.test(e) || STRLIT.test(e) ? e
+    return tpl(intr[1], exprs.map((e) => ATOM.test(e) || STRLIT.test(e) ? e
       : emit_hold(sc, [e], "x")[0]));
   }
   if (!fun_runs(tld)) {
@@ -2931,7 +2886,7 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail: boolean): string {
   }
   const call = `${name_global(k)}(${exprs.join(", ")})`;
   return v ? `(${v}) => ${call}`
-    : def_foreign(tld) || tail ? call : `\x01${name_global(k)}\x02(${call})`;
+    : def_foreign(tld) || tail ? call : `\x01${k}\x02(${call})`;
 }
 
 function js_open(sc: Scope, x: Of<"Let">): HTerm {
@@ -2967,7 +2922,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
         return js_expr(sc, y, ty);
       }
       const k = (m.t as Of<"Ref">).k;
-      if (intr_of(k)?.C === null) {
+      if (intr_of(k)?.[0] === null) {
         lay_el(m.all[0]);
       }
       return js_call(sc, k, m.args, false);
@@ -3174,9 +3129,8 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const jmps = new Map<Name, boolean>();
   const jmp = (k: Name): boolean => k === CLO_APPLY || memo(jmps, k, () =>
     (jmps.set(k, true), [...FL.tails.get(k) ?? []].some(jmp)));
-  const jumps = new Set([...FL.symbols].filter(([k]) => jmp(k)).map(([, n]) => n));
   const funs = [sc.seg, ...FL.spins].flatMap((f) => seg_text(f.lines, 0))
-    .join("\n").replace(/\x01([^\x02]*)\x02/g, (_, k) => jumps.has(k) ? "run_loop"
+    .join("\n").replace(/\x01([^\x02]*)\x02/g, (_, k) => jmp(k as Name) ? "run_loop"
       : "");
   return RUNTIME + `const $0names = Object.assign(Object.create(null), ${JSON.stringify(names)});\n` + effs
     + "// Program\n// =======\n\n" + [funs, ...[...FL.tabs]
