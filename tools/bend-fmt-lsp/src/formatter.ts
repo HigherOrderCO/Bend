@@ -177,7 +177,7 @@ function inlineBodies(lines: Line[]): number[][] {
     } else if ([")", "]", "}"].includes(token.text)) {
       open = Math.max(0, open - 1);
     } else if (header?.typed && ANGLES.has(token.text)) {
-      header.angle += (token.text.length) * (token.text[0] === "<" ? 1 : -1);
+      header.angle += token.text.length * (token.text[0] === "<" ? 1 : -1);
     } else if (header && token.text === ":" && open === header.open && header.angle === 0) {
       header = null;
       return index + 1 < line.tokens.length ? [index + 1] : [];
@@ -188,10 +188,9 @@ function inlineBodies(lines: Line[]): number[][] {
 
 // A tab is one column, as in the parser. Loose lines measure against a copy of
 // the levels, so they can't shift the statements after them.
-function indentDepths(lines: Line[]): number[] {
+function indentDepths(lines: Line[], loose = looseLines(lines)): number[] {
   const depths: number[] = [];
-  const loose = looseLines(lines);
-  let stack = [0];
+  const stack = [0];
   let levels = stack;
   for (const [index, line] of lines.entries()) {
     if (line.code === "" && line.comment === "") {
@@ -225,8 +224,8 @@ export function formatBend(source: string, options: FormatOptions = {}): string 
   } catch {
     return source;
   }
-  const depths = indentDepths(lines);
   const loose = looseLines(lines);
+  const depths = indentDepths(lines, loose);
   const bodies = inlineBodies(lines);
   const size = Math.max(1, options.tabSize ?? 2);
   const spaces = options.insertSpaces !== false;
