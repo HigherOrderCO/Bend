@@ -1656,7 +1656,7 @@ export function parse_var(p: Parse, k: Name, s?: Span): LTerm {
       return Var(k, p.stk[j][1], s);
     }
   }
-  const q = parse_reso(p, k);
+  const q = parse_reso(p, k, false);
   if (k.includes(".")) {
     return Ref(q, s);
   }
@@ -1667,7 +1667,7 @@ export function parse_qual(p: Parse, k: Name): Name {
   return p.ns === "" ? k : p.ns + ":" + k;
 }
 
-export function parse_reso(p: Parse, k: Name): Name {
+export function parse_reso(p: Parse, k: Name, ctr = true): Name {
   const dot = k.indexOf(".");
   let q = parse_qual(p, k);
   if (dot !== -1 && k.slice(0, dot) in p.al) {
@@ -1677,7 +1677,7 @@ export function parse_reso(p: Parse, k: Name): Name {
     }
   }
   const own = q in p.book.tlds || q in p.book.ctrs;
-  const far = k in p.book.tlds || k in p.book.ctrs;
+  const far = k in p.book.tlds || ctr && k in p.book.ctrs;
   return own || !far ? q : k;
 }
 
