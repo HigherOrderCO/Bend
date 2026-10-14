@@ -976,23 +976,38 @@ def Term.parts : Term → Term → Option (List (Term × Term))
   | Rwt e P f, Rwt d Q g => some [(e, d), (P, Q), (f, g)]
   | a,         b         => if a = b then some [] else none
 
+abbrev ConvMemo := List (Bool × Term × Term)
+
+@[inline]
+def Term.same (a b : Term) : Bool :=
+  withPtrEq a b (fun _ => decide (a = b)) (by intro h; simp [h])
+
+def ConvMemo.has (m : ConvMemo) (cl : Bool) (a b : Term) : Bool :=
+  m.any fun (c, x, y) => c == cl && Term.same y b && Term.same x a
+
 -- a and b convert, lazily: they are equal, or their weak heads match
 -- and each pair of parts converts, in turn. Returns the fuel left:
 -- 0 when it ran out. A binder's parts may be open.
-def Term.conv (ck : Book) (cl : Bool) : Nat → Term → Term → Bool × Nat
-  | 0, _, _ => (false, 0)
-  | n + 1, a, b =>
+def Term.convMemo (ck : Book) (cl : Bool) : Nat → Term → Term → ConvMemo → (Bool × Nat) × ConvMemo
+  | 0, _, _, memo => ((false, 0), memo)
+  | n + 1, a, b, memo =>
     if a = b then
-      (true, n)
+      ((true, n), memo)
+    else if memo.has cl a b then
+      ((true, n), memo)
     else
-      let (a, m) := Term.wnf ck cl n a []
-      let (b, m) := Term.wnf ck cl (min m n) b []
-      match Term.parts a b with
+      let (x, m) := Term.wnf ck cl n a []
+      let (y, m) := Term.wnf ck cl (min m n) b []
+      match Term.parts x y with
       | some ps =>
-        let go := fun (r : Bool × Nat) (p : Term × Term) =>
-          if r.1 then Term.conv ck (cl && !Term.binds a) (min r.2 n) p.1 p.2 else r
-        ps.foldl go (true, min m n)
-      | none => (false, m)
+        let go := fun (r : (Bool × Nat) × ConvMemo) (p : Term × Term) =>
+          if r.1.1 then Term.convMemo ck (cl && !Term.binds x) (min r.1.2 n) p.1 p.2 r.2 else r
+        let r := ps.foldl go ((true, min m n), memo)
+        if r.1.1 then (r.1, (cl, a, b) :: r.2) else r
+      | none => ((false, m), memo)
+
+def Term.conv (ck : Book) (cl : Bool) (n : Nat) (a b : Term) : Bool × Nat :=
+  (Term.convMemo ck cl n a b []).1
 
 -- g is at least h, in the quantity order: .Q2 is the top, .Q0 and .Q1
 -- the bottom, a meet on the left needs both sides, on the right either;
@@ -2133,12 +2148,51 @@ theorem wnf_pars (hb : Sees ck bk) :
     · exact V h
     · cases h; exact .refl
 
--- conv's fold: a true result passed every pair
-theorem fold_true {g : Nat → Term → Term → Bool × Nat} : ∀ {s},
-    (List.foldl (fun (r : Bool × Nat) (p : Term × Term) => if r.1 then g r.2 p.1 p.2 else r) s ps).1 = true →
-    s.1 = true ∧ ∀ p ∈ ps, ∃ m, (g m p.1 p.2).1 = true := by
-  induction ps <;> intro s h; exact ⟨h, nofun⟩
-  rename_i ih; have ⟨h1, h2⟩ := ih h; simp only at h1; split at h1 <;> simp_all; exact ⟨_, h1⟩
+def ConvMemo.Sound (bk : Book) (memo : ConvMemo) : Prop :=
+  ∀ p ∈ memo, Conv bk p.2.1 p.2.2
+
+theorem ConvMemo.has_sound {memo : ConvMemo} (hm : memo.Sound bk) (h : memo.has cl a b = true) :
+    Conv bk a b := by
+  obtain ⟨⟨c, x, y⟩, hp, hv⟩ := List.any_eq_true.mp h
+  simp [Term.same, withPtrEq] at hv
+  obtain ⟨⟨_, rfl⟩, rfl⟩ := hv
+  exact hm _ hp
+
+-- A successful fold checked every pair and retained only sound memo entries.
+theorem fold_true {ps : List (Term × Term)} {g : Nat → Term → Term → ConvMemo → (Bool × Nat) × ConvMemo}
+    (H : ∀ n a b memo, memo.Sound bk →
+      (g n a b memo).2.Sound bk ∧ ((g n a b memo).1.1 = true → Conv bk a b)) :
+    ∀ (s : (Bool × Nat) × ConvMemo), s.2.Sound bk →
+      (ps.foldl (fun (r : (Bool × Nat) × ConvMemo) (p : Term × Term) =>
+        if r.1.1 then g r.1.2 p.1 p.2 r.2 else r) s).2.Sound bk ∧
+      ((ps.foldl (fun (r : (Bool × Nat) × ConvMemo) (p : Term × Term) =>
+        if r.1.1 then g r.1.2 p.1 p.2 r.2 else r) s).1.1 = true →
+        s.1.1 = true ∧ ∀ p ∈ ps, Conv bk p.1 p.2) := by
+  induction ps with
+  | nil =>
+    intro s hs
+    exact ⟨hs, fun h => ⟨h, by simp⟩⟩
+  | cons p ps ih =>
+    intro s hs
+    simp only [List.foldl_cons]
+    by_cases hb : s.1.1 = true
+    · have he : (if s.1.1 then g s.1.2 p.1 p.2 s.2 else s) =
+          g s.1.2 p.1 p.2 s.2 := by simp [hb]
+      rw [he]
+      have hg := H s.1.2 p.1 p.2 s.2 hs
+      have hi := ih _ hg.1
+      refine ⟨hi.1, ?_⟩
+      intro ht
+      obtain ⟨hp, hps⟩ := hi.2 ht
+      refine ⟨hb, ?_⟩
+      intro q hq
+      rcases List.mem_cons.mp hq with heq | hmem
+      · subst q; exact hg.2 hp
+      · exact hps q hmem
+    · have he : (if s.1.1 then g s.1.2 p.1 p.2 s.2 else s) = s := by simp [hb]
+      rw [he]
+      have hi := ih s hs
+      exact ⟨hi.1, fun ht => False.elim (hb (hi.2 ht).1)⟩
 
 -- heads whose parts convert convert
 theorem parts_conv (h : parts a b = some ps) (H : ∀ p ∈ ps, Conv bk p.1 p.2) :
@@ -2160,16 +2214,48 @@ theorem parts_conv (h : parts a b = some ps) (H : ∀ p ∈ ps, Conv bk p.1 p.2)
 theorem wnf_nil (hb : Sees ck bk) (e : wnf ck cl n t [] = (u, k)) : Pars bk t u :=
   (e ▸ (wnf_pars (t := t) (xs := []) hb).1 :)
 
-theorem conv_sound (hb : Sees ck bk) : (Term.conv ck cl n a b).1 = true → Conv bk a b := by
-  induction n using Nat.strongRecOn generalizing a b cl; rename_i n ih
-  unfold Term.conv; split; nofun; split
-  · intro _; subst_vars; exact crefl
-  split; split; split
-  · intro h; rename_i hps
-    have ⟨_, hf⟩ := fold_true (g := fun m x y => Term.conv ck _ (min m _) x y) h
-    have ⟨c, h1, h2⟩ := parts_conv hps fun p m => have ⟨_, hp⟩ := hf p m; ih _ (by omega) hp
-    exact ⟨c, pars_trans (wnf_nil hb ‹_›) h1, pars_trans (wnf_nil hb ‹_›) h2⟩
-  · nofun
+theorem convMemo_sound (hb : Sees ck bk) (hm : memo.Sound bk) :
+    (Term.convMemo ck cl n a b memo).2.Sound bk ∧
+    ((Term.convMemo ck cl n a b memo).1.1 = true → Conv bk a b) := by
+  induction n using Nat.strongRecOn generalizing a b cl memo
+  rename_i n ih
+  cases n with
+  | zero =>
+    simp only [Term.convMemo]
+    exact ⟨hm, by simp⟩
+  | succ fuel =>
+    simp only [Term.convMemo]
+    split
+    · subst_vars; exact ⟨hm, fun _ => crefl⟩
+    split
+    · exact ⟨hm, fun _ => ConvMemo.has_sound hm ‹_›⟩
+    generalize hx : Term.wnf ck cl fuel a [] = rx
+    obtain ⟨x, m⟩ := rx
+    generalize hy : Term.wnf ck cl (min m fuel) b [] = ry
+    obtain ⟨y, k⟩ := ry
+    cases hp : Term.parts x y with
+    | none =>
+      dsimp only
+      exact ⟨hm, by simp⟩
+    | some ps =>
+      dsimp only
+      have H := fold_true (ps := ps)
+        (g := fun rem l r memo => Term.convMemo ck (cl && !Term.binds x) (min rem fuel) l r memo)
+        (fun rem l r memo hs => ih _ (by omega) hs)
+        ((true, min k fuel), memo) hm
+      split
+      · have ⟨c, h1, h2⟩ := parts_conv hp (H.2 ‹_›).2
+        have hc : Conv bk a b :=
+          ⟨c, pars_trans (wnf_nil hb hx) h1, pars_trans (wnf_nil hb hy) h2⟩
+        refine ⟨?_, fun _ => hc⟩
+        intro p hmem
+        rcases List.mem_cons.mp hmem with heq | hmem
+        · subst p; exact hc
+        · exact H.1 p hmem
+      · exact ⟨H.1, by simp_all⟩
+
+theorem conv_sound (hb : Sees ck bk) : (Term.conv ck cl n a b).1 = true → Conv bk a b :=
+  (convMemo_sound hb (memo := []) (by intro p h; cases h)).2
 
 theorem lab_fix : Pars bk (Lab k) c → c = Lab k := pars_fix fun _ s => by cases s; rfl
 
