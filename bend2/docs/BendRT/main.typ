@@ -520,11 +520,13 @@ handle threads back outside the `Result`, so even a failure cannot
 lose it.
 
 On C and Bun, an interrupted readiness wait wakes no descriptors. If
-`select` answers `EBADF`, the loop probes parked descriptors with
-`F_GETFD` and resumes only the invalid ones; their effect handlers
+`select` answers `EBADF`, the loop polls each parked descriptor before
+any handler runs, and resumes only those `poll` reports as
+`POLLNVAL`, the condition `select` refuses; their effect handlers
 produce the ordinary fallible answers. Valid descriptors remain
-parked, deadlines still run, and other wait errors remain fatal. The
-probes run only on the error path.
+parked, deadlines still run, and a wait that fails with no such
+descriptor, like any other wait error, stays fatal. The probes run
+only on the error path.
 
 = The JavaScript Backend <sec:js>
 

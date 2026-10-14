@@ -5299,8 +5299,10 @@ OUTLINE Term corpus_eval(u64* H, Term t) {
 // resumes, IO_PARK parks again. The edge is UTF-8, decoded as WHATWG does: a
 // broken sequence yields one U+FFFD and its breaking byte is read again as a
 // lead. inet_aton reads a leading zero as octal, so io_sys_addr refuses it.
-// macOS poll misses FIFO EOF; select sets fit the highest fd.
-// _DARWIN_UNLIMITED_SELECT permits fds past FD_SETSIZE.
+// macOS poll misses FIFO EOF, so io_wait selects, its sets sized to the
+// highest fd (_DARWIN_UNLIMITED_SELECT allows fds past FD_SETSIZE); on
+// EBADF, it wakes the parked fds that poll finds POLLNVAL (macOS sets it only
+// for an fd polled for some event), or fails.
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -5673,14 +5675,20 @@ static void io_wait(Env e, bool block) {
   u64 ms = soon > tick && block ? (soon - tick) / 1000000 + 1 : 0;
   struct timeval tv = { ms / 1000, ms % 1000 * 1000 };
   io_sync();
-  bool bad = false;
   if (select(top + 1, (fd_set*)set[0], (fd_set*)set[1], NULL,
     soon == 0 && block ? NULL : &tv) < 0) {
-    bad = errno == EBADF;
-    if (!bad && errno != EINTR) {
+    bool bad = errno == EBADF, hit = errno == EINTR;
+    memset(set[0], 0, 2 * len);
+    for (IoWork* a = io_park; bad && a != NULL;
+      a = a->next != io_park ? a->next : NULL) {
+      struct pollfd p = { (int)a->word, POLLIN, 0 };
+      if (a->evts != 0 && poll(&p, 1, 0) > 0 && p.revents & POLLNVAL) {
+        hit = io_bit(set[a->evts == POLLOUT], p.fd, true);
+      }
+    }
+    if (!hit) {
       err_fail("the poller failed");
     }
-    memset(set[0], 0, 2 * len);
   }
   if (io_bit(set[0], io_wake_fd[0], false)) {
     io_take(e);
@@ -5691,8 +5699,7 @@ static void io_wait(Env e, bool block) {
   while (todo != NULL) {
     IoWork* a   = io_pop(&todo);
     bool    due = (a->evts != 0
-        && (bad ? fcntl((int)a->word, F_GETFD) < 0
-          : io_bit(set[a->evts == POLLOUT], (int)a->word, false)))
+        && io_bit(set[a->evts == POLLOUT], (int)a->word, false))
       || (a->time != 0 && a->time <= now);
     if (!due) {
       io_park_add(a);
@@ -6183,7 +6190,7 @@ function io_sys() {
       Object.fromEntries(("socket:iii>i bind:ipu>i listen:ii>i connect:ipu>i"
         + " accept:ipp>i send:ipUi>I recv:ipUi>I read:ipU>I pread:ipUI>I"
         + " sendto:ipUipu>I recvfrom:ipUipp>I close:i>i setsockopt:iiipu>i"
-        + " " + sel + ":ipppp>i"
+        + " " + sel + ":ipppp>i poll:pUi>i pipe:p>i"
         + (vari ? " fcntl:iiiiiiiii>i" : " fcntl:iii>i") + " getsockopt:iiipp>i"
         + " strerror:i>c " + err + ":>p").split(" ").map((s) => {
         const [name, args, ret] = s.split(/[:>]/);
@@ -6288,25 +6295,27 @@ function io_wait(io, block) {
   const len = (top >> 6 << 3) + 8;
   const set = new Uint8Array(2 * len);
   const at = (w) => (w.out ? len : 0) + (w.fd >> 3);
-  for (const w of fds) {
-    set[at(w)] |= 1 << (w.fd & 7);
-  }
+  const mark = (w) => set[at(w)] |= 1 << (w.fd & 7);
+  fds.forEach(mark);
   const tv = new BigInt64Array([BigInt(ms / 1000 | 0),
     BigInt(ms % 1000 * 1000)]);
   const sys = io_sys();
-  let code = 0;
   if (sys.select(top + 1, sys.ptr(set), sys.ptr(set, len), null,
     ms < 0 ? null : sys.ptr(tv)) < 0) {
-    code = sys.errno();
-    if (code !== 4 && code !== 9) {
+    const code = sys.errno();
+    const p = new Int32Array(fds.flatMap((w) => [w.fd, 1]));
+    set.fill(0);
+    // A pollfd's high half-word is revents: POLLNVAL (32) for a closed fd.
+    if (code === 9 && sys.poll(sys.ptr(p), fds.length, 0) > 0) {
+      fds.forEach((w, i) => p[2 * i + 1] >> 16 & 32 && mark(w));
+    }
+    if (code !== 4 && set.every((b) => b === 0)) {
       throw "bend: the poller failed";
     }
-    set.fill(0);
   }
   const now = performance.now();
   const due = (w) => w.at <= now || w.fd !== undefined
-    && (code === 9 ? sys.fcntl(w.fd, 1, 0) < 0
-      : set[at(w)] & 1 << (w.fd & 7));
+    && set[at(w)] & 1 << (w.fd & 7);
   const todo = io.waits;
   io.waits = todo.filter((w) => !due(w));
   for (const w of todo.filter(due)) {

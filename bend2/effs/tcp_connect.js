@@ -3,6 +3,7 @@
 
 // The socket is non-blocking for life: EINPROGRESS parks the computation
 // until the socket is writable, and then SO_ERROR says how the connect ended.
+// EBADF (9) means the fd is gone, so its number is not closed.
 function tcp_connect(host, port, k) {
   const sys = io_sys();
   const at = io_addr(host, Number(port));
@@ -15,7 +16,9 @@ function tcp_connect(host, port, k) {
   }
   const end = (code) => {
     if (code !== 0) {
-      sys.close(fd);
+      if (code !== 9) {
+        sys.close(fd);
+      }
       return io_fail(code);
     }
     return io_done(fd);

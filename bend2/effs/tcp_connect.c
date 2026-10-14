@@ -3,7 +3,8 @@
 
 // The socket is non-blocking for life. The connect's outcome is w->code:
 // EINPROGRESS parked the computation until the socket was writable, and
-// then SO_ERROR says how it ended.
+// then SO_ERROR says how it ended. EBADF means the fd is gone, so its
+// number, which another open may have taken, is not closed.
 static Term tcp_connect_more(Env e, IoWork* w) {
   int       fd  = (int)w->made;
   int       err = (int)w->code;
@@ -11,7 +12,7 @@ static Term tcp_connect_more(Env e, IoWork* w) {
   if (err == EINPROGRESS && getsockopt(fd, SOL_SOCKET, SO_ERROR, &err, &len)) {
     err = errno;
   }
-  if (err != 0 && fd >= 0) {
+  if (err != 0 && err != EBADF && fd >= 0) {
     close(fd);
   }
   free(w->data);

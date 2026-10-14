@@ -17,5 +17,6 @@ static Term readiness_idle_run(Env e, Term* f, IoWork* w) {
 
 static void __attribute__((constructor)) readiness_use(void) {
   io_eff(CID(Readiness.closed), readiness_closed_run);
+  io_eff(CID(Readiness.closed_listener), readiness_closed_run);
   io_eff(CID(Readiness.idle), readiness_idle_run);
 }
