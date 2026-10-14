@@ -1316,7 +1316,7 @@ export function io_type(book: Bend.Book): HTerm | null {
   return xs?.length === 1 ? xs[0] : null;
 }
 
-export function io_run(book: Bend.Book, args: string[]): number {
+export function io_run(book: Bend.Book, args: string[]): Promise<number> {
   const src = `${js_lib(book)}\n${RUNTIME_MAIN}\ncli_args = ${
     JSON.stringify(args)};\nreturn io_run(${name_id("$", "main")});`;
   return new Function("require", src)(import.meta.require);
@@ -2916,13 +2916,9 @@ export function compile_book(book: Bend.Book): string {
 // JS
 // --
 
-// Each effect source runs once in a closure of its own and registers
-// its effects with io_eff(CID(k), run), as a C source does. A
-// def on a tail cycle is one loop over the cycle's bodies ($pc picks
-// one), each turn binding its parameters afresh, so a closure keeps its
-// own; any other call is direct. Only a closure's tail call bounces
-// (run_tail), so a call passes through run_loop only when its callee
-// may return one: a marker per call resolves once every def is out.
+// Effect sources register once in private closures. Tail cycles rebind
+// parameters each turn; only closure tail calls bounce. Call markers decide
+// where run_loop is needed after all defs are emitted.
 
 const JS_DEPTH = new WeakMap<HTerm, number>();
 
@@ -3166,8 +3162,6 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
-// What crosses to or from a host: a Nat comes in as a number, which nat_in
-// checks; text gets U+FFFD for what is no Unicode scalar.
 function host(A: HTerm | null, x: string, out = 0): string {
   const t = ty_wnf(A);
   const k = t?.$ === "ADT" ? t.k : "";
@@ -3175,8 +3169,6 @@ function host(A: HTerm | null, x: string, out = 0): string {
     : k === "Nat" && !out ? `nat_in(${x})` : x;
 }
 
-// A module (for the .bend loader and -o <out>.mjs) roots and exports each
-// def a host can call.
 export function js_lib(book: Bend.Book, mod = false): string {
   FL = file_new(book, true);
   const outs = !mod ? null : [...new Set(FL.book.order)].filter((k) => {
@@ -6096,9 +6088,6 @@ function cli(argv) {
 // Show
 // ====
 
-// show_val prints a pure main's value as term_show does (see show_main);
-// chain is the bracket it continues, or 0.
-
 function show_chr(s, q) {
   const c = char_code(s);
   const k = { 10: "n", 9: "t", 13: "r", 0: "0", 92: "\\" }[c]
@@ -6136,21 +6125,15 @@ function show_val(D, d, v, chain) {
 // Io
 // ==
 
-// Apple arm64 passes variadic fcntl flags on the stack, so io_sys
-// binds fcntl there with the flags as the ninth fixed argument. A
-// parked effect waits for fd (a write when out) or until at
-// (performance.now()), either one undefined when unused; once due, io_wait
-// calls more at once, as C calls pack, and resumes k with its value, while
-// undefined parks it again. The waits stay in deadline order, as io_park
-// does in C.
+// Foreign IO ABI: guide/EFFECTS.md. Apple's variadic fcntl flags use arg 9.
 
-function io_exit(main, show) {
+async function io_exit(main, show) {
   try {
     if (show !== null) {
       io_out(1, io_bytes(show_val(show, 0, run_loop(main()), 0) + "\n"));
       process.exit(0);
     }
-    process.exit(io_run(main));
+    process.exit(await io_run(main));
   } catch (e) {
     io_errs(String(e));
     process.exit(1);
@@ -6190,7 +6173,6 @@ function io_sys() {
     const ffi = require("bun:ffi");
     const mac = process.platform === "darwin";
     const err = mac ? "__error" : "__errno_location";
-    const sel = mac ? "select$DARWIN_EXTSN" : "select";
     const T = { i: "i32", u: "u32", U: "u64", I: "i64", p: "ptr",
       c: "cstring" };
     const vari = mac && process.arch === "arm64";
@@ -6198,7 +6180,7 @@ function io_sys() {
       Object.fromEntries(("socket:iii>i bind:ipu>i listen:ii>i connect:ipu>i"
         + " accept:ipp>i send:ipUi>I recv:ipUi>I read:ipU>I pread:ipUI>I"
         + " sendto:ipUipu>I recvfrom:ipUipp>I close:i>i setsockopt:iiipu>i"
-        + " " + sel + ":ipppp>i"
+        + " pipe:p>i poll:p" + (mac ? "u" : "U") + "i>i"
         + (vari ? " fcntl:iiiiiiiii>i" : " fcntl:iii>i") + " getsockopt:iiipp>i"
         + " strerror:i>c " + err + ":>p").split(" ").map((s) => {
         const [name, args, ret] = s.split(/[:>]/);
@@ -6207,14 +6189,12 @@ function io_sys() {
     const fcntl = (fd, cmd, arg) => vari
       ? lib.fcntl(fd, cmd, 0, 0, 0, 0, 0, 0, arg)
       : lib.fcntl(fd, cmd, arg);
-    globalThis.BEND_SYS = { ...lib, fcntl, select: lib[sel],
-      ptr: ffi.ptr, mac,
+    globalThis.BEND_SYS = { ...lib, fcntl, ptr: ffi.ptr, mac,
       errno: () => ffi.read.i32(lib[err](), 0) };
   }
   return globalThis.BEND_SYS;
 }
 
-// strerror needs bun:ffi; a host without it (node) gets the bare errno.
 function io_strerror(code) {
   try {
     return String(io_sys().strerror(code));
@@ -6256,8 +6236,6 @@ function io_text(b, n) {
   return new TextDecoder("utf-8", { ignoreBOM: true }).decode(b.subarray(0, n));
 }
 
-// Bytes cross as they are (0..255), one List cell each, with no UTF-8 in
-// either direction; io_unlist answers null if a value is past 255.
 function io_list(b, n) {
   let xs = { $: "Nil" };
   while (n > 0) {
@@ -6294,38 +6272,90 @@ function io_push(fun, arg, fresh) {
   io.live += fresh ? 1 : 0;
 }
 
-function io_wait(io, block) {
+function io_park_promise(promise, k, done, fail) {
+  const io = io_active;
+  if (!io.port) {
+    io.port = new (require("node:worker_threads").MessageChannel)();
+    io.port.port1.start();
+    io.port.port1.ref();
+  }
+  io.pending += 1;
+  const settle = (map, value) => {
+    if (io.closed) return;
+    io.pending -= 1;
+    io.runs.push({ fun: (x) => k(map(x)), arg: value });
+    io.wake?.();
+  };
+  Promise.resolve(promise).then((x) => settle(done, x), (e) => settle(fail, e));
+}
+
+function io_poller(io) {
+  if (io.poll) return io.poll;
+  const sys = io_sys();
+  const fds = new Int32Array(2);
+  if (sys.pipe(sys.ptr(fds)) !== 0) throw "bend: the poller pipe failed";
+  const code = "const {parentPort} = require('node:worker_threads'); const sys = ("
+    + io_sys + ")(), move = [];"
+    + " parentPort.on('message', (buffer) => { const fds = new Int32Array(buffer);"
+    + " if (sys.poll(sys.ptr(fds),fds.length/2-1,fds[fds.length-1])<0) {"
+    + " if (sys.errno()!==4) throw 'bend: the poller failed';"
+    + " for(let i=1;i<fds.length-2;i+=2) fds[i]&=65535; }"
+    + " if (fds[1]>>>16) sys.read(fds[0],sys.ptr(fds),1);"
+    + " move[0]=buffer; parentPort.postMessage(buffer,move); });";
+  const p = io.poll = { fds, move: [] };
+  const worker = p.worker = new (require("node:worker_threads").Worker)(code, { eval: true });
+  worker.on("message", (mask) => {
+    io.wake = null;
+    p.wait.resolve(mask);
+  });
+  worker.on("error", (error) => p.wait.reject(error));
+  return p;
+}
+
+async function io_wait(io, block) {
   const soon = io.waits[0]?.at ?? Infinity;
   const ms = !block ? 0 : soon === Infinity ? -1
     : Math.max(0, Math.ceil(soon - performance.now()));
   const fds = io.waits.filter((w) => w.fd !== undefined);
-  const top = fds.reduce((m, w) => Math.max(m, w.fd), 0);
-  const len = (top >> 6 << 3) + 8;
-  const set = new Uint8Array(2 * len);
-  const at = (w) => (w.out ? len : 0) + (w.fd >> 3);
-  for (const w of fds) {
-    set[at(w)] |= 1 << (w.fd & 7);
-  }
-  const tv = new BigInt64Array([BigInt(ms / 1000 | 0),
-    BigInt(ms % 1000 * 1000)]);
-  const sys = io_sys();
-  if (sys.select(top + 1, sys.ptr(set), sys.ptr(set, len), null,
-    ms < 0 ? null : sys.ptr(tv)) < 0) {
-    if (sys.errno() !== 4) {
-      throw "bend: the poller failed";
+  if (fds.length > 0) {
+    const p = io_poller(io);
+    const data = new Int32Array(2 * (fds.length + 2));
+    data[0] = p.fds[0];
+    data[1] = block ? 1 : 0;
+    data[data.length - 1] = Math.min(ms, 2147483647);
+    fds.forEach((w, i) => {
+      data[2 * i + 2] = w.fd;
+      data[2 * i + 3] = w.out ? 4 : 1;
+    });
+    p.wait = Promise.withResolvers();
+    if (block) {
+      io.wake = () => {
+        io.wake = null;
+        require("node:fs").writeSync(p.fds[1], p.fds, 0, 1);
+      };
     }
-    set.fill(0);
+    p.move[0] = data.buffer;
+    p.worker.postMessage(data.buffer, p.move);
+    const ready = new Int32Array(await p.wait.promise);
+    fds.forEach((w, i) => { w.ready = (ready[2 * i + 3] >>> 16) !== 0; });
+  } else if (block) {
+    const wait = Promise.withResolvers();
+    let timer;
+    io.wake = () => {
+      io.wake = null;
+      clearTimeout(timer);
+      wait.resolve();
+    };
+    if (ms >= 0) timer = setTimeout(io.wake, ms);
+    await wait.promise;
   }
   const now = performance.now();
-  const due = (w) => w.at <= now || w.fd !== undefined
-    && set[at(w)] & 1 << (w.fd & 7);
+  const due = (w) => w.at <= now || w.ready;
   const todo = io.waits;
   io.waits = todo.filter((w) => !due(w));
   for (const w of todo.filter(due)) {
     const x = w.more();
-    if (x !== undefined) {
-      io_push(w.k, x, false);
-    }
+    if (x !== undefined) io_push(w.k, x, false);
   }
 }
 
@@ -6335,8 +6365,8 @@ function io_park_on(fd, out, k, more, at) {
   ws.splice(i + 1, 0, { fd, out, k, more, at });
 }
 
-function io_run(m) {
-  const io = { runs: [], live: 0, waits: [] };
+async function io_run(m) {
+  const io = { runs: [], live: 0, waits: [], pending: 0 };
   const parent = io_active;
   io_active = io;
   try {
@@ -6347,18 +6377,18 @@ function io_run(m) {
         if (io.live === 0) {
           return 0;
         }
-        if (io.waits.length === 0) {
+        if (io.waits.length === 0 && io.pending === 0) {
           io_errs("bend: deadlock: every computation waits on a channel");
           return 1;
         }
-        io_wait(io, true);
+        await io_wait(io, true);
         continue;
       }
       if ((n & 63) === 0 && io.waits.length > 0) {
         const now = performance.now();
         if (now >= look || io.waits[0].at <= now) {
           look = now + 10;
-          io_wait(io, false);
+          await io_wait(io, false);
         }
       }
       const s = io.runs.shift();
@@ -6390,6 +6420,14 @@ function io_run(m) {
   } catch (e) {
     throw e instanceof RangeError ? "bend: ${ERRS[7]}" : e;
   } finally {
+    io.closed = true;
+    io.wake = null;
+    io.port?.port1.close();
+    io.port?.port2.close();
+    if (io.poll) {
+      await io.poll.worker?.terminate();
+      io.poll.fds.forEach((fd) => io_sys().close(fd));
+    }
     io_active = parent;
   }
 }

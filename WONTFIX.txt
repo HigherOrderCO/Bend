@@ -90,7 +90,8 @@ No Vulkan or other extra GPU lanes (#811)
   second memory model we cannot maintain.
 
 No DNS, TLS, crypto or HTTP in Base (#846)
-  TCP.connect takes an IPv4 address; JS's IO loop cannot wait on a lookup.
+  TCP.connect takes an IPv4 address; JS effects can resolve names via host
+  Promises with io_park_promise, but Base does not supply a DNS API.
   TLS and crypto need OpenSSL: build them as hub packages over TCP bytes.
 
 No cancellation of blocking effects (#1034)

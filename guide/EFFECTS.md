@@ -106,7 +106,33 @@ argument to also wake on time; with no fd
 (`io_park_on(undefined, false, k, more, deadline)`) it waits on time
 alone, as `sleep.js` does. An effect that can meet a steady backlog
 parks before its first try, as on the C side. `io_sys()` is `libc` through `bun:ffi`
-(`read`, `recv`, `select`, `errno`); `tcp_accept.js` shows the full shape.
+(`read`, `recv`, `poll`, `errno`); `tcp_accept.js` shows the full shape.
+
+A host Promise parks with `io_park_promise(promise, k, done, fail)`. The effect
+returns `undefined`; fulfillment or rejection resumes that same computation.
+Both mappers return the value supplied to `k`, and run on the IO loop so their
+exceptions use the normal Bend error path. For a `Result`, use `io_done(value)`
+and `io_fail(errno)` as usual:
+
+```js
+io_eff(CID(Host.lookup), (name, k) => {
+  io_park_promise(require("node:dns").promises.lookup(name), k,
+    (found) => io_done(found.address),
+    (error) => io_fail(5));
+});
+```
+
+The idle loop releases the host event loop: microtasks, timers and signal handlers
+can run. Native descriptor waits use one lazy worker and a wake pipe; descriptor
+buffers transfer without copying, and Promise completion interrupts the wait.
+The loop closes its worker, pipe and Promise keep-alive ports on exit. Callers of
+the compiler's `io_run` await its `Promise<number>`; generated program entrypoints
+already do so. Pure library exports remain synchronous.
+
+Byte helpers use one raw 0..255 value per List cell, without UTF-8 conversion;
+`io_unlist` rejects values above 255. Text helpers replace non-scalar characters
+with U+FFFD. On Node without `bun:ffi`, error descriptions fall back to the errno
+number; native descriptor effects still require Bun.
 
 ## A complete example
 
