@@ -3667,7 +3667,9 @@ INLINE u32 a32_cmpx(DEV u32* p, u32 x, u32 v) {
 
 #if DEVICE
 
-#define err_post(H, code) a32_cmpx(a32_at(H, H_ERROR_CODE), 0, code)
+INLINE void err_post(DEV u64* H, u32 code) {
+  a32_cmpx(a32_at(H, H_ERROR_CODE), 0, code);
+}
 
 #else
 
@@ -3680,7 +3682,9 @@ static void err_fail(const char* msg) {
   _exit(1);
 }
 
-#define err_post(H, code) err_fail(ERR_TEXT[code])
+static void err_post(u64* H, u32 code) {
+  err_fail(ERR_TEXT[code]);
+}
 
 static void err_trap(int sig) {
   err_post(NULL, ERR_DEEP);
