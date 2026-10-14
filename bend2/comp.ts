@@ -168,8 +168,6 @@ const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
 // Operations
 // ----------
 
-// The Array operations have no C text: arr_op lays them out by element.
-
 const CMPS = "is_eq:==:=== is_ne:!=:!== is_lt:< is_le:<= is_gt:> is_ge:>=";
 
 const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
@@ -265,10 +263,9 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
 // Optimized
 // ---------
 
-// Per native constructor: its builder, field readers and optional
-// test. RUNTIME_ADTS are the datatypes the runtime or the elaborator
-// lays out itself; OWNED are the Base names the compiler encodes,
-// which a file without `import Base` may declare but not compile.
+// RUNTIME_ADTS are the datatypes the runtime or the elaborator lays out
+// itself; OWNED are the Base names the compiler encodes, which a file
+// without `import Base` may declare but not compile.
 
 const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
   Nat: { Zero: { intr: "0" }, Succ: { intr: tpl_nat("", "nat_chk($0 + 1)") } },
@@ -279,7 +276,7 @@ const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
   U32: { U32: { intr: ([w]) => view_of(w) ?? `word_to_u32(${w})` } },
   F32: {
     F32: {
-      intr: ([w]) => w.match(/^u32_to_word\(f32_bits\((\w+)\)\)$/)?.[1]
+      intr: ([w]) => w.match(VIEW)?.[2]
         ?? `f32_from_bits(${tpl(OPTIMIZED.U32.U32.intr, [w])})`,
     },
   },
@@ -455,8 +452,7 @@ function u32_to_word(x) {
 }
 
 function cmp_new(a, b) {
-  return {$: a < b ? "LT"
-    : a === b ? "EQ" : "GT"};
+  return {$: a < b ? "LT" : a === b ? "EQ" : "GT"};
 }
 
 function nat_divmod(a, b) {
@@ -480,8 +476,7 @@ function f32_show(x) {
     return "nan";
   }
   if (!Number.isFinite(x) || Object.is(x, -0)) {
-    return x < 0 ? "-inf"
-      : x === 0 ? "-0" : "inf";
+    return x < 0 ? "-inf" : x === 0 ? "-0" : "inf";
   }
   let s = "x";
   for (let p = 1; p <= 9 && f32_round(s) !== x; p += 1) {
@@ -721,10 +716,8 @@ function term_eta(t: HTerm, T: HTerm, n: number): HTerm {
 function call_eta(t: HTerm): HTerm | null {
   const m = term_spine(t);
   const f = m.t.$ === "Ref" ? fun_of(m.t.k) : null;
-  if (m.tld?.$ !== "Def" || f === null || m.args.length >= f.live.length) {
-    return null;
-  }
-  return term_eta(t, tele_fill(m.tld.T, m.all), f.n - m.all.length);
+  return m.tld?.$ !== "Def" || f === null || m.args.length >= f.live.length
+    ? null : term_eta(t, tele_fill(m.tld.T, m.all), f.n - m.all.length);
 }
 
 function term_kids(tm: HTerm): HTerm[] {
@@ -794,7 +787,7 @@ function rest_use(rest: HTerm[], p: Of<"Var">): number {
 }
 
 function fun_live(x: HTerm, ty: HTerm | null): boolean {
-  return mat_head(x) || x.$ === "Lam" && quant_live(ty_all(ty).q);
+  return mat_head(x) || x.$ === "Lam" && ty_all(ty).q.$ !== "None";
 }
 
 function flat_call(t: HTerm): boolean {
@@ -806,13 +799,6 @@ function flat_call(t: HTerm): boolean {
 // ===
 
 function dom_live([q]: Dom): boolean {
-  return quant_live(q);
-}
-
-// Quant
-// =====
-
-function quant_live(q: Bend.Quant): boolean {
   return q.$ !== "None";
 }
 
@@ -912,11 +898,6 @@ function ty_value(K: HTerm | null): boolean {
   const k = ty_wnf(K);
   return k?.$ === "All" ? ty_value(k.B(DUMMY)) : !ty_holds(k, (t) =>
     !["ADT", "Qnt", "Eql"].includes(t?.$ ?? ""));
-}
-
-function ty_clo(A: HTerm | null): boolean {
-  return ty_holds(A, (t) =>
-    !["ADT", "Typ", "Qua", "Min", "Eql"].includes(t?.$ ?? ""));
 }
 
 function type_adts(T: HTerm): Name[] {
@@ -1028,8 +1009,7 @@ function lay_arr(lay: Lay) {
 function ctr_adt(x: Of<"Ctr">,
   ty: HTerm | null): [Of<"ADT">, number | null] {
   const ctr = FL.book.ctrs[x.k];
-  const adt = adt_of(ty ?? (ctr ? tele_unbind(ctr.T).ret
-    : null));
+  const adt = adt_of(ty ?? (ctr ? tele_unbind(ctr.T).ret : null));
   if (ty === null && adt.x.length > 0) {
     die("a constructor outside a datatype");
   }
@@ -1353,9 +1333,8 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // File
 // ====
 
-// A File is the book being compiled (FL): its facts, its output and its
-// caches. The emitter is the analysis: a boxed parameter starts borrowed
-// (its scope's brwl) and becomes owned (own) when owned or unlent; a lend is
+// The emitter is the analysis: a boxed parameter starts borrowed (its
+// scope's brwl) and becomes owned (own) when owned or unlent; a lend is
 // asked by a holder or passed on from a lent root (k~i<j~q). A shared value
 // heats its type (hot); a family stuck on an open index heats its arms'
 // types once, its arguments at every instantiation. compile_book emits until
@@ -1402,9 +1381,8 @@ function file_new(book: Bend.Book, js: boolean): File {
   };
 }
 
-// A scope is where the emitter writes: its segment, its locals' names, the
-// bindings and spare nodes it holds, the def it is in. A nested arm, closure
-// or fork copies its scope; the book's facts and output live in FL.
+// A nested arm, closure or fork copies its scope; the book's facts and
+// output live in FL.
 function scope_new(): Scope {
   return {
     seg: seg_new("", BOX, []),
@@ -1559,9 +1537,6 @@ function spare_flush(sc: Scope): void {
 
 // Seg
 // ===
-
-// A segment enters by popping its frame and reading its
-// parameters from the frame slots, then from the bank (r0..).
 
 function seg_new(name: string, ret: Lay, params: string[],
   ks: Kind[] = params.map(() => "w64"), frame: Seg["frame"] = null): Seg {
@@ -1851,7 +1826,7 @@ function bind_pop(sc: Scope, x: HTerm): Val {
     sc.uses.delete(p);
     return b.val;
   }
-  sc.uses.set(p, { ...b, n: b.n - 1 });
+  bind_set(sc, p, b, b.n - 1);
   val_owned(sc, b.val).forEach((w) => {
     file_push(sc, `${w} = term_keep(e, ${w}, 1);`);
     facts_hot(sc, b.A, true);
@@ -2056,7 +2031,7 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
       }
       case "Lam": {
         const all = T && Bend.tele_open(FL.book, T);
-        return all === null || quant_live(all.q) ? s
+        return all === null || all.q.$ !== "None" ? s
           : Bend.Ann(go(s.f(DUMMY), top, all.B(DUMMY)), all.B(DUMMY));
       }
       default: {
@@ -2169,7 +2144,7 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false): string[] {
       if (dead && !twin && val_brw(sc, bd.val)) {
         sc.uses.delete(p);
       } else if (!fork) {
-        sc.uses.set(p, { ...bd, n: Math.max(bd.n - 1, 1) });
+        bind_set(sc, p, bd, Math.max(bd.n - 1, 1));
       }
       b = bd.val;
     }
@@ -2533,7 +2508,7 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
   switch (x.$) {
     case "Lam": {
       const all = ty_all(ty);
-      if (!quant_live(all.q)) {
+      if (all.q.$ === "None") {
         const t = ers[0] ?? Bend.Var(x.k, x.i);
         return emit_body(sc, x.f(t), all.B(t), ers.slice(1), args, dst);
       }
@@ -2779,7 +2754,7 @@ function emit_chain(sc: Scope, cond: (i: number) => string,
 // =======
 
 // Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
-// namespace, else as is. An effect source is read once, in one namespace.
+// namespace, else as is.
 
 function c_ids(src: string, m = ""): string {
   return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
@@ -2860,8 +2835,9 @@ export function compile_book(book: Bend.Book): string {
     [...s.refs].map((r) => [s.fid, r]));
   const reach = (from: string[]) => graph_close(new Set(from), edges);
   const live = reach([seg_fid("main")]);
-  const wide = [...FL.bangs].some((k) =>
-    fun_of(k).live.some(([, , A]) => ty_clo(A)));
+  const wide = [...FL.bangs].some((k) => fun_of(k).live.some(([, , A]) =>
+    ty_holds(A, (t) => !["ADT", "Typ", "Qua", "Min", "Eql"]
+      .includes(t?.$ ?? ""))));
   const dev = reach([...[...FL.bangs].map(seg_fid), ...wide ? FL.clos : []]);
   FL.segs = FL.segs.filter((s) => live.has(s.fid));
   FL.spins = FL.spins.filter((s) => live.has(s.fid));
@@ -3037,8 +3013,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null): string {
         const v = adt.k === "F32" ? Bend.f32_from_bits(u) : u;
         return Object.is(v, -0) ? "-0" : String(v);
       }
-      const exprs = ctr_flds(x.k, x.x)
-        .map((f) => js_expr(sc, f, null));
+      const exprs = ctr_flds(x.k, x.x).map((f) => js_expr(sc, f, null));
       const native = OPTIMIZED[adt.k];
       if (native !== undefined) {
         return tpl(native[x.k].intr, exprs);
@@ -3084,7 +3059,7 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
   }
   if (x.$ === "Lam") {
     const all = ty_all(ty);
-    const [e, ...rest] = quant_live(all.q) ? args : ["null", ...args];
+    const [e, ...rest] = all.q.$ !== "None" ? args : ["null", ...args];
     const k = /^(\w*_\d+|null)$/.test(e) || VIEW.test(e) ? e
       : name_local(sc, x.k);
     const at = sc.seg.lines.length;
@@ -3194,8 +3169,6 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
-// What crosses to or from a host: a Nat comes in as a number, which nat_in
-// checks; text gets U+FFFD for what is no Unicode scalar.
 function host(A: HTerm | null, x: string, out = 0): string {
   const t = ty_wnf(A);
   const k = t?.$ === "ADT" ? t.k : "";
@@ -3909,10 +3882,7 @@ OUTLINE Term rfc_wrap(Env e, Term t, u32 cnt) {
 }
 
 INLINE Term rfc_seal(Env e, Term t) {
-  if (term_tag(t) != TAG_CTR || term_rfc(t)) {
-    return t;
-  }
-  return rfc_wrap(e, t, 1);
+  return term_tag(t) != TAG_CTR || term_rfc(t) ? t : rfc_wrap(e, t, 1);
 }
 
 INLINE void rfc_bump(Env e, u64 r, u32 k) {
@@ -3927,10 +3897,7 @@ INLINE Term term_keep(Env e, Term t, u32 k) {
     rfc_bump(e, term_loc(t), k);
     return t;
   }
-  if (term_triv(t)) {
-    return t;
-  }
-  return rfc_wrap(e, t, 1 + k);
+  return term_triv(t) ? t : rfc_wrap(e, t, 1 + k);
 }
 
 // A redirect cell holds its target's loc over a 24-bit count, which only
@@ -3939,10 +3906,7 @@ INLINE Term term_keep(Env e, Term t, u32 k) {
 // two halves, both holding the same loc. A shared node's fields never change
 // either, so ctr_take copies them before it acquires.
 INLINE u64 term_peek(DEV u64* H, Term t) {
-  if (term_rfc(t)) {
-    return w64_load(&H[term_loc(t)]) >> 24;
-  }
-  return term_loc(t);
+  return term_rfc(t) ? w64_load(&H[term_loc(t)]) >> 24 : term_loc(t);
 }
 
 #define blk_shr(t) (BLK_SHR && term_rfc(t))
@@ -4100,10 +4064,7 @@ INLINE DEV u32a* blk_ptr(DEV u64* H, u64 loc, u32 i) {
 }
 
 INLINE Term blk_read(DEV u64* H, bool arr, u64 loc, u32 i) {
-  if (arr) {
-    return H[loc + i];
-  }
-  return (u64)*blk_ptr(H, loc, i);
+  return arr ? H[loc + i] : (u64)*blk_ptr(H, loc, i);
 }
 
 INLINE void blk_write(DEV u64* H, bool arr, u64 loc, u32 i, Term v) {
@@ -4281,11 +4242,8 @@ INLINE Term task_deliver(DEV u64* H, Term cont, u32 idx, THR Term* v, u32 n) {
 INLINE void task_deal(DEV u64* H, Term join, u32 base, u32 stride, TG u32* cur) {
   u64 loc = term_loc(join);
   u32 ar  = fid_arity((u32)term_aux(join));
-  u32 g   = 0;
-  if (stride == 0) {
-    u32 rem = (u32)H[loc + ar + 1];
-    g = a32_add(a32_at(H, H_CURSOR), rem);
-  }
+  u32 g   = stride != 0 ? 0
+    : a32_add(a32_at(H, H_CURSOR), (u32)H[loc + ar + 1]);
   for (u32 i = 0; i < ar; i += 1) {
     Term k = H[loc + i];
     if (term_tag(k) == TAG_TSK) {
@@ -5164,8 +5122,6 @@ static void gpu_pass(u32 f) {
 // to cur - 1, so those rows hold every task. A slow grow deals task g to
 // row g % CUBE_T, and the grows repeat over g rows until none deals.
 
-// Between turns, each ring's pending tasks move back to slot 0.
-
 static void ring_rewind(u64* H, u32 rows) {
   Term keep[RING_LEN];
   for (u32 r = 0; r < (rows < CUBE_G ? rows : CUBE_G) * CUBE_T; r += 1) {
@@ -5756,12 +5712,10 @@ ${NATIVE.IO}
 // Show
 // ====
 
-// show_val prints a pure main's value as term_show spells it: d
-// is a SHOW_DESC node (see show_main), w its words, and chain the
-// bracket of the [a, b] or (a, b) the value continues, or 0. Con
-// or Nil spell a list, Tuple a tuple, and their tails continue
-// it. show_f32 prints the shortest text that reads back, with a
-// point before an e.
+// show_val prints a pure main's value as term_show spells it: d is a
+// SHOW_DESC node (see show_main), w its words, and chain the bracket of
+// the [a, b] or (a, b) the value continues, or 0. Con or Nil spell a list,
+// Tuple a tuple, and their tails continue it.
 
 #if MAIN_PURE
 
