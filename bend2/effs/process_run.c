@@ -291,7 +291,7 @@ Term process_run_run(Env e, Term* f, IoWork* w) {
   p->argv = io_mem(calloc(capacity, sizeof(char*)));
   p->argv[p->argc++] = command;
   Term xs = f[1];
-  while (term_aux(xs) == CID_CON) {
+  while (term_aux(xs) == CID(Con)) {
     Term pair[2];
     spare_free(e, cls_fit(2), ctr_take(e, xs, 2, pair));
     char* arg = io_cstr(e, pair[0], &len);

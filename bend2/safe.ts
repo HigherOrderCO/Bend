@@ -37,15 +37,15 @@
 // kernel where it does in bend2: Kind(&0) is *(.Q0), and fits *(.Q1)
 // (Type) only as bend2's LE does. An item (a book name) goes out
 // once per tuple of closed arguments at its template (~) parameters, with
-// those parameters gone; a def checked on its own also goes out as a
-// λ-match on its finite ones, to its instances, so the kernel checks
-// that they cover those parameters' values and fit the def's type.
-// Every def goes out after the defs its live code names; a name in a
-// type may come later. A def with no body (a law, a native, a foreign
-// fill) goes out opaque at a model: the kernel checks the model, then
-// never unfolds the def. What the kernel cannot express is out of
-// scope: it goes, with every def that names it, and --verdict fails, as
-// it does for a def that reaches no kernel def.
+// those parameters gone. A def with a finite one also goes out as a
+// λ-match on its values that names an instance in each arm, so the
+// kernel checks that every value has one. Every def goes out after the
+// defs its live code names; a name in a type may come later. A def with
+// no body (a law, a native, a foreign fill) goes out opaque at a model:
+// the kernel checks the model, then never unfolds the def. What the
+// kernel cannot express is out of scope: it goes, with every def that
+// names it, and --verdict fails, as it does for a def that reaches no
+// kernel def.
 
 import * as child from "node:child_process";
 import * as crypto from "node:crypto";
@@ -131,6 +131,7 @@ type Safe = {
   todo: Array<[Name, Cols]>;
   taken: Set<string>;
   fail: Map<string, string>;
+  log: Array<[Map<string, string> | Set<string>, string]>;
   groups: Map<Name, Group>;
   inst: Map<Name, [Name, HTerm[]]>;
   stack: string[];
@@ -168,11 +169,23 @@ const UV: O = { $: "Lab", k: "()" };
 const ET: O = { $: "Enu", ks: [] };
 const TYPE: O = { $: "Typ", q: { $: "Lab", k: "Q1" } };
 
+function variable(l: number): O {
+  return { $: "Var", l };
+}
+
+function apply(q: Q, f: O, x: O): O {
+  return { $: "App", q, f, x };
+}
+
 // Errors
 // ======
 
 // a book the kernel cannot express
 class Scope_Error extends Error {}
+
+// a template argument that depends on a run-time value, which a closed
+// argument there would not
+class Open_Error extends Scope_Error {}
 
 // a live cycle found below the item at key, now a group: the emission
 // since key began is undone, and its caller retries (Reroute)
@@ -183,8 +196,8 @@ class Regroup extends Error {
 }
 class Reroute extends Error {}
 
-function oos(why: string): never {
-  throw new Scope_Error(why);
+function oos(why: string, E = Scope_Error): never {
+  throw new E(why);
 }
 
 // Book
@@ -213,7 +226,7 @@ function safe_book(book: Book): { text: string; oos: Array<[Name, string]> } {
 function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { text: string; oos: Array<[Name, string]> } | null {
   const g0 = groups.size;
   const e: Safe = { book, mb: { ...book, tlds: Object.create(book.tlds) as Book["tlds"] }, out: [], names: new Map(), seen: new Set(),
-    todo: [], taken: new Set(), fail: new Map(), groups, inst, stack: [], going: new Set(), grew: false, consts: new Map(), uses: new WeakMap() };
+    todo: [], taken: new Set(), fail: new Map(), log: [], groups, inst, stack: [], going: new Set(), grew: false, consts: new Map(), uses: new WeakMap() };
   const roots: Array<[Name, string[], string | null]> = [];
   for (const k of [...new Set([...book.order].reverse())].reverse().filter((k) => book.tlds[k].b !== true)) {
     const m = trail(e);
@@ -225,7 +238,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
       }
       undo(e, m);
       const n = fresh(e, name_tt(k));
-      e.fail.set(n, x.message);
+      put(e, e.fail, n, x.message);
       roots.push([k, [n], null]);
     }
   }
@@ -248,37 +261,39 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
     }
   }
   e.out = e.out.filter(([k]) => !bad.has(k));
-  // a def is out at each reason its instances are out for, or else at
-  // its check's (which names them)
-  const out = new Set(e.out.map(([k]) => k));
-  const why = (n: string): string[] =>
-    out.has(n) ? [] : [bad.get(n) ?? "no kernel def"];
+  // a def is out at its instances' reasons, else at its λ-match's; with
+  // neither, it reaches no kernel def
+  const why = (n: string): string[] => bad.has(n) ? [bad.get(n) as string] : [];
   const oos = roots.flatMap(([k, ns, top]) => {
     const ws = ns.flatMap(why);
-    const all = ws.length > 0 || top === null ? ws : why(top);
+    const all = ws.length > 0 ? ws : top !== null ? why(top) : ns.length === 0 ? ["no kernel def"] : [];
     return [...new Set(all)].map((w): [Name, string] => [k, w]);
   });
   return { text: book_show(e), oos };
 }
 
-// root k: its instances, one per tuple of its telescope's columns: a
-// specialized parameter of a finite type (Quant, or a datatype whose
-// constructors have no fields) at each value, any other at an opaque
-// constant of its type, one per place for all roots, which models read
-// at its model (as bend2 checks a template: its body holds at every
-// argument). With a finite one, a def checks them in erased lets: a
-// λ-match on each, at ∀y:A -> Σz:A -> {z == y : A}, whose arm at a value
-// names its instance at k's type G, a λ on its ~ parameters (unless G
-// needs them closed), and returns that value. So the kernel checks that
-// each value has an instance that fits k's type. Its instances' names,
-// and that def's (null with no finite one)
+// root k: its instances, one per tuple of columns: a specialized
+// parameter of a finite type (Quant, or a datatype whose constructors
+// have no fields) at each value, any other at an opaque constant of its
+// type, one per place for all roots, which models read at its model (as
+// bend2 checks a template: its body holds at every argument). With a
+// finite one, k also goes out as a λ-match on each, at ∀y:A -> <()>,
+// whose arm names an instance at k's type G at its own arguments. So the
+// kernel checks that every value has an arm and each instance fits G,
+// not which arm names which. If G calls a template at one of k's ~
+// parameters (bound in it), the arms name the instances bare; any other
+// reason G cannot go out is k's. Returns the instances' names, and the
+// λ-match's (null without one). An empty equation column instead emits
+// a checked refutation, without constructing a model for its evidence.
 function root_emit(e: Safe, k: Name): [string[], string | null] {
   const tld = e.book.tlds[k];
   const ns: string[] = [];
-  // cover: k needs a check; G: k's type, if it can go out
-  let cover = false;
-  let G: O | null = null;
+  // G: undefined until a coverage check, null if its type is not exported
+  let G: O | null | undefined;
   let ps: Binder[] = [];
+  // a column's kernel term, made once for every leaf below it
+  const kc = new Map<HTerm, O>();
+  const col = (v: HTerm): O => kc.get(v) ?? kc.set(v, term(e, scope_nil(), v, false)).get(v) as O;
   // the check of k's instances after the columns cs of T, at depth d
   const go = (T: HTerm, cs: Cols, d: number): O => {
     const j = cs.length;
@@ -286,9 +301,8 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     if (F?.$ !== "All") {
       ns.push(item_try(e, k, cs));
       const x: O = { $: "Ref", k: ns[ns.length - 1] };
-      return G === null ? x : { $: "Ann", x, T: ps.reduce<O>((f, [q], j) =>
-        ({ $: "App", q, f, x: term(e, scope_nil(), cs[j] as HTerm, false) }),
-        { $: "Var", l: 0 }) };
+      return G == null ? x : { $: "Ann", x, T: ps.reduce<O>((f, [q], j) =>
+        (apply(q, f, col(cs[j] as HTerm))), variable(0)) };
     }
     const at = (v: HTerm | null, d1 = d): O =>
       go(F.B(v ?? B.Var(F.k, j)), [...cs, v], d1);
@@ -300,30 +314,25 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     const vs: HTerm[] | null = A.$ === "Qnt" ? [B.None(), B.Lone(), B.Many()].map((q) => B.Qua(q))
       : adt !== null && adt.c.every((c) => B.term_wnf(e.book, c.T).$ !== "All") ? adt.c.map((c) => B.Ctr(c.k, [])) : null;
     if (vs !== null) {
-      if (!cover) {
-        cover = true;
+      if (G === undefined) {
+        G = null;
         const m = trail(e);
         try {
           const t = tele_open(e, scope_nil(), tld.T, [], tld.x);
           const b = term(e, t.s, t.T, false);
-          G = { $: "Ann", x: lams(e, t.ps, b),
-            T: alls(t.ps, TYPE) };
+          G = { $: "Ann", x: lams(e, t.ps, b), T: alls(t.ps, TYPE) };
           ps = t.ps;
         } catch (x) {
-          if (!(x instanceof Scope_Error)) {
+          if (!(x instanceof Open_Error)) {
             throw x;
           }
           undo(e, m);
         }
       }
-      const hs = vs.map((v): O => ({ $: "Let", q: 0, l: d, v: at(v, d + 1),
-        f: { $: "Tup", q: 1, a: term(e, scope_nil(), v, false), b: { $: "Rfl" } } }));
+      const hs = vs.map((v): O => ({ $: "Let", q: 0, l: d, v: at(v, d + 1), f: UV }));
       const M: O = adt === null ? mats(QS, (i) => hs[i])
         : { $: "Prj", h: mats(adt.c.map((c) => name_tt(c.k)), (i) => unit(hs[i])) };
-      const Ao = term(e, scope_nil(), A, false);
-      const eq: O = { $: "Eql", a: { $: "Var", l: d + 1 }, b: { $: "Var", l: d }, T: Ao };
-      return { $: "Ann", x: M,
-        T: { $: "All", q: 1, l: d, A: Ao, B: { $: "Sig", q: 1, l: d + 1, A: Ao, B: eq } } };
+      return { $: "Ann", x: M, T: { $: "All", q: 1, l: d, A: term(e, scope_nil(), A, false), B: UT } };
     }
     if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
       oos("a specialized parameter whose type names a parameter");
@@ -334,16 +343,11 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
         const H = term(e, scope_nil(), A, false) as Extract<O, { $: "Eql" }>;
         const M = shape_diff(H.a, H.b) ? shape_pattern(H.a, d + 1, UT, ET) : null;
         if (M !== null) {
-          const h: O = { $: "Var", l: d };
-          const s = scope_bind({ ...scope_nil(), D: d }, h, F.A, true);
-          const R = term(e, s, F.B(B.Var(F.k, 0)), false);
-          const P: O = { $: "App", q: 1, x: { $: "Var", l: d + 1 },
-            f: { $: "Ann", x: M, T: alls([[1, d + 1, H.T]], TYPE) } };
-          cover = true;
-          return { $: "Ann", T: alls([[1, d, H]], R),
-            x: { $: "Lam", q: 1, l: d, f: { $: "App", q: 1,
-              f: { $: "Ann", x: { $: "Efq" }, T: alls([[1, d + 1, ET]], R) },
-              x: { $: "Rwt", e: h, l: d + 1, P, f: UV } } } };
+          const h: O = variable(d);
+          const P: O = apply(1, { $: "Ann", x: M, T: alls([[1, d + 1, H.T]], TYPE) }, variable(d + 1));
+          if (G === undefined) { G = null; }
+          return { $: "Ann", T: alls([[1, d, H]], UT),
+            x: { $: "Lam", q: 1, l: d, f: apply(1, { $: "Ann", x: { $: "Efq" }, T: alls([[1, d + 1, ET]], UT) }, { $: "Rwt", e: h, l: d + 1, P, f: UV }) } };
         }
       } catch (x) {
         if (!(x instanceof Scope_Error)) { throw x; }
@@ -368,10 +372,11 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     e.consts.set(key, c);
     return at(B.Ref(c));
   };
-  const v: O = { $: "Let", q: 0, l: 1, v: go(tld.T, [], 2), f: UV };
-  if (!cover) {
+  const h = go(tld.T, [], 2);
+  if (G === undefined) {
     return [ns, null];
   }
+  const v: O = { $: "Let", q: 0, l: 1, v: h, f: UV };
   const n = fresh(e, name_tt(k));
   e.out.push([n, UT, G === null ? v : { $: "Let", q: 0, l: 0, v: G, f: v }, false]);
   return [ns, n];
@@ -431,7 +436,7 @@ function item_ref(e: Safe, k: Name, cols: Cols, live: boolean): string {
   if (n === undefined) {
     const tag = cols.flatMap((v) => v === null ? [] : [v.$ === "Qua" ? String(quant(v.q)) : "v"]).join("");
     n = fresh(e, name_tt(k[0] === "\t" ? k.slice(1) + ".group" : k) + (tag !== "" ? ".q" + tag : ""));
-    e.names.set(key, n);
+    put(e, e.names, key, n);
     e.todo.push([k, cols]);
   }
   const why = e.fail.get(n);
@@ -439,14 +444,14 @@ function item_ref(e: Safe, k: Name, cols: Cols, live: boolean): string {
     oos(why);
   }
   if (m !== null) {
-    e.seen.add(key);
+    put(e, e.seen, key);
     e.stack.push(key);
     e.going.add(key);
     try {
       item_emit(e, k, cols, n);
     } catch (x) {
       if (x instanceof Scope_Error) {
-        e.fail.set(n, x.message);
+        put(e, e.fail, n, x.message);
       }
       if (x instanceof Regroup && x.key === key) {
         undo(e, m);
@@ -507,8 +512,8 @@ function adt_emit(e: Safe, cols: Cols, n: string, tld: ADT): void {
   const arms = mats(ks, (i) => fs(tld.c[i]));
   const Enu: O = { $: "Enu", ks };
   e.out.push([am, alls(ps, { $: "All", q: 1, l: t, A: Enu, B: G }), lams(e, ps, arms), false]);
-  const at = (k: string): O => ps.reduce<O>((f, [q, l]) => ({ $: "App", q, f, x: { $: "Var", l } }), { $: "Ref", k });
-  e.out.push([n, alls(ps, G), lams(e, ps, { $: "Sig", q: 1, l: t, A: Enu, B: { $: "App", q: 1, f: at(am), x: { $: "Var", l: t } } }), false]);
+  const at = (k: string): O => ps.reduce<O>((f, [q, l]) => (apply(q, f, variable(l))), { $: "Ref", k });
+  e.out.push([n, alls(ps, G), lams(e, ps, { $: "Sig", q: 1, l: t, A: Enu, B: apply(1, at(am), variable(t)) }), false]);
   if (tld.c.length === 0) {
     e.out.push([fresh(e, n + ".efq"), alls(ps, { $: "All", q: 1, l: t, A: at(n), B: { $: "Enu", ks: [] } }), lams(e, ps, { $: "Prj", h: { $: "Efq" } }), false]);
   }
@@ -527,7 +532,7 @@ function tele_open(e: Safe, s: Scope, T: HTerm, cols: Cols, n: number): { s: Sco
     const q = quant(F.q);
     if (cols[j] == null) {
       r.ps.push([q, r.s.D, term(e, r.s, F.A, false)]);
-      r.s = scope_kq(scope_bind(r.s, { $: "Var", l: r.s.D }, F.A, true), r.s.D, q);
+      r.s = scope_kq(scope_bind(r.s, variable(r.s.D), F.A, true), r.s.D, q);
     }
     r.xs.push(cols[j] ?? B.Var(F.k, r.s.d - 1));
     r.T = F.B(r.xs[j]);
@@ -540,7 +545,7 @@ function tele_open(e: Safe, s: Scope, T: HTerm, cols: Cols, n: number): { s: Sco
 
 // a specialized argument: closed, in normal form
 function spec_val(e: Safe, s: Scope, x: HTerm): HTerm {
-  return closed_val(e, s, x) ?? oos("a template argument that depends on a run-time value");
+  return closed_val(e, s, x) ?? oos("a template argument that depends on a run-time value", Open_Error);
 }
 
 // x's normal form, when it is closed; null when it depends on a run-time value
@@ -662,7 +667,7 @@ function fresh(e: Safe, n: string): string {
   for (let i = 1; e.taken.has(k); i++) {
     k = n + "_" + String(i);
   }
-  e.taken.add(k);
+  put(e, e.taken, k);
   return k;
 }
 
@@ -709,7 +714,7 @@ function scope_kq(s: Scope, l: number, q: Q): Scope {
 
 // the kernel variable at level a stands at level b from here on
 function scope_move(s: Scope, a: number, b: number): Scope {
-  const mv = (o: O): O => o.$ === "Var" ? (o.l === a ? { $: "Var", l: b } : o)
+  const mv = (o: O): O => o.$ === "Var" ? (o.l === a ? variable(b) : o)
     : Object.fromEntries(Object.entries(o).map(([k, v]) => [k, is_o(v) ? mv(v) : v])) as O;
   return { ...s, c: s.c.map((x) => x === undefined ? x : { ...x, o: mv(x.o) }), empty: s.empty.map(mv),
     tags: s.tags.flatMap((t) => t === a ? [t, b] : [t]) };
@@ -794,9 +799,9 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
   if (x.$ === "Lam") {
     const l = s.D;
     let q = all === null ? 1 : quant(all.q);
-    let s2 = scope_kq(scope_bind(s1, { $: "Var", l }, all?.A ?? null, true), l, q);
+    let s2 = scope_kq(scope_bind(s1, variable(l), all?.A ?? null, true), l, q);
     if (q > 0 && all !== null && no_ctr(e, all.A)) {
-      s2 = { ...s2, empty: [...s2.empty, { $: "App", q: 1, f: { $: "Prj", h: { $: "Efq" } }, x: { $: "Var", l } }] };
+      s2 = { ...s2, empty: [...s2.empty, apply(1, { $: "Prj", h: { $: "Efq" } }, variable(l))] };
     }
     const y: HTerm = B.Var(x.k, s.d);
     const f = tree(e, s2, typed(x.f(y), all?.B(y)), fs2);
@@ -821,7 +826,7 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
     }
     const l = s.D;
     const sw = swi(e, scope_kq(scope_hide({ ...s1, dry, again: true }), l, q), x, T, fs2, cv);
-    const app = cv.reduce<O>((f, y) => ({ $: "App", q: s.kq[y] ?? 1, f, x: { $: "Var", l: y } }), { $: "App", q, f: { $: "Prj", h: sw }, x: { $: "Var", l } });
+    const app = cv.reduce<O>((f, y) => (apply(s.kq[y] ?? 1, f, variable(y))), { $: "App", q, f: { $: "Prj", h: sw }, x: variable(l) });
     return wrap({ $: "Lam", q, l, f: app });
   };
   // the arms, to count uses: dry inside a match being built again (an
@@ -849,7 +854,7 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
     return js.length > 0 && mentions(B.term_lower(b.T, s.d), (k) => js.includes(k)) ? [...vs, ...ls] : vs;
   }, cv1).sort((a, b) => a - b);
   if (s.dry) {
-    return [...Array(s.D).keys()].filter((l) => us.has(l)).reduce<O>((f, l) => ({ $: "App", q: use(l) > 0 ? 1 : 0, f, x: { $: "Var", l } }), { $: "Efq" });
+    return [...Array(s.D).keys()].filter((l) => us.has(l)).reduce<O>((f, l) => (apply(use(l) > 0 ? 1 : 0, f, variable(l))), { $: "Efq" });
   }
   if (cv.length === 0 && !s.again) {
     return o;
@@ -892,9 +897,9 @@ function swi(e: Safe, s: Scope, t: HTerm, T: HTerm | null, fs: Chain[], cv: numb
       const s2 = scope_hide(scope_hide(s));
       const f = x.$ === "Lam" ? x : open(eta(t, all))[0] as Extract<HTerm, { $: "Lam" }>;
       // the default's binder is the pair of the tag and the fields
-      const pair: O = { $: "Tup", q: 1, a: { $: "Var", l: lt }, b: { $: "Var", l: la } };
+      const pair: O = { $: "Tup", q: 1, a: variable(lt), b: variable(la) };
       const s2e = no_ctr(e, all.A) ? { ...s2, empty: [...s2.empty,
-        { $: "App", q: 1, f: { $: "Efq" }, x: { $: "Var", l: lt } } as O] } : s2;
+        apply(1, { $: "Efq" }, variable(lt)) as O] } : s2;
       const s3 = scope_kq(scope_kq({ ...s2e, tags: [...s2e.tags, lt] }, lt, q), la, q);
       const y: HTerm = B.Var(f.k, s.d);
       const body = convoy_bind(e, scope_bind(s3, pair, all.A, false), cv, typed(f.f(y), all.B(y)), fs);
@@ -1040,7 +1045,7 @@ function term(e: Safe, s0: Scope, t: HTerm, live: boolean): O {
     case "All": {
       const l = s.D;
       const A = term(e, s, x.A, false);
-      const Bo = term(e, scope_bind(s, { $: "Var", l }, x.A, true), x.B(B.Var(x.k, s.d)), false);
+      const Bo = term(e, scope_bind(s, variable(l), x.A, true), x.B(B.Var(x.k, s.d)), false);
       return { $: "All", q: quant(x.q), l, A, B: Bo };
     }
     case "Lam":
@@ -1142,7 +1147,7 @@ function args(e: Safe, s: Scope, k: Name | O, T: HTerm | null, xs: HTerm[], live
     throw x;
   }
   const a = { ...s, sub: live && n === s.self };
-  return ps.filter((p) => p[3] === null).reduce<O>((f, [q, x, A]) => ({ $: "App", q, f, x: arg_term(e, a, x, A, live && q > 0) }),
+  return ps.filter((p) => p[3] === null).reduce<O>((f, [q, x, A]) => (apply(q, f, arg_term(e, a, x, A, live && q > 0))),
     n === null ? k as O : { $: "Ref", k: n });
 }
 
@@ -1152,9 +1157,9 @@ function args(e: Safe, s: Scope, k: Name | O, T: HTerm | null, xs: HTerm[], live
 // calls them back (String.cmp.fin calls String.cmp, which calls it). The
 // kernel has no mutual recursion, so a def k and its helpers go out as
 // one def, their group. A mention of a member is a call at its selector,
-// k's (.k, ()), a helper h's (.h, (.k, ())): so a helper's call back
-// passes a piece of its selector, k's call to a helper a piece of the
-// lead, and all mentions of a member convert.
+// k's (.k, ()), a helper h's (.h, ((.k, ()), ())): so a helper's call
+// back passes a field of its selector, k's call to a helper a piece of
+// the lead, and all mentions of a member convert.
 
 // a group: k, its members (k first), and the lead's quantities (k's)
 type Group = { k: Name; ms: Name[]; qs: Q[] };
@@ -1227,19 +1232,33 @@ function back(t: unknown, k: Name): B.LTerm[][] {
 }
 
 // what an emission has added, which a Regroup below it undoes. Emission
-// only appends to these six, so their sizes mark it; other state an
-// emission changes would outlive the undo
-type Trail = [number, number, number, number, number, number];
+// only appends to out and todo, and adds keys to names, seen, taken and
+// fail through put, which logs each new one, so their lengths mark it and
+// an undo costs what it removes; other state an emission changes would
+// outlive the undo
+type Trail = [number, number, number];
 
 function trail(e: Safe): Trail {
-  return [e.out.length, e.names.size, e.seen.size, e.todo.length, e.taken.size, e.fail.size];
+  return [e.out.length, e.todo.length, e.log.length];
 }
 
 function undo(e: Safe, m: Trail): void {
   e.out.length = m[0];
-  e.todo.length = m[3];
-  for (const [x, n] of [[e.names, m[1]], [e.seen, m[2]], [e.taken, m[4]], [e.fail, m[5]]] as Array<[Map<string, string> | Set<string>, number]>) {
-    [...x.keys()].slice(n).forEach((k) => x.delete(k));
+  e.todo.length = m[1];
+  for (const [x, k] of e.log.splice(m[2])) {
+    x.delete(k);
+  }
+}
+
+// x gains the key k (at v, in a map); a new one is logged for undo
+function put(e: Safe, x: Map<string, string> | Set<string>, k: string, v = ""): void {
+  if (!x.has(k)) {
+    e.log.push([x, k]);
+  }
+  if (x instanceof Map) {
+    x.set(k, v);
+  } else {
+    x.add(k);
   }
 }
 
@@ -1255,8 +1274,8 @@ function group_call(e: Safe, s: Scope, g: Group, m: Name, ps: Arg[], R: HTerm, l
   const args = (xs: Arg[], qs: Q[]): Array<[Q, O]> => xs.flatMap(([q, x, A, v], j): Array<[Q, O]> =>
     v !== null ? [] : [[qs[j] ?? q, arg_term(e, a, x, A, live && (qs[j] ?? q) > 0)]]);
   const sel: O = { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(g.k) }, b: UV };
-  const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(m) }, b: sel }] as [Q, O],
-    ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), { $: "Ref", k });
+  const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(m) }, b: { $: "Tup", q: 1, a: sel, b: UV } }] as [Q, O],
+    ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => (apply(q, f, x)), { $: "Ref", k });
   return { $: "Ann", x, T: term(e, s, R, false) };
 }
 
@@ -1274,26 +1293,25 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
     const qs = B.tele_unbind(e.book, tld.T).doms.map(([q]) => quant(q));
     return { ...r, vs: r.xs.flatMap((x, j): Array<[Q, O]> => j < nx ? [] : [[qs[j], term(e, r.s, x, false)]]), cs: r.xs.map((x, j) => j < nx ? x : null) };
   };
-  // the selector's match: a member's arm past its tag (and a helper's (.k, ()))
+  // the selector's match: a member's arm past its tag (and a helper's ((.k, ()), ()))
   const tags = g.ms.map(name_tt);
-  const sel = (f: (m: Name) => O): O => ({ $: "Prj", h: mats(tags, (i) =>
-    i === 0 ? unit(f(g.ms[i])) : { $: "Prj", h: mats([name_tt(g.k)], () => unit(f(g.ms[i]))) }) });
+  const sel = (f: (m: Name) => O): O => ({ $: "Prj", h: mats(tags, (i) => i === 0 ? unit(f(g.ms[i]))
+    : { $: "Prj", h: { $: "Prj", h: mats([name_tt(g.k)], () => unit(unit(f(g.ms[i])))) } }) });
   const l0 = s.D;
   const s0 = scope_kq(scope_hide(s), l0, 1);
   const mode = sel((m) => {
     const r = rest(s0, m);
     return alls(r.ps, term(e, r.s, r.T, false));
   });
-  const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: tags }, B: { $: "App", q: 1, x: { $: "Var", l: l0 },
-    f: mats(tags, (i) => i === 0 ? UT
-      : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [name_tt(g.k)] }, B: UT }) } };
-  const To = alls(ls, { $: "All", q: 1, l: l0, A: Sel, B: { $: "App", q: 1, f: mode, x: { $: "Var", l: l0 } } });
+  const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: tags }, B: apply(1, mats(tags, (i) => i === 0 ? UT
+    : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [name_tt(g.k)] }, B: UT }, B: UT }), variable(l0)) };
+  const To = alls(ls, { $: "All", q: 1, l: l0, A: Sel, B: apply(1, mode, variable(l0)) });
   const ks = ls.filter(([q]) => q === 1).map(([, l]) => l);
   const body = sel((m) => convoy_bind(e, s0, ks, (s2) => {
     const r = rest(s2, m);
     return lams(e, r.ps, arm(e, r.s, m, r.cs, r.vs));
   }, []));
-  const v = ks.reduce<O>((f, l) => ({ $: "App", q: 1, f, x: { $: "Var", l } }), { $: "App", q: 1, f: body, x: { $: "Var", l: l0 } });
+  const v = ks.reduce<O>((f, l) => (apply(1, f, variable(l))), apply(1, body, variable(l0)));
   e.out.push([n, To, lams(e, [...ls, [1, l0]], v), false]);
 }
 
@@ -1320,7 +1338,7 @@ function arm(e: Safe, s: Scope, k: Name, cols: Cols, vs: Array<[Q, O]>): O {
     si = v !== null ? scope_bind(si, { $: "Efq" }, F.A, false, v) : scope_bind(si, vs[j++][1], F.A, false);
     t = x.f(B.Var(x.k, si.d - 1));
   }
-  return vs.slice(j).reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), tree(e, si, t, []));
+  return vs.slice(j).reduce<O>((f, [q, x]) => (apply(q, f, x)), tree(e, si, t, []));
 }
 
 // an argument at its domain A: an untyped λ or match (in a type) takes
@@ -1392,7 +1410,7 @@ function word_ref(e: Safe, T: Name, fam: Name, n: number): O {
   let k = e.names.get(key);
   if (k === undefined) {
     k = fresh(e, T + ".lit" + String(n));
-    e.names.set(key, k);
+    put(e, e.names, key, k);
     const v = term(e, { ...scope_nil(), sub: true }, B.Ctr(T, [B.word_to_term(n)]), true);
     e.out.push([k, { $: "Ref", k: item_ref(e, fam, [], false) }, v, false]);
   }
@@ -1422,7 +1440,7 @@ function let_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Let" }>, live: bool
       const w: O = inferable(v) ? v : V === null ? oos("a let with no known type")
         : { $: "Ann", x: v, T: term(e, at, V, false) };
       ls.push([q, l, w, j]);
-      s2 = scope_kq(scope_bind(s2, { $: "Var", l }, V, true), l, q);
+      s2 = scope_kq(scope_bind(s2, variable(l), V, true), l, q);
     }
   }
   const xs = x.k.map((k, j) => B.Var(k, s.d + j));
@@ -1447,12 +1465,12 @@ function rwt_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Rwt" }>, live: bool
   const l = s.D;
   const Q = E0 === null ? null : B.term_wnf(e.book, E0);
   const q = Q !== null && Q.$ === "Eql" ? Q : null;
-  const s2 = scope_bind(s, { $: "Var", l }, q && q.T, true);
+  const s2 = scope_bind(s, variable(l), q && q.T, true);
   const [p2] = open(p.f(B.Var(p.k, s.d)));
   if (p2.$ !== "Lam") {
     oos("a rewrite motive that is not a λ over its evidence");
   }
-  const s3 = scope_bind(s2, { $: "Var", l: l + 1 }, q && B.Eql(q.a, B.Var(p.k, s.d), q.T), true);
+  const s3 = scope_bind(s2, variable(l + 1), q && B.Eql(q.a, B.Var(p.k, s.d), q.T), true);
   const P = term(e, s3, p2.f(B.Var(p2.k, s2.d)), false);
   return { $: "Rwt", e: ev, l, P, f: term(e, s, x.f, live) };
 }
@@ -1660,10 +1678,11 @@ export function run_read(bin: string, args: string[],
   }
 }
 
-// the kernel's verdict on a book's text: ok on exit 0 with its exact
-// success line. It checks a copy in a fresh private dir, which no one
-// else can swap, and a kernel reading /dev/stdin got EBADF (1 in 1486)
-function kernel_check(text: string): boolean {
+// the kernel's verdict on a book's text: null on exit 0 with its exact
+// success line, else the lines under its failure line, or how it exited
+// if none. It checks a copy in a fresh private dir, which no one else
+// can swap, and a kernel reading /dev/stdin got EBADF (1 in 1486)
+function kernel_check(text: string): string | null {
   const env = { ...process.env, LEAN_STACK_SIZE_KB: "4194304" };
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bendtt-"));
   try {
@@ -1676,7 +1695,9 @@ function kernel_check(text: string): boolean {
         ?? (got.signal ? "kernel terminated by " + got.signal : out.trim()
           || "kernel exited " + got.status + " without a verdict")));
     }
-    return got.status === 0 && out.trim() === "ALL PROOFS CHECK";
+    const why = out.trim().split("\n").slice(1).join("\n");
+    return got.status === 0 && out.trim() === "ALL PROOFS CHECK" ? null
+      : why || "kernel exited " + got.status + " after " + out.trim();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -1690,9 +1711,10 @@ export function safe_emit(book: Book, out: string): string[] {
   return got.oos.map(([k, why]) => "- " + B.name_key(k) + ": " + why + "\n");
 }
 
-// --verdict: whether every def of a book bend2 checked is in the kernel's
-// scope, and the kernel checks them all
-export function safe_check(book: Book): boolean {
+// --verdict: null when every def of a book bend2 checked is in the
+// kernel's scope and the kernel checks them all, else why not
+export function safe_check(book: Book): string | null {
   const got = safe_book(book);
-  return got.oos.length === 0 && kernel_check(got.text);
+  return got.oos.length === 0 ? kernel_check(got.text) : "BendTT: out of scope:\n"
+    + got.oos.map(([k, why]) => "- " + B.name_key(k) + ": " + why).join("\n");
 }

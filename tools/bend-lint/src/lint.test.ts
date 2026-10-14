@@ -666,8 +666,8 @@ describe("patch", () => {
     expect(out).toMatch(/^import \{ path \} from "file:.*seam\.ts";/m);
   });
 
-  test("comp.ts: exports RUNTIME_MAIN and js_sat", () => {
-    expect(patch("comp.ts", comp)).toContain("export { RUNTIME_MAIN, js_sat };");
+  test("comp.ts: exports RUNTIME_MAIN and name_id", () => {
+    expect(patch("comp.ts", comp)).toContain("export { RUNTIME_MAIN, name_id };");
   });
 
   test("main.ts: exports how bend reads a book and words a failure, with the same fs and path", () => {
@@ -695,8 +695,8 @@ describe("patch", () => {
     expect(() => patch("bend.ts", src + "\nexport function term_check(\n")).toThrow(
       /found 2 of "export function term_check\("/,
     );
-    expect(() => patch("comp.ts", comp.replace("function js_sat(", "function js_name("))).toThrow(
-      /comp\.ts: found 0 of a declaration of js_sat/,
+    expect(() => patch("comp.ts", comp.replace("function name_id(", "function js_name("))).toThrow(
+      /comp\.ts: found 0 of a declaration of name_id/,
     );
     expect(() =>
       patch("comp.ts", comp.replace("function io_run(m) {", "function run(m) {")),
@@ -1581,10 +1581,10 @@ describe("review fixes", () => {
     ).toEqual({ text: "abC", skipped: 0, elsewhere: 1 });
   });
 
-  test("comp.ts that already exports js_sat still loads", () => {
+  test("comp.ts that already exports name_id still loads", () => {
     const comp = fs
       .readFileSync(path.join(BEND2, "comp.ts"), "utf8")
-      .replace("\nfunction js_sat(", "\nexport function js_sat(");
+      .replace("\nfunction name_id(", "\nexport function name_id(");
     const out = patch("comp.ts", comp);
     expect(out).toContain("export { RUNTIME_MAIN };");
     expect(() => new Bun.Transpiler({ loader: "ts" }).transformSync(out)).not.toThrow();

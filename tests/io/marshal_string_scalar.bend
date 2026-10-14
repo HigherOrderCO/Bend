@@ -1,14 +1,8 @@
-# io (io_marshal_string_scalar): the seam has ONE value model -- a
-# String is the effect's JS string, walked by string_head/string_tail
-# code point by code point in every lane. This golden pinned the dead
-# two-model refusal ('a Unicode scalar Char code' on an ANSWER): the
-# interpreter refused a lone surrogate half where compiled JS kept
-# it, and two halves appended once counted 2 interpreted and 1
-# compiled. With one model that divergence class cannot exist; the
-# law is observable: the boundary scalars (55295, 57344, 1114111)
-# cross as one-Char strings, a Char answer's code reads back exact,
-# and a lone surrogate rides raw as its own code point -- torn
-# ("a" then D800) counts 2 in both lanes, byte-identically.
+# io (io_marshal_string_scalar): a String is the effect's JS string,
+# walked by Char in every lane. The boundary scalars (55295, 57344,
+# 1114111) cross as one-Char strings, a Char answer's code reads back
+# exact, and a host's lone surrogate comes in as U+FFFD: torn ("a" then
+# D800) counts 2.
 import Base
 
 law low:

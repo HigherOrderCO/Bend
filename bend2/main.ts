@@ -30,7 +30,7 @@ import * as Safe from "./safe.ts";
 // Constants
 // =========
 
-const VERSION = "2.0.36";
+const VERSION = "2.0.37";
 
 // the commands, one row each: [usage, what it does]; bend guide stays last
 const USAGE = [
@@ -471,7 +471,10 @@ function cli_base(what?: string): void {
     return cli_say(1, src);
   }
   const want: string[] = [];
-  for (const text of src.split(/\n(?=type |law |def |@)/)) {
+  let tag = "";
+  for (const part of src.split(/\n(?=type |law |def |@)/)) {
+    const text = tag + part;
+    tag = part.startsWith("@") ? text + "\n" : "";
     const m = /^(type|law|def) ([^\s(<:?]+)/m.exec(text);
     if (m === null) {
       continue;
@@ -804,36 +807,52 @@ async function pow_mine(hash: string, bytes: number): Promise<number> {
 // cli_verdict prints the verdict on a book bend2 checked: PASS when no
 // def outside Base relies on unsafe or foreign code and, with the kernel,
 // when BendTT checks every def too; else FAIL and why. A kernel failure is
-// a mismatch: bend2 accepted what the kernel rejects.
+// a mismatch: bend2 accepted what the kernel rejects; it shows the why.
+// When none of those is a law or a def of the file, no law or proof uses
+// them: they come in through imports, and a hint names them.
 function cli_verdict(book: Bend.Book, kernel: boolean): number {
   const bad = book_promises(book);
-  if (bad.length !== 0) {
-    cli_say(2, FAIL + "\nError: " + String(bad.length) + " def" + (bad.length === 1
-      ? " relies" : "s rely") + " on unsafe or foreign code:\n"
-      + bad.map((k) => "- " + Bend.name_key(k) + "\n").join(""));
+  const n   = new Set(bad.flatMap(([, ks]) => ks)).size;
+  if (n !== 0) {
+    const own = bad.some(([, ks]) => ks.some((k) =>
+      !k.includes(":") || (book.tlds[k] as Bend.Def).l === true));
+    cli_say(2, FAIL + "\nError: " + String(n) + " def" + (n === 1 ? " relies"
+      : "s rely") + " on unsafe or foreign code:\n"
+      + bad.map(([on, ks]) => "defs that depend on " + on + ": "
+        + ks.map(Bend.name_key).join(", ") + "\n").join("")
+      + (own ? "" : "Hint: no law or proof uses these defs. Move them to a"
+        + " file this proof does not import, and the proofs will check: "
+        + [...new Set(bad.flatMap(([, ks]) => ks))].map(Bend.name_key)
+          .join(", ") + "\n"));
     return 1;
   }
-  if (kernel && !Safe.safe_check(book)) {
-    cli_say(2, FAIL + "\n" + MISMATCH + "\n");
+  const why = kernel ? Safe.safe_check(book) : null;
+  if (why !== null) {
+    cli_say(2, FAIL + "\n" + why + "\n" + MISMATCH + "\n");
     return 1;
   }
   cli_say(1, PASS + "\n" + (kernel ? "" : HINT + "\n"));
   return 0;
 }
 
-// book_promises lists the defs outside Base (laws and types too) that are
-// @unsafe or foreign, or whose type, body, datatype kind, parameters or
-// constructor fields name a def that relies on one. A foreign def is a
-// promise like @unsafe is: the checker reads its type, never its code.
-// If the book holds a promise, a walk from the defs outside Base collects
-// who names whom, then the promises flood back along those edges.
-function book_promises(book: Bend.Book): string[] {
+// book_promises lists, per promise (@unsafe, foreign effects), the defs
+// outside Base (laws and types too) that are one, or whose type, body,
+// datatype kind, parameters or constructor fields name a def that relies
+// on one. A foreign def is a promise like @unsafe is: the checker reads
+// its type, never its code. If the book holds a promise, a walk from the
+// defs outside Base collects who names whom, then each promise floods
+// back along those edges.
+function book_promises(book: Bend.Book): Array<[string, string[]]> {
   const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
-  const bad  = new Set(Object.keys(book.tlds).filter((k) => {
-    const t = book.tlds[k] as Bend.Def;
-    return t.u === true || (t.i !== undefined && t.b !== true);
-  }));
-  if (bad.size === 0) {
+  const keys = Object.keys(book.tlds);
+  const roots: Array<[string, string[]]> = [
+    ["@unsafe", keys.filter((k) => (book.tlds[k] as Bend.Def).u === true)],
+    ["foreign effects", keys.filter((k) => {
+      const t = book.tlds[k] as Bend.Def;
+      return t.u !== true && t.i !== undefined && t.b !== true;
+    })],
+  ];
+  if (roots.every(([, ks]) => ks.length === 0)) {
     return [];
   }
   const uses: Record<string, string[]> = Object.create(null);
@@ -854,10 +873,14 @@ function book_promises(book: Bend.Book): string[] {
       }
     }
   }
-  for (const k of bad) {
-    uses[k]?.forEach((j) => bad.add(j));
-  }
-  return own.filter((k) => bad.has(k));
+  return roots.flatMap(([on, ks]) => {
+    const bad = new Set(ks);
+    for (const k of bad) {
+      uses[k]?.forEach((j) => bad.add(j));
+    }
+    const out = own.filter((k) => bad.has(k));
+    return out.length === 0 ? [] : [[on, out]];
+  });
 }
 
 // term_refs adds to out the names a term (a span skipped) refers to.
