@@ -6,7 +6,12 @@ function file_write_buffer(file, b) {
   let at = 0;
   try {
     while (at < b.length) {
-      at += fs.writeSync(file, b, at, b.length - at, null);
+      const n = fs.writeSync(file, b, at, b.length - at, null);
+      // no progress would retry forever (#1445)
+      if (n === 0) {
+        return io_tup(file, io_fail(5));
+      }
+      at += n;
     }
     return io_tup(file, io_done({ $: CID(Unit) }));
   } catch (e) {
