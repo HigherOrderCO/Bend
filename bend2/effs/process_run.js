@@ -61,7 +61,7 @@ async function run({ argv, input, env, max, ms }) {
 let process_worker = null;
 
 function process_run(program, args, input, maxOutput, timeoutMs) {
-  const argv = [str_out(program)];
+  const argv = [program];
   for (let xs = args; xs.$ === CID(Con); xs = xs.tail) {
     argv.push(str_out(xs.head));
   }

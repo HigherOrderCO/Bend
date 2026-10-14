@@ -240,7 +240,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   },
   ...tpl_ops("bool_", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
   string_append: { JS: "($0 + $1)" },
-  string_length: { JS: "[...str_out($0)].length" },
+  string_length: { JS: "str_len($0)" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -506,27 +506,49 @@ function f32_read(s) {
 
 const f32_round = ${Bend.f32_round};
 
-// A Char past the Unicode scalars keeps its code as 0xDC00 and three 11-bit
-// pieces; str_out writes it as U+FFFD, as str_in does a host's surrogate.
+// A Char past the Unicode scalars keeps its code in four low surrogates
+// (2+10+10+10 bits); str_out writes it as U+FFFD, as str_in does a host's
+// surrogate.
 function char_new(c) {
   return c < 0xD800 || c >= 0xE000 && c <= 0x10FFFF ? String.fromCodePoint(c)
-    : String.fromCharCode(0xDC00, c >>> 22, c >>> 11 & 0x7FF, c & 0x7FF);
+    : String.fromCharCode(0xDC00 | c >>> 30, 0xDC00 | c >>> 20 & 1023,
+      0xDC00 | c >>> 10 & 1023, 0xDC00 | c & 1023);
 }
 
-function char_len(s) {
-  return s[0] === "\uDC00" ? 4 : s.codePointAt(0) > 0xFFFF ? 2 : 1;
+function char_len(s, i = 0) {
+  const u = s.codePointAt(i);
+  if (u < 0xDC00 || u > 0xDC03) return u > 0xFFFF ? 2 : 1;
+  for (let j = 1; j <= 3; ++j) {
+    if ((s.charCodeAt(i + j) & 0xFC00) !== 0xDC00) return 1;
+  }
+  return 4;
 }
 
 function char_code(s) {
-  return s.length < 4 ? s.codePointAt(0)
-    : (s.charCodeAt(1) << 22 | s.charCodeAt(2) << 11 | s.charCodeAt(3)) >>> 0;
+  const u = s.codePointAt(0);
+  if (u < 0xDC00 || u > 0xDC03) return u;
+  let c = u & 3;
+  for (let i = 1; i <= 3; ++i) {
+    const b = s.charCodeAt(i);
+    if ((b & 0xFC00) !== 0xDC00) return u;
+    c = c << 10 | b & 1023;
+  }
+  return c >>> 0;
+}
+
+function str_len(s) {
+  let n = 0;
+  for (let i = 0; i < s.length; i += char_len(s, i)) ++n;
+  return n;
 }
 
 function str_out(s) {
-  return s.replace(/\uDC00[^]{3}/gu, "\uFFFD");
+  if (typeof s !== "string") throw "bend: expected a JS string";
+  return s.replace(/[\uDC00-\uDC03][\uDC00-\uDFFF]{3}|\p{Cs}/gu, "\uFFFD");
 }
 
 function str_in(s) {
+  if (typeof s !== "string") throw "bend: expected a JS string";
   return s.replace(/\p{Cs}/gu, "\uFFFD");
 }
 `.slice(1),
@@ -3140,9 +3162,10 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
     if (def_foreign(def)) {
       const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
       const f = params.at(-1);
+      const c = K?.$ === "All" ? host(K.A) : "";
       return file_push(sc, `return { $: ${JSON.stringify(Bend.name_key(k))
-        }, args: [${live.map(([, , A], i) => host(A, params[i], 1))
-        }], kont: (x) => ${f}(${host(K?.$ === "All" ? K.A : null, "x")}) };`);
+        }, args: [${live.map(([, , A], i) => `${host(A, 1)}(${params[i]})`)
+        }], kont: ${c ? `(x) => ${f}(${c}(x))` : f} };`);
     }
     if (loop.length === 0) {
       return js_func(sc, h!, def.T, params);
@@ -3166,13 +3189,12 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
-// What crosses to or from a host: a Nat comes in as a number, which nat_in
-// checks; text gets U+FFFD for what is no Unicode scalar.
-function host(A: HTerm | null, x: string, out = 0): string {
-  const t = ty_wnf(A);
-  const k = t?.$ === "ADT" ? t.k : "";
-  return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
-    : k === "Nat" && !out ? `nat_in(${x})` : x;
+// The converter for what crosses to or from a host: a Nat comes in as a
+// number, which nat_in checks; text gets U+FFFD for what is no scalar.
+function host(A: HTerm | null, out = 0): string {
+  const t = ty_wnf(A), k = t?.$ === "ADT" ? t.k : "";
+  return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}`
+    : k === "Nat" && !out ? "nat_in" : "";
 }
 
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
@@ -3193,12 +3215,12 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const effs = effect_srcs(".js", "a foreign def without a .js import: ")
     .map((t) => `(() => {\n${t}\n})();\n\n`).join("");
   const lib = outs === null ? "" : `export default {\n${outs.map((k) => {
-    const { live, lays } = fun_of(k);
+    const { live, n } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
-    const xs = live.map(([, , A], i) => host(A, ps[i]));
-    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${host(tele_unbind(
-      FL.book.tlds[k].T).ret, `run_loop(${name_id("$", k)}(${xs}))`, 1)
-    }, ${lays.length}),`;
+    const xs = live.map(([, , A], i) => `${host(A)}(${ps[i]})`);
+    const out = host(tele_fill(FL.book.tlds[k].T, Array(n).fill(DUMMY)), 1);
+    return `  ${js_key(Bend.name_key(k))}run_lib((${ps}) => ${
+      name_id("$", k)}(${xs}), ${ps.length}, ${out || "null"}),`;
   }).join("\n")}\n};\n`;
   const jmps = new Map<Name, boolean>();
   const jmp = (k: Name): boolean => k === CLO_APPLY || memo(jmps, k, () =>
@@ -6049,9 +6071,12 @@ function run_loop(r) {
   return r;
 }
 
-function run_lib(f, n) {
-  return (...a) => a.length < n ? run_lib((...b) => f(...a, ...b), n - a.length)
-    : run_loop(f(...a));
+function run_lib(f, n, out) {
+  return (...a) => {
+    if (a.length < n) return run_lib((...b) => f(...a, ...b), n - a.length, out);
+    const r = run_loop(f(...a));
+    return out === null ? r : out(r);
+  };
 }
 
 // Effect
@@ -6104,7 +6129,8 @@ function show_chr(s, q) {
   const k = { 10: "n", 9: "t", 13: "r", 0: "0", 92: "\\" }[c]
     ?? (s === q ? q : null);
   return k !== null ? "\\" + k : c < 32 || c === 127
-    || s.length > 2 ? "\\u{" + c.toString(16) + "}" : s;
+    || c >= 0xD800 && c < 0xE000 || c > 0x10FFFF
+    ? "\\u{" + c.toString(16) + "}" : s;
 }
 
 function show_val(D, d, v, chain) {
@@ -6127,7 +6153,7 @@ function show_val(D, d, v, chain) {
     : D[d] === 1 ? f32_show(v).replace(/^-?\d+(?=e|$)/, "$&.0")
     : D[d] === 2 ? v + "n"
     : D[d] === 3 ? "'" + show_chr(v, "'") + "'"
-    : D[d] === 4 ? "\"" + v.replace(/\uDC00[^]{3}|[^]/gu,
+    : D[d] === 4 ? "\"" + v.replace(/[\uDC00-\uDC03][\uDC00-\uDFFF]{3}|[^]/gu,
       (c) => show_chr(c, "\"")) + "\""
     : D[d] === 5 ? "{==}"
     : "[" + v.map((x) => show_val(D, D[d + 1], x, 0)).join(", ") + "]";
@@ -6182,7 +6208,7 @@ function io_out(fd, data) {
 }
 
 function io_errs(message) {
-  io_out(2, io_bytes(message + "\n"));
+  io_out(2, io_bytes(str_out(message) + "\n"));
 }
 
 function io_sys() {
@@ -6249,7 +6275,7 @@ function io_tup(...xs) {
 }
 
 function io_bytes(text) {
-  return new TextEncoder().encode(str_out(text));
+  return new TextEncoder().encode(text);
 }
 
 function io_text(b, n) {
