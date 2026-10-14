@@ -1,13 +1,11 @@
-# a def specialized at a finite parameter went to --verdict once per
-# value, and --verdict trusted that those instances cover the law: at
-# Void, with none, skip went out zero times and passed unchecked. Now a
-# def goes out too, a λ-match on the parameter whose arm at each value
-# names that value's instance at the law's type and returns the value,
-# so the kernel checks that every value has an instance that fits the
-# law: skip's is λ{(,): λ{}}, and same's has an arm per Bool (#1186).
-# main prints 3n either way, and no gate runs --verdict to failure: by
-# hand, --verdict fails here if skip's def stops going out (- skip: no
-# kernel def), though not if same's does, as its instances still go out.
+# A def specialized at a finite parameter went to --verdict only as its
+# instances, one per value: at Void, with none, skip was never checked
+# (#1186). Now it also goes out as a λ-match on the parameter that names
+# an instance at the law's type in each value's arm: skip's is λ{(,): λ{}},
+# and same's has an arm per Bool. main prints 3n too and no gate runs
+# --verdict to failure, so this documents the fix rather than guards it:
+# by hand, --verdict fails with "- skip: no kernel def" if skip's λ-match
+# stops going out.
 import Base
 
 type Void is Data:

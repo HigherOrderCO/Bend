@@ -37,15 +37,15 @@
 // kernel where it does in bend2: Kind(&0) is *(.Q0), and fits *(.Q1)
 // (Type) only as bend2's LE does. An item (a book name) goes out
 // once per tuple of closed arguments at its template (~) parameters, with
-// those parameters gone; a def checked on its own also goes out as a
-// λ-match on its finite ones, to its instances, so the kernel checks
-// that they cover those parameters' values and fit the def's type.
-// Every def goes out after the defs its live code names; a name in a
-// type may come later. A def with no body (a law, a native, a foreign
-// fill) goes out opaque at a model: the kernel checks the model, then
-// never unfolds the def. What the kernel cannot express is out of
-// scope: it goes, with every def that names it, and --verdict fails, as
-// it does for a def that reaches no kernel def.
+// those parameters gone. A def with a finite one also goes out as a
+// λ-match on its values that names an instance in each arm, so the
+// kernel checks that every value has one. Every def goes out after the
+// defs its live code names; a name in a type may come later. A def with
+// no body (a law, a native, a foreign fill) goes out opaque at a model:
+// the kernel checks the model, then never unfolds the def. What the
+// kernel cannot express is out of scope: it goes, with every def that
+// names it, and --verdict fails, as it does for a def that reaches no
+// kernel def.
 
 import * as child from "node:child_process";
 import * as crypto from "node:crypto";
@@ -246,34 +246,35 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
     }
   }
   e.out = e.out.filter(([k]) => !bad.has(k));
-  // a def is out at each reason its instances are out for, or else at
-  // its check's (which names them)
+  // a def is out at its instances' reasons, else at its λ-match's, else
+  // (with neither) as reaching no kernel def
   const out = new Set(e.out.map(([k]) => k));
   const why = (n: string): string[] =>
     out.has(n) ? [] : [bad.get(n) ?? "no kernel def"];
   const oos = roots.flatMap(([k, ns, top]) => {
     const ws = ns.flatMap(why);
-    const all = ws.length > 0 || top === null ? ws : why(top);
+    const all = ws.length > 0 ? ws : top !== null ? why(top)
+      : ns.length === 0 ? ["no kernel def"] : [];
     return [...new Set(all)].map((w): [Name, string] => [k, w]);
   });
   return { text: book_show(e), oos };
 }
 
-// root k: its instances, one per tuple of its telescope's columns: a
-// specialized parameter of a finite type (Quant, or a datatype whose
-// constructors have no fields) at each value, any other at an opaque
-// constant of its type, one per place for all roots, which models read
-// at its model (as bend2 checks a template: its body holds at every
-// argument). With a finite one, a def checks them in erased lets: a
-// λ-match on each, at ∀y:A -> Σz:A -> {z == y : A}, whose arm at a value
-// names its instance at k's type G, a λ on its ~ parameters (unless G
-// needs them closed), and returns that value. So the kernel checks that
-// each value has an instance that fits k's type. Its instances' names,
-// and that def's (null with no finite one)
+// root k: its instances, one per tuple of columns: a specialized
+// parameter of a finite type (Quant, or a datatype whose constructors
+// have no fields) at each value, any other at an opaque constant of its
+// type, one per place for all roots, which models read at its model (as
+// bend2 checks a template: its body holds at every argument). With a
+// finite one, k also goes out as a λ-match on each, at
+// ∀y:A -> Σz:A -> {z == y : A}, whose arm names an instance at k's type
+// G at its own arguments. So the kernel checks that every value has an
+// arm and each instance fits G, not which arm names which. If G cannot
+// go out, the arms name the instances bare. Returns the instances'
+// names, and the λ-match's (null without one)
 function root_emit(e: Safe, k: Name): [string[], string | null] {
   const tld = e.book.tlds[k];
   const ns: string[] = [];
-  // fin: k has a finite parameter; G: k's type, if it can go out
+  // fin: k has a finite parameter; G: k's type, null if it cannot go out
   let fin = false;
   let G: O | null = null;
   let ps: Binder[] = [];
