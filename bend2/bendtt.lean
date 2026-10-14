@@ -20,8 +20,8 @@ import Std.Data.HashMap
 -- no types. The typing checker (Checker) ignores usage; the live check
 -- (Termination) ignores types. The live part of a def must be affine (a
 -- q=1 variable is used at most once, a q=0 one never), may call only
--- earlier defs, and may call its own def only on parameters it rebuilt,
--- then a piece of one.
+-- earlier defs, and may call its own def only on arguments no bigger
+-- than its parameters, then a smaller one, as bend2's term_descend.
 -- A q=2 binder needs a Data domain, and Data holds no λ and no call.
 -- A kind is *(q), for a quantity q : <Q0, Q1, Q2>: *1 is *(.Q1), Type,
 -- and *2 is *(.Q2), Data. A meet (a <&> b) runs on two of those labels.
@@ -1248,9 +1248,9 @@ end
 -- it into pieces one step deeper, or hits a label, which the guard
 -- records. A live call must name an earlier def, or its own def with
 -- arguments that descend: compared left to right, each live column gets
--- a rebuild of itself (eq) until one gets a rebuild of a piece of itself
--- (lt). A rebuild is a tagged variable, a hit label, or a live pair of
--- the two pieces of one split. Dead columns are skipped.
+-- a value no bigger than itself (eq) until one gets a smaller one (lt),
+-- as bend2's term_descend decides against the column's pattern (Pat.cmp).
+-- Dead columns are skipped.
 
 -- the live uses of variable i in t
 def Term.uses : Term → Nat → Nat
@@ -1284,36 +1284,81 @@ def Term.uses : Term → Nat → Nat
     a + b
   | _, _ => 0
 
--- the paths of the pieces of column j that x rebuilds
-def Term.pos (g : Guard) (j : Nat) : Term → List (List Bool)
-  | Var v =>
-    match g.tags[v]? with
-    | some (some (c, π)) => if c == j then [π] else []
-    | _                  => []
-  | Lab k =>
-    g.hits.filterMap fun ((c, π), l) =>
-      if c == j && l == k then some π else none
-  | Tup q a b =>
-    let a := Term.pos g j a
-    let b := Term.pos g j b
-    let b := b.filterMap fun
-      | true :: π => if a.contains (false :: π) then some π else none
-      | _         => none
-    if Quan.live q then b else []
-  | _ => []
+-- A column's pattern: the pieces the def's case tree split open, each a
+-- pair of its parts, and holes for the rest
+inductive Pat where
+  | hole
+  | pair (a b : Pat)
 
--- how the argument x at column j compares to that column: x rebuilds
--- the column (eq), or a piece of it (lt)
-def Term.piece (g : Guard) (j : Nat) (x : Term) : Ordering :=
-  let ps := Term.pos g j x
-  if ps.contains [] then .eq else if ps.isEmpty then .gt else .lt
+-- p, split open down to the piece at π (outermost step first)
+def Pat.ins : List Bool → Pat → Pat
+  | [], p => p
+  | b :: π, p =>
+    let (x, y) := match p with | .pair x y => (x, y) | .hole => (.hole, .hole)
+    if b then .pair x (Pat.ins π y) else .pair (Pat.ins π x) y
+
+-- column j's pattern: split down to every variable the case tree bound in
+-- it and every label a match hit
+def Guard.pat (g : Guard) (j : Nat) : Pat :=
+  let ps := (g.tags.filterMap id ++ g.hits.map (·.1)).filterMap fun (c, π) =>
+    if c == j then some π else none
+  ps.foldl (fun p π => Pat.ins π.reverse p) .hole
+
+-- x is the piece at π of column j as the case tree saw it: the variable it
+-- bound there, or the label a match hit there
+def Guard.at (g : Guard) (j : Nat) (π : List Bool) : Term → Bool
+  | Var v => g.tags[v]? == some (some (j, π))
+  | Lab k => g.hits.contains ((j, π), k)
+  | _ => false
+
+mutual
+-- how x compares to the piece at π of column j, whose pattern is p, as
+-- bend2's term_descend: field by field (Pat.fields), and when one may be
+-- bigger, x is lt if it is no bigger than another of those fields
+def Pat.cmp (g : Guard) (j : Nat) (p : Pat) (π : List Bool) (x : Term) : Ordering :=
+  match Pat.fields g j p π x with
+  | .ok o => o
+  | .error bad => match p with
+    | .pair _ b => if Pat.visit g j bad b (true :: π) x then .lt else .gt
+    | .hole => .gt
+termination_by 2 * sizeOf p + 1
+
+-- x against the piece at π, whose pattern is p: eq when it is the
+-- variable the case tree bound there, or the label a match hit there;
+-- else a constructor's fields in turn, down its right spine (a dead one
+-- must be such a variable): how they compare, or the path of the first
+-- that may be bigger, or x's when it is no constructor
+def Pat.fields (g : Guard) (j : Nat) (p : Pat) (π : List Bool) (x : Term) :
+    Except (List Bool) Ordering :=
+  if g.at j π x then .ok .eq else
+  match p, x with
+  | .pair a b, Tup q x y =>
+    let o := if Quan.live q then Pat.cmp g j a (false :: π) x
+      else if g.at j (false :: π) x then .eq else .gt
+    match o with
+    | .gt => .error (false :: π)
+    | o => (Pat.fields g j b (true :: π) y).map o.then
+  | _, _ => .error π
+termination_by 2 * sizeOf p
+
+-- x is no bigger than a field on the chain q at ρ, other than the one
+-- that failed: as bend2, only the constructor's fields are tried, not its
+-- tag or the pairs that chain them
+def Pat.visit (g : Guard) (j : Nat) (bad : List Bool) (q : Pat) (ρ : List Bool)
+    (x : Term) : Bool :=
+  match q with
+  | .pair a b =>
+    (bad != false :: ρ && Pat.cmp g j a (false :: ρ) x != .gt) || Pat.visit g j bad b (true :: ρ) x
+  | .hole => false
+termination_by 2 * sizeOf q
+end
 
 def Arg.cmp (g : Guard) (j : Nat) : Arg → Ordering
   | (q, x) =>
     if g.cols[j]? != some (Quan.live q) then
       .gt
     else if Quan.live q then
-      Term.piece g j x
+      Pat.cmp g j (g.pat j) [] x
     else
       .eq
 
@@ -1708,10 +1753,10 @@ def Claim.empty : Prop :=
 -- Data (no λ, no call, no redex); or it fires a call, which replaces one call
 -- label (def index, sizes of its columns) by the labels of the reached
 -- branch: calls to earlier defs (a smaller index), and self-calls whose
--- columns are, left to right, rebuilt values (no bigger) and then a strict
--- piece (smaller). Labels live in a Dershowitz–Manna multiset, where each
--- redex node adds the least label. A dead region may hold Girard's
--- paradox: it is never run, and never measured.
+-- columns are, left to right, no bigger and then smaller. Labels live in
+-- a Dershowitz–Manna multiset, where each redex node adds the least
+-- label. A dead region may hold Girard's paradox: it is never run, and
+-- never measured.
 --
 -- Sections, and their key lemmas:
 --   S1 Syntax             ren and sub compose (sub_sub)
@@ -3432,26 +3477,25 @@ def Frame.ok (F : Frame) : Prop :=
   Book.index F.bk F.k = some F.i ∧ Book.get F.bk F.k = some F.d ∧ AOK F.bk F.xs ∧
   F.cs.length ≤ Term.size F.d.v ∧ CS F.xs F.cs ∧ Hits F.xs F.hs
 
--- a live use of a tagged variable holds the piece its tag names
+-- a tagged variable is closed, and a live use of it holds the piece its
+-- tag names
 def Frame.tags (F : Frame) (ts : List Tag) (σ : Subst) (t : Term) : Prop :=
-  ∀ v c π, ts[v]? = some (some (c, π)) → Term.uses t v ≠ 0 → Arg.at F.xs c π = some (σ v)
+  ∀ v c π, ts[v]? = some (some (c, π)) → Term.Closed (σ v) ∧
+    (Term.uses t v ≠ 0 → Arg.at F.xs c π = some (σ v))
 
 theorem tags_mono {F : Frame} (h : F.tags ts σ t)
     (hu : ∀ v, Term.uses t' v ≠ 0 → Term.uses t v ≠ 0 := by intro v n; simp_all [Term.uses]) :
-    F.tags ts σ t' := fun v c o e n => h v c o e (hu v n)
+    F.tags ts σ t' := fun v c o e => (h v c o e).imp_right (· ∘ hu v)
 
-theorem get_val (hc : Term.Closed X) (h : Term.get π X = some Y) :
-    Term.Closed Y ∧ (Value bk X → Value bk Y) ∧ Term.size Y + π.length ≤ Term.size X := by
+theorem get_val (h : Term.get π X = some Y) (v : Value bk X) : Value bk Y := by
   induction π generalizing Y with
-  | nil => cases h; exact ⟨hc, id, by simp⟩
+  | nil => cases h; exact v
   | cons b π ih =>
     simp only [Term.get] at h; split at h <;> try cases h
-    rename_i x y e; have ⟨c, v, s⟩ := ih e
-    have ⟨ca, cb⟩ : Term.Closed x ∧ Term.Closed y := by cl c
-    simp only [Term.size] at s
+    rename_i e; have := value_tup (ih e)
     split at h <;> (try split at h) <;> cases h
-    · exact ⟨cb, fun h => (value_tup (v h)).2, by simp_all <;> omega⟩
-    · exact ⟨ca, fun h => (value_tup (v h)).1 ‹_›, by simp_all <;> omega⟩
+    · exact this.2
+    · exact this.1 ‹_›
 
 theorem at_cons (h : Arg.at xs c π = some (Tup r x y)) :
     Arg.at xs c (true :: π) = some y ∧ (r.live = true → Arg.at xs c (false :: π) = some x) := by
@@ -3467,37 +3511,98 @@ def Frame.hc (F : Frame) (σ : Subst) (t : Term) (es : List Arg) : Prop :=
 theorem values_mem (h : Values bk xs) (m : a ∈ xs) (hl : a.1.live = true) : Value bk a.2 := by
   induction xs <;> cases h <;> cases m; exact ‹_ → _› hl; exact ‹Values bk _ → _ ∈ _ → _› ‹_› ‹_›
 
--- a rebuild of the piece at π of a column of value X is a closed value,
--- no bigger than that piece
-theorem pos_ok {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : Value F.bk X)
-    (x : Term) : ∀ {π}, F.tags ts σ x → π ∈ Term.pos (F.g ts) c x →
-    ∃ y, Term.get π X = some y ∧ Value F.bk (Term.sub σ x) ∧ Term.Closed (Term.sub σ x) ∧
-      Term.size (Term.sub σ x) ≤ Term.size y := by
-  have hX := (ho.2.2.1 _ (List.mem_of_getElem? ha)).1
-  have A : ∀ {π}, Arg.at F.xs c π = Term.get π X := by simp [Arg.at, ha]
-  induction x <;> intro π ht hp <;> simp only [Term.pos] at hp
-  case Var v =>
-    split at hp <;> simp at hp
-    obtain ⟨rfl, rfl⟩ := hp
-    have h := A ▸ ht v _ _ ‹_› (by simp [Term.uses])
-    have ⟨c, v, _⟩ := get_val (bk := F.bk) hX h
-    exact ⟨_, h, v hv, c, Nat.le_refl _⟩
-  case Lab k =>
-    simp at hp; obtain ⟨_, _, _, m, ⟨rfl, rfl⟩, rfl⟩ := hp
-    exact ⟨_, A ▸ ho.2.2.2.2.2 _ _ _ m, .lab, fun _ => rfl, Nat.le_refl _⟩
-  case Tup iha ihb =>
-    split at hp <;> simp at hp
-    rename_i l
-    obtain ⟨π', mb, e⟩ := hp
-    split at e <;> simp at e
-    obtain ⟨ma, rfl⟩ := e
-    have ⟨_, gb, vb, cb, sb⟩ := ihb (tags_mono ht) mb
-    have ⟨_, ga, va, ca, sa⟩ := iha (tags_mono ht) ma
-    simp only [Term.get] at gb ga; split at gb <;> simp at gb
-    rename_i e; simp [e] at ga; obtain ⟨lr, rfl⟩ := ga; subst gb
+-- under σ, x is a closed value k or more smaller than the piece at π of X
+def Below (bk : Book) (σ : Subst) (X : Term) (π : List Bool) (x : Term) (k : Nat) : Prop :=
+  ∃ y, Term.get π X = some y ∧ Value bk (Term.sub σ x) ∧ Term.Closed (Term.sub σ x) ∧
+    Term.size (Term.sub σ x) + k ≤ Term.size y
+
+-- a piece's parent is bigger by one
+theorem below_up (h : Below bk σ X (b :: π) x k) : Below bk σ X π x (k + 1) := by
+  obtain ⟨_, g, v, c, s⟩ := h; simp only [Term.get] at g; split at g <;> try cases g
+  refine ⟨_, ‹_›, v, c, ?_⟩
+  split at g <;> (try split at g) <;> cases g <;> simp only [Term.size] <;> split <;> omega
+
+theorem below_le (h : Below bk σ X π x k) (e : k' ≤ k) : Below bk σ X π x k' :=
+  let ⟨y, g, v, c, s⟩ := h; ⟨y, g, v, c, by omega⟩
+
+-- a pair's first part is below its piece, or dead and closed under σ
+theorem below_tup (h0 : Below bk σ X (false :: π) x k0 ∨ q.live = false ∧ Term.Closed (Term.sub σ x) ∧ k0 = 0)
+    (h1 : Below bk σ X (true :: π) y k1) : Below bk σ X π (Tup q x y) (k0 + k1) := by
+  obtain ⟨yb, gb, vb, cb, sb⟩ := h1
+  simp only [Term.get] at gb; split at gb <;> simp at gb
+  rename_i r u w e; subst gb
+  rcases h0 with ⟨ya, ga, va, ca, sa⟩ | ⟨l, ca, rfl⟩
+  · simp only [Term.get, e] at ga; simp at ga; obtain ⟨lr, rfl⟩ := ga
     refine ⟨_, e, .tup (fun _ => va) vb, by simp only [Term.sub]; cl And.intro ca cb, ?_⟩
-    simp [Term.sub, Term.size, l, lr]; omega
-  all_goals cases hp
+    simp [Term.sub, Term.size, lr]; split <;> omega
+  · refine ⟨_, e, .tup (by simp [l]) vb, by simp only [Term.sub]; cl And.intro ca cb, ?_⟩
+    simp [Term.sub, Term.size, l]; omega
+
+-- what each step of the comparison shows, under σ, of x against the
+-- piece of column c of value X it is compared to: a result other than gt
+-- makes x a closed value no bigger than that piece, and lt makes it smaller
+theorem pat_below {F : Frame} (ho : F.ok) (ha : F.xs[c]? = some (qa, X)) (hv : Value F.bk X) (n : Nat) :
+    (∀ p π x, 2 * sizeOf p + 1 ≤ n → F.tags ts σ x → Pat.cmp (F.g ts) c p π x ≠ .gt →
+      Below F.bk σ X π x (if Pat.cmp (F.g ts) c p π x = .lt then 1 else 0)) ∧
+    (∀ p π x o, 2 * sizeOf p ≤ n → F.tags ts σ x →
+      Pat.fields (F.g ts) c p π x = .ok o → Below F.bk σ X π x (if o = .lt then 1 else 0)) ∧
+    (∀ bad q ρ x, 2 * sizeOf q ≤ n → F.tags ts σ x →
+      Pat.visit (F.g ts) c bad q ρ x = true → Below F.bk σ X ρ x 0) := by
+  have A : ∀ {π}, Arg.at F.xs c π = Term.get π X := by simp [Arg.at, ha]
+  induction n using Nat.strongRecOn with | _ n ih =>
+  have I {m} (h : m < n) := ih m h
+  refine ⟨fun p π x hn ht hg => ?_, fun p π x o hn ht h => ?_, fun bad q ρ x hn ht h => ?_⟩
+  · generalize e : Pat.cmp (F.g ts) c p π x = o at hg ⊢
+    unfold Pat.cmp at e
+    split at e
+    · subst e; exact (I (m := 2 * sizeOf p) (by omega)).2.1 _ _ _ _ (Nat.le_refl _) ht ‹_›
+    split at e
+    · rename_i b _; simp only [Pat.pair.sizeOf_spec] at hn
+      split at e <;> subst e
+      · exact below_up ((I (m := 2 * sizeOf b) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht ‹_›)
+      · exact absurd rfl hg
+    · subst e; exact absurd rfl hg
+  · unfold Pat.fields at h
+    split at h
+    · rename_i hx; cases h; simp only [reduceCtorEq, ite_false]
+      unfold Guard.at at hx; split at hx
+      · rename_i v; have ⟨hc, h⟩ := ht v c π (by simpa using hx)
+        have h := A ▸ h (by simp [Term.uses])
+        exact ⟨_, h, get_val h hv, hc, by simp [Term.sub]⟩
+      · rename_i k; exact ⟨_, A ▸ ho.2.2.2.2.2 c π k (by simpa using hx), .lab, fun _ => rfl, by simp [Term.sub]⟩
+      · cases hx
+    split at h
+    · rename_i a b q x0 x1 _; simp only [Pat.pair.sizeOf_spec] at hn
+      generalize eo : (if q.live then Pat.cmp (F.g ts) c a (false :: π) x0
+        else if (F.g ts).at c (false :: π) x0 then Ordering.eq else .gt) = o0 at h
+      have C0 (g : o0 ≠ .gt) : Below F.bk σ X (false :: π) x0 (if o0 = .lt then 1 else 0) ∨
+          q.live = false ∧ Term.Closed (Term.sub σ x0) ∧ (if o0 = .lt then 1 else 0) = 0 := by
+        split at eo
+        · subst eo; exact .inl ((I (m := 2 * sizeOf a + 1) (by omega)).1 _ _ _ (Nat.le_refl _) (tags_mono ht) g)
+        rename_i hl; split at eo <;> subst eo
+        · rename_i hx; refine .inr ⟨by simpa using hl, ?_, rfl⟩
+          unfold Guard.at at hx; split at hx
+          · simpa [Term.sub] using (ht _ _ _ (by simpa using hx)).1
+          · exact fun _ => rfl
+          · cases hx
+        · exact absurd rfl g
+      simp only at h; split at h
+      · cases h
+      rename_i hc0
+      cases hf : Pat.fields (F.g ts) c b (true :: π) x1 <;> simp [hf, Except.map] at h
+      have h1 := (I (m := 2 * sizeOf b) (by omega)).2.1 _ _ _ _ (Nat.le_refl _) (tags_mono ht) hf
+      refine below_le (below_tup (C0 hc0) h1) ?_
+      subst h; revert hc0; cases o0 <;> rename_i o2 <;> cases o2 <;> simp [Ordering.then]
+    · cases h
+  · unfold Pat.visit at h
+    split at h
+    · rename_i a b; simp only [Pat.pair.sizeOf_spec] at hn
+      simp only [Bool.or_eq_true, Bool.and_eq_true, bne_iff_ne] at h
+      rcases h with ⟨-, h⟩ | h
+      · exact below_le (below_up ((I (m := 2 * sizeOf a + 1) (by omega)).1 _ _ _ (Nat.le_refl _) ht h)) (Nat.zero_le _)
+      · exact below_le (below_up ((I (m := 2 * sizeOf b) (by omega)).2.2 _ _ _ _ (Nat.le_refl _) ht h))
+          (Nat.zero_le _)
+    · cases h
 
 -- a descent from column j on: column by column, the call's sizes are
 -- no bigger than B's until one is smaller
@@ -3523,20 +3628,10 @@ theorem desc_lex {F : Frame} (ho : F.ok) (ys : List Arg) :
       · simp [Arg.size, hq, hl, Size.le]
       have ⟨c2, v2⟩ := ho.2.2.1 _ (List.mem_of_getElem? ha)
       have v2 := (v2 (hl.trans hq)).1
-      simp only [ite_true, Term.piece, Arg.size, hl, hq, v2, c2, and_self]
-      split
-      · rename_i h0
-        have ⟨_, g, v, c, s⟩ := pos_ok ho ha v2 y (hu _ (.head _) hq) (List.contains_iff_mem.1 h0); cases g
-        refine ⟨fun _ => ?_, nofun⟩; rw [ite_eq_left ⟨v, c⟩]
-        exact (Nat.eq_or_lt_of_le s).imp (congrArg some) id
-      split; · simp
-      rename_i h0 h1
-      obtain ⟨π, m⟩ := List.exists_mem_of_ne_nil _ (by simpa using h1)
-      have ⟨_, g, v, c, s⟩ := pos_ok ho ha v2 y (hu _ (.head _) hq) m
-      have := (get_val (bk := F.bk) c2 g).2.2
-      refine ⟨nofun, fun _ => ?_⟩; rw [ite_eq_left ⟨v, c⟩]
-      cases π; exact absurd (List.contains_iff_mem.2 m) h0
-      simp at this; show _ < _; omega
+      simp only [ite_true, Arg.size, hl, hq, v2, c2, and_self]
+      have B := (pat_below ho ha v2 (2 * sizeOf ((F.g ts).pat j) + 1)).1 _ [] _ (Nat.le_refl _) (hu _ (.head _) hq)
+      constructor <;> intro h <;> obtain ⟨_, g, v, c, s⟩ := B (by simp [h]) <;> cases g <;>
+        simp [h, v, c, Size.le, Size.lt] at s ⊢ <;> omega
     cases n; have := (List.getElem?_eq_some_iff.1 e).1; omega
     obtain _ | ⟨b, B⟩ := B <;> cases hB 0 _ ha
     cases h : Arg.cmp (F.g ts) j (q, y) <;> rw [h] at d
@@ -3582,13 +3677,12 @@ theorem vm_up (h : VM σ) : VM (Subst.up σ) ∧
   refine ⟨?_, funext ?_⟩ <;> rintro (_ | v) <;> first | exact .inl ⟨0, rfl⟩ | rfl |
     rcases h v with ⟨w, e⟩ | hc <;> simp [Subst.up, Term.ren, Term.labels, Bud.up, closed_ren, *]
 
-theorem tags_up {F : Frame} (ho : F.ok) (h : F.tags ts σ t)
+theorem tags_up {F : Frame} (h : F.tags ts σ t)
     (hu : ∀ v, Term.uses f (v + 1) ≠ 0 → Term.uses t v ≠ 0 := by intro v n; simp_all [Term.uses]) :
     F.tags (none :: ts) (Subst.up σ) f := by
-  rintro (_ | v) c π e n; cases e
-  have r := h v c π e (hu v n)
-  obtain ⟨a, ha, g⟩ := Option.bind_eq_some_iff.1 r
-  rwa [Subst.up, closed_ren (get_val (bk := F.bk) (ho.2.2.1 a (List.mem_of_getElem? ha)).1 g).1]
+  rintro (_ | v) c π e; cases e
+  have ⟨hc, r⟩ := h v c π e
+  rw [Subst.up, closed_ren hc]; exact ⟨hc, r ∘ hu v⟩
 
 theorem good_if {q : Quan} (h : q.live = true → Good L P A B C) :
     Good L P (if q.live then A else []) (if q.live then B else []) (if q.live then C else []) := by
@@ -3635,7 +3729,7 @@ theorem gsl (F : Frame) (t : Term) : ∀ {ts : List Tag} {σ : Subst} {es es₀ 
     first
       | refine good_cons hL (good_mono this ?_)
       | refine good_cons hL (good_app (good_if fun hq => good_ch (ihv hv .nil)) (good_mono this ?_))
-    exact fun ⟨o, l, tg, _⟩ => by lv at l; exact ⟨o, live_mono l.2, tags_up o tg, hcl o l.2 (tags_up o tg)⟩
+    exact fun ⟨o, l, tg, _⟩ => by lv at l; exact ⟨o, live_mono l.2, tags_up tg, hcl o l.2 (tags_up tg)⟩
   case Tup iha ihb => exact good_app (good_if fun hq => good_ch (iha hv .nil)) (good_ch (ihb hv .nil))
   case Mat iha ihb | Rwt iha _ ihb | Min iha ihb =>
     exact good_cons hL (good_app (good_ch (iha hv .nil)) (good_ch (ihb hv .nil)))
@@ -3725,7 +3819,7 @@ theorem tp (hk : Book.index bk k = some i) (hd : Book.get bk k = some d) (hx : A
     have lq : Term.uses f 0 ≠ 0 → q.live = true := (pl ▸ allows_live ht.1 ·)
     refine ih _ cs' _ _ _ rfl ⟨ht.2, (Lam.inj hr).2,
       fun | 0, _ => (ha _ (.head _)).imp_right (· ∘ lq) | v + 1, hv => hE v (by simpa using hv),
-      fun | 0 => fun c o e' h => hx' c o (Option.some.inj e') (lq h) | v + 1 => htg v,
+      fun | 0 => fun c o e' => ⟨(ha _ (.head _)).1, hx' c o (Option.some.inj e') ∘ lq⟩ | v + 1 => htg v,
       ⟨pend', hpe', hp'⟩, by omega, hcs', fun a h => ha a (.tail _ h),
       le_le (le_app (le_le (bud_once (i := 0) f fun h => data_labels (dx (allows_two ht.1 h)))
         (le_app (.inl (.of_eq (congrArg (Term.bud · f) (funext fun v => by cases v <;> rfl))))
@@ -3759,7 +3853,7 @@ theorem tp (hk : Book.index bk k = some i) (hd : Book.get bk k = some d) (hx : A
     simp only [Term.tree, show Term.takes _ = true from hn] at ht; simp [Term.ren] at hr
     have huv : q.live = true → Term.uses (App q f (Var v)) v ≠ 0 := by simp +contextual [Term.uses]
     exact ih _ _ _ _ _ rfl ⟨ht, hr.1, eok_mono hE, tags_mono htg,
-      ⟨(q, _) :: pend, by simp [hpe], .cons (fun c o e l => htg v c o (Option.join_eq_some_iff.1 e) (huv l)) hp⟩,
+      ⟨(q, _) :: pend, by simp [hpe], .cons (fun c o e l => (htg v c o (Option.join_eq_some_iff.1 e)).2 (huv l)) hp⟩,
       by omega, hcs, fun | _, .head _ => (hE v (lift_fix hr.2)).imp_right (· ∘ huv) | _, .tail _ hy => ha _ hy,
       List.append_assoc .. ▸ hbud, hh⟩
   case done t e xs' hn =>
