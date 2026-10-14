@@ -3,6 +3,12 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
+## Unreleased
+
+- Scalar `F32` inputs from JS round before Bend uses them, in exported
+  calls (direct or curried) and foreign answers, avoiding binary64
+  precision changing an F32 result (#1568).
+
 ## 2.0.37 (2026-10-13)
 
 - **A Nat crosses to a JS host as a plain number** (PR #1506 by

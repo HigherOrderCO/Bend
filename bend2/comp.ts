@@ -3200,7 +3200,8 @@ function host(A: HTerm | null, x: string, out = 0): string {
   const t = ty_wnf(A);
   const k = t?.$ === "ADT" ? t.k : "";
   return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
-    : k === "Nat" && !out ? `nat_in(${x})` : x;
+    : k === "Nat" && !out ? `nat_in(${x})`
+    : k === "F32" && !out ? `Math.fround(${x})` : x;
 }
 
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
