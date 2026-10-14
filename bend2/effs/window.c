@@ -134,13 +134,12 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
   held  = [NSMutableArray new];
   other = NO;
   [self interpretKeyEvents:@[ev]];
-  // Apple's Korean method can commit a key's bare jamo where it should
-  // start a syllable (the first key a view gets); asked again, it composes.
+  // An input method (Korean, Vietnamese) can commit the first key a view
+  // gets bare, where it should start composing; asked again, it composes.
   NSString* t = held.count == 1 ? held[0] : nil;
-  unichar   c = t.length == 1 ? [t characterAtIndex:0] : 0;
-  if (fresh && !other && !ev.ARepeat && c >= 0x3131 && c <= 0x318E
-    && [self.inputContext.selectedKeyboardInputSource
-      hasPrefix:@"com.apple.inputmethod.Korean"]) {
+  if (fresh && !other && !ev.ARepeat && t.length == 1
+    && ![self.inputContext.selectedKeyboardInputSource
+      hasPrefix:@"com.apple.keylayout."]) {
     [held removeAllObjects];
     [self interpretKeyEvents:@[ev]];
   }
