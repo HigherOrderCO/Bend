@@ -260,6 +260,12 @@ Most of these limitations are being addressed and will improve over time!
 
 **BEND IS YOUNG. EXPECT BUGS AND [REPORT THEM](https://github.com/bendlang/bend/issues).**
 
+For specialized equation parameters with incompatible constructor shapes,
+`--verdict` emits an empty elimination rather than inventing an inhabitant.
+The kernel checks a discriminator at both endpoints, including nested fields.
+Model-search failure alone is not evidence of emptiness: unmodelled opaque or
+stuck equations without a refutation remain out of scope.
+
 # Credits
 
 Bend is created by [Victor Taelin](https://github.com/VictorTaelin) and built

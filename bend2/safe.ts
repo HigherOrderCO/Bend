@@ -165,6 +165,8 @@ const QS = ["Q0", "Q1", "Q2"];
 // the unit type and value
 const UT: O = { $: "Enu", ks: ["()"] };
 const UV: O = { $: "Lab", k: "()" };
+const ET: O = { $: "Enu", ks: [] };
+const TYPE: O = { $: "Typ", q: { $: "Lab", k: "Q1" } };
 
 // Errors
 // ======
@@ -273,8 +275,8 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
 function root_emit(e: Safe, k: Name): [string[], string | null] {
   const tld = e.book.tlds[k];
   const ns: string[] = [];
-  // fin: k has a finite parameter; G: k's type, if it can go out
-  let fin = false;
+  // cover: k needs a check; G: k's type, if it can go out
+  let cover = false;
   let G: O | null = null;
   let ps: Binder[] = [];
   // the check of k's instances after the columns cs of T, at depth d
@@ -298,14 +300,14 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     const vs: HTerm[] | null = A.$ === "Qnt" ? [B.None(), B.Lone(), B.Many()].map((q) => B.Qua(q))
       : adt !== null && adt.c.every((c) => B.term_wnf(e.book, c.T).$ !== "All") ? adt.c.map((c) => B.Ctr(c.k, [])) : null;
     if (vs !== null) {
-      if (!fin) {
-        fin = true;
+      if (!cover) {
+        cover = true;
         const m = trail(e);
         try {
           const t = tele_open(e, scope_nil(), tld.T, [], tld.x);
           const b = term(e, t.s, t.T, false);
-          G = { $: "Ann", x: t.ps.reduceRight<O>((f, [q, l]) => ({ $: "Lam", q, l, f }), b),
-            T: alls(t.ps, { $: "Typ", q: { $: "Lab", k: "Q1" } }) };
+          G = { $: "Ann", x: lams(e, t.ps, b),
+            T: alls(t.ps, TYPE) };
           ps = t.ps;
         } catch (x) {
           if (!(x instanceof Scope_Error)) {
@@ -326,6 +328,28 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
       oos("a specialized parameter whose type names a parameter");
     }
+    if (A.$ === "Eql") {
+      const mark = trail(e);
+      try {
+        const H = term(e, scope_nil(), A, false) as Extract<O, { $: "Eql" }>;
+        const M = shape_diff(H.a, H.b) ? shape_pattern(H.a, d + 1, UT, ET) : null;
+        if (M !== null) {
+          const h: O = { $: "Var", l: d };
+          const s = scope_bind({ ...scope_nil(), D: d }, h, F.A, true);
+          const R = term(e, s, F.B(B.Var(F.k, 0)), false);
+          const P: O = { $: "App", q: 1, x: { $: "Var", l: d + 1 },
+            f: { $: "Ann", x: M, T: alls([[1, d + 1, H.T]], TYPE) } };
+          cover = true;
+          return { $: "Ann", T: alls([[1, d, H]], R),
+            x: { $: "Lam", q: 1, l: d, f: { $: "App", q: 1,
+              f: { $: "Ann", x: { $: "Efq" }, T: alls([[1, d + 1, ET]], R) },
+              x: { $: "Rwt", e: h, l: d + 1, P, f: UV } } } };
+        }
+      } catch (x) {
+        if (!(x instanceof Scope_Error)) { throw x; }
+      }
+      undo(e, mark);
+    }
     const key = String(j) + "\n" + B.term_key(B.term_lower(F.A));
     const kept = e.consts.get(key);
     if (kept !== undefined) {
@@ -345,12 +369,32 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     return at(B.Ref(c));
   };
   const v: O = { $: "Let", q: 0, l: 1, v: go(tld.T, [], 2), f: UV };
-  if (!fin) {
+  if (!cover) {
     return [ns, null];
   }
   const n = fresh(e, name_tt(k));
   e.out.push([n, UT, G === null ? v : { $: "Let", q: 0, l: 0, v: G, f: v }, false]);
   return [ns, n];
+}
+
+// Kernel checks Unit at a, Empty at b.
+function shape_diff(a: O, b: O): boolean {
+  while (a.$ === "Ann") { a = a.x; }
+  while (b.$ === "Ann") { b = b.x; }
+  if (a.$ === "Lab" && b.$ === "Lab") { return a.k !== b.k; }
+  return a.$ === "Tup" && b.$ === "Tup"
+    && (shape_diff(a.a, b.a) || shape_diff(a.b, b.b));
+}
+
+function shape_pattern(a: O, l: number, yes: O, no: O): O | null {
+  while (a.$ === "Ann") { a = a.x; }
+  if (a.$ === "Lab") {
+    return { $: "Mat", k: a.k, h: yes, m: { $: "Lam", q: 1, l, f: no } };
+  }
+  if (a.$ !== "Tup" || a.q === 0) { return null; }
+  const r = shape_pattern(a.b, l, yes, no);
+  const h = r && shape_pattern(a.a, l, r, { $: "Lam", q: 1, l, f: no });
+  return h && { $: "Prj", h };
 }
 
 // item_ref, with a failure kept as the item's reason
