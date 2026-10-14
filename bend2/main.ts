@@ -89,6 +89,9 @@ const MISMATCH = "Sorry - this is a mismatch between the TypeScript implementati
   + " we cannot validate them yet. This will be addressed in a future update."
   + " Meanwhile, feel free to open an issue to report this bug.";
 
+const EXHAUSTED = "BendTT exhausted its conversion budget; these proofs remain unvalidated."
+  + " Keep large computations abstract or split them into separate equality obligations.";
+
 // BendHub's terms; s18.4 makes MIT-0 the default license
 const TERMS = "https://bend-lang.com/bendai/terms#s18";
 
@@ -818,7 +821,8 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
   }
   const why = kernel ? Safe.safe_check(book) : null;
   if (why !== null) {
-    cli_say(2, FAIL + "\n" + why + "\n" + MISMATCH + "\n");
+    const note = /^out of fuel$/m.test(why) ? EXHAUSTED : MISMATCH;
+    cli_say(2, FAIL + "\n" + why + "\n" + note + "\n");
     return 1;
   }
   cli_say(1, PASS + "\n" + (kernel ? "" : HINT + "\n"));

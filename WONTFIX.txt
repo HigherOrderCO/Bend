@@ -45,6 +45,15 @@ The checker is not optimal: some terms are exponential or overflow (#993, #1075)
   large constants and depths abstract. Do not open an issue per exponential
   or overflow.
 
+BendTT conversion has a finite fuel budget (#1322)
+  The independent kernel allows 400,000,000 steps per conversion. It unfolds
+  large closed Nat literals in unary: comparisons of a few million can exhaust
+  that budget even when bend2 checks them quickly. Combining individually
+  valid comparisons in one closed Bool computation shares one budget; separate
+  equality obligations each get their own. Keep large computations abstract or
+  prove the comparisons separately and combine them with a generic law.
+  --verdict reports "out of fuel" and leaves the proof unvalidated, not disproved.
+
 A fallback arm does not refine a dependent goal (#1091)
   In `case rest:` the scrutinee stays a variable. Write the constructor arms.
 
