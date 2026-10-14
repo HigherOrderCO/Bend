@@ -31,7 +31,7 @@ type Source is Data:
 type Value is Data:
   Num{value: U32}
   Flag{value: Bool}
-  Text{value: String}
+  OptionText{value: String}
 
 type Option is Data:
   Option{key: String, value: Value}
@@ -192,7 +192,7 @@ def option_number_or(m: Maybe<&2, Value>, default: U32) -> U32:
       n
     case Some{Flag{b}}:
       default
-    case Some{Text{t}}:
+    case Some{OptionText{t}}:
       default
     case None{}:
       default
@@ -207,7 +207,7 @@ def option_flag_or(m: Maybe<&2, Value>, default: Bool) -> Bool:
       b
     case Some{Num{n}}:
       default
-    case Some{Text{t}}:
+    case Some{OptionText{t}}:
       default
     case None{}:
       default
@@ -217,7 +217,7 @@ def option_flag(opts: List<&2, Option>, key: String, default: Bool) -> Bool:
 
 def option_text_or(m: Maybe<&2, Value>, default: String) -> String:
   match m:
-    case Some{Text{t}}:
+    case Some{OptionText{t}}:
       t
     case Some{Num{n}}:
       default

@@ -54,7 +54,7 @@ function lint_value(v) {
     ? { $: CID(Num), value: v }
     : typeof v === "boolean"
       ? { $: CID(Flag), value: v }
-      : { $: CID(Text), value: v };
+      : { $: CID(OptionText), value: v };
 }
 
 function lint_term(id) {
