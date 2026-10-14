@@ -9,4 +9,5 @@ def keep(n: Nat) -> Nat:
 #|SOME PROOFS FAIL
 #|Error: 1 def relies on unsafe or foreign code:
 #|defs that depend on @unsafe: unsafe_lib.boom
+#|Hint: no law or proof uses these defs. Move them to a file this proof does not import, and the proofs will check: unsafe_lib.boom
 #|exit 1
