@@ -561,7 +561,7 @@ let FUEL = 0;
 
 let FL: File;
 
-// What the def being emitted missed, asked and lent (compile_book).
+// What the def compile_book emits missed, asked and lent.
 let TRACE: Trace | null = null;
 
 // Name
@@ -1313,7 +1313,7 @@ function brw_of(k: Name): boolean[] {
       && !FL.own.has(k + "~" + i));
   });
   TRACE?.asks.push(k);
-  row.forEach((b, i) => b && TRACE?.miss.push(() => FL.own.has(k + "~" + i)));
+  TRACE?.miss.push(() => row.some((b, i) => b && FL.own.has(k + "~" + i)));
   return row;
 }
 
@@ -2911,7 +2911,9 @@ export function compile_book(book: Bend.Book): string {
         t.asks.forEach(brw_of);
         continue;
       }
-      traces.set(k, TRACE = { miss: [], asks: [], lends: FL.lend = new Set() });
+      TRACE = { miss: [], asks: [], lends: new Set() };
+      traces.set(k, TRACE);
+      FL.lend = TRACE.lends;
       memo_gc();
       PROBES.length = 1;
       const [dl, vals] = emit_open(scope_new(), k);
