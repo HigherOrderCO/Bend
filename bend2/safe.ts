@@ -246,15 +246,13 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
     }
   }
   e.out = e.out.filter(([k]) => !bad.has(k));
-  // a def is out at its instances' reasons, else at its λ-match's, else
-  // (with neither) as reaching no kernel def
-  const out = new Set(e.out.map(([k]) => k));
-  const why = (n: string): string[] =>
-    out.has(n) ? [] : [bad.get(n) ?? "no kernel def"];
+  // a def is out at its instances' reasons, else at its λ-match's; with
+  // neither, it reaches no kernel def
+  const why = (n: string): string[] => bad.has(n) ? [bad.get(n) as string] : [];
   const oos = roots.flatMap(([k, ns, top]) => {
     const ws = ns.flatMap(why);
-    const all = ws.length > 0 ? ws : top !== null ? why(top)
-      : ns.length === 0 ? ["no kernel def"] : [];
+    const t = top ?? ns[0];
+    const all = ws.length > 0 ? ws : t === undefined ? ["no kernel def"] : why(t);
     return [...new Set(all)].map((w): [Name, string] => [k, w]);
   });
   return { text: book_show(e), oos };
