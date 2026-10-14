@@ -29,8 +29,8 @@ type Source is Data:
 
 # An option's value: a whole number (a U32), a boolean, or text.
 type Value is Data:
-  Num{value: U32}
-  Flag{value: Bool}
+  OptionNum{value: U32}
+  OptionFlag{value: Bool}
   OptionText{value: String}
 
 type Option is Data:
@@ -188,9 +188,9 @@ def find(opts: List<&2, Option>, +key: String) -> Maybe<&2, Value>:
 
 def option_number_or(m: Maybe<&2, Value>, default: U32) -> U32:
   match m:
-    case Some{Num{n}}:
+    case Some{OptionNum{n}}:
       n
-    case Some{Flag{b}}:
+    case Some{OptionFlag{b}}:
       default
     case Some{OptionText{t}}:
       default
@@ -203,9 +203,9 @@ def option_number(opts: List<&2, Option>, key: String, default: U32) -> U32:
 
 def option_flag_or(m: Maybe<&2, Value>, default: Bool) -> Bool:
   match m:
-    case Some{Flag{b}}:
+    case Some{OptionFlag{b}}:
       b
-    case Some{Num{n}}:
+    case Some{OptionNum{n}}:
       default
     case Some{OptionText{t}}:
       default
@@ -219,9 +219,9 @@ def option_text_or(m: Maybe<&2, Value>, default: String) -> String:
   match m:
     case Some{OptionText{t}}:
       t
-    case Some{Num{n}}:
+    case Some{OptionNum{n}}:
       default
-    case Some{Flag{b}}:
+    case Some{OptionFlag{b}}:
       default
     case None{}:
       default
