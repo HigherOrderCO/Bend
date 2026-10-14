@@ -1122,14 +1122,28 @@ function mat_lits(x: HTerm): Row[] {
   const same = (a: HTerm, b: HTerm, d = 0): boolean => {
     const x = Bend.term_strip(a);
     const y = Bend.term_strip(b) as any;
-    return x === y || x.$ === y.$ && (x.$ === "Lam" ? x.k === y.k
-      && x.q?.$ === y.q?.$ && same(x.f(Bend.Var(x.k, d)), y.f(Bend.Var(x.k, d)),
-        d + 1)
-      : x.$ === "App" ? same(x.f, y.f, d) && same(x.x, y.x, d)
-      : x.$ === "Ctr" ? x.k === y.k && x.x.length === y.x.length
-        && x.x.every((t, i) => same(t, y.x[i], d))
-      : x.$ === "Mat" ? x.k === y.k && same(x.h, y.h, d) && same(x.m, y.m, d)
-      : key(x, d) === key(y, d));
+    if (x === y || x.$ !== y.$) {
+      return x === y;
+    }
+    switch (x.$) {
+      case "Lam": {
+        const v: HTerm = Bend.Var(x.k, d);
+        return x.k === y.k && x.q?.$ === y.q?.$ && same(x.f(v), y.f(v), d + 1);
+      }
+      case "App": {
+        return same(x.f, y.f, d) && same(x.x, y.x, d);
+      }
+      case "Ctr": {
+        return x.k === y.k && x.x.length === y.x.length
+          && x.x.every((t, i) => same(t, y.x[i], d));
+      }
+      case "Mat": {
+        return x.k === y.k && same(x.h, y.h, d) && same(x.m, y.m, d);
+      }
+      default: {
+        return key(x, d) === key(y, d);
+      }
+    }
   };
   const walk = (t: HTerm, j: number, n: number,
     cov: ((w: Of<"Ctr">) => HTerm) | null) => {
