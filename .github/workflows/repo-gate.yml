@@ -35,3 +35,20 @@ jobs:
           git fetch --no-tags --depth=1 origin main
           git checkout FETCH_HEAD -- gates/
       - run: bun gates/repo.ts
+  kernel-verdict:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.4.0
+      - name: pinned Lean 4.34.0
+        run: |
+          curl --fail --location --output "$RUNNER_TEMP/lean.tar.zst" https://github.com/leanprover/lean4/releases/download/v4.34.0/lean-4.34.0-linux.tar.zst
+          echo "caaa98356098c85dc0fcbbd28e1ec66f39eb6551829972b752ff20e1286b646b  $RUNNER_TEMP/lean.tar.zst" | sha256sum --check --status
+          tar --zstd -xf "$RUNNER_TEMP/lean.tar.zst" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/lean-4.34.0-linux/bin" >> "$GITHUB_PATH"
+      - run: bun gates/safe_node.ts --required

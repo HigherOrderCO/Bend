@@ -260,6 +260,21 @@ Most of these limitations are being addressed and will improve over time!
 
 **BEND IS YOUNG. EXPECT BUGS AND [REPORT THEM](https://github.com/bendlang/bend/issues).**
 
+# Verification
+
+Run `bun gates/safe_node.ts --required` from the repository root with Lean and
+leanc 4.34.0 on `PATH`. This standard kernel-verdict check builds the current
+`bend2/bendtt.lean` in a fresh private cache and ignores any existing `$BENDTT`.
+It enforces kernel acceptance, source rejection and finite-model out-of-scope
+expectations, plus direct kernel rejection of an invalid inhabitant of Empty.
+Real failing-executable and expired-deadline controls must remain infrastructure
+failures, never expected proof rejections.
+
+The `kernel-verdict` CI job runs this command on every PR and merge-group tree,
+separately from the authoritative repo gate and the four-gate runner's 30-second
+cap. A cold kernel build has a five-minute deadline; each subsequent verdict has
+30 seconds. The larger safe survey remains descriptive.
+
 # Credits
 
 Bend is created by [Victor Taelin](https://github.com/VictorTaelin) and built

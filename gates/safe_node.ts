@@ -46,25 +46,30 @@ export function judge(g: Got): [string, string] {
 async function run(bin: string, args: string[], cap: number): Promise<Omit<Got, "f">> {
   const g: Omit<Got, "f"> = { code: null, ms: 0, out: "", timeout: false };
   const t0 = Date.now();
-  await new Promise<void>((done) => {
-    const kid = child.spawn(bin, args, { env: process.env });
-    kid.stdout.on("data", (d) => { g.out += d; });
-    kid.stderr.on("data", (d) => { g.out += d; });
-    kid.on("error", (e) => { g.error = e.message; });
-    const bomb = setTimeout(() => { g.timeout = kid.kill("SIGKILL"); }, cap);
-    kid.on("close", (code, signal) => {
-      clearTimeout(bomb);
-      g.code = code;
-      g.ms = Date.now() - t0;
-      if (signal) {
-        g.signal = signal;
-        if (!g.timeout) {
-          g.error = "child terminated by " + signal;
-        }
+  const { promise, resolve } = Promise.withResolvers<void>();
+  const kid = child.spawn(bin, args, { env: process.env, detached: true });
+  kid.stdout.on("data", (d) => { g.out += d; });
+  kid.stderr.on("data", (d) => { g.out += d; });
+  kid.on("error", (e) => { g.error = e.message; });
+  const bomb = setTimeout(() => {
+    if (kid.pid !== undefined) {
+      try { process.kill(-kid.pid, "SIGKILL"); g.timeout = true; }
+      catch (e) { g.error = String(e); }
+    }
+  }, cap);
+  kid.on("close", (code, signal) => {
+    clearTimeout(bomb);
+    g.code = code;
+    g.ms = Date.now() - t0;
+    if (signal) {
+      g.signal = signal;
+      if (!g.timeout) {
+        g.error = "child terminated by " + signal;
       }
-      done();
-    });
+    }
+    resolve();
   });
+  await promise;
   return g;
 }
 
@@ -116,7 +121,84 @@ async function one(f: string, cap: number): Promise<Got> {
   return g;
 }
 
+// The required suite is local and builds in a fresh HOME, never trusting $BENDTT.
+// The larger stdin survey keeps its descriptive contract.
+async function required(): Promise<void> {
+  const home = process.env.HOME;
+  const override = process.env.BENDTT;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bend-verdict-gate-"));
+  process.env.HOME = dir;
+  delete process.env.BENDTT;
+  const expect = (g: Got, want: string): void => {
+    const [mark, why] = judge(g);
+    const got = g.diagnostic_error ? "infrastructure"
+      : mark === "t" ? "timeout"
+      : mark === "e" || g.signal ? "infrastructure"
+      : g.code === 0 && why === "agree" ? "accepted"
+      : g.code === 1 && mark === "-" ? "out of scope"
+      : g.code === 1 && g.out.startsWith("SOME PROOFS FAIL") && mark === " "
+        ? g.f.endsWith(".bendtt") ? "kernel rejection" : "source rejection"
+      : g.code === 1 && mark === "!" && g.diagnostic?.startsWith("SOME PROOFS FAIL")
+        ? "kernel rejection" : "infrastructure";
+    if (got !== want) {
+      throw new Error(g.f + ": expected " + want + ", got " + got + "\n"
+        + (g.diagnostic_error ?? g.error ?? g.diagnostic ?? g.out));
+    }
+    if (got === "out of scope") {
+      const omitted = [...(g.diagnostic ?? "").matchAll(/^- (\S+):/gm)].map(m => m[1]);
+      if (omitted.length !== 1 || omitted[0] !== "reflexive") {
+        throw new Error(g.f + ": unexpected omitted definitions: " + omitted.join(", "));
+      }
+    }
+    console.log(g.f + ": " + got + " (" + g.ms + " ms)");
+  };
+  try {
+    const first = "tests/proof/cong_lambda_argument.bend";
+    expect(await one(first, 300000), "accepted");
+    const cache = path.join(dir, ".bend", "bendtt");
+    const builds = fs.readdirSync(cache);
+    if (builds.length !== 1) {
+      throw new Error("BendTT infrastructure: expected one fresh source-keyed kernel build");
+    }
+    const kernel = path.join(cache, builds[0], "bendtt");
+    process.env.BENDTT = kernel;
+    for (const [f, want] of [
+      ["tests/proof/group_dead_forward.bend", "accepted"],
+      ["tests/proof/rewrite_motive_evidence.bend", "accepted"],
+      ["tests/proof/model_no_base.bend", "out of scope"],
+    ]) {
+      expect(await one(f, 30000), want);
+    }
+    const rejected = path.join(dir, "rejected.bend");
+    fs.writeFileSync(rejected, "import Base\nlaw main:\n  {0 == 1 : U32}\ndef main(): {==}\n");
+    expect(await one(rejected, 30000), "source rejection");
+    for (const [name, text, want] of [
+      ["unit", "unit : <()> = ()\n", "accepted"],
+      ["empty", "empty : <> = ()\n", "kernel rejection"],
+    ]) {
+      const f = path.join(dir, name + ".bendtt");
+      fs.writeFileSync(f, text);
+      expect({ f, ...await run(kernel, [f], 30000) }, want);
+    }
+    const broken = path.join(dir, "broken-kernel");
+    fs.writeFileSync(broken, "#!/bin/sh\nexit 23\n", { mode: 0o700 });
+    process.env.BENDTT = broken;
+    expect(await one(first, 30000), "infrastructure");
+    expect({ f: "expired deadline", ...await run(process.execPath,
+      ["-e", "setInterval(() => {}, 1000)"], 1) }, "timeout");
+    console.log("PASS required kernel verdicts");
+  } finally {
+    if (home === undefined) { delete process.env.HOME; } else { process.env.HOME = home; }
+    if (override === undefined) { delete process.env.BENDTT; } else { process.env.BENDTT = override; }
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 if (import.meta.main) {
+  if (process.argv[2] === "--required") {
+    await required();
+    process.exit(0);
+  }
   const files = fs.readFileSync(0, "utf8").split("\n").filter((l) => l !== "");
   const cap = Number(process.env.CAP ?? 30) * 1000;
   const res: Got[] = [];
