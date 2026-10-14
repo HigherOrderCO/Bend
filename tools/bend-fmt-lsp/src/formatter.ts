@@ -7,6 +7,7 @@ type Token = {
   text: string;
   kind: "word" | "number" | "literal" | "symbol";
   gap: boolean;
+  col: number;
 };
 
 type Line = {
@@ -24,11 +25,6 @@ const BINARY = new Set(["=", "==", "!=", "->", "<-", "=>", "+", "-", "*", "/", "
 const PREFIX_CONTEXT = new Set(["(", "{", "[", "<", ",", ":", "=", "for", "case", "~"]);
 const ANGLES = new Set(["<", ">", "<<", ">>"]);
 const KEYWORDS = new Set(["return", "match", "case", "do", "for", "exs", "where", "is", "import", "def", "type", "law"]);
-const DELIMITERS = [["(", ")"], ["[", "]"], ["{", "}"]] as const;
-const DELIMITER_PAIRS = new Map<string, string>(DELIMITERS);
-const OPENING_DELIMITERS = new Set<string>(DELIMITERS.map(([opening]) => opening));
-const CLOSING_DELIMITERS = new Set<string>(DELIMITERS.map(([, closing]) => closing));
-const SUPPORTED_DO_HEADER = ["name", "<", "name", ">", ":"] as const;
 
 function splitLine(text: string): Line {
   const indent = text.match(/^[\t ]*/)?.[0] ?? "";
@@ -87,7 +83,7 @@ function splitLine(text: string): Line {
       const multi = MULTI.find((value) => code.startsWith(value, i));
       i += multi?.length ?? 1;
     }
-    tokens.push({ text: code.slice(start, i), kind, gap: hadGap });
+    tokens.push({ text: code.slice(start, i), kind, gap: hadGap, col: indent.length + start });
     hadGap = false;
   }
   return { indent, code: code.slice(0, i).trim(), comment: code.slice(i), tokens };
@@ -114,16 +110,16 @@ function needsSpace(tokens: Token[], index: number): boolean {
   const left = tokens[index - 1];
   const right = tokens[index];
   if (!left) return false;
-  if (CLOSING_DELIMITERS.has(right.text) || [",", ";"].includes(right.text)) return false;
+  if ([")", "]", "}", ",", ";"].includes(right.text)) return false;
   if (right.text === ":") return right.gap;
-  if (OPENING_DELIMITERS.has(left.text)) return false;
+  if (["(", "[", "{"].includes(left.text)) return false;
   if (left.text === ",") return true;
-  if (right.text === "!" && (left.kind === "word" || CLOSING_DELIMITERS.has(left.text))) return false;
+  if (right.text === "!" && (left.kind === "word" || [")", "]", "}"].includes(left.text))) return false;
   if (left.text === "!" && right.text === "(") return false;
   if (right.text === "?" && left.kind === "word" && (!tokens[index + 1] || tokens[index + 1].text === "(")) return right.gap;
   if (left.text === "?" && right.text === "(" && tokens[index - 2]?.kind === "word") return false;
   if (right.text === "(" || right.text === "[") {
-    const suffix = (left.kind === "word" && !KEYWORDS.has(left.text)) || left.kind === "number" || left.kind === "literal" || (CLOSING_DELIMITERS.has(left.text) || [">", ">>"].includes(left.text));
+    const suffix = (left.kind === "word" && !KEYWORDS.has(left.text)) || left.kind === "number" || left.kind === "literal" || [")", "]", "}", ">", ">>"].includes(left.text);
     return !suffix;
   }
   // A separated brace can start the next annotated argument, rather than a constructor.
@@ -133,7 +129,7 @@ function needsSpace(tokens: Token[], index: number): boolean {
   if (left.kind === "number" && left.text.endsWith("n") && (right.text === "+" || right.text === "++")) return right.gap;
   if ((left.text === "+" || left.text === "++") && tokens[index - 2]?.kind === "number" && tokens[index - 2].text.endsWith("n")) return right.gap;
   if (unary(tokens, index - 1)) return false;
-  if (unary(tokens, index)) return !(OPENING_DELIMITERS.has(left.text) || left.text === "<");
+  if (unary(tokens, index)) return !["(", "[", "{", "<"].includes(left.text);
   const angle = keepAngleGap(left, right);
   if (angle !== null) return angle;
   if (BINARY.has(left.text) || BINARY.has(right.text)) return true;
@@ -141,28 +137,74 @@ function needsSpace(tokens: Token[], index: number): boolean {
   return true;
 }
 
-function formatTokens(tokens: Token[]): string {
+// The formatted code and where each token starts in it.
+function formatTokens(tokens: Token[]): [string, number[]] {
   let output = "";
+  const starts: number[] = [];
   for (let i = 0; i < tokens.length; i++) {
     if (needsSpace(tokens, i)) output += " ";
+    starts.push(output.length);
     output += tokens[i].text;
   }
-  return output;
+  return [output, starts];
 }
 
+// Lines inside brackets and comment-only lines: their columns mean nothing to
+// the parser.
+function looseLines(lines: Line[]): boolean[] {
+  let open = 0;
+  return lines.map((line) => {
+    const loose = open > 0 || line.tokens.length === 0;
+    for (const token of line.tokens) {
+      if (["(", "[", "{"].includes(token.text)) open++;
+      else if ([")", "]", "}"].includes(token.text)) open = Math.max(0, open - 1);
+    }
+    return loose;
+  });
+}
+
+// The tokens that start a body on the line of its `do`, `match`, `case` or
+// `def` header, as in `do IO<Unit>: a`: Bend pins the lines after it to the
+// column of `a`.
+function inlineBodies(lines: Line[]): number[][] {
+  let open = 0;
+  let header: { open: number; angle: number; typed: boolean } | null = null;
+  return lines.map((line) => line.tokens.flatMap((token, index) => {
+    if (token.kind === "word" && ["do", "match", "case", "def"].includes(token.text)) {
+      header = { open, angle: 0, typed: token.text === "do" || token.text === "def" };
+    } else if (["(", "[", "{"].includes(token.text)) {
+      open++;
+    } else if ([")", "]", "}"].includes(token.text)) {
+      open = Math.max(0, open - 1);
+    } else if (header?.typed && ANGLES.has(token.text)) {
+      header.angle += (token.text.length) * (token.text[0] === "<" ? 1 : -1);
+    } else if (header && token.text === ":" && open === header.open && header.angle === 0) {
+      header = null;
+      return index + 1 < line.tokens.length ? [index + 1] : [];
+    }
+    return [];
+  }));
+}
+
+// A tab is one column, as in the parser. Loose lines measure against a copy of
+// the levels, so they can't shift the statements after them.
 function indentDepths(lines: Line[]): number[] {
   const depths: number[] = [];
-  const stack = [0];
-  for (const line of lines) {
+  const loose = looseLines(lines);
+  let stack = [0];
+  let levels = stack;
+  for (const [index, line] of lines.entries()) {
     if (line.code === "" && line.comment === "") {
       depths.push(-1);
       continue;
     }
-    const width = [...line.indent].reduce((n, char) => n + (char === "\t" ? 8 - n % 8 : 1), 0);
-    while (stack.length > 1 && width < stack[stack.length - 1]) stack.pop();
-    if (width > stack[stack.length - 1]) stack.push(width);
-    else if (width !== stack[stack.length - 1]) stack[stack.length - 1] = width;
-    depths.push(stack.length - 1);
+    if (!loose[index]) levels = stack;
+    else if (levels === stack) levels = [...stack];
+    const width = line.indent.length;
+    while (levels.length > 1 && width < levels[levels.length - 1]) levels.pop();
+    if (width > levels[levels.length - 1]) levels.push(width);
+    else if (width !== levels[levels.length - 1]) levels[levels.length - 1] = width;
+    depths.push(levels.length - 1);
   }
   return depths;
 }
@@ -170,50 +212,6 @@ function indentDepths(lines: Line[]): number[] {
 function fingerprint(lines: Line[]): string {
   const depths = indentDepths(lines);
   return lines.map((line, index) => line.tokens.length === 0 ? "" : depths[index] + ":" + line.tokens.map((token) => token.text).join("\u0000")).join("\n");
-}
-
-function isSupportedDoHeader(header: Token[]): boolean {
-  // Only do NAME<NAME>: with the first statement on the next line.
-  // For do IO<Unit>: the tokens are ["IO", "<", "Unit", ">", ":"].
-  // Nested types, annotations, multiline headers and inline statements
-  // need column-aware formatting before they can be supported here.
-  return header.length === SUPPORTED_DO_HEADER.length
-    && SUPPORTED_DO_HEADER.every((expected, at) => expected === "name"
-      ? header[at].kind === "word" : header[at].text === expected);
-}
-
-function unsupportedLayout(line: Line): boolean {
-  return line.tokens.some((token, index) => {
-    if (token.kind !== "word") return false;
-    // Inline case rows anchor subsequent rows to a physical column.
-    if (token.text === "case" && index > 0) return true;
-    return token.text === "do" && !isSupportedDoHeader(line.tokens.slice(index + 1));
-  });
-}
-
-function declarationRanges(lines: Line[]): number[] | null {
-  const starts = [0];
-  const closing: string[] = [];
-  for (let index = 0; index < lines.length; index++) {
-    const line = lines[index];
-    // Only column-zero declaration keywords outside delimiters are boundaries.
-    // Keep preceding @unsafe attributes with their declaration.
-    if (index > 0 && line.indent === "" && closing.length === 0
-      && ["def", "type", "law", "import"].includes(line.tokens[0]?.text)) {
-      let start = index;
-      while (start > starts[starts.length - 1] && lines[start - 1].tokens.length === 0) start--;
-      const previous = lines[start - 1]?.tokens;
-      if (previous?.length === 2 && previous[0].text === "@" && previous[1].text === "unsafe") start--;
-      if (start > starts[starts.length - 1]) starts.push(start);
-    }
-    for (const token of line.tokens) {
-      if (token.kind !== "symbol") continue;
-      const expected = DELIMITER_PAIRS.get(token.text);
-      if (expected) closing.push(expected);
-      else if (CLOSING_DELIMITERS.has(token.text) && closing.pop() !== token.text) return null;
-    }
-  }
-  return closing.length === 0 ? [...starts, lines.length] : null;
 }
 
 export function formatBend(source: string, options: FormatOptions = {}): string {
@@ -227,28 +225,22 @@ export function formatBend(source: string, options: FormatOptions = {}): string 
   } catch {
     return source;
   }
-  const preserved = new Set<number>();
-  if (lines.some(unsupportedLayout)) {
-    const ranges = declarationRanges(lines);
-    // Uncertain boundaries must not allow edits into an unsupported block.
-    if (!ranges || /(?<!\r)\n/.test(source) && source.includes("\r\n")) return source;
-    for (let range = 0; range < ranges.length - 1; range++) {
-      const start = ranges[range];
-      const end = ranges[range + 1];
-      if (lines.slice(start, end).some(unsupportedLayout)) {
-        // Preserve the whole declaration, including its header and columns.
-        for (let index = start; index < end; index++) preserved.add(index);
-      }
-    }
-  }
   const depths = indentDepths(lines);
+  const loose = looseLines(lines);
+  const bodies = inlineBodies(lines);
   const size = Math.max(1, options.tabSize ?? 2);
   const spaces = options.insertSpaces !== false;
+  // A line at or right of an inline body's column moves as far as that body.
+  const pins: { from: number; to: number; prefix: string }[] = [];
   const formatted = lines.map((line, index) => {
-    if (preserved.has(index)) return rawLines[index];
     if (line.code === "" && line.comment === "") return "";
-    const prefix = spaces ? " ".repeat(depths[index] * size) : "\t".repeat(depths[index]);
-    const code = formatTokens(line.tokens);
+    const width = line.indent.length;
+    if (!loose[index]) while (pins.length > 0 && pins[pins.length - 1].from > width) pins.pop();
+    const pin = pins.filter((pin) => pin.from <= width).pop();
+    const prefix = pin ? pin.prefix + " ".repeat(width - pin.from + pin.to - pin.prefix.length)
+      : spaces ? " ".repeat(depths[index] * size) : "\t".repeat(depths[index]);
+    const [code, starts] = formatTokens(line.tokens);
+    for (const at of bodies[index]) pins.push({ from: line.tokens[at].col, to: prefix.length + starts[at], prefix });
     if (code === "") return prefix + line.comment;
     return prefix + code + (line.comment === "" ? "" : "  " + line.comment);
   }).join(eol) + (finalEol ? eol : "");

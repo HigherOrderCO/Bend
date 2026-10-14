@@ -28,7 +28,9 @@ and `--stdio` instead.
 The server handles documents whose language ID is `bend` or `bend2`. It
 preserves line breaks, blank lines, comments, literal spelling, line endings,
 and the final-newline state. Formatting normalizes indentation and safe token
-spacing without wrapping code. When a document cannot be tokenized safely, the
+spacing without wrapping code. A line that Bend pins to a column, as the second
+statement after `do IO<Unit>: IO.print("a")`, moves as far as the token it
+lines up with. When a document cannot be tokenized safely, the
 server returns no edits.
 
 ## Editor setup
