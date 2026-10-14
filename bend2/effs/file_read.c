@@ -27,7 +27,7 @@ Term file_read_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) file_read_use(void) {
-  io_eff(CID(File.read), file_read_run, 0);
+  io_eff(CID(File.read), file_read_run);
 }
 
 #endif
@@ -49,7 +49,7 @@ Term file_read_bytes_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) file_read_bytes_use(void) {
-  io_eff(CID(File.read_bytes), file_read_bytes_run, 0);
+  io_eff(CID(File.read_bytes), file_read_bytes_run);
 }
 
 #endif
@@ -69,7 +69,7 @@ Term file_read_at_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) file_read_at_use(void) {
-  io_eff(CID(File.read_at), file_read_at_run, 0);
+  io_eff(CID(File.read_at), file_read_at_run);
 }
 
 #endif

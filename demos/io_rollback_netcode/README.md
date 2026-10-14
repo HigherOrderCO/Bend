@@ -86,8 +86,8 @@ relay has no timer (the Pong is the checkpoint and the clock sample);
 messages are text lines, not a bit packer; there is no state-hash ring:
 the bot hashes states instead. The relay keeps rooms in memory only.
 
-The effect kit's `UDP.poll(sock, max)` is `recv_from` without the
-wait, `None` when nothing is queued, so a frame drains its socket and
-goes on. The demo runs its own window loop instead of base's `App.run`:
-`App.turn` drops a frame with a `!`, and that mark makes a binary
+The effect kit's `UDP.try_recv_from(sock, max, 0)` is `recv_from`
+without the wait, `Wait{}` when nothing is queued, so a frame drains its
+socket and goes on. The demo runs its own window loop instead of base's
+`App.run`: `App.turn` drops a frame with a `!`, and that mark makes a binary
 compile its whole program for the GPU at launch (a minute for this one).

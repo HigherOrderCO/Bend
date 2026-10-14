@@ -32,6 +32,6 @@ Term chain_make_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) foreign_types_use(void) {
-  io_eff(CID(tree.make), tree_make_run, 0);
-  io_eff(CID(chain.make), chain_make_run, 0);
+  io_eff(CID(tree.make), tree_make_run);
+  io_eff(CID(chain.make), chain_make_run);
 }

@@ -4,5 +4,5 @@ Term main_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) main_use(void) {
-  io_eff(CID(main), main_run, 0);
+  io_eff(CID(main), main_run);
 }

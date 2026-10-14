@@ -33,14 +33,17 @@ def print_go(m):
     print_end(s, p)
 
 law send_go:
-  for m: Socket & Result<&1, &1, (U32 & String), Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
   IO(Socket)
 
 def send_go(m):
   (s, r) = m
-  do IO<Socket>:
-    u : Unit <- IO.pass(Unit, r)
-    return s
+  match r:
+    case Done{u}:
+      IO.pure(Socket, s)
+    case Fail{(error, data)}:
+      (code, message) = error
+      IO.die(Socket, code, message)
 
 law main_go:
   for b: Socket & U32
@@ -49,7 +52,7 @@ law main_go:
 def main_go(b):
   (s, port) = b
   do IO<U32>:
-    sm : Socket & Result<&1, &1, (U32 & String), Unit> <- UDP.send_to(s, "127.0.0.1", port, "bend-udp")
+    sm : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- UDP.send_to(s, "127.0.0.1", port, "bend-udp")
     s2 : Socket <- send_go(sm)
     m  : Socket & Result<&1, &1, (U32 & String), String & U32 & String> <- UDP.recv_from(s2, 64)
     print_go(m)

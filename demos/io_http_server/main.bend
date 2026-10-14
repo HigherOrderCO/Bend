@@ -12,23 +12,25 @@ import Base
 def http_response(page: String) -> String:
   "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n" ++ page
 
-def http_sent(m: Socket & Result<&1, &1, U32 & String, Unit>) -> IO(Unit):
+def http_sent(m: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(Unit):
   (s, r) = m
   Socket.close(s)
 
-def http_reply(m: Socket & Result<&1, &1, U32 & String, String>) -> IO(Unit):
+def http_reply(m: Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>) -> IO(Unit):
   (s, r) = m
   match r:
-    case Done{req}:
+    case Done{Some{req}}:
       do IO<Unit>:
-        sent : Socket & Result<&1, &1, U32 & String, Unit> <- TCP.send(s, http_response("<h1>Hello, world!</h1>"))
+        sent : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(s, http_response("<h1>Hello, world!</h1>"))
         http_sent(sent)
+    case Done{None{}}:
+      Socket.close(s)
     case Fail{e}:
       Socket.close(s)
 
 def http_talk(s: Socket) -> IO(Unit):
   do IO<Unit>:
-    read : Socket & Result<&1, &1, U32 & String, String> <- TCP.recv(s, 8192)
+    read : Socket & Result<&1, &1, U32 & String, Maybe<&1, String>> <- TCP.recv(s, 8192)
     http_reply(read)
 
 def http_conn(m: Listener & Result<&1, &1, U32 & String, Socket>) -> IO(Listener):

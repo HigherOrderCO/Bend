@@ -84,6 +84,10 @@ allow(/^tests\/[a-z]+\/[a-z0-9_]+\.(c|js)$/);
 allow(/^tools\/bend-fmt-lsp\/(\.gitignore|README\.md|package\.json|package-lock\.json|tsconfig\.json)$/);
 allow(/^tools\/bend-fmt-lsp\/src\/(formatter|server)\.ts$/);
 allow(/^tools\/bend-fmt-lsp\/src\/test\/[a-z_]+\.test\.ts$/);
+allow(/^tools\/bend-lint\/(README\.md|package\.json|tsconfig\.json)$/);
+allow(/^tools\/bend-lint\/src\/(lint\.ts|seam\.ts|lint\.test\.ts)$/);
+allow(/^tools\/bend-lint\/src\/bend\/(lint\.bend|effects\.js|sample\.bend)$/);
+allow(/^tools\/bend-lint\/rules\/[a-z_]+(\.test)?\.(ts|bend)$/);
 
 // Gate
 // ====

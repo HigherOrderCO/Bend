@@ -7,5 +7,5 @@ Term io_spawn_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) io_spawn_use(void) {
-  io_eff(CID(IO.spawn), io_spawn_run, 0);
+  io_eff(CID(IO.spawn), io_spawn_run);
 }

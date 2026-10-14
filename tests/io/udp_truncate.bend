@@ -13,14 +13,17 @@
 import Base
 
 law send_go:
-  for m: Socket & Result<&1, &1, (U32 & String), Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
   IO(Socket)
 
 def send_go(m):
   (s, r) = m
-  do IO<Socket>:
-    u : Unit <- IO.pass(Unit, r)
-    return s
+  match r:
+    case Done{u}:
+      IO.pure(Socket, s)
+    case Fail{(error, data)}:
+      (code, message) = error
+      IO.die(Socket, code, message)
 
 law data_end:
   for s: Socket
@@ -86,7 +89,7 @@ law sends_end:
 
 def sends_end(p1, s1, s2):
   do IO<U32>:
-    sm  : Socket & Result<&1, &1, (U32 & String), Unit> <- UDP.send_to(s2, "127.0.0.1", p1, "tail-intact")
+    sm  : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- UDP.send_to(s2, "127.0.0.1", p1, "tail-intact")
     s2b : Socket <- send_go(sm)
     recv_one(s1, s2b)
 
@@ -99,7 +102,7 @@ law main_go2:
 def main_go2(p1, s1, b):
   (s2, p2) = b
   do IO<U32>:
-    sm  : Socket & Result<&1, &1, (U32 & String), Unit> <- UDP.send_to(s2, "127.0.0.1", p1, "0123456789")
+    sm  : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- UDP.send_to(s2, "127.0.0.1", p1, "0123456789")
     s2b : Socket <- send_go(sm)
     sends_end(p1, s1, s2b)
 

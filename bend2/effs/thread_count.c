@@ -8,5 +8,5 @@ Term io_thread_count_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) io_thread_count_use(void) {
-  io_eff(CID(IO.thread_count), io_thread_count_run, 0);
+  io_eff(CID(IO.thread_count), io_thread_count_run);
 }

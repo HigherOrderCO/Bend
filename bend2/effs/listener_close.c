@@ -7,5 +7,5 @@ Term listener_close_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) listener_close_use(void) {
-  io_eff(CID(Listener.close), listener_close_run, 0);
+  io_eff(CID(Listener.close), listener_close_run);
 }

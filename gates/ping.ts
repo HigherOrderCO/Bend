@@ -61,7 +61,7 @@ const SAID   = "Once a day, bend asks bend-lang.com";
 const MOVED  = "Bend's installer changed";
 const PATHS  = "/usr/bin:/bin";
 const TERMS  = "Publishing to BendHub: public and permanent, under"
-  + " https://bend-lang.com/bender/terms#s18\n";
+  + " https://bend-lang.com/bendai/terms#s18\n";
 
 // what the Caddy stand-in saw: "<method> <path> <user-agent>"
 const seen: string[] = [];
@@ -236,7 +236,7 @@ try {
   check("no shell rc is written", !fs.readdirSync(HOME).some((f) =>
     f !== ".bend"));
   check("the card names the version, the PATH line and the daily check",
-    plain(ins.out).includes("Bend \u2588  " + ver) && ins.out.includes("code bender")
+    plain(ins.out).includes("Bend \u2588  " + ver) && ins.out.includes("Bend developer")
     && ins.out.includes("export PATH=\"")
     && ins.out.includes(SAID));
   const again = await install({ PATH: path.dirname(BIN) + ":" + PATHS });
@@ -277,9 +277,13 @@ try {
   check("a dead origin costs one run under four seconds", dead.code === 0
     && dead.out.includes("usage:") && Date.now() - t0 < 4000);
   const was = fs.statSync(BIN).ino;
+  const no_upd = await bend(["update"], { BEND_ORIGIN: "http://127.0.0.1:1" });
+  check("bend update fails when the installer download fails", no_upd.code !== 0
+    && fs.statSync(BIN).ino === was);
   const upd = await bend(["update"]);
   check("bend update runs the installer again: " + upd.err, upd.code === 0
-    && upd.err.startsWith("curl -fsSL " + ORIGIN + "/install.sh | sh\n")
+    && upd.err.startsWith("s=$(curl -fsSL " + ORIGIN
+      + "/install.sh) && printf '%s\\n' \"$s\" | sh\n")
     && plain(upd.out).includes("Bend \u2588  " + ver) && fs.statSync(BIN).ino !== was);
   const guide = await bend(["guide"]);
   const base  = await bend(["base", "Map"]);
@@ -289,11 +293,59 @@ try {
   check("guide, base and a program run through the executable",
     guide.out.startsWith("# Bend") && base.out.startsWith("type Map")
     && sum5.code === 0 && sum5.out === "5n\n");
+  const fork = await bend(["base", "Array.fork"]);
+  check("base keeps the @unsafe line above the selected def",
+    fork.code === 0 && fork.out === "@unsafe\ndef Array.fork(-T: Type,"
+    + " +a: Array<T>) -> Array<T> & Array<T>:\n  (a, a)\n");
+  const header_source = path.join(TMP, "literal-checkup.bend");
+  fs.writeFileSync(header_source,
+    "# a header\nimport Base\n\nimport ./sum.bend as Sum\n"
+    + "def text() -> String:\n  \"body text\n"
+    + "import ./absent.bend as Hidden\nmore text\"\n");
+  const header_check = await bend([header_source, "--check-only"],
+    { BEND_NO_TELEMETRY: "1" });
+  const header_run = await bend([header_source, "--checkup"],
+    { BEND_NO_TELEMETRY: "1" });
+  check("valid body literal text does not add an independent import",
+    header_check.code === 0 && header_run.code === 0
+    && header_run.out.endsWith("5n\n"));
+  const no_base = path.join(TMP, "no-base.bend");
+  fs.writeFileSync(no_base,
+    "def main() -> String:\n  \"body\nimport Base\n\"\n");
+  fs.writeFileSync(header_source, "import ./no-base.bend as NoBase\n");
+  const base_run = await bend([header_source, "--checkup"],
+    { BEND_NO_TELEMETRY: "1" });
+  check("--checkup gives Base only to a module that imports it",
+    base_run.code === 1);
+  fs.writeFileSync(path.join(TMP, "page.html"),
+    "<script type=\"module\" src=\"./page.ts\"></script>\n");
+  fs.writeFileSync(path.join(TMP, "page.ts"), "import \"./none.ts\";\n");
+  const page = await bend([path.join(TMP, "page.html"), "-o",
+    path.join(TMP, "dist")]);
+  check("a page that fails to bundle names the import and where, and exits 1"
+    + " with no crash banner: " + page.err, page.code === 1
+    && page.err.includes("Could not resolve: \"./none.ts\"")
+    && page.err.includes("page.ts:1:") && !page.err.includes("Bun v"));
   const bad_file = path.join(TMP, "bad.bend");
   const sum_file = path.join(TMP, "sum.bend");
   const unsafe_file = path.join(TMP, "unsafe.bend");
   const checkup = path.join(TMP, "checkup.bend");
   const good_checkup = path.join(TMP, "good_checkup.bend");
+  const verdict_tmp = path.join(TMP, "verdict-tmp");
+  fs.mkdirSync(verdict_tmp);
+  const no_lean = await bend([sum_file, "--verdict"],
+    { BENDTT: "", TMPDIR: verdict_tmp, BEND_NO_TELEMETRY: "1" });
+  check("a failed kernel build leaves no private BendTT input",
+    no_lean.code === 1 && no_lean.err.includes("--verdict needs Lean")
+    && fs.readdirSync(verdict_tmp).every((name) => !name.startsWith("bendtt-")));
+  const fuel_kernel = path.join(TMP, "fuel_kernel.sh");
+  fs.writeFileSync(fuel_kernel, "#!/bin/sh\necho 'SOME PROOFS FAIL'\n"
+    + "echo 'In Sum.f:'\necho 'out of fuel'\nexit 1\n", { mode: 0o755 });
+  const fuel = await bend([sum_file, "--verdict"],
+    { BENDTT: fuel_kernel, BEND_NO_TELEMETRY: "1" });
+  check("a kernel failure shows the kernel's why above the mismatch notice",
+    fuel.code === 1 && fuel.out === "" && fuel.err.startsWith("SOME PROOFS FAIL\n"
+      + "In Sum.f:\nout of fuel\nSorry - this is a mismatch"));
   fs.writeFileSync(unsafe_file,
     "import Base\n@unsafe\ndef main() -> Nat:\n  0n\n");
   fs.writeFileSync(checkup,
@@ -309,6 +361,30 @@ try {
     const got = await bend_closed(args);
     check("a closed reader keeps success: " + args.join(" "), got.code === 0);
   }
+  for (const args of [[sum_file, "--verdict", bad_file],
+    [sum_file, "extra", "--verdict"], [sum_file, "--check-only", "extra"]]) {
+    const got = await bend(args, { BEND_NO_TELEMETRY: "1" });
+    check("only a plain run takes arguments: " + args.join(" "), got.code === 1
+      && got.out === "" && got.err === "bend: arguments go to a run:"
+      + " bend <file.bend> [args] (see bend --help)\n");
+  }
+  fs.writeFileSync(path.join(TMP, "noted.bend"),
+    "import Base # base\ndef main() -> Nat:\n  (2n + 3n : Nat)\n");
+  const noted = path.join(TMP, "noted_checkup.bend");
+  fs.writeFileSync(noted, "import ./noted.bend as N # noted\n"
+    + "import ./bad.bend as B # bad\n");
+  const got_noted = await bend([noted, "--checkup"]);
+  check("--checkup reads imports with a # comment: " + got_noted.out,
+    got_noted.code === 1
+    && got_noted.out.includes("--- ./noted.bend ---\n5n\n")
+    && got_noted.out.includes("--- ./bad.bend ---\n"));
+  const argn = path.join(TMP, "argn.bend");
+  fs.writeFileSync(argn, "import Base\nlaw main:\n  IO(Unit)\ndef main():\n"
+    + "  do IO<Unit>:\n    xs : List<String> <- IO.args()\n"
+    + "    IO.print(Nat.show(List.length(&1, String, xs)))\n");
+  const argv = await bend([argn, "x", "--", "--verdict"]);
+  check("a plain run gets its arguments: " + argv.err, argv.code === 0
+    && argv.out === "3\n");
   const two  = "import Base\ndef two() -> Nat:\n  2n\n";
   const use  = (at: string) => "import Base\nimport ./" + at
     + " as T\ndef main() -> Nat:\n  T.two\n";
@@ -358,7 +434,7 @@ try {
     + " warns: " + none.err, none.code === 0
     && none.out.startsWith(pkg_hash(bare) + "\n")
     && none.err.includes(TERMS + "License: MIT-0, the default (no LICENSE"
-    + " file): https://bend-lang.com/bender/terms#s18.4\nwarning: no file is"
+    + " file): https://bend-lang.com/bendai/terms#s18.4\nwarning: no file is"
     + " named exactly LICENSE"));
   const bom  = { "lic_bom.bend": use("two.bend"), "two.bend": two,
     "LICENSE": "SPDX-License-Identifier: MIT\n" };

@@ -498,16 +498,19 @@ def Link.at(~P: Data, ~S: Data, ~game: Game<P, S>, +l: Link<P, S>, k: Nat) ->
 # Client
 # ======
 
-def Client.sent(sr: Socket & Result<&1, &1, U32 & String, Unit>) -> IO(Socket):
+def Client.sent(sr: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(Socket):
   (s, r) = sr
-  do IO<Socket>:
-    Unit <- IO.pass(Unit, r)
-    return s
+  match r:
+    case Done{u}:
+      IO.pure(Socket, s)
+    case Fail{(error, data)}:
+      (code, message) = error
+      IO.die(Socket, code, message)
 
 # Send a message to the relay; a failed send is fatal.
 def Client.send(sock: Socket, host: String, port: U32, m: Msg) -> IO(Socket):
   do IO<Socket>:
-    sr : Socket & Result<&1, &1, U32 & String, Unit> <-
+    sr : Socket & Result<&1, &1, (U32 & String) & String, Unit> <-
       UDP.send_to(sock, host, port, Msg.show(m))
     Client.sent(sr)
 
@@ -573,14 +576,17 @@ def Client.got(
 
 def Client.polled(
   ~P: Data, ~S: Data, ~game: Game<P, S>,
-  sr: Socket & Result<&1, &1, U32 & String, Maybe<&1, String & U32 & String>>,
+  sr: Socket & Poll<&1, &1, Result<&1, &1, U32 & String, String & U32 & String>, Unit>,
   link: Link<P, S>, now: Nat, rest: Client<P, S> -> IO(Client<P, S>)
 ) -> IO(Client<P, S>):
   (s2, r) = sr
-  do IO<Client<P, S>>:
-    got : Maybe<&1, String & U32 & String> <-
-      IO.pass(Maybe<&1, String & U32 & String>, r)
-    Client.got(~P, ~S, ~game, got, Client{s2, link}, now, rest)
+  match r:
+    case Ready{res}:
+      do IO<Client<P, S>>:
+        got : String & U32 & String <- IO.pass(String & U32 & String, res)
+        Client.got(~P, ~S, ~game, Some{got}, Client{s2, link}, now, rest)
+    case Wait{u}:
+      Client.got(~P, ~S, ~game, None{}, Client{s2, link}, now, rest)
 
 # Take every datagram waiting on the socket (at most `fuel`).
 def Client.drain(
@@ -592,8 +598,8 @@ def Client.drain(
     case 1n+f:
       Client{sock, link} = c
       do IO<Client<P, S>>:
-        sr : Socket & Result<&1, &1, U32 & String, Maybe<&1, String & U32 & String>>
-          <- UDP.poll(sock, 2048)
+        sr : Socket & Poll<&1, &1, Result<&1, &1, U32 & String, String & U32 & String>, Unit>
+          <- UDP.try_recv_from(sock, 2048, 0)
         Client.polled(~P, ~S, ~game, sr, link, now,
           c2 => Client.drain(~P, ~S, ~game, f, c2, now))
 
@@ -790,7 +796,7 @@ def Peer.add(known: Bool, ps: List<&2, Peer>, p: Peer) -> List<&2, Peer>:
     case False{}:
       p <> ps
 
-def Server.sent(sr: Socket & Result<&1, &1, U32 & String, Unit>) -> IO(Socket):
+def Server.sent(sr: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(Socket):
   (s, r) = sr
   IO.pure(Socket, s)
 
@@ -798,7 +804,7 @@ def Server.sent(sr: Socket & Result<&1, &1, U32 & String, Unit>) -> IO(Socket):
 def Server.send(sock: Socket, +p: Peer, line: String) -> IO(Socket):
   Peer{host, port} = p
   do IO<Socket>:
-    sr : Socket & Result<&1, &1, U32 & String, Unit> <-
+    sr : Socket & Result<&1, &1, (U32 & String) & String, Unit> <-
       UDP.send_to(sock, host, port, line)
     Server.sent(sr)
 

@@ -13,9 +13,9 @@ law sender:
 def sender(c):
   do IO<Unit>:
     Unit <- IO.print("s0")
-    Bool <- Chan.send(U32, c, 1)
+    Result<&1, &1, U32, Unit> <- Chan.send(U32, c, 1)
     Unit <- IO.print("s1")
-    Bool <- Chan.send(U32, c, 2)
+    Result<&1, &1, U32, Unit> <- Chan.send(U32, c, 2)
     IO.print("s2")
 
 law main.go:

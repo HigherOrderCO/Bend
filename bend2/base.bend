@@ -37,6 +37,13 @@ type Result<a, b, -E: Kind(a), -A: Kind(b)> is Kind(a <&> b):
   Fail{error: E}
   Done{value: A}
 
+# What a try_ operation answers: Ready{x}, x what its blocking twin answers,
+# or Wait{rest} once ms milliseconds pass first (0: at once), rest what did
+# not happen (the value or the bytes not sent).
+type Poll<a, b, -A: Kind(a), -R: Kind(b)> is Kind(a <&> b):
+  Ready{value: A}
+  Wait{rest: R}
+
 type List<a, -A: Kind(a)> is Kind(a):
   Nil{}
   Con{head: A, tail: List<a, A>}
@@ -116,6 +123,7 @@ law Chan:
 type IO.OP<-R: Type> is Type:
   Emit{value: R}
   Halt{code: U32, message: String}
+  Exit{code: U32}
 
 type App<-S: Type> is Type:
   App{view: S -> Pair(S, Image), tick: List<Event> -> S -> IO(Maybe<S>)}
@@ -188,6 +196,9 @@ def Process.run(program: String, args: List<String>, input: String,
 def IO.die(-A: Type, code: U32, msg: String) -> IO(A):
   R => k => Halt{code, msg}
 
+def IO.exit(code: U32) -> IO(Unit):
+  R => k => Exit{code}
+
 def IO.pass(-A: Type, r: Result<&1, &1, U32 & String, A>) -> IO(A):
   match r:
     case Done{value}:
@@ -222,11 +233,23 @@ def Chan.new(-A: Type, room: U32) -> IO(Chan(A)):
   import "./effs/chan.c"
   import "./effs/chan.js"
 
-def Chan.send(-A: Type, chan: Chan(A), value: A) -> IO(Bool):
+# Done{} once the channel takes the value, Fail{value} if it is closed.
+def Chan.send(-A: Type, chan: Chan(A), value: A) -> IO(Result<&1, &1, A, Unit>):
   import "./effs/chan.c"
   import "./effs/chan.js"
 
+# Some{value}, or None{} once the channel is closed and drained.
 def Chan.recv(-A: Type, chan: Chan(A)) -> IO(Maybe<&1, A>):
+  import "./effs/chan.c"
+  import "./effs/chan.js"
+
+def Chan.try_send(-A: Type, chan: Chan(A), value: A, ms: U32) ->
+  IO(Poll<&1, &1, Result<&1, &1, A, Unit>, A>):
+  import "./effs/chan.c"
+  import "./effs/chan.js"
+
+def Chan.try_recv(-A: Type, chan: Chan(A), ms: U32) ->
+  IO(Poll<&1, &1, Maybe<&1, A>, Unit>):
   import "./effs/chan.c"
   import "./effs/chan.js"
 
@@ -236,8 +259,9 @@ def Chan.close(-A: Type, chan: Chan(A)) -> IO(Unit):
 
 def IO.fork.go(-A: Type, act: IO(A), chan: Chan(A)) -> IO(Chan(A)):
   +c = chan
-  sent = IO.bind(A, Bool, act, x => Chan.send(A, c, x))
-  IO.bind(Unit, Chan(A), IO.spawn(Bool, sent), u => IO.pure(Chan(A), c))
+  sent = IO.bind(A, Result<&1, &1, A, Unit>, act, x => Chan.send(A, c, x))
+  IO.bind(Unit, Chan(A), IO.spawn(Result<&1, &1, A, Unit>, sent),
+    u => IO.pure(Chan(A), c))
 
 def IO.fork(-A: Type, act: IO(A)) -> IO(Chan(A)):
   IO.bind(Chan(A), Chan(A), Chan.new(A, 1), IO.fork.go(A, act))
@@ -309,19 +333,37 @@ def TCP.accept(listener: Listener) ->
   import "./effs/tcp_accept.c"
   import "./effs/tcp_accept.js"
 
+def TCP.try_accept(listener: Listener, ms: U32) ->
+  IO(Listener & Poll<&1, &1, Result<&1, &1, U32 & String, Socket>, Unit>):
+  import "./effs/tcp_accept.c"
+  import "./effs/tcp_accept.js"
+
 def TCP.connect(host: String, port: U32) ->
   IO(Result<&1, &1, U32 & String, Socket>):
   import "./effs/tcp_connect.c"
   import "./effs/tcp_connect.js"
 
+# A failed send hands back what the kernel did not take. Sent means taken
+# by the kernel, not yet read by the peer.
 def TCP.send(sock: Socket, data: String) ->
-  IO(Socket & Result<&1, &1, U32 & String, Unit>):
+  IO(Socket & Result<&1, &1, (U32 & String) & String, Unit>):
   import "./effs/tcp_send.c"
   import "./effs/tcp_send.js"
 
-# A max of 0 fails with EINVAL, as do TCP.recv_bytes and TCP.poll.
+def TCP.try_send(sock: Socket, data: String, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & String, Unit>, String>):
+  import "./effs/tcp_send.c"
+  import "./effs/tcp_send.js"
+
+# Some{data}, or None{} once the peer has sent everything (it may still
+# read). A max of 0 fails with EINVAL, as in every receive below.
 def TCP.recv(sock: Socket, max: U32) ->
-  IO(Socket & Result<&1, &1, U32 & String, String>):
+  IO(Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>):
+  import "./effs/tcp_recv.c"
+  import "./effs/tcp_recv.js"
+
+def TCP.try_recv(sock: Socket, max: U32, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, U32 & String, Maybe<&1, String>>, Unit>):
   import "./effs/tcp_recv.c"
   import "./effs/tcp_recv.js"
 
@@ -329,38 +371,80 @@ def TCP.recv(sock: Socket, max: U32) ->
 # binary data and a character split between two reads survive. A value past
 # 255 fails with EINVAL before any byte is sent.
 def TCP.send_bytes(sock: Socket, data: List<&2, U32>) ->
-  IO(Socket & Result<&1, &1, U32 & String, Unit>):
+  IO(Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>):
+  import "./effs/tcp_send.c"
+  import "./effs/tcp_send.js"
+
+def TCP.try_send_bytes(sock: Socket, data: List<&2, U32>, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>,
+    List<&2, U32>>):
   import "./effs/tcp_send.c"
   import "./effs/tcp_send.js"
 
 def TCP.recv_bytes(sock: Socket, max: U32) ->
-  IO(Socket & Result<&1, &1, U32 & String, List<&2, U32>>):
+  IO(Socket & Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>>):
   import "./effs/tcp_recv.c"
   import "./effs/tcp_recv.js"
 
-def TCP.poll(sock: Socket, max: U32, ms: U32) ->
-  IO(Socket & Result<&1, &1, U32 & String, Maybe<&1, String>>):
-  import "./effs/tcp_poll.c"
-  import "./effs/tcp_poll.js"
+def TCP.try_recv_bytes(sock: Socket, max: U32, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, U32 & String, Maybe<&1, List<&2, U32>>>,
+    Unit>):
+  import "./effs/tcp_recv.c"
+  import "./effs/tcp_recv.js"
 
 def UDP.bind(host: String, port: U32) -> IO(Result<&1, &1, U32 & String, Socket>):
   import "./effs/udp_bind.c"
   import "./effs/udp_bind.js"
 
+# A datagram goes whole or not at all: a failed send hands it back.
 def UDP.send_to(sock: Socket, host: String, port: U32, data: String) ->
-  IO(Socket & Result<&1, &1, U32 & String, Unit>):
+  IO(Socket & Result<&1, &1, (U32 & String) & String, Unit>):
   import "./effs/udp_send_to.c"
   import "./effs/udp_send_to.js"
 
+def UDP.try_send_to(sock: Socket, host: String, port: U32, data: String, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & String, Unit>, String>):
+  import "./effs/udp_send_to.c"
+  import "./effs/udp_send_to.js"
+
+# The datagram's bytes as they are (0..255), one List cell each: no UTF-8
+# encoding, so a binary protocol's datagram goes out as written. A value
+# past 255 fails with EINVAL before anything is sent.
+def UDP.send_bytes_to(sock: Socket, host: String, port: U32, data: List<&2, U32>) ->
+  IO(Socket & Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>):
+  import "./effs/udp_send_to.c"
+  import "./effs/udp_send_to.js"
+
+def UDP.try_send_bytes_to(sock: Socket, host: String, port: U32, data: List<&2, U32>,
+  ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, (U32 & String) & List<&2, U32>, Unit>,
+    List<&2, U32>>):
+  import "./effs/udp_send_to.c"
+  import "./effs/udp_send_to.js"
+
+# A datagram may be empty: UDP has no end, so no None{}.
 def UDP.recv_from(sock: Socket, max: U32) ->
   IO(Socket & Result<&1, &1, U32 & String, String & U32 & String>):
   import "./effs/udp_recv_from.c"
   import "./effs/udp_recv_from.js"
 
-def UDP.poll(sock: Socket, max: U32) ->
-  IO(Socket & Result<&1, &1, U32 & String, Maybe<&1, String & U32 & String>>):
-  import "./effs/udp_poll.c"
-  import "./effs/udp_poll.js"
+def UDP.try_recv_from(sock: Socket, max: U32, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, U32 & String, String & U32 & String>, Unit>):
+  import "./effs/udp_recv_from.c"
+  import "./effs/udp_recv_from.js"
+
+# The datagram's bytes as they are: no UTF-8 decoding, so every byte of a
+# binary datagram survives.
+def UDP.recv_bytes_from(sock: Socket, max: U32) ->
+  IO(Socket & Result<&1, &1, U32 & String, String & U32 & List<&2, U32>>):
+  import "./effs/udp_recv_from.c"
+  import "./effs/udp_recv_from.js"
+
+def UDP.try_recv_bytes_from(sock: Socket, max: U32, ms: U32) ->
+  IO(Socket & Poll<&1, &1, Result<&1, &1, U32 & String,
+    String & U32 & List<&2, U32>>, Unit>):
+  import "./effs/udp_recv_from.c"
+  import "./effs/udp_recv_from.js"
 
 def Socket.close(socket: Socket) -> IO(Unit):
   import "./effs/socket_close.c"
@@ -975,19 +1059,34 @@ def List.foldr(
     case h <> t:
       f(h, List.foldr(~a, ~A, ~B, ~f, t, z))
 
-def List.any(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
-  match xs:
-    case Nil{}:
+# Carry the previous result so strict backends can stop before the next call.
+def List.any.go(
+  ~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>, hit: Bool
+) -> Bool:
+  match xs hit:
+    case _ True{}:
+      True{}
+    case Nil{} False{}:
       False{}
-    case h <> t:
-      Bool.or(f(h), List.any(~a, ~A, ~f, t))
+    case h <> t False{}:
+      List.any.go(~a, ~A, ~f, t, f(h))
+
+def List.any(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
+  List.any.go(~a, ~A, ~f, xs, False{})
+
+def List.all.go(
+  ~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>, keep: Bool
+) -> Bool:
+  match xs keep:
+    case _ False{}:
+      False{}
+    case Nil{} True{}:
+      True{}
+    case h <> t True{}:
+      List.all.go(~a, ~A, ~f, t, f(h))
 
 def List.all(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
-  match xs:
-    case Nil{}:
-      True{}
-    case h <> t:
-      Bool.and(f(h), List.all(~a, ~A, ~f, t))
+  List.all.go(~a, ~A, ~f, xs, True{})
 
 def List.find.put(-A: Data, h: A, r: Maybe<&2, A>, hit: Bool) -> Maybe<&2, A>:
   match hit:
@@ -996,21 +1095,35 @@ def List.find.put(-A: Data, h: A, r: Maybe<&2, A>, hit: Bool) -> Maybe<&2, A>:
     case True{}:
       Some{h}
 
-def List.find(~A: Data, ~f: A -> Bool, xs: List<&2, A>) -> Maybe<&2, A>:
-  match xs:
-    case Nil{}:
+def List.find.go(
+  ~A: Data, ~f: A -> Bool, xs: List<&2, A>, found: Maybe<&2, A>
+) -> Maybe<&2, A>:
+  match xs found:
+    case _ Some{x}:
+      Some{x}
+    case Nil{} None{}:
       None{}
-    case +h <> t:
-      List.find.put(A, h, List.find(~A, ~f, t), f(h))
+    case +h <> t None{}:
+      List.find.go(~A, ~f, t, List.find.put(A, h, None{}, f(h)))
+
+def List.find(~A: Data, ~f: A -> Bool, xs: List<&2, A>) -> Maybe<&2, A>:
+  List.find.go(~A, ~f, xs, None{})
+
+def List.contains.go(
+  ~A: Data, ~eq: A -> A -> Bool, xs: List<&2, A>, +x: A, hit: Bool
+) -> Bool:
+  match xs hit:
+    case _ True{}:
+      True{}
+    case Nil{} False{}:
+      False{}
+    case h <> t False{}:
+      List.contains.go(~A, ~eq, t, x, eq(h, x))
 
 def List.contains(
   ~A: Data, ~eq: A -> A -> Bool, xs: List<&2, A>, +x: A
 ) -> Bool:
-  match xs:
-    case Nil{}:
-      False{}
-    case h <> t:
-      Bool.or(eq(h, x), List.contains(~A, ~eq, t, x))
+  List.contains.go(~A, ~eq, xs, x, False{})
 
 def List.merge.step(
   -A: Data, acc: List<&2, A>, x: A, xt: List<&2, A>, y: A, yt: List<&2, A>,
@@ -1695,7 +1808,7 @@ law F32.is_ge:
   Bool
 
 law F32.show:
-  for +a: F32
+  for a: F32
   String
 
 law F32.bits:
@@ -1729,13 +1842,27 @@ def F32.square(a: F32) -> F32:
     case F32{+x}:
       F32.mul(F32{x}, F32{x})
 
+# Outside [2^-60, 2^60] the squares would overflow or underflow, so scale
+# both sides by a power of two first; inside, the scale is 1 and exact.
 def F32.hypot(a: F32, b: F32) -> F32:
-  match a b:
-    case F32{+x} F32{+y}:
-      F32.sqrt(F32.add(F32.mul(F32{x}, F32{x}), F32.mul(F32{y}, F32{y})))
+  +x = F32.abs(a)
+  +y = F32.abs(b)
+  +m = F32.max(x, y)
+  +hi = F32.is_gt(m, 1.152921504606847e18)
+  +lo = F32.is_lt(m, 8.673617379884035e-19)
+  +s = Bool.pick(F32, hi, 8.470329472543003e-22,
+    Bool.pick(F32, lo, 1.2676506002282294e30, 1.0))
+  +u = Bool.pick(F32, hi, 1.1805916207174113e21,
+    Bool.pick(F32, lo, 7.888609052210118e-31, 1.0))
+  +p = F32.mul(x, s)
+  +q = F32.mul(y, s)
+  F32.mul(F32.sqrt(F32.add(F32.mul(p, p), F32.mul(q, q))), u)
 
 def F32.round(a: F32) -> F32:
-  F32.floor(F32.add(a, 0.5))
+  match a:
+    case F32{+x}:
+      +f = F32.floor(F32{x})
+      F32.add(f, Bool.pick(F32, F32.is_ge(F32.sub(F32{x}, f), 0.5), 1.0, 0.0))
 
 def F32.pi() -> F32:
   3.14159265

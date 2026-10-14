@@ -8,8 +8,8 @@ def producer(
   +ready: Chan(Unit)
 ) -> IO(Unit):
   do IO<Unit>:
-    Bool <- Chan.send(Unit, ready, Unit{})
-    Bool <- Chan.send({0 == 0 : U32}, data, {==})
+    Result<&1, &1, Unit, Unit> <- Chan.send(Unit, ready, Unit{})
+    Result<&1, &1, {0 == 0 : U32}, Unit> <- Chan.send({0 == 0 : U32}, data, {==})
     IO.pure(Unit, Unit{})
 
 def run(data: Chan({0 == 0 : U32}), ready: Chan(Unit)) -> IO(Unit):

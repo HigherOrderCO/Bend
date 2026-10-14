@@ -37,7 +37,7 @@ def served(r):
       IO.print(message)
 
 law posted:
-  for m: Socket & Result<&1, &1, (U32 & String), Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
   IO(Socket)
 
 def posted(m):
@@ -47,8 +47,7 @@ def posted(m):
       do IO<Socket>:
         p : Unit <- IO.print("sent")
         return s
-    case Fail{error}:
-      (code, message) = error
+    case Fail{((code, message), data)}:
       do IO<Socket>:
         p : Unit <- IO.print(message)
         return s
@@ -61,7 +60,7 @@ law probe:
 
 def probe(s, host, port):
   do IO<Socket>:
-    m : Socket & Result<&1, &1, (U32 & String), Unit> <- UDP.send_to(s, host, port, "x")
+    m : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- UDP.send_to(s, host, port, "x")
     posted(m)
 
 law main:

@@ -12,7 +12,7 @@ def got(m: Maybe<&1, Nat>) -> Nat:
 
 def go(+c: Chan(Nat)) -> IO(Unit):
   do IO<Unit>:
-    s : Bool <- Chan.send(Nat, c, Nat.add(Nat.pow(2n, 47n), Nat.sub(Nat.pow(2n, 47n), 1n)))
+    s : Result<&1, &1, Nat, Unit> <- Chan.send(Nat, c, Nat.add(Nat.pow(2n, 47n), Nat.sub(Nat.pow(2n, 47n), 1n)))
     m : Maybe<&1, Nat> <- Chan.recv(Nat, c)
     IO.print(Nat.show(got(m)))
 

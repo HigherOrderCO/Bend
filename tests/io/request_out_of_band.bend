@@ -13,11 +13,10 @@
 # the loop only runs an effect after the pure evaluator answers (one
 # heap owner at a time), and a device thread mid-kernel can never
 # reach the loop, so the one shared law is the loud refusal. Now the
-# C dispatch guards IO.OP matches (an aux past CID_HALT is a
-# request; ERR_TAGS, fail-stop) and the JS loop's catch answers the
-# fail-stop Halt line instead of running the effect: the effect
-# never fires, nothing prints SECRET, and every lane refuses after
-# printing "3". `bend run` executes the same compiled text as --js,
+# IO.OP match keeps its default arm in every lane (a request is none
+# of its arms), and that arm fail-stops instead of running the effect:
+# the effect never fires, nothing prints SECRET, and every lane refuses
+# after printing "3". `bend run` executes the same compiled text as --js,
 # one line and exit 1.
 import Base
 
@@ -35,6 +34,8 @@ def intercept.at(op):
       do IO<U32>:
         u : Unit <- IO.print(m)
         return c
+    case Exit{c}:
+      IO.pure(U32, c)
 
 law intercept:
   IO(U32)
@@ -50,6 +51,7 @@ def decode(op):
   match op:
     case Emit{v}: U32.show(v)
     case Halt{c, m}: m
+    case Exit{c}: U32.show(c)
 
 law main:
   IO(U32)

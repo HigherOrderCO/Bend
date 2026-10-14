@@ -17,7 +17,7 @@ def chunk(n: Nat, acc: String) -> String:
     case 1n+p:
       chunk(p, String.append("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", acc))
 
-def blast.sent(rest: Socket -> IO(Unit), m: Socket & Result<&1, &1, (U32 & String), Unit>) -> IO(Unit):
+def blast.sent(rest: Socket -> IO(Unit), m: Socket & Result<&1, &1, (U32 & String) & String, Unit>) -> IO(Unit):
   (s, r) = m
   match r:
     case Done{u}:
@@ -31,7 +31,7 @@ def blast(k: Nat, s: Socket) -> IO(Unit):
       Socket.close(s)
     case 1n+p:
       do IO<Unit>:
-        m : Socket & Result<&1, &1, (U32 & String), Unit> <- TCP.send(s, chunk(1024n, ""))
+        m : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(s, chunk(1024n, ""))
         blast.sent(s2 => blast(p, s2), m)
 
 def serve.got(rest: Listener -> IO(Unit), m: Listener & Result<&1, &1, (U32 & String), Socket>) -> IO(Unit):

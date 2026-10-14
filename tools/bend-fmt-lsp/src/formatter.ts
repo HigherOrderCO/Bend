@@ -62,6 +62,9 @@ function splitLine(text: string): Line {
         }
       }
       if (!closed) throw new Error("unterminated literal");
+    } else if (tokens.length === 1 && tokens[0].text === "import" && hadGap) {
+      kind = "word";
+      while (i < code.length && !/\s/.test(code[i]) && code[i] !== "#") i++;
     } else if (HEAD.test(char)) {
       kind = "word";
       i++;
@@ -117,11 +120,14 @@ function needsSpace(tokens: Token[], index: number): boolean {
   if (left.text === ",") return true;
   if (right.text === "!" && (left.kind === "word" || CLOSING_DELIMITERS.has(left.text))) return false;
   if (left.text === "!" && right.text === "(") return false;
+  if (right.text === "?" && left.kind === "word" && (!tokens[index + 1] || tokens[index + 1].text === "(")) return right.gap;
+  if (left.text === "?" && right.text === "(" && tokens[index - 2]?.kind === "word") return false;
   if (right.text === "(" || right.text === "[") {
     const suffix = (left.kind === "word" && !KEYWORDS.has(left.text)) || left.kind === "number" || left.kind === "literal" || (CLOSING_DELIMITERS.has(left.text) || [">", ">>"].includes(left.text));
     return !suffix;
   }
-  if (right.text === "{" && ((left.kind === "word" && !["return", "case"].includes(left.text)) || [">", ">>", "}"].includes(left.text))) return false;
+  // A separated brace can start the next annotated argument, rather than a constructor.
+  if (right.text === "{" && ((left.kind === "word" && !["return", "case"].includes(left.text)) || [">", ">>", "}"].includes(left.text))) return left.kind === "word" && right.gap;
   if (left.text === "\\" && right.text === "{") return false;
   if (left.text === "." || right.text === ".") return false;
   if (left.kind === "number" && left.text.endsWith("n") && (right.text === "+" || right.text === "++")) return right.gap;

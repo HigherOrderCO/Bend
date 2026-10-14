@@ -17,12 +17,12 @@
 
   outputs = { self, nixpkgs }:
     let
-      ver = "2.0.35";
+      ver = "2.0.37";
       archives = {
-        aarch64-darwin = { target = "darwin-arm64"; sha256 = "2582f25057a519c330e6875798b784b727d4201f1c1f6944a105348f0eb8972e"; };
-        x86_64-darwin  = { target = "darwin-x64";   sha256 = "7e59da4513e32ea7526464b342344a992a56372cdf62e0c55a30e9ce26baaeef"; };
-        aarch64-linux  = { target = "linux-arm64";  sha256 = "09b813073241628f590f2c2fe420299ec25e4dddd6cf3fdc49c9486339989564"; };
-        x86_64-linux   = { target = "linux-x64";    sha256 = "63039d1a119f716767ac5a7d8fe0717cfacf219c6c253c35192148e0dade722f"; };
+        aarch64-darwin = { target = "darwin-arm64"; sha256 = "846d25ccf0c12d5d1e5e648c0b3ba4c8397fdb852812ac00ef8135998f8e194b"; };
+        x86_64-darwin  = { target = "darwin-x64";   sha256 = "93eea3f54b7b91f28ea15a1b9f2d825afa58c1fcd417c11024a62f8c3506b813"; };
+        aarch64-linux  = { target = "linux-arm64";  sha256 = "b65d452e5c68a4c486e353220d4298ba5d76f535db47109a7d76ffdf72efafb1"; };
+        x86_64-linux   = { target = "linux-x64";    sha256 = "84c32465a39bc9ac315eade23f470cb8db03153dc860f89564fcfec153c3e445"; };
       };
       each = f: nixpkgs.lib.mapAttrs (system: archive:
         f (import nixpkgs { inherit system; }) archive) archives;

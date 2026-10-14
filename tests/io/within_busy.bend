@@ -12,7 +12,7 @@ def produce(+c: Chan(Nat), n: Nat) -> IO(Unit):
     case 1n+p:
       +q = p
       do IO<Unit>:
-        Bool <- Chan.send(Nat, c, q)
+        Result<&1, &1, Nat, Unit> <- Chan.send(Nat, c, q)
         produce(c, q)
 
 def alive(m: Maybe<&1, Nat>) -> Bool:

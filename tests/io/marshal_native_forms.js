@@ -1,14 +1,14 @@
 function five() {
-  return 5n;
+  return 5;
 }
 function zero() {
-  return 0n;
+  return 0;
 }
 function wrap() {
-  return {$: CID(Some), value: 9n};
+  return {$: CID(Some), value: 9};
 }
 function dub(n) {
-  return n * 2n;
+  return n * 2;
 }
 function flip(b) {
   return !b;

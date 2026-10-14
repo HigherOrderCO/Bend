@@ -3,7 +3,8 @@
 # comp (~) templates; those are ruled out whole here, and generic
 # List.map is not affine-checkable, so each template call becomes a
 # local first-order recursion at U32 (the walk bend3's splice would
-# have minted). The seven checks and their sum are the original's.
+# have minted). The first six checks are the original's; the seventh,
+# a constant 1 in the port, folds the Map without mmul10.
 import Base
 
 law b2u:
@@ -148,7 +149,8 @@ def main.out():
   d = b2u(anyeq2([1, 2, 3]))
   e = b2u(allpos([1, 2, 3]))
   g = b2u(U32.is_eq(mfold(mmul10(Map.from_list(&2, U32, [("a", 1), ("b", 2)])), 0), 32))
-  U32.add(U32.add(U32.add(U32.mul(a, 1000000), U32.mul(b, 100000)), U32.add(U32.mul(c, 10000), U32.mul(d, 1000))), U32.add(U32.add(U32.mul(e, 100), U32.mul(g, 10)), 1))
+  h = b2u(U32.is_eq(mfold(Map.from_list(&2, U32, [("a", 1), ("b", 2)]), 2), 7))
+  U32.add(U32.add(U32.add(U32.mul(a, 1000000), U32.mul(b, 100000)), U32.add(U32.mul(c, 10000), U32.mul(d, 1000))), U32.add(U32.add(U32.mul(e, 100), U32.mul(g, 10)), h))
 
 law main:
   IO(Unit)

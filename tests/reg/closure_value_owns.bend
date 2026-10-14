@@ -1,9 +1,9 @@
-# regression witness (b3f448e): a def used as a closure VALUE owns its
-# arguments -- lending once read borrow rows off direct call sites
-# alone, so every Clo.apply entry leaked the argument's heap (47 MB
-# per million applications, right answer printed). The rss pin below
-# is the tripwire; no interpreter block: a million-step loop is the
-# backends' job.
+# A def used as a closure value must own its argument: hof applies pick
+# through Clo~apply, while mint also captures the tree. Build a fresh tree
+# each turn so a borrowed closure entry leaks heap even with the right sum.
+# Warm 10k turns, then check 1M more: the C twin bounds H_BUMP growth by one
+# allocator quantum, allowing free-list retention, not measuring live bytes.
+# Both twins assert the sums; JS does not measure heap growth.
 import Base
 
 type Tr is Data:
@@ -50,27 +50,26 @@ def mint(t):
 
 law loop:
   for n   : Nat
-  for +t  : Tr
+  for +x  : U32
   for acc : U32
   U32
 
-def loop(n, t, acc):
+def loop(n, x, acc):
   match n:
     case 0n:
       acc
     case 1n+q:
-      loop(q, t, U32.add(acc, U32.add(hof(pick, t), mint(t)(1))))
+      +t = build(3n, x)
+      loop(q, x, U32.add(acc, U32.add(hof(pick, t), mint(t)(1))))
 
-law main.out:
-  U32
+def heap.check(value: U32, expected: U32, before: U32) -> IO(U32):
+  import "./closure_value_owns.c"
+  import "./closure_value_owns.js"
 
-def main.out():
-  loop(U32.to_nat(1000000), build(3n, 1), 0)
-
-law main:
-  IO(Unit)
-
-def main():
-  IO.print(U32.show(main.out()))
+def main() -> IO(Unit):
+  do IO<Unit>:
+    before : U32 <- heap.check(loop(10000n, 1, 0), 410000, 0)
+    after : U32 <- heap.check(loop(1000000n, 1, 0), 41000000, before)
+    IO.print("41000000")
 
 #|41000000

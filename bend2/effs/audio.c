@@ -108,15 +108,23 @@ static void io_ring_free(IoRing* p) {
 
 // A thread feeds the default ALSA device 256 frames at a time (a
 // write blocks until the device has room, so the ring drains at the
-// device's clock).
+// device's clock). A chunk stays until the device has taken all of it;
+// an error ALSA can't recover stops the thread, and the ring fills as
+// with a stalled device.
 static void* io_ring_pump(void* ctx) {
-  IoRing* p = ctx;
+  IoRing* p  = ctx;
   float   out[256 * 2];
+  u32     at = 256;
   while (atomic_load_explicit(&p->done, memory_order_relaxed) == 0) {
-    io_ring_pull(p, out, 256);
-    snd_pcm_sframes_t n = snd_pcm_writei(p->unit, out, 256);
-    if (n < 0) {
-      snd_pcm_recover(p->unit, (int)n, 1);
+    if (at == 256) {
+      io_ring_pull(p, out, 256);
+      at = 0;
+    }
+    snd_pcm_sframes_t n = snd_pcm_writei(p->unit, out + at * 2, 256 - at);
+    if (n > 0) {
+      at += (u32)n;
+    } else if (n == 0 || snd_pcm_recover(p->unit, (int)n, 1) < 0) {
+      break;
     }
   }
   return NULL;
@@ -176,7 +184,7 @@ Term audio_open_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) audio_open_use(void) {
-  io_eff(CID(Audio.open), audio_open_run, 0);
+  io_eff(CID(Audio.open), audio_open_run);
 }
 #endif
 
@@ -203,7 +211,7 @@ Term audio_write_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) audio_write_use(void) {
-  io_eff(CID(Audio.write), audio_write_run, 0);
+  io_eff(CID(Audio.write), audio_write_run);
 }
 #endif
 
@@ -214,6 +222,6 @@ Term audio_close_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) audio_close_use(void) {
-  io_eff(CID(Audio.close), audio_close_run, 0);
+  io_eff(CID(Audio.close), audio_close_run);
 }
 #endif

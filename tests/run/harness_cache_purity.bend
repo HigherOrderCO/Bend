@@ -1,7 +1,6 @@
-# bend3's harness-cache adversary, purity side: interleaved --eval
-# blocks of DIFFERENT defs repeated byte-identically off one cached
-# book. bend's runner caches the checked book per file; interleaved
-# --show pages of two defs and the value block must repeat unchanged
+# gates/test.ts's state_run compiles a second checked copy of this book
+# in one process, C and JS over and over, around normalization and the
+# next fixture: each must give the first copy's bytes and probe count.
 import Base
 
 law grow:

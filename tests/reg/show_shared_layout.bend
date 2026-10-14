@@ -6,11 +6,11 @@ type Choice<-A: Data> is Data:
   ChooseRight{value: A}
 
 type Answer is Data:
-  Ready{value: U32}
+  Final{value: U32}
   Again{value: Answer}
   Other{value: Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<Choice<U32>>>>>>>>>>>>>>>>>>>>>>>>}
 
 def main() -> Answer:
-  Ready{42}
+  Final{42}
 
-#|Ready{42}
+#|Final{42}

@@ -5,5 +5,5 @@ Term word_len_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) word_len_use(void) {
-  io_eff(CID(word.len), word_len_run, 0);
+  io_eff(CID(word.len), word_len_run);
 }

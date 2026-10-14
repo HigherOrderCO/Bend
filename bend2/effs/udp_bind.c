@@ -24,5 +24,5 @@ Term udp_bind_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) udp_bind_use(void) {
-  io_eff(CID(UDP.bind), udp_bind_run, 0);
+  io_eff(CID(UDP.bind), udp_bind_run);
 }

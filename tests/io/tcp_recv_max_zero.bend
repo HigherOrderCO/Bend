@@ -1,10 +1,10 @@
 # io (io_tcp_recv_max_zero): a receive of at most 0 bytes fails with
 # EINVAL. recv(2) of 0 bytes answers 0 when data waits, the same 0 it
-# answers at the peer's close, so "" (or []) there would read as EOF on a
-# socket that is still open. The peer sends "hello" and stays open; poll,
-# recv and recv_bytes with max 0 each fail with EINVAL and take nothing,
-# so a recv of 64 after them still reads "hello". The listener retries
-# upward from a base port on Fail, as tcp_loopback does.
+# answers at the peer's close, so None{} there would read as the end of a
+# socket that is still open. The peer sends "hello" and stays open;
+# try_recv, recv and recv_bytes with max 0 each fail with EINVAL and take
+# nothing, so a recv of 64 after them still reads "hello". The listener
+# retries upward from a base port on Fail, as tcp_loopback does.
 import Base
 
 law show_bytes:
@@ -27,48 +27,41 @@ def show_fail(e):
   U32.show(code) ++ (" " ++ message)
 
 law show_text:
-  for r: Result<&1, &1, (U32 & String), String>
+  for r: Result<&1, &1, (U32 & String), Maybe<&1, String>>
   String
 
 def show_text(r):
   match r:
-    case Done{s}:
+    case Done{Some{s}}:
       "done: " ++ s
+    case Done{None{}}:
+      "ended"
     case Fail{e}:
       show_fail(e)
 
 law show_list:
-  for r: Result<&1, &1, (U32 & String), List<&2, U32>>
+  for r: Result<&1, &1, (U32 & String), Maybe<&1, List<&2, U32>>>
   String
 
 def show_list(r):
   match r:
-    case Done{xs}:
+    case Done{Some{xs}}:
       "done: " ++ show_bytes(xs)
+    case Done{None{}}:
+      "ended"
     case Fail{e}:
       show_fail(e)
 
-law show_some:
-  for m: Maybe<&1, String>
-  String
-
-def show_some(m):
-  match m:
-    case None{}:
-      "none"
-    case Some{s}:
-      "some: " ++ s
-
 law show_poll:
-  for r: Result<&1, &1, (U32 & String), Maybe<&1, String>>
+  for r: Poll<&1, &1, Result<&1, &1, (U32 & String), Maybe<&1, String>>, Unit>
   String
 
 def show_poll(r):
   match r:
-    case Done{m}:
-      show_some(m)
-    case Fail{e}:
-      show_fail(e)
+    case Ready{t}:
+      show_text(t)
+    case Wait{u}:
+      "wait"
 
 law told:
   for tag: String
@@ -82,7 +75,7 @@ def told(tag, m):
     return s
 
 law text:
-  for m: Socket & Result<&1, &1, (U32 & String), String>
+  for m: Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>>
   Socket & String
 
 def text(m):
@@ -90,7 +83,7 @@ def text(m):
   (s, show_text(r))
 
 law list:
-  for m: Socket & Result<&1, &1, (U32 & String), List<&2, U32>>
+  for m: Socket & Result<&1, &1, (U32 & String), Maybe<&1, List<&2, U32>>>
   Socket & String
 
 def list(m):
@@ -98,7 +91,7 @@ def list(m):
   (s, show_list(r))
 
 law poll:
-  for m: Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>>
+  for m: Socket & Poll<&1, &1, Result<&1, &1, (U32 & String), Maybe<&1, String>>, Unit>
   Socket & String
 
 def poll(m):
@@ -106,14 +99,18 @@ def poll(m):
   (s, show_poll(r))
 
 law sent:
-  for m: Socket & Result<&1, &1, (U32 & String), Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
   IO(Socket)
 
 def sent(m):
   (s, r) = m
-  do IO<Socket>:
-    u : Unit <- IO.pass(Unit, r)
-    return s
+  match r:
+    case Done{u}:
+      IO.pure(Socket, s)
+    case Fail{((code, message), rest)}:
+      do IO<Socket>:
+        u : Unit <- IO.die(Unit, code, message)
+        return s
 
 law run:
   for l: Listener
@@ -123,15 +120,15 @@ law run:
 
 def run(l, c, a):
   do IO<U32>:
-    s0 : Socket & Result<&1, &1, (U32 & String), Unit> <- TCP.send(c, "hello")
+    s0 : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- TCP.send(c, "hello")
     c1 : Socket <- sent(s0)
-    p0 : Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>> <- TCP.poll(a, 0, 100)
-    a1 : Socket <- told("poll: ", poll(p0))
-    r0 : Socket & Result<&1, &1, (U32 & String), String> <- TCP.recv(a1, 0)
+    p0 : Socket & Poll<&1, &1, Result<&1, &1, (U32 & String), Maybe<&1, String>>, Unit> <- TCP.try_recv(a, 0, 100)
+    a1 : Socket <- told("try_recv: ", poll(p0))
+    r0 : Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>> <- TCP.recv(a1, 0)
     a2 : Socket <- told("recv: ", text(r0))
-    r1 : Socket & Result<&1, &1, (U32 & String), List<&2, U32>> <- TCP.recv_bytes(a2, 0)
+    r1 : Socket & Result<&1, &1, (U32 & String), Maybe<&1, List<&2, U32>>> <- TCP.recv_bytes(a2, 0)
     a3 : Socket <- told("recv_bytes: ", list(r1))
-    r2 : Socket & Result<&1, &1, (U32 & String), String> <- TCP.recv(a3, 64)
+    r2 : Socket & Result<&1, &1, (U32 & String), Maybe<&1, String>> <- TCP.recv(a3, 64)
     a4 : Socket <- told("then recv 64: ", text(r2))
     x  : Unit <- Socket.close(c1)
     y  : Unit <- Socket.close(a4)
@@ -196,7 +193,7 @@ def main():
     b : Listener & U32 <- tcp_listen_any(32n, 23017)
     main_go(b)
 
-#|poll: 22 Invalid argument
+#|try_recv: 22 Invalid argument
 #|recv: 22 Invalid argument
 #|recv_bytes: 22 Invalid argument
 #|then recv 64: done: hello

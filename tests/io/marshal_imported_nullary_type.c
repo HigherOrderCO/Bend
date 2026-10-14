@@ -11,6 +11,6 @@ Term tag_on_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tag_use(void) {
-  io_eff(CID(tag.off), tag_off_run, 0);
-  io_eff(CID(tag.on), tag_on_run, 0);
+  io_eff(CID(tag.off), tag_off_run);
+  io_eff(CID(tag.on), tag_on_run);
 }

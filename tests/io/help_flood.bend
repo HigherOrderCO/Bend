@@ -17,7 +17,7 @@ law one:
 def one(c):
   do IO<Unit>:
     x : U32 <- Flood.tick(1)
-    Bool <- Chan.send(U32, c, x)
+    Result<&1, &1, U32, Unit> <- Chan.send(U32, c, x)
     return Unit{}
 
 law spawn_all:

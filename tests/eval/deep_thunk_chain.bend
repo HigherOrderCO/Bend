@@ -1,14 +1,11 @@
 # a lazy accumulator deeper than the host stack must still evaluate:
 # each go step binds acc to a thunk over Nat.add(acc, 1n), so the head
 # demand at the end collapses a 262144-long thunk chain -- the head
-# Succ can only surface after every link resolves. Before the LAZ-frame
-# law, each forced thunk nested one host term_wnf frame and the
-# interpreter died at ~65536 with a raw RangeError -- not a numbered
-# refusal, a host crash -- while the compiled JS, strict in its
-# arguments, ran the same checked program to its answer. This pin adds
-# the Nat shape (Succ-node field thunks driven through the match walk)
-# and the IO main to reg_wnf_deep_chain's Bool/U32 coverage, and holds
-# the --js lane to the same answer.
+# Succ can only surface after every link resolves. Its main is IO, so
+# `bend` runs it through Comp.io_run on the emitted JS: this is an IO
+# and backend case, holding the compiled lanes, strict in their
+# arguments, to the answer. The source interpreter never forces the
+# chain here; deep_thunk_chain_pure, with a pure Bool main, pins that.
 import Base
 
 law Nat.pow2:

@@ -11,14 +11,17 @@
 import Base
 
 law send_go:
-  for m: Socket & Result<&1, &1, (U32 & String), Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
   IO(Socket)
 
 def send_go(m):
   (s, r) = m
-  do IO<Socket>:
-    u : Unit <- IO.pass(Unit, r)
-    return s
+  match r:
+    case Done{u}:
+      IO.pure(Socket, s)
+    case Fail{(error, data)}:
+      (code, message) = error
+      IO.die(Socket, code, message)
 
 law finish_end:
   for s1 : Socket
@@ -54,7 +57,7 @@ law reply_end:
 def reply_end(s1, s2, p):
   (host, from, data) = p
   do IO<U32>:
-    sm  : Socket & Result<&1, &1, (U32 & String), Unit> <- UDP.send_to(s2, host, from, String.append(data, "-pong"))
+    sm  : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- UDP.send_to(s2, host, from, String.append(data, "-pong"))
     s2b : Socket <- send_go(sm)
     rm  : Socket & Result<&1, &1, (U32 & String), String & U32 & String> <- UDP.recv_from(s1, 64)
     finish_go(s2b, rm)
@@ -79,7 +82,7 @@ law main_go2:
 def main_go2(s1, b, data):
   (s2, p2) = b
   do IO<U32>:
-    sm  : Socket & Result<&1, &1, (U32 & String), Unit> <- UDP.send_to(s1, "127.0.0.1", p2, data)
+    sm  : Socket & Result<&1, &1, (U32 & String) & String, Unit> <- UDP.send_to(s1, "127.0.0.1", p2, data)
     s1b : Socket <- send_go(sm)
     m   : Socket & Result<&1, &1, (U32 & String), String & U32 & String> <- UDP.recv_from(s2, 64)
     reply_go(s1b, m)

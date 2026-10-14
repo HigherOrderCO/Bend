@@ -87,31 +87,27 @@ def int_go(src, st):
       (acc, live, kept) = st
       D6{acc, int_go.rev(kept, SNil{})}
 
+# twelve 9s: the accumulator stops at 999999999 (the next digit would
+# overflow U32) and the dropped digits leave nothing kept
 law t6:
-  U32
+  String
 
 law t6.fin:
   for w: D6
-  U32
+  String
 
 def t6.fin(w):
   match w:
     case D6{v, s2}:
-      1
+      String.append(U32.show(v), String.append(" [", String.append(s2, "]")))
 
 def t6():
   t6.fin(int_go("999999999999", (0, True{}, SNil{})))
-
-law main.out:
-  Nat
-
-def main.out():
-  U32.to_nat(t6())
 
 law main:
   IO(Unit)
 
 def main():
-  IO.print(String.append(Nat.show(main.out()), "n"))
+  IO.print(t6())
 
-#|1n
+#|999999999 []

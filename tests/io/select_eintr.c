@@ -34,5 +34,5 @@ Term idle_park_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) idle_park_use(void) {
-  io_eff(CID(Idle.park), idle_park_run, 0);
+  io_eff(CID(Idle.park), idle_park_run);
 }

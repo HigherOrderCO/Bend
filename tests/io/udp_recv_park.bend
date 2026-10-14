@@ -52,14 +52,17 @@ def ticks(n):
         ticks(p)
 
 law send_go:
-  for m: Socket & Result<&1, &1, (U32 & String), Unit>
+  for m: Socket & Result<&1, &1, (U32 & String) & String, Unit>
   IO(Socket)
 
 def send_go(m):
   (s, r) = m
-  do IO<Socket>:
-    u : Unit <- IO.pass(Unit, r)
-    return s
+  match r:
+    case Done{u}:
+      IO.pure(Socket, s)
+    case Fail{(error, data)}:
+      (code, message) = error
+      IO.die(Socket, code, message)
 
 law main_go:
   for a: Socket & U32
@@ -72,7 +75,7 @@ def main_go(a, b):
   do IO<U32>:
     u   : Unit <- IO.spawn(Unit, receive(s2))
     t   : Unit <- ticks(3n)
-    sm  : Socket & Result<&1, &1, (U32 & String), Unit> <-
+    sm  : Socket & Result<&1, &1, (U32 & String) & String, Unit> <-
       UDP.send_to(s1, "127.0.0.1", p2, "bend-park")
     s1b : Socket <- send_go(sm)
     x   : Unit <- Socket.close(s1b)

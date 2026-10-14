@@ -17,7 +17,7 @@ def produce(c, n):
     case 1n+p:
       +q  = p
       do IO<Unit>:
-        Bool <- Chan.send(Nat, c, q)
+        Result<&1, &1, Nat, Unit> <- Chan.send(Nat, c, q)
         produce(c, q)
 
 law consume.got:

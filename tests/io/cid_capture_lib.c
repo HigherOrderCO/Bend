@@ -7,6 +7,6 @@ Term cid_capture_list(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) cid_capture_use(void) {
-  io_eff(CID(peek), cid_capture_peek, 0);
-  io_eff(CID(list), cid_capture_list, 0);
+  io_eff(CID(peek), cid_capture_peek);
+  io_eff(CID(list), cid_capture_list);
 }

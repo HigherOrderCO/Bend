@@ -25,9 +25,9 @@ law skip_is_drop:
   exs n: Nat
   {Hvm.str_skip(s, z) == Hvm.str_drop(s, n) : String}
 
-# LAW: the printer's packs are balanced: the display of a pack of run
-# p around x opens run_len(p) braces more than the display of x, for
-# any run word and any term.
+# LAW: the printer's packs add opening braces: the display of a pack
+# of run p around x opens run_len(p) more than the display of x, for
+# any run word and any term. Closing braces are not constrained here.
 law pak_braces:
   for +p: U32
   for +x: Hvm.Term
