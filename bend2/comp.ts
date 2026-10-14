@@ -1498,6 +1498,8 @@ function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
       && tele_unbind(FL.book.tlds[sc.def].T).doms[w.i];
     if (dom && dom[1] === w.k && !dom_live(dom)) {
       FL.hot.add(sc.def + "~" + w.i);
+    } else if (m && (m.t as Of<"Ref">).k === "Chan") {
+      return;
     } else if (ty_tag(w, "All Var App")) {
       FL.hot.add("*");
     } else if (!ty_tag(w, "Typ Qnt Qua Min Eql Rfl Lit Ctr Efq Ref")) {
