@@ -91,6 +91,8 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
   u64            flags;
   BOOL           grab;
   NSString*      marked;
+  NSMutableArray* held;
+  BOOL           other;
 }
 @end
 
@@ -125,12 +127,37 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
 
 - (void)keyDown:(NSEvent*)ev {
   [self key:ev down:YES];
-  if (!(ev.modifierFlags & NSEventModifierFlagCommand)) {
+  if (ev.modifierFlags & NSEventModifierFlagCommand) {
+    return;
+  }
+  BOOL fresh = marked.length == 0;
+  held  = [NSMutableArray new];
+  other = NO;
+  [self interpretKeyEvents:@[ev]];
+  // Apple's Korean method can commit a key's bare jamo where it should
+  // start a syllable (the first key a view gets); asked again, it composes.
+  NSString* t = held.count == 1 ? held[0] : nil;
+  unichar   c = t.length == 1 ? [t characterAtIndex:0] : 0;
+  if (fresh && !other && !ev.ARepeat && c >= 0x3131 && c <= 0x318E
+    && [self.inputContext.selectedKeyboardInputSource
+      hasPrefix:@"com.apple.inputmethod.Korean"]) {
+    [held removeAllObjects];
     [self interpretKeyEvents:@[ev]];
+  }
+  NSArray* ts = held;
+  held = nil;
+  for (NSString* h in ts) {
+    [self insertText:h replacementRange:NSMakeRange(NSNotFound, 0)];
   }
 }
 
 - (void)insertText:(id)s replacementRange:(NSRange)r {
+  marked = nil;
+  if (held != nil) {
+    [held addObject:[s isKindOfClass:NSAttributedString.class] ? [s string]
+      : [s copy]];
+    return;
+  }
   const char* t = [([s isKindOfClass:NSAttributedString.class] ? [s string]
     : s) UTF8String];
   u64 n  = strlen(t);
@@ -139,19 +166,21 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
   while (window_chunk(t, n, &at, ev)) {
     [evs appendBytes:ev length:sizeof ev];
   }
-  marked = nil;
 }
 
 - (void)doCommandBySelector:(SEL)sel {
+  other = YES;
 }
 
 - (void)setMarkedText:(id)s selectedRange:(NSRange)sel
   replacementRange:(NSRange)r {
+  other  = YES;
   marked = [[s isKindOfClass:NSAttributedString.class] ? [s string] : s
     copy];
 }
 
 - (void)unmarkText {
+  other  = YES;
   marked = nil;
 }
 
