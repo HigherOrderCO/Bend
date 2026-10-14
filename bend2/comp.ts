@@ -168,6 +168,8 @@ const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
 // Operations
 // ----------
 
+// The Array operations have no C text: arr_op lays them out by element.
+
 const CMPS = "is_eq:==:=== is_ne:!=:!== is_lt:< is_le:<= is_gt:> is_ge:>=";
 
 const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
@@ -263,9 +265,10 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
 // Optimized
 // ---------
 
-// RUNTIME_ADTS are the datatypes the runtime or the elaborator lays out
-// itself; OWNED are the Base names the compiler encodes, which a file
-// without `import Base` may declare but not compile.
+// Per native constructor: its builder, field readers and optional
+// test. RUNTIME_ADTS are the datatypes the runtime or the elaborator
+// lays out itself; OWNED are the Base names the compiler encodes,
+// which a file without `import Base` may declare but not compile.
 
 const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
   Nat: { Zero: { intr: "0" }, Succ: { intr: tpl_nat("", "nat_chk($0 + 1)") } },
@@ -716,8 +719,10 @@ function term_eta(t: HTerm, T: HTerm, n: number): HTerm {
 function call_eta(t: HTerm): HTerm | null {
   const m = term_spine(t);
   const f = m.t.$ === "Ref" ? fun_of(m.t.k) : null;
-  return m.tld?.$ !== "Def" || f === null || m.args.length >= f.live.length
-    ? null : term_eta(t, tele_fill(m.tld.T, m.all), f.n - m.all.length);
+  if (m.tld?.$ !== "Def" || f === null || m.args.length >= f.live.length) {
+    return null;
+  }
+  return term_eta(t, tele_fill(m.tld.T, m.all), f.n - m.all.length);
 }
 
 function term_kids(tm: HTerm): HTerm[] {
@@ -1333,8 +1338,9 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // File
 // ====
 
-// The emitter is the analysis: a boxed parameter starts borrowed (its
-// scope's brwl) and becomes owned (own) when owned or unlent; a lend is
+// A File is the book being compiled (FL): its facts, its output and its
+// caches. The emitter is the analysis: a boxed parameter starts borrowed
+// (its scope's brwl) and becomes owned (own) when owned or unlent; a lend is
 // asked by a holder or passed on from a lent root (k~i<j~q). A shared value
 // heats its type (hot); a family stuck on an open index heats its arms'
 // types once, its arguments at every instantiation. compile_book emits until
@@ -1381,8 +1387,9 @@ function file_new(book: Bend.Book, js: boolean): File {
   };
 }
 
-// A nested arm, closure or fork copies its scope; the book's facts and
-// output live in FL.
+// A scope is where the emitter writes: its segment, its locals' names, the
+// bindings and spare nodes it holds, the def it is in. A nested arm, closure
+// or fork copies its scope; the book's facts and output live in FL.
 function scope_new(): Scope {
   return {
     seg: seg_new("", BOX, []),
@@ -1537,6 +1544,9 @@ function spare_flush(sc: Scope): void {
 
 // Seg
 // ===
+
+// A segment enters by popping its frame and reading its
+// parameters from the frame slots, then from the bank (r0..).
 
 function seg_new(name: string, ret: Lay, params: string[],
   ks: Kind[] = params.map(() => "w64"), frame: Seg["frame"] = null): Seg {
@@ -2754,7 +2764,7 @@ function emit_chain(sc: Scope, cond: (i: number) => string,
 // =======
 
 // Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
-// namespace, else as is.
+// namespace, else as is. An effect source is read once, in one namespace.
 
 function c_ids(src: string, m = ""): string {
   return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
@@ -3169,6 +3179,8 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
   file_push(sc, "");
 }
 
+// What crosses to or from a host: a Nat comes in as a number, which nat_in
+// checks; text gets U+FFFD for what is no Unicode scalar.
 function host(A: HTerm | null, x: string, out = 0): string {
   const t = ty_wnf(A);
   const k = t?.$ === "ADT" ? t.k : "";
@@ -3882,7 +3894,10 @@ OUTLINE Term rfc_wrap(Env e, Term t, u32 cnt) {
 }
 
 INLINE Term rfc_seal(Env e, Term t) {
-  return term_tag(t) != TAG_CTR || term_rfc(t) ? t : rfc_wrap(e, t, 1);
+  if (term_tag(t) != TAG_CTR || term_rfc(t)) {
+    return t;
+  }
+  return rfc_wrap(e, t, 1);
 }
 
 INLINE void rfc_bump(Env e, u64 r, u32 k) {
@@ -3897,7 +3912,10 @@ INLINE Term term_keep(Env e, Term t, u32 k) {
     rfc_bump(e, term_loc(t), k);
     return t;
   }
-  return term_triv(t) ? t : rfc_wrap(e, t, 1 + k);
+  if (term_triv(t)) {
+    return t;
+  }
+  return rfc_wrap(e, t, 1 + k);
 }
 
 // A redirect cell holds its target's loc over a 24-bit count, which only
@@ -3906,7 +3924,10 @@ INLINE Term term_keep(Env e, Term t, u32 k) {
 // two halves, both holding the same loc. A shared node's fields never change
 // either, so ctr_take copies them before it acquires.
 INLINE u64 term_peek(DEV u64* H, Term t) {
-  return term_rfc(t) ? w64_load(&H[term_loc(t)]) >> 24 : term_loc(t);
+  if (term_rfc(t)) {
+    return w64_load(&H[term_loc(t)]) >> 24;
+  }
+  return term_loc(t);
 }
 
 #define blk_shr(t) (BLK_SHR && term_rfc(t))
@@ -4064,7 +4085,10 @@ INLINE DEV u32a* blk_ptr(DEV u64* H, u64 loc, u32 i) {
 }
 
 INLINE Term blk_read(DEV u64* H, bool arr, u64 loc, u32 i) {
-  return arr ? H[loc + i] : (u64)*blk_ptr(H, loc, i);
+  if (arr) {
+    return H[loc + i];
+  }
+  return (u64)*blk_ptr(H, loc, i);
 }
 
 INLINE void blk_write(DEV u64* H, bool arr, u64 loc, u32 i, Term v) {
@@ -4242,8 +4266,11 @@ INLINE Term task_deliver(DEV u64* H, Term cont, u32 idx, THR Term* v, u32 n) {
 INLINE void task_deal(DEV u64* H, Term join, u32 base, u32 stride, TG u32* cur) {
   u64 loc = term_loc(join);
   u32 ar  = fid_arity((u32)term_aux(join));
-  u32 g   = stride != 0 ? 0
-    : a32_add(a32_at(H, H_CURSOR), (u32)H[loc + ar + 1]);
+  u32 g   = 0;
+  if (stride == 0) {
+    u32 rem = (u32)H[loc + ar + 1];
+    g = a32_add(a32_at(H, H_CURSOR), rem);
+  }
   for (u32 i = 0; i < ar; i += 1) {
     Term k = H[loc + i];
     if (term_tag(k) == TAG_TSK) {
@@ -5122,6 +5149,8 @@ static void gpu_pass(u32 f) {
 // to cur - 1, so those rows hold every task. A slow grow deals task g to
 // row g % CUBE_T, and the grows repeat over g rows until none deals.
 
+// Between turns, each ring's pending tasks move back to slot 0.
+
 static void ring_rewind(u64* H, u32 rows) {
   Term keep[RING_LEN];
   for (u32 r = 0; r < (rows < CUBE_G ? rows : CUBE_G) * CUBE_T; r += 1) {
@@ -5709,10 +5738,12 @@ ${NATIVE.IO}
 // Show
 // ====
 
-// show_val prints a pure main's value as term_show spells it: d is a
-// SHOW_DESC node (see show_main), w its words, and chain the bracket of
-// the [a, b] or (a, b) the value continues, or 0. Con or Nil spell a list,
-// Tuple a tuple, and their tails continue it.
+// show_val prints a pure main's value as term_show spells it: d
+// is a SHOW_DESC node (see show_main), w its words, and chain the
+// bracket of the [a, b] or (a, b) the value continues, or 0. Con
+// or Nil spell a list, Tuple a tuple, and their tails continue
+// it. show_f32 prints the shortest text that reads back, with a
+// point before an e.
 
 #if MAIN_PURE
 
