@@ -1052,18 +1052,15 @@ function ctr_doms(ctr: Bend.Ctr, xs?: HTerm[]): HTerm[] {
 }
 
 // The slot term_drop moves last, so a node frees before its spine: the
-// last box of the last field that holds the node's own datatype.
+// last box of a field that holds the node's own datatype (255: none).
 function ctr_spine(k: Name, n: number): number {
   const ctr = FL.book.ctrs[k];
-  if (!ctr || n > WIDE) {
-    return 255;
-  }
-  const fam = Bend.book_fam(FL.book, k);
-  const lays = lay_node(k).arms![k];
-  const i = ctr_doms(ctr).findLastIndex((F) =>
-    ty_holds(F, (u) => u?.$ === "ADT" && u.k === fam));
-  return i < 0 ? 255 : lays.slice(0, i).reduce((at, lay) =>
-    at + lay.ks.length, lays[i].ks.lastIndexOf("box"));
+  const fam = ctr && Bend.book_fam(FL.book, k);
+  const at = (ctr && n <= WIDE ? ctr_doms(ctr) : []).flatMap((F) =>
+    lay_of(F).ks.map((s) => s === "box"
+      && ty_holds(F, (u) => u?.$ === "ADT" && u.k === fam)))
+    .lastIndexOf(true);
+  return at < 0 ? 255 : at;
 }
 
 function ctr_flds(k: Name, xs: HTerm[]): HTerm[] {
@@ -4011,19 +4008,13 @@ FAR void term_drop(Env e, Term t) {
           H[loc + s] = H[loc + n - 1];
           H[loc + n - 1] = f;
         }
-        if (cls < 64) {
-          while (n > 1 && term_triv(H[loc + n - 1])) {
-            n -= 1;
-          }
-        } else {
-          u32 m = 1u << (cls & 63);
-          while (m > 1 && term_triv(H[loc + m - 1])) {
-            m -= 1;
-          }
-          if (m < 256) {
-            n   = m;
-            cls &= 63;
-          }
+        u32 m = cls < 64 ? n : 1u << (cls & 63);
+        while (m > 1 && term_triv(H[loc + m - 1])) {
+          m -= 1;
+        }
+        if (m < 256) {
+          n   = m;
+          cls &= 63;
         }
         c0 = H[loc];
         H[loc] = cur;
