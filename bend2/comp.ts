@@ -54,6 +54,7 @@ type Name = Bend.Name;
 type File = {
   book: Bend.Book;
   js: boolean;
+  ops: typeof OPERATIONS;
   bangs: Set<Name>;
   sites: Map<Name, number>;
   hot: Set<Name>;
@@ -108,7 +109,7 @@ type Of<K> = Extract<HTerm, { $: K }>;
 
 type Row = [HTerm, number, number, number];
 
-type Intr = { C?: string | string[] | null; JS: string };
+type Intr = { C?: string | string[] | null; JS?: string };
 
 type Dom = [Bend.Quant, Name, HTerm];
 
@@ -168,8 +169,6 @@ const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
 // Operations
 // ----------
 
-// The Array operations have no C text: arr_op lays them out by element.
-
 const CMPS = "is_eq:==:=== is_ne:!=:!== is_lt:< is_le:<= is_gt:> is_ge:>=";
 
 const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
@@ -177,6 +176,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
+  u32_pow: { C: "u32_pow($0, $1)" },
   u32_div: {
     C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
     JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)",
@@ -262,6 +262,9 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   }])),
 }, null);
 
+const JS_OPERATIONS = Object.setPrototypeOf(Object.fromEntries(
+  Object.entries(OPERATIONS).filter(([, op]) => op.JS)), null);
+
 // Optimized
 // ---------
 
@@ -323,11 +326,7 @@ const OWNED = ["IO", ...RUNTIME_ADTS, ...Object.keys(OPTIMIZED)];
 // Native
 // ------
 
-// On Metal, sin, cos and tan are fast:: (cheap, the same pixels)
-// and the rest precise::. Metal's atan2 is NaN at the origin,
-// where libm answers +-0 or +-pi, so atan2_c99 answers as libm
-// does. Metal folds a constant dividend within 128 of 2^32 through
-// an f32, so its U32_QUO divides the half and then fixes the odd bit.
+// Metal shims fix atan2 at zero and float folding near 2^32.
 
 const SHIMS = "sqrt exp log log2 log10 sin cos tan pow fmod".split(" ")
   .map((n) => "#define " + n.padEnd(5) + ("sin cos tan".includes(n)
@@ -349,6 +348,14 @@ ${SHIMS}
 #endif
 
 #define U32_BIN(a, o, b) ((u64)((u32)(a) o (u32)(b)))
+
+INLINE u64 u32_pow(u32 a, u64 n) {
+  u32 r = 1;
+  for (; n; n >>= 1, a *= a) {
+    if (n & 1) r *= a;
+  }
+  return r;
+}
 
 INLINE f32 f32_unbox(u64 x) {
   union { u32 u; f32 f; } p = { (u32)x };
@@ -813,7 +820,7 @@ function dom_live([q]: Dom): boolean {
 function intr_of(k: Name, js = false): Intr | undefined {
   const tld = FL.book.tlds[k];
   const it = tld?.$ === "Def" && tld.i === undefined && tld.b
-    ? OPERATIONS[op_name(k)] : undefined;
+    ? FL.ops[op_name(k)] : undefined;
   return it && (js || it.C !== undefined) ? it : undefined;
 }
 
@@ -1355,6 +1362,7 @@ function file_new(book: Bend.Book, js: boolean): File {
   return {
     book,
     js,
+    ops: js ? JS_OPERATIONS : OPERATIONS,
     bangs: new Set(),
     sites: new Map(),
     hot: new Set(),
@@ -2662,7 +2670,7 @@ function emit_row(sc: Scope, t: HTerm, ty: HTerm | null): string | null {
   }
   const m = term_spine(s);
   const it = m.t.$ === "Ref" ? intr_of(m.t.k) : undefined;
-  if (it === undefined || TAB_BAD.test(it.JS)) {
+  if (!it?.JS || TAB_BAD.test(it.JS)) {
     return null;
   }
   const xs = m.args.map((a) => emit_row(sc, a, null));
@@ -2963,7 +2971,7 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail = false): string {
   }
   const intr = intr_of(k, true);
   if (intr !== undefined) {
-    return tpl(intr.JS, exprs.map((e) => ATOM.test(e) || STRLIT.test(e) ? e
+    return tpl(intr.JS!, exprs.map((e) => ATOM.test(e) || STRLIT.test(e) ? e
       : emit_hold(sc, [e], "x")[0]));
   }
   if (!fun_runs(tld)) {
