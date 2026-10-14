@@ -1059,19 +1059,34 @@ def List.foldr(
     case h <> t:
       f(h, List.foldr(~a, ~A, ~B, ~f, t, z))
 
-def List.any(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
-  match xs:
-    case Nil{}:
+# Carry the previous result so strict backends can stop before the next call.
+def List.any.go(
+  ~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>, hit: Bool
+) -> Bool:
+  match xs hit:
+    case _ True{}:
+      True{}
+    case Nil{} False{}:
       False{}
-    case h <> t:
-      Bool.or(f(h), List.any(~a, ~A, ~f, t))
+    case h <> t False{}:
+      List.any.go(~a, ~A, ~f, t, f(h))
+
+def List.any(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
+  List.any.go(~a, ~A, ~f, xs, False{})
+
+def List.all.go(
+  ~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>, keep: Bool
+) -> Bool:
+  match xs keep:
+    case _ False{}:
+      False{}
+    case Nil{} True{}:
+      True{}
+    case h <> t True{}:
+      List.all.go(~a, ~A, ~f, t, f(h))
 
 def List.all(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
-  match xs:
-    case Nil{}:
-      True{}
-    case h <> t:
-      Bool.and(f(h), List.all(~a, ~A, ~f, t))
+  List.all.go(~a, ~A, ~f, xs, True{})
 
 def List.find.put(-A: Data, h: A, r: Maybe<&2, A>, hit: Bool) -> Maybe<&2, A>:
   match hit:
@@ -1080,21 +1095,35 @@ def List.find.put(-A: Data, h: A, r: Maybe<&2, A>, hit: Bool) -> Maybe<&2, A>:
     case True{}:
       Some{h}
 
-def List.find(~A: Data, ~f: A -> Bool, xs: List<&2, A>) -> Maybe<&2, A>:
-  match xs:
-    case Nil{}:
+def List.find.go(
+  ~A: Data, ~f: A -> Bool, xs: List<&2, A>, found: Maybe<&2, A>
+) -> Maybe<&2, A>:
+  match xs found:
+    case _ Some{x}:
+      Some{x}
+    case Nil{} None{}:
       None{}
-    case +h <> t:
-      List.find.put(A, h, List.find(~A, ~f, t), f(h))
+    case +h <> t None{}:
+      List.find.go(~A, ~f, t, List.find.put(A, h, None{}, f(h)))
+
+def List.find(~A: Data, ~f: A -> Bool, xs: List<&2, A>) -> Maybe<&2, A>:
+  List.find.go(~A, ~f, xs, None{})
+
+def List.contains.go(
+  ~A: Data, ~eq: A -> A -> Bool, xs: List<&2, A>, +x: A, hit: Bool
+) -> Bool:
+  match xs hit:
+    case _ True{}:
+      True{}
+    case Nil{} False{}:
+      False{}
+    case h <> t False{}:
+      List.contains.go(~A, ~eq, t, x, eq(h, x))
 
 def List.contains(
   ~A: Data, ~eq: A -> A -> Bool, xs: List<&2, A>, +x: A
 ) -> Bool:
-  match xs:
-    case Nil{}:
-      False{}
-    case h <> t:
-      Bool.or(eq(h, x), List.contains(~A, ~eq, t, x))
+  List.contains.go(~A, ~eq, xs, x, False{})
 
 def List.merge.step(
   -A: Data, acc: List<&2, A>, x: A, xt: List<&2, A>, y: A, yt: List<&2, A>,
@@ -1779,7 +1808,7 @@ law F32.is_ge:
   Bool
 
 law F32.show:
-  for +a: F32
+  for a: F32
   String
 
 law F32.bits:
@@ -1813,13 +1842,27 @@ def F32.square(a: F32) -> F32:
     case F32{+x}:
       F32.mul(F32{x}, F32{x})
 
+# Outside [2^-60, 2^60] the squares would overflow or underflow, so scale
+# both sides by a power of two first; inside, the scale is 1 and exact.
 def F32.hypot(a: F32, b: F32) -> F32:
-  match a b:
-    case F32{+x} F32{+y}:
-      F32.sqrt(F32.add(F32.mul(F32{x}, F32{x}), F32.mul(F32{y}, F32{y})))
+  +x = F32.abs(a)
+  +y = F32.abs(b)
+  +m = F32.max(x, y)
+  +hi = F32.is_gt(m, 1.152921504606847e18)
+  +lo = F32.is_lt(m, 8.673617379884035e-19)
+  +s = Bool.pick(F32, hi, 8.470329472543003e-22,
+    Bool.pick(F32, lo, 1.2676506002282294e30, 1.0))
+  +u = Bool.pick(F32, hi, 1.1805916207174113e21,
+    Bool.pick(F32, lo, 7.888609052210118e-31, 1.0))
+  +p = F32.mul(x, s)
+  +q = F32.mul(y, s)
+  F32.mul(F32.sqrt(F32.add(F32.mul(p, p), F32.mul(q, q))), u)
 
 def F32.round(a: F32) -> F32:
-  F32.floor(F32.add(a, 0.5))
+  match a:
+    case F32{+x}:
+      +f = F32.floor(F32{x})
+      F32.add(f, Bool.pick(F32, F32.is_ge(F32.sub(F32{x}, f), 0.5), 1.0, 0.0))
 
 def F32.pi() -> F32:
   3.14159265
@@ -1953,8 +1996,21 @@ def String.reverse.go(s: String, acc: String) -> String:
 def String.reverse(s: String) -> String:
   String.reverse.go(s, SNil{})
 
+# c is the order of the chars so far: the walk is one tail call per char
+# and builds nothing (String.cmp rebuilds both strings for its callers).
+def String.order.go(a: String, b: String, c: Cmp) -> Cmp:
+  match a b c:
+    case SNil{} SCon{h, t} EQ{}:
+      LT{}
+    case SCon{h, t} SNil{} EQ{}:
+      GT{}
+    case SCon{Chr{x}, t1} SCon{Chr{y}, t2} EQ{}:
+      String.order.go(t1, t2, U32.cmp(x, y))
+    case _ _ o:
+      o
+
 def String.order(a: String, b: String) -> Cmp:
-  Pair.snd(String & String, Cmp, String.cmp(a, b))
+  String.order.go(a, b, EQ{})
 
 def String.is_lt(a: String, b: String) -> Bool:
   Cmp.is_lt(String.order(a, b))

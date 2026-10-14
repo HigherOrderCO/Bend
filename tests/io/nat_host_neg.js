@@ -1,5 +1,5 @@
 function get() {
-  return -3n;
+  return -3;
 }
 
 io_eff(CID(get), get);

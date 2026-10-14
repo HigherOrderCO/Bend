@@ -1036,9 +1036,9 @@ function args(e: Safe, s: Scope, k: Name | O, T: HTerm | null, xs: HTerm[], live
 // calls them back (String.cmp.fin calls String.cmp, which calls it). The
 // kernel has no mutual recursion, so a def k and its helpers go out as
 // one def, their group. A mention of a member is a call at its selector,
-// k's (.k, ()), a helper h's (.h, (.k, ())): so a helper's call back
-// passes a piece of its selector, k's call to a helper a piece of the
-// lead, and all mentions of a member convert.
+// k's (.k, ()), a helper h's (.h, ((.k, ()), ())): so a helper's call
+// back passes a field of its selector, k's call to a helper a piece of
+// the lead, and all mentions of a member convert.
 
 // a group: k, its members (k first), and the lead's quantities (k's)
 type Group = { k: Name; ms: Name[]; qs: Q[] };
@@ -1139,7 +1139,7 @@ function group_call(e: Safe, s: Scope, g: Group, m: Name, ps: Arg[], R: HTerm, l
   const args = (xs: Arg[], qs: Q[]): Array<[Q, O]> => xs.flatMap(([q, x, A, v], j): Array<[Q, O]> =>
     v !== null ? [] : [[qs[j] ?? q, arg_term(e, a, x, A, live && (qs[j] ?? q) > 0)]]);
   const sel: O = { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(g.k) }, b: { $: "Lab", k: "()" } };
-  const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(m) }, b: sel }] as [Q, O],
+  const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(m) }, b: { $: "Tup", q: 1, a: sel, b: { $: "Lab", k: "()" } } }] as [Q, O],
     ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), { $: "Ref", k });
   return { $: "Ann", x, T: term(e, s, R, false) };
 }
@@ -1158,11 +1158,11 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
     const qs = B.tele_unbind(e.book, tld.T).doms.map(([q]) => quant(q));
     return { ...r, vs: r.xs.flatMap((x, j): Array<[Q, O]> => j < nx ? [] : [[qs[j], term(e, r.s, x, false)]]), cs: r.xs.map((x, j) => j < nx ? x : null) };
   };
-  // the selector's match: a member's arm past its tag (and a helper's (.k, ()))
+  // the selector's match: a member's arm past its tag (and a helper's ((.k, ()), ()))
   const efq: O = { $: "Efq" };
   const unit = (h: O): O => ({ $: "Mat", k: "()", h, m: efq });
   const sel = (f: (m: Name) => O): O => ({ $: "Prj", h: g.ms.reduceRight<O>((m, k, i) => ({ $: "Mat", k: name_tt(k), m,
-    h: i === 0 ? unit(f(k)) : { $: "Prj", h: { $: "Mat", k: name_tt(g.k), h: unit(f(k)), m: efq } } }), efq) });
+    h: i === 0 ? unit(f(k)) : { $: "Prj", h: { $: "Prj", h: { $: "Mat", k: name_tt(g.k), h: unit(unit(f(k))), m: efq } } } }), efq) });
   const l0 = s.D;
   const s0 = scope_kq(scope_hide(s), l0, 1);
   const mode = sel((m) => {
@@ -1171,7 +1171,8 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
   });
   const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: g.ms.map(name_tt) }, B: { $: "App", q: 1, x: { $: "Var", l: l0 },
     f: g.ms.reduceRight<O>((m, k, i) => ({ $: "Mat", k: name_tt(k), m, h: i === 0 ? { $: "Enu", ks: ["()"] }
-      : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [name_tt(g.k)] }, B: { $: "Enu", ks: ["()"] } } }), efq) } };
+      : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [name_tt(g.k)] }, B: { $: "Enu", ks: ["()"] } },
+        B: { $: "Enu", ks: ["()"] } } }), efq) } };
   const To = alls(ls, { $: "All", q: 1, l: l0, A: Sel, B: { $: "App", q: 1, f: mode, x: { $: "Var", l: l0 } } });
   const ks = ls.filter(([q]) => q === 1).map(([, l]) => l);
   const body = sel((m) => convoy_bind(e, s0, ks, (s2) => {
@@ -1497,7 +1498,7 @@ function kernel_bin(): string {
   const tool = (t: string): string => fs.existsSync(path.join(home, t)) ? path.join(home, t) : t;
   fs.mkdirSync(dir, { recursive: true });
   const fail = (why: string): never => {
-    throw new Error("the kernel did not build (" + why
+    throw new Error("BendTT infrastructure: the kernel did not build (" + why
       + "); --verdict needs Lean v" + LEAN_VERSION + " (elan toolchain leanprover/lean4:v" + LEAN_VERSION + "), or $BENDTT set to a built kernel");
   };
   const run = (bin: string, args: string[]): string => {
@@ -1535,17 +1536,26 @@ export function run_read(bin: string, args: string[],
   }
 }
 
-// the kernel's verdict on a book's text: ok on exit 0 with its exact
-// success line. It checks a copy in a fresh private dir, which no one
-// else can swap, and a kernel reading /dev/stdin got EBADF (1 in 1486)
-function kernel_check(text: string): boolean {
+// the kernel's verdict on a book's text: null on exit 0 with its exact
+// success line, else the lines under its failure line, or how it exited
+// if none. It checks a copy in a fresh private dir, which no one else
+// can swap, and a kernel reading /dev/stdin got EBADF (1 in 1486)
+function kernel_check(text: string): string | null {
   const env = { ...process.env, LEAN_STACK_SIZE_KB: "4194304" };
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "bendtt-"));
   try {
     const inp = path.join(dir, "in.bendtt");
     fs.writeFileSync(inp, text, { flag: "wx" });
     const [got, out] = run_read(kernel_bin(), [inp], { env });
-    return got.status === 0 && out.trim() === "ALL PROOFS CHECK";
+    if (got.error || got.signal || got.status === null
+      || (out.trim() !== "ALL PROOFS CHECK" && !out.startsWith("SOME PROOFS FAIL"))) {
+      throw new Error("BendTT infrastructure: " + (got.error?.message
+        ?? (got.signal ? "kernel terminated by " + got.signal : out.trim()
+          || "kernel exited " + got.status + " without a verdict")));
+    }
+    const why = out.trim().split("\n").slice(1).join("\n");
+    return got.status === 0 && out.trim() === "ALL PROOFS CHECK" ? null
+      : why || "kernel exited " + got.status + " after " + out.trim();
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
@@ -1559,9 +1569,10 @@ export function safe_emit(book: Book, out: string): string[] {
   return got.oos.map(([k, why]) => "- " + B.name_key(k) + ": " + why + "\n");
 }
 
-// --verdict: whether every def of a book bend2 checked is in the kernel's
-// scope, and the kernel checks them all
-export function safe_check(book: Book): boolean {
+// --verdict: null when every def of a book bend2 checked is in the
+// kernel's scope and the kernel checks them all, else why not
+export function safe_check(book: Book): string | null {
   const got = safe_book(book);
-  return got.oos.length === 0 && kernel_check(got.text);
+  return got.oos.length === 0 ? kernel_check(got.text) : "BendTT: out of scope:\n"
+    + got.oos.map(([k, why]) => "- " + B.name_key(k) + ": " + why).join("\n");
 }
