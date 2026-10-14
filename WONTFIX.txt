@@ -17,8 +17,10 @@ The checker skips dead code (#820, #878, #973, #1091)
   so `(x => x(x))(x => x(x))` never ends (#973).
 
 `~` template arguments are compile-time (#784)
-  A `~` argument must be closed. A def parameter is a runtime value, so it
-  cannot fill one. Pass the function as a plain argument instead.
+  In live code a `~` argument must be closed. A def parameter is a runtime
+  value, so pass it as a plain argument instead. In a type, `--verdict`
+  lifts captured runtime Data into explicit kernel parameters (#1483);
+  this does not admit runtime captures in live template applications.
 
 Allocation failure fail-stops the runtime (#792)
   Out of memory is fatal everywhere, not a `Fail`. A program bounds the `max`
