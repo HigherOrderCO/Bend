@@ -37,8 +37,10 @@ def ordinary(x: U32) -> U32:
       return 2;
     }
     const names = Object.keys(lib);
+    const Bend = require(path.resolve("bend2/bend.ts"));
+    const file = Bend.file_name(fs.realpathSync(input));
     if (names.length !== keys.length * 2 || keys.some((k, i) =>
-      names[i * 2] !== k || !names[i * 2 + 1].endsWith(":" + k)
+      names[i * 2] !== k || names[i * 2 + 1] !== Bend.name_source(file, k)
       || lib[names[i * 2 + 1]] !== lib[k])) {
       return 3;
     }

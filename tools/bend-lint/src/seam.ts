@@ -709,7 +709,7 @@ const checked = async (
       const source = { path: real, text, root: real === root, base: real === Bend.BASE_BEND };
       const ns = seen.get(real) ?? Bend.file_name(real);
       const scope = "book" in read ? read.book.files.get(ns) : undefined;
-      const file: File = { str: text, ns, al: scope?.al ?? {}, base: scope?.base ?? null, path: real };
+      const file: File = { str: text, ns, al: { ...scope?.al }, base: scope?.base ?? null, path: real };
       FILES.set(source, file);
       SOURCES.set(file, source);
       return source;
@@ -908,8 +908,9 @@ export const operations = (m: Loaded, run: Checked): Operations => {
     body: (name) => {
       const scope = run.book.files.get(run.book.entry)!;
       if (!Object.hasOwn(run.book.tlds, name) && !Bend.SOURCE_NAME.test(name)) return undefined;
-      const k = Object.hasOwn(run.book.tlds, name) ? name : Bend.name_resolve(run.book, scope, name).k;
-      const tld = run.book.tlds[k];
+      const found = Object.hasOwn(run.book.tlds, name) ? { k: name, issue: undefined } : Bend.name_resolve(run.book, scope, name);
+      if (found.issue !== undefined) return undefined;
+      const tld = run.book.tlds[found.k];
       return tld?.$ === "Def" && tld.e !== undefined ? node(tld.e) : undefined;
     },
     node: (fact) => node(raw(fact).tm),
