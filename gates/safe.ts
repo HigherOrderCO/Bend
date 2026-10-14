@@ -102,4 +102,5 @@ for (const [c, r] of rows) {
   }
 }
 [...why].sort((a, b) => b[1] - a[1]).forEach(([k, n]) => console.log("  ! " + String(n).padStart(4) + " " + k));
-process.exit(0);
+// a false reject, timeout or infrastructure error fails the gate
+process.exit(rows.some(([c]) => c === "!" || c === "t" || c === "e") ? 1 : 0);
