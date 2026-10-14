@@ -210,13 +210,13 @@ function safe_book(book: Book): { text: string; oos: Array<[Name, string]> } {
 // on its own before the member's group was found
 function safe_pass(book: Book, groups: Map<Name, Group>): { text: string; oos: Array<[Name, string]> } | null {
   const g0 = groups.size;
-  // Opaque refs have different meanings in the model. Clone its computation
-  // cells, preserving sharing within this interpretation, before evaluating.
+  // The model evaluates bodies and constructor telescopes, not declaration
+  // signatures. Copy those computation roots together to preserve their sharing.
   const copy = B.scope_mapper(v => v);
   const mb: Book = { ...book, tlds: Object.create(null), ctrs: Object.create(null) };
   for (const [k, t] of Object.entries(book.tlds)) {
-    mb.tlds[k] = t.$ === "Def" ? { ...t, T: copy(t.T), v: t.v === null ? null : copy(t.v) }
-      : { ...t, T: copy(t.T), c: t.c.map(c =>
+    mb.tlds[k] = t.$ === "Def" ? { ...t, v: t.v === null ? null : copy(t.v) }
+      : { ...t, c: t.c.map(c =>
         mb.ctrs[c.k] = { ...c, T: copy(c.T) }) };
   }
   const e: Safe = { book, mb, out: [], names: new Map(), seen: new Set(),
@@ -298,7 +298,7 @@ function root_cols(e: Safe, k: Name, T: HTerm, j: number): Cols[] {
   const def: Def = { $: "Def", n: 0, x: 0, T: F.A, v: null };
   e.book.tlds[c] = def;
   const m = model(e, F.A);
-  e.mb.tlds[c] = { ...def, T: B.scope_mapper(v => v)(F.A), v: m };
+  e.mb.tlds[c] = { ...def, v: m };
   e.consts.set(key, c);
   return at(B.Ref(c));
 }

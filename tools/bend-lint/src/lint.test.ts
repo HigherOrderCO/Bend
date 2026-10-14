@@ -1073,6 +1073,32 @@ describe("lint", () => {
     expect((await lint(userland, [probe])).ok).toBe(true);
   });
 
+  test("body selectors reject ambiguous aliases while canonical owners stay exact", async () => {
+    const dependency = fixture("ambiguous_body_dependency.bend", `import Base
+
+def add(x: U32, y: U32) -> U32:
+  (x + y : U32)
+`);
+    const file = fixture("ambiguous_body.bend", `import Base
+import ./ambiguous_body_dependency.bend as U32
+
+def main() -> U32:
+  0
+`);
+    const result = await lint(file, [{
+      id: "test/body-alias",
+      facts: true,
+      run: (cx) => {
+        expect(cx.body("U32.add")).toBeUndefined();
+        const owner = Bend.name_source(Bend.file_name(fs.realpathSync(dependency)), "add");
+        expect(cx.body(owner)).toBeDefined();
+        expect(cx.body(Bend.name_source(Bend.BASE_ID, "U32.add"))).toBeDefined();
+        return [];
+      },
+    }]);
+    expect(result.ok).toBe(true);
+  });
+
   test("instance owners select their exact bodies without losing template filters", async () => {
     const file = fixture("instances.bend", `type N is Data:
   Z{}
@@ -1861,7 +1887,15 @@ describe("fact filters", () => {
   const userland = fixture("filter_userland.bend", USERLAND);
 
   test("kinds, defs and names narrow the facts; an empty or absent list matches all", async () => {
-    const all = await seen(userland, true);
+    const file = fixture("filter_two_templates.bend", USERLAND + `
+def other(~T: Type, x: T) -> T:
+  x
+
+def separate() -> N:
+  other(~N, Z{})
+`);
+    const generic = Bend.name_source(Bend.file_name(fs.realpathSync(file)), "generic");
+    const all = await seen(file, true);
     const only = async (want: LintRule["facts"], keep: (f: Seen) => boolean) => {
       let complete: Seen[] = [], got: Seen[] = [];
       const read = (cx: RuleContext): Seen[] => cx.facts!.map((f) => {
@@ -1869,7 +1903,7 @@ describe("fact filters", () => {
         return { kind: v.kind, def: v.owner, name: v.name, path: v.span!.file.path };
       });
       // Generated identities are fresh per check: compare filters on one book.
-      await lint(userland, [
+      await lint(file, [
         { id: "test/all", facts: true, run: (cx) => { complete = read(cx); return []; } },
         { id: "test/filtered", facts: want, run: (cx) => { got = read(cx); return []; } },
       ]);
@@ -1877,7 +1911,7 @@ describe("fact filters", () => {
       expect(got).toEqual(complete.filter(keep));
     };
     await only({ kinds: ["Var"] }, (f) => f.kind === "Var");
-    await only({ defs: ["generic"] }, (f) => f.def === "generic" || Bend.name_parent(f.def as Name) !== null);
+    await only({ defs: ["generic"] }, (f) => f.def === "generic" || Bend.name_parent(f.def as Name) === generic);
     await only({ kinds: ["Ref"], names: ["id"] }, (f) => f.kind === "Ref" && f.name === "id");
     await only({ kinds: [], defs: [], names: [] }, () => true);
     expect(all.some((f) => Bend.name_parent(f.def as Name) !== null)).toBe(true);
