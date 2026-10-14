@@ -808,14 +808,22 @@ async function pow_mine(hash: string, bytes: number): Promise<number> {
 // def outside Base relies on unsafe or foreign code and, with the kernel,
 // when BendTT checks every def too; else FAIL and why. A kernel failure is
 // a mismatch: bend2 accepted what the kernel rejects; it shows the why.
+// When none of those is a law or a def of the file, no law or proof uses
+// them: they come in through imports, and a hint names them.
 function cli_verdict(book: Bend.Book, kernel: boolean): number {
   const bad = book_promises(book);
   const n   = new Set(bad.flatMap(([, ks]) => ks)).size;
   if (n !== 0) {
+    const own = bad.some(([, ks]) => ks.some((k) =>
+      !k.includes(":") || (book.tlds[k] as Bend.Def).l === true));
     cli_say(2, FAIL + "\nError: " + String(n) + " def" + (n === 1 ? " relies"
       : "s rely") + " on unsafe or foreign code:\n"
       + bad.map(([on, ks]) => "defs that depend on " + on + ": "
-        + ks.map(Bend.name_key).join(", ") + "\n").join(""));
+        + ks.map(Bend.name_key).join(", ") + "\n").join("")
+      + (own ? "" : "Hint: no law or proof uses these defs. Move them to a"
+        + " file this proof does not import, and the proofs will check: "
+        + [...new Set(bad.flatMap(([, ks]) => ks))].map(Bend.name_key)
+          .join(", ") + "\n"));
     return 1;
   }
   const why = kernel ? Safe.safe_check(book) : null;
