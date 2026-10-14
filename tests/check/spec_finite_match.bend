@@ -63,6 +63,37 @@ law pick:
 def pick(b, x):
   {==}
 
+# an empty type after a finite one: each Bool's arm holds v's λ-match,
+# which has no arms
+law late:
+  for ~b: Bool
+  for ~v: Void
+  Nat
+
+def late(b, v):
+  0n
+
+# a Quant parameter: an arm per Quant
+law mode:
+  for ~q: Quant
+  {q == q : Quant}
+
+def mode(q):
+  {==}
+
+def Two(~b: Bool) -> Type:
+  Pick(b)
+
+# the fallback: Two(~b) at the bound b has no instance, so wrap's type
+# can't go out and its arms name its instances bare
+law wrap:
+  for ~b: Bool
+  for x: Two(~b)
+  {x == x : Two(~b)}
+
+def wrap(b, x):
+  {==}
+
 def main() -> Nat:
   3n
 
