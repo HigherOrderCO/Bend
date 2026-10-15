@@ -555,7 +555,7 @@ function drifts(f: () => unknown): boolean {
 }
 
 function file2(p: string, ns: string): BendModule.File & { path: string } {
-  return { str: "x\n", ns: Bend.file_name(ns), al: {}, base: null, path: p };
+  return { str: "x\n", ns: Bend.name_escape(ns) as FileId, al: {}, base: null, path: p };
 }
 
 function fixture(name: string, text: string): string {
@@ -919,7 +919,7 @@ def main() -> IO(Unit):
 describe("spans", () => {
   const source = (p: string, text: string) => ({
     str: text,
-    ns: Bend.file_name(""),
+    ns: "" as FileId,
     base: null,
     al: {} as Record<string, FileId>,
     path: p,
@@ -936,13 +936,13 @@ describe("spans", () => {
         const src = source("/p/m.bend", text);
         const beg = masked.indexOf("x");
         const got = mapper([src])({
-          file: { str: masked, ns: Bend.file_name(""), base: null, dir: "/p/", al: { A: Bend.file_name("a") } },
+          file: { str: masked, ns: "" as FileId, base: null, dir: "/p/", al: { A: "a" as FileId } },
           beg,
           end: beg + 1,
         } as BendSpan)!;
         expect(got.file).toBe(src);
         expect(text.slice(got.beg, got.end)).toBe("x");
-        expect(src.al.A).toBe(Bend.file_name("a"));
+        expect(src.al.A).toBe("a" as FileId);
       });
     }
   }
@@ -954,11 +954,11 @@ describe("spans", () => {
     expect(map(spn)).toBe(spn);
     expect(
       drifts(() =>
-        map({ file: { str: "\ndef g() -> N:\n  x\n", ns: Bend.file_name(""), base: null, al: {} }, beg: 0, end: 0 }),
+        map({ file: { str: "\ndef g() -> N:\n  x\n", ns: "" as FileId, base: null, al: {} }, beg: 0, end: 0 }),
       ),
     ).toBe(true);
     expect(
-      drifts(() => map({ file: { str: "def f() -> N:\n  x\n", ns: Bend.file_name(""), base: null, al: {} }, beg: 0, end: 0 })),
+      drifts(() => map({ file: { str: "def f() -> N:\n  x\n", ns: "" as FileId, base: null, al: {} }, beg: 0, end: 0 })),
     ).toBe(true);
   });
 
@@ -967,7 +967,7 @@ describe("spans", () => {
     const b = source("/b/m.bend", "import Base\nx\n");
     const map = mapper([a, b]);
     expect(
-      map({ file: { str: "\nx\n", ns: Bend.file_name(""), base: null, dir: "/b/", al: {} }, beg: 1, end: 2 } as BendSpan)!.file,
+      map({ file: { str: "\nx\n", ns: "" as FileId, base: null, dir: "/b/", al: {} }, beg: 1, end: 2 } as BendSpan)!.file,
     ).toBe(b);
   });
 });
@@ -1090,7 +1090,7 @@ def main() -> U32:
       facts: true,
       run: (cx) => {
         expect(cx.body("U32.add")).toBeUndefined();
-        const owner = Bend.name_source(Bend.file_name(fs.realpathSync(dependency)), "add");
+        const owner = Bend.name_source(Bend.name_escape(fs.realpathSync(dependency)) as FileId, "add");
         expect(cx.body(owner)).toBeDefined();
         expect(cx.body(Bend.name_source(Bend.BASE_ID, "U32.add"))).toBeDefined();
         return [];
@@ -1152,8 +1152,8 @@ def main() -> N:
 
   test("walk preserves constructor and type argument order across traversals", () => {
     const children: LTerm[] = [
-      { $: "Ref", k: Bend.name_source(Bend.file_name("test"), "first") },
-      { $: "Ref", k: Bend.name_source(Bend.file_name("test"), "second") },
+      { $: "Ref", k: Bend.name_source("test" as FileId, "first") },
+      { $: "Ref", k: Bend.name_source("test" as FileId, "second") },
     ];
     for (const $ of ["Ctr", "ADT"] as const) {
       const term = { $, k: "Pair", x: children } as LTerm;
@@ -1687,7 +1687,7 @@ describe("review fixes", () => {
       b = file2("/p/b.bend", "b");
     expect(
       mapper([a, b])({
-        file: { str: "x\n", ns: Bend.file_name("b"), base: null, dir: "/p/", al: {} },
+        file: { str: "x\n", ns: "b" as FileId, base: null, dir: "/p/", al: {} },
         beg: 0,
         end: 1,
       } as BendSpan)!.file,
@@ -1894,7 +1894,7 @@ def other(~T: Type, x: T) -> T:
 def separate() -> N:
   other(~N, Z{})
 `);
-    const generic = Bend.name_source(Bend.file_name(fs.realpathSync(file)), "generic");
+    const generic = Bend.name_source(Bend.name_escape(fs.realpathSync(file)) as FileId, "generic");
     const all = await seen(file, true);
     const only = async (want: LintRule["facts"], keep: (f: Seen) => boolean) => {
       let complete: Seen[] = [], got: Seen[] = [];

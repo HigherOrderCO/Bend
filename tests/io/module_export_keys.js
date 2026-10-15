@@ -41,8 +41,8 @@ def dep.value(x: U32) -> U32:
     }
     const lib = require(output).default;
     const Bend = require(path.resolve("bend2/bend.ts"));
-    const file = Bend.file_name(fs.realpathSync(input));
-    const dep = Bend.file_name(fs.realpathSync(path.join(dir, "dep.bend")));
+    const file = Bend.name_escape(fs.realpathSync(input));
+    const dep = Bend.name_escape(fs.realpathSync(path.join(dir, "dep.bend")));
     const values = { ["__proto__"]: 6, constructor: 7, toString: 8, ordinary: 9, "dep.value": 25 };
     const keys = Object.keys(values), imported = Bend.name_source(dep, "value");
     if (keys.some((k) => !Object.hasOwn(lib, k)) || !Object.hasOwn(lib, imported)) {

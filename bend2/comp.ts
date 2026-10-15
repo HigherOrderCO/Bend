@@ -2755,7 +2755,7 @@ function foreign_src(src: string, scopes: Bend.File[], use?: (macro: string, key
   const names = new Set<string>();
   const prefix = header[2].split(header[1]).slice(0, -1).map((line) => {
     const row = /^\/\/ (CID|FID) ([A-Za-z0-9_./:%#!?~-]+) (BEND_[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*)$/.exec(line);
-    if (!row || names.has(row[3])) die("invalid bend-ids declaration: " + line);
+    if (!row || names.has(row[3]) || /^[#:]/.test(row[2]) && !Bend.SOURCE_NAME.test(row[2].slice(1))) die("invalid bend-ids declaration: " + line);
     const [, macro, token, alias] = row;
     names.add(alias);
     const [key, ...others] = scopes.map(scope => {
@@ -2770,7 +2770,7 @@ function foreign_src(src: string, scopes: Bend.File[], use?: (macro: string, key
       return key;
     });
     if (others.some((k) => k !== key)) die("foreign binding differs between "
-      + scopes.map((s) => Bend.file_text(s.ns)).join(", ") + ": " + line);
+      + scopes.map((s) => Bend.name_unescape(s.ns)).join(", ") + ": " + line);
     if (use) {
       use(macro, key);
       return "";

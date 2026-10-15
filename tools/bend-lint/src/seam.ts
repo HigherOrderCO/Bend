@@ -740,7 +740,7 @@ const checked = async (
     .map((real): Source => {
       const text = texts.get(real) ?? fs.readFileSync(real, "utf8");
       const source = { path: real, text, root: real === root, base: real === Bend.BASE_BEND };
-      const ns = seen.get(real) ?? Bend.file_name(real);
+      const ns = seen.get(real) ?? Bend.name_escape(real) as FileId;
       const scope = "book" in read ? read.book.files.get(ns) : undefined;
       const file: File = { str: text, ns, al: { ...scope?.al }, base: scope?.base ?? null, path: real };
       FILES.set(source, file);
