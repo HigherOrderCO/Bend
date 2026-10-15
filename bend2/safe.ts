@@ -538,11 +538,8 @@ function model(e: Safe, T: HTerm): HTerm | null {
   return model_by(e, T, false) ?? model_by(e, T, true);
 }
 
-// a model of root k's constant c, at its ~ parameter j of type T: the
-// argument a bend2 instance of k passes there, checked at T in the model
-// book, so it fits the models before it. It is the user's own term, so a
-// model is built only for a root with no instance; the kernel checks
-// either, and c stays opaque in k
+// a model of c, k's ~ parameter j: the argument an instance of k passes
+// there, if it checks at T against the models so far
 function inst_model(e: Safe, k: Name, j: number, c: string, T: HTerm): HTerm | null {
   for (const [t, xs] of e.inst.values()) {
     try {

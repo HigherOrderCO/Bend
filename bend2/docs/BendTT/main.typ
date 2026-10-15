@@ -1095,14 +1095,6 @@ translation and then the kernel. The command `bend -o F.bendtt` writes
 the translated book to a file, where a reader can check what a law
 states.
 
-The translation checks a template once, with each `~` parameter an
-opaque constant. The kernel has no axioms, so each constant needs a
-closed model of its type. The model is the argument that a call to the
-template passes there: the program's own term, which the checker has
-already checked at that type. The translation builds a model only for
-a template that no call instantiates. The kernel checks every model,
-and the template's proof never unfolds one.
-
 = Related Work <sec:related>
 
 *Type in type.* Martin-Löf's first type theory had a type of all types
