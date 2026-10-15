@@ -2682,7 +2682,7 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
     const ws = vs.flatMap(([p, b]) =>
       (pos.set(p, depth), depth += b.val.ws.length, b.val.ws));
     emit_chain(sc, [["seq", () => {
-      const fr = [...ws, seg_ref(sc, seg_fid(kn))];
+      const fr = [...ws, `WL_K(${seg_ref(sc, seg_fid(kn))})`];
       file_push(sc, `WL_ROOM(${fr.length});`);
       fr.forEach((w, j) => file_push(sc, `STK(${j}) = ${w};`));
       file_push(sc, `WL_PUSHN(${fr.length});`);
@@ -3452,6 +3452,8 @@ using namespace metal;
 #define WL_OPEN    {
 #define WL_JMP(F)  { fid = (F); break; }
 #define WL_DYN     WL_JMP
+#define WL_K(F)    F
+#define WL_GO(K)   WL_DYN((u32)(K))
 #else
 #define DFAR       INLINE
 #define LOCK(l)    while (__atomic_exchange_n(&(l), 1, __ATOMIC_ACQUIRE)) {}
@@ -3459,8 +3461,10 @@ using namespace metal;
 #define WL_FN      FAR PRESERVE(preserve_none) Term
 #define WL_CASE(F) WL_FN WL_##F(WL_SIG) {
 #define WL_OPEN    { WL_BANK u32 rn;
-#define WL_JMP(F)  __attribute__((musttail)) return WL_##F(WL_ALL)
-#define WL_DYN(F)  __attribute__((musttail)) return wl_tab[F](WL_ALL)
+#define WL_GO(K)   __attribute__((musttail)) return ((WlFn)(K))(WL_ALL)
+#define WL_JMP(F)  WL_GO(WL_##F)
+#define WL_DYN(F)  WL_GO(wl_tab[F])
+#define WL_K(F)    (Term)WL_##F
 #endif
 #define WL_SPIN     for (;;) { if (err_spun(e.mem, &wpoll)) { return 0; }
 #define WL_SPUN     } break;
@@ -3469,7 +3473,8 @@ using namespace metal;
 #define LANE_STEP (DEVICE ? (long)CUBE : 1)
 #define STK(I)    sp[(long)(I) * LANE_STEP]
 
-#define WL_RETN(N)  { rn = (N); sp -= LANE_STEP; WL_DYN((u32)STK(0)); }
+// A host frame holds its continuation's address, a device frame its id.
+#define WL_RETN(N)  { rn = (N); sp -= LANE_STEP; WL_GO(STK(0)); }
 #define WL_CONT     STK(-3)
 #define WL_IDX      STK(-2)
 #define WL_POPN(N)  sp -= (N) * LANE_STEP
@@ -3478,7 +3483,7 @@ using namespace metal;
   u64 wtl = task_tail(T); \
   STK(0) = e.mem[wtl]; \
   STK(1) = (e.mem[wtl + 1] >> 32) & 0xFFFF; \
-  STK(2) = FID_EXIT; \
+  STK(2) = WL_K(FID_EXIT); \
   WL_PUSHN(3);
 #define WL_ARGS(A, N) \
   for (u32 wi = 0; wi < (N); wi += 1) { \
