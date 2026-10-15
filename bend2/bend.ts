@@ -868,7 +868,7 @@ export function ctx_scope(ctx: Ctx): Label[] {
 // for a package's <name>@<version>.
 
 export function book_nil(): Book {
-  return { entry: file_name(""), base: null, files: new Map(), tlds: Object.create(null), ctrs: Object.create(null), order: [], hols: 0, tmps: new Map() };
+  return { entry: "" as FileId, base: null, files: new Map(), tlds: Object.create(null), ctrs: Object.create(null), order: [], hols: 0, tmps: new Map() };
 }
 
 export function book_ctr(book: Book, k: Name): Ctr | null {
@@ -1634,11 +1634,10 @@ export function parse_reso(p: Parse, raw: string, category: Category = "def"): N
   return found.k;
 }
 
-// a head read again, as another category or with a method suffix: written
-// as the file writes its key
+// a head read again, as another category or with a method suffix: spelled
+// as the file spells its key
 function parse_head(p: Parse, t: LTerm, category: Category, op = ""): Name {
-  const k = (t as { k: Name }).k, al = Object.keys(p.al).find((a) => p.al[a] === name_file(k));
-  return parse_reso(p, t.$ === "Var" ? t.k + op : (al ? al + "." : "") + name_text(k) + op, category);
+  return parse_reso(p, (t.$ === "Var" ? t.k : name_display(p.book, (t as { k: Name }).k, p)) + op, category);
 }
 
 // sugar's names: Base's, or the file's own when Base is not in the book
@@ -3502,8 +3501,7 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       const t_wnf = term_wnf(book, ty);
       if (t_wnf.$ !== "ADT") {
         const fam = book_ctr(book, tm.k) === null ? null : book_fam(book, tm.k);
-        const [f, x] = [name_file(tm.k), name_text(tm.k)];
-        const type = book.tlds[name_source(f, x)] ?? (f === tm.s?.file.ns ? book.tlds[name_resolve(book, tm.s.file, x).k] : undefined);
+        const type = tm.s && book.tlds[name_resolve(book, tm.s.file, name_display(book, tm.k, tm.s.file)).k];
         const nte = fam === null && type?.$ === "ADT" ? "Note: " + name_display(book, tm.k) + " is a datatype: write its arguments as <>" : undefined;
         throw Err(book, ctx, ty, fam === null ? "non-inferrable term" : Ref(fam, tm.s), tm.s, lhs.def, nte);
       }
@@ -3814,6 +3812,9 @@ export function book_valid(book: Book, done: number = 0): void {
       continue;
     }
     if (i >= done) {
+      if (fin && tld.v === null && tld.b !== true && !tld.i) {
+        book.hols += 1;
+      }
       term_check(book, { t: Ref(k), n: 0, def: k, qs: [], u: tld.u }, tld.T, None(), Typ(Qua(Lone())), ctx_nil(), 0);
       if (tld.i) {
         let tel = term_strip(tld.T);

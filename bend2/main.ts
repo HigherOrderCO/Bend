@@ -988,10 +988,8 @@ async function book_read(file: string, base?: Bend.Book,
       throw "Error: PROOF.bend must import ./LAWS.bend";
     }
     Bend.book_valid(book, base?.order.length ?? 0);
-    const holes = book.hols + Object.values(book.tlds)
-      .filter(t => t.$ === "Def" && t.v === null && t.b !== true && !t.i).length;
-    if (holes > 0) {
-      throw "Error: " + String(holes) + " TODO" + (holes === 1 ? "" : "s")
+    if (book.hols > 0) {
+      throw "Error: " + String(book.hols) + " TODO" + (book.hols === 1 ? "" : "s")
         + " found.\nThe code is incomplete, and not a valid proof yet.";
     }
   } catch (e) {
