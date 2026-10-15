@@ -264,12 +264,15 @@ export function name_source(file: FileId, text: string, category: Category = "de
 
 export function name_internal(text: string): Name { return ("!" + text) as Name; }
 
-let next_name = 0n;
-export function name_gen(owner: Name, role: string, member?: number | bigint | string): Name {
-  const n = member === undefined ? "@" + next_name++ : typeof member === "string"
-    ? "@k" + name_escape(member) : String(BigInt(member));
+export function name_gen(owner: Name, role: string, member: number | bigint | string): Name {
+  const n = typeof member === "string" ? "@k" + name_escape(member) : String(BigInt(member));
   if (n[0] === "-") throw Error("negative member position");
   return (owner + "~" + role + ":" + n) as Name;
+}
+
+let next_name = 0n;
+export function name_fresh(owner: Name, role: string): Name {
+  return (owner + "~" + role + ":@" + next_name++) as Name;
 }
 
 export function name_escape(text: string): string {
@@ -788,55 +791,47 @@ function term_at(value: HTerm, span?: Span): HTerm {
     ? value : { ...value, s: span };
 }
 
-// A checked copier belongs to one environment; every binder application starts another.
-export function term_higher(tm: LTerm, env: Env = null, copy?: (t: HTerm) => HTerm): HTerm {
-  switch (tm.$) {
-    case "Var": {
-      if (tm.i < 0) return copy ? copy(tm) : tm;
-      const v = list_get(env, tm.i);
-      if (v !== null) return typeof v === "function" ? v(tm.s) : term_at(v, tm.s);
-      if (!copy && tm.v !== undefined) return tm.v;
-      throw Error("missing binding: " + tm.k + "@" + tm.i);
-    }
-    case "Op": {
-      const op = term_excerpt(tm);
-      throw Err(book_nil(), ctx_nil(), "a type for this operator (write (a " + op + " b : Nat))", undefined, tm.s, undefined,
-        "Note: we broke this after launch, sorry. Until 2.0.16 a bare operator meant Nat.\n"
-        + "That was a bug: operators demand annotation. Wrap the expression and it'll work again.");
-    }
-    case "Ref":
-      if (tm.issue !== undefined) throw Err(book_nil(), ctx_nil(), tm.issue, tm.s && "'" + term_excerpt(tm) + "'", tm.s);
-      return Ref(tm.k, tm.s, tm.b);
-    case "Sub": {
-      const e = list_set(env, tm.i, (s?: Span) => term_higher(patt_term(tm.v, s), env, copy));
-      return term_higher(tm.f, e, copy && checked_copy(e));
-    }
-    case "Let": return Let(tm.k, tm.i, tm.v.map(x => term_higher(x, env, copy)), (xs: HTerm[]) => {
-      const e = xs.reduce((e, x, j) => list_set(e, tm.i[j], x), env);
-      return term_higher(tm.f, e, e === env ? copy : copy && checked_copy(e));
-    }, tm.s, tm.q);
-    case "All": return All(tm.q, tm.k, tm.i, term_higher(tm.A, env, copy), (x: HTerm) => {
-      const e = list_set(env, tm.i, x);
-      return term_higher(tm.B, e, copy && checked_copy(e));
-    }, tm.s);
-    case "Lam": return Lam(tm.k, tm.i, (x: HTerm) => {
-      const e = list_set(env, tm.i, x);
-      return term_higher(tm.f, e, copy && checked_copy(e));
-    }, tm.s, tm.q);
-    case "App": {
-      const f = term_higher(tm.f, env, copy), x = term_higher(tm.x, env, copy);
-      return f.$ === "Lam" ? f.f(x) : App(f, x, tm.s);
-    }
-    default: return copy ? term_map(tm, x => term_higher(x, env, copy)) : term_map(tm, term_higher, env);
-  }
-}
-
-function checked_copy(env: Env): (t: HTerm) => HTerm {
-  const copy = scope_mapper(v => {
+// One traversal owns one environment and, for checked syntax, its cell copies.
+export function term_higher(term: LTerm, env: Env = null, checked = false): HTerm {
+  const copy = checked && scope_mapper(v => {
     if (v.i < 0) throw Error("missing checked binding: " + v.k + "@" + v.i);
-    return term_higher(v, env, copy);
+    return go(v);
   });
-  return copy;
+  function go(tm: LTerm): HTerm {
+    switch (tm.$) {
+      case "Var": {
+        if (tm.i < 0) return copy ? copy(tm) : tm;
+        const v = list_get(env, tm.i);
+        if (v !== null) return typeof v === "function" ? v(tm.s) : term_at(v, tm.s);
+        if (!checked && tm.v !== undefined) return tm.v;
+        throw Error("missing binding: " + tm.k + "@" + tm.i);
+      }
+      case "Op": {
+        const op = term_excerpt(tm);
+        throw Err(book_nil(), ctx_nil(), "a type for this operator (write (a " + op + " b : Nat))", undefined, tm.s, undefined,
+          "Note: we broke this after launch, sorry. Until 2.0.16 a bare operator meant Nat.\n"
+          + "That was a bug: operators demand annotation. Wrap the expression and it'll work again.");
+      }
+      case "Ref":
+        if (tm.issue !== undefined) throw Err(book_nil(), ctx_nil(), tm.issue, tm.s && "'" + term_excerpt(tm) + "'", tm.s);
+        return Ref(tm.k, tm.s, tm.b);
+      case "Sub": return term_higher(tm.f, list_set(env, tm.i, (s?: Span) => go(patt_term(tm.v, s))), checked);
+      case "Let": return Let(tm.k, tm.i, tm.v.map(go), (xs: HTerm[]) => {
+        const e = xs.reduce((e, x, j) => list_set(e, tm.i[j], x), env);
+        return e === env ? go(tm.f) : term_higher(tm.f, e, checked);
+      }, tm.s, tm.q);
+      case "All": return All(tm.q, tm.k, tm.i, go(tm.A), (x: HTerm) =>
+        term_higher(tm.B, list_set(env, tm.i, x), checked), tm.s);
+      case "Lam": return Lam(tm.k, tm.i, (x: HTerm) =>
+        term_higher(tm.f, list_set(env, tm.i, x), checked), tm.s, tm.q);
+      case "App": {
+        const f = go(tm.f), x = go(tm.x);
+        return f.$ === "Lam" ? f.f(x) : App(f, x, tm.s);
+      }
+      default: return term_map(tm, go);
+    }
+  }
+  return go(term);
 }
 
 export function term_lower(term: HTerm, d: number = 0): LTerm {
@@ -917,7 +912,7 @@ export function scope_mapper(free: (v: Variable) => HTerm, refs?: ReadonlyMap<Na
 
 
 // Requires checker-owned output; transport the cells captured by its annotations.
-export function checked_higher(term: LTerm): HTerm { return term_higher(term, null, checked_copy(null)); }
+export function checked_higher(term: LTerm): HTerm { return term_higher(term, null, true); }
 
 // Ctx
 // ===

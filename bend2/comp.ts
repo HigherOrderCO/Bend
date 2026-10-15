@@ -83,8 +83,6 @@ type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 // it pads to its size class and keeps 240 plus log2 of it in CID_T. An
 // argument nested past TPL_DEEP brackets goes to a local (clang allows 256).
 
-const BASE = { def: new Map<string, Name>(), ctr: new Map<string, Name>() };
-
 const CLO_APPLY = name_internal("Clo.apply");
 
 const IO_EMIT = name_internal("IO.emit");
@@ -491,7 +489,7 @@ let FL: File;
 // ====
 
 function base(k: string, category: Bend.Category = "def"): Name {
-  return memo(BASE[category], k, () => name_source(Bend.BASE_ID, k, category));
+  return name_source(Bend.BASE_ID, k, category);
 }
 
 function entry(book = FL.book): Name {
@@ -2719,7 +2717,7 @@ function foreign_src(src: string, scopes: Bend.File[]): string {
         ? name_resolve(FL.book, scope, token.slice(1), token[0] === "#" ? "ctr" : "def")
         : { k: token as Name };
       if ("issue" in found && found.issue !== undefined) die(found.issue);
-      const key = found.k ?? die(`${macro}(${token}) names no public constructor or def`);
+      const key = found.k;
       const valid = macro === "CID" ? (key in FL.book.ctrs) || def_foreign(FL.book.tlds[key])
         : FL.book.tlds[key]?.$ === "Def" || key === CLO_APPLY || key === IO_EMIT;
       if (!valid || name_parent(key) !== null) die(`${macro}(${token}) names no public constructor or def`);

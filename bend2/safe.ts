@@ -229,7 +229,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>): { text: string; oos: A
       if (!(x instanceof Scope_Error)) {
         throw x;
       }
-      const n = B.name_gen(k, "tt");
+      const n = B.name_fresh(k, "tt");
       e.fail.set(n, x.message);
       roots.push([k, n]);
     }
@@ -294,7 +294,7 @@ function root_cols(e: Safe, k: Name, T: HTerm, j: number): Cols[] {
   if (kept !== undefined) {
     return at(B.Ref(kept));
   }
-  const c = B.name_gen(k, "root");
+  const c = B.name_fresh(k, "root");
   const def: Def = { $: "Def", n: 0, x: 0, T: F.A, v: null };
   e.book.tlds[c] = def;
   const m = model(e, F.A);
@@ -335,7 +335,7 @@ function item_ref(e: Safe, k: Name, cols: Cols, live: boolean): Name {
   const m = live && !e.seen.has(key) ? trail(e) : null;
   let n = e.names.get(key);
   if (n === undefined) {
-    n = B.name_gen(k, "tt");
+    n = B.name_fresh(k, "tt");
     e.names.set(key, n);
     e.todo.push([k, cols]);
   }
@@ -1120,7 +1120,7 @@ function group_new(e: Safe, k: Name, hs: Name[]): Group | null {
   if (hs.length === 0 || !doms.some(([q], j) => q.$ !== "None" && (tld.$ !== "Def" || j >= tld.x))) {
     return null;
   }
-  return { k, id: B.name_gen(k, "group"), ms: [k, ...hs], qs: doms.map(([q]) => quant(q)) };
+  return { k, id: B.name_fresh(k, "group"), ms: [k, ...hs], qs: doms.map(([q]) => quant(q)) };
 }
 
 // the arguments of each call to k in the lowered term t
