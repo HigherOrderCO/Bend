@@ -51,10 +51,10 @@ function lint_spot(s) {
 
 function lint_value(v) {
   return typeof v === "number"
-    ? { $: CID(Num), value: v }
+    ? { $: CID(OptionNum), value: v }
     : typeof v === "boolean"
-      ? { $: CID(Flag), value: v }
-      : { $: CID(Text), value: v };
+      ? { $: CID(OptionFlag), value: v }
+      : { $: CID(OptionText), value: v };
 }
 
 function lint_term(id) {
