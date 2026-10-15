@@ -337,7 +337,7 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     }
     const def: Def = { $: "Def", n: 0, x: 0, T: F.A, v: null };
     e.book.tlds[c] = def;
-    const m = model(e, F.A);
+    const m = inst_model(e, k, j, c, F.A) ?? model(e, F.A);
     if (m !== null) {
       e.mb.tlds[c] = { ...def, v: m };
     }
@@ -442,7 +442,7 @@ function item_emit(e: Safe, k: Name, cols: Cols, n: string): void {
 // no body goes out opaque, at a model of its type
 function def_emit(e: Safe, k: Name, cols: Cols, n: string, tld: Def): void {
   const T = B.tele_fill(e.book, tld.T, cols.slice(0, tld.x) as HTerm[], B.ctx_nil());
-  const t = tld.e !== undefined ? null : model(e, T) ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_key(k));
+  const t = tld.e !== undefined ? null : (Object.hasOwn(e.mb.tlds, k) ? (e.mb.tlds[k] as Def).v : model(e, T)) ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_key(k));
   const s = { ...scope_nil(), self: n };
   const To = term(e, s, T, false);
   e.out.push([n, To, t === null ? arm(e, s, k, cols, []) : tree(e, s, t, []), t !== null]);
@@ -532,10 +532,28 @@ function subst(t: HTerm, d: number, f: (o: Record<string, unknown>) => HTerm | u
 // is used once); none for an empty type. A projection model takes that
 // variable first: a law like {a == sub(add(a, b), b)} holds of it, one
 // like {add(a, b) == add(b, a)} of a constant. It reads the model book,
-// as the kernel checks a model with every opaque def at its own
+// where each opaque def is at its own model.
 
 function model(e: Safe, T: HTerm): HTerm | null {
   return model_by(e, T, false) ?? model_by(e, T, true);
+}
+
+// a model of root k's constant c, at its ~ parameter j of type T: the
+// argument a bend2 instance of k passes there, checked at T in the model
+// book, so it fits the models before it. It is the user's own term, so a
+// model is built only for a root with no instance; the kernel checks
+// either, and c stays opaque in k
+function inst_model(e: Safe, k: Name, j: number, c: string, T: HTerm): HTerm | null {
+  for (const [t, xs] of e.inst.values()) {
+    try {
+      if (t === k) {
+        return B.term_higher(B.term_check(e.mb, { t: B.Ref(c), n: 0, def: c, qs: [] }, xs[j], B.Lone(), T, B.ctx_nil(), 0).tm);
+      }
+    } catch {
+      // it does not fit
+    }
+  }
+  return null;
 }
 
 // a round that cuts no branch finds what an unbounded search would; one
