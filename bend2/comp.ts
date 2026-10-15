@@ -1358,7 +1358,9 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // (its scope's brwl) and becomes owned (own) when owned or unlent; a lend is
 // asked by a holder or passed on from a lent root (k~i<j~q). A shared value
 // heats its type (hot); a family stuck on an open index heats its arms'
-// types once, its arguments at every instantiation. compile_book emits until
+// types once, its arguments at every instantiation. A handle, a law with no
+// body (Chan(A)), heats nothing: its copies count it and its values only
+// move; any other stuck type heats them all (*). compile_book emits until
 // a pass changes no fact.
 
 function file_new(book: Bend.Book, js: boolean): File {
@@ -1498,7 +1500,7 @@ function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
       && tele_unbind(FL.book.tlds[sc.def].T).doms[w.i];
     if (dom && dom[1] === w.k && !dom_live(dom)) {
       FL.hot.add(sc.def + "~" + w.i);
-    } else if (m && (m.t as Of<"Ref">).k === "Chan") {
+    } else if (m && m.tld?.$ === "Def" && !done_live(m.tld)) {
       return;
     } else if (ty_tag(w, "All Var App")) {
       FL.hot.add("*");
