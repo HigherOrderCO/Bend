@@ -218,7 +218,7 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
   const e: Safe = { book, mb: { ...book, tlds: Object.create(book.tlds) as Book["tlds"] }, out: [], names: new Map(), seen: new Set(),
     todo: [], taken: new Set(), fail: new Map(), log: [], groups, inst, stack: [], going: new Set(), grew: false, consts: new Map(), uses: new WeakMap() };
   const roots: Array<[Name, string[], string | null]> = [];
-  for (const k of [...new Set([...book.order].reverse())].reverse().filter((k) => book.tlds[k].b !== true)) {
+  for (const k of [...new Set([...book.order].reverse())].reverse().filter((k) => !B.is_base(k))) {
     const m = trail(e);
     try {
       roots.push([k, ...root_emit(e, k)]);
@@ -432,7 +432,7 @@ function item_emit(e: Safe, k: Name, cols: Cols, n: string): void {
     return adt_emit(e, cols, n, tld);
   }
   if (tld.u === true) {
-    oos("uses " + (tld.b === true ? "base's" : "the") + " @unsafe def " + B.name_key(k));
+    oos("uses " + (B.is_base(k) ? "base's" : "the") + " @unsafe def " + B.name_key(k));
   }
   def_emit(e, k, cols, n, tld);
 }
@@ -442,7 +442,7 @@ function item_emit(e: Safe, k: Name, cols: Cols, n: string): void {
 // no body goes out opaque, at a model of its type
 function def_emit(e: Safe, k: Name, cols: Cols, n: string, tld: Def): void {
   const T = B.tele_fill(e.book, tld.T, cols.slice(0, tld.x) as HTerm[], B.ctx_nil());
-  const t = tld.e !== undefined ? null : model(e, T) ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_key(k));
+  const t = tld.e !== undefined ? null : model(e, T) ?? oos("no model for " + (tld.i === undefined ? "" : (B.is_base(k) ? "base's" : "the") + " foreign def ") + B.name_key(k));
   const s = { ...scope_nil(), self: n };
   const To = term(e, s, T, false);
   e.out.push([n, To, t === null ? arm(e, s, k, cols, []) : tree(e, s, t, []), t !== null]);
@@ -1012,7 +1012,7 @@ function term(e: Safe, s0: Scope, t: HTerm, live: boolean): O {
       return ctr_term(e, s, x, T, live);
     }
     case "Lit": {
-      if (x.k === "Nat" && x.v > NAT_MAX && e.book.tlds.Nat?.b === true) {
+      if (x.k === "Nat" && x.v > NAT_MAX && e.book.tlds.Nat !== undefined) {
         // a long Nat is q * NAT_MAX + r, by base's Nat.mul and Nat.add
         const [q, r] = [Math.floor(x.v / NAT_MAX), x.v % NAT_MAX];
         const mul = B.App(B.App(B.Ref("Nat.mul"), B.Lit("Nat", q)), B.Lit("Nat", NAT_MAX));

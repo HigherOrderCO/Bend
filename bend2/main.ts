@@ -757,7 +757,7 @@ function pkg_files(file: string, book: Bend.Book,
     real === BASE || ns === null || ns.startsWith("0x") ? []
       : [[ns === "" ? path.basename(file) : ns + ".bend", real]]),
   ...Object.entries(book.tlds).flatMap(([k, tld]): [string, string][] =>
-    tld.$ !== "Def" || tld.i === undefined || tld.b === true
+    tld.$ !== "Def" || tld.i === undefined || Bend.is_base(k)
       || k.startsWith("0x") ? [] : tld.i.map((f) =>
       [f.startsWith(dir) ? f.slice(dir.length) : f, f]))];
   const ups = raws.map(([p]) => path.posix.normalize(p).split("/")
@@ -843,13 +843,13 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
 // defs outside Base collects who names whom, then each promise floods
 // back along those edges.
 function book_promises(book: Bend.Book): Array<[string, string[]]> {
-  const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
+  const own  = [...new Set(book.order)].filter((k) => !Bend.is_base(k));
   const keys = Object.keys(book.tlds);
   const roots: Array<[string, string[]]> = [
     ["@unsafe", keys.filter((k) => (book.tlds[k] as Bend.Def).u === true)],
     ["foreign effects", keys.filter((k) => {
       const t = book.tlds[k] as Bend.Def;
-      return t.u !== true && t.i !== undefined && t.b !== true;
+      return t.u !== true && t.i !== undefined && !Bend.is_base(k);
     })],
   ];
   if (roots.every(([, ks]) => ks.length === 0)) {
