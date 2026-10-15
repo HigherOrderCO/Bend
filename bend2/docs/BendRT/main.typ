@@ -522,13 +522,21 @@ lose it.
 `Window.fullscreen(window, on)` requests a desktop transition without
 changing the logical drawing resolution. It threads the window back
 outside its `Result`; a desktop without fullscreen support returns
-`ENOTSUP`. Cocoa keeps the Metal drawable fixed while its layer scales
-to the view; X11 scales only the display blit. Absolute pointer positions
-stay in logical image coordinates, while grabbed look deltas stay raw.
-The desktop applies the requested state asynchronously: requesting the
-same state again does not toggle it, and requesting off restores the
-windowed size. X11 releases the fixed-size hints for the fullscreen
-transition and restores them on return to the windowed state.
+`ENOTSUP`. Cocoa keeps an immutable logical image size for Metal dispatch
+and input conversion, independent of backing-scale changes. X11 uploads
+only that logical image and uses a nearest-neighbour XRender transform
+for the fullscreen display, preserving aspect ratio with black bars.
+On X11, ordinary windowed rendering stays unscaled. Absolute positions and
+grabbed look deltas use the same logical image units; bar positions clamp
+to the image edge.
+The desktop applies the state asynchronously: `Done` acknowledges the
+request, not its completion, and `Window.frame` pumps desktop events.
+X11 defers an initial request until its window manager owns the window,
+caches support at open, and ignores repeated requests for the same target.
+Fixed-size hints are relaxed during transitions and restored on exit.
+Cocoa refuses requests on a hidden or minimized window with `EAGAIN`;
+delegate failures leave the window usable, and a transition with no
+notification is retired by a later frame or request rather than staying busy.
 
 = The JavaScript Backend <sec:js>
 

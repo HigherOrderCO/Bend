@@ -2,9 +2,9 @@
 # pixel (x, y) is x + 64y; fold sums its leaves (+q is shared). Without a
 # display (the JS backend, a node with no session)
 # Window.open Fails with one line and ENOTSUP on every lane and the frames
-# fold unshown; on a display it frames each image (the shared one twice: a
-# frame answers it unconsumed), grabs the mouse for the last two and
-# lets it go, then closes.
+# fold unshown; on a display it requests fullscreen twice, frames each
+# image (the shared one twice), releases the grab, requests windowed twice
+# and frames again before close. Unsupported fullscreen retains the handle.
 import Base
 
 def count(xs: List<Event>) -> U32:
@@ -54,15 +54,35 @@ def frames(n: Nat, p: Window & Image) -> IO(Window):
 def close(w: Window) -> IO(Unit):
   Window.close(w)
 
+def full_answer(p: Window & Result<&1, &1, U32 & String, Unit>) -> IO(Window):
+  (w, r) = p
+  match r:
+    case Done{u}:
+      IO.pure(Window, w)
+    case Fail{(code, text)}:
+      do IO<Window>:
+        IO.print("fullscreen errno " ++ U32.show(code))
+        IO.pure(Window, w)
+
+def set_full(w: Window, on: Bool) -> IO(Window):
+  do IO<Window>:
+    p : Window & Result<&1, &1, U32 & String, Unit> <- Window.fullscreen(w, on)
+    full_answer(p)
+
 def shown(w: Window) -> IO(Unit):
   +q = build(2n, 0, 0)
   do IO<Unit>:
-    w1 : Window <- frames(1n, (w, Pix{7}))
+    wf : Window <- set_full(w, True{})
+    wr : Window <- set_full(wf, True{})
+    w1 : Window <- frames(1n, (wr, Pix{7}))
     w2 : Window <- frames(1n, (w1, build(6n, 0, 0)))
     g : Window <- Window.grab(w2, True{})
     w3 : Window <- frames(2n, (g, Qua{q, Pix{1}, q, Pix{2}}))
     w4 : Window <- Window.grab(w3, False{})
-    close(w4)
+    wa : Window <- set_full(w4, False{})
+    wb : Window <- set_full(wa, False{})
+    w5 : Window <- frames(1n, (wb, Pix{7}))
+    close(w5)
 
 def sup(yes: Bool, code: U32) -> String:
   match yes:

@@ -105,12 +105,12 @@ static bool window_renderer(Display* dpy) {
     window_render.tried = true;
     void* lib = dlopen("libXrender.so.1", RTLD_LAZY | RTLD_LOCAL);
     if (lib != NULL) {
-      *(void**)(&window_render.format) = dlsym(lib, "XRenderFindVisualFormat");
-      *(void**)(&window_render.create) = dlsym(lib, "XRenderCreatePicture");
-      *(void**)(&window_render.destroy) = dlsym(lib, "XRenderFreePicture");
-      *(void**)(&window_render.transform) = dlsym(lib, "XRenderSetPictureTransform");
-      *(void**)(&window_render.filter) = dlsym(lib, "XRenderSetPictureFilter");
-      *(void**)(&window_render.composite) = dlsym(lib, "XRenderComposite");
+      window_render.format = (__typeof__(window_render.format))dlsym(lib, "XRenderFindVisualFormat");
+      window_render.create = (__typeof__(window_render.create))dlsym(lib, "XRenderCreatePicture");
+      window_render.destroy = (__typeof__(window_render.destroy))dlsym(lib, "XRenderFreePicture");
+      window_render.transform = (__typeof__(window_render.transform))dlsym(lib, "XRenderSetPictureTransform");
+      window_render.filter = (__typeof__(window_render.filter))dlsym(lib, "XRenderSetPictureFilter");
+      window_render.composite = (__typeof__(window_render.composite))dlsym(lib, "XRenderComposite");
     }
   }
   int op, ev, er;
@@ -139,7 +139,8 @@ static bool window_has_value(Display* dpy, Window at, Atom property, Atom kind,
 static void window_viewport(BendWin* win) {
   u32 w = win->img->width, h = win->img->height;
   u32 vw = w, vh = h;
-  if (win->full_now) {
+  bool full = win->full_now && win->source;
+  if (full) {
     if ((u64)win->width * h <= (u64)win->height * w) {
       vw = win->width;
       vh = (u64)h * vw / w;
@@ -150,15 +151,39 @@ static void window_viewport(BendWin* win) {
       vw = vw ? vw : 1;
     }
   }
-  win->vx = win->full_now ? (win->width - vw) / 2 : 0;
-  win->vy = win->full_now ? (win->height - vh) / 2 : 0;
+  win->vx = full ? (win->width - vw) / 2 : 0;
+  win->vy = full ? (win->height - vh) / 2 : 0;
   win->vw = vw;
   win->vh = vh;
   if (win->source) {
     XTransform transform = {{{ XDoubleToFixed((double)w / vw), 0, 0 },
       { 0, XDoubleToFixed((double)h / vh), 0 }, { 0, 0, XDoubleToFixed(1) }}};
     window_render.transform(win->dpy, win->source, &transform);
+    XClearWindow(win->dpy, win->win);
   }
+}
+
+static bool window_surface(BendWin* win) {
+  if (win->source) {
+    return true;
+  }
+  if (!win->full_supported) {
+    return false;
+  }
+  Display* dpy = win->dpy;
+  int scr = DefaultScreen(dpy);
+  XRenderPictFormat* format = window_render.format(dpy, DefaultVisual(dpy, scr));
+  if (format == NULL) {
+    win->full_supported = false;
+    return false;
+  }
+  win->pix = XCreatePixmap(dpy, win->win, win->img->width, win->img->height,
+    DefaultDepth(dpy, scr));
+  XRenderPictureAttributes attrs = { .repeat = RepeatPad };
+  win->source = window_render.create(dpy, win->pix, format, CPRepeat, &attrs);
+  win->target = window_render.create(dpy, win->win, format, 0, NULL);
+  window_render.filter(dpy, win->source, FilterNearest, NULL, 0);
+  return true;
 }
 
 static void window_full_request(BendWin* win) {
@@ -392,14 +417,24 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
   flags = now;
 }
 
+- (NSRect)imageRect {
+  NSSize bounds = self.bounds.size;
+  BOOL full = [self.layer.contentsGravity isEqualToString:kCAGravityResizeAspect];
+  if (!full) {
+    return self.bounds;
+  }
+  CGFloat scale = fmin(bounds.width / draw_size.width,
+    bounds.height / draw_size.height);
+  CGFloat w = draw_size.width * scale, h = draw_size.height * scale;
+  return NSMakeRect((bounds.width - w) / 2, (bounds.height - h) / 2, w, h);
+}
+
 - (NSPoint)at:(NSEvent*)ev {
   CGSize  size = draw_size;
   NSPoint p    = [self convertPoint:ev.locationInWindow fromView:nil];
-  NSSize bounds = self.bounds.size;
-  if (bounds.width != size.width || bounds.height != size.height) {
-    p.x *= size.width / bounds.width;
-    p.y *= size.height / bounds.height;
-  }
+  NSRect rect = [self imageRect];
+  p.x = (p.x - rect.origin.x) * size.width / rect.size.width;
+  p.y = (p.y - rect.origin.y) * size.height / rect.size.height;
   return NSMakePoint(fmax(0, fmin(floor(p.x), size.width - 1)),
     fmax(0, fmin(floor(p.y), size.height - 1)));
 }
@@ -412,9 +447,9 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
 - (void)move:(NSEvent*)ev {
   NSPoint p = [self at:ev];
   if (grab) {
-    NSSize bounds = self.bounds.size;
-    [self push:CID(Look) a:f32_rewrap(ev.deltaX * draw_size.width / bounds.width)
-      b:f32_rewrap(ev.deltaY * draw_size.height / bounds.height) c:0 d:0];
+    NSSize size = [self imageRect].size;
+    [self push:CID(Look) a:f32_rewrap(ev.deltaX * draw_size.width / size.width)
+      b:f32_rewrap(ev.deltaY * draw_size.height / size.height) c:0 d:0];
   } else {
     [self push:CID(Move) a:p.x b:p.y c:0 d:0];
   }
@@ -462,6 +497,7 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
   NSWindow* win = self.window;
   if (on != ((win.styleMask & NSWindowStyleMaskFullScreen) != 0)) {
     if (on) {
+      self.layer.contentsGravity = kCAGravityResizeAspect;
       full_style = win.styleMask;
       win.styleMask |= NSWindowStyleMaskResizable;
       win.collectionBehavior |= NSWindowCollectionBehaviorFullScreenPrimary;
@@ -476,6 +512,7 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
   full_busy = NO;
   if (!(self.window.styleMask & NSWindowStyleMaskFullScreen)) {
     self.window.styleMask = full_style;
+    self.layer.contentsGravity = kCAGravityResize;
   }
   if (full_dirty) {
     [self setFullscreen:full_want];
@@ -492,6 +529,7 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
 
 - (void)windowWillEnterFullScreen:(NSNotification*)note {
   full_busy = YES;
+  self.layer.contentsGravity = kCAGravityResizeAspect;
   full_due = io_tick() + 5000000000ull;
 }
 
@@ -611,6 +649,8 @@ static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
     layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
     layer.framebufferOnly = NO;
     layer.drawableSize = CGSizeMake(w, h);
+    layer.contentsGravity = kCAGravityResize;
+    layer.backgroundColor = NSColor.blackColor.CGColor;
 #ifdef CID(Window.fullscreen)
     layer.magnificationFilter = kCAFilterNearest;
     layer.minificationFilter = kCAFilterNearest;
@@ -1061,10 +1101,14 @@ static u32 window_clip(int v, u32 most) {
 static u32 window_coord(BendWin* win, int p, bool vertical) {
   u32 logical = vertical ? win->img->height : win->img->width;
 #ifdef CID(Window.fullscreen)
-  if (win->full_now) {
+  if (win->full_now && win->source) {
     u32 offset = vertical ? win->vy : win->vx;
     u32 size = vertical ? win->vh : win->vw;
-    return (u64)window_clip(p - (int)offset, size) * logical / size;
+    if (p < (int)offset) {
+      return 0;
+    }
+    u64 point = (u64)(p - (int)offset) * logical / size;
+    return point < logical ? (u32)point : logical - 1;
   }
 #endif
   return window_clip(p, logical);
@@ -1110,6 +1154,9 @@ static void window_pump(BendWin* win) {
       }
       if (win->full_now != full) {
         win->full_now = full;
+        if (full) {
+          window_surface(win);
+        }
         window_viewport(win);
       }
     } else if (ev.type == PropertyNotify && ev.xproperty.atom == win->clients) {
@@ -1185,7 +1232,7 @@ static void window_pump(BendWin* win) {
   if (win->grab && (x != cx || y != cy)) {
     f32 dx = x - cx, dy = y - cy;
 #ifdef CID(Window.fullscreen)
-    if (win->full_now) {
+    if (win->full_now && win->source) {
       dx *= (f32)w / win->vw;
       dy *= (f32)h / win->vh;
     }
@@ -1274,7 +1321,7 @@ static void window_show(Env e, BendWin* win, Term image) {
   window_fill(e, (u32*)win->img->data, w, h, image, k);
   window_pace(win->period);
 #ifdef CID(Window.fullscreen)
-  if (win->full_now) {
+  if (win->full_now && win->source) {
     XPutImage(win->dpy, win->pix, DefaultGC(win->dpy, DefaultScreen(win->dpy)),
       win->img, 0, 0, 0, 0, w, h);
     window_render.composite(win->dpy, PictOpSrc, win->source, None, win->target,
@@ -1379,23 +1426,12 @@ static u32 window_fullscreen(intptr_t at, bool on, const char** why) {
     *why = "Window.fullscreen: desktop has no EWMH/XRender fullscreen support";
     return ENOTSUP;
   }
+  if (on && !window_surface(win)) {
+    *why = "Window.fullscreen: XRender has no format for this display";
+    return ENOTSUP;
+  }
   if (win->full_wait ? win->full_want == on : win->full_now == on) {
     return 0;
-  }
-  if (on && !win->source) {
-    int scr = DefaultScreen(dpy);
-    XRenderPictFormat* format = window_render.format(dpy, DefaultVisual(dpy, scr));
-    if (format == NULL) {
-      *why = "Window.fullscreen: XRender has no format for this display";
-      return ENOTSUP;
-    }
-    win->pix = XCreatePixmap(dpy, win->win, win->img->width, win->img->height,
-      DefaultDepth(dpy, scr));
-    XRenderPictureAttributes attrs = { .repeat = RepeatPad };
-    win->source = window_render.create(dpy, win->pix, format, CPRepeat, &attrs);
-    win->target = window_render.create(dpy, win->win, format, 0, NULL);
-    window_render.filter(dpy, win->source, FilterNearest, NULL, 0);
-    window_viewport(win);
   }
   win->full_want = on;
   if (!win->full_sent && win->full_now == on) {
