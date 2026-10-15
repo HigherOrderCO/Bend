@@ -252,47 +252,42 @@ export type Category = "def" | "ctr";
 export type Name = string & { readonly identity: unique symbol };
 export type Label = string;
 export type FileId = string & { readonly file: unique symbol };
-export const BASE_ID = file_name("Base");
+export const BASE_ID = "Base" as FileId;
 export const SOURCE_NAME = /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/;
 
-// Global slots contain canonical keys made here, never raw source labels.
-// Their primitive value preserves identity when a term or a book is copied.
+// Source spellings satisfy SOURCE_NAME; internal labels and roles are fixed.
+// File ids and arbitrary string members are escaped; separators stay structural.
 export function name_source(file: FileId, text: string, category: Category = "def"): Name {
   if (!file || !text) throw Error("empty file or declaration name");
-  return (file + (category === "ctr" ? ":#" : ":") + name_part(text)) as Name;
+  return (file + (category === "ctr" ? ":#" : ":") + text) as Name;
 }
 
-export function name_internal(text: string): Name { return ("!" + name_part(text)) as Name; }
+export function name_internal(text: string): Name { return ("!" + text) as Name; }
 
 let next_name = 0n;
 export function name_gen(owner: Name, role: string, member?: number | bigint | string): Name {
   const n = member === undefined ? "@" + next_name++ : typeof member === "string"
-    ? "@k" + name_part(member) : String(BigInt(member));
+    ? "@k" + name_escape(member) : String(BigInt(member));
   if (n[0] === "-") throw Error("negative member position");
-  return (owner + "~" + name_part(role) + ":" + n) as Name;
+  return (owner + "~" + role + ":" + n) as Name;
 }
 
-function name_part(text: string): string {
-  return text.replace(/[^A-Za-z0-9_./-]/g,
-    c => "%" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+export function name_escape(text: string): string {
+  return text.replace(/[^A-Za-z0-9]/g,
+    c => "_u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
 }
 
-function name_unpart(text: string): string {
-  return text.replace(/%([0-9a-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+export function name_unescape(text: string): string {
+  return text.replace(/_u([0-9a-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
 }
-
-// File identities are encoded once; filesystem operations use File.path.
-export function file_name(text: string): FileId { return name_part(text) as FileId; }
-export function file_text(file: FileId): string { return name_unpart(file); }
 
 export function name_file(k: Name): FileId {
   return (k[0] === "!" ? "" : k.slice(0, k.indexOf(":"))) as FileId;
 }
 
 export function name_text(k: Name): string {
-  const at = k[0] === "!" ? 1 : k.indexOf(":") + 1;
-  return name_unpart(k.slice(at).replace(/^#/, "")
-    .replace(/~([^:]*):([0-9]+|@[^~]*)/g, (_, role, member) => "~" + role + (member[0] === "@" ? "" : member)));
+  return k.slice(k[0] === "!" ? 1 : k.indexOf(":") + 1)
+    .replace(/^#/, "").replace(/:(\d+)|:@[^~]*/g, "$1");
 }
 
 export function name_parent(k: Name): Name | null {
@@ -305,7 +300,7 @@ export function file_id(real: string, base: string, store: string | null): FileI
   const tail = store === null ? "" : path.relative(store, real).split(path.sep).join("/");
   const pkg = /^0x([0-9a-f]+)\/(.*)/.exec(tail);
   if (pkg && pkg[1].length !== 32) throw Error("expected a 32-digit package hash");
-  return file_name(pkg?.[2] ? tail : real);
+  return name_escape(pkg?.[2] ? tail : real) as FileId;
 }
 
 export function display_text(text: string): string {
@@ -314,21 +309,21 @@ export function display_text(text: string): string {
 }
 
 export function name_emit(k: Name): string {
-  return "b0" + k.replace(/[^A-Za-z0-9]/g,
-    c => "_u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+  return "b0" + name_escape(k);
 }
 
 export function name_display(book: Book | undefined, k: Name, file?: File): string {
   const owner = name_file(k), text = name_text(k);
-  if (owner === "") return "!" + display_text(text);
+  if (owner === "") return "!" + text;
   let prefix: string | undefined;
   if (owner === file?.ns) prefix = "";
   else prefix = Object.entries(file?.al ?? {}).find(([, target]) => target === owner)?.[0];
   if (prefix === undefined && (owner === BASE_ID || owner === book?.entry)) prefix = "";
   if (prefix === undefined) {
     const entry = book?.files.get(book.entry), own = book?.files.get(owner);
-    prefix = entry?.path && own?.path && !/^0x[0-9a-f]{32}\//.test(owner)
-      ? path.relative(path.dirname(entry.path), own.path).split(path.sep).join("/") : file_text(owner);
+    const ns = name_unescape(owner);
+    prefix = entry?.path && own?.path && !/^0x[0-9a-f]{32}\//.test(ns)
+      ? path.relative(path.dirname(entry.path), own.path).split(path.sep).join("/") : ns;
     prefix = prefix.replace(/\.bend$/, "");
   }
   return display_text((prefix ? prefix + "." : "") + text);
@@ -407,7 +402,7 @@ export type Env = List<HTerm | ((s?: Span) => HTerm)>;
 export type Ctr  = { k: Name; n: number; T: HTerm }
 export type Ctrs = Array<Ctr>;
 export type ADT  = { $: "ADT"; n: number; g: number; T: HTerm; c: Ctrs; b?: Bool; };
-export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: { file: File; paths: string[] }; args?: HTerm[]; };
+export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: { file: File; paths: string[] }; args?: LTerm[]; };
 export type TLD  = ADT | Def;
 export type Book = {
   entry: FileId; base: FileId | null; files: Map<FileId, File>;
@@ -801,7 +796,7 @@ export function term_higher(tm: LTerm, env: Env = null, copy?: (t: HTerm) => HTe
       const v = list_get(env, tm.i);
       if (v !== null) return typeof v === "function" ? v(tm.s) : term_at(v, tm.s);
       if (!copy && tm.v !== undefined) return tm.v;
-      throw Error("missing binding: " + display_text(tm.k) + "@" + tm.i);
+      throw Error("missing binding: " + tm.k + "@" + tm.i);
     }
     case "Op": {
       const op = term_excerpt(tm);
@@ -838,7 +833,7 @@ export function term_higher(tm: LTerm, env: Env = null, copy?: (t: HTerm) => HTe
 
 function checked_copy(env: Env): (t: HTerm) => HTerm {
   const copy = scope_mapper(v => {
-    if (v.i < 0) throw Error("missing checked binding: " + display_text(v.k) + "@" + v.i);
+    if (v.i < 0) throw Error("missing checked binding: " + v.k + "@" + v.i);
     return term_higher(v, env, copy);
   });
   return copy;
@@ -963,7 +958,7 @@ export function ctx_scope(ctx: Ctx): Label[] {
 // for a package's <name>@<version>.
 
 export function book_nil(): Book {
-  return { entry: file_name(""), base: null, files: new Map(), tlds: Object.create(null), ctrs: Object.create(null), order: [], hols: 0, tmps: new Map() };
+  return { entry: "" as FileId, base: null, files: new Map(), tlds: Object.create(null), ctrs: Object.create(null), order: [], hols: 0, tmps: new Map() };
 }
 
 export function book_ctr(book: Book, k: Name): Ctr | null {
@@ -1010,7 +1005,7 @@ async function name_hash(book: Book, nv: string, spn?: Span): Promise<string> {
   if (!NAMED.test(nv)) {
     throw Err(book, ctx_nil(), "a package as <name>@<version>: a-z, 0-9 and -, 1 to 64 characters, at four numbers like 1.0.0.0", "'" + nv + "'", spn);
   }
-  const at  = path.join(BEND_LIB, "names", name_emit(name_internal(BEND_HUB)), nv);
+  const at  = path.join(BEND_LIB, "names", name_escape(BEND_HUB), nv);
   const old = fs.existsSync(at) ? fs.readFileSync(at, "utf8").trim() : "";
   if (/^0x[0-9a-f]{32}$/.test(old)) {
     return old;
@@ -1106,7 +1101,7 @@ export async function book_load(book: Book, file: string, seen: Map<string, File
       }
       const got = await book_file(book, hub(as) ? BEND_LIB + "/" + rel : path.posix.resolve(dir, rel), sp);
       const sub = identity(got);
-      if (hub(ns) && !hub(sub)) {
+      if (hub(name_unescape(ns)) && !hub(name_unescape(sub))) {
         throw bad();
       }
       al[m[2]] = sub;
@@ -1332,18 +1327,13 @@ function term_map<X, Y, C>(tm: TermOf<X>, f: (child: TermOf<X>, context?: C) => 
 // Cache keys consume finite reified syntax: no callbacks, cells or private slots.
 // Keep all fields except spans. Property order can miss a hit, never alias terms.
 function term_json(value: LTerm | LTerm[], exact = true): string {
-  return JSON.stringify(value, function(k, v) {
+  return JSON.stringify(value, (k, v) => {
     if (k === "s") return undefined;
     if (!exact && (k === "k" || k === "r" || k === "file")) return Array.isArray(v) ? v.map(() => 0) : 0;
     if (typeof v === "function" || (v?.$ === "Var" && (v.v !== undefined || v.slot !== undefined || v.i < 0))) {
       throw Error("finite reified syntax is required for a cache key");
     }
     if (!exact && v?.$ === "Lit") return { $: "Lit", k: 0, v: v.v };
-    // JSON loses -0 and nonfinite numbers; arrays cannot be literal values.
-    if (exact && this.$ === "Lit" && k === "v" && typeof v === "number"
-      && (!Number.isFinite(v) || Object.is(v, -0))) {
-      return [v === 0 ? "-0" : String(v)];
-    }
     return v;
   });
 }
@@ -1364,7 +1354,7 @@ function f32_show(x: number): string {
 // Display text is never an identity or a parser input.
 
 export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file?: File, book?: Book): string {
-  bnd = bnd.map(display_text);
+  bnd = bnd.slice();
   const owner = file ? file.base ?? file.ns : book?.base ?? (book?.entry || BASE_ID);
   const name = (k: Name) => name_display(book, k, file);
   const ctr = (text: string) => name_source(owner, text, "ctr");
@@ -1379,7 +1369,7 @@ export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file
     return wrap ? "(" + s[0] + ")" : s[0];
   }
   function bound(ks: Label[], t: LTerm, prc: number): string {
-    bnd.push(...ks.map(display_text));
+    bnd.push(...ks);
     const s = go(t, prc);
     bnd.length -= ks.length;
     return s;
@@ -1458,7 +1448,7 @@ export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file
   function form(tm: LTerm): Printed {
     switch (tm.$) {
       case "Var": {
-        const k = display_text(tm.k);
+        const k = tm.k;
         return bnd.lastIndexOf(k) === tm.i ? k : k + "^" + String(tm.i);
       }
       case "Ref": {
@@ -1468,7 +1458,7 @@ export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file
       case "Sub": return form(tm.f);
       case "Let": {
         const vs = tm.v.map(v => go(v, 1));
-        const ks = tm.k.map((k, j) => quant_show(tm.q[j]) + display_text(k));
+        const ks = tm.k.map((k, j) => quant_show(tm.q[j]) + k);
         return [ks.join(" ") + " = " + vs.join(" ") + "; " + bound(tm.k, tm.f, -1), -1];
       }
       case "Typ": return tm.g.$ === "Qua" && tm.g.q.$ !== "None"
@@ -1478,14 +1468,14 @@ export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file
       case "Min": return [go(tm.a, 2) + " <&> " + go(tm.b, 2), 1];
       case "All": {
         const A = go(tm.A, 2);
-        return ["@" + quant_show(tm.q) + display_text(tm.k) + ":" + A + " -> " + bound([tm.k], tm.B, 1), 1];
+        return ["@" + quant_show(tm.q) + tm.k + ":" + A + " -> " + bound([tm.k], tm.B, 1), 1];
       }
-      case "Lam": return [quant_show(tm.q ?? Lone()) + display_text(tm.k) + " => " + bound([tm.k], tm.f, -1), 0];
+      case "Lam": return [quant_show(tm.q ?? Lone()) + tm.k + " => " + bound([tm.k], tm.f, -1), 0];
       case "App": {
         const [h, xs] = term_unapply(tm), b = xs[1];
         if (h.$ === "Ref" && h.k === name_source(owner, "Exists") && xs.length === 2 && b.$ === "Lam") {
           const A = go(xs[0], 2);
-          return ["&" + display_text(b.k) + ":" + A + " -> " + bound([b.k], b.f, 1), 1];
+          return ["&" + b.k + ":" + A + " -> " + bound([b.k], b.f, 1), 1];
         }
         return go(h, 2) + "(" + xs.map(x => go(x, 0)).join(", ") + ")";
       }
@@ -1509,12 +1499,12 @@ export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file
       case "Efq": return "\\{}";
       case "Eql": return "{" + go(tm.a, 1) + " == " + go(tm.b, 1) + " : " + go(tm.T, 1) + "}";
       case "Rfl": return "{==}";
-      case "Op": return display_text(tm.k);
-      case "Hol": return "?" + display_text(tm.k);
+      case "Op": return tm.k;
+      case "Hol": return "?" + tm.k;
       case "Rwt": {
         const mp = term_strip(tm.p), mb = mp.$ === "Lam" ? term_strip(mp.f) : mp;
         const binders = mp.$ === "Lam" && mb.$ === "Lam";
-        const n = binders && mb.k !== "" ? display_text(mb.k) + "@" : "";
+        const n = binders && mb.k !== "" ? mb.k + "@" : "";
         const P = binders ? bound([mp.k, mb.k], mb.f, 1) : go(tm.p, 1);
         return ["%" + n + go(tm.e, 1) + " : " + P + "; " + go(tm.f, -1), 0];
       }
@@ -1536,20 +1526,20 @@ export function expr_show(book: Book, x: Expr, bnd: Label[] = [], file?: File): 
 // Prefer source spelling; synthetic variables have no enclosing display scope.
 function term_excerpt(t: LTerm): string {
   return t.s ? t.s.file.str.slice(t.s.beg, t.s.end)
-    : t.$ === "Var" ? display_text(t.k) : term_show(t);
+    : t.$ === "Var" ? t.k : term_show(t);
 }
 
 export function err_show(err: Err): string {
   const file = err.spn?.file;
   const bnd  = ctx_scope(err.ctx);
   const anns = pmap_to_array(err.ctx).sort((a, b) => a[0] - b[0]);
-  const wid  = Math.max(0, ...anns.map(([, a]) => display_text(a.k).length));
+  const wid  = Math.max(0, ...anns.map(([, a]) => a.k.length));
   const msg  = err.obs === undefined
     ? "\n- message  : " + expr_show(err.bok, err.exp, bnd, file)
     : "\n- expected : " + expr_show(err.bok, err.exp, bnd, file)
     + "\n- observed : " + expr_show(err.bok, err.obs, bnd, file);
   const ctx  = anns.map(([i, a]) =>
-    "\n- " + display_text(a.k).padEnd(wid) + " : " + expr_show(err.bok, a.T, bnd.slice(0, i), file)).join("");
+    "\n- " + a.k.padEnd(wid) + " : " + expr_show(err.bok, a.T, bnd.slice(0, i), file)).join("");
   const def  = err.def === undefined ? "" : " " + name_display(err.bok, err.def, file);
   let   spn  = "";
   if (err.spn !== undefined) {
@@ -1741,7 +1731,7 @@ export function name_resolve(book: Book, scope: File, raw: string, category: Cat
   if (alias !== undefined) {
     const k = name_source(alias, raw.slice(dot + 1), category);
     return { k, issue: base !== null && k !== base && k in table && base in table
-      ? "an unambiguous " + (category === "def" ? "definition" : "constructor") + " name (the alias " + display_text(head) + " shadows " + display_text(raw) + ")" : undefined };
+      ? "an unambiguous " + (category === "def" ? "definition" : "constructor") + " name (the alias " + head + " shadows " + raw + ")" : undefined };
   }
   const own = name_source(scope.ns, raw, category);
   return { k: own in table || base === null || !(base in table) ? own : base };
@@ -3560,7 +3550,7 @@ export function term_check_kind(book: Book, lhs: LHS, T: HTerm, q: Quant, k: Lab
     return term_check(book, lhs, T, None(), kind, ctx, d);
   } catch (e) {
     const err = e as Err;
-    const nte = q.$ === "Many" ? "Note: +" + display_text(k) + " can be used many times, so its type must be Data." : undefined;
+    const nte = q.$ === "Many" ? "Note: +" + k + " can be used many times, so its type must be Data." : undefined;
     throw err?.$ === "Err" && err.exp === kind ? { ...err, spn: s ?? err.spn, nte } : e;
   }
 }
@@ -3568,12 +3558,11 @@ export function term_check_kind(book: Book, lhs: LHS, T: HTerm, q: Quant, k: Lab
 export function uses_close(book: Book, ctx: Ctx, us: Uses, i: U32, k: Label, q: Quant, s: Span | undefined, def?: Name): Uses {
   const u = pmap_get(us, i) ?? None();
   if (quant_join(u, q).$ !== q.$) {
-    const label = display_text(k);
-    let obs = quant_show(u) + label;
+    let obs = quant_show(u) + k;
     if (u.$ === "Many") {
-      obs = label + " (consumed more than once)";
+      obs = k + " (consumed more than once)";
     }
-    throw Err(book, ctx, quant_show(q) + label, obs, s, def);
+    throw Err(book, ctx, quant_show(q) + k, obs, s, def);
   }
   return pmap_set(us, i, None());
 }
@@ -3844,7 +3833,7 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
   } catch (e) {
     const v = (e as Err)?.obs;
     if (typeof v === "object" && v.$ === "Var" && v.i >= 0 && v.i < d) {
-      throw Err(book, ctx, "a template applied to closed ~ arguments (" + display_text(v.k) + " is a variable here, not comptime: pass it at run time)", tm, tm.s, lhs.def);
+      throw Err(book, ctx, "a template applied to closed ~ arguments (" + v.k + " is a variable here, not comptime: pass it at run time)", tm, tm.s, lhs.def);
     }
     throw e;
   }
@@ -3865,10 +3854,8 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
     try {
       const v = xs.reduce((v, a) => term_apply(v, a), def.v as HTerm);
       // Elaboration consumes checked arguments; instantiation substitutes the originals.
-      const env = pmap_to_array(ctx).reduce<Env>((env, [i, a]) => list_set(env, i, Var(a.k, i)), null);
-      const copy = checked_copy(env);
       const inst: Def = { $: "Def", n: def.n - def.x, x: 0, T: checked.tel, v, u: def.u,
-        args: checked.xs.map(a => term_higher(a, env, copy)) };
+        args: checked.xs };
       book.tlds[o] = { ...inst, v: null };
       inst.e = def_check(book, o, inst, z);
       book.tlds[o] = inst;
@@ -3947,7 +3934,7 @@ export function book_valid(book: Book, done: number = 0): void {
             const t_all = tele_head(book, tel, ctx, ctr.k);
             if (d >= tld.n) {
               if (fields.has(t_all.k)) {
-                throw Err(book, ctx, "a fresh constructor field name", display_text(t_all.k), t_all.s, ctr.k);
+                throw Err(book, ctx, "a fresh constructor field name", t_all.k, t_all.s, ctr.k);
               }
               fields.add(t_all.k);
             }
