@@ -49,7 +49,7 @@ async function run(bin: string, args: string[], cap: number): Promise<Omit<Got, 
   const g: Omit<Got, "f"> = { code: null, ms: 0, out: "", timeout: false };
   const t0 = Date.now();
   await new Promise<void>((done) => {
-    const kid = child.spawn(bin, args, { env: process.env });
+    const kid = child.spawn(bin, args, { env: { ...process.env, BEND_NO_TELEMETRY: "1" } });
     kid.stdout.on("data", (d) => { g.out += d; });
     kid.stderr.on("data", (d) => { g.out += d; });
     kid.on("error", (e) => { g.error = e.message; });
