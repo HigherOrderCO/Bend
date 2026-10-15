@@ -4317,7 +4317,8 @@ static const WlFn wl_tab[] = { WL_TABLE };
 #undef WL_X
 #endif
 
-static Term work_loop(Env e, DEV Term* sp, Term t, u32 seq) {
+// Keep the C frame out of preserve_none callees, which can clobber its base pointer.
+FAR Term work_loop(Env e, DEV Term* sp, Term t, u32 seq) {
   WL_BANK
   u32 rn = 0;
   r0 = t;
