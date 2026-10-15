@@ -3,12 +3,6 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
-## Unreleased
-
-- The Node loader identifies Bend files by their decoded file path, not
-  the complete URL suffix. Query/fragment imports can reload changed code;
-  ordinary JS and data modules are not mistaken for Bend (#1570).
-
 ## 2.0.37 (2026-10-13)
 
 - **A Nat crosses to a JS host as a plain number** (PR #1506 by
