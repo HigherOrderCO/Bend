@@ -1038,27 +1038,13 @@ function ctr_doms(ctr: Bend.Ctr, xs?: HTerm[]): HTerm[] {
   return ctr_live(ctr, xs).map(([, , A]) => A);
 }
 
-function lay_holds(A: HTerm | null, lay: Lay, fam: Name): boolean[] {
-  if (lay.arms === null) {
-    return lay.ks.map((s) => s === "box"
-      && ty_holds(A, (t) => t?.$ === "ADT" && t.k === fam));
-  }
-  const got = lay.ks.map(() => false);
-  for (const [k, lays] of Object.entries(lay.arms)) {
-    let at = Number(Object.keys(lay.arms).length > 1);
-    ctr_doms(FL.book.ctrs[k], ty_adt(A)!.x).forEach((F, i) =>
-      lay_holds(F, lays[i], fam).forEach((h) => got[at++] ||= h));
-  }
-  return got;
+function lay_holds(A: HTerm | null, lay: Lay, fam: Name): Lay {
+  return lay.arms ? lay_pack(Object.entries(lay.arms).map(([k, lays]) =>
+    [k, ctr_doms(FL.book.ctrs[k], ty_adt(A)!.x).map((F, i) =>
+      lay_holds(F, lays[i], fam))])) : lay === BOX
+    && !ty_holds(A, (t) => t?.$ === "ADT" && t.k === fam) ? WORDS.U32 : lay;
 }
 
-function ctr_spine(k: Name): number {
-  const ctr = FL.book.ctrs[k];
-  const A = ctr ? tele_unbind(ctr.T).ret : null;
-  const at = ctr
-    ? lay_holds(A, lay_node(k), ty_adt(A)!.k).lastIndexOf(true) : -1;
-  return at < 0 ? 0 : lay_node(k).ks.length - 1 - at;
-}
 
 function ctr_flds(k: Name, xs: HTerm[]): HTerm[] {
   const ds = FL.book.ctrs[k] ? ctr_tail(FL.book.ctrs[k]) : [];
@@ -2901,8 +2887,13 @@ export function compile_book(book: Bend.Book): string {
     `{ ${s.params.length}, ${s.frame === null ? 0
       : s.params.length - s.frame.at.length}, ${Number(FL.bangs.has(s.def))
       | Number(!forky.has(s.fid)) << 1} }`).join(", ")} };`,
-  `CONSTV u32 CID_T[][3] = { ${[...cids].map(([k, n]) =>
-    `{ ${n}, ${Number(FL.hot.has(k))}, ${ctr_spine(k)} }`).join(", ")} };`,
+  `CONSTV u32 CID_T[][3] = { ${[...cids].map(([k, n]) => {
+    const ctr = FL.book.ctrs[k], lay = ctr ? lay_node(k) : null;
+    const A = ctr ? tele_unbind(ctr.T).ret : null;
+    const at = ctr
+      ? lay_holds(A, lay!, ty_adt(A)!.k).ks.lastIndexOf("box") : -1;
+    return `{ ${n}, ${Number(FL.hot.has(k))}, ${at < 0 ? 0 : lay!.ks.length - 1 - at} }`;
+  }).join(", ")} };`,
   `#define STAT_LEN ${FL.img.length}`, "",
   `#define WL_RESW ${resw}`, `#define BANGS   ${FL.bangs.size}`, "",
   `#define WL_BANK Term ${ws.join(", ")};`, "",
@@ -3954,11 +3945,9 @@ INLINE u32 blk_span(Term t) {
   return blk_wcls(term_tag(t) == TAG_ARR, blk_cls(t));
 }
 
-// term_drop keeps a frame per open node in the node's first word and frees
-// the node at its last live cell, before it drops that cell. A node's spine
-// (cid_spine) is swapped to its end first, so a list frees cell by cell, in
-// order. A frame holds a live end below 256; an Array or wide node whose
-// live end is past that keeps it in its last cell, which is trivial then.
+// A node's first word holds its frame; free it before its last live child.
+// Swap the spine to the end for cell-by-cell list drops. Ends <256 fit the frame;
+// store a shortened wide end in the trivial last cell.
 FAR void term_drop(Env e, Term t) {
   DEV u64* H = e.mem;
   u64  cur = 0;
@@ -3983,22 +3972,20 @@ FAR void term_drop(Env e, Term t) {
       } else {
         u32 aux = (u32)term_aux(t);
         u64 loc = term_loc(t);
-        u32 n   = tag == TAG_ARR ? 0 : tag == TAG_CTR ? cid_arity(aux)
-          : fid_arity(aux) - (tag == TAG_CLO);
-        u32 cls = tag == TAG_ARR ? 64 | blk_cls(t)
+        u32 n = tag == TAG_ARR ? 0 : tag == TAG_CTR ? cid_arity(aux)
+          : fid_arity(aux) - (tag == TAG_CLO),
+          cls = tag == TAG_ARR ? 64 | blk_cls(t)
           : n > ${WIDE} ? 64 | (n - 240)
-          : cls_fit(tag == TAG_TSK ? n + 2 : n);
-        u32 w = cls < 64 ? n : 1u << (cls & 63);
-        u32 d = tag == TAG_CTR ? CID_T[aux][2] : 0;
-        u32 m = w;
+          : cls_fit(tag == TAG_TSK ? n + 2 : n),
+          w = cls < 64 ? n : 1u << (cls & 63),
+          d = tag == TAG_CTR ? CID_T[aux][2] : 0, m = w;
         if (d) {
-          Term f = H[loc + w - 1 - d];
-          H[loc + w - 1 - d] = H[loc + w - 1];
-          H[loc + w - 1] = f;
+          u64 end = loc + w - 1;
+          Term f = H[end - d];
+          H[end - d] = H[end];
+          H[end] = f;
         }
-        while (m > 0 && term_triv(H[loc + m - 1])) {
-          m -= 1;
-        }
+        while (m && term_triv(H[loc + m - 1])) --m;
         if (m < 256) {
           n   = m;
           cls &= 63;
