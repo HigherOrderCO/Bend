@@ -1261,6 +1261,29 @@ describe("lint", () => {
     );
   });
 
+  test("Base-looking literal text does not supply undeclared types, on disk or unsaved", async () => {
+    const text = 'def main() -> String:\n  "first\nimport Base\nlast"\n';
+    const file = fixture("base_literal.bend", text);
+    const disk = await lint(file, []);
+    expect(disk.ok).toBe(false);
+    expect(disk.diags[0].code).toBe("bend/check");
+    expect(disk.diags[0].message).toContain("String");
+    expect(disk.sources.some((s) => s.base)).toBe(false);
+    fs.writeFileSync(file, 'import Base\ndef main() -> String: "disk"\n');
+    const held = await lint(file, [], { unsaved: new Map([[file, text]]) });
+    expect(held.ok).toBe(false);
+    expect(held.diags[0].code).toBe("bend/check");
+    expect(held.diags[0].message).toContain("String");
+    expect(held.sources.some((s) => s.base)).toBe(false);
+    for (const header of ["import Base\n", "# header\n\n  import Base # note\n"]) {
+      const source = header + 'def main() -> String: "header"\n';
+      const imported = await lint(file, [], { unsaved: new Map([[file, source]]) });
+      expect(imported.ok).toBe(true);
+      expect(imported.diags).toEqual([]);
+      expect(imported.sources.some((s) => s.base)).toBe(true);
+    }
+  });
+
   test("lints in flight keep their own rules and facts", async () => {
     const gate = Promise.withResolvers<void>();
     const entered = Promise.withResolvers<void>();

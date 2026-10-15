@@ -666,7 +666,8 @@ const checked = async (
   const texts = new Map<string, string>();
   let declarations: Name[] = [];
   reads = texts;
-  const seeded = real !== "" && /^import Base$/m.test(fs.readFileSync(real, "utf8"));
+  const seeded = real !== "" && /^(?:[\t\r ]*(?:(?:#|import )[^\n]*)?\n)*[\t ]*import Base\s/
+    .test(fs.readFileSync(real, "utf8"));
   const key = fs.readFileSync(Bend.BASE_BEND, "utf8");
   if (seeded && BASE?.key !== key) {
     BASE = { key, book: Main.book_read(Bend.BASE_BEND) };
