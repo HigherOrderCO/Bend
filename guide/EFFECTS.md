@@ -56,6 +56,16 @@ handle type is a WONTFIX entry for now, see `WONTFIX.txt`. An effect on a
 handle hands it back beside its result: `io_tup(e, io_hand(h), r)`, also
 on failure.
 
+A handle owns its descriptor, on both sides. An effect that answers a new
+handle gives its fd away open: it does not close it later or keep its
+number. An effect that takes a handle borrows the fd and hands back the
+same one, still open; only a close effect (`Socket.close`, ...), which
+consumes the handle, closes it. A descriptor that never becomes a handle
+is the effect's own, closed on every path, as `tcp_connect.c` does when
+its setup fails. Since handles are affine, this keeps every parked fd
+open: an fd closed under the loop is a bug in the effect that closed it,
+and the number it freed may already belong to another open.
+
 `Chan` instead owns a native heap block containing its row and buffered
 Terms, wrapped in a reference count at birth so a shared Data cell may
 hold it. Handle copies use the ordinary native reference count. Close wakes
