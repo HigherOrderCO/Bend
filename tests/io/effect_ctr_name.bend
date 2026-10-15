@@ -1,5 +1,5 @@
-# A constructor and foreign request keep distinct identities. The foreign
-# header selects :Tick explicitly because bare Tick would be ambiguous.
+# A constructor and foreign request keep distinct identities. The effect
+# source writes CID(:Tick), since a bare CID(Tick) would name both.
 import Base
 
 type T is Data:

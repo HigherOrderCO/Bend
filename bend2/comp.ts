@@ -2822,7 +2822,7 @@ export function compile_book(book: Bend.Book): string {
 
 // Private function names belong to the output; public exports retain their keys.
 // Each effect source runs once in a closure of its own and registers
-// its effects with io_eff(request, run), as a C source does. A
+// its effects with io_eff(CID(k), run), as a C source does. A
 // def on a tail cycle is one loop over the cycle's bodies ($pc picks
 // one), each turn binding its parameters afresh, so a closure keeps its
 // own; any other call is direct. Only a closure's tail call bounces
