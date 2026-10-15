@@ -54,7 +54,6 @@ type Name = Bend.Name;
 type File = {
   book: Bend.Book;
   js: boolean;
-  ops: typeof OPERATIONS;
   bangs: Set<Name>;
   sites: Map<Name, number>;
   hot: Set<Name>;
@@ -169,6 +168,8 @@ const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
 // Operations
 // ----------
 
+// The Array operations have no C text: arr_op lays them out by element.
+
 const CMPS = "is_eq:==:=== is_ne:!=:!== is_lt:< is_le:<= is_gt:> is_ge:>=";
 
 const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
@@ -176,6 +177,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
+  // C only: a JS file runs Base's U32.pow, as intr_of skips an op with no JS
   u32_pow: { C: "u32_pow($0, $1)" },
   u32_div: {
     C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
@@ -262,9 +264,6 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   }])),
 }, null);
 
-const JS_OPERATIONS = Object.setPrototypeOf(Object.fromEntries(
-  Object.entries(OPERATIONS).filter(([, op]) => op.JS)), null);
-
 // Optimized
 // ---------
 
@@ -326,7 +325,11 @@ const OWNED = ["IO", ...RUNTIME_ADTS, ...Object.keys(OPTIMIZED)];
 // Native
 // ------
 
-// Metal shims fix atan2 at zero and float folding near 2^32.
+// On Metal, sin, cos and tan are fast:: (cheap, the same pixels)
+// and the rest precise::. Metal's atan2 is NaN at the origin,
+// where libm answers +-0 or +-pi, so atan2_c99 answers as libm
+// does. Metal folds a constant dividend within 128 of 2^32 through
+// an f32, so its U32_QUO divides the half and then fixes the odd bit.
 
 const SHIMS = "sqrt exp log log2 log10 sin cos tan pow fmod".split(" ")
   .map((n) => "#define " + n.padEnd(5) + ("sin cos tan".includes(n)
@@ -820,8 +823,9 @@ function dom_live([q]: Dom): boolean {
 function intr_of(k: Name, js = false): Intr | undefined {
   const tld = FL.book.tlds[k];
   const it = tld?.$ === "Def" && tld.i === undefined && tld.b
-    ? FL.ops[op_name(k)] : undefined;
-  return it && (js || it.C !== undefined) ? it : undefined;
+    ? OPERATIONS[op_name(k)] : undefined;
+  return it && (js || it.C !== undefined) && (!FL.js || it.JS)
+    ? it : undefined;
 }
 
 function op_name(k: Name): string {
@@ -1362,7 +1366,6 @@ function file_new(book: Bend.Book, js: boolean): File {
   return {
     book,
     js,
-    ops: js ? JS_OPERATIONS : OPERATIONS,
     bangs: new Set(),
     sites: new Map(),
     hot: new Set(),
