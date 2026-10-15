@@ -2100,8 +2100,8 @@ function emit_alias(sc: Scope, e: string, k: string, kd?: Kind): string {
 
 function emit_task(sc: Scope, fid: string, rem: number, words: string[],
   cont = "WL_CONT", idx: string | number = "WL_IDX"): string {
-  return `term_tsk(${fid}, ${node_fill(sc, "t",
-    `task_node(e, ${seg_ref(sc, fid)}, ${cont}, ${idx}, ${rem})`, words)})`;
+  return node_fill(sc, "t",
+    `task_node(e, ${seg_ref(sc, fid)}, ${cont}, ${idx}, ${rem})`, words);
 }
 
 function emit_jump(sc: Scope, args: string[], k: Name, bang = false): void {
@@ -2110,11 +2110,12 @@ function emit_jump(sc: Scope, args: string[], k: Name, bang = false): void {
   if (bang || sc.seg.def !== k) {
     block(sc, `if (${bang ? "!seq"
       : `!DEVICE && !seq && fid_nofk(${fid})`}) {`, () =>
-      file_push(sc, `return ${emit_task(sc, fid, 0, args)};`));
+      file_push(sc, `return term_tsk(${fid}, ${
+        emit_task(sc, fid, 0, args)});`));
   }
   args.forEach((a, i) => file_push(sc, `r${i} = ${a};`));
   if (sc.seg.def !== k) {
-    return file_push(sc, `WL_JMP(${fid});`);
+    return file_push(sc, `WL_JMP(${seg_ref(sc, fid)});`);
   }
   sc.seg.spin = true;
   sc.seg.params.forEach((p, i) => file_push(sc, `${p} = r${i};`));
@@ -2583,11 +2584,13 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
       hold = live.map(([p]) => p);
       const caps = live.flatMap(([, b]) => b.val.ws);
       spare_flush(pl);
-      const jt = emit_task(pl, seg_fid(name), calls.length, caps);
+      const jn = emit_task(pl, seg_fid(name), calls.length, caps);
+      const jt = `term_tsk(${seg_fid(name)}, ${jn})`;
       let idx = caps.length;
       calls.forEach((c, j) => {
-        file_push(pl, `e.mem[term_loc(${jt}) + ${idx}] = ${
-          emit_task(pl, seg_fid(c.k!), 0, margs[j], jt, idx)};`);
+        const fj = seg_fid(c.k!);
+        file_push(pl, `e.mem[${jn} + ${idx}] = term_tsk(${fj}, ${
+          emit_task(pl, fj, 0, margs[j], jt, idx)});`);
         idx += fun_of(c.k!).ret.ks.length;
       });
       file_push(pl, `return ${jt};`);
@@ -2612,7 +2615,8 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
       fr.forEach((w, j) => file_push(sc, `STK(${j}) = ${w};`));
       file_push(sc, `WL_PUSHN(${fr.length});`);
     }], ...fork ? [] : [["", () => {
-      file_push(sc, `WL_CONT = ${emit_task(sc, seg_fid(kn), 1, ws)};`);
+      file_push(sc, `WL_CONT = term_tsk(${seg_fid(kn)}, ${
+        emit_task(sc, seg_fid(kn), 1, ws)});`);
       file_push(sc, `WL_IDX = ${ws.length};`);
     }] as [string, () => void]]]);
     emit_jump(sc, cargs, c.k!, !fork && c.b);
@@ -2880,12 +2884,14 @@ export function compile_book(book: Bend.Book): string {
   `#define WL_RESW ${resw}`, `#define BANGS   ${FL.bangs.size}`, "",
   `#define WL_BANK Term ${ws.join(", ")};`, "",
   `#define WL_LOAD(A, N) \\\n  do { \\\n${rs.map((r, i) =>
-    `    if ((N) <= ${i}) break; ${r} = (A)[${i}]; \\\n`).join("")
+    `    if ((N) <= ${i}) break; ${r} = e.mem[(A) + ${i}]; \\\n`).join("")
     }  } while (0);`, "",
   `#define WL_LAST(X) \\\n  switch (war) { \\\n${rs.map((r, i) =>
     `    case ${i}: ${r} = (X); \\\n      break; \\\n`).join("")}  }`, "",
   `#define WL_SAVE(V) ${rs.slice(0, resw).map((r, j) =>
     `(V)[${j}] = ${r};`).join(" ")}`, "",
+  `#define WL_TAKE(V) ${rs.slice(0, resw).map((r, j) =>
+    `${r} = (V)[${j}];`).join(" ")}`, "",
   `#define WL_SIG Env e, DEV Term* sp, u32 seq, u32 rn, ${ws.map((w) =>
     "Term " + w).join(", ")}`, "", `#define WL_ALL e, sp, seq, rn, ${ws
     .join(", ")}`, "",
@@ -4288,6 +4294,7 @@ WL_TABLE WL_X(FID_ENTER)
 #undef WL_X
 #define WL_X(F) WL_##F,
 static const WlFn wl_tab[] = { WL_TABLE };
+#undef WL_X
 #endif
 
 static Term work_loop(Env e, DEV Term* sp, Term t, u32 seq) {
@@ -4322,10 +4329,10 @@ ${segs}
     seq |= fid_nofk(f) << 1;
     u32 rw = fid_resw(f);
     if (rw) {
-      WL_LOAD(e.mem + a + war - rw, rw)
+      WL_LOAD(a + war - rw, rw)
       WL_ARGS(a, war - rw)
     } else {
-      WL_LOAD(e.mem + a, war)
+      WL_LOAD(a, war)
     }
     heap_free(e, cls_fit(war + 2), a);
     WL_DYN(f);
@@ -4347,7 +4354,7 @@ ${segs}
     u32 f    = (u32)term_aux(fun);
     u32 war  = fid_arity(f) - 1;
     u64 a    = term_loc(fun);
-    WL_LOAD(e.mem + a, war)
+    WL_LOAD(a, war)
     spare_free(e, cls_fit(war), a);
     WL_LAST(arg)
     WL_DYN(f);
@@ -4372,7 +4379,7 @@ ${segs}
       seq = (seq & 1) | fid_nofk(wf) << 1;
       WL_ARGS(wa, wn - n)
       heap_free(e, cls_fit(wn + 2), wa);
-      WL_LOAD(rv, WL_RESW)
+      WL_TAKE(rv)
       WL_DYN(wf);
     }
     return task_deliver(e.mem, cont, idx, rv, n);
@@ -5364,7 +5371,6 @@ static u64 io_sys_end(IoWork* w, ssize_t n) {
 static IoWork* io_runs;
 static IoWork* io_park;
 static IoWork* io_jobs;
-static int     io_top;
 
 static void io_push(IoWork** q, IoWork* a) {
   IoWork* l = *q != NULL ? *q : a;
@@ -5411,11 +5417,11 @@ static void io_park_cut(IoWork* w) {
   io_park = w->next == w ? NULL : io_park == w ? w->prev : io_park;
 }
 
+#define io_parked(a) for (IoWork* a = io_park; a != NULL; \
+  a = a->next != io_park ? a->next : NULL)
+
 static Term io_wait_on(IoWork* w, int fd, short evts, u64 time, IoPack more) {
   w->word = (u32)fd;
-  if (fd > io_top) {
-    io_top = fd;
-  }
   w->pack = more;
   w->time = time;
   w->evts = evts;
@@ -5638,12 +5644,17 @@ static bool io_bit(u8* set, int fd, bool put) {
 }
 
 static void io_wait(Env e, bool block) {
+  int top  = io_wake_fd[0];
   u64 soon = io_park != NULL ? io_park->next->time : 0;
-  u64 len = (u64)io_top / 64 * 8 + 8;
+  io_parked(a) {
+    if (a->evts != 0 && (int)a->word > top) {
+      top = (int)a->word;
+    }
+  }
+  u64 len = (u64)top / 64 * 8 + 8;
   u8* set = io_mem(calloc(2, len));
   io_bit(set, io_wake_fd[0], true);
-  for (IoWork* a = io_park; a != NULL;
-    a = a->next != io_park ? a->next : NULL) {
+  io_parked(a) {
     if (a->evts != 0) {
       io_bit(set + (a->evts == POLLOUT) * len, (int)a->word, true);
     }
@@ -5652,7 +5663,7 @@ static void io_wait(Env e, bool block) {
   u64 ms = soon > tick && block ? (soon - tick) / 1000000 + 1 : 0;
   struct timeval tv = { ms / 1000, ms % 1000 * 1000 };
   io_sync();
-  if (select(io_top + 1, (fd_set*)set, (fd_set*)(set + len), NULL,
+  if (select(top + 1, (fd_set*)set, (fd_set*)(set + len), NULL,
     soon == 0 && block ? NULL : &tv) < 0) {
     if (errno != EINTR) {
       err_fail("the poller failed");
@@ -5854,7 +5865,6 @@ OUTLINE void io_loop(u64* H) {
   if (pipe(io_wake_fd) | fcntl(io_wake_fd[0], F_SETFL, O_NONBLOCK)) {
     err_fail("the event loop failed to open");
   }
-  io_top = io_wake_fd[0];
   Term m = corpus_eval(H, term_tsk(MAIN_FID, task_node(e, MAIN_FID,
     TERM_HOLE, 0, 0)));
 #if MAIN_PURE
