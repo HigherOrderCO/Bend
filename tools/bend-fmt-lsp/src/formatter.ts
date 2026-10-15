@@ -172,7 +172,7 @@ function inlineBodies(lines: Line[]): number[][] {
   return lines.map((line) => line.tokens.flatMap((token, index) => {
     if (token.kind === "word" && ["do", "match", "case", "def"].includes(token.text)) {
       header = { open, angle: 0, typed: token.text === "do" || token.text === "def" };
-    } else if (token.text === "=>") {
+    } else if (token.text === "=>" && open === 0) {
       return index + 1 < line.tokens.length ? [index + 1] : [];
     } else if (["(", "[", "{"].includes(token.text)) {
       open++;
