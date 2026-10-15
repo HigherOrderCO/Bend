@@ -2888,10 +2888,10 @@ export function compile_book(book: Bend.Book): string {
       : s.params.length - s.frame.at.length}, ${Number(FL.bangs.has(s.def))
       | Number(!forky.has(s.fid)) << 1} }`).join(", ")} };`,
   `CONSTV u32 CID_T[][3] = { ${[...cids].map(([k, n]) => {
-    const ctr = FL.book.ctrs[k], lay = ctr ? lay_node(k) : null;
-    const A = ctr ? tele_unbind(ctr.T).ret : null;
-    const at = ctr
-      ? lay_holds(A, lay!, ty_adt(A)!.k).ks.lastIndexOf("box") : -1;
+    const ctr = FL.book.ctrs[k], lay = ctr && lay_node(k);
+    const A = ctr && tele_unbind(ctr.T).ret;
+    const at = lay
+      ? lay_holds(A, lay, ty_adt(A)!.k).ks.lastIndexOf("box") : -1;
     return `{ ${n}, ${Number(FL.hot.has(k))}, ${at < 0 ? 0 : lay!.ks.length - 1 - at} }`;
   }).join(", ")} };`,
   `#define STAT_LEN ${FL.img.length}`, "",
@@ -4023,7 +4023,7 @@ FAR void term_drop(Env e, Term t) {
         cur = H[loc];
         heap_free(e, cls, loc);
       } else {
-        if (arr && j > 0) {
+        if (arr && j) {
           H[loc + 1] = j + 1;
         }
         if (!arr || i < 2) {
