@@ -909,8 +909,8 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
 // promise like @unsafe is: the checker reads its type, never its code.
 // If the book holds a promise, a walk from the defs outside Base collects
 // who names whom, then the promises flood back along those edges.
-function book_promises(book: Bend.Book): Bend.Name[] {
-  const bad  = new Set((Object.keys(book.tlds) as Bend.Name[]).filter((k) => {
+function book_promises(book: Bend.Book): Bend.QualifiedName[] {
+  const bad  = new Set(Object.keys(book.tlds).filter((k) => {
     const t = book.tlds[k] as Bend.Def;
     return t.u === true || (t.i !== undefined && t.b !== true);
   }));
@@ -918,12 +918,12 @@ function book_promises(book: Bend.Book): Bend.Name[] {
     return [];
   }
   const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
-  const uses: Record<string, Bend.Name[]> = Object.create(null);
+  const uses: Record<string, Bend.QualifiedName[]> = Object.create(null);
   const reach = new Set(own);
   for (const k of reach) {
     const t = book.tlds[k];
     if (t !== undefined) {
-      const rs = new Set<Bend.Name>();
+      const rs = new Set<Bend.QualifiedName>();
       for (const c of t.$ === "ADT" ? [t, ...t.c] : [t]) {
         term_refs(Bend.term_lower(c.T), rs);
       }
@@ -943,7 +943,7 @@ function book_promises(book: Bend.Book): Bend.Name[] {
 }
 
 // term_refs adds to out the names a term (a span skipped) refers to.
-function term_refs(t: Bend.LTerm, out: Set<Bend.Name>): void {
+function term_refs(t: Bend.LTerm, out: Set<Bend.QualifiedName>): void {
   const seen = new Set([t]);
   for (const todo = [t]; todo.length > 0;) {
     const x = todo.pop() as Bend.LTerm;
