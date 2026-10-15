@@ -1,6 +1,6 @@
-# io (io_marshal_array_depth): nested Array<Tree> marshalling must use a
-# bounded host stack in both directions, preserve every constructor and
-# BigInt Nat field, and return the modified deep leaf to Bend.
+# io (io_marshal_array_depth): a nested Array<Tree> crosses to the host
+# and back at depth 20000, keeping every constructor and Nat field, and
+# the host's change to the deep leaf reaches Bend.
 import Base
 
 type Tree is Type:

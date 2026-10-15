@@ -4,7 +4,7 @@
 # capture shared the list (a term_keep per closure segment, the type
 # hot) although nothing outside the closure used it again. Now a capture
 # is one use: the last one moves the list into the closure. In the C, no
-# WL_CASE(FID_MAIN_C*) segment has a term_keep, and the spins of Xs.sum
+# WL_CASE(FID_main_c*) segment has a term_keep, and the spins of Xs.sum
 # read through term_peek.
 import Base
 

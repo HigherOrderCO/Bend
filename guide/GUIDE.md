@@ -386,8 +386,9 @@ the current directory and environment, writes UTF-8 `input` to its stdin, and
 answers `Done{(status, (stdout, stderr))}` even when the exit status is not
 zero. Both limits must be positive; failure to start, a timeout, or stdout
 and stderr exceeding `max_output` bytes together answer `Fail`. The call
-waits for the direct child and drains ready output; a descendant holding an
-inherited pipe open does not extend the wait. Timeouts do not kill descendants.
+returns once the child exits and stdout and stderr close, so a descendant
+holding a pipe open delays it, up to the timeout. Timeouts do not kill
+descendants.
 A native build runs the child on an IO helper thread; the JavaScript lane
 blocks while the child runs. On Linux, native builds need glibc 2.34 or newer
 to close inherited descriptors. It does not sandbox the child: callers must
@@ -410,8 +411,8 @@ underscores. You can add your own effects the same way. Only the event loop runs
 them, so proofs, termination and the GPU never touch host code. In the other
 direction, a JS file may `import Game from "./game.bend"` (with `bend2/main.ts`
 preloaded), or from the `./game.mjs` that `-o game.mjs` writes, and call every
-non-IO def, with constructors as `{$: "Name", field: value}` and `Nat` as
-`BigInt`. A value crosses without a copy: an `Array`
+non-IO def, with constructors as `{$: "Name", field: value}` and `Nat` as a
+number. A value crosses without a copy: an `Array`
 argument is the caller's own array, updated in place, so copy it first if you
 keep it.
 

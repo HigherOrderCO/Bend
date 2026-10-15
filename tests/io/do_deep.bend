@@ -1,0 +1,806 @@
+# 400 ordered IO steps: nested continuation bodies overflowed Node's parser.
+import Base
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    IO.print("0")
+    IO.print("1")
+    IO.print("2")
+    IO.print("3")
+    IO.print("4")
+    IO.print("5")
+    IO.print("6")
+    IO.print("7")
+    IO.print("8")
+    IO.print("9")
+    IO.print("10")
+    IO.print("11")
+    IO.print("12")
+    IO.print("13")
+    IO.print("14")
+    IO.print("15")
+    IO.print("16")
+    IO.print("17")
+    IO.print("18")
+    IO.print("19")
+    IO.print("20")
+    IO.print("21")
+    IO.print("22")
+    IO.print("23")
+    IO.print("24")
+    IO.print("25")
+    IO.print("26")
+    IO.print("27")
+    IO.print("28")
+    IO.print("29")
+    IO.print("30")
+    IO.print("31")
+    IO.print("32")
+    IO.print("33")
+    IO.print("34")
+    IO.print("35")
+    IO.print("36")
+    IO.print("37")
+    IO.print("38")
+    IO.print("39")
+    IO.print("40")
+    IO.print("41")
+    IO.print("42")
+    IO.print("43")
+    IO.print("44")
+    IO.print("45")
+    IO.print("46")
+    IO.print("47")
+    IO.print("48")
+    IO.print("49")
+    IO.print("50")
+    IO.print("51")
+    IO.print("52")
+    IO.print("53")
+    IO.print("54")
+    IO.print("55")
+    IO.print("56")
+    IO.print("57")
+    IO.print("58")
+    IO.print("59")
+    IO.print("60")
+    IO.print("61")
+    IO.print("62")
+    IO.print("63")
+    IO.print("64")
+    IO.print("65")
+    IO.print("66")
+    IO.print("67")
+    IO.print("68")
+    IO.print("69")
+    IO.print("70")
+    IO.print("71")
+    IO.print("72")
+    IO.print("73")
+    IO.print("74")
+    IO.print("75")
+    IO.print("76")
+    IO.print("77")
+    IO.print("78")
+    IO.print("79")
+    IO.print("80")
+    IO.print("81")
+    IO.print("82")
+    IO.print("83")
+    IO.print("84")
+    IO.print("85")
+    IO.print("86")
+    IO.print("87")
+    IO.print("88")
+    IO.print("89")
+    IO.print("90")
+    IO.print("91")
+    IO.print("92")
+    IO.print("93")
+    IO.print("94")
+    IO.print("95")
+    IO.print("96")
+    IO.print("97")
+    IO.print("98")
+    IO.print("99")
+    IO.print("100")
+    IO.print("101")
+    IO.print("102")
+    IO.print("103")
+    IO.print("104")
+    IO.print("105")
+    IO.print("106")
+    IO.print("107")
+    IO.print("108")
+    IO.print("109")
+    IO.print("110")
+    IO.print("111")
+    IO.print("112")
+    IO.print("113")
+    IO.print("114")
+    IO.print("115")
+    IO.print("116")
+    IO.print("117")
+    IO.print("118")
+    IO.print("119")
+    IO.print("120")
+    IO.print("121")
+    IO.print("122")
+    IO.print("123")
+    IO.print("124")
+    IO.print("125")
+    IO.print("126")
+    IO.print("127")
+    IO.print("128")
+    IO.print("129")
+    IO.print("130")
+    IO.print("131")
+    IO.print("132")
+    IO.print("133")
+    IO.print("134")
+    IO.print("135")
+    IO.print("136")
+    IO.print("137")
+    IO.print("138")
+    IO.print("139")
+    IO.print("140")
+    IO.print("141")
+    IO.print("142")
+    IO.print("143")
+    IO.print("144")
+    IO.print("145")
+    IO.print("146")
+    IO.print("147")
+    IO.print("148")
+    IO.print("149")
+    IO.print("150")
+    IO.print("151")
+    IO.print("152")
+    IO.print("153")
+    IO.print("154")
+    IO.print("155")
+    IO.print("156")
+    IO.print("157")
+    IO.print("158")
+    IO.print("159")
+    IO.print("160")
+    IO.print("161")
+    IO.print("162")
+    IO.print("163")
+    IO.print("164")
+    IO.print("165")
+    IO.print("166")
+    IO.print("167")
+    IO.print("168")
+    IO.print("169")
+    IO.print("170")
+    IO.print("171")
+    IO.print("172")
+    IO.print("173")
+    IO.print("174")
+    IO.print("175")
+    IO.print("176")
+    IO.print("177")
+    IO.print("178")
+    IO.print("179")
+    IO.print("180")
+    IO.print("181")
+    IO.print("182")
+    IO.print("183")
+    IO.print("184")
+    IO.print("185")
+    IO.print("186")
+    IO.print("187")
+    IO.print("188")
+    IO.print("189")
+    IO.print("190")
+    IO.print("191")
+    IO.print("192")
+    IO.print("193")
+    IO.print("194")
+    IO.print("195")
+    IO.print("196")
+    IO.print("197")
+    IO.print("198")
+    IO.print("199")
+    IO.print("200")
+    IO.print("201")
+    IO.print("202")
+    IO.print("203")
+    IO.print("204")
+    IO.print("205")
+    IO.print("206")
+    IO.print("207")
+    IO.print("208")
+    IO.print("209")
+    IO.print("210")
+    IO.print("211")
+    IO.print("212")
+    IO.print("213")
+    IO.print("214")
+    IO.print("215")
+    IO.print("216")
+    IO.print("217")
+    IO.print("218")
+    IO.print("219")
+    IO.print("220")
+    IO.print("221")
+    IO.print("222")
+    IO.print("223")
+    IO.print("224")
+    IO.print("225")
+    IO.print("226")
+    IO.print("227")
+    IO.print("228")
+    IO.print("229")
+    IO.print("230")
+    IO.print("231")
+    IO.print("232")
+    IO.print("233")
+    IO.print("234")
+    IO.print("235")
+    IO.print("236")
+    IO.print("237")
+    IO.print("238")
+    IO.print("239")
+    IO.print("240")
+    IO.print("241")
+    IO.print("242")
+    IO.print("243")
+    IO.print("244")
+    IO.print("245")
+    IO.print("246")
+    IO.print("247")
+    IO.print("248")
+    IO.print("249")
+    IO.print("250")
+    IO.print("251")
+    IO.print("252")
+    IO.print("253")
+    IO.print("254")
+    IO.print("255")
+    IO.print("256")
+    IO.print("257")
+    IO.print("258")
+    IO.print("259")
+    IO.print("260")
+    IO.print("261")
+    IO.print("262")
+    IO.print("263")
+    IO.print("264")
+    IO.print("265")
+    IO.print("266")
+    IO.print("267")
+    IO.print("268")
+    IO.print("269")
+    IO.print("270")
+    IO.print("271")
+    IO.print("272")
+    IO.print("273")
+    IO.print("274")
+    IO.print("275")
+    IO.print("276")
+    IO.print("277")
+    IO.print("278")
+    IO.print("279")
+    IO.print("280")
+    IO.print("281")
+    IO.print("282")
+    IO.print("283")
+    IO.print("284")
+    IO.print("285")
+    IO.print("286")
+    IO.print("287")
+    IO.print("288")
+    IO.print("289")
+    IO.print("290")
+    IO.print("291")
+    IO.print("292")
+    IO.print("293")
+    IO.print("294")
+    IO.print("295")
+    IO.print("296")
+    IO.print("297")
+    IO.print("298")
+    IO.print("299")
+    IO.print("300")
+    IO.print("301")
+    IO.print("302")
+    IO.print("303")
+    IO.print("304")
+    IO.print("305")
+    IO.print("306")
+    IO.print("307")
+    IO.print("308")
+    IO.print("309")
+    IO.print("310")
+    IO.print("311")
+    IO.print("312")
+    IO.print("313")
+    IO.print("314")
+    IO.print("315")
+    IO.print("316")
+    IO.print("317")
+    IO.print("318")
+    IO.print("319")
+    IO.print("320")
+    IO.print("321")
+    IO.print("322")
+    IO.print("323")
+    IO.print("324")
+    IO.print("325")
+    IO.print("326")
+    IO.print("327")
+    IO.print("328")
+    IO.print("329")
+    IO.print("330")
+    IO.print("331")
+    IO.print("332")
+    IO.print("333")
+    IO.print("334")
+    IO.print("335")
+    IO.print("336")
+    IO.print("337")
+    IO.print("338")
+    IO.print("339")
+    IO.print("340")
+    IO.print("341")
+    IO.print("342")
+    IO.print("343")
+    IO.print("344")
+    IO.print("345")
+    IO.print("346")
+    IO.print("347")
+    IO.print("348")
+    IO.print("349")
+    IO.print("350")
+    IO.print("351")
+    IO.print("352")
+    IO.print("353")
+    IO.print("354")
+    IO.print("355")
+    IO.print("356")
+    IO.print("357")
+    IO.print("358")
+    IO.print("359")
+    IO.print("360")
+    IO.print("361")
+    IO.print("362")
+    IO.print("363")
+    IO.print("364")
+    IO.print("365")
+    IO.print("366")
+    IO.print("367")
+    IO.print("368")
+    IO.print("369")
+    IO.print("370")
+    IO.print("371")
+    IO.print("372")
+    IO.print("373")
+    IO.print("374")
+    IO.print("375")
+    IO.print("376")
+    IO.print("377")
+    IO.print("378")
+    IO.print("379")
+    IO.print("380")
+    IO.print("381")
+    IO.print("382")
+    IO.print("383")
+    IO.print("384")
+    IO.print("385")
+    IO.print("386")
+    IO.print("387")
+    IO.print("388")
+    IO.print("389")
+    IO.print("390")
+    IO.print("391")
+    IO.print("392")
+    IO.print("393")
+    IO.print("394")
+    IO.print("395")
+    IO.print("396")
+    IO.print("397")
+    IO.print("398")
+    IO.print("399")
+
+#|0
+#|1
+#|2
+#|3
+#|4
+#|5
+#|6
+#|7
+#|8
+#|9
+#|10
+#|11
+#|12
+#|13
+#|14
+#|15
+#|16
+#|17
+#|18
+#|19
+#|20
+#|21
+#|22
+#|23
+#|24
+#|25
+#|26
+#|27
+#|28
+#|29
+#|30
+#|31
+#|32
+#|33
+#|34
+#|35
+#|36
+#|37
+#|38
+#|39
+#|40
+#|41
+#|42
+#|43
+#|44
+#|45
+#|46
+#|47
+#|48
+#|49
+#|50
+#|51
+#|52
+#|53
+#|54
+#|55
+#|56
+#|57
+#|58
+#|59
+#|60
+#|61
+#|62
+#|63
+#|64
+#|65
+#|66
+#|67
+#|68
+#|69
+#|70
+#|71
+#|72
+#|73
+#|74
+#|75
+#|76
+#|77
+#|78
+#|79
+#|80
+#|81
+#|82
+#|83
+#|84
+#|85
+#|86
+#|87
+#|88
+#|89
+#|90
+#|91
+#|92
+#|93
+#|94
+#|95
+#|96
+#|97
+#|98
+#|99
+#|100
+#|101
+#|102
+#|103
+#|104
+#|105
+#|106
+#|107
+#|108
+#|109
+#|110
+#|111
+#|112
+#|113
+#|114
+#|115
+#|116
+#|117
+#|118
+#|119
+#|120
+#|121
+#|122
+#|123
+#|124
+#|125
+#|126
+#|127
+#|128
+#|129
+#|130
+#|131
+#|132
+#|133
+#|134
+#|135
+#|136
+#|137
+#|138
+#|139
+#|140
+#|141
+#|142
+#|143
+#|144
+#|145
+#|146
+#|147
+#|148
+#|149
+#|150
+#|151
+#|152
+#|153
+#|154
+#|155
+#|156
+#|157
+#|158
+#|159
+#|160
+#|161
+#|162
+#|163
+#|164
+#|165
+#|166
+#|167
+#|168
+#|169
+#|170
+#|171
+#|172
+#|173
+#|174
+#|175
+#|176
+#|177
+#|178
+#|179
+#|180
+#|181
+#|182
+#|183
+#|184
+#|185
+#|186
+#|187
+#|188
+#|189
+#|190
+#|191
+#|192
+#|193
+#|194
+#|195
+#|196
+#|197
+#|198
+#|199
+#|200
+#|201
+#|202
+#|203
+#|204
+#|205
+#|206
+#|207
+#|208
+#|209
+#|210
+#|211
+#|212
+#|213
+#|214
+#|215
+#|216
+#|217
+#|218
+#|219
+#|220
+#|221
+#|222
+#|223
+#|224
+#|225
+#|226
+#|227
+#|228
+#|229
+#|230
+#|231
+#|232
+#|233
+#|234
+#|235
+#|236
+#|237
+#|238
+#|239
+#|240
+#|241
+#|242
+#|243
+#|244
+#|245
+#|246
+#|247
+#|248
+#|249
+#|250
+#|251
+#|252
+#|253
+#|254
+#|255
+#|256
+#|257
+#|258
+#|259
+#|260
+#|261
+#|262
+#|263
+#|264
+#|265
+#|266
+#|267
+#|268
+#|269
+#|270
+#|271
+#|272
+#|273
+#|274
+#|275
+#|276
+#|277
+#|278
+#|279
+#|280
+#|281
+#|282
+#|283
+#|284
+#|285
+#|286
+#|287
+#|288
+#|289
+#|290
+#|291
+#|292
+#|293
+#|294
+#|295
+#|296
+#|297
+#|298
+#|299
+#|300
+#|301
+#|302
+#|303
+#|304
+#|305
+#|306
+#|307
+#|308
+#|309
+#|310
+#|311
+#|312
+#|313
+#|314
+#|315
+#|316
+#|317
+#|318
+#|319
+#|320
+#|321
+#|322
+#|323
+#|324
+#|325
+#|326
+#|327
+#|328
+#|329
+#|330
+#|331
+#|332
+#|333
+#|334
+#|335
+#|336
+#|337
+#|338
+#|339
+#|340
+#|341
+#|342
+#|343
+#|344
+#|345
+#|346
+#|347
+#|348
+#|349
+#|350
+#|351
+#|352
+#|353
+#|354
+#|355
+#|356
+#|357
+#|358
+#|359
+#|360
+#|361
+#|362
+#|363
+#|364
+#|365
+#|366
+#|367
+#|368
+#|369
+#|370
+#|371
+#|372
+#|373
+#|374
+#|375
+#|376
+#|377
+#|378
+#|379
+#|380
+#|381
+#|382
+#|383
+#|384
+#|385
+#|386
+#|387
+#|388
+#|389
+#|390
+#|391
+#|392
+#|393
+#|394
+#|395
+#|396
+#|397
+#|398
+#|399

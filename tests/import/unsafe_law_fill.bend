@@ -5,5 +5,5 @@ import ./unsafe-law/fill.bend as F
 
 #|SOME PROOFS FAIL
 #|Error: 1 def relies on unsafe or foreign code:
-#|- unsafe-law/laws.false_law
+#|defs that depend on @unsafe: unsafe-law/laws.false_law
 #|exit 1

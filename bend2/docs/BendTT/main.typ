@@ -748,11 +748,18 @@ the case tree. Each leading lambda binds a _column_, which is one
 parameter. A match on a column splits it into _pieces_. A pair match
 gives its two fields, and a label match records the label it hit. At a
 self-call, the checker compares the arguments with the columns, from
-left to right, and skips erased columns. Each argument must _rebuild_
-its column, until one argument is a strict piece of its column. The
-arguments after that one may be anything. An argument rebuilds its
-column when it is the variable of the column, the label that a match
-on the column hit, or a pair of the two pieces of one split.
+left to right, and skips erased columns. Each argument must be no
+bigger than its column, until one argument is smaller. The arguments
+after that one may be anything. The checker compares an argument with
+a piece of the column's pattern from the top down. The variable bound
+at the piece, or the label a match hit there, is equal to it. A pair
+against a piece that was split compares field by field: each field no
+bigger, and one smaller, makes it smaller; all equal makes it equal.
+Otherwise the argument is smaller when it is no bigger than another
+field of the piece. A constructor $(k, (a, (b, ())))$ has the fields
+$a$ and $b$; its tag and the pairs that chain the fields are not tried. So `height(Node{rest})`
+descends under `Node{Cons{x, rest}}`: `rest` is smaller than the field
+`Cons{x, rest}`.
 
 In `ack`, the two outer calls pass `p`, a piece of `m`, in the first
 column. The inner call rebuilds `m` as `1n+p` and passes `q`, a piece
@@ -908,9 +915,9 @@ of some column into a number, which makes a label smaller.
 
 When a call fires, its label is replaced by the labels in the leaf that
 it reaches. These are calls to earlier definitions, which have a
-smaller index, and self-calls. The arguments of a self-call rebuild
-their columns, which keeps those sizes, until one is a strict piece,
-which has a smaller size. So the label of the self-call is smaller,
+smaller index, and self-calls. The arguments of a self-call are no
+bigger than their columns, until one is smaller. So the label of the
+self-call is smaller,
 whatever its later columns hold. The other labels in the leaf belong to
 nodes and are the least.
 

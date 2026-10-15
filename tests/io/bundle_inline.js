@@ -12,9 +12,18 @@ function bundle_inline() {
     path.join(dir, page), "-o", path.join(dir, "out"));
   try {
     put("m.bend", "import Base\n\nlaw main:\n  U32\n\ndef main():\n  42\n");
-    put("ok.html", '<script type="module">\nimport M from "./m.bend";\n'
+    put("ok.html", '<svg><script type="module"/></svg>\n'
+      + '<script type="module">\nimport M from "./m.bend";\n'
       + "console.log(M.main());\n</script>\n");
     put("bad.html", '<p>\n<script\n type="module">\nconst x = ;\n</script>\n');
+    put("repeated.html", '<!--\n<script type="module">\nconst x = ;\n'
+      + '</script>\n-->\n<script type="module">\nconst x = ;\n</script>\n');
+    put("multi.html", '<svg><script type="module"/></svg>\n'
+      + '<svg><script type="module"><![CDATA[\n]]></script></svg>\n'
+      + '<!-- BEND_INLINE_START_0_ -->\n'
+      + '<script type="module">\nconsole.log(1);\n</script>\n'
+      + '<!--\nconst x = ;\n-->\n'
+      + '<script type="module">\nconst x = ;\n</script>\n');
     if (build("ok.html").status !== 0) {
       return 1;
     }
@@ -24,7 +33,17 @@ function bundle_inline() {
       return 2;
     }
     const bad = build("bad.html");
-    return bad.status === 1 && bad.stderr.includes("bad.html:4:") ? 0 : 3;
+    if (bad.status !== 1 || !bad.stderr.includes("bad.html:4:11")) {
+      return 3;
+    }
+    const repeated = build("repeated.html");
+    if (repeated.status !== 1
+      || !repeated.stderr.includes("repeated.html:7:11")) {
+      return 4;
+    }
+    const multi = build("multi.html");
+    return multi.status === 1 && multi.stderr.includes("multi.html:12:11")
+      ? 0 : 5;
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

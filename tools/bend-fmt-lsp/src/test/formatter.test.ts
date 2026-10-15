@@ -1,6 +1,97 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { formatBend } from "../formatter.js";
+
+// Bend pins the lines after a body that shares a line with its `do`, `match`,
+// `case` or `def` header to that body's column. [source, formatted]
+const pinned = [
+  [
+    "import Base\ndef main() -> IO(Unit):\n    do IO<Unit>: IO.print(\"a\")\n                 IO.print(\"b\")\n",
+    "import Base\ndef main() -> IO(Unit):\n  do IO<Unit>: IO.print(\"a\")\n               IO.print(\"b\")\n",
+  ],
+  [
+    "import Base\ndef f(a: Array<U32>, b: Bool) -> Array<U32>:\n    match b:\n      case True{}: a[0] <- 7\n                   a[1] <- 8\n      case False{}: a\n\n"
+      + "def g(a: Array<U32>) -> Array<U32>: a[0] <- 5\n                                    a[1] <- 6\n\ndef main() -> Array<U32>:\n  g(f([0 : U32 * 2n], True{}))\n",
+    "import Base\ndef f(a: Array<U32>, b: Bool) -> Array<U32>:\n  match b:\n    case True{}: a[0] <- 7\n                 a[1] <- 8\n    case False{}: a\n\n"
+      + "def g(a: Array<U32>) -> Array<U32>: a[0] <- 5\n                                    a[1] <- 6\n\ndef main() -> Array<U32>:\n  g(f([0 : U32 * 2n], True{}))\n",
+  ],
+  [
+    "import Base\ndef f(n: Bool) -> U32:\n    match n: case True{}: 0\n             case False{}: 1\n\ndef main() -> U32:\n  f(False{})\n",
+    "import Base\ndef f(n: Bool) -> U32:\n  match n: case True{}: 0\n           case False{}: 1\n\ndef main() -> U32:\n  f(False{})\n",
+  ],
+  [
+    "import Base\ndef main() -> IO(Unit):\n  do IO<Unit>:\n      IO.print(String.concat([\"a\",\n    \"c\"]))\n      IO.print(\"b\")\n",
+    "import Base\ndef main() -> IO(Unit):\n  do IO<Unit>:\n    IO.print(String.concat([\"a\",\n    \"c\"]))\n    IO.print(\"b\")\n",
+  ],
+  [
+    "import Base\ndef main() -> IO(Unit):\n  do IO<Unit>:\n\t\tIO.print(\"a\")\n  IO.print(\"b\")\n",
+    "import Base\ndef main() -> IO(Unit):\n  do IO<Unit>:\n  IO.print(\"a\")\n  IO.print(\"b\")\n",
+  ],
+  [
+    "import Base\ndef pick(b: Bool) -> IO(Unit):\n      match b:\n        case True{}: do IO<Unit>: IO.print(\"t\")\n                                  # pinned too\n                                  IO.print(String.concat([\"u\",\n                \"v\"]))\n            # a comment left of the column\n                                  IO.print(\"w\")\n        case False{}: IO.print(\"f\")\n\ndef main() -> IO(Unit):\n  do IO<Unit>:\n    pick(True{})\n    pick(False{})\n",
+    "import Base\ndef pick(b: Bool) -> IO(Unit):\n  match b:\n    case True{}: do IO<Unit>: IO.print(\"t\")\n                              # pinned too\n                              IO.print(String.concat([\"u\",\n      \"v\"]))\n      # a comment left of the column\n                              IO.print(\"w\")\n    case False{}: IO.print(\"f\")\n\ndef main() -> IO(Unit):\n  do IO<Unit>:\n    pick(True{})\n    pick(False{})\n",
+  ],
+  [
+    "import Base\ndef f() -> IO(@x: U32 -> U32):\n    do IO<@x: U32->U32>: IO.print(\"a\")\n                         return x => (x + 1 : U32)\n\ndef main() -> IO(Unit):\n  do IO<Unit>:\n    g : (@x: U32 -> U32) <- f()\n    IO.print(U32.show(g(2)))\n",
+    "import Base\ndef f() -> IO(@x: U32 -> U32):\n  do IO<@x: U32 -> U32>: IO.print(\"a\")\n                         return x => (x + 1 : U32)\n\ndef main() -> IO(Unit):\n  do IO<Unit>:\n    g : (@x: U32 -> U32) <- f()\n    IO.print(U32.show(g(2)))\n",
+  ],
+  [
+    "import Base\ndef f(a: Array<U32>, b: Bool, c: Bool) -> Array<U32>:\n    match b:\n      case True{}: match c:\n                     case True{}: a[0] <- 7\n                                  a[1] <- 8\n                     case False{}: a\n      case False{}: a\n\ndef main() -> Array<U32>:\n    f([0 : U32*2n], True{}, True{})\n",
+    "import Base\ndef f(a: Array<U32>, b: Bool, c: Bool) -> Array<U32>:\n  match b:\n    case True{}: match c:\n                   case True{}: a[0] <- 7\n                                a[1] <- 8\n                   case False{}: a\n    case False{}: a\n\ndef main() -> Array<U32>:\n  f([0 : U32 * 2n], True{}, True{})\n",
+  ],
+];
+
+test("moves pinned lines as far as the body they line up with", () => {
+  for (const [source, expected] of pinned) {
+    assert.equal(formatBend(source), expected);
+    assert.equal(formatBend(expected), expected);
+  }
+});
+
+test("pins with tabs count a tab as one column, as the parser does", () => {
+  const source = "def f(n: Bool) -> U32:\n    match n: case True{}: 0\n             case False{}: 1\n";
+  const once = formatBend(source, { tabSize: 4, insertSpaces: false });
+  assert.equal(once, "def f(n: Bool) -> U32:\n\tmatch n: case True{}: 0\n\t         case False{}: 1\n");
+  assert.equal(formatBend(once, { tabSize: 4, insertSpaces: false }), once);
+});
+
+test("formats do blocks whose first statement is on the next line", () => {
+  for (const header of ["IO<Unit>", "Result<&2, &2, U32, U32>", "IO<List<&2, U32>>", "IO<Client<P, S>>"]) {
+    const source = `def main()->IO(Unit):\n    do ${header}: # first statement follows\n        IO.print("a")\n        IO.print("b")`;
+    assert.equal(formatBend(source), `def main() -> IO(Unit):\n  do ${header}:  # first statement follows\n    IO.print("a")\n    IO.print("b")`);
+  }
+});
+
+// The repo's bun and compiler, unless BEND_FMT_TEST_BUN or
+// BEND_FMT_TEST_COMPILER name others.
+const bun = process.env.BEND_FMT_TEST_BUN ?? "bun";
+const compiler = process.env.BEND_FMT_TEST_COMPILER ?? fileURLToPath(new URL("../../../../bend2/main.ts", import.meta.url));
+const runnable = spawnSync(bun, ["--version"]).status === 0 && existsSync(compiler);
+test("pinned layouts run the same after formatting", { skip: !runnable && "needs bun and bend2/main.ts" }, () => {
+  const directory = mkdtempSync(join(tmpdir(), "bend-fmt-pinned-"));
+  const run = (text: string) => {
+    const file = join(directory, "main.bend");
+    writeFileSync(file, text);
+    const result = spawnSync(bun, [compiler, file], { encoding: "utf8", timeout: 60_000 });
+    return [result.status, result.stdout + result.stderr];
+  };
+  try {
+    for (const [source] of pinned) {
+      const before = run(source);
+      assert.equal(before[0], 0, String(before[1]));
+      for (const options of [{}, { tabSize: 4 }, { insertSpaces: false }]) {
+        assert.deepEqual(run(formatBend(source, options)), before);
+      }
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("formats Bend 2 declarations and nested blocks", () => {
   const source = [
@@ -68,6 +159,21 @@ for (const [name, source, expected] of [
 
 test("keeps separated import path parts separated", () => {
   assert.equal(formatBend("import lib /dep.bend as Dep"), "import lib / dep.bend as Dep");
+});
+
+test("preserves separated annotated arguments and adjacent constructors", () => {
+  for (const [source, expected] of [
+    ["choose(id   {42:U32})", "choose(id {42: U32})"],
+    ["choose(Fns.id {42:U32})", "choose(Fns.id {42: U32})"],
+    ["use(Nat {1n==1n:Nat})", "use(Nat {1n == 1n: Nat})"],
+    ["use(P {==})", "use(P {==})"],
+    ["choose(id,{42:U32})", "choose(id, {42: U32})"],
+    ["Wrap{Inner{1}}", "Wrap{Inner{1}}"],
+    ["\\ { Case:handler }", "\\{Case: handler}"],
+  ]) {
+    assert.equal(formatBend(source), expected);
+    assert.equal(formatBend(expected), expected);
+  }
 });
 
 test("formats Base and quoted foreign imports without changing comments or arithmetic", () => {

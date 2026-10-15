@@ -19,9 +19,11 @@
 #elif defined(__linux__)
 
 // The X11 window: its own connection (so its queue holds only its
-// events), the frame's image, the events pumped since the last frame,
-// five words each (cid, a, b, c, d) as on the Mac, whether it holds the
-// pointer, and the display's refresh period in ns.
+// events), its input method and context (NULL if none opened), the
+// time and code of the last key the method took, the frame's image,
+// the events pumped since the last frame, five words each (cid, a, b,
+// c, d) as on the Mac, whether it holds the pointer, and the display's
+// refresh period in ns.
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xutil.h>
@@ -31,10 +33,16 @@
 #ifdef CID(Window.fullscreen)
 #include <X11/extensions/Xrender.h>
 #endif
+#include <langinfo.h>
+#include <locale.h>
 
 typedef struct {
   Display* dpy;
   Window   win;
+  XIM      im;
+  XIC      ic;
+  Time     kt;
+  u32      kc;
   Atom     del;
 #ifdef CID(Window.fullscreen)
   Atom     state;
@@ -176,9 +184,48 @@ static void window_full_request(BendWin* win) {
 
 #ifdef CID(Window.open)
 
+#if defined(__OBJC__) || defined(__linux__)
+
+// Typed text, from *at on, as the next Text event: up to 16 bytes of
+// UTF-8 in its four words, cut between characters, so a long input
+// method commit comes as several. Control characters and the Mac's
+// function-key characters (U+F700 on) are keys, not text: dropped.
+static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
+  char b[16] = { 0 };
+  u32  k = 0;
+  while (*at < n) {
+    u8  c = (u8)s[*at];
+    u32 l = c < 0x80 ? 1 : c < 0xE0 ? 2 : c < 0xF0 ? 3 : 4;
+    u32 u = l == 1 ? c : c & (0x7F >> l);
+    if (*at + l > n) {
+      *at = n;
+      break;
+    }
+    for (u32 i = 1; i < l; i += 1) {
+      u = u << 6 | ((u8)s[*at + i] & 0x3F);
+    }
+    if (u >= 0x20 && (u < 0x7F || u >= 0xA0) && (u < 0xF700 || u >= 0xF900)) {
+      if (k + l > sizeof b) {
+        break;
+      }
+      memcpy(b + k, s + *at, l);
+      k += l;
+    }
+    *at += l;
+  }
+  ev[0] = CID(Text);
+  memcpy(ev + 1, b, sizeof b);
+  return k > 0;
+}
+
+#endif
+
 #ifdef __OBJC__
 
-@interface BendView : NSView <NSWindowDelegate> {
+// The view takes typed text as the Mac's text input client: keys go
+// through the input method, and its commits come to insertText as Text.
+// It draws no composition: marked holds it only so the method can work.
+@interface BendView : NSView <NSWindowDelegate, NSTextInputClient> {
   @public
   NSMutableData* evs;
   u64            flags;
@@ -191,6 +238,9 @@ static void window_full_request(BendWin* win) {
   BOOL           full_dirty;
   u64            full_due;
 #endif
+  NSString*      marked;
+  NSMutableArray* held;
+  BOOL           other;
 }
 @end
 
@@ -241,6 +291,94 @@ static void window_full_request(BendWin* win) {
 
 - (void)keyDown:(NSEvent*)ev {
   [self key:ev down:YES];
+  if (ev.modifierFlags & NSEventModifierFlagCommand) {
+    return;
+  }
+  BOOL fresh = marked.length == 0;
+  held  = [NSMutableArray new];
+  other = NO;
+  [self interpretKeyEvents:@[ev]];
+  // An input method (Korean, Vietnamese) can commit the first key a view
+  // gets bare, where it should start composing; asked again, it composes.
+  NSString* t = held.count == 1 ? held[0] : nil;
+  if (fresh && !other && !ev.ARepeat && t.length == 1
+    && ![self.inputContext.selectedKeyboardInputSource
+      hasPrefix:@"com.apple.keylayout."]) {
+    [held removeAllObjects];
+    [self interpretKeyEvents:@[ev]];
+  }
+  NSArray* ts = held;
+  held = nil;
+  for (NSString* h in ts) {
+    [self insertText:h replacementRange:NSMakeRange(NSNotFound, 0)];
+  }
+}
+
+- (void)insertText:(id)s replacementRange:(NSRange)r {
+  marked = nil;
+  if (held != nil) {
+    [held addObject:[s isKindOfClass:NSAttributedString.class] ? [s string]
+      : [s copy]];
+    return;
+  }
+  const char* t = [([s isKindOfClass:NSAttributedString.class] ? [s string]
+    : s) UTF8String];
+  u64 n  = strlen(t);
+  u64 at = 0;
+  u32 ev[5];
+  while (window_chunk(t, n, &at, ev)) {
+    [evs appendBytes:ev length:sizeof ev];
+  }
+}
+
+- (void)doCommandBySelector:(SEL)sel {
+  other = YES;
+}
+
+- (void)setMarkedText:(id)s selectedRange:(NSRange)sel
+  replacementRange:(NSRange)r {
+  other  = YES;
+  marked = [[s isKindOfClass:NSAttributedString.class] ? [s string] : s
+    copy];
+}
+
+- (void)unmarkText {
+  other  = YES;
+  marked = nil;
+}
+
+- (BOOL)hasMarkedText {
+  return marked.length > 0;
+}
+
+- (NSRange)markedRange {
+  return marked.length > 0 ? NSMakeRange(0, marked.length)
+    : NSMakeRange(NSNotFound, 0);
+}
+
+- (NSRange)selectedRange {
+  return NSMakeRange(NSNotFound, 0);
+}
+
+- (NSArray<NSAttributedStringKey>*)validAttributesForMarkedText {
+  return @[];
+}
+
+- (NSAttributedString*)attributedSubstringForProposedRange:(NSRange)r
+  actualRange:(NSRangePointer)actual {
+  return nil;
+}
+
+- (NSUInteger)characterIndexForPoint:(NSPoint)p {
+  return NSNotFound;
+}
+
+// With no caret, the candidate list goes at the view's bottom left.
+- (NSRect)firstRectForCharacterRange:(NSRange)r
+  actualRange:(NSRangePointer)actual {
+  NSRect v = [self convertRect:self.bounds toView:nil];
+  return [self.window convertRectToScreen:NSMakeRect(NSMinX(v), NSMinY(v), 0,
+    0)];
 }
 
 - (void)keyUp:(NSEvent*)ev {
@@ -516,6 +654,36 @@ static u64 window_period(Display* dpy) {
   return hz >= 24 && hz <= 1000 ? 1000000000 / (u64)hz : 16666667;
 }
 
+// The input method XMODIFIERS names (as ibus or fcitx), else Xlib's own
+// (dead keys and Compose), under the user's locale, or C.UTF-8 if its
+// characters are not UTF-8 (Xlib mangles composed text there). Xlib
+// takes the locale here; the program's stays as it was. With no method,
+// Text comes from the key's symbol.
+static void window_ime(BendWin* win) {
+  char* was = io_mem(strdup(setlocale(LC_CTYPE, NULL)));
+  setlocale(LC_CTYPE, "");
+  if (strcmp(nl_langinfo(CODESET), "UTF-8") != 0) {
+    setlocale(LC_CTYPE, "C.UTF-8");
+  }
+  if (XSupportsLocale()) {
+    XSetLocaleModifiers("");
+    win->im = XOpenIM(win->dpy, NULL, NULL, NULL);
+    if (win->im == NULL) {
+      XSetLocaleModifiers("@im=none");
+      win->im = XOpenIM(win->dpy, NULL, NULL, NULL);
+    }
+  }
+  setlocale(LC_CTYPE, was);
+  free(was);
+  win->ic = win->im == NULL ? NULL : XCreateIC(win->im, XNInputStyle,
+    XIMPreeditNothing | XIMStatusNothing, XNClientWindow, win->win,
+    XNFocusWindow, win->win, NULL);
+  if (win->ic == NULL && win->im != NULL) {
+    XCloseIM(win->im);
+    win->im = NULL;
+  }
+}
+
 static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
   const char** why) {
   if (w < 1 || h < 1 || w > 16384 || h > 16384) {
@@ -539,6 +707,11 @@ static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
   win->height = h;
   win->win = XCreateSimpleWindow(dpy, RootWindow(dpy, scr), 0, 0, w, h, 0, 0,
     BlackPixel(dpy, scr));
+  window_ime(win);
+  long im_evs = 0;
+  if (win->ic != NULL) {
+    XGetICValues(win->ic, XNFilterEvents, &im_evs, NULL);
+  }
   win->del = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
 #ifdef CID(Window.fullscreen)
   win->state = XInternAtom(dpy, "_NET_WM_STATE", False);
@@ -559,7 +732,7 @@ static u32 window_make(const char* title, u32 w, u32 h, intptr_t* out,
   XSetWMProtocols(dpy, win->win, &win->del, 1);
   XStoreName(dpy, win->win, title);
   XSelectInput(dpy, win->win, KeyPressMask | KeyReleaseMask | ButtonPressMask
-    | ButtonReleaseMask | PointerMotionMask | FocusChangeMask
+    | ButtonReleaseMask | PointerMotionMask | FocusChangeMask | im_evs
 #ifdef CID(Window.fullscreen)
     | PropertyChangeMask | StructureNotifyMask
 #endif
@@ -607,6 +780,10 @@ static void __attribute__((constructor)) window_open_use(void) {
 #if defined(__OBJC__) || defined(__linux__)
 
 static Term window_node(Env e, const u32* ev) {
+  if (ev[0] == CID(Text)) {
+    const char* s = (const char*)(ev + 1);
+    return io_box(e, CID(Text), io_str(e, s, strnlen(s, 16)));
+  }
   u32 n = cid_arity(ev[0]);
   if (n == 0) {
     return term_pak(ev[0], 0);
@@ -839,6 +1016,44 @@ static void window_push(BendWin* win, u32 cid, u32 a, u32 b, u32 c, u32 d) {
   win->n += 1;
 }
 
+// A key press's text: what the input method commits, else (no method)
+// the character of the key's symbol, unless Control is held.
+static void window_text(BendWin* win, XKeyEvent* key) {
+  char   buf[64];
+  char*  s  = buf;
+  int    n  = 0;
+  KeySym ks = 0;
+  Status st = XLookupNone;
+  if (win->ic != NULL) {
+    n = Xutf8LookupString(win->ic, key, s, sizeof buf, &ks, &st);
+    if (st == XBufferOverflow) {
+      s = io_mem(malloc(n));
+      n = Xutf8LookupString(win->ic, key, s, n, &ks, &st);
+    }
+    if (st != XLookupChars && st != XLookupBoth) {
+      n = 0;
+    }
+  } else if (!(key->state & ControlMask)) {
+    XLookupString(key, buf, sizeof buf, &ks, NULL);
+    u32 u = ks <= 0xFF ? (u32)ks
+      : (ks & 0xFF000000) == 0x01000000 ? (u32)(ks & 0xFFFFFF) : 0;
+    u32 l = u < 0x80 ? 1 : u < 0x800 ? 2 : u < 0x10000 ? 3 : 4;
+    buf[0] = l == 1 ? u : (0xF00 >> l) | u >> 6 * (l - 1);
+    for (u32 i = 1; i < l; i += 1) {
+      buf[i] = 0x80 | (u >> 6 * (l - 1 - i) & 0x3F);
+    }
+    n = l;
+  }
+  u64 at = 0;
+  u32 ev[5];
+  while (window_chunk(s, n, &at, ev)) {
+    window_push(win, ev[0], ev[1], ev[2], ev[3], ev[4]);
+  }
+  if (s != buf) {
+    free(s);
+  }
+}
+
 static u32 window_clip(int v, u32 most) {
   return v < 0 ? 0 : (u32)v < most ? (u32)v : most - 1;
 }
@@ -867,6 +1082,8 @@ static void window_pump(BendWin* win) {
   while (XPending(win->dpy) > 0) {
     XEvent ev;
     XNextEvent(win->dpy, &ev);
+    XKeyEvent key  = ev.xkey;
+    bool      took = XFilterEvent(&ev, None);
     if (ev.type == ConfigureNotify) {
       if (pw != ev.xconfigure.width || ph != ev.xconfigure.height) {
         win->width = pw = ev.xconfigure.width;
@@ -876,10 +1093,10 @@ static void window_pump(BendWin* win) {
         if (win->grab) {
           window_warp(win, cx, cy);
         }
-      }
 #ifdef CID(Window.fullscreen)
         window_viewport(win);
 #endif
+      }
 #ifdef CID(Window.fullscreen)
     } else if (ev.type == PropertyNotify && ev.xproperty.atom == win->state) {
       bool full = window_has_value(win->dpy, win->win, win->state, XA_ATOM,
@@ -903,8 +1120,21 @@ static void window_pump(BendWin* win) {
       }
 #endif
     } else if (ev.type == KeyPress || ev.type == KeyRelease) {
-      window_push(win, CID(Key), window_key(&ev.xkey), ev.type == KeyPress,
-        0, 0);
+      // Each key is a Key, even one the input method took (the event as
+      // it came: Xlib's own method rewrites it). A method may hand a key
+      // back at its time, the same Key, or bring text on key code 0.
+      u32 code = key.keycode << 1 | (ev.type == KeyPress);
+      if (key.keycode != 0
+        && (took || key.time != win->kt || code != win->kc)) {
+        window_push(win, CID(Key), window_key(&key), ev.type == KeyPress, 0,
+          0);
+      }
+      if (took) {
+        win->kt = key.time;
+        win->kc = code;
+      } else if (ev.type == KeyPress) {
+        window_text(win, &ev.xkey);
+      }
     } else if (ev.type == ButtonPress || ev.type == ButtonRelease) {
       // the wheel: 4 up, 5 down, 6 left, 7 right
       u32 b  = ev.xbutton.button;
@@ -928,7 +1158,12 @@ static void window_pump(BendWin* win) {
         window_push(win, CID(Move), window_coord(win, x, false),
           window_coord(win, y, true), 0, 0);
       }
+    } else if (ev.type == FocusIn && win->ic != NULL) {
+      XSetICFocus(win->ic);
     } else if (ev.type == FocusOut) {
+      if (win->ic != NULL) {
+        XUnsetICFocus(win->ic);
+      }
       XUngrabPointer(win->dpy, CurrentTime);
       win->grab = 0;
     } else if (ev.type == ClientMessage
@@ -1274,6 +1509,10 @@ static void window_close(intptr_t at) {
 
 static void window_close(intptr_t at) {
   BendWin* win = (BendWin*)at;
+  if (win->ic != NULL) {
+    XDestroyIC(win->ic);
+    XCloseIM(win->im);
+  }
   XDestroyImage(win->img);
 #ifdef CID(Window.fullscreen)
   if (win->source) {

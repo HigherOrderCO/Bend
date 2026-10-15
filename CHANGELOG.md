@@ -3,6 +3,81 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
+## 2.0.37 (2026-10-13)
+
+- **A Nat crosses to a JS host as a plain number** (PR #1506 by
+  nicolas-abril). **Breaking for JS callers:** an effect's `.js` and a
+  caller of an exported def pass and get `5`, not `5n`. A `Nat` answer or
+  argument that isn't a whole number from 0 to 2^53 stops the run with the
+  Nat error, as in C. Calls into exported defs are about 3.5x faster.
+- **`IO.exit(code)` ends a program quietly** with a status from 0 to 255
+  (#1465, PR #1492 by oxura). A code above 255, in `IO.exit` or `IO.die`,
+  exits 1 instead of wrapping.
+- **`F32.show` takes a plain parameter**, so `~F32.show` fits `List.show`
+  and `Maybe.show` (#1511, PR #1518 by vicmcorrea). A caller passing it as
+  `+` now wraps it: `(x => F32.show(x))`.
+- **bend-lint**, a standalone linter with rules written in TS or Bend, in
+  `tools/bend-lint` (PR #1389 by MattCozendey).
+- **Faster**:
+  - The CPU hands a slow grow's forks to idle threads, so a wide late fork
+    runs 2.6x faster at 14 threads (#1475, PR #1479 by viridale).
+  - BendTT's parser reads the text's bytes, so `--verdict` parses twice as
+    fast in a quarter of the memory (PR #1380 by nicolas-abril); safe.ts
+    walks each term once (PR #1384 by nicolas-abril).
+  - A bang over a pair no longer sends every closure to the device (PR
+    #1336 by chaserelock); a spin is a device call by its C's length in
+    characters, and always inline on the host (PR #1413 by nicolas-abril).
+  - A native build frees the compiler's memory before clang runs (PR #1385
+    by Iann29).
+  - On Linux a window paces at the display's refresh rate, not 60 Hz (PR
+    #1379 by igorhasse).
+- **CLI**:
+  - `bend update` fails when the installer download fails (#1481, PR #1485
+    by vicmcorrea).
+  - `--checkup` reads only the import header, and imports with a trailing
+    `# comment` (#1501, #1497, PRs #1502 by oxura and #1517).
+  - `bend a.bend --verdict b.bend` is refused: extra arguments go only to a
+    plain run (#1503, PR #1516).
+  - Inline HTML module scripts are bundled (#1400, PR #1412 by oxura), keep
+    their diagnostic positions (PR #1454 by Osraka), and a bundler failure
+    is a formatted error (#1399, PR #1406 by oxura).
+  - An unreachable hub is a formatted error, not a TypeError (PR #1428 by
+    HamedShams); a native build that fails before clang removes its
+    `/tmp/bend-*` dir (#1402, PR #1405 by Yi-111-a).
+  - A `!` build finds CUDA at `$CUDA_PATH` and `/opt/cuda` (PR #1373 by
+    igorhasse).
+- **Fixes**:
+  - Linux audio keeps a partially written chunk until ALSA takes it, and
+    stops on a dead device instead of spinning (PR #1508 by
+    sebastian-griego).
+  - `F32.hypot` keeps lengths past 1.8e19 and below 1e-19 (PR #1515 by
+    sebastian-griego).
+  - A closed stdout or stderr reader ends a program by SIGPIPE (#1467, PR
+    #1470 by viridale); `Process.run` reads until stdout and stderr close
+    (#1343, PR #1392 by nicolas-abril); `get_env` rejects a name with a NUL
+    (#1449, PR #1450 by Yi-111-a).
+  - An erased last argument no longer cuts its call (#1374, PR #1377 by
+    nuxyel); the effect table is sized to the program's constructor ids
+    (#1163, PR #1378 by vicmcorrea); arrays of concrete functions compile
+    (#1404, PR #1410 by oxura); `lay_el` takes only datatypes and type
+    formers (PR #1426 by nicolas-abril); a `__proto__` export survives in
+    JS (PR #1458 by vicmcorrea).
+  - Match-refined Data views stay in copyable lets (#1349, PR #1369 by
+    oxura); Array-wrapped JS marshalling is stack-safe (#1346, PR #1370 by
+    oxura).
+  - `--verdict` builds inlined recursive let arguments at each use (#1326,
+    PR #1368 by oxura), keeps Base-free large Nat literals (#1330, PR #1337
+    by oxura), and parses both rewrite motive binders in its diagnostics
+    (#1315, PR #1407 by oxura).
+  - The formatter keeps module import paths (PR #1325) and separated brace
+    arguments (PR #1505), by vicmcorrea; the linter keeps quoted foreign
+    import paths (PR #1422) and module headers (PR #1460), by vicmcorrea.
+- **Docs**: README Limitations names backend divergence and the unproven
+  translation (#1423, PR #1424); the formatter README installs
+  `bend2-fmt-lsp` on PATH (PR #1486 by Osraka); IO forks vs CPU parallel
+  calls (#1375, PR #1415 by oxura); BendRT's opening program checks again
+  (#1308, PR #1382 by oxura).
+
 ## 2.0.36 (2026-10-07)
 
 - **HOC's proving agent is now named BendAI**: `bend login` logs in to

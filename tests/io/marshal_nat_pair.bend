@@ -1,8 +1,6 @@
 # io (io_marshal_nat_pair): a Nat in a pair crosses the effect seam as
-# a BigInt at any depth. A pair's second half is a type family, and the
-# marshal walk took it for no Nat: it found U32 & Nat's through the
-# Sigma's fields, but in U32 & U32 & Nat it had seen Sigma already, so
-# that Nat crossed as a number. Both effects answer the BigInt's typeof.
+# a number at any depth, the same as a Nat on its own. Both effects
+# answer its typeof.
 import Base
 
 law top:
@@ -29,5 +27,5 @@ def main():
     u : Unit <- IO.print(a)
     IO.print(b)
 
-#|bigint
-#|bigint
+#|number
+#|number

@@ -505,14 +505,16 @@ device), and the harness checks that all three print the same bytes.
 = Effects <sec:io>
 
 `IO(A)` is a definition of the base library, not a primitive: a
-continuation over one datatype `IO.OP` with two constructors, `Emit`
-and `Halt`. A _foreign fill_, a def whose body is `import` lines naming
+continuation over one datatype `IO.OP` with three constructors, `Emit`,
+`Halt` and `Exit`. A _foreign fill_, a def whose body is `import` lines naming
 a `.c` and a `.js` file, compiles to one segment that packs its
 arguments and its continuation into a request. The event loop runs on
 one thread: it evaluates `main` to a request through the pure machine,
 runs the effect's C handler, applies the continuation to the answer,
-and evaluates again; `Emit` ends the program and `Halt` exits with its
-code. Effects never run inside an evaluator, and the machine performs
+and evaluates again; `Emit` ends the program, `Halt` prints its message
+and exits with its code, and `Exit` exits with its code silently. A code
+outside 0..255 exits with 1 and an error. Effects never run inside an
+evaluator, and the machine performs
 no IO. A fallible operation answers a `Result` carrying errno, and a
 handle threads back outside the `Result`, so even a failure cannot
 lose it.
