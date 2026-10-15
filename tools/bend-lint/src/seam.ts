@@ -883,7 +883,6 @@ export const operations = (m: Loaded, run: Checked): Operations => {
     sameDeclarations: (text) => sameDeclarations(m, run, text),
     body: (name) => {
       const scope = run.book.files.get(run.book.entry)!;
-      if (!Object.hasOwn(run.book.tlds, name) && !Bend.SOURCE_NAME.test(name)) return undefined;
       const found = Object.hasOwn(run.book.tlds, name) ? { k: name, issue: undefined } : Bend.name_resolve(run.book, scope, name);
       if (found.issue !== undefined) return undefined;
       const tld = run.book.tlds[found.k];

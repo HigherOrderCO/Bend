@@ -253,8 +253,7 @@ export type Category = "def" | "ctr";
 export type Name = string & { readonly identity: unique symbol };
 export type Label = string;
 export type FileId = string & { readonly file: unique symbol };
-export const BASE_ID = file_name("Base");
-export const SOURCE_NAME = /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/;
+export const BASE_ID = "Base" as FileId;
 
 export function name_source(file: FileId, text: string, category: Category = "def"): Name {
   return (file + (category === "ctr" ? ":#" : ":") + text) as Name;
@@ -398,7 +397,7 @@ export type Local = { $: "Local"; k: Patt[]; q: Quant; v: LTerm[]; f: Body };
 export type Body  = Match | Local | LTerm
 
 // Parser
-export type File  = { str: string; ns: FileId; al: Readonly<Record<string, FileId>>; base: FileId | null; path?: string };
+export type File  = { str: string; ns: FileId; al: Record<string, FileId>; base: FileId | null; path?: string };
 export type Parse = File & { book: Book; pos: number; stk: Array<[Label, number]>; frs: number; rs: Record<Category, Map<string, { k: Name; issue?: string }>>; };
 export type Span  = { file: File; beg: number; end: number; };
 
@@ -916,7 +915,7 @@ async function name_hash(book: Book, nv: string, spn?: Span): Promise<string> {
   if (!NAMED.test(nv)) {
     throw Err(book, ctx_nil(), "a package as <name>@<version>: a-z, 0-9 and -, 1 to 64 characters, at four numbers like 1.0.0.0", "'" + nv + "'", spn);
   }
-  const at  = path.join(BEND_LIB, "names", name_emit(name_internal(BEND_HUB)), nv);
+  const at  = path.join(BEND_LIB, "names", encodeURIComponent(BEND_HUB), nv);
   const old = fs.existsSync(at) ? fs.readFileSync(at, "utf8").trim() : "";
   if (/^0x[0-9a-f]{32}$/.test(old)) {
     return old;
@@ -1546,7 +1545,7 @@ export function parse_lexeme(p: Parse): string {
     p.pos += 1;
   }
   const k = p.str.slice(beg, p.pos);
-  if (!SOURCE_NAME.test(k)) {
+  if (!/^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/.test(k)) {
     parse_fail(p, "a name (words joined by dots, got '" + k + "')", beg);
   }
   return k;
@@ -1642,8 +1641,13 @@ function parse_head(p: Parse, t: LTerm, category: Category = "def", op = ""): Na
   return parse_reso(p, t.$ === "Var" ? t.k + op : (al ? al + "." : "") + name_text(k) + op, category);
 }
 
+// sugar's names: Base's, or the file's own when Base is not in the book
+export function sugar_file(file: File): FileId {
+  return file.base ?? file.ns;
+}
+
 export function sugar_name(file: File, text: string, category: Category = "def"): Name {
-  return name_source(file.base ?? file.ns, text, category);
+  return name_source(sugar_file(file), text, category);
 }
 
 export function parse_call(p: Parse, k: string, xs: LTerm[], s?: Span): LTerm {
@@ -1888,11 +1892,11 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         parse_term_ns(p, xs[0], T);
         let d = n;
         if (cnt) {
-          const k = Math.log2(nat_from_term(n, p.base ?? p.ns) ?? 0);
+          const k = Math.log2(nat_from_term(n, sugar_file(p)) ?? 0);
           if (!Number.isInteger(k)) {
             throw Err(p.book, ctx_nil(), "a power of two count (^d takes a depth)", undefined, n.s);
           }
-          d = Lit(p.base ?? p.ns, "Nat", k, n.s);
+          d = Lit(sugar_file(p), "Nat", k, n.s);
         }
         return App(App(App(Ref(sugar_name(p, "Array.new"), s), T, s), d, s), xs[0], s);
       }
@@ -1908,7 +1912,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         parse_fail(p, "a closing '");
       }
       const spn = parse_span(p, beg);
-      return Ctr(sugar_name(p, "Chr", "ctr"), [Lit(p.base ?? p.ns, "U32", n, spn)], spn);
+      return Ctr(sugar_name(p, "Chr", "ctr"), [Lit(sugar_file(p), "U32", n, spn)], spn);
     }
     case '"': {
       parse_bump(p);
@@ -1919,7 +1923,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         }
         cs.push(parse_char(p));
       }
-      return lit_of(cs, parse_span(p, beg), p.base ?? p.ns);
+      return lit_of(cs, parse_span(p, beg), sugar_file(p));
     }
     case "?": {
       parse_bump(p);
@@ -2155,7 +2159,7 @@ export function parse_term_tup(p: Parse, beg: number): LTerm {
 const NUMBER = /(\d+)(n|\.\d+([eE][+-]?\d+)?)?/y;
 
 export function parse_term_num(p: Parse): LTerm {
-  const owner = p.base ?? p.ns;
+  const owner = sugar_file(p);
   const beg = p.pos;
   NUMBER.lastIndex = p.pos;
   const m = NUMBER.exec(p.str) as RegExpExecArray;

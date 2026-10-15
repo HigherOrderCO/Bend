@@ -448,7 +448,7 @@ function subst(t: HTerm, d: number, f: (o: Record<string, unknown>) => HTerm | u
     if (v !== undefined) {
       return B.Var(o.k as Name, -1, undefined, v);
     }
-    const out: Record<string, unknown> = Array.isArray(u) ? [] : {};
+    const out = (Array.isArray(u) ? [] : {}) as Record<string, unknown>;
     for (const k in o) {
       out[k] = k === "s" ? o[k] : go(o[k]);
     }
