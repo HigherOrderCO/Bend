@@ -326,18 +326,19 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
       oos("a specialized parameter whose type names a parameter");
     }
-    const key = String(j) + "\n" + B.term_key(B.term_lower(F.A));
-    const kept = e.consts.get(key);
-    if (kept !== undefined) {
-      return at(B.Ref(kept));
-    }
     let c = k + "~" + F.k;
     while (e.book.tlds[c] !== undefined) {
       c += "~";
     }
+    // roots share a constant only where they give it the same model
+    const m = inst_model(e, k, j, c, F.A) ?? model(e, F.A);
+    const key = String(j) + "\n" + B.term_key(B.term_lower(F.A)) + "\n" + (m === null ? "" : B.term_key(B.term_lower(m)));
+    const kept = e.consts.get(key);
+    if (kept !== undefined) {
+      return at(B.Ref(kept));
+    }
     const def: Def = { $: "Def", n: 0, x: 0, T: F.A, v: null };
     e.book.tlds[c] = def;
-    const m = inst_model(e, k, j, c, F.A) ?? model(e, F.A);
     if (m !== null) {
       e.mb.tlds[c] = { ...def, v: m };
     }
