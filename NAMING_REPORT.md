@@ -1,27 +1,133 @@
 # Simplifying naming/uniform-identities
 
-Branch `naming/uniform-identities-simplify` is local only, in the worktree `/tmp/w-naming` (repo `~/work/bend2-core`). It starts at `746528dc5` and has 5 commits, ending at `79305b95`. Nothing was pushed and nothing was written to GitHub. Paulo's branch is untouched.
+Branch `naming/uniform-identities-simplify` lives in the worktree `/tmp/w-naming`. Paulo's `naming/uniform-identities` was never touched.
+
+- **First pass:** from `746528dc5` to `79305b95`, plus `657b0990`, which adds this report and is pushed by Unii.
+- **Second pass (this one):** 6 local commits on top: 5 of code, ending at `42b8f24e`, then one that updates this report. They are not pushed, and nothing was written to GitHub.
 
 ## Sizes (lines / ttok)
 
-| file | main 32d23b434 | start 746528dc5 | final 79305b95 | final vs start | final vs main |
-|---|---|---|---|---|---|
-| bend.ts | 3882 / 43,759 | 3998 / 46,834 | 3902 / 45,775 | −96 / **−1,059** | +20 / **+2,016 (+4.6%)** |
-| comp.ts | 6396 / 63,675 | 6324 / **64,345 (over the 64k cap)** | 6301 / 63,988 | −23 / −357 | −95 / +313 |
-| main.ts | 1015 / 11,230 | 1085 / 12,255 | 1088 / 12,251 | +3 / −4 | +73 / +1,021 |
-| safe.ts | 1577 / 22,494 | 1555 / 22,184 | 1547 / 22,071 | −8 / −113 | −30 / −423 |
+| file | main 32d23b434 | start 746528dc5 | 1st pass 79305b95 | 2nd pass 42b8f24e | vs start | vs 1st pass | vs main |
+|---|---|---|---|---|---|---|---|
+| bend.ts | 3882 / 43,759 | 3998 / 46,834 | 3902 / 45,775 | **3838 / 44,743** | −160 / **−2,091** | −64 / −1,032 | −44 / **+984 (+2.2%)** |
+| comp.ts | 6396 / 63,675 | 6324 / 64,345 (over cap) | 6301 / 63,988 | 6298 / 63,995 | −26 / −350 | −3 / +7 | −98 / +320 |
+| main.ts | 1015 / 11,230 | 1085 / 12,255 | 1088 / 12,251 | 1086 / 12,214 | +1 / −41 | −2 / −37 | +71 / +984 |
+| safe.ts | 1577 / 22,494 | 1555 / 22,184 | 1547 / 22,071 | 1568 / 22,373 | +13 / +189 | +21 / +302 | −9 / −121 |
 
-- **Whole branch against main:** 171 files and +3151/−2216 lines at the start; 33 files and +1786/−1689 now.
-- **Against the start:** 154 files, +782/−1597 lines.
-- **bend.ts:** 34% of the branch's growth is gone. The remaining +2,016 is roughly:
-  - ~570: key helpers (format, file ids, reading keys back, display, C/JS emit).
-  - ~430: resolution (aliases, Base fallback, categories, the deferred alias issue, re-reading a head by its spelling, the per-file cache).
-  - ~430: sugar and literals bound to Base or to the file's own names, plus reading imports first.
-  - ~700: scope-correct copying of checked terms (`scope_mapper`, `checked_copy`, `term_at`, `checked_higher`).
-  - ~350: the rest (`book_load`, instances, cache keys, the `Op` term, the field-name check, the IO check by key).
-  - −780: the branch's own `term_map`/`term_show` refactors pay part of this back.
+- **bend.ts:** the branch added 3,075 tokens over main; 68% of that is gone. bend.ts now has fewer lines than main.
+- **Diff without the report file:**
+  - main → final: 34 files, +1670/−1599 lines (the starting branch had 171 files, +3151/−2216).
+  - start → final: 155 files, +908/−1772.
+  - 1st pass → final: 6 files, +225/−274.
+- **safe.ts grew by 302 tokens this pass.** It takes back main's own lowered-form `subst`, about 120 tokens of it, in place of the shared copier; see point 1 below. The other ~180 are the deterministic kernel names (point 3) and ordinary churn.
+- **What the remaining +984 in bend.ts is:**
+  - the key helpers: format, file ids, reading keys back, display, C/JS symbol;
+  - one resolver with a per-file reading cache;
+  - sugar and literals naming their vocabulary file;
+  - checked-type transport, now about 60 tokens;
+  - the `Op` node, the constructor field-name check, and the instance key and rollback.
+  - The branch's `term_map`/`term_show` refactors pay part of this back.
 
-## What I simplified
+## Second pass: what changed in bend.ts
+
+1. **Checked-type transport without a copier.**
+   - *What was removed:* `scope_mapper` (445 tokens), plus `checked_copy`, `term_at`, the `Slot` type and the `slot` field on `Var`, about 720 tokens in all.
+   - *How it works now:* the checker's output keeps its types in share cells, and those name the def's binders by level. `checked_higher` = `term_higher(e, null, true)`. In that mode, each cell is lowered at `DEEP` (2^30, past every binder) and raised again in the current env. Its free levels then become this copy's binder values, and its own binders get levels at `DEEP` and above, so they collide with nothing.
+   - *Effect:* the copy is fresh, so evaluating it fills no cell of the original.
+   - *Instance arguments:* `Def.args` stores the checked arguments as the checker returned them (LTerms). safe.ts raises them where it uses them, so normal checking pays nothing.
+   - *Other users:*
+     - comp's `scoped_key` lowers at `DEEP` and numbers free probes by binding.
+     - safe.ts uses main's lowered-form `subst` again, with a loop instead of `map` callbacks. This keeps it within the stack: a 6000n literal in a no-Base file now verifies, which it did on main but not on the starting branch.
+2. **A file reads Base when Base is in the book by the time the file parses.**
+   - `book_load` is main's recursive loader again. The discover-then-parse pass is gone (−175 tokens).
+   - A file's names and its sugar now follow the same rule: sugar means Base's vocabulary, or the file's own vocabulary when Base isn't loaded yet.
+   - This matches how ordinary names already resolved on main and on the starting branch.
+3. **Name resolution keeps only identities in terms.**
+   - `Ref.raw`, `ADT.raw`, `Ref.issue`, `term_raw` and `parse_find` are gone.
+   - An alias/Base ambiguity fails where the name is read, which is main's position and wording; `tests/import/alias_shadow.bend` is identical to main again.
+   - `parse_head` re-reads a head (a match label, an operator's namespace) by spelling its key as the file spells it, using `name_display(book, k, file)`. The datatype note in `term_check` uses the same spelling.
+   - `+D` and `D<..>` read the key directly.
+4. **Generated names no longer use a process counter.**
+   - `name_gen` requires a member: a position, or a string that is hashed.
+   - safe.ts names each kernel item by its item key, each root constant by its column and type, and each group by its members. Kernel names are now deterministic, and the same entity always gets the same name.
+5. **Smaller cuts.**
+   - `display_text` is dropped; main never escaped labels.
+   - The finite-syntax guard is gone from `term_key`: lowered terms carry no closures or cells.
+   - `SOURCE_NAME` is inlined again.
+   - The hub-names cache is keyed by `encodeURIComponent(BEND_HUB)`.
+   - `name_display` is about half the size.
+   - `sugar_file(p)` replaces `p.base ?? p.ns`.
+   - `term_map` keeps a context argument, so `term_higher` and `term_lower` allocate no closure per node; removing it had made the checker about 10% slower.
+6. **Restored from main or the branch.**
+   - The TODO count is back in `book_valid`; the branch had moved it into main.ts.
+   - A failed instance check rolls back its `tmps` entry and its placeholder definition again, which fixes the first pass's concern 3.
+
+## Why the rules hold
+
+- **Local binders.**
+  - *By position, not spelling:* binders are identified by level or by HOAS argument. Labels are only displayed.
+  - *Inside checked types:* a variable in a checked type names its binder by level. `checked_higher` maps that level through the env of the copy being built, so it lands on the same binder object the body uses. Two references to one binder stay connected, and a level can't alias a compiler probe.
+  - *Unbound variables:* an unbound level throws instead of turning into a `Ref` by its label, as main did.
+- **Source declarations.**
+  - *The key:* `<file>:<text>` for defs and types, `<file>:#<text>` for constructors. Two aliases of one file give the same file id, and categories never mix.
+  - *Resolution is stable within a file:* a file reads a spelling one way throughout. `parse_fresh` refuses to declare a name the reading would change for (a name Base declares), and every imported file is fully parsed before the importer.
+  - *Re-reading a head:* this goes through `name_display(book, k, file)`. For keys this file can name (its own, Base's, or an alias's), that is exactly the spelling that resolves back to the key's file.
+- **Generated entities.**
+  - *The key:* `<owner>~<role>:<member>` names the owner and the purpose. The member is a position, or the hash of the exact string that picks the entity: an instance's argument key, a kernel item's key, a group's members.
+  - *Re-referencing:* referring to the same entity again builds the same key.
+- **Sugar.** Sugar resolves to the file Base would, or to the writing file's own vocabulary when Base isn't loaded, which is the same rule ordinary names follow. Literals carry that file, so `lit_step` builds constructors of the same vocabulary.
+
+## Gates (final commit 42b8f24e)
+
+| gate | start 746528dc5 | 1st pass 79305b95 | final 42b8f24e |
+|---|---|---|---|
+| repo | FAIL 53/54 (comp.ts over cap) | 54/54 | **53/54, only because of `NAMING_REPORT.md`**; 54/54 with that file removed |
+| test (BEND_HOC=lorenzo) | 1622/1622 | 1623/1623 | 1623/1623 |
+| safe (tests corpus, bendtt b9f3e0253abffb11) | agree 1050, u 88, rej 490, − 4, ! 1 | agree 1050, u 89, rej 490, − 4, ! 1 | agree 1050, u 89, rej 490, − 4, ! 1, t 0, e 0 |
+| perf | 124/124 ×2, 123/124 ×1 | 124/124 ×1, 123/124 ×3 | 124/124 and 123/124 (merkle compiler at 1.16x) |
+| ping (SITE_REPO=~/work/bend-lang.com) | 58/58 | 58/58 | 58/58 |
+| bend-lint `bun test` / tsc | 124 / clean | 124 / clean | 124 / clean |
+| tsc (bend2/pack) | clean | clean | clean |
+
+- **repo gate:** `NAMING_REPORT.md` sits at the repo root, which the allow list doesn't permit. It needs to move out of the tree, or be deleted, before anything merges.
+- **safe:** every row matches the first pass once generated kernel names are stripped. The `!` is the known `agree_32` case (#1193).
+- **perf:**
+  - *Checker, against main's pin:*
+
+    | bench | final | 1st pass |
+    |---|---|---|
+    | compute_1600 | 0.92x | 0.91x |
+    | defs_12800 | 1.06–1.07x | 1.07x |
+    | generics_3200 | **1.13–1.14x** | 1.16x |
+    | proofs_3200 | 1.02–1.04x | 1.01x |
+    | trees_400 | 1.04–1.05x | 1.05x |
+
+  - *Compiler and runtime benches:* unchanged. merkle's compiler time sits at 1.13–1.16x in every version, including the first pass.
+  - *In-process check of generics_3200* (load and check, median of 30): final 327–335 ms, 1st pass 316–340 ms.
+
+## Behavior changes in this pass
+
+- **A file that comes before `import Base` in the importer and doesn't import Base itself** now reads sugar (`3n`, `"s"`, `[..]`) as its own vocabulary. The starting branch read it as Base's, but that file's Base names already failed to resolve, as on main.
+- **An alias that hides a name Base also declares** fails where the name is written, for the def reading. On main it also failed there, for either category.
+- **Kernel names in `--verdict` output** are hashes of what each item stands for, not counters.
+
+## Concerns still open
+
+1. **Canonical keys contain absolute file paths.** They reach JS tags and exports, C symbols and BendTT names. That means builds can't be reproduced across checkouts, and separately built JS modules only agree on tags when built from the same path. This is the branch's design.
+2. **`CID` inside a JS template literal's `${}`** is not rewritten. This is pre-existing (main's scanner).
+3. **Template parameters display as internal names**, for example `cast~param2`.
+4. **main.ts is +984 over main**, mostly `pkg_files` publication checks (symlinked or case-folded paths, unchanged imports, the PROOF/LAWS sibling). I left them alone; they are under the cap.
+
+## Decisions for you
+
+- **Effects keep `CID(..)`/`FID(..)`** (first pass), resolved in the importing file's scope.
+- **`NAMING_REPORT.md` in the repo root breaks the repo gate.**
+
+Scratch is in `/tmp/nm`. The `/tmp/w-prev`, `/tmp/w-start` and `/tmp/w-main` worktrees are removed after this report.
+
+## Appendix: first pass (746528dc5 → 79305b95)
+
+### What it simplified
 
 1. **Key encoding.**
    - Only file ids are escaped now, and only `%`, `:` and `~`. Before, every key part was percent-encoded and decoded back.
@@ -53,7 +159,7 @@ Branch `naming/uniform-identities-simplify` is local only, in the worktree `/tmp
    - JS gets the canonical key.
    - Result: about 130 effect and test files are byte-identical to main again (window.c differs only by the branch's GPU kernel rename). `foreign_src` (602 tokens) became a ~300-token `c_ids`. JS runtime tags are written as literal `"Base:#X"` (the `js_tag` helper is gone). comp.ts is under its cap again.
 
-## Why the rules still hold
+### Why its rules hold
 
 - **Each key reads back to one thing.** File ids contain no `:`, `~` or `%`-ambiguity, so the first `:` ends the file. `#` marks a constructor. Source spellings and roles never contain `: # ~`, so a key is never misread as generated. Generated members are numbers or `@`+hex.
 - **Different entities get different keys.** Category, file and spelling all stay in the key. Hashed members are sha256 of the exact key text.
@@ -64,42 +170,3 @@ Branch `naming/uniform-identities-simplify` is local only, in the worktree `/tmp
 - **The walkers see the same things.** `term_lower` forces cells and applies closures, so a lowered term holds no functions, and a field walk sees the same children as `term_children` did.
 - **Display only changes for impossible inputs.** Labels pass `SOURCE_NAME` or are compiler-made.
 
-## Gates (final commit compared with the start)
-
-| gate | start 746528dc5 | final 79305b95 |
-|---|---|---|
-| repo | **FAIL 53/54** (comp.ts 64,345) | PASS 54/54 |
-| test (BEND_HOC=lorenzo) | 1622/1622 | 1623/1623 (+ new `tests/io/cid_both`) |
-| safe (tests corpus, bendtt b9f3e0253abffb11) | agree 1050, u 88, rej 490, − 4, ! 1, t 0, e 0 | agree 1050, u 89 (new test), rej 490, − 4, ! 1, t 0, e 0 |
-| perf | 124/124 twice, 123/124 once (`generics_3200` at 1.12–1.15x) | 124/124 once, 123/124 three times (`generics_3200` at 1.15–1.16x) |
-| ping (SITE_REPO=~/work/bend-lang.com) | 58/58 | 58/58 |
-| bend-lint `bun test` / tsc | 124 pass / clean | 124 pass / clean |
-| tsc (bend2/pack) | clean | clean |
-
-- **Safe:** the only row difference is the shorter alias message. The `!` on both is `conversion_shared_cells_once` `agree_32`, a known issue (#1193).
-- **Perf:** `generics_3200` sits on the 1.15x line for both versions, against main's pin. That slowdown comes from the branch, not from this work.
-  - Local profiles of start and final are equal: 401.7 ms against 401.9 ms on generics, and medians equal within noise on all five checker benches.
-  - On the cluster, generics read 1.15/1.16/1.15/1.16x for final against 1.12/1.15/1.15x for start.
-  - Every runtime bench is unchanged.
-  - Profiling found the one real slowdown, the dropped resolution cache, and restoring it brought the checker benches back to parity.
-
-## Correctness concerns found (not fixed)
-
-1. **Canonical keys contain absolute file paths.**
-   - They leak into JS constructor tags and exports (`{$: "/Users/…/lib.bend:#Foo"}`), C symbols and BendTT names.
-   - Builds can't be reproduced across checkouts, and "separately compiled modules agree on tags" only holds on the same path.
-   - This is the branch's design; changing it is your call.
-2. **`name_gen` without a member uses a counter shared by the whole process.** safe.ts's `tt`, `root` and `group` names depend on what ran before. That is fine for one CLI run, not for a long-lived host.
-3. **No rollback when an instance fails to check.** A host that keeps the book after a failed check would get "a decreasing self-call" on a retry. The CLI and lint stop at the first failure, so nothing sees this today.
-4. **The `c_ids` scan (main's regex) does not rewrite a `CID` inside a JS template literal's `${}`.** This is pre-existing.
-5. **Template parameters now print as internal names** (`cast~param2`, `grow~inst`, from the branch). You may want the binder label instead.
-
-## Decisions for you
-
-- **Effects interface.** I kept main's released `CID(..)`/`FID(..)` in the source body, with the branch's resolution rules, rather than `// bend-ids 1` headers.
-  - It is smaller, isn't a breaking change for effect authors, and it is what brings comp.ts back under its cap.
-  - The headers do let the compiler copy host text unchanged. Restoring them means taking back `foreign_src` and the header versions of the effect files, and cutting about 350 tokens from comp.ts some other way.
-  - The CHANGELOG, EFFECTS.md and GUIDE.md now describe the macros.
-- **Error message wording.** The alias shadow message is main's wording again: "an unambiguous name (the alias … shadows …)", not "an unambiguous definition name". `tests/import/alias_shadow.bend` is updated to match.
-
-Scratch is in `/tmp/nm` (diffs, profiles, logs). I removed the temporary worktrees for main and the start.
