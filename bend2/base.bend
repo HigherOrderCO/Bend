@@ -222,6 +222,12 @@ def IO.spawn(-A: Type, act: IO(A)) -> IO(Unit):
   import "./effs/spawn.c"
   import "./effs/spawn.js"
 
+# IO.eval(f) computes f({}) off the IO loop thread (natively), so the
+# loop keeps serving other IO while it runs.
+def IO.eval(-A: Type, f: Unit -> A) -> IO(A):
+  import "./effs/eval.c"
+  import "./effs/eval.js"
+
 def IO.sleep(ms: U32) -> IO(Unit):
   import "./effs/sleep.c"
   import "./effs/sleep.js"

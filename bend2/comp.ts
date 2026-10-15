@@ -3547,7 +3547,10 @@ static CUmodule   gpu_lib;
 static CUfunction gpu_pso;
 #endif
 static bool io_gpu;
-static DEV Term*  io_stk;
+static _Thread_local Term* io_stk;
+static _Thread_local u32  io_alc;
+static _Thread_local bool io_alt;
+static pthread_mutex_t io_owner = PTHREAD_MUTEX_INITIALIZER;
 
 static const char* CLI_HELP =
   "usage: %s [options] [arguments]\n"
@@ -4236,7 +4239,21 @@ INLINE u64 task_tail(Term t) {
   return term_loc(t) + fid_arity((u32)term_aux(t));
 }
 
+#if !DEVICE
+static Term io_alt_word[WL_RESW + 1];
+static u32  io_alt_done;
+#endif
+
 INLINE Term task_deliver(DEV u64* H, Term cont, u32 idx, THR Term* v, u32 n) {
+#if !DEVICE
+  if (cont == TERM_HOLE && io_alt) {
+    for (u32 j = 0; j < n; j += 1) {
+      io_alt_word[j] = v[j];
+    }
+    io_alt_done = n + 1;
+    return 0;
+  }
+#endif
   u64 at = cont == TERM_HOLE ? H_ROOT_WORD : term_loc(cont) + idx;
   for (u32 j = 0; j < WL_RESW; j += 1) {
     if (j < n) {
@@ -4277,10 +4294,25 @@ INLINE void task_deal(DEV u64* H, Term join, u32 base, u32 stride, TG u32* cur) 
 // ====
 
 INLINE bool root_done(DEV u64* H) {
+#if !DEVICE
+  if (io_alt) {
+    return io_alt_done != 0;
+  }
+#endif
   return a32_load_acq(a32_at(H, H_ROOT_DONE)) != 0;
 }
 
 static u32 root_take(DEV u64* H, THR Term* v) {
+#if !DEVICE
+  if (io_alt) {
+    u32 m = io_alt_done - 1;
+    for (u32 j = 0; j < m; j += 1) {
+      v[j] = io_alt_word[j];
+    }
+    io_alt_done = 0;
+    return m;
+  }
+#endif
   u32 n = a32_load_acq(a32_at(H, H_ROOT_DONE)) - 1;
   for (u32 j = 0; j < n; j += 1) {
     v[j] = H[H_ROOT_WORD + j];
@@ -4810,7 +4842,7 @@ OUTLINE void pool_turn(bool grow, u32 rows) {
   a32_store_rel(&pool_row, turn << 24 | grow << 23 | n << 15);
   pthread_cond_broadcast(&pool_wake);
   pthread_mutex_unlock(&pool_lock);
-  pool_rows((Env){ CORPUS, ALC[0] }, io_stk);
+  pool_rows((Env){ CORPUS, ALC[io_alc] }, io_stk);
   POOL_WAIT(a32_load_acq(&pool_done) != 0, pool_join)
 }
 
@@ -5178,7 +5210,7 @@ static void cube_run(u64* H, bool gpu) {
       u32 rows = f;
       u32 want = (pool_size - 1) / (CUBE_T / LINE) + 1;
       if (f < want) {
-        u32 cur = row_grow((Env){ H, ALC[0] }, io_stk, 0, CUBE_G, want, f);
+        u32 cur = row_grow((Env){ H, ALC[io_alc] }, io_stk, 0, CUBE_G, want, f);
         rows = cur > f ? cur : f;
       }
       for (u32 g = f; g != 0 && f < CUBE;
@@ -5279,9 +5311,9 @@ static u64* corpus_setup(bool gpu, long threads, u64 bytes) {
 }
 
 OUTLINE Term corpus_eval(u64* H, Term t) {
-  Env  e = { H, ALC[0] };
+  Env  e = { H, ALC[io_alc] };
   Term rv[WL_RESW];
-  while ((t = work_loop(e, io_stk, t, !BANGS && pool_size == 1)) != 0) {
+  while ((t = work_loop(e, io_stk, t, io_alt || (!BANGS && pool_size == 1))) != 0) {
     u64 tl = task_tail(t);
     if ((u32)H[tl + 1] != 0) {
       task_deal(H, t, 0, 0, NULL);
@@ -5856,7 +5888,13 @@ static void io_step(Env e, IoWork* a) {
     u64  ap  = task_node(e, FID(Clo~apply), TERM_HOLE, 0, 0);
     e.mem[ap]     = a->cont;
     e.mem[ap + 1] = a->item;
+    bool own = pthread_mutex_trylock(&io_owner) == 0;
+    io_alt   = !own;
     Term req = corpus_eval(e.mem, term_tsk(FID(Clo~apply), ap));
+    io_alt   = false;
+    if (own) {
+      pthread_mutex_unlock(&io_owner);
+    }
     u32  c   = (u32)term_aux(req);
     if (c == CID(Emit)) {
       term_drop(e, req);
