@@ -4305,6 +4305,12 @@ static const WlFn wl_tab[] = { WL_TABLE };
 #undef WL_X
 #endif
 
+#if defined(__has_feature)
+#if __has_feature(address_sanitizer)
+// Keep ASan's frame base out of preserve_none callees.
+__attribute__((noinline))
+#endif
+#endif
 static Term work_loop(Env e, DEV Term* sp, Term t, u32 seq) {
   WL_BANK
   u32 rn = 0;
