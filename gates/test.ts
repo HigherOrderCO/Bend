@@ -58,7 +58,7 @@ function test_read(dir: string, file: string): Test {
     .map((m) => m[1]);
   // A program compiles only over Base (its IO runs main): a test without
   // it checks and interprets alone.
-  const lanes = ["js", "c"].filter((l) => /^import Base$/m.test(src)
+  const lanes = ["js", "c"].filter((l) => /^(?:[\t\r ]*(?:(?:#|import[\t ])[^\n]*)?\n)*[\t ]*import[\t ]+Base(?=[\t\r ]*(?:#|\n|$))/.test(src)
     && (effs.length === 0 || effs.includes(l)));
   return { name: dir + "_" + path.basename(file, ".bend"), src,
     want: tidy(want), main: /^(def|law) main(\(|:)/m.test(src), lanes };
