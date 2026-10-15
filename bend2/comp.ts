@@ -1051,40 +1051,26 @@ function ctr_doms(ctr: Bend.Ctr, xs?: HTerm[]): HTerm[] {
   return ctr_live(ctr, xs).map(([, , A]) => A);
 }
 
-// Which of the slots A takes under lay are boxes that hold the datatype
-// fam. The arms of a flat lay share its slots, after its tag.
 function lay_holds(A: HTerm | null, lay: Lay, fam: Name): boolean[] {
   if (lay.arms === null) {
     return lay.ks.map((s) => s === "box"
       && ty_holds(A, (t) => t?.$ === "ADT" && t.k === fam));
   }
   const got = lay.ks.map(() => false);
-  const tag = Number(Object.keys(lay.arms).length > 1);
   for (const [k, lays] of Object.entries(lay.arms)) {
-    let at = tag;
-    ctr_doms(FL.book.ctrs[k], ty_adt(A)!.x).forEach((F, i) => {
-      for (const h of lay_holds(F, lays[i], fam)) {
-        got[at] ||= h;
-        at += 1;
-      }
-    });
+    let at = Number(Object.keys(lay.arms).length > 1);
+    ctr_doms(FL.book.ctrs[k], ty_adt(A)!.x).forEach((F, i) =>
+      lay_holds(F, lays[i], fam).forEach((h) => got[at++] ||= h));
   }
   return got;
 }
 
-// How far before the end of k's node its spine is: the last box that holds
-// k's datatype, which term_drop swaps to the end so the node frees before
-// it. 0: no spine, or it is already last.
 function ctr_spine(k: Name): number {
   const ctr = FL.book.ctrs[k];
-  if (!ctr) {
-    return 0;
-  }
-  const lay = lay_node(k);
-  const fam = Bend.book_fam(FL.book, k);
-  const at  = ctr_doms(ctr).flatMap((F, i) =>
-    lay_holds(F, lay.arms![k][i], fam)).lastIndexOf(true);
-  return at < 0 ? 0 : lay.ks.length - 1 - at;
+  const A = ctr ? tele_unbind(ctr.T).ret : null;
+  const at = ctr
+    ? lay_holds(A, lay_node(k), ty_adt(A)!.k).lastIndexOf(true) : -1;
+  return at < 0 ? 0 : lay_node(k).ks.length - 1 - at;
 }
 
 function ctr_flds(k: Name, xs: HTerm[]): HTerm[] {
@@ -3610,7 +3596,6 @@ ${tabs}
 #define fid_nofk(x)  ((bool)(FID_T[x][2] & 2))
 #define cid_arity(x) ((u32)CID_T[x][0])
 #define cid_hot(x)   ((bool)CID_T[x][1])
-#define cid_spine(x) CID_T[x][2]
 
 // A32
 // ===
@@ -4016,9 +4001,9 @@ FAR void term_drop(Env e, Term t) {
           : n > ${WIDE} ? 64 | (n - 240)
           : cls_fit(tag == TAG_TSK ? n + 2 : n);
         u32 w = cls < 64 ? n : 1u << (cls & 63);
-        u32 d = tag == TAG_CTR ? cid_spine(aux) : 0;
+        u32 d = tag == TAG_CTR ? CID_T[aux][2] : 0;
         u32 m = w;
-        if (d > 0) {
+        if (d) {
           Term f = H[loc + w - 1 - d];
           H[loc + w - 1 - d] = H[loc + w - 1];
           H[loc + w - 1] = f;
@@ -4026,19 +4011,15 @@ FAR void term_drop(Env e, Term t) {
         while (m > 0 && term_triv(H[loc + m - 1])) {
           m -= 1;
         }
-        if (m == 0) {
-          heap_free(e, cls & 63, loc);
-        } else {
-          if (m < 256) {
-            n   = m;
-            cls &= 63;
-          } else if (m < w) {
-            H[loc + w - 1] = m;
-          }
-          c0 = H[loc];
-          H[loc] = cur;
-          cur = loc | ((u64)n << 48) | ((u64)cls << 56);
+        if (m < 256) {
+          n   = m;
+          cls &= 63;
+        } else if (m < w) {
+          H[loc + w - 1] = m;
         }
+        c0 = H[loc];
+        H[loc] = cur;
+        cur = loc | ((u64)n << 48) | ((u64)cls << 56);
       }
     }
     for (;;) {
