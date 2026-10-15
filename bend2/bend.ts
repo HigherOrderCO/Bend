@@ -1676,6 +1676,11 @@ export function parse_reso(p: Parse, k: Name): Name {
       parse_fail(p, "an unambiguous name (the alias " + k.slice(0, dot) + " shadows " + k + ")");
     }
   }
+  return parse_own(p, k, q);
+}
+
+// a name sugar writes: the file's own if it has one, else the bare one
+export function parse_own(p: Parse, k: Name, q = parse_qual(p, k)): Name {
   const own = q in p.book.tlds || q in p.book.ctrs;
   const far = k in p.book.tlds || k in p.book.ctrs;
   return own || !far ? q : k;
@@ -1685,16 +1690,8 @@ export function parse_call(p: Parse, k: Name, xs: LTerm[], s?: Span): LTerm {
   return xs.reduce<LTerm>((f, x) => App(f, x, s), Ref(parse_reso(p, k), s));
 }
 
-// a literal keeps its Lit node where its type's name resolves to the bare
-// one; elsewhere it unfolds here, every constructor resolved as written.
-export function parse_lit(p: Parse, t: LTerm): LTerm {
-  if (t.$ === "Lit" && parse_reso(p, t.k) !== t.k) {
-    return parse_lit(p, lit_step(t));
-  }
-  if (t.$ !== "Ctr") {
-    return t;
-  }
-  return Ctr(parse_reso(p, t.k), t.x.map((x) => parse_lit(p, x)), t.s);
+export function parse_sugar(p: Parse, k: Name, xs: LTerm[], s?: Span): LTerm {
+  return xs.reduce<LTerm>((f, x) => App(f, x, s), Ref(parse_own(p, k), s));
 }
 
 // Quant
@@ -1914,7 +1911,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         return Eql(a, b, T);
       }
       const s = parse_span(p, beg);
-      return All(Lone(), "_", parse_open(p, "_"), Eql(a, b, T, s), parse_call(p, "Empty", [], ns), s);
+      return All(Lone(), "_", parse_open(p, "_"), Eql(a, b, T, s), parse_sugar(p, "Empty", [], ns), s);
     }
     case "(": {
       parse_bump(p);
@@ -1942,16 +1939,14 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
           if (!Number.isInteger(k)) {
             throw Err(p.book, ctx_nil(), "a power of two count (^d takes a depth)", undefined, n.s);
           }
-          d = parse_lit(p, Lit("Nat", k, n.s));
+          d = Lit("Nat", k, n.s);
         }
-        return parse_call(p, "Array.new", [T, d, xs[0]], s);
+        return parse_sugar(p, "Array.new", [T, d, xs[0]], s);
       }
       parse_take(p, ",");
       const ys  = xs.concat(parse_term_args(p, "]"));
       const spn = parse_span(p, beg);
-      const nil = Ctr(parse_reso(p, "Nil"), [], spn);
-      const con = parse_reso(p, "Con");
-      return ys.reduceRight<LTerm>((t, x) => Ctr(con, [x, t], spn), nil);
+      return ys.reduceRight<LTerm>((t, x) => Ctr("Con", [x, t], spn), Ctr("Nil", [], spn));
     }
     case "'": {
       parse_bump(p);
@@ -1960,7 +1955,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         parse_fail(p, "a closing '");
       }
       const spn = parse_span(p, beg);
-      return parse_lit(p, Ctr("Chr", [Lit("U32", n, spn)], spn));
+      return Ctr("Chr", [Lit("U32", n, spn)], spn);
     }
     case '"': {
       parse_bump(p);
@@ -1971,7 +1966,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         }
         cs.push(parse_char(p));
       }
-      return parse_lit(p, lit_of(cs, parse_span(p, beg)));
+      return lit_of(cs, parse_span(p, beg));
     }
     case "?": {
       parse_bump(p);
@@ -2070,14 +2065,14 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
       const ix = parse_term(p);
       parse_eat(p, "]");
       const s = parse_span(p, beg);
-      const u = parse_call(p, "U32", [], s);
+      const u: LTerm = Ref(parse_own(p, "U32"), s);
       parse_term_ns(p, ix, u);
       parse_skip(p);
       if (!parse_nl(p) && parse_take(p, "<-")) {
         const v = parse_term(p, 2);
-        out = parse_call(p, "Array.set", [u, out, ix, v], s);
+        out = parse_sugar(p, "Array.set", [u, out, ix, v], s);
       } else {
-        out = parse_call(p, "Array.get", [u, out, ix], s);
+        out = parse_sugar(p, "Array.get", [u, out, ix], s);
       }
       continue;
     }
@@ -2125,10 +2120,10 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
     } else if (op === "<&>") {
       out = Min(out, b, s);
     } else if (op === "<>") {
-      out = Ctr(parse_reso(p, k), [out, b], s);
+      out = Ctr(parse_own(p, k), [out, b], s);
     } else {
-      const f = k[0] === "." ? k : parse_reso(p, k);
-      out = App(App(Ref(f, t), out, s), b, s);
+      const f = k[0] === "." ? k : parse_own(p, k);
+      out = App(App(Ref(f, op === "&" || op === "|" ? s : t), out, s), b, s);
     }
   }
 }
@@ -2147,7 +2142,8 @@ export function parse_term_ns(p: Parse, tm: LTerm, T: LTerm): void {
       throw Err(p.book, ctx_nil(), "a type name after : (the operators' namespace)", undefined, h.s);
     }
     f.k = parse_reso(p, h.k + f.k);
-  } else if (f.k !== "Bool.and" && f.k !== "Bool.or" && f.k !== "String.append") {
+  } else if (!["Bool.and", "Bool.or", "String.append"]
+    .some((k) => parse_own(p, k) === f.k)) {
     return;
   }
   for (const x of xs) {
@@ -2183,7 +2179,7 @@ export function parse_term_all(p: Parse, exi: boolean): LTerm {
   parse_close(p, n0);
   if (exi) {
     const s = parse_span(p, beg);
-    return App(App(parse_call(p, "Exists", [], s), A, s), Lam(k, i, B, s), s);
+    return parse_sugar(p, "Exists", [A, Lam(k, i, B, s)], s);
   }
   return All(q, k, i, A, B);
 }
@@ -2194,7 +2190,7 @@ export function parse_term_tup(p: Parse, beg: number): LTerm {
   parse_skip(p);
   if (b.$ !== "Match" && b.$ !== "Local" && parse_take(p, ",")) {
     const rest = parse_term_tup(p, beg);
-    return Ctr(parse_reso(p, "Tuple"), [b, rest], parse_span(p, beg));
+    return Ctr("Tuple", [b, rest], parse_span(p, beg));
   }
   const out = body_flatten(b, [], () => p.frs++);
   if (parse_take(p, ":")) {
@@ -2217,7 +2213,7 @@ export function parse_term_num(p: Parse): LTerm {
     if (!isFinite(v)) {
       parse_fail(p, "a float literal with a finite f32 value (got " + m[0] + ")", beg);
     }
-    return parse_lit(p, Lit("F32", f32_to_bits(v)));
+    return Lit("F32", f32_to_bits(v));
   }
   if (m[2] === undefined) {
     if (char_is_name(parse_peek(p))) {
@@ -2226,7 +2222,7 @@ export function parse_term_num(p: Parse): LTerm {
     if (n > 0xffffffff) {
       parse_fail(p, "a u32 literal up to 4294967295 (got " + m[1] + ")", beg);
     }
-    return parse_lit(p, Lit("U32", n));
+    return Lit("U32", n);
   }
   if (n > 0xffffffff) {
     parse_fail(p, "a nat literal up to 4294967295n (got " + m[1] + "n)");
@@ -2235,21 +2231,20 @@ export function parse_term_num(p: Parse): LTerm {
     let out = parse_term(p);
     const spn = parse_span(p, beg);
     if (out.$ === "Lit" && out.k === "Nat" && n + out.v <= 0xffffffff) {
-      return parse_lit(p, Lit("Nat", n + out.v, spn));
+      return Lit("Nat", n + out.v, spn);
     }
     if (n > NAT_LITERAL_MAX) {
-      const m = parse_lit(p, Lit("Nat", n, spn));
-      return parse_call(p, "Nat.add", [m, out], spn);
+      return App(App(Ref("Nat.add", spn), Lit("Nat", n, spn), spn), out, spn);
     }
     for (let i = 0; i < n; i++) {
-      out = Ctr(parse_reso(p, "Succ"), [out], spn);
+      out = Ctr("Succ", [out], spn);
     }
     return out;
   }
   if (char_is_name(parse_peek(p))) {
     parse_fail(p, "a nat literal (NUMBER n)");
   }
-  return parse_lit(p, Lit("Nat", n));
+  return Lit("Nat", n);
 }
 
 export function parse_fill(p: Parse, k: Name, xs: LTerm[], s?: Span): LTerm[] {
@@ -2336,7 +2331,7 @@ export function parse_body(p: Parse, col: number = 0): Body {
     [p.pos, T] = [at, null];
   }
   if (T === null && q.$ === "Lone" && ts.length === 1 && !(parse_at(p, "=") && !parse_at(p, "=="))) {
-    const w = term_write(ts[0], beg);
+    const w = term_write(p, ts[0], beg);
     if (w === null || !parse_more(p, parse_col(p.str, beg))) {
       return ts[0];
     }
@@ -2363,9 +2358,9 @@ export function parse_body(p: Parse, col: number = 0): Body {
   return { $: "Local", k: ks, q, v: vs, f };
 }
 
-export function term_write(t: LTerm, beg: number): LTerm | null {
+export function term_write(p: Parse, t: LTerm, beg: number): LTerm | null {
   const [h, xs] = term_unapply(t);
-  if (h.$ === "Ref" && h.k === "Array.set" && xs.length === 4 && xs[1].$ === "Var" && xs[1].s?.beg === beg) {
+  if (h.$ === "Ref" && h.k === parse_own(p, "Array.set") && xs.length === 4 && xs[1].$ === "Var" && xs[1].s?.beg === beg) {
     return xs[1];
   }
   return null;
@@ -2584,12 +2579,12 @@ export function parse_book(book: Book, dir: string, src: string, ns: string, al:
           const i  = parse_open(p, c);
           const w  = parse_term(p);
           parse_close(p, n1);
-          A = App(App(parse_call(p, "Exists", [], ws), A, s), Lam(c, i, w, s), s);
+          A = App(App(parse_sugar(p, "Exists", [], ws), A, s), Lam(c, i, w, s), s);
         }
         cls.push([all, q, c, parse_open(p, c), A, s]);
       }
       const T = cls.reduceRight((T, [all, q, c, i, A, s]) =>
-        all ? All(q, c, i, A, T, s) : App(App(parse_call(p, "Exists", [], s), A, s), Lam(c, i, T, s), s), parse_block(p));
+        all ? All(q, c, i, A, T, s) : parse_sugar(p, "Exists", [A, Lam(c, i, T, s)], s), parse_block(p));
       const n = cls.findIndex((c) => !c[0]);
       book.tlds[k] = { $: "Def", n: n < 0 ? cls.length : n, T: term_higher(T), v: null, x: tc, m: p.ns, l: true };
       book.order.push(k);
