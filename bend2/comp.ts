@@ -488,11 +488,13 @@ function f32_show(x) {
   return (Object.is(x, -0) ? "-0" : s).replace("Infinity", "inf");
 }
 
-const F32_VIEW = new DataView(new ArrayBuffer(4));
+function f32_bits(x) {
+  return new Uint32Array(new Float32Array([x]).buffer)[0];
+}
 
-const f32_bits = ${Bend.f32_to_bits};
-
-const f32_from_bits = ${Bend.f32_from_bits};
+function f32_from_bits(u) {
+  return new Float32Array(new Uint32Array([u]).buffer)[0];
+}
 
 function f32_read(s) {
   const re = /^[\t\n\v\f\r ]*[+-]?((\d+\.?\d*|\.\d+)(e[+-]?\d+)?|inf(inity)?|nan)$/i;
@@ -502,7 +504,7 @@ function f32_read(s) {
 
 const f32_round = ${Bend.f32_round};
 
-${char_new}
+const char_new = ${char_new};
 
 function char_len(s) {
   return s[0] === "\uDC00" ? 4 : s.codePointAt(0) > 0xFFFF ? 2 : 1;
@@ -1065,7 +1067,7 @@ function ctr_build(sc: Scope, k: Name, exprs: string[], stat = false): string {
   const s = at < 0 ? null : sc.spares.splice(at, 1)[0];
   const got = s === null ? alloc
     : s.z ? `${s.name} >= HEAP_OFF ? ${s.name} : ${alloc}` : s.name;
-  return `term_ctr(${cid}, ${node_fill(sc, got, exprs,
+  return `term_ctr(${cid}, ${node_fill(sc, "nd", got, exprs,
     FL.hot.has(k))})`;
 }
 
@@ -1403,11 +1405,13 @@ function scope_new(): Scope {
 }
 
 function file_book(roots: Name[]): void {
-  for (const [k, tld] of Object.entries(FL.book.tlds)) {
-    if (OWNED.includes(k) && !tld.b) {
+  for (const k of OWNED) {
+    if (FL.book.tlds[k] && !FL.book.tlds[k].b) {
       die(Bend.name_key(k)
         + " is a name the compiler encodes itself: name yours apart");
     }
+  }
+  for (const [k, tld] of Object.entries(FL.book.tlds)) {
     if (def_foreign(tld) && k in FL.book.ctrs) {
       die(Bend.name_key(k)
         + " names both a constructor and a foreign def: name one apart");
@@ -1579,7 +1583,7 @@ function seg_ref(sc: Scope, fid: string): string {
 function seg_clo(sc: Scope, fid: string, words: string[]): string {
   FL.clos.add(fid);
   return `term_clo(${seg_ref(sc, fid)}, ${words.length === 0 ? 0 : node_fill(
-    sc, `heap_alloc(e, cls_fit(${words.length}))`, words)})`;
+    sc, "nd", `heap_alloc(e, cls_fit(${words.length}))`, words)})`;
 }
 
 function seg_name(sc: Scope, stem: string): string {
@@ -1605,9 +1609,9 @@ function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
 // Node
 // ====
 
-function node_fill(sc: Scope, alloc: string,
+function node_fill(sc: Scope, k: string, alloc: string,
   exprs: string[], shr = false): string {
-  const nd = name_local(sc, "nd");
+  const nd = name_local(sc, k);
   file_push(sc, `u64 ${nd} = ${alloc};`);
   exprs.forEach((w, j) => file_push(sc,
     `e.mem[${nd} + ${j}] = ${shr ? `rfc_seal(e, ${w})` : w};`));
@@ -2096,7 +2100,7 @@ function emit_alias(sc: Scope, e: string, k: string, kd?: Kind): string {
 
 function emit_task(sc: Scope, fid: string, rem: number, words: string[],
   cont = "WL_CONT", idx: string | number = "WL_IDX"): string {
-  return `term_tsk(${fid}, ${node_fill(sc,
+  return `term_tsk(${fid}, ${node_fill(sc, "t",
     `task_node(e, ${seg_ref(sc, fid)}, ${cont}, ${idx}, ${rem})`, words)})`;
 }
 
@@ -2231,7 +2235,7 @@ function emit_native(sc: Scope, k: Name, ers: HTerm[]): string {
     const dst = val_new(seg.ret.ks.map((_, j) => `o[${j}]`), seg.ret);
     emit_body(sl, fun_of(k).h!, FL.book.tlds[k].T, ers, vals, dst);
     FUEL = fuel;
-    const body = [...seg_text([...seg.ks.flatMap((k, i) =>
+    const body = [...seg_text(["u32 wpoll = 0;", ...seg.ks.flatMap((k, i) =>
       arr_q(k) ? [`Term h${i} = r${i};`] : []),
     ...seg_take(seg), "WL_SPIN"], 1),
     ...seg_text(seg.lines, 2), "  break;", "  }",
@@ -2668,8 +2672,8 @@ function emit_tab(sc: Scope, cells: HTerm[] | null, ty: HTerm,
   const key = (FL.js ? ls : Function("f32_bits", `return [${ls}]`)(
     Bend.f32_to_bits).map((v: number) => BigInt(v) + "ull")).join(", ");
   const tab = "TAB_" + memo(FL.tabs, key, () => FL.tabs.size);
-  const n = ls.length - 1;
-  return `${tab}[${s} < ${n} ? ${s} : ${n}]`;
+  return FL.js ? `${tab}[Math.min(${s}, ${ls.length - 1})]`
+    : `TAB_AT(${tab}, ${s}, ${ls.length - 1})`;
 }
 
 function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
@@ -3354,8 +3358,7 @@ using namespace metal;
 #define WL_JMP(F)  __attribute__((musttail)) return WL_##F(WL_ALL)
 #define WL_DYN(F)  __attribute__((musttail)) return wl_tab[F](WL_ALL)
 #endif
-#define WL_SPIN     u32 wpoll = 0; \
-  for (;;) { if (err_spun(e.mem, &wpoll)) { return 0; }
+#define WL_SPIN     for (;;) { if (err_spun(e.mem, &wpoll)) { return 0; }
 #define WL_SPUN     } break;
 #define WL_AGAIN(F) continue
 
@@ -3536,6 +3539,8 @@ static const char* CLI_HELP =
 // ======
 
 ${tabs}
+
+#define TAB_AT(T, S, I) T[S < I ? S : I]
 
 #define fid_arity(x) ((u32)FID_T[x][0])
 #define fid_resw(x)  ((u32)FID_T[x][1])
@@ -3833,8 +3838,8 @@ INLINE bool term_rfc(Term t) {
   return (t & RFC_BIT) != 0;
 }
 
-INLINE u32 term_aux(Term t) {
-  return (u32)(t >> 40) & 0xFFFF;
+INLINE u64 term_aux(Term t) {
+  return (t >> 40) & 0xFFFF;
 }
 
 INLINE u64 term_loc(Term t) {
@@ -3897,7 +3902,7 @@ INLINE u64 term_peek(DEV u64* H, Term t) {
 #define blk_loc(H, a) (BLK_SHR ? term_peek(H, a) : term_loc(a))
 
 INLINE u32 blk_cls(Term t) {
-  return term_aux(t) & 31;
+  return (u32)term_aux(t) & 31;
 }
 
 INLINE u32 blk_wcls(bool arr, u32 c) {
@@ -3930,7 +3935,7 @@ FAR void term_drop(Env e, Term t) {
       if (tag == TAG_BUF) {
         heap_free(e, blk_span(t), term_loc(t));
       } else {
-        u32 aux = term_aux(t);
+        u32 aux = (u32)term_aux(t);
         u64 loc = term_loc(t);
         u32 n   = tag == TAG_ARR ? 0 : tag == TAG_CTR ? cid_arity(aux)
           : fid_arity(aux) - (tag == TAG_CLO);
@@ -4203,13 +4208,15 @@ INLINE u64 task_node(Env e, u32 fid, Term cont, u32 idx, u32 rem) {
 }
 
 INLINE u64 task_tail(Term t) {
-  return term_loc(t) + fid_arity(term_aux(t));
+  return term_loc(t) + fid_arity((u32)term_aux(t));
 }
 
 INLINE Term task_deliver(DEV u64* H, Term cont, u32 idx, THR Term* v, u32 n) {
   u64 at = cont == TERM_HOLE ? H_ROOT_WORD : term_loc(cont) + idx;
-  for (u32 j = 0; j < n; j += 1) {
-    H[at + j] = v[j];
+  for (u32 j = 0; j < WL_RESW; j += 1) {
+    if (j < n) {
+      H[at + j] = v[j];
+    }
   }
   if (cont == TERM_HOLE) {
     a32_store_rel(a32_at(H, H_ROOT_DONE), n + 1);
@@ -4225,7 +4232,7 @@ INLINE Term task_deliver(DEV u64* H, Term cont, u32 idx, THR Term* v, u32 n) {
 
 INLINE void task_deal(DEV u64* H, Term join, u32 base, u32 stride, TG u32* cur) {
   u64 loc = term_loc(join);
-  u32 ar  = fid_arity(term_aux(join));
+  u32 ar  = fid_arity((u32)term_aux(join));
   u32 g   = 0;
   if (stride == 0) {
     g = a32_add(a32_at(H, H_CURSOR), (u32)H[loc + ar + 1]);
@@ -4289,6 +4296,7 @@ static Term work_loop(Env e, DEV Term* sp, Term t, u32 seq) {
   r0 = t;
 #if DEVICE
   u32 fid   = FID_ENTER;
+  u32 wpoll = 0;
   WL_SPIN
   switch (fid) {
 #else
@@ -4307,7 +4315,7 @@ ${segs}
   WL_CASE(FID_ENTER)
     Term t = r0;
     WL_OPEN
-    u32 f   = term_aux(t);
+    u32 f   = (u32)term_aux(t);
     u64 a   = term_loc(t);
     u32 war = fid_arity(f);
     WL_FRAME(t)
@@ -4336,7 +4344,7 @@ ${segs}
     Term fun = r0;
     Term arg = r1;
     WL_OPEN
-    u32 f    = term_aux(fun);
+    u32 f    = (u32)term_aux(fun);
     u32 war  = fid_arity(f) - 1;
     u64 a    = term_loc(fun);
     WL_LOAD(e.mem + a, war)
@@ -4356,7 +4364,7 @@ ${segs}
     WL_POPN(2);
     Term cont = STK(0);
     u32  idx  = (u32)STK(1);
-    u32  wf   = term_aux(cont);
+    u32  wf   = (u32)term_aux(cont);
     if (cont != TERM_HOLE && fid_resw(wf)) {
       u64 wa = term_loc(cont);
       u32 wn = fid_arity(wf);
@@ -4398,7 +4406,7 @@ INLINE u32 monk_step(Env e, DEV Term* stk, u32 rg, u32 put0, u32 base, u32 strid
   DEV u32* lo = (DEV u32*)ring_slot(H, rg, *get);
   u32      hi = a32_load_acq(lo + 1);
   Term     t  = (((u64)hi << 32) | a32_load(lo)) & ~RFC_BIT;
-  if ((hi >> 31) != ring_lap(*get) || (!seq && fid_nofk(term_aux(t)))) {
+  if ((hi >> 31) != ring_lap(*get) || (!seq && fid_nofk((u32)term_aux(t)))) {
     return 0;
   }
   a32_store(get, *get + 1);
@@ -4409,13 +4417,13 @@ INLINE u32 monk_step(Env e, DEV Term* stk, u32 rg, u32 put0, u32 base, u32 strid
       return 2;
     }
     if ((u32)H[task_tail(r) + 1] == 0) {
-      bool nofk = fid_nofk(term_aux(r));
+      bool nofk = fid_nofk((u32)term_aux(r));
       Term k    = H[task_tail(r)];
       if (err_spun(H, &spin)) {
         return 2;
       }
       if (stride != 0 && nofk && (DEVICE || k == TERM_HOLE
-        || !fid_resw(term_aux(k)) || fid_nofk(term_aux(k)))) {
+        || !fid_resw((u32)term_aux(k)) || fid_nofk((u32)term_aux(k)))) {
         ring_push(H, ring_pick(base, stride, cur), r);
         return 2;
       }
@@ -5248,7 +5256,7 @@ OUTLINE Term corpus_eval(u64* H, Term t) {
       cube_run(H, false);
       break;
     }
-    if (io_gpu && fid_bangs(term_aux(t))) {
+    if (io_gpu && fid_bangs((u32)term_aux(t))) {
       Term cont = H[tl];
       u32  idx  = (u32)(H[tl + 1] >> 32) & 0xFFFF;
       H[tl]     = TERM_HOLE;
@@ -5289,7 +5297,7 @@ OUTLINE Term corpus_eval(u64* H, Term t) {
 #define IO_PARK TERM_HOLE
 
 #define io_hand(v)   term_make(TAG_PAK, (u64)(v) >> 40, (u64)(v) & LOC_MASK)
-#define io_hand_v(t) (((u64)term_aux(t) << 40) | term_loc(t))
+#define io_hand_v(t) ((term_aux(t) << 40) | term_loc(t))
 
 typedef struct IoWork IoWork;
 typedef void (*IoCall)(IoWork* w);
@@ -5762,7 +5770,7 @@ static void show_val(Env e, u32 d, const Term* w, char chain) {
     default: {
       Term t   = w[0];
       bool box = D[d + 1] != 0;
-      u32  key = box ? term_aux(t) : D[d + 2] > 1 ? (u32)t : 0;
+      u32  key = box ? (u32)term_aux(t) : D[d + 2] > 1 ? (u32)t : 0;
       u32  a   = d + 3;
       for (u32 i = 0; box ? D[a + 1] != key : i != key; i += 1) {
         a += 4 + 2 * D[a + 2];
@@ -5810,7 +5818,7 @@ static void io_step(Env e, IoWork* a) {
     e.mem[ap]     = a->cont;
     e.mem[ap + 1] = a->item;
     Term req = corpus_eval(e.mem, term_tsk(FID(Clo~apply), ap));
-    u32  c   = term_aux(req);
+    u32  c   = (u32)term_aux(req);
     if (c == CID(Emit)) {
       term_drop(e, req);
       free(a);
