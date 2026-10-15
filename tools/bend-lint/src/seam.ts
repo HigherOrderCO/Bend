@@ -918,7 +918,7 @@ export const layout = (m: Loaded, d: Diag, head: string): string => {
         ),
   ).replace(/^Error:/, head);
   if (!isErr(d.core) && d.def !== undefined) {
-    const location = "\nLocation: " + m.Bend.display_text(d.def);
+    const location = "\nLocation: " + d.def;
     out = out.includes("\nLocation:") ? out.replace("\nLocation:", location) : out + location;
   }
   return out;

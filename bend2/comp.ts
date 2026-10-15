@@ -1287,7 +1287,7 @@ function file_new(book: Bend.Book, js: boolean) {
     funs: new Map<Name, Fun>(),
     brws: new Map<Name, boolean[]>(),
     nodes: new Map<Name, Lay>(),
-    bindings: new Map<Of<"Var">, HTerm>(),
+    bindings: new Map<Of<"Var">, number>(),
     lays: new Map<string, Lay>(),
     memo: {
       opens: new Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
@@ -2107,13 +2107,10 @@ function emit_open(k: Name): [Scope, Val[]] {
   return [{ ...sc, seg, def: k }, vals];
 }
 
-// Cache-local free bindings carry an ordinal; reified bound Vars have no binding field.
+// a key of terms whose free variables (below DEEP) count by binding
 function scoped_key(...terms: HTerm[]): string {
-  return Bend.term_key(terms.map(t => {
-    const copy = Bend.scope_mapper(v => memo(FL.bindings, probe_of(v, false),
-      () => ({ $: "Var", k: "", i: 0, binding: FL.bindings.size })));
-    return Bend.term_lower(copy(t));
-  }));
+  return JSON.stringify(terms.map((t) => Bend.term_lower(t, Bend.DEEP)), (k, v) => k === "s" ? undefined
+    : v?.$ === "Var" && v.i < Bend.DEEP ? { binding: memo(FL.bindings, probe_of(v, false), () => FL.bindings.size) } : v);
 }
 
 function emit_native(sc: Scope, k: Name, ers: HTerm[]): string {

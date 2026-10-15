@@ -196,9 +196,9 @@ function safe_book(book: Book): { text: string; oos: Array<[Name, string]> } {
 // on its own before the member's group was found
 function safe_pass(book: Book, groups: Map<Name, Group>): { text: string; oos: Array<[Name, string]> } | null {
   const g0 = groups.size;
-  // The model evaluates bodies and constructor telescopes, not declaration
-  // signatures. Copy those computation roots together to preserve their sharing.
-  const copy = B.scope_mapper(v => v);
+  // the model book evaluates copies of the bodies and constructor
+  // telescopes, so its unfolded laws fill no cell the book reads
+  const copy = (t: HTerm): HTerm => subst(t, B.DEEP);
   const mb: Book = { ...book, tlds: Object.create(null), ctrs: Object.create(null) };
   for (const [k, t] of Object.entries(book.tlds)) {
     mb.tlds[k] = t.$ === "Def" ? { ...t, v: t.v === null ? null : copy(t.v) }
@@ -431,8 +431,30 @@ function spec_val(e: Safe, s: Scope, x: HTerm): HTerm {
 // x's normal form, when it is closed; null when it depends on a run-time value
 function closed_val(e: Safe, s: Scope, x: HTerm): HTerm | null {
   // bend2's annotations name a variable by its level
-  const v = B.term_snf(e.book, B.scope_mapper(v => v.i < s.d ? s.c[v.i]?.v ?? v : v)(x));
+  const v = B.term_snf(e.book, subst(x, s.d, (o) => o.$ === "Var" ? s.c[o.i as number]?.v : undefined));
   return mentions(B.term_lower(v, s.d), (i) => i >= 0 && i < s.d) ? null : v;
+}
+
+// t lowered at depth d and raised again, so evaluating the copy fills no
+// cell of t, with each node f maps replaced; a free variable (below d)
+// stays itself unless f maps it
+function subst(t: HTerm, d: number, f: (o: Record<string, unknown>) => HTerm | undefined = () => undefined): HTerm {
+  const go = (u: unknown): unknown => {
+    if (typeof u !== "object" || u === null) {
+      return u;
+    }
+    const o = u as Record<string, unknown>;
+    const v = f(o) ?? (o.$ === "Var" && (o.i as number) < d ? o as HTerm : undefined);
+    if (v !== undefined) {
+      return B.Var(o.k as Name, -1, undefined, v);
+    }
+    const out: Record<string, unknown> = Array.isArray(u) ? [] : {};
+    for (const k in o) {
+      out[k] = k === "s" ? o[k] : go(o[k]);
+    }
+    return out;
+  };
+  return B.term_higher(go(B.term_lower(t, d)) as B.LTerm);
 }
 
 // Model
@@ -447,9 +469,8 @@ function closed_val(e: Safe, s: Scope, x: HTerm): HTerm | null {
 // as the kernel checks a model with every opaque def at its own
 
 function model(e: Safe, T: HTerm): HTerm | null {
-  // The model book assigns bodies to otherwise opaque refs; its evaluation
-  // cells must not remember those bodies in the original interpretation.
-  T = B.scope_mapper(v => v)(T);
+  // as the model book unfolds laws, it reads a copy (see safe_pass)
+  T = subst(T, B.DEEP);
   return model_by(e, T, false) ?? model_by(e, T, true);
 }
 
@@ -494,7 +515,7 @@ function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm
       const x: HTerm = B.Var(F.k, d);
       const t = model_at(e, F.B(x), d + 1, path, F.q.$ === "None" ? hs : [...hs, [x, F.A]], proj, probe);
       return t === null ? null : B.Ann(B.Lam(F.k, d, (v: HTerm) =>
-        B.scope_mapper(x => x.i === d ? v : x)(t)), F);
+        subst(t, d + 1, (o) => o.$ === "Var" && o.i === d ? v : undefined)), F);
     }
     case "ADT": {
       const { key, size } = model_key(F, d);
@@ -874,7 +895,7 @@ function term(e: Safe, s0: Scope, t: HTerm, live: boolean): O {
     case "Var": {
       const b = s.c[x.i];
       if (b === undefined) {
-        oos("a free variable " + B.display_text(x.k));
+        oos("a free variable " + x.k);
       }
       return b.v !== undefined ? term(e, s0, typed(b.v, b.T), live) : b.o;
     }
@@ -1163,7 +1184,7 @@ function arm(e: Safe, s: Scope, k: Name, cols: Cols, vs: Array<[Q, O]>): O {
   const tld = e.book.tlds[k] as Def;
   const ps = tld.x === 0 ? null : new Map(B.tele_unbind(e.book, tld.T).doms.slice(0, tld.x).map((_, j) => [B.name_gen(k, "param", j), cols[j]]));
   const t0 = B.checked_higher(tld.e as B.LTerm);
-  let t = ps === null ? t0 : B.scope_mapper(x => x, ps)(t0);
+  let t = ps === null ? t0 : subst(t0, 0, (o) => o.$ === "Ref" ? ps.get(o.k as Name) ?? undefined : undefined);
   let si: Scope = { ...s, c: [], d: 0, cols: cols.slice(tld.x), sub: false };
   let j = 0;
   for (let [x, T] = open(t); x.$ === "Lam" && T !== null; [x, T] = open(t)) {
