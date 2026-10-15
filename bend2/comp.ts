@@ -2813,16 +2813,28 @@ function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
   }
 }
 
+// Arms that each allocate one node of one class, in no inner block,
+// share one allocation made first: their stores become selects.
 function emit_chain(sc: Scope, arms: [string, () => void][]): void {
   if (arms.length === 1) {
     return arms[0][1]();
   }
-  arms.forEach(([cond, body], i) => {
-    file_push(sc, i === arms.length - 1 ? "} else {"
+  const ls = sc.seg.lines;
+  const at = ls.length;
+  const al = new Set(arms.map(([cond, body], i) => {
+    const n = ls.push(i === arms.length - 1 ? "} else {"
       : `${i === 0 ? "if" : "} else if"} (${cond}) {`);
     body();
-  });
+    return ls.slice(n).filter((l) => /heap_alloc|\{/.test(l)).join("\n")
+      .match(/^u64 \w+ = (heap_alloc.*);$/)?.[1];
+  }));
   file_push(sc, "}");
+  const [a] = al;
+  if (al.size === 1 && a) {
+    const nd = name_local(sc, "nd");
+    ls.splice(at, ls.length, `u64 ${nd} = ${a};`,
+      ...ls.slice(at).map((l) => l.replace(a, nd)));
+  }
 }
 
 // Compile
