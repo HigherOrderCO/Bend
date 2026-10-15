@@ -1902,7 +1902,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         return Eql(a, b, T);
       }
       const s = parse_span(p, beg);
-      return All(Lone(), "_", parse_open(p, "_"), Eql(a, b, T, s), Ref("Empty", ns), s);
+      return All(Lone(), "_", parse_open(p, "_"), Eql(a, b, T, s), parse_call(p, "Empty", [], ns), s);
     }
     case "(": {
       parse_bump(p);
@@ -2171,7 +2171,7 @@ export function parse_term_all(p: Parse, exi: boolean): LTerm {
   parse_close(p, n0);
   if (exi) {
     const s = parse_span(p, beg);
-    return App(App(Ref("Exists", s), A, s), Lam(k, i, B, s), s);
+    return App(App(parse_call(p, "Exists", [], s), A, s), Lam(k, i, B, s), s);
   }
   return All(q, k, i, A, B);
 }
@@ -2571,12 +2571,12 @@ export function parse_book(book: Book, dir: string, src: string, ns: string, al:
           const i  = parse_open(p, c);
           const w  = parse_term(p);
           parse_close(p, n1);
-          A = App(App(Ref("Exists", ws), A, s), Lam(c, i, w, s), s);
+          A = App(App(parse_call(p, "Exists", [], ws), A, s), Lam(c, i, w, s), s);
         }
         cls.push([all, q, c, parse_open(p, c), A, s]);
       }
       const T = cls.reduceRight((T, [all, q, c, i, A, s]) =>
-        all ? All(q, c, i, A, T, s) : App(App(Ref("Exists", s), A, s), Lam(c, i, T, s), s), parse_block(p));
+        all ? All(q, c, i, A, T, s) : App(App(parse_call(p, "Exists", [], s), A, s), Lam(c, i, T, s), s), parse_block(p));
       const n = cls.findIndex((c) => !c[0]);
       book.tlds[k] = { $: "Def", n: n < 0 ? cls.length : n, T: term_higher(T), v: null, x: tc, m: p.ns, l: true };
       book.order.push(k);
