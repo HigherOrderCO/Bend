@@ -8,8 +8,12 @@ import { fileURLToPath } from "node:url";
 import { formatBend } from "../formatter.js";
 
 // Bend pins the lines after a body that shares a line with its `do`, `match`,
-// `case` or `def` header to that body's column. [source, formatted]
+// `case` or `def` header or `=>` lambda opener to that body's column. [source, formatted]
 const pinned = [
+  [
+    "import Base\ndef main() -> Array<U32>:\n    f : Array<U32> -> Array<U32> = a => a[0] <- 7\n                                        a[1] <- 8\n    f([0 : U32 * 2n])\n",
+    "import Base\ndef main() -> Array<U32>:\n  f : Array<U32> -> Array<U32> = a => a[0] <- 7\n                                      a[1] <- 8\n  f([0 : U32 * 2n])\n",
+  ],
   [
     "import Base\ndef main() -> IO(Unit):\n    do IO<Unit>: IO.print(\"a\")\n                 IO.print(\"b\")\n",
     "import Base\ndef main() -> IO(Unit):\n  do IO<Unit>: IO.print(\"a\")\n               IO.print(\"b\")\n",
