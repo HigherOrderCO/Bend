@@ -3194,7 +3194,8 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
 function host(A: HTerm | null, x: string, out = 0): string {
   const k = ty_adt(A)?.k;
   return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
-    : k === "Nat" && !out ? `nat_in(${x})` : x;
+    : k === "Nat" && !out ? `nat_in(${x})`
+    : k === "F32" && !out ? `Math.fround(${x})` : x;
 }
 
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
