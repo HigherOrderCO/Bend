@@ -108,7 +108,7 @@ type Of<K> = Extract<HTerm, { $: K }>;
 
 type Row = [HTerm, number, number, number];
 
-type Intr = { C?: string | string[] | null; JS: string };
+type Intr = { C?: string | string[] | null; JS?: string };
 
 type Dom = [Bend.Quant, Name, HTerm];
 
@@ -177,6 +177,8 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     "U32_BIN($0, $o, $1)", "(($0 $o $1) >>> 0)"),
   ...tpl_ops("u32_", CMPS, "U32_BIN($0, $o, $1)", "($0 $o $1)"),
   u32_mul: { C: "U32_BIN($0, *, $1)", JS: "(Math.imul($0, $1) >>> 0)" },
+  // C only: a JS file runs Base's U32.pow, as intr_of skips an op with no JS
+  u32_pow: { C: "u32_pow($0, $1)" },
   u32_div: {
     C:  "((u32)($1) == 0 ? 0 : (u64)U32_QUO((u32)($0), (u32)($1)))",
     JS: "($1 === 0 ? 0 : ($0 / $1) >>> 0)",
@@ -349,6 +351,14 @@ ${SHIMS}
 #endif
 
 #define U32_BIN(a, o, b) ((u64)((u32)(a) o (u32)(b)))
+
+INLINE u64 u32_pow(u32 a, u64 n) {
+  u32 r = 1;
+  for (; n; n >>= 1, a *= a) {
+    if (n & 1) r *= a;
+  }
+  return r;
+}
 
 INLINE f32 f32_unbox(u64 x) {
   union { u32 u; f32 f; } p = { (u32)x };
@@ -814,7 +824,8 @@ function intr_of(k: Name, js = false): Intr | undefined {
   const tld = FL.book.tlds[k];
   const it = tld?.$ === "Def" && tld.i === undefined && tld.b
     ? OPERATIONS[op_name(k)] : undefined;
-  return it && (js || it.C !== undefined) ? it : undefined;
+  return it && (js || it.C !== undefined) && (!FL.js || it.JS)
+    ? it : undefined;
 }
 
 function op_name(k: Name): string {
@@ -2662,7 +2673,7 @@ function emit_row(sc: Scope, t: HTerm, ty: HTerm | null): string | null {
   }
   const m = term_spine(s);
   const it = m.t.$ === "Ref" ? intr_of(m.t.k) : undefined;
-  if (it === undefined || TAB_BAD.test(it.JS)) {
+  if (!it?.JS || TAB_BAD.test(it.JS)) {
     return null;
   }
   const xs = m.args.map((a) => emit_row(sc, a, null));
@@ -2963,7 +2974,7 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail = false): string {
   }
   const intr = intr_of(k, true);
   if (intr !== undefined) {
-    return tpl(intr.JS, exprs.map((e) => ATOM.test(e) || STRLIT.test(e) ? e
+    return tpl(intr.JS!, exprs.map((e) => ATOM.test(e) || STRLIT.test(e) ? e
       : emit_hold(sc, [e], "x")[0]));
   }
   if (!fun_runs(tld)) {
