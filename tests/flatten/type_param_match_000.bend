@@ -19,4 +19,4 @@ def main(A, b, c):
     case A, Cons{c, d}, b:
       d
 
-#|A => \{Nil: (c => []); Cons: (c => d => c => d)}
+#|A => \{Nil: (c => Nil{}); Cons: (c => d => c => d)}

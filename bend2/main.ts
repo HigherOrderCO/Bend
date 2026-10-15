@@ -814,8 +814,8 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
   const bad = book_promises(book);
   const n   = new Set(bad.flatMap(([, ks]) => ks)).size;
   if (n !== 0) {
-    const own = bad.some(([, ks]) => ks.some((k) =>
-      !k.includes(":") || (book.tlds[k] as Bend.Def).l === true));
+    const own = bad.some(([, ks]) => ks.some((k) => k.startsWith(Bend.ROOT.ns
+      + ":") || (book.tlds[k] as Bend.Def).l === true));
     cli_say(2, FAIL + "\nError: " + String(n) + " def" + (n === 1 ? " relies"
       : "s rely") + " on unsafe or foreign code:\n"
       + bad.map(([on, ks]) => "defs that depend on " + on + ": "
@@ -927,7 +927,15 @@ async function book_read(file: string, base?: Bend.Book,
     seen.set(BASE, "");
   }
   try {
-    await Bend.book_load(book, file, "", seen);
+    // the root file gets its own namespace, the one an import of it would
+    // get, so sugar's bare names can only mean Base's
+    const ns = fs.realpathSync(file) === Bend.BASE_BEND ? ""
+      : path.basename(file).replace(/\.bend$/, "");
+    Bend.ROOT.ns = ns;
+    await Bend.book_load(book, file, ns, seen);
+    if (ns + ":main" in book.tlds) {
+      book.tlds["main"] = book.tlds[ns + ":main"];
+    }
     const laws = path.join(path.dirname(file), "LAWS.bend");
     if (path.basename(file) === "PROOF.bend" && fs.existsSync(laws)
       && !seen.has(fs.realpathSync(laws))) {

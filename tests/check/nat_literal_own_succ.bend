@@ -1,6 +1,5 @@
-# a literal is a Nat by name only where Nat is Base's: a module's own Nat
-# that declares Succ with another field checks the literal's unfolding, so
-# 1n is refused as Succ{0n} where 0n is not an Empty (#941)
+# a literal is Base's Nat, never a file's own: 1n is refused against this
+# file's Nat, whose Succ holds an Empty, so no closed Empty comes out (#941)
 type Empty is Data:
 
 type Nat is Data:
@@ -16,11 +15,11 @@ def boom() -> Empty:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : a declared constructor (Empty declares )
-#|- observed : 0n
+#|- expected : a declared constructor (Nat declares Succ)
+#|- observed : 1n
 #|Location: boom
-#|14 | def boom() -> Empty:
-#|15>|   extract(1n)
+#|13 | def boom() -> Empty:
+#|14>|   extract(1n)
 #|   |           ^^
-#|16 | 
+#|15 | 
 #|exit 1

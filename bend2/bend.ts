@@ -1201,9 +1201,12 @@ function f32_show(x: number): string {
   return (Object.is(x, -0) ? "-0" : s).replace(/^-?\d+(?=e|$)/, "$&.0").replace("Infinity", "inf");
 }
 
-// a key as output spells it: ns:name is internal, and ns.name is shown
+// a key as output spells it: ns:name is internal, and ns.name is shown,
+// but the root file's own names (in ROOT.ns, set as it loads) show bare
+export const ROOT = { ns: "" };
 export function name_key(k: Name): string {
-  return k.replace(":", ".");
+  const own = ROOT.ns !== "" && k.startsWith(ROOT.ns + ":");
+  return (own ? k.slice(ROOT.ns.length + 1) : k).replace(":", ".");
 }
 
 // a key as a file spells it: its own names bare, an imported file's
@@ -1663,8 +1666,14 @@ export function parse_var(p: Parse, k: Name, s?: Span): LTerm {
   return Var(k, p.frs++, s, Ref(q, s));
 }
 
+// each ns:name built once, so lookups by it reuse one hashed string
+const QUAL = new Map<string, Map<Name, Name>>();
 export function parse_qual(p: Parse, k: Name): Name {
-  return p.ns === "" ? k : p.ns + ":" + k;
+  if (p.ns === "") {
+    return k;
+  }
+  const qs = QUAL.get(p.ns) ?? QUAL.set(p.ns, new Map()).get(p.ns)!;
+  return qs.get(k) ?? qs.set(k, p.ns + ":" + k).get(k)!;
 }
 
 export function parse_reso(p: Parse, k: Name): Name {
@@ -1676,9 +1685,8 @@ export function parse_reso(p: Parse, k: Name): Name {
       parse_fail(p, "an unambiguous name (the alias " + k.slice(0, dot) + " shadows " + k + ")");
     }
   }
-  const own = q in p.book.tlds || q in p.book.ctrs;
-  const far = k in p.book.tlds || k in p.book.ctrs;
-  return own || !far ? q : k;
+  return q in p.book.tlds || q in p.book.ctrs
+    || !(k in p.book.tlds || k in p.book.ctrs) ? q : k;
 }
 
 export function parse_call(p: Parse, k: Name, xs: LTerm[], s?: Span): LTerm {
@@ -2105,7 +2113,7 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
         parse_fail(p, "a family name before <..> (a comparison here needs parens)");
       }
       parse_take(p, ",");
-      const d = parse_reso(p, out.k);
+      const d = out.$ === "Ref" ? out.k : parse_reso(p, out.k);
       out = ADT(d, parse_fill(p, d, [b, ...parse_term_args(p, ">")], s), s);
     } else if (op === "->") {
       out = All(Lone(), "_", parse_open(p, "_"), out, b, s);
@@ -3868,7 +3876,7 @@ export function book_valid(book: Book, done: number = 0): void {
         const [h] = term_unapply(tel);
         const io  = book.tlds["IO"];
         if (h.$ !== "Ref" || h.k !== "IO" || io === undefined || io.$ !== "Def" || io.b !== true) {
-          throw Err(book, ctx_nil(), "a foreign definition returning base IO(...) directly (return type aliases are not unfolded)", k, tel.s, k);
+          throw Err(book, ctx_nil(), "a foreign definition returning base IO(...) directly (return type aliases are not unfolded)", name_key(k), tel.s, k);
         }
       }
       if (fin && tld.v !== null) {

@@ -2,6 +2,7 @@
 # literal 0n matched a Zero that carries a field as a bare Zero, the
 # arm's goal became @w:U -> Empty, and the self-call f(q) passed without
 # descending. the literal is refused like Zero{} is
+# (a literal names Base's Zero and Succ, which this Base-free file lacks)
 type U is Data:
   Un{}
 type N is Data:
@@ -23,10 +24,10 @@ def boom() -> Empty:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : a Zero pattern with 1 field
+#|- message  : a declared constructor (unknown: Zero)
 #|Location:
-#|15 |   match b:
-#|16>|     case 0n:
+#|16 |   match b:
+#|17>|     case 0n:
 #|   |          ^^
-#|17 |       {\{K: q => w => f(q)} : D -> U -> Empty}(K{Zero{Un{}}})
+#|18 |       {\{K: q => w => f(q)} : D -> U -> Empty}(K{Zero{Un{}}})
 #|exit 1

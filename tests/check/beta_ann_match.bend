@@ -6,6 +6,6 @@ type Nat is Data:
   Succ{pred: Nat}
 
 def main() -> Nat:
-  (x => {\{Zero: 1n; Succ: p => 2n} : Nat -> Nat})(0n)(3n)
+  (x => {\{Zero: Succ{Zero{}}; Succ: p => Succ{Succ{Zero{}}}} : Nat -> Nat})(Zero{})(Succ{Zero{}})
 
-#|2n
+#|Succ{Succ{Zero{}}}
