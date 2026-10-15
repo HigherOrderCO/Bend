@@ -56,6 +56,38 @@ law reflexive_column:
 
 def reflexive_column(h): 5n
 
+def flip(b: Bool) -> Bool:
+  match b:
+    case False{}: True{}
+    case True{}: False{}
+
+law flipped_equation:
+  for ~b: Bool
+  for ~h: {flip(b) == False{} : Bool}
+  Nat
+
+def flipped_equation(b, h): 12n
+
+law both_true:
+  for ~a: Bool
+  for ~b: Bool
+  for ~h: {Bool.and(a, b) == True{} : Bool}
+  Nat
+
+def both_true(a, b, h): 13n
+
+law computed_nat:
+  for ~h: {Nat.add(1n, 1n) == 3n : Nat}
+  Nat
+
+def computed_nat(h): 7n
+
+law unequal_words:
+  for ~h: {1 == 2 : U32}
+  Nat
+
+def unequal_words(h): 8n
+
 def main() -> Nat: 3n
 
 #|3n
