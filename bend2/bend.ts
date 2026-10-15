@@ -246,7 +246,8 @@ import * as url from "node:url";
 // =====
 // A global key is "<file>:<text>" for a source def or type, "<file>:#<text>"
 // for a constructor, "!<text>" for a runtime internal and "<owner>~<role>:<n>"
-// for a generated entity (a string member is hashed to "@<hex>"). A file id
+// for a generated entity, n its position or "@" and the hash of a string
+// that identifies it among its owner's for that role. A file id
 // escapes %, : and ~, so the parts read back. Keys copy as plain strings.
 
 export type Category = "def" | "ctr";
@@ -261,10 +262,9 @@ export function name_source(file: FileId, text: string, category: Category = "de
 
 export function name_internal(text: string): Name { return ("!" + text) as Name; }
 
-let next_name = 0;
-export function name_gen(owner: Name, role: string, member?: number | string): Name {
-  return (owner + "~" + role + ":" + (typeof member === "number" ? member : "@" + (member === undefined
-    ? next_name++ : createHash("sha256").update(member, "utf16le").digest("hex")))) as Name;
+export function name_gen(owner: Name, role: string, member: number | string): Name {
+  return (owner + "~" + role + ":" + (typeof member === "number" ? member
+    : "@" + createHash("sha256").update(member, "utf16le").digest("hex"))) as Name;
 }
 
 export function file_name(text: string): FileId {
@@ -3711,7 +3711,13 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
     const inst: Def = { $: "Def", n: def.n - def.x, x: 0, T: checked.tel, v: xs.reduce((v, a) => term_apply(v, a), def.v as HTerm),
       u: def.u, args: checked.xs.map(checked_higher) };
     book.tlds[o] = { ...inst, v: null };
-    inst.e = def_check(book, o, inst, z);
+    try {
+      inst.e = def_check(book, o, inst, z);
+    } catch (err) {
+      book.tmps.delete(key);
+      delete book.tlds[o];
+      throw err;
+    }
     book.tlds[o] = inst;
   } else if ((book.tlds[o] as Def).v === null && o !== lhs.def) {
     throw Err(book, ctx, "a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)", tm, tm.s, lhs.def);
