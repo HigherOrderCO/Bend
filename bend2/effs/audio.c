@@ -1,10 +1,3 @@
-// bend-ids 1
-// CID :Audio.open BEND_CID_Audio_open
-// CID :Audio.write BEND_CID_Audio_write
-// CID #Con BEND_CID_Con
-// CID :Audio.close BEND_CID_Audio_close
-// CID #Unit BEND_CID_Unit
-// bend-ids end
 // Audio
 // =====
 
@@ -178,7 +171,7 @@ static void io_ring_free(IoRing* p) {
 #endif
 #endif
 
-#ifdef BEND_CID_Audio_open
+#ifdef CID(Audio.open)
 Term audio_open_run(Env e, Term* f, IoWork* w) {
   u32     rate = (u32)f[0];
   IoRing* p    = io_mem(calloc(1, sizeof *p));
@@ -191,11 +184,11 @@ Term audio_open_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) audio_open_use(void) {
-  io_eff(BEND_CID_Audio_open, audio_open_run);
+  io_eff(CID(Audio.open), audio_open_run);
 }
 #endif
 
-#ifdef BEND_CID_Audio_write
+#ifdef CID(Audio.write)
 // The samples (interleaved L R ...) into the ring; the frames queued
 // after the write. Past the ring's room, the samples are dropped and
 // the queue answered as it is.
@@ -204,7 +197,7 @@ Term audio_write_run(Env e, Term* f, IoWork* w) {
   float   pcm[IO_RING * 2];
   u32     n   = 0;
   Term    s   = f[1];
-  while (term_aux(s) == BEND_CID_Con) {
+  while (term_aux(s) == CID(Con)) {
     Term fb[2];
     spare_free(e, cls_fit(2), ctr_take(e, s, 2, fb));
     if (n < IO_RING * 2) {
@@ -218,17 +211,17 @@ Term audio_write_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) audio_write_use(void) {
-  io_eff(BEND_CID_Audio_write, audio_write_run);
+  io_eff(CID(Audio.write), audio_write_run);
 }
 #endif
 
-#ifdef BEND_CID_Audio_close
+#ifdef CID(Audio.close)
 Term audio_close_run(Env e, Term* f, IoWork* w) {
   io_ring_free((IoRing*)(uintptr_t)io_hand_v(f[0]));
-  return term_pak(BEND_CID_Unit, 0);
+  return term_pak(CID(Unit), 0);
 }
 
 static void __attribute__((constructor)) audio_close_use(void) {
-  io_eff(BEND_CID_Audio_close, audio_close_run);
+  io_eff(CID(Audio.close), audio_close_run);
 }
 #endif

@@ -1,7 +1,3 @@
-// bend-ids 1
-// CID #Unit BEND_CID_Unit
-// CID :File.close BEND_CID_File_close
-// bend-ids end
 // File
 // ====
 
@@ -11,7 +7,7 @@ function file_close(file) {
     fs.closeSync(file);
   } catch (e) {
   }
-  return { $: BEND_CID_Unit };
+  return { $: CID(Unit) };
 }
 
-io_eff(BEND_CID_File_close, file_close);
+io_eff(CID(File.close), file_close);

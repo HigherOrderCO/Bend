@@ -941,15 +941,18 @@ function book_promises(book: Bend.Book): Bend.Name[] {
 }
 
 // term_refs adds to out the names a term (a span skipped) refers to.
-function term_refs(t: Bend.LTerm, out: Set<Bend.Name>): void {
+function term_refs(t: object, out: Set<Bend.Name>): void {
   const seen = new Set([t]);
   for (const todo = [t]; todo.length > 0;) {
-    const x = todo.pop() as Bend.LTerm;
-    if (x.$ === "Ref" || x.$ === "ADT") out.add(x.k);
-    for (const key of Bend.term_children[x.$]) {
-      const v = (x as unknown as Record<string, unknown>)[key];
-      for (const child of Array.isArray(v) ? v : v === undefined ? [] : [v]) {
-        if (!seen.has(child)) { seen.add(child); todo.push(child); }
+    const x = todo.pop() as Record<string, unknown>;
+    if ((x.$ === "Ref" || x.$ === "ADT") && typeof x.k === "string") {
+      out.add(x.k as Bend.Name);
+    }
+    for (const f in x) {
+      const v = x[f];
+      if (f !== "s" && typeof v === "object" && v !== null && !seen.has(v)) {
+        seen.add(v);
+        todo.push(v);
       }
     }
   }

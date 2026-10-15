@@ -23,7 +23,7 @@ import {
 
 type Kind = "w32" | "w64" | "box";
 
-type Lay = { ks: Kind[]; arms: [Name, Lay[]][] | null };
+type Lay = { ks: Kind[]; arms: Record<Name, Lay[]> | null };
 
 type Val = { ws: string[]; lay: Lay; stat: boolean };
 
@@ -83,8 +83,6 @@ type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 // it pads to its size class and keeps 240 plus log2 of it in CID_T. An
 // argument nested past TPL_DEEP brackets goes to a local (clang allows 256).
 
-const BASE = { def: new Map<string, Name>(), ctr: new Map<string, Name>() };
-
 const CLO_APPLY = name_internal("Clo.apply");
 
 const IO_EMIT = name_internal("IO.emit");
@@ -97,7 +95,7 @@ const INTERNAL = { dummy: name_internal("dummy"), table: name_internal("table"),
   jump: name_internal("JMP") };
 const GPU_BEND = "bend_dev";
 const GPU_WINDOW = "window_dev";
-const LOCAL = /^b0_n(0|[1-9][0-9]*)v[A-Za-z0-9_]*$/;
+const LOCAL = /^b0_n\d+v\w*$/;
 
 const ATOM   = /^(?:[A-Za-z_$][A-Za-z0-9_$]*|\d+|\d+\.\d+)$/;
 const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
@@ -193,11 +191,11 @@ const OPERATIONS = new Map(Object.entries({
   Array: {
     ...Object.fromEntries(Object.entries({
       new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
-      get: `{$: ${js_tag("Tuple")}, fst: $0, snd: $0[$1 % $0.length]}`,
+      get: `{$: "Base:#Tuple", fst: $0, snd: $0[$1 % $0.length]}`,
       swap: "array_rmw($0, $1, () => $2)",
-      size: `{$: ${js_tag("Tuple")}, fst: $0, snd: $0.length}`,
+      size: `{$: "Base:#Tuple", fst: $0, snd: $0.length}`,
     }).map(([k, JS]): [string, Intr] => [k, [null, JS]])),
-    clone: [["$0", "blk_copy(e, $0)"], `{$: ${js_tag("Tuple")}, fst: $0, snd: $0.slice()}`],
+    clone: [["$0", "blk_copy(e, $0)"], `{$: "Base:#Tuple", fst: $0, snd: $0.slice()}`],
   },
   "Array.atomic": Object.fromEntries(Object.entries({
     add: "(o + $2) >>> 0", min: "Math.min(o, $2)", max: "Math.max(o, $2)",
@@ -374,7 +372,7 @@ static Term f32_read(Env e, Term s) {
   JS: String.raw`
 function word_to_u32(w) {
   let x = 0;
-  for (let i = 0; w.$ === ${js_tag("WCon")}; i++) {
+  for (let i = 0; w.$ === "Base:#WCon"; i++) {
     x |= Number(w.head) << i;
     w = w.tail;
   }
@@ -382,21 +380,21 @@ function word_to_u32(w) {
 }
 
 function u32_to_word(x) {
-  let w = {$: ${js_tag("WNil")}};
+  let w = {$: "Base:#WNil"};
   for (let i = 31; i >= 0; i--) {
-    w = {$: ${js_tag("WCon")}, head: ((x >>> i) & 1) === 1, tail: w};
+    w = {$: "Base:#WCon", head: ((x >>> i) & 1) === 1, tail: w};
   }
   return w;
 }
 
 function cmp_new(a, b) {
-  return {$: a < b ? ${js_tag("LT")}
-    : a === b ? ${js_tag("EQ")} : ${js_tag("GT")}};
+  return {$: a < b ? "Base:#LT"
+    : a === b ? "Base:#EQ" : "Base:#GT"};
 }
 
 function nat_divmod(a, b) {
-  return b === 0 ? {$: ${js_tag("Tuple")}, fst: 0, snd: a}
-    : {$: ${js_tag("Tuple")}, fst: Math.trunc(a / b), snd: a % b};
+  return b === 0 ? {$: "Base:#Tuple", fst: 0, snd: a}
+    : {$: "Base:#Tuple", fst: Math.trunc(a / b), snd: a % b};
 }
 
 function nat_chk(n) {
@@ -436,7 +434,7 @@ function f32_from_bits(u) {
 function f32_read(s) {
   const re = /^[\t\n\v\f\r ]*[+-]?((\d+\.?\d*|\.\d+)(e[+-]?\d+)?|inf(inity)?|nan)$/i;
   const v = f32_round(s.replace(/inf\w*/i, "Infinity"));
-  return re.test(s) ? {$: ${js_tag("Some")}, value: v} : {$: ${js_tag("None")}};
+  return re.test(s) ? {$: "Base:#Some", value: v} : {$: "Base:#None"};
 }
 
 const f32_round = ${Bend.f32_round};
@@ -483,7 +481,7 @@ let FL: File;
 // ====
 
 function base(k: string, category: Bend.Category = "def"): Name {
-  return memo(BASE[category], k, () => name_source(Bend.BASE_ID, k, category));
+  return name_source(Bend.BASE_ID, k, category);
 }
 
 function entry(book = FL.book): Name {
@@ -498,12 +496,9 @@ function name_member(sc: Scope, role: string): Name {
   return name_gen(sc.names.owner, role, sc.names.next++);
 }
 
-// Hash generated identities only at emission; exact identities reject collisions.
+// a generated name's symbol is its hash, as owners nest it deep
 function name_global(k: Name): string {
-  if (name_parent(k) === null) return name_emit(k);
-  const symbol = "b0_h" + createHash("sha256").update(k, "utf16le").digest("hex");
-  if (memo(FL.symbols, symbol, () => k) !== k) die("generated name hash collision");
-  return symbol;
+  return name_parent(k) === null ? name_emit(k) : "b0_h" + createHash("sha256").update(k, "utf16le").digest("hex");
 }
 
 function cid_mac(k: Name): string {
@@ -512,10 +507,6 @@ function cid_mac(k: Name): string {
 
 function base_cid(k: string): string {
   return cid_mac(base(k, "ctr"));
-}
-
-function js_tag(k: string): string {
-  return JSON.stringify(base(k, "ctr"));
 }
 
 function arg_name(k: Name, i: number, live = false): Name {
@@ -939,7 +930,7 @@ function lay_pack(arms: [Name, Lay[]][]): Lay {
       ks[at++] = old === "box" || k === "w32" ? old : k;
     }
   }
-  return { ks, arms };
+  return { ks, arms: Object.fromEntries(arms) };
 }
 
 function lay_node(k: Name): Lay {
@@ -1297,7 +1288,6 @@ function file_new(book: Bend.Book, js: boolean) {
     brws: new Map<Name, boolean[]>(),
     nodes: new Map<Name, Lay>(),
     bindings: new Map<Of<"Var">, HTerm>(),
-    symbols: new Map<string, Name>(),
     lays: new Map<string, Lay>(),
     memo: {
       opens: new Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
@@ -1564,9 +1554,9 @@ function val_new(ws: string[], lay: Lay, stat = false): Val {
   return { ws, lay, stat };
 }
 
-function val_arm(v: Val, k = v.lay.arms![0][0]): Val[] {
-  let at = Number(v.lay.arms!.length > 1);
-  return v.lay.arms!.find(([key]) => key === k)![1].map((lay) =>
+function val_arm(v: Val, k = Object.keys(v.lay.arms!)[0] as Name): Val[] {
+  let at = Number(Object.keys(v.lay.arms!).length > 1);
+  return v.lay.arms![k].map((lay) =>
     val_new(v.ws.slice(at, at += lay.ks.length), lay));
 }
 
@@ -1609,9 +1599,9 @@ function val_to(sc: Scope, v: Val, lay: Lay): Val {
 
 function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
   cond = (t: string, i: number) => `${t} == ${i}`): Val {
-  const arms = lay.arms!;
-  const ws = (al: Scope, [k, lays]: [Name, Lay[]]) => read(k).flatMap((f, j) =>
-    val_to(al, f, lays[j]).ws);
+  const arms = Object.keys(lay.arms!) as Name[];
+  const ws = (al: Scope, k: Name) => read(k).flatMap((f, j) =>
+    val_to(al, f, lay.arms![k][j]).ws);
   if (arms.length <= 1) {
     return val_new(arms.flatMap((k) => ws(sc, k)), lay);
   }
@@ -1639,15 +1629,15 @@ function val_box(sc: Scope, v: Val): string {
   if (v.lay.arms === null) {
     return val_own(sc, v)[0];
   }
-  const arms = v.lay.arms;
+  const arms = Object.keys(v.lay.arms) as Name[];
   const build = (bl: Scope, k: Name) => ctr_build(bl, k, val_arm(v, k).flatMap(
-    (f, j) => val_own(bl, val_to(bl, f, lay_node(k).arms![0][1][j]))));
+    (f, j) => val_own(bl, val_to(bl, f, lay_node(k).arms![k][j]))));
   if (arms.length <= 1) {
-    return arms.length === 0 ? "0" : build(sc, arms[0][0]);
+    return arms.length === 0 ? "0" : build(sc, arms[0]);
   }
   const out = emit_hold(sc, ["0"], "b")[0];
   const tag = emit_alias(sc, v.ws[0], "t");
-  emit_chain(sc, (i) => `${tag} == ${i}`, arms.map(([k]) => () =>
+  emit_chain(sc, (i) => `${tag} == ${i}`, arms.map((k) => () =>
     file_push(sc, `${out} = ${build({ ...sc, spares: [] }, k)};`)));
   return out;
 }
@@ -1658,7 +1648,7 @@ function val_unbox(sc: Scope, v: Val, lay: Lay): Val {
   }
   const t = emit_alias(sc, v.ws[0], "u");
   return val_arms(sc, lay, t, (k) => node_fields(sc, t, k), (_, i) =>
-    `term_aux(${t}) == ${cid_mac(lay.arms![i][0])}`);
+    `term_aux(${t}) == ${cid_mac(Object.keys(lay.arms!)[i] as Name)}`);
 }
 
 // Arr
@@ -1839,7 +1829,7 @@ function show_main(): (number | Name)[] | null {
     } else if (kind === 7 && tld?.$ === "ADT") {
       show.push(Number(box), tld.c.length);
       for (const c of tld.c) {
-        const fs = (box ? lay_node(c.k) : lay).arms!.find(([k]) => k === c.k)![1];
+        const fs = (box ? lay_node(c.k) : lay).arms![c.k];
         const doms = ctr_tail(c, adt!.x);
         let at = Number(!box && tld.c.length > 1);
         show.push(names++, c.k, doms.length,
@@ -2238,12 +2228,10 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     return got;
   }
   const lay = pos === BOX ? lay_node(x.k) : pos;
-  const arms = lay.arms!;
-  const tag = arms.findIndex(([k]) => k === x.k);
-  const fields = arms[tag][1];
-  const vs = emit_each(sc, flds, fields, tys());
-  const ws = [...arms.length > 1 ? [String(tag)] : [],
-    ...vs.flatMap((f, j) => val_to(sc, f, fields[j]).ws)];
+  const arms = Object.keys(lay.arms!);
+  const vs = emit_each(sc, flds, lay.arms![x.k], tys());
+  const ws = [...arms.length > 1 ? [String(arms.indexOf(x.k))] : [],
+    ...vs.flatMap((f, j) => val_to(sc, f, lay.arms![x.k][j]).ws)];
   const v = val_new(lay.ks.map((_, j) => ws[j] ?? "0"), lay,
     vs.every((f) => f.stat));
   const out = lay === pos ? v
@@ -2606,7 +2594,7 @@ function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
         return [val_new([`(${sw} - ${n})`], lay)].slice(0, e);
       }
       let v = val_new(lay.ks.map((_, i) => `((${sw} >> ${i}) & 1)`),
-        lay.arms![0][1][0]);
+        Object.values(lay.arms!)[0][0]);
       for (let i = 0; i < j; i++) {
         v = val_arm(v)[1];
       }
@@ -2630,7 +2618,7 @@ function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
       }
       return lay === BOX ? [`term_aux(${sw}) == ${cid_mac(k)}`, h,
         (al) => node_fields(al, sw, k, true)]
-        : [`${sw} == ${lay.arms!.findIndex(([key]) => key === k)}`, h,
+        : [`${sw} == ${Object.keys(lay.arms!).indexOf(k)}`, h,
           () => val_arm(u, k)];
     });
   emit_chain(sc, (i) => lv[i][0], lv.map(([, h, fs]) => () => {
@@ -2662,37 +2650,28 @@ function emit_chain(sc: Scope, cond: (i: number) => string,
 // Compile
 // =======
 
-// Only the explicit header is Bend syntax; the host body text stays unchanged.
-function foreign_src(src: string, scopes: Bend.File[]): string {
-  const start = src[0] === "\ufeff" ? 1 : 0;
-  if (!src.startsWith("// bend-ids", start)) return src;
-  const header = /^\/\/ bend-ids 1(\r?\n)((?:\/\/[^\r\n]*\1)*?)\/\/ bend-ids end\1/.exec(src.slice(start));
-  if (!header) die("invalid bend-ids header");
-  const names = new Set<string>();
-  const prefix = header[2].split(header[1]).slice(0, -1).map((line) => {
-    const row = /^\/\/ (CID|FID) ([A-Za-z0-9_./:%#!?~-]+) (BEND_[A-Za-z0-9]+(?:_[A-Za-z0-9]+)*)$/.exec(line);
-    if (!row || names.has(row[3])) die("invalid bend-ids declaration: " + line);
-    const [, macro, token, alias] = row;
-    names.add(alias);
-    const [key, ...others] = scopes.map(scope => {
-      const found = token[0] === "#" || token[0] === ":"
-        ? name_resolve(FL.book, scope, token.slice(1), token[0] === "#" ? "ctr" : "def")
-        : { k: token as Name };
-      if ("issue" in found && found.issue !== undefined) die(found.issue);
-      const key = found.k ?? die(`${macro}(${token}) names no public constructor or def`);
-      const valid = macro === "CID" ? (key in FL.book.ctrs) || def_foreign(FL.book.tlds[key])
-        : FL.book.tlds[key]?.$ === "Def" || key === CLO_APPLY || key === IO_EMIT;
-      if (!valid || name_parent(key) !== null) die(`${macro}(${token}) names no public constructor or def`);
-      return key;
+// Hand-written C and JS name Bend ids as CID(k) and FID(k), outside
+// comments and strings: k reads as the Bend file importing the source reads
+// it, #k a constructor, :k a def, a bare k whichever exists, or k is a whole
+// key. A source several files import must read the same in each.
+function c_ids(src: string, scopes: Bend.File[]): string {
+  return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./:#!~-]+)\)/g, (t, p, k) => {
+    if (!p) {
+      return t;
+    }
+    const ok = (q: Name): boolean => name_parent(q) === null && (p === "CID" ? q in FL.book.ctrs || def_foreign(FL.book.tlds[q])
+      : FL.book.tlds[q]?.$ === "Def" || q === CLO_APPLY || q === IO_EMIT);
+    const [q, ...qs] = scopes.map((scope) => {
+      const rs = (/^!|.:/.test(k) ? [{ k: k as Name, issue: undefined }] : (["ctr", "def"] as const)
+        .filter((c) => k[0] !== (c === "ctr" ? ":" : "#")).map((c) => name_resolve(FL.book, scope, k.replace(/^[#:]/, ""), c)))
+        .filter((r) => ok(r.k));
+      return rs.length === 1 && !rs[0].issue ? rs[0].k : die(rs[0]?.issue ?? `${p}(${k}) names ${rs.length ? "both a constructor and a def" : "no public constructor or def"}`);
     });
-    if (others.some((k) => k !== key)) die("foreign binding differs between "
-      + scopes.map((s) => Bend.file_text(s.ns)).join(", ") + ": " + line);
-    if (FL.js) return `const ${alias} = ${JSON.stringify(key)};`;
-    const symbol = macro === "CID" ? cid_mac(key) : name_global(key);
-    return `#ifdef ${alias}\n#error foreign alias already defined: ${alias}\n#endif\n#ifdef ${symbol}\n#define ${alias} ${symbol}\n#endif`;
+    if (qs.some((x) => x !== q)) {
+      die(`${p}(${k}) reads apart in the files importing it`);
+    }
+    return FL.js ? JSON.stringify(q) : p === "CID" ? cid_mac(q) : name_global(q);
   });
-  return prefix.join("\n") + "\n" + src.slice(start + header[0].length)
-    + (FL.js ? "" : "\n\n" + [...names].map((k) => "#undef " + k).join("\n") + "\n");
 }
 
 function effect_srcs(): string[] {
@@ -2705,7 +2684,7 @@ function effect_srcs(): string[] {
     const scope = tld.i!.file;
     if (!scopes.includes(scope)) scopes.push(scope);
   }
-  return [...files].map(([path, scopes]) => foreign_src(fs.readFileSync(path, "utf8"), scopes));
+  return [...files].map(([path, scopes]) => c_ids(fs.readFileSync(path, "utf8"), scopes));
 }
 
 // C
@@ -3114,14 +3093,12 @@ export function js_lib(book: Bend.Book, mod = false): string {
     memo_gc();
     js_def(sc, k, def);
   }
-  const names = Object.fromEntries(done_defs(def_foreign)
-    .map(([k]) => [k, name_display(book, k)]));
   const effs = effect_srcs().map((t) => `(() => {\n${t}\n})();\n\n`).join("");
   const lib = outs === null ? "" : `const module = Object.create(null);\n${outs.map((k) => {
     const { live, lays } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
     const xs = live.map(([, , A], i) => host(A, ps[i]));
-    return (name_file(k) === book.entry && Bend.SOURCE_NAME.test(name_text(k)) ? [k, name_text(k)] : [k]).map((n) => `module[${JSON.stringify(n)}] = `)
+    return (name_file(k) === book.entry ? [k, name_text(k)] : [k]).map((n) => `module[${JSON.stringify(n)}] = `)
       .join("") + `run_lib((${ps}) => ${host(tele_unbind(
         FL.book.tlds[k].T).ret, `run_loop(${name_global(k)}(${xs}))`, 1)
       }, ${lays.length});`;
@@ -3132,7 +3109,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const funs = [sc.seg, ...FL.spins].flatMap((f) => seg_text(f.lines, 0))
     .join("\n").replace(/\x01([^\x02]*)\x02/g, (_, k) => jmp(k as Name) ? "run_loop"
       : "");
-  return RUNTIME + `const $0names = Object.assign(Object.create(null), ${JSON.stringify(names)});\n` + effs
+  return RUNTIME + effs
     + "// Program\n// =======\n\n" + [funs, ...[...FL.tabs]
     .map(([r, i]) => `const ${name_global(i)} = [${r}];`)].join("\n") + lib;
 }
@@ -5952,7 +5929,7 @@ function array_rmw(a, i, f) {
   const at = i % a.length;
   const old = a[at];
   a[at] = f(old);
-  return {$: ${js_tag("Tuple")}, fst: a, snd: old};
+  return {$: "Base:#Tuple", fst: a, snd: old};
 }
 
 // Run
@@ -6037,7 +6014,7 @@ function show_chr(s, q) {
 function show_val(D, d, v, chain) {
   if (D[d] === 7) {
     const tag = typeof v === "boolean"
-      ? v ? ${js_tag("True")} : ${js_tag("False")} : v.$;
+      ? v ? "Base:#True" : "Base:#False" : v.$;
     let a = d + 3;
     for (; D[a + 1][0] !== tag; a += 4 + 2 * D[a + 2]) {}
     const [, name, fields] = D[a + 1];
@@ -6153,11 +6130,11 @@ function io_strerror(code) {
 
 function io_fail(code, ...rest) {
   const err = io_tup(code >>> 0, io_strerror(code));
-  return { $: ${js_tag("Fail")}, error: io_tup(err, ...rest) };
+  return { $: "Base:#Fail", error: io_tup(err, ...rest) };
 }
 
 function io_done(value) {
-  return { $: ${js_tag("Done")}, value };
+  return { $: "Base:#Done", value };
 }
 
 function io_until(ms) {
@@ -6169,11 +6146,11 @@ function io_late(at) {
 }
 
 function io_ready(at, r) {
-  return at === undefined ? r : { $: ${js_tag("Ready")}, value: r };
+  return at === undefined ? r : { $: "Base:#Ready", value: r };
 }
 
 function io_tup(...xs) {
-  return xs.reduceRight((snd, fst) => ({ $: ${js_tag("Tuple")}, fst, snd }));
+  return xs.reduceRight((snd, fst) => ({ $: "Base:#Tuple", fst, snd }));
 }
 
 function io_bytes(text) {
@@ -6187,16 +6164,16 @@ function io_text(b, n) {
 // Bytes cross as they are (0..255), one List cell each, with no UTF-8 in
 // either direction; io_unlist answers null if a value is past 255.
 function io_list(b, n) {
-  let xs = { $: ${js_tag("Nil")} };
+  let xs = { $: "Base:#Nil" };
   while (n > 0) {
-    xs = { $: ${js_tag("Con")}, head: b[--n], tail: xs };
+    xs = { $: "Base:#Con", head: b[--n], tail: xs };
   }
   return xs;
 }
 
 function io_unlist(xs) {
   const b = [];
-  for (; xs.$ === ${js_tag("Con")}; xs = xs.tail) {
+  for (; xs.$ === "Base:#Con"; xs = xs.tail) {
     b.push(xs.head);
   }
   return b.some((x) => x > 255) ? null : Uint8Array.from(b);
@@ -6268,7 +6245,7 @@ function io_run(m) {
   const parent = io_active;
   io_active = io;
   try {
-    io_push(run_loop(m()), (x) => ({ $: ${js_tag("Emit")}, value: x }), true);
+    io_push(run_loop(m()), (x) => ({ $: "Base:#Emit", value: x }), true);
     let look = 0;
     for (let n = 0;; n += 1) {
       if (io.runs.length === 0) {
@@ -6292,12 +6269,12 @@ function io_run(m) {
       const s = io.runs.shift();
       let op = s.fun(s.arg);
       while (op !== undefined) {
-        if (op.$ === ${js_tag("Emit")}) {
+        if (op.$ === "Base:#Emit") {
           io.live -= 1;
           break;
         }
-        if (op.$ === ${js_tag("Halt")} || op.$ === ${js_tag("Exit")}) {
-          if (op.$ === ${js_tag("Halt")}) io_errs(op.message);
+        if (op.$ === "Base:#Halt" || op.$ === "Base:#Exit") {
+          if (op.$ === "Base:#Halt") io_errs(op.message);
           if (op.code > 255) {
             io_errs("bend: exit code must be in 0..255");
             return 1;
@@ -6306,7 +6283,7 @@ function io_run(m) {
         }
         const run = $0eff[op.$];
         if (run === undefined) {
-          throw "bend: no effect registers " + ($0names[op.$] ?? op.$);
+          throw "bend: no effect registers " + op.$.slice(op.$.indexOf(":") + 1);
         }
         const x = run(...op.args, op.kont);
         if (x === undefined) {

@@ -1,17 +1,3 @@
-// bend-ids 1
-// CID #Some BEND_CID_Some
-// CID #None BEND_CID_None
-// CID #Unit BEND_CID_Unit
-// CID #Wait BEND_CID_Wait
-// CID #Ready BEND_CID_Ready
-// CID #Fail BEND_CID_Fail
-// CID :Chan.new BEND_CID_Chan_new
-// CID :Chan.send BEND_CID_Chan_send
-// CID :Chan.recv BEND_CID_Chan_recv
-// CID :Chan.try_send BEND_CID_Chan_try_send
-// CID :Chan.try_recv BEND_CID_Chan_try_recv
-// CID :Chan.close BEND_CID_Chan_close
-// bend-ids end
 // Chan
 // ====
 
@@ -31,11 +17,11 @@ typedef struct {
 // Ordinary term_keep/drop tracks copies and releases unread buffered Terms.
 // Parked operations own a handle until their wake or deadline.
 
-#define chan_some(e, v) io_box(e, BEND_CID_Some, v)
-#define chan_none       term_pak(BEND_CID_None, 0)
-#define chan_done(e)    io_done(e, term_pak(BEND_CID_Unit, 0))
-#define chan_wait(e, item) io_box(e, BEND_CID_Wait, \
-  (item) == TERM_HOLE ? term_pak(BEND_CID_Unit, 0) : (item))
+#define chan_some(e, v) io_box(e, CID(Some), v)
+#define chan_none       term_pak(CID(None), 0)
+#define chan_done(e)    io_done(e, term_pak(CID(Unit), 0))
+#define chan_wait(e, item) io_box(e, CID(Wait), \
+  (item) == TERM_HOLE ? term_pak(CID(Unit), 0) : (item))
 
 static Term chan_open(Env e, u32 room) {
   u32 cls = cls_fit((u32)(sizeof(ChanRow) / sizeof(Term)));
@@ -126,7 +112,7 @@ static Term chan_wake(Env e, ChanRow* row, Term x) {
   if (a->made != 0) {
     io_park_cut((IoWork*)a->made);
     free((IoWork*)a->made);
-    x = io_box(e, BEND_CID_Ready, x);
+    x = io_box(e, CID(Ready), x);
   }
   a->item = x;
   io_push(&io_runs, a);
@@ -159,14 +145,14 @@ static void chan_shut(Env e, ChanRow* row) {
   while (row->wait != 0) {
     Term item = chan_tail(row)->next->item;
     chan_wake(e, row, item == TERM_HOLE ? chan_none
-      : io_box(e, BEND_CID_Fail, item));
+      : io_box(e, CID(Fail), item));
   }
 }
 
 // Sends without waiting: Done{}, Fail{v} if closed, IO_PARK if it would.
 static Term chan_put(Env e, ChanRow* row, Term v) {
   if (row->shut) {
-    return io_box(e, BEND_CID_Fail, v);
+    return io_box(e, CID(Fail), v);
   }
   if (row->wait != 0 && chan_tail(row)->next->item == TERM_HOLE) {
     chan_wake(e, row, chan_some(e, v));
@@ -202,7 +188,7 @@ static Term chan_try(Env e, ChanRow* row, IoWork* w, Term hand, Term x,
   Term item, u32 ms) {
   if (x != IO_PARK) {
     term_drop(e, hand);
-    return io_box(e, BEND_CID_Ready, x);
+    return io_box(e, CID(Ready), x);
   }
   if (ms == 0) {
     term_drop(e, hand);
@@ -211,19 +197,19 @@ static Term chan_try(Env e, ChanRow* row, IoWork* w, Term hand, Term x,
   return chan_park(row, w, hand, item, io_until(ms));
 }
 
-#ifdef BEND_CID_Chan_new
+#ifdef CID(Chan.new)
 
 Term chan_new_run(Env e, Term* f, IoWork* w) {
   return chan_open(e, (u32)f[0]);
 }
 
 static void __attribute__((constructor)) chan_new_use(void) {
-  io_eff(BEND_CID_Chan_new, chan_new_run);
+  io_eff(CID(Chan.new), chan_new_run);
 }
 
 #endif
 
-#ifdef BEND_CID_Chan_send
+#ifdef CID(Chan.send)
 
 Term chan_send_run(Env e, Term* f, IoWork* w) {
   ChanRow* row = chan_at(e, f[0]);
@@ -236,12 +222,12 @@ Term chan_send_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) chan_send_use(void) {
-  io_eff(BEND_CID_Chan_send, chan_send_run);
+  io_eff(CID(Chan.send), chan_send_run);
 }
 
 #endif
 
-#ifdef BEND_CID_Chan_recv
+#ifdef CID(Chan.recv)
 
 Term chan_recv_run(Env e, Term* f, IoWork* w) {
   ChanRow* row = chan_at(e, f[0]);
@@ -254,12 +240,12 @@ Term chan_recv_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) chan_recv_use(void) {
-  io_eff(BEND_CID_Chan_recv, chan_recv_run);
+  io_eff(CID(Chan.recv), chan_recv_run);
 }
 
 #endif
 
-#ifdef BEND_CID_Chan_try_send
+#ifdef CID(Chan.try_send)
 
 Term chan_try_send_run(Env e, Term* f, IoWork* w) {
   ChanRow* row = chan_at(e, f[0]);
@@ -267,12 +253,12 @@ Term chan_try_send_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) chan_try_send_use(void) {
-  io_eff(BEND_CID_Chan_try_send, chan_try_send_run);
+  io_eff(CID(Chan.try_send), chan_try_send_run);
 }
 
 #endif
 
-#ifdef BEND_CID_Chan_try_recv
+#ifdef CID(Chan.try_recv)
 
 Term chan_try_recv_run(Env e, Term* f, IoWork* w) {
   ChanRow* row = chan_at(e, f[0]);
@@ -280,12 +266,12 @@ Term chan_try_recv_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) chan_try_recv_use(void) {
-  io_eff(BEND_CID_Chan_try_recv, chan_try_recv_run);
+  io_eff(CID(Chan.try_recv), chan_try_recv_run);
 }
 
 #endif
 
-#ifdef BEND_CID_Chan_close
+#ifdef CID(Chan.close)
 
 Term chan_close_run(Env e, Term* f, IoWork* w) {
   ChanRow* row = chan_at(e, f[0]);
@@ -293,11 +279,11 @@ Term chan_close_run(Env e, Term* f, IoWork* w) {
     chan_shut(e, row);
   }
   term_drop(e, f[0]);
-  return term_pak(BEND_CID_Unit, 0);
+  return term_pak(CID(Unit), 0);
 }
 
 static void __attribute__((constructor)) chan_close_use(void) {
-  io_eff(BEND_CID_Chan_close, chan_close_run);
+  io_eff(CID(Chan.close), chan_close_run);
 }
 
 #endif

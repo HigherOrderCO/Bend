@@ -405,8 +405,8 @@ for it. Underneath are `IO.spawn`, `Chan.new`, `Chan.send`, `Chan.recv` and
 every computation is done, or reports a deadlock when the remaining ones all
 wait.
 
-Base effects import `.js` and `.c` implementations with `bend-ids 1` headers
-and register handlers with `io_eff`; see [Effects](EFFECTS.md). Define your own
+Base effects import `.js` and `.c` implementations that register handlers
+with `io_eff(CID(..), ..)`; see [Effects](EFFECTS.md). Define your own
 effects the same way. Only the event loop runs host code; proofs, termination
 and the GPU never touch it.
 

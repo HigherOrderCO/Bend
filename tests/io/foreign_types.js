@@ -1,12 +1,3 @@
-// bend-ids 1
-// CID #Empty BEND_CID_Empty
-// CID #Leaf BEND_CID_Leaf
-// CID #Node BEND_CID_Node
-// CID #End BEND_CID_End
-// CID #Cell BEND_CID_Cell
-// CID :tree.make BEND_CID_tree_make
-// CID :chain.make BEND_CID_chain_make
-// bend-ids end
 // Tree
 // ====
 
@@ -17,10 +8,10 @@ function tree_make(depth) {
   const at = (d) => {
     if (d === 0) {
       next += 1;
-      return next % 2 === 1 ? { $: BEND_CID_Empty } : { $: BEND_CID_Leaf, v: next };
+      return next % 2 === 1 ? { $: CID(Empty) } : { $: CID(Leaf), v: next };
     }
     const l = at(d - 1);
-    return { $: BEND_CID_Node, l, r: at(d - 1) };
+    return { $: CID(Node), l, r: at(d - 1) };
   };
   return at(depth);
 }
@@ -29,12 +20,12 @@ function tree_make(depth) {
 // =====
 
 function chain_make(n) {
-  let c = { $: BEND_CID_End };
+  let c = { $: CID(End) };
   for (let i = 0; i < n; i += 1) {
-    c = { $: BEND_CID_Cell, v: i, next: c };
+    c = { $: CID(Cell), v: i, next: c };
   }
   return c;
 }
 
-io_eff(BEND_CID_tree_make, tree_make);
-io_eff(BEND_CID_chain_make, chain_make);
+io_eff(CID(tree.make), tree_make);
+io_eff(CID(chain.make), chain_make);

@@ -19,12 +19,11 @@ latest one; the GitHub release carries the same notes.
   dispatch tables remain local to each build.
 - Publication preserves source imports and rejects archives that would lose
   their targets, split module identity or change proof-sibling obligations.
-- **Foreign interface change:** C and JS files declare their Bend references in
-  a `// bend-ids 1` header. Replace body `CID(...)`/`FID(...)` uses with the
-  declared host aliases; the compiler now copies the host body unchanged.
-  Header names use the imports of the Bend file supplying the implementation,
-  including when that implementation fills a law declared elsewhere.
-  See [Effects](guide/EFFECTS.md) for the format and examples.
+- `CID(..)` and `FID(..)` in a C or JS effect source read a name as the Bend
+  file importing the source reads it, also when it fills a law declared
+  elsewhere; `CID(#K)` and `CID(:f)` pick the constructor or the def when a
+  file has both, which is no longer refused. A JS `CID` is the whole key, such
+  as `"Base:#Some"`; the runtime's ids are `FID(!Clo.apply)` and `FID(!IO.emit)`.
 
 ## 2.0.37 (2026-10-13)
 

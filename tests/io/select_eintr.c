@@ -1,7 +1,3 @@
-// bend-ids 1
-// CID #Unit BEND_CID_Unit
-// CID :Idle.park BEND_CID_Idle_park
-// bend-ids end
 #include <fcntl.h>
 
 // A no-op handler for SIGWINCH, installed without SA_RESTART, and a
@@ -21,7 +17,7 @@ static void* idle_ring(void* ms) {
 }
 
 static Term idle_park_more(Env e, IoWork* w) {
-  return term_pak(BEND_CID_Unit, 0);
+  return term_pak(CID(Unit), 0);
 }
 
 Term idle_park_run(Env e, Term* f, IoWork* w) {
@@ -38,5 +34,5 @@ Term idle_park_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) idle_park_use(void) {
-  io_eff(BEND_CID_Idle_park, idle_park_run);
+  io_eff(CID(Idle.park), idle_park_run);
 }

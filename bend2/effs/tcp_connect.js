@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :TCP.connect BEND_CID_TCP_connect
-// bend-ids end
 // TCP
 // ===
 
@@ -39,4 +36,4 @@ function tcp_connect(host, port, k) {
   return undefined;
 }
 
-io_eff(BEND_CID_TCP_connect, tcp_connect);
+io_eff(CID(TCP.connect), tcp_connect);

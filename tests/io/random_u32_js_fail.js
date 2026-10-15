@@ -1,7 +1,3 @@
-// bend-ids 1
-// CID #Unit BEND_CID_Unit
-// CID :crypto_broken BEND_CID_crypto_broken
-// bend-ids end
 // A host whose WebCrypto answers by throwing, which is the shape the
 // report gave. The patch puts the original getRandomValues back before it
 // throws, so the failure is scoped to the one call: the gate interprets a
@@ -18,7 +14,7 @@ function crypto_broken_run() {
   };
   Object.defineProperty(host, "getRandomValues",
     { value: failing, configurable: true, writable: true });
-  return { $: BEND_CID_Unit };
+  return { $: CID(Unit) };
 }
 
-io_eff(BEND_CID_crypto_broken, crypto_broken_run);
+io_eff(CID(crypto_broken), crypto_broken_run);

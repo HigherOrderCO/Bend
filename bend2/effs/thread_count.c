@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :IO.thread_count BEND_CID_IO_thread_count
-// bend-ids end
 // IO
 // ==
 
@@ -11,5 +8,5 @@ Term io_thread_count_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) io_thread_count_use(void) {
-  io_eff(BEND_CID_IO_thread_count, io_thread_count_run);
+  io_eff(CID(IO.thread_count), io_thread_count_run);
 }

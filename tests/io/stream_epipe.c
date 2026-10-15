@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :Epipe.write BEND_CID_Epipe_write
-// bend-ids end
 #include <sys/wait.h>
 
 // A forked child moves fd onto a pipe whose read end is closed and
@@ -29,5 +26,5 @@ Term epipe_write_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) epipe_write_use(void) {
-  io_eff(BEND_CID_Epipe_write, epipe_write_run);
+  io_eff(CID(Epipe.write), epipe_write_run);
 }

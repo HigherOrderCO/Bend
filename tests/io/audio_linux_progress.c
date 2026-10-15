@@ -1,10 +1,3 @@
-// bend-ids 1
-// CID #Unit BEND_CID_Unit
-// CID :AudioTest.count BEND_CID_AudioTest_count
-// CID :AudioTest.start BEND_CID_AudioTest_start
-// CID :AudioTest.wait BEND_CID_AudioTest_wait
-// CID :AudioTest.closed BEND_CID_AudioTest_closed
-// bend-ids end
 #ifdef __linux__
 #include <alsa/asoundlib.h>
 #include <dlfcn.h>
@@ -96,7 +89,7 @@ Term audio_test_start_run(Env e, Term* f, IoWork* w) {
   atomic_store(&audio_test_recovers, 0);
   atomic_store(&audio_test_stopped, 0);
 #endif
-  return term_pak(BEND_CID_Unit, 0);
+  return term_pak(CID(Unit), 0);
 }
 
 // Waits for all 512 frames, or for the pump to stop on a dead device.
@@ -119,7 +112,7 @@ Term audio_test_wait_run(Env e, Term* f, IoWork* w) {
     || atomic_load(&audio_test_recovers) != (c == DEAD)))
     err_fail("audio test: dead device retried");
 #endif
-  return term_pak(BEND_CID_Unit, 0);
+  return term_pak(CID(Unit), 0);
 }
 
 Term audio_test_closed_run(Env e, Term* f, IoWork* w) {
@@ -128,7 +121,7 @@ Term audio_test_closed_run(Env e, Term* f, IoWork* w) {
   if (audio_test_case != DEAD && audio_test_case != ZERO && atomic_load(&audio_test_frames) != 512)
     err_fail("audio test: final frames");
 #endif
-  return term_pak(BEND_CID_Unit, 0);
+  return term_pak(CID(Unit), 0);
 }
 
 static void __attribute__((constructor)) audio_test_use(void) {
@@ -137,8 +130,8 @@ static void __attribute__((constructor)) audio_test_use(void) {
   if (audio_test_lib == NULL || pthread_key_create(&audio_test_key, audio_test_exit))
     err_fail("audio test: setup");
 #endif
-  io_eff(BEND_CID_AudioTest_count, audio_test_count_run);
-  io_eff(BEND_CID_AudioTest_start, audio_test_start_run);
-  io_eff(BEND_CID_AudioTest_wait, audio_test_wait_run);
-  io_eff(BEND_CID_AudioTest_closed, audio_test_closed_run);
+  io_eff(CID(AudioTest.count), audio_test_count_run);
+  io_eff(CID(AudioTest.start), audio_test_start_run);
+  io_eff(CID(AudioTest.wait), audio_test_wait_run);
+  io_eff(CID(AudioTest.closed), audio_test_closed_run);
 }

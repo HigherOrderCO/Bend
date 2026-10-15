@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :Module.export_keys BEND_CID_Module_export_keys
-// bend-ids end
 function module_export_keys() {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -56,4 +53,4 @@ def ordinary(x: U32) -> U32:
   }
 }
 
-io_eff(BEND_CID_Module_export_keys, module_export_keys);
+io_eff(CID(Module.export_keys), module_export_keys);

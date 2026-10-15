@@ -1,8 +1,3 @@
-// bend-ids 1
-// CID #Unit BEND_CID_Unit
-// CID :File.write BEND_CID_File_write
-// CID :File.write_bytes BEND_CID_File_write_bytes
-// bend-ids end
 // File
 // ====
 
@@ -13,7 +8,7 @@ function file_write_buffer(file, b) {
     while (at < b.length) {
       at += fs.writeSync(file, b, at, b.length - at, null);
     }
-    return io_tup(file, io_done({ $: BEND_CID_Unit }));
+    return io_tup(file, io_done({ $: CID(Unit) }));
   } catch (e) {
     return io_tup(file, io_fail(Math.abs(e.errno ?? 5)));
   }
@@ -28,5 +23,5 @@ function file_write_bytes(file, data) {
   return b === null ? io_tup(file, io_fail(22)) : file_write_buffer(file, b);
 }
 
-io_eff(BEND_CID_File_write, file_write);
-io_eff(BEND_CID_File_write_bytes, file_write_bytes);
+io_eff(CID(File.write), file_write);
+io_eff(CID(File.write_bytes), file_write_bytes);

@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :TCP.listen BEND_CID_TCP_listen
-// bend-ids end
 // TCP
 // ===
 
@@ -30,5 +27,5 @@ Term tcp_listen_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) tcp_listen_use(void) {
-  io_eff(BEND_CID_TCP_listen, tcp_listen_run);
+  io_eff(CID(TCP.listen), tcp_listen_run);
 }

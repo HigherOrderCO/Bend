@@ -1,63 +1,18 @@
-// bend-ids 1
-// CID #Error BEND_CID_Error
-// CID #Warning BEND_CID_Warning
-// CID #Information BEND_CID_Information
-// CID #Hint BEND_CID_Hint
-// CID #Erased BEND_CID_Erased
-// CID #Once BEND_CID_Once
-// CID #Many BEND_CID_Many
-// CID #Safe BEND_CID_Safe
-// CID #Suggested BEND_CID_Suggested
-// CID #Dangerous BEND_CID_Dangerous
-// CID #Con BEND_CID_Con
-// CID #Nil BEND_CID_Nil
-// CID #None BEND_CID_None
-// CID #Some BEND_CID_Some
-// CID #Span BEND_CID_Span
-// CID #Num BEND_CID_Num
-// CID #Flag BEND_CID_Flag
-// CID #Text BEND_CID_Text
-// CID #Term BEND_CID_Term
-// CID #Node BEND_CID_Node
-// CID #Fact BEND_CID_Fact
-// CID #Input BEND_CID_Input
-// CID #Source BEND_CID_Source
-// CID #Option BEND_CID_Option
-// CID #Unit BEND_CID_Unit
-// CID #View BEND_CID_View
-// CID :input BEND_CID_input
-// CID :report BEND_CID_report
-// CID :next_fact BEND_CID_next_fact
-// CID :view BEND_CID_view
-// CID :type_of BEND_CID_type_of
-// CID :binder BEND_CID_binder
-// CID :same BEND_CID_same
-// CID :show BEND_CID_show
-// CID :normal BEND_CID_normal
-// CID :uses BEND_CID_uses
-// CID #Use BEND_CID_Use
-// CID :text BEND_CID_text
-// CID :body BEND_CID_body
-// CID :node BEND_CID_node
-// CID :shape BEND_CID_shape
-// CID #Shape BEND_CID_Shape
-// CID :fact BEND_CID_fact
-// bend-ids end
 // The effects of lint.bend. bend-lint puts its channel on
 // globalThis.BEND_LINT before it runs a rule, and removes it after. Bool,
-// String and U32 are native JS values here; other data is {$: Name, ...}.
+// String and U32 are native JS values here; other data is {$: CID(Name), ...}.
 
 const LINT_SEVERITY = {
-  [BEND_CID_Error]: "error",
-  [BEND_CID_Warning]: "warning",
-  [BEND_CID_Information]: "information",
-  [BEND_CID_Hint]: "hint",
+  [CID(Error)]: "error",
+  [CID(Warning)]: "warning",
+  [CID(Information)]: "information",
+  [CID(Hint)]: "hint",
 };
-const LINT_QUANTITY = { erased: BEND_CID_Erased, once: BEND_CID_Once, many: BEND_CID_Many };
+const LINT_QUANTITY = { erased: CID(Erased), once: CID(Once), many: CID(Many) };
 const LINT_APPLICABILITY = {
-  [BEND_CID_Safe]: "safe",
-  [BEND_CID_Suggested]: "suggested",
-  [BEND_CID_Dangerous]: "dangerous",
+  [CID(Safe)]: "safe",
+  [CID(Suggested)]: "suggested",
+  [CID(Dangerous)]: "dangerous",
 };
 
 function lint_host() {
@@ -71,23 +26,23 @@ function lint_host() {
 }
 
 function lint_list(xs) {
-  return xs.reduceRight((tail, head) => ({ $: BEND_CID_Con, head, tail }), { $: BEND_CID_Nil });
+  return xs.reduceRight((tail, head) => ({ $: CID(Con), head, tail }), { $: CID(Nil) });
 }
 
 function lint_unlist(xs) {
   const out = [];
-  for (; xs.$ === BEND_CID_Con; xs = xs.tail) {
+  for (; xs.$ === CID(Con); xs = xs.tail) {
     out.push(xs.head);
   }
   return out;
 }
 
 function lint_maybe(x) {
-  return x === undefined ? { $: BEND_CID_None } : { $: BEND_CID_Some, value: x };
+  return x === undefined ? { $: CID(None) } : { $: CID(Some), value: x };
 }
 
 function lint_span(s) {
-  return { $: BEND_CID_Span, path: s.path, beg: s.beg, end: s.end };
+  return { $: CID(Span), path: s.path, beg: s.beg, end: s.end };
 }
 
 function lint_spot(s) {
@@ -96,33 +51,33 @@ function lint_spot(s) {
 
 function lint_value(v) {
   return typeof v === "number"
-    ? { $: BEND_CID_Num, value: v }
+    ? { $: CID(Num), value: v }
     : typeof v === "boolean"
-      ? { $: BEND_CID_Flag, value: v }
-      : { $: BEND_CID_Text, value: v };
+      ? { $: CID(Flag), value: v }
+      : { $: CID(Text), value: v };
 }
 
 function lint_term(id) {
-  return { $: BEND_CID_Term, id };
+  return { $: CID(Term), id };
 }
 
 function lint_node(id) {
-  return { $: BEND_CID_Node, id };
+  return { $: CID(Node), id };
 }
 
 function lint_fact(id) {
-  return lint_maybe(id === undefined ? undefined : { $: BEND_CID_Fact, id });
+  return lint_maybe(id === undefined ? undefined : { $: CID(Fact), id });
 }
 
 function lint_input() {
   const { sources, options } = lint_host().input();
   return {
-    $: BEND_CID_Input,
+    $: CID(Input),
     sources: lint_list(
-      sources.map((s) => ({ $: BEND_CID_Source, path: s.path, text: s.text, root: s.root })),
+      sources.map((s) => ({ $: CID(Source), path: s.path, text: s.text, root: s.root })),
     ),
     options: lint_list(
-      Object.entries(options).map(([key, v]) => ({ $: BEND_CID_Option, key, value: lint_value(v) })),
+      Object.entries(options).map(([key, v]) => ({ $: CID(Option), key, value: lint_value(v) })),
     ),
   };
 }
@@ -132,7 +87,7 @@ function lint_report(diags) {
     lint_unlist(diags).map((d) => ({
       severity: LINT_SEVERITY[d.severity.$],
       message: d.message,
-      span: d.span.$ === BEND_CID_Some ? lint_spot(d.span.value) : undefined,
+      span: d.span.$ === CID(Some) ? lint_spot(d.span.value) : undefined,
       fixes: lint_unlist(d.fixes).map((f) => ({
         title: f.title,
         applicability: LINT_APPLICABILITY[f.applicability.$],
@@ -140,13 +95,13 @@ function lint_report(diags) {
       })),
     })),
   );
-  return { $: BEND_CID_Unit };
+  return { $: CID(Unit) };
 }
 
 function lint_view(fact) {
   const v = lint_host().view(fact.id);
   return {
-    $: BEND_CID_View,
+    $: CID(View),
     owner: v.owner,
     inst: v.inst,
     kind: v.kind,
@@ -157,39 +112,39 @@ function lint_view(fact) {
   };
 }
 
-io_eff(BEND_CID_input, lint_input);
-io_eff(BEND_CID_report, lint_report);
-io_eff(BEND_CID_next_fact, () => lint_fact(lint_host().next()));
-io_eff(BEND_CID_view, lint_view);
-io_eff(BEND_CID_type_of, (fact) => lint_term(lint_host().type(fact.id)));
-io_eff(BEND_CID_binder, (fact) => {
+io_eff(CID(input), lint_input);
+io_eff(CID(report), lint_report);
+io_eff(CID(next_fact), () => lint_fact(lint_host().next()));
+io_eff(CID(view), lint_view);
+io_eff(CID(type_of), (fact) => lint_term(lint_host().type(fact.id)));
+io_eff(CID(binder), (fact) => {
   const id = lint_host().binder(fact.id);
   return lint_maybe(id === undefined ? undefined : lint_term(id));
 });
-io_eff(BEND_CID_same, (fact, a, b) => lint_host().same(fact.id, a.id, b.id));
-io_eff(BEND_CID_show, (fact, t) => lint_host().show(fact.id, t.id));
-io_eff(BEND_CID_normal, (fact, t) => lint_term(lint_host().normal(fact.id, t.id)));
-io_eff(BEND_CID_uses, (fact) =>
+io_eff(CID(same), (fact, a, b) => lint_host().same(fact.id, a.id, b.id));
+io_eff(CID(show), (fact, t) => lint_host().show(fact.id, t.id));
+io_eff(CID(normal), (fact, t) => lint_term(lint_host().normal(fact.id, t.id)));
+io_eff(CID(uses), (fact) =>
   lint_list(
     lint_host()
       .uses(fact.id)
-      .map((u) => ({ $: BEND_CID_Use, name: u.name, quantity: { $: LINT_QUANTITY[u.quantity] } })),
+      .map((u) => ({ $: CID(Use), name: u.name, quantity: { $: LINT_QUANTITY[u.quantity] } })),
   ),
 );
-io_eff(BEND_CID_text, (span) => lint_host().text(lint_spot(span)));
-io_eff(BEND_CID_body, (name) => {
+io_eff(CID(text), (span) => lint_host().text(lint_spot(span)));
+io_eff(CID(body), (name) => {
   const id = lint_host().body(name);
   return lint_maybe(id === undefined ? undefined : lint_node(id));
 });
-io_eff(BEND_CID_node, (fact) => lint_node(lint_host().node(fact.id)));
-io_eff(BEND_CID_shape, (n) => {
+io_eff(CID(node), (fact) => lint_node(lint_host().node(fact.id)));
+io_eff(CID(shape), (n) => {
   const s = lint_host().shape(n.id);
   return {
-    $: BEND_CID_Shape,
+    $: CID(Shape),
     kind: s.kind,
     name: s.name,
     span: lint_maybe(s.span && lint_span(s.span)),
     children: lint_list(s.children.map(lint_node)),
   };
 });
-io_eff(BEND_CID_fact, (n) => lint_fact(lint_host().fact(n.id)));
+io_eff(CID(fact), (n) => lint_fact(lint_host().fact(n.id)));

@@ -470,19 +470,9 @@ function model_by(e: Safe, T: HTerm, proj: boolean): HTerm | null {
 // a datatype's key on the path: binders inside it count from d, so a
 // field under a ∀ meets the same datatype again
 function model_key(F: HTerm, d: number): { key: string; size: number } {
-  const at = (i: number): unknown => i >= d ? "^" + (i - d) : i;
-  const go = (t: B.LTerm): B.LTerm => {
-    const out = { ...t } as unknown as Record<string, unknown>;
-    for (const k of B.term_children[t.$]) {
-      const v = out[k];
-      out[k] = Array.isArray(v) ? v.map(go) : v === undefined ? v : go(v as B.LTerm);
-    }
-    if (t.$ === "Var" || t.$ === "Lam" || t.$ === "All") out.i = at(t.i);
-    if (t.$ === "Let") out.i = t.i.map(at);
-    return out as unknown as B.LTerm;
-  };
-  const t = go(B.term_lower(F, d));
-  return { key: B.term_key(t), size: B.term_size(t) };
+  const at = (i: unknown): unknown => typeof i === "number" && i >= d ? "^" + (i - d) : i;
+  const t = JSON.parse(JSON.stringify(B.term_lower(F, d), (k, v) => k === "s" ? undefined : k !== "i" ? v : Array.isArray(v) ? v.map(at) : at(v)));
+  return { key: B.term_key(t), size: B.term_key(t, true).length };
 }
 
 function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm, HTerm]>, proj: boolean, probe: Probe): HTerm | null {
@@ -834,12 +824,15 @@ function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>): HTerm {
 }
 
 // whether a lowered term mentions a variable at a level p holds for
-function mentions(t: B.LTerm, p: (i: number) => boolean): boolean {
-  if (t.$ === "Var" && p(t.i)) return true;
-  return B.term_children[t.$].some(k => {
-    const v = (t as unknown as Record<string, unknown>)[k];
-    return Array.isArray(v) ? v.some(t => mentions(t, p)) : v !== undefined && mentions(v as B.LTerm, p);
-  });
+function mentions(t: unknown, p: (i: number) => boolean): boolean {
+  if (typeof t !== "object" || t === null) {
+    return false;
+  }
+  const o = t as Record<string, unknown>;
+  if (o.$ === "Var" && p(o.i as number)) {
+    return true;
+  }
+  return Object.entries(o).some(([k, v]) => k !== "s" && mentions(v, p));
 }
 
 // whether T is a datatype with no constructor left
@@ -1077,16 +1070,15 @@ function group_new(e: Safe, k: Name, hs: Name[]): Group | null {
 }
 
 // the arguments of each call to k in the lowered term t
-function back(t: B.LTerm, k: Name): B.LTerm[][] {
-  let [f, xs]: [B.LTerm, B.LTerm[]] = [t, []];
+function back(t: unknown, k: Name): B.LTerm[][] {
+  if (typeof t !== "object" || t === null) {
+    return [];
+  }
+  let [f, xs]: [B.LTerm, B.LTerm[]] = [t as B.LTerm, []];
   while (f.$ === "App" || f.$ === "Ann") {
     [f, xs] = f.$ === "App" ? [f.f, [f.x, ...xs]] : [f.x, xs];
   }
-  if (f.$ === "Ref" && f.k === k && xs.length > 0) return [xs];
-  return B.term_children[t.$].flatMap(key => {
-    const v = (t as unknown as Record<string, unknown>)[key];
-    return Array.isArray(v) ? v.flatMap(t => back(t, k)) : v === undefined ? [] : back(v as B.LTerm, k);
-  });
+  return f.$ === "Ref" && f.k === k && xs.length > 0 ? [xs] : Object.entries(t).flatMap(([j, v]) => j === "s" ? [] : back(v, k));
 }
 
 // what an emission has added, which a Regroup below it undoes. Emission

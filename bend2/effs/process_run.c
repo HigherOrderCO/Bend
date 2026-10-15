@@ -1,7 +1,3 @@
-// bend-ids 1
-// CID :Process.run BEND_CID_Process_run
-// CID #Con BEND_CID_Con
-// bend-ids end
 // Process
 // =======
 
@@ -295,7 +291,7 @@ Term process_run_run(Env e, Term* f, IoWork* w) {
   p->argv = io_mem(calloc(capacity, sizeof(char*)));
   p->argv[p->argc++] = command;
   Term xs = f[1];
-  while (term_aux(xs) == BEND_CID_Con) {
+  while (term_aux(xs) == CID(Con)) {
     Term pair[2];
     spare_free(e, cls_fit(2), ctr_take(e, xs, 2, pair));
     char* arg = io_cstr(e, pair[0], &len);
@@ -322,5 +318,5 @@ Term process_run_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) process_run_use(void) {
-  io_eff(BEND_CID_Process_run, process_run_run);
+  io_eff(CID(Process.run), process_run_run);
 }

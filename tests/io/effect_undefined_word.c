@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :word.len BEND_CID_word_len
-// bend-ids end
 // The length of n copies of the word undefined, spelled in this comment
 // and in a string: C the emitter never generated.
 Term word_len_run(Env e, Term* f, IoWork* w) {
@@ -8,5 +5,5 @@ Term word_len_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) word_len_use(void) {
-  io_eff(BEND_CID_word_len, word_len_run);
+  io_eff(CID(word.len), word_len_run);
 }

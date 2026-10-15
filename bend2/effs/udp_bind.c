@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :UDP.bind BEND_CID_UDP_bind
-// bend-ids end
 // UDP
 // ===
 
@@ -27,5 +24,5 @@ Term udp_bind_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) udp_bind_use(void) {
-  io_eff(BEND_CID_UDP_bind, udp_bind_run);
+  io_eff(CID(UDP.bind), udp_bind_run);
 }

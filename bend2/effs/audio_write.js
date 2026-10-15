@@ -1,13 +1,9 @@
-// bend-ids 1
-// CID #Con BEND_CID_Con
-// CID :Audio.write BEND_CID_Audio_write
-// bend-ids end
 // Audio
 // =====
 
 function audio_write(audio, samples) {
   let n = 0;
-  for (let xs = samples; xs.$ === BEND_CID_Con; xs = xs.tail) {
+  for (let xs = samples; xs.$ === CID(Con); xs = xs.tail) {
     n += 1;
   }
   const now = Date.now();
@@ -20,4 +16,4 @@ function audio_write(audio, samples) {
   return io_tup(audio, Math.floor(audio.queued));
 }
 
-io_eff(BEND_CID_Audio_write, audio_write);
+io_eff(CID(Audio.write), audio_write);

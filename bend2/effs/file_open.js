@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :File.open BEND_CID_File_open
-// bend-ids end
 // File
 // ====
 
@@ -21,4 +18,4 @@ function file_open(path, mode) {
   }
 }
 
-io_eff(BEND_CID_File_open, file_open);
+io_eff(CID(File.open), file_open);

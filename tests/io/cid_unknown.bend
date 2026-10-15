@@ -22,5 +22,5 @@ def main() -> IO(Unit):
     b : Box <- mk()
     IO.print(show(b))
 
-#|Error: CID(#Ful) names no public constructor or def
+#|Error: CID(Ful) names no public constructor or def
 #|exit 1

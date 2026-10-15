@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :fifo.drain BEND_CID_fifo_drain
-// bend-ids end
 // A child writes len bytes into a FIFO, then waits on an ack pipe and
 // closes the FIFO only once the reader has drained it and parks again, so
 // the reader's last wake is the close alone. The reader's end moves to fd
@@ -60,4 +57,4 @@ function fifo_drain(len, hi, k) {
   return go();
 }
 
-io_eff(BEND_CID_fifo_drain, fifo_drain);
+io_eff(CID(fifo.drain), fifo_drain);

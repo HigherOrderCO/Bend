@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :File.open BEND_CID_File_open
-// bend-ids end
 // File
 // ====
 
@@ -41,5 +38,5 @@ Term file_open_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) file_open_use(void) {
-  io_eff(BEND_CID_File_open, file_open_run);
+  io_eff(CID(File.open), file_open_run);
 }

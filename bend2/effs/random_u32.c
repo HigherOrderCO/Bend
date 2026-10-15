@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :IO.random_u32 BEND_CID_IO_random_u32
-// bend-ids end
 // IO
 // ==
 
@@ -28,5 +25,5 @@ Term io_random_u32_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) io_random_u32_use(void) {
-  io_eff(BEND_CID_IO_random_u32, io_random_u32_run);
+  io_eff(CID(IO.random_u32), io_random_u32_run);
 }

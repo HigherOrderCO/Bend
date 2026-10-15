@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :File.size BEND_CID_File_size
-// bend-ids end
 // File
 // ====
 
@@ -20,4 +17,4 @@ function file_size(file) {
   }
 }
 
-io_eff(BEND_CID_File_size, file_size);
+io_eff(CID(File.size), file_size);

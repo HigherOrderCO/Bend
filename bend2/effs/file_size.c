@@ -1,6 +1,3 @@
-// bend-ids 1
-// CID :File.size BEND_CID_File_size
-// bend-ids end
 // File
 // ====
 
@@ -28,5 +25,5 @@ Term file_size_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) file_size_use(void) {
-  io_eff(BEND_CID_File_size, file_size_run);
+  io_eff(CID(File.size), file_size_run);
 }

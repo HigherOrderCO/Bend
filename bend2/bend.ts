@@ -80,16 +80,13 @@
 // def, type, law, match, case, do, return, for, exs, where,
 // is, import, Type, Data, Kind, Quant ("as" reads only on an import
 // line and "unsafe" only after "@", so they stay free).
-// a file's namespace is its real path including ".bend"; a "0x<hash>/"
-// path is its own namespace, read from BEND_LIB and fetched from BEND_HUB
-// on a miss. A "<name>@<version>/" path resolves to the hash named by the
-// hub. Base has the explicit namespace "Base". The Names helpers encode
-// namespace, declaration/constructor category and source spelling together.
-// "as Name" binds a per-file alias; two aliases of one file agree, and a
-// def of an aliased name fills it. Unknown names belong to the current file
-// unless Base declares them; an alias/Base ambiguity in that category fails.
-// Imports are discovered before parsing, fixing sugar's vocabulary owner
-// while preserving declaration visibility in the original import order.
+// a file's namespace is its real path; a "0x<hash>/" path is its own,
+// read from BEND_LIB and fetched from BEND_HUB on a miss; a
+// "<name>@<version>/" path is the hash the hub names; Base's is "Base".
+// "as Name" binds a per-file alias: two aliases of one file agree, and a
+// def of an aliased name fills it. a name is the file's own unless only
+// Base declares it. sugar means Base's names when any file imports Base,
+// else the file's own, so imports are read before any file parses.
 // a def with no prior law types itself: a Bind telescope and a
 // "->" return type. a def after its law takes bare names, no "->".
 // "def f?(..)" is "@unsafe def f(..)".
@@ -247,6 +244,10 @@ import * as url from "node:url";
 
 // Names
 // =====
+// A global key is "<file>:<text>" for a source def or type, "<file>:#<text>"
+// for a constructor, "!<text>" for a runtime internal and "<owner>~<role>:<n>"
+// for a generated entity (a string member is hashed to "@<hex>"). A file id
+// escapes %, : and ~, so the parts read back. Keys copy as plain strings.
 
 export type Category = "def" | "ctr";
 export type Name = string & { readonly identity: unique symbol };
@@ -255,57 +256,36 @@ export type FileId = string & { readonly file: unique symbol };
 export const BASE_ID = file_name("Base");
 export const SOURCE_NAME = /^[A-Za-z_]\w*(\.[A-Za-z_]\w*)*$/;
 
-// Global slots contain canonical keys made here, never raw source labels.
-// Their primitive value preserves identity when a term or a book is copied.
 export function name_source(file: FileId, text: string, category: Category = "def"): Name {
-  if (!file || !text) throw Error("empty file or declaration name");
-  return (file + (category === "ctr" ? ":#" : ":") + name_part(text)) as Name;
+  return (file + (category === "ctr" ? ":#" : ":") + text) as Name;
 }
 
-export function name_internal(text: string): Name { return ("!" + name_part(text)) as Name; }
+export function name_internal(text: string): Name { return ("!" + text) as Name; }
 
-let next_name = 0n;
-export function name_gen(owner: Name, role: string, member?: number | bigint | string): Name {
-  const n = member === undefined ? "@" + next_name++ : typeof member === "string"
-    ? "@k" + name_part(member) : String(BigInt(member));
-  if (n[0] === "-") throw Error("negative member position");
-  return (owner + "~" + name_part(role) + ":" + n) as Name;
+let next_name = 0;
+export function name_gen(owner: Name, role: string, member?: number | string): Name {
+  return (owner + "~" + role + ":" + (typeof member === "number" ? member : "@" + (member === undefined
+    ? next_name++ : createHash("sha256").update(member, "utf16le").digest("hex")))) as Name;
 }
 
-function name_part(text: string): string {
-  return text.replace(/[^A-Za-z0-9_./-]/g,
-    c => "%" + c.charCodeAt(0).toString(16).padStart(4, "0"));
+export function file_name(text: string): FileId {
+  return text.replace(/[%:~]/g, c => "%" + c.charCodeAt(0).toString(16)) as FileId;
 }
 
-function name_unpart(text: string): string {
-  return text.replace(/%([0-9a-f]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
-}
-
-// File identities are encoded once; filesystem operations use File.path.
-export function file_name(text: string): FileId { return name_part(text) as FileId; }
-export function file_text(file: FileId): string { return name_unpart(file); }
+export function file_text(file: FileId): string { return decodeURIComponent(file); }
 
 export function name_file(k: Name): FileId {
   return (k[0] === "!" ? "" : k.slice(0, k.indexOf(":"))) as FileId;
 }
 
+// the spelling: a generated name shows its owner, roles and numbers
 export function name_text(k: Name): string {
-  const at = k[0] === "!" ? 1 : k.indexOf(":") + 1;
-  return name_unpart(k.slice(at).replace(/^#/, "")
-    .replace(/~([^:]*):([0-9]+|@[^~]*)/g, (_, role, member) => "~" + role + (member[0] === "@" ? "" : member)));
+  return k.slice(k[0] === "!" ? 1 : k.indexOf(":") + 1).replace(/^#/, "").replace(/:(\d*)(@\w*)?/g, "$1");
 }
 
 export function name_parent(k: Name): Name | null {
   const at = k.lastIndexOf("~");
   return at < 0 ? null : k.slice(0, at) as Name;
-}
-
-export function file_id(real: string, base: string, store: string | null): FileId {
-  if (real === base) return BASE_ID;
-  const tail = store === null ? "" : path.relative(store, real).split(path.sep).join("/");
-  const pkg = /^0x([0-9a-f]+)\/(.*)/.exec(tail);
-  if (pkg && pkg[1].length !== 32) throw Error("expected a 32-digit package hash");
-  return file_name(pkg?.[2] ? tail : real);
 }
 
 export function display_text(text: string): string {
@@ -318,20 +298,15 @@ export function name_emit(k: Name): string {
     c => "_u" + c.charCodeAt(0).toString(16).padStart(4, "0"));
 }
 
+// k as file writes it: its own and the entry's and Base's names bare, an
+// imported file's through its alias, any other through its path
 export function name_display(book: Book | undefined, k: Name, file?: File): string {
-  const owner = name_file(k), text = name_text(k);
-  if (owner === "") return "!" + display_text(text);
-  let prefix: string | undefined;
-  if (owner === file?.ns) prefix = "";
-  else prefix = Object.entries(file?.al ?? {}).find(([, target]) => target === owner)?.[0];
-  if (prefix === undefined && (owner === BASE_ID || owner === book?.entry)) prefix = "";
-  if (prefix === undefined) {
-    const entry = book?.files.get(book.entry), own = book?.files.get(owner);
-    prefix = entry?.path && own?.path && !/^0x[0-9a-f]{32}\//.test(owner)
-      ? path.relative(path.dirname(entry.path), own.path).split(path.sep).join("/") : file_text(owner);
-    prefix = prefix.replace(/\.bend$/, "");
-  }
-  return display_text((prefix ? prefix + "." : "") + text);
+  const owner = name_file(k);
+  const al = owner === file?.ns ? "" : Object.keys(file?.al ?? {}).find((a) => file!.al[a] === owner);
+  const own = book?.files.get(owner)?.path, top = book?.files.get(book.entry)?.path;
+  const pre = owner === "" ? "!" : al === undefined ? owner === BASE_ID || owner === book?.entry ? "" : (own && top && !owner.startsWith("0x")
+    ? path.relative(path.dirname(top), own).split(path.sep).join("/") : file_text(owner)).replace(/\.bend$/, "") + "." : al && al + ".";
+  return display_text(pre + name_text(k));
 }
 
 // Core
@@ -412,7 +387,7 @@ export type TLD  = ADT | Def;
 export type Book = {
   entry: FileId; base: FileId | null; files: Map<FileId, File>;
   tlds: Record<string, TLD>; ctrs: Record<string, Ctr>; order: Name[]; hols: number;
-  tmps: Map<string, Name>; recheck?: boolean;
+  tmps: Map<string, Name>;
 };
 
 // Context
@@ -431,7 +406,7 @@ export type Body  = Match | Local | LTerm
 
 // Parser
 export type File  = { str: string; ns: FileId; al: Readonly<Record<string, FileId>>; base: FileId | null; path?: string };
-export type Parse = File & { book: Book; pos: number; stk: Array<[Label, number]>; frs: number; resolved: Record<Category, Map<string, Resolution>>; };
+export type Parse = File & { book: Book; pos: number; stk: Array<[Label, number]>; frs: number; };
 export type Span  = { file: File; beg: number; end: number; };
 
 // Machine
@@ -799,9 +774,8 @@ export function term_higher(tm: LTerm, env: Env = null, copy?: (t: HTerm) => HTe
     case "Var": {
       if (tm.i < 0) return copy ? copy(tm) : tm;
       const v = list_get(env, tm.i);
-      if (v !== null) return typeof v === "function" ? v(tm.s) : term_at(v, tm.s);
-      if (!copy && tm.v !== undefined) return tm.v;
-      throw Error("missing binding: " + display_text(tm.k) + "@" + tm.i);
+      if (v === null && (copy || tm.v === undefined)) throw Error("unbound " + tm.k);
+      return v === null ? tm.v! : typeof v === "function" ? v(tm.s) : term_at(v, tm.s);
     }
     case "Op": {
       const op = term_excerpt(tm);
@@ -836,21 +810,16 @@ export function term_higher(tm: LTerm, env: Env = null, copy?: (t: HTerm) => HTe
   }
 }
 
+// a checked term's cells hold the checker's variables: each copy maps them
+// through the environment its binder application made
 function checked_copy(env: Env): (t: HTerm) => HTerm {
-  const copy = scope_mapper(v => {
-    if (v.i < 0) throw Error("missing checked binding: " + display_text(v.k) + "@" + v.i);
-    return term_higher(v, env, copy);
-  });
+  const copy = scope_mapper((v) => v.i < 0 ? v : term_higher(v, env, copy));
   return copy;
 }
 
 export function term_lower(term: HTerm, d: number = 0): LTerm {
   const tm = term_force(term);
   switch (tm.$) {
-    case "Var":
-      if (tm.slot !== undefined) throw Error("escaped scoped binder");
-      return tm as LTerm;
-    case "Sub": return tm as LTerm;
     case "Let": {
       const xs = tm.k.map((k, j): HTerm => Var(k, d + j));
       const vs = tm.v.map((v) => term_lower(v, d));
@@ -872,35 +841,23 @@ export function term_lower(term: HTerm, d: number = 0): LTerm {
 
 type Variable = Extract<HTerm, { $: "Var" }>;
 
-// Binder callbacks perform substitution and weak normalization, not checking or
-// compiler analysis. A private probe carries its replacement; a surrounding
-// mapper's probe remains rigid until that owner sees it. Each application owns
-// its copied cells, while roots in one context share a memo table.
-// refs stays fixed; targets are inserted unchanged.
-export function scope_mapper(free: (v: Variable) => HTerm, refs?: ReadonlyMap<Name, HTerm | null>): (term: HTerm) => HTerm {
-  const owner = {}, visiting = new Set<HTerm>();
+// a copy of term with each free variable v as free(v) and each ref in refs
+// replaced, also under binders:
+// a binder's argument enters as this mapper's probe, which only it unwraps,
+// and each application copies its cells afresh; one memo keeps the sharing
+// of the cells a context reaches
+export function scope_mapper(free: (v: Variable) => HTerm, refs?: Map<Name, HTerm | null>): (term: HTerm) => HTerm {
+  const owner = {};
   const probe = (value: HTerm): Variable => ({ $: "Var", k: "_", i: 0, slot: { owner, value } });
-  function context(): (term: HTerm) => HTerm {
+  const context = (): (term: HTerm) => HTerm => {
     const memo = new WeakMap<HTerm, HTerm>();
     const go = (t: HTerm): HTerm => {
-      if (t.$ === "Ref") return refs?.get(t.k) ?? t;
-      const old = memo.get(t);
-      if (old !== undefined) return old;
-      if (visiting.has(t)) throw Error("cyclic scoped term");
-      visiting.add(t);
-      try {
-        let out: HTerm;
+      let out = memo.get(t);
+      if (out === undefined) {
         switch (t.$) {
-          case "Var": {
-            if (t.slot !== undefined) out = t.slot.owner === owner ? term_at(t.slot.value, t.s) : t;
-            else if (t.v === undefined) out = term_at(free(t), t.s);
-            else {
-              const value = go(t.v);
-              out = t.i < 0 ? { ...t, i: -1, v: value } : value;
-            }
-            break;
-          }
-          case "Sub": throw Error("uneliminated substitution");
+          case "Var": out = t.slot ? (t.slot.owner === owner ? term_at(t.slot.value, t.s) : t)
+            : t.v === undefined ? term_at(free(t), t.s) : t.i < 0 ? { ...t, v: go(t.v) } : go(t.v); break;
+          case "Ref": out = refs?.get(t.k) ?? t; break;
           case "Lam": out = { ...t, f: (x: HTerm) => context()(t.f(probe(x))) }; break;
           case "All": out = { ...t, A: go(t.A), B: (x: HTerm) => context()(t.B(probe(x))) }; break;
           case "Let": out = { ...t, v: t.v.map(go), f: (xs: HTerm[]) => context()(t.f(xs.map(probe))) }; break;
@@ -912,16 +869,15 @@ export function scope_mapper(free: (v: Variable) => HTerm, refs?: ReadonlyMap<Na
           default: out = term_map(t, go);
         }
         memo.set(t, out);
-        return out;
-      } finally { visiting.delete(t); }
+      }
+      return out;
     };
     return go;
-  }
+  };
   return context();
 }
 
-
-// Requires checker-owned output; transport the cells captured by its annotations.
+// a checked term (the checker's output) with its cells copied in scope
 export function checked_higher(term: LTerm): HTerm { return term_higher(term, null, checked_copy(null)); }
 
 // Ctx
@@ -1046,12 +1002,22 @@ async function book_file(book: Book, file: string, spn?: Span): Promise<string> 
 }
 
 export async function book_load(book: Book, file: string, seen: Map<string, FileId | null>, spn?: Span): Promise<number> {
-  const identity = (real: string) => file_id(real, BASE_BEND, fs.existsSync(BEND_LIB) ? fs.realpathSync(BEND_LIB) : null);
-  const nodes: Array<File & { path: string }> = [];
-  for (const scope of book.files.values()) if (scope.path !== undefined) seen.set(scope.path, scope.ns);
+  const lib = fs.existsSync(BEND_LIB) ? fs.realpathSync(BEND_LIB) + "/" : "\0";
+  const hub = (s: string): boolean => /^0x[0-9a-f]+\//.test(s);
+  const identity = (real: string): FileId => real === BASE_BEND ? BASE_ID
+    : file_name(real.startsWith(lib) && hub(real.slice(lib.length)) ? real.slice(lib.length) : real);
+  const ok = (s: string, lib: boolean): boolean => hub(s) === lib
+    && /^(\/|(\.\.\/)*)([A-Za-z_][\w-]*\/)*[A-Za-z_][\w-]*$/.test(s.replace(/^0x[0-9a-f]+\//, ""));
+  const files: Array<File & { path: string }> = [];
+  for (const f of book.files.values()) {
+    if (f.path !== undefined) {
+      seen.set(f.path, f.ns);
+    }
+  }
   const entry = await book_file(book, file, spn);
   book.entry ||= identity(entry);
-  async function discover(real: string, spn?: Span): Promise<void> {
+  // every file's imports are read first: sugar's names wait on Base's
+  async function read(real: string, spn?: Span): Promise<void> {
     if (seen.has(real)) {
       if (seen.get(real) === null) {
         throw Err(book, ctx_nil(), "an import cycle through " + real, undefined, spn);
@@ -1069,9 +1035,6 @@ export async function book_load(book: Book, file: string, seen: Map<string, File
     const body  = lines.slice();
     const al    : Record<string, FileId> = Object.create(null);
     const source: File & { path: string } = { str: text, ns, al, base: book.base, path: real };
-    const hub   = (s: string): boolean => /^0x[0-9a-f]+\//.test(s);
-    const ok    = (s: string, lib: boolean): boolean => hub(s) === lib
-      && /^(\/|(\.\.\/)*)([A-Za-z_][\w-]*\/)*[A-Za-z_][\w-]*$/.test(s.replace(/^0x[0-9a-f]+\//, ""));
     for (let i = 0, at = 0; i < lines.length; at += lines[i].length + 1, i++) {
       const line = lines[i].trim();
       if (line === "" || line.startsWith("#")) {
@@ -1088,7 +1051,7 @@ export async function book_load(book: Book, file: string, seen: Map<string, File
       }
       body[i] = "";
       if (m[2] === undefined) {
-        await discover(BASE_BEND, sp);
+        await read(BASE_BEND, sp);
         continue;
       }
       if (!m[1].endsWith(".bend")) {
@@ -1110,24 +1073,19 @@ export async function book_load(book: Book, file: string, seen: Map<string, File
         throw bad();
       }
       al[m[2]] = sub;
-      await discover(got, sp);
+      await read(got, sp);
     }
-    nodes.push({ ...source, str: body.join("\n") });
+    files.push({ ...source, str: body.join("\n") });
     seen.set(real, ns);
   }
-  await discover(entry, spn);
-  // Discovery chooses the sugar vocabulary; declaration visibility still
-  // follows the original import postorder.
+  await read(entry, spn);
   let done = book.order.length;
-  for (const file of nodes) {
-    file.base = book.base;
+  for (const f of files) {
     const n0 = book.order.length;
-    if (file.path === entry) {
-      done = n0;
-    }
-    parse_book(book, file);
-    if (file.path === BASE_BEND) {
-      for (const k of book.order.slice(n0)) book.tlds[k].b = true;
+    done = f.path === entry ? n0 : done;
+    parse_book(book, { ...f, base: book.base });
+    for (const k of f.path === BASE_BEND ? book.order.slice(n0) : []) {
+      book.tlds[k].b = true;
     }
   }
   return done;
@@ -1308,11 +1266,6 @@ const ESCAPES: Record<string, U32> = {
   "n": 10, "t": 9, "r": 13, "0": 0, "\\": 92, "'": 39, '"': 34,
 };
 
-export const term_children: Record<string, string[]> = {
-  Var: ["v"], Ref: [], Op: [], Sub: ["v", "f"], Let: ["v", "f"], Typ: ["g"], Qnt: [], Qua: [], Min: ["a", "b"],
-  All: ["A", "B"], Lam: ["f"], App: ["f", "x"], ADT: ["x"], Ctr: ["x"], Lit: [], Mat: ["h", "m"],
-  Efq: [], Eql: ["a", "b", "T"], Rfl: [], Rwt: ["e", "p", "f"], Hol: [], Ann: ["x", "T"], PVar: [], PCtr: ["x"],
-};
 // Rebuild direct term children. Binding cases supply their own body operation.
 function term_map<X, Y, C>(tm: TermOf<X>, f: (child: TermOf<X>, context?: C) => TermOf<Y>, context?: C): TermOf<Y> {
   switch (tm.$) {
@@ -1329,29 +1282,17 @@ function term_map<X, Y, C>(tm: TermOf<X>, f: (child: TermOf<X>, context?: C) => 
   }
 }
 
-// Cache keys consume finite reified syntax: no callbacks, cells or private slots.
-// Keep all fields except spans. Property order can miss a hit, never alias terms.
-function term_json(value: LTerm | LTerm[], exact = true): string {
-  return JSON.stringify(value, function(k, v) {
-    if (k === "s") return undefined;
-    if (!exact && (k === "k" || k === "r" || k === "file")) return Array.isArray(v) ? v.map(() => 0) : 0;
-    if (typeof v === "function" || (v?.$ === "Var" && (v.v !== undefined || v.slot !== undefined || v.i < 0))) {
-      throw Error("finite reified syntax is required for a cache key");
+// a cache key: every field but spans, of finite syntax (a closure, a cell
+// or a probe would drop out of it and alias two terms). With size, each
+// name counts one character, so long file names cap no ~ argument
+export function term_key(tm: LTerm | LTerm[], size = false): string {
+  return JSON.stringify(tm, (k, v) => {
+    if (typeof v === "function" || v?.$ === "Var" && (v.v !== undefined || v.slot !== undefined || v.i < 0)) {
+      throw Error("a cache key of finite syntax");
     }
-    if (!exact && v?.$ === "Lit") return { $: "Lit", k: 0, v: v.v };
-    // JSON loses -0 and nonfinite numbers; arrays cannot be literal values.
-    if (exact && this.$ === "Lit" && k === "v" && typeof v === "number"
-      && (!Number.isFinite(v) || Object.is(v, -0))) {
-      return [v === 0 ? "-0" : String(v)];
-    }
-    return v;
+    return k === "s" ? undefined : size && ["k", "r", "file", "kind"].includes(k) ? 0 : v;
   });
 }
-
-export function term_key(tm: LTerm | LTerm[]): string { return term_json(tm); }
-
-// Names cost one character; qualification cannot exhaust the work-size cap.
-export function term_size(tm: LTerm): number { return term_json(tm, false).length; }
 
 function f32_show(x: number): string {
   let s = "nan";
@@ -1361,10 +1302,7 @@ function f32_show(x: number): string {
   return (Object.is(x, -0) ? "-0" : s).replace(/^-?\d+(?=e|$)/, "$&.0").replace("Infinity", "inf");
 }
 
-// Display text is never an identity or a parser input.
-
 export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file?: File, book?: Book): string {
-  bnd = bnd.map(display_text);
   const owner = file ? file.base ?? file.ns : book?.base ?? (book?.entry || BASE_ID);
   const name = (k: Name) => name_display(book, k, file);
   const ctr = (text: string) => name_source(owner, text, "ctr");
@@ -1379,7 +1317,7 @@ export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file
     return wrap ? "(" + s[0] + ")" : s[0];
   }
   function bound(ks: Label[], t: LTerm, prc: number): string {
-    bnd.push(...ks.map(display_text));
+    bnd.push(...ks);
     const s = go(t, prc);
     bnd.length -= ks.length;
     return s;
@@ -1458,8 +1396,7 @@ export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file
   function form(tm: LTerm): Printed {
     switch (tm.$) {
       case "Var": {
-        const k = display_text(tm.k);
-        return bnd.lastIndexOf(k) === tm.i ? k : k + "^" + String(tm.i);
+        return bnd.lastIndexOf(tm.k) === tm.i ? tm.k : tm.k + "^" + String(tm.i);
       }
       case "Ref": {
         const k = name(tm.k);
@@ -1468,7 +1405,7 @@ export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file
       case "Sub": return form(tm.f);
       case "Let": {
         const vs = tm.v.map(v => go(v, 1));
-        const ks = tm.k.map((k, j) => quant_show(tm.q[j]) + display_text(k));
+        const ks = tm.k.map((k, j) => quant_show(tm.q[j]) + k);
         return [ks.join(" ") + " = " + vs.join(" ") + "; " + bound(tm.k, tm.f, -1), -1];
       }
       case "Typ": return tm.g.$ === "Qua" && tm.g.q.$ !== "None"
@@ -1478,14 +1415,14 @@ export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file
       case "Min": return [go(tm.a, 2) + " <&> " + go(tm.b, 2), 1];
       case "All": {
         const A = go(tm.A, 2);
-        return ["@" + quant_show(tm.q) + display_text(tm.k) + ":" + A + " -> " + bound([tm.k], tm.B, 1), 1];
+        return ["@" + quant_show(tm.q) + tm.k + ":" + A + " -> " + bound([tm.k], tm.B, 1), 1];
       }
-      case "Lam": return [quant_show(tm.q ?? Lone()) + display_text(tm.k) + " => " + bound([tm.k], tm.f, -1), 0];
+      case "Lam": return [quant_show(tm.q ?? Lone()) + tm.k + " => " + bound([tm.k], tm.f, -1), 0];
       case "App": {
         const [h, xs] = term_unapply(tm), b = xs[1];
         if (h.$ === "Ref" && h.k === name_source(owner, "Exists") && xs.length === 2 && b.$ === "Lam") {
           const A = go(xs[0], 2);
-          return ["&" + display_text(b.k) + ":" + A + " -> " + bound([b.k], b.f, 1), 1];
+          return ["&" + b.k + ":" + A + " -> " + bound([b.k], b.f, 1), 1];
         }
         return go(h, 2) + "(" + xs.map(x => go(x, 0)).join(", ") + ")";
       }
@@ -1509,12 +1446,12 @@ export function term_show(term: LTerm, top: number = -1, bnd: Label[] = [], file
       case "Efq": return "\\{}";
       case "Eql": return "{" + go(tm.a, 1) + " == " + go(tm.b, 1) + " : " + go(tm.T, 1) + "}";
       case "Rfl": return "{==}";
-      case "Op": return display_text(tm.k);
-      case "Hol": return "?" + display_text(tm.k);
+      case "Op": return tm.k;
+      case "Hol": return "?" + tm.k;
       case "Rwt": {
         const mp = term_strip(tm.p), mb = mp.$ === "Lam" ? term_strip(mp.f) : mp;
         const binders = mp.$ === "Lam" && mb.$ === "Lam";
-        const n = binders && mb.k !== "" ? display_text(mb.k) + "@" : "";
+        const n = binders && mb.k !== "" ? mb.k + "@" : "";
         const P = binders ? bound([mp.k, mb.k], mb.f, 1) : go(tm.p, 1);
         return ["%" + n + go(tm.e, 1) + " : " + P + "; " + go(tm.f, -1), 0];
       }
@@ -1536,20 +1473,20 @@ export function expr_show(book: Book, x: Expr, bnd: Label[] = [], file?: File): 
 // Prefer source spelling; synthetic variables have no enclosing display scope.
 function term_excerpt(t: LTerm): string {
   return t.s ? t.s.file.str.slice(t.s.beg, t.s.end)
-    : t.$ === "Var" ? display_text(t.k) : term_show(t);
+    : t.$ === "Var" ? t.k : term_show(t);
 }
 
 export function err_show(err: Err): string {
   const file = err.spn?.file;
   const bnd  = ctx_scope(err.ctx);
   const anns = pmap_to_array(err.ctx).sort((a, b) => a[0] - b[0]);
-  const wid  = Math.max(0, ...anns.map(([, a]) => display_text(a.k).length));
+  const wid  = Math.max(0, ...anns.map(([, a]) => a.k.length));
   const msg  = err.obs === undefined
     ? "\n- message  : " + expr_show(err.bok, err.exp, bnd, file)
     : "\n- expected : " + expr_show(err.bok, err.exp, bnd, file)
     + "\n- observed : " + expr_show(err.bok, err.obs, bnd, file);
   const ctx  = anns.map(([i, a]) =>
-    "\n- " + display_text(a.k).padEnd(wid) + " : " + expr_show(err.bok, a.T, bnd.slice(0, i), file)).join("");
+    "\n- " + a.k.padEnd(wid) + " : " + expr_show(err.bok, a.T, bnd.slice(0, i), file)).join("");
   const def  = err.def === undefined ? "" : " " + name_display(err.bok, err.def, file);
   let   spn  = "";
   if (err.spn !== undefined) {
@@ -1732,53 +1669,47 @@ export function parse_var(p: Parse, k: string, s?: Span): LTerm {
     : Var(k, p.frs++, s, Ref(parse_reso(p, k), s));
 }
 
-export function name_resolve(book: Book, scope: File, raw: string, category: Category = "def"): Resolution {
-  const table = category === "def" ? book.tlds : book.ctrs;
-  const dot = raw.indexOf(".");
-  const head = raw.substring(0, dot);
-  const alias = dot >= 0 && Object.hasOwn(scope.al, head) ? scope.al[head] : undefined;
-  const base = scope.base === null ? null : name_source(scope.base, raw, category);
-  if (alias !== undefined) {
-    const k = name_source(alias, raw.slice(dot + 1), category);
-    return { k, issue: base !== null && k !== base && k in table && base in table
-      ? "an unambiguous " + (category === "def" ? "definition" : "constructor") + " name (the alias " + display_text(head) + " shadows " + display_text(raw) + ")" : undefined };
+// raw as scope reads it in a category: through an alias, else the scope's
+// own name unless only Base declares it. An alias that reads a name Base
+// also declares is an issue, raised where the name means that category
+export function name_resolve(book: Book, scope: File, raw: string, category: Category = "def"): { k: Name; issue?: string } {
+  const tab = category === "def" ? book.tlds : book.ctrs, dot = raw.indexOf(".");
+  const al = dot > 0 && Object.hasOwn(scope.al, raw.slice(0, dot)) ? scope.al[raw.slice(0, dot)] : undefined;
+  const base = scope.base === null ? undefined : name_source(scope.base, raw, category);
+  const k = al === undefined ? name_source(scope.ns, raw, category) : name_source(al, raw.slice(dot + 1), category);
+  return al === undefined ? { k: k in tab || !base || !(base in tab) ? k : base }
+    : { k, issue: base && k !== base && k in tab && base in tab ? "an unambiguous " + (category === "def" ? "definition" : "constructor")
+      + " name (the alias " + raw.slice(0, dot) + " shadows " + raw + ")" : undefined };
+}
+
+export function parse_reso(p: Parse, raw: string, category: Category = "def"): Name {
+  const found = name_resolve(p.book, p, raw, category);
+  if (found.issue !== undefined) {
+    parse_fail(p, found.issue);
   }
-  const own = name_source(scope.ns, raw, category);
-  return { k: own in table || base === null || !(base in table) ? own : base };
-}
-
-// Parsed global heads retain their spelling for category and method lookup.
-// term_higher removes this parser data; spans never determine identity.
-type Resolution = { k: Name; issue?: string };
-
-function parse_lookup(p: Parse, raw: string | Resolution, category: Category): Resolution {
-  if (typeof raw !== "string") return raw;
-  const cache = p.resolved[category];
-  let found = cache.get(raw);
-  if (found !== undefined) return found;
-  found = name_resolve(p.book, p, raw, category);
-  cache.set(raw, found);
-  return found;
-}
-
-export function parse_reso(p: Parse, k: string | Resolution, category: Category = "def"): Name {
-  const found = parse_lookup(p, k, category);
-  if (found.issue !== undefined) parse_fail(p, found.issue);
   return found.k;
 }
 
+// a written global keeps its spelling: a later reading may need another
+// category (a match label) or a method (an operator's namespace)
 function parse_ref(p: Parse, raw: string, s?: Span): LTerm {
-  return { $: "Ref", ...parse_lookup(p, raw, "def"), raw, s };
+  return { $: "Ref", ...name_resolve(p.book, p, raw), raw, s };
 }
 
-function parse_head(t: Extract<LTerm, { $: "Var" | "Ref" | "ADT" }>): string | Resolution {
-  return t.$ === "Var" ? t.k : t.raw ?? t;
+function term_raw(t: LTerm): string | undefined {
+  return t.$ === "Var" ? t.k : t.$ === "Ref" || t.$ === "ADT" ? t.raw : undefined;
+}
+
+// a head read again, in a category, with a method suffix: its spelling
+// resolves anew, and a sugar's head keeps its file
+function parse_head(p: Parse, t: LTerm, category: Category = "def", op = ""): Name {
+  const raw = term_raw(t), k = (t as { k: Name }).k;
+  return raw !== undefined ? parse_reso(p, raw + op, category) : name_source(name_file(k), name_text(k) + op, category);
 }
 
 export function sugar_name(file: File, text: string, category: Category = "def"): Name {
   return name_source(file.base ?? file.ns, text, category);
 }
-
 
 export function parse_call(p: Parse, k: string, xs: LTerm[], s?: Span): LTerm {
   return xs.reduce<LTerm>((f, x) => App(f, x, s), parse_ref(p, k, s));
@@ -1910,8 +1841,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
       parse_bump(p);
       const t = parse_term(p, 12);
       const s = parse_span(p, beg);
-      const head = t.$ === "ADT" || t.$ === "Var" || t.$ === "Ref" ? parse_head(t) : null;
-      const k   = t.$ === "ADT" ? t.k : head === null ? null : parse_reso(p, head);
+      const k   = t.$ === "ADT" ? t.k : t.$ === "Var" || t.$ === "Ref" ? parse_head(p, t) : null;
       const tld = k && p.book.tlds[k];
       if (t.$ === "Var" && (!tld || tld.$ !== "ADT")) {
         return Var(t.k, -1, s);
@@ -1920,8 +1850,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         parse_fail(p, "a quantified datatype after + (+D<..> sets D's leading quantities to &2)");
       }
       const xs = t.$ === "ADT" ? t.x : Array.from({ length: tld.n }, (): LTerm => Qua(Lone(), s));
-      return { $: "ADT", k, x: xs.map((x, i) => i < tld.g ? Qua(Many(), s) : x), r: [], s,
-        raw: typeof head === "string" ? head : undefined };
+      return { $: "ADT", k, x: xs.map((x, i) => i < tld.g ? Qua(Many(), s) : x), r: [], s, raw: term_raw(t) };
     }
     case "\\": {
       parse_bump(p);
@@ -1937,7 +1866,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         parse_skip(p);
         if ((t.$ === "Var" || t.$ === "Ref") && parse_take(p, ":")) {
           const h = parse_term(p);
-          arms.push([parse_reso(p, parse_head(t), "ctr"), h]);
+          arms.push([parse_head(p, t, "ctr"), h]);
           parse_skip(p);
           parse_take(p, ";");
           continue;
@@ -2130,9 +2059,8 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
         continue;
       }
       parse_bump(p);
-      parse_skip(p);
-      const hd = parse_at(p, "~") && out.$ === "Ref" ? p.book.tlds[parse_reso(p, out)] : undefined;
-      const x = hd?.$ === "Def" ? hd.x : 0;
+      const hd = p.book.tlds[out.$ === "Ref" ? out.k : ""];
+      const x  = hd?.$ === "Def" ? hd.x : 0;
       const ts: LTerm[] = [];
       for (parse_skip(p); x > 0 && parse_at(p, "~"); parse_skip(p)) {
         if (ts.length === x) {
@@ -2204,9 +2132,8 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
         parse_fail(p, "a family name before <..> (a comparison here needs parens)");
       }
       parse_take(p, ",");
-      const head = parse_head(out), d = parse_reso(p, head);
-      out = { $: "ADT", k: d, x: parse_fill(p, d, [b, ...parse_term_args(p, ">")], s), r: [], s,
-        raw: typeof head === "string" ? head : undefined };
+      const d = parse_head(p, out);
+      out = { $: "ADT", k: d, x: parse_fill(p, d, [b, ...parse_term_args(p, ">")], s), r: [], s, raw: term_raw(out) };
     } else if (op === "->") {
       out = All(Lone(), "_", parse_open(p, "_"), out, b, s);
     } else if (op === "<&>") {
@@ -2232,8 +2159,7 @@ export function parse_term_ns(p: Parse, tm: LTerm, T: LTerm): void {
     if (h.$ !== "Var" && h.$ !== "Ref" && h.$ !== "ADT") {
       throw Err(p.book, ctx_nil(), "a type name after : (the operators' namespace)", undefined, h.s);
     }
-    const head = parse_head(h);
-    Object.assign(f, Ref(typeof head === "string" ? parse_reso(p, head + op) : name_source(name_file(head.k), name_text(head.k) + op), f.s));
+    Object.assign(f, Ref(parse_head(p, h, "def", op), f.s));
   } else if (f.$ !== "Ref" || !["Bool.and", "Bool.or", "String.append"].some(k => f.k === sugar_name(p, k))) {
     return;
   }
@@ -2521,7 +2447,7 @@ export function parse_tele(p: Parse, close: string, tk: string[] = []): Array<[Q
 
 export function parse_fresh(p: Parse, nm: string, category: Category = "def", what = "a fresh name"): Name {
   const tab = category === "def" ? p.book.tlds : p.book.ctrs;
-  const k = parse_lookup(p, nm, category).k;
+  const k = name_resolve(p.book, p, nm, category).k;
   const a = nm.substring(0, nm.indexOf("."));
   const alias = Object.hasOwn(p.al, a);
   if (k in tab || alias) {
@@ -2548,7 +2474,6 @@ export function parse_def(p: Parse, u: Bool): void {
   parse_skip(p);
   let def: Def;
   if (law) {
-    book.recheck = true;
     if (tele.some((cell) => cell[3].$ !== "Qnt")) {
       parse_fail(p, "a name");
     }
@@ -2590,23 +2515,12 @@ export function parse_def(p: Parse, u: Bool): void {
 }
 
 export function parse_book(book: Book, file: File, src = file.str): void {
-  const al = Object.freeze(Object.fromEntries(Object.getOwnPropertyNames(file.al).map(k => [k, file.al[k]])));
-  file = Object.freeze({ ...file, al });
   book.files.set(file.ns, file);
-  // New declarations/law fills create a new interpretation. Replay its original
-  // source bodies instead of keeping results reduced under the old one.
-  if (book.tmps.size) {
-    for (const k of book.tmps.values()) delete book.tlds[k];
-    book.tmps.clear();
-    book.recheck = true;
-  }
   book.entry ||= file.ns;
-  const p: Parse = { ...file, book, str: src, pos: 0, stk: [], frs: 0, resolved: { def: new Map(), ctr: new Map() } };
+  const p: Parse = { ...file, book, str: src, pos: 0, stk: [], frs: 0 };
   while (true) {
     parse_skip(p);
     if (p.pos >= p.str.length) {
-      p.resolved.def.clear();
-      p.resolved.ctr.clear();
       return;
     }
     p.frs = 0;
@@ -3560,7 +3474,7 @@ export function term_check_kind(book: Book, lhs: LHS, T: HTerm, q: Quant, k: Lab
     return term_check(book, lhs, T, None(), kind, ctx, d);
   } catch (e) {
     const err = e as Err;
-    const nte = q.$ === "Many" ? "Note: +" + display_text(k) + " can be used many times, so its type must be Data." : undefined;
+    const nte = q.$ === "Many" ? "Note: +" + k + " can be used many times, so its type must be Data." : undefined;
     throw err?.$ === "Err" && err.exp === kind ? { ...err, spn: s ?? err.spn, nte } : e;
   }
 }
@@ -3568,12 +3482,11 @@ export function term_check_kind(book: Book, lhs: LHS, T: HTerm, q: Quant, k: Lab
 export function uses_close(book: Book, ctx: Ctx, us: Uses, i: U32, k: Label, q: Quant, s: Span | undefined, def?: Name): Uses {
   const u = pmap_get(us, i) ?? None();
   if (quant_join(u, q).$ !== q.$) {
-    const label = display_text(k);
-    let obs = quant_show(u) + label;
+    let obs = quant_show(u) + k;
     if (u.$ === "Many") {
-      obs = label + " (consumed more than once)";
+      obs = k + " (consumed more than once)";
     }
-    throw Err(book, ctx, quant_show(q) + label, obs, s, def);
+    throw Err(book, ctx, quant_show(q) + k, obs, s, def);
   }
   return pmap_set(us, i, None());
 }
@@ -3650,11 +3563,8 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
       const t_wnf = term_wnf(book, ty);
       if (t_wnf.$ !== "ADT") {
         const fam = book_ctr(book, tm.k) === null ? null : book_fam(book, tm.k);
-        let origin = tm.k;
-        for (let parent = name_parent(origin); parent !== null; parent = name_parent(origin)) origin = parent;
-        const file = name_file(origin), text = name_text(origin);
-        const type = file === "" ? undefined : (book.tlds[name_source(file, text)]
-          ?? (file === tm.s?.file.ns ? book.tlds[name_resolve(book, tm.s.file, text).k] : undefined));
+        const [f, x] = [name_file(tm.k), name_text(tm.k)];
+        const type = book.tlds[name_source(f, x)] ?? (f === tm.s?.file.ns ? book.tlds[name_resolve(book, tm.s.file, x).k] : undefined);
         const nte = fam === null && type?.$ === "ADT" ? "Note: " + name_display(book, tm.k) + " is a datatype: write its arguments as <>" : undefined;
         throw Err(book, ctx, ty, fam === null ? "non-inferrable term" : Ref(fam, tm.s), tm.s, lhs.def, nte);
       }
@@ -3831,9 +3741,6 @@ export function def_check(book: Book, k: Name, def: Def, z?: number): LTerm {
 }
 
 export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>, def: Def, sp: HTerm[], ctx: Ctx, d: number): Name {
-  if ((book.tlds[lhs.def] as Def).x > 0) {
-    throw Error("generic checking cannot publish template instances");
-  }
   const xs = sp.slice(0, def.x);
   if (xs.length < def.x) {
     throw Err(book, ctx, "a template applied to closed ~ arguments (a def parameter is not comptime)", tm, tm.s, lhs.def);
@@ -3844,39 +3751,31 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
   } catch (e) {
     const v = (e as Err)?.obs;
     if (typeof v === "object" && v.$ === "Var" && v.i >= 0 && v.i < d) {
-      throw Err(book, ctx, "a template applied to closed ~ arguments (" + display_text(v.k) + " is a variable here, not comptime: pass it at run time)", tm, tm.s, lhs.def);
+      throw Err(book, ctx, "a template applied to closed ~ arguments (" + v.k + " is a variable here, not comptime: pass it at run time)", tm, tm.s, lhs.def);
     }
     throw e;
   }
-  const args = xs.map(a => term_lower(a));
-  if (args.reduce((n, a) => n + term_size(a) + 1, -1) > 32768) {
+  const args = xs.map((a) => term_lower(a));
+  if (term_key(args, true).length > 32768) {
     throw Err(book, ctx, "a ~ argument that stops growing", tm, tm.s, lhs.def);
   }
-  const key = term_json([Ref(tm.k), ...args]);
+  const key = term_key([Ref(tm.k), ...args]);
   let o = book.tmps.get(key);
   if (o === undefined) {
     const z = (lhs.z ?? 0) + 1;
     if (z > 64) {
       throw Err(book, ctx, "a template that stops instantiating itself (64 levels at most)", tm, tm.s, lhs.def);
     }
-    o = name_gen(tm.k, "inst", createHash("sha256").update(key, "utf16le").digest("hex"));
-    if (book.tlds[o] !== undefined) throw Error("template name hash collision");
+    o = name_gen(tm.k, "inst", key);
     book.tmps.set(key, o);
-    try {
-      const v = xs.reduce((v, a) => term_apply(v, a), def.v as HTerm);
-      // Elaboration consumes checked arguments; instantiation substitutes the originals.
-      const env = pmap_to_array(ctx).reduce<Env>((env, [i, a]) => list_set(env, i, Var(a.k, i)), null);
-      const copy = checked_copy(env);
-      const inst: Def = { $: "Def", n: def.n - def.x, x: 0, T: checked.tel, v, u: def.u,
-        args: checked.xs.map(a => term_higher(a, env, copy)) };
-      book.tlds[o] = { ...inst, v: null };
-      inst.e = def_check(book, o, inst, z);
-      book.tlds[o] = inst;
-    } catch (error) {
-      book.tmps.delete(key);
-      delete book.tlds[o];
-      throw error;
-    }
+    // elaboration reads the checked arguments (a dead arm dropped), each
+    // variable of the call's context its own
+    const env = pmap_to_array(ctx).reduce<Env>((env, [i, a]) => list_set(env, i, Var(a.k, i)), null), copy = checked_copy(env);
+    const inst: Def = { $: "Def", n: def.n - def.x, x: 0, T: checked.tel, v: xs.reduce((v, a) => term_apply(v, a), def.v as HTerm),
+      u: def.u, args: checked.xs.map((a) => term_higher(a, env, copy)) };
+    book.tlds[o] = { ...inst, v: null };
+    inst.e = def_check(book, o, inst, z);
+    book.tlds[o] = inst;
   } else if ((book.tlds[o] as Def).v === null && o !== lhs.def) {
     throw Err(book, ctx, "a decreasing self-call (arguments are read left to right: each passed unchanged until one shrinks)", tm, tm.s, lhs.def);
   }
@@ -3909,11 +3808,8 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
 // closed ~ arguments, is minted and checked by its first live call
 // (infer-ref) while the caller is declared; it stays outside the order
 // (a seeded book keeps it), so it is no claim.
-// After an interpretation change, recheck original source v/T; the old
-// checked e contains cells computed under the previous interpretation.
 
 export function book_valid(book: Book, done: number = 0): void {
-  if (book.recheck) { done = 0; book.recheck = false; }
   const tlds = book.tlds;
   const last = new Map<Name, number>();
   for (let i = 0; i < book.order.length; i++) {
@@ -3947,7 +3843,7 @@ export function book_valid(book: Book, done: number = 0): void {
             const t_all = tele_head(book, tel, ctx, ctr.k);
             if (d >= tld.n) {
               if (fields.has(t_all.k)) {
-                throw Err(book, ctx, "a fresh constructor field name", display_text(t_all.k), t_all.s, ctr.k);
+                throw Err(book, ctx, "a fresh constructor field name", t_all.k, t_all.s, ctr.k);
               }
               fields.add(t_all.k);
             }
