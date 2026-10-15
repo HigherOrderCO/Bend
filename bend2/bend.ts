@@ -768,7 +768,7 @@ function term_at(value: HTerm, span?: Span): HTerm {
     ? value : { ...value, s: span };
 }
 
-// A checked copier belongs to one environment; every binder application starts another.
+// a copy (copy, below) carries a checked term's cells into each binder
 export function term_higher(tm: LTerm, env: Env = null, copy?: (t: HTerm) => HTerm): HTerm {
   switch (tm.$) {
     case "Var": {
@@ -810,8 +810,8 @@ export function term_higher(tm: LTerm, env: Env = null, copy?: (t: HTerm) => HTe
   }
 }
 
-// a checked term's cells hold the checker's variables: each copy maps them
-// through the environment its binder application made
+// a checked term's cells hold the checker's variables, by level: a copy
+// maps them through the environment of its binder application
 function checked_copy(env: Env): (t: HTerm) => HTerm {
   const copy = scope_mapper((v) => v.i < 0 ? v : term_higher(v, env, copy));
   return copy;
@@ -841,11 +841,10 @@ export function term_lower(term: HTerm, d: number = 0): LTerm {
 
 type Variable = Extract<HTerm, { $: "Var" }>;
 
-// a copy of term with each free variable v as free(v) and each ref in refs
-// replaced, also under binders:
-// a binder's argument enters as this mapper's probe, which only it unwraps,
-// and each application copies its cells afresh; one memo keeps the sharing
-// of the cells a context reaches
+// term with each free variable v as free(v) and each ref in refs replaced,
+// under binders too: a binder's argument enters as this mapper's probe,
+// which only it unwraps; each application copies its cells afresh, and one
+// memo per application keeps the sharing of the cells it reaches
 export function scope_mapper(free: (v: Variable) => HTerm, refs?: Map<Name, HTerm | null>): (term: HTerm) => HTerm {
   const owner = {};
   const probe = (value: HTerm): Variable => ({ $: "Var", k: "_", i: 0, slot: { owner, value } });
@@ -3778,11 +3777,10 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
     }
     o = name_gen(tm.k, "inst", key);
     book.tmps.set(key, o);
-    // elaboration reads the checked arguments (a dead arm dropped), each
-    // variable of the call's context its own
-    const env = pmap_to_array(ctx).reduce<Env>((env, [i, a]) => list_set(env, i, Var(a.k, i)), null), copy = checked_copy(env);
+    // elaboration reads the checked arguments, with a dead arm dropped
+    const copy = checked_copy(null);
     const inst: Def = { $: "Def", n: def.n - def.x, x: 0, T: checked.tel, v: xs.reduce((v, a) => term_apply(v, a), def.v as HTerm),
-      u: def.u, args: checked.xs.map((a) => term_higher(a, env, copy)) };
+      u: def.u, args: checked.xs.map((a) => term_higher(a, null, copy)) };
     book.tlds[o] = { ...inst, v: null };
     inst.e = def_check(book, o, inst, z);
     book.tlds[o] = inst;
