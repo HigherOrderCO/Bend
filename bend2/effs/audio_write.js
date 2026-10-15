@@ -6,7 +6,7 @@ function audio_write(audio, samples) {
   for (let xs = samples; xs.$ === CID(Con); xs = xs.tail) {
     n += 1;
   }
-  const now = Date.now();
+  const now = performance.now();
   audio.queued = Math.max(0,
     audio.queued - (now - audio.at) * audio.rate / 1000);
   audio.at = now;
