@@ -406,7 +406,7 @@ export type Body  = Match | Local | LTerm
 
 // Parser
 export type File  = { str: string; ns: FileId; al: Readonly<Record<string, FileId>>; base: FileId | null; path?: string };
-export type Parse = File & { book: Book; pos: number; stk: Array<[Label, number]>; frs: number; };
+export type Parse = File & { book: Book; pos: number; stk: Array<[Label, number]>; frs: number; rs: Record<Category, Map<string, { k: Name; issue?: string }>>; };
 export type Span  = { file: File; beg: number; end: number; };
 
 // Machine
@@ -1290,7 +1290,7 @@ export function term_key(tm: LTerm | LTerm[], size = false): string {
     if (typeof v === "function" || v?.$ === "Var" && (v.v !== undefined || v.slot !== undefined || v.i < 0)) {
       throw Error("a cache key of finite syntax");
     }
-    return k === "s" ? undefined : size && ["k", "r", "file", "kind"].includes(k) ? 0 : v;
+    return k === "s" ? undefined : size && (k === "k" || k === "r" || k === "file") ? 0 : v;
   });
 }
 
@@ -1670,20 +1670,30 @@ export function parse_var(p: Parse, k: string, s?: Span): LTerm {
 }
 
 // raw as scope reads it in a category: through an alias, else the scope's
-// own name unless only Base declares it. An alias that reads a name Base
-// also declares is an issue, raised where the name means that category
+// own name unless only Base declares it. An alias that hides a name Base
+// declares too is an issue, raised where the name is read as that category
 export function name_resolve(book: Book, scope: File, raw: string, category: Category = "def"): { k: Name; issue?: string } {
-  const tab = category === "def" ? book.tlds : book.ctrs, dot = raw.indexOf(".");
-  const al = dot > 0 && Object.hasOwn(scope.al, raw.slice(0, dot)) ? scope.al[raw.slice(0, dot)] : undefined;
-  const base = scope.base === null ? undefined : name_source(scope.base, raw, category);
-  const k = al === undefined ? name_source(scope.ns, raw, category) : name_source(al, raw.slice(dot + 1), category);
-  return al === undefined ? { k: k in tab || !base || !(base in tab) ? k : base }
-    : { k, issue: base && k !== base && k in tab && base in tab ? "an unambiguous " + (category === "def" ? "definition" : "constructor")
-      + " name (the alias " + raw.slice(0, dot) + " shadows " + raw + ")" : undefined };
+  const tab = category === "def" ? book.tlds : book.ctrs, dot = raw.indexOf("."), head = raw.slice(0, dot);
+  const al = dot > 0 && Object.hasOwn(scope.al, head) ? scope.al[head] : undefined;
+  const base = scope.base === null ? "" : name_source(scope.base, raw, category);
+  const k = name_source(al ?? scope.ns, al ? raw.slice(dot + 1) : raw, category);
+  const both = k !== base && k in tab && base in tab;
+  return al ? { k, issue: both ? "an unambiguous name (the alias " + head + " shadows " + raw + ")" : undefined }
+    : { k: both || !(base in tab) ? k : base as Name };
+}
+
+// a file reads a name one way all along (it can't declare what Base
+// does), so its readings are kept
+function parse_find(p: Parse, raw: string, category: Category): { k: Name; issue?: string } {
+  let found = p.rs[category].get(raw);
+  if (found === undefined) {
+    p.rs[category].set(raw, found = name_resolve(p.book, p, raw, category));
+  }
+  return found;
 }
 
 export function parse_reso(p: Parse, raw: string, category: Category = "def"): Name {
-  const found = name_resolve(p.book, p, raw, category);
+  const found = parse_find(p, raw, category);
   if (found.issue !== undefined) {
     parse_fail(p, found.issue);
   }
@@ -1693,7 +1703,7 @@ export function parse_reso(p: Parse, raw: string, category: Category = "def"): N
 // a written global keeps its spelling: a later reading may need another
 // category (a match label) or a method (an operator's namespace)
 function parse_ref(p: Parse, raw: string, s?: Span): LTerm {
-  return { $: "Ref", ...name_resolve(p.book, p, raw), raw, s };
+  return { $: "Ref", ...parse_find(p, raw, "def"), raw, s };
 }
 
 function term_raw(t: LTerm): string | undefined {
@@ -2447,7 +2457,7 @@ export function parse_tele(p: Parse, close: string, tk: string[] = []): Array<[Q
 
 export function parse_fresh(p: Parse, nm: string, category: Category = "def", what = "a fresh name"): Name {
   const tab = category === "def" ? p.book.tlds : p.book.ctrs;
-  const k = name_resolve(p.book, p, nm, category).k;
+  const k = parse_find(p, nm, category).k;
   const a = nm.substring(0, nm.indexOf("."));
   const alias = Object.hasOwn(p.al, a);
   if (k in tab || alias) {
@@ -2517,7 +2527,7 @@ export function parse_def(p: Parse, u: Bool): void {
 export function parse_book(book: Book, file: File, src = file.str): void {
   book.files.set(file.ns, file);
   book.entry ||= file.ns;
-  const p: Parse = { ...file, book, str: src, pos: 0, stk: [], frs: 0 };
+  const p: Parse = { ...file, book, str: src, pos: 0, stk: [], frs: 0, rs: { def: new Map(), ctr: new Map() } };
   while (true) {
     parse_skip(p);
     if (p.pos >= p.str.length) {

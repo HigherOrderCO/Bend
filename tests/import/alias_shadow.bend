@@ -9,7 +9,7 @@ def main() -> Nat:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- expected : an unambiguous definition name (the alias Nat shadows Nat.add)
+#|- expected : an unambiguous name (the alias Nat shadows Nat.add)
 #|- observed : 'Nat.add'
 #|Location:
 #|7 | def main() -> Nat:
