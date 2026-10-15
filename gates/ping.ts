@@ -38,6 +38,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import * as lib from "./_lib";
+import { judge } from "./safe_node.ts";
 
 // Constants
 // =========
@@ -348,6 +349,10 @@ try {
       + "In Sum.f:\nout of fuel\nSorry - this is a mismatch"));
   fs.writeFileSync(unsafe_file,
     "import Base\n@unsafe\ndef main() -> Nat:\n  0n\n");
+  const unsafe = await bend([unsafe_file, "--verdict"]);
+  check("the safe summary names unsafe defs", unsafe.code === 1
+    && judge({ f: unsafe_file, code: unsafe.code, ms: 0, timeout: false,
+      out: unsafe.out + unsafe.err }).join("|") === "u|unsafe: main");
   fs.writeFileSync(checkup,
     "import ./sum.bend as Good\nimport ./bad.bend as Bad\n");
   fs.writeFileSync(good_checkup, "import ./sum.bend as Good\n");
