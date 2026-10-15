@@ -1685,6 +1685,18 @@ export function parse_call(p: Parse, k: Name, xs: LTerm[], s?: Span): LTerm {
   return xs.reduce<LTerm>((f, x) => App(f, x, s), Ref(parse_reso(p, k), s));
 }
 
+// a literal keeps its Lit node where its type's name resolves to the bare
+// one; elsewhere it unfolds here, every constructor resolved as written.
+export function parse_lit(p: Parse, t: LTerm): LTerm {
+  if (t.$ === "Lit" && parse_reso(p, t.k) !== t.k) {
+    return parse_lit(p, lit_step(t));
+  }
+  if (t.$ !== "Ctr") {
+    return t;
+  }
+  return Ctr(parse_reso(p, t.k), t.x.map((x) => parse_lit(p, x)), t.s);
+}
+
 // Quant
 // -----
 
@@ -1930,14 +1942,16 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
           if (!Number.isInteger(k)) {
             throw Err(p.book, ctx_nil(), "a power of two count (^d takes a depth)", undefined, n.s);
           }
-          d = Lit("Nat", k, n.s);
+          d = parse_lit(p, Lit("Nat", k, n.s));
         }
-        return App(App(App(Ref("Array.new", s), T, s), d, s), xs[0], s);
+        return parse_call(p, "Array.new", [T, d, xs[0]], s);
       }
       parse_take(p, ",");
       const ys  = xs.concat(parse_term_args(p, "]"));
       const spn = parse_span(p, beg);
-      return ys.reduceRight<LTerm>((t, x) => Ctr("Con", [x, t], spn), Ctr("Nil", [], spn));
+      const nil = Ctr(parse_reso(p, "Nil"), [], spn);
+      const con = parse_reso(p, "Con");
+      return ys.reduceRight<LTerm>((t, x) => Ctr(con, [x, t], spn), nil);
     }
     case "'": {
       parse_bump(p);
@@ -1946,7 +1960,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         parse_fail(p, "a closing '");
       }
       const spn = parse_span(p, beg);
-      return Ctr("Chr", [Lit("U32", n, spn)], spn);
+      return parse_lit(p, Ctr("Chr", [Lit("U32", n, spn)], spn));
     }
     case '"': {
       parse_bump(p);
@@ -1957,7 +1971,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
         }
         cs.push(parse_char(p));
       }
-      return lit_of(cs, parse_span(p, beg));
+      return parse_lit(p, lit_of(cs, parse_span(p, beg)));
     }
     case "?": {
       parse_bump(p);
@@ -2056,15 +2070,14 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
       const ix = parse_term(p);
       parse_eat(p, "]");
       const s = parse_span(p, beg);
-      parse_term_ns(p, ix, Ref("U32", s));
+      const u = parse_call(p, "U32", [], s);
+      parse_term_ns(p, ix, u);
       parse_skip(p);
       if (!parse_nl(p) && parse_take(p, "<-")) {
         const v = parse_term(p, 2);
-        out = App(App(App(App(Ref("Array.set", s), Ref("U32", s), s),
-          out, s), ix, s), v, s);
+        out = parse_call(p, "Array.set", [u, out, ix, v], s);
       } else {
-        out = App(App(App(Ref("Array.get", s), Ref("U32", s), s),
-          out, s), ix, s);
+        out = parse_call(p, "Array.get", [u, out, ix], s);
       }
       continue;
     }
@@ -2112,11 +2125,10 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
     } else if (op === "<&>") {
       out = Min(out, b, s);
     } else if (op === "<>") {
-      out = Ctr(k, [out, b], s);
-    } else if (op === "&" || op === "|") {
-      out = App(App(Ref(k, s), out, s), b, s);
+      out = Ctr(parse_reso(p, k), [out, b], s);
     } else {
-      out = App(App(Ref(k, t), out, s), b, s);
+      const f = k[0] === "." ? k : parse_reso(p, k);
+      out = App(App(Ref(f, t), out, s), b, s);
     }
   }
 }
@@ -2182,7 +2194,7 @@ export function parse_term_tup(p: Parse, beg: number): LTerm {
   parse_skip(p);
   if (b.$ !== "Match" && b.$ !== "Local" && parse_take(p, ",")) {
     const rest = parse_term_tup(p, beg);
-    return Ctr("Tuple", [b, rest], parse_span(p, beg));
+    return Ctr(parse_reso(p, "Tuple"), [b, rest], parse_span(p, beg));
   }
   const out = body_flatten(b, [], () => p.frs++);
   if (parse_take(p, ":")) {
@@ -2205,7 +2217,7 @@ export function parse_term_num(p: Parse): LTerm {
     if (!isFinite(v)) {
       parse_fail(p, "a float literal with a finite f32 value (got " + m[0] + ")", beg);
     }
-    return Lit("F32", f32_to_bits(v));
+    return parse_lit(p, Lit("F32", f32_to_bits(v)));
   }
   if (m[2] === undefined) {
     if (char_is_name(parse_peek(p))) {
@@ -2214,7 +2226,7 @@ export function parse_term_num(p: Parse): LTerm {
     if (n > 0xffffffff) {
       parse_fail(p, "a u32 literal up to 4294967295 (got " + m[1] + ")", beg);
     }
-    return Lit("U32", n);
+    return parse_lit(p, Lit("U32", n));
   }
   if (n > 0xffffffff) {
     parse_fail(p, "a nat literal up to 4294967295n (got " + m[1] + "n)");
@@ -2223,20 +2235,21 @@ export function parse_term_num(p: Parse): LTerm {
     let out = parse_term(p);
     const spn = parse_span(p, beg);
     if (out.$ === "Lit" && out.k === "Nat" && n + out.v <= 0xffffffff) {
-      return Lit("Nat", n + out.v, spn);
+      return parse_lit(p, Lit("Nat", n + out.v, spn));
     }
     if (n > NAT_LITERAL_MAX) {
-      return App(App(Ref("Nat.add", spn), Lit("Nat", n, spn), spn), out, spn);
+      const m = parse_lit(p, Lit("Nat", n, spn));
+      return parse_call(p, "Nat.add", [m, out], spn);
     }
     for (let i = 0; i < n; i++) {
-      out = Ctr("Succ", [out], spn);
+      out = Ctr(parse_reso(p, "Succ"), [out], spn);
     }
     return out;
   }
   if (char_is_name(parse_peek(p))) {
     parse_fail(p, "a nat literal (NUMBER n)");
   }
-  return Lit("Nat", n);
+  return parse_lit(p, Lit("Nat", n));
 }
 
 export function parse_fill(p: Parse, k: Name, xs: LTerm[], s?: Span): LTerm[] {
