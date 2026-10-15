@@ -4205,6 +4205,21 @@ INLINE u32 ring_flip(u32 i) {
   return (i % CUBE_T << CUBE_LOG) + i / CUBE_T;
 }
 
+INLINE u32 turn_groups(u64 f, u32 at) {
+  bool run = f != 0 && (at == 2 ? f >= CUBE_T : at == 1 ? f < LANES
+    : at == 4 || f < CUBE_T);
+  return run ? at % 4 == 0 ? 1 : CUBE_G : 0;
+}
+
+INLINE void turn_set(DEV u64* H, u64 f) {
+  DEV u32* g = (DEV u32*)(H + H_CURSOR + 2);
+  H[H_CURSOR + 1] = f;
+  H[H_CURSOR + 10] += f != 0;
+  for (u32 i = 0; i < 15; i += 1) {
+    g[i] = i % 3 != 0 ? 1 : turn_groups(f, i / 3);
+  }
+}
+
 #define ring_pick(b, s, c) ((b) + (s) * (a32_add(c, 1) & (CUBE_T - 1)))
 
 // Task
@@ -4517,8 +4532,18 @@ extern "C" __global__ void bend_dev(DEV u64* H, u32 pass) {
   u32 row   = blockIdx.x;
   u32 lane  = threadIdx.x;
 #endif
+#ifndef __METAL_VERSION__
+  if (!turn_groups(H[H_CURSOR + 1], pass ? pass % 3 ? 2 * pass : 3
+    : grids > 1)) {
+    return;
+  }
+#endif
   if (pass == 2) {
     bank_pack(H, lane);
+    if (lane == 0) {
+      turn_set(H, root_done(H) || err_seen(H) ? 0
+        : a32_exch(a32_at(H, H_CURSOR), 0));
+    }
     return;
   }
   u32 stride = grids == 1 ? CUBE_G : 1;
@@ -4828,17 +4853,12 @@ static void gpu_note(const char* path) {
 
 #if BEND_METAL || BEND_CUDA
 
-static void gpu_kernel(u32 pass, u32 groups);
+static void gpu_kernel(u32 pass, u32 at);
 
-static void gpu_run(u32 f) {
-  if (f < CUBE_T) {
-    gpu_kernel(0, 1);
+static void gpu_run(void) {
+  for (u32 i = 0; i < 5; i += 1) {
+    gpu_kernel((u32[]){ 0, 0, 1, 3, 2 }[i], i);
   }
-  if (f < LANES) {
-    gpu_kernel(0, CUBE_G);
-  }
-  gpu_kernel(f < CUBE_T ? 3 : 1, CUBE_G);
-  gpu_kernel(2, 1);
 }
 
 #endif
@@ -4927,26 +4947,38 @@ static void gpu_load(u64 bytes) {
   }
 }
 
-static void gpu_kernel(u32 pass, u32 groups) {
-  [gpu_enc setComputePipelineState:gpu_pso];
-  [gpu_enc setBuffer:gpu_buf offset:0 atIndex:0];
+static void gpu_kernel(u32 pass, u32 at) {
   [gpu_enc setBytes:&pass length:sizeof pass atIndex:1];
-  [gpu_enc setThreadgroupMemoryLength:TG_HOLD * 8 atIndex:0];
-  [gpu_enc dispatchThreadgroups:MTLSizeMake(groups, 1, 1)
+  [gpu_enc dispatchThreadgroupsWithIndirectBuffer:gpu_buf
+    indirectBufferOffset:(H_CURSOR + 2) * 8 + at * 12
     threadsPerThreadgroup:MTLSizeMake(CUBE_T, 1, 1)];
   [gpu_enc memoryBarrierWithScope:MTLBarrierScopeBuffers];
 }
 
-static void gpu_pass(u32 f) {
+static void gpu_pass(u32 n) {
   @autoreleasepool {
-    id<MTLCommandBuffer> cb = [gpu_que commandBuffer];
-    gpu_enc = [cb computeCommandEncoder];
-    gpu_run(f);
-    [gpu_enc endEncoding];
-    [cb commit];
-    [cb waitUntilCompleted];
-    if ([cb error]) {
-      gpu_fail([cb error]);
+    id<MTLCommandBuffer> cb[2];
+    id<MTLEvent>         ev = [gpu_dev newEvent];
+    u64                  v  = 0;
+    for (u32 i = 0; i < n + 2; i += 1) {
+      id<MTLCommandBuffer> c = cb[i % 2];
+      [c waitUntilCompleted];
+      if ([c error]) {
+        gpu_fail([c error]);
+      }
+      cb[i % 2] = c = i < n && CORPUS[H_CURSOR + 1] ? [gpu_que commandBuffer]
+        : nil;
+      if (c) {
+        [c encodeWaitForEvent:ev value:v];
+        gpu_enc = [c computeCommandEncoder];
+        [gpu_enc setComputePipelineState:gpu_pso];
+        [gpu_enc setBuffer:gpu_buf offset:0 atIndex:0];
+        [gpu_enc setThreadgroupMemoryLength:TG_HOLD * 8 atIndex:0];
+        gpu_run();
+        [gpu_enc endEncoding];
+        [c encodeSignalEvent:ev value:++v];
+        [c commit];
+      }
     }
   }
 }
@@ -5085,16 +5117,19 @@ static void gpu_load(u64 bytes) {
   }
 }
 
-static void gpu_kernel(u32 pass, u32 groups) {
+static void gpu_kernel(u32 pass, u32 at) {
   void* args[] = { &CORPUS, &pass };
+  u32   groups = at % 4 == 0 ? 1 : CUBE_G;
   if (cuLaunchKernel(gpu_pso, groups, 1, 1, CUBE_T, 1, 1, TG_HOLD * 8, NULL,
     args, NULL) != CUDA_SUCCESS) {
     err_fail("device launch failed");
   }
 }
 
-static void gpu_pass(u32 f) {
-  gpu_run(f);
+static void gpu_pass(u32 n) {
+  for (u32 i = 0; i < n; i += 1) {
+    gpu_run();
+  }
   if (cuCtxSynchronize() != CUDA_SUCCESS) {
     err_fail("device fault");
   }
@@ -5106,7 +5141,7 @@ static void gpu_pass(u32 f) {
 #define gpu_make(p) true
 #define gpu_span()  0
 #define gpu_load(b)
-#define gpu_pass(f)
+#define gpu_pass(n)
 
 #endif
 
@@ -5145,17 +5180,26 @@ static void ring_rewind(u64* H, u32 rows) {
   }
 }
 
+// A GPU bang runs batches of rounds sized by the last bang, doubling to
+// 64; Metal gives each round its own command buffer, two in flight.
+
+static u32 gpu_n = 1;
+
 static void cube_run(u64* H, bool gpu) {
-  for (;;) {
-    u32 f = a32_exch(a32_at(H, H_CURSOR), 0);
-    if (root_done(H)) {
-      return;
-    }
+  u32 f = a32_exch(a32_at(H, H_CURSOR), 0);
+  if (gpu) {
+    H[H_CURSOR + 10] = 0;
+    turn_set(H, f);
+  }
+  for (u32 n = gpu_n; !root_done(H);) {
     if (f == 0) {
       err_fail("frontier drained without a result");
     }
     if (gpu) {
-      gpu_pass(f);
+      gpu_pass(n);
+      f = (u32)H[H_CURSOR + 1];
+      gpu_n = H[H_CURSOR + 10] < 64 ? H[H_CURSOR + 10] : 64;
+      n = n < 32 ? 2 * n : 64;
     } else {
       u32 rows = f;
       u32 want = (pool_size - 1) / (CUBE_T / LINE) + 1;
@@ -5169,7 +5213,7 @@ static void cube_run(u64* H, bool gpu) {
         pool_turn(true, rows);
       }
       pool_turn(false, rows);
-      f = a32_load(a32_at(H, H_CURSOR));
+      f = a32_exch(a32_at(H, H_CURSOR), 0);
       ring_rewind(H, f > rows ? f : rows);
     }
     u32 ec = a32_load(a32_at(H, H_ERROR_CODE));
@@ -5177,6 +5221,7 @@ static void cube_run(u64* H, bool gpu) {
       err_post(H, ec);
     }
   }
+  a32_store(a32_at(H, H_CURSOR), 0);
 }
 
 // Corpus
