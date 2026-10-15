@@ -327,7 +327,7 @@ const identity: LintRule = {
     const raw = loose(cx, body);
     const ann = cx.unstable.Bend.pmap_get(raw.ctx, raw.tm.x!.i!)!;
     expect(ann.k).toBe("x");
-    expect((cx.unstable.Bend.term_wnf(raw.bok, raw.ty) as { k?: string }).k).toBe("N");
+    expect((cx.unstable.Bend.term_wnf(raw.bok, raw.ty) as { k?: string }).k).toBe(own(cx, "N"));
     expect(cx.same(body, cx.type(body), cx.binder(body)!)).toBe(true);
     return [
       cx.diag({
@@ -579,12 +579,17 @@ function loose(cx: RuleContext, fact: Fact): Loose {
   return cx.unstable.raw(fact) as Loose;
 }
 
+// The key bend2 gives a name the root file declares: ns:name.
+function own(cx: RuleContext, name: string): string {
+  return path.basename(cx.root.path, ".bend") + ":" + name;
+}
+
 function bodies(book: Book): Record<string, string> {
   return Object.fromEntries(
     book.order.flatMap((name) => {
       const tld = book.tlds[name];
-      return tld.$ === "Def" && tld.e !== undefined && !tld.b
-        ? [[name, Bend.term_show(tld.e)]]
+      return tld.$ === "Def" && tld.e !== undefined && !Bend.is_base(name)
+        ? [[name.slice(name.indexOf(":") + 1), Bend.term_show(tld.e)]]
         : [];
     }),
   );
@@ -998,7 +1003,7 @@ describe("lint", () => {
             return x?.$ === kind && (name === "" || x.k === name);
           })!;
         const generic = named("generic", "Var", "x");
-        expect(loose(cx, generic).bok.tlds["generic~T"]).toBeDefined();
+        expect(loose(cx, generic).bok.tlds[own(cx, "generic~T")]).toBeDefined();
         expect(cx.view(generic).inst).toBe(false);
         const inst = named("generic~0", "Var", "x");
         expect(cx.view(inst).inst).toBe(true);
@@ -1248,7 +1253,7 @@ describe("lint", () => {
         expect(cx.sources.some((s) => s.base)).toBe(true);
         const owners = cx.facts!.map((f) => cx.view(f).owner);
         expect(owners.some((def) => def === "main")).toBe(true);
-        expect(owners.every((def) => cx.unstable.book.tlds[def]?.b !== true)).toBe(true);
+        expect(cx.facts!.every((f) => !cx.unstable.Bend.is_base(loose(cx, f).def))).toBe(true);
         return [];
       },
     };
@@ -1304,7 +1309,7 @@ describe("lint", () => {
     const next: LintRule = {
       id: "test/after-api",
       run: (cx) => {
-        expect(cx.prior[0].message).toBe("advice for N");
+        expect(cx.prior[0].message).toBe("advice for " + own(cx, "N"));
         return [];
       },
     };
@@ -1537,7 +1542,7 @@ describe("review fixes", () => {
     const res = await lint(file, []);
     expect(res.diags.map(render)).toEqual([]);
     const t = performance.now();
-    const count = [...walk((res.unstable.book.tlds.xs as { e: LTerm }).e)].length;
+    const count = [...walk((res.unstable.book.tlds["long_list:xs"] as { e: LTerm }).e)].length;
     expect(count).toBeGreaterThan(n);
     expect(performance.now() - t).toBeLessThan(100);
   });
@@ -1612,13 +1617,14 @@ describe("rules", () => {
   test("erasure: four redundant annotations; the fix keeps every body", async () => {
     const file = fixture("erasure.bend", ERASURE);
     const res = await lint(file, [redundantAnnotation]);
+    const before = bodies(res.unstable.book);
     expect(res.diags.map((d) => d.def).sort()).toEqual(["alias", "dependent", "direct", "generic"]);
     const cleaned = applyFixes(root(res.sources), res.diags, ["suggested"]).text;
     expect(cleaned).toContain("f : N -> N = y => y");
     expect(cleaned).toContain("value : N = Z{}");
     const after = await lint(fixture("erasure_fixed.bend", cleaned), [redundantAnnotation]);
     expect(after.diags).toEqual([]);
-    expect(bodies(after.unstable.book)).toEqual(bodies(res.unstable.book));
+    expect(bodies(after.unstable.book)).toEqual(before);
     for (const [annotation, binding] of [
       ["f : N -> N =", "f ="],
       ["value : N =", "value ="],

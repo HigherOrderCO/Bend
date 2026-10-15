@@ -615,10 +615,17 @@ const demand = (checks: Array<[string, boolean]>, say: (wrong: string) => string
 const isErr = (e: unknown): e is Err =>
   typeof e === "object" && e !== null && (e as { $?: unknown }).$ === "Err";
 
+// The root file's namespace, and a name as that file spells it: bend keys
+// the root's own names ns:name, and rules see them bare.
+const rootNs = (sources: Source[]): string =>
+  FILES.get(sources.find((s) => s.root)!)?.ns ?? "";
+const bare = (ns: string, k: Name): Name =>
+  ns !== "" && k.startsWith(ns + ":") ? k.slice(ns.length + 1) : k;
+
 // A term's kind, and the name a Var or Ref points to.
-const kindOf = (t: LTerm): { kind: string; name: Name } => ({
+const kindOf = (ns: string, t: LTerm): { kind: string; name: Name } => ({
   kind: t.$,
-  name: t.$ === "Var" || t.$ === "Ref" ? t.k : "",
+  name: t.$ === "Var" || t.$ === "Ref" ? bare(ns, t.k) : "",
 });
 
 // Whether a fact passes a filter, its scope aside.
@@ -665,6 +672,7 @@ const checked = async (
   const program = far.length > 0;
   const texts = new Map<string, string>();
   let declarations: Name[] = [];
+  const ns = real === Bend.BASE_BEND ? "" : nodePath.basename(file).replace(/\.bend$/, "");
   reads = texts;
   const seeded = real !== "" && /^import Base$/m.test(fs.readFileSync(real, "utf8"));
   const key = fs.readFileSync(Bend.BASE_BEND, "utf8");
@@ -673,18 +681,18 @@ const checked = async (
   }
   const see = (report: Report): void => {
     const at = report.spn?.file as { dir?: string; ns?: string } | undefined;
-    const near = at?.dir === home && at.ns === "" ? filters : far;
+    const near = at?.dir === home && at.ns === ns ? filters : far;
     const { kind, name } =
-      near.length > 0 ? kindOf(Bend.term_strip(report.tm)) : { kind: "", name: "" };
-    if (near.some((f) => matches(f, kind, report.def, name))) {
+      near.length > 0 ? kindOf(ns, Bend.term_strip(report.tm)) : { kind: "", name: "" };
+    if (near.some((f) => matches(f, kind, bare(ns, report.def), name))) {
       found.push(report);
     }
   };
   const read = await Promise.resolve(seeded ? BASE?.book : undefined)
     .then((base) => {
       hook.see = filters.length > 0 ? see : undefined;
-      hook.parsed = (dir, ns, names) => {
-        if (dir === home && ns === "") declarations = names;
+      hook.parsed = (dir, at, names) => {
+        if (dir === home && at === ns) declarations = names;
       };
       return Main.book_read(file, base, seen);
     })
@@ -793,9 +801,10 @@ export const select = (
     ? facts
     : facts.filter((fact) => {
         const r = raw(fact);
-        const { kind, name } = kindOf(m.Bend.term_strip(r.tm));
+        const { kind, name } = kindOf(root?.ns ?? "", m.Bend.term_strip(r.tm));
         return (
-          (want.scope === "program" || r.spn?.file === root) && matches(want, kind, r.def, name)
+          (want.scope === "program" || r.spn?.file === root) &&
+          matches(want, kind, bare(root?.ns ?? "", r.def), name)
         );
       });
 };
@@ -858,6 +867,8 @@ const sameDeclarations = (m: Loaded, { book, sources, declarations }: Checked, t
       } else {
         if (tld?.$ === "ADT") for (const c of tld.c) delete fresh.ctrs[c.k];
         delete fresh.tlds[k];
+        // bend's `main` alias of the root's ns:main
+        if (k === ns + ":main") delete fresh.tlds.main;
       }
     }
     return fresh;
@@ -892,14 +903,15 @@ const sameDeclarations = (m: Loaded, { book, sources, declarations }: Checked, t
 // What a rule asks bend2, over one check's book and facts.
 export const operations = (m: Loaded, run: Checked): Operations => {
   const { Bend } = m;
+  const ns = rootNs(run.sources);
   let byTerm: Map<LTerm, Fact> | undefined;
   return {
     view: (fact): View => {
       const r = raw(fact);
       return {
-        owner: r.def,
+        owner: bare(ns, r.def),
         inst: r.inst,
-        ...kindOf(Bend.term_strip(r.tm)),
+        ...kindOf(ns, Bend.term_strip(r.tm)),
         quantity: QUANTITY[r.qt.$],
         span: toSpan(r.spn),
         inner: toSpan(run.map(Bend.term_strip(r.tm).s)),
@@ -923,13 +935,13 @@ export const operations = (m: Loaded, run: Checked): Operations => {
     },
     sameDeclarations: (text) => sameDeclarations(m, run, text),
     body: (name) => {
-      const tld = run.book.tlds[name];
+      const tld = run.book.tlds[ns + ":" + name] ?? run.book.tlds[name];
       return tld?.$ === "Def" && tld.e !== undefined ? node(tld.e) : undefined;
     },
     node: (fact) => node(raw(fact).tm),
     shape: (n): Shape => {
       const t = tree(n);
-      return { ...kindOf(t), span: toSpan(run.map(t.s)), children: children(t).map(node) };
+      return { ...kindOf(ns, t), span: toSpan(run.map(t.s)), children: children(t).map(node) };
     },
     fact: (n) => {
       byTerm ??= new Map((run.facts ?? []).map((f) => [raw(f).tm, f]));
@@ -959,10 +971,11 @@ export const layout = (m: Loaded, d: Diag, head: string): string => {
 
 // A Bend rule's id(), facts() and main(), compiled as comp.ts io_run does.
 // facts(), checked: NoFacts{} gives null, Want{...} a filter.
-export const compile = (m: Loaded, { book }: Checked, file: string): Compiled => {
+export const compile = (m: Loaded, { book, sources }: Checked, file: string): Compiled => {
   const { Bend, Comp } = m;
+  const ns = rootNs(sources);
   const value = (k: Name): LTerm | undefined => {
-    const tld = book.tlds[k];
+    const tld = book.tlds[ns + ":" + k] ?? book.tlds[k];
     return tld?.$ === "Def" && tld.n === 0 && tld.v !== null
       ? Bend.term_lower(Bend.term_snf(book, tld.v))
       : undefined;
@@ -1037,7 +1050,10 @@ const selfCheck = async (m: Loaded): Promise<void> => {
   demand(
     [
       ["check", run.failure === undefined],
-      ["declarations (parse_book)", run.declarations.join(",") === "N,id,main"],
+      [
+        "declarations (parse_book)",
+        run.declarations.map((k) => bare(rootNs(run.sources), k)).join(",") === "N,id,main",
+      ],
       ["Ref id (term_infer)", views.some((v) => v.kind === "Ref" && v.name === "id")],
       ["Lam (term_check)", views.some((v) => v.kind === "Lam")],
       ["type", x !== undefined && ops.show(x.fact, ops.type(x.fact)) === "N"],
