@@ -4342,6 +4342,7 @@ WL_TABLE WL_X(FID_ENTER)
 #define WL_X(F) WL_##F,
 static const WlFn wl_tab[] = { WL_TABLE };
 #undef WL_X
+FAR Term work_loop(Env e, DEV Term* sp, Term t, u32 seq);
 #endif
 
 static Term work_loop(Env e, DEV Term* sp, Term t, u32 seq) {
