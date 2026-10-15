@@ -1006,8 +1006,16 @@ function lay_node(k: Name): Lay {
   });
 }
 
+function lay_eq(a: Lay, b: Lay): boolean {
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
+}
+
 function lay_c(k: Kind): string {
   return k === "w32" ? "u32" : "Term";
+}
+
+function lay_packed(lay: Lay): boolean {
+  return ["", "w32"].includes(lay.ks.join());
 }
 
 function lay_arr(lay: Lay) {
@@ -1044,41 +1052,42 @@ function ctr_doms(ctr: Bend.Ctr, xs?: HTerm[]): HTerm[] {
 }
 
 function ctr_flds(k: Name, xs: HTerm[]): HTerm[] {
-  const ds = FL.book.ctrs[k] && ctr_tail(FL.book.ctrs[k]);
-  return xs.filter((_, j) => !ds?.[j] || dom_live(ds[j]));
+  const ds = FL.book.ctrs[k] ? ctr_tail(FL.book.ctrs[k]) : [];
+  return xs.filter((_, j) => !ds[j] || dom_live(ds[j]));
 }
 
 function src_add(k: Name): void {
   memo(FL.srcs, k, () => null);
 }
 
-function ctr_build(sc: Scope, k: Name, xs: string[], stat = false, shr = true): string {
+function ctr_build(sc: Scope, k: Name, exprs: string[],
+  stat = false, shr = true): string {
   if (FL.book.ctrs[k]) {
     src_add(Bend.book_fam(FL.book, k));
   }
   const cid = cid_mac(k);
-  if (lay_node(k).ks.join() === "w32" || !xs.length) {
-    return `term_pak(${cid}, ${xs[0] ?? 0})`;
+  if (lay_node(k).ks.join() === "w32" || exprs.length === 0) {
+    return `term_pak(${cid}, ${exprs[0] ?? 0})`;
   }
   if (stat) {
     FL.stat.add(k);
-    const at = memo(FL.lits, xs.join(", "), () =>
-      FL.img.push(...xs) - xs.length);
+    const at = memo(FL.lits, exprs.join(", "), () =>
+      FL.img.push(...exprs) - exprs.length);
     return `term_ctr(${cid}, STAT_OFF + ${at})`;
   }
-  const alloc = `heap_alloc(e, cls_fit(${xs.length}))`;
+  const alloc = `heap_alloc(e, cls_fit(${exprs.length}))`;
   const at = sc.spares.findIndex((s) =>
-    cls_fit(s.words) === cls_fit(xs.length));
+    cls_fit(s.words) === cls_fit(exprs.length));
   const s = at < 0 ? null : sc.spares.splice(at, 1)[0];
-  const got = s?.z ? `${s.name} >= HEAP_OFF ? ${s.name} : ${alloc}`
-    : s?.name ?? alloc;
-  return `term_ctr(${cid}, ${node_fill(sc, "nd", got, xs,
+  const got = s === null ? alloc
+    : s.z ? `${s.name} >= HEAP_OFF ? ${s.name} : ${alloc}` : s.name;
+  return `term_ctr(${cid}, ${node_fill(sc, "nd", got, exprs,
     shr && FL.hot.has(k))})`;
 }
 
 function facts_packed(t: HTerm): boolean {
   const s = term_strip(t);
-  return s.$ === "Ctr" && ["", "w32"].includes(lay_node(s.k).ks.join());
+  return s.$ === "Ctr" && lay_packed(lay_node(s.k));
 }
 
 // Mat
@@ -1626,7 +1635,7 @@ function node_fill(sc: Scope, k: string, alloc: string,
 function node_fields(sc: Scope, t: string, k: Name, tail = false): Val[] {
   const node = lay_node(k);
   const n = node.ks.length;
-  if (["", "w32"].includes(node.ks.join())) {
+  if (lay_packed(node)) {
     return val_arm(val_new(node.ks.map(() => `term_loc(${t})`), node));
   }
   const r = sc.brwl.get(t);
@@ -1705,7 +1714,7 @@ function val_sink(sc: Scope, v: Val): void {
 }
 
 function val_to(sc: Scope, v: Val, lay: Lay): Val {
-  return v.lay === lay || JSON.stringify(v.lay) === JSON.stringify(lay) ? v : lay === BOX ? val_new([val_box(sc, v)], BOX)
+  return lay_eq(v.lay, lay) ? v : lay === BOX ? val_new([val_box(sc, v)], BOX)
     : v.lay === BOX ? val_unbox(sc, v, lay)
     : val_arms(sc, lay, v.ws[0], (k) => val_arm(v, k));
 }
@@ -2565,7 +2574,7 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
       if (sc.seg.def !== ck.k && (flat_call(x) || (dst === null && once))) {
         return emit_fuse(sc, ck, dst, true);
       }
-      if (!(sc.seg.ret === ret || JSON.stringify(sc.seg.ret) === JSON.stringify(ret))
+      if (!lay_eq(sc.seg.ret, ret)
         && (sc.seg.ret.arms !== null || ret.arms !== null)) {
         return emit_body(sc, Bend.Let(["r"], [0], [Bend.Ann(x, ty!)],
           (xs) => xs[0]), ty, ers, args, dst);

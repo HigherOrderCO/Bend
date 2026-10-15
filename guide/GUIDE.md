@@ -643,13 +643,14 @@ GPU kernel. clang compiles it for the CPU. Metal (on Apple) or CUDA (on NVIDIA)
 compiles the same file for the GPU. So a `!` call runs the same code on
 whichever chip it lands on.
 
-A term is a 64-bit word: inline small values or a pointer into the unified
-CPU/GPU heap. No garbage collector: an affine `match` frees its node.
-Copying heats a datatype; hot builds seal fields except at a literal
-`Kind(&1)`. Unknown quantities keep sealing; hot matches handle either form.
-There is no C stack: defs are flat state-machine segments, calls jump, and
-parallel calls create a join task and one task per branch, scheduled on
-CPU or GPU lanes. `paper/BendRT.pdf` has the design and benchmarks.
+A term is one 64-bit word: small values are stored inline, everything else is a
+pointer into a single heap shared by every core and by the GPU. There is no
+garbage collector. Since values are affine, a `match` frees the node it opens
+on the spot, and only `+` values carry a reference count. There is no C stack
+either: each def compiles to a segment of a flat state machine, a call is a
+jump, and a parallel call creates a join task plus one task per call, which the
+scheduler deals across CPU or GPU lanes. `paper/BendRT.pdf` has the design and
+the benchmarks.
 
 Bend's theory has one universe and no positivity check: `Type : Type` holds,
 and a datatype may recurse on the left of an arrow. What keeps this consistent
