@@ -98,10 +98,6 @@ the answer the same way: `io_done(v)`, `io_fail(code)`,
 whole number from 0 to 2^53 stops the run; a `Nat` inside an answer goes
 unchecked, so the host keeps it in that range.
 
-Scalar `F32` arguments of an exported def, and scalar `F32` answers,
-round to binary32 on entry. Values inside host-owned arrays and
-constructors are not traversed or copied; the host supplies their precision.
-
 A blocking effect takes one more argument, `k`, and parks with
 `io_park_on(fd, out, k, more)`: it returns `undefined`, and the loop calls
 `more()` when `fd` is ready; `more` answers the value, or `undefined` to
