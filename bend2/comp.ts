@@ -2785,7 +2785,8 @@ function c_ids(src: string, m = ""): string {
     const q = [m === "" ? k : m + ":" + k, k].find((q) => q in FL.book.ctrs
       || q in FL.book.tlds || FL.ids.has(p + "_" + q))
       ?? die(`${p}(${k}) names no constructor or def`);
-    return FL.js ? JSON.stringify(Bend.name_key(q)) : name_id(p + "_", q);
+    return FL.js ? JSON.stringify(p === "CID" && q in FL.book.ctrs
+      ? js_tag(q) : Bend.name_key(q)) : name_id(p + "_", q);
   });
 }
 
@@ -2996,6 +2997,13 @@ function js_open(sc: Scope, x: Of<"Let">): HTerm {
     : js_var(sc, emit_hold(sc, [js_expr(sc, v)], x.k[j])[0])));
 }
 
+// Constructor tags name the constructor within its declaring file, not
+// the namespace a loading book gives that file. Matches stay type-local;
+// foreign effect identities and public def names keep their namespaces.
+function js_tag(k: Name): string {
+  return k.slice(k.indexOf(":") + 1);
+}
+
 function js_key(n: Name): string {
   return (n === "__proto__" ? `["${n}"]` : `"${n}"`) + ": ";
 }
@@ -3039,7 +3047,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
         return tpl(native[x.k].intr, exprs);
       }
       const fs = ctr_live(FL.book.ctrs[x.k]);
-      return `{$: "${Bend.name_key(x.k)}"${exprs.map((z, j) =>
+      return `{$: "${js_tag(x.k)}"${exprs.map((z, j) =>
         ", " + js_key(fs[j][1]) + z).join("")}}`;
     }
     case "Let": {
@@ -3133,7 +3141,7 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
       ? [wd(j)] : [wd(j) + "[\"head\"]", wd(j + 1)].slice(0, e)]);
   } else {
     const native = OPTIMIZED[adt.k];
-    const is = (c: Name) => `${s}.$ === "${Bend.name_key(c)}"`;
+    const is = (c: Name) => `${s}.$ === "${js_tag(c)}"`;
     lv = mat_ctrs(x, adt).map(([k, h]) =>
       k === "" || k === "_" ? [k && mat_ops(is), h, [s]] : native === undefined
       ? [is(k), h, ctr_live(FL.book.ctrs[k]).map(([, f]) => `${s}["${f}"]`)]
@@ -3239,7 +3247,7 @@ export function js_book(book: Bend.Book): string {
   const show = show_main();
   return `${lib}\n${RUNTIME_MAIN}\ncli(process.argv.slice(1));\nio_exit(${
     name_id("$", "main")}, ${JSON.stringify(show && show.map((c) =>
-      typeof c === "string" ? Bend.name_key(c) : c))});`;
+      typeof c === "string" ? [js_tag(c), Bend.name_key(c)] : c))});`;
 }
 
 // RuntimeC
@@ -6113,9 +6121,9 @@ function show_val(D, d, v, chain) {
     const fs = Object.values(typeof v === "boolean"
       ? { $: v ? "True" : "False" } : v);
     let a = d + 3;
-    for (; D[a + 1] !== fs[0]; a += 4 + 2 * D[a + 2]) {}
+    for (; D[a + 1][0] !== fs[0]; a += 4 + 2 * D[a + 2]) {}
     const o = "{[("[D[a + 3]];
-    let s = o === "{" ? fs[0] + "{" : chain === o ? "" : o;
+    let s = o === "{" ? D[a + 1][1] + "{" : chain === o ? "" : o;
     for (const [j, f] of fs.slice(1).entries()) {
       if (o === "[" ? j === 0 && chain === o : j > 0) {
         s += ", ";
