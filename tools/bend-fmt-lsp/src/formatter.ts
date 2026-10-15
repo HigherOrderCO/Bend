@@ -178,7 +178,7 @@ function inlineBodies(lines: Line[]): number[][] {
       open++;
     } else if ([")", "]", "}"].includes(token.text)) {
       open = Math.max(0, open - 1);
-    } else if (header?.typed && ANGLES.has(token.text)) {
+    } else if (header?.typed && open === header.open && ANGLES.has(token.text)) {
       header.angle += token.text.length * (token.text[0] === "<" ? 1 : -1);
     } else if (header && token.text === ":" && open === header.open && header.angle === 0) {
       header = null;

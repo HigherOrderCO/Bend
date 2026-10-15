@@ -10,6 +10,18 @@ import { formatBend } from "../formatter.js";
 // Bend pins the lines after a body that shares a line with its `do`, `match`,
 // `case` or `def` header or `=>` lambda opener to that body's column. [source, formatted]
 const pinned = [
+  ...[
+    "(1 < 2 : U32) == True{} : Bool",
+    "(2 > 1 : U32) == True{} : Bool",
+    "(1 << 1n : U32) == 2 : U32",
+    "(2 >> 1n : U32) == 1 : U32",
+  ].map((goal) => {
+    const head = `def update(a: Array<U32>, -ok: {${goal}}) -> Array<U32>: a[0] <- 7`;
+    const source = "import Base\n\n" + head + "\n"
+      + " ".repeat(head.indexOf("a[0]")) + "a[1] <- 8\n\n"
+      + "def main() -> Array<U32>:\n  update([0 : U32 * 2n], {==})\n";
+    return [source, source];
+  }),
   [
     "import Base\ndef main() -> Array<U32>:\n    f : Array<U32> -> Array<U32> = a => a[0] <- 7\n                                        a[1] <- 8\n    f([0 : U32 * 2n])\n",
     "import Base\ndef main() -> Array<U32>:\n  f : Array<U32> -> Array<U32> = a => a[0] <- 7\n                                      a[1] <- 8\n  f([0 : U32 * 2n])\n",
