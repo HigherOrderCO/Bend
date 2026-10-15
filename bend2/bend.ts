@@ -374,7 +374,7 @@ export type Env = List<HTerm | ((s?: Span) => HTerm)>;
 export type Ctr  = { k: Name; n: number; T: HTerm }
 export type Ctrs = Array<Ctr>;
 export type ADT  = { $: "ADT"; n: number; g: number; T: HTerm; c: Ctrs; b?: Bool; };
-export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: { file: File; paths: string[] }; args?: HTerm[]; };
+export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: { file: File; paths: string[] }; args?: LTerm[]; };
 export type TLD  = ADT | Def;
 export type Book = {
   entry: FileId; base: FileId | null; files: Map<FileId, File>;
@@ -795,7 +795,7 @@ export function term_higher(tm: LTerm, env: Env = null, checked = false): HTerm 
       const f = term_higher(tm.f, env, checked), x = term_higher(tm.x, env, checked);
       return f.$ === "Lam" ? f.f(x) : App(f, x, tm.s);
     }
-    default: return term_map(tm, (x) => term_higher(x, env, checked));
+    default: return checked ? term_map(tm, (x) => term_higher(x, env, true)) : term_map(tm, term_higher, env);
   }
 }
 
@@ -824,7 +824,7 @@ export function term_lower(term: HTerm, d: number = 0): LTerm {
       return Lam(tm.k, d, term_lower(tm.f(x), d + 1), tm.s, tm.q);
     }
     default: {
-      return term_map(tm, (x) => term_lower(x, d));
+      return term_map(tm, term_lower, d);
     }
   }
 }
@@ -1208,17 +1208,17 @@ const ESCAPES: Record<string, U32> = {
 };
 
 // Rebuild direct term children. Binding cases supply their own body operation.
-function term_map<X, Y>(tm: TermOf<X>, f: (child: TermOf<X>) => TermOf<Y>): TermOf<Y> {
+function term_map<X, Y, C>(tm: TermOf<X>, f: (child: TermOf<X>, c?: C) => TermOf<Y>, c?: C): TermOf<Y> {
   switch (tm.$) {
-    case "Typ": return Typ(f(tm.g), tm.s);
-    case "Min": return Min(f(tm.a), f(tm.b), tm.s);
-    case "App": return App(f(tm.f), f(tm.x), tm.s);
-    case "ADT": return ADT(tm.k, tm.x.map(x => f(x)), tm.s, tm.r);
-    case "Ctr": return Ctr(tm.k, tm.x.map(x => f(x)), tm.s);
-    case "Mat": return Mat(tm.k, f(tm.h), f(tm.m), tm.s);
-    case "Eql": return Eql(f(tm.a), f(tm.b), f(tm.T), tm.s);
-    case "Rwt": return Rwt(f(tm.e), f(tm.p), f(tm.f), tm.s);
-    case "Ann": return Ann(f(tm.x), f(tm.T), tm.s);
+    case "Typ": return Typ(f(tm.g, c), tm.s);
+    case "Min": return Min(f(tm.a, c), f(tm.b, c), tm.s);
+    case "App": return App(f(tm.f, c), f(tm.x, c), tm.s);
+    case "ADT": return ADT(tm.k, tm.x.map(x => f(x, c)), tm.s, tm.r);
+    case "Ctr": return Ctr(tm.k, tm.x.map(x => f(x, c)), tm.s);
+    case "Mat": return Mat(tm.k, f(tm.h, c), f(tm.m, c), tm.s);
+    case "Eql": return Eql(f(tm.a, c), f(tm.b, c), f(tm.T, c), tm.s);
+    case "Rwt": return Rwt(f(tm.e, c), f(tm.p, c), f(tm.f, c), tm.s);
+    case "Ann": return Ann(f(tm.x, c), f(tm.T, c), tm.s);
     default: return tm as unknown as TermOf<Y>;
   }
 }
@@ -1636,7 +1636,7 @@ export function parse_reso(p: Parse, raw: string, category: Category = "def"): N
 
 // a head read again, as another category or with a method suffix: written
 // as the file writes its key
-function parse_head(p: Parse, t: LTerm, category: Category = "def", op = ""): Name {
+function parse_head(p: Parse, t: LTerm, category: Category, op = ""): Name {
   const k = (t as { k: Name }).k, al = Object.keys(p.al).find((a) => p.al[a] === name_file(k));
   return parse_reso(p, t.$ === "Var" ? t.k + op : (al ? al + "." : "") + name_text(k) + op, category);
 }
@@ -1780,7 +1780,7 @@ export function parse_term_base(p: Parse, beg: number): LTerm {
       parse_bump(p);
       const t = parse_term(p, 12);
       const s = parse_span(p, beg);
-      const k   = t.$ === "ADT" ? t.k : t.$ === "Var" || t.$ === "Ref" ? parse_head(p, t) : null;
+      const k   = t.$ === "ADT" || t.$ === "Ref" ? t.k : t.$ === "Var" ? parse_reso(p, t.k) : null;
       const tld = k && p.book.tlds[k];
       if (t.$ === "Var" && (!tld || tld.$ !== "ADT")) {
         return Var(t.k, -1, s);
@@ -2071,7 +2071,7 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
         parse_fail(p, "a family name before <..> (a comparison here needs parens)");
       }
       parse_take(p, ",");
-      const d = parse_head(p, out);
+      const d = out.$ === "Var" ? parse_reso(p, out.k) : out.k;
       out = ADT(d, parse_fill(p, d, [b, ...parse_term_args(p, ">")], s), s);
     } else if (op === "->") {
       out = All(Lone(), "_", parse_open(p, "_"), out, b, s);
@@ -3709,7 +3709,7 @@ export function def_inst(book: Book, lhs: LHS, tm: Extract<HTerm, { $: "Ref" }>,
     book.tmps.set(key, o);
     // elaboration reads the checked arguments, with a dead arm dropped
     const inst: Def = { $: "Def", n: def.n - def.x, x: 0, T: checked.tel, v: xs.reduce((v, a) => term_apply(v, a), def.v as HTerm),
-      u: def.u, args: checked.xs.map(checked_higher) };
+      u: def.u, args: checked.xs };
     book.tlds[o] = { ...inst, v: null };
     try {
       inst.e = def_check(book, o, inst, z);

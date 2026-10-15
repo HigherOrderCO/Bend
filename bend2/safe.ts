@@ -978,7 +978,7 @@ function spine(e: Safe, s: Scope, t: HTerm, live: boolean): O {
   }
   // bend2's instance of a template is the template at its ~ arguments
   const g = e.book.tlds[f.k];
-  const [k, ys] = g?.$ === "Def" && g.args ? [B.name_parent(f.k)!, [...g.args, ...xs]] : [f.k, xs];
+  const [k, ys] = g?.$ === "Def" && g.args ? [B.name_parent(f.k)!, [...g.args.map(B.checked_higher), ...xs]] : [f.k, xs];
   const tld = e.book.tlds[k] ?? oos("an unknown name " + B.name_display(e.book, k));
   if (tld.$ === "Def" && ys.length < tld.x) {
     oos("a template " + B.name_display(e.book, k) + " short of its ~ arguments");
