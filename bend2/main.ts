@@ -1010,9 +1010,10 @@ async function load_js(path: string): Promise<string> {
 
 export async function load(u: string, context: unknown,
   next: (u: string, context: unknown) => unknown): Promise<unknown> {
-  return u.endsWith(".bend")
+  const file = u.startsWith("file:") ? url.fileURLToPath(u) : null;
+  return file !== null && file.endsWith(".bend")
     ? { format: "module", shortCircuit: true,
-      source: await load_js(url.fileURLToPath(u)) }
+      source: await load_js(file) }
     : next(u, context);
 }
 
