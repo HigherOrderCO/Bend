@@ -70,7 +70,6 @@ type File = {
   tails: Map<Name, Set<Name>>;
   img: string[];
   lits: Map<string, number>;
-  consts: Map<Lay, Map<HTerm, Val>>;
   ids: Map<string, string>;
   taken: Set<string>;
   teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
@@ -1502,7 +1501,6 @@ function file_new(book: Bend.Book, js: boolean): File {
     tails: new Map(),
     img: [],
     lits: new Map(),
-    consts: new Map(),
     ids: new Map(),
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
     teles: new Map(),
@@ -2488,11 +2486,6 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     facts_ctr(sc, ctr, adt.x);
   }
   const pos = at ?? lay_of(adt);
-  const seen = memo(FL.consts, pos, () => new Map());
-  const got = seen.get(x);
-  if (got !== undefined) {
-    return got;
-  }
   const lay = pos === BOX ? lay_node(x.k) : pos;
   const arms = Object.keys(lay.arms!);
   const vs = emit_each(sc, flds, lay.arms![x.k], ctr_doms(ctr, adt.x));
@@ -2500,12 +2493,8 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     ...vs.flatMap((f, j) => val_to(sc, f, lay.arms![x.k][j]).ws)];
   const v = val_new(lay.ks.map((_, j) => ws[j] ?? "0"), lay,
     vs.every((f) => f.stat));
-  const out = lay === pos ? v
+  return lay === pos ? v
     : val_new([ctr_build(sc, x.k, val_own(sc, v), v.stat)], BOX, v.stat);
-  if (out.stat) {
-    seen.set(x, out);
-  }
-  return out;
 }
 
 function emit_fold(sc: Scope, t: HTerm): HTerm | null {
@@ -2721,8 +2710,7 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
       }
       const f = fun_of(ck.k);
       const ret = f.ret;
-      const once = FL.sites.get(ck.k) === 1 && !ck.b && !def_foreign(ck.tld)
-        && (ret !== BOX || sc.seg.ret === BOX);
+      const once = FL.sites.get(ck.k) === 1 && !ck.b && !def_foreign(ck.tld);
       if (sc.seg.def !== ck.k && (flat_call(x) || (dst === null && once))) {
         return emit_fuse(sc, ck, dst, true);
       }
@@ -3009,7 +2997,7 @@ export function compile_book(book: Bend.Book): string {
   do {
     was = facts();
     FL.lends = [];
-    [FL.lent, FL.spun, FL.clos, FL.tabs, FL.lits, FL.consts, FL.brws]
+    [FL.lent, FL.spun, FL.clos, FL.tabs, FL.lits, FL.brws]
       .forEach((m) => m.clear());
     FL.segs = [];
     FL.spins = [];
