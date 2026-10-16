@@ -6,7 +6,7 @@
 // ====
 
 // Compiles a checked Book to C, one source for the host and
-// the device, or to JS. The C and JS runtimes close the file.
+// the device, or to JS.
 
 import * as fs from "node:fs";
 
@@ -122,10 +122,9 @@ type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 // CLO_APPLY and IO_EMIT are the runtime's own segments, named with a ~
 // so that no file declares them. FOLD_FUEL caps the nodes that unfolds
 // add to a segment, so a literal-bounded loop does not unroll into its
-// caller. A spin of SPIN_FAR characters of C is a call on the device
-// (DFAR). WIDE is the widest flat layout or segment; a node past
-// it pads to its size class and keeps 240 plus log2 of it in CID_T. An
-// argument nested past TPL_DEEP brackets goes to a local (clang allows 256).
+// caller. WIDE is the widest flat layout or segment; a node past it pads
+// to its size class and keeps 240 plus log2 of it in CID_T. An argument
+// nested past TPL_DEEP brackets goes to a local (clang allows 256).
 
 const CLO_APPLY = "Clo~apply";
 
@@ -169,8 +168,6 @@ const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
 
 // Operations
 // ----------
-
-// The Array operations have no C text: arr_op lays them out by element.
 
 const CMPS = "is_eq:==:=== is_ne:!=:!== is_lt:< is_le:<= is_gt:> is_ge:>=";
 
@@ -269,10 +266,9 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
 // Optimized
 // ---------
 
-// Per native constructor: its builder, field readers and optional
-// test. RUNTIME_ADTS are the datatypes the runtime or the elaborator
-// lays out itself; OWNED are the Base names the compiler encodes,
-// which a file without `import Base` may declare but not compile.
+// RUNTIME_ADTS are the datatypes the runtime or the elaborator lays
+// out itself; OWNED are the Base names the compiler encodes, which a
+// file without `import Base` may declare but not compile.
 
 const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
   Nat: { Zero: { intr: "0" }, Succ: { intr: tpl_nat("", "nat_chk($0 + 1)") } },
@@ -580,9 +576,8 @@ function cid_mac(k: string): string {
 // Char
 // ====
 
-// A Char past the Unicode scalars keeps its code as 0xDC00 and three 11-bit
-// pieces; str_out writes it as U+FFFD, as str_in does a host's surrogate.
-// The JS runtime holds this function's text.
+// str_out writes a Char past the Unicode scalars as U+FFFD, as str_in does
+// a host's surrogate.
 function char_new(c: number): string {
   return c < 0xD800 || c >= 0xE000 && c <= 0x10FFFF ? String.fromCodePoint(c)
     : String.fromCharCode(0xDC00, c >>> 22, c >>> 11 & 0x7FF, c & 0x7FF);
@@ -646,9 +641,8 @@ function graph_close<K>(set: Set<K>, edges: K[][]): Set<K> {
 // Term
 // ====
 
-// A literal is a constant tree, except a Nat past the cap: U32.to_nat of
-// its word. A spine calls its def directly when the live arguments meet
-// the def's parameters, else Clo~apply over the outermost live one.
+// A spine calls its def directly when the live arguments meet the def's
+// parameters, else Clo~apply over the outermost live one.
 
 function lit_call(s: Of<"Lit">): HTerm | null {
   return s.k === "Nat" && s.v > Bend.NAT_LITERAL_MAX
@@ -880,8 +874,7 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
   return adt;
 }
 
-// Whether A holds a type p seeks: a datatype p rejects is looked into,
-// but for the words.
+// A datatype p rejects is looked into, but for the words.
 function ty_holds(A: HTerm | null,
   p: (t: HTerm | null) => boolean, seen = new Set<Name>()): boolean {
   const t = ty_wnf(A);
@@ -938,12 +931,12 @@ function ty_srcs(T: HTerm): void {
 // An Array, an IO.OP, a recursive datatype, and a datatype with a field
 // that re-enters it under layout (a family hid the cycle) are one box.
 // A lay without arms is W32, W64 or BOX itself. An Array cell takes
-// the open layout of its element type (the return type of its
-// constructors), so all callers agree. lay_el refuses an open element
-// type: one that reduces to neither a datatype nor a type former (a type
-// variable, a hole, a law or family with no body). A former is a box
-// whatever its parts mention: a function is one even when its arguments
-// are erased. adt_of and js_expr call it only for that check.
+// the open layout of its element type, so all callers agree. lay_el
+// refuses an open element type: one that reduces to neither a datatype
+// nor a type former (a type variable, a hole, a law or family with no
+// body). A former is a box whatever its parts mention: a function is one
+// even when its arguments are erased. adt_of and js_expr call it only
+// for that check.
 
 function lay_of(A: HTerm | null): Lay {
   const t = ty_adt(A);
@@ -997,7 +990,6 @@ function lay_node(k: Name): Lay {
   });
 }
 
-// An open type takes its value's layout.
 function lay_at(A: HTerm | null, v: Val): Lay {
   return ty_holds(A, (t) => ty_tag(t, "Var App")) ? v.lay : lay_of(A);
 }
@@ -1089,9 +1081,8 @@ function facts_packed(t: HTerm): boolean {
 // A Nat or word match's rows hold the arm, the low bits known (32: a
 // hit), their value and the fields bound; a Nat row knows its level
 // and binds the scrutinee less it. A default covers the deeper rows
-// that are its instance (the flattener's substitution replayed). A U32
-// match reads a table when its hits cover over half of 0..max and all
-// other rows share one body. The default arm of a match is named "".
+// that are its instance (the flattener's substitution replayed). The
+// default arm of a match is named "".
 
 function mat_head(t: HTerm): boolean {
   return t.$ === "Mat" || t.$ === "Efq";
@@ -2011,8 +2002,7 @@ function show_main(): (number | Name)[] | null {
 // ===
 
 // A statement in normal form is a fork, a cut, a let of a
-// value, or a tail. A live over-application cuts its call prefix;
-// a variable applied to erased arguments is the variable.
+// value, or a tail. A live over-application cuts its call prefix.
 
 function anf(t: HTerm, ty: HTerm | null = null): HTerm {
   const binds: [Of<"Var">, HTerm][] = [];
@@ -2111,7 +2101,7 @@ function anf(t: HTerm, ty: HTerm | null = null): HTerm {
 // ====
 
 // A call emits its nested arguments first, then pops the owned ones
-// before it reads the borrowed ones (a read asks a lend). A closure
+// before it reads the borrowed ones. A closure
 // moves its captures into a node, each one use of its binding. A jump's
 // returns must agree or both be one word (a box holds a word as is);
 // else the call becomes a cut. A fork runs a join task and a kid per
@@ -2245,7 +2235,6 @@ function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
   emit_put(sc, dst, out);
 }
 
-// A foreign def's last parameter, past its live ones, is its continuation k.
 function emit_open(sc: Scope, k: Name, f = fun_of(k)): [Scope, Val[]] {
   FUEL = FOLD_FUEL;
   const { live, lays, ret } = f;
@@ -2272,13 +2261,13 @@ function emit_native(sc: Scope, k: Name, ers: HTerm[], f: Fun): string {
     const seg = sl.seg;
     seg.fid = name;
     const dst = val_new(seg.ret.ks.map((_, j) => `o[${j}]`), seg.ret);
-    emit_body(sl, fun_of(k).h!, FL.book.tlds[k].T, ers, vals, dst);
+    emit_body(sl, f.h!, FL.book.tlds[k].T, ers, vals, dst);
     FUEL = fuel;
     const body = [...seg_text(["u32 wpoll = 0;", ...seg.ks.flatMap((k, i) =>
       arr_q(k) ? [`Term h${i} = r${i};`] : []),
     ...seg_take(seg), "WL_SPIN"], 1),
     ...seg_text(seg.lines, 2), "  break;", "  }", "  return 1;", "}"];
-    const far = body.reduce((n, l) => n + l.length + 1, 0) >= SPIN_FAR;
+    const far = body.join("\n").length + 1 >= SPIN_FAR;
     FL.spins.push({ ...seg, lines: [`${far ? "DFAR" : "INLINE"} Term ${
       name}(Env e, THR Term* o${
       seg.ks.map((k, i) => `, ${lay_c(k)} r${i}${arr_q(k)
@@ -2805,7 +2794,7 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 // =======
 
 // Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
-// namespace, else as is. An effect source is read once, in one namespace.
+// namespace, else as is.
 
 function c_ids(src: string, m = ""): string {
   return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
@@ -2972,13 +2961,12 @@ export function compile_book(book: Bend.Book): string {
 // JS
 // --
 
-// Each effect source runs once in a closure of its own and registers
-// its effects with io_eff(CID(k), run), as a C source does. A
-// def on a tail cycle is one loop over the cycle's bodies ($pc picks
-// one), each turn binding its parameters afresh, so a closure keeps its
-// own; any other call is direct. Only a closure's tail call bounces
-// (run_tail), so a call passes through run_loop only when its callee
-// may return one: a marker per call resolves once every def is out.
+// Each effect source registers its effects with io_eff(CID(k), run), as a
+// C source does. A def on a tail cycle is one loop over the cycle's bodies,
+// each turn binding its parameters afresh, so a closure keeps its own. Only
+// a closure's tail call bounces (run_tail), so a call passes through
+// run_loop only when its callee may return one: a marker per call resolves
+// once every def is out.
 
 const JS_DEPTH = new WeakMap<HTerm, number>();
 
@@ -3228,7 +3216,7 @@ function js_def(sc: Scope, k: Name, def: Bend.Def): void {
 }
 
 // What crosses to or from a host: a Nat comes in as a number, which nat_in
-// checks; text gets U+FFFD for what is no Unicode scalar.
+// checks.
 function host(A: HTerm | null, x: string, out = 0): string {
   const k = ty_adt(A)?.k;
   return k === "Char" || k === "String" ? `str_${out ? "out" : "in"}(${x})`
@@ -3349,9 +3337,8 @@ using namespace metal;
 // in L1: lanes hand off through a32 and FENCE. Only clang 19+ has both
 // preserve_none and preserve_most, and compiles preserve_most soundly; at
 // -O0 its register allocator cannot place a preserve_none segment, so an
-// unoptimized build takes neither. A segment is a case of the device's
-// switch; on the host, a preserve_none function (WL_SIG) entered by
-// musttail, its words fresh at WL_OPEN.
+// unoptimized build takes neither. A host segment's words are fresh at
+// WL_OPEN.
 
 #ifdef __METAL_VERSION__
 #if __METAL_VERSION__ >= 320
@@ -3555,7 +3542,7 @@ enum { ERR_RING = 1, ERR_TAGS, ERR_HEAP, ERR_FIDS, ERR_NATS, ERR_RFCS,
 // =======
 
 // The bag is 2^CUBE_LOG groups of CUBE_T lanes (a -D constant on the
-// device). The device program compiles from the binary's own text.
+// device).
 
 #if !DEVICE
 
@@ -4857,10 +4844,10 @@ OUTLINE void pool_turn(bool grow, u32 rows) {
 
 // gpu_make compiles the device program into <binary>.gpu
 // (--gpu-build): Metal's binary archive, or CUDA's cubin behind a
-// hash of the text. A launch loads it, else notes and compiles. CUDA
-// shapes the bag by the device: a group of 128 lanes per 64 KB of
-// L2, a power of two in 16..128 (Apple keeps the tuned 128). CUDA
-// runs one stream: the default 8 cost about half of the startup.
+// hash of the text. CUDA shapes the bag by the device: a group of 128
+// lanes per 64 KB of L2, a power of two in 16..128 (Apple keeps the
+// tuned 128). CUDA runs one stream: the default 8 cost about half of
+// the startup.
 
 static const char* gpu_path(void) {
   static char path[4096];
@@ -5239,8 +5226,7 @@ static void cube_run(u64* H, bool gpu) {
 // ======
 
 // The cores map 8 GiB at a high base and double it in place, so one
-// base holds every location; the banks move up past the pages. The GPU maps
-// its whole span at once, and never grows it.
+// base holds every location; the banks move up past the pages.
 
 static u64 corpus_size;
 
@@ -5351,12 +5337,11 @@ OUTLINE Term corpus_eval(u64* H, Term t) {
 // ==
 
 // Base's opaque, linear handles pack host fds or pointers into aux and loc:
-// no forging, copying, reuse or host wrapper. A request's cont applied to
-// its item is the next request. A parked request keeps its fd, deadline and
-// readiness in word, time and evts; the loop then calls pack: a value
-// resumes, IO_PARK parks again. The edge is UTF-8, decoded as WHATWG does: a
-// broken sequence yields one U+FFFD and its breaking byte is read again as a
-// lead. inet_aton reads a leading zero as octal, so io_sys_addr refuses it.
+// no forging, copying, reuse or host wrapper. Once a parked request is due,
+// the loop calls its pack: a value resumes, IO_PARK parks again. The edge is
+// UTF-8, decoded as WHATWG does: a broken sequence yields one U+FFFD and its
+// breaking byte is read again as a lead. inet_aton reads a leading zero as
+// octal, so io_sys_addr refuses it.
 // macOS poll misses FIFO EOF, so io_wait selects, its sets sized to the
 // highest fd (_DARWIN_UNLIMITED_SELECT allows fds past FD_SETSIZE).
 
@@ -5767,8 +5752,7 @@ ${NATIVE.IO}
 // is a SHOW_DESC node (see show_main), w its words, and chain the
 // bracket of the [a, b] or (a, b) the value continues, or 0. Con
 // or Nil spell a list, Tuple a tuple, and their tails continue
-// it. show_f32 prints the shortest text that reads back, with a
-// point before an e.
+// it.
 
 #if MAIN_PURE
 
@@ -5950,7 +5934,6 @@ OUTLINE void io_loop(u64* H) {
       io_wait(e, true);
       continue;
     }
-    // A busy loop still checks due timers, and fds periodically.
     if ((n & 63) == 0) {
       if (io_busy != 0) {
         io_take(e);
@@ -6177,8 +6160,7 @@ function show_val(D, d, v, chain) {
 // parked effect waits for fd (a write when out) or until at
 // (performance.now()), either one undefined when unused; once due, io_wait
 // calls more at once, as C calls pack, and resumes k with its value, while
-// undefined parks it again. The waits stay in deadline order, as io_park
-// does in C.
+// undefined parks it again.
 
 function io_exit(main, show) {
   try {
@@ -6248,7 +6230,7 @@ function io_sys() {
   return globalThis.BEND_SYS;
 }
 
-// strerror needs bun:ffi; a host without it (node) gets the bare errno.
+// strerror needs bun:ffi, which node lacks.
 function io_fail(code, ...rest) {
   let text = "errno " + code;
   try {
