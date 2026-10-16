@@ -83,6 +83,7 @@ type File = {
   lays: Map<string, Lay>;
   lay_ids: Map<Lay, number>;
   depths: Map<HTerm, number>;
+  views: Map<string, { of: Name; root: string }>;
   memo: {
     opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
     uses: Map<HTerm, Bend.PMap<number>>;
@@ -149,13 +150,6 @@ const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
 
 // A name name_local made.
 const LOCAL = /^\w*_\d+$/;
-
-// The field a JS match opens from a named U32, F32 or Char (its word, its
-// code): a binder takes it as written, so a rebuild folds back to the name.
-// word is what a U32 view reads (an F32's is f32_bits of the name, bits),
-// code what a Char's does.
-const VIEW =
-  /^(?:u32_to_word\((?<word>\w+|f32_bits\((?<bits>\w+)\))\)|char_code\((?<code>\w+)\))$/;
 
 const FOLD_FUEL = 8192;
 
@@ -349,14 +343,12 @@ const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
   U32: { U32: { intr: ([w]) => word_u32(w) } },
   F32: {
     F32: {
-      intr: ([w]) => w.match(VIEW)?.groups?.bits
-        ?? `f32_from_bits(${word_u32(w)})`,
+      intr: ([w]) => js_view(w, "F32") ?? `f32_from_bits(${word_u32(w)})`,
     },
   },
   Char: {
     Chr: {
-      intr: ([c]) => view_of(c) ?? (/^\d+$/.test(c)
-        ? JSON.stringify(char_new(+c)) : `char_new(${c})`),
+      intr: ([c]) => js_view(c, "Char") ?? `char_new(${c})`,
       elim: ["char_code($0)"],
     },
   },
@@ -371,9 +363,7 @@ const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
   String: {
     SNil: { intr: "\"\"", cond: "$0 === \"\"" },
     SCon: {
-      intr: ([h, t]) => STRLIT.test(h) && STRLIT.test(t)
-        ? JSON.stringify(JSON.parse(h) + JSON.parse(t))
-        : `(${h} + ${t})`,
+      intr: "($0 + $1)",
       elim: ["$0.slice(0, char_len($0))", "$0.slice(char_len($0))"],
       cond: "$0 !== \"\"",
     },
@@ -672,14 +662,19 @@ function tpl(t: Tpl, xs: string[]): string {
   return typeof t !== "string" ? t(xs) : t.replace(/\$(\d)/g, (_, i) => xs[i]);
 }
 
-function view_of(e: string): string | undefined {
-  const v = e.match(VIEW)?.groups;
-  return v?.word ?? v?.code;
+// The field a JS match opens from a U32, F32 or Char of root (its word, its
+// code) is a view: a binder takes it as written (FL.views), so a rebuild of
+// the same type is the root again.
+function js_view(e: string, of: Name): string | undefined {
+  const v = FL.views.get(e);
+  return v?.of === of ? v.root : undefined;
 }
 
-// The U32 a JS word holds: a view's name, else the word read back.
+// The U32 a JS word holds: a view's root (an F32's bits), else the word
+// read back.
 function word_u32(w: string): string {
-  return view_of(w) ?? `word_to_u32(${w})`;
+  const f = js_view(w, "F32");
+  return js_view(w, "U32") ?? (f ? `f32_bits(${f})` : `word_to_u32(${w})`);
 }
 
 // A Nat constructor as the Succs over its base, or over none when it is a
@@ -1565,6 +1560,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     lays: new Map(),
     lay_ids: new Map(),
     depths: new Map(),
+    views: new Map(),
     memo: {
       opens: new Map(),
       uses: new Map(),
@@ -3249,6 +3245,20 @@ function js_tag(k: Name): string {
   return k.slice(k.indexOf(":") + 1);
 }
 
+// A constant Char or String as its JS text: a Char past the scalars as
+// char_new spells it.
+function js_text(t: HTerm): string {
+  const s = Bend.term_strip(t);
+  if (s.$ === "Lit") {
+    return [...String(s.v)].map((c) => char_new(c.codePointAt(0)!)).join("");
+  }
+  if (s.$ !== "Ctr" || s.k === "SNil") {
+    return "";
+  }
+  return s.k === "Chr" ? char_new(Bend.u32_from_term(s.x[0])!)
+    : js_text(s.x[0]) + js_text(s.x[1]);
+}
+
 // A U32 or F32 (of its bits) as a JS number.
 function js_word(k: Name, u: number): string {
   const v = k === "F32" ? Bend.f32_from_bits(u) : u;
@@ -3260,12 +3270,11 @@ function js_key(n: Name): string {
   return (n === "__proto__" ? `["${n}"]` : `"${n}"`) + ": ";
 }
 
-// A closure captures a variable bound outside it: a view's root name.
+// A closure captures a variable bound outside it, or a view's root.
 function js_capture(sc: Scope, p: Of<"Var">): void {
   const c = sc.caps;
   if (c && !c.vs.has(p) && (FL.depths.get(p) ?? c.d) < c.d) {
-    const v = p.k.match(VIEW)?.groups;
-    c.vs.set(p, v?.bits ?? v?.word ?? v?.code ?? p.k);
+    c.vs.set(p, FL.views.get(p.k)?.root ?? p.k);
   }
 }
 
@@ -3299,6 +3308,9 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
       const [adt, u] = ctr_adt(x, ty);
       if (u !== null) {
         return js_word(adt.k, u);
+      }
+      if ((adt.k === "Char" || adt.k === "String") && term_const(x)) {
+        return JSON.stringify(js_text(x));
       }
       if (adt.k === "Nat") {
         const [b, n] = nat_peel(x);
@@ -3352,7 +3364,7 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
   if (x.$ === "Lam") {
     const all = ty_all(ty);
     const [e, ...rest] = all.q.$ !== "None" ? args : ["null", ...args];
-    const k = e === "null" || LOCAL.test(e) || VIEW.test(e) ? e
+    const k = e === "null" || LOCAL.test(e) || FL.views.has(e) ? e
       : name_local(sc, x.k);
     const v = k === "null" ? JS_NULL : js_var(sc, k);
     const b = x.f(v);
@@ -3398,8 +3410,9 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
       [`(${s} - ${val})`].slice(0, flds)]);
   } else if (rows !== null) {
     const bits = adt.k === "F32" ? `f32_bits(${s})` : s;
-    const wd = (j: number) =>
-      `u32_to_word(${bits})` + "[\"tail\"]".repeat(j);
+    const word = `u32_to_word(${bits})`;
+    FL.views.set(word, { of: adt.k, root: s });
+    const wd = (j: number) => word + "[\"tail\"]".repeat(j);
     lv = rows.map((r) => [lits_cond(bits, r.bits, r.val), r.arm, r.flds === 1
       ? [wd(r.bits)] : [wd(r.bits) + "[\"head\"]", wd(r.bits + 1)]
         .slice(0, r.flds)]);
@@ -3411,6 +3424,9 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
       ? [is(k), h, ctr_live(FL.book.ctrs[k]).map(([, f]) => `${s}["${f}"]`)]
       : [tpl(native[k].cond ?? "", [s]), h,
         (native[k].elim ?? []).map((e) => tpl(e, [s]))]);
+    if (adt.k === "Char") {
+      FL.views.set(tpl(native.Chr.elim![0], [s]), { of: "Char", root: s });
+    }
   }
   emit_chain(sc, lv.map(([c, h, fs]) => [c, () =>
     js_func(sc, h, null, [...fs, ...args.slice(1)])]));
