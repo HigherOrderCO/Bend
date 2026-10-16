@@ -60,6 +60,7 @@ type File = {
   stat: Set<Name>;
   own: Set<string>;
   lend: Set<string>;
+  heat: Set<string>;
   segs: Seg[];
   spins: Seg[];
   spun: Map<string, string>;
@@ -93,6 +94,7 @@ type Scope = {
   seg: Seg;
   fresh: Map<string, number>;
   brwl: Map<string, string>;
+  seal: Set<string>;
   spares: { words: number; name: string; z: boolean }[];
   uses: Map<Of<"Var">, Bind>;
   rest: HTerm[];
@@ -1378,11 +1380,11 @@ export function io_run(book: Bend.Book, args: string[]): number {
 
 // A File is the book being compiled (FL): its facts, its output and its
 // caches. The emitter is the analysis: a boxed parameter starts borrowed
-// (its scope's brwl) and becomes owned (own) when owned or unlent; a lend is
-// asked by a holder or passed on from a lent root (k~i<j~q). A shared value
-// heats its type (hot); a family stuck on an open index heats its arms'
-// types once, its arguments at every instantiation. compile_book emits until
-// a pass changes no fact.
+// (brwl) and becomes owned (own) when owned or unlent; a holder asks a lend,
+// a lent root passes it on (k~i<j~q). A shared value heats its type (hot); a
+// family stuck on an open index heats its arms' types once, its arguments at
+// every instantiation. compile_book emits until a pass changes no fact, then
+// heats the roots of kept fields (heat).
 
 function file_new(book: Bend.Book, js: boolean): File {
   PROBES.length = 1;
@@ -1395,6 +1397,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     stat: new Set(),
     own: new Set(),
     lend: new Set(),
+    heat: new Set(),
     segs: [],
     spins: [],
     spun: new Map(),
@@ -1425,12 +1428,11 @@ function file_new(book: Bend.Book, js: boolean): File {
   };
 }
 
-// A scope is where the emitter writes: its segment, its locals' names, the
-// bindings and spare nodes it holds, the def it is in. A nested arm, closure
-// or fork copies its scope; the book's facts and output live in FL.
+// A scope is where the emitter writes. A nested arm, closure or fork copies
+// it; the book's facts and output live in FL.
 function scope_new(): Scope {
   return { seg: seg_new("", BOX, []), fresh: new Map(), brwl: new Map(),
-    spares: [], uses: new Map(), rest: [], def: "" };
+    seal: new Set(), spares: [], uses: new Map(), rest: [], def: "" };
 }
 
 function file_book(roots: Name[]): void {
@@ -1626,6 +1628,9 @@ function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
     if (sc.brwl.has(w)) {
       sc.brwl.set(nw, sc.brwl.get(w)!);
     }
+    if (sc.seal.has(w)) {
+      sc.seal.add(nw);
+    }
     return nw;
   }), b.val.lay));
   const seg = seg_new(name, ret, [...vals, res], frame);
@@ -1669,6 +1674,7 @@ function node_fields(sc: Scope, t: string, k: Name, tail = false): Val[] {
     ws.forEach((w, j) => {
       if (node.ks[j] === "box") {
         sc.brwl.set(w, r);
+        sc.seal.add(w);
       }
     });
   } else if (tail) {
@@ -1682,10 +1688,10 @@ function node_fields(sc: Scope, t: string, k: Name, tail = false): Val[] {
 // Val
 // ===
 
-// A word rooted in a borrowed parameter (brwl) is not owned. val_own is
-// the one gate: at an owned position a rooted word owns its root; lent
-// at `at`, a rooted word passes its lend on, and an unheld owned box
-// owns `at`. A destination every arm fills from one root stays rooted.
+// val_own is the one gate: at an owned position a rooted word owns its root,
+// or is kept if a field (seal); lent at `at`, it passes its lend on, and an
+// unheld owned box owns `at`. A destination every arm fills from one root
+// stays rooted.
 
 function val_new(ws: string[], lay: Lay, stat = false): Val {
   return { ws, lay, stat };
@@ -1707,6 +1713,9 @@ function val_own(sc: Scope, v: Val, at: string | null = null,
     const r = sc.brwl.get(w);
     if (r !== undefined && at !== null) {
       FL.lend.add(at + "<" + r);
+    } else if (sc.seal.has(w)) {
+      file_push(sc, `term_keep(e, ${w}, 1);`);
+      FL.heat.add(r!);
     } else if (r !== undefined
       || (at !== null && !held && v.lay.ks[j] === "box")) {
       FL.own.add(r ?? at!);
@@ -2837,8 +2846,6 @@ function effect_srcs(ext: string, miss: string): string[] {
 
 export function compile_book(book: Bend.Book): string {
   FL = file_new(book, false);
-  // a pure main's descriptor names constructors of the types it prints,
-  // so their datatypes are roots too
   const show = show_main();
   const names = (show ?? []).filter((c) => typeof c === "string");
   file_book(["main", ...RUNTIME_ADTS,
@@ -2847,7 +2854,7 @@ export function compile_book(book: Bend.Book): string {
   let was: number;
   do {
     was = facts();
-    [FL.lend, FL.spun, FL.clos, FL.tabs, FL.lits, FL.consts, FL.brws]
+    [FL.lend, FL.spun, FL.clos, FL.tabs, FL.lits, FL.consts, FL.brws, FL.heat]
       .forEach((m) => m.clear());
     FL.segs = [];
     FL.spins = [];
@@ -2870,6 +2877,12 @@ export function compile_book(book: Bend.Book): string {
         FL.own.add(k + "~" + i);
       }
     }));
+    if (was === facts()) {
+      FL.heat.forEach((r) => {
+        const [k, i] = r.split(/~(?=\d+$)/);
+        facts_hot({ ...scope_new(), def: k }, fun_of(k).live[+i][2], true);
+      });
+    }
   } while (was !== facts());
   const edges = [...FL.segs, ...FL.spins].flatMap((s) =>
     [...s.refs].map((r) => [s.fid, r]));

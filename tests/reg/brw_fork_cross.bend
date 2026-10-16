@@ -1,8 +1,8 @@
-# borrow witness: a fork whose kids read (cnt~0 borrowed) and consume
-# (tail~0 owned: it returns a field) one list. The reader's use still
-# counts when the consumer pops, so tail gets a kept copy (a term_keep on
-# each path, parallel and sequential; Xs hot), both tasks see a live list,
-# and the join holds it and sinks it after both. Correct at 8 threads.
+# borrow witness: a fork whose kids read (cnt~0) and take apart (tail~0)
+# one list. Xs.tail returns a field: it keeps rest there and stays borrowed
+# (term_peek; Xs hot), so Cross keeps nothing on either path, both tasks see
+# a live list, and the join holds it and sinks it after both. Correct at 8
+# threads.
 import Base
 
 type Xs is Data:
