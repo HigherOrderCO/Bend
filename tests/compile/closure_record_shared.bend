@@ -1,7 +1,7 @@
 # compile (closure_record_shared): a closure's result is a flat record
 # bound with + and used twice. The closure returns it boxed; the binding
-# unboxes it before its first share, so the words copy and the node is
-# freed once (a boxed share of the node freed it twice: memory fault).
+# shares the node, which heats its type, so it is freed once (a share
+# that did not heat freed it twice: memory fault).
 import Base
 
 type P is Data:

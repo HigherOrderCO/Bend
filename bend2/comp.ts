@@ -1748,7 +1748,7 @@ function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
   const seg = seg_new(name, ret, [...vals, res], frame);
   FL.segs.push(seg);
   sc = { ...sc, seg, spares: [], uses: new Map() };
-  live.forEach(([p, b], i) => bind_uses(sc, p, vals[i], rest, b.A, false));
+  live.forEach(([p, b], i) => bind_uses(sc, p, vals[i], rest, b.A));
   return sc;
 }
 
@@ -1974,8 +1974,7 @@ function arr_leaf(sc: Scope, s: string, el: Lay): Val {
 // ====
 
 // A binding counts its uses: the last takes the value, an earlier
-// one shares it. A fresh binding of a shared box of a flat type
-// unboxes before its first share, so its words copy, not its node.
+// one shares it.
 
 function bind_pop(sc: Scope, x: HTerm): Val {
   const p = probe_of(x);
@@ -1993,13 +1992,9 @@ function bind_pop(sc: Scope, x: HTerm): Val {
   return b.val;
 }
 
-function bind_uses(sc: Scope, p: Of<"Var">, v: Val, rest: HTerm[], A: HTerm,
-  fresh = true): void {
+function bind_uses(sc: Scope, p: Of<"Var">, v: Val, rest: HTerm[],
+  A: HTerm): void {
   const n = rest_use(rest, p);
-  const lay = lay_of(A);
-  if (fresh && n > 1 && v.lay === BOX && lay !== BOX && !val_brw(sc, v)) {
-    v = val_unbox(sc, v, lay);
-  }
   facts_hot(sc, A, FL.hot.open);
   bind_set(sc, p, { val: v, n, A }, n);
 }
