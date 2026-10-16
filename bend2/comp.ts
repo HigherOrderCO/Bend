@@ -1592,9 +1592,6 @@ function spare_flush(sc: Scope): void {
 // Seg
 // ===
 
-// A segment enters by popping its frame and reading its
-// parameters from the frame slots, then from the bank (r0..).
-
 function seg_new(name: string, ret: Lay, vals: Val[],
   frame: Seg["frame"] = null): Seg {
   return { fid: name && seg_fid(name), def: name, ret, lines: [],
@@ -1874,6 +1871,7 @@ function arr_leaf(sc: Scope, s: string, el: Lay): Val {
 // A binding counts its uses: the last takes the value, an earlier
 // one shares it. A fresh binding of a shared box of a flat type
 // unboxes before its first share, so its words copy, not its node.
+// A share may wrap its word: a frame slot holding it takes the new one.
 
 function bind_pop(sc: Scope, x: HTerm): Val {
   const p = probe_of(x);
@@ -1883,8 +1881,11 @@ function bind_pop(sc: Scope, x: HTerm): Val {
     return b.val;
   }
   bind_set(sc, p, b, b.n - 1);
+  const fr = sc.seg.frame;
   val_owned(sc, b.val).forEach((w) => {
-    file_push(sc, `${w} = term_keep(e, ${w}, 1);`);
+    const s = fr?.pop === 0 ? fr.at[sc.seg.params.indexOf(w)] : undefined;
+    const to = s === undefined ? "" : `STK(${s}) = `;
+    file_push(sc, `${to}${w} = term_keep(e, ${w}, 1);`);
     facts_hot(sc, b.A, true);
   });
   return b.val;
@@ -1947,8 +1948,7 @@ function memo_gc(): void {
 // A pure main prints through a descriptor of its type, a node per (type,
 // layout): 0 U32, 1 F32, 2 Nat, 3 Char (boxed?), 4 String, 5 Eql, 6 Array
 // (element, lgs), 7 Data (boxed?, arms; per arm name, cid, fields, bracket,
-// then an (offset, node) per field). An IO main has none; an unprintable
-// type (a function, a Type, an erased or dependent field) refuses the build.
+// then an (offset, node) per field).
 
 function show_main(): (number | Name)[] | null {
   const main = FL.book.tlds.main;
@@ -3793,7 +3793,7 @@ INLINE void bank_push(DEV u64* H, u32 c, u64 head) {
 // on the host COLD, one parked generation. A host free reaching KEEP_WORDS
 // parks HOT as COLD and banks the old COLD. A miss takes COLD, a bank entry
 // or a fresh quantum. A device lane banks its complete generations at the
-// kernel end (dev_cut). The bump grows only when all of these are empty.
+// kernel end (dev_cut).
 
 #define ALC_AT(e, i)   (e).alc[(i) * LANE_STEP]
 #define ALC_LEN(e, c)  ALC_AT(e, NCLS_ALL + (c))
@@ -4099,8 +4099,7 @@ INLINE Term term_word(Env e, Term w) {
 // ===
 
 // A block owns one allocation in its class (an ARR 2^c Terms, a BUF 2^c
-// u32). Matching ANode is blk_half twice (the high call frees the source);
-// ANode{l, r} is blk_node; Array.clone is blk_copy.
+// u32). Matching ANode is blk_half twice (the high call frees the source).
 
 #define BLK_ALLOC(n, w) \
   u64 n = heap_alloc(e, w); \
@@ -5170,8 +5169,6 @@ static void gpu_pass(u32 f) {
 // to cur - 1, so those rows hold every task. A slow grow deals task g to
 // row g % CUBE_T, and the grows repeat over g rows until none deals.
 
-// Between turns, each ring's pending tasks move back to slot 0.
-
 static void ring_rewind(u64* H, u32 rows) {
   Term keep[RING_LEN];
   for (u32 r = 0; r < (rows < CUBE_G ? rows : CUBE_G) * CUBE_T; r += 1) {
@@ -5452,7 +5449,6 @@ static void io_spawn(Term m) {
 
 // io_park stays in deadline order (time 0, none, sorts last; ties keep
 // their park order), so io_wait wakes due timers in the order they expire.
-// It links both ways, so io_park_cut drops a waiter in O(1).
 static void io_park_add(IoWork* w) {
   IoWork* p = io_park;
   if (p == NULL || p->time - 1 <= w->time - 1) {
@@ -5605,7 +5601,6 @@ static Term io_str(Env e, const char* p, u64 n) {
   return s;
 }
 
-// Bytes cross as they are (0..255), one List cell each, with no UTF-8.
 #ifdef CID(Con)
 
 static Term io_list(Env e, const char* p, u64 n) {
@@ -6122,9 +6117,6 @@ function cli(argv) {
 
 // Show
 // ====
-
-// show_val prints a pure main's value as term_show does (see show_main);
-// chain is the bracket it continues, or 0.
 
 function show_chr(s, q) {
   const c = char_code(s);
