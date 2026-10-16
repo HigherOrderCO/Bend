@@ -1,7 +1,8 @@
 # borrow witness: a borrower passing a field to a storing position. Xs.rev
 # stores v, a word: rev~0 stays borrowed (term_peek in its spin) and F has
-# no term_keep. Ys.rev stores v, a box field of its rooted parameter: the
-# root is owned, Ys.rev takes its nodes, and G keeps ys once.
+# no term_keep. Ys.rev stores v, a box field of its rooted parameter: it
+# keeps v there (term_peek, then term_keep), its root stays borrowed, and G
+# keeps nothing.
 import Base
 
 type Xs is Data:

@@ -1,5 +1,5 @@
-# borrow witness: mixed conventions in one call. Mixed~1 is owned (b goes
-# to Xs.tail, which returns a field) and Mixed~0 borrowed (a is only read):
+# borrow witness: mixed conventions in one call. Mixed~1 is owned (F moves
+# ys in, so no call lends it) and Mixed~0 borrowed (a is only read):
 # F reads xs in place (term_peek) and moves ys, no term_keep in the C.
 import Base
 
