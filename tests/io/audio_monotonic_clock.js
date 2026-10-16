@@ -1,3 +1,7 @@
+// bend-ids 1
+// CID #Unit BEND_CID_Unit
+// CID :wall_clock_backwards BEND_CID_wall_clock_backwards
+// bend-ids end
 // One second backwards between opening the ring and its empty write.
 const wall_now = Date.now;
 
@@ -14,7 +18,7 @@ function wall_clock_backwards(reset) {
       return 0;
     };
   }
-  return { $: CID(Unit) };
+  return { $: BEND_CID_Unit };
 }
 
-io_eff(CID(wall_clock_backwards), wall_clock_backwards);
+io_eff(BEND_CID_wall_clock_backwards, wall_clock_backwards);

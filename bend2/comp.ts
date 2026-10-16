@@ -1186,7 +1186,10 @@ function fun_at(ck: Spine): Fun {
     || lays.flatMap((l) => l.ks).length > WIDE || term_any(b, (s, tail) => {
       const m = term_spine(s);
       return tail && m.k === ck.k && m.all.filter((_, i) => !dom_live(doms[i]))
-        .some((a, j) => probe_of(term_strip(a)) !== ps[j]);
+        .some((a, j) => {
+          const t = term_strip(a);
+          return t.$ !== "Var" || probe_of(t) !== ps[j];
+        });
     }) ? f : { ...f, lays, ret };
 }
 
@@ -2771,9 +2774,9 @@ export function compile_book(book: Bend.Book): string {
     `static const char* SHOW_NAMES[] = { ${names.map((n) =>
       JSON.stringify(name_display(FL.book, n)).replaceAll("?", "\\?")).join(", ")} };`,
     "#endif"];
-  const arg = () => val_new([""], W64);
-  const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [arg()]),
-    seg_new(CLO_APPLY, BOX, [arg(), arg()])];
+  const arg = val_new([""], W64);
+  const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [arg]),
+    seg_new(CLO_APPLY, BOX, [arg, arg])];
   const cids = new Map<QName, number>();
   const cid = (k: QName, n: number) =>
     cids.set(k, n > WIDE ? 240 + Math.log2(n) : n);

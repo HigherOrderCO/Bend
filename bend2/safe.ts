@@ -291,6 +291,7 @@ function root_emit(e: Safe, k: QName): [QName[], QName | null] {
   let ps: Binder[] = [];
   // a column's kernel term, made once for every leaf below it
   const kc = new Map<HTerm, O>();
+  const pick = tld.$ === "Def" && tld.x > 0 ? inst_pick(e, k) : null;
   const col = (v: HTerm): O => kc.get(v) ?? kc.set(v, term(e, scope_nil(), v, false)).get(v) as O;
   // the check of k's instances after the columns cs of T, at depth d
   const go = (T: HTerm, cs: Cols, d: number): O => {
@@ -335,7 +336,9 @@ function root_emit(e: Safe, k: QName): [QName[], QName | null] {
     if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
       oos("a specialized parameter whose type names a parameter");
     }
-    const key = String(j) + "\n" + B.term_key(B.term_lower(F.A));
+    // roots share a constant only where they give it the same model
+    const f = pick === null ? null : fit(e, k, pick[j], F.A);
+    const key = String(j) + "\n" + B.term_key(B.term_lower(F.A)) + "\n" + (f === null ? "" : B.term_key(B.term_lower(f)));
     const kept = e.consts.get(key);
     if (kept !== undefined) {
       return at(B.Ref(kept));
@@ -343,7 +346,7 @@ function root_emit(e: Safe, k: QName): [QName[], QName | null] {
     const c = B.name_fresh(k, "root");
     const def: Def = { $: "Def", n: 0, x: 0, T: F.A, v: null };
     e.book.tlds[c] = def;
-    const m = model(e, F.A);
+    const m = f ?? model(e, F.A);
     e.mb.tlds[c] = { ...def, v: m };
     e.consts.set(key, c);
     return at(B.Ref(c));
@@ -479,7 +482,7 @@ function item_emit(e: Safe, k: QName, cols: Cols, n: QName): void {
 // no body goes out opaque, at a model of its type
 function def_emit(e: Safe, k: QName, cols: Cols, n: QName, tld: Def): void {
   const T = B.tele_fill(e.book, tld.T, cols.slice(0, tld.x) as HTerm[], B.ctx_nil());
-  const t = tld.e !== undefined ? null : model(e, T)
+  const t = tld.e !== undefined ? null : (e.mb.tlds[k] as Def).v ?? model(e, T)
     ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_display(e.book, k));
   const s = { ...scope_nil(), self: n };
   const To = term(e, s, T, false);
@@ -595,7 +598,7 @@ function model(e: Safe, T: HTerm): HTerm | null {
 // the ~ arguments of k's first instance whose arguments all fit, each at
 // its parameter's type after the ones before it; k's constants take their
 // models from it alone
-function inst_pick(e: Safe, k: Name): HTerm[] | null {
+function inst_pick(e: Safe, k: QName): HTerm[] | null {
   const fits = (T: HTerm, [x, ...xs]: HTerm[]): boolean => {
     if (x === undefined) {
       return true;
@@ -603,13 +606,19 @@ function inst_pick(e: Safe, k: Name): HTerm[] | null {
     const F = B.term_wnf(e.mb, T);
     return F.$ === "All" && fit(e, k, x, F.A) !== null && fits(F.B(x), xs);
   };
-  return [...e.inst.values()].find(([t, xs]) => t === k && fits(e.book.tlds[k].T, xs))?.[1] ?? null;
+  for (const n of e.book.tmps.values()) {
+    if (B.name_parent(n) !== k) continue;
+    const xs = (e.book.tlds[n] as Def).args!.map(x => B.checked_higher(x));
+    if (fits(B.scope_mapper(v => v)(e.book.tlds[k].T), xs)) return xs;
+  }
+  return null;
 }
 
 // x checked at T in the model book, as k's code; null if it does not fit
-function fit(e: Safe, k: Name, x: HTerm, T: HTerm): HTerm | null {
+function fit(e: Safe, k: QName, x: HTerm, T: HTerm): HTerm | null {
   try {
-    return B.term_higher(B.term_check(e.mb, { t: B.Ref(k), n: 0, def: k, qs: [] }, x, B.Lone(), T, B.ctx_nil(), 0).tm);
+    const copy = B.scope_mapper(v => v);
+    return B.checked_higher(B.term_check(e.mb, { t: B.Ref(k), n: 0, def: k, qs: [] }, copy(x), B.Lone(), copy(T), B.ctx_nil(), 0).tm);
   } catch (err) {
     if ((err as B.Err).$ !== "Err") {
       throw err;
