@@ -48,14 +48,14 @@
 // String and U32 are native JS values here; other data is {$: Name, ...}.
 
 const LINT_SEVERITY = {
-  [BEND_CID_Error]: "error",
-  [BEND_CID_Warning]: "warning",
+  [BEND_CID_Error]:       "error",
+  [BEND_CID_Warning]:     "warning",
   [BEND_CID_Information]: "information",
-  [BEND_CID_Hint]: "hint",
+  [BEND_CID_Hint]:        "hint",
 };
 const LINT_QUANTITY = { erased: BEND_CID_Erased, once: BEND_CID_Once, many: BEND_CID_Many };
 const LINT_APPLICABILITY = {
-  [BEND_CID_Safe]: "safe",
+  [BEND_CID_Safe]:      "safe",
   [BEND_CID_Suggested]: "suggested",
   [BEND_CID_Dangerous]: "dangerous",
 };
@@ -147,12 +147,10 @@ function lint_view(fact) {
   const v = lint_host().view(fact.id);
   return {
     $: BEND_CID_View,
-    owner: v.owner,
-    inst: v.inst,
-    kind: v.kind,
-    name: v.name,
+    owner: v.owner, inst: v.inst,
+    kind: v.kind, name: v.name,
     quantity: { $: LINT_QUANTITY[v.quantity] },
-    span: lint_maybe(v.span && lint_span(v.span)),
+    span:  lint_maybe(v.span && lint_span(v.span)),
     inner: lint_maybe(v.inner && lint_span(v.inner)),
   };
 }

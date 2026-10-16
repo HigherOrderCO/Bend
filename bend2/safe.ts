@@ -54,7 +54,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import * as B from "./bend.ts";
-import type { Book, Def, HTerm, QualifiedName, Quant, ADT } from "./bend.ts";
+import type { Book, Def, HTerm, QName, Quant, ADT } from "./bend.ts";
 
 // Types
 // =====
@@ -64,7 +64,7 @@ type Q = 0 | 1 | 2;
 // a kernel term; a binder names its variable by its level
 type O =
   | { $: "Var"; l: number }
-  | { $: "Ref"; k: QualifiedName }
+  | { $: "Ref"; k: QName }
   | { $: "Ann"; x: O; T: O }
   | { $: "Let"; q: Q; l: number; v: O; f: O }
   | { $: "Typ"; q: O }
@@ -75,9 +75,9 @@ type O =
   | { $: "Sig"; q: Q; l: number; A: O; B: O }
   | { $: "Tup"; q: Q; a: O; b: O }
   | { $: "Prj"; h: O }
-  | { $: "Enu"; ks: QualifiedName[] }
-  | { $: "Lab"; k: QualifiedName }
-  | { $: "Mat"; k: QualifiedName; h: O; m: O }
+  | { $: "Enu"; ks: QName[] }
+  | { $: "Lab"; k: QName }
+  | { $: "Mat"; k: QName; h: O; m: O }
   | { $: "Efq" }
   | { $: "Eql"; a: O; b: O; T: O }
   | { $: "Rfl" }
@@ -110,8 +110,11 @@ type Chain = { n: number; cv: number[] };
 // a pattern), each kernel binder's tentative quantity, the default tags
 // (a tag's fields follow it), whether the tree is built only to count
 // its uses, and whether it is built again for a convoy
-type Scope = { c: Bind[]; d: number; D: number; cols: Cols;
-  self: QualifiedName | null; empty: O[]; sub: boolean; kq: Q[]; tags: number[]; dry: boolean; again: boolean };
+type Scope = {
+  c: Bind[]; d: number; D: number; cols: Cols;
+  self: QName | null; empty: O[]; sub: boolean;
+  kq: Q[]; tags: number[]; dry: boolean; again: boolean;
+};
 
 // the elaboration: the book, the book models read (a root's constant at
 // its model), the defs out (an opaque one flagged), each item's kernel
@@ -120,19 +123,20 @@ type Scope = { c: Bind[]; d: number; D: number; cols: Cols;
 // pass, the active items (ordered and as a set), whether a group grew,
 // shared root constants by place and type, and cached kernel live uses.
 type Safe = {
-  book: Book;
-  mb: Book;
-  out: Array<[QualifiedName, O, O, boolean]>;
-  names: Map<string, { k: QualifiedName; n: QualifiedName }>;
+  book: Book; mb: Book;
+
+  out: Array<[QName, O, O, boolean]>;
+  names: Map<string, { k: QName; n: QName }>;
   seen: Set<string>;
-  todo: Array<[QualifiedName, Cols]>;
-  fail: Map<QualifiedName, string>;
+  todo: Array<[QName, Cols]>;
+  fail: Map<QName, string>;
   log: Array<[Map<string, unknown> | Set<string>, string]>;
-  groups: Map<QualifiedName, Group>;
-  stack: string[];
-  going: Set<string>;
+
+  groups: Map<QName, Group>;
+  stack: string[]; going: Set<string>;
   grew: boolean;
-  consts: Map<string, QualifiedName>;
+
+  consts: Map<string, QName>;
   uses: WeakMap<O, Map<number, number>>;
 };
 
@@ -144,7 +148,11 @@ type Probe = { left: number; depth: number; cut: boolean };
 // =========
 
 const QUANTS = ["Q0", "Q1", "Q2"];
+
+// the unit label, type and value
 const UNIT = "()";
+const UT: O = { $: "Enu", ks: [UNIT] };
+const UV: O = { $: "Lab", k: UNIT };
 
 // a Nat literal longer than this goes out as arithmetic on shorter ones
 const NAT_MAX = 4096;
@@ -157,10 +165,6 @@ const MODEL_DEPTH = 8;
 
 // only this compiler release may build a cached kernel
 const LEAN_VERSION = "4.34.0";
-
-// the unit type and value
-const UT: O = { $: "Enu", ks: [UNIT] };
-const UV: O = { $: "Lab", k: UNIT };
 
 // Errors
 // ======
@@ -191,9 +195,9 @@ function oos(why: string, E = Scope_Error): never {
 // the BendTT text of a checked book: every def and datatype not in base,
 // in bend2's fill order, and what they name; a def out of scope goes, as
 // does every def that names it, and oos says why, for each book name
-function safe_book(book: Book): { text: string; oos: Array<[QualifiedName, string]> } {
+function safe_book(book: Book): { text: string; oos: Array<[QName, string]> } {
   const n0 = Object.keys(book.tlds).length;
-  const groups = new Map<QualifiedName, Group>();
+  const groups = new Map<QName, Group>();
   for (let r = safe_pass(book, groups); ; r = safe_pass(book, groups)) {
     if (r !== null) {
       return r;
@@ -206,7 +210,7 @@ function safe_book(book: Book): { text: string; oos: Array<[QualifiedName, strin
 // one pass at the groups found so far, or null when it is stale: it grew
 // a group some item had already gone out at, or a mention named a member
 // on its own before the member's group was found
-function safe_pass(book: Book, groups: Map<QualifiedName, Group>): { text: string; oos: Array<[QualifiedName, string]> } | null {
+function safe_pass(book: Book, groups: Map<QName, Group>): { text: string; oos: Array<[QName, string]> } | null {
   const g0 = groups.size;
   // The model evaluates bodies and constructor telescopes, not declaration
   // signatures. Copy those computation roots together to preserve their sharing.
@@ -214,12 +218,15 @@ function safe_pass(book: Book, groups: Map<QualifiedName, Group>): { text: strin
   const mb: Book = { ...book, tlds: Object.create(null), ctrs: Object.create(null) };
   for (const [k, t] of Object.entries(book.tlds)) {
     mb.tlds[k] = t.$ === "Def" ? { ...t, v: t.v === null ? null : copy(t.v) }
-      : { ...t, c: t.c.map(c =>
-        mb.ctrs[c.k] = { ...c, T: copy(c.T) }) };
+      : { ...t, c: t.c.map(c => mb.ctrs[c.k] = { ...c, T: copy(c.T) }) };
   }
-  const e: Safe = { book, mb, out: [], names: new Map(), seen: new Set(),
-    todo: [], fail: new Map(), log: [], groups, stack: [], going: new Set(), grew: false, consts: new Map(), uses: new WeakMap() };
-  const roots: Array<[QualifiedName, QualifiedName[], QualifiedName | null]> = [];
+  const e: Safe = {
+    book, mb,
+    out: [], names: new Map(), seen: new Set(), todo: [], fail: new Map(), log: [],
+    groups, stack: [], going: new Set(), grew: false,
+    consts: new Map(), uses: new WeakMap()
+  };
+  const roots: Array<[QName, QName[], QName | null]> = [];
   for (const k of [...new Set([...book.order].reverse())].reverse().filter((k) => book.tlds[k].b !== true)) {
     const m = trail(e);
     try {
@@ -255,11 +262,11 @@ function safe_pass(book: Book, groups: Map<QualifiedName, Group>): { text: strin
   e.out = e.out.filter(([k]) => !bad.has(k));
   // a def is out at its instances' reasons, else at its λ-match's; with
   // neither, it reaches no kernel def
-  const why = (n: QualifiedName): string[] => bad.has(n) ? [bad.get(n) as string] : [];
+  const why = (n: QName): string[] => bad.has(n) ? [bad.get(n) as string] : [];
   const oos = roots.flatMap(([k, ns, top]) => {
     const ws = ns.flatMap(why);
     const all = ws.length > 0 ? ws : top !== null ? why(top) : ns.length === 0 ? ["no kernel def"] : [];
-    return [...new Set(all)].map((w): [QualifiedName, string] => [k, w]);
+    return [...new Set(all)].map((w): [QName, string] => [k, w]);
   });
   return { text: book_show(e), oos };
 }
@@ -276,9 +283,9 @@ function safe_pass(book: Book, groups: Map<QualifiedName, Group>): { text: strin
 // parameters (bound in it), the arms name the instances bare; any other
 // reason G cannot go out is k's. Returns the instances' names, and the
 // λ-match's (null without one)
-function root_emit(e: Safe, k: QualifiedName): [QualifiedName[], QualifiedName | null] {
+function root_emit(e: Safe, k: QName): [QName[], QName | null] {
   const tld = e.book.tlds[k];
-  const ns: QualifiedName[] = [];
+  const ns: QName[] = [];
   // k's type G: undefined until a finite parameter, null if it cannot go out
   let G: O | null | undefined;
   let ps: Binder[] = [];
@@ -351,8 +358,16 @@ function root_emit(e: Safe, k: QualifiedName): [QualifiedName[], QualifiedName |
   return [ns, n];
 }
 
+// Item
+// ====
+
+// book name k and each specialized argument paired with its column
+function item_key(k: QName, cols: Cols): string {
+  return JSON.stringify([k, cols.flatMap((v, j) => v === null ? [] : [[j, B.term_key(B.term_lower(v))]])]);
+}
+
 // item_ref, with a failure kept as the item's reason
-function item_try(e: Safe, k: QualifiedName, cols: Cols): QualifiedName {
+function item_try(e: Safe, k: QName, cols: Cols): QName {
   try {
     return item_ref(e, k, cols, true);
   } catch (x) {
@@ -366,19 +381,10 @@ function item_try(e: Safe, k: QualifiedName, cols: Cols): QualifiedName {
   }
 }
 
-// Item
-// ====
-
-// book name k at the arguments cols of its specialized parameters (a
-// tab and a def's name is the def's group)
-function item_key(k: QualifiedName, cols: Cols): string {
-  return JSON.stringify([k, cols.flatMap((v, j) => v === null ? [] : [[j, B.term_key(B.term_lower(v))]])]);
-}
-
 // the kernel name of book name k at cols: a Quant literal names itself;
 // a live name goes out now (before its caller), a dead one later. A live
 // name still going out (not its own) closes a live cycle: a group
-function item_ref(e: Safe, k: QualifiedName, cols: Cols, live: boolean): QualifiedName {
+function item_ref(e: Safe, k: QName, cols: Cols, live: boolean): QName {
   const key = item_key(k, cols);
   const m = live && !e.seen.has(key) ? trail(e) : null;
   let n = e.names.get(key)?.n;
@@ -416,7 +422,40 @@ function item_ref(e: Safe, k: QualifiedName, cols: Cols, live: boolean): Qualifi
   return n;
 }
 
-function item_emit(e: Safe, k: QualifiedName, cols: Cols, n: QualifiedName): void {
+// what an emission has added, which a Regroup below it undoes. Emission
+// only appends to out and todo, and adds keys to names, seen and fail
+// through put, which logs each new one, so their lengths mark it and
+// an undo costs what it removes; other state an emission changes would
+// outlive the undo
+type Trail = [number, number, number];
+
+function trail(e: Safe): Trail {
+  return [e.out.length, e.todo.length, e.log.length];
+}
+
+function undo(e: Safe, m: Trail): void {
+  e.out.length = m[0];
+  e.todo.length = m[1];
+  for (const [x, k] of e.log.splice(m[2])) {
+    x.delete(k);
+  }
+}
+
+// x gains the key k (at v, in a map); a new one is logged for undo
+function put<V>(e: Safe, x: Map<string, V>, k: string, v: V): void;
+function put(e: Safe, x: Set<string>, k: string): void;
+function put(e: Safe, x: Map<string, unknown> | Set<string>, k: string, v?: unknown): void {
+  if (!x.has(k)) {
+    e.log.push([x, k]);
+  }
+  if (x instanceof Map) {
+    x.set(k, v);
+  } else {
+    x.add(k);
+  }
+}
+
+function item_emit(e: Safe, k: QName, cols: Cols, n: QName): void {
   const parent = B.name_parent(k);
   const group = parent === null ? undefined : e.groups.get(parent);
   if (group?.id === k) {
@@ -438,16 +477,44 @@ function item_emit(e: Safe, k: QualifiedName, cols: Cols, n: QualifiedName): voi
 // a def at its specialized arguments: non-null cols are the leading
 // template prefix, filled into its type; the tree takes them. A def with
 // no body goes out opaque, at a model of its type
-function def_emit(e: Safe, k: QualifiedName, cols: Cols, n: QualifiedName, tld: Def): void {
+function def_emit(e: Safe, k: QName, cols: Cols, n: QName, tld: Def): void {
   const T = B.tele_fill(e.book, tld.T, cols.slice(0, tld.x) as HTerm[], B.ctx_nil());
-  const t = tld.e !== undefined ? null : (Object.hasOwn(e.mb.tlds, k) ? (e.mb.tlds[k] as Def).v : model(e, T)) ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_display(e.book, k));
+  const t = tld.e !== undefined ? null : model(e, T)
+    ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_display(e.book, k));
   const s = { ...scope_nil(), self: n };
   const To = term(e, s, T, false);
   e.out.push([n, To, t === null ? arm(e, s, k, cols, []) : tree(e, s, t, []), t !== null]);
 }
 
+// def k's checked tree at the terms vs (its parameters left to right,
+// but the specialized ones, in cols; a group's variables): a λ binds its
+// term, and the terms left go to the tree as arguments, (λ{..} x ..), so
+// its matches stay nodes of the case tree. bend2 checks a template once,
+// each ~ parameter j an opaque constant name_gen(k, "param", j), which stands
+// for its ~ argument, a column the tree drops
+function arm(e: Safe, s: Scope, k: QName, cols: Cols, vs: Array<[Q, O]>): O {
+  const tld = e.book.tlds[k] as Def;
+  const ps = tld.x === 0 ? null : new Map(B.tele_unbind(e.book, tld.T).doms.slice(0, tld.x)
+    .map((_, j) => [B.name_gen(k, "param", j), cols[j]]));
+  const t0 = B.checked_higher(tld.e as B.LTerm);
+  let t = ps === null ? t0 : B.scope_mapper(x => x, ps)(t0);
+  let si: Scope = { ...s, c: [], d: 0, cols: cols.slice(tld.x), sub: false };
+  let j = 0;
+  for (let [x, T] = open(t); x.$ === "Lam" && T !== null; [x, T] = open(t)) {
+    const F = B.term_wnf(e.book, T);
+    const v = si.cols[0] ?? null;
+    if (F.$ !== "All" || (v === null && j === vs.length)) {
+      break;
+    }
+    si = { ...si, cols: si.cols.slice(1) };
+    si = v !== null ? scope_bind(si, { $: "Efq" }, F.A, false, v) : scope_bind(si, vs[j++][1], F.A, false);
+    t = x.f(B.Var(x.k, si.d - 1));
+  }
+  return vs.slice(j).reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), tree(e, si, t, []));
+}
+
 // D.arms and D, at D's specialized arguments
-function adt_emit(e: Safe, cols: Cols, n: QualifiedName, tld: ADT): void {
+function adt_emit(e: Safe, cols: Cols, n: QName, tld: ADT): void {
   const { s, ps, xs, T } = tele_open(e, scope_nil(), tld.T, cols, tld.n);
   const K = B.term_wnf(e.book, T);
   if (K.$ !== "Typ") {
@@ -462,10 +529,13 @@ function adt_emit(e: Safe, cols: Cols, n: QualifiedName, tld: ADT): void {
   const arms = mats(ks, (i) => fs(tld.c[i]));
   const Enu: O = { $: "Enu", ks };
   e.out.push([am, alls(ps, { $: "All", q: 1, l: t, A: Enu, B: G }), lams(e, ps, arms), false]);
-  const at = (k: QualifiedName): O => ps.reduce<O>((f, [q, l]) => ({ $: "App", q, f, x: { $: "Var", l } }), { $: "Ref", k });
-  e.out.push([n, alls(ps, G), lams(e, ps, { $: "Sig", q: 1, l: t, A: Enu, B: { $: "App", q: 1, f: at(am), x: { $: "Var", l: t } } }), false]);
+  const at = (k: QName): O => ps.reduce<O>((f, [q, l]) => ({ $: "App", q, f, x: { $: "Var", l } }), { $: "Ref", k });
+  e.out.push([n, alls(ps, G),
+    lams(e, ps, { $: "Sig", q: 1, l: t, A: Enu, B: { $: "App", q: 1, f: at(am), x: { $: "Var", l: t } } }), false]);
   if (tld.c.length === 0) {
-    e.out.push([B.name_gen(n, "efq", 0), alls(ps, { $: "All", q: 1, l: t, A: at(n), B: { $: "Enu", ks: [] } }), lams(e, ps, { $: "Prj", h: { $: "Efq" } }), false]);
+    e.out.push([B.name_gen(n, "efq", 0),
+      alls(ps, { $: "All", q: 1, l: t, A: at(n), B: { $: "Enu", ks: [] } }),
+      lams(e, ps, { $: "Prj", h: { $: "Efq" } }), false]);
   }
 }
 
@@ -644,7 +714,8 @@ function quant(q: Quant): Q {
 // =====
 
 function scope_nil(): Scope {
-  return { c: [], d: 0, D: 0, cols: [], self: null, empty: [], sub: false, kq: [], tags: [], dry: false, again: false };
+  return { c: [], d: 0, D: 0, cols: [], self: null, empty: [], sub: false,
+    kq: [], tags: [], dry: false, again: false };
 }
 
 // binds the next bend2 variable to o, or to its original term v when
@@ -910,11 +981,11 @@ function rebuild(e: Safe, s: Scope, x: Extract<HTerm, { $: "Lam" }>, all: Extrac
     const G = B.term_wnf(e.book, U);
     return G.$ !== "All" || (kind(e, s, B.term_wnf(e.book, G.A)) === 2 && data(G.B(B.Var(G.k, -1))));
   };
-  const arm = (k: QualifiedName, U: HTerm, xs: HTerm[]): HTerm => {
+  const arm = (k: QName, U: HTerm, xs: HTerm[]): HTerm => {
     const G = B.term_wnf(e.book, U);
     return G.$ !== "All" ? x.f(B.Ann(B.Ctr(k, xs), F)) : B.Lam(G.k, 0, (v: HTerm) => arm(k, G.B(v), [...xs, v]));
   };
-  const cs = (e.book.tlds[F.k] as ADT).c.filter((c) => !F.r.includes(c.k)).map((c): [QualifiedName, HTerm] => [c.k, B.tele_fill(e.book, c.T, F.x, B.ctx_nil())]);
+  const cs = (e.book.tlds[F.k] as ADT).c.filter((c) => !F.r.includes(c.k)).map((c): [QName, HTerm] => [c.k, B.tele_fill(e.book, c.T, F.x, B.ctx_nil())]);
   return cs.every(([, U]) => data(U)) ? B.Ann(cs.reduceRight<HTerm>((m, [k, U]) => B.Mat(k, arm(k, U, []), m), B.Efq()), all) : null;
 }
 
@@ -1070,7 +1141,7 @@ function spine(e: Safe, s: Scope, t: HTerm, live: boolean): O {
 
 // the item named k (or the term k) applied to xs along its telescope T:
 // the arguments of an item's specialized parameters pick its instance and go
-function args(e: Safe, s: Scope, k: QualifiedName | O, T: HTerm | null, xs: HTerm[], live: boolean): O {
+function args(e: Safe, s: Scope, k: QName | O, T: HTerm | null, xs: HTerm[], live: boolean): O {
   const tld = typeof k === "string" ? e.book.tlds[k] : null;
   // a def's first x parameters, its ~ ones, are specialized
   const nx = tld?.$ === "Def" ? tld.x : 0;
@@ -1086,11 +1157,11 @@ function args(e: Safe, s: Scope, k: QualifiedName | O, T: HTerm | null, xs: HTer
     U = F.B(v ?? x);
   });
   // a call that closed a live cycle goes again, through its group
-  let n: QualifiedName | null;
+  let n: QName | null;
   try {
     const g = typeof k === "string" ? e.groups.get(k) ?? null : null;
     if (g !== null) {
-      return group_call(e, s, g, k as QualifiedName, ps, U as HTerm, live);
+      return group_call(e, s, g, k as QName, ps, U as HTerm, live);
     }
     n = typeof k === "string" ? item_ref(e, k, ps.map((p) => p[3]), live) : null;
   } catch (x) {
@@ -1114,8 +1185,8 @@ function args(e: Safe, s: Scope, k: QualifiedName | O, T: HTerm | null, xs: HTer
 // back passes a field of its selector, k's call to a helper a piece of
 // the lead, and all mentions of a member convert.
 
-// a group: k, its members (k first), and the lead's quantities (k's)
-type Group = { k: QualifiedName; id: QualifiedName; ms: QualifiedName[]; qs: Q[] };
+// a group: its lead k, generated name id, members (k first), and k's quantities
+type Group = { k: QName; id: QName; ms: QName[]; qs: Q[] };
 
 // the live cycle from the item at key to the top of the stack, as a group:
 // a group item on it brings its members, and the lead is the member
@@ -1130,7 +1201,7 @@ function regroup(e: Safe, key: string): never {
   if (ms.length < 2 || gs.length === 1 && ms.length === gs[0].ms.length) {
     oos("a recursion through " + B.name_display(e.book, ms[0]) + " at other specialized arguments");
   }
-  const at = (x: QualifiedName): number => e.book.order.lastIndexOf(x);
+  const at = (x: QName): number => e.book.order.lastIndexOf(x);
   const k = ms.reduce((a, b) => at(b) > at(a) ? b : a);
   const g = group_new(e, k, ms.filter((x) => x !== k).sort((a, b) => at(a) - at(b)))
     ?? oos("a mutual recursion through " + ms.map(k => B.name_display(e.book, k)).join(", ") + " that no live parameter of " + B.name_display(e.book, k) + " leads");
@@ -1143,7 +1214,7 @@ function regroup(e: Safe, key: string): never {
 
 // k's group with the helpers hs: each calls k back, and k's call to a
 // helper must shrink a live lead parameter
-function group_new(e: Safe, k: QualifiedName, hs: QualifiedName[]): Group | null {
+function group_new(e: Safe, k: QName, hs: QName[]): Group | null {
   const lead = Math.min(...hs.map((h) => {
     const t = B.term_lower(B.checked_higher((e.book.tlds[h] as Def).e as B.LTerm));
     let n = 0;
@@ -1168,7 +1239,7 @@ function group_new(e: Safe, k: QualifiedName, hs: QualifiedName[]): Group | null
 }
 
 // the arguments of each call to k in the lowered term t
-function back(t: B.LTerm, k: QualifiedName): B.LTerm[][] {
+function back(t: B.LTerm, k: QName): B.LTerm[][] {
   let [f, xs]: [B.LTerm, B.LTerm[]] = [t, []];
   while (f.$ === "App" || f.$ === "Ann") {
     [f, xs] = f.$ === "App" ? [f.f, [f.x, ...xs]] : [f.x, xs];
@@ -1180,42 +1251,9 @@ function back(t: B.LTerm, k: QualifiedName): B.LTerm[][] {
   });
 }
 
-// what an emission has added, which a Regroup below it undoes. Emission
-// only appends to out and todo, and adds keys to names, seen and fail
-// through put, which logs each new one, so their lengths mark it and
-// an undo costs what it removes; other state an emission changes would
-// outlive the undo
-type Trail = [number, number, number];
-
-function trail(e: Safe): Trail {
-  return [e.out.length, e.todo.length, e.log.length];
-}
-
-function undo(e: Safe, m: Trail): void {
-  e.out.length = m[0];
-  e.todo.length = m[1];
-  for (const [x, k] of e.log.splice(m[2])) {
-    x.delete(k);
-  }
-}
-
-// x gains the key k (at v, in a map); a new one is logged for undo
-function put<V>(e: Safe, x: Map<string, V>, k: string, v: V): void;
-function put(e: Safe, x: Set<string>, k: string): void;
-function put(e: Safe, x: Map<string, unknown> | Set<string>, k: string, v?: unknown): void {
-  if (!x.has(k)) {
-    e.log.push([x, k]);
-  }
-  if (x instanceof Map) {
-    x.set(k, v);
-  } else {
-    x.add(k);
-  }
-}
-
 // a call to member m at the arguments ps (R its type): the group's at
 // m's selector, annotated (the kernel infers an unreduced mode)
-function group_call(e: Safe, s: Scope, g: Group, m: QualifiedName, ps: Arg[], R: HTerm, live: boolean): O {
+function group_call(e: Safe, s: Scope, g: Group, m: QName, ps: Arg[], R: HTerm, live: boolean): O {
   const n = g.qs.length;
   if (ps.length < Math.max(e.book.tlds[m].n, n) || ps.slice(n).some((p) => p[3] !== null)) {
     oos("a partial or specialized call to " + B.name_display(e.book, m) + ", mutually recursive");
@@ -1225,7 +1263,8 @@ function group_call(e: Safe, s: Scope, g: Group, m: QualifiedName, ps: Arg[], R:
   const args = (xs: Arg[], qs: Q[]): Array<[Q, O]> => xs.flatMap(([q, x, A, v], j): Array<[Q, O]> =>
     v !== null ? [] : [[qs[j] ?? q, arg_term(e, a, x, A, live && (qs[j] ?? q) > 0)]]);
   const sel: O = { $: "Tup", q: 1, a: { $: "Lab", k: g.k }, b: UV };
-  const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: m }, b: { $: "Tup", q: 1, a: sel, b: UV } }] as [Q, O],
+  const x = [...args(ps.slice(0, n), g.qs),
+    [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: m }, b: { $: "Tup", q: 1, a: sel, b: UV } }] as [Q, O],
     ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), { $: "Ref", k });
   return { $: "Ann", x, T: term(e, s, R, false) };
 }
@@ -1233,20 +1272,21 @@ function group_call(e: Safe, s: Scope, g: Group, m: QualifiedName, ps: Arg[], R:
 // the group at the specialized lead arguments cols: ∀lead -> ∀s:Sel ->
 // (MODE s), MODE the selected member's other parameters and type; its
 // tree convoys the lead's q=1 variables through the selector's match
-function group_emit(e: Safe, g: Group, cols: Cols, n: QualifiedName): void {
+function group_emit(e: Safe, g: Group, cols: Cols, n: QName): void {
   const { s, ps: ls, xs: lead } = tele_open(e, { ...scope_nil(), self: n }, e.book.tlds[g.k].T, cols, g.qs.length);
   // member m past the lead, from scope s1 on: its binders, its terms (but
   // at its specialized parameters), its cols and type
-  const rest = (s1: Scope, m: QualifiedName) => {
+  const rest = (s1: Scope, m: QName) => {
     const tld = e.book.tlds[m];
     const nx = tld.$ === "Def" ? tld.x : 0;
     const r = tele_open(e, s1, tld.T, lead, Math.max(tld.n, lead.length));
     const qs = B.tele_unbind(e.book, tld.T).doms.map(([q]) => quant(q));
-    return { ...r, vs: r.xs.flatMap((x, j): Array<[Q, O]> => j < nx ? [] : [[qs[j], term(e, r.s, x, false)]]), cs: r.xs.map((x, j) => j < nx ? x : null) };
+    return { ...r, vs: r.xs.flatMap((x, j): Array<[Q, O]> => j < nx ? [] : [[qs[j], term(e, r.s, x, false)]]),
+      cs: r.xs.map((x, j) => j < nx ? x : null) };
   };
   // the selector's match: a member's arm past its tag (and a helper's ((.k, ()), ()))
   const tags = g.ms;
-  const sel = (f: (m: QualifiedName) => O): O => ({ $: "Prj", h: mats(tags, (i) => i === 0 ? unit(f(g.ms[i]))
+  const sel = (f: (m: QName) => O): O => ({ $: "Prj", h: mats(tags, (i) => i === 0 ? unit(f(g.ms[i]))
     : { $: "Prj", h: { $: "Prj", h: mats([g.k], () => unit(unit(f(g.ms[i])))) } }) });
   const l0 = s.D;
   const s0 = scope_kq(scope_hide(s), l0, 1);
@@ -1254,8 +1294,8 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: QualifiedName): void {
     const r = rest(s0, m);
     return alls(r.ps, term(e, r.s, r.T, false));
   });
-  const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: tags }, B: { $: "App", q: 1, x: { $: "Var", l: l0 },
-    f: mats(tags, (i) => i === 0 ? UT
+  const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: tags },
+    B: { $: "App", q: 1, x: { $: "Var", l: l0 }, f: mats(tags, (i) => i === 0 ? UT
       : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [g.k] }, B: UT }, B: UT }) } };
   const To = alls(ls, { $: "All", q: 1, l: l0, A: Sel, B: { $: "App", q: 1, f: mode, x: { $: "Var", l: l0 } } });
   const ks = ls.filter(([q]) => q === 1).map(([, l]) => l);
@@ -1265,32 +1305,6 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: QualifiedName): void {
   }, []));
   const v = ks.reduce<O>((f, l) => ({ $: "App", q: 1, f, x: { $: "Var", l } }), { $: "App", q: 1, f: body, x: { $: "Var", l: l0 } });
   e.out.push([n, To, lams(e, [...ls, [1, l0]], v), false]);
-}
-
-// def k's checked tree at the terms vs (its parameters left to right,
-// but the specialized ones, in cols; a group's variables): a λ binds its
-// term, and the terms left go to the tree as arguments, (λ{..} x ..), so
-// its matches stay nodes of the case tree. bend2 checks a template once,
-// each ~ parameter j an opaque constant name_gen(k, "param", j), which stands
-// for its ~ argument, a column the tree drops
-function arm(e: Safe, s: Scope, k: QualifiedName, cols: Cols, vs: Array<[Q, O]>): O {
-  const tld = e.book.tlds[k] as Def;
-  const ps = tld.x === 0 ? null : new Map(B.tele_unbind(e.book, tld.T).doms.slice(0, tld.x).map((_, j) => [B.name_gen(k, "param", j), cols[j]]));
-  const t0 = B.checked_higher(tld.e as B.LTerm);
-  let t = ps === null ? t0 : B.scope_mapper(x => x, ps)(t0);
-  let si: Scope = { ...s, c: [], d: 0, cols: cols.slice(tld.x), sub: false };
-  let j = 0;
-  for (let [x, T] = open(t); x.$ === "Lam" && T !== null; [x, T] = open(t)) {
-    const F = B.term_wnf(e.book, T);
-    const v = si.cols[0] ?? null;
-    if (F.$ !== "All" || (v === null && j === vs.length)) {
-      break;
-    }
-    si = { ...si, cols: si.cols.slice(1) };
-    si = v !== null ? scope_bind(si, { $: "Efq" }, F.A, false, v) : scope_bind(si, vs[j++][1], F.A, false);
-    t = x.f(B.Var(x.k, si.d - 1));
-  }
-  return vs.slice(j).reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), tree(e, si, t, []));
 }
 
 // an argument at its domain A: an untyped λ or match (in a type) takes
@@ -1426,7 +1440,7 @@ function rwt_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Rwt" }>, live: bool
 // ============
 
 // whether o calls def k with the variable at level l as an argument
-function self_arg(o: O, k: QualifiedName | null, l: number): boolean {
+function self_arg(o: O, k: QName | null, l: number): boolean {
   let h: O = o;
   let found = false;
   while (h.$ === "App") {
@@ -1438,7 +1452,7 @@ function self_arg(o: O, k: QualifiedName | null, l: number): boolean {
 }
 
 // the def names o mentions
-function o_refs(o: O, out: Set<QualifiedName> = new Set()): Set<QualifiedName> {
+function o_refs(o: O, out: Set<QName> = new Set()): Set<QName> {
   if (o.$ === "Ref") {
     out.add(o.k);
   }
@@ -1460,7 +1474,7 @@ function alls(ps: Binder[], b: O, $: "All" | "Sig" = "All"): O {
 }
 
 // a λ-match whose arm at the label ks[i] is h(i), made last to first
-function mats(ks: QualifiedName[], h: (i: number) => O): O {
+function mats(ks: QName[], h: (i: number) => O): O {
   return ks.reduceRight<O>((m, k, i) => ({ $: "Mat", k, h: h(i), m }), { $: "Efq" });
 }
 
@@ -1519,7 +1533,7 @@ function o_uses(e: Safe, o: O, live: boolean = true, out?: Map<number, number>):
 // Show
 // ====
 
-function name_tt(k: QualifiedName): string {
+function name_tt(k: QName): string {
   return k === UNIT || QUANTS.includes(k) ? k : B.name_emit(k);
 }
 
