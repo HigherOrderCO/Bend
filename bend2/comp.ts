@@ -873,8 +873,8 @@ function adt_of(A: HTerm | null): Of<"ADT"> {
   return adt;
 }
 
-// Whether A holds a type p seeks or names: a datatype p rejects is
-// looked into, but for the words.
+// Whether A holds a type p seeks: a datatype p rejects is looked into,
+// but for the words.
 function ty_holds(A: HTerm | null,
   p: Name | ((t: HTerm | null) => boolean), seen = new Set<Name>()): boolean {
   const t = ty_wnf(A);
@@ -2885,11 +2885,11 @@ export function compile_book(book: Bend.Book): string {
     .map((s) => s.params.length));
   const rs = [...Array(n).keys()].map((i) => "r" + i);
   const ws = n > 6 ? [...rs.slice(0, 6), "rp", ...rs.slice(6)] : rs;
-  defs.push(`CONSTV u8 FID_T[][3] = { ${entries.map((s) =>
-    `{ ${s.params.length}, ${s.frame === null ? 0
-      : s.params.length - s.frame.at.length}, ${Number(FL.bangs.has(s.def))
-      | Number(!forky.has(s.fid)) << 1} }`).join(", ")} };`,
-  `CONSTV u16 CID_T[][3] = { ${[...cids.values()].map((r) =>
+  defs.push(`CONSTV Fid FID_T[] = { ${entries.map((s) => `{ ${[s.params.length,
+    s.frame === null ? 0 : s.params.length - s.frame.at.length,
+    FL.bangs.has(s.def), !forky.has(s.fid)].map(Number).join(", ")} }`)
+    .join(", ")} };`,
+  `CONSTV Cid CID_T[] = { ${[...cids.values()].map((r) =>
     `{ ${r.join(", ")} }`).join(", ")} };`,
   `#define STAT_LEN ${FL.img.length}`, "",
   `#define WL_RESW ${resw}`, `#define BANGS   ${FL.bangs.size}`, "",
@@ -3563,16 +3563,19 @@ static const char* CLI_HELP =
 // Tables
 // ======
 
+typedef struct { u8 ar, resw, bangs, nofk; } Fid;
+typedef struct { u8 ar, hot; u16 spine; } Cid;
+
 ${tabs}
 
 #define TAB_AT(T, S, I) T[S < I ? S : I]
 
-#define fid_arity(x) ((u32)FID_T[x][0])
-#define fid_resw(x)  ((u32)FID_T[x][1])
-#define fid_bangs(x) ((bool)(FID_T[x][2] & 1))
-#define fid_nofk(x)  ((bool)(FID_T[x][2] & 2))
-#define cid_arity(x) ((u32)CID_T[x][0])
-#define cid_hot(x)   ((bool)CID_T[x][1])
+#define fid_arity(x) FID_T[x].ar
+#define fid_resw(x)  FID_T[x].resw
+#define fid_bangs(x) FID_T[x].bangs
+#define fid_nofk(x)  FID_T[x].nofk
+#define cid_arity(x) CID_T[x].ar
+#define cid_hot(x)   CID_T[x].hot
 
 // A32
 // ===
@@ -3976,7 +3979,7 @@ FAR void term_drop(Env e, Term t) {
           : n > ${WIDE} ? 64 | (n - 240)
           : cls_fit(tag == TAG_TSK ? n + 2 : n),
           w = cls < 64 ? n : 1u << (cls & 63),
-          d = tag == TAG_CTR ? CID_T[aux][2] : 0, m = w;
+          d = tag == TAG_CTR ? CID_T[aux].spine : 0, m = w;
         if (d) {
           u64 end = loc + w - 1;
           Term f = H[end - d];
