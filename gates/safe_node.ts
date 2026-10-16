@@ -45,22 +45,49 @@ export function judge(g: Got): [string, string] {
   return ["!", tt.split("\n").slice(1, 3).join(" | ").slice(0, 300)];
 }
 
+// with MEM_MB set, a check's processes (bend2 and the kernel it runs, one
+// process group) hold at most MEM_MB of resident memory: past it the group
+// is killed, an infrastructure error, so one heavy file cannot starve a
+// node's other checks; unset, no check is capped
+const MEM_KB = Number(process.env.MEM_MB ?? 0) * 1024;
+
+function group_rss(pgid: number): number {
+  const ps = child.spawnSync("ps", ["-A", "-o", "pgid=,rss="], { encoding: "utf8" });
+  return (ps.stdout ?? "").split("\n").reduce((n, l) => {
+    const [g, r] = l.trim().split(/\s+/).map(Number);
+    return g === pgid ? n + (r || 0) : n;
+  }, 0);
+}
+
 async function run(bin: string, args: string[], cap: number): Promise<Omit<Got, "f">> {
   const g: Omit<Got, "f"> = { code: null, ms: 0, out: "", timeout: false };
   const t0 = Date.now();
   await new Promise<void>((done) => {
-    const kid = child.spawn(bin, args, { env: { ...process.env, BEND_NO_TELEMETRY: "1" } });
+    const kid = child.spawn(bin, args, { env: { ...process.env, BEND_NO_TELEMETRY: "1" }, detached: true });
+    const kill = (): boolean => {
+      try { process.kill(-(kid.pid ?? 0), "SIGKILL"); } catch { kid.kill("SIGKILL"); }
+      return true;
+    };
+    let over = false;
+    const watch = setInterval(() => {
+      if (MEM_KB > 0 && kid.pid !== undefined && group_rss(kid.pid) > MEM_KB) {
+        over = kill();
+      }
+    }, 500);
     kid.stdout.on("data", (d) => { g.out += d; });
     kid.stderr.on("data", (d) => { g.out += d; });
     kid.on("error", (e) => { g.error = e.message; });
-    const bomb = setTimeout(() => { g.timeout = kid.kill("SIGKILL"); }, cap);
+    const bomb = setTimeout(() => { g.timeout = kill(); }, cap);
     kid.on("close", (code, signal) => {
       clearTimeout(bomb);
+      clearInterval(watch);
       g.code = code;
       g.ms = Date.now() - t0;
       if (signal) {
         g.signal = signal;
-        if (!g.timeout) {
+        if (over) {
+          g.error = "memory cap: the check passed " + String(MEM_KB / 1024) + " MB";
+        } else if (!g.timeout) {
           g.error = "child terminated by " + signal;
         }
       }
