@@ -1863,11 +1863,20 @@ def F32.hypot(a: F32, b: F32) -> F32:
   +q = F32.mul(y, s)
   F32.mul(F32.sqrt(F32.add(F32.mul(p, p), F32.mul(q, q))), u)
 
+# A rounded zero keeps the input sign, including at the negative half.
+def F32.round.zero(a: F32, r: F32, zero: Bool) -> F32:
+  match zero:
+    case True{}:
+      F32.mul(a, 0.0)
+    case False{}:
+      r
+
 def F32.round(a: F32) -> F32:
   match a:
     case F32{+x}:
       +f = F32.floor(F32{x})
-      F32.add(f, Bool.pick(F32, F32.is_ge(F32.sub(F32{x}, f), 0.5), 1.0, 0.0))
+      +r = F32.add(f, Bool.pick(F32, F32.is_ge(F32.sub(F32{x}, f), 0.5), 1.0, 0.0))
+      F32.round.zero(F32{x}, r, F32.is_eq(r, 0.0))
 
 def F32.pi() -> F32:
   3.14159265
