@@ -158,7 +158,7 @@ const WORDS: Record<string, Lay> = Object.setPrototypeOf(
 const WIDE = 247;
 
 const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
-  + " --gpu 8GB|a function the device does not hold|a Nat past the"
+  + " +RTS --gpu 8GB|a function the device does not hold|a Nat past the"
   + " largest immediate 2^48-1|*|memory fault (machine stack overflow?)|an"
   + " array past the deepest block class 31|a value has more than 2^24-1 live"
   + " copies: keep fewer alive at once, or build it again for some of them"
@@ -3588,13 +3588,15 @@ static bool io_gpu;
 static DEV Term*  io_stk;
 
 static const char* CLI_HELP =
-  "usage: %s [options] [arguments]\n"
+  "usage: %s [arguments] [+RTS options -RTS] [arguments]\n"
+  "options, from $BENDRTS, then between +RTS and -RTS (or the end):\n"
   "  --threads N       worker threads, 1 to 128 (default: the CPU count)\n"
   "  --gpu on|off|4GB  run ! calls on the GPU, over this much of its memory\n"
   "                    (default: on if present, over 2GB on Metal)\n"
   "  --gpu-build       write the GPU program and exit\n"
   "  --bend-help       show this text\n"
-  "  --                the rest are the program's arguments (IO.args)\n";
+  "the rest are the program's arguments (IO.args); -- (kept) or --RTS\n"
+  "(dropped) makes every argument after it the program's\n";
 
 #endif
 
@@ -5172,8 +5174,6 @@ static void gpu_pass(u32 f) {
 // to cur - 1, so those rows hold every task. A slow grow deals task g to
 // row g % CUBE_T, and the grows repeat over g rows until none deals.
 
-// Between turns, each ring's pending tasks move back to slot 0.
-
 static void ring_rewind(u64* H, u32 rows) {
   Term keep[RING_LEN];
   for (u32 r = 0; r < (rows < CUBE_G ? rows : CUBE_G) * CUBE_T; r += 1) {
@@ -5970,19 +5970,40 @@ ${reqs}
 // ====
 
 int main(int argc, char** argv) {
-  long thr = cpu_count();
-  int  gpu = -1;
-  u64  mem = 0;
+  long   thr = cpu_count();
+  int    gpu = -1;
+  u64    mem = 0;
+  char*  env = strdup(getenv("BENDRTS") != NULL ? getenv("BENDRTS") : "");
+  char** rts = malloc((argc + strlen(env)) * sizeof(char*));
+  int    nr  = 0;
+  bool   in  = false;
+  for (char* w = strtok(env, " \t\n"); w != NULL; w = strtok(NULL, " \t\n")) {
+    rts[nr++] = w;
+  }
+  rts[nr++] = NULL;
   io_argv = argv;
   io_argc = 1;
   for (int i = 1; i < argc; i += 1) {
-    const char* a = argv[i];
-    const char* v = i + 1 < argc ? argv[i + 1] : "";
-    char*       end;
-    if (!strcmp(a, "--")) {
-      while (i + 1 < argc) {
-        io_argv[io_argc++] = argv[++i];
+    char* a = argv[i];
+    if (!strcmp(a, "--") || !strcmp(a, "--RTS")) {
+      for (i += a[2] == 'R'; i < argc; i += 1) {
+        io_argv[io_argc++] = argv[i];
       }
+    } else if (!strcmp(a, "+RTS") || !strcmp(a, "-RTS")) {
+      in        = a[0] == '+';
+      rts[nr++] = NULL;
+    } else if (in) {
+      rts[nr++] = a;
+    } else {
+      io_argv[io_argc++] = a;
+    }
+  }
+  for (int i = 0; i < nr; i += 1) {
+    const char* a = rts[i];
+    const char* v = i + 1 < nr && rts[i + 1] != NULL ? rts[i + 1] : "";
+    char*       end;
+    if (a == NULL) {
+      continue;
     } else if (!strcmp(a, "--bend-help")) {
       printf(CLI_HELP, argv[0]);
       return 0;
@@ -5993,8 +6014,8 @@ int main(int argc, char** argv) {
       }
       return 0;
     } else if (!strcmp(a, "--threads")) {
-      thr = strtol(v, &end, 10);
-      if (thr < 1 || *end != 0) {
+      thr = strtol(v, NULL, 10);
+      if (thr < 1 || v[strspn(v, "0123456789")] != 0) {
         err_fail("expected a thread count of 1 or more after --threads");
       }
       i += 1;
@@ -6004,7 +6025,8 @@ int main(int argc, char** argv) {
         : !strcmp(end, "MB") ? 1ull << 20 : 0;
       if (!strcmp(v, "off")) {
         gpu = 0;
-      } else if (!strcmp(v, "on") || (mul != 0 && n > 0)) {
+      } else if (!strcmp(v, "on")
+        || (mul != 0 && n > 0 && end == v + strspn(v, "0123456789."))) {
         gpu = 1;
         mem = (u64)(n * (double)mul);
       } else {
@@ -6012,7 +6034,8 @@ int main(int argc, char** argv) {
       }
       i += 1;
     } else {
-      io_argv[io_argc++] = argv[i];
+      fprintf(stderr, "bend: unknown runtime option %s\n", a);
+      return 1;
     }
   }
   const char* why = gpu != 0 && BANGS != 0 ? gpu_probe() : "";
@@ -6105,28 +6128,35 @@ const RUNTIME_MAIN: string = String.raw`
 let cli_args = [];
 
 function cli(argv) {
+  let rts = false;
   cli_args.push(argv[0]);
   for (let i = 1; i < argv.length; i += 1) {
     const a = argv[i];
-    if (a === "--") {
-      cli_args.push(...argv.slice(i + 1));
+    if (a === "--" || a === "--RTS") {
+      cli_args.push(...argv.slice(a === "--" ? i : i + 1));
       break;
-    } else if (a === "--bend-help") {
-      io_out(1, io_bytes("usage: " + argv[0] + "\n"));
-      process.exit(0);
-    } else if (a === "--threads" || a === "--gpu") {
-      i += 1;
-    } else {
+    } else if (a === "+RTS" || a === "-RTS") {
+      rts = a === "+RTS";
+    } else if (!rts) {
       cli_args.push(a);
+    } else if (a === "--bend-help" || a === "--gpu-build") {
+      io_out(1, io_bytes(a === "--bend-help" ? "usage: " + argv[0] + "\n" : ""));
+      process.exit(0);
+    } else {
+      const re = a === "--threads" ? /^0*[1-9]\d*$/ : a === "--gpu"
+        ? /^(on|off|(?=.*[1-9])\d*\.?\d*[GM]B)$/ : undefined;
+      if (!re?.test(argv[++i])) {
+        io_errs("bend: " + (re === undefined ? "unknown runtime option " + a
+          : a === "--gpu" ? "expected on, off or a size like 4GB after --gpu"
+          : "expected a thread count of 1 or more after --threads"));
+        process.exit(1);
+      }
     }
   }
 }
 
 // Show
 // ====
-
-// show_val prints a pure main's value as term_show does (see show_main);
-// chain is the bracket it continues, or 0.
 
 function show_chr(s, q) {
   const c = char_code(s);
@@ -6280,8 +6310,6 @@ function io_text(b, n) {
   return new TextDecoder("utf-8", { ignoreBOM: true }).decode(b.subarray(0, n));
 }
 
-// Bytes cross as they are (0..255), one List cell each, with no UTF-8 in
-// either direction; io_unlist answers null if a value is past 255.
 function io_list(b, n) {
   let xs = { $: "Nil" };
   while (n > 0) {

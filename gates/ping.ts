@@ -399,6 +399,42 @@ try {
   const argv = await bend([argn, "x", "--", "--verdict"]);
   check("a plain run gets its arguments: " + argv.err, argv.code === 0
     && argv.out === "3\n");
+  // a built program's runtime options are BENDRTS's, then those between
+  // +RTS and -RTS; the rest are its arguments, -- (kept) or --RTS (dropped)
+  // making every one after it the program's, as GHC's RTS reads them
+  const argf = path.join(TMP, "args.bend");
+  const argo = path.join(TMP, "args");
+  fs.writeFileSync(argf, "import Base\nlaw main:\n  IO(Unit)\ndef main():\n"
+    + "  do IO<Unit>:\n    xs : List<String> <- IO.args()\n"
+    + "    IO.print(List.show(~&1, ~String, ~(s => \"<\" ++ s ++ \">\"), xs))\n");
+  const built = await bend([argf, "-o", argo, "-o", argo + ".js"]);
+  const rts   = ["grep", "-e", "--threads", "+RTS", "--threads", "2", "--gpu",
+    "off", "-RTS", "", "space value", "--", "+RTS", "x"];
+  const kept  = ", <grep>, <-e>, <--threads>, <>, <space value>, <-->, <+RTS>,"
+    + " <x>]\n";
+  const c_rts  = await run(argo, rts);
+  const js_rts = await run(process.execPath, [argo + ".js", ...rts]);
+  check("a built program's +RTS options are the runtime's, the rest its own: "
+    + built.err + c_rts.out + c_rts.err + js_rts.out + js_rts.err,
+    built.code === 0 && [c_rts, js_rts].every((r) => r.code === 0
+      && r.out.endsWith(kept)));
+  const ends = await run(argo, ["a", "--RTS", "+RTS", "b"],
+    { BENDRTS: "--threads 2" });
+  const zero = await run(argo, ["a"], { BENDRTS: "--threads 0" });
+  const span = await run(argo, ["+RTS", "2"], { BENDRTS: "--threads" });
+  check("--RTS ends the runtime's options; BENDRTS holds some, each value in"
+    + " its own span: " + ends.out + ends.err + zero.err + span.err,
+    ends.code === 0 && ends.out.endsWith(", <a>, <+RTS>, <b>]\n")
+    && zero.code === 1 && span.code === 1);
+  for (const bad of [["+RTS", "--thread", "2"], ["+RTS", "--gpu", "of"],
+    ["+RTS", "--gpu", "1e2GB"], ["+RTS", "", "-RTS"],
+    ["+RTS", "--threads", "-RTS", "x", "+RTS", "2"]]) {
+    const c  = await run(argo, bad);
+    const js = await run(process.execPath, [argo + ".js", ...bad]);
+    check("a malformed runtime option fails alike on C and JS: "
+      + bad.join(" ") + ": " + c.err + js.err,
+      c.code === 1 && js.code === 1 && c.err === js.err);
+  }
   const two  = "import Base\ndef two() -> Nat:\n  2n\n";
   const use  = (at: string) => "import Base\nimport ./" + at
     + " as T\ndef main() -> Nat:\n  T.two\n";
