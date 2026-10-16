@@ -139,23 +139,17 @@ type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 // add to a segment, so a literal-bounded loop does not unroll into its
 // caller. A spin of SPIN_FAR characters of C is a call on the device
 // (DFAR). WIDE is the widest flat layout or segment; a node past
-// it pads to its size class and keeps WIDE_CLS plus log2 of it in CID_T. An
-// argument nested past TPL_DEEP brackets goes to a local (clang allows 256).
+// it pads to its size class and keeps WIDE_CLS plus log2 of it in CID_T.
 
 const CLO_APPLY = "Clo~apply";
 
 const IO_EMIT = "IO~emit";
-
-const ATOM   = /^(?:[A-Za-z_$][A-Za-z0-9_$]*|\d+|\d+\.\d+)$/;
-const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
 
 const FOLD_FUEL = 8192;
 
 const EXACT = { fround: Math.fround, imul: Math.imul };
 
 const SPIN_FAR = 8192;
-
-const TPL_DEEP = 32;
 
 const USE0 = Bend.Emp<number>();
 
@@ -308,7 +302,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
     C:  null,
     JS: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
   },
-  array_swap: { C: null, JS: "array_rmw($0, $1, () => $2)" },
+  array_swap: { C: null, JS: "array_rmw($0, $1, () => ($2))" },
   array_size: { C: null, JS: "{$: \"Tuple\", fst: $0, snd: $0.length}" },
   array_clone: {
     C:  ["$0", "blk_copy(e, $0)"],
@@ -320,7 +314,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   array_atomic_and: atomic("and", "(o & $2) >>> 0"),
   array_atomic_or: atomic("or", "(o | $2) >>> 0"),
   array_atomic_xor: atomic("xor", "(o ^ $2) >>> 0"),
-  array_atomic_exch: atomic("exch", "$2"),
+  array_atomic_exch: atomic("exch", "($2)"),
   array_atomic_cas: atomic("cmpx", "o === $2 ? $3 : o", ", (u32)$3"),
   array_atomic_fadd: atomic("fadd", "Math.fround(o + $2)"),
 }, null);
@@ -652,12 +646,6 @@ function char_new(c: number): string {
 // Tpl
 // ===
 
-function tpl_deep(e: string): boolean {
-  let d = 0;
-  return [...e].some((c) =>
-    (d += c === "(" ? 1 : c === ")" ? -1 : 0) > TPL_DEEP);
-}
-
 function tpl(t: Tpl, xs: string[]): string {
   return typeof t !== "string" ? t(xs) : t.replace(/\$(\d)/g, (_, i) => xs[i]);
 }
@@ -903,6 +891,13 @@ function intr_of(k: Name, js = false): Intr | undefined {
     ? OPERATIONS[op_name(k)] : undefined;
   return it && (js || it.C !== undefined) && (!FL.js || it.JS)
     ? it : undefined;
+}
+
+// An op's argument goes to a local unless it is a variable or a constant,
+// so an op's text neither nests another op's nor repeats one's work.
+function op_bare(t: HTerm): boolean {
+  const s = term_strip(t);
+  return s.$ === "Var" || term_const(s);
 }
 
 function op_name(k: Name): string {
@@ -2479,13 +2474,13 @@ function emit_intr(sc: Scope, k: Name, it: Intr, m: Spine,
     return arr_op(sc, op, lay_el(m.all[0]), args);
   }
   const lays = fun_of(k).lays;
-  const ws = args.map((v, i) => val_own(sc, val_to(sc, v, lays[i]))[0]);
+  const as = args.map((v, i) => {
+    const w = val_own(sc, val_to(sc, v, lays[i]))[0];
+    return op_bare(m.args[i]) ? w : emit_alias(sc, w, "a");
+  });
   const lay = lay_of(ty);
-  const all = Array.isArray(C) || /\$(\d)[^]*\$\1/.test(C);
-  const as = ws.map((w) => all || tpl_deep(w) ? emit_alias(sc, w, "a") : w);
   if (Array.isArray(C)) {
-    C.forEach((p) => as.push(emit_alias(sc, tpl(p, as), "a")));
-    return val_new(as.slice(ws.length), lay);
+    return val_new(C.map((p) => emit_alias(sc, tpl(p, as), "a")), lay);
   }
   return val_new([tpl(C, as)], lay.ks.length === 1 ? lay : BOX);
 }
@@ -3217,7 +3212,7 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail = false): string {
   }
   const intr = intr_of(k, true);
   if (intr !== undefined) {
-    return tpl(intr.JS!, exprs.map((e) => ATOM.test(e) || STRLIT.test(e) ? e
+    return tpl(intr.JS!, exprs.map((e, i) => op_bare(args[i]) ? e
       : emit_hold(sc, [e], "x")[0]));
   }
   if (!fun_runs(tld)) {
