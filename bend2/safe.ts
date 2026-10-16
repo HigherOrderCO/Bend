@@ -282,6 +282,7 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
   let ps: Binder[] = [];
   // a column's kernel term, made once for every leaf below it
   const kc = new Map<HTerm, O>();
+  const pick = tld.$ === "Def" && tld.x > 0 ? inst_pick(e, k) : null;
   const col = (v: HTerm): O => kc.get(v) ?? kc.set(v, term(e, scope_nil(), v, false)).get(v) as O;
   // the check of k's instances after the columns cs of T, at depth d
   const go = (T: HTerm, cs: Cols, d: number): O => {
@@ -331,7 +332,7 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
       c += "~";
     }
     // roots share a constant only where they give it the same model
-    const m = inst_model(e, k, j, c, F.A) ?? model(e, F.A);
+    const m = (pick === null ? null : fit(e, k, pick[j], F.A)) ?? model(e, F.A);
     const key = String(j) + "\n" + B.term_key(B.term_lower(F.A)) + "\n" + (m === null ? "" : B.term_key(B.term_lower(m)));
     const kept = e.consts.get(key);
     if (kept !== undefined) {
@@ -539,19 +540,32 @@ function model(e: Safe, T: HTerm): HTerm | null {
   return model_by(e, T, false) ?? model_by(e, T, true);
 }
 
-// a model of c, k's ~ parameter j: the argument an instance of k passes
-// there, if it checks at T against the models so far
-function inst_model(e: Safe, k: Name, j: number, c: string, T: HTerm): HTerm | null {
+// the ~ arguments of k's first instance whose arguments all fit, each at
+// its parameter's type after the ones before it; k's constants take their
+// models from it alone
+function inst_pick(e: Safe, k: Name): HTerm[] | null {
   for (const [t, xs] of e.inst.values()) {
-    try {
-      if (t === k) {
-        return B.term_higher(B.term_check(e.mb, { t: B.Ref(c), n: 0, def: c, qs: [] }, xs[j], B.Lone(), T, B.ctx_nil(), 0).tm);
-      }
-    } catch {
-      // it does not fit
+    let T = e.book.tlds[k].T;
+    if (t === k && xs.every((x) => {
+      const F = B.term_wnf(e.mb, T);
+      return F.$ === "All" && fit(e, k, x, F.A) !== null && (T = F.B(x)) !== null;
+    })) {
+      return xs;
     }
   }
   return null;
+}
+
+// x checked at T in the model book, as k's code; null if it does not fit
+function fit(e: Safe, k: Name, x: HTerm, T: HTerm): HTerm | null {
+  try {
+    return B.term_higher(B.term_check(e.mb, { t: B.Ref(k), n: 0, def: k, qs: [] }, x, B.Lone(), T, B.ctx_nil(), 0).tm);
+  } catch (err) {
+    if ((err as B.Err).$ !== "Err") {
+      throw err;
+    }
+    return null;
+  }
 }
 
 // a round that cuts no branch finds what an unbounded search would; one
