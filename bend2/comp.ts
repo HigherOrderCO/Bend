@@ -158,7 +158,7 @@ const WORDS: Record<string, Lay> = Object.setPrototypeOf(
 const WIDE = 247;
 
 const ERRS = ("|*|*|out of memory: run again with a bigger span, as in"
-  + " --gpu 8GB|a function the device does not hold|a Nat past the"
+  + " +RTS --gpu 8GB|a function the device does not hold|a Nat past the"
   + " largest immediate 2^48-1|*|memory fault (machine stack overflow?)|an"
   + " array past the deepest block class 31|a value has more than 2^24-1 live"
   + " copies: keep fewer alive at once, or build it again for some of them"
@@ -5125,8 +5125,6 @@ static void gpu_pass(u32 f) {
 // to cur - 1, so those rows hold every task. A slow grow deals task g to
 // row g % CUBE_T, and the grows repeat over g rows until none deals.
 
-// Between turns, each ring's pending tasks move back to slot 0.
-
 static void ring_rewind(u64* H, u32 rows) {
   Term keep[RING_LEN];
   for (u32 r = 0; r < (rows < CUBE_G ? rows : CUBE_G) * CUBE_T; r += 1) {
@@ -5922,10 +5920,6 @@ ${reqs}
 // Main
 // ====
 
-// The runtime's options are $BENDRTS's words, then those between +RTS and
-// -RTS (or the end), as GHC's RTS reads them; NULL closes each span, so an
-// option's value is in its own. The rest are the program's (IO.args), and
-// -- (kept) or --RTS (dropped) hands it every argument after it.
 int main(int argc, char** argv) {
   long   thr = cpu_count();
   int    gpu = -1;
@@ -5991,9 +5985,8 @@ int main(int argc, char** argv) {
       }
       i += 1;
     } else {
-      char msg[256];
-      snprintf(msg, sizeof msg, "unknown runtime option %s", a);
-      err_fail(msg);
+      fprintf(stderr, "bend: unknown runtime option %s\n", a);
+      return 1;
     }
   }
   const char* why = gpu != 0 && BANGS != 0 ? gpu_probe() : "";
@@ -6085,7 +6078,6 @@ const RUNTIME_MAIN: string = String.raw`
 
 let cli_args = [];
 
-// cli reads argv as the C main does, but only checks a bracket's options
 function cli(argv) {
   let rts = false;
   cli_args.push(argv[0]);
@@ -6103,7 +6095,7 @@ function cli(argv) {
       process.exit(0);
     } else {
       const re = a === "--threads" ? /^0*[1-9]\d*$/ : a === "--gpu"
-        ? /^(on|off|(?=.*[1-9])(\d+\.?\d*|\.\d+)[GM]B)$/ : undefined;
+        ? /^(on|off|(?=.*[1-9])\d*\.?\d*[GM]B)$/ : undefined;
       if (!re?.test(argv[++i])) {
         io_errs("bend: " + (re === undefined ? "unknown runtime option " + a
           : a === "--gpu" ? "expected on, off or a size like 4GB after --gpu"
@@ -6116,9 +6108,6 @@ function cli(argv) {
 
 // Show
 // ====
-
-// show_val prints a pure main's value as term_show does (see show_main);
-// chain is the bracket it continues, or 0.
 
 function show_chr(s, q) {
   const c = char_code(s);
@@ -6272,8 +6261,6 @@ function io_text(b, n) {
   return new TextDecoder("utf-8", { ignoreBOM: true }).decode(b.subarray(0, n));
 }
 
-// Bytes cross as they are (0..255), one List cell each, with no UTF-8 in
-// either direction; io_unlist answers null if a value is past 255.
 function io_list(b, n) {
   let xs = { $: "Nil" };
   while (n > 0) {
