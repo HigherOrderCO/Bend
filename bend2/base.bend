@@ -1872,8 +1872,9 @@ def F32.round(a: F32) -> F32:
 def F32.pi() -> F32:
   3.14159265
 
+# Decimal text specifies the full Nat; compiled lanes use a direct cast.
 def F32.from_nat(n: Nat) -> F32:
-  U32.to_f32(U32.from_nat(n))
+  Maybe.default(&2, F32, F32.read(Nat.show(n)), F32.div(0.0, 0.0))
 
 def F32.to_nat(a: F32) -> Nat:
   U32.to_nat(F32.to_u32(a))
