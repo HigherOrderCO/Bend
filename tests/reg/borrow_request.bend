@@ -5,7 +5,7 @@
 # sinks it after the call. Before, the last use made R an owner, so F
 # shared the list (a term_keep) and the type went hot. In the C, the
 # WL_CASE(FID_F) and WL_CASE(FID_R) segments have no term_keep, and
-# WL_CASE(FID_XS_LEN) reads through term_peek.
+# WL_CASE(FID_Xs_len) reads through term_peek.
 import Base
 
 type Xs is Data:

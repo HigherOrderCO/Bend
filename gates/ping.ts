@@ -38,6 +38,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import * as lib from "./_lib";
+import { judge } from "./safe_node.ts";
 
 // Constants
 // =========
@@ -270,6 +271,14 @@ try {
     + " command's stdout and exit code untouched", bad.code === 1
     && bad.out === "" && bad.err.includes("bend 99.0.0 is available: run"
     + " bend update\nhelloworld\n"));
+  for (const cached of [{ ver: null, notice: "" }, { ver: "99.0.0", notice: null }]) {
+    fs.writeFileSync(path.join(BEND, "check.json"),
+      JSON.stringify({ t: Date.now(), ...cached }));
+    const invalid = await bend(["--help"]);
+    check("an invalid update cache leaves the command unchanged: "
+      + JSON.stringify(cached), invalid.code === 0 && invalid.out === help.out
+      && invalid.err === "");
+  }
   release(ver);
   fresh();
   const t0 = Date.now();
@@ -293,6 +302,30 @@ try {
   check("guide, base and a program run through the executable",
     guide.out.startsWith("# Bend") && base.out.startsWith("type Map")
     && sum5.code === 0 && sum5.out === "5n\n");
+  const fork = await bend(["base", "Array.fork"]);
+  check("base keeps the @unsafe line above the selected def",
+    fork.code === 0 && fork.out === "@unsafe\ndef Array.fork(-T: Type,"
+    + " +a: Array<T>) -> Array<T> & Array<T>:\n  (a, a)\n");
+  const header_source = path.join(TMP, "literal-checkup.bend");
+  fs.writeFileSync(header_source,
+    "# a header\nimport Base\n\nimport ./sum.bend as Sum\n"
+    + "def text() -> String:\n  \"body text\n"
+    + "import ./absent.bend as Hidden\nmore text\"\n");
+  const header_check = await bend([header_source, "--check-only"],
+    { BEND_NO_TELEMETRY: "1" });
+  const header_run = await bend([header_source, "--checkup"],
+    { BEND_NO_TELEMETRY: "1" });
+  check("valid body literal text does not add an independent import",
+    header_check.code === 0 && header_run.code === 0
+    && header_run.out.endsWith("5n\n"));
+  const no_base = path.join(TMP, "no-base.bend");
+  fs.writeFileSync(no_base,
+    "def main() -> String:\n  \"body\nimport Base\n\"\n");
+  fs.writeFileSync(header_source, "import ./no-base.bend as NoBase\n");
+  const base_run = await bend([header_source, "--checkup"],
+    { BEND_NO_TELEMETRY: "1" });
+  check("--checkup gives Base only to a module that imports it",
+    base_run.code === 1);
   fs.writeFileSync(path.join(TMP, "page.html"),
     "<script type=\"module\" src=\"./page.ts\"></script>\n");
   fs.writeFileSync(path.join(TMP, "page.ts"), "import \"./none.ts\";\n");
@@ -314,8 +347,29 @@ try {
   check("a failed kernel build leaves no private BendTT input",
     no_lean.code === 1 && no_lean.err.includes("--verdict needs Lean")
     && fs.readdirSync(verdict_tmp).every((name) => !name.startsWith("bendtt-")));
+  const fuel_kernel = path.join(TMP, "fuel_kernel.sh");
+  fs.writeFileSync(fuel_kernel, "#!/bin/sh\necho 'SOME PROOFS FAIL'\n"
+    + "echo 'In Sum.f:'\necho 'out of fuel'\nexit 1\n", { mode: 0o755 });
+  const fuel = await bend([sum_file, "--verdict"],
+    { BENDTT: fuel_kernel, BEND_NO_TELEMETRY: "1" });
+  check("a kernel failure shows the kernel's why above the mismatch notice",
+    fuel.code === 1 && fuel.out === "" && fuel.err.startsWith("SOME PROOFS FAIL\n"
+      + "In Sum.f:\nout of fuel\nSorry - this is a mismatch"));
+  fs.writeFileSync(path.join(BEND, "check.json"), JSON.stringify({
+    t: Date.now(), ver: "99.0.0", notice: "hello" }));
+  const survey = await lib.exec(process.execPath, ["gates/safe_node.ts"],
+    sum_file + "\n", 25_000, { HOME, BENDTT: fuel_kernel,
+      BEND_NO_TELEMETRY: "" });
+  fresh();
+  check("an update notice cannot hide the safe worker's kernel rejection",
+    survey.code === 0 && judge(JSON.parse(survey.out)[0]).join("|")
+      === "!|In Sum.f: | out of fuel");
   fs.writeFileSync(unsafe_file,
     "import Base\n@unsafe\ndef main() -> Nat:\n  0n\n");
+  const unsafe = await bend([unsafe_file, "--verdict"]);
+  check("the safe summary names unsafe defs", unsafe.code === 1
+    && judge({ f: unsafe_file, code: unsafe.code, ms: 0, timeout: false,
+      out: unsafe.out + unsafe.err }).join("|") === "u|unsafe: main");
   fs.writeFileSync(checkup,
     "import ./sum.bend as Good\nimport ./bad.bend as Bad\n");
   fs.writeFileSync(good_checkup, "import ./sum.bend as Good\n");
@@ -329,6 +383,30 @@ try {
     const got = await bend_closed(args);
     check("a closed reader keeps success: " + args.join(" "), got.code === 0);
   }
+  for (const args of [[sum_file, "--verdict", bad_file],
+    [sum_file, "extra", "--verdict"], [sum_file, "--check-only", "extra"]]) {
+    const got = await bend(args, { BEND_NO_TELEMETRY: "1" });
+    check("only a plain run takes arguments: " + args.join(" "), got.code === 1
+      && got.out === "" && got.err === "bend: arguments go to a run:"
+      + " bend <file.bend> [args] (see bend --help)\n");
+  }
+  fs.writeFileSync(path.join(TMP, "noted.bend"),
+    "import Base # base\ndef main() -> Nat:\n  (2n + 3n : Nat)\n");
+  const noted = path.join(TMP, "noted_checkup.bend");
+  fs.writeFileSync(noted, "import ./noted.bend as N # noted\n"
+    + "import ./bad.bend as B # bad\n");
+  const got_noted = await bend([noted, "--checkup"]);
+  check("--checkup reads imports with a # comment: " + got_noted.out,
+    got_noted.code === 1
+    && got_noted.out.includes("--- ./noted.bend ---\n5n\n")
+    && got_noted.out.includes("--- ./bad.bend ---\n"));
+  const argn = path.join(TMP, "argn.bend");
+  fs.writeFileSync(argn, "import Base\nlaw main:\n  IO(Unit)\ndef main():\n"
+    + "  do IO<Unit>:\n    xs : List<String> <- IO.args()\n"
+    + "    IO.print(Nat.show(List.length(&1, String, xs)))\n");
+  const argv = await bend([argn, "x", "--", "--verdict"]);
+  check("a plain run gets its arguments: " + argv.err, argv.code === 0
+    && argv.out === "3\n");
   const two  = "import Base\ndef two() -> Nat:\n  2n\n";
   const use  = (at: string) => "import Base\nimport ./" + at
     + " as T\ndef main() -> Nat:\n  T.two\n";

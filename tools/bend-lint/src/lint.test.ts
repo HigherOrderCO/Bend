@@ -666,8 +666,8 @@ describe("patch", () => {
     expect(out).toMatch(/^import \{ path \} from "file:.*seam\.ts";/m);
   });
 
-  test("comp.ts: exports RUNTIME_MAIN and js_sat", () => {
-    expect(patch("comp.ts", comp)).toContain("export { RUNTIME_MAIN, js_sat };");
+  test("comp.ts: exports RUNTIME_MAIN and name_id", () => {
+    expect(patch("comp.ts", comp)).toContain("export { RUNTIME_MAIN, name_id };");
   });
 
   test("main.ts: exports how bend reads a book and words a failure, with the same fs and path", () => {
@@ -695,8 +695,8 @@ describe("patch", () => {
     expect(() => patch("bend.ts", src + "\nexport function term_check(\n")).toThrow(
       /found 2 of "export function term_check\("/,
     );
-    expect(() => patch("comp.ts", comp.replace("function js_sat(", "function js_name("))).toThrow(
-      /comp\.ts: found 0 of a declaration of js_sat/,
+    expect(() => patch("comp.ts", comp.replace("function name_id(", "function js_name("))).toThrow(
+      /comp\.ts: found 0 of a declaration of name_id/,
     );
     expect(() =>
       patch("comp.ts", comp.replace("function io_run(m) {", "function run(m) {")),
@@ -1261,6 +1261,29 @@ describe("lint", () => {
     );
   });
 
+  test("Base-looking literal text does not supply undeclared types, on disk or unsaved", async () => {
+    const text = 'def main() -> String:\n  "first\nimport Base\nlast"\n';
+    const file = fixture("base_literal.bend", text);
+    const disk = await lint(file, []);
+    expect(disk.ok).toBe(false);
+    expect(disk.diags[0].code).toBe("bend/check");
+    expect(disk.diags[0].message).toContain("String");
+    expect(disk.sources.some((s) => s.base)).toBe(false);
+    fs.writeFileSync(file, 'import Base\ndef main() -> String: "disk"\n');
+    const held = await lint(file, [], { unsaved: new Map([[file, text]]) });
+    expect(held.ok).toBe(false);
+    expect(held.diags[0].code).toBe("bend/check");
+    expect(held.diags[0].message).toContain("String");
+    expect(held.sources.some((s) => s.base)).toBe(false);
+    for (const header of ["import Base\n", "# header\n\n  import Base # note\n"]) {
+      const source = header + 'def main() -> String: "header"\n';
+      const imported = await lint(file, [], { unsaved: new Map([[file, source]]) });
+      expect(imported.ok).toBe(true);
+      expect(imported.diags).toEqual([]);
+      expect(imported.sources.some((s) => s.base)).toBe(true);
+    }
+  });
+
   test("lints in flight keep their own rules and facts", async () => {
     const gate = Promise.withResolvers<void>();
     const entered = Promise.withResolvers<void>();
@@ -1581,10 +1604,10 @@ describe("review fixes", () => {
     ).toEqual({ text: "abC", skipped: 0, elsewhere: 1 });
   });
 
-  test("comp.ts that already exports js_sat still loads", () => {
+  test("comp.ts that already exports name_id still loads", () => {
     const comp = fs
       .readFileSync(path.join(BEND2, "comp.ts"), "utf8")
-      .replace("\nfunction js_sat(", "\nexport function js_sat(");
+      .replace("\nfunction name_id(", "\nexport function name_id(");
     const out = patch("comp.ts", comp);
     expect(out).toContain("export { RUNTIME_MAIN };");
     expect(() => new Bun.Transpiler({ loader: "ts" }).transformSync(out)).not.toThrow();
@@ -1807,6 +1830,22 @@ describe("cli", () => {
       status: 1,
       stdout: expect.stringContaining("Error [bend/check]:"),
     });
+  });
+
+  test("help does not need a Bend checkout", () => {
+    const missing = path.join(DIR, "missing-bend");
+    for (const args of [["--help"], ["-h"], ["--help", "--bend", missing]]) {
+      const out = spawnSync(process.execPath, [CLI, ...args], {
+        encoding: "utf8",
+        env: { ...process.env, BEND_DIR: missing },
+      });
+      expect(out).toMatchObject({
+        status: 0,
+        stdout: expect.stringContaining("usage: bun src/lint.ts"),
+        stderr: "",
+      });
+    }
+    expect(run("--help", "--nope").status).toBe(2);
   });
 
   test("bad usage and bad modules exit 2", () => {

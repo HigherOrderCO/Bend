@@ -1,8 +1,9 @@
 // A child bun gets a pipe whose read end is closed as fd and writes a
 // line there with the runtime's own io_out, as IO.print does. The
 // answer is the child's status as a shell shows it: 128 plus the signal
-// that ended it, else its exit code.
-function epipe_write(fd, k) {
+// that ended it, else its exit code. JS writes synchronously, so the
+// buffered-output case reaches EPIPE at the write, before it could exit.
+function epipe_write(fd, resume, k) {
   const ffi = require("bun:ffi");
   const sys = io_sys();
   const lib = ffi.dlopen(sys.mac ? "libSystem.dylib" : "libc.so.6", {

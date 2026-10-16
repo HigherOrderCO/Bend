@@ -10,11 +10,14 @@
 // run, its JS run and its C run all print its `#|` lines; a test whose main
 // the compiler refuses to print (a function, a Type, an erased or dependent
 // field) is checked and interpreted only; a foreign def with no twin for a
-// lane drops that lane; any other build failure fails its lanes.
+// lane drops that lane; any other build failure fails its lanes. Meanwhile,
+// here, one process compiles four of them over and over (state_run).
 
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+import * as Bend from "../bend2/bend.ts";
+import * as Comp from "../bend2/comp.ts";
 import * as lib from "./_lib";
 
 // Types
@@ -55,7 +58,7 @@ function test_read(dir: string, file: string): Test {
     .map((m) => m[1]);
   // A program compiles only over Base (its IO runs main): a test without
   // it checks and interprets alone.
-  const lanes = ["js", "c"].filter((l) => /^import Base$/m.test(src)
+  const lanes = ["js", "c"].filter((l) => /^(?:[\t\r ]*(?:(?:#|import[\t ])[^\n]*)?\n)*[\t ]*import[\t ]+Base(?=[\t\r ]*(?:#|\n|$))/.test(src)
     && (effs.length === 0 || effs.includes(l)));
   return { name: dir + "_" + path.basename(file, ".bend"), src,
     want: tidy(want), main: /^(def|law) main(\(|:)/m.test(src), lanes };
@@ -195,6 +198,59 @@ async function shard_run(shard: Test[], pack: Buffer, tag: number,
   }
 }
 
+// State
+// =====
+
+// A process may compile many books (the bun loader, io_run), and none may
+// leave state for the next: #976 kept every book's probes, with the same
+// bytes. Each fixture loads and checks twice. Its first copy's C and JS
+// are the baseline (compiled after the earlier fixtures' baselines, not in
+// a fresh process); its second copy must match them, bytes and probes left,
+// at every step: C, C, JS, C, normalization, JS, C, the next fixture (+),
+// C, JS. It builds and runs nothing: the shards run these programs.
+async function state_run(): Promise<Fail[]> {
+  const files = ["reg/borrow_loop", "run/harness_cache_compile",
+    "run/harness_cache_purity", "run/harness_cache_stats"];
+  const books: Bend.Book[][] = [];
+  for (const file of files) {
+    const copies = [Bend.book_nil(), Bend.book_nil()];
+    for (const book of copies) {
+      await Bend.book_load(book, path.join(TESTS, file + ".bend"), "",
+        new Map());
+      Bend.book_valid(book);
+    }
+    books.push(copies);
+  }
+  const emit = (book: Bend.Book, lane: string): string =>
+    Bun.hash(lane === "c" ? Comp.compile_book(book) : Comp.js_book(book))
+    + " bytes, " + String(Comp.PROBES.length) + " probes";
+  const base = books.map(([book]): Record<string, string> =>
+    ({ c: emit(book, "c"), js: emit(book, "js") }));
+  const fails: Fail[] = [];
+  for (const [i, file] of files.entries()) {
+    const book = books[i][1];
+    // the steps on this fixture's second copy; + is the next fixture's
+    for (const step of "c c js c snf js c +c +js c js".split(" ")) {
+      if (step === "snf") {
+        for (const def of Object.values(book.tlds)) {
+          if (def.$ === "Def" && def.v !== null) {
+            Bend.term_snf(book, def.v);
+          }
+        }
+        continue;
+      }
+      const at = step[0] === "+" ? (i + 1) % files.length : i;
+      const lane = step[0] === "+" ? step.slice(1) : step;
+      const got = emit(books[at][1], lane);
+      if (got !== base[at][lane]) {
+        fails.push({ name: files[at].replace("/", "_"),
+          probe: "state " + file + " " + step, want: base[at][lane], got });
+      }
+    }
+  }
+  return fails;
+}
+
 // Main
 // ====
 
@@ -202,6 +258,7 @@ if (import.meta.main) {
   const tests = fs.readdirSync(TESTS).sort().flatMap((dir) =>
     fs.readdirSync(path.join(TESTS, dir)).filter((f) => f.endsWith(".bend"))
       .sort().map((f) => test_read(dir, f)));
+  const state = state_run();
   const nodes = await lib.node_lock();
   // Every test's source goes to every shard: a test may import another,
   // or a module from a subdirectory.
@@ -210,6 +267,7 @@ if (import.meta.main) {
   const fails: Fail[] = [];
   await lib.node_pool(nodes, shards.map((shard, tag) => (node: number) =>
     shard_run(shard, pack, tag, node, fails)));
+  fails.push(...await state);
   fails.sort((a, b) => a.name < b.name ? -1 : 1);
   if (!lib.GATE) {
     for (const f of fails) {

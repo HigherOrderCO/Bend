@@ -61,9 +61,9 @@ async function run({ argv, input, env, max, ms }) {
 let process_worker = null;
 
 function process_run(program, args, input, maxOutput, timeoutMs) {
-  const argv = [program];
+  const argv = [str_out(program)];
   for (let xs = args; xs.$ === CID(Con); xs = xs.tail) {
-    argv.push(xs.head);
+    argv.push(str_out(xs.head));
   }
   if (maxOutput === 0 || timeoutMs === 0
     || argv.some((arg) => arg.includes("\0"))) {
@@ -80,7 +80,7 @@ function process_run(program, args, input, maxOutput, timeoutMs) {
   }
   const { worker, port, flag, receive } = process_worker;
   Atomics.store(flag, 0, 0);
-  worker.postMessage({ argv, input: Buffer.from(input), env: { ...process.env },
+  worker.postMessage({ argv, input: io_bytes(input), env: { ...process.env },
     max: maxOutput, ms: timeoutMs });
   if (Atomics.wait(flag, 0, 0, timeoutMs + 1000) === "timed-out") {
     worker.terminate();
