@@ -60,6 +60,47 @@ async function run({ argv, input, env, max, ms }) {
 
 let process_worker = null;
 
+// A host without Bun (node) has no Worker and no Bun.spawn, so the request
+// runs on node:child_process.spawnSync, which is the semantics the C lane
+// models: it feeds stdin, reads until stdout and stderr close, answers the
+// exit code (128 + the signal), kills on the deadline, and reports the
+// spawn error. maxBuffer caps each stream at max + 1 bytes, and the sum is
+// checked after, so the answer is EFBIG exactly when the C lane's combined
+// cap would say so (the interim buffer is at most twice it).
+function process_run_host(argv, input, maxOutput, timeoutMs) {
+  const { spawnSync } = require("node:child_process");
+  const { errno, signals } = require("node:os").constants;
+  const got = spawnSync(argv[0], argv.slice(1), { input,
+    timeout: Number(timeoutMs), killSignal: "SIGKILL",
+    maxBuffer: maxOutput + 1, env: { ...process.env } });
+  if (got.error !== undefined) {
+    const code = got.error.code;
+    const flood = (got.stdout?.length ?? 0) + (got.stderr?.length ?? 0)
+      > maxOutput;
+    // Node caps each stream at maxBuffer, so a stream past it alone puts the
+    // sum past the combined cap; it reports the cap as ENOBUFS (or the older
+    // ERR_CHILD_PROCESS_STDIO_MAXBUFFER code), and a flood a descendant holds
+    // open may instead surface as the deadline. The cap fired first either way.
+    if (flood || code === "ERR_CHILD_PROCESS_STDIO_MAXBUFFER") {
+      return io_fail(errno.EFBIG);
+    }
+    if (code === "ETIMEDOUT") {
+      return io_fail(errno.ETIMEDOUT);
+    }
+    return io_fail(typeof got.error.errno === "number"
+      ? Math.abs(got.error.errno) : errno.ENOENT);
+  }
+  const out = got.stdout ?? Buffer.alloc(0);
+  const err = got.stderr ?? Buffer.alloc(0);
+  if (out.length + err.length > maxOutput) {
+    return io_fail(errno.EFBIG);
+  }
+  const status = got.status !== null ? got.status
+    : got.signal !== null ? 128 + (signals[got.signal] ?? 0) : 1;
+  return io_done(io_tup(status, io_text(out, out.length),
+    io_text(err, err.length)));
+}
+
 function process_run(program, args, input, maxOutput, timeoutMs) {
   const argv = [str_out(program)];
   for (let xs = args; xs.$ === CID(Con); xs = xs.tail) {
@@ -68,6 +109,9 @@ function process_run(program, args, input, maxOutput, timeoutMs) {
   if (maxOutput === 0 || timeoutMs === 0
     || argv.some((arg) => arg.includes("\0"))) {
     return io_fail(22);
+  }
+  if (typeof Bun === "undefined") {
+    return process_run_host(argv, input, maxOutput, timeoutMs);
   }
   if (process_worker === null) {
     const { MessageChannel, receiveMessageOnPort } = require("node:worker_threads");
