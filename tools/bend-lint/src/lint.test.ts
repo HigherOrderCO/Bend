@@ -1832,6 +1832,22 @@ describe("cli", () => {
     });
   });
 
+  test("help does not need a Bend checkout", () => {
+    const missing = path.join(DIR, "missing-bend");
+    for (const args of [["--help"], ["-h"], ["--help", "--bend", missing]]) {
+      const out = spawnSync(process.execPath, [CLI, ...args], {
+        encoding: "utf8",
+        env: { ...process.env, BEND_DIR: missing },
+      });
+      expect(out).toMatchObject({
+        status: 0,
+        stdout: expect.stringContaining("usage: bun src/lint.ts"),
+        stderr: "",
+      });
+    }
+    expect(run("--help", "--nope").status).toBe(2);
+  });
+
   test("bad usage and bad modules exit 2", () => {
     expect(run().status).toBe(2);
     expect(run(input, "--rules").status).toBe(2);

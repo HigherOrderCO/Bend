@@ -805,10 +805,14 @@ const given = import.meta.main
       options: OPTIONS,
       allowPositionals: true,
       strict: false,
-    }).values.bend
+    }).values
   : undefined;
 
-const loaded = await load(typeof given === "string" ? given : undefined).catch((e: unknown) =>
+if (given?.help) {
+  process.exit(await cli(process.argv.slice(2)).catch(fail));
+}
+
+const loaded = await load(typeof given?.bend === "string" ? given.bend : undefined).catch((e: unknown) =>
   import.meta.main ? fail(e) : Promise.reject(e),
 );
 
