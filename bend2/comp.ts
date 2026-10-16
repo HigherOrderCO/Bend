@@ -243,6 +243,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   },
   ...tpl_ops("bool_", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
   string_append: { JS: "($0 + $1)" },
+  string_contains: { JS: "string_contains($0, $1)" },
   string_length: { JS: "[...str_out($0)].length" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
@@ -518,13 +519,23 @@ const f32_round = ${Bend.f32_round};
 
 const char_new = ${char_new};
 
-function char_len(s) {
-  return s[0] === "\uDC00" ? 4 : s.codePointAt(0) > 0xFFFF ? 2 : 1;
+function char_len(s, at = 0) {
+  return s[at] === "\uDC00" ? 4 : s.codePointAt(at) > 0xFFFF ? 2 : 1;
 }
 
 function char_code(s) {
   return s.length < 4 ? s.codePointAt(0)
     : (s.charCodeAt(1) << 22 | s.charCodeAt(2) << 11 | s.charCodeAt(3)) >>> 0;
+}
+
+function string_contains(s, p) {
+  // A match must start at a Char boundary, not inside a packed U32 code.
+  for (let at = 0; at <= s.length; at += char_len(s, at)) {
+    if (s.startsWith(p, at)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function str_out(s) {
