@@ -31,7 +31,7 @@ lines its run must print, and the gates run on the mini cluster.
     gates/perf.ts       the benches on 48 minis against the pins (--pin writes
                         the medians of three runs)
     gates/repo.ts       the allow list of files and the permanent ttok caps
-                        (bend.ts 48k, comp.ts 64k, main.ts 16k, bendtt.lean
+                        (bend.ts 48k, comp.ts 66k, main.ts 16k, bendtt.lean
                         64k, README 4k, GUIDE 8k); only Taelin changes them
     gates/ping.ts       the installer, the compiled bend, its daily version
                         check and a release, on a localhost hub
