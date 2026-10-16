@@ -342,7 +342,6 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
 // which a file without `import Base` may declare but not compile.
 
 const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
-  Nat: { Zero: { intr: "0" }, Succ: { intr: ([p]) => nat_succ(p, false) } },
   Bool: {
     False: { intr: "false", cond: "!$0" },
     True: { intr: "true", cond: "$0" },
@@ -384,7 +383,7 @@ const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
 const RUNTIME_ADTS = ["Sigma", "String", "Word.Con", "IO.OP", "Result",
   "Poll", "Maybe", "Bool", "Unit"];
 
-const OWNED = ["IO", ...RUNTIME_ADTS, ...Object.keys(OPTIMIZED)];
+const OWNED = ["IO", ...RUNTIME_ADTS, "Nat", ...Object.keys(OPTIMIZED)];
 
 // Native
 // ------
@@ -683,13 +682,16 @@ function word_u32(w: string): string {
   return view_of(w) ?? `word_to_u32(${w})`;
 }
 
-// The Succ of p, on the C lane or the JS one: a literal's successor, one
-// more on a checked sum, else a checked increment.
-function nat_succ(p: string, c: boolean): string {
-  return /^\d/.test(p) ? BigInt(parseInt(p)) + 1n + (c ? "ull" : "")
-    : /^nat_chk\(.* \+ \d+\)$/.test(p)
-    ? p.replace(/\d+(?=\)$)/, (k) => String(+k + 1))
-    : `nat_chk(${c ? "e, " : ""}${p} + 1)`;
+// A Nat constructor as the Succs over its base, or over none when it is a
+// literal; step reads each term first (the C lane folds it).
+function nat_peel(t: HTerm, step = (s: HTerm) => s): [HTerm | null, number] {
+  let s = Bend.term_strip(step(t));
+  let n = 0;
+  for (; s.$ === "Ctr" && s.k === "Succ"; n += 1) {
+    s = Bend.term_strip(step(s.x[s.x.length - 1]));
+  }
+  return s.$ === "Lit" ? [null, n + Number(s.v)]
+    : s.$ === "Ctr" ? [null, n] : [s, n];
 }
 
 // Probe
@@ -2517,6 +2519,12 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
   const ctr = FL.book.ctrs[x.k];
   const word = WORDS[adt.k];
   if (word !== undefined || adt.k === "Array") {
+    if (adt.k === "Nat") {
+      const [b, n] = nat_peel(x, (s) => emit_refold(sc, s));
+      return b === null ? val_new([`${n}ull`], word, true)
+        : val_new([`nat_chk(e, ${emit_expr(sc, b, adt, null).ws[0]} + ${n})`],
+          word);
+    }
     const vs = emit_each(sc, flds, [], ctr_doms(ctr, adt.x));
     if (adt.k === "Array") {
       return val_new([x.k === "ALeaf"
@@ -2531,9 +2539,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     if (vs.length === 0) {
       return val_new(["0"], word, true);
     }
-    const w = adt.k === "Nat" ? nat_succ(vs[0].ws[0], true)
-      : `term_word(e, ${vs[0].ws[0]})`;
-    return val_new([w], word, /^\d/.test(w));
+    return val_new([`term_word(e, ${vs[0].ws[0]})`], word);
   }
   if (FL.hot.ctrs.has(x.k)) {
     facts_ctr(sc, ctr, adt.x);
@@ -2587,6 +2593,19 @@ function emit_fold(sc: Scope, t: HTerm): HTerm | null {
   });
   const T = ty_ann(t);
   return r === s ? t : r === null || T === null ? r : Bend.Ann(r, T);
+}
+
+// x folded (emit_fold), the counts of its bindings moved to what it folds to.
+function emit_refold(sc: Scope, x: HTerm): HTerm {
+  const got = emit_fold(sc, x);
+  if (got === null || got === x) {
+    return x;
+  }
+  const a = term_uses(x);
+  const b = term_uses(got);
+  sc.uses.forEach((bd, p) => bind_set(sc, p, bd,
+    bd.n - term_use(a, p) + term_use(b, p)));
+  return got;
 }
 
 function emit_fold_args(sc: Scope, m: Spine): HTerm[] {
@@ -2644,12 +2663,8 @@ function emit_expr(sc: Scope, tm: HTerm, ty0: HTerm | null,
     }
     case "Ref":
     case "App": {
-      const got = emit_fold(sc, x);
-      if (got !== null && got !== x) {
-        const a = term_uses(x);
-        const b = term_uses(got);
-        sc.uses.forEach((bd, p) => bind_set(sc, p, bd,
-          bd.n - term_use(a, p) + term_use(b, p)));
+      const got = emit_refold(sc, x);
+      if (got !== x) {
         return emit_expr(sc, got, ty, at);
       }
       const m = term_spine(x);
@@ -3267,6 +3282,11 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
         const v = adt.k === "F32" ? Bend.f32_from_bits(u) : u;
         return Object.is(v, -0) ? "-0" : String(v);
       }
+      if (adt.k === "Nat") {
+        const [b, n] = nat_peel(x);
+        return b === null ? String(n)
+          : `nat_chk(${js_expr(sc, b, adt)} + ${n})`;
+      }
       const exprs = ctr_flds(x.k, x.x).map((f) => js_expr(sc, f));
       const native = OPTIMIZED[adt.k];
       if (native !== undefined) {
@@ -3316,13 +3336,12 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
     const [e, ...rest] = all.q.$ !== "None" ? args : ["null", ...args];
     const k = e === "null" || LOCAL.test(e) || VIEW.test(e) ? e
       : name_local(sc, x.k);
-    const at = sc.seg.lines.length;
     const v = k === "null" ? JS_NULL : js_var(sc, k);
-    js_func(sc, x.f(v), all.B(v), rest);
-    if (k !== e && sc.seg.lines.slice(at).some((l) => l.includes(k))) {
-      sc.seg.lines.splice(at, 0, `const ${k} = ${e};`);
+    const b = x.f(v);
+    if (k !== e && term_use(term_uses(b), v as Of<"Var">) > 0) {
+      file_push(sc, `const ${k} = ${e};`);
     }
-    return;
+    return js_func(sc, b, all.B(v), rest);
   }
   if (mat_head(x)) {
     return js_match(sc, x, ty, args);
