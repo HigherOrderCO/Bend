@@ -1377,6 +1377,12 @@ function def_raise(t: HTerm, left: number): number {
   return s.$ === "Efq" ? Infinity : 0;
 }
 
+// What a foreign def's continuation takes: its answer's type.
+function def_answer(def: Bend.Def): HTerm | null {
+  const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
+  return K?.$ === "All" ? K.A : null;
+}
+
 function def_foreign(tld: Bend.TLD | undefined):
   tld is Bend.Def & { i: string[] } {
   return tld?.$ === "Def" && tld.i !== undefined;
@@ -3044,6 +3050,8 @@ export function compile_book(book: Bend.Book): string {
     }
   }
   done_defs(def_foreign).forEach(([k]) => cid(k, fun_of(k).lays.length));
+  const nats = new Set(done_defs(def_foreign).filter(([, d]) =>
+    ty_adt(def_answer(d))?.k === "Nat").map(([k]) => k));
   const callers = [...FL.segs.flatMap((s) => [...s.refs].map((r) =>
     [r, s.fid])), ...[...FL.clos].map((c) => [c, seg_fid(CLO_APPLY)])];
   const forky = graph_close(new Set(FL.segs.filter((s) => s.fork)
@@ -3070,9 +3078,11 @@ export function compile_book(book: Bend.Book): string {
     const bits = Number(FL.bangs.has(s.def)) | Number(!forky.has(s.fid)) << 1;
     return `{ ${s.params.length}, ${res}, ${bits} }`;
   });
+  // per constructor: its words, and cid_hot | cid_nat << 1 (a foreign
+  // request whose answer is a Nat, which io_step checks)
   defs.push(`CONSTV u8 FID_T[][3] = { ${fid_t.join(", ")} };`,
-  `CONSTV u8 CID_T[][2] = { ${[...cids].map(([k, n]) =>
-    `{ ${n}, ${Number(FL.hot.ctrs.has(k))} }`).join(", ")} };`,
+  `CONSTV u8 CID_T[][2] = { ${[...cids].map(([k, n]) => `{ ${n}, ${
+    Number(FL.hot.ctrs.has(k)) | Number(nats.has(k)) << 1} }`).join(", ")} };`,
   `#define STAT_LEN ${FL.img.length}`, "",
   `#define WL_RESW ${resw}`, `#define BANGS   ${FL.bangs.size}`, "",
   `#define WL_BANK Term ${ws.join(", ")};`, "",
@@ -3380,10 +3390,9 @@ function js_def(k: Name, def: Bend.Def): void {
   }
   block(sc, `function ${name_id("$", k)}(${params.join(", ")}) {`, () => {
     if (def_foreign(def)) {
-      const K = ty_wnf(tele_unbind(def.T).doms.at(-1)![2]);
       return file_push(sc, `return { $: ${JSON.stringify(Bend.name_key(k))
         }, args: [${live.map(([, , A], i) => host(A, params[i], true))
-        }], kont: (x) => ${params.at(-1)}(${host(K?.$ === "All" ? K.A : null,
+        }], kont: (x) => ${params.at(-1)}(${host(def_answer(def),
         "x", false)}) };`);
     }
     if (loop.length === 0) {
@@ -3785,7 +3794,8 @@ ${tabs}
 #define fid_bangs(x) ((bool)(FID_T[x][2] & 1))
 #define fid_nofk(x)  ((bool)(FID_T[x][2] & 2))
 #define cid_arity(x) ((u32)CID_T[x][0])
-#define cid_hot(x)   ((bool)CID_T[x][1])
+#define cid_hot(x)   ((bool)(CID_T[x][1] & 1))
+#define cid_nat(x)   ((bool)(CID_T[x][1] >> 1))
 
 // A32
 // ===
@@ -5566,6 +5576,7 @@ struct IoWork {
   IoPack   pack;
   Term     cont;
   Term     item;
+  bool     nat;
   u64      time;
   short    evts;
   IoWork*  next;
@@ -6071,7 +6082,9 @@ static void io_step(Env e, IoWork* a) {
   for (;;) {
     u64  ap  = task_node(e, FID(Clo~apply), TERM_HOLE, 0, 0);
     e.mem[ap]     = a->cont;
-    e.mem[ap + 1] = a->item;
+    // a host's Nat past 2^53 fail-stops, as JS's nat_in
+    e.mem[ap + 1] = a->nat && a->item > 1ull << 53 ? nat_chk(e, a->item)
+      : a->item;
     Term req = corpus_eval(e.mem, term_tsk(FID(Clo~apply), ap));
     u32  c   = (u32)term_aux(req);
     if (c == CID(Emit)) {
@@ -6094,6 +6107,7 @@ static void io_step(Env e, IoWork* a) {
       err_fail("an alien request");
     }
     a->cont = fs[n - 1];
+    a->nat  = cid_nat(c);
     Term x  = io_eff_rows[c](e, fs, a);
     if (x == IO_PARK) {
       return;

@@ -1,7 +1,6 @@
-# io (io_nat_host_neg): a foreign effect answers a negative Nat. The C
-# lane reads it as a word past the cap and fail-stops when Nat.show
-# computes with it; the JS lane rejects it as the answer comes in. Both
-# stop with the same message and exit code.
+# io (io_nat_host_neg): a foreign effect answers a negative Nat. Both
+# lanes reject it as the answer comes in (C reads it as a word past the
+# cap), with the same message and exit code.
 import Base
 
 law get:
