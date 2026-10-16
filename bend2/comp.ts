@@ -79,6 +79,7 @@ type File = {
   brws: Map<Name, boolean[]>;
   nodes: Map<Name, Lay>;
   lays: Map<string, Lay>;
+  holds: Map<string, Lay>;
   lay_ids: Map<Lay, number>;
   memo: {
     opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
@@ -1041,7 +1042,8 @@ function lay_holds(A: HTerm | null, lay: Lay, fam: Name): Lay {
   if (lay.arms) {
     return lay_pack(Object.entries(lay.arms).map(([k, lays]) =>
       [k, ctr_doms(FL.book.ctrs[k], ty_adt(A)!.x).map((F, i) =>
-        lay_holds(F, lays[i], fam))]));
+        memo(FL.holds, fam + " " + Bend.term_key(Bend.term_lower(F)),
+          () => lay_holds(F, lays[i], fam)))]));
   }
   return lay === BOX && !ty_holds(A, fam) ? W32 : lay;
 }
@@ -1386,6 +1388,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     brws: new Map(),
     nodes: new Map(),
     lays: new Map(),
+    holds: new Map(),
     lay_ids: new Map(),
     memo: {
       opens: new Map(),
