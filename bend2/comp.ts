@@ -72,6 +72,8 @@ type File = {
   ids: Map<string, string>;
   taken: Set<string>;
   teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
+  steps: Map<string, HTerm>;
+  opens: Map<string, boolean>;
   srcs: Map<Name, Set<Name> | null>;
   loops: Map<Name, Name[]>;
   flats: Map<Name, boolean>;
@@ -85,7 +87,6 @@ type File = {
     uses: Map<HTerm, Bend.PMap<number>>;
     folds: Map<HTerm, HTerm | null>;
     spines: Map<HTerm, Spine>;
-    steps: Map<HTerm, HTerm>;
   };
 };
 
@@ -658,7 +659,7 @@ function lit_call(s: Of<"Lit">): HTerm | null {
 function term_force(t: HTerm): HTerm {
   const s = Bend.term_force(t);
   return s.$ !== "Lit" ? s
-    : memo(FL.memo.steps, s, () => lit_call(s) ?? Bend.lit_step(s));
+    : memo(FL.steps, s.k + s.v, () => lit_call(s) ?? Bend.lit_step(s));
 }
 
 function term_strip(t: HTerm): HTerm {
@@ -1005,7 +1006,8 @@ function lay_node(k: Name): Lay {
 
 // An open type takes its value's layout.
 function lay_at(A: HTerm | null, v: Val): Lay {
-  return ty_holds(A, (t) => ty_tag(t, "Var App")) ? v.lay : lay_of(A);
+  return A && memo(FL.opens, Bend.term_key(Bend.term_lower(A)), () =>
+    ty_holds(A, (t) => ty_tag(t, "Var App"))) ? v.lay : lay_of(A);
 }
 
 function lay_eq(a: Lay, b: Lay): boolean {
@@ -1417,6 +1419,8 @@ function file_new(book: Bend.Book, js: boolean): File {
     ids: new Map(),
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
     teles: new Map(),
+    steps: new Map(),
+    opens: new Map(),
     srcs: new Map(),
     loops: new Map(),
     flats: new Map(),
@@ -1430,7 +1434,6 @@ function file_new(book: Bend.Book, js: boolean): File {
       uses: new Map(),
       folds: new Map(),
       spines: new Map(),
-      steps: new Map(),
     },
   };
 }
@@ -2863,6 +2866,7 @@ export function compile_book(book: Bend.Book): string {
     for (const [k, tld] of [...done_defs().reverse(),
       ...done_defs(def_foreign)]) {
       memo_gc();
+      PROBES.length = 1;
       const [dl, vals] = emit_open(scope_new(), k);
       FL.segs.push(dl.seg);
       if (def_foreign(tld)) {
