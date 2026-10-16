@@ -2668,7 +2668,7 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
       (pos.set(p, depth), depth += b.val.ws.length, b.val.ws));
     emit_chain(sc, [["seq", () => {
       const fr = [...ws, seg_ref(sc, seg_fid(kn))];
-      file_push(sc, `WL_ROOM(${fr.length});`);
+      file_push(sc, `WL_ROOM(${fr.length}, ${depth - ws.length});`);
       fr.forEach((w, j) => file_push(sc, `STK(${j}) = ${w};`));
       file_push(sc, `WL_PUSHN(${fr.length});`);
     }], ...fork ? [] : [["", () => {
@@ -3453,8 +3453,9 @@ using namespace metal;
     STK(wi) = e.mem[(A) + wi]; \
   } \
   WL_PUSHN(N);
-#define WL_ROOM(N) \
-  if (DEVICE && sp + (N) * CUBE >= e.mem + STAT_OFF + CUBE) { \
+#define WL_ROOM(N, D) \
+  if (DEVICE && sp + (N) * CUBE >= e.mem + STAT_OFF + CUBE \
+    && !(sp = lane_spill(e, sp, N, D))) { \
     err_post(e.mem, ERR_DEEP); \
     return 0; \
   }
@@ -4363,6 +4364,27 @@ static const WlFn wl_tab[] = { WL_TABLE };
 FAR Term work_loop(Env e, DEV Term* sp, Term t, u32 seq);
 #endif
 
+// A full lane moves the words below its def's to the heap, under an exit
+// frame that moves them back (#1393).
+FAR DEV Term* lane_spill(Env e, DEV Term* sp, u32 n, u32 d) {
+  DEV Term* lo = e.alc + (STAK_OFF - ALC_OFF);
+  u64 k = (sp - lo) / CUBE - d;
+  if (d + n + 3 > STAK_LEN) {
+    return 0;
+  }
+  u64 b = heap_alloc(e, cls_fit(STAK_LEN));
+  for (u64 i = 0; i < k + d; i += 1) {
+    e.mem[b + i] = lo[i * CUBE];
+  }
+  sp = lo;
+  STK(0) = term_tsk(FID_EXIT, b);
+  STK(1) = k;
+  STK(2) = FID_EXIT;
+  WL_PUSHN(3);
+  WL_ARGS(b + k, d)
+  return sp;
+}
+
 static Term work_loop(Env e, DEV Term* sp, Term t, u32 seq) {
   WL_BANK
   u32 rn = 0;
@@ -4438,6 +4460,12 @@ ${segs}
     Term cont = STK(0);
     u32  idx  = (u32)STK(1);
     u32  wf   = (u32)term_aux(cont);
+    if (wf == FID_EXIT) {
+      WL_ARGS(term_loc(cont), idx)
+      heap_free(e, cls_fit(STAK_LEN), term_loc(cont));
+      WL_TAKE(rv)
+      WL_RETN(n);
+    }
     if (cont != TERM_HOLE && fid_resw(wf)) {
       u64 wa = term_loc(cont);
       u32 wn = fid_arity(wf);
