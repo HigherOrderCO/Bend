@@ -157,9 +157,9 @@ const LOCAL = /^\w*_\d+$/;
 const VIEW =
   /^(?:u32_to_word\((?<word>\w+|f32_bits\((?<bits>\w+)\))\)|char_code\((?<code>\w+)\))$/;
 
-const TAB_BAD = /\b(?!(?:fround|imul)\()\w+\(/;
-
 const FOLD_FUEL = 8192;
+
+const EXACT = { fround: Math.fround, imul: Math.imul };
 
 const SPIN_FAR = 8192;
 
@@ -2876,49 +2876,62 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
   emit_body(sc, o.b, null, ers, [], null);
 }
 
-function emit_row(sc: Scope, t: HTerm, ty: HTerm | null): string | null {
+// A table row's word: its arm folded to a constant, or ops over rows run
+// by their JS with Math.fround and Math.imul alone (an op that calls any
+// other function throws, and is no row). An F32 constant keeps its bits, as
+// a NaN payload has no JS number.
+function emit_row(sc: Scope, t: HTerm, ty: HTerm): number | null {
   const k = ty_adt(ty)?.k ?? "";
-  if (ty !== null && WORDS[k] === undefined) {
+  if (WORDS[k] === undefined) {
     return null;
   }
+  const s = row_term(sc, t);
+  if (k === "F32" && term_const(s)) {
+    return Bend.u32_from_term(s, "F32");
+  }
+  const js = row_js(sc, s, ty);
+  if (js === null) {
+    return null;
+  }
+  try {
+    const v = Function("Math", `return ${js}`)(EXACT);
+    return k === "F32" ? Bend.f32_to_bits(v) : v;
+  } catch {
+    return null;
+  }
+}
+
+function row_term(sc: Scope, t: HTerm): HTerm {
   let s = term_strip(t);
   while (s.$ === "Lam") {
     s = term_strip(term_open(s).b);
   }
-  s = emit_fold(sc, s) ?? s;
-  const bits = k === "F32" && !FL.js;
-  if (term_const(s)) {
-    return bits ? String(Bend.u32_from_term(s, "F32")) : js_expr(sc, s, ty);
-  }
-  const m = term_spine(s);
-  const it = m.t.$ === "Ref" ? intr_of(m.t.k) : undefined;
-  if (!it?.JS || TAB_BAD.test(it.JS)) {
-    return null;
-  }
-  const xs = m.args.map((a) => emit_row(sc, a, null));
-  if (!xs.every((x): x is string => x !== null)) {
-    return null;
-  }
-  const r = tpl(it.JS, xs);
-  return bits ? `f32_bits(${r})` : r;
+  return emit_fold(sc, s) ?? s;
 }
 
-// A table's rows are JS text (emit_row); the C lane evaluates them to its
-// words.
+// A row's JS: a constant, or an op over rows.
+function row_js(sc: Scope, s: HTerm, ty: HTerm | null): string | null {
+  if (term_const(s)) {
+    return js_expr(sc, s, ty);
+  }
+  const m = term_spine(s);
+  const it = m.t.$ === "Ref" ? intr_of(m.t.k, true) : undefined;
+  const xs = m.args.map((a) => row_js(sc, row_term(sc, a), null));
+  return it?.JS === undefined || !xs.every((x): x is string => x !== null)
+    ? null : tpl(it.JS, xs);
+}
+
 function emit_tab(sc: Scope, cells: HTerm[] | null, ty: HTerm,
   s: string): string | null {
-  if (cells === null) {
+  const vs = cells?.map((t) => emit_row(sc, t, ty));
+  if (vs === undefined || !vs.every((v): v is number => v !== null)) {
     return null;
   }
-  const ls = cells.map((t) => emit_row(sc, t, ty));
-  if (!ls.every((l): l is string => l !== null)) {
-    return null;
-  }
-  const key = (FL.js ? ls : Function("f32_bits", `return [${ls}]`)(
-    Bend.f32_to_bits).map((v: number) => BigInt(v) + "ull")).join(", ");
+  const k = ty_adt(ty)!.k;
+  const key = vs.map((v) => FL.js ? js_word(k, v) : v + "ull").join(", ");
   const tab = "TAB_" + memo(FL.tabs, key, () => FL.tabs.size);
-  return FL.js ? `${tab}[Math.min(${s}, ${ls.length - 1})]`
-    : `TAB_AT(${tab}, ${s}, ${ls.length - 1})`;
+  return FL.js ? `${tab}[Math.min(${s}, ${vs.length - 1})]`
+    : `TAB_AT(${tab}, ${s}, ${vs.length - 1})`;
 }
 
 function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
@@ -3236,6 +3249,12 @@ function js_tag(k: Name): string {
   return k.slice(k.indexOf(":") + 1);
 }
 
+// A U32 or F32 (of its bits) as a JS number.
+function js_word(k: Name, u: number): string {
+  const v = k === "F32" ? Bend.f32_from_bits(u) : u;
+  return Object.is(v, -0) ? "-0" : String(v);
+}
+
 // A literal "__proto__" key sets the prototype; a computed one is a field.
 function js_key(n: Name): string {
   return (n === "__proto__" ? `["${n}"]` : `"${n}"`) + ": ";
@@ -3279,8 +3298,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
     case "Ctr": {
       const [adt, u] = ctr_adt(x, ty);
       if (u !== null) {
-        const v = adt.k === "F32" ? Bend.f32_from_bits(u) : u;
-        return Object.is(v, -0) ? "-0" : String(v);
+        return js_word(adt.k, u);
       }
       if (adt.k === "Nat") {
         const [b, n] = nat_peel(x);
