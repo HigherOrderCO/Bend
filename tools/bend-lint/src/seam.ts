@@ -611,10 +611,11 @@ const isErr = (e: unknown): e is Err =>
 // Display is a public lookup name only when it resolves back to this identity.
 // Generated and otherwise unaddressable globals retain their opaque keys.
 const sourceName = (m: Loaded, book: Book, k: QName): string => {
+  if (m.Bend.name_parent(k) !== null) return k;
   const scope = book.files.get(book.entry);
   const text  = m.Bend.name_display(book, k, scope);
   const found = scope && m.Bend.name_resolve(book, scope, text);
-  return m.Bend.name_parent(k) === null && found?.k === k && !found.issue ? text : k;
+  return found?.k === k && !found.issue ? text : k;
 };
 
 // A term's kind, and the name a Var or Ref points to.
@@ -624,12 +625,14 @@ const kindOf = (m: Loaded, book: Book, t: LTerm): { kind: string; name: string }
 });
 
 // Whether a fact passes a filter, its scope aside.
-const matches = (m: Loaded, book: Book, f: FactFilter, kind: string, def: QName, name: string): boolean => {
-  const all = (xs: string[] | undefined, x: string): boolean =>
-    xs === undefined || xs.length === 0 || xs.includes(x);
-  let owner: QName | null = def;
-  while (owner !== null && !all(f.defs, sourceName(m, book, owner))) owner = m.Bend.name_parent(owner);
-  return owner !== null && all(f.kinds, kind) && all(f.names, name);
+const matches = (m: Loaded, book: Book, f: FactFilter, t: LTerm, def: QName): boolean => {
+  if (f.kinds?.length && !f.kinds.includes(t.$)) return false;
+  if (f.names?.length && !f.names.includes(kindOf(m, book, t).name)) return false;
+  if (!f.defs?.length) return true;
+  for (let owner: QName | null = def; owner !== null; owner = m.Bend.name_parent(owner)) {
+    if (f.defs.includes(sourceName(m, book, owner))) return true;
+  }
+  return false;
 };
 
 // bend's words for a failed check, its location aside (a finding has its
@@ -675,9 +678,9 @@ const checked = async (
 
   const see = (report: Report): void => {
     const near = report.spn?.file.path === real ? filters : far;
-    const { kind, name } =
-      near.length > 0 ? kindOf(m, report.bok, Bend.term_strip(report.tm)) : { kind: "", name: "" };
-    if (near.some((f) => matches(m, report.bok, f, kind, report.def, name))) {
+    if (near.length === 0) return;
+    const t = Bend.term_strip(report.tm);
+    if (near.some((f) => matches(m, report.bok, f, t, report.def))) {
       found.push(report);
     }
   };
@@ -799,10 +802,8 @@ export const select = (
     ? facts
     : facts.filter((fact) => {
         const r = raw(fact);
-        const { kind, name } = kindOf(m, r.bok, m.Bend.term_strip(r.tm));
-        return (
-          (want.scope === "program" || r.spn?.file === root) && matches(m, r.bok, want, kind, r.def, name)
-        );
+        return (want.scope === "program" || r.spn?.file === root)
+          && matches(m, r.bok, want, m.Bend.term_strip(r.tm), r.def);
       });
 };
 
@@ -880,12 +881,13 @@ export const operations = (m: Loaded, run: Checked): Operations => {
   return {
     view: (fact): View => {
       const r = raw(fact);
+      const t = Bend.term_strip(r.tm);
       return {
         owner: sourceName(m, r.bok, r.def), inst: r.inst,
-        ...kindOf(m, r.bok, Bend.term_strip(r.tm)),
+        ...kindOf(m, r.bok, t),
         quantity: QUANTITY[r.qt.$],
         span:  toSpan(r.spn),
-        inner: toSpan(run.map(Bend.term_strip(r.tm).s)),
+        inner: toSpan(run.map(t.s)),
       };
     },
     type: (fact) => typed(raw(fact).ty),
@@ -971,13 +973,14 @@ export const compile = (m: Loaded, { book }: Checked, file: string): Compiled =>
     return owner !== undefined && t?.$ === "Ctr" && t.k === Bend.name_source(owner, ctr, "ctr") ? t.x : undefined;
   };
   const texts = (t: LTerm | undefined): string[] | undefined => {
-    const [head, tail] = args(t, "Con") ?? [];
-    const rest = tail && texts(tail);
-    return args(t, "Nil") !== undefined
-      ? []
-      : head?.$ === "Lit" && typeof head.v === "string" && rest
-        ? [head.v, ...rest]
-        : undefined;
+    const out: string[] = [];
+    while (args(t, "Nil") === undefined) {
+      const [head, tail] = args(t, "Con") ?? [];
+      if (head?.$ !== "Lit" || typeof head.v !== "string") return undefined;
+      out.push(head.v);
+      t = tail;
+    }
+    return out;
   };
 
   const asked = value("facts");

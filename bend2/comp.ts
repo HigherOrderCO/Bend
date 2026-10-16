@@ -509,7 +509,7 @@ function arg_name(k: QName, i: number, live = false): QName {
 }
 
 function name_global(k: QName): string {
-  return name_parent(k) === null ? name_emit(k) : memo(FL.symbols, k, () => `b0_g${FL.symbols.size}`);
+  return memo(FL.symbols, k, () => name_parent(k) === null ? name_emit(k) : `b0_g${FL.symbols.size}`);
 }
 
 function cid_mac(k: QName): string { return "CID_" + name_global(k); }
@@ -618,11 +618,12 @@ function term_spine(tm: HTerm): Spine {
     let c = term_force(tm);
     while (c.$ === "Ann" || c.$ === "App") {
       if (c.$ === "App") {
-        apps.unshift(c);
+        apps.push(c);
         h = c.f;
       }
       c = term_force(c.$ === "App" ? c.f : c.x);
     }
+    apps.reverse();
     const tld = c.$ === "Ref" ? FL.book.tlds[c.k] : undefined;
     const T = tld?.$ === "Def" ? tld.T : ty_ann(h);
     const qs = T === null || apps.length === 0 ? [] : tele_unbind(T).doms;
@@ -662,8 +663,8 @@ function call_eta(t: HTerm): HTerm | null {
   return term_eta(t, tele_fill(m.tld.T, m.all), f.n - m.all.length);
 }
 
-function term_kids(tm: HTerm): HTerm[] {
-  const t = term_force(tm);
+// Callers force the node before selecting its live children.
+function term_kids(t: HTerm): HTerm[] {
   switch (t.$) {
     case "Ann": {
       return [t.x];
@@ -698,14 +699,20 @@ function term_any(t: HTerm, p: (s: HTerm, tail: boolean) => boolean,
   tail = true): boolean {
   const s = term_force(t);
   const kids = term_kids(s);
-  return p(s, tail) || kids.some((x, i) => term_any(x, p, tail && (s.$
-    === "Let" ? i === kids.length - 1 : "Ann Lam Mat Rwt".includes(s.$))));
+  if (p(s, tail)) return true;
+  for (let i = 0; i < kids.length; i++) {
+    if (term_any(kids[i], p, tail && (s.$ === "Let"
+      ? i === kids.length - 1 : "Ann Lam Mat Rwt".includes(s.$)))) return true;
+  }
+  return false;
 }
 
 function term_const(t: HTerm): boolean {
   const s = Bend.term_strip(t);
-  return s.$ === "Lit" ? lit_call(s) === null
-    : s.$ === "Ctr" && s.x.every(term_const);
+  if (s.$ === "Lit") return lit_call(s) === null;
+  if (s.$ !== "Ctr") return false;
+  for (const x of s.x) if (!term_const(x)) return false;
+  return true;
 }
 
 function term_use(u: Bend.PMap<number>, p: Of<"Var">): number {
@@ -713,16 +720,19 @@ function term_use(u: Bend.PMap<number>, p: Of<"Var">): number {
 }
 
 function term_uses(tm: HTerm): Bend.PMap<number> {
-  return memo(FL.memo.uses, tm, () => {
-    const t = term_force(tm);
-    if (t.$ === "Var") {
-      const p = probe_of(t);
-      return p === DUMMY ? USE0 : Bend.pmap_set(USE0, p.i, 1);
-    }
+  const got = FL.memo.uses.get(tm);
+  if (got !== undefined) return got;
+  const t = term_force(tm);
+  let uses = USE0;
+  if (t.$ === "Var") {
+    const p = probe_of(t);
+    if (p !== DUMMY) uses = Bend.pmap_set(USE0, p.i, 1);
+  } else {
     const add = t.$ === "Mat" ? Math.max : (a: number, b: number) => a + b;
-    return term_kids(t).reduce((u, x) =>
-      Bend.pmap_union(u, term_uses(x), add), USE0);
-  });
+    for (const x of term_kids(t)) uses = Bend.pmap_union(uses, term_uses(x), add);
+  }
+  FL.memo.uses.set(tm, uses);
+  return uses;
 }
 
 function rest_use(rest: HTerm[], p: Of<"Var">): number {
@@ -3108,9 +3118,10 @@ export function js_lib(book: Bend.Book, mod = false): string {
     const { live, lays } = fun_of(k);
     const ps = live.map((_, i) => "a" + i);
     const xs = live.map(([, , A], i) => host(A, ps[i]));
-    return (name_file(k) === book.entry && Bend.SOURCE_NAME.test(name_text(k))
-      ? [k, name_text(k)] : [k]).map((n) => `module[${JSON.stringify(n)}] = `)
-      .join("") + `run_lib((${ps}) => ${host(tele_unbind(
+    const alias = name_file(k) === book.entry ? name_text(k) : "";
+    return `module[${JSON.stringify(k)}] = `
+      + (Bend.SOURCE_NAME.test(alias) ? `module[${JSON.stringify(alias)}] = ` : "")
+      + `run_lib((${ps}) => ${host(tele_unbind(
         FL.book.tlds[k].T).ret, `run_loop(${name_global(k)}(${xs}))`, 1)
       }, ${lays.length});`;
   }).join("\n")}\nexport default module;\n`;

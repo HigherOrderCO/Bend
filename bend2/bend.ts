@@ -789,74 +789,73 @@ export const term_children: Record<string, string[]> = {
   PVar: [], PCtr: ["x"],
 };
 
-// Rebuild direct term children. Binding cases supply their own body operation.
-function term_map<X, Y, C>(tm: TermOf<X>, f: (child: TermOf<X>, context?: C) => TermOf<Y>, context?: C): TermOf<Y> {
-  switch (tm.$) {
-    case "Typ": return Typ(f(tm.g, context), tm.s);
-    case "Min": return Min(f(tm.a, context), f(tm.b, context), tm.s);
-    case "App": return App(f(tm.f, context), f(tm.x, context), tm.s);
-    case "ADT": return ADT(tm.k, tm.x.map(x => f(x, context)), tm.s, tm.r);
-    case "Ctr": return Ctr(tm.k, tm.x.map(x => f(x, context)), tm.s);
-    case "Mat": return Mat(tm.k, f(tm.h, context), f(tm.m, context), tm.s);
-    case "Eql": return Eql(f(tm.a, context), f(tm.b, context), f(tm.T, context), tm.s);
-    case "Rwt": return Rwt(f(tm.e, context), f(tm.p, context), f(tm.f, context), tm.s);
-    case "Ann": return Ann(f(tm.x, context), f(tm.T, context), tm.s);
-    default: return tm as unknown as TermOf<Y>;
-  }
-}
-
 // Preserve value spans and mutable-cell identity.
 function term_at(value: HTerm, span?: Span): HTerm {
   return value.s !== undefined || span === undefined || (value.$ === "Var" && value.i < 0)
     ? value : { ...value, s: span };
 }
 
-// One traversal owns one environment and, for checked syntax, its cell copies.
-export function term_higher(term: LTerm, env: Env = null, checked = false): HTerm {
-  const copy = checked && scope_mapper(v => {
-    if (v.i < 0) throw Error("missing checked binding: " + v.k + "@" + v.i);
-    return go(v);
-  });
-  function go(tm: LTerm): HTerm {
-    switch (tm.$) {
-      case "Var": {
-        if (tm.i < 0) return copy ? copy(tm) : tm;
-        const v = list_get(env, tm.i);
-        if (v !== null) return typeof v === "function" ? v(tm.s) : term_at(v, tm.s);
-        if (!checked && tm.v !== undefined) return tm.v;
-        throw Error("missing binding: " + tm.k + "@" + tm.i);
-      }
-      case "Hol": {
-        if (!tm.k.startsWith(".")) return tm;
-        const op = term_excerpt(tm);
-        throw Err(book_nil(), ctx_nil(), "a type for this operator (write (a " + op + " b : Nat))", undefined, tm.s, undefined,
-          "Note: we broke this after launch, sorry. Until 2.0.16 a bare operator meant Nat.\n"
-          + "That was a bug: operators demand annotation. Wrap the expression and it'll work again.");
-      }
-      case "Ref":
-        if (tm.issue !== undefined) throw Err(book_nil(), ctx_nil(), tm.issue, tm.s && "'" + term_excerpt(tm) + "'", tm.s);
-        return Ref(tm.k, tm.s, tm.b);
-      case "Sub": return term_higher(tm.f, list_set(env, tm.i, (s?: Span) => go(patt_term(tm.v, s))), checked);
-      case "Let": return Let(tm.k, tm.i, tm.v.map(go), (xs: HTerm[]) => {
-        const e = xs.reduce((e, x, j) => list_set(e, tm.i[j], x), env);
-        return e === env ? go(tm.f) : term_higher(tm.f, e, checked);
-      }, tm.s, tm.q);
-      case "All": return All(tm.q, tm.k, tm.i, go(tm.A), (x: HTerm) =>
-        term_higher(tm.B, list_set(env, tm.i, x), checked), tm.s);
-      case "Lam": return Lam(tm.k, tm.i, (x: HTerm) =>
-        term_higher(tm.f, list_set(env, tm.i, x), checked), tm.s, tm.q);
-      case "App": {
-        const f = go(tm.f), x = go(tm.x);
-        return f.$ === "Lam" ? f.f(x) : App(f, x, tm.s);
-      }
-      default: return term_map(tm, go);
+// Children in one environment share annotation copies; binder applications do not.
+export function term_higher(tm: LTerm, env: Env = null, copy?: (term: HTerm) => HTerm): HTerm {
+  switch (tm.$) {
+    case "Var": {
+      if (tm.i < 0) return copy ? copy(tm) : tm;
+      const v = list_get(env, tm.i);
+      if (v !== null) return typeof v === "function" ? v(tm.s) : term_at(v, tm.s);
+      if (!copy && tm.v !== undefined) return tm.v;
+      throw Error("missing binding: " + tm.k + "@" + tm.i);
     }
+    case "Hol": {
+      if (!tm.k.startsWith(".")) return tm;
+      const op = term_excerpt(tm);
+      throw Err(book_nil(), ctx_nil(), "a type for this operator (write (a " + op + " b : Nat))", undefined, tm.s, undefined,
+        "Note: we broke this after launch, sorry. Until 2.0.16 a bare operator meant Nat.\n"
+        + "That was a bug: operators demand annotation. Wrap the expression and it'll work again.");
+    }
+    case "Ref":
+      if (tm.issue !== undefined) throw Err(book_nil(), ctx_nil(), tm.issue, tm.s && "'" + term_excerpt(tm) + "'", tm.s);
+      return Ref(tm.k, tm.s, tm.b);
+    case "Sub": {
+      const e = list_set(env, tm.i, (s?: Span) => term_higher(patt_term(tm.v, s), env, copy));
+      return copy ? checked_higher(tm.f, e) : term_higher(tm.f, e);
+    }
+    case "Let": return Let(tm.k, tm.i, tm.v.map(x => term_higher(x, env, copy)), (xs: HTerm[]) => {
+      let e = env;
+      for (let j = 0; j < xs.length; j++) e = list_set(e, tm.i[j], xs[j]);
+      return copy && e !== env ? checked_higher(tm.f, e) : term_higher(tm.f, e, copy);
+    }, tm.s, tm.q);
+    case "All": return All(tm.q, tm.k, tm.i, term_higher(tm.A, env, copy), (x: HTerm) => {
+      const e = list_set(env, tm.i, x);
+      return copy ? checked_higher(tm.B, e) : term_higher(tm.B, e);
+    }, tm.s);
+    case "Lam": return Lam(tm.k, tm.i, (x: HTerm) => {
+      const e = list_set(env, tm.i, x);
+      return copy ? checked_higher(tm.f, e) : term_higher(tm.f, e);
+    }, tm.s, tm.q);
+    case "App": {
+      const f = term_higher(tm.f, env, copy), x = term_higher(tm.x, env, copy);
+      return f.$ === "Lam" ? f.f(x) : App(f, x, tm.s);
+    }
+    case "Typ": return Typ(term_higher(tm.g, env, copy), tm.s);
+    case "Min": return Min(term_higher(tm.a, env, copy), term_higher(tm.b, env, copy), tm.s);
+    case "ADT": return ADT(tm.k, tm.x.map(x => term_higher(x, env, copy)), tm.s, tm.r);
+    case "Ctr": return Ctr(tm.k, tm.x.map(x => term_higher(x, env, copy)), tm.s);
+    case "Mat": return Mat(tm.k, term_higher(tm.h, env, copy), term_higher(tm.m, env, copy), tm.s);
+    case "Eql": return Eql(term_higher(tm.a, env, copy), term_higher(tm.b, env, copy), term_higher(tm.T, env, copy), tm.s);
+    case "Rwt": return Rwt(term_higher(tm.e, env, copy), term_higher(tm.p, env, copy), term_higher(tm.f, env, copy), tm.s);
+    case "Ann": return Ann(term_higher(tm.x, env, copy), term_higher(tm.T, env, copy), tm.s);
+    default: return tm;
   }
-  return go(term);
 }
 
 // Requires checker-owned output; transport the cells captured by its annotations.
-export function checked_higher(term: LTerm): HTerm { return term_higher(term, null, true); }
+export function checked_higher(term: LTerm, env: Env = null): HTerm {
+  const copy = scope_mapper(v => {
+    if (v.i < 0) throw Error("missing checked binding: " + v.k + "@" + v.i);
+    return term_higher(v, env, copy);
+  });
+  return term_higher(term, env, copy);
+}
 
 export function term_lower(term: HTerm, d: number = 0): LTerm {
   const tm = term_force(term);
@@ -878,9 +877,16 @@ export function term_lower(term: HTerm, d: number = 0): LTerm {
       const x: HTerm = Var(tm.k, d);
       return Lam(tm.k, d, term_lower(tm.f(x), d + 1), tm.s, tm.q);
     }
-    default: {
-      return term_map(tm, term_lower, d);
-    }
+    case "Typ": return Typ(term_lower(tm.g, d), tm.s);
+    case "Min": return Min(term_lower(tm.a, d), term_lower(tm.b, d), tm.s);
+    case "App": return App(term_lower(tm.f, d), term_lower(tm.x, d), tm.s);
+    case "ADT": return ADT(tm.k, tm.x.map(x => term_lower(x, d)), tm.s, tm.r);
+    case "Ctr": return Ctr(tm.k, tm.x.map(x => term_lower(x, d)), tm.s);
+    case "Mat": return Mat(tm.k, term_lower(tm.h, d), term_lower(tm.m, d), tm.s);
+    case "Eql": return Eql(term_lower(tm.a, d), term_lower(tm.b, d), term_lower(tm.T, d), tm.s);
+    case "Rwt": return Rwt(term_lower(tm.e, d), term_lower(tm.p, d), term_lower(tm.f, d), tm.s);
+    case "Ann": return Ann(term_lower(tm.x, d), term_lower(tm.T, d), tm.s);
+    default: return tm;
   }
 }
 
@@ -923,7 +929,15 @@ export function scope_mapper(free: (v: Variable) => HTerm, refs?: Map<QName, HTe
             out = f.$ === "Lam" ? f.f(x) : { ...t, f, x };
             break;
           }
-          default: out = term_map(t, go);
+          case "Typ": out = Typ(go(t.g), t.s); break;
+          case "Min": out = Min(go(t.a), go(t.b), t.s); break;
+          case "ADT": out = ADT(t.k, t.x.map(go), t.s, t.r); break;
+          case "Ctr": out = Ctr(t.k, t.x.map(go), t.s); break;
+          case "Mat": out = Mat(t.k, go(t.h), go(t.m), t.s); break;
+          case "Eql": out = Eql(go(t.a), go(t.b), go(t.T), t.s); break;
+          case "Rwt": out = Rwt(go(t.e), go(t.p), go(t.f), t.s); break;
+          case "Ann": out = Ann(go(t.x), go(t.T), t.s); break;
+          default: out = t;
         }
         memo.set(t, out);
         return out;
@@ -1367,19 +1381,6 @@ export function term_show(term: LTerm, top: number = -1, bnd: Name[] = [], file?
   const named = (t: LTerm, text: string, arity: number): boolean =>
     t.$ === "Ctr" && t.k === ctr(text) && t.x.length === arity;
   type Printed = string | [string, number];
-  // Only compound forms carry precedence; one boundary inserts parentheses.
-  function go(tm: LTerm, prc: number): string {
-    const s = form(tm);
-    if (typeof s === "string") return s;
-    const wrap = s[1] < 0 ? prc >= 0 : prc > s[1];
-    return wrap ? "(" + s[0] + ")" : s[0];
-  }
-  function bound(ks: Name[], t: LTerm, prc: number): string {
-    bnd.push(...ks);
-    const s = go(t, prc);
-    bnd.length -= ks.length;
-    return s;
-  }
   function chain(t: LTerm, k: string, n: number): [LTerm[], LTerm] {
     const xs: LTerm[] = [], key = ctr(k);
     while (t.$ === "Ctr" && t.k === key && t.x.length === n) {
@@ -1451,7 +1452,8 @@ export function term_show(term: LTerm, top: number = -1, bnd: Name[] = [], file?
       default: return null;
     }
   }
-  function form(tm: LTerm): Printed {
+  function go(tm: LTerm, prc: number): string {
+    let s: Printed;
     switch (tm.$) {
       case "Var": {
         const k = tm.k;
@@ -1461,37 +1463,56 @@ export function term_show(term: LTerm, top: number = -1, bnd: Name[] = [], file?
         const k = name(tm.k);
         return (bnd.includes(k) ? k + "^" : k) + (tm.b === true ? "!" : "");
       }
-      case "Sub": return form(tm.f);
+      case "Sub": return go(tm.f, prc);
       case "Let": {
         const vs = tm.v.map(v => go(v, 1));
         const ks = tm.k.map((k, j) => quant_show(tm.q[j]) + k);
-        return [ks.join(" ") + " = " + vs.join(" ") + "; " + bound(tm.k, tm.f, -1), -1];
+        bnd.push(...tm.k);
+        const f = go(tm.f, -1);
+        bnd.length -= tm.k.length;
+        s = [ks.join(" ") + " = " + vs.join(" ") + "; " + f, -1];
+        break;
       }
       case "Typ": return tm.g.$ === "Qua" && tm.g.q.$ !== "None"
         ? tm.g.q.$ === "Lone" ? "Type" : "Data" : "Kind(" + go(tm.g, 0) + ")";
       case "Qnt": return "Quant";
       case "Qua": return { None: "&0", Lone: "&1", Many: "&2" }[tm.q.$];
-      case "Min": return [go(tm.a, 2) + " <&> " + go(tm.b, 2), 1];
+      case "Min": s = [go(tm.a, 2) + " <&> " + go(tm.b, 2), 1]; break;
       case "All": {
         const A = go(tm.A, 2);
-        return ["@" + quant_show(tm.q) + tm.k + ":" + A + " -> " + bound([tm.k], tm.B, 1), 1];
+        bnd.push(tm.k);
+        const B = go(tm.B, 1);
+        bnd.pop();
+        s = ["@" + quant_show(tm.q) + tm.k + ":" + A + " -> " + B, 1];
+        break;
       }
-      case "Lam": return [quant_show(tm.q ?? Lone()) + tm.k + " => " + bound([tm.k], tm.f, -1), 0];
+      case "Lam": {
+        bnd.push(tm.k);
+        const f = go(tm.f, -1);
+        bnd.pop();
+        s = [quant_show(tm.q ?? Lone()) + tm.k + " => " + f, 0];
+        break;
+      }
       case "App": {
         const [h, xs] = term_unapply(tm), b = xs[1];
         if (h.$ === "Ref" && h.k === name_source(owner, "Exists") && xs.length === 2 && b.$ === "Lam") {
           const A = go(xs[0], 2);
-          return ["&" + b.k + ":" + A + " -> " + bound([b.k], b.f, 1), 1];
+          bnd.push(b.k);
+          const B = go(b.f, 1);
+          bnd.pop();
+          s = ["&" + b.k + ":" + A + " -> " + B, 1];
+          break;
         }
         return go(h, 2) + "(" + xs.map(x => go(x, 0)).join(", ") + ")";
       }
       case "ADT": {
         const rs = tm.r.map(c => " - " + name(c) + "{}").join("");
-        const s = name(tm.k) + (tm.x.length === 0 && rs === "" ? "" : "<" + tm.x.map(x => go(x, 0)).join(", ") + ">") + rs;
-        return rs === "" ? s : [s, 1];
+        const text = name(tm.k) + (tm.x.length === 0 && rs === "" ? "" : "<" + tm.x.map(x => go(x, 0)).join(", ") + ">") + rs;
+        s = rs === "" ? text : [text, 1];
+        break;
       }
-      case "Ctr": return sugar(tm) ?? name(tm.k) + "{" + tm.x.map(x => go(x, 0)).join(", ") + "}";
-      case "Lit": return form(lit_step(tm));
+      case "Ctr": s = sugar(tm) ?? name(tm.k) + "{" + tm.x.map(x => go(x, 0)).join(", ") + "}"; break;
+      case "Lit": return go(lit_step(tm), prc);
       case "Mat": {
         const arms: string[] = [];
         let m: LTerm = tm;
@@ -1510,11 +1531,23 @@ export function term_show(term: LTerm, top: number = -1, bnd: Name[] = [], file?
         const mp = term_strip(tm.p), mb = mp.$ === "Lam" ? term_strip(mp.f) : mp;
         const binders = mp.$ === "Lam" && mb.$ === "Lam";
         const n = binders && mb.k !== "" ? mb.k + "@" : "";
-        const P = binders ? bound([mp.k, mb.k], mb.f, 1) : go(tm.p, 1);
-        return ["%" + n + go(tm.e, 1) + " : " + P + "; " + go(tm.f, -1), 0];
+        let P: string;
+        if (binders) {
+          bnd.push(mp.k, mb.k);
+          P = go(mb.f, 1);
+          bnd.length -= 2;
+        } else {
+          P = go(tm.p, 1);
+        }
+        s = ["%" + n + go(tm.e, 1) + " : " + P + "; " + go(tm.f, -1), 0];
+        break;
       }
       case "Ann": return "{" + go(tm.x, 1) + " : " + go(tm.T, 1) + "}";
     }
+    // Only compound forms carry precedence; one boundary inserts parentheses.
+    if (typeof s === "string") return s;
+    const wrap = s[1] < 0 ? prc >= 0 : prc > s[1];
+    return wrap ? "(" + s[0] + ")" : s[0];
   }
   return go(term, top);
 }
@@ -3019,8 +3052,12 @@ export function term_wnf(book: Book, term: HTerm): HTerm {
           case "VAR": {
             switch (tm.$) {
               case "All": tm = All(tm.q, tm.k, tm.i, term_cell(tm.A), tm.B, tm.s); break;
-              case "Ctr": case "ADT": case "Mat": case "Eql": case "Min": case "Typ":
-                tm = term_map(tm, term_cell); break;
+              case "Ctr": tm = Ctr(tm.k, tm.x.map(x => term_cell(x)), tm.s); break;
+              case "ADT": tm = ADT(tm.k, tm.x.map(x => term_cell(x)), tm.s, tm.r); break;
+              case "Mat": tm = Mat(tm.k, term_cell(tm.h), term_cell(tm.m), tm.s); break;
+              case "Eql": tm = Eql(term_cell(tm.a), term_cell(tm.b), term_cell(tm.T), tm.s); break;
+              case "Min": tm = Min(term_cell(tm.a), term_cell(tm.b), tm.s); break;
+              case "Typ": tm = Typ(term_cell(tm.g), tm.s); break;
             }
             fr.l.v = fr.a === undefined ? tm
               : Ann(tm, term_cell(fr.a.T), fr.a.s);
@@ -3122,9 +3159,15 @@ export function term_snf(book: Book, term: HTerm): HTerm {
     case "App": {
       return App(tm.f.$ === "Ref" ? tm.f : term_snf(book, tm.f), term_snf(book, tm.x), tm.s);
     }
-    default: {
-      return term_map(tm, x => term_snf(book, x));
-    }
+    case "Typ": return Typ(term_snf(book, tm.g), tm.s);
+    case "Min": return Min(term_snf(book, tm.a), term_snf(book, tm.b), tm.s);
+    case "ADT": return ADT(tm.k, tm.x.map(x => term_snf(book, x)), tm.s, tm.r);
+    case "Ctr": return Ctr(tm.k, tm.x.map(x => term_snf(book, x)), tm.s);
+    case "Mat": return Mat(tm.k, term_snf(book, tm.h), term_snf(book, tm.m), tm.s);
+    case "Eql": return Eql(term_snf(book, tm.a), term_snf(book, tm.b), term_snf(book, tm.T), tm.s);
+    case "Rwt": return Rwt(term_snf(book, tm.e), term_snf(book, tm.p), term_snf(book, tm.f), tm.s);
+    case "Ann": return Ann(term_snf(book, tm.x), term_snf(book, tm.T), tm.s);
+    default: return tm;
   }
 }
 
