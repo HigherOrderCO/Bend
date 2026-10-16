@@ -84,6 +84,7 @@ type File = {
   lay_ids: Map<Lay, number>;
   depths: Map<HTerm, number>;
   views: Map<string, { of: Name; root: string }>;
+  locals: Set<string>;
   memo: {
     opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
     uses: Map<HTerm, Bend.PMap<number>>;
@@ -147,9 +148,6 @@ const IO_EMIT = "IO~emit";
 
 const ATOM   = /^(?:[A-Za-z_$][A-Za-z0-9_$]*|\d+|\d+\.\d+)$/;
 const STRLIT = /^"(?:[^"\\]|\\.)*"$/;
-
-// A name name_local made.
-const LOCAL = /^\w*_\d+$/;
 
 const FOLD_FUEL = 8192;
 
@@ -619,7 +617,9 @@ function name_local(sc: Scope, k: Name): string {
   const base = name_clean(k).replace(/^_+/, "");
   const n = sc.fresh.get(base) ?? 0;
   sc.fresh.set(base, n + 1);
-  return `_${base}_${n}`;
+  const name = `_${base}_${n}`;
+  FL.locals.add(name);
+  return name;
 }
 
 function name_id(pre: string, k: string): string {
@@ -1561,6 +1561,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     lay_ids: new Map(),
     depths: new Map(),
     views: new Map(),
+    locals: new Set(),
     memo: {
       opens: new Map(),
       uses: new Map(),
@@ -2296,7 +2297,7 @@ function emit_hold(sc: Scope, exprs: string[], k: string,
 }
 
 function emit_alias(sc: Scope, e: string, k: string, kd?: Kind): string {
-  return LOCAL.test(e) ? e : emit_hold(sc, [e], k, kd && [kd])[0];
+  return FL.locals.has(e) ? e : emit_hold(sc, [e], k, kd && [kd])[0];
 }
 
 function emit_task(sc: Scope, fid: string, rem: number, words: string[],
@@ -3364,7 +3365,7 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
   if (x.$ === "Lam") {
     const all = ty_all(ty);
     const [e, ...rest] = all.q.$ !== "None" ? args : ["null", ...args];
-    const k = e === "null" || LOCAL.test(e) || FL.views.has(e) ? e
+    const k = e === "null" || FL.locals.has(e) || FL.views.has(e) ? e
       : name_local(sc, x.k);
     const v = k === "null" ? JS_NULL : js_var(sc, k);
     const b = x.f(v);
