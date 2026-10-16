@@ -38,6 +38,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 
 import * as lib from "./_lib";
+import { judge } from "./safe_node.ts";
 
 // Constants
 // =========
@@ -346,8 +347,21 @@ try {
   check("a kernel failure shows the kernel's why above the mismatch notice",
     fuel.code === 1 && fuel.out === "" && fuel.err.startsWith("SOME PROOFS FAIL\n"
       + "In Sum.f:\nout of fuel\nSorry - this is a mismatch"));
+  fs.writeFileSync(path.join(BEND, "check.json"), JSON.stringify({
+    t: Date.now(), ver: "99.0.0", notice: "hello" }));
+  const survey = await lib.exec(process.execPath, ["gates/safe_node.ts"],
+    sum_file + "\n", 25_000, { HOME, BENDTT: fuel_kernel,
+      BEND_NO_TELEMETRY: "" });
+  fresh();
+  check("an update notice cannot hide the safe worker's kernel rejection",
+    survey.code === 0 && judge(JSON.parse(survey.out)[0]).join("|")
+      === "!|In Sum.f: | out of fuel");
   fs.writeFileSync(unsafe_file,
     "import Base\n@unsafe\ndef main() -> Nat:\n  0n\n");
+  const unsafe = await bend([unsafe_file, "--verdict"]);
+  check("the safe summary names unsafe defs", unsafe.code === 1
+    && judge({ f: unsafe_file, code: unsafe.code, ms: 0, timeout: false,
+      out: unsafe.out + unsafe.err }).join("|") === "u|unsafe: main");
   fs.writeFileSync(checkup,
     "import ./sum.bend as Good\nimport ./bad.bend as Bad\n");
   fs.writeFileSync(good_checkup, "import ./sum.bend as Good\n");

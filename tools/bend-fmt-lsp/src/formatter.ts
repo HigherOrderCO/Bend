@@ -164,19 +164,21 @@ function looseLines(lines: Line[]): boolean[] {
 }
 
 // The tokens that start a body on the line of its `do`, `match`, `case` or
-// `def` header, as in `do IO<Unit>: a`: Bend pins the lines after it to the
-// column of `a`.
+// `def` header, `=>` lambda opener or `;` statement separator. As in
+// `do IO<Unit>: a`, Bend pins the lines after it to the column of `a`.
 function inlineBodies(lines: Line[]): number[][] {
   let open = 0;
   let header: { open: number; angle: number; typed: boolean } | null = null;
   return lines.map((line) => line.tokens.flatMap((token, index) => {
     if (token.kind === "word" && ["do", "match", "case", "def"].includes(token.text)) {
       header = { open, angle: 0, typed: token.text === "do" || token.text === "def" };
+    } else if ((token.text === "=>" || token.text === ";") && open === 0) {
+      return index + 1 < line.tokens.length ? [index + 1] : [];
     } else if (["(", "[", "{"].includes(token.text)) {
       open++;
     } else if ([")", "]", "}"].includes(token.text)) {
       open = Math.max(0, open - 1);
-    } else if (header?.typed && ANGLES.has(token.text)) {
+    } else if (header?.typed && open === header.open && ANGLES.has(token.text)) {
       header.angle += token.text.length * (token.text[0] === "<" ? 1 : -1);
     } else if (header && token.text === ":" && open === header.open && header.angle === 0) {
       header = null;

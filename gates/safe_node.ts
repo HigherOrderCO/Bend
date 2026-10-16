@@ -30,7 +30,9 @@ export function judge(g: Got): [string, string] {
     return [" ", "agree"];
   }
   if (/^Error: \d+ defs? rel(y|ies) on unsafe or foreign code/m.test(out)) {
-    return ["u", "unsafe: " + [...out.matchAll(/^- (\S+)$/gm)].map((m) => m[1]).slice(0, 3).join(" ")];
+    return ["u", "unsafe: " + [...out.matchAll(
+      /^defs that depend on (?:@unsafe|foreign effects): (.+)$/gm)]
+      .flatMap((m) => m[1].split(", ")).slice(0, 3).join(" ")];
   }
   if (!out.includes("Sorry - ")) {
     return [" ", "bend2 rejects: " + out.split("\n").slice(1, 3).join(" ").slice(0, 80)];
@@ -47,7 +49,7 @@ async function run(bin: string, args: string[], cap: number): Promise<Omit<Got, 
   const g: Omit<Got, "f"> = { code: null, ms: 0, out: "", timeout: false };
   const t0 = Date.now();
   await new Promise<void>((done) => {
-    const kid = child.spawn(bin, args, { env: process.env });
+    const kid = child.spawn(bin, args, { env: { ...process.env, BEND_NO_TELEMETRY: "1" } });
     kid.stdout.on("data", (d) => { g.out += d; });
     kid.stderr.on("data", (d) => { g.out += d; });
     kid.on("error", (e) => { g.error = e.message; });

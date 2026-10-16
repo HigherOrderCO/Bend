@@ -394,9 +394,9 @@ into `/` paths so imports resolve on Windows. `comp.ts` also exports
 code as `bend <file>`, never a copy of it. Imported, `main.ts` also registers
 Bend's loader for `import "x.bend"`.
 
-If a file has a line that's exactly `import Base` (what `bend --checkup` reads),
-it reuses one Base, checked once per process. Base facts are left out of rule
-requests.
+If a file imports Base in its initial header (what `bend --checkup` reads),
+it reuses the latest checked Base, checking it again when its source changes.
+Base facts are left out of rule requests.
 
 A failed check is one `bend/check` finding. Its message is Bend's, without the
 location: expected and observed, with the names in scope, and Bend's note.
