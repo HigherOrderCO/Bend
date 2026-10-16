@@ -2153,15 +2153,14 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
       const ix = parse_term(p);
       parse_eat(p, "]");
       const s = parse_span(p, beg);
-      parse_term_ns(p, ix, Ref(sugar_name(p, "U32"), s));
+      const u: LTerm = Ref(sugar_name(p, "U32"), s);
+      parse_term_ns(p, ix, u);
       parse_skip(p);
       if (!parse_nl(p) && parse_take(p, "<-")) {
         const v = parse_term(p, 2);
-        out = App(App(App(App(Ref(sugar_name(p, "Array.set"), s), Ref(sugar_name(p, "U32"), s), s),
-          out, s), ix, s), v, s);
+        out = App(App(App(App(Ref(sugar_name(p, "Array.set"), s), u, s), out, s), ix, s), v, s);
       } else {
-        out = App(App(App(Ref(sugar_name(p, "Array.get"), s), Ref(sugar_name(p, "U32"), s), s),
-          out, s), ix, s);
+        out = App(App(App(Ref(sugar_name(p, "Array.get"), s), u, s), out, s), ix, s);
       }
       continue;
     }
@@ -2211,10 +2210,10 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
       out = Min(out, b, s);
     } else if (op === "<>") {
       out = Ctr(sugar_name(p, k, "ctr"), [out, b], s);
-    } else if (op === "&" || op === "|") {
-      out = App(App(Ref(sugar_name(p, k), s), out, s), b, s);
     } else {
-      out = App(App((k.startsWith(".") ? Hol(k, t) : Ref(sugar_name(p, k), t)), out, s), b, s);
+      const f: LTerm = k.startsWith(".") ? Hol(k, t)
+        : Ref(sugar_name(p, k), op === "&" || op === "|" ? s : t);
+      out = App(App(f, out, s), b, s);
     }
   }
 }
