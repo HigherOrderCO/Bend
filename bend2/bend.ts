@@ -279,7 +279,7 @@ export type BodyOf<B> = B extends [infer T] ? T : B;
 export type LetsOf<B> = BodyOf<B> extends Function ? (xs: TermOf<B>[]) => TermOf<B> : BodyOf<B>;
 export type SubsOf<B> = BodyOf<B> extends Function ? TermOf<NoInfer<B>> : HTerm;
 export type TermOf<B> = (
-  | { $: "Var"; k: Name; i: number; v?: SubsOf<B> }                                // x
+  | { $: "Var"; k: Name; i: number; v?: SubsOf<B>; u?: object }                            // x
   | { $: "Ref"; k: Name; b?: Bool }                                                // x
   | { $: "Sub"; i: number; v: Patt; f: TermOf<B> }                                 // x <- v; f
   | { $: "Let"; k: Name[]; i: number[]; q: Quant[]; v: TermOf<B>[]; f: LetsOf<B> } // x y = v w; f
@@ -2802,7 +2802,8 @@ export function term_wnf(book: Book, term: HTerm): HTerm {
         if (tm.v === undefined) {
           break focus;
         } else {
-          if (tm.i === -1) {
+          // a rigid whnf is not the cell's: it would stop the full one
+          if (tm.i === -1 && book !== RIGID) {
             frs.push({ $: "VAR", l: tm, a: tm.v.$ === "Ann" ? tm.v : undefined });
           }
           lhs = null;
@@ -3060,14 +3061,53 @@ export function term_snf(book: Book, term: HTerm): HTerm {
 const RIGID: Book = book_nil();
 
 // two copies of one term are equal: a conversion first compares both
-// sides with every def rigid (the empty book unfolds none), then as usual
+// sides with every def rigid (the empty book unfolds none), then as
+// usual, asking the rigid pass again at each pair of calls it unfolds
 export function term_compare(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: number = 0): boolean {
   return compare_go(mode, RIGID, lhs, rhs, dep) || compare_go(mode, book, lhs, rhs, dep);
+}
+
+// the head of a spine
+function head(t: HTerm): HTerm {
+  let f = term_strip(t);
+  while (f.$ === "App") {
+    f = term_strip(f.f);
+  }
+  return f;
+}
+
+// two calls of one def are equal when their arguments are equal with
+// every def rigid: the full pass asks before it unfolds them, so a copy
+// met only after an outer def unfolds (a big numeral in a field) converts
+// without evaluating either; the arguments, first to last
+function compare_call(book: Book, lhs: HTerm, rhs: HTerm, dep: number): boolean {
+  const f = term_strip(lhs);
+  const g = term_strip(rhs);
+  if (f.$ !== "App" || g.$ !== "App") {
+    return f.$ !== "App" && g.$ !== "App";
+  }
+  return compare_call(book, f.f, g.f, dep) && compare_go("EQ", RIGID, f.x, g.x, dep);
 }
 
 function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: number): boolean {
   if (lhs === rhs) {
     return true;
+  }
+  if (book === RIGID && mode === "EQ" && lhs.$ === "Var" && lhs.u === rhs) {
+    return false;
+  }
+  if (book !== RIGID) {
+    const f = head(lhs);
+    const g = head(rhs);
+    const d = f.$ === "Ref" ? book.tlds[f.k] : undefined;
+    if (g.$ === "Ref" && g.k === (f as typeof g).k && d?.$ === "Def" && d.v !== null) {
+      if (compare_call(book, lhs, rhs, dep)) {
+        if (mode === "EQ" && lhs.$ === "Var" && lhs.i === -2 && rhs.$ === "Var" && rhs.i === -2) {
+          rhs.v = lhs.v;
+        }
+        return true;
+      }
+    }
   }
   let a = term_wnf(book, lhs);
   let b = term_wnf(book, rhs);
@@ -3080,6 +3120,8 @@ function compare_go(mode: "EQ" | "LE", book: Book, lhs: HTerm, rhs: HTerm, dep: 
     const same = compare_go(mode, book, a, b, dep);
     if (same) {
       rhs.v = lhs.v;
+    } else if (book === RIGID) {
+      lhs.u = rhs;
     }
     return same;
   }
