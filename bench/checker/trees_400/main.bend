@@ -39,7 +39,7 @@ law Cpyable:
   Type
 
 def Cpyable(T):
-  @x: T -> Cpy(T, x) & Cpy(T, x)
+  @x: T -> Pair(Cpy(T, x), Cpy(T, x))
 
 law Equal.cong2:
   for -A: Type
@@ -73,21 +73,21 @@ def add(a, b):
 
 law Nat.cpy:
   for n: Nat
-  Cpy(Nat, n) & Cpy(Nat, n)
+  Pair(Cpy(Nat, n), Cpy(Nat, n))
 
 law Nat.cpy.succ:
   for -p: Nat
-  for c: Cpy(Nat, p) & Cpy(Nat, p)
-  Cpy(Nat, S{p}) & Cpy(Nat, S{p})
+  for c: Pair(Cpy(Nat, p), Cpy(Nat, p))
+  Pair(Cpy(Nat, S{p}), Cpy(Nat, S{p}))
 
 def Nat.cpy.succ(p, c):
-  ((a, ea), (b, eb)) = c
-  ((S{a}, cong(Nat, Nat, x => S{x}, p, a, ea)), (S{b}, cong(Nat, Nat, x => S{x}, p, b, eb)))
+  Tuple{Tuple{a, ea}, Tuple{b, eb}} = c
+  Tuple{Tuple{S{a}, cong(Nat, Nat, x => S{x}, p, a, ea)}, Tuple{S{b}, cong(Nat, Nat, x => S{x}, p, b, eb)}}
 
 def Nat.cpy(n):
   match n:
     case Z{}:
-      ((Z{}, {==}), (Z{}, {==}))
+      Tuple{Tuple{Z{}, {==}}, Tuple{Z{}, {==}}}
     case S{p}:
       Nat.cpy.succ(p, Nat.cpy(p))
 

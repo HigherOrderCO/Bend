@@ -313,8 +313,8 @@ export type Env = List<HTerm | ((s?: Span) => HTerm)>;
 // Definitions & Book
 export type Ctr  = { k: Name; n: number; T: HTerm }
 export type Ctrs = Array<Ctr>;
-export type ADT  = { $: "ADT"; n: number; g: number; T: HTerm; c: Ctrs; b?: Bool; };
-export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: string[]; m?: string; l?: Bool; };
+export type ADT  = { $: "ADT"; n: number; g: number; T: HTerm; c: Ctrs; };
+export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; o?: Bool; u?: Bool; i?: string[]; m?: string; l?: Bool; };
 export type TLD  = ADT | Def;
 export type Book = { tlds: Record<Name, TLD>; ctrs: Record<Name, Ctr>; order: Name[]; hols: number; tmps: Record<Name, Map<string, Name>>; };
 
@@ -957,6 +957,9 @@ export async function book_load(book: Book, file: string, ns: string, seen: Map<
     }
     return book.order.length;
   }
+  if (ns === "" && real !== BASE_BEND) {
+    throw Err(book, ctx_nil(), "a namespace for " + file + " (only Base has none)", undefined, spn);
+  }
   seen.set(real, null);
   const dir   = real.slice(0, real.lastIndexOf("/") + 1);
   const top   = root ?? dir;
@@ -1011,11 +1014,6 @@ export async function book_load(book: Book, file: string, ns: string, seen: Map<
   }
   const n0 = book.order.length;
   parse_book(book, dir, body.join("\n"), ns, al);
-  if (real === BASE_BEND) {
-    for (const k of book.order.slice(n0)) {
-      book.tlds[k].b = true;
-    }
-  }
   seen.set(real, ns);
   return n0;
 }
@@ -1201,9 +1199,18 @@ function f32_show(x: number): string {
   return (Object.is(x, -0) ? "-0" : s).replace(/^-?\d+(?=e|$)/, "$&.0").replace("Infinity", "inf");
 }
 
-// a key as output spells it: ns:name is internal, and ns.name is shown
+// Base is the one file without a namespace (book_load refuses any other),
+// so a name without one is Base's; its template instances (k~N) are not
+export function is_base(k: Name): boolean {
+  return !k.includes(":") && !k.includes("~");
+}
+
+// a key as output spells it: ns:name is internal, and ns.name is shown,
+// but the root file's own names (in ROOT.ns, set as it loads) show bare
+export const ROOT = { ns: "" };
 export function name_key(k: Name): string {
-  return k.replace(":", ".");
+  const own = ROOT.ns !== "" && k.startsWith(ROOT.ns + ":");
+  return (own ? k.slice(ROOT.ns.length + 1) : k).replace(":", ".");
 }
 
 // a key as a file spells it: its own names bare, an imported file's
@@ -1663,8 +1670,14 @@ export function parse_var(p: Parse, k: Name, s?: Span): LTerm {
   return Var(k, p.frs++, s, Ref(q, s));
 }
 
+// each ns:name built once, so lookups by it reuse one hashed string
+const QUAL = new Map<string, Map<Name, Name>>();
 export function parse_qual(p: Parse, k: Name): Name {
-  return p.ns === "" ? k : p.ns + ":" + k;
+  if (p.ns === "") {
+    return k;
+  }
+  const qs = QUAL.get(p.ns) ?? QUAL.set(p.ns, new Map()).get(p.ns)!;
+  return qs.get(k) ?? qs.set(k, p.ns + ":" + k).get(k)!;
 }
 
 export function parse_reso(p: Parse, k: Name): Name {
@@ -1676,9 +1689,8 @@ export function parse_reso(p: Parse, k: Name): Name {
       parse_fail(p, "an unambiguous name (the alias " + k.slice(0, dot) + " shadows " + k + ")");
     }
   }
-  const own = q in p.book.tlds || q in p.book.ctrs;
-  const far = k in p.book.tlds || k in p.book.ctrs;
-  return own || !far ? q : k;
+  return q in p.book.tlds || q in p.book.ctrs
+    || !(k in p.book.tlds || k in p.book.ctrs) ? q : k;
 }
 
 export function parse_call(p: Parse, k: Name, xs: LTerm[], s?: Span): LTerm {
@@ -2105,7 +2117,7 @@ export function parse_term_ops(p: Parse, tm: LTerm, beg: number, lvl: number): L
         parse_fail(p, "a family name before <..> (a comparison here needs parens)");
       }
       parse_take(p, ",");
-      const d = parse_reso(p, out.k);
+      const d = out.$ === "Ref" ? out.k : parse_reso(p, out.k);
       out = ADT(d, parse_fill(p, d, [b, ...parse_term_args(p, ">")], s), s);
     } else if (op === "->") {
       out = All(Lone(), "_", parse_open(p, "_"), out, b, s);
@@ -2433,7 +2445,7 @@ export function parse_def(p: Parse, u: Bool): void {
   const nm  = parse_name(p);
   const q   = parse_reso(p, nm);
   const tld = book.tlds[q];
-  const law = tld?.$ === "Def" && tld.v === null && tld.b !== true && !tld.i ? tld : undefined;
+  const law = tld?.$ === "Def" && tld.v === null && (p.ns === "" || !is_base(q)) && !tld.i ? tld : undefined;
   const k   = law ? q : parse_fresh(p, nm);
   const un  = parse_take(p, "?") || u;
   parse_eat(p, "(");
@@ -3318,7 +3330,7 @@ export function term_infer(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ctx: Ctx,
       let x = 0;
       if (qt.$ !== "None") {
         const gen = tld.$ === "Def" && tld.x > 0 && !(book.tlds[lhs.def] as Def).x ? tld : null;
-        if (tld.$ === "Def" && tld.v === null && !tld.i && (tld.b !== true && lhs.u !== true || gen !== null) && k !== lhs.def) {
+        if (tld.$ === "Def" && tld.v === null && !tld.i && (tld.o !== true && !is_base(k) && lhs.u !== true || gen !== null) && k !== lhs.def) {
           throw Err(book, ctx, "a filled definition (an unfilled law is a dead claim: live code cannot use it)", tm, tm.s, lhs.def);
         }
         if (gen !== null) {
@@ -3584,7 +3596,7 @@ export function term_check(book: Book, lhs: LHS, tm: HTerm, qt: Quant, ty: HTerm
     // Γ ⊢ "text" : T ~ {}    Γ ⊢ 3n : T ~ {}
     case "Lit": {
       const t_wnf = term_wnf(book, ty);
-      if (t_wnf.$ === "ADT" && t_wnf.k === tm.k && t_wnf.r.length === 0 && book.tlds[tm.k]?.b === true) {
+      if (t_wnf.$ === "ADT" && t_wnf.k === tm.k && t_wnf.r.length === 0) {
         return Check(tm, ty, uses_nil());
       }
       return term_check(book, lhs, lit_step(tm), qt, ty, ctx, d);
@@ -3728,7 +3740,7 @@ export function def_check(book: Book, k: Name, def: Def, z?: number): LTerm {
     if (o in gen.tlds) {
       throw Err(book, ctx_nil(), "a fresh ~ binder name", h.k, h.s);
     }
-    gen.tlds[o] = { $: "Def", n: 0, x: 0, T: h.A, v: null, b: true };
+    gen.tlds[o] = { $: "Def", n: 0, x: 0, T: h.A, v: null, o: true };
     t = App(t, Ref(o));
     v = term_apply(v, Ref(o));
     T = h.B(Ref(o));
@@ -3856,7 +3868,7 @@ export function book_valid(book: Book, done: number = 0): void {
       continue;
     }
     if (i >= done) {
-      if (fin && tld.v === null && tld.b !== true && !tld.i) {
+      if (fin && tld.v === null && !is_base(k) && !tld.i) {
         book.hols += 1;
       }
       term_check(book, { t: Ref(k), n: 0, def: k, qs: [], u: tld.u }, tld.T, None(), Typ(Qua(Lone())), ctx_nil(), 0);
@@ -3867,8 +3879,8 @@ export function book_valid(book: Book, done: number = 0): void {
         }
         const [h] = term_unapply(tel);
         const io  = book.tlds["IO"];
-        if (h.$ !== "Ref" || h.k !== "IO" || io === undefined || io.$ !== "Def" || io.b !== true) {
-          throw Err(book, ctx_nil(), "a foreign definition returning base IO(...) directly (return type aliases are not unfolded)", k, tel.s, k);
+        if (h.$ !== "Ref" || h.k !== "IO" || io === undefined || io.$ !== "Def") {
+          throw Err(book, ctx_nil(), "a foreign definition returning base IO(...) directly (return type aliases are not unfolded)", name_key(k), tel.s, k);
         }
       }
       if (fin && tld.v !== null) {

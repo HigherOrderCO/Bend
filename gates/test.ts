@@ -215,8 +215,13 @@ async function state_run(): Promise<Fail[]> {
   for (const file of files) {
     const copies = [Bend.book_nil(), Bend.book_nil()];
     for (const book of copies) {
-      await Bend.book_load(book, path.join(TESTS, file + ".bend"), "",
+      const ns = path.basename(file);
+      Bend.ROOT.ns = ns;
+      await Bend.book_load(book, path.join(TESTS, file + ".bend"), ns,
         new Map());
+      if (ns + ":main" in book.tlds) {
+        book.tlds["main"] = book.tlds[ns + ":main"];
+      }
       Bend.book_valid(book);
     }
     books.push(copies);

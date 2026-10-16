@@ -269,8 +269,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
 
 // Per native constructor: its builder, field readers and optional
 // test. RUNTIME_ADTS are the datatypes the runtime or the elaborator
-// lays out itself; OWNED are the Base names the compiler encodes,
-// which a file without `import Base` may declare but not compile.
+// lays out itself.
 
 const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
   Nat: { Zero: { intr: "0" }, Succ: { intr: tpl_nat("", "nat_chk($0 + 1)") } },
@@ -314,8 +313,6 @@ const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
 
 const RUNTIME_ADTS = ["Sigma", "String", "Word.Con", "IO.OP", "Result",
   "Poll", "Maybe", "Bool", "Unit"];
-
-const OWNED = ["IO", ...RUNTIME_ADTS, ...Object.keys(OPTIMIZED)];
 
 // Native
 // ------
@@ -824,7 +821,7 @@ function dom_live([q]: Dom): boolean {
 
 function intr_of(k: Name, js = false): Intr | undefined {
   const tld = FL.book.tlds[k];
-  const it = tld?.$ === "Def" && tld.i === undefined && tld.b
+  const it = tld?.$ === "Def" && tld.i === undefined
     ? OPERATIONS[op_name(k)] : undefined;
   return it && (js || it.C !== undefined) && (!FL.js || it.JS)
     ? it : undefined;
@@ -1324,7 +1321,7 @@ function flat_of(k: Name): boolean {
 
 function io_base(book: Bend.Book, t: HTerm): HTerm[] | null {
   const io = book.tlds["IO"];
-  if (io?.$ !== "Def" || !io.b) {
+  if (io?.$ !== "Def") {
     return null;
   }
   const tlds = Object.assign(Object.create(book.tlds),
@@ -1416,12 +1413,6 @@ function scope_new(): Scope {
 }
 
 function file_book(roots: Name[]): void {
-  for (const k of OWNED) {
-    if (FL.book.tlds[k] && !FL.book.tlds[k].b) {
-      die(Bend.name_key(k)
-        + " is a name the compiler encodes itself: name yours apart");
-    }
-  }
   for (const [k, tld] of Object.entries(FL.book.tlds)) {
     if (def_foreign(tld) && k in FL.book.ctrs) {
       die(Bend.name_key(k)
@@ -3203,7 +3194,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
   FL = file_new(book, true);
   const outs = !mod ? null : [...new Set(FL.book.order)].filter((k) => {
     const t = FL.book.tlds[k];
-    return done_live(t) && t.b !== true && t.x === 0
+    return done_live(t) && !Bend.is_base(k) && t.x === 0
       && io_base(FL.book, t.T) === null;
   });
   file_book(outs ?? ["main"]);

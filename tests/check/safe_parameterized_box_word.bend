@@ -1,3 +1,5 @@
+# a literal is Base's U32, never a file's own: 7 is refused against a
+# Box whose constructor is named U32
 type Bit is Data:
   False{}
   True{}
@@ -18,4 +20,13 @@ def word() -> Box<Word>:
 def main() -> Box<Bit>:
   bit()
 
-#|7
+#|SOME PROOFS FAIL
+#|Error:
+#|- expected : a declared constructor (Box declares U32)
+#|- observed : 7
+#|Location: bit
+#|14 | def bit() -> Box<Bit>:
+#|15>|   7
+#|   |   ^
+#|16 | 
+#|exit 1

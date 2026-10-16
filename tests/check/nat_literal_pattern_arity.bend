@@ -3,6 +3,7 @@
 # a Succ/Zero pattern chain of its own, skipping the constructor case, so
 # 257n passed where the hand-written Zero{} is refused at its arity. the
 # literal now expands to constructor terms and takes the same path
+# (a literal names Base's Zero and Succ, which this Base-free file lacks)
 type U is Data:
   Un{}
 type N is Data:
@@ -18,10 +19,10 @@ def f(b: N) -> U:
 
 #|SOME PROOFS FAIL
 #|Error:
-#|- message  : a Zero pattern with 1 field
+#|- message  : a declared constructor (unknown: Succ)
 #|Location:
-#|13 |   match b:
-#|14>|     case 257n:
+#|14 |   match b:
+#|15>|     case 257n:
 #|   |          ^^^^
-#|15 |       Un{}
+#|16 |       Un{}
 #|exit 1

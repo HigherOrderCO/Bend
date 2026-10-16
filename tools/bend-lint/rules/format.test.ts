@@ -37,7 +37,7 @@ async function fixed(text: string, options: FormatOptions = opts) {
     Object.fromEntries(
       book.order.flatMap((name) => {
         const tld = book.tlds[name];
-        return tld.$ === "Def" && tld.e !== undefined && !tld.b
+        return tld.$ === "Def" && tld.e !== undefined && !Bend.is_base(name)
           ? [[name, Bend.term_show(tld.e)]]
           : [];
       }),

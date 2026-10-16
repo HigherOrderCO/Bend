@@ -35,4 +35,4 @@ law main:
 def main():
   addself(Succ{Succ{Zero{}}})
 
-#|3n
+#|Succ{Succ{Succ{Zero{}}}}

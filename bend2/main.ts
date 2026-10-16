@@ -757,7 +757,7 @@ function pkg_files(file: string, book: Bend.Book,
     real === BASE || ns === null || ns.startsWith("0x") ? []
       : [[ns === "" ? path.basename(file) : ns + ".bend", real]]),
   ...Object.entries(book.tlds).flatMap(([k, tld]): [string, string][] =>
-    tld.$ !== "Def" || tld.i === undefined || tld.b === true
+    tld.$ !== "Def" || tld.i === undefined || Bend.is_base(k)
       || k.startsWith("0x") ? [] : tld.i.map((f) =>
       [f.startsWith(dir) ? f.slice(dir.length) : f, f]))];
   const ups = raws.map(([p]) => path.posix.normalize(p).split("/")
@@ -814,8 +814,8 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
   const bad = book_promises(book);
   const n   = new Set(bad.flatMap(([, ks]) => ks)).size;
   if (n !== 0) {
-    const own = bad.some(([, ks]) => ks.some((k) =>
-      !k.includes(":") || (book.tlds[k] as Bend.Def).l === true));
+    const own = bad.some(([, ks]) => ks.some((k) => k.startsWith(Bend.ROOT.ns
+      + ":") || (book.tlds[k] as Bend.Def).l === true));
     cli_say(2, FAIL + "\nError: " + String(n) + " def" + (n === 1 ? " relies"
       : "s rely") + " on unsafe or foreign code:\n"
       + bad.map(([on, ks]) => "defs that depend on " + on + ": "
@@ -843,13 +843,13 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
 // defs outside Base collects who names whom, then each promise floods
 // back along those edges.
 function book_promises(book: Bend.Book): Array<[string, string[]]> {
-  const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
+  const own  = [...new Set(book.order)].filter((k) => !Bend.is_base(k));
   const keys = Object.keys(book.tlds);
   const roots: Array<[string, string[]]> = [
     ["@unsafe", keys.filter((k) => (book.tlds[k] as Bend.Def).u === true)],
     ["foreign effects", keys.filter((k) => {
       const t = book.tlds[k] as Bend.Def;
-      return t.u !== true && t.i !== undefined && t.b !== true;
+      return t.u !== true && t.i !== undefined && !Bend.is_base(k);
     })],
   ];
   if (roots.every(([, ks]) => ks.length === 0)) {
@@ -927,7 +927,15 @@ async function book_read(file: string, base?: Bend.Book,
     seen.set(BASE, "");
   }
   try {
-    await Bend.book_load(book, file, "", seen);
+    // the root file gets its own namespace, the one an import of it would
+    // get, so sugar's bare names can only mean Base's
+    const ns = fs.realpathSync(file) === Bend.BASE_BEND ? ""
+      : path.basename(file).replace(/\.bend$/, "");
+    Bend.ROOT.ns = ns;
+    await Bend.book_load(book, file, ns, seen);
+    if (ns + ":main" in book.tlds) {
+      book.tlds["main"] = book.tlds[ns + ":main"];
+    }
     const laws = path.join(path.dirname(file), "LAWS.bend");
     if (path.basename(file) === "PROOF.bend" && fs.existsSync(laws)
       && !seen.has(fs.realpathSync(laws))) {

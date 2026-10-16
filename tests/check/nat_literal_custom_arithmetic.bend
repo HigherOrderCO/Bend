@@ -1,3 +1,5 @@
+# a literal is Base's Nat, never a file's own: without Base, 4097n is
+# refused against this file's Nat
 type Nat is Data:
   Zero{}
   Succ{pred: Nat}
@@ -46,4 +48,13 @@ def claim_two() -> {two_succ(id(~4097n)) == True{} : Bool}:
 def claim_one() -> {two_succ(id(~1n)) == False{} : Bool}:
   {==}
 
-#|4097n
+#|SOME PROOFS FAIL
+#|Error:
+#|- expected : a declared constructor (Nat declares Zero, Succ)
+#|- observed : 4097n
+#|Location: main
+#|31 | def main() -> Nat:
+#|32>|   id(~4097n)
+#|   |       ^^^^^
+#|33 | 
+#|exit 1
