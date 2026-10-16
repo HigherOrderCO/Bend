@@ -1064,34 +1064,19 @@ def List.foldr(
     case h <> t:
       f(h, List.foldr(~a, ~A, ~B, ~f, t, z))
 
-# Carry the previous result so strict backends can stop before the next call.
-def List.any.go(
-  ~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>, hit: Bool
-) -> Bool:
-  match xs hit:
-    case _ True{}:
-      True{}
-    case Nil{} False{}:
-      False{}
-    case h <> t False{}:
-      List.any.go(~a, ~A, ~f, t, f(h))
-
 def List.any(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
-  List.any.go(~a, ~A, ~f, xs, False{})
-
-def List.all.go(
-  ~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>, keep: Bool
-) -> Bool:
-  match xs keep:
-    case _ False{}:
+  match xs:
+    case Nil{}:
       False{}
-    case Nil{} True{}:
-      True{}
-    case h <> t True{}:
-      List.all.go(~a, ~A, ~f, t, f(h))
+    case h <> t:
+      Bool.or(f(h), List.any(~a, ~A, ~f, t))
 
 def List.all(~a: Quant, ~A: Kind(a), ~f: A -> Bool, xs: List<a, A>) -> Bool:
-  List.all.go(~a, ~A, ~f, xs, True{})
+  match xs:
+    case Nil{}:
+      True{}
+    case h <> t:
+      Bool.and(f(h), List.all(~a, ~A, ~f, t))
 
 def List.find.put(-A: Data, h: A, r: Maybe<&2, A>, hit: Bool) -> Maybe<&2, A>:
   match hit:
@@ -1100,35 +1085,21 @@ def List.find.put(-A: Data, h: A, r: Maybe<&2, A>, hit: Bool) -> Maybe<&2, A>:
     case True{}:
       Some{h}
 
-def List.find.go(
-  ~A: Data, ~f: A -> Bool, xs: List<&2, A>, found: Maybe<&2, A>
-) -> Maybe<&2, A>:
-  match xs found:
-    case _ Some{x}:
-      Some{x}
-    case Nil{} None{}:
-      None{}
-    case +h <> t None{}:
-      List.find.go(~A, ~f, t, List.find.put(A, h, None{}, f(h)))
-
 def List.find(~A: Data, ~f: A -> Bool, xs: List<&2, A>) -> Maybe<&2, A>:
-  List.find.go(~A, ~f, xs, None{})
-
-def List.contains.go(
-  ~A: Data, ~eq: A -> A -> Bool, xs: List<&2, A>, +x: A, hit: Bool
-) -> Bool:
-  match xs hit:
-    case _ True{}:
-      True{}
-    case Nil{} False{}:
-      False{}
-    case h <> t False{}:
-      List.contains.go(~A, ~eq, t, x, eq(h, x))
+  match xs:
+    case Nil{}:
+      None{}
+    case +h <> t:
+      List.find.put(A, h, List.find(~A, ~f, t), f(h))
 
 def List.contains(
   ~A: Data, ~eq: A -> A -> Bool, xs: List<&2, A>, +x: A
 ) -> Bool:
-  List.contains.go(~A, ~eq, xs, x, False{})
+  match xs:
+    case Nil{}:
+      False{}
+    case h <> t:
+      Bool.or(eq(h, x), List.contains(~A, ~eq, t, x))
 
 def List.merge.step(
   -A: Data, acc: List<&2, A>, x: A, xt: List<&2, A>, y: A, yt: List<&2, A>,
