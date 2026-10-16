@@ -530,8 +530,14 @@ function subst(t: HTerm, d: number, f: (o: Record<string, unknown>) => HTerm | u
 // first constructor whose fields all have one (none for a datatype
 // already on the path), Unit for a kind, {==} for an equation bend2
 // converts, else a live λ variable of type T (the codomain's own, so it
-// is used once); none for an empty type. It reads the model book, where
-// each opaque def is at its own model.
+// is used once); none for an empty type. A projection model takes that
+// variable first: a law like {a == sub(add(a, b), b)} holds of it, one
+// like {add(a, b) == add(b, a)} of a constant. It reads the model book,
+// where each opaque def is at its own model.
+
+function model(e: Safe, T: HTerm): HTerm | null {
+  return model_by(e, T, false) ?? model_by(e, T, true);
+}
 
 // a model of c, k's ~ parameter j: the argument an instance of k passes
 // there, if it checks at T against the models so far
@@ -551,12 +557,12 @@ function inst_model(e: Safe, k: Name, j: number, c: string, T: HTerm): HTerm | n
 // a round that cuts no branch finds what an unbounded search would; one
 // that does is retried deeper while fuel lasts, and the first model a
 // cut round found stands only when none is left (the kernel checks it)
-function model(e: Safe, T: HTerm): HTerm | null {
+function model_by(e: Safe, T: HTerm, proj: boolean): HTerm | null {
   const probe: Probe = { left: MODEL_FUEL, depth: MODEL_DEPTH, cut: true };
   let m: HTerm | null = null;
   for (; probe.cut && probe.left > 0; probe.depth *= 2) {
     probe.cut = false;
-    const v = model_at(e, T, 0, [], [], probe);
+    const v = model_at(e, T, 0, [], [], proj, probe);
     m = probe.cut ? m ?? v : v;
   }
   return m;
@@ -569,7 +575,7 @@ function model_key(F: HTerm, d: number): string {
   return JSON.stringify(B.term_lower(F, d), (k, v) => k === "s" ? undefined : k !== "i" ? v : Array.isArray(v) ? v.map(at) : at(v));
 }
 
-function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm, HTerm]>, probe: Probe): HTerm | null {
+function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm, HTerm]>, proj: boolean, probe: Probe): HTerm | null {
   if (path.length + d > probe.depth || probe.left <= 0) {
     probe.cut = true;
     return null;
@@ -585,7 +591,7 @@ function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm
     case "All": {
       // the body is searched once, then each use binds level d in it
       const x: HTerm = B.Var(F.k, d);
-      const t = model_at(e, F.B(x), d + 1, path, F.q.$ === "None" ? hs : [...hs, [x, F.A]], probe);
+      const t = model_at(e, F.B(x), d + 1, path, F.q.$ === "None" ? hs : [...hs, [x, F.A]], proj, probe);
       return t === null ? null : B.Ann(B.Lam(F.k, d, (v: HTerm) =>
         subst(t, d + 1, (o) => o.$ !== "Var" || (o.i as number) > d ? undefined : o.i === d ? v : B.Var(o.k as Name, o.i as number))), F);
     }
@@ -596,11 +602,12 @@ function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm
       if (tld?.$ !== "ADT") {
         return hyp();
       }
-      for (const c of path.includes(key) ? [] : tld.c.filter((c) => !F.r.includes(c.k))) {
+      const h = proj ? hyp() : null;
+      for (const c of path.includes(key) || h !== null ? [] : tld.c.filter((c) => !F.r.includes(c.k))) {
         const xs: HTerm[] = [];
         let U = B.term_wnf(e.mb, B.tele_fill(e.mb, c.T, F.x, B.ctx_nil()));
         let x: HTerm | null = null;
-        while (U.$ === "All" && (x = model_at(e, U.A, d, [...path, key], [], probe)) !== null) {
+        while (U.$ === "All" && (x = model_at(e, U.A, d, [...path, key], [], proj, probe)) !== null) {
           xs.push(x);
           U = B.term_wnf(e.mb, U.B(x));
         }
