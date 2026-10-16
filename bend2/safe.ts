@@ -282,6 +282,7 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
   let ps: Binder[] = [];
   // a column's kernel term, made once for every leaf below it
   const kc = new Map<HTerm, O>();
+  const pick = tld.$ === "Def" && tld.x > 0 ? inst_pick(e, k) : null;
   const col = (v: HTerm): O => kc.get(v) ?? kc.set(v, term(e, scope_nil(), v, false)).get(v) as O;
   // the check of k's instances after the columns cs of T, at depth d
   const go = (T: HTerm, cs: Cols, d: number): O => {
@@ -326,7 +327,9 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
       oos("a specialized parameter whose type names a parameter");
     }
-    const key = String(j) + "\n" + B.term_key(B.term_lower(F.A));
+    // roots share a constant only where they give it the same model
+    const f = pick === null ? null : fit(e, k, pick[j], F.A);
+    const key = String(j) + "\n" + B.term_key(B.term_lower(F.A)) + "\n" + (f === null ? "" : B.term_key(B.term_lower(f)));
     const kept = e.consts.get(key);
     if (kept !== undefined) {
       return at(B.Ref(kept));
@@ -335,9 +338,9 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     while (e.book.tlds[c] !== undefined) {
       c += "~";
     }
+    const m = f ?? model(e, F.A);
     const def: Def = { $: "Def", n: 0, x: 0, T: F.A, v: null };
     e.book.tlds[c] = def;
-    const m = model(e, F.A);
     if (m !== null) {
       e.mb.tlds[c] = { ...def, v: m };
     }
@@ -442,7 +445,7 @@ function item_emit(e: Safe, k: Name, cols: Cols, n: string): void {
 // no body goes out opaque, at a model of its type
 function def_emit(e: Safe, k: Name, cols: Cols, n: string, tld: Def): void {
   const T = B.tele_fill(e.book, tld.T, cols.slice(0, tld.x) as HTerm[], B.ctx_nil());
-  const t = tld.e !== undefined ? null : model(e, T) ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_key(k));
+  const t = tld.e !== undefined ? null : (Object.hasOwn(e.mb.tlds, k) ? (e.mb.tlds[k] as Def).v : model(e, T)) ?? oos("no model for " + (tld.i === undefined ? "" : (tld.b === true ? "base's" : "the") + " foreign def ") + B.name_key(k));
   const s = { ...scope_nil(), self: n };
   const To = term(e, s, T, false);
   e.out.push([n, To, t === null ? arm(e, s, k, cols, []) : tree(e, s, t, []), t !== null]);
@@ -532,10 +535,36 @@ function subst(t: HTerm, d: number, f: (o: Record<string, unknown>) => HTerm | u
 // is used once); none for an empty type. A projection model takes that
 // variable first: a law like {a == sub(add(a, b), b)} holds of it, one
 // like {add(a, b) == add(b, a)} of a constant. It reads the model book,
-// as the kernel checks a model with every opaque def at its own
+// where each opaque def is at its own model.
 
 function model(e: Safe, T: HTerm): HTerm | null {
   return model_by(e, T, false) ?? model_by(e, T, true);
+}
+
+// the ~ arguments of k's first instance whose arguments all fit, each at
+// its parameter's type after the ones before it; k's constants take their
+// models from it alone
+function inst_pick(e: Safe, k: Name): HTerm[] | null {
+  const fits = (T: HTerm, [x, ...xs]: HTerm[]): boolean => {
+    if (x === undefined) {
+      return true;
+    }
+    const F = B.term_wnf(e.mb, T);
+    return F.$ === "All" && fit(e, k, x, F.A) !== null && fits(F.B(x), xs);
+  };
+  return [...e.inst.values()].find(([t, xs]) => t === k && fits(e.book.tlds[k].T, xs))?.[1] ?? null;
+}
+
+// x checked at T in the model book, as k's code; null if it does not fit
+function fit(e: Safe, k: Name, x: HTerm, T: HTerm): HTerm | null {
+  try {
+    return B.term_higher(B.term_check(e.mb, { t: B.Ref(k), n: 0, def: k, qs: [] }, x, B.Lone(), T, B.ctx_nil(), 0).tm);
+  } catch (err) {
+    if ((err as B.Err).$ !== "Err") {
+      throw err;
+    }
+    return null;
+  }
 }
 
 // a round that cuts no branch finds what an unbounded search would; one
