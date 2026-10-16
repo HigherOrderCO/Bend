@@ -45,18 +45,51 @@ export function judge(g: Got): [string, string] {
   return ["!", tt.split("\n").slice(1, 3).join(" | ").slice(0, 300)];
 }
 
-// with MEM_MB set, a check's processes (bend2 and the kernel it runs, one
-// process group) hold at most MEM_MB of resident memory: past it the group
-// is killed, an infrastructure error, so one heavy file cannot starve a
-// node's other checks; unset, no check is capped
+// a check (bend2 and the kernel it runs) is its own process group, so its
+// deadline or the memory cap kills all of it, and the runner kills every
+// live group when it exits or gets SIGINT, SIGTERM or SIGHUP (an aborted
+// gate, a dropped ssh), so no check outlives it. With MEM_MB set, one
+// poller reads all groups' resident memory twice a second and kills a group
+// past MEM_MB, an infrastructure error, so one heavy file cannot starve a
+// node's other checks; unset, no check is capped and ps never runs
 const MEM_KB = Number(process.env.MEM_MB ?? 0) * 1024;
 
-function group_rss(pgid: number): number {
-  const ps = child.spawnSync("ps", ["-A", "-o", "pgid=,rss="], { encoding: "utf8" });
-  return (ps.stdout ?? "").split("\n").reduce((n, l) => {
-    const [g, r] = l.trim().split(/\s+/).map(Number);
-    return g === pgid ? n + (r || 0) : n;
-  }, 0);
+// the live check groups, by pgid, and whether the cap killed each
+const live = new Map<number, { over: boolean }>();
+
+function kill_group(pid: number): void {
+  try { process.kill(-pid, "SIGKILL"); } catch { /* the group is gone */ }
+}
+
+process.on("exit", () => { live.forEach((_, pid) => kill_group(pid)); });
+for (const [sig, n] of [["SIGINT", 2], ["SIGTERM", 15], ["SIGHUP", 1]] as const) {
+  process.on(sig, () => { live.forEach((_, pid) => kill_group(pid)); process.exit(128 + n); });
+}
+
+let polling = false;
+if (MEM_KB > 0) {
+  setInterval(() => {
+    if (polling || live.size === 0) {
+      return;
+    }
+    polling = true;
+    child.execFile("ps", ["-A", "-o", "pgid=,rss="], (_, out) => {
+      polling = false;
+      const rss = new Map<number, number>();
+      for (const l of String(out ?? "").split("\n")) {
+        const [g, r] = l.trim().split(/\s+/).map(Number);
+        if (live.has(g)) {
+          rss.set(g, (rss.get(g) ?? 0) + (r || 0));
+        }
+      }
+      live.forEach((c, pid) => {
+        if ((rss.get(pid) ?? 0) > MEM_KB) {
+          c.over = true;
+          kill_group(pid);
+        }
+      });
+    });
+  }, 500).unref();
 }
 
 async function run(bin: string, args: string[], cap: number): Promise<Omit<Got, "f">> {
@@ -64,28 +97,33 @@ async function run(bin: string, args: string[], cap: number): Promise<Omit<Got, 
   const t0 = Date.now();
   await new Promise<void>((done) => {
     const kid = child.spawn(bin, args, { env: { ...process.env, BEND_NO_TELEMETRY: "1" }, detached: true });
+    const pid = kid.pid;
+    const c = { over: false };
+    if (pid) {
+      live.set(pid, c);
+    }
     const kill = (): boolean => {
-      try { process.kill(-(kid.pid ?? 0), "SIGKILL"); } catch { kid.kill("SIGKILL"); }
+      if (pid) {
+        kill_group(pid);
+      } else {
+        kid.kill("SIGKILL");
+      }
       return true;
     };
-    let over = false;
-    const watch = setInterval(() => {
-      if (MEM_KB > 0 && kid.pid !== undefined && group_rss(kid.pid) > MEM_KB) {
-        over = kill();
-      }
-    }, 500);
     kid.stdout.on("data", (d) => { g.out += d; });
     kid.stderr.on("data", (d) => { g.out += d; });
     kid.on("error", (e) => { g.error = e.message; });
     const bomb = setTimeout(() => { g.timeout = kill(); }, cap);
     kid.on("close", (code, signal) => {
       clearTimeout(bomb);
-      clearInterval(watch);
+      if (pid) {
+        live.delete(pid);
+      }
       g.code = code;
       g.ms = Date.now() - t0;
       if (signal) {
         g.signal = signal;
-        if (over) {
+        if (c.over) {
           g.error = "memory cap: the check passed " + String(MEM_KB / 1024) + " MB";
         } else if (!g.timeout) {
           g.error = "child terminated by " + signal;
