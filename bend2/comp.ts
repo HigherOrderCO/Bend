@@ -1235,36 +1235,10 @@ function mat_arms(t: HTerm) {
 
 function mat_lits(x: HTerm, k: Name, self: HTerm): Row[] {
   const ws: Row[] = [];
-  const key = (t: HTerm, d: number) => JSON.stringify(Bend.term_lower(t, d),
+  // a default its parent's covers is the same arm, spans and annotations
+  // aside
+  const key = (t: HTerm) => JSON.stringify(Bend.term_lower(t),
     (k, v) => k === "s" ? undefined : v?.$ === "Ann" ? Bend.term_strip(v) : v);
-  // a default and its replay share most nodes: walk both until they meet,
-  // comparing by key what the walk does not open
-  const same = (a: HTerm, b: HTerm, d = 0): boolean => {
-    const x = Bend.term_strip(a);
-    const y = Bend.term_strip(b) as any;
-    if (x === y || x.$ !== y.$) {
-      return x === y;
-    }
-    switch (x.$) {
-      case "Lam": {
-        const v: HTerm = Bend.Var(x.k, d);
-        return x.k === y.k && x.q?.$ === y.q?.$ && same(x.f(v), y.f(v), d + 1);
-      }
-      case "App": {
-        return same(x.f, y.f, d) && same(x.x, y.x, d);
-      }
-      case "Ctr": {
-        return x.k === y.k && x.x.length === y.x.length
-          && x.x.every((t, i) => same(t, y.x[i], d));
-      }
-      case "Mat": {
-        return x.k === y.k && same(x.h, y.h, d) && same(x.m, y.m, d);
-      }
-      default: {
-        return key(x, d) === key(y, d);
-      }
-    }
-  };
   // a default reads its scrutinee back as k{its known bits, its fields}
   const back = (bits: number, val: number) =>
     (c: Of<"Ctr">, ps: HTerm[]) => {
@@ -1290,7 +1264,7 @@ function mat_lits(x: HTerm, k: Name, self: HTerm): Row[] {
     const { arms, end } = mat_arms(h ?? t);
     const [arm, flds] = arms.length < 2
       ? arm_self(end, h ? 2 : 1, self, back(bits, val)) : [end, 0];
-    const own = arms.length < 2 && !(flds === 0 && cov && same(cov, arm));
+    const own = arms.length < 2 && !(flds === 0 && cov && key(cov) === key(arm));
     for (const [c, a] of arms) {
       walk(a, bits + 1, val + (c === "True" ? 2 ** bits : 0),
         !own ? cov : flds === 0 ? arm : null);
