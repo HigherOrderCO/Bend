@@ -414,13 +414,24 @@ static int f32_text(char* buf, f32 v) {
   int ex = atoi(ep + 1);
   if (ex >= 21 || ex <= -7) {
     n = (int)(ep - buf) + sprintf(ep, "e%+d", ex);
-  } else if (ex <= p) {
-    n = snprintf(buf, 40, "%.*f", p - ex, (double)v);
   } else {
+    // The scientific form has the rounded digits. Move its decimal point.
     int s = *buf == '-';
     memmove(buf + s + 1, buf + s + 2, p);
-    memset(buf + s + 1 + p, '0', ex - p);
-    n = s + 1 + ex;
+    if (ex < 0) {
+      memmove(buf + s + 1 - ex, buf + s, p + 1);
+      buf[s] = '0';
+      buf[s + 1] = '.';
+      memset(buf + s + 2, '0', -ex - 1);
+      n = s + p - ex + 2;
+    } else if (ex < p) {
+      memmove(buf + s + ex + 2, buf + s + ex + 1, p - ex);
+      buf[s + ex + 1] = '.';
+      n = s + p + 2;
+    } else {
+      memset(buf + s + 1 + p, '0', ex - p);
+      n = s + 1 + ex;
+    }
   }
   buf[n] = 0;
   return n;
