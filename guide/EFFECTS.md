@@ -44,6 +44,9 @@ same way. `f` holds the def's arguments in order: a `U32` is the word
 calls the effect at once; an effect that waits (for a handle, or for time)
 parks itself, as below.
 
+The compiler splices C backslash-newline pairs (LF or CRLF) before
+resolving `CID` and `FID`, as in C preprocessing.
+
 The effect returns a Term: a `U32` is `(Term)n`, `Unit` is
 `term_pak(CID(Unit), 0)`, a `String` is `io_str(e, p, n)`, a two-field
 constructor is `io_node(e, CID(K), a, b)`. A `Result` is `io_done(e, v)`
@@ -107,6 +110,8 @@ the answer the same way: `io_done(v)`, `io_fail(code)`,
 `io_tup(handle, result)`, `{$: CID(Unit)}`. A `Nat` answer that is not a
 whole number from 0 to 2^53 stops the run; a `Nat` inside an answer goes
 unchecked, so the host keeps it in that range.
+
+Unlike C, a trailing backslash does not continue a JS `//` comment.
 
 A blocking effect takes one more argument, `k`, and parks with
 `io_park_on(fd, out, k, more)`: it returns `undefined`, and the loop calls

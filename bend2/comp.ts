@@ -2807,7 +2807,10 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 // namespace, else as is. An effect source is read once, in one namespace.
 
 function c_ids(src: string, m = ""): string {
-  return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
+  if (!FL.js) {
+    src = src.replace(/\\\r?\n/g, "");
+  }
+  return src.replace(/\/\/.*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
     if (!p) {
       return t;
     }
