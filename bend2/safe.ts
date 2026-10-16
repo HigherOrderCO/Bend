@@ -494,8 +494,7 @@ function def_emit(e: Safe, k: QName, cols: Cols, n: QName, tld: Def): void {
 // for its ~ argument, a column the tree drops
 function arm(e: Safe, s: Scope, k: QName, cols: Cols, vs: Array<[Q, O]>): O {
   const tld = e.book.tlds[k] as Def;
-  const ps = tld.x === 0 ? null : new Map(B.tele_unbind(e.book, tld.T).doms.slice(0, tld.x)
-    .map((_, j) => [B.name_gen(k, "param", j), cols[j]]));
+  const ps = tld.x === 0 ? null : new Map(cols.slice(0, tld.x).map((v, j) => [B.name_gen(k, "param", j), v]));
   const t0 = B.checked_higher(tld.e as B.LTerm);
   let t = ps === null ? t0 : B.scope_mapper(x => x, ps)(t0);
   let si: Scope = { ...s, c: [], d: 0, cols: cols.slice(tld.x), sub: false };
@@ -741,8 +740,12 @@ function scope_kq(s: Scope, l: number, q: Q): Scope {
 
 // the kernel variable at level a stands at level b from here on
 function scope_move(s: Scope, a: number, b: number): Scope {
-  const mv = (o: O): O => o.$ === "Var" ? (o.l === a ? { $: "Var", l: b } : o)
-    : Object.fromEntries(Object.entries(o).map(([k, v]) => [k, is_o(v) ? mv(v) : v])) as O;
+  const mv = (o: O): O => {
+    if (o.$ === "Var") return o.l === a ? { $: "Var", l: b } : o;
+    const out = { ...o } as Record<string, unknown>;
+    for (const k in out) if (is_o(out[k])) out[k] = mv(out[k]);
+    return out as O;
+  };
   return { ...s, c: s.c.map((x) => x === undefined ? x : { ...x, o: mv(x.o) }), empty: s.empty.map(mv),
     tags: s.tags.flatMap((t) => t === a ? [t, b] : [t]) };
 }
@@ -1003,10 +1006,13 @@ function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>): HTerm {
 // whether a lowered term mentions a variable at a level p holds for
 function mentions(t: B.LTerm, p: (i: number) => boolean): boolean {
   if (t.$ === "Var" && p(t.i)) return true;
-  return B.term_children[t.$].some(k => {
+  for (const k of B.term_children[t.$]) {
     const v = (t as unknown as Record<string, unknown>)[k];
-    return Array.isArray(v) ? v.some(t => mentions(t, p)) : v !== undefined && mentions(v as B.LTerm, p);
-  });
+    if (Array.isArray(v)) {
+      for (const x of v) if (mentions(x, p)) return true;
+    } else if (v !== undefined && mentions(v as B.LTerm, p)) return true;
+  }
+  return false;
 }
 
 // whether T is a datatype with no constructor left
@@ -1131,7 +1137,7 @@ function spine(e: Safe, s: Scope, t: HTerm, live: boolean): O {
   }
   // bend2's instance of a template is the template at its ~ arguments
   const g = e.book.tlds[f.k];
-  const [k, ys] = g?.$ === "Def" && g.args ? [B.name_parent(f.k)!, [...g.args.map(B.checked_higher), ...xs]] : [f.k, xs];
+  const [k, ys] = g?.$ === "Def" && g.args ? [B.name_parent(f.k)!, [...g.args.map(x => B.checked_higher(x)), ...xs]] : [f.k, xs];
   const tld = e.book.tlds[k] ?? oos("an unknown name " + B.name_display(e.book, k));
   if (tld.$ === "Def" && ys.length < tld.x) {
     oos("a template " + B.name_display(e.book, k) + " short of its ~ arguments");
@@ -1196,7 +1202,10 @@ type Group = { k: QName; id: QName; ms: QName[]; qs: Q[] };
 // out already
 function regroup(e: Safe, key: string): never {
   const ns = e.stack.slice(e.stack.indexOf(key)).map((x) => e.names.get(x)!.k);
-  const gs = [...new Set(ns.flatMap((x) => [...e.groups.values()].filter((g) => g.id === x)))];
+  const gs = [...new Set(ns.flatMap((x) => {
+    const g = e.groups.get(B.name_parent(x) ?? "");
+    return g?.id === x ? [g] : [];
+  }))];
   const ms = [...new Set(ns.flatMap((x) => gs.find((g) => g.id === x)?.ms ?? [x]))];
   if (ms.length < 2 || gs.length === 1 && ms.length === gs[0].ms.length) {
     oos("a recursion through " + B.name_display(e.book, ms[0]) + " at other specialized arguments");
@@ -1239,16 +1248,24 @@ function group_new(e: Safe, k: QName, hs: QName[]): Group | null {
 }
 
 // the arguments of each call to k in the lowered term t
-function back(t: B.LTerm, k: QName): B.LTerm[][] {
-  let [f, xs]: [B.LTerm, B.LTerm[]] = [t, []];
+function back(t: B.LTerm, k: QName, out: B.LTerm[][] = []): B.LTerm[][] {
+  let f = t;
+  const xs: B.LTerm[] = [];
   while (f.$ === "App" || f.$ === "Ann") {
-    [f, xs] = f.$ === "App" ? [f.f, [f.x, ...xs]] : [f.x, xs];
+    if (f.$ === "App") xs.push(f.x);
+    f = f.$ === "App" ? f.f : f.x;
   }
-  if (f.$ === "Ref" && f.k === k && xs.length > 0) return [xs];
-  return B.term_children[t.$].flatMap(key => {
+  if (f.$ === "Ref" && f.k === k && xs.length > 0) {
+    out.push(xs.reverse());
+    return out;
+  }
+  for (const key of B.term_children[t.$]) {
     const v = (t as unknown as Record<string, unknown>)[key];
-    return Array.isArray(v) ? v.flatMap(t => back(t, k)) : v === undefined ? [] : back(v as B.LTerm, k);
-  });
+    if (Array.isArray(v)) {
+      for (const x of v) back(x, k, out);
+    } else if (v !== undefined) back(v as B.LTerm, k, out);
+  }
+  return out;
 }
 
 // a call to member m at the arguments ps (R its type): the group's at
@@ -1447,8 +1464,11 @@ function self_arg(o: O, k: QName | null, l: number): boolean {
     found ||= h.x.$ === "Var" && h.x.l === l && h.q > 0;
     h = h.f;
   }
-  return (found && h.$ === "Ref" && h.k === k)
-    || Object.values(o).some((v) => is_o(v) && self_arg(v, k, l));
+  if (found && h.$ === "Ref" && h.k === k) return true;
+  for (const v of Object.values(o)) {
+    if (is_o(v) && self_arg(v, k, l)) return true;
+  }
+  return false;
 }
 
 // the def names o mentions
@@ -1480,7 +1500,7 @@ function mats(ks: QName[], h: (i: number) => O): O {
 
 // the match that splits a Σ chain's unit, then h
 function unit(h: O): O {
-  return mats([UNIT], () => h);
+  return { $: "Mat", k: UNIT, h, m: { $: "Efq" } };
 }
 
 // λs over b, at the binders ps; one that uses its variable twice copies it
@@ -1546,16 +1566,15 @@ function mark(q: Q): string {
 }
 
 function o_show(o: O): string {
-  const nm = (l: number): string => "x" + l;
   switch (o.$) {
-    case "Var": return nm(o.l);
+    case "Var": return "x" + o.l;
     case "Ref": return name_tt(o.k);
     case "Ann": return "{" + o_show(o.x) + " : " + o_show(o.T) + "}";
-    case "Let": return "!" + mark(o.q) + nm(o.l) + " = " + o_show(o.v) + "; " + o_show(o.f);
+    case "Let": return "!" + mark(o.q) + "x" + o.l + " = " + o_show(o.v) + "; " + o_show(o.f);
     case "Typ": return "*(" + o_show(o.q) + ")";
     case "Min": return "(" + o_show(o.a) + " <&> " + o_show(o.b) + ")";
-    case "All": return "∀" + mark(o.q) + nm(o.l) + " : " + o_show(o.A) + " -> " + o_show(o.B);
-    case "Lam": return "λ" + mark(o.q) + nm(o.l) + " => " + o_show(o.f);
+    case "All": return "∀" + mark(o.q) + "x" + o.l + " : " + o_show(o.A) + " -> " + o_show(o.B);
+    case "Lam": return "λ" + mark(o.q) + "x" + o.l + " => " + o_show(o.f);
     case "App": {
       const xs: string[] = [];
       let f: O = o;
@@ -1565,16 +1584,16 @@ function o_show(o: O): string {
       }
       return "(" + o_show(f) + " " + xs.reverse().join(" ") + ")";
     }
-    case "Sig": return "Σ" + mark(o.q) + nm(o.l) + " : " + o_show(o.A) + " -> " + o_show(o.B);
+    case "Sig": return "Σ" + mark(o.q) + "x" + o.l + " : " + o_show(o.A) + " -> " + o_show(o.B);
     case "Tup": return "(" + mark(o.q) + o_show(o.a) + ", " + o_show(o.b) + ")";
     case "Prj": return "λ{(,): " + o_show(o.h) + "}";
     case "Enu": return "<" + o.ks.map(name_tt).join(", ") + ">";
     case "Lab": return o.k === UNIT ? "()" : "." + name_tt(o.k);
-    case "Mat": return "λ{" + o_show({ $: "Lab", k: o.k }) + ": " + o_show(o.h) + "; " + o_show(o.m) + "}";
+    case "Mat": return "λ{" + (o.k === UNIT ? "()" : "." + name_tt(o.k)) + ": " + o_show(o.h) + "; " + o_show(o.m) + "}";
     case "Efq": return "λ{}";
     case "Eql": return "{" + o_show(o.a) + " == " + o_show(o.b) + " : " + o_show(o.T) + "}";
     case "Rfl": return "{==}";
-    case "Rwt": return "%" + o_show(o.e) + " : " + nm(o.l) + ", " + nm(o.l + 1) + " => " + o_show(o.P) + "; " + o_show(o.f);
+    case "Rwt": return "%" + o_show(o.e) + " : x" + o.l + ", x" + (o.l + 1) + " => " + o_show(o.P) + "; " + o_show(o.f);
   }
 }
 

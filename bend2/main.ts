@@ -805,21 +805,24 @@ async function cli_login(): Promise<string> {
 // never match its hash.
 function pkg_files(file: string, book: Bend.Book, seen: Map<string, Bend.FileId | null>): Record<string, string> {
   const entry = fs.realpathSync(file);
-  const dir = path.dirname(entry) + "/";
-  const raws = [
-    ...[...seen].flatMap(([real, ns]): [string, string][] =>
-      real === BASE || ns === null || ns.startsWith("0x") ? []
-        : [[real === entry ? path.basename(file) : path.posix.relative(dir, real), real]]),
-    ...Object.values(book.tlds).flatMap((tld): [string, string][] =>
-      tld.$ !== "Def" || tld.i === undefined || tld.b === true
-        || tld.i.file.ns.startsWith("0x") ? [] : tld.i.paths.map((f) => {
-          const real = fs.realpathSync(f);
-          return [path.posix.relative(dir, real), real];
-        }))
-  ];
-  const ups = raws.map(([p]) => path.posix.normalize(p).split("/").filter((s) => s === "..").length);
-  const anc = path.dirname(entry).split("/").slice(-Math.max(0, ...ups) || Infinity);
-  const names = new Map(raws.map(([raw, real]) => [real, path.posix.join(...anc, raw)]));
+  const dir = path.dirname(entry);
+  const names = new Map<string, string>();
+  for (const [real, ns] of seen) {
+    if (real !== BASE && ns !== null && !ns.startsWith("0x")) {
+      names.set(real, real === entry ? path.basename(file) : path.posix.relative(dir, real));
+    }
+  }
+  for (const tld of Object.values(book.tlds)) {
+    if (tld.$ !== "Def" || !tld.i || tld.b === true || tld.i.file.ns.startsWith("0x")) continue;
+    for (const f of tld.i.paths) {
+      const real = fs.realpathSync(f);
+      names.set(real, path.posix.relative(dir, real));
+    }
+  }
+  let up = 0;
+  for (const p of names.values()) up = Math.max(up, p.split("/").filter(s => s === "..").length);
+  const anc = dir.split("/").slice(-up || Infinity);
+  for (const [real, p] of names) names.set(real, path.posix.join(...anc, p));
 
   const owners = new Map<string, string>();
   const files: Record<string, string> = {};
@@ -830,11 +833,11 @@ function pkg_files(file: string, book: Bend.Book, seen: Map<string, Bend.FileId 
       throw "Error: " + real + " cannot be published: package paths cannot contain"
         + " whitespace, #, ?, %, or backslash";
     }
-    const old = owners.get(disk_key(p));
+    const key = disk_key(p), old = owners.get(key);
     if (old !== undefined && old !== real) {
       throw "Error: " + real + " cannot be published: " + p + " clashes with " + old;
     }
-    owners.set(disk_key(p), real);
+    owners.set(key, real);
     files[p] = fs.readFileSync(real, "utf8").replace(/^\uFEFF/, "");
   };
   for (const [real, p] of names) {
@@ -944,18 +947,17 @@ async function pow_mine(hash: string, bytes: number): Promise<number> {
 // them: they come in through imports, and a hint names them.
 function cli_verdict(book: Bend.Book, kernel: boolean): number {
   const bad = book_promises(book);
-  const n   = new Set(bad.flatMap(([, ks]) => ks)).size;
+  const defs = [...new Set(bad.flatMap(([, ks]) => ks))];
+  const n = defs.length;
   if (n !== 0) {
-    const own = bad.some(([, ks]) => ks.some((k) =>
-      Bend.name_file(k) === book.entry || (book.tlds[k] as Bend.Def).l === true));
+    const own = defs.some(k => Bend.name_file(k) === book.entry || (book.tlds[k] as Bend.Def).l === true);
     cli_say(2, FAIL + "\nError: " + String(n) + " def" + (n === 1 ? " relies"
       : "s rely") + " on unsafe or foreign code:\n"
       + bad.map(([on, ks]) => "defs that depend on " + on + ": "
         + ks.map((k) => Bend.name_display(book, k)).join(", ") + "\n").join("")
       + (own ? "" : "Hint: no law or proof uses these defs. Move them to a"
         + " file this proof does not import, and the proofs will check: "
-        + [...new Set(bad.flatMap(([, ks]) => ks))].map((k) => Bend.name_display(book, k))
-          .join(", ") + "\n"));
+        + defs.map(k => Bend.name_display(book, k)).join(", ") + "\n"));
     return 1;
   }
   const why = kernel ? Safe.safe_check(book) : null;
@@ -975,7 +977,6 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
 // defs outside Base collects who names whom, then each promise floods
 // back along those edges.
 function book_promises(book: Bend.Book): Array<[string, Bend.QName[]]> {
-  const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
   const keys = Object.keys(book.tlds);
   const roots: Array<[string, Bend.QName[]]> = [
     ["@unsafe", keys.filter((k) => (book.tlds[k] as Bend.Def).u === true)],
@@ -988,6 +989,7 @@ function book_promises(book: Bend.Book): Array<[string, Bend.QName[]]> {
     return [];
   }
 
+  const own = [...new Set(book.order)].filter(k => book.tlds[k].b !== true);
   const uses: Record<Bend.QName, Bend.QName[]> = Object.create(null);
   const reach = new Set(own);
   for (const k of reach) {
@@ -1021,12 +1023,15 @@ function book_promises(book: Bend.Book): Array<[string, Bend.QName[]]> {
 function term_refs(t: Bend.LTerm, out: Set<Bend.QName>): void {
   const seen = new Set([t]);
   for (const todo = [t]; todo.length > 0;) {
-    const x = todo.pop() as Bend.LTerm;
+    const x = todo.pop()!;
     if (x.$ === "Ref" || x.$ === "ADT") out.add(x.k);
     for (const key of Bend.term_children[x.$]) {
-      const v = (x as unknown as Record<string, unknown>)[key];
-      for (const child of Array.isArray(v) ? v : v === undefined ? [] : [v]) {
-        if (!seen.has(child)) { seen.add(child); todo.push(child); }
+      const v = (x as unknown as Record<string, Bend.LTerm | Bend.LTerm[]>)[key];
+      if (Array.isArray(v)) {
+        for (const child of v) if (!seen.has(child)) { seen.add(child); todo.push(child); }
+      } else if (v !== undefined && !seen.has(v)) {
+        seen.add(v);
+        todo.push(v);
       }
     }
   }
