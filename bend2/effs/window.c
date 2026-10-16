@@ -1,6 +1,7 @@
 // bend-ids 1
 // CID :Window.open BEND_CID_Window_open
 // CID #Key BEND_CID_Key
+// CID #Text BEND_CID_Text
 // CID #Mouse BEND_CID_Mouse
 // CID #Look BEND_CID_Look
 // CID #Move BEND_CID_Move

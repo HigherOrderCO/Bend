@@ -180,9 +180,8 @@ const OPERATIONS = new Map(Object.entries({
     read: ["f32_read(e, $0)", "f32_read($0)"],
   },
   Nat: {
-    add: ["nat_chk(e, $0 + $1)", "nat_chk($0 + $1)"],
+    ...tpl_ops("add:$1 double:$0", "nat_chk(e, $0 + $o)", "nat_chk($0 + $o)"),
     mul: ["nat_mul(e, $0, $1)", "nat_chk($0 * $1)"],
-    double: ["nat_chk(e, $0 + $0)", "nat_chk($0 + $0)"],
     cmp: ["(($0 > $1) + ($0 >= $1))", "cmp_new($0, $1)"],
     ...tpl_ops("sub", "($0 < $1 ? 0 : $0 - $1)"),
     ...tpl_ops("is_lt:<", "($0 $o $1)"),
@@ -227,17 +226,12 @@ const OPTIMIZED: Map<QualifiedName, Native[string]> = new Map(Object.entries({
   True: { intr: "true", cond: "$0" },
   U32: { intr: ([w]) => view_of(w) ?? `word_to_u32(${w})` },
   F32: {
-    intr: ([w]) => w.match(/^u32_to_word\(f32_bits\((\w+)\)\)$/)?.[1]
+    intr: ([w]) => w.match(VIEW)?.[2]
       ?? `f32_from_bits(${tpl(OPTIMIZED.get(base("U32", "ctr"))!.intr, [w])})`,
   },
   Chr: {
-    intr: ([c]) => {
-      const n = Number(c);
-      return view_of(c) ?? (/^\d+$/.test(c)
-        && (n < 0xd800 || n >= 0xe000 && n <= 0x10ffff)
-        ? JSON.stringify(String.fromCodePoint(n))
-        : `char_new(${c})`);
-    },
+    intr: ([c]) => view_of(c) ?? (/^\d+$/.test(c)
+      ? JSON.stringify(char_new(+c)) : `char_new(${c})`),
     elim: ["char_code($0)"],
   },
   ALeaf: { intr: "[$0]", elim: ["$0[0]"], cond: "$0.length === 1" },
@@ -414,8 +408,7 @@ function u32_to_word(x) {
 }
 
 function cmp_new(a, b) {
-  return {$: a < b ? ${js_tag("LT")}
-    : a === b ? ${js_tag("EQ")} : ${js_tag("GT")}};
+  return {$: a < b ? ${js_tag("LT")} : a === b ? ${js_tag("EQ")} : ${js_tag("GT")}};
 }
 
 function nat_divmod(a, b) {
@@ -903,11 +896,6 @@ function ty_value(K: HTerm | null): boolean {
     : !ty_holds(k, (t) => !ty_tag(t, "ADT Qnt Eql"));
 }
 
-function ty_clo(A: HTerm | null): boolean {
-  return ty_holds(A, (t) =>
-    !["ADT", "Typ", "Qua", "Min", "Eql"].includes(t?.$ ?? ""));
-}
-
 function ty_srcs(T: HTerm): void {
   const t = ty_wnf(T);
   if (t?.$ === "All") {
@@ -916,7 +904,7 @@ function ty_srcs(T: HTerm): void {
   } else if (t?.$ === "Lam") {
     ty_srcs(t.f(DUMMY));
   } else if (t?.$ === "ADT") {
-    if (!WORDS.get(t.k) && t.k !== base("Array")) {
+    if (WORDS.get(t.k) === undefined && t.k !== base("Array")) {
       src_add(t.k);
     }
     t.x.forEach(ty_srcs);
@@ -1014,8 +1002,7 @@ function lay_arr(lay: Lay) {
 function ctr_adt(x: Of<"Ctr">,
   ty: HTerm | null): [Of<"ADT">, number | null] {
   const ctr = FL.book.ctrs[x.k];
-  const adt = adt_of(ty ?? (ctr ? tele_unbind(ctr.T).ret
-    : null));
+  const adt = adt_of(ty ?? (ctr ? tele_unbind(ctr.T).ret : null));
   if (ty === null && adt.x.length > 0) die("a constructor outside a datatype");
   return [adt, adt.k === base("U32") || adt.k === base("F32")
     ? Bend.u32_from_term(x, adt.k === base("U32") ? "U32" : "F32") : null];
@@ -1109,6 +1096,24 @@ function mat_arms(t: HTerm) {
 
 function mat_lits(x: HTerm): Row[] {
   const ws: Row[] = [];
+  // A default and its replay share most nodes. Open corresponding binders
+  // with one probe; fallback keys preserve the identity of every free binding.
+  const same = (a: HTerm, b: HTerm): boolean => {
+    const x = Bend.term_strip(a);
+    const y = Bend.term_strip(b) as any;
+    if (x === y || x.$ !== y.$) return x === y;
+    switch (x.$) {
+      case "Lam": {
+        const v = probe(x.k);
+        return x.k === y.k && x.q?.$ === y.q?.$ && same(x.f(v), y.f(v));
+      }
+      case "App": return same(x.f, y.f) && same(x.x, y.x);
+      case "Ctr": return x.k === y.k && x.x.length === y.x.length
+        && x.x.every((t, i) => same(t, y.x[i]));
+      case "Mat": return x.k === y.k && same(x.h, y.h) && same(x.m, y.m);
+      default: return scoped_key(x) === scoped_key(y);
+    }
+  };
   const walk = (t: HTerm, j: number, n: number,
     cov: ((w: Of<"Ctr">) => HTerm) | null) => {
     const h = mat_arms(t).arms[0]?.[1];
@@ -1120,7 +1125,7 @@ function mat_lits(x: HTerm): Row[] {
     const inst = (w: Of<"Ctr">) => (h ? w.x : [w])
       .reduce((f, a) => Bend.term_apply(f, a), end);
     const w = Bend.Ctr(base("WCon", "ctr"), [probe("b"), probe("t")]) as Of<"Ctr">;
-    const own = arms.length < 2 && (!cov || scoped_key(cov(w)) !== scoped_key(inst(w)));
+    const own = arms.length < 2 && (!cov || !same(cov(w), inst(w)));
     const sub = own ? inst : cov;
     for (const [k, a] of arms) {
       walk(a, j + 1, n + (k === base("True", "ctr") ? 2 ** j : 0), sub && ((v) =>
@@ -1480,10 +1485,9 @@ function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
       && tele_unbind(FL.book.tlds[sc.def].T).doms[w.i];
     if (dom && dom[1] === w.k && !dom_live(dom)) {
       FL.hot.add(arg_name(sc.def, w.i));
-    } else if ("All Var App".includes(w?.$!)) {
+    } else if (ty_tag(w, "All Var App")) {
       FL.hot_all = true;
-    } else if (!"Typ Qnt Qua Min Eql Rfl Lit Ctr Efq Ref".split(" ")
-      .includes(w?.$ ?? "")) {
+    } else if (!ty_tag(w, "Typ Qnt Qua Min Eql Rfl Lit Ctr Efq Ref")) {
       die(`a type the C facts cannot read (${w?.$ ?? "no type"})`);
     }
     return;
@@ -1544,9 +1548,10 @@ function spare_flush(sc: Scope): void {
 // A segment enters by popping its frame and reading its
 // parameters from the frame slots, then from the bank (r0..).
 
-function seg_new(name: QualifiedName, ret: Lay, params: string[],
-  ks: Kind[] = params.map(() => "w64"), frame: Seg["frame"] = null): Seg {
-  return { key: name, def: name, ret, lines: [], params, ks,
+function seg_new(name: QualifiedName, ret: Lay, vals: Val[],
+  frame: Seg["frame"] = null): Seg {
+  return { key: name, def: name, ret, lines: [],
+    params: vals.flatMap((v) => v.ws), ks: vals.flatMap((v) => v.lay.ks),
     frame, refs: new Set(), spin: false, fork: false };
 }
 
@@ -1694,7 +1699,7 @@ function val_to(sc: Scope, v: Val, lay: Lay): Val {
 }
 
 function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: QualifiedName) => Val[],
-  cond = (t: string, i: number) => `${t} == ${i}`): Val {
+  box = false): Val {
   const arms = lay.arms!;
   const ws = (al: Scope, [k, lays]: [QualifiedName, Lay[]]) => read(k).flatMap((f, j) =>
     val_to(al, f, lays[j]).ws);
@@ -1704,7 +1709,8 @@ function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: QualifiedName) => 
   const out = emit_dst(sc, lay, "o").ws;
   const t = emit_alias(sc, sel, "t");
   const rs: (QualifiedName | null)[][] = out.map(() => []);
-  emit_chain(sc, arms.map((k, i) => [cond(t, i), () => {
+  emit_chain(sc, arms.map((k, i) => [box ? `term_aux(${t}) == ${cid_mac(k[0])}`
+    : `${t} == ${i}`, () => {
     file_push(sc, `${out[0]} = ${i};`);
     const ks = lay.arms![k].flatMap((l) => l.ks);
     ws({ ...sc, spares: [] }, k).forEach((w, n) => {
@@ -1748,8 +1754,7 @@ function val_unbox(sc: Scope, v: Val, lay: Lay): Val {
     return val_new(v.ws, lay);
   }
   const t = emit_alias(sc, v.ws[0], "u");
-  return val_arms(sc, lay, t, (k) => node_fields(sc, t, k), (_, i) =>
-    `term_aux(${t}) == ${cid_mac(lay.arms![i][0])}`);
+  return val_arms(sc, lay, t, (k) => node_fields(sc, t, k), true);
 }
 
 // Arr
@@ -2159,7 +2164,7 @@ function emit_put(sc: Scope, dst: Val | null, v: Val): void {
 
 function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
   const k = ck.k!;
-  const T = FL.book.tlds[k].T;
+  const T = ck.tld!.T;
   const doms = tele_unbind(T).doms;
   const flat = flat_of(k);
   const f = flat ? fun_at(ck) : fun_of(k);
@@ -2199,8 +2204,7 @@ function emit_open(k: QualifiedName, f = fun_of(k)): [Scope, Val[]] {
     }
     return w;
   }), l));
-  const seg = seg_new(k, ret, vals.flatMap((v) => v.ws),
-    vals.flatMap((v) => v.lay.ks));
+  const seg = seg_new(k, ret, vals);
   return [{ ...sc, seg, def: k }, vals];
 }
 
@@ -2295,10 +2299,15 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
   }
   const flds = ctr_flds(x.k, x.x);
   const ctr = FL.book.ctrs[x.k];
-  const tys = () => ctr_doms(ctr, adt.x);
   const word = WORDS.get(adt.k);
-  if (word !== undefined) {
-    const vs = emit_each(sc, flds, [], tys());
+  if (word !== undefined || adt.k === base("Array")) {
+    const vs = emit_each(sc, flds, [], ctr_doms(ctr, adt.x));
+    if (word === undefined) {
+      return val_new([x.k === base("ALeaf", "ctr")
+        ? arr_new(sc, "0", vs[0], lay_el(adt.x[0]))
+        : `blk_node(e, ${val_own(sc, vs[0])[0]}, ${val_own(sc, vs[1])[0]})`],
+      BOX);
+    }
     if (vs.length === 1 && vs[0].ws.length > 1) {
       return val_new([`(${vs[0].ws.map((w, i) => `((u64)${w} << ${i})`)
         .join(" | ")})`], word);
@@ -2307,13 +2316,6 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     const w = adt.k === base("Nat") ? tpl(tpl_nat("ull", "nat_chk(e, $0 + 1)"),
       [vs[0].ws[0]]) : `term_word(e, ${vs[0].ws[0]})`;
     return val_new([w], word, /^\d/.test(w));
-  }
-  if (adt.k === base("Array")) {
-    const vs = emit_each(sc, flds, [], tys());
-    return val_new([x.k === base("ALeaf", "ctr")
-      ? arr_new(sc, "0", vs[0], lay_el(adt.x[0]))
-      : `blk_node(e, ${val_own(sc, vs[0])[0]}, ${val_own(sc, vs[1])[0]})`],
-    BOX);
   }
   if (FL.hot.has(x.k)) {
     facts_ctr(sc, ctr, adt.x);
@@ -2328,7 +2330,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
   const arms = lay.arms!;
   const tag = arms.findIndex(([k]) => k === x.k);
   const fields = arms[tag][1];
-  const vs = emit_each(sc, flds, fields, tys());
+  const vs = emit_each(sc, flds, fields, ctr_doms(ctr, adt.x));
   const ws = [...arms.length > 1 ? [String(tag)] : [],
     ...vs.flatMap((f, j) => val_to(sc, f, fields[j]).ws)];
   const v = val_new(lay.ks.map((_, j) => ws[j] ?? "0"), lay,
@@ -2538,8 +2540,7 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null,
       }
       const f = sc.seg.native ? fun_at(ck) : fun_of(ck.k);
       const ret = f.ret;
-      const once = FL.sites.get(ck.k) === 1 && !ck.b
-        && !def_foreign(FL.book.tlds[ck.k])
+      const once = FL.sites.get(ck.k) === 1 && !ck.b && !def_foreign(ck.tld)
         && (ret !== BOX || sc.seg.ret === BOX);
       if (sc.seg.def !== ck.k && (flat_call(x) || (dst === null && once))) {
         return emit_fuse(sc, ck, dst, true);
@@ -2702,8 +2703,7 @@ function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
     }])
     : mat_ctrs(x, adt).map(([k, h]) => {
       if (k === DEFAULT || k === IO_DEFAULT) {
-        return [k === DEFAULT ? "" : mat_ops((c) => `term_aux(${sw}) == ${cid_mac(c)}`), h,
-          () => [u]];
+        return [k === DEFAULT ? "" : mat_ops(is), h, () => [u]];
       }
       if (adt.k === base("Array")) {
         const el = lay_el(adt.x[0]);
@@ -2716,8 +2716,7 @@ function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
               .map((w) => val_new([w], BOX));
           }];
       }
-      return lay === BOX ? [`term_aux(${sw}) == ${cid_mac(k)}`, h,
-        (al) => node_fields(al, sw, k, true)]
+      return lay === BOX ? [is(k), h, (al) => node_fields(al, sw, k, true)]
         : [`${sw} == ${lay.arms!.findIndex(([key]) => key === k)}`, h,
           () => val_arm(u, k)];
     });
@@ -2861,8 +2860,9 @@ export function compile_book(book: Bend.Book): string {
     `static const char* SHOW_NAMES[] = { ${names.map((n) =>
       JSON.stringify(name_display(FL.book, n)).replaceAll("?", "\\?")).join(", ")} };`,
     "#endif"];
-  const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [""]),
-    seg_new(CLO_APPLY, BOX, ["", ""])];
+  const arg = () => val_new([""], W64);
+  const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [arg()]),
+    seg_new(CLO_APPLY, BOX, [arg(), arg()])];
   const cids = new Map<QualifiedName, number[]>();
   const cid = (k: QualifiedName, n: number, d = 0) =>
     cids.set(k, [n > WIDE ? 240 + Math.log2(n) : n, Number(FL.hot.has(k)), d]);
@@ -2952,7 +2952,7 @@ function js_var(sc: Scope, k: Name, expr: string): HTerm {
   return p;
 }
 
-function js_call(sc: Scope, k: QualifiedName, args: HTerm[], tail: boolean): string {
+function js_call(sc: Scope, k: QualifiedName, args: HTerm[], tail = false): string {
   if (tail) {
     memo(FL.tails, sc.seg.def, () => new Set()).add(k);
   }
@@ -2960,7 +2960,7 @@ function js_call(sc: Scope, k: QualifiedName, args: HTerm[], tail: boolean): str
   if (tld?.$ === "ADT") {
     return "null";
   }
-  const exprs = args.map((x) => js_expr(sc, x, null));
+  const exprs = args.map((x) => js_expr(sc, x));
   if (k === CLO_APPLY) {
     const [f, x] = exprs;
     return tail ? `run_tail(${f}, ${x})` : `${f}(${x})`;
@@ -2986,7 +2986,7 @@ function js_call(sc: Scope, k: QualifiedName, args: HTerm[], tail: boolean): str
 function js_open(sc: Scope, x: Of<"Let">): HTerm {
   const on = let_live(x);
   return x.f(x.v.map((v, j): HTerm => !on[j] ? v
-    : js_var(sc, x.k[j], emit_hold(sc, [js_expr(sc, v, null)], x.k[j])[0])));
+    : js_var(sc, x.k[j], emit_hold(sc, [js_expr(sc, v)], x.k[j])[0])));
 }
 
 function js_field(n: Name): string {
@@ -3001,7 +3001,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
       const p = probe_of(x) as Probe;
       const expr = p.expr ?? die("a JS variable outside its binding");
       if (c && !c.vs.has(p) && (p.depth ?? c.d) < c.d) {
-        c.vs.set(p, view_root(expr) ?? expr);
+        c.vs.set(p, expr.match(VIEW)?.[2] ?? view_of(expr) ?? expr);
       }
       return expr;
     }
@@ -3027,8 +3027,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
         const v = adt.k === base("F32") ? Bend.f32_from_bits(u) : u;
         return Object.is(v, -0) ? "-0" : String(v);
       }
-      const exprs = ctr_flds(x.k, x.x)
-        .map((f) => js_expr(sc, f, null));
+      const exprs = ctr_flds(x.k, x.x).map((f) => js_expr(sc, f));
       const native = OPTIMIZED.get(x.k);
       if (native !== undefined) {
         return tpl(native.intr, exprs);
@@ -3072,7 +3071,7 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
   }
   if (x.$ === "Lam") {
     const all = ty_all(ty);
-    const [e, ...rest] = quant_live(all.q) ? args : ["null", ...args];
+    const [e, ...rest] = all.q.$ !== "None" ? args : ["null", ...args];
     const k = LOCAL.test(e) || e === "null" || VIEW.test(e) ? e
       : name_local(sc, x.k);
     const at = sc.seg.lines.length;
@@ -3120,7 +3119,7 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
       [`(${s} - ${n})`].slice(0, e)]);
   } else if (rows !== null) {
     const bits = adt.k === base("F32") ? `f32_bits(${s})` : s;
-    const wd = (j: number): string =>
+    const wd = (j: number) =>
       `u32_to_word(${bits})` + "[\"tail\"]".repeat(j);
     lv = rows.map(([h, j, n, e]) => [lits_cond(bits, j, n), h, e === 1
       ? [wd(j)] : [wd(j) + "[\"head\"]", wd(j + 1)].slice(0, e)]);
@@ -3187,10 +3186,10 @@ function js_def(sc: Scope, k: QualifiedName, def: Bend.Def): void {
 // What crosses to or from a host: a Nat comes in as a number, which nat_in
 // checks; text gets U+FFFD for what is no Unicode scalar.
 function host(A: HTerm | null, x: string, out = 0): string {
-  const t = ty_wnf(A);
-  const k = t?.$ === "ADT" ? t.k : null;
+  const k = ty_adt(A)?.k;
   return k === base("Char") || k === base("String") ? `str_${out ? "out" : "in"}(${x})`
-    : k === base("Nat") && !out ? `nat_in(${x})` : x;
+    : k === base("Nat") && !out ? `nat_in(${x})`
+    : k === base("F32") && !out ? `Math.fround(${x})` : x;
 }
 
 // A module (for the .bend loader and -o <out>.mjs) roots and exports each
@@ -6212,7 +6211,8 @@ function show_chr(s, q) {
 }
 
 function show_val(D, d, v, chain) {
-  if (D[d] === 7) {
+  const k = D[d];
+  if (k === 7) {
     const tag = typeof v === "boolean"
       ? v ? ${js_tag("True")} : ${js_tag("False")} : v.$;
     let a = d + 3;
@@ -6320,8 +6320,12 @@ function io_sys() {
 
 // strerror needs bun:ffi; a host without it (node) gets the bare errno.
 function io_fail(code, ...rest) {
-  const err = io_tup(code >>> 0, io_strerror(code));
-  return { $: ${js_tag("Fail")}, error: io_tup(err, ...rest) };
+  let text = "errno " + code;
+  try {
+    text = String(io_sys().strerror(code));
+  } catch (_) {
+  }
+  return { $: ${js_tag("Fail")}, error: io_tup(io_tup(code >>> 0, text), ...rest) };
 }
 
 function io_done(value) {

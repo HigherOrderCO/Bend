@@ -1122,7 +1122,7 @@ def main() -> N:
         expect(cx.body(owners[0])).not.toBe(cx.body(owners[1]));
         for (const owner of owners) {
           expect(cx.body(owner)).toBeDefined();
-          const run = { book: cx.unstable.book, sources: cx.sources, facts: cx.facts, map: (s: BendSpan | undefined) => s };
+          const run = { book: cx.unstable.book, sources: cx.sources, declarations: [], facts: cx.facts, map: (s: BendSpan | undefined) => s };
           const selected = select({ Bend } as Loaded, run, { defs: [owner] }, false)!;
           expect(selected.length).toBeGreaterThan(0);
           expect(selected.every((f) => cx.view(f).owner === owner)).toBe(true);

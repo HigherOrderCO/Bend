@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Host.constructor_interchange BEND_CID_Host_constructor_interchange
+// bend-ids end
 function constructor_interchange() {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -67,4 +70,4 @@ def flag(c: A.Flag) -> U32:
   }
 }
 
-io_eff(CID(Host.constructor_interchange), constructor_interchange);
+io_eff(BEND_CID_Host_constructor_interchange, constructor_interchange);

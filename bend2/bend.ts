@@ -405,7 +405,7 @@ export type Env = List<HTerm | ((s?: Span) => HTerm)>;
 export type Ctr  = { k: QualifiedName; n: number; T: HTerm }
 export type Ctrs = Array<Ctr>;
 export type ADT  = { $: "ADT"; n: number; g: number; T: HTerm; c: Ctrs; b?: Bool; };
-export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: { file: File; paths: string[] }; args?: LTerm[]; };
+export type Def  = { $: "Def"; n: number; x: number; T: HTerm; v: HTerm | null; e?: LTerm; b?: Bool; u?: Bool; i?: { file: File; paths: string[] }; args?: LTerm[]; l?: Bool; };
 export type TLD  = ADT | Def;
 export type Book = {
   entry: FileId; base: FileId | null; files: Map<FileId, File>;
@@ -2670,7 +2670,7 @@ export function parse_book(book: Book, file: File, src = file.str): void {
       const T = cls.reduceRight((T, [all, q, c, i, A, s]) =>
         all ? All(q, c, i, A, T, s) : App(App(Ref(sugar_name(p, "Exists"), s), A, s), Lam(c, i, T, s), s), parse_block(p));
       const n = cls.findIndex((c) => !c[0]);
-      book.tlds[k] = { $: "Def", n: n < 0 ? cls.length : n, T: term_higher(T), v: null, x: tc };
+      book.tlds[k] = { $: "Def", n: n < 0 ? cls.length : n, T: term_higher(T), v: null, x: tc, l: true };
       book.order.push(k);
       continue;
     }
