@@ -606,8 +606,7 @@ function tpl_deep(e: string): boolean {
 }
 
 function tpl(t: Tpl, xs: string[]): string {
-  return typeof t !== "string" ? t(xs)
-    : t.split(/\$(\d)/).map((p, i) => (i % 2 ? xs[+p] : p)).join("");
+  return typeof t !== "string" ? t(xs) : t.replace(/\$(\d)/g, (_, i) => xs[i]);
 }
 
 function view_of(e: string): string | undefined {
@@ -1191,11 +1190,11 @@ function mat_rows(sc: Scope, x: HTerm, ty: HTerm | null) {
     }
   }
   const rows = WORDS[adt.k] === W32 ? mat_lits(x) : null;
-  if (adt.k !== "U32" || rows === null) {
+  if (adt.k !== "U32") {
     return { adt, ret, rows, cells: null };
   }
-  const hit = new Map(rows.flatMap(([h, j, n]) => j === 32 ? [[n, h]] : []));
-  const out = rows.filter(([, j]) => j < 32);
+  const hit = new Map(rows!.flatMap(([h, j, n]) => j === 32 ? [[n, h]] : []));
+  const out = rows!.filter(([, j]) => j < 32);
   const rs = new Set(out.map(([o]) => emit_row(sc, o, ret)));
   const len = Math.max(-1, ...hit.keys()) + 1;
   return { adt, ret, rows, cells: hit.size * 2 > len && rs.size === 1
@@ -2632,7 +2631,6 @@ function emit_fork(sc: Scope, x: Of<"Let">, ers: HTerm[]): void {
         !val_brw(pl, b.val) || rest_use([o.b], p) > 0);
       hold = live.map(([p]) => p);
       const caps = live.flatMap(([, b]) => b.val.ws);
-      spare_flush(pl);
       const jn = emit_task(pl, seg_fid(name), calls.length, caps);
       const jt = `term_tsk(${seg_fid(name)}, ${jn})`;
       let idx = caps.length;
@@ -2896,9 +2894,9 @@ export function compile_book(book: Bend.Book): string {
     `static const char* SHOW_NAMES[] = { ${names.map((n) =>
       JSON.stringify(Bend.name_key(n))).join(", ")} };`,
     "#endif"];
-  const arg = () => val_new([""], W64);
-  const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [arg()]),
-    seg_new(CLO_APPLY, BOX, [arg(), arg()])];
+  const arg = val_new([""], W64);
+  const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [arg]),
+    seg_new(CLO_APPLY, BOX, [arg, arg])];
   const cids = new Map<Name, number>();
   const cid = (k: Name, n: number) =>
     cids.set(k, n > WIDE ? 240 + Math.log2(n) : n);
