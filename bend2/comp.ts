@@ -3301,7 +3301,10 @@ using namespace metal;
 // -O0 its register allocator cannot place a preserve_none segment, so an
 // unoptimized build takes neither. A segment is a case of the device's
 // switch; on the host, a preserve_none function (WL_SIG) entered by
-// musttail, its words fresh at WL_OPEN.
+// musttail, its words fresh at WL_OPEN. Metal's OUTLINE is noinline: the
+// AGX backend numbers a function's structured-flow states in 16 bits but
+// tests them against 8-bit immediates, so a kernel whose inlined helpers
+// push its count past 255 takes wrong branches (mp3 on an M1 Pro).
 
 #ifdef __METAL_VERSION__
 #if __METAL_VERSION__ >= 320
@@ -3312,7 +3315,7 @@ using namespace metal;
 #define THR     thread
 #define TG      threadgroup
 #define INLINE  inline
-#define OUTLINE static
+#define OUTLINE static __attribute__((noinline))
 #define CONSTV  constant
 #define DEVICE  1
 #define CLZ(x)  clz(x)
