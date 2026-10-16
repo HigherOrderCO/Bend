@@ -166,6 +166,17 @@ const QS = ["Q0", "Q1", "Q2"];
 // the unit type and value
 const UT: O = { $: "Enu", ks: ["()"] };
 const UV: O = { $: "Lab", k: "()" };
+const ET: O = { $: "Enu", ks: [] };
+const EFQ: O = { $: "Efq" };
+const TYPE: O = { $: "Typ", q: { $: "Lab", k: "Q1" } };
+
+function variable(l: number): O {
+  return { $: "Var", l };
+}
+
+function apply(q: Q, f: O, x: O): O {
+  return { $: "App", q, f, x };
+}
 
 // Errors
 // ======
@@ -273,11 +284,12 @@ function safe_pass(book: Book, groups: Map<Name, Group>, inst: Safe["inst"]): { 
 // not which arm names which. If G calls a template at one of k's ~
 // parameters (bound in it), the arms name the instances bare; any other
 // reason G cannot go out is k's. Returns the instances' names, and the
-// λ-match's (null without one)
+// λ-match's (null without one). An empty equation column instead emits
+// a checked refutation, without constructing a model for its evidence.
 function root_emit(e: Safe, k: Name): [string[], string | null] {
   const tld = e.book.tlds[k];
   const ns: string[] = [];
-  // k's type G: undefined until a finite parameter, null if it cannot go out
+  // G: undefined until a coverage check, null if its type is not exported
   let G: O | null | undefined;
   let ps: Binder[] = [];
   // a column's kernel term, made once for every leaf below it
@@ -291,7 +303,7 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
       ns.push(item_try(e, k, cs));
       const x: O = { $: "Ref", k: ns[ns.length - 1] };
       return G == null ? x : { $: "Ann", x, T: ps.reduce<O>((f, [q], j) =>
-        ({ $: "App", q, f, x: col(cs[j] as HTerm) }), { $: "Var", l: 0 }) };
+        apply(q, f, col(cs[j] as HTerm)), variable(0)) };
     }
     const at = (v: HTerm | null, d1 = d): O =>
       go(F.B(v ?? B.Var(F.k, j)), [...cs, v], d1);
@@ -309,7 +321,7 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
         try {
           const t = tele_open(e, scope_nil(), tld.T, [], tld.x);
           const b = term(e, t.s, t.T, false);
-          G = { $: "Ann", x: lams(e, t.ps, b), T: alls(t.ps, { $: "Typ", q: { $: "Lab", k: "Q1" } }) };
+          G = { $: "Ann", x: lams(e, t.ps, b), T: alls(t.ps, TYPE) };
           ps = t.ps;
         } catch (x) {
           if (!(x instanceof Open_Error)) {
@@ -325,6 +337,26 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     }
     if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
       oos("a specialized parameter whose type names a parameter");
+    }
+    if (A.$ === "Eql") {
+      const mark = trail(e);
+      try {
+        const nf = (t: HTerm): HTerm => (t = B.term_wnf(e.book, t)).$ === "Ctr" ? B.Ctr(t.k, t.x.map(nf)) : t;
+        const H = term(e, scope_nil(), A, false) as Extract<O, { $: "Eql" }>;
+        const S = { ...scope_nil(), sub: true };
+        const Ha = term(e, S, nf(A.a), false);
+        const M = shape_diff(Ha, term(e, S, nf(A.b), false)) ? shape_pattern(Ha, d + 1, UT, ET) : null;
+        if (M !== null) {
+          const h: O = variable(d);
+          const P: O = apply(1, { $: "Ann", x: M, T: alls([[1, d + 1, H.T]], TYPE) }, variable(d + 1));
+          if (G === undefined) { G = null; }
+          return { $: "Ann", T: alls([[1, d, H]], UT),
+            x: { $: "Lam", q: 1, l: d, f: apply(1, { $: "Ann", x: EFQ, T: alls([[1, d + 1, ET]], UT) }, { $: "Rwt", e: h, l: d + 1, P, f: UV }) } };
+        }
+      } catch (x) {
+        if (!(x instanceof Scope_Error)) { throw x; }
+      }
+      undo(e, mark);
     }
     const key = String(j) + "\n" + B.term_key(B.term_lower(F.A));
     const kept = e.consts.get(key);
@@ -352,6 +384,27 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
   const n = fresh(e, name_tt(k));
   e.out.push([n, UT, G === null ? v : { $: "Let", q: 0, l: 0, v: G, f: v }, false]);
   return [ns, n];
+}
+
+// Kernel checks Unit at a, Empty at b.
+function shape_diff(a: O, b: O): boolean {
+  while (a.$ === "Ann") { a = a.x; }
+  while (b.$ === "Ann") { b = b.x; }
+  if (a.$ === "Lab" && b.$ === "Lab") { return a.k !== b.k; }
+  return a.$ === "Tup" && b.$ === "Tup"
+    && (shape_diff(a.a, b.a) || shape_diff(a.b, b.b));
+}
+
+function shape_pattern(a: O, l: number, yes: O, no: O): O | null {
+  while (a.$ === "Ann") { a = a.x; }
+  const n: O = { $: "Lam", q: 1, l, f: no };
+  if (a.$ === "Lab") {
+    return { $: "Mat", k: a.k, h: yes, m: n };
+  }
+  if (a.$ !== "Tup" || a.q === 0) { return null; }
+  const r = shape_pattern(a.b, l, yes, no);
+  const h = r && shape_pattern(a.a, l, r, n);
+  return h && { $: "Prj", h };
 }
 
 // item_ref, with a failure kept as the item's reason
@@ -464,10 +517,10 @@ function adt_emit(e: Safe, cols: Cols, n: string, tld: ADT): void {
   const arms = mats(ks, (i) => fs(tld.c[i]));
   const Enu: O = { $: "Enu", ks };
   e.out.push([am, alls(ps, { $: "All", q: 1, l: t, A: Enu, B: G }), lams(e, ps, arms), false]);
-  const at = (k: string): O => ps.reduce<O>((f, [q, l]) => ({ $: "App", q, f, x: { $: "Var", l } }), { $: "Ref", k });
-  e.out.push([n, alls(ps, G), lams(e, ps, { $: "Sig", q: 1, l: t, A: Enu, B: { $: "App", q: 1, f: at(am), x: { $: "Var", l: t } } }), false]);
+  const at = (k: string): O => ps.reduce<O>((f, [q, l]) => apply(q, f, variable(l)), { $: "Ref", k });
+  e.out.push([n, alls(ps, G), lams(e, ps, { $: "Sig", q: 1, l: t, A: Enu, B: apply(1, at(am), variable(t)) }), false]);
   if (tld.c.length === 0) {
-    e.out.push([fresh(e, n + ".efq"), alls(ps, { $: "All", q: 1, l: t, A: at(n), B: { $: "Enu", ks: [] } }), lams(e, ps, { $: "Prj", h: { $: "Efq" } }), false]);
+    e.out.push([fresh(e, n + ".efq"), alls(ps, { $: "All", q: 1, l: t, A: at(n), B: ET }), lams(e, ps, { $: "Prj", h: EFQ }), false]);
   }
 }
 
@@ -484,7 +537,7 @@ function tele_open(e: Safe, s: Scope, T: HTerm, cols: Cols, n: number): { s: Sco
     const q = quant(F.q);
     if (cols[j] == null) {
       r.ps.push([q, r.s.D, term(e, r.s, F.A, false)]);
-      r.s = scope_kq(scope_bind(r.s, { $: "Var", l: r.s.D }, F.A, true), r.s.D, q);
+      r.s = scope_kq(scope_bind(r.s, variable(r.s.D), F.A, true), r.s.D, q);
     }
     r.xs.push(cols[j] ?? B.Var(F.k, r.s.d - 1));
     r.T = F.B(r.xs[j]);
@@ -666,7 +719,7 @@ function scope_kq(s: Scope, l: number, q: Q): Scope {
 
 // the kernel variable at level a stands at level b from here on
 function scope_move(s: Scope, a: number, b: number): Scope {
-  const mv = (o: O): O => o.$ === "Var" ? (o.l === a ? { $: "Var", l: b } : o)
+  const mv = (o: O): O => o.$ === "Var" ? (o.l === a ? variable(b) : o)
     : Object.fromEntries(Object.entries(o).map(([k, v]) => [k, is_o(v) ? mv(v) : v])) as O;
   return { ...s, c: s.c.map((x) => x === undefined ? x : { ...x, o: mv(x.o) }), empty: s.empty.map(mv),
     tags: s.tags.flatMap((t) => t === a ? [t, b] : [t]) };
@@ -728,7 +781,7 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
   // binder), a match goes to the arm it takes, whose fields it binds so
   const v = top === undefined ? s.cols[0] ?? null : null;
   if (v !== null && x.$ === "Lam") {
-    const s2 = scope_bind({ ...s, cols: s.cols.slice(1) }, { $: "Efq" }, all?.A ?? null, false, v);
+    const s2 = scope_bind({ ...s, cols: s.cols.slice(1) }, EFQ, all?.A ?? null, false, v);
     return tree(e, s2, x.f(B.Var(x.k, s.d)), fs);
   }
   if (v !== null && (x.$ === "Mat" || x.$ === "Efq")) {
@@ -751,9 +804,9 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
   if (x.$ === "Lam") {
     const l = s.D;
     let q = all === null ? 1 : quant(all.q);
-    let s2 = scope_kq(scope_bind(s1, { $: "Var", l }, all?.A ?? null, true), l, q);
+    let s2 = scope_kq(scope_bind(s1, variable(l), all?.A ?? null, true), l, q);
     if (q > 0 && all !== null && no_ctr(e, all.A)) {
-      s2 = { ...s2, empty: [...s2.empty, { $: "App", q: 1, f: { $: "Prj", h: { $: "Efq" } }, x: { $: "Var", l } }] };
+      s2 = { ...s2, empty: [...s2.empty, apply(1, { $: "Prj", h: EFQ }, variable(l))] };
     }
     const y: HTerm = B.Var(x.k, s.d);
     const f = tree(e, s2, typed(x.f(y), all?.B(y)), fs2);
@@ -778,7 +831,7 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
     }
     const l = s.D;
     const sw = swi(e, scope_kq(scope_hide({ ...s1, dry, again: true }), l, q), x, T, fs2, cv);
-    const app = cv.reduce<O>((f, y) => ({ $: "App", q: s.kq[y] ?? 1, f, x: { $: "Var", l: y } }), { $: "App", q, f: { $: "Prj", h: sw }, x: { $: "Var", l } });
+    const app = cv.reduce<O>((f, y) => apply(s.kq[y] ?? 1, f, variable(y)), apply(q, { $: "Prj", h: sw }, variable(l)));
     return wrap({ $: "Lam", q, l, f: app });
   };
   // the arms, to count uses: dry inside a match being built again (an
@@ -806,7 +859,7 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
     return js.length > 0 && mentions(B.term_lower(b.T, s.d), (k) => js.includes(k)) ? [...vs, ...ls] : vs;
   }, cv1).sort((a, b) => a - b);
   if (s.dry) {
-    return [...Array(s.D).keys()].filter((l) => us.has(l)).reduce<O>((f, l) => ({ $: "App", q: use(l) > 0 ? 1 : 0, f, x: { $: "Var", l } }), { $: "Efq" });
+    return [...Array(s.D).keys()].filter((l) => us.has(l)).reduce<O>((f, l) => apply(use(l) > 0 ? 1 : 0, f, variable(l)), EFQ);
   }
   if (cv.length === 0 && !s.again) {
     return o;
@@ -822,7 +875,7 @@ function swi(e: Safe, s: Scope, t: HTerm, T: HTerm | null, fs: Chain[], cv: numb
   switch (x.$) {
     case "Efq": {
       if (all === null || no_ctr(e, all.A) || s.empty.length === 0) {
-        return { $: "Efq" };
+        return EFQ;
       }
       // tags remain, but a live tag in scope is of the empty enum
       const q = quant(all.q);
@@ -849,9 +902,9 @@ function swi(e: Safe, s: Scope, t: HTerm, T: HTerm | null, fs: Chain[], cv: numb
       const s2 = scope_hide(scope_hide(s));
       const f = x.$ === "Lam" ? x : open(eta(t, all))[0] as Extract<HTerm, { $: "Lam" }>;
       // the default's binder is the pair of the tag and the fields
-      const pair: O = { $: "Tup", q: 1, a: { $: "Var", l: lt }, b: { $: "Var", l: la } };
+      const pair: O = { $: "Tup", q: 1, a: variable(lt), b: variable(la) };
       const s2e = no_ctr(e, all.A) ? { ...s2, empty: [...s2.empty,
-        { $: "App", q: 1, f: { $: "Efq" }, x: { $: "Var", l: lt } } as O] } : s2;
+        apply(1, EFQ, variable(lt))] } : s2;
       const s3 = scope_kq(scope_kq({ ...s2e, tags: [...s2e.tags, lt] }, lt, q), la, q);
       const y: HTerm = B.Var(f.k, s.d);
       const body = convoy_bind(e, scope_bind(s3, pair, all.A, false), cv, typed(f.f(y), all.B(y)), fs);
@@ -997,7 +1050,7 @@ function term(e: Safe, s0: Scope, t: HTerm, live: boolean): O {
     case "All": {
       const l = s.D;
       const A = term(e, s, x.A, false);
-      const Bo = term(e, scope_bind(s, { $: "Var", l }, x.A, true), x.B(B.Var(x.k, s.d)), false);
+      const Bo = term(e, scope_bind(s, variable(l), x.A, true), x.B(B.Var(x.k, s.d)), false);
       return { $: "All", q: quant(x.q), l, A, B: Bo };
     }
     case "Lam":
@@ -1099,7 +1152,7 @@ function args(e: Safe, s: Scope, k: Name | O, T: HTerm | null, xs: HTerm[], live
     throw x;
   }
   const a = { ...s, sub: live && n === s.self };
-  return ps.filter((p) => p[3] === null).reduce<O>((f, [q, x, A]) => ({ $: "App", q, f, x: arg_term(e, a, x, A, live && q > 0) }),
+  return ps.filter((p) => p[3] === null).reduce<O>((f, [q, x, A]) => (apply(q, f, arg_term(e, a, x, A, live && q > 0))),
     n === null ? k as O : { $: "Ref", k: n });
 }
 
@@ -1227,7 +1280,7 @@ function group_call(e: Safe, s: Scope, g: Group, m: Name, ps: Arg[], R: HTerm, l
     v !== null ? [] : [[qs[j] ?? q, arg_term(e, a, x, A, live && (qs[j] ?? q) > 0)]]);
   const sel: O = { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(g.k) }, b: UV };
   const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: name_tt(m) }, b: { $: "Tup", q: 1, a: sel, b: UV } }] as [Q, O],
-    ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), { $: "Ref", k });
+    ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => (apply(q, f, x)), { $: "Ref", k });
   return { $: "Ann", x, T: term(e, s, R, false) };
 }
 
@@ -1255,16 +1308,15 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: string): void {
     const r = rest(s0, m);
     return alls(r.ps, term(e, r.s, r.T, false));
   });
-  const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: tags }, B: { $: "App", q: 1, x: { $: "Var", l: l0 },
-    f: mats(tags, (i) => i === 0 ? UT
-      : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [name_tt(g.k)] }, B: UT }, B: UT }) } };
-  const To = alls(ls, { $: "All", q: 1, l: l0, A: Sel, B: { $: "App", q: 1, f: mode, x: { $: "Var", l: l0 } } });
+  const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: tags }, B: apply(1, mats(tags, (i) => i === 0 ? UT
+    : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [name_tt(g.k)] }, B: UT }, B: UT }), variable(l0)) };
+  const To = alls(ls, { $: "All", q: 1, l: l0, A: Sel, B: apply(1, mode, variable(l0)) });
   const ks = ls.filter(([q]) => q === 1).map(([, l]) => l);
   const body = sel((m) => convoy_bind(e, s0, ks, (s2) => {
     const r = rest(s2, m);
     return lams(e, r.ps, arm(e, r.s, m, r.cs, r.vs));
   }, []));
-  const v = ks.reduce<O>((f, l) => ({ $: "App", q: 1, f, x: { $: "Var", l } }), { $: "App", q: 1, f: body, x: { $: "Var", l: l0 } });
+  const v = ks.reduce<O>((f, l) => (apply(1, f, variable(l))), apply(1, body, variable(l0)));
   e.out.push([n, To, lams(e, [...ls, [1, l0]], v), false]);
 }
 
@@ -1288,10 +1340,10 @@ function arm(e: Safe, s: Scope, k: Name, cols: Cols, vs: Array<[Q, O]>): O {
       break;
     }
     si = { ...si, cols: si.cols.slice(1) };
-    si = v !== null ? scope_bind(si, { $: "Efq" }, F.A, false, v) : scope_bind(si, vs[j++][1], F.A, false);
+    si = v !== null ? scope_bind(si, EFQ, F.A, false, v) : scope_bind(si, vs[j++][1], F.A, false);
     t = x.f(B.Var(x.k, si.d - 1));
   }
-  return vs.slice(j).reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), tree(e, si, t, []));
+  return vs.slice(j).reduce<O>((f, [q, x]) => (apply(q, f, x)), tree(e, si, t, []));
 }
 
 // an argument at its domain A: an untyped λ or match (in a type) takes
@@ -1380,7 +1432,7 @@ function let_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Let" }>, live: bool
     const q = quant(x.q[j]);
     const V = open(x.v[j])[1];
     if (put.has(j)) {
-      s2 = scope_bind(s2, { $: "Efq" }, V, false, x.v[j]);
+      s2 = scope_bind(s2, EFQ, V, false, x.v[j]);
       continue;
     }
     // a parallel let's value sees s's variables, below the lets before it
@@ -1393,7 +1445,7 @@ function let_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Let" }>, live: bool
       const w: O = inferable(v) ? v : V === null ? oos("a let with no known type")
         : { $: "Ann", x: v, T: term(e, at, V, false) };
       ls.push([q, l, w, j]);
-      s2 = scope_kq(scope_bind(s2, { $: "Var", l }, V, true), l, q);
+      s2 = scope_kq(scope_bind(s2, variable(l), V, true), l, q);
     }
   }
   const xs = x.k.map((k, j) => B.Var(k, s.d + j));
@@ -1418,12 +1470,12 @@ function rwt_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Rwt" }>, live: bool
   const l = s.D;
   const Q = E0 === null ? null : B.term_wnf(e.book, E0);
   const q = Q !== null && Q.$ === "Eql" ? Q : null;
-  const s2 = scope_bind(s, { $: "Var", l }, q && q.T, true);
+  const s2 = scope_bind(s, variable(l), q && q.T, true);
   const [p2] = open(p.f(B.Var(p.k, s.d)));
   if (p2.$ !== "Lam") {
     oos("a rewrite motive that is not a λ over its evidence");
   }
-  const s3 = scope_bind(s2, { $: "Var", l: l + 1 }, q && B.Eql(q.a, B.Var(p.k, s.d), q.T), true);
+  const s3 = scope_bind(s2, variable(l + 1), q && B.Eql(q.a, B.Var(p.k, s.d), q.T), true);
   const P = term(e, s3, p2.f(B.Var(p2.k, s2.d)), false);
   return { $: "Rwt", e: ev, l, P, f: term(e, s, x.f, live) };
 }
@@ -1467,7 +1519,7 @@ function alls(ps: Binder[], b: O, $: "All" | "Sig" = "All"): O {
 
 // a λ-match whose arm at the label ks[i] is h(i), made last to first
 function mats(ks: string[], h: (i: number) => O): O {
-  return ks.reduceRight<O>((m, k, i) => ({ $: "Mat", k, h: h(i), m }), { $: "Efq" });
+  return ks.reduceRight<O>((m, k, i) => ({ $: "Mat", k, h: h(i), m }), EFQ);
 }
 
 // the match that splits a Σ chain's unit, then h

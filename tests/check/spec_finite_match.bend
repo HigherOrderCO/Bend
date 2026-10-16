@@ -116,7 +116,6 @@ law both:
 
 def both(p, q):
   {==}
-
 def main() -> Nat:
   3n
 
