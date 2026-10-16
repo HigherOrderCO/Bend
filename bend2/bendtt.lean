@@ -1737,6 +1737,12 @@ def Claim.halts : Prop :=
 def Claim.empty : Prop :=
   ∀ bk t, Book.WellTyped bk → Value bk t → ¬ Typed bk [] t (Enu [])
 
+-- a corollary: a closed live term typed at {a == b} has convertible sides,
+-- so a checked law holds at each closed instance (its def on closed values)
+def Claim.adequate : Prop :=
+  ∀ bk t T a b A, Book.check bk = .ok () → Term.Closed t → Term.Live bk t →
+    Typed bk [] t T → Conv bk T (Eql a b A) → Conv bk a b
+
 -- PROOF
 -- =====
 --
@@ -2721,6 +2727,23 @@ theorem canon_enu (wt : Book.WellTyped bk) (v : Value bk t) (h : Typed bk [] t T
     (c : Conv bk T (Enu ks)) : ∃ k, k ∈ ks ∧ t = Lab k := by
   have := value_form wt v h c nofun
   cases v <;> simp [tform, former, ↓tform_call] at this ⊢; exact lab_in h (.conv c)
+
+-- the sides of convertible equations convert
+theorem eql_inj : Conv bk (Eql a b T) (Eql a' b' T') → Conv bk a a' ∧ Conv bk b b' := by
+  rintro ⟨c, h1, h2⟩
+  obtain ⟨x, y, z, rfl, ha, hb⟩ := pars_eql h1 rfl
+  obtain ⟨x', y', z', e, ha', hb'⟩ := pars_eql h2 rfl
+  cases e
+  exact ⟨⟨_, ha, ha'⟩, ⟨_, hb, hb'⟩⟩
+
+-- a closed value at an equation is {==}, and the equation's sides convert
+theorem canon_eql (wt : Book.WellTyped bk) (v : Value bk t) (h : Typed bk [] t T)
+    (c : Conv bk T (Eql a b A)) : t = Rfl ∧ Conv bk a b := by
+  have hf := value_form wt v h c (by simp [former])
+  cases v <;> simp [tform, former, ↓tform_call] at hf ⊢
+  obtain ⟨U, ⟨a', b', T', rfl, hab⟩, f, -⟩ := gen h
+  have ⟨ea, eb⟩ := eql_inj (fits_conv f c (by simp [former]))
+  exact conv_trans (csym ea) (conv_trans hab eb)
 
 -- what fits Data is Data (the kind case at σ = Var)
 theorem fits2 (f : Fits bk U T2) : Conv bk U T2 := by
@@ -3979,3 +4002,14 @@ theorem consistent : Claim.consistent := by
       (.conv (.ref get) (.conv (conv_sub (σ := Var) hc)))
   intro t a ht; induction a; rename_i t _ ih
   exact (progress bk t _ wt lv ht).elim (empty bk t wt · ht) fun ⟨u, e⟩ => ih u e (pars_sr wt ht (eval_pars lv.1 e))
+
+-- by halts, progress and sr, t reaches a value at {a == b}: {==}, whose
+-- sides convert (canon_eql)
+theorem adequate : Claim.adequate := by
+  intro bk t T a b A ok hc hl ht c
+  have ⟨wt, lv⟩ := book_check bk ok
+  suffices ∀ t, Acc (fun u t => Eval bk t u) t → Typed bk [] t T → Conv bk a b from
+    this t (halts bk t lv hc hl) ht
+  intro t acc ht; induction acc; rename_i t _ ih
+  exact (progress bk t _ wt lv ht).elim (fun v => (canon_eql wt v ht c).2)
+    fun ⟨u, e⟩ => ih u e (pars_sr wt ht (eval_pars lv.1 e))
