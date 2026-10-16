@@ -8,8 +8,12 @@ import { fileURLToPath } from "node:url";
 import { formatBend } from "../formatter.js";
 
 // Bend pins the lines after a body that shares a line with its `do`, `match`,
-// `case` or `def` header or `=>` lambda opener to that body's column. [source, formatted]
+// `case` or `def` header, `=>` lambda opener or `;` to that body's column. [source, formatted]
 const pinned = [
+  [
+    "import Base\ndef f(a:Array<U32>)->Array<U32>: b=a; b[0]<-7\n                                      b[1]<-8\n\ndef main() -> Array<U32>:\n  f([0 : U32 * 2n])\n",
+    "import Base\ndef f(a: Array<U32>) -> Array<U32>: b = a; b[0] <- 7\n                                           b[1] <- 8\n\ndef main() -> Array<U32>:\n  f([0 : U32 * 2n])\n",
+  ],
   ...[
     "(1 < 2 : U32) == True{} : Bool",
     "(2 > 1 : U32) == True{} : Bool",
@@ -271,5 +275,17 @@ test("leaves unterminated literals unchanged", () => {
   ]) {
     const source = "def main() -> String:\n  " + literal;
     assert.equal(formatBend(source), source);
+  }
+});
+
+test("semicolon pins respect delimiters, literals, and comments", () => {
+  for (const [source, expected] of [
+    ["def f() -> U32:\n    (x:U32=1; x\n                  )\n", "def f() -> U32:\n  (x: U32 = 1; x\n    )\n"],
+    ["def f() -> List<U32>:\n    [1, (x:U32=2; x),\n                  3]\n", "def f() -> List<U32>:\n  [1, (x: U32 = 2; x),\n    3]\n"],
+    ['def f() -> String:\n    "a; b" # ; comment\n', 'def f() -> String:\n  "a; b"  # ; comment\n'],
+    ['def f() -> String:\n    "a;\n                  b"\n', 'def f() -> String:\n    "a;\n                  b"\n'],
+  ]) {
+    assert.equal(formatBend(source), expected);
+    assert.equal(formatBend(expected), expected);
   }
 });
