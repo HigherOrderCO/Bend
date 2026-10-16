@@ -2799,9 +2799,8 @@ export function compile_book(book: Bend.Book): string {
     for (const [k, tld] of [...done_defs().reverse(),
       ...done_defs(def_foreign)]) {
       memo_gc();
-      // Collect on heap growth, not the host's total RAM budget.
       if (process.memoryUsage().heapUsed > pressure) {
-        globalThis.Bun?.gc(true);
+        Bun.gc(true);
         pressure = process.memoryUsage().heapUsed + 2 ** 31;
       }
       const [dl, vals] = emit_open(scope_new(), k);
