@@ -72,6 +72,8 @@ type File = {
   ids: Map<string, string>;
   taken: Set<string>;
   teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
+  steps: Map<string, HTerm>;
+  opens: Map<string, boolean>;
   srcs: Map<Name, Set<Name> | null>;
   loops: Map<Name, Name[]>;
   flats: Map<Name, boolean>;
@@ -85,7 +87,6 @@ type File = {
     uses: Map<HTerm, Bend.PMap<number>>;
     folds: Map<HTerm, HTerm | null>;
     spines: Map<HTerm, Spine>;
-    steps: Map<HTerm, HTerm>;
   };
 };
 
@@ -658,7 +659,7 @@ function lit_call(s: Of<"Lit">): HTerm | null {
 function term_force(t: HTerm): HTerm {
   const s = Bend.term_force(t);
   return s.$ !== "Lit" ? s
-    : memo(FL.memo.steps, s, () => lit_call(s) ?? Bend.lit_step(s));
+    : memo(FL.steps, s.k + s.v, () => lit_call(s) ?? Bend.lit_step(s));
 }
 
 function term_strip(t: HTerm): HTerm {
@@ -666,10 +667,12 @@ function term_strip(t: HTerm): HTerm {
 }
 
 function term_open(t: Of<"Lam"> | Of<"Let">): { ps: Of<"Var">[]; b: HTerm } {
-  return memo(FL.memo.opens, t, () => {
-    const ps = (t.$ === "Lam" ? [t.k] : t.k).map(probe);
-    return { ps, b: t.$ === "Lam" ? t.f(ps[0]) : t.f(ps) };
-  });
+  return memo(FL.memo.opens, t, open_of);
+}
+
+function open_of(t: Of<"Lam"> | Of<"Let">): { ps: Of<"Var">[]; b: HTerm } {
+  const ps = (t.$ === "Lam" ? [t.k] : t.k).map(probe);
+  return { ps, b: t.$ === "Lam" ? t.f(ps[0]) : t.f(ps) };
 }
 
 function let_open(ps: Of<"Var">[], vs: HTerm[], b: HTerm): Of<"Let"> {
@@ -686,36 +689,38 @@ function let_live(t: Of<"Let">): boolean[] {
 }
 
 function term_spine(tm: HTerm): Spine {
-  return memo(FL.memo.spines, tm, () => {
-    const apps: Of<"App">[] = [];
-    let h = tm;
-    let c = term_force(tm);
-    while (c.$ === "Ann" || c.$ === "App") {
-      if (c.$ === "App") {
-        apps.unshift(c);
-        h = c.f;
-      }
-      c = term_force(c.$ === "App" ? c.f : c.x);
+  return memo(FL.memo.spines, tm, spine_of);
+}
+
+function spine_of(tm: HTerm): Spine {
+  const apps: Of<"App">[] = [];
+  let h = tm;
+  let c = term_force(tm);
+  while (c.$ === "Ann" || c.$ === "App") {
+    if (c.$ === "App") {
+      apps.unshift(c);
+      h = c.f;
     }
-    const tld = c.$ === "Ref" ? FL.book.tlds[c.k] : undefined;
-    const T = tld?.$ === "Def" ? tld.T : ty_ann(h);
-    const qs = T === null || apps.length === 0 ? [] : tele_unbind(T).doms;
-    const live = apps.map((_, i) => i >= qs.length || dom_live(qs[i]));
-    const all = apps.map((a) => a.x);
-    const args = all.filter((_, i) => live[i]);
-    const def = c.$ === "Ref" && intr_of(c.k) === undefined
-      && fun_runs(tld) ? c.k : null;
-    const need = def === null ? 0 : fun_of(def).lays.length;
-    const a = apps[live.lastIndexOf(true)];
-    const m = { h, t: c, all, args, tld, k: null, xs: args };
-    if (def !== null && args.length === need) {
-      return { ...m, k: def, b: (c as Of<"Ref">).b };
-    }
-    if (args.length > need && (def !== null || c.$ !== "Ref")) {
-      return { ...m, k: CLO_APPLY, xs: [a.f, a.x] };
-    }
-    return m;
-  });
+    c = term_force(c.$ === "App" ? c.f : c.x);
+  }
+  const tld = c.$ === "Ref" ? FL.book.tlds[c.k] : undefined;
+  const T = tld?.$ === "Def" ? tld.T : ty_ann(h);
+  const qs = T === null || apps.length === 0 ? [] : tele_unbind(T).doms;
+  const live = apps.map((_, i) => i >= qs.length || dom_live(qs[i]));
+  const all = apps.map((a) => a.x);
+  const args = all.filter((_, i) => live[i]);
+  const def = c.$ === "Ref" && intr_of(c.k) === undefined
+    && fun_runs(tld) ? c.k : null;
+  const need = def === null ? 0 : fun_of(def).lays.length;
+  const a = apps[live.lastIndexOf(true)];
+  const m = { h, t: c, all, args, tld, k: null, xs: args };
+  if (def !== null && args.length === need) {
+    return { ...m, k: def, b: (c as Of<"Ref">).b };
+  }
+  if (args.length > need && (def !== null || c.$ !== "Ref")) {
+    return { ...m, k: CLO_APPLY, xs: [a.f, a.x] };
+  }
+  return m;
 }
 
 function term_eta(t: HTerm, T: HTerm, n: number): HTerm {
@@ -786,16 +791,19 @@ function term_use(u: Bend.PMap<number>, p: Of<"Var">): number {
   return Bend.pmap_get(u, p.i) ?? 0;
 }
 
+const ADD = (a: number, b: number) => a + b;
+
 function term_uses(tm: HTerm): Bend.PMap<number> {
-  return memo(FL.memo.uses, tm, () => {
-    const t = term_force(tm);
-    if (t.$ === "Var") {
-      return t.i === DUMMY.i ? USE0 : Bend.pmap_set(USE0, t.i, 1);
-    }
-    const add = t.$ === "Mat" ? Math.max : (a: number, b: number) => a + b;
-    return term_kids(t).reduce((u, x) =>
-      Bend.pmap_union(u, term_uses(x), add), USE0);
-  });
+  return memo(FL.memo.uses, tm, uses_of);
+}
+
+function uses_of(tm: HTerm): Bend.PMap<number> {
+  const t = term_force(tm);
+  let u = t.$ !== "Var" || t.i === DUMMY.i ? USE0 : Bend.pmap_set(USE0, t.i, 1);
+  for (const x of term_kids(t)) {
+    u = Bend.pmap_union(u, term_uses(x), t.$ === "Mat" ? Math.max : ADD);
+  }
+  return u;
 }
 
 function rest_use(rest: HTerm[], p: Of<"Var">): number {
@@ -1005,7 +1013,8 @@ function lay_node(k: Name): Lay {
 
 // An open type takes its value's layout.
 function lay_at(A: HTerm | null, v: Val): Lay {
-  return ty_holds(A, (t) => ty_tag(t, "Var App")) ? v.lay : lay_of(A);
+  return A && memo(FL.opens, Bend.term_key(Bend.term_lower(A)), () =>
+    ty_holds(A, (t) => ty_tag(t, "Var App"))) ? v.lay : lay_of(A);
 }
 
 function lay_eq(a: Lay, b: Lay): boolean {
@@ -1417,6 +1426,8 @@ function file_new(book: Bend.Book, js: boolean): File {
     ids: new Map(),
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
     teles: new Map(),
+    steps: new Map(),
+    opens: new Map(),
     srcs: new Map(),
     loops: new Map(),
     flats: new Map(),
@@ -1430,7 +1441,6 @@ function file_new(book: Bend.Book, js: boolean): File {
       uses: new Map(),
       folds: new Map(),
       spines: new Map(),
-      steps: new Map(),
     },
   };
 }
@@ -2863,6 +2873,7 @@ export function compile_book(book: Bend.Book): string {
     for (const [k, tld] of [...done_defs().reverse(),
       ...done_defs(def_foreign)]) {
       memo_gc();
+      PROBES.length = 1;
       const [dl, vals] = emit_open(scope_new(), k);
       FL.segs.push(dl.seg);
       if (def_foreign(tld)) {
