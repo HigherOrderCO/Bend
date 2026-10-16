@@ -327,17 +327,18 @@ function root_emit(e: Safe, k: Name): [string[], string | null] {
     if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
       oos("a specialized parameter whose type names a parameter");
     }
-    let c = k + "~" + F.k;
-    while (e.book.tlds[c] !== undefined) {
-      c += "~";
-    }
     // roots share a constant only where they give it the same model
-    const m = (pick === null ? null : fit(e, k, pick[j], F.A)) ?? model(e, F.A);
-    const key = String(j) + "\n" + B.term_key(B.term_lower(F.A)) + "\n" + (m === null ? "" : B.term_key(B.term_lower(m)));
+    const f = pick === null ? null : fit(e, k, pick[j], F.A);
+    const key = String(j) + "\n" + B.term_key(B.term_lower(F.A)) + "\n" + (f === null ? "" : B.term_key(B.term_lower(f)));
     const kept = e.consts.get(key);
     if (kept !== undefined) {
       return at(B.Ref(kept));
     }
+    let c = k + "~" + F.k;
+    while (e.book.tlds[c] !== undefined) {
+      c += "~";
+    }
+    const m = f ?? model(e, F.A);
     const def: Def = { $: "Def", n: 0, x: 0, T: F.A, v: null };
     e.book.tlds[c] = def;
     if (m !== null) {
@@ -544,16 +545,14 @@ function model(e: Safe, T: HTerm): HTerm | null {
 // its parameter's type after the ones before it; k's constants take their
 // models from it alone
 function inst_pick(e: Safe, k: Name): HTerm[] | null {
-  for (const [t, xs] of e.inst.values()) {
-    let T = e.book.tlds[k].T;
-    if (t === k && xs.every((x) => {
-      const F = B.term_wnf(e.mb, T);
-      return F.$ === "All" && fit(e, k, x, F.A) !== null && (T = F.B(x)) !== null;
-    })) {
-      return xs;
+  const fits = (T: HTerm, [x, ...xs]: HTerm[]): boolean => {
+    if (x === undefined) {
+      return true;
     }
-  }
-  return null;
+    const F = B.term_wnf(e.mb, T);
+    return F.$ === "All" && fit(e, k, x, F.A) !== null && fits(F.B(x), xs);
+  };
+  return [...e.inst.values()].find(([t, xs]) => t === k && fits(e.book.tlds[k].T, xs))?.[1] ?? null;
 }
 
 // x checked at T in the model book, as k's code; null if it does not fit

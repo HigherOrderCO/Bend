@@ -1,12 +1,7 @@
-# use's ~F is an injectivity proof, which no built model proves; main's
-# instance passes inj there, so inj is its model and use is still checked
-# at an opaque F. use2's ~P must fit ~f: both come from the one instance,
-# where a model built for f (n => Z{}) would leave none for P. app's
-# instance sets app~f to pred, so use4 cannot share it: use4's R holds
-# only at its own g (n => Z{}). t's models all come from one instance:
-# ia's g (n => pp(n, n)) uses n twice, so ia does not fit, and ib's f, g
-# and P do, whichever comes first. Nothing calls tk, so its p is built
-# with a projection model (Mk{n => n, {==}})
+# A template's ~ constants take their models from one instance whose
+# arguments all fit: main's for use and use2, ib's for t (ia's g uses n
+# twice). app~f = pred is not shared with use4~g. tk, never called,
+# gets a built model.
 import Base
 
 type N is Data:
