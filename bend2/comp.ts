@@ -1329,7 +1329,7 @@ function file_new(book: Bend.Book, js: boolean) {
     spins: [] as Seg[],
     spun: new Map<string, QualifiedName>(),
     clos: new Set<QualifiedName>(),
-    tabs: new Map<string, QualifiedName>(),
+    tabs: new Map<string, string>(),
     tails: new Map<QualifiedName, Set<QualifiedName>>(),
     img: [] as string[],
     lits: new Map<string, number>(),
@@ -2620,8 +2620,8 @@ function emit_tab(sc: Scope, cells: HTerm[] | null, ty: HTerm,
   }
   const key = (FL.js ? ls : Function("f32_bits", `return [${ls}]`)(
     Bend.f32_to_bits).map((v: number) => BigInt(v) + "ull")).join(", ");
-  const tab = name_global(memo(FL.tabs, key, () =>
-    name_gen(INTERNAL.table, "tab", key)));
+  const tab = memo(FL.tabs, key, () =>
+    name_global(name_gen(INTERNAL.table, "tab", key)));
   return FL.js ? `${tab}[Math.min(${s}, ${ls.length - 1})]`
     : `TAB_AT(${tab}, ${s}, ${ls.length - 1})`;
 }
@@ -2863,7 +2863,7 @@ export function compile_book(book: Bend.Book): string {
   `#define BEND_GPU_WINDOW ${JSON.stringify(GPU_WINDOW)}`,
   `#define BLK_SHR ${Number(FL.hot.has(base("Array")))}`);
   const tabs = [defs.join("\n"), ...[...FL.tabs].map(([r, i]) =>
-    `CONSTV u64 ${name_global(i)}[] = { ${r} };`)].join("\n\n");
+    `CONSTV u64 ${i}[] = { ${r} };`)].join("\n\n");
   const spins = [`CONSTV u64 STAT_IMG[] = { ${FL.img.join(", ") || 0} };`,
     ...FL.spins.map((s) => s.lines.join("\n"))].join("\n\n");
   const segs = FL.segs.map((seg) => {
@@ -3175,7 +3175,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
       : "");
   return RUNTIME + `const $0names = Object.assign(Object.create(null), ${JSON.stringify(names)});\n` + effs
     + "// Program\n// =======\n\n" + [funs, ...[...FL.tabs]
-    .map(([r, i]) => `const ${name_global(i)} = [${r}];`)].join("\n") + lib;
+    .map(([r, i]) => `const ${i} = [${r}];`)].join("\n") + lib;
 }
 
 export function js_book(book: Bend.Book): string {

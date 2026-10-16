@@ -974,7 +974,7 @@ export function book_adt(book: Book, tm: Extract<HTerm, { $: "ADT" }>, ctx: Ctx,
     return tld;
   }
   const r = new Set(tm.r);
-  return { $: "ADT", n: tld.n, g: tld.g, T: tld.T, c: tld.c.filter((c) => !r.has(c.k)) };
+  return { ...tld, c: tld.c.filter((c) => !r.has(c.k)) };
 }
 
 export const BEND_DIR = import.meta.url.startsWith("file:///$bunfs/")
