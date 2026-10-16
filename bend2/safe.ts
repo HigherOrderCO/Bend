@@ -1336,7 +1336,7 @@ function arg_term(e: Safe, s: Scope, x: HTerm, A: HTerm, live: boolean): O {
   if (all !== null && (!(live && s.sub) || T !== null && !qsig_eq(e, T, A, s.d))) {
     return term(e, s, eta(x, all), live);
   }
-  return term(e, s, T === null && tree ? B.Ann(x, A) : x, live);
+  return term(e, s, T === null && (tree || y.$ === "Ctr") ? B.Ann(x, A) : x, live);
 }
 
 // whether two function types bind at the same quantities: the kernel's
