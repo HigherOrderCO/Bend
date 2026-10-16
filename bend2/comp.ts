@@ -509,7 +509,7 @@ function f32_from_bits(u) {
 }
 
 function f32_read(s) {
-  const re = /^[\t\n\v\f\r ]*[+-]?((\d+\.?\d*|\.\d+)(e[+-]?\d+)?|inf(inity)?|nan)$/i;
+  const re = /^[\t\n\v\f\r ]*[+-]?((\d+(?:\.\d*)?|\.\d+)(e[+-]?\d+)?|inf(inity)?|nan)$/i;
   const v = f32_round(s.replace(/inf\w*/i, "Infinity"));
   return re.test(s) ? {$: "Some", value: v} : {$: "None"};
 }
