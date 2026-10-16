@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Stall.open BEND_CID_Stall_open
+// bend-ids end
 #include <dlfcn.h>
 
 // Every nonempty write to stall_fd makes no progress; the rest go through.
@@ -18,5 +21,5 @@ Term stall_open_run(Env e, Term* f, IoWork* w) {
 }
 
 static void __attribute__((constructor)) stall_use(void) {
-  io_eff(CID(Stall.open), stall_open_run);
+  io_eff(BEND_CID_Stall_open, stall_open_run);
 }

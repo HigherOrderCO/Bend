@@ -14,9 +14,9 @@
 // CID #None BEND_CID_None
 // CID #Some BEND_CID_Some
 // CID #Span BEND_CID_Span
-// CID #Num BEND_CID_Num
-// CID #Flag BEND_CID_Flag
-// CID #Text BEND_CID_Text
+// CID #OptionNum BEND_CID_OptionNum
+// CID #OptionFlag BEND_CID_OptionFlag
+// CID #OptionText BEND_CID_OptionText
 // CID #Term BEND_CID_Term
 // CID #Node BEND_CID_Node
 // CID #Fact BEND_CID_Fact
@@ -96,10 +96,10 @@ function lint_spot(s) {
 
 function lint_value(v) {
   return typeof v === "number"
-    ? { $: BEND_CID_Num, value: v }
+    ? { $: BEND_CID_OptionNum, value: v }
     : typeof v === "boolean"
-      ? { $: BEND_CID_Flag, value: v }
-      : { $: BEND_CID_Text, value: v };
+      ? { $: BEND_CID_OptionFlag, value: v }
+      : { $: BEND_CID_OptionText, value: v };
 }
 
 function lint_term(id) {

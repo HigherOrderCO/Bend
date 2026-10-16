@@ -99,7 +99,7 @@ export type Checked = {
   book: Book;
   sources: Source[];
   map: Mapper;
-  declarations: Name[];
+  declarations: QualifiedName[];
   facts?: Fact[];
   failure?: Diag;
 };
@@ -168,7 +168,7 @@ export const PATCHED = Object.keys(PATCHES);
 // Where the wrappers report, set for one check at a time.
 export const hook: {
   see?: (report: Report) => void;
-  parsed?: (dir: string, ns: string, names: Name[]) => void;
+  parsed?: (file: BendModule.File, names: QualifiedName[]) => void;
 } = {};
 
 // Text an editor holds unsaved, by real path, set for one check at a time.
@@ -307,12 +307,12 @@ export const seeCheck = (f: typeof BendModule.term_check): typeof BendModule.ter
 
 // Record the declarations read by the parser, including imported law fills.
 export const seeParseBook = (f: typeof BendModule.parse_book): typeof BendModule.parse_book => {
-  arity(f, 5, "parse_book");
+  arity(f, 2, "parse_book");
   return (...args) => {
-    const [book, dir, , ns] = args;
+    const [book, file] = args;
     const begin = book.order.length;
     f(...args);
-    hook.parsed?.(dir, ns, book.order.slice(begin));
+    hook.parsed?.(file, book.order.slice(begin));
   };
 };
 
@@ -671,7 +671,7 @@ const checked = async (
   const far = filters.filter((f) => f.scope === "program");
   const program = far.length > 0;
   const texts = new Map<string, string>();
-  let declarations: Name[] = [];
+  let declarations: QualifiedName[] = [];
   reads = texts;
   const seeded = real !== "" && /^(?:[\t\r ]*(?:(?:#|import )[^\n]*)?\n)*[\t ]*import Base\s/
     .test(fs.readFileSync(real, "utf8"));
@@ -690,8 +690,8 @@ const checked = async (
   const read = await Promise.resolve(seeded ? BASE?.book : undefined)
     .then((base) => {
       hook.see = filters.length > 0 ? see : undefined;
-      hook.parsed = (dir, ns, names) => {
-        if (dir === home && ns === "") declarations = names;
+      hook.parsed = (parsed, names) => {
+        if (parsed.path === real) declarations = names;
       };
       return Main.book_read(file, base, seen);
     })
@@ -830,11 +830,7 @@ const sameDeclarations = (m: Loaded, { book, sources, declarations }: Checked, t
     }
     return lines.join("\n");
   };
-  const own = new Set(
-    [...root.text.matchAll(/^(?:@unsafe\s+)?(?:def|type|law)\s+([\w.]+)/gm)].map((match) =>
-      Bend.name_resolve(book, file, match[1]).k,
-    ),
-  );
+  const own = new Set(declarations);
   const seed = (): Book => {
     const fresh = Bend.book_nil();
     fresh.tlds = { ...book.tlds };
@@ -852,7 +848,13 @@ const sameDeclarations = (m: Loaded, { book, sources, declarations }: Checked, t
   };
   const snapshot = (s: string) => {
     const parsed = seed();
-    Bend.parse_book(parsed, file, body(s));
+    const held = hook.parsed;
+    hook.parsed = undefined;
+    try {
+      Bend.parse_book(parsed, file, body(s));
+    } finally {
+      hook.parsed = held;
+    }
     const lower = (t: HTerm | null) => (t === null ? null : Bend.term_lower(t));
     return JSON.stringify(
       parsed.order.map((k) => {
@@ -1032,7 +1034,7 @@ const selfCheck = async (m: Loaded): Promise<void> => {
   demand(
     [
       ["check", run.failure === undefined],
-      ["declarations (parse_book)", run.declarations.join(",") === "N,id,main"],
+      ["declarations (parse_book)", run.declarations.join(",") === ["N", "id", "main"].map(k => m.Bend.name_source(run.book.entry, k)).join(",")],
       ["Ref id (term_infer)", views.some((v) => v.kind === "Ref" && v.name === "id")],
       ["Lam (term_check)", views.some((v) => v.kind === "Lam")],
       ["type", x !== undefined && ops.show(x.fact, ops.type(x.fact)) === "N"],

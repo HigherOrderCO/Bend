@@ -127,6 +127,7 @@ type Safe = {
   seen: Set<string>;
   todo: Array<[QualifiedName, Cols]>;
   fail: Map<QualifiedName, string>;
+  log: Array<[Map<string, unknown> | Set<string>, string]>;
   groups: Map<QualifiedName, Group>;
   stack: string[];
   going: Set<string>;
@@ -157,12 +158,9 @@ const MODEL_DEPTH = 8;
 // only this compiler release may build a cached kernel
 const LEAN_VERSION = "4.34.0";
 
-// Quant's kernel labels, by quant
-const QS = ["Q0", "Q1", "Q2"];
-
 // the unit type and value
-const UT: O = { $: "Enu", ks: ["()"] };
-const UV: O = { $: "Lab", k: "()" };
+const UT: O = { $: "Enu", ks: [UNIT] };
+const UV: O = { $: "Lab", k: UNIT };
 
 // Errors
 // ======
@@ -220,18 +218,20 @@ function safe_pass(book: Book, groups: Map<QualifiedName, Group>): { text: strin
         mb.ctrs[c.k] = { ...c, T: copy(c.T) }) };
   }
   const e: Safe = { book, mb, out: [], names: new Map(), seen: new Set(),
-    todo: [], fail: new Map(), groups, stack: [], going: new Set(), grew: false, consts: new Map(), uses: new WeakMap() };
-  const roots: Array<[QualifiedName, QualifiedName]> = [];
+    todo: [], fail: new Map(), log: [], groups, stack: [], going: new Set(), grew: false, consts: new Map(), uses: new WeakMap() };
+  const roots: Array<[QualifiedName, QualifiedName[], QualifiedName | null]> = [];
   for (const k of [...new Set([...book.order].reverse())].reverse().filter((k) => book.tlds[k].b !== true)) {
+    const m = trail(e);
     try {
-      roots.push(...root_cols(e, k, book.tlds[k].T, 0).map((cols): [QualifiedName, QualifiedName] => [k, item_try(e, k, cols)]));
+      roots.push([k, ...root_emit(e, k)]);
     } catch (x) {
       if (!(x instanceof Scope_Error)) {
         throw x;
       }
+      undo(e, m);
       const n = B.name_fresh(k, "tt");
-      e.fail.set(n, x.message);
-      roots.push([k, n]);
+      put(e, e.fail, n, x.message);
+      roots.push([k, [n], null]);
     }
   }
   for (let it = e.todo.pop(); it !== undefined; it = e.todo.pop()) {
@@ -253,47 +253,102 @@ function safe_pass(book: Book, groups: Map<QualifiedName, Group>): { text: strin
     }
   }
   e.out = e.out.filter(([k]) => !bad.has(k));
-  const oos = roots.filter(([, n]) => bad.has(n)).map(([k, n]): [QualifiedName, string] => [k, bad.get(n) as string]);
+  // a def is out at its instances' reasons, else at its λ-match's; with
+  // neither, it reaches no kernel def
+  const why = (n: QualifiedName): string[] => bad.has(n) ? [bad.get(n) as string] : [];
+  const oos = roots.flatMap(([k, ns, top]) => {
+    const ws = ns.flatMap(why);
+    const all = ws.length > 0 ? ws : top !== null ? why(top) : ns.length === 0 ? ["no kernel def"] : [];
+    return [...new Set(all)].map((w): [QualifiedName, string] => [k, w]);
+  });
   return { text: book_show(e), oos };
 }
 
-// the columns root k checks at, from its telescope T's parameter j on:
-// a specialized parameter of a finite type (Quant, or a datatype whose
-// constructors have no fields) at each value, any other at an opaque
-// constant of its type, one per place for all roots, which models read at
-// its model (as bend2 checks a template: its body holds at every argument)
-function root_cols(e: Safe, k: QualifiedName, T: HTerm, j: number): Cols[] {
+// root k: its instances, one per tuple of columns: a specialized
+// parameter of a finite type (Quant, or a datatype whose constructors
+// have no fields) at each value, any other at an opaque constant of its
+// type, one per place for all roots, which models read at its model (as
+// bend2 checks a template: its body holds at every argument). With a
+// finite one, k also goes out as a λ-match on each, at ∀y:A -> <()>,
+// whose arm names an instance at k's type G at its own arguments. So the
+// kernel checks that every value has an arm and each instance fits G,
+// not which arm names which. If G calls a template at one of k's ~
+// parameters (bound in it), the arms name the instances bare; any other
+// reason G cannot go out is k's. Returns the instances' names, and the
+// λ-match's (null without one)
+function root_emit(e: Safe, k: QualifiedName): [QualifiedName[], QualifiedName | null] {
   const tld = e.book.tlds[k];
-  const F = j === tld.n ? null : B.term_wnf(e.book, T);
-  if (F?.$ !== "All") {
-    return [[]];
+  const ns: QualifiedName[] = [];
+  // k's type G: undefined until a finite parameter, null if it cannot go out
+  let G: O | null | undefined;
+  let ps: Binder[] = [];
+  // a column's kernel term, made once for every leaf below it
+  const kc = new Map<HTerm, O>();
+  const col = (v: HTerm): O => kc.get(v) ?? kc.set(v, term(e, scope_nil(), v, false)).get(v) as O;
+  // the check of k's instances after the columns cs of T, at depth d
+  const go = (T: HTerm, cs: Cols, d: number): O => {
+    const j = cs.length;
+    const F = j === tld.n ? null : B.term_wnf(e.book, T);
+    if (F?.$ !== "All") {
+      ns.push(item_try(e, k, cs));
+      const x: O = { $: "Ref", k: ns[ns.length - 1] };
+      return G == null ? x : { $: "Ann", x, T: ps.reduce<O>((f, [q], j) =>
+        ({ $: "App", q, f, x: col(cs[j] as HTerm) }), { $: "Var", l: 0 }) };
+    }
+    const at = (v: HTerm | null, d1 = d): O =>
+      go(F.B(v ?? B.Var(F.k, j)), [...cs, v], d1);
+    if (tld.$ !== "Def" || j >= tld.x) {
+      return at(null);
+    }
+    const A = B.term_wnf(e.book, F.A);
+    const adt = A.$ === "ADT" && A.x.length === 0 ? e.book.tlds[A.k] as ADT : null;
+    const vs: HTerm[] | null = A.$ === "Qnt" ? [B.None(), B.Lone(), B.Many()].map((q) => B.Qua(q))
+      : adt !== null && adt.c.every((c) => B.term_wnf(e.book, c.T).$ !== "All") ? adt.c.map((c) => B.Ctr(c.k, [])) : null;
+    if (vs !== null) {
+      if (G === undefined) {
+        G = null;
+        const m = trail(e);
+        try {
+          const t = tele_open(e, scope_nil(), tld.T, [], tld.x);
+          const b = term(e, t.s, t.T, false);
+          G = { $: "Ann", x: lams(e, t.ps, b), T: alls(t.ps, { $: "Typ", q: { $: "Lab", k: "Q1" } }) };
+          ps = t.ps;
+        } catch (x) {
+          if (!(x instanceof Open_Error)) {
+            throw x;
+          }
+          undo(e, m);
+        }
+      }
+      const hs = vs.map((v): O => ({ $: "Let", q: 0, l: d, v: at(v, d + 1), f: UV }));
+      const M: O = adt === null ? mats(QUANTS, (i) => hs[i])
+        : { $: "Prj", h: mats(adt.c.map((c) => c.k), (i) => unit(hs[i])) };
+      return { $: "Ann", x: M, T: { $: "All", q: 1, l: d, A: term(e, scope_nil(), A, false), B: UT } };
+    }
+    if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
+      oos("a specialized parameter whose type names a parameter");
+    }
+    const key = String(j) + "\n" + B.term_key(B.term_lower(F.A));
+    const kept = e.consts.get(key);
+    if (kept !== undefined) {
+      return at(B.Ref(kept));
+    }
+    const c = B.name_fresh(k, "root");
+    const def: Def = { $: "Def", n: 0, x: 0, T: F.A, v: null };
+    e.book.tlds[c] = def;
+    const m = model(e, F.A);
+    e.mb.tlds[c] = { ...def, v: m };
+    e.consts.set(key, c);
+    return at(B.Ref(c));
+  };
+  const h = go(tld.T, [], 2);
+  if (G === undefined) {
+    return [ns, null];
   }
-  const at = (v: HTerm | null): Cols[] => root_cols(e, k, F.B(v ?? B.Var(F.k, j)), j + 1).map((cs) => [v, ...cs]);
-  if (tld.$ !== "Def" || j >= tld.x) {
-    return at(null);
-  }
-  const A = B.term_wnf(e.book, F.A);
-  const adt = A.$ === "ADT" && A.x.length === 0 ? e.book.tlds[A.k] as ADT : null;
-  const vs: HTerm[] | null = A.$ === "Qnt" ? [B.None(), B.Lone(), B.Many()].map((q) => B.Qua(q))
-    : adt !== null && adt.c.every((c) => B.term_wnf(e.book, c.T).$ !== "All") ? adt.c.map((c) => B.Ctr(c.k, [])) : null;
-  if (vs !== null) {
-    return vs.flatMap(at);
-  }
-  if (mentions(B.term_lower(F.A, j), (i) => i >= 0 && i < j)) {
-    oos("a specialized parameter whose type names a parameter");
-  }
-  const key = String(j) + "\n" + B.term_key(B.term_lower(F.A));
-  const kept = e.consts.get(key);
-  if (kept !== undefined) {
-    return at(B.Ref(kept));
-  }
-  const c = B.name_fresh(k, "root");
-  const def: Def = { $: "Def", n: 0, x: 0, T: F.A, v: null };
-  e.book.tlds[c] = def;
-  const m = model(e, F.A);
-  e.mb.tlds[c] = { ...def, v: m };
-  e.consts.set(key, c);
-  return at(B.Ref(c));
+  const v: O = { $: "Let", q: 0, l: 1, v: h, f: UV };
+  const n = B.name_fresh(k, "tt");
+  e.out.push([n, UT, G === null ? v : { $: "Let", q: 0, l: 0, v: G, f: v }, false]);
+  return [ns, n];
 }
 
 // item_ref, with a failure kept as the item's reason
@@ -329,7 +384,7 @@ function item_ref(e: Safe, k: QualifiedName, cols: Cols, live: boolean): Qualifi
   let n = e.names.get(key)?.n;
   if (n === undefined) {
     n = B.name_fresh(k, "tt");
-    e.names.set(key, { k, n });
+    put(e, e.names, key, { k, n });
     e.todo.push([k, cols]);
   }
   const why = e.fail.get(n);
@@ -402,9 +457,10 @@ function adt_emit(e: Safe, cols: Cols, n: QualifiedName, tld: ADT): void {
   const am = B.name_gen(n, "arms", 0);
   const t = s.D;
   // a constructor's fields as a Σ chain ending in <()>
-  const fs = (c: B.Ctr): O => alls(tele_open(e, s, B.tele_fill(e.book, c.T, xs, B.ctx_nil()), [], Infinity).ps, { $: "Enu", ks: [UNIT] }, "Sig");
-  const arms = tld.c.reduceRight<O>((m, c) => ({ $: "Mat", k: c.k, h: fs(c), m }), { $: "Efq" });
-  const Enu: O = { $: "Enu", ks: tld.c.map((c) => c.k) };
+  const fs = (c: B.Ctr): O => alls(tele_open(e, s, B.tele_fill(e.book, c.T, xs, B.ctx_nil()), [], Infinity).ps, UT, "Sig");
+  const ks = tld.c.map((c) => c.k);
+  const arms = mats(ks, (i) => fs(tld.c[i]));
+  const Enu: O = { $: "Enu", ks };
   e.out.push([am, alls(ps, { $: "All", q: 1, l: t, A: Enu, B: G }), lams(e, ps, arms), false]);
   const at = (k: QualifiedName): O => ps.reduce<O>((f, [q, l]) => ({ $: "App", q, f, x: { $: "Var", l } }), { $: "Ref", k });
   e.out.push([n, alls(ps, G), lams(e, ps, { $: "Sig", q: 1, l: t, A: Enu, B: { $: "App", q: 1, f: at(am), x: { $: "Var", l: t } } }), false]);
@@ -668,7 +724,7 @@ function unapply(t: HTerm): [HTerm, HTerm[]] {
 function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
   const top = fs[fs.length - 1];
   if (top !== undefined && top.n === 0) {
-    return { $: "Mat", k: UNIT, h: convoy_bind(e, s, top.cv, t, fs.slice(0, -1)), m: { $: "Efq" } };
+    return unit(convoy_bind(e, s, top.cv, t, fs.slice(0, -1)));
   }
   const [x, T] = open(t);
   const all = all_of(e, T);
@@ -1125,19 +1181,35 @@ function back(t: B.LTerm, k: QualifiedName): B.LTerm[][] {
 }
 
 // what an emission has added, which a Regroup below it undoes. Emission
-// only appends to these five, so their sizes mark it; other state an
-// emission changes would outlive the undo
-type Trail = [number, number, number, number, number];
+// only appends to out and todo, and adds keys to names, seen and fail
+// through put, which logs each new one, so their lengths mark it and
+// an undo costs what it removes; other state an emission changes would
+// outlive the undo
+type Trail = [number, number, number];
 
 function trail(e: Safe): Trail {
-  return [e.out.length, e.names.size, e.seen.size, e.todo.length, e.fail.size];
+  return [e.out.length, e.todo.length, e.log.length];
 }
 
 function undo(e: Safe, m: Trail): void {
   e.out.length = m[0];
-  e.todo.length = m[3];
-  for (const [x, n] of [[e.names, m[1]], [e.seen, m[2]], [e.fail, m[4]]] as Array<[Map<string, unknown> | Set<string>, number]>) {
-    [...x.keys()].slice(n).forEach((k) => x.delete(k));
+  e.todo.length = m[1];
+  for (const [x, k] of e.log.splice(m[2])) {
+    x.delete(k);
+  }
+}
+
+// x gains the key k (at v, in a map); a new one is logged for undo
+function put<V>(e: Safe, x: Map<string, V>, k: string, v: V): void;
+function put(e: Safe, x: Set<string>, k: string): void;
+function put(e: Safe, x: Map<string, unknown> | Set<string>, k: string, v?: unknown): void {
+  if (!x.has(k)) {
+    e.log.push([x, k]);
+  }
+  if (x instanceof Map) {
+    x.set(k, v);
+  } else {
+    x.add(k);
   }
 }
 
@@ -1152,8 +1224,8 @@ function group_call(e: Safe, s: Scope, g: Group, m: QualifiedName, ps: Arg[], R:
   const a = { ...s, sub: live && k === s.self };
   const args = (xs: Arg[], qs: Q[]): Array<[Q, O]> => xs.flatMap(([q, x, A, v], j): Array<[Q, O]> =>
     v !== null ? [] : [[qs[j] ?? q, arg_term(e, a, x, A, live && (qs[j] ?? q) > 0)]]);
-  const sel: O = { $: "Tup", q: 1, a: { $: "Lab", k: g.k }, b: { $: "Lab", k: UNIT } };
-  const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: m }, b: sel }] as [Q, O],
+  const sel: O = { $: "Tup", q: 1, a: { $: "Lab", k: g.k }, b: UV };
+  const x = [...args(ps.slice(0, n), g.qs), [1, m === g.k ? sel : { $: "Tup", q: 1, a: { $: "Lab", k: m }, b: { $: "Tup", q: 1, a: sel, b: UV } }] as [Q, O],
     ...args(ps.slice(n), [])].reduce<O>((f, [q, x]) => ({ $: "App", q, f, x }), { $: "Ref", k });
   return { $: "Ann", x, T: term(e, s, R, false) };
 }
@@ -1172,20 +1244,19 @@ function group_emit(e: Safe, g: Group, cols: Cols, n: QualifiedName): void {
     const qs = B.tele_unbind(e.book, tld.T).doms.map(([q]) => quant(q));
     return { ...r, vs: r.xs.flatMap((x, j): Array<[Q, O]> => j < nx ? [] : [[qs[j], term(e, r.s, x, false)]]), cs: r.xs.map((x, j) => j < nx ? x : null) };
   };
-  // the selector's match: a member's arm past its tag (and a helper's (.k, ()))
-  const efq: O = { $: "Efq" };
-  const unit = (h: O): O => ({ $: "Mat", k: UNIT, h, m: efq });
-  const sel = (f: (m: QualifiedName) => O): O => ({ $: "Prj", h: g.ms.reduceRight<O>((m, k, i) => ({ $: "Mat", k, m,
-    h: i === 0 ? unit(f(k)) : { $: "Prj", h: { $: "Mat", k: g.k, h: unit(f(k)), m: efq } } }), efq) });
+  // the selector's match: a member's arm past its tag (and a helper's ((.k, ()), ()))
+  const tags = g.ms;
+  const sel = (f: (m: QualifiedName) => O): O => ({ $: "Prj", h: mats(tags, (i) => i === 0 ? unit(f(g.ms[i]))
+    : { $: "Prj", h: { $: "Prj", h: mats([g.k], () => unit(unit(f(g.ms[i])))) } }) });
   const l0 = s.D;
   const s0 = scope_kq(scope_hide(s), l0, 1);
   const mode = sel((m) => {
     const r = rest(s0, m);
     return alls(r.ps, term(e, r.s, r.T, false));
   });
-  const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: g.ms }, B: { $: "App", q: 1, x: { $: "Var", l: l0 },
-    f: g.ms.reduceRight<O>((m, k, i) => ({ $: "Mat", k, m, h: i === 0 ? { $: "Enu", ks: [UNIT] }
-      : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [g.k] }, B: { $: "Enu", ks: [UNIT] } } }), efq) } };
+  const Sel: O = { $: "Sig", q: 1, l: l0, A: { $: "Enu", ks: tags }, B: { $: "App", q: 1, x: { $: "Var", l: l0 },
+    f: mats(tags, (i) => i === 0 ? UT
+      : { $: "Sig", q: 1, l: l0 + 1, A: { $: "Sig", q: 1, l: l0 + 1, A: { $: "Enu", ks: [g.k] }, B: UT }, B: UT }) } };
   const To = alls(ls, { $: "All", q: 1, l: l0, A: Sel, B: { $: "App", q: 1, f: mode, x: { $: "Var", l: l0 } } });
   const ks = ls.filter(([q]) => q === 1).map(([, l]) => l);
   const body = sel((m) => convoy_bind(e, s0, ks, (s2) => {
@@ -1269,7 +1340,7 @@ function ctr_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Ctr" }>, T: HTerm |
     // A word literal is shared as a def of its own.
     const k = B.name_gen(x.k, "word", w);
     if (!e.names.has(k)) {
-      e.names.set(k, { k: x.k, n: k });
+      put(e, e.names, k, { k: x.k, n: k });
       const v = term(e, { ...scope_nil(), sub: true }, B.Ctr(x.k, [B.word_to_term(w, owner)]), true);
       e.out.push([k, { $: "Ref", k: item_ref(e, f, [], false) }, v, false]);
     }
@@ -1289,7 +1360,7 @@ function ctr_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Ctr" }>, T: HTerm |
     F = A.B(a);
   }
   const k = x.k;
-  const tail = fs.reduceRight<O>((b, [q, a]) => ({ $: "Tup", q, a, b }), { $: "Lab", k: UNIT });
+  const tail = fs.reduceRight<O>((b, [q, a]) => ({ $: "Tup", q, a, b }), UV);
   return { $: "Tup", q: 1, a: { $: "Lab", k }, b: tail };
 }
 
@@ -1389,13 +1460,13 @@ function alls(ps: Binder[], b: O, $: "All" | "Sig" = "All"): O {
 }
 
 // a λ-match whose arm at the label ks[i] is h(i), made last to first
-function mats(ks: string[], h: (i: number) => O): O {
+function mats(ks: QualifiedName[], h: (i: number) => O): O {
   return ks.reduceRight<O>((m, k, i) => ({ $: "Mat", k, h: h(i), m }), { $: "Efq" });
 }
 
 // the match that splits a Σ chain's unit, then h
 function unit(h: O): O {
-  return mats(["()"], () => h);
+  return mats([UNIT], () => h);
 }
 
 // λs over b, at the binders ps; one that uses its variable twice copies it

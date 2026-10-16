@@ -1,3 +1,6 @@
+// bend-ids 1
+// CID :Stall.open BEND_CID_Stall_open
+// bend-ids end
 // Every nonempty write to the fd Stall.open answers makes no progress.
 function stall_open() {
   const fs = require("fs");
@@ -8,4 +11,4 @@ function stall_open() {
   return io_done(fd);
 }
 
-io_eff(CID(Stall.open), stall_open);
+io_eff(BEND_CID_Stall_open, stall_open);

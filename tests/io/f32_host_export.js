@@ -1,3 +1,7 @@
+// bend-ids 1
+// CID :F32.host_export BEND_CID_F32_host_export
+// CID :F32.host_input BEND_CID_F32_host_input
+// bend-ids end
 function f32_host_export() {
   const fs = require("node:fs");
   const path = require("node:path");
@@ -38,5 +42,5 @@ function f32_host_input() {
   return 16777217;
 }
 
-io_eff(CID(F32.host_export), f32_host_export);
-io_eff(CID(F32.host_input), f32_host_input);
+io_eff(BEND_CID_F32_host_export, f32_host_export);
+io_eff(BEND_CID_F32_host_input, f32_host_input);

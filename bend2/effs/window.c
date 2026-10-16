@@ -1,6 +1,7 @@
 // bend-ids 1
 // CID :Window.open BEND_CID_Window_open
 // CID #Key BEND_CID_Key
+// CID #Text BEND_CID_Text
 // CID #Mouse BEND_CID_Mouse
 // CID #Look BEND_CID_Look
 // CID #Move BEND_CID_Move
@@ -90,7 +91,7 @@ static inline bool window_chunk(const char* s, u64 n, u64* at, u32 ev[5]) {
     }
     *at += l;
   }
-  ev[0] = CID(Text);
+  ev[0] = BEND_CID_Text;
   memcpy(ev + 1, b, sizeof b);
   return k > 0;
 }
@@ -534,9 +535,9 @@ static void __attribute__((constructor)) window_open_use(void) {
 #if defined(__OBJC__) || defined(__linux__)
 
 static Term window_node(Env e, const u32* ev) {
-  if (ev[0] == CID(Text)) {
+  if (ev[0] == BEND_CID_Text) {
     const char* s = (const char*)(ev + 1);
-    return io_box(e, CID(Text), io_str(e, s, strnlen(s, 16)));
+    return io_box(e, BEND_CID_Text, io_str(e, s, strnlen(s, 16)));
   }
   u32 n = cid_arity(ev[0]);
   if (n == 0) {
@@ -820,8 +821,21 @@ static void window_pump(BendWin* win) {
     XKeyEvent key  = ev.xkey;
     bool      took = XFilterEvent(&ev, None);
     if (ev.type == KeyPress || ev.type == KeyRelease) {
-      window_push(win, BEND_CID_Key, window_key(&ev.xkey), ev.type == KeyPress,
-        0, 0);
+      // Each key is a Key, even one the input method took (the event as
+      // it came: Xlib's own method rewrites it). A method may hand a key
+      // back at its time, the same Key, or bring text on key code 0.
+      u32 code = key.keycode << 1 | (ev.type == KeyPress);
+      if (key.keycode != 0
+        && (took || key.time != win->kt || code != win->kc)) {
+        window_push(win, BEND_CID_Key, window_key(&key), ev.type == KeyPress, 0,
+          0);
+      }
+      if (took) {
+        win->kt = key.time;
+        win->kc = code;
+      } else if (ev.type == KeyPress) {
+        window_text(win, &ev.xkey);
+      }
     } else if (ev.type == ButtonPress || ev.type == ButtonRelease) {
       // the wheel: 4 up, 5 down, 6 left, 7 right
       u32 b  = ev.xbutton.button;
