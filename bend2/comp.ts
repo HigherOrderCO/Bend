@@ -242,7 +242,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   },
   ...tpl_ops("bool_", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
   string_append: { JS: "($0 + $1)" },
-  string_length: { JS: "[...str_out($0)].length" },
+  string_length: { JS: "str_len($0)" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -306,7 +306,7 @@ const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
       intr: ([h, t]) => STRLIT.test(h) && STRLIT.test(t)
         ? JSON.stringify(JSON.parse(h) + JSON.parse(t))
         : `(${h} + ${t})`,
-      elim: ["$0.slice(0, char_len($0))", "$0.slice(char_len($0))"],
+      elim: ["$0.slice(0, char_len($0, 0))", "$0.slice(char_len($0, 0))"],
       cond: "$0 !== \"\"",
     },
   },
@@ -517,8 +517,18 @@ const f32_round = ${Bend.f32_round};
 
 const char_new = ${char_new};
 
-function char_len(s) {
-  return s[0] === "\uDC00" ? 4 : s.codePointAt(0) > 0xFFFF ? 2 : 1;
+function char_len(s, i) {
+  return s.charCodeAt(i) === 0xDC00 ? 4 : s.codePointAt(i) > 0xFFFF ? 2 : 1;
+}
+
+// Walk internal Char spans without an array or text-edge replacement;
+// a non-scalar U32 still counts as one Char.
+function str_len(s) {
+  let n = 0;
+  for (let i = 0; i < s.length; i += char_len(s, i)) {
+    n += 1;
+  }
+  return n;
 }
 
 function char_code(s) {
