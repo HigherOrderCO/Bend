@@ -84,7 +84,7 @@ type File = {
   lay_ids: Map<Lay, number>;
   depths: Map<HTerm, number>;
   views: Map<string, { of: Name; root: string }>;
-  locals: Set<string>;
+  locals: Map<string, Name>;
   memo: {
     opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
     uses: Map<HTerm, Bend.PMap<number>>;
@@ -612,7 +612,7 @@ function name_local(sc: Scope, k: Name): string {
   const n = sc.fresh.get(base) ?? 0;
   sc.fresh.set(base, n + 1);
   const name = `_${base}_${n}`;
-  FL.locals.add(name);
+  FL.locals.set(name, k);
   return name;
 }
 
@@ -1556,7 +1556,7 @@ function file_new(book: Bend.Book, js: boolean): File {
     lay_ids: new Map(),
     depths: new Map(),
     views: new Map(),
-    locals: new Set(),
+    locals: new Map(),
     memo: {
       opens: new Map(),
       uses: new Map(),
@@ -1774,13 +1774,13 @@ function seg_clo(sc: Scope, fid: string, words: string[]): string {
 }
 
 function seg_name(sc: Scope, stem: string): string {
-  return sc.seg.def.split("$")[0] + "$" + stem + FL.segs.length;
+  return sc.def + "$" + stem + FL.segs.length;
 }
 
 function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
   live: [Of<"Var">, Bind][], res: Val, rest: HTerm[]): Scope {
   const vals = live.map(([, b]) => val_new(b.val.ws.map((w) => {
-    const nw = name_local(sc, w.replace(/_\d+$/, ""));
+    const nw = name_local(sc, FL.locals.get(w) ?? w);
     if (sc.brwl.has(w)) {
       sc.brwl.set(nw, sc.brwl.get(w)!);
     }
