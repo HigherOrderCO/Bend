@@ -342,16 +342,16 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
 // which a file without `import Base` may declare but not compile.
 
 const OPTIMIZED: Record<Name, Native> = Object.setPrototypeOf({
-  Nat: { Zero: { intr: "0" }, Succ: { intr: tpl_nat("", "nat_chk($0 + 1)") } },
+  Nat: { Zero: { intr: "0" }, Succ: { intr: ([p]) => nat_succ(p, false) } },
   Bool: {
     False: { intr: "false", cond: "!$0" },
     True: { intr: "true", cond: "$0" },
   },
-  U32: { U32: { intr: ([w]) => view_of(w) ?? `word_to_u32(${w})` } },
+  U32: { U32: { intr: ([w]) => word_u32(w) } },
   F32: {
     F32: {
       intr: ([w]) => w.match(VIEW)?.groups?.bits
-        ?? `f32_from_bits(${tpl(OPTIMIZED.U32.U32.intr, [w])})`,
+        ?? `f32_from_bits(${word_u32(w)})`,
     },
   },
   Char: {
@@ -678,12 +678,18 @@ function view_of(e: string): string | undefined {
   return v?.word ?? v?.code;
 }
 
-// A Succ: a literal's successor (with its suffix), one more on a checked
-// sum, else the checked increment f.
-function tpl_nat(suffix: string, f: string): Tpl {
-  return ([p]) => /^\d/.test(p) ? BigInt(parseInt(p)) + 1n + suffix
+// The U32 a JS word holds: a view's name, else the word read back.
+function word_u32(w: string): string {
+  return view_of(w) ?? `word_to_u32(${w})`;
+}
+
+// The Succ of p, on the C lane or the JS one: a literal's successor, one
+// more on a checked sum, else a checked increment.
+function nat_succ(p: string, c: boolean): string {
+  return /^\d/.test(p) ? BigInt(parseInt(p)) + 1n + (c ? "ull" : "")
     : /^nat_chk\(.* \+ \d+\)$/.test(p)
-    ? p.replace(/\d+(?=\)$)/, (k) => String(+k + 1)) : tpl(f, [p]);
+    ? p.replace(/\d+(?=\)$)/, (k) => String(+k + 1))
+    : `nat_chk(${c ? "e, " : ""}${p} + 1)`;
 }
 
 // Probe
@@ -1688,10 +1694,12 @@ function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
   }
 }
 
+// A constructor with erased fields reads its field types over its own
+// binders, not its def's: local.
 function facts_ctr(sc: Scope, c: Bend.Ctr, xs: HTerm[]): void {
   const ds = ctr_tail(c, xs);
-  const own = !ds.every(dom_live);
-  ds.filter(dom_live).forEach(([, , A]) => facts_hot(sc, A, true, own));
+  const local = !ds.every(dom_live);
+  ds.filter(dom_live).forEach(([, , A]) => facts_hot(sc, A, true, local));
 }
 
 function file_push(sc: Scope, line: string): void {
@@ -2133,8 +2141,8 @@ function show_main(): (number | Name)[] | null {
     if (adt?.k === "Char") {
       show.push(Number(box));
     } else if (adt?.k === "Array") {
-      const el = lay_el(adt!.x[0]);
-      refs.push([show.length, adt!.x[0], el]);
+      const el = lay_el(adt.x[0]);
+      refs.push([show.length, adt.x[0], el]);
       show.push(0, lay_arr(el).lgs);
     } else if (kind === 7 && tld?.$ === "ADT") {
       show.push(Number(box), tld.c.length);
@@ -2523,8 +2531,8 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     if (vs.length === 0) {
       return val_new(["0"], word, true);
     }
-    const w = adt.k === "Nat" ? tpl(tpl_nat("ull", "nat_chk(e, $0 + 1)"),
-      [vs[0].ws[0]]) : `term_word(e, ${vs[0].ws[0]})`;
+    const w = adt.k === "Nat" ? nat_succ(vs[0].ws[0], true)
+      : `term_word(e, ${vs[0].ws[0]})`;
     return val_new([w], word, /^\d/.test(w));
   }
   if (FL.hot.ctrs.has(x.k)) {
@@ -2683,8 +2691,10 @@ function emit_expr(sc: Scope, tm: HTerm, ty0: HTerm | null,
     case "Lam":
     case "Mat":
     case "Efq": {
-      return fun_live(x, ty) ? emit_clo(sc, x, ty)
-        : emit_expr(sc, (x as Of<"Lam">).f(DUMMY), ty_all(ty).B(DUMMY), at);
+      // a match is always live: an erased lambda is its body
+      return x.$ === "Lam" && !fun_live(x, ty)
+        ? emit_expr(sc, x.f(DUMMY), ty_all(ty).B(DUMMY), at)
+        : emit_clo(sc, x, ty);
     }
     default: {
       return emit_zero(ty);
@@ -3189,16 +3199,13 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail = false): string {
     die("a live call into the law " + Bend.name_key(k));
   }
   const f = name_id("$", k);
-  if (!def_foreign(tld)) {
-    const call = `${f}(${exprs.join(", ")})`;
-    return tail ? call : `\x01${k}\x02(${call})`;
-  }
   // short of its continuation, a foreign call is an IO action that awaits it
-  if (exprs.length === fun_of(k).lays.length - 1) {
+  if (def_foreign(tld) && exprs.length === fun_of(k).lays.length - 1) {
     const v = name_local(sc, "x");
     return `(${v}) => ${f}(${[...exprs, v].join(", ")})`;
   }
-  return `${f}(${exprs.join(", ")})`;
+  const call = `${f}(${exprs.join(", ")})`;
+  return def_foreign(tld) || tail ? call : `\x01${k}\x02(${call})`;
 }
 
 function js_open(sc: Scope, x: Of<"Let">): HTerm {
@@ -3372,13 +3379,13 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
     js_func(sc, h, null, [...fs, ...args.slice(1)])]));
 }
 
-function js_def(sc: Scope, k: Name, def: Bend.Def): void {
+function js_def(k: Name, def: Bend.Def): void {
   if (intr_of(k, true) !== undefined) {
     return;
   }
-  const seg = { ...seg_new("", BOX, []), def: k };
-  FL.segs.push(seg);
-  sc = { ...sc, seg, fresh: new Map(), def: k, fuel: { n: FOLD_FUEL } };
+  const sc = { ...scope_new(), def: k };
+  sc.seg.def = k;
+  FL.segs.push(sc.seg);
   const { live, h } = fun_of(k);
   const loop = loop_of(k);
   const params = loop.length > 0 ? [...Array(Math.max(...loop.map((d) =>
@@ -3438,7 +3445,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
   file_book(outs ?? ["main"]);
   for (const [k, def] of done_defs(fun_runs)) {
     memo_gc();
-    js_def(scope_new(), k, def);
+    js_def(k, def);
   }
   const effs = effect_srcs(".js", "a foreign def without a .js import: ")
     .map((t) => `(() => {\n${t}\n})();\n\n`).join("");
