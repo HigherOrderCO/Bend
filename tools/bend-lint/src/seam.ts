@@ -9,7 +9,7 @@ import * as os from "node:os";
 import * as nodePath from "node:path";
 import * as url from "node:url";
 
-import type { Book, Ctx, Err, HTerm, LTerm, QualifiedName, FileId, Quant, Uses } from "bend2/bend.ts";
+import type { Book, Ctx, Err, HTerm, LTerm, QName, FileId, Quant, Uses } from "bend2/bend.ts";
 import type { Span as BendSpan } from "bend2/bend.ts";
 import type * as BendModule from "bend2/bend.ts";
 import type * as CompModule from "bend2/comp.ts";
@@ -48,7 +48,7 @@ export type FindOptions = {
 };
 
 // comp.ts as the patch exports it.
-type Comp = typeof CompModule & { RUNTIME_MAIN: string; name_global(k: QualifiedName): string };
+type Comp = typeof CompModule & { RUNTIME_MAIN: string; name_global(k: QName): string };
 
 // What bend-lint uses of main.ts, as the patch exports it: book_read throws
 // a Check_Fail holding why the check failed.
@@ -71,16 +71,9 @@ type Mapper = (s: BendSpan | undefined) => BendSpan | undefined;
 // variables in `us`, in book `bok` (a template body has its own). `inst`
 // marks an instance's fact.
 export type Raw = {
-  tm: LTerm;
-  ty: HTerm;
-  bok: Book;
-  ctx: Ctx;
-  dep: number;
-  def: QualifiedName;
-  qt: Quant;
-  us: Uses;
-  inst: boolean;
-  spn?: BendSpan;
+  tm: LTerm; ty: HTerm; bok: Book;
+  ctx: Ctx; dep: number; def: QName;
+  qt: Quant; us: Uses; inst: boolean; spn?: BendSpan;
 };
 
 // What the wrappers report for each checked term.
@@ -99,7 +92,7 @@ export type Checked = {
   book: Book;
   sources: Source[];
   map: Mapper;
-  declarations: QualifiedName[];
+  declarations: QName[];
   facts?: Fact[];
   failure?: Diag;
 };
@@ -168,7 +161,7 @@ export const PATCHED = Object.keys(PATCHES);
 // Where the wrappers report, set for one check at a time.
 export const hook: {
   see?: (report: Report) => void;
-  parsed?: (file: BendModule.File, names: QualifiedName[]) => void;
+  parsed?: (file: BendModule.File, names: QName[]) => void;
 } = {};
 
 // Text an editor holds unsaved, by real path, set for one check at a time.
@@ -220,7 +213,6 @@ const CHILDREN: { [K in LTerm["$"]]: (tm: Extract<LTerm, { $: K }>) => LTerm[] }
   Efq: () => [],
   Rfl: () => [],
   Hol: () => [],
-  Op: () => [],
 };
 
 // Functions
@@ -618,9 +610,9 @@ const isErr = (e: unknown): e is Err =>
 
 // Display is a public lookup name only when it resolves back to this identity.
 // Generated and otherwise unaddressable globals retain their opaque keys.
-const sourceName = (m: Loaded, book: Book, k: QualifiedName): string => {
+const sourceName = (m: Loaded, book: Book, k: QName): string => {
   const scope = book.files.get(book.entry);
-  const text = m.Bend.name_display(book, k, scope);
+  const text  = m.Bend.name_display(book, k, scope);
   const found = scope && m.Bend.name_resolve(book, scope, text);
   return m.Bend.name_parent(k) === null && found?.k === k && !found.issue ? text : k;
 };
@@ -632,10 +624,10 @@ const kindOf = (m: Loaded, book: Book, t: LTerm): { kind: string; name: string }
 });
 
 // Whether a fact passes a filter, its scope aside.
-const matches = (m: Loaded, book: Book, f: FactFilter, kind: string, def: QualifiedName, name: string): boolean => {
+const matches = (m: Loaded, book: Book, f: FactFilter, kind: string, def: QName, name: string): boolean => {
   const all = (xs: string[] | undefined, x: string): boolean =>
     xs === undefined || xs.length === 0 || xs.includes(x);
-  let owner: QualifiedName | null = def;
+  let owner: QName | null = def;
   while (owner !== null && !all(f.defs, sourceName(m, book, owner))) owner = m.Bend.name_parent(owner);
   return owner !== null && all(f.kinds, kind) && all(f.names, name);
 };
@@ -671,14 +663,16 @@ const checked = async (
   const far = filters.filter((f) => f.scope === "program");
   const program = far.length > 0;
   const texts = new Map<string, string>();
-  let declarations: QualifiedName[] = [];
+  let declarations: QName[] = [];
   reads = texts;
+
   const seeded = real !== "" && /^(?:[\t\r ]*(?:(?:#|import )[^\n]*)?\n)*[\t ]*import Base\s/
     .test(fs.readFileSync(real, "utf8"));
   const key = fs.readFileSync(Bend.BASE_BEND, "utf8");
   if (seeded && BASE?.key !== key) {
     BASE = { key, book: Main.book_read(Bend.BASE_BEND) };
   }
+
   const see = (report: Report): void => {
     const near = report.spn?.file.path === real ? filters : far;
     const { kind, name } =
@@ -701,6 +695,7 @@ const checked = async (
     );
   reads = undefined;
   signal.throwIfAborted();
+
   const root = [...seen.keys()].find((real) => real !== Bend.BASE_BEND || !seeded);
   const sources = [...seen.keys()]
     .filter((real) => texts.has(real) || fs.existsSync(real))
@@ -715,6 +710,7 @@ const checked = async (
       return source;
     });
   const map = mapper(sources.map((s) => FILES.get(s)!));
+
   if ("book" in read) {
     const { book } = read;
     const insts = new Set(book.tmps.values());
@@ -735,6 +731,7 @@ const checked = async (
       facts: filters.length > 0 ? [...new Map(facts).values()] : undefined,
     };
   }
+
   const err = isErr(read.e) ? read.e : undefined;
   let span: Span | undefined;
   try {
@@ -830,6 +827,7 @@ const sameDeclarations = (m: Loaded, { book, sources, declarations }: Checked, t
     }
     return lines.join("\n");
   };
+
   const own = new Set(declarations);
   const seed = (): Book => {
     const fresh = Bend.book_nil();
@@ -846,6 +844,7 @@ const sameDeclarations = (m: Loaded, { book, sources, declarations }: Checked, t
     }
     return fresh;
   };
+
   const snapshot = (s: string) => {
     const parsed = seed();
     const held = hook.parsed;
@@ -866,6 +865,7 @@ const sameDeclarations = (m: Loaded, { book, sources, declarations }: Checked, t
       (k, v) => (k === "s" ? undefined : v),
     );
   };
+
   try {
     return snapshot(root.text) === snapshot(text);
   } catch {
@@ -881,11 +881,10 @@ export const operations = (m: Loaded, run: Checked): Operations => {
     view: (fact): View => {
       const r = raw(fact);
       return {
-        owner: sourceName(m, r.bok, r.def),
-        inst: r.inst,
+        owner: sourceName(m, r.bok, r.def), inst: r.inst,
         ...kindOf(m, r.bok, Bend.term_strip(r.tm)),
         quantity: QUANTITY[r.qt.$],
-        span: toSpan(r.spn),
+        span:  toSpan(r.spn),
         inner: toSpan(run.map(Bend.term_strip(r.tm).s)),
       };
     },
@@ -910,7 +909,8 @@ export const operations = (m: Loaded, run: Checked): Operations => {
     body: (name) => {
       const scope = run.book.files.get(run.book.entry)!;
       if (!Object.hasOwn(run.book.tlds, name) && !Bend.SOURCE_NAME.test(name)) return undefined;
-      const found = Object.hasOwn(run.book.tlds, name) ? { k: name, issue: undefined } : Bend.name_resolve(run.book, scope, name);
+      const found = Object.hasOwn(run.book.tlds, name)
+        ? { k: name, issue: undefined } : Bend.name_resolve(run.book, scope, name);
       if (found.issue !== undefined) return undefined;
       const tld = run.book.tlds[found.k];
       return tld?.$ === "Def" && tld.e !== undefined ? node(tld.e) : undefined;
@@ -961,7 +961,9 @@ export const compile = (m: Loaded, { book }: Checked, file: string): Compiled =>
       : undefined;
   };
   const shown = value("id");
-  const id = shown === undefined ? undefined : Bend.term_show(shown, -1, [], book.files.get(book.entry), book).match(/^"([^"\\]*)"$/)?.[1];
+  const id = shown === undefined ? undefined
+    : Bend.term_show(shown, -1, [], book.files.get(book.entry), book).match(/^"([^"\\]*)"$/)?.[1];
+
   const lintPath = fs.realpathSync(path.join(HERE, "bend", "lint.bend"));
   const api = [...book.files.values()].find((f) => f.path === lintPath);
   const args = (t: LTerm | undefined, ctr: string): LTerm[] | undefined => {
@@ -977,6 +979,7 @@ export const compile = (m: Loaded, { book }: Checked, file: string): Compiled =>
         ? [head.v, ...rest]
         : undefined;
   };
+
   const asked = value("facts");
   const [scope, kinds, defs, names] = args(asked, "Want") ?? [];
   const want =
@@ -990,6 +993,7 @@ export const compile = (m: Loaded, { book }: Checked, file: string): Compiled =>
           defs: texts(defs),
           names: texts(names),
         };
+
   if (
     id === undefined ||
     Comp.io_type(book) === null ||
@@ -999,6 +1003,7 @@ export const compile = (m: Loaded, { book }: Checked, file: string): Compiled =>
       file + " must define id() -> String, facts() -> Lint.Want and main() -> IO(Unit)",
     );
   }
+
   const main = new Function(
     "require",
     `${Comp.js_lib(book)}\n${Comp.RUNTIME_MAIN}\nreturn (args) => { cli_args = args; return io_run(${Comp.name_global(Bend.name_source(book.entry, "main"))}); };`,
@@ -1034,7 +1039,8 @@ const selfCheck = async (m: Loaded): Promise<void> => {
   demand(
     [
       ["check", run.failure === undefined],
-      ["declarations (parse_book)", run.declarations.join(",") === ["N", "id", "main"].map(k => m.Bend.name_source(run.book.entry, k)).join(",")],
+      ["declarations (parse_book)",
+        run.declarations.join(",") === ["N", "id", "main"].map(k => m.Bend.name_source(run.book.entry, k)).join(",")],
       ["Ref id (term_infer)", views.some((v) => v.kind === "Ref" && v.name === "id")],
       ["Lam (term_check)", views.some((v) => v.kind === "Lam")],
       ["type", x !== undefined && ops.show(x.fact, ops.type(x.fact)) === "N"],

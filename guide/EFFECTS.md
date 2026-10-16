@@ -15,9 +15,9 @@ def Clock.now() -> IO(U32):
 ```
 
 Each file declares the Bend identities it uses in a header, then registers
-the effect with `io_eff(BEND_CLOCK, ..)`. The `.c` file serves `bend x.bend -o x`; the `.js` file
-serves `bend x.bend -o x.js` and `bend x.bend`. Every effect in Base is
-built this way: `bend2/effs/*.c` and `*.js` are the reference.
+the effect with `io_eff(BEND_CLOCK, ..)`. The `.c` file serves `bend x.bend -o x`;
+the `.js` file serves `bend x.bend -o x.js` and `bend x.bend`. Every effect in
+Base is built this way: `bend2/effs/*.c` and `*.js` are the reference.
 
 ## The C side
 
@@ -50,11 +50,11 @@ header identically in each importing scope. Unused definitions do not add scopes
 
 Host aliases start with `BEND_`, followed by letters or digits, with optional
 single underscores between nonempty groups. They must be distinct within the
-header. The compiler leaves the decoded body text untouched: `CID(...)` in the body is
-ordinary C or JS, not a compiler macro. A declared constructor the program
-does not use has no emitted C id; `#ifdef BEND_K` tests for it. C aliases are
-undefined again after the file. Host code must reserve generated identifiers
-starting with `b0` or `CID_b0`, and the runtime's own names.
+header. The compiler leaves the decoded body text untouched: `CID(...)` in
+the body is ordinary C or JS, not a compiler macro. A declared constructor
+the program does not use has no emitted C id; `#ifdef BEND_K` tests for it.
+C aliases are undefined again after the file. Host code must reserve generated
+identifiers starting with `b0` or `CID_b0`, and the runtime's own names.
 
 `f` holds the def's arguments in order: a `U32` is the word
 (`(u32)f[0]`), a `String` is taken with `io_cstr(e, f[0], &len)` (a
@@ -65,8 +65,8 @@ parks itself, as below.
 The effect returns a Term: a `U32` is `(Term)n`, `Unit` is
 `term_pak(BEND_UNIT, 0)` after declaring `CID #Unit BEND_UNIT`, a `String`
 is `io_str(e, p, n)`, a two-field constructor is `io_node(e, BEND_K, a, b)`.
-A `Result` is `io_done(e, v)`
-or `io_fail(e, code, text)` (`text` NULL prints `strerror(code)`).
+A `Result` is `io_done(e, v)` or `io_fail(e, code, text)` (`text` NULL prints
+`strerror(code)`).
 `io_sys_end(w, n)` stores `errno` in `w->code` when a call fails.
 
 Descriptor and window handles pack one word with `io_hand(v)`. Their
@@ -118,16 +118,14 @@ allocate it in the run function and free it in `pack`. In `bend2/effs/`,
 
 The `.js` file is a plain script, run once in a closure of its own, that
 registers the effect: `io_eff(BEND_CLOCK, clock_now)`, with the same header
-as the C example. The effect
-takes the def's arguments as JS values: a `U32` is a number, a `Nat` a
-number, a `String` a string, a constructor
+as the C example. The effect takes the def's arguments as JS values: a `U32`
+is a number, a `Nat` a number, a `String` a string, a constructor
 `{$: BEND_K, field: value}`, a handle its host value (a descriptor).
 CID aliases contain the full canonical constructor or effect tag; JS FID
 aliases also contain identities, not callable functions. Constructor fields
 keep their source spelling; a leading `$` gains another `$` to leave `$`
 for the tag. Use computed properties for fields such as `__proto__`.
-It returns
-the answer the same way: `io_done(v)`, `io_fail(code)`,
+It returns the answer the same way: `io_done(v)`, `io_fail(code)`,
 `io_tup(handle, result)`, `{$: BEND_UNIT}`. A `Nat` answer that is not a
 whole number from 0 to 2^53 stops the run; a `Nat` inside an answer goes
 unchecked, so the host keeps it in that range.

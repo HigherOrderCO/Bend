@@ -59,15 +59,13 @@ export type Quantity = "erased" | "once" | "many";
 // name a Var or Ref points to, the def whose body holds it, and how many
 // times it is demanded. A template body is checked as written, then again
 // for each instance at the same spans; `inst` marks the facts of an instance.
-// Generated owner names are opaque keys, usable with body and defs filters. `inner` is the term's span without its annotations.
+// Generated owner names are opaque keys, usable with body and defs filters.
+// `inner` is the term's span without its annotations.
 export type View = {
-  owner: string;
-  inst: boolean;
-  kind: string;
-  name: string;
+  owner: string; inst: boolean;
+  kind: string; name: string;
   quantity: Quantity;
-  span?: Span;
-  inner?: Span;
+  span?: Span; inner?: Span;
 };
 
 export type Diag = {

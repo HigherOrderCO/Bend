@@ -743,32 +743,32 @@ async function cli_login(): Promise<string> {
 // pkg_files is the package the loader read for this file, the entry first:
 // every local .bend and foreign .c or .js file, relative to the entry's
 // directory (the entry at its name); Base and stored packages stay out.
-// A path that climbs above the entry's directory
-// takes the entry's ancestor directories along, as many as the deepest climb.
+// A path that climbs above the entry's directory takes the entry's ancestor
+// directories along, as many as the deepest climb.
 // A LICENSE beside a published file goes along; a license/ directory, in
 // any case, is refused (it clashes with LICENSE on a case-blind disk).
 // Imports must still select the same files without rewriting the source.
 // A leading byte order mark is dropped: the hub stores the text as sent,
 // and an importer's fetch drops the mark, so a file sent with one would
 // never match its hash.
-function pkg_files(file: string, book: Bend.Book,
-  seen: Map<string, Bend.FileId | null>): Record<string, string> {
+function pkg_files(file: string, book: Bend.Book, seen: Map<string, Bend.FileId | null>): Record<string, string> {
   const entry = fs.realpathSync(file);
   const dir = path.dirname(entry) + "/";
-  const raws = [...[...seen].flatMap(([real, ns]): [string, string][] =>
-    real === BASE || ns === null || ns.startsWith("0x") ? []
-      : [[real === entry ? path.basename(file) : path.posix.relative(dir, real), real]]),
-  ...Object.values(book.tlds).flatMap((tld): [string, string][] =>
-    tld.$ !== "Def" || tld.i === undefined || tld.b === true
-      || tld.i.file.ns.startsWith("0x") ? [] : tld.i.paths.map((f) => {
-        const real = fs.realpathSync(f);
-        return [path.posix.relative(dir, real), real];
-      }))];
-  const ups = raws.map(([p]) => path.posix.normalize(p).split("/")
-    .filter((s) => s === "..").length);
-  const anc = path.dirname(entry).split("/")
-    .slice(-Math.max(0, ...ups) || Infinity);
+  const raws = [
+    ...[...seen].flatMap(([real, ns]): [string, string][] =>
+      real === BASE || ns === null || ns.startsWith("0x") ? []
+        : [[real === entry ? path.basename(file) : path.posix.relative(dir, real), real]]),
+    ...Object.values(book.tlds).flatMap((tld): [string, string][] =>
+      tld.$ !== "Def" || tld.i === undefined || tld.b === true
+        || tld.i.file.ns.startsWith("0x") ? [] : tld.i.paths.map((f) => {
+          const real = fs.realpathSync(f);
+          return [path.posix.relative(dir, real), real];
+        }))
+  ];
+  const ups = raws.map(([p]) => path.posix.normalize(p).split("/").filter((s) => s === "..").length);
+  const anc = path.dirname(entry).split("/").slice(-Math.max(0, ...ups) || Infinity);
   const names = new Map(raws.map(([raw, real]) => [real, path.posix.join(...anc, raw)]));
+
   const owners = new Map<string, string>();
   const files: Record<string, string> = {};
   const disk_key = (p: string): string => p.toLowerCase().normalize("NFC");
@@ -802,6 +802,7 @@ function pkg_files(file: string, book: Bend.Book,
       add(path.posix.join(path.posix.dirname(p), "LICENSE"), path.join(path.dirname(real), "LICENSE"));
     }
   }
+
   const dirs = new Set(["."]);
   for (const p of Object.keys(files)) {
     for (let dir = path.posix.dirname(p); dir !== "."; dir = path.posix.dirname(dir)) {
@@ -811,6 +812,7 @@ function pkg_files(file: string, book: Bend.Book,
       dirs.add(dir);
     }
   }
+
   const check = (from: string, target: string, use: string): void => {
     const p = path.posix.join(path.posix.dirname(names.get(from)!), use);
     if (path.posix.isAbsolute(use) || names.get(target) !== p) {
@@ -832,6 +834,7 @@ function pkg_files(file: string, book: Bend.Book,
       check(from, book.files.get(scope.al[alias])?.path ?? "", use);
     }
   }
+
   for (const tld of Object.values(book.tlds)) {
     if (tld.$ !== "Def" || !tld.i) continue;
     const from = tld.i.file.path;
@@ -849,6 +852,7 @@ function pkg_files(file: string, book: Bend.Book,
       }
     }
   }
+
   for (const [real, p] of names) if (path.posix.basename(p) === "PROOF.bend") {
     const from = real === entry ? file : real;
     const laws = path.join(path.dirname(from), "LAWS.bend");
@@ -918,10 +922,10 @@ function cli_verdict(book: Bend.Book, kernel: boolean): number {
 // its type, never its code. If the book holds a promise, a walk from the
 // defs outside Base collects who names whom, then each promise floods
 // back along those edges.
-function book_promises(book: Bend.Book): Array<[string, Bend.QualifiedName[]]> {
+function book_promises(book: Bend.Book): Array<[string, Bend.QName[]]> {
   const own  = [...new Set(book.order)].filter((k) => book.tlds[k].b !== true);
   const keys = Object.keys(book.tlds);
-  const roots: Array<[string, Bend.QualifiedName[]]> = [
+  const roots: Array<[string, Bend.QName[]]> = [
     ["@unsafe", keys.filter((k) => (book.tlds[k] as Bend.Def).u === true)],
     ["foreign effects", keys.filter((k) => {
       const t = book.tlds[k] as Bend.Def;
@@ -931,12 +935,13 @@ function book_promises(book: Bend.Book): Array<[string, Bend.QualifiedName[]]> {
   if (roots.every(([, ks]) => ks.length === 0)) {
     return [];
   }
-  const uses: Record<Bend.QualifiedName, Bend.QualifiedName[]> = Object.create(null);
+
+  const uses: Record<Bend.QName, Bend.QName[]> = Object.create(null);
   const reach = new Set(own);
   for (const k of reach) {
     const t = book.tlds[k];
     if (t !== undefined) {
-      const rs = new Set<Bend.QualifiedName>();
+      const rs = new Set<Bend.QName>();
       for (const c of t.$ === "ADT" ? [t, ...t.c] : [t]) {
         term_refs(Bend.term_lower(c.T), rs);
       }
@@ -949,6 +954,7 @@ function book_promises(book: Bend.Book): Array<[string, Bend.QualifiedName[]]> {
       }
     }
   }
+
   return roots.flatMap(([on, ks]) => {
     const bad = new Set(ks);
     for (const k of bad) {
@@ -960,7 +966,7 @@ function book_promises(book: Bend.Book): Array<[string, Bend.QualifiedName[]]> {
 }
 
 // term_refs adds to out the names a term (a span skipped) refers to.
-function term_refs(t: Bend.LTerm, out: Set<Bend.QualifiedName>): void {
+function term_refs(t: Bend.LTerm, out: Set<Bend.QName>): void {
   const seen = new Set([t]);
   for (const todo = [t]; todo.length > 0;) {
     const x = todo.pop() as Bend.LTerm;
@@ -1025,9 +1031,9 @@ function book_seed(base: Bend.Book): Bend.Book {
   const book = Bend.book_nil();
   for (const [k, t] of Object.entries(base.tlds)) book.tlds[k] = { ...t };
   Object.assign(book.ctrs, base.ctrs);
-  book.base = base.base;
+  book.base  = base.base;
   book.files = new Map(base.files);
-  book.tmps = new Map(base.tmps);
+  book.tmps  = new Map(base.tmps);
   book.order.push(...base.order);
   return book;
 }
