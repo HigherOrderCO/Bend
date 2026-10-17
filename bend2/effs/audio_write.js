@@ -6,12 +6,14 @@ function audio_write(audio, samples) {
   for (let xs = samples; xs.$ === CID(Con); xs = xs.tail) {
     n += 1;
   }
+  // Complete stereo frames only; oversized writes are dropped whole.
+  const frames = n > 8192 ? 0 : Math.floor(n / 2);
   const now = performance.now();
   audio.queued = Math.max(0,
     audio.queued - (now - audio.at) * audio.rate / 1000);
   audio.at = now;
-  if (audio.queued + n / 2 <= 4096) {
-    audio.queued += n / 2;
+  if (audio.queued + frames <= 4096) {
+    audio.queued += frames;
   }
   return io_tup(audio, Math.floor(audio.queued));
 }
