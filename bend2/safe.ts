@@ -505,21 +505,20 @@ function spec_val(e: Safe, s: Scope, x: HTerm): HTerm {
 
 // x's normal form, when it is closed; null when it depends on a run-time value
 function closed_val(e: Safe, s: Scope, x: HTerm): HTerm | null {
-  // bend2's annotations name a variable by its level
-  const v = B.term_snf(e.book, subst(x, s.d, (o) => o.$ === "Var" && (o.i as number) >= 0 && (o.i as number) < s.d
-    ? s.c[o.i as number]?.v ?? B.Var(o.k as Name, o.i as number) : undefined));
+  const v = B.term_snf(e.book, subst(x, s.d, (o) => o.$ === "Var" ? s.c[o.i as number]?.v : undefined));
   return mentions(B.term_lower(v, s.d), (i) => i >= 0 && i < s.d) ? null : v;
 }
 
 // t at depth d, with each node f maps replaced, through its lowered form
-// (so no closure hides one)
-function subst(t: HTerm, d: number, f: (o: Record<string, unknown>) => HTerm | undefined): HTerm {
+// (so no closure hides one); a variable below d stays one
+function subst(t: HTerm, d: number, f?: (o: Record<string, unknown>) => HTerm | undefined): HTerm {
   const go = (u: unknown): unknown => {
     if (typeof u !== "object" || u === null) {
       return u;
     }
     const o = u as Record<string, unknown>;
-    const v = f(o);
+    const i = o.i as number;
+    const v = f?.(o) ?? (o.$ === "Var" && i >= 0 && i < d ? B.Var(o.k as Name, i) : undefined);
     return v !== undefined ? B.Var(o.k as Name, -1, undefined, v)
       : Array.isArray(u) ? u.map(go) : Object.fromEntries(Object.entries(o).map(([k, x]) => [k, k === "s" ? x : go(x)]));
   };
@@ -606,7 +605,7 @@ function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm
       const x: HTerm = B.Var(F.k, d);
       const t = model_at(e, F.B(x), d + 1, path, F.q.$ === "None" ? hs : [...hs, [x, F.A]], proj, probe);
       return t === null ? null : B.Ann(B.Lam(F.k, d, (v: HTerm) =>
-        subst(t, d + 1, (o) => o.$ !== "Var" || (o.i as number) > d ? undefined : o.i === d ? v : B.Var(o.k as Name, o.i as number))), F);
+        subst(t, d + 1, (o) => o.$ === "Var" && o.i === d ? v : undefined)), F);
     }
     case "ADT": {
       const key = model_key(F, d);
@@ -769,7 +768,7 @@ function tree(e: Safe, s: Scope, t: HTerm, fs: Chain[]): O {
   // equation bend2 closes by η must be a λ
   if (x.$ !== "Lam" && x.$ !== "Mat" && x.$ !== "Efq") {
     if (all !== null) {
-      return tree(e, s, eta(t, all), fs);
+      return tree(e, s, eta(t, all, s.d), fs);
     }
     return top === undefined ? term(e, s, t, true) : oos("a match arm with no known type");
   }
@@ -876,7 +875,7 @@ function swi(e: Safe, s: Scope, t: HTerm, T: HTerm | null, fs: Chain[], cv: numb
       const q = quant(all.q);
       const [lt, la] = [s.D, s.D + 1];
       const s2 = scope_hide(scope_hide(s));
-      const f = x.$ === "Lam" ? x : open(eta(t, all))[0] as Extract<HTerm, { $: "Lam" }>;
+      const f = x.$ === "Lam" ? x : open(eta(t, all, s.d))[0] as Extract<HTerm, { $: "Lam" }>;
       // the default's binder is the pair of the tag and the fields
       const pair: O = { $: "Tup", q: 1, a: { $: "Var", l: lt }, b: { $: "Var", l: la } };
       const s2e = no_ctr(e, all.A) ? { ...s2, empty: [...s2.empty,
@@ -950,8 +949,9 @@ function all_of(e: Safe, T: HTerm | null): Extract<HTerm, { $: "All" }> | null {
 }
 
 // λy => t(y), at t's type ∀y:A -> B
-function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>): HTerm {
-  return B.Ann(B.Lam(all.k, 0, (y: HTerm) => B.Ann(B.App(t, y), all.B(y))), all);
+function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>, d: number): HTerm {
+  const u = subst(t, d);
+  return B.Ann(B.Lam(all.k, 0, (y: HTerm) => B.Ann(B.App(u, y), all.B(y))), all);
 }
 
 // whether a lowered term mentions a variable at a level p holds for
@@ -1334,7 +1334,7 @@ function arg_term(e: Safe, s: Scope, x: HTerm, A: HTerm, live: boolean): O {
   const tree = y.$ === "Lam" || y.$ === "Mat" || y.$ === "Efq";
   const all = tree || y.$ === "Ctr" ? null : all_of(e, A);
   if (all !== null && (!(live && s.sub) || T !== null && !qsig_eq(e, T, A, s.d))) {
-    return term(e, s, eta(x, all), live);
+    return term(e, s, eta(x, all, s.d), live);
   }
   return term(e, s, T === null && (tree || y.$ === "Ctr") ? B.Ann(x, A) : x, live);
 }
