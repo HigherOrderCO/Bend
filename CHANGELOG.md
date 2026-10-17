@@ -3,6 +3,11 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
+## Unreleased
+
+- `F32.to_nat` keeps finite values above 2^32 that fit the Nat runtime range
+  instead of losing them through a U32 cast (#1636).
+
 ## 2.0.37 (2026-10-13)
 
 - **A Nat crosses to a JS host as a plain number** (PR #1506 by
