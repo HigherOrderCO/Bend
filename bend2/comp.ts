@@ -1513,6 +1513,7 @@ function file_new(book: Bend.Book, js: boolean) {
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
     locals: new Map<string, Name>(),
     facts: new Set<string>(),
+    heat: new Set<string>(),
     miss: new Map<string, Set<Unit>>(),
     when: new Map<string, (() => void)[]>(),
     stale: new Set<Unit>(),
@@ -1643,8 +1644,16 @@ function fact_when(kind: string, k: string, f: () => void): void {
   }
 }
 
+// Heating only adds facts, so a heat done before (def, force, local, type)
+// is skipped: else Tree(16), a Sigma of two Tree(15), heats 2^16 types.
 function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
   local = false): void {
+  const key = [sc.def, force, local, B && Bend.term_key(Bend.term_lower(B))]
+    .join(" ");
+  if (FL.heat.has(key)) {
+    return;
+  }
+  FL.heat.add(key);
   const w = ty_wnf(B);
   if (w?.$ === "Lam") {
     return facts_hot(sc, w.f(DUMMY), force, local);
