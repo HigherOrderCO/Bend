@@ -65,7 +65,6 @@ type Scope = {
   rest: HTerm[];
   def: Name;
   fuel: { n: number };
-  caps?: { d: number; vs: Set<Of<"Var">> };
 };
 
 // A node a match took apart, kept to rebuild in: its words, its local, and
@@ -848,6 +847,15 @@ function term_uses(tm: HTerm): Bend.PMap<number> {
   });
 }
 
+// The variables t uses that it does not bind.
+function term_free(t: HTerm): Of<"Var">[] {
+  const bound = new Set<number>();
+  term_each(t, (s) => s.$ === "Lam" || s.$ === "Let"
+    ? term_open(s).ps.forEach((p) => bound.add(p.i)) : undefined);
+  return Bend.pmap_to_array(term_uses(t)).flatMap(([i]) =>
+    bound.has(i) ? [] : [PROBES[i]]);
+}
+
 function rest_use(rest: HTerm[], p: Of<"Var">): number {
   return rest.reduce((n, r) => n + term_use(term_uses(r), p), 0);
 }
@@ -1504,7 +1512,6 @@ function file_new(book: Bend.Book, js: boolean) {
     ids: new Map<string, string>(),
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
     locals: new Map<string, Name>(),
-    depths: new Map<HTerm, number>(),
     facts: new Set<string>(),
     miss: new Map<string, Set<Unit>>(),
     when: new Map<string, (() => void)[]>(),
@@ -3236,15 +3243,10 @@ export function compile_book(book: Bend.Book): string {
 // every def is out as run_loop over the def, or as the def itself.
 // A def's function and its closures' are its unit's segments.
 
-// An erased argument: it prints as null and, at DUMMY's index, has no
-// closure depth, so no closure captures it.
+// An erased argument: it prints as null and, at DUMMY's index, is no use
+// term_uses counts, so no closure captures it.
 const JS_NULL: HTerm = Bend.Var("null", 0);
 
-function js_var(sc: Scope, k: string): HTerm {
-  const p = probe(k);
-  FL.depths.set(p, sc.caps?.d ?? 0);
-  return p;
-}
 
 function js_call(sc: Scope, k: Name, args: HTerm[], tail = false): string {
   if (tail) {
@@ -3283,7 +3285,7 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail = false): string {
 function js_open(sc: Scope, x: Of<"Let">): HTerm {
   const on = let_live(x);
   return x.f(x.v.map((v, j) => !on[j] ? v
-    : js_var(sc, emit_hold(sc, [js_expr(sc, v)], x.k[j])[0])));
+    : probe(emit_hold(sc, [js_expr(sc, v)], x.k[j])[0])));
 }
 
 // Constructor tags name the constructor within its declaring file, not
@@ -3318,19 +3320,11 @@ function js_key(n: Name): string {
   return (n === "__proto__" ? `["${n}"]` : `"${n}"`) + ": ";
 }
 
-// A closure captures a variable bound outside it.
-function js_capture(sc: Scope, p: Of<"Var">): void {
-  const c = sc.caps;
-  if (c && (FL.depths.get(p) ?? c.d) < c.d) {
-    c.vs.add(p);
-  }
-}
 
 function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
   const [x, ty] = ty_peel(tm, ty0);
   switch (x.$) {
     case "Var": {
-      js_capture(sc, PROBES[x.i]);
       return x.k;
     }
     case "Ref":
@@ -3385,15 +3379,12 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
         return js_expr(sc, x.f(JS_NULL), ty_all(ty).B(DUMMY));
       }
       const arg = name_local(sc, "x");
-      const vs = new Set<Of<"Var">>();
-      const cl = { ...sc, seg: seg_new("", BOX, []),
-        caps: { d: (sc.caps?.d ?? 0) + 1, vs } };
+      const cl = { ...sc, seg: seg_new("", BOX, []) };
       cl.seg.tab = 2;
       FL.unit!.segs.push(cl.seg);
       const name = name_id("$", FL.unit!.name + "$c" + FL.unit!.n++);
       js_func(cl, x, ty, [arg]);
-      const ps = [...new Set([...vs].map((p) => p.k))];
-      vs.forEach((p) => js_capture(sc, p));
+      const ps = [...new Set(term_free(x).map((p) => p.k))];
       cl.seg.lines = [`function ${name}(${ps}) {`, `  return (${arg}) => {`,
         ...cl.seg.lines, "  }", "}"];
       return `run_clo(${name}(${ps}))`;
@@ -3415,7 +3406,7 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
     const [e, ...rest] = all.q.$ !== "None" ? args : ["null", ...args];
     const k = e === "null" || FL.locals.has(e) ? e
       : name_local(sc, x.k);
-    const v = k === "null" ? JS_NULL : js_var(sc, k);
+    const v = k === "null" ? JS_NULL : probe(k);
     const b = x.f(v);
     if (k !== e && term_use(term_uses(b), v as Of<"Var">) > 0) {
       file_push(sc, `const ${k} = ${e};`);
@@ -3448,7 +3439,7 @@ function js_match(sc: Scope, x: HTerm, ty: HTerm | null, args: string[]): void {
     return file_push(sc, `throw "bend: ${ERRS.TAGS}";`);
   }
   const s = emit_alias(sc, args[0], "t");
-  const self = js_var(sc, s);
+  const self = probe(s);
   const { adt, ret, rows, cells } = mat_rows(sc, x, ty, self);
   const tab = emit_tab(sc, cells, ret, s);
   if (tab !== null) {
