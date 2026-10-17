@@ -2826,9 +2826,17 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
 
 // Hand-written C and JS name ids as CID(k) and FID(k): k in the source's
 // namespace, else as is. An effect source is read once, in one namespace.
+//
+// C splices a backslash-newline (line continuation) before a token is read,
+// so a continuation inside a comment keeps the next line in the comment; JS
+// does not (its // comment ends at the newline even after a backslash). So C
+// sources are spliced here first and JS sources are left alone.
 
-function c_ids(src: string, m = ""): string {
-  return src.replace(/\/\/(?:\\\n|.)*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
+function c_ids(src: string, m = "", c = false): string {
+  if (c) {
+    src = src.replace(/\\\r?\n/g, "");
+  }
+  return src.replace(/\/\/[^\n]*|\/\*[^]*?\*\/|"(?:\\[^]|[^"\\\n])*"|'(?:\\[^]|[^'\\\n])*'|`(?:\\[^]|[^`\\])*`|\b([CF]ID)\(([\w./~-]+)\)/g, (t, p, k) => {
     if (!p) {
       return t;
     }
@@ -2852,7 +2860,8 @@ function effect_srcs(ext: string, miss: string): string[] {
     }
     seen.set(path, m);
   }
-  return [...seen].map(([p, m]) => c_ids(fs.readFileSync(p, "utf8"), m));
+  return [...seen].map(([p, m]) =>
+    c_ids(fs.readFileSync(p, "utf8"), m, ext === ".c"));
 }
 
 // C
