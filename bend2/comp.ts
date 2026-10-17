@@ -2046,8 +2046,7 @@ function bind_pop(sc: Scope, x: HTerm): Val {
 function bind_uses(sc: Scope, p: Of<"Var">, v: Val, rest: HTerm[],
   A: HTerm): void {
   const n = rest_use(rest, p);
-  facts_hot(sc, A, false);
-  fact_when("open", "", () => facts_hot(sc, A, true));
+  facts_hot(sc, A, fact("open"));
   bind_set(sc, p, { val: v, n, A }, n);
 }
 
@@ -2375,7 +2374,7 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false,
   const k = ck.k!;
   const brw = brw_of(k);
   ck.all.forEach((a, q) =>
-    fact_when("arg", arg_key(k, q), () => facts_hot(sc, a, true)));
+    fact("arg", arg_key(k, q)) && facts_hot(sc, a, true));
   const xs = ck.xs.map(term_strip);
   const vars = xs.filter((x) => x.$ === "Var");
   const vs = ck.xs.map((a, i) => xs[i].$ === "Var" ? null
