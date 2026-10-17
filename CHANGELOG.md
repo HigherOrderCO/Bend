@@ -3,6 +3,11 @@
 Each release names what changed for a user. `bend update` installs the
 latest one; the GitHub release carries the same notes.
 
+## Unreleased
+
+- JS F32 bit casts reuse private scratch storage instead of allocating a
+  buffer and typed-array views for each conversion (#1638).
+
 ## 2.0.37 (2026-10-13)
 
 - **A Nat crosses to a JS host as a plain number** (PR #1506 by
