@@ -835,6 +835,7 @@ function term_use(u: Bend.PMap<number>, p: Of<"Var">): number {
   return Bend.pmap_get(u, p.i) ?? 0;
 }
 
+// The uses of each variable t does not bind (one it binds counts 0).
 function term_uses(tm: HTerm): Bend.PMap<number> {
   return memo(FL.uses, tm, () => {
     const t = term_force(tm);
@@ -842,18 +843,26 @@ function term_uses(tm: HTerm): Bend.PMap<number> {
       return t.i === DUMMY.i ? USE0 : Bend.pmap_set(USE0, t.i, 1);
     }
     const add = t.$ === "Mat" ? Math.max : (a: number, b: number) => a + b;
-    return term_kids(t).reduce((u, x) =>
+    const u = term_kids(t).reduce((u, x) =>
       Bend.pmap_union(u, term_uses(x), add), USE0);
+    return t.$ !== "Lam" && t.$ !== "Let" ? u
+      : term_open(t).ps.reduce((m, p) => pmap_del(m, p.i), u);
   });
 }
 
-// The variables t uses that it does not bind.
+function pmap_del(m: Bend.PMap<number>, k: number): Bend.PMap<number> {
+  if (m.$ === "Emp") {
+    return m;
+  }
+  const v = k === 0 ? null : m.v;
+  const l = k % 2 === 1 ? pmap_del(m.l, (k - 1) / 2) : m.l;
+  const r = k > 0 && k % 2 === 0 ? pmap_del(m.r, (k - 2) / 2) : m.r;
+  return v === null && l.$ === "Emp" && r.$ === "Emp" ? USE0
+    : Bend.Bin(v, l, r);
+}
+
 function term_free(t: HTerm): Of<"Var">[] {
-  const bound = new Set<number>();
-  term_each(t, (s) => s.$ === "Lam" || s.$ === "Let"
-    ? term_open(s).ps.forEach((p) => bound.add(p.i)) : undefined);
-  return Bend.pmap_to_array(term_uses(t)).flatMap(([i]) =>
-    bound.has(i) ? [] : [PROBES[i]]);
+  return Bend.pmap_to_array(term_uses(t)).map(([i]) => PROBES[i]);
 }
 
 function rest_use(rest: HTerm[], p: Of<"Var">): number {
@@ -1512,6 +1521,7 @@ function file_new(book: Bend.Book, js: boolean) {
     ids: new Map<string, string>(),
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
     locals: new Map<string, Name>(),
+    names: new Map<number, string>(),
     facts: new Set<string>(),
     heat: new Set<string>(),
     miss: new Map<string, Set<Unit>>(),
@@ -3313,9 +3323,10 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail = false): string {
 }
 
 function js_open(sc: Scope, x: Of<"Let">): HTerm {
-  const on = let_live(x);
-  return x.f(x.v.map((v, j) => !on[j] ? v
-    : probe(emit_hold(sc, [js_expr(sc, v)], x.k[j])[0])));
+  const o = term_open(x);
+  let_live(x).forEach((on, j) => FL.names.set(o.ps[j].i, !on ? "null"
+    : emit_hold(sc, [js_expr(sc, x.v[j])], x.k[j])[0]));
+  return o.b;
 }
 
 // Constructor tags name the constructor within its declaring file, not
@@ -3355,7 +3366,7 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
   const [x, ty] = ty_peel(tm, ty0);
   switch (x.$) {
     case "Var": {
-      return x.k;
+      return FL.names.get(x.i) ?? x.k;
     }
     case "Ref":
     case "App": {
@@ -3414,7 +3425,8 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
       FL.unit!.segs.push(cl.seg);
       const name = name_id("$", FL.unit!.name + "$c" + FL.unit!.n++);
       js_func(cl, x, ty, [arg]);
-      const ps = [...new Set(term_free(x).map((p) => p.k))];
+      const ps = [...new Set(term_free(x).map((p) =>
+        FL.names.get(p.i) ?? p.k))];
       cl.seg.lines = [`function ${name}(${ps}) {`, `  return (${arg}) => {`,
         ...cl.seg.lines, "  }", "}"];
       return `run_clo(${name}(${ps}))`;
@@ -3434,11 +3446,11 @@ function js_func(sc: Scope, tm: HTerm, ty0: HTerm | null,
   if (x.$ === "Lam") {
     const all = ty_all(ty);
     const [e, ...rest] = all.q.$ !== "None" ? args : ["null", ...args];
+    const { ps: [v], b } = term_open(x);
     const k = e === "null" || FL.locals.has(e) ? e
       : name_local(sc, x.k);
-    const v = k === "null" ? JS_NULL : probe(k);
-    const b = x.f(v);
-    if (k !== e && term_use(term_uses(b), v as Of<"Var">) > 0) {
+    FL.names.set(v.i, k);
+    if (k !== e && term_use(term_uses(b), v) > 0) {
       file_push(sc, `const ${k} = ${e};`);
     }
     return js_func(sc, b, all.B(v), rest);
