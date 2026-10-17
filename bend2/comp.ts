@@ -3079,14 +3079,8 @@ function effect_srcs(ext: string, miss: string): string[] {
 // host's twelfth slot, which keeps rax free for the tail call. WL_LOAD is a
 // ladder, as clang builds the phi cascade of a fallthrough switch in O(n^2).
 
-export function compile_book(book: Bend.Book): string {
-  FL = file_new(book, false);
-  // a pure main's descriptor names constructors of the types it prints,
-  // so their datatypes are roots too
-  const show = show_main();
-  const names = (show ?? []).filter((c) => typeof c === "string");
-  file_book(["main", ...RUNTIME_ADTS,
-    ...names.map((c) => Bend.book_fam(FL.book, c))]);
+// Every def's unit, emitted until no unit is stale.
+function c_units(): Unit[] {
   for (const [k, tld] of [...done_defs().reverse(),
     ...done_defs(def_foreign)]) {
     const emit = () => {
@@ -3127,32 +3121,12 @@ export function compile_book(book: Bend.Book): string {
       });
     }
   }
-  const all = us.flatMap((u) => u.segs);
-  const clos = us.flatMap((u) => [...u.clos]);
-  const edges = all.flatMap((s) => [...s.refs].map((r) => [s.fid, r]));
-  const reach = (from: string[]) => graph_close(new Set(from), edges);
-  const live = reach([seg_fid("main")]);
-  const wide = [...FL.bangs].some((k) => fun_of(k).live.some(([, , A]) =>
-    ty_holds(A, (t) => !ty_tag(t, "ADT Typ Qua Min Eql"))));
-  const dev = reach([...[...FL.bangs].map(seg_fid), ...wide ? clos : []]);
-  const segs = all.filter((s) => !s.native && live.has(s.fid));
-  // a spin is declared before its callers (spins call no cycle: flat_of)
-  const natives = new Map(all.flatMap((s) => s.native && live.has(s.fid)
-    ? [[s.fid, s]] : []));
-  const spins: Seg[] = [];
-  const visit = (s: Seg | undefined) => {
-    if (s !== undefined && natives.delete(s.fid)) {
-      s.refs.forEach((r) => visit(natives.get(r)));
-      spins.push(s);
-    }
-  };
-  [...natives.values()].forEach(visit);
-  const desc = show === null ? [] : ["#if !DEVICE",
-    `static const u32 SHOW_DESC[] = { ${show.map((c) =>
-      typeof c === "string" ? cid_mac(c) : c).join(", ")} };`,
-    `static const char* SHOW_NAMES[] = { ${names.map((n) =>
-      JSON.stringify(Bend.name_key(n))).join(", ")} };`,
-    "#endif"];
+  return us;
+}
+
+// The C file's ids, per-segment and per-constructor tables, bank macros
+// and folded tables.
+function c_header(segs: Seg[], clos: string[], pure: boolean): string {
   const arg = val_new([""], W64);
   const entries = [...segs, seg_new(IO_EMIT, BOX, [arg]),
     seg_new(CLO_APPLY, BOX, [arg, arg])];
@@ -3216,10 +3190,48 @@ export function compile_book(book: Bend.Book): string {
     .join(", ")}`, "",
   `#define WL_TABLE ${entries.map((s) => `WL_X(${s.fid})`).join(" ")
     } WL_X(FID_EXIT)`, `#define MAIN_FID ${seg_fid("main")}`,
-  `#define MAIN_PURE ${Number(show !== null)}`,
+  `#define MAIN_PURE ${Number(pure)}`,
   `#define BLK_SHR ${Number(fact("type", "Array"))}`);
-  const tabs = [defs.join("\n"), ...[...FL.tabs].map(([r, i]) =>
+  return [defs.join("\n"), ...[...FL.tabs].map(([r, i]) =>
     `CONSTV u64 TAB_${i}[] = { ${r} };`)].join("\n\n");
+}
+
+export function compile_book(book: Bend.Book): string {
+  FL = file_new(book, false);
+  // a pure main's descriptor names constructors of the types it prints,
+  // so their datatypes are roots too
+  const show = show_main();
+  const names = (show ?? []).filter((c) => typeof c === "string");
+  file_book(["main", ...RUNTIME_ADTS,
+    ...names.map((c) => Bend.book_fam(FL.book, c))]);
+  const us = c_units();
+  const all = us.flatMap((u) => u.segs);
+  const clos = us.flatMap((u) => [...u.clos]);
+  const edges = all.flatMap((s) => [...s.refs].map((r) => [s.fid, r]));
+  const reach = (from: string[]) => graph_close(new Set(from), edges);
+  const live = reach([seg_fid("main")]);
+  const wide = [...FL.bangs].some((k) => fun_of(k).live.some(([, , A]) =>
+    ty_holds(A, (t) => !ty_tag(t, "ADT Typ Qua Min Eql"))));
+  const dev = reach([...[...FL.bangs].map(seg_fid), ...wide ? clos : []]);
+  const segs = all.filter((s) => !s.native && live.has(s.fid));
+  // a spin is declared before its callers (spins call no cycle: flat_of)
+  const natives = new Map(all.flatMap((s) => s.native && live.has(s.fid)
+    ? [[s.fid, s]] : []));
+  const spins: Seg[] = [];
+  const visit = (s: Seg | undefined) => {
+    if (s !== undefined && natives.delete(s.fid)) {
+      s.refs.forEach((r) => visit(natives.get(r)));
+      spins.push(s);
+    }
+  };
+  [...natives.values()].forEach(visit);
+  const desc = show === null ? [] : ["#if !DEVICE",
+    `static const u32 SHOW_DESC[] = { ${show.map((c) =>
+      typeof c === "string" ? cid_mac(c) : c).join(", ")} };`,
+    `static const char* SHOW_NAMES[] = { ${names.map((n) =>
+      JSON.stringify(Bend.name_key(n))).join(", ")} };`,
+    "#endif"];
+  const tabs = c_header(segs, clos, show !== null);
   const img = [`CONSTV u64 STAT_IMG[] = { ${FL.img.join(", ") || 0} };`,
     ...spins.map((s) => s.lines.join("\n"))].join("\n\n");
   const text = segs.map((seg) => {
