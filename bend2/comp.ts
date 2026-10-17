@@ -3039,8 +3039,9 @@ export function compile_book(book: Bend.Book): string {
   const names = (show ?? []).filter((c) => typeof c === "string");
   file_book(["main", ...RUNTIME_ADTS,
     ...names.map((c) => Bend.book_fam(FL.book, c))]);
-  // a flat def's callers run its spin, so its segment is a unit only once
-  // a segment names it (seg_ref): main's, a bang's, a fork's
+  // a flat def's callers run its spin, and a def with one call site is
+  // most often fused into it, so their segments are units only once a
+  // segment names them (seg_ref)
   for (const [k, tld] of [...done_defs().reverse(),
     ...done_defs(def_foreign)]) {
     const unit = () => unit_new(k, () => {
@@ -3052,7 +3053,8 @@ export function compile_book(book: Bend.Book): string {
         emit_body(dl, fun_of(k).h!, tld.T, vals, null);
       }
     });
-    if (flat_of(k) && k !== "main" && !FL.bangs.has(k)) {
+    if ((flat_of(k) || FL.sites.get(k) === 1) && k !== "main"
+      && !FL.bangs.has(k)) {
       FL.lazy.set(seg_fid(k), unit);
     } else {
       unit();
