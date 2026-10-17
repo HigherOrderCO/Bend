@@ -3745,9 +3745,19 @@ INLINE void err_post(DEV u64* H, u32 code) {
 static const char* ERR_TEXT[] = { ${ERRS.map((s) => JSON.stringify(s))
   .join(",\n  ")} };
 
+// err_write goes straight to fd 2 with write, never stdio: a fault while
+// another thread holds a stdio lock must not hang the process instead of
+// ending it (async-signal-safe, so a signal handler may call it).
+static void err_write(const char* msg) {
+  ssize_t n = write(2, "bend: ", 6);
+  n = write(2, msg, strlen(msg));
+  n = write(2, "\n", 1);
+  (void)n;
+}
+
 static void err_fail(const char* msg) {
   fflush(stdout);
-  fprintf(stderr, "bend: %s\n", msg);
+  err_write(msg);
   _exit(1);
 }
 
@@ -3756,7 +3766,11 @@ static void err_post(u64* H, u32 code) {
 }
 
 static void err_trap(int sig) {
-  err_post(NULL, ERR_DEEP);
+  // A signal handler must not flush stdio: fflush could deadlock on the
+  // stdout lock. Write the numbered line and exit; there is no buffered
+  // output worth risking a hang for on a fault.
+  err_write(ERR_TEXT[ERR_DEEP]);
+  _exit(1);
 }
 
 #endif
