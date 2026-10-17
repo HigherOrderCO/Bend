@@ -2014,23 +2014,33 @@ law String.starts_with:
   for p: String
   Bool
 
-def String.starts_with.if(t: String, pt: String, same: Bool) -> Bool:
+law String.starts_with.go:
+  for p: String
+  for s: String
+  Bool
+
+def String.starts_with.go.if(pt: String, t: String, same: Bool) -> Bool:
   match same:
     case False{}:
       False{}
     case True{}:
-      String.starts_with(t, pt)
+      String.starts_with.go(pt, t)
+
+# Match the prefix first so an exhausted prefix never inspects the tail.
+def String.starts_with.go(p, s):
+  match p s:
+    case SNil{} _:
+      True{}
+    case SCon{y, yt} SNil{}:
+      False{}
+    case SCon{y, yt} SCon{x, xt}:
+      String.starts_with.go.if(yt, xt, Char.is_eq(x, y))
 
 def String.starts_with(s, p):
-  match s p:
-    case SNil{} SNil{}:
-      True{}
-    case SNil{} SCon{h, t}:
-      False{}
-    case SCon{h, t} SNil{}:
-      True{}
-    case SCon{x, xt} SCon{y, yt}:
-      String.starts_with.if(xt, yt, Char.is_eq(x, y))
+  String.starts_with.go(p, s)
+
+def String.starts_with.if(t: String, pt: String, same: Bool) -> Bool:
+  String.starts_with.go.if(pt, t, same)
 
 def String.ends_with(s: String, p: String) -> Bool:
   String.starts_with(String.reverse(s), String.reverse(p))
