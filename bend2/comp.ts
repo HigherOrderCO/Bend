@@ -1864,8 +1864,7 @@ function val_hold(sc: Scope, v: Val, k: string): Val {
     v.lay, v.rs);
 }
 
-function val_own(sc: Scope, v: Val, at: string | null = null,
-  held = false): string[] {
+function val_own(v: Val, at: string | null = null, held = false): string[] {
   v.rs.forEach((r, j) => {
     if (r !== null && at !== null) {
       FL.unit!.lends.push([at, r]);
@@ -1877,16 +1876,16 @@ function val_own(sc: Scope, v: Val, at: string | null = null,
   return v.ws;
 }
 
-function val_owned(sc: Scope, v: Val): string[] {
+function val_owned(v: Val): string[] {
   return v.ws.filter((_, j) => v.lay.ks[j] === "box" && v.rs[j] === null);
 }
 
-function val_brw(sc: Scope, v: Val): boolean {
-  return val_owned(sc, v).length === 0;
+function val_brw(v: Val): boolean {
+  return val_owned(v).length === 0;
 }
 
 function val_sink(sc: Scope, v: Val): void {
-  val_owned(sc, v).forEach((w) => file_push(sc, `term_sink(e, ${w});`));
+  val_owned(v).forEach((w) => file_push(sc, `term_sink(e, ${w});`));
 }
 
 // A word boxed as is (one word, no arms) keeps its root.
@@ -1931,11 +1930,11 @@ function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
 
 function val_box(sc: Scope, v: Val): string {
   if (v.lay.arms === null) {
-    return val_own(sc, v)[0];
+    return val_own(v)[0];
   }
   const arms = Object.keys(v.lay.arms);
   const build = (bl: Scope, k: Name) => ctr_build(bl, k, val_arm(v, k).flatMap(
-    (f, j) => val_own(bl, val_to(bl, f, lay_node(k).arms![k][j]))));
+    (f, j) => val_own(val_to(bl, f, lay_node(k).arms![k][j]))));
   if (arms.length <= 1) {
     return arms.length === 0 ? "0" : build(sc, arms[0]);
   }
@@ -1969,7 +1968,7 @@ function arr_cells(sc: Scope, l: string, at: string, el: Lay,
 
 function arr_new(sc: Scope, d: string, v: Val, el: Lay): string {
   const { arr, lgs } = lay_arr(el);
-  const ws = val_own(sc, val_to(sc, v, el));
+  const ws = val_own(val_to(sc, v, el));
   const fv = name_local(sc, "fv");
   file_push(sc, `Term ${fv}[${Math.max(1, ws.length)}];`);
   ws.forEach((w, j) => file_push(sc, `${fv}[${j}] = ${w};`));
@@ -1993,7 +1992,7 @@ function arr_op(sc: Scope, k: string, el: Lay, args: Val[]): Val {
     return val_new([arr_new(sc, args[0].ws[0], args[1], el)], BOX);
   }
   // the array an op returns is the one it took, rooted as that was
-  const a = emit_alias(sc, val_own(sc, args[0])[0], "a");
+  const a = emit_alias(sc, val_own(args[0])[0], "a");
   const ra = [args[0].rs[0]];
   if (k === "array_size") {
     return val_new([a, `(1ull << (blk_cls(${a}) - ${lgs}))`],
@@ -2004,7 +2003,7 @@ function arr_op(sc: Scope, k: string, el: Lay, args: Val[]): Val {
   const old = arr_cells(sc, l, at, el, (c) =>
     k === "array_get" ? `blk_keep(e, ${c})` : `e.mem[${c}]`);
   if (k !== "array_get") {
-    val_own(sc, val_to(sc, args[2], el)).forEach((w, j) => file_push(sc,
+    val_own(val_to(sc, args[2], el)).forEach((w, j) => file_push(sc,
       `blk_write(e.mem, ${Number(arr)}, ${l}, ${at} + ${j}, ${w});`));
     if (k !== "array_swap") {
       val_sink(sc, old);
@@ -2035,7 +2034,7 @@ function bind_pop(sc: Scope, x: HTerm): Val {
     return b.val;
   }
   bind_set(sc, p, b, b.n - 1);
-  const owned = val_owned(sc, b.val);
+  const owned = val_owned(b.val);
   owned.forEach((w) => file_push(sc, `${w} = term_keep(e, ${w}, 1);`));
   if (owned.length > 0) {
     facts_hot(sc, b.A, true);
@@ -2396,9 +2395,9 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false,
       if (!dead || (!jump && twin)) {
         FL.unit!.lent.add(at);
       } else {
-        val_own(sc, bd.val, at, !jump);
+        val_own(bd.val, at, !jump);
       }
-      if (dead && !twin && val_brw(sc, bd.val)) {
+      if (dead && !twin && val_brw(bd.val)) {
         sc.uses.delete(p);
       } else if (!fork) {
         bind_set(sc, p, bd, Math.max(bd.n - 1, 1));
@@ -2407,9 +2406,9 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false,
     }
     const v = val_to(sc, b, lays[i]);
     if (!brw[i]) {
-      val_own(sc, v);
+      val_own(v);
     } else if (!(vs[i] === null && v === b) && !ctr_packed(x)) {
-      val_own(sc, v, at);
+      val_own(v, at);
     }
     return val_new(v.ws, v.lay, v.rs);
   });
@@ -2425,7 +2424,7 @@ function emit_put(sc: Scope, dst: Val | null, v: Val): void {
   if (dst === null) {
     spare_flush(sc);
   }
-  const ws = val_own(sc, val_to(sc, v, dst?.lay ?? sc.seg.ret));
+  const ws = val_own(val_to(sc, v, dst?.lay ?? sc.seg.ret));
   ws.forEach((w, j) => file_push(sc, `${dst?.ws[j] ?? "r" + j} = ${w};`));
   if (dst === null) {
     file_push(sc, `WL_RETN(${ws.length});`);
@@ -2516,7 +2515,7 @@ function emit_intr(sc: Scope, k: Name, it: Intr, m: Spine,
   const lays = fun_of(k).lays;
   const vs = args.map((v, i) => val_to(sc, v, lays[i]));
   const as = vs.map((v, i) => {
-    const w = val_own(sc, v)[0];
+    const w = val_own(v)[0];
     return op_bare(m.args[i]) ? w : emit_alias(sc, w, "a");
   });
   const lay = lay_of(ty);
@@ -2535,7 +2534,7 @@ function emit_clo(sc: Scope, x: HTerm, ty: HTerm | null): Val {
     sc.uses.set(p, { ...b, n: b.n - term_use(u, p) + 1 });
     bind_pop(sc, p);
   });
-  const words = live.flatMap(([, b]) => val_own(sc, b.val));
+  const words = live.flatMap(([, b]) => val_own(b.val));
   const name = seg_name("c");
   const clo = seg_clo(sc, seg_fid(name), words);
   const arg = val_new([name_local(sc, "x")], BOX);
@@ -2563,7 +2562,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     if (adt.k === "Array") {
       return val_new([x.k === "ALeaf"
         ? arr_new(sc, "0", vs[0], lay_el(adt.x[0]))
-        : `blk_node(e, ${val_own(sc, vs[0])[0]}, ${val_own(sc, vs[1])[0]})`],
+        : `blk_node(e, ${val_own(vs[0])[0]}, ${val_own(vs[1])[0]})`],
       BOX);
     }
     if (vs.length === 1 && vs[0].ws.length > 1) {
@@ -2593,7 +2592,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     [...tag.map(() => null), ...fs.flatMap((f) => f.rs)],
     vs.every((f) => f.stat));
   const out = lay === pos ? v
-    : val_new([ctr_build(sc, x.k, val_own(sc, v), v.stat)], BOX, [], v.stat);
+    : val_new([ctr_build(sc, x.k, val_own(v), v.stat)], BOX, [], v.stat);
   if (out.stat) {
     seen.set(x, out);
   }
@@ -2845,7 +2844,7 @@ function emit_fork(sc: Scope, x: Of<"Let">): void {
         rest: [...x.v.filter((_, i) => i !== j), o.b] }, c, false, true)
         .flatMap((v) => v.ws));
       const live = [...pl.uses].filter(([p, b]) =>
-        !val_brw(pl, b.val) || rest_use([o.b], p) > 0);
+        !val_brw(b.val) || rest_use([o.b], p) > 0);
       hold = live.map(([p]) => p);
       const caps = live.flatMap(([, b]) => b.val.ws);
       const jn = emit_task(pl, seg_fid(name), calls.length, caps);
@@ -3015,7 +3014,7 @@ function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
         const leaf = k === "ALeaf";
         return [`blk_cls(${sw}) ${leaf ? "==" : "!="} ${lay_arr(el).lgs}`, h,
           () => {
-            val_own(sc, u);
+            val_own(u);
             return leaf ? [arr_leaf(sc, sw, el)] : emit_hold(sc,
               [0, 1].map((hi) => `blk_half(e, ${sw}, ${hi})`), "h")
               .map((w) => val_new([w], BOX));
