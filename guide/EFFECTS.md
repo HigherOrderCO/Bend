@@ -106,7 +106,8 @@ number, a `String` a string, a constructor
 the answer the same way: `io_done(v)`, `io_fail(code)`,
 `io_tup(handle, result)`, `{$: CID(Unit)}`. A `Nat` answer that is not a
 whole number from 0 to 2^53 stops the run; a `Nat` inside an answer goes
-unchecked, so the host keeps it in that range.
+unchecked, so the host keeps it in that range. This host-input check is
+distinct from the 2^48-1 arithmetic limit.
 
 A blocking effect takes one more argument, `k`, and parks with
 `io_park_on(fd, out, k, more)`: it returns `undefined`, and the loop calls
