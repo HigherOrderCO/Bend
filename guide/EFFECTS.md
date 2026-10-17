@@ -26,12 +26,19 @@ runtime, so every runtime symbol is in scope. Define the effect and
 register it in a constructor:
 
 ```c
-Term clock_now_run(Env e, Term* f, IoWork* w);
+Term HID(clock_now_run)(Env e, Term* f, IoWork* w);
 
-static void __attribute__((constructor)) clock_now_use(void) {
-  io_eff(CID(Clock.now), clock_now_run);
+static void __attribute__((constructor)) HID(clock_now_use)(void) {
+  io_eff(CID(Clock.now), HID(clock_now_run));
 }
 ```
+
+`HID(name)` gives a C name defined by the effect a module-qualified host id.
+Use it at the definition and every reference, including helpers, globals,
+types and include guards. Unlike `CID` and `FID`, the name need not be a
+Bend constructor or def. Unmarked C names keep their normal scope; the
+compiler does not parse or rename them. Packages must adopt `HID` and
+republish before different versions can coexist without those name clashes.
 
 `CID(Name)` is the C id of a constructor or of an effect def: the compiler
 replaces it with the name's own id, reading `Name` in the effect's
