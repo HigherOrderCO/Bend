@@ -1631,6 +1631,256 @@ def U32.pow(+a: U32, n: Nat) -> U32:
 def U32.is_even(a: U32) -> Bool:
   U32.is_zero(U32.and(a, 1))
 
+# Byte and Word16
+# ---------------
+# 8- and 16-bit words: Word ops at 8 and 16 bits, conversions through U32
+# (the low bits; U32.to_byte wraps), and a U32's bytes, least significant
+# first. No natives yet: these run as Base's defs in every lane.
+
+# the low m bits of a Word(m + n), its high n bits, and their join
+def Word.lo(m: Nat, n: Nat, w: Word(Nat.add(m, n))) -> Word(m):
+  match m:
+    case 0n:
+      WNil{}
+    case 1n+p:
+      match w:
+        case WCon{h, t}:
+          WCon{h, Word.lo(p, n, t)}
+
+def Word.hi(m: Nat, n: Nat, w: Word(Nat.add(m, n))) -> Word(n):
+  match m:
+    case 0n:
+      w
+    case 1n+p:
+      match w:
+        case WCon{h, t}:
+          Word.hi(p, n, t)
+
+def Word.cat(m: Nat, n: Nat, a: Word(m), b: Word(n)) -> Word(Nat.add(m, n)):
+  match m:
+    case 0n:
+      b
+    case 1n+p:
+      match a:
+        case WCon{h, t}:
+          WCon{h, Word.cat(p, n, t, b)}
+
+type Byte is Data:
+  Byte{data: Word(8n)}
+
+def Byte.add(a: Byte, b: Byte) -> Byte:
+  match a b:
+    case Byte{x} Byte{y}:
+      Byte{Word.add(8n, x, y)}
+
+def Byte.sub(a: Byte, b: Byte) -> Byte:
+  match a b:
+    case Byte{x} Byte{y}:
+      Byte{Word.sub(8n, x, y)}
+
+def Byte.mul(a: Byte, b: Byte) -> Byte:
+  match a b:
+    case Byte{x} Byte{y}:
+      Byte{Word.mul(8n, x, y)}
+
+def Byte.and(a: Byte, b: Byte) -> Byte:
+  match a b:
+    case Byte{x} Byte{y}:
+      Byte{Word.and(8n, x, y)}
+
+def Byte.or(a: Byte, b: Byte) -> Byte:
+  match a b:
+    case Byte{x} Byte{y}:
+      Byte{Word.or(8n, x, y)}
+
+def Byte.xor(a: Byte, b: Byte) -> Byte:
+  match a b:
+    case Byte{x} Byte{y}:
+      Byte{Word.xor(8n, x, y)}
+
+def Byte.not(a: Byte) -> Byte:
+  match a:
+    case Byte{x}:
+      Byte{Word.not(8n, x)}
+
+def Byte.inc(a: Byte) -> Byte:
+  match a:
+    case Byte{x}:
+      Byte{Word.inc(8n, x)}
+
+def Byte.shl(a: Byte) -> Byte:
+  match a:
+    case Byte{x}:
+      Byte{Word.shl(8n, x)}
+
+def Byte.shr(a: Byte) -> Byte:
+  match a:
+    case Byte{x}:
+      Byte{Word.shr(8n, x)}
+
+def Byte.cmp(a: Byte, b: Byte) -> Cmp:
+  match a b:
+    case Byte{x} Byte{y}:
+      Word.cmp(8n, x, y)
+
+def Byte.is_eq(a: Byte, b: Byte) -> Bool:
+  Cmp.is_eq(Byte.cmp(a, b))
+
+def Byte.is_lt(a: Byte, b: Byte) -> Bool:
+  Cmp.is_lt(Byte.cmp(a, b))
+
+def Byte.is_le(a: Byte, b: Byte) -> Bool:
+  Cmp.is_le(Byte.cmp(a, b))
+
+def Byte.is_gt(a: Byte, b: Byte) -> Bool:
+  Cmp.is_gt(Byte.cmp(a, b))
+
+def Byte.is_ge(a: Byte, b: Byte) -> Bool:
+  Cmp.is_ge(Byte.cmp(a, b))
+
+def Byte.to_nat(a: Byte) -> Nat:
+  match a:
+    case Byte{w}:
+      Word.to_nat(8n, w)
+
+def Byte.to_u32(a: Byte) -> U32:
+  match a:
+    case Byte{w}:
+      U32{Word.cat(8n, 24n, w, Word.zero(24n))}
+
+def U32.to_byte(a: U32) -> Byte:
+  match a:
+    case U32{w}:
+      Byte{Word.lo(8n, 24n, w)}
+
+def Byte.from_nat(n: Nat) -> Byte:
+  U32.to_byte(U32.from_nat(n))
+
+def Byte.show(a: Byte) -> String:
+  U32.show(Byte.to_u32(a))
+
+type Word16 is Data:
+  Word16{data: Word(16n)}
+
+def Word16.add(a: Word16, b: Word16) -> Word16:
+  match a b:
+    case Word16{x} Word16{y}:
+      Word16{Word.add(16n, x, y)}
+
+def Word16.sub(a: Word16, b: Word16) -> Word16:
+  match a b:
+    case Word16{x} Word16{y}:
+      Word16{Word.sub(16n, x, y)}
+
+def Word16.mul(a: Word16, b: Word16) -> Word16:
+  match a b:
+    case Word16{x} Word16{y}:
+      Word16{Word.mul(16n, x, y)}
+
+def Word16.and(a: Word16, b: Word16) -> Word16:
+  match a b:
+    case Word16{x} Word16{y}:
+      Word16{Word.and(16n, x, y)}
+
+def Word16.or(a: Word16, b: Word16) -> Word16:
+  match a b:
+    case Word16{x} Word16{y}:
+      Word16{Word.or(16n, x, y)}
+
+def Word16.xor(a: Word16, b: Word16) -> Word16:
+  match a b:
+    case Word16{x} Word16{y}:
+      Word16{Word.xor(16n, x, y)}
+
+def Word16.not(a: Word16) -> Word16:
+  match a:
+    case Word16{x}:
+      Word16{Word.not(16n, x)}
+
+def Word16.inc(a: Word16) -> Word16:
+  match a:
+    case Word16{x}:
+      Word16{Word.inc(16n, x)}
+
+def Word16.shl(a: Word16) -> Word16:
+  match a:
+    case Word16{x}:
+      Word16{Word.shl(16n, x)}
+
+def Word16.shr(a: Word16) -> Word16:
+  match a:
+    case Word16{x}:
+      Word16{Word.shr(16n, x)}
+
+def Word16.cmp(a: Word16, b: Word16) -> Cmp:
+  match a b:
+    case Word16{x} Word16{y}:
+      Word.cmp(16n, x, y)
+
+def Word16.is_eq(a: Word16, b: Word16) -> Bool:
+  Cmp.is_eq(Word16.cmp(a, b))
+
+def Word16.is_lt(a: Word16, b: Word16) -> Bool:
+  Cmp.is_lt(Word16.cmp(a, b))
+
+def Word16.is_le(a: Word16, b: Word16) -> Bool:
+  Cmp.is_le(Word16.cmp(a, b))
+
+def Word16.is_gt(a: Word16, b: Word16) -> Bool:
+  Cmp.is_gt(Word16.cmp(a, b))
+
+def Word16.is_ge(a: Word16, b: Word16) -> Bool:
+  Cmp.is_ge(Word16.cmp(a, b))
+
+def Word16.to_nat(a: Word16) -> Nat:
+  match a:
+    case Word16{w}:
+      Word.to_nat(16n, w)
+
+def Word16.to_u32(a: Word16) -> U32:
+  match a:
+    case Word16{w}:
+      U32{Word.cat(16n, 16n, w, Word.zero(16n))}
+
+def U32.to_word16(a: U32) -> Word16:
+  match a:
+    case U32{w}:
+      Word16{Word.lo(16n, 16n, w)}
+
+def Word16.from_nat(n: Nat) -> Word16:
+  U32.to_word16(U32.from_nat(n))
+
+def Word16.show(a: Word16) -> String:
+  U32.show(Word16.to_u32(a))
+
+# byte i of a U32 (0 the least significant)
+def U32.byte(a: U32, i: Nat) -> Byte:
+  U32.to_byte(U32.shrn(a, Nat.mul(8n, i)))
+
+# the U32 of four bytes, least significant first, and most significant first
+def U32.of_bytes(b0: Byte, b1: Byte, b2: Byte, b3: Byte) -> U32:
+  match b0 b1 b2 b3:
+    case Byte{w0} Byte{w1} Byte{w2} Byte{w3}:
+      U32{Word.cat(8n, 24n, w0, Word.cat(8n, 16n, w1, Word.cat(8n, 8n, w2, w3)))}
+
+def U32.of_bytes_be(b3: Byte, b2: Byte, b1: Byte, b0: Byte) -> U32:
+  U32.of_bytes(b0, b1, b2, b3)
+
+# the Word16 of two bytes, least significant first
+def Word16.of_bytes(b0: Byte, b1: Byte) -> Word16:
+  match b0 b1:
+    case Byte{w0} Byte{w1}:
+      Word16{Word.cat(8n, 8n, w0, w1)}
+
+law Byte.to_u32_to_byte:
+  for b: Byte
+  {U32.to_byte(Byte.to_u32(b)) == b : Byte}
+
+def Byte.to_u32_to_byte(b):
+  match b:
+    case Byte{WCon{x0, WCon{x1, WCon{x2, WCon{x3, WCon{x4, WCon{x5, WCon{x6, WCon{x7, WNil{}}}}}}}}}}:
+      {==}
+
 # F32
 # ---
 
