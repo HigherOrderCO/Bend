@@ -244,7 +244,7 @@ const OPERATIONS: Record<string, Intr> = Object.setPrototypeOf({
   ...tpl_ops("bool_", "or:|:|| xor:^:!==", "(($0) $o ($1))", "($0 $o $1)"),
   string_append: { JS: "($0 + $1)" },
   string_contains: { JS: "string_contains($0, $1)" },
-  string_length: { JS: "[...str_out($0)].length" },
+  string_length: { JS: "string_length($0)" },
   ...Object.fromEntries(Object.entries({
     new: "array_new($0, $1)", set: "($0[$1 % $0.length] = $2, $0)",
     get: "{$: \"Tuple\", fst: $0, snd: $0[$1 % $0.length]}",
@@ -536,6 +536,17 @@ function string_contains(s, p) {
     }
   }
   return false;
+}
+
+function string_length(s) {
+  // Count Chars by walking the string with Char width, instead of building a
+  // whole expanded copy just to count. A packed U32 Char is 4 UTF-16 units but
+  // one Char; an astral scalar is 2 units and one Char; the rest are one unit.
+  let n = 0;
+  for (let at = 0; at < s.length; at += char_len(s, at)) {
+    n += 1;
+  }
+  return n;
 }
 
 function str_out(s) {
