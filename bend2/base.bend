@@ -1855,8 +1855,20 @@ def F32.pi() -> F32:
 def F32.from_nat(n: Nat) -> F32:
   U32.to_f32(U32.from_nat(n))
 
+# Preserve the direct cast below 2^32; wider Nats need both word halves.
+def F32.to_nat.wide(+a: F32, wide: Bool) -> Nat:
+  match wide:
+    case False{}:
+      U32.to_nat(F32.to_u32(a))
+    case True{}:
+      +hi = U32.to_nat(F32.to_u32(F32.div(a, 4294967296.0)))
+      +lo = U32.to_nat(F32.to_u32(F32.mod(a, 4294967296.0)))
+      Nat.add(Nat.mul(hi, Nat.mul(65536n, 65536n)), lo)
+
 def F32.to_nat(a: F32) -> Nat:
-  U32.to_nat(F32.to_u32(a))
+  match a:
+    case F32{+x}:
+      F32.to_nat.wide(F32{x}, F32.is_ge(F32{x}, 4294967296.0))
 
 # Char
 # ----
