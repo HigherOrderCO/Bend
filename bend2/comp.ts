@@ -52,37 +52,7 @@ type HTerm = Bend.HTerm;
 
 type Name = Bend.Name;
 
-type File = {
-  book: Bend.Book;
-  js: boolean;
-  bangs: Set<Name>;
-  sites: Map<Name, number>;
-  srcs: Map<Name, Set<Name> | null>;
-  loops: Map<Name, Name[]>;
-  flats: Map<Name, boolean>;
-  funs: Map<Name, Fun>;
-  nodes: Map<Name, Lay>;
-  lays: Map<string, Lay>;
-  teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
-  ids: Map<string, string>;
-  taken: Set<string>;
-  locals: Map<string, Name>;
-  depths: Map<HTerm, number>;
-  facts: Set<string>;
-  miss: Map<string, Set<Unit>>;
-  stale: Set<Unit>;
-  units: Map<string, Unit>;
-  unit: Unit | null;
-  tabs: Map<string, number>;
-  lits: Map<string, number>;
-  img: string[];
-  tails: Map<Name, Set<Name>>;
-  opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
-  uses: Map<HTerm, Bend.PMap<number>>;
-  folds: Map<HTerm, HTerm | null>;
-  spines: Map<HTerm, Spine>;
-  steps: Map<HTerm, HTerm>;
-};
+type File = ReturnType<typeof file_new>;
 
 type Scope = {
   seg: Seg;
@@ -1510,38 +1480,38 @@ function arg_key(k: Name, i: number): string {
   return k + "~" + i;
 }
 
-function file_new(book: Bend.Book, js: boolean): File {
+function file_new(book: Bend.Book, js: boolean) {
   PROBES.length = 1;
   return {
     book,
     js,
-    bangs: new Set(),
-    sites: new Map(),
-    srcs: new Map(),
-    loops: new Map(),
-    flats: new Map(),
-    funs: new Map(),
-    nodes: new Map(),
-    lays: new Map(),
-    teles: new Map(),
-    ids: new Map(),
+    bangs: new Set<Name>(),
+    sites: new Map<Name, number>(),
+    srcs: new Map<Name, Set<Name> | null>(),
+    loops: new Map<Name, Name[]>(),
+    flats: new Map<Name, boolean>(),
+    funs: new Map<Name, Fun>(),
+    nodes: new Map<Name, Lay>(),
+    lays: new Map<string, Lay>(),
+    teles: new Map<HTerm, { doms: Dom[]; ret: HTerm }>(),
+    ids: new Map<string, string>(),
     taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
-    locals: new Map(),
-    depths: new Map(),
-    facts: new Set(),
-    miss: new Map(),
-    stale: new Set(),
-    units: new Map(),
-    unit: null,
-    tabs: new Map(),
-    lits: new Map(),
-    img: [],
-    tails: new Map(),
-    opens: new Map(),
-    uses: new Map(),
-    folds: new Map(),
-    spines: new Map(),
-    steps: new Map(),
+    locals: new Map<string, Name>(),
+    depths: new Map<HTerm, number>(),
+    facts: new Set<string>(),
+    miss: new Map<string, Set<Unit>>(),
+    stale: new Set<Unit>(),
+    units: new Map<string, Unit>(),
+    unit: null as Unit | null,
+    tabs: new Map<string, number>(),
+    lits: new Map<string, number>(),
+    img: [] as string[],
+    tails: new Map<Name, Set<Name>>(),
+    opens: new Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
+    uses: new Map<HTerm, Bend.PMap<number>>(),
+    folds: new Map<HTerm, HTerm | null>(),
+    spines: new Map<HTerm, Spine>(),
+    steps: new Map<HTerm, HTerm>(),
   };
 }
 
@@ -3459,7 +3429,7 @@ function js_def(k: Name, def: Bend.Def): void {
   if (intr_of(k, true) !== undefined) {
     return;
   }
-  const sc = { ...scope_new(), def: k };
+  const sc = scope_new();
   sc.seg.def = k;
   FL.unit!.segs.push(sc.seg);
   const { live, h } = fun_of(k);
@@ -3486,8 +3456,7 @@ function js_def(k: Name, def: Bend.Def): void {
     }
     block(sc, pc ? "for (;;) switch ($pc) {" : "for (;;) {", () =>
       loop.forEach((d, i) => {
-        const fx = { ...sc, fresh: new Map(), def: d,
-          fuel: { n: FOLD_FUEL } };
+        const fx = { ...sc, fresh: new Map(), fuel: { n: FOLD_FUEL } };
         const ps = fun_of(d).live.map(([, x]) => name_local(fx, x));
         block(fx, pc ? `case ${i}: {` : "{", () => {
           ps.forEach((p, j) => file_push(fx, `const ${p} = $${j};`));
