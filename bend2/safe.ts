@@ -505,21 +505,20 @@ function spec_val(e: Safe, s: Scope, x: HTerm): HTerm {
 
 // x's normal form, when it is closed; null when it depends on a run-time value
 function closed_val(e: Safe, s: Scope, x: HTerm): HTerm | null {
-  // bend2's annotations name a variable by its level
-  const v = B.term_snf(e.book, subst(x, s.d, (o) => o.$ === "Var" && (o.i as number) >= 0 && (o.i as number) < s.d
-    ? s.c[o.i as number]?.v ?? B.Var(o.k as Name, o.i as number) : undefined));
+  const v = B.term_snf(e.book, subst(x, s.d, (o) => o.$ === "Var" ? s.c[o.i as number]?.v : undefined));
   return mentions(B.term_lower(v, s.d), (i) => i >= 0 && i < s.d) ? null : v;
 }
 
 // t at depth d, with each node f maps replaced, through its lowered form
-// (so no closure hides one)
-function subst(t: HTerm, d: number, f: (o: Record<string, unknown>) => HTerm | undefined): HTerm {
+// (so no closure hides one); a variable below d stays one
+function subst(t: HTerm, d: number, f?: (o: Record<string, unknown>) => HTerm | undefined): HTerm {
   const go = (u: unknown): unknown => {
     if (typeof u !== "object" || u === null) {
       return u;
     }
     const o = u as Record<string, unknown>;
-    const v = f(o);
+    const i = o.i as number;
+    const v = f?.(o) ?? (o.$ === "Var" && i >= 0 && i < d ? B.Var(o.k as Name, i) : undefined);
     return v !== undefined ? B.Var(o.k as Name, -1, undefined, v)
       : Array.isArray(u) ? u.map(go) : Object.fromEntries(Object.entries(o).map(([k, x]) => [k, k === "s" ? x : go(x)]));
   };
@@ -606,7 +605,7 @@ function model_at(e: Safe, T: HTerm, d: number, path: string[], hs: Array<[HTerm
       const x: HTerm = B.Var(F.k, d);
       const t = model_at(e, F.B(x), d + 1, path, F.q.$ === "None" ? hs : [...hs, [x, F.A]], proj, probe);
       return t === null ? null : B.Ann(B.Lam(F.k, d, (v: HTerm) =>
-        subst(t, d + 1, (o) => o.$ !== "Var" || (o.i as number) > d ? undefined : o.i === d ? v : B.Var(o.k as Name, o.i as number))), F);
+        subst(t, d + 1, (o) => o.$ === "Var" && o.i === d ? v : undefined)), F);
     }
     case "ADT": {
       const key = model_key(F, d);
@@ -949,12 +948,9 @@ function all_of(e: Safe, T: HTerm | null): Extract<HTerm, { $: "All" }> | null {
   return G?.$ === "All" ? G : null;
 }
 
-// λy => t(y), at t's type ∀y:A -> B, for t at depth d: y takes level d,
-// and t's binders the levels after it. bend2's annotations name a
-// variable by its level, so t goes in through its lowered form, where an
-// annotation names t's binder as t's own uses do
+// λy => t(y), at t's type ∀y:A -> B
 function eta(t: HTerm, all: Extract<HTerm, { $: "All" }>, d: number): HTerm {
-  const u = subst(t, d, (o) => o.$ === "Var" && (o.i as number) >= 0 && (o.i as number) < d ? B.Var(o.k as Name, o.i as number) : undefined);
+  const u = subst(t, d);
   return B.Ann(B.Lam(all.k, 0, (y: HTerm) => B.Ann(B.App(u, y), all.B(y))), all);
 }
 
