@@ -1516,6 +1516,7 @@ function file_new(book: Bend.Book, js: boolean) {
     lits: new Map<string, number>(),
     img: [] as string[],
     tails: new Map<Name, Set<Name>>(),
+    entries: new Set<Name>(),
     opens: new Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>(),
     uses: new Map<HTerm, Bend.PMap<number>>(),
     folds: new Map<HTerm, HTerm | null>(),
@@ -3231,7 +3232,8 @@ export function compile_book(book: Bend.Book): string {
 // one), each turn binding its parameters afresh, so a closure keeps its
 // own; any other call is direct. Only a closure's tail call bounces
 // (run_tail), so a call passes through run_loop only when its callee's
-// tail calls reach one: a marker per call resolves once every def is out.
+// tail calls reach one: it calls its callee's entry ($$k), declared once
+// every def is out as run_loop over the def, or as the def itself.
 // A def's function and its closures' are its unit's segments.
 
 // An erased argument: it prints as null and, at DUMMY's index, has no
@@ -3271,8 +3273,11 @@ function js_call(sc: Scope, k: Name, args: HTerm[], tail = false): string {
     const v = name_local(sc, "x");
     return `(${v}) => ${f}(${[...exprs, v].join(", ")})`;
   }
-  const call = `${f}(${exprs.join(", ")})`;
-  return def_foreign(tld) || tail ? call : `\x01${k}\x02(${call})`;
+  if (def_foreign(tld) || tail) {
+    return `${f}(${exprs.join(", ")})`;
+  }
+  FL.entries.add(k);
+  return `${name_id("$$", k)}(${exprs.join(", ")})`;
 }
 
 function js_open(sc: Scope, x: Of<"Let">): HTerm {
@@ -3559,12 +3564,17 @@ export function js_lib(book: Bend.Book, mod = false): string {
   const jumps = graph_close(new Set([CLO_APPLY]), [...FL.tails]
     .flatMap(([k, ts]) => [...ts].map((t) => [t, k])));
   const funs = [...FL.units.values()].flatMap((u) => u.segs)
-    .flatMap((f) => seg_text(f.lines, 0))
-    .join("\n").replace(/\x01([^\x02]*)\x02/g, (_, k) =>
-      jumps.has(k) ? "run_loop" : "");
+    .flatMap((f) => seg_text(f.lines, 0));
+  const entries = [...FL.entries].map((k) => {
+    const [f, g] = [name_id("$", k), name_id("$$", k)];
+    const ps = fun_of(k).live.map((_, i) => "a" + i);
+    return jumps.has(k) ? `function ${g}(${ps}) {\n  return run_loop(${f}(${
+      ps}));\n}` : `const ${g} = ${f};`;
+  });
   PROBES.length = 1;
-  return RUNTIME + effs + "// Program\n// =======\n\n" + [funs, ...[...FL.tabs]
-    .map(([r, i]) => `const TAB_${i} = [${r}];`)].join("\n") + lib;
+  return RUNTIME + effs + "// Program\n// =======\n\n" + [...funs, ...entries,
+    ...[...FL.tabs].map(([r, i]) => `const TAB_${i} = [${r}];`)].join("\n")
+    + lib;
 }
 
 export function js_book(book: Bend.Book): string {
