@@ -57,31 +57,26 @@ type File = {
   js: boolean;
   bangs: Set<Name>;
   sites: Map<Name, number>;
-  hot: Hot;
-  stat: Set<Name>;
-  own: Set<string>;
-  lent: Set<string>;
-  lends: [string, string][];
-  segs: Seg[];
-  spins: Seg[];
-  spun: Map<string, string>;
-  clos: Set<string>;
-  tabs: Map<string, number>;
-  tails: Map<Name, Set<Name>>;
-  img: string[];
-  lits: Map<string, number>;
-  ids: Map<string, string>;
-  taken: Set<string>;
-  teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
   srcs: Map<Name, Set<Name> | null>;
   loops: Map<Name, Name[]>;
   flats: Map<Name, boolean>;
   funs: Map<Name, Fun>;
-  brws: Map<Name, boolean[]>;
   nodes: Map<Name, Lay>;
   lays: Map<string, Lay>;
-  depths: Map<HTerm, number>;
+  teles: Map<HTerm, { doms: Dom[]; ret: HTerm }>;
+  ids: Map<string, string>;
+  taken: Set<string>;
   locals: Map<string, Name>;
+  depths: Map<HTerm, number>;
+  facts: Set<string>;
+  miss: Map<string, Set<Unit>>;
+  stale: Set<Unit>;
+  units: Map<string, Unit>;
+  unit: Unit | null;
+  tabs: Map<string, number>;
+  lits: Map<string, number>;
+  img: string[];
+  tails: Map<Name, Set<Name>>;
   memo: {
     opens: Map<Of<"Lam"> | Of<"Let">, { ps: Of<"Var">[]; b: HTerm }>;
     uses: Map<HTerm, Bend.PMap<number>>;
@@ -120,11 +115,10 @@ type Intr = { C?: string | string[] | null; JS?: string };
 
 type Dom = [Bend.Quant, Name, HTerm];
 
-// What shares a node (see File): the constructors, datatypes and families a
-// shared value reaches, the erased parameters (arg_key) that hold its type,
-// and whether an open type holds one, which heats every datatype.
-type Hot = { ctrs: Set<Name>; types: Set<Name>; fams: Set<Name>;
-  args: Set<string>; open: boolean };
+// What one emission of a def or a spin wrote: its segments (n names the
+// next), the lends it asked, the closures it made.
+type Unit = { name: string; segs: Seg[]; n: number; lent: Set<string>;
+  lends: [string, string][]; clos: Set<string>; emit: () => void };
 
 type Fun = { n: number; h: HTerm | null; live: Dom[]; lays: Lay[]; ret: Lay };
 
@@ -1189,7 +1183,7 @@ function ctr_build(sc: Scope, k: Name, exprs: string[], stat = false): string {
     return `term_pak(${cid}, ${exprs[0] ?? 0})`;
   }
   if (stat) {
-    FL.stat.add(k);
+    fact_add("stat", k);
     const at = memo(FL.lits, exprs.join(", "), () =>
       FL.img.push(...exprs) - exprs.length);
     return `term_ctr(${cid}, STAT_OFF + ${at})`;
@@ -1201,7 +1195,7 @@ function ctr_build(sc: Scope, k: Name, exprs: string[], stat = false): string {
   const got = s === null ? alloc
     : s.taken ? `${s.name} >= HEAP_OFF ? ${s.name} : ${alloc}` : s.name;
   return `term_ctr(${cid}, ${node_fill(sc, "nd", got, exprs,
-    FL.hot.ctrs.has(k))})`;
+    fact("ctr", k))})`;
 }
 
 function ctr_packed(t: HTerm): boolean {
@@ -1392,12 +1386,10 @@ function fun_of(k: Name): Fun {
 }
 
 function brw_of(k: Name): boolean[] {
-  return memo(FL.brws, k, () => {
-    const { live, lays } = fun_of(k);
-    const done = done_live(FL.book.tlds[k]);
-    return lays.map((l, i) => done && l.ks.includes("box")
-      && ty_adt(live[i][2])?.k !== "Array" && !FL.own.has(arg_key(k, i)));
-  });
+  const { live, lays } = fun_of(k);
+  const done = done_live(FL.book.tlds[k]);
+  return lays.map((l, i) => done && l.ks.includes("box")
+    && ty_adt(live[i][2])?.k !== "Array" && !fact("own", arg_key(k, i)));
 }
 
 function def_raise(t: HTerm, left: number): number {
@@ -1509,13 +1501,11 @@ export function io_run(book: Bend.Book, args: string[]): number {
 // File
 // ====
 
-// A File is the book being compiled (FL): its facts, its output and its
-// caches. The emitter is the analysis: a boxed parameter starts borrowed
-// (its scope's brwl) and becomes owned (own) when owned or unlent; a lend is
-// asked by a holder (lent) or passed on from a lent root (lends: holder,
-// root). A shared value heats its type (hot); a family stuck on an open index
-// heats its arms' types once, its arguments at every instantiation.
-// compile_book emits until a pass changes no fact.
+// A File is the book being compiled (FL): what its defs are, the names it
+// gave, its facts, its output and its caches. The emitter is the analysis:
+// emitting a def or a spin (a unit) learns facts, and a unit that read a
+// fact absent (miss) is stale once it holds, and emits again; compile_book
+// emits until no unit is stale.
 
 // A def's parameter i, as the facts name it.
 function arg_key(k: Name, i: number): string {
@@ -1529,32 +1519,26 @@ function file_new(book: Bend.Book, js: boolean): File {
     js,
     bangs: new Set(),
     sites: new Map(),
-    hot: { ctrs: new Set(), types: new Set(), fams: new Set(),
-      args: new Set(), open: false },
-    stat: new Set(),
-    own: new Set(),
-    lent: new Set(),
-    lends: [],
-    segs: [],
-    spins: [],
-    spun: new Map(),
-    clos: new Set(),
-    tabs: new Map(),
-    tails: new Map(),
-    img: [],
-    lits: new Map(),
-    ids: new Map(),
-    taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
-    teles: new Map(),
     srcs: new Map(),
     loops: new Map(),
     flats: new Map(),
     funs: new Map(),
-    brws: new Map(),
     nodes: new Map(),
     lays: new Map(),
-    depths: new Map(),
+    teles: new Map(),
+    ids: new Map(),
+    taken: new Set("FID_EXIT FID_ENTER FID_T CID_T $pc".split(" ")),
     locals: new Map(),
+    depths: new Map(),
+    facts: new Set(),
+    miss: new Map(),
+    stale: new Set(),
+    units: new Map(),
+    unit: null,
+    tabs: new Map(),
+    lits: new Map(),
+    img: [],
+    tails: new Map(),
     memo: {
       opens: new Map(),
       uses: new Map(),
@@ -1635,6 +1619,36 @@ function file_book(roots: Name[]): void {
   }
 }
 
+// A fact is what emitting learned: own k~i, a boxed parameter its def owns;
+// stat k, a constructor in the static image; and what shares a node: ctr,
+// type and fam k, the constructors, datatypes and families a shared value
+// reaches, arg k~i, an erased parameter that holds its type, and open, an
+// open type that holds one, which heats every datatype. A family stuck on an
+// open index heats its arms' types once, its arguments at every
+// instantiation. A unit that reads a fact absent is stale once it holds.
+function fact(kind: string, k = ""): boolean {
+  const key = kind + " " + k;
+  if (FL.facts.has(key)) {
+    return true;
+  }
+  if (FL.unit !== null) {
+    memo(FL.miss, key, () => new Set()).add(FL.unit);
+  }
+  return false;
+}
+
+// Whether the fact is new.
+function fact_add(kind: string, k = ""): boolean {
+  const key = kind + " " + k;
+  if (FL.facts.has(key)) {
+    return false;
+  }
+  FL.facts.add(key);
+  FL.miss.get(key)?.forEach((u) => FL.stale.add(u));
+  FL.miss.delete(key);
+  return true;
+}
+
 function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
   local = false): void {
   const w = ty_wnf(B);
@@ -1650,9 +1664,7 @@ function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
       m.all.reduce((b, x) => Bend.term_apply(b, x), m.tld.v!))[0]) : null;
     if (m && fam?.$ === "Mat") {
       m.all.forEach((x) => facts_hot(sc, x, true, local));
-      const k = (m.t as Of<"Ref">).k;
-      if (!FL.hot.fams.has(k)) {
-        FL.hot.fams.add(k);
+      if (fact_add("fam", (m.t as Of<"Ref">).k)) {
         facts_hot(sc, fam, true, local);
       }
       return;
@@ -1663,24 +1675,23 @@ function facts_hot(sc: Scope, B: HTerm | null, force: boolean,
     const dom = w?.$ === "Var" && !local
       && tele_unbind(FL.book.tlds[sc.def].T).doms[w.i];
     if (dom && dom[1] === w.k && !dom_live(dom)) {
-      FL.hot.args.add(arg_key(sc.def, w.i));
+      fact_add("arg", arg_key(sc.def, w.i));
     } else if (ty_tag(w, "All Var App")) {
-      FL.hot.open = true;
+      fact_add("open");
     } else if (!ty_tag(w, "Typ Qnt Qua Min Eql Rfl Lit Ctr Efq Ref")) {
       die(`a type the C facts cannot read (${w?.$ ?? "no type"})`);
     }
     return;
   }
-  const hot = force || FL.hot.types.has(w.k);
+  const hot = force || fact("type", w.k);
   w.x.forEach((x) => facts_hot(sc, x, hot, local));
-  if (!hot || FL.hot.types.has(w.k)) {
+  if (!hot || !fact_add("type", w.k)) {
     return;
   }
-  FL.hot.types.add(w.k);
   const tld = FL.book.tlds[w.k];
   if (tld?.$ === "ADT") {
     for (const c of tld.c) {
-      FL.hot.ctrs.add(c.k);
+      fact_add("ctr", c.k);
       facts_ctr(sc, c, w.x);
     }
   }
@@ -1766,13 +1777,13 @@ function seg_ref(sc: Scope, fid: string): string {
 }
 
 function seg_clo(sc: Scope, fid: string, words: string[]): string {
-  FL.clos.add(fid);
+  FL.unit!.clos.add(fid);
   return `term_clo(${seg_ref(sc, fid)}, ${words.length === 0 ? 0 : node_fill(
     sc, "nd", `heap_alloc(e, cls_fit(${words.length}))`, words)})`;
 }
 
-function seg_name(sc: Scope, stem: string): string {
-  return sc.def + "$" + stem + FL.segs.length;
+function seg_name(stem: string): string {
+  return FL.unit!.name + "$" + stem + FL.unit!.n++;
 }
 
 function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
@@ -1785,7 +1796,7 @@ function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
     return nw;
   }), b.val.lay));
   const seg = seg_new(name, ret, [...vals, res], frame);
-  FL.segs.push(seg);
+  FL.unit!.segs.push(seg);
   sc = { ...sc, seg, spares: [], uses: new Map() };
   live.forEach(([p, b], i) => bind_uses(sc, p, vals[i], rest, b.A));
   return sc;
@@ -1810,7 +1821,7 @@ function node_fields(sc: Scope, t: string, k: Name, tail = false): Val[] {
     return val_arm(val_new(node.ks.map(() => `term_loc(${t})`), node));
   }
   const r = sc.brwl.get(t);
-  const taken = r === undefined && (FL.hot.ctrs.has(k) || FL.stat.has(k));
+  const taken = r === undefined && (fact("ctr", k) || fact("stat", k));
   const sp = name_local(sc, "sp");
   const fb = taken ? name_local(sc, "fb") : "";
   if (taken) {
@@ -1863,10 +1874,10 @@ function val_own(sc: Scope, v: Val, at: string | null = null,
   v.ws.forEach((w, j) => {
     const r = sc.brwl.get(w);
     if (r !== undefined && at !== null) {
-      FL.lends.push([at, r]);
+      FL.unit!.lends.push([at, r]);
     } else if (r !== undefined
       || (at !== null && !held && v.lay.ks[j] === "box")) {
-      FL.own.add(r ?? at!);
+      fact_add("own", r ?? at!);
     }
   });
   return v.ws;
@@ -1913,7 +1924,7 @@ function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
     if (r[0] && r.every((x) => x === r[0])) {
       sc.brwl.set(out[k], r[0]);
     } else {
-      r.filter((x) => x).forEach((x) => FL.own.add(x));
+      r.filter((x) => x).forEach((x) => fact_add("own", x));
     }
   });
   return val_new(out, lay);
@@ -1967,7 +1978,7 @@ function arr_new(sc: Scope, d: string, v: Val, el: Lay): string {
 }
 
 function arr_q(k: Kind): boolean {
-  return k === "box" && FL.hot.types.has("Array");
+  return k === "box" && fact("type", "Array");
 }
 
 function arr_loc(sc: Scope, a: string): string {
@@ -2034,7 +2045,7 @@ function bind_pop(sc: Scope, x: HTerm): Val {
 function bind_uses(sc: Scope, p: Of<"Var">, v: Val, rest: HTerm[],
   A: HTerm): void {
   const n = rest_use(rest, p);
-  facts_hot(sc, A, FL.hot.open);
+  facts_hot(sc, A, fact("open"));
   bind_set(sc, p, { val: v, n, A }, n);
 }
 
@@ -2076,6 +2087,28 @@ function memo<K, V>(m: Map<K, V>, k: K, f: (k: K) => V): V {
 
 function memo_gc(): void {
   Object.values(FL.memo).forEach((m) => m.clear());
+}
+
+// Unit
+// ====
+
+// A unit starts stale; it emits with its output cleared, as FL.unit.
+function unit_new(name: string, emit: () => void): Unit {
+  const u = { name, segs: [], n: 0, lent: new Set<string>(), lends: [],
+    clos: new Set<string>(), emit };
+  FL.units.set(name, u);
+  FL.stale.add(u);
+  return u;
+}
+
+function unit_emit(u: Unit): void {
+  const up = FL.unit;
+  FL.stale.delete(u);
+  Object.assign(u, { segs: [], n: 0, lent: new Set(), lends: [],
+    clos: new Set() });
+  FL.unit = u;
+  u.emit();
+  FL.unit = up;
 }
 
 // Show
@@ -2317,7 +2350,7 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false,
   const k = ck.k!;
   const brw = brw_of(k);
   ck.all.forEach((a, q) => {
-    if (FL.hot.args.has(arg_key(k, q))) {
+    if (fact("arg", arg_key(k, q))) {
       facts_hot(sc, a, true);
     }
   });
@@ -2340,7 +2373,7 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false,
       const twin = vars.filter((y) => probe_of(y) === p).length > 1;
       const dead = rest_use(sc.rest, p) === 0;
       if (!dead || (!jump && twin)) {
-        FL.lent.add(at);
+        FL.unit!.lent.add(at);
       } else {
         val_own(sc, bd.val, at, !jump);
       }
@@ -2420,27 +2453,28 @@ function emit_open(sc: Scope, k: Name): [Scope, Val[]] {
 }
 
 function emit_native(sc: Scope, k: Name): string {
-  return seg_ref(sc, memo(FL.spun, k, () => {
-    const name = `spin_${FL.spun.size}`;
-    FL.spun.set(k, name);
-    const [sl, vals] = emit_open(sc, k);
-    const seg = sl.seg;
-    seg.fid = name;
-    seg.native = true;
-    const dst = val_new(seg.ret.ks.map((_, j) => `o[${j}]`), seg.ret);
-    emit_body(sl, fun_of(k).h!, FL.book.tlds[k].T, vals, dst);
-    const hs = seg.ks.flatMap((kd, i) => arr_q(kd) ? [`Term h${i} = r${i};`]
-      : []);
-    const body = [
-      ...seg_text(["u32 wpoll = 0;", ...hs, ...seg_take(seg), "WL_SPIN"], 1),
-      ...seg_text(seg.lines, 2), "  break;", "  }", "  return 1;", "}"];
-    const far = body.reduce((n, l) => n + l.length + 1, 0) >= SPIN_FAR;
-    const ps = seg.ks.map((kd, i) => `, ${lay_c(kd)} r${i}`
-      + (arr_q(kd) ? `, u64 q${i}` : "")).join("");
-    FL.spins.push({ ...seg, lines: [`${far ? "DFAR" : "INLINE"} Term ${name}`
-      + `(Env e, THR Term* o${ps}) {`, ...body] });
-    return name;
-  }));
+  const name = name_id("spin_", k);
+  if (!FL.units.has("spin " + k)) {
+    unit_emit(unit_new("spin " + k, () => {
+      const [sl, vals] = emit_open(scope_new(), k);
+      const seg = sl.seg;
+      seg.fid = name;
+      seg.native = true;
+      const dst = val_new(seg.ret.ks.map((_, j) => `o[${j}]`), seg.ret);
+      emit_body(sl, fun_of(k).h!, FL.book.tlds[k].T, vals, dst);
+      const hs = seg.ks.flatMap((kd, i) => arr_q(kd)
+        ? [`Term h${i} = r${i};`] : []);
+      const body = [
+        ...seg_text(["u32 wpoll = 0;", ...hs, ...seg_take(seg), "WL_SPIN"], 1),
+        ...seg_text(seg.lines, 2), "  break;", "  }", "  return 1;", "}"];
+      const far = body.reduce((n, l) => n + l.length + 1, 0) >= SPIN_FAR;
+      const ps = seg.ks.map((kd, i) => `, ${lay_c(kd)} r${i}`
+        + (arr_q(kd) ? `, u64 q${i}` : "")).join("");
+      FL.unit!.segs.push({ ...seg, lines: [`${far ? "DFAR" : "INLINE"} Term ${
+        name}(Env e, THR Term* o${ps}) {`, ...body] });
+    }));
+  }
+  return seg_ref(sc, name);
 }
 
 function emit_dst(sc: Scope, lay: Lay, k = "v"): Val {
@@ -2480,7 +2514,7 @@ function emit_clo(sc: Scope, x: HTerm, ty: HTerm | null): Val {
     bind_pop(sc, p);
   });
   const words = live.flatMap(([, b]) => val_own(sc, b.val));
-  const name = seg_name(sc, "c");
+  const name = seg_name("c");
   const clo = seg_clo(sc, seg_fid(name), words);
   const arg = val_new([name_local(sc, "x")], BOX);
   emit_body(seg_open(sc, name, BOX, null, live, arg, [x]), x, ty, [arg], null);
@@ -2519,7 +2553,7 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
     }
     return val_new([`term_word(e, ${vs[0].ws[0]})`], word);
   }
-  if (FL.hot.ctrs.has(x.k)) {
+  if (fact("ctr", x.k)) {
     facts_ctr(sc, ctr, adt.x);
   }
   const pos = at ?? lay_of(adt);
@@ -2767,7 +2801,7 @@ function emit_fork(sc: Scope, x: Of<"Let">): void {
   const o = term_open(x);
   const calls = x.v.map(term_spine);
   const fork = calls.length > 1;
-  const name = seg_name(sc, "j");
+  const name = seg_name("j");
   let hold: Of<"Var">[] = [];
   if (fork) {
     spare_flush(sc);
@@ -2801,7 +2835,7 @@ function emit_fork(sc: Scope, x: Of<"Let">): void {
   calls.forEach((c, i) => {
     const cargs = emit_args({ ...sc, rest: [chain[i]] }, c);
     const vs = [...sc.uses].filter(([p]) => i === 0 || p === o.ps[i - 1]);
-    const kn = seg_name(sc, "k");
+    const kn = seg_name("k");
     spare_flush(sc);
     const ws: string[] = [];
     for (const [p, b] of vs) {
@@ -3031,48 +3065,58 @@ export function compile_book(book: Bend.Book): string {
   const names = (show ?? []).filter((c) => typeof c === "string");
   file_book(["main", ...RUNTIME_ADTS,
     ...names.map((c) => Bend.book_fam(FL.book, c))]);
-  const { ctrs, types, fams, args } = FL.hot;
-  const facts = () => FL.own.size + FL.stat.size + ctrs.size + types.size
-    + fams.size + args.size + Number(FL.hot.open);
-  let was: number;
-  do {
-    was = facts();
-    FL.lends = [];
-    [FL.lent, FL.spun, FL.clos, FL.tabs, FL.lits, FL.brws]
-      .forEach((m) => m.clear());
-    FL.segs = [];
-    FL.spins = [];
-    FL.img = [];
-    for (const [k, tld] of [...done_defs().reverse(),
-      ...done_defs(def_foreign)]) {
-      memo_gc();
+  for (const [k, tld] of [...done_defs().reverse(),
+    ...done_defs(def_foreign)]) {
+    unit_new(k, () => {
       const [dl, vals] = emit_open(scope_new(), k);
-      FL.segs.push(dl.seg);
+      FL.unit!.segs.push(dl.seg);
       if (def_foreign(tld)) {
         emit_put(dl, null, val_new([ctr_build(dl, k, dl.seg.params)], BOX));
       } else {
         emit_body(dl, fun_of(k).h!, tld.T, vals, null);
       }
-      // what its body owned, its callers (emitted after it) see
-      FL.brws.delete(k);
-      brw_of(k);
-    }
-    graph_close(FL.lent, FL.lends.map(([at, r]) => [r, at]));
-    FL.brws.forEach((bs, k) => bs.forEach((b, i) => {
-      if (b && !FL.lent.has(arg_key(k, i))) {
-        FL.own.add(arg_key(k, i));
+    });
+  }
+  // after a sweep, a boxed parameter that no caller lends is owned
+  let us: Unit[] = [];
+  while (FL.stale.size > 0) {
+    for (const u of FL.units.values()) {
+      if (FL.stale.has(u)) {
+        memo_gc();
+        unit_emit(u);
       }
-    }));
-  } while (was !== facts());
-  const edges = [...FL.segs, ...FL.spins].flatMap((s) =>
-    [...s.refs].map((r) => [s.fid, r]));
+    }
+    us = [...FL.units.values()];
+    const lent = graph_close(new Set(us.flatMap((u) => [...u.lent])),
+      us.flatMap((u) => u.lends.map(([at, r]) => [r, at])));
+    for (const [k] of done_defs()) {
+      brw_of(k).forEach((b, i) => {
+        if (b && !lent.has(arg_key(k, i))) {
+          fact_add("own", arg_key(k, i));
+        }
+      });
+    }
+  }
+  const all = us.flatMap((u) => u.segs);
+  const clos = us.flatMap((u) => [...u.clos]);
+  const edges = all.flatMap((s) => [...s.refs].map((r) => [s.fid, r]));
   const reach = (from: string[]) => graph_close(new Set(from), edges);
   const live = reach([seg_fid("main")]);
   const wide = [...FL.bangs].some((k) => fun_of(k).live.some(([, , A]) =>
     ty_holds(A, (t) => !ty_tag(t, "ADT Typ Qua Min Eql"))));
-  const dev = reach([...[...FL.bangs].map(seg_fid), ...wide ? FL.clos : []]);
-  FL.segs = FL.segs.filter((s) => live.has(s.fid));
-  FL.spins = FL.spins.filter((s) => live.has(s.fid));
+  const dev = reach([...[...FL.bangs].map(seg_fid), ...wide ? clos : []]);
+  const segs = all.filter((s) => !s.native && live.has(s.fid));
+  // a spin is declared before its callers (spins call no cycle: flat_of)
+  const natives = new Map(all.flatMap((s) => s.native && live.has(s.fid)
+    ? [[s.fid, s]] : []));
+  const spins: Seg[] = [];
+  const visit = (s: Seg | undefined) => {
+    if (s !== undefined && natives.delete(s.fid)) {
+      s.refs.forEach((r) => visit(natives.get(r)));
+      spins.push(s);
+    }
+  };
+  [...natives.values()].forEach(visit);
   const desc = show === null ? [] : ["#if !DEVICE",
     `static const u32 SHOW_DESC[] = { ${show.map((c) =>
       typeof c === "string" ? cid_mac(c) : c).join(", ")} };`,
@@ -3080,7 +3124,7 @@ export function compile_book(book: Bend.Book): string {
       JSON.stringify(Bend.name_key(n))).join(", ")} };`,
     "#endif"];
   const arg = val_new([""], W64);
-  const entries = [...FL.segs, seg_new(IO_EMIT, BOX, [arg]),
+  const entries = [...segs, seg_new(IO_EMIT, BOX, [arg]),
     seg_new(CLO_APPLY, BOX, [arg, arg])];
   const cids = new Map<Name, number>();
   const cid = (k: Name, n: number) =>
@@ -3094,9 +3138,9 @@ export function compile_book(book: Bend.Book): string {
   done_defs(def_foreign).forEach(([k]) => cid(k, fun_of(k).lays.length));
   const nats = new Set(done_defs(def_foreign).filter(([, d]) =>
     ty_adt(def_answer(d))?.k === "Nat").map(([k]) => k));
-  const callers = [...FL.segs.flatMap((s) => [...s.refs].map((r) =>
-    [r, s.fid])), ...[...FL.clos].map((c) => [c, seg_fid(CLO_APPLY)])];
-  const forky = graph_close(new Set(FL.segs.filter((s) => s.fork)
+  const callers = [...segs.flatMap((s) => [...s.refs].map((r) =>
+    [r, s.fid])), ...clos.map((c) => [c, seg_fid(CLO_APPLY)])];
+  const forky = graph_close(new Set(segs.filter((s) => s.fork)
     .map((s) => s.fid)), callers);
   if (entries.some((s) => s.params.length > WIDE)
     || [...cids.values()].some((n) => n > 255)) {
@@ -3124,7 +3168,7 @@ export function compile_book(book: Bend.Book): string {
   // request whose answer is a Nat, which io_step checks)
   defs.push(`CONSTV u8 FID_T[][3] = { ${fid_t.join(", ")} };`,
   `CONSTV u8 CID_T[][2] = { ${[...cids].map(([k, n]) => `{ ${n}, ${
-    Number(FL.hot.ctrs.has(k)) | Number(nats.has(k)) << 1} }`).join(", ")} };`,
+    Number(fact("ctr", k)) | Number(nats.has(k)) << 1} }`).join(", ")} };`,
   `#define STAT_LEN ${FL.img.length}`, "",
   `#define WL_RESW ${resw}`, `#define BANGS   ${FL.bangs.size}`, "",
   `#define WL_BANK Term ${ws.join(", ")};`, "",
@@ -3143,19 +3187,19 @@ export function compile_book(book: Bend.Book): string {
   `#define WL_TABLE ${entries.map((s) => `WL_X(${s.fid})`).join(" ")
     } WL_X(FID_EXIT)`, `#define MAIN_FID ${seg_fid("main")}`,
   `#define MAIN_PURE ${Number(show !== null)}`,
-  `#define BLK_SHR ${Number(FL.hot.types.has("Array"))}`);
+  `#define BLK_SHR ${Number(fact("type", "Array"))}`);
   const tabs = [defs.join("\n"), ...[...FL.tabs].map(([r, i]) =>
     `CONSTV u64 TAB_${i}[] = { ${r} };`)].join("\n\n");
-  const spins = [`CONSTV u64 STAT_IMG[] = { ${FL.img.join(", ") || 0} };`,
-    ...FL.spins.map((s) => s.lines.join("\n"))].join("\n\n");
-  const segs = FL.segs.map((seg) => {
+  const img = [`CONSTV u64 STAT_IMG[] = { ${FL.img.join(", ") || 0} };`,
+    ...spins.map((s) => s.lines.join("\n"))].join("\n\n");
+  const text = segs.map((seg) => {
     const out = [`  WL_CASE(${seg.fid})`, ...seg_text([...seg_take(seg),
       "WL_OPEN", ...seg.spin ? ["WL_SPIN", ...seg.lines, "WL_SPUN"]
         : seg.lines], 2), "  }}"];
     return (dev.has(seg.fid) ? out : ["#if !DEVICE", ...out, "#endif"])
       .join("\n");
   }).join("\n\n");
-  const c = c_ids(runtime_c([tabs, ...desc].join("\n\n"), spins, segs,
+  const c = c_ids(runtime_c([tabs, ...desc].join("\n\n"), img, text,
     effect_srcs(".c", "no .c import: ").join("")));
   // keep nothing memoized: clang may run next, while this process waits
   FL = file_new(book, false);
@@ -3172,7 +3216,7 @@ export function compile_book(book: Bend.Book): string {
 // own; any other call is direct. Only a closure's tail call bounces
 // (run_tail), so a call passes through run_loop only when its callee's
 // tail calls reach one: a marker per call resolves once every def is out.
-// A def's function is a segment (FL.segs), a closure's a spin.
+// A def's function and its closures' are its unit's segments.
 
 // An erased argument: it prints as null and, at DUMMY's index, has no
 // closure depth, so no closure captures it.
@@ -3323,8 +3367,8 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
       const vs = new Set<Of<"Var">>();
       const cl = { ...sc, seg: seg_new("", BOX, []),
         caps: { d: (sc.caps?.d ?? 0) + 1, vs } };
-      FL.spins.push(cl.seg);
-      const name = name_id("$", sc.def + "$c" + FL.spins.length);
+      FL.unit!.segs.push(cl.seg);
+      const name = name_id("$", FL.unit!.name + "$c" + FL.unit!.n++);
       js_func(cl, x, ty, [arg]);
       const ps = [...new Set([...vs].map((p) => p.k))];
       vs.forEach((p) => js_capture(sc, p));
@@ -3427,7 +3471,7 @@ function js_def(k: Name, def: Bend.Def): void {
   }
   const sc = { ...scope_new(), def: k };
   sc.seg.def = k;
-  FL.segs.push(sc.seg);
+  FL.unit!.segs.push(sc.seg);
   const { live, h } = fun_of(k);
   const loop = loop_of(k);
   const params = loop.length > 0 ? [...Array(Math.max(...loop.map((d) =>
@@ -3486,7 +3530,7 @@ export function js_lib(book: Bend.Book, mod = false): string {
   file_book(outs ?? ["main"]);
   for (const [k, def] of done_defs(fun_runs)) {
     memo_gc();
-    js_def(k, def);
+    unit_emit(unit_new(k, () => js_def(k, def)));
   }
   const effs = effect_srcs(".js", "a foreign def without a .js import: ")
     .map((t) => `(() => {\n${t}\n})();\n\n`).join("");
@@ -3500,7 +3544,8 @@ export function js_lib(book: Bend.Book, mod = false): string {
   }).join("\n")}\n};\n`;
   const jumps = graph_close(new Set([CLO_APPLY]), [...FL.tails]
     .flatMap(([k, ts]) => [...ts].map((t) => [t, k])));
-  const funs = [...FL.segs, ...FL.spins].flatMap((f) => seg_text(f.lines, 0))
+  const funs = [...FL.units.values()].flatMap((u) => u.segs)
+    .flatMap((f) => seg_text(f.lines, 0))
     .join("\n").replace(/\x01([^\x02]*)\x02/g, (_, k) =>
       jumps.has(k) ? "run_loop" : "");
   PROBES.length = 1;
