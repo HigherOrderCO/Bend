@@ -99,8 +99,16 @@ function is_manifest(value: unknown): value is Record<string, unknown> {
     && typeof host.cc === "string" && typeof host.no_telemetry === "string";
 }
 
-function is_receipt(value: unknown, key: string): value is
-  Record<string, unknown> {
+type CacheReceipt = {
+  schema: typeof RECEIPT_SCHEMA;
+  key: string;
+  artifact_sha256: string;
+  artifact_bytes: number;
+  compiler_invoked: false;
+  manifest: Record<string, unknown>;
+};
+
+function is_receipt(value: unknown, key: string): value is CacheReceipt {
   return is_record(value) && value.schema === RECEIPT_SCHEMA
     && value.key === key && is_digest(value.artifact_sha256)
     && Number.isSafeInteger(value.artifact_bytes)
@@ -248,7 +256,8 @@ export function store(dir: string, keyed: KeyResult,
     fs.mkdirSync(tmp, { recursive: true });
     const receipt = { schema: RECEIPT_SCHEMA, key: keyed.key,
       manifest: keyed.manifest, artifact_sha256: sha_bytes(c),
-      artifact_bytes: c.length, compiler_invoked: false };
+      artifact_bytes: Buffer.byteLength(c, "utf8"),
+      compiler_invoked: false };
     atomic_json(path.join(tmp, "receipt.json"), receipt);
     const digest = sha_file(path.join(tmp, "receipt.json")) ?? "";
     fs.writeFileSync(path.join(tmp, "receipt.sha256"), digest + "\n");
