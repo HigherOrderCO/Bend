@@ -1324,15 +1324,15 @@ function arm(e: Safe, s: Scope, k: Name, cols: Cols, vs: Array<[Q, O]>): O {
 }
 
 // an argument at its domain A: an untyped λ or match (in a type) takes
-// A as its goal. Any other argument of a function type goes η-long at A
+// A as its goal. A non-field argument of a function type goes η-long at A
 // (a tree leaf does): the kernel converts without η, and an argument may
 // reach a type, as a side of an equation whose carrier only the call
 // knows. A live self-call's argument stays whole, as the live check
 // reads it, unless its binders differ from A's
-function arg_term(e: Safe, s: Scope, x: HTerm, A: HTerm, live: boolean): O {
+function arg_term(e: Safe, s: Scope, x: HTerm, A: HTerm, live: boolean, field = false): O {
   const [y, T] = open(x);
   const tree = y.$ === "Lam" || y.$ === "Mat" || y.$ === "Efq";
-  const all = tree || y.$ === "Ctr" ? null : all_of(e, A);
+  const all = field || tree || y.$ === "Ctr" ? null : all_of(e, A);
   if (all !== null && (!(live && s.sub) || T !== null && !qsig_eq(e, T, A, s.d))) {
     return term(e, s, eta(x, all), live);
   }
@@ -1378,7 +1378,7 @@ function ctr_term(e: Safe, s: Scope, x: Extract<HTerm, { $: "Ctr" }>, T: HTerm |
       oos("a constructor past its fields");
     }
     const q = quant(A.q);
-    fs.push([q, arg_term(e, s, a, A.A, live && q > 0)]);
+    fs.push([q, arg_term(e, s, a, A.A, live && q > 0, true)]);
     F = A.B(a);
   }
   const k = name_tt(x.k);
