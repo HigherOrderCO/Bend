@@ -26,7 +26,7 @@ import tempfile
 
 WORKTREE = os.path.normpath(os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-MAIN_TS = os.path.join(WORKTREE, "bend2", "main.ts")
+MAIN_TS = os.path.join(WORKTREE, "compiler", "main.ts")
 BUN = ("/run/baton2-native-homelab/retained/baton2-compiler-741-20261015"
        "/postrelease-751-761-20261015-11/toolchain-home/bin/bun")
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -46,6 +46,7 @@ def main() -> IO(Unit):
 """
 HOST_C = """// IO
 // ==
+// Unicode byte-count fixture: λ
 
 Term io_fx_tag_run(Env e, Term* f, IoWork* w) {
   return (Term)%d;
@@ -137,6 +138,16 @@ def main():
               events[-1] if events else "no log")
         check("A-artifact-nonempty",
               code == 0 and os.path.getsize(c1) > 1000)
+        first_key = events[-1]["key"] if events else None
+        receipt_path = (os.path.join(cache, first_key, "receipt.json")
+                        if first_key else "")
+        receipt = None
+        if receipt_path and os.path.isfile(receipt_path):
+            with open(receipt_path) as handle:
+                receipt = json.load(handle)
+        check("A-receipt-counts-utf8-bytes",
+              receipt is not None and receipt.get("artifact_bytes")
+              == os.path.getsize(c1), receipt)
 
         code, c2, wall, rss, events = build(fx, cache, "b.c")
         runs.append({"step": "B-rebuild", "exit": code, "wall_s": wall,
