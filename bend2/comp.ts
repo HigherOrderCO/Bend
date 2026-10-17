@@ -79,6 +79,9 @@ type Of<K> = Extract<HTerm, { $: K }>;
 // A row of a Nat or word match (see Mat).
 type Row = { arm: HTerm; bits: number; val: number; flds: number };
 
+// A table row's value as JS reads it (a Bool is a JS boolean).
+type Cell = number | boolean;
+
 type Intr = { C?: string | string[] | null; JS?: string };
 
 type Dom = [Bend.Quant, Name, HTerm];
@@ -107,6 +110,8 @@ const IO_EMIT = "IO~emit";
 const FOLD_FUEL = 8192;
 
 const EXACT = { fround: Math.fround, imul: Math.imul };
+
+const ROWS = new Map<string, (...xs: unknown[]) => Cell>();
 
 const SPIN_FAR = 8192;
 
@@ -2871,10 +2876,10 @@ function emit_fork(sc: Scope, x: Of<"Let">): void {
   emit_body(sc, o.b, null, [], null);
 }
 
-// A table row's word: its arm folded to a constant, or ops over rows run
-// by their JS with Math.fround and Math.imul alone (an op that calls any
-// other function throws, and is no row). An F32 constant keeps its bits, as
-// a NaN payload has no JS number.
+// A table row's word: its arm folded to a constant, or an op over rows,
+// whose JS runs on their values with Math.fround and Math.imul alone (an
+// op that calls any other function throws, and is no row). An F32 constant
+// keeps its bits, as a NaN payload has no JS number.
 function emit_row(sc: Scope, t: HTerm, ty: HTerm): number | null {
   const k = ty_adt(ty)?.k ?? "";
   if (WORDS[k] === undefined) {
@@ -2884,13 +2889,9 @@ function emit_row(sc: Scope, t: HTerm, ty: HTerm): number | null {
   if (k === "F32" && term_const(s)) {
     return Bend.u32_from_term(s, "F32");
   }
-  const js = row_js(sc, s, ty);
-  if (js === null) {
-    return null;
-  }
   try {
-    const v = Function("Math", `return ${js}`)(EXACT);
-    return k === "F32" ? Bend.f32_to_bits(v) : v;
+    const v = row_val(sc, s, ty) as number | null;
+    return v === null ? null : k === "F32" ? Bend.f32_to_bits(v) : v;
   } catch {
     return null;
   }
@@ -2904,16 +2905,21 @@ function row_term(sc: Scope, t: HTerm): HTerm {
   return emit_fold(sc, s) ?? s;
 }
 
-// A row's JS: a constant, or an op over rows.
-function row_js(sc: Scope, s: HTerm, ty: HTerm | null): string | null {
+// A row's value: a word, a Nat or a Bool constant, or an op over rows.
+function row_val(sc: Scope, s: HTerm, ty: HTerm | null): Cell | null {
   if (term_const(s)) {
-    return js_expr(sc, s, ty);
+    const c = term_strip(s) as Of<"Ctr">;
+    const [adt, u] = ctr_adt(c, ty);
+    return u !== null ? adt.k === "F32" ? Bend.f32_from_bits(u) : u
+      : adt.k === "Nat" ? nat_peel(c)[1]
+      : adt.k === "Bool" ? c.k === "True" : null;
   }
   const m = term_spine(s);
-  const it = m.t.$ === "Ref" ? intr_of(m.t.k, true) : undefined;
-  const xs = m.args.map((a) => row_js(sc, row_term(sc, a), null));
-  return it?.JS === undefined || !xs.every((x): x is string => x !== null)
-    ? null : tpl(it.JS, xs);
+  const js = m.t.$ === "Ref" ? intr_of(m.t.k, true)?.JS : undefined;
+  const xs = m.args.map((a) => row_val(sc, row_term(sc, a), null));
+  return js === undefined || xs.includes(null) ? null
+    : memo(ROWS, js, () => Function("Math", "$0", "$1", "$2", "$3",
+      `return ${js}`))(EXACT, ...xs);
 }
 
 function emit_tab(sc: Scope, cells: HTerm[] | null, ty: HTerm,
