@@ -19,7 +19,9 @@ type Kind = "w32" | "w64" | "box";
 
 type Lay = { ks: Kind[]; arms: Record<Name, Lay[]> | null };
 
-type Val = { ws: string[]; lay: Lay; stat: boolean };
+// A value's words, its layout, whether it is static, and the borrowed root
+// of each word (the parameter it is lent from, as arg_key names it).
+type Val = { ws: string[]; lay: Lay; stat: boolean; rs: (string | null)[] };
 
 type Bind = { val: Val; n: number; A: HTerm };
 
@@ -58,7 +60,6 @@ type File = ReturnType<typeof file_new>;
 type Scope = {
   seg: Seg;
   fresh: Map<string, number>;
-  brwl: Map<string, string>;
   spares: Spare[];
   uses: Map<Of<"Var">, Bind>;
   rest: HTerm[];
@@ -1531,7 +1532,6 @@ function scope_new(): Scope {
   return {
     seg: seg_new("", BOX, []),
     fresh: new Map(),
-    brwl: new Map(),
     spares: [],
     uses: new Map(),
     rest: [],
@@ -1773,13 +1773,8 @@ function seg_name(stem: string): string {
 
 function seg_open(sc: Scope, name: string, ret: Lay, frame: Seg["frame"],
   live: [Of<"Var">, Bind][], res: Val, rest: HTerm[]): Scope {
-  const vals = live.map(([, b]) => val_new(b.val.ws.map((w) => {
-    const nw = name_local(sc, FL.locals.get(w) ?? w);
-    if (sc.brwl.has(w)) {
-      sc.brwl.set(nw, sc.brwl.get(w)!);
-    }
-    return nw;
-  }), b.val.lay));
+  const vals = live.map(([, b]) => val_new(b.val.ws.map((w) =>
+    name_local(sc, FL.locals.get(w) ?? w)), b.val.lay, false, b.val.rs));
   const seg = seg_new(name, ret, [...vals, res], frame);
   FL.unit!.segs.push(seg);
   sc = { ...sc, seg, spares: [], uses: new Map() };
@@ -1799,68 +1794,63 @@ function node_fill(sc: Scope, k: string, alloc: string,
   return nd;
 }
 
-function node_fields(sc: Scope, t: string, k: Name, tail = false): Val[] {
+function node_fields(sc: Scope, t: string, r: string | null, k: Name,
+  tail = false): Val[] {
   const node = lay_node(k);
   const n = node.ks.length;
   if (lay_packed(node)) {
     return val_arm(val_new(node.ks.map(() => `term_loc(${t})`), node));
   }
-  const r = sc.brwl.get(t);
-  const taken = r === undefined && (fact("ctr", k) || fact("stat", k));
+  const taken = r === null && (fact("ctr", k) || fact("stat", k));
   const sp = name_local(sc, "sp");
   const fb = taken ? name_local(sc, "fb") : "";
   if (taken) {
     file_push(sc, `Term ${fb}[${n}];`);
   }
   file_push(sc, `u64 ${sp} = ${taken ? `ctr_take(e, ${t}, ${n}, ${fb})`
-    : r === undefined ? `term_loc(${t})` : `term_peek(e.mem, ${t})`};`);
+    : r === null ? `term_loc(${t})` : `term_peek(e.mem, ${t})`};`);
   const ws = emit_hold(sc, node.ks.map((_, j) =>
     taken ? `${fb}[${j}]` : `e.mem[${sp} + ${j}]`), "f", node.ks);
   const spare = { words: n, name: sp, taken };
-  if (r !== undefined) {
-    ws.forEach((w, j) => {
-      if (node.ks[j] === "box") {
-        sc.brwl.set(w, r);
-      }
-    });
-  } else if (tail) {
+  if (r === null && tail) {
     sc.spares.push(spare);
-  } else {
+  } else if (r === null) {
     spare_free(sc, spare);
   }
-  return val_arm(val_new(ws, node));
+  return val_arm(val_new(ws, node, false, node.ks.map((kd) =>
+    kd === "box" ? r : null)));
 }
 
 // Val
 // ===
 
-// A word rooted in a borrowed parameter (brwl) is not owned. val_own is
+// A word rooted in a borrowed parameter (rs) is not owned. val_own is
 // the one gate: at an owned position a rooted word owns its root; lent
 // at `at`, a rooted word passes its lend on, and an unheld owned box
 // owns `at`. A destination every arm fills from one root stays rooted.
 
-function val_new(ws: string[], lay: Lay, stat = false): Val {
-  return { ws, lay, stat };
+function val_new(ws: string[], lay: Lay, stat = false,
+  rs: (string | null)[] = []): Val {
+  return { ws, lay, stat, rs: ws.map((_, j) => rs[j] ?? null) };
 }
 
 function val_arm(v: Val, k = Object.keys(v.lay.arms!)[0]): Val[] {
   let at = Number(Object.keys(v.lay.arms!).length > 1);
-  return v.lay.arms![k].map((lay) =>
-    val_new(v.ws.slice(at, at += lay.ks.length), lay));
+  return v.lay.arms![k].map((lay) => val_new(v.ws.slice(at,
+    at + lay.ks.length), lay, false, v.rs.slice(at, at += lay.ks.length)));
 }
 
 function val_hold(sc: Scope, v: Val, k: string): Val {
   return val_new(v.ws.map((w, j) => emit_alias(sc, w, k, v.lay.ks[j])),
-    v.lay);
+    v.lay, false, v.rs);
 }
 
 function val_own(sc: Scope, v: Val, at: string | null = null,
   held = false): string[] {
-  v.ws.forEach((w, j) => {
-    const r = sc.brwl.get(w);
-    if (r !== undefined && at !== null) {
+  v.rs.forEach((r, j) => {
+    if (r !== null && at !== null) {
       FL.unit!.lends.push([at, r]);
-    } else if (r !== undefined
+    } else if (r !== null
       || (at !== null && !held && v.lay.ks[j] === "box")) {
       fact_add("own", r ?? at!);
     }
@@ -1869,7 +1859,7 @@ function val_own(sc: Scope, v: Val, at: string | null = null,
 }
 
 function val_owned(sc: Scope, v: Val): string[] {
-  return v.ws.filter((w, j) => v.lay.ks[j] === "box" && !sc.brwl.has(w));
+  return v.ws.filter((_, j) => v.lay.ks[j] === "box" && v.rs[j] === null);
 }
 
 function val_brw(sc: Scope, v: Val): boolean {
@@ -1880,8 +1870,10 @@ function val_sink(sc: Scope, v: Val): void {
   val_owned(sc, v).forEach((w) => file_push(sc, `term_sink(e, ${w});`));
 }
 
+// A word boxed as is (one word, no arms) keeps its root.
 function val_to(sc: Scope, v: Val, lay: Lay): Val {
-  return lay_eq(v.lay, lay) ? v : lay === BOX ? val_new([val_box(sc, v)], BOX)
+  return lay_eq(v.lay, lay) ? v : lay === BOX ? val_new([val_box(sc, v)], BOX,
+    false, v.lay.arms === null ? v.rs : [])
     : v.lay === BOX ? val_unbox(sc, v, lay)
     : val_arms(sc, lay, v.ws[0], (k) => val_arm(v, k));
 }
@@ -1889,30 +1881,33 @@ function val_to(sc: Scope, v: Val, lay: Lay): Val {
 function val_arms(sc: Scope, lay: Lay, sel: string, read: (k: Name) => Val[],
   box = false): Val {
   const arms = Object.keys(lay.arms!);
-  const ws = (al: Scope, k: Name) => read(k).flatMap((f, j) =>
-    val_to(al, f, lay.arms![k][j]).ws);
+  const vs = (al: Scope, k: Name) => read(k).map((f, j) =>
+    val_to(al, f, lay.arms![k][j]));
   if (arms.length <= 1) {
-    return val_new(arms.flatMap((k) => ws(sc, k)), lay);
+    const fs = arms.flatMap((k) => vs(sc, k));
+    return val_new(fs.flatMap((f) => f.ws), lay, false,
+      fs.flatMap((f) => f.rs));
   }
   const out = emit_dst(sc, lay, "o").ws;
   const t = emit_alias(sc, sel, "t");
-  const rs: string[][] = out.map(() => []);
+  const rs: (string | null)[][] = out.map(() => []);
   emit_chain(sc, arms.map((k, i) => [box ? `term_aux(${t}) == ${cid_mac(k)}`
     : `${t} == ${i}`, () => {
     file_push(sc, `${out[0]} = ${i};`);
-    ws({ ...sc, spares: [] }, k).forEach((w, n) => {
-      rs[1 + n].push(sc.brwl.get(w) ?? "");
+    const fs = vs({ ...sc, spares: [] }, k);
+    fs.flatMap((f) => f.ws).forEach((w, n) => {
+      rs[1 + n].push(fs.flatMap((f) => f.rs)[n]);
       file_push(sc, `${out[1 + n]} = ${w};`);
     });
   }]));
-  rs.forEach((r, k) => {
+  // a destination every arm fills from one root keeps it
+  return val_new(out, lay, false, rs.map((r) => {
     if (r[0] && r.every((x) => x === r[0])) {
-      sc.brwl.set(out[k], r[0]);
-    } else {
-      r.filter((x) => x).forEach((x) => fact_add("own", x));
+      return r[0];
     }
-  });
-  return val_new(out, lay);
+    r.forEach((x) => x !== null && fact_add("own", x));
+    return null;
+  }));
 }
 
 function val_box(sc: Scope, v: Val): string {
@@ -1934,10 +1929,10 @@ function val_box(sc: Scope, v: Val): string {
 
 function val_unbox(sc: Scope, v: Val, lay: Lay): Val {
   if (lay.arms === null) {
-    return val_new(v.ws, lay);
+    return val_new(v.ws, lay, false, v.rs);
   }
   const t = emit_alias(sc, v.ws[0], "u");
-  return val_arms(sc, lay, t, (k) => node_fields(sc, t, k), true);
+  return val_arms(sc, lay, t, (k) => node_fields(sc, t, v.rs[0], k), true);
 }
 
 // Arr
@@ -1978,10 +1973,12 @@ function arr_op(sc: Scope, k: string, el: Lay, args: Val[]): Val {
   if (k === "array_new") {
     return val_new([arr_new(sc, args[0].ws[0], args[1], el)], BOX);
   }
+  // the array an op returns is the one it took, rooted as that was
   const a = emit_alias(sc, val_own(sc, args[0])[0], "a");
+  const ra = [args[0].rs[0]];
   if (k === "array_size") {
     return val_new([a, `(1ull << (blk_cls(${a}) - ${lgs}))`],
-      lay_pack([["Tuple", [BOX, W32]]]));
+      lay_pack([["Tuple", [BOX, W32]]]), false, ra);
   }
   const [l, at] = emit_hold(sc, [arr_loc(sc, a),
     `blk_at(${a}, ${args[1].ws[0]}, ${lgs})`], "at");
@@ -1992,10 +1989,10 @@ function arr_op(sc: Scope, k: string, el: Lay, args: Val[]): Val {
       `blk_write(e.mem, ${Number(arr)}, ${l}, ${at} + ${j}, ${w});`));
     if (k !== "array_swap") {
       val_sink(sc, old);
-      return val_new([a], BOX);
+      return val_new([a], BOX, false, ra);
     }
   }
-  return val_new([a, ...old.ws], lay_pack([["Tuple", [BOX, el]]]));
+  return val_new([a, ...old.ws], lay_pack([["Tuple", [BOX, el]]]), false, ra);
 }
 
 function arr_leaf(sc: Scope, s: string, el: Lay): Val {
@@ -2346,7 +2343,7 @@ function emit_jump(sc: Scope, args: string[], k: Name, bang = false): void {
 }
 
 function emit_args(sc: Scope, ck: Spine, jump = false, fork = false,
-  lays = fun_of(ck.k!).lays): string[] {
+  lays = fun_of(ck.k!).lays): Val[] {
   const k = ck.k!;
   const brw = brw_of(k);
   ck.all.forEach((a, q) =>
@@ -2361,7 +2358,7 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false,
       vs[i] = bind_pop(sc, x);
     }
   });
-  return xs.flatMap((x, i) => {
+  return xs.map((x, i) => {
     const at = arg_key(k, i);
     let b = vs[i];
     if (b === null) {
@@ -2382,8 +2379,12 @@ function emit_args(sc: Scope, ck: Spine, jump = false, fork = false,
       b = bd.val;
     }
     const v = val_to(sc, b, lays[i]);
-    return !brw[i] ? val_own(sc, v) : (vs[i] === null && v === b)
-      || ctr_packed(x) ? v.ws : val_own(sc, v, at);
+    if (!brw[i]) {
+      val_own(sc, v);
+    } else if (!(vs[i] === null && v === b) && !ctr_packed(x)) {
+      val_own(sc, v, at);
+    }
+    return val_new(v.ws, v.lay, false, v.rs);
   });
 }
 
@@ -2408,11 +2409,11 @@ function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
   const k = ck.k!;
   const flat = flat_of(k);
   const { h, lays, ret } = fun_of(k);
-  const ws = emit_args(sc, ck, tail && !flat, false, lays);
+  const vals = emit_args(sc, ck, tail && !flat, false, lays);
   if (!flat) {
-    return emit_body({ ...sc, def: k }, h!, ck.tld!.T,
-      lays.map((lay) => val_new(ws.splice(0, lay.ks.length), lay)), dst);
+    return emit_body({ ...sc, def: k }, h!, ck.tld!.T, vals, dst);
   }
+  const ws = vals.flatMap((v) => v.ws);
   const name = emit_native(sc, k);
   const o = name_local(sc, "o");
   const out = val_new(ret.ks.map((kd, j) =>
@@ -2437,13 +2438,9 @@ function emit_fuse(sc: Scope, ck: Spine, dst: Val | null, tail = false): void {
 function emit_open(sc: Scope, k: Name): [Scope, Val[]] {
   const { live, lays, ret } = fun_of(k);
   const brw = brw_of(k);
-  const vals = lays.map((l, i) => val_new(l.ks.map((kd) => {
-    const w = name_local(sc, live[i]?.[1] ?? "k");
-    if (brw[i] && kd === "box") {
-      sc.brwl.set(w, arg_key(k, i));
-    }
-    return w;
-  }), l));
+  const vals = lays.map((l, i) => val_new(l.ks.map(() =>
+    name_local(sc, live[i]?.[1] ?? "k")), l, false, l.ks.map((kd) =>
+    brw[i] && kd === "box" ? arg_key(k, i) : null)));
   const seg = seg_new(k, ret, vals);
   return [{ ...sc, seg, spares: [], uses: new Map(), def: k,
     fuel: { n: FOLD_FUEL } }, vals];
@@ -2492,13 +2489,16 @@ function emit_intr(sc: Scope, k: Name, it: Intr, m: Spine,
     return arr_op(sc, op, lay_el(m.all[0]), args);
   }
   const lays = fun_of(k).lays;
-  const as = args.map((v, i) => {
-    const w = val_own(sc, val_to(sc, v, lays[i]))[0];
+  const vs = args.map((v, i) => val_to(sc, v, lays[i]));
+  const as = vs.map((v, i) => {
+    const w = val_own(sc, v)[0];
     return op_bare(m.args[i]) ? w : emit_alias(sc, w, "a");
   });
   const lay = lay_of(ty);
+  // an op that returns its first argument ($0) returns it as rooted
   if (Array.isArray(C)) {
-    return val_new(C.map((p) => emit_alias(sc, tpl(p, as), "a")), lay);
+    return val_new(C.map((p) => emit_alias(sc, tpl(p, as), "a")), lay,
+      false, C.map((p) => p === "$0" ? vs[0].rs[0] : null));
   }
   return val_new([tpl(C, as)], lay.ks.length === 1 ? lay : BOX);
 }
@@ -2555,10 +2555,12 @@ function emit_ctr(sc: Scope, x: Of<"Ctr">, ty: HTerm | null,
   const lay = pos === BOX ? lay_node(x.k) : pos;
   const arms = Object.keys(lay.arms!);
   const vs = emit_each(sc, flds, lay.arms![x.k], ctr_doms(ctr, adt.x));
-  const ws = [...arms.length > 1 ? [String(arms.indexOf(x.k))] : [],
-    ...vs.flatMap((f, j) => val_to(sc, f, lay.arms![x.k][j]).ws)];
+  const fs = vs.map((f, j) => val_to(sc, f, lay.arms![x.k][j]));
+  const tag = arms.length > 1 ? [String(arms.indexOf(x.k))] : [];
+  const ws = [...tag, ...fs.flatMap((f) => f.ws)];
   const v = val_new(lay.ks.map((_, j) => ws[j] ?? "0"), lay,
-    vs.every((f) => f.stat));
+    vs.every((f) => f.stat), [...tag.map(() => null), ...fs.flatMap((f) =>
+      f.rs)]);
   return lay === pos ? v
     : val_new([ctr_build(sc, x.k, val_own(sc, v), v.stat)], BOX, v.stat);
 }
@@ -2785,7 +2787,8 @@ function emit_body(sc: Scope, tm: HTerm, ty0: HTerm | null, args: Val[],
         return emit_body(sc, Bend.Let(["r"], [0], [Bend.Ann(x, ty!)],
           (xs) => xs[0]), ty, args, dst);
       }
-      const cargs = emit_args(sc, ck, true, false, f.lays);
+      const cargs = emit_args(sc, ck, true, false, f.lays)
+        .flatMap((v) => v.ws);
       spare_flush(sc);
       emit_jump(sc, cargs, ck.k, ck.b);
     }
@@ -2804,7 +2807,8 @@ function emit_fork(sc: Scope, x: Of<"Let">): void {
     const pl = { ...sc, uses: new Map(sc.uses) };
     block(pl, "if (!seq) {", () => {
       const margs = calls.map((c, j) => emit_args({ ...pl,
-        rest: [...x.v.filter((_, i) => i !== j), o.b] }, c, false, true));
+        rest: [...x.v.filter((_, i) => i !== j), o.b] }, c, false, true)
+        .flatMap((v) => v.ws));
       const live = [...pl.uses].filter(([p, b]) =>
         !val_brw(pl, b.val) || rest_use([o.b], p) > 0);
       hold = live.map(([p]) => p);
@@ -2828,7 +2832,8 @@ function emit_fork(sc: Scope, x: Of<"Let">): void {
   const pos = new Map<Of<"Var">, number>();
   let depth = 0;
   calls.forEach((c, i) => {
-    const cargs = emit_args({ ...sc, rest: [chain[i]] }, c);
+    const cargs = emit_args({ ...sc, rest: [chain[i]] }, c)
+      .flatMap((v) => v.ws);
     const vs = [...sc.uses].filter(([p]) => i === 0 || p === o.ps[i - 1]);
     const kn = seg_name("k");
     spare_flush(sc);
@@ -2981,7 +2986,8 @@ function emit_match(sc: Scope, x: Of<"Mat"> | Of<"Efq">,
               .map((w) => val_new([w], BOX));
           }];
       }
-      return lay === BOX ? [is(k), h, (al) => node_fields(al, sw, k, true)]
+      return lay === BOX ? [is(k), h, (al) => node_fields(al, sw, u.rs[0], k,
+        true)]
         : [`${sw} == ${Object.keys(lay.arms!).indexOf(k)}`, h,
           () => val_arm(u, k)];
     });
