@@ -331,14 +331,13 @@ Base is a valid proof, which bend2 and the kernel both accept, and which relies
 on no `@unsafe` or foreign code. `-o PROOF.bendtt` writes the translation the
 kernel reads; the translation has no proof, so read it to confirm a law.
 
-Bend has no tactics: a proposition is a type, and a proof is a def of that type.
-`{a == b : T}` is an equality; `{==}` proves it when both sides compute to the
-same term. Matching refines the goal in each case, a recursive call is the
-induction hypothesis, and `%e : P` rewrites with `e : {a == b : T}`: `P` is the
-goal with `_` marking `b`, and the goal becomes `P` with `a` there. `exs y: T`
-in a law asks for a witness, returned as `(y, proof)`. A failed step prints the
-expected and observed terms; `?name` prints the goal, `?TODO` leaves it open,
-and a law with no def is an open claim.
+Bend has no tactics: propositions are types and proofs are defs of those types.
+`{a == b : T}` states equality; `{==}` proves it by computation. Matching
+refines each goal; recursive calls supply induction hypotheses. `%e : P`
+rewrites with `e : {a == b : T}`: `_` in `P` marks `b`, replaced by `a`.
+`exs y: T` asks for a witness, returned as `(y, proof)`. Failures show the
+expected and observed terms; `?name` prints the goal, `?TODO` leaves it open.
+A law without a def is an open claim.
 
 Since types are terms, a def may return a `Type`, like `def IsEven(n: Nat) ->
 Type:`, which is all dependent types are. A `match e:` with no cases closes a
@@ -346,6 +345,8 @@ branch where `e : Empty`. To refute a clash like `e : {1n == 0n : Nat}`, rewrite
 it through a motive `disc(_)`, where `disc` sends `0n` to `Empty` and `1n+p` to
 `Unit`, and answer `Unit{}`. `{a != b : T}` is `{a == b : T} -> Empty`, and
 `Equal.sym`, `Equal.trans` and `Equal.cong` are in Base.
+
+`String.starts_with(s, "")` reduces to `True{}` even for unknown `s`.
 
 ### IO and Concurrency
 
