@@ -32,6 +32,7 @@ type Seg = {
   ks: Kind[];
   frame: { pop: number; at: number[] } | null;
   refs: Set<string>;
+  tab: number;
   spin: boolean;
   fork: boolean;
   native: boolean;
@@ -1691,13 +1692,17 @@ function facts_ctr(sc: Scope, c: Bend.Ctr, xs: HTerm[]): void {
   ds.filter(dom_live).forEach(([, , A]) => facts_hot(sc, A, true, local));
 }
 
+// A line sits under the blocks open in its segment (block, emit_chain).
 function file_push(sc: Scope, line: string): void {
-  sc.seg.lines.push(line);
+  sc.seg.lines.push("  ".repeat(sc.seg.tab) + line);
 }
 
 function block(sc: Scope, open: string, go: () => void): void {
+  const seg = sc.seg;
   file_push(sc, open);
+  seg.tab += 1;
   go();
+  seg.tab -= 1;
   file_push(sc, "}");
 }
 
@@ -1730,7 +1735,8 @@ function seg_new(name: string, ret: Lay, vals: Val[],
   frame: Seg["frame"] = null): Seg {
   return { fid: name && seg_fid(name), def: name, ret, lines: [],
     params: vals.flatMap((v) => v.ws), ks: vals.flatMap((v) => v.lay.ks),
-    frame, refs: new Set(), spin: false, fork: false, native: false };
+    frame, refs: new Set(), tab: 0, spin: false, fork: false,
+    native: false };
 }
 
 function seg_fid(k: Name): string {
@@ -1745,16 +1751,7 @@ function seg_take(seg: Seg): string[] {
 }
 
 function seg_text(lines: string[], tab: number): string[] {
-  return lines.map((l) => {
-    if (l.startsWith("}")) {
-      tab -= 1;
-    }
-    const out = "  ".repeat(tab) + l;
-    if (l.endsWith("{")) {
-      tab += 1;
-    }
-    return out;
-  });
+  return lines.map((l) => "  ".repeat(tab) + l);
 }
 
 function seg_ref(sc: Scope, fid: string): string {
@@ -3005,10 +3002,13 @@ function emit_chain(sc: Scope, arms: [string, () => void][]): void {
   if (arms.length === 1) {
     return arms[0][1]();
   }
+  const seg = sc.seg;
   arms.forEach(([cond, body], i) => {
     file_push(sc, i === arms.length - 1 ? "} else {"
       : `${i === 0 ? "if" : "} else if"} (${cond}) {`);
+    seg.tab += 1;
     body();
+    seg.tab -= 1;
   });
   file_push(sc, "}");
 }
@@ -3377,13 +3377,14 @@ function js_expr(sc: Scope, tm: HTerm, ty0: HTerm | null = null): string {
       const vs = new Set<Of<"Var">>();
       const cl = { ...sc, seg: seg_new("", BOX, []),
         caps: { d: (sc.caps?.d ?? 0) + 1, vs } };
+      cl.seg.tab = 2;
       FL.unit!.segs.push(cl.seg);
       const name = name_id("$", FL.unit!.name + "$c" + FL.unit!.n++);
       js_func(cl, x, ty, [arg]);
       const ps = [...new Set([...vs].map((p) => p.k))];
       vs.forEach((p) => js_capture(sc, p));
-      cl.seg.lines = [`function ${name}(${ps}) {`, `return (${arg}) => {`,
-        ...cl.seg.lines, "}", "}"];
+      cl.seg.lines = [`function ${name}(${ps}) {`, `  return (${arg}) => {`,
+        ...cl.seg.lines, "  }", "}"];
       return `run_clo(${name}(${ps}))`;
     }
     default: {
