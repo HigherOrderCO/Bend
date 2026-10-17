@@ -501,12 +501,16 @@ function f32_show(x) {
   return (Object.is(x, -0) ? "-0" : s).replace("Infinity", "inf");
 }
 
+const _f32_buf = new ArrayBuffer(4);
+const _f32_view = new DataView(_f32_buf);
 function f32_bits(x) {
-  return new Uint32Array(new Float32Array([x]).buffer)[0];
+  _f32_view.setFloat32(0, x, true);
+  return _f32_view.getUint32(0, true);
 }
 
 function f32_from_bits(u) {
-  return new Float32Array(new Uint32Array([u]).buffer)[0];
+  _f32_view.setUint32(0, u, true);
+  return _f32_view.getFloat32(0, true);
 }
 
 function f32_read(s) {
